@@ -15,7 +15,7 @@ def getNSxData(filePath, elecIds, startTime_s, dataLength_s, downsample = 1):
 
     # Open file and extract headers
     nsx_file = NsxFile(filePath)
-
+    
     # Extract data - note: data will be returned based on *SORTED* elec_ids, see cont_data['elec_ids']
     channelData = nsx_file.getdata(elecIds, startTime_s, dataLength_s, downsample)
 
@@ -29,7 +29,7 @@ def getNSxData(filePath, elecIds, startTime_s, dataLength_s, downsample = 1):
 def getBadDataMask(channelData, ExtendedHeaders, plotting = False, smoothing_ms = 1, badThresh = .1, kernLen = 2):
     #Look for abnormally high values in the first difference of each channel
     # how many standard deviations should we keep?
-    nStd = 3
+    nStd = 5
     # Look for unchanging signal across channels
     channelDataDiff = channelData['data'].diff()
 
@@ -40,36 +40,27 @@ def getBadDataMask(channelData, ExtendedHeaders, plotting = False, smoothing_ms 
     # points where the derivative is identically zero across electrodes
     kern = np.ones((kernLen))
     cumDiff = pd.Series(np.convolve(cumDiff.values, kern, 'same'))
-
-    cumDiffBar = cumDiff.mean()
-    cumDiffStd = cumDiff.std()
-
     badMask = cumDiff < badThresh
 
+    for idx, row in channelDataDiff.iteritems():
+        rowBar = row.mean()
+        rowStd = row.std()
+        maxAcceptable = rowBar + nStd * rowStd
+        badMask = np.logical_or(badMask, row > maxAcceptable)
 
-    if plotting:
-        bins = np.linspace(cumDiffBar - nStd * cumDiffStd, cumDiffBar + nStd * cumDiffStd, 1000)
-        bins = bins[bins > 0]
-        leftBin  = [] if cumDiffBar - nStd * cumDiffStd < cumDiff.min() else [cumDiff.min()]
-        rightBin = [] if cumDiffBar + nStd * cumDiffStd > cumDiff.max() else [cumDiff.max()]
+        if plotting and idx == 0:
+            plt.figure()
+            row.plot.hist(bins = 100, kind = 'line')
+            plt.show()
 
-        bins = np.concatenate([leftBin, bins, rightBin], axis = 0)
-        counts, _ = np.histogram(cumDiff, bins = bins)
-        bins = bins[:-1]
-        plt.plot(bins, counts,'bd-')
-        plt.plot(bins[counts > 0], counts[counts > 0], 'rd')
-        plt.show()
-
-    maxAcceptable = cumDiffBar + nStd * cumDiffStd
-    badMask = np.logical_or(badMask, cumDiff > maxAcceptable)
-
+    #smooth out the bad data mask
     smoothKernLen = smoothing_ms * 1e-3 * channelData['samp_per_s']
     smoothKern = np.ones((smoothKernLen))
     badMask = np.convolve(badMask, smoothKern, 'same') > 0
     badMask = np.array(badMask, dtype = bool)
 
     if plotting:
-        plot_chan(channelData, ExtendedHeaders,1, mask = badMask, show = True)
+        plot_chan(channelData, ExtendedHeaders, 1, mask = badMask, show = True)
 
     return badMask
 

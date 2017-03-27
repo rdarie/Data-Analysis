@@ -21,6 +21,7 @@ import numpy as np
 import pandas as pd
 import libtfr
 import sys
+import pickle
 
 font_opts = {'family' : 'arial',
         'weight' : 'bold',
@@ -42,16 +43,18 @@ fileName = '201612201054-Starbuck_Treadmill-Array1480_Right-Trial00001.ns5';
 
 datafile = fileDir + fileName
 
-elec_ids     = range(1,20)              # 'all' is default for all (1-indexed)
-start_time_s = 10                       # 0 is default for all
-data_time_s  = 100                        # 'all' is default for all
+elec_ids     = range(1,97)              # 'all' is default for all (1-indexed)
+start_time_s = 0                        # 0 is default for all
+data_time_s  = 'all'                    # 'all' is default for all
 whichChan    = 2                        # 1-indexed
 
-cont_data, _, extended_headers = getNSxData(datafile, elec_ids, start_time_s, data_time_s)
-badData = getBadDataMask(cont_data, extended_headers, plotting = False, smoothing_ms = .5)
+simi_triggers, _, _ = getNSxData(datafile, 136, start_time_s, data_time_s)
 
-pdfFile = fileDir + 'pdfReport.pdf'
-#pdfReport(cont_data, extended_headers, mask = badData, pdfFilePath = pdfFile)
+cont_data, _, extended_headers = getNSxData(datafile, elec_ids, start_time_s, data_time_s)
+badData = getBadDataMask(cont_data, extended_headers, plotting = False, smoothing_ms = 1)
+
+pdfFile = fileDir + 'Python/pdfReport.pdf'
+pdfReport(cont_data, extended_headers, mask = badData, pdfFilePath = pdfFile)
 
 f,_ = plot_chan(cont_data, extended_headers, whichChan, mask = None, show = False)
 # interpolate bad data
@@ -64,4 +67,7 @@ winLen_s = 0.1
 stepLen_fr = 0.25 # window step as a fraction of window length
 R = 50 # target bandwidth for spectrogram
 
-#spectrum = get_spectrogram(cont_data, winLen_s, stepLen_fr, R, whichChan)
+spectrum = get_spectrogram(cont_data, winLen_s, stepLen_fr, R, whichChan)
+
+data = {'channel':cont_data, 'headers':extended_headers, 'spectrum':spectrum, 'simiTrigger': simi_triggers}
+pickle.dump(data, open( fileDir + "Python/save.p", "wb" ), protocol=4 )
