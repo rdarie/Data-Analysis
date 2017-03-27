@@ -42,38 +42,26 @@ fileName = '201612201054-Starbuck_Treadmill-Array1480_Right-Trial00001.ns5';
 
 datafile = fileDir + fileName
 
-elec_ids     = range(1,97)  # 'all' is default for all (1-indexed)
-start_time_s = 40                      # 0 is default for all
-data_time_s  = 3                        # 'all' is default for all
-whichChan    = 2                       # 1-indexed
+elec_ids     = range(1,20)              # 'all' is default for all (1-indexed)
+start_time_s = 10                       # 0 is default for all
+data_time_s  = 100                        # 'all' is default for all
+whichChan    = 2                        # 1-indexed
 
 cont_data, _, extended_headers = getNSxData(datafile, elec_ids, start_time_s, data_time_s)
-badData = getBadDataMask(cont_data, extended_headers, plotting = False, smoothing_ms = 5)
+badData = getBadDataMask(cont_data, extended_headers, plotting = False, smoothing_ms = .5)
 
-plot_chan(cont_data, extended_headers, whichChan, mask = badData, show = False)
+pdfFile = fileDir + 'pdfReport.pdf'
+#pdfReport(cont_data, extended_headers, mask = badData, pdfFilePath = pdfFile)
 
-# mask bad data with nans
-# to do: make the data natively be a pandas dataframe
-for arr in cont_data['data']:
-    arr[badData] = float('nan')
-    arrDf = pd.Series(arr)
-    arrDf.interpolate(method = 'linear', inplace = True)
-    arr[:] = arrDf
+f,_ = plot_chan(cont_data, extended_headers, whichChan, mask = None, show = False)
+# interpolate bad data
+cont_data['data'].apply(replaceBad, raw = False, args = (badData, 'interp'))
+# check interpolation results
+plot_chan(cont_data, extended_headers, whichChan, mask = badData, show = True, prevFig = f)
 
-plot_chan(cont_data, extended_headers, whichChan, mask = badData, show = True)
-winLen = 1000
-#for idx in range(len(signal) - winLen, winLen):
-    # load signal of dimension (npoints,)
-
-Fs = cont_data['samp_per_s']
-nSamples = len(cont_data['data'][0])
-t = np.arange(nSamples)
-nChan = len(cont_data['data'])
-delta = 1 / Fs
-
-# function parameters
+# spectrum function parameters
 winLen_s = 0.1
 stepLen_fr = 0.25 # window step as a fraction of window length
 R = 50 # target bandwidth for spectrogram
 
-spectrum = get_spectrogram(cont_data, winLen_s, stepLen_fr, R, whichChan)
+#spectrum = get_spectrogram(cont_data, winLen_s, stepLen_fr, R, whichChan)

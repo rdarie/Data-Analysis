@@ -19,62 +19,65 @@ def getNSxData(filePath, elecIds, startTime_s, dataLength_s, downsample = 1):
     # Extract data - note: data will be returned based on *SORTED* elec_ids, see cont_data['elec_ids']
     channelData = nsx_file.getdata(elecIds, startTime_s, dataLength_s, downsample)
 
+    channelData['data'] = pd.DataFrame(channelData['data'].transpose())
+
     # Close the nsx file now that all data is out
     nsx_file.close()
 
     return channelData, nsx_file.basic_header, nsx_file.extended_headers
 
-def getBadDataMask(channelData, ExtendedHeaders, plotting = False, smoothing_ms = 1, badThresh = .5, kernLen = 2):
-
+def getBadDataMask(channelData, ExtendedHeaders, plotting = False, smoothing_ms = 1, badThresh = .1, kernLen = 2):
+    #Look for abnormally high values in the first difference of each channel
+    # how many standard deviations should we keep?
+    nStd = 3
     # Look for unchanging signal across channels
-    channelDataDiff = np.diff(channelData['data'])
-    channelDataDiff = np.concatenate([np.ones((channelDataDiff.shape[0],1)), channelDataDiff], axis = 1)
+    channelDataDiff = channelData['data'].diff()
 
-    cumDiff = np.sum(np.abs(channelDataDiff), axis = 0)
+    #cumDiff = np.sum(np.abs(channelDataDiff), axis = 0)
+    cumDiff = channelDataDiff.abs().sum(axis = 1)
 
     # convolve with step function to find consecutive
     # points where the derivative is identically zero across electrodes
-
     kern = np.ones((kernLen))
-    cumDiff = np.convolve(cumDiff, kern, 'same')
+    cumDiff = pd.Series(np.convolve(cumDiff.values, kern, 'same'))
 
-    cumDiffDf = pd.Series(cumDiff)
-    cumDiffBar = cumDiffDf.mean()
-    cumDiffStd = cumDiffDf.std()
+    cumDiffBar = cumDiff.mean()
+    cumDiffStd = cumDiff.std()
 
-    badMask = cumDiffDf < badThresh
+    badMask = cumDiff < badThresh
 
-    nStd = 5
 
     if plotting:
         bins = np.linspace(cumDiffBar - nStd * cumDiffStd, cumDiffBar + nStd * cumDiffStd, 1000)
         bins = bins[bins > 0]
-        leftBin = [] if cumDiffBar - nStd * cumDiffStd < cumDiffDf.min() else [cumDiffDf.min()]
-        rightBin = [] if cumDiffBar + nStd * cumDiffStd > cumDiffDf.max() else [cumDiffDf.max()]
+        leftBin  = [] if cumDiffBar - nStd * cumDiffStd < cumDiff.min() else [cumDiff.min()]
+        rightBin = [] if cumDiffBar + nStd * cumDiffStd > cumDiff.max() else [cumDiff.max()]
 
         bins = np.concatenate([leftBin, bins, rightBin], axis = 0)
-        counts, _ = np.histogram(cumDiffDf, bins = bins)
+        counts, _ = np.histogram(cumDiff, bins = bins)
         bins = bins[:-1]
         plt.plot(bins, counts,'bd-')
         plt.plot(bins[counts > 0], counts[counts > 0], 'rd')
         plt.show()
 
     maxAcceptable = cumDiffBar + nStd * cumDiffStd
-    badMask = np.logical_or(badMask, cumDiffDf > maxAcceptable)
+    badMask = np.logical_or(badMask, cumDiff > maxAcceptable)
 
     smoothKernLen = smoothing_ms * 1e-3 * channelData['samp_per_s']
     smoothKern = np.ones((smoothKernLen))
     badMask = np.convolve(badMask, smoothKern, 'same') > 0
+    badMask = np.array(badMask, dtype = bool)
 
     if plotting:
         plot_chan(channelData, ExtendedHeaders,1, mask = badMask, show = True)
+
     return badMask
 
 def get_spectrogram(cont_data, winLen_s, stepLen_fr = 0.5, R = 50, plotChan = 1):
     Fs = cont_data['samp_per_s']
-    nSamples = len(cont_data['data'][0])
+    nChan = cont_data['data'].shape[1]
+    nSamples = cont_data['data'].shape[0]
     t = np.arange(nSamples)
-    nChan = len(cont_data['data'])
     delta = 1 / Fs
 
     winLen_samp = winLen_s * Fs
@@ -88,8 +91,9 @@ def get_spectrogram(cont_data, winLen_s, stepLen_fr = 0.5, R = 50, plotChan = 1)
     spectrum = np.zeros((nChan, int(winLen_samp / 2) + 1, nWindows))
     # generate a transform object with size equal to signal length and ntapers tapers
     D = libtfr.mfft_dpss(winLen_samp, nw, ntapers)
+    #pdb.set_trace()
 
-    for idx,signal in enumerate(cont_data['data']):
+    for idx,signal in cont_data['data'].iteritems():
         P = D.mtspec(signal, stepLen_samp)
         P = P[np.newaxis,:,:]
         spectrum[idx,:,:] = P
@@ -110,23 +114,66 @@ def get_spectrogram(cont_data, winLen_s, stepLen_fr = 0.5, R = 50, plotChan = 1)
     plt.show()
     return spectrum
 
-def plot_chan(channelData, ExtendedHeaders, whichChan, mask = None, show = False):
+def plot_chan(channelData, ExtendedHeaders, whichChan, mask = None, show = False, prevFig = None):
     # Plot the data channel
+
     ch_idx  = channelData['elec_ids'].index(whichChan)
     hdr_idx = channelData['ExtendedHeaderIndices'][ch_idx]
-    t       = channelData['start_time_s'] + np.arange(channelData['data'].shape[1]) / channelData['samp_per_s']
+    t       = channelData['start_time_s'] + np.arange(channelData['data'].shape[0]) / channelData['samp_per_s']
+
+    if not prevFig:
+        f, ax = plt.subplots()
+    else:
+        f = prevFig
+        ax = prevFig.axes[0]
 
     plt.plot(t, channelData['data'][ch_idx])
+
     if np.any(mask):
-        mask = np.array(mask, dtype = bool)
         plt.plot(t[mask], channelData['data'][ch_idx][mask], 'ro')
+
     plt.axis([t[0], t[-1], min(channelData['data'][ch_idx]), max(channelData['data'][ch_idx])])
-    plt.locator_params(axis='y', nbins=20)
+    plt.locator_params(axis = 'y', nbins = 20)
     plt.xlabel('Time (s)')
     plt.ylabel("Output (" + ExtendedHeaders[hdr_idx]['Units'] + ")")
     plt.title(ExtendedHeaders[hdr_idx]['ElectrodeLabel'])
+
     if show:
         plt.show()
 
+    return f, ax
+
 def nextpowof2(x):
     return 2**(m.ceil(m.log(x, 2)))
+
+
+def replaceBad(dfSeries, mask, typeOpt = 'nans'):
+    dfSeries[mask] = float('nan')
+    if typeOpt == 'nans':
+        return dfSeries
+    elif typeOpt == 'interp':
+        dfSeries.interpolate(method = 'linear', inplace = True)
+        return dfSeries
+
+import matplotlib.backends.backend_pdf
+
+def pdfReport(channelData, ExtendedHeaders, mask = None, pdfFilePath = 'pdfReport.pdf'):
+
+    pdf = matplotlib.backends.backend_pdf.PdfPages(pdfFilePath)
+    for idx, row in channelData['data'].iteritems():
+        f,_ = plot_chan(channelData, ExtendedHeaders, idx + 1, mask = mask, show = False)
+        pdf.savefig(f)
+        plt.close(f)
+
+    #pdb.set_trace()
+    for idx, row in channelData['data'].iteritems():
+        if idx == 0:
+            f,_ = plot_chan(channelData, ExtendedHeaders, idx + 1, mask = None, show = False)
+        elif idx == channelData['data'].shape[1] - 1:
+            f,_ = plot_chan(channelData, ExtendedHeaders, idx + 1, mask = mask, show = True, prevFig = f)
+            pdf.savefig(f)
+            plt.close(f)
+        else:
+            f,_ = plot_chan(channelData, ExtendedHeaders, idx + 1, mask = None, show = False, prevFig = f)
+
+    pdf.close()
