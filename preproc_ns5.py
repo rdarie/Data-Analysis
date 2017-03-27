@@ -45,7 +45,7 @@ datafile = fileDir + fileName
 
 elec_ids     = range(1,97)                    # 'all' is default for all (1-indexed)
 start_time_s = 3                        # 0 is default for all
-data_time_s  = 3                    # 'all' is default for all
+data_time_s  = 30                    # 'all' is default for all
 whichChan    = 25                        # 1-indexed
 
 simi_triggers, simi_headers, _ = getNSxData(datafile, 136, start_time_s, data_time_s)
@@ -77,7 +77,7 @@ R = 50 # target bandwidth for spectrogram
 clean_data['spectrum'] = get_spectrogram(clean_data, extended_headers, winLen_s, stepLen_fr, R, whichChan, plotting = whichChan)
 
 pdfFile = fileDir + 'Python/pdfReport.pdf'
-pdfReport(cont_data, clean_data, extended_headers, badData = badData, pdfFilePath = pdfFile, spectrum = True)
+#pdfReport(cont_data, clean_data, extended_headers, badData = badData, pdfFilePath = pdfFile, spectrum = True)
 
 data = {'channel':clean_data, 'headers':extended_headers, 'simiTrigger': simi_triggers, 'simiHeader': simi_headers}
 pickle.dump(data, open( fileDir + "Python/save.p", "wb" ), protocol=4 )

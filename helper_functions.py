@@ -34,7 +34,7 @@ def getBadDataMask(channelData, ExtendedHeaders, plotting = False, smoothing_ms 
     #Look for abnormally high values in the first difference of each channel
     # how many standard deviations should we keep?
     nStdDiff = 20
-    nStdAmp = 10
+    nStdAmp = 20
     # Look for unchanging signal across channels
     channelDataDiff = channelData['data'].diff()
     channelDataDiff.fillna(0, inplace = True)
@@ -91,6 +91,7 @@ def getBadDataMask(channelData, ExtendedHeaders, plotting = False, smoothing_ms 
             plt.plot(channelData['t'][plot_mask], row[plot_mask],'ro')
             plt.plot(channelData['t'], dRowVals)
             print("Current derivative rejection threshold: %f" % dMaxAcceptable)
+            print("Current amplitude rejection threshold: %f" % maxAcceptable)
             plt.tight_layout()
             plt.show(block = False)
 
