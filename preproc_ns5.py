@@ -25,7 +25,7 @@ import pickle
 
 font_opts = {'family' : 'arial',
         'weight' : 'bold',
-        'size'   : 30
+        'size'   : 20
         }
 
 fig_opts = {
@@ -38,36 +38,48 @@ matplotlib.rc('font', **font_opts)
 matplotlib.rc('figure', **fig_opts)
 
 # Inits
-fileDir = 'W:/ENG_Neuromotion_Shared/group/Starbuck_Bilateral_Recordings/201612201054-Starbuck_Treadmill/Right_Array/';
-fileName = '201612201054-Starbuck_Treadmill-Array1480_Right-Trial00001.ns5';
+fileDir = 'W:/ENG_Neuromotion_Shared/group/Starbuck_Bilateral_Recordings/201612201054-Starbuck_Treadmill/';
+fileName = 'Right_Array/201612201054-Starbuck_Treadmill-Array1480_Right-Trial00001.ns5';
 
 datafile = fileDir + fileName
 
-elec_ids     = range(1,97)              # 'all' is default for all (1-indexed)
-start_time_s = 0                        # 0 is default for all
-data_time_s  = 'all'                    # 'all' is default for all
-whichChan    = 2                        # 1-indexed
+elec_ids     = range(1,97)                    # 'all' is default for all (1-indexed)
+start_time_s = 3                        # 0 is default for all
+data_time_s  = 3                    # 'all' is default for all
+whichChan    = 25                        # 1-indexed
 
-simi_triggers, _, _ = getNSxData(datafile, 136, start_time_s, data_time_s)
+simi_triggers, simi_headers, _ = getNSxData(datafile, 136, start_time_s, data_time_s)
 
 cont_data, _, extended_headers = getNSxData(datafile, elec_ids, start_time_s, data_time_s)
-badData = getBadDataMask(cont_data, extended_headers, plotting = False, smoothing_ms = 1)
 
-pdfFile = fileDir + 'Python/pdfReport.pdf'
-pdfReport(cont_data, extended_headers, mask = badData, pdfFilePath = pdfFile)
+ch_idx  = cont_data['elec_ids'].index(whichChan)
+
+badData = getBadDataMask(cont_data, extended_headers, plotting = whichChan, smoothing_ms = 0.5)
 
 f,_ = plot_chan(cont_data, extended_headers, whichChan, mask = None, show = False)
+
+from copy import *
+clean_data = deepcopy(cont_data)
 # interpolate bad data
-cont_data['data'].apply(replaceBad, raw = False, args = (badData, 'interp'))
+for idx, row in clean_data['data'].iteritems():
+    mask = np.logical_or(badData['general'], badData['perChannel'][idx])
+    row = replaceBad(row, mask, typeOpt = 'interp')
+
 # check interpolation results
-plot_chan(cont_data, extended_headers, whichChan, mask = badData, show = True, prevFig = f)
+plot_mask = np.logical_or(badData['general'], badData['perChannel'][ch_idx])
+plot_chan(clean_data, extended_headers, whichChan, mask = plot_mask, show = True, prevFig = f)
 
 # spectrum function parameters
 winLen_s = 0.1
 stepLen_fr = 0.25 # window step as a fraction of window length
 R = 50 # target bandwidth for spectrogram
+# get the spectrum
+clean_data['spectrum'] = get_spectrogram(clean_data, extended_headers, winLen_s, stepLen_fr, R, whichChan, plotting = whichChan)
 
-spectrum = get_spectrogram(cont_data, winLen_s, stepLen_fr, R, whichChan)
+pdfFile = fileDir + 'Python/pdfReport.pdf'
+pdfReport(cont_data, clean_data, extended_headers, badData = badData, pdfFilePath = pdfFile, spectrum = True)
 
-data = {'channel':cont_data, 'headers':extended_headers, 'spectrum':spectrum, 'simiTrigger': simi_triggers}
+data = {'channel':clean_data, 'headers':extended_headers, 'simiTrigger': simi_triggers, 'simiHeader': simi_headers}
 pickle.dump(data, open( fileDir + "Python/save.p", "wb" ), protocol=4 )
+
+x = input("Press any key")

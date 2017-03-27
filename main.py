@@ -11,7 +11,7 @@ from scipy.signal import *
 
 font_opts = {'family' : 'arial',
         'weight' : 'bold',
-        'size'   : 30
+        'size'   : 20
         }
 
 fig_opts = {
@@ -25,35 +25,35 @@ matplotlib.rc('figure', **fig_opts)
 
 # Inits
 fileDir = 'W:/ENG_Neuromotion_Shared/group/Starbuck_Bilateral_Recordings/201612201054-Starbuck_Treadmill/';
-fileName = 'Right_Array/Python/save.p'
+fileName = 'Python/save.p'
 simiName = 'Trial01_Step_Timing.txt'
 
 dataFile = fileDir + fileName
 simiFile = fileDir + simiName
 
-simiDf = pd.read_table(simiFile)
+# Read in simi text file
+simiTable = pd.read_table(simiFile)
+simiTable.drop(simiTable.iloc[1], inplace = True) # first row contains giberrish
 data = pd.read_pickle(dataFile)
 
 # sample rate
 fs = data['simiTrigger']['samp_per_s']
-# expected interval between triggers
-rates = np.arange(50, 150, 10) * 1e-3
-#find peaks
-widths = fs/rates
-width = fs / 200
-simiPrime = data['simiTrigger']['data'].diff()
-simiPrime.fillna(0, inplace = True)
-simiPrime.values.squeeze().shape
+# get camera triggers
+simiTriggers = data['simiTrigger']['data']
+iti = .01 # inter trigger interval
+width = fs * iti / 2 # minimum distance between triggers
+simiTriggersPrime = simiTriggers.diff()
+simiTriggersPrime.fillna(0, inplace = True)
+# moments when camera capture occured
+peakIdx = peakutils.indexes((-1) * simiTriggersPrime.values.squeeze(), thres=0.7, min_dist=width)
 
-#peakIdx = argrelmax(simiPrime.values.squeeze(), order = int(widths[0]))
-peakIdx = peakutils.indexes(simiPrime.values.squeeze(), thres=0.7, min_dist=width)
-#peakIdx = find_peaks_cwt(simiPrime.values.squeeze(), widths)
-peakIdx.shape
-simiDf['Time'].max()
-t = data['channel']['start_time_s'] + np.arange(data['channel']['data'].shape[0]) / data['channel']['samp_per_s']
-plt.plot(t, simiPrime.values)
-plt.plot(t[peakIdx], simiPrime.values[peakIdx], 'r*')
-
+plt.plot(data['simiTrigger']['t'], simiTriggersPrime.values)
+plt.plot(data['simiTrigger']['t'][peakIdx], simiTriggersPrime.values[peakIdx], 'r*')
 ax = plt.gca()
-ax.set_xlim([100, 100.3])
+ax.set_xlim([5.2, 5.6])
 plt.show()
+
+# get time of first simi frame in NSP time:
+timeOffset = data['simiTrigger']['t'][peakIdx[0]]
+simiDf = pd.DataFrame(simiTable[['ToeUp_Left Y', 'ToeDown_Left Y']], index = simiTable['Time'] + timeOffset)
+simiDf = simiDf.notnull()
