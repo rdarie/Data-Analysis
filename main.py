@@ -6,7 +6,6 @@ import pandas as pd
 import libtfr
 import sys
 import pickle
-import peakutils
 from scipy.signal import *
 
 font_opts = {'family' : 'arial',
@@ -34,55 +33,28 @@ simiFile = fileDir + simiName
 # Read in simi text file
 simiTable = pd.read_table(simiFile)
 simiTable.drop(simiTable.index[[0,1,2]], inplace = True) # first rows contain giberrish
+# Read in NSP data from preproc_ns5
 data = pd.read_pickle(dataFile)
 
-# sample rate
-fs = data['simiTrigger']['samp_per_s']
-# get camera triggers
-simiTriggers = data['simiTrigger']['data']
-iti = .01 # inter trigger interval
-width = fs * iti / 2 # minimum distance between triggers
-simiTriggersPrime = simiTriggers.diff()
-simiTriggersPrime.fillna(0, inplace = True)
-# moments when camera capture occured
-peakIdx = peakutils.indexes((-1) * simiTriggersPrime.values.squeeze(), thres=0.7, min_dist=width)
+peakIdx, trigTimes = get_camera_triggers(data['simiTrigger'], plotting = True)
 
-plt.plot(data['simiTrigger']['t'], simiTriggers.values)
-plt.plot(data['simiTrigger']['t'][peakIdx], simiTriggers.values[peakIdx], 'r*')
-ax = plt.gca()
-ax.set_xlim([5.2, 5.6])
+simiDf, gaitLabelFun, downLabelFun, upLabelFun = get_gait_events(trigTimes, simiTable, plotting = True)
+
+data['channel']['data']['Labels'] = pd.Series(['Swing' if x == 1 else 'Stance' for x in upLabelFun(data['channel']['t'])], index = data['channel']['data'].index)
+data['channel']['spectrum']['Labels'] = pd.Series(['Swing' if x == 1 else 'Stance' for x in upLabelFun(data['channel']['spectrum']['t'])])
+
+swingMask = (data['channel']['spectrum']['Labels'] == 'Swing').values
+stanceMask = np.logical_not(swingMask)
+dummyVar = np.ones(data['channel']['spectrum']['t'].shape[0]) * 400
+
+fi = plot_spectrum(data['channel']['spectrum']['PSD'][0,:,:], data['channel']['samp_per_s'], data['channel']['start_time_s'], data['channel']['t'][-1], show = False)
+ax = fi.axes[0]
+ax.plot(data['channel']['spectrum']['t'][swingMask], dummyVar[swingMask], 'ro')
+#ax.plot(data['channel']['spectrum']['t'][stanceMask], dummyVar[stanceMask], 'go')
+plt.show(block = False)
+
+f,ax = plot_chan(data['channel'], 1, mask = None, show = False)
+dummyVar = np.ones(data['channel']['t'].shape[0]) * 100
+swingMask = (data['channel']['data']['Labels'] == 'Swing').values
+ax.plot(data['channel']['t'][swingMask], dummyVar[swingMask], 'ro')
 plt.show()
-
-# get time of first simi frame in NSP time:
-trigTimes = data['simiTrigger']['t'][peakIdx]
-timeOffset = trigTimes[0]
-timeMax = data['simiTrigger']['t'].max()
-
-simiDf = pd.DataFrame(simiTable[['ToeUp_Left Y', 'ToeDown_Left Y']])
-simiDf = simiDf.notnull()
-simiDf['simiTime'] = simiTable['Time'] + timeOffset
-simiDf.drop(simiDf[simiDf['simiTime'] >= timeMax].index, inplace = True)
-
-simiDf['NSPTime'] = pd.Series(trigTimes, index = simiDf.index)
-
-down = (simiDf['ToeDown_Left Y'].values * 1)
-up = (simiDf['ToeUp_Left Y'].values * 1)
-gait = up.cumsum() - down.cumsum()
-
-plt.plot(simiDf['simiTime'], gait)
-plt.plot(simiDf['simiTime'], down, 'g*')
-plt.plot(simiDf['simiTime'], up, 'r*')
-ax = plt.gca()
-ax.set_ylim([-1.1, 1.1])
-ax.set_xlim([6.8, 7.8])
-plt.show()
-
-# TODO: interpolate labels onto neural data
-simiDf['Labels'] = pd.Series(['Swing' if x == 1 else 'Stance' for x in gait], index = simiDf.index)
-data['channel']['data']['NSPTime'] = data['channel']['t']
-data['channel']['data']['Labels'] = np.nan
-
-data['channel']['data'].loc[peakIdx,'Labels'] = simiDf['Labels'] #unsure if this is producing what I want it to..
-data['channel']['data']['Labels'].fillna(method = 'ffill', inplace = True)
-data['channel']['data']['Labels'].fillna(method = 'bfill', inplace = True)
-data['channel']['data'][data['channel']['data']['NSPTime']> 6.9]

@@ -1,11 +1,30 @@
 import pdb
-from brpylib             import NsxFile, brpylib_ver
+from brpylib             import NsxFile, NevFile, brpylib_ver
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import math as m
 import sys
 import libtfr
+import peakutils
+from scipy import interpolate
+
+def getNEVData(filePath, elecIds):
+    # Version control
+    brpylib_ver_req = "1.3.1"
+    if brpylib_ver.split('.') < brpylib_ver_req.split('.'):
+        raise Exception("requires brpylib " + brpylib_ver_req + " or higher, please use latest version")
+
+    # Open file and extract headers
+    nev_file = NevFile(filePath)
+    # Extract data and separate out spike data
+    spikes = nev_file.getdata(elecIds)['spike_events']
+
+    spikes['basic_headers'] = nev_file.basic_header
+    spikes['extended_headers'] = nev_file.extended_headers
+    # Close the nev file now that all data is out
+    nev_file.close()
+    return spikes
 
 def getNSxData(filePath, elecIds, startTime_s, dataLength_s, downsample = 1):
     # Version control
@@ -21,13 +40,40 @@ def getNSxData(filePath, elecIds, startTime_s, dataLength_s, downsample = 1):
 
     channelData['data'] = pd.DataFrame(channelData['data'].transpose())
     channelData['t'] = channelData['start_time_s'] + np.arange(channelData['data'].shape[0]) / channelData['samp_per_s']
-    channelData['spectrum'] = []
+    channelData['badData'] = dict()
+    channelData['spectrum'] = {'PSD': [], 't': [], 'fr': [], 'Labels': []}
+    channelData['basic_headers'] = nsx_file.basic_header
+    channelData['extended_headers'] =  nsx_file.extended_headers
     # Close the nsx file now that all data is out
     nsx_file.close()
 
-    return channelData, nsx_file.basic_header, nsx_file.extended_headers
+    return channelData
 
-def getBadDataMask(channelData, ExtendedHeaders, plotting = False, smoothing_ms = 1, badThresh = 1e-3, consecLen = 4):
+def getBadSpikesMask(spikes, nStd = 5, whichChan = 0, plotting = False, deleteBad = False):
+    spikesBar = [np.mean(sp, axis = 0) for sp in spikes['Waveforms']]
+    spikesStd = [np.std (sp, axis = 0) for sp in spikes['Waveforms']]
+
+    t = np.arange(spikesBar[0].shape[0])
+    if plotting:
+        plt.plot(t, spikesBar[whichChan])
+        plt.fill_between(t, spikesBar[whichChan]+spikesStd[whichChan],
+                         spikesBar[whichChan]-spikesStd[whichChan],facecolor='blue',
+                         alpha = 0.3, label = 'mean(spike)')
+
+    badMask = []
+    for idx, sp in enumerate(spikes['Waveforms']):
+        maxAcceptable = np.abs(spikesBar[idx]) + nStd*spikesStd[idx]
+        outliers = [(np.abs(row) > maxAcceptable).any() for row in sp]
+        badMask.append(np.array(outliers, dtype = bool))
+    #
+    if deleteBad:
+        for idx, sp in enumerate(spikes['Waveforms']):
+            spikes['Waveforms'][idx] = sp[np.logical_not(badMask[idx])]
+            spikes['Classification'][idx] = np.array(spikes['Classification'][idx])[np.logical_not(badMask[idx])]
+            spikes['TimeStamps'][idx] = np.array(spikes['TimeStamps'][idx])[np.logical_not(badMask[idx])]
+    return badMask
+
+def getBadDataMask(channelData, plotting = False, smoothing_ms = 1, badThresh = 1e-3, consecLen = 4):
     #Allocate bad data mask as dict
     badMask = {'general' : [], 'perChannel' : []}
 
@@ -99,17 +145,81 @@ def getBadDataMask(channelData, ExtendedHeaders, plotting = False, smoothing_ms 
 
     return badMask
 
-def get_spectrogram(channelData, ExtendedHeaders, winLen_s, stepLen_fr = 0.5, R = 50, whichChan = 1, plotting = False):
+def get_camera_triggers(simiData, plotting = False):
+    # sample rate
+    fs = simiData['samp_per_s']
+    # get camera triggers
+    triggers = simiData['data']
+     # expected inter trigger interval
+    iti = .01
+    # minimum distance between triggers (units of samples)
+    width = fs * iti / 2
+    # first difference of triggers
+    triggersPrime = triggers.diff()
+    triggersPrime.fillna(0, inplace = True)
+    # moments when camera capture occured (note *(-1) inverts the signal to look for falling edges)
+    peakIdx = peakutils.indexes((-1) * triggersPrime.values.squeeze(), thres=0.7, min_dist=width)
+
+    if plotting:
+        f = plt.figure()
+        plt.plot(simiData['t'], triggers.values)
+        plt.plot(simiData['t'][peakIdx], triggers.values[peakIdx], 'r*')
+        ax = plt.gca()
+        ax.set_xlim([5.2, 5.6])
+        plt.show(block = False)
+
+    # get time of first simi frame in NSP time:
+    trigTimes = simiData['t'][peakIdx]
+    # timeOffset = trigTimes[0]
+
+    return peakIdx, trigTimes
+
+def get_gait_events(trigTimes, simiTable, CameraFs = 100, plotting = False):
+    # NSP time of first camera trigger
+    timeOffset = trigTimes[0]
+    # max time recorded on NSP
+    #timeMax = data['simiTrigger']['t'].max()
+    timeMax = trigTimes[-1] + 1/CameraFs
+
+    simiDf = pd.DataFrame(simiTable[['ToeUp_Left Y', 'ToeDown_Left Y']])
+    simiDf = simiDf.notnull()
+    simiDf['simiTime'] = simiTable['Time'] + timeOffset
+    simiDf.drop(simiDf[simiDf['simiTime'] >= timeMax].index, inplace = True)
+
+    simiDf['NSPTime'] = pd.Series(trigTimes, index = simiDf.index)
+
+    down = (simiDf['ToeDown_Left Y'].values * 1)
+    up = (simiDf['ToeUp_Left Y'].values * 1)
+    gait = up.cumsum() - down.cumsum()
+
+    if plotting:
+        f = plt.figure()
+        plt.plot(simiDf['simiTime'], gait)
+        plt.plot(simiDf['simiTime'], down, 'g*')
+        plt.plot(simiDf['simiTime'], up, 'r*')
+        ax = plt.gca()
+        ax.set_ylim([-1.1, 1.1])
+        ax.set_xlim([6.8, 7.8])
+        plt.show(block = False)
+
+    gaitLabelFun = interpolate.interp1d(simiDf['simiTime'], gait, bounds_error = False, fill_value = 'extrapolate')
+    downLabelFun = interpolate.interp1d(simiDf['simiTime'], down, kind = 'nearest', bounds_error = False, fill_value = 0)
+    upLabelFun   = interpolate.interp1d(simiDf['simiTime'], up  , kind = 'nearest', bounds_error = False, fill_value = 0)
+
+    simiDf['Labels'] = pd.Series(['Swing' if x == 1 else 'Stance' for x in gait], index = simiDf.index)
+    return simiDf, gaitLabelFun, downLabelFun, upLabelFun
+
+def get_spectrogram(channelData, winLen_s, stepLen_fr = 0.5, R = 50, whichChan = 1, plotting = False):
 
     Fs = channelData['samp_per_s']
     nChan = channelData['data'].shape[1]
     nSamples = channelData['data'].shape[0]
-    t = np.arange(nSamples)
+
     delta = 1 / Fs
 
-    winLen_samp = winLen_s * Fs
+    winLen_samp = int(winLen_s * Fs)
     stepLen_s = winLen_s * stepLen_fr
-    stepLen_samp = stepLen_fr * winLen_samp
+    stepLen_samp = int(stepLen_fr * winLen_samp)
 
     NFFT = nextpowof2(winLen_samp)
     nw = winLen_s * R # time bandwidth product based on 0.1 sec windows and 200 Hz bandwidth
@@ -129,29 +239,39 @@ def get_spectrogram(channelData, ExtendedHeaders, winLen_s, stepLen_fr = 0.5, R 
         P = P[np.newaxis,:,:]
         spectrum[idx,:,:] = P
 
+    fr = np.arange(P.shape[1]) * channelData['samp_per_s'] / (2 * P.shape[1])
+    t = channelData['start_time_s'] + np.arange(P.shape[2]) * stepLen_s
     if plotting:
-        plt.figure()
-        f = np.arange(P.shape[1]) * channelData['samp_per_s'] / (2 * P.shape[1])
-        t = np.arange(P.shape[2]) * stepLen_s
-        t,f = np.meshgrid(t,f)
 
         ch_idx  = channelData['elec_ids'].index(whichChan)
-        hdr_idx = channelData['ExtendedHeaderIndices'][ch_idx]
+
+        #TODO: implement passing elecID to plot_spectrum
+        #hdr_idx = channelData['ExtendedHeaderIndices'][ch_idx]
 
         plotSpectrum = spectrum[ch_idx,:,:]
-        zMin, zMax = plotSpectrum.min(), plotSpectrum.max()
-        plt.pcolormesh(t,f,plotSpectrum, vmin = zMin, vmax = zMax / 500)
-        plt.axis([t.min(), t.max(), f.min(), 500])
-        plt.colorbar()
-        #plt.locator_params(axis='y', nbins=20)
-        plt.xlabel('Time (s)')
-        plt.ylabel("Frequency (Hz)")
-        plt.title(ExtendedHeaders[hdr_idx]['ElectrodeLabel'])
-        plt.tight_layout()
-        plt.show(block = False)
-    return spectrum
+        plot_spectrum(plotSpectrum, Fs, channelData['start_time_s'], channelData['t'][-1], fr =fr, t = t, show = True)
 
-def plot_chan(channelData, ExtendedHeaders, whichChan, mask = None, show = False, prevFig = None):
+    return spectrum, t, fr
+
+def nextpowof2(x):
+    return 2**(m.ceil(m.log(x, 2)))
+
+def cleanNEVSpikes(spikes, badData):
+    pass
+
+def replaceBad(dfSeries, mask, typeOpt = 'nans'):
+    dfSeries[mask] = float('nan')
+    if typeOpt == 'nans':
+        pass
+    elif typeOpt == 'interp':
+        dfSeries.interpolate(method = 'linear', inplace = True)
+        if dfSeries.isnull().any(): # For instance, if begins with bad data, there is nothing there to linearly interpolate
+            dfSeries.fillna(method = 'backfill', inplace = True)
+            dfSeries.fillna(method = 'ffill', inplace = True)
+
+    return dfSeries
+
+def plot_chan(channelData, whichChan, mask = None, show = False, prevFig = None):
     # Plot the data channel
     ch_idx  = channelData['elec_ids'].index(whichChan)
     hdr_idx = channelData['ExtendedHeaderIndices'][ch_idx]
@@ -175,8 +295,8 @@ def plot_chan(channelData, ExtendedHeaders, whichChan, mask = None, show = False
     ax.axis([channelData['t'][0], channelData['t'][-1], min(channelData['data'][ch_idx]), max(channelData['data'][ch_idx])])
     ax.locator_params(axis = 'y', nbins = 20)
     plt.xlabel('Time (s)')
-    plt.ylabel("Output (" + ExtendedHeaders[hdr_idx]['Units'] + ")")
-    plt.title(ExtendedHeaders[hdr_idx]['ElectrodeLabel'])
+    plt.ylabel("Output (" + channelData['extended_headers'][hdr_idx]['Units'] + ")")
+    plt.title(channelData['extended_headers'][hdr_idx]['ElectrodeLabel'])
     plt.tight_layout()
     if show:
         plt.show(block = False)
@@ -184,34 +304,19 @@ def plot_chan(channelData, ExtendedHeaders, whichChan, mask = None, show = False
 
     return f, ax
 
-def nextpowof2(x):
-    return 2**(m.ceil(m.log(x, 2)))
-
-def replaceBad(dfSeries, mask, typeOpt = 'nans'):
-    dfSeries[mask] = float('nan')
-    if typeOpt == 'nans':
-        pass
-    elif typeOpt == 'interp':
-        dfSeries.interpolate(method = 'linear', inplace = True)
-        if dfSeries.isnull().any(): # For instance, if begins with bad data, there is nothing there to linearly interpolate
-            dfSeries.fillna(method = 'backfill', inplace = True)
-            dfSeries.fillna(method = 'ffill', inplace = True)
-
-    return dfSeries
-
 import matplotlib.backends.backend_pdf
 
-def pdfReport(origData, cleanData, ExtendedHeaders, badData = None, pdfFilePath = 'pdfReport.pdf', spectrum = False):
+def pdfReport(origData, cleanData, badData = None, pdfFilePath = 'pdfReport.pdf', spectrum = False):
 
     pdf = matplotlib.backends.backend_pdf.PdfPages(pdfFilePath)
     nChan = cleanData['data'].shape[1]
 
     if spectrum:
-        P = cleanData['spectrum'][0,:,:]
+        P = cleanData['spectrum']['PSD'][0,:,:]
         #pdb.set_trace()
-        fr = np.arange(P.shape[0]) / P.shape[0] * cleanData['samp_per_s'] / 2
-        t = cleanData['start_time_s'] + np.arange(P.shape[1]) * (cleanData['t'][-1]-cleanData['start_time_s']) / P.shape[1]
-        t,fr = np.meshgrid(t,fr)
+        fr = cleanData['spectrum']['fr']
+        t = cleanData['spectrum']['t']
+        #t,fr = np.meshgrid(t,fr)
 
     for idx, row in origData['data'].iteritems():
 
@@ -220,37 +325,135 @@ def pdfReport(origData, cleanData, ExtendedHeaders, badData = None, pdfFilePath 
 
         ch_idx  = origData['elec_ids'].index(idx + 1)
         plot_mask = np.logical_or(badData['general'], badData['perChannel'][ch_idx])
-        f,_ = plot_chan(origData, ExtendedHeaders, idx + 1, mask = None, show = False)
-        plot_chan(cleanData, ExtendedHeaders, idx + 1, mask = plot_mask, show = False, prevFig = f)
+        f,_ = plot_chan(origData, idx + 1, mask = None, show = False)
+        plot_chan(cleanData, idx + 1, mask = plot_mask, show = False, prevFig = f)
         plt.tight_layout()
         pdf.savefig(f)
         plt.close(f)
 
         if spectrum:
-            P = cleanData['spectrum'][idx,:,:]
-            zMin, zMax = P.min(), P.max()
-
-            f = plt.figure()
-            plt.pcolormesh(t,fr,P, vmin = zMin, vmax = zMax / 500)
-            plt.axis([t.min(), t.max(), fr.min(), 500])
-            plt.colorbar()
-            #plt.locator_params(axis='y', nbins=20)
-            plt.xlabel('Time (s)')
-            plt.ylabel("Frequency (Hz)")
-            plt.tight_layout()
+            P = cleanData['spectrum']['PSD'][idx,:,:]
+            f = plot_spectrum(plotSpectrum, Fs, cleanData['start_time_s'], cleanData['t'][-1], fr = fr, t = t, show = False)
             pdf.savefig(f)
             plt.close(f)
 
     #pdb.set_trace()
     for idx, row in origData['data'].iteritems():
         if idx == 0:
-            f,_ = plot_chan(origData, ExtendedHeaders, idx + 1, mask = None, show = False)
+            f,_ = plot_chan(origData, idx + 1, mask = None, show = False)
         elif idx == origData['data'].shape[1] - 1:
-            f,_ = plot_chan(origData, ExtendedHeaders, idx + 1, mask = badData['general'], show = True, prevFig = f)
+            f,_ = plot_chan(origData, idx + 1, mask = badData['general'], show = True, prevFig = f)
             plt.tight_layout()
             pdf.savefig(f)
             plt.close(f)
         else:
-            f,_ = plot_chan(origData, ExtendedHeaders, idx + 1, mask = None, show = False, prevFig = f)
+            f,_ = plot_chan(origData, idx + 1, mask = None, show = False, prevFig = f)
 
     pdf.close()
+
+def plot_spectrum(P, fs, start_time_s, end_time_s, fr = None, t = None, show = False):
+
+    if fr is None:
+        fr = np.arange(P.shape[0]) / P.shape[0] * fs / 2
+    if t is None:
+        t = start_time_s + np.arange(P.shape[1]) * (end_time_s-start_time_s) / P.shape[1]
+
+    zMin, zMax = P.min(), P.max()
+
+    f = plt.figure()
+    plt.pcolormesh(t,fr,P, vmin = zMin, vmax = zMax / 500)
+    plt.axis([t.min(), t.max(), fr.min(), 500])
+    plt.colorbar()
+    #plt.locator_params(axis='y', nbins=20)
+    plt.xlabel('Time (s)')
+    plt.ylabel("Frequency (Hz)")
+    plt.tight_layout()
+    if show:
+        plt.show()
+    return f
+
+def plot_spikes(spikes, chans):
+    # Initialize plots
+    colors      = 'kbgrm'
+    line_styles = ['-', '--', ':', '-.']
+    f, axarr    = plt.subplots(len(chans))
+    samp_per_ms = spikes['basic_headers']['SampleTimeResolution'] / 1000.0
+
+    for i in range(len(chans)):
+
+        # Extract the channel index, then use that index to get unit ids, extended header index, and label index
+        ch_idx      = spikes['ChannelID'].index(chans[i])
+        units       = sorted(list(set(spikes['Classification'][ch_idx])))
+        ext_hdr_idx = spikes['NEUEVWAV_HeaderIndices'][ch_idx]
+        lbl_idx     = next(idx for (idx, d) in enumerate(spikes['extended_headers'])
+                           if d['PacketID'] == 'NEUEVLBL' and d['ElectrodeID'] == chans[i])
+
+        # loop through all spikes and plot based on unit classification
+        # note: no classifications in sampleData, i.e., only unit='none' exists in the sample data
+        ymin = 0; ymax = 0
+        t = np.arange(spikes['extended_headers'][ext_hdr_idx]['SpikeWidthSamples']) / samp_per_ms
+
+        for j in range(len(units)):
+            unit_idxs   = [idx for idx, unit in enumerate(spikes['Classification'][ch_idx]) if unit == units[j]]
+            unit_spikes = np.array(spikes['Waveforms'][ch_idx][unit_idxs]) / 1000
+
+            if units[j] == 'none':
+                color_idx = 0; ln_sty_idx = 0
+            else:
+                color_idx = (units[j] % len(colors)) + 1
+                ln_sty_idx = units[j] // len(colors)
+
+            for k in range(unit_spikes.shape[0]):
+                axarr[i].plot(t, unit_spikes[k], (colors[color_idx] + line_styles[ln_sty_idx]))
+                if min(unit_spikes[k]) < ymin: ymin = min(unit_spikes[k])
+                if max(unit_spikes[k]) > ymax: ymax = max(unit_spikes[k])
+
+        if lbl_idx: axarr[i].set_ylabel(spikes['extended_headers'][lbl_idx]['Label'] + ' ($\mu$V)')
+        else:       axarr[i].set_ylabel('Channel ' + str(chans[i]) + ' ($\mu$V)')
+        axarr[i].set_ylim((ymin * 1.05, ymax * 1.05))
+        axarr[i].locator_params(axis='y', nbins=10)
+
+    axarr[-1].set_xlabel('Time (ms)')
+    plt.tight_layout()
+    plt.show(block = False)
+
+def plot_raster(spikes, chans):
+    # Initialize plots
+    colors      = 'kbgrm'
+    line_styles = ['-', '--', ':', '-.']
+    f, ax    = plt.subplots()
+    samp_per_s = spikes['basic_headers']['SampleTimeResolution']
+
+    for idx, chan in enumerate(chans):
+        # Extract the channel index, then use that index to get unit ids, extended header index, and label index
+        ch_idx      = spikes['ChannelID'].index(chan)
+        units       = sorted(list(set(spikes['Classification'][ch_idx])))
+        ext_hdr_idx = spikes['NEUEVWAV_HeaderIndices'][ch_idx]
+        lbl_idx     = next(idx for (idx, d) in enumerate(spikes['extended_headers'])
+                           if d['PacketID'] == 'NEUEVLBL' and d['ElectrodeID'] == chan)
+
+        # loop through all spikes and plot based on unit classification
+        # note: no classifications in sampleData, i.e., only unit='none' exists in the sample data
+
+        timeMax = max(max(spikes['TimeStamps']))
+        t = np.arange(timeMax) / samp_per_s
+
+        for j in range(len(units)):
+            unit_idxs   = [idx for idx, unit in enumerate(spikes['Classification'][ch_idx]) if unit == units[j]]
+            unit_spike_times = np.array(spikes['TimeStamps'][ch_idx])[unit_idxs] / samp_per_s
+
+            if units[j] == 'none':
+                color_idx = 0; ln_sty_idx = 0
+            else:
+                color_idx = (units[j] % len(colors)) + 1
+                ln_sty_idx = units[j] // len(colors)
+
+            for spt in unit_spike_times:
+                ax.vlines(spt, idx, idx + 1, colors = colors[color_idx],  linestyles = line_styles[ln_sty_idx])
+
+        ax.set_ylim((0, len(chans)))
+        ax.locator_params(axis='y', nbins=10)
+
+    ax.set_xlabel('Time (s)')
+    plt.tight_layout()
+    plt.show(block = False)

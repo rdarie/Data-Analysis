@@ -22,6 +22,7 @@ import pandas as pd
 import libtfr
 import sys
 import pickle
+from copy import *
 
 font_opts = {'family' : 'arial',
         'weight' : 'bold',
@@ -31,8 +32,6 @@ font_opts = {'family' : 'arial',
 fig_opts = {
     'figsize' : (10,5),
     }
-
-matplotlib.rcParams.keys()
 
 matplotlib.rc('font', **font_opts)
 matplotlib.rc('figure', **fig_opts)
@@ -48,38 +47,39 @@ start_time_s = 3                        # 0 is default for all
 data_time_s  = 30                    # 'all' is default for all
 whichChan    = 25                        # 1-indexed
 
-simi_triggers, simi_headers, _ = getNSxData(datafile, 136, start_time_s, data_time_s)
+simi_triggers = getNSxData(datafile, 136, start_time_s, data_time_s)
 
-cont_data, _, extended_headers = getNSxData(datafile, elec_ids, start_time_s, data_time_s)
+cont_data = getNSxData(datafile, elec_ids, start_time_s, data_time_s)
 
 ch_idx  = cont_data['elec_ids'].index(whichChan)
 
-badData = getBadDataMask(cont_data, extended_headers, plotting = whichChan, smoothing_ms = 0.5)
+badData = getBadDataMask(cont_data, plotting = whichChan, smoothing_ms = 0.5)
 
-f,_ = plot_chan(cont_data, extended_headers, whichChan, mask = None, show = False)
+f,_ = plot_chan(cont_data, whichChan, mask = None, show = False)
 
-from copy import *
 clean_data = deepcopy(cont_data)
 # interpolate bad data
 for idx, row in clean_data['data'].iteritems():
     mask = np.logical_or(badData['general'], badData['perChannel'][idx])
     row = replaceBad(row, mask, typeOpt = 'interp')
 
+clean_data['badData'] = badData
 # check interpolation results
 plot_mask = np.logical_or(badData['general'], badData['perChannel'][ch_idx])
-plot_chan(clean_data, extended_headers, whichChan, mask = plot_mask, show = True, prevFig = f)
+plot_chan(clean_data, whichChan, mask = plot_mask, show = True, prevFig = f)
 
 # spectrum function parameters
 winLen_s = 0.1
 stepLen_fr = 0.25 # window step as a fraction of window length
 R = 50 # target bandwidth for spectrogram
 # get the spectrum
-clean_data['spectrum'] = get_spectrogram(clean_data, extended_headers, winLen_s, stepLen_fr, R, whichChan, plotting = whichChan)
+clean_data['spectrum']['PSD'], clean_data['spectrum']['t'], clean_data['spectrum']['fr'] = get_spectrogram(
+    clean_data, winLen_s, stepLen_fr, R, whichChan, plotting = whichChan)
 
 pdfFile = fileDir + 'Python/pdfReport.pdf'
 #pdfReport(cont_data, clean_data, extended_headers, badData = badData, pdfFilePath = pdfFile, spectrum = True)
 
-data = {'channel':clean_data, 'headers':extended_headers, 'simiTrigger': simi_triggers, 'simiHeader': simi_headers}
+data = {'channel':clean_data, 'simiTrigger': simi_triggers}
 pickle.dump(data, open( fileDir + "Python/save.p", "wb" ), protocol=4 )
 
 x = input("Press any key")
