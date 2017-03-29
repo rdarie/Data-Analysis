@@ -8,6 +8,7 @@ import sys
 import libtfr
 import peakutils
 from scipy import interpolate
+from copy import *
 
 def getNEVData(filePath, elecIds):
     # Version control
@@ -55,10 +56,12 @@ def getBadSpikesMask(spikes, nStd = 5, whichChan = 0, plotting = False, deleteBa
 
     t = np.arange(spikesBar[0].shape[0])
     if plotting:
+        fi = plt.figure()
         plt.plot(t, spikesBar[whichChan])
         plt.fill_between(t, spikesBar[whichChan]+spikesStd[whichChan],
                          spikesBar[whichChan]-spikesStd[whichChan],facecolor='blue',
                          alpha = 0.3, label = 'mean(spike)')
+
 
     badMask = []
     for idx, sp in enumerate(spikes['Waveforms']):
@@ -188,26 +191,59 @@ def get_gait_events(trigTimes, simiTable, CameraFs = 100, plotting = False):
 
     simiDf['NSPTime'] = pd.Series(trigTimes, index = simiDf.index)
 
-    down = (simiDf['ToeDown_Left Y'].values * 1)
-    up = (simiDf['ToeUp_Left Y'].values * 1)
+    simiDfPadded = deepcopy(simiDf)
+    for idx, row in simiDfPadded.iterrows():
+
+        if row['ToeDown_Left Y']:
+            newSimiTime = row['simiTime'] + 1/CameraFs
+            newNSPTime = row['NSPTime'] + 1/CameraFs
+            simiDfPadded = simiDfPadded.append(pd.Series({'ToeUp_Left Y': False, 'ToeDown_Left Y': False, 'simiTime': row['simiTime'] - 1e-6, 'NSPTime': row['NSPTime'] - 1e-6}), ignore_index = True)
+            simiDfPadded = simiDfPadded.append(pd.Series({'ToeUp_Left Y': False, 'ToeDown_Left Y': True, 'simiTime': newSimiTime -1e-6, 'NSPTime': newNSPTime -1e-6}), ignore_index = True)
+            #simiDfPadded = simiDfPadded.append(pd.Series({'ToeUp_Left Y': False, 'ToeDown_Left Y': False, 'simiTime': newSimiTime + 1e-6, 'NSPTime': newNSPTime + 1e-6}), ignore_index = True)
+
+        if row['ToeUp_Left Y']:
+            newSimiTime = row['simiTime'] + 1/CameraFs
+            newNSPTime = row['NSPTime'] + 1/CameraFs
+            simiDfPadded = simiDfPadded.append(pd.Series({'ToeUp_Left Y': False, 'ToeDown_Left Y': False, 'simiTime': row['simiTime'] - 1e-6, 'NSPTime': row['NSPTime'] - 1e-6}), ignore_index = True)
+            simiDfPadded = simiDfPadded.append(pd.Series({'ToeUp_Left Y': True, 'ToeDown_Left Y': False, 'simiTime': newSimiTime -1e-6, 'NSPTime': newNSPTime -1e-6}), ignore_index = True)
+            #simiDfPadded = simiDfPadded.append(pd.Series({'ToeUp_Left Y': False, 'ToeDown_Left Y': False, 'simiTime': newSimiTime + 1e-6, 'NSPTime': newNSPTime + 1e-6}), ignore_index = True)
+
+    simiDfPadded.sort_values('simiTime', inplace = True)
+    down = (simiDfPadded['ToeDown_Left Y'].values * 1)
+    up = (simiDfPadded['ToeUp_Left Y'].values * 1)
     gait = up.cumsum() - down.cumsum()
 
     if plotting:
         f = plt.figure()
-        plt.plot(simiDf['simiTime'], gait)
-        plt.plot(simiDf['simiTime'], down, 'g*')
-        plt.plot(simiDf['simiTime'], up, 'r*')
+        plt.plot(simiDfPadded['simiTime'], gait)
+        plt.plot(simiDfPadded['simiTime'], down, 'g*')
+        plt.plot(simiDfPadded['simiTime'], up, 'r*')
         ax = plt.gca()
         ax.set_ylim([-1.1, 1.1])
         ax.set_xlim([6.8, 7.8])
         plt.show(block = False)
 
-    gaitLabelFun = interpolate.interp1d(simiDf['simiTime'], gait, bounds_error = False, fill_value = 'extrapolate')
-    downLabelFun = interpolate.interp1d(simiDf['simiTime'], down, kind = 'nearest', bounds_error = False, fill_value = 0)
-    upLabelFun   = interpolate.interp1d(simiDf['simiTime'], up  , kind = 'nearest', bounds_error = False, fill_value = 0)
-
-    simiDf['Labels'] = pd.Series(['Swing' if x == 1 else 'Stance' for x in gait], index = simiDf.index)
+    gaitLabelFun = interpolate.interp1d(simiDfPadded['simiTime'], gait, bounds_error = False, fill_value = 'extrapolate')
+    downLabelFun = interpolate.interp1d(simiDfPadded['simiTime'], down, bounds_error = False, fill_value = 0)
+    upLabelFun   = interpolate.interp1d(simiDfPadded['simiTime'], up  , bounds_error = False, fill_value = 0)
+    # TODO: check that the padded Df oesn't inerfere with thiese labelrs
+    simiDf['Labels'] = pd.Series(['Swing' if x > 0 else 'Stance' for x in gaitLabelFun(simiDf['simiTime'])], index = simiDf.index)
     return simiDf, gaitLabelFun, downLabelFun, upLabelFun
+
+def assignLabels(timeVector, lbl, fnc, CameraFs = 100):
+    dt = np.mean(np.diff(timeVector))
+    if dt < 1/CameraFs:
+        # sampling faster than the original data! Interpolate!
+        labels = pd.Series([lbl if x > 0 else 'None' for x in fnc(timeVector)])
+        #
+    else:
+        #sampling slower than the original data! Histogram!
+        pseudoTime = np.arange(timeVector[0], timeVector[-1] + dt, 0.5/CameraFs)
+        timeVector = np.append(timeVector, timeVector[-1] + dt)
+        #
+        histo,_ = np.histogram(pseudoTime[fnc(pseudoTime) > 0], timeVector)
+        labels = pd.Series([lbl if x > 0 else 'None' for x in histo])
+    return labels
 
 def get_spectrogram(channelData, winLen_s, stepLen_fr = 0.5, R = 50, whichChan = 1, plotting = False):
 
@@ -372,6 +408,47 @@ def plot_spectrum(P, fs, start_time_s, end_time_s, fr = None, t = None, show = F
         plt.show()
     return f
 
+from fractions import gcd
+
+def binnedSpikes(spikes, chans, binInterval, binWidth, timeStart, timeEnd):
+    #binCenters = timeStart + BinWidth / 2 : binInterval : timeEnd - binWidth/2
+    timeStamps = [x / spikes['basic_headers']['TimeStampResolution'] for x in spikes['TimeStamps']]
+    binCenters = np.arange(timeStart + binWidth / 2, timeEnd - binWidth/2 + binInterval, binInterval)
+
+    #timeInterval = timeEnd - timeStart - binWidth
+    binRes = gcd(binWidth *1e3 / 2, binInterval*1e3)*1e-3 # greatest common denominator
+    fineBins = np.arange(timeStart, timeEnd + binRes, binRes)
+
+    fineBinsPerWindow = int(binWidth / binRes)
+    fineBinsPerInterval = int(binInterval / binRes)
+    fineBinsTotal = len(fineBins) - 1
+    centerIdx = np.arange(0, fineBinsTotal - fineBinsPerWindow + fineBinsPerInterval, fineBinsPerInterval)
+
+    nChans = len(timeStamps)
+    spikeMat = np.zeros([nChans, len(binCenters)])
+    for idx, chan in enumerate(chans):
+        ch_idx = spikes['ChannelID'].index(chan)
+        histo, _ = np.histogram(timeStamps[ch_idx], fineBins)
+        spikeMat[idx, :] = np.array(
+            [histo[x:x+fineBinsPerWindow].sum() for x in centerIdx]
+        )
+    return spikeMat, binCenters
+
+def plotBinnedSpikes(spikeMat, binCenters, chans, show = True):
+    zMin, zMax = spikeMat.min(), spikeMat.max()
+    fi = plt.figure()
+    chanIdx = np.arange(len(chans) + 1)
+    plt.pcolormesh(binCenters, chanIdx, spikeMat, vmin = zMin, vmax = zMax)
+    plt.axis([binCenters.min(), binCenters.max(), chanIdx.min(), chanIdx.max()])
+    plt.colorbar()
+    #plt.locator_params(axis='y', nbins=20)
+    plt.xlabel('Time (s)')
+    plt.ylabel("Channel (#)")
+    plt.tight_layout()
+    if show:
+        plt.show()
+    return fi
+
 def plot_spikes(spikes, chans):
     # Initialize plots
     colors      = 'kbgrm'
@@ -424,8 +501,11 @@ def plot_raster(spikes, chans):
     f, ax    = plt.subplots()
     samp_per_s = spikes['basic_headers']['SampleTimeResolution']
 
+    timeMax = max([max(x) for x in spikes['TimeStamps']])
+
     for idx, chan in enumerate(chans):
         # Extract the channel index, then use that index to get unit ids, extended header index, and label index
+        #pdb.set_trace()
         ch_idx      = spikes['ChannelID'].index(chan)
         units       = sorted(list(set(spikes['Classification'][ch_idx])))
         ext_hdr_idx = spikes['NEUEVWAV_HeaderIndices'][ch_idx]
@@ -435,7 +515,6 @@ def plot_raster(spikes, chans):
         # loop through all spikes and plot based on unit classification
         # note: no classifications in sampleData, i.e., only unit='none' exists in the sample data
 
-        timeMax = max(max(spikes['TimeStamps']))
         t = np.arange(timeMax) / samp_per_s
 
         for j in range(len(units)):

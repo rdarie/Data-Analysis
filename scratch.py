@@ -23,6 +23,9 @@ badMask[4].any()
 spikes['Waveforms'][4].shape
 len(spikes['TimeStamps'][4])
 len(spikes['Classification'][4])
-
+simiDf
 bla = 4
 np.array(spikes['TimeStamps'][4])[np.logical_not(badMask[bla])].shape
+data['channel']['spectrum']['t']
+spikes['basic_headers']
+mat.shape

@@ -69,7 +69,7 @@ plot_mask = np.logical_or(badData['general'], badData['perChannel'][ch_idx])
 plot_chan(clean_data, whichChan, mask = plot_mask, show = True, prevFig = f)
 
 # spectrum function parameters
-winLen_s = 0.1
+winLen_s = 0.4
 stepLen_fr = 0.25 # window step as a fraction of window length
 R = 50 # target bandwidth for spectrogram
 # get the spectrum

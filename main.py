@@ -40,10 +40,14 @@ peakIdx, trigTimes = get_camera_triggers(data['simiTrigger'], plotting = True)
 
 simiDf, gaitLabelFun, downLabelFun, upLabelFun = get_gait_events(trigTimes, simiTable, plotting = True)
 
-data['channel']['data']['Labels'] = pd.Series(['Swing' if x == 1 else 'Stance' for x in upLabelFun(data['channel']['t'])], index = data['channel']['data'].index)
-data['channel']['spectrum']['Labels'] = pd.Series(['Swing' if x == 1 else 'Stance' for x in upLabelFun(data['channel']['spectrum']['t'])])
+simiData = {'simiGait':simiDf, 'gaitLabelFun': gaitLabelFun, 'upLabelFun': upLabelFun, 'downLabelFun': downLabelFun}
+pickle.dump(simiData, open( fileDir + "Python/saveSimi.p", "wb" ), protocol=4 )
 
-swingMask = (data['channel']['spectrum']['Labels'] == 'Swing').values
+#data['channel']['data']['Labels'] = pd.Series(['Swing' if x > 0 else 'Stance' for x in upLabelFun(data['channel']['t'])], index = data['channel']['data'].index)
+data['channel']['data']['Labels'] = assignLabels(data['channel']['t'], 'Toe Up', upLabelFun)
+data['channel']['spectrum']['Labels'] = assignLabels(data['channel']['spectrum']['t'], 'Toe Up', upLabelFun)
+
+swingMask = (data['channel']['spectrum']['Labels'] == 'Toe Up').values
 stanceMask = np.logical_not(swingMask)
 dummyVar = np.ones(data['channel']['spectrum']['t'].shape[0]) * 400
 
@@ -55,6 +59,6 @@ plt.show(block = False)
 
 f,ax = plot_chan(data['channel'], 1, mask = None, show = False)
 dummyVar = np.ones(data['channel']['t'].shape[0]) * 100
-swingMask = (data['channel']['data']['Labels'] == 'Swing').values
+swingMask = (data['channel']['data']['Labels'] == 'Toe Up').values
 ax.plot(data['channel']['t'][swingMask], dummyVar[swingMask], 'ro')
 plt.show()
