@@ -51,10 +51,10 @@ badMask = getBadSpikesMask(spikes, nStd = 5, whichChan = 0, plotting = False, de
 binInterval = 20e-3
 binWidth = 150e-3
 timeStart = 3
-timeEnd = 63
-mat, binCenters, binLeftEdges = binnedSpikes(spikes, chans, binInterval, binWidth, timeStart, timeEnd)
+timeDur = 90
+mat, binCenters, binLeftEdges = binnedSpikes(spikes, chans, binInterval, binWidth, timeStart, timeDur)
 
 spikeData = {'spikes':spikes, 'spikeMat':mat, 'binCenters':binCenters, 'binLeftEdges': binLeftEdges, 'binWidth':binWidth}
-pickle.dump(spikeData, open( remoteDir + "Python/saveSpike.p", "wb" ), protocol=4 )
+pickle.dump(spikeData, open( fileDir + "saveSpike.p", "wb" ), protocol=4 )
 
 x = input("Press any key")

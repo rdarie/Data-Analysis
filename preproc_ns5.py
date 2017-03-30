@@ -14,6 +14,7 @@ v1.1.0 - 07/12/2016 - addition of version checking for brpylib starting with v1.
 v1.1.1 - 07/22/2016 - now uses 'samp_per_sec' as returned by NsxFile.getdata()
                       minor modifications to use close() functionality of NsxFile class
 """
+
 import matplotlib, math
 from helper_functions import *
 import matplotlib.pyplot as plt
@@ -36,14 +37,15 @@ matplotlib.rc('font', **font_opts)
 matplotlib.rc('figure', **fig_opts)
 
 # Inits
-fileDir = 'W:/ENG_Neuromotion_Shared/group/Starbuck_Bilateral_Recordings/201612201054-Starbuck_Treadmill/';
-fileName = 'Right_Array/201612201054-Starbuck_Treadmill-Array1480_Right-Trial00001.ns5';
+localDir = 'E:/Google Drive/Github/tempdata/Data-Analysis/'
+fileDir = 'W:/ENG_Neuromotion_Shared/group/Starbuck_Bilateral_Recordings/201612201054-Starbuck_Treadmill/'
+fileName = 'Right_Array/201612201054-Starbuck_Treadmill-Array1480_Right-Trial00001.ns5'
 
 datafile = fileDir + fileName
 
 elec_ids = range(1,97) # 'all' is default for all (1-indexed)
 start_time_s = 3 # 0 is default for all
-data_time_s = 60 # 'all' is default for all
+data_time_s = 90 # 'all' is default for all
 whichChan = 25 # 1-indexed
 
 simi_triggers = getNSxData(datafile, 136, start_time_s, data_time_s)
@@ -57,6 +59,7 @@ badData = getBadContinuousMask(ChannelData, plotting = whichChan, smoothing_ms =
 f,_ = plot_chan(ChannelData, whichChan, mask = None, show = False)
 
 clean_data = deepcopy(ChannelData)
+
 # interpolate bad data
 for idx, row in clean_data['data'].iteritems():
     mask = np.logical_or(badData['general'], badData['perChannel'][idx])
@@ -68,17 +71,21 @@ plot_mask = np.logical_or(badData['general'], badData['perChannel'][ch_idx])
 plot_chan(clean_data, whichChan, mask = plot_mask, show = True, prevFig = f)
 
 # spectrum function parameters
-winLen_s = 0.4
-stepLen_fr = 0.25 # window step as a fraction of window length
+winLen_s = 0.15
+stepLen_s = 0.02 # window step as a fraction of window length
 R = 50 # target bandwidth for spectrogram
-# get the spectrum
-clean_data['spectrum']['PSD'], clean_data['spectrum']['t'], clean_data['spectrum']['fr'] = get_spectrogram(
-    clean_data, winLen_s, stepLen_fr, R, whichChan, plotting = whichChan)
 
-pdfFile = fileDir + 'Python/pdfReport.pdf'
-#pdfReport(cont_data, clean_data, extended_headers, badData = badData, pdfFilePath = pdfFile, spectrum = True)
+# get the spectrum
+clean_data['spectrum']['PSD'], clean_data['spectrum']['t'], clean_data['spectrum']['fr'] = getSpectrogram(
+    clean_data, winLen_s, stepLen_s, R, 300, whichChan, plotting = True)
 
 data = {'channel':clean_data, 'simiTrigger': simi_triggers}
-pickle.dump(data, open( fileDir + "Python/save.p", "wb" ), protocol=4 )
+with open(localDir + "save.p", "wb" ) as f:
+    pickle.dump(data, f, protocol=4 )
+
+print('Starting to write PDF Report.')
+
+pdfFile = localDir + 'pdfReport.pdf'
+pdfReport(ChannelData, clean_data, badData = badData, pdfFilePath = pdfFile, spectrum = True)
 
 x = input("Press any key")

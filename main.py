@@ -18,13 +18,13 @@ fig_opts = {
 matplotlib.rc('font', **font_opts)
 matplotlib.rc('figure', **fig_opts)
 
-ns5Dir = 'W:/ENG_Neuromotion_Shared/group/Starbuck_Bilateral_Recordings/201612201054-Starbuck_Treadmill/'
+ns5Dir = 'E:/Google Drive/Github/tempdata/Data-Analysis/'
 
-ns5Name = 'Python/save.p'
+ns5Name = 'save.p'
 ns5File = ns5Dir + ns5Name
 data = pd.read_pickle(ns5File)
 
-simiName = 'Python/saveSimi.p'
+simiName = 'saveSimi.p'
 simiFile = ns5Dir + simiName
 simiData = pd.read_pickle(simiFile)
 simiDf = simiData['simiGait']
@@ -32,7 +32,7 @@ gaitLabelFun = simiData['gaitLabelFun']
 upLabelFun = simiData['upLabelFun']
 downLabelFun = simiData['downLabelFun']
 
-spikeName = 'Python/saveSpike.p'
+spikeName = 'saveSpike.p'
 spikeFile = ns5Dir + spikeName
 spikeData = pd.read_pickle(spikeFile)
 spikes = spikeData['spikes']
@@ -55,15 +55,21 @@ data['channel']['spectrum']['Labels'] = assignLabels(data['channel']['spectrum']
 
 swingMask = (data['channel']['spectrum']['Labels'] == 'Toe Up').values
 stanceMask = np.logical_not(swingMask)
-dummyVar = np.ones(data['channel']['spectrum']['t'].shape[0]) * 400
+dummyVar = np.ones(data['channel']['spectrum']['t'].shape[0]) * 1
 
-fi = plot_spectrum(data['channel']['spectrum']['PSD'][0,:,:], data['channel']['samp_per_s'], data['channel']['start_time_s'], data['channel']['t'][-1], show = False)
+fi = plotSpectrum(data['channel']['spectrum']['PSD'][0,:,:],
+    data['channel']['samp_per_s'],
+    data['channel']['start_time_s'],
+    data['channel']['t'][-1],
+    fr = data['channel']['spectrum']['fr'],
+    t = data['channel']['spectrum']['t'],
+    show = False)
 ax = fi.axes[0]
 ax.plot(data['channel']['spectrum']['t'][swingMask], dummyVar[swingMask], 'ro')
 #ax.plot(data['channel']['spectrum']['t'][stanceMask], dummyVar[stanceMask], 'go')
 plt.show(block = False)
 
-f,ax = plot_chan(data['channel'], 1, mask = None, show = False)
+f,ax = plot_chan(data['channel'], 25, mask = None, show = False)
 dummyVar = np.ones(data['channel']['t'].shape[0]) * 100
 swingMask = (data['channel']['data']['Labels'] == 'Toe Up').values
 ax.plot(data['channel']['t'][swingMask], dummyVar[swingMask], 'ro')

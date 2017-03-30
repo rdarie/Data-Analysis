@@ -23,11 +23,12 @@ matplotlib.rc('font', **font_opts)
 matplotlib.rc('figure', **fig_opts)
 
 # Inits
-fileDir = 'W:/ENG_Neuromotion_Shared/group/Starbuck_Bilateral_Recordings/201612201054-Starbuck_Treadmill/';
-fileName = 'Python/save.p'
+localDir = 'E:/Google Drive/Github/tempdata/Data-Analysis/'
+fileDir = 'W:/ENG_Neuromotion_Shared/group/Starbuck_Bilateral_Recordings/201612201054-Starbuck_Treadmill/'
+fileName = 'save.p'
 simiName = 'Trial01_Step_Timing.txt'
 
-dataFile = fileDir + fileName
+dataFile = localDir + fileName
 simiFile = fileDir + simiName
 
 # Read in simi text file
@@ -41,4 +42,4 @@ peakIdx, trigTimes = getCameraTriggers(data['simiTrigger'], plotting = True)
 simiDf, gaitLabelFun, downLabelFun, upLabelFun = getGaitEvents(trigTimes, simiTable, plotting = True)
 
 simiData = {'simiGait':simiDf, 'gaitLabelFun': gaitLabelFun, 'upLabelFun': upLabelFun, 'downLabelFun': downLabelFun}
-pickle.dump(simiData, open( fileDir + "Python/saveSimi.p", "wb" ), protocol=4 )
+pickle.dump(simiData, open( localDir + "saveSimi.p", "wb" ), protocol=4 )

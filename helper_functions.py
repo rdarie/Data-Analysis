@@ -1,6 +1,7 @@
 import pdb
 from brpylib             import NsxFile, NevFile, brpylib_ver
 import matplotlib.pyplot as plt
+import matplotlib.colors as colors
 import numpy as np
 import pandas as pd
 import math as m
@@ -84,8 +85,8 @@ def getBadContinuousMask(channelData, plotting = False, smoothing_ms = 1, badThr
 
     #Look for abnormally high values in the first difference of each channel
     # how many standard deviations should we keep?
-    nStdDiff = 20
-    nStdAmp = 20
+    nStdDiff = 10
+    nStdAmp = 10
     # Look for unchanging signal across channels
     channelDataDiff = channelData['data'].diff()
     channelDataDiff.fillna(0, inplace = True)
@@ -110,20 +111,24 @@ def getBadContinuousMask(channelData, plotting = False, smoothing_ms = 1, badThr
 
         # on the data itself
         row = channelData['data'][idx]
-        rowVals = row.abs()
+        rowVals = row.values
         rowBar  = rowVals.mean()
         rowStd  = rowVals.std()
         maxAcceptable = rowBar + nStdAmp * rowStd
-        outliers = rowVals > maxAcceptable
+        minAcceptable = rowBar - nStdAmp * rowStd
+
+        outliers = np.logical_or(row > maxAcceptable,row < minAcceptable)
 
         # on the derivative of the data
-        dRowVals = dRow.abs()
+        dRowVals = dRow.values
         dRowBar  = dRowVals.mean()
         dRowStd  = dRowVals.std()
         dMaxAcceptable = dRowBar + nStdDiff * dRowStd
+        dMinAcceptable = dRowBar - nStdDiff * dRowStd
 
         # append to previous list of outliers
-        outliers = np.logical_or(outliers, dRowVals > dMaxAcceptable)
+        newOutliers = np.logical_or(dRowVals > dMaxAcceptable, dRowVals < dMinAcceptable)
+        outliers = np.logical_or(outliers, newOutliers)
 
         outliers = np.convolve(outliers.values, shortSmoothKern, 'same') > 0
 
@@ -132,7 +137,7 @@ def getBadContinuousMask(channelData, plotting = False, smoothing_ms = 1, badThr
         if plotting and channelData['elec_ids'][idx] == plotting:
 
             plt.figure()
-            dRowVals.plot.hist(bins = 100)
+            dRow.plot.hist(bins = 100)
             plt.tight_layout()
             plt.show(block = False)
 
@@ -162,8 +167,8 @@ def getCameraTriggers(simiData, plotting = False):
     # first difference of triggers
     triggersPrime = triggers.diff()
     triggersPrime.fillna(0, inplace = True)
-    # moments when camera capture occured (note *(-1) inverts the signal to look for falling edges)
-    peakIdx = peakutils.indexes((-1) * triggersPrime.values.squeeze(), thres=0.7, min_dist=width)
+    # moments when camera capture occured
+    peakIdx = peakutils.indexes(triggersPrime.values.squeeze(), thres=0.7, min_dist=width)
 
     if plotting:
         f = plt.figure()
@@ -188,7 +193,7 @@ def getGaitEvents(trigTimes, simiTable, whichColumns = ['ToeUp_Left Y', 'ToeDown
     # Note: Clocks drift slightly between Simi Computer and NSP. Allow timeMax
     # to go a little bit beyond so that we don't drop the last simi frame, i.e.
     # add 1.5 times the time increment
-    timeMax = trigTimes[-1] + 1.5/CameraFs
+    timeMax = trigTimes[-1] + 2/CameraFs
 
     simiDf = pd.DataFrame(simiTable[whichColumns])
     simiDf = simiDf.notnull()
@@ -283,7 +288,7 @@ def assignLabels(timeVector, lbl, fnc, CameraFs = 100, oversizeWindow = None):
             #pdb.set_trace()
     return labels
 
-def get_spectrogram(channelData, winLen_s, stepLen_s = 0.02, R = 50, whichChan = 1, plotting = False):
+def getSpectrogram(channelData, winLen_s, stepLen_s = 0.02, R = 50, fr_cutoff = None, whichChan = 1, plotting = False):
 
     Fs = channelData['samp_per_s']
     nChan = channelData['data'].shape[1]
@@ -298,7 +303,15 @@ def get_spectrogram(channelData, winLen_s, stepLen_s = 0.02, R = 50, whichChan =
     nw = winLen_s * R # time bandwidth product based on 0.1 sec windows and 200 Hz bandwidth
     ntapers = round(nw / 2) # L < nw - 1
     nWindows = m.floor((nSamples - NFFT + 1) / stepLen_samp)
-    spectrum = np.zeros((nChan, int(NFFT / 2) + 1, nWindows))
+
+    fr_samp = int(NFFT / 2) + 1
+    fr = np.arange(fr_samp) * channelData['samp_per_s'] / (2 * fr_samp)
+    if fr_cutoff is not None:
+        fr = fr[fr < fr_cutoff]
+        fr_samp = len(fr)
+
+    t = channelData['start_time_s'] + np.arange(nWindows) * stepLen_s
+    spectrum = np.zeros((nChan, fr_samp, nWindows))
     # generate a transform object with size equal to signal length and ntapers tapers
     D = libtfr.mfft_dpss(NFFT, nw, ntapers)
     #pdb.set_trace()
@@ -309,20 +322,19 @@ def get_spectrogram(channelData, winLen_s, stepLen_s = 0.02, R = 50, whichChan =
         sys.stdout.flush()
 
         P = D.mtspec(signal, stepLen_samp)
-        P = P[np.newaxis,:,:]
+        #pdb.set_trace()
+        P = P[np.newaxis,:fr_samp,:]
         spectrum[idx,:,:] = P
 
-    fr = np.arange(P.shape[1]) * channelData['samp_per_s'] / (2 * P.shape[1])
-    t = channelData['start_time_s'] + np.arange(P.shape[2]) * stepLen_s
     if plotting:
 
         ch_idx  = channelData['elec_ids'].index(whichChan)
 
-        #TODO: implement passing elecID to plot_spectrum
+        #TODO: implement passing elecID to plotSpectrum
         #hdr_idx = channelData['ExtendedHeaderIndices'][ch_idx]
 
-        plotSpectrum = spectrum[ch_idx,:,:]
-        plot_spectrum(plotSpectrum, Fs, channelData['start_time_s'], channelData['t'][-1], fr =fr, t = t, show = True)
+        P = spectrum[ch_idx,:,:]
+        plotSpectrum(P, Fs, channelData['start_time_s'], channelData['t'][-1], fr =fr, t = t, show = True)
 
     return spectrum, t, fr
 
@@ -378,51 +390,48 @@ def plot_chan(channelData, whichChan, mask = None, show = False, prevFig = None)
     return f, ax
 
 def pdfReport(origData, cleanData, badData = None, pdfFilePath = 'pdfReport.pdf', spectrum = False):
-
-    pdf = matplotlib.backends.backend_pdf.PdfPages(pdfFilePath)
-    nChan = cleanData['data'].shape[1]
-
-    if spectrum:
-        P = cleanData['spectrum']['PSD'][0,:,:]
-        #pdb.set_trace()
-        fr = cleanData['spectrum']['fr']
-        t = cleanData['spectrum']['t']
-        #t,fr = np.meshgrid(t,fr)
-
-    for idx, row in origData['data'].iteritems():
-
-        sys.stdout.write("Running pdfReport: %d%%\r" % int(idx * 100 / nChan + 1))
-        sys.stdout.flush()
-
-        ch_idx  = origData['elec_ids'].index(idx + 1)
-        plot_mask = np.logical_or(badData['general'], badData['perChannel'][ch_idx])
-        f,_ = plot_chan(origData, idx + 1, mask = None, show = False)
-        plot_chan(cleanData, idx + 1, mask = plot_mask, show = False, prevFig = f)
-        plt.tight_layout()
-        pdf.savefig(f)
-        plt.close(f)
+    with matplotlib.backends.backend_pdf.PdfPages(pdfFilePath) as pdf:
+        nChan = cleanData['data'].shape[1]
 
         if spectrum:
-            P = cleanData['spectrum']['PSD'][idx,:,:]
-            f = plot_spectrum(plotSpectrum, Fs, cleanData['start_time_s'], cleanData['t'][-1], fr = fr, t = t, show = False)
-            pdf.savefig(f)
-            plt.close(f)
+            fr = cleanData['spectrum']['fr']
+            t = cleanData['spectrum']['t']
+            Fs = cleanData['samp_per_s']
 
-    #pdb.set_trace()
-    for idx, row in origData['data'].iteritems():
-        if idx == 0:
+        for idx, row in origData['data'].iteritems():
+
+            sys.stdout.write("Running pdfReport: %d%%\r" % int(idx * 100 / nChan + 1))
+            sys.stdout.flush()
+
+            ch_idx  = origData['elec_ids'].index(idx + 1)
+            plot_mask = np.logical_or(badData['general'], badData['perChannel'][ch_idx])
             f,_ = plot_chan(origData, idx + 1, mask = None, show = False)
-        elif idx == origData['data'].shape[1] - 1:
-            f,_ = plot_chan(origData, idx + 1, mask = badData['general'], show = True, prevFig = f)
+            plot_chan(cleanData, idx + 1, mask = plot_mask, show = False, prevFig = f)
             plt.tight_layout()
             pdf.savefig(f)
             plt.close(f)
-        else:
-            f,_ = plot_chan(origData, idx + 1, mask = None, show = False, prevFig = f)
 
-    pdf.close()
+            if spectrum:
+                P = cleanData['spectrum']['PSD'][idx,:,:]
+                f = plotSpectrum(P, Fs, cleanData['start_time_s'], cleanData['t'][-1], fr = fr, t = t, show = False)
+                pdf.savefig(f)
+                plt.close(f)
 
-def plot_spectrum(P, fs, start_time_s, end_time_s, fr = None, t = None, show = False):
+        #pdb.set_trace()
+        generateLastPage = False
+        if generateLastPage:
+            for idx, row in origData['data'].iteritems():
+                if idx == 0:
+                    f,_ = plot_chan(origData, idx + 1, mask = None, show = False)
+                elif idx == origData['data'].shape[1] - 1:
+                    f,_ = plot_chan(origData, idx + 1, mask = badData['general'], show = True, prevFig = f)
+                    plt.tight_layout()
+                    pdf.savefig(f)
+                    plt.close(f)
+                else:
+                    f,_ = plot_chan(origData, idx + 1, mask = None, show = False, prevFig = f)
+
+def plotSpectrum(P, fs, start_time_s, end_time_s, fr = None, t = None, show = False):
 
     if fr is None:
         fr = np.arange(P.shape[0]) / P.shape[0] * fs / 2
@@ -432,15 +441,15 @@ def plot_spectrum(P, fs, start_time_s, end_time_s, fr = None, t = None, show = F
     zMin, zMax = P.min(), P.max()
 
     f = plt.figure()
-    plt.pcolormesh(t,fr,P, vmin = zMin, vmax = zMax / 500)
-    plt.axis([t.min(), t.max(), fr.min(), 500])
+    plt.pcolormesh(t,fr,P, norm=colors.LogNorm(vmin=zMin, vmax=zMax))
+    plt.axis([t.min(), t.max(), fr.min(), min(300, fr.max())])
     plt.colorbar()
     #plt.locator_params(axis='y', nbins=20)
     plt.xlabel('Time (s)')
     plt.ylabel("Frequency (Hz)")
     plt.tight_layout()
     if show:
-        plt.show()
+        plt.show(block = False)
     return f
 
 def binnedEvents(timeStamps, chans, ChannelID, binInterval, binWidth, timeStart, timeEnd):
@@ -462,23 +471,32 @@ def binnedEvents(timeStamps, chans, ChannelID, binInterval, binWidth, timeStart,
     for idx, chan in enumerate(chans):
         ch_idx = ChannelID.index(chan)
         histo, _ = np.histogram(timeStamps[ch_idx], fineBins)
+        #pdb.set_trace()
         spikeMat[idx, :] = np.array(
-            [histo[x:x+fineBinsPerWindow].sum() for x in centerIdx]
+            [histo[x:x+fineBinsPerWindow].sum() / binWidth for x in centerIdx]
         )
     return spikeMat, binCenters, binLeftEdges
 
-def binnedSpikes(spikes, chans, binInterval, binWidth, timeStart, timeEnd):
+def binnedSpikes(spikes, chans, binInterval, binWidth, timeStart, timeDur):
+    timeEnd = timeStart + timeDur
     #binCenters = timeStart + BinWidth / 2 : binInterval : timeEnd - binWidth/2
     timeStamps = [x / spikes['basic_headers']['TimeStampResolution'] for x in spikes['TimeStamps']]
     ChannelID = spikes['ChannelID']
     spikeMat, binCenters, binLeftEdges = binnedEvents(timeStamps, chans, ChannelID, binInterval, binWidth, timeStart, timeEnd)
+
     return spikeMat, binCenters, binLeftEdges
 
-def plotBinnedSpikes(spikeMat, binCenters, chans, show = True):
+def plotBinnedSpikes(spikeMat, binCenters, chans, show = True, normalizationType = 'linear'):
+    #pdb.set_trace()
     zMin, zMax = spikeMat.min(), spikeMat.max()
+    if normalizationType == 'linear':
+        nor = colors.Normalize(vmin=zMin, vmax=zMax)
+    elif normalizationType == 'logarithmic':
+        nor = colors.SymLogNorm(linthresh= 1, linscale=1,
+                                              vmin=zMin, vmax=zMax)
     fi = plt.figure()
     chanIdx = np.arange(len(chans) + 1)
-    plt.pcolormesh(binCenters, chanIdx, spikeMat, vmin = zMin, vmax = zMax)
+    plt.pcolormesh(binCenters, chanIdx, spikeMat, norm = nor)
     plt.axis([binCenters.min(), binCenters.max(), chanIdx.min(), chanIdx.max()])
     plt.colorbar()
     #plt.locator_params(axis='y', nbins=20)
