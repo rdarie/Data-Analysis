@@ -36,9 +36,9 @@ simiTable.drop(simiTable.index[[0,1,2]], inplace = True) # first rows contain gi
 # Read in NSP data from preproc_ns5
 data = pd.read_pickle(dataFile)
 
-peakIdx, trigTimes = get_camera_triggers(data['simiTrigger'], plotting = True)
+peakIdx, trigTimes = getCameraTriggers(data['simiTrigger'], plotting = True)
 
-simiDf, gaitLabelFun, downLabelFun, upLabelFun = get_gait_events(trigTimes, simiTable, plotting = True)
+simiDf, gaitLabelFun, downLabelFun, upLabelFun = getGaitEvents(trigTimes, simiTable, plotting = True)
 
 simiData = {'simiGait':simiDf, 'gaitLabelFun': gaitLabelFun, 'upLabelFun': upLabelFun, 'downLabelFun': downLabelFun}
 pickle.dump(simiData, open( fileDir + "Python/saveSimi.p", "wb" ), protocol=4 )

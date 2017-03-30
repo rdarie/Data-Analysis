@@ -24,15 +24,14 @@ import sys
 import pickle
 from copy import *
 
+# Reformat figures
 font_opts = {'family' : 'arial',
         'weight' : 'bold',
         'size'   : 20
         }
-
 fig_opts = {
     'figsize' : (10,5),
     }
-
 matplotlib.rc('font', **font_opts)
 matplotlib.rc('figure', **fig_opts)
 
@@ -42,22 +41,22 @@ fileName = 'Right_Array/201612201054-Starbuck_Treadmill-Array1480_Right-Trial000
 
 datafile = fileDir + fileName
 
-elec_ids     = range(1,97)                    # 'all' is default for all (1-indexed)
-start_time_s = 3                        # 0 is default for all
-data_time_s  = 30                    # 'all' is default for all
-whichChan    = 25                        # 1-indexed
+elec_ids = range(1,97) # 'all' is default for all (1-indexed)
+start_time_s = 3 # 0 is default for all
+data_time_s = 60 # 'all' is default for all
+whichChan = 25 # 1-indexed
 
 simi_triggers = getNSxData(datafile, 136, start_time_s, data_time_s)
 
-cont_data = getNSxData(datafile, elec_ids, start_time_s, data_time_s)
+ChannelData = getNSxData(datafile, elec_ids, start_time_s, data_time_s)
 
-ch_idx  = cont_data['elec_ids'].index(whichChan)
+ch_idx  = ChannelData['elec_ids'].index(whichChan)
 
-badData = getBadDataMask(cont_data, plotting = whichChan, smoothing_ms = 0.5)
+badData = getBadContinuousMask(ChannelData, plotting = whichChan, smoothing_ms = 0.5)
 
-f,_ = plot_chan(cont_data, whichChan, mask = None, show = False)
+f,_ = plot_chan(ChannelData, whichChan, mask = None, show = False)
 
-clean_data = deepcopy(cont_data)
+clean_data = deepcopy(ChannelData)
 # interpolate bad data
 for idx, row in clean_data['data'].iteritems():
     mask = np.logical_or(badData['general'], badData['perChannel'][idx])

@@ -29,31 +29,32 @@ font_opts = {'family' : 'arial',
         'weight' : 'bold',
         'size'   : 20
         }
-
 fig_opts = {
     'figsize' : (10,5),
     }
-
 matplotlib.rc('font', **font_opts)
 matplotlib.rc('figure', **fig_opts)
 
 # Init
-chans    = [25, 90]
+chans    = range(1,97)
 #fileDir = 'W:/ENG_Neuromotion_Shared/group/Starbuck_Bilateral_Recordings/201612201054-Starbuck_Treadmill/'
-fileDir = 'W:/ENG_Neuromotion_Shared/group/Starbuck_Bilateral_Recordings/201612201054-Starbuck_Treadmill/'
-fileName = 'Right_Array/201612201054-Starbuck_Treadmill-Array1480_Right-Trial00001.nev';
+fileDir = 'E:/Google Drive/Github/tempdata/Data-Analysis/'
+fileName = '201612201054-Starbuck_Treadmill-Array1480_Right-Trial00001.nev'
 datafile = fileDir + fileName
 spikes = getNEVData(datafile, chans)
+
+remoteDir = 'W:/ENG_Neuromotion_Shared/group/Starbuck_Bilateral_Recordings/201612201054-Starbuck_Treadmill/'
+remoteName = 'Right_Array/201612201054-Starbuck_Treadmill-Array1480_Right-Trial00001.nev'
 
 badMask = getBadSpikesMask(spikes, nStd = 5, whichChan = 0, plotting = False, deleteBad = True)
 
 binInterval = 20e-3
 binWidth = 150e-3
 timeStart = 3
-timeEnd = 33
-mat, binCenters = binnedSpikes(spikes, chans, binInterval, binWidth, timeStart, timeEnd)
+timeEnd = 63
+mat, binCenters, binLeftEdges = binnedSpikes(spikes, chans, binInterval, binWidth, timeStart, timeEnd)
 
-spikeData = {'spikes':spikes, 'spikeMat':mat, 'binCenters':binCenters}
-pickle.dump(spikeData, open( fileDir + "Python/saveSpike.p", "wb" ), protocol=4 )
+spikeData = {'spikes':spikes, 'spikeMat':mat, 'binCenters':binCenters, 'binLeftEdges': binLeftEdges, 'binWidth':binWidth}
+pickle.dump(spikeData, open( remoteDir + "Python/saveSpike.p", "wb" ), protocol=4 )
 
 x = input("Press any key")

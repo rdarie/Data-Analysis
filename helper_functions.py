@@ -9,6 +9,9 @@ import libtfr
 import peakutils
 from scipy import interpolate
 from copy import *
+import matplotlib.backends.backend_pdf
+import math
+from fractions import gcd
 
 def getNEVData(filePath, elecIds):
     # Version control
@@ -75,7 +78,7 @@ def getBadSpikesMask(spikes, nStd = 5, whichChan = 0, plotting = False, deleteBa
             spikes['TimeStamps'][idx] = np.array(spikes['TimeStamps'][idx])[np.logical_not(badMask[idx])]
     return badMask
 
-def getBadDataMask(channelData, plotting = False, smoothing_ms = 1, badThresh = 1e-3, consecLen = 4):
+def getBadContinuousMask(channelData, plotting = False, smoothing_ms = 1, badThresh = 1e-3, consecLen = 4):
     #Allocate bad data mask as dict
     badMask = {'general' : [], 'perChannel' : []}
 
@@ -147,7 +150,7 @@ def getBadDataMask(channelData, plotting = False, smoothing_ms = 1, badThresh = 
 
     return badMask
 
-def get_camera_triggers(simiData, plotting = False):
+def getCameraTriggers(simiData, plotting = False):
     # sample rate
     fs = simiData['samp_per_s']
     # get camera triggers
@@ -167,7 +170,7 @@ def get_camera_triggers(simiData, plotting = False):
         plt.plot(simiData['t'], triggers.values)
         plt.plot(simiData['t'][peakIdx], triggers.values[peakIdx], 'r*')
         ax = plt.gca()
-        ax.set_xlim([5.2, 5.6])
+        ax.set_xlim([36.5, 37])
         plt.show(block = False)
 
     # get time of first simi frame in NSP time:
@@ -176,40 +179,53 @@ def get_camera_triggers(simiData, plotting = False):
 
     return peakIdx, trigTimes
 
-def get_gait_events(trigTimes, simiTable, CameraFs = 100, plotting = False):
+def getGaitEvents(trigTimes, simiTable, whichColumns = ['ToeUp_Left Y', 'ToeDown_Left Y'], CameraFs = 100, plotting = False):
     # NSP time of first camera trigger
     timeOffset = trigTimes[0]
-    # max time recorded on NSP
-    #timeMax = data['simiTrigger']['t'].max()
-    timeMax = trigTimes[-1] + 1/CameraFs
 
-    simiDf = pd.DataFrame(simiTable[['ToeUp_Left Y', 'ToeDown_Left Y']])
+    # max time recorded on NSP
+
+    # Note: Clocks drift slightly between Simi Computer and NSP. Allow timeMax
+    # to go a little bit beyond so that we don't drop the last simi frame, i.e.
+    # add 1.5 times the time increment
+    timeMax = trigTimes[-1] + 1.5/CameraFs
+
+    simiDf = pd.DataFrame(simiTable[whichColumns])
     simiDf = simiDf.notnull()
     simiDf['simiTime'] = simiTable['Time'] + timeOffset
     simiDf.drop(simiDf[simiDf['simiTime'] >= timeMax].index, inplace = True)
 
+    debugging = False
+    if debugging:
+        simiHist, simiBins = np.histogram(np.diff(simiDf['simiTime'].values))
+        totalSimiTime = np.diff(simiDf['simiTime'].values).sum()
+        trigHist, trigBins = np.histogram(np.diff(trigTimes))
+        totalNSPTime = np.diff(trigTimes).sum()
+        np.savetxt('getGaitEvents-trigTimes.txt', trigTimes, fmt = '%4.4f', delimiter = ' \n')
+
+    #pdb.set_trace()
     simiDf['NSPTime'] = pd.Series(trigTimes, index = simiDf.index)
 
     simiDfPadded = deepcopy(simiDf)
     for idx, row in simiDfPadded.iterrows():
 
-        if row['ToeDown_Left Y']:
+        if row[whichColumns[0]]:
             newSimiTime = row['simiTime'] + 1/CameraFs
             newNSPTime = row['NSPTime'] + 1/CameraFs
-            simiDfPadded = simiDfPadded.append(pd.Series({'ToeUp_Left Y': False, 'ToeDown_Left Y': False, 'simiTime': row['simiTime'] - 1e-6, 'NSPTime': row['NSPTime'] - 1e-6}), ignore_index = True)
-            simiDfPadded = simiDfPadded.append(pd.Series({'ToeUp_Left Y': False, 'ToeDown_Left Y': True, 'simiTime': newSimiTime -1e-6, 'NSPTime': newNSPTime -1e-6}), ignore_index = True)
+            simiDfPadded = simiDfPadded.append(pd.Series({whichColumns[0]: False, whichColumns[1]: False, 'simiTime': row['simiTime'] - 1e-6, 'NSPTime': row['NSPTime'] - 1e-6}), ignore_index = True)
+            simiDfPadded = simiDfPadded.append(pd.Series({whichColumns[0]: True, whichColumns[1]: False, 'simiTime': newSimiTime -1e-6, 'NSPTime': newNSPTime -1e-6}), ignore_index = True)
             #simiDfPadded = simiDfPadded.append(pd.Series({'ToeUp_Left Y': False, 'ToeDown_Left Y': False, 'simiTime': newSimiTime + 1e-6, 'NSPTime': newNSPTime + 1e-6}), ignore_index = True)
 
-        if row['ToeUp_Left Y']:
+        if row[whichColumns[1]]:
             newSimiTime = row['simiTime'] + 1/CameraFs
             newNSPTime = row['NSPTime'] + 1/CameraFs
-            simiDfPadded = simiDfPadded.append(pd.Series({'ToeUp_Left Y': False, 'ToeDown_Left Y': False, 'simiTime': row['simiTime'] - 1e-6, 'NSPTime': row['NSPTime'] - 1e-6}), ignore_index = True)
-            simiDfPadded = simiDfPadded.append(pd.Series({'ToeUp_Left Y': True, 'ToeDown_Left Y': False, 'simiTime': newSimiTime -1e-6, 'NSPTime': newNSPTime -1e-6}), ignore_index = True)
+            simiDfPadded = simiDfPadded.append(pd.Series({whichColumns[0]: False, whichColumns[1]: False, 'simiTime': row['simiTime'] - 1e-6, 'NSPTime': row['NSPTime'] - 1e-6}), ignore_index = True)
+            simiDfPadded = simiDfPadded.append(pd.Series({whichColumns[0]: False, whichColumns[1]: True, 'simiTime': newSimiTime -1e-6, 'NSPTime': newNSPTime -1e-6}), ignore_index = True)
             #simiDfPadded = simiDfPadded.append(pd.Series({'ToeUp_Left Y': False, 'ToeDown_Left Y': False, 'simiTime': newSimiTime + 1e-6, 'NSPTime': newNSPTime + 1e-6}), ignore_index = True)
 
     simiDfPadded.sort_values('simiTime', inplace = True)
-    down = (simiDfPadded['ToeDown_Left Y'].values * 1)
-    up = (simiDfPadded['ToeUp_Left Y'].values * 1)
+    down = (simiDfPadded[whichColumns[1]].values * 1)
+    up = (simiDfPadded[whichColumns[0]].values * 1)
     gait = up.cumsum() - down.cumsum()
 
     if plotting:
@@ -229,7 +245,7 @@ def get_gait_events(trigTimes, simiTable, CameraFs = 100, plotting = False):
     simiDf['Labels'] = pd.Series(['Swing' if x > 0 else 'Stance' for x in gaitLabelFun(simiDf['simiTime'])], index = simiDf.index)
     return simiDf, gaitLabelFun, downLabelFun, upLabelFun
 
-def assignLabels(timeVector, lbl, fnc, CameraFs = 100):
+def assignLabels(timeVector, lbl, fnc, CameraFs = 100, oversizeWindow = None):
     dt = np.mean(np.diff(timeVector))
     if dt < 1/CameraFs:
         # sampling faster than the original data! Interpolate!
@@ -237,14 +253,37 @@ def assignLabels(timeVector, lbl, fnc, CameraFs = 100):
         #
     else:
         #sampling slower than the original data! Histogram!
-        pseudoTime = np.arange(timeVector[0], timeVector[-1] + dt, 0.5/CameraFs)
-        timeVector = np.append(timeVector, timeVector[-1] + dt)
-        #
-        histo,_ = np.histogram(pseudoTime[fnc(pseudoTime) > 0], timeVector)
-        labels = pd.Series([lbl if x > 0 else 'None' for x in histo])
+        pseudoTime = np.arange(timeVector[0], timeVector[-1] + dt, 0.1/CameraFs)
+        oversampledFnc = fnc(pseudoTime)
+        #pdb.set_trace()
+        if oversizeWindow is None:
+            timeBins = np.append(timeVector, timeVector[-1] + dt)
+            #
+            histo,_ = np.histogram(pseudoTime[oversampledFnc > 0], timeBins)
+            labels = pd.Series([lbl if x > 0 else 'None' for x in histo])
+        else:
+            binInterval = dt
+            binWidth = oversizeWindow
+            timeStart = timeVector[0] - binWidth / 2
+
+            timeEnd = timeVector[-1] + binWidth / 2
+            #pdb.set_trace()
+            mat, binCenters, binLeftEdges = binnedEvents([pseudoTime[oversampledFnc > 0]], [0], [0], binInterval, binWidth, timeStart, timeEnd)
+            mat = np.squeeze(mat)
+            """
+            It's possible mat will have an extra entry, because we don't know
+            what the original timeEnd was.
+            timeVector[-1] <= originalTimeEnd - binWidth/2, because we're not
+            guaranteed that the time window is divisible by the binInterval.
+            Therefore, delete the last entry if need be:
+            """
+            if len(mat) != len(timeVector):
+                mat = mat[:-1]
+            labels = pd.Series([lbl if x > 0 else 'None' for x in mat])
+            #pdb.set_trace()
     return labels
 
-def get_spectrogram(channelData, winLen_s, stepLen_fr = 0.5, R = 50, whichChan = 1, plotting = False):
+def get_spectrogram(channelData, winLen_s, stepLen_s = 0.02, R = 50, whichChan = 1, plotting = False):
 
     Fs = channelData['samp_per_s']
     nChan = channelData['data'].shape[1]
@@ -253,8 +292,7 @@ def get_spectrogram(channelData, winLen_s, stepLen_fr = 0.5, R = 50, whichChan =
     delta = 1 / Fs
 
     winLen_samp = int(winLen_s * Fs)
-    stepLen_s = winLen_s * stepLen_fr
-    stepLen_samp = int(stepLen_fr * winLen_samp)
+    stepLen_samp = int(stepLen_s * Fs)
 
     NFFT = nextpowof2(winLen_samp)
     nw = winLen_s * R # time bandwidth product based on 0.1 sec windows and 200 Hz bandwidth
@@ -339,8 +377,6 @@ def plot_chan(channelData, whichChan, mask = None, show = False, prevFig = None)
 
     return f, ax
 
-import matplotlib.backends.backend_pdf
-
 def pdfReport(origData, cleanData, badData = None, pdfFilePath = 'pdfReport.pdf', spectrum = False):
 
     pdf = matplotlib.backends.backend_pdf.PdfPages(pdfFilePath)
@@ -407,31 +443,36 @@ def plot_spectrum(P, fs, start_time_s, end_time_s, fr = None, t = None, show = F
         plt.show()
     return f
 
-from fractions import gcd
+def binnedEvents(timeStamps, chans, ChannelID, binInterval, binWidth, timeStart, timeEnd):
 
-def binnedSpikes(spikes, chans, binInterval, binWidth, timeStart, timeEnd):
-    #binCenters = timeStart + BinWidth / 2 : binInterval : timeEnd - binWidth/2
-    timeStamps = [x / spikes['basic_headers']['TimeStampResolution'] for x in spikes['TimeStamps']]
     binCenters = np.arange(timeStart + binWidth / 2, timeEnd - binWidth/2 + binInterval, binInterval)
 
     #timeInterval = timeEnd - timeStart - binWidth
-    binRes = gcd(binWidth *1e3 / 2, binInterval*1e3)*1e-3 # greatest common denominator
+    binRes = gcd(math.floor(binWidth *1e3 / 2), math.floor(binInterval*1e3))*1e-3 # greatest common denominator
     fineBins = np.arange(timeStart, timeEnd + binRes, binRes)
 
     fineBinsPerWindow = int(binWidth / binRes)
     fineBinsPerInterval = int(binInterval / binRes)
     fineBinsTotal = len(fineBins) - 1
     centerIdx = np.arange(0, fineBinsTotal - fineBinsPerWindow + fineBinsPerInterval, fineBinsPerInterval)
+    binLeftEdges = centerIdx * binRes
 
     nChans = len(timeStamps)
     spikeMat = np.zeros([nChans, len(binCenters)])
     for idx, chan in enumerate(chans):
-        ch_idx = spikes['ChannelID'].index(chan)
+        ch_idx = ChannelID.index(chan)
         histo, _ = np.histogram(timeStamps[ch_idx], fineBins)
         spikeMat[idx, :] = np.array(
             [histo[x:x+fineBinsPerWindow].sum() for x in centerIdx]
         )
-    return spikeMat, binCenters
+    return spikeMat, binCenters, binLeftEdges
+
+def binnedSpikes(spikes, chans, binInterval, binWidth, timeStart, timeEnd):
+    #binCenters = timeStart + BinWidth / 2 : binInterval : timeEnd - binWidth/2
+    timeStamps = [x / spikes['basic_headers']['TimeStampResolution'] for x in spikes['TimeStamps']]
+    ChannelID = spikes['ChannelID']
+    spikeMat, binCenters, binLeftEdges = binnedEvents(timeStamps, chans, ChannelID, binInterval, binWidth, timeStart, timeEnd)
+    return spikeMat, binCenters, binLeftEdges
 
 def plotBinnedSpikes(spikeMat, binCenters, chans, show = True):
     zMin, zMax = spikeMat.min(), spikeMat.max()

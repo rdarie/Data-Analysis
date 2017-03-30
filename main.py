@@ -38,7 +38,10 @@ spikeData = pd.read_pickle(spikeFile)
 spikes = spikeData['spikes']
 binCenters = spikeData['binCenters']
 spikeMat = spikeData['spikeMat']
+binWidth = spikeData['binWidth']
+#TODO: binned centers are only labeled as food event if the event binInterval spaces to its right. Should be BinWindow around.
 
+chans = spikes['ChannelID']
 fi = plotBinnedSpikes(spikeMat, binCenters, chans, show = False)
 binnedLabels = assignLabels(binCenters, 'Toe Up', upLabelFun)
 swingMask = (binnedLabels == 'Toe Up').values
