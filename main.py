@@ -1,13 +1,11 @@
-import matplotlib, math
 from helper_functions import *
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import libtfr
+from brpylib             import NevFile, brpylib_ver
 import sys
 import pickle
-from scipy.signal import *
-
+# Plotting options
 font_opts = {'family' : 'arial',
         'weight' : 'bold',
         'size'   : 20
@@ -17,33 +15,38 @@ fig_opts = {
     'figsize' : (10,5),
     }
 
-matplotlib.rcParams.keys()
-
 matplotlib.rc('font', **font_opts)
 matplotlib.rc('figure', **fig_opts)
 
-# Inits
-fileDir = 'W:/ENG_Neuromotion_Shared/group/Starbuck_Bilateral_Recordings/201612201054-Starbuck_Treadmill/';
-fileName = 'Python/save.p'
-simiName = 'Trial01_Step_Timing.txt'
+ns5Dir = 'W:/ENG_Neuromotion_Shared/group/Starbuck_Bilateral_Recordings/201612201054-Starbuck_Treadmill/'
 
-dataFile = fileDir + fileName
-simiFile = fileDir + simiName
+ns5Name = 'Python/save.p'
+ns5File = ns5Dir + ns5Name
+data = pd.read_pickle(ns5File)
 
-# Read in simi text file
-simiTable = pd.read_table(simiFile)
-simiTable.drop(simiTable.index[[0,1,2]], inplace = True) # first rows contain giberrish
-# Read in NSP data from preproc_ns5
-data = pd.read_pickle(dataFile)
+simiName = 'Python/saveSimi.p'
+simiFile = ns5Dir + simiName
+simiData = pd.read_pickle(simiFile)
+simiDf = simiData['simiGait']
+gaitLabelFun = simiData['gaitLabelFun']
+upLabelFun = simiData['upLabelFun']
+downLabelFun = simiData['downLabelFun']
 
-peakIdx, trigTimes = get_camera_triggers(data['simiTrigger'], plotting = True)
+spikeName = 'Python/saveSpike.p'
+spikeFile = ns5Dir + spikeName
+spikeData = pd.read_pickle(spikeFile)
+spikes = spikeData['spikes']
+binCenters = spikeData['binCenters']
+spikeMat = spikeData['spikeMat']
 
-simiDf, gaitLabelFun, downLabelFun, upLabelFun = get_gait_events(trigTimes, simiTable, plotting = True)
+fi = plotBinnedSpikes(spikeMat, binCenters, chans, show = False)
+binnedLabels = assignLabels(binCenters, 'Toe Up', upLabelFun)
+swingMask = (binnedLabels == 'Toe Up').values
+dummyVar = np.ones(binCenters.shape[0]) * 1
+ax = fi.axes[0]
+ax.plot(binCenters[swingMask], dummyVar[swingMask], 'ro')
+plt.show(block = False)
 
-simiData = {'simiGait':simiDf, 'gaitLabelFun': gaitLabelFun, 'upLabelFun': upLabelFun, 'downLabelFun': downLabelFun}
-pickle.dump(simiData, open( fileDir + "Python/saveSimi.p", "wb" ), protocol=4 )
-
-#data['channel']['data']['Labels'] = pd.Series(['Swing' if x > 0 else 'Stance' for x in upLabelFun(data['channel']['t'])], index = data['channel']['data'].index)
 data['channel']['data']['Labels'] = assignLabels(data['channel']['t'], 'Toe Up', upLabelFun)
 data['channel']['spectrum']['Labels'] = assignLabels(data['channel']['spectrum']['t'], 'Toe Up', upLabelFun)
 

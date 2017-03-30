@@ -62,7 +62,6 @@ def getBadSpikesMask(spikes, nStd = 5, whichChan = 0, plotting = False, deleteBa
                          spikesBar[whichChan]-spikesStd[whichChan],facecolor='blue',
                          alpha = 0.3, label = 'mean(spike)')
 
-
     badMask = []
     for idx, sp in enumerate(spikes['Waveforms']):
         maxAcceptable = np.abs(spikesBar[idx]) + nStd*spikesStd[idx]
