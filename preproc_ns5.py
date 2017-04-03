@@ -39,9 +39,9 @@ matplotlib.rc('figure', **fig_opts)
 # Inits
 localDir = 'E:/Google Drive/Github/tempdata/Data-Analysis/'
 fileDir = 'W:/ENG_Neuromotion_Shared/group/Starbuck_Bilateral_Recordings/201612201054-Starbuck_Treadmill/'
-fileName = 'Right_Array/201612201054-Starbuck_Treadmill-Array1480_Right-Trial00001.ns5'
+fileName = '201612201054-Starbuck_Treadmill-Array1480_Right-Trial00001.ns5'
 
-datafile = fileDir + fileName
+datafile = localDir + fileName
 
 elec_ids = range(1,97) # 'all' is default for all (1-indexed)
 start_time_s = 3 # 0 is default for all
@@ -76,16 +76,16 @@ stepLen_s = 0.02 # window step as a fraction of window length
 R = 50 # target bandwidth for spectrogram
 
 # get the spectrum
-clean_data['spectrum']['PSD'], clean_data['spectrum']['t'], clean_data['spectrum']['fr'] = getSpectrogram(
+clean_data['spectrum'] = getSpectrogram(
     clean_data, winLen_s, stepLen_s, R, 300, whichChan, plotting = True)
 
 data = {'channel':clean_data, 'simiTrigger': simi_triggers}
-with open(localDir + "save.p", "wb" ) as f:
+with open(localDir + "saveRight.p", "wb" ) as f:
     pickle.dump(data, f, protocol=4 )
 
 print('Starting to write PDF Report.')
 
-pdfFile = localDir + 'pdfReport.pdf'
-pdfReport(ChannelData, clean_data, badData = badData, pdfFilePath = pdfFile, spectrum = True)
+#pdfFile = localDir + 'pdfReport.pdf'
+#pdfReport(ChannelData, clean_data, badData = badData, pdfFilePath = pdfFile, spectrum = True)
 
 x = input("Press any key")

@@ -25,7 +25,7 @@ matplotlib.rc('figure', **fig_opts)
 # Inits
 localDir = 'E:/Google Drive/Github/tempdata/Data-Analysis/'
 fileDir = 'W:/ENG_Neuromotion_Shared/group/Starbuck_Bilateral_Recordings/201612201054-Starbuck_Treadmill/'
-fileName = 'save.p'
+fileName = 'saveRight.p'
 simiName = 'Trial01_Step_Timing.txt'
 
 dataFile = localDir + fileName
@@ -39,7 +39,7 @@ data = pd.read_pickle(dataFile)
 
 peakIdx, trigTimes = getCameraTriggers(data['simiTrigger'], plotting = True)
 
-simiDf, gaitLabelFun, downLabelFun, upLabelFun = getGaitEvents(trigTimes, simiTable, plotting = True)
+simiDf, gaitLabelFun, downLabelFun, upLabelFun = getGaitEvents(trigTimes, simiTable, ['ToeUp_Left Y', 'ToeDown_Left Y'],  plotting = True)
 
 simiData = {'simiGait':simiDf, 'gaitLabelFun': gaitLabelFun, 'upLabelFun': upLabelFun, 'downLabelFun': downLabelFun}
 pickle.dump(simiData, open( localDir + "saveSimi.p", "wb" ), protocol=4 )

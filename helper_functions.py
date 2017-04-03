@@ -46,7 +46,7 @@ def getNSxData(filePath, elecIds, startTime_s, dataLength_s, downsample = 1):
     channelData['data'] = pd.DataFrame(channelData['data'].transpose())
     channelData['t'] = channelData['start_time_s'] + np.arange(channelData['data'].shape[0]) / channelData['samp_per_s']
     channelData['badData'] = dict()
-    channelData['spectrum'] = {'PSD': [], 't': [], 'fr': [], 'Labels': []}
+    channelData['spectrum'] = pd.DataFrame({'PSD': [], 't': [], 'fr': [], 'Labels': []})
     channelData['basic_headers'] = nsx_file.basic_header
     channelData['extended_headers'] =  nsx_file.extended_headers
     # Close the nsx file now that all data is out
@@ -184,7 +184,7 @@ def getCameraTriggers(simiData, plotting = False):
 
     return peakIdx, trigTimes
 
-def getGaitEvents(trigTimes, simiTable, whichColumns = ['ToeUp_Left Y', 'ToeDown_Left Y'], CameraFs = 100, plotting = False):
+def getGaitEvents(trigTimes, simiTable, whichColumns =  ['ToeUp_Left Y', 'ToeDown_Left Y'], plotting = False, fudge = 2, CameraFs = 100):
     # NSP time of first camera trigger
     timeOffset = trigTimes[0]
 
@@ -192,8 +192,9 @@ def getGaitEvents(trigTimes, simiTable, whichColumns = ['ToeUp_Left Y', 'ToeDown
 
     # Note: Clocks drift slightly between Simi Computer and NSP. Allow timeMax
     # to go a little bit beyond so that we don't drop the last simi frame, i.e.
-    # add 1.5 times the time increment
-    timeMax = trigTimes[-1] + 2/CameraFs
+    # add fudge times the time increment TODO: FIX THIS.
+
+    timeMax = trigTimes[-1] + fudge/CameraFs
 
     simiDf = pd.DataFrame(simiTable[whichColumns])
     simiDf = simiDf.notnull()
@@ -202,13 +203,15 @@ def getGaitEvents(trigTimes, simiTable, whichColumns = ['ToeUp_Left Y', 'ToeDown
 
     debugging = False
     if debugging:
+        nNSPTrigs = len(trigTimes)
         simiHist, simiBins = np.histogram(np.diff(simiDf['simiTime'].values))
         totalSimiTime = np.diff(simiDf['simiTime'].values).sum()
+        nSimiTrigs = len(simiDf['simiTime'].values)
         trigHist, trigBins = np.histogram(np.diff(trigTimes))
         totalNSPTime = np.diff(trigTimes).sum()
         np.savetxt('getGaitEvents-trigTimes.txt', trigTimes, fmt = '%4.4f', delimiter = ' \n')
-
-    #pdb.set_trace()
+        pdb.set_trace()
+    #
     simiDf['NSPTime'] = pd.Series(trigTimes, index = simiDf.index)
 
     simiDfPadded = deepcopy(simiDf)
@@ -252,6 +255,7 @@ def getGaitEvents(trigTimes, simiTable, whichColumns = ['ToeUp_Left Y', 'ToeDown
 
 def assignLabels(timeVector, lbl, fnc, CameraFs = 100, oversizeWindow = None):
     dt = np.mean(np.diff(timeVector))
+
     if dt < 1/CameraFs:
         # sampling faster than the original data! Interpolate!
         labels = pd.Series([lbl if x > 0 else 'None' for x in fnc(timeVector)])
@@ -311,7 +315,7 @@ def getSpectrogram(channelData, winLen_s, stepLen_s = 0.02, R = 50, fr_cutoff = 
         fr_samp = len(fr)
 
     t = channelData['start_time_s'] + np.arange(nWindows) * stepLen_s
-    spectrum = np.zeros((nChan, fr_samp, nWindows))
+    spectrum = np.zeros((nChan, nWindows, fr_samp))
     # generate a transform object with size equal to signal length and ntapers tapers
     D = libtfr.mfft_dpss(NFFT, nw, ntapers)
     #pdb.set_trace()
@@ -321,9 +325,9 @@ def getSpectrogram(channelData, winLen_s, stepLen_s = 0.02, R = 50, fr_cutoff = 
         sys.stdout.write("Running getSpectrogram: %d%%\r" % int(idx * 100 / nChan + 1))
         sys.stdout.flush()
 
-        P = D.mtspec(signal, stepLen_samp)
+        P = D.mtspec(signal, stepLen_samp).transpose()
         #pdb.set_trace()
-        P = P[np.newaxis,:fr_samp,:]
+        P = P[np.newaxis,:,:fr_samp]
         spectrum[idx,:,:] = P
 
     if plotting:
@@ -336,7 +340,12 @@ def getSpectrogram(channelData, winLen_s, stepLen_s = 0.02, R = 50, fr_cutoff = 
         P = spectrum[ch_idx,:,:]
         plotSpectrum(P, Fs, channelData['start_time_s'], channelData['t'][-1], fr =fr, t = t, show = True)
 
-    return spectrum, t, fr
+    #pdb.set_trace()
+
+    return {'PSD' : pd.Panel(spectrum, items = channelData['elec_ids'], major_axis = t, minor_axis = fr),
+            'fr' : fr,
+            't' : t
+            }
 
 def nextpowof2(x):
     return 2**(m.ceil(m.log(x, 2)))
@@ -356,7 +365,7 @@ def replaceBad(dfSeries, mask, typeOpt = 'nans'):
 
     return dfSeries
 
-def plot_chan(channelData, whichChan, mask = None, show = False, prevFig = None):
+def plotChan(channelData, whichChan, mask = None, show = False, prevFig = None):
     # Plot the data channel
     ch_idx  = channelData['elec_ids'].index(whichChan)
     hdr_idx = channelData['ExtendedHeaderIndices'][ch_idx]
@@ -369,15 +378,15 @@ def plot_chan(channelData, whichChan, mask = None, show = False, prevFig = None)
         ax = prevFig.axes[0]
 
 
-    ax.plot(channelData['t'], channelData['data'][ch_idx])
+    ax.plot(channelData['t'], channelData['data'].drop('Labels', axis = 1)[ch_idx])
 
     if np.any(mask):
-        ax.plot(channelData['t'][mask], channelData['data'][ch_idx][mask], 'ro')
+        ax.plot(channelData['t'][mask], channelData['data'].drop('Labels', axis = 1)[ch_idx][mask], 'ro')
 
     #pdb.set_trace()
     #channelData['data'][ch_idx].fillna(0, inplace = True)
 
-    ax.axis([channelData['t'][0], channelData['t'][-1], min(channelData['data'][ch_idx]), max(channelData['data'][ch_idx])])
+    ax.axis([channelData['t'][0], channelData['t'][-1], min(channelData['data'].drop('Labels', axis = 1)[ch_idx]), max(channelData['data'].drop('Labels', axis = 1)[ch_idx])])
     ax.locator_params(axis = 'y', nbins = 20)
     plt.xlabel('Time (s)')
     plt.ylabel("Output (" + channelData['extended_headers'][hdr_idx]['Units'] + ")")
@@ -432,18 +441,20 @@ def pdfReport(origData, cleanData, badData = None, pdfFilePath = 'pdfReport.pdf'
                     f,_ = plot_chan(origData, idx + 1, mask = None, show = False, prevFig = f)
 
 def plotSpectrum(P, fs, start_time_s, end_time_s, fr = None, t = None, show = False):
-
+    #pdb.set_trace()
     if fr is None:
-        fr = np.arange(P.shape[0]) / P.shape[0] * fs / 2
+        fr = np.arange(P.shape[1]) / P.shape[1] * fs / 2
     if t is None:
-        t = start_time_s + np.arange(P.shape[1]) * (end_time_s-start_time_s) / P.shape[1]
+        t = start_time_s + np.arange(P.shape[0]) * (end_time_s-start_time_s) / P.shape[0]
 
+    if type(P) is pd.DataFrame:
+        P = P.values
     zMin, zMax = P.min(), P.max()
 
     f = plt.figure()
-    plt.pcolormesh(t,fr,P, norm=colors.LogNorm(vmin=zMin, vmax=zMax))
+    plt.pcolormesh(t,fr,P.transpose(), norm=colors.LogNorm(vmin=zMin, vmax=zMax))
     plt.axis([t.min(), t.max(), fr.min(), min(300, fr.max())])
-    plt.colorbar()
+    #plt.colorbar()
     #plt.locator_params(axis='y', nbins=20)
     plt.xlabel('Time (s)')
     plt.ylabel("Frequency (Hz)")
@@ -475,6 +486,7 @@ def binnedEvents(timeStamps, chans, ChannelID, binInterval, binWidth, timeStart,
         spikeMat[idx, :] = np.array(
             [histo[x:x+fineBinsPerWindow].sum() / binWidth for x in centerIdx]
         )
+
     return spikeMat, binCenters, binLeftEdges
 
 def binnedSpikes(spikes, chans, binInterval, binWidth, timeStart, timeDur):
@@ -484,21 +496,21 @@ def binnedSpikes(spikes, chans, binInterval, binWidth, timeStart, timeDur):
     ChannelID = spikes['ChannelID']
     spikeMat, binCenters, binLeftEdges = binnedEvents(timeStamps, chans, ChannelID, binInterval, binWidth, timeStart, timeEnd)
 
-    return spikeMat, binCenters, binLeftEdges
+    return pd.DataFrame(spikeMat), binCenters, binLeftEdges
 
 def plotBinnedSpikes(spikeMat, binCenters, chans, show = True, normalizationType = 'linear'):
     #pdb.set_trace()
-    zMin, zMax = spikeMat.min(), spikeMat.max()
+    zMin, zMax = spikeMat.min().min(), spikeMat.max().max()
     if normalizationType == 'linear':
         nor = colors.Normalize(vmin=zMin, vmax=zMax)
     elif normalizationType == 'logarithmic':
         nor = colors.SymLogNorm(linthresh= 1, linscale=1,
                                               vmin=zMin, vmax=zMax)
     fi = plt.figure()
-    chanIdx = np.arange(len(chans) + 1)
-    plt.pcolormesh(binCenters, chanIdx, spikeMat, norm = nor)
+    chanIdx = np.arange(len(chans))
+    plt.pcolormesh(binCenters, chanIdx, spikeMat.values.transpose(), norm = nor)
     plt.axis([binCenters.min(), binCenters.max(), chanIdx.min(), chanIdx.max()])
-    plt.colorbar()
+    #plt.colorbar()
     #plt.locator_params(axis='y', nbins=20)
     plt.xlabel('Time (s)')
     plt.ylabel("Channel (#)")

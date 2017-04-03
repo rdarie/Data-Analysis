@@ -39,7 +39,7 @@ matplotlib.rc('figure', **fig_opts)
 chans    = range(1,97)
 #fileDir = 'W:/ENG_Neuromotion_Shared/group/Starbuck_Bilateral_Recordings/201612201054-Starbuck_Treadmill/'
 fileDir = 'E:/Google Drive/Github/tempdata/Data-Analysis/'
-fileName = '201612201054-Starbuck_Treadmill-Array1480_Right-Trial00001.nev'
+fileName = '201612201054-Starbuck_Treadmill-Array1514_Left-Trial00001.nev'
 datafile = fileDir + fileName
 spikes = getNEVData(datafile, chans)
 
@@ -52,9 +52,11 @@ binInterval = 20e-3
 binWidth = 150e-3
 timeStart = 3
 timeDur = 90
-mat, binCenters, binLeftEdges = binnedSpikes(spikes, chans, binInterval, binWidth, timeStart, timeDur)
 
+mat, binCenters, binLeftEdges = binnedSpikes(spikes, chans, binInterval, binWidth, timeStart, timeDur)
+pdb.set_trace()
 spikeData = {'spikes':spikes, 'spikeMat':mat, 'binCenters':binCenters, 'binLeftEdges': binLeftEdges, 'binWidth':binWidth}
-pickle.dump(spikeData, open( fileDir + "saveSpike.p", "wb" ), protocol=4 )
+with open( fileDir + "saveSpikeLeft.p", "wb" ) as f:
+    pickle.dump(spikeData, f, protocol=4 )
 
 x = input("Press any key")
