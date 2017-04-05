@@ -2,6 +2,7 @@ from helper_functions import *
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import pickle
 
 from sklearn.model_selection import StratifiedKFold, train_test_split, cross_val_score
 from sklearn.model_selection import validation_curve, GridSearchCV, cross_val_predict
@@ -36,12 +37,16 @@ y = spikeMat['LabelsNumeric']
 skf = StratifiedKFold(n_splits=3, shuffle = True, random_state = 1)
 logReg = LogisticRegression()
 
-Cvalues=np.logspace(-1,4,10)
+Cvalues=np.logspace(-1,4,3)
 
-logGrid=GridSearchCV(logReg,{'C': Cvalues,'penalty':['l1','l2']}, cv = skf)
+logGrid=GridSearchCV(logReg,{'C': Cvalues,'penalty':['l1','l2']}, cv = skf, n_jobs = -1, verbose = 3)
 logGrid.fit(X,y)
 bestLogReg=logGrid.best_estimator_
 ylogreg=cross_val_predict(bestLogReg,X,y)
+
+labelsNumeric = {'Neither': 0, 'Toe Up': 1, 'Toe Down': 2}
+numericLabels = {v: k for k, v in labelsNumeric.items()}
+predictedLabels = pd.Series([numericLabels[x] for x in ylogreg])
 
 plotting = True
 if plotting:
@@ -51,8 +56,8 @@ if plotting:
     upMaskSpikes = (spikeMat['Labels'] == 'Toe Up').values
     downMaskSpikes = (spikeMat['Labels'] == 'Toe Down').values
 
-    upMaskSpikesPredicted = ylogreg == 1
-    downMaskSpikesPredicted = ylogreg == 2
+    upMaskSpikesPredicted = (predictedLabels == 'Toe Up').values
+    downMaskSpikesPredicted = (predictedLabels == 'Toe Down').values
 
     dummyVar = np.ones(binCenters.shape[0]) * 1
     ax = fi.axes[0]
@@ -61,6 +66,9 @@ if plotting:
 
     ax.plot(binCenters[upMaskSpikesPredicted], dummyVar[upMaskSpikesPredicted] + .5, 'mo')
     ax.plot(binCenters[downMaskSpikesPredicted], dummyVar[downMaskSpikesPredicted] + 1.5, 'co')
+
+    with open(localDir + 'myplot.pickle', 'wb') as f:
+        pickle.dump(fi, f)
     plt.show(block = True)
 
 """
