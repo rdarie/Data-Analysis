@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pickle
+import os
 from sklearn.model_selection import StratifiedKFold, train_test_split, cross_val_score
 from sklearn.model_selection import validation_curve, GridSearchCV, cross_val_predict
 from sklearn.linear_model import LogisticRegression
@@ -20,7 +21,7 @@ fig_opts = {
 matplotlib.rc('font', **font_opts)
 matplotlib.rc('figure', **fig_opts)
 
-localDir = 'E:/Google Drive/Github/tempdata/Data-Analysis/'
+localDir = os.environ['DATA_ANALYSIS_LOCAL_DIR']
 ns5Name = 'saveRightLabeled.p'
 ns5File = localDir + ns5Name
 ns5Data = pd.read_pickle(ns5File)
