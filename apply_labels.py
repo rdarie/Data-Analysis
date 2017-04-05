@@ -39,22 +39,25 @@ spikes = spikeData['spikes']
 binCenters = spikeData['binCenters']
 spikeMat = spikeData['spikeMat']
 binWidth = spikeData['binWidth']
-#TODO: binned centers are only labeled as food event if the event binInterval spaces to its right. Should be BinWindow around.
+
+labelsNumeric = {'Neither': 0, 'Toe Up': 1, 'Toe Down': 2}
 
 tempUpLabels = assignLabels(binCenters, 'Toe Up', upLabelFun)
 tempDownLabels = assignLabels(binCenters, 'Toe Down', downLabelFun)
 spikeMat['Labels'] = pd.Series([x if x == 'Toe Up' else y for x,y in zip(tempUpLabels, tempDownLabels)])
+spikeMat['LabelsNumeric'] = pd.Series([labelsNumeric[x] for x in spikeMat['Labels']])
 
 tempUpLabels = assignLabels(data['channel']['t'], 'Toe Up', upLabelFun)
 tempDownLabels = assignLabels(data['channel']['t'], 'Toe Down', downLabelFun)
 binnedLabels = pd.Series([x if x == 'Toe Up' else y for x,y in zip(tempUpLabels, tempDownLabels)])
 data['channel']['data']['Labels'] = binnedLabels
+data['channel']['data']['LabelsNumeric'] = pd.Series([labelsNumeric[x] for x in data['channel']['data']['Labels']])
 
 tempUpLabels = assignLabels(data['channel']['spectrum']['t'], 'Toe Up', upLabelFun)
 tempDownLabels = assignLabels(data['channel']['spectrum']['t'], 'Toe Down', downLabelFun)
 binnedLabels = pd.Series([x if x == 'Toe Up' else y for x,y in zip(tempUpLabels, tempDownLabels)])
 data['channel']['spectrum']['Labels'] = binnedLabels
-
+data['channel']['spectrum']['LabelsNumeric'] = pd.Series([labelsNumeric[x] for x in data['channel']['spectrum']['Labels']])
 with open(ns5Dir + "saveRightLabeled.p", "wb" ) as f:
     pickle.dump(data, f, protocol=4 )
 with open(ns5Dir + "saveSpikeRightLabeled.p", "wb" ) as f:
@@ -64,7 +67,7 @@ plotting = True
 if plotting:
     #Plot the spikes
     chans = spikes['ChannelID']
-    fi = plotBinnedSpikes(spikeMat.drop('Labels', axis = 1), binCenters, chans, show = False)
+    fi = plotBinnedSpikes(spikeMat.drop(['Labels', 'LabelsNumeric'], axis = 1), binCenters, chans, show = False)
 
     upMaskSpikes = (spikeMat['Labels'] == 'Toe Up').values
     downMaskSpikes = (spikeMat['Labels'] == 'Toe Down').values
