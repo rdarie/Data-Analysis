@@ -6,7 +6,13 @@ import numpy as np
 import pandas as pd
 import math as m
 import sys
-import libtfr
+
+try:
+    import libtfr
+    HASLIBTFR = True
+except:
+    HASLIBTFR = False
+
 import peakutils
 from scipy import interpolate
 from copy import *
@@ -292,60 +298,61 @@ def assignLabels(timeVector, lbl, fnc, CameraFs = 100, oversizeWindow = None):
             #pdb.set_trace()
     return labels
 
-def getSpectrogram(channelData, winLen_s, stepLen_s = 0.02, R = 50, fr_cutoff = None, whichChan = 1, plotting = False):
+if HASLIBTFR:
+    def getSpectrogram(channelData, winLen_s, stepLen_s = 0.02, R = 50, fr_cutoff = None, whichChan = 1, plotting = False):
 
-    Fs = channelData['samp_per_s']
-    nChan = channelData['data'].shape[1]
-    nSamples = channelData['data'].shape[0]
+        Fs = channelData['samp_per_s']
+        nChan = channelData['data'].shape[1]
+        nSamples = channelData['data'].shape[0]
 
-    delta = 1 / Fs
+        delta = 1 / Fs
 
-    winLen_samp = int(winLen_s * Fs)
-    stepLen_samp = int(stepLen_s * Fs)
+        winLen_samp = int(winLen_s * Fs)
+        stepLen_samp = int(stepLen_s * Fs)
 
-    NFFT = nextpowof2(winLen_samp)
-    nw = winLen_s * R # time bandwidth product based on 0.1 sec windows and 200 Hz bandwidth
-    ntapers = round(nw / 2) # L < nw - 1
-    nWindows = m.floor((nSamples - NFFT + 1) / stepLen_samp)
+        NFFT = nextpowof2(winLen_samp)
+        nw = winLen_s * R # time bandwidth product based on 0.1 sec windows and 200 Hz bandwidth
+        ntapers = round(nw / 2) # L < nw - 1
+        nWindows = m.floor((nSamples - NFFT + 1) / stepLen_samp)
 
-    fr_samp = int(NFFT / 2) + 1
-    fr = np.arange(fr_samp) * channelData['samp_per_s'] / (2 * fr_samp)
-    if fr_cutoff is not None:
-        fr = fr[fr < fr_cutoff]
-        fr_samp = len(fr)
+        fr_samp = int(NFFT / 2) + 1
+        fr = np.arange(fr_samp) * channelData['samp_per_s'] / (2 * fr_samp)
+        if fr_cutoff is not None:
+            fr = fr[fr < fr_cutoff]
+            fr_samp = len(fr)
 
-    t = channelData['start_time_s'] + np.arange(nWindows) * stepLen_s
-    spectrum = np.zeros((nChan, nWindows, fr_samp))
-    # generate a transform object with size equal to signal length and ntapers tapers
-    D = libtfr.mfft_dpss(NFFT, nw, ntapers)
-    #pdb.set_trace()
-
-    for idx,signal in channelData['data'].iteritems():
-
-        sys.stdout.write("Running getSpectrogram: %d%%\r" % int(idx * 100 / nChan + 1))
-        sys.stdout.flush()
-
-        P = D.mtspec(signal, stepLen_samp).transpose()
+        t = channelData['start_time_s'] + np.arange(nWindows) * stepLen_s
+        spectrum = np.zeros((nChan, nWindows, fr_samp))
+        # generate a transform object with size equal to signal length and ntapers tapers
+        D = libtfr.mfft_dpss(NFFT, nw, ntapers)
         #pdb.set_trace()
-        P = P[np.newaxis,:,:fr_samp]
-        spectrum[idx,:,:] = P
 
-    if plotting:
+        for idx,signal in channelData['data'].iteritems():
 
-        ch_idx  = channelData['elec_ids'].index(whichChan)
+            sys.stdout.write("Running getSpectrogram: %d%%\r" % int(idx * 100 / nChan + 1))
+            sys.stdout.flush()
 
-        #TODO: implement passing elecID to plotSpectrum
-        #hdr_idx = channelData['ExtendedHeaderIndices'][ch_idx]
+            P = D.mtspec(signal, stepLen_samp).transpose()
+            #pdb.set_trace()
+            P = P[np.newaxis,:,:fr_samp]
+            spectrum[idx,:,:] = P
 
-        P = spectrum[ch_idx,:,:]
-        plotSpectrum(P, Fs, channelData['start_time_s'], channelData['t'][-1], fr =fr, t = t, show = True)
+        if plotting:
 
-    #pdb.set_trace()
+            ch_idx  = channelData['elec_ids'].index(whichChan)
 
-    return {'PSD' : pd.Panel(spectrum, items = channelData['elec_ids'], major_axis = t, minor_axis = fr),
-            'fr' : fr,
-            't' : t
-            }
+            #TODO: implement passing elecID to plotSpectrum
+            #hdr_idx = channelData['ExtendedHeaderIndices'][ch_idx]
+
+            P = spectrum[ch_idx,:,:]
+            plotSpectrum(P, Fs, channelData['start_time_s'], channelData['t'][-1], fr =fr, t = t, show = True)
+
+        #pdb.set_trace()
+
+        return {'PSD' : pd.Panel(spectrum, items = channelData['elec_ids'], major_axis = t, minor_axis = fr),
+                'fr' : fr,
+                't' : t
+                }
 
 def nextpowof2(x):
     return 2**(m.ceil(m.log(x, 2)))
