@@ -22,7 +22,7 @@ matplotlib.rc('font', **font_opts)
 matplotlib.rc('figure', **fig_opts)
 
 localDir = os.environ['DATA_ANALYSIS_LOCAL_DIR']
-ns5Name = 'saveRightLabeled.p'
+ns5Name = '/saveRightLabeled.p'
 ns5File = localDir + ns5Name
 ns5Data = pd.read_pickle(ns5File)
 
@@ -36,14 +36,16 @@ y = labels
 flatSpectrum = spectrum[whichChans, :, whichFreqs].transpose(1, 0, 2).to_frame().transpose()
 X = flatSpectrum
 
+skf = StratifiedKFold(n_splits=3, shuffle = True, random_state = 1)
+logReg = LogisticRegression()
+
+Cvalues=np.logspace(-1,3,2)
+
+logGrid=GridSearchCV(logReg,{'C': Cvalues,'penalty':['l1','l2']}, cv = skf, verbose = 2, n_jobs = -1)
+
 if __name__ == '__main__':
-    skf = StratifiedKFold(n_splits=3, shuffle = True, random_state = 1)
-    logReg = LogisticRegression()
-
-    Cvalues=np.logspace(-1,3,2)
-
-    logGrid=GridSearchCV(logReg,{'C': Cvalues,'penalty':['l1','l2']}, cv = skf, verbose = 2, n_jobs = -1)
     logGrid.fit(X,y)
+
     bestLogReg=logGrid.best_estimator_
     ylogreg=cross_val_predict(bestLogReg,X,y)
 
