@@ -85,8 +85,8 @@ def getBadContinuousMask(channelData, plotting = False, smoothing_ms = 1, badThr
 
     #Look for abnormally high values in the first difference of each channel
     # how many standard deviations should we keep?
-    nStdDiff = 10
-    nStdAmp = 10
+    nStdDiff = 3
+    nStdAmp = 2
     # Look for unchanging signal across channels
     channelDataDiff = channelData['data'].diff()
     channelDataDiff.fillna(0, inplace = True)
@@ -141,11 +141,17 @@ def getBadContinuousMask(channelData, plotting = False, smoothing_ms = 1, badThr
             plt.tight_layout()
             plt.show(block = False)
 
-            plt.figure()
+            fi, ax1 = plt.subplots()
             plot_mask = np.logical_or(badMask['general'], badMask['perChannel'][idx])
-            plt.plot(channelData['t'], row)
-            plt.plot(channelData['t'][plot_mask], row[plot_mask],'ro')
-            plt.plot(channelData['t'], dRowVals)
+            ax1.plot(channelData['t'], row)
+
+            ax1.plot(channelData['t'][plot_mask], row[plot_mask],'ro')
+            ax1.set_xlabel('time (s)')
+            ax1.set_ylabel('Voltage (uV)')
+
+            ax2 = ax1.twinx()
+            ax2.plot(channelData['t'], dRowVals, 'g-')
+            ax2.set_ylabel('Voltage Derivative (uV / s)')
             print("Current derivative rejection threshold: %f" % dMaxAcceptable)
             print("Current amplitude rejection threshold: %f" % maxAcceptable)
             plt.tight_layout()
@@ -173,8 +179,9 @@ def getCameraTriggers(simiData, plotting = False):
     if plotting:
         f = plt.figure()
         plt.plot(simiData['t'], triggers.values)
-        plt.plot(simiData['t'][peakIdx], triggers.values[peakIdx], 'r*')
+        plt.plot(simiData['t'][peakIdx], triggers.values[peakIdx], 'r*', label='Camera Trigger')
         ax = plt.gca()
+        plt.xlabel('Time (s)')
         ax.set_xlim([36.5, 37])
         plt.show(block = False)
 
@@ -238,12 +245,13 @@ def getGaitEvents(trigTimes, simiTable, whichColumns =  ['ToeUp_Left Y', 'ToeDow
 
     if plotting:
         f = plt.figure()
-        plt.plot(simiDfPadded['simiTime'], gait)
-        plt.plot(simiDfPadded['simiTime'], down, 'g*')
-        plt.plot(simiDfPadded['simiTime'], up, 'r*')
+        plt.plot(simiDfPadded['simiTime'], gait, label = 'Leg Swing')
+        plt.plot(simiDfPadded['simiTime'], down, 'g*', label = 'Foot Strike')
+        plt.plot(simiDfPadded['simiTime'], up, 'r*', label = 'Foot Off')
         ax = plt.gca()
-        ax.set_ylim([-1.1, 1.1])
-        ax.set_xlim([6.8, 7.8])
+        ax.set_ylim([-1.1, 2.1])
+        ax.set_xlim([6.8, 8.8])
+        ax.legend()
         plt.show(block = False)
 
     gaitLabelFun = interpolate.interp1d(simiDfPadded['simiTime'], gait, bounds_error = False, fill_value = 'extrapolate')
@@ -377,16 +385,26 @@ def plotChan(channelData, whichChan, mask = None, show = False, prevFig = None):
         f = prevFig
         ax = prevFig.axes[0]
 
+    if 'Labels' in channelData['data'].columns:
+        ax.plot(channelData['t'], channelData['data'].drop(['Labels', 'LabelsNumeric'], axis = 1)[ch_idx])
+    else:
+        ax.plot(channelData['t'], channelData['data'][ch_idx])
 
-    ax.plot(channelData['t'], channelData['data'].drop(['Labels', 'LabelsNumeric'], axis = 1)[ch_idx])
 
     if np.any(mask):
-        ax.plot(channelData['t'][mask], channelData['data'].drop(['Labels', 'LabelsNumeric'], axis = 1)[ch_idx][mask], 'ro')
+        if 'Labels' in channelData['data'].columns:
+            ax.plot(channelData['t'][mask], channelData['data'].drop(['Labels', 'LabelsNumeric'], axis = 1)[ch_idx][mask], 'ro')
+        else:
+            ax.plot(channelData['t'][mask], channelData['data'][ch_idx][mask], 'ro')
 
     #pdb.set_trace()
     #channelData['data'][ch_idx].fillna(0, inplace = True)
 
-    ax.axis([channelData['t'][0], channelData['t'][-1], min(channelData['data'].drop(['Labels', 'LabelsNumeric'], axis = 1)[ch_idx]), max(channelData['data'].drop('Labels', axis = 1)[ch_idx])])
+    if 'Labels' in channelData['data'].columns:
+        ax.axis([channelData['t'][0], channelData['t'][-1], min(channelData['data'].drop(['Labels', 'LabelsNumeric'], axis = 1)[ch_idx]), max(channelData['data'].drop('Labels', axis = 1)[ch_idx])])
+    else:
+        ax.axis([channelData['t'][0], channelData['t'][-1], min(channelData['data'][ch_idx]), max(channelData['data'][ch_idx])])
+
     ax.locator_params(axis = 'y', nbins = 20)
     plt.xlabel('Time (s)')
     plt.ylabel("Output (" + channelData['extended_headers'][hdr_idx]['Units'] + ")")
@@ -519,7 +537,7 @@ def plotBinnedSpikes(spikeMat, binCenters, chans, show = True, normalizationType
         plt.show()
     return fi
 
-def plot_spikes(spikes, chans):
+def plotSpikes(spikes, chans):
     # Initialize plots
     colors      = 'kbgrm'
     line_styles = ['-', '--', ':', '-.']

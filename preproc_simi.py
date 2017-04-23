@@ -41,5 +41,7 @@ peakIdx, trigTimes = getCameraTriggers(data['simiTrigger'], plotting = True)
 
 simiDf, gaitLabelFun, downLabelFun, upLabelFun = getGaitEvents(trigTimes, simiTable, ['ToeUp_Left Y', 'ToeDown_Left Y'],  plotting = True)
 
-simiData = {'simiGait':simiDf, 'gaitLabelFun': gaitLabelFun, 'upLabelFun': upLabelFun, 'downLabelFun': downLabelFun}
-pickle.dump(simiData, open( localDir + "saveSimi.p", "wb" ), protocol=4 )
+#simiData = {'simiGait':simiDf, 'gaitLabelFun': gaitLabelFun, 'upLabelFun': upLabelFun, 'downLabelFun': downLabelFun}
+#pickle.dump(simiData, open( localDir + "saveSimi.p", "wb" ), protocol=4 )
+
+x = input("Press any key")

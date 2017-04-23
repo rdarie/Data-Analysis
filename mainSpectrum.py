@@ -22,7 +22,7 @@ matplotlib.rc('font', **font_opts)
 matplotlib.rc('figure', **fig_opts)
 
 localDir = os.environ['DATA_ANALYSIS_LOCAL_DIR']
-ns5Name = 'saveRightLabeled.p'
+ns5Name = '/saveRightLabeled.p'
 ns5File = localDir + ns5Name
 ns5Data = pd.read_pickle(ns5File)
 
@@ -42,7 +42,7 @@ if __name__ == '__main__':
 
     Cvalues=np.logspace(-1,3,2)
 
-    logGrid=GridSearchCV(logReg,{'C': Cvalues,'penalty':['l1','l2']}, cv = skf, verbose = 2, n_jobs = -1)
+    logGrid=GridSearchCV(logReg,{'C': Cvalues,'penalty':['l1','l2']}, cv = skf, verbose = 3, n_jobs = -1)
     logGrid.fit(X,y)
     bestLogReg=logGrid.best_estimator_
     ylogreg=cross_val_predict(bestLogReg,X,y)
@@ -69,13 +69,13 @@ if __name__ == '__main__':
             t = ns5Data['channel']['spectrum']['t'],
             show = False)
         ax = fi.axes[0]
-        ax.plot(ns5Data['channel']['spectrum']['t'][upMaskSpectrum], dummyVar[upMaskSpectrum], 'ro')
-        ax.plot(ns5Data['channel']['spectrum']['t'][downMaskSpectrum], dummyVar[downMaskSpectrum] + 1, 'go')
+        ax.plot(ns5Data['channel']['spectrum']['t'][upMaskSpectrum], dummyVar[upMaskSpectrum], 'ro', label = 'Foot Up')
+        ax.plot(ns5Data['channel']['spectrum']['t'][downMaskSpectrum], dummyVar[downMaskSpectrum] + 1, 'go', label = 'Foot Strike')
 
-        ax.plot(ns5Data['channel']['spectrum']['t'][upMaskSpectrumPredicted], dummyVar[upMaskSpectrumPredicted] + .5, 'mo')
-        ax.plot(ns5Data['channel']['spectrum']['t'][downMaskSpectrumPredicted], dummyVar[downMaskSpectrumPredicted] + 1.5, 'co')
+        ax.plot(ns5Data['channel']['spectrum']['t'][upMaskSpectrumPredicted], dummyVar[upMaskSpectrumPredicted] + .5, 'mo', label = 'Decoded Foot Up')
+        ax.plot(ns5Data['channel']['spectrum']['t'][downMaskSpectrumPredicted], dummyVar[downMaskSpectrumPredicted] + 1.5, 'co', label = 'Decoded Foot Strike')
 
-        with open(localDir + 'myplot.pickle', 'wb') as f:
+        with open(localDir + 'myplotSpectrum.pickle', 'wb') as f:
             pickle.dump(fi, f)
 
         plt.show(block = True)

@@ -44,9 +44,9 @@ fileName = '201612201054-Starbuck_Treadmill-Array1480_Right-Trial00001.ns5'
 datafile = localDir + fileName
 
 elec_ids = range(1,97) # 'all' is default for all (1-indexed)
-start_time_s = 3 # 0 is default for all
-data_time_s = 90 # 'all' is default for all
-whichChan = 25 # 1-indexed
+start_time_s = 45 # 0 is default for all
+data_time_s = 10 # 'all' is default for all
+whichChan = 2 # 1-indexed
 
 simi_triggers = getNSxData(datafile, 136, start_time_s, data_time_s)
 
@@ -54,9 +54,9 @@ ChannelData = getNSxData(datafile, elec_ids, start_time_s, data_time_s)
 
 ch_idx  = ChannelData['elec_ids'].index(whichChan)
 
-badData = getBadContinuousMask(ChannelData, plotting = whichChan, smoothing_ms = 0.5)
+badData = getBadContinuousMask(ChannelData, plotting = whichChan, smoothing_ms = 1)
 
-f,_ = plot_chan(ChannelData, whichChan, mask = None, show = False)
+f,_ = plotChan(ChannelData, whichChan, mask = None, show = False)
 
 clean_data = deepcopy(ChannelData)
 
@@ -68,7 +68,7 @@ for idx, row in clean_data['data'].iteritems():
 clean_data['badData'] = badData
 # check interpolation results
 plot_mask = np.logical_or(badData['general'], badData['perChannel'][ch_idx])
-plot_chan(clean_data, whichChan, mask = plot_mask, show = True, prevFig = f)
+plotChan(clean_data, whichChan, mask = plot_mask, show = True, prevFig = f)
 
 # spectrum function parameters
 winLen_s = 0.15
@@ -79,11 +79,11 @@ R = 50 # target bandwidth for spectrogram
 clean_data['spectrum'] = getSpectrogram(
     clean_data, winLen_s, stepLen_s, R, 300, whichChan, plotting = True)
 
-data = {'channel':clean_data, 'simiTrigger': simi_triggers}
-with open(localDir + "saveRight.p", "wb" ) as f:
-    pickle.dump(data, f, protocol=4 )
+#data = {'channel':clean_data, 'simiTrigger': simi_triggers}
+#with open(localDir + "saveRight.p", "wb" ) as f:
+#    pickle.dump(data, f, protocol=4 )
 
-print('Starting to write PDF Report.')
+#print('Starting to write PDF Report.')
 
 #pdfFile = localDir + 'pdfReport.pdf'
 #pdfReport(ChannelData, clean_data, badData = badData, pdfFilePath = pdfFile, spectrum = True)
