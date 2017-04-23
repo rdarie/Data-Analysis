@@ -77,7 +77,7 @@ if __name__ == '__main__':
         ax.plot(ns5Data['channel']['spectrum']['t'][upMaskSpectrumPredicted], dummyVar[upMaskSpectrumPredicted] + .5, 'mo')
         ax.plot(ns5Data['channel']['spectrum']['t'][downMaskSpectrumPredicted], dummyVar[downMaskSpectrumPredicted] + 1.5, 'co')
 
-        with open(localDir + 'myplot.pickle', 'wb') as f:
+        with open(localDir + 'mySpectrumPlot.pickle', 'wb') as f:
             pickle.dump(fi, f)
 
         plt.show(block = True)
