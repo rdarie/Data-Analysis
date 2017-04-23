@@ -7,7 +7,7 @@ import os
 from sklearn.model_selection import StratifiedKFold, train_test_split, cross_val_score
 from sklearn.model_selection import validation_curve, GridSearchCV, cross_val_predict
 from sklearn.linear_model import LogisticRegression
-
+from sklearn.metrics import confusion_matrix
 # Plotting options
 font_opts = {'family' : 'arial',
         'weight' : 'bold',
@@ -80,7 +80,7 @@ if __name__ == '__main__':
         with open(localDir + 'mySpectrumPlot.pickle', 'wb') as f:
             pickle.dump(fi, f)
 
-        plt.show(block = True)
+        #plt.show(block = True)
 
     """
     By default, the score computed at each CV iteration is the score method of
