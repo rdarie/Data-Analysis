@@ -6,7 +6,13 @@ import numpy as np
 import pandas as pd
 import math as m
 import sys
-import libtfr
+
+try:
+    import libtfr
+    HASLIBTFR = True
+except:
+    HASLIBTFR = False
+
 import peakutils
 from scipy import interpolate
 from copy import *
@@ -85,8 +91,8 @@ def getBadContinuousMask(channelData, plotting = False, smoothing_ms = 1, badThr
 
     #Look for abnormally high values in the first difference of each channel
     # how many standard deviations should we keep?
-    nStdDiff = 3
-    nStdAmp = 2
+    nStdDiff = 10
+    nStdAmp = 10
     # Look for unchanging signal across channels
     channelDataDiff = channelData['data'].diff()
     channelDataDiff.fillna(0, inplace = True)
@@ -141,17 +147,11 @@ def getBadContinuousMask(channelData, plotting = False, smoothing_ms = 1, badThr
             plt.tight_layout()
             plt.show(block = False)
 
-            fi, ax1 = plt.subplots()
+            plt.figure()
             plot_mask = np.logical_or(badMask['general'], badMask['perChannel'][idx])
-            ax1.plot(channelData['t'], row)
-
-            ax1.plot(channelData['t'][plot_mask], row[plot_mask],'ro')
-            ax1.set_xlabel('time (s)')
-            ax1.set_ylabel('Voltage (uV)')
-
-            ax2 = ax1.twinx()
-            ax2.plot(channelData['t'], dRowVals, 'g-')
-            ax2.set_ylabel('Voltage Derivative (uV / s)')
+            plt.plot(channelData['t'], row)
+            plt.plot(channelData['t'][plot_mask], row[plot_mask],'ro')
+            plt.plot(channelData['t'], dRowVals)
             print("Current derivative rejection threshold: %f" % dMaxAcceptable)
             print("Current amplitude rejection threshold: %f" % maxAcceptable)
             plt.tight_layout()
@@ -179,9 +179,8 @@ def getCameraTriggers(simiData, plotting = False):
     if plotting:
         f = plt.figure()
         plt.plot(simiData['t'], triggers.values)
-        plt.plot(simiData['t'][peakIdx], triggers.values[peakIdx], 'r*', label='Camera Trigger')
+        plt.plot(simiData['t'][peakIdx], triggers.values[peakIdx], 'r*')
         ax = plt.gca()
-        plt.xlabel('Time (s)')
         ax.set_xlim([36.5, 37])
         plt.show(block = False)
 
@@ -245,13 +244,12 @@ def getGaitEvents(trigTimes, simiTable, whichColumns =  ['ToeUp_Left Y', 'ToeDow
 
     if plotting:
         f = plt.figure()
-        plt.plot(simiDfPadded['simiTime'], gait, label = 'Leg Swing')
-        plt.plot(simiDfPadded['simiTime'], down, 'g*', label = 'Foot Strike')
-        plt.plot(simiDfPadded['simiTime'], up, 'r*', label = 'Foot Off')
+        plt.plot(simiDfPadded['simiTime'], gait)
+        plt.plot(simiDfPadded['simiTime'], down, 'g*')
+        plt.plot(simiDfPadded['simiTime'], up, 'r*')
         ax = plt.gca()
-        ax.set_ylim([-1.1, 2.1])
-        ax.set_xlim([6.8, 8.8])
-        ax.legend()
+        ax.set_ylim([-1.1, 1.1])
+        ax.set_xlim([6.8, 7.8])
         plt.show(block = False)
 
     gaitLabelFun = interpolate.interp1d(simiDfPadded['simiTime'], gait, bounds_error = False, fill_value = 'extrapolate')
@@ -300,60 +298,61 @@ def assignLabels(timeVector, lbl, fnc, CameraFs = 100, oversizeWindow = None):
             #pdb.set_trace()
     return labels
 
-def getSpectrogram(channelData, winLen_s, stepLen_s = 0.02, R = 50, fr_cutoff = None, whichChan = 1, plotting = False):
+if HASLIBTFR:
+    def getSpectrogram(channelData, winLen_s, stepLen_s = 0.02, R = 50, fr_cutoff = None, whichChan = 1, plotting = False):
 
-    Fs = channelData['samp_per_s']
-    nChan = channelData['data'].shape[1]
-    nSamples = channelData['data'].shape[0]
+        Fs = channelData['samp_per_s']
+        nChan = channelData['data'].shape[1]
+        nSamples = channelData['data'].shape[0]
 
-    delta = 1 / Fs
+        delta = 1 / Fs
 
-    winLen_samp = int(winLen_s * Fs)
-    stepLen_samp = int(stepLen_s * Fs)
+        winLen_samp = int(winLen_s * Fs)
+        stepLen_samp = int(stepLen_s * Fs)
 
-    NFFT = nextpowof2(winLen_samp)
-    nw = winLen_s * R # time bandwidth product based on 0.1 sec windows and 200 Hz bandwidth
-    ntapers = round(nw / 2) # L < nw - 1
-    nWindows = m.floor((nSamples - NFFT + 1) / stepLen_samp)
+        NFFT = nextpowof2(winLen_samp)
+        nw = winLen_s * R # time bandwidth product based on 0.1 sec windows and 200 Hz bandwidth
+        ntapers = round(nw / 2) # L < nw - 1
+        nWindows = m.floor((nSamples - NFFT + 1) / stepLen_samp)
 
-    fr_samp = int(NFFT / 2) + 1
-    fr = np.arange(fr_samp) * channelData['samp_per_s'] / (2 * fr_samp)
-    if fr_cutoff is not None:
-        fr = fr[fr < fr_cutoff]
-        fr_samp = len(fr)
+        fr_samp = int(NFFT / 2) + 1
+        fr = np.arange(fr_samp) * channelData['samp_per_s'] / (2 * fr_samp)
+        if fr_cutoff is not None:
+            fr = fr[fr < fr_cutoff]
+            fr_samp = len(fr)
 
-    t = channelData['start_time_s'] + np.arange(nWindows) * stepLen_s
-    spectrum = np.zeros((nChan, nWindows, fr_samp))
-    # generate a transform object with size equal to signal length and ntapers tapers
-    D = libtfr.mfft_dpss(NFFT, nw, ntapers)
-    #pdb.set_trace()
-
-    for idx,signal in channelData['data'].iteritems():
-
-        sys.stdout.write("Running getSpectrogram: %d%%\r" % int(idx * 100 / nChan + 1))
-        sys.stdout.flush()
-
-        P = D.mtspec(signal, stepLen_samp).transpose()
+        t = channelData['start_time_s'] + np.arange(nWindows) * stepLen_s
+        spectrum = np.zeros((nChan, nWindows, fr_samp))
+        # generate a transform object with size equal to signal length and ntapers tapers
+        D = libtfr.mfft_dpss(NFFT, nw, ntapers)
         #pdb.set_trace()
-        P = P[np.newaxis,:,:fr_samp]
-        spectrum[idx,:,:] = P
 
-    if plotting:
+        for idx,signal in channelData['data'].iteritems():
 
-        ch_idx  = channelData['elec_ids'].index(whichChan)
+            sys.stdout.write("Running getSpectrogram: %d%%\r" % int(idx * 100 / nChan + 1))
+            sys.stdout.flush()
 
-        #TODO: implement passing elecID to plotSpectrum
-        #hdr_idx = channelData['ExtendedHeaderIndices'][ch_idx]
+            P = D.mtspec(signal, stepLen_samp).transpose()
+            #pdb.set_trace()
+            P = P[np.newaxis,:,:fr_samp]
+            spectrum[idx,:,:] = P
 
-        P = spectrum[ch_idx,:,:]
-        plotSpectrum(P, Fs, channelData['start_time_s'], channelData['t'][-1], fr =fr, t = t, show = True)
+        if plotting:
 
-    #pdb.set_trace()
+            ch_idx  = channelData['elec_ids'].index(whichChan)
 
-    return {'PSD' : pd.Panel(spectrum, items = channelData['elec_ids'], major_axis = t, minor_axis = fr),
-            'fr' : fr,
-            't' : t
-            }
+            #TODO: implement passing elecID to plotSpectrum
+            #hdr_idx = channelData['ExtendedHeaderIndices'][ch_idx]
+
+            P = spectrum[ch_idx,:,:]
+            plotSpectrum(P, Fs, channelData['start_time_s'], channelData['t'][-1], fr =fr, t = t, show = True)
+
+        #pdb.set_trace()
+
+        return {'PSD' : pd.Panel(spectrum, items = channelData['elec_ids'], major_axis = t, minor_axis = fr),
+                'fr' : fr,
+                't' : t
+                }
 
 def nextpowof2(x):
     return 2**(m.ceil(m.log(x, 2)))
@@ -385,26 +384,16 @@ def plotChan(channelData, whichChan, mask = None, show = False, prevFig = None):
         f = prevFig
         ax = prevFig.axes[0]
 
-    if 'Labels' in channelData['data'].columns:
-        ax.plot(channelData['t'], channelData['data'].drop(['Labels', 'LabelsNumeric'], axis = 1)[ch_idx])
-    else:
-        ax.plot(channelData['t'], channelData['data'][ch_idx])
 
+    ax.plot(channelData['t'], channelData['data'].drop(['Labels', 'LabelsNumeric'], axis = 1)[ch_idx])
 
     if np.any(mask):
-        if 'Labels' in channelData['data'].columns:
-            ax.plot(channelData['t'][mask], channelData['data'].drop(['Labels', 'LabelsNumeric'], axis = 1)[ch_idx][mask], 'ro')
-        else:
-            ax.plot(channelData['t'][mask], channelData['data'][ch_idx][mask], 'ro')
+        ax.plot(channelData['t'][mask], channelData['data'].drop(['Labels', 'LabelsNumeric'], axis = 1)[ch_idx][mask], 'ro')
 
     #pdb.set_trace()
     #channelData['data'][ch_idx].fillna(0, inplace = True)
 
-    if 'Labels' in channelData['data'].columns:
-        ax.axis([channelData['t'][0], channelData['t'][-1], min(channelData['data'].drop(['Labels', 'LabelsNumeric'], axis = 1)[ch_idx]), max(channelData['data'].drop('Labels', axis = 1)[ch_idx])])
-    else:
-        ax.axis([channelData['t'][0], channelData['t'][-1], min(channelData['data'][ch_idx]), max(channelData['data'][ch_idx])])
-
+    ax.axis([channelData['t'][0], channelData['t'][-1], min(channelData['data'].drop(['Labels', 'LabelsNumeric'], axis = 1)[ch_idx]), max(channelData['data'].drop('Labels', axis = 1)[ch_idx])])
     ax.locator_params(axis = 'y', nbins = 20)
     plt.xlabel('Time (s)')
     plt.ylabel("Output (" + channelData['extended_headers'][hdr_idx]['Units'] + ")")
@@ -537,7 +526,7 @@ def plotBinnedSpikes(spikeMat, binCenters, chans, show = True, normalizationType
         plt.show()
     return fi
 
-def plotSpikes(spikes, chans):
+def plot_spikes(spikes, chans):
     # Initialize plots
     colors      = 'kbgrm'
     line_styles = ['-', '--', ':', '-.']
