@@ -40,36 +40,42 @@ logReg = LogisticRegression()
 Cvalues=np.logspace(-1,4,3)
 
 logGrid=GridSearchCV(logReg,{'C': Cvalues,'penalty':['l1','l2']}, cv = skf, n_jobs = -1, verbose = 3)
-logGrid.fit(X,y)
-bestLogReg=logGrid.best_estimator_
-ylogreg=cross_val_predict(bestLogReg,X,y)
 
-labelsNumeric = {'Neither': 0, 'Toe Up': 1, 'Toe Down': 2}
-numericLabels = {v: k for k, v in labelsNumeric.items()}
-predictedLabels = pd.Series([numericLabels[x] for x in ylogreg])
+if __name__ == __main__:
+    logGrid.fit(X,y)
+    bestLogReg=logGrid.best_estimator_
 
-plotting = True
-if plotting:
-    #Plot the spikes
-    fi = plotBinnedSpikes(X, binCenters, chans, show = False)
+    ylogreg=bestLogReg.predict(X)
 
-    upMaskSpikes = (spikeMat['Labels'] == 'Toe Up').values
-    downMaskSpikes = (spikeMat['Labels'] == 'Toe Down').values
+    labelsNumeric = {'Neither': 0, 'Toe Up': 1, 'Toe Down': 2}
+    numericLabels = {v: k for k, v in labelsNumeric.items()}
+    predictedLabels = pd.Series([numericLabels[x] for x in ylogreg])
 
-    upMaskSpikesPredicted = (predictedLabels == 'Toe Up').values
-    downMaskSpikesPredicted = (predictedLabels == 'Toe Down').values
+    plotting = True
+    if plotting:
+        #Plot the spikes
+        fi = plotBinnedSpikes(X, binCenters, chans, show = False)
 
-    dummyVar = np.ones(binCenters.shape[0]) * 1
-    ax = fi.axes[0]
-    ax.plot(binCenters[upMaskSpikes], dummyVar[upMaskSpikes], 'ro')
-    ax.plot(binCenters[downMaskSpikes], dummyVar[downMaskSpikes] + 1, 'go')
+        upMaskSpikes = (spikeMat['Labels'] == 'Toe Up').values
+        downMaskSpikes = (spikeMat['Labels'] == 'Toe Down').values
 
-    ax.plot(binCenters[upMaskSpikesPredicted], dummyVar[upMaskSpikesPredicted] + .5, 'mo')
-    ax.plot(binCenters[downMaskSpikesPredicted], dummyVar[downMaskSpikesPredicted] + 1.5, 'co')
+        upMaskSpikesPredicted = (predictedLabels == 'Toe Up').values
+        downMaskSpikesPredicted = (predictedLabels == 'Toe Down').values
 
-    with open(localDir + 'myplot.pickle', 'wb') as f:
-        pickle.dump(fi, f)
-    plt.show(block = True)
+        dummyVar = np.ones(binCenters.shape[0]) * 1
+        ax = fi.axes[0]
+        ax.plot(binCenters[upMaskSpikes], dummyVar[upMaskSpikes], 'ro')
+        ax.plot(binCenters[downMaskSpikes], dummyVar[downMaskSpikes] + 1, 'go')
+
+        ax.plot(binCenters[upMaskSpikesPredicted], dummyVar[upMaskSpikesPredicted] + .5, 'mo')
+        ax.plot(binCenters[downMaskSpikesPredicted], dummyVar[downMaskSpikesPredicted] + 1.5, 'co')
+
+        with open(localDir + '/mySpikePredictionPlot.pickle', 'wb') as f:
+            pickle.dump(fi, f)
+
+        with open(localDir + '/bestSpectrumLogReg.pickle', 'wb') as f:
+            pickle.dump(bestLogReg, f)
+        #plt.show(block = True)
 
 """
 By default, the score computed at each CV iteration is the score method of

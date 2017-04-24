@@ -48,7 +48,7 @@ if __name__ == '__main__':
     logGrid.fit(X,y)
 
     bestLogReg=logGrid.best_estimator_
-    ylogreg=cross_val_predict(bestLogReg,X,y)
+    ylogreg=bestLogReg.predict(X)
 
     labelsNumeric = {'Neither': 0, 'Toe Up': 1, 'Toe Down': 2}
     numericLabels = {v: k for k, v in labelsNumeric.items()}
@@ -78,8 +78,11 @@ if __name__ == '__main__':
         ax.plot(ns5Data['channel']['spectrum']['t'][upMaskSpectrumPredicted], dummyVar[upMaskSpectrumPredicted] + .5, 'mo')
         ax.plot(ns5Data['channel']['spectrum']['t'][downMaskSpectrumPredicted], dummyVar[downMaskSpectrumPredicted] + 1.5, 'co')
 
-        with open(localDir + 'mySpectrumPlot.pickle', 'wb') as f:
+        with open(localDir + '/mySpectrumPlot.pickle', 'wb') as f:
             pickle.dump(fi, f)
+
+        with open(localDir + '/bestSpectrumLogReg.pickle', 'wb') as f:
+            picle.dump(bestLogReg, f)
 
         #plt.show(block = True)
 
