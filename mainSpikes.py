@@ -21,8 +21,8 @@ fig_opts = {
 matplotlib.rc('font', **font_opts)
 matplotlib.rc('figure', **fig_opts)
 
-localDir = 'E:/Google Drive/Github/tempdata/Data-Analysis/'
-spikeName = 'saveSpikeRightLabeled.p'
+localDir = os.environ['DATA_ANALYSIS_LOCAL_DIR']
+spikeName = '/saveSpikeRightLabeled.p'
 spikeFile = localDir + spikeName
 spikeData = pd.read_pickle(spikeFile)
 spikes = spikeData['spikes']

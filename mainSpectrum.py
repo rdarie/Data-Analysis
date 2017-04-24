@@ -8,6 +8,7 @@ from sklearn.model_selection import StratifiedKFold, train_test_split, cross_val
 from sklearn.model_selection import validation_curve, GridSearchCV, cross_val_predict
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import confusion_matrix
+
 # Plotting options
 font_opts = {'family' : 'arial',
         'weight' : 'bold',
