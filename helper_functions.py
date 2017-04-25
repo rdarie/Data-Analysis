@@ -5,7 +5,7 @@ import matplotlib.colors as colors
 import numpy as np
 import pandas as pd
 import math as m
-import sys
+import sys, itertools
 
 try:
     import libtfr
