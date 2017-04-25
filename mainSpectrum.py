@@ -82,7 +82,7 @@ if __name__ == '__main__':
             pickle.dump(fi, f)
 
         with open(localDir + '/bestSpectrumLogReg.pickle', 'wb') as f:
-            picle.dump(bestLogReg, f)
+            pickle.dump(bestLogReg, f)
 
         #plt.show(block = True)
 

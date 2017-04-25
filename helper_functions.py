@@ -614,7 +614,7 @@ def plot_raster(spikes, chans):
     plt.tight_layout()
     plt.show(block = False)
 
-def plot_confusion_matrix(cm, classes,
+def plotConfusionMatrix(cm, classes,
                           normalize=False,
                           title='Confusion matrix',
                           cmap=plt.cm.Blues):
@@ -624,9 +624,8 @@ def plot_confusion_matrix(cm, classes,
 
     Modified from: http://scikit-learn.org/stable/auto_examples/model_selection/plot_confusion_matrix.html
     """
-    plt.imshow(cm, interpolation='nearest', cmap=cmap)
+    fi = plt.imshow(cm, interpolation='nearest', cmap=cmap)
     plt.title(title)
-    plt.colorbar()
     tick_marks = np.arange(len(classes))
     plt.xticks(tick_marks, classes, rotation=45)
     plt.yticks(tick_marks, classes)
@@ -645,6 +644,10 @@ def plot_confusion_matrix(cm, classes,
                  horizontalalignment="center",
                  color="white" if cm[i, j] > thresh else "black")
 
+    plt.colorbar()
     plt.tight_layout()
+    plt.colorbar()
     plt.ylabel('True label')
     plt.xlabel('Predicted label')
+
+    return fi

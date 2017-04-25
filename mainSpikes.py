@@ -2,7 +2,7 @@ from helper_functions import *
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import pickle
+import pickle, os
 
 from sklearn.model_selection import StratifiedKFold, train_test_split, cross_val_score
 from sklearn.model_selection import validation_curve, GridSearchCV, cross_val_predict
@@ -69,12 +69,22 @@ if __name__ == __main__:
 
         ax.plot(binCenters[upMaskSpikesPredicted], dummyVar[upMaskSpikesPredicted] + .5, 'mo')
         ax.plot(binCenters[downMaskSpikesPredicted], dummyVar[downMaskSpikesPredicted] + 1.5, 'co')
+        # Compute confusion matrix
+        cnf_matrix = confusion_matrix(y, ylogreg)
+        np.set_printoptions(precision=2)
+
+        # Plot normalized confusion matrix
+        fiCm = plotConfusionMatrix(cnf_matrix, classes = labelsNumeric.keys(), normalize=True,
+                              title='Normalized confusion matrix')
+
+        #plt.show()
+        figDic = {'spectrum': fi, 'confusion': fiCm}
 
         with open(localDir + '/mySpikePredictionPlot.pickle', 'wb') as f:
-            pickle.dump(fi, f)
+            pickle.dump(figDic, f)
 
-        with open(localDir + '/bestSpectrumLogReg.pickle', 'wb') as f:
-            pickle.dump(bestLogReg, f)
+    with open(localDir + '/bestSpectrumLogReg.pickle', 'wb') as f:
+        pickle.dump(bestLogReg, f)
         #plt.show(block = True)
 
 """
