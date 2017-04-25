@@ -81,10 +81,10 @@ if __name__ == '__main__':
         #plt.show()
         figDic = {'spectrum': fi, 'confusion': fiCm}
 
-        with open(localDir + '/mySpikePredictionPlot.pickle', 'wb') as f:
+        with open(localDir + '/spikePlot.pickle', 'wb') as f:
             pickle.dump(figDic, f)
 
-    with open(localDir + '/bestSpectrumLogReg.pickle', 'wb') as f:
+    with open(localDir + '/bestSpikeLogReg.pickle', 'wb') as f:
         pickle.dump(bestLogReg, f)
         #plt.show(block = True)
 

@@ -1,8 +1,8 @@
 import matplotlib.pyplot as plt
 import pickle
 
-localDir = 'Z:/data/rdarie/tempdata/'
+localDir = 'Z:/data/rdarie/tempdata/Data-Analysis/'
 
-with open(localDir + 'mySpectrumPlot.pickle', 'rb') as f:
+with open(localDir + 'mySpikePredictionPlot.pickle', 'rb') as f:
     ax = pickle.load(f)
 plt.show()
