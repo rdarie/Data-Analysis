@@ -624,7 +624,8 @@ def plotConfusionMatrix(cm, classes,
 
     Modified from: http://scikit-learn.org/stable/auto_examples/model_selection/plot_confusion_matrix.html
     """
-    fi = plt.imshow(cm, interpolation='nearest', cmap=cmap)
+    fi = plt.figure()
+    plt.imshow(cm, interpolation='nearest', cmap=cmap)
     plt.title(title)
     tick_marks = np.arange(len(classes))
     plt.xticks(tick_marks, classes, rotation=45)
