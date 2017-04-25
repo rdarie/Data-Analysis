@@ -82,7 +82,9 @@ if __name__ == '__main__':
         figDic = {'spectrum': fi, 'confusion': fiCm}
 
         with open(localDir + '/spikePlot.pickle', 'wb') as f:
-            pickle.dump(figDic, f)
+            pickle.dump(fi, f)
+        with open(localDir + '/spikeConfusionMatrix.pickle', 'wb') as f:
+            pickle.dump(fiCm, f)
 
     with open(localDir + '/bestSpikeLogReg.pickle', 'wb') as f:
         pickle.dump(bestLogReg, f)
