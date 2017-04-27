@@ -29,6 +29,7 @@ ns5Data = pd.read_pickle(ns5File)
 
 whichChans = range(96)
 whichFreqs = ns5Data['channel']['spectrum']['fr'] < 300
+
 spectrum = ns5Data['channel']['spectrum']['PSD']
 t = ns5Data['channel']['spectrum']['t']
 labels = ns5Data['channel']['spectrum']['LabelsNumeric']
@@ -48,41 +49,12 @@ if __name__ == '__main__':
     logGrid.fit(X,y)
 
     bestLogReg=logGrid.best_estimator_
-    ylogreg=bestLogReg.predict(X)
-
-    labelsNumeric = {'Neither': 0, 'Toe Up': 1, 'Toe Down': 2}
-    numericLabels = {v: k for k, v in labelsNumeric.items()}
-    predictedLabels = pd.Series([numericLabels[x] for x in ylogreg])
-
-    plotting = True
-    if plotting:
-        #plot the spectrum
-        upMaskSpectrum = (ns5Data['channel']['spectrum']['Labels'] == 'Toe Up').values
-        downMaskSpectrum = (ns5Data['channel']['spectrum']['Labels'] == 'Toe Down').values
-        dummyVar = np.ones(ns5Data['channel']['spectrum']['t'].shape[0]) * 1
-
-        upMaskSpectrumPredicted = (predictedLabels == 'Toe Up').values
-        downMaskSpectrumPredicted = (predictedLabels == 'Toe Down').values
-
-        fi = plotSpectrum(ns5Data['channel']['spectrum']['PSD'][1],
-            ns5Data['channel']['samp_per_s'],
-            ns5Data['channel']['start_time_s'],
-            ns5Data['channel']['t'][-1],
-            fr = ns5Data['channel']['spectrum']['fr'],
-            t = ns5Data['channel']['spectrum']['t'],
-            show = False)
-        ax = fi.axes[0]
-        ax.plot(ns5Data['channel']['spectrum']['t'][upMaskSpectrum], dummyVar[upMaskSpectrum], 'ro')
-        ax.plot(ns5Data['channel']['spectrum']['t'][downMaskSpectrum], dummyVar[downMaskSpectrum] + 1, 'go')
-
-        ax.plot(ns5Data['channel']['spectrum']['t'][upMaskSpectrumPredicted], dummyVar[upMaskSpectrumPredicted] + .5, 'mo')
-        ax.plot(ns5Data['channel']['spectrum']['t'][downMaskSpectrumPredicted], dummyVar[downMaskSpectrumPredicted] + 1.5, 'co')
 
         with open(localDir + '/mySpectrumPlot.pickle', 'wb') as f:
             pickle.dump(fi, f)
 
         with open(localDir + '/bestSpectrumLogReg.pickle', 'wb') as f:
-            pickle.dump(bestLogReg, f)
+            pickle.dump({'estimator' : bestLogReg}, f)
 
         #plt.show(block = True)
 

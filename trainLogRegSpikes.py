@@ -7,7 +7,6 @@ import pickle, os
 from sklearn.model_selection import StratifiedKFold, train_test_split, cross_val_score
 from sklearn.model_selection import validation_curve, GridSearchCV, cross_val_predict
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import confusion_matrix
 
 # Plotting options
 font_opts = {'family' : 'arial',
@@ -48,7 +47,8 @@ logGrid=GridSearchCV(logReg,{'C': Cvalues,'penalty':['l1','l2']}, cv = skf, n_jo
 
 if __name__ == '__main__':
     logGrid.fit(X,y)
-    bestLogReg=logGrid.best_estimator_
+    bestLogReg={'estimator' : logGrid.best_estimator_}
+    pdb.set_trace()
 
     with open(localDir + '/bestSpikeLogReg.pickle', 'wb') as f:
-        pickle.dump({'estimator': bestLogReg}, f)
+        pickle.dump(bestLogReg, f)
