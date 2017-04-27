@@ -19,7 +19,7 @@ matplotlib.rc('figure', **fig_opts)
 
 localDir = os.environ['DATA_ANALYSIS_LOCAL_DIR']
 
-dataName = '/saveRightLabeled.p'
+dataName = '/saveSpikeRightLabeled.p'
 dataFile = localDir + dataName
 data = pd.read_pickle(dataFile)
 
@@ -27,6 +27,10 @@ features = data['spikes']
 binCenters = data['binCenters']
 spikeMat = data['spikeMat']
 binWidth = data['binWidth']
+
+modelName = '/bestSpikeLogReg.pickle'
+modelFile = localDir + dataName
+estimator = pd.read_pickle(modelFile)
 
 # get all columns of spikemat that aren't the labels
 chans = spikeMat.columns.values[np.array([not isinstance(x, str) for x in spikeMat.columns.values], dtype = bool)]

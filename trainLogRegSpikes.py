@@ -51,24 +51,4 @@ if __name__ == '__main__':
     bestLogReg=logGrid.best_estimator_
 
     with open(localDir + '/bestSpikeLogReg.pickle', 'wb') as f:
-        pickle.dump(bestLogReg, f)
-        #plt.show(block = True)
-
-"""
-By default, the score computed at each CV iteration is the score method of
- the estimator. It is possible to change this by using the scoring parameter.
-
-For LogReg, score is accuracy:
-
-True positive (TP) = the number of cases correctly identified as patient
-
-False positive (FP) = the number of cases incorrectly identified as patient
-
-True negative (TN) = the number of cases correctly identified as healthy
-
-False negative (FN) = the number of cases incorrectly identified as healthy
-
-Accuracy: The accuracy of a test is its ability to differentiate the patient and healthy cases correctly. To estimate the accuracy of a test, we should calculate the proportion of true positive and true negative in all evaluated cases. Mathematically, this can be stated as:
-
-Accuracy= (TP+TN) / (TP+TN+FP+FN)
-"""
+        pickle.dump({'estimator': bestLogReg}, f)

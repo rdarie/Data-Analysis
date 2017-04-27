@@ -23,7 +23,7 @@ matplotlib.rc('font', **font_opts)
 matplotlib.rc('figure', **fig_opts)
 
 localDir = os.environ['DATA_ANALYSIS_LOCAL_DIR']
-ns5Name = '/saveRightLabeled.p'
+ns5Name = '/saveSpectrumRightLabeled.p'
 ns5File = localDir + ns5Name
 ns5Data = pd.read_pickle(ns5File)
 

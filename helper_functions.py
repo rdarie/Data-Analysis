@@ -384,16 +384,16 @@ def plotChan(channelData, whichChan, mask = None, show = False, prevFig = None):
         f = prevFig
         ax = prevFig.axes[0]
 
-
-    ax.plot(channelData['t'], channelData['data'].drop(['Labels', 'LabelsNumeric'], axis = 1)[ch_idx])
+    channelDataForPlotting = channelData['data'].drop(['Labels', 'LabelsNumeric'], axis = 1) if 'Labels' in channelData['data'].columns.values else channelData['data']
+    ax.plot(channelData['t'], channelDataForPlotting[ch_idx])
 
     if np.any(mask):
-        ax.plot(channelData['t'][mask], channelData['data'].drop(['Labels', 'LabelsNumeric'], axis = 1)[ch_idx][mask], 'ro')
+        ax.plot(channelData['t'][mask], channelDataForPlotting[ch_idx][mask], 'ro')
 
     #pdb.set_trace()
     #channelData['data'][ch_idx].fillna(0, inplace = True)
 
-    ax.axis([channelData['t'][0], channelData['t'][-1], min(channelData['data'].drop(['Labels', 'LabelsNumeric'], axis = 1)[ch_idx]), max(channelData['data'].drop('Labels', axis = 1)[ch_idx])])
+    ax.axis([channelData['t'][0], channelData['t'][-1], min(channelDataForPlotting[ch_idx]), max(channelDataForPlotting[ch_idx])])
     ax.locator_params(axis = 'y', nbins = 20)
     plt.xlabel('Time (s)')
     plt.ylabel("Output (" + channelData['extended_headers'][hdr_idx]['Units'] + ")")

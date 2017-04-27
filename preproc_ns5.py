@@ -56,7 +56,7 @@ ch_idx  = ChannelData['elec_ids'].index(whichChan)
 
 badData = getBadContinuousMask(ChannelData, plotting = whichChan, smoothing_ms = 0.5)
 
-f,_ = plot_chan(ChannelData, whichChan, mask = None, show = False)
+f,_ = plotChan(ChannelData, whichChan, mask = None, show = False)
 
 clean_data = deepcopy(ChannelData)
 
@@ -68,7 +68,7 @@ for idx, row in clean_data['data'].iteritems():
 clean_data['badData'] = badData
 # check interpolation results
 plot_mask = np.logical_or(badData['general'], badData['perChannel'][ch_idx])
-plot_chan(clean_data, whichChan, mask = plot_mask, show = True, prevFig = f)
+plotChan(clean_data, whichChan, mask = plot_mask, show = True, prevFig = f)
 
 # spectrum function parameters
 winLen_s = 0.15
@@ -80,10 +80,10 @@ clean_data['spectrum'] = getSpectrogram(
     clean_data, winLen_s, stepLen_s, R, 300, whichChan, plotting = True)
 
 data = {'channel':clean_data, 'simiTrigger': simi_triggers}
-with open(localDir + "saveRight.p", "wb" ) as f:
+with open(localDir + "saveSpectrumRight.p", "wb" ) as f:
     pickle.dump(data, f, protocol=4 )
 
-print('Starting to write PDF Report.')
+#print('Starting to write PDF Report.')
 
 #pdfFile = localDir + 'pdfReport.pdf'
 #pdfReport(ChannelData, clean_data, badData = badData, pdfFilePath = pdfFile, spectrum = True)
