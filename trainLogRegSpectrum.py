@@ -49,12 +49,8 @@ if __name__ == '__main__':
     logGrid.fit(X,y)
 
     bestLogReg=logGrid.best_estimator_
-
-        with open(localDir + '/mySpectrumPlot.pickle', 'wb') as f:
-            pickle.dump(fi, f)
-
-        with open(localDir + '/bestSpectrumLogReg.pickle', 'wb') as f:
-            pickle.dump({'estimator' : bestLogReg}, f)
+    with open(localDir + '/bestSpectrumLogReg.pickle', 'wb') as f:
+        pickle.dump({'estimator' : bestLogReg}, f)
 
         #plt.show(block = True)
 
