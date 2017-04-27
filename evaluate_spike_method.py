@@ -31,8 +31,8 @@ binWidth = data['binWidth']
 
 modelName = '/bestSpikeLogReg.pickle'
 modelFile = localDir + modelName
-estimator = pd.read_pickle(modelFile)['estimator']
-
+estimatorDict = pd.read_pickle(modelFile)
+estimator = estimatorDict['estimator']
 # get all columns of spikemat that aren't the labels
 chans = spikeMat.columns.values[np.array([not isinstance(x, str) for x in spikeMat.columns.values], dtype = bool)]
 
