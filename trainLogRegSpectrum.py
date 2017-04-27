@@ -27,8 +27,8 @@ ns5Name = '/saveSpectrumRightLabeled.p'
 ns5File = localDir + ns5Name
 ns5Data = pd.read_pickle(ns5File)
 
-whichChans = range(10)
-whichFreqs = ns5Data['channel']['spectrum']['fr'] < 30
+whichChans = [0, 24, 49, 95]
+whichFreqs = ns5Data['channel']['spectrum']['fr'] < 100
 
 spectrum = ns5Data['channel']['spectrum']['PSD']
 t = ns5Data['channel']['spectrum']['t']
@@ -43,14 +43,14 @@ logReg = LogisticRegression()
 
 Cvalues=np.logspace(-1,3,2)
 
-logGrid=GridSearchCV(logReg,{'penalty':['l1','l2']}, cv = skf, verbose = 3, n_jobs = -1)
+logGrid=GridSearchCV(logReg,{'penalty':['l1','l2']}, cv = skf, verbose = 4, scoring = 'f1_weighted', n_jobs = -1)
 
 if __name__ == '__main__':
     logGrid.fit(X,y)
 
-    bestLogReg=logGrid.best_estimator_
+    bestLogReg={'estimator' : logGrid.best_estimator_, 'info' : logGrid.cv_results_}
     with open(localDir + '/bestSpectrumLogReg.pickle', 'wb') as f:
-        pickle.dump({'estimator' : bestLogReg}, f)
+        pickle.dump(bestLogReg, f)
 
         #plt.show(block = True)
 

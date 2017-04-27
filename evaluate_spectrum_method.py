@@ -29,12 +29,12 @@ t = ns5Data['channel']['spectrum']['t']
 labels = ns5Data['channel']['spectrum']['LabelsNumeric']
 y = labels
 
-whichChans = range(96)
-whichFreqs = ns5Data['channel']['spectrum']['fr'] < 300
+whichChans = range(10)
+whichFreqs = ns5Data['channel']['spectrum']['fr'] < 30
 flatSpectrum = spectrum[whichChans, :, whichFreqs].transpose(1, 0, 2).to_frame().transpose()
 X = flatSpectrum
 
-modelName = '/bestSpectrumLogReg-variant.pickle'
+modelName = '/bestSpectrumLogReg.pickle'
 modelFile = localDir + modelName
 estimator = pd.read_pickle(modelFile)['estimator']
 
