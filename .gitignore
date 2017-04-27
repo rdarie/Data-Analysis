@@ -48,3 +48,6 @@ Temporary Items
 
 # Python c files
 *.pyc
+
+# CCV files
+slurm*
