@@ -27,8 +27,8 @@ ns5Name = '/saveSpectrumRightLabeled.p'
 ns5File = localDir + ns5Name
 ns5Data = pd.read_pickle(ns5File)
 
-whichChans = range(96)
-whichFreqs = ns5Data['channel']['spectrum']['fr'] < 300
+whichChans = range(10)
+whichFreqs = ns5Data['channel']['spectrum']['fr'] < 30
 
 spectrum = ns5Data['channel']['spectrum']['PSD']
 t = ns5Data['channel']['spectrum']['t']
@@ -38,12 +38,12 @@ y = labels
 flatSpectrum = spectrum[whichChans, :, whichFreqs].transpose(1, 0, 2).to_frame().transpose()
 X = flatSpectrum
 
-skf = StratifiedKFold(n_splits=3, shuffle = True, random_state = 1)
+skf = StratifiedKFold(n_splits=2, shuffle = True, random_state = 1)
 logReg = LogisticRegression()
 
 Cvalues=np.logspace(-1,3,2)
 
-logGrid=GridSearchCV(logReg,{'C': Cvalues,'penalty':['l1','l2']}, cv = skf, verbose = 2, n_jobs = -1)
+logGrid=GridSearchCV(logReg,{'penalty':['l1','l2']}, cv = skf, verbose = 3, n_jobs = -1)
 
 if __name__ == '__main__':
     logGrid.fit(X,y)
