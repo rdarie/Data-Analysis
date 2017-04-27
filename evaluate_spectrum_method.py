@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pickle, os
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix, f1_score
 
 # Plotting options
 font_opts = {'family' : 'arial',
@@ -29,10 +29,12 @@ t = ns5Data['channel']['spectrum']['t']
 labels = ns5Data['channel']['spectrum']['LabelsNumeric']
 y = labels
 
-flatSpectrum = spectrum.transpose(1, 0, 2).to_frame().transpose()
+whichChans = range(96)
+whichFreqs = ns5Data['channel']['spectrum']['fr'] < 300
+flatSpectrum = spectrum[whichChans, :, whichFreqs].transpose(1, 0, 2).to_frame().transpose()
 X = flatSpectrum
 
-modelName = '/bestSpectrumLogReg.pickle'
+modelName = '/bestSpectrumLogReg-variant.pickle'
 modelFile = localDir + modelName
 estimator = pd.read_pickle(modelFile)['estimator']
 
@@ -48,7 +50,7 @@ print("Normalized confusion matrix:")
 cnf_matrix.astype('float') / cnf_matrix.sum(axis=1)[:, np.newaxis]
 
 # Compute F1 score
-f1Score = f1_score(y, yHat, average = 'samples')
+f1Score = f1_score(y, yHat, average = 'weighted')
 print("F1 Score was:")
 print(f1Score)
 
@@ -75,6 +77,13 @@ if plotting:
 
     ax.plot(ns5Data['channel']['spectrum']['t'][upMaskSpectrumPredicted], dummyVar[upMaskSpectrumPredicted] + .5, 'mo')
     ax.plot(ns5Data['channel']['spectrum']['t'][downMaskSpectrumPredicted], dummyVar[downMaskSpectrumPredicted] + 1.5, 'co')
+
+    # Plot normalized confusion matrix
+    fiCm = plotConfusionMatrix(cnf_matrix, classes = labelsNumeric.keys(), normalize=True,
+                          title='Normalized confusion matrix')
+
+    #plt.show()
+    figDic = {'spectrum': fi, 'confusion': fiCm}
 
     with open(localDir + '/spikePlot.pickle', 'wb') as f:
         pickle.dump(fi, f)

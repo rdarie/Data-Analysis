@@ -43,7 +43,7 @@ logReg = LogisticRegression()
 
 Cvalues=np.logspace(-1,4,3)
 
-logGrid=GridSearchCV(logReg,{'C': Cvalues,'penalty':['l1','l2']}, cv = skf, n_jobs = -1, verbose = 3)
+logGrid=GridSearchCV(logReg,{'C': Cvalues,'penalty':['l1','l2']}, scoring = 'f1_weighted', cv = skf, n_jobs = -1, verbose = 3)
 
 if __name__ == '__main__':
     logGrid.fit(X,y)
