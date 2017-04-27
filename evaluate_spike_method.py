@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pickle, os
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix, f1_score
 
 # Plotting options
 font_opts = {'family' : 'arial',
@@ -45,6 +45,16 @@ labelsNumeric = {'Neither': 0, 'Toe Up': 1, 'Toe Down': 2}
 numericLabels = {v: k for k, v in labelsNumeric.items()}
 predictedLabels = pd.Series([numericLabels[x] for x in yHat])
 
+# Compute confusion matrix
+cnf_matrix = confusion_matrix(y, yHat)
+print("Normalized confusion matrix:")
+cnf_matrix.astype('float') / cnf_matrix.sum(axis=1)[:, np.newaxis]
+
+# Compute F1 score
+f1Score = f1_score(y, yHat, average = 'samples')
+print("F1 Score was:")
+print(f1Score)
+
 plotting = True
 if plotting:
     #Plot the spikes
@@ -63,9 +73,6 @@ if plotting:
 
     ax.plot(binCenters[upMaskSpikesPredicted], dummyVar[upMaskSpikesPredicted] + .5, 'mo')
     ax.plot(binCenters[downMaskSpikesPredicted], dummyVar[downMaskSpikesPredicted] + 1.5, 'co')
-    # Compute confusion matrix
-    cnf_matrix = confusion_matrix(y, yHat)
-    np.set_printoptions(precision=2)
 
     # Plot normalized confusion matrix
     fiCm = plotConfusionMatrix(cnf_matrix, classes = labelsNumeric.keys(), normalize=True,
@@ -78,3 +85,4 @@ if plotting:
         pickle.dump(fi, f)
     with open(localDir + '/spikeConfusionMatrix.pickle', 'wb') as f:
         pickle.dump(fiCm, f)
+    plt.show()

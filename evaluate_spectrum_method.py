@@ -24,30 +24,33 @@ ns5Name = '/saveSpectrumRightLabeled.p'
 ns5File = localDir + ns5Name
 ns5Data = pd.read_pickle(ns5File)
 
-whichChans = range(96)
-whichFreqs = ns5Data['channel']['spectrum']['fr'] < 300
-
 spectrum = ns5Data['channel']['spectrum']['PSD']
 t = ns5Data['channel']['spectrum']['t']
 labels = ns5Data['channel']['spectrum']['LabelsNumeric']
 y = labels
 
+flatSpectrum = spectrum.transpose(1, 0, 2).to_frame().transpose()
+X = flatSpectrum
+
 modelName = '/bestSpectrumLogReg.pickle'
 modelFile = localDir + modelName
 estimator = pd.read_pickle(modelFile)['estimator']
 
-# get all columns of spikemat that aren't the labels
-chans = spikeMat.columns.values[np.array([not isinstance(x, str) for x in spikeMat.columns.values], dtype = bool)]
-
-X = spikeMat[chans]
-y = spikeMat['LabelsNumeric']
-
 yHat = estimator.predict(X)
-ylogreg=bestLogReg.predict(X)
 
 labelsNumeric = {'Neither': 0, 'Toe Up': 1, 'Toe Down': 2}
 numericLabels = {v: k for k, v in labelsNumeric.items()}
-predictedLabels = pd.Series([numericLabels[x] for x in ylogreg])
+predictedLabels = pd.Series([numericLabels[x] for x in yHat])
+
+# Compute confusion matrix
+cnf_matrix = confusion_matrix(y, yHat)
+print("Normalized confusion matrix:")
+cnf_matrix.astype('float') / cnf_matrix.sum(axis=1)[:, np.newaxis]
+
+# Compute F1 score
+f1Score = f1_score(y, yHat, average = 'samples')
+print("F1 Score was:")
+print(f1Score)
 
 plotting = True
 if plotting:
@@ -77,3 +80,4 @@ if plotting:
         pickle.dump(fi, f)
     with open(localDir + '/spikeConfusionMatrix.pickle', 'wb') as f:
         pickle.dump(fiCm, f)
+    plt.show()
