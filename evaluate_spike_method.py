@@ -60,14 +60,14 @@ print("Normalized confusion matrix:")
 cnf_matrix.astype('float') / cnf_matrix.sum(axis=1)[:, np.newaxis]
 
 # Compute F1 score
-f1Score = f1_score(y.iloc[testIdx], yHat, average = 'samples')
+f1Score = f1_score(y.iloc[testIdx], yHat, average = 'weighted')
 print("F1 Score was:")
 print(f1Score)
 
 plotting = True
 if plotting:
     #Plot the spikes
-    fi = plotBinnedSpikes(X, binCenters, chans, show = False)
+    fi = plotBinnedSpikes(X.iloc[testIdx], binCenters[testIdx], chans, show = False)
 
     upMaskSpikes = (spikeMat['Labels'].iloc[testIdx] == 'Toe Up').values
     downMaskSpikes = (spikeMat['Labels'].iloc[testIdx] == 'Toe Down').values
@@ -77,11 +77,11 @@ if plotting:
 
     dummyVar = np.ones(binCenters[testIdx].shape[0]) * 1
     ax = fi.axes[0]
-    ax.plot(binCenters[upMaskSpikes], dummyVar[upMaskSpikes], 'ro')
-    ax.plot(binCenters[downMaskSpikes], dummyVar[downMaskSpikes] + 1, 'go')
+    ax.plot(binCenters[testIdx][upMaskSpikes], dummyVar[upMaskSpikes], 'ro')
+    ax.plot(binCenters[testIdx][downMaskSpikes], dummyVar[downMaskSpikes] + 1, 'go')
 
-    ax.plot(binCenters[upMaskSpikesPredicted], dummyVar[upMaskSpikesPredicted] + .5, 'mo')
-    ax.plot(binCenters[downMaskSpikesPredicted], dummyVar[downMaskSpikesPredicted] + 1.5, 'co')
+    ax.plot(binCenters[testIdx][upMaskSpikesPredicted], dummyVar[upMaskSpikesPredicted] + .5, 'mo')
+    ax.plot(binCenters[testIdx][downMaskSpikesPredicted], dummyVar[downMaskSpikesPredicted] + 1.5, 'co')
 
     # Plot normalized confusion matrix
     fiCm = plotConfusionMatrix(cnf_matrix, classes = labelsNumeric.keys(), normalize=True,

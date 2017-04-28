@@ -38,16 +38,18 @@ chans = spikeMat.columns.values[np.array([not isinstance(x, str) for x in spikeM
 X = spikeMat[chans]
 y = spikeMat['LabelsNumeric']
 
-skf = StratifiedKFold(n_splits=3, shuffle = True, random_state = 1)
-logReg = LogisticRegression()
+skf = StratifiedKFold(n_splits=5, shuffle = True, random_state = 1)
+logReg = LogisticRegression(class_weight = 'balanced', max_iter = 500)
 
-Cvalues=np.logspace(-1,4,3)
+cValues=np.logspace(-1,4,3)
+solvers = ['sag', 'liblinear']
+penalties = ['l2']
 
-logGrid=GridSearchCV(logReg,{'C': Cvalues,'penalty':['l1','l2']}, scoring = 'f1_weighted', cv = skf, n_jobs = -1, verbose = 3)
+logGrid=GridSearchCV(logReg,{'C': cValues,'penalty': penalties, 'solver' : solvers}, scoring = 'f1_weighted', cv = skf, n_jobs = -1, verbose = 4)
 
 if __name__ == '__main__':
     logGrid.fit(X,y)
     bestLogReg={'estimator' : logGrid.best_estimator_, 'info' : logGrid.cv_results_}
-    
+
     with open(localDir + '/bestSpikeLogReg.pickle', 'wb') as f:
         pickle.dump(bestLogReg, f)
