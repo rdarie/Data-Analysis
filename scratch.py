@@ -1,2 +1,1 @@
-estimatorInfo
-estimator
+whichChans = list(range(10))

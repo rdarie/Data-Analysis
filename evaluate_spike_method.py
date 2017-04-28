@@ -19,6 +19,7 @@ matplotlib.rc('font', **font_opts)
 matplotlib.rc('figure', **fig_opts)
 
 localDir = os.environ['DATA_ANALYSIS_LOCAL_DIR']
+whichChans = list(range(96))
 
 dataName = '/saveSpikeRightLabeled.p'
 dataFile = localDir + dataName
@@ -36,10 +37,10 @@ estimator = estimatorDict['estimator']
 estimatorInfo = estimatorDict['info']
 
 # get all columns of spikemat that aren't the labels
-chans = spikeMat.columns.values[np.array([not isinstance(x, str) for x in spikeMat.columns.values], dtype = bool)]
+nonLabelChans = spikeMat.columns.values[np.array([not isinstance(x, str) for x in spikeMat.columns.values], dtype = bool)]
 
 nSamples = len(binCenters)
-X = spikeMat[chans]
+X = spikeMat[nonLabelChans]
 y = spikeMat['LabelsNumeric']
 
 # Poor man's test train split:
@@ -47,8 +48,8 @@ trainSize = 0.9
 trainIdx = slice(None, int(trainSize * nSamples))
 testIdx = slice(int(trainSize * nSamples) + 1, None)
 
-estimator.fit(X.iloc[trainIdx, :], y.iloc[trainIdx])
-yHat = estimator.predict(X.iloc[testIdx, :])
+estimator.fit(X[whichChans].iloc[trainIdx, :], y.iloc[trainIdx])
+yHat = estimator.predict(X[whichChans].iloc[testIdx, :])
 
 labelsNumeric = {'Neither': 0, 'Toe Up': 1, 'Toe Down': 2}
 numericLabels = {v: k for k, v in labelsNumeric.items()}
@@ -67,7 +68,7 @@ print(f1Score)
 plotting = True
 if plotting:
     #Plot the spikes
-    fi = plotBinnedSpikes(X.iloc[testIdx], binCenters[testIdx], chans, show = False)
+    fi = plotBinnedSpikes(X.iloc[testIdx], binCenters[testIdx], nonLabelChans, show = False)
 
     upMaskSpikes = (spikeMat['Labels'].iloc[testIdx] == 'Toe Up').values
     downMaskSpikes = (spikeMat['Labels'].iloc[testIdx] == 'Toe Down').values

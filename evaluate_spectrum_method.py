@@ -19,8 +19,9 @@ matplotlib.rc('font', **font_opts)
 matplotlib.rc('figure', **fig_opts)
 
 localDir = os.environ['DATA_ANALYSIS_LOCAL_DIR']
-
+modelName = '/bestSpectrumLDA.pickle'
 ns5Name = '/saveSpectrumRightLabeled.p'
+
 ns5File = localDir + ns5Name
 ns5Data = pd.read_pickle(ns5File)
 
@@ -33,7 +34,9 @@ nSamples = len(t)
 y = labels
 
 whichChans = range(96)
-whichFreqs = ns5Data['channel']['spectrum']['fr'] < 300
+maxFreq = 200
+
+whichFreqs = ns5Data['channel']['spectrum']['fr'] < maxFreq
 flatSpectrum = spectrum[whichChans, :, whichFreqs].transpose(1, 0, 2).to_frame().transpose()
 X = flatSpectrum
 
@@ -42,7 +45,6 @@ trainSize = 0.9
 trainIdx = slice(None, int(trainSize * nSamples))
 testIdx = slice(int(trainSize * nSamples) + 1, None)
 
-modelName = '/bestSpectrumLogReg.pickle'
 modelFile = localDir + modelName
 estimatorDict = pd.read_pickle(modelFile)
 estimator = estimatorDict['estimator']
@@ -96,8 +98,8 @@ if plotting:
     #plt.show()
     figDic = {'spectrum': fi, 'confusion': fiCm}
 
-    with open(localDir + '/spikePlot.pickle', 'wb') as f:
+    with open(localDir + '/spectrumPlot.pickle', 'wb') as f:
         pickle.dump(fi, f)
-    with open(localDir + '/spikeConfusionMatrix.pickle', 'wb') as f:
+    with open(localDir + '/spectrumConfusionMatrix.pickle', 'wb') as f:
         pickle.dump(fiCm, f)
     plt.show()

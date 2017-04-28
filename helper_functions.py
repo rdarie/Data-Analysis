@@ -5,7 +5,9 @@ import matplotlib.colors as colors
 import numpy as np
 import pandas as pd
 import math as m
-import sys, itertools
+import sys, itertools, os, pickle
+from sklearn.model_selection import StratifiedKFold, GridSearchCV
+from sklearn.linear_model import LogisticRegression
 
 try:
     import libtfr
@@ -653,27 +655,52 @@ def plotConfusionMatrix(cm, classes,
 
     return fi
 
-def trainSpectralMethod(estimator, parameters):
+def trainSpectralMethod(dataName, whichChans, maxFreq, estimator, skf, parameters, outputFileName):
+
     localDir = os.environ['DATA_ANALYSIS_LOCAL_DIR']
-    ns5File = localDir + ns5Name
-    ns5Data = pd.read_pickle(ns5File)
 
-    whichChans = range(96)
-    whichFreqs = ns5Data['channel']['spectrum']['fr'] < 300
+    dataFile = localDir + dataName
+    pickleData = pd.read_pickle(dataFile)
 
-    spectrum = ns5Data['channel']['spectrum']['PSD']
+    whichFreqs = pickleData['channel']['spectrum']['fr'] < maxFreq
+
+    spectrum = pickleData['channel']['spectrum']['PSD']
     #t = ns5Data['channel']['spectrum']['t']
-    labels = ns5Data['channel']['spectrum']['LabelsNumeric']
+    labels = pickleData['channel']['spectrum']['LabelsNumeric']
     flatSpectrum = spectrum[whichChans, :, whichFreqs].transpose(1, 0, 2).to_frame().transpose()
 
     X = flatSpectrum
     y = labels
 
-    grid=GridSearchCV(estimator, parameters, cv = skf, verbose = 4, scoring = 'f1_weighted', n_jobs = -1)
+    grid=GridSearchCV(estimator, parameters, cv = skf, verbose = 4, scoring = 'f1_weighted', pre_dispatch='n_jobs', n_jobs = -1)
 
-    if __name__ == '__main__':
-        grid.fit(X,y)
+    #if __name__ == '__main__':
+    grid.fit(X,y)
 
-        bestLogReg={'estimator' : logGrid.best_estimator_, 'info' : logGrid.cv_results_}
-        with open(localDir + '/bestSpectrumLogReg.pickle', 'wb') as f:
-            pickle.dump(bestLogReg, f)
+    bestEstimator={'estimator' : grid.best_estimator_, 'info' : grid.cv_results_}
+    with open(localDir + outputFileName, 'wb') as f:
+        pickle.dump(bestEstimator, f)
+
+def trainSpikeMethod(dataName, whichChans, estimator, skf, parameters, outputFileName):
+    localDir = os.environ['DATA_ANALYSIS_LOCAL_DIR']
+    spikeFile = localDir + dataName
+    spikeData = pd.read_pickle(spikeFile)
+
+    spikes = spikeData['spikes']
+    binCenters = spikeData['binCenters']
+    spikeMat = spikeData['spikeMat']
+    binWidth = spikeData['binWidth']
+
+    # get all columns of spikemat that aren't the labels
+    nonLabelChans = spikeMat.columns.values[np.array([not isinstance(x, str) for x in spikeMat.columns.values], dtype = bool)]
+
+    X = spikeMat[nonLabelChans][whichChans]
+    y = spikeMat['LabelsNumeric']
+
+    grid=GridSearchCV(estimator, parameters, scoring = 'f1_weighted', cv = skf, n_jobs = -1, verbose = 4)
+
+    grid.fit(X,y)
+    bestEstimator={'estimator' : grid.best_estimator_, 'info' : grid.cv_results_}
+
+    with open(localDir + outputFileName, 'wb') as f:
+        pickle.dump(bestEstimator, f)
