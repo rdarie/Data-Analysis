@@ -33,25 +33,34 @@ modelName = '/bestSpikeLogReg.pickle'
 modelFile = localDir + modelName
 estimatorDict = pd.read_pickle(modelFile)
 estimator = estimatorDict['estimator']
+estimatorInfo = estimatorDict['info']
+
 # get all columns of spikemat that aren't the labels
 chans = spikeMat.columns.values[np.array([not isinstance(x, str) for x in spikeMat.columns.values], dtype = bool)]
 
+nSamples = len(binCenters)
 X = spikeMat[chans]
 y = spikeMat['LabelsNumeric']
 
-yHat = estimator.predict(X)
+# Poor man's test train split:
+trainSize = 0.9
+trainIdx = slice(None, int(trainSize * nSamples))
+testIdx = slice(int(trainSize * nSamples) + 1, None)
+
+estimator.fit(X.iloc[trainIdx, :], y.iloc[trainIdx])
+yHat = estimator.predict(X.iloc[testIdx, :])
 
 labelsNumeric = {'Neither': 0, 'Toe Up': 1, 'Toe Down': 2}
 numericLabels = {v: k for k, v in labelsNumeric.items()}
 predictedLabels = pd.Series([numericLabels[x] for x in yHat])
 
 # Compute confusion matrix
-cnf_matrix = confusion_matrix(y, yHat)
+cnf_matrix = confusion_matrix(y.iloc[testIdx], yHat)
 print("Normalized confusion matrix:")
 cnf_matrix.astype('float') / cnf_matrix.sum(axis=1)[:, np.newaxis]
 
 # Compute F1 score
-f1Score = f1_score(y, yHat, average = 'samples')
+f1Score = f1_score(y.iloc[testIdx], yHat, average = 'samples')
 print("F1 Score was:")
 print(f1Score)
 
@@ -60,13 +69,13 @@ if plotting:
     #Plot the spikes
     fi = plotBinnedSpikes(X, binCenters, chans, show = False)
 
-    upMaskSpikes = (spikeMat['Labels'] == 'Toe Up').values
-    downMaskSpikes = (spikeMat['Labels'] == 'Toe Down').values
+    upMaskSpikes = (spikeMat['Labels'].iloc[testIdx] == 'Toe Up').values
+    downMaskSpikes = (spikeMat['Labels'].iloc[testIdx] == 'Toe Down').values
 
     upMaskSpikesPredicted = (predictedLabels == 'Toe Up').values
     downMaskSpikesPredicted = (predictedLabels == 'Toe Down').values
 
-    dummyVar = np.ones(binCenters.shape[0]) * 1
+    dummyVar = np.ones(binCenters[testIdx].shape[0]) * 1
     ax = fi.axes[0]
     ax.plot(binCenters[upMaskSpikes], dummyVar[upMaskSpikes], 'ro')
     ax.plot(binCenters[downMaskSpikes], dummyVar[downMaskSpikes] + 1, 'go')

@@ -26,57 +26,68 @@ ns5Data = pd.read_pickle(ns5File)
 
 spectrum = ns5Data['channel']['spectrum']['PSD']
 t = ns5Data['channel']['spectrum']['t']
+fr = ns5Data['channel']['spectrum']['fr']
 labels = ns5Data['channel']['spectrum']['LabelsNumeric']
+
+nSamples = len(t)
 y = labels
 
-whichChans = range(10)
-whichFreqs = ns5Data['channel']['spectrum']['fr'] < 30
+whichChans = [0, 24, 49, 95]
+whichFreqs = ns5Data['channel']['spectrum']['fr'] < 100
 flatSpectrum = spectrum[whichChans, :, whichFreqs].transpose(1, 0, 2).to_frame().transpose()
 X = flatSpectrum
 
+# Poor man's test train split:
+trainSize = 0.9
+trainIdx = slice(None, int(trainSize * nSamples))
+testIdx = slice(int(trainSize * nSamples) + 1, None)
+
 modelName = '/bestSpectrumLogReg.pickle'
 modelFile = localDir + modelName
-estimator = pd.read_pickle(modelFile)['estimator']
+estimatorDict = pd.read_pickle(modelFile)
+estimator = estimatorDict['estimator']
+estimatorInfo = estimatorDict['info']
 
-yHat = estimator.predict(X)
+estimator.fit(X.iloc[trainIdx, :], y.iloc[trainIdx])
+yHat = estimator.predict(X.iloc[testIdx, :])
 
 labelsNumeric = {'Neither': 0, 'Toe Up': 1, 'Toe Down': 2}
 numericLabels = {v: k for k, v in labelsNumeric.items()}
 predictedLabels = pd.Series([numericLabels[x] for x in yHat])
 
 # Compute confusion matrix
-cnf_matrix = confusion_matrix(y, yHat)
+cnf_matrix = confusion_matrix(y.iloc[testIdx], yHat)
 print("Normalized confusion matrix:")
 cnf_matrix.astype('float') / cnf_matrix.sum(axis=1)[:, np.newaxis]
 
 # Compute F1 score
-f1Score = f1_score(y, yHat, average = 'weighted')
+f1Score = f1_score(y.iloc[testIdx], yHat, average = 'weighted')
 print("F1 Score was:")
 print(f1Score)
 
 plotting = True
 if plotting:
     #plot the spectrum
-    upMaskSpectrum = (ns5Data['channel']['spectrum']['Labels'] == 'Toe Up').values
-    downMaskSpectrum = (ns5Data['channel']['spectrum']['Labels'] == 'Toe Down').values
-    dummyVar = np.ones(ns5Data['channel']['spectrum']['t'].shape[0]) * 1
+    upMaskSpectrum = (ns5Data['channel']['spectrum']['Labels'].iloc[testIdx] == 'Toe Up').values
+    downMaskSpectrum = (ns5Data['channel']['spectrum']['Labels'].iloc[testIdx] == 'Toe Down').values
+    dummyVar = np.ones(t[testIdx].shape[0]) * 1
 
     upMaskSpectrumPredicted = (predictedLabels == 'Toe Up').values
     downMaskSpectrumPredicted = (predictedLabels == 'Toe Down').values
 
-    fi = plotSpectrum(ns5Data['channel']['spectrum']['PSD'][1],
+    fi = plotSpectrum(spectrum[1].iloc[testIdx],
         ns5Data['channel']['samp_per_s'],
-        ns5Data['channel']['start_time_s'],
-        ns5Data['channel']['t'][-1],
-        fr = ns5Data['channel']['spectrum']['fr'],
-        t = ns5Data['channel']['spectrum']['t'],
+        t[testIdx][0],
+        t[testIdx][-1],
+        fr = fr,
+        t = t[testIdx],
         show = False)
     ax = fi.axes[0]
-    ax.plot(ns5Data['channel']['spectrum']['t'][upMaskSpectrum], dummyVar[upMaskSpectrum], 'ro')
-    ax.plot(ns5Data['channel']['spectrum']['t'][downMaskSpectrum], dummyVar[downMaskSpectrum] + 1, 'go')
+    ax.plot(t[testIdx][upMaskSpectrum], dummyVar[upMaskSpectrum], 'ro')
+    ax.plot(t[testIdx][downMaskSpectrum], dummyVar[downMaskSpectrum] + 1, 'go')
 
-    ax.plot(ns5Data['channel']['spectrum']['t'][upMaskSpectrumPredicted], dummyVar[upMaskSpectrumPredicted] + .5, 'mo')
-    ax.plot(ns5Data['channel']['spectrum']['t'][downMaskSpectrumPredicted], dummyVar[downMaskSpectrumPredicted] + 1.5, 'co')
+    ax.plot(t[testIdx][upMaskSpectrumPredicted], dummyVar[upMaskSpectrumPredicted] + .5, 'mo')
+    ax.plot(t[testIdx][downMaskSpectrumPredicted], dummyVar[downMaskSpectrumPredicted] + 1.5, 'co')
 
     # Plot normalized confusion matrix
     fiCm = plotConfusionMatrix(cnf_matrix, classes = labelsNumeric.keys(), normalize=True,

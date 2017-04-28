@@ -1,12 +1,9 @@
-spectrum[whichChans, :, whichFreqs].shape
-spectrum = ns5Data['channel']['spectrum']['PSD']
-flatSpectrum = spectrum.transpose(2, 1, 0).to_frame()
 flatSpectrum.shape
-ylogreg.shape
+spectrum.shape
+len(t)
 
-ns5Data['channel']['spectrum']['t'].shape
-dummyVar = np.ones(ns5Data['channel']['spectrum']['t'].shape[0]) * 1
-predictedLabels.shape
-upMaskSpectrumPredicted.shape
-dummyVar[upMaskSpectrumPredicted].shape
-dummyVar[downMaskSpectrumPredicted].shape
+list(trainIdx)
+testIdx[0]
+y.shape
+
+X[trainIdx, :]

@@ -47,8 +47,7 @@ logGrid=GridSearchCV(logReg,{'C': Cvalues,'penalty':['l1','l2']}, scoring = 'f1_
 
 if __name__ == '__main__':
     logGrid.fit(X,y)
-    bestLogReg={'estimator' : logGrid.best_estimator_}
-    pdb.set_trace()
-
+    bestLogReg={'estimator' : logGrid.best_estimator_, 'info' : logGrid.cv_results_}
+    
     with open(localDir + '/bestSpikeLogReg.pickle', 'wb') as f:
         pickle.dump(bestLogReg, f)
