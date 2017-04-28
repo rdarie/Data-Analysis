@@ -32,8 +32,8 @@ labels = ns5Data['channel']['spectrum']['LabelsNumeric']
 nSamples = len(t)
 y = labels
 
-whichChans = [0, 24, 49, 95]
-whichFreqs = ns5Data['channel']['spectrum']['fr'] < 100
+whichChans = range(96)
+whichFreqs = ns5Data['channel']['spectrum']['fr'] < 300
 flatSpectrum = spectrum[whichChans, :, whichFreqs].transpose(1, 0, 2).to_frame().transpose()
 X = flatSpectrum
 

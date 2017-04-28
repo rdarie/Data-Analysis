@@ -9,41 +9,31 @@ from sklearn.model_selection import validation_curve, GridSearchCV, cross_val_pr
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import confusion_matrix
 
-# Plotting options
-font_opts = {'family' : 'arial',
-        'weight' : 'bold',
-        'size'   : 20
-        }
-
-fig_opts = {
-    'figsize' : (10,5),
-    }
-
-matplotlib.rc('font', **font_opts)
-matplotlib.rc('figure', **fig_opts)
-
 localDir = os.environ['DATA_ANALYSIS_LOCAL_DIR']
-ns5Name = '/saveSpectrumRightLabeled.p'
-ns5File = localDir + ns5Name
-ns5Data = pd.read_pickle(ns5File)
+dataName = '/saveSpectrumRightLabeled.p'
+dataFile = localDir + dataName
+ns5Data = pd.read_pickle(dataFile)
 
-whichChans = [0, 24, 49, 95]
-whichFreqs = ns5Data['channel']['spectrum']['fr'] < 100
+whichChans = [1]
+whichFreqs = ns5Data['channel']['spectrum']['fr'] < 10
 
-spectrum = ns5Data['channel']['spectrum']['PSD']
-t = ns5Data['channel']['spectrum']['t']
-labels = ns5Data['channel']['spectrum']['LabelsNumeric']
+spectrum = dataData['channel']['spectrum']['PSD']
+#t = ns5Data['channel']['spectrum']['t']
+labels = dataData['channel']['spectrum']['LabelsNumeric']
+flatSpectrum = spectrum[whichChans, :, whichFreqs].transpose(1, 0, 2).to_frame().transpose()
+
+X = flatSpectrum
 y = labels
 
-flatSpectrum = spectrum[whichChans, :, whichFreqs].transpose(1, 0, 2).to_frame().transpose()
-X = flatSpectrum
+skf = StratifiedKFold(n_splits=5, shuffle = True, random_state = 1)
+logReg = LogisticRegression(class_weight = 'balanced', max_iter = 500)
 
-skf = StratifiedKFold(n_splits=2, shuffle = True, random_state = 1)
-logReg = LogisticRegression()
+#cValues=np.logspace(-2,5,10)
+cValues = [1]
+solvers = ['liblinear']
+penalties = ['l2']
 
-Cvalues=np.logspace(-1,3,2)
-
-logGrid=GridSearchCV(logReg,{'penalty':['l1','l2']}, cv = skf, verbose = 4, scoring = 'f1_weighted', n_jobs = -1)
+logGrid=GridSearchCV(logReg, {'C': cValues,'penalty': penalties, 'solver' : solvers}, cv = skf, verbose = 4, scoring = 'f1_weighted', n_jobs = -1)
 
 if __name__ == '__main__':
     logGrid.fit(X,y)

@@ -652,3 +652,28 @@ def plotConfusionMatrix(cm, classes,
     plt.xlabel('Predicted label')
 
     return fi
+
+def trainSpectralMethod(estimator, parameters):
+    localDir = os.environ['DATA_ANALYSIS_LOCAL_DIR']
+    ns5File = localDir + ns5Name
+    ns5Data = pd.read_pickle(ns5File)
+
+    whichChans = range(96)
+    whichFreqs = ns5Data['channel']['spectrum']['fr'] < 300
+
+    spectrum = ns5Data['channel']['spectrum']['PSD']
+    #t = ns5Data['channel']['spectrum']['t']
+    labels = ns5Data['channel']['spectrum']['LabelsNumeric']
+    flatSpectrum = spectrum[whichChans, :, whichFreqs].transpose(1, 0, 2).to_frame().transpose()
+
+    X = flatSpectrum
+    y = labels
+
+    grid=GridSearchCV(estimator, parameters, cv = skf, verbose = 4, scoring = 'f1_weighted', n_jobs = -1)
+
+    if __name__ == '__main__':
+        grid.fit(X,y)
+
+        bestLogReg={'estimator' : logGrid.best_estimator_, 'info' : logGrid.cv_results_}
+        with open(localDir + '/bestSpectrumLogReg.pickle', 'wb') as f:
+            pickle.dump(bestLogReg, f)

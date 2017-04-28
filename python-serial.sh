@@ -13,4 +13,4 @@
 #SBATCH -J PythonJob
 
 # Run a matlab function called 'foo.m' in the same directory as this batch script.
-python mainSpikes.py
+python3 mainSpikes.py
