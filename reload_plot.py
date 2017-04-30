@@ -4,7 +4,7 @@ import numpy as np
 
 localDir = 'Z:/data/rdarie/tempdata/Data-Analysis/'
 
-with open(localDir + 'spikeConfusionMatrix.pickle', 'rb') as f:
+with open(localDir + 'spectrumSVC(C=1, caDecisionBoundaryPlot.pickle', 'rb') as f:
     ax = pickle.load(f)
 
 #np.set_printoptions(precision=2)

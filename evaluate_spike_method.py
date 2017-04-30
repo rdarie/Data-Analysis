@@ -30,7 +30,7 @@ binCenters = data['binCenters']
 spikeMat = data['spikeMat']
 binWidth = data['binWidth']
 
-modelName = '/bestSpikeLogReg.pickle'
+modelName = '/bestSpikeSVM_RBF.pickle'
 modelFile = localDir + modelName
 estimatorDict = pd.read_pickle(modelFile)
 estimator = estimatorDict['estimator']
@@ -62,7 +62,7 @@ cnf_matrix.astype('float') / cnf_matrix.sum(axis=1)[:, np.newaxis]
 
 # Compute F1 score
 f1Score = f1_score(y.iloc[testIdx], yHat, average = 'weighted')
-print("F1 Score was:")
+print('F1 Score for '+ estimator.__str__()[:11] + ' was:')
 print(f1Score)
 
 plotting = True
@@ -88,11 +88,52 @@ if plotting:
     fiCm = plotConfusionMatrix(cnf_matrix, classes = labelsNumeric.keys(), normalize=True,
                           title='Normalized confusion matrix')
 
-    #plt.show()
+    #plot a scatter matrix describing the performance:
+    if hasattr(estimator, 'transform'):
+        plotData = estimator.transform(X.iloc[testIdx])
+        fiTr, ax = plt.subplots()
+        ax.scatter(plotData[:, 0][y.iloc[testIdx].values == 0],
+            plotData[:, 1][y.iloc[testIdx].values == 0],
+            c = plt.cm.Paired(0.3), label = 'Neither')
+        ax.scatter(plotData[:, 0][y.iloc[testIdx].values == 1],
+            plotData[:, 1][y.iloc[testIdx].values == 1],
+            c = plt.cm.Paired(0.6), label = 'Foot Off')
+        ax.scatter(plotData[:, 0][y.iloc[testIdx].values == 2],
+            plotData[:, 1][y.iloc[testIdx].values == 2],
+            c = plt.cm.Paired(1), label = 'Foot Strike')
+        plt.legend(markerscale=2, scatterpoints=1)
+        ax.set_title('Method Transform')
+        ax.set_xticks(())
+        ax.set_yticks(())
+        plt.show()
+        with open(localDir + '/spike'+ estimator.__str__()[:11] + 'TransformedPlot.pickle', 'wb') as f:
+            pickle.dump(fiTr, f)
+
+    if hasattr(estimator, 'decision_function'):
+        fiDb, ax = plt.subplots()
+        plotData = estimator.decision_function(X.iloc[testIdx])
+
+        ax.scatter(binCenters[testIdx][y.iloc[testIdx].values == 0],
+            plotData[:, 0][y.iloc[testIdx].values == 0],
+            c = plt.cm.Paired(0.3), label = 'Neither')
+        ax.scatter(binCenters[testIdx][y.iloc[testIdx].values == 1],
+            plotData[:, 0][y.iloc[testIdx].values == 1],
+            c = plt.cm.Paired(0.6), label = 'Foot Off')
+        ax.scatter(binCenters[testIdx][y.iloc[testIdx].values == 2],
+            plotData[:, 0][y.iloc[testIdx].values == 2],
+            c = plt.cm.Paired(0.1), label = 'Foot Strike')
+        ax.set_xlabel('Time (sec)')
+        ax.set_title('Distance from Neither Boundary')
+        #ax.set_yticks(())
+        plt.legend(markerscale=2, scatterpoints=1)
+        plt.show()
+        with open(localDir + '/spike'+ estimator.__str__()[:11] + 'DecisionBoundaryPlot.pickle', 'wb') as f:
+            pickle.dump(fiDb, f)
+
     figDic = {'spectrum': fi, 'confusion': fiCm}
 
-    with open(localDir + '/spikePlot.pickle', 'wb') as f:
+    with open(localDir + '/spike'+ estimator.__str__()[:11] + 'Plot.pickle', 'wb') as f:
         pickle.dump(fi, f)
-    with open(localDir + '/spikeConfusionMatrix.pickle', 'wb') as f:
+    with open(localDir + '/spike'+ estimator.__str__()[:11] + 'ConfusionMatrix.pickle', 'wb') as f:
         pickle.dump(fiCm, f)
     plt.show()

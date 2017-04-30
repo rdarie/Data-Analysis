@@ -12,9 +12,11 @@ LDA = LinearDiscriminantAnalysis()
 
 solvers = ['svd']
 shrinkages = ['auto']
-componentCounts = [None]
+componentCounts = [2]
 
 parameters = {'solver': solvers, 'n_components' : componentCounts}
 outputFileName = '/bestSpectrumLDA.pickle'
 
 trainSpectralMethod(dataName, whichChans, maxFreq, LDA, skf, parameters, outputFileName)
+
+print('Train LDA Spectrum DONE')

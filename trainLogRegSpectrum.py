@@ -19,3 +19,4 @@ parameters = {'C': cValues, 'solver': solvers, 'penalty': penalties}
 outputFileName = '/bestSpectrumLogReg.pickle'
 
 trainSpectralMethod(dataName, whichChans, maxFreq, logReg, skf, parameters, outputFileName)
+print('Train LogReg Spectrum DONE')
