@@ -2,7 +2,7 @@ from helper_functions import *
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import pickle, os
+import pickle, os, sys
 from sklearn.metrics import confusion_matrix, f1_score
 
 # Plotting options
@@ -30,7 +30,11 @@ binCenters = data['binCenters']
 spikeMat = data['spikeMat']
 binWidth = data['binWidth']
 
-modelName = '/bestSpikeSVM_RBF.pickle'
+try:
+    modelName = '/' + sys.argv[1]
+except:
+    modelName = '/bestSpikeSVM_RBF_Z.pickle'
+
 modelFile = localDir + modelName
 estimatorDict = pd.read_pickle(modelFile)
 estimator = estimatorDict['estimator']
@@ -62,7 +66,7 @@ cnf_matrix.astype('float') / cnf_matrix.sum(axis=1)[:, np.newaxis]
 
 # Compute F1 score
 f1Score = f1_score(y.iloc[testIdx], yHat, average = 'weighted')
-print('F1 Score for '+ estimator.__str__()[:11] + ' was:')
+print('F1 Score for '+ estimator.__str__()[:3] + ' was:')
 print(f1Score)
 
 plotting = True
@@ -84,56 +88,113 @@ if plotting:
     ax.plot(binCenters[testIdx][upMaskSpikesPredicted], dummyVar[upMaskSpikesPredicted] + .5, 'mo')
     ax.plot(binCenters[testIdx][downMaskSpikesPredicted], dummyVar[downMaskSpikesPredicted] + 1.5, 'co')
 
+    plt.tight_layout()
+    plt.savefig(localDir + '/spike'+ estimator.__str__()[:3] + 'Plot.png')
+
     # Plot normalized confusion matrix
     fiCm = plotConfusionMatrix(cnf_matrix, classes = labelsNumeric.keys(), normalize=True,
                           title='Normalized confusion matrix')
+
+    plt.tight_layout()
+    plt.savefig(localDir + '/spike'+ estimator.__str__()[:3] + 'ConfusionMatrix.png')
+
+    # Plot a validation Curve
+    fiVC = plotValidationCurve(estimator, estimatorInfo)
+
+    plt.savefig(localDir + '/spike'+ estimator.__str__()[:3] + 'ValidationCurve.png')
 
     #plot a scatter matrix describing the performance:
     if hasattr(estimator, 'transform'):
         plotData = estimator.transform(X.iloc[testIdx])
         fiTr, ax = plt.subplots()
-        ax.scatter(plotData[:, 0][y.iloc[testIdx].values == 0],
-            plotData[:, 1][y.iloc[testIdx].values == 0],
-            c = plt.cm.Paired(0.3), label = 'Neither')
-        ax.scatter(plotData[:, 0][y.iloc[testIdx].values == 1],
-            plotData[:, 1][y.iloc[testIdx].values == 1],
-            c = plt.cm.Paired(0.6), label = 'Foot Off')
-        ax.scatter(plotData[:, 0][y.iloc[testIdx].values == 2],
-            plotData[:, 1][y.iloc[testIdx].values == 2],
-            c = plt.cm.Paired(1), label = 'Foot Strike')
+        if plotData.shape[1] == 2:
+            try:
+                ax.scatter(plotData[:, 0][y.iloc[testIdx].values == 0],
+                    plotData[:, 1][y.iloc[testIdx].values == 0],
+                    c = plt.cm.Paired(0.3), label = 'Neither')
+            except:
+                pass
+            try:
+                ax.scatter(plotData[:, 0][y.iloc[testIdx].values == 1],
+                    plotData[:, 1][y.iloc[testIdx].values == 1],
+                    c = plt.cm.Paired(0.6), label = 'Foot Off')
+            except:
+                pass
+            try:
+                ax.scatter(plotData[:, 0][y.iloc[testIdx].values == 2],
+                    plotData[:, 1][y.iloc[testIdx].values == 2],
+                    c = plt.cm.Paired(1), label = 'Foot Strike')
+            except:
+                pass
+        else: # 1D
+            try:
+                ax.scatter(binCenters[testIdx][y.iloc[testIdx].values == 0],
+                    plotData[:, 0][y.iloc[testIdx].values == 0],
+                    c = plt.cm.Paired(0.3), label = 'Neither')
+            except:
+                pass
+            try:
+                ax.scatter(binCenters[testIdx][y.iloc[testIdx].values == 1],
+                    plotData[:, 0][y.iloc[testIdx].values == 1],
+                    c = plt.cm.Paired(0.6), label = 'Foot Off')
+            except:
+                pass
+            try:
+                ax.scatter(binCenters[testIdx][y.iloc[testIdx].values == 2],
+                    plotData[:,0][y.iloc[testIdx].values == 2],
+                    c = plt.cm.Paired(1), label = 'Foot Strike')
+            except:
+                pass
+
         plt.legend(markerscale=2, scatterpoints=1)
         ax.set_title('Method Transform')
         ax.set_xticks(())
         ax.set_yticks(())
+        plt.tight_layout()
+        plt.savefig(localDir + '/spike'+ estimator.__str__()[:3] + 'TransformedPlot.png')
+
         plt.show()
-        with open(localDir + '/spike'+ estimator.__str__()[:11] + 'TransformedPlot.pickle', 'wb') as f:
+        with open(localDir + '/spike'+ estimator.__str__()[:3] + 'TransformedPlot.pickle', 'wb') as f:
             pickle.dump(fiTr, f)
 
     if hasattr(estimator, 'decision_function'):
         fiDb, ax = plt.subplots()
         plotData = estimator.decision_function(X.iloc[testIdx])
-
-        ax.scatter(binCenters[testIdx][y.iloc[testIdx].values == 0],
-            plotData[:, 0][y.iloc[testIdx].values == 0],
-            c = plt.cm.Paired(0.3), label = 'Neither')
-        ax.scatter(binCenters[testIdx][y.iloc[testIdx].values == 1],
-            plotData[:, 0][y.iloc[testIdx].values == 1],
-            c = plt.cm.Paired(0.6), label = 'Foot Off')
-        ax.scatter(binCenters[testIdx][y.iloc[testIdx].values == 2],
-            plotData[:, 0][y.iloc[testIdx].values == 2],
-            c = plt.cm.Paired(0.1), label = 'Foot Strike')
+        try:
+            ax.scatter(binCenters[testIdx][y.iloc[testIdx].values == 0],
+                plotData[:, 0][y.iloc[testIdx].values == 0],
+                c = plt.cm.Paired(0.3), label = 'Neither')
+        except:
+            pass
+        try:
+            ax.scatter(binCenters[testIdx][y.iloc[testIdx].values == 1],
+                plotData[:, 0][y.iloc[testIdx].values == 1],
+                c = plt.cm.Paired(0.6), label = 'Foot Off')
+        except:
+            pass
+        try:
+            ax.scatter(binCenters[testIdx][y.iloc[testIdx].values == 2],
+                plotData[:, 0][y.iloc[testIdx].values == 2],
+                c = plt.cm.Paired(0.1), label = 'Foot Strike')
+        except:
+            pass
         ax.set_xlabel('Time (sec)')
         ax.set_title('Distance from Neither Boundary')
         #ax.set_yticks(())
         plt.legend(markerscale=2, scatterpoints=1)
+        plt.tight_layout()
+        plt.savefig(localDir + '/spike'+ estimator.__str__()[:3] + 'DecisionBoundaryPlot.png')
+
         plt.show()
-        with open(localDir + '/spike'+ estimator.__str__()[:11] + 'DecisionBoundaryPlot.pickle', 'wb') as f:
+        with open(localDir + '/spike'+ estimator.__str__()[:3] + 'DecisionBoundaryPlot.pickle', 'wb') as f:
             pickle.dump(fiDb, f)
 
     figDic = {'spectrum': fi, 'confusion': fiCm}
 
-    with open(localDir + '/spike'+ estimator.__str__()[:11] + 'Plot.pickle', 'wb') as f:
+    with open(localDir + '/spike'+ estimator.__str__()[:3] + 'Plot.pickle', 'wb') as f:
         pickle.dump(fi, f)
-    with open(localDir + '/spike'+ estimator.__str__()[:11] + 'ConfusionMatrix.pickle', 'wb') as f:
+    with open(localDir + '/spike'+ estimator.__str__()[:3] + 'ConfusionMatrix.pickle', 'wb') as f:
         pickle.dump(fiCm, f)
+    with open(localDir + '/spike'+ estimator.__str__()[:3] + 'ValidationCurve.pickle', 'wb') as f:
+        pickle.dump(fiVC, f)
     plt.show()

@@ -285,7 +285,9 @@ def assignLabels(timeVector, lbl, fnc, CameraFs = 100, oversizeWindow = None):
 
             timeEnd = timeVector[-1] + binWidth / 2
             #pdb.set_trace()
-            mat, binCenters, binLeftEdges = binnedEvents([pseudoTime[oversampledFnc > 0]], [0], [0], binInterval, binWidth, timeStart, timeEnd)
+            mat, binCenters, binLeftEdges = binnedEvents(
+                [pseudoTime[oversampledFnc > 0]], [0], [0],
+                binInterval, binWidth, timeStart, timeEnd)
             mat = np.squeeze(mat)
             """
             It's possible mat will have an extra entry, because we don't know
@@ -655,6 +657,41 @@ def plotConfusionMatrix(cm, classes,
 
     return fi
 
+def freqDownSampler(nChan, factor):
+    def downSample(X):
+        support = np.arange(X.shape[1] / nChan) # range of original frequencies
+        downSampledSupport = np.linspace(0, support[-1], m.floor(len(support) / factor)) # range of new frequencies
+
+        XReshaped = np.reshape(X.values, (X.shape[0], nChan, -1)) # electrodes by frequency by time bin
+        XDownSampled = np.zeros((XReshaped.shape[0], XReshaped.shape[1], m.floor(XReshaped.shape[2] / factor)))# electrodes by new frequency by time bin
+
+        for idx in range(nChan):
+            oldX = XReshaped[:, idx, :]
+            interpFun = interpolate.interp1d(support, oldX, kind = 'cubic', axis = -1)
+            XDownSampled[:, idx, :] = interpFun(downSampledSupport)
+
+        XDownSampledFlat = pd.DataFrame(np.reshape(XDownSampled, (X.shape[0], -1)))
+        return XDownSampledFlat
+    return downSample
+
+def freqDownSample(X, **kwargs):
+    nChan = kwargs['nChan']
+    factor = kwargs['factor']
+
+    support = np.arange(X.shape[1] / nChan) # range of original frequencies
+    downSampledSupport = np.linspace(0, support[-1], m.floor(len(support) / factor)) # range of new frequencies
+
+    XReshaped = np.reshape(X, (X.shape[0], nChan, -1)) # electrodes by frequency by time bin
+    XDownSampled = np.zeros((XReshaped.shape[0], XReshaped.shape[1], m.floor(XReshaped.shape[2] / factor)))# electrodes by new frequency by time bin
+
+    for idx in range(nChan):
+        oldX = XReshaped[:, idx, :]
+        interpFun = interpolate.interp1d(support, oldX, kind = 'cubic', axis = -1)
+        XDownSampled[:, idx, :] = interpFun(downSampledSupport)
+
+    XDownSampledFlat = pd.DataFrame(np.reshape(XDownSampled, (X.shape[0], -1)))
+    return XDownSampledFlat
+
 def trainSpectralMethod(dataName, whichChans, maxFreq, estimator, skf, parameters, outputFileName):
 
     localDir = os.environ['DATA_ANALYSIS_LOCAL_DIR']
@@ -667,12 +704,13 @@ def trainSpectralMethod(dataName, whichChans, maxFreq, estimator, skf, parameter
     spectrum = pickleData['channel']['spectrum']['PSD']
     #t = ns5Data['channel']['spectrum']['t']
     labels = pickleData['channel']['spectrum']['LabelsNumeric']
-    flatSpectrum = spectrum[whichChans, :, whichFreqs].transpose(1, 0, 2).to_frame().transpose()
+    reducedSpectrum = spectrum[whichChans, :, whichFreqs]
+    flatSpectrum = reducedSpectrum.transpose(1, 0, 2).to_frame().transpose()
 
     X = flatSpectrum
     y = labels
 
-    grid=GridSearchCV(estimator, parameters, cv = skf, verbose = 4, scoring = 'f1_weighted', pre_dispatch='n_jobs', n_jobs = -1)
+    grid=GridSearchCV(estimator, parameters, cv = skf, verbose = 4, scoring = 'f1_macro', pre_dispatch='n_jobs', n_jobs = -1)
 
     #if __name__ == '__main__':
     grid.fit(X,y)
@@ -697,10 +735,65 @@ def trainSpikeMethod(dataName, whichChans, estimator, skf, parameters, outputFil
     X = spikeMat[nonLabelChans][whichChans]
     y = spikeMat['LabelsNumeric']
 
-    grid=GridSearchCV(estimator, parameters, scoring = 'f1_weighted', cv = skf, n_jobs = -1, verbose = 4)
+    grid=GridSearchCV(estimator, parameters, scoring = 'f1_macro', cv = skf, n_jobs = -1, verbose = 4)
 
     grid.fit(X,y)
     bestEstimator={'estimator' : grid.best_estimator_, 'info' : grid.cv_results_}
 
     with open(localDir + outputFileName, 'wb') as f:
         pickle.dump(bestEstimator, f)
+
+def plotValidationCurve(estimator, estimatorInfo):
+    keys = sorted(list(estimatorInfo['params'][0].keys()))
+    print(keys)
+
+    if len(keys) == 1:
+        fi, ax = plt.subplots()
+        plt.title("Validation Curve with " + estimator.__str__()[:3])
+        plt.xlabel("Parameter")
+        plt.ylabel("Score")
+        plt.ylim(0.0, 1.1)
+        lw = 2
+
+        param_range = [x[parameterName] for x in estimatorInfo['params']]
+
+        ax.semilogx(param_range, estimatorInfo['mean_train_score'], label="Training score",
+                     color="darkorange", lw=lw)
+        ax.fill_between(param_range, estimatorInfo['mean_train_score'] - estimatorInfo['std_train_score'],
+                         estimatorInfo['mean_train_score'] + estimatorInfo['std_train_score'], alpha=0.2,
+                         color="darkorange", lw=lw)
+        ax.semilogx(param_range, estimatorInfo['mean_test_score'], label="Cross-validation score",
+                     color="navy", lw=lw)
+        ax.fill_between(param_range, estimatorInfo['mean_test_score'] - estimatorInfo['std_test_score'],
+                         estimatorInfo['mean_test_score'] + estimatorInfo['std_test_score'], alpha=0.2,
+                         color="navy", lw=lw)
+        plt.legend(loc="best")
+
+    elif len(keys) == 2:
+        fi, ax = plt.subplots(nrows = 2, ncols = 1)
+        ax[0].set_title("Validation Curve with " + estimator.__str__()[:3])
+
+        nParams = [len(np.unique(estimatorInfo['param_' + keys[0]].data)),
+            len(np.unique(estimatorInfo['param_' + keys[1]].data))]
+
+        plotTest = np.reshape(estimatorInfo['mean_test_score'],(nParams[0], nParams[1]))
+        plotTrain = np.reshape(estimatorInfo['mean_train_score'],(nParams[0], nParams[1]))
+
+        param1 = np.reshape(estimatorInfo['param_' + keys[0]].data,(nParams[0], nParams[1])).astype(np.float32)
+        param2 = np.reshape(estimatorInfo['param_' + keys[1]].data,(nParams[0], nParams[1])).astype(np.float32)
+
+        zMin = min(estimatorInfo['mean_test_score'])
+        zMax = max(estimatorInfo['mean_test_score'])
+
+        im = ax[0].pcolormesh(np.log10(param1), np.log10(param2), plotTest, norm = colors.Normalize(vmin=zMin, vmax=zMax))
+
+        ax[0].set_xlabel(keys[0])
+        ax[0].set_ylabel('Test ' + keys[1])
+        im = ax[1].pcolormesh(np.log10(param1), np.log10(param2), plotTrain, norm = colors.Normalize(vmin=zMin, vmax=zMax))
+
+        ax[1].set_xlabel(keys[0])
+        ax[1].set_ylabel('Train ' + keys[1])
+        fi.subplots_adjust(right = 0.8)
+        cbar_ax = fi.add_axes([0.85, 0.15, 0.05, 0.7])
+        fi.colorbar(im, cax = cbar_ax)
+    return fi

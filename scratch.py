@@ -1,6 +1,5 @@
-whichChans = list(range(10))
-type(y)
-plotData.shape
-
-dir(estimator)
-estimator.__str__()[:11]
+downSampledLDA.get_params().keys()
+testDownSampler = FunctionTransformer(freqDownSample, kw_args = {'nChan' : 96, 'factor' : 5})
+downSampledLDA.set_params(downSampler__kw_args = {'nChan' : 96, 'factor' : 15})
+downSampledLDA.set_params(linDis__n_components = 2)
+type(X)

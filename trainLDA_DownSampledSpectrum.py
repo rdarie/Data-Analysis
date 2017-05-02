@@ -11,17 +11,15 @@ maxFreq = 200
 
 skf = StratifiedKFold(n_splits=10, shuffle = True, random_state = 1)
 LDA = LinearDiscriminantAnalysis()
-downSampler = FunctionTransformer(downSampleFreq, kw_args={'factor': 10})
+downSampler = FunctionTransformer(freqDownSample)
 
-downSampledLDA = Pipeline([('downSampler', downSampler)])
-
-solvers = ['svd']
-shrinkages = ['auto']
+downSampledLDA = Pipeline([('downSampler', downSampler), ('linDis', LDA)])
+downSampleKWargs = [{'nChan' : 96, 'factor' : 1}, {'nChan' : 96, 'factor' : 5}, {'nChan' : 96, 'factor' : 10}]
 componentCounts = [1,2]
 
-parameters = {'solver': solvers, 'n_components' : componentCounts}
-outputFileName = '/bestSpectrumLDA.pickle'
+parameters = { 'downSampler__kw_args' : downSampleKWargs, 'linDis__n_components' : componentCounts}
+outputFileName = '/bestSpectrumLDA_DownSampled.pickle'
 
-trainSpectralMethod(dataName, whichChans, maxFreq, LDA, skf, parameters, outputFileName)
+trainSpectralMethod(dataName, whichChans, maxFreq, downSampledLDA, skf, parameters, outputFileName)
 
 print('Train LDA Spectrum DONE')
