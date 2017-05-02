@@ -37,9 +37,9 @@ matplotlib.rc('font', **font_opts)
 matplotlib.rc('figure', **fig_opts)
 
 # Inits
-localDir = 'E:/Google Drive/Github/tempdata/Data-Analysis/'
+localDir = os.environ['DATA_ANALYSIS_LOCAL_DIR']
 fileDir = 'W:/ENG_Neuromotion_Shared/group/Starbuck_Bilateral_Recordings/201612201054-Starbuck_Treadmill/'
-fileName = '201612201054-Starbuck_Treadmill-Array1480_Right-Trial00001.ns5'
+fileName = '/201612201054-Starbuck_Treadmill-Array1480_Right-Trial00001.ns5'
 
 datafile = localDir + fileName
 
@@ -71,16 +71,17 @@ plot_mask = np.logical_or(badData['general'], badData['perChannel'][ch_idx])
 plotChan(clean_data, whichChan, mask = plot_mask, show = True, prevFig = f)
 
 # spectrum function parameters
-winLen_s = 0.15
+winLen_s = 0.1
 stepLen_s = 0.02 # window step as a fraction of window length
 R = 50 # target bandwidth for spectrogram
 
 # get the spectrum
 clean_data['spectrum'] = getSpectrogram(
-    clean_data, winLen_s, stepLen_s, R, 300, whichChan, plotting = True)
+    clean_data, winLen_s, stepLen_s, R, 600, whichChan, plotting = True)
 
 data = {'channel':clean_data, 'simiTrigger': simi_triggers}
-with open(localDir + "saveSpectrumRight.p", "wb" ) as f:
+
+with open(localDir + "/saveSpectrumRight.p", "wb" ) as f:
     pickle.dump(data, f, protocol=4 )
 
 #print('Starting to write PDF Report.')

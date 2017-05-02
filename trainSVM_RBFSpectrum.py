@@ -6,7 +6,7 @@ dataName = '/saveSpectrumRightLabeled.p'
 
 #whichChans = range(1,97)
 whichChans = [0, 25, 50, 75]
-maxFreq = 500
+maxFreq = 250
 
 skf = StratifiedKFold(n_splits=10, shuffle = True, random_state = 1)
 SVC = svm.SVC(kernel = 'rbf', class_weight = 'balanced', random_state = 500,
@@ -18,7 +18,7 @@ cValues = np.logspace(-3, 1, 10)
 #gammaValues = ['auto']
 # See https://stats.stackexchange.com/questions/125353/output-of-scikit-svm-in-multiclass-classification-always-gives-same-label
 # for discussion of gamma tuning
-gammaValues = np.logspace(-5,-3,20)
+gammaValues = np.logspace(-10,-5,20)
 
 parameters = {'C': cValues, 'gamma': gammaValues}
 

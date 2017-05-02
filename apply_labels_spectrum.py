@@ -18,13 +18,13 @@ fig_opts = {
 matplotlib.rc('font', **font_opts)
 matplotlib.rc('figure', **fig_opts)
 
-localDir = 'E:/Google Drive/Github/tempdata/Data-Analysis/'
+localDir = os.environ['DATA_ANALYSIS_LOCAL_DIR']
 
-ns5Name = 'saveSpectrumRight.p'
+ns5Name = '/saveSpectrumRight.p'
 ns5File = localDir + ns5Name
 data = pd.read_pickle(ns5File)
 
-simiName = 'saveSimi.p'
+simiName = '/saveSimi.p'
 simiFile = localDir + simiName
 simiData = pd.read_pickle(simiFile)
 simiDf = simiData['simiGait']
@@ -46,11 +46,11 @@ binnedLabels = pd.Series([x if x == 'Toe Up' else y for x,y in zip(tempUpLabels,
 data['channel']['spectrum']['Labels'] = binnedLabels
 data['channel']['spectrum']['LabelsNumeric'] = pd.Series([labelsNumeric[x] for x in data['channel']['spectrum']['Labels']])
 
-with open(localDir + "saveSpectrumRightLabeled.p", "wb" ) as f:
+with open(localDir + "/saveSpectrumRightLabeled.p", "wb" ) as f:
     pickle.dump(data, f, protocol=4 )
 
 labelStruct = {'Labels': binnedLabels, 'LabelsNumeric' : pd.Series([labelsNumeric[x] for x in binnedLabels])}
-with open(localDir + "saveSpectrumRightLabelsOnly.p", "wb" ) as f:
+with open(localDir + "/saveSpectrumRightLabelsOnly.p", "wb" ) as f:
     pickle.dump(labelStruct, f, protocol=4 )
 
 plotting = False

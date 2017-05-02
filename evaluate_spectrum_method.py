@@ -2,7 +2,7 @@ from helper_functions import *
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import pickle, os
+import pickle, os, matplotlib
 from sklearn.metrics import confusion_matrix, f1_score
 
 # Plotting options
@@ -22,7 +22,7 @@ localDir = os.environ['DATA_ANALYSIS_LOCAL_DIR']
 try:
     modelName = '/' + sys.argv[1]
 except:
-    modelName = '/bestSpectrumSVM_RBF.pickle'
+    modelName = '/bestSpectrumLDA_DownSampled.pickle'
 
 ns5Name = '/saveSpectrumRightLabeled.p'
 
@@ -34,25 +34,25 @@ t = ns5Data['channel']['spectrum']['t']
 fr = ns5Data['channel']['spectrum']['fr']
 labels = ns5Data['channel']['spectrum']['LabelsNumeric']
 
+modelFile = localDir + modelName
+estimatorDict = pd.read_pickle(modelFile)
+estimator = estimatorDict['estimator']
+estimatorInfo = estimatorDict['info']
+
 nSamples = len(t)
 y = labels
 
-whichChans = range(1,97)
-maxFreq = 200
+whichChans = estimatorDict['whichChans']
+maxFreq = estimatorDict['maxFreq']
 
 whichFreqs = ns5Data['channel']['spectrum']['fr'] < maxFreq
 flatSpectrum = spectrum[whichChans, :, whichFreqs].transpose(1, 0, 2).to_frame().transpose()
 X = flatSpectrum
 
 # Poor man's test train split:
-trainSize = 0.9
+trainSize = 0.95
 trainIdx = slice(None, int(trainSize * nSamples))
 testIdx = slice(int(trainSize * nSamples) + 1, None)
-
-modelFile = localDir + modelName
-estimatorDict = pd.read_pickle(modelFile)
-estimator = estimatorDict['estimator']
-estimatorInfo = estimatorDict['info']
 
 estimator.fit(X.iloc[trainIdx, :], y.iloc[trainIdx])
 yHat = estimator.predict(X.iloc[testIdx, :])
@@ -67,7 +67,7 @@ print("Normalized confusion matrix:")
 cnf_matrix.astype('float') / cnf_matrix.sum(axis=1)[:, np.newaxis]
 
 # Compute F1 score
-f1Score = f1_score(y.iloc[testIdx], yHat, average = 'weighted')
+f1Score = f1_score(y.iloc[testIdx], yHat, average = 'macro')
 print('F1 Score for '+ estimator.__str__()[:11] + ' was:')
 print(f1Score)
 
@@ -88,6 +88,7 @@ if plotting:
         fr = fr,
         t = t[testIdx],
         show = False)
+
     ax = fi.axes[0]
     ax.plot(t[testIdx][upMaskSpectrum], dummyVar[upMaskSpectrum], 'ro')
     ax.plot(t[testIdx][downMaskSpectrum], dummyVar[downMaskSpectrum] + 1, 'go')
@@ -107,7 +108,7 @@ if plotting:
 
     # Plot a validation Curve
     fiVC = plotValidationCurve(estimator, estimatorInfo)
-    plt.tight_layout()
+    #plt.tight_layout()
     plt.savefig(localDir + '/spectrum'+ estimator.__str__()[:11] + 'ValidationCurve.png')
 
     figDic = {'spectrum': fi, 'confusion': fiCm, 'validation': fiVC}
@@ -160,13 +161,14 @@ if plotting:
                     c = plt.cm.Paired(1), label = 'Foot Strike')
             except:
                 pass
+
         plt.legend(markerscale=2, scatterpoints=1)
         ax.set_title('Method Transform')
         ax.set_xticks(())
         ax.set_yticks(())
         plt.tight_layout()
         plt.savefig(localDir + '/spectrum'+ estimator.__str__()[:11] + 'TransformedPlot.png')
-        plt.show()
+        plt.show(block = False)
         with open(localDir + '/spectrum'+ estimator.__str__()[:11] + 'TransformedPlot.pickle', 'wb') as f:
             pickle.dump(fiTr, f)
 
@@ -192,13 +194,14 @@ if plotting:
                 c = plt.cm.Paired(0.1), label = 'Foot on')
         except:
             pass
+
         ax.set_xlabel('Time (sec)')
         ax.set_title('Distance from Neither Boundary')
         #ax.set_yticks(())
         plt.legend(markerscale=2, scatterpoints=1)
         plt.tight_layout()
         plt.savefig(localDir + '/spectrum'+ estimator.__str__()[:11] + 'DecisionBoundaryPlot.png')
-        plt.show()
+        plt.show(block = False)
         with open(localDir + '/spectrum'+ estimator.__str__()[:11] + 'DecisionBoundaryPlot.pickle', 'wb') as f:
             pickle.dump(fiDb, f)
     plt.show()

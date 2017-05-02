@@ -5,7 +5,7 @@ import matplotlib.colors as colors
 import numpy as np
 import pandas as pd
 import math as m
-import sys, itertools, os, pickle
+import sys, itertools, os, pickle, gc, random
 from sklearn.model_selection import StratifiedKFold, GridSearchCV
 from sklearn.linear_model import LogisticRegression
 
@@ -464,6 +464,7 @@ def plotSpectrum(P, fs, start_time_s, end_time_s, fr = None, t = None, show = Fa
 
     f = plt.figure()
     plt.pcolormesh(t,fr,P.transpose(), norm=colors.LogNorm(vmin=zMin, vmax=zMax))
+
     plt.axis([t.min(), t.max(), fr.min(), min(300, fr.max())])
     #plt.colorbar()
     #plt.locator_params(axis='y', nbins=20)
@@ -675,21 +676,33 @@ def freqDownSampler(nChan, factor):
     return downSample
 
 def freqDownSample(X, **kwargs):
-    nChan = kwargs['nChan']
-    factor = kwargs['factor']
+    keepChans = kwargs['keepChans']
+    whichChans = kwargs['whichChans']
+    nChan = len(whichChans)
 
+    newNChan = len(keepChans)
+
+    freqFactor = kwargs['freqFactor']
     support = np.arange(X.shape[1] / nChan) # range of original frequencies
-    downSampledSupport = np.linspace(0, support[-1], m.floor(len(support) / factor)) # range of new frequencies
+    newFreqRes = m.floor(len(support) / freqFactor)
 
-    XReshaped = np.reshape(X, (X.shape[0], nChan, -1)) # electrodes by frequency by time bin
-    XDownSampled = np.zeros((XReshaped.shape[0], XReshaped.shape[1], m.floor(XReshaped.shape[2] / factor)))# electrodes by new frequency by time bin
+    nTimePoints = X.shape[0]
 
-    for idx in range(nChan):
-        oldX = XReshaped[:, idx, :]
-        interpFun = interpolate.interp1d(support, oldX, kind = 'cubic', axis = -1)
-        XDownSampled[:, idx, :] = interpFun(downSampledSupport)
+    downSampledSupport = np.linspace(support[0], support[-1], newFreqRes) # range of new frequencies
 
-    XDownSampledFlat = pd.DataFrame(np.reshape(XDownSampled, (X.shape[0], -1)))
+    XReshaped = np.reshape(X, (nTimePoints, nChan, -1)) # electrodes by frequency by time bin
+    del(X)
+    XDownSampled = np.zeros((XReshaped.shape[0], newNChan, m.floor(XReshaped.shape[2] / freqFactor)))# electrodes by new frequency by time bin
+
+    for newIdx, origIdx in enumerate(keepChans):
+        oldX = XReshaped[:, origIdx, :]
+        interpFun = interpolate.interp1d(support, oldX, kind = 'linear', axis = -1)
+        XDownSampled[:, newIdx, :] = interpFun(downSampledSupport)
+        del(interpFun)
+        #gc.collect()
+
+    del(XReshaped)
+    XDownSampledFlat = pd.DataFrame(np.reshape(XDownSampled, (nTimePoints, -1)))
     return XDownSampledFlat
 
 def trainSpectralMethod(dataName, whichChans, maxFreq, estimator, skf, parameters, outputFileName):
@@ -703,19 +716,21 @@ def trainSpectralMethod(dataName, whichChans, maxFreq, estimator, skf, parameter
 
     spectrum = pickleData['channel']['spectrum']['PSD']
     #t = ns5Data['channel']['spectrum']['t']
-    labels = pickleData['channel']['spectrum']['LabelsNumeric']
-    reducedSpectrum = spectrum[whichChans, :, whichFreqs]
-    flatSpectrum = reducedSpectrum.transpose(1, 0, 2).to_frame().transpose()
+    y = pickleData['channel']['spectrum']['LabelsNumeric'] # labels
+    del(pickleData) # done with pickle data
 
-    X = flatSpectrum
-    y = labels
+    reducedSpectrum = spectrum[whichChans, :, whichFreqs]
+    del(spectrum) # done with spectrum
+    X = reducedSpectrum.transpose(1, 0, 2).to_frame().transpose()
+    del(reducedSpectrum)
 
     grid=GridSearchCV(estimator, parameters, cv = skf, verbose = 4, scoring = 'f1_macro', pre_dispatch='n_jobs', n_jobs = -1)
 
     #if __name__ == '__main__':
     grid.fit(X,y)
 
-    bestEstimator={'estimator' : grid.best_estimator_, 'info' : grid.cv_results_}
+    bestEstimator={'estimator' : grid.best_estimator_, 'info' : grid.cv_results_, 'whichChans' : whichChans, 'maxFreq' : maxFreq}
+
     with open(localDir + outputFileName, 'wb') as f:
         pickle.dump(bestEstimator, f)
 
@@ -729,6 +744,7 @@ def trainSpikeMethod(dataName, whichChans, estimator, skf, parameters, outputFil
     spikeMat = spikeData['spikeMat']
     binWidth = spikeData['binWidth']
 
+    del(spikeData)
     # get all columns of spikemat that aren't the labels
     nonLabelChans = spikeMat.columns.values[np.array([not isinstance(x, str) for x in spikeMat.columns.values], dtype = bool)]
 
@@ -747,6 +763,14 @@ def plotValidationCurve(estimator, estimatorInfo):
     keys = sorted(list(estimatorInfo['params'][0].keys()))
     print(keys)
 
+    # TODO: kludge, fix it
+    if keys[0][:11] == 'downSampler':
+        try:
+            keys = sorted(list(estimatorInfo['params'][0]['downSampler__kw_args'].keys()))
+            if 'whichChans' in keys: keys.remove('whichChans')
+        except:
+            pass
+        #pdb.set_trace()
     if len(keys) == 1:
         fi, ax = plt.subplots()
         plt.title("Validation Curve with " + estimator.__str__()[:3])
@@ -754,8 +778,11 @@ def plotValidationCurve(estimator, estimatorInfo):
         plt.ylabel("Score")
         plt.ylim(0.0, 1.1)
         lw = 2
-
-        param_range = [x[parameterName] for x in estimatorInfo['params']]
+        # TODO: handle dict paramater
+        if estimator.steps[0].__str__()[2:13] == 'downSampler':
+            param_range = [len(x['downSampler__kw_args']['keepChans']) for x in estimatorInfo['params']]
+        else:
+            param_range = [x[keys[0]] for x in estimatorInfo['params']]
 
         ax.semilogx(param_range, estimatorInfo['mean_train_score'], label="Training score",
                      color="darkorange", lw=lw)
@@ -773,23 +800,43 @@ def plotValidationCurve(estimator, estimatorInfo):
         fi, ax = plt.subplots(nrows = 2, ncols = 1)
         ax[0].set_title("Validation Curve with " + estimator.__str__()[:3])
 
-        nParams = [len(np.unique(estimatorInfo['param_' + keys[0]].data)),
-            len(np.unique(estimatorInfo['param_' + keys[1]].data))]
+        if not estimator.steps[0].__str__()[2:13] == 'downSampler':
+            nParam1 = len(np.unique(estimatorInfo['param_' + keys[0]].data))
+        else:
+            #TODO: this is an edge case kludge to deal with downsampler dictionary argument. change
+            param1 = [len(x['keepChans']) for x in estimatorInfo['param_' + 'downSampler__kw_args'].data]
+            nParam1 = len(np.unique(param1))
+
+        if not estimator.steps[0].__str__()[2:13] == 'downSampler':
+            nParam2 = len(np.unique(estimatorInfo['param_' + keys[1]].data))
+        else:
+            #TODO: this is an edge case kludge to deal with downsampler dictionary argument. change
+            param2 = [x['freqFactor'] for x in estimatorInfo['param_' + 'downSampler__kw_args'].data]
+            nParam2 = len(np.unique(param2))
+
+        nParams = [nParam1, nParam2]
 
         plotTest = np.reshape(estimatorInfo['mean_test_score'],(nParams[0], nParams[1]))
         plotTrain = np.reshape(estimatorInfo['mean_train_score'],(nParams[0], nParams[1]))
 
-        param1 = np.reshape(estimatorInfo['param_' + keys[0]].data,(nParams[0], nParams[1])).astype(np.float32)
-        param2 = np.reshape(estimatorInfo['param_' + keys[1]].data,(nParams[0], nParams[1])).astype(np.float32)
+        try:
+            param1 = np.reshape(estimatorInfo['param_' + keys[0]].data,(nParams[1], nParams[0])).astype(np.float32)
+        except:
+            param1 = np.reshape(param1,(nParams[1], nParams[0])).astype(np.float32)
+
+        try:
+            param2 = np.reshape(estimatorInfo['param_' + keys[1]].data,(nParams[1], nParams[0])).astype(np.float32)
+        except:
+            param2 = np.reshape(param2,(nParams[1], nParams[0])).astype(np.float32)
 
         zMin = min(estimatorInfo['mean_test_score'])
         zMax = max(estimatorInfo['mean_test_score'])
 
-        im = ax[0].pcolormesh(np.log10(param1), np.log10(param2), plotTest, norm = colors.Normalize(vmin=zMin, vmax=zMax))
+        im = ax[0].pcolormesh(param1, param2, plotTest.transpose(), norm = colors.Normalize(vmin=zMin, vmax=zMax))
 
         ax[0].set_xlabel(keys[0])
         ax[0].set_ylabel('Test ' + keys[1])
-        im = ax[1].pcolormesh(np.log10(param1), np.log10(param2), plotTrain, norm = colors.Normalize(vmin=zMin, vmax=zMax))
+        im = ax[1].pcolormesh(param1, param2, plotTrain.transpose(), norm = colors.Normalize(vmin=zMin, vmax=zMax))
 
         ax[1].set_xlabel(keys[0])
         ax[1].set_ylabel('Train ' + keys[1])

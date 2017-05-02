@@ -1,5 +1,15 @@
-downSampledLDA.get_params().keys()
-testDownSampler = FunctionTransformer(freqDownSample, kw_args = {'nChan' : 96, 'factor' : 5})
-downSampledLDA.set_params(downSampler__kw_args = {'nChan' : 96, 'factor' : 15})
-downSampledLDA.set_params(linDis__n_components = 2)
+
+estimator.__str__()
+dict
+type(estimatorInfo['params'][0])
+estimatorInfo.keys()
+param_range
+param1
+param2
+estimator
+keys
+estimator.steps[0]
+keys
+keys
 type(X)
+estimator.steps[0][1]
