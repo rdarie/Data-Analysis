@@ -5,6 +5,17 @@ import pandas as pd
 from brpylib             import NevFile, brpylib_ver
 import sys
 import pickle
+
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--nspFile', default = '201612201054-Starbuck_Treadmill-Array1480_Right-Trial00001.ns5')
+parser.add_argument('--simiFile', default = 'Trial01_Step_Timing.txt')
+args = parser.parse_args()
+argNspFile = args.nspFile
+argSimiFile = args.simiFile
+
+
 # Plotting options
 font_opts = {'family' : 'arial',
         'weight' : 'bold',
@@ -20,11 +31,11 @@ matplotlib.rc('figure', **fig_opts)
 
 localDir = os.environ['DATA_ANALYSIS_LOCAL_DIR']
 
-ns5Name = '/saveSpectrumRight.p'
+ns5Name = '/' + argNspFile.split('.')[0] + '_saveSpectrum.p'
 ns5File = localDir + ns5Name
 data = pd.read_pickle(ns5File)
 
-simiName = '/saveSimi.p'
+simiName = '/' + argSimiFile.split('.')[0] + '_saveSimi.p'
 simiFile = localDir + simiName
 simiData = pd.read_pickle(simiFile)
 simiDf = simiData['simiGait']
@@ -46,11 +57,12 @@ binnedLabels = pd.Series([x if x == 'Toe Up' else y for x,y in zip(tempUpLabels,
 data['channel']['spectrum']['Labels'] = binnedLabels
 data['channel']['spectrum']['LabelsNumeric'] = pd.Series([labelsNumeric[x] for x in data['channel']['spectrum']['Labels']])
 
-with open(localDir + "/saveSpectrumRightLabeled.p", "wb" ) as f:
-    pickle.dump(data, f, protocol=4 )
+with open(localDir + '/' + argNspFile.split('.')[0] + '_saveSpectrumLabeled.p', "wb" ) as f:
+    pickle.dump(data, f, protocol=4)
 
 labelStruct = {'Labels': binnedLabels, 'LabelsNumeric' : pd.Series([labelsNumeric[x] for x in binnedLabels])}
-with open(localDir + "/saveSpectrumRightLabelsOnly.p", "wb" ) as f:
+
+with open(localDir + '/' + argNspFile.split('.')[0] + '_saveSpectrumLabelsOnly.p', "wb" ) as f:
     pickle.dump(labelStruct, f, protocol=4 )
 
 plotting = False

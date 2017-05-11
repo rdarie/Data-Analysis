@@ -5,14 +5,16 @@ import matplotlib.colors as colors
 import numpy as np
 import pandas as pd
 import math as m
-import sys, itertools, os, pickle, gc, random
+import sys, itertools, os, pickle, gc, random, string
 from sklearn.model_selection import StratifiedKFold, GridSearchCV
 from sklearn.linear_model import LogisticRegression
+import sklearn.pipeline
 
 try:
     import libtfr
     HASLIBTFR = True
 except:
+    import scipy.signal
     HASLIBTFR = False
 
 import peakutils
@@ -21,6 +23,7 @@ from copy import *
 import matplotlib.backends.backend_pdf
 import math
 from fractions import gcd
+import argparse
 
 def getNEVData(filePath, elecIds):
     # Version control
@@ -195,19 +198,25 @@ def getCameraTriggers(simiData, plotting = False):
 def getGaitEvents(trigTimes, simiTable, whichColumns =  ['ToeUp_Left Y', 'ToeDown_Left Y'], plotting = False, fudge = 2, CameraFs = 100):
     # NSP time of first camera trigger
     timeOffset = trigTimes[0]
-
+    simiTable['Time'] = simiTable['Time'] + timeOffset
+    simiDf = pd.DataFrame(simiTable[whichColumns])
+    simiDf = simiDf.notnull()
+    simiDf['simiTime'] = simiTable['Time']
     # max time recorded on NSP
-
     # Note: Clocks drift slightly between Simi Computer and NSP. Allow timeMax
     # to go a little bit beyond so that we don't drop the last simi frame, i.e.
     # add fudge times the time increment TODO: FIX THIS.
 
-    timeMax = trigTimes[-1] + fudge/CameraFs
+    # depeding on which acquisition system stopped first
+    if trigTimes[-1] > simiTable['Time'].max():
+        # NSP stopped after SIMI
+        timeMax = simiTable['Time'].max() + fudge/CameraFs
+        trigTimes = trigTimes[:simiDf.shape[0]]
+    else:
+        # SIMI stopped after NSP
+        timeMax = trigTimes[-1] + fudge/CameraFs
+        simiDf.drop(simiDf[simiDf['simiTime'] >= timeMax].index, inplace = True)
 
-    simiDf = pd.DataFrame(simiTable[whichColumns])
-    simiDf = simiDf.notnull()
-    simiDf['simiTime'] = simiTable['Time'] + timeOffset
-    simiDf.drop(simiDf[simiDf['simiTime'] >= timeMax].index, inplace = True)
 
     debugging = False
     if debugging:
@@ -302,61 +311,75 @@ def assignLabels(timeVector, lbl, fnc, CameraFs = 100, oversizeWindow = None):
             #pdb.set_trace()
     return labels
 
-if HASLIBTFR:
-    def getSpectrogram(channelData, winLen_s, stepLen_s = 0.02, R = 50, fr_cutoff = None, whichChan = 1, plotting = False):
+def getSpectrogram(channelData, winLen_s, stepLen_s = 0.02, R = 20, fr_cutoff = None, whichChan = 1, plotting = False):
 
-        Fs = channelData['samp_per_s']
-        nChan = channelData['data'].shape[1]
-        nSamples = channelData['data'].shape[0]
+    Fs = channelData['samp_per_s']
+    nChan = channelData['data'].shape[1]
+    nSamples = channelData['data'].shape[0]
 
-        delta = 1 / Fs
+    delta = 1 / Fs
 
-        winLen_samp = int(winLen_s * Fs)
-        stepLen_samp = int(stepLen_s * Fs)
+    winLen_samp = int(winLen_s * Fs)
+    stepLen_samp = int(stepLen_s * Fs)
 
-        NFFT = nextpowof2(winLen_samp)
-        nw = winLen_s * R # time bandwidth product based on 0.1 sec windows and 200 Hz bandwidth
-        ntapers = round(nw / 2) # L < nw - 1
-        nWindows = m.floor((nSamples - NFFT + 1) / stepLen_samp)
+    NFFT = nextpowof2(winLen_samp)
+    nw = winLen_s * R # time bandwidth product based on 0.1 sec windows and 200 Hz bandwidth
+    nTapers = m.ceil(nw / 2) # L < nw - 1
+    nWindows = m.floor((nSamples - NFFT + 1) / stepLen_samp)
 
-        fr_samp = int(NFFT / 2) + 1
-        fr = np.arange(fr_samp) * channelData['samp_per_s'] / (2 * fr_samp)
-        if fr_cutoff is not None:
-            fr = fr[fr < fr_cutoff]
-            fr_samp = len(fr)
+    fr_samp = int(NFFT / 2) + 1
+    fr = np.arange(fr_samp) * channelData['samp_per_s'] / (2 * fr_samp)
+    if fr_cutoff is not None:
+        fr = fr[fr < fr_cutoff]
+        fr_samp = len(fr)
 
-        t = channelData['start_time_s'] + np.arange(nWindows) * stepLen_s
+
+    if HASLIBTFR:
+        origin = 'libtfr'
+        #pdb.set_trace()
+        t = channelData['start_time_s'] + np.arange(nWindows) * stepLen_s + NFFT / Fs * 0.5
         spectrum = np.zeros((nChan, nWindows, fr_samp))
         # generate a transform object with size equal to signal length and ntapers tapers
-        D = libtfr.mfft_dpss(NFFT, nw, ntapers)
+        D = libtfr.mfft_dpss(NFFT, nw, nTapers)
         #pdb.set_trace()
 
         for idx,signal in channelData['data'].iteritems():
-
             sys.stdout.write("Running getSpectrogram: %d%%\r" % int(idx * 100 / nChan + 1))
             sys.stdout.flush()
 
-            P = D.mtspec(signal, stepLen_samp).transpose()
+            P_libtfr = D.mtspec(signal, stepLen_samp).transpose()
             #pdb.set_trace()
-            P = P[np.newaxis,:,:fr_samp]
-            spectrum[idx,:,:] = P
+            P_libtfr = P_libtfr[np.newaxis,:,:fr_samp]
+            spectrum[idx,:,:] = P_libtfr
+    else:
+        origin = 'scipy'
+        spectrum = np.zeros((nChan, nWindows + 1, fr_samp))
+        for idx,signal in channelData['data'].iteritems():
+            sys.stdout.write("Running getSpectrogram: %d%%\r" % int(idx * 100 / nChan + 1))
+            sys.stdout.flush()
 
-        if plotting:
+            overlap_samp = NFFT - stepLen_samp
+            _, t, P_scipy = scipy.signal.spectrogram(signal,mode='magnitude',
+                window = 'boxcar', nperseg = NFFT, noverlap = overlap_samp, fs = Fs)
+            P_scipy = P_scipy.transpose()[np.newaxis,:,:fr_samp]
+            spectrum[idx,:,:] = P_scipy
+        t = channelData['start_time_s'] + t
+    if plotting:
+        ch_idx  = channelData['elec_ids'].index(whichChan)
 
-            ch_idx  = channelData['elec_ids'].index(whichChan)
+        #TODO: implement passing elecID to plotSpectrum
+        #hdr_idx = channelData['ExtendedHeaderIndices'][ch_idx]
 
-            #TODO: implement passing elecID to plotSpectrum
-            #hdr_idx = channelData['ExtendedHeaderIndices'][ch_idx]
+        P = spectrum[ch_idx,:,:]
+        plotSpectrum(P, Fs, channelData['start_time_s'], channelData['t'][-1], fr =fr, t = t, show = True)
 
-            P = spectrum[ch_idx,:,:]
-            plotSpectrum(P, Fs, channelData['start_time_s'], channelData['t'][-1], fr =fr, t = t, show = True)
+    #pdb.set_trace()
 
-        #pdb.set_trace()
-
-        return {'PSD' : pd.Panel(spectrum, items = channelData['elec_ids'], major_axis = t, minor_axis = fr),
-                'fr' : fr,
-                't' : t
-                }
+    return {'PSD' : pd.Panel(spectrum, items = channelData['elec_ids'], major_axis = t, minor_axis = fr),
+            'fr' : fr,
+            't' : t,
+            'origin' : origin
+            }
 
 def nextpowof2(x):
     return 2**(m.ceil(m.log(x, 2)))
@@ -388,7 +411,7 @@ def plotChan(channelData, whichChan, mask = None, show = False, prevFig = None):
         f = prevFig
         ax = prevFig.axes[0]
 
-    channelDataForPlotting = channelData['data'].drop(['Labels', 'LabelsNumeric'], axis = 1) if 'Labels' in channelData['data'].columns.values else channelData['data']
+    channelDataForPlotting = channelData['data'].drop(['Labels', 'LabelsNumeric'], axis = 1) if 'Labels' in channelData['data'].columns else channelData['data']
     ax.plot(channelData['t'], channelDataForPlotting[ch_idx])
 
     if np.any(mask):
@@ -405,7 +428,6 @@ def plotChan(channelData, whichChan, mask = None, show = False, prevFig = None):
     plt.tight_layout()
     if show:
         plt.show(block = False)
-
 
     return f, ax
 
@@ -463,7 +485,8 @@ def plotSpectrum(P, fs, start_time_s, end_time_s, fr = None, t = None, show = Fa
     zMin, zMax = P.min(), P.max()
 
     f = plt.figure()
-    plt.pcolormesh(t,fr,P.transpose(), norm=colors.LogNorm(vmin=zMin, vmax=zMax))
+    plt.pcolormesh(t,fr,P.transpose(), norm=colors.SymLogNorm(linthresh=0.03, linscale=0.03,
+        vmin=zMin, vmax=zMax))
 
     plt.axis([t.min(), t.max(), fr.min(), min(300, fr.max())])
     #plt.colorbar()
@@ -490,12 +513,12 @@ def binnedEvents(timeStamps, chans, ChannelID, binInterval, binWidth, timeStart,
     binLeftEdges = centerIdx * binRes
 
     nChans = len(timeStamps)
-    spikeMat = np.zeros([nChans, len(binCenters)])
+    spikeMat = np.zeros([len(binCenters), nChans])
     for idx, chan in enumerate(chans):
         ch_idx = ChannelID.index(chan)
         histo, _ = np.histogram(timeStamps[ch_idx], fineBins)
         #pdb.set_trace()
-        spikeMat[idx, :] = np.array(
+        spikeMat[:, idx] = np.array(
             [histo[x:x+fineBinsPerWindow].sum() / binWidth for x in centerIdx]
         )
 
@@ -658,6 +681,26 @@ def plotConfusionMatrix(cm, classes,
 
     return fi
 
+def plotFeature(X, y):
+    fi = plt.figure()
+
+    t = np.array(range(X.shape[0]))
+    dummyVar = np.ones(X.shape[0]) * 1
+
+    zMin = X.min().min()
+    zMax = X.max().max()
+
+    plt.pcolormesh(X.transpose(),
+        norm=colors.SymLogNorm(linthresh=0.03, linscale=0.03,
+        vmin=zMin, vmax=zMax))
+    ax = fi.axes[0]
+    clrs = ['b', 'r', 'g']
+    #pdb.set_trace()
+    for idx, label in enumerate(np.unique(y)):
+        if label != 0: ax.plot(t[y.values == label], dummyVar[y.values == label], 'o', c = clrs[idx])
+    #plt.show()
+    return fi
+
 def freqDownSampler(nChan, factor):
     def downSample(X):
         support = np.arange(X.shape[1] / nChan) # range of original frequencies
@@ -678,53 +721,74 @@ def freqDownSampler(nChan, factor):
 def freqDownSample(X, **kwargs):
     keepChans = kwargs['keepChans']
     whichChans = kwargs['whichChans']
-    nChan = len(whichChans)
+    strategy = kwargs['strategy']
 
+    nChan = len(whichChans)
     newNChan = len(keepChans)
 
-    freqFactor = kwargs['freqFactor']
     support = np.arange(X.shape[1] / nChan) # range of original frequencies
-    newFreqRes = m.floor(len(support) / freqFactor)
-
     nTimePoints = X.shape[0]
-
-    downSampledSupport = np.linspace(support[0], support[-1], newFreqRes) # range of new frequencies
 
     XReshaped = np.reshape(X, (nTimePoints, nChan, -1)) # electrodes by frequency by time bin
     del(X)
-    XDownSampled = np.zeros((XReshaped.shape[0], newNChan, m.floor(XReshaped.shape[2] / freqFactor)))# electrodes by new frequency by time bin
 
-    for newIdx, origIdx in enumerate(keepChans):
-        oldX = XReshaped[:, origIdx, :]
-        interpFun = interpolate.interp1d(support, oldX, kind = 'linear', axis = -1)
-        XDownSampled[:, newIdx, :] = interpFun(downSampledSupport)
-        del(interpFun)
-        #gc.collect()
+    if strategy == 'interpolate':
+        freqFactor = kwargs['freqFactor']
+        newFreqRes = m.floor(len(support) / freqFactor)
+        downSampledSupport = np.linspace(support[0], support[-1], newFreqRes) # range of new frequencies
 
-    del(XReshaped)
+        XDownSampled = np.zeros((XReshaped.shape[0], newNChan, m.floor(XReshaped.shape[2] / freqFactor)))# electrodes by new frequency by time bin
+
+        for newIdx, origIdx in enumerate(keepChans):
+            oldX = XReshaped[:, origIdx, :]
+            interpFun = interpolate.interp1d(support, oldX, kind = 'linear', axis = -1)
+            XDownSampled[:, newIdx, :] = interpFun(downSampledSupport)
+            del(interpFun)
+            #gc.collect()
+        del(XReshaped)
+    else:
+        bands = kwargs['bands']
+        maxFreq = kwargs['maxFreq']
+        XDownSampled = np.zeros((XReshaped.shape[0], newNChan, len(bands)))# electrodes by new frequency by time bin
+        support = np.linspace(0, maxFreq, len(support))
+        bandIdx = [np.logical_and(support > band[0], support < band[1]) for band in bands]
+
+        for newIdx, origIdx in enumerate(keepChans):
+            oldX = XReshaped[:, origIdx, :]
+            for frIdx, band in enumerate(bands):
+                if not np.any(bandIdx[frIdx]):
+                    print("WARNING. no evaluations in band.")
+                    print(band)
+                    idx = (np.abs(support-np.mean(band))).argmin()
+                    bandIdx[frIdx] = support == support[idx]
+                XDownSampled[:, newIdx, frIdx] = np.mean(oldX[:, bandIdx[frIdx]], axis = 1)
+        del(XReshaped)
     XDownSampledFlat = pd.DataFrame(np.reshape(XDownSampled, (nTimePoints, -1)))
+    #pdb.set_trace()
     return XDownSampledFlat
 
-def trainSpectralMethod(dataName, whichChans, maxFreq, estimator, skf, parameters, outputFileName):
+def trainSpectralMethod(dataNames, whichChans, maxFreq, estimator, skf, parameters, outputFileName):
 
     localDir = os.environ['DATA_ANALYSIS_LOCAL_DIR']
+    X,y = pd.DataFrame(), pd.Series()
+    for dataName in dataNames:
+        dataFile = localDir + dataName
+        pickleData = pd.read_pickle(dataFile)
 
-    dataFile = localDir + dataName
-    pickleData = pd.read_pickle(dataFile)
+        whichFreqs = pickleData['channel']['spectrum']['fr'] < maxFreq
 
-    whichFreqs = pickleData['channel']['spectrum']['fr'] < maxFreq
+        spectrum = pickleData['channel']['spectrum']['PSD']
+        #t = ns5Data['channel']['spectrum']['t']
+        y = pd.concat((y, pickleData['channel']['spectrum']['LabelsNumeric'])) # labels
+        del(pickleData) # done with pickle data
 
-    spectrum = pickleData['channel']['spectrum']['PSD']
-    #t = ns5Data['channel']['spectrum']['t']
-    y = pickleData['channel']['spectrum']['LabelsNumeric'] # labels
-    del(pickleData) # done with pickle data
+        reducedSpectrum = spectrum[whichChans, :, whichFreqs]
+        del(spectrum, whichFreqs) # done with spectrum
+        X = pd.concat((X,reducedSpectrum.transpose(1, 0, 2).to_frame().transpose()))
+        del(reducedSpectrum)
+        #pdb.set_trace()
 
-    reducedSpectrum = spectrum[whichChans, :, whichFreqs]
-    del(spectrum) # done with spectrum
-    X = reducedSpectrum.transpose(1, 0, 2).to_frame().transpose()
-    del(reducedSpectrum)
-
-    grid=GridSearchCV(estimator, parameters, cv = skf, verbose = 4, scoring = 'f1_macro', pre_dispatch='n_jobs', n_jobs = -1)
+    grid=GridSearchCV(estimator, parameters, cv = skf, verbose = 1, scoring = 'f1_macro', pre_dispatch='0.25 * n_jobs', n_jobs = -1)
 
     #if __name__ == '__main__':
     grid.fit(X,y)
@@ -734,22 +798,26 @@ def trainSpectralMethod(dataName, whichChans, maxFreq, estimator, skf, parameter
     with open(localDir + outputFileName, 'wb') as f:
         pickle.dump(bestEstimator, f)
 
-def trainSpikeMethod(dataName, whichChans, estimator, skf, parameters, outputFileName):
+def trainSpikeMethod(dataNames, whichChans, estimator, skf, parameters, outputFileName):
     localDir = os.environ['DATA_ANALYSIS_LOCAL_DIR']
-    spikeFile = localDir + dataName
-    spikeData = pd.read_pickle(spikeFile)
+    X,y = pd.DataFrame(), pd.Series()
 
-    spikes = spikeData['spikes']
-    binCenters = spikeData['binCenters']
-    spikeMat = spikeData['spikeMat']
-    binWidth = spikeData['binWidth']
+    for dataName in dataNames:
+        spikeFile = localDir + dataName
+        spikeData = pd.read_pickle(spikeFile)
 
-    del(spikeData)
-    # get all columns of spikemat that aren't the labels
-    nonLabelChans = spikeMat.columns.values[np.array([not isinstance(x, str) for x in spikeMat.columns.values], dtype = bool)]
+        #spikes = spikeData['spikes']
+        #binCenters = spikeData['binCenters']
 
-    X = spikeMat[nonLabelChans][whichChans]
-    y = spikeMat['LabelsNumeric']
+        spikeMat = spikeData['spikeMat']
+        #binWidth = spikeData['binWidth']
+
+        del(spikeData)
+        # get all columns of spikemat that aren't the labels
+        nonLabelChans = spikeMat.columns.values[np.array([not isinstance(x, str) for x in spikeMat.columns.values], dtype = bool)]
+
+        X = pd.concat((X,spikeMat[nonLabelChans][list(whichChans)]))
+        y = pd.concat((y, spikeMat['LabelsNumeric']))
 
     grid=GridSearchCV(estimator, parameters, scoring = 'f1_macro', cv = skf, n_jobs = -1, verbose = 4)
 
@@ -759,28 +827,42 @@ def trainSpikeMethod(dataName, whichChans, estimator, skf, parameters, outputFil
     with open(localDir + outputFileName, 'wb') as f:
         pickle.dump(bestEstimator, f)
 
-def plotValidationCurve(estimator, estimatorInfo):
-    keys = sorted(list(estimatorInfo['params'][0].keys()))
-    print(keys)
+def getModelName(estimator):
+    if type(estimator) == sklearn.pipeline.Pipeline:
+        modelName = '_'.join([x[0] for x in estimator.steps])
+    else:
+        modelName = str(type(estimator)).split('.')[-1]
+        #strip away non alphanumeric chars
+        modelName = ''.join(c for c in modelName if c in string.ascii_letters)
+    return modelName
 
+def plotValidationCurve(estimator, estimatorInfo):
+    modelName = getModelName(estimator)
+    keys = sorted(list(estimatorInfo['params'][0].keys()))
     # TODO: kludge, fix it
-    if keys[0][:11] == 'downSampler':
+    if modelName == 'downSampler_linDis':
         try:
             keys = sorted(list(estimatorInfo['params'][0]['downSampler__kw_args'].keys()))
+            whichChans = estimatorInfo['params'][0]['downSampler__kw_args']['whichChans']
+            strategy = estimatorInfo['params'][0]['downSampler__kw_args']['strategy']
+            # the following keywords are not searchable parameters:
             if 'whichChans' in keys: keys.remove('whichChans')
+            if 'maxFreq' in keys: keys.remove('maxFreq')
+            if 'strategy' in keys: keys.remove('strategy')
         except:
             pass
-        #pdb.set_trace()
+
     if len(keys) == 1:
         fi, ax = plt.subplots()
-        plt.title("Validation Curve with " + estimator.__str__()[:3])
+        plt.title("Validation Curve with " + modelName)
         plt.xlabel("Parameter")
         plt.ylabel("Score")
         plt.ylim(0.0, 1.1)
         lw = 2
+
         # TODO: handle dict paramater
-        if estimator.steps[0].__str__()[2:13] == 'downSampler':
-            param_range = [len(x['downSampler__kw_args']['keepChans']) for x in estimatorInfo['params']]
+        if modelName == 'downSampler_linDis':
+            param_range = [len(whichChans) / len(x['downSampler__kw_args']['keepChans']) for x in estimatorInfo['params']]
         else:
             param_range = [x[keys[0]] for x in estimatorInfo['params']]
 
@@ -789,6 +871,7 @@ def plotValidationCurve(estimator, estimatorInfo):
         ax.fill_between(param_range, estimatorInfo['mean_train_score'] - estimatorInfo['std_train_score'],
                          estimatorInfo['mean_train_score'] + estimatorInfo['std_train_score'], alpha=0.2,
                          color="darkorange", lw=lw)
+
         ax.semilogx(param_range, estimatorInfo['mean_test_score'], label="Cross-validation score",
                      color="navy", lw=lw)
         ax.fill_between(param_range, estimatorInfo['mean_test_score'] - estimatorInfo['std_test_score'],
@@ -798,24 +881,43 @@ def plotValidationCurve(estimator, estimatorInfo):
 
     elif len(keys) == 2:
         fi, ax = plt.subplots(nrows = 2, ncols = 1)
-        ax[0].set_title("Validation Curve with " + estimator.__str__()[:3])
+        ax[0].set_title("Validation Curve with " + modelName)
 
-        if not estimator.steps[0].__str__()[2:13] == 'downSampler':
+        if not modelName == 'downSampler_linDis':
             nParam1 = len(np.unique(estimatorInfo['param_' + keys[0]].data))
         else:
             #TODO: this is an edge case kludge to deal with downsampler dictionary argument. change
-            param1 = [len(x['keepChans']) for x in estimatorInfo['param_' + 'downSampler__kw_args'].data]
+            if strategy =='interpolate':
+                param1 = [x['freqFactor'] for x in estimatorInfo['param_' + 'downSampler__kw_args'].data]
+            else:
+                param1 = [np.mean(x['bands']) for x in estimatorInfo['param_' + 'downSampler__kw_args'].data]
             nParam1 = len(np.unique(param1))
 
-        if not estimator.steps[0].__str__()[2:13] == 'downSampler':
+        if not type(estimator) == sklearn.pipeline.Pipeline:
             nParam2 = len(np.unique(estimatorInfo['param_' + keys[1]].data))
         else:
             #TODO: this is an edge case kludge to deal with downsampler dictionary argument. change
-            param2 = [x['freqFactor'] for x in estimatorInfo['param_' + 'downSampler__kw_args'].data]
+            param2 = [len(whichChans) / len(x['keepChans']) for x in estimatorInfo['param_' + 'downSampler__kw_args'].data]
             nParam2 = len(np.unique(param2))
 
         nParams = [nParam1, nParam2]
 
+        zMin = min(estimatorInfo['mean_test_score'])
+        zMax = max(estimatorInfo['mean_test_score'])
+
+        #Create a uniform grid for the scatter plot
+        xTickRange = list(range(nParam1))
+        xTickTargets = list(np.unique(param1))
+        xTickLabels = ['{:4.2f}'.format(num) for num in xTickTargets]
+        xTicks = [xTickRange[xTickTargets.index(x)] for x in param1]
+
+        yTickRange = list(range(nParam2))
+        yTickTargets = list(np.unique(param2))
+        yTickLabels = ['{:4.2f}'.format(num) for num in yTickTargets]
+        yTicks = [yTickRange[yTickTargets.index(y)] for y in param2]
+
+        """
+        # Old code for pcolormesh plot
         plotTest = np.reshape(estimatorInfo['mean_test_score'],(nParams[0], nParams[1]))
         plotTrain = np.reshape(estimatorInfo['mean_train_score'],(nParams[0], nParams[1]))
 
@@ -829,17 +931,29 @@ def plotValidationCurve(estimator, estimatorInfo):
         except:
             param2 = np.reshape(param2,(nParams[1], nParams[0])).astype(np.float32)
 
-        zMin = min(estimatorInfo['mean_test_score'])
-        zMax = max(estimatorInfo['mean_test_score'])
-
         im = ax[0].pcolormesh(param1, param2, plotTest.transpose(), norm = colors.Normalize(vmin=zMin, vmax=zMax))
+        im = ax[1].pcolormesh(param1, param2, plotTrain.transpose(), norm = colors.Normalize(vmin=zMin, vmax=zMax))
+        """
+
+        im = ax[0].scatter(xTicks, yTicks, c = estimatorInfo['mean_test_score'],
+            s = 200, norm = colors.Normalize(vmin=zMin, vmax=zMax))
+        im = ax[1].scatter(xTicks, yTicks, c = estimatorInfo['mean_train_score'],
+            s = 200, norm = colors.Normalize(vmin=zMin, vmax=zMax))
 
         ax[0].set_xlabel(keys[0])
         ax[0].set_ylabel('Test ' + keys[1])
-        im = ax[1].pcolormesh(param1, param2, plotTrain.transpose(), norm = colors.Normalize(vmin=zMin, vmax=zMax))
+        ax[0].set_xticks(xTickRange)
+        ax[0].set_yticks(yTickRange)
+        ax[0].set_xticklabels(xTickLabels)
+        ax[0].set_yticklabels(yTickLabels)
 
         ax[1].set_xlabel(keys[0])
         ax[1].set_ylabel('Train ' + keys[1])
+        ax[1].set_xticks(xTickRange)
+        ax[1].set_yticks(yTickRange)
+        ax[1].set_xticklabels(xTickLabels)
+        ax[1].set_yticklabels(yTickLabels)
+
         fi.subplots_adjust(right = 0.8)
         cbar_ax = fi.add_axes([0.85, 0.15, 0.05, 0.7])
         fi.colorbar(im, cax = cbar_ax)

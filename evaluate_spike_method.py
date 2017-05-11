@@ -2,9 +2,15 @@ from helper_functions import *
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import pickle, os, sys
+import pickle, os, sys, argparse
 from sklearn.metrics import confusion_matrix, f1_score
 
+parser = argparse.ArgumentParser()
+parser.add_argument('--model', default = 'bestSpikeLDA_DownSampled.pickle')
+parser.add_argument('--file', nargs='*', default = ['201612201054-Starbuck_Treadmill-Array1480_Right-Trial00002.nev','201612201054-Starbuck_Treadmill-Array1480_Right-Trial00001.nev'])
+args = parser.parse_args()
+argModel = args.model
+argFile = args.file
 # Plotting options
 font_opts = {'family' : 'arial',
         'weight' : 'bold',
@@ -19,54 +25,57 @@ matplotlib.rc('font', **font_opts)
 matplotlib.rc('figure', **fig_opts)
 
 localDir = os.environ['DATA_ANALYSIS_LOCAL_DIR']
-whichChans = list(range(96))
+dataNames = ['/' + x.split('.')[0] + '_saveSpikeLabeled.p' for x in argFile]
+modelFileName = '/' + argModel
 
-dataName = '/saveSpikeRightLabeled.p'
-dataFile = localDir + dataName
-data = pd.read_pickle(dataFile)
-
-features = data['spikes']
-binCenters = data['binCenters']
-spikeMat = data['spikeMat']
-binWidth = data['binWidth']
-
-try:
-    modelName = '/' + sys.argv[1]
-except:
-    modelName = '/bestSpikeSVM_RBF_Z.pickle'
-
-modelFile = localDir + modelName
+modelFile = localDir + modelFileName
 estimatorDict = pd.read_pickle(modelFile)
 estimator = estimatorDict['estimator']
 estimatorInfo = estimatorDict['info']
+modelName = getModelName(estimator)
 
-# get all columns of spikemat that aren't the labels
-nonLabelChans = spikeMat.columns.values[np.array([not isinstance(x, str) for x in spikeMat.columns.values], dtype = bool)]
+whichChans = list(range(96))
+X, y, trueLabels = pd.DataFrame(), pd.Series(), pd.Series()
 
-nSamples = len(binCenters)
-X = spikeMat[nonLabelChans]
-y = spikeMat['LabelsNumeric']
+for idx, dataName in enumerate(dataNames):
+    #get all columns of spikemat that aren't the labels
+    dataFile = localDir + dataName
+    data = pd.read_pickle(dataFile)
 
+    spikeMat = data['spikeMat']
+    nonLabelChans = spikeMat.columns.values[np.array([not isinstance(x, str) for x in spikeMat.columns.values], dtype = bool)]
+
+    X = pd.concat((X,spikeMat[nonLabelChans]))
+    y = pd.concat((y,spikeMat['LabelsNumeric']))
+    trueLabels = pd.concat((trueLabels, spikeMat['Labels']))
+
+    if idx == len(dataNames) - 1:
+        binCenters = data['binCenters']
+        binWidth = data['binWidth']
+
+suffix = modelName
+nSamples = y.shape[0]
 # Poor man's test train split:
-trainSize = 0.9
+trainSize = 0.8
 trainIdx = slice(None, int(trainSize * nSamples))
-testIdx = slice(int(trainSize * nSamples) + 1, None)
+testIdx = slice(-(nSamples -int(trainSize * nSamples)), None)
 
 estimator.fit(X[whichChans].iloc[trainIdx, :], y.iloc[trainIdx])
 yHat = estimator.predict(X[whichChans].iloc[testIdx, :])
 
 labelsNumeric = {'Neither': 0, 'Toe Up': 1, 'Toe Down': 2}
+labelsList = ['Neither', 'Toe Up', 'Toe Down']
 numericLabels = {v: k for k, v in labelsNumeric.items()}
 predictedLabels = pd.Series([numericLabels[x] for x in yHat])
 
 # Compute confusion matrix
-cnf_matrix = confusion_matrix(y.iloc[testIdx], yHat)
+cnf_matrix = confusion_matrix(y.iloc[testIdx], yHat, labels = [0,1,2])
 print("Normalized confusion matrix:")
 cnf_matrix.astype('float') / cnf_matrix.sum(axis=1)[:, np.newaxis]
 
 # Compute F1 score
-f1Score = f1_score(y.iloc[testIdx], yHat, average = 'weighted')
-print('F1 Score for '+ estimator.__str__()[:3] + ' was:')
+f1Score = f1_score(y.iloc[testIdx], yHat, average = 'macro')
+print('F1 Score for '+ modelName + ' was:')
 print(f1Score)
 
 plotting = True
@@ -89,19 +98,24 @@ if plotting:
     ax.plot(binCenters[testIdx][downMaskSpikesPredicted], dummyVar[downMaskSpikesPredicted] + 1.5, 'co')
 
     plt.tight_layout()
-    plt.savefig(localDir + '/spike'+ estimator.__str__()[:3] + 'Plot.png')
+    plt.savefig(localDir + '/spike_'+ modelName + '_Plot.png')
+    with open(localDir + '/spike_'+ modelName + '_Plot.pickle', 'wb') as f:
+        pickle.dump(fi, f)
 
     # Plot normalized confusion matrix
-    fiCm = plotConfusionMatrix(cnf_matrix, classes = labelsNumeric.keys(), normalize=True,
+    fiCm = plotConfusionMatrix(cnf_matrix, classes = labelsList, normalize=True,
                           title='Normalized confusion matrix')
 
     plt.tight_layout()
-    plt.savefig(localDir + '/spike'+ estimator.__str__()[:3] + 'ConfusionMatrix.png')
+    plt.savefig(localDir + '/spike'+ modelName + 'ConfusionMatrix.png')
+    with open(localDir + '/spike_'+ modelName + '_ConfusionMatrix.pickle', 'wb') as f:
+        pickle.dump(fiCm, f)
 
     # Plot a validation Curve
-    fiVC = plotValidationCurve(estimator, estimatorInfo)
-
-    plt.savefig(localDir + '/spike'+ estimator.__str__()[:3] + 'ValidationCurve.png')
+    #fiVC = plotValidationCurve(estimator, estimatorInfo)
+    #plt.savefig(localDir + '/spike'+ modelName + 'ValidationCurve.png')
+    #with open(localDir + '/spike_'+ modelName + '_ValidationCurve.pickle', 'wb') as f:
+    #    pickle.dump(fiVC, f)
 
     #plot a scatter matrix describing the performance:
     if hasattr(estimator, 'transform'):
@@ -151,10 +165,8 @@ if plotting:
         ax.set_xticks(())
         ax.set_yticks(())
         plt.tight_layout()
-        plt.savefig(localDir + '/spike'+ estimator.__str__()[:3] + 'TransformedPlot.png')
-
-        plt.show()
-        with open(localDir + '/spike'+ estimator.__str__()[:3] + 'TransformedPlot.pickle', 'wb') as f:
+        plt.savefig(localDir + '/spike'+ modelName + 'TransformedPlot.png')
+        with open(localDir + '/spike'+ modelName + 'TransformedPlot.pickle', 'wb') as f:
             pickle.dump(fiTr, f)
 
     if hasattr(estimator, 'decision_function'):
@@ -183,18 +195,10 @@ if plotting:
         #ax.set_yticks(())
         plt.legend(markerscale=2, scatterpoints=1)
         plt.tight_layout()
-        plt.savefig(localDir + '/spike'+ estimator.__str__()[:3] + 'DecisionBoundaryPlot.png')
-
-        plt.show()
-        with open(localDir + '/spike'+ estimator.__str__()[:3] + 'DecisionBoundaryPlot.pickle', 'wb') as f:
+        plt.savefig(localDir + '/spike'+ modelName + 'DecisionBoundaryPlot.png')
+        with open(localDir + '/spike'+ modelName + 'DecisionBoundaryPlot.pickle', 'wb') as f:
             pickle.dump(fiDb, f)
 
     figDic = {'spectrum': fi, 'confusion': fiCm}
 
-    with open(localDir + '/spike'+ estimator.__str__()[:3] + 'Plot.pickle', 'wb') as f:
-        pickle.dump(fi, f)
-    with open(localDir + '/spike'+ estimator.__str__()[:3] + 'ConfusionMatrix.pickle', 'wb') as f:
-        pickle.dump(fiCm, f)
-    with open(localDir + '/spike'+ estimator.__str__()[:3] + 'ValidationCurve.pickle', 'wb') as f:
-        pickle.dump(fiVC, f)
     plt.show()

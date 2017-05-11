@@ -2,11 +2,11 @@ from helper_functions import *
 from sklearn import svm
 from sklearn.model_selection import StratifiedKFold
 import numpy as np
-dataName = '/saveSpectrumRightLabeled.p'
+dataName = '/saveSpectrumLabeled.p'
 
 #whichChans = range(1,97)
 whichChans = [0, 25, 50, 75]
-maxFreq = 250
+maxFreq = 500
 
 skf = StratifiedKFold(n_splits=10, shuffle = True, random_state = 1)
 SVC = svm.SVC(kernel = 'rbf', class_weight = 'balanced', random_state = 500,

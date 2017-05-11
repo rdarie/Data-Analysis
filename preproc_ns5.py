@@ -20,11 +20,22 @@ from helper_functions import *
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import libtfr
 import sys
 import pickle
 from copy import *
+import argparse
 
+parser = argparse.ArgumentParser()
+parser.add_argument('--stepLen', default = '0.1')
+parser.add_argument('--winLen', default = '0.1')
+parser.add_argument('--file', default = '201612201054-Starbuck_Treadmill-Array1480_Right-Trial00001.ns5')
+args = parser.parse_args()
+argWinLen = float(args.winLen)
+argStepLen = float(args.stepLen)
+argFile = args.file
+
+
+print("Preprocessing spectral data with a window length of {:4.4f} seconds and a step length of {:4.4f} seconds".format(argWinLen, argStepLen))
 # Reformat figures
 font_opts = {'family' : 'arial',
         'weight' : 'bold',
@@ -38,14 +49,13 @@ matplotlib.rc('figure', **fig_opts)
 
 # Inits
 localDir = os.environ['DATA_ANALYSIS_LOCAL_DIR']
-fileDir = 'W:/ENG_Neuromotion_Shared/group/Starbuck_Bilateral_Recordings/201612201054-Starbuck_Treadmill/'
-fileName = '/201612201054-Starbuck_Treadmill-Array1480_Right-Trial00001.ns5'
+fileName = '/' + argFile
 
 datafile = localDir + fileName
 
 elec_ids = range(1,97) # 'all' is default for all (1-indexed)
-start_time_s = 3 # 0 is default for all
-data_time_s = 90 # 'all' is default for all
+start_time_s = 0 # 0 is default for all
+data_time_s = 'all' # 'all' is default for all
 whichChan = 25 # 1-indexed
 
 simi_triggers = getNSxData(datafile, 136, start_time_s, data_time_s)
@@ -71,17 +81,19 @@ plot_mask = np.logical_or(badData['general'], badData['perChannel'][ch_idx])
 plotChan(clean_data, whichChan, mask = plot_mask, show = True, prevFig = f)
 
 # spectrum function parameters
-winLen_s = 0.1
-stepLen_s = 0.02 # window step as a fraction of window length
-R = 50 # target bandwidth for spectrogram
+winLen_s = argWinLen
+stepLen_s = argStepLen # window step as a fraction of window length
+R = 30 # target bandwidth for spectrogram
 
 # get the spectrum
 clean_data['spectrum'] = getSpectrogram(
     clean_data, winLen_s, stepLen_s, R, 600, whichChan, plotting = True)
 
-data = {'channel':clean_data, 'simiTrigger': simi_triggers}
+data = {'channel':clean_data, 'simiTrigger': simi_triggers,
+    'origin' : clean_data['spectrum']['origin'],
+    'winLen' : argWinLen, 'stepLen' : argStepLen}
 
-with open(localDir + "/saveSpectrumRight.p", "wb" ) as f:
+with open(localDir + '/' + argFile.split('.')[0] + '_saveSpectrum.p', "wb" ) as f:
     pickle.dump(data, f, protocol=4 )
 
 #print('Starting to write PDF Report.')
@@ -89,4 +101,4 @@ with open(localDir + "/saveSpectrumRight.p", "wb" ) as f:
 #pdfFile = localDir + 'pdfReport.pdf'
 #pdfReport(ChannelData, clean_data, badData = badData, pdfFilePath = pdfFile, spectrum = True)
 
-x = input("Press any key")
+#x = input("Press any key")
