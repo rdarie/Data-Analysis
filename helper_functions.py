@@ -7,8 +7,11 @@ import pandas as pd
 import math as m
 import sys, itertools, os, pickle, gc, random, string
 from sklearn.model_selection import StratifiedKFold, GridSearchCV
+from sklearn.metrics import roc_auc_score, make_scorer, f1_score
 from sklearn.linear_model import LogisticRegression
+from sklearn.preprocessing import LabelBinarizer
 import sklearn.pipeline
+from sklearn.feature_selection import RFECV
 
 try:
     import libtfr
@@ -731,6 +734,7 @@ def freqDownSample(X, **kwargs):
 
     XReshaped = np.reshape(X, (nTimePoints, nChan, -1)) # electrodes by frequency by time bin
     del(X)
+    XReshaped = XReshaped[:, keepChans, :] #remove unwanted contacts
 
     if strategy == 'interpolate':
         freqFactor = kwargs['freqFactor']
@@ -739,10 +743,10 @@ def freqDownSample(X, **kwargs):
 
         XDownSampled = np.zeros((XReshaped.shape[0], newNChan, m.floor(XReshaped.shape[2] / freqFactor)))# electrodes by new frequency by time bin
 
-        for newIdx, origIdx in enumerate(keepChans):
-            oldX = XReshaped[:, origIdx, :]
+        for idx in range(newNChan):
+            oldX = XReshaped[:, idx, :]
             interpFun = interpolate.interp1d(support, oldX, kind = 'linear', axis = -1)
-            XDownSampled[:, newIdx, :] = interpFun(downSampledSupport)
+            XDownSampled[:, idx, :] = interpFun(downSampledSupport)
             del(interpFun)
             #gc.collect()
         del(XReshaped)
@@ -753,21 +757,61 @@ def freqDownSample(X, **kwargs):
         support = np.linspace(0, maxFreq, len(support))
         bandIdx = [np.logical_and(support > band[0], support < band[1]) for band in bands]
 
-        for newIdx, origIdx in enumerate(keepChans):
-            oldX = XReshaped[:, origIdx, :]
+        for idx in range(newNChan):
+            oldX = XReshaped[:, idx, :]
+
             for frIdx, band in enumerate(bands):
+
                 if not np.any(bandIdx[frIdx]):
                     print("WARNING. no evaluations in band.")
                     print(band)
-                    idx = (np.abs(support-np.mean(band))).argmin()
-                    bandIdx[frIdx] = support == support[idx]
-                XDownSampled[:, newIdx, frIdx] = np.mean(oldX[:, bandIdx[frIdx]], axis = 1)
+                    closeIdx = (np.abs(support-np.mean(band))).argmin()
+                    bandIdx[frIdx] = support == support[closeIdx]
+
+                XDownSampled[:, idx, frIdx] = np.mean(oldX[:, bandIdx[frIdx]], axis = 1)
         del(XReshaped)
     XDownSampledFlat = pd.DataFrame(np.reshape(XDownSampled, (nTimePoints, -1)))
-    #pdb.set_trace()
+    del(XDownSampled)
     return XDownSampledFlat
 
-def trainSpectralMethod(dataNames, whichChans, maxFreq, estimator, skf, parameters, outputFileName):
+def selectFromX(X, support):
+    return X[:,support]
+
+""" Gives "cannot be pickled" error
+def multiLabelROCAUCScorer(yClasses, average = 'macro'):
+    binarizer = LabelBinarizer()
+    binarizer.fit(yClasses)
+    def ROCAUC_ScoreFunction(estimator, X, y):
+        pdb.set_trace()
+        if hasattr(estimator, 'predict_proba'):
+            score = roc_auc_score(binarizer.transform(y), estimator.predict_proba(X), average = average)
+        elif hasattr(estimator, 'decision_function'):
+            score = roc_auc_score(binarizer.transform(y),
+                estimator.decision_function(X), average = average)
+        else: # default to f1 score
+            score = f1_score(y, estimator.predict(X), average = 'macro')
+
+        return score
+    return ROCAUC_ScoreFunction
+
+"""
+def ROCAUC_ScoreFunction(estimator, X, y):
+    #pdb.set_trace()
+    binarizer = LabelBinarizer()
+    binarizer.fit([0,1,2])
+    average = 'macro'
+    if hasattr(estimator, 'decision_function'):
+        score = roc_auc_score(binarizer.transform(y), estimator.decision_function(X), average = average)
+    elif hasattr(estimator, 'predict_proba'):
+        #pdb.set_trace()
+        score = roc_auc_score(binarizer.transform(y), estimator.predict_proba(X), average = average)
+    else: # default to f1 score
+        score = f1_score(y, estimator.predict(X), average = average)
+    return score
+
+def trainSpectralMethod(
+    dataNames, whichChans, maxFreq, estimator, skf, parameters,
+    outputFileName, memPreallocate = 'n_jobs'):
 
     localDir = os.environ['DATA_ANALYSIS_LOCAL_DIR']
     X,y = pd.DataFrame(), pd.Series()
@@ -788,17 +832,22 @@ def trainSpectralMethod(dataNames, whichChans, maxFreq, estimator, skf, paramete
         del(reducedSpectrum)
         #pdb.set_trace()
 
-    grid=GridSearchCV(estimator, parameters, cv = skf, verbose = 1, scoring = 'f1_macro', pre_dispatch='0.25 * n_jobs', n_jobs = -1)
+    grid=GridSearchCV(estimator, parameters, cv = skf, verbose = 1,
+        scoring = ROCAUC_ScoreFunction, pre_dispatch = memPreallocate,
+        n_jobs = -1)
 
     #if __name__ == '__main__':
     grid.fit(X,y)
 
-    bestEstimator={'estimator' : grid.best_estimator_, 'info' : grid.cv_results_, 'whichChans' : whichChans, 'maxFreq' : maxFreq}
+    bestEstimator={'estimator' : grid.best_estimator_,
+        'info' : grid.cv_results_, 'whichChans' : whichChans,
+        'maxFreq' : maxFreq}
 
     with open(localDir + outputFileName, 'wb') as f:
         pickle.dump(bestEstimator, f)
 
-def trainSpikeMethod(dataNames, whichChans, estimator, skf, parameters, outputFileName):
+def trainSpikeMethod(dataNames, whichChans, estimator, skf, parameters,
+    outputFileName, memPreallocate = 'n_jobs'):
     localDir = os.environ['DATA_ANALYSIS_LOCAL_DIR']
     X,y = pd.DataFrame(), pd.Series()
 
@@ -814,15 +863,24 @@ def trainSpikeMethod(dataNames, whichChans, estimator, skf, parameters, outputFi
 
         del(spikeData)
         # get all columns of spikemat that aren't the labels
-        nonLabelChans = spikeMat.columns.values[np.array([not isinstance(x, str) for x in spikeMat.columns.values], dtype = bool)]
+        nonLabelChans = spikeMat.columns.values[np.array([not isinstance(x, str)
+            for x in spikeMat.columns.values], dtype = bool)]
 
         X = pd.concat((X,spikeMat[nonLabelChans][list(whichChans)]))
         y = pd.concat((y, spikeMat['LabelsNumeric']))
 
-    grid=GridSearchCV(estimator, parameters, scoring = 'f1_macro', cv = skf, n_jobs = -1, verbose = 4)
+    del(spikeMat, nonLabelChans)
+
+    grid=GridSearchCV(estimator, parameters,
+        scoring = ROCAUC_ScoreFunction,
+        cv = skf, n_jobs = -1, pre_dispatch = memPreallocate, verbose = 2)
 
     grid.fit(X,y)
-    bestEstimator={'estimator' : grid.best_estimator_, 'info' : grid.cv_results_}
+
+    best_estimator = grid.best_estimator_
+    estimator_info = grid.cv_results_
+
+    bestEstimator={'estimator' : best_estimator, 'info' : estimator_info}
 
     with open(localDir + outputFileName, 'wb') as f:
         pickle.dump(bestEstimator, f)
@@ -835,6 +893,12 @@ def getModelName(estimator):
         #strip away non alphanumeric chars
         modelName = ''.join(c for c in modelName if c in string.ascii_letters)
     return modelName
+
+def fitRFECV(estimator, skf, X, y):
+    selector = RFECV(estimator, step=1, cv=skf, scoring = ROCAUC_ScoreFunction,
+        n_jobs = -1, verbose = 1)
+    selector.fit(X, y)
+    return selector
 
 def plotValidationCurve(estimator, estimatorInfo):
     modelName = getModelName(estimator)
@@ -885,6 +949,7 @@ def plotValidationCurve(estimator, estimatorInfo):
 
         if not modelName == 'downSampler_linDis':
             nParam1 = len(np.unique(estimatorInfo['param_' + keys[0]].data))
+            param1 = estimatorInfo['param_' + keys[0]].data
         else:
             #TODO: this is an edge case kludge to deal with downsampler dictionary argument. change
             if strategy =='interpolate':
@@ -894,6 +959,7 @@ def plotValidationCurve(estimator, estimatorInfo):
             nParam1 = len(np.unique(param1))
 
         if not type(estimator) == sklearn.pipeline.Pipeline:
+            param2 = estimatorInfo['param_' + keys[1]].data
             nParam2 = len(np.unique(estimatorInfo['param_' + keys[1]].data))
         else:
             #TODO: this is an edge case kludge to deal with downsampler dictionary argument. change
@@ -913,7 +979,10 @@ def plotValidationCurve(estimator, estimatorInfo):
 
         yTickRange = list(range(nParam2))
         yTickTargets = list(np.unique(param2))
-        yTickLabels = ['{:4.2f}'.format(num) for num in yTickTargets]
+        try:
+            yTickLabels = ['{:4.2f}'.format(num) for num in yTickTargets]
+        except:
+            yTickLabels = yTickTargets
         yTicks = [yTickRange[yTickTargets.index(y)] for y in param2]
 
         """

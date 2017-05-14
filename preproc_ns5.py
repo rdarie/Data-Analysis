@@ -55,7 +55,7 @@ datafile = localDir + fileName
 
 elec_ids = range(1,97) # 'all' is default for all (1-indexed)
 start_time_s = 0 # 0 is default for all
-data_time_s = 'all' # 'all' is default for all
+data_time_s = 90 # 'all' is default for all
 whichChan = 25 # 1-indexed
 
 simi_triggers = getNSxData(datafile, 136, start_time_s, data_time_s)

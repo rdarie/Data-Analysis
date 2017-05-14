@@ -58,8 +58,8 @@ binInterval = float(argBinInterval)
 binWidth = float(argBinWidth)
 timeStart = 0
 #pdb.set_trace()
-timeDur = max([max(sp) for sp in spikes['TimeStamps']]) / spikes['basic_headers']['TimeStampResolution'] - timeStart
-
+#timeDur = max([max(sp) for sp in spikes['TimeStamps']]) / spikes['basic_headers']['TimeStampResolution'] - timeStart
+timeDur = 90
 mat, binCenters, binLeftEdges = binnedSpikes(spikes, chans, binInterval, binWidth, timeStart, timeDur)
 
 spikeData = {'spikes':spikes, 'spikeMat':mat, 'binCenters':binCenters, 'binLeftEdges': binLeftEdges, 'binWidth':binWidth}

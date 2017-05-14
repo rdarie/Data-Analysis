@@ -1,8 +1,9 @@
 from helper_functions import *
-from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from sklearn import svm
 from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import FunctionTransformer
 from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
 import numpy as np
 import itertools
 import argparse
@@ -21,14 +22,14 @@ whichChans = list(range(1,97))
 maxFreq = 500
 
 skf = StratifiedKFold(n_splits=5, shuffle = True, random_state = 1)
-LDA = LinearDiscriminantAnalysis(n_components = 2, solver = 'eigen',
-    shrinkage = 'auto')
+SVC = svm.LinearSVC(class_weight = 'balanced', random_state = 500)
 downSampler = FunctionTransformer(freqDownSample)
-
-downSampledLDA = Pipeline([('downSampler', downSampler), ('linDis', LDA)])
+scaler = StandardScaler(copy = False)
+downSampledSVC = Pipeline([('downSampler', downSampler), ('scaler', scaler),
+    ('SVCL', SVC)])
 
 keepChans = [ sorted(random.sample(range(len(whichChans)),
-    m.floor(len(whichChans) / nSubsampled))) for nSubsampled in [1, 10] ]
+    m.floor(len(whichChans) / nSubsampled))) for nSubsampled in [1] ]
 
 bands = []
 for x in range(1,8):
@@ -42,31 +43,21 @@ for x in range(1,8):
         (400,500)
         ],x))
 
-### Debugging:
-"""
-keepChans = [ sorted(random.sample(range(len(whichChans)),
-    m.floor(len(whichChans) / nSubsampled))) for nSubsampled in [15, 30] ]
+cValues = np.logspace(-9, -1, 10)
 
-bands = []
-for x in range(1,3):
-    bands = bands + list(itertools.combinations([
-        (8,15),
-        (400,500)
-        ],x))
-"""
 #downSampleKWargs = [{'whichChans' : whichChans, 'freqFactor' : x, 'keepChans': y} for x,y in itertools.product([1, 5, 10, 15],keepChans)]
 downSampleKWargs = [{'whichChans' : whichChans, 'strategy': 'bands',
-    'maxFreq' : maxFreq,
-    'bands' : x, 'keepChans': y} for x,y in itertools.product(bands,keepChans)]
+    'maxFreq' : maxFreq, 'bands' : x, 'keepChans': y}
+    for x,y in itertools.product(bands,keepChans)]
 
 #componentCounts = [1,2]
 
 #parameters = { 'downSampler__kw_args' : downSampleKWargs, 'linDis__n_components' : componentCounts}
-parameters = { 'downSampler__kw_args' : downSampleKWargs}
+parameters = { 'downSampler__kw_args' : downSampleKWargs, 'SVCL__C': cValues}
 
-outputFileName = '/bestSpectrumLDA_DownSampled.pickle'
+outputFileName = '/bestSpectrumSVMLZ_DownSampled.pickle'
 
-trainSpectralMethod(dataName, whichChans, maxFreq, downSampledLDA,
+trainSpectralMethod(dataName, whichChans, maxFreq, downSampledSVC,
     skf, parameters, outputFileName, memPreallocate = 'n_jobs')
 
-print('Train LDA DownSampled Spectrum DONE')
+print('Train SVCZ DownSampled Spectrum DONE')
