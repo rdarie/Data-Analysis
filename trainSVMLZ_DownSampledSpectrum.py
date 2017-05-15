@@ -26,7 +26,7 @@ SVC = svm.LinearSVC(class_weight = 'balanced', random_state = 500)
 downSampler = FunctionTransformer(freqDownSample)
 scaler = StandardScaler(copy = False)
 downSampledSVC = Pipeline([('downSampler', downSampler), ('scaler', scaler),
-    ('SVCL', SVC)])
+    ('LinearSVC', SVC)])
 
 keepChans = [ sorted(random.sample(range(len(whichChans)),
     m.floor(len(whichChans) / nSubsampled))) for nSubsampled in [1] ]
@@ -43,7 +43,7 @@ for x in range(1,8):
         (400,500)
         ],x))
 
-cValues = np.logspace(-9, -1, 10)
+cValues = np.logspace(-9, -2, 10)
 
 #downSampleKWargs = [{'whichChans' : whichChans, 'freqFactor' : x, 'keepChans': y} for x,y in itertools.product([1, 5, 10, 15],keepChans)]
 downSampleKWargs = [{'whichChans' : whichChans, 'strategy': 'bands',
@@ -53,7 +53,7 @@ downSampleKWargs = [{'whichChans' : whichChans, 'strategy': 'bands',
 #componentCounts = [1,2]
 
 #parameters = { 'downSampler__kw_args' : downSampleKWargs, 'linDis__n_components' : componentCounts}
-parameters = { 'downSampler__kw_args' : downSampleKWargs, 'SVCL__C': cValues}
+parameters = { 'downSampler__kw_args' : downSampleKWargs, 'LinearSVC__C': cValues}
 
 outputFileName = '/bestSpectrumSVMLZ_DownSampled.pickle'
 

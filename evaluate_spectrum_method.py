@@ -79,31 +79,67 @@ if not os.path.isdir(localDir + '/' + modelName + '/'):
     os.makedirs(localDir + '/' + modelName + '/')
 
 with open(localDir + '/' + modelName + '/spectrum_EstimatorInfo_'+ suffix + '.txt', 'w') as txtf:
-    if type(estimator) == Pipeline:
+    if isinstance(estimator, Pipeline):
         listOfEstimators = [x[1] for x in estimator.steps]
     else:
         listOfEstimators = [estimator]
 
     for step in listOfEstimators:
         txtf.write(getModelName(step) + '\n')
+        for key, value in step.get_params().items():
+            txtf.write(str(key) + '\n')
+            if isinstance(value, dict):
+                for nested_key, nested_value in value.items():
+                    txtf.write(str(nested_key) + '\n')
+                    txtf.write(str(nested_value) + '\n')
+            else:
+                txtf.write(str(value) + '\n')
 
     useRFE = bool(argUseRFE)
     if useRFE:
         skf = StratifiedKFold(n_splits=10, shuffle = True, random_state = 1)
 
         if __name__ == '__main__':
-            if 'downSampler' in estimator.named_steps.keys():
+            # Get preliminary scores:
+            estimator.fit(X.iloc[trainIdx, :], y.iloc[trainIdx])
+            yHat = estimator.predict(X.iloc[testIdx, :])
+            # Compute confusion matrix
+            cnf_matrix = confusion_matrix(y.iloc[testIdx], yHat, labels = [0,1,2])
+            print("Before RFE, Normalized confusion matrix:")
+            txtf.write("Before RFE, Normalized confusion matrix:\n")
+            print(cnf_matrix.astype('float') / cnf_matrix.sum(axis=1)[:, np.newaxis])
+            txtf.write(str(cnf_matrix.astype('float') / cnf_matrix.sum(axis=1)[:, np.newaxis]))
+            # Compute F1 score
+            f1Score = f1_score(y.iloc[testIdx], yHat, average = 'macro')
+
+            txtf.write('\nBefore RFE, the F1 Score for '+ modelName + ' was:')
+            txtf.write(str(f1Score))
+            print('Before RFE, the F1 Score for '+ modelName + ' was:')
+            print(f1Score)
+
+            ROC_AUC = ROCAUC_ScoreFunction(estimator,
+                X.iloc[testIdx, :], y.iloc[testIdx])
+
+            txtf.write('\nBefore RFE, the ROC_AUC Score for '+ modelName + ' was:')
+            txtf.write(str(ROC_AUC))
+            print('Before RFE, the ROC_AUC Score for '+ modelName + ' was:')
+            print(ROC_AUC)
+
+            if isinstance(estimator, Pipeline) and 'downSampler' in estimator.named_steps.keys():
                 trainX = estimator.named_steps['downSampler'].transform(X.iloc[trainIdx, :])
                 trainY = y.iloc[trainIdx]
             else:
                 trainX = X.iloc[trainIdx, :]
                 trainY = y.iloc[trainIdx]
 
-            if 'scaler' in estimator.named_steps.keys():
+            if isinstance(estimator, Pipeline) and 'scaler' in estimator.named_steps.keys():
                 trainX = estimator.named_steps['scaler'].transform(trainX)
             #restOfPipeline = Pipeline([(name, estimator) for name, estimator in estimator.steps if not name == 'downSampler'])
-            restOfPipeline = estimator.steps[-1][1]
-            selector = fitRFECV(restOfPipeline, skf, trainX, trainY)
+            if isinstance(estimator, Pipeline):
+                restOfPipeline = estimator.steps[-1][1]
+                selector = fitRFECV(restOfPipeline, skf, trainX, trainY)
+            else:
+                selector = fitRFECV(estimator, skf, trainX, trainY)
 
             outputFileName = '/' + 'featureSelected_' +argModel
             bestSelector={'estimator' : selector}
@@ -111,9 +147,12 @@ with open(localDir + '/' + modelName + '/spectrum_EstimatorInfo_'+ suffix + '.tx
             with open(localDir + outputFileName, 'wb') as f:
                 pickle.dump(bestSelector, f)
 
-            selectionOutcome = "Optimal number of features : %d" % selector.n_features_
+            selectionOutcome = "\nOptimal number of features : %d" % selector.n_features_
             print(selectionOutcome)
             txtf.write(selectionOutcome)
+            txtf.write('\nThese features were: ' + str(selector.support_) + '\n')
+            txtf.write('\nThe ranking was: ' + str(selector.ranking_) + '\n')
+
             fi, ax = plt.subplots(1)
             plt.xlabel("Number of features selected")
             plt.ylabel("Cross validation score (ROC AUC)")
@@ -125,19 +164,24 @@ with open(localDir + '/' + modelName + '/spectrum_EstimatorInfo_'+ suffix + '.tx
 
             featureSelector = FunctionTransformer(selectFromX, kw_args = {'support': selector.support_})
 
-            if 'downSampler' in estimator.named_steps.keys():
+            if isinstance(estimator, Pipeline) and 'downSampler' in estimator.named_steps.keys():
                 downSamplerIfPresent = [('downSampler', estimator.named_steps['downSampler'])]
             else:
                 downSamplerIfPresent = []
 
-            if 'scaler' in estimator.named_steps.keys():
+            if isinstance(estimator, Pipeline) and 'scaler' in estimator.named_steps.keys():
                 scalerIfPresent = [('scaler', estimator.named_steps['scaler'])]
             else:
                 scalerIfPresent = []
 
-            estimator = Pipeline(downSamplerIfPresent + scalerIfPresent +
-                [('featureSelector', featureSelector)] +
-                [(estimator.steps[-1][0], selector.estimator_)])
+            if isinstance(estimator, Pipeline):
+                estimator = Pipeline(downSamplerIfPresent + scalerIfPresent +
+                    [('featureSelector', featureSelector)] +
+                    [(estimator.steps[-1][0], selector.estimator_)])
+            else:
+                estimator = Pipeline(downSamplerIfPresent + scalerIfPresent +
+                    [('featureSelector', featureSelector)] +
+                    [(modelName, selector.estimator_)])
 
     else:
         estimator.fit(X.iloc[trainIdx, :], y.iloc[trainIdx])

@@ -14,6 +14,14 @@ import sklearn.pipeline
 from sklearn.feature_selection import RFECV
 
 try:
+    # for Python2
+    from Tkinter import *   ## notice capitalized T in Tkinter
+    from tkFileDialog import askopenfilenames, askopenfilename, asksaveasfilename
+except ImportError:
+    # for Python3
+    from tkinter import filedialog   ## notice lowercase 't' in tkinter here
+
+try:
     import libtfr
     HASLIBTFR = True
 except:
@@ -1027,3 +1035,19 @@ def plotValidationCurve(estimator, estimatorInfo):
         cbar_ax = fi.add_axes([0.85, 0.15, 0.05, 0.7])
         fi.colorbar(im, cax = cbar_ax)
     return fi
+
+def reloadPlot(filePath = None, message = "Please choose file(s)"):
+    # get filename
+
+    if filePath is None:
+        try:
+            filePath = os.environ['DATA_ANALYSIS_LOCAL_DIR']
+        except:
+            filePath = 'Z:/data/rdarie/tempdata/Data-Analysis'
+
+    filename_all = filedialog.askopenfilename(title = message, initialdir = filePath) # open window to get file name
+    with open(filename_all, 'rb') as f:
+        ax = pickle.load(f)
+
+    #np.set_printoptions(precision=2)
+    plt.show()

@@ -27,8 +27,8 @@ SVC = svm.SVC(kernel = 'rbf', class_weight = 'balanced', random_state = 500,
     cache_size = 250, verbose = 2, decision_function_shape = 'ovr', probability = False)
 downSampler = FunctionTransformer(freqDownSample)
 
-downSampledSVC = Pipeline([('downSampler', downSampler),
-    ('scaler', scaler), ('SVCRBF', SVC)])
+downSampledSVC = Pipeline([('downSampler', downSampler),('scaler', scaler),
+    ('SVCRBF', SVC)])
 
 keepChans = [ sorted(random.sample(range(len(whichChans)),
     m.floor(len(whichChans) / nSubsampled))) for nSubsampled in [1] ]
@@ -46,6 +46,7 @@ for x in range(1,8):
         ],x))
 
 cValues = np.logspace(-9, -1, 10)
+gammaValues = np.logspace(-5,-2,10)
 
 #downSampleKWargs = [{'whichChans' : whichChans, 'freqFactor' : x, 'keepChans': y} for x,y in itertools.product([1, 5, 10, 15],keepChans)]
 downSampleKWargs = [{'whichChans' : whichChans, 'strategy': 'bands',
@@ -55,11 +56,12 @@ downSampleKWargs = [{'whichChans' : whichChans, 'strategy': 'bands',
 #componentCounts = [1,2]
 
 #parameters = { 'downSampler__kw_args' : downSampleKWargs, 'linDis__n_components' : componentCounts}
-parameters = { 'downSampler__kw_args' : downSampleKWargs, 'SVCL__C': cValues}
+parameters = { 'downSampler__kw_args' : downSampleKWargs, 'SVCRBF__C': cValues,
+    'SVCRBF__gamma': gammaValues}
 
 outputFileName = '/bestSpectrumSVMRBFZ_DownSampled.pickle'
 
 trainSpectralMethod(dataName, whichChans, maxFreq, downSampledSVC,
     skf, parameters, outputFileName, memPreallocate = 'n_jobs')
 
-print('Train SVCRBFZ DownSampled Spectrum DONE')
+print('Train SVC DownSampled Spectrum DONE')
