@@ -26,7 +26,7 @@ from copy import *
 import argparse
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--stepLen', default = '0.1')
+parser.add_argument('--stepLen', default = '0.05')
 parser.add_argument('--winLen', default = '0.1')
 parser.add_argument('--file', default = '201612201054-Starbuck_Treadmill-Array1480_Right-Trial00001.ns5')
 args = parser.parse_args()
@@ -66,7 +66,7 @@ ch_idx  = ChannelData['elec_ids'].index(whichChan)
 
 badData = getBadContinuousMask(ChannelData, plotting = whichChan, smoothing_ms = 0.5)
 
-f,_ = plotChan(ChannelData, whichChan, mask = None, show = False)
+f,_ = plotChan(ChannelData, whichChan, label = 'Raw data', mask = None, show = False)
 
 clean_data = deepcopy(ChannelData)
 
@@ -78,8 +78,13 @@ for idx, row in clean_data['data'].iteritems():
 clean_data['badData'] = badData
 # check interpolation results
 plot_mask = np.logical_or(badData['general'], badData['perChannel'][ch_idx])
-plotChan(clean_data, whichChan, mask = plot_mask, show = True, prevFig = f)
+plotChan(clean_data, whichChan, label = 'Clean data', mask = plot_mask,
+    maskLabel = "Dropout", show = True, prevFig = f)
 
+plt.legend()
+plt.savefig(localDir + '/' + argFile.split('.')[0] + '_ns5Clean.png')
+with open(localDir + '/' + argFile.split('.')[0] + '_ns5Clean.pickle', 'wb') as File:
+    pickle.dump(f, File)
 # spectrum function parameters
 winLen_s = argWinLen
 stepLen_s = argStepLen # window step as a fraction of window length
@@ -88,6 +93,21 @@ R = 30 # target bandwidth for spectrogram
 # get the spectrum
 clean_data['spectrum'] = getSpectrogram(
     clean_data, winLen_s, stepLen_s, R, 600, whichChan, plotting = True)
+
+plt.savefig(localDir + '/' + argFile.split('.')[0] + '_SpectrumClean.png')
+with open(localDir + '/' + argFile.split('.')[0] + '_SpectrumClean.pickle', 'wb') as File:
+    pickle.dump(plt.gcf(), File)
+
+compareBad = True
+if compareBad:
+    # get the spectrum
+    ChannelData['spectrum'] = getSpectrogram(
+        ChannelData, winLen_s, stepLen_s, R, 600, whichChan, plotting = True)
+
+    plt.savefig(localDir + '/' + argFile.split('.')[0] + '_SpectrumRaw.png')
+    with open(localDir + '/' + argFile.split('.')[0] + '_SpectrumRaw.pickle', 'wb') as File:
+        pickle.dump(plt.gcf(), File)
+
 
 data = {'channel':clean_data, 'simiTrigger': simi_triggers,
     'origin' : clean_data['spectrum']['origin'],

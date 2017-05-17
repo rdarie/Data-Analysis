@@ -27,7 +27,7 @@ import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--file', default = '201612201054-Starbuck_Treadmill-Array1480_Right-Trial00001.nev')
-parser.add_argument('--binInterval', default = '20e-3')
+parser.add_argument('--binInterval', default = '50e-3')
 parser.add_argument('--binWidth', default = '100e-3')
 args = parser.parse_args()
 argFile = args.file
@@ -52,17 +52,35 @@ fileName = '/' + argFile
 datafile = localDir + fileName
 spikes = getNEVData(datafile, chans)
 
-badMask = getBadSpikesMask(spikes, nStd = 5, whichChan = 0, plotting = False, deleteBad = True)
-
 binInterval = float(argBinInterval)
 binWidth = float(argBinWidth)
 timeStart = 0
 #pdb.set_trace()
 #timeDur = max([max(sp) for sp in spikes['TimeStamps']]) / spikes['basic_headers']['TimeStampResolution'] - timeStart
 timeDur = 90
+
+compareBad = True
+if compareBad:
+    badMask = getBadSpikesMask(spikes, nStd = 1e6, whichChan = 0, plotting = False, deleteBad = True)
+    mat, binCenters, binLeftEdges = binnedSpikes(spikes, chans, binInterval, binWidth, timeStart, timeDur)
+    fi = plotBinnedSpikes(mat, binCenters, chans, show = False)
+    plt.tight_layout()
+    plt.savefig(localDir + '/' + argFile.split('.')[0] + '_SpikesRaw.png')
+    with open(localDir + '/' + argFile.split('.')[0] + '_SpikesRaw.pickle', 'wb') as f:
+        pickle.dump(fi, f)
+
+badMask = getBadSpikesMask(spikes, nStd = 2, whichChan = 0, plotting = False, deleteBad = True)
 mat, binCenters, binLeftEdges = binnedSpikes(spikes, chans, binInterval, binWidth, timeStart, timeDur)
 
+if compareBad:
+    fi = plotBinnedSpikes(mat, binCenters, chans, show = False)
+    plt.tight_layout()
+    plt.savefig(localDir + '/' + argFile.split('.')[0] + '_SpikesClean.png')
+    with open(localDir + '/' + argFile.split('.')[0] + '_SpikesClean.pickle', 'wb') as f:
+        pickle.dump(fi, f)
+
 spikeData = {'spikes':spikes, 'spikeMat':mat, 'binCenters':binCenters, 'binLeftEdges': binLeftEdges, 'binWidth':binWidth}
+
 with open( localDir + '/' + argFile.split('.')[0] + '_saveSpike.p', "wb" ) as f:
     pickle.dump(spikeData, f, protocol=4 )
 

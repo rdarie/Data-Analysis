@@ -20,15 +20,16 @@ dataName = ['/' + x.split('.')[0] + '_saveSpectrumLabeled.p' for x in argFile]
 whichChans = list(range(1,97))
 maxFreq = 500
 
-skf = StratifiedKFold(n_splits=5, shuffle = True, random_state = 1)
+skf = StratifiedKFold(n_splits = 5, shuffle = True, random_state = 1)
 LDA = LinearDiscriminantAnalysis(n_components = 2, solver = 'eigen',
     shrinkage = 'auto')
 downSampler = FunctionTransformer(freqDownSample)
 
-downSampledLDA = Pipeline([('downSampler', downSampler), ('linDis', LDA)])
+downSampledLDA = Pipeline([('downSampler', downSampler),
+    ('linearDiscriminantAnalysis', LDA)])
 
 keepChans = [ sorted(random.sample(range(len(whichChans)),
-    m.floor(len(whichChans) / nSubsampled))) for nSubsampled in [1, 10] ]
+    m.floor(len(whichChans) / nSubsampled))) for nSubsampled in [1] ]
 
 bands = []
 for x in range(1,8):
@@ -53,16 +54,17 @@ for x in range(1,3):
         (8,15),
         (400,500)
         ],x))
+
 """
-#downSampleKWargs = [{'whichChans' : whichChans, 'freqFactor' : x, 'keepChans': y} for x,y in itertools.product([1, 5, 10, 15],keepChans)]
+
 downSampleKWargs = [{'whichChans' : whichChans, 'strategy': 'bands',
     'maxFreq' : maxFreq,
     'bands' : x, 'keepChans': y} for x,y in itertools.product(bands,keepChans)]
 
-#componentCounts = [1,2]
+shrinkages = [0.1 * float(x) for x in range(10)] + ['auto']
 
-#parameters = { 'downSampler__kw_args' : downSampleKWargs, 'linDis__n_components' : componentCounts}
-parameters = { 'downSampler__kw_args' : downSampleKWargs}
+parameters = { 'downSampler__kw_args' : downSampleKWargs,
+    'linearDiscriminantAnalysis__shrinkage' : shrinkages}
 
 outputFileName = '/bestSpectrumLDA_DownSampled.pickle'
 

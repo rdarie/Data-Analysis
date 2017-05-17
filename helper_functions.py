@@ -6,12 +6,12 @@ import numpy as np
 import pandas as pd
 import math as m
 import sys, itertools, os, pickle, gc, random, string
-from sklearn.model_selection import StratifiedKFold, GridSearchCV
-from sklearn.metrics import roc_auc_score, make_scorer, f1_score
+from sklearn.model_selection import StratifiedKFold, GridSearchCV, learning_curve
+from sklearn.metrics import roc_auc_score, make_scorer, f1_score, classification_report
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import LabelBinarizer
 import sklearn.pipeline
-from sklearn.feature_selection import RFECV
+from sklearn.feature_selection import RFE,RFECV
 
 try:
     # for Python2
@@ -290,6 +290,7 @@ def assignLabels(timeVector, lbl, fnc, CameraFs = 100, oversizeWindow = None):
         #
     else:
         #sampling slower than the original data! Histogram!
+        # create a false time vector with 10x as many samples as the camera sample rate
         pseudoTime = np.arange(timeVector[0], timeVector[-1] + dt, 0.1/CameraFs)
         oversampledFnc = fnc(pseudoTime)
         #pdb.set_trace()
@@ -410,7 +411,8 @@ def replaceBad(dfSeries, mask, typeOpt = 'nans'):
 
     return dfSeries
 
-def plotChan(channelData, whichChan, mask = None, show = False, prevFig = None):
+def plotChan(channelData, whichChan, label = " ", mask = None, maskLabel = " ",
+    show = False, prevFig = None):
     # Plot the data channel
     ch_idx  = channelData['elec_ids'].index(whichChan)
     hdr_idx = channelData['ExtendedHeaderIndices'][ch_idx]
@@ -423,10 +425,10 @@ def plotChan(channelData, whichChan, mask = None, show = False, prevFig = None):
         ax = prevFig.axes[0]
 
     channelDataForPlotting = channelData['data'].drop(['Labels', 'LabelsNumeric'], axis = 1) if 'Labels' in channelData['data'].columns else channelData['data']
-    ax.plot(channelData['t'], channelDataForPlotting[ch_idx])
+    ax.plot(channelData['t'], channelDataForPlotting[ch_idx], label = label)
 
     if np.any(mask):
-        ax.plot(channelData['t'][mask], channelDataForPlotting[ch_idx][mask], 'ro')
+        ax.plot(channelData['t'][mask], channelDataForPlotting[ch_idx][mask], 'ro', label = maskLabel)
 
     #pdb.set_trace()
     #channelData['data'][ch_idx].fillna(0, inplace = True)
@@ -434,7 +436,7 @@ def plotChan(channelData, whichChan, mask = None, show = False, prevFig = None):
     ax.axis([channelData['t'][0], channelData['t'][-1], min(channelDataForPlotting[ch_idx]), max(channelDataForPlotting[ch_idx])])
     ax.locator_params(axis = 'y', nbins = 20)
     plt.xlabel('Time (s)')
-    plt.ylabel("Output (" + channelData['extended_headers'][hdr_idx]['Units'] + ")")
+    plt.ylabel("Extracellular voltage (" + channelData['extended_headers'][hdr_idx]['Units'] + ")")
     plt.title(channelData['extended_headers'][hdr_idx]['ElectrodeLabel'])
     plt.tight_layout()
     if show:
@@ -484,7 +486,7 @@ def pdfReport(origData, cleanData, badData = None, pdfFilePath = 'pdfReport.pdf'
                 else:
                     f,_ = plot_chan(origData, idx + 1, mask = None, show = False, prevFig = f)
 
-def plotSpectrum(P, fs, start_time_s, end_time_s, fr = None, t = None, show = False):
+def plotSpectrum(P, fs, start_time_s, end_time_s, fr_cutoff = 600, fr = None, t = None, show = False):
     #pdb.set_trace()
     if fr is None:
         fr = np.arange(P.shape[1]) / P.shape[1] * fs / 2
@@ -499,7 +501,7 @@ def plotSpectrum(P, fs, start_time_s, end_time_s, fr = None, t = None, show = Fa
     plt.pcolormesh(t,fr,P.transpose(), norm=colors.SymLogNorm(linthresh=0.03, linscale=0.03,
         vmin=zMin, vmax=zMax))
 
-    plt.axis([t.min(), t.max(), fr.min(), min(300, fr.max())])
+    plt.axis([t.min(), t.max(), fr.min(), min(fr_cutoff, fr.max())])
     #plt.colorbar()
     #plt.locator_params(axis='y', nbins=20)
     plt.xlabel('Time (s)')
@@ -817,6 +819,24 @@ def ROCAUC_ScoreFunction(estimator, X, y):
         score = f1_score(y, estimator.predict(X), average = average)
     return score
 
+def getSpectrumXY(dataNames, whichChans, maxFreq):
+    localDir = os.environ['DATA_ANALYSIS_LOCAL_DIR']
+
+    X, y, trueLabels = pd.DataFrame(), pd.Series(), pd.Series()
+
+    for idx, dataName in enumerate(dataNames):
+        dataFile = localDir + dataName
+
+        ns5Data = pd.read_pickle(dataFile)
+        spectrum = ns5Data['channel']['spectrum']['PSD']
+        whichFreqs = ns5Data['channel']['spectrum']['fr'] < maxFreq
+
+        reducedSpectrum = spectrum[whichChans, :, whichFreqs]
+        X = pd.concat((X,reducedSpectrum.transpose(1, 0, 2).to_frame().transpose()))
+        y = pd.concat((y,ns5Data['channel']['spectrum']['LabelsNumeric']))
+        trueLabels = pd.concat((trueLabels, ns5Data['channel']['spectrum']['Labels']))
+    return X, y, trueLabels
+
 def trainSpectralMethod(
     dataNames, whichChans, maxFreq, estimator, skf, parameters,
     outputFileName, memPreallocate = 'n_jobs'):
@@ -854,30 +874,49 @@ def trainSpectralMethod(
     with open(localDir + outputFileName, 'wb') as f:
         pickle.dump(bestEstimator, f)
 
+def getEstimator(modelFileName):
+    localDir = os.environ['DATA_ANALYSIS_LOCAL_DIR']
+    modelFile = localDir + modelFileName
+    estimatorDict = pd.read_pickle(modelFile)
+    estimator = estimatorDict['estimator']
+
+    try:
+        estimatorInfo = estimatorDict['info']
+    except:
+        estimatorInfo = None
+
+    try:
+        whichChans = estimatorDict['whichChans']
+    except:
+        whichChans = None
+
+    try:
+        maxFreq = estimatorDict['maxFreq']
+    except:
+        maxFreq = None
+
+    return estimator, estimatorInfo, whichChans, maxFreq
+
+def getSpikeXY(dataNames, whichChans):
+    localDir = os.environ['DATA_ANALYSIS_LOCAL_DIR']
+    X, y, trueLabels = pd.DataFrame(), pd.Series(), pd.Series()
+    for idx, dataName in enumerate(dataNames):
+        #get all columns of spikemat that aren't the labels
+        dataFile = localDir + dataName
+        data = pd.read_pickle(dataFile)
+
+        spikeMat = data['spikeMat']
+        nonLabelChans = spikeMat.columns.values[np.array([not isinstance(x, str) for x in spikeMat.columns.values], dtype = bool)]
+
+        X = pd.concat((X,spikeMat[nonLabelChans]))
+        y = pd.concat((y,spikeMat['LabelsNumeric']))
+        trueLabels = pd.concat((trueLabels, spikeMat['Labels']))
+    return X, y, trueLabels
+
 def trainSpikeMethod(dataNames, whichChans, estimator, skf, parameters,
     outputFileName, memPreallocate = 'n_jobs'):
     localDir = os.environ['DATA_ANALYSIS_LOCAL_DIR']
-    X,y = pd.DataFrame(), pd.Series()
-
-    for dataName in dataNames:
-        spikeFile = localDir + dataName
-        spikeData = pd.read_pickle(spikeFile)
-
-        #spikes = spikeData['spikes']
-        #binCenters = spikeData['binCenters']
-
-        spikeMat = spikeData['spikeMat']
-        #binWidth = spikeData['binWidth']
-
-        del(spikeData)
-        # get all columns of spikemat that aren't the labels
-        nonLabelChans = spikeMat.columns.values[np.array([not isinstance(x, str)
-            for x in spikeMat.columns.values], dtype = bool)]
-
-        X = pd.concat((X,spikeMat[nonLabelChans][list(whichChans)]))
-        y = pd.concat((y, spikeMat['LabelsNumeric']))
-
-    del(spikeMat, nonLabelChans)
+    X, y, _ = getSpikeXY(dataNames, whichChans)
 
     grid=GridSearchCV(estimator, parameters,
         scoring = ROCAUC_ScoreFunction,
@@ -902,27 +941,46 @@ def getModelName(estimator):
         modelName = ''.join(c for c in modelName if c in string.ascii_letters)
     return modelName
 
-def fitRFECV(estimator, skf, X, y):
-    selector = RFECV(estimator, step=1, cv=skf, scoring = ROCAUC_ScoreFunction,
-        n_jobs = -1, verbose = 1)
+def fitRFECV(estimator, skf, X, y, nFeatures = None):
+    if nFeatures == None:
+        selector = RFECV(estimator, step=1, cv=skf, scoring = ROCAUC_ScoreFunction,
+            n_jobs = -1, verbose = 1)
+    else:
+        selector = RFE(estimator, n_features_to_select=nFeatures, step=1, verbose=0)
     selector.fit(X, y)
     return selector
 
-def plotValidationCurve(estimator, estimatorInfo):
+def plotValidationCurve(estimator, estimatorInfo, whichParams = [0,1]):
     modelName = getModelName(estimator)
-    keys = sorted(list(estimatorInfo['params'][0].keys()))
-    # TODO: kludge, fix it
-    if modelName == 'downSampler_linDis':
-        try:
-            keys = sorted(list(estimatorInfo['params'][0]['downSampler__kw_args'].keys()))
-            whichChans = estimatorInfo['params'][0]['downSampler__kw_args']['whichChans']
-            strategy = estimatorInfo['params'][0]['downSampler__kw_args']['strategy']
-            # the following keywords are not searchable parameters:
-            if 'whichChans' in keys: keys.remove('whichChans')
-            if 'maxFreq' in keys: keys.remove('maxFreq')
-            if 'strategy' in keys: keys.remove('strategy')
-        except:
-            pass
+    keys = sorted([name for name in estimatorInfo.keys() if name[:6] == 'param_'])
+    validationParams = {}
+    for key in keys:
+        if isinstance(estimatorInfo[key].data[0], dict):
+            nestedKeys = sorted([name for name in estimatorInfo[key].data[0].keys()])
+
+            if 'downSampler' in modelName.split('_'):
+                # These aren't "parameters" for this particular estimator
+                if 'whichChans' in nestedKeys: nestedKeys.remove('whichChans')
+                if 'maxFreq' in nestedKeys: nestedKeys.remove('maxFreq')
+                if 'strategy' in nestedKeys: nestedKeys.remove('strategy')
+                #
+                whichChans = estimatorInfo['params'][0]['downSampler__kw_args']['whichChans']
+                strategy = estimatorInfo['params'][0]['downSampler__kw_args']['strategy']
+
+            for nestedKey in nestedKeys:
+                if nestedKey == 'keepChans':
+                    theseParams = np.array([len(whichChans) / len(x[nestedKey]) for x in estimatorInfo[key].data])
+                else:
+                    theseParams = np.array([x[nestedKey] for x in estimatorInfo[key].data])
+
+                validationParams.update({nestedKey : theseParams})
+        else:
+            validationParams.update({key[6:]: estimatorInfo[key].data})
+
+    keys = sorted([name for name in validationParams.keys()])
+
+    if len(keys) > 2:
+        keys = [keys[i] for i in whichParams]
 
     if len(keys) == 1:
         fi, ax = plt.subplots()
@@ -932,21 +990,25 @@ def plotValidationCurve(estimator, estimatorInfo):
         plt.ylim(0.0, 1.1)
         lw = 2
 
-        # TODO: handle dict paramater
-        if modelName == 'downSampler_linDis':
-            param_range = [len(whichChans) / len(x['downSampler__kw_args']['keepChans']) for x in estimatorInfo['params']]
-        else:
-            param_range = [x[keys[0]] for x in estimatorInfo['params']]
+        nParam1 = len(np.unique(validationParams[keys[0]]))
+        param1 = validationParams[keys[0]]
+        xTickRange = list(range(nParam1))
+        xTickTargets = list(np.unique(param1))
+        try:
+            xTickLabels = ['{:4.2e}'.format(num) for num in xTickTargets]
+        except:
+            xTickLabels = xTickTargets
+        xTicks = [xTickRange[xTickTargets.index(x)] for x in param1]
 
-        ax.semilogx(param_range, estimatorInfo['mean_train_score'], label="Training score",
+        ax.semilogx(param1, estimatorInfo['mean_train_score'], label="Training score",
                      color="darkorange", lw=lw)
-        ax.fill_between(param_range, estimatorInfo['mean_train_score'] - estimatorInfo['std_train_score'],
+        ax.fill_between(param1, estimatorInfo['mean_train_score'] - estimatorInfo['std_train_score'],
                          estimatorInfo['mean_train_score'] + estimatorInfo['std_train_score'], alpha=0.2,
                          color="darkorange", lw=lw)
 
-        ax.semilogx(param_range, estimatorInfo['mean_test_score'], label="Cross-validation score",
+        ax.semilogx(param1, estimatorInfo['mean_test_score'], label="Cross-validation score",
                      color="navy", lw=lw)
-        ax.fill_between(param_range, estimatorInfo['mean_test_score'] - estimatorInfo['std_test_score'],
+        ax.fill_between(param1, estimatorInfo['mean_test_score'] - estimatorInfo['std_test_score'],
                          estimatorInfo['mean_test_score'] + estimatorInfo['std_test_score'], alpha=0.2,
                          color="navy", lw=lw)
         plt.legend(loc="best")
@@ -955,24 +1017,10 @@ def plotValidationCurve(estimator, estimatorInfo):
         fi, ax = plt.subplots(nrows = 2, ncols = 1)
         ax[0].set_title("Validation Curve with " + modelName)
 
-        if not modelName == 'downSampler_linDis':
-            nParam1 = len(np.unique(estimatorInfo['param_' + keys[0]].data))
-            param1 = estimatorInfo['param_' + keys[0]].data
-        else:
-            #TODO: this is an edge case kludge to deal with downsampler dictionary argument. change
-            if strategy =='interpolate':
-                param1 = [x['freqFactor'] for x in estimatorInfo['param_' + 'downSampler__kw_args'].data]
-            else:
-                param1 = [np.mean(x['bands']) for x in estimatorInfo['param_' + 'downSampler__kw_args'].data]
-            nParam1 = len(np.unique(param1))
-
-        if not type(estimator) == sklearn.pipeline.Pipeline:
-            param2 = estimatorInfo['param_' + keys[1]].data
-            nParam2 = len(np.unique(estimatorInfo['param_' + keys[1]].data))
-        else:
-            #TODO: this is an edge case kludge to deal with downsampler dictionary argument. change
-            param2 = [len(whichChans) / len(x['keepChans']) for x in estimatorInfo['param_' + 'downSampler__kw_args'].data]
-            nParam2 = len(np.unique(param2))
+        nParam1 = len(np.unique(validationParams[keys[0]]))
+        param1 = validationParams[keys[0]]
+        nParam2 = len(np.unique(validationParams[keys[1]]))
+        param2 = validationParams[keys[1]]
 
         nParams = [nParam1, nParam2]
 
@@ -982,35 +1030,19 @@ def plotValidationCurve(estimator, estimatorInfo):
         #Create a uniform grid for the scatter plot
         xTickRange = list(range(nParam1))
         xTickTargets = list(np.unique(param1))
-        xTickLabels = ['{:4.2f}'.format(num) for num in xTickTargets]
+        try:
+            xTickLabels = ['{:4.2e}'.format(num) for num in xTickTargets]
+        except:
+            xTickLabels = xTickTargets
         xTicks = [xTickRange[xTickTargets.index(x)] for x in param1]
 
         yTickRange = list(range(nParam2))
         yTickTargets = list(np.unique(param2))
         try:
-            yTickLabels = ['{:4.2f}'.format(num) for num in yTickTargets]
+            yTickLabels = ['{:4.2e}'.format(num) for num in yTickTargets]
         except:
             yTickLabels = yTickTargets
         yTicks = [yTickRange[yTickTargets.index(y)] for y in param2]
-
-        """
-        # Old code for pcolormesh plot
-        plotTest = np.reshape(estimatorInfo['mean_test_score'],(nParams[0], nParams[1]))
-        plotTrain = np.reshape(estimatorInfo['mean_train_score'],(nParams[0], nParams[1]))
-
-        try:
-            param1 = np.reshape(estimatorInfo['param_' + keys[0]].data,(nParams[1], nParams[0])).astype(np.float32)
-        except:
-            param1 = np.reshape(param1,(nParams[1], nParams[0])).astype(np.float32)
-
-        try:
-            param2 = np.reshape(estimatorInfo['param_' + keys[1]].data,(nParams[1], nParams[0])).astype(np.float32)
-        except:
-            param2 = np.reshape(param2,(nParams[1], nParams[0])).astype(np.float32)
-
-        im = ax[0].pcolormesh(param1, param2, plotTest.transpose(), norm = colors.Normalize(vmin=zMin, vmax=zMax))
-        im = ax[1].pcolormesh(param1, param2, plotTrain.transpose(), norm = colors.Normalize(vmin=zMin, vmax=zMax))
-        """
 
         im = ax[0].scatter(xTicks, yTicks, c = estimatorInfo['mean_test_score'],
             s = 200, norm = colors.Normalize(vmin=zMin, vmax=zMax))
@@ -1036,18 +1068,120 @@ def plotValidationCurve(estimator, estimatorInfo):
         fi.colorbar(im, cax = cbar_ax)
     return fi
 
+def plotLearningCurve(estimator, title, X, y, ylim=None, cv=None, scoreFun = 'f1_macro',
+                        n_jobs=1, pre_dispatch = 'n_jobs', train_sizes=np.linspace(.1, 1.0, 10)):
+    """
+    Generate a simple plot of the test and training learning curve.
+    Based on http://scikit-learn.org/stable/auto_examples/model_selection/plot_learning_curve.html
+    Parameters
+    ----------
+    estimator : object type that implements the "fit" and "predict" methods
+        An object of that type which is cloned for each validation.
+
+    title : string
+        Title for the chart.
+
+    X : array-like, shape (n_samples, n_features)
+        Training vector, where n_samples is the number of samples and
+        n_features is the number of features.
+
+    y : array-like, shape (n_samples) or (n_samples, n_features), optional
+        Target relative to X for classification or regression;
+        None for unsupervised learning.
+
+    ylim : tuple, shape (ymin, ymax), optional
+        Defines minimum and maximum yvalues plotted.
+
+    cv : int, cross-validation generator or an iterable, optional
+        Determines the cross-validation splitting strategy.
+        Possible inputs for cv are:
+          - None, to use the default 3-fold cross-validation,
+          - integer, to specify the number of folds.
+          - An object to be used as a cross-validation generator.
+          - An iterable yielding train/test splits.
+
+        For integer/None inputs, if ``y`` is binary or multiclass,
+        :class:`StratifiedKFold` used. If the estimator is not a classifier
+        or if ``y`` is neither binary nor multiclass, :class:`KFold` is used.
+
+        Refer :ref:`User Guide <cross_validation>` for the various
+        cross-validators that can be used here.
+
+    n_jobs : integer, optional
+        Number of jobs to run in parallel (default 1).
+    """
+    fi = plt.figure()
+    plt.title(title)
+    if ylim is not None:
+        plt.ylim(*ylim)
+    plt.xlabel("Training examples")
+    plt.ylabel("Score")
+    train_sizes, train_scores, test_scores = learning_curve(
+        estimator, X, y, cv=cv, n_jobs=n_jobs,
+        scoring = scoreFun, train_sizes=train_sizes, pre_dispatch = pre_dispatch)
+    train_scores_mean = np.mean(train_scores, axis=1)
+    train_scores_std = np.std(train_scores, axis=1)
+    test_scores_mean = np.mean(test_scores, axis=1)
+    test_scores_std = np.std(test_scores, axis=1)
+    plt.grid()
+
+    plt.fill_between(train_sizes, train_scores_mean - train_scores_std,
+                     train_scores_mean + train_scores_std, alpha=0.1,
+                     color="r")
+    plt.fill_between(train_sizes, test_scores_mean - test_scores_std,
+                     test_scores_mean + test_scores_std, alpha=0.1, color="g")
+    plt.plot(train_sizes, train_scores_mean, 'o-', color="r",
+             label="Training score")
+    plt.plot(train_sizes, test_scores_mean, 'o-', color="g",
+             label="Cross-validation score")
+
+    plt.legend(loc="best")
+    return fi
+
+def lenientScore(yTrue, yPredicted, oldBinSize, newBinSize, scoreFun, **kwargs):
+    if not isinstance(yTrue, np.ndarray):
+        yTrue = yTrue.values
+
+    downSampleFactor = m.ceil(newBinSize / oldBinSize)
+    nSamples = len(yTrue)
+    yTrueLenient = []
+    yPredictedLenient = []
+    for idx, currY in enumerate(yPredicted):
+        if currY == 1 or currY == 2:
+            yPredicted[idx + 1 : idx + downSampleFactor + 1] = 0
+
+    for idx in range(nSamples)[0::downSampleFactor]:
+        if 1 in yTrue[idx:idx + downSampleFactor]:
+            yTrueLenient.append(1)
+        elif 2 in yTrue[idx:idx + downSampleFactor]:
+            yTrueLenient.append(2)
+        else:
+            yTrueLenient.append(0)
+        if 1 in yPredicted[idx:idx + downSampleFactor]:
+            yPredictedLenient.append(1)
+        elif 2 in yPredicted[idx:idx + downSampleFactor]:
+            yPredictedLenient.append(2)
+        else:
+            yPredictedLenient.append(0)
+
+    return scoreFun(yTrueLenient, yPredictedLenient, **kwargs), yPredicted
+
 def reloadPlot(filePath = None, message = "Please choose file(s)"):
     # get filename
+    filename = ''
 
-    if filePath is None:
+    if filePath == 'None':
         try:
-            filePath = os.environ['DATA_ANALYSIS_LOCAL_DIR']
+            startPath = os.environ['DATA_ANALYSIS_LOCAL_DIR']
         except:
-            filePath = 'Z:/data/rdarie/tempdata/Data-Analysis'
+            startPath = 'Z:/data/rdarie/tempdata/Data-Analysis'
+        filename = filedialog.askopenfilename(title = message, initialdir = startPath) # open window to get file name
+    else:
+        filename = filePath
 
-    filename_all = filedialog.askopenfilename(title = message, initialdir = filePath) # open window to get file name
-    with open(filename_all, 'rb') as f:
+    with open(filename, 'rb') as f:
         ax = pickle.load(f)
 
     #np.set_printoptions(precision=2)
     plt.show()
+    return plt.gcf()

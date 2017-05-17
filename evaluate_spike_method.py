@@ -2,27 +2,25 @@ from helper_functions import *
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import pickle, os, sys, argparse
+import pickle, os, sys, argparse, warnings
 from sklearn.metrics import confusion_matrix, f1_score
 from sklearn.preprocessing import FunctionTransformer
 from sklearn.pipeline import Pipeline
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--model', default = 'bestSpikeSVML.pickle')
-parser.add_argument('--useRFE', nargs='*', default = '')
+parser.add_argument('--model', default = 'bestSpikeLDA.pickle')
 parser.add_argument('--file', nargs='*', default =
     ['201612201054-Starbuck_Treadmill-Array1480_Right-Trial00002.nev',
     '201612201054-Starbuck_Treadmill-Array1480_Right-Trial00001.nev'])
 args = parser.parse_args()
 argModel = args.model
-argUseRFE = args.useRFE
 argFile = args.file
+
 # Plotting options
 font_opts = {'family' : 'arial',
         'weight' : 'bold',
         'size'   : 20
         }
-
 fig_opts = {
     'figsize' : (10,5),
     }
@@ -34,30 +32,19 @@ localDir = os.environ['DATA_ANALYSIS_LOCAL_DIR']
 dataNames = ['/' + x.split('.')[0] + '_saveSpikeLabeled.p' for x in argFile]
 modelFileName = '/' + argModel
 
-modelFile = localDir + modelFileName
-estimatorDict = pd.read_pickle(modelFile)
-estimator = estimatorDict['estimator']
-estimatorInfo = estimatorDict['info']
+estimator, estimatorInfo, _, _ = getEstimator(modelFileName)
 modelName = getModelName(estimator)
 
 whichChans = list(range(96))
-X, y, trueLabels = pd.DataFrame(), pd.Series(), pd.Series()
+X, y, trueLabels = getSpikeXY(dataNames, whichChans)
 
-for idx, dataName in enumerate(dataNames):
-    #get all columns of spikemat that aren't the labels
-    dataFile = localDir + dataName
-    data = pd.read_pickle(dataFile)
-
-    spikeMat = data['spikeMat']
-    nonLabelChans = spikeMat.columns.values[np.array([not isinstance(x, str) for x in spikeMat.columns.values], dtype = bool)]
-
-    X = pd.concat((X,spikeMat[nonLabelChans]))
-    y = pd.concat((y,spikeMat['LabelsNumeric']))
-    trueLabels = pd.concat((trueLabels, spikeMat['Labels']))
-
-    if idx == len(dataNames) - 1:
-        binCenters = data['binCenters']
-        binWidth = data['binWidth']
+dataFile = localDir + dataNames[-1]
+data = pd.read_pickle(dataFile)
+binCenters = data['binCenters']
+binWidth = data['binWidth']
+spikeMat = data['spikeMat']
+nonLabelChans = spikeMat.columns.values[np.array([not isinstance(x, str) for x in spikeMat.columns.values], dtype = bool)]
+del(data)
 
 suffix = modelName
 
@@ -70,7 +57,9 @@ trainSize = 0.8
 trainIdx = slice(None, int(trainSize * nSamples))
 testIdx = slice(-(nSamples -int(trainSize * nSamples)), None)
 
-with open(localDir + '/' + modelName + '/spike_EstimatorInfo_'+ suffix + '.txt', 'w') as txtf:
+with open(localDir + '/' + modelName + '/spike_EstimatorInfo_'+
+    suffix + '.txt', 'w') as txtf:
+
     if isinstance(estimator, Pipeline):
         listOfEstimators = [x[1] for x in estimator.steps]
     else:
@@ -87,98 +76,7 @@ with open(localDir + '/' + modelName + '/spike_EstimatorInfo_'+ suffix + '.txt',
             else:
                 txtf.write(str(value) + '\n')
 
-    useRFE = bool(argUseRFE)
-    if useRFE:
-        skf = StratifiedKFold(n_splits=10, shuffle = True, random_state = 1)
-        if __name__ == '__main__':
-            # Get preliminary scores:
-            estimator.fit(X.iloc[trainIdx, :], y.iloc[trainIdx])
-            yHat = estimator.predict(X.iloc[testIdx, :])
-            # Compute confusion matrix
-            cnf_matrix = confusion_matrix(y.iloc[testIdx], yHat, labels = [0,1,2])
-            print("Before RFE, Normalized confusion matrix:")
-            txtf.write("Before RFE, Normalized confusion matrix:\n")
-            print(cnf_matrix.astype('float') / cnf_matrix.sum(axis=1)[:, np.newaxis])
-            txtf.write(str(cnf_matrix.astype('float') / cnf_matrix.sum(axis=1)[:, np.newaxis]))
-
-            # Compute F1 score
-            f1Score = f1_score(y.iloc[testIdx], yHat, average = 'macro')
-
-            txtf.write('\nBefore RFE, the F1 Score for '+ modelName + ' was:')
-            txtf.write(str(f1Score))
-            print('Before RFE, the F1 Score for '+ modelName + ' was:')
-            print(f1Score)
-
-            ROC_AUC = ROCAUC_ScoreFunction(estimator,
-                X.iloc[testIdx, :], y.iloc[testIdx])
-
-            txtf.write('\nBefore RFE, the ROC_AUC Score for '+ modelName + ' was:')
-            txtf.write(str(ROC_AUC))
-            print('Before RFE, the ROC_AUC Score for '+ modelName + ' was:')
-            print(ROC_AUC)
-
-            if isinstance(estimator, Pipeline) and 'downSampler' in estimator.named_steps.keys():
-                trainX = estimator.named_steps['downSampler'].transform(X.iloc[trainIdx, :])
-                trainY = y.iloc[trainIdx]
-            else:
-                trainX = X.iloc[trainIdx, :]
-                trainY = y.iloc[trainIdx]
-
-            if isinstance(estimator, Pipeline) and 'scaler' in estimator.named_steps.keys():
-                trainX = estimator.named_steps['scaler'].transform(trainX)
-            #restOfPipeline = Pipeline([(name, estimator) for name, estimator in estimator.steps if not name == 'downSampler'])
-            if isinstance(estimator, Pipeline):
-                restOfPipeline = estimator.steps[-1][1]
-                selector = fitRFECV(restOfPipeline, skf, trainX, trainY)
-            else:
-                selector = fitRFECV(estimator, skf, trainX, trainY)
-
-            outputFileName = '/' + 'featureSelected_' + argModel
-            bestSelector={'estimator' : selector}
-
-            with open(localDir + outputFileName, 'wb') as f:
-                pickle.dump(bestSelector, f)
-
-
-            selectionOutcome = "\nOptimal number of features : %d" % selector.n_features_
-            print(selectionOutcome)
-            txtf.write(selectionOutcome)
-            txtf.write('\nThese features were: ' + str(selector.support_) + '\n')
-            txtf.write('\nThe ranking was: ' + str(selector.ranking_) + '\n')
-
-            fi, ax = plt.subplots(1)
-
-            plt.xlabel("Number of features selected")
-            plt.ylabel("Cross validation score (ROC AUC)")
-            ax.plot(range(1, len(selector.grid_scores_) + 1), selector.grid_scores_)
-            #plt.show()
-            plt.savefig(localDir + '/' + modelName + '/spike_FeatureSelection_'+ suffix + '.png')
-            with open(localDir + '/' + modelName + '/spike_FeatureSelection_'+ suffix + '.pickle', 'wb') as f:
-                pickle.dump(fi, f)
-
-            featureSelector = FunctionTransformer(selectFromX, kw_args = {'support': selector.support_})
-
-            if isinstance(estimator, Pipeline) and 'downSampler' in estimator.named_steps.keys():
-                downSamplerIfPresent = [('downSampler', estimator.named_steps['downSampler'])]
-            else:
-                downSamplerIfPresent = []
-
-            if isinstance(estimator, Pipeline) and 'scaler' in estimator.named_steps.keys():
-                scalerIfPresent = [('scaler', estimator.named_steps['scaler'])]
-            else:
-                scalerIfPresent = []
-
-            if isinstance(estimator, Pipeline):
-                estimator = Pipeline(downSamplerIfPresent + scalerIfPresent +
-                    [('featureSelector', featureSelector)] +
-                    [(estimator.steps[-1][0], selector.estimator_)])
-            else:
-                estimator = Pipeline(downSamplerIfPresent + scalerIfPresent +
-                    [('featureSelector', featureSelector)] +
-                    [(modelName, selector.estimator_)])
-
-    else:
-        estimator.fit(X[whichChans].iloc[trainIdx, :], y.iloc[trainIdx])
+    estimator.fit(X[whichChans].iloc[trainIdx, :], y.iloc[trainIdx])
 
     if __name__ == '__main__':
         yHat = estimator.predict(X[whichChans].iloc[testIdx, :])
@@ -187,6 +85,17 @@ with open(localDir + '/' + modelName + '/spike_EstimatorInfo_'+ suffix + '.txt',
         labelsList = ['Neither', 'Toe Up', 'Toe Down']
         numericLabels = {v: k for k, v in labelsNumeric.items()}
         predictedLabels = pd.Series([numericLabels[x] for x in yHat])
+
+        lS, yHatLenient = lenientScore(y.iloc[testIdx], yHat, 0.05, 0.2,
+            scoreFun = f1_score, average = 'macro')
+
+        # Debugging
+        predictedLabels = pd.Series([numericLabels[x] for x in yHatLenient])
+
+        txtf.write('\nLenient Score for '+ modelName + ' was:')
+        txtf.write(str(lS))
+        print('Lenient Score for '+ modelName + ' was:')
+        print(lS)
 
         # Compute confusion matrix
         cnf_matrix = confusion_matrix(y.iloc[testIdx], yHat, labels = [0,1,2])
@@ -210,6 +119,10 @@ with open(localDir + '/' + modelName + '/spike_EstimatorInfo_'+ suffix + '.txt',
         txtf.write(str(ROC_AUC))
         print('ROC_AUC Score for '+ modelName + ' was:')
         print(ROC_AUC)
+
+        txtReport = classification_report(y.iloc[testIdx], yHat,
+            labels = [0,1,2], target_names = labelsList)
+        txtf.write(txtReport)
 
         plotting = True
         if plotting:
@@ -251,6 +164,7 @@ with open(localDir + '/' + modelName + '/spike_EstimatorInfo_'+ suffix + '.txt',
                 with open(localDir + '/' + modelName + '/spike_ValidationCurve_'+ suffix + '.pickle', 'wb') as f:
                     pickle.dump(fiVC, f)
             except:
+                warnings.warn("Unable to plot Validation Curve!", UserWarning)
                 pass
 
             #plot a scatter matrix describing the performance:

@@ -19,14 +19,14 @@ whichChans = range(96)
 skf = StratifiedKFold(n_splits=10, shuffle = True, random_state = 1)
 scaler = StandardScaler(copy = False)
 SVC = svm.LinearSVC(class_weight = 'balanced', random_state = 500)
-scaledSVC = Pipeline([('scaler', scaler),('SVCL', SVC)])
+scaledSVC = Pipeline([('scaler', scaler),('LinearSVC', SVC)])
 #cValues = [1]
 cValues = np.logspace(-9, -1, 10)
 
 penalties = ['l2']
 #penalties = ['l1','l2']
 
-parameters = {'SVCL__C': cValues, 'SVCL__penalty' : penalties}
+parameters = {'SVCL__C': cValues, 'LinearSVC__penalty' : penalties}
 
 outputFileName = '/bestSpikeSVMLZ.pickle'
 

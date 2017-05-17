@@ -43,7 +43,7 @@ for x in range(1,8):
         (400,500)
         ],x))
 
-cValues = np.logspace(-9, -2, 10)
+cValues = np.logspace(-7, 0, 10)
 
 #downSampleKWargs = [{'whichChans' : whichChans, 'freqFactor' : x, 'keepChans': y} for x,y in itertools.product([1, 5, 10, 15],keepChans)]
 downSampleKWargs = [{'whichChans' : whichChans, 'strategy': 'bands',

@@ -2,7 +2,7 @@ from helper_functions import *
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import pickle, os, matplotlib, argparse, string
+import pickle, os, matplotlib, argparse, string, warnings
 from sklearn.metrics import confusion_matrix, f1_score
 from sklearn.preprocessing import FunctionTransformer
 from sklearn.pipeline import Pipeline
@@ -17,6 +17,7 @@ argModel = args.model
 argUseRFE = args.useRFE
 argFile = args.file
 
+plotting = True
 # Plotting options
 font_opts = {'family' : 'arial',
         'weight' : 'bold',
@@ -34,39 +35,24 @@ localDir = os.environ['DATA_ANALYSIS_LOCAL_DIR']
 modelFileName = '/' + argModel
 ns5Names = ['/' + x.split('.')[0] + '_saveSpectrumLabeled.p' for x in argFile]
 
-modelFile = localDir + modelFileName
-estimatorDict = pd.read_pickle(modelFile)
-
-estimator = estimatorDict['estimator']
-estimatorInfo = estimatorDict['info']
-whichChans = estimatorDict['whichChans']
-maxFreq = estimatorDict['maxFreq']
+estimator, estimatorInfo, whichChans, maxFreq = getEstimator(modelFileName)
 modelName = getModelName(estimator)
 print("Using estimator:")
 print(estimator)
 
-X, y, trueLabels = pd.DataFrame(), pd.Series(), pd.Series()
+X, y, trueLabels = getSpectrumXY(ns5Names, whichChans, maxFreq)
 
-for idx, ns5Name in enumerate(ns5Names):
-    ns5File = localDir + ns5Name
+ns5File = localDir + ns5Names[-1]
+ns5Data = pd.read_pickle(ns5File)
 
-    ns5Data = pd.read_pickle(ns5File)
-    spectrum = ns5Data['channel']['spectrum']['PSD']
-    whichFreqs = ns5Data['channel']['spectrum']['fr'] < maxFreq
-
-    reducedSpectrum = spectrum[whichChans, :, whichFreqs]
-    X = pd.concat((X,reducedSpectrum.transpose(1, 0, 2).to_frame().transpose()))
-    y = pd.concat((y,ns5Data['channel']['spectrum']['LabelsNumeric']))
-    trueLabels = pd.concat((trueLabels, ns5Data['channel']['spectrum']['Labels']))
-
-    if idx == len(ns5Names) - 1:
-        origin = ns5Data['channel']['spectrum']['origin']
-        t = ns5Data['channel']['spectrum']['t']
-        fr = ns5Data['channel']['spectrum']['fr']
-        Fs = ns5Data['channel']['samp_per_s']
-        winLen = ns5Data['winLen']
-        stepLen = ns5Data['stepLen']
-del(ns5Data, whichFreqs, reducedSpectrum)
+origin = ns5Data['channel']['spectrum']['origin']
+spectrum = ns5Data['channel']['spectrum']['PSD']
+t = ns5Data['channel']['spectrum']['t']
+fr = ns5Data['channel']['spectrum']['fr']
+Fs = ns5Data['channel']['samp_per_s']
+winLen = ns5Data['winLen']
+stepLen = ns5Data['stepLen']
+del(ns5Data)
 
 suffix = modelName + '_winLen_' + str(winLen) + '_stepLen_' + str(stepLen) + '_from_' + origin
 nSamples = y.shape[0]
@@ -95,96 +81,7 @@ with open(localDir + '/' + modelName + '/spectrum_EstimatorInfo_'+ suffix + '.tx
             else:
                 txtf.write(str(value) + '\n')
 
-    useRFE = bool(argUseRFE)
-    if useRFE:
-        skf = StratifiedKFold(n_splits=10, shuffle = True, random_state = 1)
-
-        if __name__ == '__main__':
-            # Get preliminary scores:
-            estimator.fit(X.iloc[trainIdx, :], y.iloc[trainIdx])
-            yHat = estimator.predict(X.iloc[testIdx, :])
-            # Compute confusion matrix
-            cnf_matrix = confusion_matrix(y.iloc[testIdx], yHat, labels = [0,1,2])
-            print("Before RFE, Normalized confusion matrix:")
-            txtf.write("Before RFE, Normalized confusion matrix:\n")
-            print(cnf_matrix.astype('float') / cnf_matrix.sum(axis=1)[:, np.newaxis])
-            txtf.write(str(cnf_matrix.astype('float') / cnf_matrix.sum(axis=1)[:, np.newaxis]))
-            # Compute F1 score
-            f1Score = f1_score(y.iloc[testIdx], yHat, average = 'macro')
-
-            txtf.write('\nBefore RFE, the F1 Score for '+ modelName + ' was:')
-            txtf.write(str(f1Score))
-            print('Before RFE, the F1 Score for '+ modelName + ' was:')
-            print(f1Score)
-
-            ROC_AUC = ROCAUC_ScoreFunction(estimator,
-                X.iloc[testIdx, :], y.iloc[testIdx])
-
-            txtf.write('\nBefore RFE, the ROC_AUC Score for '+ modelName + ' was:')
-            txtf.write(str(ROC_AUC))
-            print('Before RFE, the ROC_AUC Score for '+ modelName + ' was:')
-            print(ROC_AUC)
-
-            if isinstance(estimator, Pipeline) and 'downSampler' in estimator.named_steps.keys():
-                trainX = estimator.named_steps['downSampler'].transform(X.iloc[trainIdx, :])
-                trainY = y.iloc[trainIdx]
-            else:
-                trainX = X.iloc[trainIdx, :]
-                trainY = y.iloc[trainIdx]
-
-            if isinstance(estimator, Pipeline) and 'scaler' in estimator.named_steps.keys():
-                trainX = estimator.named_steps['scaler'].transform(trainX)
-            #restOfPipeline = Pipeline([(name, estimator) for name, estimator in estimator.steps if not name == 'downSampler'])
-            if isinstance(estimator, Pipeline):
-                restOfPipeline = estimator.steps[-1][1]
-                selector = fitRFECV(restOfPipeline, skf, trainX, trainY)
-            else:
-                selector = fitRFECV(estimator, skf, trainX, trainY)
-
-            outputFileName = '/' + 'featureSelected_' +argModel
-            bestSelector={'estimator' : selector}
-
-            with open(localDir + outputFileName, 'wb') as f:
-                pickle.dump(bestSelector, f)
-
-            selectionOutcome = "\nOptimal number of features : %d" % selector.n_features_
-            print(selectionOutcome)
-            txtf.write(selectionOutcome)
-            txtf.write('\nThese features were: ' + str(selector.support_) + '\n')
-            txtf.write('\nThe ranking was: ' + str(selector.ranking_) + '\n')
-
-            fi, ax = plt.subplots(1)
-            plt.xlabel("Number of features selected")
-            plt.ylabel("Cross validation score (ROC AUC)")
-            ax.plot(range(1, len(selector.grid_scores_) + 1), selector.grid_scores_)
-            #plt.show()
-            plt.savefig(localDir + '/' + modelName + '/spectrum_FeatureSelection_'+ suffix + '.png')
-            with open(localDir + '/' + modelName + '/spectrum_FeatureSelection_'+ suffix + '.pickle', 'wb') as f:
-                pickle.dump(fi, f)
-
-            featureSelector = FunctionTransformer(selectFromX, kw_args = {'support': selector.support_})
-
-            if isinstance(estimator, Pipeline) and 'downSampler' in estimator.named_steps.keys():
-                downSamplerIfPresent = [('downSampler', estimator.named_steps['downSampler'])]
-            else:
-                downSamplerIfPresent = []
-
-            if isinstance(estimator, Pipeline) and 'scaler' in estimator.named_steps.keys():
-                scalerIfPresent = [('scaler', estimator.named_steps['scaler'])]
-            else:
-                scalerIfPresent = []
-
-            if isinstance(estimator, Pipeline):
-                estimator = Pipeline(downSamplerIfPresent + scalerIfPresent +
-                    [('featureSelector', featureSelector)] +
-                    [(estimator.steps[-1][0], selector.estimator_)])
-            else:
-                estimator = Pipeline(downSamplerIfPresent + scalerIfPresent +
-                    [('featureSelector', featureSelector)] +
-                    [(modelName, selector.estimator_)])
-
-    else:
-        estimator.fit(X.iloc[trainIdx, :], y.iloc[trainIdx])
+    estimator.fit(X.iloc[trainIdx, :], y.iloc[trainIdx])
 
     if __name__ == '__main__':
         yHat = estimator.predict(X.iloc[testIdx, :])
@@ -194,6 +91,16 @@ with open(localDir + '/' + modelName + '/spectrum_EstimatorInfo_'+ suffix + '.tx
         labelsList = ['Neither', 'Toe Up', 'Toe Down']
         numericLabels = {v: k for k, v in labelsNumeric.items()}
         predictedLabels = pd.Series([numericLabels[x] for x in yHat])
+
+        lS, yHatLenient = lenientScore(y.iloc[testIdx], yHat, 0.05,
+            0.2, scoreFun = f1_score, average = 'macro')
+        # Debugging
+        predictedLabels = pd.Series([numericLabels[x] for x in yHatLenient])
+
+        txtf.write('\nLenient Score for '+ modelName + ' was:')
+        txtf.write(str(lS))
+        print('Lenient Score for '+ modelName + ' was:')
+        print(lS)
 
         # Compute confusion matrix
         cnf_matrix = confusion_matrix(y.iloc[testIdx], yHat, labels = [0,1,2])
@@ -219,7 +126,10 @@ with open(localDir + '/' + modelName + '/spectrum_EstimatorInfo_'+ suffix + '.tx
         print('ROC_AUC Score for '+ modelName + ' was:')
         print(ROC_AUC)
 
-        plotting = True
+        txtReport = classification_report(y.iloc[testIdx], yHat,
+            labels = [0,1,2], target_names = labelsList)
+        txtf.write(txtReport)
+
         if plotting:
             #plot the spectrum
             upMaskSpectrum = (trueLabels.iloc[testIdx] == 'Toe Up').values
@@ -249,14 +159,15 @@ with open(localDir + '/' + modelName + '/spectrum_EstimatorInfo_'+ suffix + '.tx
             with open(localDir + '/' + modelName + '/spectrum_Plot_' + suffix  + '.pickle', 'wb') as f:
                 pickle.dump(fi, f)
 
-            if 'downSampler' in estimator.named_steps.keys():
-                downSampler = estimator.named_steps['downSampler']
-                reducedX = downSampler.transform(X,y)
-                fiDs = plotFeature(reducedX, y)
-                plt.tight_layout()
-                plt.savefig(localDir + '/' + modelName + '/spectrum_DownSampledFeatures_' + suffix  + '.png')
-                with open(localDir + '/' + modelName + '/spectrum_DownSampledFeatures_' + suffix  + '.pickle', 'wb') as f:
-                    pickle.dump(fiDs, f)
+            if isinstance(estimator, Pipeline):
+                if 'downSampler' in estimator.named_steps.keys():
+                    downSampler = estimator.named_steps['downSampler']
+                    reducedX = downSampler.transform(X,y)
+                    fiDs = plotFeature(reducedX, y)
+                    plt.tight_layout()
+                    plt.savefig(localDir + '/' + modelName + '/spectrum_DownSampledFeatures_' + suffix  + '.png')
+                    with open(localDir + '/' + modelName + '/spectrum_DownSampledFeatures_' + suffix  + '.pickle', 'wb') as f:
+                        pickle.dump(fiDs, f)
 
             # Plot normalized confusion matrix
             fiCm = plotConfusionMatrix(cnf_matrix, classes = labelsList, normalize=True,
@@ -273,6 +184,7 @@ with open(localDir + '/' + modelName + '/spectrum_EstimatorInfo_'+ suffix + '.tx
                 with open(localDir + '/' + modelName + '/spectrumValidationCurve' + suffix  + '.pickle', 'wb') as f:
                     pickle.dump(fiVC, f)
             except:
+                warnings.warn("Unable to plot Validation Curve!", UserWarning)
                 pass
 
             #plot a scatter matrix describing the performance:
