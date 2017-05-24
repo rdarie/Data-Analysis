@@ -842,23 +842,7 @@ def trainSpectralMethod(
     outputFileName, memPreallocate = 'n_jobs'):
 
     localDir = os.environ['DATA_ANALYSIS_LOCAL_DIR']
-    X,y = pd.DataFrame(), pd.Series()
-    for dataName in dataNames:
-        dataFile = localDir + dataName
-        pickleData = pd.read_pickle(dataFile)
-
-        whichFreqs = pickleData['channel']['spectrum']['fr'] < maxFreq
-
-        spectrum = pickleData['channel']['spectrum']['PSD']
-        #t = ns5Data['channel']['spectrum']['t']
-        y = pd.concat((y, pickleData['channel']['spectrum']['LabelsNumeric'])) # labels
-        del(pickleData) # done with pickle data
-
-        reducedSpectrum = spectrum[whichChans, :, whichFreqs]
-        del(spectrum, whichFreqs) # done with spectrum
-        X = pd.concat((X,reducedSpectrum.transpose(1, 0, 2).to_frame().transpose()))
-        del(reducedSpectrum)
-        #pdb.set_trace()
+    X, y, _ = getSpectrumXY(dataNames, whichChans, maxFreq)
 
     grid=GridSearchCV(estimator, parameters, cv = skf, verbose = 1,
         scoring = ROCAUC_ScoreFunction, pre_dispatch = memPreallocate,
@@ -1146,6 +1130,7 @@ def lenientScore(yTrue, yPredicted, oldBinSize, newBinSize, scoreFun, **kwargs):
     nSamples = len(yTrue)
     yTrueLenient = []
     yPredictedLenient = []
+
     for idx, currY in enumerate(yPredicted):
         if currY == 1 or currY == 2:
             yPredicted[idx + 1 : idx + downSampleFactor + 1] = 0
@@ -1164,7 +1149,7 @@ def lenientScore(yTrue, yPredicted, oldBinSize, newBinSize, scoreFun, **kwargs):
         else:
             yPredictedLenient.append(0)
 
-    return scoreFun(yTrueLenient, yPredictedLenient, **kwargs), yPredicted
+    return scoreFun(yTrueLenient, yPredictedLenient, **kwargs), yTrueLenient, yPredictedLenient
 
 def reloadPlot(filePath = None, message = "Please choose file(s)"):
     # get filename

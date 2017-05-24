@@ -43,8 +43,8 @@ for x in range(1,8):
         (400,500)
         ],x))
 
-### Debugging:
 """
+
 keepChans = [ sorted(random.sample(range(len(whichChans)),
     m.floor(len(whichChans) / nSubsampled))) for nSubsampled in [15, 30] ]
 
@@ -55,16 +55,19 @@ for x in range(1,3):
         (400,500)
         ],x))
 
-"""
+freqFactors = [1, 5, 10, 15]
+downSampleKWargs = [{'whichChans' : whichChans, 'strategy': 'interpolate',
+    'maxFreq' : maxFreq,
+    'freqFactor' : x, 'keepChans': y} for x,y in itertools.product(freqFactors,keepChans)]
 
+"""
 downSampleKWargs = [{'whichChans' : whichChans, 'strategy': 'bands',
     'maxFreq' : maxFreq,
     'bands' : x, 'keepChans': y} for x,y in itertools.product(bands,keepChans)]
 
-shrinkages = [0.1 * float(x) for x in range(10)] + ['auto']
+shrinkages = ['auto']
 
-parameters = { 'downSampler__kw_args' : downSampleKWargs,
-    'linearDiscriminantAnalysis__shrinkage' : shrinkages}
+parameters = { 'downSampler__kw_args' : downSampleKWargs}
 
 outputFileName = '/bestSpectrumLDA_DownSampled.pickle'
 

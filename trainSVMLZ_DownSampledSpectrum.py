@@ -43,16 +43,19 @@ for x in range(1,8):
         (400,500)
         ],x))
 
-cValues = np.logspace(-7, 0, 10)
+cValues = np.logspace(-7, 0, 5)
 
-#downSampleKWargs = [{'whichChans' : whichChans, 'freqFactor' : x, 'keepChans': y} for x,y in itertools.product([1, 5, 10, 15],keepChans)]
+"""
+freqFactors = [1, 5, 10, 15]
+downSampleKWargs = [{'whichChans' : whichChans, 'strategy': 'interpolate',
+    'maxFreq' : maxFreq,
+    'freqFactors' : x, 'keepChans': y} for x,y in itertools.product(freqFactors,keepChans)]
+
+"""
 downSampleKWargs = [{'whichChans' : whichChans, 'strategy': 'bands',
     'maxFreq' : maxFreq, 'bands' : x, 'keepChans': y}
     for x,y in itertools.product(bands,keepChans)]
 
-#componentCounts = [1,2]
-
-#parameters = { 'downSampler__kw_args' : downSampleKWargs, 'linDis__n_components' : componentCounts}
 parameters = { 'downSampler__kw_args' : downSampleKWargs, 'LinearSVC__C': cValues}
 
 outputFileName = '/bestSpectrumSVMLZ_DownSampled.pickle'

@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import pickle, os, matplotlib, argparse, string, warnings
 from sklearn.metrics import confusion_matrix, f1_score
+from sklearn.model_selection import cross_val_predict
 from sklearn.preprocessing import FunctionTransformer
 from sklearn.pipeline import Pipeline
 
@@ -33,33 +34,29 @@ matplotlib.rc('figure', **fig_opts)
 
 localDir = os.environ['DATA_ANALYSIS_LOCAL_DIR']
 modelFileName = '/' + argModel
-ns5Names = ['/' + x.split('.')[0] + '_saveSpectrumLabeled.p' for x in argFile]
+dataNames = ['/' + x.split('.')[0] + '_saveSpectrumLabeled.p' for x in argFile]
 
 estimator, estimatorInfo, whichChans, maxFreq = getEstimator(modelFileName)
 modelName = getModelName(estimator)
 print("Using estimator:")
 print(estimator)
 
-X, y, trueLabels = getSpectrumXY(ns5Names, whichChans, maxFreq)
+X, y, trueLabels = getSpectrumXY(dataNames, whichChans, maxFreq)
+nSamples = y.shape[0]
 
-ns5File = localDir + ns5Names[-1]
+ns5File = localDir + dataNames[-1]
 ns5Data = pd.read_pickle(ns5File)
 
 origin = ns5Data['channel']['spectrum']['origin']
 spectrum = ns5Data['channel']['spectrum']['PSD']
-t = ns5Data['channel']['spectrum']['t']
 fr = ns5Data['channel']['spectrum']['fr']
 Fs = ns5Data['channel']['samp_per_s']
 winLen = ns5Data['winLen']
 stepLen = ns5Data['stepLen']
+t = np.arange(nSamples) * stepLen
 del(ns5Data)
 
 suffix = modelName + '_winLen_' + str(winLen) + '_stepLen_' + str(stepLen) + '_from_' + origin
-nSamples = y.shape[0]
-# Poor man's test train split:
-trainSize = 0.8
-trainIdx = slice(None, int(trainSize * nSamples))
-testIdx = slice(-(nSamples -int(trainSize * nSamples)), None)
 
 if not os.path.isdir(localDir + '/' + modelName + '/'):
     os.makedirs(localDir + '/' + modelName + '/')
@@ -81,10 +78,11 @@ with open(localDir + '/' + modelName + '/spectrum_EstimatorInfo_'+ suffix + '.tx
             else:
                 txtf.write(str(value) + '\n')
 
-    estimator.fit(X.iloc[trainIdx, :], y.iloc[trainIdx])
+    skf = StratifiedKFold(n_splits = 5, shuffle = False, random_state = 1)
 
     if __name__ == '__main__':
-        yHat = estimator.predict(X.iloc[testIdx, :])
+        yHat = cross_val_predict(estimator, X, y, cv=skf,
+            n_jobs = -1, pre_dispatch = 'n_jobs')
 
         #get predicted labels
         labelsNumeric = {'Neither': 0, 'Toe Up': 1, 'Toe Down': 2}
@@ -92,18 +90,18 @@ with open(localDir + '/' + modelName + '/spectrum_EstimatorInfo_'+ suffix + '.tx
         numericLabels = {v: k for k, v in labelsNumeric.items()}
         predictedLabels = pd.Series([numericLabels[x] for x in yHat])
 
-        lS, yHatLenient = lenientScore(y.iloc[testIdx], yHat, 0.05,
-            0.2, scoreFun = f1_score, average = 'macro')
+        lS, yTrueLenient, yHatLenient = lenientScore(deepcopy(y), deepcopy(yHat), 0.05,
+            0.25, scoreFun = f1_score, average = 'macro')
         # Debugging
-        predictedLabels = pd.Series([numericLabels[x] for x in yHatLenient])
+        # predictedLabels = pd.Series([numericLabels[x] for x in yHatLenient])
 
-        txtf.write('\nLenient Score for '+ modelName + ' was:')
+        txtf.write('\nLenient F1 Score for '+ modelName + ' was:')
         txtf.write(str(lS))
         print('Lenient Score for '+ modelName + ' was:')
         print(lS)
 
         # Compute confusion matrix
-        cnf_matrix = confusion_matrix(y.iloc[testIdx], yHat, labels = [0,1,2])
+        cnf_matrix = confusion_matrix(y, yHat, labels = [0,1,2])
 
         print("Normalized confusion matrix:")
         txtf.write("Normalized confusion matrix:\n")
@@ -111,7 +109,7 @@ with open(localDir + '/' + modelName + '/spectrum_EstimatorInfo_'+ suffix + '.tx
         txtf.write(str(cnf_matrix.astype('float') / cnf_matrix.sum(axis=1)[:, np.newaxis]))
 
         # Compute F1 score
-        f1Score = f1_score(y.iloc[testIdx], yHat, average = 'macro')
+        f1Score = f1_score(y, yHat, average = 'macro')
 
         txtf.write('\nF1 Score for '+ modelName + ' was:')
         txtf.write(str(f1Score))
@@ -119,40 +117,34 @@ with open(localDir + '/' + modelName + '/spectrum_EstimatorInfo_'+ suffix + '.tx
         print(f1Score)
 
         ROC_AUC = ROCAUC_ScoreFunction(estimator,
-            X.iloc[testIdx, :], y.iloc[testIdx])
+            X, y)
 
         txtf.write('\nROC_AUC Score for '+ modelName + ' was:')
         txtf.write(str(ROC_AUC))
         print('ROC_AUC Score for '+ modelName + ' was:')
         print(ROC_AUC)
 
-        txtReport = classification_report(y.iloc[testIdx], yHat,
+        txtReport = classification_report(y, yHat,
             labels = [0,1,2], target_names = labelsList)
         txtf.write(txtReport)
 
         if plotting:
             #plot the spectrum
-            upMaskSpectrum = (trueLabels.iloc[testIdx] == 'Toe Up').values
-            downMaskSpectrum = (trueLabels.iloc[testIdx] == 'Toe Down').values
-            dummyVar = np.ones(t[testIdx].shape[0]) * 1
+            upMaskSpectrum = y == 1
+            downMaskSpectrum = y == 2
+            dummyVar = np.ones(t.shape[0]) * 1
 
-            upMaskSpectrumPredicted = (predictedLabels == 'Toe Up').values
-            downMaskSpectrumPredicted = (predictedLabels == 'Toe Down').values
+            upMaskSpectrumPredicted = yHat == 1
+            downMaskSpectrumPredicted = yHat == 2
 
-            fi = plotSpectrum(spectrum[1].iloc[testIdx],
-                Fs,
-                t[testIdx][0],
-                t[testIdx][-1],
-                fr = fr,
-                t = t[testIdx],
-                show = False)
+            fi,ax = plt.subplots(1)
 
-            ax = fi.axes[0]
-            ax.plot(t[testIdx][upMaskSpectrum], dummyVar[upMaskSpectrum], 'ro')
-            ax.plot(t[testIdx][downMaskSpectrum], dummyVar[downMaskSpectrum] + 1, 'go')
+            plt.grid()
+            ax.plot(t[upMaskSpectrum], dummyVar[upMaskSpectrum], 'ro')
+            ax.plot(t[downMaskSpectrum], dummyVar[downMaskSpectrum] + 1, 'go')
 
-            ax.plot(t[testIdx][upMaskSpectrumPredicted], dummyVar[upMaskSpectrumPredicted] + .5, 'mo')
-            ax.plot(t[testIdx][downMaskSpectrumPredicted], dummyVar[downMaskSpectrumPredicted] + 1.5, 'co')
+            ax.plot(t[upMaskSpectrumPredicted], dummyVar[upMaskSpectrumPredicted] + .5, 'mo')
+            ax.plot(t[downMaskSpectrumPredicted], dummyVar[downMaskSpectrumPredicted] + 1.5, 'co')
 
             plt.tight_layout()
             plt.savefig(localDir + '/' + modelName + '/spectrum_Plot_' + suffix  + '.png')
@@ -189,43 +181,43 @@ with open(localDir + '/' + modelName + '/spectrum_EstimatorInfo_'+ suffix + '.tx
 
             #plot a scatter matrix describing the performance:
             if hasattr(estimator, 'transform'):
-                plotData = estimator.transform(X.iloc[testIdx])
+                plotData = estimator.transform(X)
                 fiTr, ax = plt.subplots()
                 if plotData.shape[1] == 2: #2D
                     try:
-                        ax.scatter(plotData[:, 0][y.iloc[testIdx].values == 0],
-                            plotData[:, 1][y.iloc[testIdx].values == 0],
+                        ax.scatter(plotData[:, 0][y.values == 0],
+                            plotData[:, 1][y.values == 0],
                             c = plt.cm.Paired(0.3), label = 'Neither')
                     except:
                         pass
                     try:
-                        ax.scatter(plotData[:, 0][y.iloc[testIdx].values == 1],
-                            plotData[:, 1][y.iloc[testIdx].values == 1],
+                        ax.scatter(plotData[:, 0][y.values == 1],
+                            plotData[:, 1][y.values == 1],
                             c = plt.cm.Paired(0.6), label = 'Foot Off')
                     except:
                         pass
                     try:
-                        ax.scatter(plotData[:, 0][y.iloc[testIdx].values == 2],
-                            plotData[:, 1][y.iloc[testIdx].values == 2],
+                        ax.scatter(plotData[:, 0][y.values == 2],
+                            plotData[:, 1][y.values == 2],
                             c = plt.cm.Paired(1), label = 'Foot Strike')
                     except:
                         pass
                 else: # 1D
                     try:
-                        ax.scatter(t[testIdx][y.iloc[testIdx].values == 0],
-                            plotData[:, 0][y.iloc[testIdx].values == 0],
+                        ax.scatter(t[y.values == 0],
+                            plotData[:, 0][y.values == 0],
                             c = plt.cm.Paired(0.3), label = 'Neither')
                     except:
                         pass
                     try:
-                        ax.scatter(t[testIdx][y.iloc[testIdx].values == 1],
-                            plotData[:, 0][y.iloc[testIdx].values == 1],
+                        ax.scatter(t[y.values == 1],
+                            plotData[:, 0][y.values == 1],
                             c = plt.cm.Paired(0.6), label = 'Foot Off')
                     except:
                         pass
                     try:
-                        ax.scatter(t[testIdx][y.iloc[testIdx].values == 2],
-                            plotData[:, 0][y.iloc[testIdx].values == 2],
+                        ax.scatter(t[y.values == 2],
+                            plotData[:, 0][y.values == 2],
                             c = plt.cm.Paired(1), label = 'Foot Strike')
                     except:
                         pass
@@ -242,23 +234,23 @@ with open(localDir + '/' + modelName + '/spectrum_EstimatorInfo_'+ suffix + '.tx
 
             if hasattr(estimator, 'decision_function'):
                 fiDb, ax = plt.subplots()
-                plotData = estimator.decision_function(X.iloc[testIdx])
+                plotData = estimator.decision_function(X)
 
                 try:
-                    ax.scatter(t[testIdx][y.iloc[testIdx].values == 0],
-                        plotData[:, 0][y.iloc[testIdx].values == 0],
+                    ax.scatter(t[y.values == 0],
+                        plotData[:, 0][y.values == 0],
                         c = plt.cm.Paired(0.3), label = 'Neither')
                 except:
                     pass
                 try:
-                    ax.scatter(t[testIdx][y.iloc[testIdx].values == 1],
-                        plotData[:, 0][y.iloc[testIdx].values == 1],
+                    ax.scatter(t[y.values == 1],
+                        plotData[:, 0][y.values == 1],
                         c = plt.cm.Paired(0.6), label = 'Foot Off')
                 except:
                     pass
                 try:
-                    ax.scatter(t[testIdx][y.iloc[testIdx].values == 2],
-                        plotData[:, 0][y.iloc[testIdx].values == 2],
+                    ax.scatter(t[y.values == 2],
+                        plotData[:, 0][y.values == 2],
                         c = plt.cm.Paired(0.1), label = 'Foot on')
                 except:
                     pass
