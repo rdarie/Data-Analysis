@@ -345,7 +345,6 @@ def getSpectrogram(channelData, winLen_s, stepLen_s = 0.02, R = 20, fr_cutoff = 
         fr = fr[fr < fr_cutoff]
         fr_samp = len(fr)
 
-
     if HASLIBTFR:
         origin = 'libtfr'
         #pdb.set_trace()
@@ -612,6 +611,23 @@ def plot_spikes(spikes, chans):
     plt.tight_layout()
     plt.show(block = False)
 
+def plot_events_raster(eventDf, names, collapse = False):
+    # Initialize plots
+    colors      = 'kbgrm'
+    names2int = list(range(len(names)))
+    line_styles = ['-', '--', ':', '-.']
+    f, ax       = plt.subplots()
+
+    for idx, name in enumerate(names):
+        color_idx = (names2int[idx] % len(colors)) + 1
+        ln_sty_idx = 0
+        event_times = eventDf['Time'][eventDf['Label'] == name]
+        if collapse:
+            idx = 0
+        ax.vlines(event_times, idx, idx + 1, colors = colors[color_idx],
+            linestyles = line_styles[ln_sty_idx], label = name)
+    plt.legend()
+
 def plot_raster(spikes, chans):
     # Initialize plots
     colors      = 'kbgrm'
@@ -654,6 +670,19 @@ def plot_raster(spikes, chans):
     ax.set_xlabel('Time (s)')
     plt.tight_layout()
     plt.show(block = False)
+
+def readPiLog(filePath, names = None, zeroTime = False):
+    if names is not None:
+        log = pd.read_table(filePath, header = None, names = names)
+    else:
+        log = pd.read_table(filePath)
+
+    if zeroTime:
+        if 'Time' in log.columns.values:
+            log['Time'] = log['Time'] - log['Time'][0]
+        else:
+            print('No time column find to zero!')
+    return log
 
 def plotConfusionMatrix(cm, classes,
                           normalize=False,
