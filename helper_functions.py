@@ -12,7 +12,10 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import LabelBinarizer
 import sklearn.pipeline
 from sklearn.feature_selection import RFE,RFECV
-
+import plotly
+import plotly.plotly as py
+from plotly.tools import FigureFactory as ff
+import plotly.graph_objs as go
 try:
     # for Python2
     from Tkinter import *   ## notice capitalized T in Tkinter
@@ -611,22 +614,77 @@ def plot_spikes(spikes, chans):
     plt.tight_layout()
     plt.show(block = False)
 
-def plot_events_raster(eventDf, names, collapse = False):
+def plot_events_raster(eventDf, names, collapse = False, usePlotly = False):
     # Initialize plots
+
     colors      = 'kbgrm'
     names2int = list(range(len(names)))
     line_styles = ['-', '--', ':', '-.']
-    f, ax       = plt.subplots()
+
+    if not usePlotly:
+        fig, ax = plt.subplots()
+    else:
+        data = []
 
     for idx, name in enumerate(names):
+
         color_idx = (names2int[idx] % len(colors)) + 1
         ln_sty_idx = 0
         event_times = eventDf['Time'][eventDf['Label'] == name]
+
         if collapse:
             idx = 0
-        ax.vlines(event_times, idx, idx + 1, colors = colors[color_idx],
-            linestyles = line_styles[ln_sty_idx], label = name)
-    plt.legend()
+
+        if not usePlotly:
+
+            ax.vlines(event_times, idx, idx + 1, colors = colors[color_idx],
+                linestyles = line_styles[ln_sty_idx], label = name)
+
+        else:
+
+            data.append(go.Scatter(
+                    x = event_times,
+                    y = [idx for i in event_times],
+                    mode = 'markers',
+                    name = name,
+                    marker = go.Marker(
+                        color=colors[color_idx],
+                        symbol="circleS"
+                        )
+                ))
+
+    if not usePlotly:
+
+        plt.legend()
+        plt.xlabel('Times (sec)')
+        ax.get_yaxis().set_visible(False)
+
+    else:
+
+        layout = go.Layout(
+            title='Plot Title',
+            xaxis=dict(
+                title='x Axis',
+                titlefont=dict(
+                    family='Courier New, monospace',
+                    size=18,
+                    color='#7f7f7f'
+                )
+            ),
+
+            yaxis=dict(
+                title='y Axis',
+                titlefont=dict(
+                    family='Courier New, monospace',
+                    size=18,
+                    color='#7f7f7f'
+                )
+            )
+        )
+
+        fig = {'data': data}
+        py.iplot(fig, filename='eventRaster')
+    return fig
 
 def plot_raster(spikes, chans):
     # Initialize plots
