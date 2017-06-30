@@ -2,6 +2,7 @@ import pdb
 from brpylib             import NsxFile, NevFile, brpylib_ver
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
+from matplotlib import cm
 import numpy as np
 import pandas as pd
 import math as m
@@ -14,7 +15,8 @@ import sklearn.pipeline
 from sklearn.feature_selection import RFE,RFECV
 import plotly
 import plotly.plotly as py
-from plotly.tools import FigureFactory as ff
+import plotly.tools as tls
+import plotly.figure_factory as ff
 import plotly.graph_objs as go
 try:
     # for Python2
@@ -614,10 +616,22 @@ def plot_spikes(spikes, chans):
     plt.tight_layout()
     plt.show(block = False)
 
-def plot_events_raster(eventDf, names, collapse = False, usePlotly = False):
+def plot_events_raster(eventDf, names, collapse = False, usePlotly = True):
     # Initialize plots
 
-    colors      = 'kbgrm'
+    viridis_cmap = matplotlib.cm.get_cmap('viridis')
+    norm = colors.Normalize(vmin=0, vmax=255)
+    colorsRgb = [colors.colorConverter.to_rgb(viridis_cmap(norm(i)))
+                    for i in range(0,255)]
+
+    plotColPlotly, plotColMPL = [], []
+    h = 1.0/(len(names)-1)
+
+    for k in range(len(names)):
+        C = list(map(np.uint8, np.array(viridis_cmap(k*h)[:3])*255))
+        plotColPlotly.append([k*h, 'rgb'+str((C[0], C[1], C[2]))])
+        plotColMPL.append(norm(C))
+
     names2int = list(range(len(names)))
     line_styles = ['-', '--', ':', '-.']
 
@@ -625,45 +639,11 @@ def plot_events_raster(eventDf, names, collapse = False, usePlotly = False):
         fig, ax = plt.subplots()
     else:
         data = []
+        layout = {
 
-    for idx, name in enumerate(names):
+            'title' : 'Plot Title',
 
-        color_idx = (names2int[idx] % len(colors)) + 1
-        ln_sty_idx = 0
-        event_times = eventDf['Time'][eventDf['Label'] == name]
-
-        if collapse:
-            idx = 0
-
-        if not usePlotly:
-
-            ax.vlines(event_times, idx, idx + 1, colors = colors[color_idx],
-                linestyles = line_styles[ln_sty_idx], label = name)
-
-        else:
-
-            data.append(go.Scatter(
-                    x = event_times,
-                    y = [idx for i in event_times],
-                    mode = 'markers',
-                    name = name,
-                    marker = go.Marker(
-                        color=colors[color_idx],
-                        symbol="circleS"
-                        )
-                ))
-
-    if not usePlotly:
-
-        plt.legend()
-        plt.xlabel('Times (sec)')
-        ax.get_yaxis().set_visible(False)
-
-    else:
-
-        layout = go.Layout(
-            title='Plot Title',
-            xaxis=dict(
+            'xaxis' : dict(
                 title='x Axis',
                 titlefont=dict(
                     family='Courier New, monospace',
@@ -672,19 +652,88 @@ def plot_events_raster(eventDf, names, collapse = False, usePlotly = False):
                 )
             ),
 
-            yaxis=dict(
+            'yaxis' : dict(
                 title='y Axis',
                 titlefont=dict(
                     family='Courier New, monospace',
                     size=18,
                     color='#7f7f7f'
                 )
-            )
-        )
+            ),
+            'shapes' : []}
 
-        fig = {'data': data}
-        py.iplot(fig, filename='eventRaster')
-    return fig
+    for idx, name in enumerate(names):
+
+        color_idx = (names2int[idx] % len(plotColPlotly))
+        ln_sty_idx = 0
+        event_times = eventDf['Time'][eventDf['Label'] == name]
+
+        if collapse:
+            idx = 0
+
+        if not usePlotly:
+
+            ax.vlines(event_times, idx, idx + 1, colors = plotColMPL[color_idx],
+                linestyles = line_styles[ln_sty_idx], label = name)
+
+        else:
+
+            data.append( go.Scatter(
+                    x = event_times,
+                    y = [idx + 0.5 for i in event_times],
+                    mode = 'markers',
+                    name = name,
+                    marker = dict(
+                        color = plotColPlotly[color_idx][1],
+                        symbol = "line-ns-open",
+                        line = dict(
+                            width = 4,
+                            color = plotColPlotly[color_idx][1]
+                        )
+                    )
+                )
+            )
+
+            layout['shapes'] = layout['shapes'] + [
+                {
+                    'type' : 'line',
+                    'x0' :  t,
+                    'y0' :  idx,
+                    'x1' :  t,
+                    'y1' :  idx + 1,
+                    'line' :  dict(
+                        color = plotColPlotly[color_idx][1],
+                        width = 5
+                    )
+                } for t in event_times
+            ]
+
+    if not usePlotly:
+        plt.legend()
+        plt.xlabel('Times (sec)')
+        ax.get_yaxis().set_visible(False)
+
+    else:
+        rasterFig = go.Figure(data=data,layout=layout)
+        #py.iplot(fig, filename='eventRaster')
+    return rasterFig
+
+def fileId_from_url(url):
+    """Return fileId from a url."""
+    index = url.find('~')
+    fileId = url[index + 1:]
+    local_id_index = fileId.find('/')
+
+    share_key_index = fileId.find('?share_key')
+    if share_key_index == -1:
+        return fileId.replace('/', ':')
+    else:
+        return fileId[:share_key_index].replace('/', ':')
+
+def sharekey_from_url(url):
+    """Return the sharekey from a url."""
+    index = url.find('share_key=')
+    return url[index + len('share_key='):]
 
 def plot_raster(spikes, chans):
     # Initialize plots
