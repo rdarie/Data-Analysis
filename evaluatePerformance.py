@@ -14,12 +14,10 @@ import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--file', default = 'Murdoc_26_06_2017_15_32_04')
+parser.add_argument('--folder', default = 'W:/ENG_Neuromotion_Shared/group/Proprioprosthetics/Training/Flywheel Logs/Murdoc')
 args = parser.parse_args()
 fileName = args.file
-
-fileDir = 'W:/ENG_Neuromotion_Shared/group/Proprioprosthetics/Training/Flywheel Logs/Murdoc'
-
-
+fileDir = args.folder
 
 # In[2]:
 
