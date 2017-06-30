@@ -1,6 +1,8 @@
 import pdb
 try:
-    from brpylib             import NsxFile, NevFile, brpylib_ver
+    from brpylib import NsxFile, NevFile, brpylib_ver
+except:
+    pass
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 from matplotlib import cm
