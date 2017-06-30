@@ -30,7 +30,7 @@ log = readPiLog(filePath, names = ['Label', 'Time', 'Details'], zeroTime = True)
 counts = pd.DataFrame(log['Label'].value_counts())
 table = ff.create_table(counts, index = True)
 tableUrl = py.plot(table, filename= fileName + '/buttonPressSummary',fileopt="overwrite", sharing='public', auto_open=False)
-py.iplot(table, filename= fileName + '/buttonPressSummary',fileopt="overwrite", sharing='public')
+#py.iplot(table, filename= fileName + '/buttonPressSummary',fileopt="overwrite", sharing='public')
 
 
 # In[ ]:
@@ -41,7 +41,7 @@ data = [go.Bar(
     )]
 
 barUrl = py.plot(data, filename= fileName + '/buttonPressBar',fileopt="overwrite", sharing='public', auto_open=False)
-py.iplot(data, filename= fileName + '/buttonPressBar',fileopt="overwrite", sharing='public')
+#py.iplot(data, filename= fileName + '/buttonPressBar',fileopt="overwrite", sharing='public')
 
 
 # In[ ]:
@@ -50,7 +50,7 @@ plotNames = ['trial_start', 'event', 'good']
 fi = plot_events_raster(log, plotNames, collapse = True, usePlotly = True)
 
 rasterUrl = py.plot(fi, filename=fileName + '/buttonPressRaster',fileopt="overwrite", sharing='public', auto_open=False)
-py.iplot(fi, filename=fileName + '/buttonPressRaster',fileopt="overwrite", sharing='public')
+#py.iplot(fi, filename=fileName + '/buttonPressRaster',fileopt="overwrite", sharing='public')
 
 
 # In[ ]:
