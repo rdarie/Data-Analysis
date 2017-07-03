@@ -19,11 +19,15 @@ args = parser.parse_args()
 fileName = args.file
 fileDir = args.folder
 
+if '.txt' in fileName:
+    fileName = fileName.split('.txt')[0]
+if 'Log_' in fileName:
+    fileName = fileName.split('Log_')[1]
+
 # In[2]:
 
 filePath = fileDir + '/' + 'Log_' + fileName + '.txt'
 log = readPiLog(filePath, names = ['Label', 'Time', 'Details'], zeroTime = True)
-
 
 # In[3]:
 
@@ -31,7 +35,6 @@ counts = pd.DataFrame(log['Label'].value_counts())
 table = ff.create_table(counts, index = True)
 tableUrl = py.plot(table, filename= fileName + '/buttonPressSummary',fileopt="overwrite", sharing='public', auto_open=False)
 #py.iplot(table, filename= fileName + '/buttonPressSummary',fileopt="overwrite", sharing='public')
-
 
 # In[ ]:
 
@@ -43,15 +46,13 @@ data = [go.Bar(
 barUrl = py.plot(data, filename= fileName + '/buttonPressBar',fileopt="overwrite", sharing='public', auto_open=False)
 #py.iplot(data, filename= fileName + '/buttonPressBar',fileopt="overwrite", sharing='public')
 
-
 # In[ ]:
 
-plotNames = ['trial_start', 'event', 'good']
+plotNames = ['trial_start', 'event', 'post_trial', 'good']
 fi = plot_events_raster(log, plotNames, collapse = True, usePlotly = True)
 
 rasterUrl = py.plot(fi, filename=fileName + '/buttonPressRaster',fileopt="overwrite", sharing='public', auto_open=False)
 #py.iplot(fi, filename=fileName + '/buttonPressRaster',fileopt="overwrite", sharing='public')
-
 
 # In[ ]:
 
@@ -86,8 +87,6 @@ else:
 
     dboardURL = py.dashboard_ops.upload(my_dboard, filename = fileName + '_dashboard', auto_open = False)
     #dboardID = fileId_from_url(dboardURL)
-
-
 
 # In[ ]:
 

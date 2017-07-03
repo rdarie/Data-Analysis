@@ -9,7 +9,7 @@ from matplotlib import cm
 import numpy as np
 import pandas as pd
 import math as m
-import sys, itertools, os, pickle, gc, random, string
+import sys, itertools, os, pickle, gc, random, string, subprocess
 from sklearn.model_selection import StratifiedKFold, GridSearchCV, learning_curve
 from sklearn.metrics import roc_auc_score, make_scorer, f1_score, classification_report
 from sklearn.linear_model import LogisticRegression
@@ -21,6 +21,7 @@ import plotly.plotly as py
 import plotly.tools as tls
 import plotly.figure_factory as ff
 import plotly.graph_objs as go
+
 try:
     # for Python2
     from Tkinter import *   ## notice capitalized T in Tkinter
@@ -720,6 +721,17 @@ def plot_events_raster(eventDf, names, collapse = False, usePlotly = True):
         rasterFig = go.Figure(data=data,layout=layout)
         #py.iplot(fig, filename='eventRaster')
     return rasterFig
+
+def runScriptAllFiles(scriptPath, folderPath):
+    onlyfiles = [f for f in os.listdir(folderPath) if os.path.isfile(os.path.join(folderPath, f))]
+    for f in onlyfiles:
+        try:
+            subprocess.check_output('python3 ' + scriptPath + ' --file '  + '\"' + f  + '\"' + ' --folder \"' + folderPath + '\"', shell=True)
+        except:
+            try:
+                subprocess.check_output('python ' + scriptPath + ' --file '  + '\"' + f  + '\"' + ' --folder \"' + folderPath + '\"', shell=True)
+            except:
+                print("issue with :" + f)
 
 def fileId_from_url(url):
     """Return fileId from a url."""
