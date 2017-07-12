@@ -45,4 +45,3 @@ onlyfiles
 fileName = onlyfiles[1]
 f = fileName
 fileName = 'Log_Murdoc_08_06_2017_16_51_05.txt'
-issue with :Log_Murdoc_06_06_2017_16_59_02.txt
