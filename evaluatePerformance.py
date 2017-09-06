@@ -1,4 +1,3 @@
-
 # coding: utf-8
 
 # In[1]:
@@ -6,7 +5,8 @@
 from helper_functions import *
 
 import sys
-sys.path.append('/home/pi/research/ProprioprostheticsBehavioralControl/')
+sys.path.append('/home/pi/research/ProprioprostheticsBehavioralControl')
+sys.path.append('/home/pi/research/')
 
 from ProprioprostheticsBehavioralControl.helperFunctions import *
 import plotly.plotly as py
