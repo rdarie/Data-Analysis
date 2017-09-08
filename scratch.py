@@ -6,7 +6,7 @@ txtf = open(localDir + '/' + modelName + '/spike_EstimatorInfo_'+ suffix + '.txt
 argFile ='201612201054-Starbuck_Treadmill-Array1480_Right-Trial00001.nev'
 import pandas as pd
 from helper_functions import *
-fileDir = 'W:/ENG_Neuromotion_Shared/group/Proprioprosthetics/Training/Flywheel Logs/Murdoc'
+fileDir = 'C:/Users/radud/Desktop/Session1501886431276 - Release - Chan 1, 10, 14, 26/DeviceNPC700192H/'
 fileName = 'Log_Murdoc_01_06_2017_16_45_37.txt'
 
 filePath = fileDir + '/' + fileName
