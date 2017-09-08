@@ -51,3 +51,8 @@ Temporary Items
 
 # CCV files
 slurm*
+
+#setup files
+build/
+dist/
+ProprioDataAnalysis.egg-info/
