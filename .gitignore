@@ -55,3 +55,4 @@ slurm*
 #setup files
 build/
 dist/
+ProprioDataAnalysis.egg-info/

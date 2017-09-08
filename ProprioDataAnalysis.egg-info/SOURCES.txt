@@ -10,6 +10,8 @@ dataAnalysis/behavioral/evaluatePerformance.py
 dataAnalysis/behavioral/scratch.py
 dataAnalysis/helperFunctions/__init__.py
 dataAnalysis/helperFunctions/helper_functions.py
+dataAnalysis/helperFunctions/io_code.py
+dataAnalysis/helperFunctions/plot_sta.py
 dataAnalysis/lfpDecoding/__init__.py
 dataAnalysis/lfpDecoding/apply_labels_spectrum.py
 dataAnalysis/lfpDecoding/apply_labels_spikes.py
