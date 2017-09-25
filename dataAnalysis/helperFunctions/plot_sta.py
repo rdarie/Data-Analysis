@@ -19,7 +19,11 @@ matplotlib.rc('font', **font)
 class NORM(Enum):
     NONE = 0
     TOMAX = 1
-global serverDir
+
+gitPath = os.environ['GIT_BASE'] + '/Data-Analysis'
+
+with open(gitPath + '/.serverHome') as f:
+    serverHome = f.read().replace('\n', '')
 
 def get_spikes(raw, chanLabels, filter_function, spike_dur, trig_sr,
     trig_idx, debugging):
@@ -66,13 +70,13 @@ def plot_sta(whichChan, chanLabels, spike_dur, filter_function = lambda x: x,
     root.withdraw() # we don't want a full GUI, so keep the root window from appearing
     TDMS_filename_all = filedialog.askopenfilenames(parent = root,
         title = 'Choose file(s)',
-        initialdir = serverDir)
+        initialdir = serverHome + '/Reversible lesions/Rodent Spinal Virus Transfection')
         # open window to get file name
     #pdb.set_trace()
 
     if not TDMS_filename_all: # if file not selected, select a default
-        TDMS_filename_all = (serverDir +
-            'Survivor - 20160727\\10_Survivor_HReflex_I1000_PW100us_A055.tdms',)
+        TDMS_filename_all = (serverHome +
+            '/Reversible lesions/Rodent Spinal Virus Transfection/Survivor - 20160727/10_Survivor_HReflex_I1000_PW100us_A055.tdms',)
         warning_string = "No file selected, setting to default: %s" % TDMS_filename_all[0]
         warnings.warn(warning_string, UserWarning, stacklevel=2)
 
@@ -143,7 +147,7 @@ def plot_sta(whichChan, chanLabels, spike_dur, filter_function = lambda x: x,
 
         if debugging:
             plt.xlabel('Time (msec)')
-            plt.ylabel(output_chan[0] + ' (V)')
+            plt.ylabel(chanLabels[0] + ' (V)')
             if override_ylim:
                 fig_axes.set_ylim(override_ylim)
 
@@ -184,7 +188,7 @@ def plot_sta(whichChan, chanLabels, spike_dur, filter_function = lambda x: x,
         else:
             plt.show()
 
-def compare_sta(input_chan, chanLabels, spike_dur, filter_function = lambda x: x,conditions = ['1', '2'], debugging = False, override_ylim = 0, normalize = NORM.NONE):
+def compare_sta(whichChan, chanLabels, spike_dur, filter_function = lambda x: x,conditions = ['1', '2'], debugging = False, override_ylim = 0, normalize = NORM.NONE):
 
     # get color map
     use_color = plt.get_cmap('viridis')
@@ -193,12 +197,13 @@ def compare_sta(input_chan, chanLabels, spike_dur, filter_function = lambda x: x
     # get filename
     root = Tk()
     root.withdraw() # we don't want a full GUI, so keep the root window from appearing
-    TDMS_filename_all = askopenfilenames(parent = root, title = 'Choose file(s)', initialdir = 'A:\\Reversible lesions\\Rodent Spinal Virus Transfection') # open window to get file name
+    TDMS_filename_all = filedialog.askopenfilenames(title = 'Choose file(s)',
+        initialdir = serverHome + '/Reversible lesions/Rodent Spinal Virus Transfection') # open window to get file name
     numFiles = len(TDMS_filename_all)
     #pdb.set_trace()
 
     if not TDMS_filename_all: # if file not selected, select a default
-        TDMS_filename_all = ('A:\\Reversible lesions\\Rodent Spinal Virus Transfection\\Survivor - 20160727\\10_Survivor_HReflex_I1000_PW100us_A055.tdms',)
+        TDMS_filename_all = (serverHome + '/Reversible lesions/Rodent Spinal Virus Transfection/Survivor - 20160727/10_Survivor_HReflex_I1000_PW100us_A055.tdms',)
         warning_string = "No file selected, setting to default: %s" % TDMS_filename_all[0]
         warnings.warn(warning_string, UserWarning, stacklevel=2)
 
@@ -212,7 +217,8 @@ def compare_sta(input_chan, chanLabels, spike_dur, filter_function = lambda x: x
     fig2_axes = fig2.add_subplot(111)
 
     for counter,TDMS_filename in enumerate(TDMS_filename_all):
-        raw = TDMS_to_dict(TDMS_filename,input_chan, chanLabels)
+        raw = TDMS_to_dict(TDMS_filename,whichChan
+        , chanLabels)
 
         trig_idx, trig, trig_sr, trig_diff_threshold, trig_diff = get_trig_idx(raw)
 
