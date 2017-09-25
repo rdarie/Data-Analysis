@@ -1,8 +1,10 @@
 import pdb
+
 try:
     from brpylib import NsxFile, NevFile, brpylib_ver
 except:
     pass
+
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 from matplotlib import cm
@@ -46,6 +48,10 @@ from fractions import gcd
 import argparse
 
 def getPlotOpts(names):
+    """
+        Gets the colors to assign to n traces, where n is the length of the
+        names list, which contains the names of the n traces.
+    """
     viridis_cmap = matplotlib.cm.get_cmap('viridis')
     norm = colors.Normalize(vmin=0, vmax=255)
     colorsRgb = [colors.colorConverter.to_rgb(viridis_cmap(norm(i)))
@@ -61,7 +67,7 @@ def getPlotOpts(names):
 
     names2int = list(range(len(names)))
     line_styles = ['-', '--', ':', '-.']
-    return viridis_cmap, norm,colorsRgb, plotColPlotly, plotColMPL, names2int, line_styles
+    return viridis_cmap, norm, colorsRgb, plotColPlotly, plotColMPL, names2int, line_styles
 
 def getNEVData(filePath, elecIds):
     # Version control
@@ -104,6 +110,9 @@ def getNSxData(filePath, elecIds, startTime_s, dataLength_s, downsample = 1):
     return channelData
 
 def getBadSpikesMask(spikes, nStd = 5, whichChan = 0, plotting = False, deleteBad = False):
+    """
+        where spikes comes from an NSX file extracted with brpy
+    """
     spikesBar = [np.mean(sp, axis = 0) for sp in spikes['Waveforms']]
     spikesStd = [np.std (sp, axis = 0) for sp in spikes['Waveforms']]
 
@@ -905,7 +914,7 @@ def readPiLog(filePath, names = None, zeroTime = False, clarifyEvents = False):
         if 'Time' in log.columns.values:
             log['Time'] = log['Time'] - log['Time'][0]
         else:
-            print('No time column find to zero!')
+            print('No time column found to zero!')
 
     if clarifyEvents:
         for index, row in log.iterrows():

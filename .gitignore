@@ -56,3 +56,6 @@ slurm*
 build/
 dist/
 ProprioDataAnalysis.egg-info/
+
+#Random code for debugging
+scratch.py
