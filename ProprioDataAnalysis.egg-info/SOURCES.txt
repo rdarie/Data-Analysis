@@ -5,7 +5,6 @@ ProprioDataAnalysis.egg-info/SOURCES.txt
 ProprioDataAnalysis.egg-info/dependency_links.txt
 ProprioDataAnalysis.egg-info/top_level.txt
 dataAnalysis/__init__.py
-dataAnalysis/run_plot_sta.py
 dataAnalysis/behavioral/__init__.py
 dataAnalysis/behavioral/evaluatePerformance.py
 dataAnalysis/behavioral/scratch.py

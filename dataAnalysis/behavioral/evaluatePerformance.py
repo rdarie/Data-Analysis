@@ -4,7 +4,7 @@
 # In[1]:
 
 from dataAnalysis.helperFunctions.helper_functions import *
-from ProprioprostheticsBehavioralControl.helperFunctions import *
+from proprioBehavioralControl.helperFunctions import *
 import plotly.plotly as py
 import plotly.tools as tls
 import plotly.figure_factory as ff
