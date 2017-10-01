@@ -1,10 +1,11 @@
 
-fileName = 'Murdoc_31_08_2017_11_08_36'
+fileName = 'Murdoc_29_09_2017_10_48_48'
 fileDir = 'W:/ENG_Neuromotion_Shared/group/Proprioprosthetics/Training/Flywheel Logs/Murdoc'
 
 # for PSTH function
 eventDf = log
-names = ['red', 'blue', 'good']
+
+names = ['red', 'green', 'good']
 stimulus = 'trial_start'
 
 preInterval = 5

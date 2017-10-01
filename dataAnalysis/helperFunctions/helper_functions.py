@@ -904,7 +904,7 @@ def plot_raster(spikes, chans):
     plt.tight_layout()
     plt.show(block = False)
 
-def readPiLog(filePath, names = None, zeroTime = False, clarifyEvents = False):
+def readPiLog(filePath, names = None, zeroTime = False, fixMovedToError = False):
     if names is not None:
         log = pd.read_table(filePath, header = None, names = names)
     else:
@@ -916,12 +916,17 @@ def readPiLog(filePath, names = None, zeroTime = False, clarifyEvents = False):
         else:
             print('No time column found to zero!')
 
-    if clarifyEvents:
-        for index, row in log.iterrows():
-            if pd.notnull(row['Details']):
-                log.loc[index, 'Label'] = row['Details']
-        log.drop('Details', axis = 1, inplace = True)
-        log.drop_duplicates(inplace = True)
+    keepIdx = None
+    if fixMovedToError:
+        for idx, row in log.iterrows():
+            if row['Label'] == 'turnPedalRandom_1' or row['Label'] == 'turnPedalRandom_2':
+                keepIdx = idx
+            if row['Label'] == 'moved to: ':
+                log.loc[keepIdx, 'Details'] = row['Time']
+                keepIdx = None
+                log.drop([idx], inplace = True)
+
+    log.drop_duplicates(inplace = True)
     return log
 
 def plotConfusionMatrix(cm, classes,

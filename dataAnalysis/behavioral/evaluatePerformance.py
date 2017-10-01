@@ -11,13 +11,16 @@ import plotly.figure_factory as ff
 import plotly.graph_objs as go
 import plotly.dashboard_objs as dashboard
 import argparse
+import copy
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--file', default = 'Murdoc_31_08_2017_11_08_36')
 parser.add_argument('--folder', default = 'W:/ENG_Neuromotion_Shared/group/Proprioprosthetics/Training/Flywheel Logs/Murdoc')
+parser.add_argument('--fixMovedToError', default = 'False')
 args = parser.parse_args()
 fileName = args.file
 fileDir = args.folder
+fixMovedToError = True if args.fixMovedToError == 'True' else False
 
 if '.txt' in fileName:
     fileName = fileName.split('.txt')[0]
@@ -27,11 +30,20 @@ if 'Log_' in fileName:
 # In[2]:
 
 filePath = fileDir + '/' + 'Log_' + fileName + '.txt'
-log = readPiLog(filePath, names = ['Label', 'Time', 'Details'], zeroTime = True, clarifyEvents = True)
+log = readPiLog(filePath, names = ['Label', 'Time', 'Details'], zeroTime = True, fixMovedToError = True)
 
 # In[3]:
 
-counts = pd.DataFrame(log['Label'].value_counts())
+countLog = copy.deepcopy(log)
+
+for idx, row in countLog.iterrows():
+    if row['Label'] == 'event':
+        if (row['Details'] == 'green' or row['Details'] == 'red'):
+            countLog.loc[idx, 'Label'] = 'Uncued ' + row['Details']
+        if (row['Details'] == 'greenLED' or row['Details'] == 'redLED'):
+            countLog.loc[idx, 'Label'] = row['Details']
+
+counts = pd.DataFrame(countLog['Label'].value_counts())
 table = ff.create_table(counts, index = True)
 tableUrl = py.plot(table, filename= fileName + '/buttonPressSummary',fileopt="overwrite", sharing='public', auto_open=False)
 #py.iplot(table, filename= fileName + '/buttonPressSummary',fileopt="overwrite", sharing='public')
@@ -48,13 +60,13 @@ barUrl = py.plot(data, filename= fileName + '/buttonPressBar',fileopt="overwrite
 
 # In[ ]:
 
-plotNames = ['trial_start', 'red', 'blue', 'post_trial', 'good']
+plotNames = ['goEasy', 'goBoth', 'red', 'green', 'post_trial', 'good']
 fi = plot_events_raster(log, plotNames, collapse = True, usePlotly = True)
 
 rasterUrl = py.plot(fi, filename=fileName + '/buttonPressRaster',
     fileopt="overwrite", sharing='public', auto_open=False)
 
-plotNames = ['red', 'blue', 'good']
+plotNames = ['red', 'green', 'good']
 stimulus = 'trial_start'
 preInterval = 5
 postInterval = 15
