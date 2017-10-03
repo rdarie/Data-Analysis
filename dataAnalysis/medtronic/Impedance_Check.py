@@ -2,10 +2,9 @@
 # coding: utf-8
 
 # In[1]:
-
-insFilePath = 'C:/Users/radud/Desktop/NANOZ/INS/trial_1.txt'
+insfileRoot = 'W:/ENG_Neuromotion_Shared/group/Proprioprosthetics/Spinal Electrode\Microleads impedance testing/INS'
+insFilePath = insfileRoot + '/trial_1.txt'
 impedances = {i:[] for i in range(32)}
-
 
 # In[2]:
 
@@ -45,7 +44,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 impedanceBar = []
-impedanceStd = [] 
+impedanceStd = []
 elecIdx = []
 
 
@@ -69,6 +68,3 @@ plt.show()
 
 
 # In[ ]:
-
-
-
