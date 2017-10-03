@@ -60,19 +60,19 @@ barUrl = py.plot(data, filename= fileName + '/buttonPressBar',fileopt="overwrite
 
 # In[ ]:
 
-plotNames = ['goEasy', 'goBoth', 'red', 'green', 'post_trial', 'good']
-fi = plot_events_raster(log, plotNames, collapse = True, usePlotly = True)
+plotNames = ['goEasy', 'goHard', 'correct_button', 'incorrect_button']
+fi = plot_events_raster(countLog, plotNames, collapse = True, usePlotly = True)
 
 rasterUrl = py.plot(fi, filename=fileName + '/buttonPressRaster',
     fileopt="overwrite", sharing='public', auto_open=False)
 
-plotNames = ['red', 'green', 'good']
-stimulus = 'trial_start'
+plotNames = ['correct_button', 'incorrect_button', 'Uncued green', 'Uncued red']
+stimulus = ['goEasy', 'goHard']
 preInterval = 5
 postInterval = 15
 deltaInterval = 500e-3
 
-fi = plotPeristimulusTimeHistogram(log, stimulus, plotNames,
+fi = plotPeristimulusTimeHistogram(countLog, stimulus, plotNames,
     preInterval = preInterval, postInterval = postInterval,
     deltaInterval = deltaInterval, usePlotly = True)
 

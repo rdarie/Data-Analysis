@@ -777,7 +777,7 @@ def plotPeristimulusTimeHistogram(eventDf, stimulus, names,
         eventTimes = pd.Series(index = ['Time'])
         allEventTimes = eventDf[eventDf['Label'] == name]['Time']
 
-        for stimTime in eventDf[eventDf['Label'] == stimulus]['Time']:
+        for stimTime in eventDf[eventDf['Label'].isin(stimulus)]['Time']:
             startTime = max(stimTime - preInterval, 0)
             endTime = min(stimTime + postInterval, maxTime)
 
