@@ -749,23 +749,39 @@ def plotPeristimulusTimeHistogram(eventDf, stimulus, names,
     else:
         data = []
         layout = go.Layout(barmode='overlay')
-        layout['title'] = 'PSTH'
+        layout['title'] = 'Peristimulus Time Histogram'
+        layout['titlefont'] =dict(
+                family='Arial',
+                size=25,
+                color='#7f7f7f'
+            )
         layout['xaxis'] = dict(
                 title='Time (sec)',
                 titlefont=dict(
-                    family='Courier New, monospace',
-                    size=18,
+                    family='Arial',
+                    size=25,
                     color='#7f7f7f'
+                ),
+                tickfont = dict(
+                    size = 20
                 )
             )
         layout['yaxis'] = dict(
-                title='',
+                title='Count',
                 titlefont=dict(
-                    family='Courier New, monospace',
-                    size=18,
+                    family='Arial',
+                    size=25,
                     color='#7f7f7f'
+                ),
+                tickfont = dict(
+                    size = 20
                 )
             )
+        layout['legend'] = dict(
+            font = dict(
+                size = 20
+            )
+        )
 
     maxTime = max(eventDf['Time'])
     for idx, name in enumerate(names):
@@ -814,7 +830,6 @@ def plotPeristimulusTimeHistogram(eventDf, stimulus, names,
         ax.get_yaxis().set_visible(False)
 
     else:
-
         layout['shapes'] = [
             {
                 'type' : 'line',
@@ -832,6 +847,68 @@ def plotPeristimulusTimeHistogram(eventDf, stimulus, names,
         psthFig = go.Figure(data=data,layout=layout)
 
     return psthFig
+
+def plot_trial_stats(trialStatsDf, usePlotly = True):
+    if usePlotly:
+        data = []
+        conditionLongName = {
+            'easy' : 'Cued by LED',
+            'hard' : 'Uncued by LED'
+        }
+        outcomeLongName = {
+            'correct_button' : 'Correct button',
+            'incorrect_button' : 'Incorrect button',
+            'button timed out!' : 'No press'
+
+        }
+        for conditionName in np.unique(trialStatsDf['Condition']):
+
+            conditionStats = trialStatsDf[trialStatsDf['Condition'] == conditionName]
+            y = [conditionStats[conditionStats['Outcome'] == on].size \
+                for on in np.unique(conditionStats['Outcome'])]
+            x = [outcomeLongName[on] for on in np.unique(conditionStats['Outcome'])]
+            data.append(go.Bar(
+                x=x,
+                y=100 * y / sum(y),
+                name=conditionLongName[conditionName]
+                ))
+
+        layout = {
+            'barmode' : 'group',
+            'title' : 'Trial Outcome',
+            'xaxis' : {
+                'title' : 'Outcome',
+                'titlefont' : {
+                    'family' : 'Arial',
+                    'size' : 30,
+                    'color' : '#7f7f7f'
+                    },
+                'tickfont' : {
+                    'size' : 20
+                    }
+                },
+            'yaxis' : {
+                'title' : 'Percentage',
+                'titlefont' : {
+                    'family' : 'Arial',
+                    'size' : 25,
+                    'color' : '#7f7f7f'
+                    },
+                'tickfont' : {
+                    'size' : 20
+                    }
+                },
+            'legend' : {
+                'font' : {
+                    'size' : 20
+                }
+            }
+            }
+
+        fig = go.Figure(data=data, layout=layout)
+        return fig
+    else:
+        return None
 
 def runScriptAllFiles(scriptPath, folderPath):
     onlyfiles = [f for f in os.listdir(folderPath) if os.path.isfile(os.path.join(folderPath, f))]
@@ -904,30 +981,33 @@ def plot_raster(spikes, chans):
     plt.tight_layout()
     plt.show(block = False)
 
-def readPiLog(filePath, names = None, zeroTime = False, fixMovedToError = False):
-    if names is not None:
-        log = pd.read_table(filePath, header = None, names = names)
-    else:
-        log = pd.read_table(filePath)
-
-    if zeroTime:
-        if 'Time' in log.columns.values:
-            log['Time'] = log['Time'] - log['Time'][0]
+def readPiLog(filePaths, names = None, zeroTime = False, fixMovedToError = False):
+    logs = pd.DataFrame()
+    for idx, filePath in enumerate(filePaths):
+        if names is not None:
+            log = pd.read_table(filePath, header = None, names = names)
         else:
-            print('No time column found to zero!')
+            log = pd.read_table(filePath)
 
-    keepIdx = None
-    if fixMovedToError:
-        for idx, row in log.iterrows():
-            if row['Label'] == 'turnPedalRandom_1' or row['Label'] == 'turnPedalRandom_2':
-                keepIdx = idx
-            if row['Label'] == 'moved to: ':
-                log.loc[keepIdx, 'Details'] = row['Time']
-                keepIdx = None
-                log.drop([idx], inplace = True)
+        if zeroTime:
+            if 'Time' in log.columns.values:
+                log['Time'] = log['Time'] - log['Time'][0]
+            else:
+                print('No time column found to zero!')
 
-    log.drop_duplicates(inplace = True)
-    return log
+        keepIdx = None
+        if fixMovedToError[idx]:
+            for idx, row in log.iterrows():
+                if row['Label'] == 'turnPedalRandom_1' or row['Label'] == 'turnPedalRandom_2':
+                    keepIdx = idx
+                if row['Label'] == 'moved to: ':
+                    log.loc[keepIdx, 'Details'] = row['Time']
+                    keepIdx = None
+                    log.drop([idx], inplace = True)
+
+        log.drop_duplicates(inplace = True)
+        logs = pd.concat([logs, log], ignore_index = True)
+    return logs
 
 def plotConfusionMatrix(cm, classes,
                           normalize=False,
