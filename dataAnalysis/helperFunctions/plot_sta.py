@@ -1,11 +1,15 @@
 import numpy as np
 
 import pdb, re, warnings, string, os
+#pdb.set_trace()
 from enum import Enum
 from tkinter import *
 from tkinter import filedialog
 
+import pdb;
+
 import matplotlib
+matplotlib.use('TkAgg')
 from matplotlib import pyplot as plt
 
 from dataAnalysis.helperFunctions.io_code import TDMS_to_dict
@@ -24,6 +28,7 @@ gitPath = os.environ['GIT_BASE'] + '/Data-Analysis'
 
 with open(gitPath + '/.serverHome') as f:
     serverHome = f.read().replace('\n', '')
+
 
 def get_spikes(raw, chanLabels, filter_function, spike_dur, trig_sr,
     trig_idx, debugging):
@@ -66,6 +71,7 @@ def plot_sta(whichChan, chanLabels, spike_dur, filter_function = lambda x: x,
     normalize = NORM.NONE):
 
     # get filename
+
     root = Tk()
     root.withdraw() # we don't want a full GUI, so keep the root window from appearing
     TDMS_filename_all = filedialog.askopenfilenames(parent = root,
