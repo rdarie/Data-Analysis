@@ -33,7 +33,8 @@ def get_spikes(raw, chanLabels, filter_function, spike_dur, trig_sr,
 
     current_spike = 0
 
-    for idx in trig_idx:
+    for idx in np.squeeze(trig_idx):
+        #pdb.set_trace()
         spike = np.array(raw[chanLabels[0]]['data'][idx:idx+spike_num_samp]) #collect spike from raw data trace
         spike = filter_function(spike)
         spike_mat[current_spike,:] = spike
