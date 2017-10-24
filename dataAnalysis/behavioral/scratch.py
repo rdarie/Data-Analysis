@@ -1,7 +1,7 @@
 
-fileNamesRaw = ['Log_Murdoc_13_10_2017_17_20_22.txt']
+fileNamesRaw = ['Log_Murdoc_17_10_2017_11_00_41.txt']
 fileDir = 'W:/ENG_Neuromotion_Shared/group/Proprioprosthetics/Training/Flywheel Logs/Murdoc'
-outputFileName = 'Murdoc_13_10_2017_17_20_22'
+outputFileName = 'Murdoc_17_10_2017_11_00_41'
 fixMovedToError = False
 # for PSTH function
 eventDf = log
