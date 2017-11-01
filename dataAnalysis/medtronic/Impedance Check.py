@@ -35,10 +35,10 @@ sns.set(font_scale=3)
 sns.set_style("white")
 matplotlib.rc('font', **font_opts)
 matplotlib.rc('figure', **fig_opts)
-baseFolder = 'W:/ENG_Neuromotion_Shared/group\Proprioprosthetics/Spinal Electrode/Microleads 10022017/'
+baseFolder = 'W:/ENG_Neuromotion_Shared/group/Proprioprosthetics/Spinal Electrode/Microleads 10022017'
 
-insFilePath = 'INS/Trial_6.txt'
-excelSheetNo = 2
+insFilePath = '/INS/Trial_5.txt'
+excelSheetNo = 3
 picPrefix = 'BSI20B/BSI20B'
 
 data = {'Impedance':np.array([]), 'Electrode':np.array([]), 'Method':[]}
