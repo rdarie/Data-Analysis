@@ -1,4 +1,18 @@
 import numpy as np
+import os
+
+curfilePath = os.path.abspath(__file__)
+#print(curfilePath)
+curDir = os.path.abspath(os.path.join(curfilePath,os.pardir))
+ # this will return current directory in which python file resides.
+parentDir = os.path.abspath(
+    os.path.join(
+        os.path.join(
+            os.path.join(curDir,os.pardir),
+        os.pardir),
+    os.pardir),
+) # this will return parent directory.
+#print(parentDir)
 
 import pdb, re, warnings, string, os
 #pdb.set_trace()
@@ -24,7 +38,7 @@ class NORM(Enum):
     NONE = 0
     TOMAX = 1
 
-gitPath = os.environ['GIT_BASE'] + '/Data-Analysis'
+gitPath = parentDir + '/Data-Analysis'
 
 with open(gitPath + '/.serverHome') as f:
     serverHome = f.read().replace('\n', '')
