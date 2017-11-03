@@ -35,14 +35,14 @@ sns.set(font_scale=3)
 sns.set_style("white")
 matplotlib.rc('font', **font_opts)
 matplotlib.rc('figure', **fig_opts)
-baseFolder = 'E:/Google Drive/Borton Lab/Proprioprosthetics/Spinal Electrode/Microleads Electrode Characterization/Microleads-BSI20/'
+baseFolder = 'Z:/ENG_Neuromotion_Shared/group/Proprioprosthetics/Spinal Electrode/Microleads impedance testing'
 insFilePath = [
     #Part 1
-    [baseFolder + 'trial_1.txt',
-        baseFolder + 'trial_3.txt'],
+    [baseFolder + '/INS/trial_1.txt',
+        baseFolder + '/INS/trial_3.txt'],
     #Part 2
-    [baseFolder + 'trial_2.txt',
-        baseFolder + 'trial_4.txt']
+    [baseFolder + '/INS/trial_2.txt',
+        baseFolder + '/INS/trial_4.txt']
 ]
 
 data = {'Impedance':np.array([]), 'Electrode':np.array([]), 'Method':[]}
