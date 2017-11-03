@@ -856,9 +856,9 @@ def plot_trial_stats(trialStatsDf, usePlotly = True):
             'hard' : 'Uncued by LED'
         }
         outcomeLongName = {
-            'correct_button' : 'Correct button',
-            'incorrect_button' : 'Incorrect button',
-            'button timed out!' : 'No press'
+            'correct button' : 'Correct button',
+            'incorrect button' : 'Incorrect button',
+            'button timed out' : 'No press'
 
         }
         for conditionName in np.unique(trialStatsDf['Condition']):
