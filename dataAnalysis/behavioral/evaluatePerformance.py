@@ -10,27 +10,37 @@ import plotly.tools as tls
 import plotly.figure_factory as ff
 import plotly.graph_objs as go
 import plotly.dashboard_objs as dashboard
-import argparse
+import argparse, pdb
 import copy
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--file', default = 'Murdoc_31_08_2017_11_08_36')
+parser.add_argument('--file', default = 'Murdoc_29_09_2017_10_48_48',  nargs='*')
 parser.add_argument('--folder', default = 'W:/ENG_Neuromotion_Shared/group/Proprioprosthetics/Training/Flywheel Logs/Murdoc')
-parser.add_argument('--fixMovedToError', default = 'False')
+parser.add_argument('--fixMovedToError', dest='fixMovedToError', action='store_true')
+parser.add_argument('--outputFileName', required = True)
+parser.set_defaults(fixMovedToError = False)
 args = parser.parse_args()
-fileName = args.file
-fileDir = args.folder
-fixMovedToError = True if args.fixMovedToError == 'True' else False
 
-if '.txt' in fileName:
-    fileName = fileName.split('.txt')[0]
-if 'Log_' in fileName:
-    fileName = fileName.split('Log_')[1]
+fileNamesRaw = args.file
+if isinstance(fileNamesRaw, str):
+    fileNamesRaw = [fileNamesRaw]
+
+fileDir = args.folder
+outputFileName = args.outputFileName
+fixMovedToError =args.fixMovedToError
+
+fileNames = []
+for fileName in fileNamesRaw:
+    if '.txt' in fileName:
+        fileName = fileName.split('.txt')[0]
+    if 'Log_' in fileName:
+        fileName = fileName.split('Log_')[1]
+    fileNames = fileNames + [fileName]
 
 # In[2]:
+filePaths = [fileDir + '/' + 'Log_' + fileName + '.txt' for fileName in fileNames]
 
-filePath = fileDir + '/' + 'Log_' + fileName + '.txt'
-log = readPiLog(filePath, names = ['Label', 'Time', 'Details'], zeroTime = True, fixMovedToError = True)
+log = readPiLog(filePaths, names = ['Label', 'Time', 'Details'], zeroTime = True, fixMovedToError = [True, True])
 
 # In[3]:
 
@@ -45,7 +55,7 @@ for idx, row in countLog.iterrows():
 
 counts = pd.DataFrame(countLog['Label'].value_counts())
 table = ff.create_table(counts, index = True)
-tableUrl = py.plot(table, filename= fileName + '/buttonPressSummary',fileopt="overwrite", sharing='public', auto_open=False)
+tableUrl = py.plot(table, filename= outputFileName + '/buttonPressSummary',fileopt="overwrite", sharing='public', auto_open=False)
 #py.iplot(table, filename= fileName + '/buttonPressSummary',fileopt="overwrite", sharing='public')
 
 # In[ ]:
@@ -55,44 +65,108 @@ data = [go.Bar(
             y=counts.values
     )]
 
-barUrl = py.plot(data, filename= fileName + '/buttonPressBar',fileopt="overwrite", sharing='public', auto_open=False)
+barUrl = py.plot(data, filename= outputFileName + '/buttonPressBar',fileopt="overwrite", sharing='public', auto_open=False)
 #py.iplot(data, filename= fileName + '/buttonPressBar',fileopt="overwrite", sharing='public')
 
 # In[ ]:
 
-plotNames = ['goEasy', 'goHard', 'correct_button', 'incorrect_button']
+plotNames = ['goEasy', 'goHard', 'correct button', 'incorrect button']
 fi = plot_events_raster(countLog, plotNames, collapse = True, usePlotly = True)
 
-rasterUrl = py.plot(fi, filename=fileName + '/buttonPressRaster',
+rasterUrl = py.plot(fi, filename= outputFileName + '/buttonPressRaster',
     fileopt="overwrite", sharing='public', auto_open=False)
 
-plotNames = ['correct_button', 'incorrect_button', 'Uncued green', 'Uncued red']
-stimulus = ['goEasy', 'goHard']
-preInterval = 5
-postInterval = 15
+# In[ ]: EasyPSTH
+
+plotNames = ['correct button', 'incorrect button']
+stimulus = ['goEasy']
+preInterval = 2
+postInterval = 5
 deltaInterval = 500e-3
 
 fi = plotPeristimulusTimeHistogram(countLog, stimulus, plotNames,
     preInterval = preInterval, postInterval = postInterval,
     deltaInterval = deltaInterval, usePlotly = True)
 
-psthUrl = py.plot(fi, filename=fileName + '/buttonPressPSTH',
+psthUrlEasy = py.plot(fi, filename= outputFileName + '/buttonPressPSTHEasy',
     fileopt="overwrite", sharing='public', auto_open=False)
+
+# In[ ]: HardPSTH
+
+plotNames = ['correct button', 'incorrect button']
+stimulus = ['goHard']
+preInterval = 2
+postInterval = 5
+deltaInterval = 500e-3
+
+fi = plotPeristimulusTimeHistogram(countLog, stimulus, plotNames,
+    preInterval = preInterval, postInterval = postInterval,
+    deltaInterval = deltaInterval, usePlotly = True)
+
+psthUrlHard = py.plot(fi, filename= outputFileName + '/buttonPressPSTHHard',
+    fileopt="overwrite", sharing='public', auto_open=False)
+
+# In[ ]:
+
+mask = log['Label'].str.contains('turnPedalRandom_1') | \
+    log['Label'].str.contains('turnPedalRandom_2') | \
+    log['Label'].str.contains('easy') | \
+    log['Label'].str.contains('hard') | \
+    log['Label'].str.endswith('correct button') | \
+    log['Label'].str.endswith('incorrect button') | \
+    log['Label'].str.endswith('button timed out')
+trialRelevant = pd.DataFrame(log[mask]).reset_index()
+# TODO: kludge, to avoid wait for corect button substring. fix
+
+while not trialRelevant.iloc[-1, :]['Label'] in ['correct button', 'incorrect button', 'button timed out']:
+    trialRelevant.drop(trialRelevant.index[len(trialRelevant)-1], inplace = True)
+
+def magnitude_lookup_table(difference):
+    if difference > 2e4:
+        return 'Long Extension'
+    if difference > 0:
+        return 'Short Extension'
+    if difference > -2e4:
+        return 'Short Flexion'
+    else:
+        return 'Long Flexion'
+
+trialStartIdx = trialRelevant.index[trialRelevant['Label'].str.contains('turnPedalRandom_1')]
+trialStats = pd.DataFrame(index = trialStartIdx, columns = ['First', 'Second', 'Magnitude', 'Condition', 'Outcome'])
+for idx in trialStartIdx:
+    assert trialRelevant.loc[idx, 'Label'] == 'turnPedalRandom_1'
+    trialStats.loc[idx, 'First'] = float(trialRelevant.loc[idx, 'Details'])
+    assert trialRelevant.loc[idx + 1, 'Label'] == 'turnPedalRandom_2'
+    trialStats.loc[idx, 'Second'] = float(trialRelevant.loc[idx + 1, 'Details'])
+    trialStats.loc[idx, 'Magnitude'] = magnitude_lookup_table(trialStats.loc[idx, 'First'] - trialStats.loc[idx, 'Second'])
+    assert (trialRelevant.loc[idx + 2, 'Label'] == 'easy') | (trialRelevant.loc[idx + 2, 'Label'] == 'hard')
+    trialStats.loc[idx, 'Condition'] = trialRelevant.loc[idx + 2, 'Label']
+    assert (trialRelevant.loc[idx + 3, 'Label'] == 'correct button') | \
+        (trialRelevant.loc[idx + 3, 'Label'] == 'incorrect button') | \
+        (trialRelevant.loc[idx + 3, 'Label'] == 'button timed out')
+    trialStats.loc[idx, 'Outcome'] = trialRelevant.loc[idx + 3, 'Label']
+
+fi = plot_trial_stats(trialStats)
+outcomeStatsUrl = py.plot(fi, filename= outputFileName + '/buttonPressOutcomeStats',
+    fileopt="overwrite", sharing='public', auto_open=False)
+
 
 # In[ ]:
 
 existingDBoards = py.dashboard_ops.get_dashboard_names()
 
-if fileName + '_dashboard' in existingDBoards:
+if outputFileName + '_dashboard' in existingDBoards:
     # If already exists, plots were updated above, just get the name
-    dboard = py.dashboard_ops.get_dashboard(fileName + '_dashboard')
+    dboard = py.dashboard_ops.get_dashboard(outputFileName + '_dashboard')
 else:
     # If not, create the dashboard
     my_dboard = dashboard.Dashboard()
 
     fileIdBar = fileId_from_url(barUrl)
     fileIdRaster = fileId_from_url(rasterUrl)
-    fileIdPsth = fileId_from_url(psthUrl)
+    fileIdPsthEasy = fileId_from_url(psthUrlEasy)
+    fileIdPsthHard = fileId_from_url(psthUrlHard)
+    fileIdOutcomes = fileId_from_url(outcomeStatsUrl)
 
     boxes = [{
         'type': 'box',
@@ -111,16 +185,32 @@ else:
     {
         'type': 'box',
         'boxType': 'plot',
-        'fileId': fileIdPsth,
-        'title': 'PSTHPlot'
+        'fileId': fileIdPsthEasy,
+        'title': 'PSTH Plot Easy'
+    },
+
+    {
+        'type': 'box',
+        'boxType': 'plot',
+        'fileId': fileIdPsthHard,
+        'title': 'PSTH Plot Hard'
+    },
+
+    {
+        'type': 'box',
+        'boxType': 'plot',
+        'fileId': fileIdOutcomes,
+        'title': 'OutcomesPlot'
     }]
 
 
     my_dboard.insert(boxes[0])
     my_dboard.insert(boxes[1], 'above', 1)
     my_dboard.insert(boxes[2], 'above', 1)
+    my_dboard.insert(boxes[3], 'above', 1)
+    my_dboard.insert(boxes[4], 'above', 1)
 
-    dboardURL = py.dashboard_ops.upload(my_dboard, filename = fileName + '_dashboard', auto_open = False)
+    dboardURL = py.dashboard_ops.upload(my_dboard, filename = outputFileName + '_dashboard', auto_open = False)
     #dboardID = fileId_from_url(dboardURL)
 
 # In[ ]:

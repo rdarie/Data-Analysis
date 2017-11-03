@@ -1,11 +1,15 @@
 import numpy as np
 
 import pdb, re, warnings, string, os
+#pdb.set_trace()
 from enum import Enum
 from tkinter import *
 from tkinter import filedialog
 
+import pdb;
+
 import matplotlib
+matplotlib.use('TkAgg')
 from matplotlib import pyplot as plt
 
 from dataAnalysis.helperFunctions.io_code import TDMS_to_dict
@@ -25,6 +29,7 @@ gitPath = os.environ['GIT_BASE'] + '/Data-Analysis'
 with open(gitPath + '/.serverHome') as f:
     serverHome = f.read().replace('\n', '')
 
+
 def get_spikes(raw, chanLabels, filter_function, spike_dur, trig_sr,
     trig_idx, debugging):
     spike_num_samp = int(spike_dur*1e-3*trig_sr) #msec * 1e-3 msec/sec * samples/sec
@@ -33,7 +38,8 @@ def get_spikes(raw, chanLabels, filter_function, spike_dur, trig_sr,
 
     current_spike = 0
 
-    for idx in trig_idx:
+    for idx in np.squeeze(trig_idx):
+        #pdb.set_trace()
         spike = np.array(raw[chanLabels[0]]['data'][idx:idx+spike_num_samp]) #collect spike from raw data trace
         spike = filter_function(spike)
         spike_mat[current_spike,:] = spike
@@ -66,6 +72,7 @@ def plot_sta(whichChan, chanLabels, spike_dur, filter_function = lambda x: x,
     normalize = NORM.NONE):
 
     # get filename
+
     root = Tk()
     root.withdraw() # we don't want a full GUI, so keep the root window from appearing
     TDMS_filename_all = filedialog.askopenfilenames(parent = root,
