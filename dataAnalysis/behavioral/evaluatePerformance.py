@@ -70,7 +70,7 @@ barUrl = py.plot(data, filename= outputFileName + '/buttonPressBar',fileopt="ove
 
 # In[ ]:
 
-plotNames = ['goEasy', 'goHard', 'correct_button', 'incorrect_button']
+plotNames = ['goEasy', 'goHard', 'correct button', 'incorrect button']
 fi = plot_events_raster(countLog, plotNames, collapse = True, usePlotly = True)
 
 rasterUrl = py.plot(fi, filename= outputFileName + '/buttonPressRaster',
@@ -78,7 +78,7 @@ rasterUrl = py.plot(fi, filename= outputFileName + '/buttonPressRaster',
 
 # In[ ]: EasyPSTH
 
-plotNames = ['correct_button', 'incorrect_button']
+plotNames = ['correct button', 'incorrect button']
 stimulus = ['goEasy']
 preInterval = 2
 postInterval = 5
@@ -93,7 +93,7 @@ psthUrlEasy = py.plot(fi, filename= outputFileName + '/buttonPressPSTHEasy',
 
 # In[ ]: HardPSTH
 
-plotNames = ['correct_button', 'incorrect_button']
+plotNames = ['correct button', 'incorrect button']
 stimulus = ['goHard']
 preInterval = 2
 postInterval = 5
@@ -112,13 +112,13 @@ mask = log['Label'].str.contains('turnPedalRandom_1') | \
     log['Label'].str.contains('turnPedalRandom_2') | \
     log['Label'].str.contains('easy') | \
     log['Label'].str.contains('hard') | \
-    log['Label'].str.endswith('correct_button') | \
-    log['Label'].str.endswith('incorrect_button') | \
-    log['Label'].str.endswith('button timed out!')
+    log['Label'].str.endswith('correct button') | \
+    log['Label'].str.endswith('incorrect button') | \
+    log['Label'].str.endswith('button timed out')
 trialRelevant = pd.DataFrame(log[mask]).reset_index()
 # TODO: kludge, to avoid wait for corect button substring. fix
 
-while (trialRelevant.iloc[-1, :]['Label'] != ('correct_button')) & (trialRelevant.iloc[-1, :]['Label'] != ('incorrect_button')):
+while not trialRelevant.iloc[-1, :]['Label'] in ['correct button', 'incorrect button', 'button timed out']:
     trialRelevant.drop(trialRelevant.index[len(trialRelevant)-1], inplace = True)
 
 def magnitude_lookup_table(difference):
@@ -141,9 +141,9 @@ for idx in trialStartIdx:
     trialStats.loc[idx, 'Magnitude'] = magnitude_lookup_table(trialStats.loc[idx, 'First'] - trialStats.loc[idx, 'Second'])
     assert (trialRelevant.loc[idx + 2, 'Label'] == 'easy') | (trialRelevant.loc[idx + 2, 'Label'] == 'hard')
     trialStats.loc[idx, 'Condition'] = trialRelevant.loc[idx + 2, 'Label']
-    assert (trialRelevant.loc[idx + 3, 'Label'] == 'correct_button') | \
-        (trialRelevant.loc[idx + 3, 'Label'] == 'incorrect_button') | \
-        (trialRelevant.loc[idx + 3, 'Label'] == 'button timed out!')
+    assert (trialRelevant.loc[idx + 3, 'Label'] == 'correct button') | \
+        (trialRelevant.loc[idx + 3, 'Label'] == 'incorrect button') | \
+        (trialRelevant.loc[idx + 3, 'Label'] == 'button timed out')
     trialStats.loc[idx, 'Outcome'] = trialRelevant.loc[idx + 3, 'Label']
 
 fi = plot_trial_stats(trialStats)

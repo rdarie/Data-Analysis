@@ -1,5 +1,8 @@
 from dataAnalysis.helperFunctions.plot_sta import *
 import numpy as np
+# import pdb
+
+
 
 whichChan = [0,1]
 chanLabels = ['EMG', 'trigger']
@@ -17,11 +20,12 @@ experiments = ['Control', 'Perlapine']
 amplitudes = ['100','120','140','160','180','200','220','240','260','280',
 '300','320','340','360','380','400','420','500','600','700','800','900','1000']
 
-
+#pdb.set_trace()
 plot_sta(whichChan, chanLabels, spike_dur = 10, filter_function = remove_mean,
     debugging = True, updateLog = False, override_ylim = [-0.2,0.2],
     normalize = NORM.NONE)
-
+"""
 compare_sta(whichChan, chanLabels, spike_dur = 15, conditions = experiments,
 filter_function = remove_mean, debugging = True, override_ylim = 0,
 normalize = NORM.NONE)
+"""
