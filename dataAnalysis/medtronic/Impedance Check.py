@@ -111,7 +111,7 @@ info = pd.DataFrame(info)
 info = info.drop_duplicates(subset=['Electrode']).sort_values('Electrode')
 
 
-nanozFilePath = baseFolder + 'Microleads_Impedance_test.xlsx'
+nanozFilePath = baseFolder + '/Microleads_Impedance_test.xlsx'
 nanozData = pd.read_excel(nanozFilePath,sheetname=excelSheetNo, index_col = 0, header = None).reset_index()
 
 for index, row in nanozData.iterrows():
