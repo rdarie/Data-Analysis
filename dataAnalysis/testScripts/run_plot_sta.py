@@ -2,8 +2,6 @@ from dataAnalysis.helperFunctions.plot_sta import *
 import numpy as np
 # import pdb
 
-
-
 whichChan = [0,1]
 chanLabels = ['EMG', 'trigger']
 

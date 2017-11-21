@@ -38,11 +38,7 @@ class NORM(Enum):
     NONE = 0
     TOMAX = 1
 
-gitPath = parentDir + '/Data-Analysis'
-
-with open(gitPath + '/.serverHome') as f:
-    serverHome = f.read().replace('\n', '')
-
+from dataAnalysis.paths import serverHome, gitPath
 
 def get_spikes(raw, chanLabels, filter_function, spike_dur, trig_sr,
     trig_idx, debugging):
