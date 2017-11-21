@@ -59,5 +59,6 @@ ProprioDataAnalysis.egg-info/
 
 #Random code for debugging
 scratch.py
-
+.serverHome
+.gitBase.txt
 #local environment definitions
