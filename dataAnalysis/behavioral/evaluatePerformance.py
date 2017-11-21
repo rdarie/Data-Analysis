@@ -224,7 +224,7 @@ if 'dboardURL' in locals():
                              discoveryServiceUrl=discoveryUrl)
 
    spreadsheetId = '1BWjBqbtoVr9j6dU_7eHp-bQMJApNn8Wkl_N1jv20faE'
-   range_name = 'Sheet1!J1'
+   range_name = 'Sheet1!T1'
    valueInputOption = 'USER_ENTERED'
 
    body = {
