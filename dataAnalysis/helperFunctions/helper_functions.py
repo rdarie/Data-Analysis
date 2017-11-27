@@ -377,6 +377,7 @@ def getSpectrogram(channelData, winLen_s, stepLen_s = 0.02, R = 20, fr_cutoff = 
 
     fr_samp = int(NFFT / 2) + 1
     fr = np.arange(fr_samp) * channelData['samp_per_s'] / (2 * fr_samp)
+
     if fr_cutoff is not None:
         fr = fr[fr < fr_cutoff]
         fr_samp = len(fr)
@@ -400,7 +401,7 @@ def getSpectrogram(channelData, winLen_s, stepLen_s = 0.02, R = 20, fr_cutoff = 
             spectrum[idx,:,:] = P_libtfr
     else:
         origin = 'scipy'
-        spectrum = np.zeros((nChan, nWindows + 1, fr_samp))
+        spectrum = np.zeros((nChan, nWindows, fr_samp))
         for idx,signal in channelData['data'].iteritems():
             sys.stdout.write("Running getSpectrogram: %d%%\r" % int(idx * 100 / nChan + 1))
             sys.stdout.flush()
