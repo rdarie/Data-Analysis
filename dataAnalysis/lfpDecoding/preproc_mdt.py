@@ -8,6 +8,7 @@ import pickle
 from copy import *
 import argparse, linecache
 from dataAnalysis.helperFunctions.mdt_constants import *
+from scipy import interpolate
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--file')
@@ -17,7 +18,7 @@ parser.add_argument('--winLen', default = 0.1, type = float)
 args = parser.parse_args()
 
 argFile = args.file
-argFile = 'W:/ENG_Neuromotion_Shared/group/BSI/Shepherd/Recordings/201711201344-Shepherd-Treadmill/ORCA Logs/Session1511203613428/DeviceNPC700199H/RawDataTD.json'
+argFile = 'W:/ENG_Neuromotion_Shared/group/BSI/Shepherd/Recordings/201711161108-Shepherd-Treadmill/ORCA Logs/Session1510849056349/DeviceNPC700199H/RawDataTD.json'
 fileDir = '/'.join(argFile.split('/')[:-1])
 fileName = argFile.split('/')[-1]
 fileType = fileName.split('.')[-1]
@@ -56,18 +57,64 @@ if fileType == 'txt':
     data.update({'start_time_s' : 0})
 
 elif fileType == 'json':
-    data = {'raw' : pd.read_json(argFile)}
+    RawDataTD = pd.read_json(fileDir + '/RawDataTD.json')
+    data = {'raw' : RawDataTD}
+
+    RawDataFFT = pd.read_json(fileDir + '/RawDataFFT.json')
+    RawDataPower = pd.read_json(fileDir + '/RawDataPower.json')
+    RawDataAccel = pd.read_json(fileDir + '/RawDataAccel.json')
+    AdaptiveLog = pd.read_json(fileDir + '/AdaptiveLog.json')
+
+    logs = [RawDataTD, RawDataFFT, RawDataPower, RawDataAccel]
+    logDataFields = ['TimeDomainData', 'FftData', 'PowerDomainData', 'AccelData']
+    firstGoodTimeAll = [np.nan for i in logs] + [np.nan]
+
+    for idx, log in enumerate(logs):
+        if not log[logDataFields[idx]].empty:
+            for packet in log[logDataFields[idx]][0]:
+                if packet['PacketGenTime'] > 0:
+                    firstGoodTimeAll[idx] = packet['PacketGenTime']
+                    break
+
+    if not AdaptiveLog.empty:
+        for log in AdaptiveLog:
+            if log['AdaptiveUpdate']['PacketGenTime'] > 0:
+                firstGoodTimeAll[4] = log['AdaptiveUpdate']['PacketGenTime']
+                break
+
+    firstGoodTime = min(firstGoodTimeAll)
+    # This will be used as a reference for all plots when plotting based off Packet Gen
+    # Time. It is the end of the first streamed packet. The first received sample is
+    # considered the zero reference.
+    TimeSync = pd.read_json(fileDir + '/TimeSync.json')
+    logs = logs + [TimeSync]
+    logDataFields = logDataFields + ['TimeSyncData']
+    masterTickArray = np.asarray([np.nan for i in logs] + [np.nan])
+    masterTimeStampArray = np.asarray([np.nan for i in logs] + [np.nan])
+
+    for idx, log in enumerate(logs):
+        if not log[logDataFields[idx]].empty:
+            masterTickArray[idx] = log[logDataFields[idx]][0][0]['Header']['systemTick']
+            masterTimeStampArray[idx] = log[logDataFields[idx]][0][0]['Header']['timestamp']['seconds']
+
+    if not AdaptiveLog.empty:
+        masterTickArray[idx] = AdaptiveLog[0]['Header']['systemTick']
+        masterTimeStampArray[idx] = AdaptiveLog[0]['Header']['timestamp']['seconds']
+
+    masterTimeStamp = min(masterTimeStampArray)
+    I = [i for i, x in enumerate(masterTimeStampArray) if x == masterTimeStamp]
+    masterTick = min(masterTickArray[I])
+
+    # This (masterTimeStamp and masterTick) will be used as a reference for all plots
+    # when plotting based off System Tick. It is the end of the first streamed packet.
+    # The first received sample is considered the zero reference.
+
+    rolloverseconds = 6.5535 # System Tick seconds before roll over
 
     # get first packet to unpack some information about packets to come
     packets = iter(data['raw']['TimeDomainData'][0])
     packet = next(packets)
 
-    masterTick = packet['Header']['systemTick']
-    masterTimeStamp = packet['Header']['timestamp']['seconds']
-    # This (masterTimeStamp and masterTick) will be used as a reference for all plots
-    # when plotting based off System Tick. It is the end of the first streamed packet.
-    # The first received sample is considered the zero reference.
-    rolloverseconds = 6.5535 # System Tick seconds before roll over
     elecUnits = packet['Units']
     numberOfChannels = len(packet['ChannelSamples'])
     assert numberOfChannels == len(elecLabel)
@@ -77,10 +124,15 @@ elif fileType == 'json':
     #get first channel data
     channels = iter(packet['ChannelSamples'])
     channel = next(channels)
-    # if only time domain packets are being considered:
-    #endtime1 = (len(channel['Value']) - 1) / sampleRate
-    # else this would be zero
-    endtime1 = 0
+
+    if I == [0]:
+        endtime1 = (len(channel['Value']) - 1) / sampleRate
+        # Sets the first packet end time in seconds based off samples and sample rate.
+        # This is used as a reference for FFT, Power, and Adaptive data because these are
+        # calculated after the TD data has been acquired. Accel data generates its own
+        # first packet end time in seconds.
+    else:
+        endtime1 = 0
     #preallocate data containers
     channelData = pd.DataFrame(index = [], columns = elecLabel)
     packetSize = []
@@ -108,16 +160,11 @@ elif fileType == 'json':
     loopCount = 0 #Initializes loop count
     loopTimeStamp = [] #Initializes loop time stamp index
 
-    # Find first good packet gen time
-    for idx, packet in enumerate(data['raw']['TimeDomainData'][0]):
-        if packet['PacketGenTime'] > 0:
-            firstGoodTime = packet['PacketGenTime']
-            break
-
     # plot based off system tick if True, else plot based off Packet Gen Time:
     timing = True
     #linearly space packet data points if True, else space packet data points based off sample rate:
     spacing = False
+
     if ('stp', 'var') in locals():
         del stp
 
@@ -141,11 +188,12 @@ elif fileType == 'json':
                    endtimeold = endtime - (len(packet['ChannelSamples'][0]['Value']) - 1) / sampleRate # plot back from endtime based off of sample rate
             else:
                    endtimeold = endtime
-                   if packets[idx - 1]['Header']['systemTick'] < packet['Header']['systemTick']:
+                   if packets[idx - 1]['Header']['systemTick'] < packets[idx]['Header']['systemTick']:
                        endtime = (packet['Header']['systemTick'] - masterTick)*0.0001 + endtime1 + seconds
                    else:
+                       #systemTick has rolled over, add the appropriate number of seconds
                        seconds = seconds + rolloverseconds
-                       endtime = (packet['Header']['systemTick'] - masterTick)*0.0001 + endtime1 + seconds
+                       endtime = (packets[idx]['Header']['systemTick'] - masterTick)*0.0001 + endtime1 + seconds
 
             #-------------------------------------------------------------------------
             channels = enumerate(packet['ChannelSamples'])
@@ -159,19 +207,21 @@ elif fileType == 'json':
             if spacing:
                 #linearly spacing data between packet system ticks------------------------
                 if idx != 0:
+                    tvec = tvec.iloc[:-1]
                     tvec = tvec.append(pd.Series(np.linspace(endtimeold,endtime,len(packet['ChannelSamples'][0]['Value']) + 1)), ignore_index = True) # Linearly spacing between packet end times
                 else:
+                    tvec = tvec.iloc[:-1]
                     tvec = tvec.append(pd.Series(np.linspace(endtimeold,endtime,len(packet['ChannelSamples'][0]['Value']))), ignore_index = True)
             else:
                 #sample rate spacing data between packet system ticks---------------------
                 newTimes = pd.Series(np.arange(endtime-(len(packet['ChannelSamples'][0]['Value']) - 1)/sampleRate,endtime + 1/sampleRate,1/sampleRate))
                 #pdb.set_trace()
-                # TODO: something (round-off error?) is causing newTimes to have an extra entry on occasion. This is a kludgey fix, should revisit
-                newTimes = newTimes[:tempChannelData.shape[1]]
-                tvec = tvec.append(newTimes, ignore_index = True)
 
-            #if len(newTimes) != tempChannelData.shape[1]:
-            #    pdb.set_trace()
+                #if len(newTimes) != tempChannelData.shape[1]:
+                #    pdb.set_trace()
+                # TODO: something (round-off error?) is causing newTimes to have an extra entry on occasion. This is a kludgey fix, should revisit
+                newTimes = newTimes[newTimes <= endtime]
+                tvec = tvec.append(newTimes, ignore_index = True)
 
             packetSize.append(len(channel['Value']))
         else:
@@ -216,15 +266,37 @@ elif fileType == 'json':
             )
 
         #pdb.set_trace()
-    data.update({'data' : channelData})
-    data['data'].columns = [0,1,2,3]
-    data.update({'t' : tvec.values})
+    data.update({'dataRaw' : channelData})
+    data['dataRaw'].columns = [0,1,2,3]
+    data.update({'tRaw' : tvec.values})
 
     data.update({'samp_per_s' : sampleRate})
     data.update({'start_time_s' : 0})
 
-f,_ = plotChan(data, whichChan, label = 'Raw data', mask = None, show = False)
+    nonIncreasingMask = np.concatenate((np.diff(data['tRaw']) <= 0, [False]))
+    nonIncreasingTimes = deepcopy(data['tRaw'][nonIncreasingMask])
+    nonIncreasingMagnitude = np.diff(data['tRaw'])[np.diff(data['tRaw']) <= 0]
 
+    assert all(nonIncreasingMagnitude < 1e-10)
+    data['tRaw'] = data['tRaw'][~nonIncreasingMask]
+    data['dataRaw'] = data['dataRaw'].iloc[~nonIncreasingMask, :]
+
+    data['t'] = np.arange(min(data['tRaw']), max(data['tRaw']), 1/sampleRate)
+    data['data'] = pd.DataFrame(index = data['t'], columns = data['ExtendedHeaderIndices'])
+
+    for idx, column in data['dataRaw'].items():
+        f = interpolate.interp1d(data['tRaw'], column.values)
+        data['data'][data['ExtendedHeaderIndices'][idx]] = f(data['t'])
+
+def increasing(L):
+    return all(x<=y for x, y in zip(L, L[1:]))
+
+#assert increasing(data['t'])
+f, ax = plt.subplots()
+#plt.show()
+plotChan(data, whichChan, label = 'Raw data', mask = None,
+    show = False, prevFig = f)
+ax.plot(nonIncreasingTimes , nonIncreasingTimes * 0, 'ro')
 plt.legend()
 
 plotName = fileName.split('.')[0] + '_' +\
