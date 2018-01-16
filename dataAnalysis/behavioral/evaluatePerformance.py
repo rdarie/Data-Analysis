@@ -15,6 +15,7 @@ import copy
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--file', default = 'Murdoc_29_09_2017_10_48_48',  nargs='*')
+#fileNamesRaw = []
 parser.add_argument('--folder', default = 'W:/ENG_Neuromotion_Shared/group/Proprioprosthetics/Training/Flywheel Logs/Murdoc')
 parser.add_argument('--fixMovedToError', dest='fixMovedToError', action='store_true')
 parser.add_argument('--outputFileName', required = True)
