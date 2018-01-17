@@ -15,10 +15,12 @@ import copy
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--file', default = 'Murdoc_29_09_2017_10_48_48',  nargs='*')
-#fileNamesRaw = []
+#fileNamesRaw = ['Murdoc_15_01_2018_11_44_47']
 parser.add_argument('--folder', default = 'W:/ENG_Neuromotion_Shared/group/Proprioprosthetics/Training/Flywheel Logs/Murdoc')
+#fileDir = 'W:/ENG_Neuromotion_Shared/group/Proprioprosthetics/Training/Flywheel Logs/Murdoc'
 parser.add_argument('--fixMovedToError', dest='fixMovedToError', action='store_true')
 parser.add_argument('--outputFileName', required = True)
+# outputFileName = 'Murdoc_15_01_2018_11_44_47_Debug'
 parser.set_defaults(fixMovedToError = False)
 args = parser.parse_args()
 
@@ -118,28 +120,33 @@ mask = log['Label'].str.contains('turnPedalRandom_1') | \
     log['Label'].str.endswith('button timed out')
 trialRelevant = pd.DataFrame(log[mask]).reset_index()
 # TODO: kludge, to avoid wait for corect button substring. fix
+# later note: what does the above even mean?
 
+# if the last trial didn't have time to end, remove its entries from the list of events
 while not trialRelevant.iloc[-1, :]['Label'] in ['correct button', 'incorrect button', 'button timed out']:
     trialRelevant.drop(trialRelevant.index[len(trialRelevant)-1], inplace = True)
 
 def magnitude_lookup_table(difference):
     if difference > 2e4:
-        return 'Long Extension'
+        return ('Long', 'Extension')
     if difference > 0:
-        return 'Short Extension'
+        return ('Short', 'Extension')
     if difference > -2e4:
-        return 'Short Flexion'
+        return ('Short', 'Flexion')
     else:
-        return 'Long Flexion'
+        return ('Long', 'Flexion')
 
 trialStartIdx = trialRelevant.index[trialRelevant['Label'].str.contains('turnPedalRandom_1')]
-trialStats = pd.DataFrame(index = trialStartIdx, columns = ['First', 'Second', 'Magnitude', 'Condition', 'Outcome'])
+trialStats = pd.DataFrame(index = trialStartIdx, columns = ['First', 'Second', 'Magnitude', 'Direction', 'Condition', 'Type', 'Outcome'])
+
 for idx in trialStartIdx:
     assert trialRelevant.loc[idx, 'Label'] == 'turnPedalRandom_1'
     trialStats.loc[idx, 'First'] = float(trialRelevant.loc[idx, 'Details'])
     assert trialRelevant.loc[idx + 1, 'Label'] == 'turnPedalRandom_2'
     trialStats.loc[idx, 'Second'] = float(trialRelevant.loc[idx + 1, 'Details'])
-    trialStats.loc[idx, 'Magnitude'] = magnitude_lookup_table(trialStats.loc[idx, 'First'] - trialStats.loc[idx, 'Second'])
+    trialStats.loc[idx, 'Type'] = 0 if abs(trialStats.loc[idx, 'First']) < abs(trialStats.loc[idx, 'Second']) else 1
+    trialStats.loc[idx, 'Magnitude'] = magnitude_lookup_table(trialStats.loc[idx, 'First'] - trialStats.loc[idx, 'Second'])[0]
+    trialStats.loc[idx, 'Direction'] = magnitude_lookup_table(trialStats.loc[idx, 'First'] - trialStats.loc[idx, 'Second'])[1]
     assert (trialRelevant.loc[idx + 2, 'Label'] == 'easy') | (trialRelevant.loc[idx + 2, 'Label'] == 'hard')
     trialStats.loc[idx, 'Condition'] = trialRelevant.loc[idx + 2, 'Label']
     assert (trialRelevant.loc[idx + 3, 'Label'] == 'correct button') | \
@@ -151,6 +158,49 @@ fi = plot_trial_stats(trialStats)
 outcomeStatsUrl = py.plot(fi, filename= outputFileName + '/buttonPressOutcomeStats',
     fileopt="overwrite", sharing='public', auto_open=False)
 
+trialStats.to_excel(fileDir + '/' + outputFileName + '.xlsx')
+################################################################################
+# Plot statistics about the blocks
+trialStats = trialStats.reset_index(drop = True)
+#idx, row = next(trialStats.iterrows())
+
+blockStats = pd.DataFrame(columns = ['First Outcome', 'First Condition', 'Type', 'Length'])
+blockIdx = 0
+for idx, row in trialStats.iterrows():
+    if idx == 0:
+        blockStats.loc[0, 'Type'] = row['Type']
+        blockStats.loc[0, 'First Condition'] = row['Condition']
+        blockStats.loc[0, 'First Outcome'] = row['Outcome']
+        blockStats.loc[0, 'Length'] = 1
+    else:
+        if trialStats.loc[idx - 1, 'Type'] == row['Type']:
+            #if the previous trial was of the same type as the current trial:
+            blockStats.loc[blockIdx, 'Length'] = blockStats.loc[blockIdx, 'Length'] + 1
+        else:
+            #start a new block
+            blockIdx = blockIdx + 1
+            blockStats.loc[blockIdx, 'Type'] = row['Type']
+            blockStats.loc[blockIdx, 'First Outcome'] = row['Outcome']
+            blockStats.loc[blockIdx, 'First Condition'] = row['Condition']
+            blockStats.loc[blockIdx, 'Length'] = 1
+
+newNames = {
+    'Type' : 'Type',
+    'First Outcome' : 'Outcome',
+    'First Condition' : 'Condition',
+    'Length' : 'Length'
+    }
+fi = plot_trial_stats(blockStats.rename(columns = newNames))
+blockOutcomeStatsUrl = py.plot(fi, filename= outputFileName + '/FirstInBlockOutcomeStats',
+    fileopt="overwrite", sharing='public', auto_open=False)
+
+blockLengths = blockStats['Length'].value_counts()
+data = [go.Bar(
+            x=list(blockLengths.index),
+            y=blockLengths.values
+    )]
+
+blockBarUrl = py.plot(data, filename= outputFileName + '/blockBar',fileopt="overwrite", sharing='public', auto_open=False)
 
 # In[ ]:
 
@@ -168,6 +218,8 @@ else:
     fileIdPsthEasy = fileId_from_url(psthUrlEasy)
     fileIdPsthHard = fileId_from_url(psthUrlHard)
     fileIdOutcomes = fileId_from_url(outcomeStatsUrl)
+    fileIdBlockOutcomes = fileId_from_url(blockOutcomeStatsUrl)
+    fileIdBlockBar = fileId_from_url(blockBarUrl)
 
     boxes = [{
         'type': 'box',
@@ -202,6 +254,20 @@ else:
         'boxType': 'plot',
         'fileId': fileIdOutcomes,
         'title': 'OutcomesPlot'
+    },
+
+    {
+        'type': 'box',
+        'boxType': 'plot',
+        'fileId': fileIdBlockOutcomes,
+        'title': 'BlockOutcomesPlot'
+    },
+
+    {
+        'type': 'box',
+        'boxType': 'plot',
+        'fileId': fileIdBlockBar,
+        'title': 'BlockBarPlot'
     }]
 
 
@@ -210,8 +276,13 @@ else:
     my_dboard.insert(boxes[2], 'above', 1)
     my_dboard.insert(boxes[3], 'above', 1)
     my_dboard.insert(boxes[4], 'above', 1)
+    my_dboard.insert(boxes[5], 'above', 1)
+    my_dboard.insert(boxes[6], 'above', 1)
+
+    my_dboard['layout']['size'] = 10000
 
     dboardURL = py.dashboard_ops.upload(my_dboard, filename = outputFileName + '_dashboard', auto_open = False)
+
     #dboardID = fileId_from_url(dboardURL)
 
 # In[ ]:
