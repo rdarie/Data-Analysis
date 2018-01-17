@@ -866,8 +866,8 @@ def plot_trial_stats(trialStatsDf, usePlotly = True):
 
             conditionStats = trialStatsDf[trialStatsDf['Condition'] == conditionName]
             y = [conditionStats[conditionStats['Outcome'] == on].size \
-                for on in np.unique(conditionStats['Outcome'])]
-            x = [outcomeLongName[on] for on in np.unique(conditionStats['Outcome'])]
+                for on in sorted(np.unique(conditionStats['Outcome']))]
+            x = [outcomeLongName[on] for on in sorted(np.unique(conditionStats['Outcome']))]
             data.append(go.Bar(
                 x=x,
                 y=100 * y / sum(y),
@@ -1505,6 +1505,13 @@ def lenientScore(yTrue, yPredicted, oldBinSize, newBinSize, scoreFun, **kwargs):
             yPredictedLenient.append(0)
 
     return scoreFun(yTrueLenient, yPredictedLenient, **kwargs), yTrueLenient, yPredictedLenient
+
+def long_form_df(DF, overrideColumns = None):
+    longDF = pd.DataFrame(DF.unstack())
+    longDF.reset_index(inplace=True)
+    if overrideColumns is not None:
+        longDF.columns = overrideColumns
+    return longDF
 
 def reloadPlot(filePath = None, message = "Please choose file(s)"):
     # get filename

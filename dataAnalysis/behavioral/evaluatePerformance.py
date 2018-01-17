@@ -19,7 +19,7 @@ parser.add_argument('--file', default = 'Murdoc_29_09_2017_10_48_48',  nargs='*'
 parser.add_argument('--folder', default = 'W:/ENG_Neuromotion_Shared/group/Proprioprosthetics/Training/Flywheel Logs/Murdoc')
 #fileDir = 'W:/ENG_Neuromotion_Shared/group/Proprioprosthetics/Training/Flywheel Logs/Murdoc'
 parser.add_argument('--fixMovedToError', dest='fixMovedToError', action='store_true')
-parser.add_argument('--outputFileName', required = True)
+parser.add_argument('--outputFileName')
 # outputFileName = 'Murdoc_15_01_2018_11_44_47_Debug'
 parser.set_defaults(fixMovedToError = False)
 args = parser.parse_args()
@@ -29,7 +29,12 @@ if isinstance(fileNamesRaw, str):
     fileNamesRaw = [fileNamesRaw]
 
 fileDir = args.folder
-outputFileName = args.outputFileName
+if args.outputFileName is not None:
+    outputFileName = args.outputFileName
+else:
+    outputFileName = fileNamesRaw[0]
+
+print(outputFileName)
 fixMovedToError =args.fixMovedToError
 
 fileNames = []
@@ -158,7 +163,7 @@ fi = plot_trial_stats(trialStats)
 outcomeStatsUrl = py.plot(fi, filename= outputFileName + '/buttonPressOutcomeStats',
     fileopt="overwrite", sharing='public', auto_open=False)
 
-trialStats.to_excel(fileDir + '/' + outputFileName + '.xlsx')
+trialStats.to_csv(fileDir + '/' + outputFileName + '_trialStats.csv')
 ################################################################################
 # Plot statistics about the blocks
 trialStats = trialStats.reset_index(drop = True)
@@ -184,6 +189,7 @@ for idx, row in trialStats.iterrows():
             blockStats.loc[blockIdx, 'First Condition'] = row['Condition']
             blockStats.loc[blockIdx, 'Length'] = 1
 
+blockStats.to_csv(fileDir + '/' + outputFileName + '_blockStats.csv')
 newNames = {
     'Type' : 'Type',
     'First Outcome' : 'Outcome',
