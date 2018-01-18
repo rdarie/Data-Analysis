@@ -113,7 +113,7 @@ for idx, fileName in enumerate(fileList):
 
 plt.subplot(2,1,1)
 for column in overallTrialStats.loc[:, 'Cued by LED']:
-    plt.plot(overallTrialStats.loc[:, ('Cued by LED', column)], label = column)
+    plt.plot(overallTrialStats.loc[:, ('Cued by LED', column)], 'o-', label = column)
 
 plt.legend()
 plt.title('Cued by LED')
@@ -121,7 +121,7 @@ plt.ylabel('Percentage Correct')
 
 plt.subplot(2,1,2)
 for column in overallTrialStats.loc[:, 'Uncued by LED']:
-    plt.plot(overallTrialStats.loc[:, ('Uncued by LED', column)], label = column)
+    plt.plot(overallTrialStats.loc[:, ('Uncued by LED', column)], 'o-', label = column)
 
 plt.legend()
 plt.title('Uncued by LED')
@@ -133,7 +133,7 @@ plt.show()
 
 plt.subplot(2,1,1)
 for column in overallBlockStats.loc[:, 'Cued by LED']:
-    plt.plot(overallBlockStats.loc[:, ('Cued by LED', column)], label = column)
+    plt.plot(overallBlockStats.loc[:, ('Cued by LED', column)], 'o-', label = column)
 
 plt.legend()
 plt.title('Cued by LED')
@@ -141,7 +141,7 @@ plt.ylabel('Percentage Correct')
 
 plt.subplot(2,1,2)
 for column in overallBlockStats.loc[:, 'Cued by LED']:
-    plt.plot(overallBlockStats.loc[:, ('Uncued by LED', column)], label = column)
+    plt.plot(overallBlockStats.loc[:, ('Uncued by LED', column)], 'o-', label = column)
 
 plt.legend()
 plt.title('Uncued by LED')
