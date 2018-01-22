@@ -15,12 +15,12 @@ import copy
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--file', default = 'Murdoc_29_09_2017_10_48_48',  nargs='*')
-#fileNamesRaw = ['Murdoc_15_01_2018_11_44_47']
+#fileNamesRaw = ['Murdoc_14_09_2017_10_52_20']
 parser.add_argument('--folder', default = 'W:/ENG_Neuromotion_Shared/group/Proprioprosthetics/Training/Flywheel Logs/Murdoc')
 #fileDir = 'W:/ENG_Neuromotion_Shared/group/Proprioprosthetics/Training/Flywheel Logs/Murdoc'
 parser.add_argument('--fixMovedToError', dest='fixMovedToError', action='store_true')
 parser.add_argument('--outputFileName')
-# outputFileName = 'Murdoc_15_01_2018_11_44_47_Debug'
+# outputFileName = 'Murdoc_14_09_2017_10_52_20_Debug'
 parser.set_defaults(fixMovedToError = False)
 args = parser.parse_args()
 
@@ -36,7 +36,7 @@ else:
 
 print(outputFileName)
 fixMovedToError =args.fixMovedToError
-
+#fixMovedToError = True
 fileNames = []
 for fileName in fileNamesRaw:
     if '.txt' in fileName:
@@ -48,7 +48,8 @@ for fileName in fileNamesRaw:
 # In[2]:
 filePaths = [fileDir + '/' + 'Log_' + fileName + '.txt' for fileName in fileNames]
 
-log = readPiLog(filePaths, names = ['Label', 'Time', 'Details'], zeroTime = True, fixMovedToError = [True, True])
+# TODO reading multiple files is broken
+log = readPiLog(filePaths, names = ['Label', 'Time', 'Details'], zeroTime = True, fixMovedToError = [fixMovedToError])
 
 # In[3]:
 
@@ -163,6 +164,12 @@ fi = plot_trial_stats(trialStats)
 outcomeStatsUrl = py.plot(fi, filename= outputFileName + '/buttonPressOutcomeStats',
     fileopt="overwrite", sharing='public', auto_open=False)
 
+separateLeftRight = True
+
+fi = plot_trial_stats(trialStats, separateLeftRight = True)
+outcomeStatsByDirUrl = py.plot(fi, filename= outputFileName + '/buttonPressOutcomeStatsByDir',
+    fileopt="overwrite", sharing='public', auto_open=False)
+
 trialStats.to_csv(fileDir + '/' + outputFileName + '_trialStats.csv')
 ################################################################################
 # Plot statistics about the blocks
@@ -224,6 +231,7 @@ else:
     fileIdPsthEasy = fileId_from_url(psthUrlEasy)
     fileIdPsthHard = fileId_from_url(psthUrlHard)
     fileIdOutcomes = fileId_from_url(outcomeStatsUrl)
+    fileIdOutcomesByDir = fileId_from_url(outcomeStatsByDirUrl)
     fileIdBlockOutcomes = fileId_from_url(blockOutcomeStatsUrl)
     fileIdBlockBar = fileId_from_url(blockBarUrl)
 
@@ -274,6 +282,13 @@ else:
         'boxType': 'plot',
         'fileId': fileIdBlockBar,
         'title': 'BlockBarPlot'
+    },
+
+    {
+        'type': 'box',
+        'boxType': 'plot',
+        'fileId': fileIdOutcomesByDir,
+        'title': 'OutcomesByDirPlot'
     }]
 
 
@@ -284,6 +299,7 @@ else:
     my_dboard.insert(boxes[4], 'above', 1)
     my_dboard.insert(boxes[5], 'above', 1)
     my_dboard.insert(boxes[6], 'above', 1)
+    my_dboard.insert(boxes[7], 'above', 1)
 
     my_dboard['layout']['size'] = 10000
 

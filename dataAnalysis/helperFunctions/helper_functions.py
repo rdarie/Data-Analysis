@@ -848,31 +848,48 @@ def plotPeristimulusTimeHistogram(eventDf, stimulus, names,
         psthFig = go.Figure(data=data,layout=layout)
 
     return psthFig
-
-def plot_trial_stats(trialStatsDf, usePlotly = True):
+def plot_trial_stats(trialStatsDf, usePlotly = True, separateLeftRight = False):
+    #trialStatsDf = trialStats
     if usePlotly:
         data = []
         conditionLongName = {
             'easy' : 'Cued by LED',
             'hard' : 'Uncued by LED'
-        }
+            }
         outcomeLongName = {
             'correct button' : 'Correct button',
             'incorrect button' : 'Incorrect button',
             'button timed out' : 'No press'
-
-        }
+            }
+        typeLongName = {
+            0 : 'Short First',
+            1 : 'Long First'
+            }
+        #conditionName = next(iter(np.unique(trialStatsDf['Condition'])))
         for conditionName in np.unique(trialStatsDf['Condition']):
 
             conditionStats = trialStatsDf[trialStatsDf['Condition'] == conditionName]
-            y = [conditionStats[conditionStats['Outcome'] == on].size \
-                for on in sorted(np.unique(conditionStats['Outcome']))]
-            x = [outcomeLongName[on] for on in sorted(np.unique(conditionStats['Outcome']))]
-            data.append(go.Bar(
-                x=x,
-                y=100 * y / sum(y),
-                name=conditionLongName[conditionName]
-                ))
+            if separateLeftRight:
+                #typeName = next(iter(np.unique(conditionStats['Type'])))
+                for typeName in np.unique(conditionStats['Type']):
+                    typeStats = conditionStats[conditionStats['Type'] == typeName]
+                    y = [typeStats[typeStats['Outcome'] == on].size \
+                        for on in sorted(np.unique(typeStats['Outcome']))]
+                    x = [outcomeLongName[on] for on in sorted(np.unique(typeStats['Outcome']))]
+                    data.append(go.Bar(
+                        x=x,
+                        y=100 * y / sum(y),
+                        name=conditionLongName[conditionName] + ' ' + typeLongName[typeName]
+                        ))
+            else:
+                y = [conditionStats[conditionStats['Outcome'] == on].size \
+                    for on in sorted(np.unique(conditionStats['Outcome']))]
+                x = [outcomeLongName[on] for on in sorted(np.unique(conditionStats['Outcome']))]
+                data.append(go.Bar(
+                    x=x,
+                    y=100 * y / sum(y),
+                    name=conditionLongName[conditionName]
+                    ))
 
         layout = {
             'barmode' : 'group',
@@ -910,6 +927,7 @@ def plot_trial_stats(trialStatsDf, usePlotly = True):
         return fig
     else:
         return None
+
 
 def runScriptAllFiles(scriptPath, folderPath):
     onlyfiles = [f for f in os.listdir(folderPath) if os.path.isfile(os.path.join(folderPath, f))]
@@ -982,7 +1000,7 @@ def plot_raster(spikes, chans):
     plt.tight_layout()
     plt.show(block = False)
 
-def readPiLog(filePaths, names = None, zeroTime = False, fixMovedToError = False):
+def readPiLog(filePaths, names = None, zeroTime = False, fixMovedToError = [False]):
     logs = pd.DataFrame()
     for idx, filePath in enumerate(filePaths):
         if names is not None:
@@ -1005,6 +1023,14 @@ def readPiLog(filePaths, names = None, zeroTime = False, fixMovedToError = False
                     log.loc[keepIdx, 'Details'] = row['Time']
                     keepIdx = None
                     log.drop([idx], inplace = True)
+
+        for idx, row in log.iterrows():
+            if row['Label'] == 'button timed out!':
+                log.loc[idx, 'Label'] = 'button timed out'
+            if row['Label'] == 'correct_button':
+                log.loc[idx, 'Label'] = 'correct button'
+            if row['Label'] == 'incorrect_button':
+                log.loc[idx, 'Label'] = 'incorrect button'
 
         log.drop_duplicates(inplace = True)
         logs = pd.concat([logs, log], ignore_index = True)
