@@ -15,12 +15,12 @@ import copy
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--file', default = 'Murdoc_29_09_2017_10_48_48',  nargs='*')
-#fileNamesRaw = ['Murdoc_14_09_2017_10_52_20']
+#fileNamesRaw = ['Murdoc_29_01_2018_11_17_16']
 parser.add_argument('--folder', default = 'W:/ENG_Neuromotion_Shared/group/Proprioprosthetics/Training/Flywheel Logs/Murdoc')
 #fileDir = 'W:/ENG_Neuromotion_Shared/group/Proprioprosthetics/Training/Flywheel Logs/Murdoc'
 parser.add_argument('--fixMovedToError', dest='fixMovedToError', action='store_true')
 parser.add_argument('--outputFileName')
-# outputFileName = 'Murdoc_14_09_2017_10_52_20_Debug'
+# outputFileName = 'Murdoc_29_01_2018_11_17_16_Debug'
 parser.set_defaults(fixMovedToError = False)
 args = parser.parse_args()
 
@@ -171,6 +171,7 @@ outcomeStatsByDirUrl = py.plot(fi, filename= outputFileName + '/buttonPressOutco
     fileopt="overwrite", sharing='public', auto_open=False)
 
 trialStats.to_csv(fileDir + '/' + outputFileName + '_trialStats.csv')
+
 ################################################################################
 # Plot statistics about the blocks
 trialStats = trialStats.reset_index(drop = True)
@@ -197,12 +198,14 @@ for idx, row in trialStats.iterrows():
             blockStats.loc[blockIdx, 'Length'] = 1
 
 blockStats.to_csv(fileDir + '/' + outputFileName + '_blockStats.csv')
+
 newNames = {
     'Type' : 'Type',
     'First Outcome' : 'Outcome',
     'First Condition' : 'Condition',
     'Length' : 'Length'
     }
+
 fi = plot_trial_stats(blockStats.rename(columns = newNames))
 blockOutcomeStatsUrl = py.plot(fi, filename= outputFileName + '/FirstInBlockOutcomeStats',
     fileopt="overwrite", sharing='public', auto_open=False)
@@ -225,7 +228,6 @@ if outputFileName + '_dashboard' in existingDBoards:
 else:
     # If not, create the dashboard
     my_dboard = dashboard.Dashboard()
-
     fileIdBar = fileId_from_url(barUrl)
     fileIdRaster = fileId_from_url(rasterUrl)
     fileIdPsthEasy = fileId_from_url(psthUrlEasy)

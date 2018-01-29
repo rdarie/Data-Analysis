@@ -848,6 +848,7 @@ def plotPeristimulusTimeHistogram(eventDf, stimulus, names,
         psthFig = go.Figure(data=data,layout=layout)
 
     return psthFig
+    
 def plot_trial_stats(trialStatsDf, usePlotly = True, separateLeftRight = False):
     #trialStatsDf = trialStats
     if usePlotly:

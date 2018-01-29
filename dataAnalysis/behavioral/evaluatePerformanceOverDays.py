@@ -10,7 +10,9 @@ import copy
 import pandas as pd
 import numpy as np
 from matplotlib import pyplot as plt
+
 import seaborn as sns
+sns.set(font_scale=1.5)
 
 fileList = [
     'Murdoc_17_10_2017_11_00_41',
@@ -60,6 +62,15 @@ fileList = [
     'Murdoc_14_01_2018_12_10_56',
     'Murdoc_15_01_2018_11_44_47',
     'Murdoc_17_01_2018_11_16_09',
+    'Murdoc_18_01_2018_10_48_13',
+    'Murdoc_19_01_2018_10_53_20',
+    'Murdoc_22_01_2018_10_42_48',
+    'Murdoc_22_01_2018_11_06_37',
+    'Murdoc_23_01_2018_10_45_57',
+    'Murdoc_23_01_2018_11_17_00',
+    'Murdoc_24_01_2018_10_56_58',
+    'Murdoc_24_01_2018_11_25_40',
+    'Murdoc_26_01_2018_11_01_54'
     ]
 
 fileDir = 'W:/ENG_Neuromotion_Shared/group/Proprioprosthetics/Training/Flywheel Logs/Murdoc'
@@ -112,41 +123,42 @@ for idx, fileName in enumerate(fileList):
             overallBlockStats.loc[idx, (conditionLongName[conditionName], x[subIdx])] = 100 * val / sum(y)
 
 plt.subplot(2,1,1)
-for column in overallTrialStats.loc[:, 'Cued by LED']:
-    plt.plot(overallTrialStats.loc[:, ('Cued by LED', column)], 'o-', label = column)
+for column in overallBlockStats.loc[:, 'Cued by LED']:
+    plt.plot(overallBlockStats.loc[:, ('Uncued by LED', column)], 'o-', label = column)
 
-plt.legend()
-plt.title('Cued by LED')
-plt.ylabel('Percentage Correct')
+plt.legend(loc = 1)
+plt.title('Trials at the beginning of each block')
+plt.ylabel('Percentage')
 
 plt.subplot(2,1,2)
 for column in overallTrialStats.loc[:, 'Uncued by LED']:
     plt.plot(overallTrialStats.loc[:, ('Uncued by LED', column)], 'o-', label = column)
 
-plt.legend()
-plt.title('Uncued by LED')
-plt.ylabel('Percentage Correct')
+#plt.legend()
+plt.title('All trials')
+plt.ylabel('Percentage')
 plt.xlabel('Day')
 fig = plt.gcf()
-fig.suptitle("Overall Trial Stats", fontsize=14)
+fig.suptitle("Trials uncued by LED", fontsize=22)
 plt.show()
 
 plt.subplot(2,1,1)
 for column in overallBlockStats.loc[:, 'Cued by LED']:
     plt.plot(overallBlockStats.loc[:, ('Cued by LED', column)], 'o-', label = column)
 
-plt.legend()
-plt.title('Cued by LED')
-plt.ylabel('Percentage Correct')
+plt.legend(loc = 1)
+plt.title('Trials at the beginning of each block')
+plt.ylabel('Percentage')
 
 plt.subplot(2,1,2)
-for column in overallBlockStats.loc[:, 'Cued by LED']:
-    plt.plot(overallBlockStats.loc[:, ('Uncued by LED', column)], 'o-', label = column)
+for column in overallTrialStats.loc[:, 'Cued by LED']:
+    plt.plot(overallTrialStats.loc[:, ('Cued by LED', column)], 'o-', label = column)
 
 plt.legend()
-plt.title('Uncued by LED')
-plt.ylabel('Percentage Correct')
+plt.title('All trials')
+plt.ylabel('Percentage')
+
 plt.xlabel('Day')
 fig = plt.gcf()
-fig.suptitle("First in Block Stats", fontsize=14)
+fig.suptitle("Trials cued by LED", fontsize=22)
 plt.show()
