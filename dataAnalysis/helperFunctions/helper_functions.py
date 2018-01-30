@@ -848,8 +848,8 @@ def plotPeristimulusTimeHistogram(eventDf, stimulus, names,
         psthFig = go.Figure(data=data,layout=layout)
 
     return psthFig
-    
-def plot_trial_stats(trialStatsDf, usePlotly = True, separateLeftRight = False):
+
+def plot_trial_stats(trialStatsDf, usePlotly = True, separate = None):
     #trialStatsDf = trialStats
     if usePlotly:
         data = []
@@ -866,13 +866,14 @@ def plot_trial_stats(trialStatsDf, usePlotly = True, separateLeftRight = False):
             0 : 'Short First',
             1 : 'Long First'
             }
-        #conditionName = next(iter(np.unique(trialStatsDf['Condition'])))
-        for conditionName in np.unique(trialStatsDf['Condition']):
-
+        conditionShortNames = np.unique(trialStatsDf['Condition'])
+        #conditionName = next(iter(conditionShortNames))
+        for conditionName in conditionShortNames:
             conditionStats = trialStatsDf[trialStatsDf['Condition'] == conditionName]
-            if separateLeftRight:
+            if separate == 'leftRight':
+                typeShortNames = np.unique(conditionStats['Type'])
                 #typeName = next(iter(np.unique(conditionStats['Type'])))
-                for typeName in np.unique(conditionStats['Type']):
+                for typeName in typeShortNames:
                     typeStats = conditionStats[conditionStats['Type'] == typeName]
                     y = [typeStats[typeStats['Outcome'] == on].size \
                         for on in sorted(np.unique(typeStats['Outcome']))]
@@ -880,7 +881,19 @@ def plot_trial_stats(trialStatsDf, usePlotly = True, separateLeftRight = False):
                     data.append(go.Bar(
                         x=x,
                         y=100 * y / sum(y),
-                        name=conditionLongName[conditionName] + ' ' + typeLongName[typeName]
+                        name=conditionLongName[conditionName] + ' ' + typeLongName[typeName] + ' ' + str(len(typeStats)) + ' total trials'
+                        ))
+            elif separate == 'forwardBack':
+                directionShortNames = np.unique(conditionStats['Direction'])
+                for directionName in directionShortNames:
+                    directionStats = conditionStats[conditionStats['Direction'] == directionName]
+                    y = [directionStats[directionStats['Outcome'] == on].size \
+                        for on in sorted(np.unique(directionStats['Outcome']))]
+                    x = [outcomeLongName[on] for on in sorted(np.unique(directionStats['Outcome']))]
+                    data.append(go.Bar(
+                        x=x,
+                        y=100 * y / sum(y),
+                        name=conditionLongName[conditionName] + ' ' + directionName + ' ' + str(len(directionStats)) + ' total trials'
                         ))
             else:
                 y = [conditionStats[conditionStats['Outcome'] == on].size \
@@ -889,12 +902,14 @@ def plot_trial_stats(trialStatsDf, usePlotly = True, separateLeftRight = False):
                 data.append(go.Bar(
                     x=x,
                     y=100 * y / sum(y),
-                    name=conditionLongName[conditionName]
+                    name=conditionLongName[conditionName] + ' ' + str(len(conditionStats)) + ' trials'
                     ))
 
+        #plotTitle = ['%d %s trials' % (totals[cn], conditionLongName[cn]) for cn in conditionShortNames]
+        #plotTitle = ' '.join(plotTitle)
         layout = {
             'barmode' : 'group',
-            'title' : 'Trial Outcome',
+            'title' : 'Overall Outcomes',
             'xaxis' : {
                 'title' : 'Outcome',
                 'titlefont' : {
@@ -928,7 +943,6 @@ def plot_trial_stats(trialStatsDf, usePlotly = True, separateLeftRight = False):
         return fig
     else:
         return None
-
 
 def runScriptAllFiles(scriptPath, folderPath):
     onlyfiles = [f for f in os.listdir(folderPath) if os.path.isfile(os.path.join(folderPath, f))]

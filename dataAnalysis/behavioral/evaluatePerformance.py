@@ -15,12 +15,12 @@ import copy
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--file', default = 'Murdoc_29_09_2017_10_48_48',  nargs='*')
-#fileNamesRaw = ['Murdoc_29_01_2018_11_17_16']
+#fileNamesRaw = ['Murdoc_17_10_2017_11_00_41']
 parser.add_argument('--folder', default = 'W:/ENG_Neuromotion_Shared/group/Proprioprosthetics/Training/Flywheel Logs/Murdoc')
 #fileDir = 'W:/ENG_Neuromotion_Shared/group/Proprioprosthetics/Training/Flywheel Logs/Murdoc'
 parser.add_argument('--fixMovedToError', dest='fixMovedToError', action='store_true')
 parser.add_argument('--outputFileName')
-# outputFileName = 'Murdoc_29_01_2018_11_17_16_Debug'
+# outputFileName = 'Murdoc_17_10_2017_11_00_41'
 parser.set_defaults(fixMovedToError = False)
 args = parser.parse_args()
 
@@ -161,13 +161,15 @@ for idx in trialStartIdx:
     trialStats.loc[idx, 'Outcome'] = trialRelevant.loc[idx + 3, 'Label']
 
 fi = plot_trial_stats(trialStats)
-outcomeStatsUrl = py.plot(fi, filename= outputFileName + '/buttonPressOutcomeStats',
+outcomeStatsUrl = py.plot(fi, filename= outputFileName + '/overallPercentages',
     fileopt="overwrite", sharing='public', auto_open=False)
 
-separateLeftRight = True
+fi = plot_trial_stats(trialStats, separate = 'leftRight')
+outcomeStatsByResponseUrl = py.plot(fi, filename= outputFileName + '/percentagesByResponse',
+    fileopt="overwrite", sharing='public', auto_open=False)
 
-fi = plot_trial_stats(trialStats, separateLeftRight = True)
-outcomeStatsByDirUrl = py.plot(fi, filename= outputFileName + '/buttonPressOutcomeStatsByDir',
+fi = plot_trial_stats(trialStats, separate = 'forwardBack')
+outcomeStatsByDirUrl = py.plot(fi, filename= outputFileName + '/percentagesByDir',
     fileopt="overwrite", sharing='public', auto_open=False)
 
 trialStats.to_csv(fileDir + '/' + outputFileName + '_trialStats.csv')
@@ -207,7 +209,7 @@ newNames = {
     }
 
 fi = plot_trial_stats(blockStats.rename(columns = newNames))
-blockOutcomeStatsUrl = py.plot(fi, filename= outputFileName + '/FirstInBlockOutcomeStats',
+blockOutcomeStatsUrl = py.plot(fi, filename= outputFileName + '/FirstInBlockPercentages',
     fileopt="overwrite", sharing='public', auto_open=False)
 
 blockLengths = blockStats['Length'].value_counts()
@@ -217,6 +219,83 @@ data = [go.Bar(
     )]
 
 blockBarUrl = py.plot(data, filename= outputFileName + '/blockBar',fileopt="overwrite", sharing='public', auto_open=False)
+
+# plot block stats by block trials
+
+outcomeLongName = {
+    'correct button' : 'Correct button',
+    'incorrect button' : 'Incorrect button',
+    'button timed out' : 'No press'
+    }
+outcomeShortNames = sorted(outcomeLongName.keys())
+
+extendedColumns = ['Result of trial %s' % str(s + 1) for s in range(max(blockStats['Length']))]
+extendedBlockStats = pd.DataFrame(0, index = outcomeShortNames,
+    columns = extendedColumns)
+
+trialIdx = 1
+totals = {name : 0 for name in extendedBlockStats}
+#idx, row = next(trialStats.iterrows())
+for idx, row in trialStats.iterrows():
+    if idx == 0:
+        if row['Condition'] == 'hard':
+            extendedBlockStats.loc[row['Outcome'], 'Result of trial 1'] = 1
+    else:
+        trialIdx = trialIdx + 1 if trialStats.loc[idx - 1, 'Type'] == row['Type'] else 1
+        if row['Condition'] == 'hard':
+            extendedBlockStats.loc[row['Outcome'], 'Result of trial %s' % str(trialIdx)] += 1
+
+#name = next(iter(extendedBlockStats))
+for name in extendedBlockStats:
+    totals[name] = extendedBlockStats[name].sum()
+    extendedBlockStats[name] = extendedBlockStats[name] / extendedBlockStats[name].sum()
+
+plotEntries = [' '.join([name, ', ', str(totals[name])]) + ' total trials' for name in extendedBlockStats]
+extendedBlockStats =extendedBlockStats.rename(index = outcomeLongName)
+
+#name = next(iter(outcomeShortNames))
+data = []
+for name in outcomeShortNames:
+    data.append(go.Bar(
+        x= plotEntries,
+        y= extendedBlockStats.loc[outcomeLongName[name], :],
+        name=outcomeLongName[name]
+        ))
+
+layout = {
+    'barmode' : 'group',
+    'title' : 'Trial Outcome',
+    'xaxis' : {
+        'title' : 'Outcome',
+        'titlefont' : {
+            'family' : 'Arial',
+            'size' : 30,
+            'color' : '#7f7f7f'
+            },
+        'tickfont' : {
+            'size' : 20
+            }
+        },
+    'yaxis' : {
+        'title' : 'Percentage',
+        'titlefont' : {
+            'family' : 'Arial',
+            'size' : 25,
+            'color' : '#7f7f7f'
+            },
+        'tickfont' : {
+            'size' : 20
+            }
+        },
+    'legend' : {
+        'font' : {
+            'size' : 20
+        }
+    }
+    }
+
+fig = go.Figure(data=data, layout=layout)
+extendedBlockOutcomesUrl = py.plot(fig, filename= outputFileName + '/percentagesWithinBlock',fileopt="overwrite", sharing='public', auto_open=False)
 
 # In[ ]:
 
@@ -234,8 +313,10 @@ else:
     fileIdPsthHard = fileId_from_url(psthUrlHard)
     fileIdOutcomes = fileId_from_url(outcomeStatsUrl)
     fileIdOutcomesByDir = fileId_from_url(outcomeStatsByDirUrl)
+    fileIdOutcomesByResponse = fileId_from_url(outcomeStatsByResponseUrl)
     fileIdBlockOutcomes = fileId_from_url(blockOutcomeStatsUrl)
     fileIdBlockBar = fileId_from_url(blockBarUrl)
+    fileIDExtendedBlockOutcomes = fileId_from_url(extendedBlockOutcomesUrl)
 
     boxes = [{
         'type': 'box',
@@ -269,14 +350,14 @@ else:
         'type': 'box',
         'boxType': 'plot',
         'fileId': fileIdOutcomes,
-        'title': 'OutcomesPlot'
+        'title': 'Overall Percentages'
     },
 
     {
         'type': 'box',
         'boxType': 'plot',
         'fileId': fileIdBlockOutcomes,
-        'title': 'BlockOutcomesPlot'
+        'title': 'First Trial in Every Block Percentages'
     },
 
     {
@@ -290,7 +371,21 @@ else:
         'type': 'box',
         'boxType': 'plot',
         'fileId': fileIdOutcomesByDir,
-        'title': 'OutcomesByDirPlot'
+        'title': 'Overall Percentages by Direction'
+    },
+
+    {
+        'type': 'box',
+        'boxType': 'plot',
+        'fileId': fileIdOutcomesByResponse,
+        'title': 'Overall Percentages by Response'
+    },
+
+    {
+        'type': 'box',
+        'boxType': 'plot',
+        'fileId': fileIDExtendedBlockOutcomes,
+        'title': 'Percentages in each Block'
     }]
 
 
@@ -302,8 +397,10 @@ else:
     my_dboard.insert(boxes[5], 'above', 1)
     my_dboard.insert(boxes[6], 'above', 1)
     my_dboard.insert(boxes[7], 'above', 1)
+    my_dboard.insert(boxes[8], 'above', 1)
+    my_dboard.insert(boxes[9], 'above', 1)
 
-    my_dboard['layout']['size'] = 10000
+    my_dboard['layout']['size'] = 1000
 
     dboardURL = py.dashboard_ops.upload(my_dboard, filename = outputFileName + '_dashboard', auto_open = False)
 
