@@ -49,7 +49,7 @@ for fileName in fileNamesRaw:
 filePaths = [fileDir + '/' + 'Log_' + fileName + '.txt' for fileName in fileNames]
 
 # TODO reading multiple files is broken
-log = readPiLog(filePaths, names = ['Label', 'Time', 'Details'], zeroTime = True, fixMovedToError = [fixMovedToError])
+log = readPiLog(filePaths, names = ['Label', 'Time', 'Details'], zeroTime = True, fixMovedToError = [fixMovedToError for i in filePaths])
 
 # In[3]:
 
