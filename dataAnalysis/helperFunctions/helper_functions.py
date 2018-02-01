@@ -1017,6 +1017,7 @@ def plot_raster(spikes, chans):
 
 def readPiLog(filePaths, names = None, zeroTime = False, fixMovedToError = [False]):
     logs = pd.DataFrame()
+    trialStatsAll = pd.DataFrame()
     for idx, filePath in enumerate(filePaths):
         if names is not None:
             log = pd.read_table(filePath, header = None, names = names)
@@ -1048,8 +1049,53 @@ def readPiLog(filePaths, names = None, zeroTime = False, fixMovedToError = [Fals
                 log.loc[idx, 'Label'] = 'incorrect button'
 
         log.drop_duplicates(inplace = True)
+        mask = log['Label'].str.contains('turnPedalRandom_1') | \
+            log['Label'].str.contains('turnPedalRandom_2') | \
+            log['Label'].str.contains('easy') | \
+            log['Label'].str.contains('hard') | \
+            log['Label'].str.endswith('correct button') | \
+            log['Label'].str.endswith('incorrect button') | \
+            log['Label'].str.endswith('button timed out')
+        trialRelevant = pd.DataFrame(log[mask]).reset_index()
+        # TODO: kludge, to avoid wait for corect button substring. fix
+        # later note: what does the above even mean?
+
+        # if the last trial didn't have time to end, remove its entries from the list of events
+        while not trialRelevant.iloc[-1, :]['Label'] in ['correct button', 'incorrect button', 'button timed out']:
+            trialRelevant.drop(trialRelevant.index[len(trialRelevant)-1], inplace = True)
+
+        def magnitude_lookup_table(difference):
+            if difference > 2e4:
+                return ('Long', 'Extension')
+            if difference > 0:
+                return ('Short', 'Extension')
+            if difference > -2e4:
+                return ('Short', 'Flexion')
+            else:
+                return ('Long', 'Flexion')
+
+        trialStartIdx = trialRelevant.index[trialRelevant['Label'].str.contains('turnPedalRandom_1')]
+        trialStats = pd.DataFrame(index = trialStartIdx, columns = ['First', 'Second', 'Magnitude', 'Direction', 'Condition', 'Type', 'Outcome'])
+
+        for idx in trialStartIdx:
+            assert trialRelevant.loc[idx, 'Label'] == 'turnPedalRandom_1'
+            trialStats.loc[idx, 'First'] = float(trialRelevant.loc[idx, 'Details'])
+            assert trialRelevant.loc[idx + 1, 'Label'] == 'turnPedalRandom_2'
+            trialStats.loc[idx, 'Second'] = float(trialRelevant.loc[idx + 1, 'Details'])
+            trialStats.loc[idx, 'Type'] = 0 if abs(trialStats.loc[idx, 'First']) < abs(trialStats.loc[idx, 'Second']) else 1
+            trialStats.loc[idx, 'Magnitude'] = magnitude_lookup_table(trialStats.loc[idx, 'First'] - trialStats.loc[idx, 'Second'])[0]
+            trialStats.loc[idx, 'Direction'] = magnitude_lookup_table(trialStats.loc[idx, 'First'] - trialStats.loc[idx, 'Second'])[1]
+            assert (trialRelevant.loc[idx + 2, 'Label'] == 'easy') | (trialRelevant.loc[idx + 2, 'Label'] == 'hard')
+            trialStats.loc[idx, 'Condition'] = trialRelevant.loc[idx + 2, 'Label']
+            assert (trialRelevant.loc[idx + 3, 'Label'] == 'correct button') | \
+                (trialRelevant.loc[idx + 3, 'Label'] == 'incorrect button') | \
+                (trialRelevant.loc[idx + 3, 'Label'] == 'button timed out')
+            trialStats.loc[idx, 'Outcome'] = trialRelevant.loc[idx + 3, 'Label']
+
         logs = pd.concat([logs, log], ignore_index = True)
-    return logs
+        trialStatsAll = pd.concat([trialStatsAll, trialStats], ignore_index = True)
+        print(trialStatsAll.shape)
+    return logs, trialStatsAll
 
 def plotConfusionMatrix(cm, classes,
                           normalize=False,

@@ -70,7 +70,9 @@ fileList = [
     'Murdoc_23_01_2018_11_17_00',
     'Murdoc_24_01_2018_10_56_58',
     'Murdoc_24_01_2018_11_25_40',
-    'Murdoc_26_01_2018_11_01_54'
+    'Murdoc_26_01_2018_11_01_54',
+    'Murdoc_29_01_2018_10_44_34',
+    'Murdoc_30_01_2018_10_39_15',
     ]
 
 fileDir = 'W:/ENG_Neuromotion_Shared/group/Proprioprosthetics/Training/Flywheel Logs/Murdoc'
