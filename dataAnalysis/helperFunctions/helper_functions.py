@@ -849,7 +849,7 @@ def plotPeristimulusTimeHistogram(eventDf, stimulus, names,
 
     return psthFig
 
-def plot_trial_stats(trialStatsDf, usePlotly = True, separate = None):
+def plot_trial_stats(trialStatsDf, usePlotly = True, separate = None, debugging = False, title = 'Global outcomes'):
     #trialStatsDf = trialStats
     if usePlotly:
         data = []
@@ -877,10 +877,12 @@ def plot_trial_stats(trialStatsDf, usePlotly = True, separate = None):
                     typeStats = conditionStats[conditionStats['Type'] == typeName]
                     y = [typeStats[typeStats['Outcome'] == on].size \
                         for on in sorted(np.unique(typeStats['Outcome']))]
+                    if debugging:
+                        print(y)
                     x = [outcomeLongName[on] for on in sorted(np.unique(typeStats['Outcome']))]
                     data.append(go.Bar(
                         x=x,
-                        y=100 * y / sum(y),
+                        y=y / sum(y),
                         name=conditionLongName[conditionName] + ' ' + typeLongName[typeName] + ' ' + str(len(typeStats)) + ' total trials'
                         ))
             elif separate == 'forwardBack':
@@ -889,19 +891,23 @@ def plot_trial_stats(trialStatsDf, usePlotly = True, separate = None):
                     directionStats = conditionStats[conditionStats['Direction'] == directionName]
                     y = [directionStats[directionStats['Outcome'] == on].size \
                         for on in sorted(np.unique(directionStats['Outcome']))]
+                    if debugging:
+                        print(y)
                     x = [outcomeLongName[on] for on in sorted(np.unique(directionStats['Outcome']))]
                     data.append(go.Bar(
                         x=x,
-                        y=100 * y / sum(y),
+                        y=y / sum(y),
                         name=conditionLongName[conditionName] + ' ' + directionName + ' ' + str(len(directionStats)) + ' total trials'
                         ))
             else:
                 y = [conditionStats[conditionStats['Outcome'] == on].size \
                     for on in sorted(np.unique(conditionStats['Outcome']))]
+                if debugging:
+                    print(y)
                 x = [outcomeLongName[on] for on in sorted(np.unique(conditionStats['Outcome']))]
                 data.append(go.Bar(
                     x=x,
-                    y=100 * y / sum(y),
+                    y=y / sum(y),
                     name=conditionLongName[conditionName] + ' ' + str(len(conditionStats)) + ' trials'
                     ))
 
@@ -909,7 +915,7 @@ def plot_trial_stats(trialStatsDf, usePlotly = True, separate = None):
         #plotTitle = ' '.join(plotTitle)
         layout = {
             'barmode' : 'group',
-            'title' : 'Overall Outcomes',
+            'title' : title,
             'xaxis' : {
                 'title' : 'Outcome',
                 'titlefont' : {
@@ -940,7 +946,7 @@ def plot_trial_stats(trialStatsDf, usePlotly = True, separate = None):
             }
 
         fig = go.Figure(data=data, layout=layout)
-        return fig
+        return fig, data, layout
     else:
         return None
 
@@ -1057,6 +1063,7 @@ def readPiLog(filePaths, names = None, zeroTime = False, fixMovedToError = [Fals
             log['Label'].str.endswith('incorrect button') | \
             log['Label'].str.endswith('button timed out')
         trialRelevant = pd.DataFrame(log[mask]).reset_index()
+
         # TODO: kludge, to avoid wait for corect button substring. fix
         # later note: what does the above even mean?
 
@@ -1075,17 +1082,24 @@ def readPiLog(filePaths, names = None, zeroTime = False, fixMovedToError = [Fals
                 return ('Long', 'Flexion')
 
         trialStartIdx = trialRelevant.index[trialRelevant['Label'].str.contains('turnPedalRandom_1')]
-        trialStats = pd.DataFrame(index = trialStartIdx, columns = ['First', 'Second', 'Magnitude', 'Direction', 'Condition', 'Type', 'Outcome'])
+        trialStats = pd.DataFrame(index = trialStartIdx, columns = ['First', 'Second', 'Magnitude', 'Direction', 'Condition', 'Type', 'Stimulus Duration', 'Outcome'])
 
         for idx in trialStartIdx:
             assert trialRelevant.loc[idx, 'Label'] == 'turnPedalRandom_1'
+            movementStartTime = trialRelevant.loc[idx, 'Time']
+
             trialStats.loc[idx, 'First'] = float(trialRelevant.loc[idx, 'Details'])
+
             assert trialRelevant.loc[idx + 1, 'Label'] == 'turnPedalRandom_2'
+
             trialStats.loc[idx, 'Second'] = float(trialRelevant.loc[idx + 1, 'Details'])
             trialStats.loc[idx, 'Type'] = 0 if abs(trialStats.loc[idx, 'First']) < abs(trialStats.loc[idx, 'Second']) else 1
             trialStats.loc[idx, 'Magnitude'] = magnitude_lookup_table(trialStats.loc[idx, 'First'] - trialStats.loc[idx, 'Second'])[0]
             trialStats.loc[idx, 'Direction'] = magnitude_lookup_table(trialStats.loc[idx, 'First'] - trialStats.loc[idx, 'Second'])[1]
             assert (trialRelevant.loc[idx + 2, 'Label'] == 'easy') | (trialRelevant.loc[idx + 2, 'Label'] == 'hard')
+            movementEndTime = trialRelevant.loc[idx + 2, 'Time']
+
+            trialStats.loc[idx, 'Stimulus Duration'] = movementEndTime - movementStartTime
             trialStats.loc[idx, 'Condition'] = trialRelevant.loc[idx + 2, 'Label']
             assert (trialRelevant.loc[idx + 3, 'Label'] == 'correct button') | \
                 (trialRelevant.loc[idx + 3, 'Label'] == 'incorrect button') | \

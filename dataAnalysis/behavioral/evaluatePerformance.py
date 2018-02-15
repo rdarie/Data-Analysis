@@ -1,4 +1,3 @@
-
 # coding: utf-8
 
 # In[1]:
@@ -12,6 +11,7 @@ import plotly.graph_objs as go
 import plotly.dashboard_objs as dashboard
 import argparse, pdb
 import copy
+import re
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--file', default = 'Murdoc_29_09_2017_10_48_48',  nargs='*')
@@ -20,7 +20,7 @@ parser.add_argument('--folder', default = 'W:/ENG_Neuromotion_Shared/group/Propr
 #fileDir = 'W:/ENG_Neuromotion_Shared/group/Proprioprosthetics/Training/Flywheel Logs/Murdoc'
 parser.add_argument('--fixMovedToError', dest='fixMovedToError', action='store_true')
 parser.add_argument('--outputFileName')
-# outputFileName = 'Murdoc_2017_12_14-21_PreBreak'
+# outputFileName = 'Murdoc_Debug'
 parser.set_defaults(fixMovedToError = False)
 args = parser.parse_args()
 
@@ -47,8 +47,6 @@ for fileName in fileNamesRaw:
 
 # In[2]:
 filePaths = [fileDir + '/' + 'Log_' + fileName + '.txt' for fileName in fileNames]
-
-# TODO reading multiple files is broken
 
 log, trialStats = readPiLog(filePaths, names = ['Label', 'Time', 'Details'], zeroTime = True, fixMovedToError = [fixMovedToError for i in filePaths])
 
@@ -118,19 +116,87 @@ psthUrlHard = py.plot(fi, filename= outputFileName + '/buttonPressPSTHHard',
 
 # In[ ]:
 
-fi = plot_trial_stats(trialStats)
+fi, _, _ = plot_trial_stats(trialStats)
 outcomeStatsUrl = py.plot(fi, filename= outputFileName + '/overallPercentages',
     fileopt="overwrite", sharing='public', auto_open=False)
 
-fi = plot_trial_stats(trialStats, separate = 'leftRight')
+fi, _, _ = plot_trial_stats(trialStats, separate = 'leftRight')
 outcomeStatsByResponseUrl = py.plot(fi, filename= outputFileName + '/percentagesByResponse',
     fileopt="overwrite", sharing='public', auto_open=False)
 
-fi = plot_trial_stats(trialStats, separate = 'forwardBack')
+fi, _, _ = plot_trial_stats(trialStats, separate = 'forwardBack')
 outcomeStatsByDirUrl = py.plot(fi, filename= outputFileName + '/percentagesByDir',
     fileopt="overwrite", sharing='public', auto_open=False)
 
 trialStats.to_csv(fileDir + '/' + outputFileName + '_trialStats.csv')
+
+############ trial durations
+totalMagnitude = np.abs(trialStats.loc[:, 'First'].values) + np.abs(trialStats.loc[:, 'Second'].values)
+totalMagnitude = np.asarray([float(item) for item in totalMagnitude])
+#totalMagnitude.dtype
+
+durations = trialStats.loc[:, 'Stimulus Duration'].values
+durations = np.asarray([float(item) for item in durations])
+
+# Create a trace
+trace = go.Scatter(
+    x = durations,
+    y = totalMagnitude,
+    mode = 'markers'
+)
+
+data = [trace]
+stimDurationUrl = py.plot(data, filename= outputFileName + '/stimDuration',
+    fileopt="overwrite", sharing='public', auto_open=False)
+
+
+# agregate by stimulus duration
+""" Work in progress"""
+shortestStimDur = trialStats['Stimulus Duration'].min()
+longestStimDur = trialStats['Stimulus Duration'].max()
+bins = np.linspace(shortestStimDur, longestStimDur, 10)
+binAssignments = np.digitize([float(value) for value in trialStats['Stimulus Duration']],bins)
+
+binNames = {i : '%2.1f to %2.1f' %(bins[i-1], bins[i]) for i in range(1,len(bins))}
+binNames.update({0: '< %2.1f' % bins[0]})
+binNames.update({len(bins): '> %2.1f' % bins[-1]})
+
+trialStatsGrouped = trialStats.groupby(binAssignments)
+
+stimBinnedStats = pd.DataFrame(0, index = outcomeLongNames,
+    columns = sorted(binNames.keys()))
+plotXAxisEntries = [value[1] for value in binNames.items()]
+#name, group = next(iter(trialStatsGrouped))
+for name, group in trialStatsGrouped:
+    #idx, row = next(group.iterrows())
+    _, data, layout = plot_trial_stats(group)
+    for datum in data:
+        #datum = next(iter(data))
+        findNums = re.search(r'\d+', datum['name']).span()
+        numTrialStart = findNums[0]
+        numTrialStop = findNums[1]
+        condition = datum['name'][:numTrialStart - 1]
+
+        if condition == 'Uncued by LED':
+            print(condition)
+            print(datum['x'])
+            print(datum['y'])
+
+            for idx, outcome in enumerate(datum['x']):
+                #idx, outcome = next(enumerate(datum['x']))
+                stimBinnedStats.loc[outcome, name] = datum['y'][idx]
+
+stimBinnedPlotData = []
+for name in outcomeLongNames:
+    stimBinnedPlotData.append(go.Bar(
+        x= plotXAxisEntries,
+        y= stimBinnedStats.loc[name, :],
+        name=name
+        ))
+
+layout['title'] = 'Outcomes by Stimulus Duration'
+fig = go.Figure(data=stimBinnedPlotData, layout=layout)
+stimBinnedPlotUrl = py.plot(fig, filename= outputFileName + '/percentagesByStimDur',fileopt="overwrite", sharing='public', auto_open=False)
 
 ################################################################################
 # Plot statistics about the blocks
@@ -166,7 +232,7 @@ newNames = {
     'Length' : 'Length'
     }
 
-fi = plot_trial_stats(blockStats.rename(columns = newNames))
+fi, _, _ = plot_trial_stats(blockStats.rename(columns = newNames), title = 'Outcomes for first trial of each block')
 blockOutcomeStatsUrl = py.plot(fi, filename= outputFileName + '/FirstInBlockPercentages',
     fileopt="overwrite", sharing='public', auto_open=False)
 
@@ -186,6 +252,7 @@ outcomeLongName = {
     'button timed out' : 'No press'
     }
 outcomeShortNames = sorted(outcomeLongName.keys())
+outcomeLongNames = sorted(outcomeLongName.values())
 
 extendedColumns = ['Result of trial %s' % str(s + 1) for s in range(max(blockStats['Length']))]
 extendedBlockStats = pd.DataFrame(0, index = outcomeShortNames,
@@ -208,21 +275,21 @@ for name in extendedBlockStats:
     totals[name] = extendedBlockStats[name].sum()
     extendedBlockStats[name] = extendedBlockStats[name] / extendedBlockStats[name].sum()
 
-plotEntries = [' '.join([name, ', ', str(totals[name])]) + ' total trials' for name in extendedBlockStats]
+plotXAxisEntries = [' '.join([name, ', ', str(totals[name])]) + ' total trials' for name in extendedBlockStats]
 extendedBlockStats =extendedBlockStats.rename(index = outcomeLongName)
 
 #name = next(iter(outcomeShortNames))
 data = []
 for name in outcomeShortNames:
     data.append(go.Bar(
-        x= plotEntries,
+        x= plotXAxisEntries,
         y= extendedBlockStats.loc[outcomeLongName[name], :],
         name=outcomeLongName[name]
         ))
 
 layout = {
     'barmode' : 'group',
-    'title' : 'Trial Outcome',
+    'title' : 'Block Outcomes, Trial by Trial',
     'xaxis' : {
         'title' : 'Outcome',
         'titlefont' : {
@@ -255,6 +322,7 @@ layout = {
 fig = go.Figure(data=data, layout=layout)
 extendedBlockOutcomesUrl = py.plot(fig, filename= outputFileName + '/percentagesWithinBlock',fileopt="overwrite", sharing='public', auto_open=False)
 
+""" """
 # In[ ]:
 
 existingDBoards = py.dashboard_ops.get_dashboard_names()
