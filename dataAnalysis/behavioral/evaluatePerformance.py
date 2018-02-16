@@ -69,12 +69,23 @@ tableUrl = py.plot(table, filename= outputFileName + '/buttonPressSummary',fileo
 # In[ ]:
 
 data = [go.Bar(
-            x=list(counts.index),
-            y=counts.values
+    x=list(counts.index),
+    y=counts.values
     )]
 
 barUrl = py.plot(data, filename= outputFileName + '/buttonPressBar',fileopt="overwrite", sharing='public', auto_open=False)
 #py.iplot(data, filename= fileName + '/buttonPressBar',fileopt="overwrite", sharing='public')
+
+choiceCounts = trialStats['Choice'].value_counts()
+data = [go.Bar(
+    x=choiceCounts.index,
+    y=choiceCounts.values
+    )]
+layout = go.Layout(
+    title='Choices'
+    )
+choiceBarUrl = py.plot(data, filename= outputFileName + '/choiceBar',fileopt="overwrite", sharing='public', auto_open=False)
+
 
 # In[ ]:
 
@@ -115,6 +126,13 @@ psthUrlHard = py.plot(fi, filename= outputFileName + '/buttonPressPSTHHard',
     fileopt="overwrite", sharing='public', auto_open=False)
 
 # In[ ]:
+outcomeLongName = {
+    'correct button' : 'Correct button',
+    'incorrect button' : 'Incorrect button',
+    'button timed out' : 'No press'
+    }
+outcomeShortNames = sorted(outcomeLongName.keys())
+outcomeLongNames = sorted(outcomeLongName.values())
 
 fi, _, _ = plot_trial_stats(trialStats)
 outcomeStatsUrl = py.plot(fi, filename= outputFileName + '/overallPercentages',
@@ -245,14 +263,6 @@ data = [go.Bar(
 blockBarUrl = py.plot(data, filename= outputFileName + '/blockBar',fileopt="overwrite", sharing='public', auto_open=False)
 
 # plot block stats by block trials
-
-outcomeLongName = {
-    'correct button' : 'Correct button',
-    'incorrect button' : 'Incorrect button',
-    'button timed out' : 'No press'
-    }
-outcomeShortNames = sorted(outcomeLongName.keys())
-outcomeLongNames = sorted(outcomeLongName.values())
 
 extendedColumns = ['Result of trial %s' % str(s + 1) for s in range(max(blockStats['Length']))]
 extendedBlockStats = pd.DataFrame(0, index = outcomeShortNames,

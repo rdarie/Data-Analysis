@@ -1082,7 +1082,7 @@ def readPiLog(filePaths, names = None, zeroTime = False, fixMovedToError = [Fals
                 return ('Long', 'Flexion')
 
         trialStartIdx = trialRelevant.index[trialRelevant['Label'].str.contains('turnPedalRandom_1')]
-        trialStats = pd.DataFrame(index = trialStartIdx, columns = ['First', 'Second', 'Magnitude', 'Direction', 'Condition', 'Type', 'Stimulus Duration', 'Outcome'])
+        trialStats = pd.DataFrame(index = trialStartIdx, columns = ['First', 'Second', 'Magnitude', 'Direction', 'Condition', 'Type', 'Stimulus Duration', 'Outcome', 'Choice'])
 
         for idx in trialStartIdx:
             assert trialRelevant.loc[idx, 'Label'] == 'turnPedalRandom_1'
@@ -1104,7 +1104,9 @@ def readPiLog(filePaths, names = None, zeroTime = False, fixMovedToError = [Fals
             assert (trialRelevant.loc[idx + 3, 'Label'] == 'correct button') | \
                 (trialRelevant.loc[idx + 3, 'Label'] == 'incorrect button') | \
                 (trialRelevant.loc[idx + 3, 'Label'] == 'button timed out')
+
             trialStats.loc[idx, 'Outcome'] = trialRelevant.loc[idx + 3, 'Label']
+            trialStats.loc[idx, 'Choice'] = trialRelevant.loc[idx + 3, 'Details']
 
         logs = pd.concat([logs, log], ignore_index = True)
         trialStatsAll = pd.concat([trialStatsAll, trialStats], ignore_index = True)
