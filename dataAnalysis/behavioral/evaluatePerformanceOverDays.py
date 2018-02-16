@@ -111,6 +111,14 @@ fileList = [
     'Murdoc_2018_02_08_16_21_26',
     ]
     """
+fileList = [
+['Murdoc_29_09_2017_10_48_48',
+'Murdoc_03_10_2017_10_54_10',
+'Murdoc_16_10_2017_11_08_06',
+'Murdoc_19_10_2017_10_28_51',
+'Murdoc_24_10_2017_10_55_56',],
+[]
+]
 sessionTimes = [name_to_date(name, 'old') for name in fileList[0]] + [name_to_date(name, 'new') for name in fileList[1]]
 #fileName = fileList[0]
 fileDir = 'W:/ENG_Neuromotion_Shared/group/Proprioprosthetics/Training/Flywheel Logs/Murdoc'
@@ -125,9 +133,16 @@ outcomeLongName = {
     'incorrect button' : 'Incorrect button',
     'button timed out' : 'No press'
     }
+choiceLongName = {
+    'green' : 'A > B button',
+    'red' : 'B > A button',
+    np.nan : 'No Press'
+    }
 
 overallTrialStats = pd.DataFrame(index = sessionTimes, columns = pd.MultiIndex.from_product([['Cued by LED', 'Uncued by LED'], ['Correct button', 'Incorrect button', 'No press']]))
 overallBlockStats = pd.DataFrame(index = sessionTimes, columns = pd.MultiIndex.from_product([['Cued by LED', 'Uncued by LED'], ['Correct button', 'Incorrect button', 'No press']]))
+
+overallTrialChoices = pd.DataFrame(index = sessionTimes, columns = pd.MultiIndex.from_product([['Cued by LED', 'Uncued by LED'], ['A > B button', 'B > A button', 'No Press']]))
 
 for idx, fileName in enumerate(fileList[0] + fileList[1]):
     try:
@@ -138,12 +153,24 @@ for idx, fileName in enumerate(fileList[0] + fileList[1]):
     for conditionName in np.unique(trialStats['Condition']):
         #condition is easy vs hard:
         conditionStats = trialStats[trialStats['Condition'] == conditionName]
+
+        #y counts the number of outcomes
         y = [conditionStats[conditionStats['Outcome'] == on].size \
-            for on in sorted(np.unique(conditionStats['Outcome']))]
-        x = [outcomeLongName[on] for on in sorted(np.unique(conditionStats['Outcome']))]
+            for on in (np.unique(conditionStats['Outcome']))]
+        #x is the name of the outcomes
+        x = [outcomeLongName[on] for on in (np.unique(conditionStats['Outcome']))]
 
         for subIdx, val in enumerate(y):
             overallTrialStats.loc[sessionTimes[idx], (conditionLongName[conditionName], x[subIdx])] = 100 * val / sum(y)
+
+        #y counts the number of choices
+        y = [conditionStats[conditionStats['Choice'] == on].size \
+            for on in (conditionStats['Choice'].unique())]
+        #x is the name of the choice
+        x = [choiceLongName[on] for on in (conditionStats['Choice'].unique())]
+
+        for subIdx, val in enumerate(y):
+            overallTrialChoices.loc[sessionTimes[idx], (conditionLongName[conditionName], x[subIdx])] = 100 * val / sum(y)
     try:
         blockStats = pd.read_csv(fileDir + '/' + fileName + '_blockStats.csv')
     except:
@@ -184,10 +211,8 @@ plt.title('All trials')
 plt.ylabel('Percentage')
 plt.xlabel('Day')
 
-
-
 fig = plt.gcf()
-fig.suptitle("Trials uncued by LED", fontsize=22)
+fig.suptitle("Trials uncued by LED - Outcomes", fontsize=22)
 plt.show()
 
 plt.subplot(2,1,1)
@@ -208,5 +233,35 @@ plt.ylabel('Percentage')
 
 plt.xlabel('Day')
 fig = plt.gcf()
-fig.suptitle("Trials cued by LED", fontsize=22)
+fig.suptitle("Trials cued by LED - Outcomes", fontsize=22)
+plt.show()
+
+# ----------------- choice stats --------------------------------------------------------------
+plt.subplot(1,1,1)
+
+for column in overallTrialChoices.loc[:, 'Uncued by LED']:
+    plt.plot(overallTrialChoices.loc[:, ('Uncued by LED', column)], 'o-', label = column)
+
+#plt.legend()
+plt.title('All trials')
+plt.ylabel('Percentage')
+plt.xlabel('Day')
+plt.legend(loc = 1)
+
+fig = plt.gcf()
+fig.suptitle("Trials uncued by LED - Choices", fontsize=22)
+plt.show()
+
+plt.subplot(1,1,1)
+for column in overallTrialChoices.loc[:, 'Cued by LED']:
+    plt.plot(overallTrialChoices.loc[:, ('Cued by LED', column)], 'o-', label = column)
+
+plt.legend()
+plt.title('All trials')
+plt.ylabel('Percentage')
+
+plt.xlabel('Day')
+plt.legend(loc = 1)
+fig = plt.gcf()
+fig.suptitle("Trials cued by LED - Choices", fontsize=22)
 plt.show()
