@@ -15,9 +15,11 @@ import re
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--file', default = 'Murdoc_29_09_2017_10_48_48',  nargs='*')
-#fileNamesRaw = ['Murdoc_14_12_2017_10_34_20', 'Murdoc_15_12_2017_11_26_51', 'Murdoc_15_12_2017_11_39_00', 'Murdoc_18_12_2017_10_48_36', 'Murdoc_19_12_2017_10_46_03', 'Murdoc_20_12_2017_10_33_22', 'Murdoc_20_12_2017_11_21_29', 'Murdoc_21_12_2017_10_51_20']
+#fileNamesRaw = ['Log_Murdoc_2018_02_28_17_53_20.txt']
+#fileNamesRaw = ['debugLog.txt']
 parser.add_argument('--folder', default = 'W:/ENG_Neuromotion_Shared/group/Proprioprosthetics/Training/Flywheel Logs/Murdoc')
 #fileDir = 'W:/ENG_Neuromotion_Shared/group/Proprioprosthetics/Training/Flywheel Logs/Murdoc'
+#fileDir = 'C:/Users/Radu/Desktop'
 parser.add_argument('--fixMovedToError', dest='fixMovedToError', action='store_true')
 parser.add_argument('--outputFileName')
 # outputFileName = 'Murdoc_Debug'
@@ -47,8 +49,10 @@ for fileName in fileNamesRaw:
 
 # In[2]:
 filePaths = [fileDir + '/' + 'Log_' + fileName + '.txt' for fileName in fileNames]
+#filePaths = [fileDir + '/' + fileName + '.txt' for fileName in fileNames]
 
-log, trialStats = readPiLog(filePaths, names = ['Label', 'Time', 'Details'], zeroTime = True, fixMovedToError = [fixMovedToError for i in filePaths])
+#log, trialStats = readPiLog(filePaths, names = ['Label', 'Time', 'Details'], zeroTime = True, fixMovedToError = [fixMovedToError for i in filePaths])
+log, trialStats = readPiJsonLog(filePaths, zeroTime = True)
 
 # In[3]:
 

@@ -1113,6 +1113,86 @@ def readPiLog(filePaths, names = None, zeroTime = False, fixMovedToError = [Fals
         print(trialStatsAll.shape)
     return logs, trialStatsAll
 
+def readPiJsonLog(filePaths, zeroTime = False):
+    logs = pd.DataFrame()
+    trialStatsAll = pd.DataFrame()
+
+    timeOffset = 0
+    for idx, filePath in enumerate(filePaths):
+        #idx, filePath = next(enumerate(filePaths))
+        log = pd.read_json(filePath, orient = 'records')
+
+        trialStartTime = 0
+        if zeroTime:
+            #zeroTime = True
+            if 'Time' in log.columns.values:
+                trialStartTime = log['Time'][0]
+                log['Time'] = log['Time'] - trialStartTime + timeOffset
+                timeOffset = timeOffset + log['Time'].iloc[-1]
+            else:
+                print('No time column found to zero!')
+
+        #log.drop_duplicates(inplace = True)
+        mask = log['Label'].str.contains('turnPedalCompound') | \
+            log['Label'].str.contains('goEasy') | \
+            log['Label'].str.contains('goHard') | \
+            log['Label'].str.endswith('correct button') | \
+            log['Label'].str.endswith('incorrect button') | \
+            log['Label'].str.endswith('button timed out')
+        trialRelevant = pd.DataFrame(log[mask]).reset_index()
+
+        # TODO: kludge, to avoid wait for corect button substring. fix
+        # later note: what does the above even mean?
+
+        # if the last trial didn't have time to end, remove its entries from the list of events
+        while not trialRelevant.iloc[-1, :]['Label'] in ['correct button', 'incorrect button', 'button timed out']:
+            trialRelevant.drop(trialRelevant.index[len(trialRelevant)-1], inplace = True)
+
+        def magnitude_lookup_table(difference):
+            if difference > 2e4:
+                return ('Long', 'Extension')
+            if difference > 0:
+                return ('Short', 'Extension')
+            if difference > -2e4:
+                return ('Short', 'Flexion')
+            else:
+                return ('Long', 'Flexion')
+
+        trialStartIdx = trialRelevant.index[trialRelevant['Label'].str.contains('turnPedalCompound')]
+        trialStats = pd.DataFrame(index = trialStartIdx, columns = ['First', 'Second', 'Magnitude', 'Direction', 'Condition', 'Type', 'Stimulus Duration', 'Outcome', 'Choice'])
+
+        for idx in trialStartIdx:
+            #idx = trialStartIdx[0]
+            assert trialRelevant.loc[idx, 'Label'] == 'turnPedalCompound'
+            movementStartTime = trialRelevant.loc[idx, 'Details']['movementOnset']
+
+            trialStats.loc[idx, 'First'] = float(trialRelevant.loc[idx, 'Details']['firstThrow'])
+            trialStats.loc[idx, 'Second'] = float(trialRelevant.loc[idx, 'Details']['secondThrow'])
+            trialStats.loc[idx, 'Type'] = 0 if abs(trialStats.loc[idx, 'First']) < abs(trialStats.loc[idx, 'Second']) else 1
+            trialStats.loc[idx, 'Magnitude'] = magnitude_lookup_table(trialStats.loc[idx, 'First'] - trialStats.loc[idx, 'Second'])[0]
+            trialStats.loc[idx, 'Direction'] = magnitude_lookup_table(trialStats.loc[idx, 'First'] - trialStats.loc[idx, 'Second'])[1]
+            assert (trialRelevant.loc[idx + 1, 'Label'] == 'goEasy') | (trialRelevant.loc[idx + 1, 'Label'] == 'goHard')
+            movementEndTime = trialRelevant.loc[idx, 'Details']['movementOff']
+
+            trialStats.loc[idx, 'Stimulus Duration'] = movementEndTime - movementStartTime
+
+            conditionLookUp = {
+                'goEasy' : 'easy',
+                'goHard' : 'hard'
+                }
+            trialStats.loc[idx, 'Condition'] = conditionLookUp[trialRelevant.loc[idx + 1, 'Label']]
+            assert (trialRelevant.loc[idx + 2, 'Label'] == 'correct button') | \
+                (trialRelevant.loc[idx + 2, 'Label'] == 'incorrect button') | \
+                (trialRelevant.loc[idx + 2, 'Label'] == 'button timed out')
+
+            trialStats.loc[idx, 'Outcome'] = trialRelevant.loc[idx + 2, 'Label']
+            trialStats.loc[idx, 'Choice'] = trialRelevant.loc[idx + 2, 'Details']
+
+        logs = pd.concat([logs, log], ignore_index = True)
+        trialStatsAll = pd.concat([trialStatsAll, trialStats], ignore_index = True)
+        print(trialStatsAll.shape)
+    return logs, trialStatsAll
+
 def plotConfusionMatrix(cm, classes,
                           normalize=False,
                           title='Confusion matrix',

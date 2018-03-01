@@ -72,32 +72,71 @@ def name_to_date(fileName, spec):
 """
 fileList = [
     [
-    'Murdoc_10_01_2018_11_35_56',
-    'Murdoc_11_01_2018_10_51_33',
-    'Murdoc_12_01_2018_10_43_35',
-    'Murdoc_12_01_2018_11_07_48',
-    'Murdoc_14_01_2018_12_10_56',
-    'Murdoc_15_01_2018_11_44_47',
-    'Murdoc_17_01_2018_11_16_09',
-    'Murdoc_18_01_2018_10_48_13',
-    'Murdoc_19_01_2018_10_53_20',
-    'Murdoc_22_01_2018_10_42_48',
-    'Murdoc_22_01_2018_11_06_37',
-    'Murdoc_23_01_2018_10_45_57',
-    'Murdoc_23_01_2018_11_17_00',
-    'Murdoc_24_01_2018_10_56_58',
-    'Murdoc_24_01_2018_11_25_40',
-    'Murdoc_26_01_2018_11_01_54',
-    'Murdoc_29_01_2018_10_44_34',
-    'Murdoc_30_01_2018_10_39_15',
+'Murdoc_01_12_2017_10_44_06',
+'Murdoc_04_12_2017_10_57_13',
+'Murdoc_06_12_2017_10_58_28',
+'Murdoc_07_12_2017_10_37_06',
+'Murdoc_07_12_2017_11_05_49',
+'Murdoc_08_12_2017_10_44_25',
+'Murdoc_08_12_2017_10_52_01',
+'Murdoc_10_12_2017_11_41_22',
+'Murdoc_10_12_2017_12_01_22',
+'Murdoc_11_12_2017_10_49_49',
+'Murdoc_11_12_2017_11_02_25',
+'Murdoc_12_12_2017_10_55_54',
+'Murdoc_13_12_2017_10_59_52',
+'Murdoc_13_12_2017_11_20_24',
+'Murdoc_14_12_2017_10_34_20',
+'Murdoc_15_12_2017_11_26_51',
+'Murdoc_15_12_2017_11_39_00',
+'Murdoc_18_12_2017_10_48_36',
+'Murdoc_19_12_2017_10_46_03',
+'Murdoc_20_12_2017_10_33_22',
+'Murdoc_20_12_2017_11_21_29',
+'Murdoc_21_12_2017_10_51_20',
+'Murdoc_10_01_2018_11_35_56',
+'Murdoc_11_01_2018_10_51_33',
+'Murdoc_12_01_2018_10_43_35',
+'Murdoc_12_01_2018_11_07_48',
+'Murdoc_14_01_2018_12_10_56',
+'Murdoc_15_01_2018_11_44_47',
+'Murdoc_17_01_2018_11_16_09',
+'Murdoc_18_01_2018_10_48_13',
+'Murdoc_19_01_2018_10_53_20',
+'Murdoc_22_01_2018_10_42_48',
+'Murdoc_22_01_2018_11_06_37',
+'Murdoc_23_01_2018_10_45_57',
+'Murdoc_23_01_2018_11_17_00',
+'Murdoc_24_01_2018_10_56_58',
+'Murdoc_24_01_2018_11_25_40',
+'Murdoc_25_01_2018_10_50_48',
+'Murdoc_25_01_2018_11_27_12',
+'Murdoc_26_01_2018_11_01_54',
+'Murdoc_29_01_2018_10_44_34',
+'Murdoc_29_01_2018_11_17_16',
+'Murdoc_30_01_2018_10_39_15',
+'Murdoc_30_01_2018_11_15_44',
+'Murdoc_30_01_2018_14_59_41',
     ],[
-    'Murdoc_2018_01_31_10_33_11',
-    'Murdoc_2018_02_01_10_38_28',
-    'Murdoc_2018_02_02_10_43_56',
-    'Murdoc_2018_02_05_10_45_40',
-    'Murdoc_2018_02_06_10_58_16',
-    'Murdoc_2018_02_07_10_21_54',
-    'Murdoc_2018_02_08_10_46_06',
+'Murdoc_2018_01_31_10_33_11',
+'Murdoc_2018_01_31_16_07_13',
+'Murdoc_2018_02_01_10_38_28',
+'Murdoc_2018_02_01_15_18_16',
+'Murdoc_2018_02_02_10_43_56',
+'Murdoc_2018_02_04_12_09_03',
+'Murdoc_2018_02_05_10_45_40',
+'Murdoc_2018_02_06_10_58_16',
+'Murdoc_2018_02_06_14_38_55',
+'Murdoc_2018_02_07_10_21_54',
+'Murdoc_2018_02_08_10_46_06',
+'Murdoc_2018_02_08_16_21_26',
+'Murdoc_2018_02_09_10_57_31',
+'Murdoc_2018_02_11_11_19_49',
+'Murdoc_2018_02_13_10_44_52',
+'Murdoc_2018_02_14_10_46_25',
+'Murdoc_2018_02_15_10_49_48',
+'Murdoc_2018_02_16_10_32_28',
+'Murdoc_2018_02_16_11_28_41'
     ]
     ]
 """
@@ -111,14 +150,6 @@ fileList = [
     'Murdoc_2018_02_08_16_21_26',
     ]
     """
-fileList = [
-['Murdoc_29_09_2017_10_48_48',
-'Murdoc_03_10_2017_10_54_10',
-'Murdoc_16_10_2017_11_08_06',
-'Murdoc_19_10_2017_10_28_51',
-'Murdoc_24_10_2017_10_55_56',],
-[]
-]
 sessionTimes = [name_to_date(name, 'old') for name in fileList[0]] + [name_to_date(name, 'new') for name in fileList[1]]
 #fileName = fileList[0]
 fileDir = 'W:/ENG_Neuromotion_Shared/group/Proprioprosthetics/Training/Flywheel Logs/Murdoc'
@@ -149,7 +180,7 @@ for idx, fileName in enumerate(fileList[0] + fileList[1]):
         trialStats = pd.read_csv(fileDir + '/' + fileName + '_trialStats.csv')
     except:
         trialStats = pd.read_csv(fileDir + '/' + 'Log_' + fileName + '_trialStats.csv')
-
+    print('Running %s' % fileName)
     for conditionName in np.unique(trialStats['Condition']):
         #condition is easy vs hard:
         conditionStats = trialStats[trialStats['Condition'] == conditionName]

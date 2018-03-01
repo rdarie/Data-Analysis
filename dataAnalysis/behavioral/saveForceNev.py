@@ -1,7 +1,7 @@
 import pickle
-from brpylib import NsxFile, NevFile, brpylib_ver
-dataDir = 'C:/Users/Radu/Desktop/Force Plate NEV'
-nevDataName = '/201801241426-Freely_Moving_ForcePlates-Array1480_Right_Side-Trail001.nev'
+from brPY.brpylib import NsxFile, NevFile, brpylib_ver
+dataDir = 'W:/ENG_Neuromotion_Shared/group/Starbuck_Bilateral_Recordings'
+nevDataName = '/201802191132-Starbuck-Freely_Moving_Force_Plates/201802191132-Starbuck-Freely_Moving_Force_Plates-Array1480_Right_Side-Trial001.nev'
 
 # Open nev data
 # Open file and extract headers
