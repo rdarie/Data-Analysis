@@ -1,25 +1,49 @@
-import pickle, sys, math, pdb
+import pickle, sys, math, pdb, h5py
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 from brPY.brpylib import NsxFile, NevFile, brpylib_ver
 dataDir = 'W:/ENG_Neuromotion_Shared/group/Monkey_Neural_Recordings/Starbuck_Bilateral_Recordings/201802191132-Starbuck-Freely_Moving_Force_Plates'
-pythonDataName = '/Force Plate Data/201802191105-Freely_Moving_Force_Plates_Starbuck001.p'
-nevDataName = '/201802191132-Starbuck-Freely_Moving_Force_Plates-Array1480_Right_Side-Trial001.mat.p'
+pythonDataName = '/Force Plate Data/201802191105-Freely_Moving_Force_Plates_Starbuck002.p'
+nevDataName = '/201802191132-Starbuck-Freely_Moving_Force_Plates-Array1480_Right_Side-Trial002.mat'
 
 sns.set(font_scale=1.5)
 #Load calibration data
-S = [0,1]
-S[1] = pd.read_csv('C:/Users/Radu/Documents/GitHub/Data-Analysis/D1550_1.acl', names = range(1,13), index_col = False, header = None).reindex(index = range(1,7))
-S[0] = pd.read_csv('C:/Users/Radu/Documents/GitHub/Data-Analysis/D1551_2.acl', names = range(1,13), index_col = False).reindex(index = range(1,7))
+calibrationFiles = [0,1]
+calibrationFiles[1] = 'C:/Users/Radu/Documents/GitHub/Data-Analysis/D1550_1.acl'
+calibrationFiles[0] = 'C:/Users/Radu/Documents/GitHub/Data-Analysis/D1551_2.acl'
 
-def readForceData(nevDataName):
+def readForceData(nevDataName, calibrationFiles):
+    """
+    Reads a .mat file derived from a NEV file and parses the force data inside
+    """
+    #read in calibration files
+    S = [0,1]
+    S[1] = pd.read_csv(calibrationFiles[0], names = range(1,13), index_col = False, header = None).reindex(index = range(1,7))
+    S[0] = pd.read_csv(calibrationFiles[1], names = range(1,13), index_col = False).reindex(index = range(1,7))
+    #
     # Open nev data
-    nevData= pickle.load(open(dataDir + nevDataName, 'rb'))
+    #
+    f = h5py.File(dataDir + nevDataName,'r')
+
+    timeStampsHDF = f.get('NEV/Data/SerialDigitalIO/TimeStampSec')
+    timeStamps = np.array(timeStampsHDF)
+    eventsHDF = f.get('NEV/Data/SerialDigitalIO/UnparsedData')
+    events = np.array(eventsHDF)
+    reasonHDF = f.get('NEV/Data/SerialDigitalIO/InsertionReason')
+    reason = np.array(reasonHDF)
+
+    nevData = {
+        'dig_events': {
+            'Data' : events,
+            'TimeStamps' : timeStamps,
+            'Reason' : reason
+            }
+        }
 
     nPoints = 3
-    # 48 * 16 bit blocks per reading
+    # 24 * 16 bit blocks per reading
     addressIdx = range(1,48*nPoints,2)
     matchStr = ['f123456789abba9876543210', 'f123456789abba987654321f', '0123456789abba987654321f', '0123456789abba9876543210']
     idNibbles = '' # will hold bits 4-7 of the high byte for each number assuming the reading frame starts with the first byte
@@ -63,31 +87,62 @@ def readForceData(nevDataName):
     addressIdxRange = range(1, 48, 2)
     channelNames = ['Ax0', 'Ay0', 'Az0', 'Bx0', 'By0', 'Bz0', 'Cx0', 'Cy0', 'Cz0', 'Dx0', 'Dy0', 'Dz0',
         'Ax1', 'Ay1', 'Az1', 'Bx1', 'By1', 'Bz1', 'Cx1', 'Cy1', 'Cz1', 'Dx1', 'Dy1', 'Dz1']
+    # Sanity check: sensor readings must be coming in in this order:
+    # [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0]
+    expectedSensorIdxOrder = list(range(12)) + list(range(12))[::-1]
+
     channelLookup = {i : channelNames[count] for count, i in enumerate(addressIdxRange)}
 
     # if there's junk at the end, discount the number of readings
     nReadings = math.floor(len(nevData['dig_events']['Data'][0]) / 48) - math.floor(startIdx / 48)
     #nReadings = 12500
-    blockIdxRange = range(0,48*nReadings,48) # 48 * 16 bit blocks per reading, the index of each block start
+    blockIdxRange = range(0,48*nReadings,48) # 24 * 16 bit or 48 byte long blocks per reading, the index of each block start
     NevProcData = {name : [0 for i in range(nReadings)] for name in channelNames + ['Sync']}
 
     #make an np.array that will hold the times at which the first block of each reading was read
     tNevSerial = np.zeros((nReadings,))
     # Collect nReadings worth of data:
     for readingIdx, blockIdx in enumerate(blockIdxRange):
-        for addressIdx in addressIdxRange:
+        # must perform sanity check that we are reading all 48 bits
+        sensorIds = ''
+        for byteIdx, addressIdx in enumerate(addressIdxRange):
             lowByte = nevData['dig_events']['Data'][0][blockIdx + addressIdx - 1 + startIdx]
             highByte = nevData['dig_events']['Data'][0][blockIdx + addressIdx + startIdx]
             lowByteStr = format(lowByte, '02x')
             highByteStr = format(highByte, '02x')
-            #print(lowByteStr + highByteStr)
+
+            #print('address index is %d' % addressIdx)
+            sensorIndex = int('0x' + highByteStr[0], 0)
+            sensorIndex = 0 if sensorIndex == 15 else sensorIndex # roll f's into 0's
+            sensorIds = sensorIds + highByteStr[0]
+            #print('sensor index is %d' % highByteIndex)
+
+            """
+            if expectedSensorIdxOrder[byteIdx] != sensorIndex:
+                # We somehow skipped a reading! This is really bad because it messes up the reading frame and any subsequent data.....
+
+                currIndexIntoNevData = blockIdx + addressIdx + startIdx
+                print('Reading frame error at %d' % (currIndexIntoNevData))
+                print('Offset is %d' % (expectedSensorIdxOrder[byteIdx] - sensorIndex))
+                newDataArray = np.insert(nevData['dig_events']['Data'][0], currIndexIntoNevData, 0)
+                nevData['dig_events']['Data'] = np.array([newDataArray])
+                NevProcData[channelLookup[addressIdx]][readingIdx] = 0
+                pdb.set_trace()
+                sensorIds = sensorIds[:-1] + format(expectedSensorIdxOrder[byteIdx], '01x')
+                #
+            #
+            else:
+                NevProcData[channelLookup[addressIdx]][readingIdx] = int(highByteStr[1] + lowByteStr[0] + lowByteStr[1], 16)
+            """
             NevProcData[channelLookup[addressIdx]][readingIdx] = int(highByteStr[1] + lowByteStr[0] + lowByteStr[1], 16)
             if addressIdx == 1:
                 #pdb.set_trace()
                 NevProcData['Sync'][readingIdx] = 1 if highByteStr[0] == 'f' else 0
                 tNevSerial[readingIdx] = nevData['dig_events']['TimeStamps'][blockIdx + addressIdx - 1 + startIdx]
 
-        #pdb.set_trace()
+        #print('Sensor ids were: ' + sensorIds)
+        #if sensorIds not in matchStr:
+        #    pdb.set_trace()
     """
     Zero the measurements
     """
@@ -115,27 +170,28 @@ def readForceData(nevDataName):
 
     return ProcData
 
-ProcData = readForceData(nevDataName)
-"""
-standardDeviation = {}
-for key in ProcData:
-    standardDeviation[key] = np.std(ProcData[key][:1000])
-plt.plot(NevProcData['Az1'] + NevProcData['Bz1'] + NevProcData['Cz1'] + NevProcData['Dz1'])
-plt.plot(NevProcData['Az0'] + NevProcData['Bz0'] + NevProcData['Cz0'] + NevProcData['Dz0'])
-"""
+ProcData = readForceData(nevDataName, calibrationFiles)
 
-plt.plot(ProcData['t'], ProcData['Fz0'], label = 'Force Plate 0')
-plt.plot(ProcData['t'], ProcData['Fz1'], label = 'Force Plate 1')
+plt.plot(ProcData['t'] - ProcData['t'][0], ProcData['Fz0'], label = 'Force Plate 0')
+plt.plot(ProcData['t'] - ProcData['t'][0], ProcData['Fz1'], label = 'Force Plate 1')
 
 # open data saved via python
-def readPythonForceData(pythonDataName):
+def readPythonForceData(pythonDataName, calibrationFiles):
+    #read in calibration files
+    S = [0,1]
+    S[1] = pd.read_csv(calibrationFiles[0], names = range(1,13), index_col = False, header = None).reindex(index = range(1,7))
+    S[0] = pd.read_csv(calibrationFiles[1], names = range(1,13), index_col = False).reindex(index = range(1,7))
+
     pythonData = pickle.load(open(dataDir + pythonDataName, 'rb'))
     nReadings = len(pythonData)
-    procPythonData = {name : [0 for i in range(nReadings)] for name in channelNames + ['Sync']}
-    addressIdxRange = range(1,48,2)
 
+    addressIdxRange = range(1, 48, 2)
     channelNames = ['Ax0', 'Ay0', 'Az0', 'Bx0', 'By0', 'Bz0', 'Cx0', 'Cy0', 'Cz0', 'Dx0', 'Dy0', 'Dz0',
         'Ax1', 'Ay1', 'Az1', 'Bx1', 'By1', 'Bz1', 'Cx1', 'Cy1', 'Cz1', 'Dx1', 'Dy1', 'Dz1']
+    channelLookup = {i : channelNames[count] for count, i in enumerate(addressIdxRange)}
+
+    procPythonData = {name : [0 for i in range(nReadings)] for name in channelNames + ['Sync']}
+    addressIdxRange = range(1,48,2)
 
     for readingIdx, datum in enumerate(pythonData[:nReadings]):
         for addressIdx in addressIdxRange:
@@ -171,18 +227,19 @@ def readPythonForceData(pythonDataName):
         }
     return calibPythonData
 
-calibPythonData = readPythonForceData(pythonDataName)
+calibPythonData = readPythonForceData(pythonDataName, calibrationFiles)
+
 plt.plot(calibPythonData['t'], calibPythonData['Fz1'], linestyle = '--', linewidth = 4, label = 'Force Plate 0 (Python)')
 plt.plot(calibPythonData['t'], calibPythonData['Fz0'], linestyle = '--', linewidth = 4, label = 'Force Plate 1 (Python)')
 
 plt.ylabel('Weight (g)')
 plt.xlabel('Time (sec)')
-plt.title('Force Plate Recording')
 plt.legend(loc = 1)
+plt.title('Force Plate Recording')
 plt.show()
-
-plt.plot(t, ProcData['Sync'], label = 'Sync Pulse')
-plt.plot(tPython, calibPythonData['Sync'], label = 'Sync Pulse (Python)')
+"""
+plt.plot(ProcData['t'] - ProcData['t'][0], ProcData['Sync'], label = 'Sync Pulse')
+plt.plot(calibPythonData['t'], calibPythonData['Sync'], label = 'Sync Pulse (Python)')
 plt.show()
 #plt.plot(np.diff(nevData['dig_events']['TimeStamps'][0]))
-#
+"""
