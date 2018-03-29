@@ -1133,7 +1133,8 @@ def readPiJsonLog(filePaths, zeroTime = False):
                 print('No time column found to zero!')
 
         #log.drop_duplicates(inplace = True)
-        mask = log['Label'].str.contains('turnPedalCompound') | \
+        mask = log['Label'].str.contains('turnPedalPhantomCompound') | \
+            log['Label'].str.contains('turnPedalCompound') | \
             log['Label'].str.contains('goEasy') | \
             log['Label'].str.contains('goHard') | \
             log['Label'].str.endswith('correct button') | \
@@ -1158,12 +1159,12 @@ def readPiJsonLog(filePaths, zeroTime = False):
             else:
                 return ('Long', 'Flexion')
 
-        trialStartIdx = trialRelevant.index[trialRelevant['Label'].str.contains('turnPedalCompound')]
+        trialStartIdx = trialRelevant.index[trialRelevant['Label'].str.contains('turnPedalPhantomCompound')] | trialRelevant.index[trialRelevant['Label'].str.contains('turnPedalCompound')]
         trialStats = pd.DataFrame(index = trialStartIdx, columns = ['First', 'Second', 'Magnitude', 'Direction', 'Condition', 'Type', 'Stimulus Duration', 'Outcome', 'Choice'])
 
         for idx in trialStartIdx:
             #idx = trialStartIdx[0]
-            assert trialRelevant.loc[idx, 'Label'] == 'turnPedalCompound'
+            assert trialRelevant.loc[idx, 'Label'] == 'turnPedalPhantomCompound' or trialRelevant.loc[idx, 'Label'] == 'turnPedalCompound'
             movementStartTime = trialRelevant.loc[idx, 'Details']['movementOnset']
 
             trialStats.loc[idx, 'First'] = float(trialRelevant.loc[idx, 'Details']['firstThrow'])
@@ -1190,7 +1191,7 @@ def readPiJsonLog(filePaths, zeroTime = False):
 
         logs = pd.concat([logs, log], ignore_index = True)
         trialStatsAll = pd.concat([trialStatsAll, trialStats], ignore_index = True)
-        print(trialStatsAll.shape)
+        #print(trialStatsAll.shape)
     return logs, trialStatsAll
 
 def plotConfusionMatrix(cm, classes,

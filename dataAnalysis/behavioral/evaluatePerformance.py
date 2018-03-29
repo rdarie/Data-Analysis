@@ -15,7 +15,7 @@ import re
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--file', default = 'Murdoc_29_09_2017_10_48_48',  nargs='*')
-#fileNamesRaw = ['Log_Murdoc_2018_02_28_17_53_20.txt']
+#fileNamesRaw = ['Log_Murdoc_2018_03_29_15_02_26.txt']
 #fileNamesRaw = ['debugLog.txt']
 parser.add_argument('--folder', default = 'W:/ENG_Neuromotion_Shared/group/Proprioprosthetics/Training/Flywheel Logs/Murdoc')
 #fileDir = 'W:/ENG_Neuromotion_Shared/group/Proprioprosthetics/Training/Flywheel Logs/Murdoc'
@@ -48,6 +48,7 @@ for fileName in fileNamesRaw:
     fileNames = fileNames + [fileName]
 
 # In[2]:
+
 filePaths = [fileDir + '/' + 'Log_' + fileName + '.txt' for fileName in fileNames]
 #filePaths = [fileDir + '/' + fileName + '.txt' for fileName in fileNames]
 
