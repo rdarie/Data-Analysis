@@ -23,6 +23,7 @@ import plotly.plotly as py
 import plotly.tools as tls
 import plotly.figure_factory as ff
 import plotly.graph_objs as go
+from brPY.brpylib import NsxFile, NevFile, brpylib_ver
 
 try:
     # for Python2

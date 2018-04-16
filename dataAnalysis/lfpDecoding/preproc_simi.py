@@ -41,6 +41,7 @@ simiFile = localDir + simiName
 # Read in simi text file
 simiTable = pd.read_table(simiFile)
 simiTable.drop(simiTable.index[[0]], inplace = True) # first rows contain giberrish
+
 # Read in NSP data from preproc_ns5
 data = pd.read_pickle(dataFile)
 

@@ -15,7 +15,7 @@ import re
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--file', default = 'Murdoc_29_09_2017_10_48_48',  nargs='*')
-#fileNamesRaw = ['Log_Murdoc_2018_03_29_15_02_26.txt']
+#fileNamesRaw = ['Log_Murdoc_2018_04_06_15_01_25.txt']
 #fileNamesRaw = ['debugLog.txt']
 parser.add_argument('--folder', default = 'W:/ENG_Neuromotion_Shared/group/Proprioprosthetics/Training/Flywheel Logs/Murdoc')
 #fileDir = 'W:/ENG_Neuromotion_Shared/group/Proprioprosthetics/Training/Flywheel Logs/Murdoc'
@@ -166,7 +166,7 @@ trace = go.Scatter(
     x = durations,
     y = totalMagnitude,
     mode = 'markers'
-)
+    )
 
 data = [trace]
 stimDurationUrl = py.plot(data, filename= outputFileName + '/stimDuration',
@@ -174,7 +174,6 @@ stimDurationUrl = py.plot(data, filename= outputFileName + '/stimDuration',
 
 
 # agregate by stimulus duration
-""" Work in progress"""
 shortestStimDur = trialStats['Stimulus Duration'].min()
 longestStimDur = trialStats['Stimulus Duration'].max()
 bins = np.linspace(shortestStimDur, longestStimDur, 10)
@@ -220,6 +219,60 @@ for name in outcomeLongNames:
 layout['title'] = 'Outcomes by Stimulus Duration'
 fig = go.Figure(data=stimBinnedPlotData, layout=layout)
 stimBinnedPlotUrl = py.plot(fig, filename= outputFileName + '/percentagesByStimDur',fileopt="overwrite", sharing='public', auto_open=False)
+
+# Aggregate by stimulus pair
+def getStimID(trialStats):
+    #trialStats.columns
+    allMagnitudes = pd.concat([trialStats.loc[:,'First'].abs(), trialStats.loc[:,'Second'].abs()], ignore_index = True)
+    binEdges = np.linspace(0.99 * allMagnitudes.min(), 1.01 * allMagnitudes.max(), 10)
+    firstStimID  = pd.cut(trialStats.loc[:,'First'].abs(), binEdges, labels = [i for i in range(9)])
+    secondStimID = pd.cut(trialStats.loc[:,'Second'].abs(), binEdges, labels = [i for i in range(9)])
+    stimIDs = pd.Series([(firstStimID[i], secondStimID[i]) for i in trialStats.index])
+    return stimIDs
+
+if "Stimulus ID Pair" not in trialStats.columns:
+    stimIDs = getStimID(trialStats)
+    trialStats.insert(0, "Stimulus ID Pair", stimIDs)
+
+trialStatsByStimID = trialStats.groupby(by="Stimulus ID Pair")
+type(trialStatsByStimID.size())
+
+
+plotXAxisEntries = ['(%d, %d), %d total' % (name[0], name[1], count) for name, count in trialStatsByStimID.size().items()]
+
+pairBinnedStats = pd.DataFrame(0, index = outcomeLongNames,
+    columns = sorted(trialStatsByStimID.groups.keys()))
+#name, group = next(iter(trialStatsByStimID))
+for name, group in trialStatsByStimID:
+    #idx, row = next(group.iterrows())
+    _, data, layout = plot_trial_stats(group)
+    for datum in data:
+        #datum = next(iter(data))
+        findNums = re.search(r'\d+', datum['name']).span()
+        numTrialStart = findNums[0]
+        numTrialStop = findNums[1]
+        condition = datum['name'][:numTrialStart - 1]
+
+        if condition == 'Uncued by LED':
+            print(condition)
+            print(datum['x'])
+            print(datum['y'])
+
+            for idx, outcome in enumerate(datum['x']):
+                #idx, outcome = next(enumerate(datum['x']))
+                pairBinnedStats.loc[outcome, name] = datum['y'][idx]
+
+pairBinnedPlotData = []
+for name in outcomeLongNames:
+    pairBinnedPlotData.append(go.Bar(
+        x= plotXAxisEntries,
+        y= pairBinnedStats.loc[name, :],
+        name=name
+        ))
+
+layout['title'] = 'Outcomes by Stimulus Pair'
+fig = go.Figure(data=pairBinnedPlotData, layout=layout)
+stimBinnedPlotUrl = py.plot(fig, filename= outputFileName + '/percentagesByStimPair',fileopt="overwrite", sharing='public', auto_open=False)
 
 ################################################################################
 # Plot statistics about the blocks
@@ -336,6 +389,7 @@ layout = {
 
 fig = go.Figure(data=data, layout=layout)
 extendedBlockOutcomesUrl = py.plot(fig, filename= outputFileName + '/percentagesWithinBlock',fileopt="overwrite", sharing='public', auto_open=False)
+
 
 """ """
 # In[ ]:

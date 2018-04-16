@@ -4,8 +4,10 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 from brPY.brpylib import NsxFile, NevFile, brpylib_ver
+from dataAnalysis.helperFunctions.helper_functions import getNSxData
 dataDir = 'W:/ENG_Neuromotion_Shared/group/Monkey_Neural_Recordings/Starbuck_Bilateral_Recordings/201802191132-Starbuck-Freely_Moving_Force_Plates'
 pythonDataName = '/Force Plate Data/201802191105-Freely_Moving_Force_Plates_Starbuck002.p'
+simiNs5 = '/201802191132-Starbuck-Freely_Moving_Force_Plates-Array1514_Left_Side-Trial002.ns5'
 nevDataName = '/201802191132-Starbuck-Freely_Moving_Force_Plates-Array1480_Right_Side-Trial002.mat'
 
 sns.set(font_scale=1.5)
@@ -100,16 +102,39 @@ def readForceData(nevDataName, calibrationFiles):
     NevProcData = {name : [0 for i in range(nReadings)] for name in channelNames + ['Sync']}
 
     #make an np.array that will hold the times at which the first block of each reading was read
-    tNevSerial = np.zeros((nReadings,))
+    tNevSerial = []
     # Collect nReadings worth of data:
+
+    #should we give up trying to pad missing bytes?
+    giveUp = False
+    # find addresses in future bytes to check for possibly corrupt data
+    def forwardAddresses(nevData, lookAhead):
+        ret = [ format(i, '02x')[0] for i in nevData[lookAhead] ]
+        ret = [ i if i != 'f' else '0' for i in ret]
+        return ''.join(ret)
+
+    def isValidAddressSequence(sequence):
+        return sequence in '0123456789abba98765432100123456789abba9876543210'
+
     for readingIdx, blockIdx in enumerate(blockIdxRange):
         # must perform sanity check that we are reading all 48 bits
         sensorIds = ''
         for byteIdx, addressIdx in enumerate(addressIdxRange):
+
             lowByte = nevData['dig_events']['Data'][0][blockIdx + addressIdx - 1 + startIdx]
             highByte = nevData['dig_events']['Data'][0][blockIdx + addressIdx + startIdx]
             lowByteStr = format(lowByte, '02x')
             highByteStr = format(highByte, '02x')
+            if addressIdx == 1:
+                #pdb.set_trace()
+                currTimeStamp = nevData['dig_events']['TimeStamps'][blockIdx + addressIdx - 1 + startIdx]
+                if type(currTimeStamp) == np.ndarray:
+                    currTimeStamp = currTimeStamp[0]
+                #print(type(currTimeStamp))
+                if currTimeStamp == 0:
+                    break
+                NevProcData['Sync'][readingIdx] = 0 if highByteStr[0] == 'f' else 1
+                tNevSerial.append(currTimeStamp)
 
             #print('address index is %d' % addressIdx)
             sensorIndex = int('0x' + highByteStr[0], 0)
@@ -117,28 +142,38 @@ def readForceData(nevDataName, calibrationFiles):
             sensorIds = sensorIds + highByteStr[0]
             #print('sensor index is %d' % highByteIndex)
 
-            """
-            if expectedSensorIdxOrder[byteIdx] != sensorIndex:
+            if expectedSensorIdxOrder[byteIdx] != sensorIndex and not giveUp:
                 # We somehow skipped a reading! This is really bad because it messes up the reading frame and any subsequent data.....
-
                 currIndexIntoNevData = blockIdx + addressIdx + startIdx
+                lookAhead = [currIndexIntoNevData + i for i in range(-2, 48, 2)]
                 print('Reading frame error at %d' % (currIndexIntoNevData))
-                print('Offset is %d' % (expectedSensorIdxOrder[byteIdx] - sensorIndex))
-                newDataArray = np.insert(nevData['dig_events']['Data'][0], currIndexIntoNevData, 0)
-                nevData['dig_events']['Data'] = np.array([newDataArray])
+                forwardPeek = forwardAddresses(nevData['dig_events']['Data'][0], lookAhead)
+                print(' Forward look is : ' + forwardPeek)
+
+                #if all zeros, we're at the end, give up
+                if '0' * (len(forwardPeek) - 1) == forwardPeek[1:]:
+                    giveUp = True
+
+                while not isValidAddressSequence( forwardPeek ) and not giveUp:
+                    #pdb.set_trace()
+                    newAddressByte = int ( '0x' + format( expectedSensorIdxOrder[byteIdx], '01x') + '0', 0)
+                    nevData['dig_events']['Data'] = np.array([np.insert(nevData['dig_events']['Data'][0], currIndexIntoNevData, newAddressByte )])
+                    nevData['dig_events']['TimeStamps'] = np.array(np.insert(nevData['dig_events']['TimeStamps'], currIndexIntoNevData, 0 ))
+                    forwardPeek = forwardAddresses(nevData['dig_events']['Data'][0], lookAhead)
+                    print(forwardPeek)
+
                 NevProcData[channelLookup[addressIdx]][readingIdx] = 0
-                pdb.set_trace()
                 sensorIds = sensorIds[:-1] + format(expectedSensorIdxOrder[byteIdx], '01x')
                 #
             #
             else:
                 NevProcData[channelLookup[addressIdx]][readingIdx] = int(highByteStr[1] + lowByteStr[0] + lowByteStr[1], 16)
-            """
-            NevProcData[channelLookup[addressIdx]][readingIdx] = int(highByteStr[1] + lowByteStr[0] + lowByteStr[1], 16)
-            if addressIdx == 1:
-                #pdb.set_trace()
-                NevProcData['Sync'][readingIdx] = 1 if highByteStr[0] == 'f' else 0
-                tNevSerial[readingIdx] = nevData['dig_events']['TimeStamps'][blockIdx + addressIdx - 1 + startIdx]
+
+        else:
+            continue  # executed if the loop ended normally (no break)
+        break  # executed if 'continue' was skipped (break)
+
+            #NevProcData[channelLookup[addressIdx]][readingIdx] = int(highByteStr[1] + lowByteStr[0] + lowByteStr[1], 16)
 
         #print('Sensor ids were: ' + sensorIds)
         #if sensorIds not in matchStr:
@@ -165,15 +200,15 @@ def readForceData(nevDataName, calibrationFiles):
         'My1' : ( (NevProcData['Ax1'] * S[1].loc[5,1]) + (NevProcData['Ay1'] * S[1].loc[5,2]) + (NevProcData['Az1'] * S[1].loc[5,3]) + (NevProcData['Bx1'] * S[1].loc[5,4])+ (NevProcData['By1'] * S[1].loc[5,5])+ (NevProcData['Bz1'] * S[1].loc[5,6]) + (NevProcData['Cx1'] * S[1].loc[5,7]) + (NevProcData['Cy1'] * S[1].loc[5,8]) + (NevProcData['Cz1'] * S[1].loc[5,9]) + (NevProcData['Dx1'] * S[1].loc[5,10])+ (NevProcData['Dy1'] * S[1].loc[5,11]) + (NevProcData['Dz1'] * S[1].loc[5,12]) ) * 0.113, #Ino N*m
         'Mz1' : ( (NevProcData['Ax1'] * S[1].loc[6,1]) + (NevProcData['Ay1'] * S[1].loc[6,2]) + (NevProcData['Az1'] * S[1].loc[6,3]) + (NevProcData['Bx1'] * S[1].loc[6,4])+ (NevProcData['By1'] * S[1].loc[6,5])+ (NevProcData['Bz1'] * S[1].loc[6,6]) + (NevProcData['Cx1'] * S[1].loc[6,7]) + (NevProcData['Cy1'] * S[1].loc[6,8]) + (NevProcData['Cz1'] * S[1].loc[6,9]) + (NevProcData['Dx1'] * S[1].loc[6,10])+ (NevProcData['Dy1'] * S[1].loc[6,11]) + (NevProcData['Dz1'] * S[1].loc[6,12]) ) * 0.113, #Ino N*m
         'Sync': NevProcData['Sync'],
-        't' : tNevSerial
+        't' : np.asarray(tNevSerial)
         }
 
     return ProcData
 
 ProcData = readForceData(nevDataName, calibrationFiles)
 
-plt.plot(ProcData['t'] - ProcData['t'][0], ProcData['Fz0'], label = 'Force Plate 0')
-plt.plot(ProcData['t'] - ProcData['t'][0], ProcData['Fz1'], label = 'Force Plate 1')
+plt.plot(ProcData['t'], ProcData['Fz0'], label = 'Force Plate 0', marker = 'o')
+plt.plot(ProcData['t'], ProcData['Fz1'], label = 'Force Plate 1', marker = 'o')
 
 # open data saved via python
 def readPythonForceData(pythonDataName, calibrationFiles):
@@ -229,17 +264,73 @@ def readPythonForceData(pythonDataName, calibrationFiles):
 
 calibPythonData = readPythonForceData(pythonDataName, calibrationFiles)
 
-plt.plot(calibPythonData['t'], calibPythonData['Fz1'], linestyle = '--', linewidth = 4, label = 'Force Plate 0 (Python)')
-plt.plot(calibPythonData['t'], calibPythonData['Fz0'], linestyle = '--', linewidth = 4, label = 'Force Plate 1 (Python)')
+plt.plot(calibPythonData['t'] + ProcData['t'][0], calibPythonData['Fz1'], linestyle = '--', linewidth = 4, label = 'Force Plate 0 (Python)')
+plt.plot(calibPythonData['t'] + ProcData['t'][0], calibPythonData['Fz0'], linestyle = '--', linewidth = 4, label = 'Force Plate 1 (Python)')
 
 plt.ylabel('Weight (g)')
 plt.xlabel('Time (sec)')
 plt.legend(loc = 1)
 plt.title('Force Plate Recording')
 plt.show()
+
+
 """
-plt.plot(ProcData['t'] - ProcData['t'][0], ProcData['Sync'], label = 'Sync Pulse')
-plt.plot(calibPythonData['t'], calibPythonData['Sync'], label = 'Sync Pulse (Python)')
+plt.plot(np.diff(nevData['dig_events']['TimeStamps'][0]))
+"""
+
+intervals = np.diff(ProcData['t'][ProcData['t'] != 0])
+sns.distplot(intervals)
+plt.xlabel('Reading Interval (s)')
+plt.ylabel('Count')
+plt.title('NEV Timestamps')
 plt.show()
-#plt.plot(np.diff(nevData['dig_events']['TimeStamps'][0]))
+
 """
+Nonfunctional brpy code...
+
+startTime_s = ProcData['t'][0]
+dataLength_s = ProcData['t'][ProcData['t'] != 0][-1] - startTime_s
+elecIds = 136
+#simi_triggers = getNSxData(dataDir + simiNs5, 98, start_time_s, data_time_s)
+filePath = dataDir + simiNs5
+def getNSxData(filePath, elecIds, startTime_s, dataLength_s, downsample = 1):
+    # Version control
+    brpylib_ver_req = "1.3.1"
+    if brpylib_ver.split('.') < brpylib_ver_req.split('.'):
+        raise Exception("requires brpylib " + brpylib_ver_req + " or higher, please use latest version")
+
+    # Open file and extract headers
+    nsx_file = NsxFile(filePath)
+
+    # Extract data - note: data will be returned based on *SORTED* elec_ids, see cont_data['elec_ids']
+    channelData = nsx_file.getdata(elecIds, startTime_s, dataLength_s, downsample)
+    #nsx_file.extended_headers[-1]
+    channelData['data'] = pd.DataFrame(channelData['data'].transpose())
+    channelData['t'] = channelData['start_time_s'] + np.arange(channelData['data'].shape[0]) / channelData['samp_per_s']
+    channelData['badData'] = dict()
+    channelData['spectrum'] = pd.DataFrame({'PSD': [], 't': [], 'fr': [], 'Labels': []})
+    channelData['basic_headers'] = nsx_file.basic_header
+    channelData['extended_headers'] =  nsx_file.extended_headers
+    # Close the nsx file now that all data is out
+    nsx_file.close()
+
+    return channelData
+"""
+
+#Sync Pulses
+procDataMask = np.logical_and(ProcData['t']!=0 , ProcData['t'] < 20)
+plt.plot(ProcData['t'][procDataMask], np.array(ProcData['Sync'])[procDataMask], label = 'Sync Pulse (NEV Serial)')
+
+simiTriggersPath = 'E:/temp/201802191132-Starbuck-Freely_Moving_Force_Plates-Simi_Triggers.h5'
+f = h5py.File(simiTriggersPath,'r')
+simiTriggers = np.array(f.get('simiTriggers'))
+simiTime = np.arange(len(simiTriggers)) / 3e4
+simiMask = simiTime < 20
+plt.plot(simiTime[simiMask][::10],simiTriggers[simiMask][::10] / simiTriggers.max(), label = 'Sync Pulse (NS5)')
+
+#pythonDataMask = calibPythonData['t'] < 100
+#plt.plot(calibPythonData['t'][pythonDataMask] + ProcData['t'][0], np.array(calibPythonData['Sync'])[pythonDataMask], label = 'Sync Pulse (Python)')
+
+plt.legend()
+
+plt.show()
