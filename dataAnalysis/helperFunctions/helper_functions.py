@@ -182,7 +182,7 @@ def fillInOverflow(channelData, plotting = False):
             plt.plot(fixedAddAverageDip)
             plt.show()
 
-        channelData['data'].loc(idx, :) = fixedAddAverageDip
+        channelData['data'].loc[idx, :] = fixedAddAverageDip
     return channelData
 
 def getBadContinuousMask(channelData, plotting = False, smoothing_ms = 1, badThresh = 1e-3, consecLen = 4):
