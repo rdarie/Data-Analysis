@@ -149,7 +149,7 @@ def fillInOverflow(channelData, plotting = False):
         rowDiff.fillna(0, inplace = True)
         # negative dips are the start of the dip
 
-        dipCutoff = 3e3 # 3000 uV jumps are probably caused by artifact
+        dipCutoff = 4e3 # 3000 uV jumps are probably caused by artifact
         dipThresh = (dipCutoff - rowDiff.min()) / (rowDiff.max() - rowDiff.min())
         dipStarts = peakutils.indexes(-rowDiff, thres=dipThresh )
         dipEnds = peakutils.indexes(rowDiff, thres=dipThresh )
@@ -163,26 +163,30 @@ def fillInOverflow(channelData, plotting = False):
             plt.plot(dipEnds, row.iloc[dipEnds], '*')
             plt.show()
 
-        nDips = len(dipStarts)
-        averageDip = (-rowDiff.iloc[dipStarts].values + rowDiff.iloc[dipEnds[:nDips]].values) / 2
-
-        fixedAddAverageDip = row;
-        for dipIdx, dipStartIdx in enumerate(dipStarts):
-            #pdb.set_trace()
+        if dipStarts is not None:
+            nDips = len(dipStarts)
             try:
-                fixedAddAverageDip.iloc[dipStartIdx:dipEnds[dipIdx]] = \
-                    row.iloc[dipStartIdx:dipEnds[dipIdx]].values + \
-                    averageDip[dipIdx]
+                averageDip = (-rowDiff.iloc[dipStarts].values + rowDiff.iloc[dipEnds[:nDips]].values) / 2
             except:
                 pdb.set_trace()
 
-        if dipStarts is not None and plotting:
-            plt.figure()
-            plt.plot(row)
-            plt.plot(fixedAddAverageDip)
-            plt.show()
+            fixedAddAverageDip = row;
+            for dipIdx, dipStartIdx in enumerate(dipStarts):
+                #pdb.set_trace()
+                try:
+                    fixedAddAverageDip.iloc[dipStartIdx:dipEnds[dipIdx]] = \
+                        row.iloc[dipStartIdx:dipEnds[dipIdx]].values + \
+                        averageDip[dipIdx]
+                except:
+                    pdb.set_trace()
 
-        channelData['data'].loc[idx, :] = fixedAddAverageDip
+            if dipStarts is not None and plotting:
+                plt.figure()
+                plt.plot(row)
+                plt.plot(fixedAddAverageDip)
+                plt.show()
+
+            channelData['data'].loc[idx, :] = fixedAddAverageDip
     return channelData
 
 def getBadContinuousMask(channelData, plotting = False, smoothing_ms = 1, badThresh = 1e-3, consecLen = 4):
