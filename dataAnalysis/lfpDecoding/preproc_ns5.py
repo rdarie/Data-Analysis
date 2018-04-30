@@ -1,18 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Example of how to extract and plot continuous data saved in Blackrock nsX data files
-current version: 1.1.1 --- 07/22/2016
+Based on example of how to extract and plot continuous data saved in Blackrock nsX data files
+from brpy version: 1.1.1 --- 07/22/2016
 
-@author: Mitch Frankel - Blackrock Microsystems
-"""
-
-"""
-Version History:
-v1.0.0 - 07/05/2016 - initial release - requires brpylib v1.0.0 or higher
-v1.1.0 - 07/12/2016 - addition of version checking for brpylib starting with v1.2.0
-                      minor code cleanup for readability
-v1.1.1 - 07/22/2016 - now uses 'samp_per_sec' as returned by NsxFile.getdata()
-                      minor modifications to use close() functionality of NsxFile class
+@author: Radu Darie
 """
 
 import matplotlib, math
@@ -33,7 +24,6 @@ args = parser.parse_args()
 argWinLen = float(args.winLen)
 argStepLen = float(args.stepLen)
 argFile = args.file
-
 
 print("Preprocessing spectral data with a window length of {:4.4f} seconds and a step length of {:4.4f} seconds".format(argWinLen, argStepLen))
 # Reformat figures

@@ -7,7 +7,7 @@ from brPY.brpylib import NsxFile, NevFile, brpylib_ver
 from dataAnalysis.helperFunctions.helper_functions import getNSxData
 dataDir = 'W:/ENG_Neuromotion_Shared/group/Monkey_Neural_Recordings/Starbuck_Bilateral_Recordings/201802191132-Starbuck-Freely_Moving_Force_Plates'
 pythonDataName = '/Force Plate Data/201802191105-Freely_Moving_Force_Plates_Starbuck002.p'
-simiNs5 = '/201802191132-Starbuck-Freely_Moving_Force_Plates-Array1514_Left_Side-Trial002.ns5'
+simiTriggersPath = 'E:/temp/201802191132-Starbuck-Freely_Moving_Force_Plates-Simi_Triggers-Trial002.h5'
 nevDataName = '/201802191132-Starbuck-Freely_Moving_Force_Plates-Array1480_Right_Side-Trial002.mat'
 
 sns.set(font_scale=1.5)
@@ -53,8 +53,10 @@ def readForceData(nevDataName, calibrationFiles):
     for idx in addressIdx:
         # the top 8 bits of each 16 bit number is the high byte and it contains the counter (unless the reading frame starts with two, we handle that case below)
         highByte = format(nevData['dig_events']['Data'][0][idx], '02x')
+        print(highByte)
         # make a list of the nibbles that should contain the counter
         idNibbles = idNibbles + highByte[0]
+        print(idNibbles)
 
     addressStartID = None
     # scan through the nibble list to find something that looks like the counter
@@ -99,7 +101,7 @@ def readForceData(nevDataName, calibrationFiles):
     nReadings = math.floor(len(nevData['dig_events']['Data'][0]) / 48) - math.floor(startIdx / 48)
     #nReadings = 12500
     blockIdxRange = range(0,48*nReadings,48) # 24 * 16 bit or 48 byte long blocks per reading, the index of each block start
-    NevProcData = {name : [0 for i in range(nReadings)] for name in channelNames + ['Sync']}
+    NevProcData = {name : [] for name in channelNames + ['Sync']}
 
     #make an np.array that will hold the times at which the first block of each reading was read
     tNevSerial = []
@@ -117,14 +119,24 @@ def readForceData(nevDataName, calibrationFiles):
         return sequence in '0123456789abba98765432100123456789abba9876543210'
 
     for readingIdx, blockIdx in enumerate(blockIdxRange):
+        #print('Reading index was: ')
+        #print(readingIdx)
+        #print('Reading index was: ')
+        #print(blockIdx)
         # must perform sanity check that we are reading all 48 bits
         sensorIds = ''
         for byteIdx, addressIdx in enumerate(addressIdxRange):
+            #print('byteIdx index was: ')
+            #print(byteIdx)
+            #print('addressIdx index was: ')
+            #print(addressIdx)
 
             lowByte = nevData['dig_events']['Data'][0][blockIdx + addressIdx - 1 + startIdx]
             highByte = nevData['dig_events']['Data'][0][blockIdx + addressIdx + startIdx]
             lowByteStr = format(lowByte, '02x')
             highByteStr = format(highByte, '02x')
+            #if readingIdx == 0:
+            #    pdb.set_trace()
             if addressIdx == 1:
                 #pdb.set_trace()
                 currTimeStamp = nevData['dig_events']['TimeStamps'][blockIdx + addressIdx - 1 + startIdx]
@@ -133,7 +145,9 @@ def readForceData(nevDataName, calibrationFiles):
                 #print(type(currTimeStamp))
                 if currTimeStamp == 0:
                     break
-                NevProcData['Sync'][readingIdx] = 0 if highByteStr[0] == 'f' else 1
+
+                syncReading = 0 if highByteStr[0] == 'f' else 1
+                NevProcData['Sync'].append(syncReading)
                 tNevSerial.append(currTimeStamp)
 
             #print('address index is %d' % addressIdx)
@@ -162,12 +176,12 @@ def readForceData(nevDataName, calibrationFiles):
                     forwardPeek = forwardAddresses(nevData['dig_events']['Data'][0], lookAhead)
                     print(forwardPeek)
 
-                NevProcData[channelLookup[addressIdx]][readingIdx] = 0
+                NevProcData[channelLookup[addressIdx]].append(0)
                 sensorIds = sensorIds[:-1] + format(expectedSensorIdxOrder[byteIdx], '01x')
                 #
             #
             else:
-                NevProcData[channelLookup[addressIdx]][readingIdx] = int(highByteStr[1] + lowByteStr[0] + lowByteStr[1], 16)
+                NevProcData[channelLookup[addressIdx]].append(int(highByteStr[1] + lowByteStr[0] + lowByteStr[1], 16))
 
         else:
             continue  # executed if the loop ended normally (no break)
@@ -181,7 +195,8 @@ def readForceData(nevDataName, calibrationFiles):
     """
     Zero the measurements
     """
-
+    #plt.plot(np.diff(nevData['dig_events']['TimeStamps'][0]))
+    #plt.show()
     for key in NevProcData:
         if key != 'Sync':
             NevProcData[key] = np.asarray(NevProcData[key]) - int(round(np.mean(NevProcData[key][:1000])))
@@ -238,7 +253,7 @@ def readPythonForceData(pythonDataName, calibrationFiles):
             procPythonData[channelLookup[addressIdx]][readingIdx] = int(highByteStr[1] + lowByteStr[0] + lowByteStr[1], 16)
             if addressIdx == 1:
                 #pdb.set_trace()
-                procPythonData['Sync'][readingIdx] = 1 if highByteStr[0] == 'f' else 0
+                procPythonData['Sync'][readingIdx] = 0 if highByteStr[0] == 'f' else 1
 
     for key in procPythonData:
         if key != 'Sync':
@@ -273,10 +288,7 @@ plt.legend(loc = 1)
 plt.title('Force Plate Recording')
 plt.show()
 
-
-"""
-plt.plot(np.diff(nevData['dig_events']['TimeStamps'][0]))
-"""
+#
 
 intervals = np.diff(ProcData['t'][ProcData['t'] != 0])
 sns.distplot(intervals)
@@ -318,18 +330,18 @@ def getNSxData(filePath, elecIds, startTime_s, dataLength_s, downsample = 1):
 """
 
 #Sync Pulses
-procDataMask = np.logical_and(ProcData['t']!=0 , ProcData['t'] < 20)
-plt.plot(ProcData['t'][procDataMask], np.array(ProcData['Sync'])[procDataMask], label = 'Sync Pulse (NEV Serial)')
+timeLimit = 40
+procDataMask = np.logical_and(ProcData['t']!=0 , ProcData['t'] < timeLimit)
+plt.plot(ProcData['t'][procDataMask], np.array(ProcData['Sync'])[procDataMask], label = 'Sync Pulse (NEV Serial)', marker = 'o')
 
-simiTriggersPath = 'E:/temp/201802191132-Starbuck-Freely_Moving_Force_Plates-Simi_Triggers.h5'
 f = h5py.File(simiTriggersPath,'r')
 simiTriggers = np.array(f.get('simiTriggers'))
 simiTime = np.arange(len(simiTriggers)) / 3e4
-simiMask = simiTime < 20
+simiMask = simiTime < timeLimit
 plt.plot(simiTime[simiMask][::10],simiTriggers[simiMask][::10] / simiTriggers.max(), label = 'Sync Pulse (NS5)')
 
-#pythonDataMask = calibPythonData['t'] < 100
-#plt.plot(calibPythonData['t'][pythonDataMask] + ProcData['t'][0], np.array(calibPythonData['Sync'])[pythonDataMask], label = 'Sync Pulse (Python)')
+pythonDataMask = (calibPythonData['t'] + ProcData['t'][0]) < timeLimit
+plt.plot(calibPythonData['t'][pythonDataMask] + ProcData['t'][0], np.array(calibPythonData['Sync'])[pythonDataMask], label = 'Sync Pulse (Python)')
 
 plt.legend()
 

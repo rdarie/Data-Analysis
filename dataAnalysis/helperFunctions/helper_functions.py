@@ -138,6 +138,10 @@ def getBadSpikesMask(spikes, nStd = 5, whichChan = 0, plotting = False, deleteBa
             spikes['TimeStamps'][idx] = np.array(spikes['TimeStamps'][idx])[np.logical_not(badMask[idx])]
     return badMask
 
+def fillInOverflow(channelData, plotting = False):
+    channelDataDiff = channelData['data'].diff()
+    pdb.set_trace()
+
 def getBadContinuousMask(channelData, plotting = False, smoothing_ms = 1, badThresh = 1e-3, consecLen = 4):
     #Allocate bad data mask as dict
     badMask = {'general' : [], 'perChannel' : []}
@@ -1147,6 +1151,8 @@ def readPiJsonLog(filePaths, zeroTime = False):
         # later note: what does the above even mean?
 
         # if the last trial didn't have time to end, remove its entries from the list of events
+        print('On file %s' % filePath)
+        #pdb.set_trace()
         while not trialRelevant.iloc[-1, :]['Label'] in ['correct button', 'incorrect button', 'button timed out']:
             trialRelevant.drop(trialRelevant.index[len(trialRelevant)-1], inplace = True)
 

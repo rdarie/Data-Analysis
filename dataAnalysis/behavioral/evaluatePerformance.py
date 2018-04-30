@@ -49,6 +49,7 @@ for fileName in fileNamesRaw:
 
 # In[2]:
 
+#pdb.set_trace()
 filePaths = [fileDir + '/' + 'Log_' + fileName + '.txt' for fileName in fileNames]
 #filePaths = [fileDir + '/' + fileName + '.txt' for fileName in fileNames]
 
