@@ -149,6 +149,7 @@ def fillInOverflow(channelData, plotting = True):
         rowDiff.fillna(0, inplace = True)
         # negative dips are the start of the dip
         diffStd  = rowDiff.std()
+        pdb.set_trace()
         dipThresh = (nStdDiff * diffStd) / rowDiff.max()
         dipStarts = peakutils.indexes(-rowDiff, thres=dipThresh )
         dipEnds = peakutils.indexes(rowDiff, thres=dipThresh )
