@@ -23,6 +23,7 @@ import plotly.plotly as py
 import plotly.tools as tls
 import plotly.figure_factory as ff
 import plotly.graph_objs as go
+
 from brPY.brpylib import NsxFile, NevFile, brpylib_ver
 
 try:
@@ -138,9 +139,28 @@ def getBadSpikesMask(spikes, nStd = 5, whichChan = 0, plotting = False, deleteBa
             spikes['TimeStamps'][idx] = np.array(spikes['TimeStamps'][idx])[np.logical_not(badMask[idx])]
     return badMask
 
-def fillInOverflow(channelData, plotting = False):
-    channelDataDiff = channelData['data'].diff()
-    pdb.set_trace()
+import peakutils
+
+def fillInOverflow(channelData, plotting = True):
+    nStdDiff = 100
+    for idx, row in channelData['data'].iterrows():
+        # get the first difference of the row
+        rowDiff = row.diff()
+        rowDiff.fillna(0, inplace = True)
+        # negative dips are the start of the dip
+        diffStd  = rowDiff.std()
+        dipThresh = (nStdDiff * diffStd) / rowDiff.max()
+        dipStarts = peakutils.indexes(-rowDiff, thres=dipThresh )
+        dipEnds = peakutils.indexes(rowDiff, thres=dipThresh )
+
+        if dipStarts is not None:
+            if plotting:
+                plt.figure()
+                plt.plot(row)
+                plt.plot(dipStarts, row.iloc[dipStarts])
+                plt.show()
+
+    return channelData
 
 def getBadContinuousMask(channelData, plotting = False, smoothing_ms = 1, badThresh = 1e-3, consecLen = 4):
     #Allocate bad data mask as dict
