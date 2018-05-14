@@ -17,12 +17,20 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--file', default = 'Murdoc_29_09_2017_10_48_48',  nargs='*')
 #fileNamesRaw = ['Log_Murdoc_2018_04_06_15_01_25.txt']
 #fileNamesRaw = ['debugLog.txt']
+"""
+fileNamesRaw = ['Murdoc_2018_05_04_14_30_12',
+    'Murdoc_2018_05_07_15_10_06',
+    'Murdoc_2018_05_08_15_27_07',
+    'Murdoc_2018_05_10_16_10_33',
+    'Murdoc_2018_05_11_15_22_48'
+]
+"""
 parser.add_argument('--folder', default = 'W:/ENG_Neuromotion_Shared/group/Proprioprosthetics/Training/Flywheel Logs/Murdoc')
 #fileDir = 'W:/ENG_Neuromotion_Shared/group/Proprioprosthetics/Training/Flywheel Logs/Murdoc'
 #fileDir = 'C:/Users/Radu/Desktop'
 parser.add_argument('--fixMovedToError', dest='fixMovedToError', action='store_true')
 parser.add_argument('--outputFileName')
-# outputFileName = 'Murdoc_Debug'
+# outputFileName = 'Murdoc_2018_05_step_12_week_2'
 parser.set_defaults(fixMovedToError = False)
 args = parser.parse_args()
 
