@@ -20,10 +20,13 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--stepLen', default = '0.05')
 parser.add_argument('--winLen', default = '0.1')
 parser.add_argument('--file', default = '201612201054-Starbuck_Treadmill-Array1480_Right-Trial00001.ns5')
+parser.add_argument('--folder', default = 'W:/ENG_Neuromotion_Shared/group/Proprioprosthetics/Training/Flywheel Logs/Murdoc')
+
 args = parser.parse_args()
 argWinLen = float(args.winLen)
 argStepLen = float(args.stepLen)
 argFile = args.file
+fileDir = args.folder
 
 print("Preprocessing spectral data with a window length of {:4.4f} seconds and a step length of {:4.4f} seconds".format(argWinLen, argStepLen))
 # Reformat figures
@@ -38,17 +41,16 @@ matplotlib.rc('font', **font_opts)
 matplotlib.rc('figure', **fig_opts)
 
 # Inits
-localDir = os.environ['DATA_ANALYSIS_LOCAL_DIR']
 fileName = '/' + argFile
 
-datafile = localDir + fileName
+datafile = fileDir + fileName
 
 elec_ids = range(1,97) # 'all' is default for all (1-indexed)
-start_time_s = 0 # 0 is default for all
-data_time_s = 90 # 'all' is default for all
+start_time_s = 120 # 0 is default for all
+data_time_s = 180 # 'all' is default for all
 whichChan = 25 # 1-indexed
 
-simi_triggers = getNSxData(datafile, 136, start_time_s, data_time_s)
+simi_triggers = getNSxData(datafile, 104, start_time_s, data_time_s)
 
 ChannelData = getNSxData(datafile, elec_ids, start_time_s, data_time_s)
 
@@ -72,8 +74,8 @@ plotChan(clean_data, whichChan, label = 'Clean data', mask = plot_mask,
     maskLabel = "Dropout", show = True, prevFig = f)
 
 plt.legend()
-plt.savefig(localDir + '/' + argFile.split('.')[0] + '_ns5Clean.png')
-with open(localDir + '/' + argFile.split('.')[0] + '_ns5Clean.pickle', 'wb') as File:
+plt.savefig(fileDir + '/' + argFile.split('.')[0] + '_ns5Clean.png')
+with open(fileDir + '/' + argFile.split('.')[0] + '_ns5Clean.pickle', 'wb') as File:
     pickle.dump(f, File)
 # spectrum function parameters
 winLen_s = argWinLen
@@ -84,8 +86,8 @@ R = 30 # target bandwidth for spectrogram
 clean_data['spectrum'] = getSpectrogram(
     clean_data, winLen_s, stepLen_s, R, 600, whichChan, plotting = True)
 
-plt.savefig(localDir + '/' + argFile.split('.')[0] + '_SpectrumClean.png')
-with open(localDir + '/' + argFile.split('.')[0] + '_SpectrumClean.pickle', 'wb') as File:
+plt.savefig(fileDir + '/' + argFile.split('.')[0] + '_SpectrumClean.png')
+with open(fileDir + '/' + argFile.split('.')[0] + '_SpectrumClean.pickle', 'wb') as File:
     pickle.dump(plt.gcf(), File)
 
 compareBad = True
@@ -94,8 +96,8 @@ if compareBad:
     ChannelData['spectrum'] = getSpectrogram(
         ChannelData, winLen_s, stepLen_s, R, 600, whichChan, plotting = True)
 
-    plt.savefig(localDir + '/' + argFile.split('.')[0] + '_SpectrumRaw.png')
-    with open(localDir + '/' + argFile.split('.')[0] + '_SpectrumRaw.pickle', 'wb') as File:
+    plt.savefig(fileDir + '/' + argFile.split('.')[0] + '_SpectrumRaw.png')
+    with open(fileDir + '/' + argFile.split('.')[0] + '_SpectrumRaw.pickle', 'wb') as File:
         pickle.dump(plt.gcf(), File)
 
 
@@ -103,7 +105,7 @@ data = {'channel':clean_data, 'simiTrigger': simi_triggers,
     'origin' : clean_data['spectrum']['origin'],
     'winLen' : argWinLen, 'stepLen' : argStepLen}
 
-with open(localDir + '/' + argFile.split('.')[0] + '_saveSpectrum.p', "wb" ) as f:
+with open(fileDir + '/' + argFile.split('.')[0] + '_saveSpectrum.p', "wb" ) as f:
     pickle.dump(data, f, protocol=4 )
 
 #print('Starting to write PDF Report.')
