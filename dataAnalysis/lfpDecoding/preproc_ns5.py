@@ -45,12 +45,12 @@ fileName = '/' + argFile
 
 datafile = fileDir + fileName
 
-elec_ids = range(1,97) # 'all' is default for all (1-indexed)
-start_time_s = 120 # 0 is default for all
+elec_ids = range(1, 97) # 'all' is default for all (1-indexed)
+start_time_s = 0 # 0 is default for all
 data_time_s = 180 # 'all' is default for all
-whichChan = 25 # 1-indexed
+whichChan = 90 # 1-indexed
 
-simi_triggers = getNSxData(datafile, 104, start_time_s, data_time_s)
+simi_triggers = getNSxData(datafile, 136, start_time_s, data_time_s)
 
 ChannelData = getNSxData(datafile, elec_ids, start_time_s, data_time_s)
 
@@ -84,7 +84,7 @@ R = 30 # target bandwidth for spectrogram
 
 # get the spectrum
 clean_data['spectrum'] = getSpectrogram(
-    clean_data, winLen_s, stepLen_s, R, 600, whichChan, plotting = True)
+    clean_data, winLen_s, stepLen_s, R, 2000, whichChan, plotting = True)
 
 plt.savefig(fileDir + '/' + argFile.split('.')[0] + '_SpectrumClean.png')
 with open(fileDir + '/' + argFile.split('.')[0] + '_SpectrumClean.pickle', 'wb') as File:
@@ -94,7 +94,7 @@ compareBad = True
 if compareBad:
     # get the spectrum
     ChannelData['spectrum'] = getSpectrogram(
-        ChannelData, winLen_s, stepLen_s, R, 600, whichChan, plotting = True)
+        ChannelData, winLen_s, stepLen_s, R, 2000, whichChan, plotting = True)
 
     plt.savefig(fileDir + '/' + argFile.split('.')[0] + '_SpectrumRaw.png')
     with open(fileDir + '/' + argFile.split('.')[0] + '_SpectrumRaw.pickle', 'wb') as File:
@@ -108,9 +108,9 @@ data = {'channel':clean_data, 'simiTrigger': simi_triggers,
 with open(fileDir + '/' + argFile.split('.')[0] + '_saveSpectrum.p', "wb" ) as f:
     pickle.dump(data, f, protocol=4 )
 
-#print('Starting to write PDF Report.')
+print('Starting to write PDF Report.')
 
-#pdfFile = localDir + 'pdfReport.pdf'
-#pdfReport(ChannelData, clean_data, badData = badData, pdfFilePath = pdfFile, spectrum = True)
+pdfFile = fileDir + '/' + argFile.split('.')[0] + '_pdfReport.pdf'
+pdfReport(ChannelData, clean_data, badData = badData, pdfFilePath = pdfFile, spectrum = True)
 
 #x = input("Press any key")

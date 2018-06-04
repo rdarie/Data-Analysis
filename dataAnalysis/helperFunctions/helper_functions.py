@@ -100,7 +100,8 @@ def getNSxData(filePath, elecIds, startTime_s, dataLength_s, downsample = 1):
     # Extract data - note: data will be returned based on *SORTED* elec_ids, see cont_data['elec_ids']
     channelData = nsx_file.getdata(elecIds, startTime_s, dataLength_s, downsample)
 
-    channelData['data'] = pd.DataFrame(channelData['data'].transpose())
+    #pdb.set_trace()
+    channelData['data'] = pd.DataFrame(channelData['data']).transpose()
     channelData['t'] = channelData['start_time_s'] + np.arange(channelData['data'].shape[0]) / channelData['samp_per_s']
     channelData['badData'] = dict()
     channelData['spectrum'] = pd.DataFrame({'PSD': [], 't': [], 'fr': [], 'Labels': []})
@@ -195,8 +196,8 @@ def getBadContinuousMask(channelData, plotting = False, smoothing_ms = 1, badThr
 
     #Look for abnormally high values in the first difference of each channel
     # how many standard deviations should we keep?
-    nStdDiff = 10
-    nStdAmp = 10
+    nStdDiff = 20
+    nStdAmp = 20
     # Look for unchanging signal across channels
     channelDataDiff = channelData['data'].diff()
     channelDataDiff.fillna(0, inplace = True)
@@ -437,10 +438,10 @@ def getSpectrogram(channelData, winLen_s, stepLen_s = 0.02, R = 20, fr_cutoff = 
     if HASLIBTFR:
         origin = 'libtfr'
         #pdb.set_trace()
-        t = channelData['start_time_s'] + np.arange(nWindows) * stepLen_s + NFFT / Fs * 0.5
-        spectrum = np.zeros((nChan, nWindows, fr_samp))
+        t = channelData['start_time_s'] + np.arange(nWindows + 1) * stepLen_s + NFFT / Fs * 0.5
+        spectrum = np.zeros((nChan, nWindows + 1, fr_samp))
         # generate a transform object with size equal to signal length and ntapers tapers
-        D = libtfr.mfft_dpss(NFFT, nw, nTapers)
+        D = libtfr.mfft_dpss(NFFT, nw, nTapers, NFFT)
         #pdb.set_trace()
 
         for idx,signal in channelData['data'].iteritems():
@@ -448,8 +449,8 @@ def getSpectrogram(channelData, winLen_s, stepLen_s = 0.02, R = 20, fr_cutoff = 
             sys.stdout.flush()
 
             P_libtfr = D.mtspec(signal, stepLen_samp).transpose()
-            #pdb.set_trace()
             P_libtfr = P_libtfr[np.newaxis,:,:fr_samp]
+            #pdb.set_trace()
             spectrum[idx,:,:] = P_libtfr
     else:
         origin = 'scipy'
@@ -464,6 +465,7 @@ def getSpectrogram(channelData, winLen_s, stepLen_s = 0.02, R = 20, fr_cutoff = 
             P_scipy = P_scipy.transpose()[np.newaxis,:,:fr_samp]
             spectrum[idx,:,:] = P_scipy
         t = channelData['start_time_s'] + t
+
     if plotting:
         ch_idx  = channelData['elec_ids'].index(whichChan)
 
@@ -471,7 +473,8 @@ def getSpectrogram(channelData, winLen_s, stepLen_s = 0.02, R = 20, fr_cutoff = 
         #hdr_idx = channelData['ExtendedHeaderIndices'][ch_idx]
 
         P = spectrum[ch_idx,:,:]
-        plotSpectrum(P, Fs, channelData['start_time_s'], channelData['t'][-1], fr =fr, t = t, show = True)
+        #pdb.set_trace()
+        plotSpectrum(P, Fs, channelData['start_time_s'], channelData['t'][-1], fr = fr, t = t, show = True, fr_cutoff = fr_cutoff)
 
     #pdb.set_trace()
 
@@ -546,8 +549,11 @@ def pdfReport(origData, cleanData, badData = None, pdfFilePath = 'pdfReport.pdf'
             sys.stdout.write("Running pdfReport: %d%%\r" % int(idx * 100 / nChan + 1))
             sys.stdout.flush()
 
+            #print('idx is %s' % idx)
+            #pdb.set_trace()
+
             ch_idx  = origData['elec_ids'].index(idx + 1)
-            plot_mask = np.logical_or(badData['general'], badData['perChannel'][ch_idx])
+            plot_mask = np.logical_or(badData['general'], badData['perChannel'][idx])
             f,_ = plot_chan(origData, idx + 1, mask = None, show = False)
             plot_chan(cleanData, idx + 1, mask = plot_mask, show = False, prevFig = f)
             plt.tight_layout()
