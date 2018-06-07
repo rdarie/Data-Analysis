@@ -190,14 +190,10 @@ def fillInOverflow(channelData, plotting = False):
             channelData['data'].loc[idx, :] = fixedAddAverageDip
     return channelData
 
-def getBadContinuousMask(channelData, plotting = False, smoothing_ms = 1, badThresh = 1e-3, consecLen = 4):
+def getBadContinuousMask(channelData, plotting = False, smoothing_ms = 1, badThresh = 1e-3, consecLen = 4, nStdDiff = 20, nStdAmp = 20):
     #Allocate bad data mask as dict
     badMask = {'general' : [], 'perChannel' : []}
 
-    #Look for abnormally high values in the first difference of each channel
-    # how many standard deviations should we keep?
-    nStdDiff = 20
-    nStdAmp = 20
     # Look for unchanging signal across channels
     channelDataDiff = channelData['data'].diff()
     channelDataDiff.fillna(0, inplace = True)
@@ -225,6 +221,8 @@ def getBadContinuousMask(channelData, plotting = False, smoothing_ms = 1, badThr
         rowVals = row.values
         rowBar  = rowVals.mean()
         rowStd  = rowVals.std()
+        #Look for abnormally high values in the first difference of each channel
+        # how many standard deviations should we keep?
         maxAcceptable = rowBar + nStdAmp * rowStd
         minAcceptable = rowBar - nStdAmp * rowStd
 
@@ -412,7 +410,7 @@ def assignLabels(timeVector, lbl, fnc, CameraFs = 100, oversizeWindow = None):
             #pdb.set_trace()
     return labels
 
-def getSpectrogram(channelData, winLen_s, stepLen_s = 0.02, R = 20, fr_cutoff = None, whichChan = 1, plotting = False):
+def getSpectrogram(channelData, winLen_s, stepLen_s = 0.02, R = 20, fr_start = None, fr_stop = None, whichChan = 1, plotting = False):
 
     Fs = channelData['samp_per_s']
     nChan = channelData['data'].shape[1]
@@ -431,9 +429,20 @@ def getSpectrogram(channelData, winLen_s, stepLen_s = 0.02, R = 20, fr_cutoff = 
     fr_samp = int(NFFT / 2) + 1
     fr = np.arange(fr_samp) * channelData['samp_per_s'] / (2 * fr_samp)
 
-    if fr_cutoff is not None:
-        fr = fr[fr < fr_cutoff]
-        fr_samp = len(fr)
+    #pdb.set_trace()
+    if fr_start is not None:
+        fr_start_idx = np.where(fr > fr_start)[0][0]
+    else:
+        fr_start_idx = 0
+
+    if fr_stop is not None:
+        fr_stop_idx = np.where(fr < fr_stop)[0][-1]
+    else:
+        fr_stop_idx = -1
+
+    #pdb.set_trace()
+    fr = fr[fr_start_idx : fr_stop_idx]
+    fr_samp = len(fr)
 
     if HASLIBTFR:
         origin = 'libtfr'
@@ -449,8 +458,8 @@ def getSpectrogram(channelData, winLen_s, stepLen_s = 0.02, R = 20, fr_cutoff = 
             sys.stdout.flush()
 
             P_libtfr = D.mtspec(signal, stepLen_samp).transpose()
-            P_libtfr = P_libtfr[np.newaxis,:,:fr_samp]
-            #pdb.set_trace()
+            P_libtfr = P_libtfr[np.newaxis,:,fr_start_idx:fr_stop_idx]
+
             spectrum[idx,:,:] = P_libtfr
     else:
         origin = 'scipy'
@@ -462,7 +471,7 @@ def getSpectrogram(channelData, winLen_s, stepLen_s = 0.02, R = 20, fr_cutoff = 
             overlap_samp = NFFT - stepLen_samp
             _, t, P_scipy = scipy.signal.spectrogram(signal,mode='magnitude',
                 window = 'boxcar', nperseg = NFFT, noverlap = overlap_samp, fs = Fs)
-            P_scipy = P_scipy.transpose()[np.newaxis,:,:fr_samp]
+            P_scipy = P_scipy.transpose()[np.newaxis,:,fr_start_idx:fr_stop_idx]
             spectrum[idx,:,:] = P_scipy
         t = channelData['start_time_s'] + t
 
@@ -474,7 +483,7 @@ def getSpectrogram(channelData, winLen_s, stepLen_s = 0.02, R = 20, fr_cutoff = 
 
         P = spectrum[ch_idx,:,:]
         #pdb.set_trace()
-        plotSpectrum(P, Fs, channelData['start_time_s'], channelData['t'][-1], fr = fr, t = t, show = True, fr_cutoff = fr_cutoff)
+        plotSpectrum(P, Fs, channelData['start_time_s'], channelData['t'][-1], fr = fr, t = t, show = True, fr_start = fr_start, fr_stop = fr_stop)
 
     #pdb.set_trace()
 
@@ -535,7 +544,7 @@ def plotChan(channelData, whichChan, label = " ", mask = None, maskLabel = " ",
 
     return f, ax
 
-def pdfReport(origData, cleanData, badData = None, pdfFilePath = 'pdfReport.pdf', spectrum = False):
+def pdfReport(origData, cleanData, badData = None, pdfFilePath = 'pdfReport.pdf', spectrum = False, fr_start = 5, fr_stop = 3000):
     with matplotlib.backends.backend_pdf.PdfPages(pdfFilePath) as pdf:
         nChan = cleanData['data'].shape[1]
 
@@ -552,17 +561,17 @@ def pdfReport(origData, cleanData, badData = None, pdfFilePath = 'pdfReport.pdf'
             #print('idx is %s' % idx)
             #pdb.set_trace()
 
-            ch_idx  = origData['elec_ids'].index(idx + 1)
+            ch_idx  = origData['elec_ids'][idx]
             plot_mask = np.logical_or(badData['general'], badData['perChannel'][idx])
-            f,_ = plot_chan(origData, idx + 1, mask = None, show = False)
-            plot_chan(cleanData, idx + 1, mask = plot_mask, show = False, prevFig = f)
+            f,_ = plotChan(origData, ch_idx, mask = None, show = False)
+            plotChan(cleanData, ch_idx, mask = plot_mask, show = False, prevFig = f)
             plt.tight_layout()
             pdf.savefig(f)
             plt.close(f)
 
             if spectrum:
-                P = cleanData['spectrum']['PSD'][idx,:,:]
-                f = plotSpectrum(P, Fs, cleanData['start_time_s'], cleanData['t'][-1], fr = fr, t = t, show = False)
+                P = cleanData['spectrum']['PSD'][ch_idx,:,:]
+                f = plotSpectrum(P, Fs, cleanData['start_time_s'], cleanData['t'][-1], fr = fr, t = t, show = False, fr_start = fr_start, fr_stop = fr_stop)
                 pdf.savefig(f)
                 plt.close(f)
 
@@ -571,16 +580,16 @@ def pdfReport(origData, cleanData, badData = None, pdfFilePath = 'pdfReport.pdf'
         if generateLastPage:
             for idx, row in origData['data'].iteritems():
                 if idx == 0:
-                    f,_ = plot_chan(origData, idx + 1, mask = None, show = False)
+                    f,_ = plotChan(origData, ch_idx, mask = None, show = False)
                 elif idx == origData['data'].shape[1] - 1:
-                    f,_ = plot_chan(origData, idx + 1, mask = badData['general'], show = True, prevFig = f)
+                    f,_ = plotChan(origData, ch_idx, mask = badData['general'], show = True, prevFig = f)
                     plt.tight_layout()
                     pdf.savefig(f)
                     plt.close(f)
                 else:
-                    f,_ = plot_chan(origData, idx + 1, mask = None, show = False, prevFig = f)
+                    f,_ = plotChan(origData, ch_idx, mask = None, show = False, prevFig = f)
 
-def plotSpectrum(P, fs, start_time_s, end_time_s, fr_cutoff = 600, fr = None, t = None, show = False):
+def plotSpectrum(P, fs, start_time_s, end_time_s, fr_start = 10, fr_stop = 600, fr = None, t = None, show = False):
     #pdb.set_trace()
     if fr is None:
         fr = np.arange(P.shape[1]) / P.shape[1] * fs / 2
@@ -595,7 +604,7 @@ def plotSpectrum(P, fs, start_time_s, end_time_s, fr_cutoff = 600, fr = None, t 
     plt.pcolormesh(t,fr,P.transpose(), norm=colors.SymLogNorm(linthresh=0.03, linscale=0.03,
         vmin=zMin, vmax=zMax))
 
-    plt.axis([t.min(), t.max(), fr.min(), min(fr_cutoff, fr.max())])
+    plt.axis([t.min(), t.max(), max(fr_start, fr.min()), min(fr_stop, fr.max())])
     #plt.colorbar()
     #plt.locator_params(axis='y', nbins=20)
     plt.xlabel('Time (s)')
