@@ -12,7 +12,7 @@ from dataAnalysis.helperFunctions.helper_functions import *
 def loadParamsPy(filePath):
 
     """
-    # Old implementation, treats params.py as a package and has many problems
+    # Old implementation, treats params.py as a package and cannot be overriden when processing a new folder.
     pdb.set_trace()
 
     sys.path.insert(0, filePath)
@@ -220,7 +220,9 @@ def coordsToIndices(xcoords, ycoords):
     xSpacing = np.ufunc.reduce(np.frompyfunc(gcd, 2, 1), xcoords)
     ySpacing = np.ufunc.reduce(np.frompyfunc(gcd, 2, 1), ycoords)
     xIdx = np.array(np.divide(xcoords, xSpacing), dtype = np.int)
+    xIdx = xIdx - min(xIdx)
     yIdx = np.array(np.divide(ycoords, ySpacing), dtype = np.int)
+    yIdx = yIdx - min(yIdx)
 
     return xIdx, yIdx
 
@@ -345,6 +347,7 @@ def spikePDFReport(filePath, spikes, spikeStruct):
                         plt.close()
 
 if __name__ == "__main__":
+
     spikeStructNForm = loadKSDir('D:/Trial001_NForm', loadPCs = True)
     nevIDs = list(range(65,97))
     spikesNForm = getWaveForms('D:/Trial001_NForm', spikeStructNForm, nevIDs = None, wfWin = (-30, 80), plotting = False)
@@ -353,4 +356,4 @@ if __name__ == "__main__":
     spikeStructUtah = loadKSDir('D:/Trial001_Utah', loadPCs = True)
     nevIDs = list(range(65,97))
     spikesUtah = getWaveForms('D:/Trial001_Utah', spikeStructUtah, nevIDs = None, wfWin = (-30, 80), plotting = False)
-    spikePDFReport('D:/Trial001_Utah', spikesNForm, spikeStructUtah)
+    spikePDFReport('D:/Trial001_Utah', spikesUtah, spikeStructUtah)
