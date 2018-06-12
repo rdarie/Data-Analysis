@@ -223,6 +223,12 @@ def plotSpike(spikes, channel, showNow = False, ax = None, acrossArray = False, 
     if unitsOnThisChan is not None:
 
         if acrossArray:
+            sns.set_style("dark", {"axes.facecolor": ".9"})
+            matplotlib.rc('xtick', labelsize=5)
+            matplotlib.rc('ytick', labelsize=5)
+            matplotlib.rc('legend', fontsize=5)
+            matplotlib.rc('axes', xmargin=.01)
+            matplotlib.rc('axes', ymargin=.01)
             xIdx, yIdx = coordsToIndices(xcoords, ycoords)
             fig, ax = plt.subplots(nrows = max(np.unique(xIdx)) + 1, ncols = max(np.unique(yIdx)) + 1)
 
@@ -240,6 +246,7 @@ def plotSpike(spikes, channel, showNow = False, ax = None, acrossArray = False, 
                     curAx.fill_between(timeRange, thisSpike-thisError, thisSpike+thisError, alpha=0.4, label='chan %s, unit %s' % (channel, unitName))
                     curAx.plot(timeRange, thisSpike, 'k-')
 
+                sns.despine()
                 plt.tight_layout()
                 for curAx in ax.flatten():
                     curAx.tick_params(left='off', top='off', right='off', bottom='off', labelleft='off', labeltop='off', labelright='off', labelbottom='off')
@@ -317,13 +324,13 @@ def spikePDFReport(filePath, spikes, spikeStruct):
                         pdf.savefig()
                         plt.close()
 
-#if __name__ == "__main__":
-spikeStruct = loadKSDir('D:/Trial001_Utah', loadPCs = True)
-nevIDs = list(range(65,97))
-spikes = getWaveForms('D:/Trial001_Utah', spikeStruct, nevIDs = None, wfWin = (-30, 80), plotting = False)
-#plotSpike(spikes, channel = 45, showNow = True, acrossArray = True, xcoords = spikeStruct['xcoords'], ycoords = spikeStruct['ycoords'])
-#plotISIHistogram(spikes, channel = 45, bins = np.linspace(0, 25e-3, 100), showNow = True)
-#plotSpikePanel(spikeStruct['xcoords'], spikeStruct['ycoords'], spikes)
-spikePDFReport('D:/Trial001_Utah', spikes, spikeStruct)
-plt.show()
+if __name__ == "__main__":
+    spikeStruct = loadKSDir('D:/Trial001_Utah', loadPCs = True)
+    nevIDs = list(range(65,97))
+    spikes = getWaveForms('D:/Trial001_Utah', spikeStruct, nevIDs = None, wfWin = (-30, 80), plotting = False)
+    #plotSpike(spikes, channel = 45, showNow = True, acrossArray = True, xcoords = spikeStruct['xcoords'], ycoords = spikeStruct['ycoords'])
+    #plotISIHistogram(spikes, channel = 45, bins = np.linspace(0, 25e-3, 100), showNow = True)
+    #plotSpikePanel(spikeStruct['xcoords'], spikeStruct['ycoords'], spikes)
+    spikePDFReport('D:/Trial001_Utah', spikes, spikeStruct)
+    plt.show()
 #pdb.set_trace()
