@@ -6,12 +6,16 @@ from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib import pyplot as plt
 from fractions import gcd
 import seaborn as sns
+from importlib import reload
 from dataAnalysis.helperFunctions.helper_functions import *
 
 def loadParamsPy(filePath):
-     sys.path.append(filePath)
-     import params
-     return params
+    sys.path.insert(0, filePath)
+    try:
+        reload(params)
+    except:
+         import params
+    return params
 
 def loadKSDir(filePath, excludeNoise = True, loadPCs = False):
     mMapMode = 'r'
@@ -210,6 +214,12 @@ def plotSpike(spikes, channel, showNow = False, ax = None, acrossArray = False, 
     unitsOnThisChan = np.unique(spikes['Classification'][ChanIdx])
 
     if acrossArray:
+        sns.set_style("dark", {"axes.facecolor": ".9"})
+        matplotlib.rc('xtick', labelsize=5)
+        matplotlib.rc('ytick', labelsize=5)
+        matplotlib.rc('legend', fontsize=5)
+        matplotlib.rc('axes', xmargin=.01)
+        matplotlib.rc('axes', ymargin=.01)
         # Check that we didn't ask to plot the spikes across channels into a single axis
         assert ax is None
         # Check that we have waveform data everywhere
@@ -223,12 +233,6 @@ def plotSpike(spikes, channel, showNow = False, ax = None, acrossArray = False, 
     if unitsOnThisChan is not None:
 
         if acrossArray:
-            sns.set_style("dark", {"axes.facecolor": ".9"})
-            matplotlib.rc('xtick', labelsize=5)
-            matplotlib.rc('ytick', labelsize=5)
-            matplotlib.rc('legend', fontsize=5)
-            matplotlib.rc('axes', xmargin=.01)
-            matplotlib.rc('axes', ymargin=.01)
             xIdx, yIdx = coordsToIndices(xcoords, ycoords)
             fig, ax = plt.subplots(nrows = max(np.unique(xIdx)) + 1, ncols = max(np.unique(yIdx)) + 1)
 
@@ -247,9 +251,9 @@ def plotSpike(spikes, channel, showNow = False, ax = None, acrossArray = False, 
                     curAx.plot(timeRange, thisSpike, 'k-')
 
                 sns.despine()
-                plt.tight_layout()
                 for curAx in ax.flatten():
                     curAx.tick_params(left='off', top='off', right='off', bottom='off', labelleft='off', labeltop='off', labelright='off', labelbottom='off')
+                plt.tight_layout()
 
             else:
                 waveForms = spikes['Waveforms'][ChanIdx][unitMask, :, ChanIdx]
@@ -325,12 +329,12 @@ def spikePDFReport(filePath, spikes, spikeStruct):
                         plt.close()
 
 if __name__ == "__main__":
-    spikeStruct = loadKSDir('D:/Trial001_Utah', loadPCs = True)
+    spikeStructNForm = loadKSDir('D:/Trial001_NForm', loadPCs = True)
     nevIDs = list(range(65,97))
-    spikes = getWaveForms('D:/Trial001_Utah', spikeStruct, nevIDs = None, wfWin = (-30, 80), plotting = False)
-    #plotSpike(spikes, channel = 45, showNow = True, acrossArray = True, xcoords = spikeStruct['xcoords'], ycoords = spikeStruct['ycoords'])
-    #plotISIHistogram(spikes, channel = 45, bins = np.linspace(0, 25e-3, 100), showNow = True)
-    #plotSpikePanel(spikeStruct['xcoords'], spikeStruct['ycoords'], spikes)
-    spikePDFReport('D:/Trial001_Utah', spikes, spikeStruct)
-    plt.show()
-#pdb.set_trace()
+    spikesNForm = getWaveForms('D:/Trial001_NForm', spikeStructNForm, nevIDs = None, wfWin = (-30, 80), plotting = False)
+    spikePDFReport('D:/Trial001_NForm', spikesNForm, spikeStructNForm)
+
+    spikeStructUtah = loadKSDir('D:/Trial001_Utah', loadPCs = True)
+    nevIDs = list(range(65,97))
+    spikesUtah = getWaveForms('D:/Trial001_Utah', spikeStructUtah, nevIDs = None, wfWin = (-30, 80), plotting = False)
+    spikePDFReport('D:/Trial001_Utah', spikesNForm, spikeStructUtah)
