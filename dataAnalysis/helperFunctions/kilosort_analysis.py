@@ -10,19 +10,35 @@ from importlib import reload
 from dataAnalysis.helperFunctions.helper_functions import *
 
 def loadParamsPy(filePath):
+
+    """
+    # Old implementation, treats params.py as a package and has many problems
+    pdb.set_trace()
+
     sys.path.insert(0, filePath)
+
     try:
         reload(params)
     except:
          import params
-    return params
+
+    sys.path.remove(filePath)
+    """
+
+    with open(filePath + '/params.py') as f:
+        paramsText = f.read()
+
+    exec(paramsText)
+    del paramsText
+
+    return locals()
 
 def loadKSDir(filePath, excludeNoise = True, loadPCs = False):
     mMapMode = 'r'
     params = loadParamsPy(filePath)
 
     spikeTimesSamples = np.load(filePath + '/spike_times.npy', mmap_mode = mMapMode).squeeze()
-    spikeTimes = spikeTimesSamples.astype(np.float)/params.sample_rate
+    spikeTimes = spikeTimesSamples.astype(np.float)/params['sample_rate']
 
     spikeTemplates = np.load(filePath + '/spike_templates.npy', mmap_mode = mMapMode).squeeze()
     try:
@@ -89,12 +105,12 @@ def loadKSDir(filePath, excludeNoise = True, loadPCs = False):
     winv = np.load(filePath + '/whitening_mat_inv.npy', mmap_mode = mMapMode)
 
     spikeStruct = {
-        'dat_path'          : params.dat_path,
-        'dtype'             : params.dtype,
-        'hp_filtered'       : params.hp_filtered,
-        'n_channels_dat'    : params.n_channels_dat,
-        'offset'            : params.offset,
-        'sample_rate'       : params.sample_rate,
+        'dat_path'          : params['dat_path'],
+        'dtype'             : params['dtype'],
+        'hp_filtered'       : params['hp_filtered'],
+        'n_channels_dat'    : params['n_channels_dat'],
+        'offset'            : params['offset'],
+        'sample_rate'       : params['sample_rate'],
         'spikeTimes'        : spikeTimes,
         'spikeTimesSamples' : spikeTimesSamples,
         'spikeTemplates'    : spikeTemplates,
