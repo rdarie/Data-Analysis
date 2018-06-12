@@ -48,6 +48,7 @@ import matplotlib.backends.backend_pdf
 import math
 from fractions import gcd
 import argparse
+import peakutils
 
 def getPlotOpts(names):
     """
@@ -139,8 +140,6 @@ def getBadSpikesMask(spikes, nStd = 5, whichChan = 0, plotting = False, deleteBa
             spikes['Classification'][idx] = np.array(spikes['Classification'][idx])[np.logical_not(badMask[idx])]
             spikes['TimeStamps'][idx] = np.array(spikes['TimeStamps'][idx])[np.logical_not(badMask[idx])]
     return badMask
-
-import peakutils
 
 def fillInOverflow(channelData, plotting = False):
 
