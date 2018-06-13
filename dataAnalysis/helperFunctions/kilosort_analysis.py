@@ -126,7 +126,7 @@ def loadKSDir(filePath, excludeNoise = True, loadPCs = False):
         }
     return spikeStruct
 
-def getWaveForms(filePath, spikeStruct, nevIDs = None, dataType = np.int16, wfWin = (-40, 41), nWf = None, plotting = False):
+def getWaveForms(filePath, spikeStruct, nevIDs = None, dataType = np.int16, wfWin = (-40, 81), nWf = None, plotting = False):
     chMap = np.load(filePath + '/channel_map.npy', mmap_mode = 'r').squeeze()
     nCh = len(chMap)
     rawData = np.memmap(filename = filePath + '/' + spikeStruct['dat_path'], dtype = dataType, mode = 'r').reshape((-1, nCh))
@@ -278,13 +278,13 @@ def plotSpike(spikes, channel, showNow = False, ax = None, acrossArray = False, 
                 thisSpike = np.mean(waveForms, axis = 0)
                 thisError = np.std(waveForms, axis = 0)
                 timeRange = np.arange(len(thisSpike))
-                ax.fill_between(timeRange, thisSpike-thisError, thisSpike+thisError, alpha=0.4, label='chan %s, unit %s' % (channel, unitName))
+                ax.fill_between(timeRange, thisSpike - thisError, thisSpike + thisError, alpha=0.4, label='chan %s, unit %s' % (channel, unitName))
                 ax.plot(timeRange, thisSpike, 'k-')
 
         if showNow:
             plt.show()
 
-def plotISIHistogram(spikes, channel, showNow = False, ax = None, bins = None):
+def plotISIHistogram(spikes, channel, showNow = False, ax = None, bins = None, kde_kws = None):
     if ax is None:
         fig, ax = plt.subplots()
     else:
@@ -298,7 +298,7 @@ def plotISIHistogram(spikes, channel, showNow = False, ax = None, bins = None):
             unitMask = spikes['Classification'][idx] == unitName
             theseTimes = spikes['TimeStamps'][idx][unitMask]
             theseISI = np.diff(theseTimes)
-            sns.distplot(theseISI, bins = bins, ax = ax)
+            sns.distplot(theseISI, bins = bins, ax = ax, kde_kws = kde_kws)
             if bins is not None:
                 ax.set_xlim(min(bins), max(bins))
         if showNow:
@@ -337,7 +337,9 @@ def spikePDFReport(filePath, spikes, spikeStruct):
                 if len(unitsOnThisChan) > 0:
                     fig, ax = plt.subplots(nrows = 1, ncols = 2)
                     plotSpike(spikes, channel = channel, ax = ax[0])
-                    plotISIHistogram(spikes, channel = channel, bins = np.linspace(0, 25e-3, 100), ax = ax[1])
+                    isiBins = np.linspace(0, 50e-3, 100)
+                    kde_kws = {'clip' : (isiBins[0] * 0.8, isiBins[-1] * 1.2), 'bw' : 'silverman'}
+                    plotISIHistogram(spikes, channel = channel, bins = isiBins, kde_kws = kde_kws, ax = ax[1])
                     pdf.savefig()
                     plt.close()
 
@@ -347,10 +349,13 @@ def spikePDFReport(filePath, spikes, spikeStruct):
                         plt.close()
 
 if __name__ == "__main__":
-
     spikeStructNForm = loadKSDir('D:/Trial001_NForm', loadPCs = True)
     nevIDs = list(range(65,97))
     spikesNForm = getWaveForms('D:/Trial001_NForm', spikeStructNForm, nevIDs = None, wfWin = (-30, 80), plotting = False)
+    #isiBins = np.linspace(0, 50e-3, 100)
+    #plotISIHistogram(spikesNForm, channel = 25, bins = isiBins,kde_kws = {'clip' : (isiBins[0] * 0.8, isiBins[-1] * 1.2), 'bw' : 'silverman'} )
+    #plt.show()
+
     spikePDFReport('D:/Trial001_NForm', spikesNForm, spikeStructNForm)
 
     spikeStructUtah = loadKSDir('D:/Trial001_Utah', loadPCs = True)
