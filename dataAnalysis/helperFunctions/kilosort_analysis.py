@@ -8,6 +8,7 @@ from fractions import gcd
 import seaborn as sns
 from importlib import reload
 from dataAnalysis.helperFunctions.helper_functions import *
+from dataAnalysis.helperFunctions.motor_encoder import *
 
 def loadParamsPy(filePath):
 
@@ -324,7 +325,32 @@ def plotSpikePanel(xcoords, ycoords, spikes):
 
     plt.tight_layout()
 
-def spikePDFReport(filePath, spikes, spikeStruct):
+def plotRaster(spikes, trialEvents, alignTo, channel, windowSize = (-0.1, 0.5), showNow = False, ax = None):
+
+    ChanIdx = spikes['ChannelID'].index(channel)
+    unitsOnThisChan = np.unique(spikes['Classification'][ChanIdx])
+
+    if ax is None:
+        fig, ax = plt.subplots()
+
+    if unitsOnThisChan is not None:
+        for unitName in unitsOnThisChan:
+            unitMask = spikes['Classification'][ChanIdx] == unitName
+            allSpikeTimes = np.array(spikes['TimeStamps'][ChanIdx][unitMask] * 3e4, dtype = np.int64)
+            for idx, startTime in enumerate(trialStats[alignTo]):
+                trialTimeMask = np.logical_and(allSpikeTimes > startTime + windowSize[0] * 3e4, allSpikeTimes < startTime + windowSize[1] * 3e4)
+                trialSpikeTimes = allSpikeTimes[trialTimeMask]
+                ax.vlines(trialSpikeTimes - startTime, idx, idx + 1)
+
+    ax.set_xlabel('Time (samples) aligned to ' + alignTo)
+    ax.set_ylabel('Trial')
+
+    if showNow:
+        plt.show()
+
+    return ax
+
+def spikePDFReport(filePath, spikes, spikeStruct, plotRastersAlignedTo = None, trialStats = None):
     pdfName = filePath + '/' + spikeStruct['dat_path'].split('.')[0] + '.pdf'
     with PdfPages(pdfName) as pdf:
         plotSpikePanel(spikeStruct['xcoords'], spikeStruct['ycoords'], spikes)
@@ -348,17 +374,43 @@ def spikePDFReport(filePath, spikes, spikeStruct):
                         pdf.savefig()
                         plt.close()
 
-if __name__ == "__main__":
-    spikeStructNForm = loadKSDir('D:/Trial001_NForm', loadPCs = True)
-    nevIDs = list(range(65,97))
-    spikesNForm = getWaveForms('D:/Trial001_NForm', spikeStructNForm, nevIDs = None, wfWin = (-30, 80), plotting = False)
-    #isiBins = np.linspace(0, 50e-3, 100)
-    #plotISIHistogram(spikesNForm, channel = 25, bins = isiBins,kde_kws = {'clip' : (isiBins[0] * 0.8, isiBins[-1] * 1.2), 'bw' : 'silverman'} )
-    #plt.show()
+                    if plotRastersAlignedTo is not None and trialStats is not None:
+                        plotRaster(spikes, trialStats, alignTo = plotRastersAlignedTo, channel = channel)
+                        pdf.savefig()
+                        plt.close()
 
-    spikePDFReport('D:/Trial001_NForm', spikesNForm, spikeStructNForm)
+#if __name__ == "__main__":
+#spikeStructNForm = loadKSDir('D:/KiloSort/Trial001_NForm', loadPCs = True)
+#nevIDs = list(range(65,97))
+#spikesNForm = getWaveForms('D:/KiloSort/Trial001_NForm', spikeStructNForm, nevIDs = None, wfWin = (-30, 80), plotting = False)
+#isiBins = np.linspace(0, 50e-3, 100)
+#plotISIHistogram(spikesNForm, channel = 25, bins = isiBins,kde_kws = {'clip' : (isiBins[0] * 0.8, isiBins[-1] * 1.2), 'bw' : 'silverman'} )
+#plt.show()
 
-    spikeStructUtah = loadKSDir('D:/Trial001_Utah', loadPCs = True)
-    nevIDs = list(range(65,97))
-    spikesUtah = getWaveForms('D:/Trial001_Utah', spikeStructUtah, nevIDs = None, wfWin = (-30, 80), plotting = False)
-    spikePDFReport('D:/Trial001_Utah', spikesUtah, spikeStructUtah)
+#spikePDFReport('D:/KiloSort/Trial001_NForm', spikesNForm, spikeStructNForm)
+
+spikeStructUtah = loadKSDir('D:/KiloSort/Trial001_Utah', loadPCs = True)
+nevIDs = list(range(65,97))
+spikes = getWaveForms('D:/KiloSort/Trial001_Utah', spikeStructUtah, nevIDs = None, wfWin = (-30, 80), plotting = False)
+#spikePDFReport('D:/KiloSort/Trial001_Utah', spikesUtah, spikeStructUtah)
+
+ns5FilePath = 'D:/KiloSort/Trial001.ns5'
+inputIDs = {
+    'A+' : 139,
+    'A-' : 140,
+    'B+' : 141,
+    'B-' : 142,
+    'Z+' : 143,
+    'Z-' : 144,
+    'leftLED' : 132,
+    'leftBut' : 130,
+    'rightLED' : 131,
+    'rightBut' : 129,
+    'simiTrigs' : 136,
+    }
+
+motorData = getMotorData(ns5FilePath, inputIDs, 0 , 'all')
+trialStats, trialEvents = getTrials(motorData)
+
+#plotRaster(spikes, trialStats, alignTo = 'FirstOnset', channel = 28)
+spikePDFReport('D:/KiloSort/Trial001_Utah', spikes, spikeStructUtah, plotRastersAlignedTo = 'FirstOnset', trialStats = trialStats)

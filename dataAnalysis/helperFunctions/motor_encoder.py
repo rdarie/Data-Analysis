@@ -162,7 +162,7 @@ def getTrials(motorData, trialType = '2AFC'):
     assert len(movementOnsetIdx) == len(movementOffsetIdx)
 
     # detection of right button choice (debouce)
-    skipAhead = 0
+    #skipAhead = 0
     # look at this size window and determine if there's an index there
     windowLen = int(200e-3 / 3e-4)
     # How many transitions should be in the window in order for this to count as a "start"
@@ -172,45 +172,138 @@ def getTrials(motorData, trialType = '2AFC'):
     for idx in motorData.index[rightButEdges].tolist():
         #check that we're not out of bounds])
         if idx - windowLen >= firstIdx and idx + windowLen <= lastIdx:
-            if not skipAhead:
-                transitionInPast = sum(motorData['rightBut_int'][idx - windowLen : idx])
-                transitionInFuture = sum(motorData['rightBut_int'][idx : idx + windowLen])
-                if transitionInPast < offThreshold and transitionInFuture > onThreshold:
-                    rightButOnsetIdx.append(idx)
-                    trialEvents = trialEvents.append({'Time':idx,'Label':'Right Button Onset'}, ignore_index = True)
-                    skipAhead = skipAheadInc
-            else:
-                skipAhead = skipAhead - 1
+    #        if not skipAhead:
+            transitionInPast = sum(motorData['rightBut_int'][idx - windowLen : idx])
+            transitionInFuture = sum(motorData['rightBut_int'][idx : idx + windowLen])
+            if transitionInPast < offThreshold and transitionInFuture > onThreshold:
+                rightButOnsetIdx.append(idx)
+                trialEvents = trialEvents.append({'Time':idx,'Label':'Right Button Onset'}, ignore_index = True)
+    #            skipAhead = skipAheadInc
+    #        else:
+    #            skipAhead = skipAhead - 1
 
-    skipAhead = 0
+    #skipAhead = 0
     for idx in motorData.index[leftButEdges].tolist():
         #check that we're not out of bounds])
         #if idx > 161400 and idx < 161600:
         #    pdb.set_trace()
         if idx - windowLen >= firstIdx and idx + windowLen <= lastIdx:
-            if not skipAhead:
-                transitionInPast = sum(motorData['leftBut_int'][idx - windowLen : idx])
-                transitionInFuture = sum(motorData['leftBut_int'][idx : idx + windowLen])
-                if transitionInPast < offThreshold and transitionInFuture > onThreshold:
-                    leftButOnsetIdx.append(idx)
-                    trialEvents = trialEvents.append({'Time':idx,'Label':'Left Button Onset'}, ignore_index = True)
-                    skipAhead = skipAheadInc
-            else:
-                skipAhead = skipAhead - 1
+    #        if not skipAhead:
+            transitionInPast = sum(motorData['leftBut_int'][idx - windowLen : idx])
+            transitionInFuture = sum(motorData['leftBut_int'][idx : idx + windowLen])
+            if transitionInPast < offThreshold and transitionInFuture > onThreshold:
+                leftButOnsetIdx.append(idx)
+                trialEvents = trialEvents.append({'Time':idx,'Label':'Left Button Onset'}, ignore_index = True)
+    #            skipAhead = skipAheadInc
+    #        else:
+    #            skipAhead = skipAhead - 1
 
     for idx in rightLEDOnsetIdx:
         trialEvents = trialEvents.append({'Time':idx,'Label':'Right LED Onset'}, ignore_index = True)
     for idx in leftLEDOnsetIdx:
         trialEvents = trialEvents.append({'Time':idx,'Label':'Left LED Onset'}, ignore_index = True)
 
-    #pdb.set_trace()
+
     trialEvents.sort_values('Time', inplace = True)
+    trialEvents.reset_index(drop=True, inplace = True)
     if trialType == '2AFC':
-        trials = pd.DataFrame()
+        while not (trialEvents.loc[:3,'Label'].str.contains('Movement').all()) or trialEvents.loc[4:4,'Label'].str.contains('Movement').all():
+            #above expression is not true if the first 5 events do not make up a complete sequence
+            trialEvents.drop(0).reset_index(drop=True, inplace = True)
 
-    return trials, trialEvents
+        #pdb.set_trace()
+        trialStartIdx = trialEvents.index[trialEvents['Label'] == 'Movement Onset']
+        trialStartIdx = trialStartIdx[range(0,len(trialStartIdx),2)]
+        eventsToTrack = ['First',
+                         'FirstOnset',
+                         'FirstOffset',
+                         'Second',
+                         'SecondOnset',
+                         'SecondOffset',
+                         'Magnitude',
+                         'Direction',
+                         'Condition',
+                         'Type',
+                         'Stimulus Duration',
+                         'Outcome',
+                         'Choice',
+                         'CueOnset',
+                         'ChoiceOnset'
+                         ]
+        trialStats = pd.DataFrame(index = range(len(trialStartIdx)), columns = eventsToTrack)
 
-def plotTrialEvents(trialEvents):
+        for idx, startIdx in enumerate(trialStartIdx):
+            try:
+                try:
+                    nextStartIdx = trialStartIdx[idx + 1]
+                except:
+                    nextStartIdx = trialStartIdx[-1]
+
+                assert trialEvents.loc[startIdx, 'Label'] == 'Movement Onset' and trialEvents.loc[startIdx + 1, 'Label'] == 'Movement Offset'
+
+                offsetMask = trialEvents.loc[startIdx:nextStartIdx,'Label'] == 'Movement Offset'
+                offsetTimes = trialEvents.loc[startIdx:nextStartIdx,'Time'][offsetMask]
+
+                firstOnsetTime = trialEvents.loc[startIdx, 'Time']
+                trialStats.loc[idx, 'FirstOnset'] = firstOnsetTime
+                firstOffsetTime = offsetTimes.iloc[0]
+                trialStats.loc[idx, 'FirstOffset'] = firstOffsetTime
+                firstMovement = motorData.loc[firstOnsetTime:firstOffsetTime, 'position']
+
+                if abs(firstMovement.max()) < abs(firstMovement.min()):
+                    trialStats.loc[idx, 'Direction'] = 'Extension'
+                    trialStats.loc[idx, 'First'] = firstMovement.min()
+                else:
+                    trialStats.loc[idx, 'Direction'] = 'Flexion'
+                    trialStats.loc[idx, 'First'] = firstMovement.max()
+
+                assert trialEvents.loc[startIdx + 2, 'Label'] == 'Movement Onset'
+                secondOnsetTime = trialEvents.loc[startIdx + 2, 'Time']
+                trialStats.loc[idx, 'SecondOnset'] = secondOnsetTime
+                secondOffsetTime = offsetTimes.iloc[1]
+                trialStats.loc[idx, 'SecondOffset'] = secondOffsetTime
+                secondMovement = motorData.loc[secondOnsetTime:secondOffsetTime, 'position']
+
+                if trialStats.loc[idx, 'Direction'] == 'Extension':
+                    assert abs(secondMovement.max()) < abs(secondMovement.min())
+                    trialStats.loc[idx, 'Second'] = secondMovement.min()
+                else:
+                    assert abs(secondMovement.max()) > abs(secondMovement.min())
+                    trialStats.loc[idx, 'Second'] = secondMovement.max()
+
+                trialStats.loc[idx, 'Magnitude'] = 'Short' if abs(trialStats.loc[idx, 'Second'] - trialStats.loc[idx, 'First']) < 2e4 else 'Long'
+                cueMask = trialEvents.loc[startIdx:nextStartIdx, 'Label'].str.contains('LED')
+                nCues = sum(cueMask)
+                trialStats.loc[idx, 'Condition'] = 'hard' if nCues == 2 else 'easy'
+                trialStats.loc[idx, 'CueOnset'] = trialEvents.loc[startIdx:nextStartIdx, 'Time'][cueMask].mean()
+
+                trialStats.loc[idx, 'Type'] = 0 if abs(trialStats.loc[idx, 'First']) < abs(trialStats.loc[idx, 'Second']) else 1
+                trialStats.loc[idx, 'Stimulus Duration'] = secondOffsetTime - firstOnsetTime
+
+                rightButtonMask = trialEvents.loc[startIdx:nextStartIdx, 'Label'].str.contains('Right Button')
+                leftButtonMask = trialEvents.loc[startIdx:nextStartIdx, 'Label'].str.contains('Left Button')
+                if rightButtonMask.any() and leftButtonMask.any():
+                    trialStats.loc[idx, 'Choice'] = 'both'
+                    trialStats.loc[idx, 'Outcome'] = 'incorrect button'
+                elif rightButtonMask.any():
+                    trialStats.loc[idx, 'Choice'] = 'right'
+                    trialStats.loc[idx, 'ChoiceOnset'] = trialEvents.loc[startIdx:nextStartIdx, 'Time'][rightButtonMask].mean()
+                    trialStats.loc[idx, 'Outcome'] = 'correct button' if trialStats.loc[idx, 'Type'] == 1 else 'incorrect button'
+                elif leftButtonMask.any():
+                    trialStats.loc[idx, 'Choice'] = 'left'
+                    trialStats.loc[idx, 'ChoiceOnset'] = trialEvents.loc[startIdx:nextStartIdx, 'Time'][leftButtonMask].mean()
+                    trialStats.loc[idx, 'Outcome'] = 'correct button' if trialStats.loc[idx, 'Type'] == 0 else 'incorrect button'
+                elif not rightButtonMask.any() and not leftButtonMask.any():
+                    trialStats.loc[idx, 'Choice'] = 'none'
+                    trialStats.loc[idx, 'Outcome'] = 'button timed out'
+            except:
+                pass
+            #pdb.set_trace()
+    return trialStats, trialEvents
+
+def plotTrialEvents(trialEvents, ax = None):
+    if ax is None:
+        fig, ax = plt.subplots()
     moveOnIdx = trialEvents['Time'][trialEvents['Label'] == 'Movement Onset']
     moveOffIdx = trialEvents['Time'][trialEvents['Label'] == 'Movement Offset']
     RBOnIdx = trialEvents['Time'][trialEvents['Label'] == 'Right Button Onset']
@@ -218,42 +311,44 @@ def plotTrialEvents(trialEvents):
     RLOnIdx = trialEvents['Time'][trialEvents['Label'] == 'Right LED Onset']
     LLOnIdx = trialEvents['Time'][trialEvents['Label'] == 'Left LED Onset']
     #pdb.set_trace()
-    plt.plot(moveOnIdx, np.ones((len(moveOnIdx),1)), 'go')
-    plt.plot(moveOffIdx, np.ones((len(moveOffIdx),1)), 'yo')
-    plt.plot(RBOnIdx, np.ones((len(RBOnIdx),1)), 'cd')
-    plt.plot(LBOnIdx, np.ones((len(LBOnIdx),1)), 'rd')
-    plt.plot(RLOnIdx, np.ones((len(RLOnIdx),1)), 'bo')
-    plt.plot(LLOnIdx, np.ones((len(LLOnIdx),1)), 'co')
+    ax.plot(moveOnIdx, np.ones((len(moveOnIdx),1)), 'go')
+    ax.plot(moveOffIdx, np.ones((len(moveOffIdx),1)), 'yo')
+    ax.plot(RBOnIdx, np.ones((len(RBOnIdx),1)), 'cd')
+    ax.plot(LBOnIdx, np.ones((len(LBOnIdx),1)), 'rd')
+    ax.plot(RLOnIdx, np.ones((len(RLOnIdx),1)), 'bo')
+    ax.plot(LLOnIdx, np.ones((len(LLOnIdx),1)), 'co')
 
-def plotMotor(motorData, plotRange = (0,-1), subset = None):
+def plotMotor(motorData, plotRange = (0,-1), subset = None, addAxes = 0):
     if subset is None:
         subset = motorData.columns
-    fig, ax = plt.subplots(nrows = len(subset), ncols = 1, sharex = True)
+    fig, ax = plt.subplots(nrows = len(subset) + addAxes, ncols = 1, sharex = True)
     for idx, column in enumerate(subset):
         ax[idx].plot(motorData.loc[slice(plotRange[0], plotRange[1]), column], label = column)
         ax[idx].legend()
 
-#if __name__ == "__main__":
-ns5FilePath = 'D:/KiloSort/Trial001.ns5'
-inputIDs = {
-    'A+' : 139,
-    'A-' : 140,
-    'B+' : 141,
-    'B-' : 142,
-    'Z+' : 143,
-    'Z-' : 144,
-    'leftLED' : 132,
-    'leftBut' : 130,
-    'rightLED' : 131,
-    'rightBut' : 129,
-    'simiTrigs' : 136,
-    }
+    return ax
 
-motorData = getMotorData(ns5FilePath, inputIDs, 10 , 30)
-trials, trialEvents = getTrials(motorData)
-plotMotor(motorData, plotRange = (0e4, 200e4), subset = ['position', 'leftLED_int', 'rightLED_int', 'leftBut_int', 'rightBut_int','A_int'])
-plotTrialEvents(trialEvents)
-#
+if __name__ == "__main__":
+    ns5FilePath = 'D:/KiloSort/Trial001.ns5'
+    inputIDs = {
+        'A+' : 139,
+        'A-' : 140,
+        'B+' : 141,
+        'B-' : 142,
+        'Z+' : 143,
+        'Z-' : 144,
+        'leftLED' : 132,
+        'leftBut' : 130,
+        'rightLED' : 131,
+        'rightBut' : 129,
+        'simiTrigs' : 136,
+        }
 
-plt.show(block = False)
-pdb.set_trace()
+    motorData = getMotorData(ns5FilePath, inputIDs, 10 , 30)
+    trials, trialEvents = getTrials(motorData)
+    plotAxes = plotMotor(motorData, plotRange = (0e4, 200e4), subset = ['position', 'leftLED_int', 'rightLED_int', 'leftBut_int', 'rightBut_int','A_int'])
+    plotTrialEvents(trialEvents, ax = plotAxes[-1])
+    #
+
+    plt.show(block = False)
+    #pdb.set_trace()
