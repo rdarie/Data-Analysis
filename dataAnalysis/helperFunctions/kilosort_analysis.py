@@ -157,7 +157,7 @@ def getWaveForms(filePath, spikeStruct, nevIDs = None, dataType = np.int16, wfWi
         'extended_headers' : []
         }
 
-    #pdb.set_trace()
+    pdb.set_trace()
     if nevIDs:
         rootFolder = filePath.split('KiloSort')[0]
         rootName = spikeStruct['dat_path'].split('.dat')[0]
