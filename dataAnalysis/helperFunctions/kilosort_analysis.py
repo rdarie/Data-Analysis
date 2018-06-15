@@ -462,7 +462,7 @@ if __name__ == "__main__":
         'simiTrigs' : 136,
         }
 
-    motorData = getMotorData(ns5FilePath, inputIDs, 0 , 30)
+    motorData = getMotorData(ns5FilePath, inputIDs, 0 , 'all')
     trialStats, trialEvents = getTrials(motorData)
 
     #plotAx = plotRaster(spikes, trialStats, alignTo = 'FirstOnset', channel = 28)

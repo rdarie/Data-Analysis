@@ -320,7 +320,7 @@ def getTrials(motorData, trialType = '2AFC'):
     return trialStats, trialEvents
 
 #@profile
-def plotTrialEvents(trialEvents, ax = None):
+def plotTrialEvents(trialEvents, plotRange = None, ax = None):
     if ax is None:
         fig, ax = plt.subplots()
     moveOnIdx = trialEvents['Time'][trialEvents['Label'] == 'Movement Onset']
@@ -329,6 +329,14 @@ def plotTrialEvents(trialEvents, ax = None):
     LBOnIdx = trialEvents['Time'][trialEvents['Label'] == 'Left Button Onset']
     RLOnIdx = trialEvents['Time'][trialEvents['Label'] == 'Right LED Onset']
     LLOnIdx = trialEvents['Time'][trialEvents['Label'] == 'Left LED Onset']
+
+    if plotRange is not None:
+        moveOnIdx = moveOnIdx[np.logical_and(moveOnIdx > plotRange[0], moveOnIdx < plotRange[1])]
+        moveOffIdx = moveOffIdx[np.logical_and(moveOffIdx > plotRange[0], moveOffIdx < plotRange[1])]
+        RBOnIdx = RBOnIdx[np.logical_and(RBOnIdx > plotRange[0], RBOnIdx < plotRange[1])]
+        LBOnIdx = LBOnIdx[np.logical_and(LBOnIdx > plotRange[0], LBOnIdx < plotRange[1])]
+        RLOnIdx = RLOnIdx[np.logical_and(RLOnIdx > plotRange[0], RLOnIdx < plotRange[1])]
+        LLOnIdx = LLOnIdx[np.logical_and(LLOnIdx > plotRange[0], LLOnIdx < plotRange[1])]
     #pdb.set_trace()
     ax.plot(moveOnIdx, np.ones((len(moveOnIdx),1)), 'go')
     ax.plot(moveOffIdx, np.ones((len(moveOffIdx),1)), 'yo')
@@ -341,9 +349,16 @@ def plotTrialEvents(trialEvents, ax = None):
 def plotMotor(motorData, plotRange = (0,-1), subset = None, addAxes = 0):
     if subset is None:
         subset = motorData.columns
+    if plotRange is None:
+        xAxis = range(len(motorData.index))
+    else:
+        xAxis = range(int(plotRange[0]), int(plotRange[1]))
+    #pdb.set_trace()
     fig, ax = plt.subplots(nrows = len(subset) + addAxes, ncols = 1, sharex = True)
     for idx, column in enumerate(subset):
-        ax[idx].plot(motorData.loc[slice(plotRange[0], plotRange[1]), column], label = column)
+        #pdb.set_trace()
+        #ax[idx].plot(xAxis, motorData.loc[slice(plotRange[0], plotRange[1]), column], label = column)
+        ax[idx].plot(xAxis, motorData.loc[xAxis, column], label = column)
         ax[idx].legend()
 
     return ax
@@ -364,11 +379,12 @@ if __name__ == "__main__":
         'simiTrigs' : 136,
         }
 
-    motorData = getMotorData(ns5FilePath, inputIDs, 10 , 30)
+    motorData = getMotorData(ns5FilePath, inputIDs, 0 , 150)
     trials, trialEvents = getTrials(motorData)
-    plotAxes = plotMotor(motorData, plotRange = (0e4, 200e4), subset = ['position', 'leftLED_int', 'rightLED_int', 'leftBut_int', 'rightBut_int','A_int'])
-    plotTrialEvents(trialEvents, ax = plotAxes[-1])
+    for timeRange in [30, 60, 90, 120, 150]:
+        plotAxes = plotMotor(motorData, plotRange = ((timeRange - 30)* 30e3, timeRange * 30e3), subset = ['position', 'leftLED_int', 'rightLED_int', 'leftBut_int', 'rightBut_int','A_int'])
+        plotTrialEvents(trialEvents, plotRange = ((timeRange - 30)* 30e3, timeRange * 30e3), ax = plotAxes[-1])
+        plt.show(block = True)
     #
 
-    plt.show(block = True)
     #pdb.set_trace()
