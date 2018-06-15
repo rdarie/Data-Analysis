@@ -1,5 +1,6 @@
 import os, sys, pdb
 import numpy as np
+from scipy.ndimage.filters import gaussian_filter1d
 import pandas as pd
 import matplotlib
 from matplotlib.backends.backend_pdf import PdfPages
@@ -255,7 +256,8 @@ def plotSpike(spikes, channel, showNow = False, ax = None, acrossArray = False, 
             xIdx, yIdx = coordsToIndices(xcoords, ycoords)
             fig, ax = plt.subplots(nrows = max(np.unique(xIdx)) + 1, ncols = max(np.unique(yIdx)) + 1)
 
-        for unitName in unitsOnThisChan:
+        colorPalette = sns.color_palette()
+        for unitIdx, unitName in enumerate(unitsOnThisChan):
 
             unitMask = spikes['Classification'][ChanIdx] == unitName
 
@@ -266,8 +268,8 @@ def plotSpike(spikes, channel, showNow = False, ax = None, acrossArray = False, 
                     thisSpike = np.mean(waveForms, axis = 0)
                     thisError = np.std(waveForms, axis = 0)
                     timeRange = np.arange(len(thisSpike))
-                    curAx.fill_between(timeRange, thisSpike-thisError, thisSpike+thisError, alpha=0.4, label='chan %s, unit %s' % (channel, unitName))
-                    curAx.plot(timeRange, thisSpike, 'k-')
+                    curAx.fill_between(timeRange, thisSpike-thisError, thisSpike+thisError, alpha=0.4, facecolor=colorPalette[unitIdx], label='chan %s, unit %s' % (channel, unitName))
+                    curAx.plot(timeRange, thisSpike, linewidth=1, color=colorPalette[unitIdx])
 
                 sns.despine()
                 for curAx in ax.flatten():
@@ -279,8 +281,9 @@ def plotSpike(spikes, channel, showNow = False, ax = None, acrossArray = False, 
                 thisSpike = np.mean(waveForms, axis = 0)
                 thisError = np.std(waveForms, axis = 0)
                 timeRange = np.arange(len(thisSpike))
-                ax.fill_between(timeRange, thisSpike - thisError, thisSpike + thisError, alpha=0.4, label='chan %s, unit %s' % (channel, unitName))
-                ax.plot(timeRange, thisSpike, 'k-')
+                colorPalette = sns.color_palette()
+                ax.fill_between(timeRange, thisSpike - thisError, thisSpike + thisError, alpha=0.4, facecolor=colorPalette[unitIdx], label='chan %s, unit %s' % (channel, unitName))
+                ax.plot(timeRange, thisSpike, linewidth=1, color=colorPalette[unitIdx])
 
         if showNow:
             plt.show()
@@ -295,11 +298,12 @@ def plotISIHistogram(spikes, channel, showNow = False, ax = None, bins = None, k
     unitsOnThisChan = np.unique(spikes['Classification'][idx])
 
     if unitsOnThisChan is not None:
-        for unitName in unitsOnThisChan:
+        colorPalette = sns.color_palette()
+        for unitIdx, unitName in enumerate(unitsOnThisChan):
             unitMask = spikes['Classification'][idx] == unitName
             theseTimes = spikes['TimeStamps'][idx][unitMask]
             theseISI = np.diff(theseTimes)
-            sns.distplot(theseISI, bins = bins, ax = ax, kde_kws = kde_kws)
+            sns.distplot(theseISI, bins = bins, ax = ax, color = colorPalette[unitIdx],  kde_kws = kde_kws)
             if bins is not None:
                 ax.set_xlim(min(bins), max(bins))
         if showNow:
@@ -333,14 +337,16 @@ def plotRaster(spikes, trialStats, alignTo, channel, windowSize = (-0.1, 0.5), s
     if ax is None:
         fig, ax = plt.subplots()
 
+    timeWindow = list(range(int(windowSize[0] * 3e4), int(windowSize[1] * 3e4) + 1))
     if unitsOnThisChan is not None:
-        for unitName in unitsOnThisChan:
+        colorPalette = sns.color_palette()
+        for unitIdx, unitName in enumerate(unitsOnThisChan):
             unitMask = spikes['Classification'][ChanIdx] == unitName
             allSpikeTimes = np.array(spikes['TimeStamps'][ChanIdx][unitMask] * 3e4, dtype = np.int64)
             for idx, startTime in enumerate(trialStats[alignTo]):
-                trialTimeMask = np.logical_and(allSpikeTimes > startTime + windowSize[0] * 3e4, allSpikeTimes < startTime + windowSize[1] * 3e4)
+                trialTimeMask = np.logical_and(allSpikeTimes > startTime + timeWindow[0], allSpikeTimes < startTime + timeWindow[-1])
                 trialSpikeTimes = allSpikeTimes[trialTimeMask]
-                ax.vlines(trialSpikeTimes - startTime, idx, idx + 1)
+                ax.vlines(trialSpikeTimes - startTime, idx, idx + 1, colors = [colorPalette[unitIdx]], linewidths = [0.5])
 
     ax.set_xlabel('Time (samples) aligned to ' + alignTo)
     ax.set_ylabel('Trial')
@@ -349,25 +355,37 @@ def plotRaster(spikes, trialStats, alignTo, channel, windowSize = (-0.1, 0.5), s
         plt.show()
 
     return ax
-def plotFR(spikes, trialStats, alignTo, channel, windowSize = (-0.1, 0.5), showNow = False, ax = None):
+def plotFR(spikes, trialStats, alignTo, channel, windowSize = (-0.1, 0.5), showNow = False, ax = None, twin = False):
     ChanIdx = spikes['ChannelID'].index(channel)
     unitsOnThisChan = np.unique(spikes['Classification'][ChanIdx])
+
+    if ax is not None and twin:
+        ax = ax.twinx()
 
     if ax is None:
         fig, ax = plt.subplots()
 
-    timeWindow = list(range(windowSize[0] * 3e4, windowSize[1] * 3e4))
+    timeWindow = list(range(int(windowSize[0] * 3e4), int(windowSize[1] * 3e4) + 1))
     if unitsOnThisChan is not None:
-        for unitName in unitsOnThisChan:
+        FR = [pd.DataFrame(index = trialStats.index, columns = timeWindow[:-1]) for i in unitsOnThisChan]
+        for unitIdx, unitName in enumerate(unitsOnThisChan):
             unitMask = spikes['Classification'][ChanIdx] == unitName
             allSpikeTimes = np.array(spikes['TimeStamps'][ChanIdx][unitMask] * 3e4, dtype = np.int64)
             for idx, startTime in enumerate(trialStats[alignTo]):
                 trialTimeMask = np.logical_and(allSpikeTimes > startTime + timeWindow[0], allSpikeTimes < startTime + timeWindow[-1])
                 trialSpikeTimes = allSpikeTimes[trialTimeMask] - startTime
-                pdb.set_trace()
+                FR[unitIdx].iloc[idx, :] = np.histogram(trialSpikeTimes, timeWindow)[0]
+                #pdb.set_trace()
 
+    kernelWidth = 5e-3 # seconds
+    FR = [gaussian_filter1d(x.mean(axis = 0), kernelWidth * 3e4) / kernelWidth for x in FR]
+    colorPalette = sns.color_palette()
+    for unitIdx, x in FR:
+        ax.plot(timeWindow[:-1], x, linewidth = 1, color = colorPalette[unitIdx])
+    ax.set_ylabel('Average Firing rate')
     if showNow:
         plt.show()
+    return ax, FR
 
 def spikePDFReport(filePath, spikes, spikeStruct, plotRastersAlignedTo = None, trialStats = None):
     pdfName = filePath + '/' + spikeStruct['dat_path'].split('.')[0] + '.pdf'
@@ -394,7 +412,8 @@ def spikePDFReport(filePath, spikes, spikeStruct, plotRastersAlignedTo = None, t
                         plt.close()
 
                     if plotRastersAlignedTo is not None and trialStats is not None:
-                        plotRaster(spikes, trialStats, alignTo = plotRastersAlignedTo, channel = channel)
+                        plotAx = plotRaster(spikes, trialStats, alignTo = plotRastersAlignedTo, channel = channel)
+                        plotFR(spikes, trialStats, alignTo = plotRastersAlignedTo, channel = channel, ax = plotAx, twin = True)
                         pdf.savefig()
                         plt.close()
 
@@ -428,9 +447,10 @@ if __name__ == "__main__":
         'simiTrigs' : 136,
         }
 
-    motorData = getMotorData(ns5FilePath, inputIDs, 0 , 'all')
+    motorData = getMotorData(ns5FilePath, inputIDs, 30 , 30)
     trialStats, trialEvents = getTrials(motorData)
 
     plotAx = plotRaster(spikes, trialStats, alignTo = 'FirstOnset', channel = 28)
-    plotFR(spikes, trialStats, alignTo = 'FirstOnset', channel = 28)
+    plotFR(spikes, trialStats, alignTo = 'FirstOnset', channel = 28, ax = plotAx, twin = True)
+    plt.show()
     #spikePDFReport('D:/KiloSort/Trial001_Utah', spikes, spikeStructUtah, plotRastersAlignedTo = 'FirstOnset', trialStats = trialStats)
