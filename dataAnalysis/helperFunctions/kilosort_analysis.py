@@ -340,7 +340,7 @@ def plotSpikePanel(xcoords, ycoords, spikes):
     plt.tight_layout()
 
 #@profile
-def plotRaster(spikes, trialStats, alignTo, channel, windowSize = (-0.1, 0.5), showNow = False, ax = None):
+def plotRaster(spikes, trialStats, alignTo, channel, windowSize = (-0.25, 1), showNow = False, ax = None):
 
     ChanIdx = spikes['ChannelID'].index(channel)
     unitsOnThisChan = np.unique(spikes['Classification'][ChanIdx])
@@ -368,7 +368,7 @@ def plotRaster(spikes, trialStats, alignTo, channel, windowSize = (-0.1, 0.5), s
     return ax
 
 #@profile
-def plotFR(spikes, trialStats, alignTo, channel, windowSize = (-0.1, 0.5), showNow = False, ax = None, twin = False):
+def plotFR(spikes, trialStats, alignTo, channel, windowSize = (-0.25, 1), showNow = False, ax = None, twin = False):
     ChanIdx = spikes['ChannelID'].index(channel)
     unitsOnThisChan = np.unique(spikes['Classification'][ChanIdx])
 
@@ -390,7 +390,7 @@ def plotFR(spikes, trialStats, alignTo, channel, windowSize = (-0.1, 0.5), showN
                 FR[unitIdx].iloc[idx, :] = np.histogram(trialSpikeTimes, timeWindow)[0]
                 #pdb.set_trace()
 
-    kernelWidth = 5e-3 # seconds
+    kernelWidth = 50e-3 # seconds
     FR = [gaussian_filter1d(x.mean(axis = 0), kernelWidth * 3e4) / kernelWidth for x in FR]
     colorPalette = sns.color_palette()
     for unitIdx, x in enumerate(FR):
