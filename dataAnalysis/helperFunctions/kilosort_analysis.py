@@ -11,6 +11,7 @@ from importlib import reload
 from dataAnalysis.helperFunctions.helper_functions import *
 from dataAnalysis.helperFunctions.motor_encoder import *
 
+@profile
 def loadParamsPy(filePath):
 
     """
@@ -35,6 +36,7 @@ def loadParamsPy(filePath):
 
     return locals()
 
+@profile
 def loadKSDir(filePath, excludeNoise = True, loadPCs = False):
     mMapMode = 'r'
     params = loadParamsPy(filePath)
@@ -128,6 +130,7 @@ def loadKSDir(filePath, excludeNoise = True, loadPCs = False):
         }
     return spikeStruct
 
+@profile
 def getWaveForms(filePath, spikeStruct, nevIDs = None, dataType = np.int16, wfWin = (-40, 81), nWf = None, plotting = False):
     chMap = np.load(filePath + '/channel_map.npy', mmap_mode = 'r').squeeze()
     nCh = len(chMap)
@@ -217,6 +220,7 @@ def getWaveForms(filePath, spikeStruct, nevIDs = None, dataType = np.int16, wfWi
     #pdb.set_trace()
     return spikes
 
+@profile
 def coordsToIndices(xcoords, ycoords):
 
     xSpacing = np.ufunc.reduce(np.frompyfunc(gcd, 2, 1), xcoords)
@@ -228,6 +232,7 @@ def coordsToIndices(xcoords, ycoords):
 
     return xIdx, yIdx
 
+@profile
 def plotSpike(spikes, channel, showNow = False, ax = None, acrossArray = False, xcoords = None, ycoords = None):
 
     ChanIdx = spikes['ChannelID'].index(channel)
@@ -288,6 +293,7 @@ def plotSpike(spikes, channel, showNow = False, ax = None, acrossArray = False, 
         if showNow:
             plt.show()
 
+@profile
 def plotISIHistogram(spikes, channel, showNow = False, ax = None, bins = None, kde_kws = None):
     if ax is None:
         fig, ax = plt.subplots()
@@ -309,6 +315,7 @@ def plotISIHistogram(spikes, channel, showNow = False, ax = None, bins = None, k
         if showNow:
             plt.show()
 
+@profile
 def plotSpikePanel(xcoords, ycoords, spikes):
     sns.set_style("dark", {"axes.facecolor": ".9"})
     matplotlib.rc('xtick', labelsize=5)
@@ -329,6 +336,7 @@ def plotSpikePanel(xcoords, ycoords, spikes):
 
     plt.tight_layout()
 
+@profile
 def plotRaster(spikes, trialStats, alignTo, channel, windowSize = (-0.1, 0.5), showNow = False, ax = None):
 
     ChanIdx = spikes['ChannelID'].index(channel)
@@ -355,6 +363,8 @@ def plotRaster(spikes, trialStats, alignTo, channel, windowSize = (-0.1, 0.5), s
         plt.show()
 
     return ax
+
+@profile
 def plotFR(spikes, trialStats, alignTo, channel, windowSize = (-0.1, 0.5), showNow = False, ax = None, twin = False):
     ChanIdx = spikes['ChannelID'].index(channel)
     unitsOnThisChan = np.unique(spikes['Classification'][ChanIdx])
@@ -380,13 +390,14 @@ def plotFR(spikes, trialStats, alignTo, channel, windowSize = (-0.1, 0.5), showN
     kernelWidth = 5e-3 # seconds
     FR = [gaussian_filter1d(x.mean(axis = 0), kernelWidth * 3e4) / kernelWidth for x in FR]
     colorPalette = sns.color_palette()
-    for unitIdx, x in FR:
+    for unitIdx, x in enumerate(FR):
         ax.plot(timeWindow[:-1], x, linewidth = 1, color = colorPalette[unitIdx])
     ax.set_ylabel('Average Firing rate')
     if showNow:
         plt.show()
     return ax, FR
 
+@profile
 def spikePDFReport(filePath, spikes, spikeStruct, plotRastersAlignedTo = None, trialStats = None):
     pdfName = filePath + '/' + spikeStruct['dat_path'].split('.')[0] + '.pdf'
     with PdfPages(pdfName) as pdf:
