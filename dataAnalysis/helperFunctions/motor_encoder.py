@@ -10,10 +10,13 @@ from sklearn.mixture import GaussianMixture
 
 import seaborn as sns
 from scipy.signal import hilbert
+import line_profiler
 
+#@profile
 def debounceLine(dataLine):
     pass
 
+#@profile
 def getTransitionIdx(motorData):
 
     Adiff = motorData['A_int'].diff().abs()
@@ -24,6 +27,7 @@ def getTransitionIdx(motorData):
 
     return transitionMask, transitionIdx
 
+#@profile
 def getMotorData(ns5FilePath, inputIDs, startTime, dataTime, debounce = None):
 
     analogData = getNSxData(ns5FilePath, inputIDs.values(), startTime, dataTime)
@@ -103,6 +107,7 @@ def getMotorData(ns5FilePath, inputIDs, startTime, dataTime, debounce = None):
 
     return motorData
 
+#@profile
 def getTrials(motorData, trialType = '2AFC'):
 
     rightLEDdiff = motorData['rightLED_int'].diff()
@@ -138,12 +143,34 @@ def getTrials(motorData, trialType = '2AFC'):
     firstIdx = motorData.index[0]
     lastIdx = motorData.index[-1]
     lookForStarts = True
+
+    """
+    # preallocate transition mask, as well as its past and future shifted values
+    dummyFuture = pd.DataFrame(list(range(11)))
+    dummyPast = pd.DataFrame(list(range(11)))
+    for i in range(10):
+        dummyFuture = pd.concat([dummyFuture, dummyFuture.iloc[1:, -1].reset_index(drop = True)], axis = 1)
+        dummyPast = pd.concat([dummyPast, pd.concat([filler, dummyPast.iloc[:-1,-1]]).reset_index(drop = True)], axis = 1)
+    pdb.set_trace()
+    """
+    filler = pd.DataFrame([np.nan])
+    transitionMaskFuture = pd.DataFrame(transitionMask)
+    transitionMaskPast = pd.DataFrame(transitionMask)
+    for i in range(windowLen):
+        transitionMaskFuture = pd.concat([transitionMaskFuture, transitionMaskFuture.iloc[1:, -1].reset_index(drop = True)], axis = 1)
+        transitionMaskPast = pd.concat([transitionMaskPast, pd.concat([filler, transitionMaskPast.iloc[:-1,-1]]).reset_index(drop = True)], axis = 1)
+
     for idx in transitionIdx:
         #check that we're not out of bounds])
         if idx - windowLen >= firstIdx and idx + windowLen <= lastIdx:
             if not skipAhead:
+                pdb.set_trace()
+                """
+                #old way, index into transition mask and find the number of crossings
                 transitionInPast = sum(transitionMask[idx - windowLen : idx])
                 transitionInFuture = sum(transitionMask[idx : idx + windowLen])
+                # new way, index into past and present samples and find the number of crossings:
+                """
                 if transitionInPast < noMoveThreshold and transitionInFuture > moveThreshold and lookForStarts:
                     movementOnsetIdx.append(idx)
                     trialEvents = trialEvents.append({'Time':idx,'Label':'Movement Onset'}, ignore_index = True)
@@ -301,6 +328,7 @@ def getTrials(motorData, trialType = '2AFC'):
             #pdb.set_trace()
     return trialStats, trialEvents
 
+#@profile
 def plotTrialEvents(trialEvents, ax = None):
     if ax is None:
         fig, ax = plt.subplots()
@@ -318,6 +346,7 @@ def plotTrialEvents(trialEvents, ax = None):
     ax.plot(RLOnIdx, np.ones((len(RLOnIdx),1)), 'bo')
     ax.plot(LLOnIdx, np.ones((len(LLOnIdx),1)), 'co')
 
+#@profile
 def plotMotor(motorData, plotRange = (0,-1), subset = None, addAxes = 0):
     if subset is None:
         subset = motorData.columns

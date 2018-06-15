@@ -9,8 +9,7 @@ from fractions import gcd
 import seaborn as sns
 from importlib import reload
 from dataAnalysis.helperFunctions.helper_functions import *
-from dataAnalysis.helperFunctions.motor_encoder import *
-
+import line_profiler
 
 def loadParamsPy(filePath):
 
@@ -37,6 +36,7 @@ def loadParamsPy(filePath):
     return locals()
 
 
+#@profile
 def loadKSDir(filePath, excludeNoise = True, loadPCs = False):
     mMapMode = 'r'
     params = loadParamsPy(filePath)
@@ -131,6 +131,7 @@ def loadKSDir(filePath, excludeNoise = True, loadPCs = False):
     return spikeStruct
 
 
+#@profile
 def getWaveForms(filePath, spikeStruct, nevIDs = None, dataType = np.int16, wfWin = (-40, 81), nWf = None, plotting = False):
     chMap = np.load(filePath + '/channel_map.npy', mmap_mode = 'r').squeeze()
     nCh = len(chMap)
@@ -233,6 +234,7 @@ def coordsToIndices(xcoords, ycoords):
     return xIdx, yIdx
 
 
+#@profile
 def plotSpike(spikes, channel, showNow = False, ax = None, acrossArray = False, xcoords = None, ycoords = None):
 
     ChanIdx = spikes['ChannelID'].index(channel)
@@ -294,6 +296,7 @@ def plotSpike(spikes, channel, showNow = False, ax = None, acrossArray = False, 
             plt.show()
 
 
+#@profile
 def plotISIHistogram(spikes, channel, showNow = False, ax = None, bins = None, kde_kws = None):
     if ax is None:
         fig, ax = plt.subplots()
@@ -315,6 +318,7 @@ def plotISIHistogram(spikes, channel, showNow = False, ax = None, bins = None, k
         if showNow:
             plt.show()
 
+#@profile
 def plotSpikePanel(xcoords, ycoords, spikes):
     sns.set_style("dark", {"axes.facecolor": ".9"})
     matplotlib.rc('xtick', labelsize=5)
@@ -335,6 +339,7 @@ def plotSpikePanel(xcoords, ycoords, spikes):
 
     plt.tight_layout()
 
+#@profile
 def plotRaster(spikes, trialStats, alignTo, channel, windowSize = (-0.1, 0.5), showNow = False, ax = None):
 
     ChanIdx = spikes['ChannelID'].index(channel)
@@ -362,6 +367,7 @@ def plotRaster(spikes, trialStats, alignTo, channel, windowSize = (-0.1, 0.5), s
 
     return ax
 
+#@profile
 def plotFR(spikes, trialStats, alignTo, channel, windowSize = (-0.1, 0.5), showNow = False, ax = None, twin = False):
     ChanIdx = spikes['ChannelID'].index(channel)
     unitsOnThisChan = np.unique(spikes['Classification'][ChanIdx])
@@ -394,7 +400,7 @@ def plotFR(spikes, trialStats, alignTo, channel, windowSize = (-0.1, 0.5), showN
         plt.show()
     return ax, FR
 
-
+#@profile
 def spikePDFReport(filePath, spikes, spikeStruct, plotRastersAlignedTo = None, trialStats = None):
     pdfName = filePath + '/' + spikeStruct['dat_path'].split('.')[0] + '.pdf'
     with PdfPages(pdfName) as pdf:
@@ -426,6 +432,7 @@ def spikePDFReport(filePath, spikes, spikeStruct, plotRastersAlignedTo = None, t
                         plt.close()
 
 if __name__ == "__main__":
+    from dataAnalysis.helperFunctions.motor_encoder import *
     #spikeStructNForm = loadKSDir('D:/KiloSort/Trial001_NForm', loadPCs = True)
     #nevIDs = list(range(65,97))
     #spikesNForm = getWaveForms('D:/KiloSort/Trial001_NForm', spikeStructNForm, nevIDs = None, wfWin = (-30, 80), plotting = False)
@@ -455,10 +462,10 @@ if __name__ == "__main__":
         'simiTrigs' : 136,
         }
 
-    motorData = getMotorData(ns5FilePath, inputIDs, 30 , 30)
+    motorData = getMotorData(ns5FilePath, inputIDs, 0 , 30)
     trialStats, trialEvents = getTrials(motorData)
 
-    plotAx = plotRaster(spikes, trialStats, alignTo = 'FirstOnset', channel = 28)
-    plotFR(spikes, trialStats, alignTo = 'FirstOnset', channel = 28, ax = plotAx, twin = True)
-    plt.show()
-    #spikePDFReport('D:/KiloSort/Trial001_Utah', spikes, spikeStructUtah, plotRastersAlignedTo = 'FirstOnset', trialStats = trialStats)
+    #plotAx = plotRaster(spikes, trialStats, alignTo = 'FirstOnset', channel = 28)
+    #plotFR(spikes, trialStats, alignTo = 'FirstOnset', channel = 28, ax = plotAx, twin = True)
+    #plt.show()
+    spikePDFReport('D:/KiloSort/Trial001_Utah', spikes, spikeStructUtah, plotRastersAlignedTo = 'FirstOnset', trialStats = trialStats)
