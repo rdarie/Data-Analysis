@@ -10,6 +10,7 @@ import seaborn as sns
 from importlib import reload
 from dataAnalysis.helperFunctions.helper_functions import *
 from dataAnalysis.helperFunctions.motor_encoder import *
+import line_profiler
 
 @profile
 def loadParamsPy(filePath):
