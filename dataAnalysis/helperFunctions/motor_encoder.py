@@ -227,7 +227,9 @@ def getTrials(motorData, trialType = '2AFC'):
     if trialType == '2AFC':
         while not (trialEvents.loc[:3,'Label'].str.contains('Movement').all()) or trialEvents.loc[4:4,'Label'].str.contains('Movement').all():
             #above expression is not true if the first 5 events do not make up a complete sequence
-            trialEvents.drop(0).reset_index(drop=True, inplace = True)
+            #pdb.set_trace()
+            trialEvents.drop(0, inplace = True)
+            trialEvents.reset_index(drop=True, inplace = True)
 
         #pdb.set_trace()
         trialStartIdx = trialEvents.index[trialEvents['Label'] == 'Movement Onset']
@@ -315,8 +317,8 @@ def getTrials(motorData, trialType = '2AFC'):
                     trialStats.loc[idx, 'Choice'] = 'none'
                     trialStats.loc[idx, 'Outcome'] = 'button timed out'
             except:
-                pass
-            #pdb.set_trace()
+                print('Error detected!')
+                pdb.set_trace()
     return trialStats, trialEvents
 
 #@profile
@@ -379,12 +381,16 @@ if __name__ == "__main__":
         'simiTrigs' : 136,
         }
 
-    motorData = getMotorData(ns5FilePath, inputIDs, 0 , 150)
+    motorData = getMotorData(ns5FilePath, inputIDs, 0 , 'all')
     trials, trialEvents = getTrials(motorData)
-    for timeRange in [30, 60, 90, 120, 150]:
+    timeRange = 30
+    pdb.set_trace()
+
+    while True:
         plotAxes = plotMotor(motorData, plotRange = ((timeRange - 30)* 30e3, timeRange * 30e3), subset = ['position', 'leftLED_int', 'rightLED_int', 'leftBut_int', 'rightBut_int','A_int'])
         plotTrialEvents(trialEvents, plotRange = ((timeRange - 30)* 30e3, timeRange * 30e3), ax = plotAxes[-1])
         plt.show(block = True)
+        timeRange = timeRange + 30
     #
 
-    #pdb.set_trace()
+    #
