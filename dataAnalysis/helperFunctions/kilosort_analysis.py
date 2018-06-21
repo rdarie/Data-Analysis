@@ -357,10 +357,13 @@ def plotRaster(spikes, trialStats, alignTo, channel, windowSize = (-0.25, 1), sh
             allSpikeTimes = np.array(spikes['TimeStamps'][ChanIdx][unitMask] * 3e4, dtype = np.int64)
             for idx, startTime in enumerate(trialStats[alignTo]):
                 try:
+                    print('Plotting trial %s' % idx)
                     trialTimeMask = np.logical_and(allSpikeTimes > startTime + timeWindow[0], allSpikeTimes < startTime + timeWindow[-1])
                     trialSpikeTimes = allSpikeTimes[trialTimeMask]
+                    print(trialSpikeTimes - startTime)
                     ax.vlines(trialSpikeTimes - startTime, idx, idx + 1, colors = [colorPalette[unitIdx]], linewidths = [0.5])
                 except:
+                    #pdb.set_trace()
                     pass
 
     ax.set_xlabel('Time (samples) aligned to ' + alignTo)
@@ -392,10 +395,12 @@ def plotFR(spikes, trialStats, alignTo, channel, windowSize = (-0.25, 1), showNo
             allSpikeTimes = np.array(spikes['TimeStamps'][ChanIdx][unitMask] * 3e4, dtype = np.int64)
             for idx, startTime in enumerate(trialStats[alignTo]):
                 try:
+                    print('Calculating raster for trial %s' % idx)
                     trialTimeMask = np.logical_and(allSpikeTimes > startTime + timeWindow[0], allSpikeTimes < startTime + timeWindow[-1])
                     trialSpikeTimes = allSpikeTimes[trialTimeMask] - startTime
                     FR[unitIdx].iloc[idx, :-1] = np.histogram(trialSpikeTimes, timeWindow)[0]
                 except:
+                    pdb.set_trace()
                     FR[unitIdx].iloc[idx, 'discard'] = True
                 #pdb.set_trace()
 
@@ -414,7 +419,7 @@ def plotFR(spikes, trialStats, alignTo, channel, windowSize = (-0.25, 1), showNo
     return ax, FR
 
 #@profile
-def spikePDFReport(filePath, spikes, spikeStruct, plotRastersAlignedTo = None, trialStats = None):
+def spikePDFReport(filePath, spikes, spikeStruct, plotRastersAlignedTo = None, trialStats = None, enableFR = False):
     pdfName = filePath + '/' + spikeStruct['dat_path'].split('.')[0] + '.pdf'
     with PdfPages(pdfName) as pdf:
         plotSpikePanel(spikeStruct['xcoords'], spikeStruct['ycoords'], spikes)
@@ -440,7 +445,8 @@ def spikePDFReport(filePath, spikes, spikeStruct, plotRastersAlignedTo = None, t
 
                     if plotRastersAlignedTo is not None and trialStats is not None:
                         plotAx = plotRaster(spikes, trialStats, alignTo = plotRastersAlignedTo, channel = channel)
-                        plotFR(spikes, trialStats, alignTo = plotRastersAlignedTo, channel = channel, ax = plotAx, twin = True)
+                        if enableFR:
+                            plotFR(spikes, trialStats, alignTo = plotRastersAlignedTo, channel = channel, ax = plotAx, twin = True)
                         pdf.savefig()
                         plt.close()
 
@@ -457,15 +463,15 @@ if __name__ == "__main__":
 
     #pdb.set_trace()
     try:
-        spikeStructUtah = pickle.load(open('D:/KiloSort/Trial001_Utah/Trial001_spikeStructUtah.pickle'), 'rb')
-        spikesUtah = pickle.load(open('D:/KiloSort/Trial001_Utah/Trial001_spikesUtah.pickle'), 'rb')
+        spikeStructUtah = pickle.load(open('D:/KiloSort_more/KiloSort/Trial001_Utah/Trial001_spikeStructUtah.pickle'), 'rb')
+        spikesUtah      = pickle.load(open('D:/KiloSort_more/KiloSort/Trial001_Utah/Trial001_spikesUtah.pickle'), 'rb')
     except:
-        spikeStructUtah = loadKSDir('D:/KiloSort/Trial001_Utah', loadPCs = True)
+        spikeStructUtah = loadKSDir('D:/KiloSort_more/KiloSort/Trial001_Utah', loadPCs = True)
         nevIDs = list(range(1,65))
-        spikesUtah = getWaveForms('D:/KiloSort/Trial001_Utah', spikeStructUtah, nevIDs = None, wfWin = (-30, 80), plotting = False)
+        spikesUtah = getWaveForms('D:/KiloSort_more/KiloSort/Trial001_Utah', spikeStructUtah, nevIDs = None, wfWin = (-30, 80), plotting = False)
 
-        pickle.dump(spikeStructUtah, open('D:/KiloSort/Trial001_Utah/Trial001_spikeStructUtah.pickle', 'wb'))
-        pickle.dump(spikesUtah, open('D:/KiloSort/Trial001_Utah/Trial001_spikesUtah.pickle', 'wb'))
+        pickle.dump(spikeStructUtah, open('D:/KiloSort_more/KiloSort/Trial001_Utah/Trial001_spikeStructUtah.pickle', 'wb'))
+        pickle.dump(spikesUtah, open('D:/KiloSort_more/KiloSort/Trial001_Utah/Trial001_spikesUtah.pickle', 'wb'))
     #spikePDFReport('D:/KiloSort/Trial001_Utah', spikesUtah, spikeStructUtah)
 
     ns5FilePath = 'D:/KiloSort/Trial001.ns5'
@@ -485,15 +491,15 @@ if __name__ == "__main__":
 
     #pdb.set_trace()
     try:
-        trialStats  = pd.read_pickle('D:/KiloSort/Trial001_trialStats.pickle')
-        trialEvents = pd.read_pickle('D:/KiloSort/Trial001_trialEvents.pickle')
+        trialStats  = pd.read_pickle('D:/KiloSort_more/KiloSort/Trial001_trialStats.pickle')
+        trialEvents = pd.read_pickle('D:/KiloSort_more/KiloSort/Trial001_trialEvents.pickle')
     except:
         motorData = getMotorData(ns5FilePath, inputIDs, 0 , 'all')
         trialStats, trialEvents = getTrials(motorData)
-        trialStats.to_pickle('D:/KiloSort/Trial001_trialStats.pickle')
-        trialEvents.to_pickle('D:/KiloSort/Trial001_trialEvents.pickle')
+        trialStats.to_pickle('D:/KiloSort_more/KiloSort/Trial001_trialStats.pickle')
+        trialEvents.to_pickle('D:/KiloSort_more/KiloSort/Trial001_trialEvents.pickle')
 
-    #plotAx = plotRaster(spikes, trialStats, alignTo = 'FirstOnset', channel = 28)
-    #plotFR(spikes, trialStats, alignTo = 'FirstOnset', channel = 28, ax = plotAx, twin = True)
-    #plt.show()
-    spikePDFReport('D:/KiloSort/Trial001_Utah', spikesUtah, spikeStructUtah, plotRastersAlignedTo = 'FirstOnset', trialStats = trialStats)
+    plotAx = plotRaster(spikesUtah, trialStats, alignTo = 'FirstOnset', channel = 28)
+    #plotFR(spikesUtah, trialStats, alignTo = 'FirstOnset', channel = 28, ax = plotAx, twin = True)
+    plt.show()
+#spikePDFReport('D:/KiloSort/Trial001_Utah', spikesUtah, spikeStructUtah, plotRastersAlignedTo = 'FirstOnset', trialStats = trialStats)
