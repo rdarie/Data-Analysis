@@ -463,15 +463,15 @@ if __name__ == "__main__":
 
     #pdb.set_trace()
     try:
-        spikeStructUtah = pickle.load(open('D:/KiloSort_more/KiloSort/Trial001_Utah/Trial001_spikeStructUtah.pickle'), 'rb')
-        spikesUtah      = pickle.load(open('D:/KiloSort_more/KiloSort/Trial001_Utah/Trial001_spikesUtah.pickle'), 'rb')
+        spikeStructUtah = pickle.load(open('D:/Staging/Trial001_Utah/Trial001_spikeStructUtah.pickle'), 'rb')
+        spikesUtah      = pickle.load(open('D:/Staging/Trial001_Utah/Trial001_spikesUtah.pickle'), 'rb')
     except:
-        spikeStructUtah = loadKSDir('D:/KiloSort_more/KiloSort/Trial001_Utah', loadPCs = True)
+        spikeStructUtah = loadKSDir('D:/Staging/Trial001_Utah', loadPCs = True)
         nevIDs = list(range(1,65))
-        spikesUtah = getWaveForms('D:/KiloSort_more/KiloSort/Trial001_Utah', spikeStructUtah, nevIDs = None, wfWin = (-30, 80), plotting = False)
+        spikesUtah = getWaveForms('D:/Staging/Trial001_Utah', spikeStructUtah, nevIDs = None, wfWin = (-30, 80), plotting = False)
 
-        pickle.dump(spikeStructUtah, open('D:/KiloSort_more/KiloSort/Trial001_Utah/Trial001_spikeStructUtah.pickle', 'wb'))
-        pickle.dump(spikesUtah, open('D:/KiloSort_more/KiloSort/Trial001_Utah/Trial001_spikesUtah.pickle', 'wb'))
+        pickle.dump(spikeStructUtah, open('D:/Staging/Trial001_Utah/Trial001_spikeStructUtah.pickle', 'wb'))
+        pickle.dump(spikesUtah, open('D:/Staging/Trial001_Utah/Trial001_spikesUtah.pickle', 'wb'))
     #spikePDFReport('D:/KiloSort/Trial001_Utah', spikesUtah, spikeStructUtah)
 
     ns5FilePath = 'D:/KiloSort/Trial001.ns5'
@@ -491,13 +491,13 @@ if __name__ == "__main__":
 
     #pdb.set_trace()
     try:
-        trialStats  = pd.read_pickle('D:/KiloSort_more/KiloSort/Trial001_trialStats.pickle')
-        trialEvents = pd.read_pickle('D:/KiloSort_more/KiloSort/Trial001_trialEvents.pickle')
+        trialStats  = pd.read_pickle('D:/Staging/Trial001_trialStats.pickle')
+        trialEvents = pd.read_pickle('D:/Staging/Trial001_trialEvents.pickle')
     except:
         motorData = getMotorData(ns5FilePath, inputIDs, 0 , 'all')
         trialStats, trialEvents = getTrials(motorData)
-        trialStats.to_pickle('D:/KiloSort_more/KiloSort/Trial001_trialStats.pickle')
-        trialEvents.to_pickle('D:/KiloSort_more/KiloSort/Trial001_trialEvents.pickle')
+        trialStats.to_pickle('D:/Staging/Trial001_trialStats.pickle')
+        trialEvents.to_pickle('D:/Staging/Trial001_trialEvents.pickle')
 
     plotAx = plotRaster(spikesUtah, trialStats, alignTo = 'FirstOnset', channel = 28)
     #plotFR(spikesUtah, trialStats, alignTo = 'FirstOnset', channel = 28, ax = plotAx, twin = True)
