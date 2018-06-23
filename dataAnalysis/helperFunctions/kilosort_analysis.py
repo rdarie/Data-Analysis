@@ -1,4 +1,5 @@
 import os, sys, pdb
+from tempfile import mkdtemp
 import numpy as np
 from scipy.ndimage.filters import gaussian_filter1d
 import pandas as pd
@@ -133,7 +134,9 @@ def loadKSDir(filePath, excludeNoise = True, loadPCs = False):
 
 
 #@profile
-def getWaveForms(filePath, spikeStruct, nevIDs = None, dataType = np.int16, wfWin = (-40, 81), nWf = None, plotting = False):
+def getWaveForms(filePath, spikeStruct, nevIDs = None, dataType = np.int16, wfWin = (-40, 81), nWf = None, plotting = False, tempFolder = None):
+    if tempFolder is None:
+        tempFolder = mkdtemp()
     chMap = np.load(filePath + '/channel_map.npy', mmap_mode = 'r').squeeze()
     nCh = len(chMap)
     rawData = np.memmap(filename = filePath + '/' + spikeStruct['dat_path'], dtype = dataType, mode = 'r').reshape((-1, nCh))
@@ -145,7 +148,8 @@ def getWaveForms(filePath, spikeStruct, nevIDs = None, dataType = np.int16, wfWi
     #Read spike time-centered waveforms
     unitIDs = np.array(np.unique(spikeStruct['spikeCluster']))
     numUnits = len(unitIDs)
-    waveForms = [[] for i in range(numUnits)]
+    waveFormTempFileNames = [os.path.join(tempFolder, 'tempfile_%s.dat' % idx) for idx in unitIDs]
+    waveForms = [None for idx in range(numUnits)]
     meanWaveForms = [None for i in range(numUnits)]
     stdWaveForms = [None for i in range(numUnits)]
     unitChannel = [None for i in range(numUnits)]
@@ -181,7 +185,8 @@ def getWaveForms(filePath, spikeStruct, nevIDs = None, dataType = np.int16, wfWi
     for idx, curUnitIdx in enumerate(unitIDs):
         curSpikeTimes = spikeStruct['spikeTimesSamples'][spikeStruct['spikeCluster'] == curUnitIdx]
         curUnitNSpikes = len(curSpikeTimes)
-        waveForms[idx] = np.zeros((curUnitNSpikes, wfNSamples, nCh))
+
+        waveForms[idx] = np.memmap(waveFormTempFileNames[idx], dtype='int16', mode='w+', shape=(curUnitNSpikes, wfNSamples, nCh))
 
         for spikeIdx, curSpikeTime in enumerate(curSpikeTimes):
             #pdb.set_trace()
@@ -203,6 +208,8 @@ def getWaveForms(filePath, spikeStruct, nevIDs = None, dataType = np.int16, wfWi
             plt.legend()
             plt.show()
 
+
+    waveFormTempFileNames = [os.path.join(tempFolder, 'tempfileSpike_%s.dat' % idx) for idx, chan in enumerate(chMap)]
     # redistribute data on a channel by channel basis to conform to the convention of the blackrock NEV file.
     for idx, chan in enumerate(chMap): # for each channel
         setMask = unitChannel == chan # which indices correspond to units on this channel
@@ -213,13 +220,17 @@ def getWaveForms(filePath, spikeStruct, nevIDs = None, dataType = np.int16, wfWi
             spikes['TimeStamps'][idx] = spikeStruct['spikeTimes'][chanMask]
             nSpikesOnChan = len(spikes['TimeStamps'][idx])
             waveFormIndices = {i:0 for i in unitsOnThisChan}
-            spikes['Waveforms'][idx] = np.zeros((nSpikesOnChan,wfNSamples,nCh))
+            spikes['Waveforms'][idx] = np.memmap(waveFormTempFileNames[idx], dtype='int16', mode='w+', shape=(nSpikesOnChan,wfNSamples,nCh))
+            #spikes['Waveforms'][idx] = np.zeros((nSpikesOnChan,wfNSamples,nCh))
             for spikeIdx, spikeClass in enumerate(spikes['Classification'][idx]):
                 #pdb.set_trace()
                 classIdx = np.where(unitIDs==spikeClass)[0][0]
                 spikes['Waveforms'][idx][spikeIdx,:,:] = waveForms[classIdx][waveFormIndices[spikeClass],:,:]
                 waveFormIndices[spikeClass] = waveFormIndices[spikeClass] + 1
+            spikes['Waveforms'][idx].flush()
     #pdb.set_trace()
+    del waveForms
+    #spikes['Waveforms'].flush()
     return spikes
 
 
@@ -396,12 +407,16 @@ def plotFR(spikes, trialStats, alignTo, channel, windowSize = (-0.25, 1), showNo
             for idx, startTime in enumerate(trialStats[alignTo]):
                 try:
                     print('Calculating raster for trial %s' % idx)
+                    #pdb.set_trace()
                     trialTimeMask = np.logical_and(allSpikeTimes > startTime + timeWindow[0], allSpikeTimes < startTime + timeWindow[-1])
-                    trialSpikeTimes = allSpikeTimes[trialTimeMask] - startTime
-                    FR[unitIdx].iloc[idx, :-1] = np.histogram(trialSpikeTimes, timeWindow)[0]
+                    if trialTimeMask.sum() != 0:
+                        trialSpikeTimes = allSpikeTimes[trialTimeMask] - startTime
+                        FR[unitIdx].iloc[idx, :-1] = np.histogram(trialSpikeTimes, timeWindow)[0]
+                    else:
+                        FR[unitIdx].iloc[idx, -1] = True
                 except:
-                    pdb.set_trace()
-                    FR[unitIdx].iloc[idx, 'discard'] = True
+                    #pdb.set_trace()
+                    FR[unitIdx].iloc[idx, -1] = True
                 #pdb.set_trace()
 
     for idx, x in enumerate(FR):
@@ -412,8 +427,8 @@ def plotFR(spikes, trialStats, alignTo, channel, windowSize = (-0.25, 1), showNo
     FR = [gaussian_filter1d(x.mean(axis = 0), kernelWidth * 3e4) / kernelWidth for x in FR]
     colorPalette = sns.color_palette()
     for unitIdx, x in enumerate(FR):
-        ax.plot(timeWindow[:-1], x, linewidth = 1, color = colorPalette[unitIdx])
-    ax.set_ylabel('Average Firing rate')
+        ax.plot(timeWindow[:-1], x * 3e4, linewidth = 1, color = colorPalette[unitIdx])
+    ax.set_ylabel('Average Firing rate (spk/sec)')
     if showNow:
         plt.show()
     return ax, FR
@@ -444,9 +459,9 @@ def spikePDFReport(filePath, spikes, spikeStruct, plotRastersAlignedTo = None, t
                         plt.close()
 
                     if plotRastersAlignedTo is not None and trialStats is not None:
-                        plotAx = plotRaster(spikes, trialStats, alignTo = plotRastersAlignedTo, channel = channel)
+                        plotAx = plotRaster(spikes, trialStats, alignTo = plotRastersAlignedTo, windowSize = (-0.5, 2), channel = channel)
                         if enableFR:
-                            plotFR(spikes, trialStats, alignTo = plotRastersAlignedTo, channel = channel, ax = plotAx, twin = True)
+                            plotFR(spikes, trialStats, alignTo = plotRastersAlignedTo, windowSize = (-0.5, 2), channel = channel, ax = plotAx, twin = True)
                         pdf.savefig()
                         plt.close()
 
@@ -463,12 +478,12 @@ if __name__ == "__main__":
 
     #pdb.set_trace()
     try:
-        spikeStructUtah = pickle.load(open('D:/Staging/Trial001_Utah/Trial001_spikeStructUtah.pickle'), 'rb')
-        spikesUtah      = pickle.load(open('D:/Staging/Trial001_Utah/Trial001_spikesUtah.pickle'), 'rb')
+        spikeStructUtah = pickle.load(open('D:/Staging/Trial001_Utah/Trial001_spikeStructUtah.pickle', 'rb'))
+        spikesUtah      = pickle.load(open('D:/Staging/Trial001_Utah/Trial001_spikesUtah.pickle', 'rb'))
     except:
         spikeStructUtah = loadKSDir('D:/Staging/Trial001_Utah', loadPCs = True)
         nevIDs = list(range(1,65))
-        spikesUtah = getWaveForms('D:/Staging/Trial001_Utah', spikeStructUtah, nevIDs = None, wfWin = (-30, 80), plotting = False)
+        spikesUtah = getWaveForms('D:/Staging/Trial001_Utah', spikeStructUtah, nevIDs = None, wfWin = (-30, 80), plotting = False, tempFolder = 'E:/temp')
 
         pickle.dump(spikeStructUtah, open('D:/Staging/Trial001_Utah/Trial001_spikeStructUtah.pickle', 'wb'))
         pickle.dump(spikesUtah, open('D:/Staging/Trial001_Utah/Trial001_spikesUtah.pickle', 'wb'))
@@ -499,7 +514,8 @@ if __name__ == "__main__":
         trialStats.to_pickle('D:/Staging/Trial001_trialStats.pickle')
         trialEvents.to_pickle('D:/Staging/Trial001_trialEvents.pickle')
 
-    plotAx = plotRaster(spikesUtah, trialStats, alignTo = 'FirstOnset', channel = 28)
-    #plotFR(spikesUtah, trialStats, alignTo = 'FirstOnset', channel = 28, ax = plotAx, twin = True)
+    plotSpike(spikesUtah, channel = 28)
+    plotAx = plotRaster(spikesUtah, trialStats, alignTo = 'FirstOnset', windowSize = (-0.5, 2), channel = 28)
+    plotFR(spikesUtah, trialStats, alignTo = 'FirstOnset', windowSize = (-0.5, 2), channel = 28, ax = plotAx, twin = True)
     plt.show()
 #spikePDFReport('D:/KiloSort/Trial001_Utah', spikesUtah, spikeStructUtah, plotRastersAlignedTo = 'FirstOnset', trialStats = trialStats)
