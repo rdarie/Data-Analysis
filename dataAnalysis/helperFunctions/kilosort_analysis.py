@@ -360,24 +360,27 @@ def plotRaster(spikes, trialStats, alignTo, channel, windowSize = (-0.25, 1), sh
     if ax is None:
         fig, ax = plt.subplots()
 
-    timeWindow = list(range(int(windowSize[0] * 3e4), int(windowSize[1] * 3e4) + 1))
+    # timeWindow in milliseconds
+    timeWindow = list(range(int(windowSize[0] * 1e3), int(windowSize[1] * 1e3) + 1))
     if unitsOnThisChan is not None:
         colorPalette = sns.color_palette()
         for unitIdx, unitName in enumerate(unitsOnThisChan):
             unitMask = spikes['Classification'][ChanIdx] == unitName
-            allSpikeTimes = np.array(spikes['TimeStamps'][ChanIdx][unitMask] * 3e4, dtype = np.int64)
+            # time stamps in milliseconds
+            allSpikeTimes = np.array(spikes['TimeStamps'][ChanIdx][unitMask] * 1e3, dtype = np.int64)
             for idx, startTime in enumerate(trialStats[alignTo]):
                 try:
                     print('Plotting trial %s' % idx)
-                    trialTimeMask = np.logical_and(allSpikeTimes > startTime + timeWindow[0], allSpikeTimes < startTime + timeWindow[-1])
+                    #convert start time from index to milliseconds
+                    trialTimeMask = np.logical_and(allSpikeTimes > startTime / 3e1 + timeWindow[0], allSpikeTimes < startTime / 3e1 + timeWindow[-1])
                     trialSpikeTimes = allSpikeTimes[trialTimeMask]
-                    print(trialSpikeTimes - startTime)
-                    ax.vlines(trialSpikeTimes - startTime, idx, idx + 1, colors = [colorPalette[unitIdx]], linewidths = [0.5])
+                    print(trialSpikeTimes - startTime / 3e1)
+                    ax.vlines(trialSpikeTimes - startTime / 3e1, idx, idx + 1, colors = [colorPalette[unitIdx]], linewidths = [0.5])
                 except:
                     #pdb.set_trace()
                     pass
 
-    ax.set_xlabel('Time (samples) aligned to ' + alignTo)
+    ax.set_xlabel('Time (milliseconds) aligned to ' + alignTo)
     ax.set_ylabel('Trial')
 
     if showNow:
@@ -396,21 +399,24 @@ def plotFR(spikes, trialStats, alignTo, channel, windowSize = (-0.25, 1), showNo
     if ax is None:
         fig, ax = plt.subplots()
 
-    timeWindow = list(range(int(windowSize[0] * 3e4), int(windowSize[1] * 3e4) + 1))
+    # window size specified in seconds
+    # time window in milliseconds
+    timeWindow = list(range(int(windowSize[0] * 1e3), int(windowSize[1] * 1e3) + 1))
     if unitsOnThisChan is not None:
         FR = [pd.DataFrame(index = trialStats.index, columns = timeWindow[:-1] + ['discard']) for i in unitsOnThisChan]
         for x in FR:
             x['discard'] = False
         for unitIdx, unitName in enumerate(unitsOnThisChan):
             unitMask = spikes['Classification'][ChanIdx] == unitName
-            allSpikeTimes = np.array(spikes['TimeStamps'][ChanIdx][unitMask] * 3e4, dtype = np.int64)
+            # spike times in milliseconds
+            allSpikeTimes = np.array(spikes['TimeStamps'][ChanIdx][unitMask] * 1e3, dtype = np.int64)
             for idx, startTime in enumerate(trialStats[alignTo]):
                 try:
                     print('Calculating raster for trial %s' % idx)
                     #pdb.set_trace()
-                    trialTimeMask = np.logical_and(allSpikeTimes > startTime + timeWindow[0], allSpikeTimes < startTime + timeWindow[-1])
+                    trialTimeMask = np.logical_and(allSpikeTimes > startTime / 3e1 + timeWindow[0], allSpikeTimes < startTime / 3e1 + timeWindow[-1])
                     if trialTimeMask.sum() != 0:
-                        trialSpikeTimes = allSpikeTimes[trialTimeMask] - startTime
+                        trialSpikeTimes = allSpikeTimes[trialTimeMask] - startTime / 3e1
                         FR[unitIdx].iloc[idx, :-1] = np.histogram(trialSpikeTimes, timeWindow)[0]
                     else:
                         FR[unitIdx].iloc[idx, -1] = True
@@ -424,10 +430,10 @@ def plotFR(spikes, trialStats, alignTo, channel, windowSize = (-0.25, 1), showNo
         FR[idx].drop('discard', axis = 1, inplace = True)
 
     kernelWidth = 50e-3 # seconds
-    FR = [gaussian_filter1d(x.mean(axis = 0), kernelWidth * 3e4) / kernelWidth for x in FR]
+    FR = [gaussian_filter1d(x.mean(axis = 0), kernelWidth * 1e3) for x in FR]
     colorPalette = sns.color_palette()
     for unitIdx, x in enumerate(FR):
-        ax.plot(timeWindow[:-1], x * 3e4, linewidth = 1, color = colorPalette[unitIdx])
+        ax.plot(timeWindow[:-1], x * 1e3, linewidth = 1, color = colorPalette[unitIdx])
     ax.set_ylabel('Average Firing rate (spk/sec)')
     if showNow:
         plt.show()
