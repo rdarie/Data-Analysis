@@ -370,7 +370,7 @@ def plotRaster(spikes, trialStats, alignTo, channel, windowSize = (-0.25, 1), sh
             allSpikeTimes = np.array(spikes['TimeStamps'][ChanIdx][unitMask] * 1e3, dtype = np.int64)
             for idx, startTime in enumerate(trialStats[alignTo]):
                 try:
-                    print('Plotting trial %s' % idx)
+                    #print('Plotting trial %s' % idx)
                     #convert start time from index to milliseconds
                     trialTimeMask = np.logical_and(allSpikeTimes > startTime / 3e1 + timeWindow[0], allSpikeTimes < startTime / 3e1 + timeWindow[-1])
                     trialSpikeTimes = allSpikeTimes[trialTimeMask]
@@ -412,7 +412,7 @@ def plotFR(spikes, trialStats, alignTo, channel, windowSize = (-0.25, 1), showNo
             allSpikeTimes = np.array(spikes['TimeStamps'][ChanIdx][unitMask] * 1e3, dtype = np.int64)
             for idx, startTime in enumerate(trialStats[alignTo]):
                 try:
-                    print('Calculating raster for trial %s' % idx)
+                    #print('Calculating raster for trial %s' % idx)
                     #pdb.set_trace()
                     trialTimeMask = np.logical_and(allSpikeTimes > startTime / 3e1 + timeWindow[0], allSpikeTimes < startTime / 3e1 + timeWindow[-1])
                     if trialTimeMask.sum() != 0:
