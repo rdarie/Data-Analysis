@@ -374,7 +374,7 @@ def plotRaster(spikes, trialStats, alignTo, channel, windowSize = (-0.25, 1), sh
                     #convert start time from index to milliseconds
                     trialTimeMask = np.logical_and(allSpikeTimes > startTime / 3e1 + timeWindow[0], allSpikeTimes < startTime / 3e1 + timeWindow[-1])
                     trialSpikeTimes = allSpikeTimes[trialTimeMask]
-                    print(trialSpikeTimes - startTime / 3e1)
+                    #print(trialSpikeTimes - startTime / 3e1)
                     ax.vlines(trialSpikeTimes - startTime / 3e1, idx, idx + 1, colors = [colorPalette[unitIdx]], linewidths = [0.5])
                 except:
                     #pdb.set_trace()
