@@ -252,10 +252,10 @@ def numFromWaveClusSpikeFile(spikeFileName):
 def getWaveClusSpikes(filePath, nevIDs = None, plotting = False, getMUA = False, tempFolder = None):
 
     if nevIDs is None:
-        spikeFileList = [f for f in os.listdir(filePath + '\wave_clus') if '.mat' in f and 'times_' in f]
+        spikeFileList = [f for f in os.listdir(filePath + '/wave_clus') if '.mat' in f and 'times_' in f]
         nevIDs = [numFromWaveClusSpikeFile(f) for f in spikeFileList]
     else:
-        spikeFileList = [f for f in os.listdir(filePath + '\wave_clus') if '.mat' in f and 'times_' in f and numFromWaveClusSpikeFile(f) in nevIDs]
+        spikeFileList = [f for f in os.listdir(filePath + '/wave_clus') if '.mat' in f and 'times_' in f and numFromWaveClusSpikeFile(f) in nevIDs]
 
     nCh = len(nevIDs)
 
