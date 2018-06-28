@@ -3,6 +3,7 @@ from tempfile import mkdtemp
 import numpy as np
 from scipy.ndimage.filters import gaussian_filter1d
 import pandas as pd
+import scipy.io
 import matplotlib
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib import pyplot as plt
@@ -12,6 +13,7 @@ from importlib import reload
 from dataAnalysis.helperFunctions.helper_functions import *
 import line_profiler
 import pickle
+import h5py
 
 def loadParamsPy(filePath):
 
@@ -37,6 +39,17 @@ def loadParamsPy(filePath):
 
     return locals()
 
+
+def coordsToIndices(xcoords, ycoords):
+
+    xSpacing = np.ufunc.reduce(np.frompyfunc(gcd, 2, 1), xcoords)
+    ySpacing = np.ufunc.reduce(np.frompyfunc(gcd, 2, 1), ycoords)
+    xIdx = np.array(np.divide(xcoords, xSpacing), dtype = np.int)
+    xIdx = xIdx - min(xIdx)
+    yIdx = np.array(np.divide(ycoords, ySpacing), dtype = np.int)
+    yIdx = yIdx - min(yIdx)
+
+    return xIdx, yIdx
 
 #@profile
 def loadKSDir(filePath, excludeNoise = True, loadPCs = False):
@@ -131,7 +144,6 @@ def loadKSDir(filePath, excludeNoise = True, loadPCs = False):
         'pcFeatInd'         : pcFeatInd
         }
     return spikeStruct
-
 
 #@profile
 def getWaveForms(filePath, spikeStruct, nevIDs = None, dataType = np.int16, wfWin = (-40, 81), nWf = None, plotting = False, tempFolder = None):
@@ -233,18 +245,58 @@ def getWaveForms(filePath, spikeStruct, nevIDs = None, dataType = np.int16, wfWi
     #spikes['Waveforms'].flush()
     return spikes
 
+#@profile
+def numFromWaveClusSpikeFile(spikeFileName):
+    return int(spikeFileName.split('times_NSX')[-1].split('.mat')[0])
 
-def coordsToIndices(xcoords, ycoords):
+def getWaveClusSpikes(filePath, nevIDs = None, plotting = False, getMUA = False, tempFolder = None):
 
-    xSpacing = np.ufunc.reduce(np.frompyfunc(gcd, 2, 1), xcoords)
-    ySpacing = np.ufunc.reduce(np.frompyfunc(gcd, 2, 1), ycoords)
-    xIdx = np.array(np.divide(xcoords, xSpacing), dtype = np.int)
-    xIdx = xIdx - min(xIdx)
-    yIdx = np.array(np.divide(ycoords, ySpacing), dtype = np.int)
-    yIdx = yIdx - min(yIdx)
+    if nevIDs is None:
+        spikeFileList = [f for f in os.listdir(filePath + '\wave_clus') if '.mat' in f and 'times_' in f]
+        nevIDs = [numFromWaveClusSpikeFile(f) for f in spikeFileList]
+    else:
+        spikeFileList = [f for f in os.listdir(filePath + '\wave_clus') if '.mat' in f and 'times_' in f and numFromWaveClusSpikeFile(f) in nevIDs]
 
-    return xIdx, yIdx
+    nCh = len(nevIDs)
 
+    if tempFolder is None:
+        tempFolder = mkdtemp()
+
+    spikes = {
+        'ChannelID' : [i for i in range(nCh)],
+        'Classification' : [[] for i in range(nCh)],
+        'NEUEVWAV_HeaderIndices' : [None for i in range(nCh)],
+        'TimeStamps' : [[] for i in range(nCh)],
+        'Units' : 'nV',
+        'Waveforms' : [None for i in range(nCh)],
+#        'meanWaveforms' : [None for i in range(nCh)],
+#        'stdWaveforms' : [None for i in range(nCh)],
+        'basic_headers' : [],
+        'extended_headers' : []
+        }
+
+    unitIDs = []
+    lastMaxUnitID = 0
+    for idx, spikeFile in enumerate(spikeFileList):
+        waveClusData = scipy.io.loadmat(filePath + '/wave_clus/' + spikeFile)
+        spikes['ChannelID'][idx] = nevIDs[idx]
+        unitsInFile = np.unique(waveClusData['cluster_class'][:,0]) + 1 + lastMaxUnitID
+
+        if getMUA:
+            spikes['Classification'][idx] = waveClusData['cluster_class'][:,0] + 1 + lastMaxUnitID
+            spikes['TimeStamps'][idx] = waveClusData['cluster_class'][:,1] / 1e3
+            spikes['Waveforms'][idx] = waveClusData['spikes']
+        else:
+            notMUAMask = waveClusData['cluster_class'][:,0] != 0
+            spikes['Classification'][idx] = waveClusData['cluster_class'][notMUAMask,0] + 1 + lastMaxUnitID
+            spikes['TimeStamps'][idx] = waveClusData['cluster_class'][notMUAMask,1] / 1e3
+            spikes['Waveforms'][idx] = waveClusData['spikes'][notMUAMask, :]
+
+        unitIDs+=unitsInFile.tolist()
+        lastMaxUnitID = max(unitIDs)
+
+    #pdb.set_trace()
+    return spikes
 
 #@profile
 def plotSpike(spikes, channel, showNow = False, ax = None, acrossArray = False, xcoords = None, ycoords = None):
@@ -296,7 +348,10 @@ def plotSpike(spikes, channel, showNow = False, ax = None, acrossArray = False, 
                 plt.tight_layout()
 
             else:
-                waveForms = spikes['Waveforms'][ChanIdx][unitMask, :, ChanIdx]
+                if len(spikes['Waveforms'][ChanIdx].shape) == 3:
+                    waveForms = spikes['Waveforms'][ChanIdx][unitMask, :, ChanIdx]
+                else:
+                    waveForms = spikes['Waveforms'][ChanIdx][unitMask, :]
                 thisSpike = np.mean(waveForms, axis = 0)
                 thisError = np.std(waveForms, axis = 0)
                 timeRange = np.arange(len(thisSpike))
@@ -483,6 +538,9 @@ if __name__ == "__main__":
     #spikePDFReport('D:/KiloSort/Trial001_NForm', spikesNForm, spikeStructNForm)
 
     #pdb.set_trace()
+    spikesUtah = getWaveClusSpikes('D:/Staging', nevIDs = [71,76], plotting = False, getMUA = False, tempFolder = 'D:/Staging/wave_clus/temp')
+
+    """
     try:
         spikeStructUtah = pickle.load(open('D:/Staging/Trial001_Utah/Trial001_spikeStructUtah.pickle', 'rb'))
         spikesUtah      = pickle.load(open('D:/Staging/Trial001_Utah/Trial001_spikesUtah.pickle', 'rb'))
@@ -494,6 +552,7 @@ if __name__ == "__main__":
         pickle.dump(spikeStructUtah, open('D:/Staging/Trial001_Utah/Trial001_spikeStructUtah.pickle', 'wb'))
         pickle.dump(spikesUtah, open('D:/Staging/Trial001_Utah/Trial001_spikesUtah.pickle', 'wb'))
     #spikePDFReport('D:/KiloSort/Trial001_Utah', spikesUtah, spikeStructUtah)
+    """
 
     ns5FilePath = 'D:/KiloSort/Trial001.ns5'
     inputIDs = {
@@ -520,8 +579,11 @@ if __name__ == "__main__":
         trialStats.to_pickle('D:/Staging/Trial001_trialStats.pickle')
         trialEvents.to_pickle('D:/Staging/Trial001_trialEvents.pickle')
 
-    plotSpike(spikesUtah, channel = 28)
-    plotAx = plotRaster(spikesUtah, trialStats, alignTo = 'FirstOnset', windowSize = (-0.5, 2), channel = 28)
-    plotFR(spikesUtah, trialStats, alignTo = 'FirstOnset', windowSize = (-0.5, 2), channel = 28, ax = plotAx, twin = True)
+    plotChan = 71
+    plotSpike(spikesUtah, channel = plotChan)
+    isiBins = np.linspace(0, 50e-3, 100)
+    plotISIHistogram(spikesUtah, channel = plotChan, bins = isiBins,kde_kws = {'clip' : (isiBins[0] * 0.8, isiBins[-1] * 1.2), 'bw' : 'silverman'} )
+    plotAx = plotRaster(spikesUtah, trialStats, alignTo = 'FirstOnset', windowSize = (-0.5, 2), channel = plotChan)
+    plotFR(spikesUtah, trialStats, alignTo = 'FirstOnset', windowSize = (-0.5, 2), channel = plotChan, ax = plotAx, twin = True)
     plt.show()
 #spikePDFReport('D:/KiloSort/Trial001_Utah', spikesUtah, spikeStructUtah, plotRastersAlignedTo = 'FirstOnset', trialStats = trialStats)
