@@ -407,15 +407,29 @@ def plotSpikePanel(xcoords, ycoords, spikes):
     plt.tight_layout()
 
 #@profile
-def plotRaster(spikes, trialStats, alignTo, channel, windowSize = (-0.25, 1), showNow = False, ax = None):
+def plotRaster(spikes, trialStats, alignTo, channel, separateBy = None, windowSize = (-0.25, 1), showNow = False, ax = None, maxTrial = None):
 
     ChanIdx = spikes['ChannelID'].index(channel)
     unitsOnThisChan = np.unique(spikes['Classification'][ChanIdx])
 
-    if ax is None:
-        fig, ax = plt.subplots()
+    if separateBy is not None:
+        uniqueCategories = pd.Series(trialStats.loc[:,separateBy].unique())
+        uniqueCategories.dropna(inplace = True)
+        curLine = {category : 0 for category in uniqueCategories}
+
+        if ax is None:
+            fig, ax = plt.subplots(len(uniqueCategories),1)
+
+        else:
+            assert len(ax) == len(uniqueCategories)
+
+    else: # only one plot
+        if ax is None:
+            fig, ax = plt.subplots()
+
 
     # timeWindow in milliseconds
+
     timeWindow = list(range(int(windowSize[0] * 1e3), int(windowSize[1] * 1e3) + 1))
     if unitsOnThisChan is not None:
         colorPalette = sns.color_palette()
@@ -430,13 +444,35 @@ def plotRaster(spikes, trialStats, alignTo, channel, windowSize = (-0.25, 1), sh
                     trialTimeMask = np.logical_and(allSpikeTimes > startTime / 3e1 + timeWindow[0], allSpikeTimes < startTime / 3e1 + timeWindow[-1])
                     trialSpikeTimes = allSpikeTimes[trialTimeMask]
                     #print(trialSpikeTimes - startTime / 3e1)
-                    ax.vlines(trialSpikeTimes - startTime / 3e1, idx, idx + 1, colors = [colorPalette[unitIdx]], linewidths = [0.5])
+                    if separateBy is not None:
+                        #pdb.set_trace()
+                        curCategory = trialStats.loc[idx, separateBy]
+                        whichAx = pd.Index(uniqueCategories).get_loc(curCategory)
+                        axToPlotOn = ax[whichAx]
+                        lineToPlot = curLine[curCategory]
+                        curLine[curCategory] += 1
+                    else:
+                        axToPlotOn = ax
+                        lineToPlot = idx
+                    axToPlotOn.vlines(trialSpikeTimes - startTime / 3e1, lineToPlot, lineToPlot + 1, colors = [colorPalette[unitIdx]], linewidths = [0.5])
+                    if maxTrial is not None:
+                        if idx >= maxTrial -1:
+                            break
                 except:
                     #pdb.set_trace()
                     pass
+            #reset line counts for next pass through for the next unit on this chan
+            if separateBy is not None:
+                curLine = {category : 0 for category in uniqueCategories}
 
-    ax.set_xlabel('Time (milliseconds) aligned to ' + alignTo)
-    ax.set_ylabel('Trial')
+    if separateBy is not None:
+        for idx, thisAx in enumerate(ax):
+            thisAx.set_xlabel('Time (milliseconds) aligned to ' + alignTo)
+            thisAx.set_ylabel('Trial')
+            thisAx.set_title(uniqueCategories[idx])
+    else:
+        ax.set_xlabel('Time (milliseconds) aligned to ' + alignTo)
+        ax.set_ylabel('Trial')
 
     if showNow:
         plt.show()
@@ -444,23 +480,45 @@ def plotRaster(spikes, trialStats, alignTo, channel, windowSize = (-0.25, 1), sh
     return ax
 
 #@profile
-def plotFR(spikes, trialStats, alignTo, channel, windowSize = (-0.25, 1), showNow = False, ax = None, twin = False):
+def plotFR(spikes, trialStats, alignTo, channel, separateBy = None, windowSize = (-0.25, 1), showNow = False, ax = None, twin = False, maxTrial = None):
     ChanIdx = spikes['ChannelID'].index(channel)
     unitsOnThisChan = np.unique(spikes['Classification'][ChanIdx])
 
-    if ax is not None and twin:
-        ax = ax.twinx()
+    if separateBy is not None:
+        uniqueCategories = pd.Series(trialStats.loc[:,separateBy].unique())
+        uniqueCategories.dropna(inplace = True)
 
-    if ax is None:
-        fig, ax = plt.subplots()
+        if ax is not None and twin:
+            for idx, thisAx in enumerate(ax):
+                ax[idx] = thisAx.twinx()
 
+        if ax is None:
+            fig, ax = plt.subplots(len(uniqueCategories),1)
+
+        else:
+            assert len(ax) == len(uniqueCategories)
+
+    else: # only one plot
+
+        if ax is not None and twin:
+            ax = ax.twinx()
+
+        if ax is None:
+            fig, ax = plt.subplots()
+
+    if maxTrial is not None:
+        maxTrial = min(len(trialStats.index), maxTrial)
+        trialStats = trialStats.iloc[:maxTrial, :]
     # window size specified in seconds
     # time window in milliseconds
     timeWindow = list(range(int(windowSize[0] * 1e3), int(windowSize[1] * 1e3) + 1))
     if unitsOnThisChan is not None:
+
         FR = [pd.DataFrame(index = trialStats.index, columns = timeWindow[:-1] + ['discard']) for i in unitsOnThisChan]
+
         for x in FR:
             x['discard'] = False
+
         for unitIdx, unitName in enumerate(unitsOnThisChan):
             unitMask = spikes['Classification'][ChanIdx] == unitName
             # spike times in milliseconds
@@ -475,6 +533,10 @@ def plotFR(spikes, trialStats, alignTo, channel, windowSize = (-0.25, 1), showNo
                         FR[unitIdx].iloc[idx, :-1] = np.histogram(trialSpikeTimes, timeWindow)[0]
                     else:
                         FR[unitIdx].iloc[idx, -1] = True
+
+                    if maxTrial is not None:
+                        if idx >= maxTrial -1:
+                            break
                 except:
                     #pdb.set_trace()
                     FR[unitIdx].iloc[idx, -1] = True
@@ -485,11 +547,28 @@ def plotFR(spikes, trialStats, alignTo, channel, windowSize = (-0.25, 1), showNo
         FR[idx].drop('discard', axis = 1, inplace = True)
 
     kernelWidth = 50e-3 # seconds
-    FR = [gaussian_filter1d(x.mean(axis = 0), kernelWidth * 1e3) for x in FR]
+    if separateBy is not None:
+        meanFR = {category : [pd.Series(index = timeWindow[:-1]) for i in unitsOnThisChan] for category in uniqueCategories}
+        for category in uniqueCategories:
+            for idx, unit in enumerate(unitsOnThisChan):
+                meanFR[category][idx] = FR[idx].loc[trialStats[separateBy] == category].mean(axis = 0)
+                meanFR[category][idx] = gaussian_filter1d(meanFR[category][idx], kernelWidth * 1e3)
+    else:
+        meanFR = {'all' : [gaussian_filter1d(x.mean(axis = 0), kernelWidth * 1e3) for x in FR]}
+    #pdb.set_trace()
     colorPalette = sns.color_palette()
-    for unitIdx, x in enumerate(FR):
-        ax.plot(timeWindow[:-1], x * 1e3, linewidth = 1, color = colorPalette[unitIdx])
-    ax.set_ylabel('Average Firing rate (spk/sec)')
+
+    for category, meanFRThisCategory in meanFR.items():
+        if separateBy is not None:
+            categoryIndex = pd.Index(uniqueCategories).get_loc(category)
+            thisAx = ax[categoryIndex]
+        else:
+            thisAx = ax
+
+        for unitIdx, x in enumerate(meanFRThisCategory):
+            thisAx.plot(timeWindow[:-1], x * 1e3, linewidth = 1, color = colorPalette[unitIdx])
+            thisAx.set_ylabel('Average Firing rate (spk/sec)')
+        thisAx.set_title('spikes for ' + category + ' trials')
     if showNow:
         plt.show()
     return ax, FR
@@ -538,21 +617,20 @@ if __name__ == "__main__":
     #spikePDFReport('D:/KiloSort/Trial001_NForm', spikesNForm, spikeStructNForm)
 
     #pdb.set_trace()
-    spikesUtah = getWaveClusSpikes('D:/Staging', nevIDs = [71,76], plotting = False, getMUA = False, tempFolder = 'D:/Staging/wave_clus/temp')
+    #spikesUtah = getWaveClusSpikes('D:/Staging', nevIDs = [71,76], plotting = False, getMUA = True, tempFolder = 'D:/Staging/wave_clus/temp')
 
-    """
+
     try:
-        spikeStructUtah = pickle.load(open('D:/Staging/Trial001_Utah/Trial001_spikeStructUtah.pickle', 'rb'))
-        spikesUtah      = pickle.load(open('D:/Staging/Trial001_Utah/Trial001_spikesUtah.pickle', 'rb'))
+        spikeStructUtah = pickle.load(open('D:/Kilosort/Trial001_Utah/Trial001_spikeStructUtah.pickle', 'rb'))
+        spikesUtah      = pickle.load(open('D:/Kilosort/Trial001_Utah/Trial001_spikesUtah.pickle', 'rb'))
     except:
-        spikeStructUtah = loadKSDir('D:/Staging/Trial001_Utah', loadPCs = True)
+        spikeStructUtah = loadKSDir('D:/Kilosort/Trial001_Utah', loadPCs = True)
         nevIDs = list(range(1,65))
-        spikesUtah = getWaveForms('D:/Staging/Trial001_Utah', spikeStructUtah, nevIDs = None, wfWin = (-30, 80), plotting = False, tempFolder = 'E:/temp')
+        spikesUtah = getWaveForms('D:/Kilosort/Trial001_Utah', spikeStructUtah, nevIDs = None, wfWin = (-30, 80), plotting = False, tempFolder = 'E:/temp')
 
-        pickle.dump(spikeStructUtah, open('D:/Staging/Trial001_Utah/Trial001_spikeStructUtah.pickle', 'wb'))
-        pickle.dump(spikesUtah, open('D:/Staging/Trial001_Utah/Trial001_spikesUtah.pickle', 'wb'))
+        pickle.dump(spikeStructUtah, open('D:/Kilosort/Trial001_Utah/Trial001_spikeStructUtah.pickle', 'wb'))
+        pickle.dump(spikesUtah, open('D:/Kilosort/Trial001_Utah/Trial001_spikesUtah.pickle', 'wb'))
     #spikePDFReport('D:/KiloSort/Trial001_Utah', spikesUtah, spikeStructUtah)
-    """
 
     ns5FilePath = 'D:/KiloSort/Trial001.ns5'
     inputIDs = {
@@ -571,19 +649,19 @@ if __name__ == "__main__":
 
     #pdb.set_trace()
     try:
-        trialStats  = pd.read_pickle('D:/Staging/Trial001_trialStats.pickle')
-        trialEvents = pd.read_pickle('D:/Staging/Trial001_trialEvents.pickle')
+        trialStats  = pd.read_pickle('D:/Kilosort/Trial001_trialStats.pickle')
+        trialEvents = pd.read_pickle('D:/Kilosort/Trial001_trialEvents.pickle')
     except:
         motorData = getMotorData(ns5FilePath, inputIDs, 0 , 'all')
         trialStats, trialEvents = getTrials(motorData)
-        trialStats.to_pickle('D:/Staging/Trial001_trialStats.pickle')
-        trialEvents.to_pickle('D:/Staging/Trial001_trialEvents.pickle')
+        trialStats.to_pickle('D:/Kilosort/Trial001_trialStats.pickle')
+        trialEvents.to_pickle('D:/Kilosort/Trial001_trialEvents.pickle')
 
-    plotChan = 71
-    plotSpike(spikesUtah, channel = plotChan)
-    isiBins = np.linspace(0, 50e-3, 100)
-    plotISIHistogram(spikesUtah, channel = plotChan, bins = isiBins,kde_kws = {'clip' : (isiBins[0] * 0.8, isiBins[-1] * 1.2), 'bw' : 'silverman'} )
-    plotAx = plotRaster(spikesUtah, trialStats, alignTo = 'FirstOnset', windowSize = (-0.5, 2), channel = plotChan)
-    plotFR(spikesUtah, trialStats, alignTo = 'FirstOnset', windowSize = (-0.5, 2), channel = plotChan, ax = plotAx, twin = True)
+    plotChan = 20
+    #plotSpike(spikesUtah, channel = plotChan)
+    #isiBins = np.linspace(0, 50e-3, 100)
+    #plotISIHistogram(spikesUtah, channel = plotChan, bins = isiBins,kde_kws = {'clip' : (isiBins[0] * 0.8, isiBins[-1] * 1.2), 'bw' : 'silverman'} )
+    plotAx = plotRaster(spikesUtah, trialStats, alignTo = 'FirstOnset', windowSize = (-0.5, 2), channel = plotChan, separateBy = 'Direction', maxTrial = 15)
+    plotFR(spikesUtah, trialStats, alignTo = 'FirstOnset', windowSize = (-0.5, 2), channel = plotChan, separateBy = 'Direction', ax = plotAx, twin = True, maxTrial = 15)
     plt.show()
 #spikePDFReport('D:/KiloSort/Trial001_Utah', spikesUtah, spikeStructUtah, plotRastersAlignedTo = 'FirstOnset', trialStats = trialStats)

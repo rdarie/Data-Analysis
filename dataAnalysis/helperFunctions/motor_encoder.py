@@ -381,10 +381,15 @@ if __name__ == "__main__":
         'simiTrigs' : 136,
         }
 
+    """
     motorData = getMotorData(ns5FilePath, inputIDs, 0 , 'all')
     trials, trialEvents = getTrials(motorData)
+    """
+    motorData = getMotorData(ns5FilePath, inputIDs, 0 , 'all')
+    trialStats  = pd.read_pickle('D:/Staging/Trial001_trialStats.pickle')
+    trialEvents = pd.read_pickle('D:/Staging/Trial001_trialEvents.pickle')
     timeRange = 30
-    pdb.set_trace()
+    #pdb.set_trace()
 
     while True:
         plotAxes = plotMotor(motorData, plotRange = ((timeRange - 30)* 30e3, timeRange * 30e3), subset = ['position', 'leftLED_int', 'rightLED_int', 'leftBut_int', 'rightBut_int','A_int'])
