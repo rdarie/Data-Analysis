@@ -574,7 +574,7 @@ def plotFR(spikes, trialStats, alignTo, channel, separateBy = None, windowSize =
     return ax, FR
 
 #@profile
-def spikePDFReport(filePath, spikes, spikeStruct, plotRastersAlignedTo = None, trialStats = None, enableFR = False):
+def spikePDFReport(filePath, spikes, spikeStruct, plotRastersAlignedTo = None, plotRastersSeparatedBy = None, trialStats = None, enableFR = False):
     pdfName = filePath + '/' + spikeStruct['dat_path'].split('.')[0] + '.pdf'
     with PdfPages(pdfName) as pdf:
         plotSpikePanel(spikeStruct['xcoords'], spikeStruct['ycoords'], spikes)
@@ -599,9 +599,9 @@ def spikePDFReport(filePath, spikes, spikeStruct, plotRastersAlignedTo = None, t
                         plt.close()
 
                     if plotRastersAlignedTo is not None and trialStats is not None:
-                        plotAx = plotRaster(spikes, trialStats, alignTo = plotRastersAlignedTo, windowSize = (-0.5, 2), channel = channel)
+                        plotAx = plotRaster(spikes, trialStats, alignTo = plotRastersAlignedTo, windowSize = (-0.5, 2), channel = channel, separateBy = plotRastersSeparatedBy)
                         if enableFR:
-                            plotFR(spikes, trialStats, alignTo = plotRastersAlignedTo, windowSize = (-0.5, 2), channel = channel, ax = plotAx, twin = True)
+                            plotFR(spikes, trialStats, alignTo = plotRastersAlignedTo, windowSize = (-0.5, 2), channel = channel, separateBy = plotRastersSeparatedBy, ax = plotAx, twin = True)
                         pdf.savefig()
                         plt.close()
 
