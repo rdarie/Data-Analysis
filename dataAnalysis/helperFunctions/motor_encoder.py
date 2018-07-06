@@ -318,7 +318,7 @@ def getTrials(motorData, trialType = '2AFC'):
                     trialStats.loc[idx, 'Outcome'] = 'button timed out'
             except:
                 print('Error detected!')
-                pdb.set_trace()
+                #pdb.set_trace()
     return trialStats, trialEvents
 
 #@profile
