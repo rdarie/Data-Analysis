@@ -51,6 +51,19 @@ def coordsToIndices(xcoords, ycoords):
 
     return xIdx, yIdx
 
+def getSpikeMetaData(filePath, ns5FileName, KSDir):
+
+    coords = np.load(filePath + '/'+ KSDir + '/channel_positions.npy', mmap_mode = mMapMode)
+    xcoords = [coord[0] for coord in coords]
+    ycoords = [coord[1] for coord in coords]
+    spikeStruct = {
+    'dat_path'          : filePath + '/' + ns5FileName,
+    'dtype'             : None,
+    'xcoords'           : xcoords,
+    'ycoords'           : ycoords
+    }
+    return spikeStruct
+
 #@profile
 def loadKSDir(filePath, excludeNoise = True, loadPCs = False):
     mMapMode = 'r'
@@ -84,6 +97,7 @@ def loadKSDir(filePath, excludeNoise = True, loadPCs = False):
             clusterInfo = pd.read_csv(cgsFile, sep='\t')
             hasClusterInfo = True
         except:
+            clusterInfo = None
             hasClusterInfo = False
 
         if excludeNoise and hasClusterInfo:
@@ -354,10 +368,13 @@ def plotSpike(spikes, channel, showNow = False, ax = None, acrossArray = False, 
                     waveForms = spikes['Waveforms'][ChanIdx][unitMask, :]
                 thisSpike = np.mean(waveForms, axis = 0)
                 thisError = np.std(waveForms, axis = 0)
-                timeRange = np.arange(len(thisSpike))
+                timeRange = np.arange(len(thisSpike)) / 3e4 * 1e3
                 colorPalette = sns.color_palette()
                 ax.fill_between(timeRange, thisSpike - thisError, thisSpike + thisError, alpha=0.4, facecolor=colorPalette[unitIdx], label='chan %s, unit %s' % (channel, unitName))
                 ax.plot(timeRange, thisSpike, linewidth=1, color=colorPalette[unitIdx])
+                ax.set_ylabel(spikes['Units'])
+                ax.set_xlabel('Time (msec)')
+                ax.set_title('Units on channel %d' % channel)
 
         if showNow:
             plt.show()
@@ -568,7 +585,7 @@ def plotFR(spikes, trialStats, alignTo, channel, separateBy = None, windowSize =
         for unitIdx, x in enumerate(meanFRThisCategory):
             thisAx.plot(timeWindow[:-1], x * 1e3, linewidth = 1, color = colorPalette[unitIdx])
             thisAx.set_ylabel('Average Firing rate (spk/sec)')
-        thisAx.set_title('spikes for ' + category + ' trials')
+        #thisAx.set_title('spikes for ' + category + ' trials')
     if showNow:
         plt.show()
     return ax, FR
@@ -658,7 +675,7 @@ if __name__ == "__main__":
         trialEvents.to_pickle('D:/Kilosort/Trial001_trialEvents.pickle')
 
     plotChan = 20
-    #plotSpike(spikesUtah, channel = plotChan)
+    plotSpike(spikesUtah, channel = plotChan)
     #isiBins = np.linspace(0, 50e-3, 100)
     #plotISIHistogram(spikesUtah, channel = plotChan, bins = isiBins,kde_kws = {'clip' : (isiBins[0] * 0.8, isiBins[-1] * 1.2), 'bw' : 'silverman'} )
     plotAx = plotRaster(spikesUtah, trialStats, alignTo = 'FirstOnset', windowSize = (-0.5, 2), channel = plotChan, separateBy = 'Direction', maxTrial = 15)
