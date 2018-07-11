@@ -313,7 +313,7 @@ def getWaveClusSpikes(filePath, nevIDs = None, plotting = False, getMUA = False,
     return spikes
 
 #@profile
-def plotSpike(spikes, channel, showNow = False, ax = None, acrossArray = False, xcoords = None, ycoords = None):
+def plotSpike(spikes, channel, showNow = False, ax = None, acrossArray = False, xcoords = None, ycoords = None, axesLabel = False):
 
     ChanIdx = spikes['ChannelID'].index(channel)
     unitsOnThisChan = np.unique(spikes['Classification'][ChanIdx])
@@ -372,9 +372,10 @@ def plotSpike(spikes, channel, showNow = False, ax = None, acrossArray = False, 
                 colorPalette = sns.color_palette()
                 ax.fill_between(timeRange, thisSpike - thisError, thisSpike + thisError, alpha=0.4, facecolor=colorPalette[unitIdx], label='chan %s, unit %s' % (channel, unitName))
                 ax.plot(timeRange, thisSpike, linewidth=1, color=colorPalette[unitIdx])
-                ax.set_ylabel(spikes['Units'])
-                ax.set_xlabel('Time (msec)')
-                ax.set_title('Units on channel %d' % channel)
+                if axesLabel:
+                    ax.set_ylabel(spikes['Units'])
+                    ax.set_xlabel('Time (msec)')
+                    ax.set_title('Units on channel %d' % channel)
 
         if showNow:
             plt.show()
@@ -563,7 +564,7 @@ def plotFR(spikes, trialStats, alignTo, channel, separateBy = None, windowSize =
         FR[idx].drop(x.index[x['discard'] == True], axis = 0, inplace = True)
         FR[idx].drop('discard', axis = 1, inplace = True)
 
-    kernelWidth = 50e-3 # seconds
+    kernelWidth = 25e-3 # seconds
     if separateBy is not None:
         meanFR = {category : [pd.Series(index = timeWindow[:-1]) for i in unitsOnThisChan] for category in uniqueCategories}
         for category in uniqueCategories:
@@ -603,7 +604,7 @@ def spikePDFReport(filePath, spikes, spikeStruct, plotRastersAlignedTo = None, p
             if unitsOnThisChan is not None:
                 if len(unitsOnThisChan) > 0:
                     fig, ax = plt.subplots(nrows = 1, ncols = 2)
-                    plotSpike(spikes, channel = channel, ax = ax[0])
+                    plotSpike(spikes, channel = channel, ax = ax[0], axesLabel = True)
                     isiBins = np.linspace(0, 50e-3, 100)
                     kde_kws = {'clip' : (isiBins[0] * 0.8, isiBins[-1] * 1.2), 'bw' : 'silverman'}
                     plotISIHistogram(spikes, channel = channel, bins = isiBins, kde_kws = kde_kws, ax = ax[1])
