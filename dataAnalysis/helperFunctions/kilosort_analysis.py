@@ -427,7 +427,7 @@ def plotSpikePanel(xcoords, ycoords, spikes):
 
 #def plotEventRaster
 #@profile
-def plotRaster(spikes, trialStats, alignTo, channel, separateBy = None, windowSize = (-0.25, 1), showNow = False, ax = None, maxTrial = None):
+def plotRaster(spikes, trialStats, alignTo, channel, separateBy = None, windowSize = (-0.25, 1), timeRange = None, showNow = False, ax = None, maxTrial = None):
 
     ChanIdx = spikes['ChannelID'].index(channel)
     unitsOnThisChan = np.unique(spikes['Classification'][ChanIdx])
@@ -447,8 +447,13 @@ def plotRaster(spikes, trialStats, alignTo, channel, separateBy = None, windowSi
         if ax is None:
             fig, ax = plt.subplots()
 
+    if timeRange is not None:
+        timeMask = np.logical_and(trialStats['FirstOnset'] > timeRange[0] * 3e4, trialStats['ChoiceOnset'] < timeRange[1] * 3e4)
+        trialStats = trialStats.loc[timeMask, :]
 
-    # timeWindow in milliseconds
+    if maxTrial is not None:
+        maxTrial = min(len(trialStats.index), maxTrial)
+        trialStats = trialStats.iloc[:maxTrial, :]
 
     timeWindow = list(range(int(windowSize[0] * 1e3), int(windowSize[1] * 1e3) + 1))
     if unitsOnThisChan is not None:
@@ -500,7 +505,7 @@ def plotRaster(spikes, trialStats, alignTo, channel, separateBy = None, windowSi
     return ax
 
 #@profile
-def plotFR(spikes, trialStats, alignTo, channel, separateBy = None, windowSize = (-0.25, 1), showNow = False, ax = None, twin = False, maxTrial = None):
+def plotFR(spikes, trialStats, alignTo, channel, separateBy = None, windowSize = (-0.25, 1), timeRange = None, showNow = False, ax = None, twin = False, maxTrial = None):
     ChanIdx = spikes['ChannelID'].index(channel)
     unitsOnThisChan = np.unique(spikes['Classification'][ChanIdx])
 
@@ -525,6 +530,10 @@ def plotFR(spikes, trialStats, alignTo, channel, separateBy = None, windowSize =
 
         if ax is None:
             fig, ax = plt.subplots()
+
+    if timeRange is not None:
+        timeMask = np.logical_and(trialStats['FirstOnset'] > timeRange[0] * 3e4, trialStats['ChoiceOnset'] < timeRange[1] * 3e4)
+        trialStats = trialStats.loc[timeMask, :]
 
     if maxTrial is not None:
         maxTrial = min(len(trialStats.index), maxTrial)

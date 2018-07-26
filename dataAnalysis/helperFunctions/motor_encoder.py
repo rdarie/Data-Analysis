@@ -349,7 +349,7 @@ def plotTrialEvents(trialEvents, plotRange = None, ax = None):
     ax.plot(LLOnIdx, np.ones((len(LLOnIdx),1)), 'co')
 
 #@profile
-def plotMotor(motorData, plotRange = (0,-1), subset = None, addAxes = 0, collapse = False, ax = None):
+def plotMotor(motorData, plotRange = (0,-1), subset = None, addAxes = 0, subsampleFactor = 30, collapse = False, ax = None):
 
     if subset is None:
         subset = motorData.columns
@@ -368,8 +368,10 @@ def plotMotor(motorData, plotRange = (0,-1), subset = None, addAxes = 0, collaps
     else:
         fig, ax = plt.subplots(nrows = 1 + addAxes, ncols = 1, sharex = True)
 
-    subsampleFactor = 30
+
     plotX = xAxis[::subsampleFactor] / 3e4
+    motorDataSub = pd.DataFrame(motorData.iloc[::subsampleFactor, :].values, index = motorData.index[::subsampleFactor], columns = motorData.columns)
+
     for idx, column in enumerate(subset):
         #pdb.set_trace()
         #ax[idx].plot(xAxis, motorData.loc[slice(plotRange[0], plotRange[1]), column], label = column)
@@ -400,7 +402,6 @@ def plotAverageAnalog(motorData, trialStats, alignTo, separateBy = None, subset 
         else:
             fig = ax.figure
 
-
     if timeRange is not None:
         timeMask = np.logical_and(trialStats['FirstOnset'] > timeRange[0] * 3e4, trialStats['ChoiceOnset'] < timeRange[1] * 3e4)
         trialStats = trialStats.loc[timeMask, :]
@@ -409,7 +410,6 @@ def plotAverageAnalog(motorData, trialStats, alignTo, separateBy = None, subset 
         maxTrial = min(len(trialStats.index), maxTrial)
         trialStats = trialStats.iloc[:maxTrial, :]
 
-    pdb.set_trace()
     motorDataSub = pd.DataFrame(motorData.iloc[::subsampleFactor, :].values, index = motorData.index[::subsampleFactor], columns = motorData.columns)
     timeWindow = list(range(int(windowSize[0] * 1e3), int(windowSize[1] * 1e3) + 1))
     colorPalette = sns.color_palette()
@@ -421,13 +421,21 @@ def plotAverageAnalog(motorData, trialStats, alignTo, separateBy = None, subset 
             try:
                 #pdb.set_trace()
                 #print('Getting %s trace for trial %s' % (column, trialIdx))
-                trace.iloc[trialIdx, :] = motorDataSub.loc[thisLocMask, column].values
+                thisLocMask = np.logical_and(list(motorDataSub.index) > startTime + timeWindow[0] * 30 , list(motorDataSub.index) < startTime + timeWindow[-1]* 30)
+                tempTrace = motorDataSub.loc[thisLocMask, column].copy()
+                oldIndex = tempTrace.index
+                newIndex = trace.columns * 30 + startTime
+                tempTrace = tempTrace.append(pd.Series(index = newIndex))
+                tempTrace.interpolate(method = 'cubic', inplace = True)
+                tempTrace.drop(oldIndex, inplace = True)
+                trace.iloc[trialIdx, :] = tempTrace.values
 
                 if maxTrial is not None:
                     if trialIdx >= maxTrial - 1:
                         break
             except:
                 break
+
         #pdb.set_trace()
         if separateBy is not None:
             meanTrace = {category : pd.Series(index = timeWindow[:-1]) for category in uniqueCategories}
