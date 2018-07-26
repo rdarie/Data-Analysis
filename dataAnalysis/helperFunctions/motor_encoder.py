@@ -325,6 +325,7 @@ def getTrials(motorData, trialType = '2AFC'):
 def plotTrialEvents(trialEvents, plotRange = None, ax = None):
     if ax is None:
         fig, ax = plt.subplots()
+
     moveOnIdx = trialEvents['Time'][trialEvents['Label'] == 'Movement Onset']
     moveOffIdx = trialEvents['Time'][trialEvents['Label'] == 'Movement Offset']
     RBOnIdx = trialEvents['Time'][trialEvents['Label'] == 'Right Button Onset']
@@ -348,22 +349,108 @@ def plotTrialEvents(trialEvents, plotRange = None, ax = None):
     ax.plot(LLOnIdx, np.ones((len(LLOnIdx),1)), 'co')
 
 #@profile
-def plotMotor(motorData, plotRange = (0,-1), subset = None, addAxes = 0):
+def plotMotor(motorData, plotRange = (0,-1), subset = None, addAxes = 0, collapse = False, ax = None):
+
     if subset is None:
         subset = motorData.columns
+
     if plotRange is None:
-        xAxis = range(len(motorData.index))
+        xAxis = np.arange(len(motorData.index))
     else:
-        xAxis = range(int(plotRange[0]), int(plotRange[1]))
+        xAxis = np.arange(int(plotRange[0]), int(plotRange[1]))
     #pdb.set_trace()
-    fig, ax = plt.subplots(nrows = len(subset) + addAxes, ncols = 1, sharex = True)
+    if ax is not None:
+        assert collapse == True
+        fig = ax.figure
+        ax = [ax]
+    elif ax is None and not collapse:
+        fig, ax = plt.subplots(nrows = len(subset) + addAxes, ncols = 1, sharex = True)
+    else:
+        fig, ax = plt.subplots(nrows = 1 + addAxes, ncols = 1, sharex = True)
+
+    subsampleFactor = 30
+    plotX = xAxis[::subsampleFactor] / 3e4
     for idx, column in enumerate(subset):
         #pdb.set_trace()
         #ax[idx].plot(xAxis, motorData.loc[slice(plotRange[0], plotRange[1]), column], label = column)
-        ax[idx].plot(xAxis, motorData.loc[xAxis, column], label = column)
+        if collapse:
+            idx = 0
+        ax[idx].plot(plotX, motorData.loc[xAxis[::subsampleFactor], column], label = column)
         ax[idx].legend()
+    #pdb.set_trace()
+    return fig, ax
 
-    return ax
+def plotAverageAnalog(motorData, trialStats, alignTo, separateBy = None, subset = None, windowSize = (-0.25, 1), timeRange = None, showNow = False, ax = None, maxTrial = None, collapse = True, subsampleFactor = 30):
+    if subset is None:
+        subset = motorData.columns
+
+    if separateBy is not None:
+        uniqueCategories = pd.Series(trialStats.loc[:,separateBy].unique())
+        uniqueCategories.dropna(inplace = True)
+
+        if ax is None:
+            fig, ax = plt.subplots(len(uniqueCategories),1)
+        else:
+            assert len(ax) == len(uniqueCategories)
+            fig = ax.figure()
+
+    else: # only one plot
+        if ax is None:
+            fig, ax = plt.subplots()
+        else:
+            fig = ax.figure
+
+
+    if timeRange is not None:
+        timeMask = np.logical_and(trialStats['FirstOnset'] > timeRange[0] * 3e4, trialStats['ChoiceOnset'] < timeRange[1] * 3e4)
+        trialStats = trialStats.loc[timeMask, :]
+
+    if maxTrial is not None:
+        maxTrial = min(len(trialStats.index), maxTrial)
+        trialStats = trialStats.iloc[:maxTrial, :]
+
+    pdb.set_trace()
+    motorDataSub = pd.DataFrame(motorData.iloc[::subsampleFactor, :].values, index = motorData.index[::subsampleFactor], columns = motorData.columns)
+    timeWindow = list(range(int(windowSize[0] * 1e3), int(windowSize[1] * 1e3) + 1))
+    colorPalette = sns.color_palette()
+    for idx, column in enumerate(subset):
+        #get the trace of interest
+        trace = pd.DataFrame(index = trialStats.index, columns = timeWindow[:-1])
+
+        for trialIdx, startTime in enumerate(trialStats[alignTo]):
+            try:
+                #pdb.set_trace()
+                #print('Getting %s trace for trial %s' % (column, trialIdx))
+                trace.iloc[trialIdx, :] = motorDataSub.loc[thisLocMask, column].values
+
+                if maxTrial is not None:
+                    if trialIdx >= maxTrial - 1:
+                        break
+            except:
+                break
+        #pdb.set_trace()
+        if separateBy is not None:
+            meanTrace = {category : pd.Series(index = timeWindow[:-1]) for category in uniqueCategories}
+            errorTrace ={category : pd.Series(index = timeWindow[:-1]) for category in uniqueCategories}
+            for category in uniqueCategories:
+                    meanTrace[category] = trace.loc[trialStats[separateBy] == category].mean(axis = 0)
+                    errorTrace[category] = trace.loc[trialStats[separateBy] == category].std(axis = 0)
+        else:
+            meanTrace = {'all' : trace.mean(axis = 0)}
+            errorTrace = {'all' : trace.std(axis = 0)}
+
+        for category, meanTraceThisCategory in meanTrace.items():
+            if separateBy is not None:
+                categoryIndex = pd.Index(uniqueCategories).get_loc(category)
+                thisAx = ax[categoryIndex]
+            else:
+                thisAx = ax
+            errorTraceThisCategory = errorTrace[category]
+            thisAx.fill_between(timeWindow[:-1], meanTraceThisCategory-errorTraceThisCategory, meanTraceThisCategory+errorTraceThisCategory, alpha=0.4, facecolor=colorPalette[idx])
+            thisAx.plot(timeWindow[:-1], meanTraceThisCategory, label=column, color=colorPalette[idx])
+            thisAx.legend()
+    #pdb.set_trace()
+    return fig, ax
 
 if __name__ == "__main__":
     ns5FilePath = 'D:/KiloSort/Trial001.ns5'

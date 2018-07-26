@@ -292,6 +292,112 @@ def getCameraTriggers(simiData, plotting = False):
 
     return peakIdx, trigTimes
 
+def getAngles(anglesFile, trigTimes, selectHeaders = None, selectTime = None,
+    reIndex = None, lowCutoff = None):
+
+    raw = pd.read_table(anglesFile, index_col = 0, skiprows = [1])
+    timeOffset = trigTimes[0]
+    raw.index = raw.index + timeOffset
+
+    raw.index = np.around(raw.index, 3)
+    #pdb.set_trace()
+    if selectTime:
+        raw = raw.loc[slice(selectTime[0], selectTime[1]), :]
+
+    headings = sorted(raw.columns) # get column names
+    coordinates = ['x', 'y', 'z']
+
+    # reorder alphabetically by columns
+    raw = raw.reindex(columns = headings)
+    #pdb.set_trace()
+
+    proc = pd.DataFrame(raw.values, columns = raw.columns, index = raw.index)
+
+    if lowCutoff is not None:
+        fr = 1 / 0.01
+        Wn = 2 * lowCutoff / fr
+        b, a = signal.butter(12, Wn, analog=False)
+        for column in proc:
+            proc.loc[:, column] = signal.filtfilt(b, a, proc.loc[:, column])
+
+    proc = proc.reset_index()
+    proc.index = proc.loc[:, 'Time'] * 3e4
+    return proc
+
+
+
+def getKinematics(kinematicsFile, trigTimes, selectHeaders = None, selectTime = None,
+    flip = None, reIndex = None, lowCutoff = None):
+    # TODO: unify with mujoco stuff
+    raw = pd.read_table(kinematicsFile, index_col = 0, skiprows = [1])
+    timeOffset = trigTimes[0]
+    raw.index = raw.index + timeOffset
+
+    raw.index = np.around(raw.index, 3)
+    #pdb.set_trace()
+    if selectTime:
+        raw = raw.loc[slice(selectTime[0], selectTime[1]), :]
+
+    headings = sorted(raw.columns) # get column names
+    coordinates = ['x', 'y', 'z']
+
+    # reorder alphabetically by columns
+    raw = raw.reindex(columns = headings)
+    #pdb.set_trace()
+
+    if reIndex is not None:
+        uniqueHeadings = set([name[:-2] for name in headings])
+        oldIndex = raw.columns
+        newIndex = np.array(oldIndex)
+        for name in uniqueHeadings:
+            for reindexPair in reIndex:
+                mask = [
+                    oldIndex.str.contains(name + ' ' + reindexPair[0]),
+                    oldIndex.str.contains(name + ' ' + reindexPair[1])
+                    ]
+                temp = newIndex[mask[0]]
+                newIndex[mask[0]] = newIndex[mask[1]]
+                newIndex[mask[1]] = temp
+        raw.columns = newIndex
+        headings = sorted(newIndex)
+        raw = raw.reindex_axis(headings, axis = 1)
+
+    if flip is not None:
+        uniqueHeadings = set([name[:-2] for name in headings])
+        for name in uniqueHeadings:
+            for flipAxis in flip:
+                raw.loc[:,name + ' ' + flipAxis] = -raw.loc[:,name + ' ' + flipAxis]
+
+    # create multiIndex column names
+
+    #pdb.set_trace()
+    if selectHeaders is not None:
+        expandedHeadings = [
+            name + ' X' for name in selectHeaders
+        ] + [
+            name + ' Y' for name in selectHeaders
+        ] + [
+            name + ' Z' for name in selectHeaders
+        ]
+        raw = raw[sorted(expandedHeadings)]
+        indexPD = pd.MultiIndex.from_product([sorted(selectHeaders),
+            coordinates], names=['joint', 'coordinate'])
+    else:
+        uniqueHeadings = set([name[:-2] for name in headings])
+        indexPD = pd.MultiIndex.from_product([sorted(uniqueHeadings),
+            coordinates], names=['joint', 'coordinate'])
+
+    proc = pd.DataFrame(raw.values, columns = indexPD, index = raw.index)
+
+    if lowCutoff is not None:
+        fr = 1 / 0.01
+        Wn = 2 * lowCutoff / fr
+        b, a = signal.butter(12, Wn, analog=False)
+        for column in proc:
+            proc.loc[:, column] = signal.filtfilt(b, a, proc.loc[:, column])
+
+    return proc
+
 def getGaitEvents(trigTimes, simiTable, whichColumns =  ['ToeUp_Left Y', 'ToeDown_Left Y'], plotting = False, fudge = 2, CameraFs = 100):
     # NSP time of first camera trigger
     timeOffset = trigTimes[0]
@@ -614,19 +720,20 @@ def plotSpectrum(P, fs, start_time_s, end_time_s, fr_start = 10, fr_stop = 600, 
     return f
 
 def binnedEvents(timeStamps, chans, ChannelID, binInterval, binWidth, timeStart, timeEnd):
-
+    #pdb.set_trace()
     binCenters = np.arange(timeStart + binWidth / 2, timeEnd - binWidth/2 + binInterval, binInterval)
 
     #timeInterval = timeEnd - timeStart - binWidth
-    binRes = gcd(math.floor(binWidth *1e3 / 2), math.floor(binInterval*1e3))*1e-3 # greatest common denominator
+    binRes = gcd(math.floor(binWidth * 1e6 / 2), math.floor(binInterval * 1e6)) * 1e-6 # greatest common denominator
     fineBins = np.arange(timeStart, timeEnd + binRes, binRes)
 
     fineBinsPerWindow = int(binWidth / binRes)
     fineBinsPerInterval = int(binInterval / binRes)
     fineBinsTotal = len(fineBins) - 1
+
     centerIdx = np.arange(0, fineBinsTotal - fineBinsPerWindow + fineBinsPerInterval, fineBinsPerInterval)
     binLeftEdges = centerIdx * binRes
-
+    #pdb.set_trace()
     nChans = len(timeStamps)
     spikeMat = np.zeros([len(binCenters), nChans])
     for idx, chan in enumerate(chans):
@@ -636,41 +743,78 @@ def binnedEvents(timeStamps, chans, ChannelID, binInterval, binWidth, timeStart,
         spikeMat[:, idx] = np.array(
             [histo[x:x+fineBinsPerWindow].sum() / binWidth for x in centerIdx]
         )
-
+    #pdb.set_trace()
     return spikeMat, binCenters, binLeftEdges
 
-def binnedSpikes(spikes, chans, binInterval, binWidth, timeStart, timeDur):
+def binnedSpikes(spikes, chans, binInterval, binWidth, timeStart, timeDur, timeStampUnits = 'samples'):
+
     timeEnd = timeStart + timeDur
     #binCenters = timeStart + BinWidth / 2 : binInterval : timeEnd - binWidth/2
-    timeStamps = [x / spikes['basic_headers']['TimeStampResolution'] for x in spikes['TimeStamps']]
-    ChannelID = spikes['ChannelID']
-    spikeMat, binCenters, binLeftEdges = binnedEvents(timeStamps, chans, ChannelID, binInterval, binWidth, timeStart, timeEnd)
+    if timeStampUnits == 'samples':
+        timeStamps = [x / spikes['basic_headers']['TimeStampResolution'] for x in spikes['TimeStamps']]
+    elif timeStampUnits == 'seconds':
+        timeStamps = spikes['TimeStamps']
 
-    return pd.DataFrame(spikeMat), binCenters, binLeftEdges
-
-def plotBinnedSpikes(spikeMat, binCenters, chans, show = True, normalizationType = 'linear'):
+    timeStamps = []
+    ChannelID = []
+    # # TODO: separate different units into their own "channels"
     #pdb.set_trace()
-    zMin, zMax = spikeMat.min().min(), spikeMat.max().max()
+
+    if timeStampUnits == 'samples':
+        allTimeStamps = [x / spikes['basic_headers']['TimeStampResolution'] for x in spikes['TimeStamps']]
+    elif timeStampUnits == 'seconds':
+        allTimeStamps = spikes['TimeStamps']
+
+    for channel in spikes['ChannelID']:
+
+        idx = spikes['ChannelID'].index(channel)
+        unitsOnThisChan = np.unique(spikes['Classification'][idx])
+
+        if unitsOnThisChan is not None:
+            for unitName in unitsOnThisChan:
+                unitMask = spikes['Classification'][idx] == unitName
+                timeStamps.append(allTimeStamps[idx][unitMask])
+                ChannelID.append(unitName)
+
+    spikeMat, binCenters, binLeftEdges = binnedEvents(timeStamps, ChannelID, ChannelID, binInterval, binWidth, timeStart, timeEnd)
+
+    return pd.DataFrame(spikeMat, index = binCenters, columns = ChannelID), binCenters, binLeftEdges
+
+def plotBinnedSpikes(spikeMat, binCenters, chans, show = True, normalizationType = 'linear', zAxis = None, ax = None):
+    #pdb.set_trace()
+
+    if ax is None:
+        fi, ax = plt.subplots()
+    else:
+        fi = ax.figure
+
+    if zAxis is None:
+        zMin, zMax = spikeMat.min().min(), spikeMat.max().max()
+    else:
+        zMin = zAxis[0]
+        zMax = zAxis[1]
+
     if normalizationType == 'linear':
         nor = colors.Normalize(vmin=zMin, vmax=zMax)
     elif normalizationType == 'logarithmic':
-        nor = colors.SymLogNorm(linthresh= 1, linscale=1,
+        nor = colors.SymLogNorm(linthresh= 10, linscale=1,
                                               vmin=zMin, vmax=zMax)
-    fi = plt.figure()
+    #fi = plt.figure()
     chanIdx = np.arange(len(chans))
-    plt.pcolormesh(binCenters, chanIdx, spikeMat.values.transpose(), norm = nor)
-    plt.axis([binCenters.min(), binCenters.max(), chanIdx.min(), chanIdx.max()])
+    im = ax.pcolormesh(binCenters, chanIdx, spikeMat.values.transpose(), norm = nor)
+    ax.axis([binCenters.min(), binCenters.max(), chanIdx.min(), chanIdx.max()])
     #plt.colorbar()
     #plt.locator_params(axis='y', nbins=20)
-    plt.xlabel('Time (s)')
-    plt.ylabel("Channel (#)")
-    plt.tight_layout()
+    ax.set_xlabel('Time (s)')
+    ax.set_ylabel("Unit (#)")
+    #splt.tight_layout()
     if show:
         plt.show()
-    return fi
+    return fi, im
 
 def plot_spikes(spikes, chans):
     # Initialize plots
+    #pdb.set_trace()
     colors      = 'kbgrm'
     line_styles = ['-', '--', ':', '-.']
     f, axarr    = plt.subplots(len(chans))

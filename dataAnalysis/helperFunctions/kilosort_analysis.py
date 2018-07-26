@@ -187,8 +187,8 @@ def getWaveForms(filePath, spikeStruct, nevIDs = None, dataType = np.int16, wfWi
         'TimeStamps' : [[] for i in range(nCh)],
         'Units' : 'nV',
         'Waveforms' : [None for i in range(nCh)],
-#        'meanWaveforms' : [None for i in range(nCh)],
-#        'stdWaveforms' : [None for i in range(nCh)],
+        #'meanWaveforms' : [None for i in range(nCh)],
+        #'stdWaveforms' : [None for i in range(nCh)],
         'basic_headers' : [],
         'extended_headers' : []
         }
@@ -283,9 +283,9 @@ def getWaveClusSpikes(filePath, nevIDs = None, plotting = False, getMUA = False,
         'TimeStamps' : [[] for i in range(nCh)],
         'Units' : 'uV',
         'Waveforms' : [None for i in range(nCh)],
-#        'meanWaveforms' : [None for i in range(nCh)],
-#        'stdWaveforms' : [None for i in range(nCh)],
-        'basic_headers' : [],
+        #'meanWaveforms' : [None for i in range(nCh)],
+        #'stdWaveforms' : [None for i in range(nCh)],
+        'basic_headers' : {'TimeStampResolution': 3e4},
         'extended_headers' : []
         }
 
@@ -306,6 +306,7 @@ def getWaveClusSpikes(filePath, nevIDs = None, plotting = False, getMUA = False,
             spikes['TimeStamps'][idx] = waveClusData['cluster_class'][notMUAMask,1] / 1e3
             spikes['Waveforms'][idx] = waveClusData['spikes'][notMUAMask, :]
 
+        # note that the units of TimeStamps is in SECONDS
         unitIDs+=unitsInFile.tolist()
         lastMaxUnitID = max(unitIDs)
 
@@ -424,6 +425,7 @@ def plotSpikePanel(xcoords, ycoords, spikes):
 
     plt.tight_layout()
 
+#def plotEventRaster
 #@profile
 def plotRaster(spikes, trialStats, alignTo, channel, separateBy = None, windowSize = (-0.25, 1), showNow = False, ax = None, maxTrial = None):
 
