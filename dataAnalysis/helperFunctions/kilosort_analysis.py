@@ -5,12 +5,15 @@ from scipy.ndimage.filters import gaussian_filter1d
 import pandas as pd
 import scipy.io
 import matplotlib
+#matplotlib.use('PS')   # generate postscript output by default
+matplotlib.use('Qt5Agg')   # generate postscript output by default
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib import pyplot as plt
 from fractions import gcd
 import seaborn as sns
 from importlib import reload
-from dataAnalysis.helperFunctions.helper_functions import *
+import dataAnalysis.helperFunctions.motor_encoder as mea
+import dataAnalysis.helperFunctions.helper_functions as hf
 import line_profiler
 import pickle
 import h5py
@@ -264,7 +267,7 @@ def numFromWaveClusSpikeFile(spikeFileName):
     return int(spikeFileName.split('times_NSX')[-1].split('.mat')[0])
 
 def getWaveClusSpikes(filePath, nevIDs = None, plotting = False, getMUA = False, tempFolder = None):
-
+    # TODO: not memory mapped yet
     if nevIDs is None:
         spikeFileList = [f for f in os.listdir(filePath + '/wave_clus') if '.mat' in f and 'times_' in f]
         nevIDs = [numFromWaveClusSpikeFile(f) for f in spikeFileList]
@@ -380,7 +383,6 @@ def plotSpike(spikes, channel, showNow = False, ax = None, acrossArray = False, 
 
         if showNow:
             plt.show()
-
 
 #@profile
 def plotISIHistogram(spikes, channel, showNow = False, ax = None, bins = None, kde_kws = None):
@@ -602,6 +604,51 @@ def plotFR(spikes, trialStats, alignTo, channel, separateBy = None, windowSize =
         plt.show()
     return ax, FR
 
+#TODO: replace motorData wording with analogData wording
+def plotSingleTrial(trialStats, trialEvents, motorData, kinematics, spikes,\
+    nevIDs, spikesExclude, whichTrial, orderSpikesBy = None, zAxis = None, startEvent = 'FirstOnset', endEvent = 'ChoiceOnset',\
+    analogSubset = ['position'], analogLabel = '', kinematicsSubset = ['Hip_Right_Angle X'],\
+    kinematicLabel = '', eventSubset = ['Right LED Onset', 'Right Button Onset', 'Left LED Onset', 'Left Button Onset', 'Movement Onset', 'Movement Offset'],\
+    binInterval = 20e-3, binWidth = 50e-3):
+    nArrays = len(spikes)
+    #pdb.set_trace()
+    thisTrial = trialStats.loc[whichTrial, :]
+    timeStart = thisTrial[startEvent] - 0.1 * 3e4
+    timeEnd = thisTrial[endEvent] + 0.1 * 3e4
+    fig, motorPlotAxes = mea.plotMotor(motorData, plotRange = (timeStart, timeEnd), subset = analogSubset, subsampleFactor = 30, addAxes = 1 + nArrays, collapse = True)
+
+    fig.subplots_adjust(bottom=0.1, top=0.9, left=0.1, right=0.8, wspace=0.02, hspace=0.02)
+    mea.plotTrialEvents(trialEvents, plotRange = (timeStart, timeEnd), ax = motorPlotAxes[0], colorOffset = len(analogSubset), subset = eventSubset)
+
+    motorPlotAxes[0].set_ylabel(analogLabel)
+    #try:
+    motorPlotAxes[0].legend(loc = 1)
+    #except:
+    #    pass
+
+    mea.plotMotor(kinematics, plotRange = (timeStart, timeEnd), subset = kinematicsSubset, subsampleFactor = 1, ax = motorPlotAxes[1], collapse = True)
+    motorPlotAxes[1].set_ylabel(kinematicLabel)
+    try:
+        motorPlotAxes[1].legend(loc = 1)
+    except:
+        pass
+
+    for idx, spikeDict in enumerate(spikes):
+        #pdb.set_trace()
+        spikeMatOriginal, binCenters, binLeftEdges = hf.binnedSpikes(spikeDict, nevIDs[idx], binInterval, binWidth, timeStart /3e4, (timeEnd - timeStart)/3e4, timeStampUnits = 'seconds')
+        spikeMat = spikeMatOriginal.drop(spikesExclude[idx], axis = 'columns')
+        if orderSpikesBy == 'idxmax':
+            spikeOrder = spikeMat.idxmax().sort_values().index
+            spikeMat = spikeMat.loc[:,spikeOrder]
+        fig, im = hf.plotBinnedSpikes(spikeMat, binCenters, spikeMat.columns, show = False, normalizationType = 'linear', ax = motorPlotAxes[idx + 2], zAxis = zAxis)
+        # add an axes, lower left corner in [0.83, 0.1] measured in figure coordinate with axes width 0.02 and height 0.8
+        cbAx = fig.add_axes([0.83, 0.1 + 0.21 * idx, 0.02, 0.18])
+        cbar = fig.colorbar(im, cax=cbAx)
+        cbar.set_label('Firing Rate (Hz)')
+
+    fig.suptitle('Trial %d: %s' % (whichTrial, thisTrial['Outcome']))
+    return fig, motorPlotAxes
+
 #@profile
 def spikePDFReport(filePath, spikes, spikeStruct, plotRastersAlignedTo = None, plotRastersSeparatedBy = None, trialStats = None, enableFR = False):
     pdfName = filePath + '/' + spikeStruct['dat_path'].split('.')[0] + '.pdf'
@@ -633,6 +680,29 @@ def spikePDFReport(filePath, spikes, spikeStruct, plotRastersAlignedTo = None, p
                             plotFR(spikes, trialStats, alignTo = plotRastersAlignedTo, windowSize = (-0.5, 2), channel = channel, separateBy = plotRastersSeparatedBy, ax = plotAx, twin = True)
                         pdf.savefig()
                         plt.close()
+
+def trialPDFReport(filePath, trialStats, trialEvents, motorData, kinematics, spikes,\
+    nevIDs, spikesExclude, startEvent = 'FirstOnset', endEvent = 'ChoiceOnset',\
+    analogSubset = ['position'], analogLabel = '', kinematicsSubset =  ['Hip Right X', 'Knee Right X', 'Ankle Right X'],\
+    kinematicLabel = '', eventSubset = ['Right LED Onset', 'Right Button Onset', 'Left LED Onset', 'Left Button Onset', 'Movement Onset', 'Movement Offset'],\
+    binInterval = 20e-3, binWidth = 50e-3, maxTrial = None):
+
+    with PdfPages(filePath) as pdf:
+        for idx, curTrial in trialStats.iterrows():
+            if maxTrial is not None:
+                if idx > maxTrial:
+                    break
+            try:
+                fig, motorPlotAxes = plotSingleTrial(trialStats, trialEvents, motorData, \
+                    kinematics, spikes, nevIDs, spikesExclude, idx, startEvent = startEvent, \
+                    endEvent = endEvent, analogSubset = analogSubset, analogLabel = analogLabel, \
+                    kinematicsSubset = kinematicsSubset, kinematicLabel = kinematicLabel, \
+                    eventSubset = eventSubset, binInterval = binInterval, binWidth = binWidth)
+                pdf.savefig()
+                plt.close()
+            except:
+                pdf.savefig()
+                plt.close()
 
 if __name__ == "__main__":
     from dataAnalysis.helperFunctions.motor_encoder import *

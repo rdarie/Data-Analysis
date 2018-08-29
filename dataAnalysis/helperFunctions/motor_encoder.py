@@ -322,31 +322,55 @@ def getTrials(motorData, trialType = '2AFC'):
     return trialStats, trialEvents
 
 #@profile
-def plotTrialEvents(trialEvents, plotRange = None, ax = None):
+def plotTrialEvents(trialEvents, plotRange = None, colorOffset = 0, ax = None, subset = None):
     if ax is None:
         fig, ax = plt.subplots()
+        lowerBound, upperBound = 0,1
+    else:
+        lowerBound, upperBound = ax.get_ylim()
 
-    moveOnIdx = trialEvents['Time'][trialEvents['Label'] == 'Movement Onset']
-    moveOffIdx = trialEvents['Time'][trialEvents['Label'] == 'Movement Offset']
-    RBOnIdx = trialEvents['Time'][trialEvents['Label'] == 'Right Button Onset']
-    LBOnIdx = trialEvents['Time'][trialEvents['Label'] == 'Left Button Onset']
-    RLOnIdx = trialEvents['Time'][trialEvents['Label'] == 'Right LED Onset']
-    LLOnIdx = trialEvents['Time'][trialEvents['Label'] == 'Left LED Onset']
+    if 'Movement Onset' in subset or subset is None:
+        moveOnIdx = trialEvents['Time'][trialEvents['Label'] == 'Movement Onset']
+    if 'Movement Offset' in subset or subset is None:
+        moveOffIdx = trialEvents['Time'][trialEvents['Label'] == 'Movement Offset']
+    if 'Right Button Onset' in subset or subset is None:
+        RBOnIdx = trialEvents['Time'][trialEvents['Label'] == 'Right Button Onset']
+    if 'Left Button Onset' in subset or subset is None:
+        LBOnIdx = trialEvents['Time'][trialEvents['Label'] == 'Left Button Onset']
+    if 'Right LED Onset' in subset or subset is None:
+        RLOnIdx = trialEvents['Time'][trialEvents['Label'] == 'Right LED Onset']
+    if 'Left LED Onset' in subset or subset is None:
+        LLOnIdx = trialEvents['Time'][trialEvents['Label'] == 'Left LED Onset']
 
     if plotRange is not None:
-        moveOnIdx = moveOnIdx[np.logical_and(moveOnIdx > plotRange[0], moveOnIdx < plotRange[1])]
-        moveOffIdx = moveOffIdx[np.logical_and(moveOffIdx > plotRange[0], moveOffIdx < plotRange[1])]
-        RBOnIdx = RBOnIdx[np.logical_and(RBOnIdx > plotRange[0], RBOnIdx < plotRange[1])]
-        LBOnIdx = LBOnIdx[np.logical_and(LBOnIdx > plotRange[0], LBOnIdx < plotRange[1])]
-        RLOnIdx = RLOnIdx[np.logical_and(RLOnIdx > plotRange[0], RLOnIdx < plotRange[1])]
-        LLOnIdx = LLOnIdx[np.logical_and(LLOnIdx > plotRange[0], LLOnIdx < plotRange[1])]
+        if 'Movement Onset' in subset or subset is None:
+            moveOnIdx = moveOnIdx[np.logical_and(moveOnIdx > plotRange[0], moveOnIdx < plotRange[1])]
+        if 'Movement Offset' in subset or subset is None:
+            moveOffIdx = moveOffIdx[np.logical_and(moveOffIdx > plotRange[0], moveOffIdx < plotRange[1])]
+        if 'Right Button Onset' in subset or subset is None:
+            RBOnIdx = RBOnIdx[np.logical_and(RBOnIdx > plotRange[0], RBOnIdx < plotRange[1])]
+        if 'Left Button Onset' in subset or subset is None:
+            LBOnIdx = LBOnIdx[np.logical_and(LBOnIdx > plotRange[0], LBOnIdx < plotRange[1])]
+        if 'Right LED Onset' in subset or subset is None:
+            RLOnIdx = RLOnIdx[np.logical_and(RLOnIdx > plotRange[0], RLOnIdx < plotRange[1])]
+        if 'Left LED Onset' in subset or subset is None:
+            LLOnIdx = LLOnIdx[np.logical_and(LLOnIdx > plotRange[0], LLOnIdx < plotRange[1])]
     #pdb.set_trace()
-    ax.plot(moveOnIdx, np.ones((len(moveOnIdx),1)), 'go')
-    ax.plot(moveOffIdx, np.ones((len(moveOffIdx),1)), 'yo')
-    ax.plot(RBOnIdx, np.ones((len(RBOnIdx),1)), 'cd')
-    ax.plot(LBOnIdx, np.ones((len(LBOnIdx),1)), 'rd')
-    ax.plot(RLOnIdx, np.ones((len(RLOnIdx),1)), 'bo')
-    ax.plot(LLOnIdx, np.ones((len(LLOnIdx),1)), 'co')
+    #ax.vlines(trialSpikeTimes - startTime / 3e1, lineToPlot, lineToPlot + 1, colors = [colorPalette[unitIdx]], linewidths = [0.5])
+    colorPalette = sns.color_palette()
+
+    if ('Movement Onset' in subset or subset is None) and not moveOnIdx.empty:
+        ax.vlines(moveOnIdx / 3e4, lowerBound, upperBound, label = 'Movement Onset', colors = [colorPalette[0 + colorOffset] for idx in moveOnIdx], linewidths = [0.5])
+    if ('Movement Offset' in subset or subset is None) and not moveOffIdx.empty:
+        ax.vlines(moveOffIdx / 3e4, lowerBound, upperBound, label = 'Movement Offset', colors = [colorPalette[1 + colorOffset] for idx in moveOffIdx], linewidths = [0.5])
+    if ('Right Button Onset' in subset or subset is None) and not RBOnIdx.empty:
+        ax.vlines(RBOnIdx / 3e4, lowerBound, upperBound, label = 'Right Button Onset', colors = [colorPalette[2 + colorOffset] for idx in RBOnIdx], linewidths = [0.5])
+    if ('Left Button Onset' in subset or subset is None) and not LBOnIdx.empty:
+        ax.vlines(LBOnIdx / 3e4, lowerBound, upperBound, label = 'Left Button Onset', colors = [colorPalette[3 + colorOffset] for idx in LBOnIdx], linewidths = [0.5])
+    if ('Right LED Onset' in subset or subset is None) and not RLOnIdx.empty:
+        ax.vlines(RLOnIdx / 3e4, lowerBound, upperBound, label = 'Right LED Onset', colors = [colorPalette[4 + colorOffset] for idx in RLOnIdx], linewidths = [0.5])
+    if ('Left LED Onset' in subset or subset is None) and not LLOnIdx.empty:
+        ax.vlines(LLOnIdx / 3e4, lowerBound, upperBound, label = 'Left LED Onset', colors = [colorPalette[5 + colorOffset] for idx in LLOnIdx], linewidths = [0.5])
 
 #@profile
 def plotMotor(motorData, plotRange = (0,-1), subset = None, addAxes = 0, subsampleFactor = 30, collapse = False, ax = None):
@@ -355,9 +379,10 @@ def plotMotor(motorData, plotRange = (0,-1), subset = None, addAxes = 0, subsamp
         subset = motorData.columns
 
     if plotRange is None:
-        xAxis = np.arange(len(motorData.index))
+        xAxis = motorData.index
     else:
-        xAxis = np.arange(int(plotRange[0]), int(plotRange[1]))
+        xAxisMask = np.logical_and(motorData.index > plotRange[0], motorData.index < plotRange[1])
+        xAxis = motorData.index[xAxisMask]
     #pdb.set_trace()
     if ax is not None:
         assert collapse == True
@@ -368,21 +393,21 @@ def plotMotor(motorData, plotRange = (0,-1), subset = None, addAxes = 0, subsamp
     else:
         fig, ax = plt.subplots(nrows = 1 + addAxes, ncols = 1, sharex = True)
 
-
     plotX = xAxis[::subsampleFactor] / 3e4
-    motorDataSub = pd.DataFrame(motorData.iloc[::subsampleFactor, :].values, index = motorData.index[::subsampleFactor], columns = motorData.columns)
-
+    #motorDataSub = pd.DataFrame(motorData.iloc[::subsampleFactor, :].values, index = motorData.index[::subsampleFactor], columns = motorData.columns)
+    #pdb.set_trace()
     for idx, column in enumerate(subset):
         #pdb.set_trace()
         #ax[idx].plot(xAxis, motorData.loc[slice(plotRange[0], plotRange[1]), column], label = column)
         if collapse:
             idx = 0
+
         ax[idx].plot(plotX, motorData.loc[xAxis[::subsampleFactor], column], label = column)
-        ax[idx].legend()
+        #ax[idx].legend(loc = 1)
     #pdb.set_trace()
     return fig, ax
 
-def plotAverageAnalog(motorData, trialStats, alignTo, separateBy = None, subset = None, windowSize = (-0.25, 1), timeRange = None, showNow = False, ax = None, maxTrial = None, collapse = True, subsampleFactor = 30):
+def plotAverageAnalog(motorData, trialStats, alignTo, separateBy = None, subset = None, windowSize = (-0.25, 1), timeRange = None, showNow = False, ax = None, maxTrial = None, collapse = True, subsampleFactor = 30, equalAxes = True):
     if subset is None:
         subset = motorData.columns
 
@@ -413,6 +438,7 @@ def plotAverageAnalog(motorData, trialStats, alignTo, separateBy = None, subset 
     motorDataSub = pd.DataFrame(motorData.iloc[::subsampleFactor, :].values, index = motorData.index[::subsampleFactor], columns = motorData.columns)
     timeWindow = list(range(int(windowSize[0] * 1e3), int(windowSize[1] * 1e3) + 1))
     colorPalette = sns.color_palette()
+
     for idx, column in enumerate(subset):
         #get the trace of interest
         trace = pd.DataFrame(index = trialStats.index, columns = timeWindow[:-1])
@@ -421,7 +447,7 @@ def plotAverageAnalog(motorData, trialStats, alignTo, separateBy = None, subset 
             try:
                 #pdb.set_trace()
                 #print('Getting %s trace for trial %s' % (column, trialIdx))
-                thisLocMask = np.logical_and(list(motorDataSub.index) > startTime + timeWindow[0] * 30 , list(motorDataSub.index) < startTime + timeWindow[-1]* 30)
+                thisLocMask = np.logical_and(motorDataSub.index.values > startTime + timeWindow[0] * 30 , motorDataSub.index.values < startTime + timeWindow[-1]* 30)
                 tempTrace = motorDataSub.loc[thisLocMask, column].copy()
                 oldIndex = tempTrace.index
                 newIndex = trace.columns * 30 + startTime
@@ -434,7 +460,7 @@ def plotAverageAnalog(motorData, trialStats, alignTo, separateBy = None, subset 
                     if trialIdx >= maxTrial - 1:
                         break
             except:
-                break
+                pass
 
         #pdb.set_trace()
         if separateBy is not None:
@@ -447,6 +473,7 @@ def plotAverageAnalog(motorData, trialStats, alignTo, separateBy = None, subset 
             meanTrace = {'all' : trace.mean(axis = 0)}
             errorTrace = {'all' : trace.std(axis = 0)}
 
+        # keep Track of axis extents
         for category, meanTraceThisCategory in meanTrace.items():
             if separateBy is not None:
                 categoryIndex = pd.Index(uniqueCategories).get_loc(category)
@@ -456,8 +483,25 @@ def plotAverageAnalog(motorData, trialStats, alignTo, separateBy = None, subset 
             errorTraceThisCategory = errorTrace[category]
             thisAx.fill_between(timeWindow[:-1], meanTraceThisCategory-errorTraceThisCategory, meanTraceThisCategory+errorTraceThisCategory, alpha=0.4, facecolor=colorPalette[idx])
             thisAx.plot(timeWindow[:-1], meanTraceThisCategory, label=column, color=colorPalette[idx])
-            thisAx.legend()
-    #pdb.set_trace()
+            thisAx.legend(loc = 1)
+
+    if separateBy is not None and equalAxes:
+        axExtentsUnset = True
+        for thisAx in ax:
+            if axExtentsUnset:
+                axMin, axMax = thisAx.get_ylim()
+                axExtentsUnset = False
+            else:
+                thisAxMin, thisAxMax = thisAx.get_ylim()
+                if thisAxMin < axMin:
+                    print('new axMin')
+                    axMin = thisAxMin
+                if thisAxMax > axMax:
+                    print('new axMax')
+                    axMax = thisAxMax
+        for thisAx in ax:
+            thisAx.set_ylim(axMin, axMax)
+            #pdb.set_trace()
     return fig, ax
 
 if __name__ == "__main__":

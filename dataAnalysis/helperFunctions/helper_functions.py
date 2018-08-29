@@ -5,6 +5,7 @@ try:
 except:
     pass
 
+import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 from matplotlib import cm
@@ -23,7 +24,7 @@ import plotly.plotly as py
 import plotly.tools as tls
 import plotly.figure_factory as ff
 import plotly.graph_objs as go
-
+import collections
 from brPY.brpylib import NsxFile, NevFile, brpylib_ver
 
 try:
@@ -94,20 +95,23 @@ def getNSxData(filePath, elecIds, startTime_s, dataLength_s, downsample = 1):
     brpylib_ver_req = "1.3.1"
     if brpylib_ver.split('.') < brpylib_ver_req.split('.'):
         raise Exception("requires brpylib " + brpylib_ver_req + " or higher, please use latest version")
-
+    if not isinstance(elecIds, collections.Iterable):
+        elecIds = [elecIds]
     # Open file and extract headers
     nsx_file = NsxFile(filePath)
 
     # Extract data - note: data will be returned based on *SORTED* elec_ids, see cont_data['elec_ids']
     channelData = nsx_file.getdata(elecIds, startTime_s, dataLength_s, downsample)
 
+    pdb.set_trace()
+    channelData['data'] = pd.DataFrame(channelData['data'], index = elecIds).transpose()
     #pdb.set_trace()
-    channelData['data'] = pd.DataFrame(channelData['data']).transpose()
     channelData['t'] = channelData['start_time_s'] + np.arange(channelData['data'].shape[0]) / channelData['samp_per_s']
     channelData['badData'] = dict()
     channelData['spectrum'] = pd.DataFrame({'PSD': [], 't': [], 'fr': [], 'Labels': []})
     channelData['basic_headers'] = nsx_file.basic_header
     channelData['extended_headers'] =  nsx_file.extended_headers
+    #pdb.set_trace()
     # Close the nsx file now that all data is out
     nsx_file.close()
 
@@ -141,20 +145,24 @@ def getBadSpikesMask(spikes, nStd = 5, whichChan = 0, plotting = False, deleteBa
             spikes['TimeStamps'][idx] = np.array(spikes['TimeStamps'][idx])[np.logical_not(badMask[idx])]
     return badMask
 
-def fillInOverflow(channelData, plotting = False):
-
-    for idx, row in channelData['data'].iterrows():
+def fillInOverflow(channelData, plotting = False, fillMethod = 'constant'):
+    whereOverflow = {}
+    #pdb.set_trace()
+    for idx, row in channelData.iteritems():
+        whereOverflow.update({idx : {'dips': [], 'returns' : []}})
         # get the first difference of the row
         rowDiff = row.diff()
         rowDiff.fillna(0, inplace = True)
         # negative dips are the start of the dip
 
-        dipCutoff = 4e3 # 3000 uV jumps are probably caused by artifact
+        dipCutoff = 3e3 # 3000 uV jumps are probably caused by artifact
+        #pdb.set_trace()
+        # peakutils works on a percentage of the range of values
         dipThresh = (dipCutoff - rowDiff.min()) / (rowDiff.max() - rowDiff.min())
-        dipStarts = peakutils.indexes(-rowDiff, thres=dipThresh )
-        dipEnds = peakutils.indexes(rowDiff, thres=dipThresh )
+        dipStarts = peakutils.indexes(-rowDiff, thres=dipThresh)
+        dipEnds = []
 
-        if dipStarts is not None and plotting:
+        if dipStarts.any() and plotting:
             #pdb.set_trace()
             plt.figure()
             plt.plot(row)
@@ -163,38 +171,71 @@ def fillInOverflow(channelData, plotting = False):
             plt.plot(dipEnds, row.iloc[dipEnds], '*')
             plt.show()
 
-        if dipStarts is not None:
+        if dipStarts.any():
+            whereOverflow[idx]['dips'] = dipStarts
             nDips = len(dipStarts)
-            try:
-                averageDip = (-rowDiff.iloc[dipStarts].values + rowDiff.iloc[dipEnds[:nDips]].values) / 2
-            except:
-                pdb.set_trace()
-
-            fixedAddAverageDip = row;
+            fixedRow = row.copy()
+            #pdb.set_trace()
             for dipIdx, dipStartIdx in enumerate(dipStarts):
-                #pdb.set_trace()
+                #
                 try:
-                    fixedAddAverageDip.iloc[dipStartIdx:dipEnds[dipIdx]] = \
-                        row.iloc[dipStartIdx:dipEnds[dipIdx]].values + \
-                        averageDip[dipIdx]
+                    assert row.iloc[dipStartIdx] > 8e3 # 8191 mV is equivalent to 32768
+                    nextIdx = dipStarts[dipIdx + 1] if dipIdx < nDips - 1 else len(row)
+                    thisSection = rowDiff.iloc[dipStartIdx:nextIdx].values
+                    dipEndIdx = peakutils.indexes(thisSection, thres=dipThresh)
+                    if not dipEndIdx and thisSection[-1] > dipCutoff:
+                        # if the end is the peak, peakutils won't catch it; add it in manually
+                        dipEndIdx = [len(thisSection)]
+                    dipEndIdx = dipEndIdx[0] + dipStartIdx
+                    dipEnds.append(dipEndIdx)
+                    if dipEndIdx == nextIdx:
+                        # avoid double counting the last point
+                        dipEndIdx -= 1
+                    assert dipEndIdx > dipStartIdx
                 except:
-                    pdb.set_trace()
+                    continue
 
-            if dipStarts is not None and plotting:
+                if fillMethod == 'average':
+                    try:
+                        fixValue = (-rowDiff.iloc[dipStartIdx] + rowDiff.iloc[dipEndIdx]) / 2
+                        assert fixedRow.iloc[dipStartIdx:dipEndIdx].mean() < 3e3
+                        fixedRow.iloc[dipStartIdx:dipEndIdx] = \
+                            row.iloc[dipStartIdx:dipEndIdx].values + \
+                            fixValue
+                    except:
+                        pass
+                        #pdb.set_trace()
+
+                elif fillMethod == 'constant':
+                    try:
+                        assert fixedRow.iloc[dipStartIdx:dipEndIdx].mean() < 3e3
+                        fixedRow.iloc[dipStartIdx:dipEndIdx] = \
+                            row.iloc[dipStartIdx:dipEndIdx].values + \
+                            8191
+                    except:
+                        pass
+
+            #pdb.set_trace()
+            if dipStarts.any() and plotting:
                 plt.figure()
-                plt.plot(row)
-                plt.plot(fixedAddAverageDip)
+                plt.plot(row, label = 'Original')
+                plt.plot(fixedRow, label = 'Fixed')
+                plt.plot(dipStarts, row.iloc[dipStarts], '*')
+                plt.plot(dipEnds, row.iloc[dipEnds], '*')
+                plt.legend()
                 plt.show()
 
-            channelData['data'].loc[idx, :] = fixedAddAverageDip
-    return channelData
+            channelData.loc[:, idx] = fixedRow
+            whereOverflow[idx]['returns'] = dipEnds
 
-def getBadContinuousMask(channelData, plotting = False, smoothing_ms = 1, badThresh = 1e-3, consecLen = 4, nStdDiff = 20, nStdAmp = 20):
+    return channelData, whereOverflow
+
+def getBadContinuousMask(channelData, samp_per_s, dataT, plotting = False, smoothing_ms = 1, badThresh = 1e-3, consecLen = 30, nStdDiff = 20, nStdAmp = 20):
     #Allocate bad data mask as dict
-    badMask = {'general' : [], 'perChannel' : []}
-
+    badMask = {key: {'perChannelAmp' : [], 'perChannelDer' : []} for key in channelData.columns}
+    badMask.update({'general':[]})
     # Look for unchanging signal across channels
-    channelDataDiff = channelData['data'].diff()
+    channelDataDiff = channelData.diff()
     channelDataDiff.fillna(0, inplace = True)
 
     #cumDiff = np.sum(np.abs(channelDataDiff), axis = 0)
@@ -207,17 +248,22 @@ def getBadContinuousMask(channelData, plotting = False, smoothing_ms = 1, badThr
     badMask['general'] = cumDiff < badThresh
 
     #smooth out the bad data mask
-    smoothKernLen = smoothing_ms * 1e-3 * channelData['samp_per_s']
+    smoothKernLen = smoothing_ms * 1e-3 * samp_per_s
     smoothKern = np.ones((int(smoothKernLen)))
     badMask['general'] = np.convolve(badMask['general'], smoothKern, 'same') > 0
     #per channel, only smooth a couple of samples
     shortSmoothKern = np.ones((5))
     # per channel look for abberantly large jumps
+    #pdb.set_trace()
     for idx, dRow in channelDataDiff.iteritems():
 
         # on the data itself
-        row = channelData['data'][idx]
-        rowVals = row.values
+        row = channelData[idx]
+        if len(row) < 3 * 10e4:
+            rowVals = row.values
+        else:
+            rowVals =  row.values[:10 * 3e4]
+
         rowBar  = rowVals.mean()
         rowStd  = rowVals.std()
         #Look for abnormally high values in the first difference of each channel
@@ -226,23 +272,30 @@ def getBadContinuousMask(channelData, plotting = False, smoothing_ms = 1, badThr
         minAcceptable = rowBar - nStdAmp * rowStd
 
         outliers = np.logical_or(row > maxAcceptable,row < minAcceptable)
+        outliers = np.convolve(outliers.values, shortSmoothKern, 'same') > 0
+
+        badMask[idx]['perChannelAmp']=np.array(outliers, dtype = bool)
 
         # on the derivative of the data
-        dRowVals = dRow.values
+        if len(row) < 10 * 3e4:
+            dRowVals = dRow.values
+        else:
+            dRowVals =  dRow.values[:10 * 3e4]
+
         dRowBar  = dRowVals.mean()
         dRowStd  = dRowVals.std()
         dMaxAcceptable = dRowBar + nStdDiff * dRowStd
         dMinAcceptable = dRowBar - nStdDiff * dRowStd
+        #pdb.set_trace()
 
         # append to previous list of outliers
-        newOutliers = np.logical_or(dRowVals > dMaxAcceptable, dRowVals < dMinAcceptable)
-        outliers = np.logical_or(outliers, newOutliers)
+        newOutliers = np.logical_or(dRow > dMaxAcceptable, dRow < dMinAcceptable)
+        newOutliers = np.convolve(newOutliers.values, shortSmoothKern, 'same') > 0
+        #pdb.set_trace()
 
-        outliers = np.convolve(outliers.values, shortSmoothKern, 'same') > 0
+        badMask[idx]['perChannelDer']=np.array(newOutliers, dtype = bool)
 
-        badMask['perChannel'].append(np.array(outliers, dtype = bool))
-
-        if plotting and channelData['elec_ids'][idx] == plotting:
+        if plotting and idx == plotting:
 
             plt.figure()
             dRow.plot.hist(bins = 100)
@@ -250,10 +303,11 @@ def getBadContinuousMask(channelData, plotting = False, smoothing_ms = 1, badThr
             plt.show(block = False)
 
             plt.figure()
-            plot_mask = np.logical_or(badMask['general'], badMask['perChannel'][idx])
-            plt.plot(channelData['t'], row)
-            plt.plot(channelData['t'][plot_mask], row[plot_mask],'ro')
-            plt.plot(channelData['t'], dRowVals)
+            plot_mask = np.logical_or(badMask['general'], badMask['perChannelAmp'][idx])
+            plot_mask = np.logical_or(plot_mask, badMask['perChannelDer'][idx])
+            plt.plot(dataT, row)
+            plt.plot(dataT[plot_mask], row[plot_mask],'ro')
+            plt.plot(dataT, dRowVals)
             print("Current derivative rejection threshold: %f" % dMaxAcceptable)
             print("Current amplitude rejection threshold: %f" % maxAcceptable)
             plt.tight_layout()
@@ -323,8 +377,6 @@ def getAngles(anglesFile, trigTimes, selectHeaders = None, selectTime = None,
     proc = proc.reset_index()
     proc.index = proc.loc[:, 'Time'] * 3e4
     return proc
-
-
 
 def getKinematics(kinematicsFile, trigTimes, selectHeaders = None, selectTime = None,
     flip = None, reIndex = None, lowCutoff = None):
@@ -515,11 +567,11 @@ def assignLabels(timeVector, lbl, fnc, CameraFs = 100, oversizeWindow = None):
             #pdb.set_trace()
     return labels
 
-def getSpectrogram(channelData, winLen_s, stepLen_s = 0.02, R = 20, fr_start = None, fr_stop = None, whichChan = 1, plotting = False):
+def getSpectrogram(channelData, elec_ids, samp_per_s, start_time_s, dataT, winLen_s, stepLen_s = 0.02, R = 20, fr_start = None, fr_stop = None, whichChan = 1, plotting = False):
 
-    Fs = channelData['samp_per_s']
-    nChan = channelData['data'].shape[1]
-    nSamples = channelData['data'].shape[0]
+    Fs = samp_per_s
+    nChan = channelData.shape[1]
+    nSamples = channelData.shape[0]
 
     delta = 1 / Fs
 
@@ -532,7 +584,7 @@ def getSpectrogram(channelData, winLen_s, stepLen_s = 0.02, R = 20, fr_start = N
     nWindows = m.floor((nSamples - NFFT + 1) / stepLen_samp)
 
     fr_samp = int(NFFT / 2) + 1
-    fr = np.arange(fr_samp) * channelData['samp_per_s'] / (2 * fr_samp)
+    fr = np.arange(fr_samp) * samp_per_s / (2 * fr_samp)
 
     #pdb.set_trace()
     if fr_start is not None:
@@ -549,16 +601,18 @@ def getSpectrogram(channelData, winLen_s, stepLen_s = 0.02, R = 20, fr_start = N
     fr = fr[fr_start_idx : fr_stop_idx]
     fr_samp = len(fr)
 
+    columnList = list(channelData.columns)
     if HASLIBTFR:
         origin = 'libtfr'
         #pdb.set_trace()
-        t = channelData['start_time_s'] + np.arange(nWindows + 1) * stepLen_s + NFFT / Fs * 0.5
+        t = start_time_s + np.arange(nWindows + 1) * stepLen_s + NFFT / Fs * 0.5
         spectrum = np.zeros((nChan, nWindows + 1, fr_samp))
         # generate a transform object with size equal to signal length and ntapers tapers
         D = libtfr.mfft_dpss(NFFT, nw, nTapers, NFFT)
         #pdb.set_trace()
-
-        for idx,signal in channelData['data'].iteritems():
+        for col,signal in channelData.iteritems():
+            #pdb.set_trace()
+            idx = columnList.index(col)
             sys.stdout.write("Running getSpectrogram: %d%%\r" % int(idx * 100 / nChan + 1))
             sys.stdout.flush()
 
@@ -569,7 +623,8 @@ def getSpectrogram(channelData, winLen_s, stepLen_s = 0.02, R = 20, fr_start = N
     else:
         origin = 'scipy'
         spectrum = np.zeros((nChan, nWindows, fr_samp))
-        for idx,signal in channelData['data'].iteritems():
+        for col,signal in channelData.iteritems():
+            idx = columnList.index(col)
             sys.stdout.write("Running getSpectrogram: %d%%\r" % int(idx * 100 / nChan + 1))
             sys.stdout.flush()
 
@@ -578,21 +633,21 @@ def getSpectrogram(channelData, winLen_s, stepLen_s = 0.02, R = 20, fr_start = N
                 window = 'boxcar', nperseg = NFFT, noverlap = overlap_samp, fs = Fs)
             P_scipy = P_scipy.transpose()[np.newaxis,:,fr_start_idx:fr_stop_idx]
             spectrum[idx,:,:] = P_scipy
-        t = channelData['start_time_s'] + t
+        t = start_time_s + t
 
     if plotting:
-        ch_idx  = channelData['elec_ids'].index(whichChan)
+        ch_idx  = elec_ids.index(whichChan)
 
         #TODO: implement passing elecID to plotSpectrum
         #hdr_idx = channelData['ExtendedHeaderIndices'][ch_idx]
 
         P = spectrum[ch_idx,:,:]
         #pdb.set_trace()
-        plotSpectrum(P, Fs, channelData['start_time_s'], channelData['t'][-1], fr = fr, t = t, show = True, fr_start = fr_start, fr_stop = fr_stop)
+        plotSpectrum(P, Fs, start_time_s, dataT[-1], fr = fr, t = t, show = True, fr_start = fr_start, fr_stop = fr_stop)
 
     #pdb.set_trace()
 
-    return {'PSD' : pd.Panel(spectrum, items = channelData['elec_ids'], major_axis = t, minor_axis = fr),
+    return {'PSD' : pd.Panel(spectrum, items = elec_ids, major_axis = t, minor_axis = fr),
             'fr' : fr,
             't' : t,
             'origin' : origin
@@ -616,11 +671,11 @@ def replaceBad(dfSeries, mask, typeOpt = 'nans'):
 
     return dfSeries
 
-def plotChan(channelData, whichChan, label = " ", mask = None, maskLabel = " ",
-    show = False, prevFig = None):
+def plotChan(channelData, dataT, whichChan, recordingUnits = 'uV', electrodeLabel = '', label = " ", mask = None, maskLabel = " ",
+    show = False, prevFig = None, timeRange = (0,-1)):
     # Plot the data channel
-    ch_idx  = channelData['elec_ids'].index(whichChan)
-    hdr_idx = channelData['ExtendedHeaderIndices'][ch_idx]
+    ch_idx  = whichChan
+    #hdr_idx = channelData['ExtendedHeaderIndices'][channelData['elec_ids'].index(whichChan)]
 
     if not prevFig:
         #plt.figure()
@@ -629,54 +684,70 @@ def plotChan(channelData, whichChan, label = " ", mask = None, maskLabel = " ",
         f = prevFig
         ax = prevFig.axes[0]
 
-    channelDataForPlotting = channelData['data'].drop(['Labels', 'LabelsNumeric'], axis = 1) if 'Labels' in channelData['data'].columns else channelData['data']
-    ax.plot(channelData['t'], channelDataForPlotting[ch_idx], label = label)
+    channelDataForPlotting = channelData.drop(['Labels', 'LabelsNumeric'], axis = 1) if 'Labels' in channelData.columns else channelData
+    tMask = np.logical_and(dataT > timeRange[0], dataT < timeRange[1])
+    tPlot = dataT[tMask]
+    #pdb.set_trace()
+    ax.plot(tPlot, channelDataForPlotting.loc[tMask,ch_idx], label = label)
 
     if np.any(mask):
-        ax.plot(channelData['t'][mask], channelDataForPlotting[ch_idx][mask], 'ro', label = maskLabel)
-
+        for idx, thisMask in enumerate(mask):
+            thisMask = thisMask[tMask]
+            ax.plot(tPlot[thisMask], channelDataForPlotting.loc[tMask,ch_idx][thisMask], 'o', label = maskLabel[idx])
     #pdb.set_trace()
     #channelData['data'][ch_idx].fillna(0, inplace = True)
 
-    ax.axis([channelData['t'][0], channelData['t'][-1], min(channelDataForPlotting[ch_idx]), max(channelDataForPlotting[ch_idx])])
+    ax.axis([tPlot[0], tPlot[-1], min(channelDataForPlotting.loc[:,ch_idx]), max(channelDataForPlotting.loc[:,ch_idx])])
     ax.locator_params(axis = 'y', nbins = 20)
     plt.xlabel('Time (s)')
-    plt.ylabel("Extracellular voltage (" + channelData['extended_headers'][hdr_idx]['Units'] + ")")
-    plt.title(channelData['extended_headers'][hdr_idx]['ElectrodeLabel'])
+    plt.ylabel("Extracellular voltage (" + recordingUnits + ")")
+    plt.title(electrodeLabel)
     plt.tight_layout()
     if show:
         plt.show(block = False)
 
     return f, ax
 
-def pdfReport(origData, cleanData, badData = None, pdfFilePath = 'pdfReport.pdf', spectrum = False, fr_start = 5, fr_stop = 3000):
+def pdfReport(origData, cleanData, badData = None, whereOverflow = None, pdfFilePath = 'pdfReport.pdf', spectrum = False, clean_data_spectrum = None, fr_start = 5, fr_stop = 3000, nSecPlot = 30):
     with matplotlib.backends.backend_pdf.PdfPages(pdfFilePath) as pdf:
-        nChan = cleanData['data'].shape[1]
+        nChan = cleanData.shape[1]
 
         if spectrum:
-            fr = cleanData['spectrum']['fr']
-            t = cleanData['spectrum']['t']
-            Fs = cleanData['samp_per_s']
+            fr = clean_data_spectrum['fr']
+            t = clean_data_spectrum['t']
+            Fs = origData['samp_per_s']
 
+        columnList = list(origData['data'].columns)
         for idx, row in origData['data'].iteritems():
+            ch_idx  = columnList.index(idx)
 
-            sys.stdout.write("Running pdfReport: %d%%\r" % int(idx * 100 / nChan + 1))
+            sys.stdout.write("Running pdfReport: %d%%\r" % int(ch_idx * 100 / nChan + 1))
             sys.stdout.flush()
 
             #print('idx is %s' % idx)
             #pdb.set_trace()
+            hdr_idx = origData['ExtendedHeaderIndices'][origData['elec_ids'].index(idx)]
+            electrodeLabel = origData['extended_headers'][hdr_idx]['ElectrodeLabel']
 
-            ch_idx  = origData['elec_ids'][idx]
-            plot_mask = np.logical_or(badData['general'], badData['perChannel'][idx])
-            f,_ = plotChan(origData, ch_idx, mask = None, show = False)
-            plotChan(cleanData, ch_idx, mask = plot_mask, show = False, prevFig = f)
+            f,_ = plotChan(origData['data'], origData['t'], idx, electrodeLabel = electrodeLabel, label = 'Raw data', mask = None, show = False, timeRange = (origData['start_time_s'] , (origData['start_time_s'] + nSecPlot) ))
+
+            dip_mask = np.full(len(row), False, dtype = np.bool)
+            dip_mask[whereOverflow[idx]['dips']] = True
+            return_mask = np.full(len(row), False, dtype = np.bool)
+            return_mask[whereOverflow[idx]['returns']] = True
+
+            plotChan(cleanData, origData['t'], idx, electrodeLabel = electrodeLabel, mask = [badData["general"], badData[idx]["perChannelAmp"], badData[idx]["perChannelDer"], dip_mask, return_mask], label = 'Raw data', timeRange = (origData['start_time_s'], origData['start_time_s'] + nSecPlot),
+                maskLabel = ["Flatline Dropout", "Amp Out of Bounds Dropout", "Derrivative Out of Bounds Dropout", "Overflow Dips", "Overflow Returns"], show = False, prevFig = f)
             plt.tight_layout()
+            plt.legend()
             pdf.savefig(f)
             plt.close(f)
 
             if spectrum:
-                P = cleanData['spectrum']['PSD'][ch_idx,:,:]
-                f = plotSpectrum(P, Fs, cleanData['start_time_s'], cleanData['t'][-1], fr = fr, t = t, show = False, fr_start = fr_start, fr_stop = fr_stop)
+                #pdb.set_trace()
+                P =  clean_data_spectrum["PSD"][idx,:,:]
+                #pdb.set_trace()
+                f = plotSpectrum(P, Fs, origData['start_time_s'], origData['start_time_s'] + origData['data_time_s'], fr = fr, t = t, timeRange = (origData['start_time_s'],origData['start_time_s']+nSecPlot), show = False, fr_start = fr_start, fr_stop = fr_stop)
                 pdf.savefig(f)
                 plt.close(f)
 
@@ -685,16 +756,16 @@ def pdfReport(origData, cleanData, badData = None, pdfFilePath = 'pdfReport.pdf'
         if generateLastPage:
             for idx, row in origData['data'].iteritems():
                 if idx == 0:
-                    f,_ = plotChan(origData, ch_idx, mask = None, show = False)
+                    f,_ = plotChan(origData['data'], origData['t'], idx, electrodeLabel = electrodeLabel, mask = None, show = False)
                 elif idx == origData['data'].shape[1] - 1:
-                    f,_ = plotChan(origData, ch_idx, mask = badData['general'], show = True, prevFig = f)
+                    f,_ = plotChan(origData['data'], origData['t'], idx, electrodeLabel = electrodeLabel, mask = badData['general'], show = True, prevFig = f)
                     plt.tight_layout()
                     pdf.savefig(f)
                     plt.close(f)
                 else:
-                    f,_ = plotChan(origData, ch_idx, mask = None, show = False, prevFig = f)
+                    f,_ = plotChan(origData['data'], origData['t'], idx, electrodeLabel = electrodeLabel, mask = None, show = False, prevFig = f)
 
-def plotSpectrum(P, fs, start_time_s, end_time_s, fr_start = 10, fr_stop = 600, fr = None, t = None, show = False):
+def plotSpectrum(P, fs, start_time_s, end_time_s, fr_start = 10, fr_stop = 600, fr = None, t = None, show = False, timeRange = None):
     #pdb.set_trace()
     if fr is None:
         fr = np.arange(P.shape[1]) / P.shape[1] * fs / 2
@@ -703,6 +774,13 @@ def plotSpectrum(P, fs, start_time_s, end_time_s, fr_start = 10, fr_stop = 600, 
 
     if type(P) is pd.DataFrame:
         P = P.values
+
+    if timeRange is not None:
+        tMask = np.logical_and(t > timeRange[0], t < timeRange[1])
+        P = P[tMask, :]
+        t = t[tMask]
+        #pdb.set_trace()
+
     zMin, zMax = P.min(), P.max()
 
     f = plt.figure()
@@ -1928,3 +2006,10 @@ def reloadPlot(filePath = None, message = "Please choose file(s)"):
     #np.set_printoptions(precision=2)
     plt.show()
     return plt.gcf()
+
+def memory_usage_psutil():
+    # return the memory usage in MB
+    import psutil
+    process = psutil.Process(os.getpid())
+    mem = process.memory_info()[0] / float(2 ** 20)
+    return mem
