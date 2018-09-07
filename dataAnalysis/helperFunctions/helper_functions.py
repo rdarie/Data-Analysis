@@ -90,7 +90,7 @@ def getNEVData(filePath, elecIds):
     nev_file.close()
     return spikes
 
-def getNSxData(filePath, elecIds, startTime_s, dataLength_s, downsample = 1):
+def getNSxData(filePath, elecIds, startTime_s, dataLength_s, downsample = 1, memMapFile = False):
     # Version control
     brpylib_ver_req = "1.3.1"
     if brpylib_ver.split('.') < brpylib_ver_req.split('.'):
@@ -98,13 +98,24 @@ def getNSxData(filePath, elecIds, startTime_s, dataLength_s, downsample = 1):
     if not isinstance(elecIds, collections.Iterable):
         elecIds = [elecIds]
     # Open file and extract headers
+    #pdb.set_trace()
     nsx_file = NsxFile(filePath)
-
+    #
     # Extract data - note: data will be returned based on *SORTED* elec_ids, see cont_data['elec_ids']
     channelData = nsx_file.getdata(elecIds, startTime_s, dataLength_s, downsample)
-
-    pdb.set_trace()
-    channelData['data'] = pd.DataFrame(channelData['data'], index = elecIds).transpose()
+    if memMapFile:
+        fileName = filePath.split('/')[-1]
+        tempPath = filePath.replace('data', 'scratch').replace(fileName, fileName.replace('ns5', 'tmp'))
+        tempPathFolder = '/'.join(tempPath.split('/')[:-1])
+        #pdb.set_trace()
+        if not os.path.exists(tempPathFolder):
+            os.makedirs(tempPathFolder)
+        dataMM = np.memmap(tempPath, dtype=channelData['data'].dtype, mode='w+', shape=channelData['data'].shape)
+        dataMM[:] = channelData['data'][:]
+        dataMM.flush()
+    else:
+        dataMM = channelData['data']
+    channelData['data'] = pd.DataFrame(dataMM, index = elecIds).transpose()
     #pdb.set_trace()
     channelData['t'] = channelData['start_time_s'] + np.arange(channelData['data'].shape[0]) / channelData['samp_per_s']
     channelData['badData'] = dict()

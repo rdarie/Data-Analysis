@@ -60,11 +60,11 @@ def preproc_ns5(stepLen_s = 0.05, winLen_s = 0.1, fr_start = 5, fr_stop = 1000,\
     datafile = fileDir + fileName
     #pdb.set_trace()
     simi_triggers = hf.getNSxData(datafile, 136, start_time_s, data_time_s)
-    ChannelData   = hf.getNSxData(datafile, elec_ids, start_time_s, data_time_s)
+    ChannelData   = hf.getNSxData(datafile, elec_ids, start_time_s, data_time_s, memMapFile = True)
 
     #
     if data_time_s == 'all':
-        data_time_s = [-1] / (3e4)
+        data_time_s = simi_triggers['data'].index[-1] / (3e4)
 
     ch_idx  = chanToPlot
     hdr_idx = ChannelData['ExtendedHeaderIndices'][ChannelData['elec_ids'].index(chanToPlot)]
@@ -116,6 +116,7 @@ def preproc_ns5(stepLen_s = 0.05, winLen_s = 0.1, fr_start = 5, fr_stop = 1000,\
         clean_data_spectrum = hf.getSpectrogram(
             clean_data, ChannelData['elec_ids'], ChannelData['samp_per_s'], ChannelData['start_time_s'], ChannelData['t'], winLen_s, stepLen_s, R, fr_start = fr_start, fr_stop = fr_stop, whichChan = chanToPlot, plotting = False)
         plt.savefig(fileDir + '/dataAnalysisPreproc' + fileName.split('.')[0] + '_SpectrumClean.png')
+        plt.show()
         with open(fileDir + '/dataAnalysisPreproc' + fileName.split('.')[0] + '_SpectrumClean.pickle', 'wb') as File:
             pickle.dump(plt.gcf(), File)
     else:
