@@ -26,6 +26,7 @@ import plotly.figure_factory as ff
 import plotly.graph_objs as go
 import collections
 from brPY.brpylib import NsxFile, NevFile, brpylib_ver
+import tables as pt
 
 try:
     # for Python2
@@ -103,19 +104,29 @@ def getNSxData(filePath, elecIds, startTime_s, dataLength_s, downsample = 1, mem
     #
     # Extract data - note: data will be returned based on *SORTED* elec_ids, see cont_data['elec_ids']
     channelData = nsx_file.getdata(elecIds, startTime_s, dataLength_s, downsample)
+    #pdb.set_trace()
+    channelData['data']  = channelData['data'].transpose()
     if memMapFile:
         fileName = filePath.split('/')[-1]
+        # TODO: make this work outside of ccv
         tempPath = filePath.replace('data', 'scratch').replace(fileName, fileName.replace('ns5', 'tmp'))
         tempPathFolder = '/'.join(tempPath.split('/')[:-1])
-        #pdb.set_trace()
+
         if not os.path.exists(tempPathFolder):
             os.makedirs(tempPathFolder)
-        dataMM = np.memmap(tempPath, dtype=channelData['data'].dtype, mode='w+', shape=channelData['data'].shape)
+
+        saveShape = channelData['data'].shape
+        saveDtype = channelData['data'].dtype
+        dataMM = np.memmap(tempPath, dtype=saveDtype, mode='w+', shape=saveShape)
+
         dataMM[:] = channelData['data'][:]
         dataMM.flush()
+        del channelData['data'], dataMM
+        dataMM = np.memmap(tempPath, dtype=saveDtype, mode='r+', shape=saveShape)
+        channelData['data'] = pd.DataFrame(dataMM, columns = elecIds)
     else:
-        dataMM = channelData['data']
-    channelData['data'] = pd.DataFrame(dataMM, index = elecIds).transpose()
+        channelData['data'] = pd.DataFrame(channelData['data'], columns = elecIds)
+
     #pdb.set_trace()
     channelData['t'] = channelData['start_time_s'] + np.arange(channelData['data'].shape[0]) / channelData['samp_per_s']
     channelData['badData'] = dict()
@@ -696,19 +707,23 @@ def plotChan(channelData, dataT, whichChan, recordingUnits = 'uV', electrodeLabe
         ax = prevFig.axes[0]
 
     channelDataForPlotting = channelData.drop(['Labels', 'LabelsNumeric'], axis = 1) if 'Labels' in channelData.columns else channelData
+    channelDataForPlotting = channelDataForPlotting.loc[:,ch_idx].values
     tMask = np.logical_and(dataT > timeRange[0], dataT < timeRange[1])
-    tPlot = dataT[tMask]
+    tSlice = slice(np.flatnonzero(tMask)[0], np.flatnonzero(tMask)[-1])
+    tPlot = dataT[tSlice]
+
     #pdb.set_trace()
-    ax.plot(tPlot, channelDataForPlotting.loc[tMask,ch_idx], label = label)
+    ax.plot(tPlot, channelDataForPlotting[tSlice], label = label)
 
     if np.any(mask):
         for idx, thisMask in enumerate(mask):
-            thisMask = thisMask[tMask]
-            ax.plot(tPlot[thisMask], channelDataForPlotting.loc[tMask,ch_idx][thisMask], 'o', label = maskLabel[idx])
+            thisMask = thisMask[tSlice]
+            ax.plot(tPlot[thisMask], channelDataForPlotting[tSlice][thisMask], 'o', label = maskLabel[idx])
     #pdb.set_trace()
     #channelData['data'][ch_idx].fillna(0, inplace = True)
 
-    ax.axis([tPlot[0], tPlot[-1], min(channelDataForPlotting.loc[:,ch_idx]), max(channelDataForPlotting.loc[:,ch_idx])])
+    pdb.set_trace()
+    ax.axis([tPlot[0], tPlot[-1], min(channelDataForPlotting), max(channelDataForPlotting)])
     ax.locator_params(axis = 'y', nbins = 20)
     plt.xlabel('Time (s)')
     plt.ylabel("Extracellular voltage (" + recordingUnits + ")")

@@ -58,9 +58,10 @@ def preproc_ns5(stepLen_s = 0.05, winLen_s = 0.1, fr_start = 5, fr_stop = 1000,\
     # Inits
     fileName = '/' + fileName
     datafile = fileDir + fileName
+
     #pdb.set_trace()
-    simi_triggers = hf.getNSxData(datafile, 136, start_time_s, data_time_s)
     ChannelData   = hf.getNSxData(datafile, elec_ids, start_time_s, data_time_s, memMapFile = True)
+    simi_triggers = hf.getNSxData(datafile, 136, start_time_s, data_time_s)
 
     #
     if data_time_s == 'all':
@@ -69,8 +70,8 @@ def preproc_ns5(stepLen_s = 0.05, winLen_s = 0.1, fr_start = 5, fr_stop = 1000,\
     ch_idx  = chanToPlot
     hdr_idx = ChannelData['ExtendedHeaderIndices'][ChannelData['elec_ids'].index(chanToPlot)]
     electrodeLabel = ChannelData['extended_headers'][hdr_idx]['ElectrodeLabel']
-    #pdb.set_trace()
 
+    #pdb.set_trace()
     f,_ = hf.plotChan(ChannelData['data'], ChannelData['t'], chanToPlot, electrodeLabel = electrodeLabel, label = 'Raw data', mask = None, show = False, timeRange = (start_time_s,start_time_s+30))
 
     clean_data = deepcopy(ChannelData['data'])
