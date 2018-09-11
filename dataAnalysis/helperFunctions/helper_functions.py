@@ -1154,7 +1154,7 @@ def plot_trial_stats(trialStatsDf, usePlotly = True, separate = None, debugging 
         data = []
         conditionLongName = {
             'easy' : 'Cued by LED',
-            'hard' : 'Uncued by LED'
+            'hard' : 'Uncued by LED',
             }
         outcomeLongName = {
             'correct button' : 'Correct button',
@@ -1165,48 +1165,50 @@ def plot_trial_stats(trialStatsDf, usePlotly = True, separate = None, debugging 
             0 : 'Short First',
             1 : 'Long First'
             }
-        conditionShortNames = np.unique(trialStatsDf['Condition'])
+        conditionShortNames = trialStatsDf['Condition'].unique()
         #conditionName = next(iter(conditionShortNames))
         for conditionName in conditionShortNames:
             conditionStats = trialStatsDf[trialStatsDf['Condition'] == conditionName]
             if separate == 'leftRight':
-                typeShortNames = np.unique(conditionStats['Type'])
+                typeShortNames = conditionStats['Type'].unique()
                 #typeName = next(iter(np.unique(conditionStats['Type'])))
                 for typeName in typeShortNames:
                     typeStats = conditionStats[conditionStats['Type'] == typeName]
                     y = [typeStats[typeStats['Outcome'] == on].size \
-                        for on in sorted(np.unique(typeStats['Outcome']))]
+                        for on in sorted(typeStats['Outcome'].unique())]
                     if debugging:
                         print(y)
-                    x = [outcomeLongName[on] for on in sorted(np.unique(typeStats['Outcome']))]
+                    x = [outcomeLongName[on] for on in sorted(typeStats['Outcome'].unique())]
+
                     data.append(go.Bar(
                         x=x,
-                        y=y / sum(y),
+                        y= [i / sum(y) for i in y],
                         name=conditionLongName[conditionName] + ' ' + typeLongName[typeName] + ' ' + str(len(typeStats)) + ' total trials'
                         ))
             elif separate == 'forwardBack':
-                directionShortNames = np.unique(conditionStats['Direction'])
+                directionShortNames = conditionStats['Direction'].unique()
                 for directionName in directionShortNames:
                     directionStats = conditionStats[conditionStats['Direction'] == directionName]
                     y = [directionStats[directionStats['Outcome'] == on].size \
-                        for on in sorted(np.unique(directionStats['Outcome']))]
+                        for on in sorted(directionStats['Outcome'].unique())]
                     if debugging:
                         print(y)
-                    x = [outcomeLongName[on] for on in sorted(np.unique(directionStats['Outcome']))]
+                    x = [outcomeLongName[on] for on in sorted(directionStats['Outcome'].unique())]
                     data.append(go.Bar(
                         x=x,
-                        y=y / sum(y),
+                        y= [i / sum(y) for i in y],
                         name=conditionLongName[conditionName] + ' ' + directionName + ' ' + str(len(directionStats)) + ' total trials'
                         ))
             else:
                 y = [conditionStats[conditionStats['Outcome'] == on].size \
-                    for on in sorted(np.unique(conditionStats['Outcome']))]
+                    for on in sorted(conditionStats['Outcome'].unique())]
                 if debugging:
                     print(y)
-                x = [outcomeLongName[on] for on in sorted(np.unique(conditionStats['Outcome']))]
+                x = [outcomeLongName[on] for on in sorted(conditionStats['Outcome'].unique())]
+                #pdb.set_trace()
                 data.append(go.Bar(
                     x=x,
-                    y=y / sum(y),
+                    y= [i / sum(y) for i in y],
                     name=conditionLongName[conditionName] + ' ' + str(len(conditionStats)) + ' trials'
                     ))
 

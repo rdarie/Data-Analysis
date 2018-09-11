@@ -46,9 +46,10 @@ def getMotorData(ns5FilePath, inputIDs, startTime, dataTime, debounce = None):
     newColNames = {num : '' for num in analogData['data'].columns}
 
     for key, value in inputIDs.items():
-        idx = analogData['elec_ids'].index(value)
-        newColNames[idx] = key
+        #idx = analogData['elec_ids'].index(value)
+        newColNames[value] = key
 
+    #pdb.set_trace()
     motorData = analogData['data'].rename(columns = newColNames)
     motorData['A'] = motorData['A+'] - motorData['A-']
     motorData['B'] = motorData['B+'] - motorData['B-']
@@ -259,6 +260,23 @@ def getTrials(motorData, trialType = '2AFC'):
                 except:
                     nextStartIdx = trialStartIdx[-1]
 
+                rightButtonMask = trialEvents.loc[startIdx:nextStartIdx, 'Label'].str.contains('Right Button')
+                leftButtonMask = trialEvents.loc[startIdx:nextStartIdx, 'Label'].str.contains('Left Button')
+                if rightButtonMask.any() and leftButtonMask.any():
+                    trialStats.loc[idx, 'Choice'] = 'both'
+                    trialStats.loc[idx, 'Outcome'] = 'incorrect button'
+                elif rightButtonMask.any():
+                    trialStats.loc[idx, 'Choice'] = 'right'
+                    trialStats.loc[idx, 'ChoiceOnset'] = trialEvents.loc[startIdx:nextStartIdx, 'Time'][rightButtonMask].mean()
+                    trialStats.loc[idx, 'Outcome'] = 'correct button' if trialStats.loc[idx, 'Type'] == 1 else 'incorrect button'
+                elif leftButtonMask.any():
+                    trialStats.loc[idx, 'Choice'] = 'left'
+                    trialStats.loc[idx, 'ChoiceOnset'] = trialEvents.loc[startIdx:nextStartIdx, 'Time'][leftButtonMask].mean()
+                    trialStats.loc[idx, 'Outcome'] = 'correct button' if trialStats.loc[idx, 'Type'] == 0 else 'incorrect button'
+                elif not rightButtonMask.any() and not leftButtonMask.any():
+                    trialStats.loc[idx, 'Choice'] = 'none'
+                    trialStats.loc[idx, 'Outcome'] = 'button timed out'
+
                 assert trialEvents.loc[startIdx, 'Label'] == 'Movement Onset' and trialEvents.loc[startIdx + 1, 'Label'] == 'Movement Offset'
 
                 offsetMask = trialEvents.loc[startIdx:nextStartIdx,'Label'] == 'Movement Offset'
@@ -299,23 +317,6 @@ def getTrials(motorData, trialType = '2AFC'):
 
                 trialStats.loc[idx, 'Type'] = 0 if abs(trialStats.loc[idx, 'First']) < abs(trialStats.loc[idx, 'Second']) else 1
                 trialStats.loc[idx, 'Stimulus Duration'] = secondOffsetTime - firstOnsetTime
-
-                rightButtonMask = trialEvents.loc[startIdx:nextStartIdx, 'Label'].str.contains('Right Button')
-                leftButtonMask = trialEvents.loc[startIdx:nextStartIdx, 'Label'].str.contains('Left Button')
-                if rightButtonMask.any() and leftButtonMask.any():
-                    trialStats.loc[idx, 'Choice'] = 'both'
-                    trialStats.loc[idx, 'Outcome'] = 'incorrect button'
-                elif rightButtonMask.any():
-                    trialStats.loc[idx, 'Choice'] = 'right'
-                    trialStats.loc[idx, 'ChoiceOnset'] = trialEvents.loc[startIdx:nextStartIdx, 'Time'][rightButtonMask].mean()
-                    trialStats.loc[idx, 'Outcome'] = 'correct button' if trialStats.loc[idx, 'Type'] == 1 else 'incorrect button'
-                elif leftButtonMask.any():
-                    trialStats.loc[idx, 'Choice'] = 'left'
-                    trialStats.loc[idx, 'ChoiceOnset'] = trialEvents.loc[startIdx:nextStartIdx, 'Time'][leftButtonMask].mean()
-                    trialStats.loc[idx, 'Outcome'] = 'correct button' if trialStats.loc[idx, 'Type'] == 0 else 'incorrect button'
-                elif not rightButtonMask.any() and not leftButtonMask.any():
-                    trialStats.loc[idx, 'Choice'] = 'none'
-                    trialStats.loc[idx, 'Outcome'] = 'button timed out'
             except:
                 print('Error detected!')
                 #pdb.set_trace()
