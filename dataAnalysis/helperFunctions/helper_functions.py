@@ -109,12 +109,13 @@ def getNSxData(filePath, elecIds, startTime_s, dataLength_s, downsample = 1, mem
     if memMapFile:
         fileName = filePath.split('/')[-1]
         # TODO: make this work outside of ccv
-        tempPath = filePath.replace('data', 'scratch').replace(fileName, fileName.replace('ns5', 'tmp'))
+        tempPath = filePath.replace('data', 'data').replace(fileName, fileName.replace('ns5', 'npy'))
         tempPathFolder = '/'.join(tempPath.split('/')[:-1])
 
         if not os.path.exists(tempPathFolder):
             os.makedirs(tempPathFolder)
 
+        """
         saveShape = channelData['data'].shape
         saveDtype = channelData['data'].dtype
         dataMM = np.memmap(tempPath, dtype=saveDtype, mode='w+', shape=saveShape)
@@ -122,8 +123,15 @@ def getNSxData(filePath, elecIds, startTime_s, dataLength_s, downsample = 1, mem
         dataMM[:] = channelData['data'][:]
         dataMM.flush()
         del channelData['data'], dataMM
+
         dataMM = np.memmap(tempPath, dtype=saveDtype, mode='r+', shape=saveShape)
-        channelData['data'] = pd.DataFrame(dataMM, columns = elecIds)
+        """
+        np.save(tempPath, channelData['data'])
+        del channelData['data']
+        dataMM = np.load(tempPath, mmap_mode='r')
+        channelData['data'] = pd.DataFrame(dataMM, columns = elecIds, copy=False)
+        # channelData['data'].values is not dataMM!!!!!!
+
     else:
         channelData['data'] = pd.DataFrame(channelData['data'], columns = elecIds)
 
@@ -706,8 +714,9 @@ def plotChan(channelData, dataT, whichChan, recordingUnits = 'uV', electrodeLabe
         f = prevFig
         ax = prevFig.axes[0]
 
-    channelDataForPlotting = channelData.drop(['Labels', 'LabelsNumeric'], axis = 1) if 'Labels' in channelData.columns else channelData
-    channelDataForPlotting = channelDataForPlotting.loc[:,ch_idx].values
+    pdb.set_trace()
+    #channelDataForPlotting = channelData.drop(['Labels', 'LabelsNumeric'], axis = 1) if 'Labels' in channelData.columns else channelData
+    channelDataForPlotting = channelData.loc[:,ch_idx]
     tMask = np.logical_and(dataT > timeRange[0], dataT < timeRange[1])
     tSlice = slice(np.flatnonzero(tMask)[0], np.flatnonzero(tMask)[-1])
     tPlot = dataT[tSlice]
@@ -722,8 +731,8 @@ def plotChan(channelData, dataT, whichChan, recordingUnits = 'uV', electrodeLabe
     #pdb.set_trace()
     #channelData['data'][ch_idx].fillna(0, inplace = True)
 
-    pdb.set_trace()
     ax.axis([tPlot[0], tPlot[-1], min(channelDataForPlotting), max(channelDataForPlotting)])
+
     ax.locator_params(axis = 'y', nbins = 20)
     plt.xlabel('Time (s)')
     plt.ylabel("Extracellular voltage (" + recordingUnits + ")")
