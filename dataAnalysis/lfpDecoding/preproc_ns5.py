@@ -72,17 +72,26 @@ def preproc_ns5(stepLen_s = 0.05, winLen_s = 0.1, fr_start = 5, fr_stop = 1000,\
     electrodeLabel = ChannelData['extended_headers'][hdr_idx]['ElectrodeLabel']
 
     #pdb.set_trace()
-    f,_ = hf.plotChan(ChannelData['data'], ChannelData['t'], chanToPlot, electrodeLabel = electrodeLabel, label = 'Raw data', mask = None, show = False, timeRange = (start_time_s,start_time_s+30))
+    f,_ = hf.plotChan(ChannelData['data'], ChannelData['t'], chanToPlot,
+        electrodeLabel = electrodeLabel, label = 'Raw data', mask = None,
+        show = False, timeRange = (start_time_s, start_time_s + 30))
 
-    clean_data = deepcopy(ChannelData['data'])
+    np.save(fileDir + fileName.replace('.ns5', '_temp.npy'), ChannelData['data'].values)
+
     # fill in overflow:
     if fillOverflow:
-        clean_data, whereOverflow = hf.fillInOverflow(clean_data, fillMethod = 'average')
+        #TODO: check if this expands into too much memory
+        ChannelData['data'], whereOverflow = hf.fillInOverflow(
+            ChannelData['data'], fillMethod = 'average')
+
     #pdb.set_trace()
     if removeJumps:
-        badData = hf.getBadContinuousMask(clean_data, ChannelData['samp_per_s'], ChannelData['t'], smoothing_ms = 0.5, nStdDiff = 50, nStdAmp = 100)
+        badData = hf.getBadContinuousMask(ChannelData['data'],
+            ChannelData['samp_per_s'], ChannelData['t'],
+            smoothing_ms = 0.5, nStdDiff = 50, nStdAmp = 100)
+
         # interpolate bad data
-        for idx, row in clean_data.iteritems():
+        for idx, row in ChannelData['data'].iteritems():
             mask = np.logical_or(badData['general'], badData[idx]['perChannelAmp'])
             mask = np.logical_or(mask, badData[idx]['perChannelDer'])
             row = hf.replaceBad(row, mask, typeOpt = 'interp')
@@ -95,9 +104,16 @@ def preproc_ns5(stepLen_s = 0.05, winLen_s = 0.1, fr_start = 5, fr_stop = 1000,\
         return_mask = np.full(len(clean_data.index), False, dtype = np.bool)
         return_mask[whereOverflow[ch_idx]['returns']] = True
         #
-        #
-        hf.plotChan(clean_data, ChannelData['t'], chanToPlot, electrodeLabel = electrodeLabel, label = 'Clean data', mask = [badData["general"], badData[ch_idx]["perChannelAmp"], badData[ch_idx]["perChannelDer"], dip_mask, return_mask],
-            maskLabel = ["Flatline Dropout", "Amp Out of Bounds Dropout", "Derrivative Out of Bounds Dropout", "Overflow Dips", "Overflow Returns"], show = False, prevFig = f, timeRange = (start_time_s,start_time_s+30))
+
+        hf.plotChan(ChannelData['data'], ChannelData['t'], chanToPlot,
+            electrodeLabel = electrodeLabel, label = 'Clean data',
+            mask = [badData["general"], badData[ch_idx]["perChannelAmp"],
+            badData[ch_idx]["perChannelDer"], dip_mask, return_mask],
+            maskLabel = ["Flatline Dropout", "Amp Out of Bounds Dropout",
+                "Derrivative Out of Bounds Dropout",
+                "Overflow Dips", "Overflow Returns"],
+            show = False, prevFig = f,
+            timeRange = (start_time_s,start_time_s+30))
 
     if not os.path.exists(fileDir + '/dataAnalysisPreproc'):
         os.makedirs(fileDir + '/dataAnalysisPreproc')

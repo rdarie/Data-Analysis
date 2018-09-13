@@ -104,7 +104,7 @@ def getNSxData(filePath, elecIds, startTime_s, dataLength_s, downsample = 1):
     #
     # Extract data - note: data will be returned based on *SORTED* elec_ids, see cont_data['elec_ids']
     channelData = nsx_file.getdata(elecIds, startTime_s, dataLength_s, downsample)
-    channelData['data'] = pd.DataFrame(channelData['data'], columns = elecIds)
+    channelData['data'] = pd.DataFrame(channelData['data'].transpose(), columns = elecIds)
     #pdb.set_trace()
     channelData['t'] = channelData['start_time_s'] + np.arange(channelData['data'].shape[0]) / channelData['samp_per_s']
     channelData['badData'] = dict()
@@ -232,6 +232,7 @@ def fillInOverflow(channelData, plotting = False, fillMethod = 'constant'):
 
 def getBadContinuousMask(channelData, samp_per_s, dataT, plotting = False, smoothing_ms = 1, badThresh = 1e-3, consecLen = 30, nStdDiff = 20, nStdAmp = 20):
     #Allocate bad data mask as dict
+    pdb.set_trace()
     badMask = {key: {'perChannelAmp' : [], 'perChannelDer' : []} for key in channelData.columns}
     badMask.update({'general':[]})
     # Look for unchanging signal across channels
