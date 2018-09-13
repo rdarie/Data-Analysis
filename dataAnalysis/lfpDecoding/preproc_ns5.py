@@ -60,7 +60,7 @@ def preproc_ns5(stepLen_s = 0.05, winLen_s = 0.1, fr_start = 5, fr_stop = 1000,\
     datafile = fileDir + fileName
 
     #pdb.set_trace()
-    ChannelData   = hf.getNSxData(datafile, elec_ids, start_time_s, data_time_s, memMapFile = True)
+    ChannelData   = hf.getNSxData(datafile, elec_ids, start_time_s, data_time_s)
     simi_triggers = hf.getNSxData(datafile, 136, start_time_s, data_time_s)
 
     #

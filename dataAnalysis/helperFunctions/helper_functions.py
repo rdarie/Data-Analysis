@@ -91,7 +91,7 @@ def getNEVData(filePath, elecIds):
     nev_file.close()
     return spikes
 
-def getNSxData(filePath, elecIds, startTime_s, dataLength_s, downsample = 1, memMapFile = False):
+def getNSxData(filePath, elecIds, startTime_s, dataLength_s, downsample = 1):
     # Version control
     brpylib_ver_req = "1.3.1"
     if brpylib_ver.split('.') < brpylib_ver_req.split('.'):
@@ -104,37 +104,7 @@ def getNSxData(filePath, elecIds, startTime_s, dataLength_s, downsample = 1, mem
     #
     # Extract data - note: data will be returned based on *SORTED* elec_ids, see cont_data['elec_ids']
     channelData = nsx_file.getdata(elecIds, startTime_s, dataLength_s, downsample)
-    #pdb.set_trace()
-    channelData['data']  = channelData['data'].transpose()
-    if memMapFile:
-        fileName = filePath.split('/')[-1]
-        # TODO: make this work outside of ccv
-        tempPath = filePath.replace('data', 'data').replace(fileName, fileName.replace('ns5', 'npy'))
-        tempPathFolder = '/'.join(tempPath.split('/')[:-1])
-
-        if not os.path.exists(tempPathFolder):
-            os.makedirs(tempPathFolder)
-
-        """
-        saveShape = channelData['data'].shape
-        saveDtype = channelData['data'].dtype
-        dataMM = np.memmap(tempPath, dtype=saveDtype, mode='w+', shape=saveShape)
-
-        dataMM[:] = channelData['data'][:]
-        dataMM.flush()
-        del channelData['data'], dataMM
-
-        dataMM = np.memmap(tempPath, dtype=saveDtype, mode='r+', shape=saveShape)
-        """
-        np.save(tempPath, channelData['data'])
-        del channelData['data']
-        dataMM = np.load(tempPath, mmap_mode='r')
-        channelData['data'] = pd.DataFrame(dataMM, columns = elecIds, copy=False)
-        # channelData['data'].values is not dataMM!!!!!!
-
-    else:
-        channelData['data'] = pd.DataFrame(channelData['data'], columns = elecIds)
-
+    channelData['data'] = pd.DataFrame(channelData['data'], columns = elecIds)
     #pdb.set_trace()
     channelData['t'] = channelData['start_time_s'] + np.arange(channelData['data'].shape[0]) / channelData['samp_per_s']
     channelData['badData'] = dict()
@@ -714,7 +684,7 @@ def plotChan(channelData, dataT, whichChan, recordingUnits = 'uV', electrodeLabe
         f = prevFig
         ax = prevFig.axes[0]
 
-    pdb.set_trace()
+    #pdb.set_trace()
     #channelDataForPlotting = channelData.drop(['Labels', 'LabelsNumeric'], axis = 1) if 'Labels' in channelData.columns else channelData
     channelDataForPlotting = channelData.loc[:,ch_idx]
     tMask = np.logical_and(dataT > timeRange[0], dataT < timeRange[1])
