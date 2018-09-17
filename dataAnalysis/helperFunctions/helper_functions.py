@@ -146,17 +146,20 @@ def getBadSpikesMask(spikes, nStd = 5, whichChan = 0, plotting = False, deleteBa
     return badMask
 
 def fillInOverflow(channelData, plotting = False, fillMethod = 'constant'):
-    whereOverflow = {}
+    # TODO merge this into getBadContinuousMask
+    overflowMask = pd.DataFrame(False, index = channelData.index,
+        columns = channelData.columns,
+        dtype = np.bool).to_sparse(fill_value=False)
     #pdb.set_trace()
     columnList = list(channelData.columns)
     nChan = len(columnList)
     for idx, row in channelData.iteritems():
 
         ch_idx  = columnList.index(idx)
-        sys.stdout.write("Running fillInOverflow: %d%%\r" % int(ch_idx * 100 / nChan + 1))
+        col_idx = channelData.columns.get_loc(idx)
+        sys.stdout.write("Running fillInOverflow: %d%%\r" % int((ch_idx + 1) * 100 / nChan))
         sys.stdout.flush()
 
-        whereOverflow.update({idx : {'dips': [], 'returns' : []}})
         # get the first difference of the row
         rowDiff = row.diff()
         rowDiff.fillna(0, inplace = True)
@@ -179,14 +182,12 @@ def fillInOverflow(channelData, plotting = False, fillMethod = 'constant'):
             plt.show()
 
         if dipStarts.any():
-            whereOverflow[idx]['dips'] = dipStarts
             nDips = len(dipStarts)
             fixedRow = row.copy()
-            #pdb.set_trace()
             for dipIdx, dipStartIdx in enumerate(dipStarts):
                 #
                 try:
-                    assert row.iloc[dipStartIdx] > 8e3 # 8191 mV is equivalent to 32768
+                    assert row.iloc[dipStartIdx - 1] > 8e3 # 8191 mV is equivalent to 32768
                     nextIdx = dipStarts[dipIdx + 1] if dipIdx < nDips - 1 else len(row)
                     thisSection = rowDiff.iloc[dipStartIdx:nextIdx].values
                     dipEndIdx = peakutils.indexes(thisSection, thres=dipThresh)
@@ -202,6 +203,8 @@ def fillInOverflow(channelData, plotting = False, fillMethod = 'constant'):
                 except:
                     continue
 
+                #pdb.set_trace()
+                overflowMask.iloc[col_idx, dipStartIdx:dipEndIdx] = True
                 if fillMethod == 'average':
                     try:
                         fixValue = (-rowDiff.iloc[dipStartIdx] + rowDiff.iloc[dipEndIdx]) / 2
@@ -210,7 +213,8 @@ def fillInOverflow(channelData, plotting = False, fillMethod = 'constant'):
                             row.iloc[dipStartIdx:dipEndIdx].values + \
                             fixValue
                     except:
-                        pass
+                        print('Error filling')
+                        continue
                         #pdb.set_trace()
 
                 elif fillMethod == 'constant':
@@ -220,7 +224,8 @@ def fillInOverflow(channelData, plotting = False, fillMethod = 'constant'):
                             row.iloc[dipStartIdx:dipEndIdx].values + \
                             8191
                     except:
-                        pass
+                        print('Error filling')
+                        continue
 
             #pdb.set_trace()
             if dipStarts.any() and plotting:
@@ -233,17 +238,15 @@ def fillInOverflow(channelData, plotting = False, fillMethod = 'constant'):
                 plt.show()
 
             channelData.loc[:, idx] = fixedRow
-            whereOverflow[idx]['returns'] = dipEnds
 
     print('\nFinished finding boolean overflow')
-    return channelData, whereOverflow
+    return channelData, overflowMask
 
 def getBadContinuousMask(channelData, samp_per_s, dataT, plotting = False, smoothing_ms = 1, badThresh = 1e-3, consecLen = 30, nStdDiff = 20, nStdAmp = 20):
     #Allocate bad data mask as dict
-
     badMask = {'general':None,
-        'perChannelAmp' : pd.DataFrame(index = channelData.index, columns = channelData.columns, dtype = np.bool).to_sparse(fill_value=False),
-        'perChannelDer' : pd.DataFrame(index = channelData.index, columns = channelData.columns, dtype = np.bool).to_sparse(fill_value=False)
+        'perChannelAmp' : pd.DataFrame(False, index = channelData.index, columns = channelData.columns, dtype = np.bool).to_sparse(fill_value=False),
+        'perChannelDer' : pd.DataFrame(False, index = channelData.index, columns = channelData.columns, dtype = np.bool).to_sparse(fill_value=False)
         }
     #pdb.set_trace()
     #per channel, only smooth a couple of samples
@@ -257,7 +260,7 @@ def getBadContinuousMask(channelData, samp_per_s, dataT, plotting = False, smoot
     for idx, row in channelData.iteritems():
         #pdb.set_trace()
         ch_idx  = columnList.index(idx)
-        sys.stdout.write("Running getBadContinuousMask: %d%%\r" % int(ch_idx * 100 / nChan + 1))
+        sys.stdout.write("Running getBadContinuousMask: %d%%\r" % int((ch_idx + 1) * 100 / nChan))
         sys.stdout.flush()
 
         if len(row.index) < 3 * 10e4:
@@ -733,7 +736,7 @@ def plotChan(channelData, dataT, whichChan, recordingUnits = 'uV', electrodeLabe
 
     return f, ax
 
-def pdfReport(cleanData, origData, badData = None, whereOverflow = None,
+def pdfReport(cleanData, origData, badData = None,
     pdfFilePath = 'pdfReport.pdf', spectrum = False, cleanSpectrum = None,
     origSpectrum = None, fr_start = 5, fr_stop = 3000, nSecPlot = 30):
 
@@ -749,7 +752,7 @@ def pdfReport(cleanData, origData, badData = None, whereOverflow = None,
         for idx, row in cleanData['data'].iteritems():
             ch_idx  = columnList.index(idx)
 
-            sys.stdout.write("Running pdfReport: %d%%\r" % int(ch_idx * 100 / nChan + 1))
+            sys.stdout.write("Running pdfReport: %d%%\r" % int((ch_idx + 1) * 100 / nChan))
             sys.stdout.flush()
 
             #print('idx is %s' % idx)
@@ -763,20 +766,14 @@ def pdfReport(cleanData, origData, badData = None, whereOverflow = None,
                 mask = None, show = False, timeRange = (cleanData['start_time_s'],
                 (cleanData['start_time_s'] + nSecPlot) ))
 
-            dip_mask = np.full(len(row), False, dtype = np.bool)
-            dip_mask[whereOverflow[idx]['dips']] = True
-            return_mask = np.full(len(row), False, dtype = np.bool)
-            return_mask[whereOverflow[idx]['returns']] = True
-
-
             plotChan(cleanData['data'], cleanData['t'], idx, electrodeLabel = electrodeLabel,
                 mask = [badData["general"].to_dense(), badData["perChannelAmp"].loc[:,idx].to_dense(),
-                badData["perChannelDer"].loc[:,idx].to_dense(), dip_mask, return_mask],
+                badData["perChannelDer"].loc[:,idx].to_dense(), badData["overflow"].loc[:,idx].to_dense()],
                 label = 'Clean data', timeRange = (cleanData['start_time_s'],
                 cleanData['start_time_s'] + nSecPlot),
                 maskLabel = ["Flatline Dropout", "Amp Out of Bounds Dropout",
-                "Derrivative Out of Bounds Dropout", "Overflow Dips",
-                "Overflow Returns"], show = False, prevFig = f)
+                "Derrivative Out of Bounds Dropout", "Overflow"], show = False,
+                prevFig = f)
 
             plt.tight_layout()
             plt.legend()
@@ -793,7 +790,7 @@ def pdfReport(cleanData, origData, badData = None, whereOverflow = None,
 
         #pdb.set_trace()
         generateLastPage = False
-        print('On last page of pdf report')
+        print('\nOn last page of pdf report')
         if generateLastPage:
             for idx, row in origData['data'].iteritems():
                 if idx == 0:

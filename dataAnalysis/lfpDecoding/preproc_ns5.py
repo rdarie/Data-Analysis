@@ -7,7 +7,7 @@ from brpy version: 1.1.1 --- 07/22/2016
 """
 
 import matplotlib, math, pdb
-matplotlib.use('PS')
+matplotlib.use('TkAgg')
 import dataAnalysis.helperFunctions.helper_functions as hf
 import matplotlib.pyplot as plt
 import numpy as np
@@ -80,18 +80,20 @@ def preproc_ns5(stepLen_s = 0.05, winLen_s = 0.1, fr_start = 5, fr_stop = 1000,\
     origDataPath = fileDir + fileName.replace('.ns5', '_temp.npy')
     np.save(origDataPath, ChannelData['data'].values)
 
-    # fill in overflow:
-    if fillOverflow:
-        #TODO: check if this expands into too much memory
-        ChannelData['data'], whereOverflow = hf.fillInOverflow(
-            ChannelData['data'], fillMethod = 'average')
-
     #pdb.set_trace()
     if removeJumps:
-        badData = hf.getBadContinuousMask(ChannelData['data'],
+        badData = {}
+        # fill in overflow:
+        #TODO: check if this expands into too much memory
+        ChannelData['data'], overflowMask = hf.fillInOverflow(
+            ChannelData['data'], fillMethod = 'average')
+        badData.update({'overflow': overflowMask})
+        
+        # find unusual jumps in derivative or amplitude
+        newBadData = hf.getBadContinuousMask(ChannelData['data'],
             ChannelData['samp_per_s'], ChannelData['t'],
             smoothing_ms = 0.5, nStdDiff = 50, nStdAmp = 100)
-
+        badData.update(newBadData)
         # interpolate bad data
         for idx, row in ChannelData['data'].iteritems():
             #pdb.set_trace()
@@ -101,30 +103,20 @@ def preproc_ns5(stepLen_s = 0.05, winLen_s = 0.1, fr_start = 5, fr_stop = 1000,\
 
         ChannelData['badData'] = badData
         # check interpolation results
-        #pdb.set_trace()
-        dip_mask = np.full(len(ChannelData['data'].index), False, dtype = np.bool)
-        dip_mask[whereOverflow[ch_idx]['dips']] = True
-        return_mask = np.full(len(ChannelData['data'].index), False, dtype = np.bool)
-        return_mask[whereOverflow[ch_idx]['returns']] = True
-        #
-
         hf.plotChan(ChannelData['data'], ChannelData['t'], chanToPlot,
             electrodeLabel = electrodeLabel, label = 'Clean data',
             mask = [badData["general"].to_dense(), badData["perChannelAmp"].loc[:,ch_idx].to_dense(),
-            badData["perChannelDer"].loc[:,ch_idx].to_dense(), dip_mask, return_mask],
+            badData["perChannelDer"].loc[:,ch_idx].to_dense(), badData["overflow"].loc[:,ch_idx].to_dense()],
             maskLabel = ["Flatline Dropout", "Amp Out of Bounds Dropout",
-                "Derrivative Out of Bounds Dropout",
-                "Overflow Dips", "Overflow Returns"],
+                "Derrivative Out of Bounds Dropout", "Overflow Dropout"],
             show = False, prevFig = f,
             timeRange = (start_time_s,start_time_s+30))
-
-        del dip_mask, return_mask
 
     if not os.path.exists(fileDir + '/dataAnalysisPreproc'):
         os.makedirs(fileDir + '/dataAnalysisPreproc')
 
     plt.legend()
-    #plt.show()
+    plt.show()
     #pdb.set_trace()
     plt.savefig(fileDir + '/dataAnalysisPreproc' + fileName.split('.')[0] +
         '_ns5CleanFig.png')
@@ -132,7 +124,7 @@ def preproc_ns5(stepLen_s = 0.05, winLen_s = 0.1, fr_start = 5, fr_stop = 1000,\
         '_ns5CleanFig.pickle', 'wb') as File:
             pickle.dump(f, File)
 
-    pdb.set_trace()
+    #pdb.set_trace()
     data = {'channel':ChannelData['data'], 'simiTrigger': simi_triggers}
     with open(fileDir + '/dataAnalysisPreproc' + fileName.split('.')[0] + '_saveCleaned.p', "wb" ) as f:
         pickle.dump(data, f, protocol=4 )
@@ -178,7 +170,9 @@ def preproc_ns5(stepLen_s = 0.05, winLen_s = 0.1, fr_start = 5, fr_stop = 1000,\
         origDataDF = pd.DataFrame(origData, index = ChannelData['data'].index, columns = ChannelData['data'].columns)
         pdfFile = fileDir + '/dataAnalysisPreproc' + fileName.split('.')[0] + '_pdfReport.pdf'
         hf.pdfReport(ChannelData, origDataDF, badData = badData,
-        whereOverflow = whereOverflow, pdfFilePath = pdfFile,
+        pdfFilePath = pdfFile,
         spectrum = computeSpectrum, cleanSpectrum = None,
         origSpectrum = None, fr_start = fr_start, fr_stop = fr_stop)
+
+    pdb.set_trace()
     #x = input("Press any key")
