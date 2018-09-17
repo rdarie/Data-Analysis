@@ -148,7 +148,14 @@ def getBadSpikesMask(spikes, nStd = 5, whichChan = 0, plotting = False, deleteBa
 def fillInOverflow(channelData, plotting = False, fillMethod = 'constant'):
     whereOverflow = {}
     #pdb.set_trace()
+    columnList = list(channelData.columns)
+    nChan = len(columnList)
     for idx, row in channelData.iteritems():
+
+        ch_idx  = columnList.index(idx)
+        sys.stdout.write("Running fillInOverflow: %d%%\r" % int(ch_idx * 100 / nChan + 1))
+        sys.stdout.flush()
+
         whereOverflow.update({idx : {'dips': [], 'returns' : []}})
         # get the first difference of the row
         rowDiff = row.diff()
@@ -228,42 +235,35 @@ def fillInOverflow(channelData, plotting = False, fillMethod = 'constant'):
             channelData.loc[:, idx] = fixedRow
             whereOverflow[idx]['returns'] = dipEnds
 
+    print('\nFinished finding boolean overflow')
     return channelData, whereOverflow
 
 def getBadContinuousMask(channelData, samp_per_s, dataT, plotting = False, smoothing_ms = 1, badThresh = 1e-3, consecLen = 30, nStdDiff = 20, nStdAmp = 20):
     #Allocate bad data mask as dict
-    pdb.set_trace()
-    badMask = {key: {'perChannelAmp' : [], 'perChannelDer' : []} for key in channelData.columns}
-    badMask.update({'general':[]})
-    # Look for unchanging signal across channels
-    channelDataDiff = channelData.diff()
-    channelDataDiff.fillna(0, inplace = True)
 
-    #cumDiff = np.sum(np.abs(channelDataDiff), axis = 0)
-    cumDiff = channelDataDiff.abs().sum(axis = 1)
-
-    # convolve with step function to find consecutive
-    # points where the derivative is identically zero across electrodes
-    kern = np.ones((int(consecLen)))
-    cumDiff = pd.Series(np.convolve(cumDiff.values, kern, 'same'))
-    badMask['general'] = cumDiff < badThresh
-
-    #smooth out the bad data mask
-    smoothKernLen = smoothing_ms * 1e-3 * samp_per_s
-    smoothKern = np.ones((int(smoothKernLen)))
-    badMask['general'] = np.convolve(badMask['general'], smoothKern, 'same') > 0
+    badMask = {'general':None,
+        'perChannelAmp' : pd.DataFrame(index = channelData.index, columns = channelData.columns, dtype = np.bool).to_sparse(fill_value=False),
+        'perChannelDer' : pd.DataFrame(index = channelData.index, columns = channelData.columns, dtype = np.bool).to_sparse(fill_value=False)
+        }
+    #pdb.set_trace()
     #per channel, only smooth a couple of samples
     shortSmoothKern = np.ones((5))
     # per channel look for abberantly large jumps
-    #pdb.set_trace()
-    for idx, dRow in channelDataDiff.iteritems():
+    cumDiff = pd.Series(np.zeros(len(channelData.index)),
+        index = channelData.index)
 
-        # on the data itself
-        row = channelData[idx]
-        if len(row) < 3 * 10e4:
+    columnList = list(channelData.columns)
+    nChan = len(columnList)
+    for idx, row in channelData.iteritems():
+        #pdb.set_trace()
+        ch_idx  = columnList.index(idx)
+        sys.stdout.write("Running getBadContinuousMask: %d%%\r" % int(ch_idx * 100 / nChan + 1))
+        sys.stdout.flush()
+
+        if len(row.index) < 3 * 10e4:
             rowVals = row.values
         else:
-            rowVals =  row.values[:10 * 3e4]
+            rowVals =  row.values[:int(10 * 3e4)]
 
         rowBar  = rowVals.mean()
         rowStd  = rowVals.std()
@@ -273,15 +273,17 @@ def getBadContinuousMask(channelData, samp_per_s, dataT, plotting = False, smoot
         minAcceptable = rowBar - nStdAmp * rowStd
 
         outliers = np.logical_or(row > maxAcceptable,row < minAcceptable)
-        outliers = np.convolve(outliers.values, shortSmoothKern, 'same') > 0
+        outliers = np.convolve(outliers, shortSmoothKern, 'same') > 0
 
-        badMask[idx]['perChannelAmp']=np.array(outliers, dtype = bool)
+        badMask['perChannelAmp'].loc[:, idx]=np.array(outliers, dtype = bool)
 
         # on the derivative of the data
-        if len(row) < 10 * 3e4:
+        dRow = row.diff()
+        dRow.fillna(0, inplace = True)
+        if len(row.index) < 10 * 3e4:
             dRowVals = dRow.values
         else:
-            dRowVals =  dRow.values[:10 * 3e4]
+            dRowVals =  dRow.values[:int(10 * 3e4)]
 
         dRowBar  = dRowVals.mean()
         dRowStd  = dRowVals.std()
@@ -290,11 +292,10 @@ def getBadContinuousMask(channelData, samp_per_s, dataT, plotting = False, smoot
         #pdb.set_trace()
 
         # append to previous list of outliers
-        newOutliers = np.logical_or(dRow > dMaxAcceptable, dRow < dMinAcceptable)
-        newOutliers = np.convolve(newOutliers.values, shortSmoothKern, 'same') > 0
+        dOutliers = np.logical_or(dRow > dMaxAcceptable, dRow < dMinAcceptable)
+        dOutliers = np.convolve(dOutliers, shortSmoothKern, 'same') > 0
         #pdb.set_trace()
-
-        badMask[idx]['perChannelDer']=np.array(newOutliers, dtype = bool)
+        badMask['perChannelDer'].loc[:, idx]=np.array(dOutliers, dtype = bool)
 
         if plotting and idx == plotting:
 
@@ -304,8 +305,8 @@ def getBadContinuousMask(channelData, samp_per_s, dataT, plotting = False, smoot
             plt.show(block = False)
 
             plt.figure()
-            plot_mask = np.logical_or(badMask['general'], badMask['perChannelAmp'][idx])
-            plot_mask = np.logical_or(plot_mask, badMask['perChannelDer'][idx])
+            plot_mask = np.logical_or(badMask['general'], badMask['perChannelAmp'].loc[:, idx])
+            plot_mask = np.logical_or(plot_mask, badMask['perChannelDer'].loc[:, idx])
             plt.plot(dataT, row)
             plt.plot(dataT[plot_mask], row[plot_mask],'ro')
             plt.plot(dataT, dRowVals)
@@ -314,7 +315,24 @@ def getBadContinuousMask(channelData, samp_per_s, dataT, plotting = False, smoot
             plt.tight_layout()
             plt.show(block = False)
 
-    badMask['general'] = np.array(badMask['general'], dtype = bool)
+        #add to the cummulative derivative (will check it at the end for flat periods signifying signal cutout)
+        cumDiff = cumDiff + dRow.abs() / len(channelData.columns)
+
+    # Look for unchanging signal across channels
+
+    # convolve with step function to find consecutive
+    # points where the derivative is identically zero across electrodes
+    kern = np.ones((int(consecLen)))
+    cumDiff = pd.Series(np.convolve(cumDiff.values, kern, 'same'))
+    badFlat = cumDiff < badThresh
+
+    #smooth out the bad data mask
+    smoothKernLen = smoothing_ms * 1e-3 * samp_per_s
+    smoothKern = np.ones((int(smoothKernLen)))
+
+    badFlat = np.convolve(badFlat, smoothKern, 'same') > 0
+    badMask['general'] = pd.Series(np.array(badFlat, dtype = bool), index = channelData.index, dtype = np.bool).to_sparse(fill_value=False)
+    print('\nFinished finding abnormal signal jumps')
 
     return badMask
 
@@ -673,7 +691,7 @@ def replaceBad(dfSeries, mask, typeOpt = 'nans'):
     return dfSeries
 
 def plotChan(channelData, dataT, whichChan, recordingUnits = 'uV', electrodeLabel = '', label = " ", mask = None, maskLabel = " ",
-    show = False, prevFig = None, timeRange = (0,-1)):
+    show = False, prevFig = None, zoomAxis = True, timeRange = (0,-1)):
     # Plot the data channel
     ch_idx  = whichChan
     #hdr_idx = channelData['ExtendedHeaderIndices'][channelData['elec_ids'].index(whichChan)]
@@ -702,7 +720,8 @@ def plotChan(channelData, dataT, whichChan, recordingUnits = 'uV', electrodeLabe
     #pdb.set_trace()
     #channelData['data'][ch_idx].fillna(0, inplace = True)
 
-    ax.axis([tPlot[0], tPlot[-1], min(channelDataForPlotting), max(channelDataForPlotting)])
+    if zoomAxis:
+        ax.axis([tPlot[0], tPlot[-1], min(channelDataForPlotting), max(channelDataForPlotting)])
 
     ax.locator_params(axis = 'y', nbins = 20)
     plt.xlabel('Time (s)')
@@ -714,17 +733,20 @@ def plotChan(channelData, dataT, whichChan, recordingUnits = 'uV', electrodeLabe
 
     return f, ax
 
-def pdfReport(origData, cleanData, badData = None, whereOverflow = None, pdfFilePath = 'pdfReport.pdf', spectrum = False, clean_data_spectrum = None, fr_start = 5, fr_stop = 3000, nSecPlot = 30):
+def pdfReport(cleanData, origData, badData = None, whereOverflow = None,
+    pdfFilePath = 'pdfReport.pdf', spectrum = False, cleanSpectrum = None,
+    origSpectrum = None, fr_start = 5, fr_stop = 3000, nSecPlot = 30):
+
     with matplotlib.backends.backend_pdf.PdfPages(pdfFilePath) as pdf:
-        nChan = cleanData.shape[1]
+        nChan = cleanData['data'].shape[1]
 
         if spectrum:
             fr = clean_data_spectrum['fr']
             t = clean_data_spectrum['t']
             Fs = origData['samp_per_s']
 
-        columnList = list(origData['data'].columns)
-        for idx, row in origData['data'].iteritems():
+        columnList = list(cleanData['data'].columns)
+        for idx, row in cleanData['data'].iteritems():
             ch_idx  = columnList.index(idx)
 
             sys.stdout.write("Running pdfReport: %d%%\r" % int(ch_idx * 100 / nChan + 1))
@@ -732,18 +754,30 @@ def pdfReport(origData, cleanData, badData = None, whereOverflow = None, pdfFile
 
             #print('idx is %s' % idx)
             #pdb.set_trace()
-            hdr_idx = origData['ExtendedHeaderIndices'][origData['elec_ids'].index(idx)]
-            electrodeLabel = origData['extended_headers'][hdr_idx]['ElectrodeLabel']
+            hdr_idx = cleanData['ExtendedHeaderIndices'][cleanData['elec_ids'].index(idx)]
+            electrodeLabel = cleanData['extended_headers'][hdr_idx]['ElectrodeLabel']
 
-            f,_ = plotChan(origData['data'], origData['t'], idx, electrodeLabel = electrodeLabel, label = 'Raw data', mask = None, show = False, timeRange = (origData['start_time_s'] , (origData['start_time_s'] + nSecPlot) ))
+            #pdb.set_trace()
+            f,_ = plotChan(origData, cleanData['t'], idx,
+                electrodeLabel = electrodeLabel, label = 'Raw data', zoomAxis = False,
+                mask = None, show = False, timeRange = (cleanData['start_time_s'],
+                (cleanData['start_time_s'] + nSecPlot) ))
 
             dip_mask = np.full(len(row), False, dtype = np.bool)
             dip_mask[whereOverflow[idx]['dips']] = True
             return_mask = np.full(len(row), False, dtype = np.bool)
             return_mask[whereOverflow[idx]['returns']] = True
 
-            plotChan(cleanData, origData['t'], idx, electrodeLabel = electrodeLabel, mask = [badData["general"], badData[idx]["perChannelAmp"], badData[idx]["perChannelDer"], dip_mask, return_mask], label = 'Raw data', timeRange = (origData['start_time_s'], origData['start_time_s'] + nSecPlot),
-                maskLabel = ["Flatline Dropout", "Amp Out of Bounds Dropout", "Derrivative Out of Bounds Dropout", "Overflow Dips", "Overflow Returns"], show = False, prevFig = f)
+
+            plotChan(cleanData['data'], cleanData['t'], idx, electrodeLabel = electrodeLabel,
+                mask = [badData["general"].to_dense(), badData["perChannelAmp"].loc[:,idx].to_dense(),
+                badData["perChannelDer"].loc[:,idx].to_dense(), dip_mask, return_mask],
+                label = 'Clean data', timeRange = (cleanData['start_time_s'],
+                cleanData['start_time_s'] + nSecPlot),
+                maskLabel = ["Flatline Dropout", "Amp Out of Bounds Dropout",
+                "Derrivative Out of Bounds Dropout", "Overflow Dips",
+                "Overflow Returns"], show = False, prevFig = f)
+
             plt.tight_layout()
             plt.legend()
             pdf.savefig(f)
@@ -759,6 +793,7 @@ def pdfReport(origData, cleanData, badData = None, whereOverflow = None, pdfFile
 
         #pdb.set_trace()
         generateLastPage = False
+        print('On last page of pdf report')
         if generateLastPage:
             for idx, row in origData['data'].iteritems():
                 if idx == 0:

@@ -7,6 +7,7 @@ from brpy version: 1.1.1 --- 07/22/2016
 """
 
 import matplotlib, math, pdb
+matplotlib.use('PS')
 import dataAnalysis.helperFunctions.helper_functions as hf
 import matplotlib.pyplot as plt
 import numpy as np
@@ -65,7 +66,7 @@ def preproc_ns5(stepLen_s = 0.05, winLen_s = 0.1, fr_start = 5, fr_stop = 1000,\
 
     #
     if data_time_s == 'all':
-        data_time_s = simi_triggers['data'].index[-1] / (3e4)
+        data_time_s = (simi_triggers['data'].index[-1] - simi_triggers['data'].index[0]) / (3e4)
 
     ch_idx  = chanToPlot
     hdr_idx = ChannelData['ExtendedHeaderIndices'][ChannelData['elec_ids'].index(chanToPlot)]
@@ -76,7 +77,8 @@ def preproc_ns5(stepLen_s = 0.05, winLen_s = 0.1, fr_start = 5, fr_stop = 1000,\
         electrodeLabel = electrodeLabel, label = 'Raw data', mask = None,
         show = False, timeRange = (start_time_s, start_time_s + 30))
 
-    np.save(fileDir + fileName.replace('.ns5', '_temp.npy'), ChannelData['data'].values)
+    origDataPath = fileDir + fileName.replace('.ns5', '_temp.npy')
+    np.save(origDataPath, ChannelData['data'].values)
 
     # fill in overflow:
     if fillOverflow:
@@ -92,28 +94,31 @@ def preproc_ns5(stepLen_s = 0.05, winLen_s = 0.1, fr_start = 5, fr_stop = 1000,\
 
         # interpolate bad data
         for idx, row in ChannelData['data'].iteritems():
-            mask = np.logical_or(badData['general'], badData[idx]['perChannelAmp'])
-            mask = np.logical_or(mask, badData[idx]['perChannelDer'])
+            #pdb.set_trace()
+            mask = np.logical_or(badData['general'].to_dense(), badData['perChannelAmp'].loc[:,idx].to_dense())
+            mask = np.logical_or(mask, badData['perChannelDer'].loc[:,idx].to_dense())
             row = hf.replaceBad(row, mask, typeOpt = 'interp')
 
         ChannelData['badData'] = badData
         # check interpolation results
         #pdb.set_trace()
-        dip_mask = np.full(len(clean_data.index), False, dtype = np.bool)
+        dip_mask = np.full(len(ChannelData['data'].index), False, dtype = np.bool)
         dip_mask[whereOverflow[ch_idx]['dips']] = True
-        return_mask = np.full(len(clean_data.index), False, dtype = np.bool)
+        return_mask = np.full(len(ChannelData['data'].index), False, dtype = np.bool)
         return_mask[whereOverflow[ch_idx]['returns']] = True
         #
 
         hf.plotChan(ChannelData['data'], ChannelData['t'], chanToPlot,
             electrodeLabel = electrodeLabel, label = 'Clean data',
-            mask = [badData["general"], badData[ch_idx]["perChannelAmp"],
-            badData[ch_idx]["perChannelDer"], dip_mask, return_mask],
+            mask = [badData["general"].to_dense(), badData["perChannelAmp"].loc[:,ch_idx].to_dense(),
+            badData["perChannelDer"].loc[:,ch_idx].to_dense(), dip_mask, return_mask],
             maskLabel = ["Flatline Dropout", "Amp Out of Bounds Dropout",
                 "Derrivative Out of Bounds Dropout",
                 "Overflow Dips", "Overflow Returns"],
             show = False, prevFig = f,
             timeRange = (start_time_s,start_time_s+30))
+
+        del dip_mask, return_mask
 
     if not os.path.exists(fileDir + '/dataAnalysisPreproc'):
         os.makedirs(fileDir + '/dataAnalysisPreproc')
@@ -121,28 +126,47 @@ def preproc_ns5(stepLen_s = 0.05, winLen_s = 0.1, fr_start = 5, fr_stop = 1000,\
     plt.legend()
     #plt.show()
     #pdb.set_trace()
-    plt.savefig(fileDir + '/dataAnalysisPreproc' + fileName.split('.')[0] + '_ns5Clean.png')
-    with open(fileDir + '/dataAnalysisPreproc' + fileName.split('.')[0] + '_ns5Clean.pickle', 'wb') as File:
-        pickle.dump(f, File)
+    plt.savefig(fileDir + '/dataAnalysisPreproc' + fileName.split('.')[0] +
+        '_ns5CleanFig.png')
+    with open(fileDir + '/dataAnalysisPreproc' + fileName.split('.')[0] +
+        '_ns5CleanFig.pickle', 'wb') as File:
+            pickle.dump(f, File)
 
-    # spectrum function parameters
-    R = 30 # target bandwidth for spectrogram
+    pdb.set_trace()
+    data = {'channel':ChannelData['data'], 'simiTrigger': simi_triggers}
+    with open(fileDir + '/dataAnalysisPreproc' + fileName.split('.')[0] + '_saveCleaned.p', "wb" ) as f:
+        pickle.dump(data, f, protocol=4 )
 
-    # get the spectrum
+    print('Done cleaning data')
+
+    # get the spectrum TODO: not currently working
     if computeSpectrum:
+        # spectrum function parameters
+        R = 30 # target bandwidth for spectrogram
         clean_data_spectrum = hf.getSpectrogram(
-            clean_data, ChannelData['elec_ids'], ChannelData['samp_per_s'], ChannelData['start_time_s'], ChannelData['t'], winLen_s, stepLen_s, R, fr_start = fr_start, fr_stop = fr_stop, whichChan = chanToPlot, plotting = False)
-        plt.savefig(fileDir + '/dataAnalysisPreproc' + fileName.split('.')[0] + '_SpectrumClean.png')
+            ChannelData['data'], ChannelData['elec_ids'],
+            ChannelData['samp_per_s'], ChannelData['start_time_s'],
+            ChannelData['t'], winLen_s, stepLen_s, R, fr_start = fr_start,
+            fr_stop = fr_stop, whichChan = chanToPlot, plotting = False)
+        plt.savefig(fileDir + '/dataAnalysisPreproc' + fileName.split('.')[0] +
+            '_SpectrumClean.png')
         plt.show()
-        with open(fileDir + '/dataAnalysisPreproc' + fileName.split('.')[0] + '_SpectrumClean.pickle', 'wb') as File:
-            pickle.dump(plt.gcf(), File)
+        with open(fileDir + '/dataAnalysisPreproc' + fileName.split('.')[0] +
+            '_SpectrumClean.pickle', 'wb') as File:
+                pickle.dump(plt.gcf(), File)
+        spectrum_data = {'spectrum':clean_data_spectrum,
+            'origin' : clean_data_spectrum['origin'],
+            'winLen' : winLen_s, 'stepLen' : stepLen_s}
+        with open(fileDir + '/dataAnalysisPreproc' + fileName.split('.')[0] + '_saveSpectrum.p', "wb" ) as f:
+            pickle.dump(data, f, protocol=4 )
     else:
         clean_data_spectrum = {'origin': None}
 
     if compareBad and computeSpectrum:
         # get the spectrum
-        ChannelData['spectrum'] = hf.getSpectrogram(
-            ChannelData['data'], ChannelData['elec_ids'], ChannelData['samp_per_s'], ChannelData['start_time_s'], ChannelData['t'], winLen_s, stepLen_s, R, fr_start = fr_start, fr_stop = fr_stop, whichChan = chanToPlot, plotting = False)
+        origData = np.load(origDataPath, mmap_mode='r')
+        origData_spectrum = hf.getSpectrogram(
+            origData, ChannelData['elec_ids'], ChannelData['samp_per_s'], ChannelData['start_time_s'], ChannelData['t'], winLen_s, stepLen_s, R, fr_start = fr_start, fr_stop = fr_stop, whichChan = chanToPlot, plotting = False)
 
         plt.savefig(fileDir + '/dataAnalysisPreproc' + fileName.split('.')[0] + '_SpectrumRaw.png')
         with open(fileDir + '/dataAnalysisPreproc' + fileName.split('.')[0] + '_SpectrumRaw.pickle', 'wb') as File:
@@ -150,19 +174,11 @@ def preproc_ns5(stepLen_s = 0.05, winLen_s = 0.1, fr_start = 5, fr_stop = 1000,\
 
     if printReport:
         print('Starting to write PDF Report.')
+        origData = np.load(origDataPath, mmap_mode='r')
+        origDataDF = pd.DataFrame(origData, index = ChannelData['data'].index, columns = ChannelData['data'].columns)
         pdfFile = fileDir + '/dataAnalysisPreproc' + fileName.split('.')[0] + '_pdfReport.pdf'
-        hf.pdfReport(ChannelData, clean_data, badData = badData, whereOverflow = whereOverflow, pdfFilePath = pdfFile, spectrum = computeSpectrum, clean_data_spectrum = clean_data_spectrum, fr_start = fr_start, fr_stop = fr_stop)
-
-    ChannelData['data'] = clean_data
-    data = {'channel':clean_data, 'simiTrigger': simi_triggers}
-    with open(fileDir + '/dataAnalysisPreproc' + fileName.split('.')[0] + '_saveCleaned.p', "wb" ) as f:
-        pickle.dump(data, f, protocol=4 )
-
-    if computeSpectrum:
-        spectrum_data = {'spectrum':clean_data_spectrum,
-            'origin' : clean_data_spectrum['origin'],
-            'winLen' : winLen_s, 'stepLen' : stepLen_s}
-        with open(fileDir + '/dataAnalysisPreproc' + fileName.split('.')[0] + '_saveSpectrum.p', "wb" ) as f:
-            pickle.dump(data, f, protocol=4 )
-
+        hf.pdfReport(ChannelData, origDataDF, badData = badData,
+        whereOverflow = whereOverflow, pdfFilePath = pdfFile,
+        spectrum = computeSpectrum, cleanSpectrum = None,
+        origSpectrum = None, fr_start = fr_start, fr_stop = fr_stop)
     #x = input("Press any key")
