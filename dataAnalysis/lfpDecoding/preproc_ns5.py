@@ -125,9 +125,9 @@ def preproc_ns5(stepLen_s = 0.05, winLen_s = 0.1, fr_start = 5, fr_stop = 1000,\
 
     dataPath = fileDir + '/dataAnalysisPreproc' + fileName.split('.')[0] + '_saveCleaned.h5'
     ChannelData['data'].to_hdf(dataPath, 'data', mode = 'w')
-    simi_triggers['data'].to_hdf(dataPath, 'simi', mode = 'w')
+    simi_triggers['data'].to_hdf(dataPath, 'simi', mode = 'a')
     ChannelData['t'] = pd.Series(ChannelData['t'], index = ChannelData['data'].index)
-    ChannelData['t'].to_hdf(dataPath, 't', mode = 'w')
+    ChannelData['t'].to_hdf(dataPath, 't', mode = 'a')
 
     del ChannelData['data'], simi_triggers['data'], ChannelData['t']
 
