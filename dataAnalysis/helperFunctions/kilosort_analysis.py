@@ -2,11 +2,12 @@ import os, sys, pdb
 from tempfile import mkdtemp
 import numpy as np
 from scipy.ndimage.filters import gaussian_filter1d
+from scipy import stats
 import pandas as pd
 import scipy.io
 import matplotlib
-#matplotlib.use('PS')   # generate postscript output by default
-matplotlib.use('Qt5Agg')   # generate postscript output by default
+matplotlib.use('PS')   # generate postscript output by default
+#matplotlib.use('Qt5Agg')   # generate interactive output by default
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib import pyplot as plt
 from fractions import gcd
@@ -266,14 +267,29 @@ def getWaveForms(filePath, spikeStruct, nevIDs = None, dataType = np.int16, wfWi
 def numFromWaveClusSpikeFile(spikeFileName):
     return int(spikeFileName.split('times_NSX')[-1].split('.mat')[0])
 
-def getWaveClusSpikes(filePath, nevIDs = None, plotting = False, getMUA = False, tempFolder = None):
+import re
+# From https://stackoverflow.com/questions/5967500/how-to-correctly-sort-a-string-with-a-number-inside
+def atoi(text):
+    return int(text) if text.isdigit() else text
+
+def natural_keys(text):
+    '''
+    alist.sort(key=natural_keys) sorts in human order
+    http://nedbatchelder.com/blog/200712/human_sorting.html
+    (See Toothy's implementation in the comments)
+    '''
+    return [ atoi(c) for c in re.split('(\d+)', text) ]
+
+
+def getWaveClusSpikes(filePath, nevIDs = None, plotting = False, excludeClus = [0], tempFolder = None):
     # TODO: not memory mapped yet
     if nevIDs is None:
-        spikeFileList = [f for f in os.listdir(filePath + '/wave_clus') if '.mat' in f and 'times_' in f]
+        spikeFileList = [f for f in os.listdir(filePath) if '.mat' in f and 'times_' in f]
         nevIDs = [numFromWaveClusSpikeFile(f) for f in spikeFileList]
     else:
-        spikeFileList = [f for f in os.listdir(filePath + '/wave_clus') if '.mat' in f and 'times_' in f and numFromWaveClusSpikeFile(f) in nevIDs]
+        spikeFileList = [f for f in os.listdir(filePath) if '.mat' in f and 'times_' in f and numFromWaveClusSpikeFile(f) in nevIDs]
 
+    spikeFileList.sort(key=natural_keys)
     nCh = len(nevIDs)
 
     if tempFolder is None:
@@ -295,25 +311,24 @@ def getWaveClusSpikes(filePath, nevIDs = None, plotting = False, getMUA = False,
     unitIDs = []
     lastMaxUnitID = 0
     for idx, spikeFile in enumerate(spikeFileList):
-        waveClusData = scipy.io.loadmat(filePath + '/wave_clus/' + spikeFile)
+        waveClusData = scipy.io.loadmat(filePath + spikeFile)
         spikes['ChannelID'][idx] = nevIDs[idx]
         unitsInFile = np.unique(waveClusData['cluster_class'][:,0]) + 1 + lastMaxUnitID
 
-        if getMUA:
-            spikes['Classification'][idx] = waveClusData['cluster_class'][:,0] + 1 + lastMaxUnitID
-            spikes['TimeStamps'][idx] = waveClusData['cluster_class'][:,1] / 1e3
-            spikes['Waveforms'][idx] = waveClusData['spikes']
+        #pdb.set_trace()
+        if excludeClus:
+            notMUAMask = np.logical_not(np.isin(waveClusData['cluster_class'][:,0], excludeClus))
         else:
-            notMUAMask = waveClusData['cluster_class'][:,0] != 0
-            spikes['Classification'][idx] = waveClusData['cluster_class'][notMUAMask,0] + 1 + lastMaxUnitID
-            spikes['TimeStamps'][idx] = waveClusData['cluster_class'][notMUAMask,1] / 1e3
-            spikes['Waveforms'][idx] = waveClusData['spikes'][notMUAMask, :]
+            notMUAMask = np.full(len(waveClusData['cluster_class'][:,0]), True, dtype = np.bool)
+        #pdb.set_trace()
+        spikes['Classification'][idx] = waveClusData['cluster_class'][notMUAMask,0] + 1 + lastMaxUnitID
+        spikes['TimeStamps'][idx] = waveClusData['cluster_class'][notMUAMask,1] / 1e3
+        spikes['Waveforms'][idx] = waveClusData['spikes'][notMUAMask, :]
 
         # note that the units of TimeStamps is in SECONDS
         unitIDs+=unitsInFile.tolist()
         lastMaxUnitID = max(unitIDs)
 
-    #pdb.set_trace()
     return spikes
 
 #@profile
@@ -356,8 +371,8 @@ def plotSpike(spikes, channel, showNow = False, ax = None, acrossArray = False, 
                     waveForms = spikes['Waveforms'][ChanIdx][unitMask, :, idx]
                     thisSpike = np.mean(waveForms, axis = 0)
                     thisError = np.std(waveForms, axis = 0)
-                    timeRange = np.arange(len(thisSpike))
-                    curAx.fill_between(timeRange, thisSpike-thisError, thisSpike+thisError, alpha=0.4, facecolor=colorPalette[unitIdx], label='chan %s, unit %s' % (channel, unitName))
+                    timeRange = np.arange(len(thisSpike)) / 3e4 * 1e3
+                    curAx.fill_between(timeRange, thisSpike - 2*thisError, thisSpike + 2*thisError, alpha=0.4, facecolor=colorPalette[unitIdx], label='chan %s, unit %s' % (channel, unitName))
                     curAx.plot(timeRange, thisSpike, linewidth=1, color=colorPalette[unitIdx])
 
                 sns.despine()
@@ -374,7 +389,7 @@ def plotSpike(spikes, channel, showNow = False, ax = None, acrossArray = False, 
                 thisError = np.std(waveForms, axis = 0)
                 timeRange = np.arange(len(thisSpike)) / 3e4 * 1e3
                 colorPalette = sns.color_palette()
-                ax.fill_between(timeRange, thisSpike - thisError, thisSpike + thisError, alpha=0.4, facecolor=colorPalette[unitIdx], label='chan %s, unit %s' % (channel, unitName))
+                ax.fill_between(timeRange, thisSpike - 2*thisError, thisSpike + 2*thisError, alpha=0.4, facecolor=colorPalette[unitIdx], label='chan %s, unit %s' % (channel, unitName))
                 ax.plot(timeRange, thisSpike, linewidth=1, color=colorPalette[unitIdx])
                 if axesLabel:
                     ax.set_ylabel(spikes['Units'])
@@ -385,7 +400,8 @@ def plotSpike(spikes, channel, showNow = False, ax = None, acrossArray = False, 
             plt.show()
 
 #@profile
-def plotISIHistogram(spikes, channel, showNow = False, ax = None, bins = None, kde_kws = None):
+def plotISIHistogram(spikes, channel, showNow = False, ax = None,
+    bins = None, kde = False, kde_kws = None):
     if ax is None:
         fig, ax = plt.subplots()
     else:
@@ -399,8 +415,21 @@ def plotISIHistogram(spikes, channel, showNow = False, ax = None, bins = None, k
         for unitIdx, unitName in enumerate(unitsOnThisChan):
             unitMask = spikes['Classification'][idx] == unitName
             theseTimes = spikes['TimeStamps'][idx][unitMask]
-            theseISI = np.diff(theseTimes)
-            sns.distplot(theseISI, bins = bins, ax = ax, color = colorPalette[unitIdx],  kde_kws = kde_kws)
+            theseISI = np.diff(theseTimes) * 1e3 # units of msec
+            #pdb.set_trace()
+            sns.distplot(theseISI, bins = bins, ax = ax,
+                color = colorPalette[unitIdx], kde = kde, kde_kws = kde_kws)
+            """
+            fit_alpha, fit_loc, fit_beta = stats.gamma.fit(np.histogram(theseISI, bins = bins))
+            rv = stats.gamma(fit_alpha, loc = fit_loc, scale = fit_beta)
+            ax.plot(bins, rv.pdf(bins), 'k-', lw=2)
+            #pdb.set_trace()
+
+            plt.hist(theseISI, bins = bins, color = colorPalette[unitIdx], density = False)
+            """
+            plt.xlabel('ISI (msec)')
+            yAxLabel = 'Count (normalized)' if kde else 'Count'
+            plt.ylabel(yAxLabel)
             if bins is not None:
                 ax.set_xlim(min(bins), max(bins))
         if showNow:
@@ -416,16 +445,37 @@ def plotSpikePanel(xcoords, ycoords, spikes):
     matplotlib.rc('axes', ymargin=.01)
     xIdx, yIdx = coordsToIndices(xcoords, ycoords)
     fig, ax = plt.subplots(nrows = max(np.unique(xIdx)) + 1, ncols = max(np.unique(yIdx)) + 1)
+    axHighLims = np.empty(ax.shape)
+    axHighLims[:] = np.nan
+    axLowLims = np.empty(ax.shape)
+    axLowLims[:] = np.nan
 
     for idx, channel in enumerate(spikes['ChannelID']):
         curAx = ax[xIdx[idx], yIdx[idx]]
         plotSpike(spikes, channel, ax = curAx)
-
+        curAxLim = curAx.get_ylim()
+        axHighLims[xIdx[idx], yIdx[idx]] = curAxLim[1]
+        axLowLims[xIdx[idx], yIdx[idx]] = curAxLim[0]
+        xLim = curAx.get_xlim()
     sns.despine()
-    for curAx in ax.flatten():
-        curAx.tick_params(left='off', top='off', right='off', bottom='off', labelleft='off', labeltop='off', labelright='off', labelbottom='off')
 
-    plt.tight_layout()
+    newAxMin = np.nanmean(axLowLims) - 2 * np.nanstd(axLowLims)
+    newAxMax = np.nanmean(axHighLims) + 2 * np.nanstd(axHighLims)
+
+    for idx, channel in enumerate(spikes['ChannelID']):
+        curAx = ax[xIdx[idx], yIdx[idx]]
+        curAx.set_ylim(newAxMin, newAxMax)
+
+    for idx, curAx in enumerate(ax.flatten()):
+        if idx != 0:
+            curAx.tick_params(left='off', top='off', right='off', bottom='off', labelleft='off', labeltop='off', labelright='off', labelbottom='off')
+        else:
+            curAx.set_ylim(newAxMin, newAxMax)
+            curAx.set_xlim(*xLim)
+            curAx.set_xlabel('Time (msec)', fontsize = 5, labelpad = 0)
+            curAx.set_ylabel('Voltage (uV)', fontsize = 5, labelpad = 0)
+        plt.tight_layout()
+    return newAxMin, newAxMax
 
 #def plotEventRaster
 #@profile
@@ -652,20 +702,23 @@ def plotSingleTrial(trialStats, trialEvents, motorData, kinematics, spikes,\
 #@profile
 def spikePDFReport(filePath, spikes, spikeStruct, plotRastersAlignedTo = None, plotRastersSeparatedBy = None, trialStats = None, enableFR = False):
     pdfName = filePath + '/' + spikeStruct['dat_path'].split('.')[0] + '.pdf'
+
     with PdfPages(pdfName) as pdf:
         plotSpikePanel(spikeStruct['xcoords'], spikeStruct['ycoords'], spikes)
         pdf.savefig()
         plt.close()
 
         for idx, channel in enumerate(spikes['ChannelID']):
+            sys.stdout.write("Running spikePDFReport: %d%%\r" % int((idx + 1) * 100 / len(spikes['ChannelID'])))
+            sys.stdout.flush()
             unitsOnThisChan = np.unique(spikes['Classification'][idx])
             if unitsOnThisChan is not None:
                 if len(unitsOnThisChan) > 0:
                     fig, ax = plt.subplots(nrows = 1, ncols = 2)
                     plotSpike(spikes, channel = channel, ax = ax[0], axesLabel = True)
-                    isiBins = np.linspace(0, 50e-3, 100)
-                    kde_kws = {'clip' : (isiBins[0] * 0.8, isiBins[-1] * 1.2), 'bw' : 'silverman'}
-                    plotISIHistogram(spikes, channel = channel, bins = isiBins, kde_kws = kde_kws, ax = ax[1])
+                    isiBins = np.linspace(0, 80, 40)
+                    kde_kws = {'clip' : (isiBins[0] * 0.8, isiBins[-1] * 1.2), 'bw' : 'silverman', 'gridsize' : 500}
+                    plotISIHistogram(spikes, channel = channel, bins = isiBins, ax = ax[1], kde = False)
                     pdf.savefig()
                     plt.close()
 

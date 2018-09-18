@@ -184,8 +184,8 @@ def fillInOverflow(channelData, plotting = False, fillMethod = 'constant'):
         if dipStarts.any():
             nDips = len(dipStarts)
             fixedRow = row.copy()
+            maskRow = np.full(len(overflowMask.index), False, dtype = np.bool)
             for dipIdx, dipStartIdx in enumerate(dipStarts):
-                #
                 try:
                     assert row.iloc[dipStartIdx - 1] > 8e3 # 8191 mV is equivalent to 32768
                     nextIdx = dipStarts[dipIdx + 1] if dipIdx < nDips - 1 else len(row)
@@ -203,31 +203,21 @@ def fillInOverflow(channelData, plotting = False, fillMethod = 'constant'):
                 except:
                     continue
 
-                #pdb.set_trace()
-                overflowMask.iloc[col_idx, dipStartIdx:dipEndIdx] = True
+                maskRow[dipStartIdx:dipEndIdx] = True
                 if fillMethod == 'average':
-                    try:
-                        fixValue = (-rowDiff.iloc[dipStartIdx] + rowDiff.iloc[dipEndIdx]) / 2
-                        assert fixedRow.iloc[dipStartIdx:dipEndIdx].mean() < 3e3
-                        fixedRow.iloc[dipStartIdx:dipEndIdx] = \
-                            row.iloc[dipStartIdx:dipEndIdx].values + \
-                            fixValue
-                    except:
-                        print('Error filling')
-                        continue
-                        #pdb.set_trace()
-
+                    fixValue = (-rowDiff.iloc[dipStartIdx] + rowDiff.iloc[dipEndIdx]) / 2
                 elif fillMethod == 'constant':
-                    try:
-                        assert fixedRow.iloc[dipStartIdx:dipEndIdx].mean() < 3e3
-                        fixedRow.iloc[dipStartIdx:dipEndIdx] = \
-                            row.iloc[dipStartIdx:dipEndIdx].values + \
-                            8191
-                    except:
-                        print('Error filling')
-                        continue
+                    fixValue = 8191
 
-            #pdb.set_trace()
+                try:
+                    #assert fixedRow.iloc[dipStartIdx:dipEndIdx].mean() < 5e3
+                    fixedRow.iloc[dipStartIdx:dipEndIdx] = \
+                        row.iloc[dipStartIdx:dipEndIdx].values + \
+                        fixValue
+                except Exception as e:
+                    print(e)
+                    continue
+
             if dipStarts.any() and plotting:
                 plt.figure()
                 plt.plot(row, label = 'Original')
@@ -238,6 +228,7 @@ def fillInOverflow(channelData, plotting = False, fillMethod = 'constant'):
                 plt.show()
 
             channelData.loc[:, idx] = fixedRow
+            overflowMask.loc[:, idx] = maskRow
 
     print('\nFinished finding boolean overflow')
     return channelData, overflowMask

@@ -7,7 +7,7 @@ from brpy version: 1.1.1 --- 07/22/2016
 """
 
 import matplotlib, math, pdb
-matplotlib.use('TkAgg')
+matplotlib.use('PS')
 import dataAnalysis.helperFunctions.helper_functions as hf
 import matplotlib.pyplot as plt
 import numpy as np
@@ -77,7 +77,7 @@ def preproc_ns5(stepLen_s = 0.05, winLen_s = 0.1, fr_start = 5, fr_stop = 1000,\
         electrodeLabel = electrodeLabel, label = 'Raw data', mask = None,
         show = False, timeRange = (start_time_s, start_time_s + 30))
 
-    origDataPath = fileDir + fileName.replace('.ns5', '_temp.npy')
+    origDataPath = fileDir + '/dataAnalysisPreproc' + fileName.split('.')[0] + '_orig.npy'
     np.save(origDataPath, ChannelData['data'].values)
 
     #pdb.set_trace()
@@ -88,7 +88,7 @@ def preproc_ns5(stepLen_s = 0.05, winLen_s = 0.1, fr_start = 5, fr_stop = 1000,\
         ChannelData['data'], overflowMask = hf.fillInOverflow(
             ChannelData['data'], fillMethod = 'average')
         badData.update({'overflow': overflowMask})
-        
+
         # find unusual jumps in derivative or amplitude
         newBadData = hf.getBadContinuousMask(ChannelData['data'],
             ChannelData['samp_per_s'], ChannelData['t'],
@@ -99,10 +99,11 @@ def preproc_ns5(stepLen_s = 0.05, winLen_s = 0.1, fr_start = 5, fr_stop = 1000,\
             #pdb.set_trace()
             mask = np.logical_or(badData['general'].to_dense(), badData['perChannelAmp'].loc[:,idx].to_dense())
             mask = np.logical_or(mask, badData['perChannelDer'].loc[:,idx].to_dense())
-            row = hf.replaceBad(row, mask, typeOpt = 'interp')
+            ChannelData['data'].loc[:,idx] = hf.replaceBad(row, mask, typeOpt = 'interp')
 
         ChannelData['badData'] = badData
         # check interpolation results
+
         hf.plotChan(ChannelData['data'], ChannelData['t'], chanToPlot,
             electrodeLabel = electrodeLabel, label = 'Clean data',
             mask = [badData["general"].to_dense(), badData["perChannelAmp"].loc[:,ch_idx].to_dense(),
@@ -116,21 +117,25 @@ def preproc_ns5(stepLen_s = 0.05, winLen_s = 0.1, fr_start = 5, fr_stop = 1000,\
         os.makedirs(fileDir + '/dataAnalysisPreproc')
 
     plt.legend()
-    plt.show()
-    #pdb.set_trace()
     plt.savefig(fileDir + '/dataAnalysisPreproc' + fileName.split('.')[0] +
         '_ns5CleanFig.png')
     with open(fileDir + '/dataAnalysisPreproc' + fileName.split('.')[0] +
         '_ns5CleanFig.pickle', 'wb') as File:
             pickle.dump(f, File)
 
-    #pdb.set_trace()
-    data = {'channel':ChannelData['data'], 'simiTrigger': simi_triggers}
-    with open(fileDir + '/dataAnalysisPreproc' + fileName.split('.')[0] + '_saveCleaned.p', "wb" ) as f:
-        pickle.dump(data, f, protocol=4 )
+    dataPath = fileDir + '/dataAnalysisPreproc' + fileName.split('.')[0] + '_saveCleaned.h5'
+    ChannelData['data'].to_hdf(dataPath, 'data', mode = 'w')
+    simi_triggers['data'].to_hdf(dataPath, 'simi', mode = 'w')
+    ChannelData['t'] = pd.Series(ChannelData['t'], index = ChannelData['data'].index)
+    ChannelData['t'].to_hdf(dataPath, 't', mode = 'w')
+
+    del ChannelData['data'], simi_triggers['data'], ChannelData['t']
+
+    metadata = {'channel':ChannelData, 'simiTrigger': simi_triggers}
+    with open(fileDir + '/dataAnalysisPreproc' + fileName.split('.')[0] + '_saveCleanedMetadata.p', "wb" ) as f:
+        pickle.dump(metadata, f, protocol=4 )
 
     print('Done cleaning data')
-
     # get the spectrum TODO: not currently working
     if computeSpectrum:
         # spectrum function parameters
@@ -164,6 +169,7 @@ def preproc_ns5(stepLen_s = 0.05, winLen_s = 0.1, fr_start = 5, fr_stop = 1000,\
         with open(fileDir + '/dataAnalysisPreproc' + fileName.split('.')[0] + '_SpectrumRaw.pickle', 'wb') as File:
             pickle.dump(plt.gcf(), File)
 
+    # # TODO: move this to its own function
     if printReport:
         print('Starting to write PDF Report.')
         origData = np.load(origDataPath, mmap_mode='r')
