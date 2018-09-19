@@ -16,6 +16,7 @@ import dataAnalysis.helperFunctions.helper_functions as hf
 import line_profiler
 import pickle
 import h5py
+import traceback
 
 def loadParamsPy(filePath):
 
@@ -77,7 +78,8 @@ def loadKSDir(filePath, excludeNoise = True, loadPCs = False):
     spikeTemplates = np.load(filePath + '/spike_templates.npy', mmap_mode = mMapMode).squeeze()
     try:
         spikeCluster = np.load(filePath + '/spike_clusters.npy', mmap_mode = mMapMode)
-    except:
+    except Exception:
+        traceback.print_exc()
         spikeCluster = spikeTemplates
 
     tempScalingAmps = np.load(filePath + '/amplitudes.npy', mmap_mode = mMapMode).squeeze()
@@ -98,7 +100,8 @@ def loadKSDir(filePath, excludeNoise = True, loadPCs = False):
         try:
             clusterInfo = pd.read_csv(cgsFile, sep='\t')
             hasClusterInfo = True
-        except:
+        except Exception:
+            traceback.print_exc()
             clusterInfo = None
             hasClusterInfo = False
 
@@ -512,6 +515,7 @@ def plotRaster(spikes, trialStats, alignTo, channel, separateBy = None, windowSi
             unitMask = spikes['Classification'][ChanIdx] == unitName
             # time stamps in milliseconds
             allSpikeTimes = np.array(spikes['TimeStamps'][ChanIdx][unitMask] * 1e3, dtype = np.int64)
+
             for idx, startTime in enumerate(trialStats[alignTo]):
                 try:
                     #print('Plotting trial %s' % idx)
@@ -529,13 +533,16 @@ def plotRaster(spikes, trialStats, alignTo, channel, separateBy = None, windowSi
                     else:
                         axToPlotOn = ax
                         lineToPlot = idx
+
                     axToPlotOn.vlines(trialSpikeTimes - startTime / 3e1, lineToPlot, lineToPlot + 1, colors = [colorPalette[unitIdx]], linewidths = [0.5])
                     if maxTrial is not None:
                         if idx >= maxTrial -1:
                             break
-                except:
+                except Exception:
+                    print('Error plotting raster for trial %s' % idx)
+                    traceback.print_exc()
                     #pdb.set_trace()
-                    pass
+                    continue
             #reset line counts for next pass through for the next unit on this chan
             if separateBy is not None:
                 curLine = {category : 0 for category in uniqueCategories}
@@ -555,7 +562,7 @@ def plotRaster(spikes, trialStats, alignTo, channel, separateBy = None, windowSi
     return ax
 
 #@profile
-def plotFR(spikes, trialStats, alignTo, channel, separateBy = None, windowSize = (-0.25, 1), timeRange = None, showNow = False, ax = None, twin = False, maxTrial = None):
+def plotFR(spikes, trialStats, alignTo, channel, separateBy = None, windowSize = (-0.25, 1), timeRange = None, showNow = False, ax = None, twin = False, maxTrial = None, discardEmpty = False):
     ChanIdx = spikes['ChannelID'].index(channel)
     unitsOnThisChan = np.unique(spikes['Classification'][ChanIdx])
 
@@ -611,12 +618,15 @@ def plotFR(spikes, trialStats, alignTo, channel, separateBy = None, windowSize =
                         trialSpikeTimes = allSpikeTimes[trialTimeMask] - startTime / 3e1
                         FR[unitIdx].iloc[idx, :-1] = np.histogram(trialSpikeTimes, timeWindow)[0]
                     else:
-                        FR[unitIdx].iloc[idx, -1] = True
+                        if discardEmpty:
+                            FR[unitIdx].iloc[idx, -1] = True
 
                     if maxTrial is not None:
                         if idx >= maxTrial -1:
                             break
-                except:
+                except Exception:
+                    print('In plotFR: Error getting firing rate for trial %s' % idx)
+                    traceback.print_exc()
                     #pdb.set_trace()
                     FR[unitIdx].iloc[idx, -1] = True
                 #pdb.set_trace()
@@ -628,13 +638,14 @@ def plotFR(spikes, trialStats, alignTo, channel, separateBy = None, windowSize =
     kernelWidth = 25e-3 # seconds
     if separateBy is not None:
         meanFR = {category : [pd.Series(index = timeWindow[:-1]) for i in unitsOnThisChan] for category in uniqueCategories}
-        stdFR = meanFR.copy()
+        stdFR = {category : [pd.Series(index = timeWindow[:-1]) for i in unitsOnThisChan] for category in uniqueCategories}
         for category in uniqueCategories:
             for idx, unit in enumerate(unitsOnThisChan):
                 meanFR[category][idx] = FR[idx].loc[trialStats[separateBy] == category].mean(axis = 0)
                 meanFR[category][idx] = gaussian_filter1d(meanFR[category][idx], kernelWidth * 1e3)
+
                 stdFR[category][idx] = FR[idx].loc[trialStats[separateBy] == category].std(axis = 0)
-                stdFR[category][idx] = gaussian_filter1d(meanFR[category][idx], kernelWidth * 1e3)
+                stdFR[category][idx] = gaussian_filter1d(stdFR[category][idx], kernelWidth * 1e3)
     else:
         meanFR = {'all' : [gaussian_filter1d(x.mean(axis = 0), kernelWidth * 1e3) for x in FR]}
         stdFR = {'all' : [gaussian_filter1d(x.std(axis = 0), kernelWidth * 1e3) for x in FR]}
@@ -651,10 +662,9 @@ def plotFR(spikes, trialStats, alignTo, channel, separateBy = None, windowSize =
 
         for unitIdx, x in enumerate(meanFRThisCategory):
             thisError = stdFRThisCategory[unitIdx]
-            thisAx.fill_between(timeWindow[:-1], x * 1e3 - 2*thisError, x * 1e3 + 2*thisError, alpha=0.4, facecolor=colorPalette[unitIdx])
+            thisAx.fill_between(timeWindow[:-1], (x - 2 * thisError) * 1e3, (x + 2 * thisError) * 1e3, alpha=0.4, facecolor=colorPalette[unitIdx])
             thisAx.plot(timeWindow[:-1], x * 1e3, linewidth = 1, color = colorPalette[unitIdx])
             thisAx.set_ylabel('Average Firing rate (spk/sec)')
-        #thisAx.set_title('spikes for ' + category + ' trials')
     if showNow:
         plt.show()
     return ax, FR
@@ -766,10 +776,10 @@ def trialPDFReport(filePath, trialStats, trialEvents, motorData, kinematics, spi
                 pdf.savefig()
                 plt.close()
 
-def generateSpikeReport(folderPath, eventInfo, trialFiles):
-    """
-    Read in Trial events
-    """
+def capitalizeFirstLetter(stringInput):
+    return stringInput[0].capitalize() + stringInput[1:]
+
+def loadEventInfo(folderPath, eventInfo):
     try:
         trialStats  = pd.read_pickle(os.path.join(folderPath, eventInfo['ns5FileName']) + '_trialStats.pickle')
         trialEvents = pd.read_pickle(os.path.join(folderPath, eventInfo['ns5FileName']) + '_trialEvents.pickle')
@@ -781,62 +791,66 @@ def generateSpikeReport(folderPath, eventInfo, trialFiles):
         trialStats.to_pickle(os.path.join(folderPath, eventInfo['ns5FileName']) + '_trialStats.pickle')
         trialEvents.to_pickle(os.path.join(folderPath, eventInfo['ns5FileName']) + '_trialEvents.pickle')
         print('Recalculated trial data and saved to pickle.')
+    return trialStats, trialEvents
+
+def loadSpikeInfo(folderPath, arrayName, arrayInfo):
+    try:
+        spikeStruct = pickle.load(
+            open(os.path.join(folderPath, 'coords') + capitalizeFirstLetter(arrayName) + '.pickle', 'rb'))
+        spikes      = pickle.load(
+            open(os.path.join(folderPath, arrayInfo['ns5FileName']) + '_spikes' + capitalizeFirstLetter(arrayName) + '.pickle', 'rb'))
+        print('Loaded spike data from pickle.')
+    except:
+        print('Spike data not pickled. Recalculating...')
+
+        spikeStruct = loadKSDir(
+            os.path.join(folderPath, 'Kilosort/'+ arrayInfo['ns5FileName'] + '_' + capitalizeFirstLetter(arrayName)),
+            loadPCs = False)
+        spikes = getWaveClusSpikes(
+            os.path.join(folderPath, 'wave_clus', arrayInfo['ns5FileName']),
+            nevIDs = arrayInfo['nevIDs'], plotting = False, excludeClus = arrayInfo['excludeClus'])
+
+        pickle.dump(spikeStruct,
+            open(os.path.join(folderPath, arrayInfo['ns5FileName']) + '_spikeStruct' + capitalizeFirstLetter(arrayName) + '.pickle', 'wb'))
+        pickle.dump(spikes,
+            open(os.path.join(folderPath, arrayInfo['ns5FileName']) + '_spikes' + capitalizeFirstLetter(arrayName) + '.pickle', 'wb'))
+        print('Recalculated spike data and saved to pickle.')
+    return spikeStruct, spikes
+
+def generateSpikeReport(folderPath, eventInfo, trialFiles):
     """
-    Read in array spikes
+    Read in Trial events
     """
+    trialStats, trialEvents = loadEventInfo(folderPath, eventInfo)
+
     for key, value in trialFiles.items():
-        try:
-            spikeStruct = pickle.load(
-                open(os.path.join(folderPath, 'coords') + key.capitalize() + '.pickle', 'rb'))
-            spikes      = pickle.load(
-                open(os.path.join(folderPath, value['ns5FileName']) + '_spikes' + key.capitalize() + '.pickle', 'rb'))
-            print('Loaded spike data from pickle.')
-        except:
-            print('Spike data not pickled. Recalculating...')
-
-            spikeStruct = loadKSDir(
-                os.path.join(folderPath, 'Kilosort/'+ value['ns5FileName'] + '_' + key.capitalize()),
-                loadPCs = False)
-            spikes = getWaveClusSpikes(
-                os.path.join(folderPath, 'wave_clus', value['ns5FileName']),
-                nevIDs = value['nevIDs'], plotting = False, excludeClus = value['excludeClus'],
-                tempFolder = '/users/rdarie/data/rdarie/Murdoc Neural Recordings/201806031226-Proprio/wave_clus/temp')
-
-            pickle.dump(spikeStruct,
-                open(os.path.join(folderPath, value['ns5FileName']) + '_spikeStruct' + key.capitalize() + '.pickle', 'wb'))
-            pickle.dump(spiket,
-                open(os.path.join(folderPath, value['ns5FileName']) + '_spikes' + key.capitalize() + '.pickle', 'wb'))
-            print('Recalculated spike data and saved to pickle.')
-
-        #Debugging plots
-        plotRastersAlignedTo = 'FirstOnset'
-        plotRastersSeparatedBy = 'Direction'
-        plotChan = 3
-        enableFR = True
         """
-        fig, ax = plt.subplots(nrows = 1, ncols = 2)
-        plotSpike(spikes, channel = plotChan, ax = ax[0], axesLabel = True)
-        isiBins = np.linspace(0, 150, 75)
-        kde_kws = {'clip' : (isiBins[0], isiBins[-1]),
-            'bw' : 'scott', 'gridsize' : 1000}
-        plotISIHistogram(spikes, channel = plotChan, bins = isiBins,
-            kde_kws = kde_kws, kde = False,
-            ax = ax[1])
-        plotSpike(spikes, channel = plotChan)
-        plotSpikePanel(spikeStruct['xcoords'], spikeStruct['ycoords'], spikes)
+        Read in array spikes
         """
-        plotAx = plotRaster(spikes, trialStats, alignTo = plotRastersAlignedTo, windowSize = (-0.5, 2), channel = plotChan, separateBy = plotRastersSeparatedBy, maxTrial = 20)
-        plotFR(spikes, trialStats, alignTo = plotRastersAlignedTo, windowSize = (-0.5, 2), channel = plotChan, separateBy = plotRastersSeparatedBy, ax = plotAx, twin = True, maxTrial = 20)
+        spikeStruct, spikes = loadSpikeInfo(folderPath, key, value)
 
-        plt.show()
-
-        newName = value['ns5FileName'] + '_' + key.capitalize() + '_exclude_' + '_'.join([str(i) for i in value['excludeClus']])
+        newName = value['ns5FileName'] + '_' + capitalizeFirstLetter(key) + '_exclude_' + '_'.join([str(i) for i in value['excludeClus']])
         spikePDFReport(folderPath,
             spikes, spikeStruct, plotRastersAlignedTo = 'FirstOnset',
             plotRastersSeparatedBy = 'Direction', trialStats = trialStats,
             enableFR = True,newName = newName)
 
         del spikes, spikeStruct
+
+def plotSpikeTriggeredRaster(spikesFrom, spikesTo, spikesFromIdx, spikesToIdx,
+    windowSize = (-0.25, 1), timeRange = None, showNow = False,
+    ax = None, maxSpikes = None):
+    # get spike firing times to align to
+    ChanIdx = spikesTo['ChannelID'].index(spikesToIdx['chan'])
+    unitsOnThisChan = np.unique(spikesTo['Classification'][ChanIdx])
+
+    # get spike firing times to plot
+    ChanIdx = spikesFrom['ChannelID'].index(channel)
+    unitsOnThisChan = np.unique(spikes['Classification'][ChanIdx])
+
+    if ax is None:
+        fig, ax = plt.subplots()
+    pdb.set_trace()
 
 if __name__ == "__main__":
     pass
