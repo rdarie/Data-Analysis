@@ -6,8 +6,6 @@ from scipy import stats
 import pandas as pd
 import scipy.io
 import matplotlib
-matplotlib.use('PS')   # generate postscript output by default
-#matplotlib.use('Qt5Agg')   # generate interactive output by default
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib import pyplot as plt
 from fractions import gcd
@@ -630,16 +628,21 @@ def plotFR(spikes, trialStats, alignTo, channel, separateBy = None, windowSize =
     kernelWidth = 25e-3 # seconds
     if separateBy is not None:
         meanFR = {category : [pd.Series(index = timeWindow[:-1]) for i in unitsOnThisChan] for category in uniqueCategories}
+        stdFR = meanFR.copy()
         for category in uniqueCategories:
             for idx, unit in enumerate(unitsOnThisChan):
                 meanFR[category][idx] = FR[idx].loc[trialStats[separateBy] == category].mean(axis = 0)
                 meanFR[category][idx] = gaussian_filter1d(meanFR[category][idx], kernelWidth * 1e3)
+                stdFR[category][idx] = FR[idx].loc[trialStats[separateBy] == category].std(axis = 0)
+                stdFR[category][idx] = gaussian_filter1d(meanFR[category][idx], kernelWidth * 1e3)
     else:
         meanFR = {'all' : [gaussian_filter1d(x.mean(axis = 0), kernelWidth * 1e3) for x in FR]}
+        stdFR = {'all' : [gaussian_filter1d(x.std(axis = 0), kernelWidth * 1e3) for x in FR]}
     #pdb.set_trace()
     colorPalette = sns.color_palette()
 
     for category, meanFRThisCategory in meanFR.items():
+        stdFRThisCategory = stdFR[category]
         if separateBy is not None:
             categoryIndex = pd.Index(uniqueCategories).get_loc(category)
             thisAx = ax[categoryIndex]
@@ -647,6 +650,8 @@ def plotFR(spikes, trialStats, alignTo, channel, separateBy = None, windowSize =
             thisAx = ax
 
         for unitIdx, x in enumerate(meanFRThisCategory):
+            thisError = stdFRThisCategory[unitIdx]
+            thisAx.fill_between(timeWindow[:-1], x * 1e3 - 2*thisError, x * 1e3 + 2*thisError, alpha=0.4, facecolor=colorPalette[unitIdx])
             thisAx.plot(timeWindow[:-1], x * 1e3, linewidth = 1, color = colorPalette[unitIdx])
             thisAx.set_ylabel('Average Firing rate (spk/sec)')
         #thisAx.set_title('spikes for ' + category + ' trials')
@@ -690,18 +695,22 @@ def plotSingleTrial(trialStats, trialEvents, motorData, kinematics, spikes,\
         if orderSpikesBy == 'idxmax':
             spikeOrder = spikeMat.idxmax().sort_values().index
             spikeMat = spikeMat.loc[:,spikeOrder]
-        fig, im = hf.plotBinnedSpikes(spikeMat, binCenters, spikeMat.columns, show = False, normalizationType = 'linear', ax = motorPlotAxes[idx + 2], zAxis = zAxis)
+        fig, im = hf.plotBinnedSpikes(spikeMat, binCenters, spikeMat.columns, show = False, normalizationType = 'linear', ax = motorPlotAxes[idx + 2], zAxis = zAxis[idx])
         # add an axes, lower left corner in [0.83, 0.1] measured in figure coordinate with axes width 0.02 and height 0.8
-        cbAx = fig.add_axes([0.83, 0.1 + 0.21 * idx, 0.02, 0.18])
+        cbAx = fig.add_axes([0.83, 0.1 + 0.21 * (len(spikes) - idx - 1), 0.02, 0.18])
         cbar = fig.colorbar(im, cax=cbAx)
         cbar.set_label('Firing Rate (Hz)')
+        #pdb.set_trace()
 
     fig.suptitle('Trial %d: %s' % (whichTrial, thisTrial['Outcome']))
     return fig, motorPlotAxes
 
 #@profile
-def spikePDFReport(filePath, spikes, spikeStruct, plotRastersAlignedTo = None, plotRastersSeparatedBy = None, trialStats = None, enableFR = False):
-    pdfName = filePath + '/' + spikeStruct['dat_path'].split('.')[0] + '.pdf'
+def spikePDFReport(filePath, spikes, spikeStruct, plotRastersAlignedTo = None, plotRastersSeparatedBy = None, trialStats = None, enableFR = False, newName = None):
+    if newName is None:
+        pdfName = filePath + '/' + 'spikePDFReport' + '.pdf'
+    else:
+        pdfName = filePath + '/' + newName + '.pdf'
 
     with PdfPages(pdfName) as pdf:
         plotSpikePanel(spikeStruct['xcoords'], spikeStruct['ycoords'], spikes)
@@ -757,63 +766,77 @@ def trialPDFReport(filePath, trialStats, trialEvents, motorData, kinematics, spi
                 pdf.savefig()
                 plt.close()
 
+def generateSpikeReport(folderPath, eventInfo, trialFiles):
+    """
+    Read in Trial events
+    """
+    try:
+        trialStats  = pd.read_pickle(os.path.join(folderPath, eventInfo['ns5FileName']) + '_trialStats.pickle')
+        trialEvents = pd.read_pickle(os.path.join(folderPath, eventInfo['ns5FileName']) + '_trialEvents.pickle')
+        print('Loaded trial data from pickle.')
+    except:
+        print('Trial data not pickled. Recalculating...')
+        motorData = mea.getMotorData(os.path.join(folderPath, eventInfo['ns5FileName']) + '.ns5', eventInfo['inputIDs'], 0 , 'all')
+        trialStats, trialEvents = mea.getTrials(motorData)
+        trialStats.to_pickle(os.path.join(folderPath, eventInfo['ns5FileName']) + '_trialStats.pickle')
+        trialEvents.to_pickle(os.path.join(folderPath, eventInfo['ns5FileName']) + '_trialEvents.pickle')
+        print('Recalculated trial data and saved to pickle.')
+    """
+    Read in array spikes
+    """
+    for key, value in trialFiles.items():
+        try:
+            spikeStruct = pickle.load(
+                open(os.path.join(folderPath, 'coords') + key.capitalize() + '.pickle', 'rb'))
+            spikes      = pickle.load(
+                open(os.path.join(folderPath, value['ns5FileName']) + '_spikes' + key.capitalize() + '.pickle', 'rb'))
+            print('Loaded spike data from pickle.')
+        except:
+            print('Spike data not pickled. Recalculating...')
+
+            spikeStruct = loadKSDir(
+                os.path.join(folderPath, 'Kilosort/'+ value['ns5FileName'] + '_' + key.capitalize()),
+                loadPCs = False)
+            spikes = getWaveClusSpikes(
+                os.path.join(folderPath, 'wave_clus', value['ns5FileName']),
+                nevIDs = value['nevIDs'], plotting = False, excludeClus = value['excludeClus'],
+                tempFolder = '/users/rdarie/data/rdarie/Murdoc Neural Recordings/201806031226-Proprio/wave_clus/temp')
+
+            pickle.dump(spikeStruct,
+                open(os.path.join(folderPath, value['ns5FileName']) + '_spikeStruct' + key.capitalize() + '.pickle', 'wb'))
+            pickle.dump(spiket,
+                open(os.path.join(folderPath, value['ns5FileName']) + '_spikes' + key.capitalize() + '.pickle', 'wb'))
+            print('Recalculated spike data and saved to pickle.')
+
+        #Debugging plots
+        plotRastersAlignedTo = 'FirstOnset'
+        plotRastersSeparatedBy = 'Direction'
+        plotChan = 3
+        enableFR = True
+        """
+        fig, ax = plt.subplots(nrows = 1, ncols = 2)
+        plotSpike(spikes, channel = plotChan, ax = ax[0], axesLabel = True)
+        isiBins = np.linspace(0, 150, 75)
+        kde_kws = {'clip' : (isiBins[0], isiBins[-1]),
+            'bw' : 'scott', 'gridsize' : 1000}
+        plotISIHistogram(spikes, channel = plotChan, bins = isiBins,
+            kde_kws = kde_kws, kde = False,
+            ax = ax[1])
+        plotSpike(spikes, channel = plotChan)
+        plotSpikePanel(spikeStruct['xcoords'], spikeStruct['ycoords'], spikes)
+        """
+        plotAx = plotRaster(spikes, trialStats, alignTo = plotRastersAlignedTo, windowSize = (-0.5, 2), channel = plotChan, separateBy = plotRastersSeparatedBy, maxTrial = 20)
+        plotFR(spikes, trialStats, alignTo = plotRastersAlignedTo, windowSize = (-0.5, 2), channel = plotChan, separateBy = plotRastersSeparatedBy, ax = plotAx, twin = True, maxTrial = 20)
+
+        plt.show()
+
+        newName = value['ns5FileName'] + '_' + key.capitalize() + '_exclude_' + '_'.join([str(i) for i in value['excludeClus']])
+        spikePDFReport(folderPath,
+            spikes, spikeStruct, plotRastersAlignedTo = 'FirstOnset',
+            plotRastersSeparatedBy = 'Direction', trialStats = trialStats,
+            enableFR = True,newName = newName)
+
+        del spikes, spikeStruct
+
 if __name__ == "__main__":
-    from dataAnalysis.helperFunctions.motor_encoder import *
-    #spikeStructNForm = loadKSDir('D:/KiloSort/Trial001_NForm', loadPCs = True)
-    #nevIDs = list(range(65,97))
-    #spikesNForm = getWaveForms('D:/KiloSort/Trial001_NForm', spikeStructNForm, nevIDs = None, wfWin = (-30, 80), plotting = False)
-    #isiBins = np.linspace(0, 50e-3, 100)
-    #plotISIHistogram(spikesNForm, channel = 25, bins = isiBins,kde_kws = {'clip' : (isiBins[0] * 0.8, isiBins[-1] * 1.2), 'bw' : 'silverman'} )
-    #plt.show()
-
-    #spikePDFReport('D:/KiloSort/Trial001_NForm', spikesNForm, spikeStructNForm)
-
-    #pdb.set_trace()
-    #spikesUtah = getWaveClusSpikes('D:/Staging', nevIDs = [71,76], plotting = False, getMUA = True, tempFolder = 'D:/Staging/wave_clus/temp')
-
-
-    try:
-        spikeStructUtah = pickle.load(open('D:/Kilosort/Trial001_Utah/Trial001_spikeStructUtah.pickle', 'rb'))
-        spikesUtah      = pickle.load(open('D:/Kilosort/Trial001_Utah/Trial001_spikesUtah.pickle', 'rb'))
-    except:
-        spikeStructUtah = loadKSDir('D:/Kilosort/Trial001_Utah', loadPCs = True)
-        nevIDs = list(range(1,65))
-        spikesUtah = getWaveForms('D:/Kilosort/Trial001_Utah', spikeStructUtah, nevIDs = None, wfWin = (-30, 80), plotting = False, tempFolder = 'E:/temp')
-
-        pickle.dump(spikeStructUtah, open('D:/Kilosort/Trial001_Utah/Trial001_spikeStructUtah.pickle', 'wb'))
-        pickle.dump(spikesUtah, open('D:/Kilosort/Trial001_Utah/Trial001_spikesUtah.pickle', 'wb'))
-    #spikePDFReport('D:/KiloSort/Trial001_Utah', spikesUtah, spikeStructUtah)
-
-    ns5FilePath = 'D:/KiloSort/Trial001.ns5'
-    inputIDs = {
-        'A+' : 139,
-        'A-' : 140,
-        'B+' : 141,
-        'B-' : 142,
-        'Z+' : 143,
-        'Z-' : 144,
-        'leftLED' : 132,
-        'leftBut' : 130,
-        'rightLED' : 131,
-        'rightBut' : 129,
-        'simiTrigs' : 136,
-        }
-
-    #pdb.set_trace()
-    try:
-        trialStats  = pd.read_pickle('D:/Kilosort/Trial001_trialStats.pickle')
-        trialEvents = pd.read_pickle('D:/Kilosort/Trial001_trialEvents.pickle')
-    except:
-        motorData = getMotorData(ns5FilePath, inputIDs, 0 , 'all')
-        trialStats, trialEvents = getTrials(motorData)
-        trialStats.to_pickle('D:/Kilosort/Trial001_trialStats.pickle')
-        trialEvents.to_pickle('D:/Kilosort/Trial001_trialEvents.pickle')
-
-    plotChan = 20
-    plotSpike(spikesUtah, channel = plotChan)
-    #isiBins = np.linspace(0, 50e-3, 100)
-    #plotISIHistogram(spikesUtah, channel = plotChan, bins = isiBins,kde_kws = {'clip' : (isiBins[0] * 0.8, isiBins[-1] * 1.2), 'bw' : 'silverman'} )
-    plotAx = plotRaster(spikesUtah, trialStats, alignTo = 'FirstOnset', windowSize = (-0.5, 2), channel = plotChan, separateBy = 'Direction', maxTrial = 15)
-    plotFR(spikesUtah, trialStats, alignTo = 'FirstOnset', windowSize = (-0.5, 2), channel = plotChan, separateBy = 'Direction', ax = plotAx, twin = True, maxTrial = 15)
-    plt.show()
-#spikePDFReport('D:/KiloSort/Trial001_Utah', spikesUtah, spikeStructUtah, plotRastersAlignedTo = 'FirstOnset', trialStats = trialStats)
+    pass

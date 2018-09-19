@@ -7,7 +7,6 @@ from brpy version: 1.1.1 --- 07/22/2016
 """
 
 import matplotlib, math, pdb
-matplotlib.use('PS')
 import dataAnalysis.helperFunctions.helper_functions as hf
 import matplotlib.pyplot as plt
 import numpy as np

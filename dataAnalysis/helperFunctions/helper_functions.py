@@ -895,6 +895,7 @@ def plotBinnedSpikes(spikeMat, binCenters, chans, show = True, normalizationType
     else:
         fi = ax.figure
 
+    #pdb.set_trace()
     if zAxis is None:
         zMin, zMax = spikeMat.min().min(), spikeMat.max().max()
     else:
