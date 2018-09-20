@@ -572,7 +572,8 @@ def plotRaster(spikes, trialStats, alignTo, channel, separateBy = None,
 #@profile
 def plotFR(spikes, trialStats, alignTo, channel, separateBy = None,
     windowSize = (-0.25, 1), timeRange = None, showNow = False, ax = None,
-    twin = False, maxTrial = None, discardEmpty = False, kernelWidth = None):
+    twin = False, maxTrial = None, discardEmpty = False, kernelWidth = None,
+    plotOpts = {'type' : 'ticks'}):
 
     if kernelWidth is None:
         smoothingStep = False
@@ -648,6 +649,20 @@ def plotFR(spikes, trialStats, alignTo, channel, separateBy = None,
     for idx, x in enumerate(FR):
         FR[idx].dropna(inplace = True)
 
+    if plotOpts['type'] == 'ticks':
+        binInterval = 1e-3
+        binWidth = 1e-3
+
+    elif plotOpts['type'] == 'binned':
+        assert kernelWidth is None
+        binInterval = plotOpts['binInterval']
+        binWidth = plotOpts['binWidth']
+
+    FRnew = hf.binnedSpikesAlignedToTrial(spikes, binInterval, binWidth, trialStats,
+        alignTo, channel, windowSize = windowSize, timeRange = timeRange,
+        maxTrial = maxTrial)
+    pdb.set_trace()
+
     if separateBy is not None:
         meanFR = {category : [None for i in unitsOnThisChan] for category in uniqueCategories}
         stdFR = {category : [None for i in unitsOnThisChan] for category in uniqueCategories}
@@ -706,7 +721,7 @@ def plotFR(spikes, trialStats, alignTo, channel, separateBy = None,
 
     if showNow:
         plt.show()
-    return ax, FR
+    return ax
 
 #TODO: replace motorData wording with analogData wording
 def plotSingleTrial(trialStats, trialEvents, motorData, kinematics, spikes,\

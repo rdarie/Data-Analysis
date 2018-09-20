@@ -1,32 +1,34 @@
-import pdb
-
 try:
     from brpylib import NsxFile, NevFile, brpylib_ver
 except:
     pass
+try:
+    import plotly
+    import plotly.plotly as py
+    import plotly.tools as tls
+    import plotly.figure_factory as ff
+    import plotly.graph_objs as go
+except:
+    pass
 
-import matplotlib
+import matplotlib, pdb, sys, itertools, os, pickle, gc, random, string,\
+subprocess, collections, traceback, peakutils, math, argparse
+
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 from matplotlib import cm
+
 import numpy as np
 import pandas as pd
 import math as m
-import sys, itertools, os, pickle, gc, random, string, subprocess
+import tables as pt
+
 from sklearn.model_selection import StratifiedKFold, GridSearchCV, learning_curve
 from sklearn.metrics import roc_auc_score, make_scorer, f1_score, classification_report
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import LabelBinarizer
 import sklearn.pipeline
 from sklearn.feature_selection import RFE,RFECV
-import plotly
-import plotly.plotly as py
-import plotly.tools as tls
-import plotly.figure_factory as ff
-import plotly.graph_objs as go
-import collections
-from brPY.brpylib import NsxFile, NevFile, brpylib_ver
-import tables as pt
 
 try:
     # for Python2
@@ -43,14 +45,10 @@ except:
     import scipy.signal
     HASLIBTFR = False
 
-import peakutils
 from scipy import interpolate
 from copy import *
 import matplotlib.backends.backend_pdf
-import math
 from fractions import gcd
-import argparse
-import peakutils
 
 def getPlotOpts(names):
     """
@@ -826,7 +824,7 @@ def plotSpectrum(P, fs, start_time_s, end_time_s, fr_start = 10, fr_stop = 600, 
         plt.show(block = False)
     return f
 
-def binnedEvents(timeStamps, chans, ChannelID, binInterval, binWidth, timeStart, timeEnd):
+def binnedEvents(timeStamps, chans, binInterval, binWidth, timeStart, timeEnd):
     #pdb.set_trace()
     binCenters = np.arange(timeStart + binWidth / 2, timeEnd - binWidth/2 + binInterval, binInterval)
 
@@ -844,24 +842,68 @@ def binnedEvents(timeStamps, chans, ChannelID, binInterval, binWidth, timeStart,
     nChans = len(timeStamps)
     spikeMat = np.zeros([len(binCenters), nChans])
     for idx, chan in enumerate(chans):
-        ch_idx = ChannelID.index(chan)
-        histo, _ = np.histogram(timeStamps[ch_idx], fineBins)
+        histo, _ = np.histogram(timeStamps[idx], fineBins)
         #pdb.set_trace()
         spikeMat[:, idx] = np.array(
             [histo[x:x+fineBinsPerWindow].sum() / binWidth for x in centerIdx]
         )
     #pdb.set_trace()
-    spikeMatDF = pd.DataFrame(spikeMat.transpose(), index = ChannelID, columns = binCenters)
+    spikeMatDF = pd.DataFrame(spikeMat.transpose(), index = chans, columns = binCenters)
     return spikeMatDF, binCenters, binLeftEdges
 
-def binnedSpikesAligned():
-    pass
-
-def binnedSpikesAlignedToTrial(spikes, trialStats, alignTo, channel,
-    windowSize = (-0.25, 1), timeRange = None, maxTrial = None):
+def binnedSpikesAligned(spikes, alignTimes, binInterval, binWidth, channel,
+    windowSize = (-0.25, 1), timeStampUnits = 'samples', discardEmpty = False):
 
     ChanIdx = spikes['ChannelID'].index(channel)
     unitsOnThisChan = np.unique(spikes['Classification'][ChanIdx])
+
+    if unitsOnThisChan is not None:
+        #peek at the binCenters. Note that this must be identical to the ones in binnedEvents
+        binCenters = np.arange(windowSize[0] + binWidth / 2,
+            windowSize[1] - binWidth/2 + binInterval,
+            binInterval)
+
+        spikeMats = [pd.DataFrame(0, index = alignTimes.index,
+            columns = binCenters) for unit in unitsOnThisChan]
+        for unitIdx, unitName in enumerate(unitsOnThisChan):
+            unitMask = spikes['Classification'][ChanIdx] == unitName
+            # spike times in seconds
+            allSpikeTimes = np.array(spikes['TimeStamps'][ChanIdx][unitMask])
+
+            timeStamps = []
+            trialID = []
+            for rowIdx, startTime in alignTimes.items():
+                idx = alignTimes.index.get_loc(rowIdx)
+                try:
+                    #print('Calculating raster for trial %s' % idx)
+                    # allSpikeTimes is in seconds
+                    # startTime is also in seconds
+                    trialTimeMask = np.logical_and(allSpikeTimes > startTime + windowSize[0],
+                        allSpikeTimes < startTime + windowSize[-1])
+                    if trialTimeMask.sum() != 0:
+                        trialSpikeTimes = allSpikeTimes[trialTimeMask] - startTime
+                        # # TODO: this is inefficient - can I think of a way to only call binnedEvents once??
+                        tempSpikeMat, binCenters, binLeftEdges = binnedEvents([trialSpikeTimes],
+                            [0], binInterval, binWidth, windowSize[0], windowSize[-1])
+                        #pdb.set_trace()
+                        spikeMats[unitIdx].loc[idx, :] = tempSpikeMat.values.ravel()
+                    else:
+                        if discardEmpty:
+                            spikeMats[unitIdx].iloc[idx, :] = np.nan
+                except Exception:
+                    print('In binSpikesAligned: Error getting firing rate for trial %s' % idx)
+                    traceback.print_exc()
+                    spikeMats[unitIdx].iloc[idx, :] = np.nan
+
+            for idx, x in enumerate(spikeMats):
+                spikeMats[idx].dropna(inplace = True)
+    else: #no units on this chan
+        spikeMats = []
+    return spikeMats
+
+def binnedSpikesAlignedToTrial(spikes, binInterval, binWidth, trialStats,
+    alignTo, channel, windowSize = (-0.25, 1), timeRange = None,
+    maxTrial = None, discardEmpty = False):
 
     if timeRange is not None:
         timeMask = np.logical_and(trialStats['FirstOnset'] > timeRange[0] * 3e4,
@@ -871,44 +913,14 @@ def binnedSpikesAlignedToTrial(spikes, trialStats, alignTo, channel,
     if maxTrial is not None:
         maxTrial = min(len(trialStats.index), maxTrial)
         trialStats = trialStats.iloc[:maxTrial, :]
-    # window size specified in seconds
-    # time window in milliseconds
-    timeWindow = list(range(int(windowSize[0] * 1e3), int(windowSize[1] * 1e3) + 1))
-    if unitsOnThisChan is not None:
 
-        FR = [pd.DataFrame(0, index = trialStats.index, columns = timeWindow[:-1], dtype = np.float) for i in unitsOnThisChan]
+    #trialStats[alignedTo] gets converted from samples to seconds
+    #spikes[TimesStamps] is already in seconds
+    alignTimes = trialStats[alignTo] / 3e4
+    spikeMats = binnedSpikesAligned(spikes, alignTimes, binInterval,
+        binWidth, channel, windowSize = windowSize, discardEmpty = discardEmpty)
 
-        for unitIdx, unitName in enumerate(unitsOnThisChan):
-            unitMask = spikes['Classification'][ChanIdx] == unitName
-            # spike times in milliseconds
-            allSpikeTimes = np.array(spikes['TimeStamps'][ChanIdx][unitMask] * 1e3, dtype = np.int64)
-            for idx, startTime in enumerate(trialStats[alignTo]):
-                try:
-                    #print('Calculating raster for trial %s' % idx)
-                    # convert startTime from samples to milliseconds
-                    trialTimeMask = np.logical_and(allSpikeTimes > startTime / 3e1 + timeWindow[0], allSpikeTimes < startTime / 3e1 + timeWindow[-1])
-                    if trialTimeMask.sum() != 0:
-                        trialSpikeTimes = allSpikeTimes[trialTimeMask] - startTime / 3e1
-                        #convert FR back to spikes per second
-                        FR[unitIdx].iloc[idx, :] = np.histogram(trialSpikeTimes, timeWindow)[0] * 1e3
-                    else:
-                        if discardEmpty:
-                            FR[unitIdx].iloc[idx, :] = np.nan
-
-                    if maxTrial is not None:
-                        if idx >= maxTrial -1:
-                            break
-                except Exception:
-                    print('In plotFR: Error getting firing rate for trial %s' % idx)
-                    traceback.print_exc()
-                    #pdb.set_trace()
-                    FR[unitIdx].iloc[idx, :] = np.nan
-                #pdb.set_trace()
-
-    for idx, x in enumerate(FR):
-        FR[idx].dropna(inplace = True)
-
-    return spikeMat
+    return spikeMats
 
 def binnedSpikes(spikes, binInterval, binWidth, timeStart, timeDur,
     timeStampUnits = 'samples', chans = None):
@@ -930,6 +942,7 @@ def binnedSpikes(spikes, binInterval, binWidth, timeStart, timeDur,
             parseThis = True
         else:
             parseThis = channel in chans
+
         if  parseThis:
             #expand list to account for different units on each channel
             idx = spikes['ChannelID'].index(channel)
@@ -943,7 +956,7 @@ def binnedSpikes(spikes, binInterval, binWidth, timeStart, timeDur,
 
     #pdb.set_trace()
     spikeMat, binCenters, binLeftEdges = binnedEvents(timeStamps, ChannelID,
-        ChannelID, binInterval, binWidth, timeStart, timeEnd)
+        binInterval, binWidth, timeStart, timeEnd)
 
     return spikeMat, binCenters, binLeftEdges
 
