@@ -482,7 +482,9 @@ def plotSpikePanel(xcoords, ycoords, spikes):
 
 #def plotEventRaster
 #@profile
-def plotRaster(spikes, trialStats, alignTo, channel, separateBy = None, windowSize = (-0.25, 1), timeRange = None, showNow = False, ax = None, maxTrial = None):
+def plotRaster(spikes, trialStats, alignTo, channel, separateBy = None,
+    windowSize = (-0.25, 1), timeRange = None, showNow = False, ax = None,
+    maxTrial = None):
 
     ChanIdx = spikes['ChannelID'].index(channel)
     unitsOnThisChan = np.unique(spikes['Classification'][ChanIdx])
@@ -516,13 +518,15 @@ def plotRaster(spikes, trialStats, alignTo, channel, separateBy = None, windowSi
         for unitIdx, unitName in enumerate(unitsOnThisChan):
             unitMask = spikes['Classification'][ChanIdx] == unitName
             # time stamps in milliseconds
-            allSpikeTimes = np.array(spikes['TimeStamps'][ChanIdx][unitMask] * 1e3, dtype = np.int64)
+            allSpikeTimes = np.array(spikes['TimeStamps'][ChanIdx][unitMask] * 1e3,
+                dtype = np.int64)
 
             for idx, startTime in enumerate(trialStats[alignTo]):
                 try:
                     #print('Plotting trial %s' % idx)
                     #convert start time from index to milliseconds
-                    trialTimeMask = np.logical_and(allSpikeTimes > startTime / 3e1 + timeWindow[0], allSpikeTimes < startTime / 3e1 + timeWindow[-1])
+                    trialTimeMask = np.logical_and(allSpikeTimes > startTime / 3e1 +
+                        timeWindow[0], allSpikeTimes < startTime / 3e1 + timeWindow[-1])
                     trialSpikeTimes = allSpikeTimes[trialTimeMask]
                     #print(trialSpikeTimes - startTime / 3e1)
                     if separateBy is not None:
@@ -536,7 +540,9 @@ def plotRaster(spikes, trialStats, alignTo, channel, separateBy = None, windowSi
                         axToPlotOn = ax
                         lineToPlot = idx
 
-                    axToPlotOn.vlines(trialSpikeTimes - startTime / 3e1, lineToPlot, lineToPlot + 1, colors = [colorPalette[unitIdx]], linewidths = [0.5])
+                    axToPlotOn.vlines(trialSpikeTimes - startTime / 3e1,
+                        lineToPlot, lineToPlot + 1, colors = [colorPalette[unitIdx]],
+                        linewidths = [0.5])
                     if maxTrial is not None:
                         if idx >= maxTrial -1:
                             break
@@ -707,6 +713,7 @@ def plotSingleTrial(trialStats, trialEvents, motorData, kinematics, spikes,\
     nArrays = len(spikes)
     #pdb.set_trace()
     thisTrial = trialStats.loc[whichTrial, :]
+    # time units of samples
     timeStart = thisTrial[startEvent] - 0.1 * 3e4
     timeEnd = thisTrial[endEvent] + 0.1 * 3e4
     fig, motorPlotAxes = mea.plotMotor(motorData,
@@ -735,10 +742,9 @@ def plotSingleTrial(trialStats, trialEvents, motorData, kinematics, spikes,\
         pass
 
     for idx, spikeDict in enumerate(spikes):
-        #pdb.set_trace()
         spikeMatOriginal, binCenters, binLeftEdges = hf.binnedSpikes(spikeDict,
-            nevIDs[idx], binInterval, binWidth, timeStart / 3e4,
-            (timeEnd - timeStart) / 3e4, timeStampUnits = 'seconds')
+            nevIDs[idx], binInterval, binWidth, timeStart ,
+            (timeEnd - timeStart) , timeStampUnits = 'seconds')
         spikeMat = spikeMatOriginal.drop(spikesExclude[idx], axis = 'columns')
         if orderSpikesBy == 'idxmax':
             spikeOrder = spikeMat.idxmax().sort_values().index

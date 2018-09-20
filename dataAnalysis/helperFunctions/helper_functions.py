@@ -853,37 +853,38 @@ def binnedEvents(timeStamps, chans, ChannelID, binInterval, binWidth, timeStart,
     #pdb.set_trace()
     return spikeMat, binCenters, binLeftEdges
 
-def binnedSpikes(spikes, chans, binInterval, binWidth, timeStart, timeDur,
-    timeStampUnits = 'samples'):
+def binnedSpikes(spikes, binInterval, binWidth, timeStart, timeDur,
+    timeStampUnits = 'samples', chans = None):
+    # bins all spikes at a particular point in time
+    parseAll = True
+    if chans is not None:
+        parseAll = False
 
     timeEnd = timeStart + timeDur
-    #binCenters = timeStart + BinWidth / 2 : binInterval : timeEnd - binWidth/2
-    if timeStampUnits == 'samples':
-        timeStamps = [x / spikes['basic_headers']['TimeStampResolution'] for x in spikes['TimeStamps']]
-    elif timeStampUnits == 'seconds':
-        timeStamps = spikes['TimeStamps']
-
     timeStamps = []
     ChannelID = []
-    # # TODO: separate different units into their own "channels"
-    #pdb.set_trace()
-
     if timeStampUnits == 'samples':
         allTimeStamps = [x / spikes['basic_headers']['TimeStampResolution'] for x in spikes['TimeStamps']]
     elif timeStampUnits == 'seconds':
         allTimeStamps = spikes['TimeStamps']
 
     for channel in spikes['ChannelID']:
+        if parseAll:
+            parseThis = True
+        else:
+            parseThis = channel in chans
+        if  parseThis:
+            #expand list to account for different units on each channel
+            idx = spikes['ChannelID'].index(channel)
+            unitsOnThisChan = np.unique(spikes['Classification'][idx])
 
-        idx = spikes['ChannelID'].index(channel)
-        unitsOnThisChan = np.unique(spikes['Classification'][idx])
+            if unitsOnThisChan is not None:
+                for unitName in unitsOnThisChan:
+                    unitMask = spikes['Classification'][idx] == unitName
+                    timeStamps.append(allTimeStamps[idx][unitMask])
+                    ChannelID.append(unitName)
 
-        if unitsOnThisChan is not None:
-            for unitName in unitsOnThisChan:
-                unitMask = spikes['Classification'][idx] == unitName
-                timeStamps.append(allTimeStamps[idx][unitMask])
-                ChannelID.append(unitName)
-
+    #pdb.set_trace()
     spikeMat, binCenters, binLeftEdges = binnedEvents(timeStamps, ChannelID,
         ChannelID, binInterval, binWidth, timeStart, timeEnd)
 
