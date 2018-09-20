@@ -3,8 +3,8 @@ from tempfile import mkdtemp
 import numpy as np
 from scipy.ndimage.filters import gaussian_filter1d
 from scipy import stats
-import pandas as pd
 import scipy.io
+import pandas as pd
 import matplotlib
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib import pyplot as plt
@@ -17,6 +17,7 @@ import line_profiler
 import pickle
 import h5py
 import traceback
+import collections
 
 def loadParamsPy(filePath):
 
@@ -390,7 +391,8 @@ def plotSpike(spikes, channel, showNow = False, ax = None, acrossArray = False, 
                 thisError = np.std(waveForms, axis = 0)
                 timeRange = np.arange(len(thisSpike)) / 3e4 * 1e3
                 colorPalette = sns.color_palette()
-                ax.fill_between(timeRange, thisSpike - 2*thisError, thisSpike + 2*thisError, alpha=0.4, facecolor=colorPalette[unitIdx], label='chan %s, unit %s' % (channel, unitName))
+                numSDs = 2
+                ax.fill_between(timeRange, thisSpike - numSDs*thisError, thisSpike + numSDs*thisError, alpha=0.4, facecolor=colorPalette[unitIdx], label='chan %s, unit %s (%d SDs)' % (channel, unitName, numSDs))
                 ax.plot(timeRange, thisSpike, linewidth=1, color=colorPalette[unitIdx])
                 if axesLabel:
                     ax.set_ylabel(spikes['Units'])
@@ -562,7 +564,10 @@ def plotRaster(spikes, trialStats, alignTo, channel, separateBy = None, windowSi
     return ax
 
 #@profile
-def plotFR(spikes, trialStats, alignTo, channel, separateBy = None, windowSize = (-0.25, 1), timeRange = None, showNow = False, ax = None, twin = False, maxTrial = None, discardEmpty = False):
+def plotFR(spikes, trialStats, alignTo, channel, separateBy = None,
+    windowSize = (-0.25, 1), timeRange = None, showNow = False, ax = None,
+    twin = False, maxTrial = None, discardEmpty = False):
+
     ChanIdx = spikes['ChannelID'].index(channel)
     unitsOnThisChan = np.unique(spikes['Classification'][ChanIdx])
 
@@ -600,10 +605,7 @@ def plotFR(spikes, trialStats, alignTo, channel, separateBy = None, windowSize =
     timeWindow = list(range(int(windowSize[0] * 1e3), int(windowSize[1] * 1e3) + 1))
     if unitsOnThisChan is not None:
 
-        FR = [pd.DataFrame(index = trialStats.index, columns = timeWindow[:-1] + ['discard']) for i in unitsOnThisChan]
-
-        for x in FR:
-            x['discard'] = False
+        FR = [pd.DataFrame(0, index = trialStats.index, columns = timeWindow[:-1], dtype = np.float) for i in unitsOnThisChan]
 
         for unitIdx, unitName in enumerate(unitsOnThisChan):
             unitMask = spikes['Classification'][ChanIdx] == unitName
@@ -612,14 +614,15 @@ def plotFR(spikes, trialStats, alignTo, channel, separateBy = None, windowSize =
             for idx, startTime in enumerate(trialStats[alignTo]):
                 try:
                     #print('Calculating raster for trial %s' % idx)
-                    #pdb.set_trace()
+                    # convert startTime from samples to milliseconds
                     trialTimeMask = np.logical_and(allSpikeTimes > startTime / 3e1 + timeWindow[0], allSpikeTimes < startTime / 3e1 + timeWindow[-1])
                     if trialTimeMask.sum() != 0:
                         trialSpikeTimes = allSpikeTimes[trialTimeMask] - startTime / 3e1
-                        FR[unitIdx].iloc[idx, :-1] = np.histogram(trialSpikeTimes, timeWindow)[0]
+                        #convert FR back to spikes per second
+                        FR[unitIdx].iloc[idx, :] = np.histogram(trialSpikeTimes, timeWindow)[0] * 1e3
                     else:
                         if discardEmpty:
-                            FR[unitIdx].iloc[idx, -1] = True
+                            FR[unitIdx].iloc[idx, :] = np.nan
 
                     if maxTrial is not None:
                         if idx >= maxTrial -1:
@@ -628,43 +631,67 @@ def plotFR(spikes, trialStats, alignTo, channel, separateBy = None, windowSize =
                     print('In plotFR: Error getting firing rate for trial %s' % idx)
                     traceback.print_exc()
                     #pdb.set_trace()
-                    FR[unitIdx].iloc[idx, -1] = True
+                    FR[unitIdx].iloc[idx, :] = np.nan
                 #pdb.set_trace()
 
     for idx, x in enumerate(FR):
-        FR[idx].drop(x.index[x['discard'] == True], axis = 0, inplace = True)
-        FR[idx].drop('discard', axis = 1, inplace = True)
+        FR[idx].dropna(inplace = True)
 
     kernelWidth = 25e-3 # seconds
     if separateBy is not None:
-        meanFR = {category : [pd.Series(index = timeWindow[:-1]) for i in unitsOnThisChan] for category in uniqueCategories}
-        stdFR = {category : [pd.Series(index = timeWindow[:-1]) for i in unitsOnThisChan] for category in uniqueCategories}
+        meanFR = {category : [None for i in unitsOnThisChan] for category in uniqueCategories}
+        stdFR = {category : [None for i in unitsOnThisChan] for category in uniqueCategories}
+
         for category in uniqueCategories:
             for idx, unit in enumerate(unitsOnThisChan):
+                tempDF = pd.DataFrame(FR[idx].loc[trialStats[separateBy] == category], copy = True)
+                tempDF = tempDF.apply(gaussian_filter1d, axis = 1, raw = True,
+                    result_type = 'expand', args = (int(kernelWidth * 1e3 / 2),))
+
+                meanFR[category][idx] = tempDF.mean(axis = 0)
+                stdFR[category][idx]  = tempDF.std(axis = 0)
+                """
                 meanFR[category][idx] = FR[idx].loc[trialStats[separateBy] == category].mean(axis = 0)
                 meanFR[category][idx] = gaussian_filter1d(meanFR[category][idx], kernelWidth * 1e3)
 
                 stdFR[category][idx] = FR[idx].loc[trialStats[separateBy] == category].std(axis = 0)
                 stdFR[category][idx] = gaussian_filter1d(stdFR[category][idx], kernelWidth * 1e3)
+                """
     else:
-        meanFR = {'all' : [gaussian_filter1d(x.mean(axis = 0), kernelWidth * 1e3) for x in FR]}
-        stdFR = {'all' : [gaussian_filter1d(x.std(axis = 0), kernelWidth * 1e3) for x in FR]}
+        meanFR = {'all' : [None for i in unitsOnThisChan]}
+        stdFR = {'all' : [None for i in unitsOnThisChan]}
+        for idx, unit in enumerate(unitsOnThisChan):
+            tempDF = pd.DataFrame(FR[idx], copy = True)
+            tempDF = tempDF.apply(gaussian_filter1d, axis = 1, raw = True,
+                result_type = 'expand', args = (int(kernelWidth * 1e3 / 2),))
+
+            meanFR['all'][idx] = tempDF.mean(axis = 0)
+            stdFR['all'][idx]  = tempDF.std(axis = 0)
     #pdb.set_trace()
     colorPalette = sns.color_palette()
-
+    yAxBot, yAxTop = 1e6,-1e6
     for category, meanFRThisCategory in meanFR.items():
         stdFRThisCategory = stdFR[category]
         if separateBy is not None:
             categoryIndex = pd.Index(uniqueCategories).get_loc(category)
-            thisAx = ax[categoryIndex]
+            curAx = ax[categoryIndex]
         else:
-            thisAx = ax
+            curAx = ax
 
         for unitIdx, x in enumerate(meanFRThisCategory):
             thisError = stdFRThisCategory[unitIdx]
-            thisAx.fill_between(timeWindow[:-1], (x - 2 * thisError) * 1e3, (x + 2 * thisError) * 1e3, alpha=0.4, facecolor=colorPalette[unitIdx])
-            thisAx.plot(timeWindow[:-1], x * 1e3, linewidth = 1, color = colorPalette[unitIdx])
-            thisAx.set_ylabel('Average Firing rate (spk/sec)')
+            curAx.fill_between(timeWindow[:-1], (x - thisError), (x + thisError), alpha=0.4, facecolor=colorPalette[unitIdx])
+            curAx.plot(timeWindow[:-1], x, linewidth = 1, color = colorPalette[unitIdx])
+
+        curYAxBot, curYAxTop = curAx.get_ylim()
+        yAxBot = min(yAxBot, curYAxBot)
+        yAxTop = max(yAxTop, curYAxTop)
+
+    if isinstance(ax, collections.Iterable):
+        for axIdx, curAx in enumerate(ax):
+            curAx.set_ylim(yAxBot, yAxTop)
+            curAx.set_ylabel('Average Firing rate (spk/sec)')
+
     if showNow:
         plt.show()
     return ax, FR
@@ -674,16 +701,23 @@ def plotSingleTrial(trialStats, trialEvents, motorData, kinematics, spikes,\
     nevIDs, spikesExclude, whichTrial, orderSpikesBy = None, zAxis = None, startEvent = 'FirstOnset', endEvent = 'ChoiceOnset',\
     analogSubset = ['position'], analogLabel = '', kinematicsSubset = ['Hip_Right_Angle X'],\
     kinematicLabel = '', eventSubset = ['Right LED Onset', 'Right Button Onset', 'Left LED Onset', 'Left Button Onset', 'Movement Onset', 'Movement Offset'],\
-    binInterval = 20e-3, binWidth = 50e-3):
+    binInterval = 20e-3, binWidth = 50e-3, arrayNames = None):
+    if arrayNames is None:
+        arrayNames = ['' for i in spikes]
     nArrays = len(spikes)
     #pdb.set_trace()
     thisTrial = trialStats.loc[whichTrial, :]
     timeStart = thisTrial[startEvent] - 0.1 * 3e4
     timeEnd = thisTrial[endEvent] + 0.1 * 3e4
-    fig, motorPlotAxes = mea.plotMotor(motorData, plotRange = (timeStart, timeEnd), subset = analogSubset, subsampleFactor = 30, addAxes = 1 + nArrays, collapse = True)
+    fig, motorPlotAxes = mea.plotMotor(motorData,
+        plotRange = (timeStart, timeEnd), subset = analogSubset,
+        subsampleFactor = 30, addAxes = 1 + nArrays, collapse = True)
 
-    fig.subplots_adjust(bottom=0.1, top=0.9, left=0.1, right=0.8, wspace=0.02, hspace=0.02)
-    mea.plotTrialEvents(trialEvents, plotRange = (timeStart, timeEnd), ax = motorPlotAxes[0], colorOffset = len(analogSubset), subset = eventSubset)
+    fig.subplots_adjust(bottom=0.1, top=0.9, left=0.1, right=0.8, wspace=0.02,
+        hspace=0.02)
+    mea.plotTrialEvents(trialEvents, plotRange = (timeStart, timeEnd),
+        ax = motorPlotAxes[0], colorOffset = len(analogSubset),
+        subset = eventSubset)
 
     motorPlotAxes[0].set_ylabel(analogLabel)
     #try:
@@ -691,7 +725,9 @@ def plotSingleTrial(trialStats, trialEvents, motorData, kinematics, spikes,\
     #except:
     #    pass
 
-    mea.plotMotor(kinematics, plotRange = (timeStart, timeEnd), subset = kinematicsSubset, subsampleFactor = 1, ax = motorPlotAxes[1], collapse = True)
+    mea.plotMotor(kinematics, plotRange = (timeStart, timeEnd),
+        subset = kinematicsSubset, subsampleFactor = 1, ax = motorPlotAxes[1],
+        collapse = True)
     motorPlotAxes[1].set_ylabel(kinematicLabel)
     try:
         motorPlotAxes[1].legend(loc = 1)
@@ -700,7 +736,9 @@ def plotSingleTrial(trialStats, trialEvents, motorData, kinematics, spikes,\
 
     for idx, spikeDict in enumerate(spikes):
         #pdb.set_trace()
-        spikeMatOriginal, binCenters, binLeftEdges = hf.binnedSpikes(spikeDict, nevIDs[idx], binInterval, binWidth, timeStart /3e4, (timeEnd - timeStart)/3e4, timeStampUnits = 'seconds')
+        spikeMatOriginal, binCenters, binLeftEdges = hf.binnedSpikes(spikeDict,
+            nevIDs[idx], binInterval, binWidth, timeStart / 3e4,
+            (timeEnd - timeStart) / 3e4, timeStampUnits = 'seconds')
         spikeMat = spikeMatOriginal.drop(spikesExclude[idx], axis = 'columns')
         if orderSpikesBy == 'idxmax':
             spikeOrder = spikeMat.idxmax().sort_values().index
@@ -709,7 +747,7 @@ def plotSingleTrial(trialStats, trialEvents, motorData, kinematics, spikes,\
         # add an axes, lower left corner in [0.83, 0.1] measured in figure coordinate with axes width 0.02 and height 0.8
         cbAx = fig.add_axes([0.83, 0.1 + 0.21 * (len(spikes) - idx - 1), 0.02, 0.18])
         cbar = fig.colorbar(im, cax=cbAx)
-        cbar.set_label('Firing Rate (Hz)')
+        cbar.set_label('Spk/s ' + arrayNames[idx])
         #pdb.set_trace()
 
     fig.suptitle('Trial %d: %s' % (whichTrial, thisTrial['Outcome']))
@@ -779,13 +817,18 @@ def trialPDFReport(filePath, trialStats, trialEvents, motorData, kinematics, spi
 def capitalizeFirstLetter(stringInput):
     return stringInput[0].capitalize() + stringInput[1:]
 
-def loadEventInfo(folderPath, eventInfo):
-    try:
-        trialStats  = pd.read_pickle(os.path.join(folderPath, eventInfo['ns5FileName']) + '_trialStats.pickle')
-        trialEvents = pd.read_pickle(os.path.join(folderPath, eventInfo['ns5FileName']) + '_trialEvents.pickle')
-        print('Loaded trial data from pickle.')
-    except:
-        print('Trial data not pickled. Recalculating...')
+def loadEventInfo(folderPath, eventInfo, forceRecalc = False):
+    if not forceRecalc:
+    # if not requiring a recalculation, load from pickle
+        try:
+            trialStats  = pd.read_pickle(os.path.join(folderPath, eventInfo['ns5FileName']) + '_trialStats.pickle')
+            trialEvents = pd.read_pickle(os.path.join(folderPath, eventInfo['ns5FileName']) + '_trialEvents.pickle')
+            print('Loaded trial data from pickle.')
+        except:
+            print('Trial data not pickled. Recalculating...')
+            forceRecalc = True
+
+    if forceRecalc:
         motorData = mea.getMotorData(os.path.join(folderPath, eventInfo['ns5FileName']) + '.ns5', eventInfo['inputIDs'], 0 , 'all')
         trialStats, trialEvents = mea.getTrials(motorData)
         trialStats.to_pickle(os.path.join(folderPath, eventInfo['ns5FileName']) + '_trialStats.pickle')
@@ -793,28 +836,34 @@ def loadEventInfo(folderPath, eventInfo):
         print('Recalculated trial data and saved to pickle.')
     return trialStats, trialEvents
 
-def loadSpikeInfo(folderPath, arrayName, arrayInfo):
-    try:
-        spikeStruct = pickle.load(
-            open(os.path.join(folderPath, 'coords') + capitalizeFirstLetter(arrayName) + '.pickle', 'rb'))
-        spikes      = pickle.load(
-            open(os.path.join(folderPath, arrayInfo['ns5FileName']) + '_spikes' + capitalizeFirstLetter(arrayName) + '.pickle', 'rb'))
-        print('Loaded spike data from pickle.')
-    except:
-        print('Spike data not pickled. Recalculating...')
+def loadSpikeInfo(folderPath, arrayName, arrayInfo, forceRecalc = False):
+    if not forceRecalc:
+    # if not requiring a recalculation, load from pickle
+        try:
+            spikes      = pickle.load(
+                open(os.path.join(folderPath, arrayInfo['ns5FileName']) + '_spikes' + capitalizeFirstLetter(arrayName) + '_exclude_' + '_'.join([str(i) for i in arrayInfo['excludeClus']]) + '.pickle', 'rb'))
+            print('Loaded spike data from pickle.')
+        except:
+            # if loading failed, recalculate anyway
+            print('Spike data not pickled. Recalculating...')
+            forceRecalc = True
 
-        spikeStruct = loadKSDir(
-            os.path.join(folderPath, 'Kilosort/'+ arrayInfo['ns5FileName'] + '_' + capitalizeFirstLetter(arrayName)),
-            loadPCs = False)
+    if forceRecalc:
         spikes = getWaveClusSpikes(
-            os.path.join(folderPath, 'wave_clus', arrayInfo['ns5FileName']),
+            os.path.join(folderPath, 'wave_clus', arrayInfo['ns5FileName']) + '/',
             nevIDs = arrayInfo['nevIDs'], plotting = False, excludeClus = arrayInfo['excludeClus'])
-
-        pickle.dump(spikeStruct,
-            open(os.path.join(folderPath, arrayInfo['ns5FileName']) + '_spikeStruct' + capitalizeFirstLetter(arrayName) + '.pickle', 'wb'))
         pickle.dump(spikes,
-            open(os.path.join(folderPath, arrayInfo['ns5FileName']) + '_spikes' + capitalizeFirstLetter(arrayName) + '.pickle', 'wb'))
+            open(os.path.join(folderPath, arrayInfo['ns5FileName']) + '_spikes' + capitalizeFirstLetter(arrayName) + '_exclude_' + '_'.join([str(i) for i in arrayInfo['excludeClus']]) + '.pickle', 'wb'))
         print('Recalculated spike data and saved to pickle.')
+
+    try:
+        spikeStruct = pickle.load(open(os.path.join(folderPath, 'coords') + capitalizeFirstLetter(arrayName) + '.pickle', 'rb'))
+    except:
+        print('Spike metadata not pickled. Recalculating...')
+        spikeStruct = loadKSDir(os.path.join(folderPath, 'Kilosort/'+ arrayInfo['ns5FileName'] + '_' + capitalizeFirstLetter(arrayName)), loadPCs = False)
+        pickle.dump(spikeStruct, open(os.path.join(folderPath, arrayInfo['ns5FileName']) + '_spikeStruct' + capitalizeFirstLetter(arrayName) + '.pickle', 'wb'))
+        print('Recalculated spike metadata and saved to pickle.')
+
     return spikeStruct, spikes
 
 def generateSpikeReport(folderPath, eventInfo, trialFiles):

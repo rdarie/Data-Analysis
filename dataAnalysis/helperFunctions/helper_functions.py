@@ -853,7 +853,8 @@ def binnedEvents(timeStamps, chans, ChannelID, binInterval, binWidth, timeStart,
     #pdb.set_trace()
     return spikeMat, binCenters, binLeftEdges
 
-def binnedSpikes(spikes, chans, binInterval, binWidth, timeStart, timeDur, timeStampUnits = 'samples'):
+def binnedSpikes(spikes, chans, binInterval, binWidth, timeStart, timeDur,
+    timeStampUnits = 'samples'):
 
     timeEnd = timeStart + timeDur
     #binCenters = timeStart + BinWidth / 2 : binInterval : timeEnd - binWidth/2
@@ -883,7 +884,8 @@ def binnedSpikes(spikes, chans, binInterval, binWidth, timeStart, timeDur, timeS
                 timeStamps.append(allTimeStamps[idx][unitMask])
                 ChannelID.append(unitName)
 
-    spikeMat, binCenters, binLeftEdges = binnedEvents(timeStamps, ChannelID, ChannelID, binInterval, binWidth, timeStart, timeEnd)
+    spikeMat, binCenters, binLeftEdges = binnedEvents(timeStamps, ChannelID,
+        ChannelID, binInterval, binWidth, timeStart, timeEnd)
 
     return pd.DataFrame(spikeMat, index = binCenters, columns = ChannelID), binCenters, binLeftEdges
 
