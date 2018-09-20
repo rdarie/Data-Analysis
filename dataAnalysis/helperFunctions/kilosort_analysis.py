@@ -20,7 +20,6 @@ import traceback
 import collections
 
 def loadParamsPy(filePath):
-
     """
     # Old implementation, treats params.py as a package and cannot be overriden when processing a new folder.
     pdb.set_trace()
@@ -42,7 +41,6 @@ def loadParamsPy(filePath):
     del paramsText
 
     return locals()
-
 
 def coordsToIndices(xcoords, ycoords):
 
@@ -527,8 +525,10 @@ def plotRaster(spikes, trialStats, alignTo, channel, separateBy = None,
                     #convert start time from index to milliseconds
                     trialTimeMask = np.logical_and(allSpikeTimes > startTime / 3e1 +
                         timeWindow[0], allSpikeTimes < startTime / 3e1 + timeWindow[-1])
-                    trialSpikeTimes = allSpikeTimes[trialTimeMask]
-                    #print(trialSpikeTimes - startTime / 3e1)
+                    trialSpikeTimes = allSpikeTimes[trialTimeMask] - startTime / 3e1
+                    ## TODO: add an option to plot a heatmap style raster
+                    #at this point I could diverge and add to a list of timeStamps
+                    #for use with binnedEvents()
                     if separateBy is not None:
                         #pdb.set_trace()
                         curCategory = trialStats.loc[idx, separateBy]
@@ -540,7 +540,7 @@ def plotRaster(spikes, trialStats, alignTo, channel, separateBy = None,
                         axToPlotOn = ax
                         lineToPlot = idx
 
-                    axToPlotOn.vlines(trialSpikeTimes - startTime / 3e1,
+                    axToPlotOn.vlines(trialSpikeTimes,
                         lineToPlot, lineToPlot + 1, colors = [colorPalette[unitIdx]],
                         linewidths = [0.5])
                     if maxTrial is not None:
@@ -572,7 +572,12 @@ def plotRaster(spikes, trialStats, alignTo, channel, separateBy = None,
 #@profile
 def plotFR(spikes, trialStats, alignTo, channel, separateBy = None,
     windowSize = (-0.25, 1), timeRange = None, showNow = False, ax = None,
-    twin = False, maxTrial = None, discardEmpty = False):
+    twin = False, maxTrial = None, discardEmpty = False, kernelWidth = None):
+
+    if kernelWidth is None:
+        smoothingStep = False
+    else:
+        smoothingStep = True
 
     ChanIdx = spikes['ChannelID'].index(channel)
     unitsOnThisChan = np.unique(spikes['Classification'][ChanIdx])
@@ -643,7 +648,6 @@ def plotFR(spikes, trialStats, alignTo, channel, separateBy = None,
     for idx, x in enumerate(FR):
         FR[idx].dropna(inplace = True)
 
-    kernelWidth = 25e-3 # seconds
     if separateBy is not None:
         meanFR = {category : [None for i in unitsOnThisChan] for category in uniqueCategories}
         stdFR = {category : [None for i in unitsOnThisChan] for category in uniqueCategories}
@@ -651,9 +655,10 @@ def plotFR(spikes, trialStats, alignTo, channel, separateBy = None,
         for category in uniqueCategories:
             for idx, unit in enumerate(unitsOnThisChan):
                 tempDF = pd.DataFrame(FR[idx].loc[trialStats[separateBy] == category], copy = True)
-                tempDF = tempDF.apply(gaussian_filter1d, axis = 1, raw = True,
-                    result_type = 'expand', args = (int(kernelWidth * 1e3 / 2),))
-
+                if smoothingStep:
+                    tempDF = tempDF.apply(gaussian_filter1d, axis = 1, raw = True,
+                        result_type = 'expand', args = (int(kernelWidth * 1e3 / 2),))
+                #pdb.set_trace()
                 meanFR[category][idx] = tempDF.mean(axis = 0)
                 stdFR[category][idx]  = tempDF.std(axis = 0)
                 """
@@ -668,8 +673,9 @@ def plotFR(spikes, trialStats, alignTo, channel, separateBy = None,
         stdFR = {'all' : [None for i in unitsOnThisChan]}
         for idx, unit in enumerate(unitsOnThisChan):
             tempDF = pd.DataFrame(FR[idx], copy = True)
-            tempDF = tempDF.apply(gaussian_filter1d, axis = 1, raw = True,
-                result_type = 'expand', args = (int(kernelWidth * 1e3 / 2),))
+            if smoothingStep:
+                tempDF = tempDF.apply(gaussian_filter1d, axis = 1, raw = True,
+                    result_type = 'expand', args = (int(kernelWidth * 1e3 / 2),))
 
             meanFR['all'][idx] = tempDF.mean(axis = 0)
             stdFR['all'][idx]  = tempDF.std(axis = 0)
@@ -749,7 +755,9 @@ def plotSingleTrial(trialStats, trialEvents, motorData, kinematics, spikes,\
         if orderSpikesBy == 'idxmax':
             spikeOrder = spikeMat.idxmax().sort_values().index
             spikeMat = spikeMat.loc[:,spikeOrder]
-        fig, im = hf.plotBinnedSpikes(spikeMat, binCenters, spikeMat.columns, show = False, normalizationType = 'linear', ax = motorPlotAxes[idx + 2], zAxis = zAxis[idx])
+        fig, im = hf.plotBinnedSpikes(spikeMat, show = False,
+            normalizationType = 'linear', ax = motorPlotAxes[idx + 2],
+            zAxis = zAxis[idx])
         # add an axes, lower left corner in [0.83, 0.1] measured in figure coordinate with axes width 0.02 and height 0.8
         cbAx = fig.add_axes([0.83, 0.1 + 0.21 * (len(spikes) - idx - 1), 0.02, 0.18])
         cbar = fig.colorbar(im, cax=cbAx)
@@ -894,14 +902,14 @@ def generateSpikeReport(folderPath, eventInfo, trialFiles):
 
 def plotSpikeTriggeredRaster(spikesFrom, spikesTo, spikesFromIdx, spikesToIdx,
     windowSize = (-0.25, 1), timeRange = None, showNow = False,
-    ax = None, maxSpikes = None):
+    ax = None, maxSpikesTo = None):
     # get spike firing times to align to
-    ChanIdx = spikesTo['ChannelID'].index(spikesToIdx['chan'])
-    unitsOnThisChan = np.unique(spikesTo['Classification'][ChanIdx])
+    ChanIdxTo = spikesTo['ChannelID'].index(spikesToIdx['chan'])
+    unitsOnThisChanTo = np.unique(spikesTo['Classification'][ChanIdx])
 
     # get spike firing times to plot
-    ChanIdx = spikesFrom['ChannelID'].index(channel)
-    unitsOnThisChan = np.unique(spikes['Classification'][ChanIdx])
+    ChanIdxFrom = spikesFrom['ChannelID'].index(spikesFromIdx['chan'])
+    unitsOnThisChanFrom = np.unique(spikesFrom['Classification'][ChanIdx])
 
     if ax is None:
         fig, ax = plt.subplots()

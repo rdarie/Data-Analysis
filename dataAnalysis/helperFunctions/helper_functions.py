@@ -851,7 +851,64 @@ def binnedEvents(timeStamps, chans, ChannelID, binInterval, binWidth, timeStart,
             [histo[x:x+fineBinsPerWindow].sum() / binWidth for x in centerIdx]
         )
     #pdb.set_trace()
-    return spikeMat, binCenters, binLeftEdges
+    spikeMatDF = pd.DataFrame(spikeMat.transpose(), index = ChannelID, columns = binCenters)
+    return spikeMatDF, binCenters, binLeftEdges
+
+def binnedSpikesAligned():
+    pass
+
+def binnedSpikesAlignedToTrial(spikes, trialStats, alignTo, channel,
+    windowSize = (-0.25, 1), timeRange = None, maxTrial = None):
+
+    ChanIdx = spikes['ChannelID'].index(channel)
+    unitsOnThisChan = np.unique(spikes['Classification'][ChanIdx])
+
+    if timeRange is not None:
+        timeMask = np.logical_and(trialStats['FirstOnset'] > timeRange[0] * 3e4,
+            trialStats['ChoiceOnset'] < timeRange[1] * 3e4)
+        trialStats = trialStats.loc[timeMask, :]
+
+    if maxTrial is not None:
+        maxTrial = min(len(trialStats.index), maxTrial)
+        trialStats = trialStats.iloc[:maxTrial, :]
+    # window size specified in seconds
+    # time window in milliseconds
+    timeWindow = list(range(int(windowSize[0] * 1e3), int(windowSize[1] * 1e3) + 1))
+    if unitsOnThisChan is not None:
+
+        FR = [pd.DataFrame(0, index = trialStats.index, columns = timeWindow[:-1], dtype = np.float) for i in unitsOnThisChan]
+
+        for unitIdx, unitName in enumerate(unitsOnThisChan):
+            unitMask = spikes['Classification'][ChanIdx] == unitName
+            # spike times in milliseconds
+            allSpikeTimes = np.array(spikes['TimeStamps'][ChanIdx][unitMask] * 1e3, dtype = np.int64)
+            for idx, startTime in enumerate(trialStats[alignTo]):
+                try:
+                    #print('Calculating raster for trial %s' % idx)
+                    # convert startTime from samples to milliseconds
+                    trialTimeMask = np.logical_and(allSpikeTimes > startTime / 3e1 + timeWindow[0], allSpikeTimes < startTime / 3e1 + timeWindow[-1])
+                    if trialTimeMask.sum() != 0:
+                        trialSpikeTimes = allSpikeTimes[trialTimeMask] - startTime / 3e1
+                        #convert FR back to spikes per second
+                        FR[unitIdx].iloc[idx, :] = np.histogram(trialSpikeTimes, timeWindow)[0] * 1e3
+                    else:
+                        if discardEmpty:
+                            FR[unitIdx].iloc[idx, :] = np.nan
+
+                    if maxTrial is not None:
+                        if idx >= maxTrial -1:
+                            break
+                except Exception:
+                    print('In plotFR: Error getting firing rate for trial %s' % idx)
+                    traceback.print_exc()
+                    #pdb.set_trace()
+                    FR[unitIdx].iloc[idx, :] = np.nan
+                #pdb.set_trace()
+
+    for idx, x in enumerate(FR):
+        FR[idx].dropna(inplace = True)
+
+    return spikeMat
 
 def binnedSpikes(spikes, binInterval, binWidth, timeStart, timeDur,
     timeStampUnits = 'samples', chans = None):
@@ -888,9 +945,9 @@ def binnedSpikes(spikes, binInterval, binWidth, timeStart, timeDur,
     spikeMat, binCenters, binLeftEdges = binnedEvents(timeStamps, ChannelID,
         ChannelID, binInterval, binWidth, timeStart, timeEnd)
 
-    return pd.DataFrame(spikeMat, index = binCenters, columns = ChannelID), binCenters, binLeftEdges
+    return spikeMat, binCenters, binLeftEdges
 
-def plotBinnedSpikes(spikeMat, binCenters, chans, show = True, normalizationType = 'linear', zAxis = None, ax = None):
+def plotBinnedSpikes(spikeMat, show = True, normalizationType = 'linear', zAxis = None, ax = None):
     #pdb.set_trace()
 
     if ax is None:
@@ -911,9 +968,9 @@ def plotBinnedSpikes(spikeMat, binCenters, chans, show = True, normalizationType
         nor = colors.SymLogNorm(linthresh= 10, linscale=1,
                                               vmin=zMin, vmax=zMax)
     #fi = plt.figure()
-    chanIdx = np.arange(len(chans))
-    im = ax.pcolormesh(binCenters, chanIdx, spikeMat.values.transpose(), norm = nor)
-    ax.axis([binCenters.min(), binCenters.max(), chanIdx.min(), chanIdx.max()])
+    chanIdx = np.arange(len(spikeMat.index))
+    im = ax.pcolormesh(spikeMat.columns, chanIdx, spikeMat.values, norm = nor)
+    ax.axis([spikeMat.columns.min(), spikeMat.columns.max(), chanIdx.min(), chanIdx.max()])
     #plt.colorbar()
     #plt.locator_params(axis='y', nbins=20)
     ax.set_xlabel('Time (s)')
