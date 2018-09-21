@@ -478,8 +478,7 @@ def plotSpikePanel(xcoords, ycoords, spikes):
         plt.tight_layout()
     return newAxMin, newAxMax
 
-def getTrialAxes(trialStats, alignTo, channel, separateBy = None, ax = None, twin = False):
-
+def getTrialAxes(trialStats, alignTo, channel, separateBy = None, ax = None):
     if separateBy is not None:
         uniqueCategories = pd.Series(trialStats.loc[:,separateBy].unique())
         uniqueCategories.dropna(inplace = True)
@@ -487,12 +486,7 @@ def getTrialAxes(trialStats, alignTo, channel, separateBy = None, ax = None, twi
 
         if ax is not None:
             fig = ax[0].figure
-
-        if ax is not None and twin:
-            for idx, thisAx in enumerate(ax):
-                ax[idx] = thisAx.twinx()
-
-        if ax is None:
+        elif ax is None:
             fig, ax = plt.subplots(len(uniqueCategories),1)
         else:
             assert len(ax) == len(uniqueCategories)
@@ -507,11 +501,7 @@ def getTrialAxes(trialStats, alignTo, channel, separateBy = None, ax = None, twi
     else: # only one plot
         if ax is not None:
             fig = ax.figure
-
-        if ax is not None and twin:
-            ax = ax.twinx()
-
-        if ax is None:
+        else:
             fig, ax = plt.subplots()
 
         ax.set_xlabel('Time (milliseconds) aligned to ' + alignTo)
@@ -520,131 +510,170 @@ def getTrialAxes(trialStats, alignTo, channel, separateBy = None, ax = None, twi
         return fig, ax, None, None
 
 #@profile
-def plotRaster(spikes, trialStats, alignTo, channel, separateBy = None,
-    windowSize = (-0.25, 1), timeRange = None, showNow = False, ax = None,
-    maxTrial = None, plotOpts = {'type' : 'ticks'}):
+def plotRaster(spikeMats, fig, ax,
+    categories = None, uniqueCategories = None, curLine = None,
+    showNow = False, plotOpts = {'type' : 'ticks'}):
+    colorPalette = sns.color_palette()
+    for unitIdx, thisSpikeMat in enumerate(spikeMats):
+        for idx, row in thisSpikeMat.iterrows():
 
-    fig, ax, uniqueCategories, curLine = getTrialAxes(trialStats, alignTo,
-        channel, separateBy = separateBy, ax = ax)
-
-    if plotOpts['type'] == 'ticks':
-        binInterval = 1e-3
-        binWidth = 1e-3
-
-    elif plotOpts['type'] == 'binned':
-        assert kernelWidth is None
-        binInterval = plotOpts['binInterval']
-        binWidth = plotOpts['binWidth']
-
-    FR = hf.binnedSpikesAlignedToTrial(spikes, binInterval, binWidth, trialStats,
-        alignTo, channel, windowSize = windowSize, timeRange = timeRange,
-        maxTrial = maxTrial)
-
-    ChanIdx = spikes['ChannelID'].index(channel)
-    unitsOnThisChan = np.unique(spikes['Classification'][ChanIdx])
-
-    if unitsOnThisChan is not None:
-        colorPalette = sns.color_palette()
-        for unitIdx, unitName in enumerate(unitsOnThisChan):
-            for idx, row in FR[unitIdx].iterrows():
-                try:
-                    if separateBy is not None:
-                        #pdb.set_trace()
-                        curCategory = trialStats.loc[idx, separateBy]
-                        whichAx = pd.Index(uniqueCategories).get_loc(curCategory)
-                        axToPlotOn = ax[whichAx]
-                        lineToPlot = curLine[curCategory]
-                        curLine[curCategory] += 1
-                    else:
-                        axToPlotOn = ax
-                        lineToPlot = idx
-                    # # TODO: add option to plot a heatmap style rendering
-                    #pdb.set_trace()
-                    trialSpikeTimes = row.index[row > 0] * 1e3
-                    axToPlotOn.vlines(trialSpikeTimes,
-                        lineToPlot, lineToPlot + 1, colors = [colorPalette[unitIdx]],
-                        linewidths = [0.5])
-                except Exception:
-                    print('Error plotting raster for trial %s' % idx)
-                    traceback.print_exc()
-                    #pdb.set_trace()
-                    continue
-            #reset line counts for next pass through for the next unit on this chan
-            if separateBy is not None:
-                curLine = {category : 0 for category in uniqueCategories}
+            try:
+                if isinstance(ax, collections.Iterable):
+                    curCategory = categories.loc[idx]
+                    whichAx = pd.Index(uniqueCategories).get_loc(curCategory)
+                    axToPlotOn = ax[whichAx]
+                    lineToPlot = curLine[curCategory]
+                    curLine[curCategory] += 1
+                else:
+                    axToPlotOn = ax
+                    lineToPlot = thisSpikeMat.index.get_loc(idx)
+                # # TODO: add option to plot a heatmap style rendering
+                trialSpikeTimes = row.index[row > 0] * 1e3
+                axToPlotOn.vlines(trialSpikeTimes,
+                    lineToPlot, lineToPlot + 1, colors = [colorPalette[unitIdx]],
+                    linewidths = [0.5])
+            except Exception:
+                print('Error plotting raster for line %s' % idx)
+                traceback.print_exc()
+                continue
+        #reset line counts for next pass through for the next unit on this chan
+        if isinstance(ax, collections.Iterable):
+            curLine = {category : 0 for category in uniqueCategories}
 
     if showNow:
         plt.show()
 
     return ax
 
-#@profile
-def plotFR(spikes, trialStats, alignTo, channel, separateBy = None,
-    windowSize = (-0.25, 1), timeRange = None, showNow = False, ax = None,
-    twin = False, maxTrial = None, discardEmpty = False, kernelWidth = None,
-    plotOpts = {'type' : 'ticks'}):
-
-    fig, ax, uniqueCategories, curLine = getTrialAxes(trialStats, alignTo,
-        channel, separateBy = separateBy, ax = ax, twin = twin)
-
-    if kernelWidth is None:
-        smoothingStep = False
-    else:
-        smoothingStep = True
+def plotTrialRaster(spikes = None, trialStats = None, channel = None,
+    spikeMats = None, categories = None,
+    fig = None, ax = None, uniqueCategories = None, curLine = None,
+    alignTo = None, separateBy = None,
+    windowSize = (-0.25, 1), timeRange = None, maxTrial = None,
+    showNow = False, plotOpts = {'type' : 'ticks'}):
 
     if plotOpts['type'] == 'ticks':
         binInterval = 1e-3
         binWidth = 1e-3
-
     elif plotOpts['type'] == 'binned':
-        assert kernelWidth is None
         binInterval = plotOpts['binInterval']
         binWidth = plotOpts['binWidth']
 
-    FR = hf.binnedSpikesAlignedToTrial(spikes, binInterval, binWidth, trialStats,
-        alignTo, channel, windowSize = windowSize, timeRange = timeRange,
-        maxTrial = maxTrial)
+    if spikeMats is None:
+        assert spikes is not None and trialStats is not None and channel is not None
+        spikeMats = hf.binnedSpikesAlignedToTrial(spikes, binInterval, binWidth,
+        trialStats, alignTo, channel, windowSize = windowSize, timeRange = timeRange,
+            maxTrial = maxTrial)
 
-    ChanIdx = spikes['ChannelID'].index(channel)
-    unitsOnThisChan = np.unique(spikes['Classification'][ChanIdx])
+    if trialStats is not None:
+        fig, ax, uniqueCategories, curLine = getTrialAxes(trialStats, alignTo,
+            channel, separateBy = separateBy, ax = ax)
+    else:
+        assert fig is not None
+        assert ax is not None
+        if separateBy is not None:
+            assert uniqueCategories is not None
+            assert curLine  is not None
 
-    if separateBy is not None:
-        meanFR = {category : [None for i in unitsOnThisChan] for category in uniqueCategories}
-        stdFR = {category : [None for i in unitsOnThisChan] for category in uniqueCategories}
+    if categories is None and separateBy is not None:
+        categories = trialStats[separateBy]
+
+    plotRaster(spikeMats, fig, ax, categories, uniqueCategories, curLine,
+        showNow = showNow, plotOpts = plotOpts)
+
+    return spikeMats, categories, fig, ax, uniqueCategories, curLine
+
+def plotSpikeTriggeredRaster(spikesFrom = None, spikesTo = None,
+    spikesFromIdx = None, spikesToIdx = None,
+    spikeMats = None,
+    fig = None, ax = None, titleOverride = None,
+    windowSize = (-0.25, 1), timeRange = None, maxSpikesTo = None,
+    showNow = False, plotOpts = {'type' : 'ticks'}):
+
+    if plotOpts['type'] == 'ticks':
+        binInterval = 1e-3
+        binWidth = 1e-3
+    elif plotOpts['type'] == 'binned':
+        binInterval = plotOpts['binInterval']
+        binWidth = plotOpts['binWidth']
+
+    if spikeMats is None:
+        assert spikesFrom is not None and spikesTo is not None
+        assert spikesFromIdx is not None and spikesToIdx is not None
+        #pdb.set_trace()
+        spikeMats = hf.binnedSpikesAlignedToSpikes(spikesFrom, spikesTo,
+            spikesFromIdx, spikesToIdx,
+            binInterval, binWidth, windowSize = windowSize,
+            timeRange = timeRange, maxSpikesTo = maxSpikesTo)
+    elif maxSpikesTo is not None and len(spikeMats[0].index) > maxSpikesTo:
+        for idx, thisSpikeMat in enumerate(spikeMats):
+            spikeMats[idx] = thisSpikeMat.sample(n = maxSpikesTo)
+
+    if ax is not None:
+        fig = ax.figure
+    else:
+        fig, ax = plt.subplots()
+        ax.set_xlabel('Time (milliseconds)')
+        ax.set_ylabel('Spike')
+        if spikesFromIdx is not None and spikesToIdx is not None:
+            ax.set_title('Channel %d triggered by channel %d unit %d' % (
+                spikesFromIdx['chan'], spikesToIdx['chan'], spikesToIdx['unit']))
+    if titleOverride is not None:
+        ax.set_title(titleOverride)
+
+    plotRaster(spikeMats, fig, ax, showNow = showNow, plotOpts = plotOpts)
+
+    return spikeMats, fig, ax
+
+#@profile
+def plotFR(spikeMats, fig, ax,
+    categories = None, uniqueCategories = None,
+    showNow = False,
+    plotOpts = {'type' : 'ticks', 'kernelWidth' : 25e-3}):
+
+    if plotOpts['type'] == 'ticks':
+        kernelWidth = plotOpts['kernelWidth']
+        smoothingStep = True
+    elif plotOpts['type'] == 'binned':
+        smoothingStep = False
+
+    if isinstance(ax, collections.Iterable):
+        meanSpikeMat = {category : [None for i in spikeMats] for category in uniqueCategories}
+        stdSpikeMat = {category : [None for i in spikeMats] for category in uniqueCategories}
 
         for category in uniqueCategories:
-            for idx, unit in enumerate(unitsOnThisChan):
-                tempDF = pd.DataFrame(FR[idx].loc[trialStats[separateBy] == category], copy = True)
+            for idx, thisSpikeMat in enumerate(spikeMats):
+                tempDF = pd.DataFrame(thisSpikeMat.loc[categories == category], copy = True)
                 if smoothingStep:
                     tempDF = tempDF.apply(gaussian_filter1d, axis = 1, raw = True,
                         result_type = 'expand', args = (int(kernelWidth * 1e3 / 2),))
                 #pdb.set_trace()
-                meanFR[category][idx] = tempDF.mean(axis = 0)
-                stdFR[category][idx]  = tempDF.std(axis = 0)
+                meanSpikeMat[category][idx] = tempDF.mean(axis = 0)
+                stdSpikeMat[category][idx]  = tempDF.std(axis = 0)
     else:
-        meanFR = {'all' : [None for i in unitsOnThisChan]}
-        stdFR = {'all' : [None for i in unitsOnThisChan]}
-        for idx, unit in enumerate(unitsOnThisChan):
-            tempDF = pd.DataFrame(FR[idx], copy = True)
+        meanSpikeMat = {'all' : [None for i in spikeMats]}
+        stdSpikeMat = {'all' : [None for i in spikeMats]}
+        for idx, thisSpikeMat in enumerate(spikeMats):
+            tempDF = pd.DataFrame(thisSpikeMat, copy = True)
             if smoothingStep:
                 tempDF = tempDF.apply(gaussian_filter1d, axis = 1, raw = True,
                     result_type = 'expand', args = (int(kernelWidth * 1e3 / 2),))
 
-            meanFR['all'][idx] = tempDF.mean(axis = 0)
-            stdFR['all'][idx]  = tempDF.std(axis = 0)
+            meanSpikeMat['all'][idx] = tempDF.mean(axis = 0)
+            stdSpikeMat['all'][idx]  = tempDF.std(axis = 0)
 
     colorPalette = sns.color_palette()
     yAxBot, yAxTop = 1e6,-1e6
-    for category, meanFRThisCategory in meanFR.items():
-        stdFRThisCategory = stdFR[category]
-        if separateBy is not None:
+    for category, meanSpikeMatThisCategory in meanSpikeMat.items():
+        stdSpikeMatThisCategory = stdSpikeMat[category]
+        if isinstance(ax, collections.Iterable):
             categoryIndex = pd.Index(uniqueCategories).get_loc(category)
             curAx = ax[categoryIndex]
         else:
             curAx = ax
 
-        for unitIdx, x in enumerate(meanFRThisCategory):
-            thisError = stdFRThisCategory[unitIdx]
+        for unitIdx, x in enumerate(meanSpikeMatThisCategory):
+            thisError = stdSpikeMatThisCategory[unitIdx]
             curAx.fill_between(x.index * 1e3, (x - thisError), (x + thisError), alpha=0.4, facecolor=colorPalette[unitIdx])
             curAx.plot(x.index * 1e3, x, linewidth = 1, color = colorPalette[unitIdx])
 
@@ -661,7 +690,98 @@ def plotFR(spikes, trialStats, alignTo, channel, separateBy = None,
         plt.show()
     return ax
 
-#TODO: replace motorData wording with analogData wording
+def plotTrialFR(spikes = None, trialStats = None, channel = None,
+    spikeMats = None, categories = None,
+    fig = None, ax = None, uniqueCategories = None, curLine = None, twin = False,
+    alignTo = None, separateBy = None,
+    windowSize = (-0.25, 1), timeRange = None, maxTrial = None,
+    showNow = False, plotOpts = {'type' : 'ticks', 'kernelWidth' : 25e-3}):
+
+    if plotOpts['type'] == 'ticks':
+        binInterval = 1e-3
+        binWidth = 1e-3
+    elif plotOpts['type'] == 'binned':
+        binInterval = plotOpts['binInterval']
+        binWidth = plotOpts['binWidth']
+
+    if spikeMats is None:
+        assert spikes is not None and trialStats is not None and channel is not None
+        spikeMats = hf.binnedSpikesAlignedToTrial(spikes, binInterval, binWidth,
+        trialStats, alignTo, channel, windowSize = windowSize, timeRange = timeRange,
+            maxTrial = maxTrial)
+
+    if trialStats is not None:
+        fig, ax, uniqueCategories, curLine = getTrialAxes(trialStats, alignTo,
+            channel, separateBy = separateBy, ax = ax)
+    else:
+        assert fig is not None
+        assert ax is not None
+        if separateBy is not None:
+            assert uniqueCategories is not None
+
+    if twin:
+        if isinstance(ax, collections.Iterable):
+            for idx, thisAx in enumerate(ax):
+                ax[idx] = thisAx.twinx()
+                thisAx.set_xlabel('Time (milliseconds) aligned to ' + alignTo)
+                thisAx.set_title(uniqueCategories[idx])
+        else:
+            ax = ax.twinx()
+            ax.set_xlabel('Time (milliseconds) aligned to ' + alignTo)
+
+    if categories is None and separateBy is not None:
+        categories = trialStats[separateBy]
+
+    plotFR(spikeMats, fig, ax, categories, uniqueCategories,
+        showNow = showNow, plotOpts = plotOpts)
+
+    return spikeMats, categories, fig, ax, uniqueCategories, curLine
+
+def plotSpikeTriggeredFR(spikesFrom = None, spikesTo = None,
+    spikesFromIdx = None, spikesToIdx = None,
+    spikeMats = None,
+    fig = None, ax = None, titleOverride = None, twin = False,
+    windowSize = (-0.25, 1), timeRange = None,  maxSpikesTo = None,
+    showNow = False, plotOpts = {'type' : 'ticks', 'kernelWidth' : 25e-3}):
+
+    if plotOpts['type'] == 'ticks':
+        binInterval = 1e-3
+        binWidth = 1e-3
+    elif plotOpts['type'] == 'binned':
+        binInterval = plotOpts['binInterval']
+        binWidth = plotOpts['binWidth']
+
+    if spikeMats is None:
+        assert spikesFrom is not None and spikesTo is not None
+        assert spikesFromIdx is not None and spikesToIdx is not None
+        #pdb.set_trace()
+        spikeMats = hf.binnedSpikesAlignedToSpikes(spikesFrom, spikesTo,
+            spikesFromIdx, spikesToIdx,
+            binInterval, binWidth, windowSize = windowSize,
+            timeRange = timeRange, maxSpikesTo = maxSpikesTo)
+    elif maxSpikesTo is not None and len(spikeMats[0].index) > maxSpikesTo:
+        for idx, thisSpikeMat in enumerate(spikeMats):
+            spikeMats[idx] = thisSpikeMat.sample(n = maxSpikesTo)
+
+    if ax is not None and twin:
+        ax = ax.twinx()
+        ax.set_ylabel('Average Firing rate (spk/sec)')
+    if ax is not None:
+        fig = ax.figure
+    else:
+        fig, ax = plt.subplots()
+        ax.set_xlabel('Time (milliseconds)')
+        ax.set_ylabel('Average Firing rate (spk/sec)')
+        if spikesFromIdx is not None and spikesToIdx is not None:
+            ax.set_title('Channel %d triggered by channel %d unit %d' % (
+                spikesFromIdx['chan'], spikesToIdx['chan'], spikesToIdx['unit']))
+    if titleOverride is not None:
+        ax.set_title(titleOverride)
+    plotFR(spikeMats, fig, ax, showNow = showNow, plotOpts = plotOpts)
+
+    return spikeMats, fig, ax
+
+
 def plotSingleTrial(trialStats, trialEvents, motorData, kinematics, spikes,\
     nevIDs, spikesExclude, whichTrial, orderSpikesBy = None, zAxis = None, startEvent = 'FirstOnset', endEvent = 'ChoiceOnset',\
     analogSubset = ['position'], analogLabel = '', kinematicsSubset = ['Hip_Right_Angle X'],\
@@ -852,21 +972,6 @@ def generateSpikeReport(folderPath, eventInfo, trialFiles):
             enableFR = True,newName = newName)
 
         del spikes, spikeStruct
-
-def plotSpikeTriggeredRaster(spikesFrom, spikesTo, spikesFromIdx, spikesToIdx,
-    windowSize = (-0.25, 1), timeRange = None, showNow = False,
-    ax = None, maxSpikesTo = None):
-    # get spike firing times to align to
-    ChanIdxTo = spikesTo['ChannelID'].index(spikesToIdx['chan'])
-    unitsOnThisChanTo = np.unique(spikesTo['Classification'][ChanIdx])
-
-    # get spike firing times to plot
-    ChanIdxFrom = spikesFrom['ChannelID'].index(spikesFromIdx['chan'])
-    unitsOnThisChanFrom = np.unique(spikesFrom['Classification'][ChanIdx])
-
-    if ax is None:
-        fig, ax = plt.subplots()
-    pdb.set_trace()
 
 if __name__ == "__main__":
     pass

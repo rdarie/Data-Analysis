@@ -29,6 +29,7 @@ argStepLen = float(args.stepLen)
 argFile = args.file
 fileDir = args.folder
 """
+
 def preproc_ns5(stepLen_s = 0.05, winLen_s = 0.1, fr_start = 5, fr_stop = 1000,\
  elec_ids = range(1, 97),  chanToPlot = 90,\
    fileName = '201612201054-Starbuck_Treadmill-Array1480_Right-Trial00001.ns5',\

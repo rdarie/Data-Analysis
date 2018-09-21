@@ -905,6 +905,35 @@ def binnedSpikesAligned(spikes, alignTimes, binInterval, binWidth, channel,
         spikeMats = []
     return spikeMats
 
+def binnedSpikesAlignedToSpikes(spikesFrom, spikesTo,
+    spikesFromIdx, spikesToIdx,
+    binInterval, binWidth, windowSize = (-0.25, 1),
+    timeRange = None, maxSpikesTo = None, discardEmpty = False):
+
+    # get spike firing times to align to
+    ChanIdxTo = spikesTo['ChannelID'].index(spikesToIdx['chan'])
+    unitsOnThisChanTo = np.unique(spikesTo['Classification'][ChanIdxTo])
+
+    if unitsOnThisChanTo is not None:
+        unitName = unitsOnThisChanTo[spikesToIdx['unit']]
+        unitMask = spikesTo['Classification'][ChanIdxTo] == unitName
+        alignTimes = pd.Series(spikesTo['TimeStamps'][ChanIdxTo][unitMask])
+
+    if timeRange is not None:
+        timeMask = np.logical_and(alignTimes > timeRange[0],
+            alignTimes < timeRange[1])
+        alignTimes = alignTimes.loc[timeMask]
+
+    if maxSpikesTo is not None:
+        if len(alignTimes.index) > maxSpikesTo:
+            alignTimes = alignTimes.sample(n = maxSpikesTo)
+
+    spikeMats = binnedSpikesAligned(spikesFrom, alignTimes, binInterval,
+        binWidth, spikesFromIdx['chan'], windowSize = windowSize,
+        discardEmpty = discardEmpty)
+
+    return spikeMats
+
 def binnedSpikesAlignedToTrial(spikes, binInterval, binWidth, trialStats,
     alignTo, channel, windowSize = (-0.25, 1), timeRange = None,
     maxTrial = None, discardEmpty = False):
@@ -921,6 +950,7 @@ def binnedSpikesAlignedToTrial(spikes, binInterval, binWidth, trialStats,
     #trialStats[alignedTo] gets converted from samples to seconds
     #spikes[TimesStamps] is already in seconds
     alignTimes = trialStats[alignTo] / 3e4
+
     spikeMats = binnedSpikesAligned(spikes, alignTimes, binInterval,
         binWidth, channel, windowSize = windowSize, discardEmpty = discardEmpty)
 
