@@ -478,26 +478,54 @@ def plotSpikePanel(xcoords, ycoords, spikes):
         plt.tight_layout()
     return newAxMin, newAxMax
 
-#def plotEventRaster
-#@profile
-def plotRaster(spikes, trialStats, alignTo, channel, separateBy = None,
-    windowSize = (-0.25, 1), timeRange = None, showNow = False, ax = None,
-    maxTrial = None, plotOpts = {'type' : 'ticks'}):
+def getTrialAxes(trialStats, alignTo, channel, separateBy = None, ax = None, twin = False):
 
     if separateBy is not None:
         uniqueCategories = pd.Series(trialStats.loc[:,separateBy].unique())
         uniqueCategories.dropna(inplace = True)
         curLine = {category : 0 for category in uniqueCategories}
 
+        if ax is not None:
+            fig = ax[0].figure
+
+        if ax is not None and twin:
+            for idx, thisAx in enumerate(ax):
+                ax[idx] = thisAx.twinx()
+
         if ax is None:
             fig, ax = plt.subplots(len(uniqueCategories),1)
-
         else:
             assert len(ax) == len(uniqueCategories)
 
+        for idx, thisAx in enumerate(ax):
+            thisAx.set_xlabel('Time (milliseconds) aligned to ' + alignTo)
+            thisAx.set_ylabel('Trial')
+            thisAx.set_title(uniqueCategories[idx])
+
+        return fig, ax, uniqueCategories, curLine
+
     else: # only one plot
+        if ax is not None:
+            fig = ax.figure
+
+        if ax is not None and twin:
+            ax = ax.twinx()
+
         if ax is None:
             fig, ax = plt.subplots()
+
+        ax.set_xlabel('Time (milliseconds) aligned to ' + alignTo)
+        ax.set_ylabel('Trial')
+
+        return fig, ax, None, None
+
+#@profile
+def plotRaster(spikes, trialStats, alignTo, channel, separateBy = None,
+    windowSize = (-0.25, 1), timeRange = None, showNow = False, ax = None,
+    maxTrial = None, plotOpts = {'type' : 'ticks'}):
+
+    fig, ax, uniqueCategories, curLine = getTrialAxes(trialStats, alignTo,
+        channel, separateBy = separateBy, ax = ax)
 
     if plotOpts['type'] == 'ticks':
         binInterval = 1e-3
@@ -545,15 +573,6 @@ def plotRaster(spikes, trialStats, alignTo, channel, separateBy = None,
             if separateBy is not None:
                 curLine = {category : 0 for category in uniqueCategories}
 
-    if separateBy is not None:
-        for idx, thisAx in enumerate(ax):
-            thisAx.set_xlabel('Time (milliseconds) aligned to ' + alignTo)
-            thisAx.set_ylabel('Trial')
-            thisAx.set_title(uniqueCategories[idx])
-    else:
-        ax.set_xlabel('Time (milliseconds) aligned to ' + alignTo)
-        ax.set_ylabel('Trial')
-
     if showNow:
         plt.show()
 
@@ -565,32 +584,13 @@ def plotFR(spikes, trialStats, alignTo, channel, separateBy = None,
     twin = False, maxTrial = None, discardEmpty = False, kernelWidth = None,
     plotOpts = {'type' : 'ticks'}):
 
+    fig, ax, uniqueCategories, curLine = getTrialAxes(trialStats, alignTo,
+        channel, separateBy = separateBy, ax = ax, twin = twin)
+
     if kernelWidth is None:
         smoothingStep = False
     else:
         smoothingStep = True
-
-    if separateBy is not None:
-        uniqueCategories = pd.Series(trialStats.loc[:,separateBy].unique())
-        uniqueCategories.dropna(inplace = True)
-
-        if ax is not None and twin:
-            for idx, thisAx in enumerate(ax):
-                ax[idx] = thisAx.twinx()
-
-        if ax is None:
-            fig, ax = plt.subplots(len(uniqueCategories),1)
-
-        else:
-            assert len(ax) == len(uniqueCategories)
-
-    else: # only one plot
-
-        if ax is not None and twin:
-            ax = ax.twinx()
-
-        if ax is None:
-            fig, ax = plt.subplots()
 
     if plotOpts['type'] == 'ticks':
         binInterval = 1e-3
@@ -632,7 +632,7 @@ def plotFR(spikes, trialStats, alignTo, channel, separateBy = None,
 
             meanFR['all'][idx] = tempDF.mean(axis = 0)
             stdFR['all'][idx]  = tempDF.std(axis = 0)
-    #pdb.set_trace()
+
     colorPalette = sns.color_palette()
     yAxBot, yAxTop = 1e6,-1e6
     for category, meanFRThisCategory in meanFR.items():

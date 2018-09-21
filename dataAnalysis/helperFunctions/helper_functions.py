@@ -882,21 +882,25 @@ def binnedSpikesAligned(spikes, alignTimes, binInterval, binWidth, channel,
                         allSpikeTimes < startTime + windowSize[-1])
                     if trialTimeMask.sum() != 0:
                         trialSpikeTimes = allSpikeTimes[trialTimeMask] - startTime
-                        # # TODO: this is inefficient - can I think of a way to only call binnedEvents once??
-                        tempSpikeMat, binCenters, binLeftEdges = binnedEvents([trialSpikeTimes],
-                            [0], binInterval, binWidth, windowSize[0], windowSize[-1])
+                        timeStampsToAnalyze.append(trialSpikeTimes)
+                        trialID.append(rowIdx)
                         #pdb.set_trace()
-                        spikeMats[unitIdx].loc[idx, :] = tempSpikeMat.values.ravel()
                     else:
-                        if discardEmpty:
-                            spikeMats[unitIdx].iloc[idx, :] = np.nan
+                        if not discardEmpty:
+                            timeStampsToAnalyze.append(np.array([]))
+                            trialID.append(rowIdx)
+                        else:
+                            pass
                 except Exception:
                     print('In binSpikesAligned: Error getting firing rate for trial %s' % idx)
                     traceback.print_exc()
                     spikeMats[unitIdx].iloc[idx, :] = np.nan
-
-            for idx, x in enumerate(spikeMats):
-                spikeMats[idx].dropna(inplace = True)
+            #pdb.set_trace()
+            spikeMats[unitIdx], binCenters, binLeftEdges = binnedEvents(
+                timeStampsToAnalyze, trialID, binInterval, binWidth,
+                windowSize[0], windowSize[-1])
+        #for idx, x in enumerate(spikeMats):
+        #    spikeMats[idx].dropna(inplace = True)
     else: #no units on this chan
         spikeMats = []
     return spikeMats
