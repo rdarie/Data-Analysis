@@ -482,10 +482,7 @@ def plotSpikePanel(xcoords, ycoords, spikes):
 #@profile
 def plotRaster(spikes, trialStats, alignTo, channel, separateBy = None,
     windowSize = (-0.25, 1), timeRange = None, showNow = False, ax = None,
-    maxTrial = None):
-
-    ChanIdx = spikes['ChannelID'].index(channel)
-    unitsOnThisChan = np.unique(spikes['Classification'][ChanIdx])
+    maxTrial = None, plotOpts = {'type' : 'ticks'}):
 
     if separateBy is not None:
         uniqueCategories = pd.Series(trialStats.loc[:,separateBy].unique())
@@ -502,33 +499,27 @@ def plotRaster(spikes, trialStats, alignTo, channel, separateBy = None,
         if ax is None:
             fig, ax = plt.subplots()
 
-    if timeRange is not None:
-        timeMask = np.logical_and(trialStats['FirstOnset'] > timeRange[0] * 3e4, trialStats['ChoiceOnset'] < timeRange[1] * 3e4)
-        trialStats = trialStats.loc[timeMask, :]
+    if plotOpts['type'] == 'ticks':
+        binInterval = 1e-3
+        binWidth = 1e-3
 
-    if maxTrial is not None:
-        maxTrial = min(len(trialStats.index), maxTrial)
-        trialStats = trialStats.iloc[:maxTrial, :]
+    elif plotOpts['type'] == 'binned':
+        assert kernelWidth is None
+        binInterval = plotOpts['binInterval']
+        binWidth = plotOpts['binWidth']
 
-    timeWindow = list(range(int(windowSize[0] * 1e3), int(windowSize[1] * 1e3) + 1))
+    FR = hf.binnedSpikesAlignedToTrial(spikes, binInterval, binWidth, trialStats,
+        alignTo, channel, windowSize = windowSize, timeRange = timeRange,
+        maxTrial = maxTrial)
+
+    ChanIdx = spikes['ChannelID'].index(channel)
+    unitsOnThisChan = np.unique(spikes['Classification'][ChanIdx])
+
     if unitsOnThisChan is not None:
         colorPalette = sns.color_palette()
         for unitIdx, unitName in enumerate(unitsOnThisChan):
-            unitMask = spikes['Classification'][ChanIdx] == unitName
-            # time stamps in milliseconds
-            allSpikeTimes = np.array(spikes['TimeStamps'][ChanIdx][unitMask] * 1e3,
-                dtype = np.int64)
-
-            for idx, startTime in enumerate(trialStats[alignTo]):
+            for idx, row in FR[unitIdx].iterrows():
                 try:
-                    #print('Plotting trial %s' % idx)
-                    #convert start time from index to milliseconds
-                    trialTimeMask = np.logical_and(allSpikeTimes > startTime / 3e1 +
-                        timeWindow[0], allSpikeTimes < startTime / 3e1 + timeWindow[-1])
-                    trialSpikeTimes = allSpikeTimes[trialTimeMask] - startTime / 3e1
-                    ## TODO: add an option to plot a heatmap style raster
-                    #at this point I could diverge and add to a list of timeStamps
-                    #for use with binnedEvents()
                     if separateBy is not None:
                         #pdb.set_trace()
                         curCategory = trialStats.loc[idx, separateBy]
@@ -539,13 +530,12 @@ def plotRaster(spikes, trialStats, alignTo, channel, separateBy = None,
                     else:
                         axToPlotOn = ax
                         lineToPlot = idx
-
+                    # # TODO: add option to plot a heatmap style rendering
+                    #pdb.set_trace()
+                    trialSpikeTimes = row.index[row > 0] * 1e3
                     axToPlotOn.vlines(trialSpikeTimes,
                         lineToPlot, lineToPlot + 1, colors = [colorPalette[unitIdx]],
                         linewidths = [0.5])
-                    if maxTrial is not None:
-                        if idx >= maxTrial -1:
-                            break
                 except Exception:
                     print('Error plotting raster for trial %s' % idx)
                     traceback.print_exc()
@@ -580,9 +570,6 @@ def plotFR(spikes, trialStats, alignTo, channel, separateBy = None,
     else:
         smoothingStep = True
 
-    ChanIdx = spikes['ChannelID'].index(channel)
-    unitsOnThisChan = np.unique(spikes['Classification'][ChanIdx])
-
     if separateBy is not None:
         uniqueCategories = pd.Series(trialStats.loc[:,separateBy].unique())
         uniqueCategories.dropna(inplace = True)
@@ -605,50 +592,6 @@ def plotFR(spikes, trialStats, alignTo, channel, separateBy = None,
         if ax is None:
             fig, ax = plt.subplots()
 
-    if timeRange is not None:
-        timeMask = np.logical_and(trialStats['FirstOnset'] > timeRange[0] * 3e4, trialStats['ChoiceOnset'] < timeRange[1] * 3e4)
-        trialStats = trialStats.loc[timeMask, :]
-
-    if maxTrial is not None:
-        maxTrial = min(len(trialStats.index), maxTrial)
-        trialStats = trialStats.iloc[:maxTrial, :]
-    # window size specified in seconds
-    # time window in milliseconds
-    timeWindow = list(range(int(windowSize[0] * 1e3), int(windowSize[1] * 1e3) + 1))
-    if unitsOnThisChan is not None:
-
-        FR = [pd.DataFrame(0, index = trialStats.index, columns = timeWindow[:-1], dtype = np.float) for i in unitsOnThisChan]
-
-        for unitIdx, unitName in enumerate(unitsOnThisChan):
-            unitMask = spikes['Classification'][ChanIdx] == unitName
-            # spike times in milliseconds
-            allSpikeTimes = np.array(spikes['TimeStamps'][ChanIdx][unitMask] * 1e3, dtype = np.int64)
-            for idx, startTime in enumerate(trialStats[alignTo]):
-                try:
-                    #print('Calculating raster for trial %s' % idx)
-                    # convert startTime from samples to milliseconds
-                    trialTimeMask = np.logical_and(allSpikeTimes > startTime / 3e1 + timeWindow[0], allSpikeTimes < startTime / 3e1 + timeWindow[-1])
-                    if trialTimeMask.sum() != 0:
-                        trialSpikeTimes = allSpikeTimes[trialTimeMask] - startTime / 3e1
-                        #convert FR back to spikes per second
-                        FR[unitIdx].iloc[idx, :] = np.histogram(trialSpikeTimes, timeWindow)[0] * 1e3
-                    else:
-                        if discardEmpty:
-                            FR[unitIdx].iloc[idx, :] = np.nan
-
-                    if maxTrial is not None:
-                        if idx >= maxTrial -1:
-                            break
-                except Exception:
-                    print('In plotFR: Error getting firing rate for trial %s' % idx)
-                    traceback.print_exc()
-                    #pdb.set_trace()
-                    FR[unitIdx].iloc[idx, :] = np.nan
-                #pdb.set_trace()
-
-    for idx, x in enumerate(FR):
-        FR[idx].dropna(inplace = True)
-
     if plotOpts['type'] == 'ticks':
         binInterval = 1e-3
         binWidth = 1e-3
@@ -658,10 +601,12 @@ def plotFR(spikes, trialStats, alignTo, channel, separateBy = None,
         binInterval = plotOpts['binInterval']
         binWidth = plotOpts['binWidth']
 
-    FRnew = hf.binnedSpikesAlignedToTrial(spikes, binInterval, binWidth, trialStats,
+    FR = hf.binnedSpikesAlignedToTrial(spikes, binInterval, binWidth, trialStats,
         alignTo, channel, windowSize = windowSize, timeRange = timeRange,
         maxTrial = maxTrial)
-    pdb.set_trace()
+
+    ChanIdx = spikes['ChannelID'].index(channel)
+    unitsOnThisChan = np.unique(spikes['Classification'][ChanIdx])
 
     if separateBy is not None:
         meanFR = {category : [None for i in unitsOnThisChan] for category in uniqueCategories}
@@ -676,13 +621,6 @@ def plotFR(spikes, trialStats, alignTo, channel, separateBy = None,
                 #pdb.set_trace()
                 meanFR[category][idx] = tempDF.mean(axis = 0)
                 stdFR[category][idx]  = tempDF.std(axis = 0)
-                """
-                meanFR[category][idx] = FR[idx].loc[trialStats[separateBy] == category].mean(axis = 0)
-                meanFR[category][idx] = gaussian_filter1d(meanFR[category][idx], kernelWidth * 1e3)
-
-                stdFR[category][idx] = FR[idx].loc[trialStats[separateBy] == category].std(axis = 0)
-                stdFR[category][idx] = gaussian_filter1d(stdFR[category][idx], kernelWidth * 1e3)
-                """
     else:
         meanFR = {'all' : [None for i in unitsOnThisChan]}
         stdFR = {'all' : [None for i in unitsOnThisChan]}
@@ -707,8 +645,8 @@ def plotFR(spikes, trialStats, alignTo, channel, separateBy = None,
 
         for unitIdx, x in enumerate(meanFRThisCategory):
             thisError = stdFRThisCategory[unitIdx]
-            curAx.fill_between(timeWindow[:-1], (x - thisError), (x + thisError), alpha=0.4, facecolor=colorPalette[unitIdx])
-            curAx.plot(timeWindow[:-1], x, linewidth = 1, color = colorPalette[unitIdx])
+            curAx.fill_between(x.index * 1e3, (x - thisError), (x + thisError), alpha=0.4, facecolor=colorPalette[unitIdx])
+            curAx.plot(x.index * 1e3, x, linewidth = 1, color = colorPalette[unitIdx])
 
         curYAxBot, curYAxTop = curAx.get_ylim()
         yAxBot = min(yAxBot, curYAxBot)

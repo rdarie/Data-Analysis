@@ -870,7 +870,7 @@ def binnedSpikesAligned(spikes, alignTimes, binInterval, binWidth, channel,
             # spike times in seconds
             allSpikeTimes = np.array(spikes['TimeStamps'][ChanIdx][unitMask])
 
-            timeStamps = []
+            timeStampsToAnalyze = []
             trialID = []
             for rowIdx, startTime in alignTimes.items():
                 idx = alignTimes.index.get_loc(rowIdx)
