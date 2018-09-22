@@ -344,6 +344,7 @@ def plotTrialEvents(trialEvents, plotRange = None, colorOffset = 0, ax = None, s
         LLOnIdx = trialEvents['Time'][trialEvents['Label'] == 'Left LED Onset']
 
     if plotRange is not None:
+        #plotRange in units of seconds
         if 'Movement Onset' in subset or subset is None:
             moveOnIdx = moveOnIdx[np.logical_and(moveOnIdx > plotRange[0], moveOnIdx < plotRange[1])]
         if 'Movement Offset' in subset or subset is None:
@@ -380,6 +381,7 @@ def plotMotor(motorData, plotRange = (0,-1), subset = None, addAxes = 0, subsamp
         subset = motorData.columns
 
     if plotRange is None:
+        #plotRange is in units of samples
         xAxis = motorData.index
     else:
         xAxisMask = np.logical_and(motorData.index > plotRange[0], motorData.index < plotRange[1])

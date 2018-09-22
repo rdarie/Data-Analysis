@@ -135,6 +135,17 @@ def preproc_ns5(stepLen_s = 0.05, winLen_s = 0.1, fr_start = 5, fr_stop = 1000,\
     with open(fileDir + '/dataAnalysisPreproc' + fileName.split('.')[0] + '_saveCleanedMetadata.p', "wb" ) as f:
         pickle.dump(metadata, f, protocol=4 )
 
+    # # TODO: move this to its own function
+    if printReport:
+        print('Starting to write PDF Report.')
+        origData = np.load(origDataPath, mmap_mode='r')
+        origDataDF = pd.DataFrame(origData, index = ChannelData['data'].index, columns = ChannelData['data'].columns)
+        pdfFile = fileDir + '/dataAnalysisPreproc' + fileName.split('.')[0] + '_pdfReport.pdf'
+        hf.pdfReport(ChannelData, origDataDF, badData = badData,
+        pdfFilePath = pdfFile,
+        spectrum = computeSpectrum, cleanSpectrum = None,
+        origSpectrum = None, fr_start = fr_start, fr_stop = fr_stop)
+        
     print('Done cleaning data')
     # get the spectrum TODO: not currently working
     if computeSpectrum:
@@ -168,17 +179,6 @@ def preproc_ns5(stepLen_s = 0.05, winLen_s = 0.1, fr_start = 5, fr_stop = 1000,\
         plt.savefig(fileDir + '/dataAnalysisPreproc' + fileName.split('.')[0] + '_SpectrumRaw.png')
         with open(fileDir + '/dataAnalysisPreproc' + fileName.split('.')[0] + '_SpectrumRaw.pickle', 'wb') as File:
             pickle.dump(plt.gcf(), File)
-
-    # # TODO: move this to its own function
-    if printReport:
-        print('Starting to write PDF Report.')
-        origData = np.load(origDataPath, mmap_mode='r')
-        origDataDF = pd.DataFrame(origData, index = ChannelData['data'].index, columns = ChannelData['data'].columns)
-        pdfFile = fileDir + '/dataAnalysisPreproc' + fileName.split('.')[0] + '_pdfReport.pdf'
-        hf.pdfReport(ChannelData, origDataDF, badData = badData,
-        pdfFilePath = pdfFile,
-        spectrum = computeSpectrum, cleanSpectrum = None,
-        origSpectrum = None, fr_start = fr_start, fr_stop = fr_stop)
 
     pdb.set_trace()
     #x = input("Press any key")

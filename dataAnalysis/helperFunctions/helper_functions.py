@@ -16,12 +16,14 @@ subprocess, collections, traceback, peakutils, math, argparse
 
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
+import matplotlib.ticker as ticker
 from matplotlib import cm
 
 import numpy as np
 import pandas as pd
 import math as m
 import tables as pt
+import seaborn as sns
 
 from sklearn.model_selection import StratifiedKFold, GridSearchCV, learning_curve
 from sklearn.metrics import roc_auc_score, make_scorer, f1_score, classification_report
@@ -826,10 +828,10 @@ def plotSpectrum(P, fs, start_time_s, end_time_s, fr_start = 10, fr_stop = 600, 
 
 def binnedEvents(timeStamps, chans, binInterval, binWidth, timeStart, timeEnd):
     #pdb.set_trace()
-    binCenters = np.arange(timeStart + binWidth / 2, timeEnd - binWidth/2 + binInterval, binInterval)
+    binCenters = np.arange(timeStart + binWidth / 2, timeEnd - binWidth / 2 + binInterval, binInterval)
 
     #timeInterval = timeEnd - timeStart - binWidth
-    binRes = gcd(math.floor(binWidth * 1e6 / 2), math.floor(binInterval * 1e6)) * 1e-6 # greatest common denominator
+    binRes = gcd(math.floor(binWidth * 1e9 / 2), math.floor(binInterval * 1e9)) * 1e-9 # greatest common denominator
     fineBins = np.arange(timeStart, timeEnd + binRes, binRes)
 
     fineBinsPerWindow = int(binWidth / binRes)
@@ -838,16 +840,16 @@ def binnedEvents(timeStamps, chans, binInterval, binWidth, timeStart, timeEnd):
 
     centerIdx = np.arange(0, fineBinsTotal - fineBinsPerWindow + fineBinsPerInterval, fineBinsPerInterval)
     binLeftEdges = centerIdx * binRes
-    #pdb.set_trace()
+
     nChans = len(timeStamps)
     spikeMat = np.zeros([len(binCenters), nChans])
     for idx, chan in enumerate(chans):
         histo, _ = np.histogram(timeStamps[idx], fineBins)
-        #pdb.set_trace()
+
         spikeMat[:, idx] = np.array(
             [histo[x:x+fineBinsPerWindow].sum() / binWidth for x in centerIdx]
         )
-    #pdb.set_trace()
+
     spikeMatDF = pd.DataFrame(spikeMat.transpose(), index = chans, columns = binCenters)
     return spikeMatDF, binCenters, binLeftEdges
 
@@ -956,14 +958,13 @@ def binnedSpikesAlignedToTrial(spikes, binInterval, binWidth, trialStats,
 
     return spikeMats
 
-def binnedSpikes(spikes, binInterval, binWidth, timeStart, timeDur,
+def binnedSpikes(spikes, binInterval, binWidth, timeStart, timeEnd,
     timeStampUnits = 'samples', chans = None):
     # bins all spikes at a particular point in time
     parseAll = True
     if chans is not None:
         parseAll = False
 
-    timeEnd = timeStart + timeDur
     timeStamps = []
     ChannelID = []
     if timeStampUnits == 'samples':
@@ -994,8 +995,8 @@ def binnedSpikes(spikes, binInterval, binWidth, timeStart, timeDur,
 
     return spikeMat, binCenters, binLeftEdges
 
-def plotBinnedSpikes(spikeMat, show = True, normalizationType = 'linear', zAxis = None, ax = None):
-    #pdb.set_trace()
+def plotBinnedSpikes(spikeMat, show = True, normalizationType = 'linear',
+    zAxis = None, ax = None, labelTxt = 'Spk/s'):
 
     if ax is None:
         fi, ax = plt.subplots()
@@ -1003,26 +1004,40 @@ def plotBinnedSpikes(spikeMat, show = True, normalizationType = 'linear', zAxis 
         fi = ax.figure
 
     #pdb.set_trace()
-    if zAxis is None:
-        zMin, zMax = spikeMat.min().min(), spikeMat.max().max()
+    if zAxis is not None:
+        zMin, zMax = zAxis
     else:
-        zMin = zAxis[0]
-        zMax = zAxis[1]
+        zMin, zMax = None, None
 
     if normalizationType == 'linear':
         nor = colors.Normalize(vmin=zMin, vmax=zMax)
     elif normalizationType == 'logarithmic':
-        nor = colors.SymLogNorm(linthresh= 10, linscale=1,
-                                              vmin=zMin, vmax=zMax)
-    #fi = plt.figure()
-    chanIdx = np.arange(len(spikeMat.index))
-    im = ax.pcolormesh(spikeMat.columns, chanIdx, spikeMat.values, norm = nor)
-    ax.axis([spikeMat.columns.min(), spikeMat.columns.max(), chanIdx.min(), chanIdx.max()])
-    #plt.colorbar()
-    #plt.locator_params(axis='y', nbins=20)
+        nor = colors.SymLogNorm(linthresh= 10, linscale=1, vmin=zMin, vmax=zMax)
+
+    #fi, ax = plt.subplots()
+    cbar_kws = {'label' : labelTxt}
+    axPos = ax.get_position()
+    cbAxPos = [axPos.x0 + axPos.width - 0.075, axPos.y0,
+        axPos.width / 50, axPos.height]
+    cbAx = fi.add_axes(cbAxPos)
+    #ax = sns.heatmap(spikeMat, ax = ax, robust = False,
+    #    vmin = zMin, vmax = zMax, cbar_kws = cbar_kws, cbar_ax = cbAx)
+    chanIdx = np.arange(len(spikeMat.index)+1)
+    timeVals = np.linspace(spikeMat.columns[0], spikeMat.columns[-1],
+        len(spikeMat.columns) + 1)
+    #pdb.set_trace()
+    im = ax.pcolormesh(timeVals, chanIdx, spikeMat, norm = nor, cmap = 'plasma')
+    ax.set_xlim([timeVals[0], timeVals[-1]])
+    #ax.xaxis.set_major_formatter(ticker.StrMethodFormatter('{x:.0f}'))
+    cbar = fi.colorbar(im, cax=cbAx)
+    cbar.set_label(labelTxt)
     ax.set_xlabel('Time (s)')
     ax.set_ylabel("Unit (#)")
-    #splt.tight_layout()
+    #plt.show()
+
+    ax.tick_params(left=False, top=False, right=False, bottom=False,
+        labelleft=False, labeltop=False, labelright=False,
+        labelbottom=False)
     if show:
         plt.show()
     return fi, im

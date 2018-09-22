@@ -378,7 +378,7 @@ def plotSpike(spikes, channel, showNow = False, ax = None, acrossArray = False, 
                 sns.despine()
                 for curAx in ax.flatten():
                     curAx.tick_params(left='off', top='off', right='off', bottom='off', labelleft='off', labeltop='off', labelright='off', labelbottom='off')
-                plt.tight_layout()
+                plt.tight_layout(pad = 0.01)
 
             else:
                 if len(spikes['Waveforms'][ChanIdx].shape) == 3:
@@ -437,15 +437,19 @@ def plotISIHistogram(spikes, channel, showNow = False, ax = None,
             plt.show()
 
 #@profile
-def plotSpikePanel(xcoords, ycoords, spikes):
+def plotSpikePanel(spikeStruct, spikes):
     sns.set_style("dark", {"axes.facecolor": ".9"})
     matplotlib.rc('xtick', labelsize=5)
     matplotlib.rc('ytick', labelsize=5)
     matplotlib.rc('legend', fontsize=5)
     matplotlib.rc('axes', xmargin=.01)
     matplotlib.rc('axes', ymargin=.01)
-    xIdx, yIdx = coordsToIndices(xcoords, ycoords)
-    fig, ax = plt.subplots(nrows = max(np.unique(xIdx)) + 1, ncols = max(np.unique(yIdx)) + 1)
+
+    xIdx, yIdx = coordsToIndices(spikeStruct['xcoords'],
+        spikeStruct['ycoords'])
+    fig, ax = plt.subplots(nrows = max(np.unique(xIdx)) + 1,
+        ncols = max(np.unique(yIdx)) + 1)
+
     axHighLims = np.empty(ax.shape)
     axHighLims[:] = np.nan
     axLowLims = np.empty(ax.shape)
@@ -457,11 +461,12 @@ def plotSpikePanel(xcoords, ycoords, spikes):
         curAxLim = curAx.get_ylim()
         axHighLims[xIdx[idx], yIdx[idx]] = curAxLim[1]
         axLowLims[xIdx[idx], yIdx[idx]] = curAxLim[0]
-        xLim = curAx.get_xlim()
+    # get xLim from last axis that has spikes, in order to make the label
+    xLim = ax[xIdx[idx], yIdx[idx]].get_xlim()
     sns.despine()
 
-    newAxMin = np.nanmean(axLowLims) - 2 * np.nanstd(axLowLims)
-    newAxMax = np.nanmean(axHighLims) + 2 * np.nanstd(axHighLims)
+    newAxMin = np.nanmean(axLowLims) - 1.5 * np.nanstd(axLowLims)
+    newAxMax = np.nanmean(axHighLims) + 1.5 * np.nanstd(axHighLims)
 
     for idx, channel in enumerate(spikes['ChannelID']):
         curAx = ax[xIdx[idx], yIdx[idx]]
@@ -469,16 +474,27 @@ def plotSpikePanel(xcoords, ycoords, spikes):
 
     for idx, curAx in enumerate(ax.flatten()):
         if idx != 0:
-            curAx.tick_params(left='off', top='off', right='off', bottom='off', labelleft='off', labeltop='off', labelright='off', labelbottom='off')
+            curAx.tick_params(left=False, top=False, right=False, bottom=False,
+                labelleft=False, labeltop=False, labelright=False,
+                labelbottom=False)
         else:
+            curAx.tick_params(left=True, top=False, right=False, bottom=True,
+                labelleft=True, labeltop=False, labelright=False,
+                labelbottom=True, direction = 'in')
+
             curAx.set_ylim(newAxMin, newAxMax)
             curAx.set_xlim(*xLim)
-            curAx.set_xlabel('Time (msec)', fontsize = 5, labelpad = 0)
-            curAx.set_ylabel('Voltage (uV)', fontsize = 5, labelpad = 0)
-        plt.tight_layout()
+            labelFontSize = 7
+            curAx.set_xlabel('msec', fontsize = labelFontSize,
+                labelpad = - 3 * labelFontSize)
+            curAx.set_ylabel('uV', fontsize = labelFontSize,
+                labelpad = - 3 * labelFontSize)
+
+    plt.tight_layout(0.01)
     return newAxMin, newAxMax
 
 def getTrialAxes(trialStats, alignTo, channel, separateBy = None, ax = None):
+    ## TODO: leverage a seaborn.FacetGrid to make this more streamlined
     if separateBy is not None:
         uniqueCategories = pd.Series(trialStats.loc[:,separateBy].unique())
         uniqueCategories.dropna(inplace = True)
@@ -497,13 +513,11 @@ def getTrialAxes(trialStats, alignTo, channel, separateBy = None, ax = None):
             thisAx.set_title(uniqueCategories[idx])
 
         return fig, ax, uniqueCategories, curLine
-
     else: # only one plot
         if ax is not None:
             fig = ax.figure
         else:
             fig, ax = plt.subplots()
-
         ax.set_xlabel('Time (milliseconds) aligned to ' + alignTo)
         ax.set_ylabel('Trial')
 
@@ -571,6 +585,7 @@ def plotTrialRaster(spikes = None, trialStats = None, channel = None,
     else:
         assert fig is not None
         assert ax is not None
+
         if separateBy is not None:
             assert uniqueCategories is not None
             assert curLine  is not None
@@ -580,7 +595,7 @@ def plotTrialRaster(spikes = None, trialStats = None, channel = None,
 
     plotRaster(spikeMats, fig, ax, categories, uniqueCategories, curLine,
         showNow = showNow, plotOpts = plotOpts)
-
+    plt.tight_layout(pad = 0.01)
     return spikeMats, categories, fig, ax, uniqueCategories, curLine
 
 def plotSpikeTriggeredRaster(spikesFrom = None, spikesTo = None,
@@ -622,7 +637,7 @@ def plotSpikeTriggeredRaster(spikesFrom = None, spikesTo = None,
         ax.set_title(titleOverride)
 
     plotRaster(spikeMats, fig, ax, showNow = showNow, plotOpts = plotOpts)
-
+    plt.tight_layout(pad = 0.01)
     return spikeMats, fig, ax
 
 #@profile
@@ -674,6 +689,7 @@ def plotFR(spikeMats, fig, ax,
 
         for unitIdx, x in enumerate(meanSpikeMatThisCategory):
             thisError = stdSpikeMatThisCategory[unitIdx]
+            ## TODO: add option for this to be the SEM instead of STD
             curAx.fill_between(x.index * 1e3, (x - thisError), (x + thisError), alpha=0.4, facecolor=colorPalette[unitIdx])
             curAx.plot(x.index * 1e3, x, linewidth = 1, color = colorPalette[unitIdx])
 
@@ -688,6 +704,7 @@ def plotFR(spikeMats, fig, ax,
 
     if showNow:
         plt.show()
+
     return ax
 
 def plotTrialFR(spikes = None, trialStats = None, channel = None,
@@ -734,7 +751,7 @@ def plotTrialFR(spikes = None, trialStats = None, channel = None,
 
     plotFR(spikeMats, fig, ax, categories, uniqueCategories,
         showNow = showNow, plotOpts = plotOpts)
-
+    plt.tight_layout(pad = 0.01)
     return spikeMats, categories, fig, ax, uniqueCategories, curLine
 
 def plotSpikeTriggeredFR(spikesFrom = None, spikesTo = None,
@@ -778,38 +795,44 @@ def plotSpikeTriggeredFR(spikesFrom = None, spikesTo = None,
     if titleOverride is not None:
         ax.set_title(titleOverride)
     plotFR(spikeMats, fig, ax, showNow = showNow, plotOpts = plotOpts)
-
+    plt.tight_layout(pad = 0.01)
     return spikeMats, fig, ax
 
 
 def plotSingleTrial(trialStats, trialEvents, motorData, kinematics, spikes,\
-    nevIDs, spikesExclude, whichTrial, orderSpikesBy = None, zAxis = None, startEvent = 'FirstOnset', endEvent = 'ChoiceOnset',\
-    analogSubset = ['position'], analogLabel = '', kinematicsSubset = ['Hip_Right_Angle X'],\
-    kinematicLabel = '', eventSubset = ['Right LED Onset', 'Right Button Onset', 'Left LED Onset', 'Left Button Onset', 'Movement Onset', 'Movement Offset'],\
+    nevIDs, spikesExclude, whichTrial, orderSpikesBy = None, zAxis = None,\
+    startEvent = 'FirstOnset', endEvent = 'ChoiceOnset',\
+    analogSubset = ['position'], analogLabel = '',\
+    kinematicsSubset = ['Hip_Right_Angle X'],\
+    kinematicLabel = '',\
+    eventSubset = ['Right LED Onset', 'Right Button Onset', 'Left LED Onset',\
+    'Left Button Onset', 'Movement Onset', 'Movement Offset'],\
     binInterval = 20e-3, binWidth = 50e-3, arrayNames = None):
+
     if arrayNames is None:
         arrayNames = ['' for i in spikes]
+
     nArrays = len(spikes)
-    #pdb.set_trace()
+
     thisTrial = trialStats.loc[whichTrial, :]
-    # time units of samples
+    # thisTrial has time units of samples
     timeStart = thisTrial[startEvent] - 0.1 * 3e4
     timeEnd = thisTrial[endEvent] + 0.1 * 3e4
+
+    #create a list of axes and add one for the kinematics and one for each array
     fig, motorPlotAxes = mea.plotMotor(motorData,
         plotRange = (timeStart, timeEnd), subset = analogSubset,
         subsampleFactor = 30, addAxes = 1 + nArrays, collapse = True)
 
-    fig.subplots_adjust(bottom=0.1, top=0.9, left=0.1, right=0.8, wspace=0.02,
-        hspace=0.02)
     mea.plotTrialEvents(trialEvents, plotRange = (timeStart, timeEnd),
         ax = motorPlotAxes[0], colorOffset = len(analogSubset),
         subset = eventSubset)
 
     motorPlotAxes[0].set_ylabel(analogLabel)
-    #try:
-    motorPlotAxes[0].legend(loc = 1)
-    #except:
-    #    pass
+    try:
+        motorPlotAxes[0].legend(loc = 1)
+    except:
+        pass
 
     mea.plotMotor(kinematics, plotRange = (timeStart, timeEnd),
         subset = kinematicsSubset, subsampleFactor = 1, ax = motorPlotAxes[1],
@@ -820,61 +843,85 @@ def plotSingleTrial(trialStats, trialEvents, motorData, kinematics, spikes,\
     except:
         pass
 
+    #plt.show()
     for idx, spikeDict in enumerate(spikes):
+        #convert timeStart and timeDur to seconds
         spikeMatOriginal, binCenters, binLeftEdges = hf.binnedSpikes(spikeDict,
-            nevIDs[idx], binInterval, binWidth, timeStart ,
-            (timeEnd - timeStart) , timeStampUnits = 'seconds')
+            binInterval, binWidth, timeStart / 3e4,
+            timeEnd / 3e4, timeStampUnits = 'seconds')
         spikeMat = spikeMatOriginal.drop(spikesExclude[idx], axis = 'columns')
         if orderSpikesBy == 'idxmax':
-            spikeOrder = spikeMat.idxmax().sort_values().index
-            spikeMat = spikeMat.loc[:,spikeOrder]
-        fig, im = hf.plotBinnedSpikes(spikeMat, show = False,
-            normalizationType = 'linear', ax = motorPlotAxes[idx + 2],
-            zAxis = zAxis[idx])
-        # add an axes, lower left corner in [0.83, 0.1] measured in figure coordinate with axes width 0.02 and height 0.8
-        cbAx = fig.add_axes([0.83, 0.1 + 0.21 * (len(spikes) - idx - 1), 0.02, 0.18])
-        cbar = fig.colorbar(im, cax=cbAx)
-        cbar.set_label('Spk/s ' + arrayNames[idx])
-        #pdb.set_trace()
+            #pdb.set_trace()
+            spikeOrder = spikeMat.idxmax(axis = 1).sort_values().index
+            spikeMat = spikeMat.loc[spikeOrder,:]
 
+        hf.plotBinnedSpikes(spikeMat, show = False,
+            ax = motorPlotAxes[idx + 2],
+            zAxis = zAxis[idx], labelTxt = 'Spk/s ' + arrayNames[idx])
+        motorPlotAxes[idx + 2].tick_params(labelleft=True)
+
+    motorPlotAxes[-1].tick_params(bottom=True, labelbottom = True)
     fig.suptitle('Trial %d: %s' % (whichTrial, thisTrial['Outcome']))
+
+    fig.subplots_adjust(bottom=0.1, top=0.9, left=0.1, right=0.8, wspace=0.02,
+        hspace=0.02)
+
     return fig, motorPlotAxes
 
 #@profile
-def spikePDFReport(filePath, spikes, spikeStruct, plotRastersAlignedTo = None, plotRastersSeparatedBy = None, trialStats = None, enableFR = False, newName = None):
+def spikePDFReport(filePath, spikes, spikeStruct,
+    plotRastersAlignedTo = 'FirstOnset', plotRastersSeparatedBy = None,
+    trialStats = None, enableFR = False, newName = None):
+
     if newName is None:
         pdfName = filePath + '/' + 'spikePDFReport' + '.pdf'
     else:
         pdfName = filePath + '/' + newName + '.pdf'
 
     with PdfPages(pdfName) as pdf:
-        plotSpikePanel(spikeStruct['xcoords'], spikeStruct['ycoords'], spikes)
+        plotSpikePanel(spikeStruct, spikes)
         pdf.savefig()
         plt.close()
 
         for idx, channel in enumerate(spikes['ChannelID']):
             sys.stdout.write("Running spikePDFReport: %d%%\r" % int((idx + 1) * 100 / len(spikes['ChannelID'])))
             sys.stdout.flush()
+
             unitsOnThisChan = np.unique(spikes['Classification'][idx])
             if unitsOnThisChan is not None:
                 if len(unitsOnThisChan) > 0:
                     fig, ax = plt.subplots(nrows = 1, ncols = 2)
-                    plotSpike(spikes, channel = channel, ax = ax[0], axesLabel = True)
+                    plotSpike(spikes, channel = channel, ax = ax[0],
+                        axesLabel = True)
                     isiBins = np.linspace(0, 80, 40)
-                    kde_kws = {'clip' : (isiBins[0] * 0.8, isiBins[-1] * 1.2), 'bw' : 'silverman', 'gridsize' : 500}
-                    plotISIHistogram(spikes, channel = channel, bins = isiBins, ax = ax[1], kde = False)
+                    kde_kws = {'clip' : (isiBins[0] * 0.8, isiBins[-1] * 1.2),
+                        'bw' : 'silverman', 'gridsize' : 500}
+                    plotISIHistogram(spikes, channel = channel, bins = isiBins,
+                        ax = ax[1], kde_kws = kde_kws)
                     pdf.savefig()
                     plt.close()
 
                     if len(spikes['Waveforms'][idx].shape) == 3:
-                        plotSpike(spikes, channel = channel, acrossArray = True, xcoords = spikeStruct['xcoords'], ycoords = spikeStruct['ycoords'])
+                        plotSpike(spikes, channel = channel, acrossArray = True,
+                         xcoords = spikeStruct['xcoords'], ycoords = spikeStruct['ycoords'])
                         pdf.savefig()
                         plt.close()
 
                     if plotRastersAlignedTo is not None and trialStats is not None:
-                        plotAx = plotRaster(spikes, trialStats, alignTo = plotRastersAlignedTo, windowSize = (-0.5, 2), channel = channel, separateBy = plotRastersSeparatedBy)
+                        plotOpts = {'type' : 'ticks', 'kernelWidth' : 25e-3}
+                        windowSize = (-0.5, 2)
+                        spikeMats, categories, plotFig, plotAx, uniqueCategories, curLine = plotTrialRaster(
+                            spikes = spikes, trialStats =  trialStats, channel = channel,
+                            alignTo = plotRastersAlignedTo, separateBy = plotRastersSeparatedBy,
+                            windowSize = windowSize, plotOpts = plotOpts)
+
+                        #plotAx = plotRaster(spikes, trialStats, alignTo = plotRastersAlignedTo, windowSize = (-0.5, 2), channel = channel, separateBy = plotRastersSeparatedBy)
                         if enableFR:
-                            plotFR(spikes, trialStats, alignTo = plotRastersAlignedTo, windowSize = (-0.5, 2), channel = channel, separateBy = plotRastersSeparatedBy, ax = plotAx, twin = True)
+                            plotTrialFR(spikeMats = spikeMats, categories = categories,
+                                fig = plotFig, ax = plotAx, uniqueCategories = uniqueCategories, twin = True,
+                                alignTo = plotRastersAlignedTo, separateBy = plotRastersSeparatedBy,
+                                windowSize = windowSize, plotOpts = plotOpts)
+                            #plotFR(spikes, trialStats, alignTo = plotRastersAlignedTo, windowSize = (-0.5, 2), channel = channel, separateBy = plotRastersSeparatedBy, ax = plotAx, twin = True)
                         pdf.savefig()
                         plt.close()
 
@@ -927,7 +974,7 @@ def loadSpikeInfo(folderPath, arrayName, arrayInfo, forceRecalc = False):
     if not forceRecalc:
     # if not requiring a recalculation, load from pickle
         try:
-            spikes      = pickle.load(
+            spikes = pickle.load(
                 open(os.path.join(folderPath, arrayInfo['ns5FileName']) + '_spikes' + capitalizeFirstLetter(arrayName) + '_exclude_' + '_'.join([str(i) for i in arrayInfo['excludeClus']]) + '.pickle', 'rb'))
             print('Loaded spike data from pickle.')
         except:
@@ -953,13 +1000,16 @@ def loadSpikeInfo(folderPath, arrayName, arrayInfo, forceRecalc = False):
 
     return spikeStruct, spikes
 
-def generateSpikeReport(folderPath, eventInfo, trialFiles):
+def generateSpikeReport(folderPath, eventInfo, trialFiles,
+    plotRastersAlignedTo = 'FirstOnset', plotRastersSeparatedBy = None):
+
     """
     Read in Trial events
     """
     trialStats, trialEvents = loadEventInfo(folderPath, eventInfo)
 
     for key, value in trialFiles.items():
+
         """
         Read in array spikes
         """
@@ -967,8 +1017,8 @@ def generateSpikeReport(folderPath, eventInfo, trialFiles):
 
         newName = value['ns5FileName'] + '_' + capitalizeFirstLetter(key) + '_exclude_' + '_'.join([str(i) for i in value['excludeClus']])
         spikePDFReport(folderPath,
-            spikes, spikeStruct, plotRastersAlignedTo = 'FirstOnset',
-            plotRastersSeparatedBy = 'Direction', trialStats = trialStats,
+            spikes, spikeStruct, plotRastersAlignedTo = plotRastersAlignedTo,
+            plotRastersSeparatedBy = plotRastersSeparatedBy, trialStats = trialStats,
             enableFR = True,newName = newName)
 
         del spikes, spikeStruct
