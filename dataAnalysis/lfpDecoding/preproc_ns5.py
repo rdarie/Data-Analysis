@@ -31,20 +31,20 @@ fileDir = args.folder
 """
 
 def preproc_ns5(stepLen_s = 0.05, winLen_s = 0.1, fr_start = 5, fr_stop = 1000,\
- elec_ids = range(1, 97),  chanToPlot = 90,\
-   fileName = '201612201054-Starbuck_Treadmill-Array1480_Right-Trial00001.ns5',\
+    elec_ids = range(1, 97),  chanToPlot = 90,\
+    fileName = '201612201054-Starbuck_Treadmill-Array1480_Right-Trial00001.ns5',\
     fileDir = 'W:/ENG_Neuromotion_Shared/group/Proprioprosthetics/Training/Flywheel Logs/Murdoc',\
-     start_time_s = 0, data_time_s = 'all', compareBad = False,\
-      fillOverflow = False, removeJumps = True, printReport = False,\
-       computeSpectrum = True, saveNSx = None):
+    start_time_s = 0, data_time_s = 'all', compareBad = False,\
+    fillOverflow = False, removeJumps = True, printReport = False,\
+    computeSpectrum = True, saveNSx = None):
 
     print("Preprocessing spectral data with a window length of {:4.4f} seconds and a step length of {:4.4f} seconds".format(winLen_s, stepLen_s))
 
     # Reformat figures
     font_opts = {'family' : 'arial',
-            'weight' : 'bold',
-            'size'   : 20
-            }
+        'weight' : 'bold',
+        'size'   : 20
+        }
     fig_opts = {
         'figsize' : (10,5),
         }
@@ -116,24 +116,24 @@ def preproc_ns5(stepLen_s = 0.05, winLen_s = 0.1, fr_start = 5, fr_stop = 1000,\
     if not os.path.exists(fileDir + '/dataAnalysisPreproc'):
         os.makedirs(fileDir + '/dataAnalysisPreproc')
 
-    plt.legend()
-    plt.savefig(fileDir + '/dataAnalysisPreproc' + fileName.split('.')[0] +
-        '_ns5CleanFig.png')
-    with open(fileDir + '/dataAnalysisPreproc' + fileName.split('.')[0] +
-        '_ns5CleanFig.pickle', 'wb') as File:
-            pickle.dump(f, File)
+    print('Saving clean data')
 
-    dataPath = fileDir + '/dataAnalysisPreproc' + fileName.split('.')[0] + '_saveCleaned.h5'
+    dataPath = fileDir + '/dataAnalysisPreproc' + fileName.split('.')[0] + '_saveClean.h5'
     ChannelData['data'].to_hdf(dataPath, 'data', mode = 'w')
     simi_triggers['data'].to_hdf(dataPath, 'simi', mode = 'a')
     ChannelData['t'] = pd.Series(ChannelData['t'], index = ChannelData['data'].index)
     ChannelData['t'].to_hdf(dataPath, 't', mode = 'a')
 
-    del ChannelData['data'], simi_triggers['data'], ChannelData['t']
-
     metadata = {'channel':ChannelData, 'simiTrigger': simi_triggers}
     with open(fileDir + '/dataAnalysisPreproc' + fileName.split('.')[0] + '_saveCleanedMetadata.p', "wb" ) as f:
         pickle.dump(metadata, f, protocol=4 )
+
+    print('Done cleaning data')
+
+    plt.legend()
+    plt.savefig(fileDir + '/dataAnalysisPreproc' + fileName.split('.')[0] +
+        '_ns5CleanFig.pdf')
+
 
     # # TODO: move this to its own function
     if printReport:
@@ -145,8 +145,7 @@ def preproc_ns5(stepLen_s = 0.05, winLen_s = 0.1, fr_start = 5, fr_stop = 1000,\
         pdfFilePath = pdfFile,
         spectrum = computeSpectrum, cleanSpectrum = None,
         origSpectrum = None, fr_start = fr_start, fr_stop = fr_stop)
-        
-    print('Done cleaning data')
+
     # get the spectrum TODO: not currently working
     if computeSpectrum:
         # spectrum function parameters

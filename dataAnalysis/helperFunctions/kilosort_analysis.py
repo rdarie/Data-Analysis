@@ -18,6 +18,7 @@ import pickle
 import h5py
 import traceback
 import collections
+import itertools
 
 def loadParamsPy(filePath):
     """
@@ -948,6 +949,79 @@ def trialPDFReport(filePath, trialStats, trialEvents, motorData, kinematics, spi
                 pdf.savefig()
                 plt.close()
 
+def spikeTriggeredAveragePDFReport(filePath,
+    spikesFrom, spikesTo,
+    spikesFromList, spikesToList,
+    newName = None,
+    enableFR = True , plotOpts = {'type' : 'ticks', 'kernelWidth' : 5e-3}):
+
+    if newName is None:
+        pdfName = filePath + '/' + 'STA_Report' + '.pdf'
+    else:
+        pdfName = filePath + '/' + newName + '.pdf'
+
+    if plotOpts['type'] == 'ticks':
+        binInterval = 1e-3
+        binWidth = 1e-3
+    elif plotOpts['type'] == 'binned':
+        binInterval = plotOpts['binInterval']
+        binWidth = plotOpts['binWidth']
+
+    with PdfPages(pdfName) as pdf:
+        pairsNum = len(spikesFromList) * len(spikesToList)
+        pairCount = 0
+        for spikesFromIdx, spikesToIdx in itertools.product(spikesFromList, spikesToList):
+            sys.stdout.write("Running spikePDFReport: %d%%\r" % int((pairCount + 1) * 100 / pairsNum))
+            sys.stdout.flush()
+            pairCount += 1
+            spikeMats = hf.binnedSpikesAlignedToSpikes(spikesFrom, spikesTo,
+                spikesFromIdx, spikesToIdx,
+                binInterval, binWidth, windowSize = (-0.01, .5))
+
+            titleOverride = 'Channel %d triggered by channel %d unit %d' % (
+                            spikesFromIdx['chan'], spikesToIdx['chan'], spikesToIdx['unit'])
+
+            _, fig, ax = plotSpikeTriggeredRaster(spikesFrom = None, spikesTo = None,
+                spikesFromIdx = None, spikesToIdx = None,
+                spikeMats = spikeMats,
+                fig = None, ax = None,
+                windowSize = None, timeRange = None, maxSpikesTo = 250,
+                showNow = False, plotOpts = plotOpts)
+
+            plotSpikeTriggeredFR(spikesFrom = None, spikesTo = None,
+                spikesFromIdx = None, spikesToIdx = None,
+                spikeMats = spikeMats, titleOverride = titleOverride,
+                fig = fig, ax = ax, twin = True,
+                windowSize = None, timeRange = None, maxSpikesTo = 1000,
+                showNow = False, plotOpts = plotOpts)
+            pdf.savefig()
+            plt.close()
+
+def generateSpikeTriggeredAverageReport(folderPath, trialFileFrom, trialFileTo):
+    key, value = next(iter(trialFileFrom.items()))
+    newName = value['ns5FileName'] + '_' + capitalizeFirstLetter(key) + '_exclude_' + '_'.join([str(i) for i in value['excludeClus']]) + '_ALIGNEDTO_'
+    spikeStructFrom, spikesFrom = loadSpikeInfo(folderPath, key, value)
+    key, value = next(iter(trialFileTo.items()))
+    newName = newName + value['ns5FileName'] + '_' + capitalizeFirstLetter(key) + '_exclude_' + '_'.join([str(i) for i in value['excludeClus']])
+    spikeStructTo, spikesTo = loadSpikeInfo(folderPath, key, value)
+
+    spikesFromList = []
+    for idx, channel in enumerate(spikesFrom['ChannelID']):
+        unitsOnThisChan = np.unique(spikesFrom['Classification'][idx])
+        if unitsOnThisChan.any():
+            spikesFromList.append({'chan':channel,'units':list(range(len(unitsOnThisChan)))})
+
+    spikesToList = []
+    for idx, channel in enumerate(spikesTo['ChannelID']):
+        unitsOnThisChan = np.unique(spikesTo['Classification'][idx])
+        if unitsOnThisChan.any():
+            for unitIdx in range(len(unitsOnThisChan)):
+                spikesToList.append({'chan':channel,'unit':unitIdx})
+    #pdb.set_trace()
+    spikeTriggeredAveragePDFReport('./', spikesFrom, spikesTo, spikesFromList,
+        spikesToList, newName = newName, enableFR = True,
+        plotOpts = {'type' : 'ticks', 'kernelWidth' : 5e-3})
+
 def capitalizeFirstLetter(stringInput):
     return stringInput[0].capitalize() + stringInput[1:]
 
@@ -955,18 +1029,23 @@ def loadEventInfo(folderPath, eventInfo, forceRecalc = False):
     if not forceRecalc:
     # if not requiring a recalculation, load from pickle
         try:
-            trialStats  = pd.read_pickle(os.path.join(folderPath, eventInfo['ns5FileName']) + '_trialStats.pickle')
-            trialEvents = pd.read_pickle(os.path.join(folderPath, eventInfo['ns5FileName']) + '_trialEvents.pickle')
+            trialStats  = pd.read_pickle(os.path.join(folderPath,
+                eventInfo['ns5FileName']) + '_trialStats.pickle')
+            trialEvents = pd.read_pickle(os.path.join(folderPath,
+                eventInfo['ns5FileName']) + '_trialEvents.pickle')
             print('Loaded trial data from pickle.')
         except:
             print('Trial data not pickled. Recalculating...')
             forceRecalc = True
 
     if forceRecalc:
-        motorData = mea.getMotorData(os.path.join(folderPath, eventInfo['ns5FileName']) + '.ns5', eventInfo['inputIDs'], 0 , 'all')
+        motorData = mea.getMotorData(os.path.join(folderPath,
+            eventInfo['ns5FileName']) + '.ns5', eventInfo['inputIDs'], 0 , 'all')
         trialStats, trialEvents = mea.getTrials(motorData)
-        trialStats.to_pickle(os.path.join(folderPath, eventInfo['ns5FileName']) + '_trialStats.pickle')
-        trialEvents.to_pickle(os.path.join(folderPath, eventInfo['ns5FileName']) + '_trialEvents.pickle')
+        trialStats.to_pickle(os.path.join(folderPath,
+            eventInfo['ns5FileName']) + '_trialStats.pickle')
+        trialEvents.to_pickle(os.path.join(folderPath,
+            eventInfo['ns5FileName']) + '_trialEvents.pickle')
         print('Recalculated trial data and saved to pickle.')
     return trialStats, trialEvents
 
@@ -975,7 +1054,8 @@ def loadSpikeInfo(folderPath, arrayName, arrayInfo, forceRecalc = False):
     # if not requiring a recalculation, load from pickle
         try:
             spikes = pickle.load(
-                open(os.path.join(folderPath, arrayInfo['ns5FileName']) + '_spikes' + capitalizeFirstLetter(arrayName) + '_exclude_' + '_'.join([str(i) for i in arrayInfo['excludeClus']]) + '.pickle', 'rb'))
+                open(os.path.join(folderPath,
+                arrayInfo['ns5FileName']) + '_spikes' + capitalizeFirstLetter(arrayName) + '_exclude_' + '_'.join([str(i) for i in arrayInfo['excludeClus']]) + '.pickle', 'rb'))
             print('Loaded spike data from pickle.')
         except:
             # if loading failed, recalculate anyway
@@ -1019,7 +1099,7 @@ def generateSpikeReport(folderPath, eventInfo, trialFiles,
         spikePDFReport(folderPath,
             spikes, spikeStruct, plotRastersAlignedTo = plotRastersAlignedTo,
             plotRastersSeparatedBy = plotRastersSeparatedBy, trialStats = trialStats,
-            enableFR = True,newName = newName)
+            enableFR = True, newName = newName)
 
         del spikes, spikeStruct
 
