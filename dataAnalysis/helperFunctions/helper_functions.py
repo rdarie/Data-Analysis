@@ -99,22 +99,25 @@ def getNSxData(filePath, elecIds, startTime_s, dataLength_s, downsample = 1):
     if not isinstance(elecIds, collections.Iterable):
         elecIds = [elecIds]
     # Open file and extract headers
-    #pdb.set_trace()
+
     nsx_file = NsxFile(filePath)
     #
     # Extract data - note: data will be returned based on *SORTED* elec_ids, see cont_data['elec_ids']
-    channelData = nsx_file.getdata(elecIds, startTime_s, dataLength_s, downsample)
-    channelData['data'] = pd.DataFrame(channelData['data'].transpose(), columns = elecIds)
     #pdb.set_trace()
+    channelData = nsx_file.getdata(elecIds, startTime_s, dataLength_s, downsample)
+
+    rowIndex = range(int(channelData['start_time_s'] * channelData['samp_per_s']),
+        int((channelData['start_time_s'] + channelData['data_time_s']) * channelData['samp_per_s']))
+    channelData['data'] = pd.DataFrame(channelData['data'].transpose(),
+        index = rowIndex, columns = elecIds)
+
     channelData['t'] = channelData['start_time_s'] + np.arange(channelData['data'].shape[0]) / channelData['samp_per_s']
-    channelData['badData'] = dict()
-    channelData['spectrum'] = pd.DataFrame({'PSD': [], 't': [], 'fr': [], 'Labels': []})
+    channelData['t'] = pd.Series(channelData['t'], index = channelData['data'].index)
+    channelData['badData'] = {}
     channelData['basic_headers'] = nsx_file.basic_header
     channelData['extended_headers'] =  nsx_file.extended_headers
-    #pdb.set_trace()
     # Close the nsx file now that all data is out
     nsx_file.close()
-
     return channelData
 
 def getBadSpikesMask(spikes, nStd = 5, whichChan = 0, plotting = False, deleteBad = False):
@@ -157,8 +160,7 @@ def fillInOverflow(channelData, plotting = False, fillMethod = 'constant'):
 
         ch_idx  = columnList.index(idx)
         col_idx = channelData.columns.get_loc(idx)
-        sys.stdout.write("Running fillInOverflow: %d%%\r" % int((ch_idx + 1) * 100 / nChan))
-        sys.stdout.flush()
+        print("Running fillInOverflow: %d%%" % int((ch_idx + 1) * 100 / nChan), end = '\r')
 
         # get the first difference of the row
         rowDiff = row.diff()
@@ -233,25 +235,24 @@ def fillInOverflow(channelData, plotting = False, fillMethod = 'constant'):
     print('\nFinished finding boolean overflow')
     return channelData, overflowMask
 
-def getBadContinuousMask(channelData, samp_per_s, dataT, plotting = False, smoothing_ms = 1, badThresh = 1e-3, consecLen = 30, nStdDiff = 20, nStdAmp = 20):
+def fillInJumps(channelData, samp_per_s, smoothing_ms = 1, badThresh = 1e-3,
+    consecLen = 30, nStdDiff = 20, nStdAmp = 20):
     #Allocate bad data mask as dict
     badMask = {'general':None,
         'perChannelAmp' : pd.DataFrame(False, index = channelData.index, columns = channelData.columns, dtype = np.bool).to_sparse(fill_value=False),
         'perChannelDer' : pd.DataFrame(False, index = channelData.index, columns = channelData.columns, dtype = np.bool).to_sparse(fill_value=False)
         }
-    #pdb.set_trace()
+
     #per channel, only smooth a couple of samples
     shortSmoothKern = np.ones((5))
     # per channel look for abberantly large jumps
-    cumDiff = pd.Series(np.zeros(len(channelData.index)),
-        index = channelData.index)
-
+    cumDiff = pd.Series(np.zeros(len(channelData.index)), index = channelData.index)
     columnList = list(channelData.columns)
     nChan = len(columnList)
     for idx, row in channelData.iteritems():
-        #pdb.set_trace()
+
         ch_idx  = columnList.index(idx)
-        sys.stdout.write("Running getBadContinuousMask: %d%%\r" % int((ch_idx + 1) * 100 / nChan))
+        sys.stdout.write("Finding Signal Jumps: %d%%\r" % int((ch_idx + 1) * 100 / nChan))
         sys.stdout.flush()
 
         if len(row.index) < 3 * 10e4:
@@ -291,24 +292,6 @@ def getBadContinuousMask(channelData, samp_per_s, dataT, plotting = False, smoot
         #pdb.set_trace()
         badMask['perChannelDer'].loc[:, idx]=np.array(dOutliers, dtype = bool)
 
-        if plotting and idx == plotting:
-
-            plt.figure()
-            dRow.plot.hist(bins = 100)
-            plt.tight_layout()
-            plt.show(block = False)
-
-            plt.figure()
-            plot_mask = np.logical_or(badMask['general'], badMask['perChannelAmp'].loc[:, idx])
-            plot_mask = np.logical_or(plot_mask, badMask['perChannelDer'].loc[:, idx])
-            plt.plot(dataT, row)
-            plt.plot(dataT[plot_mask], row[plot_mask],'ro')
-            plt.plot(dataT, dRowVals)
-            print("Current derivative rejection threshold: %f" % dMaxAcceptable)
-            print("Current amplitude rejection threshold: %f" % maxAcceptable)
-            plt.tight_layout()
-            plt.show(block = False)
-
         #add to the cummulative derivative (will check it at the end for flat periods signifying signal cutout)
         cumDiff = cumDiff + dRow.abs() / len(channelData.columns)
 
@@ -325,10 +308,24 @@ def getBadContinuousMask(channelData, samp_per_s, dataT, plotting = False, smoot
     smoothKern = np.ones((int(smoothKernLen)))
 
     badFlat = np.convolve(badFlat, smoothKern, 'same') > 0
-    badMask['general'] = pd.Series(np.array(badFlat, dtype = bool), index = channelData.index, dtype = np.bool).to_sparse(fill_value=False)
     print('\nFinished finding abnormal signal jumps')
 
-    return badMask
+    for idx, row in channelData.iteritems():
+
+        ch_idx  = columnList.index(idx)
+        sys.stdout.write("Fixing Signal Jumps: %d%%\r" % int((ch_idx + 1) * 100 / nChan))
+        sys.stdout.flush()
+        #correct the row
+        mask = np.logical_or(badMask['perChannelAmp'].loc[:, idx].to_dense(),
+            badMask['perChannelDer'].loc[:, idx].to_dense())
+        mask = np.logical_or(mask, badFlat)
+        channelData.loc[:,idx] = replaceBad(row, mask, typeOpt = 'interp')
+
+    badMask['general'] = pd.Series(np.array(badFlat, dtype = bool),
+        index = channelData.index, dtype = np.bool).to_sparse(fill_value=False)
+    print('\nFinished processing abnormal signal jumps')
+
+    return channelData, badMask
 
 def getCameraTriggers(simiData, plotting = False):
     # sample rate
@@ -626,8 +623,8 @@ def getSpectrogram(channelData, elec_ids, samp_per_s, start_time_s, dataT, winLe
         for col,signal in channelData.iteritems():
             #pdb.set_trace()
             idx = columnList.index(col)
-            sys.stdout.write("Running getSpectrogram: %d%%\r" % int(idx * 100 / nChan + 1))
-            sys.stdout.flush()
+            print("Running getSpectrogram: %d%%" % int(idx * 100 / nChan + 1), end = '\r')
+
 
             P_libtfr = D.mtspec(signal, stepLen_samp).transpose()
             P_libtfr = P_libtfr[np.newaxis,:,fr_start_idx:fr_stop_idx]
@@ -638,8 +635,8 @@ def getSpectrogram(channelData, elec_ids, samp_per_s, start_time_s, dataT, winLe
         spectrum = np.zeros((nChan, nWindows, fr_samp))
         for col,signal in channelData.iteritems():
             idx = columnList.index(col)
-            sys.stdout.write("Running getSpectrogram: %d%%\r" % int(idx * 100 / nChan + 1))
-            sys.stdout.flush()
+            print("Running getSpectrogram: %d%%" % int(idx * 100 / nChan + 1), end = '\r')
+
 
             overlap_samp = NFFT - stepLen_samp
             _, t, P_scipy = scipy.signal.spectrogram(signal,mode='magnitude',
@@ -743,15 +740,11 @@ def pdfReport(cleanData, origData, badData = None,
         for idx, row in cleanData['data'].iteritems():
             ch_idx  = columnList.index(idx)
 
-            sys.stdout.write("Running pdfReport: %d%%\r" % int((ch_idx + 1) * 100 / nChan))
-            sys.stdout.flush()
+            print("Running pdfReport: %d%%" % int((ch_idx + 1) * 100 / nChan), end = '\r')
 
-            #print('idx is %s' % idx)
-            #pdb.set_trace()
             hdr_idx = cleanData['ExtendedHeaderIndices'][cleanData['elec_ids'].index(idx)]
             electrodeLabel = cleanData['extended_headers'][hdr_idx]['ElectrodeLabel']
 
-            #pdb.set_trace()
             f,_ = plotChan(origData, cleanData['t'], idx,
                 electrodeLabel = electrodeLabel, label = 'Raw data', zoomAxis = False,
                 mask = None, show = False, timeRange = (cleanData['start_time_s'],
@@ -795,7 +788,7 @@ def pdfReport(cleanData, origData, badData = None,
                     f,_ = plotChan(origData['data'], origData['t'], idx, electrodeLabel = electrodeLabel, mask = None, show = False, prevFig = f)
 
 def plotSpectrum(P, fs, start_time_s, end_time_s, fr_start = 10, fr_stop = 600, fr = None, t = None, show = False, timeRange = None):
-    #pdb.set_trace()
+
     if fr is None:
         fr = np.arange(P.shape[1]) / P.shape[1] * fs / 2
     if t is None:

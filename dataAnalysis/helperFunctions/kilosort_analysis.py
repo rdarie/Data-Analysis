@@ -645,7 +645,7 @@ def plotSpikeTriggeredRaster(spikesFrom = None, spikesTo = None,
 def plotFR(spikeMats, fig, ax,
     categories = None, uniqueCategories = None,
     showNow = False,
-    plotOpts = {'type' : 'ticks', 'kernelWidth' : 25e-3}):
+    plotOpts = {'type' : 'ticks', 'kernelWidth' : 25e-3, 'errorBar' : 'std'}):
 
     if plotOpts['type'] == 'ticks':
         kernelWidth = plotOpts['kernelWidth']
@@ -663,12 +663,16 @@ def plotFR(spikeMats, fig, ax,
                 if smoothingStep:
                     tempDF = tempDF.apply(gaussian_filter1d, axis = 1, raw = True,
                         result_type = 'expand', args = (int(kernelWidth * 1e3 / 2),))
-                #pdb.set_trace()
                 meanSpikeMat[category][idx] = tempDF.mean(axis = 0)
                 stdSpikeMat[category][idx]  = tempDF.std(axis = 0)
+
+                if 'errorBar' in plotOpts.keys():
+                    if plotOpts['errorBar'] == 'sem':
+                        stdSpikeMat[category][idx] = 1.96 * stdSpikeMat[category][idx] / len(stdSpikeMat[category][idx].index)
     else:
         meanSpikeMat = {'all' : [None for i in spikeMats]}
         stdSpikeMat = {'all' : [None for i in spikeMats]}
+
         for idx, thisSpikeMat in enumerate(spikeMats):
             tempDF = pd.DataFrame(thisSpikeMat, copy = True)
             if smoothingStep:
@@ -677,6 +681,10 @@ def plotFR(spikeMats, fig, ax,
 
             meanSpikeMat['all'][idx] = tempDF.mean(axis = 0)
             stdSpikeMat['all'][idx]  = tempDF.std(axis = 0)
+
+            if 'errorBar' in plotOpts.keys():
+                if plotOpts['errorBar'] == 'sem':
+                    stdSpikeMat['all'][idx] = 1.96 * stdSpikeMat['all'][idx] / len(stdSpikeMat['all'][idx].index)
 
     colorPalette = sns.color_palette()
     yAxBot, yAxTop = 1e6,-1e6
@@ -691,17 +699,23 @@ def plotFR(spikeMats, fig, ax,
         for unitIdx, x in enumerate(meanSpikeMatThisCategory):
             thisError = stdSpikeMatThisCategory[unitIdx]
             ## TODO: add option for this to be the SEM instead of STD
-            curAx.fill_between(x.index * 1e3, (x - thisError), (x + thisError), alpha=0.4, facecolor=colorPalette[unitIdx])
-            curAx.plot(x.index * 1e3, x, linewidth = 1, color = colorPalette[unitIdx])
+            curAx.fill_between(x.index * 1e3, (x - thisError), (x + thisError),
+                alpha=0.4, facecolor=colorPalette[unitIdx])
+            curAx.plot(x.index * 1e3, x, linewidth = 1,
+                color = colorPalette[unitIdx])
 
         curYAxBot, curYAxTop = curAx.get_ylim()
         yAxBot = min(yAxBot, curYAxBot)
         yAxTop = max(yAxTop, curYAxTop)
 
+    #negative firing rates don't make sense
+    yAxBot = max(yAxBot, 0)
     if isinstance(ax, collections.Iterable):
         for axIdx, curAx in enumerate(ax):
             curAx.set_ylim(yAxBot, yAxTop)
             curAx.set_ylabel('Average Firing rate (spk/sec)')
+    else:
+        ax.set_ylabel('Average Firing rate (spk/sec)')
 
     if showNow:
         plt.show()
@@ -752,7 +766,7 @@ def plotTrialFR(spikes = None, trialStats = None, channel = None,
 
     plotFR(spikeMats, fig, ax, categories, uniqueCategories,
         showNow = showNow, plotOpts = plotOpts)
-    plt.tight_layout(pad = 0.01)
+    plt.tight_layout(pad = 0.1)
     return spikeMats, categories, fig, ax, uniqueCategories, curLine
 
 def plotSpikeTriggeredFR(spikesFrom = None, spikesTo = None,
@@ -796,7 +810,7 @@ def plotSpikeTriggeredFR(spikesFrom = None, spikesTo = None,
     if titleOverride is not None:
         ax.set_title(titleOverride)
     plotFR(spikeMats, fig, ax, showNow = showNow, plotOpts = plotOpts)
-    plt.tight_layout(pad = 0.01)
+    plt.tight_layout(pad = 0.1)
     return spikeMats, fig, ax
 
 
@@ -885,8 +899,7 @@ def spikePDFReport(filePath, spikes, spikeStruct,
         plt.close()
 
         for idx, channel in enumerate(spikes['ChannelID']):
-            sys.stdout.write("Running spikePDFReport: %d%%\r" % int((idx + 1) * 100 / len(spikes['ChannelID'])))
-            sys.stdout.flush()
+            print("Running spikePDFReport: %d%%" % int((idx + 1) * 100 / len(spikes['ChannelID'])), end = '\r')
 
             unitsOnThisChan = np.unique(spikes['Classification'][idx])
             if unitsOnThisChan is not None:
@@ -971,12 +984,12 @@ def spikeTriggeredAveragePDFReport(filePath,
         pairsNum = len(spikesFromList) * len(spikesToList)
         pairCount = 0
         for spikesFromIdx, spikesToIdx in itertools.product(spikesFromList, spikesToList):
-            sys.stdout.write("Running spikePDFReport: %d%%\r" % int((pairCount + 1) * 100 / pairsNum))
-            sys.stdout.flush()
+            print("Running staPDFReport: %d%%" % int((pairCount + 1) * 100 / pairsNum), end = '\r')
+
             pairCount += 1
             spikeMats = hf.binnedSpikesAlignedToSpikes(spikesFrom, spikesTo,
                 spikesFromIdx, spikesToIdx,
-                binInterval, binWidth, windowSize = (-0.01, .5))
+                binInterval, binWidth, windowSize = (-0.05, .2))
 
             titleOverride = 'Channel %d triggered by channel %d unit %d' % (
                             spikesFromIdx['chan'], spikesToIdx['chan'], spikesToIdx['unit'])
