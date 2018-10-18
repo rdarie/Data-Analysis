@@ -16,6 +16,7 @@ import sys, os
 import pickle
 from copy import *
 import argparse
+import h5py
 
 def preprocNs5(
     fileName = 'Trial001',
@@ -26,28 +27,50 @@ def preprocNs5(
     ):
 
     filePath = os.path.join(folderPath, fileName) + '.ns5'
+    dummyChannelData = hf.getNSxData(filePath, elecIds[0], startTimeS, dataTimeS)
+
     if dataTimeS == 'all':
-        dummyChannelData = hf.getNSxData(filePath, elecIds[0], startTimeS, dataTimeS)
         dataTimeS = dummyChannelData['data_time_s']
         print('Recording is %4.2f seconds long' % dataTimeS)
 
+    nSamples = int(dataTimeS * dummyChannelData['samp_per_s'])
+    nChannels = len(elecIds)
     nChunks = dataTimeS // chunkSize
-
+    # add a chunk if division isn't perfect
     if dataTimeS / chunkSize > dataTimeS // chunkSize:
         nChunks += 1
-
     nChunks = int(nChunks)
+
+    if not os.path.exists(os.path.join(folderPath, 'dataAnalysisPreproc')):
+        os.makedirs(os.path.join(folderPath, 'dataAnalysisPreproc'))
+
+    dataPath = os.path.join(folderPath, 'dataAnalysisPreproc',
+        fileName + '_clean.h5')
+
+    with h5py.File(dataPath, "w") as f:
+        #pdb.set_trace()
+
+        f.create_dataset("data", (nSamples,nChannels), dtype='float32',
+            chunks=True)
+        f.create_dataset("channels", (nChannels,), data = list(elecIds),
+            dtype='int32')
+        f.create_dataset("index", (nSamples,), dtype='int32')
+        f.create_dataset("t", (nSamples,), dtype='float32')
+
     for curSection in range(nChunks):
         print('PreprocNs5: starting chunk %d of %d' % (curSection + 1, nChunks))
+
         if curSection == nChunks - 1:
             thisDataTime = dataTimeS - chunkSize * curSection
         else:
             thisDataTime = chunkSize
+
         preprocNs5Section(
             fileName = fileName,
             folderPath = folderPath,
             elecIds = elecIds, startTimeS = startTimeS + curSection * chunkSize,
             dataTimeS = thisDataTime,
+            chunkSize = chunkSize,
             curSection = curSection, sectionsTotal = nChunks,
             fillOverflow = fillOverflow, removeJumps = removeJumps)
 
@@ -55,11 +78,9 @@ def preprocNs5Section(
     fileName = 'Trial001',
     folderPath = './',
     elecIds = range(1, 97), startTimeS = 0, dataTimeS = 900,
+    chunkSize = 900,
     curSection = 0, sectionsTotal = 1,
     fillOverflow = False, removeJumps = True):
-
-    if not os.path.exists(os.path.join(folderPath, 'dataAnalysisPreproc')):
-        os.makedirs(os.path.join(folderPath, 'dataAnalysisPreproc'))
 
     filePath     = os.path.join(folderPath, fileName +'.ns5')
     timeSection  = hf.getNSxData(filePath, elecIds, startTimeS, dataTimeS)
@@ -85,24 +106,17 @@ def preprocNs5Section(
     timeSection['badData'] = badData
 
     print('Saving clean data')
-
+    #
     dataPath = os.path.join(folderPath, 'dataAnalysisPreproc',
         fileName + '_clean.h5')
-
-    if curSection == 0:
-        useMode = 'w'
-    else:
-        useMode = 'a'
-
-    """
-    timeSection['data'].columns = [str(i) for i in timeSection['data'].columns]
-    timeSection['data'].to_hdf(dataPath, 'data', mode = useMode, data_columns = True,format = 'table', append = True)
-    timeSection['t'].to_hdf(dataPath, 't', mode = 'a', format = 'table',
-        append = True)
-    """
-
-    timeSection['data'].to_hdf(dataPath, 'data', mode = useMode, format = 'fixed')
-    timeSection['t'].to_hdf(dataPath, 't', mode = 'a', format = 'fixed')
+    with h5py.File(dataPath, "a") as f:
+        #print(timeSection['data'])
+        #pdb.set_trace()
+        sectionIndex = slice(int(curSection * chunkSize * timeSection['samp_per_s']),
+            int((curSection * chunkSize + dataTimeS) * timeSection['samp_per_s']))
+        f['data'][sectionIndex, :] = timeSection['data'].values
+        f['index'][sectionIndex] = timeSection['data'].index
+        f['t'][sectionIndex] = timeSection['t'].values
 
     del timeSection['data'], timeSection['t']
 

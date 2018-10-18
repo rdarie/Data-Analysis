@@ -20,6 +20,8 @@ import traceback
 import collections
 import itertools
 
+LABELFONTSIZE = 5
+
 def loadParamsPy(filePath):
     """
     # Old implementation, treats params.py as a package and cannot be overriden when processing a new folder.
@@ -281,6 +283,59 @@ def natural_keys(text):
     '''
     return [ atoi(c) for c in re.split('(\d+)', text) ]
 
+def getNevMatSpikes(filePath, nevIDs = None, plotting = False, excludeClus = [0]):
+    # TODO: not memory mapped yet
+    nCh = len(nevIDs)
+
+    spikes = {
+        'ChannelID' : [i for i in range(nCh)],
+        'Classification' : [[] for i in range(nCh)],
+        'NEUEVWAV_HeaderIndices' : [None for i in range(nCh)],
+        'TimeStamps' : [[] for i in range(nCh)],
+        'Units' : 'uV',
+        'Waveforms' : [None for i in range(nCh)],
+        #'meanWaveforms' : [None for i in range(nCh)],
+        #'stdWaveforms' : [None for i in range(nCh)],
+        'basic_headers' : {'TimeStampResolution': 3e4},
+        'extended_headers' : []
+        }
+
+    unitIDs = []
+    markForDeletion = {i: False for i in nevIDs}
+    lastMaxUnitID = 0
+    with h5py.File(filePath, 'r') as f:
+        for idx, chanID in enumerate(nevIDs):
+            #pdb.set_trace()
+            spikes['ChannelID'][idx] = chanID
+            chanMask = np.array(f['NEV']['Data']['Spikes']['Electrode']) == chanID
+            markForDeletion[chanID] = not chanMask.any()
+            if not markForDeletion[chanID]:
+                unitsInFile = np.unique(f['NEV']['Data']['Spikes']['Unit'][chanMask]) +  1 + lastMaxUnitID
+                if excludeClus:
+                    notMUAMask = np.logical_not(np.isin(f['NEV']['Data']['Spikes']['Unit'][chanMask], excludeClus))
+                else:
+                    notMUAMask = np.full(len(f['NEV']['Data']['Spikes']['Unit'][chanMask]), True, dtype = np.bool)
+                #pdb.set_trace()
+                spikes['Classification'][idx] = f['NEV']['Data']['Spikes']['Unit'][chanMask] + 1 + lastMaxUnitID
+                spikes['Classification'][idx] = spikes['Classification'][idx][notMUAMask]
+
+                spikes['TimeStamps'][idx] =  f['NEV']['Data']['Spikes']['TimeStamp'][chanMask] / 3e4
+                spikes['TimeStamps'][idx] = spikes['TimeStamps'][idx][notMUAMask]
+
+                spikes['Waveforms'][idx] = f['NEV']['Data']['Spikes']['Waveform'][chanMask[:,0],:]
+                spikes['Waveforms'][idx] = spikes['Waveforms'][idx][notMUAMask, :]
+
+                # note that the units of TimeStamps is in SECONDS
+                unitIDs+=unitsInFile.tolist()
+                lastMaxUnitID = max(unitIDs)
+
+    #pdb.set_trace()
+    spikes['ChannelID'] = list(filter(lambda it: not markForDeletion[it], spikes['ChannelID']))
+    spikes['Classification'] = list(filter(lambda it: not it == [], spikes['Classification']))
+    spikes['TimeStamps'] = list(filter(lambda it:not it == [], spikes['TimeStamps']))
+    spikes['Waveforms'] = list(filter(lambda it: it is not None, spikes['Waveforms']))
+    spikes['NEUEVWAV_HeaderIndices'] = list(filter(lambda it: it is not None, spikes['NEUEVWAV_HeaderIndices']))
+    return spikes
 
 def getWaveClusSpikes(filePath, nevIDs = None, plotting = False, excludeClus = [0], tempFolder = None):
     # TODO: not memory mapped yet
@@ -311,6 +366,7 @@ def getWaveClusSpikes(filePath, nevIDs = None, plotting = False, excludeClus = [
 
     unitIDs = []
     lastMaxUnitID = 0
+
     for idx, spikeFile in enumerate(spikeFileList):
         waveClusData = scipy.io.loadmat(filePath + spikeFile)
         spikes['ChannelID'][idx] = nevIDs[idx]
@@ -485,7 +541,7 @@ def plotSpikePanel(spikeStruct, spikes):
 
             curAx.set_ylim(newAxMin, newAxMax)
             curAx.set_xlim(*xLim)
-            labelFontSize = 7
+            labelFontSize = LABELFONTSIZE
             curAx.set_xlabel('msec', fontsize = labelFontSize,
                 labelpad = - 3 * labelFontSize)
             curAx.set_ylabel('uV', fontsize = labelFontSize,
@@ -508,10 +564,14 @@ def getTrialAxes(trialStats, alignTo, channel, separateBy = None, ax = None):
         else:
             assert len(ax) == len(uniqueCategories)
 
-        for idx, thisAx in enumerate(ax):
-            thisAx.set_xlabel('Time (milliseconds) aligned to ' + alignTo)
-            thisAx.set_ylabel('Trial')
-            thisAx.set_title(uniqueCategories[idx])
+        for idx, curAx in enumerate(ax):
+            labelFontSize = LABELFONTSIZE
+            curAx.set_xlabel('Time (milliseconds) aligned to ' + alignTo,
+                fontsize = labelFontSize,
+                labelpad = - 3 * labelFontSize)
+            curAx.set_ylabel('Trial', fontsize = labelFontSize,
+                labelpad = - 3 * labelFontSize)
+            curAx.set_title(uniqueCategories[idx])
 
         return fig, ax, uniqueCategories, curLine
     else: # only one plot
@@ -519,8 +579,12 @@ def getTrialAxes(trialStats, alignTo, channel, separateBy = None, ax = None):
             fig = ax.figure
         else:
             fig, ax = plt.subplots()
-        ax.set_xlabel('Time (milliseconds) aligned to ' + alignTo)
-        ax.set_ylabel('Trial')
+        labelFontSize = LABELFONTSIZE
+        ax.set_xlabel('Time (milliseconds) aligned to ' + alignTo,
+            fontsize = labelFontSize,
+            labelpad = - 3 * labelFontSize)
+        ax.set_ylabel('Trial', fontsize = labelFontSize,
+            labelpad = - 3 * labelFontSize)
 
         return fig, ax, None, None
 
@@ -546,7 +610,7 @@ def plotRaster(spikeMats, fig, ax,
                 trialSpikeTimes = row.index[row > 0] * 1e3
                 axToPlotOn.vlines(trialSpikeTimes,
                     lineToPlot, lineToPlot + 1, colors = [colorPalette[unitIdx]],
-                    linewidths = [0.5])
+                    linewidths = [1])
             except Exception:
                 print('Error plotting raster for line %s' % idx)
                 traceback.print_exc()
@@ -593,7 +657,7 @@ def plotTrialRaster(spikes = None, trialStats = None, channel = None,
 
     if categories is None and separateBy is not None:
         categories = trialStats[separateBy]
-
+    #pdb.set_trace()
     plotRaster(spikeMats, fig, ax, categories, uniqueCategories, curLine,
         showNow = showNow, plotOpts = plotOpts)
     plt.tight_layout(pad = 0.01)
@@ -604,6 +668,7 @@ def plotSpikeTriggeredRaster(spikesFrom = None, spikesTo = None,
     spikeMats = None,
     fig = None, ax = None, titleOverride = None,
     windowSize = (-0.25, 1), timeRange = None, maxSpikesTo = None,
+    categories = None, separateByFun = None,
     showNow = False, plotOpts = {'type' : 'ticks'}):
 
     if plotOpts['type'] == 'ticks':
@@ -613,33 +678,73 @@ def plotSpikeTriggeredRaster(spikesFrom = None, spikesTo = None,
         binInterval = plotOpts['binInterval']
         binWidth = plotOpts['binWidth']
 
+    selectedIndices = None
     if spikeMats is None:
         assert spikesFrom is not None and spikesTo is not None
         assert spikesFromIdx is not None and spikesToIdx is not None
         #pdb.set_trace()
-        spikeMats = hf.binnedSpikesAlignedToSpikes(spikesFrom, spikesTo,
+        spikeMats, categories, selectedIndices = hf.binnedSpikesAlignedToSpikes(spikesFrom, spikesTo,
             spikesFromIdx, spikesToIdx,
             binInterval, binWidth, windowSize = windowSize,
+            separateByFun = separateByFun,
             timeRange = timeRange, maxSpikesTo = maxSpikesTo)
     elif maxSpikesTo is not None and len(spikeMats[0].index) > maxSpikesTo:
+        spikeMats[0] = spikeMats[0].sample(n = maxSpikesTo)
+        selectedIndices = spikeMats[0].index
         for idx, thisSpikeMat in enumerate(spikeMats):
-            spikeMats[idx] = thisSpikeMat.sample(n = maxSpikesTo)
+            if idx > 0:
+                spikeMats[idx] = thisSpikeMat.loc[selectedIndices, :]
+        if categories is not None:
+            #pdb.set_trace()
+            categories = categories.loc[selectedIndices]
 
-    if ax is not None:
-        fig = ax.figure
+    if categories is not None:
+        uniqueCategories = pd.Series(np.unique(categories))
+        uniqueCategories.dropna(inplace = True)
+        curLine = {category : 0 for category in uniqueCategories}
+        categoriesButOnlyOne = len(uniqueCategories) == 1
     else:
-        fig, ax = plt.subplots()
-        ax.set_xlabel('Time (milliseconds)')
-        ax.set_ylabel('Spike')
-        if spikesFromIdx is not None and spikesToIdx is not None:
-            ax.set_title('Channel %d triggered by channel %d unit %d' % (
-                spikesFromIdx['chan'], spikesToIdx['chan'], spikesToIdx['unit']))
-    if titleOverride is not None:
-        ax.set_title(titleOverride)
+        categoriesButOnlyOne = False
 
-    plotRaster(spikeMats, fig, ax, showNow = showNow, plotOpts = plotOpts)
+    if (separateByFun is None and categories is None) or categoriesButOnlyOne:# only one subplot
+        if ax is not None:
+            fig = ax.figure
+        else:
+            fig, ax = plt.subplots()
+            labelFontSize = LABELFONTSIZE
+            ax.set_xlabel('Time (milliseconds)',
+                fontsize = labelFontSize,
+                labelpad = - 3 * labelFontSize)
+            ax.set_ylabel('Spike', fontsize = labelFontSize,
+                labelpad = - 3 * labelFontSize)
+            if spikesFromIdx is not None and spikesToIdx is not None:
+                ax.set_title('Channel %d triggered by channel %d' % (
+                    spikesFromIdx['chan'], spikesToIdx['chan']))
+            if titleOverride is not None:
+                ax.set_title(titleOverride)
+        plotRaster(spikeMats, fig, ax, showNow = showNow, plotOpts = plotOpts)
+    else: # multiple subplots
+        if ax is None:
+            fig, ax = plt.subplots(len(uniqueCategories),1)
+            for idx, curAx in enumerate(ax):
+                labelFontSize = LABELFONTSIZE
+                curAx.set_ylabel('Spike', fontsize = labelFontSize,
+                    labelpad = - 3 * labelFontSize)
+                if idx == len(ax) - 1:
+                    curAx.set_xlabel('Time (milliseconds)',
+                        fontsize = labelFontSize,
+                        labelpad = - 3 * labelFontSize)
+            if spikesFromIdx is not None and spikesToIdx is not None:
+                fig.suptitle('Channel %d triggered by channel %d' % (
+                    spikesFromIdx['chan'], spikesToIdx['chan']))
+            if titleOverride is not None:
+                fig.suptitle(titleOverride)
+        else:
+            fig = ax[0].figure
+        plotRaster(spikeMats, fig, ax, categories, uniqueCategories, curLine,
+            showNow = showNow, plotOpts = plotOpts)
     plt.tight_layout(pad = 0.01)
-    return spikeMats, fig, ax
+    return spikeMats, fig, ax, selectedIndices
 
 #@profile
 def plotFR(spikeMats, fig, ax,
@@ -713,9 +818,10 @@ def plotFR(spikeMats, fig, ax,
     if isinstance(ax, collections.Iterable):
         for axIdx, curAx in enumerate(ax):
             curAx.set_ylim(yAxBot, yAxTop)
-            curAx.set_ylabel('Average Firing rate (spk/sec)')
+            curAx.set_ylabel('(spk/sec)')
     else:
-        ax.set_ylabel('Average Firing rate (spk/sec)')
+        ax.set_ylabel('(spk/sec)')
+        ax.set_ylim(yAxBot, yAxTop)
 
     if showNow:
         plt.show()
@@ -753,10 +859,10 @@ def plotTrialFR(spikes = None, trialStats = None, channel = None,
 
     if twin:
         if isinstance(ax, collections.Iterable):
-            for idx, thisAx in enumerate(ax):
-                ax[idx] = thisAx.twinx()
-                thisAx.set_xlabel('Time (milliseconds) aligned to ' + alignTo)
-                thisAx.set_title(uniqueCategories[idx])
+            for idx, curAx in enumerate(ax):
+                ax[idx] = curAx.twinx()
+                curAx.set_xlabel('Time (milliseconds) aligned to ' + alignTo)
+                curAx.set_title(uniqueCategories[idx])
         else:
             ax = ax.twinx()
             ax.set_xlabel('Time (milliseconds) aligned to ' + alignTo)
@@ -774,6 +880,7 @@ def plotSpikeTriggeredFR(spikesFrom = None, spikesTo = None,
     spikeMats = None,
     fig = None, ax = None, titleOverride = None, twin = False,
     windowSize = (-0.25, 1), timeRange = None,  maxSpikesTo = None,
+    categories = None, separateByFun = None,
     showNow = False, plotOpts = {'type' : 'ticks', 'kernelWidth' : 25e-3}):
 
     if plotOpts['type'] == 'ticks':
@@ -787,30 +894,69 @@ def plotSpikeTriggeredFR(spikesFrom = None, spikesTo = None,
         assert spikesFrom is not None and spikesTo is not None
         assert spikesFromIdx is not None and spikesToIdx is not None
         #pdb.set_trace()
-        spikeMats = hf.binnedSpikesAlignedToSpikes(spikesFrom, spikesTo,
+        spikeMats, categories = hf.binnedSpikesAlignedToSpikes(spikesFrom, spikesTo,
             spikesFromIdx, spikesToIdx,
             binInterval, binWidth, windowSize = windowSize,
+            separateByFun = separateByFun,
             timeRange = timeRange, maxSpikesTo = maxSpikesTo)
-    elif maxSpikesTo is not None and len(spikeMats[0].index) > maxSpikesTo:
-        for idx, thisSpikeMat in enumerate(spikeMats):
-            spikeMats[idx] = thisSpikeMat.sample(n = maxSpikesTo)
 
-    if ax is not None and twin:
-        ax = ax.twinx()
-        ax.set_ylabel('Average Firing rate (spk/sec)')
-    if ax is not None:
-        fig = ax.figure
+    elif maxSpikesTo is not None and len(spikeMats[0].index) > maxSpikesTo:
+        spikeMats[0] = spikeMats[0].sample(n = maxSpikesTo)
+        for idx, thisSpikeMat in enumerate(spikeMats):
+            if idx > 0:
+                spikeMats[idx] = thisSpikeMat.loc[spikeMats[0].index, :]
+        if categories is not None:
+            #pdb.set_trace()
+            categories = categories.loc[spikeMats[0].index]
+
+    if categories is not None:
+        uniqueCategories = pd.Series(np.unique(categories))
+        uniqueCategories.dropna(inplace = True)
+        curLine = {category : 0 for category in uniqueCategories}
+        categoriesButOnlyOne = len(uniqueCategories) == 1
     else:
-        fig, ax = plt.subplots()
-        ax.set_xlabel('Time (milliseconds)')
-        ax.set_ylabel('Average Firing rate (spk/sec)')
-        if spikesFromIdx is not None and spikesToIdx is not None:
-            ax.set_title('Channel %d triggered by channel %d unit %d' % (
-                spikesFromIdx['chan'], spikesToIdx['chan'], spikesToIdx['unit']))
-    if titleOverride is not None:
-        ax.set_title(titleOverride)
-    plotFR(spikeMats, fig, ax, showNow = showNow, plotOpts = plotOpts)
-    plt.tight_layout(pad = 0.1)
+        categoriesButOnlyOne = False
+
+    if (separateByFun is None and categories is None) or categoriesButOnlyOne:# only one subplot
+        if ax is not None and twin:
+            ax = ax.twinx()
+            ax.set_ylabel('(spk/sec)')
+        if ax is not None:
+            fig = ax.figure
+        else:
+            fig, ax = plt.subplots()
+            labelFontSize = LABELFONTSIZE
+            ax.set_xlabel('(milliseconds)', fontsize = labelFontSize,
+                labelpad = - 3 * labelFontSize)
+            if spikesFromIdx is not None and spikesToIdx is not None:
+                ax.set_title('Channel %d triggered by channel %d' % (
+                    spikesFromIdx['chan'], spikesToIdx['chan']), fontsize = labelFontSize)
+        if titleOverride is not None:
+            ax.set_title(titleOverride)
+        plotFR(spikeMats, fig, ax, showNow = showNow, plotOpts = plotOpts)
+    else: # subplots
+        if ax is None:
+            fig, ax = plt.subplots(len(uniqueCategories),1)
+        else: # ax pre-exists and has multiple subplots
+            fig = ax[0].figure
+            for idx, curAx in enumerate(ax):
+                ax[idx] = curAx.twinx()
+                labelFontSize = LABELFONTSIZE
+                curAx.set_title('Unit %d' % uniqueCategories[idx], fontsize = labelFontSize)
+                if idx == len(ax) - 1:
+                    curAx.set_xlabel('(milliseconds)', fontsize = labelFontSize,
+                        labelpad = - 3 * labelFontSize)
+                    curAx.set_ylabel('(spk/sec)', fontsize = labelFontSize,
+                        labelpad = - 3 * labelFontSize)
+            if spikesFromIdx is not None and spikesToIdx is not None:
+                fig.suptitle('Channel %d triggered by channel %d' % (
+                    spikesFromIdx['chan'], spikesToIdx['chan']))
+            if titleOverride is not None:
+                fig.suptitle(titleOverride)
+        plotFR(spikeMats, fig, ax,
+            categories, uniqueCategories,
+            showNow = showNow, plotOpts = plotOpts)
+    plt.tight_layout(pad = 0.01)
     return spikeMats, fig, ax
 
 
@@ -987,36 +1133,46 @@ def spikeTriggeredAveragePDFReport(filePath,
             print("Running staPDFReport: %d%%" % int((pairCount + 1) * 100 / pairsNum), end = '\r')
 
             pairCount += 1
-            spikeMats = hf.binnedSpikesAlignedToSpikes(spikesFrom, spikesTo,
+            spikeMats, categories, selectedIndices = hf.binnedSpikesAlignedToSpikes(spikesFrom, spikesTo,
                 spikesFromIdx, spikesToIdx,
-                binInterval, binWidth, windowSize = (-0.05, .2))
+                binInterval, binWidth, windowSize = (-0.01, .11))
 
-            titleOverride = 'Channel %d triggered by channel %d unit %d' % (
-                            spikesFromIdx['chan'], spikesToIdx['chan'], spikesToIdx['unit'])
+            titleOverride = 'Channel %d triggered by channel %d' % (
+                            spikesFromIdx['chan'], spikesToIdx['chan'])
 
-            _, fig, ax = plotSpikeTriggeredRaster(spikesFrom = None, spikesTo = None,
+            _, fig, ax, selectedIndices = plotSpikeTriggeredRaster(spikesFrom = None, spikesTo = None,
                 spikesFromIdx = None, spikesToIdx = None,
                 spikeMats = spikeMats,
                 fig = None, ax = None,
-                windowSize = None, timeRange = None, maxSpikesTo = 250,
+                categories = categories,
+                windowSize = None, timeRange = None, maxSpikesTo = 500,
                 showNow = False, plotOpts = plotOpts)
 
             plotSpikeTriggeredFR(spikesFrom = None, spikesTo = None,
                 spikesFromIdx = None, spikesToIdx = None,
                 spikeMats = spikeMats, titleOverride = titleOverride,
                 fig = fig, ax = ax, twin = True,
-                windowSize = None, timeRange = None, maxSpikesTo = 1000,
+                categories = categories,
+                windowSize = None, timeRange = None, maxSpikesTo = 5000,
                 showNow = False, plotOpts = plotOpts)
             pdf.savefig()
             plt.close()
 
-def generateSpikeTriggeredAverageReport(folderPath, trialFileFrom, trialFileTo):
+            fig, ax = plt.subplots(nrows = 1, ncols = 2)
+            plotSpike(spikesFrom, channel = spikesFromIdx['chan'], ax = ax[0],
+                axesLabel = True)
+            plotSpike(spikesTo, channel = spikesToIdx['chan'], ax = ax[1],
+                axesLabel = True)
+            pdf.savefig()
+            plt.close()
+
+def generateSpikeTriggeredAverageReport(folderPath, trialFileFrom, trialFileTo, mechanism = 'wave_clus'):
     key, value = next(iter(trialFileFrom.items()))
     newName = value['ns5FileName'] + '_' + capitalizeFirstLetter(key) + '_exclude_' + '_'.join([str(i) for i in value['excludeClus']]) + '_ALIGNEDTO_'
-    spikeStructFrom, spikesFrom = loadSpikeInfo(folderPath, key, value)
+    spikeStructFrom, spikesFrom = loadSpikeInfo(folderPath, key, value, mechanism = mechanism)
     key, value = next(iter(trialFileTo.items()))
     newName = newName + value['ns5FileName'] + '_' + capitalizeFirstLetter(key) + '_exclude_' + '_'.join([str(i) for i in value['excludeClus']])
-    spikeStructTo, spikesTo = loadSpikeInfo(folderPath, key, value)
+    spikeStructTo, spikesTo = loadSpikeInfo(folderPath, key, value, mechanism = mechanism)
 
     spikesFromList = []
     for idx, channel in enumerate(spikesFrom['ChannelID']):
@@ -1028,12 +1184,46 @@ def generateSpikeTriggeredAverageReport(folderPath, trialFileFrom, trialFileTo):
     for idx, channel in enumerate(spikesTo['ChannelID']):
         unitsOnThisChan = np.unique(spikesTo['Classification'][idx])
         if unitsOnThisChan.any():
-            for unitIdx in range(len(unitsOnThisChan)):
-                spikesToList.append({'chan':channel,'unit':unitIdx})
+            spikesToList.append({'chan':channel})
     #pdb.set_trace()
     spikeTriggeredAveragePDFReport('./', spikesFrom, spikesTo, spikesFromList,
         spikesToList, newName = newName, enableFR = True,
-        plotOpts = {'type' : 'ticks', 'kernelWidth' : 5e-3})
+        plotOpts = {'type' : 'ticks', 'kernelWidth' : 5e-3, 'errorBar' : 'sem'})
+
+def generateStimTriggeredAverageReport(folderPath, trialFileFrom, trialFileStim, mechanism = 'wave_clus'):
+    key, value = next(iter(trialFileFrom.items()))
+    newName = value['ns5FileName'] + '_' + capitalizeFirstLetter(key) + '_exclude_' + '_'.join([str(i) for i in value['excludeClus']]) + '_ALIGNEDTO_'
+    spikeStructFrom, spikesFrom = loadSpikeInfo(folderPath, key, value, mechanism = mechanism)
+
+    spikesFromList = []
+    for idx, channel in enumerate(spikesFrom['ChannelID']):
+        unitsOnThisChan = np.unique(spikesFrom['Classification'][idx])
+        if unitsOnThisChan.any():
+            spikesFromList.append({'chan':channel,'units':list(range(len(unitsOnThisChan)))})
+
+    key, value = next(iter(trialFileStim.items()))
+    newName = newName + value['ns5FileName'] + '_' + capitalizeFirstLetter(key) + '_exclude_' + '_'.join([str(i) for i in value['excludeClus']])
+    spikeStructStim, spikesStim = loadSpikeInfo(folderPath, key, value, mechanism = 'mat') # stim only from mat file
+
+    spikesStimList = []
+    impedances = pd.read_csv(os.path.join(folderPath, 'Murdoc Impedances'), skiprows = [0, 1, 2, 3, 4, 5, 6, 7, 9], delim_whitespace = True)
+    impedances['MaxAmp(uA)'] = (8.5* 1e3) / impedances['Mag(kOhms)']
+    impedances.index = impedances.index + 5121
+
+    spikesStim['Units'] = 'uA'
+    catSpikeFun = hf.catSpikesByAmpGenerator(5, type = 'minPeak', subSet = slice(10, 30))
+    for idx, channel in enumerate(spikesStim['ChannelID']):
+        unitsOnThisChan = np.unique(spikesStim['Classification'][idx])
+        if unitsOnThisChan.any():
+            spikesStimList.append({'chan':channel})
+        spikesStim['Waveforms'][idx] = (np.array(spikesStim['Waveforms'][idx],
+            dtype = np.float32) * 8.5 *1e3) / (2 **15 * impedances.loc[channel, 'Mag(kOhms)'])
+
+        spikesStim['Classification'][idx] = catSpikeFun(spikesStim, idx)
+    #pdb.set_trace()
+    spikeTriggeredAveragePDFReport('./', spikesFrom, spikesStim, spikesFromList,
+        spikesStimList, newName = newName, enableFR = True,
+        plotOpts = {'type' : 'ticks', 'kernelWidth' : 5e-3, 'errorBar' : 'sem'})
 
 def capitalizeFirstLetter(stringInput):
     return stringInput[0].capitalize() + stringInput[1:]
@@ -1062,7 +1252,8 @@ def loadEventInfo(folderPath, eventInfo, forceRecalc = False):
         print('Recalculated trial data and saved to pickle.')
     return trialStats, trialEvents
 
-def loadSpikeInfo(folderPath, arrayName, arrayInfo, forceRecalc = False):
+def loadSpikeInfo(folderPath, arrayName, arrayInfo,
+    forceRecalc = False, mechanism = 'wave_clus'):
     if not forceRecalc:
     # if not requiring a recalculation, load from pickle
         try:
@@ -1076,15 +1267,29 @@ def loadSpikeInfo(folderPath, arrayName, arrayInfo, forceRecalc = False):
             forceRecalc = True
 
     if forceRecalc:
-        spikes = getWaveClusSpikes(
-            os.path.join(folderPath, 'wave_clus', arrayInfo['ns5FileName']) + '/',
-            nevIDs = arrayInfo['nevIDs'], plotting = False, excludeClus = arrayInfo['excludeClus'])
+        if mechanism == 'wave_clus':
+            spikes = getWaveClusSpikes(
+                os.path.join(folderPath, 'wave_clus', arrayInfo['ns5FileName']) + '/',
+                nevIDs = arrayInfo['nevIDs'], plotting = False, excludeClus = arrayInfo['excludeClus'])
+            print('Recalculated spike data from wave_clus folder and saved to pickle.')
+        elif mechanism == 'nev':
+            filePath = os.path.join(folderPath, arrayInfo['ns5FileName'] + '.nev')
+            spikes = hf.getNEVData(filePath, arrayInfo['nevIDs'])
+        elif mechanism == 'mat':
+            spikes = getNevMatSpikes(
+                os.path.join(folderPath, arrayInfo['ns5FileName']+'.mat'),
+                nevIDs = arrayInfo['nevIDs'], plotting = False, excludeClus = arrayInfo['excludeClus'])
+
         pickle.dump(spikes,
-            open(os.path.join(folderPath, arrayInfo['ns5FileName']) + '_spikes' + capitalizeFirstLetter(arrayName) + '_exclude_' + '_'.join([str(i) for i in arrayInfo['excludeClus']]) + '.pickle', 'wb'))
-        print('Recalculated spike data and saved to pickle.')
+            open(os.path.join(folderPath, arrayInfo['ns5FileName']) + '_spikes' +
+                capitalizeFirstLetter(arrayName) + '_exclude_' +
+                '_'.join([str(i) for i in arrayInfo['excludeClus']]) +
+                '.pickle', 'wb'))
+        print('Recalculated spike data from wave_clus folder and saved to pickle.')
 
     try:
-        spikeStruct = pickle.load(open(os.path.join(folderPath, 'coords') + capitalizeFirstLetter(arrayName) + '.pickle', 'rb'))
+        spikeStruct = pickle.load(open(os.path.join(folderPath, 'coords') +
+            capitalizeFirstLetter(arrayName) + '.pickle', 'rb'))
     except:
         print('Spike metadata not pickled. Recalculating...')
         spikeStruct = loadKSDir(os.path.join(folderPath, 'Kilosort/'+ arrayInfo['ns5FileName'] + '_' + capitalizeFirstLetter(arrayName)), loadPCs = False)

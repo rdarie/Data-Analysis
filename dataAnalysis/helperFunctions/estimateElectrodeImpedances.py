@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 import pdb
 import matplotlib.pyplot as plt
+from lmfit import Minimizer, Parameters, report_fit
 
 def doubleLayerCapacitancePerArea(V):
     c_H = 45 # uF/cm^2
@@ -30,15 +31,15 @@ def faradaicResistancePerArea(V):
     alpha = 1/2
     beta = 37.44 # V^-1
     r_min = 40 # Ohm * cm
-    
+
     if abs(V) > 10:
         r_f = r_min
     else:
-        try:
-            r_f = (J_0 * (alpha * beta * m.exp(-alpha * beta * V) +
-                (1-alpha) * beta * m.exp((1-alpha) * beta * V) )) ** -1 + r_min
-        except:
-            pdb.set_trace()
+        #try:
+        r_f = (J_0 * (alpha * beta * m.exp(-alpha * beta * V) +
+            (1-alpha) * beta * m.exp((1-alpha) * beta * V) )) ** -1 + r_min
+        #except:
+        #    pdb.set_trace()
     # r_f in Ohm * cm ^ 2
     return r_f
 
@@ -92,7 +93,7 @@ def ETITransient(S, I, PW, R_s, openCircuitV = 0, r_f = None, c_dl = None, step 
         I_R = curV / curR_f
         I_C = curI - I_R
         dVdt = I_C / curC_dl
-        
+
         curV += dVdt * step
 
         V.loc[curT] = curV + curI * R_s + openCircuitV
@@ -101,8 +102,10 @@ def ETITransient(S, I, PW, R_s, openCircuitV = 0, r_f = None, c_dl = None, step 
 
     return V, R_f, C_dl
 
-def ETIPulseResponse(S, IAmp, PW = None, pulseShape = 'biphasic-symmetric', R_s = 150, openCircuitV = 0, r_f = None, c_dl = None, step = 1e-6, F = None, nPeriods = None):
-    
+def ETIPulseResponse(S, IAmp, PW = None, pulseShape = 'biphasic-symmetric',
+    R_s = 150, openCircuitV = 0, r_f = None, c_dl = None, step = 1e-6,
+    F = None, nPeriods = None):
+
     if pulseShape == 'biphasic-symmetric':
         grid = PW / step
         t = np.linspace(- 0.5 * PW, 2.5 * PW, 3 * grid) # t in sec
@@ -121,9 +124,101 @@ def ETIPulseResponse(S, IAmp, PW = None, pulseShape = 'biphasic-symmetric', R_s 
         t = np.linspace(- 0.5 * PW, 1.5 * PW, 2 * grid) # t in sec
         sineWave = np.tile(np.sin(np.linspace(-m.pi, m.pi, 1 / (F * step))), nPeriods)
         I = pd.Series(0, index = t)
-        I.loc[np.logical_and(t > 0 , t < PW)] = sineWave * IAmp       
+        I.loc[np.logical_and(t > 0 , t < PW)] = sineWave * IAmp
+
     V, R_f, C_dl = ETITransient(S, I, PW, R_s, openCircuitV = openCircuitV, r_f = r_f, c_dl = c_dl, step = step)
     return I, V, R_f, C_dl
+
+def fitETIPulseResponse(
+    # required variables
+    V, indexIntoModel, PW, step, pulseShape = 'biphasic-symmetric',
+    F = None, nPeriods = None,
+    # Variables that can be fit
+    S = None, IAmp = None, R_s = None,
+    openCircuitV = None, r_f = None, c_dl = None,
+    ):
+
+    params = Parameters()
+    if S is None:
+        fitETIPulseResponse.S = None
+        params.add('S', value=1) # mm^2
+    else:
+        fitETIPulseResponse.S = S
+    if IAmp is None:
+        fitETIPulseResponse.IAmp = None
+        params.add('IAmp', value=100e-6) # A
+    else:
+        fitETIPulseResponse.IAmp = IAmp
+    if R_s is None:
+        fitETIPulseResponse.R_s = None
+        params.add('R_s', value=10e3) # ohms
+    else:
+        fitETIPulseResponse.R_s = R_s
+    if openCircuitV is None:
+        fitETIPulseResponse.openCircuitV = None
+        params.add('openCircuitV', value=0.5, min = -1, max = 1) # V
+    else:
+        fitETIPulseResponse.openCircuitV = openCircuitV
+    if r_f is None:
+        fitETIPulseResponse.r_f = None
+        params.add('r_f', value=1, min = 1e-2, max = 600) # ohms * cm^2
+    else:
+        fitETIPulseResponse.r_f = r_f
+    if c_dl is None:
+        fitETIPulseResponse.c_dl = None
+        params.add('c_dl', value=100, min = 5e-1, max = 500) # uF / cm^2
+    else:
+        fitETIPulseResponse.c_dl = c_dl
+
+    def fcn2min(params, data):
+        if fitETIPulseResponse.S is not None:
+            min_S = fitETIPulseResponse.S
+        else:
+            min_S = params['S'] # mm^2
+
+        if fitETIPulseResponse.IAmp is not None:
+            min_IAmp = fitETIPulseResponse.IAmp
+        else:
+            min_IAmp = params['IAmp'] # A
+
+        if fitETIPulseResponse.openCircuitV is not None:
+            min_openCircuitV = fitETIPulseResponse.openCircuitV
+        else:
+            min_openCircuitV = params['openCircuitV'] # V
+
+        if fitETIPulseResponse.R_s is not None:
+            min_R_s = fitETIPulseResponse.R_s
+        else:
+            min_R_s = params['R_s'] # ohms
+
+        if fitETIPulseResponse.r_f is not None:
+            min_r_f = fitETIPulseResponse.r_f
+        else:
+            min_r_f = params['r_f'] # ohms * cm^2
+
+        if fitETIPulseResponse.c_dl is not None:
+            min_c_dl = fitETIPulseResponse.c_dl
+        else:
+            min_c_dl = params['c_dl'] # uF / cm^2
+
+        upSample = 25
+        I, modelV, R_f, C_dl = ETIPulseResponse(min_S, min_IAmp, PW = PW, pulseShape = pulseShape,
+            R_s = min_R_s, openCircuitV = min_openCircuitV, r_f = min_r_f, c_dl = min_c_dl,
+            step = step / upSample,
+            F = F, nPeriods = nPeriods)
+        modelV = modelV.iloc[::upSample]
+
+        plotting = True
+        if plotting:
+            plt.plot(range(data.shape[1]), data[0,:], 'k-', label = 'Target')
+            plt.plot(range(data.shape[1]), modelV.iloc[indexIntoModel], 'r.', label = 'Model')
+            plt.legend()
+            plt.show()
+        repModelV = np.repeat(modelV.iloc[indexIntoModel].values[np.newaxis,:], data.shape[0], axis = 0)
+        return (data-repModelV).flatten()
+
+    minner = Minimizer(fcn2min, params, fcn_args=([V]))
+    return minner.minimize()
 
 def ETIImpedanceFromTransient(S, IAmp, PW, R_s = 150, openCircuitV = 0, r_f = None, c_dl = None, step = 1e-6):
     I, V, R_f, C_dl = ETIPulseResponse(S, IAmp, PW, pulseShape = 'monophasic', R_s = R_s, openCircuitV = openCircuitV, r_f = r_f, c_dl = c_dl, step = step)
@@ -138,7 +233,7 @@ if __name__ == "main":
     """
     F = 1e3 # Hz
     nPeriods = 20 # count of periods
-    
+
     I, V, R_f, C_dl = eti.ETIPulseResponse(S, IAmp, F = F, nPeriods = nPeriods,
         pulseShape = 'sine', R_s = R_s, openCircuitV = openCircuitV,
         step = 1e-6)
@@ -146,7 +241,7 @@ if __name__ == "main":
     I, V, R_f, C_dl = eti.ETIPulseResponse(S, IAmp, PW,
         pulseShape = 'biphasic-symmetric', R_s = R_s, openCircuitV = openCircuitV,
         step = 1e-6)
-    
+
     cmap=plt.get_cmap('Set1')
     fig, ax = plt.subplots(2,1,sharex = 'col')
     line1, = ax[0].plot(V.index * 1e3, V, label = 'Interface Voltage (nonlinear model)', color = cmap(0))
@@ -161,8 +256,7 @@ if __name__ == "main":
     line2, = ax2.plot(I.index * 1e3, I * 1e3, label = 'Current', color = cmap(1))
     ax2.set_ylabel('Current (mA)')
     plt.legend(handles = (line1, line2))
-    
-    
+
     line3, = ax[1].plot(C_dl.index * 1e3, C_dl * 1e6, label = 'Double layer capacitance', color = cmap(2))
     ax[1].set_ylabel('Capacitance (uF)')
     ax[1].set_xlabel('time (msec)')
@@ -172,14 +266,15 @@ if __name__ == "main":
     ax2.set_ylabel('Resistance (Ohms)')
     plt.legend(handles = (line3, line4))
     plt.show()
-    
+
     print('The estimated impedance is %4.2f Ohms' % ((V.max() - openCircuitV) / IAmp - R_s))
+
     """
     Z = eti.ETIImpedance(S, F = 1e3, R_f = R_f.mean(), C_dl = C_dl.mean()) + R_s
-    
+
     VppSteadyState = V.loc[V.index > 15e-3].max() - V.loc[V.index > 15e-3].min()
     Zeffective = VppSteadyState / (IAmp * 2)
-    
+
     r_f = R_f.mean() * (S / 100)
     c_dl = C_dl.mean() / (S / 100)
     """

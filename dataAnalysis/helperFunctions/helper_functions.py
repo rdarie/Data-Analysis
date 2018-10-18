@@ -1,7 +1,4 @@
-try:
-    from brpylib import NsxFile, NevFile, brpylib_ver
-except:
-    pass
+from brPY.brpylib import NsxFile, NevFile, brpylib_ver
 try:
     import plotly
     import plotly.plotly as py
@@ -83,7 +80,9 @@ def getNEVData(filePath, elecIds):
     # Open file and extract headers
     nev_file = NevFile(filePath)
     # Extract data and separate out spike data
-    spikes = nev_file.getdata(elecIds)['spike_events']
+    spikes = nev_file.getdata(elecIds)
+
+    spikes = spikes['spike_events']
 
     spikes['basic_headers'] = nev_file.basic_header
     spikes['extended_headers'] = nev_file.extended_headers
@@ -101,9 +100,8 @@ def getNSxData(filePath, elecIds, startTime_s, dataLength_s, downsample = 1):
     # Open file and extract headers
 
     nsx_file = NsxFile(filePath)
-    #
     # Extract data - note: data will be returned based on *SORTED* elec_ids, see cont_data['elec_ids']
-    #pdb.set_trace()
+
     channelData = nsx_file.getdata(elecIds, startTime_s, dataLength_s, downsample)
 
     rowIndex = range(int(channelData['start_time_s'] * channelData['samp_per_s']),
@@ -819,6 +817,42 @@ def plotSpectrum(P, fs, start_time_s, end_time_s, fr_start = 10, fr_stop = 600, 
         plt.show(block = False)
     return f
 
+def catSpikesByAmpGenerator(nBins = None, type = 'RMS', timePoint = None, subSet = slice(None, None), bounds = None):
+    # creates a function that takes in spikes, chanIdx and categorizes them by the rule
+    calcBounds = bounds is None
+    if type == 'RMS':
+        def catSpikesByAmp(spikes, chanIdx):
+            rms = np.sqrt(np.mean(np.array(spikes['Waveforms'][chanIdx][:,subSet], dtype = np.float32) ** 2, axis = 1))
+            if calcBounds:
+                bounds = np.linspace(rms.min() * 0.99, rms.max() * 1.01, nBins + 1)
+            return np.digitize(rms, bounds)
+        return catSpikesByAmp
+
+    if type == 'atTime':
+        assert timePoint is not None
+        def catSpikesByAmp(spikes, chanIdx):
+            val = spikes['Waveforms'][chanIdx][:, timePoint]
+            if calcBounds:
+                bounds = np.linspace(val.min(), val.max(), nBins + 1)
+            return np.digitize(val, bounds)
+        return catSpikesByAmp
+
+    if type == 'minPeak':
+        def catSpikesByAmp(spikes, chanIdx):
+            val = abs(spikes['Waveforms'][chanIdx][:,subSet].min(axis = 1))
+            #pdb.set_trace()
+            if calcBounds:
+                bounds = np.linspace(val.min() * 0.99, val.max() * 1.01, nBins + 1)
+            return np.digitize(val, bounds)
+        return catSpikesByAmp
+
+    if type == 'Classification':
+        def catSpikesByAmp(spikes, chanIdx):
+            return spikes['Classification'][chanIdx]
+        return catSpikesByAmp
+
+    return
+
 def binnedEvents(timeStamps, chans, binInterval, binWidth, timeStart, timeEnd):
     #pdb.set_trace()
     binCenters = np.arange(timeStart + binWidth / 2, timeEnd - binWidth / 2 + binInterval, binInterval)
@@ -903,31 +937,40 @@ def binnedSpikesAligned(spikes, alignTimes, binInterval, binWidth, channel,
 def binnedSpikesAlignedToSpikes(spikesFrom, spikesTo,
     spikesFromIdx, spikesToIdx,
     binInterval, binWidth, windowSize = (-0.25, 1),
+    separateByFun = catSpikesByAmpGenerator(type = 'Classification'),
     timeRange = None, maxSpikesTo = None, discardEmpty = False):
 
     # get spike firing times to align to
+    categories = None
     ChanIdxTo = spikesTo['ChannelID'].index(spikesToIdx['chan'])
     unitsOnThisChanTo = np.unique(spikesTo['Classification'][ChanIdxTo])
 
     if unitsOnThisChanTo is not None:
-        unitName = unitsOnThisChanTo[spikesToIdx['unit']]
-        unitMask = spikesTo['Classification'][ChanIdxTo] == unitName
-        alignTimes = pd.Series(spikesTo['TimeStamps'][ChanIdxTo][unitMask])
+        alignTimes = pd.Series(spikesTo['TimeStamps'][ChanIdxTo])
+        if separateByFun is not None:
+            categories = pd.Series(separateByFun(spikesTo, ChanIdxTo), index = alignTimes.index)
 
     if timeRange is not None:
         timeMask = np.logical_and(alignTimes > timeRange[0],
             alignTimes < timeRange[1])
         alignTimes = alignTimes.loc[timeMask]
+        if separateByFun is not None:
+            categories = categories.loc[timeMask]
 
+    selectedIndices = None
     if maxSpikesTo is not None:
         if len(alignTimes.index) > maxSpikesTo:
             alignTimes = alignTimes.sample(n = maxSpikesTo)
+            selectedIndices = alignTimes.index
+            if separateByFun is not None:
+                categories = categories.loc[selectedIndices]
+
 
     spikeMats = binnedSpikesAligned(spikesFrom, alignTimes, binInterval,
         binWidth, spikesFromIdx['chan'], windowSize = windowSize,
         discardEmpty = discardEmpty)
 
-    return spikeMats
+    return spikeMats, categories, selectedIndices
 
 def binnedSpikesAlignedToTrial(spikes, binInterval, binWidth, trialStats,
     alignTo, channel, windowSize = (-0.25, 1), timeRange = None,
@@ -1038,42 +1081,50 @@ def plotBinnedSpikes(spikeMat, show = True, normalizationType = 'linear',
 def plot_spikes(spikes, chans):
     # Initialize plots
     #pdb.set_trace()
-    colors      = 'kbgrm'
+    colors      =  sns.color_palette()
     line_styles = ['-', '--', ':', '-.']
     f, axarr    = plt.subplots(len(chans))
-    samp_per_ms = spikes['basic_headers']['SampleTimeResolution'] / 1000.0
+    if len(chans) == 1:
+        axarr = [axarr]
+    samp_per_ms = spikes['basic_headers']['TimeStampResolution'] / 1000.0
 
     for i in range(len(chans)):
 
         # Extract the channel index, then use that index to get unit ids, extended header index, and label index
         ch_idx      = spikes['ChannelID'].index(chans[i])
         units       = sorted(list(set(spikes['Classification'][ch_idx])))
-        ext_hdr_idx = spikes['NEUEVWAV_HeaderIndices'][ch_idx]
-        lbl_idx     = next(idx for (idx, d) in enumerate(spikes['extended_headers'])
-                           if d['PacketID'] == 'NEUEVLBL' and d['ElectrodeID'] == chans[i])
+        unitIds     = list(range(len(units)))
+        #ext_hdr_idx = spikes['NEUEVWAV_HeaderIndices'][ch_idx]
+        #lbl_idx     = next(idx for (idx, d) in enumerate(spikes['extended_headers'])
+        #                   if d['PacketID'] == 'NEUEVLBL' and d['ElectrodeID'] == chans[i])
 
         # loop through all spikes and plot based on unit classification
         # note: no classifications in sampleData, i.e., only unit='none' exists in the sample data
         ymin = 0; ymax = 0
-        t = np.arange(spikes['extended_headers'][ext_hdr_idx]['SpikeWidthSamples']) / samp_per_ms
+        t = np.arange(spikes['Waveforms'][0].shape[1]) / samp_per_ms
 
         for j in range(len(units)):
             unit_idxs   = [idx for idx, unit in enumerate(spikes['Classification'][ch_idx]) if unit == units[j]]
-            unit_spikes = np.array(spikes['Waveforms'][ch_idx][unit_idxs]) / 1000
+            unit_spikes = np.array(spikes['Waveforms'][ch_idx][unit_idxs])
 
             if units[j] == 'none':
                 color_idx = 0; ln_sty_idx = 0
             else:
-                color_idx = (units[j] % len(colors)) + 1
-                ln_sty_idx = units[j] // len(colors)
+                color_idx = (unitIds[j] % len(colors)) + 1
+                ln_sty_idx = unitIds[j] // len(colors)
 
             for k in range(unit_spikes.shape[0]):
-                axarr[i].plot(t, unit_spikes[k], (colors[color_idx] + line_styles[ln_sty_idx]))
-                if min(unit_spikes[k]) < ymin: ymin = min(unit_spikes[k])
-                if max(unit_spikes[k]) > ymax: ymax = max(unit_spikes[k])
+                try:
+                    axarr[i].plot(t, unit_spikes[k], line_styles[ln_sty_idx], c = colors[color_idx])
+                    if min(unit_spikes[k]) < ymin: ymin = min(unit_spikes[k])
+                    if max(unit_spikes[k]) > ymax: ymax = max(unit_spikes[k])
+                except:
+                    #pdb.set_trace()
+                    pass
 
-        if lbl_idx: axarr[i].set_ylabel(spikes['extended_headers'][lbl_idx]['Label'] + ' ($\mu$V)')
-        else:       axarr[i].set_ylabel('Channel ' + str(chans[i]) + ' ($\mu$V)')
+        #if lbl_idx: axarr[i].set_ylabel(spikes['extended_headers'][lbl_idx]['Label'] + ' ($\mu$V)')
+        #else:       axarr[i].set_ylabel('Channel ' + str(chans[i]) + ' ($\mu$V)')
+        axarr[i].set_ylabel('Channel ' + str(chans[i]) + ' ' + spikes['Units'])
         axarr[i].set_ylim((ymin * 1.05, ymax * 1.05))
         axarr[i].locator_params(axis='y', nbins=10)
 
