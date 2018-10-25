@@ -417,7 +417,7 @@ def plotSpike(spikes, channel, showNow = False, ax = None, acrossArray = False, 
             xIdx, yIdx = coordsToIndices(xcoords, ycoords)
             fig, ax = plt.subplots(nrows = max(np.unique(xIdx)) + 1, ncols = max(np.unique(yIdx)) + 1)
 
-        colorPalette = sns.color_palette()
+        colorPalette = sns.color_palette(n_colors = 15)
         for unitIdx, unitName in enumerate(unitsOnThisChan):
 
             unitMask = spikes['Classification'][ChanIdx] == unitName
@@ -445,7 +445,7 @@ def plotSpike(spikes, channel, showNow = False, ax = None, acrossArray = False, 
                 thisSpike = np.mean(waveForms, axis = 0)
                 thisError = np.std(waveForms, axis = 0)
                 timeRange = np.arange(len(thisSpike)) / 3e4 * 1e3
-                colorPalette = sns.color_palette()
+                colorPalette = sns.color_palette(n_colors = 15)
                 numSDs = 2
                 ax.fill_between(timeRange, thisSpike - numSDs*thisError, thisSpike + numSDs*thisError, alpha=0.4, facecolor=colorPalette[unitIdx], label='chan %s, unit %s (%d SDs)' % (channel, unitName, numSDs))
                 ax.plot(timeRange, thisSpike, linewidth=1, color=colorPalette[unitIdx])
@@ -469,7 +469,7 @@ def plotISIHistogram(spikes, channel, showNow = False, ax = None,
     unitsOnThisChan = np.unique(spikes['Classification'][idx])
 
     if unitsOnThisChan is not None:
-        colorPalette = sns.color_palette()
+        colorPalette = sns.color_palette(n_colors = 15)
         for unitIdx, unitName in enumerate(unitsOnThisChan):
             unitMask = spikes['Classification'][idx] == unitName
             theseTimes = spikes['TimeStamps'][idx][unitMask]
@@ -591,24 +591,28 @@ def getTrialAxes(trialStats, alignTo, channel, separateBy = None, ax = None):
 #@profile
 def plotRaster(spikeMats, fig, ax,
     categories = None, uniqueCategories = None, curLine = None,
-    showNow = False, plotOpts = {'type' : 'ticks'}):
-    colorPalette = sns.color_palette()
+    showNow = False, plotOpts = {'type' : 'ticks',
+        'binInterval' : (3**-1) * 1e-3, 'binWidth' : (3**-1)*1e-3}):
+
+    colorPalette = sns.color_palette(n_colors = 15)
+
+    # spikeMat columns are in seconds, convert to milliseconds
+    indexConversionFactor = 1e3
     for unitIdx, thisSpikeMat in enumerate(spikeMats):
         for idx, row in thisSpikeMat.iterrows():
-
             try:
                 if isinstance(ax, collections.Iterable):
                     curCategory = categories.loc[idx]
                     whichAx = pd.Index(uniqueCategories).get_loc(curCategory)
-                    axToPlotOn = ax[whichAx]
+                    curAx = ax[whichAx]
                     lineToPlot = curLine[curCategory]
                     curLine[curCategory] += 1
                 else:
-                    axToPlotOn = ax
+                    curAx = ax
                     lineToPlot = thisSpikeMat.index.get_loc(idx)
                 # # TODO: add option to plot a heatmap style rendering
-                trialSpikeTimes = row.index[row > 0] * 1e3
-                axToPlotOn.vlines(trialSpikeTimes,
+                trialSpikeTimes = row.index[row > 0] * indexConversionFactor
+                curAx.vlines(trialSpikeTimes,
                     lineToPlot, lineToPlot + 1, colors = [colorPalette[unitIdx]],
                     linewidths = [1])
             except Exception:
@@ -619,24 +623,32 @@ def plotRaster(spikeMats, fig, ax,
         if isinstance(ax, collections.Iterable):
             curLine = {category : 0 for category in uniqueCategories}
 
+    if isinstance(ax, collections.Iterable):
+        for curAx in ax:
+            curAx.grid(b=True)
+    else:
+        ax.grid(b=True)
+
     if showNow:
         plt.show()
 
     return ax
 
 def plotTrialRaster(spikes = None, trialStats = None, channel = None,
+    correctAlignmentSpikes = 0,
     spikeMats = None, categories = None,
     fig = None, ax = None, uniqueCategories = None, curLine = None,
     alignTo = None, separateBy = None,
     windowSize = (-0.25, 1), timeRange = None, maxTrial = None,
-    showNow = False, plotOpts = {'type' : 'ticks'}):
+    showNow = False, plotOpts = {'type' : 'ticks',
+    'binInterval' : (3**-1)*1e-3, 'binWidth' : (3**-1)*1e-3}
+    ):
 
-    if plotOpts['type'] == 'ticks':
-        binInterval = 1e-3
-        binWidth = 1e-3
-    elif plotOpts['type'] == 'binned':
-        binInterval = plotOpts['binInterval']
-        binWidth = plotOpts['binWidth']
+    binInterval = plotOpts['binInterval']
+    binWidth = plotOpts['binWidth']
+
+    if correctAlignmentSpikes: #correctAlignmentSpikes units in samples
+        spikes = hf.correctSpikeAlignment(spikes, correctAlignmentSpikes)
 
     if spikeMats is None:
         assert spikes is not None and trialStats is not None and channel is not None
@@ -665,24 +677,28 @@ def plotTrialRaster(spikes = None, trialStats = None, channel = None,
 
 def plotSpikeTriggeredRaster(spikesFrom = None, spikesTo = None,
     spikesFromIdx = None, spikesToIdx = None,
+    correctAlignmentSpikesFrom = 0, correctAlignmentSpikesTo = 0,
     spikeMats = None,
     fig = None, ax = None, titleOverride = None,
     windowSize = (-0.25, 1), timeRange = None, maxSpikesTo = None,
     categories = None, separateByFun = None,
-    showNow = False, plotOpts = {'type' : 'ticks'}):
+    showNow = False, plotOpts = {'type' : 'ticks',
+    'binInterval' : (3**-1)*1e-3, 'binWidth' : (3**-1)*1e-3}
+    ):
 
-    if plotOpts['type'] == 'ticks':
-        binInterval = 1e-3
-        binWidth = 1e-3
-    elif plotOpts['type'] == 'binned':
-        binInterval = plotOpts['binInterval']
-        binWidth = plotOpts['binWidth']
+    binInterval = plotOpts['binInterval']
+    binWidth = plotOpts['binWidth']
+
+    if correctAlignmentSpikesFrom: #correctAlignmentSpikesFrom units in samples
+        spikesFrom = hf.correctSpikeAlignment(spikesFrom, correctAlignmentSpikesFrom)
+    if correctAlignmentSpikesTo: #correctAlignmentSpikesFrom units in samples
+        spikesTo = hf.correctSpikeAlignment(spikesTo, correctAlignmentSpikesTo)
 
     selectedIndices = None
     if spikeMats is None:
         assert spikesFrom is not None and spikesTo is not None
         assert spikesFromIdx is not None and spikesToIdx is not None
-        #pdb.set_trace()
+
         spikeMats, categories, selectedIndices = hf.binnedSpikesAlignedToSpikes(spikesFrom, spikesTo,
             spikesFromIdx, spikesToIdx,
             binInterval, binWidth, windowSize = windowSize,
@@ -707,6 +723,7 @@ def plotSpikeTriggeredRaster(spikesFrom = None, spikesTo = None,
         categoriesButOnlyOne = False
 
     if (separateByFun is None and categories is None) or categoriesButOnlyOne:# only one subplot
+
         if ax is not None:
             fig = ax.figure
         else:
@@ -750,13 +767,21 @@ def plotSpikeTriggeredRaster(spikesFrom = None, spikesTo = None,
 def plotFR(spikeMats, fig, ax,
     categories = None, uniqueCategories = None,
     showNow = False,
-    plotOpts = {'type' : 'ticks', 'kernelWidth' : 25e-3, 'errorBar' : 'std'}):
+    plotOpts = {'type' : 'ticks', 'kernelWidth' : 25e-3,
+        'binInterval' : (3**-1)*1e-3, 'binWidth' : (3**-1)*1e-3, 'errorBar' : 'sem'}
+    ):
 
     if plotOpts['type'] == 'ticks':
         kernelWidth = plotOpts['kernelWidth']
         smoothingStep = True
+        binWidth = plotOpts['binWidth']
     elif plotOpts['type'] == 'binned':
         smoothingStep = False
+
+    if smoothingStep:
+        # kernel width in seconds
+        # bin width in seconds
+        gaussianRadius = int(kernelWidth / (binWidth * 2)) # samples
 
     if isinstance(ax, collections.Iterable):
         meanSpikeMat = {category : [None for i in spikeMats] for category in uniqueCategories}
@@ -767,7 +792,7 @@ def plotFR(spikeMats, fig, ax,
                 tempDF = pd.DataFrame(thisSpikeMat.loc[categories == category], copy = True)
                 if smoothingStep:
                     tempDF = tempDF.apply(gaussian_filter1d, axis = 1, raw = True,
-                        result_type = 'expand', args = (int(kernelWidth * 1e3 / 2),))
+                        result_type = 'expand', args = (gaussianRadius,))
                 meanSpikeMat[category][idx] = tempDF.mean(axis = 0)
                 stdSpikeMat[category][idx]  = tempDF.std(axis = 0)
 
@@ -782,7 +807,7 @@ def plotFR(spikeMats, fig, ax,
             tempDF = pd.DataFrame(thisSpikeMat, copy = True)
             if smoothingStep:
                 tempDF = tempDF.apply(gaussian_filter1d, axis = 1, raw = True,
-                    result_type = 'expand', args = (int(kernelWidth * 1e3 / 2),))
+                    result_type = 'expand', args = (gaussianRadius,))
 
             meanSpikeMat['all'][idx] = tempDF.mean(axis = 0)
             stdSpikeMat['all'][idx]  = tempDF.std(axis = 0)
@@ -791,7 +816,7 @@ def plotFR(spikeMats, fig, ax,
                 if plotOpts['errorBar'] == 'sem':
                     stdSpikeMat['all'][idx] = 1.96 * stdSpikeMat['all'][idx] / len(stdSpikeMat['all'][idx].index)
 
-    colorPalette = sns.color_palette()
+    colorPalette = sns.color_palette(n_colors = 15)
     yAxBot, yAxTop = 1e6,-1e6
     for category, meanSpikeMatThisCategory in meanSpikeMat.items():
         stdSpikeMatThisCategory = stdSpikeMat[category]
@@ -819,9 +844,11 @@ def plotFR(spikeMats, fig, ax,
         for axIdx, curAx in enumerate(ax):
             curAx.set_ylim(yAxBot, yAxTop)
             curAx.set_ylabel('(spk/sec)')
+            curAx.grid(b=True)
     else:
         ax.set_ylabel('(spk/sec)')
         ax.set_ylim(yAxBot, yAxTop)
+        ax.grid(b=True)
 
     if showNow:
         plt.show()
@@ -829,18 +856,19 @@ def plotFR(spikeMats, fig, ax,
     return ax
 
 def plotTrialFR(spikes = None, trialStats = None, channel = None,
+    correctAlignmentSpikes = 0,
     spikeMats = None, categories = None,
     fig = None, ax = None, uniqueCategories = None, curLine = None, twin = False,
     alignTo = None, separateBy = None,
     windowSize = (-0.25, 1), timeRange = None, maxTrial = None,
-    showNow = False, plotOpts = {'type' : 'ticks', 'kernelWidth' : 25e-3}):
+    showNow = False, plotOpts = {'type' : 'ticks', 'kernelWidth' : 25e-3,
+        'binInterval' : (3**-1)*1e-3, 'binWidth' : (3**-1)*1e-3}):
 
-    if plotOpts['type'] == 'ticks':
-        binInterval = 1e-3
-        binWidth = 1e-3
-    elif plotOpts['type'] == 'binned':
-        binInterval = plotOpts['binInterval']
-        binWidth = plotOpts['binWidth']
+    binInterval = plotOpts['binInterval']
+    binWidth = plotOpts['binWidth']
+
+    if correctAlignmentSpikes: #correctAlignmentSpikes units in samples
+        spikes = hf.correctSpikeAlignment(spikes, correctAlignmentSpikes)
 
     if spikeMats is None:
         assert spikes is not None and trialStats is not None and channel is not None
@@ -877,18 +905,21 @@ def plotTrialFR(spikes = None, trialStats = None, channel = None,
 
 def plotSpikeTriggeredFR(spikesFrom = None, spikesTo = None,
     spikesFromIdx = None, spikesToIdx = None,
+    correctAlignmentSpikesFrom = 0, correctAlignmentSpikesTo = 0,
     spikeMats = None,
     fig = None, ax = None, titleOverride = None, twin = False,
     windowSize = (-0.25, 1), timeRange = None,  maxSpikesTo = None,
     categories = None, separateByFun = None,
-    showNow = False, plotOpts = {'type' : 'ticks', 'kernelWidth' : 25e-3}):
+    showNow = False, plotOpts = {'type' : 'ticks', 'kernelWidth' : 25e-3,
+        'binInterval' : (3**-1)*1e-3, 'binWidth' : (3**-1)*1e-3}):
 
-    if plotOpts['type'] == 'ticks':
-        binInterval = 1e-3
-        binWidth = 1e-3
-    elif plotOpts['type'] == 'binned':
-        binInterval = plotOpts['binInterval']
-        binWidth = plotOpts['binWidth']
+    binInterval = plotOpts['binInterval']
+    binWidth = plotOpts['binWidth']
+
+    if correctAlignmentSpikesFrom: #correctAlignmentSpikesFrom units in samples
+        spikesFrom = hf.correctSpikeAlignment(spikesFrom, correctAlignmentSpikesFrom)
+    if correctAlignmentSpikesTo: #correctAlignmentSpikesFrom units in samples
+        spikesTo = hf.correctSpikeAlignment(spikesTo, correctAlignmentSpikesTo)
 
     if spikeMats is None:
         assert spikesFrom is not None and spikesTo is not None
@@ -992,7 +1023,8 @@ def plotSingleTrial(trialStats, trialEvents, motorData, kinematics, spikes,\
     motorPlotAxes[0].set_ylabel(analogLabel)
     try:
         motorPlotAxes[0].legend(loc = 1)
-    except:
+    except Exception:
+        traceback.print_exc()
         pass
 
     mea.plotMotor(kinematics, plotRange = (timeStart, timeEnd),
@@ -1001,7 +1033,8 @@ def plotSingleTrial(trialStats, trialEvents, motorData, kinematics, spikes,\
     motorPlotAxes[1].set_ylabel(kinematicLabel)
     try:
         motorPlotAxes[1].legend(loc = 1)
-    except:
+    except Exception:
+        traceback.print_exc()
         pass
 
     #plt.show()
@@ -1031,8 +1064,12 @@ def plotSingleTrial(trialStats, trialEvents, motorData, kinematics, spikes,\
 
 #@profile
 def spikePDFReport(filePath, spikes, spikeStruct,
+    correctAlignmentSpikes = 0,
     plotRastersAlignedTo = 'FirstOnset', plotRastersSeparatedBy = None,
     trialStats = None, enableFR = False, newName = None):
+
+    if correctAlignmentSpikes: #correctAlignmentSpikes units in samples
+        spikes = hf.correctSpikeAlignment(spikes, correctAlignmentSpikes)
 
     if newName is None:
         pdfName = filePath + '/' + 'spikePDFReport' + '.pdf'
@@ -1045,7 +1082,11 @@ def spikePDFReport(filePath, spikes, spikeStruct,
         plt.close()
 
         for idx, channel in enumerate(spikes['ChannelID']):
-            print("Running spikePDFReport: %d%%" % int((idx + 1) * 100 / len(spikes['ChannelID'])), end = '\r')
+            if os.fstat(0) == os.fstat(1):
+                endChar = '\r'
+                print("Running spikePDFReport: %d%%" % int((idx + 1) * 100 / len(spikes['ChannelID'])), end = endChar)
+            else:
+                print("Running spikePDFReport: %d%%" % int((idx + 1) * 100 / len(spikes['ChannelID'])))
 
             unitsOnThisChan = np.unique(spikes['Classification'][idx])
             if unitsOnThisChan is not None:
@@ -1068,7 +1109,8 @@ def spikePDFReport(filePath, spikes, spikeStruct,
                         plt.close()
 
                     if plotRastersAlignedTo is not None and trialStats is not None:
-                        plotOpts = {'type' : 'ticks', 'kernelWidth' : 25e-3}
+                        plotOpts = {'type' : 'ticks', 'kernelWidth' : 25e-3, 'binInterval' : (3**-1)* 1e-3,
+                            'binWidth' : (3**-1)* 1e-3, 'errorBar' : 'sem'}
                         windowSize = (-0.5, 2)
                         spikeMats, categories, plotFig, plotAx, uniqueCategories, curLine = plotTrialRaster(
                             spikes = spikes, trialStats =  trialStats, channel = channel,
@@ -1086,10 +1128,13 @@ def spikePDFReport(filePath, spikes, spikeStruct,
                         plt.close()
 
 def trialPDFReport(filePath, trialStats, trialEvents, motorData, kinematics, spikes,\
-    nevIDs, spikesExclude, startEvent = 'FirstOnset', endEvent = 'ChoiceOnset',\
+    nevIDs, spikesExclude, correctAlignmentSpikes = 0, startEvent = 'FirstOnset', endEvent = 'ChoiceOnset',\
     analogSubset = ['position'], analogLabel = '', kinematicsSubset =  ['Hip Right X', 'Knee Right X', 'Ankle Right X'],\
     kinematicLabel = '', eventSubset = ['Right LED Onset', 'Right Button Onset', 'Left LED Onset', 'Left Button Onset', 'Movement Onset', 'Movement Offset'],\
     binInterval = 20e-3, binWidth = 50e-3, maxTrial = None):
+
+    if correctAlignmentSpikes: #correctAlignmentSpikes units in samples
+        spikes = hf.correctSpikeAlignment(spikes, correctAlignmentSpikes)
 
     with PdfPages(filePath) as pdf:
         for idx, curTrial in trialStats.iterrows():
@@ -1104,33 +1149,41 @@ def trialPDFReport(filePath, trialStats, trialEvents, motorData, kinematics, spi
                     eventSubset = eventSubset, binInterval = binInterval, binWidth = binWidth)
                 pdf.savefig()
                 plt.close()
-            except:
+            except Exception:
+                traceback.print_exc()
                 pdf.savefig()
                 plt.close()
 
 def spikeTriggeredAveragePDFReport(filePath,
     spikesFrom, spikesTo,
     spikesFromList, spikesToList,
+    correctAlignmentSpikesFrom = 0, correctAlignmentSpikesTo = 0,
     newName = None,
-    enableFR = True , plotOpts = {'type' : 'ticks', 'kernelWidth' : 5e-3}):
+    enableFR = True , plotOpts = {'type' : 'ticks', 'kernelWidth' : 5e-3, 'binInterval' : (3**-1)* 1e-3,
+    'binWidth' : (3**-1)* 1e-3, 'errorBar' : 'sem'}):
 
     if newName is None:
         pdfName = filePath + '/' + 'STA_Report' + '.pdf'
     else:
         pdfName = filePath + '/' + newName + '.pdf'
 
-    if plotOpts['type'] == 'ticks':
-        binInterval = 1e-3
-        binWidth = 1e-3
-    elif plotOpts['type'] == 'binned':
-        binInterval = plotOpts['binInterval']
-        binWidth = plotOpts['binWidth']
+    binInterval = plotOpts['binInterval']
+    binWidth = plotOpts['binWidth']
+
+    if correctAlignmentSpikesFrom: #correctAlignmentSpikesFrom units in samples
+        spikesFrom = hf.correctSpikeAlignment(spikesFrom, correctAlignmentSpikesFrom)
+    if correctAlignmentSpikesTo: #correctAlignmentSpikesFrom units in samples
+        spikesTo = hf.correctSpikeAlignment(spikesTo, correctAlignmentSpikesTo)
 
     with PdfPages(pdfName) as pdf:
         pairsNum = len(spikesFromList) * len(spikesToList)
         pairCount = 0
         for spikesFromIdx, spikesToIdx in itertools.product(spikesFromList, spikesToList):
-            print("Running staPDFReport: %d%%" % int((pairCount + 1) * 100 / pairsNum), end = '\r')
+            if os.fstat(0) == os.fstat(1):
+                endChar = '\r'
+                print("Running staPDFReport: %d%%" % int((pairCount + 1) * 100 / pairsNum), end = endChar)
+            else:
+                print("Running staPDFReport: %d%%" % int((pairCount + 1) * 100 / pairsNum))
 
             pairCount += 1
             spikeMats, categories, selectedIndices = hf.binnedSpikesAlignedToSpikes(spikesFrom, spikesTo,
@@ -1166,15 +1219,19 @@ def spikeTriggeredAveragePDFReport(filePath,
             pdf.savefig()
             plt.close()
 
-def generateSpikeTriggeredAverageReport(folderPath, trialFileFrom, trialFileTo, mechanism = 'wave_clus'):
+def generateSpikeTriggeredAverageReport(folderPath, trialFileFrom, trialFileTo,
+    correctAlignmentSpikesFrom = 0, correctAlignmentSpikesTo = 0):
     key, value = next(iter(trialFileFrom.items()))
-    newName = value['ns5FileName'] + '_' + capitalizeFirstLetter(key) + '_exclude_' + '_'.join([str(i) for i in value['excludeClus']]) + '_ALIGNEDTO_'
-    spikeStructFrom, spikesFrom = loadSpikeInfo(folderPath, key, value, mechanism = mechanism)
+    arrayInfoFrom = value
+    arrayNameFrom = key
+    spikeStructFrom, spikesFrom = loadSpikeInfo(folderPath, key, value)
     key, value = next(iter(trialFileTo.items()))
-    newName = newName + value['ns5FileName'] + '_' + capitalizeFirstLetter(key) + '_exclude_' + '_'.join([str(i) for i in value['excludeClus']])
-    spikeStructTo, spikesTo = loadSpikeInfo(folderPath, key, value, mechanism = mechanism)
-
+    arrayInfoTo = value
+    arrayNameTo = key
+    spikeStructTo, spikesTo = loadSpikeInfo(folderPath, key, value)
+    newName = spikeBinnedSpikesNameGenerator(arrayNameFrom, arrayInfoFrom, arrayNameTo, arrayInfoTo)
     spikesFromList = []
+
     for idx, channel in enumerate(spikesFrom['ChannelID']):
         unitsOnThisChan = np.unique(spikesFrom['Classification'][idx])
         if unitsOnThisChan.any():
@@ -1187,13 +1244,18 @@ def generateSpikeTriggeredAverageReport(folderPath, trialFileFrom, trialFileTo, 
             spikesToList.append({'chan':channel})
     #pdb.set_trace()
     spikeTriggeredAveragePDFReport('./', spikesFrom, spikesTo, spikesFromList,
-        spikesToList, newName = newName, enableFR = True,
-        plotOpts = {'type' : 'ticks', 'kernelWidth' : 5e-3, 'errorBar' : 'sem'})
+        spikesToList,
+        correctAlignmentSpikesFrom = correctAlignmentSpikesFrom, correctAlignmentSpikesTo = correctAlignmentSpikesTo,
+        newName = newName, enableFR = True,
+        plotOpts = {'type' : 'ticks', 'kernelWidth' : 5e-3, 'binInterval' : (3**-1)* 1e-3,
+            'binWidth' : (3**-1)* 1e-3, 'errorBar' : 'sem'})
 
-def generateStimTriggeredAverageReport(folderPath, trialFileFrom, trialFileStim, mechanism = 'wave_clus'):
+def generateStimTriggeredAverageReport(folderPath, trialFileFrom, trialFileStim,
+    correctAlignmentSpikesFrom = 0, correctAlignmentSpikesStim = 0):
     key, value = next(iter(trialFileFrom.items()))
-    newName = value['ns5FileName'] + '_' + capitalizeFirstLetter(key) + '_exclude_' + '_'.join([str(i) for i in value['excludeClus']]) + '_ALIGNEDTO_'
-    spikeStructFrom, spikesFrom = loadSpikeInfo(folderPath, key, value, mechanism = mechanism)
+    arrayInfoFrom = value
+    arrayNameFrom = key
+    spikeStructFrom, spikesFrom = loadSpikeInfo(folderPath, key, value)
 
     spikesFromList = []
     for idx, channel in enumerate(spikesFrom['ChannelID']):
@@ -1202,10 +1264,13 @@ def generateStimTriggeredAverageReport(folderPath, trialFileFrom, trialFileStim,
             spikesFromList.append({'chan':channel,'units':list(range(len(unitsOnThisChan)))})
 
     key, value = next(iter(trialFileStim.items()))
-    newName = newName + value['ns5FileName'] + '_' + capitalizeFirstLetter(key) + '_exclude_' + '_'.join([str(i) for i in value['excludeClus']])
-    spikeStructStim, spikesStim = loadSpikeInfo(folderPath, key, value, mechanism = 'mat') # stim only from mat file
 
+    arrayInfoTo = value
+    arrayNameTo = key
+    spikeStructStim, spikesStim = loadSpikeInfo(folderPath, key, value) # stim only from mat file
+    newName = spikeBinnedSpikesNameGenerator(arrayNameFrom, arrayInfoFrom, arrayNameTo, arrayInfoTo)
     spikesStimList = []
+
     impedances = pd.read_csv(os.path.join(folderPath, 'Murdoc Impedances'), skiprows = [0, 1, 2, 3, 4, 5, 6, 7, 9], delim_whitespace = True)
     impedances['MaxAmp(uA)'] = (8.5* 1e3) / impedances['Mag(kOhms)']
     impedances.index = impedances.index + 5121
@@ -1222,8 +1287,11 @@ def generateStimTriggeredAverageReport(folderPath, trialFileFrom, trialFileStim,
         spikesStim['Classification'][idx] = catSpikeFun(spikesStim, idx)
     #pdb.set_trace()
     spikeTriggeredAveragePDFReport('./', spikesFrom, spikesStim, spikesFromList,
-        spikesStimList, newName = newName, enableFR = True,
-        plotOpts = {'type' : 'ticks', 'kernelWidth' : 5e-3, 'errorBar' : 'sem'})
+        spikesStimList,
+        correctAlignmentSpikesFrom = correctAlignmentSpikesFrom, correctAlignmentSpikesTo = correctAlignmentSpikesStim,
+        newName = newName, enableFR = True,
+        plotOpts = {'type' : 'ticks', 'kernelWidth' : 5e-3, 'binInterval' : (3**-1)* 1e-3,
+            'binWidth' : (3**-1)* 1e-3, 'errorBar' : 'sem'})
 
 def capitalizeFirstLetter(stringInput):
     return stringInput[0].capitalize() + stringInput[1:]
@@ -1237,7 +1305,8 @@ def loadEventInfo(folderPath, eventInfo, forceRecalc = False):
             trialEvents = pd.read_pickle(os.path.join(folderPath,
                 eventInfo['ns5FileName']) + '_trialEvents.pickle')
             print('Loaded trial data from pickle.')
-        except:
+        except Exception:
+            traceback.print_exc()
             print('Trial data not pickled. Recalculating...')
             forceRecalc = True
 
@@ -1252,45 +1321,54 @@ def loadEventInfo(folderPath, eventInfo, forceRecalc = False):
         print('Recalculated trial data and saved to pickle.')
     return trialStats, trialEvents
 
+def spikesNameGenerator(arrayName, arrayInfo):
+    return arrayInfo['ns5FileName'] + '_spikes' + capitalizeFirstLetter(arrayName) + '_exclude_' + '_'.join([str(i) for i in arrayInfo['excludeClus']]) + '_' + arrayInfo['origin']
+
+def spikeBinnedSpikesNameGenerator(arrayNameFrom, arrayInfoFrom, arrayNameTo, arrayInfoTo):
+    return spikesNameGenerator(arrayNameFrom, arrayInfoFrom) + '_ALIGNEDTO_' + spikesNameGenerator(arrayNameTo, arrayInfoTo)
+
 def loadSpikeInfo(folderPath, arrayName, arrayInfo,
-    forceRecalc = False, mechanism = 'wave_clus'):
+    forceRecalc = False):
+
     if not forceRecalc:
     # if not requiring a recalculation, load from pickle
         try:
             spikes = pickle.load(
                 open(os.path.join(folderPath,
-                arrayInfo['ns5FileName']) + '_spikes' + capitalizeFirstLetter(arrayName) + '_exclude_' + '_'.join([str(i) for i in arrayInfo['excludeClus']]) + '.pickle', 'rb'))
+                spikesNameGenerator(arrayName, arrayInfo) + '.pickle'), 'rb'))
             print('Loaded spike data from pickle.')
-        except:
+        except Exception:
+            traceback.print_exc()
             # if loading failed, recalculate anyway
             print('Spike data not pickled. Recalculating...')
             forceRecalc = True
 
     if forceRecalc:
-        if mechanism == 'wave_clus':
+        if arrayInfo['origin'] == 'wave_clus':
             spikes = getWaveClusSpikes(
                 os.path.join(folderPath, 'wave_clus', arrayInfo['ns5FileName']) + '/',
                 nevIDs = arrayInfo['nevIDs'], plotting = False, excludeClus = arrayInfo['excludeClus'])
             print('Recalculated spike data from wave_clus folder and saved to pickle.')
-        elif mechanism == 'nev':
+        elif arrayInfo['origin'] == 'nev':
             filePath = os.path.join(folderPath, arrayInfo['ns5FileName'] + '.nev')
             spikes = hf.getNEVData(filePath, arrayInfo['nevIDs'])
-        elif mechanism == 'mat':
+        elif arrayInfo['origin'] == 'mat':
             spikes = getNevMatSpikes(
                 os.path.join(folderPath, arrayInfo['ns5FileName']+'.mat'),
                 nevIDs = arrayInfo['nevIDs'], plotting = False, excludeClus = arrayInfo['excludeClus'])
 
         pickle.dump(spikes,
-            open(os.path.join(folderPath, arrayInfo['ns5FileName']) + '_spikes' +
-                capitalizeFirstLetter(arrayName) + '_exclude_' +
-                '_'.join([str(i) for i in arrayInfo['excludeClus']]) +
-                '.pickle', 'wb'))
+            open(os.path.join(folderPath, spikesNameGenerator(arrayName, arrayInfo) +
+                '.pickle'), 'wb')
+            )
         print('Recalculated spike data from wave_clus folder and saved to pickle.')
 
     try:
         spikeStruct = pickle.load(open(os.path.join(folderPath, 'coords') +
             capitalizeFirstLetter(arrayName) + '.pickle', 'rb'))
-    except:
+
+    except Exception:
+        traceback.print_exc()
         print('Spike metadata not pickled. Recalculating...')
         spikeStruct = loadKSDir(os.path.join(folderPath, 'Kilosort/'+ arrayInfo['ns5FileName'] + '_' + capitalizeFirstLetter(arrayName)), loadPCs = False)
         pickle.dump(spikeStruct, open(os.path.join(folderPath, arrayInfo['ns5FileName']) + '_spikeStruct' + capitalizeFirstLetter(arrayName) + '.pickle', 'wb'))
@@ -1298,8 +1376,66 @@ def loadSpikeInfo(folderPath, arrayName, arrayInfo,
 
     return spikeStruct, spikes
 
+def loadSpikeBinnedSpike(folderPath,
+    spikesFromIdx, spikesToIdx,
+    arrayNameFrom, arrayInfoFrom, arrayNameTo, arrayInfoTo,
+    spikesFrom = None, spikesTo = None,
+    correctAlignmentSpikesFrom = 0, correctAlignmentSpikesTo = 0,
+    spikesFromIdx, spikesToIdx,
+    param,
+    forceRecalc = False):
+
+    if not forceRecalc:
+    # if not requiring a recalculation, load from pickle
+        try:
+            # TODO: figure out how to load it...
+            print('Loaded spikeMats from pickle.')
+        except Exception:
+            traceback.print_exc()
+            # if loading failed, recalculate anyway
+            print('SpikeMats not pickled. Recalculating...')
+            forceRecalc = True
+
+    if forceRecalc:
+        setName = spikeBinnedSpikesNameGenerator(arrayNameFrom, arrayInfoFrom, arrayNameTo, arrayInfoTo)
+        setPath = os.path.join(folderPath, setName + '.h5')
+
+        if spikesFrom is None:
+            spikeStructFrom, spikesFrom = loadSpikeInfo(folderPath, arrayNameFrom, arrayInfoFrom)
+
+        if correctAlignmentSpikesFrom: #correctAlignmentSpikesFrom units in samples
+            spikesFrom = hf.correctSpikeAlignment(spikesFrom, correctAlignmentSpikesFrom)
+
+        for idx, channel in enumerate(spikesFrom['ChannelID']):
+            unitsOnThisChan = np.unique(spikesFrom['Classification'][idx])
+            if unitsOnThisChan.any():
+                spikesFromList.append({'chan':channel,'units':list(range(len(unitsOnThisChan)))})
+
+        if spikesTo is None:
+            spikeStructTo, spikesTo = loadSpikeInfo(folderPath, arrayNameTo, arrayInfoTo)
+
+        if correctAlignmentSpikesTo: #correctAlignmentSpikesFrom units in samples
+        spikesTo = hf.correctSpikeAlignment(spikesTo, correctAlignmentSpikesTo)
+
+        spikesToList = []
+        for idx, channel in enumerate(spikesTo['ChannelID']):
+            unitsOnThisChan = np.unique(spikesTo['Classification'][idx])
+            if unitsOnThisChan.any():
+                spikesToList.append({'chan':channel,'units':list(range(len(unitsOnThisChan)))})
+
+        binCenters = hf.getBinCenters(timeStart, timeEnd, binWidth, binInterval)
+
+        with h5py.File(setPath, "w") as f:
+            grp = f.create_group("data")
+            for key, value in param:
+                grp.attrs[key] = value
+            for spikesFromIdx, spikesToIdx in itertools.product(spikesFromList, spikesToList):
+                dsetName = str(spikesFromIdx['chan']) + '_to_' + str(spikesToIdx['chan'])
+                grp.create_dataset(dsetName, (,len(binCenters),len(spikesFromIdx['units'])), dtype='f')
+    return
+
 def generateSpikeReport(folderPath, eventInfo, trialFiles,
-    plotRastersAlignedTo = 'FirstOnset', plotRastersSeparatedBy = None):
+    plotRastersAlignedTo = 'FirstOnset', plotRastersSeparatedBy = None, correctAlignmentSpikes = 0):
 
     """
     Read in Trial events
@@ -1313,9 +1449,9 @@ def generateSpikeReport(folderPath, eventInfo, trialFiles,
         """
         spikeStruct, spikes = loadSpikeInfo(folderPath, key, value)
 
-        newName = value['ns5FileName'] + '_' + capitalizeFirstLetter(key) + '_exclude_' + '_'.join([str(i) for i in value['excludeClus']])
+        newName = spikesNameGenerator(key, value)
         spikePDFReport(folderPath,
-            spikes, spikeStruct, plotRastersAlignedTo = plotRastersAlignedTo,
+            spikes, spikeStruct, correctAlignmentSpikes = correctAlignmentSpikes, plotRastersAlignedTo = plotRastersAlignedTo,
             plotRastersSeparatedBy = plotRastersSeparatedBy, trialStats = trialStats,
             enableFR = True, newName = newName)
 

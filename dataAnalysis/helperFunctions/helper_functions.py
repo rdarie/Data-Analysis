@@ -158,7 +158,12 @@ def fillInOverflow(channelData, plotting = False, fillMethod = 'constant'):
 
         ch_idx  = columnList.index(idx)
         col_idx = channelData.columns.get_loc(idx)
-        print("Running fillInOverflow: %d%%" % int((ch_idx + 1) * 100 / nChan), end = '\r')
+
+        if os.fstat(0) == os.fstat(1):
+            endChar = '\r'
+            print("Running fillInOverflow: %d%%" % int((ch_idx + 1) * 100 / nChan), end = endChar)
+        else:
+            print("Running fillInOverflow: %d%%" % int((ch_idx + 1) * 100 / nChan))
 
         # get the first difference of the row
         rowDiff = row.diff()
@@ -256,7 +261,7 @@ def fillInJumps(channelData, samp_per_s, smoothing_ms = 1, badThresh = 1e-3,
         if len(row.index) < 3 * 10e4:
             rowVals = row.values
         else:
-            rowVals =  row.values[:int(10 * 3e4)]
+            rowVals =  row.values[:int(10 * channelData['samp_per_s'])]
 
         rowBar  = rowVals.mean()
         rowStd  = rowVals.std()
@@ -273,10 +278,10 @@ def fillInJumps(channelData, samp_per_s, smoothing_ms = 1, badThresh = 1e-3,
         # on the derivative of the data
         dRow = row.diff()
         dRow.fillna(0, inplace = True)
-        if len(row.index) < 10 * 3e4:
+        if len(row.index) < 10 * channelData['samp_per_s']:
             dRowVals = dRow.values
         else:
-            dRowVals =  dRow.values[:int(10 * 3e4)]
+            dRowVals =  dRow.values[:int(10 * channelData['samp_per_s'])]
 
         dRowBar  = dRowVals.mean()
         dRowStd  = dRowVals.std()
@@ -325,33 +330,36 @@ def fillInJumps(channelData, samp_per_s, smoothing_ms = 1, badThresh = 1e-3,
 
     return channelData, badMask
 
+def getTriggers(dataSeries, iti = .01, fs = 3e4, thres = 0.5, plotting = False):
+    # iti: expected inter trigger interval
+
+    # minimum distance between triggers (units of samples)
+    width = fs * iti / 2
+    # first difference of triggers
+    triggersPrime = dataSeries.diff()
+    triggersPrime.fillna(0, inplace = True)
+    # moments when camera capture occured
+    peakIdx = peakutils.indexes(triggersPrime.values.squeeze(), thres=thres, min_dist=width)
+
+    if plotting:
+        f = plt.figure()
+        plt.plot(dataSeries.index, dataSeries.values)
+        plt.plot(dataSeries.index[peakIdx], dataSeries.values[peakIdx], 'r*')
+        ax = plt.gca()
+        plt.show(block = False)
+
+    return peakIdx
+
 def getCameraTriggers(simiData, plotting = False):
     # sample rate
     fs = simiData['samp_per_s']
     # get camera triggers
     triggers = simiData['data']
-     # expected inter trigger interval
-    iti = .01
-    # minimum distance between triggers (units of samples)
-    width = fs * iti / 2
-    # first difference of triggers
-    triggersPrime = triggers.diff()
-    triggersPrime.fillna(0, inplace = True)
-    # moments when camera capture occured
-    peakIdx = peakutils.indexes(triggersPrime.values.squeeze(), thres=0.7, min_dist=width)
-
-    if plotting:
-        f = plt.figure()
-        plt.plot(simiData['t'], triggers.values)
-        plt.plot(simiData['t'][peakIdx], triggers.values[peakIdx], 'r*')
-        ax = plt.gca()
-        ax.set_xlim([36.5, 37])
-        plt.show(block = False)
-
+    # get Triggers
+    peakIdx = getTriggers(dataSeries, iti = .01, fs = fs, plotting = plotting)
     # get time of first simi frame in NSP time:
     trigTimes = simiData['t'][peakIdx]
     # timeOffset = trigTimes[0]
-
     return peakIdx, trigTimes
 
 def getAngles(anglesFile, trigTimes, selectHeaders = None, selectTime = None,
@@ -621,7 +629,11 @@ def getSpectrogram(channelData, elec_ids, samp_per_s, start_time_s, dataT, winLe
         for col,signal in channelData.iteritems():
             #pdb.set_trace()
             idx = columnList.index(col)
-            print("Running getSpectrogram: %d%%" % int(idx * 100 / nChan + 1), end = '\r')
+            if os.fstat(0) == os.fstat(1):
+                endChar = '\r'
+                print("Running getSpectrogram: %d%%" % int(idx * 100 / nChan + 1), end = endChar)
+            else:
+                print("Running getSpectrogram: %d%%" % int(idx * 100 / nChan + 1))
 
 
             P_libtfr = D.mtspec(signal, stepLen_samp).transpose()
@@ -633,7 +645,11 @@ def getSpectrogram(channelData, elec_ids, samp_per_s, start_time_s, dataT, winLe
         spectrum = np.zeros((nChan, nWindows, fr_samp))
         for col,signal in channelData.iteritems():
             idx = columnList.index(col)
-            print("Running getSpectrogram: %d%%" % int(idx * 100 / nChan + 1), end = '\r')
+            if os.fstat(0) == os.fstat(1):
+                endChar = '\r'
+                print("Running getSpectrogram: %d%%" % int(idx * 100 / nChan + 1), end = endChar)
+            else:
+                print("Running getSpectrogram: %d%%" % int(idx * 100 / nChan + 1))
 
 
             overlap_samp = NFFT - stepLen_samp
@@ -684,7 +700,6 @@ def plotChan(channelData, dataT, whichChan, recordingUnits = 'uV', electrodeLabe
     # Plot the data channel
     ch_idx  = whichChan
     #hdr_idx = channelData['ExtendedHeaderIndices'][channelData['elec_ids'].index(whichChan)]
-
     if not prevFig:
         #plt.figure()
         f, ax = plt.subplots()
@@ -722,6 +737,52 @@ def plotChan(channelData, dataT, whichChan, recordingUnits = 'uV', electrodeLabe
 
     return f, ax
 
+def plotChanWithSpikesandStim(\
+    spikes, spikesStim, channelData,
+    spikeChanName, stimChanName,
+    startTimeS, dataTimeS, timeRange
+    ):
+
+    stimChIdx = spikesStim['ChannelID'].index(stimChanName)
+    spikeChIdx = spikes['ChannelID'].index(spikeChanName)
+
+    unitsOnThisChan = np.unique(spikes['Classification'][spikeChIdx])
+    mask = [np.full(len(channelData['data'].index), False) for i in unitsOnThisChan]
+    maskLabel = [" " for i in unitsOnThisChan]
+
+    stimUnitsOnThisChan = np.unique(spikesStim['Classification'][stimChIdx])
+    stimMask = [np.full(len(channelData['data'].index), False) for i in stimUnitsOnThisChan]
+    stimMaskLabel = [" " for i in stimUnitsOnThisChan]
+
+    spikeSnippetLen = spikes['Waveforms'][0].shape[1] / spikes['basic_headers']['TimeStampResolution']
+
+    for unitIdx, unitName in enumerate(unitsOnThisChan):
+        unitMask = spikes['Classification'][spikeChIdx] == unitName
+        timeMask = np.logical_and(spikes['TimeStamps'][spikeChIdx] > startTimeS, spikes['TimeStamps'][spikeChIdx] < startTimeS + dataTimeS)
+        theseTimes = spikes['TimeStamps'][spikeChIdx][np.logical_and(unitMask, timeMask)]
+        for spikeTime in theseTimes:
+            timeMaskContinuous = np.logical_and(channelData['t'] > spikeTime, channelData['t'] < spikeTime + spikeSnippetLen)
+            mask[unitIdx][timeMaskContinuous] = True
+            maskLabel[unitIdx] = 'unit %d' % unitName
+
+    spikeSnippetLen = spikesStim['Waveforms'][0].shape[1] / spikesStim['basic_headers']['TimeStampResolution']
+
+    for unitIdx, unitName in enumerate(stimUnitsOnThisChan):
+        unitMask = spikesStim['Classification'][stimChIdx] == unitName
+        timeMask = np.logical_and(spikesStim['TimeStamps'][stimChIdx] > startTimeS, spikesStim['TimeStamps'][stimChIdx] < startTimeS + dataTimeS)
+        #pdb.set_trace()
+        theseTimes = spikesStim['TimeStamps'][stimChIdx][np.logical_and(unitMask, timeMask)]
+        for spikeTime in theseTimes:
+            timeMaskContinuous = np.logical_and(channelData['t'] > spikeTime, channelData['t'] < spikeTime + spikeSnippetLen)
+            stimMask[unitIdx][timeMaskContinuous] = True
+            stimMaskLabel[unitIdx] = 'stim category %d' % unitIdx
+        #theseTimes = spikes['TimeStamps'][spikeChIdx][unitMask]
+    plotChan(channelData['data'], channelData['t'].values, spikeChanName,
+        mask = mask + stimMask, maskLabel = maskLabel + stimMaskLabel,
+        timeRange = (startTimeS + timeRange[0], startTimeS + timeRange[1]))
+    plt.legend()
+    plt.show()
+
 def pdfReport(cleanData, origData, badData = None,
     pdfFilePath = 'pdfReport.pdf', spectrum = False, cleanSpectrum = None,
     origSpectrum = None, fr_start = 5, fr_stop = 3000, nSecPlot = 30):
@@ -737,8 +798,11 @@ def pdfReport(cleanData, origData, badData = None,
         columnList = list(cleanData['data'].columns)
         for idx, row in cleanData['data'].iteritems():
             ch_idx  = columnList.index(idx)
-
-            print("Running pdfReport: %d%%" % int((ch_idx + 1) * 100 / nChan), end = '\r')
+            if os.fstat(0) == os.fstat(1):
+                endChar = '\r'
+                print("Running pdfReport: %d%%" % int((ch_idx + 1) * 100 / nChan), end = endChar)
+            else:
+                print("Running pdfReport: %d%%" % int((ch_idx + 1) * 100 / nChan))
 
             hdr_idx = cleanData['ExtendedHeaderIndices'][cleanData['elec_ids'].index(idx)]
             electrodeLabel = cleanData['extended_headers'][hdr_idx]['ElectrodeLabel']
@@ -853,9 +917,19 @@ def catSpikesByAmpGenerator(nBins = None, type = 'RMS', timePoint = None, subSet
 
     return
 
+def correctSpikeAlignment(spikes, w_pre):
+    alignmentCorrection = w_pre / spikes['basic_headers']['TimeStampResolution'] # seconds
+    for idx, spikeTimes in enumerate(spikes['TimeStamps']):
+        spikes['TimeStamps'][idx] += alignmentCorrection
+    return spikes
+
+def getBinCenters(timeStart, timeEnd, binWidth, binInterval):
+    binCenters = np.arange(timeStart + binWidth / 2, timeEnd - binWidth / 2 + binInterval, binInterval)
+    return binCenters
+
 def binnedEvents(timeStamps, chans, binInterval, binWidth, timeStart, timeEnd):
     #pdb.set_trace()
-    binCenters = np.arange(timeStart + binWidth / 2, timeEnd - binWidth / 2 + binInterval, binInterval)
+    binCenters = getBinCenters(timeStart, timeEnd, binWidth, binInterval)
 
     #timeInterval = timeEnd - timeStart - binWidth
     binRes = gcd(math.floor(binWidth * 1e9 / 2), math.floor(binInterval * 1e9)) * 1e-9 # greatest common denominator
@@ -934,9 +1008,7 @@ def binnedSpikesAligned(spikes, alignTimes, binInterval, binWidth, channel,
         spikeMats = []
     return spikeMats
 
-def binnedSpikesAlignedToSpikes(spikesFrom, spikesTo,
-    spikesFromIdx, spikesToIdx,
-    binInterval, binWidth, windowSize = (-0.25, 1),
+def spikeAlignmentTimes(spikesTo,spikesToIdx,
     separateByFun = catSpikesByAmpGenerator(type = 'Classification'),
     timeRange = None, maxSpikesTo = None, discardEmpty = False):
 
@@ -950,7 +1022,7 @@ def binnedSpikesAlignedToSpikes(spikesFrom, spikesTo,
         if separateByFun is not None:
             categories = pd.Series(separateByFun(spikesTo, ChanIdxTo), index = alignTimes.index)
 
-    if timeRange is not None:
+    if timeRange is not None: # timeRange in seconds
         timeMask = np.logical_and(alignTimes > timeRange[0],
             alignTimes < timeRange[1])
         alignTimes = alignTimes.loc[timeMask]
@@ -965,6 +1037,19 @@ def binnedSpikesAlignedToSpikes(spikesFrom, spikesTo,
             if separateByFun is not None:
                 categories = categories.loc[selectedIndices]
 
+    return alignTimes, categories, selectedIndices
+
+
+def binnedSpikesAlignedToSpikes(spikesFrom, spikesTo,
+    spikesFromIdx, spikesToIdx,
+    binInterval, binWidth, windowSize = (-0.25, 1),
+    separateByFun = catSpikesByAmpGenerator(type = 'Classification'),
+    timeRange = None, maxSpikesTo = None, discardEmpty = False):
+
+    # get spike firing times to align to
+    alignTimes, categories, selectedIndices = spikeAlignmentTimes(spikesTo,spikesToIdx,
+        separateByFun = separateByFun,
+        timeRange = timeRange, maxSpikesTo = maxSpikesTo, discardEmpty =  discardEmpty)
 
     spikeMats = binnedSpikesAligned(spikesFrom, alignTimes, binInterval,
         binWidth, spikesFromIdx['chan'], windowSize = windowSize,
@@ -1131,6 +1216,78 @@ def plot_spikes(spikes, chans):
     axarr[-1].set_xlabel('Time (ms)')
     plt.tight_layout()
     plt.show(block = False)
+
+def triggeredTimeSeries(alignTimes, channelData,
+    nevIDs, categories, removeBaseline = False,
+    windowSize= (-0.25, 1), timeStampResolution = 3e4):
+
+    nCh = len(nevIDs)
+    windowIdx = [int(i * timeStampResolution) for i in windowSize]
+    nSampsInWindow = len(range(windowIdx[0], windowIdx[1]))
+
+    spikesTriggered = {
+        'ChannelID' : [i for i in nevIDs],
+        'Classification' : [categories.values for i in nevIDs],
+        'NEUEVWAV_HeaderIndices' : [None for i in nevIDs],
+        'TimeStamps' : [alignTimes.values for i in nevIDs],
+        'Units' : 'uV',
+        'Waveforms' : [np.zeros((len(alignTimes.index), nSampsInWindow), dtype = np.float) for i in nevIDs],
+        #'meanWaveforms' : [None for i in range(nCh)],
+        #'stdWaveforms' : [None for i in range(nCh)],
+        'basic_headers' : {'TimeStampResolution': timeStampResolution},
+        'extended_headers' : []
+        }
+
+    startTimeIdxTriggeredChan = -windowIdx[0]
+    for rowIdx, startTime in alignTimes.items():
+
+        startTimeIdxChan = np.flatnonzero(channelData['t'] > startTime)[0]
+        maskPre = channelData['t'] > (startTime + windowSize[0])
+        maskPost = channelData['t'] <= (startTime + windowSize[1])
+        mask = np.logical_and(maskPre, maskPost)
+        rowIdxWave = alignTimes.index.get_loc(rowIdx)
+
+        for chIdx in nevIDs:
+            idx = spikesTriggered['ChannelID'].index(chIdx)
+
+            try:
+                chanSlice = channelData['data'].loc[mask, chIdx]
+                if removeBaseline:
+                    chanSlice = chanSlice - chanSlice.mean()
+                    #chanSlice = chanSlice - peakutils.baseline(chanSlice)
+
+                idxIntoStart = np.flatnonzero(maskPre)[0]-startTimeIdxChan + startTimeIdxTriggeredChan
+                idxIntoEnd = np.flatnonzero(maskPost)[-1]-startTimeIdxChan + startTimeIdxTriggeredChan + 1
+
+                try:
+                    spikesTriggered['Waveforms'][idx][rowIdxWave,idxIntoStart:idxIntoEnd] = chanSlice.values
+                except Exception:
+                    traceback.print_exc()
+                    spikesTriggered['Waveforms'][idx][rowIdxWave,idxIntoStart:idxIntoEnd] = chanSlice.values[idxIntoStart:idxIntoEnd]
+
+            except Exception:
+                traceback.print_exc()
+                pdb.set_trace()
+    return spikesTriggered
+
+def spikeTriggeredTimeSeries(spikes, channelData,
+    nevIDs, spikesToIdx,
+    windowSize = (-0.25, 1), removeBaseline = False,
+    separateByFun = catSpikesByAmpGenerator(type = 'Classification'),
+    timeRange = None, maxSpikesTo = None, discardEmpty = False):
+
+    if timeRange is None:
+        timeRange = (channelData['t'].iloc[0], channelData['t'].iloc[-1])
+    # get spike firing times to align to
+    alignTimes, categories, selectedIndices = spikeAlignmentTimes(spikes,
+        spikesToIdx,
+        separateByFun = separateByFun,
+        timeRange = timeRange, maxSpikesTo = maxSpikesTo, discardEmpty =  discardEmpty)
+
+    spikesTriggered = triggeredTimeSeries(alignTimes, channelData,
+        nevIDs, categories, removeBaseline = removeBaseline,
+        windowSize= windowSize, timeStampResolution = channelData['samp_per_s'])
+    return spikesTriggered, selectedIndices
 
 def plot_events_raster(eventDf, names, collapse = False, usePlotly = True):
     # Initialize plots
