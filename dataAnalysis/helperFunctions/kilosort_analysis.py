@@ -1377,17 +1377,16 @@ def loadSpikeInfo(folderPath, arrayName, arrayInfo,
     return spikeStruct, spikes
 
 def loadSpikeBinnedSpike(folderPath,
-    spikesFromIdx, spikesToIdx,
     arrayNameFrom, arrayInfoFrom, arrayNameTo, arrayInfoTo,
-    spikesFrom = None, spikesTo = None,
-    correctAlignmentSpikesFrom = 0, correctAlignmentSpikesTo = 0,
     spikesFromIdx, spikesToIdx,
     param,
-    forceRecalc = False):
+    spikesFrom = None, spikesTo = None,
+    correctAlignmentSpikesFrom = 0, correctAlignmentSpikesTo = 0, forceRecalc = False):
 
     if not forceRecalc:
     # if not requiring a recalculation, load from pickle
         try:
+            spikeMats, categories, selectedIndices = None, None, None
             # TODO: figure out how to load it...
             print('Loaded spikeMats from pickle.')
         except Exception:
@@ -1423,19 +1422,30 @@ def loadSpikeBinnedSpike(folderPath,
             if unitsOnThisChan.any():
                 spikesToList.append({'chan':channel,'units':list(range(len(unitsOnThisChan)))})
 
-        binCenters = hf.getBinCenters(timeStart, timeEnd, binWidth, binInterval)
-
         with h5py.File(setPath, "w") as f:
             grp = f.create_group("data")
             for key, value in param:
                 grp.attrs[key] = value
-            for spikesFromIdx, spikesToIdx in itertools.product(spikesFromList, spikesToList):
-                dsetName = str(spikesFromIdx['chan']) + '_to_' + str(spikesToIdx['chan'])
-                grp.create_dataset(dsetName, (,len(binCenters),len(spikesFromIdx['units'])), dtype='f')
-    return
+            for spikesToIdx in spikesToList:
+
+                alignTimes, categories, selectedIndices= hf.spikeAlignmentTimes(spikesTo,spikesToIdx,
+                    separateByFun = param['separateByFun'], timeRange = param['timeRange'],
+                    maxSpikesTo =param['maxSpikesTo'], discardEmpty = param['discardEmpty'])
+
+                for spikesFromIdx in spikesFromList:
+                    spikeMats = binnedSpikesAligned(spikesFrom, alignTimes, param['binInterval'],
+                        binWidth, spikesFromIdx['chan'], windowSize = param['windowSize'],
+                        discardEmpty = param['discardEmpty'])
+
+                    dsetName = str(spikesFromIdx['chan']) + '_to_' + str(spikesToIdx['chan'])
+                    dset = grp.create_dataset(dsetName, (spikeMats[0].shape[0],spikeMats[0].shape[1],len(spikeMats)), dtype='f')
+                    for idx, spikeMat in enumerate(spikeMats):
+                        dset[:,:,idx] = spikeMat
+    return spikeMats, categories, selectedIndices
 
 def generateSpikeReport(folderPath, eventInfo, trialFiles,
-    plotRastersAlignedTo = 'FirstOnset', plotRastersSeparatedBy = None, correctAlignmentSpikes = 0):
+    plotRastersAlignedTo = 'FirstOnset', plotRastersSeparatedBy = None,
+    correctAlignmentSpikes = 0):
 
     """
     Read in Trial events
