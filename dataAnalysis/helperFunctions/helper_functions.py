@@ -397,7 +397,12 @@ def getAngles(anglesFile, trigTimes, selectHeaders = None, selectTime = None,
     proc.index = proc.loc[:, 'Time'] * 3e4
     return proc
 
-def loadAngles(folderPath, fileName, kinAngleOpts = None, forceRecalc = False):
+def loadAngles(folderPath, fileName, kinAngleOpts = {
+    'selectHeaders' : None,
+    'reIndex' : None,
+    'flip' : None,
+    'lowCutoff': None
+    }, forceRecalc = False):
     setPath = os.path.join(folderPath, fileName + '.h5')
     if not forceRecalc:
         try:
@@ -493,7 +498,14 @@ def getKinematics(kinematicsFile, trigTimes, selectHeaders = None, selectTime = 
 
     return proc
 
-def loadKinematics(folderPath, fileName, kinPosOpts = None, forceRecalc = False):
+def loadKinematics(folderPath, fileName, kinPosOpts = {
+    'selectHeaders' : None,
+    'reIndex' : None,
+    'flip' : None,
+    'lowCutoff': None
+    },
+    forceRecalc = False):
+
     setPath = os.path.join(folderPath, fileName + '.h5')
     if not forceRecalc:
         try:
@@ -1202,9 +1214,10 @@ def trialBinnedArray(spikes, rasterOpts, trialStats, chans = None):
     timeStart = trialStats.loc[validMask, rasterOpts['alignTo']] / 3e4 # conversion to seconds
     timeEnd = trialStats.loc[validMask, rasterOpts['endOn']] / 3e4 # conversion to seconds
 
-    spikeMats = hf.binnedArray(spikesUtah, rasterOpts, timeStart, timeEnd)
+    spikeMats = binnedArray(spikes, rasterOpts, timeStart, timeEnd)
 
     return spikeMats
+
 def binnedSpikes(spikes, binInterval, binWidth, timeStart, timeEnd,
     timeStampUnits = 'samples', chans = None):
     # bins all spikes at a particular point in time

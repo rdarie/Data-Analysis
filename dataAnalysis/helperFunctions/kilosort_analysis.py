@@ -1407,6 +1407,9 @@ def trialBinnedSpikesNameGenerator(arrayName, arrayInfo, rasterOpts):
 def spikeBinnedSpikesNameGenerator(arrayNameFrom, arrayInfoFrom, arrayNameTo, arrayInfoTo):
     return spikesNameGenerator(arrayNameFrom, arrayInfoFrom) + '_ALIGNEDTO_' + spikesNameGenerator(arrayNameTo, arrayInfoTo)
 
+def trialBinnedArrayNameGenerator(arrayName, arrayInfo, rasterOpts):
+    return spikesNameGenerator(arrayName, arrayInfo) + '_BETWEEN_' + rasterOpts['alignTo'] +"_AND_"+ rasterOpts['endOn']
+
 def spikesNameRetrieve(spikesName):
 
     arrayInfo = {'ns5FileName' : None, 'nevIDs' : None, 'excludeClus' : None, 'origin' : None}
@@ -1444,9 +1447,18 @@ def trialBinnedSpikesNameRetrieve(spikesName):
 
     return arrayName, arrayInfo, rasterOpts
 
-def loadSpikeInfo(folderPath, arrayName, arrayInfo,
-    forceRecalc = False):
+def trialBinnedArrayNameRetrieve(spikeNames):
+    subNames = spikesName.split('_ALIGNEDTO_')
+    unitsName = subNames[0]
+    arrayName, arrayInfo = spikesNameRetrieve(unitsName )
 
+    rasterOpts = {'alignTo' : None, 'separateBy' : None}
+    rasterOpts['alignTo'] = subNames[-1].split('_BETWEEN_')[0]
+    rasterOpts['endOn'] = spikeNames.split('_AND_')[-1]
+
+    return arrayName, arrayInfo, rasterOpts
+
+def loadSpikeInfo(folderPath, arrayName, arrayInfo, forceRecalc = False):
     if not forceRecalc:
     # if not requiring a recalculation, load from pickle
         try:
@@ -1770,6 +1782,88 @@ def loadTrialBinnedSpike(folderPath,
         # after looping through everything and saving, return the requested channel
         spikeMats, categories, selectedIndices = saveSpikeMats, saveCategories, saveSelectedIndices
     return spikeMats, categories, selectedIndices
+
+def loadTrialBinnedArray(
+    arrayName, arrayInfo,
+    eventInfo, rasterOpts,
+    whichTrial,
+    spikes = None,
+    trialStats = None, chans = None,
+    correctAlignmentSpikes = 0,
+    forceRecalc = False):
+
+    setName = trialBinnedArrayNameGenerator(arrayName, arrayInfo, rasterOpts)
+    setPath = os.path.join(folderPath, setName + '.h5')
+    if not forceRecalc:
+    # if not requiring a recalculation, load from pickle
+        try:
+            with h5py.File(setPath, "r") as f:
+                recordAttributes = f['/'+"rasterOpts"].attrs
+                for key, value in rasterOpts.items():
+                    if type(value) is not dict:
+                        thisAttr = recordAttributes[key]
+
+                        if isinstance(value, collections.Iterable):
+                            for idx, valueComponent in enumerate(value):
+                                assert (valueComponent == thisAttr[idx]) or (valueComponent is None and np.isnan(thisAttr[idx]))
+                        else:
+                            assert (value == thisAttr) or (value is None and np.isnan(thisAttr))
+                    else:
+                        for subKey, subValue in value.items():
+                            thisAttr = recordAttributes[key + '_' + subKey]
+
+                            if isinstance(subValue, collections.Iterable):
+                                for idx, valueComponent in enumerate(subValue):
+                                    assert (valueComponent == thisAttr[idx]) or (valueComponent is None and np.isnan(thisAttr[idx]))
+                            else:
+                                assert (subValue == thisAttr) or (subValue is None and np.isnan(thisAttr))
+
+                requestedSpikeMat = '/' + str(whichTrial)
+                spikeMat = pd.DataFrame(f[requestedSpikeMat + '/spikeMat'], index = f[requestedSpikeMat + '/index'], columns = f[requestedSpikeMat + '/columns'])
+
+        except Exception:
+            traceback.print_exc()
+            # if loading failed, recalculate anyway
+            print('SpikeMats not pickled. Recalculating...')
+            forceRecalc = True
+
+    if forceRecalc:
+        if spikes is None:
+            spikeStruct, spikes = ksa.loadSpikeInfo(folderPath, 'utah', trialFiles['utah'])
+        if trialStats is None:
+            trialStats, trialEvents = ksa.loadEventInfo(folderPath, eventInfo)
+        if correctAlignmentSpikes: #correctAlignmentSpikes units in samples
+            spikes= hf.correctSpikeAlignment(spikes, correctAlignmentSpikes)
+
+        with h5py.File(setPath, "w") as f:
+            grp = f.create_group("rasterOpts")
+            for key, value in rasterOpts.items():
+                if type(value) is not dict:
+                    if value is not None:
+                        grp.attrs[key] = value
+                    else:
+                        grp.attrs[key] = np.nan
+                else:
+                    for subKey, subValue in value.items():
+                        if value is not None:
+                            grp.attrs[key + '_' + subKey] = subValue
+                        else:
+                            grp.attrs[key + '_' + subKey] = np.nan
+
+            spikeMats = hf.trialBinnedArray(spikes, rasterOpts, trialStats, chans = None)
+            saveSpikeMat = None
+            for idx, spikeMat in spikeMats:
+                spikeMatSetName = str(trialStats.index[idx])
+                grp = f.create_group(spikeMatSetName)
+                spikeMatSet = grp.create_dataset("spikeMat", data = spikeMat.values)
+                binCentersSet =  grp.create_dataset("columns", data = spikeMat.columns)
+                allRowIdxSet = grp.create_dataset("index", data  = spikeMat.index)
+
+                if trialStats.index[idx] == whichTrial:
+                    saveSpikeMat = spikeMatk
+            #after looping through everything and saving, return the requested channel
+            spikeMat = saveSpikeMat
+    return spikeMat
 
 def generateSpikeReport(folderPath, eventInfo, trialFiles,
     rasterOpts = None, plotOpts = None,
