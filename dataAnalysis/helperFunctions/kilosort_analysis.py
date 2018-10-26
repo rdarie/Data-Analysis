@@ -19,7 +19,7 @@ import h5py
 import traceback
 import collections
 import itertools
-
+import re
 LABELFONTSIZE = 5
 
 def loadParamsPy(filePath):
@@ -591,8 +591,12 @@ def getTrialAxes(trialStats, alignTo, channel, separateBy = None, ax = None):
 #@profile
 def plotRaster(spikeMats, fig, ax,
     categories = None, uniqueCategories = None, curLine = None,
-    showNow = False, plotOpts = {'type' : 'ticks',
-        'binInterval' : (3**-1) * 1e-3, 'binWidth' : (3**-1)*1e-3}):
+    showNow = False,
+    plotOpts = {'type' : 'ticks'},
+    rasterOpts = {
+        'binInterval' : 5* 1e-3, 'binWidth' : 10* 1e-3
+        }
+    ):
 
     colorPalette = sns.color_palette(n_colors = 15)
 
@@ -639,37 +643,36 @@ def plotTrialRaster(spikes = None, trialStats = None, channel = None,
     spikeMats = None, categories = None,
     fig = None, ax = None, uniqueCategories = None, curLine = None,
     alignTo = None, separateBy = None,
-    windowSize = (-0.25, 1), timeRange = None, maxTrial = None,
-    showNow = False, plotOpts = {'type' : 'ticks',
-    'binInterval' : (3**-1)*1e-3, 'binWidth' : (3**-1)*1e-3}
+    showNow = False,
+    rasterOpts = {
+        'kernelWidth' : 50e-3,
+        'binInterval' : 2.5* 1e-3, 'binWidth' : 5* 1e-3,
+        'windowSize' : (-0.25, 1),
+        'alignTo' : 'FirstOnset',
+        'separateBy' : 'Direction',
+        'discardEmpty': None, 'maxTrial' : None, 'timeRange' : None},
+    plotOpts = {'type' : 'ticks', 'errorBar' : 'sem'}
     ):
-
-    binInterval = plotOpts['binInterval']
-    binWidth = plotOpts['binWidth']
 
     if correctAlignmentSpikes: #correctAlignmentSpikes units in samples
         spikes = hf.correctSpikeAlignment(spikes, correctAlignmentSpikes)
 
     if spikeMats is None:
         assert spikes is not None and trialStats is not None and channel is not None
-        spikeMats = hf.binnedSpikesAlignedToTrial(spikes, binInterval, binWidth,
-        trialStats, alignTo, channel, windowSize = windowSize, timeRange = timeRange,
-            maxTrial = maxTrial)
+        spikeMats, categories, selectedIndices = hf.binnedSpikesAlignedToTrial(spikes, rasterOpts['binInterval'], rasterOpts['binWidth'],
+        trialStats, rasterOpts['alignTo'], channel, separateBy = rasterOpts['separateBy'], windowSize = rasterOpts['windowSize'], timeRange = rasterOpts['timeRange'],
+            maxTrial = rasterOpts['maxTrial'])
 
     if trialStats is not None:
-        fig, ax, uniqueCategories, curLine = getTrialAxes(trialStats, alignTo,
-            channel, separateBy = separateBy, ax = ax)
+        fig, ax, uniqueCategories, curLine = getTrialAxes(trialStats, rasterOpts['alignTo'],
+            channel, separateBy = rasterOpts['separateBy'], ax = ax)
     else:
         assert fig is not None
         assert ax is not None
-
-        if separateBy is not None:
+        if rasterOpts['separateBy'] is not None:
             assert uniqueCategories is not None
             assert curLine  is not None
 
-    if categories is None and separateBy is not None:
-        categories = trialStats[separateBy]
-    #pdb.set_trace()
     plotRaster(spikeMats, fig, ax, categories, uniqueCategories, curLine,
         showNow = showNow, plotOpts = plotOpts)
     plt.tight_layout(pad = 0.01)
@@ -680,14 +683,15 @@ def plotSpikeTriggeredRaster(spikesFrom = None, spikesTo = None,
     correctAlignmentSpikesFrom = 0, correctAlignmentSpikesTo = 0,
     spikeMats = None,
     fig = None, ax = None, titleOverride = None,
-    windowSize = (-0.25, 1), timeRange = None, maxSpikesTo = None,
-    categories = None, separateByFun = None,
-    showNow = False, plotOpts = {'type' : 'ticks',
-    'binInterval' : (3**-1)*1e-3, 'binWidth' : (3**-1)*1e-3}
+    categories = None,
+    showNow = False, rasterOpts = {
+        'kernelWidth' : 1e-3,
+        'binInterval' : (3**-1)* 1e-3, 'binWidth' : (3**-1)* 1e-3,
+        'windowSize' : (-0.01, .11),
+        'discardEmpty': None, 'maxSpikesTo' : None, 'timeRange' : None,
+        'separateByFunArgs': None,'separateByFunKWArgs': {'type' : 'Classification'}},
+    plotOpts = {'type' : 'ticks'}
     ):
-
-    binInterval = plotOpts['binInterval']
-    binWidth = plotOpts['binWidth']
 
     if correctAlignmentSpikesFrom: #correctAlignmentSpikesFrom units in samples
         spikesFrom = hf.correctSpikeAlignment(spikesFrom, correctAlignmentSpikesFrom)
@@ -695,23 +699,32 @@ def plotSpikeTriggeredRaster(spikesFrom = None, spikesTo = None,
         spikesTo = hf.correctSpikeAlignment(spikesTo, correctAlignmentSpikesTo)
 
     selectedIndices = None
+    if rasterOpts['separateByFunArgs'] is not None and rasterOpts['separateByFunKWArgs'] is not None:
+        separateByFun = hf.catSpikesGenerator(*rasterOpts['separateByFunArgs'], **rasterOpts['separateByFunKWArgs'])
+    elif rasterOpts['separateByFunArgs'] is not None and rasterOpts['separateByFunKWArgs'] is None:
+        separateByFun = hf.catSpikesGenerator(*rasterOpts['separateByFunArgs'])
+    elif rasterOpts['separateByFunArgs'] is None and rasterOpts['separateByFunKWArgs'] is not None:
+        separateByFun = hf.catSpikesGenerator(**rasterOpts['separateByFunKWArgs'])
+    else:
+        separateByFun = None
+
     if spikeMats is None:
         assert spikesFrom is not None and spikesTo is not None
         assert spikesFromIdx is not None and spikesToIdx is not None
 
         spikeMats, categories, selectedIndices = hf.binnedSpikesAlignedToSpikes(spikesFrom, spikesTo,
             spikesFromIdx, spikesToIdx,
-            binInterval, binWidth, windowSize = windowSize,
+            rasterOpts['binInterval'], rasterOpts['binWidth'], windowSize = rasterOpts['windowSize'],
             separateByFun = separateByFun,
-            timeRange = timeRange, maxSpikesTo = maxSpikesTo)
-    elif maxSpikesTo is not None and len(spikeMats[0].index) > maxSpikesTo:
-        spikeMats[0] = spikeMats[0].sample(n = maxSpikesTo)
+            timeRange = rasterOpts['timeRange'], maxSpikesTo = rasterOpts['maxSpikesTo'])
+
+    elif rasterOpts['maxSpikesTo'] is not None and len(spikeMats[0].index) > rasterOpts['maxSpikesTo']:
+        spikeMats[0] = spikeMats[0].sample(n = rasterOpts['maxSpikesTo'])
         selectedIndices = spikeMats[0].index
         for idx, thisSpikeMat in enumerate(spikeMats):
             if idx > 0:
                 spikeMats[idx] = thisSpikeMat.loc[selectedIndices, :]
         if categories is not None:
-            #pdb.set_trace()
             categories = categories.loc[selectedIndices]
 
     if categories is not None:
@@ -739,7 +752,7 @@ def plotSpikeTriggeredRaster(spikesFrom = None, spikesTo = None,
                     spikesFromIdx['chan'], spikesToIdx['chan']))
             if titleOverride is not None:
                 ax.set_title(titleOverride)
-        plotRaster(spikeMats, fig, ax, showNow = showNow, plotOpts = plotOpts)
+        plotRaster(spikeMats, fig, ax, showNow = showNow, plotOpts = plotOpts, rasterOpts = rasterOpts)
     else: # multiple subplots
         if ax is None:
             fig, ax = plt.subplots(len(uniqueCategories),1)
@@ -759,7 +772,7 @@ def plotSpikeTriggeredRaster(spikesFrom = None, spikesTo = None,
         else:
             fig = ax[0].figure
         plotRaster(spikeMats, fig, ax, categories, uniqueCategories, curLine,
-            showNow = showNow, plotOpts = plotOpts)
+            showNow = showNow, plotOpts = plotOpts, rasterOpts = rasterOpts)
     plt.tight_layout(pad = 0.01)
     return spikeMats, fig, ax, selectedIndices
 
@@ -767,21 +780,22 @@ def plotSpikeTriggeredRaster(spikesFrom = None, spikesTo = None,
 def plotFR(spikeMats, fig, ax,
     categories = None, uniqueCategories = None,
     showNow = False,
-    plotOpts = {'type' : 'ticks', 'kernelWidth' : 25e-3,
-        'binInterval' : (3**-1)*1e-3, 'binWidth' : (3**-1)*1e-3, 'errorBar' : 'sem'}
+    plotOpts = {'type' : 'ticks', 'errorBar' : 'sem'},
+    rasterOpts = {
+        'kernelWidth' : 20e-3,
+        'binInterval' : 5* 1e-3, 'binWidth' : 10* 1e-3
+        }
     ):
 
     if plotOpts['type'] == 'ticks':
-        kernelWidth = plotOpts['kernelWidth']
         smoothingStep = True
-        binWidth = plotOpts['binWidth']
     elif plotOpts['type'] == 'binned':
         smoothingStep = False
 
     if smoothingStep:
         # kernel width in seconds
         # bin width in seconds
-        gaussianRadius = int(kernelWidth / (binWidth * 2)) # samples
+        gaussianRadius = int(rasterOpts['kernelWidth'] / (rasterOpts['binWidth'] * 2)) # samples
 
     if isinstance(ax, collections.Iterable):
         meanSpikeMat = {category : [None for i in spikeMats] for category in uniqueCategories}
@@ -859,43 +873,46 @@ def plotTrialFR(spikes = None, trialStats = None, channel = None,
     correctAlignmentSpikes = 0,
     spikeMats = None, categories = None,
     fig = None, ax = None, uniqueCategories = None, curLine = None, twin = False,
-    alignTo = None, separateBy = None,
-    windowSize = (-0.25, 1), timeRange = None, maxTrial = None,
-    showNow = False, plotOpts = {'type' : 'ticks', 'kernelWidth' : 25e-3,
-        'binInterval' : (3**-1)*1e-3, 'binWidth' : (3**-1)*1e-3}):
-
-    binInterval = plotOpts['binInterval']
-    binWidth = plotOpts['binWidth']
+    showNow = False,
+    rasterOpts = {
+        'kernelWidth' : 20e-3,
+        'binInterval' : 5* 1e-3, 'binWidth' : 10* 1e-3,
+        'windowSize' : (-0.25, 1),
+        'alignTo' : 'FirstOnset',
+        'separateBy' : 'Direction',
+        'discardEmpty': None, 'maxTrial' : None, 'timeRange' : None},
+    plotOpts = {'type' : 'ticks', 'errorBar' : 'sem'}
+    ):
 
     if correctAlignmentSpikes: #correctAlignmentSpikes units in samples
         spikes = hf.correctSpikeAlignment(spikes, correctAlignmentSpikes)
 
     if spikeMats is None:
         assert spikes is not None and trialStats is not None and channel is not None
-        spikeMats = hf.binnedSpikesAlignedToTrial(spikes, binInterval, binWidth,
-        trialStats, alignTo, channel, windowSize = windowSize, timeRange = timeRange,
-            maxTrial = maxTrial)
+        spikeMats, categories, selectedIndices = hf.binnedSpikesAlignedToTrial(spikes, rasterOpts['binInterval'], rasterOpts['binWidth'],
+        trialStats, rasterOpts['alignTo'], channel, separateBy = rasterOpts['separateBy'], windowSize = rasterOpts['windowSize'], timeRange = rasterOpts['timeRange'],
+            maxTrial = rasterOpts['maxTrial'])
 
     if trialStats is not None:
-        fig, ax, uniqueCategories, curLine = getTrialAxes(trialStats, alignTo,
-            channel, separateBy = separateBy, ax = ax)
+        fig, ax, uniqueCategories, curLine = getTrialAxes(trialStats, rasterOpts['alignTo'],
+            channel, separateBy = rasterOpts['separateBy'], ax = ax)
     else:
         assert fig is not None
         assert ax is not None
-        if separateBy is not None:
+        if rasterOpts['separateBy'] is not None:
             assert uniqueCategories is not None
 
     if twin:
         if isinstance(ax, collections.Iterable):
             for idx, curAx in enumerate(ax):
                 ax[idx] = curAx.twinx()
-                curAx.set_xlabel('Time (milliseconds) aligned to ' + alignTo)
+                curAx.set_xlabel('Time (milliseconds) aligned to ' + rasterOpts['alignTo'])
                 curAx.set_title(uniqueCategories[idx])
         else:
             ax = ax.twinx()
-            ax.set_xlabel('Time (milliseconds) aligned to ' + alignTo)
+            ax.set_xlabel('Time (milliseconds) aligned to ' + rasterOpts['alignTo'])
 
-    if categories is None and separateBy is not None:
+    if categories is None and rasterOpts['separateBy'] is not None:
         categories = trialStats[separateBy]
 
     plotFR(spikeMats, fig, ax, categories, uniqueCategories,
@@ -908,37 +925,50 @@ def plotSpikeTriggeredFR(spikesFrom = None, spikesTo = None,
     correctAlignmentSpikesFrom = 0, correctAlignmentSpikesTo = 0,
     spikeMats = None,
     fig = None, ax = None, titleOverride = None, twin = False,
-    windowSize = (-0.25, 1), timeRange = None,  maxSpikesTo = None,
-    categories = None, separateByFun = None,
-    showNow = False, plotOpts = {'type' : 'ticks', 'kernelWidth' : 25e-3,
-        'binInterval' : (3**-1)*1e-3, 'binWidth' : (3**-1)*1e-3}):
-
-    binInterval = plotOpts['binInterval']
-    binWidth = plotOpts['binWidth']
+    categories = None,
+    showNow = False,  rasterOpts = {
+        'kernelWidth' : 1e-3,
+        'binInterval' : (3**-1)* 1e-3, 'binWidth' : (3**-1)* 1e-3,
+        'windowSize' : (-0.01, .11),
+        'discardEmpty': None, 'maxSpikesTo' : None, 'timeRange' : None,
+        'separateByFunArgs': None,'separateByFunKWArgs': {'type' : 'Classification'}},
+    plotOpts = {'type' : 'ticks', 'errorBar' : 'sem'}
+    ):
 
     if correctAlignmentSpikesFrom: #correctAlignmentSpikesFrom units in samples
         spikesFrom = hf.correctSpikeAlignment(spikesFrom, correctAlignmentSpikesFrom)
     if correctAlignmentSpikesTo: #correctAlignmentSpikesFrom units in samples
         spikesTo = hf.correctSpikeAlignment(spikesTo, correctAlignmentSpikesTo)
 
+    selectedIndices = None
+    if rasterOpts['separateByFunArgs'] is not None and rasterOpts['separateByFunKWArgs'] is not None:
+        separateByFun = hf.catSpikesGenerator(*rasterOpts['separateByFunArgs'], **rasterOpts['separateByFunKWArgs'])
+    elif rasterOpts['separateByFunArgs'] is not None and rasterOpts['separateByFunKWArgs'] is None:
+        separateByFun = hf.catSpikesGenerator(*rasterOpts['separateByFunArgs'])
+    elif rasterOpts['separateByFunArgs'] is None and rasterOpts['separateByFunKWArgs'] is not None:
+        separateByFun = hf.catSpikesGenerator(**rasterOpts['separateByFunKWArgs'])
+    else:
+        separateByFun = None
+
     if spikeMats is None:
         assert spikesFrom is not None and spikesTo is not None
         assert spikesFromIdx is not None and spikesToIdx is not None
-        #pdb.set_trace()
+
         spikeMats, categories = hf.binnedSpikesAlignedToSpikes(spikesFrom, spikesTo,
             spikesFromIdx, spikesToIdx,
-            binInterval, binWidth, windowSize = windowSize,
+            rasterOpts['binInterval'], rasterOpts['binWidth'], windowSize = rasterOpts['windowSize'],
             separateByFun = separateByFun,
-            timeRange = timeRange, maxSpikesTo = maxSpikesTo)
+            timeRange = rasterOpts['timeRange'], maxSpikesTo = rasterOpts['maxSpikesTo'])
 
-    elif maxSpikesTo is not None and len(spikeMats[0].index) > maxSpikesTo:
-        spikeMats[0] = spikeMats[0].sample(n = maxSpikesTo)
+    elif rasterOpts['maxSpikesTo'] is not None and len(spikeMats[0].index) > rasterOpts['maxSpikesTo']:
+        spikeMats[0] = spikeMats[0].sample(n = rasterOpts['maxSpikesTo'])
+        selectedIndices = spikeMats[0].index
         for idx, thisSpikeMat in enumerate(spikeMats):
             if idx > 0:
-                spikeMats[idx] = thisSpikeMat.loc[spikeMats[0].index, :]
+                spikeMats[idx] = thisSpikeMat.loc[selectedIndices, :]
         if categories is not None:
             #pdb.set_trace()
-            categories = categories.loc[spikeMats[0].index]
+            categories = categories.loc[selectedIndices]
 
     if categories is not None:
         uniqueCategories = pd.Series(np.unique(categories))
@@ -964,7 +994,7 @@ def plotSpikeTriggeredFR(spikesFrom = None, spikesTo = None,
                     spikesFromIdx['chan'], spikesToIdx['chan']), fontsize = labelFontSize)
         if titleOverride is not None:
             ax.set_title(titleOverride)
-        plotFR(spikeMats, fig, ax, showNow = showNow, plotOpts = plotOpts)
+        plotFR(spikeMats, fig, ax, showNow = showNow, plotOpts = plotOpts, rasterOpts = rasterOpts)
     else: # subplots
         if ax is None:
             fig, ax = plt.subplots(len(uniqueCategories),1)
@@ -986,10 +1016,9 @@ def plotSpikeTriggeredFR(spikesFrom = None, spikesTo = None,
                 fig.suptitle(titleOverride)
         plotFR(spikeMats, fig, ax,
             categories, uniqueCategories,
-            showNow = showNow, plotOpts = plotOpts)
+            showNow = showNow, plotOpts = plotOpts, rasterOpts = rasterOpts)
     plt.tight_layout(pad = 0.01)
     return spikeMats, fig, ax
-
 
 def plotSingleTrial(trialStats, trialEvents, motorData, kinematics, spikes,\
     nevIDs, spikesExclude, whichTrial, orderSpikesBy = None, zAxis = None,\
@@ -1063,18 +1092,30 @@ def plotSingleTrial(trialStats, trialEvents, motorData, kinematics, spikes,\
     return fig, motorPlotAxes
 
 #@profile
-def spikePDFReport(filePath, spikes, spikeStruct,
+def spikePDFReport(folderPath, spikes, spikeStruct,
+    arrayName = None, arrayInfo = None,
     correctAlignmentSpikes = 0,
-    plotRastersAlignedTo = 'FirstOnset', plotRastersSeparatedBy = None,
+    plotOpts = {'type' : 'ticks', 'errorBar' : 'sem'},
+    rasterOpts = {
+    'kernelWidth' : 50e-3,
+    'binInterval' : 2.5* 1e-3, 'binWidth' : 5* 1e-3,
+    'windowSize' : (-0.25, 1),
+    'alignTo' : 'FirstOnset',
+    'separateBy' : 'Direction',
+    'discardEmpty': None, 'maxTrial' : None, 'timeRange' : None},
     trialStats = None, enableFR = False, newName = None):
 
     if correctAlignmentSpikes: #correctAlignmentSpikes units in samples
         spikes = hf.correctSpikeAlignment(spikes, correctAlignmentSpikes)
 
     if newName is None:
-        pdfName = filePath + '/' + 'spikePDFReport' + '.pdf'
+        pdfName = os.path.join(folderPath, 'spikePDFReport.pdf')
     else:
-        pdfName = filePath + '/' + newName + '.pdf'
+        pdfName = os.path.join(folderPath , newName + '.pdf')
+
+    if any((arrayName is None, arrayInfo is None)):
+        arrayName, arrayInfo, partialRasterOpts = trialBinnedSpikesNameRetrieve(newName)
+        arrayInfo['nevIDs'] = spikes['ChannelID']
 
     with PdfPages(pdfName) as pdf:
         plotSpikePanel(spikeStruct, spikes)
@@ -1108,21 +1149,25 @@ def spikePDFReport(filePath, spikes, spikeStruct,
                         pdf.savefig()
                         plt.close()
 
-                    if plotRastersAlignedTo is not None and trialStats is not None:
-                        plotOpts = {'type' : 'ticks', 'kernelWidth' : 25e-3, 'binInterval' : (3**-1)* 1e-3,
-                            'binWidth' : (3**-1)* 1e-3, 'errorBar' : 'sem'}
-                        windowSize = (-0.5, 2)
+                    if rasterOpts['alignTo'] is not None and trialStats is not None:
+                        spikeMats, categories, selectedIndices = loadTrialBinnedSpike(folderPath,
+                            arrayName, arrayInfo,
+                            channel,
+                            rasterOpts,
+                            trialStats = trialStats, spikes = spikes,
+                            correctAlignmentSpikes = 0,
+                            forceRecalc = False)
+
                         spikeMats, categories, plotFig, plotAx, uniqueCategories, curLine = plotTrialRaster(
-                            spikes = spikes, trialStats =  trialStats, channel = channel,
-                            alignTo = plotRastersAlignedTo, separateBy = plotRastersSeparatedBy,
-                            windowSize = windowSize, plotOpts = plotOpts)
+                            trialStats = trialStats, channel = channel,
+                            spikeMats = spikeMats, categories = categories,
+                            plotOpts = plotOpts, rasterOpts = rasterOpts)
 
                         #plotAx = plotRaster(spikes, trialStats, alignTo = plotRastersAlignedTo, windowSize = (-0.5, 2), channel = channel, separateBy = plotRastersSeparatedBy)
                         if enableFR:
                             plotTrialFR(spikeMats = spikeMats, categories = categories,
                                 fig = plotFig, ax = plotAx, uniqueCategories = uniqueCategories, twin = True,
-                                alignTo = plotRastersAlignedTo, separateBy = plotRastersSeparatedBy,
-                                windowSize = windowSize, plotOpts = plotOpts)
+                                plotOpts = plotOpts, rasterOpts = rasterOpts)
                             #plotFR(spikes, trialStats, alignTo = plotRastersAlignedTo, windowSize = (-0.5, 2), channel = channel, separateBy = plotRastersSeparatedBy, ax = plotAx, twin = True)
                         pdf.savefig()
                         plt.close()
@@ -1154,21 +1199,28 @@ def trialPDFReport(filePath, trialStats, trialEvents, motorData, kinematics, spi
                 pdf.savefig()
                 plt.close()
 
-def spikeTriggeredAveragePDFReport(filePath,
+def spikeTriggeredAveragePDFReport(folderPath,
     spikesFrom, spikesTo,
     spikesFromList, spikesToList,
+    arrayNameFrom = None, arrayInfoFrom = None, arrayNameTo = None, arrayInfoTo = None,
     correctAlignmentSpikesFrom = 0, correctAlignmentSpikesTo = 0,
-    newName = None,
-    enableFR = True , plotOpts = {'type' : 'ticks', 'kernelWidth' : 5e-3, 'binInterval' : (3**-1)* 1e-3,
-    'binWidth' : (3**-1)* 1e-3, 'errorBar' : 'sem'}):
+    newName = None, enableFR = True,
+    plotOpts = {'type' : 'ticks', 'errorBar' : 'sem'},
+    rasterOpts = {'kernelWidth' : 5e-3, 'binInterval' : (3**-1)* 1e-3,
+        'binWidth' : (3**-1)* 1e-3, 'windowSize' : (-0.01, .11),'maxSpikesTo':None,
+        'discardEmpty':None, 'timeRange':None,
+        'separateByFunArgs': None,'separateByFunKWArgs': {'type' : 'Classification'}}
+    ):
 
     if newName is None:
-        pdfName = filePath + '/' + 'STA_Report' + '.pdf'
+        pdfName = os.path.join(folderPath,'STA_Report.pdf')
     else:
-        pdfName = filePath + '/' + newName + '.pdf'
+        pdfName = os.path.join(folderPath, newName + '.pdf')
 
-    binInterval = plotOpts['binInterval']
-    binWidth = plotOpts['binWidth']
+    if any((arrayNameFrom is None, arrayInfoFrom is None, arrayNameTo is None, arrayInfoTo is None)):
+        arrayNameFrom, arrayInfoFrom, arrayNameTo, arrayInfoTo = spikeBinnedSpikesNameRetrieve(newName)
+        arrayInfoFrom['nevIDs'] = spikesFrom['ChannelID']
+        arrayInfoTo['nevIDs'] = spikesTo['ChannelID']
 
     if correctAlignmentSpikesFrom: #correctAlignmentSpikesFrom units in samples
         spikesFrom = hf.correctSpikeAlignment(spikesFrom, correctAlignmentSpikesFrom)
@@ -1186,19 +1238,29 @@ def spikeTriggeredAveragePDFReport(filePath,
                 print("Running staPDFReport: %d%%" % int((pairCount + 1) * 100 / pairsNum))
 
             pairCount += 1
+
+            spikeMats, categories, selectedIndices = loadSpikeBinnedSpike(folderPath,
+                arrayNameFrom, arrayInfoFrom, arrayNameTo, arrayInfoTo,
+                spikesFromIdx, spikesToIdx,
+                rasterOpts,
+                spikesFrom = spikesFrom, spikesTo = spikesTo,
+                correctAlignmentSpikesFrom = 0, correctAlignmentSpikesTo = 0)
+
+            """
             spikeMats, categories, selectedIndices = hf.binnedSpikesAlignedToSpikes(spikesFrom, spikesTo,
                 spikesFromIdx, spikesToIdx,
-                binInterval, binWidth, windowSize = (-0.01, .11))
-
+                rasterOpts['binInterval'], rasterOpts['binWidth'], windowSize = rasterOpts['windowSize'])
+            """
             titleOverride = 'Channel %d triggered by channel %d' % (
                             spikesFromIdx['chan'], spikesToIdx['chan'])
 
-            _, fig, ax, selectedIndices = plotSpikeTriggeredRaster(spikesFrom = None, spikesTo = None,
+            _, fig, ax, selectedIndices = plotSpikeTriggeredRaster(\
+                spikesFrom = None, spikesTo = None,
                 spikesFromIdx = None, spikesToIdx = None,
                 spikeMats = spikeMats,
                 fig = None, ax = None,
                 categories = categories,
-                windowSize = None, timeRange = None, maxSpikesTo = 500,
+                rasterOpts = rasterOpts,
                 showNow = False, plotOpts = plotOpts)
 
             plotSpikeTriggeredFR(spikesFrom = None, spikesTo = None,
@@ -1206,7 +1268,7 @@ def spikeTriggeredAveragePDFReport(filePath,
                 spikeMats = spikeMats, titleOverride = titleOverride,
                 fig = fig, ax = ax, twin = True,
                 categories = categories,
-                windowSize = None, timeRange = None, maxSpikesTo = 5000,
+                rasterOpts = rasterOpts,
                 showNow = False, plotOpts = plotOpts)
             pdf.savefig()
             plt.close()
@@ -1220,7 +1282,10 @@ def spikeTriggeredAveragePDFReport(filePath,
             plt.close()
 
 def generateSpikeTriggeredAverageReport(folderPath, trialFileFrom, trialFileTo,
-    correctAlignmentSpikesFrom = 0, correctAlignmentSpikesTo = 0):
+    correctAlignmentSpikesFrom = 0, correctAlignmentSpikesTo = 0,
+    plotOpts = None,
+    rasterOpts = None):
+
     key, value = next(iter(trialFileFrom.items()))
     arrayInfoFrom = value
     arrayNameFrom = key
@@ -1243,15 +1308,18 @@ def generateSpikeTriggeredAverageReport(folderPath, trialFileFrom, trialFileTo,
         if unitsOnThisChan.any():
             spikesToList.append({'chan':channel})
     #pdb.set_trace()
-    spikeTriggeredAveragePDFReport('./', spikesFrom, spikesTo, spikesFromList,
+    spikeTriggeredAveragePDFReport(folderPath, spikesFrom, spikesTo, spikesFromList,
         spikesToList,
+        arrayNameFrom = arrayNameFrom, arrayInfoFrom = arrayInfoFrom,
+        arrayNameTo = arrayNameTo, arrayInfoTo = arrayInfoTo,
         correctAlignmentSpikesFrom = correctAlignmentSpikesFrom, correctAlignmentSpikesTo = correctAlignmentSpikesTo,
         newName = newName, enableFR = True,
-        plotOpts = {'type' : 'ticks', 'kernelWidth' : 5e-3, 'binInterval' : (3**-1)* 1e-3,
-            'binWidth' : (3**-1)* 1e-3, 'errorBar' : 'sem'})
+        plotOpts = plotOpts, rasterOpts = rasterOpts)
 
 def generateStimTriggeredAverageReport(folderPath, trialFileFrom, trialFileStim,
-    correctAlignmentSpikesFrom = 0, correctAlignmentSpikesStim = 0):
+    correctAlignmentSpikesFrom = 0, correctAlignmentSpikesStim = 0,
+    plotOpts = None,
+    rasterOpts = None):
     key, value = next(iter(trialFileFrom.items()))
     arrayInfoFrom = value
     arrayNameFrom = key
@@ -1271,12 +1339,12 @@ def generateStimTriggeredAverageReport(folderPath, trialFileFrom, trialFileStim,
     newName = spikeBinnedSpikesNameGenerator(arrayNameFrom, arrayInfoFrom, arrayNameTo, arrayInfoTo)
     spikesStimList = []
 
-    impedances = pd.read_csv(os.path.join(folderPath, 'Murdoc Impedances'), skiprows = [0, 1, 2, 3, 4, 5, 6, 7, 9], delim_whitespace = True)
+    impedances = pd.read_csv(os.path.join(folderPath, 'Murdoc Impedances.txt'), skiprows = [0, 1, 2, 3, 4, 5, 6, 7, 9], delim_whitespace = True)
     impedances['MaxAmp(uA)'] = (8.5* 1e3) / impedances['Mag(kOhms)']
     impedances.index = impedances.index + 5121
 
     spikesStim['Units'] = 'uA'
-    catSpikeFun = hf.catSpikesByAmpGenerator(5, type = 'minPeak', subSet = slice(10, 30))
+    catSpikeFun = hf.catSpikesGenerator(5, type = 'minPeak', subSet = slice(10, 30))
     for idx, channel in enumerate(spikesStim['ChannelID']):
         unitsOnThisChan = np.unique(spikesStim['Classification'][idx])
         if unitsOnThisChan.any():
@@ -1286,15 +1354,14 @@ def generateStimTriggeredAverageReport(folderPath, trialFileFrom, trialFileStim,
 
         spikesStim['Classification'][idx] = catSpikeFun(spikesStim, idx)
     #pdb.set_trace()
-    spikeTriggeredAveragePDFReport('./', spikesFrom, spikesStim, spikesFromList,
+    spikeTriggeredAveragePDFReport(folderPath, spikesFrom, spikesStim, spikesFromList,
         spikesStimList,
-        correctAlignmentSpikesFrom = correctAlignmentSpikesFrom, correctAlignmentSpikesTo = correctAlignmentSpikesStim,
+        arrayNameFrom = arrayNameFrom, arrayInfoFrom = arrayInfoFrom,
+        arrayNameTo = arrayNameTo, arrayInfoTo = arrayInfoTo,
+        correctAlignmentSpikesFrom = correctAlignmentSpikesFrom,
+        correctAlignmentSpikesTo = correctAlignmentSpikesStim,
         newName = newName, enableFR = True,
-        plotOpts = {'type' : 'ticks', 'kernelWidth' : 5e-3, 'binInterval' : (3**-1)* 1e-3,
-            'binWidth' : (3**-1)* 1e-3, 'errorBar' : 'sem'})
-
-def capitalizeFirstLetter(stringInput):
-    return stringInput[0].capitalize() + stringInput[1:]
+        plotOpts = plotOpts, rasterOpts = rasterOpts)
 
 def loadEventInfo(folderPath, eventInfo, forceRecalc = False):
     if not forceRecalc:
@@ -1321,11 +1388,61 @@ def loadEventInfo(folderPath, eventInfo, forceRecalc = False):
         print('Recalculated trial data and saved to pickle.')
     return trialStats, trialEvents
 
+def capitalizeFirstLetter(stringInput):
+    return stringInput[0].capitalize() + stringInput[1:]
+
+def unCapitalizeFirstLetter(stringInput):
+    return stringInput[0].lower() + stringInput[1:]
+
 def spikesNameGenerator(arrayName, arrayInfo):
-    return arrayInfo['ns5FileName'] + '_spikes' + capitalizeFirstLetter(arrayName) + '_exclude_' + '_'.join([str(i) for i in arrayInfo['excludeClus']]) + '_' + arrayInfo['origin']
+    if arrayInfo['excludeClus'] is None:
+        excludeStr = ''
+    else:
+        excludeStr = '_'.join([str(i) for i in arrayInfo['excludeClus']])
+    return arrayInfo['ns5FileName'] + '_spikes' + capitalizeFirstLetter(arrayName) + '_exclude_' + excludeStr + '_' + arrayInfo['origin']
+
+def trialBinnedSpikesNameGenerator(arrayName, arrayInfo, rasterOpts):
+    return spikesNameGenerator(arrayName, arrayInfo) + '_ALIGNEDTO_' + rasterOpts['alignTo'] + '_SEPARATEDBY_' + rasterOpts['separateBy']
 
 def spikeBinnedSpikesNameGenerator(arrayNameFrom, arrayInfoFrom, arrayNameTo, arrayInfoTo):
     return spikesNameGenerator(arrayNameFrom, arrayInfoFrom) + '_ALIGNEDTO_' + spikesNameGenerator(arrayNameTo, arrayInfoTo)
+
+def spikesNameRetrieve(spikesName):
+
+    arrayInfo = {'ns5FileName' : None, 'nevIDs' : None, 'excludeClus' : None, 'origin' : None}
+
+    arrayInfo['ns5FileName'] = spikesName.split('_spikes')[0]
+    arrayInfo['origin'] = spikesName.split('_')[-1]
+    excludeRe = r'_exclude(_\d*)*_'
+    match = re.search(excludeRe, spikesName)
+    arrayInfo['excludeClus'] = []
+    for i in match.groups():
+        if i[1:]:
+            arrayInfo['excludeClus'].append(int(i[1:]))
+
+    arrayName = spikesName.split('_spikes')[1].split('_exclude_')[0]
+    arrayName = unCapitalizeFirstLetter(arrayName)
+
+    return arrayName, arrayInfo
+
+def spikeBinnedSpikesNameRetrieve(spikesName):
+    subNames = spikesName.split('_ALIGNEDTO_')
+    fromName = subNames[0]
+    arrayNameFrom, arrayInfoFrom = spikesNameRetrieve(fromName)
+    toName   = subNames[1]
+    arrayNameTo, arrayInfoTo = spikesNameRetrieve(toName)
+    return arrayNameFrom, arrayInfoFrom, arrayNameTo, arrayInfoTo
+
+def trialBinnedSpikesNameRetrieve(spikesName):
+    subNames = spikesName.split('_ALIGNEDTO_')
+    unitsName = subNames[0]
+    arrayName, arrayInfo = spikesNameRetrieve(unitsName )
+
+    rasterOpts = {'alignTo' : None, 'separateBy' : None}
+    rasterOpts['alignTo'] = subNames[-1].split('_SEPARATEDBY_')[0]
+    rasterOpts['separateBy'] = subNames[-1].split('_SEPARATEDBY_')[-1]
+
+    return arrayName, arrayInfo, rasterOpts
 
 def loadSpikeInfo(folderPath, arrayName, arrayInfo,
     forceRecalc = False):
@@ -1336,10 +1453,14 @@ def loadSpikeInfo(folderPath, arrayName, arrayInfo,
             spikes = pickle.load(
                 open(os.path.join(folderPath,
                 spikesNameGenerator(arrayName, arrayInfo) + '.pickle'), 'rb'))
+
+            # make sure the file contains all requested channels
+            for chanIdx in spikes['ChannelID']:
+                assert chanIdx in arrayInfo['nevIDs']
             print('Loaded spike data from pickle.')
         except Exception:
             traceback.print_exc()
-            # if loading failed, recalculate anyway
+            # if loading failed, recalculate anyway=
             print('Spike data not pickled. Recalculating...')
             forceRecalc = True
 
@@ -1379,16 +1500,56 @@ def loadSpikeInfo(folderPath, arrayName, arrayInfo,
 def loadSpikeBinnedSpike(folderPath,
     arrayNameFrom, arrayInfoFrom, arrayNameTo, arrayInfoTo,
     spikesFromIdx, spikesToIdx,
-    param,
+    rasterOpts,
     spikesFrom = None, spikesTo = None,
-    correctAlignmentSpikesFrom = 0, correctAlignmentSpikesTo = 0, forceRecalc = False):
+    correctAlignmentSpikesFrom = 0, correctAlignmentSpikesTo = 0,
+    forceRecalc = False):
 
+    setName = spikeBinnedSpikesNameGenerator(arrayNameFrom, arrayInfoFrom, arrayNameTo, arrayInfoTo)
+    setPath = os.path.join(folderPath, setName + '.h5')
     if not forceRecalc:
     # if not requiring a recalculation, load from pickle
         try:
-            spikeMats, categories, selectedIndices = None, None, None
+            with h5py.File(setPath, "r") as f:
+                recordAttributes = f['/'+"rasterOpts"].attrs
+                for key, value in rasterOpts.items():
+                    if type(value) is not dict:
+                        thisAttr = recordAttributes[key]
+
+                        if isinstance(value, collections.Iterable):
+                            for idx, valueComponent in enumerate(value):
+                                assert (valueComponent == thisAttr[idx]) or (valueComponent is None and np.isnan(thisAttr[idx]))
+                        else:
+                            assert (value == thisAttr) or (value is None and np.isnan(thisAttr))
+                    else:
+                        for subKey, subValue in value.items():
+                            thisAttr = recordAttributes[key + '_' + subKey]
+
+                            if isinstance(subValue, collections.Iterable):
+                                for idx, valueComponent in enumerate(subValue):
+                                    assert (valueComponent == thisAttr[idx]) or (valueComponent is None and np.isnan(thisAttr[idx]))
+                            else:
+                                assert (subValue == thisAttr) or (subValue is None and np.isnan(thisAttr))
+
+                #spikeMats, categories, selectedIndices = None, None, None
+                requestedSpikeMat = '/' + str(spikesFromIdx['chan']) + '_to_' + str(spikesToIdx['chan'])
+
+                spikeMatShape = f[requestedSpikeMat + '/spikeMats'].shape
+                spikeMats = [f[requestedSpikeMat + '/spikeMats'][:,:,i] for i in range(spikeMatShape[2])]
+                for idx, spikeMat in enumerate(spikeMats):
+                    spikeMats[idx] = pd.DataFrame(spikeMat, index = f[requestedSpikeMat + '/index'], columns = f[requestedSpikeMat + '/columns'])
+
+                categories = np.array(f[requestedSpikeMat + '/categories'])
+                categories = pd.Series(categories, index = f[requestedSpikeMat + '/index'])
+
+                selectedIndices = np.array(f[requestedSpikeMat + '/selectedIndices'])
+
+                if selectedIndices.any():
+                    selectedIndices = pd.Series(selectedIndices, index = f[requestedSpikeMat + '/index'])
+                else:
+                    selectedIndices = None
             # TODO: figure out how to load it...
-            print('Loaded spikeMats from pickle.')
+            #print('Loaded spikeMats from h5.')
         except Exception:
             traceback.print_exc()
             # if loading failed, recalculate anyway
@@ -1396,15 +1557,13 @@ def loadSpikeBinnedSpike(folderPath,
             forceRecalc = True
 
     if forceRecalc:
-        setName = spikeBinnedSpikesNameGenerator(arrayNameFrom, arrayInfoFrom, arrayNameTo, arrayInfoTo)
-        setPath = os.path.join(folderPath, setName + '.h5')
-
         if spikesFrom is None:
             spikeStructFrom, spikesFrom = loadSpikeInfo(folderPath, arrayNameFrom, arrayInfoFrom)
 
         if correctAlignmentSpikesFrom: #correctAlignmentSpikesFrom units in samples
             spikesFrom = hf.correctSpikeAlignment(spikesFrom, correctAlignmentSpikesFrom)
 
+        spikesFromList = []
         for idx, channel in enumerate(spikesFrom['ChannelID']):
             unitsOnThisChan = np.unique(spikesFrom['Classification'][idx])
             if unitsOnThisChan.any():
@@ -1414,7 +1573,7 @@ def loadSpikeBinnedSpike(folderPath,
             spikeStructTo, spikesTo = loadSpikeInfo(folderPath, arrayNameTo, arrayInfoTo)
 
         if correctAlignmentSpikesTo: #correctAlignmentSpikesFrom units in samples
-        spikesTo = hf.correctSpikeAlignment(spikesTo, correctAlignmentSpikesTo)
+            spikesTo = hf.correctSpikeAlignment(spikesTo, correctAlignmentSpikesTo)
 
         spikesToList = []
         for idx, channel in enumerate(spikesTo['ChannelID']):
@@ -1423,28 +1582,197 @@ def loadSpikeBinnedSpike(folderPath,
                 spikesToList.append({'chan':channel,'units':list(range(len(unitsOnThisChan)))})
 
         with h5py.File(setPath, "w") as f:
-            grp = f.create_group("data")
-            for key, value in param:
-                grp.attrs[key] = value
+            grp = f.create_group("rasterOpts")
+            for key, value in rasterOpts.items():
+                if type(value) is not dict:
+                    if value is not None:
+                        grp.attrs[key] = value
+                    else:
+                        grp.attrs[key] = np.nan
+                else:
+                    for subKey, subValue in value.items():
+                        if value is not None:
+                            grp.attrs[key + '_' + subKey] = subValue
+                        else:
+                            grp.attrs[key + '_' + subKey] = np.nan
+
+            if rasterOpts['separateByFunArgs'] is not None and rasterOpts['separateByFunKWArgs'] is not None:
+                separateByFun = hf.catSpikesGenerator(*rasterOpts['separateByFunArgs'], **rasterOpts['separateByFunKWArgs'])
+            elif rasterOpts['separateByFunArgs'] is not None and rasterOpts['separateByFunKWArgs'] is None:
+                separateByFun = hf.catSpikesGenerator(*rasterOpts['separateByFunArgs'])
+            elif rasterOpts['separateByFunArgs'] is None and rasterOpts['separateByFunKWArgs'] is not None:
+                separateByFun = hf.catSpikesGenerator(**rasterOpts['separateByFunKWArgs'])
+
+            pairsNum = len(spikesFromList) * len(spikesToList)
+            pairCount = 0
+
+            saveSpikesFromIdx, saveSpikesToIdx = spikesFromIdx, spikesToIdx
+            saveSpikeMats, saveCategories, saveSelectedIndices = None, None, None
+
             for spikesToIdx in spikesToList:
 
-                alignTimes, categories, selectedIndices= hf.spikeAlignmentTimes(spikesTo,spikesToIdx,
-                    separateByFun = param['separateByFun'], timeRange = param['timeRange'],
-                    maxSpikesTo =param['maxSpikesTo'], discardEmpty = param['discardEmpty'])
+                alignTimes, categories, selectedIndices = hf.spikeAlignmentTimes(spikesTo,spikesToIdx,
+                    separateByFun = separateByFun,
+                    timeRange = rasterOpts['timeRange'],
+                    maxSpikesTo =rasterOpts['maxSpikesTo'], discardEmpty = rasterOpts['discardEmpty'])
 
                 for spikesFromIdx in spikesFromList:
-                    spikeMats = binnedSpikesAligned(spikesFrom, alignTimes, param['binInterval'],
-                        binWidth, spikesFromIdx['chan'], windowSize = param['windowSize'],
-                        discardEmpty = param['discardEmpty'])
+                    if os.fstat(0) == os.fstat(1):
+                        endChar = '\r'
+                        print("Running loadSpikeBinnedSpike: %d%%" % int((pairCount + 1) * 100 / pairsNum), end = endChar)
+                    else:
+                        print("Running loadSpikeBinnedSpike: %d%%" % int((pairCount + 1) * 100 / pairsNum))
 
-                    dsetName = str(spikesFromIdx['chan']) + '_to_' + str(spikesToIdx['chan'])
-                    dset = grp.create_dataset(dsetName, (spikeMats[0].shape[0],spikeMats[0].shape[1],len(spikeMats)), dtype='f')
+                    try:
+                        spikeMats = hf.binnedSpikesAligned(spikesFrom, alignTimes, rasterOpts['binInterval'],
+                            rasterOpts['binWidth'], spikesFromIdx['chan'], windowSize = rasterOpts['windowSize'],
+                            discardEmpty = rasterOpts['discardEmpty'])
+                    except Exception:
+                        traceback.print_exc()
+                        pdb.set_trace()
+
+                    spikeMatSetName = str(spikesFromIdx['chan']) + '_to_' + str(spikesToIdx['chan'])
+                    grp = f.create_group(spikeMatSetName)
+                    spikeMatSet = grp.create_dataset("spikeMats", (spikeMats[0].shape[0], spikeMats[0].shape[1], len(spikeMats)), dtype = 'f')
+                    binCentersSet =  grp.create_dataset("columns", (spikeMats[0].shape[1],), data = spikeMats[0].columns, dtype = 'f')
+                    allRowIdxSet = grp.create_dataset("index", (spikeMats[0].shape[0],), data = spikeMats[0].index, dtype = 'f')
+                    categSet = grp.create_dataset("categories", (spikeMats[0].shape[0],), data = categories, dtype = 'f')
+                    idxSet = grp.create_dataset("selectedIndices", (spikeMats[0].shape[0],), data = selectedIndices, dtype = 'f')
+
                     for idx, spikeMat in enumerate(spikeMats):
-                        dset[:,:,idx] = spikeMat
+                        spikeMatSet[:,:,idx] = spikeMat
+
+                    pairCount += 1
+
+                    if saveSpikesFromIdx['chan'] == spikesFromIdx['chan'] and saveSpikesToIdx['chan'] == spikesToIdx['chan']:
+                        saveSpikeMats, saveCategories, saveSelectedIndices = spikeMats, categories, selectedIndices
+        # after looping through everything and saving, return the requested channel
+        spikeMats, categories, selectedIndices = saveSpikeMats, saveCategories, saveSelectedIndices
+    return spikeMats, categories, selectedIndices
+
+def loadTrialBinnedSpike(folderPath,
+    arrayName, arrayInfo,
+    channel,
+    rasterOpts,
+    trialStats = None, spikes = None,
+    correctAlignmentSpikes = 0,
+    forceRecalc = False):
+
+    setName = trialBinnedSpikesNameGenerator(arrayName, arrayInfo, rasterOpts)
+    setPath = os.path.join(folderPath, setName + '.h5')
+    if not forceRecalc:
+    # if not requiring a recalculation, load from pickle
+        try:
+            with h5py.File(setPath, "r") as f:
+                recordAttributes = f['/'+"rasterOpts"].attrs
+                for key, value in rasterOpts.items():
+                    if type(value) is not dict:
+                        thisAttr = recordAttributes[key]
+
+                        if isinstance(value, collections.Iterable):
+                            for idx, valueComponent in enumerate(value):
+                                assert (valueComponent == thisAttr[idx]) or (valueComponent is None and np.isnan(thisAttr[idx]))
+                        else:
+                            assert (value == thisAttr) or (value is None and np.isnan(thisAttr))
+                    else:
+                        for subKey, subValue in value.items():
+                            thisAttr = recordAttributes[key + '_' + subKey]
+
+                            if isinstance(subValue, collections.Iterable):
+                                for idx, valueComponent in enumerate(subValue):
+                                    assert (valueComponent == thisAttr[idx]) or (valueComponent is None and np.isnan(thisAttr[idx]))
+                            else:
+                                assert (subValue == thisAttr) or (subValue is None and np.isnan(thisAttr))
+
+                requestedSpikeMat = '/' + str(channel)
+
+                spikeMatShape = f[requestedSpikeMat + '/spikeMats'].shape
+                spikeMats = [f[requestedSpikeMat + '/spikeMats'][:,:,i] for i in range(spikeMatShape[2])]
+                for idx, spikeMat in enumerate(spikeMats):
+                    spikeMats[idx] = pd.DataFrame(spikeMat, index = f[requestedSpikeMat + '/index'], columns = f[requestedSpikeMat + '/columns'])
+
+                categories = np.array(f[requestedSpikeMat + '/categories'])
+                categories = pd.Series(categories, index = f[requestedSpikeMat + '/index'])
+
+                selectedIndices = np.array(f[requestedSpikeMat + '/selectedIndices'])
+
+                if selectedIndices.any():
+                    selectedIndices = pd.Series(selectedIndices, index = f[requestedSpikeMat + '/index'])
+                else:
+                    selectedIndices = None
+
+            #print('Loaded spikeMats from h5.')
+
+        except Exception:
+            traceback.print_exc()
+            # if loading failed, recalculate anyway
+            print('SpikeMats not pickled. Recalculating...')
+            forceRecalc = True
+
+    if forceRecalc:
+        if spikes is None:
+            spikeStruct, spikes = loadSpikeInfo(folderPath, arrayName, arrayInfo)
+
+        if correctAlignmentSpikes: #correctAlignmentSpikes units in samples
+            spikes= hf.correctSpikeAlignment(spikes, correctAlignmentSpikes)
+
+        with h5py.File(setPath, "w") as f:
+            grp = f.create_group("rasterOpts")
+            for key, value in rasterOpts.items():
+                if type(value) is not dict:
+                    if value is not None:
+                        grp.attrs[key] = value
+                    else:
+                        grp.attrs[key] = np.nan
+                else:
+                    for subKey, subValue in value.items():
+                        if value is not None:
+                            grp.attrs[key + '_' + subKey] = subValue
+                        else:
+                            grp.attrs[key + '_' + subKey] = np.nan
+
+            saveChanIdx = channel
+            saveSpikeMats, saveCategories, saveSelectedIndices = None, None, None
+
+            nCh = len(spikes['ChannelID'])
+            for idx, chanIdx in enumerate(spikes['ChannelID']):
+                unitsOnThisChan = np.unique(spikes['Classification'][idx])
+
+                if unitsOnThisChan.any():
+                    spikeMats, categories, selectedIndices = hf.binnedSpikesAlignedToTrial(spikes,
+                        rasterOpts['binInterval'], rasterOpts['binWidth'],
+                        trialStats, rasterOpts['alignTo'], chanIdx,
+                        separateBy = rasterOpts['separateBy'],
+                        windowSize = rasterOpts['windowSize'], timeRange = rasterOpts['timeRange'],
+                        maxTrial = rasterOpts['maxTrial'])
+
+                    if os.fstat(0) == os.fstat(1):
+                        endChar = '\r'
+                        print("Running loadTrialBinnedSpike: %d%%" % int((idx + 1) * 100 / nCh), end = endChar)
+                    else:
+                        print("Running loadTrialBinnedSpike: %d%%" % int((idx + 1) * 100 / nCh))
+
+                    spikeMatSetName = str(chanIdx)
+                    grp = f.create_group(spikeMatSetName)
+
+                    spikeMatSet = grp.create_dataset("spikeMats", (spikeMats[0].shape[0], spikeMats[0].shape[1], len(spikeMats)), dtype = 'f')
+                    binCentersSet =  grp.create_dataset("columns", (spikeMats[0].shape[1],), data = spikeMats[0].columns, dtype = 'f')
+                    allRowIdxSet = grp.create_dataset("index", (spikeMats[0].shape[0],), data = spikeMats[0].index, dtype = 'f')
+                    dt = h5py.special_dtype(vlen=str)
+                    categSet = grp.create_dataset("categories", (spikeMats[0].shape[0],), data = categories, dtype=dt)
+                    idxSet = grp.create_dataset("selectedIndices", (spikeMats[0].shape[0],), data = selectedIndices, dtype = 'f')
+
+                    for idx, spikeMat in enumerate(spikeMats):
+                        spikeMatSet[:,:,idx] = spikeMat
+
+                    if saveChanIdx == chanIdx:
+                        saveSpikeMats, saveCategories, saveSelectedIndices = spikeMats, categories, selectedIndices
+        # after looping through everything and saving, return the requested channel
+        spikeMats, categories, selectedIndices = saveSpikeMats, saveCategories, saveSelectedIndices
     return spikeMats, categories, selectedIndices
 
 def generateSpikeReport(folderPath, eventInfo, trialFiles,
-    plotRastersAlignedTo = 'FirstOnset', plotRastersSeparatedBy = None,
+    rasterOpts = None, plotOpts = None,
     correctAlignmentSpikes = 0):
 
     """
@@ -1461,8 +1789,11 @@ def generateSpikeReport(folderPath, eventInfo, trialFiles,
 
         newName = spikesNameGenerator(key, value)
         spikePDFReport(folderPath,
-            spikes, spikeStruct, correctAlignmentSpikes = correctAlignmentSpikes, plotRastersAlignedTo = plotRastersAlignedTo,
-            plotRastersSeparatedBy = plotRastersSeparatedBy, trialStats = trialStats,
+            spikes, spikeStruct,
+            arrayName =key, arrayInfo = value,
+            correctAlignmentSpikes = correctAlignmentSpikes,
+            rasterOpts = rasterOpts, plotOpts = plotOpts,
+            trialStats = trialStats,
             enableFR = True, newName = newName)
 
         del spikes, spikeStruct
