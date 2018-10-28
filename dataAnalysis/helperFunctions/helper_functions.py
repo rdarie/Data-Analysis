@@ -45,6 +45,7 @@ except:
     HASLIBTFR = False
 
 from scipy import interpolate
+from scipy import stats
 from copy import *
 import matplotlib.backends.backend_pdf
 from fractions import gcd
@@ -331,60 +332,115 @@ def fillInJumps(channelData, samp_per_s, smoothing_ms = 1, badThresh = 1e-3,
 
     return channelData, badMask
 
-def getTriggers(dataSeries, iti = .01, fs = 3e4, thres = 0.5, plotting = False):
+def confirmTriggersPlot(peakIdx, dataSeries, fs, whichPeak = 0, nSec = 2):
+
+    indent = peakIdx[whichPeak]
+
+    dataSlice = slice(int(indent-.25*fs),int(indent+nSec*fs)) # 5 sec after first peak
+    peakSlice = np.where(np.logical_and(peakIdx > indent - .25*fs, peakIdx < indent + nSec*fs))
+
+    f = plt.figure()
+    plt.plot(dataSeries.index[dataSlice] - indent, dataSeries.iloc[dataSlice])
+    plt.plot(peakIdx[peakSlice] - indent, dataSeries.iloc[peakIdx[peakSlice]], 'r*')
+    plt.show(block = False)
+
+    f = plt.figure()
+    sns.distplot(np.diff(peakIdx))
+    plt.xlabel('distance between triggers ( # samples)')
+    plt.show(block = False)
+
+def compareClocks(foundTime, expectedTime, thresh):
+    timeMismatch = foundTime[:len(expectedTime)] - expectedTime
+
+    expectedClockDrift = np.polyfit(x=range(len(expectedTime)), y=timeMismatch, deg=1)
+    expectedTimeMismatchFun = np.poly1d(expectedClockDrift)
+    expectedTimeMismatch = expectedTimeMismatchFun(range(len(expectedTime)))
+
+    correctedTimeMismatch = timeMismatch - expectedTimeMismatch
+    whereOff = np.flatnonzero(abs(correctedTimeMismatch) > thresh)
+
+    return correctedTimeMismatch, whereOff, expectedTimeMismatchFun
+
+def getTriggers(dataSeries, iti = .01, fs = 3e4, thres = 2.58,
+    edgeType = 'rising', expectedTime = None, plotting = False):
     # iti: expected inter trigger interval
 
-    # minimum distance between triggers (units of samples)
-    width = fs * iti / 2
+    # minimum distance between triggers (units of samples), 5% wiggle room
+    itiWiggle = 0.05
+    width = int(fs * iti * (1 - itiWiggle))
     # first difference of triggers
     triggersPrime = dataSeries.diff()
     triggersPrime.fillna(0, inplace = True)
+    # z-score the derivative
+    triggersPrime = pd.Series(stats.zscore(triggersPrime), index = triggersPrime.index)
+
+    if edgeType == 'falling':
+        triggersPrime = - triggersPrime
+
     # moments when camera capture occured
-    peakIdx = peakutils.indexes(triggersPrime.values.squeeze(), thres=thres, min_dist=width)
+    peakIdx = peakutils.indexes(triggersPrime.values.squeeze(), thres=thres,
+        min_dist=width, thres_abs=True)
+
+    # check that the # of triggers matches the number of frames
+
+    if expectedTime is not None:
+        foundTime = (dataSeries.index[peakIdx] - dataSeries.index[peakIdx[0]]) / fs
+        if len(foundTime) > len(expectedTime):
+            # more triggers found than frames in the video
+
+            # check for inconsistencies beyond normal clock drift
+            foundTime = foundTime[:len(expectedTime)]
+            correctedTimeMismatch, whereOff, expectedTimeMismatchFun = compareClocks(
+                foundTime, expectedTime, 1e-3)
+
+            if whereOff.any():
+                raise Exception('triggers do not match simi record')
+
+            peakIdx = peakIdx[:len(expectedTime)]
+
+        elif len(foundTimes) > len(expectedTime):
+            raise Exception('table contains {} entries and there are {} triggers'.format(len(raw.index), len(trigTimes)))
 
     if plotting:
-        indent = peakIdx[0]
-        dataSlice = slice(int(peakIdx[0]),int(peakIdx[0]+5*fs)) # 5 sec after first peak
-        peakSlice = np.where(peakIdx < peakIdx[0]+5*fs)
-        f = plt.figure()
-        plt.plot(dataSeries.iloc[dataSlice])
-        plt.plot(dataSeries.iloc[peakIdx[peakSlice]], 'r*')
-        plt.show(block = False)
+        confirmTriggersPlot(peakIdx, dataSeries, fs)
 
     return peakIdx
 
-def getCameraTriggers(simiData, plotting = False):
+def getCameraTriggers(simiData, thres = 2.58, expectedTime = None, plotting = False):
     # sample rate
     fs = simiData['samp_per_s']
     # get camera triggers
     triggers = simiData['data']
     # get Triggers
-    peakIdx = getTriggers(triggers, iti = .01, fs = fs, thres = .9, plotting = plotting)
+    peakIdx = getTriggers(triggers, iti = .01, fs = fs, thres = thres,
+        edgeType = 'falling', expectedTime = expectedTime, plotting = plotting)
+
     # get time of first simi frame in NSP time:
     trigTimes = simiData['t'][peakIdx]
     # timeOffset = trigTimes[0]
     return peakIdx, trigTimes
 
-def getAngles(anglesFile, trigTimes, selectHeaders = None, selectTime = None,
+def getAngles(anglesFile,
+    trigTimes = None,
+    simiData = None, thres = None,
+    selectHeaders = None, selectTime = None,
     reIndex = None, lowCutoff = None):
 
     raw = pd.read_table(anglesFile, index_col = 0, skiprows = [1])
-    timeOffset = trigTimes[0]
-    raw.index = raw.index + timeOffset
 
-    raw.index = np.around(raw.index, 3)
-    #pdb.set_trace()
-    if selectTime:
-        raw = raw.loc[slice(selectTime[0], selectTime[1]), :]
+    if trigTimes is None:
+        peakIdx, trigTimes = getCameraTriggers(simiData, thres = thres, expectedTime = raw.index)
 
     headings = sorted(raw.columns) # get column names
-    coordinates = ['x', 'y', 'z']
 
     # reorder alphabetically by columns
     raw = raw.reindex(columns = headings)
-    #pdb.set_trace()
 
-    proc = pd.DataFrame(raw.values, columns = raw.columns, index = raw.index)
+    proc = pd.DataFrame(raw.values, columns = raw.columns, index = trigTimes)
+
+    proc.index = np.around(proc.index, 3)
+    if selectTime:
+        proc = proc.loc[slice(selectTime[0], selectTime[1]), :]
 
     if lowCutoff is not None:
         fr = 1 / 0.01
@@ -393,16 +449,16 @@ def getAngles(anglesFile, trigTimes, selectHeaders = None, selectTime = None,
         for column in proc:
             proc.loc[:, column] = signal.filtfilt(b, a, proc.loc[:, column])
 
-    proc = proc.reset_index()
-    proc.index = proc.loc[:, 'Time'] * 3e4
     return proc
 
 def loadAngles(folderPath, fileName, kinAngleOpts = {
+    'ns5FileName' : '',
     'selectHeaders' : None,
     'reIndex' : None,
     'flip' : None,
     'lowCutoff': None
     }, forceRecalc = False):
+
     setPath = os.path.join(folderPath, fileName + '.h5')
     if not forceRecalc:
         try:
@@ -412,29 +468,44 @@ def loadAngles(folderPath, fileName, kinAngleOpts = {
             # if loading failed, recalculate anyway
             print('Angles not pickled. Recalculating...')
             forceRecalc = True
+
     if forceRecalc:
-        motorData   = pd.read_pickle(os.path.join(folderPath, 'motorData.pickle'))
+
+        motorDataPath = os.path.join(folderPath,
+            kinAngleOpts['ns5FileName'] + '_eventInfo.h5')
+        motorData= pd.read_hdf(motorDataPath, 'motorData')
+
         simiData = {
         'samp_per_s' : 3e4,
         'data' : motorData['simiTrigs'],
         't' : np.array(motorData['simiTrigs'].index) / 3e4
         }
-        peakIdx, trigTimes = getCameraTriggers(simiData)
         anglesFile = os.path.join(folderPath,fileName + '-angles.txt')
 
-        angles = getAngles(anglesFile, trigTimes, selectHeaders = kinAngleOpts['selectHeaders'])
+        # keep trying thresholds until the # of trigs matches the # of samples
+        for thres in [3.29, 2.58, 2.33, 2.05]:
+            try:
+                angles = getAngles(anglesFile, simiData = simiData, thres = thres, selectHeaders = kinAngleOpts['selectHeaders'])
+                break
+            except Exception:
+                traceback.print_exc()
 
         angles.to_hdf(setPath, 'angles')
 
     return angles
 
-def getKinematics(kinematicsFile, trigTimes, selectHeaders = None, selectTime = None,
+def getKinematics(kinematicsFile,
+    trigTimes = None,
+    simiData = None, thres = None,
+    selectHeaders = None, selectTime = None,
     flip = None, reIndex = None, lowCutoff = None):
     # TODO: unify with mujoco stuff
     raw = pd.read_table(kinematicsFile, index_col = 0, skiprows = [1])
-    timeOffset = trigTimes[0]
-    raw.index = raw.index + timeOffset
 
+    if trigTimes is None:
+        peakIdx, trigTimes = getCameraTriggers(simiData, thres = thres, expectedTime = raw.index)
+
+    raw = pd.DataFrame(raw.values, index = trigTimes, columns = raw.columns)
     raw.index = np.around(raw.index, 3)
 
     if selectTime:
@@ -499,6 +570,7 @@ def getKinematics(kinematicsFile, trigTimes, selectHeaders = None, selectTime = 
     return proc
 
 def loadKinematics(folderPath, fileName, kinPosOpts = {
+    'ns5FileName' : '',
     'selectHeaders' : None,
     'reIndex' : None,
     'flip' : None,
@@ -516,7 +588,8 @@ def loadKinematics(folderPath, fileName, kinPosOpts = {
             print('kinematics not pickled. Recalculating...')
             forceRecalc = True
     if forceRecalc:
-        motorData   = pd.read_pickle(os.path.join(folderPath, 'motorData.pickle'))
+        motorData   = pd.read_pickle(os.path.join(folderPath,
+            kinPosOpts['ns5FileName'] + '_motorData.pickle'))
         simiData = {
         'samp_per_s' : 3e4,
         'data' : motorData['simiTrigs'],
@@ -525,14 +598,22 @@ def loadKinematics(folderPath, fileName, kinPosOpts = {
         peakIdx, trigTimes = getCameraTriggers(simiData)
         kinematicsFile = os.path.join(folderPath,fileName + '-positions.txt')
 
-        kinematics = getKinematics(kinematicsFile, trigTimes, selectHeaders = kinPosOpts['selectHeaders'],
-            flip = kinPosOpts['flip'], reIndex = kinPosOpts['reIndex'], lowCutoff = kinPosOpts['lowCutoff'])
+        # keep trying thresholds until the # of trigs matches the # of samples
+        for thres in [3.29, 2.58, 2.33, 2.05]:
+            try:
+                kinematics = getKinematics(kinematicsFile, simiData = simiData, thres = thres, selectHeaders = kinPosOpts['selectHeaders'],
+                    flip = kinPosOpts['flip'], reIndex = kinPosOpts['reIndex'], lowCutoff = kinPosOpts['lowCutoff'])
+
+                break
+            except Exception:
+                traceback.print_exc()
 
         kinematics.to_hdf(setPath, 'kinematics')
 
     return kinematics
 
-def getGaitEvents(trigTimes, simiTable, whichColumns =  ['ToeUp_Left Y', 'ToeDown_Left Y'], plotting = False, fudge = 2, CameraFs = 100):
+def getGaitEvents(trigTimes, simiTable, whichColumns =  ['ToeUp_Left Y', 'ToeDown_Left Y'],
+    plotting = False, fudge = 2, CameraFs = 100):
     # NSP time of first camera trigger
     timeOffset = trigTimes[0]
     simiTable['Time'] = simiTable['Time'] + timeOffset
@@ -1030,7 +1111,7 @@ def binnedEvents(timeStamps, chans,
     return spikeMatDF, binCenters, binLeftEdges
 
 def binnedSpikesAligned(spikes, alignTimes, binInterval, binWidth, channel,
-    windowSize = (-0.25, 1), timeStampUnits = 'samples', discardEmpty = False):
+    windowSize = [-0.25, 1], timeStampUnits = 'samples', discardEmpty = False):
 
     ChanIdx = spikes['ChannelID'].index(channel)
     unitsOnThisChan = np.unique(spikes['Classification'][ChanIdx])
@@ -1114,7 +1195,7 @@ def spikeAlignmentTimes(spikesTo,spikesToIdx,
 
 def binnedSpikesAlignedToSpikes(spikesFrom, spikesTo,
     spikesFromIdx, spikesToIdx,
-    binInterval, binWidth, windowSize = (-0.25, 1),
+    binInterval, binWidth, windowSize = [-0.25, 1],
     separateByFun = catSpikesGenerator(type = 'Classification'),
     timeRange = None, maxSpikesTo = None, discardEmpty = False):
 
@@ -1130,7 +1211,7 @@ def binnedSpikesAlignedToSpikes(spikesFrom, spikesTo,
     return spikeMats, categories, selectedIndices
 
 def binnedSpikesAlignedToTrial(spikes, binInterval, binWidth, trialStats,
-    alignTo, channel, separateBy = None, windowSize = (-0.25, 1), timeRange = None,
+    alignTo, channel, separateBy = None, windowSize = [-0.25, 1], timeRange = None,
     maxTrial = None, discardEmpty = False):
 
     #trialStats[alignedTo] gets converted from samples to seconds
@@ -1158,7 +1239,7 @@ def binnedSpikesAlignedToTrial(spikes, binInterval, binWidth, trialStats,
 
     return spikeMats, categories, selectedIndices
 
-def binnedArray(spikes, rasterOpts, timeStart, timeEnd, chans = None):
+def binnedArray(spikes, rasterOpts, timeStart, chans = None):
     # bins all spikes at a particular point in time
 
     parseAll = True
@@ -1185,22 +1266,22 @@ def binnedArray(spikes, rasterOpts, timeStart, timeEnd, chans = None):
                     timeStamps.append(spikes['TimeStamps'][idx][unitMask])
                     ChannelID.append(unitName)
 
-    spikeMats = [None for i in timeStart.index]
-    currIdx = 0
+    spikeMats = {i:None for i in timeStart.index}
+
     for idx, thisStartTime in timeStart.iteritems():
         try:
             binCenters, fineBins, fineBinsPerWindow, binWidth, centerIdx, binLeftEdges =\
                 getEventBins(thisStartTime + rasterOpts['windowSize'][0],
-                    timeEnd.loc[idx] + rasterOpts['windowSize'][-1],
+                    thisStartTime + rasterOpts['windowSize'][-1],
                     rasterOpts['binInterval'], rasterOpts['binWidth'])
 
-            spikeMats[currIdx], binCenters, binLeftEdges = binnedEvents(timeStamps, ChannelID,
+            spikeMats[idx], binCenters, binLeftEdges = binnedEvents(timeStamps, ChannelID,
                 binWidth = rasterOpts['binWidth'],
                 binCenters = binCenters, fineBins = fineBins,
                 fineBinsPerWindow = fineBinsPerWindow,
                 centerIdx = centerIdx, binLeftEdges = binLeftEdges
                 )
-            currIdx += 1
+
         except Exception:
             traceback.print_exc()
             pdb.set_trace()
@@ -1208,13 +1289,16 @@ def binnedArray(spikes, rasterOpts, timeStart, timeEnd, chans = None):
 
 def trialBinnedArray(spikes, rasterOpts, trialStats, chans = None):
 
-    validMask = np.logical_and(trialStats[rasterOpts['alignTo']].notnull(),
-        trialStats[rasterOpts['endOn']].notnull())
+    validMask = trialStats[rasterOpts['alignTo']].notnull()
+    if rasterOpts['endOn'] is not None:
+        validMask = np.logical_and(validMask,
+            trialStats[rasterOpts['endOn']].notnull())
+        endTimes = trialStats[rasterOpts['endOn']] - trialStats[rasterOpts['alignTo']]
+        rasterOpts['windowSize'][1] = rasterOpts['windowSize'][1] + endTimes.max() / 3e4 # samples to seconds conversion
     # time units of samples
     timeStart = trialStats.loc[validMask, rasterOpts['alignTo']] / 3e4 # conversion to seconds
-    timeEnd = trialStats.loc[validMask, rasterOpts['endOn']] / 3e4 # conversion to seconds
-
-    spikeMats = binnedArray(spikes, rasterOpts, timeStart, timeEnd)
+    spikeMats = {i : None for i in trialStats.index}
+    spikeMats.update(binnedArray(spikes, rasterOpts, timeStart))
 
     return spikeMats
 
@@ -1316,6 +1400,7 @@ def plot_spikes(spikes, chans):
 
         # Extract the channel index, then use that index to get unit ids, extended header index, and label index
         ch_idx      = spikes['ChannelID'].index(chans[i])
+
         units       = sorted(list(set(spikes['Classification'][ch_idx])))
         unitIds     = list(range(len(units)))
         #ext_hdr_idx = spikes['NEUEVWAV_HeaderIndices'][ch_idx]
@@ -1328,6 +1413,8 @@ def plot_spikes(spikes, chans):
         t = np.arange(spikes['Waveforms'][0].shape[1]) / samp_per_ms
 
         for j in range(len(units)):
+            if units[j] == -1:
+                continue
             unit_idxs   = [idx for idx, unit in enumerate(spikes['Classification'][ch_idx]) if unit == units[j]]
             unit_spikes = np.array(spikes['Waveforms'][ch_idx][unit_idxs])
 
@@ -1338,6 +1425,7 @@ def plot_spikes(spikes, chans):
                 ln_sty_idx = unitIds[j] // len(colors)
 
             for k in range(unit_spikes.shape[0]):
+
                 try:
                     axarr[i].plot(t, unit_spikes[k], line_styles[ln_sty_idx], c = colors[color_idx])
                     if min(unit_spikes[k]) < ymin: ymin = min(unit_spikes[k])
@@ -1356,82 +1444,11 @@ def plot_spikes(spikes, chans):
     plt.tight_layout()
     plt.show(block = False)
 
-def triggeredTimeSeries(alignTimes, channelData,
-    nevIDs, categories, removeBaseline = False,
-    windowSize= (-0.25, 1), timeStampResolution = 3e4):
-
-    nCh = len(nevIDs)
-    windowIdx = [int(i * timeStampResolution) for i in windowSize]
-    nSampsInWindow = len(range(windowIdx[0], windowIdx[1]))
-
-    spikesTriggered = {
-        'ChannelID' : [i for i in nevIDs],
-        'Classification' : [categories.values for i in nevIDs],
-        'NEUEVWAV_HeaderIndices' : [None for i in nevIDs],
-        'TimeStamps' : [alignTimes.values for i in nevIDs],
-        'Units' : 'uV',
-        'Waveforms' : [np.zeros((len(alignTimes.index), nSampsInWindow), dtype = np.float) for i in nevIDs],
-        #'meanWaveforms' : [None for i in range(nCh)],
-        #'stdWaveforms' : [None for i in range(nCh)],
-        'basic_headers' : {'TimeStampResolution': timeStampResolution},
-        'extended_headers' : []
-        }
-
-    startTimeIdxTriggeredChan = -windowIdx[0]
-    for rowIdx, startTime in alignTimes.items():
-
-        startTimeIdxChan = np.flatnonzero(channelData['t'] > startTime)[0]
-        maskPre = channelData['t'] > (startTime + windowSize[0])
-        maskPost = channelData['t'] <= (startTime + windowSize[1])
-        mask = np.logical_and(maskPre, maskPost)
-        rowIdxWave = alignTimes.index.get_loc(rowIdx)
-
-        for chIdx in nevIDs:
-            idx = spikesTriggered['ChannelID'].index(chIdx)
-
-            try:
-                chanSlice = channelData['data'].loc[mask, chIdx]
-                if removeBaseline:
-                    chanSlice = chanSlice - chanSlice.mean()
-                    #chanSlice = chanSlice - peakutils.baseline(chanSlice)
-
-                idxIntoStart = np.flatnonzero(maskPre)[0]-startTimeIdxChan + startTimeIdxTriggeredChan
-                idxIntoEnd = np.flatnonzero(maskPost)[-1]-startTimeIdxChan + startTimeIdxTriggeredChan + 1
-
-                try:
-                    spikesTriggered['Waveforms'][idx][rowIdxWave,idxIntoStart:idxIntoEnd] = chanSlice.values
-                except Exception:
-                    traceback.print_exc()
-                    spikesTriggered['Waveforms'][idx][rowIdxWave,idxIntoStart:idxIntoEnd] = chanSlice.values[idxIntoStart:idxIntoEnd]
-
-            except Exception:
-                traceback.print_exc()
-                pdb.set_trace()
-    return spikesTriggered
-
-def spikeTriggeredTimeSeries(spikes, channelData,
-    nevIDs, spikesToIdx,
-    windowSize = (-0.25, 1), removeBaseline = False,
-    separateByFun = catSpikesGenerator(type = 'Classification'),
-    timeRange = None, maxSpikesTo = None, discardEmpty = False):
-
-    if timeRange is None:
-        timeRange = (channelData['t'].iloc[0], channelData['t'].iloc[-1])
-    # get spike firing times to align to
-    alignTimes, categories, selectedIndices = spikeAlignmentTimes(spikes,
-        spikesToIdx,
-        separateByFun = separateByFun,
-        timeRange = timeRange, maxSpikesTo = maxSpikesTo, discardEmpty =  discardEmpty)
-
-    spikesTriggered = triggeredTimeSeries(alignTimes, channelData,
-        nevIDs, categories, removeBaseline = removeBaseline,
-        windowSize= windowSize, timeStampResolution = channelData['samp_per_s'])
-    return spikesTriggered, selectedIndices
-
 def plot_events_raster(eventDf, names, collapse = False, usePlotly = True):
     # Initialize plots
     (viridis_cmap, norm,colorsRgb, plotColPlotly,
     plotColMPL, names2int, line_styles) = getPlotOpts(names)
+
     if not usePlotly:
         fig, ax = plt.subplots()
     else:

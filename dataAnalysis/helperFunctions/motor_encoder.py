@@ -375,7 +375,9 @@ def plotTrialEvents(trialEvents, plotRange = None, colorOffset = 0, ax = None, s
         ax.vlines(LLOnIdx / 3e4, lowerBound, upperBound, label = 'Left LED Onset', colors = [colorPalette[5 + colorOffset] for idx in LLOnIdx], linewidths = [0.5])
 
 #@profile
-def plotMotor(motorData, plotRange = (0,-1), subset = None, addAxes = 0, subsampleFactor = 30, collapse = False, ax = None):
+def plotMotor(motorData, plotRange = (0,-1), idxUnits = 'samples',
+    subset = None, addAxes = 0,
+    subsampleFactor = 30, collapse = False, ax = None):
 
     if subset is None:
         subset = motorData.columns
@@ -383,20 +385,29 @@ def plotMotor(motorData, plotRange = (0,-1), subset = None, addAxes = 0, subsamp
     if plotRange is None:
         #plotRange is in units of samples
         xAxis = motorData.index
+        motorDataPlot = motorData
     else:
         xAxisMask = np.logical_and(motorData.index > plotRange[0], motorData.index < plotRange[1])
         xAxis = motorData.index[xAxisMask]
-    #pdb.set_trace()
+        motorDataPlot = motorData.loc[xAxisMask]
+
     if ax is not None:
         assert collapse == True
         fig = ax.figure
         ax = [ax]
+
     elif ax is None and not collapse:
         fig, ax = plt.subplots(nrows = len(subset) + addAxes, ncols = 1, sharex = True)
     else:
         fig, ax = plt.subplots(nrows = 1 + addAxes, ncols = 1, sharex = True)
 
-    plotX = xAxis[::subsampleFactor] / 3e4
+    if idxUnits == 'samples':
+        unitConversionFactor = 1 / 3e4
+    if idxUnits == 'seconds':
+        unitConversionFactor = 1
+
+    plotX = xAxis[::subsampleFactor] * unitConversionFactor
+    motorDataPlot = motorDataPlot.iloc[::subsampleFactor]
     #motorDataSub = pd.DataFrame(motorData.iloc[::subsampleFactor, :].values, index = motorData.index[::subsampleFactor], columns = motorData.columns)
     #pdb.set_trace()
     for idx, column in enumerate(subset):
@@ -405,12 +416,15 @@ def plotMotor(motorData, plotRange = (0,-1), subset = None, addAxes = 0, subsamp
         if collapse:
             idx = 0
 
-        ax[idx].plot(plotX, motorData.loc[xAxis[::subsampleFactor], column], label = column)
+        ax[idx].plot(plotX, motorDataPlot.loc[:, column], label = column)
         #ax[idx].legend(loc = 1)
     #pdb.set_trace()
     return fig, ax
 
-def plotAverageAnalog(motorData, trialStats, alignTo, separateBy = None, subset = None, windowSize = (-0.25, 1), timeRange = None, showNow = False, ax = None, maxTrial = None, collapse = True, subsampleFactor = 30, equalAxes = True):
+def plotAverageAnalog(motorData, trialStats, alignTo, separateBy = None, subset = None,
+    windowSize = (-0.25, 1), timeRange = None, showNow = False, ax = None, maxTrial = None,
+    collapse = True, subsampleFactor = 30, equalAxes = True):
+    
     if subset is None:
         subset = motorData.columns
 

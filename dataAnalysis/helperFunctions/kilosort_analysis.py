@@ -20,6 +20,7 @@ import traceback
 import collections
 import itertools
 import re
+import math as m
 LABELFONTSIZE = 5
 
 def loadParamsPy(filePath):
@@ -389,7 +390,9 @@ def getWaveClusSpikes(filePath, nevIDs = None, plotting = False, excludeClus = [
     return spikes
 
 #@profile
-def plotSpike(spikes, channel, showNow = False, ax = None, acrossArray = False, xcoords = None, ycoords = None, axesLabel = False):
+def plotSpike(spikes, channel, showNow = False, ax = None,
+    acrossArray = False, xcoords = None, ycoords = None,
+    axesLabel = False, errorMultiplier = 2):
 
     ChanIdx = spikes['ChannelID'].index(channel)
     unitsOnThisChan = np.unique(spikes['Classification'][ChanIdx])
@@ -419,6 +422,8 @@ def plotSpike(spikes, channel, showNow = False, ax = None, acrossArray = False, 
 
         colorPalette = sns.color_palette(n_colors = 15)
         for unitIdx, unitName in enumerate(unitsOnThisChan):
+            if unitName == -1:
+                continue
 
             unitMask = spikes['Classification'][ChanIdx] == unitName
 
@@ -426,15 +431,20 @@ def plotSpike(spikes, channel, showNow = False, ax = None, acrossArray = False, 
                 for idx, channel in enumerate(spikes['ChannelID']):
                     curAx = ax[xIdx[idx], yIdx[idx]]
                     waveForms = spikes['Waveforms'][ChanIdx][unitMask, :, idx]
-                    thisSpike = np.mean(waveForms, axis = 0)
-                    thisError = np.std(waveForms, axis = 0)
-                    timeRange = np.arange(len(thisSpike)) / 3e4 * 1e3
-                    curAx.fill_between(timeRange, thisSpike - 2*thisError, thisSpike + 2*thisError, alpha=0.4, facecolor=colorPalette[unitIdx], label='chan %s, unit %s' % (channel, unitName))
+                    thisSpike = np.nanmean(waveForms, axis = 0)
+                    thisError = np.nanstd(waveForms, axis = 0)
+                    timeRange = np.arange(len(thisSpike)) / spikes['basic_headers']['TimeStampResolution']
+                    curAx.fill_between(timeRange, thisSpike - errorMultiplier*thisError,
+                        thisSpike + errorMultiplier*thisError, alpha=0.4,
+                        facecolor=colorPalette[unitIdx],
+                        label='chan %s, unit %s (%d SDs)' % (channel, unitName, errorMultiplier))
                     curAx.plot(timeRange, thisSpike, linewidth=1, color=colorPalette[unitIdx])
 
                 sns.despine()
                 for curAx in ax.flatten():
-                    curAx.tick_params(left='off', top='off', right='off', bottom='off', labelleft='off', labeltop='off', labelright='off', labelbottom='off')
+                    curAx.tick_params(left='off', top='off', right='off',
+                    bottom='off', labelleft='off', labeltop='off',
+                    labelright='off', labelbottom='off')
                 plt.tight_layout(pad = 0.01)
 
             else:
@@ -442,18 +452,21 @@ def plotSpike(spikes, channel, showNow = False, ax = None, acrossArray = False, 
                     waveForms = spikes['Waveforms'][ChanIdx][unitMask, :, ChanIdx]
                 else:
                     waveForms = spikes['Waveforms'][ChanIdx][unitMask, :]
-                thisSpike = np.mean(waveForms, axis = 0)
-                thisError = np.std(waveForms, axis = 0)
-                timeRange = np.arange(len(thisSpike)) / 3e4 * 1e3
+                thisSpike = np.nanmean(waveForms, axis = 0)
+                thisError = np.nanstd(waveForms, axis = 0)
+                timeRange = np.arange(len(thisSpike)) / spikes['basic_headers']['TimeStampResolution']
                 colorPalette = sns.color_palette(n_colors = 15)
-                numSDs = 2
-                ax.fill_between(timeRange, thisSpike - numSDs*thisError, thisSpike + numSDs*thisError, alpha=0.4, facecolor=colorPalette[unitIdx], label='chan %s, unit %s (%d SDs)' % (channel, unitName, numSDs))
+
+                ax.fill_between(timeRange, thisSpike - errorMultiplier*thisError,
+                    thisSpike + errorMultiplier*thisError, alpha=0.4,
+                    facecolor=colorPalette[unitIdx],
+                    label='chan %s, unit %s (%d SDs)' % (channel, unitName, errorMultiplier))
                 ax.plot(timeRange, thisSpike, linewidth=1, color=colorPalette[unitIdx])
                 if axesLabel:
                     ax.set_ylabel(spikes['Units'])
                     ax.set_xlabel('Time (msec)')
                     ax.set_title('Units on channel %d' % channel)
-
+                    ax.legend()
         if showNow:
             plt.show()
 
@@ -1020,32 +1033,89 @@ def plotSpikeTriggeredFR(spikesFrom = None, spikesTo = None,
     plt.tight_layout(pad = 0.01)
     return spikeMats, fig, ax
 
-def plotSingleTrial(trialStats, trialEvents, motorData, kinematics, spikes,\
-    nevIDs, spikesExclude, whichTrial, orderSpikesBy = None, zAxis = None,\
-    startEvent = 'FirstOnset', endEvent = 'ChoiceOnset',\
+def plotSingleTrial(
+    whichTrial,
+    spikesExclude,
+    folderPath = None,
+    trialStats = None, trialEvents = None, motorData = None,
+    eventInfo = None,
+    spikesList = None, arrayNames = None,
+    trialFiles = None,
+    kinematics = None,
+    kinematicsFileName = None,
+    kinPosOpts = {
+        'ns5FileName' : '',
+        'selectHeaders' : None,
+        'reIndex' : None,
+        'flip' : None,
+        'lowCutoff': None
+        },
+    orderSpikesBy = None, zAxis = None,\
+    rasterOpts = {
+    'kernelWidth' : 50e-3,
+    'binInterval' : 50 * 1e-3, 'binWidth' : 100 * 1e-3,
+    'windowSize' : (-1, .1),
+    'alignTo' : 'FirstOnset',
+    'separateBy' : 'Direction',
+    'endOn' : 'ChoiceOnset',
+    'discardEmpty': None, 'maxTrial' : None, 'timeRange' : None},
+    plotOpts = {'type' : 'ticks', 'errorBar' : 'sem'},
     analogSubset = ['position'], analogLabel = '',\
-    kinematicsSubset = ['Hip_Right_Angle X'],\
+    kinematicsSubset = ['Hip Right X'],\
     kinematicLabel = '',\
     eventSubset = ['Right LED Onset', 'Right Button Onset', 'Left LED Onset',\
     'Left Button Onset', 'Movement Onset', 'Movement Offset'],\
-    binInterval = 20e-3, binWidth = 50e-3, arrayNames = None):
+    ):
 
-    if arrayNames is None:
-        arrayNames = ['' for i in spikes]
+    if kinematics is None:
+        kinematics = hf.loadAngles(folderPath, kinematicsFileName)
 
-    nArrays = len(spikes)
+    if any((trialStats is None, trialEvents is None, motorData is None)):
+        trialStats, trialEvents, motorData = loadEventInfo(folderPath, eventInfo)
 
+    if spikesList is None:
+        spikesList = []
+        arrayNames = []
+        for key, value in trialFiles.items():
+            spikeStruct, newSpikes = loadSpikeInfo(folderPath, key, value)
+            spikesList.append(newSpikes)
+            arrayNames.append(key)
+    elif arrayNames is None or trialFiles is None:
+        arrayNames = ['spike' for i in spikesList]
+
+    nArrays = len(spikesList)
+    spikeMatList = [None for i in spikesList]
+    idx = 0
+    for key, value in trialFiles.items():
+        spikeMatList[idx] = loadTrialBinnedArray(folderPath,
+            key, value,
+            eventInfo, rasterOpts,
+            whichTrial = [whichTrial],
+            spikes = spikesList[idx],
+            trialStats = trialStats, chans = None,
+            correctAlignmentSpikes = 0,
+            forceRecalc = False)[0]
+        idx += 1
+    #plt.show()
+    if zAxis is None:
+        zAxis = [None for i in spikesList]
+    if spikesExclude is None:
+        spikesExclude = [[] for i in spikesList]
+
+    # time units of samples
     thisTrial = trialStats.loc[whichTrial, :]
-    # thisTrial has time units of samples
-    timeStart = thisTrial[startEvent] - 0.1 * 3e4
-    timeEnd = thisTrial[endEvent] + 0.1 * 3e4
+    idxStart = trialStats.loc[whichTrial, rasterOpts['alignTo']] + rasterOpts['windowSize'][0] * 3e4
+    idxEnd = trialStats.loc[whichTrial, rasterOpts['endOn']] + rasterOpts['windowSize'][-1] * 3e4
+    # time units of seconds
+    timeStart = idxStart / 3e4
+    timeEnd = idxEnd / 3e4
 
     #create a list of axes and add one for the kinematics and one for each array
     fig, motorPlotAxes = mea.plotMotor(motorData,
-        plotRange = (timeStart, timeEnd), subset = analogSubset,
+        plotRange = (idxStart, idxEnd), idxUnits = 'samples', subset = analogSubset,
         subsampleFactor = 30, addAxes = 1 + nArrays, collapse = True)
-
-    mea.plotTrialEvents(trialEvents, plotRange = (timeStart, timeEnd),
+    # every 30th sample give 1 msec resolution
+    mea.plotTrialEvents(trialEvents, plotRange = (idxStart, idxEnd),
         ax = motorPlotAxes[0], colorOffset = len(analogSubset),
         subset = eventSubset)
 
@@ -1056,9 +1126,10 @@ def plotSingleTrial(trialStats, trialEvents, motorData, kinematics, spikes,\
         traceback.print_exc()
         pass
 
-    mea.plotMotor(kinematics, plotRange = (timeStart, timeEnd),
+    mea.plotMotor(kinematics, plotRange = (timeStart, timeEnd), idxUnits = 'seconds',
         subset = kinematicsSubset, subsampleFactor = 1, ax = motorPlotAxes[1],
         collapse = True)
+    # the kinematics, on the other hand, have data every 10 msec
     motorPlotAxes[1].set_ylabel(kinematicLabel)
     try:
         motorPlotAxes[1].legend(loc = 1)
@@ -1066,19 +1137,13 @@ def plotSingleTrial(trialStats, trialEvents, motorData, kinematics, spikes,\
         traceback.print_exc()
         pass
 
-    #plt.show()
     for idx, spikeDict in enumerate(spikes):
-        #convert timeStart and timeDur to seconds
-        spikeMatOriginal, binCenters, binLeftEdges = hf.binnedSpikes(spikeDict,
-            binInterval, binWidth, timeStart / 3e4,
-            timeEnd / 3e4, timeStampUnits = 'seconds')
-        spikeMat = spikeMatOriginal.drop(spikesExclude[idx], axis = 'columns')
         if orderSpikesBy == 'idxmax':
             #pdb.set_trace()
-            spikeOrder = spikeMat.idxmax(axis = 1).sort_values().index
-            spikeMat = spikeMat.loc[spikeOrder,:]
+            spikeOrder = spikeMatList[idx].idxmax(axis = 1).sort_values().index
+            spikeMatList[idx] = spikeMatList[idx].loc[spikeOrder,:]
 
-        hf.plotBinnedSpikes(spikeMat, show = False,
+        hf.plotBinnedSpikes(spikeMatList[idx], show = False,
             ax = motorPlotAxes[idx + 2],
             zAxis = zAxis[idx], labelTxt = 'Spk/s ' + arrayNames[idx])
         motorPlotAxes[idx + 2].tick_params(labelleft=True)
@@ -1090,6 +1155,59 @@ def plotSingleTrial(trialStats, trialEvents, motorData, kinematics, spikes,\
         hspace=0.02)
 
     return fig, motorPlotAxes
+
+def plotAverageTrial(
+    whichTrial,
+    spikesExclude,
+    folderPath = None,
+    trialStats = None, trialEvents = None, motorData = None,
+    eventInfo = None,
+    spikes = None, arrayNames = None,
+    trialFiles = None,
+    kinematics = None,
+    kinematicsFileName = None,
+    kinPosOpts = {
+        'ns5FileName' : '',
+        'selectHeaders' : None,
+        'reIndex' : None,
+        'flip' : None,
+        'lowCutoff': None
+        },
+    orderSpikesBy = None, zAxis = None,\
+    rasterOpts = {
+    'kernelWidth' : 50e-3,
+    'binInterval' : 50 * 1e-3, 'binWidth' : 100 * 1e-3,
+    'windowSize' : (-1, .1),
+    'alignTo' : 'FirstOnset',
+    'separateBy' : 'Direction',
+    'endOn' : 'ChoiceOnset',
+    'discardEmpty': None, 'maxTrial' : None, 'timeRange' : None},
+    plotOpts = {'type' : 'ticks', 'errorBar' : 'sem'},
+    analogSubset = ['position'], analogLabel = '',\
+    kinematicsSubset = ['Hip Right X', 'Knee Right X', 'Ankle Right X'],\
+    kinematicLabel = '',\
+    eventSubset = ['Right LED Onset', 'Right Button Onset', 'Left LED Onset',\
+    'Left Button Onset', 'Movement Onset', 'Movement Offset'],\
+    ):
+
+    if kinematics is None:
+        kinematics = hf.loadAngles(folderPath, kinematicsFileName)
+
+    if any((trialStats is None, trialEvents is None, motorData is None)):
+        trialStats, trialEvents, motorData = loadEventInfo(folderPath, eventInfo)
+
+    if spikesList is None:
+        spikesList = []
+        arrayNames = []
+        for key, value in trialFiles.items():
+            spikeStruct, newSpikes = loadSpikeInfo(folderPath, key, value)
+            spikesList.append(newSpikes)
+            arrayNames.append(key)
+    elif arrayNames is None or trialFiles is None:
+        arrayNames = ['spike' for i in spikesList]
+
+    nArrays = len(spikesList)
+
 
 #@profile
 def spikePDFReport(folderPath, spikes, spikeStruct,
@@ -1172,26 +1290,67 @@ def spikePDFReport(folderPath, spikes, spikeStruct,
                         pdf.savefig()
                         plt.close()
 
-def trialPDFReport(filePath, trialStats, trialEvents, motorData, kinematics, spikes,\
-    nevIDs, spikesExclude, correctAlignmentSpikes = 0, startEvent = 'FirstOnset', endEvent = 'ChoiceOnset',\
+def trialPDFReport(folderPath,
+    eventInfo,
+    trialFiles,
+    kinematicsFileName,
+    trialStats = None,
+    kinPosOpts = {
+    'ns5FileName' : 'Trial001',
+    'selectHeaders' : None,
+    'reIndex' : None,
+    'flip' : None,
+    'lowCutoff': None
+    },
+    correctAlignmentSpikes = 0, rasterOpts = {
+    'kernelWidth' : 50e-3,
+    'binInterval' : 50 * 1e-3, 'binWidth' : 100 * 1e-3,
+    'windowSize' : (-1, .1),
+    'alignTo' : 'FirstOnset',
+    'separateBy' : 'Direction',
+    'endOn' : 'ChoiceOnset',
+    'discardEmpty': None, 'maxTrial' : None, 'timeRange' : None},
+    plotOpts = {'type' : 'ticks', 'errorBar' : 'sem'},
     analogSubset = ['position'], analogLabel = '', kinematicsSubset =  ['Hip Right X', 'Knee Right X', 'Ankle Right X'],\
     kinematicLabel = '', eventSubset = ['Right LED Onset', 'Right Button Onset', 'Left LED Onset', 'Left Button Onset', 'Movement Onset', 'Movement Offset'],\
-    binInterval = 20e-3, binWidth = 50e-3, maxTrial = None):
+    maxTrial = None):
 
-    if correctAlignmentSpikes: #correctAlignmentSpikes units in samples
-        spikes = hf.correctSpikeAlignment(spikes, correctAlignmentSpikes)
-
+    filePath = os.path.join(folderPath, eventInfo['ns5FileName'] + '_report.pdf')
+    if trialStats is None:
+        trialStats, trialEvents, motorData = loadEventInfo(folderPath, eventInfo)
     with PdfPages(filePath) as pdf:
+        if maxTrial is None:
+            numTrials = len(trialStats.index)
+        else:
+            numTrials = maxTrial
         for idx, curTrial in trialStats.iterrows():
+
+            if os.fstat(0) == os.fstat(1):
+                endChar = '\r'
+                print("Running trialPDFReport: %d%%" % int((idx + 1) * 100 /numTrials), end = endChar)
+            else:
+                print("Running trialPDFReport: %d%%" % int((idx + 1) * 100 / numTrials))
+
             if maxTrial is not None:
                 if idx > maxTrial:
                     break
             try:
-                fig, motorPlotAxes = plotSingleTrial(trialStats, trialEvents, motorData, \
-                    kinematics, spikes, nevIDs, spikesExclude, idx, startEvent = startEvent, \
-                    endEvent = endEvent, analogSubset = analogSubset, analogLabel = analogLabel, \
-                    kinematicsSubset = kinematicsSubset, kinematicLabel = kinematicLabel, \
-                    eventSubset = eventSubset, binInterval = binInterval, binWidth = binWidth)
+                fig, motorPlotAxes = plotSingleTrial(
+                    idx,
+                    spikesExclude = None,
+                    folderPath = folderPath,
+                    eventInfo = eventInfo,
+                    trialStats = trialStats,
+                    trialFiles = trialFiles,
+                    kinematicsFileName = kinematicsFileName,
+                    zAxis = None,
+                    kinPosOpts = kinPosOpts,
+                    rasterOpts = rasterOpts,
+                    plotOpts = plotOpts,
+                    analogSubset = ['position'], analogLabel = 'Pedal Position (a.u.)',
+                    kinematicsSubset = ['Hip Right X', 'Knee Right X', 'Ankle Right X'],
+                    kinematicLabel = 'Joint Angle (deg)', orderSpikesBy = None)
+
                 pdf.savefig()
                 plt.close()
             except Exception:
@@ -1320,6 +1479,7 @@ def generateStimTriggeredAverageReport(folderPath, trialFileFrom, trialFileStim,
     correctAlignmentSpikesFrom = 0, correctAlignmentSpikesStim = 0,
     plotOpts = None,
     rasterOpts = None):
+
     key, value = next(iter(trialFileFrom.items()))
     arrayInfoFrom = value
     arrayNameFrom = key
@@ -1363,15 +1523,29 @@ def generateStimTriggeredAverageReport(folderPath, trialFileFrom, trialFileStim,
         newName = newName, enableFR = True,
         plotOpts = plotOpts, rasterOpts = rasterOpts)
 
-def loadEventInfo(folderPath, eventInfo, forceRecalc = False):
+def loadEventInfo(folderPath, eventInfo,
+    requested = ['trialStats', 'trialEvents', 'motorData'],
+    forceRecalc = False):
+
+    setName = eventInfo['ns5FileName'] + '_eventInfo'
+    setPath = os.path.join(folderPath, setName + '.h5')
     if not forceRecalc:
     # if not requiring a recalculation, load from pickle
         try:
-            trialStats  = pd.read_pickle(os.path.join(folderPath,
-                eventInfo['ns5FileName']) + '_trialStats.pickle')
-            trialEvents = pd.read_pickle(os.path.join(folderPath,
-                eventInfo['ns5FileName']) + '_trialEvents.pickle')
-            print('Loaded trial data from pickle.')
+            if 'trialStats' in requested:
+                trialStats  = pd.read_hdf(setPath, 'trialStats')
+            else:
+                trialStats = None
+
+            if 'trialEvents' in requested:
+                trialEvents = pd.read_hdf(setPath, 'trialEvents')
+            else:
+                trialEvents = None
+            if 'motorData' in requested:
+                motorData = pd.read_hdf(setPath, 'motorData')
+            else:
+                motorData = None
+            #print('Loaded trial data from pickle.')
         except Exception:
             traceback.print_exc()
             print('Trial data not pickled. Recalculating...')
@@ -1381,12 +1555,20 @@ def loadEventInfo(folderPath, eventInfo, forceRecalc = False):
         motorData = mea.getMotorData(os.path.join(folderPath,
             eventInfo['ns5FileName']) + '.ns5', eventInfo['inputIDs'], 0 , 'all')
         trialStats, trialEvents = mea.getTrials(motorData)
-        trialStats.to_pickle(os.path.join(folderPath,
-            eventInfo['ns5FileName']) + '_trialStats.pickle')
-        trialEvents.to_pickle(os.path.join(folderPath,
-            eventInfo['ns5FileName']) + '_trialEvents.pickle')
+
+        trialStats.to_hdf(setPath, 'trialStats')
+        if 'trialStats' not in requested:
+            trialStats = None
+        trialEvents.to_hdf(setPath, 'trialEvents')
+        if 'trialEvents' not in requested:
+            trialEvents = None
+
+        motorData.to_hdf(setPath, 'motorData')
+        if 'motorData' not in requested:
+            motorData = None
+
         print('Recalculated trial data and saved to pickle.')
-    return trialStats, trialEvents
+    return trialStats, trialEvents, motorData
 
 def capitalizeFirstLetter(stringInput):
     return stringInput[0].capitalize() + stringInput[1:]
@@ -1459,17 +1641,19 @@ def trialBinnedArrayNameRetrieve(spikeNames):
     return arrayName, arrayInfo, rasterOpts
 
 def loadSpikeInfo(folderPath, arrayName, arrayInfo, forceRecalc = False):
+
+    setName = spikesNameGenerator(arrayName, arrayInfo)
+    setPath = os.path.join(folderPath, setName + '.pickle')
     if not forceRecalc:
     # if not requiring a recalculation, load from pickle
         try:
             spikes = pickle.load(
-                open(os.path.join(folderPath,
-                spikesNameGenerator(arrayName, arrayInfo) + '.pickle'), 'rb'))
+                open(os.path.join(folderPath, setPath), 'rb'))
 
             # make sure the file contains all requested channels
             for chanIdx in spikes['ChannelID']:
                 assert chanIdx in arrayInfo['nevIDs']
-            print('Loaded spike data from pickle.')
+            #print('Loaded spike data from pickle.')
         except Exception:
             traceback.print_exc()
             # if loading failed, recalculate anyway=
@@ -1491,8 +1675,7 @@ def loadSpikeInfo(folderPath, arrayName, arrayInfo, forceRecalc = False):
                 nevIDs = arrayInfo['nevIDs'], plotting = False, excludeClus = arrayInfo['excludeClus'])
 
         pickle.dump(spikes,
-            open(os.path.join(folderPath, spikesNameGenerator(arrayName, arrayInfo) +
-                '.pickle'), 'wb')
+            open(os.path.join(folderPath, setPath), 'wb')
             )
         print('Recalculated spike data from wave_clus folder and saved to pickle.')
 
@@ -1662,6 +1845,216 @@ def loadSpikeBinnedSpike(folderPath,
         spikeMats, categories, selectedIndices = saveSpikeMats, saveCategories, saveSelectedIndices
     return spikeMats, categories, selectedIndices
 
+
+def triggeredTimeSeries(alignTimes, dataDF, categories,
+    whichColumns = None, removeBaseline = False,
+    windowSize= [-0.25, 1], timeStampResolution = 3e4,
+    units = 'uV', idxUnits = 'seconds', subSample = 1):
+
+    if subSample:
+        dataDF = dataDF.iloc[::subSample, :]
+    # dataDF.index units must be consistent with windowSize!!
+    if idxUnits == 'samples':
+        dataDF.index = dataDF.index / 3e4
+
+    if whichColumns is None:
+        whichColumns = dataDF.columns
+
+    # round WindowSize to the nearest samples
+    windowSize = [m.ceil(i * timeStampResolution) / timeStampResolution for i in windowSize]
+    nCh = len(whichColumns)
+    windowIdx = [int(i * timeStampResolution) for i in windowSize]
+    nSampsInWindow = len(range(windowIdx[0], windowIdx[1]))
+
+    spikesTriggered = {
+        'ChannelID' : [idx for idx, columnName in enumerate(whichColumns)],
+        'ChannelLabel' : whichColumns,
+        'Classification' : [categories.astype('category').cat.codes.values for i in whichColumns],
+        'ClassificationLabel' : [categories.values for i in whichColumns],
+        'NEUEVWAV_HeaderIndices' : [None for i in whichColumns],
+        'TimeStamps' : [alignTimes.values for i in whichColumns],
+        'Units' : units,
+        'Waveforms' : [np.full((len(alignTimes.index), nSampsInWindow), np.nan
+            ) for i in whichColumns],
+        'basic_headers' : {'TimeStampResolution': timeStampResolution},
+        'extended_headers' : [],
+        'name' : '',
+        'info' : ''
+        }
+
+    startTimeIdxTriggeredChan = -windowIdx[0]
+    for rowIdx, startTime in alignTimes.items():
+
+        if pd.isnull(categories[rowIdx]):
+            continue
+
+        try:
+            startTimeIdxChan = np.flatnonzero(dataDF.index > startTime)[0]
+        except Exception:
+            traceback.print_exc()
+            break
+        maskPre = dataDF.index > (startTime + windowSize[0])
+        maskPost = dataDF.index < (startTime + windowSize[1])
+        mask = np.logical_and(maskPre, maskPost)
+        rowIdxWave = alignTimes.index.get_loc(rowIdx)
+        #print(rowIdxWave) #Debugging
+        for idx, columnName in enumerate(whichColumns):
+            try:
+
+                chanSlice = dataDF.loc[mask, columnName]
+
+                if removeBaseline:
+                    chanSlice = chanSlice - chanSlice.mean()
+                    #chanSlice = chanSlice - peakutils.baseline(chanSlice)
+
+                idxIntoStart = np.flatnonzero(maskPre)[0] - startTimeIdxChan + startTimeIdxTriggeredChan
+                idxIntoEnd = np.flatnonzero(maskPost)[-1] - startTimeIdxChan + startTimeIdxTriggeredChan + 1
+
+                if idxIntoEnd > nSampsInWindow:
+                    idxIntoEnd = nSampsInWindow
+                try:
+                    spikesTriggered['Waveforms'][idx][rowIdxWave,idxIntoStart:idxIntoEnd] = chanSlice.values
+                except Exception:
+                    traceback.print_exc()
+                    spikesTriggered['Waveforms'][idx][rowIdxWave,idxIntoStart:idxIntoEnd] = chanSlice.values[idxIntoStart:idxIntoEnd]
+
+            except Exception:
+                pdb.set_trace()
+                traceback.print_exc()
+
+    return spikesTriggered
+
+def triggeredNSxChanData(alignTimes, channelData,
+    nevIDs, categories, removeBaseline = False,
+    windowSize = [-0.25, 1]):
+
+    dataDF  = pd.DataFrame(channelData['data'].values, index = channelData['t'],
+        columns = channelData['data'].columns)
+
+    spikesTriggered = triggeredTimeSeries(alignTimes, dataDF, categories,
+        whichColumns = nevIDs, removeBaseline = removeBaseline,
+        windowSize= windowSize, timeStampResolution = channelData['samp_per_s'])
+
+    for idx, chIdx in enumerate(nevIDs):
+        spikesTriggered['ChannelID'][idx] = chIdx
+    return spikesTriggered
+
+def spikeTriggeredTimeSeries(spikes, dataDF,
+    whichColumns, spikesToIdx,
+    timeStampResolution = 3e4, units = 'uV', idxUnits = 'seconds', subSample = 1,
+    windowSize = [-0.25, 1], removeBaseline = False,
+    separateByFun = hf.catSpikesGenerator(type = 'Classification'),
+    timeRange = None, maxSpikesTo = None, discardEmpty = False):
+
+    if timeRange is None:
+        timeRange = (dataDF.index[0], dataDF.index[-1])
+    # get spike firing times to align to
+    alignTimes, categories, selectedIndices = spikeAlignmentTimes(spikes,
+        spikesToIdx,
+        separateByFun = separateByFun,
+        timeRange = timeRange, maxSpikesTo = maxSpikesTo, discardEmpty =  discardEmpty)
+
+    spikesTriggered = triggeredTimeSeries(alignTimes, dataDF,
+        categories, whichColumns, removeBaseline = removeBaseline,
+        windowSize= windowSize, timeStampResolution = timeStampResolution, units = units, idxUnits = idxUnits, subSample = subSample)
+    return spikesTriggered, selectedIndices
+
+def trialTriggeredTimeSeries(
+    dataDF, trialStats, tsInfo):
+
+    if tsInfo['whichColumns'] is None:
+        tsInfo['whichColumns'] = dataDF.columns
+
+    if tsInfo['timeRange'] is None:
+        tsInfo['timeRange'] = (dataDF.index[0], dataDF.index[-1])
+
+    alignTimes = trialStats[tsInfo['alignTo']] / 3e4
+    validMask = trialStats[tsInfo['alignTo']].notnull()
+    if tsInfo['endOn'] is not None:
+        #expand end of window to always catch the endOn event
+        endTimes = trialStats[tsInfo['endOn']] - trialStats[tsInfo['alignTo']]
+        tsInfo['windowSize'][1] = tsInfo['windowSize'][1] + endTimes.max() / 3e4 # samples to seconds conversion
+        validMask = np.logical_and(validMask, trialStats[tsInfo['endOn']].notnull())
+
+    if tsInfo['separateBy'] is not None:
+        categories = trialStats[tsInfo['separateBy']]
+    else:
+        categories = pd.Series('all', index = trialStats.index)
+
+    categories[np.logical_not(validMask)] = np.nan
+
+    spikesTriggered = triggeredTimeSeries(alignTimes, dataDF, categories,
+        whichColumns = tsInfo['whichColumns'], removeBaseline = tsInfo['removeBaseline'],
+        windowSize = tsInfo['windowSize'],
+        timeStampResolution = tsInfo['timeStampResolution'],
+        units = tsInfo['units'], idxUnits = tsInfo['idxUnits'], subSample = tsInfo['subSample'])
+
+    spikesTriggered['basic_headers'].update(tsInfo)
+    return spikesTriggered
+
+def spikeTriggeredNSxChanData(spikes, channelData,
+    nevIDs, spikesToIdx,
+    windowSize = [-0.25, 1], removeBaseline = False,
+    separateByFun = hf.catSpikesGenerator(type = 'Classification'),
+    timeRange = None, maxSpikesTo = None, discardEmpty = False):
+
+    dataDF = pd.DataFrame(channelData['data'].values, index = channelData['t'],
+        columns = channelData['data'].columns)
+
+    spikesTriggered, selectedIndices = spikeTriggeredTimeSeries(spikes, dataDF,
+        nevIDs, spikesToIdx,
+        timeStampResolution = channelData['samp_per_s'],
+        windowSize = windowSize, removeBaseline = removeBaseline,
+        separateByFun = separateByFun,
+        timeRange = timeRange, maxSpikesTo = maxSpikesTo, discardEmpty = discardEmpty)
+
+    for idx, chIdx in enumerate(nevIDs):
+        spikesTriggered['ChannelID'][idx] = chIdx
+    return spikesTriggered, selectedIndices
+
+def loadSpikeTriggeredTimeSeries():
+    pass
+
+def trialTriggeredTimeSeriesNameGenerator(tsInfo):
+    seriesName = tsInfo['seriesName'] + '_' + tsInfo['recordName'] + '_ALIGNEDTO_' + tsInfo['alignTo']
+    if tsInfo['separateBy'] is not None:
+        seriesName = seriesName + '_SEPARATEDBY_' + tsInfo['separateBy']
+    if tsInfo['endOn'] is not None:
+        seriesName = seriesName + '_ENDON_' + tsInfo['endOn']
+    return seriesName
+
+def loadTrialTriggeredTimeSeries(folderPath, tsInfo,
+    dataDF = None, trialStats = None, eventInfo = None,
+    forceRecalc = False):
+
+    setName = trialTriggeredTimeSeriesNameGenerator(tsInfo)
+    setPath = os.path.join(folderPath, setName + '.pickle')
+    if not forceRecalc:
+        try:
+            spikesTriggered = pickle.load(open(setPath, 'rb'))
+            # make sure the metadata matches
+            for key, value in tsInfo.items():
+                pdb.set_trace()
+        except Exception:
+            traceback.print_exc()
+            # if loading failed, recalculate anyway=
+            print('Triggered Time Series data not pickled. Recalculating...')
+            forceRecalc = True
+
+    if forceRecalc:
+        if dataDF is None:
+            dataDFPath = os.path.join(folderPath, tsInfo['seriesName'] + '.h5')
+            dataDF = pd.read_hdf(dataDFPath, tsInfo['recordName'])
+        if trialStats is None:
+            trialStats, trialEvents, motorData = loadEventInfo(folderPath, eventInfo)
+
+        spikesTriggered = trialTriggeredTimeSeries(
+            dataDF, trialStats, tsInfo)
+
+        pickle.dump(spikesTriggered, open(setPath, 'wb'))
+    return spikesTriggered
+
+
 def loadTrialBinnedSpike(folderPath,
     arrayName, arrayInfo,
     channel,
@@ -1783,10 +2176,10 @@ def loadTrialBinnedSpike(folderPath,
         spikeMats, categories, selectedIndices = saveSpikeMats, saveCategories, saveSelectedIndices
     return spikeMats, categories, selectedIndices
 
-def loadTrialBinnedArray(
+def loadTrialBinnedArray(folderPath,
     arrayName, arrayInfo,
     eventInfo, rasterOpts,
-    whichTrial,
+    whichTrial  = None,
     spikes = None,
     trialStats = None, chans = None,
     correctAlignmentSpikes = 0,
@@ -1818,8 +2211,14 @@ def loadTrialBinnedArray(
                             else:
                                 assert (subValue == thisAttr) or (subValue is None and np.isnan(thisAttr))
 
-                requestedSpikeMat = '/' + str(whichTrial)
-                spikeMat = pd.DataFrame(f[requestedSpikeMat + '/spikeMat'], index = f[requestedSpikeMat + '/index'], columns = f[requestedSpikeMat + '/columns'])
+                if whichTrial is None:
+                    whichTrial = [int(i) for i in f if i != 'rasterOpts']
+
+                spikeMats = {i:None for i in whichTrial}
+
+                for trialNum in whichTrial:
+                    requestedSpikeMat = '/' + str(trialNum)
+                    spikeMats[trialNum] = pd.DataFrame(f[requestedSpikeMat + '/spikeMat'][:,:], index = f[requestedSpikeMat + '/index'], columns = f[requestedSpikeMat + '/columns'])
 
         except Exception:
             traceback.print_exc()
@@ -1831,9 +2230,11 @@ def loadTrialBinnedArray(
         if spikes is None:
             spikeStruct, spikes = ksa.loadSpikeInfo(folderPath, 'utah', trialFiles['utah'])
         if trialStats is None:
-            trialStats, trialEvents = ksa.loadEventInfo(folderPath, eventInfo)
+            trialStats, trialEvents, motorData = loadEventInfo(folderPath, eventInfo)
         if correctAlignmentSpikes: #correctAlignmentSpikes units in samples
             spikes= hf.correctSpikeAlignment(spikes, correctAlignmentSpikes)
+        if whichTrial is None:
+            whichTrial = trialStats.index
 
         with h5py.File(setPath, "w") as f:
             grp = f.create_group("rasterOpts")
@@ -1850,20 +2251,26 @@ def loadTrialBinnedArray(
                         else:
                             grp.attrs[key + '_' + subKey] = np.nan
 
-            spikeMats = hf.trialBinnedArray(spikes, rasterOpts, trialStats, chans = None)
-            saveSpikeMat = None
-            for idx, spikeMat in spikeMats:
-                spikeMatSetName = str(trialStats.index[idx])
+            spikeMats = {i:None for i in trialStats.index}
+            spikeMats.update(hf.trialBinnedArray(spikes, rasterOpts, trialStats, chans = None))
+            saveSpikeMats = {i:None for i in whichTrial}
+            for idx, spikeMat in spikeMats.items():
+                spikeMatSetName = str(idx)
                 grp = f.create_group(spikeMatSetName)
-                spikeMatSet = grp.create_dataset("spikeMat", data = spikeMat.values)
-                binCentersSet =  grp.create_dataset("columns", data = spikeMat.columns)
-                allRowIdxSet = grp.create_dataset("index", data  = spikeMat.index)
+                if spikeMat is not None:
+                    spikeMatSet = grp.create_dataset("spikeMat", data = spikeMat.values)
+                    binCentersSet =  grp.create_dataset("columns", data = spikeMat.columns)
+                    allRowIdxSet = grp.create_dataset("index", data  = spikeMat.index)
+                else:
+                    spikeMatSet = grp.create_dataset("spikeMat", data = [np.nan])
+                    binCentersSet =  grp.create_dataset("columns", data = [np.nan])
+                    allRowIdxSet = grp.create_dataset("index", data = [np.nan])
 
-                if trialStats.index[idx] == whichTrial:
-                    saveSpikeMat = spikeMatk
+                if idx in whichTrial:
+                    saveSpikeMats[idx]= spikeMat
             #after looping through everything and saving, return the requested channel
-            spikeMat = saveSpikeMat
-    return spikeMat
+            spikeMats = saveSpikeMats
+    return spikeMats
 
 def generateSpikeReport(folderPath, eventInfo, trialFiles,
     rasterOpts = None, plotOpts = None,
@@ -1872,7 +2279,7 @@ def generateSpikeReport(folderPath, eventInfo, trialFiles,
     """
     Read in Trial events
     """
-    trialStats, trialEvents = loadEventInfo(folderPath, eventInfo)
+    trialStats, trialEvents, motorData = loadEventInfo(folderPath, eventInfo)
 
     for key, value in trialFiles.items():
 
@@ -1884,7 +2291,7 @@ def generateSpikeReport(folderPath, eventInfo, trialFiles,
         newName = spikesNameGenerator(key, value)
         spikePDFReport(folderPath,
             spikes, spikeStruct,
-            arrayName =key, arrayInfo = value,
+            arrayName = key, arrayInfo = value,
             correctAlignmentSpikes = correctAlignmentSpikes,
             rasterOpts = rasterOpts, plotOpts = plotOpts,
             trialStats = trialStats,
