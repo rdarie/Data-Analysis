@@ -1033,6 +1033,16 @@ def plotSpikeTriggeredFR(spikesFrom = None, spikesTo = None,
     plt.tight_layout(pad = 0.01)
     return spikeMats, fig, ax
 
+def sortBinnedArray(spikeMat, orderSpikesBy):
+    if orderSpikesBy == 'idxmax':
+        #pdb.set_trace()
+        spikeOrder = spikeMat.idxmax(axis = 1).sort_values().index
+    elif orderSpikesBy == 'meanFR':
+        spikeOrder = spikeMat.mean(axis = 1).sort_values().index
+    spikeMat = spikeMat.loc[spikeOrder,:]
+
+    return spikeMat, spikeOrder
+
 def plotSingleTrial(
     whichTrial,
     spikesExclude,
@@ -1138,10 +1148,8 @@ def plotSingleTrial(
         pass
 
     for idx, spikeDict in enumerate(spikes):
-        if orderSpikesBy == 'idxmax':
-            #pdb.set_trace()
-            spikeOrder = spikeMatList[idx].idxmax(axis = 1).sort_values().index
-            spikeMatList[idx] = spikeMatList[idx].loc[spikeOrder,:]
+        if orderSpikesBy is not None:
+            spikeMatList[idx], spikeOrder = sortBinnedArray(spikeMatList[idx], orderSpikesBy)
 
         hf.plotBinnedSpikes(spikeMatList[idx], show = False,
             ax = motorPlotAxes[idx + 2],
@@ -2196,7 +2204,7 @@ def loadTrialBinnedArray(folderPath,
                     if type(value) is not dict:
                         thisAttr = recordAttributes[key]
 
-                        if isinstance(value, collections.Iterable):
+                        if isinstance(value, collections.Iterable) and key != 'windowSize':
                             for idx, valueComponent in enumerate(value):
                                 assert (valueComponent == thisAttr[idx]) or (valueComponent is None and np.isnan(thisAttr[idx]))
                         else:
