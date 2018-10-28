@@ -50,7 +50,7 @@ from copy import *
 import matplotlib.backends.backend_pdf
 from fractions import gcd
 import h5py
-
+LABELFONTSIZE = 5
 def getPlotOpts(names):
     """
         Gets the colors to assign to n traces, where n is the length of the
@@ -1375,8 +1375,11 @@ def plotBinnedSpikes(spikeMat, show = True, normalizationType = 'linear',
     #ax.xaxis.set_major_formatter(ticker.StrMethodFormatter('{x:.0f}'))
     cbar = fi.colorbar(im, cax=cbAx)
     cbar.set_label(labelTxt)
-    ax.set_xlabel('Time (s)')
-    ax.set_ylabel("Unit (#)")
+    labelFontSize = LABELFONTSIZE
+    ax.set_xlabel('Time (s)', fontsize = labelFontSize,
+        labelpad = - 3 * labelFontSize)
+    ax.set_ylabel("Unit (#)", fontsize = labelFontSize,
+        labelpad = - 3 * labelFontSize)
     #plt.show()
 
     ax.tick_params(left=False, top=False, right=False, bottom=False,

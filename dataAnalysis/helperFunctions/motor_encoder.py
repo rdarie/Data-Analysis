@@ -377,8 +377,9 @@ def plotTrialEvents(trialEvents, plotRange = None, colorOffset = 0, ax = None, s
 #@profile
 def plotMotor(motorData, plotRange = (0,-1), idxUnits = 'samples',
     subset = None, addAxes = 0,
-    subsampleFactor = 30, collapse = False, ax = None):
-
+    subsampleFactor = 30, collapse = False,
+    ax = None
+    ):
     if subset is None:
         subset = motorData.columns
 
@@ -421,10 +422,44 @@ def plotMotor(motorData, plotRange = (0,-1), idxUnits = 'samples',
     #pdb.set_trace()
     return fig, ax
 
+def getStimID(trialStats, nBins = 9):
+    #trialStats.columns
+    #pdb.set_trace()
+    firstThrowMag = trialStats.loc[:,'First']
+    secondThrowMag = trialStats.loc[:,'Second']
+    """
+    magnitudesNegative = pd.concat([trialStats.loc[trialStats['Direction'] == 'Extension', 'First'], trialStats.loc[trialStats['Direction'] == 'Extension','Second']], ignore_index = True)
+    binEdgesNegative = np.linspace(0.99 * magnitudesNegative.min(), 1.01 * magnitudesNegative.max(), nBins+1)
+    
+    magnitudesPositive = pd.concat([trialStats.loc[trialStats['Direction'] == 'Flexion', 'First'], trialStats.loc[trialStats['Direction'] == 'Flexion','Second']], ignore_index = True)
+    binEdgesPositive = np.linspace(0.99 * magnitudesPositive.min(), 1.01 * magnitudesPositive.max(), nBins+1)
+    
+    binEdges = np.concatenate((binEdgesNegative, binEdgesPositive))
+    binLabels={idx:i for idx, i in enumerate(range(-nBins,nBins+1))}
+    binLabels.update{nBins+1:np.nan}
+    
+    secondStimID = np.digitize(secondThrowMag.astype(float), binEdges)
+    """
+    allMagnitudes = pd.concat([firstThrowMag.abs(), secondThrowMag.abs()], ignore_index = True)
+    binEdges = np.linspace(0.99 * allMagnitudes.min(), 1.01 * allMagnitudes.max(), nBins+1)    
+    binEdges = np.concatenate((-binEdges[::-1], binEdges))
+    
+    binLabels = range(-nBins,nBins+1)
+    firstStimID  = pd.cut(firstThrowMag.astype(float), binEdges, labels = binLabels)
+    secondStimID = pd.cut(secondThrowMag.astype(float), binEdges, labels = binLabels)
+  
+    stimIDs = pd.Series([(firstStimID[i], secondStimID[i]) for i in trialStats.index])
+    stimIDsAbs = pd.Series([(abs(firstStimID[i]), abs(secondStimID[i])) for i in trialStats.index])
+    for i in trialStats.index:
+        if np.isnan(firstStimID[i]) or np.isnan(secondStimID[i]):
+            stimIDs[i] = np.nan
+            stimIDsAbs[i] = np.nan
+    return stimIDs, stimIDsAbs
+
 def plotAverageAnalog(motorData, trialStats, alignTo, separateBy = None, subset = None,
     windowSize = (-0.25, 1), timeRange = None, showNow = False, ax = None, maxTrial = None,
     collapse = True, subsampleFactor = 30, equalAxes = True):
-    
+
     if subset is None:
         subset = motorData.columns
 

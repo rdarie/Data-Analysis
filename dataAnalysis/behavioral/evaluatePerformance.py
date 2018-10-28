@@ -230,12 +230,12 @@ fig = go.Figure(data=stimBinnedPlotData, layout=layout)
 stimBinnedPlotUrl = py.plot(fig, filename= outputFileName + '/percentagesByStimDur',fileopt="overwrite", sharing='public', auto_open=False)
 
 # Aggregate by stimulus pair
-def getStimID(trialStats):
+def getStimID(trialStats, nBins = 8):
     #trialStats.columns
     allMagnitudes = pd.concat([trialStats.loc[:,'First'].abs(), trialStats.loc[:,'Second'].abs()], ignore_index = True)
-    binEdges = np.linspace(0.99 * allMagnitudes.min(), 1.01 * allMagnitudes.max(), 10)
-    firstStimID  = pd.cut(trialStats.loc[:,'First'].abs(), binEdges, labels = [i for i in range(9)])
-    secondStimID = pd.cut(trialStats.loc[:,'Second'].abs(), binEdges, labels = [i for i in range(9)])
+    binEdges = np.linspace(0.99 * allMagnitudes.min(), 1.01 * allMagnitudes.max(), nBins+1)
+    firstStimID  = pd.cut(trialStats.loc[:,'First'].abs(), binEdges, labels = [i for i in range(nBins)])
+    secondStimID = pd.cut(trialStats.loc[:,'Second'].abs(), binEdges, labels = [i for i in range(nBins)])
     stimIDs = pd.Series([(firstStimID[i], secondStimID[i]) for i in trialStats.index])
     return stimIDs
 
