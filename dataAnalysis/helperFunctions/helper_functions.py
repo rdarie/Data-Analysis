@@ -51,6 +51,7 @@ import matplotlib.backends.backend_pdf
 from fractions import gcd
 import h5py
 LABELFONTSIZE = 5
+
 def getPlotOpts(names):
     """
         Gets the colors to assign to n traces, where n is the length of the
@@ -1071,7 +1072,9 @@ def correctSpikeAlignment(spikes, w_pre):
     return spikes
 
 def getBinCenters(timeStart, timeEnd, binWidth, binInterval):
+    #won't include last one unless I add binInterval to the end
     binCenters = np.arange(timeStart + binWidth / 2, timeEnd - binWidth / 2 + binInterval, binInterval)
+
     return binCenters
 
 def getEventBins(timeStart, timeEnd, binInterval, binWidth):
@@ -1086,6 +1089,7 @@ def getEventBins(timeStart, timeEnd, binInterval, binWidth):
     fineBinsTotal = len(fineBins) - 1
 
     centerIdx = np.arange(0, fineBinsTotal - fineBinsPerWindow + fineBinsPerInterval, fineBinsPerInterval)
+
     binLeftEdges = centerIdx * binRes
 
     return binCenters, fineBins, fineBinsPerWindow, binWidth, centerIdx, binLeftEdges
@@ -1267,19 +1271,19 @@ def binnedArray(spikes, rasterOpts, timeStart, chans = None):
                     ChannelID.append(unitName)
 
     spikeMats = {i:None for i in timeStart.index}
+    binCenters, fineBins, fineBinsPerWindow, binWidth, centerIdx, binLeftEdges =\
+        getEventBins(rasterOpts['windowSize'][0],
+            rasterOpts['windowSize'][-1],
+            rasterOpts['binInterval'], rasterOpts['binWidth'])
 
     for idx, thisStartTime in timeStart.iteritems():
         try:
-            binCenters, fineBins, fineBinsPerWindow, binWidth, centerIdx, binLeftEdges =\
-                getEventBins(thisStartTime + rasterOpts['windowSize'][0],
-                    thisStartTime + rasterOpts['windowSize'][-1],
-                    rasterOpts['binInterval'], rasterOpts['binWidth'])
 
             spikeMats[idx], binCenters, binLeftEdges = binnedEvents(timeStamps, ChannelID,
                 binWidth = rasterOpts['binWidth'],
-                binCenters = binCenters, fineBins = fineBins,
+                binCenters = binCenters + thisStartTime, fineBins = fineBins + thisStartTime,
                 fineBinsPerWindow = fineBinsPerWindow,
-                centerIdx = centerIdx, binLeftEdges = binLeftEdges
+                centerIdx = centerIdx, binLeftEdges = binLeftEdges + thisStartTime
                 )
 
         except Exception:
@@ -1351,12 +1355,17 @@ def plotBinnedSpikes(spikeMat, show = True, normalizationType = 'linear',
     if zAxis is not None:
         zMin, zMax = zAxis
     else:
-        zMin, zMax = None, None
+        zMin, zMax = spikeMat.min().min(), spikeMat.max().max()
 
     if normalizationType == 'linear':
         nor = colors.Normalize(vmin=zMin, vmax=zMax)
-    elif normalizationType == 'logarithmic':
-        nor = colors.SymLogNorm(linthresh= 10, linscale=1, vmin=zMin, vmax=zMax)
+    elif normalizationType == 'SymLogNorm':
+        nor = colors.SymLogNorm(linthresh= 1, linscale=1, vmin=zMin, vmax=zMax)
+    elif normalizationType == 'LogNorm':
+        #print('zMin is {}'.format(zMin))
+        nor = colors.LogNorm(vmin=max(zMin, 1e-6), vmax=zMax)
+    elif normalizationType == 'Power':
+        nor = colors.PowerNorm(gamma=0.5)
 
     #fi, ax = plt.subplots()
     cbar_kws = {'label' : labelTxt}
@@ -1389,10 +1398,10 @@ def plotBinnedSpikes(spikeMat, show = True, normalizationType = 'linear',
         plt.show()
     return fi, im
 
-def plot_spikes(spikes, chans):
+def plot_spikes(spikes, chans, ignoreUnits = []):
     # Initialize plots
     #pdb.set_trace()
-    colors      =  sns.color_palette()
+    colors      =  sns.color_palette(n_colors = 40)
     line_styles = ['-', '--', ':', '-.']
     f, axarr    = plt.subplots(len(chans))
     if len(chans) == 1:
@@ -1416,7 +1425,7 @@ def plot_spikes(spikes, chans):
         t = np.arange(spikes['Waveforms'][0].shape[1]) / samp_per_ms
 
         for j in range(len(units)):
-            if units[j] == -1:
+            if units[j] in [-1] + ignoreUnits:
                 continue
             unit_idxs   = [idx for idx, unit in enumerate(spikes['Classification'][ch_idx]) if unit == units[j]]
             unit_spikes = np.array(spikes['Waveforms'][ch_idx][unit_idxs])
@@ -2242,6 +2251,7 @@ def getSpikeXY(dataNames, whichChans):
 
 def trainSpikeMethod(dataNames, whichChans, estimator, skf, parameters,
     outputFileName, memPreallocate = 'n_jobs'):
+
     localDir = os.environ['DATA_ANALYSIS_LOCAL_DIR']
     X, y, _ = getSpikeXY(dataNames, whichChans)
 

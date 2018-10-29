@@ -21,7 +21,7 @@ import collections
 import itertools
 import re
 import math as m
-LABELFONTSIZE = 5
+LABELFONTSIZE = 10
 
 def loadParamsPy(filePath):
     """
@@ -422,7 +422,7 @@ def plotSpike(spikes, channel, showNow = False, ax = None,
 
         colorPalette = sns.color_palette(n_colors = 40)
         for unitIdx, unitName in enumerate(unitsOnThisChan):
-            print('ignoreUnits are {}'.format([-1] + ignoreUnits))
+            #print('ignoreUnits are {}'.format([-1] + ignoreUnits))
             if unitName in [-1] + ignoreUnits:
                 continue
 
@@ -1165,11 +1165,124 @@ def plotSingleTrial(
 
     return fig, motorPlotAxes
 
+def resetTrialStatsStimID(folderPath, eventInfo, nBins = 3):
+    trialStats, trialEvents, motorData = loadEventInfo(folderPath, eventInfo, requested = ['trialStats'])
+
+    stimIDs, stimIDsAbs, firstStimID, secondStimID = mea.getStimID(trialStats, nBins = nBins)
+    trialStats["Stimulus ID Pair"]= stimIDs
+    trialStats["Stimulus ID Pair (Abs)"]= stimIDsAbs
+
+    trialStats["firstStimID"]= firstStimID.astype(float)
+    trialStats["firstStimID (Abs)"]= firstStimID.astype(float).abs()
+    trialStats["secondStimID"]= secondStimID.astype(float)
+    trialStats["secondStimID (Abs)"]= secondStimID.astype(float).abs()
+    setName = eventInfo['ns5FileName'] + '_eventInfo'
+    setPath = os.path.join(folderPath, setName + '.h5')
+    trialStats.to_hdf(setPath, 'trialStats')
+
+def getSpikeMatsForIdx(spikeMats, whichTrials):
+
+    exampleSpikeMat = next(iter(spikeMats.values()))
+    spikeMatIdx = exampleSpikeMat.index
+    spikeMatCols = exampleSpikeMat.columns - exampleSpikeMat.columns[0]
+    theseSpikeMats =  np.full((exampleSpikeMat.shape[0],
+        exampleSpikeMat.shape[1], len(whichTrials)), np.nan)
+    for idx, trialIdx in enumerate(whichTrials):
+        try:
+            theseSpikeMats[:,:,idx] = spikeMats[trialIdx]
+        except Exception:
+            traceback.print_exc()
+            pdb.set_trace()
+    return theseSpikeMats, spikeMatIdx, spikeMatCols
+
+def getSpikeMatsForCategories(categories, uniqueCategories, validTrials, spikeMats):
+
+    spikeMatsCategorized = {category:None for category in uniqueCategories.values}
+
+    for category in uniqueCategories:
+        if category == 'all':
+            catMask = np.full((categories.shape[0],), True)
+        else:
+            catMask = categories == category
+
+        catMask = np.logical_and(catMask, validTrials)
+        whichTrials = np.flatnonzero(catMask).tolist()
+        #prune nans
+        whichTrials = [i for i in whichTrials if spikeMats[i] is not None]
+        spikeMatsCategorized[category], spikeMatIdx, spikeMatCols = getSpikeMatsForIdx(spikeMats, whichTrials)
+
+    return spikeMatsCategorized, spikeMatIdx, spikeMatCols
+
+def getAverageSpikeMatsForIdx(spikeMats, whichTrials):
+    theseSpikeMats = getSpikeMatsForIdx(spikeMats, whichTrials)
+
+    exampleSpikeMat = next(iter(spikeMats.values()))
+    spikeMatIdx = exampleSpikeMat.index
+    spikeMatCols = exampleSpikeMat.columns
+
+    averageSpikeMats = pd.DataFrame(np.nanmean(theseSpikeMats, axis = 2),
+        columns = spikeMatCols, index = spikeMatIdx)
+    stdSpikeMats = pd.DataFrame(np.nanstd(theseSpikeMats, axis = 2),
+        columns = spikeMatCols, index = spikeMatIdx)
+
+    return averageSpikeMats, stdSpikeMats
+
+def getAverageSpikeMatsForCategories(categories, uniqueCategories, validTrials, spikeMats):
+
+    spikeMatsCategorized, spikeMatIdx, spikeMatCols = getSpikeMatsForCategories(categories,
+        uniqueCategories, validTrials, spikeMats)
+
+    averageSpikeMats = {category:None for category in uniqueCategories.values}
+    stdSpikeMats = {category:None for category in uniqueCategories.values}
+
+    for category, theseSpikeMats in spikeMatsCategorized.items():
+        #pdb.set_trace()
+        averageSpikeMats[category] = pd.DataFrame(np.nanmean(theseSpikeMats, axis = 2),
+            columns = spikeMatCols, index = spikeMatIdx)
+        stdSpikeMats[category] = pd.DataFrame(np.nanstd(theseSpikeMats, axis = 2),
+            columns = spikeMatCols, index = spikeMatIdx)
+
+    return averageSpikeMats, stdSpikeMats
+
+def getAverageSpikeMatsFromList(categories, uniqueCategories, validTrials, spikeMatList, arrayNames):
+
+    averageSpikeMats = {arrayName: None for arrayName in arrayNames}
+    stdSpikeMats = {arrayName: None for arrayName in arrayNames}
+    for arrayName in arrayNames:
+        averageSpikeMats[arrayName], stdSpikeMats[arrayName] =\
+            getAverageSpikeMatsForCategories(categories, uniqueCategories, validTrials, spikeMatList[arrayName])
+
+    return averageSpikeMats, stdSpikeMats
+
+def getPairedSpikeMatTTest(spikeMatCubeCatA, spikeMatCubeCatB):
+    #pdb.set_trace()
+    tTestStatistic, tTestPVal = scipy.stats.ttest_ind(spikeMatCubeCatA, spikeMatCubeCatB, axis=2, nan_policy = 'omit')
+    return tTestPVal
+
+def getAllPairedSpikeMatTTestForCategories(categories, uniqueCategories, validTrials, spikeMats):
+
+    spikeMatsCategorized, spikeMatIdx, spikeMatCols = getSpikeMatsForCategories(categories,
+        uniqueCategories, validTrials, spikeMats)
+
+    tTestSpikeMats = {}
+
+    for categoryA, categoryB in itertools.combinations(uniqueCategories,2):
+        spikeMatCubeCatA = spikeMatsCategorized[categoryA]
+        spikeMatCubeCatB = spikeMatsCategorized[categoryB]
+
+        resultingMat = getPairedSpikeMatTTest(spikeMatCubeCatA,spikeMatCubeCatB)
+        resultingMat = pd.DataFrame(resultingMat, index = spikeMatIdx, columns = spikeMatCols)
+        tTestSpikeMats.update({(categoryA, categoryB) : resultingMat})
+
+    return tTestSpikeMats
+
 def plotAverageTrialPDFReport(
     folderPath,
     spikesExclude = None,
     trialStats = None, trialEvents = None, motorData = None,
     eventInfo = None,
+    spikeMatList = None, arrayNames = None,
+    trialFiles = None,
     eventTsInfo = {
         'seriesName' : None,
         'recordName' : 'motorData',
@@ -1185,10 +1298,11 @@ def plotAverageTrialPDFReport(
         'removeBaseline' : False,
         'timeRange' : None
         },
-    spikeMatList = None, arrayNames = None,
-    trialFiles = None,
-    orderSpikesBy = 'meanFR',
-    normalizationType = 'logarithmic',
+    plotOpts = {
+    'orderSpikesBy' : 'meanFR',
+    'normalizationType' : 'logarithmic',
+    'zAxis' : None,
+    'forceRecalc' : True},
     kinTsInfo = {
     'seriesName' : None,
         'recordName' : 'angles',
@@ -1237,111 +1351,62 @@ def plotAverageTrialPDFReport(
                 whichTrial = None,
                 spikes = newSpikes,
                 trialStats = trialStats, chans = None,
-                correctAlignmentSpikes = 0)
+                correctAlignmentSpikes = 0, forceRecalc = plotOpts['forceRecalc'])
             spikeMatList.update({key:newSpikeMats})
             arrayNames.append(key)
-    elif arrayNames is None or trialFiles is None:
-        arrayNames = ['spike' for i in spikeMatList]
 
     nArrays = len(spikeMatList)
-
-    if eventTsInfo['separateBy'] is not None:
-
-        uniqueCategories = pd.Series(pd.unique(trialStats[eventTsInfo['separateBy']]))
-        pdb.set_trace()
-        print('Unique Categories are {}'.format(uniqueCategories))
-
-        validTrials = pd.notnull(trialStats[eventTsInfo['separateBy']])
-        catIndices = uniqueCategories.astype('category').cat.codes
-        uniqueCategories.dropna(inplace = True)
-    else:
-        uniqueCategories = pd.Series(('all',))
-        catIndices = uniqueCategories.astype('category').cat.codes
-        validTrials = pd.full((trialStats.shape[0],), True)
-
-    averageSpikeMats = {arrayName: {category:None for category in uniqueCategories.values} for arrayName in arrayNames}
-    stdSpikeMats = {arrayName: {category:None for category in uniqueCategories.values} for arrayName in arrayNames}
+    categories, uniqueCategories, catIndices, validTrials = getTrialCategories(trialStats,
+        eventTsInfo['separateBy'])
 
     zAxisAverage = {arrayName: {category:None for category in uniqueCategories.values} for arrayName in arrayNames}
     zAxisStd = {arrayName: {category:None for category in uniqueCategories.values} for arrayName in arrayNames}
+    tTestResults = {arrayName : None for arrayName in arrayNames}
+    averageSpikeMats, stdSpikeMats = getAverageSpikeMatsFromList(categories, uniqueCategories, validTrials, spikeMatList, arrayNames)
 
-    averageSpikeMatsAll = {arrayName: None for arrayName in arrayNames}
-    stdSpikeMatsAll = {arrayName: None for arrayName in arrayNames}
+    allValidTrials = [True if spikeMatList[arrayNames[0]][i] is not None else False\
+        for i in trialStats.index]
+    averageSpikeMatsAll,\
+        stdSpikeMatsAll = getAverageSpikeMatsFromList(np.full((trialStats.shape[0],), 'all'),
+        pd.Series(('all',)), allValidTrials, spikeMatList, arrayNames)
 
-    zAxisAverageAll = {arrayName: None for arrayName in arrayNames}
-    zAxisStdAll = {arrayName: None for arrayName in arrayNames}
-
-    for category in uniqueCategories:
-
-        if category == 'all':
-            catMask = np.full((trialStats.shape[0],), True)
-        else:
-            catMask = trialStats[eventTsInfo['separateBy']] == category
-
-        # prune nans caused by separateBy
-        catMask = np.logical_and(catMask, validTrials)
-        whichTrial = np.flatnonzero(catMask).tolist()
-        #prune nans
-        whichTrial = [i for i in whichTrial if spikeMatList[arrayNames[0]][i] is not None]
-
-        for arrayName in arrayNames:
-            theseSpikeMats =  np.full((spikeMatList[arrayName][0].shape[0],
-                spikeMatList[arrayName][0].shape[1], len(whichTrial)), np.nan)
-            for idx, trialIdx in enumerate(whichTrial):
-                try:
-                    theseSpikeMats[:,:,idx] = spikeMatList[arrayName][trialIdx]
-                except Exception:
-                    traceback.print_exc()
-                    pdb.set_trace()
-
-            binCenters = spikeMatList[arrayName][0].columns - spikeMatList[arrayName][0].columns[0]
-            averageSpikeMats[arrayName][category] = pd.DataFrame(np.nanmean(theseSpikeMats, axis = 2),
-                columns = binCenters, index = spikeMatList[arrayName][0].index)
-            zAxisAverage[arrayName][category] = (averageSpikeMats[arrayName][category].min().min(),
-                averageSpikeMats[arrayName][category].max().max())
-            stdSpikeMats[arrayName][category] = pd.DataFrame(np.nanstd(theseSpikeMats, axis = 2),
-                columns = binCenters, index = spikeMatList[arrayName][0].index)
-            zAxisStd[arrayName][category] = (stdSpikeMats[arrayName][category].min().min(),
-                stdSpikeMats[arrayName][category].max().max())
-            #pdb.set_trace()
-
-            if orderSpikesBy is not None:
-                averageSpikeMats[arrayName][category], spikeOrder = sortBinnedArray(averageSpikeMats[arrayName][category], orderSpikesBy)
-                stdSpikeMats[arrayName][category] = stdSpikeMats[arrayName][category].loc[spikeOrder, :]
-
-    allValidTrials = [i for i in trialStats.index if spikeMatList[arrayNames[0]][i] is not None]
+    zAxisAverageAll = {arrayName: {'all' : None} for arrayName in arrayNames}
+    zAxisStdAll = {arrayName: {'all' : None} for arrayName in arrayNames}
 
     for arrayName in arrayNames:
-        theseSpikeMats =  np.full((spikeMatList[arrayName][0].shape[0],
-            spikeMatList[arrayName][0].shape[1], len(allValidTrials)), np.nan)
-        for idx, trialIdx in enumerate(allValidTrials):
-            try:
-                theseSpikeMats[:,:,idx] = spikeMatList[arrayName][trialIdx]
-            except Exception:
-                traceback.print_exc()
-                pdb.set_trace()
 
-        binCenters = spikeMatList[arrayName][0].columns - spikeMatList[arrayName][0].columns[0]
-        averageSpikeMatsAll[arrayName] = pd.DataFrame(np.nanmean(theseSpikeMats, axis = 2),
-            columns = binCenters, index = spikeMatList[arrayName][0].index)
-        zAxisAverageAll[arrayName] = (averageSpikeMatsAll[arrayName].min().min(),
-            averageSpikeMatsAll[arrayName].max().max())
-        stdSpikeMatsAll[arrayName] = pd.DataFrame(np.nanstd(theseSpikeMats, axis = 2),
-            columns = binCenters, index = spikeMatList[arrayName][0].index)
-        zAxisStdAll[arrayName] = (stdSpikeMatsAll[arrayName].min().min(),
-            stdSpikeMatsAll[arrayName].max().max())
+        tTestResults[arrayName] = getAllPairedSpikeMatTTestForCategories(categories, uniqueCategories, validTrials, spikeMatList[arrayName])
 
-        if orderSpikesBy is not None:
-            averageSpikeMatsAll[arrayName], spikeOrder = sortBinnedArray(averageSpikeMatsAll[arrayName], orderSpikesBy)
-            stdSpikeMatsAll[arrayName] = stdSpikeMatsAll[arrayName].loc[spikeOrder, :]
+        zAxisAverageAll[arrayName]['all'] = (averageSpikeMatsAll[arrayName]['all'].min().min(),
+        averageSpikeMatsAll[arrayName]['all'].max().max())
+        zAxisStdAll[arrayName]['all'] = (stdSpikeMatsAll[arrayName]['all'].min().min(),
+        stdSpikeMatsAll[arrayName]['all'].max().max())
+
+        for category in uniqueCategories:
+            zAxisAverage[arrayName][category] = (averageSpikeMats[arrayName][category].min().min(),
+            averageSpikeMats[arrayName][category].max().max())
+            zAxisStd[arrayName][category] = (stdSpikeMats[arrayName][category].min().min(),
+            stdSpikeMats[arrayName][category].max().max())
+
+        if plotOpts['orderSpikesBy'] is not None:
+            averageSpikeMatsAll[arrayName]['all'], spikeOrder = sortBinnedArray(averageSpikeMatsAll[arrayName]['all'], plotOpts['orderSpikesBy'])
+            stdSpikeMatsAll[arrayName]['all'] = stdSpikeMatsAll[arrayName]['all'].loc[spikeOrder, :]
+
+            for categoryA, categoryB in itertools.combinations(uniqueCategories,2):
+                tTestResults[arrayName][(categoryA, categoryB)] = tTestResults[arrayName][(categoryA, categoryB)].loc[spikeOrder, :]
+
+            for category in uniqueCategories:
+                stdSpikeMats[arrayName][category]     = stdSpikeMats[arrayName][category].loc[spikeOrder, :]
+                averageSpikeMats[arrayName][category] = averageSpikeMats[arrayName][category].loc[spikeOrder, :]
 
     zAxisToUseAverage = [np.inf, -np.inf]
     zAxisToUseStd = [np.inf, -np.inf]
+
     for arrayName in arrayNames:
-        zAxisToUseAverage[0] = min(zAxisToUseAverage[0], zAxisAverageAll[arrayName][0])
-        zAxisToUseAverage[1] = max(zAxisToUseAverage[1], zAxisAverageAll[arrayName][1])
-        zAxisToUseStd[0] = min(zAxisToUseStd[0], zAxisStdAll[arrayName][0])
-        zAxisToUseStd[1] = max(zAxisToUseStd[1], zAxisStdAll[arrayName][1])
+        zAxisToUseAverage[0] = min(zAxisToUseAverage[0], zAxisAverageAll[arrayName]['all'][0])
+        zAxisToUseAverage[1] = max(zAxisToUseAverage[1], zAxisAverageAll[arrayName]['all'][1])
+        zAxisToUseStd[0] = min(zAxisToUseStd[0], zAxisStdAll[arrayName]['all'][0])
+        zAxisToUseStd[1] = max(zAxisToUseStd[1], zAxisStdAll[arrayName]['all'][1])
         for category in uniqueCategories:
             zAxisToUseAverage[0] = min(zAxisToUseAverage[0], zAxisAverage[arrayName][category][0])
             zAxisToUseAverage[1] = max(zAxisToUseAverage[1], zAxisAverage[arrayName][category][1])
@@ -1352,6 +1417,7 @@ def plotAverageTrialPDFReport(
     print('zAxisToUseStd = ({})'.format(zAxisToUseStd))
     labelFontSize = LABELFONTSIZE
     with PdfPages(pdfName) as pdf:
+        matplotlib.rc('figure', figsize=(11.69,16.53))
         fig, ax = plt.subplots(2 + 2 * nArrays,1)
         for chanIdx in trialTriggeredPosition['ChannelID']:
             plotSpike(trialTriggeredPosition, ax = ax[0], channel = chanIdx,
@@ -1362,20 +1428,20 @@ def plotAverageTrialPDFReport(
                 axesLabel = True, showNow = False, errorMultiplier = 1)
         ax[1].set_title(kinTsInfo['recordName'], fontsize = labelFontSize)
         for idx, arrayName in enumerate(arrayNames):
-            fig, im = hf.plotBinnedSpikes(averageSpikeMatsAll[arrayName], show = False,
+            fig, im = hf.plotBinnedSpikes(averageSpikeMatsAll[arrayName]['all'], show = False,
                 ax = ax[2 + 2 *idx],zAxis = zAxisToUseAverage,
-                normalizationType = normalizationType)
+                normalizationType = plotOpts['normalizationType'])
             ax[2 + 2 *idx].set_title(arrayName + ' Average', fontsize = labelFontSize)
-            fig, im = hf.plotBinnedSpikes(stdSpikeMatsAll[arrayName], show = False,
+            fig, im = hf.plotBinnedSpikes(stdSpikeMatsAll[arrayName]['all'], show = False,
                 ax = ax[2 + 2 *idx + 1],zAxis = zAxisToUseStd,
-                normalizationType = normalizationType)
+                normalizationType = plotOpts['normalizationType'])
             ax[2 + 2 *idx+1].set_title(arrayName + ' Std', fontsize = labelFontSize)
         pdf.savefig()
         plt.close()
 
         for idx, category in enumerate(uniqueCategories):
             allOtherCategories = np.delete(catIndices.values, [uniqueCategories[uniqueCategories == category].index[0]])
-            print('allOtherCategories are {}'.format(allOtherCategories))
+            print('Plotting {}'.format(category))
             fig, ax = plt.subplots(2 + 2 * nArrays,1)
             for chanIdx in trialTriggeredPosition['ChannelID']:
                 plotSpike(trialTriggeredPosition, ax = ax[0], channel = chanIdx,
@@ -1387,12 +1453,12 @@ def plotAverageTrialPDFReport(
             ax[1].set_title(kinTsInfo['recordName'], fontsize = labelFontSize)
             for idx, arrayName in enumerate(arrayNames):
                 fig, im = hf.plotBinnedSpikes(averageSpikeMats[arrayName][category], show = False,
-                    ax = ax[2 + 2 *idx],zAxis = zAxisToUseAverage,
-                    normalizationType = normalizationType)
+                    ax = ax[2 + 2 *idx], zAxis = zAxisToUseAverage,
+                    normalizationType = plotOpts['normalizationType'])
                 ax[2 + 2 *idx].set_title('{} {} Average'.format(arrayName, category), fontsize = labelFontSize)
                 fig, im = hf.plotBinnedSpikes(stdSpikeMats[arrayName][category], show = False,
                     ax = ax[2 + 2 *idx + 1],zAxis = zAxisToUseStd,
-                    normalizationType = normalizationType)
+                    normalizationType = plotOpts['normalizationType'])
                 ax[2 + 2 *idx+1].set_title('{} {} Std'.format(arrayName, category), fontsize = labelFontSize)
             pdf.savefig()
             plt.close()
@@ -1401,8 +1467,8 @@ def plotAverageTrialPDFReport(
             allOtherCategories = np.delete(catIndices.values,
                 [uniqueCategories[uniqueCategories == categoryA].index[0],
                 uniqueCategories[uniqueCategories == categoryB].index[0]])
-            print('allOtherCategories are {}'.format(allOtherCategories))
-            fig, ax = plt.subplots(2 + nArrays,1)
+            print('Plotting {}'.format((categoryA, categoryB)))
+            fig, ax = plt.subplots(2 + 2*nArrays,1)
             for chanIdx in trialTriggeredPosition['ChannelID']:
                 plotSpike(trialTriggeredPosition, ax = ax[0], channel = chanIdx,
                     axesLabel = True, showNow = False, errorMultiplier = 1, ignoreUnits = allOtherCategories.tolist())
@@ -1411,11 +1477,19 @@ def plotAverageTrialPDFReport(
                 plotSpike(trialTriggeredAngles, ax = ax[1], channel = chanIdx,
                     axesLabel = True, showNow = False, errorMultiplier = 1, ignoreUnits = allOtherCategories.tolist())
             ax[1].set_title(kinTsInfo['recordName'], fontsize = labelFontSize)
+            if plotOpts['normalizationType'] == 'LogNorm':
+                thisNorm = 'SymLogNorm'
+            else:
+                thisNorm =  plotOpts['normalizationType']
             for idx, arrayName in enumerate(arrayNames):
                 fig, im = hf.plotBinnedSpikes(averageSpikeMats[arrayName][categoryA] - averageSpikeMats[arrayName][categoryB], show = False,
-                    ax = ax[2 + idx],
-                    normalizationType = normalizationType)
-                ax[2 + idx].set_title('{} Difference Between {} and {}'.format(arrayName, categoryA, categoryB), fontsize = labelFontSize)
+                    ax = ax[2 + 2*idx],
+                    normalizationType = thisNorm )
+                ax[2 + 2*idx].set_title('{} Difference Between {} and {}'.format(arrayName, categoryA, categoryB), fontsize = labelFontSize)
+                fig, im = hf.plotBinnedSpikes(tTestResults[arrayName][(categoryA,categoryB)], show = False,
+                    ax = ax[2 + 2*idx+1],
+                    normalizationType = 'LogNorm')
+                ax[2 + 2*idx+1].set_title('{} T Test P Value for above comparison'.format(arrayName), fontsize = labelFontSize)
             pdf.savefig()
             plt.close()
 #@profile
@@ -1768,6 +1842,7 @@ def loadEventInfo(folderPath, eventInfo,
         trialStats.to_hdf(setPath, 'trialStats')
         if 'trialStats' not in requested:
             trialStats = None
+
         trialEvents.to_hdf(setPath, 'trialEvents')
         if 'trialEvents' not in requested:
             trialEvents = None
@@ -1799,7 +1874,7 @@ def spikeBinnedSpikesNameGenerator(arrayNameFrom, arrayInfoFrom, arrayNameTo, ar
     return spikesNameGenerator(arrayNameFrom, arrayInfoFrom) + '_ALIGNEDTO_' + spikesNameGenerator(arrayNameTo, arrayInfoTo)
 
 def trialBinnedArrayNameGenerator(arrayName, arrayInfo, rasterOpts):
-    return spikesNameGenerator(arrayName, arrayInfo) + '_BETWEEN_' + rasterOpts['alignTo'] +"_AND_"+ rasterOpts['endOn']
+    return spikesNameGenerator(arrayName, arrayInfo) + '_BETWEEN_' + rasterOpts['alignTo'] +"_AND_"+ '{}'.format(rasterOpts['endOn'])
 
 def spikesNameRetrieve(spikesName):
 
@@ -1856,8 +1931,7 @@ def loadSpikeInfo(folderPath, arrayName, arrayInfo, forceRecalc = False):
     if not forceRecalc:
     # if not requiring a recalculation, load from pickle
         try:
-            spikes = pickle.load(
-                open(os.path.join(folderPath, setPath), 'rb'))
+            spikes = pickle.load(open(setPath, 'rb'))
 
             # make sure the file contains all requested channels
             for chanIdx in spikes['ChannelID']:
@@ -2168,6 +2242,51 @@ def spikeTriggeredTimeSeries(spikes, dataDF,
         windowSize= windowSize, timeStampResolution = timeStampResolution, units = units, idxUnits = idxUnits, subSample = subSample)
     return spikesTriggered, selectedIndices
 
+def getTrialCategories(trialStats, separateBy, validTrials = None):
+    if validTrials is None:
+        validTrials = np.full((trialStats.shape[0],), True)
+
+    if separateBy is not None:
+        if not isinstance(separateBy, list):
+            categories = trialStats[separateBy].copy()
+            validTrials = np.logical_and(validTrials, trialStats[separateBy].notnull())
+        else:
+            categories = pd.Series([[] for i in trialStats.index], index = trialStats.index)
+            for idx, thisCriterion in enumerate(separateBy):
+                validTrials = np.logical_and(validTrials, trialStats[thisCriterion].notnull())
+                for rowIdx in trialStats.index:
+                    categories[rowIdx].append(trialStats.loc[rowIdx,thisCriterion])
+
+        categories[np.logical_not(validTrials)] = None
+        # lists are mutable but unhashable, so convert to tuple once done
+        if isinstance(separateBy, list):
+            for rowIdx in trialStats.index:
+                if categories[rowIdx] is not None:
+                    categories[rowIdx] = tuple(categories[rowIdx])
+
+        categories.loc[np.logical_not(validTrials)] = np.nan
+
+        uniqueCategories = pd.Series(pd.unique(categories))
+
+        uniqueCategories.dropna(inplace = True)
+        #sort unique categories
+        #pdb.set_trace()
+        if not isinstance(uniqueCategories[0], tuple):
+            uniqueCategories.sort_values(inplace = True)
+        elif isinstance(uniqueCategories[0], tuple):
+            for dim in range(len(uniqueCategories[0])):
+                sortBy = pd.Series([value[dim] for value in uniqueCategories], index = uniqueCategories.index)
+                sortIdx = sortBy.sort_values().index
+                uniqueCategories = uniqueCategories[sortIdx]
+        uniqueCategories.reset_index(drop=True, inplace=True)
+    else:
+        categories = pd.Series('all', index = trialStats.index)
+        uniqueCategories = pd.Series(('all',))
+
+
+    catIndices = uniqueCategories.astype('category').cat.codes
+    return categories, uniqueCategories, catIndices, validTrials
+
 def trialTriggeredTimeSeries(
     dataDF, trialStats, tsInfo):
 
@@ -2180,12 +2299,8 @@ def trialTriggeredTimeSeries(
         tsInfo['windowSize'][1] = tsInfo['windowSize'][1] + endTimes.max() / 3e4 # samples to seconds conversion
         validMask = np.logical_and(validMask, trialStats[tsInfo['endOn']].notnull())
 
-    if tsInfo['separateBy'] is not None:
-        categories = trialStats[tsInfo['separateBy']]
-    else:
-        categories = pd.Series('all', index = trialStats.index)
-
-    categories[np.logical_not(validMask)] = np.nan
+    categories, uniqueCategories, catIndices, validMask =  getTrialCategories(trialStats,
+        tsInfo['separateBy'], validTrials = validMask)
 
     spikesTriggered = triggeredTimeSeries(alignTimes, dataDF, categories,
         whichColumns = tsInfo['whichColumns'], removeBaseline = tsInfo['removeBaseline'],
@@ -2222,7 +2337,7 @@ def loadSpikeTriggeredTimeSeries():
 def trialTriggeredTimeSeriesNameGenerator(tsInfo):
     seriesName = tsInfo['seriesName'] + '_' + tsInfo['recordName'] + '_ALIGNEDTO_' + tsInfo['alignTo']
     if tsInfo['separateBy'] is not None:
-        seriesName = seriesName + '_SEPARATEDBY_' + tsInfo['separateBy']
+        seriesName = seriesName + '_SEPARATEDBY_' + '{}'.format(tsInfo['separateBy'])
     if tsInfo['endOn'] is not None:
         seriesName = seriesName + '_ENDON_' + tsInfo['endOn']
     return seriesName
@@ -2230,7 +2345,7 @@ def trialTriggeredTimeSeriesNameGenerator(tsInfo):
 def trialTriggeredTimeSeriesReportNameGenerator(tsInfo):
     seriesName = tsInfo['seriesName'] + '_ALIGNEDTO_' + tsInfo['alignTo']
     if tsInfo['separateBy'] is not None:
-        seriesName = seriesName + '_SEPARATEDBY_' + tsInfo['separateBy']
+        seriesName = seriesName + '_SEPARATEDBY_' + '{}'.format(tsInfo['separateBy'])
     if tsInfo['endOn'] is not None:
         seriesName = seriesName + '_ENDON_' + tsInfo['endOn']
     return seriesName
@@ -2406,24 +2521,27 @@ def loadTrialBinnedArray(folderPath,
             with h5py.File(setPath, "r") as f:
                 recordAttributes = f['/'+"rasterOpts"].attrs
                 for key, value in rasterOpts.items():
-                    if type(value) is not dict:
-                        thisAttr = recordAttributes[key]
-                        if isinstance(value, collections.Iterable):
-                            if  key != 'windowSize':
-                                for idx, valueComponent in enumerate(value):
-                                    assert (valueComponent == thisAttr[idx]) or (valueComponent is None and np.isnan(thisAttr[idx]))
-                        else:
-                            assert (value == thisAttr) or (value is None and np.isnan(thisAttr))
-
-                    else:
+                    #value can be dict, iterable or single value
+                    if type(value) is dict:
                         for subKey, subValue in value.items():
                             thisAttr = recordAttributes[key + '_' + subKey]
-
                             if isinstance(subValue, collections.Iterable):
                                 for idx, valueComponent in enumerate(subValue):
-                                    assert (valueComponent == thisAttr[idx]) or (valueComponent is None and np.isnan(thisAttr[idx]))
+                                    if not ( (valueComponent == thisAttr[idx]) or (valueComponent is None and np.isnan(thisAttr[idx])) ):
+                                        raise Exception('Parameter {} was requested to be {} but was {}'.format(subKey, subValue, thisAttr))
                             else:
-                                assert (subValue == thisAttr) or (subValue is None and np.isnan(thisAttr).all())
+                                if not ( (subValue == thisAttr) or (subValue is None and np.isnan(thisAttr).all()) ):
+                                    raise Exception('Parameter {} was requested to be {} but was {}'.format(subKey, subValue, thisAttr))
+                    elif isinstance(value, collections.Iterable):
+                        thisAttr = recordAttributes[key]
+                        if  key not in ['separateBy']:
+                            for idx, valueComponent in enumerate(value):
+                                if not ( (valueComponent == thisAttr[idx]) or (valueComponent is None and np.isnan(thisAttr[idx])) ):
+                                    raise Exception('Parameter {} was requested to be {} but was {}'.format(key, value, thisAttr))
+                    else:
+                        thisAttr = recordAttributes[key]
+                        if not ( (value == thisAttr) or (value is None and np.isnan(thisAttr))):
+                            raise Exception('Parameter {} was requested to be {} but was {}'.format(key, value, thisAttr))
 
                 if whichTrial is None:
                     whichTrial = [int(i) for i in f if i != 'rasterOpts']
@@ -2460,17 +2578,19 @@ def loadTrialBinnedArray(folderPath,
         with h5py.File(setPath, "w") as f:
             grp = f.create_group("rasterOpts")
             for key, value in rasterOpts.items():
-                if type(value) is not dict:
-                    if value is not None:
-                        grp.attrs[key] = value
-                    else:
-                        grp.attrs[key] = np.nan
-                else:
+                #value can be dict, iterable or single value
+                if type(value) is dict:
                     for subKey, subValue in value.items():
-                        if value is not None:
+                        if subValue is not None:
                             grp.attrs[key + '_' + subKey] = subValue
                         else:
                             grp.attrs[key + '_' + subKey] = np.nan
+                else:
+                    if value is not None and key not in ['separateBy']:
+                        try: grp.attrs[key] = value
+                        except Exception: traceback.print_exc(); pdb.set_trace()
+                    else:
+                        grp.attrs[key] = np.nan
 
             spikeMats = {i:None for i in trialStats.index}
             spikeMats.update(hf.trialBinnedArray(spikes, rasterOpts, trialStats, chans = None))
