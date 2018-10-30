@@ -1180,6 +1180,26 @@ def resetTrialStatsStimID(folderPath, eventInfo, nBins = 3):
     setPath = os.path.join(folderPath, setName + '.h5')
     trialStats.to_hdf(setPath, 'trialStats')
 
+def addHistory(X, nHistBins = 0):
+    tempDF = pd.DataFrame(X)
+    allDFs = {0:tempDF}
+    for i in range(1,nHistBins):
+        allDFs.update({i:allDFs[i-1].shift(1)})
+    outputDF = pd.concat(allDFs, axis = 1)
+    return outputDF.fillna(method = 'pad', axis = 1)
+
+
+def featureUnstackerGenerator(spikeMats, whichLevel = None, nCol = None):
+    if nCol is None:
+        nCol = len(spikeMats.columns)
+    # make a custom function that only works on spikeMats to unstack it
+    def unstacker(X):
+        tempDF = pd.DataFrame(X, index = spikeMats.index, columns = range(nCol))
+        tempDF = tempDF.unstack(level = whichLevel)
+        #fig, ax = plt.subplots(); plt.spy(tempDF.isnull()); plt.axis('equal'); plt.show()
+        return tempDF #maybe add .values here
+    return unstacker
+
 def getSpikeMatsForIdx(spikeMats, whichTrials):
 
     exampleSpikeMat = next(iter(spikeMats.values()))
@@ -1257,7 +1277,7 @@ def getAverageSpikeMatsFromList(categories, uniqueCategories, validTrials, spike
 def getPairedSpikeMatTTest(spikeMatCubeCatA, spikeMatCubeCatB):
     #pdb.set_trace()
     tTestStatistic, tTestPVal = scipy.stats.ttest_ind(spikeMatCubeCatA, spikeMatCubeCatB, axis=2, nan_policy = 'omit')
-    return tTestPVal
+    return tTestPVal * spikeMatCubeCatA.shape[0] * spikeMatCubeCatA.shape[1]
 
 def getAllPairedSpikeMatTTestForCategories(categories, uniqueCategories, validTrials, spikeMats):
 
@@ -1275,6 +1295,159 @@ def getAllPairedSpikeMatTTestForCategories(categories, uniqueCategories, validTr
         tTestSpikeMats.update({(categoryA, categoryB) : resultingMat})
 
     return tTestSpikeMats
+
+def getTrialCategoriesAsFeatures(folderPath,
+    trialStats = None, eventInfo = None,
+    targetCategory = None,
+    alignToList = None, overrideLabel = None):
+
+    targetsDict = {}
+
+    if trialStats is None:
+        trialStats, _, _ = loadEventInfo(folderPath, eventInfo, requested = ['trialStats'])
+
+    categories, uniqueCategories, catIndices, validTrials =\
+         getTrialCategories(trialStats, targetCategory)
+
+    for alignTo in alignToList:
+        #theseValidTrials = np.logical_and(validTrials,trialStats[alignTo].notnull())
+        theseTargets = pd.Series(trialStats.loc[validTrials, targetCategory], index=trialStats.index[validTrials])
+        theseTargets.index.name = 'trial'
+        targetsDict.update({alignTo:theseTargets})
+
+    targets = pd.concat(targetsDict, names = ['alignLabel'])
+    if overrideLabel is not None:
+        targets.loc[:] = overrideLabel
+
+    targets = targets.astype('category')
+
+    return targets
+
+def getTrialTriggeredTimeSeriesAsFeatures(folderPath, binCenters,
+    trialStats = None, eventInfo = None,
+    tsInfo = None,
+    trialFiles = None,
+    targetCategory = None,
+    alignToList = None, targetVariables = ['Knee Right X']):
+
+    setName = regressionRunNameGenerator(trialFiles, alignToList, tsInfo)
+    setPath = os.path.join(folderPath, setName + '.h5')
+    if trialStats is None:
+            trialStats, _, _ = loadEventInfo(folderPath, eventInfo, requested = ['trialStats'])
+    trialsIdx = trialStats.index
+
+    timeSeriesFeatures = {}
+    tsInfo.update({'whichColumns':targetVariables})
+    for targetVariable in targetVariables:
+        waveformsDict = {}
+        for idx, alignTo in enumerate(alignToList):
+            tsInfo.update({'alignTo':alignTo})
+            timeSeries = loadTrialTriggeredTimeSeries(folderPath, tsInfo,
+                dataDF = None, trialStats = trialStats, eventInfo = eventInfo)
+
+            chIdx = timeSeries['ChannelLabel'].index(targetVariable)
+            waveforms = timeSeries['Waveforms'][chIdx][trialsIdx, :]
+
+            dT = timeSeries['basic_headers']['timeStampResolution'] ** -1
+            t = np.linspace(timeSeries['basic_headers']['windowSize'][0],
+                timeSeries['basic_headers']['windowSize'][1],waveforms.shape[1])
+            tFull = np.unique(np.concatenate([t, binCenters.values]))
+            theseWaveformsDF = pd.DataFrame(np.nan, index = trialsIdx, columns = tFull)
+            theseWaveformsDF.loc[:,t] = waveforms
+            theseWaveformsDF.index.name = 'trial'
+            waveformsDict.update({alignTo:theseWaveformsDF})
+
+        waveformsDF = pd.concat(waveformsDict, names = ['alignLabel'])
+        waveformsDF.interpolate(axis = 1, inplace = True)
+        targets = waveformsDF.loc[:, binCenters].copy()
+        targets.columns.name = 'bin'
+        targets.name = targetVariable
+        targets = targets.stack()
+        timeSeriesFeatures.update({targetVariable:targets})
+    return timeSeriesFeatures
+
+def getSpikeMatsAsFeatures(folderPath,
+    trialStats = None, eventInfo = None,
+    trialFiles = None,
+    binCenters = None,
+    rasterOpts = None,
+    eventTsInfo = None,
+    kinTsInfo = None,
+    targetCategory = None,
+    alignToList = None
+    ):
+    arrayNames = []
+
+    if trialStats is None:
+        trialStats, _, _ = loadEventInfo(folderPath, eventInfo, requested = ['trialStats'])
+
+    if binCenters is None:
+        doWeHaveTheBinsYet = False
+    else:
+        theBins = binCenters
+        doWeHaveTheBinsYet = True
+
+    rasterOpts.update({'separateBy':targetCategory})
+    eventTsInfo.update({'separateBy':targetCategory})
+    kinTsInfo.update({'separateBy':targetCategory})
+
+    categories, uniqueCategories, catIndices, validTrials =\
+         getTrialCategories(trialStats, targetCategory)
+
+    spikeMatsDict = {}
+
+    for key, value in trialFiles.items():
+        # key are ARRAY NAMES!
+        spikeStruct, newSpikes = loadSpikeInfo(folderPath, key, value)
+        arrayNames.append(key)
+        spikeMatsThisArrayDict = {}
+
+        for alignTo in alignToList:
+            rasterOpts.update({'alignTo':alignTo})
+            eventTsInfo.update({'alignTo':alignTo})
+            kinTsInfo.update({'alignTo':alignTo})
+
+            newSpikeMats = loadTrialBinnedArray(folderPath,
+                key, value,
+                eventInfo, rasterOpts,
+                whichTrial = None,
+                spikes = newSpikes,
+                trialStats = trialStats, chans = None,
+                correctAlignmentSpikes = 0)
+
+            #theseValidTrials = np.logical_and(validTrials,trialStats[alignTo].notnull())
+            whichTrials = trialStats.index[validTrials]
+            spikeMatCubes, spikeMatIdx, spikeMatCols = getSpikeMatsForIdx(newSpikeMats, whichTrials)
+
+            if not doWeHaveTheBinsYet:
+                theBins = spikeMatCols
+                doWeHaveTheBinsYet = True
+            theseOservationColumns = pd.MultiIndex.from_product((whichTrials,theBins), names=['trial','bin'])
+            spikeMat2D = pd.DataFrame(np.nan,index = spikeMatIdx, columns = theseOservationColumns)
+
+            spikeMat2D.index.name = 'unit'
+            for idx1, binIDx in enumerate(theBins):
+                for idx2, trialIDx in enumerate(whichTrials):
+                    spikeMat2D.loc[:, (trialIDx, binIDx)] = spikeMatCubes[:, idx1, idx2]
+
+            #fig, ax = plt.subplots(); plt.spy(spikeMat2D); plt.axis('equal'); plt.show()
+            #fig, ax = plt.subplots(); plt.spy(spikeMatCubes[0, :, :]); plt.axis('equal'); plt.show()
+            #spikeMat2D.index = spikeMat2D.index.remove_unused_levels()
+            spikeMat2D.columns = spikeMat2D.columns.remove_unused_levels()
+            spikeMatsThisArrayDict.update({alignTo:spikeMat2D})
+
+        spikeMatsThisArray = pd.concat(spikeMatsThisArrayDict, axis = 1, names = ['alignLabel'])
+        #spikeMatsThisArray.index = spikeMatsThisArray.index.remove_unused_levels()
+        spikeMatsThisArray.columns = spikeMatsThisArray.columns.remove_unused_levels()
+        spikeMatsDict.update({key:spikeMatsThisArray})
+
+    spikeMats = pd.concat(spikeMatsDict, axis = 0, names = ['arrayName'])
+    spikeMats.index = spikeMats.index.remove_unused_levels()
+    spikeMats.columns = spikeMats.columns.remove_unused_levels()
+    spikeMats = spikeMats.transpose()
+    spikeMats.fillna(method = 'pad', inplace = True)
+
+    return spikeMats, theBins
 
 def plotAverageTrialPDFReport(
     folderPath,
@@ -1335,10 +1508,10 @@ def plotAverageTrialPDFReport(
         trialStats, _, _ = loadEventInfo(folderPath, eventInfo, requested = ['trialStats'])
 
     trialTriggeredAngles = loadTrialTriggeredTimeSeries(folderPath, kinTsInfo,
-        dataDF = None, trialStats = trialStats, eventInfo = eventInfo)
+        dataDF = None, trialStats = trialStats, eventInfo = eventInfo, forceRecalc = plotOpts['forceRecalc'])
 
     trialTriggeredPosition = loadTrialTriggeredTimeSeries(folderPath, eventTsInfo,
-        dataDF = None, trialStats = trialStats, eventInfo = eventInfo)
+        dataDF = None, trialStats = trialStats, eventInfo = eventInfo, forceRecalc = plotOpts['forceRecalc'])
 
     if spikeMatList is None:
         spikeMatList = {}
@@ -1417,7 +1590,7 @@ def plotAverageTrialPDFReport(
     print('zAxisToUseStd = ({})'.format(zAxisToUseStd))
     labelFontSize = LABELFONTSIZE
     with PdfPages(pdfName) as pdf:
-        matplotlib.rc('figure', figsize=(11.69,16.53))
+        matplotlib.rc('figure', figsize=(12,36))
         fig, ax = plt.subplots(2 + 2 * nArrays,1)
         for chanIdx in trialTriggeredPosition['ChannelID']:
             plotSpike(trialTriggeredPosition, ax = ax[0], channel = chanIdx,
@@ -1468,7 +1641,7 @@ def plotAverageTrialPDFReport(
                 [uniqueCategories[uniqueCategories == categoryA].index[0],
                 uniqueCategories[uniqueCategories == categoryB].index[0]])
             print('Plotting {}'.format((categoryA, categoryB)))
-            fig, ax = plt.subplots(2 + 2*nArrays,1)
+            fig, ax = plt.subplots(2 + 3*nArrays,1)
             for chanIdx in trialTriggeredPosition['ChannelID']:
                 plotSpike(trialTriggeredPosition, ax = ax[0], channel = chanIdx,
                     axesLabel = True, showNow = False, errorMultiplier = 1, ignoreUnits = allOtherCategories.tolist())
@@ -1477,19 +1650,34 @@ def plotAverageTrialPDFReport(
                 plotSpike(trialTriggeredAngles, ax = ax[1], channel = chanIdx,
                     axesLabel = True, showNow = False, errorMultiplier = 1, ignoreUnits = allOtherCategories.tolist())
             ax[1].set_title(kinTsInfo['recordName'], fontsize = labelFontSize)
+
             if plotOpts['normalizationType'] == 'LogNorm':
                 thisNorm = 'SymLogNorm'
             else:
                 thisNorm =  plotOpts['normalizationType']
+
             for idx, arrayName in enumerate(arrayNames):
+                theseTTestResults = tTestResults[arrayName][(categoryA,categoryB)]
+                pThres = 1e-2
+                # Difference in means
                 fig, im = hf.plotBinnedSpikes(averageSpikeMats[arrayName][categoryA] - averageSpikeMats[arrayName][categoryB], show = False,
-                    ax = ax[2 + 2*idx],
+                    ax = ax[2 + 3*idx],
                     normalizationType = thisNorm )
-                ax[2 + 2*idx].set_title('{} Difference Between {} and {}'.format(arrayName, categoryA, categoryB), fontsize = labelFontSize)
-                fig, im = hf.plotBinnedSpikes(tTestResults[arrayName][(categoryA,categoryB)], show = False,
-                    ax = ax[2 + 2*idx+1],
+                ax[2 + 3*idx].set_title('{}: Difference Between {} and {}'.format(arrayName, categoryA, categoryB), fontsize = labelFontSize)
+                # Significance of difference
+                fig, im = hf.plotBinnedSpikes(theseTTestResults, show = False,
+                    ax = ax[2 + 3*idx+1],
                     normalizationType = 'LogNorm')
-                ax[2 + 2*idx+1].set_title('{} T Test P Value for above comparison'.format(arrayName), fontsize = labelFontSize)
+                ax[2 + 3*idx+1].set_title('{}: T Test P Value for above comparison'.format(arrayName), fontsize = labelFontSize)
+                #pdb.set_trace()
+                significantBins = theseTTestResults < pThres
+                significantBins.columns.name = 'Time (sec)'
+                significantBins.index.name = 'Trial'
+                nameStr = 'p < {}'.format(pThres)
+                # turn into 'tidy' DataFrame
+                significantBins = significantBins.unstack().reset_index(name = nameStr)
+                sns.countplot(x="Time (sec)", hue=nameStr, data=significantBins.loc[significantBins[nameStr], :], ax = ax[2 + 3*idx+2])
+                ax[2 + 3*idx+2].set_title('{}: count of {}'.format(arrayName, nameStr), fontsize = labelFontSize)
             pdf.savefig()
             plt.close()
 #@profile
@@ -1873,8 +2061,32 @@ def trialBinnedSpikesNameGenerator(arrayName, arrayInfo, rasterOpts):
 def spikeBinnedSpikesNameGenerator(arrayNameFrom, arrayInfoFrom, arrayNameTo, arrayInfoTo):
     return spikesNameGenerator(arrayNameFrom, arrayInfoFrom) + '_ALIGNEDTO_' + spikesNameGenerator(arrayNameTo, arrayInfoTo)
 
+def spikeBinnedArrayNameGenerator(arrayNameFrom, arrayInfoFrom, arrayNameTo, arrayInfoTo):
+    return spikesNameGenerator(arrayNameFrom, arrayInfoFrom) + '_TRIGGEREDBY_' + spikesNameGenerator(arrayNameTo, arrayInfoTo)
+
 def trialBinnedArrayNameGenerator(arrayName, arrayInfo, rasterOpts):
     return spikesNameGenerator(arrayName, arrayInfo) + '_BETWEEN_' + rasterOpts['alignTo'] +"_AND_"+ '{}'.format(rasterOpts['endOn'])
+
+def categorizationRunNameGenerator(trialFiles, alignToList, targetCategory):
+    outputName = ''
+    for arrayName, arrayInfo in trialFiles.items():
+        outputName += spikesNameGenerator(arrayName, arrayInfo) + '_'
+
+    outputName += '_ALIGNEDTO_{}'.format(alignToList)
+    outputName += '_CATEGORIZATION_TARGET_{}'.format(targetCategory)
+
+    return outputName
+
+def regressionRunNameGenerator(trialFiles, alignToList, tsInfo):
+    outputName = ''
+    for arrayName, arrayInfo in trialFiles.items():
+        outputName += spikesNameGenerator(arrayName, arrayInfo) + '_'
+
+    outputName += '_ALIGNEDTO_{}'.format(alignToList)
+    outputName += '_REGRESSION_TARGET_' + tsInfo['seriesName'] + '_{}'.format(tsInfo['recordName'])
+
+    return outputName
+
 
 def spikesNameRetrieve(spikesName):
 
@@ -2167,15 +2379,13 @@ def triggeredTimeSeries(alignTimes, dataDF, categories,
 
     startTimeIdxTriggeredChan = -windowIdx[0]
     for rowIdx, startTime in alignTimes.items():
-
         if pd.isnull(categories[rowIdx]):
             continue
-
         try:
             startTimeIdxChan = np.flatnonzero(dataDF.index > startTime)[0]
         except Exception:
             traceback.print_exc()
-            break
+            continue
         maskPre = dataDF.index > (startTime + windowSize[0])
         maskPost = dataDF.index < (startTime + windowSize[1])
         mask = np.logical_and(maskPre, maskPost)
@@ -2361,12 +2571,12 @@ def loadTrialTriggeredTimeSeries(folderPath, tsInfo,
             spikesTriggered = pickle.load(open(setPath, 'rb'))
             # make sure the metadata matches
             for key, value in tsInfo.items():
-                if key in spikesTriggered['basic_headers'] and key != 'windowSize':
+                if key in spikesTriggered['basic_headers']:
                     if value != spikesTriggered['basic_headers'][key]:
                         raise Exception('Parameter {} was requested to be {} but was {}'.format(key, value, spikesTriggered['basic_headers'][key]))
         except Exception:
             traceback.print_exc()
-            # if loading failed, recalculate anyway=
+            # if loading failed, recalculate anyway
             print('Triggered Time Series data not pickled. Recalculating...')
             forceRecalc = True
 
@@ -2503,6 +2713,148 @@ def loadTrialBinnedSpike(folderPath,
         # after looping through everything and saving, return the requested channel
         spikeMats, categories, selectedIndices = saveSpikeMats, saveCategories, saveSelectedIndices
     return spikeMats, categories, selectedIndices
+
+def loadSpikeBinnedArray(folderPath,
+    arrayNameFrom, arrayInfoFrom, arrayNameTo, arrayInfoTo,
+    spikesToIdx,
+    rasterOpts,
+    spikesFrom = None, spikesTo = None,
+    correctAlignmentSpikesFrom = 0, correctAlignmentSpikesTo = 0,
+    forceRecalc = False):
+
+    setName = spikeBinnedArrayNameGenerator(arrayNameFrom, arrayInfoFrom, arrayNameTo, arrayInfoTo)
+    setPath = os.path.join(folderPath, setName + '.h5')
+
+    if not forceRecalc:
+    # if not requiring a recalculation, load from pickle
+        try:
+            with h5py.File(setPath, "r") as f:
+                recordAttributes = f['/'+"rasterOpts"].attrs
+                for key, value in rasterOpts.items():
+                    if type(value) is not dict:
+                        thisAttr = recordAttributes[key]
+
+                        if isinstance(value, collections.Iterable):
+                            for idx, valueComponent in enumerate(value):
+                                assert (valueComponent == thisAttr[idx]) or (valueComponent is None and np.isnan(thisAttr[idx]))
+                        else:
+                            assert (value == thisAttr) or (value is None and np.isnan(thisAttr))
+                    else:
+                        for subKey, subValue in value.items():
+                            thisAttr = recordAttributes[key + '_' + subKey]
+
+                            if isinstance(subValue, collections.Iterable):
+                                for idx, valueComponent in enumerate(subValue):
+                                    assert (valueComponent == thisAttr[idx]) or (valueComponent is None and np.isnan(thisAttr[idx]))
+                            else:
+                                assert (subValue == thisAttr) or (subValue is None and np.isnan(thisAttr))
+
+                #spikeMats, categories, selectedIndices = None, None, None
+                requestedSpikeMat = str(spikesToIdx['chan'])
+
+                spikeMatShape = f[requestedSpikeMat + '/spikeMats'].shape
+                spikeMats = [f[requestedSpikeMat + '/spikeMats'][:,:,i] for i in range(spikeMatShape[2])]
+                for idx, spikeMat in enumerate(spikeMats):
+                    spikeMats[idx] = pd.DataFrame(spikeMat, index = f[requestedSpikeMat + '/index'], columns = f[requestedSpikeMat + '/columns'])
+
+                categories = np.array(f[requestedSpikeMat + '/categories'])
+                categories = pd.Series(categories, index = f[requestedSpikeMat + '/index'])
+
+                selectedIndices = np.array(f[requestedSpikeMat + '/selectedIndices'])
+
+                if selectedIndices.any():
+                    selectedIndices = pd.Series(selectedIndices, index = f[requestedSpikeMat + '/index'])
+                else:
+                    selectedIndices = None
+            # TODO: figure out how to load it...
+            #print('Loaded spikeMats from h5.')
+        except Exception:
+            traceback.print_exc()
+            # if loading failed, recalculate anyway
+            print('SpikeMats not pickled. Recalculating...')
+            forceRecalc = True
+
+    if forceRecalc:
+
+        if spikesTo is None:
+            spikeStructTo, spikesTo = loadSpikeInfo(folderPath, arrayNameTo, arrayInfoTo)
+
+        if correctAlignmentSpikesTo: #correctAlignmentSpikesFrom units in samples
+            spikesTo = hf.correctSpikeAlignment(spikesTo, correctAlignmentSpikesTo)
+
+        spikesToList = []
+        for idx, channel in enumerate(spikesTo['ChannelID']):
+            unitsOnThisChan = np.unique(spikesTo['Classification'][idx])
+            if unitsOnThisChan.any():
+                spikesToList.append({'chan':channel,'units':list(range(len(unitsOnThisChan)))})
+
+        with h5py.File(setPath, "w") as f:
+            grp = f.create_group("rasterOpts")
+            for key, value in rasterOpts.items():
+                if type(value) is not dict:
+                    if value is not None:
+                        grp.attrs[key] = value
+                    else:
+                        grp.attrs[key] = np.nan
+                else:
+                    for subKey, subValue in value.items():
+                        if value is not None:
+                            grp.attrs[key + '_' + subKey] = subValue
+                        else:
+                            grp.attrs[key + '_' + subKey] = np.nan
+
+            if rasterOpts['separateByFunArgs'] is not None and rasterOpts['separateByFunKWArgs'] is not None:
+                separateByFun = hf.catSpikesGenerator(*rasterOpts['separateByFunArgs'], **rasterOpts['separateByFunKWArgs'])
+            elif rasterOpts['separateByFunArgs'] is not None and rasterOpts['separateByFunKWArgs'] is None:
+                separateByFun = hf.catSpikesGenerator(*rasterOpts['separateByFunArgs'])
+            elif rasterOpts['separateByFunArgs'] is None and rasterOpts['separateByFunKWArgs'] is not None:
+                separateByFun = hf.catSpikesGenerator(**rasterOpts['separateByFunKWArgs'])
+
+            saveSpikesToIdx = spikesToIdx
+            saveSpikeMats, saveCategories, saveSelectedIndices = None, None, None
+
+            nCh = len(spikesToList)
+            iterCount = 0
+            for spikesToIdx in spikesToList:
+
+                alignTimes, categories, selectedIndices = hf.spikeAlignmentTimes(spikesTo, spikesToIdx,
+                    separateByFun = separateByFun,
+                    timeRange = rasterOpts['timeRange'],
+                    maxSpikesTo =rasterOpts['maxSpikesTo'], discardEmpty = rasterOpts['discardEmpty'])
+
+                if os.fstat(0) == os.fstat(1):
+                    endChar = '\r'
+                    print("Running loadSpikeBinnedArray: %d%%" % int((iterCount + 1) * 100 / nCh), end = endChar)
+                else:
+                    print("Running loadSpikeBinnedArray: %d%%" % int((iterCount + 1) * 100 / nCh))
+
+                try:
+                    spikeMats = hf.binnedSpikesAligned(spikesFrom, alignTimes, rasterOpts['binInterval'],
+                        rasterOpts['binWidth'], spikesFromIdx['chan'], windowSize = rasterOpts['windowSize'],
+                        discardEmpty = rasterOpts['discardEmpty'])
+                except Exception:
+                    traceback.print_exc()
+                    pdb.set_trace()
+
+                spikeMatSetName = str(spikesFromIdx['chan']) + '_to_' + str(spikesToIdx['chan'])
+                grp = f.create_group(spikeMatSetName)
+                spikeMatSet = grp.create_dataset("spikeMats", (spikeMats[0].shape[0], spikeMats[0].shape[1], len(spikeMats)), dtype = 'f')
+                binCentersSet =  grp.create_dataset("columns", (spikeMats[0].shape[1],), data = spikeMats[0].columns, dtype = 'f')
+                allRowIdxSet = grp.create_dataset("index", (spikeMats[0].shape[0],), data = spikeMats[0].index, dtype = 'f')
+                categSet = grp.create_dataset("categories", (spikeMats[0].shape[0],), data = categories, dtype = 'f')
+                idxSet = grp.create_dataset("selectedIndices", (spikeMats[0].shape[0],), data = selectedIndices, dtype = 'f')
+
+                for idx, spikeMat in enumerate(spikeMats):
+                    spikeMatSet[:,:,idx] = spikeMat
+
+                pairCount += 1
+
+                if saveSpikesFromIdx['chan'] == spikesFromIdx['chan'] and saveSpikesToIdx['chan'] == spikesToIdx['chan']:
+                    saveSpikeMats, saveCategories, saveSelectedIndices = spikeMats, categories, selectedIndices
+        # after looping through everything and saving, return the requested channel
+        spikeMats, categories, selectedIndices = saveSpikeMats, saveCategories, saveSelectedIndices
+    return spikeMats, categories, selectedIndices
+
 
 def loadTrialBinnedArray(folderPath,
     arrayName, arrayInfo,
