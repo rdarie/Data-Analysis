@@ -21,6 +21,7 @@ import collections
 import itertools
 import re
 import math as m
+import copy
 LABELFONTSIZE = 10
 
 def loadParamsPy(filePath):
@@ -522,7 +523,7 @@ def plotSpikePanel(spikeStruct, spikes):
         ncols = max(np.unique(yIdx)) + 1)
     """
 
-    spikeStruct.dropna(inplace = True)
+    #spikeStruct.dropna(inplace = True)
     xIdx = np.array(spikeStruct['xcoords'].values - spikeStruct['xcoords'].min(), dtype = np.int)
     yIdx = np.array(spikeStruct['ycoords'].values - spikeStruct['ycoords'].min(), dtype = np.int)
     #pdb.set_trace()
@@ -1202,15 +1203,44 @@ def resetTrialStatsStimID(folderPath, eventInfo, nBins = 3):
     setPath = os.path.join(folderPath, setName + '.h5')
     trialStats.to_hdf(setPath, 'trialStats')
 
-def addHistory(X, nHistBins = 0):
-    # todo make this accept arbitrarily shuffled data
-    tempDF = pd.DataFrame(X)
-    allDFs = {0:tempDF}
-    for i in range(1,nHistBins):
-        allDFs.update({i:allDFs[i-1].shift(1)})
-    outputDF = pd.concat(allDFs, axis = 1)
-    return outputDF.fillna(method = 'pad', axis = 1)
 
+def addHistory(X, nHistBins = 0, binStride = 1, setPath = None, recordName = None):
+    # todo make this accept arbitrarily shuffled data
+    # print('Loading {} from {}'.format(recordName, setPath))
+    spikeMats = pd.read_hdf(setPath, 'spikeMats')
+    origX = pd.read_hdf(setPath, recordName + '/X')
+    shuffledIdx = origX.index
+    allDFs = {}
+    for i in range(0, nHistBins, binStride):
+        allDFs.update({i:spikeMats.shift(binStride * i).loc[shuffledIdx, :]})
+    outputDF = pd.concat(allDFs, axis = 1, names = 'lag')
+    outputDF = outputDF.fillna(method = 'pad', axis = 1)
+    #print('addHistory outputing DF with shape = {}'.format(outputDF.shape))
+    return outputDF.values
+
+"""
+def addHistory(X, nHistBins = 0, binStride = 1, setPath = None, recordName = None):
+    # todo make this accept arbitrarily shuffled data
+    spikeMats = pd.read_hdf(setPath, 'spikeMats')
+    origX = pd.read_hdf(setPath, recordName + '/X')
+    pdb.set_trace()
+    shuffledIdx = []
+    origIndex = spikeMats.index
+    for i in range(X.shape[0]):
+        for rowIdx, row in origX.iterrows():
+            xRow = X[i,:]
+            if (xRow == row.values).all():
+                shuffledIdx.append(rowIdx)
+    print('Bing!')
+    #tempDF = pd.DataFrame(X, index = shuffledIndex, columns = spikeMats.columns)
+    allDFs = {}
+    for i in range(0, nHistBins, binStride):
+        allDFs.update({i:spikeMats.shift(binStride * i).loc[shuffledIndex, :]})
+    outputDF = pd.concat(allDFs, axis = 1, names = 'lag')
+    outputDF = outputDF.fillna(method = 'pad', axis = 1)
+    print('addHistory outputing DF with shape = {}'.format(outputDF.shape))
+    return outputDF.values
+"""
 
 def featureUnstackerGenerator(spikeMats, whichLevel = None, nCol = None):
     if nCol is None:
@@ -2193,12 +2223,40 @@ def loadSpikeInfo(folderPath, arrayName, arrayInfo, forceRecalc = False):
 
     setName = spikesNameGenerator(arrayName, arrayInfo)
     setPath = os.path.join(folderPath, setName + '.pickle')
+
+    try:
+        #raise Exception('DEBUGG')
+        spikeStruct = pd.read_hdf(os.path.join(folderPath, arrayInfo['ns5FileName'] + '_spikeStruct' + capitalizeFirstLetter(arrayName) + '.h5'), 'spikeStruct')
+    except Exception:
+        traceback.print_exc()
+        print('Spike metadata not pickled. Recalculating...')
+        arrayMap = pd.read_table(os.path.join(folderPath, 'array_map.cmp'), skiprows = 13)
+        spikeStruct = pd.DataFrame(np.nan, index = range(1,129), columns = ['xcoords', 'ycoords', 'nevID', 'bank', 'bankID'])
+        bankLookup = {'A' :0, 'B':1, 'C':2, 'D': 3}
+        for rowIdx, row in arrayMap.iterrows():
+            if arrayName in row['label']:
+                elec = int(row['elec']) + bankLookup[row['bank']] * 32
+                elecLabel = int(row['label'].split(arrayName)[-1])
+                spikeStruct.loc[elecLabel, 'xcoords'] = row['row']
+                spikeStruct.loc[elecLabel, 'ycoords'] = row['//col']
+                spikeStruct.loc[elecLabel, 'nevID'] = elec
+                spikeStruct.loc[elecLabel, 'bank'] = row['bank']
+                spikeStruct.loc[elecLabel, 'bankID'] = int(row['elec'])
+        #pdb.set_trace()
+        spikeStruct.dropna(inplace = True)
+        #spikeStruct = loadKSDir(os.path.join(folderPath, 'Kilosort/'+ arrayInfo['ns5FileName'] + '_' + capitalizeFirstLetter(arrayName)), loadPCs = False)
+        spikeStruct.to_hdf(os.path.join(folderPath, arrayInfo['ns5FileName'] + '_spikeStruct' + capitalizeFirstLetter(arrayName) + '.h5'), 'spikeStruct')
+        print('Recalculated spike metadata and saved to pickle.')
+
+
+    #pdb.set_trace()
+    nevIDs = spikeStruct.loc[arrayInfo['nevIDs'], 'nevID'].astype(int).tolist()
     if not forceRecalc:
     # if not requiring a recalculation, load from pickle
         try:
             spikes = pickle.load(open(setPath, 'rb'))
 
-            # make sure the file contains all requested channels
+            # make sure the fifle contains all requested channels
             for chanIdx in spikes['ChannelID']:
                 assert chanIdx in arrayInfo['nevIDs']
             #print('Loaded spike data from pickle.')
@@ -2212,40 +2270,22 @@ def loadSpikeInfo(folderPath, arrayName, arrayInfo, forceRecalc = False):
         if arrayInfo['origin'] == 'wave_clus':
             spikes = getWaveClusSpikes(
                 os.path.join(folderPath, 'wave_clus', arrayInfo['ns5FileName']) + '/',
-                nevIDs = arrayInfo['nevIDs'], plotting = False, excludeClus = arrayInfo['excludeClus'])
-            print('Recalculated spike data from wave_clus folder and saved to pickle.')
+                nevIDs = nevIDs, plotting = False, excludeClus = arrayInfo['excludeClus'])
+
         elif arrayInfo['origin'] == 'nev':
             filePath = os.path.join(folderPath, arrayInfo['ns5FileName'] + '.nev')
-            spikes = hf.getNEVData(filePath, arrayInfo['nevIDs'])
+            spikes = hf.getNEVData(filePath, nevIDs)
+
         elif arrayInfo['origin'] == 'mat':
             spikes = getNevMatSpikes(
                 os.path.join(folderPath, arrayInfo['ns5FileName']+'.mat'),
-                nevIDs = arrayInfo['nevIDs'], plotting = False, excludeClus = arrayInfo['excludeClus'])
-
+                nevIDs = nevIDs, plotting = False, excludeClus = arrayInfo['excludeClus'])
+        #pdb.set_trace()
+        spikes['ChannelID'] = arrayInfo['nevIDs']
         pickle.dump(spikes,
             open(os.path.join(folderPath, setPath), 'wb')
             )
         print('Recalculated spike data from wave_clus folder and saved to pickle.')
-
-    try:
-        raise Exception('DEBUGG')
-        spikeStruct = pickle.load(open(os.path.join(folderPath, arrayInfo['ns5FileName']) + '_spikeStruct' + capitalizeFirstLetter(arrayName) + '.pickle', 'rb'))
-
-    except Exception:
-        traceback.print_exc()
-        print('Spike metadata not pickled. Recalculating...')
-        arrayMap = pd.read_table(os.path.join(folderPath, 'array_map.cmp'), skiprows = 13)
-        spikeStruct = pd.DataFrame(np.nan, index = range(1,97), columns = ['xcoords', 'ycoords'])
-
-        for rowIdx, row in arrayMap.iterrows():
-            if arrayName in row['label']:
-                rowNum = int(row['label'].split(arrayName)[-1])
-                spikeStruct.loc[rowNum, 'xcoords'] = arrayMap.loc[rowIdx, 'row']
-                spikeStruct.loc[rowNum, 'ycoords'] = arrayMap.loc[rowIdx, '//col']
-        pdb.set_trace()
-        #spikeStruct = loadKSDir(os.path.join(folderPath, 'Kilosort/'+ arrayInfo['ns5FileName'] + '_' + capitalizeFirstLetter(arrayName)), loadPCs = False)
-        pickle.dump(spikeStruct, open(os.path.join(folderPath, arrayInfo['ns5FileName']) + '_spikeStruct' + capitalizeFirstLetter(arrayName) + '.pickle', 'wb'))
-        print('Recalculated spike metadata and saved to pickle.')
 
     return spikeStruct, spikes
 
