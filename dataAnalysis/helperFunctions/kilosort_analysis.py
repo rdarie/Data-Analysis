@@ -523,8 +523,8 @@ def plotSpikePanel(spikeStruct, spikes):
     """
 
     spikeStruct.dropna(inplace = True)
-    xIdx = spikeStruct['xcoords'].values - spikeStruct['xcoords'].min()
-    yIdx = spikeStruct['ycoords'].values - spikeStruct['ycoords'].min()
+    xIdx = np.array(spikeStruct['xcoords'].values - spikeStruct['xcoords'].min(), dtype = np.int)
+    yIdx = np.array(spikeStruct['ycoords'].values - spikeStruct['ycoords'].min(), dtype = np.int)
     #pdb.set_trace()
 
     fig, ax = plt.subplots(nrows = int(max(np.unique(xIdx)) + 1),
@@ -2228,7 +2228,7 @@ def loadSpikeInfo(folderPath, arrayName, arrayInfo, forceRecalc = False):
         print('Recalculated spike data from wave_clus folder and saved to pickle.')
 
     try:
-        #raise Exception('DEBUGG')
+        raise Exception('DEBUGG')
         spikeStruct = pickle.load(open(os.path.join(folderPath, arrayInfo['ns5FileName']) + '_spikeStruct' + capitalizeFirstLetter(arrayName) + '.pickle', 'rb'))
 
     except Exception:
@@ -2242,7 +2242,7 @@ def loadSpikeInfo(folderPath, arrayName, arrayInfo, forceRecalc = False):
                 rowNum = int(row['label'].split(arrayName)[-1])
                 spikeStruct.loc[rowNum, 'xcoords'] = arrayMap.loc[rowIdx, 'row']
                 spikeStruct.loc[rowNum, 'ycoords'] = arrayMap.loc[rowIdx, '//col']
-                    #pdb.set_trace()
+        pdb.set_trace()
         #spikeStruct = loadKSDir(os.path.join(folderPath, 'Kilosort/'+ arrayInfo['ns5FileName'] + '_' + capitalizeFirstLetter(arrayName)), loadPCs = False)
         pickle.dump(spikeStruct, open(os.path.join(folderPath, arrayInfo['ns5FileName']) + '_spikeStruct' + capitalizeFirstLetter(arrayName) + '.pickle', 'wb'))
         print('Recalculated spike metadata and saved to pickle.')
