@@ -545,8 +545,8 @@ def plotSpikePanel(spikeStruct, spikes):
     xLim = ax[xIdx[idx], yIdx[idx]].get_xlim()
     sns.despine()
 
-    newAxMin = np.nanmean(axLowLims) - 0.15 * np.nanstd(axLowLims)
-    newAxMax = np.nanmean(axHighLims) + 0.3 * np.nanstd(axHighLims)
+    newAxMin = np.nanmean(axLowLims) - .5 * np.nanstd(axLowLims)
+    newAxMax = np.nanmean(axHighLims) + .5 * np.nanstd(axHighLims)
 
     for idx, channel in enumerate(spikes['ChannelID']):
         curAx = ax[xIdx[idx], yIdx[idx]]
@@ -1203,16 +1203,57 @@ def resetTrialStatsStimID(folderPath, eventInfo, nBins = 3):
     setPath = os.path.join(folderPath, setName + '.h5')
     trialStats.to_hdf(setPath, 'trialStats')
 
+def addLags(X, nBins = 1, binStride = 1, binOffset = 0, setPath = None, recordName = None):
+    # todo make this accept arbitrarily shuffled data
+    # print('Loading {} from {}'.format(recordName, setPath))
+    spikeMats = pd.read_hdf(setPath, 'spikeMats')
+    stackedByBin = spikeMats.unstack(level = ['alignLabel', 'trial'])
+    origX = pd.read_hdf(setPath, recordName + '/X')
+    shuffledIdx = origX.index
+    allDFs = {}
+    for i in range(binOffset, binOffset+nBins+1, binStride):
+        thisStackedBin = stackedByBin.shift(i).fillna(method = 'ffill', axis = 0).fillna(method = 'bfill', axis = 0)
+        thisUnstackedBin = thisStackedBin.stack(level = ['alignLabel', 'trial']).reorder_levels(['alignLabel', 'trial', 'bin']).loc[shuffledIdx, :]
+        allDFs.update({i:thisUnstackedBin})
+    outputDF = pd.concat(allDFs, axis = 1, names = ['lag'])
+    #print('addLags outputing DF with shape = {}'.format(outputDF.shape))
+    return outputDF.values
+
+def addLagsCentered(X, nBins = 1, binStride = 1, binOffset = 0, setPath = None, recordName = None):
+    nBins = int(nBins / 2 + 1)
+    # todo make this accept arbitrarily shuffled data
+    # print('Loading {} from {}'.format(recordName, setPath))
+    spikeMats = pd.read_hdf(setPath, 'spikeMats')
+    stackedByBin = spikeMats.unstack(level = ['alignLabel', 'trial'])
+    origX = pd.read_hdf(setPath, recordName + '/X')
+    shuffledIdx = origX.index
+    allDFs = {}
+    for i in range(binOffset-nBins, binOffset+nBins+1, binStride):
+        #pdb.set_trace()
+        #thisStackedBin = stackedByBin.shift(i).dropna(how = 'all')
+        thisStackedBin = stackedByBin.shift(i).fillna(method = 'ffill', axis = 0).fillna(method = 'bfill', axis = 0)
+        thisUnstackedBin = thisStackedBin.stack(level = ['alignLabel', 'trial']).reorder_levels(['alignLabel', 'trial', 'bin']).loc[shuffledIdx, :]
+        allDFs.update({i:thisUnstackedBin})
+    #pdb.set_trace()
+    outputDF = pd.concat(allDFs, axis = 1, names = ['lag'])
+    #print('outputDF.isna().sum() = {}'.format(outputDF.isna().sum().sum()))
+    #print('X.shape = {}'.format(X.shape))
+    #print('outputDF.shape = {}'.format(outputDF.shape))
+    #print('addLags outputing DF with shape = {}'.format(outputDF.shape))
+    return outputDF.values
 
 def addHistory(X, nHistBins = 0, binStride = 1, setPath = None, recordName = None):
     # todo make this accept arbitrarily shuffled data
     # print('Loading {} from {}'.format(recordName, setPath))
     spikeMats = pd.read_hdf(setPath, 'spikeMats')
+    stackedByBin = spikeMats.unstack(level = ['alignLabel', 'trial'])
     origX = pd.read_hdf(setPath, recordName + '/X')
     shuffledIdx = origX.index
     allDFs = {}
-    for i in range(0, nHistBins, binStride):
-        allDFs.update({i:spikeMats.shift(binStride * i).loc[shuffledIdx, :]})
+    for i in range(0, nHistBins+1, binStride):
+        thisStackedBin = stackedByBin.shift(binStride * i).fillna(method = 'ffill', axis = 0).fillna(method = 'bfill', axis = 0)
+        thisUnstackedBin = thisStackedBin.stack(level = ['alignLabel', 'trial']).reorder_levels(['alignLabel', 'trial', 'bin']).loc[shuffledIdx, :]
+        allDFs.update({i:thisUnstackedBin})
     outputDF = pd.concat(allDFs, axis = 1, names = 'lag')
     outputDF = outputDF.fillna(method = 'pad', axis = 1)
     #print('addHistory outputing DF with shape = {}'.format(outputDF.shape))
