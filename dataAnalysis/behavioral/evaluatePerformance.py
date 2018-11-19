@@ -2,8 +2,8 @@
 
 # In[1]:
 
-from dataAnalysis.helperFunctions.helper_functions import *
-from proprioBehavioralControl.helperFunctions import *
+import dataAnalysis.helperFunctions.helper_functions as hf
+import proprioBehavioralControl.helperFunctions as bhf
 import plotly.plotly as py
 import plotly.tools as tls
 import plotly.figure_factory as ff
@@ -55,14 +55,11 @@ for fileName in fileNamesRaw:
         fileName = fileName.split('Log_')[1]
     fileNames = fileNames + [fileName]
 
-# In[2]:
-
-#pdb.set_trace()
 filePaths = [fileDir + '/' + 'Log_' + fileName + '.txt' for fileName in fileNames]
 #filePaths = [fileDir + '/' + fileName + '.txt' for fileName in fileNames]
 
 #log, trialStats = readPiLog(filePaths, names = ['Label', 'Time', 'Details'], zeroTime = True, fixMovedToError = [fixMovedToError for i in filePaths])
-log, trialStats = readPiJsonLog(filePaths, zeroTime = True)
+log, trialStats = hf.readPiJsonLog(filePaths, zeroTime = True)
 
 # In[3]:
 
