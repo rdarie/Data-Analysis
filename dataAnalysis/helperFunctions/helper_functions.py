@@ -1538,6 +1538,7 @@ def plot_events_raster(eventDf, names, collapse = False, usePlotly = True):
         plt.legend()
         plt.xlabel('Times (sec)')
         ax.get_yaxis().set_visible(False)
+        rasterFig = fig
 
     else:
         rasterFig = go.Figure(data=data,layout=layout)
@@ -1553,6 +1554,7 @@ def plotPeristimulusTimeHistogram(eventDf, stimulus, names,
     nBins = int((preInterval + postInterval)/deltaInterval + 1)
     (viridis_cmap, norm,colorsRgb, plotColPlotly,
         plotColMPL, names2int, line_styles) = getPlotOpts(names)
+
     if not usePlotly:
         fig, ax = plt.subplots()
         listHistograms = []
@@ -1635,10 +1637,10 @@ def plotPeristimulusTimeHistogram(eventDf, stimulus, names,
 
     if not usePlotly:
         ax.hist(listHistograms, nBins, histtype='bar')
-        plt.legend()
+        plt.legend(names)
         plt.xlabel('Times (sec)')
         ax.get_yaxis().set_visible(False)
-
+        psthFig = fig
     else:
         layout['shapes'] = [
             {
@@ -1660,27 +1662,17 @@ def plotPeristimulusTimeHistogram(eventDf, stimulus, names,
 
 def plot_trial_stats(trialStatsDf, usePlotly = True, separate = None, debugging = False, title = 'Global outcomes'):
     #trialStatsDf = trialStats
+
+    conditionShortNames = trialStatsDf['Condition'].unique()
+    typeShortNames = conditionStats['Type'].unique()
+    directionShortNames = conditionStats['Direction'].unique()
+
     if usePlotly:
         data = []
-        conditionLongName = {
-            'easy' : 'Cued by LED',
-            'hard' : 'Uncued by LED',
-            }
-        outcomeLongName = {
-            'correct button' : 'Correct button',
-            'incorrect button' : 'Incorrect button',
-            'button timed out' : 'No press'
-            }
-        typeLongName = {
-            0 : 'Short First',
-            1 : 'Long First'
-            }
-        conditionShortNames = trialStatsDf['Condition'].unique()
-        #conditionName = next(iter(conditionShortNames))
+
         for conditionName in conditionShortNames:
             conditionStats = trialStatsDf[trialStatsDf['Condition'] == conditionName]
             if separate == 'leftRight':
-                typeShortNames = conditionStats['Type'].unique()
                 #typeName = next(iter(np.unique(conditionStats['Type'])))
                 for typeName in typeShortNames:
                     typeStats = conditionStats[conditionStats['Type'] == typeName]
@@ -1696,7 +1688,6 @@ def plot_trial_stats(trialStatsDf, usePlotly = True, separate = None, debugging 
                         name=conditionLongName[conditionName] + ' ' + typeLongName[typeName] + ' ' + str(len(typeStats)) + ' total trials'
                         ))
             elif separate == 'forwardBack':
-                directionShortNames = conditionStats['Direction'].unique()
                 for directionName in directionShortNames:
                     directionStats = conditionStats[conditionStats['Direction'] == directionName]
                     y = [directionStats[directionStats['Outcome'] == on].size \
@@ -1759,6 +1750,7 @@ def plot_trial_stats(trialStatsDf, usePlotly = True, separate = None, debugging 
         fig = go.Figure(data=data, layout=layout)
         return fig, data, layout
     else:
+
         return None
 
 def runScriptAllFiles(scriptPath, folderPath):
@@ -1865,7 +1857,7 @@ def readPiLog(filePaths, names = None, zeroTime = False, fixMovedToError = [Fals
             if row['Label'] == 'incorrect_button':
                 log.loc[idx, 'Label'] = 'incorrect button'
 
-        log.drop_duplicates(inplace = True)
+        log.drop_duplicates(subset = 'Time', inplace = True)
         mask = log['Label'].str.contains('turnPedalRandom_1') | \
             log['Label'].str.contains('turnPedalRandom_2') | \
             log['Label'].str.contains('easy') | \
@@ -1917,7 +1909,10 @@ def readPiLog(filePaths, names = None, zeroTime = False, fixMovedToError = [Fals
                 (trialRelevant.loc[idx + 3, 'Label'] == 'button timed out')
 
             trialStats.loc[idx, 'Outcome'] = trialRelevant.loc[idx + 3, 'Label']
-            trialStats.loc[idx, 'Choice'] = trialRelevant.loc[idx + 3, 'Details']
+            if trialRelevant.loc[idx + 3, 'Label'] == 'button timed out':
+                trialStats.loc[idx, 'Choice'] = 'button timed out'
+            else:
+                trialStats.loc[idx, 'Choice'] = trialRelevant.loc[idx + 3, 'Details']
 
         logs = pd.concat([logs, log], ignore_index = True)
         trialStatsAll = pd.concat([trialStatsAll, trialStats], ignore_index = True)
@@ -1931,8 +1926,13 @@ def readPiJsonLog(filePaths, zeroTime = False):
     timeOffset = 0
     for idx, filePath in enumerate(filePaths):
         #idx, filePath = next(enumerate(filePaths))
-        log = pd.read_json(filePath, orient = 'records')
-
+        try:
+            log = pd.read_json(filePath, orient = 'records')
+        except:
+            with open(filePath, 'a+') as f:
+                f.write('{}]')
+            log = pd.read_json(filePath, orient = 'records')
+        log.drop_duplicates(subset = 'Time', inplace = True)
         trialStartTime = 0
         if zeroTime:
             #zeroTime = True
@@ -1943,7 +1943,7 @@ def readPiJsonLog(filePaths, zeroTime = False):
             else:
                 print('No time column found to zero!')
 
-        #log.drop_duplicates(inplace = True)
+
         mask = log['Label'].str.contains('turnPedalPhantomCompound') | \
             log['Label'].str.contains('turnPedalCompound') | \
             log['Label'].str.contains('goEasy') | \
@@ -2000,7 +2000,10 @@ def readPiJsonLog(filePaths, zeroTime = False):
                 (trialRelevant.loc[idx + 2, 'Label'] == 'button timed out')
 
             trialStats.loc[idx, 'Outcome'] = trialRelevant.loc[idx + 2, 'Label']
-            trialStats.loc[idx, 'Choice'] = trialRelevant.loc[idx + 2, 'Details']
+            if trialRelevant.loc[idx + 2, 'Label'] == 'button timed out':
+                trialStats.loc[idx, 'Choice'] = 'button timed out'
+            else:
+                trialStats.loc[idx, 'Choice'] = trialRelevant.loc[idx + 2, 'Details']
 
         logs = pd.concat([logs, log], ignore_index = True)
         trialStatsAll = pd.concat([trialStatsAll, trialStats], ignore_index = True)
