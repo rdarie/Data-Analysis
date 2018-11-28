@@ -21,7 +21,7 @@ args = parser.parse_args()
 fileNamesRaw = args.file
 if isinstance(fileNamesRaw, str):
     fileNamesRaw = [fileNamesRaw]
-#fileNamesRaw = ['Log_Murdoc_2018_11_19_16_49_00.txt']
+#fileNamesRaw = ['Log_Murdoc_2018_11_20_16_31_46.txt', 'Log_Murdoc_2018_11_20_16_46_43.txt', 'Log_Murdoc_2018_11_20_17_02_54.txt']
 
 fileDir = args.folder
 #fileDir = 'Y:\ENG_Neuromotion_Shared\group\Proprioprosthetics\Training\Flywheel Logs\Murdoc'
@@ -38,7 +38,7 @@ if args.outputFileName is not None:
     outputFileName = args.outputFileName
 else:
     outputFileName = fileNames[0]
-# outputFileName = 'Murdoc_testEvaluation'
+# outputFileName = 'Murdoc_2018_11_20'
 
 filePaths = [fileDir + '/' + 'Log_' + fileName + '.txt' for fileName in fileNames]
 
@@ -56,7 +56,7 @@ typeLongName = {
     1 : 'Long First'
     }
 
-log, trialStats = hf.readPiJsonLog(filePaths, zeroTime = True)
+log, trialStats = hf.readPiJsonLog(filePaths, zeroTime = False)
 
 # In[ ]: Count total # of events
 with PdfPages(os.path.join(fileDir, outputFileName + '_piReport.pdf')) as pdf:
@@ -70,7 +70,7 @@ with PdfPages(os.path.join(fileDir, outputFileName + '_piReport.pdf')) as pdf:
 
     # In[ ]: Count choices
     ax = sns.countplot(x='Choice', data = trialStats)
-    ax.set_title('Total count of button presses and reward deliveries')
+    ax.set_title('Count of cued button presses')
 
     pdf.savefig()
     plt.close()
@@ -79,11 +79,11 @@ with PdfPages(os.path.join(fileDir, outputFileName + '_piReport.pdf')) as pdf:
 
     plotNames = ['goEasy', 'goHard', 'correct button', 'incorrect button']
     fi = hf.plot_events_raster(log, plotNames, collapse = True, usePlotly = False)
-
+    plt.title('Events Raster')
     pdf.savefig()
     plt.close()
     # In[ ]: EasyPSTH
-
+    """
     plotNames = ['correct button', 'incorrect button']
     stimulus = ['goEasy']
     preInterval = 2
@@ -96,6 +96,7 @@ with PdfPages(os.path.join(fileDir, outputFileName + '_piReport.pdf')) as pdf:
 
     pdf.savefig()
     plt.close()
+    """
     # In[ ]: HardPSTH
 
     plotNames = ['correct button', 'incorrect button']
@@ -107,7 +108,8 @@ with PdfPages(os.path.join(fileDir, outputFileName + '_piReport.pdf')) as pdf:
     fi = hf.plotPeristimulusTimeHistogram(log, stimulus, plotNames,
         preInterval = preInterval, postInterval = postInterval,
         deltaInterval = deltaInterval, usePlotly = False)
-
+    plt.title('Timing of button presses (PSTH)')
+    pdf.savefig()
     pdf.savefig()
     plt.close()
     # In[ ]: Plot Trial Statistics
