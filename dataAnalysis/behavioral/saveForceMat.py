@@ -1,8 +1,8 @@
 import numpy as np
 import h5py, pickle
 
-dataDir = 'W:/ENG_Neuromotion_Shared/group/Monkey_Neural_Recordings/Starbuck_Bilateral_Recordings/201802191132-Starbuck-Freely_Moving_Force_Plates'
-nevDataName = '201802191132-Starbuck-Freely_Moving_Force_Plates-Array1480_Right_Side-Trial002.mat'
+dataDir = 'Y://ENG_Neuromotion_Shared//group//Proprioprosthetics//Data//201811261600-ForceSensorCalibration'
+nevDataName = 'datafile002.mat'
 f = h5py.File(dataDir + '/' + nevDataName,'r')
 
 timeStampsHDF = f.get('NEV/Data/SerialDigitalIO/TimeStamp')

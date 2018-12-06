@@ -310,6 +310,7 @@ def getNevMatSpikes(filePath, nevIDs = None, plotting = False, excludeClus = [0]
             #pdb.set_trace()
             spikes['ChannelID'][idx] = chanID
             chanMask = np.array(f['NEV']['Data']['Spikes']['Electrode']) == chanID
+            
             markForDeletion[chanID] = not chanMask.any()
             if not markForDeletion[chanID]:
                 unitsInFile = np.unique(f['NEV']['Data']['Spikes']['Unit'][chanMask]) +  1 + lastMaxUnitID
@@ -1535,8 +1536,6 @@ def getSpikeMatsAsFeatures(folderPath,
     trialFiles = None,
     binCenters = None,
     rasterOpts = None,
-    eventTsInfo = None,
-    kinTsInfo = None,
     targetCategory = None,
     alignToList = None
     ):
@@ -1552,8 +1551,6 @@ def getSpikeMatsAsFeatures(folderPath,
         doWeHaveTheBinsYet = True
 
     rasterOpts.update({'separateBy':targetCategory})
-    eventTsInfo.update({'separateBy':targetCategory})
-    kinTsInfo.update({'separateBy':targetCategory})
 
     categories, uniqueCategories, catIndices, validTrials =\
          getTrialCategories(trialStats, targetCategory)
@@ -1568,8 +1565,6 @@ def getSpikeMatsAsFeatures(folderPath,
 
         for alignTo in alignToList:
             rasterOpts.update({'alignTo':alignTo})
-            eventTsInfo.update({'alignTo':alignTo})
-            kinTsInfo.update({'alignTo':alignTo})
 
             newSpikeMats = loadTrialBinnedArray(folderPath,
                 key, value,
@@ -1612,6 +1607,70 @@ def getSpikeMatsAsFeatures(folderPath,
     spikeMats.fillna(method = 'pad', inplace = True)
 
     return spikeMats, theBins
+
+def loadCategorizationData(
+    folderPath = None,
+    trialFiles = None, eventInfo = None,
+    rasterOpts = None,
+    targetCategory = None, alignToList = None,
+    addOverrideLabels = None):
+
+    setName = categorizationRunNameGenerator(trialFiles, alignToList, targetCategory)
+    setPath = os.path.join(folderPath, setName + '.h5')
+    try:
+        spikeMats = pd.read_hdf(setPath, 'spikeMatsFeatures')
+        targets = pd.read_hdf(setPath, 'targets')
+    except Exception:
+        traceback.print_exc()
+        ################
+        spikeMats, binCenters = getSpikeMatsAsFeatures(folderPath,
+            trialStats = None, eventInfo = eventInfo,
+            trialFiles = trialFiles,
+            rasterOpts = rasterOpts,
+            targetCategory = targetCategory,
+            alignToList = alignToList
+            )
+        ############################# functionalize
+        targets = getTrialCategoriesAsFeatures(folderPath,
+            trialStats = None, eventInfo = eventInfo,
+            targetCategory = targetCategory,
+            alignToList = alignToList)
+
+        ###############################################################
+        if addOverrideLabels is not None:
+            for overrideLabel, overrideAlignToList in addOverrideLabels.items():
+                ################
+                spikeMatsOverride, _ = getSpikeMatsAsFeatures(folderPath,
+                    trialStats = None, eventInfo = eventInfo,
+                    trialFiles = trialFiles,
+                    binCenters = binCenters,
+                    rasterOpts = rasterOpts,
+                    targetCategory = targetCategory,
+                    alignToList = overrideAlignToList
+                    )
+                ############################# functionalize
+                targetsOverride = getTrialCategoriesAsFeatures(folderPath,
+                    trialStats = None, eventInfo = eventInfo,
+                    targetCategory = targetCategory,
+                    alignToList = overrideAlignToList, overrideLabel = overrideLabel)
+
+                nOverridesToKeep = targets.value_counts().min()
+                selectOverrides = targetsOverride[targetsOverride == overrideLabel].sample(n = targetsOverride.value_counts()[overrideLabel] - nOverridesToKeep).index
+                spikeMatsOverride.drop(selectOverrides, axis = 0, inplace = True)
+                targetsOverride.drop(selectOverrides, axis = 0, inplace = True)
+
+                spikeMats = pd.concat((spikeMats, spikeMatsOverride), join = 'inner')
+                targets = pd.concat((targets, targetsOverride), join = 'inner')
+
+        try:
+            spikeMats.to_hdf(setPath, 'spikeMatsFeatures')
+            targets.to_hdf(setPath, 'targets',format="table")
+        except Exception:
+            traceback.print_exc()
+            pass
+
+    targets = targets.astype('category')
+    return spikeMats, targets
 
 def plotAverageTrialPDFReport(
     folderPath,
@@ -2244,27 +2303,30 @@ def trialBinnedArrayNameGenerator(arrayName, arrayInfo, rasterOpts):
     return spikesNameGenerator(arrayName, arrayInfo) + '_BETWEEN_' + rasterOpts['alignTo'] +"_AND_"+ '{}'.format(rasterOpts['endOn'])
 
 def categorizationRunNameGenerator(trialFiles, alignToList, targetCategory):
-    outputName = ''
+
     arrayNames = []
     for arrayName, arrayInfo in trialFiles.items():
         arrayNames.append(arrayName)
-    for arrayName in sorted(arrayNames):
-        outputName += spikesNameGenerator(arrayName, trialFiles[arrayName]) + '_'
 
-    outputName += '_ALIGNEDTO_{}'.format(alignToList)
+    outputName = arrayInfo['ns5FileName'] + '_'
+
+    for arrayName in sorted(arrayNames):
+        outputName += arrayName + '_'
+
+    outputName += 'ALIGNEDTO_{}'.format(alignToList)
     outputName += '_CATEGORIZATION_TARGET_{}'.format(targetCategory)
 
     return outputName
 
 def regressionRunNameGenerator(trialFiles, alignToList, tsInfo):
-    outputName = ''
     arrayNames = []
     for arrayName, arrayInfo in trialFiles.items():
         arrayNames.append(arrayName)
+    outputName = arrayInfo['ns5FileName'] + '_'
     for arrayName in sorted(arrayNames):
-        outputName += spikesNameGenerator(arrayName, trialFiles[arrayName]) + '_'
+        outputName += arrayName + '_'
 
-    outputName += '_ALIGNEDTO_{}'.format(alignToList)
+    outputName += 'ALIGNEDTO_{}'.format(alignToList)
     outputName += '_REGRESSION_TARGET_' + tsInfo['seriesName'] + '_{}'.format(tsInfo['recordName'])
 
     return outputName

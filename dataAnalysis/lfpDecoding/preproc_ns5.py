@@ -17,6 +17,7 @@ import pickle
 from copy import *
 import argparse
 import h5py
+from scipy import signal
 
 def preprocNs5(
     fileName = 'Trial001',
@@ -127,6 +128,54 @@ def preprocNs5Section(
         pickle.dump(timeSection, f, protocol=4 )
 
     print('Done cleaning data')
+
+def preprocOpenEphysFolder(
+    folderPath,
+    chIds = 'all', adcIds = 'all',
+    chanNames = None,
+    notchFreq = 60, notchWidth = 5, notchOrder = 2,
+    startTimeS = 0, dataTimeS = 900,
+    chunkSize = 900,
+    curSection = 0, sectionsTotal = 1,
+    fillOverflow = False, removeJumps = True):
+
+    channelData = hf.getOpenEphysFolder(folderPath, adcIds = adcIds, chanNames = chanNames)
+    cleanData = preprocOpenEphys(channelData,
+        notchFreq = notchFreq, notchWidth = notchWidth, notchOrder = notchOrder,
+        startTimeS =startTimeS, dataTimeS = dataTimeS,
+        chunkSize = chunkSize ,
+        curSection = curSection, sectionsTotal = sectionsTotal,
+        fillOverflow = fillOverflow, removeJumps = removeJumps)
+
+    nSamples = channelData['data'].shape[0]
+    nChannels = channelData['data'].shape[1]
+    isChan = np.logical_not(channelData['basic_headers']['isADC'])
+
+    with h5py.File(os.path.join(folderPath, 'processed.h5'), "w") as f:
+        f.create_dataset("data", data = channelData['data'].values, dtype='float32',
+            chunks=True)
+        f.create_dataset("cleanData", data = cleanData.values, dtype='float32')
+        f.create_dataset("t", data = channelData['t'].values, dtype='float32')
+
+    return channelData, cleanData
+
+def preprocOpenEphys(channelData,
+    notchFreq = 60, notchWidth = 5, notchOrder = 2,
+    startTimeS = 0, dataTimeS = 900,
+    chunkSize = 900,
+    curSection = 0, sectionsTotal = 1,
+    fillOverflow = False, removeJumps = True):
+
+    if notchFreq is not None:
+        y, x = signal.butter(notchOrder, (2 * (notchFreq - notchWidth) / channelData['samp_per_s'], 2 * (notchFreq + notchWidth) / channelData['samp_per_s']), 'bandstop')
+        isChan = np.logical_not(channelData['basic_headers']['isADC'])
+        def filterFun(sig):
+            return signal.filtfilt(y, x, sig, method="gust")
+
+        cleanData = channelData['data'].loc[:,isChan].apply(filterFun)
+
+    print('Done cleaning Data')
+    return cleanData
 
 def preprocNs5Spectrum(stepLen_s = 0.05, winLen_s = 0.1,
     fr_start = 5, fr_stop = 1000):
