@@ -133,7 +133,9 @@ def preprocOpenEphysFolder(
     folderPath,
     chIds = 'all', adcIds = 'all',
     chanNames = None,
-    notchFreq = 60, notchWidth = 5, notchOrder = 2,
+    notchFreq = 60, notchWidth = 5, notchOrder = 2, nNotchHarmonics = 1,
+    highPassFreq = None, highPassOrder = 2,
+    lowPassFreq = None, lowPassOrder = 2,
     startTimeS = 0, dataTimeS = 900,
     chunkSize = 900,
     curSection = 0, sectionsTotal = 1,
@@ -141,7 +143,9 @@ def preprocOpenEphysFolder(
 
     channelData = hf.getOpenEphysFolder(folderPath, adcIds = adcIds, chanNames = chanNames)
     cleanData = preprocOpenEphys(channelData,
-        notchFreq = notchFreq, notchWidth = notchWidth, notchOrder = notchOrder,
+        notchFreq = notchFreq, notchWidth = notchWidth, notchOrder = notchOrder, nNotchHarmonics = nNotchHarmonics,
+        highPassFreq = highPassFreq, highPassOrder = highPassOrder,
+        lowPassFreq = lowPassFreq, lowPassOrder = lowPassOrder,
         startTimeS =startTimeS, dataTimeS = dataTimeS,
         chunkSize = chunkSize ,
         curSection = curSection, sectionsTotal = sectionsTotal,
@@ -157,22 +161,59 @@ def preprocOpenEphysFolder(
         f.create_dataset("cleanData", data = cleanData.values, dtype='float32')
         f.create_dataset("t", data = channelData['t'].values, dtype='float32')
 
+    with open(os.path.join(folderPath, 'metadata.p'), "wb" ) as f:
+        pickle.dump(channelData['basic_headers'], f, protocol=4 )
+
     return channelData, cleanData
 
 def preprocOpenEphys(channelData,
-    notchFreq = 60, notchWidth = 5, notchOrder = 2,
+    notchFreq = 60, notchWidth = 5, notchOrder = 2, nNotchHarmonics = 1,
+    highPassFreq = None, highPassOrder = 2,
+    lowPassFreq = None, lowPassOrder = 2,
     startTimeS = 0, dataTimeS = 900,
     chunkSize = 900,
     curSection = 0, sectionsTotal = 1,
     fillOverflow = False, removeJumps = True):
 
+    isChan = np.logical_not(channelData['basic_headers']['isADC'])
+    cleanData = channelData['data'].loc[:,isChan]
+
     if notchFreq is not None:
-        y, x = signal.butter(notchOrder, (2 * (notchFreq - notchWidth) / channelData['samp_per_s'], 2 * (notchFreq + notchWidth) / channelData['samp_per_s']), 'bandstop')
-        isChan = np.logical_not(channelData['basic_headers']['isADC'])
+        for harmonicOrder in range(1, nNotchHarmonics + 1):
+            print('notch filtering harmonic order: {}'.format(harmonicOrder))
+            notchLowerBound = harmonicOrder * notchFreq - notchWidth / 2
+            notchUpperBound = harmonicOrder * notchFreq + notchWidth / 2
+
+            y, x = signal.iirfilter(notchOrder,
+                (2 * notchLowerBound / channelData['samp_per_s'],
+                2 * notchUpperBound / channelData['samp_per_s']), rp=1, rs=50, btype = 'bandstop', ftype='ellip')
+
+            def filterFun(sig):
+                return signal.filtfilt(y, x, sig, method="gust")
+
+            cleanData = cleanData.apply(filterFun)
+
+    if highPassFreq is not None:
+        print('high pass filtering: {}'.format(highPassFreq))
+        y, x = signal.iirfilter(highPassOrder,
+            2 * highPassFreq / channelData['samp_per_s'],
+            rp=1, rs=50, btype = 'high', ftype='ellip')
+
         def filterFun(sig):
             return signal.filtfilt(y, x, sig, method="gust")
 
-        cleanData = channelData['data'].loc[:,isChan].apply(filterFun)
+        cleanData = cleanData.apply(filterFun)
+
+    if lowPassFreq is not None:
+        print('low pass filtering: {}'.format(lowPassFreq))
+        y, x = signal.iirfilter(lowPassOrder,
+            2 * lowPassFreq / channelData['samp_per_s'],
+            rp=1, rs=50, btype = 'low', ftype='ellip')
+
+        def filterFun(sig):
+            return signal.filtfilt(y, x, sig, method="gust")
+
+        cleanData = cleanData.apply(filterFun)
 
     print('Done cleaning Data')
     return cleanData

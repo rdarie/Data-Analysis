@@ -135,12 +135,8 @@ def getOpenEphysFolder(folderPath, chIds = 'all', adcIds = 'all', chanNames = No
 
     t = np.arange(dummyChannelData['data'].shape[0]) / float(dummyChannelData['header']['sampleRate'])
 
-    data = pd.DataFrame(np.concatenate((recordingData, adcData), axis = 1), columns = chanNames)
-    isADC = np.ones(len(data.columns), dtype = np.bool)
-    isADC[:len(chIds)] = False
-
     if startTime_s > 0:
-        dataMask = t < startTime_s
+        dataMask = t > startTime_s
         t = t[dataMask]
         if adcData is not None:
             adcData = adcData[dataMask,:]
@@ -151,7 +147,7 @@ def getOpenEphysFolder(folderPath, chIds = 'all', adcIds = 'all', chanNames = No
         dataLength_s = t[-1]
     else:
         if dataLength_s < t[-1]:
-            dataMask = t > dataLength_s
+            dataMask = t < dataLength_s
             t = t[dataMask]
             if adcData is not None:
                 adcData = adcData[dataMask,:]
@@ -159,6 +155,11 @@ def getOpenEphysFolder(folderPath, chIds = 'all', adcIds = 'all', chanNames = No
                 recordingData = recordingData[dataMask,:]
         else:
             dataLength_s = t[-1]
+
+    #pdb.set_trace()
+    data = pd.DataFrame(np.concatenate((recordingData, adcData), axis = 1), columns = chanNames)
+    isADC = np.ones(len(data.columns), dtype = np.bool)
+    isADC[:len(chIds)] = False
 
     channelData = {
         'data' : data,
@@ -171,7 +172,7 @@ def getOpenEphysFolder(folderPath, chIds = 'all', adcIds = 'all', chanNames = No
         }
 
     channelData['basic_headers']['isADC'] = isADC
-
+    channelData['basic_headers']['chanNames'] = chanNames
     return channelData
 
 def getNSxData(filePath, elecIds, startTime_s, dataLength_s, downsample = 1):
@@ -429,7 +430,7 @@ def confirmTriggersPlot(peakIdx, dataSeries, fs, whichPeak = 0, nSec = 2):
     f = plt.figure()
     sns.distplot(np.diff(peakIdx))
     plt.xlabel('distance between triggers (# samples)')
-    plt.show(block = False)
+    plt.show(block = True)
 
 def compareClocks(foundTime, expectedTime, thresh):
     timeMismatch = foundTime[:len(expectedTime)] - expectedTime
@@ -444,8 +445,82 @@ def compareClocks(foundTime, expectedTime, thresh):
 
     return correctedTimeMismatch, whereOff, expectedTimeMismatchFun
 
+def getThresholdCrossings(dataSeries, thresh, absVal = False, edgeType = 'rising',
+    fs = 3e4, iti = None):
+    if absVal:
+        dsToSearch = dataSeries.abs()
+    else:
+        dsToSearch = dataSeries
+    nextDS = dsToSearch.shift(1)
+
+    if edgeType == 'rising':
+        crossMask = ((dsToSearch >= thresh) & (nextDS < thresh)) |\
+            ((dsToSearch > thresh) & (nextDS <= thresh))
+    else:
+        crossMask = ((dsToSearch <= thresh) & (nextDS > thresh)) |\
+            ((dsToSearch < thresh) & (nextDS >= thresh))
+
+    crossIdx = dataSeries.index[crossMask]
+
+    if iti is not None:
+        itiWiggle = 0.05
+        width = int(fs * iti * (1 - itiWiggle))
+        rejectMask = pd.Series(crossIdx).diff() < width
+        crossMask[crossIdx[rejectMask]] = False
+        crossIdx = crossIdx[~rejectMask]
+        #pdb.set_trace()
+    return crossIdx, crossMask
+
+def findTrains(dataSeries, peakIdx, iti, fs, minTrainLength, maxDistance = 1.5, maxTrain = False):
+    peakMask = dataSeries.index.isin(peakIdx)
+    foundTime = pd.Series((dataSeries.index[peakIdx] - dataSeries.index[peakIdx[0]]) / fs)
+    #
+    # identify trains of peaks
+    itiWiggle = 0.05
+    minPeriod = iti * (1 - itiWiggle)
+
+    peakDiff = foundTime.diff()
+    #pdb.set_trace()
+    peakDiff.iloc[0] = iti * 2e3 #fudge it so that the first one is taken
+    trainStartIdx = foundTime.index[peakDiff > (iti * maxDistance)]
+    trainStarts = foundTime[trainStartIdx]
+
+    peakFwdDiff = foundTime.diff(periods = -1).abs()
+    peakFwdDiff.iloc[-1] = iti * 2e3 #fudge it so that the last one is taken
+    trainEndIdx = foundTime.index[peakFwdDiff > (iti * maxDistance)]
+    trainEnds = foundTime[trainEndIdx]
+
+    #pdb.set_trace()
+    trainLengths = (trainEnds.values - trainStarts.values)
+    validTrains = trainLengths > minTrainLength
+    keepPeaks = pd.Series(False, index = foundTime.index)
+    nTrains = 0
+    for idx, idxIntoPeaks in enumerate(trainStartIdx):
+        #print('{}, {}'.format(idx, idxIntoPeaks))
+        #pdb.set_trace()
+        thisMeanPeriod = peakDiff.loc[idxIntoPeaks:trainEndIdx[idx]].iloc[1:].mean()
+        if validTrains[idx] and thisMeanPeriod > minPeriod:
+            keepPeaks.loc[idxIntoPeaks:trainEndIdx[idx]] = True
+            nTrains += 1
+            #pdb.set_trace()
+            if maxTrain:
+                if nTrains > maxTrain: break;
+        else:
+            validTrains[idx] = False
+
+    #pdb.set_trace()
+    trainStartPeaks = peakIdx[trainStartIdx[validTrains]]
+    trainEndPeaks = peakIdx[trainEndIdx[validTrains]]
+    foundTime = foundTime[keepPeaks]
+    peakIdx = peakIdx[keepPeaks]
+
+    return peakIdx, trainStartPeaks,trainEndPeaks
+
 def getTriggers(dataSeries, iti = .01, fs = 3e4, thres = 2.58,
-    edgeType = 'rising', expectedTime = None, keep_max = True, plotting = False):
+    edgeType = 'rising',
+    minAmp = None,
+    minTrainLength = None,
+    expectedTime = None, keep_max = True, plotting = False):
     # iti: expected inter trigger interval
 
     # minimum distance between triggers (units of samples), 5% wiggle room
@@ -489,8 +564,52 @@ def getTriggers(dataSeries, iti = .01, fs = 3e4, thres = 2.58,
         elif len(foundTimes) > len(expectedTime):
             raise Exception('table contains {} entries and there are {} triggers'.format(len(raw.index), len(trigTimes)))
 
+    if minAmp is not None:
+        triggersZScore = pd.Series(stats.zscore(dataSeries), index = dataSeries.index)
+        insetIntoTrig = int(fs * iti * 1e-2)
+        peakIdx = np.array(peakIdx[triggersZScore.loc[peakIdx+insetIntoTrig] > minAmp])
+        #pdb.set_trace()
+
+    if minTrainLength is not None:
+        peakMask = dataSeries.index.isin(peakIdx)
+        foundTime = pd.Series((dataSeries.index[peakIdx] - dataSeries.index[peakIdx[0]]) / fs)
+        #
+        # identify trains of peaks
+        peakDiff = foundTime.diff()
+        peakDiff.iloc[0] = iti * 2e3 #fudge it so that the first one is taken
+        #pdb.set_trace()
+        trainStartIdx = foundTime.index[peakDiff > (iti * 2)]
+        trainStarts = foundTime[trainStartIdx]
+
+        peakFwdDiff = foundTime.diff(periods = -1).abs()
+        peakFwdDiff.iloc[-1] = iti * 2e3 #fudge it so that the last one is taken
+        trainEndIdx = foundTime.index[peakFwdDiff > (iti * 2)]
+        trainEnds = foundTime[trainEndIdx]
+
+        trainLengths = (trainEnds.values - trainStarts.values)
+        validTrains = trainLengths > minTrainLength
+        keepPeaks = pd.Series(False, index = foundTime.index)
+        nTrains = 0
+        maxTrain = 3
+        for idx, idxIntoPeaks in enumerate(trainStartIdx):
+            #print('{}, {}'.format(idx, idxIntoPeaks))
+            if validTrains[idx]:
+                keepPeaks.loc[idxIntoPeaks:trainEndIdx[idx]] = True
+                nTrains += 1
+                #pdb.set_trace()
+                if nTrains > maxTrain: break;
+
+        #pdb.set_trace()
+        foundTime = foundTime[keepPeaks]
+        peakIdx = peakIdx[keepPeaks]
+
     if plotting:
         confirmTriggersPlot(peakIdx, dataSeries, fs)
+        if minAmp is not None:
+            plt.plot(triggersZScore)
+            plt.plot(triggersZScore[peakIdx], '*')
+            plt.title('Z scored trace')
+            plt.show(block = True)
 
     return peakIdx
 
@@ -538,6 +657,119 @@ def getAngles(anglesFile,
             proc.loc[:, column] = signal.filtfilt(b, a, proc.loc[:, column])
 
     return proc
+
+def getTensTrigs(tensThresh, ampThresh, channelData, referenceTimes, plotting = False):
+
+    iti = .1
+    minTrainLength = 5 * iti * 1e3
+
+    peakIdx = getTriggers(channelData['data']['TensSync'], iti = iti, fs = channelData['samp_per_s'],
+        thres = tensThresh, keep_max = False, minAmp = ampThresh, plotting = plotting)
+    peakMask = channelData['data'].index.isin(peakIdx)
+
+    peakTimes = channelData['t'][peakMask] * 1e3
+
+    # identify trains of peaks
+    peakDiff = peakTimes.diff()
+    peakDiff.iloc[0] = iti * 2e3 #fudge it so that the first one is taken
+    trainStartIdx = peakTimes.index[peakDiff > iti * 1.1 * 1e3]
+    trainStarts = peakTimes[trainStartIdx]
+
+    peakFwdDiff = peakTimes.diff(periods = -1).abs()
+    peakFwdDiff.iloc[-1] = iti * 2e3 #fudge it so that the first one is taken
+    trainEndIdx = peakTimes.index[peakFwdDiff > iti * 1.1 * 1e3]
+    trainEnds = peakTimes[trainEndIdx]
+
+    if plotting:
+        plt.plot(peakTimes, peakTimes ** 0, 'mo', label = 'unaligned OpE TENS Pulses')
+
+    trainLengths = (trainEnds.values - trainStarts.values)
+    validTrains = trainLengths > minTrainLength
+    keepPeaks = pd.Series(False, index = peakTimes.index)
+    nTrains = 0
+    maxTrain = 3
+    for idx, idxIntoPeaks in enumerate(trainStartIdx):
+        #print('{}, {}'.format(idx, idxIntoPeaks))
+        if validTrains[idx]:
+            keepPeaks.loc[idxIntoPeaks:trainEndIdx[idx]] = True
+            nTrains += 1
+            #pdb.set_trace()
+            if nTrains > maxTrain: break;
+
+    peakTimes = peakTimes[keepPeaks]
+    peakIdx = np.array(peakTimes.index)
+
+    if plotting:
+        plt.plot(peakTimes, peakTimes ** 0, 'co', label = 'unaligned OpE TENS Pulses (valid Trains)')
+        plt.plot(trainStarts, trainStarts ** 0 -1, 'go', label = 'unaligned OpE TENS Train Start')
+        plt.plot(trainEnds, trainEnds ** 0 +1, 'ro', label = 'unaligned OpE TENS Train End')
+        plt.legend()
+        plt.show()
+
+    nDetectedMismatch = len(peakIdx) - len(referenceTimes)
+    print('peakIdx is {} samples long, referenceTimes is {} samples long'.format(len(peakIdx), len(referenceTimes)))
+    if nDetectedMismatch != 0:
+        if nDetectedMismatch > 0:
+            shorterTimes = referenceTimes
+            longerTimes = peakTimes
+        else:
+            shorterTimes = peakTimes
+            longerTimes = referenceTimes
+
+        rmsDiff = np.inf
+        keepTimes = np.array(longerTimes[:len(shorterTimes)])
+        for correctTimes in itertools.combinations(longerTimes, len(shorterTimes)):
+            #pdb.set_trace()
+            alignedCorrectTimes = pd.Series(correctTimes) - correctTimes[0]
+            alignedShorterTimes = shorterTimes - shorterTimes.iloc[0]
+            newRmsDiff = np.mean((alignedCorrectTimes.values - alignedShorterTimes.values) ** 2)
+            if newRmsDiff < rmsDiff:
+                keepTimes = correctTimes
+        #pdb.set_trace()
+
+        if nDetectedMismatch > 0:
+            peakTimes = peakTimes[peakTimes.isin(keepTimes)]
+        else:
+            referenceTimes = referenceTimes[referenceTimes.isin(keepTimes)]
+
+    peakIdx = np.array(peakTimes.index)
+    peakMask = channelData['data'].index.isin(peakIdx)
+
+    if plotting:
+        plt.plot(peakTimes, peakTimes ** 0, 'co', label = 'unaligned OpE TENS Pulses')
+        plt.plot(trainStarts, trainStarts ** 0 -1, 'go', label = 'unaligned OpE TENS Train Start')
+        plt.plot(trainEnds, trainEnds ** 0 +1, 'ro', label = 'unaligned OpE TENS Train End')
+        plt.plot(referenceTimes, referenceTimes ** 0, 'ko', label = 'unaligned INS TENS Pulses')
+        plt.legend()
+        plt.show()
+        #pdb.set_trace()
+
+    return peakIdx, peakTimes / 1e3, peakMask, referenceTimes
+
+def optimizeTensThresholds(diffThresholds, ampThresholds, channelData, plotting = False):
+    dv, av = np.meshgrid(diffThresholds, ampThresholds, sparse=False, indexing='ij')
+    mismatch = pd.DataFrame(np.nan, index = diffThresholds, columns = ampThresholds)
+    for i in range(len(diffThresholds)):
+        for j in range(len(ampThresholds)):
+            # treat xv[i,j], yv[i,j]
+            print('Evaluating {}, {}'.format(i,j))
+            peakIdx, openEphysTensTimes, peakMask = getTensTrigs(dv[i,j], av[i,j], channelData)
+            if len(peakIdx) != len(insTensTimes[trialIdx]):
+                #no good, not the same number
+                mismatch.loc[diffThresholds[i], ampThresholds[j]] = 1e9
+            else:
+                # coarsely align
+                minNSamp = min(len(peakIdx) , len(insTensTimes[trialIdx]))
+                coarseOpenEphysTensTimes = (openEphysTensTimes.iloc[:minNSamp] - openEphysTensTimes.iloc[0]) * 1e3
+                coarseInsTensTimes = insTensTimes[trialIdx][:minNSamp] - insTensTimes[trialIdx][0]
+                coarseDiff = (coarseOpenEphysTensTimes - coarseInsTensTimes).abs().sum()
+                mismatch.loc[diffThresholds[i], ampThresholds[j]] = coarseDiff
+    if plotting:
+        ax = sns.heatmap(mismatch, vmax = 1e4, cmap="YlGnBu")
+        plt.show()
+    bestDiff = mismatch.idxmin(axis = 0).iloc[0]
+    bestAmp = mismatch.idxmin(axis = 1).iloc[0]
+    return mismatch, bestDiff, bestAmp
 
 def loadAngles(folderPath, fileName, kinAngleOpts = {
     'ns5FileName' : '',
@@ -961,7 +1193,8 @@ def plotChan(channelData, dataT, whichChan, recordingUnits = 'uV', electrodeLabe
     #channelData['data'][ch_idx].fillna(0, inplace = True)
 
     if zoomAxis:
-        ax.axis([tPlot[0], tPlot[-1], min(channelDataForPlotting), max(channelDataForPlotting)])
+        ax.set_xlim((tPlot[0], tPlot[-1]))
+        ax.set_ylim((min(channelDataForPlotting[tSlice]),max(channelDataForPlotting[tSlice])))
 
     ax.locator_params(axis = 'y', nbins = 20)
     plt.xlabel('Time (s)')
@@ -2621,6 +2854,21 @@ def reloadPlot(filePath = None, message = "Please choose file(s)"):
     #np.set_printoptions(precision=2)
     plt.show()
     return plt.gcf()
+
+def loadRecruitmentCurve(folderPath, ignoreChans = []):
+
+    with open(os.path.join(folderPath, 'metadata.p'), 'rb') as f:
+        metadata = pickle.load(f)
+
+    recruitmentCurve = pd.read_hdf(os.path.join(folderPath, 'recruitmentCurve.h5'), 'recruitment')
+    dropList = pd.Series()
+    for chanName in ignoreChans:
+        dropIndices = pd.Series(recruitmentCurve.loc[recruitmentCurve['chanName'] == chanName, :].index)
+        dropList = dropList.append(dropIndices, ignore_index = True)
+    recruitmentCurve.drop(index = dropList, inplace = True)
+
+    return metadata, recruitmentCurve
+
 
 def memory_usage_psutil():
     # return the memory usage in MB

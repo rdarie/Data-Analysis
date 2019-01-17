@@ -40,7 +40,7 @@ def getTransitionIdx(motorData, edgeType = 'rising'):
     return transitionMask, transitionIdx
 
 #@profile
-def getMotorData(ns5FilePath, inputIDs, startTime, dataTime, debounce = None):
+def getMotorData(ns5FilePath, inputIDs, startTime, dataTime, debounce = None, invertLookup = False):
 
     analogData = getNSxData(ns5FilePath, inputIDs.values(), startTime, dataTime)
     newColNames = {num : '' for num in analogData['data'].columns}
@@ -54,6 +54,8 @@ def getMotorData(ns5FilePath, inputIDs, startTime, dataTime, debounce = None):
     motorData['A'] = motorData['A+'] - motorData['A-']
     motorData['B'] = motorData['B+'] - motorData['B-']
     motorData['Z'] = motorData['Z+'] - motorData['Z-']
+    #pdb.set_trace();plt.plot(motorData.loc[:,('A+', 'A-')]);plt.show()
+
 
     motorData.drop(['A+', 'A-', 'B+', 'B-', 'Z+', 'Z-'], axis = 1, inplace = True)
 
@@ -69,13 +71,22 @@ def getMotorData(ns5FilePath, inputIDs, startTime, dataTime, debounce = None):
     """
     # use signal range to digitize analog trace
     """
-    for column in motorData.columns:
-        threshold = (motorData[column].max() - motorData[column].min() ) / 2
+    #for column in motorData.columns:
+    for column in ['A','B','Z']:
+        minQ = motorData[column].quantile(q=0.05)
+        maxQ = motorData[column].quantile(q=0.95)
+        #print('min quantile = {}'.format(minQ))
+        #print('max quantile = {}'.format(maxQ))
+        #plt.plot(motorData[column]); plt.show()
+        motorData[column] = (motorData[column] - minQ) / (maxQ - minQ)
+        #threshold = (motorData[column].max() - motorData[column].min() ) / 2
+        threshold = 0.5
         motorData.loc[:,column + '_int'] = (motorData[column] > threshold).astype(int)
 
     transitionMask, transitionIdx = getTransitionIdx(motorData, edgeType = 'both')
     motorData['encoderState'] = 0
     motorData['count'] = 0
+
     state1Mask = np.logical_and(motorData['A_int'] == 1, motorData['B_int'] == 1)
     motorData.loc[state1Mask, 'encoderState'] = 1
     state2Mask = np.logical_and(motorData['A_int'] == 1, motorData['B_int'] == 0)
@@ -108,13 +119,17 @@ def getMotorData(ns5FilePath, inputIDs, startTime, dataTime, debounce = None):
             (4, 4) : 0,
             }
 
+    if invertLookup:
+        for key, value in incrementLookup.items():
+            incrementLookup[key] = incrementLookup[key] * (-1)
+
     statesAtTransition = motorData.loc[transitionIdx, 'encoderState'].tolist()
     transitionStatePairs = [(statesAtTransition[i], statesAtTransition[i-1]) for i in range(1, len(statesAtTransition))]
     count = [incrementLookup[pair] for pair in transitionStatePairs]
     #pad with a zero to make up for the fact that the first one doesn't have a pair
     motorData.loc[transitionIdx,'count'] = [0] + count
     #pdb.set_trace()
-    motorData['position'] = motorData['count'].cumsum()
+    motorData['position'] = motorData['count'].cumsum() / 180e2
     #motorData['stateChanges'] = motorData['encoderState'].diff().abs() != 0
     #pdb.set_trace()
 

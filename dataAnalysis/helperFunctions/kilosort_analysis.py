@@ -310,7 +310,7 @@ def getNevMatSpikes(filePath, nevIDs = None, plotting = False, excludeClus = [0]
             #pdb.set_trace()
             spikes['ChannelID'][idx] = chanID
             chanMask = np.array(f['NEV']['Data']['Spikes']['Electrode']) == chanID
-            
+
             markForDeletion[chanID] = not chanMask.any()
             if not markForDeletion[chanID]:
                 unitsInFile = np.unique(f['NEV']['Data']['Spikes']['Unit'][chanMask]) +  1 + lastMaxUnitID
@@ -392,12 +392,65 @@ def getWaveClusSpikes(filePath, nevIDs = None, plotting = False, excludeClus = [
     return spikes
 
 #@profile
-def plotSpike(spikes, channel, showNow = False, ax = None,
-    acrossArray = False, xcoords = None, ycoords = None,
-    axesLabel = False, errorMultiplier = 2, ignoreUnits = []):
+def getSpikeStats(spikes, channel, whichStats = ['mean', 'std'], bounds = None, windowSize = None):
 
     ChanIdx = spikes['ChannelID'].index(channel)
-    unitsOnThisChan = np.unique(spikes['Classification'][ChanIdx])
+    unitsOnThisChan = pd.unique(spikes['Classification'][ChanIdx])
+
+    statsDict = {}
+
+    if windowSize is None:
+        windowSize = [0, (spikes['Waveforms'][ChanIdx].shape[1] - 1) / spikes['basic_headers']['TimeStampResolution']]
+
+    if unitsOnThisChan is not None:
+
+        statsDict = {unitName: {} for  unitName in unitsOnThisChan}
+
+        for unitIdx, unitName in enumerate(unitsOnThisChan):
+            unitMask = spikes['Classification'][ChanIdx] == unitName
+
+            #pdb.set_trace()
+            if bounds is not None:
+                startIdx = int((bounds[0] - windowSize[0]) * spikes['basic_headers']['TimeStampResolution'])
+                endIdx = int((bounds[1] - windowSize[0]) * spikes['basic_headers']['TimeStampResolution'])
+                boundsSlice = slice(startIdx, endIdx, 1)
+            else:
+                boundsSlice = slice(None)
+            if len(spikes['Waveforms'][ChanIdx].shape) == 3:
+                waveForms = spikes['Waveforms'][ChanIdx][unitMask, boundsSlice, ChanIdx]
+            else:
+                waveForms = spikes['Waveforms'][ChanIdx][unitMask, boundsSlice]
+
+            if 'mean' in whichStats:
+                statsDict[unitName].update({'mean':np.nanmean(waveForms, axis = 0)})
+            if 'std' in whichStats:
+                statsDict[unitName].update({'std':np.nanstd(waveForms, axis = 0)})
+            if 'rms' in whichStats:
+                waveFormsDF = pd.DataFrame(waveForms).fillna(method = 'ffill', axis = 1, limit = 30).fillna(method = 'bfill', axis = 1, limit =  30)
+                statsDict[unitName].update({'rms':np.linalg.norm(waveFormsDF, ord=None, axis=1)})
+            if 'abs max' in whichStats:
+                #pdb.set_trace()
+                statsDict[unitName].update({'abs max':np.abs(waveForms).max().max()})
+            if 'max' in whichStats:
+                statsDict[unitName].update({'max':waveForms.max().max()})
+            if 'min' in whichStats:
+                statsDict[unitName].update({'min':waveForms.min().min()})
+    return statsDict
+
+def plotSpike(spikes, channel, showNow = False, ax = None,
+    acrossArray = False, xcoords = None, ycoords = None,
+    axesLabel = False, errorMultiplier = 2, ignoreUnits = [],
+    channelPlottingName = None, chanNameInLegend = True):
+
+    if channelPlottingName is None:
+        channelPlottingName = str(channel)
+
+    ChanIdx = spikes['ChannelID'].index(channel)
+    unitsOnThisChan = pd.unique(spikes['Classification'][ChanIdx])
+    if 'ClassificationLabel' in spikes.keys():
+        unitsLabelsOnThisChan = pd.unique(spikes['ClassificationLabel'][ChanIdx])
+    else:
+        unitsLabelsOnThisChan = None
 
     if acrossArray:
         sns.set_style("dark", {"axes.facecolor": ".9"})
@@ -417,7 +470,6 @@ def plotSpike(spikes, channel, showNow = False, ax = None,
         fig = ax.figure
 
     if unitsOnThisChan is not None:
-
         if acrossArray:
             xIdx, yIdx = coordsToIndices(xcoords, ycoords)
             fig, ax = plt.subplots(nrows = max(np.unique(xIdx)) + 1, ncols = max(np.unique(yIdx)) + 1)
@@ -430,6 +482,16 @@ def plotSpike(spikes, channel, showNow = False, ax = None,
 
             unitMask = spikes['Classification'][ChanIdx] == unitName
 
+            if 'ClassificationLabel' in spikes.keys():
+                unitPlottingName = unitsLabelsOnThisChan[unitIdx]
+            else:
+                unitPlottingName = unitName
+
+            if chanNameInLegend:
+                labelName = 'chan %s, unit %s (%d SDs)' % (channelPlottingName, unitPlottingName, errorMultiplier)
+            else:
+                labelName = 'unit %s (%d SDs)' % (unitPlottingName, errorMultiplier)
+
             if acrossArray:
                 for idx, channel in enumerate(spikes['ChannelID']):
                     curAx = ax[xIdx[idx], yIdx[idx]]
@@ -440,7 +502,7 @@ def plotSpike(spikes, channel, showNow = False, ax = None,
                     curAx.fill_between(timeRange, thisSpike - errorMultiplier*thisError,
                         thisSpike + errorMultiplier*thisError, alpha=0.4,
                         facecolor=colorPalette[unitIdx],
-                        label='chan %s, unit %s (%d SDs)' % (channel, unitName, errorMultiplier))
+                        label=labelName)
                     curAx.plot(timeRange, thisSpike, linewidth=1, color=colorPalette[unitIdx])
 
                 sns.despine()
@@ -463,15 +525,17 @@ def plotSpike(spikes, channel, showNow = False, ax = None,
                 ax.fill_between(timeRange, thisSpike - errorMultiplier*thisError,
                     thisSpike + errorMultiplier*thisError, alpha=0.4,
                     facecolor=colorPalette[unitIdx],
-                    label='chan %s, unit %s (%d SDs)' % (channel, unitName, errorMultiplier))
+                    label=labelName)
                 ax.plot(timeRange, thisSpike, linewidth=1, color=colorPalette[unitIdx])
                 if axesLabel:
                     ax.set_ylabel(spikes['Units'])
                     ax.set_xlabel('Time (msec)')
-                    ax.set_title('Units on channel %d' % channel)
+                    ax.set_title('Units on channel {}'.format(channelPlottingName))
                     ax.legend()
         if showNow:
             plt.show()
+
+    return fig,ax
 
 #@profile
 def plotISIHistogram(spikes, channel, showNow = False, ax = None,
@@ -2290,6 +2354,16 @@ def spikesNameGenerator(arrayName, arrayInfo):
         excludeStr = '_'.join([str(i) for i in arrayInfo['excludeClus']])
     return arrayInfo['ns5FileName'] + '_spikes' + capitalizeFirstLetter(arrayName) + '_exclude_' + excludeStr + '_' + arrayInfo['origin']
 
+def timeTriggeredTimeSeriesNameGenerator():
+    pass
+    return
+def spikesNameGenerator(arrayName, arrayInfo):
+    if arrayInfo['excludeClus'] is None:
+        excludeStr = ''
+    else:
+        excludeStr = '_'.join([str(i) for i in arrayInfo['excludeClus']])
+    return arrayInfo['ns5FileName'] + '_spikes' + capitalizeFirstLetter(arrayName) + '_exclude_' + excludeStr + '_' + arrayInfo['origin']
+
 def trialBinnedSpikesNameGenerator(arrayName, arrayInfo, rasterOpts):
     return spikesNameGenerator(arrayName, arrayInfo) + '_ALIGNEDTO_' + rasterOpts['alignTo'] + '_SEPARATEDBY_' + rasterOpts['separateBy']
 
@@ -2330,7 +2404,6 @@ def regressionRunNameGenerator(trialFiles, alignToList, tsInfo):
     outputName += '_REGRESSION_TARGET_' + tsInfo['seriesName'] + '_{}'.format(tsInfo['recordName'])
 
     return outputName
-
 
 def spikesNameRetrieve(spikesName):
 
@@ -2460,6 +2533,7 @@ def loadSpikeBinnedSpike(folderPath,
 
     setName = spikeBinnedSpikesNameGenerator(arrayNameFrom, arrayInfoFrom, arrayNameTo, arrayInfoTo)
     setPath = os.path.join(folderPath, setName + '.h5')
+
     if not forceRecalc:
     # if not requiring a recalculation, load from pickle
         try:
@@ -2603,7 +2677,6 @@ def loadSpikeBinnedSpike(folderPath,
         spikeMats, categories, selectedIndices = saveSpikeMats, saveCategories, saveSelectedIndices
     return spikeMats, categories, selectedIndices
 
-
 def triggeredTimeSeries(alignTimes, dataDF, categories,
     whichColumns = None, removeBaseline = False,
     windowSize= [-0.25, 1], timeStampResolution = 3e4,
@@ -2634,7 +2707,7 @@ def triggeredTimeSeries(alignTimes, dataDF, categories,
         'Units' : units,
         'Waveforms' : [np.full((len(alignTimes.index), nSampsInWindow), np.nan
             ) for i in whichColumns],
-        'basic_headers' : {'TimeStampResolution': timeStampResolution},
+        'basic_headers' : {'TimeStampResolution': timeStampResolution, 'windowSize' : windowSize},
         'extended_headers' : [],
         'name' : '',
         'info' : ''
@@ -2663,18 +2736,23 @@ def triggeredTimeSeries(alignTimes, dataDF, categories,
                     #chanSlice = chanSlice - peakutils.baseline(chanSlice)
 
                 idxIntoStart = np.flatnonzero(maskPre)[0] - startTimeIdxChan + startTimeIdxTriggeredChan
-                idxIntoEnd = np.flatnonzero(maskPost)[-1] - startTimeIdxChan + startTimeIdxTriggeredChan + 1
+
+                idxMismatch = max(-idxIntoStart, 0)
+                if idxMismatch > 0:
+                    idxIntoStart += idxMismatch
+                idxIntoEnd = np.flatnonzero(maskPost)[-1] - startTimeIdxChan + startTimeIdxTriggeredChan + 1 + idxMismatch
 
                 if idxIntoEnd > nSampsInWindow:
                     idxIntoEnd = nSampsInWindow
+
                 try:
                     spikesTriggered['Waveforms'][idx][rowIdxWave,idxIntoStart:idxIntoEnd] = chanSlice.values
                 except Exception:
-                    traceback.print_exc()
+                    #traceback.print_exc()
                     spikesTriggered['Waveforms'][idx][rowIdxWave,idxIntoStart:idxIntoEnd] = chanSlice.values[idxIntoStart:idxIntoEnd]
 
             except Exception:
-                #pdb.set_trace()
+                pdb.set_trace()
                 traceback.print_exc()
 
     return spikesTriggered
