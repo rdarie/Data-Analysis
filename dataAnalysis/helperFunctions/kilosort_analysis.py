@@ -22,6 +22,7 @@ import itertools
 import re
 import math as m
 import copy
+import re
 LABELFONTSIZE = 10
 
 def loadParamsPy(filePath):
@@ -272,7 +273,6 @@ def getWaveForms(filePath, spikeStruct, nevIDs = None, dataType = np.int16, wfWi
 def numFromWaveClusSpikeFile(spikeFileName):
     return int(spikeFileName.split('times_NSX')[-1].split('.mat')[0])
 
-import re
 # From https://stackoverflow.com/questions/5967500/how-to-correctly-sort-a-string-with-a-number-inside
 def atoi(text):
     return int(text) if text.isdigit() else text
@@ -2357,6 +2357,7 @@ def spikesNameGenerator(arrayName, arrayInfo):
 def timeTriggeredTimeSeriesNameGenerator():
     pass
     return
+
 def spikesNameGenerator(arrayName, arrayInfo):
     if arrayInfo['excludeClus'] is None:
         excludeStr = ''

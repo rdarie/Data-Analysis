@@ -2463,24 +2463,6 @@ def freqDownSample(X, **kwargs):
 def selectFromX(X, support):
     return X[:,support]
 
-""" Gives "cannot be pickled" error
-def multiLabelROCAUCScorer(yClasses, average = 'macro'):
-    binarizer = LabelBinarizer()
-    binarizer.fit(yClasses)
-    def ROCAUC_ScoreFunction(estimator, X, y):
-        pdb.set_trace()
-        if hasattr(estimator, 'predict_proba'):
-            score = roc_auc_score(binarizer.transform(y), estimator.predict_proba(X), average = average)
-        elif hasattr(estimator, 'decision_function'):
-            score = roc_auc_score(binarizer.transform(y),
-                estimator.decision_function(X), average = average)
-        else: # default to f1 score
-            score = f1_score(y, estimator.predict(X), average = 'macro')
-
-        return score
-    return ROCAUC_ScoreFunction
-
-"""
 def ROCAUC_ScoreFunction(estimator, X, y):
     #pdb.set_trace()
     binarizer = LabelBinarizer()
@@ -2868,7 +2850,6 @@ def loadRecruitmentCurve(folderPath, ignoreChans = []):
     recruitmentCurve.drop(index = dropList, inplace = True)
 
     return metadata, recruitmentCurve
-
 
 def memory_usage_psutil():
     # return the memory usage in MB
