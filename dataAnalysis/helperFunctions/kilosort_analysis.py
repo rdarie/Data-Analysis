@@ -2,7 +2,7 @@ import os, sys, pdb
 from tempfile import mkdtemp
 import numpy as np
 from scipy.ndimage.filters import gaussian_filter1d
-from scipy import stats
+from scipy import stats, ndimage
 import scipy.io
 import pandas as pd
 import matplotlib
@@ -19,11 +19,11 @@ import h5py
 import traceback
 import collections
 import itertools
-import re
+import re, json
 import math as m
 import copy
-import re
 LABELFONTSIZE = 10
+import peakutils
 
 def loadParamsPy(filePath):
     """
@@ -308,6 +308,7 @@ def getNevMatSpikes(filePath, nevIDs = None, plotting = False, excludeClus = [0]
     with h5py.File(filePath, 'r') as f:
         for idx, chanID in enumerate(nevIDs):
             #pdb.set_trace()
+            print('getNevMatSpikes() on channel {} of {}'.format(idx + 1, len(nevIDs)))
             spikes['ChannelID'][idx] = chanID
             chanMask = np.array(f['NEV']['Data']['Spikes']['Electrode']) == chanID
 
@@ -436,6 +437,226 @@ def getSpikeStats(spikes, channel, whichStats = ['mean', 'std'], bounds = None, 
             if 'min' in whichStats:
                 statsDict[unitName].update({'min':waveForms.min().min()})
     return statsDict
+
+def getINSStimOnset(
+    folderPath, sessionName,
+    deviceName = 'DeviceNPC700373H',
+    fs = 500, stimIti = 1.1, minimumDuration = 0, thres = .5,
+    chanNames = None,
+    td = None, accel = None, accelFs = 64, plotting = False):
+    
+    if chanNames is None:
+        chanNames = {i: ['channel_0', 'channel_1'] for i in range(4)}
+
+    elecStatus, elecType, elecConfiguration = hf.getINSDeviceConfig(
+        folderPath, sessionName, deviceName)
+    stimStatus = hf.serializeINSStimLog(
+        folderPath, sessionName, deviceName)
+
+    if plotting:
+        progAmpNames = ['program{}_amplitude'.format(progIdx) for progIdx in range(4)]
+
+        plottingRange = np.arange(
+            stimStatus['INSTime'].min(),
+            stimStatus['INSTime'].max(), 10e-3) # units of sec
+
+        plottingColumns = [
+            'INSTime', 'frequency', 'therapyStatus', 'amplitudeChange'] + progAmpNames
+        plottingEntries = pd.DataFrame(columns=plottingColumns)
+        plottingEntries['INSTime'] = plottingRange
+        plotStimStatus = pd.concat([
+            stimStatus.loc[:, plottingColumns], plottingEntries
+            ])
+        plotStimStatus.sort_values('INSTime', inplace=True)
+        plotStimStatus.fillna(method='ffill', axis=0, inplace=True)
+
+    if td is None:
+        td = hf.getINSTDFromJson(
+            folderPath, sessionName, deviceName, fs)
+        
+    if accel is None:
+        accel = hf.getINSAccelFromJson(
+            folderPath, sessionName, deviceName, accelFs)
+            
+    stimStatus['amplitudeRound'] = stimStatus['amplitudeChange'].astype(np.float).cumsum()
+    columnsToBeAdded = [
+        'amplitudeRound', 'activeGroup',
+        'frequency', 'activeProgram', 'maxAmp']
+    roundPlaceholder = pd.DataFrame(index = td['data'].index, columns = columnsToBeAdded)
+    roundPlaceholder['INSTime'] = td['INSTime']
+    roundPlaceholder = roundPlaceholder.append(
+        stimStatus.loc[:,columnsToBeAdded + ['INSTime']], ignore_index = True
+        )
+    roundPlaceholder.sort_values('INSTime', inplace=True)
+    roundPlaceholder.fillna(method='ffill', axis=0, inplace=True)
+    roundPlaceholder.fillna(method='bfill', axis=0, inplace=True)
+
+    for columnName in columnsToBeAdded:
+        td['data'][columnName] = roundPlaceholder.loc[td['data'].index,columnName]
+
+    allGroups = pd.unique(stimStatus['activeGroup'])
+    uniqueElectrodeCombos = list(range(4*len(allGroups)))
+    nCh = len(uniqueElectrodeCombos)
+
+    stimSpikes = {
+        'ChannelID' : uniqueElectrodeCombos,
+        'Classification' : [np.array([]) for i in range(nCh)],
+        'NEUEVWAV_HeaderIndices' : [None for i in range(nCh)],
+        'TimeStamps' : [np.array([]) for i in range(nCh)],
+        'Units' : 'uV',
+        'Waveforms' : [None for i in range(nCh)],
+        #'meanWaveforms' : [None for i in range(nCh)],
+        #'stdWaveforms' : [None for i in range(nCh)],
+        'basic_headers' : {'TimeStampResolution': 3e4},
+        'extended_headers' : []
+        }
+
+    for name, group in td['data'].groupby('amplitudeRound'):
+        electrodeCombo = int(4*pd.unique(group['activeGroup'])[0]+pd.unique(group['activeProgram'])[0])
+        print('electrode combo: {}'.format(electrodeCombo))
+        
+        thisAmplitude = group['maxAmp'].value_counts().index[0]
+        # pad with 100 msec to capture first pulse
+        tStart = max(0, group['INSTime'].iloc[0] - 0.1)
+        tStop = min(group['INSTime'].iloc[-1], td['INSTime'].iloc[-1])
+
+        if tStop - tStart < minimumDuration:
+            print('tStop - tStart = {}'.format(tStop - tStart))
+            continue
+
+        plotMaskTD = (td['INSTime'] > tStart) & (td['INSTime'] < tStop)
+        plotMaskStimStatus = (stimStatus['INSTime'] > tStart) & (stimStatus['INSTime'] < tStop)
+
+        activeState = stimStatus.loc[plotMaskStimStatus,'therapyStatus'].value_counts().idxmax()
+        activeProgram = stimStatus.loc[plotMaskStimStatus,'activeProgram'].value_counts().idxmax()
+
+        if not activeState:
+            print('Therapy not active!')
+            continue
+        '''
+        tdPow = pd.Series(0, index = td['data'].loc[plotMaskTD, chanNames].index)
+        for chanName in chanNames:
+            tdPow = tdPow + stats.zscore(td['data'].loc[plotMaskTD, chanName]) ** 2
+        '''
+        print('Active program is {}'.format(activeProgram))
+        theseChanNames = chanNames[activeProgram]
+        tdPow = (td['data'].loc[plotMaskTD, theseChanNames] ** 2).sum(axis = 1)
+        tdPow = tdPow - tdPow.min()
+        # convolve with a rectangular kernel
+        # then shift forward and backward to get forward and backward sum
+        kernDur = 0.2
+        kernNSamp = int(kernDur * fs)
+        kern = np.concatenate((
+            np.linspace(0, 1, round(kernNSamp/2)),
+            np.array([0]),
+            np.linspace(-1, 0, round(kernNSamp/2))
+            ))
+        correctionFactor = pd.Series(
+            np.convolve(kern, tdPow, mode = 'same'),
+            index = tdPow.index)
+
+        correctionFactor.loc[correctionFactor < 0] = 0
+        sobelFiltered = pd.Series(
+            ndimage.sobel(tdPow, mode='reflect'),
+            index = tdPow.index)
+        '''
+        rollingBoxcar = tdPow.abs().rolling(
+            kernNSamp, win_type='boxcar', center = True).sum().fillna(0)
+        fwd = rollingBoxcar.shift(-round(kernNSamp/2))
+        back = rollingBoxcar.shift(round(kernNSamp/2))
+        correctionFactor = fwd - back
+        '''
+        stimDetectSignal = sobelFiltered * correctionFactor
+        stimDetectSignal =stimDetectSignal.fillna(0)
+        thres = thres
+        peakIdx = peakutils.indexes(stimDetectSignal.values, thres=thres,
+            min_dist=int(stimIti * fs), thres_abs=False, keep_max = True)
+        #print(peakIdx)
+        #if name > 1:
+        #    break
+        peakIdx = tdPow.index[peakIdx]
+
+        theseTimestamps = td['INSTime'].loc[peakIdx].values
+        stimSpikes['TimeStamps'][electrodeCombo] = np.append(
+            stimSpikes['TimeStamps'][electrodeCombo],
+            theseTimestamps
+        )
+
+        ampList = theseTimestamps ** 0 * thisAmplitude
+        print('The amplitude was {}'.format(thisAmplitude))
+        stimSpikes['Classification'][electrodeCombo] = np.append(
+            stimSpikes['Classification'][electrodeCombo],
+            ampList
+        )
+        
+        if plotting:
+            plotMaskStim = (plotStimStatus['INSTime'] > tStart) & (plotStimStatus['INSTime'] < tStop)
+            plotMaskAccel = (accel['INSTime'] > tStart) & (accel['INSTime'] < tStop)
+            # plot match between all times
+            fig, ax = plt.subplots(3, 1, sharex=True)
+            ax[0].plot(
+                accel['INSTime'].loc[plotMaskAccel],
+                stats.zscore(accel['data'].loc[plotMaskAccel, 'inertia']),
+                '-', label='inertia')
+            ax[0].plot(
+                td['INSTime'].loc[plotMaskTD],
+                stats.zscore(td['data'].loc[plotMaskTD, 'channel_0']),
+                '-', label='channel_0')
+            ax[0].plot(
+                td['INSTime'].loc[plotMaskTD],
+                stats.zscore(td['data'].loc[plotMaskTD, 'channel_1']),
+                '-', label='channel_1')
+            ax[0].legend()
+            ax[0].set_title('INS Data')
+            
+            ax[1].plot(
+                td['INSTime'].loc[plotMaskTD],
+                correctionFactor,
+                '-', label='correctionFactor')
+            '''
+            ax[1].plot(
+                group['INSTime'],
+                fwd,
+                '-', label='fwd')
+            
+            ax[1].plot(
+                group['INSTime'],
+                back,
+                '-', label='back')
+            '''
+            ax[1].plot(
+                td['INSTime'].loc[plotMaskTD],
+                sobelFiltered,
+                '-', label='sobelFiltered')
+            ax[1].plot(
+                td['INSTime'].loc[plotMaskTD],
+                stimDetectSignal,
+                '-', label='stimDetectSignal')
+            ax[1].plot(
+                td['INSTime'].loc[peakIdx],
+                stimDetectSignal.loc[peakIdx] ** 0,
+                'o', label='stimOnset')
+            ax[1].legend()
+            
+            for columnName in progAmpNames:
+                ax[2].plot(
+                    plotStimStatus.loc[plotMaskStim, 'INSTime'],
+                    plotStimStatus.loc[plotMaskStim, columnName],
+                    '-', label=columnName)
+
+            statusAx = ax[2].twinx()
+            statusAx.plot(
+                plotStimStatus.loc[plotMaskStim, 'INSTime'],
+                plotStimStatus.loc[plotMaskStim, 'therapyStatus'],
+                '--', label='therapyStatus')
+            ax[2].legend(loc = 'upper left')    
+            statusAx.legend(loc = 'upper right')
+            ax[2].set_ylabel('Stim Amplitude (mA)')
+            ax[2].set_xlabel('NSP Time (sec)')
+            plt.suptitle('Stim State')
+            plt.show()
+
+    return stimSpikes
 
 def plotSpike(spikes, channel, showNow = False, ax = None,
     acrossArray = False, xcoords = None, ycoords = None,

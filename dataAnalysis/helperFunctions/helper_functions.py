@@ -21,6 +21,7 @@ import pandas as pd
 import math as m
 import tables as pt
 import seaborn as sns
+import rcsanalysis.packet_func as rcsa_helpers
 
 import openEphysAnalysis.OpenEphys as oea
 
@@ -30,6 +31,10 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import LabelBinarizer
 import sklearn.pipeline
 from sklearn.feature_selection import RFE,RFECV
+
+import datetime
+from datetime import datetime as dt
+import json
 
 try:
     # for Python2
@@ -202,6 +207,247 @@ def getNSxData(filePath, elecIds, startTime_s, dataLength_s, downsample = 1):
     # Close the nsx file now that all data is out
     nsx_file.close()
     return channelData
+
+def getINSTDFromJson(folderPath, sessionName, deviceName = 'DeviceNPC700373H', fs = 500):
+    jsonPath = os.path.join(folderPath, sessionName, deviceName)
+    try:
+        #  raise(Exception('Debugging, always extract fresh'))
+        tdData = pd.read_csv(
+            os.path.join(jsonPath, 'RawDataTD.csv'))
+        tdData['microseconds'] = pd.to_timedelta(
+            tdData['microseconds'])
+    except Exception:
+        traceback.print_exc()
+
+        with open(os.path.join(jsonPath, 'RawDataTD.json'), 'r') as f:
+            timeDomainJson = json.load(f)
+            
+        intersampleTickCount = (1/fs) / (100e-6)
+
+        timeDomainMeta = rcsa_helpers.extract_td_meta_data(timeDomainJson)
+        # assume n channels is constant
+        nChan = int(timeDomainMeta[0, 8])
+
+        timeDomainMeta = rcsa_helpers.code_micro_and_macro_packet_loss(
+            timeDomainMeta)
+
+        timeDomainMeta, packetsNeededFixing =\
+            rcsa_helpers.correct_meta_matrix_time_displacement(
+                timeDomainMeta, intersampleTickCount)
+
+        num_real_points, num_macro_rollovers, loss_as_scalar =\
+            rcsa_helpers.calculate_statistics(
+                timeDomainMeta, intersampleTickCount)
+        
+        timeDomainValues = rcsa_helpers.unpacker_td(
+            timeDomainMeta, timeDomainJson, intersampleTickCount)
+        
+        tdData = rcsa_helpers.save_to_disk(
+            timeDomainValues, os.path.join(
+                jsonPath, 'RawDataTD.csv'),
+            time_format='full', data_type='td', num_cols=nChan)
+
+    tdData['t'] = tdData['microseconds'] / datetime.timedelta(seconds=1)
+    tdDataSorted = tdData.drop_duplicates(
+        ['t']
+        ).sort_values('t').reset_index(drop=True)
+    td = {
+    'data': tdDataSorted,
+    't': tdDataSorted['microseconds'] / datetime.timedelta(seconds=1)
+    }
+    td['data']['INSTime'] = td['t']
+    td['INSTime'] = td['t']
+    return td
+
+def getINSAccelFromJson(folderPath, sessionName, deviceName = 'DeviceNPC700373H', fs = 64):
+    jsonPath = os.path.join(folderPath, sessionName, deviceName)
+    try:
+        #  raise(Exception('Debugging, always extract fresh'))
+        accelData = pd.read_csv(os.path.join(jsonPath, 'RawDataAccel.csv'))
+        accelData['microseconds'] = pd.to_timedelta(accelData['microseconds'])
+    except Exception:
+        traceback.print_exc()
+
+        with open(os.path.join(jsonPath, 'RawDataAccel.json'), 'r') as f:
+            accelJson = json.load(f)
+
+        intersampleTickCount = (1/fs) / (100e-6)
+        accelMeta = rcsa_helpers.extract_accel_meta_data(accelJson)
+
+        accelMeta = rcsa_helpers.code_micro_and_macro_packet_loss(
+            accelMeta)
+
+        accelMeta, packetsNeededFixing =\
+            rcsa_helpers.correct_meta_matrix_time_displacement(
+                accelMeta, intersampleTickCount)
+
+        accelDataValues = rcsa_helpers.unpacker_accel(
+            accelMeta, accelJson, intersampleTickCount)
+        accelData = rcsa_helpers.save_to_disk(
+            accelDataValues, os.path.join(
+                jsonPath, 'RawDataAccel.csv'),
+            time_format='full', data_type='accel')
+
+    accelData['t'] = accelData['microseconds'] / datetime.timedelta(seconds=1)
+    accelDataSorted = accelData.drop_duplicates(
+        ['t']
+        ).sort_values('t').reset_index(drop=True)
+    accel = {
+        'data': accelDataSorted,
+        't': accelDataSorted['microseconds'] / datetime.timedelta(seconds=1)
+        }
+    inertia = accel['data']['accel_x']**2 +\
+        accel['data']['accel_y']**2 +\
+        accel['data']['accel_z']**2
+    inertia = inertia.apply(np.sqrt)
+    accel['data']['inertia'] = inertia
+
+    accel['INSTime'] = accel['t']
+    accel['data']['INSTime'] = accel['t']
+    return accel
+
+def getINSTapTimestamp(
+    td, accel,
+    tStart = 0, tStop = 30, iti = 1/4,
+    visibleInChannel = False,
+    ):
+    def deviance(x, timeMask):
+        return np.abs(stats.zscore(x[timeMask]))
+        
+    plotMask = (accel['t'] > tStart) & (accel['t'] < tStop)
+    plotMaskTD = (td['t'] > tStart) & (td['t'] < tStop)
+
+    dev = pd.Series(
+        (
+            deviance(accel['data']['inertia'], plotMask)
+        ))
+
+    accelPeakIdx = getTriggers(
+        dev, iti=iti, fs=64, thres=5,
+        edgeType='rising', minAmp=None, minTrainLength=2*iti,
+        expectedTime=None, keep_max=False, plotting=False)
+
+    if visibleInChannel:
+        tapDetectSignal = td['data'].loc[plotMaskTD, visibleInChannel]
+
+        tStart = accel['t'].loc[accelPeakIdx[0]] - .1
+        tStop = accel['t'].loc[accelPeakIdx[-1]] + .1
+
+        plotMask = (accel['t'] > tStart) & (accel['t'] < tStop)
+        plotMaskTD = (td['t'] > tStart) & (td['t'] < tStop)
+
+        peakIdx = getTriggers(
+            tapDetectSignal.loc[plotMaskTD], iti=iti, fs=500, thres=3,
+            edgeType='rising', minAmp=None, minTrainLength=2*iti,
+            expectedTime=None, keep_max=True, plotting=False)
+
+        tdPeakIdx = tapDetectSignal.loc[plotMaskTD].index[peakIdx]
+        tapTimestamps = td['t'].loc[tdPeakIdx]
+        peakIdx = tdPeakIdx
+    else:
+        tapTimestamps = accel['t'].loc[accelPeakIdx]
+        peakIdx = accelPeakIdx
+
+    return tapTimestamps, peakIdx
+
+def synchronizeINStoNSP(
+    tapSpikes, tapTimestamps,
+    td = None, accel = None
+    ):
+    # sanity check that the intervals match
+    print('On the INS, the diff() between taps was\n{}'.format(
+    tapTimestamps.diff().dropna()
+    ))
+    print('On the NSP, the diff() between taps was\n{}'.format(
+        np.diff(tapSpikes['TimeStamps'][0])
+        ))
+    print('This amounts to a difference of {}'.format(
+        tapTimestamps.diff().dropna().values -
+        np.diff(tapSpikes['TimeStamps'][0])
+        ))
+
+    synchPolyCoeffsINStoNSP = np.polyfit(
+        x=tapTimestamps.values, y=tapSpikes['TimeStamps'][0], deg=1)
+    timeInterpFunINStoNSP = np.poly1d(synchPolyCoeffsINStoNSP)
+    if td is not None:
+        td['NSPTime'] = pd.Series(
+            timeInterpFunINStoNSP(td['t']), index=td['t'].index)
+    # accel['originalTime'] = accel['t']
+    if accel is not None:
+        accel['NSPTime'] = pd.Series(
+            timeInterpFunINStoNSP(accel['t']), index=accel['t'].index)
+
+    return td, accel, timeInterpFunINStoNSP
+
+def synchronizeHUTtoINS(folderPath, sessionName, deviceName = 'DeviceNPC700373H'):
+    jsonPath = os.path.join(folderPath, sessionName, deviceName)
+    with open(os.path.join(jsonPath, 'TimeSync.json'), 'r') as f:
+        timeSync = json.load(f)[0]
+        
+    timeSyncData = rcsa_helpers.extract_time_sync_meta_data(timeSync)
+    synchPolyCoeffsHUTtoINS = np.polyfit(
+        x=timeSyncData['HostUnixTime'].values,
+        y=timeSyncData['microseconds'].values * 1e-6,
+        deg=1)
+    timeInterpFunHUTtoINS = np.poly1d(synchPolyCoeffsHUTtoINS)
+    return timeInterpFunHUTtoINS
+
+def serializeINSStimLog(folderPath, sessionName, deviceName = 'DeviceNPC700373H'):
+    jsonPath = os.path.join(folderPath, sessionName, deviceName)
+    with open(os.path.join(jsonPath, 'StimLog.json'), 'r') as f:
+        stimLog = json.load(f)
+    progAmpNames = ['program{}_amplitude'.format(progIdx) for progIdx in range(4)]
+    progPWNames = ['program{}_pw'.format(progIdx) for progIdx in range(4)]
+
+    stimStatus = rcsa_helpers.extract_stim_meta_data(stimLog)
+    stripProgName = lambda x: int(x.split('program')[-1].split('_')[0])
+    stimStatus['activeProgram'] = stimStatus.loc[:,progAmpNames].idxmax(axis = 1).apply(stripProgName)
+    stimStatus['maxAmp'] = stimStatus.loc[:,progAmpNames].max(axis = 1)
+
+    try:
+        timeInterpFunHUTtoINS = synchronizeHUTtoINS(
+            folderPath, sessionName, deviceName)
+        stimStatus['INSTime'] = pd.Series(
+            timeInterpFunHUTtoINS(stimStatus['HostUnixTime']),
+            index=stimStatus['HostUnixTime'].index)
+    except Exception:
+        traceback.print_exc()
+
+    return stimStatus
+
+def getINSDeviceConfig(folderPath, sessionName, deviceName = 'DeviceNPC700373H'):
+    jsonPath = os.path.join(folderPath, sessionName, deviceName)
+
+    with open(os.path.join(jsonPath, 'DeviceSettings.json'), 'r') as f:
+        deviceSettings = json.load(f)
+    with open(os.path.join(jsonPath, 'StimLog.json'), 'r') as f:
+        stimLog = json.load(f)
+
+    progIndices = list(range(4))
+    groupIndices = list(range(4))
+    elecIndices = list(range(17))
+
+    electrodeConfiguration = [[{'cathodes': [], 'anodes': []} for i in progIndices] for j in groupIndices]
+    
+    dfIndex = pd.MultiIndex.from_product([groupIndices, progIndices], names=['group', 'program'])
+
+    electrodeStatus = pd.DataFrame(index=dfIndex, columns=elecIndices)
+    electrodeType = pd.DataFrame(index=dfIndex, columns=elecIndices)
+
+    for groupIdx in groupIndices:
+        groupPrograms = deviceSettings[0]['TherapyConfigGroup{}'.format(groupIdx)]['programs']
+        for progIdx in progIndices:
+            for elecIdx in elecIndices:
+                electrodeStatus.loc[(groupIdx, progIdx), elecIdx] =\
+                    not groupPrograms[progIdx]['electrodes']['electrodes'][elecIdx]['isOff']
+                electrodeType.loc[(groupIdx, progIdx), elecIdx] =\
+                    groupPrograms[progIdx]['electrodes']['electrodes'][elecIdx]['electrodeType']
+                if electrodeStatus.loc[(groupIdx, progIdx), elecIdx]:
+                    if electrodeType.loc[(groupIdx, progIdx), elecIdx] == 1:
+                        electrodeConfiguration[groupIdx][progIdx]['anodes'].append(elecIdx)
+                    else:
+                        electrodeConfiguration[groupIdx][progIdx]['cathodes'].append(elecIdx)
+    return electrodeStatus, electrodeType, electrodeConfiguration
 
 def getBadSpikesMask(spikes, nStd = 5, whichChan = 0, plotting = False, deleteBad = False):
     """
@@ -1209,7 +1455,7 @@ def plotChan(channelData, dataT, whichChan, recordingUnits = 'uV', electrodeLabe
 def plotChanWithSpikesandStim(\
     spikes, spikesStim, channelData,
     spikeChanName, stimChanName,
-    startTimeS, dataTimeS, timeRange
+    startTimeS, dataTimeS
     ):
 
     stimChIdx = spikesStim['ChannelID'].index(stimChanName)
@@ -1223,7 +1469,10 @@ def plotChanWithSpikesandStim(\
     stimMask = [np.full(len(channelData['data'].index), False) for i in stimUnitsOnThisChan]
     stimMaskLabel = [" " for i in stimUnitsOnThisChan]
 
-    spikeSnippetLen = spikes['Waveforms'][0].shape[1] / spikes['basic_headers']['TimeStampResolution']
+    try:
+        spikeSnippetLen = spikes['Waveforms'][0].shape[1] / spikes['basic_headers']['TimeStampResolution']
+    except:
+        spikeSnippetLen = 64 / spikes['basic_headers']['TimeStampResolution']
 
     for unitIdx, unitName in enumerate(unitsOnThisChan):
         unitMask = spikes['Classification'][spikeChIdx] == unitName
@@ -1234,7 +1483,10 @@ def plotChanWithSpikesandStim(\
             mask[unitIdx][timeMaskContinuous] = True
             maskLabel[unitIdx] = 'unit %d' % unitName
 
-    spikeSnippetLen = spikesStim['Waveforms'][0].shape[1] / spikesStim['basic_headers']['TimeStampResolution']
+    try:
+        spikeSnippetLen = spikesStim['Waveforms'][0].shape[1] / spikesStim['basic_headers']['TimeStampResolution']
+    except:
+        spikeSnippetLen = 64 / spikes['basic_headers']['TimeStampResolution']
 
     for unitIdx, unitName in enumerate(stimUnitsOnThisChan):
         unitMask = spikesStim['Classification'][stimChIdx] == unitName
@@ -1248,7 +1500,7 @@ def plotChanWithSpikesandStim(\
         #theseTimes = spikes['TimeStamps'][spikeChIdx][unitMask]
     plotChan(channelData['data'], channelData['t'].values, spikeChanName,
         mask = mask + stimMask, maskLabel = maskLabel + stimMaskLabel,
-        timeRange = (startTimeS + timeRange[0], startTimeS + timeRange[1]))
+        timeRange = (startTimeS, startTimeS + dataTimeS))
     plt.legend()
     plt.show()
 
@@ -1427,10 +1679,13 @@ def binnedEvents(timeStamps, chans,
     spikeMat = np.zeros([len(binCenters), nChans])
     for idx, chan in enumerate(chans):
         histo, _ = np.histogram(timeStamps[idx], fineBins)
-
-        spikeMat[:, idx] = np.array(
-            [histo[x:x+fineBinsPerWindow].sum() / binWidth for x in centerIdx]
-        )
+        try:
+            spikeMat[:, idx] = np.array(
+                [histo[x:x+fineBinsPerWindow].sum() / binWidth for x in centerIdx]
+            )
+        except Exception:
+            traceback.print_exc()
+            pdb.set_trace()
 
     spikeMatDF = pd.DataFrame(spikeMat.transpose(), index = chans, columns = binCenters)
     return spikeMatDF, binCenters, binLeftEdges
