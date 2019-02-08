@@ -25,6 +25,7 @@ import copy
 LABELFONTSIZE = 10
 import peakutils
 
+
 def loadParamsPy(filePath):
     """
     # Old implementation, treats params.py as a package and cannot be overriden when processing a new folder.
@@ -47,6 +48,7 @@ def loadParamsPy(filePath):
     del paramsText
 
     return locals()
+
 
 def coordsToIndices(xcoords, ycoords):
 
@@ -454,14 +456,16 @@ def getINSStimOnset(
         folderPath, sessionName, deviceName)
 
     if plotting:
-        progAmpNames = ['program{}_amplitude'.format(progIdx) for progIdx in range(4)]
+        progAmpNames = [
+            'program{}_amplitude'.format(progIdx) for progIdx in range(4)]
 
         plottingRange = np.arange(
             stimStatus['INSTime'].min(),
             stimStatus['INSTime'].max(), 10e-3) # units of sec
 
         plottingColumns = [
-            'INSTime', 'frequency', 'therapyStatus', 'amplitudeChange'] + progAmpNames
+            'INSTime', 'frequency', 'therapyStatus',
+            'amplitudeChange'] + progAmpNames
         plottingEntries = pd.DataFrame(columns=plottingColumns)
         plottingEntries['INSTime'] = plottingRange
         plotStimStatus = pd.concat([
@@ -2445,8 +2449,9 @@ def generateSpikeTriggeredAverageReport(folderPath, trialFileFrom, trialFileTo,
     arrayNameTo = key
     spikeStructTo, spikesTo = loadSpikeInfo(folderPath, key, value)
     newName = spikeBinnedSpikesNameGenerator(arrayNameFrom, arrayInfoFrom, arrayNameTo, arrayInfoTo)
+    
     spikesFromList = []
-
+    pdb.set_trace()
     for idx, channel in enumerate(spikesFrom['ChannelID']):
         unitsOnThisChan = np.unique(spikesFrom['Classification'][idx])
         if unitsOnThisChan.any():
@@ -2675,8 +2680,8 @@ def trialBinnedArrayNameRetrieve(spikeNames):
 
     return arrayName, arrayInfo, rasterOpts
 
-def loadSpikeInfo(folderPath, arrayName, arrayInfo, forceRecalc = False):
-
+def loadSpikeInfo(arrayName, arrayInfo, forceRecalc = False):
+    folderPath = arrayInfo['folderPath']
     setName = spikesNameGenerator(arrayName, arrayInfo)
     setPath = os.path.join(folderPath, setName + '.pickle')
 
@@ -2686,13 +2691,14 @@ def loadSpikeInfo(folderPath, arrayName, arrayInfo, forceRecalc = False):
     except Exception:
         traceback.print_exc()
         print('Spike metadata not pickled. Recalculating...')
-        arrayMap = pd.read_table(os.path.join(folderPath, 'array_map.cmp'), skiprows = 13)
-        spikeStruct = pd.DataFrame(np.nan, index = range(1,129), columns = ['xcoords', 'ycoords', 'nevID', 'bank', 'bankID'])
+        arrayMap = pd.read_table(os.path.join(folderPath, '{}_array_map.cmp'.format(arrayName)), skiprows = 13)
+        spikeStruct = pd.DataFrame(np.nan, index = range(1,141), columns = ['xcoords', 'ycoords', 'nevID', 'bank', 'bankID'])
         bankLookup = {'A' :0, 'B':1, 'C':2, 'D': 3}
         for rowIdx, row in arrayMap.iterrows():
             if arrayName in row['label']:
                 elec = int(row['elec']) + bankLookup[row['bank']] * 32
-                elecLabel = int(row['label'].split(arrayName)[-1])
+                elecLabel = row['label'].split(arrayName)[-1]
+                elecLabel = int(elecLabel)
                 spikeStruct.loc[elecLabel, 'xcoords'] = row['row']
                 spikeStruct.loc[elecLabel, 'ycoords'] = row['//col']
                 spikeStruct.loc[elecLabel, 'nevID'] = elec
@@ -2706,7 +2712,7 @@ def loadSpikeInfo(folderPath, arrayName, arrayInfo, forceRecalc = False):
 
 
     #pdb.set_trace()
-    nevIDs = spikeStruct.loc[arrayInfo['nevIDs'], 'nevID'].astype(int).tolist()
+    nevIDs = spikeStruct.loc[arrayInfo['nevIDs'], 'nevID'].fillna(999).astype(int).tolist()
     if not forceRecalc:
     # if not requiring a recalculation, load from pickle
         try:
@@ -2727,17 +2733,24 @@ def loadSpikeInfo(folderPath, arrayName, arrayInfo, forceRecalc = False):
             spikes = getWaveClusSpikes(
                 os.path.join(folderPath, 'wave_clus', arrayInfo['ns5FileName']) + '/',
                 nevIDs = nevIDs, plotting = False, excludeClus = arrayInfo['excludeClus'])
+            spikes['ChannelID'] = arrayInfo['nevIDs']
 
         elif arrayInfo['origin'] == 'nev':
             filePath = os.path.join(folderPath, arrayInfo['ns5FileName'] + '.nev')
             spikes = hf.getNEVData(filePath, nevIDs)
+            spikes['ChannelID'] = arrayInfo['nevIDs']
 
         elif arrayInfo['origin'] == 'mat':
             spikes = getNevMatSpikes(
                 os.path.join(folderPath, arrayInfo['ns5FileName']+'.mat'),
                 nevIDs = nevIDs, plotting = False, excludeClus = arrayInfo['excludeClus'])
+            spikes['ChannelID'] = arrayInfo['nevIDs']
+
+        elif arrayInfo['origin'] == 'ins':
+            spikes = getINSStimOnset(
+                folderPath, arrayInfo['jsonSessionNames'],
+                fs=500, stimIti=1.5, minimumDuration=10, thres=.25)
         #pdb.set_trace()
-        spikes['ChannelID'] = arrayInfo['nevIDs']
         pickle.dump(spikes,
             open(os.path.join(folderPath, setPath), 'wb')
             )

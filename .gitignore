@@ -170,3 +170,4 @@ dataAnalysis/paths.py
 #local environment definitions
 
 dataAnalysis/\.ftpconfig
+.vscode/
