@@ -67,7 +67,7 @@ def getPlotOpts(names):
     viridis_cmap = matplotlib.cm.get_cmap('viridis')
     norm = colors.Normalize(vmin=0, vmax=255)
     colorsRgb = [colors.colorConverter.to_rgb(viridis_cmap(norm(i)))
-                    for i in range(0,255)]
+                    for i in range(0, 255)]
 
     plotColPlotly, plotColMPL = [], []
     h = 1.0/(len(names)-1)
@@ -80,6 +80,7 @@ def getPlotOpts(names):
     names2int = list(range(len(names)))
     line_styles = ['-', '--', ':', '-.']
     return viridis_cmap, norm, colorsRgb, plotColPlotly, plotColMPL, names2int, line_styles
+
 
 def getNEVData(filePath, elecIds):
     # Version control
@@ -180,35 +181,45 @@ def getOpenEphysFolder(folderPath, chIds = 'all', adcIds = 'all', chanNames = No
     channelData['basic_headers']['chanNames'] = chanNames
     return channelData
 
-def getNSxData(filePath, elecIds, startTime_s, dataLength_s, downsample = 1):
+
+def getNSxData(filePath, elecIds, startTime_s, dataLength_s, spikeStruct, downsample=1):
     # Version control
     brpylib_ver_req = "1.3.1"
     if brpylib_ver.split('.') < brpylib_ver_req.split('.'):
         raise Exception("requires brpylib " + brpylib_ver_req + " or higher, please use latest version")
-    if not isinstance(elecIds, collections.Iterable):
-        elecIds = [elecIds]
+
+    elecCorrespondence = spikeStruct.loc[elecIds, 'nevID'].astype(int)
     # Open file and extract headers
 
     nsx_file = NsxFile(filePath)
-    # Extract data - note: data will be returned based on *SORTED* elec_ids, see cont_data['elec_ids']
+    # Extract data - note: data will be returned based on *SORTED* nevIds, see cont_data['elec_ids']
+    # pdb.set_trace()
+    channelData = nsx_file.getdata(
+        list(elecCorrespondence.values), startTime_s, dataLength_s, downsample)
 
-    channelData = nsx_file.getdata(elecIds, startTime_s, dataLength_s, downsample)
-
-    rowIndex = range(int(channelData['start_time_s'] * channelData['samp_per_s']),
-        int((channelData['start_time_s'] + channelData['data_time_s']) * channelData['samp_per_s']))
-    channelData['data'] = pd.DataFrame(channelData['data'].transpose(),
-        index = rowIndex, columns = elecIds)
+    rowIndex = range(
+        int(channelData['start_time_s'] * channelData['samp_per_s']),
+        int((channelData['start_time_s'] + channelData['data_time_s']) *
+            channelData['samp_per_s']))
+    channelData['data'] = pd.DataFrame(
+        channelData['data'].transpose(),
+        index=rowIndex, columns=elecCorrespondence.sort_values().index.values)
 
     channelData['t'] = channelData['start_time_s'] + np.arange(channelData['data'].shape[0]) / channelData['samp_per_s']
-    channelData['t'] = pd.Series(channelData['t'], index = channelData['data'].index)
+    channelData['t'] = pd.Series(
+        channelData['t'], index=channelData['data'].index)
     channelData['badData'] = {}
     channelData['basic_headers'] = nsx_file.basic_header
-    channelData['extended_headers'] =  nsx_file.extended_headers
+    channelData['extended_headers'] = nsx_file.extended_headers
     # Close the nsx file now that all data is out
     nsx_file.close()
     return channelData
 
-def getINSTDFromJson(folderPath, sessionName, deviceName = 'DeviceNPC700373H', fs = 500):
+
+def getINSTDFromJson(
+    folderPath, sessionName, deviceName='DeviceNPC700373H', fs=500
+    ):
+
     jsonPath = os.path.join(folderPath, sessionName, deviceName)
     try:
         #  raise(Exception('Debugging, always extract fresh'))
@@ -1695,11 +1706,11 @@ def binnedSpikesAligned(spikes, alignTimes, binInterval, binWidth, channel,
 
     ChanIdx = spikes['ChannelID'].index(channel)
     unitsOnThisChan = np.unique(spikes['Classification'][ChanIdx])
-
+    
     if unitsOnThisChan is not None:
         #peek at the binCenters. Note that this must be identical to the ones in binnedEvents
         binCenters = getBinCenters(windowSize[0], windowSize[1], binWidth, binInterval)
-
+        
         spikeMats = [pd.DataFrame(0, index = alignTimes.index,
             columns = binCenters) for unit in unitsOnThisChan]
         for unitIdx, unitName in enumerate(unitsOnThisChan):
@@ -1783,7 +1794,7 @@ def binnedSpikesAlignedToSpikes(spikesFrom, spikesTo,
     alignTimes, categories, selectedIndices = spikeAlignmentTimes(spikesTo,spikesToIdx,
         separateByFun = separateByFun,
         timeRange = timeRange, maxSpikesTo = maxSpikesTo, discardEmpty =  discardEmpty)
-
+    
     spikeMats = binnedSpikesAligned(spikesFrom, alignTimes, binInterval,
         binWidth, spikesFromIdx['chan'], windowSize = windowSize,
         discardEmpty = discardEmpty)

@@ -20,11 +20,11 @@ import h5py
 from scipy import signal
 
 def preprocNs5(
-    fileName = 'Trial001',
-    folderPath = './',
-    elecIds = range(1, 97), startTimeS = 0, dataTimeS = 'all',
-    fillOverflow = True, removeJumps = True,
-    chunkSize = 900
+    fileName='Trial001',
+    folderPath='./',
+    elecIds=range(1, 97), startTimeS=0, dataTimeS='all',
+    fillOverflow=True, removeJumps=True,
+    chunkSize=900
     ):
 
     filePath = os.path.join(folderPath, fileName) + '.ns5'
@@ -45,15 +45,15 @@ def preprocNs5(
     if not os.path.exists(os.path.join(folderPath, 'dataAnalysisPreproc')):
         os.makedirs(os.path.join(folderPath, 'dataAnalysisPreproc'))
 
-    dataPath = os.path.join(folderPath, 'dataAnalysisPreproc',
+    dataPath = os.path.join(
+        folderPath, 'dataAnalysisPreproc',
         fileName + '_clean.h5')
 
     with h5py.File(dataPath, "w") as f:
         #pdb.set_trace()
-
-        f.create_dataset("data", (nSamples,nChannels), dtype='float32',
+        f.create_dataset("data", (nSamples, nChannels), dtype='float32',
             chunks=True)
-        f.create_dataset("channels", (nChannels,), data = list(elecIds),
+        f.create_dataset("channels", (nChannels,), data=list(elecIds),
             dtype='int32')
         f.create_dataset("index", (nSamples,), dtype='int32')
         f.create_dataset("t", (nSamples,), dtype='float32')
@@ -83,7 +83,7 @@ def preprocNs5Section(
     curSection = 0, sectionsTotal = 1,
     fillOverflow = False, removeJumps = True):
 
-    filePath     = os.path.join(folderPath, fileName +'.ns5')
+    filePath     = os.path.join(folderPath, fileName + '.ns5')
     timeSection  = hf.getNSxData(filePath, elecIds, startTimeS, dataTimeS)
 
     origDataPath = os.path.join(folderPath, 'dataAnalysisPreproc',
@@ -111,10 +111,12 @@ def preprocNs5Section(
     dataPath = os.path.join(folderPath, 'dataAnalysisPreproc',
         fileName + '_clean.h5')
     with h5py.File(dataPath, "a") as f:
-        #print(timeSection['data'])
-        #pdb.set_trace()
-        sectionIndex = slice(int(curSection * chunkSize * timeSection['samp_per_s']),
-            int((curSection * chunkSize + dataTimeS) * timeSection['samp_per_s']))
+        #  print(timeSection['data'])
+        #  pdb.set_trace()
+        sectionIndex = slice(
+            int(curSection * chunkSize * timeSection['samp_per_s']),
+            int((curSection * chunkSize + dataTimeS) * timeSection['samp_per_s'])
+            )
         f['data'][sectionIndex, :] = timeSection['data'].values
         f['index'][sectionIndex] = timeSection['data'].index
         f['t'][sectionIndex] = timeSection['t'].values
