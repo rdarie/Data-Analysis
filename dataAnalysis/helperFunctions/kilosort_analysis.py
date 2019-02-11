@@ -2381,7 +2381,8 @@ def spikeTriggeredAveragePDFReport(folderPath,
     correctAlignmentSpikesFrom = 0, correctAlignmentSpikesTo = 0,
     newName = None, enableFR = True,
     plotOpts = {
-        'type' : 'ticks', 'errorBar' : 'sem', 'pageSize': (12,24)},
+        'type' : 'ticks', 'errorBar' : 'sem',
+        'pageSize': (12,24), 'removeOutliers': (0.01, 0.99)},
     rasterOpts = {
         'kernelWidth': 5e-3, 'binInterval': (3**-1)* 1e-3,
         'binWidth': (3**-1)* 1e-3, 'windowSize': (-0.01, .11),'maxSpikesTo': None,
@@ -2417,34 +2418,47 @@ def spikeTriggeredAveragePDFReport(folderPath,
 
             pairCount += 1
 
-            spikeMats, categories, selectedIndices = loadSpikeBinnedSpike(folderPath,
-                arrayNameFrom, arrayInfoFrom, arrayNameTo, arrayInfoTo,
+            spikeMats, categories, selectedIndices = loadSpikeBinnedSpike(
+                folderPath,
+                arrayNameFrom, arrayInfoFrom,
+                arrayNameTo, arrayInfoTo,
                 spikesFromIdx, spikesToIdx,
                 rasterOpts,
                 spikesFrom = spikesFrom, spikesTo = spikesTo,
                 correctAlignmentSpikesFrom = 0, correctAlignmentSpikesTo = 0)
-                
+            
+            if plotOpts['removeOutliers']:
+                spikeMats, selectedIndices = removeSpikeMatOutliers(
+                    spikeMats, plotOpts['removeOutliers'])
+                categories = categories[selectedIndices]
+
             titleOverride = 'Channel %d triggered by channel %d' % (
                             spikesFromIdx['chan'], spikesToIdx['chan'])
+            try:
+                _, fig, ax, selectedIndices = plotSpikeTriggeredRaster(\
+                    spikesFrom = None, spikesTo = None,
+                    spikesFromIdx = None, spikesToIdx = None,
+                    spikeMats = spikeMats,
+                    fig = None, ax = None,
+                    categories = categories,
+                    rasterOpts = rasterOpts,
+                    showNow = False, plotOpts = plotOpts)
 
-            _, fig, ax, selectedIndices = plotSpikeTriggeredRaster(\
-                spikesFrom = None, spikesTo = None,
-                spikesFromIdx = None, spikesToIdx = None,
-                spikeMats = spikeMats,
-                fig = None, ax = None,
-                categories = categories,
-                rasterOpts = rasterOpts,
-                showNow = False, plotOpts = plotOpts)
+                plotSpikeTriggeredFR(spikesFrom = None, spikesTo = None,
+                    spikesFromIdx = None, spikesToIdx = None,
+                    spikeMats = spikeMats, titleOverride = titleOverride,
+                    fig = fig, ax = ax, twin = True,
+                    categories = categories,
+                    rasterOpts = rasterOpts,
+                    showNow = False, plotOpts = plotOpts)
+                pdf.savefig()
+                plt.close()
 
-            plotSpikeTriggeredFR(spikesFrom = None, spikesTo = None,
-                spikesFromIdx = None, spikesToIdx = None,
-                spikeMats = spikeMats, titleOverride = titleOverride,
-                fig = fig, ax = ax, twin = True,
-                categories = categories,
-                rasterOpts = rasterOpts,
-                showNow = False, plotOpts = plotOpts)
-            pdf.savefig()
-            plt.close()
+            except Exception:
+                traceback.print_exc()
+                plt.close()
+                #  pdb.set_trace()
+
             try:
                 fig, ax = plt.subplots(nrows = 1, ncols = 2)
                 plotSpike(spikesFrom, channel = spikesFromIdx['chan'], ax = ax[0],
@@ -2453,9 +2467,11 @@ def spikeTriggeredAveragePDFReport(folderPath,
                     axesLabel = True)
                 pdf.savefig()
                 plt.close()
+
             except Exception:
                 traceback.print_exc()
-                pdb.set_trace()
+                plt.close()
+                #  pdb.set_trace()
 
 def generateSpikeTriggeredAverageReport(folderPath, trialFileFrom, trialFileTo,
     correctAlignmentSpikesFrom = 0, correctAlignmentSpikesTo = 0,
@@ -2794,6 +2810,19 @@ def loadSpikeInfo(arrayName, arrayInfo, forceRecalc = False):
         print('Recalculated spike data from {} data and saved to pickle.'.format(arrayInfo['origin']))
 
     return spikeStruct, spikes
+
+def removeSpikeMatOutliers(spikeMats, removeOutliers = (1e-2, 99e-2)):
+    for idx, spikeMat in enumerate(spikeMats):
+        sumFiring = spikeMat.sum(axis=1)
+        minFiring = sumFiring.quantile(removeOutliers[0])
+        maxFiring = sumFiring.quantile(removeOutliers[1])
+        if idx == 0:
+            keepMask = (sumFiring > minFiring) & (sumFiring < maxFiring)
+        else:
+            keepMask = keepMask & (sumFiring > minFiring) & (sumFiring < maxFiring)
+    selectedIndices = spikeMat.loc[keepMask, :].index
+    newSpikeMats = [spikeMat.loc[selectedIndices, :] for spikeMat in spikeMats]
+    return newSpikeMats, selectedIndices
 
 def loadSpikeBinnedSpike(folderPath,
     arrayNameFrom, arrayInfoFrom, arrayNameTo, arrayInfoTo,
