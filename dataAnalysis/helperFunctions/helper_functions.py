@@ -216,17 +216,38 @@ def getNSxData(filePath, elecIds, startTime_s, dataLength_s, spikeStruct, downsa
     return channelData
 
 
+def interpolateDF(
+        df, newX, kind='linear', fill_value='extrapolate',
+        x=None, columns=None):
+    #  pdb.set_trace()
+    if x is None:
+        oldX = np.array(df.index)
+        if columns is None:
+            columns = df.columns
+        outputDF = pd.DataFrame(index=newX, columns=columns)
+    else:
+        oldX = np.array(df[x])
+        if columns is None:
+            columns = df.columns[~df.columns.isin([x])]
+        outputDF = pd.DataFrame(columns=columns+[x])
+        outputDF[x] = newX
+    for columnName in columns:
+        interpFun = interpolate.interp1d(
+            oldX, df[columnName], kind=kind, fill_value=fill_value)
+        outputDF[columnName] = interpFun(newX)
+    return outputDF
+
+
 def getINSTDFromJson(
-    folderPath, sessionName, deviceName='DeviceNPC700373H', fs=500
-    ):
+        folderPath, sessionName,
+        deviceName='DeviceNPC700373H', fs=500
+        ):
 
     jsonPath = os.path.join(folderPath, sessionName, deviceName)
     try:
         #  raise(Exception('Debugging, always extract fresh'))
         tdData = pd.read_csv(
             os.path.join(jsonPath, 'RawDataTD.csv'))
-        tdData['microseconds'] = pd.to_timedelta(
-            tdData['microseconds'])
     except Exception:
         traceback.print_exc()
 
@@ -258,24 +279,31 @@ def getINSTDFromJson(
                 jsonPath, 'RawDataTD.csv'),
             time_format='full', data_type='td', num_cols=nChan)
 
-    tdData['t'] = tdData['microseconds'] / datetime.timedelta(seconds=1)
-    tdDataSorted = tdData.drop_duplicates(
-        ['t']
-        ).sort_values('t').reset_index(drop=True)
+        tdData['t'] = tdData['microseconds'] / datetime.timedelta(seconds=1)
+        tdData = tdData.drop_duplicates(
+            ['t']
+            ).sort_values('t').reset_index(drop=True)
+        uniformT = np.arange(tdData['t'].iloc[0], tdData['t'].iloc[-1] + 1/fs, 1/fs)
+        channelsPresent = [i for i in tdData.columns if 'channel_' in i]
+        tdData = interpolateDF(
+            tdData, uniformT, x='t', columns=channelsPresent)
+        tdData.to_csv(os.path.join(jsonPath, 'RawDataTD.csv'))
+    #  pdb.set_trace()
     td = {
-    'data': tdDataSorted,
-    't': tdDataSorted['microseconds'] / datetime.timedelta(seconds=1)
-    }
+        'data': tdData,
+        't': tdData['t']
+        }
     td['data']['INSTime'] = td['t']
     td['INSTime'] = td['t']
     return td
 
-def getINSAccelFromJson(folderPath, sessionName, deviceName = 'DeviceNPC700373H', fs = 64):
+def getINSAccelFromJson(
+    folderPath, sessionName, deviceName='DeviceNPC700373H', fs = 64):
+
     jsonPath = os.path.join(folderPath, sessionName, deviceName)
     try:
         #  raise(Exception('Debugging, always extract fresh'))
         accelData = pd.read_csv(os.path.join(jsonPath, 'RawDataAccel.csv'))
-        accelData['microseconds'] = pd.to_timedelta(accelData['microseconds'])
     except Exception:
         traceback.print_exc()
 
@@ -294,65 +322,96 @@ def getINSAccelFromJson(folderPath, sessionName, deviceName = 'DeviceNPC700373H'
 
         accelDataValues = rcsa_helpers.unpacker_accel(
             accelMeta, accelJson, intersampleTickCount)
+        #  pdb.set_trace()
         accelData = rcsa_helpers.save_to_disk(
             accelDataValues, os.path.join(
                 jsonPath, 'RawDataAccel.csv'),
             time_format='full', data_type='accel')
-
-    accelData['t'] = accelData['microseconds'] / datetime.timedelta(seconds=1)
-    accelDataSorted = accelData.drop_duplicates(
-        ['t']
-        ).sort_values('t').reset_index(drop=True)
+    
+        accelData['t'] = accelData['microseconds'] / datetime.timedelta(seconds=1)
+        accelData = accelData.drop_duplicates(
+            ['t']
+            ).sort_values('t').reset_index(drop=True)
+        uniformT = np.arange(accelData['t'].iloc[0], accelData['t'].iloc[-1] + 1/fs, 1/fs)
+        channelsPresent = [i for i in accelData.columns if 'accel_' in i]
+        accelData = interpolateDF(
+            accelData, uniformT, x='t', columns=channelsPresent)
+        inertia = accelData['accel_x']**2 +\
+            accelData['accel_y']**2 +\
+            accelData['accel_z']**2
+        inertia = inertia.apply(np.sqrt)
+        accelData['inertia'] = inertia
+        accelData.to_csv(os.path.join(jsonPath, 'RawDataAccel.csv'))
     accel = {
-        'data': accelDataSorted,
-        't': accelDataSorted['microseconds'] / datetime.timedelta(seconds=1)
+        'data': accelData,
+        't': accelData['t']
         }
-    inertia = accel['data']['accel_x']**2 +\
-        accel['data']['accel_y']**2 +\
-        accel['data']['accel_z']**2
-    inertia = inertia.apply(np.sqrt)
-    accel['data']['inertia'] = inertia
-
+    
     accel['INSTime'] = accel['t']
     accel['data']['INSTime'] = accel['t']
     return accel
 
 def getINSTapTimestamp(
-    td, accel,
-    tStart = 0, tStop = 30, iti = 1/4,
-    visibleInChannel = False,
-    ):
-    def deviance(x, timeMask):
-        return np.abs(stats.zscore(x[timeMask]))
-        
-    plotMask = (accel['t'] > tStart) & (accel['t'] < tStop)
-    plotMaskTD = (td['t'] > tStart) & (td['t'] < tStop)
+        td, accel,
+        timeSegments=None,
+        iti=1/4, accThres=2.58, tdThres=2.58,
+        visibleInChannel=False, plotting=False,
+        keepIndex = slice(None)
+        ):
+    accel['data']['inertia_z'] = stats.zscore(accel['data']['inertia'])
 
-    dev = pd.Series(
-        (
-            deviance(accel['data']['inertia'], plotMask)
-        ))
+    if timeSegments is None:
+        accelMask = accel['t'] > 0
+        tdMask = td['t'] > 0
+    else:
+        for idx, timeSegment in enumerate(timeSegments):
+            if idx == 0:
+                accelMask = (accel['t'] > timeSegment[0]) & (accel['t'] < timeSegment[1])
+                tdMask = (td['t'] > timeSegment[0]) & (td['t'] < timeSegment[1])
+            else:
+                accelMask = accelMask | (
+                    (accel['t'] > timeSegment[0]) & (accel['t'] < timeSegment[1]))
+                tdMask = tdMask | (
+                    (td['t'] > timeSegment[0]) & (td['t'] < timeSegment[1]))
+    #  pdb.set_trace()
 
+    # minimum distance between triggers (units of samples), 5% wiggle room
+    itiWiggle = 0.05
+    width = int(64 * iti * (1 - itiWiggle))
+    
     accelPeakIdx = getTriggers(
-        dev, iti=iti, fs=64, thres=5,
-        edgeType='rising', minAmp=None, minTrainLength=2*iti,
-        expectedTime=None, keep_max=False, plotting=False)
+        accel['data']['inertia_z'].loc[accelMask], iti=iti, fs=64, thres=accThres,
+        edgeType='rising', minAmp=None,
+        expectedTime=None, keep_max=False, plotting=plotting)
+    '''
+    ilocPeakIdx = peakutils.indexes(
+        accel['data']['inertia_z'].loc[accelMask].values, thres=accThres,
+        min_dist=width, thres_abs=True, keep_max=True)
+    accelPeakIdx = accel['data']['inertia_z'].loc[accelMask].index[ilocPeakIdx]
+    '''
+    accelPeakIdx = accelPeakIdx[keepIndex]
 
     if visibleInChannel:
-        tapDetectSignal = td['data'].loc[plotMaskTD, visibleInChannel]
+        tapDetectSignal = td['data'].loc[tdMask, visibleInChannel]
 
         tStart = accel['t'].loc[accelPeakIdx[0]] - .1
         tStop = accel['t'].loc[accelPeakIdx[-1]] + .1
 
-        plotMask = (accel['t'] > tStart) & (accel['t'] < tStop)
-        plotMaskTD = (td['t'] > tStart) & (td['t'] < tStop)
+        accelMask = accelMask & (accel['t'] > tStart) & (accel['t'] < tStop)
+        tdMask = tdMask & (td['t'] > tStart) & (td['t'] < tStop)
 
-        peakIdx = getTriggers(
-            tapDetectSignal.loc[plotMaskTD], iti=iti, fs=500, thres=3,
-            edgeType='rising', minAmp=None, minTrainLength=2*iti,
-            expectedTime=None, keep_max=True, plotting=False)
+        tdPeakIdx = getTriggers(
+            tapDetectSignal.loc[tdMask] ** 2, iti=iti, fs=500, thres=tdThres,
+            edgeType='rising', minAmp=None,
+            expectedTime=None, keep_max=False, plotting=plotting)
+        '''
+        ilocPeakIdx = peakutils.indexes(
+            tapDetectSignal.loc[tdMask].values, thres=tdThres,
+            min_dist=width, thres_abs=True, keep_max=True)
+        tdPeakIdx = tapDetectSignal.loc[tdMask].index[ilocPeakIdx]
+        '''
+        tdPeakIdx = tdPeakIdx[keepIndex]
 
-        tdPeakIdx = tapDetectSignal.loc[plotMaskTD].index[peakIdx]
         tapTimestamps = td['t'].loc[tdPeakIdx]
         peakIdx = tdPeakIdx
     else:
@@ -362,23 +421,22 @@ def getINSTapTimestamp(
     return tapTimestamps, peakIdx
 
 def synchronizeINStoNSP(
-    tapSpikes, tapTimestamps,
-    td = None, accel = None
+    tapTimestampsNSP, tapTimestampsINS,
+    td = None, accel = None, degree = 1
     ):
     # sanity check that the intervals match
-    print('On the INS, the diff() between taps was\n{}'.format(
-    tapTimestamps.diff().dropna()
-    ))
-    print('On the NSP, the diff() between taps was\n{}'.format(
-        np.diff(tapSpikes['TimeStamps'][0])
-        ))
-    print('This amounts to a difference of {}'.format(
-        tapTimestamps.diff().dropna().values -
-        np.diff(tapSpikes['TimeStamps'][0])
-        ))
-
-    synchPolyCoeffsINStoNSP = np.polyfit(
-        x=tapTimestamps.values, y=tapSpikes['TimeStamps'][0], deg=1)
+    insDiff = tapTimestampsINS.diff().dropna().values
+    nspDiff = tapTimestampsNSP.diff().dropna().values
+    print('On the INS, the diff() between taps was\n{}'.format(insDiff))
+    print('On the NSP, the diff() between taps was\n{}'.format(nspDiff))
+    print('This amounts to a difference of\n{}'.format(insDiff - nspDiff))
+    #  pdb.set_trace()
+    if degree > 0:
+        synchPolyCoeffsINStoNSP = np.polyfit(
+            x=tapTimestampsINS.values, y=tapTimestampsNSP.values, deg=degree)
+    else:
+        timeOffset = tapTimestampsNSP.values - tapTimestampsINS.values
+        synchPolyCoeffsINStoNSP = np.array([1, np.mean(timeOffset)])
     timeInterpFunINStoNSP = np.poly1d(synchPolyCoeffsINStoNSP)
     if td is not None:
         td['NSPTime'] = pd.Series(
@@ -390,17 +448,40 @@ def synchronizeINStoNSP(
 
     return td, accel, timeInterpFunINStoNSP
 
-def synchronizeHUTtoINS(folderPath, sessionName, deviceName = 'DeviceNPC700373H'):
+def synchronizeHUTtoINS(
+            folderPath, sessionName, deviceName = 'DeviceNPC700373H',
+            degree = 1, plotting = False
+            ):
     jsonPath = os.path.join(folderPath, sessionName, deviceName)
     with open(os.path.join(jsonPath, 'TimeSync.json'), 'r') as f:
         timeSync = json.load(f)[0]
         
     timeSyncData = rcsa_helpers.extract_time_sync_meta_data(timeSync)
-    synchPolyCoeffsHUTtoINS = np.polyfit(
-        x=timeSyncData['HostUnixTime'].values,
-        y=timeSyncData['microseconds'].values * 1e-6,
-        deg=1)
+    
+    if degree > 0:
+        synchPolyCoeffsHUTtoINS = np.polyfit(
+            x=timeSyncData['HostUnixTime'].values,
+            y=timeSyncData['microseconds'].values * 1e-6,
+            deg=1)
+    else:
+        #  TODO! Fix. not working
+        timeOffset = timeSyncData['microseconds'].values * 1e3 - timeSyncData['HostUnixTime'].values
+        synchPolyCoeffsHUTtoINS = np.array([1, np.mean(timeOffset)]) * 1e-3
+    #  pdb.set_trace()
     timeInterpFunHUTtoINS = np.poly1d(synchPolyCoeffsHUTtoINS)
+    if plotting:
+        plt.plot(
+            timeSyncData['HostUnixTime'].values,
+            timeSyncData['microseconds'].values * 1e-6, 'bo',
+            label = 'original')
+        plt.plot(
+            timeSyncData['HostUnixTime'].values,
+            timeInterpFunHUTtoINS(timeSyncData['HostUnixTime'].values), 'r-',
+            label = 'first degree polynomial fit')
+        plt.xlabel('Host Unix Time (msec)')
+        plt.ylabel('INS Time (sec)')
+        plt.legend()
+        plt.show()
     return timeInterpFunHUTtoINS
 
 def serializeINSStimLog(folderPath, sessionName, deviceName = 'DeviceNPC700373H'):
@@ -424,6 +505,7 @@ def serializeINSStimLog(folderPath, sessionName, deviceName = 'DeviceNPC700373H'
     except Exception:
         traceback.print_exc()
 
+    stimStatus['amplitudeRound'] = stimStatus['amplitudeChange'].astype(np.float).cumsum()
     return stimStatus
 
 def getINSDeviceConfig(folderPath, sessionName, deviceName = 'DeviceNPC700373H'):
@@ -797,10 +879,16 @@ def getTriggers(dataSeries, iti = .01, fs = 3e4, thres = 2.58,
     if edgeType == 'falling':
         triggersPrime = - triggersPrime
 
-    # moments when camera capture occured
+    # moments when camera capture occured (iloc style indexes!)
     triggersPrimeVals = triggersPrime.values.squeeze()
     peakIdx = peakutils.indexes(triggersPrimeVals, thres=thres,
         min_dist=width, thres_abs=True, keep_max = keep_max)
+    
+    if minAmp is not None:
+        #  pdb.set_trace()
+        triggersZScore = stats.zscore(dataSeries)
+        triggersAtPeaks = triggersZScore[peakIdx]
+        peakIdx = peakIdx[triggersAtPeaks > minAmp]
 
     # check that the # of triggers matches the number of frames
     if expectedTime is not None:
@@ -820,13 +908,7 @@ def getTriggers(dataSeries, iti = .01, fs = 3e4, thres = 2.58,
 
         elif len(foundTimes) > len(expectedTime):
             raise Exception('table contains {} entries and there are {} triggers'.format(len(raw.index), len(trigTimes)))
-
-    if minAmp is not None:
-        triggersZScore = pd.Series(stats.zscore(dataSeries), index = dataSeries.index)
-        insetIntoTrig = int(fs * iti * 1e-2)
-        peakIdx = np.array(peakIdx[triggersZScore.loc[peakIdx+insetIntoTrig] > minAmp])
-        #pdb.set_trace()
-
+    
     if minTrainLength is not None:
         peakMask = dataSeries.index.isin(peakIdx)
         foundTime = pd.Series((dataSeries.index[peakIdx] - dataSeries.index[peakIdx[0]]) / fs)
@@ -868,7 +950,7 @@ def getTriggers(dataSeries, iti = .01, fs = 3e4, thres = 2.58,
             plt.title('Z scored trace')
             plt.show(block = True)
 
-    return peakIdx
+    return dataSeries.index[peakIdx]
 
 def getCameraTriggers(simiData, thres = 2.58, expectedTime = None, plotting = False):
     # sample rate
@@ -1420,7 +1502,7 @@ def replaceBad(dfSeries, mask, typeOpt = 'nans'):
     return dfSeries
 
 def plotChan(channelData, dataT, whichChan, recordingUnits = 'uV', electrodeLabel = '', label = " ", mask = None, maskLabel = " ",
-    show = False, prevFig = None, zoomAxis = True, timeRange = (0,-1)):
+    show = False, prevFig = None, prevAx = None, zoomAxis = True, timeRange = (0,-1)):
     # Plot the data channel
     ch_idx  = whichChan
 
@@ -1430,7 +1512,10 @@ def plotChan(channelData, dataT, whichChan, recordingUnits = 'uV', electrodeLabe
         f, ax = plt.subplots()
     else:
         f = prevFig
-        ax = prevFig.axes[0]
+        if prevAx is None:
+            ax = prevFig.axes[0]
+        else:
+            ax = prevAx
 
     #pdb.set_trace()
     #channelDataForPlotting = channelData.drop(['Labels', 'LabelsNumeric'], axis = 1) if 'Labels' in channelData.columns else channelData

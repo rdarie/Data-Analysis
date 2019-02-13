@@ -444,12 +444,19 @@ def getSpikeStats(spikes, channel, whichStats = ['mean', 'std'], bounds = None, 
 def getINSStimOnset(
     folderPath, sessionName,
     deviceName = 'DeviceNPC700373H',
-    fs = 500, stimIti = 1.1, minimumDuration = 0, thres = .5,
-    chanNames = None,
-    td = None, accel = None, accelFs = 64, plotting = False):
+    fs = 500, stimIti = 0, minDist = 0, minDur = 0, thres = .5,
+    timeInterpFunINStoNSP=None,
+    maxSpikesPerGroup=None,
+    stimFreq = None,
+    stimDetectOpts = None,
+    td = None, accel = None, accelFs = 64, plotting = []):
     
-    if chanNames is None:
-        chanNames = {i: ['channel_0', 'channel_1'] for i in range(4)}
+    if stimDetectOpts is None:
+        defaultOptsDict = {
+            'channels': ['channel_0', 'channel_1'],
+            'thres': thres,
+            'keep_max': False}
+        stimDetectOpts = {i: defaultOptsDict for i in range(4)}
 
     elecStatus, elecType, elecConfiguration = hf.getINSDeviceConfig(
         folderPath, sessionName, deviceName)
@@ -462,7 +469,7 @@ def getINSStimOnset(
 
         plottingRange = np.arange(
             stimStatus['INSTime'].min(),
-            stimStatus['INSTime'].max(), 10e-3) # units of sec
+            stimStatus['INSTime'].max(), 2e-3) # units of sec
 
         plottingColumns = [
             'INSTime', 'frequency', 'therapyStatus',
@@ -482,10 +489,9 @@ def getINSStimOnset(
     if accel is None:
         accel = hf.getINSAccelFromJson(
             folderPath, sessionName, deviceName, accelFs)
-            
-    stimStatus['amplitudeRound'] = stimStatus['amplitudeChange'].astype(np.float).cumsum()
+
     columnsToBeAdded = [
-        'amplitudeRound', 'activeGroup',
+        'amplitudeChange', 'amplitudeRound', 'activeGroup',
         'frequency', 'activeProgram', 'maxAmp']
     roundPlaceholder = pd.DataFrame(index = td['data'].index, columns = columnsToBeAdded)
     roundPlaceholder['INSTime'] = td['INSTime']
@@ -519,14 +525,13 @@ def getINSStimOnset(
     for name, group in td['data'].groupby('amplitudeRound'):
         electrodeCombo = int(4*pd.unique(group['activeGroup'])[0]+pd.unique(group['activeProgram'])[0])
         #  print('electrode combo: {}'.format(electrodeCombo))
-        
-        thisAmplitude = group['maxAmp'].value_counts().index[0]
+        thisAmplitude = group['maxAmp'].max()
+
         # pad with 100 msec to capture first pulse
         tStart = max(0, group['INSTime'].iloc[0] - 0.1)
         tStop = min(group['INSTime'].iloc[-1], td['INSTime'].iloc[-1])
-
-        if tStop - tStart < minimumDuration:
-            #  print('tStop - tStart = {}'.format(tStop - tStart))
+        
+        if (tStop - tStart) < minDur:
             continue
 
         plotMaskTD = (td['INSTime'] > tStart) & (td['INSTime'] < tStop)
@@ -544,18 +549,23 @@ def getINSStimOnset(
             tdPow = tdPow + stats.zscore(td['data'].loc[plotMaskTD, chanName]) ** 2
         '''
         #  print('Active program is {}'.format(activeProgram))
-        theseChanNames = chanNames[activeProgram]
-        tdPow = (td['data'].loc[plotMaskTD, theseChanNames] ** 2).sum(axis = 1)
+        
+        theseDetectOpts = stimDetectOpts[activeProgram]
+        
+        tdPow = (td['data'].loc[plotMaskTD, theseDetectOpts['channels']] ** 2).sum(axis = 1)
         tdPow = tdPow - tdPow.min()
         # convolve with a rectangular kernel
         # then shift forward and backward to get forward and backward sum
         kernDur = 0.2
         kernNSamp = int(kernDur * fs)
+        if kernNSamp > len(tdPow):
+            kernNSamp = round(len(tdPow) - 2)
         kern = np.concatenate((
             np.linspace(0, 1, round(kernNSamp/2)),
             np.array([0]),
             np.linspace(-1, 0, round(kernNSamp/2))
             ))
+        #  pdb.set_trace()
         correctionFactor = pd.Series(
             np.convolve(kern, tdPow, mode = 'same'),
             index = tdPow.index)
@@ -565,22 +575,49 @@ def getINSStimOnset(
             ndimage.sobel(tdPow, mode='reflect'),
             index = tdPow.index)
             
-        stimDetectSignal = sobelFiltered * correctionFactor
-        stimDetectSignal =stimDetectSignal.fillna(0)
-        thres = thres
-        peakIdx = peakutils.indexes(stimDetectSignal.values, thres=thres,
-            min_dist=int(stimIti * fs), thres_abs=False, keep_max = True)
+        stimDetectSignal = sobelFiltered ** 2 * correctionFactor
+        stimDetectSignal = stimDetectSignal.fillna(0)
+        stimDetectSignal.iloc[:] = stats.zscore(stimDetectSignal)
+        if thisAmplitude == 0:
+            #  pdb.set_trace()
+            peakIdx = hf.getTriggers(
+                td['data'].loc[plotMaskTD, 'amplitudeChange'].astype(np.float), thres=5,
+                iti=minDist, keep_max = theseDetectOpts['keep_max'])
+        else:
+            peakIdx = peakutils.indexes(
+                stimDetectSignal.values, thres=theseDetectOpts['thres'],
+                min_dist=int(minDist * fs * 1.3), thres_abs=True, keep_max = theseDetectOpts['keep_max'])
+            peakIdx = tdPow.index[peakIdx]
 
-        #print(peakIdx)
-        #if name > 1:
-        #    break
-        peakIdx = tdPow.index[peakIdx]
+            # check for amplitude
+            keepMask = (td['data'].loc[peakIdx, 'maxAmp'] == thisAmplitude).values
+            peakIdx = peakIdx[keepMask]
+            # use the HUT derived stim onset if no artifact visible
+            if len(peakIdx) == 0:
+                #  pdb.set_trace()
+                peakIdx = hf.getTriggers(
+                    td['data'].loc[plotMaskTD, 'maxAmp'], thres=5,
+                    iti=minDist, keep_max = theseDetectOpts['keep_max'])
+        
+        if maxSpikesPerGroup is not None:
+            peakIdx = peakIdx[:maxSpikesPerGroup]
 
-        theseTimestamps = td['INSTime'].loc[peakIdx].values
+        theseTimestamps = pd.Series(
+            td['INSTime'].loc[peakIdx].values,
+            index = td['INSTime'].loc[peakIdx].index)
+
+        if stimIti > 0:
+            stimBackDiff = theseTimestamps.diff().fillna(method = 'bfill')
+            stimFwdDiff = (-1) * theseTimestamps.diff(-1).fillna(method = 'ffill')
+            stimDiff = (stimBackDiff + stimFwdDiff) / 2
+            keepMask = (stimDiff - stimIti).abs() < 0.05
+            theseTimestamps = theseTimestamps.loc[keepMask]
+            peakIdx = peakIdx[keepMask]
+        
+        theseTimestamps = theseTimestamps.values
         stimSpikes['TimeStamps'][electrodeCombo] = np.append(
             stimSpikes['TimeStamps'][electrodeCombo],
-            theseTimestamps
-        )
+            theseTimestamps)
 
         ampList = theseTimestamps ** 0 * thisAmplitude * 1e3
         #  print('The amplitude was {}'.format(thisAmplitude))
@@ -595,9 +632,11 @@ def getINSStimOnset(
             stimSpikes['Waveforms'][electrodeCombo] = np.zeros((theseTimestamps.shape[0], 3))
         #pdb.set_trace()
         
-        if plotting:
-            plotMaskStim = (plotStimStatus['INSTime'] > tStart) & (plotStimStatus['INSTime'] < tStop)
-            plotMaskAccel = (accel['INSTime'] > tStart) & (accel['INSTime'] < tStop)
+        if name in plotting:
+            plotMaskStim = (plotStimStatus['INSTime'] > tStart) & (
+                plotStimStatus['INSTime'] < tStop)
+            plotMaskAccel = (accel['INSTime'] > tStart) & (
+                accel['INSTime'] < tStop)
             # plot match between all times
             fig, ax = plt.subplots(3, 1, sharex=True)
             ax[0].plot(
@@ -619,17 +658,7 @@ def getINSStimOnset(
                 td['INSTime'].loc[plotMaskTD],
                 correctionFactor,
                 '-', label='correctionFactor')
-            '''
-            ax[1].plot(
-                group['INSTime'],
-                fwd,
-                '-', label='fwd')
-            
-            ax[1].plot(
-                group['INSTime'],
-                back,
-                '-', label='back')
-            '''
+                
             ax[1].plot(
                 td['INSTime'].loc[plotMaskTD],
                 sobelFiltered,
@@ -640,8 +669,13 @@ def getINSStimOnset(
                 '-', label='stimDetectSignal')
             ax[1].plot(
                 td['INSTime'].loc[peakIdx],
-                stimDetectSignal.loc[peakIdx] ** 0,
+                stimDetectSignal.loc[peakIdx],
                 'o', label='stimOnset')
+                                  
+            ax[1].plot(
+                td['INSTime'].loc[plotMaskTD],
+                stimDetectSignal ** 0 * theseDetectOpts['thres'],
+                'r-', label='detection Threshold')
             ax[1].legend()
             
             for columnName in progAmpNames:
@@ -655,6 +689,10 @@ def getINSStimOnset(
                 plotStimStatus.loc[plotMaskStim, 'INSTime'],
                 plotStimStatus.loc[plotMaskStim, 'therapyStatus'],
                 '--', label='therapyStatus')
+            statusAx.plot(
+                plotStimStatus.loc[plotMaskStim, 'INSTime'],
+                plotStimStatus.loc[plotMaskStim, 'amplitudeChange'],
+                'c-', label='amplitudeChange')
             ax[2].legend(loc = 'upper left')    
             statusAx.legend(loc = 'upper right')
             ax[2].set_ylabel('Stim Amplitude (mA)')
@@ -680,6 +718,12 @@ def getINSStimOnset(
         i for i in itertools.compress(stimSpikes['Waveforms'], fil)]
     stimSpikes['NEUEVWAV_HeaderIndices'] = [
         i for i in itertools.compress(stimSpikes['NEUEVWAV_HeaderIndices'], fil)]
+
+    if timeInterpFunINStoNSP is not None:
+        # synchronize stim timestamps with INS timestamps
+        for idx, timestampArray in enumerate(stimSpikes['TimeStamps']):
+            stimSpikes['TimeStamps'][idx] = timeInterpFunINStoNSP(timestampArray)
+
     return stimSpikes
 
 def plotSpike(spikes, channel, showNow = False, ax = None,
@@ -2586,8 +2630,9 @@ def loadEventInfo(folderPath, eventInfo,
             forceRecalc = True
 
     if forceRecalc:
-        motorData = mea.getMotorData(os.path.join(folderPath,
-            eventInfo['ns5FileName']) + '.ns5', eventInfo['inputIDs'], 0 , 'all')
+        motorData = mea.getMotorData(
+            os.path.join(folderPath, eventInfo['ns5FileName'] + '.ns5'),
+            eventInfo['inputIDs'], 0 , 'all', eventInfo['spikeStruct'])
         trialStats, trialEvents = mea.getTrials(motorData)
 
         trialStats.to_hdf(setPath, 'trialStats')
@@ -2801,7 +2846,7 @@ def loadSpikeInfo(arrayName, arrayInfo, forceRecalc = False):
         elif arrayInfo['origin'] == 'ins':
             spikes = getINSStimOnset(
                 folderPath, arrayInfo['jsonSessionNames'],
-                fs=500, stimIti=1.5, minimumDuration=10, thres=.25)
+                fs=500, **arrayInfo['getINSkwargs'])
             
         #pdb.set_trace()
         pickle.dump(spikes,
