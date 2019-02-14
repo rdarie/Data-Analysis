@@ -463,38 +463,16 @@ def getINSStimOnset(
 
     progAmpNames = [
         'program{}_amplitude'.format(progIdx) for progIdx in range(4)]
-    '''
-    plottingColumns = [
-        'frequency', 'therapyStatus', 'activeProgram',
-        'amplitudeChange'] + progAmpNames
-    plottingRange = np.arange(
-        stimStatus['INSTime'].min(),
-        stimStatus['INSTime'].max(), 1e-3) # units of sec
-    stimStatusExtended = hf.interpolateDF(
-        stimStatus, plottingRange,
-        x='INSTime', columns=plottingColumns, kind='previous')
-    '''
-    #  TODO: replace with call to interpolateDF
+    
     columnsToBeAdded = [
         'amplitudeChange', 'amplitudeRound', 'activeGroup',
         'frequency', 'therapyStatus', 'activeProgram', 'maxAmp'] + progAmpNames
     infoFromStimStatus = hf.interpolateDF(
         stimStatus, td['INSTime'],
         x='INSTime', columns=columnsToBeAdded, kind='previous')
-    '''
-    roundPlaceholder = pd.DataFrame(index = td['data'].index, columns = columnsToBeAdded)
-    roundPlaceholder['INSTime'] = td['INSTime']
-    roundPlaceholder = roundPlaceholder.append(
-        stimStatus.loc[:,columnsToBeAdded + ['INSTime']], ignore_index = True
-        )
-    roundPlaceholder.sort_values('INSTime', inplace=True)
-    roundPlaceholder.fillna(method='ffill', axis=0, inplace=True)
-    roundPlaceholder.fillna(method='bfill', axis=0, inplace=True)
-    '''
+    
     for columnName in columnsToBeAdded:
-        #td['data'][columnName] = roundPlaceholder.loc[td['data'].index,columnName]
         td['data'][columnName] = infoFromStimStatus.loc[:,columnName]
-    #  TODO: replace above with call to interpolateDF
     allGroups = pd.unique(stimStatus['activeGroup'])
     uniqueElectrodeCombos = list(range(4*len(allGroups)))
     nCh = len(uniqueElectrodeCombos)
@@ -516,22 +494,21 @@ def getINSStimOnset(
         electrodeCombo = int(4*pd.unique(group['activeGroup'])[0]+pd.unique(group['activeProgram'])[0])
         #  print('electrode combo: {}'.format(electrodeCombo))
         thisAmplitude = group['maxAmp'].max()
-
+        thisTrialSegment = group['trialSegment'].value_counts().idxmax()
         #  pad with 100 msec to capture first pulse
-        tStart = max(0, group['INSTime'].iloc[0] -0.1)
+        #  tStart = max(0, group['INSTime'].iloc[0])
         tStop = min(group['INSTime'].iloc[-1], td['INSTime'].iloc[-1])
         
         #  pad with 100 msec to *avoid* first pulse
-        #  tStart = min(tStop, group['INSTime'].iloc[0] + 0.1)
+        tStart = min(tStop, group['INSTime'].iloc[0] + 0.1)
         
         if (tStop - tStart) < minDur:
             continue
 
         plotMaskTD = (td['INSTime'] > tStart) & (td['INSTime'] < tStop)
-        maskStim = (stimStatusExtended['INSTime'] > tStart) & (stimStatusExtended['INSTime'] < tStop)
-
-        activeState = stimStatusExtended.loc[maskStim,'therapyStatus'].value_counts().idxmax()
-        activeProgram = stimStatusExtended.loc[maskStim,'activeProgram'].value_counts().idxmax()
+        
+        activeState = td['data'].loc[plotMaskTD,'therapyStatus'].value_counts().idxmax()
+        activeProgram = td['data'].loc[plotMaskTD,'activeProgram'].value_counts().idxmax()
 
         if not activeState:
             print('Therapy not active!')
@@ -622,6 +599,11 @@ def getINSStimOnset(
             theseTimestamps = theseTimestamps.loc[keepMask]
             peakIdx = peakIdx[keepMask]
         
+        if timeInterpFunINStoNSP is not None:
+            # synchronize stim timestamps with INS timestamps
+            theseTimestamps.iloc[:] = timeInterpFunINStoNSP[thisTrialSegment](
+                theseTimestamps.values)
+        
         theseTimestamps = theseTimestamps.values
         stimSpikes['TimeStamps'][electrodeCombo] = np.append(
             stimSpikes['TimeStamps'][electrodeCombo],
@@ -688,18 +670,18 @@ def getINSStimOnset(
             
             for columnName in progAmpNames:
                 ax[2].plot(
-                    stimStatusExtended.loc[maskStim, 'INSTime'],
-                    stimStatusExtended.loc[maskStim, columnName],
+                    td['data'].loc[plotMaskTD, 'INSTime'],
+                    td['data'].loc[plotMaskTD, columnName],
                     '-', label=columnName, lw = 2.5)
 
             statusAx = ax[2].twinx()
             statusAx.plot(
-                stimStatusExtended.loc[maskStim, 'INSTime'],
-                stimStatusExtended.loc[maskStim, 'therapyStatus'],
+                td['data'].loc[plotMaskTD, 'INSTime'],
+                td['data'].loc[plotMaskTD, 'therapyStatus'],
                 '--', label='therapyStatus', lw = 1.5)
             statusAx.plot(
-                stimStatusExtended.loc[maskStim, 'INSTime'],
-                stimStatusExtended.loc[maskStim, 'amplitudeChange'],
+                td['data'].loc[plotMaskTD, 'INSTime'],
+                td['data'].loc[plotMaskTD, 'amplitudeChange'],
                 'c--', label='amplitudeChange', lw = 1.5)
             ax[2].legend(loc = 'upper left')    
             statusAx.legend(loc = 'upper right')
@@ -726,11 +708,6 @@ def getINSStimOnset(
         i for i in itertools.compress(stimSpikes['Waveforms'], fil)]
     stimSpikes['NEUEVWAV_HeaderIndices'] = [
         i for i in itertools.compress(stimSpikes['NEUEVWAV_HeaderIndices'], fil)]
-
-    if timeInterpFunINStoNSP is not None:
-        # synchronize stim timestamps with INS timestamps
-        for idx, timestampArray in enumerate(stimSpikes['TimeStamps']):
-            stimSpikes['TimeStamps'][idx] = timeInterpFunINStoNSP(timestampArray)
 
     return stimSpikes
 
@@ -1140,7 +1117,7 @@ def plotSpikeTriggeredRaster(spikesFrom = None, spikesTo = None,
         plotRaster(spikeMats, fig, ax, showNow = showNow, plotOpts = plotOpts, rasterOpts = rasterOpts)
     else: # multiple subplots
         if ax is None:
-            fig, ax = plt.subplots(len(uniqueCategories),1)
+            fig, ax = plt.subplots(len(uniqueCategories),1, tight_layout={'pad': 0.01})
             for idx, curAx in enumerate(ax):
                 labelFontSize = LABELFONTSIZE
                 curAx.set_ylabel('Spike', fontsize = labelFontSize,
@@ -1158,7 +1135,7 @@ def plotSpikeTriggeredRaster(spikesFrom = None, spikesTo = None,
             fig = ax[0].figure
         plotRaster(spikeMats, fig, ax, categories, uniqueCategories, curLine,
             showNow = showNow, plotOpts = plotOpts, rasterOpts = rasterOpts)
-    plt.tight_layout(pad = 0.01)
+    
     return spikeMats, fig, ax, selectedIndices
 
 #@profile
@@ -1382,7 +1359,7 @@ def plotSpikeTriggeredFR(spikesFrom = None, spikesTo = None,
         plotFR(spikeMats, fig, ax, showNow = showNow, plotOpts = plotOpts, rasterOpts = rasterOpts)
     else: # subplots
         if ax is None:
-            fig, ax = plt.subplots(len(uniqueCategories),1)
+            fig, ax = plt.subplots(len(uniqueCategories),1, tight_layout={'pad':0.01})
         else: # ax pre-exists and has multiple subplots
             fig = ax[0].figure
             for idx, curAx in enumerate(ax):
