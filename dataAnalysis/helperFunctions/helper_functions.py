@@ -162,14 +162,14 @@ def getOpenEphysFolder(folderPath, chIds = 'all', adcIds = 'all', chanNames = No
         else:
             dataLength_s = t[-1]
 
-    #pdb.set_trace()
-    data = pd.DataFrame(np.concatenate((recordingData, adcData), axis = 1), columns = chanNames)
-    isADC = np.ones(len(data.columns), dtype = np.bool)
+    #  pdb.set_trace()
+    data = pd.DataFrame(np.concatenate((recordingData, adcData), axis=1), columns=chanNames)
+    isADC = np.ones(len(data.columns), dtype=np.bool)
     isADC[:len(chIds)] = False
 
     channelData = {
         'data' : data,
-        't' : pd.Series(t, index = data.index),
+        't' : pd.Series(t, index=data.index),
         'basic_headers' :dummyChannelData['header'],
         'badData' : {},
         'start_time_s' : startTime_s,
@@ -238,19 +238,17 @@ def interpolateDF(
     return outputDF
 
 
+INSReferenceTime = pd.Timestamp('2018-03-01')
+
+
 def getINSTDFromJson(
         folderPath, sessionNames,
         deviceName='DeviceNPC700373H', fs=500,
-        forceRecalc=False, getInterpolated=True,
-        absoluteStartTime=None
+        forceRecalc=False, getInterpolated=True
         ):
 
     if not isinstance(sessionNames, Iterable):
         sessionNames = [sessionNames]
-
-    if absoluteStartTime is not None and getInterpolated:
-        #  can't trust that the .csv files are aligned properly
-        forceRecalc = True
 
     pktAlignData = pd.DataFrame(
         index=range(len(sessionNames)),
@@ -281,11 +279,8 @@ def getINSTDFromJson(
                 tdData = pd.read_csv(
                     os.path.join(jsonPath, 'RawDataTD_interpolated.csv'))
             else:
-                #  realign t index
-                if absoluteStartTime is None:
-                    absoluteStartTime = tdData['actual_time'].iloc[0]
                 tdData['t'] = (
-                    tdData['actual_time'] - absoluteStartTime) / (
+                    tdData['actual_time'] - INSReferenceTime) / (
                         datetime.timedelta(seconds=1))
 
             tdSessions.append(tdData)
@@ -320,10 +315,8 @@ def getINSTDFromJson(
                     jsonPath, 'RawDataTD.csv'),
                 time_format='full', data_type='td', num_cols=nChan)
 
-            if absoluteStartTime is None:
-                absoluteStartTime = tdData['actual_time'].iloc[0]
             tdData['t'] = (
-                tdData['actual_time'] - absoluteStartTime) / (
+                tdData['actual_time'] - INSReferenceTime) / (
                     datetime.timedelta(seconds=1))
 
             #  get first SysTick and timestamp for this session
@@ -347,10 +340,14 @@ def getINSTDFromJson(
                     tdData, uniformT, x='t', columns=channelsPresent)
 
             tdData['trialSegment'] = idx
-            
+
             if getInterpolated:
                 tdData.to_csv(
                     os.path.join(jsonPath, 'RawDataTD_interpolated.csv'))
+            else:
+                tdData.to_csv(
+                    os.path.join(jsonPath, 'RawDataTD.csv'))
+
             tdSessions.append(tdData)
 
     td = {
@@ -361,14 +358,13 @@ def getINSTDFromJson(
 
     td['data']['INSTime'] = td['data']['t']
     td['INSTime'] = td['t']
-    return td, absoluteStartTime, pktAlignData
+    return td, pktAlignData
 
 
 def getINSTimeSyncFromJson(
         folderPath, sessionNames,
         deviceName='DeviceNPC700373H',
-        forceRecalc=False,
-        absoluteStartTime=None
+        forceRecalc=False
         ):
 
     if not isinstance(sessionNames, Iterable):
@@ -388,8 +384,8 @@ def getINSTimeSyncFromJson(
             #  loading from csv removes datetime formatting, recover it:
             timeSyncData['microseconds'] = pd.to_timedelta(
                 timeSyncData['microseconds'], unit='us')
-            timeSyncData['master_time'] = pd.to_datetime(
-                timeSyncData['master_time'])
+            timeSyncData['time_master'] = pd.to_datetime(
+                timeSyncData['time_master'])
             timeSyncData['actual_time'] = pd.to_datetime(
                 timeSyncData['actual_time'])
 
@@ -406,31 +402,25 @@ def getINSTimeSyncFromJson(
         pktAlignData.loc[idx, 'firstSysTick'] = timeSyncData[
             'microseconds'].iloc[0]
         pktAlignData.loc[idx, 'firstTimestamp'] = timeSyncData[
-            'master_time'].iloc[0]
+            'time_master'].iloc[0]
 
-        if absoluteStartTime is None:
-            absoluteStartTime = timeSyncData['actual_time'].iloc[0]
         timeSyncData['t'] = (
-            timeSyncData['actual_time'] - absoluteStartTime) / (
+            timeSyncData['actual_time'] - INSReferenceTime) / (
                 datetime.timedelta(seconds=1))
         tsSessions.append(timeSyncData)
 
     allTimeSync = pd.concat(tsSessions, ignore_index=True)
-    return allTimeSync, absoluteStartTime, pktAlignData
-    
+    return allTimeSync, pktAlignData
+
+
 def getINSAccelFromJson(
         folderPath, sessionNames,
         deviceName='DeviceNPC700373H', fs=64,
-        forceRecalc=False, getInterpolated=True,
-        absoluteStartTime=None
+        forceRecalc=False, getInterpolated=True
         ):
 
     if not isinstance(sessionNames, Iterable):
         sessionNames = [sessionNames]
-
-    if absoluteStartTime is not None and getInterpolated:
-        #  can't trust that the .csv files are aligned properly
-        forceRecalc = True
 
     pktAlignData = pd.DataFrame(
         index=range(len(sessionNames)),
@@ -461,12 +451,10 @@ def getINSAccelFromJson(
                 accelData = pd.read_csv(
                     os.path.join(jsonPath, 'RawDataAccel_interpolated.csv'))
             else:
-                if absoluteStartTime is None:
-                    absoluteStartTime = accelData['actual_time'].iloc[0]
                 accelData['t'] = (
-                    accelData['actual_time'] - absoluteStartTime) / (
+                    accelData['actual_time'] - INSReferenceTime) / (
                         datetime.timedelta(seconds=1))
-            accelSessions.append(accelData)
+
         except Exception:
             traceback.print_exc()
 
@@ -491,9 +479,6 @@ def getINSAccelFromJson(
                     jsonPath, 'RawDataAccel.csv'),
                 time_format='full', data_type='accel')
 
-            if absoluteStartTime is None:
-                absoluteStartTime = accelData['actual_time'].iloc[0]
-
             #  get first SysTick and timestamp for this session
             pktAlignData.loc[idx, 'firstSysTick'] = accelData[
                 'microseconds'].iloc[0]
@@ -501,12 +486,13 @@ def getINSAccelFromJson(
                 'time_master'].iloc[0]
 
             accelData['t'] = (
-                accelData['actual_time'] - absoluteStartTime) / (
+                accelData['actual_time'] - INSReferenceTime) / (
                     datetime.timedelta(seconds=1))
 
             accelData = accelData.drop_duplicates(
                 ['t']
                 ).sort_values('t').reset_index(drop=True)
+
             if getInterpolated:
                 uniformT = np.arange(
                     accelData['t'].iloc[0],
@@ -527,7 +513,11 @@ def getINSAccelFromJson(
             if getInterpolated:
                 accelData.to_csv(
                     os.path.join(jsonPath, 'RawDataAccel_interpolated.csv'))
-            accelSessions.append(accelData)
+            else:
+                accelData.to_csv(
+                    os.path.join(jsonPath, 'RawDataAccel.csv'))
+
+        accelSessions.append(accelData)
 
     accel = {
         'data': pd.concat(accelSessions, ignore_index=True),
@@ -537,7 +527,29 @@ def getINSAccelFromJson(
     accel['t'] = accel['data']['t']
     accel['INSTime'] = accel['data']['t']
     accel['data']['INSTime'] = accel['t']
-    return accel, absoluteStartTime, pktAlignData
+    return accel, pktAlignData
+
+
+def realignINSTimestamps(
+        dataStruct, trialSegment, alignmentFactor
+        ):
+
+    if isinstance(dataStruct, pd.DataFrame):
+        segmentMask = dataStruct['trialSegment'] == trialSegment
+        dataStruct.loc[segmentMask, 't'] += alignmentFactor
+
+    elif isinstance(dataStruct, dict):
+        segmentMask = dataStruct['data']['trialSegment'] == trialSegment
+        dataStruct['data'].loc[segmentMask, 't'] += alignmentFactor
+        '''
+        #  Don't do this! ['INSTime'] is a reference to ['t']
+        #  both for the dict and the dataFrame
+        if 'INSTime' in dataStruct['data'].columns:
+            dataStruct['data'].loc[
+                segmentMask, 'INSTime'] += alignmentFactor
+        '''
+        dataStruct['t'].loc[segmentMask] += alignmentFactor
+    return dataStruct
 
 
 def getINSTapTimestamp(
@@ -721,7 +733,7 @@ def serializeINSStimLog(
         deviceName='DeviceNPC700373H',
         absoluteStartTime=None):
     allStimStatus = []
-    allTimeInterpFunHUTtoINS = []
+    
     for idx, sessionName in enumerate(sessionNames):
         jsonPath = os.path.join(folderPath, sessionName, deviceName)
         with open(os.path.join(jsonPath, 'StimLog.json'), 'r') as f:
@@ -732,25 +744,12 @@ def serializeINSStimLog(
         stimStatus = rcsa_helpers.extract_stim_meta_data(stimLog)
         stripProgName = lambda x: int(x.split('program')[-1].split('_')[0])
         stimStatus['activeProgram'] = stimStatus.loc[:,progAmpNames].idxmax(axis = 1).apply(stripProgName)
-        stimStatus['maxAmp'] = stimStatus.loc[:,progAmpNames].max(axis = 1)
-
-        try:
-            timeInterpFunHUTtoINS, absoluteStartTime = synchronizeHUTtoINS(
-                folderPath, sessionName, deviceName,
-                degree=0, plotting=False, absoluteStartTime=absoluteStartTime)
-
-            allTimeInterpFunHUTtoINS.append(timeInterpFunHUTtoINS)
-            stimStatus['INSTime'] = pd.Series(
-                timeInterpFunHUTtoINS(stimStatus['HostUnixTime']),
-                index=stimStatus['HostUnixTime'].index)
-        except Exception:
-            traceback.print_exc()
-        
+        stimStatus['maxAmp'] = stimStatus.loc[:,progAmpNames].max(axis = 1)       
         stimStatus['trialSegment'] = idx
         allStimStatus.append(stimStatus)
     allStimStatusDF = pd.concat(allStimStatus, ignore_index=True)
     allStimStatusDF['amplitudeRound'] = allStimStatusDF['amplitudeChange'].astype(np.float).cumsum()
-    return allStimStatusDF, allTimeInterpFunHUTtoINS
+    return allStimStatusDF
 
 def getINSDeviceConfig(folderPath, sessionName, deviceName = 'DeviceNPC700373H'):
     jsonPath = os.path.join(folderPath, sessionName, deviceName)
