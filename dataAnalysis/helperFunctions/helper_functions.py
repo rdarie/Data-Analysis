@@ -10,7 +10,7 @@ except:
 
 import matplotlib, pdb, sys, itertools, os, pickle, gc, random, string,\
 subprocess, collections, traceback, peakutils, math, argparse
-
+from collections.abc import Iterable
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 import matplotlib.ticker as ticker
@@ -239,186 +239,283 @@ def interpolateDF(
 
 
 def getINSTDFromJson(
-        folderPath, sessionName,
-        deviceName='DeviceNPC700373H', fs=500
+        folderPath, sessionNames,
+        deviceName='DeviceNPC700373H', fs=500,
+        forceRecalc=False,
+        absoluteStartTime=None
         ):
 
-    jsonPath = os.path.join(folderPath, sessionName, deviceName)
-    try:
-        #  raise(Exception('Debugging, always extract fresh'))
-        tdData = pd.read_csv(
-            os.path.join(jsonPath, 'RawDataTD.csv'))
-    except Exception:
-        traceback.print_exc()
+    if not isinstance(sessionNames, Iterable):
+        sessionNames = [sessionNames]
 
-        with open(os.path.join(jsonPath, 'RawDataTD.json'), 'r') as f:
-            timeDomainJson = json.load(f)
-            
-        intersampleTickCount = (1/fs) / (100e-6)
+    if absoluteStartTime is not None:
+        #  can't trust that the .csv files are aligned properly
+        forceRecalc = True
 
-        timeDomainMeta = rcsa_helpers.extract_td_meta_data(timeDomainJson)
-        # assume n channels is constant
-        nChan = int(timeDomainMeta[0, 8])
+    tdSessions = []
+    for idx, sessionName in enumerate(sessionNames):
+        jsonPath = os.path.join(folderPath, sessionName, deviceName)
+        try:
+            if forceRecalc:
+                raise(Exception('Debugging, always extract fresh'))
+            tdData = pd.read_csv(
+                os.path.join(jsonPath, 'RawDataTD.csv'))
+        except Exception:
+            traceback.print_exc()
 
-        timeDomainMeta = rcsa_helpers.code_micro_and_macro_packet_loss(
-            timeDomainMeta)
+            with open(os.path.join(jsonPath, 'RawDataTD.json'), 'r') as f:
+                timeDomainJson = json.load(f)
+                
+            intersampleTickCount = (1/fs) / (100e-6)
 
-        timeDomainMeta, packetsNeededFixing =\
-            rcsa_helpers.correct_meta_matrix_time_displacement(
-                timeDomainMeta, intersampleTickCount)
+            timeDomainMeta = rcsa_helpers.extract_td_meta_data(timeDomainJson)
+            # assume n channels is constant
+            nChan = int(timeDomainMeta[0, 8])
 
-        num_real_points, num_macro_rollovers, loss_as_scalar =\
-            rcsa_helpers.calculate_statistics(
-                timeDomainMeta, intersampleTickCount)
-        
-        timeDomainValues = rcsa_helpers.unpacker_td(
-            timeDomainMeta, timeDomainJson, intersampleTickCount)
-        
-        tdData = rcsa_helpers.save_to_disk(
-            timeDomainValues, os.path.join(
-                jsonPath, 'RawDataTD.csv'),
-            time_format='full', data_type='td', num_cols=nChan)
+            timeDomainMeta = rcsa_helpers.code_micro_and_macro_packet_loss(
+                timeDomainMeta)
 
-        tdData['t'] = tdData['microseconds'] / datetime.timedelta(seconds=1)
-        tdData = tdData.drop_duplicates(
-            ['t']
-            ).sort_values('t').reset_index(drop=True)
-        uniformT = np.arange(tdData['t'].iloc[0], tdData['t'].iloc[-1] + 1/fs, 1/fs)
-        channelsPresent = [i for i in tdData.columns if 'channel_' in i]
-        tdData = interpolateDF(
-            tdData, uniformT, x='t', columns=channelsPresent)
-        tdData.to_csv(os.path.join(jsonPath, 'RawDataTD.csv'))
+            timeDomainMeta, packetsNeededFixing =\
+                rcsa_helpers.correct_meta_matrix_time_displacement(
+                    timeDomainMeta, intersampleTickCount)
+
+            num_real_points, num_macro_rollovers, loss_as_scalar =\
+                rcsa_helpers.calculate_statistics(
+                    timeDomainMeta, intersampleTickCount)
+
+            timeDomainValues = rcsa_helpers.unpacker_td(
+                timeDomainMeta, timeDomainJson, intersampleTickCount)
+
+            tdData = rcsa_helpers.save_to_disk(
+                timeDomainValues, os.path.join(
+                    jsonPath, 'RawDataTD.csv'),
+                time_format='full', data_type='td', num_cols=nChan)
+
+            if absoluteStartTime is None:
+                absoluteStartTime = tdData['actual_time'].iloc[0]
+
+            tdData['t'] = (
+                tdData['actual_time'] - absoluteStartTime) / (
+                    datetime.timedelta(seconds=1))
+
+            tdData = tdData.drop_duplicates(
+                ['t']
+                ).sort_values('t').reset_index(drop=True)
+                
+            uniformT = np.arange(
+                tdData['t'].iloc[0],
+                tdData['t'].iloc[-1] + 1/fs,
+                1/fs)
+            channelsPresent = [i for i in tdData.columns if 'channel_' in i]
+            tdData = interpolateDF(
+                tdData, uniformT, x='t', columns=channelsPresent)
+            tdData['trialSegment'] = idx
+            tdData.to_csv(os.path.join(jsonPath, 'RawDataTD.csv'))
+            tdSessions.append(tdData)
     #  pdb.set_trace()
+    #   / datetime.timedelta(seconds=1)
     td = {
-        'data': tdData,
-        't': tdData['t']
+        'data': pd.concat(tdSessions, ignore_index=True),
+        't': None
         }
-    td['data']['INSTime'] = td['t']
+    td['t'] = td['data']['t']
+
+    td['data']['INSTime'] = td['data']['t']
     td['INSTime'] = td['t']
-    return td
+    return td, absoluteStartTime
 
 def getINSAccelFromJson(
-    folderPath, sessionName, deviceName='DeviceNPC700373H', fs = 64):
+        folderPath, sessionNames,
+        deviceName='DeviceNPC700373H', fs=64,
+        forceRecalc=False,
+        absoluteStartTime=None
+        ):
 
-    jsonPath = os.path.join(folderPath, sessionName, deviceName)
-    try:
-        #  raise(Exception('Debugging, always extract fresh'))
-        accelData = pd.read_csv(os.path.join(jsonPath, 'RawDataAccel.csv'))
-    except Exception:
-        traceback.print_exc()
+    if not isinstance(sessionNames, Iterable):
+        sessionNames = [sessionNames]
 
-        with open(os.path.join(jsonPath, 'RawDataAccel.json'), 'r') as f:
-            accelJson = json.load(f)
+    if absoluteStartTime is not None:
+        #  can't trust that the .csv files are aligned properly
+        forceRecalc = True
 
-        intersampleTickCount = (1/fs) / (100e-6)
-        accelMeta = rcsa_helpers.extract_accel_meta_data(accelJson)
+    accelSessions = []
+    for idx, sessionName in enumerate(sessionNames):
+        jsonPath = os.path.join(folderPath, sessionName, deviceName)
+        try:
+            if forceRecalc:
+                raise(Exception('Debugging, always extract fresh'))
+            accelData = pd.read_csv(os.path.join(jsonPath, 'RawDataAccel.csv'))
+        except Exception:
+            traceback.print_exc()
 
-        accelMeta = rcsa_helpers.code_micro_and_macro_packet_loss(
-            accelMeta)
+            with open(os.path.join(jsonPath, 'RawDataAccel.json'), 'r') as f:
+                accelJson = json.load(f)
 
-        accelMeta, packetsNeededFixing =\
-            rcsa_helpers.correct_meta_matrix_time_displacement(
-                accelMeta, intersampleTickCount)
+            intersampleTickCount = (1/fs) / (100e-6)
+            accelMeta = rcsa_helpers.extract_accel_meta_data(accelJson)
 
-        accelDataValues = rcsa_helpers.unpacker_accel(
-            accelMeta, accelJson, intersampleTickCount)
-        #  pdb.set_trace()
-        accelData = rcsa_helpers.save_to_disk(
-            accelDataValues, os.path.join(
-                jsonPath, 'RawDataAccel.csv'),
-            time_format='full', data_type='accel')
-    
-        accelData['t'] = accelData['microseconds'] / datetime.timedelta(seconds=1)
-        accelData = accelData.drop_duplicates(
-            ['t']
-            ).sort_values('t').reset_index(drop=True)
-        uniformT = np.arange(accelData['t'].iloc[0], accelData['t'].iloc[-1] + 1/fs, 1/fs)
-        channelsPresent = [i for i in accelData.columns if 'accel_' in i]
-        accelData = interpolateDF(
-            accelData, uniformT, x='t', columns=channelsPresent)
-        inertia = accelData['accel_x']**2 +\
-            accelData['accel_y']**2 +\
-            accelData['accel_z']**2
-        inertia = inertia.apply(np.sqrt)
-        accelData['inertia'] = inertia
-        accelData.to_csv(os.path.join(jsonPath, 'RawDataAccel.csv'))
+            accelMeta = rcsa_helpers.code_micro_and_macro_packet_loss(
+                accelMeta)
+
+            accelMeta, packetsNeededFixing =\
+                rcsa_helpers.correct_meta_matrix_time_displacement(
+                    accelMeta, intersampleTickCount)
+
+            accelDataValues = rcsa_helpers.unpacker_accel(
+                accelMeta, accelJson, intersampleTickCount)
+            #  pdb.set_trace()
+            accelData = rcsa_helpers.save_to_disk(
+                accelDataValues, os.path.join(
+                    jsonPath, 'RawDataAccel.csv'),
+                time_format='full', data_type='accel')
+
+            if absoluteStartTime is None:
+                absoluteStartTime = accelData['actual_time'].iloc[0]
+
+            accelData['t'] = (
+                accelData['actual_time'] - absoluteStartTime) / (
+                    datetime.timedelta(seconds=1))
+
+            accelData = accelData.drop_duplicates(
+                ['t']
+                ).sort_values('t').reset_index(drop=True)
+
+            uniformT = np.arange(
+                accelData['t'].iloc[0],
+                accelData['t'].iloc[-1] + 1/fs,
+                1/fs)
+            channelsPresent = [i for i in accelData.columns if 'accel_' in i]
+            accelData = interpolateDF(
+                accelData, uniformT, x='t', columns=channelsPresent)
+
+            inertia = accelData['accel_x']**2 +\
+                accelData['accel_y']**2 +\
+                accelData['accel_z']**2
+            inertia = inertia.apply(np.sqrt)
+            accelData['inertia'] = inertia
+
+            accelData['trialSegment'] = idx
+            accelData.to_csv(os.path.join(jsonPath, 'RawDataAccel.csv'))
+            accelSessions.append(accelData)
+
     accel = {
-        'data': accelData,
-        't': accelData['t']
+        'data': pd.concat(accelSessions, ignore_index=True),
+        't': None
         }
-    
-    accel['INSTime'] = accel['t']
+
+    accel['t'] = accel['data']['t']
+    accel['INSTime'] = accel['data']['t']
     accel['data']['INSTime'] = accel['t']
-    return accel
+    return accel, absoluteStartTime
+
 
 def getINSTapTimestamp(
-        td, accel,
-        timeSegments=None,
-        iti=1/4, accThres=2.58, tdThres=2.58,
-        visibleInChannel=False, plotting=False,
-        keepIndex = slice(None)
+        td=None, accel=None,
+        tapDetectOpts={}, plotting=False
         ):
-    accel['data']['inertia_z'] = stats.zscore(accel['data']['inertia'])
 
-    if timeSegments is None:
-        accelMask = accel['t'] > 0
-        tdMask = td['t'] > 0
+    if 'timeRanges' in tapDetectOpts.keys():
+        timeRanges = tapDetectOpts['timeRanges']
     else:
-        for idx, timeSegment in enumerate(timeSegments):
-            if idx == 0:
-                accelMask = (accel['t'] > timeSegment[0]) & (accel['t'] < timeSegment[1])
-                tdMask = (td['t'] > timeSegment[0]) & (td['t'] < timeSegment[1])
-            else:
-                accelMask = accelMask | (
-                    (accel['t'] > timeSegment[0]) & (accel['t'] < timeSegment[1]))
-                tdMask = tdMask | (
-                    (td['t'] > timeSegment[0]) & (td['t'] < timeSegment[1]))
-    #  pdb.set_trace()
+        timeRanges = None
 
-    # minimum distance between triggers (units of samples), 5% wiggle room
-    itiWiggle = 0.05
-    width = int(64 * iti * (1 - itiWiggle))
-    
-    accelPeakIdx = getTriggers(
-        accel['data']['inertia_z'].loc[accelMask], iti=iti, fs=64, thres=accThres,
-        edgeType='rising', minAmp=None,
-        expectedTime=None, keep_max=False, plotting=plotting)
-    '''
-    ilocPeakIdx = peakutils.indexes(
-        accel['data']['inertia_z'].loc[accelMask].values, thres=accThres,
-        min_dist=width, thres_abs=True, keep_max=True)
-    accelPeakIdx = accel['data']['inertia_z'].loc[accelMask].index[ilocPeakIdx]
-    '''
-    accelPeakIdx = accelPeakIdx[keepIndex]
+    if 'keepIndex' in tapDetectOpts.keys():
+        keepIndex = tapDetectOpts['keepIndex']
+    else:
+        keepIndex = slice(None)
 
-    if visibleInChannel:
-        tapDetectSignal = td['data'].loc[tdMask, visibleInChannel]
+    if 'iti' in tapDetectOpts.keys():
+        iti = tapDetectOpts['iti']
+    else:
+        iti = 0.25
+    #  itiWiggle = 0.05
 
-        tStart = accel['t'].loc[accelPeakIdx[0]] - .1
-        tStop = accel['t'].loc[accelPeakIdx[-1]] + .1
+    if 'accChan' in tapDetectOpts.keys():
+        assert accel is not None
 
-        accelMask = accelMask & (accel['t'] > tStart) & (accel['t'] < tStop)
-        tdMask = tdMask & (td['t'] > tStart) & (td['t'] < tStop)
+        if not isinstance(accel, dict):
+            accel = {
+                'data': accel,
+                't': accel['t']
+                }
 
-        tdPeakIdx = getTriggers(
-            tapDetectSignal.loc[tdMask] ** 2, iti=iti, fs=500, thres=tdThres,
-            edgeType='rising', minAmp=None,
+        if timeRanges is None:
+            tdMask = td['t'] > 0
+        else:
+            for idx, timeSegment in enumerate(timeRanges):
+                if idx == 0:
+                    accelMask = (accel['t'] > timeSegment[0]) & (
+                        accel['t'] < timeSegment[1])
+                else:
+                    accelMask = accelMask | (
+                        (accel['t'] > timeSegment[0]) & (
+                            accel['t'] < timeSegment[1]))
+
+        tapDetectSignal = accel['data'].loc[
+            accelMask, tapDetectOpts['accChan']]
+        
+        accelPeakIdx = getTriggers(
+            tapDetectSignal, iti=iti, fs=64, thres=tapDetectOpts['accThres'],
+            edgeType='both', minAmp=None,
             expectedTime=None, keep_max=False, plotting=plotting)
         '''
+
+        # minimum distance between triggers (units of samples), 5% wiggle room
+        width = int(64 * iti * (1 - itiWiggle))
+        ilocPeakIdx = peakutils.indexes(
+            accel['data']['inertia_z'].loc[accelMask].values, thres=accThres,
+            min_dist=width, thres_abs=True, keep_max=True)
+        accelPeakIdx = accel['data']['inertia_z'].loc[accelMask].index[ilocPeakIdx]
+        '''
+        accelPeakIdx = accelPeakIdx[keepIndex]
+        print('Accel Timestamps \n{}'.format(accel['t'].loc[accelPeakIdx]))
+
+        tapTimestamps = accel['t'].loc[accelPeakIdx]
+        peakIdx = accelPeakIdx
+
+    if 'tdChan' in tapDetectOpts.keys():
+        assert td is not None
+        if not isinstance(td, dict):
+            td = {
+                'data': td,
+                't': td['t']
+                }
+
+        if timeRanges is None:
+            tdMask = td['t'] > 0
+        else:
+            for idx, timeSegment in enumerate(timeRanges):
+                if idx == 0:
+                    tdMask = (td['t'] > timeSegment[0]) & (
+                        td['t'] < timeSegment[1])
+                else:
+                    tdMask = tdMask | (
+                        (td['t'] > timeSegment[0]) & (
+                            td['t'] < timeSegment[1]))
+
+        tapDetectSignal = td['data'].loc[tdMask, tapDetectOpts['tdChan']]
+
+        tdPeakIdx = getTriggers(
+            tapDetectSignal, iti=iti, fs=500, thres=tapDetectOpts['tdThres'],
+            edgeType='both', minAmp=None,
+            expectedTime=None, keep_max=False, plotting=plotting)
+        '''
+
+        # minimum distance between triggers (units of samples), 5% wiggle room
+        width = int(500 * iti * (1 - itiWiggle))
         ilocPeakIdx = peakutils.indexes(
             tapDetectSignal.loc[tdMask].values, thres=tdThres,
             min_dist=width, thres_abs=True, keep_max=True)
         tdPeakIdx = tapDetectSignal.loc[tdMask].index[ilocPeakIdx]
         '''
         tdPeakIdx = tdPeakIdx[keepIndex]
+        print('TD Timestamps \n{}'.format(td['t'].loc[tdPeakIdx]))
 
         tapTimestamps = td['t'].loc[tdPeakIdx]
         peakIdx = tdPeakIdx
-    else:
-        tapTimestamps = accel['t'].loc[accelPeakIdx]
-        peakIdx = accelPeakIdx
 
     return tapTimestamps, peakIdx
+
 
 def synchronizeINStoNSP(
     tapTimestampsNSP, tapTimestampsINS,
@@ -449,64 +546,80 @@ def synchronizeINStoNSP(
     return td, accel, timeInterpFunINStoNSP
 
 def synchronizeHUTtoINS(
-            folderPath, sessionName, deviceName = 'DeviceNPC700373H',
-            degree = 1, plotting = False
+            folderPath, sessionName, deviceName='DeviceNPC700373H',
+            degree=1, plotting=False, absoluteStartTime=None
             ):
     jsonPath = os.path.join(folderPath, sessionName, deviceName)
     with open(os.path.join(jsonPath, 'TimeSync.json'), 'r') as f:
         timeSync = json.load(f)[0]
         
     timeSyncData = rcsa_helpers.extract_time_sync_meta_data(timeSync)
-    
+    #  pdb.set_trace()
+    if absoluteStartTime is None:
+        absoluteStartTime = timeSyncData['actual_time'].iloc[0]
+
+    timeSyncData['t'] = (timeSyncData['actual_time'] - absoluteStartTime) / (datetime.timedelta(seconds=1))
     if degree > 0:
         synchPolyCoeffsHUTtoINS = np.polyfit(
             x=timeSyncData['HostUnixTime'].values,
-            y=timeSyncData['microseconds'].values * 1e-6,
+            y=timeSyncData['t'].values,
             deg=1)
     else:
         #  TODO! Fix. not working
-        timeOffset = timeSyncData['microseconds'].values * 1e3 - timeSyncData['HostUnixTime'].values
-        synchPolyCoeffsHUTtoINS = np.array([1, np.mean(timeOffset)]) * 1e-3
+        timeOffset = timeSyncData['t'].values - timeSyncData['HostUnixTime'].values * 1e-3
+        synchPolyCoeffsHUTtoINS = np.array([1e-3, np.mean(timeOffset)])
     #  pdb.set_trace()
     timeInterpFunHUTtoINS = np.poly1d(synchPolyCoeffsHUTtoINS)
     if plotting:
         plt.plot(
-            timeSyncData['HostUnixTime'].values,
-            timeSyncData['microseconds'].values * 1e-6, 'bo',
+            timeSyncData['HostUnixTime'].values * 1e-3,
+            timeSyncData['t'].values, 'bo',
             label = 'original')
         plt.plot(
-            timeSyncData['HostUnixTime'].values,
+            timeSyncData['HostUnixTime'].values * 1e-3,
             timeInterpFunHUTtoINS(timeSyncData['HostUnixTime'].values), 'r-',
             label = 'first degree polynomial fit')
         plt.xlabel('Host Unix Time (msec)')
         plt.ylabel('INS Time (sec)')
         plt.legend()
         plt.show()
-    return timeInterpFunHUTtoINS
+    return timeInterpFunHUTtoINS, absoluteStartTime
 
-def serializeINSStimLog(folderPath, sessionName, deviceName = 'DeviceNPC700373H'):
-    jsonPath = os.path.join(folderPath, sessionName, deviceName)
-    with open(os.path.join(jsonPath, 'StimLog.json'), 'r') as f:
-        stimLog = json.load(f)
-    progAmpNames = ['program{}_amplitude'.format(progIdx) for progIdx in range(4)]
-    progPWNames = ['program{}_pw'.format(progIdx) for progIdx in range(4)]
+def serializeINSStimLog(
+        folderPath, sessionNames,
+        deviceName='DeviceNPC700373H',
+        absoluteStartTime=None):
+    allStimStatus = []
+    allTimeInterpFunHUTtoINS = []
+    for idx, sessionName in enumerate(sessionNames):
+        jsonPath = os.path.join(folderPath, sessionName, deviceName)
+        with open(os.path.join(jsonPath, 'StimLog.json'), 'r') as f:
+            stimLog = json.load(f)
+        progAmpNames = ['program{}_amplitude'.format(progIdx) for progIdx in range(4)]
+        progPWNames = ['program{}_pw'.format(progIdx) for progIdx in range(4)]
 
-    stimStatus = rcsa_helpers.extract_stim_meta_data(stimLog)
-    stripProgName = lambda x: int(x.split('program')[-1].split('_')[0])
-    stimStatus['activeProgram'] = stimStatus.loc[:,progAmpNames].idxmax(axis = 1).apply(stripProgName)
-    stimStatus['maxAmp'] = stimStatus.loc[:,progAmpNames].max(axis = 1)
+        stimStatus = rcsa_helpers.extract_stim_meta_data(stimLog)
+        stripProgName = lambda x: int(x.split('program')[-1].split('_')[0])
+        stimStatus['activeProgram'] = stimStatus.loc[:,progAmpNames].idxmax(axis = 1).apply(stripProgName)
+        stimStatus['maxAmp'] = stimStatus.loc[:,progAmpNames].max(axis = 1)
 
-    try:
-        timeInterpFunHUTtoINS = synchronizeHUTtoINS(
-            folderPath, sessionName, deviceName)
-        stimStatus['INSTime'] = pd.Series(
-            timeInterpFunHUTtoINS(stimStatus['HostUnixTime']),
-            index=stimStatus['HostUnixTime'].index)
-    except Exception:
-        traceback.print_exc()
+        try:
+            timeInterpFunHUTtoINS, absoluteStartTime = synchronizeHUTtoINS(
+                folderPath, sessionName, deviceName,
+                degree=0, plotting=False, absoluteStartTime=absoluteStartTime)
 
-    stimStatus['amplitudeRound'] = stimStatus['amplitudeChange'].astype(np.float).cumsum()
-    return stimStatus
+            allTimeInterpFunHUTtoINS.append(timeInterpFunHUTtoINS)
+            stimStatus['INSTime'] = pd.Series(
+                timeInterpFunHUTtoINS(stimStatus['HostUnixTime']),
+                index=stimStatus['HostUnixTime'].index)
+        except Exception:
+            traceback.print_exc()
+        
+        stimStatus['trialSegment'] = idx
+        allStimStatus.append(stimStatus)
+    allStimStatusDF = pd.concat(allStimStatus, ignore_index=True)
+    allStimStatusDF['amplitudeRound'] = allStimStatusDF['amplitudeChange'].astype(np.float).cumsum()
+    return allStimStatusDF, allTimeInterpFunHUTtoINS
 
 def getINSDeviceConfig(folderPath, sessionName, deviceName = 'DeviceNPC700373H'):
     jsonPath = os.path.join(folderPath, sessionName, deviceName)
@@ -878,7 +991,8 @@ def getTriggers(dataSeries, iti = .01, fs = 3e4, thres = 2.58,
 
     if edgeType == 'falling':
         triggersPrime = - triggersPrime
-
+    elif edgeType == 'both':
+        triggersPrime = triggersPrime.abs()
     # moments when camera capture occured (iloc style indexes!)
     triggersPrimeVals = triggersPrime.values.squeeze()
     peakIdx = peakutils.indexes(triggersPrimeVals, thres=thres,
