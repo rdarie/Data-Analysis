@@ -241,16 +241,20 @@ def interpolateDF(
 def getINSTDFromJson(
         folderPath, sessionNames,
         deviceName='DeviceNPC700373H', fs=500,
-        forceRecalc=False,
+        forceRecalc=False, getInterpolated=True,
         absoluteStartTime=None
         ):
 
     if not isinstance(sessionNames, Iterable):
         sessionNames = [sessionNames]
 
-    if absoluteStartTime is not None:
+    if absoluteStartTime is not None and getInterpolated:
         #  can't trust that the .csv files are aligned properly
         forceRecalc = True
+
+    pktAlignData = pd.DataFrame(
+        index=range(len(sessionNames)),
+        columns=['firstSysTick', 'firstTimestamp'])
 
     tdSessions = []
     for idx, sessionName in enumerate(sessionNames):
@@ -258,8 +262,33 @@ def getINSTDFromJson(
         try:
             if forceRecalc:
                 raise(Exception('Debugging, always extract fresh'))
-            tdData = pd.read_csv(
-                os.path.join(jsonPath, 'RawDataTD.csv'))
+
+            tdData = pd.read_csv(os.path.join(jsonPath, 'RawDataTD.csv'))
+
+            #  loading from csv removes datetime formatting, recover it:
+            tdData['microseconds'] = pd.to_timedelta(
+                tdData['microseconds'], unit='us')
+            tdData['time_master'] = pd.to_datetime(
+                tdData['time_master'])
+
+            #  get first SysTick and timestamp for this session
+            pktAlignData.loc[idx, 'firstSysTick'] = tdData[
+                'microseconds'].iloc[0]
+            pktAlignData.loc[idx, 'firstTimestamp'] = tdData[
+                'time_master'].iloc[0]
+
+            if getInterpolated:
+                tdData = pd.read_csv(
+                    os.path.join(jsonPath, 'RawDataTD_interpolated.csv'))
+            else:
+                #  realign t index
+                if absoluteStartTime is None:
+                    absoluteStartTime = tdData['actual_time'].iloc[0]
+                tdData['t'] = (
+                    tdData['actual_time'] - absoluteStartTime) / (
+                        datetime.timedelta(seconds=1))
+
+            tdSessions.append(tdData)
         except Exception:
             traceback.print_exc()
 
@@ -293,27 +322,37 @@ def getINSTDFromJson(
 
             if absoluteStartTime is None:
                 absoluteStartTime = tdData['actual_time'].iloc[0]
-
             tdData['t'] = (
                 tdData['actual_time'] - absoluteStartTime) / (
                     datetime.timedelta(seconds=1))
 
+            #  get first SysTick and timestamp for this session
+            pktAlignData.loc[idx, 'firstSysTick'] = tdData[
+                'microseconds'].iloc[0]
+            pktAlignData.loc[idx, 'firstTimestamp'] = tdData[
+                'time_master'].iloc[0]
+
             tdData = tdData.drop_duplicates(
                 ['t']
                 ).sort_values('t').reset_index(drop=True)
-                
-            uniformT = np.arange(
-                tdData['t'].iloc[0],
-                tdData['t'].iloc[-1] + 1/fs,
-                1/fs)
-            channelsPresent = [i for i in tdData.columns if 'channel_' in i]
-            tdData = interpolateDF(
-                tdData, uniformT, x='t', columns=channelsPresent)
+
+            if getInterpolated:
+                uniformT = np.arange(
+                    tdData['t'].iloc[0],
+                    tdData['t'].iloc[-1] + 1/fs,
+                    1/fs)
+                channelsPresent = [
+                    i for i in tdData.columns if 'channel_' in i]
+                tdData = interpolateDF(
+                    tdData, uniformT, x='t', columns=channelsPresent)
+
             tdData['trialSegment'] = idx
-            tdData.to_csv(os.path.join(jsonPath, 'RawDataTD.csv'))
+            
+            if getInterpolated:
+                tdData.to_csv(
+                    os.path.join(jsonPath, 'RawDataTD_interpolated.csv'))
             tdSessions.append(tdData)
-    #  pdb.set_trace()
-    #   / datetime.timedelta(seconds=1)
+
     td = {
         'data': pd.concat(tdSessions, ignore_index=True),
         't': None
@@ -322,11 +361,12 @@ def getINSTDFromJson(
 
     td['data']['INSTime'] = td['data']['t']
     td['INSTime'] = td['t']
-    return td, absoluteStartTime
+    return td, absoluteStartTime, pktAlignData
 
-def getINSAccelFromJson(
+
+def getINSTimeSyncFromJson(
         folderPath, sessionNames,
-        deviceName='DeviceNPC700373H', fs=64,
+        deviceName='DeviceNPC700373H',
         forceRecalc=False,
         absoluteStartTime=None
         ):
@@ -334,9 +374,67 @@ def getINSAccelFromJson(
     if not isinstance(sessionNames, Iterable):
         sessionNames = [sessionNames]
 
-    if absoluteStartTime is not None:
+    pktAlignData = pd.DataFrame(
+        index=range(len(sessionNames)),
+        columns=['firstSysTick', 'firstTimestamp'])
+    tsSessions = []
+    for idx, sessionName in enumerate(sessionNames):
+        jsonPath = os.path.join(folderPath, sessionName, deviceName)
+        try:
+            if forceRecalc:
+                raise(Exception('Debugging, always extract fresh'))
+
+            timeSyncData = pd.read_csv(os.path.join(jsonPath, 'TimeSync.csv'))
+            #  loading from csv removes datetime formatting, recover it:
+            timeSyncData['microseconds'] = pd.to_timedelta(
+                timeSyncData['microseconds'], unit='us')
+            timeSyncData['master_time'] = pd.to_datetime(
+                timeSyncData['master_time'])
+            timeSyncData['actual_time'] = pd.to_datetime(
+                timeSyncData['actual_time'])
+
+        except Exception:
+            traceback.print_exc()
+            with open(os.path.join(jsonPath, 'TimeSync.json'), 'r') as f:
+                timeSync = json.load(f)[0]
+            timeSyncData = rcsa_helpers.extract_time_sync_meta_data(timeSync)
+
+            timeSyncData['trialSegment'] = idx
+            timeSyncData.to_csv(os.path.join(jsonPath, 'TimeSync.csv'))
+
+        #  get first SysTick and timestamp for this session
+        pktAlignData.loc[idx, 'firstSysTick'] = timeSyncData[
+            'microseconds'].iloc[0]
+        pktAlignData.loc[idx, 'firstTimestamp'] = timeSyncData[
+            'master_time'].iloc[0]
+
+        if absoluteStartTime is None:
+            absoluteStartTime = timeSyncData['actual_time'].iloc[0]
+        timeSyncData['t'] = (
+            timeSyncData['actual_time'] - absoluteStartTime) / (
+                datetime.timedelta(seconds=1))
+        tsSessions.append(timeSyncData)
+
+    allTimeSync = pd.concat(tsSessions, ignore_index=True)
+    return allTimeSync, absoluteStartTime, pktAlignData
+    
+def getINSAccelFromJson(
+        folderPath, sessionNames,
+        deviceName='DeviceNPC700373H', fs=64,
+        forceRecalc=False, getInterpolated=True,
+        absoluteStartTime=None
+        ):
+
+    if not isinstance(sessionNames, Iterable):
+        sessionNames = [sessionNames]
+
+    if absoluteStartTime is not None and getInterpolated:
         #  can't trust that the .csv files are aligned properly
         forceRecalc = True
+
+    pktAlignData = pd.DataFrame(
+        index=range(len(sessionNames)),
+        columns=['firstSysTick', 'firstTimestamp'])
 
     accelSessions = []
     for idx, sessionName in enumerate(sessionNames):
@@ -344,7 +442,31 @@ def getINSAccelFromJson(
         try:
             if forceRecalc:
                 raise(Exception('Debugging, always extract fresh'))
+                
             accelData = pd.read_csv(os.path.join(jsonPath, 'RawDataAccel.csv'))
+
+            #  loading from csv removes datetime formatting, recover it:
+            accelData['microseconds'] = pd.to_timedelta(
+                accelData['microseconds'], unit='us')
+            accelData['time_master'] = pd.to_datetime(
+                accelData['time_master'])
+
+            #  get first SysTick and timestamp for this session
+            pktAlignData.loc[idx, 'firstSysTick'] = accelData[
+                'microseconds'].iloc[0]
+            pktAlignData.loc[idx, 'firstTimestamp'] = accelData[
+                'time_master'].iloc[0]
+
+            if getInterpolated:
+                accelData = pd.read_csv(
+                    os.path.join(jsonPath, 'RawDataAccel_interpolated.csv'))
+            else:
+                if absoluteStartTime is None:
+                    absoluteStartTime = accelData['actual_time'].iloc[0]
+                accelData['t'] = (
+                    accelData['actual_time'] - absoluteStartTime) / (
+                        datetime.timedelta(seconds=1))
+            accelSessions.append(accelData)
         except Exception:
             traceback.print_exc()
 
@@ -372,6 +494,12 @@ def getINSAccelFromJson(
             if absoluteStartTime is None:
                 absoluteStartTime = accelData['actual_time'].iloc[0]
 
+            #  get first SysTick and timestamp for this session
+            pktAlignData.loc[idx, 'firstSysTick'] = accelData[
+                'microseconds'].iloc[0]
+            pktAlignData.loc[idx, 'firstTimestamp'] = accelData[
+                'time_master'].iloc[0]
+
             accelData['t'] = (
                 accelData['actual_time'] - absoluteStartTime) / (
                     datetime.timedelta(seconds=1))
@@ -379,14 +507,15 @@ def getINSAccelFromJson(
             accelData = accelData.drop_duplicates(
                 ['t']
                 ).sort_values('t').reset_index(drop=True)
-
-            uniformT = np.arange(
-                accelData['t'].iloc[0],
-                accelData['t'].iloc[-1] + 1/fs,
-                1/fs)
-            channelsPresent = [i for i in accelData.columns if 'accel_' in i]
-            accelData = interpolateDF(
-                accelData, uniformT, x='t', columns=channelsPresent)
+            if getInterpolated:
+                uniformT = np.arange(
+                    accelData['t'].iloc[0],
+                    accelData['t'].iloc[-1] + 1/fs,
+                    1/fs)
+                channelsPresent = [
+                    i for i in accelData.columns if 'accel_' in i]
+                accelData = interpolateDF(
+                    accelData, uniformT, x='t', columns=channelsPresent)
 
             inertia = accelData['accel_x']**2 +\
                 accelData['accel_y']**2 +\
@@ -395,7 +524,9 @@ def getINSAccelFromJson(
             accelData['inertia'] = inertia
 
             accelData['trialSegment'] = idx
-            accelData.to_csv(os.path.join(jsonPath, 'RawDataAccel.csv'))
+            if getInterpolated:
+                accelData.to_csv(
+                    os.path.join(jsonPath, 'RawDataAccel_interpolated.csv'))
             accelSessions.append(accelData)
 
     accel = {
@@ -406,7 +537,7 @@ def getINSAccelFromJson(
     accel['t'] = accel['data']['t']
     accel['INSTime'] = accel['data']['t']
     accel['data']['INSTime'] = accel['t']
-    return accel, absoluteStartTime
+    return accel, absoluteStartTime, pktAlignData
 
 
 def getINSTapTimestamp(
@@ -565,7 +696,7 @@ def synchronizeHUTtoINS(
             y=timeSyncData['t'].values,
             deg=1)
     else:
-        #  TODO! Fix. not working
+        
         timeOffset = timeSyncData['t'].values - timeSyncData['HostUnixTime'].values * 1e-3
         synchPolyCoeffsHUTtoINS = np.array([1e-3, np.mean(timeOffset)])
     #  pdb.set_trace()
