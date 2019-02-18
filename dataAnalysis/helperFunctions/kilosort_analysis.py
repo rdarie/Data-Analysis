@@ -443,7 +443,7 @@ def getSpikeStats(spikes, channel, whichStats = ['mean', 'std'], bounds = None, 
 
 def getINSStimOnset(
     folderPath, sessionName, 
-    td, stimStatus, accel = None, deviceName='DeviceNPC700373H',
+    td = None, stimStatus = None, accel = None, deviceName='DeviceNPC700373H',
     fs = 500, stimIti = 0, minDist = 0, minDur = 0, thres = .5,
     timeInterpFunINStoNSP=None,
     maxSpikesPerGroup=None,
@@ -491,18 +491,23 @@ def getINSStimOnset(
         }
 
     for name, group in td['data'].groupby('amplitudeRound'):
-        electrodeCombo = int(4*pd.unique(group['activeGroup'])[0]+pd.unique(group['activeProgram'])[0])
+        electrodeCombo = int(4 * pd.unique(group['activeGroup'])[0] + (
+            pd.unique(group['activeProgram'])[0]))
         #  print('electrode combo: {}'.format(electrodeCombo))
         thisAmplitude = group['maxAmp'].max()
         thisTrialSegment = group['trialSegment'].value_counts().idxmax()
+        
         #  pad with 100 msec to capture first pulse
-        #  tStart = max(0, group['INSTime'].iloc[0])
+        tStart = max(0, group['INSTime'].iloc[0] - 0.1)
         tStop = min(group['INSTime'].iloc[-1], td['INSTime'].iloc[-1])
         
         #  pad with 100 msec to *avoid* first pulse
-        tStart = min(tStop, group['INSTime'].iloc[0] + 0.1)
+        #  tStart = min(tStop, group['INSTime'].iloc[0] + 0.1)
         
         if (tStop - tStart) < minDur:
+            print('tStart ={}'.format(tStart))
+            print('tStop ={}'.format(tStop))
+            print('(tStop - tStart) < minDur')
             continue
 
         plotMaskTD = (td['INSTime'] > tStart) & (td['INSTime'] < tStop)
@@ -543,7 +548,7 @@ def getINSStimOnset(
 
         sobelFiltered = pd.Series(
             ndimage.sobel(tdPow, mode='reflect'),
-            index = tdPow.index)
+            index=tdPow.index)
 
         sobelFiltered.iloc[:] = stats.zscore(sobelFiltered)
         stimDetectSignal = sobelFiltered.abs() * correctionFactor
@@ -552,9 +557,10 @@ def getINSStimOnset(
 
         if thisAmplitude == 0:
             #  pdb.set_trace()
-            peakIdx = hf.getTriggers(
-                td['data'].loc[plotMaskTD, 'amplitudeChange'].astype(np.float), thres=5,
-                iti=minDist, keep_max = theseDetectOpts['keep_max'])
+            #  peakIdx = hf.getTriggers(
+            #      td['data'].loc[plotMaskTD, 'amplitudeChange'].astype(np.float), thres=5,
+            #      iti=minDist, keep_max = theseDetectOpts['keep_max'])
+            peakIdx = np.array([])
         else:
             peakIdx = peakutils.indexes(
                 stimDetectSignal.values, thres=theseDetectOpts['thres'],
@@ -593,7 +599,7 @@ def getINSStimOnset(
             stimDiff = (stimBackDiff + stimFwdDiff) / 2
             offBy = (stimDiff - stimIti).abs()
             if name in plotting:
-                print('offBy')
+                print('off by:')
                 print('{}'.format(offBy))
             keepMask = offBy < 0.3
             theseTimestamps = theseTimestamps.loc[keepMask]
@@ -2830,8 +2836,8 @@ def loadSpikeInfo(arrayName, arrayInfo, forceRecalc = False):
 
         elif arrayInfo['origin'] == 'ins':
             spikes = getINSStimOnset(
-                folderPath, arrayInfo['jsonSessionNames'],
-                fs=500, **arrayInfo['getINSkwargs'])
+                folderPath, arrayInfo['jsonSessionNames'][0],
+                **arrayInfo['getINSkwargs'])
             
         #pdb.set_trace()
         pickle.dump(spikes,
