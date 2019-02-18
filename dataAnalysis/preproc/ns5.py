@@ -9,6 +9,7 @@ from brpy version: 1.1.1 --- 07/22/2016
 import matplotlib, math, pdb
 import dataAnalysis.helperFunctions.helper_functions as hf
 import dataAnalysis.helperFunctions.motor_encoder as mea
+from brPY.brpylib import NsxFile, NevFile, brpylib_ver
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -18,6 +19,42 @@ from copy import *
 import argparse
 import h5py
 from scipy import signal
+
+
+def getNSxData(
+        filePath, elecIds, startTime_s,
+        dataLength_s, spikeStruct, downsample=1):
+    # Version control
+    brpylib_ver_req = "1.3.1"
+    if brpylib_ver.split('.') < brpylib_ver_req.split('.'):
+        raise Exception("requires brpylib " + brpylib_ver_req + " or higher, please use latest version")
+
+    elecCorrespondence = spikeStruct.loc[elecIds, 'nevID'].astype(int)
+    # Open file and extract headers
+
+    nsx_file = NsxFile(filePath)
+    # Extract data - note: data will be returned based on *SORTED* nevIds, see cont_data['elec_ids']
+    # pdb.set_trace()
+    channelData = nsx_file.getdata(
+        list(elecCorrespondence.values), startTime_s, dataLength_s, downsample)
+
+    rowIndex = range(
+        int(channelData['start_time_s'] * channelData['samp_per_s']),
+        int((channelData['start_time_s'] + channelData['data_time_s']) *
+            channelData['samp_per_s']))
+    channelData['data'] = pd.DataFrame(
+        channelData['data'].transpose(),
+        index=rowIndex, columns=elecCorrespondence.sort_values().index.values)
+
+    channelData['t'] = channelData['start_time_s'] + np.arange(channelData['data'].shape[0]) / channelData['samp_per_s']
+    channelData['t'] = pd.Series(
+        channelData['t'], index=channelData['data'].index)
+    channelData['badData'] = {}
+    channelData['basic_headers'] = nsx_file.basic_header
+    channelData['extended_headers'] = nsx_file.extended_headers
+    # Close the nsx file now that all data is out
+    nsx_file.close()
+    return channelData
 
 def preprocNs5(
     fileName='Trial001',
@@ -130,95 +167,6 @@ def preprocNs5Section(
         pickle.dump(timeSection, f, protocol=4 )
 
     print('Done cleaning data')
-
-def preprocOpenEphysFolder(
-    folderPath,
-    chIds = 'all', adcIds = 'all',
-    chanNames = None,
-    notchFreq = 60, notchWidth = 5, notchOrder = 2, nNotchHarmonics = 1,
-    highPassFreq = None, highPassOrder = 2,
-    lowPassFreq = None, lowPassOrder = 2,
-    startTimeS = 0, dataTimeS = 900,
-    chunkSize = 900,
-    curSection = 0, sectionsTotal = 1,
-    fillOverflow = False, removeJumps = True):
-
-    channelData = hf.getOpenEphysFolder(folderPath, adcIds = adcIds, chanNames = chanNames)
-    cleanData = preprocOpenEphys(channelData,
-        notchFreq = notchFreq, notchWidth = notchWidth, notchOrder = notchOrder, nNotchHarmonics = nNotchHarmonics,
-        highPassFreq = highPassFreq, highPassOrder = highPassOrder,
-        lowPassFreq = lowPassFreq, lowPassOrder = lowPassOrder,
-        startTimeS =startTimeS, dataTimeS = dataTimeS,
-        chunkSize = chunkSize ,
-        curSection = curSection, sectionsTotal = sectionsTotal,
-        fillOverflow = fillOverflow, removeJumps = removeJumps)
-
-    nSamples = channelData['data'].shape[0]
-    nChannels = channelData['data'].shape[1]
-    isChan = np.logical_not(channelData['basic_headers']['isADC'])
-
-    with h5py.File(os.path.join(folderPath, 'processed.h5'), "w") as f:
-        f.create_dataset("data", data = channelData['data'].values, dtype='float32',
-            chunks=True)
-        f.create_dataset("cleanData", data = cleanData.values, dtype='float32')
-        f.create_dataset("t", data = channelData['t'].values, dtype='float32')
-
-    with open(os.path.join(folderPath, 'metadata.p'), "wb" ) as f:
-        pickle.dump(channelData['basic_headers'], f, protocol=4 )
-
-    return channelData, cleanData
-
-def preprocOpenEphys(channelData,
-    notchFreq = 60, notchWidth = 5, notchOrder = 2, nNotchHarmonics = 1,
-    highPassFreq = None, highPassOrder = 2,
-    lowPassFreq = None, lowPassOrder = 2,
-    startTimeS = 0, dataTimeS = 900,
-    chunkSize = 900,
-    curSection = 0, sectionsTotal = 1,
-    fillOverflow = False, removeJumps = True):
-
-    isChan = np.logical_not(channelData['basic_headers']['isADC'])
-    cleanData = channelData['data'].loc[:,isChan]
-
-    if notchFreq is not None:
-        for harmonicOrder in range(1, nNotchHarmonics + 1):
-            print('notch filtering harmonic order: {}'.format(harmonicOrder))
-            notchLowerBound = harmonicOrder * notchFreq - notchWidth / 2
-            notchUpperBound = harmonicOrder * notchFreq + notchWidth / 2
-
-            y, x = signal.iirfilter(notchOrder,
-                (2 * notchLowerBound / channelData['samp_per_s'],
-                2 * notchUpperBound / channelData['samp_per_s']), rp=1, rs=50, btype = 'bandstop', ftype='ellip')
-
-            def filterFun(sig):
-                return signal.filtfilt(y, x, sig, method="gust")
-
-            cleanData = cleanData.apply(filterFun)
-
-    if highPassFreq is not None:
-        print('high pass filtering: {}'.format(highPassFreq))
-        y, x = signal.iirfilter(highPassOrder,
-            2 * highPassFreq / channelData['samp_per_s'],
-            rp=1, rs=50, btype = 'high', ftype='ellip')
-
-        def filterFun(sig):
-            return signal.filtfilt(y, x, sig, method="gust")
-
-        cleanData = cleanData.apply(filterFun)
-
-    if lowPassFreq is not None:
-        print('low pass filtering: {}'.format(lowPassFreq))
-        y, x = signal.iirfilter(lowPassOrder,
-            2 * lowPassFreq / channelData['samp_per_s'],
-            rp=1, rs=50, btype = 'low', ftype='ellip')
-
-        def filterFun(sig):
-            return signal.filtfilt(y, x, sig, method="gust")
-
-        cleanData = cleanData.apply(filterFun)
-
-    print('Done cleaning Data')
-    return cleanData
 
 def preprocNs5Spectrum(stepLen_s = 0.05, winLen_s = 0.1,
     fr_start = 5, fr_stop = 1000):
