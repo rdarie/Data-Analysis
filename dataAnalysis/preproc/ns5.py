@@ -5,7 +5,7 @@ from brpy version: 1.1.1 --- 07/22/2016
 
 @author: Radu Darie
 """
-
+import neo
 import matplotlib, math, pdb
 import dataAnalysis.helperFunctions.helper_functions as hf
 import dataAnalysis.helperFunctions.motor_encoder as mea
@@ -24,17 +24,17 @@ from scipy import signal
 def getNSxData(
         filePath, elecIds, startTime_s,
         dataLength_s, spikeStruct, downsample=1):
-    # Version control
-    brpylib_ver_req = "1.3.1"
-    if brpylib_ver.split('.') < brpylib_ver_req.split('.'):
-        raise Exception("requires brpylib " + brpylib_ver_req + " or higher, please use latest version")
 
-    elecCorrespondence = spikeStruct.loc[elecIds, 'nevID'].astype(int)
-    # Open file and extract headers
-
+    elecCorrespondence = spikeStruct.loc[elecIds, 'nevID']
+    elecCorrespondence = elecCorrespondence.astype(int)
+    #  Open file and extract headers
+    reader = neo.io.BlackrockIO(filename=filePath)
+    #  read the blocks
+    blks = reader.read(lazy=False)
+    
     nsx_file = NsxFile(filePath)
-    # Extract data - note: data will be returned based on *SORTED* nevIds, see cont_data['elec_ids']
-    # pdb.set_trace()
+    #  Extract data - note: data will be returned based on *SORTED* nevIds, see cont_data['elec_ids']
+    #  pdb.set_trace()
     channelData = nsx_file.getdata(
         list(elecCorrespondence.values), startTime_s, dataLength_s, downsample)
 
@@ -56,7 +56,7 @@ def getNSxData(
     nsx_file.close()
     return channelData
 
-def preprocNs5(
+def preproc(
     fileName='Trial001',
     folderPath='./',
     elecIds=range(1, 97), startTimeS=0, dataTimeS='all',
@@ -103,7 +103,7 @@ def preprocNs5(
         else:
             thisDataTime = chunkSize
 
-        preprocNs5Section(
+        preprocSection(
             fileName = fileName,
             folderPath = folderPath,
             elecIds = elecIds, startTimeS = startTimeS + curSection * chunkSize,
@@ -111,8 +111,9 @@ def preprocNs5(
             chunkSize = chunkSize,
             curSection = curSection, sectionsTotal = nChunks,
             fillOverflow = fillOverflow, removeJumps = removeJumps)
+    return channelData
 
-def preprocNs5Section(
+def preprocSection(
     fileName = 'Trial001',
     folderPath = './',
     elecIds = range(1, 97), startTimeS = 0, dataTimeS = 900,
@@ -120,7 +121,7 @@ def preprocNs5Section(
     curSection = 0, sectionsTotal = 1,
     fillOverflow = False, removeJumps = True):
 
-    filePath     = os.path.join(folderPath, fileName + '.ns5')
+    filePath     = os.path.join(folderPath, fileName + '.h5')
     timeSection  = hf.getNSxData(filePath, elecIds, startTimeS, dataTimeS)
 
     origDataPath = os.path.join(folderPath, 'dataAnalysisPreproc',
@@ -167,7 +168,15 @@ def preprocNs5Section(
         pickle.dump(timeSection, f, protocol=4 )
 
     print('Done cleaning data')
-
+    return section
+    
 def preprocNs5Spectrum(stepLen_s = 0.05, winLen_s = 0.1,
     fr_start = 5, fr_stop = 1000):
     pass
+
+
+def loadTimeSeries(
+        filePath=None, elecIds=None,
+        startTime_s=None, dataLength_s=None):
+    channelData = None
+    return channelData

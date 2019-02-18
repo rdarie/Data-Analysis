@@ -449,7 +449,8 @@ def plotHUTtoINS(
         tStartTD, tStopTD,
         tStartStim=None, tStopStim=None,
         tdX='t', stimX='INSTime', sharex=True,
-        plotBlocking=True
+        plotBlocking=True, plotEachPacket=False,
+        annotatePacketName=False
         ):
     # check match between INS time and HUT time
     if stimX == 'INSTime':
@@ -465,21 +466,33 @@ def plotHUTtoINS(
     plotMaskAccel = (accel[tdX] > tStartTD) & (accel[tdX] < tStopTD)
     plotMaskStim = (plotStimStatus[stimX] * unitsCorrection > tStartStim) &\
         (plotStimStatus[stimX] * unitsCorrection < tStopStim)
-    for name, group in td['data'].loc[plotMaskTD, :].groupby('packetIdx'):
+
+    if plotEachPacket:
+        tdIterator = td['data'].loc[plotMaskTD, :].groupby('packetIdx')
+    else:
+        tdIterator = enumerate([td['data'].loc[plotMaskTD, :]])
+
+    for name, group in tdIterator:
         for columnName in ['channel_0', 'channel_1']:
             ax[0].plot(
                 group.loc[:, tdX],
                 group.loc[:, columnName],
                 '-', label=columnName)
-            ax[0].text(
-                group[tdX].iloc[-1],
-                group[columnName].iloc[-1],
-                '{}'.format(name))
+            if annotatePacketName:
+                ax[0].text(
+                    group[tdX].iloc[-1],
+                    group[columnName].iloc[-1],
+                    '{}'.format(name))
     #  ax[0].legend()
     ax[0].set_title('INS Data')
     ax[1].set_ylabel('TD Data')
-    for name, group in (
-            accel['data'].loc[plotMaskAccel, :].groupby('packetIdx')):
+
+    if plotEachPacket:
+        accelIterator = accel['data'].loc[plotMaskAccel, :].groupby('packetIdx')
+    else:
+        accelIterator = enumerate([accel['data'].loc[plotMaskAccel, :]])
+
+    for name, group in accelIterator:
         for columnName in ['inertia']:
             ax[1].plot(
                 group.loc[:, tdX],

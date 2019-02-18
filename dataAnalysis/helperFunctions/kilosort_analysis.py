@@ -2799,8 +2799,13 @@ def loadSpikeInfo(arrayName, arrayInfo, forceRecalc = False):
             'Recalculated spike Metadata from {} data and saved to pickle.'.format(
                 arrayInfo['origin']))
     
-    #  pdb.set_trace()
-    nevIDs = spikeStruct.loc[arrayInfo['elecIDs'], 'nevID'].astype(int).tolist()
+    elecCorrespondence = spikeStruct.loc[arrayInfo['elecIDs'], 'nevID']
+    if elecCorrespondence.isna().any():
+        print('Caution!\n{}'.format(
+            elecCorrespondence.loc[elecCorrespondence.isna()]))
+        print('Removing nonexistent...')
+        elecCorrespondence.dropna(inplace = True)
+    nevIDs = elecCorrespondence.astype(int).tolist()
     if not forceRecalc:
     # if not requiring a recalculation, load from pickle
         try:
