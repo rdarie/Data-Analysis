@@ -1,4 +1,4 @@
-from brPY.brpylib import NsxFile, NevFile, brpylib_ver
+
 try:
     import plotly
     import plotly.plotly as py
@@ -23,14 +23,13 @@ import tables as pt
 import seaborn as sns
 import rcsanalysis.packet_func as rcsa_helpers
 
-import openEphysAnalysis.OpenEphys as oea
 
 from sklearn.model_selection import StratifiedKFold, GridSearchCV, learning_curve
 from sklearn.metrics import roc_auc_score, make_scorer, f1_score, classification_report
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import LabelBinarizer
 import sklearn.pipeline
-from sklearn.feature_selection import RFE,RFECV
+from sklearn.feature_selection import RFE, RFECV
 
 import datetime
 from datetime import datetime as dt
@@ -100,120 +99,6 @@ def getNEVData(filePath, elecIds):
     # Close the nev file now that all data is out
     nev_file.close()
     return spikes
-
-def getOpenEphysFolder(folderPath, chIds = 'all', adcIds = 'all', chanNames = None, startTime_s = 0, dataLength_s = 'all', downsample = 1):
-
-    # load one file to get the metadata
-    source = '100'
-    session = '0'
-    dummyChFileName = None
-    if chIds is not None:
-        chprefix = 'CH'
-        if chIds == 'all':
-            chIds = oea._get_sorted_channels(folderPath, 'CH', session, source)
-            dummyChFileName = os.path.join(folderPath, source + '_'+chprefix + '1.continuous')
-        else: # already gave a list
-            if not isinstance(chIds, collections.Iterable):
-                chIds = [chIds]
-            dummyChFileName = os.path.join(folderPath, source + '_'+ chprefix + str(chIds[0]) + '.continuous')
-
-        recordingData = oea.loadFolderToArray(folderPath, channels = chIds)
-    else:
-        recordingData = None
-
-    if adcIds is not None:
-        if adcIds == 'all':
-            adcIds = oea._get_sorted_channels(folderPath, 'ADC', session, source)
-            if dummyChFileName is None:
-                chprefix = 'ADC'
-                dummyChFileName = os.path.join(folderPath, source + '_'+ chprefix + '1.continuous')
-        else: # already gave a list
-            if not isinstance(adcIds, collections.Iterable):
-                adcIds = [adcIds]
-            if dummyChFileName is None:
-                chprefix = 'ADC'
-                dummyChFileName = os.path.join(folderPath, source + '_'+ chprefix + str(chIds[0]) + '.continuous')
-        adcData = oea.loadFolderToArray(folderPath, channels = adcIds, chprefix = 'ADC')
-    else:
-        adcData = None
-
-    dummyChannelData = oea.loadContinuous(dummyChFileName)
-
-    t = np.arange(dummyChannelData['data'].shape[0]) / float(dummyChannelData['header']['sampleRate'])
-
-    if startTime_s > 0:
-        dataMask = t > startTime_s
-        t = t[dataMask]
-        if adcData is not None:
-            adcData = adcData[dataMask,:]
-        if recordingData is not None:
-            recordingData = recordingData[dataMask,:]
-
-    if dataLength_s == 'all':
-        dataLength_s = t[-1]
-    else:
-        if dataLength_s < t[-1]:
-            dataMask = t < dataLength_s
-            t = t[dataMask]
-            if adcData is not None:
-                adcData = adcData[dataMask,:]
-            if recordingData is not None:
-                recordingData = recordingData[dataMask,:]
-        else:
-            dataLength_s = t[-1]
-
-    #  pdb.set_trace()
-    data = pd.DataFrame(np.concatenate((recordingData, adcData), axis=1), columns=chanNames)
-    isADC = np.ones(len(data.columns), dtype=np.bool)
-    isADC[:len(chIds)] = False
-
-    channelData = {
-        'data' : data,
-        't' : pd.Series(t, index=data.index),
-        'basic_headers' :dummyChannelData['header'],
-        'badData' : {},
-        'start_time_s' : startTime_s,
-        'data_time_s' : dataLength_s,
-        'samp_per_s' : float(dummyChannelData['header']['sampleRate'])
-        }
-
-    channelData['basic_headers']['isADC'] = isADC
-    channelData['basic_headers']['chanNames'] = chanNames
-    return channelData
-
-
-def getNSxData(filePath, elecIds, startTime_s, dataLength_s, spikeStruct, downsample=1):
-    # Version control
-    brpylib_ver_req = "1.3.1"
-    if brpylib_ver.split('.') < brpylib_ver_req.split('.'):
-        raise Exception("requires brpylib " + brpylib_ver_req + " or higher, please use latest version")
-
-    elecCorrespondence = spikeStruct.loc[elecIds, 'nevID'].astype(int)
-    # Open file and extract headers
-
-    nsx_file = NsxFile(filePath)
-    # Extract data - note: data will be returned based on *SORTED* nevIds, see cont_data['elec_ids']
-    # pdb.set_trace()
-    channelData = nsx_file.getdata(
-        list(elecCorrespondence.values), startTime_s, dataLength_s, downsample)
-
-    rowIndex = range(
-        int(channelData['start_time_s'] * channelData['samp_per_s']),
-        int((channelData['start_time_s'] + channelData['data_time_s']) *
-            channelData['samp_per_s']))
-    channelData['data'] = pd.DataFrame(
-        channelData['data'].transpose(),
-        index=rowIndex, columns=elecCorrespondence.sort_values().index.values)
-
-    channelData['t'] = channelData['start_time_s'] + np.arange(channelData['data'].shape[0]) / channelData['samp_per_s']
-    channelData['t'] = pd.Series(
-        channelData['t'], index=channelData['data'].index)
-    channelData['badData'] = {}
-    channelData['basic_headers'] = nsx_file.basic_header
-    channelData['extended_headers'] = nsx_file.extended_headers
-    # Close the nsx file now that all data is out
-    nsx_file.close()
-    return channelData
 
 
 def interpolateDF(
