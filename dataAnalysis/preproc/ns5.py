@@ -39,23 +39,30 @@ def getNSxData(
     if reader is None:
         assert (fileName is not None) and (folderPath is not None)
         filePath = os.path.join(folderPath, fileName) + '.nix'
-        reader = neo.io.nixio_fr.NixIO(filename=filePath)
+        reader = neo.io.nixio.NixIO(filename=filePath)
     
     idx = 0
     reader.parse_header()
     metadata = reader.header
+    
     #  pdb.set_trace()
     for blkIdx in range(metadata['nb_block']):
-        #  blkIdx = 0      
-        blockMeta = reader.read_block(block_index=blkIdx, lazy=True)  
+        #  blkIdx = 0
+        block = reader.read_block(
+            block_index=blkIdx, lazy=True,
+            signal_group_mode='group-by-same-units')
         for segIdx in range(metadata['nb_segment'][blkIdx]):
             #  segIdx = 0
-            nSamp = reader.get_signal_size(blkIdx, segIdx)
-            blockMeta = reader.read_block(block_index=blkIdx, lazy=True)
-            segMeta = blockMeta.segments[segIdx]
-            print(segMeta.t_start)
+            #  you will get an error unless you load events
+            seg = block.segments[segIdx]
+            seg.events = [i.load() for i in seg.events]
+    testPlot = False
+    if testPlot:
+        data = seg.analogsignals[0].load(channel_indexes=[8])
+        plt.plot(data.magnitude)
+        plt.show()
     channelData = None
-    return channelData
+    return reader
 
 
 def preproc(
@@ -72,117 +79,143 @@ def preproc(
         filename=trialBasePath, nsx_to_load=5)
     reader.parse_header()
     metadata = reader.header
-    fs = reader.get_signal_sampling_rate()
+    
     #  instantiate writer
     writer = neo.io.NixIO(filename=trialBasePath + '.nix')
     #  absolute section index
     idx = 0
     for blkIdx in range(metadata['nb_block']):
         #  blkIdx = 0
-        blockMeta = reader.read_block(block_index=blkIdx, lazy=True)
+        block = reader.read_block(
+            block_index=blkIdx, lazy=True,
+            signal_group_mode='split-all')
         #  prune out nev spike placeholders
-        for metaIdx, chanIdx in enumerate(blockMeta.channel_indexes):
+        for chanIdx in block.channel_indexes:
             if chanIdx.units:
-                for unitIdx, unit in enumerate(chanIdx.units):
-                    print(unit.spiketrains)
-                    unit.spiketrains = []
+                for unit in chanIdx.units:
+                    #  print(unit.spiketrains)
+                    if unit.spiketrains:
+                        for st in unit.spiketrains:
+                            del st
+                        unit.spiketrains = []
+                    del unit
                 chanIdx.units = []
                 #  chanIdx.name += ' ' + chanIdx.units[0].name
-        blockMeta.channel_indexes = (
-            [chanIdx for chanIdx in blockMeta.channel_indexes if (
+        block.channel_indexes = (
+            [chanIdx for chanIdx in block.channel_indexes if (
                 chanIdx.analogsignals)])
+        #  delete asig proxies from channel index list
+        for metaIdx, chanIdx in enumerate(block.channel_indexes):
+            chanIdx.analogsignals = []
+            chanIdx.irregularlysampledsignals = []
+        
+        #  precalculate new segments
+        newSegList = []
+        oldSegList = block.segments
+        #  keep track of which oldSeg newSegs spawn from
+        segParents = {}
+        for segIdx, seg in enumerate(block.segments):
+            segLen = seg.analogsignals[0].shape[0] / (
+                seg.analogsignals[0].sampling_rate)
+            nChunks = math.ceil(segLen / chunkSize)
+            actualChunkSize = (segLen / nChunks).magnitude
+            segParents.update({segIdx: {}})
+            #  for chunkIdx in range(nChunks):
+            for chunkIdx in [0, 1]:
+                tStart = chunkIdx * actualChunkSize
+                tStop = (chunkIdx + 1) * actualChunkSize
 
-        for segIdx in range(metadata['nb_segment'][blkIdx]):
-            #  segIdx = 0
-            nSamp = reader.get_signal_size(blkIdx, segIdx)
-            segLen = nSamp / fs
-            nChunks = int(math.ceil(segLen / chunkSize))
-            for curChunk in range(nChunks):
+                newSeg = Segment(
+                        index=idx, name=seg.name,
+                        description=seg.description,
+                        file_origin=seg.file_origin,
+                        file_datetime=seg.file_datetime,
+                        rec_datetime=seg.rec_datetime,
+                        **seg.annotations
+                    )
+                newSeg.events = [
+                    i.load(time_slice=(tStart, tStop)) for i in seg.events]
+                newSeg.epochs = [
+                    i.load(time_slice=(tStart, tStop)) for i in seg.epochs]
+                    
+                newSegList.append(newSeg)
+                segParents[segIdx].update(
+                    {chunkIdx: newSegList.index(newSeg)})
+                idx += 1
+        block.segments = newSegList
+        #  print(block.children_recur)
+        block, nixblock = writer.write_block_meta(block)
+        # descend into Segments
+        for segIdx, seg in enumerate(oldSegList):
+            segLen = seg.analogsignals[0].shape[0] / (
+                seg.analogsignals[0].sampling_rate)
+            nChunks = math.ceil(segLen / chunkSize)
+            actualChunkSize = (segLen / nChunks).magnitude
+            #  for chunkIdx in range(nChunks):
+            for chunkIdx in [0, 1]:
+                tStart = chunkIdx * actualChunkSize
+                tStop = (chunkIdx + 1) * actualChunkSize
                 print(
                     'PreprocNs5: starting chunk %d of %d' % (
-                        curChunk + 1, nChunks))
-
-                blockMeta = reader.read_block(block_index=blkIdx, lazy=True)
-                segMeta = blockMeta.segments[segIdx]
-                for metaIdx, chanIdx in enumerate(blockMeta.channel_indexes):
-                    if 'Unit' in chanIdx.name:
-                        blockMeta.channel_indexes[metaIdx].name += '{}'.format(metaIdx)
-                #  see https://neo.readthedocs.io/en/latest/_images/simple_generated_diagram.png
-                #  seg is a new object in memory, swap it out
-                #  for the metadata placeholder
-
-                i_start = int(curChunk * chunkSize * fs)
-                i_stop = i_start + int(chunkSize * fs)
-                chunkData = reader.get_analogsignal_chunk(
-                    block_index=blkIdx, seg_index=segIdx,
-                    i_start=i_start, i_stop=i_stop)
-                # recalc i_stop in case there wasn't enough data
-                i_stop = i_start + chunkData.shape[0]
-                # actualChunkDur = chunkData.shape[0] / fs 
-                #  actually do the preprocessing on the chunkData
-                if fillOverflow:
-                    # fill in overflow:
-                    pass
-                    '''
-                    timeSection['data'], overflowMask = hf.fillInOverflow(
-                        timeSection['data'], fillMethod = 'average')
-                    #  todo: add epoch showing problematic period
-                    '''
-                if removeJumps:
-                    # find unusual jumps in derivative or amplitude
-                    pass
-                    '''
-                    timeSection['data'], newBadData = hf.fillInJumps(timeSection['data'],
-                        timeSection['samp_per_s'], smoothing_ms = 0.5, nStdDiff = 50,
-                        nStdAmp = 100)
-                    #  todo: add epoch showing problematic period
-                    '''
-                segMeta.spiketrains = []
-                segMeta.epochs = []
-                segMeta.events = []
-                assert not segMeta.irregularlysampledsignals
-
-                #  replace analogsignal proxies with the chunk data
-                for aIdx, aSigProxy in enumerate(segMeta.analogsignals):
+                        chunkIdx + 1, nChunks))
+                newSeg = block.segments[segParents[segIdx][chunkIdx]]
+                
+                for aSigIdx, aSigProxy in enumerate(seg.analogsignals):
                     chanIdx = aSigProxy.channel_index
-                    aSig = AnalogSignal(
-                        chunkData[:, chanIdx.index],
-                        units=aSigProxy.units, dtype=aSigProxy.dtype,
-                        t_start=aSigProxy.t_start + curChunk * chunkSize * s,
-                        sampling_rate=aSigProxy.sampling_rate,
-                        sampling_period=aSigProxy.sampling_period,
-                        name=aSigProxy.name, file_origin=aSigProxy.file_origin,
-                        description=aSigProxy.description,
-                        array_annotations=aSigProxy.array_annotations,
-                        **aSigProxy.annotations)
+                    #  print(chanIdx)
+                    a = aSigProxy.load(
+                        time_slice=(tStart, tStop))
+                    #  link AnalogSignal and ID providing channel_index
+                    a.channel_index = chanIdx
+                    #  perform requested preproc operations
+                    if fillOverflow:
+                        # fill in overflow:
+                        '''
+                        timeSection['data'], overflowMask = hf.fillInOverflow(
+                            timeSection['data'], fillMethod = 'average')
+                        badData.update({'overflow': overflowMask})
+                        '''
+                        pass
+                    if removeJumps:
+                        # find unusual jumps in derivative or amplitude
+                        '''
+                        timeSection['data'], newBadData = hf.fillInJumps(timeSection['data'],
+                            timeSection['samp_per_s'], smoothing_ms = 0.5, nStdDiff = 50,
+                            nStdAmp = 100)
+                        badData.update(newBadData)
+                        '''
+                        pass
 
-                    #  fix the channel index pointers
-                    assert len(chanIdx.analogsignals) == 1
-                    chanIdx.analogsignals[0] = aSig
-                    #  purge the spiketrains
-                    for unit in chanIdx.units:
-                        unit.spiketrains = []
-                    chanIdx.units = []
-                    #  save the data
-                    segMeta.analogsignals[aIdx] = aSig
-                
-                # purge units on remaining channels
-                for chanIdx in blockMeta.channel_indexes:
-                    for unit in chanIdx.units:
-                        unit.spiketrains = []
-                        #  print(chanIdx.channel_names)
-                    chanIdx.units = []
-                
-                segMeta.index = idx
-                blockMeta.index = idx
-                idx += 1
-                writer.write_block(blockMeta, use_obj_names=True)
+                    chanIdx.analogsignals.append(a)
+                    chanIdx.create_relationship()
+                    newSeg.analogsignals.append(a)
+                    newSeg.create_relationship()
+
+                for iaSigIdx, iaSigProxy in enumerate(
+                        seg.irregularlysampledsignals):
+                    chanIdx = iaSigProxy.channel_index
+                    tStart = chunkIdx * actualChunkSize
+                    tStop = (chunkIdx + 1) * actualChunkSize
+                    ia = iaSigProxy.load(
+                        time_slice=(tStart, tStop))
+                    #  link AnalogSignal and ID providing channel_index
+                    ia.channel_index = chanIdx
+                    chanIdx.irregularlysampledsignals.append(ia)
+                    newSeg.irregularlysampledsignals.append(ia)
+                #  print(newSeg.children_recur)
+                newSeg = writer._write_segment(newSeg, nixblock)
+        # descend into ChannelIndexes
+        for chanIdx in block.channel_indexes:
+            chanIdx = writer._write_channelindex(chanIdx, nixblock)
+        writer._create_source_links(block, nixblock)
 
     writer.close()
+
     channelData = getNSxData(
         reader=neo.io.nixio_fr.NixIO(filename=trialBasePath + '.nix'),
         elecIds=None, startTime_s=None,
         dataLength_s=None, downsample=1)
+    
     return channelData
 
 def loadTimeSeries(
