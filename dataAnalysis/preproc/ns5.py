@@ -6,7 +6,11 @@ from brpy version: 1.1.1 --- 07/22/2016
 @author: Radu Darie
 """
 import neo
+from neo.core import (Block, Segment, ChannelIndex,
+    AnalogSignal)
+from quantities import mV, kHz, s, uV
 import matplotlib, math, pdb
+from copy import copy
 import dataAnalysis.helperFunctions.helper_functions as hf
 import dataAnalysis.helperFunctions.motor_encoder as mea
 from brPY.brpylib import NsxFile, NevFile, brpylib_ver
@@ -19,7 +23,10 @@ from copy import *
 import argparse
 import h5py
 from scipy import signal
-
+try:
+    from collections.abc import Iterable
+except ImportError:
+    from collections import Iterable
 
 def getNSxData(
         filePath, elecIds, startTime_s,
@@ -29,9 +36,7 @@ def getNSxData(
     elecCorrespondence = elecCorrespondence.astype(int)
     #  Open file and extract headers
     reader = neo.io.BlackrockIO(filename=filePath)
-    #  read the blocks
-    blks = reader.read(lazy=False)
-    
+
     nsx_file = NsxFile(filePath)
     #  Extract data - note: data will be returned based on *SORTED* nevIds, see cont_data['elec_ids']
     #  pdb.set_trace()
@@ -56,65 +61,89 @@ def getNSxData(
     nsx_file.close()
     return channelData
 
+
 def preproc(
-    fileName='Trial001',
-    folderPath='./',
-    elecIds=range(1, 97), startTimeS=0, dataTimeS='all',
-    fillOverflow=True, removeJumps=True,
-    chunkSize=900
-    ):
+        fileName='Trial001',
+        folderPath='./',
+        elecIds=range(1, 97), startTimeS=0, dataTimeS='all',
+        fillOverflow=True, removeJumps=True,
+        chunkSize=1800
+        ):
 
-    filePath = os.path.join(folderPath, fileName) + '.ns5'
-    dummyChannelData = hf.getNSxData(filePath, elecIds[0], startTimeS, dataTimeS)
+    #  base file name
+    trialBasePath = os.path.join(folderPath, fileName)
+    #  instantiate reader, get metadata
+    reader = neo.io.BlackrockIO(
+        filename=trialBasePath, nsx_to_load=5)
+    reader.parse_header()
+    metadata = reader.header
+    fs = reader.get_signal_sampling_rate()
+    #  instantiate writer
+    writer = neo.io.NixIO(filename=trialBasePath + '.nix')
+    #  absolute section index
+    idx = 0
+    for blkIdx in range(metadata['nb_block']):
+        #  blkIdx = 0
+        #  load block metadata only
+        #  blockMeta = reader.read_block(block_index=blkIdx, lazy=True)
+        #  make a copy and strip it of placeholders
+        #  blockMeta.segments = []
+        #  blockMeta.channel_indexes = []
+        #  writer.write_block(blockMeta)
+        
+        for segIdx in range(metadata['nb_segment'][blkIdx]):
+            #  segIdx = 0
+            nSamp = reader.get_signal_size(blkIdx, segIdx)
+            segLen = nSamp / fs
+            nChunks = int(math.ceil(segLen / chunkSize))
+            for curChunk in range(nChunks):
+                print(
+                    'PreprocNs5: starting chunk %d of %d' % (
+                        curChunk + 1, nChunks))
 
-    if dataTimeS == 'all':
-        dataTimeS = dummyChannelData['data_time_s']
-        print('Recording is %4.2f seconds long' % dataTimeS)
+                blockMeta = reader.read_block(block_index=blkIdx, lazy=True)
+                segMeta = blockMeta.segments[segIdx]
+                segMeta.index = idx
+                #  see https://neo.readthedocs.io/en/latest/_images/simple_generated_diagram.png
+                #  seg is a new object in memory, swap it out
+                #  for the metadata placeholder
 
-    nSamples = int(dataTimeS * dummyChannelData['samp_per_s'])
-    nChannels = len(elecIds)
-    nChunks = dataTimeS // chunkSize
-    # add a chunk if division isn't perfect
-    if dataTimeS / chunkSize > dataTimeS // chunkSize:
-        nChunks += 1
-    nChunks = int(nChunks)
+                i_start = int(curChunk * chunkSize * fs)
+                i_stop = i_start + int(chunkSize * fs)
+                chunkData = reader.get_analogsignal_chunk(
+                    block_index=blkIdx, seg_index=segIdx,
+                    i_start=i_start, i_stop=i_stop)
+                # recalc i_stop in case there wasn't enough data
+                i_stop = i_start + chunkData.shape[0]
+                #  actually do the preprocessing on the chunkData
+                
+                segMeta.spiketrains = []
+                segMeta.epochs = []
+                segMeta.events = []
+                assert not segMeta.irregularlysampledsignals
 
-    if not os.path.exists(os.path.join(folderPath, 'dataAnalysisPreproc')):
-        os.makedirs(os.path.join(folderPath, 'dataAnalysisPreproc'))
-
-    dataPath = os.path.join(
-        folderPath, 'dataAnalysisPreproc',
-        fileName + '_clean.h5')
-
-    with h5py.File(dataPath, "w") as f:
-        #pdb.set_trace()
-        f.create_dataset("data", (nSamples, nChannels), dtype='float32',
-            chunks=True)
-        f.create_dataset("channels", (nChannels,), data=list(elecIds),
-            dtype='int32')
-        f.create_dataset("index", (nSamples,), dtype='int32')
-        f.create_dataset("t", (nSamples,), dtype='float32')
-
-    for curSection in range(nChunks):
-        print('PreprocNs5: starting chunk %d of %d' % (curSection + 1, nChunks))
-
-        if curSection == nChunks - 1:
-            thisDataTime = dataTimeS - chunkSize * curSection
-        else:
-            thisDataTime = chunkSize
-
-        preprocSection(
-            fileName = fileName,
-            folderPath = folderPath,
-            elecIds = elecIds, startTimeS = startTimeS + curSection * chunkSize,
-            dataTimeS = thisDataTime,
-            chunkSize = chunkSize,
-            curSection = curSection, sectionsTotal = nChunks,
-            fillOverflow = fillOverflow, removeJumps = removeJumps)
-    return channelData
+                #  replace analogsignal proxies with the chunk data
+                for aIdx, aSigProxy in enumerate(segMeta.analogsignals):
+                    aSig = AnalogSignal(
+                        chunkData[:, aSigProxy.channel_index.index],
+                        units=aSigProxy.units, dtype=aSigProxy.dtype,
+                        t_start=aSigProxy.t_start + curChunk * chunkSize * s,
+                        sampling_rate=aSigProxy.sampling_rate,
+                        sampling_period=aSigProxy.sampling_period,
+                        name=aSigProxy.name, file_origin=aSigProxy.file_origin,
+                        description=aSigProxy.description,
+                        array_annotations=aSigProxy.array_annotations,
+                        **aSigProxy.annotations)
+                    #  fix the channel index references
+                    aSigProxy.channel_index = aSig.channel_index
+                    #  save the data
+                    segMeta.analogsignals[aIdx] = aSig
+                idx += 1
+                writer.write_block(blockMeta)
+    return writer
 
 def preprocSection(
-    fileName = 'Trial001',
+    fileName='Trial001',
     folderPath = './',
     elecIds = range(1, 97), startTimeS = 0, dataTimeS = 900,
     chunkSize = 900,
@@ -169,7 +198,7 @@ def preprocSection(
 
     print('Done cleaning data')
     return section
-    
+
 def preprocNs5Spectrum(stepLen_s = 0.05, winLen_s = 0.1,
     fr_start = 5, fr_stop = 1000):
     pass
