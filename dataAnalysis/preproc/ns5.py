@@ -7,7 +7,8 @@ from brpy version: 1.1.1 --- 07/22/2016
 """
 import neo
 from neo.core import (Block, Segment, ChannelIndex,
-    AnalogSignal)
+    AnalogSignal, Unit, SpikeTrain)
+import quantities as pq
 from quantities import mV, kHz, s, uV
 import matplotlib, math, pdb
 from copy import copy
@@ -29,18 +30,79 @@ except ImportError:
     from collections import Iterable
 
 
+def spikeDictToSpikeTrains(
+        spikes, block=None, seg=None,
+        probeName='insTD', t_stop=None,
+        waveformUnits=pq.uV,
+        sampling_rate=3e4 * pq.Hz):
+
+    if block is None:
+        assert seg is None
+        block = Block()
+        seg = Segment(name=probeName + ' segment')
+        block.segments.append(seg)
+
+    if t_stop is None:
+        t_stop = hf.getLastSpikeTime(spikes) + 1
+
+    for idx, chanName in enumerate(spikes['ChannelID']):
+        #  unique units on this channel
+        unitsOnThisChan = pd.unique(spikes['Classification'][idx])
+        nixChanName = probeName + '{}'.format(chanName)
+        chanIdx = ChannelIndex(
+            name=nixChanName,
+            index=np.array([idx]),
+            channel_names=np.array([nixChanName]))
+        block.channel_indexes.append(chanIdx)
+        
+        for unitIdx, unitName in enumerate(unitsOnThisChan):
+            unitMask = spikes['Classification'][idx] == unitName
+            # this unit's spike timestamps
+            theseTimes = spikes['TimeStamps'][idx][unitMask]
+            # this unit's waveforms
+            if len(spikes['Waveforms'][idx].shape) == 3:
+                theseWaveforms = spikes['Waveforms'][idx][unitMask, :, :]
+                theseWaveforms = np.swapaxes(theseWaveforms, 1, 2)
+            elif len(spikes['Waveforms'][idx].shape) == 2:
+                theseWaveforms = (
+                    spikes['Waveforms'][idx][unitMask, np.newaxis, :])
+            else:
+                raise(Exception('spikes[Waveforms] has bad shape'))
+
+            unitName = '{}#{}'.format(nixChanName, unitIdx)
+            unit = Unit(name=unitName)
+            unit.channel_index = chanIdx
+            chanIdx.units.append(unit)
+
+            train = SpikeTrain(
+                times=theseTimes, t_stop=t_stop, units='sec',
+                name=unitName, sampling_rate=sampling_rate,
+                waveforms=theseWaveforms*waveformUnits,
+                left_sweep=0, dtype=np.float32)
+            unit.spiketrains.append(train)
+            seg.spiketrains.append(train)
+
+            unit.create_relationship()
+        chanIdx.create_relationship()
+    seg.create_relationship()
+    block.create_relationship()
+    return block
 
 
-def dataFrameToNeo(
+def dataFrameToAnalogSignals(
         df,
+        block=None, seg=None,
         idxT='NSPTime',
         probeName='insTD', samplingRate=500*pq.Hz,
         timeUnits=pq.s, measureUnits=pq.mV,
         dataCol=['channel_0', 'channel_1'],
         useColNames=False, forceColNames=None, namePrefix=''):
-    block = Block()
-    seg = Segment(name=probeName + ' segment')
-    block.segments.append(seg)
+
+    if block is None:
+        assert seg is None
+        block = Block()
+        seg = Segment(name=probeName + ' segment')
+        block.segments.append(seg)
 
     for idx, colName in enumerate(dataCol):
         if useColNames:
@@ -74,73 +136,6 @@ def dataFrameToNeo(
     block.create_relationship()
     seg.create_relationship()
     return block
-
-
-def addBlockToNIX(
-        newBlock, segIdx=0,
-        fileName=None,
-        folderPath=None,
-        nixBlockIdx=0, nixSegIdx=0,
-        ):
-    #  base file name
-    trialBasePath = os.path.join(folderPath, fileName)
-    
-    # peek at file to ensure compatibility
-    reader = neo.io.nixio_fr.NixIO(filename=trialBasePath + '.nix')
-    tempBlock = reader.read_block(
-        block_index=nixBlockIdx,
-        lazy=True)
-
-    '''
-    #  future dev: find segment automatically
-    for segIdx, seg in enumerate(tempBlock.segments):
-        seg.events = [i.load() for i in seg.events]
-        seg.epochs = [i.load() for i in seg.epochs]
-
-    timeSlice = (
-        newBlock.segments[0].t_start,
-        newBlock.segments[0].t_stop)
-
-    _, segsWriteTo = preproc.findSegsIncluded(tempBlock, timeSlice)
-    '''
-
-    maxIdx = 0
-    for chanIdx in tempBlock.channel_indexes:
-        if chanIdx.analogsignals:
-            maxIdx = max(maxIdx, max(chanIdx.index))
-    
-    tempAsig = tempBlock.channel_indexes[0].analogsignals[0]
-
-    forceType = tempAsig.dtype
-    forceShape = tempAsig.shape[0]  # ? docs say shape[1], but that's confusing
-    forceFS = tempAsig.sampling_rate
-    reader.file.close()
-    
-    writer = neo.io.NixIO(filename=trialBasePath + '.nix')
-    nixblock = writer.nix_file.blocks[nixBlockIdx]
-    nixblockName = nixblock.name
-    newBlock.annotate(nix_name=nixblockName)
-
-    #  for idx, segIdx in enumerate(segsWriteTo.index):
-    nixgroup = nixblock.groups[nixSegIdx]
-    nixSegName = nixgroup.name
-    newBlock.segments[segIdx].annotate(nix_name=nixSegName)
-    #  TODO: double check that you can't add the same thing twice
-    for asig in newBlock.segments[segIdx].analogsignals:
-        #  asig.annotations.update({
-        #      'channel_ids': asig.channel_index.channel_ids + maxIdx+1
-        #      })
-        assert asig.dtype == forceType
-        assert asig.sampling_rate == forceFS
-        assert asig.shape[0] == forceShape
-        asig = writer._write_analogsignal(asig, nixblock, nixgroup)
-    for chanIdx in newBlock.channel_indexes:
-        chanIdx.index = chanIdx.index + maxIdx + 1
-        chanIdx.channel_ids = chanIdx.index
-        chanIdx = writer._write_channelindex(chanIdx, nixblock)
-    writer._create_source_links(newBlock, nixblock)
-    writer.close()
-    return
 
 
 def findSegsIncluding(block, timeSlice=None):
@@ -459,6 +454,76 @@ def blockToNix(
     return idx
 
 
+#  TODO: write code that merges a dataframe and a spikesdict to a block
+def addBlockToNIX(
+        newBlock, segIdx=0,
+        fileName=None,
+        folderPath=None,
+        nixBlockIdx=0, nixSegIdx=0,
+        ):
+    #  base file name
+    trialBasePath = os.path.join(folderPath, fileName)
+    
+    # peek at file to ensure compatibility
+    reader = neo.io.nixio_fr.NixIO(filename=trialBasePath + '.nix')
+    tempBlock = reader.read_block(
+        block_index=nixBlockIdx,
+        lazy=True)
+
+    '''
+    #  future dev: find segment automatically
+    for segIdx, seg in enumerate(tempBlock.segments):
+        seg.events = [i.load() for i in seg.events]
+        seg.epochs = [i.load() for i in seg.epochs]
+
+    timeSlice = (
+        newBlock.segments[0].t_start,
+        newBlock.segments[0].t_stop)
+
+    _, segsWriteTo = preproc.findSegsIncluded(tempBlock, timeSlice)
+    '''
+
+    maxIdx = 0
+    for chanIdx in tempBlock.channel_indexes:
+        if chanIdx.analogsignals:
+            maxIdx = max(maxIdx, max(chanIdx.index))
+    
+    tempAsig = tempBlock.channel_indexes[0].analogsignals[0]
+
+    forceType = tempAsig.dtype
+    forceShape = tempAsig.shape[0]  # ? docs say shape[1], but that's confusing
+    forceFS = tempAsig.sampling_rate
+    reader.file.close()
+    
+    writer = neo.io.NixIO(filename=trialBasePath + '.nix')
+    nixblock = writer.nix_file.blocks[nixBlockIdx]
+    nixblockName = nixblock.name
+    newBlock.annotate(nix_name=nixblockName)
+
+    #  for idx, segIdx in enumerate(segsWriteTo.index):
+    nixgroup = nixblock.groups[nixSegIdx]
+    nixSegName = nixgroup.name
+    newBlock.segments[segIdx].annotate(nix_name=nixSegName)
+    #  TODO: double check that you can't add the same thing twice
+    for asig in newBlock.segments[segIdx].analogsignals:
+        assert asig.dtype == forceType
+        assert asig.sampling_rate == forceFS
+        assert asig.shape[0] == forceShape
+        asig = writer._write_analogsignal(asig, nixblock, nixgroup)
+    for isig in newBlock.segments[segIdx].irregularlysampledsignals:
+        isig = writer._write_irregularlysampledsignal(isig, nixblock, nixgroup)
+    for st in newBlock.segments[segIdx].spiketrains:
+        st = writer._write_spiketrain(st, nixblock, nixgroup)
+    for chanIdx in newBlock.channel_indexes:
+        chanIdx.index = chanIdx.index + maxIdx + 1
+        chanIdx.channel_ids = chanIdx.index
+        chanIdx = writer._write_channelindex(chanIdx, nixblock)
+        #  auto descends into units inside of _write_channelindex
+    writer._create_source_links(newBlock, nixblock)
+    writer.close()
+    return newBlock
+
+
 def preproc(
         fileName='Trial001',
         folderPath='./',
@@ -496,10 +561,3 @@ def preproc(
     writer.close()
 
     return reader
-
-
-def loadTimeSeries(
-        filePath=None, elecIds=None,
-        startTime_s=None, dataLength_s=None):
-    channelData = None
-    return channelData

@@ -3542,6 +3542,23 @@ def loadRecruitmentCurve(folderPath, ignoreChans = []):
 
     return metadata, recruitmentCurve
 
+
+def getLastSpikeTime(spikes):
+    lastTimestamp = -1
+    for idx, timestamps in enumerate(spikes['TimeStamps']):
+        lastTimestamp = max(lastTimestamp, timestamps[-1])
+    return lastTimestamp
+
+
+def getAllUnits(spikes):
+    allUnitsList = []
+    for idx, chanIdx in enumerate(spikes['ChannelID']):
+        unitsOnThisChan = pd.unique(spikes['Classification'][idx])
+        allUnitsList.append(pd.Series(unitsOnThisChan))
+    allUnits = pd.unique(pd.concat(allUnitsList))
+    return allUnits
+
+
 def memory_usage_psutil():
     # return the memory usage in MB
     import psutil

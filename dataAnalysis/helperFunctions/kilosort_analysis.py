@@ -61,6 +61,7 @@ def coordsToIndices(xcoords, ycoords):
 
     return xIdx, yIdx
 
+
 def getSpikeMetaData(filePath, ns5FileName, KSDir):
 
     coords = np.load(filePath + '/'+ KSDir + '/channel_positions.npy', mmap_mode = mMapMode)
@@ -74,8 +75,8 @@ def getSpikeMetaData(filePath, ns5FileName, KSDir):
     }
     return spikeStruct
 
-#@profile
-def loadKSDir(filePath, excludeNoise = True, loadPCs = False):
+
+def loadKSDir(filePath, excludeNoise=True, loadPCs=False):
     mMapMode = 'r'
     params = loadParamsPy(filePath)
 
@@ -171,7 +172,7 @@ def loadKSDir(filePath, excludeNoise = True, loadPCs = False):
         }
     return spikeStruct
 
-#@profile
+
 def getWaveForms(filePath, spikeStruct, nevIDs = None, dataType = np.int16, wfWin = (-40, 81), nWf = None, plotting = False, tempFolder = None):
     if tempFolder is None:
         tempFolder = mkdtemp()
@@ -271,7 +272,7 @@ def getWaveForms(filePath, spikeStruct, nevIDs = None, dataType = np.int16, wfWi
     #spikes['Waveforms'].flush()
     return spikes
 
-#@profile
+
 def numFromWaveClusSpikeFile(spikeFileName):
     return int(spikeFileName.split('times_NSX')[-1].split('.mat')[0])
 
@@ -1422,22 +1423,24 @@ def modOnset(spikeMat):
     thisModOnset[thisModOnset < 3] = np.nan
     thisModOnset[thisModOnset > lastValid] = np.nan
     return thisModOnset, pValHolder, magDiffHolder
-"""
-tempDF = pd.DataFrame(False, index = spikeMat.loc[:,postStimMask].index, columns = spikeMat.loc[:,postStimMask].columns)
-for rowIdx, row in spikeMat.loc[:,postStimMask].iterrows():
-    tempDF.loc[rowIdx, :] = row > thresh[rowIdx]
 
-# add future samples to each sample to check if it continues to be modulated
-tempDF = tempDF.astype(float)
-for i in range(1,sustainCriterion+1):
-    tempDF = tempDF + tempDF.shift(-i, axis = 1).fillna(method = 'ffill',axis = 1)
+    """
+    notes for modOnset
+    tempDF = pd.DataFrame(False, index = spikeMat.loc[:,postStimMask].index, columns = spikeMat.loc[:,postStimMask].columns)
+    for rowIdx, row in spikeMat.loc[:,postStimMask].iterrows():
+        tempDF.loc[rowIdx, :] = row > thresh[rowIdx]
 
-tempDF = (tempDF > sustainCriterion).astype(float)
-thisModOnset = tempDF.idxmax(axis = 1)
+    # add future samples to each sample to check if it continues to be modulated
+    tempDF = tempDF.astype(float)
+    for i in range(1,sustainCriterion+1):
+        tempDF = tempDF + tempDF.shift(-i, axis = 1).fillna(method = 'ffill',axis = 1)
 
-thisModOnset = (thisModOnset - preWindow) * 1e3
-thisModOnset[thisModOnset < 1] = np.nan
-"""
+    tempDF = (tempDF > sustainCriterion).astype(float)
+    thisModOnset = tempDF.idxmax(axis = 1)
+
+    thisModOnset = (thisModOnset - preWindow) * 1e3
+    thisModOnset[thisModOnset < 1] = np.nan
+    """
 
 def saveModOnset(arrayName, spikeMatDict):
     for key, value in spikeMatDict.items():
@@ -1449,20 +1452,16 @@ def saveModOnset(arrayName, spikeMatDict):
         magDiffHolder.to_hdf('./modOnset.h5', 'magDiffHolder_{}_{}'.format(arrayName, key))
 
 def sortBinnedArray(spikeMat, orderSpikesBy):
-
     if orderSpikesBy == 'idxmax':
         spikeOrder = spikeMat.idxmax(axis = 1).sort_values().index
-
     elif orderSpikesBy == 'meanFR':
         spikeOrder = spikeMat.mean(axis = 1).sort_values().index
-
     elif orderSpikesBy == 'modOnset':
         #pdb.set_trace()
         thisModOnset, pValHolder, magDiffHolder = modOnset(spikeMat)
         spikeOrder = thisModOnset.sort_values(ascending=False).index
-
+    
     spikeMat = spikeMat.loc[spikeOrder,:]
-
     return spikeMat, spikeOrder
 
 def plotSingleTrial(
@@ -1685,7 +1684,9 @@ def addHistory(X, nHistBins = 0, binStride = 1, setPath = None, recordName = Non
     return outputDF.values
 """
 
-def featureUnstackerGenerator(spikeMats, whichLevel = None, nCol = None):
+
+def featureUnstackerGenerator(
+        spikeMats, whichLevel = None, nCol = None):
     if nCol is None:
         nCol = len(spikeMats.columns)
     # make a custom function that only works on spikeMats to unstack it
@@ -1696,7 +1697,9 @@ def featureUnstackerGenerator(spikeMats, whichLevel = None, nCol = None):
         return tempDF #maybe add .values here
     return unstacker
 
-def getSpikeMatsForIdx(spikeMats, whichTrials, startBin = 0):
+
+def getSpikeMatsForIdx(
+        spikeMats, whichTrials, startBin = 0):
 
     exampleSpikeMat = next(iter(spikeMats.values()))
     spikeMatIdx = exampleSpikeMat.index
@@ -1711,7 +1714,8 @@ def getSpikeMatsForIdx(spikeMats, whichTrials, startBin = 0):
             pdb.set_trace()
     return theseSpikeMats, spikeMatIdx, spikeMatCols
 
-def getSpikeMatsForCategories(categories, uniqueCategories, validTrials, spikeMats, startBin = 0):
+def getSpikeMatsForCategories(
+        categories, uniqueCategories, validTrials, spikeMats, startBin = 0):
 
     spikeMatsCategorized = {category:None for category in uniqueCategories.values}
 
@@ -1729,7 +1733,8 @@ def getSpikeMatsForCategories(categories, uniqueCategories, validTrials, spikeMa
 
     return spikeMatsCategorized, spikeMatIdx, spikeMatCols
 
-def getAverageSpikeMatsForIdx(spikeMats, whichTrials):
+def getAverageSpikeMatsForIdx(
+        spikeMats, whichTrials):
     theseSpikeMats = getSpikeMatsForIdx(spikeMats, whichTrials)
 
     exampleSpikeMat = next(iter(spikeMats.values()))
@@ -1743,7 +1748,8 @@ def getAverageSpikeMatsForIdx(spikeMats, whichTrials):
 
     return averageSpikeMats, stdSpikeMats
 
-def getAverageSpikeMatsForCategories(categories, uniqueCategories, validTrials, spikeMats, startBin = 0):
+def getAverageSpikeMatsForCategories(
+        categories, uniqueCategories, validTrials, spikeMats, startBin = 0):
 
     spikeMatsCategorized, spikeMatIdx, spikeMatCols = getSpikeMatsForCategories(categories,
         uniqueCategories, validTrials, spikeMats, startBin = startBin)
@@ -1760,7 +1766,8 @@ def getAverageSpikeMatsForCategories(categories, uniqueCategories, validTrials, 
 
     return averageSpikeMats, stdSpikeMats
 
-def getAverageSpikeMatsFromList(categories, uniqueCategories, validTrials, spikeMatList, arrayNames, startBin = 0):
+def getAverageSpikeMatsFromList(
+        categories, uniqueCategories, validTrials, spikeMatList, arrayNames, startBin = 0):
     averageSpikeMats = {arrayName: None for arrayName in arrayNames}
     stdSpikeMats = {arrayName: None for arrayName in arrayNames}
     for arrayName in arrayNames:
@@ -1769,12 +1776,14 @@ def getAverageSpikeMatsFromList(categories, uniqueCategories, validTrials, spike
         saveModOnset(arrayName, averageSpikeMats[arrayName])
     return averageSpikeMats, stdSpikeMats
 
-def getPairedSpikeMatTTest(spikeMatCubeCatA, spikeMatCubeCatB):
+def getPairedSpikeMatTTest(
+        spikeMatCubeCatA, spikeMatCubeCatB):
     #pdb.set_trace()
     tTestStatistic, tTestPVal = scipy.stats.ttest_ind(spikeMatCubeCatA, spikeMatCubeCatB, axis=2, nan_policy = 'omit')
     return tTestPVal * spikeMatCubeCatA.shape[0] * spikeMatCubeCatA.shape[1]
 
-def getAllPairedSpikeMatTTestForCategories(categories, uniqueCategories, validTrials, spikeMats):
+def getAllPairedSpikeMatTTestForCategories(
+        categories, uniqueCategories, validTrials, spikeMats):
 
     spikeMatsCategorized, spikeMatIdx, spikeMatCols = getSpikeMatsForCategories(categories,
         uniqueCategories, validTrials, spikeMats)
@@ -1791,10 +1800,11 @@ def getAllPairedSpikeMatTTestForCategories(categories, uniqueCategories, validTr
 
     return tTestSpikeMats
 
-def getTrialCategoriesAsFeatures(folderPath,
-    trialStats = None, eventInfo = None,
-    targetCategory = None,
-    alignToList = None, overrideLabel = None):
+def getTrialCategoriesAsFeatures(
+        folderPath,
+        trialStats = None, eventInfo = None,
+        targetCategory = None,
+        alignToList = None, overrideLabel = None):
 
     targetsDict = {}
 
@@ -1832,7 +1842,8 @@ def getTrialCategoriesAsFeatures(folderPath,
 
     return targets
 
-def getTrialTriggeredTimeSeriesAsFeatures(folderPath, binCenters,
+def getTrialTriggeredTimeSeriesAsFeatures(
+    folderPath, binCenters,
     trialStats = None, eventInfo = None,
     tsInfo = None,
     trialFiles = None,
@@ -1875,14 +1886,15 @@ def getTrialTriggeredTimeSeriesAsFeatures(folderPath, binCenters,
     #pdb.set_trace()
     return pd.concat(timeSeriesFeatures, names = ['joint'], axis = 1)
 
-def getSpikeMatsAsFeatures(folderPath,
-    trialStats = None, eventInfo = None,
-    trialFiles = None,
-    binCenters = None,
-    rasterOpts = None,
-    targetCategory = None,
-    alignToList = None
-    ):
+def getSpikeMatsAsFeatures(
+        folderPath,
+        trialStats = None, eventInfo = None,
+        trialFiles = None,
+        binCenters = None,
+        rasterOpts = None,
+        targetCategory = None,
+        alignToList = None
+        ):
     arrayNames = []
 
     if trialStats is None:
@@ -1953,11 +1965,11 @@ def getSpikeMatsAsFeatures(folderPath,
     return spikeMats, theBins
 
 def loadCategorizationData(
-    folderPath = None,
-    trialFiles = None, eventInfo = None,
-    rasterOpts = None,
-    targetCategory = None, alignToList = None,
-    addOverrideLabels = None):
+        folderPath = None,
+        trialFiles = None, eventInfo = None,
+        rasterOpts = None,
+        targetCategory = None, alignToList = None,
+        addOverrideLabels = None):
 
     setName = categorizationRunNameGenerator(trialFiles, alignToList, targetCategory)
     setPath = os.path.join(folderPath, setName + '.h5')
@@ -2259,7 +2271,8 @@ def plotAverageTrialPDFReport(
                 ax[2 + 3*idx+2].set_title('{}: count of {}'.format(arrayName, nameStr), fontsize = labelFontSize)
             pdf.savefig()
             plt.close()
-#@profile
+
+
 def spikePDFReport(folderPath, spikes, spikeStruct,
     arrayName = None, arrayInfo = None,
     correctAlignmentSpikes = 0,
