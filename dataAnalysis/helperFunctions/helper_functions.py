@@ -105,6 +105,7 @@ def interpolateDF(
         df, newX, kind='linear', fill_value='extrapolate',
         x=None, columns=None):
     #  pdb.set_trace()
+
     if x is None:
         oldX = np.array(df.index)
         if columns is None:
@@ -116,9 +117,11 @@ def interpolateDF(
             columns = df.columns[~df.columns.isin([x])]
         outputDF = pd.DataFrame(columns=columns+[x])
         outputDF[x] = newX
+    
     for columnName in columns:
         interpFun = interpolate.interp1d(
-            oldX, df[columnName], kind=kind, fill_value=fill_value)
+            oldX, df[columnName], kind=kind,
+            fill_value=fill_value, bounds_error=False)
         outputDF[columnName] = interpFun(newX)
     return outputDF
 
@@ -535,7 +538,7 @@ def peekAtTaps(
         td, accel,
         channelData, trialIdx,
         tapDetectOpts, sessionTapRangesNSP,
-        insX='t',
+        insX='t', plotBlocking=True,
         allTapTimestampsINS=None,
         allTapTimestampsNSP=None,
         segmentsToPlot=None):
@@ -601,7 +604,7 @@ def peekAtTaps(
 
         plotChan(
             channelData['data'], channelData['t'].values,
-            135, recordingUnits='uV', electrodeLabel='',
+            'ainp7', recordingUnits='uV', electrodeLabel='',
             label="Analog Sync", mask=None, maskLabel=" ",
             show=False, prevFig=fig, prevAx=ax[2],
             zoomAxis=False, timeRange=(tStartNSP, tStopNSP)
@@ -615,7 +618,7 @@ def peekAtTaps(
 
         ax[2].legend()
         ax[2].set_title('NSP Data')
-        plt.show(block=False)
+        plt.show(block=plotBlocking)
     return
 
 
@@ -1854,7 +1857,7 @@ def plotChan(channelData, dataT, whichChan, recordingUnits = 'uV', electrodeLabe
         else:
             ax = prevAx
 
-    #pdb.set_trace()
+    #  pdb.set_trace()
     #channelDataForPlotting = channelData.drop(['Labels', 'LabelsNumeric'], axis = 1) if 'Labels' in channelData.columns else channelData
     channelDataForPlotting = channelData.loc[:,ch_idx]
     tMask = np.logical_and(dataT > timeRange[0], dataT < timeRange[1])
