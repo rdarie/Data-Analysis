@@ -34,6 +34,7 @@ from sklearn.feature_selection import RFE, RFECV
 import datetime
 from datetime import datetime as dt
 import json
+import dataAnalysis.preproc.mdt_constants as mdt_constants
 
 try:
     # for Python2
@@ -451,7 +452,8 @@ def plotHUTtoINS(
         td, accel, plotStimStatus,
         tStartTD, tStopTD,
         tStartStim=None, tStopStim=None,
-        tdX='t', stimX='INSTime', sharex=True,
+        tdX='t', stimX='INSTime', dataCols=['channel_0', 'channel_1'],
+        sharex=True,
         plotBlocking=True, plotEachPacket=False,
         annotatePacketName=False
         ):
@@ -476,7 +478,7 @@ def plotHUTtoINS(
         tdIterator = enumerate([td['data'].loc[plotMaskTD, :]])
 
     for name, group in tdIterator:
-        for columnName in ['channel_0', 'channel_1']:
+        for columnName in dataCols:
             ax[0].plot(
                 group.loc[:, tdX],
                 group.loc[:, columnName],
@@ -762,7 +764,8 @@ def synchronizeINStoNSP(
 def getHUTtoINSSyncFun(
         timeSyncData,
         degree=1, plotting=False,
-        trialSegments=None
+        trialSegments=None,
+        syncTo='PacketGenTime'
         ):
     if trialSegments is None:
         trialSegments = pd.unique(timeSyncData['trialSegment'])
@@ -773,26 +776,26 @@ def getHUTtoINSSyncFun(
 
         if degree > 0:
             synchPolyCoeffsHUTtoINS = np.polyfit(
-                x=timeSyncData.loc[segmentMask, 'HostUnixTime'].values,
+                x=timeSyncData.loc[segmentMask, syncTo].values,
                 y=timeSyncData.loc[segmentMask, 't'].values,
                 deg=degree)
         else:
             timeOffset = timeSyncData.loc[
                 segmentMask, 't'].values - timeSyncData.loc[
-                    segmentMask, 'HostUnixTime'].values * 1e-3
+                    segmentMask, syncTo].values * 1e-3
             synchPolyCoeffsHUTtoINS = np.array([1e-3, np.mean(timeOffset)])
         #  pdb.set_trace()
         timeInterpFunHUTtoINS[trialSegment] = np.poly1d(
             synchPolyCoeffsHUTtoINS)
         if plotting:
             plt.plot(
-                timeSyncData.loc[segmentMask, 'HostUnixTime'].values * 1e-3,
+                timeSyncData.loc[segmentMask, syncTo].values * 1e-3,
                 timeSyncData.loc[segmentMask, 't'].values, 'bo',
                 label='original')
             plt.plot(
-                timeSyncData.loc[segmentMask, 'HostUnixTime'].values * 1e-3,
+                timeSyncData.loc[segmentMask, syncTo].values * 1e-3,
                 timeInterpFunHUTtoINS(
-                    timeSyncData['HostUnixTime'].values), 'r-',
+                    timeSyncData[syncTo].values), 'r-',
                 label='first degree polynomial fit')
             plt.xlabel('Host Unix Time (msec)')
             plt.ylabel('INS Time (sec)')
@@ -819,35 +822,40 @@ def synchronizeHUTtoINS(
 def getINSStimLogFromJson(
         folderPath, sessionNames,
         deviceName='DeviceNPC700373H',
-        absoluteStartTime=None):
+        absoluteStartTime=None, logForm='serial'):
     allStimStatus = []
     
     for idx, sessionName in enumerate(sessionNames):
         jsonPath = os.path.join(folderPath, sessionName, deviceName)
         with open(os.path.join(jsonPath, 'StimLog.json'), 'r') as f:
             stimLog = json.load(f)
-        progAmpNames = ['program{}_amplitude'.format(progIdx) for progIdx in range(4)]
-        progPWNames = ['program{}_pw'.format(progIdx) for progIdx in range(4)]
 
-        stimStatus = rcsa_helpers.extract_stim_meta_data(stimLog)
-        stripProgName = lambda x: int(x.split('program')[-1].split('_')[0])
-        stimStatus['activeProgram'] = stimStatus.loc[
-            :, progAmpNames].idxmax(axis = 1).apply(stripProgName)
-        stimStatus['maxAmp'] = stimStatus.loc[:,progAmpNames].max(axis = 1)
-        
+        progAmpNames = rcsa_helpers.progAmpNames
+        progPWNames = rcsa_helpers.progPWNames
+        stripProgName = rcsa_helpers.strip_prog_name
+        if logForm == 'serial':
+            stimStatus = rcsa_helpers.extract_stim_meta_data_events(stimLog)
+            pdb.set_trace()
+        elif logForm == 'long':
+            stimStatus = rcsa_helpers.extract_stim_meta_data(stimLog)
+            stimStatus['activeProgram'] = stimStatus.loc[
+                :, progAmpNames].idxmax(axis=1).apply(stripProgName)
+            stimStatus['maxAmp'] = stimStatus.loc[:, progAmpNames].max(axis=1)
         stimStatus['trialSegment'] = idx
         
         allStimStatus.append(stimStatus)
     allStimStatusDF = pd.concat(allStimStatus, ignore_index=True)
     #  if all we're doing is turn something off, don't consider it a new round
     #  pdb.set_trace()
-    ampPositive = allStimStatusDF['maxAmp'].diff().fillna(0) >= 0
-    allStimStatusDF['amplitudeIncrease'] = allStimStatusDF['amplitudeChange'] & ampPositive
-    allStimStatusDF['amplitudeRound'] = allStimStatusDF[
-        'amplitudeIncrease'].astype(np.float).cumsum()
+    if logForm == 'long':
+        ampPositive = allStimStatusDF['maxAmp'].diff().fillna(0) >= 0
+        allStimStatusDF['amplitudeIncrease'] = allStimStatusDF['amplitudeChange'] & ampPositive
+        allStimStatusDF['amplitudeRound'] = allStimStatusDF[
+            'amplitudeIncrease'].astype(np.float).cumsum()
     return allStimStatusDF
 
-def getINSDeviceConfig(folderPath, sessionName, deviceName = 'DeviceNPC700373H'):
+def getINSDeviceConfig(
+        folderPath, sessionName, deviceName='DeviceNPC700373H'):
     jsonPath = os.path.join(folderPath, sessionName, deviceName)
 
     with open(os.path.join(jsonPath, 'DeviceSettings.json'), 'r') as f:
@@ -859,9 +867,12 @@ def getINSDeviceConfig(folderPath, sessionName, deviceName = 'DeviceNPC700373H')
     groupIndices = list(range(4))
     elecIndices = list(range(17))
 
-    electrodeConfiguration = [[{'cathodes': [], 'anodes': []} for i in progIndices] for j in groupIndices]
+    electrodeConfiguration = [
+        [{'cathodes': [], 'anodes': []} for i in progIndices] for j in groupIndices]
     
-    dfIndex = pd.MultiIndex.from_product([groupIndices, progIndices], names=['group', 'program'])
+    dfIndex = pd.MultiIndex.from_product(
+        [groupIndices, progIndices],
+        names=['group', 'program'])
 
     electrodeStatus = pd.DataFrame(index=dfIndex, columns=elecIndices)
     electrodeType = pd.DataFrame(index=dfIndex, columns=elecIndices)
@@ -879,7 +890,22 @@ def getINSDeviceConfig(folderPath, sessionName, deviceName = 'DeviceNPC700373H')
                         electrodeConfiguration[groupIdx][progIdx]['anodes'].append(elecIdx)
                     else:
                         electrodeConfiguration[groupIdx][progIdx]['cathodes'].append(elecIdx)
-    return electrodeStatus, electrodeType, electrodeConfiguration
+    
+    senseInfo = pd.DataFrame(
+        deviceSettings[0]['SensingConfig']['timeDomainChannels'])
+    senseInfo['sampleRate'] = senseInfo['sampleRate'].apply(
+        lambda x: mdt_constants.sampleRate[x])
+    senseInfo['minusInput'] = senseInfo['minusInput'].apply(
+        lambda x: mdt_constants.muxIdx[x])
+    senseInfo['plusInput'] = senseInfo['plusInput'].apply(
+        lambda x: mdt_constants.muxIdx[x])
+    senseInfo.loc[(2, 3), ('minusInput', 'plusInput')] += 8
+    senseInfo.loc[:, ('minusInput', 'plusInput')].fillna(17, inplace=True)
+    senseInfo = senseInfo.loc[senseInfo['sampleRate'].notnull(), :]
+    senseInfo.reset_index(inplace=True)
+
+    return electrodeStatus, electrodeType, electrodeConfiguration, senseInfo
+
 
 def getBadSpikesMask(spikes, nStd = 5, whichChan = 0, plotting = False, deleteBad = False):
     """

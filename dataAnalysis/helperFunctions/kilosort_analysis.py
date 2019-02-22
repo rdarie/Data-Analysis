@@ -1,8 +1,10 @@
 import os, sys, pdb
+import quantities as pq
+from neo import Unit, ChannelIndex, Block, Segment, SpikeTrain, Event
 from tempfile import mkdtemp
 import numpy as np
 from scipy.ndimage.filters import gaussian_filter1d
-from scipy import stats, ndimage
+from scipy import stats, ndimage, signal
 import scipy.io
 import pandas as pd
 import matplotlib
@@ -443,27 +445,67 @@ def getSpikeStats(spikes, channel, whichStats = ['mean', 'std'], bounds = None, 
     return statsDict
 
 def getINSStimOnset(
-    folderPath, sessionName, 
-    td = None, stimStatus = None, accel = None, deviceName='DeviceNPC700373H',
-    fs = 500, stimIti = 0, minDist = 0, minDur = 0, thres = .5,
+    td=None, stimStatus=None, accel=None,
+    block=None, seg=None,
+    folderPath=None, sessionName=None, deviceName='DeviceNPC700373H',
+    groupIdx=0, probeName='ins',
+    fs=500, stimIti = 0, minDist = 0, minDur = 0, thres = .5,
     timeInterpFunINStoNSP=None,
     maxSpikesPerGroup=None,
-    stimFreq = None,
+    stimFreq = None, fixedDelay=15e-3,
     stimDetectOpts = None,
     plotting = []):
     
     if stimDetectOpts is None:
         defaultOptsDict = {
-            'channels': ['channel_0', 'channel_1'],
+            'detectChannels': ['channel_0', 'channel_1'],
             'thres': thres,
             'keep_max': False}
         stimDetectOpts = {i: defaultOptsDict for i in range(4)}
 
+    #  initialize neo block
+    if block is None:
+        assert seg is None
+        block = Block()
+        seg = Segment(name=probeName + ' segment')
+        block.segments.append(seg)
+
     elecStatus, elecType, elecConfiguration = hf.getINSDeviceConfig(
         folderPath, sessionName, deviceName)
+    
+    if 'NSPTime' in td['data'].columns:
+        t_stop = td['data']['NSPTime'].iloc[-1]
+    else:
+        t_stop = td['data']['t'].iloc[-1]
 
-    progAmpNames = [
-        'program{}_amplitude'.format(progIdx) for progIdx in range(4)]
+    if not block.channel_indexes:
+        for mdtIdx in range(17):
+            mdtChanName = probeName+'{}'.format(mdtIdx)
+            chanIdx = ChannelIndex(
+                name=mdtChanName,
+                index=np.array([mdtIdx]),
+                channel_names=np.array([mdtChanName]))
+            block.channel_indexes.append(chanIdx)
+
+    progAmpNames = []
+    for progIdx in range(4):
+        progAmpNames.append('program{}_amplitude'.format(progIdx))
+        for grpIdx in range(4):
+            thisElecConfig=elecConfiguration[grpIdx][progIdx]
+            unitName='gr{}pr{}'.format(grpIdx, progIdx)
+            unit = Unit(name=unitName)
+            
+            unit.annotate(cathodes=thisElecConfig['cathodes'])
+            unit.annotate(anodes=thisElecConfig['anodes'])
+            if grpIdx==groupIdx:
+                #  the naming scheme sucks, but groupIdx is the one we *expect* to be active
+                for key, value in stimDetectOpts[progIdx].items():
+                    unit.annotations.update({key:value})
+            for chanIdx in block.channel_indexes:
+                if np.intersect1d(chanIdx.index, thisElecConfig['cathodes']):
+                    chanIdx.units.append(unit)
+                if np.intersect1d(chanIdx.index, thisElecConfig['anodes']):
+                    chanIdx.units.append(unit)
     
     columnsToBeAdded = [
         'amplitudeChange', 'amplitudeRound', 'activeGroup',
@@ -474,27 +516,13 @@ def getINSStimOnset(
     
     for columnName in columnsToBeAdded:
         td['data'][columnName] = infoFromStimStatus.loc[:,columnName]
-    allGroups = pd.unique(stimStatus['activeGroup'])
-    uniqueElectrodeCombos = list(range(4*len(allGroups)))
-    nCh = len(uniqueElectrodeCombos)
 
-    stimSpikes = {
-        'ChannelID' : uniqueElectrodeCombos,
-        'Classification' : [np.array([]) for i in range(nCh)],
-        'NEUEVWAV_HeaderIndices' : [None for i in range(nCh)],
-        'TimeStamps' : [np.array([]) for i in range(nCh)],
-        'Units' : 'uV',
-        'Waveforms' : [None for i in range(nCh)],
-        #'meanWaveforms' : [None for i in range(nCh)],
-        #'stdWaveforms' : [None for i in range(nCh)],
-        'basic_headers' : {'TimeStampResolution': 3e4},
-        'extended_headers' : []
-        }
+    #  allGroups = pd.unique(stimStatus['activeGroup'])
+    #  uniqueElectrodeCombos = list(range(4*len(allGroups)))
+    #  nCh = len(uniqueElectrodeCombos)
 
     for name, group in td['data'].groupby('amplitudeRound'):
-        electrodeCombo = int(4 * pd.unique(group['activeGroup'])[0] + (
-            pd.unique(group['activeProgram'])[0]))
-        #  print('electrode combo: {}'.format(electrodeCombo))
+        
         thisAmplitude = group['maxAmp'].max()
         thisTrialSegment = group['trialSegment'].value_counts().idxmax()
         
@@ -513,22 +541,25 @@ def getINSStimOnset(
 
         plotMaskTD = (td['INSTime'] > tStart) & (td['INSTime'] < tStop)
         
-        activeState = td['data'].loc[plotMaskTD,'therapyStatus'].value_counts().idxmax()
-        activeProgram = td['data'].loc[plotMaskTD,'activeProgram'].value_counts().idxmax()
+        activeState = bool(td['data'].loc[plotMaskTD,'therapyStatus'].value_counts().idxmax())
+        activeGroup =  int(td['data'].loc[plotMaskTD,'activeGroup'].value_counts().idxmax())
+        activeProgram =  int(td['data'].loc[plotMaskTD,'activeProgram'].value_counts().idxmax())
+
+        electrodeCombo = 'gr{}pr{}'.format(activeGroup, activeProgram)
+        for unit in block.list_units:
+            if unit.name == electrodeCombo:
+                thisUnit = unit
+
+        print('electrode combo: {}'.format(electrodeCombo))
 
         if not activeState:
             print('Therapy not active!')
             continue
-        '''
-        tdPow = pd.Series(0, index = td['data'].loc[plotMaskTD, chanNames].index)
-        for chanName in chanNames:
-            tdPow = tdPow + stats.zscore(td['data'].loc[plotMaskTD, chanName]) ** 2
-        '''
-        #  print('Active program is {}'.format(activeProgram))
-        
+                
         theseDetectOpts = stimDetectOpts[activeProgram]
         
-        tdPow = (td['data'].loc[plotMaskTD, theseDetectOpts['channels']] ** 2).sum(axis = 1)
+        tdPow = (td['data'].loc[
+            plotMaskTD, theseDetectOpts['detectChannels']] ** 2).sum(axis = 1)
         
         # convolve with a rectangular kernel
         # then shift forward and backward to get forward and backward sum
@@ -541,20 +572,63 @@ def getINSStimOnset(
             np.array([0]),
             np.linspace(-1, 0, round(kernNSamp/2))
             ))
-        #  pdb.set_trace()
+        
+        # use the HUT derived stim onset to favor detection
+        hutPeakIdx = hf.getTriggers(
+            td['data'].loc[plotMaskTD, 'maxAmp'], thres=5,
+            iti=minDist, keep_max = theseDetectOpts['keep_max'])
+        
+        onsetIndices = hutPeakIdx
+        if len(onsetIndices):
+            #  assume a fixed delay of 5 msec between onset and stim
+            fixedDelayIdx = int(fixedDelay * fs)
+            onsetIndices = onsetIndices + fixedDelayIdx
+            if stimFreq is not None:
+                onsetIndices = onsetIndices + int(fs / stimFreq)
+                
+        onsetTimestamps = pd.Series(
+            td['INSTime'].loc[onsetIndices].values,
+            index = td['INSTime'].loc[onsetIndices].index)
+        # if we know cycle value, use it to predict onsets
+        if len(onsetIndices) == 1 and stimIti > 0:
+            segmentEnding = td['data'].loc[plotMaskTD, 'INSTime']
+            onsetIndices = np.arange(
+                onsetIndices[0], segmentEnding.index[-1], fs*stimIti)
+            onsetTimestamps = pd.Series(
+                td['INSTime'].loc[onsetIndices].values,
+                index = td['INSTime'].loc[onsetIndices].index)
+
         correctionFactor = pd.Series(
             np.convolve(kern, tdPow, mode = 'same'),
             index = tdPow.index)
-        correctionFactor.loc[correctionFactor < 1] = 1
-
+        
+        correctionFactor = correctionFactor - correctionFactor.min()
+        correctionFactor = (correctionFactor / correctionFactor.max()) + 1
+        
+        if len(onsetTimestamps):
+            gaussDur = 0.15
+            gaussNSamp = int(gaussDur * fs)
+            gaussKern = signal.gaussian(
+                3 * gaussNSamp, gaussNSamp)
+            #  pdb.set_trace()
+            support = pd.Series(0, index = tdPow.index)
+            support.loc[onsetIndices] = 1
+            support.iloc[:] = np.convolve(
+                support.values,
+                gaussKern, mode = 'same'
+                )
+            support = support + 1
+            #  correctionFactor = support
+            #  pdb.set_trace()
+            correctionFactor = correctionFactor * support
         sobelFiltered = pd.Series(
             ndimage.sobel(tdPow, mode='reflect'),
             index=tdPow.index)
 
-        sobelFiltered.iloc[:] = stats.zscore(sobelFiltered)
-        stimDetectSignal = sobelFiltered.abs() * correctionFactor
+        stimDetectSignal = sobelFiltered * correctionFactor
         stimDetectSignal = stimDetectSignal.fillna(0)
-        stimDetectSignal = stimDetectSignal - stimDetectSignal.min()
+        stimDetectSignal.iloc[:] = stats.zscore(sobelFiltered)
+        stimDetectSignal = stimDetectSignal.abs()
 
         if thisAmplitude == 0:
             #  pdb.set_trace()
@@ -565,7 +639,8 @@ def getINSStimOnset(
         else:
             peakIdx = peakutils.indexes(
                 stimDetectSignal.values, thres=theseDetectOpts['thres'],
-                min_dist=int(minDist * fs), thres_abs=True, keep_max = theseDetectOpts['keep_max'])
+                min_dist=int(minDist * fs), thres_abs=True,
+                keep_max = theseDetectOpts['keep_max'])
             peakIdx = tdPow.index[peakIdx]
             if name in plotting:
                 print('After peakutils.indexes, before check for amplitude')
@@ -573,12 +648,6 @@ def getINSStimOnset(
             # check for amplitude
             keepMask = (td['data'].loc[peakIdx, 'maxAmp'] == thisAmplitude).values
             peakIdx = peakIdx[keepMask]
-            # use the HUT derived stim onset if no artifact visible
-            if len(peakIdx) == 0:
-                #  pdb.set_trace()
-                peakIdx = hf.getTriggers(
-                    td['data'].loc[plotMaskTD, 'maxAmp'], thres=5,
-                    iti=minDist, keep_max = theseDetectOpts['keep_max'])
         
         if name in plotting:
             print('Before if maxSpikesPerGroup is not None')
@@ -600,7 +669,7 @@ def getINSStimOnset(
             stimDiff = (stimBackDiff + stimFwdDiff) / 2
             offBy = (stimDiff - stimIti).abs()
             if name in plotting:
-                print('off by:')
+                print('stim iti off by:')
                 print('{}'.format(offBy))
             keepMask = offBy < 0.3
             theseTimestamps = theseTimestamps.loc[keepMask]
@@ -611,23 +680,14 @@ def getINSStimOnset(
             theseTimestamps.iloc[:] = timeInterpFunINStoNSP[thisTrialSegment](
                 theseTimestamps.values)
         
-        theseTimestamps = theseTimestamps.values
-        stimSpikes['TimeStamps'][electrodeCombo] = np.append(
-            stimSpikes['TimeStamps'][electrodeCombo],
-            theseTimestamps)
-
-        ampList = theseTimestamps ** 0 * thisAmplitude * 1e3
-        #  print('The amplitude was {}'.format(thisAmplitude))
-        stimSpikes['Classification'][electrodeCombo] = np.append(
-            stimSpikes['Classification'][electrodeCombo],
-            ampList)
-        if stimSpikes['Waveforms'][electrodeCombo] is not None:
-            stimSpikes['Waveforms'][electrodeCombo] = np.concatenate(
-                [stimSpikes['Waveforms'][electrodeCombo],
-                np.zeros((theseTimestamps.shape[0], 3))], axis = 0)
-        else:
-            stimSpikes['Waveforms'][electrodeCombo] = np.zeros((theseTimestamps.shape[0], 3))
-        #pdb.set_trace()
+        theseTimestamps = theseTimestamps.values * pq.s
+        ampList = theseTimestamps ** 0 * thisAmplitude * pq.mA
+        arrayAnn = {'stimAmplitude': ampList}
+        st = SpikeTrain(
+                times=theseTimestamps, t_stop=t_stop,
+                array_annotations = arrayAnn)
+        thisUnit.spiketrains.append(st)
+        seg.spiketrains.append(st)
         
         if name in plotting:
             #  pdb.set_trace()
@@ -642,7 +702,7 @@ def getINSStimOnset(
                     accel['INSTime'].loc[plotMaskAccel],
                     stats.zscore(accel['data'].loc[plotMaskAccel, 'inertia']),
                     '-', label='inertia')
-            for channelName in theseDetectOpts['channels']:
+            for channelName in theseDetectOpts['detectChannels']:
                 ax[0].plot(
                     td['INSTime'].loc[plotMaskTD],
                     stats.zscore(td['data'].loc[plotMaskTD, channelName]),
@@ -652,7 +712,7 @@ def getINSStimOnset(
             
             ax[1].plot(
                 td['INSTime'].loc[plotMaskTD],
-                stats.zscore(correctionFactor),
+                correctionFactor,
                 '-', label='correctionFactor')
                 
             ax[1].plot(
@@ -667,6 +727,10 @@ def getINSStimOnset(
                 td['INSTime'].loc[peakIdx],
                 stimDetectSignal.loc[peakIdx],
                 'o', label='stimOnset')
+            ax[1].plot(
+                td['INSTime'].loc[onsetIndices],
+                stimDetectSignal.loc[onsetIndices],
+                '*', label='stimOnset')
                                   
             ax[1].plot(
                 td['INSTime'].loc[plotMaskTD],
@@ -697,26 +761,19 @@ def getINSStimOnset(
             plt.suptitle('Stim State')
             plt.show()
 
-    markForDeletion = {i: False for i in stimSpikes['ChannelID']}
-    for idx, chanID in enumerate(stimSpikes['ChannelID']):
-        markForDeletion[chanID] = len(stimSpikes['TimeStamps'][idx]) == 0
-
-    #  pdb.set_trace()
-    fil = [not markForDeletion[it] for it in stimSpikes['ChannelID']]
-
-    stimSpikes['ChannelID'] = [
-        i for i in itertools.compress(stimSpikes['ChannelID'], fil)]
-    #pdb.set_trace()
-    stimSpikes['Classification'] = [
-        i for i in itertools.compress(stimSpikes['Classification'], fil)]
-    stimSpikes['TimeStamps'] = [
-        i for i in itertools.compress(stimSpikes['TimeStamps'], fil)]
-    stimSpikes['Waveforms'] = [
-        i for i in itertools.compress(stimSpikes['Waveforms'], fil)]
-    stimSpikes['NEUEVWAV_HeaderIndices'] = [
-        i for i in itertools.compress(stimSpikes['NEUEVWAV_HeaderIndices'], fil)]
-
-    return stimSpikes
+    for unit in block.list_units:
+        if not unit.spiketrains:
+            st = SpikeTrain(
+                times=[], units = 'sec',
+                t_stop=t_stop)
+            thisUnit.spiketrains.append(st)
+            seg.spiketrains.append(st)
+        unit.create_relationship()
+    for chanIdx in block.channel_indexes:
+        chanIdx.create_relationship()
+    block.create_relationship()
+    seg.create_relationship()
+    return block
 
 def plotSpike(spikes, channel, showNow = False, ax = None,
     acrossArray = False, xcoords = None, ycoords = None,

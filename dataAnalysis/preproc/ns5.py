@@ -429,8 +429,7 @@ def blockToNix(
 
             for eventProxy in seg.events:
                 event = eventProxy.load(
-                    time_slice=(tStart, tStop),
-                    magnitude_mode='rescaled')
+                    time_slice=(tStart, tStop))
                 event.segment = newSeg
                 newSeg.events.append(event)
                 newSeg.create_relationship()
@@ -439,8 +438,7 @@ def blockToNix(
 
             for epochProxy in seg.epochs:
                 epoch = epochProxy.load(
-                    time_slice=(tStart, tStop),
-                    magnitude_mode='rescaled')
+                    time_slice=(tStart, tStop))
                 epoch.segment = newSeg
                 newSeg.events.append(epoch)
                 newSeg.create_relationship()
@@ -560,4 +558,4 @@ def preproc(
 
     writer.close()
 
-    return reader
+    return neo.io.nixio_fr.NixIO(filename=trialBasePath)
