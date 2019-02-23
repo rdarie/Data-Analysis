@@ -7,7 +7,7 @@ from brpy version: 1.1.1 --- 07/22/2016
 """
 import neo
 from neo.core import (Block, Segment, ChannelIndex,
-    AnalogSignal, Unit, SpikeTrain)
+    AnalogSignal, Unit, SpikeTrain, Event)
 import quantities as pq
 from quantities import mV, kHz, s, uV
 import matplotlib, math, pdb
@@ -89,6 +89,28 @@ def spikeDictToSpikeTrains(
     return block
 
 
+def analogSignalsToDataFrame(analogsignals, idxT='t'):
+    asigList = []
+    for asig in analogsignals:
+        if asig.shape[1] == 1:
+            colNames = [asig.name]
+        else:
+            colNames = [
+                asig.name +
+                '_{}'.format(i) for i in
+                asig.channel_index.channel_ids
+                ]
+        asigList.append(
+            pd.DataFrame(
+                asig.magnitude, columns=colNames,
+                index=range(asig.shape[0])))
+    asigList.append(
+        pd.DataFrame(
+            asig.times.magnitude, columns=[idxT],
+            index=range(asig.shape[0])))
+    return pd.concat(asigList, axis=1)
+
+
 def dataFrameToAnalogSignals(
         df,
         block=None, seg=None,
@@ -136,6 +158,44 @@ def dataFrameToAnalogSignals(
     block.create_relationship()
     seg.create_relationship()
     return block
+
+
+def eventDataFrameToEvents(
+        eventDF, idxT=None,
+        annCol=None,
+        eventName='', tUnits=pq.s
+        ):
+    eventList = []
+    for colName in annCol:
+        event = Event(
+            name=eventName + colName,
+            times=eventDF[idxT].values * tUnits,
+            labels=eventDF[colName].values
+            )
+        #  pdb.set_trace()
+        originalDType = type(eventDF[colName].values[0]).__name__
+        event.annotate(originalDType=originalDType)
+        eventList.append(event)
+    return eventList
+
+
+def eventsToDataFrame(
+        events, idxT='t'
+        ):
+    eventDict = {}
+    
+    for event in events:
+        print(event.name)
+        values = event.array_annotations['labels']
+        if isinstance(values[0], bytes):
+            #  event came from hdf, need to recover dtype
+            originalDType = eval('np.' + event.annotations['originalDType'])
+            values = np.array(values, dtype=originalDType)
+        #  print(values.dtype)
+        eventDict.update({
+            event.name: pd.Series(values)})
+    eventDict.update({idxT: pd.Series(event.times.magnitude)})
+    return pd.concat(eventDict, axis=1)
 
 
 def findSegsIncluding(block, timeSlice=None):
@@ -203,7 +263,8 @@ def getNIXData(
         folderPath=None,
         reader=None, blockIdx=0,
         elecIds=None, startTime_s=None,
-        dataLength_s=None, downsample=1):
+        dataLength_s=None, downsample=1,
+        signal_group_mode='group-by-same-units'):
     #  Open file and extract headers
     if reader is None:
         assert (fileName is not None) and (folderPath is not None)
@@ -212,7 +273,7 @@ def getNIXData(
 
     block = reader.read_block(
         block_index=blockIdx, lazy=True,
-        signal_group_mode='group-by-same-units')
+        signal_group_mode=signal_group_mode)
 
     for segIdx, seg in enumerate(block.segments):
         seg.events = [i.load() for i in seg.events]

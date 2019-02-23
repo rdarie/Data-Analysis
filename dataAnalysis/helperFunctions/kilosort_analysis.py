@@ -1,6 +1,8 @@
 import os, sys, pdb
 import quantities as pq
-from neo import Unit, ChannelIndex, Block, Segment, SpikeTrain, Event
+from neo import (
+    Unit, ChannelIndex, Block,
+    Segment, SpikeTrain, Event, AnalogSignal)
 from tempfile import mkdtemp
 import numpy as np
 from scipy.ndimage.filters import gaussian_filter1d
@@ -15,6 +17,7 @@ import seaborn as sns
 from importlib import reload
 import dataAnalysis.helperFunctions.motor_encoder as mea
 import dataAnalysis.helperFunctions.helper_functions as hf
+import dataAnalysis.preproc.ns5 as preproc
 import line_profiler
 import pickle
 import h5py
@@ -26,6 +29,7 @@ import math as m
 import copy
 LABELFONTSIZE = 10
 import peakutils
+import rcsanalysis.packet_func as rcsa_helpers
 
 
 def loadParamsPy(filePath):
@@ -445,93 +449,73 @@ def getSpikeStats(spikes, channel, whichStats = ['mean', 'std'], bounds = None, 
     return statsDict
 
 def getINSStimOnset(
-    td=None, stimStatus=None, accel=None,
-    block=None, seg=None,
-    folderPath=None, sessionName=None, deviceName='DeviceNPC700373H',
-    groupIdx=0, probeName='ins',
+    block, elecConfiguration,
     fs=500, stimIti = 0, minDist = 0, minDur = 0, thres = .5,
     timeInterpFunINStoNSP=None,
     maxSpikesPerGroup=None,
     stimFreq = None, fixedDelay=15e-3,
     stimDetectOpts = None,
     plotting = []):
-    
+    seg = block.segments[0]
+    defaultOptsDict = {
+        'detectChannels': ['ins_td0', 'ins_td2'],
+        'thres': thres,
+        'keep_max': False}
+
     if stimDetectOpts is None:
-        defaultOptsDict = {
-            'detectChannels': ['channel_0', 'channel_1'],
-            'thres': thres,
-            'keep_max': False}
-        stimDetectOpts = {i: defaultOptsDict for i in range(4)}
-
-    #  initialize neo block
-    if block is None:
-        assert seg is None
-        block = Block()
-        seg = Segment(name=probeName + ' segment')
-        block.segments.append(seg)
-
-    elecStatus, elecType, elecConfiguration = hf.getINSDeviceConfig(
-        folderPath, sessionName, deviceName)
-    
-    if 'NSPTime' in td['data'].columns:
-        t_stop = td['data']['NSPTime'].iloc[-1]
-    else:
-        t_stop = td['data']['t'].iloc[-1]
-
-    if not block.channel_indexes:
-        for mdtIdx in range(17):
-            mdtChanName = probeName+'{}'.format(mdtIdx)
-            chanIdx = ChannelIndex(
-                name=mdtChanName,
-                index=np.array([mdtIdx]),
-                channel_names=np.array([mdtChanName]))
-            block.channel_indexes.append(chanIdx)
-
-    progAmpNames = []
+        stimDetectOpts = {
+            grpIdx: {progIdx: defaultOptsDict for progIdx in range(4)}
+            for grpIdx in range(4)}
+    #  allocate channels for each physical contact
+    for mdtIdx in range(17):
+        mdtChanName = 'ins_ch{}'.format(mdtIdx)
+        chanIdx = ChannelIndex(
+            name=mdtChanName,
+            index=[mdtIdx])
+        block.channel_indexes.append(chanIdx)
+    #  allocate units for each combination of group and program
     for progIdx in range(4):
-        progAmpNames.append('program{}_amplitude'.format(progIdx))
         for grpIdx in range(4):
             thisElecConfig=elecConfiguration[grpIdx][progIdx]
             unitName='gr{}pr{}'.format(grpIdx, progIdx)
             unit = Unit(name=unitName)
-            
             unit.annotate(cathodes=thisElecConfig['cathodes'])
             unit.annotate(anodes=thisElecConfig['anodes'])
-            if grpIdx==groupIdx:
-                #  the naming scheme sucks, but groupIdx is the one we *expect* to be active
-                for key, value in stimDetectOpts[progIdx].items():
-                    unit.annotations.update({key:value})
-            for chanIdx in block.channel_indexes:
-                if np.intersect1d(chanIdx.index, thisElecConfig['cathodes']):
-                    chanIdx.units.append(unit)
-                if np.intersect1d(chanIdx.index, thisElecConfig['anodes']):
-                    chanIdx.units.append(unit)
-    
-    columnsToBeAdded = [
-        'amplitudeChange', 'amplitudeRound', 'activeGroup',
-        'frequency', 'therapyStatus', 'activeProgram', 'maxAmp'] + progAmpNames
-    infoFromStimStatus = hf.interpolateDF(
-        stimStatus, td['INSTime'],
-        x='INSTime', columns=columnsToBeAdded, kind='previous')
-    
-    for columnName in columnsToBeAdded:
-        td['data'][columnName] = infoFromStimStatus.loc[:,columnName]
 
-    #  allGroups = pd.unique(stimStatus['activeGroup'])
-    #  uniqueElectrodeCombos = list(range(4*len(allGroups)))
-    #  nCh = len(uniqueElectrodeCombos)
+            try:
+                theseDetOpts = stimDetectOpts[grpIdx][prgIdx]
+            except:
+                theseDetOpts = defaultOptsDict
 
-    for name, group in td['data'].groupby('amplitudeRound'):
-        
-        thisAmplitude = group['maxAmp'].max()
+            for key, value in theseDetOpts.items():
+                unit.annotations.update({key:value})
+            
+            for mdtIdx in thisElecConfig['cathodes']:
+                chanIdx = block.filter(
+                    objects=ChannelIndex,
+                    index=[mdtIdx])[0]
+                chanIdx.units.append(unit)
+            for mdtIdx in thisElecConfig['anodes']:
+                chanIdx = block.filter(
+                    objects=ChannelIndex,
+                    index=[mdtIdx])[0]
+                chanIdx.units.append(unit)
+    
+    tdDF, accelDF, stimStatus = preprocINS.unpackINSNeoBlock(block)
+    t_stop = tdDF['t'].iloc[-1]
+    for name, group in tdDF.groupby('amplitudeRound'):
+        activeProgram = int(group['program'].value_counts().idxmax())
+        activeGroup = int(group['group'].value_counts().idxmax())
+        ampColName = 'program{}_amplitude'.format(activeProgram)
+        thisAmplitude = group[ampColName].max()
         thisTrialSegment = group['trialSegment'].value_counts().idxmax()
         
-        #  pad with 100 msec to capture first pulse
-        tStart = max(0, group['INSTime'].iloc[0] - 0.1)
-        tStop = min(group['INSTime'].iloc[-1], td['INSTime'].iloc[-1])
+        #  pad with 150 msec to capture first pulse
+        tStart = max(0, group['t'].iloc[0] - 150e-3)
+        tStop = min(group['t'].iloc[-1], tdDF['t'].iloc[-1])
         
         #  pad with 100 msec to *avoid* first pulse
-        #  tStart = min(tStop, group['INSTime'].iloc[0] + 0.1)
+        #  tStart = min(tStop, group['t'].iloc[0] + 0.1)
         
         if (tStop - tStart) < minDur:
             print('tStart ={}'.format(tStart))
@@ -539,26 +523,25 @@ def getINSStimOnset(
             print('(tStop - tStart) < minDur')
             continue
 
-        plotMaskTD = (td['INSTime'] > tStart) & (td['INSTime'] < tStop)
+        plotMaskTD = (tdDF['t'] > tStart) & (tdDF['t'] < tStop)
         
-        activeState = bool(td['data'].loc[plotMaskTD,'therapyStatus'].value_counts().idxmax())
-        activeGroup =  int(td['data'].loc[plotMaskTD,'activeGroup'].value_counts().idxmax())
-        activeProgram =  int(td['data'].loc[plotMaskTD,'activeProgram'].value_counts().idxmax())
-
+        activeState = bool(tdDF.loc[plotMaskTD,'therapyStatus'].value_counts().idxmax())
+        
         electrodeCombo = 'gr{}pr{}'.format(activeGroup, activeProgram)
+        thisUnit = None
         for unit in block.list_units:
             if unit.name == electrodeCombo:
-                thisUnit = unit
-
-        print('electrode combo: {}'.format(electrodeCombo))
+                thisUnit=unit
+        #  print('This unit is named ' + thisUnit.name)
+        #  print('electrode combo: {}'.format(electrodeCombo))
 
         if not activeState:
             print('Therapy not active!')
             continue
                 
-        theseDetectOpts = stimDetectOpts[activeProgram]
+        theseDetectOpts = stimDetectOpts[activeGroup][activeProgram]
         
-        tdPow = (td['data'].loc[
+        tdPow = (tdDF.loc[
             plotMaskTD, theseDetectOpts['detectChannels']] ** 2).sum(axis = 1)
         
         # convolve with a rectangular kernel
@@ -575,7 +558,7 @@ def getINSStimOnset(
         
         # use the HUT derived stim onset to favor detection
         hutPeakIdx = hf.getTriggers(
-            td['data'].loc[plotMaskTD, 'maxAmp'], thres=5,
+            tdDF.loc[plotMaskTD, ampColName], thres=5,
             iti=minDist, keep_max = theseDetectOpts['keep_max'])
         
         onsetIndices = hutPeakIdx
@@ -587,16 +570,16 @@ def getINSStimOnset(
                 onsetIndices = onsetIndices + int(fs / stimFreq)
                 
         onsetTimestamps = pd.Series(
-            td['INSTime'].loc[onsetIndices].values,
-            index = td['INSTime'].loc[onsetIndices].index)
+            tdDF['t'].loc[onsetIndices].values,
+            index = tdDF['t'].loc[onsetIndices].index)
         # if we know cycle value, use it to predict onsets
         if len(onsetIndices) == 1 and stimIti > 0:
-            segmentEnding = td['data'].loc[plotMaskTD, 'INSTime']
+            segmentEnding = tdDF.loc[plotMaskTD, 't']
             onsetIndices = np.arange(
                 onsetIndices[0], segmentEnding.index[-1], fs*stimIti)
             onsetTimestamps = pd.Series(
-                td['INSTime'].loc[onsetIndices].values,
-                index = td['INSTime'].loc[onsetIndices].index)
+                tdDF['t'].loc[onsetIndices].values,
+                index = tdDF['t'].loc[onsetIndices].index)
 
         correctionFactor = pd.Series(
             np.convolve(kern, tdPow, mode = 'same'),
@@ -633,7 +616,7 @@ def getINSStimOnset(
         if thisAmplitude == 0:
             #  pdb.set_trace()
             #  peakIdx = hf.getTriggers(
-            #      td['data'].loc[plotMaskTD, 'amplitudeChange'].astype(np.float), thres=5,
+            #      tdDF.loc[plotMaskTD, 'amplitudeChange'].astype(np.float), thres=5,
             #      iti=minDist, keep_max = theseDetectOpts['keep_max'])
             peakIdx = np.array([])
         else:
@@ -646,7 +629,7 @@ def getINSStimOnset(
                 print('After peakutils.indexes, before check for amplitude')
                 print('{}'.format(peakIdx))
             # check for amplitude
-            keepMask = (td['data'].loc[peakIdx, 'maxAmp'] == thisAmplitude).values
+            keepMask = (tdDF.loc[peakIdx, ampColName] == thisAmplitude).values
             peakIdx = peakIdx[keepMask]
         
         if name in plotting:
@@ -657,8 +640,8 @@ def getINSStimOnset(
             peakIdx = peakIdx[:maxSpikesPerGroup]
 
         theseTimestamps = pd.Series(
-            td['INSTime'].loc[peakIdx].values,
-            index = td['INSTime'].loc[peakIdx].index)
+            tdDF['t'].loc[peakIdx].values,
+            index = tdDF['t'].loc[peakIdx].index)
 
         if name in plotting:
             print('Before if stimIti > 0')
@@ -681,13 +664,15 @@ def getINSStimOnset(
                 theseTimestamps.values)
         
         theseTimestamps = theseTimestamps.values * pq.s
-        ampList = theseTimestamps ** 0 * thisAmplitude * pq.mA
+        ampList = theseTimestamps ** 0 * 0.1 * thisAmplitude * pq.mA
         arrayAnn = {'stimAmplitude': ampList}
+        
         st = SpikeTrain(
-                times=theseTimestamps, t_stop=t_stop,
-                array_annotations = arrayAnn)
+            times=theseTimestamps, t_stop=t_stop,
+            name=thisUnit.name, 
+            array_annotations = arrayAnn)
+        
         thisUnit.spiketrains.append(st)
-        seg.spiketrains.append(st)
         
         if name in plotting:
             #  pdb.set_trace()
@@ -695,45 +680,46 @@ def getINSStimOnset(
             print('{}'.format(peakIdx))
 
             fig, ax = plt.subplots(3, 1, sharex=True)
-            if accel is not None:
-                plotMaskAccel = (accel['INSTime'] > tStart) & (
-                    accel['INSTime'] < tStop)
+            if accelDF is not None:
+                plotMaskAccel = (accelDF['t'] > tStart) & (
+                    accelDF['t'] < tStop)
                 ax[0].plot(
-                    accel['INSTime'].loc[plotMaskAccel],
-                    stats.zscore(accel['data'].loc[plotMaskAccel, 'inertia']),
+                    accelDF['t'].loc[plotMaskAccel],
+                    stats.zscore(
+                        accelDF.loc[plotMaskAccel, 'ins_accinertia']),
                     '-', label='inertia')
             for channelName in theseDetectOpts['detectChannels']:
                 ax[0].plot(
-                    td['INSTime'].loc[plotMaskTD],
-                    stats.zscore(td['data'].loc[plotMaskTD, channelName]),
+                    tdDF['t'].loc[plotMaskTD],
+                    stats.zscore(tdDF.loc[plotMaskTD, channelName]),
                     '-', label=channelName)
             ax[0].legend()
             ax[0].set_title('INS Accel and TD')
             
             ax[1].plot(
-                td['INSTime'].loc[plotMaskTD],
+                tdDF['t'].loc[plotMaskTD],
                 correctionFactor,
                 '-', label='correctionFactor')
                 
             ax[1].plot(
-                td['INSTime'].loc[plotMaskTD],
+                tdDF['t'].loc[plotMaskTD],
                 sobelFiltered,
                 '-', label='sobelFiltered')
             ax[1].plot(
-                td['INSTime'].loc[plotMaskTD],
+                tdDF['t'].loc[plotMaskTD],
                 stimDetectSignal,
                 '-', label='stimDetectSignal')
             ax[1].plot(
-                td['INSTime'].loc[peakIdx],
+                tdDF['t'].loc[peakIdx],
                 stimDetectSignal.loc[peakIdx],
                 'o', label='stimOnset')
             ax[1].plot(
-                td['INSTime'].loc[onsetIndices],
+                tdDF['t'].loc[onsetIndices],
                 stimDetectSignal.loc[onsetIndices],
                 '*', label='stimOnset')
                                   
             ax[1].plot(
-                td['INSTime'].loc[plotMaskTD],
+                tdDF['t'].loc[plotMaskTD],
                 stimDetectSignal ** 0 * theseDetectOpts['thres'],
                 'r-', label='detection Threshold')
             ax[1].legend()
@@ -741,38 +727,61 @@ def getINSStimOnset(
             
             for columnName in progAmpNames:
                 ax[2].plot(
-                    td['data'].loc[plotMaskTD, 'INSTime'],
-                    td['data'].loc[plotMaskTD, columnName],
+                    tdDF.loc[plotMaskTD, 't'],
+                    tdDF.loc[plotMaskTD, columnName],
                     '-', label=columnName, lw = 2.5)
 
             statusAx = ax[2].twinx()
             statusAx.plot(
-                td['data'].loc[plotMaskTD, 'INSTime'],
-                td['data'].loc[plotMaskTD, 'therapyStatus'],
+                tdDF.loc[plotMaskTD, 't'],
+                tdDF.loc[plotMaskTD, 'therapyStatus'],
                 '--', label='therapyStatus', lw = 1.5)
+            '''
             statusAx.plot(
-                td['data'].loc[plotMaskTD, 'INSTime'],
-                td['data'].loc[plotMaskTD, 'amplitudeChange'],
+                tdDF.loc[plotMaskTD, 't'],
+                tdDF.loc[plotMaskTD, 'amplitudeChange'],
                 'c--', label='amplitudeChange', lw = 1.5)
+            '''
             ax[2].legend(loc = 'upper left')    
             statusAx.legend(loc = 'upper right')
             ax[2].set_ylabel('Stim Amplitude (mA)')
             ax[2].set_xlabel('NSP Time (sec)')
             plt.suptitle('Stim State')
             plt.show()
-
-    for unit in block.list_units:
-        if not unit.spiketrains:
+    
+    createRelationship = False
+    for thisUnit in block.list_units:
+        if not len(thisUnit.spiketrains):
             st = SpikeTrain(
-                times=[], units = 'sec',
+                name=thisUnit.name,
+                times=[], units='sec',
                 t_stop=t_stop)
             thisUnit.spiketrains.append(st)
             seg.spiketrains.append(st)
-        unit.create_relationship()
-    for chanIdx in block.channel_indexes:
-        chanIdx.create_relationship()
-    block.create_relationship()
-    seg.create_relationship()
+        else:
+            #  consolidate spiketrains
+            consolidatedTimes = np.array([])
+            for idx, st in enumerate(thisUnit.spiketrains):
+                consolidatedTimes = np.concatenate((
+                    consolidatedTimes,
+                    st.times.magnitude
+                ))
+            newSt = SpikeTrain(
+                name=thisUnit.name,
+                times=consolidatedTimes, units='sec',
+                t_stop=t_stop)
+            thisUnit.spiketrains = [newSt]
+            seg.spiketrains.append(newSt)
+
+        if createRelationship:
+            thisUnit.create_relationship()
+
+    if createRelationship:
+        for chanIdx in block.channel_indexes:
+            chanIdx.create_relationship()
+        seg.create_relationship()
+        block.create_relationship()
+    
     return block
 
 def plotSpike(spikes, channel, showNow = False, ax = None,

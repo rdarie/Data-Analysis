@@ -35,7 +35,6 @@ import datetime
 from datetime import datetime as dt
 import json
 import dataAnalysis.preproc.mdt_constants as mdt_constants
-
 try:
     # for Python2
     from Tkinter import *   ## notice capitalized T in Tkinter
@@ -831,11 +830,9 @@ def getINSStimLogFromJson(
             stimLog = json.load(f)
 
         progAmpNames = rcsa_helpers.progAmpNames
-        progPWNames = rcsa_helpers.progPWNames
         stripProgName = rcsa_helpers.strip_prog_name
         if logForm == 'serial':
             stimStatus = rcsa_helpers.extract_stim_meta_data_events(stimLog)
-            pdb.set_trace()
         elif logForm == 'long':
             stimStatus = rcsa_helpers.extract_stim_meta_data(stimLog)
             stimStatus['activeProgram'] = stimStatus.loc[
@@ -849,10 +846,85 @@ def getINSStimLogFromJson(
     #  pdb.set_trace()
     if logForm == 'long':
         ampPositive = allStimStatusDF['maxAmp'].diff().fillna(0) >= 0
-        allStimStatusDF['amplitudeIncrease'] = allStimStatusDF['amplitudeChange'] & ampPositive
+        allStimStatusDF['amplitudeIncrease'] = (
+            allStimStatusDF['amplitudeChange'] & ampPositive)
         allStimStatusDF['amplitudeRound'] = allStimStatusDF[
             'amplitudeIncrease'].astype(np.float).cumsum()
     return allStimStatusDF
+
+
+def stimStatusSerialtoLong(
+        stimStSer, idxT='t', expandCols=[],
+        deriveCols=[], progAmpNames=[]):
+    
+    stimStLong = pd.DataFrame(index=stimStSer.index, columns=expandCols)
+    #  fill in frequency
+    for pName in expandCols:
+        print(pName)
+        stimStLong[pName] = np.nan
+        pMask = stimStSer['property'] == pName
+        pValues = stimStSer.loc[pMask, 'value']
+        stimStLong.loc[pMask, pName] = pValues
+        stimStLong[pName].fillna(
+            method='ffill', inplace=True)
+        stimStLong[pName].fillna(
+            method='bfill', inplace=True)
+
+    for pName in ['group', 'program', 'trialSegment', idxT]:
+        stimStLong[pName] = stimStSer[pName]
+        pMask = stimStSer['property'] == pName
+        stimStLong[pName].fillna(
+            method='ffill', inplace=True)
+        stimStLong[pName].fillna(
+            method='bfill', inplace=True)
+
+    for pName in progAmpNames:
+        stimStLong[pName] = np.nan
+
+    if 'amplitudeRound' in deriveCols:
+        grpProg = (
+            stimStSer['group'] * 4 + stimStSer['program'])
+        grpProg = grpProg.fillna(method='bfill')
+        grpProgChange = grpProg.diff().fillna(0) != 0
+        grpProgRound = grpProgChange.astype(np.float).cumsum()
+    
+        #  find times of amplitude increase
+        ampRoundChange = pd.Series(False, index=stimStSer.index)
+        #  activeProgram = pd.Series(np.nan, index=stimStSer.index)
+        #  activeGroup = pd.Series(np.nan, index=stimStSer.index)
+        for rnd in pd.unique(grpProgRound):
+            #  break
+            rndMask = grpProgRound == rnd
+            
+            activeProgram = int(
+                stimStSer.loc[rndMask, 'program'].value_counts().idxmax())
+            activeGroup = int(
+                stimStSer.loc[rndMask, 'group'].value_counts().idxmax())
+
+            ampChange = stimStSer.loc[rndMask, 'property'] == 'amplitude'
+            ampChIdx = ampChange.index[ampChange]
+            ampVals = stimStSer.loc[ampChIdx, 'value']
+            if activeGroup == 0:
+                stimStLong.loc[
+                    ampChIdx, 'program{}_amplitude'.format(activeProgram)] = (
+                    ampVals
+                    )
+            ampIncreases = ampVals.diff().fillna(0) >= 0
+            ampIncIdx = ampIncreases.index[ampIncreases]
+            ampRoundChange.loc[ampIncIdx] = True
+            #  force a change at the end of the group/prog combo
+            ampRoundChange.loc[ampChange.index[-1]] = True
+            
+            #  activeGroup.loc[rndMask] = (
+            #      stimStSer.loc[rndMask, 'group'].value_counts().idxmax())
+        stimStLong['amplitudeRound'] = (
+            ampRoundChange.astype(np.float).cumsum())
+    for pName in progAmpNames:
+        stimStLong[pName].fillna(method='ffill', inplace=True)
+        stimStLong[pName].fillna(method='bfill', inplace=True)
+        
+    return stimStLong
+
 
 def getINSDeviceConfig(
         folderPath, sessionName, deviceName='DeviceNPC700373H'):
@@ -903,7 +975,7 @@ def getINSDeviceConfig(
     senseInfo.loc[:, ('minusInput', 'plusInput')].fillna(17, inplace=True)
     senseInfo = senseInfo.loc[senseInfo['sampleRate'].notnull(), :]
     senseInfo.reset_index(inplace=True)
-
+    senseInfo.rename(columns={'index': 'senseChan'}, inplace=True)
     return electrodeStatus, electrodeType, electrodeConfiguration, senseInfo
 
 
