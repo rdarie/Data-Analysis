@@ -832,12 +832,14 @@ def getINSStimLogFromJson(
         progAmpNames = rcsa_helpers.progAmpNames
         stripProgName = rcsa_helpers.strip_prog_name
         if logForm == 'serial':
-            stimStatus = rcsa_helpers.extract_stim_meta_data_events(stimLog)
+            stimStatus = rcsa_helpers.extract_stim_meta_data_events(
+                stimLog, trialSegment=idx)
         elif logForm == 'long':
             stimStatus = rcsa_helpers.extract_stim_meta_data(stimLog)
             stimStatus['activeProgram'] = stimStatus.loc[
                 :, progAmpNames].idxmax(axis=1).apply(stripProgName)
             stimStatus['maxAmp'] = stimStatus.loc[:, progAmpNames].max(axis=1)
+        pdb.set_trace()
         stimStatus['trialSegment'] = idx
         
         allStimStatus.append(stimStatus)

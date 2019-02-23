@@ -360,32 +360,6 @@ def getINSStimOnset(
             index=[mdtIdx])
         block.channel_indexes.append(chanIdx)
     #  allocate units for each combination of group and program
-    for progIdx in range(4):
-        for grpIdx in range(4):
-            thisElecConfig = elecConfiguration[grpIdx][progIdx]
-            unitName = 'gr{}pr{}'.format(grpIdx, progIdx)
-            unit = Unit(name=unitName)
-            unit.annotate(cathodes=thisElecConfig['cathodes'])
-            unit.annotate(anodes=thisElecConfig['anodes'])
-
-            try:
-                theseDetOpts = stimDetectOpts[grpIdx][progIdx]
-            except Exception:
-                theseDetOpts = defaultOptsDict
-
-            for key, value in theseDetOpts.items():
-                unit.annotations.update({key: value})
-            
-            for mdtIdx in thisElecConfig['cathodes']:
-                chanIdx = block.filter(
-                    objects=ChannelIndex,
-                    index=[mdtIdx])[0]
-                chanIdx.units.append(unit)
-            for mdtIdx in thisElecConfig['anodes']:
-                chanIdx = block.filter(
-                    objects=ChannelIndex,
-                    index=[mdtIdx])[0]
-                chanIdx.units.append(unit)
     
     tdDF, accelDF, stimStatus = unpackINSNeoBlock(block)
     t_stop = tdDF['t'].iloc[-1]
@@ -412,14 +386,6 @@ def getINSStimOnset(
         plotMaskTD = (tdDF['t'] > tStart) & (tdDF['t'] < tStop)
         thisTherapyStatus = tdDF.loc[plotMaskTD, 'therapyStatus']
         activeState = bool(thisTherapyStatus.value_counts().idxmax())
-        
-        electrodeCombo = 'gr{}pr{}'.format(activeGroup, activeProgram)
-        thisUnit = None
-        for unit in block.list_units:
-            if unit.name == electrodeCombo:
-                thisUnit = unit
-        #  print('This unit is named ' + thisUnit.name)
-        #  print('electrode combo: {}'.format(electrodeCombo))
 
         if not activeState:
             print('Therapy not active!')
@@ -550,15 +516,55 @@ def getINSStimOnset(
                 theseTimestamps.values)
         
         theseTimestamps = theseTimestamps.values * pq.s
-        ampList = theseTimestamps ** 0 * 0.1 * thisAmplitude * pq.mA
-        arrayAnn = {'stimAmplitude': ampList}
+        electrodeCombo = 'gr{}pr{}_{}'.format(
+            activeGroup, activeProgram, int(thisAmplitude * 100))
         
-        st = SpikeTrain(
-            times=theseTimestamps, t_stop=t_stop,
-            name=thisUnit.name + '_{}'.format(thisAmplitude),
-            array_annotations=arrayAnn)
-        st.annotate(amplitude=thisAmplitude * 0.1 * pq.mA)
-        thisUnit.spiketrains.append(st)
+        if len(theseTimestamps):
+            thisUnitList = block.filter(
+                objects=Unit,
+                name=electrodeCombo
+                )
+            if len(thisUnitList):
+                #  unit already exists
+                thisUnit = thisUnitList[0]
+            else:
+                #  allocate unit
+                thisElecConfig = elecConfiguration[
+                    activeGroup][activeProgram]
+            
+                thisUnit = Unit(name=electrodeCombo)
+                thisUnit.annotate(cathodes=thisElecConfig['cathodes'])
+                thisUnit.annotate(anodes=thisElecConfig['anodes'])
+                thisUnit.annotate(amplitude=thisAmplitude * 100 * pq.uA)
+
+                try:
+                    theseDetOpts = stimDetectOpts[
+                        activeGroup][activeProgram]
+                except Exception:
+                    theseDetOpts = defaultOptsDict
+
+                for key, value in theseDetOpts.items():
+                    thisUnit.annotations.update({key: value})
+            
+                for mdtIdx in thisElecConfig['cathodes']:
+                    chanIdx = block.filter(
+                        objects=ChannelIndex,
+                        index=[mdtIdx])[0]
+                    chanIdx.units.append(thisUnit)
+                for mdtIdx in thisElecConfig['anodes']:
+                    chanIdx = block.filter(
+                        objects=ChannelIndex,
+                        index=[mdtIdx])[0]
+                    chanIdx.units.append(thisUnit)
+            ampList = theseTimestamps ** 0 * 100 * thisAmplitude * pq.mA
+            arrayAnn = {'stimAmplitude': ampList}
+        
+            st = SpikeTrain(
+                times=theseTimestamps, t_stop=t_stop,
+                name=thisUnit.name,
+                array_annotations=arrayAnn)
+            st.annotate(amplitude=thisAmplitude * 100 * pq.uA)
+            thisUnit.spiketrains.append(st)
         
         if name in plotting:
             #  pdb.set_trace()
@@ -644,7 +650,6 @@ def getINSStimOnset(
                 t_stop=t_stop)
             thisUnit.spiketrains.append(st)
             seg.spiketrains.append(st)
-        '''
         else:
             #  consolidate spiketrains
             consolidatedTimes = np.array([])
@@ -659,7 +664,7 @@ def getINSStimOnset(
                 t_stop=t_stop)
             thisUnit.spiketrains = [newSt]
             seg.spiketrains.append(newSt)
-        '''
+
         if createRelationship:
             thisUnit.create_relationship()
 
