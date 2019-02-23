@@ -51,7 +51,7 @@ except:
     HASLIBTFR = False
 
 from scipy import interpolate
-from scipy import stats
+from scipy import stats, signal
 from copy import *
 import matplotlib.backends.backend_pdf
 from fractions import gcd
@@ -99,6 +99,41 @@ def getNEVData(filePath, elecIds):
     # Close the nev file now that all data is out
     nev_file.close()
     return spikes
+
+
+def filterDF(
+        df, fs,
+        lowPass=None, lowOrder=2,
+        highPass=None, highOrder=2,
+        notch=False, filtFun=signal.butter,
+        columns=None):
+
+    if columns is None:
+            columns = df.columns
+
+    if (lowPass is not None) and (highPass is not None):
+        if notch:
+            btype = 'bandstop'
+        else:
+            btype = 'bandpass'
+        Wn = 2 * (highPass, lowPass) / fs
+        filtOrder = max(lowOrder, highOrder)
+    elif lowPass is not None:
+        btype = 'low'
+        Wn = 2 * lowPass / fs
+        filtOrder = lowOrder
+    elif highPass is not None:
+        btype = 'high'
+        Wn = 2 * highPass / fs
+        filtOrder = lowOrder
+
+    b, a = filtFun(filtOrder, Wn, btype=btype, analog=False)
+    filteredDF = pd.DataFrame(df[columns])
+    
+    for column in filteredDF.columns:
+        filteredDF.loc[:, column] = (
+            signal.filtfilt(b, a, filteredDF[column]))
+    return filteredDF
 
 
 def interpolateDF(
@@ -778,6 +813,9 @@ def getHUTtoINSSyncFun(
                 x=timeSyncData.loc[segmentMask, syncTo].values,
                 y=timeSyncData.loc[segmentMask, 't'].values,
                 deg=degree)
+            #  print(
+            #      'synchPolyCoeffsHUTtoINS = {}'.format(
+            #          synchPolyCoeffsHUTtoINS))
         else:
             timeOffset = timeSyncData.loc[
                 segmentMask, 't'].values - timeSyncData.loc[
@@ -810,7 +848,14 @@ def synchronizeHUTtoINS(
     if 'INSTime' not in insDF.columns:
         insDF['INSTime'] = np.nan
 
-    segmentMask = insDF['trialSegment'] == trialSegment
+    try:
+        segmentMask = insDF['trialSegment'] == trialSegment
+    except Exception:
+        traceback.print_exc()
+        #  event dataframes don't have an explicit trialSegment
+        tempHolder = stimStatusSerialtoLong(
+            insDF, idxT='HostUnixTime', expandCols=['trialSegment'])
+        segmentMask = tempHolder['trialSegment'] == trialSegment
     #  pdb.set_trace()
     insDF.loc[segmentMask, 'INSTime'] = interpFun(
         insDF.loc[segmentMask, 'HostUnixTime'])
@@ -834,13 +879,13 @@ def getINSStimLogFromJson(
         if logForm == 'serial':
             stimStatus = rcsa_helpers.extract_stim_meta_data_events(
                 stimLog, trialSegment=idx)
+
         elif logForm == 'long':
             stimStatus = rcsa_helpers.extract_stim_meta_data(stimLog)
             stimStatus['activeProgram'] = stimStatus.loc[
                 :, progAmpNames].idxmax(axis=1).apply(stripProgName)
             stimStatus['maxAmp'] = stimStatus.loc[:, progAmpNames].max(axis=1)
-        pdb.set_trace()
-        stimStatus['trialSegment'] = idx
+            stimStatus['trialSegment'] = idx
         
         allStimStatus.append(stimStatus)
     allStimStatusDF = pd.concat(allStimStatus, ignore_index=True)
@@ -858,23 +903,22 @@ def getINSStimLogFromJson(
 def stimStatusSerialtoLong(
         stimStSer, idxT='t', expandCols=[],
         deriveCols=[], progAmpNames=[]):
-    
-    stimStLong = pd.DataFrame(index=stimStSer.index, columns=expandCols)
-    #  fill in frequency
+    #  pdb.set_trace()
+    if 'program' not in expandCols:
+        expandCols.append('program')
+    if 'activeGroup' not in expandCols:
+        expandCols.append('activeGroup')
+
+    stimStLong = pd.DataFrame(
+        index=stimStSer.index, columns=expandCols + [idxT])
+    #  fill req columns
+    stimStLong[idxT] = stimStSer[idxT]
     for pName in expandCols:
-        print(pName)
+        #  print(pName)
         stimStLong[pName] = np.nan
         pMask = stimStSer['property'] == pName
         pValues = stimStSer.loc[pMask, 'value']
         stimStLong.loc[pMask, pName] = pValues
-        stimStLong[pName].fillna(
-            method='ffill', inplace=True)
-        stimStLong[pName].fillna(
-            method='bfill', inplace=True)
-
-    for pName in ['group', 'program', 'trialSegment', idxT]:
-        stimStLong[pName] = stimStSer[pName]
-        pMask = stimStSer['property'] == pName
         stimStLong[pName].fillna(
             method='ffill', inplace=True)
         stimStLong[pName].fillna(
@@ -885,7 +929,7 @@ def stimStatusSerialtoLong(
 
     if 'amplitudeRound' in deriveCols:
         grpProg = (
-            stimStSer['group'] * 4 + stimStSer['program'])
+            stimStLong['activeGroup'] * 4 + stimStLong['program'])
         grpProg = grpProg.fillna(method='bfill')
         grpProgChange = grpProg.diff().fillna(0) != 0
         grpProgRound = grpProgChange.astype(np.float).cumsum()
@@ -897,11 +941,11 @@ def stimStatusSerialtoLong(
         for rnd in pd.unique(grpProgRound):
             #  break
             rndMask = grpProgRound == rnd
-            
+            #  pdb.set_trace()
             activeProgram = int(
-                stimStSer.loc[rndMask, 'program'].value_counts().idxmax())
+                stimStLong.loc[rndMask, 'program'].value_counts().idxmax())
             activeGroup = int(
-                stimStSer.loc[rndMask, 'group'].value_counts().idxmax())
+                stimStLong.loc[rndMask, 'activeGroup'].value_counts().idxmax())
 
             ampChange = stimStSer.loc[rndMask, 'property'] == 'amplitude'
             ampChIdx = ampChange.index[ampChange]
@@ -918,9 +962,10 @@ def stimStatusSerialtoLong(
             ampRoundChange.loc[ampChange.index[-1]] = True
             
             #  activeGroup.loc[rndMask] = (
-            #      stimStSer.loc[rndMask, 'group'].value_counts().idxmax())
+            #      stimStSer.loc[rndMask, 'activeGroup'].value_counts().idxmax())
         stimStLong['amplitudeRound'] = (
             ampRoundChange.astype(np.float).cumsum())
+
     for pName in progAmpNames:
         stimStLong[pName].fillna(method='ffill', inplace=True)
         stimStLong[pName].fillna(method='bfill', inplace=True)
@@ -952,8 +997,15 @@ def getINSDeviceConfig(
     electrodeType = pd.DataFrame(index=dfIndex, columns=elecIndices)
 
     for groupIdx in groupIndices:
-        groupPrograms = deviceSettings[0]['TherapyConfigGroup{}'.format(groupIdx)]['programs']
+        groupTherapyConfig = deviceSettings[0][
+            'TherapyConfigGroup{}'.format(groupIdx)]
+        groupPrograms = groupTherapyConfig['programs']
         for progIdx in progIndices:
+            electrodeConfiguration[groupIdx][progIdx].update({
+                'cycleOffTime': groupTherapyConfig['cycleOffTime'],
+                'cycleOnTime': groupTherapyConfig['cycleOnTime'],
+                'cyclingEnabled': groupTherapyConfig['cyclingEnabled']
+                })
             for elecIdx in elecIndices:
                 electrodeStatus.loc[(groupIdx, progIdx), elecIdx] =\
                     not groupPrograms[progIdx]['electrodes']['electrodes'][elecIdx]['isOff']
@@ -964,7 +1016,8 @@ def getINSDeviceConfig(
                         electrodeConfiguration[groupIdx][progIdx]['anodes'].append(elecIdx)
                     else:
                         electrodeConfiguration[groupIdx][progIdx]['cathodes'].append(elecIdx)
-    
+    #  pdb.set_trace()
+    #  process senseInfo
     senseInfo = pd.DataFrame(
         deviceSettings[0]['SensingConfig']['timeDomainChannels'])
     senseInfo['sampleRate'] = senseInfo['sampleRate'].apply(
@@ -978,7 +1031,7 @@ def getINSDeviceConfig(
     senseInfo = senseInfo.loc[senseInfo['sampleRate'].notnull(), :]
     senseInfo.reset_index(inplace=True)
     senseInfo.rename(columns={'index': 'senseChan'}, inplace=True)
-    return electrodeStatus, electrodeType, electrodeConfiguration, senseInfo
+    return electrodeConfiguration, senseInfo
 
 
 def getBadSpikesMask(spikes, nStd = 5, whichChan = 0, plotting = False, deleteBad = False):

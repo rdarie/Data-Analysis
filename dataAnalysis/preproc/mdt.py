@@ -4,6 +4,7 @@ from neo import (
     AnalogSignal, Event, Block,
     Segment, ChannelIndex, SpikeTrain, Unit)
 import neo
+import elephant as elph
 import dataAnalysis.helperFunctions.helper_functions as hf
 import dataAnalysis.helperFunctions.kilosort_analysis as ksa
 import rcsanalysis.packet_func as rcsa_helpers
@@ -17,8 +18,10 @@ import quantities as pq
 #  import argparse, linecache
 from scipy import stats, signal, ndimage
 import peakutils
+import seaborn as sns
 
-def preprocINS(trialFilesStim,
+def preprocINS(
+        trialFilesStim,
         plottingFigures=False,
         plotBlocking=True):
     jsonBaseFolder = trialFilesStim['folderPath']
@@ -26,9 +29,9 @@ def preprocINS(trialFilesStim,
 
     td = hf.getINSTDFromJson(
         jsonBaseFolder, jsonSessionNames, getInterpolated=True,
-        forceRecalc=True)
+        forceRecalc=trialFilesStim['forceRecalc'])
 
-    elecStatus, elecType, elecConfiguration, senseInfo = (
+    elecConfiguration, senseInfo = (
         hf.getINSDeviceConfig(jsonBaseFolder, jsonSessionNames[0])
         )
 
@@ -44,7 +47,7 @@ def preprocINS(trialFilesStim,
 
     accel = hf.getINSAccelFromJson(
         jsonBaseFolder, jsonSessionNames, getInterpolated=True,
-        forceRecalc=True)
+        forceRecalc=trialFilesStim['forceRecalc'])
 
     timeSync = hf.getINSTimeSyncFromJson(
         jsonBaseFolder, jsonSessionNames,
@@ -192,7 +195,7 @@ def preprocINS(trialFilesStim,
 
     #  sync Host PC Unix time to NSP
     HUTtoINSPlotting = True
-    if HUTtoINSPlotting:
+    if HUTtoINSPlotting and plottingFigures:
         progAmpNames = rcsa_helpers.progAmpNames
         
         plottingColumns = [
@@ -234,84 +237,18 @@ def preprocINS(trialFilesStim,
             plotBlocking=plotBlocking
             )
 
-    #  ins data to block
+    block = insDataToBlock(
+        td, accel, stimStatusSerial,
+        senseInfo, trialFilesStim,
+        tdDataCols=tdDataCols)
 
-    accelColumns = (
-        ['accel_' + i for i in ['x', 'y', 'z']]) + (
-        ['inertia'])
-    accelNixColNames = ['x', 'y', 'z', 'inertia']
-    accelInterp = hf.interpolateDF(
-        accel['data'], td['data']['t'],
-        kind='linear', fill_value=(0, 0),
-        x='t', columns=accelColumns)
-
-    tStart = td['data']['t'].iloc[0]
-    blockName = trialFilesStim['experimentName'] + ' ins data'
-    block = Block(name=blockName)
-    block.annotate(jsonSessionNames=trialFilesStim['jsonSessionNames'])
-    seg = Segment()
-    block.segments.append(seg)
-
-    #  assume constant sampleRate
-    sampleRate = senseInfo.loc[0, 'sampleRate'] * pq.Hz
-    for idx, colName in enumerate(tdDataCols):
-        sigName = 'ins_td{}'.format(senseInfo.loc[idx, 'senseChan'])
-        asig = AnalogSignal(
-            td['data'][colName].values*pq.mV,
-            name=sigName,
-            sampling_rate=sampleRate,
-            dtype=np.float32,
-            **senseInfo.loc[idx, :].to_dict())
-        asig.annotate(td=True, accel=False)
-        asig.t_start = tStart*pq.s
-        seg.analogsignals.append(asig)
-
-        minIn = int(senseInfo.loc[idx, 'minusInput'])
-        plusIn = int(senseInfo.loc[idx, 'plusInput'])
-        chanIdx = ChannelIndex(
-            name=sigName,
-            index=np.array([0]),
-            channel_names=np.array(['p{}m{}'.format(minIn, plusIn)]),
-            channel_ids=np.array([plusIn])
-            )
-        block.channel_indexes.append(chanIdx)
-        chanIdx.analogsignals.append(asig)
-        asig.channel_index = chanIdx
-
-    for idx, colName in enumerate(accelColumns):
-        sigName = 'ins_acc{}'.format(accelNixColNames[idx])
-        #  print(sigName)
-        asig = AnalogSignal(
-            accelInterp[colName].values*pq.mV,
-            name=sigName,
-            sampling_rate=sampleRate,
-            dtype=np.float32)
-        asig.annotate(td=False, accel=True)
-        asig.t_start = tStart*pq.s
-        seg.analogsignals.append(asig)
-    
-        chanIdx = ChannelIndex(
-            name=sigName,
-            index=np.array([0]),
-            channel_names=np.array([sigName])
-            )
-        block.channel_indexes.append(chanIdx)
-        chanIdx.analogsignals.append(asig)
-        asig.channel_index = chanIdx
-
-    stimEvents = ns5.eventDataFrameToEvents(
-        stimStatusSerial, idxT='INSTime',
-        annCol=['property', 'group', 'program', 'value', 'trialSegment']
-        )
-    #  pdb.set_trace()
-    seg.events = stimEvents
-    '''
-    seg.create_relationship()
-    for chanIdx in block.channel_indexes:
-        chanIdx.create_relationship()
-    block.create_relationship()
-    '''
     #  stim detection
+    if trialFilesStim['detectStim']:
+        block = getINSStimOnset(
+            block, elecConfiguration,
+            **trialFilesStim['getINSkwargs'])
+        
+    # export function
     orcaExpPath = os.path.join(
         trialFilesStim['folderPath'],
         trialFilesStim['experimentName']
@@ -319,11 +256,6 @@ def preprocINS(trialFilesStim,
     if not os.path.exists(orcaExpPath):
         os.makedirs(orcaExpPath)
 
-    block = getINSStimOnset(
-        block, elecConfiguration,
-        **trialFilesStim['getINSkwargs'])
-        
-    # export function
     insDataFilename = os.path.join(
         orcaExpPath, trialFilesStim['ns5FileName'] + '_ins.nix')
 
@@ -335,10 +267,10 @@ def preprocINS(trialFilesStim,
 
 def getINSStimOnset(
         block, elecConfiguration,
-        fs=500, stimIti=0, minDist=0, minDur=0, thres=.5,
+        stimIti=0, minDist=0, minDur=0, thres=.5,
         timeInterpFunINStoNSP=None,
         maxSpikesPerGroup=None,
-        stimFreq=None, fixedDelay=15e-3,
+        fixedDelay=15e-3,
         stimDetectOpts=None,
         plotting=[]):
 
@@ -352,6 +284,7 @@ def getINSStimOnset(
         stimDetectOpts = {
             grpIdx: {progIdx: defaultOptsDict for progIdx in range(4)}
             for grpIdx in range(4)}
+    
     #  allocate channels for each physical contact
     for mdtIdx in range(17):
         mdtChanName = 'ins_ch{}'.format(mdtIdx)
@@ -359,45 +292,50 @@ def getINSStimOnset(
             name=mdtChanName,
             index=[mdtIdx])
         block.channel_indexes.append(chanIdx)
-    #  allocate units for each combination of group and program
     
-    tdDF, accelDF, stimStatus = unpackINSNeoBlock(block)
+    tdDF, accelDF, stimStatus = unpackINSBlock(block)
+    
     t_stop = tdDF['t'].iloc[-1]
+    fs = seg.analogsignals[0].sampling_rate
     for name, group in tdDF.groupby('amplitudeRound'):
         activeProgram = int(group['program'].value_counts().idxmax())
-        activeGroup = int(group['group'].value_counts().idxmax())
+        activeGroup = int(group['activeGroup'].value_counts().idxmax())
+        thisTrialSegment = int(group['trialSegment'].value_counts().idxmax())
+        activeState = bool(group['therapyStatus'].value_counts().idxmax())
+        stimRate = group['RateInHz'].value_counts().idxmax()
+        #  changes to stim wait for a full period
+        delayByFreq = (1.5 / stimRate)
+        delayByFreqIdx = int(fs * delayByFreq)
+        
         ampColName = 'program{}_amplitude'.format(activeProgram)
         thisAmplitude = group[ampColName].max()
-        thisTrialSegment = group['trialSegment'].value_counts().idxmax()
         
         #  pad with 150 msec to capture first pulse
         tStart = max(0, group['t'].iloc[0] - 150e-3)
         tStop = min(group['t'].iloc[-1], tdDF['t'].iloc[-1])
-        
         #  pad with 100 msec to *avoid* first pulse
         #  tStart = min(tStop, group['t'].iloc[0] + 0.1)
+        plotMaskTD = (tdDF['t'] > tStart) & (tdDF['t'] < tStop)
         
         if (tStop - tStart) < minDur:
-            print('tStart ={}'.format(tStart))
-            print('tStop ={}'.format(tStop))
-            print('(tStop - tStart) < minDur')
+            #  print('tStart ={}'.format(tStart))
+            #  print('tStop ={}'.format(tStop))
+            print('group {} (tStop - tStart) < minDur'.format(name))
             continue
-
-        plotMaskTD = (tdDF['t'] > tStart) & (tdDF['t'] < tStop)
-        thisTherapyStatus = tdDF.loc[plotMaskTD, 'therapyStatus']
-        activeState = bool(thisTherapyStatus.value_counts().idxmax())
-
+        
         if not activeState:
-            print('Therapy not active!')
+            print('group {} Therapy not active!'.format(name))
             continue
                 
         theseDetectOpts = stimDetectOpts[activeGroup][activeProgram]
+        pdb.set_trace()
+        tdSeg = (tdDF.loc[plotMaskTD, theseDetectOpts['detectChannels']])
+        tdPow = hf.filterDF(tdSeg, fs, lowPass=stimRate + 10, lowOrder=2, highPass=stimRate - 10, highOrder=2)
+        tdPow = tdPow.abs().sum(axis=1)
+        #  tdPow = (tdDF.loc[
+        #      plotMaskTD, theseDetectOpts['detectChannels']] ** 2).sum(axis=1)
         
-        tdPow = (tdDF.loc[
-            plotMaskTD, theseDetectOpts['detectChannels']] ** 2).sum(axis = 1)
-        
-        # convolve with a rectangular kernel
-        # then shift forward and backward to get forward and backward sum
+        # convolve with a future facing kernel
         kernDur = 0.2
         kernNSamp = int(kernDur * fs)
         if kernNSamp > len(tdPow):
@@ -408,6 +346,13 @@ def getINSStimOnset(
             np.linspace(-1, 0, round(kernNSamp/2))
             ))
         
+        correctionFactor = pd.Series(
+            np.convolve(kern, tdPow, mode='same'),
+            index=tdPow.index)
+        
+        correctionFactor = correctionFactor - correctionFactor.min()
+        correctionFactor = (correctionFactor / correctionFactor.max()) + 1
+
         # use the HUT derived stim onset to favor detection
         hutPeakIdx = hf.getTriggers(
             tdDF.loc[plotMaskTD, ampColName], thres=5,
@@ -417,45 +362,46 @@ def getINSStimOnset(
         if len(onsetIndices):
             #  assume a fixed delay of 5 msec between onset and stim
             fixedDelayIdx = int(fixedDelay * fs)
-            onsetIndices = onsetIndices + fixedDelayIdx
-            if stimFreq is not None:
-                onsetIndices = onsetIndices + int(fs / stimFreq)
+            onsetIndices = (
+                onsetIndices + fixedDelayIdx +
+                delayByFreqIdx)
                 
         onsetTimestamps = pd.Series(
             tdDF['t'].loc[onsetIndices].values,
-            index = tdDF['t'].loc[onsetIndices].index)
+            index=tdDF['t'].loc[onsetIndices].index)
+        
         # if we know cycle value, use it to predict onsets
+        if stimIti == 0:
+            thisElecConfig = elecConfiguration[activeGroup][activeProgram]
+            if thisElecConfig['cyclingEnabled']:
+                stimIti = (
+                    thisElecConfig['cycleOffTime']['time'] +
+                    thisElecConfig['cycleOnTime']['time']) / 10
+        
         if len(onsetIndices) == 1 and stimIti > 0:
-            segmentEnding = tdDF.loc[plotMaskTD, 't']
+            segmentEnding = tdDF.loc[plotMaskTD, 't'].index[-1]
             onsetIndices = np.arange(
-                onsetIndices[0], segmentEnding.index[-1], fs*stimIti)
+                onsetIndices[0], segmentEnding,
+                int(fs*(stimIti+delayByFreq)))
             onsetTimestamps = pd.Series(
                 tdDF['t'].loc[onsetIndices].values,
-                index = tdDF['t'].loc[onsetIndices].index)
-
-        correctionFactor = pd.Series(
-            np.convolve(kern, tdPow, mode='same'),
-            index = tdPow.index)
-        
-        correctionFactor = correctionFactor - correctionFactor.min()
-        correctionFactor = (correctionFactor / correctionFactor.max()) + 1
-        
+                index=tdDF['t'].loc[onsetIndices].index)
+      
         if len(onsetTimestamps):
-            gaussDur = 0.15
+            gaussDur = 0.1
             gaussNSamp = int(gaussDur * fs)
             gaussKern = signal.gaussian(
-                3 * gaussNSamp, gaussNSamp)
-            #  pdb.set_trace()
-            support = pd.Series(0, index = tdPow.index)
+                4 * gaussNSamp, gaussNSamp)
+            support = pd.Series(0, index=tdPow.index)
             support.loc[onsetIndices] = 1
             support.iloc[:] = np.convolve(
                 support.values,
-                gaussKern, mode = 'same'
+                gaussKern, mode='same'
                 )
             support = support + 1
             #  correctionFactor = support
-            #  pdb.set_trace()
             correctionFactor = correctionFactor * support
+
         sobelFiltered = pd.Series(
             ndimage.sobel(tdPow, mode='reflect'),
             index=tdPow.index)
@@ -466,16 +412,12 @@ def getINSStimOnset(
         stimDetectSignal = stimDetectSignal.abs()
 
         if thisAmplitude == 0:
-            #  pdb.set_trace()
-            #  peakIdx = hf.getTriggers(
-            #      tdDF.loc[plotMaskTD, 'amplitudeChange'].astype(np.float), thres=5,
-            #      iti=minDist, keep_max = theseDetectOpts['keep_max'])
             peakIdx = np.array([])
         else:
             peakIdx = peakutils.indexes(
                 stimDetectSignal.values, thres=theseDetectOpts['thres'],
                 min_dist=int(minDist * fs), thres_abs=True,
-                keep_max = theseDetectOpts['keep_max'])
+                keep_max=theseDetectOpts['keep_max'])
             peakIdx = tdPow.index[peakIdx]
             if name in plotting:
                 print('After peakutils.indexes, before check for amplitude')
@@ -488,7 +430,7 @@ def getINSStimOnset(
             print('Before if maxSpikesPerGroup is not None')
             print('{}'.format(peakIdx))
 
-        if maxSpikesPerGroup is not None:
+        if maxSpikesPerGroup > 0:
             peakIdx = peakIdx[:maxSpikesPerGroup]
 
         theseTimestamps = pd.Series(
@@ -498,12 +440,16 @@ def getINSStimOnset(
         if name in plotting:
             print('Before if stimIti > 0')
             print('{}'.format(peakIdx))
+        
         if stimIti > 0:
             stimBackDiff = theseTimestamps.diff().fillna(method='bfill')
             stimFwdDiff = (-1) * theseTimestamps.diff(-1).fillna(method='ffill')
             stimDiff = (stimBackDiff + stimFwdDiff) / 2
-            offBy = (stimDiff - stimIti).abs()
-            if name in plotting:
+            offBy = (stimDiff - stimIti - delayByFreq).abs()
+            if (name in plotting) and (len(offBy) > 1):
+                ax = sns.distplot(stimDiff)
+                plt.plot()
+            else:
                 print('stim iti off by:')
                 print('{}'.format(offBy))
             keepMask = offBy < 0.3
@@ -516,8 +462,9 @@ def getINSStimOnset(
                 theseTimestamps.values)
         
         theseTimestamps = theseTimestamps.values * pq.s
-        electrodeCombo = 'gr{}pr{}_{}'.format(
-            activeGroup, activeProgram, int(thisAmplitude * 100))
+        electrodeCombo = 'g{:d}p{:d}_a{:0>4d}_r{:0>3d}'.format(
+            activeGroup, activeProgram,
+            int(thisAmplitude * 100), int(stimRate))
         
         if len(theseTimestamps):
             thisUnitList = block.filter(
@@ -677,7 +624,94 @@ def getINSStimOnset(
     return block
 
 
-def unpackINSNeoBlock(block):
+def insDataToBlock(
+        td, accel, stimStatusSerial,
+        senseInfo, trialFilesStim,
+        tdDataCols=None):
+    #  ins data to block
+    accelColumns = (
+        ['accel_' + i for i in ['x', 'y', 'z']]) + (
+        ['inertia'])
+    accelNixColNames = ['x', 'y', 'z', 'inertia']
+    accelInterp = hf.interpolateDF(
+        accel['data'], td['data']['t'],
+        kind='linear', fill_value=(0, 0),
+        x='t', columns=accelColumns)
+
+    tStart = td['data']['t'].iloc[0]
+    blockName = trialFilesStim['experimentName'] + ' ins data'
+    block = Block(name=blockName)
+    block.annotate(jsonSessionNames=trialFilesStim['jsonSessionNames'])
+    seg = Segment()
+    block.segments.append(seg)
+
+    #  assume constant sampleRate
+    sampleRate = senseInfo.loc[0, 'sampleRate'] * pq.Hz
+    for idx, colName in enumerate(tdDataCols):
+        sigName = 'ins_td{}'.format(senseInfo.loc[idx, 'senseChan'])
+        asig = AnalogSignal(
+            td['data'][colName].values*pq.mV,
+            name=sigName,
+            sampling_rate=sampleRate,
+            dtype=np.float32,
+            **senseInfo.loc[idx, :].to_dict())
+        asig.annotate(td=True, accel=False)
+        asig.t_start = tStart*pq.s
+        seg.analogsignals.append(asig)
+
+        minIn = int(senseInfo.loc[idx, 'minusInput'])
+        plusIn = int(senseInfo.loc[idx, 'plusInput'])
+        chanIdx = ChannelIndex(
+            name=sigName,
+            index=np.array([0]),
+            channel_names=np.array(['p{}m{}'.format(minIn, plusIn)]),
+            channel_ids=np.array([plusIn])
+            )
+        block.channel_indexes.append(chanIdx)
+        chanIdx.analogsignals.append(asig)
+        asig.channel_index = chanIdx
+
+    for idx, colName in enumerate(accelColumns):
+        if colName == 'inertia':
+            accUnits = (pq.N)
+        else:
+            accUnits = (pq.m/pq.s**2)
+        sigName = 'ins_acc{}'.format(accelNixColNames[idx])
+        #  print(sigName)
+        asig = AnalogSignal(
+            accelInterp[colName].values*accUnits,
+            name=sigName,
+            sampling_rate=sampleRate,
+            dtype=np.float32)
+        asig.annotate(td=False, accel=True)
+        asig.t_start = tStart*pq.s
+        seg.analogsignals.append(asig)
+    
+        chanIdx = ChannelIndex(
+            name=sigName,
+            index=np.array([0]),
+            channel_names=np.array([sigName])
+            )
+        block.channel_indexes.append(chanIdx)
+        chanIdx.analogsignals.append(asig)
+        asig.channel_index = chanIdx
+
+    stimEvents = ns5.eventDataFrameToEvents(
+        stimStatusSerial, idxT='INSTime',
+        annCol=['property', 'value']
+        )
+    #  pdb.set_trace()
+    seg.events = stimEvents
+    createRelationship = False
+    if createRelationship:
+        seg.create_relationship()
+        for chanIdx in block.channel_indexes:
+            chanIdx.create_relationship()
+        block.create_relationship()
+    return block
+
+
+def unpackINSBlock(block):
     tdAsig = block.filter(
         objects=AnalogSignal,
         td=True
@@ -698,7 +732,9 @@ def unpackINSNeoBlock(block):
         )
     #  pdb.set_trace()
     #  serialize stimStatus
-    expandCols = ['RateInHz', 'therapyStatus']
+    expandCols = [
+        'RateInHz', 'therapyStatus',
+        'activeGroup', 'program', 'trialSegment']
     deriveCols = ['amplitudeRound']
     progAmpNames = rcsa_helpers.progAmpNames
 
@@ -708,8 +744,7 @@ def unpackINSNeoBlock(block):
     #  add stim info to traces
     #  pdb.set_trace()
     columnsToBeAdded = (
-        expandCols + deriveCols + progAmpNames +
-        ['group', 'program', 'trialSegment'])
+        expandCols + deriveCols + progAmpNames)
     infoFromStimStatus = hf.interpolateDF(
         stimStatus, tdDF['t'],
         x='t', columns=columnsToBeAdded, kind='previous')
