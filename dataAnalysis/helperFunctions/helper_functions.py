@@ -552,16 +552,16 @@ def plotHUTtoINS(
     
     statusAx.plot(
         plotStimStatus[stimX].loc[plotMaskStim]*unitsCorrection,
-        plotStimStatus.loc[plotMaskStim, 'amplitudeChange'],
-        'c--', label='amplitudeChange')
+        plotStimStatus.loc[plotMaskStim, 'amplitudeIncrease'],
+        'c--', label='amplitudeIncrease')
     statusAx.plot(
         plotStimStatus[stimX].loc[plotMaskStim]*unitsCorrection,
         plotStimStatus.loc[plotMaskStim, 'therapyStatus'],
         '--', label='therapyStatus')
     statusAx.plot(
         plotStimStatus[stimX].loc[plotMaskStim]*unitsCorrection,
-        plotStimStatus.loc[plotMaskStim, 'frequency']/100,
-        '--', label='frequency')
+        plotStimStatus.loc[plotMaskStim, 'RateInHz']/100,
+        '--', label='RateInHz')
     statusAx.legend()
     ax[2].set_ylabel('Stim Amplitude (mA)')
     ax[2].set_xlabel('INS Time (sec)')
@@ -853,10 +853,12 @@ def synchronizeHUTtoINS(
     except Exception:
         traceback.print_exc()
         #  event dataframes don't have an explicit trialSegment
-        tempHolder = stimStatusSerialtoLong(
-            insDF, idxT='HostUnixTime', expandCols=['trialSegment'])
-        segmentMask = tempHolder['trialSegment'] == trialSegment
-    #  pdb.set_trace()
+        tsegMask = insDF['property'] == 'trialSegment'
+        tseg = pd.Series(np.nan, index=insDF.index)
+        tseg.loc[tsegMask] = insDF.loc[tsegMask, 'value']
+        tseg.fillna(method='ffill', inplace=True)
+        segmentMask = tseg == trialSegment
+        #  pdb.set_trace()
     insDF.loc[segmentMask, 'INSTime'] = interpFun(
         insDF.loc[segmentMask, 'HostUnixTime'])
 
@@ -902,7 +904,7 @@ def getINSStimLogFromJson(
 
 def stimStatusSerialtoLong(
         stimStSer, idxT='t', expandCols=[],
-        deriveCols=[], progAmpNames=[]):
+        deriveCols=[], progAmpNames=[], dropDuplicates=True):
     #  pdb.set_trace()
     if 'program' not in expandCols:
         expandCols.append('program')
@@ -921,55 +923,45 @@ def stimStatusSerialtoLong(
         stimStLong.loc[pMask, pName] = pValues
         stimStLong[pName].fillna(
             method='ffill', inplace=True)
-        stimStLong[pName].fillna(
-            method='bfill', inplace=True)
+        #  stimStLong[pName].fillna(
+        #      method='bfill', inplace=True)
 
-    for pName in progAmpNames:
+    debugPlot = False
+    for idx, pName in enumerate(progAmpNames):
         stimStLong[pName] = np.nan
+        pMask = (stimStSer['property'] == 'amplitude') & (
+            stimStLong['program'] == idx)
+        stimStLong.loc[pMask, pName] = stimStSer.loc[pMask, 'value']
+        stimStLong[pName].fillna(method='ffill', inplace=True)
+        #  stimStLong[pName].fillna(method='bfill', inplace=True)
+
+    if dropDuplicates:
+        stimStLong.drop_duplicates(subset=idxT, keep='last', inplace=True)
+    
+    ampIncrease = pd.Series(False, index=stimStLong.index)
+    ampChange = pd.Series(False, index=stimStLong.index)
+    for idx, pName in enumerate(progAmpNames):
+        ampIncrease = ampIncrease | (stimStLong[pName].diff().fillna(0) > 0)
+        ampChange = ampChange | (stimStLong[pName].diff().fillna(0) != 0)
+        if debugPlot:
+            plt.plot(stimStLong[pName].diff().fillna(0), label=pName)
+    
+    if debugPlot:
+        plt.legend()
+        plt.show()
 
     if 'amplitudeRound' in deriveCols:
-        grpProg = (
-            stimStLong['activeGroup'] * 4 + stimStLong['program'])
-        grpProg = grpProg.fillna(method='bfill')
-        grpProgChange = grpProg.diff().fillna(0) != 0
-        grpProgRound = grpProgChange.astype(np.float).cumsum()
-    
-        #  find times of amplitude increase
-        ampRoundChange = pd.Series(False, index=stimStSer.index)
-        #  activeProgram = pd.Series(np.nan, index=stimStSer.index)
-        #  activeGroup = pd.Series(np.nan, index=stimStSer.index)
-        for rnd in pd.unique(grpProgRound):
-            #  break
-            rndMask = grpProgRound == rnd
-            #  pdb.set_trace()
-            activeProgram = int(
-                stimStLong.loc[rndMask, 'program'].value_counts().idxmax())
-            activeGroup = int(
-                stimStLong.loc[rndMask, 'activeGroup'].value_counts().idxmax())
-
-            ampChange = stimStSer.loc[rndMask, 'property'] == 'amplitude'
-            ampChIdx = ampChange.index[ampChange]
-            ampVals = stimStSer.loc[ampChIdx, 'value']
-            if activeGroup == 0:
-                stimStLong.loc[
-                    ampChIdx, 'program{}_amplitude'.format(activeProgram)] = (
-                    ampVals
-                    )
-            ampIncreases = ampVals.diff().fillna(0) >= 0
-            ampIncIdx = ampIncreases.index[ampIncreases]
-            ampRoundChange.loc[ampIncIdx] = True
-            #  force a change at the end of the group/prog combo
-            ampRoundChange.loc[ampChange.index[-1]] = True
-            
-            #  activeGroup.loc[rndMask] = (
-            #      stimStSer.loc[rndMask, 'activeGroup'].value_counts().idxmax())
         stimStLong['amplitudeRound'] = (
-            ampRoundChange.astype(np.float).cumsum())
-
-    for pName in progAmpNames:
-        stimStLong[pName].fillna(method='ffill', inplace=True)
-        stimStLong[pName].fillna(method='bfill', inplace=True)
-        
+            ampIncrease.astype(np.float).cumsum())
+        #  stimStLong['amplitudeChange'] = (
+        #      ampChange.astype(np.float))
+        #  stimStLong['amplitudeIncrease'] = (
+        #      ampIncrease.astype(np.float))
+    
+    #  pdb.set_trace()
+    if debugPlot:
+        stimStLong.drop(columns=[idxT]).plot()
+        plt.show()
     return stimStLong
 
 

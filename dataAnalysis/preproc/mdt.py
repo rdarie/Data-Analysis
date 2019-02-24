@@ -53,8 +53,8 @@ def preprocINS(
         jsonBaseFolder, jsonSessionNames,
         forceRecalc=True)
 
-    stimStatus = hf.getINSStimLogFromJson(
-        jsonBaseFolder, jsonSessionNames, logForm='long')
+    #  stimStatus = hf.getINSStimLogFromJson(
+    #      jsonBaseFolder, jsonSessionNames, logForm='long')
     stimStatusSerial = hf.getINSStimLogFromJson(
         jsonBaseFolder, jsonSessionNames)
 
@@ -185,6 +185,15 @@ def preprocINS(
         plt.legend()
         plt.show()
 
+    progAmpNames = rcsa_helpers.progAmpNames
+    expandCols = (
+        ['RateInHz', 'therapyStatus', 'trialSegment'] +
+        progAmpNames)
+    deriveCols = ['amplitudeRound']
+    stimStatus = hf.stimStatusSerialtoLong(
+        stimStatusSerial, idxT='HostUnixTime', expandCols=expandCols,
+        deriveCols=deriveCols, progAmpNames=progAmpNames)
+        
     interpFunHUTtoINS = hf.getHUTtoINSSyncFun(
         timeSync, degree=1, syncTo='HostUnixTime')
     for trialSegment in pd.unique(td['data']['trialSegment']):
@@ -192,16 +201,12 @@ def preprocINS(
             stimStatus, trialSegment, interpFunHUTtoINS[trialSegment])
         stimStatusSerial = hf.synchronizeHUTtoINS(
             stimStatusSerial, trialSegment, interpFunHUTtoINS[trialSegment])
-
+    
+    #  pdb.set_trace()
     #  sync Host PC Unix time to NSP
     HUTtoINSPlotting = True
     if HUTtoINSPlotting and plottingFigures:
-        progAmpNames = rcsa_helpers.progAmpNames
-        
-        plottingColumns = [
-            'frequency', 'therapyStatus', 'trialSegment',
-            'amplitudeChange', 'amplitudeRound'] +\
-            progAmpNames
+        plottingColumns = deriveCols + expandCols + progAmpNames
         plotStimStatusList = []
         for trialSegment in pd.unique(td['data']['trialSegment']):
             stimGroupMask = stimStatus['trialSegment'] == trialSegment
@@ -215,9 +220,7 @@ def preprocINS(
             temp = hf.interpolateDF(
                 stimGroup, plottingRange,
                 x='HostUnixTime', columns=plottingColumns, kind='previous')
-            temp['amplitudeChange'] = (temp[
-                'amplitudeRound'].diff().fillna(0) > 0).astype(float)
-
+            temp['amplitudeIncrease'] = temp['amplitudeRound'].diff().fillna(0)
             temp['INSTime'] = pd.Series(
                 thisHUTtoINS(temp['HostUnixTime']),
                 index=temp['HostUnixTime'].index)
@@ -268,6 +271,7 @@ def preprocINS(
 def getINSStimOnset(
         block, elecConfiguration,
         stimIti=0, minDist=0, minDur=0, thres=.5,
+        gaussWid=500e-3, gaussKerWid=150e-3,
         timeInterpFunINStoNSP=None,
         maxSpikesPerGroup=None,
         fixedDelay=15e-3,
@@ -328,30 +332,39 @@ def getINSStimOnset(
             continue
                 
         theseDetectOpts = stimDetectOpts[activeGroup][activeProgram]
-        pdb.set_trace()
+        #  pdb.set_trace()
         tdSeg = (tdDF.loc[plotMaskTD, theseDetectOpts['detectChannels']])
-        tdPow = hf.filterDF(tdSeg, fs, lowPass=stimRate + 10, lowOrder=2, highPass=stimRate - 10, highOrder=2)
+        tdPow = hf.filterDF(
+            tdSeg, fs,
+            lowPass=stimRate+10, highPass=stimRate - 10,
+            highOrder=5, notch=True)
         tdPow = tdPow.abs().sum(axis=1)
         #  tdPow = (tdDF.loc[
         #      plotMaskTD, theseDetectOpts['detectChannels']] ** 2).sum(axis=1)
         
         # convolve with a future facing kernel
-        kernDur = 0.2
-        kernNSamp = int(kernDur * fs)
-        if kernNSamp > len(tdPow):
-            kernNSamp = round(len(tdPow) - 2)
-        kern = np.concatenate((
-            np.linspace(0, 1, round(kernNSamp/2)),
-            np.array([0]),
-            np.linspace(-1, 0, round(kernNSamp/2))
-            ))
+        fancyCorrection = True
+        if fancyCorrection:
+            kernDur = 0.2
+            kernNSamp = int(kernDur * fs)
+            if kernNSamp > len(tdPow):
+                kernNSamp = round(len(tdPow) - 2)
+            kern = np.concatenate((
+                np.linspace(0, 1, round(kernNSamp/2)),
+                np.array([0]),
+                np.linspace(-1, 0, round(kernNSamp/2))
+                ))
         
-        correctionFactor = pd.Series(
-            np.convolve(kern, tdPow, mode='same'),
-            index=tdPow.index)
+            correctionFactor = pd.Series(
+                np.convolve(kern, tdPow, mode='same'),
+                index=tdPow.index)
         
-        correctionFactor = correctionFactor - correctionFactor.min()
-        correctionFactor = (correctionFactor / correctionFactor.max()) + 1
+            correctionFactor = correctionFactor - correctionFactor.min()
+            correctionFactor = (correctionFactor / correctionFactor.max()) + 1
+        else:
+            correctionFactor = pd.Series(
+                tdPow**0,
+                index=tdPow.index)
 
         # use the HUT derived stim onset to favor detection
         hutPeakIdx = hf.getTriggers(
@@ -388,10 +401,10 @@ def getINSStimOnset(
                 index=tdDF['t'].loc[onsetIndices].index)
       
         if len(onsetTimestamps):
-            gaussDur = 0.1
-            gaussNSamp = int(gaussDur * fs)
+            gaussWidIdx = min(int(gaussWid * fs), len(tdPow.index)-1)
+            gaussKerIdx = int(gaussKerWid * fs)
             gaussKern = signal.gaussian(
-                4 * gaussNSamp, gaussNSamp)
+                gaussWidIdx, gaussKerIdx)
             support = pd.Series(0, index=tdPow.index)
             support.loc[onsetIndices] = 1
             support.iloc[:] = np.convolve(
@@ -399,7 +412,6 @@ def getINSStimOnset(
                 gaussKern, mode='same'
                 )
             support = support + 1
-            #  correctionFactor = support
             correctionFactor = correctionFactor * support
 
         sobelFiltered = pd.Series(
@@ -447,9 +459,9 @@ def getINSStimOnset(
             stimDiff = (stimBackDiff + stimFwdDiff) / 2
             offBy = (stimDiff - stimIti - delayByFreq).abs()
             if (name in plotting) and (len(offBy) > 1):
-                ax = sns.distplot(stimDiff)
-                plt.plot()
-            else:
+                #      ax = sns.distplot(stimDiff)
+                #      plt.plot()
+                #  else:
                 print('stim iti off by:')
                 print('{}'.format(offBy))
             keepMask = offBy < 0.3
@@ -480,9 +492,10 @@ def getINSStimOnset(
                     activeGroup][activeProgram]
             
                 thisUnit = Unit(name=electrodeCombo)
-                thisUnit.annotate(cathodes=thisElecConfig['cathodes'])
-                thisUnit.annotate(anodes=thisElecConfig['anodes'])
                 thisUnit.annotate(amplitude=thisAmplitude * 100 * pq.uA)
+                thisUnit.annotate(rate=stimRate * pq.Hz)
+                thisUnit.annotate(group=activeGroup)
+                thisUnit.annotate(program=activeProgram)
 
                 try:
                     theseDetOpts = stimDetectOpts[
@@ -493,24 +506,32 @@ def getINSStimOnset(
                 for key, value in theseDetOpts.items():
                     thisUnit.annotations.update({key: value})
             
-                for mdtIdx in thisElecConfig['cathodes']:
+                for subIdx, mdtIdx in enumerate(thisElecConfig['cathodes']):
+                    thisUnit.annotations.update(
+                        {'cathode_{}'.format(subIdx): mdtIdx})
                     chanIdx = block.filter(
                         objects=ChannelIndex,
                         index=[mdtIdx])[0]
                     chanIdx.units.append(thisUnit)
-                for mdtIdx in thisElecConfig['anodes']:
+                for subIdx, mdtIdx in enumerate(thisElecConfig['anodes']):
+                    thisUnit.annotations.update(
+                        {'anode_{}'.format(subIdx): mdtIdx})
                     chanIdx = block.filter(
                         objects=ChannelIndex,
                         index=[mdtIdx])[0]
                     chanIdx.units.append(thisUnit)
-            ampList = theseTimestamps ** 0 * 100 * thisAmplitude * pq.mA
-            arrayAnn = {'stimAmplitude': ampList}
+            ampList = theseTimestamps ** 0 * 100 * thisAmplitude * pq.uA
+            rateList = theseTimestamps ** 0 * stimRate * pq.Hz
+            arrayAnn = {'amplitudes': ampList, 'rate': rateList}
         
             st = SpikeTrain(
                 times=theseTimestamps, t_stop=t_stop,
                 name=thisUnit.name,
                 array_annotations=arrayAnn)
             st.annotate(amplitude=thisAmplitude * 100 * pq.uA)
+            st.annotate(amplitudes=ampList)
+            st.annotate(rate=stimRate * pq.Hz)
+            st.annotate(rates=rateList)
             thisUnit.spiketrains.append(st)
         
         if name in plotting:
@@ -575,12 +596,12 @@ def getINSStimOnset(
                 tdDF.loc[plotMaskTD, 't'],
                 tdDF.loc[plotMaskTD, 'therapyStatus'],
                 '--', label='therapyStatus', lw = 1.5)
-            '''
+            
             statusAx.plot(
                 tdDF.loc[plotMaskTD, 't'],
-                tdDF.loc[plotMaskTD, 'amplitudeChange'],
-                'c--', label='amplitudeChange', lw = 1.5)
-            '''
+                tdDF.loc[plotMaskTD, 'amplitudeIncrease'],
+                'c--', label='amplitudeIncrease', lw = 1.5)
+            
             ax[2].legend(loc = 'upper left')    
             statusAx.legend(loc = 'upper right')
             ax[2].set_ylabel('Stim Amplitude (mA)')
@@ -600,15 +621,28 @@ def getINSStimOnset(
         else:
             #  consolidate spiketrains
             consolidatedTimes = np.array([])
+            consolidatedAmplitudes = np.array([])
+            consolidatedRates = np.array([])
             for idx, st in enumerate(thisUnit.spiketrains):
                 consolidatedTimes = np.concatenate((
                     consolidatedTimes,
                     st.times.magnitude
                 ))
+                consolidatedAmplitudes = np.concatenate((
+                    consolidatedAmplitudes,
+                    st.annotations['amplitudes']
+                ))
+                consolidatedRates = np.concatenate((
+                    consolidatedRates,
+                    st.annotations['rates']
+                ))
+                
             newSt = SpikeTrain(
                 name=thisUnit.name,
                 times=consolidatedTimes, units='sec',
                 t_stop=t_stop)
+            newSt.annotate(amplitudes=ampList)
+            newSt.annotate(rates=rateList)
             thisUnit.spiketrains = [newSt]
             seg.spiketrains.append(newSt)
 
@@ -748,6 +782,8 @@ def unpackINSBlock(block):
     infoFromStimStatus = hf.interpolateDF(
         stimStatus, tdDF['t'],
         x='t', columns=columnsToBeAdded, kind='previous')
+    infoFromStimStatus['amplitudeIncrease'] = (
+        infoFromStimStatus['amplitudeRound'].diff().fillna(0))
     tdDF = pd.concat((
         tdDF,
         infoFromStimStatus.drop(columns='t')),
