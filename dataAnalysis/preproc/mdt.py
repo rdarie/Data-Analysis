@@ -278,7 +278,8 @@ def getINSStimOnset(
         stimDetectOpts=None,
         plotting=[]):
 
-    seg = block.segments[0]
+    segIdx = 0
+    seg = block.segments[segIdx]
     defaultOptsDict = {
         'detectChannels': ['ins_td0', 'ins_td2'],
         'thres': thres,
@@ -290,13 +291,49 @@ def getINSStimOnset(
             for grpIdx in range(4)}
     
     #  allocate channels for each physical contact
-    for mdtIdx in range(17):
-        mdtChanName = 'ins_ch{}'.format(mdtIdx)
-        chanIdx = ChannelIndex(
-            name=mdtChanName,
-            index=[mdtIdx])
-        block.channel_indexes.append(chanIdx)
+    #  for mdtIdx in range(17):
+    #      mdtChanName = 'ins_ch{}'.format(mdtIdx)
+    #      chanIdx = ChannelIndex(
+    #          name=mdtChanName,
+    #          index=[mdtIdx])
+    #      block.channel_indexes.append(chanIdx)
     
+    #  allocate units for each group/program pair
+    for groupIdx in range(4):
+        for progIdx in range(4):
+            electrodeCombo = 'g{:d}p{:d}'.format(
+                groupIdx, progIdx)
+            mdtIdx = int(4 * groupIdx + progIdx)
+            chanIdx = ChannelIndex(
+                name=electrodeCombo + '_ch',
+                index=[mdtIdx])
+            block.channel_indexes.append(chanIdx)
+
+            thisElecConfig = elecConfiguration[
+                groupIdx][progIdx]
+            thisUnit = Unit(name=electrodeCombo)
+            thisUnit.annotate(group=groupIdx)
+            thisUnit.annotate(program=progIdx)
+            thisUnit.annotate(cathodes=thisElecConfig['cathodes'])
+            thisUnit.annotate(anodes=thisElecConfig['anodes'])
+            try:
+                theseDetOpts = stimDetectOpts[
+                    groupIdx][progIdx]
+            except Exception:
+                theseDetOpts = defaultOptsDict
+            for key, value in theseDetOpts.items():
+                thisUnit.annotations.update({key: value})
+            chanIdx.units.append(thisUnit)
+            #  for mdtIdx in thisElecConfig['cathodes']:
+            #      chanIdx = block.filter(
+            #          objects=ChannelIndex,
+            #          index=[mdtIdx])[0]
+            #      chanIdx.units.append(thisUnit)
+            #  for mdtIdx in thisElecConfig['anodes']:
+            #      chanIdx = block.filter(
+            #          objects=ChannelIndex,
+            #          index=[mdtIdx])[0]
+            #      chanIdx.units.append(thisUnit)
     tdDF, accelDF, stimStatus = unpackINSBlock(block)
     
     t_stop = tdDF['t'].iloc[-1]
@@ -345,22 +382,7 @@ def getINSStimOnset(
         # convolve with a future facing kernel
         fancyCorrection = True
         if fancyCorrection:
-            kernDur = 0.2
-            kernNSamp = int(kernDur * fs)
-            if kernNSamp > len(tdPow):
-                kernNSamp = round(len(tdPow) - 2)
-            kern = np.concatenate((
-                np.linspace(0, 1, round(kernNSamp/2)),
-                np.array([0]),
-                np.linspace(-1, 0, round(kernNSamp/2))
-                ))
-        
-            correctionFactor = pd.Series(
-                np.convolve(kern, tdPow, mode='same'),
-                index=tdPow.index)
-        
-            correctionFactor = correctionFactor - correctionFactor.min()
-            correctionFactor = (correctionFactor / correctionFactor.max()) + 1
+            correctionFactor = hf.noisyTriggerCorrection(tdPow, fs)
         else:
             correctionFactor = pd.Series(
                 tdPow**0,
@@ -414,15 +436,7 @@ def getINSStimOnset(
             support = support + 1
             correctionFactor = correctionFactor * support
 
-        sobelFiltered = pd.Series(
-            ndimage.sobel(tdPow, mode='reflect'),
-            index=tdPow.index)
-
-        stimDetectSignal = sobelFiltered * correctionFactor
-        stimDetectSignal = stimDetectSignal.fillna(0)
-        stimDetectSignal.iloc[:] = stats.zscore(sobelFiltered)
-        stimDetectSignal = stimDetectSignal.abs()
-
+        stimDetectSignal = hf.enhanceNoisyTriggers(tdPow, correctionFactor)
         if thisAmplitude == 0:
             peakIdx = np.array([])
         else:
@@ -474,64 +488,29 @@ def getINSStimOnset(
                 theseTimestamps.values)
         
         theseTimestamps = theseTimestamps.values * pq.s
-        electrodeCombo = 'g{:d}p{:d}_a{:0>4d}_r{:0>3d}'.format(
-            activeGroup, activeProgram,
-            int(thisAmplitude * 100), int(stimRate))
+        electrodeCombo = 'g{:d}p{:d}'.format(
+            activeGroup, activeProgram)
         
         if len(theseTimestamps):
-            thisUnitList = block.filter(
+            thisUnit = block.filter(
                 objects=Unit,
                 name=electrodeCombo
-                )
-            if len(thisUnitList):
-                #  unit already exists
-                thisUnit = thisUnitList[0]
-            else:
-                #  allocate unit
-                thisElecConfig = elecConfiguration[
-                    activeGroup][activeProgram]
-            
-                thisUnit = Unit(name=electrodeCombo)
-                thisUnit.annotate(amplitude=thisAmplitude * 100 * pq.uA)
-                thisUnit.annotate(rate=stimRate * pq.Hz)
-                thisUnit.annotate(group=activeGroup)
-                thisUnit.annotate(program=activeProgram)
+                )[0]
 
-                try:
-                    theseDetOpts = stimDetectOpts[
-                        activeGroup][activeProgram]
-                except Exception:
-                    theseDetOpts = defaultOptsDict
-
-                for key, value in theseDetOpts.items():
-                    thisUnit.annotations.update({key: value})
-            
-                for subIdx, mdtIdx in enumerate(thisElecConfig['cathodes']):
-                    thisUnit.annotations.update(
-                        {'cathode_{}'.format(subIdx): mdtIdx})
-                    chanIdx = block.filter(
-                        objects=ChannelIndex,
-                        index=[mdtIdx])[0]
-                    chanIdx.units.append(thisUnit)
-                for subIdx, mdtIdx in enumerate(thisElecConfig['anodes']):
-                    thisUnit.annotations.update(
-                        {'anode_{}'.format(subIdx): mdtIdx})
-                    chanIdx = block.filter(
-                        objects=ChannelIndex,
-                        index=[mdtIdx])[0]
-                    chanIdx.units.append(thisUnit)
             ampList = theseTimestamps ** 0 * 100 * thisAmplitude * pq.uA
             rateList = theseTimestamps ** 0 * stimRate * pq.Hz
-            arrayAnn = {'amplitudes': ampList, 'rate': rateList}
+            tSegList = theseTimestamps ** 0 * thisTrialSegment
+            arrayAnn = {
+                'amplitudes': ampList, 'rates': rateList,
+                'trialSegments': tSegList}
         
             st = SpikeTrain(
                 times=theseTimestamps, t_stop=t_stop,
                 name=thisUnit.name,
-                array_annotations=arrayAnn)
-            st.annotate(amplitude=thisAmplitude * 100 * pq.uA)
-            st.annotate(amplitudes=ampList)
-            st.annotate(rate=stimRate * pq.Hz)
-            st.annotate(rates=rateList)
+                array_annotations=arrayAnn,
+                **arrayAnn)
+            #  st.annotate(amplitude=thisAmplitude * 100 * pq.uA)
+            #  st.annotate(rate=stimRate * pq.Hz)
             thisUnit.spiketrains.append(st)
         
         if name in plotting:
@@ -609,11 +588,11 @@ def getINSStimOnset(
             plt.suptitle('Stim State')
             plt.show()
     
-    createRelationship = False
+    createRelationship = True
     for thisUnit in block.list_units:
-        if not len(thisUnit.spiketrains):
+        if len(thisUnit.spiketrains) == 0:
             st = SpikeTrain(
-                name=thisUnit.name,
+                name=thisUnit.name + '_{}'.format(int(segIdx)),
                 times=[], units='sec',
                 t_stop=t_stop)
             thisUnit.spiketrains.append(st)
@@ -621,33 +600,34 @@ def getINSStimOnset(
         else:
             #  consolidate spiketrains
             consolidatedTimes = np.array([])
-            consolidatedAmplitudes = np.array([])
-            consolidatedRates = np.array([])
+            consolidatedAnn = {
+                'amplitudes': np.array([]),
+                'rates': np.array([]),
+                'trialSegments': np.array([])
+                }
+            arrayAnnNames = {'arrayAnnNames': list(consolidatedAnn.keys())}
             for idx, st in enumerate(thisUnit.spiketrains):
                 consolidatedTimes = np.concatenate((
                     consolidatedTimes,
                     st.times.magnitude
                 ))
-                consolidatedAmplitudes = np.concatenate((
-                    consolidatedAmplitudes,
-                    st.annotations['amplitudes']
-                ))
-                consolidatedRates = np.concatenate((
-                    consolidatedRates,
-                    st.annotations['rates']
-                ))
-                
+                for key, value in consolidatedAnn.items():
+                    consolidatedAnn[key] = np.concatenate((
+                        consolidatedAnn[key],
+                        st.annotations[key]
+                        ))
+            #  pdb.set_trace()
             newSt = SpikeTrain(
-                name=thisUnit.name,
+                name=thisUnit.name + '_{}'.format(int(segIdx)),
                 times=consolidatedTimes, units='sec',
-                t_stop=t_stop)
-            newSt.annotate(amplitudes=ampList)
-            newSt.annotate(rates=rateList)
+                t_stop=t_stop, **consolidatedAnn, **arrayAnnNames)
+            
+            newSt.unit = thisUnit
             thisUnit.spiketrains = [newSt]
+            if createRelationship:
+                thisUnit.create_relationship()
             seg.spiketrains.append(newSt)
-
-        if createRelationship:
-            thisUnit.create_relationship()
+        #  if createRelationship:
 
     if createRelationship:
         for chanIdx in block.channel_indexes:
@@ -732,7 +712,7 @@ def insDataToBlock(
 
     stimEvents = ns5.eventDataFrameToEvents(
         stimStatusSerial, idxT='INSTime',
-        annCol=['property', 'value']
+        annCol=['ins_property', 'ins_value']
         )
     #  pdb.set_trace()
     seg.events = stimEvents
@@ -787,6 +767,10 @@ def unpackINSBlock(block):
     tdDF = pd.concat((
         tdDF,
         infoFromStimStatus.drop(columns='t')),
+        axis=1)
+    accelDF = pd.concat((
+        accelDF,
+        infoFromStimStatus['trialSegment']),
         axis=1)
     return tdDF, accelDF, stimStatus
 

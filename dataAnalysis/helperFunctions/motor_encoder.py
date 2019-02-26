@@ -1,16 +1,18 @@
-import pdb
+import pdb, traceback
 from dataAnalysis.helperFunctions.helper_functions import *
 import pandas as pd
-
+import numpy as np
 import matplotlib
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib import pyplot as plt
 
 from sklearn.mixture import GaussianMixture
-
+from statsmodels.nonparametric.smoothers_lowess import lowess
 import seaborn as sns
+from scipy import stats
 from scipy.signal import hilbert
 import line_profiler
+import dataAnalysis.helperFunctions.helper_functions as hf
 
 #@profile
 def debounceLine(dataLine):
@@ -40,9 +42,12 @@ def getTransitionIdx(motorData, edgeType='rising'):
     return transitionMask, transitionIdx
 
 #@profile
-def getMotorData(ns5FilePath, inputIDs, startTime, dataTime, spikeStruct, debounce = None, invertLookup = False):
+def getMotorData(
+        ns5FilePath, inputIDs, startTime, dataTime,
+        spikeStruct, debounce=None, invertLookup=False):
 
-    analogData = getNSxData(ns5FilePath, inputIDs.values(), startTime, dataTime, spikeStruct)
+    analogData = getNSxData(
+        ns5FilePath, inputIDs.values(), startTime, dataTime, spikeStruct)
     newColNames = {num : '' for num in analogData['data'].columns}
 
     for key, value in inputIDs.items():
@@ -51,13 +56,19 @@ def getMotorData(ns5FilePath, inputIDs, startTime, dataTime, spikeStruct, deboun
 
     #pdb.set_trace()
     motorData = analogData['data'].rename(columns = newColNames)
+    return processMotorData(motorData)
+
+def processMotorData(motorData, fs, invertLookup=False):
+    #  pdb.set_trace()
     motorData['A'] = motorData['A+'] - motorData['A-']
     motorData['B'] = motorData['B+'] - motorData['B-']
     motorData['Z'] = motorData['Z+'] - motorData['Z-']
-    #pdb.set_trace();plt.plot(motorData.loc[:,('A+', 'A-')]);plt.show()
+    
+    #  pdb.set_trace();plt.plot(motorData.loc[:,('B+', 'A-')]);plt.show()
 
-
-    motorData.drop(['A+', 'A-', 'B+', 'B-', 'Z+', 'Z-'], axis = 1, inplace = True)
+    motorData.drop(
+        ['A+', 'A-', 'B+', 'B-', 'Z+', 'Z-'],
+        axis=1, inplace=True)
 
     """
     # use gaussian mixture model to digitize analog trace
@@ -72,7 +83,7 @@ def getMotorData(ns5FilePath, inputIDs, startTime, dataTime, spikeStruct, deboun
     # use signal range to digitize analog trace
     """
     for column in motorData.columns:
-    #  for column in ['A','B','Z']:
+        #  for column in ['A','B','Z']:
         minQ = motorData[column].quantile(q=0.05)
         maxQ = motorData[column].quantile(q=0.95)
         #print('min quantile = {}'.format(minQ))
@@ -129,14 +140,25 @@ def getMotorData(ns5FilePath, inputIDs, startTime, dataTime, spikeStruct, deboun
     #  pad with a zero to make up for the fact that the first one doesn't have a pair
     motorData.loc[transitionIdx, 'count'] = [0] + count
     #  pdb.set_trace()
-    motorData['position'] = motorData['count'].cumsum() / 180e2
+    motorData['velocity'] = motorData['count'] / 180e2
+    motorData['position'] = motorData['velocity'].cumsum()
+
+    detectSignal = hf.filterDF(
+            motorData['velocity'], fs, filtFun='bessel',
+            lowPass=500, lowOrder=2)
+    #  motorData['velocity'] = detectSignal.values
+    
+    detectSignal.iloc[:] = stats.zscore(detectSignal)
+    bins = np.array([-1.5, 1.5])
+    detectSignal.iloc[:] = np.digitize(detectSignal.values, bins)
+    motorData['velocityCat'] = detectSignal
     #  motorData['stateChanges'] = motorData['encoderState'].diff().abs() != 0
     #  pdb.set_trace()
 
     return motorData
 
 #@profile
-def getTrials(motorData, trialType = '2AFC'):
+def getTrials(motorData, trialType='2AFC'):
 
     rightLEDdiff = motorData['rightLED_int'].diff()
     rightButdiff = motorData['rightBut_int'].diff()
@@ -173,9 +195,9 @@ def getTrials(motorData, trialType = '2AFC'):
 
     transitionIdxIter = iter(transitionIdx)
     for idx in transitionIdxIter:
-        #check that we're not out of bounds])
+        #  check that we're not out of bounds])
         if idx - windowLen >= firstIdx and idx + windowLen <= lastIdx:
-            #old way, index into transition mask and find the number of crossings
+            #  old way, index into transition mask and find the number of crossings
             transitionInPast = sum(transitionMask[idx - windowLen : idx])
             transitionInFuture = sum(transitionMask[idx : idx + windowLen])
 
@@ -335,6 +357,203 @@ def getTrials(motorData, trialType = '2AFC'):
             except:
                 print('Error detected!')
                 #pdb.set_trace()
+    return trialStats, trialEvents
+
+def getTrialsNew(motorData, fs, tStart, trialType = '2AFC'):
+    
+    trialEvents = pd.DataFrame(index = [], columns = ['idx', 'Label', 'Details'])
+    trialEvents = {
+        'Time':[],
+        'Label':[],
+        'Details':[]
+        }
+    messageLookup = {
+        'rightBut_int': 'Right Button Onset',
+        'rightLED_int': 'Right LED Onset',
+        'leftBut_int': 'Left Button Onset',
+        'leftLED_int': 'Left LED Onset'
+        }
+    
+    analyzeColumns = [
+        'rightLED_int', 'leftLED_int',
+        'rightBut_int', 'leftBut_int']
+    for colName in analyzeColumns:
+        tdSeries = motorData.loc[:, colName].astype(float)
+        
+        fancyCorrection = False
+        if fancyCorrection:
+            correctionFactor = hf.noisyTriggerCorrection(tdSeries, fs)
+        else:
+            correctionFactor = pd.Series(
+                tdSeries**0,
+                index=tdSeries.index)
+
+        detectSignal = hf.filterDF(
+            tdSeries, fs,
+            highPass=1000, highOrder=3)
+        detectSignal = hf.enhanceNoisyTriggers(
+            detectSignal, correctionFactor)
+        minDist = 150e-3  # sec debounce
+        peakIdx = peakutils.indexes(
+            detectSignal.values, thres=30,
+            min_dist=int(minDist * fs), thres_abs=True,
+            keep_max=True)
+        #  this catches both edges, skip every other one
+        peakIdx = tdSeries.index[peakIdx[::2]]
+        for thisIdx in peakIdx:
+            trialEvents['Time'].append(thisIdx / fs + tStart)
+            trialEvents['Label'].append(messageLookup[colName])
+            trialEvents['Details'].append(np.nan)
+        #  plt.plot(tdSeries.index / fs, tdSeries)
+        #  plt.plot(peakIdx / fs, tdSeries.loc[peakIdx]**0, 'ro'); plt.show()
+        #  plt.plot(tdSeries.index / fs, detectSignal)
+        #  plt.plot(peakIdx / fs, detectSignal.loc[peakIdx]**0, 'ro'); plt.show()
+    
+    vCat = motorData.loc[:, 'velocityCat'].astype(float)
+    # vCat = motorData.loc[:, 'position'].astype(float)
+
+    detectSignal = vCat.diff().fillna(0)
+    minDist = 50e-3  # msec debounce
+    peakIdx = peakutils.indexes(
+        detectSignal.abs().values, thres=0.5,
+        min_dist=int(fs*minDist),
+        thres_abs=True, keep_max = True)[1:]
+    peakIdx = detectSignal.index[peakIdx]
+    
+    onPeakIdx = peakIdx[::2]
+    offPeakIdx = peakIdx[1::2]
+    for thisIdx in onPeakIdx:
+        trialEvents['Time'].append(thisIdx / fs + tStart)
+        trialEvents['Label'].append('movement')
+        trialEvents['Details'].append(1)
+    for thisIdx in offPeakIdx:
+        trialEvents['Time'].append(thisIdx / fs + tStart)
+        trialEvents['Label'].append('movement')
+        trialEvents['Details'].append(0)
+    #  thisT = vCat.index / fs
+    #  tMask = (thisT > 200) & (thisT < 300)
+    #  plt.plot(thisT[tMask], mPos.loc[tMask])
+    #  plt.plot(peakIdx / fs, mPos.loc[peakIdx], 'bo')
+    #  plt.plot(onPeakIdx / fs, mPos.loc[onPeakIdx], 'go')
+    #  plt.plot(offPeakIdx / fs, mPos.loc[offPeakIdx], 'ro'); plt.show()
+    #  plt.plot(thisT, vCat)
+    #  plt.plot(onPeakIdx / fs, vCat.loc[onPeakIdx]**0-1, 'ro'); plt.show()
+    #  plt.plot(vCat.index / fs, detectSignal)
+    #  plt.plot(onPeakIdx / fs, detectSignal.loc[onPeakIdx], 'go')
+    #  plt.plot(offPeakIdx / fs, detectSignal.loc[offPeakIdx]**0-1, 'ro'); plt.show()
+    
+    trialEvents = pd.DataFrame(trialEvents)
+    trialEvents.sort_values('Time', inplace = True)
+    trialEvents.reset_index(drop=True, inplace = True)
+    #  pdb.set_trace()
+    if trialType == '2AFC':
+        #  !!!! TODO: changes to how we calculate movement break this, because we now track
+        #  move on and move off 4 times a trial (to and back)
+        while not (trialEvents.loc[:3,'Label'].str.contains('movement').all()) or trialEvents.loc[4:4,'Label'].str.contains('movement').all():
+            #above expression is not true if the first 5 events do not make up a complete sequence
+            #pdb.set_trace()
+            trialEvents.drop(0, inplace = True)
+            trialEvents.reset_index(drop=True, inplace = True)
+
+        #pdb.set_trace()
+        trialStartIdx = trialEvents.index[trialEvents['Label'] == 'Movement Onset']
+        trialStartIdx = trialStartIdx[range(0,len(trialStartIdx),2)]
+        eventsToTrack = ['First',
+                         'FirstOnset',
+                         'FirstOffset',
+                         'Second',
+                         'SecondOnset',
+                         'SecondOffset',
+                         'Magnitude',
+                         'Direction',
+                         'Condition',
+                         'Type',
+                         'Stimulus Duration',
+                         'Outcome',
+                         'Choice',
+                         'CueOnset',
+                         'ChoiceOnset'
+                         ]
+        trialStats = pd.DataFrame(index = range(len(trialStartIdx)), columns = eventsToTrack)
+
+        for idx, startIdx in enumerate(trialStartIdx):
+            try:
+                try:
+                    nextStartIdx = trialStartIdx[idx + 1]
+                except:
+                    nextStartIdx = trialStartIdx[-1]
+
+                rightButtonMask = trialEvents.loc[startIdx:nextStartIdx, 'Label'].str.contains('Right Button')
+                leftButtonMask = trialEvents.loc[startIdx:nextStartIdx, 'Label'].str.contains('Left Button')
+                if rightButtonMask.any() and leftButtonMask.any():
+                    trialStats.loc[idx, 'Choice'] = 'both'
+                    trialStats.loc[idx, 'Outcome'] = 'incorrect button'
+                elif rightButtonMask.any():
+                    trialStats.loc[idx, 'Choice'] = 'right'
+                    trialStats.loc[idx, 'ChoiceOnset'] = trialEvents.loc[startIdx:nextStartIdx, 'Time'][rightButtonMask].mean()
+                    trialStats.loc[idx, 'Outcome'] = 'correct button' if trialStats.loc[idx, 'Type'] == 1 else 'incorrect button'
+                elif leftButtonMask.any():
+                    trialStats.loc[idx, 'Choice'] = 'left'
+                    trialStats.loc[idx, 'ChoiceOnset'] = trialEvents.loc[startIdx:nextStartIdx, 'Time'][leftButtonMask].mean()
+                    trialStats.loc[idx, 'Outcome'] = 'correct button' if trialStats.loc[idx, 'Type'] == 0 else 'incorrect button'
+                elif not rightButtonMask.any() and not leftButtonMask.any():
+                    trialStats.loc[idx, 'Choice'] = 'none'
+                    trialStats.loc[idx, 'Outcome'] = 'button timed out'
+
+                assert (
+                    (trialEvents.loc[startIdx, 'Label'] == 'movement') &
+                    (trialEvents.loc[startIdx, 'Details'] == 1)
+                    (trialEvents.loc[startIdx, 'Label'] == 'movement') &
+                    (trialEvents.loc[startIdx + 1, 'Details'] == 0))
+
+                offsetMask = (
+                    (trialEvents.loc[startIdx:nextStartIdx,'Label'] == 'movement') &
+                    (trialEvents.loc[startIdx:nextStartIdx,'Details'] == 1))
+                offsetTimes = trialEvents.loc[startIdx:nextStartIdx,'Time'][offsetMask]
+
+                firstOnsetTime = trialEvents.loc[startIdx, 'Time']
+                trialStats.loc[idx, 'FirstOnset'] = firstOnsetTime
+                firstOffsetTime = offsetTimes.iloc[0]
+                trialStats.loc[idx, 'FirstOffset'] = firstOffsetTime
+                firstMovement = motorData.loc[firstOnsetTime:firstOffsetTime, 'position']
+
+                if abs(firstMovement.max()) < abs(firstMovement.min()):
+                    trialStats.loc[idx, 'Direction'] = 'Extension'
+                    trialStats.loc[idx, 'First'] = firstMovement.min()
+                else:
+                    trialStats.loc[idx, 'Direction'] = 'Flexion'
+                    trialStats.loc[idx, 'First'] = firstMovement.max()
+
+                assert (
+                    (trialEvents.loc[startIdx + 2, 'Label'] == 'movement') &
+                    (trialEvents.loc[startIdx + 2, 'Details'] == 1))
+                secondOnsetTime = trialEvents.loc[startIdx + 2, 'Time']
+                trialStats.loc[idx, 'SecondOnset'] = secondOnsetTime
+                secondOffsetTime = offsetTimes.iloc[1]
+                trialStats.loc[idx, 'SecondOffset'] = secondOffsetTime
+                secondMovement = motorData.loc[secondOnsetTime:secondOffsetTime, 'position']
+
+                if trialStats.loc[idx, 'Direction'] == 'Extension':
+                    assert abs(secondMovement.max()) < abs(secondMovement.min())
+                    trialStats.loc[idx, 'Second'] = secondMovement.min()
+                else:
+                    assert abs(secondMovement.max()) > abs(secondMovement.min())
+                    trialStats.loc[idx, 'Second'] = secondMovement.max()
+
+                trialStats.loc[idx, 'Magnitude'] = 'Short' if abs(trialStats.loc[idx, 'Second'] - trialStats.loc[idx, 'First']) < 2e4 else 'Long'
+                cueMask = trialEvents.loc[startIdx:nextStartIdx, 'Label'].str.contains('LED')
+                nCues = sum(cueMask)
+                trialStats.loc[idx, 'Condition'] = 'hard' if nCues == 2 else 'easy'
+                trialStats.loc[idx, 'CueOnset'] = trialEvents.loc[startIdx:nextStartIdx, 'Time'][cueMask].mean()
+
+                trialStats.loc[idx, 'Type'] = 0 if abs(trialStats.loc[idx, 'First']) < abs(trialStats.loc[idx, 'Second']) else 1
+                trialStats.loc[idx, 'Stimulus Duration'] = secondOffsetTime - firstOnsetTime
+            except Exception:
+                traceback.print_exc()
+                print('Error detected while calculating TrialStats!')
+                #pdb.set_trace()
+    else:
+        trialStats = None
     return trialStats, trialEvents
 
 #@profile

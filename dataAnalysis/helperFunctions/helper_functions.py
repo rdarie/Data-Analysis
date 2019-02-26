@@ -8,6 +8,7 @@ try:
 except:
     pass
 
+import psutil
 import matplotlib, pdb, sys, itertools, os, pickle, gc, random, string,\
 subprocess, collections, traceback, peakutils, math, argparse
 from collections.abc import Iterable
@@ -22,7 +23,9 @@ import math as m
 import tables as pt
 import seaborn as sns
 import rcsanalysis.packet_func as rcsa_helpers
-
+from neo import Unit, AnalogSignal, Event, Block, Segment, ChannelIndex
+from neo.io.proxyobjects import (
+    AnalogSignalProxy, SpikeTrainProxy, EventProxy) 
 
 from sklearn.model_selection import StratifiedKFold, GridSearchCV, learning_curve
 from sklearn.metrics import roc_auc_score, make_scorer, f1_score, classification_report
@@ -51,8 +54,8 @@ except:
     HASLIBTFR = False
 
 from scipy import interpolate
-from scipy import stats, signal
-from copy import *
+from scipy import stats, signal, ndimage
+from copy import copy
 import matplotlib.backends.backend_pdf
 from fractions import gcd
 import h5py
@@ -105,10 +108,15 @@ def filterDF(
         df, fs,
         lowPass=None, lowOrder=2,
         highPass=None, highOrder=2,
-        notch=False, filtFun=signal.butter,
+        notch=False, filtFun='butter',
         columns=None):
-
-    if columns is None:
+    passedSeries = False
+    
+    if isinstance(df, pd.Series):
+        passedSeries = True
+        df = pd.DataFrame(df.values, index=df.index, columns=['temp'])
+        columns = ['temp']
+    elif columns is None:
             columns = df.columns
 
     if (lowPass is not None) and (highPass is not None):
@@ -127,12 +135,23 @@ def filterDF(
         Wn = 2 * highPass / fs
         filtOrder = lowOrder
 
-    b, a = filtFun(filtOrder, Wn, btype=btype, analog=False)
+    if filtFun == 'butter':
+        b, a = signal.butter(
+            filtOrder, Wn=Wn, btype=btype, analog=False)
+    elif filtFun == 'bessel':
+        b, a = signal.bessel(
+            filtOrder, Wn=Wn, btype=btype, analog=False)
+    elif filtFun == 'ellip':
+        b, a = signal.ellip(
+            filtOrder, rp=5, rs=10, Wn=Wn, btype=btype, analog=False)
+
     filteredDF = pd.DataFrame(df[columns])
     
     for column in filteredDF.columns:
         filteredDF.loc[:, column] = (
             signal.filtfilt(b, a, filteredDF[column]))
+    if passedSeries:
+        filteredDF = filteredDF['temp']
     return filteredDF
 
 
@@ -584,6 +603,7 @@ def peekAtTaps(
 
     for trialSegment in segmentsToPlot:
         #  NSP plotting Bounds
+        trialSegment = int(trialSegment)
         tStartNSP = sessionTapRangesNSP[trialIdx][trialSegment][0]
         tStopNSP = sessionTapRangesNSP[trialIdx][trialSegment][1]
         #  Set up figures
@@ -608,7 +628,9 @@ def peekAtTaps(
         plotMask = (accel[insX] > tStartINS) & (accel[insX] < tStopINS)
         plotMaskTD = (td[insX] > tStartINS) & (td[insX] < tStopINS)
 
-        for columnName in ['accel_x', 'accel_y', 'accel_z', 'inertia']:
+        for columnName in [
+                'ins_accx', 'ins_accy',
+                'ins_accz', 'ins_accinertia']:
             ax[0].plot(
                 accel[insX].loc[plotMask],
                 stats.zscore(accel['data'].loc[plotMask, columnName]),
@@ -616,7 +638,8 @@ def peekAtTaps(
         ax[0].set_title('INS Data')
         ax[0].set_ylabel('Z Score (a.u.)')
 
-        for columnName in ['channel_0', 'channel_1']:
+        dataColMask = np.array(['ins_td' in i for i in td['data'].columns])
+        for columnName in td['data'].columns[dataColMask]:
             ax[1].plot(
                 td[insX].loc[plotMaskTD],
                 stats.zscore(td['data'].loc[plotMaskTD, columnName]),
@@ -704,7 +727,7 @@ def getINSTapTimestamp(
             accelMask, tapDetectOpts['accChan']]
         
         accelPeakIdx = getTriggers(
-            tapDetectSignal, iti=iti, fs=64, thres=tapDetectOpts['accThres'],
+            tapDetectSignal, iti=iti, fs=500, thres=tapDetectOpts['accThres'],
             edgeType='both', minAmp=None,
             expectedTime=None, keep_max=False, plotting=plotting)
         '''
@@ -766,9 +789,27 @@ def getINSTapTimestamp(
     return tapTimestamps, peakIdx
 
 
+def eventsToDataFrame(
+        events, idxT='t'
+        ):
+    eventDict = {}
+    
+    for event in events:
+        print(event.name)
+        values = event.array_annotations['labels']
+        if isinstance(values[0], bytes):
+            #  event came from hdf, need to recover dtype
+            originalDType = eval('np.' + event.annotations['originalDType'])
+            values = np.array(values, dtype=originalDType)
+        #  print(values.dtype)
+        eventDict.update({
+            event.name: pd.Series(values)})
+    eventDict.update({idxT: pd.Series(event.times.magnitude)})
+    return pd.concat(eventDict, axis=1)
+
 def synchronizeINStoNSP(
         tapTimestampsNSP, tapTimestampsINS,
-        td=None, accel=None, degree=1
+        td=None, accel=None, insBlock=None, trialSegment=None, degree=1
         ):
     # sanity check that the intervals match
     insDiff = tapTimestampsINS.diff().dropna().values
@@ -791,9 +832,120 @@ def synchronizeINStoNSP(
     if accel is not None:
         accel['NSPTime'] = pd.Series(
             timeInterpFunINStoNSP(accel['t']), index=accel['t'].index)
+    if insBlock is not None:
+        allUnits = [st.unit for st in insBlock.segments[0].spiketrains]
+        for unit in allUnits:
+            if np.any([len(st.times) for st in unit.spiketrains]):
+                for st in unit.spiketrains:
+                    #  pdb.set_trace()
+                    segMask = np.array(
+                        st.annotations['trialSegments'],
+                        dtype=np.int) == trialSegment
+                    st.magnitude[segMask] = (
+                        timeInterpFunINStoNSP(st.times[segMask]))
+                    st.t_start = timeInterpFunINStoNSP(st.t_start)
+                    st.t_stop = timeInterpFunINStoNSP(st.t_stop)
+                    #  pdb.set_trace()
+        allEvents = insBlock.filter(objects=Event)
+        eventsDF = eventsToDataFrame(allEvents, idxT='t')
+        segMask = getStimSerialTrialSegMask(eventsDF, trialSegment)
+        for event in allEvents:
+            event.magnitude[segMask] = (
+                timeInterpFunINStoNSP(event.times[segMask]))
+    return td, accel, insBlock, timeInterpFunINStoNSP
 
-    return td, accel, timeInterpFunINStoNSP
 
+def blockUniqueUnits(block):
+
+    return
+
+def loadBlockProxyObjects(block):
+    #  !! Probably doesn't work
+    #  prune out spike placeholders
+    #  (will get added back)
+    for metaIdx, chanIdx in enumerate(block.channel_indexes):
+        if chanIdx.units:
+            for unit in chanIdx.units:
+                if unit.spiketrains:
+                    unit.spiketrains = []
+        if chanIdx.analogsignals:
+            chanIdx.analogsignals = []
+        if chanIdx.irregularlysampledsignals:
+            chanIdx.irregularlysampledsignals = []
+
+    for segIdx, seg in enumerate(block.segments):
+        stProxyList = seg.spiketrains
+        seg.spiketrains = []
+        for stProxy in stProxyList:
+            unit = stProxy.unit
+            st = stProxy.load(load_waveforms=True)
+            #  link SpikeTrain and ID providing unit
+            st.unit = unit
+            # assign ownership to containers
+            unit.spiketrains.append(st)
+            seg.spiketrains.append(st)
+
+        sigProxyList = seg.analogsignals
+        seg.analogsignals = []
+        for aSigProxy in sigProxyList:
+            chanIdx = aSigProxy.channel_index
+            asig = aSigProxy.load()
+            #  link AnalogSignal and ID providing channel_index
+            asig.channel_index = chanIdx
+            # assign ownership to containers
+            chanIdx.analogsignals.append(asig)
+            seg.analogsignals.append(asig)
+        
+        #  evProxyList = seg.events
+        #  seg.events = []
+        #  for eventProxy in evProxyList:
+        #      event = eventProxy.load()
+        #      event.segment = seg
+        #      seg.events.append(event)
+    block.create_relationship()
+    return block
+    
+def extractSignalsFromBlock(
+        block, keepSpikes=True, keepEvents=True, keepSignals=[]):
+    newBlock = Block()
+    newBlock.merge_annotations(block)
+    for idx, seg in enumerate(block.segments):
+        newSeg = Segment()
+        newSeg.merge_annotations(seg)
+        newBlock.segments.append(newSeg)
+        for asig in seg.analogsignals:
+            if asig.name in keepSignals:
+                newSeg.analogsignals.append(asig)
+        if keepSpikes:
+            newSeg.spiketrains = seg.spiketrains
+        if keepEvents:
+            newSeg.events = seg.events
+            newSeg.epochs = seg.epochs
+
+    newChanIdxList = []
+    for idx, chanIdx in enumerate(block.channel_indexes):
+        newChan = ChannelIndex(index=np.array([0]))
+        newChan.merge_annotations(chanIdx)
+        keepThisChan = False
+
+        for asig in chanIdx.analogsignals:
+            if asig.name in keepSignals:
+                newChan.analogsignals.append(asig)
+                keepThisChan = True
+
+        if keepSpikes:
+            for unit in chanIdx.units:
+                keepThisChan = True
+                #  newUnit = Unit()
+                #  newUnit.merge(unit)
+                newChan.units.append(unit)
+        else:
+            newChan.units = []
+
+        if keepThisChan:
+            newBlock.channel_indexes.append(newChan)
+    newBlock.create_relationship()
+    return newBlock
 
 def getHUTtoINSSyncFun(
         timeSyncData,
@@ -840,6 +992,13 @@ def getHUTtoINSSyncFun(
             plt.show()
     return timeInterpFunHUTtoINS
 
+def getStimSerialTrialSegMask(insDF, trialSegment):
+    tsegMask = insDF['ins_property'] == 'trialSegment'
+    tseg = pd.Series(np.nan, index=insDF.index)
+    tseg.loc[tsegMask] = insDF.loc[tsegMask, 'ins_value']
+    tseg.fillna(method='ffill', inplace=True)
+    segmentMask = tseg == trialSegment
+    return segmentMask
 
 def synchronizeHUTtoINS(
         insDF, trialSegment, interpFun
@@ -853,11 +1012,7 @@ def synchronizeHUTtoINS(
     except Exception:
         traceback.print_exc()
         #  event dataframes don't have an explicit trialSegment
-        tsegMask = insDF['property'] == 'trialSegment'
-        tseg = pd.Series(np.nan, index=insDF.index)
-        tseg.loc[tsegMask] = insDF.loc[tsegMask, 'value']
-        tseg.fillna(method='ffill', inplace=True)
-        segmentMask = tseg == trialSegment
+        segmentMask = getStimSerialTrialSegMask(insDF, trialSegment)
         #  pdb.set_trace()
     insDF.loc[segmentMask, 'INSTime'] = interpFun(
         insDF.loc[segmentMask, 'HostUnixTime'])
@@ -905,6 +1060,7 @@ def getINSStimLogFromJson(
 def stimStatusSerialtoLong(
         stimStSer, idxT='t', expandCols=[],
         deriveCols=[], progAmpNames=[], dropDuplicates=True):
+    
     #  pdb.set_trace()
     if 'program' not in expandCols:
         expandCols.append('program')
@@ -918,8 +1074,8 @@ def stimStatusSerialtoLong(
     for pName in expandCols:
         #  print(pName)
         stimStLong[pName] = np.nan
-        pMask = stimStSer['property'] == pName
-        pValues = stimStSer.loc[pMask, 'value']
+        pMask = stimStSer['ins_property'] == pName
+        pValues = stimStSer.loc[pMask, 'ins_value']
         stimStLong.loc[pMask, pName] = pValues
         stimStLong[pName].fillna(
             method='ffill', inplace=True)
@@ -929,9 +1085,9 @@ def stimStatusSerialtoLong(
     debugPlot = False
     for idx, pName in enumerate(progAmpNames):
         stimStLong[pName] = np.nan
-        pMask = (stimStSer['property'] == 'amplitude') & (
+        pMask = (stimStSer['ins_property'] == 'amplitude') & (
             stimStLong['program'] == idx)
-        stimStLong.loc[pMask, pName] = stimStSer.loc[pMask, 'value']
+        stimStLong.loc[pMask, pName] = stimStSer.loc[pMask, 'ins_value']
         stimStLong[pName].fillna(method='ffill', inplace=True)
         #  stimStLong[pName].fillna(method='bfill', inplace=True)
 
@@ -953,11 +1109,9 @@ def stimStatusSerialtoLong(
     if 'amplitudeRound' in deriveCols:
         stimStLong['amplitudeRound'] = (
             ampIncrease.astype(np.float).cumsum())
-        #  stimStLong['amplitudeChange'] = (
-        #      ampChange.astype(np.float))
-        #  stimStLong['amplitudeIncrease'] = (
-        #      ampIncrease.astype(np.float))
-    
+    if 'movementRound' in deriveCols:
+        stimStLong['movementRound'] = (
+            stimStLong['movement'].cumsum())
     #  pdb.set_trace()
     if debugPlot:
         stimStLong.drop(columns=[idxT]).plot()
@@ -1025,6 +1179,36 @@ def getINSDeviceConfig(
     senseInfo.rename(columns={'index': 'senseChan'}, inplace=True)
     return electrodeConfiguration, senseInfo
 
+
+def noisyTriggerCorrection(tdSeries, fs):
+    kernDur = 0.2
+    kernNSamp = int(kernDur * fs)
+    if kernNSamp > len(tdSeries):
+        kernNSamp = round(len(tdSeries) - 2)
+    kern = np.concatenate((
+        np.linspace(0, 1, round(kernNSamp/2)),
+        np.array([0]),
+        np.linspace(-1, 0, round(kernNSamp/2))
+        ))
+        
+    correctionFactor = pd.Series(
+        np.convolve(kern, tdSeries, mode='same'),
+        index=tdSeries.index)
+        
+    correctionFactor = correctionFactor - correctionFactor.min()
+    correctionFactor = (correctionFactor / correctionFactor.max()) + 1
+    return correctionFactor
+
+
+def enhanceNoisyTriggers(tdSeries, correctionFactor):
+    stimDetectSignal = pd.Series(
+        ndimage.sobel(tdSeries, mode='reflect'),
+        index=tdSeries.index)
+    stimDetectSignal.iloc[:] = stimDetectSignal.values * correctionFactor.values
+    stimDetectSignal = stimDetectSignal.fillna(0)
+    stimDetectSignal.iloc[:] = stats.zscore(stimDetectSignal)
+    stimDetectSignal = stimDetectSignal.abs()
+    return stimDetectSignal
 
 def getBadSpikesMask(spikes, nStd = 5, whichChan = 0, plotting = False, deleteBad = False):
     """
@@ -1287,11 +1471,28 @@ def getThresholdCrossings(dataSeries, thresh, absVal = False, edgeType = 'rising
 
     if iti is not None:
         itiWiggle = 0.05
-        width = int(fs * iti * (1 - itiWiggle))
-        rejectMask = pd.Series(crossIdx).diff() < width
-        crossMask[crossIdx[rejectMask]] = False
-        crossIdx = crossIdx[~rejectMask]
-        #pdb.set_trace()
+        min_dist = int(fs * iti * (1 - itiWiggle))
+        peaks = np.array(range(len(crossIdx)))
+        y = dataSeries.abs().values
+        keep_max = True
+        if peaks.size > 1 and min_dist > 1:
+            print(len(peaks))
+            if keep_max:
+                highest = peaks[np.argsort(y[peaks])][::-1]
+            else:
+                highest = peaks
+            rem = np.ones(y.size, dtype=bool)
+            rem[peaks] = False
+
+            for peak in highest:
+                if not rem[peak]:
+                    sl = slice(max(0, peak - min_dist), peak + min_dist + 1)
+                    rem[sl] = True
+                    rem[peak] = False
+
+            peaks = np.arange(y.size)[~rem]
+            crossIdx = crossIdx[peaks]
+            crossMask = crossMask.iloc[peaks]
     return crossIdx, crossMask
 
 def findTrains(dataSeries, peakIdx, iti, fs, minTrainLength, maxDistance = 1.5, maxTrain = False):
@@ -3706,7 +3907,6 @@ def getAllUnits(spikes):
 
 def memory_usage_psutil():
     # return the memory usage in MB
-    import psutil
     process = psutil.Process(os.getpid())
     mem = process.memory_info()[0] / float(2 ** 20)
     return mem
