@@ -131,6 +131,7 @@ def spikeTrainsToSpikeDict(spiketrains):
             spikes['Classification'][idx] = classVals
     return spikes
 
+
 def analogSignalsToDataFrame(analogsignals, idxT='t'):
     asigList = []
     for asig in analogsignals:
@@ -221,18 +222,25 @@ def eventDataFrameToEvents(
         eventList.append(event)
     return eventList
 
+
 def eventsToDataFrame(
-        events, idxT='t'
+        events, idxT='t', names=None
         ):
     eventDict = {}
     
     for event in events:
+        if names is not None:
+            if event.name not in names:
+                continue
         if len(event.times):
             #  print(event.name)
             values = event.array_annotations['labels']
             if isinstance(values[0], bytes):
                 #  event came from hdf, need to recover dtype
-                originalDType = eval('np.' + event.annotations['originalDType'])
+                dtypeStr = event.annotations['originalDType'].split(';')[-1]
+                if 'np.' not in dtypeStr:
+                    dtypeStr = 'np.' + dtypeStr
+                originalDType = eval(dtypeStr)
                 values = np.array(values, dtype=originalDType)
             #  print(values.dtype)
             eventDict.update({
@@ -240,62 +248,50 @@ def eventsToDataFrame(
     eventDict.update({idxT: pd.Series(event.times.magnitude)})
     return pd.concat(eventDict, axis=1)
 
-def unpackAnalysisBlock(block, interpolateToTimeSeries=False):
-    tdAsig = block.filter(
-        objects=AnalogSignal
-        )
-    tdDF = analogSignalsToDataFrame(tdAsig)
+
+def unpackAnalysisBlock(
+        block, interpolateToTimeSeries=False,
+        binnedSpikePath=None):
     
-    insProp = block.filter(
-        objects=Event,
-        name='ins_property'
-        )[0]
-    insVal = block.filter(
-        objects=Event,
-        name='ins_value'
-        )[0]
+    tdDFList = []
+    for seg in block.segments:
+        tdAsig = seg.filter(
+            objects=AnalogSignal
+            )
+        tdDFList.append(analogSignalsToDataFrame(tdAsig))
+    tdDF = pd.concat(tdDFList)
+    if binnedSpikePath is not None:
+        reader = neo.io.nixio_fr.NixIO(
+            filename=binnedSpikePath)
+        tStart = reader.get_signal_t_start(
+            block_index=0, seg_index=0)
+        fs = reader.get_signal_sampling_rate()
+        sigSize = reader.get_signal_size(
+            block_index=0, seg_index=0)
+        newX = np.arange(tStart, sigSize / fs, 1 / fs)
 
-    insEvDF = eventsToDataFrame(
-        [insProp, insVal], idxT='t'
-        )
-    rigEvDF = eventsToDataFrame(
-        block.filter(
-            objects=Event,
-            name='Label'), idxT='t')
-
-    moveOnMask = rigEvDF['Label'] == 'Movement Onset'
-    moveOffMask = rigEvDF['Label'] == 'Movement Offset'
-    moveMask = moveOnMask | moveOffMask
-    moveEvents = pd.DataFrame(
-        rigEvDF.loc[moveMask, ['Label', 't']],
-        columns=['Label', 't'])
-    moveEvents['ins_property'] = 'movement'
-    moveEvents['ins_value'] = (
-        moveEvents['Label'] == 'Movement Onset').astype(np.float32)
-    moveEvents.drop(columns=['Label'], inplace=True)
-    moveEvents.rename(
-        columns={
-            'rig_property': 'ins_property',
-            'rig_value': 'ins_value'},
-        inplace=True)
+        tdDF = hf.interpolateDF(
+            tdDF, newX, kind='linear',
+            x='t')
     #  TODO use epochs for amplitude and movement!
-    stimStSer = pd.concat(
-        (insEvDF, moveEvents),
-        axis=0, ignore_index=True
-        ).sort_values('t').reset_index(drop=True)
-    #  pdb.set_trace()
+    stimStSer = eventsToDataFrame(
+        block.segments[0].events, idxT='t',
+        names=['property', 'value']
+        )
     #  serialize stimStatus
     expandCols = [
         'RateInHz', 'therapyStatus',
         'activeGroup', 'program', 'trialSegment', 'movement']
-    deriveCols = ['amplitudeRound', 'movementRound']
+    deriveCols = ['amplitudeRound', 'movementRound', 'amplitude']
     progAmpNames = rcsa_helpers.progAmpNames
     stimStatus = hf.stimStatusSerialtoLong(
-        stimStSer, idxT='t', expandCols=expandCols,
+        stimStSer, idxT='t', namePrefix='', expandCols=expandCols,
         deriveCols=deriveCols, progAmpNames=progAmpNames)
     #  add stim info to traces
-    #  pdb.set_trace()
-
+    debugPlot = False
+    if debugPlot:
+        stimStatus.loc[:, ['program'] + progAmpNames].plot()
+        plt.show()
     if interpolateToTimeSeries:
         columnsToBeAdded = (
             expandCols + deriveCols + progAmpNames)
@@ -308,7 +304,83 @@ def unpackAnalysisBlock(block, interpolateToTimeSeries=False):
             tdDF,
             infoFromStimStatus.drop(columns='t')),
             axis=1)
+        #  tdDF.loc[3e5:4e5, ['program', 'amplitude']].plot(); plt.show()
     return tdDF, stimStatus
+
+
+def loadSpikeMats(
+        dataPath, rasterOpts,
+        alignTimes, chans=None,
+        absoluteBins=False, transposeSpikeMat=False):
+    reader = neo.io.nixio_fr.NixIO(filename=dataPath)
+
+    chanNames = reader.header['signal_channels']['name']
+    if chans is not None:
+        sigMask = np.isin(chanNames, chans)
+        chanNames = chanNames[sigMask]
+    chanIdx = reader.channel_name_to_index(chanNames)
+    tStart = reader.get_signal_t_start(
+        block_index=0, seg_index=0)
+    fs = reader.get_signal_sampling_rate(
+        channel_indexes=chanIdx
+        )
+    tStop = reader.get_signal_size(
+        block_index=0, seg_index=0
+        ) / fs + tStart
+    # convert to indices early to avoid floating point problems
+    winStartIdx = int(round(rasterOpts['windowSize'][0] * fs))
+    winStopIdx = int(round(rasterOpts['windowSize'][1] * fs))
+    
+    intervalIdx = int(round(rasterOpts['binInterval'] * fs))
+    halfIntervalIdx = int(round(intervalIdx / 2))
+    
+    widthIdx = int(round(rasterOpts['binWidth'] * fs))
+    halfWidthIdx = int(round(widthIdx / 2))
+    
+    theBins = None
+
+    spikeMats = {i: None for i in alignTimes.index}
+    validTrials = pd.Series(True, index=alignTimes.index)
+    for idx, tOnset in alignTimes.iteritems():
+        
+        idxOnset = round(tOnset * fs)
+        if (tStart * fs) > (idxOnset + winStartIdx - halfWidthIdx):
+            #  near the first edge
+            validTrials[idx] = False
+        elif (tStop * fs) < (idxOnset + winStopIdx + halfWidthIdx):
+            # near the ending edge
+            validTrials[idx] = False
+        else:
+            iStart = int(round(idxOnset + winStartIdx - halfWidthIdx))
+            iStop = int(round(idxOnset + winStopIdx + halfWidthIdx))
+            
+            rawSpikeMat = pd.DataFrame(
+                reader.get_analogsignal_chunk(
+                    block_index=0, seg_index=0,
+                    i_start=iStart, i_stop=iStop,
+                    channel_names=chanNames))
+            procSpikeMat = rawSpikeMat.rolling(
+                window=widthIdx, center=True
+                ).sum().dropna().iloc[::intervalIdx, :]
+                
+            procSpikeMat.columns = chanNames
+            procSpikeMat.columns.name = 'unit'
+            if theBins is None:
+                theBins = np.array(
+                    procSpikeMat.index -
+                    halfWidthIdx + winStartIdx) / fs
+            if absoluteBins:
+                procSpikeMat.index = theBins + idxOnset / fs
+            else:
+                procSpikeMat.index = theBins
+            procSpikeMat.index.name = 'bin'
+            #  convert to Hz
+            spikeMats[idx] = procSpikeMat / rasterOpts['binWidth']
+            if transposeSpikeMat:
+                spikeMats[idx] = spikeMats[idx].transpose()
+        #  plt.imshow(rawSpikeMat.values, aspect='equal'); plt.show()
+    return spikeMats, validTrials
+
 
 def findSegsIncluding(block, timeSlice=None):
     segBoundsList = []
@@ -625,6 +697,8 @@ def blockToNix(
                         time_slice=(tStart, tStop),
                         magnitude_mode='rescaled',
                         load_waveforms=True)
+                    st.annotate(fromNSP=True)
+                    #  !!! TODO, mark by origin (utah, nForm, ainp)
                     #  link SpikeTrain and ID providing unit
                     st.unit = unit
                     # assign ownership to containers
@@ -800,17 +874,17 @@ def addBlockToNIX(
         alreadyWrittenSpikeTrainNames = []
         for st in newBlock.segments[segIdx].spiketrains:
             #  pdb.set_trace()
-            if st.name not in alreadyWrittenSpikeTrainNames:
-                alreadyWrittenSpikeTrainNames.append(st.name)
-                st = writer._write_spiketrain(st, nixblock, nixgroup)
+            #  if st.name not in alreadyWrittenSpikeTrainNames:
+            alreadyWrittenSpikeTrainNames.append(st.name)
+            st = writer._write_spiketrain(st, nixblock, nixgroup)
             #  print('already wrote {}'.format(alreadyWrittenSpikeTrainNames))
     
     alreadyWrittenChanNames = []
     for chanIdx in newBlock.channel_indexes:
-        if chanIdx.name not in alreadyWrittenChanNames:
-            chanIdx = writer._write_channelindex(chanIdx, nixblock)
-            alreadyWrittenChanNames.append(chanIdx.name)
-            #  print('already wrote {}'.format(alreadyWrittenChanNames))
+        #  if chanIdx.name not in alreadyWrittenChanNames:
+        chanIdx = writer._write_channelindex(chanIdx, nixblock)
+        alreadyWrittenChanNames.append(chanIdx.name)
+        #  print('already wrote {}'.format(alreadyWrittenChanNames))
         #  auto descends into units inside of _write_channelindex
     writer._create_source_links(newBlock, nixblock)
     writer.close()
@@ -823,7 +897,7 @@ def preproc(
         fillOverflow=True, removeJumps=True,
         eventInfo=None,
         pruneOutUnits=True,
-        chunkSize=1800,
+        chunkSize=1800, writeMode='rw',
         signal_group_mode='split-all', trialInfo=None
         ):
 
@@ -836,7 +910,8 @@ def preproc(
     metadata = reader.header
     
     #  instantiate writer
-    writer = neo.io.NixIO(filename=trialBasePath + '.nix')
+    writer = neo.io.NixIO(
+        filename=trialBasePath + '.nix', mode=writeMode)
     #  absolute section index
     idx = 0
     for blkIdx in range(metadata['nb_block']):
@@ -863,14 +938,39 @@ def calcSpikeMatsAndSave(block):
     return block
 
 def purgeNixAnn(block):
-
     block.annotations.pop('nix_name', None)
     block.annotations.pop('neo_name', None)
     for child in block.children_recur:
-        child.annotations.pop('nix_name', None)
-        child.annotations.pop('neo_name', None)
+        if child.annotations:
+            child.annotations = {
+                k: v for
+                k, v in child.annotations.items() if k not in [
+                    'nix_name', 'neo_name']}
     for child in block.data_children_recur:
-        child.annotations.pop('nix_name', None)
-        child.annotations.pop('neo_name', None)
+        if child.annotations:
+            child.annotations = {
+                k: v for
+                k, v in child.annotations.items() if k not in [
+                    'nix_name', 'neo_name']}
+    return block
 
+
+def loadWithArrayAnn(dataPath, fromRaw=False):
+    if fromRaw:
+        reader = neo.io.nixio_fr.NixIO(filename=dataPath)
+    else:
+        reader = neo.io.NixIO(filename=dataPath)
+    block = reader.read_block()
+    block.create_relationship()  # need this!
+    
+    if fromRaw:
+        reader.file.close()
+    else:
+        reader.close()
+
+    for st in block.filter(objects=SpikeTrain):
+        if 'arrayAnnNames' in st.annotations.keys():
+            for key in st.annotations['arrayAnnNames']:
+                #  fromRaw, the ann come back as tuple, need to recast
+                st.array_annotations.update({key: np.array(st.annotations[key])})
     return block

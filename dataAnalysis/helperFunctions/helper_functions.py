@@ -23,7 +23,9 @@ import math as m
 import tables as pt
 import seaborn as sns
 import rcsanalysis.packet_func as rcsa_helpers
-from neo import Unit, AnalogSignal, Event, Block, Segment, ChannelIndex
+from neo import (
+    Unit, AnalogSignal, Event, Epoch,
+    Block, Segment, ChannelIndex, SpikeTrain)
 from neo.io.proxyobjects import (
     AnalogSignalProxy, SpikeTrainProxy, EventProxy) 
 
@@ -168,7 +170,9 @@ def interpolateDF(
     else:
         oldX = np.array(df[x])
         if columns is None:
-            columns = df.columns[~df.columns.isin([x])]
+            columns = list(
+                df.columns[~df.columns.isin([x])])
+
         outputDF = pd.DataFrame(columns=columns+[x])
         outputDF[x] = newX
     
@@ -855,12 +859,24 @@ def synchronizeINStoNSP(
     return td, accel, insBlock, timeInterpFunINStoNSP
 
 
+def timeOffsetBlock(block, timeOffset, masterTStart):
+    for st in block.filter(objects=SpikeTrain):
+        st.magnitude[:] = st.times.magnitude + timeOffset.magnitude
+        st.t_start = masterTStart
+        st.t_stop += timeOffset
+    for asig in block.filter(objects=AnalogSignal):
+        asig.t_start += timeOffset
+    for event in block.filter(objects=Event):
+        event.magnitude[:] = event.magnitude + timeOffset.magnitude
+    for epoch in block.filter(objects=Epoch):
+        epoch.magnitude[:] = epoch.magnitude + timeOffset.magnitude
+    return block
+
 def blockUniqueUnits(block):
 
     return
 
 def loadBlockProxyObjects(block):
-    #  !! Probably doesn't work
     #  prune out spike placeholders
     #  (will get added back)
     for metaIdx, chanIdx in enumerate(block.channel_indexes):
@@ -878,7 +894,14 @@ def loadBlockProxyObjects(block):
         seg.spiketrains = []
         for stProxy in stProxyList:
             unit = stProxy.unit
-            st = stProxy.load(load_waveforms=True)
+            try:
+                st = stProxy.load(load_waveforms=False)
+                st.left_sweep = None
+                #  seems like writing ins data breaks the
+                #  waveforms. oh well, turning it off for now
+            except Exception:
+                #  traceback.print_exc()
+                st = stProxy.load(load_waveforms=False)
             #  link SpikeTrain and ID providing unit
             st.unit = unit
             # assign ownership to containers
@@ -896,17 +919,14 @@ def loadBlockProxyObjects(block):
             chanIdx.analogsignals.append(asig)
             seg.analogsignals.append(asig)
         
-        #  evProxyList = seg.events
-        #  seg.events = []
-        #  for eventProxy in evProxyList:
-        #      event = eventProxy.load()
-        #      event.segment = seg
-        #      seg.events.append(event)
+        seg.events = [i.load() for i in seg.events]
+        seg.epochs = [i.load() for i in seg.epochs]
     block.create_relationship()
     return block
     
 def extractSignalsFromBlock(
-        block, keepSpikes=True, keepEvents=True, keepSignals=[]):
+        block, keepSpikes=True,
+        keepEvents=True, keepSignals=[]):
     newBlock = Block()
     newBlock.merge_annotations(block)
     for idx, seg in enumerate(block.segments):
@@ -1058,7 +1078,7 @@ def getINSStimLogFromJson(
 
 
 def stimStatusSerialtoLong(
-        stimStSer, idxT='t', expandCols=[],
+        stimStSer, idxT='t', namePrefix='ins_', expandCols=[],
         deriveCols=[], progAmpNames=[], dropDuplicates=True):
     
     #  pdb.set_trace()
@@ -1074,26 +1094,31 @@ def stimStatusSerialtoLong(
     for pName in expandCols:
         #  print(pName)
         stimStLong[pName] = np.nan
-        pMask = stimStSer['ins_property'] == pName
-        pValues = stimStSer.loc[pMask, 'ins_value']
+        pMask = stimStSer[namePrefix + 'property'] == pName
+        pValues = stimStSer.loc[pMask, namePrefix + 'value']
         stimStLong.loc[pMask, pName] = pValues
         stimStLong[pName].fillna(
             method='ffill', inplace=True)
-        #  stimStLong[pName].fillna(
-        #      method='bfill', inplace=True)
+        stimStLong[pName].fillna(
+            method='bfill', inplace=True)
 
     debugPlot = False
+    if debugPlot:
+        stimCat = pd.concat((stimStLong, stimStSer), axis=1)
     for idx, pName in enumerate(progAmpNames):
         stimStLong[pName] = np.nan
-        pMask = (stimStSer['ins_property'] == 'amplitude') & (
+        pMask = (stimStSer[namePrefix + 'property'] == 'amplitude') & (
             stimStLong['program'] == idx)
-        stimStLong.loc[pMask, pName] = stimStSer.loc[pMask, 'ins_value']
+        stimStLong.loc[pMask, pName] = stimStSer.loc[pMask, namePrefix + 'value']
         stimStLong[pName].fillna(method='ffill', inplace=True)
-        #  stimStLong[pName].fillna(method='bfill', inplace=True)
+        stimStLong[pName].fillna(method='bfill', inplace=True)
 
     if dropDuplicates:
         stimStLong.drop_duplicates(subset=idxT, keep='last', inplace=True)
     
+    if debugPlot:
+        stimStLong.loc[:, ['program'] + progAmpNames].plot()
+        plt.show()
     ampIncrease = pd.Series(False, index=stimStLong.index)
     ampChange = pd.Series(False, index=stimStLong.index)
     for idx, pName in enumerate(progAmpNames):
@@ -1103,6 +1128,9 @@ def stimStatusSerialtoLong(
             plt.plot(stimStLong[pName].diff().fillna(0), label=pName)
     
     if debugPlot:
+        stimStLong.loc[:, ['program'] + progAmpNames].plot()
+        ampIncrease.astype(float).plot(style='ro')
+        ampChange.astype(float).plot(style='go')
         plt.legend()
         plt.show()
 
@@ -1111,10 +1139,13 @@ def stimStatusSerialtoLong(
             ampIncrease.astype(np.float).cumsum())
     if 'movementRound' in deriveCols:
         stimStLong['movementRound'] = (
-            stimStLong['movement'].cumsum())
-    #  pdb.set_trace()
+            stimStLong['movement'].abs().cumsum())
+    if 'amplitude' in deriveCols:
+        stimStLong['amplitude'] = (
+            stimStLong[progAmpNames].sum(axis=1))
     if debugPlot:
-        stimStLong.drop(columns=[idxT]).plot()
+        stimStLong.loc[:, ['program'] + progAmpNames].plot()
+        (10 * stimStLong['amplitudeRound'] / (stimStLong['amplitudeRound'].max())).plot()
         plt.show()
     return stimStLong
 
@@ -2468,7 +2499,7 @@ def binnedEvents(timeStamps, chans,
         except Exception:
             traceback.print_exc()
             pdb.set_trace()
-
+            
     spikeMatDF = pd.DataFrame(spikeMat.transpose(), index = chans, columns = binCenters)
     return spikeMatDF, binCenters, binLeftEdges
 
@@ -2622,7 +2653,7 @@ def binnedArray(spikes, rasterOpts, timeStart, chans = None):
             idx = spikes['ChannelID'].index(channel)
             unitsOnThisChan = np.unique(spikes['Classification'][idx])
 
-            if unitsOnThisChan.any():
+            if len(unitsOnThisChan):
                 for unitName in unitsOnThisChan:
                     unitMask = spikes['Classification'][idx] == unitName
                     timeStamps.append(spikes['TimeStamps'][idx][unitMask])
@@ -2701,8 +2732,8 @@ def binnedSpikes(spikes, binInterval, binWidth, timeStart, timeEnd,
 
     return spikeMat, binCenters, binLeftEdges
 
-def plotBinnedSpikes(spikeMat, show = True, normalizationType = 'linear',
-    zAxis = None, ax = None, labelTxt = 'Spk/s'):
+def plotBinnedSpikes(spikeMat, show=True, normalizationType='linear',
+    zAxis=None, ax=None, labelTxt='Spk/s'):
 
     if ax is None:
         fi, ax = plt.subplots()
@@ -2728,7 +2759,7 @@ def plotBinnedSpikes(spikeMat, show = True, normalizationType = 'linear',
     #fi, ax = plt.subplots()
     cbar_kws = {'label' : labelTxt}
     axPos = ax.get_position()
-    cbAxPos = [axPos.x0 + axPos.width - 0.075, axPos.y0,
+    cbAxPos = [axPos.x0 + axPos.width * 1.05, axPos.y0,
         axPos.width / 50, axPos.height]
     cbAx = fi.add_axes(cbAxPos)
     #ax = sns.heatmap(spikeMat, ax = ax, robust = False,
@@ -2744,9 +2775,9 @@ def plotBinnedSpikes(spikeMat, show = True, normalizationType = 'linear',
     cbar.set_label(labelTxt)
     labelFontSize = LABELFONTSIZE
     ax.set_xlabel('Time (s)', fontsize = labelFontSize,
-        labelpad = - 3 * labelFontSize)
+        labelpad = 3 * labelFontSize)
     ax.set_ylabel("Unit (#)", fontsize = labelFontSize,
-        labelpad = - 3 * labelFontSize)
+        labelpad = 3 * labelFontSize)
     #plt.show()
 
     ax.tick_params(left=False, top=False, right=False, bottom=False,

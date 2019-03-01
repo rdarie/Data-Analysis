@@ -360,7 +360,6 @@ def getTrials(motorData, trialType='2AFC'):
     return trialStats, trialEvents
 
 def getTrialsNew(motorData, fs, tStart, trialType = '2AFC'):
-    
     trialEvents = pd.DataFrame(index = [], columns = ['idx', 'Label', 'Details'])
     trialEvents = {
         'Time':[],
@@ -409,35 +408,33 @@ def getTrialsNew(motorData, fs, tStart, trialType = '2AFC'):
         #  plt.plot(tdSeries.index / fs, detectSignal)
         #  plt.plot(peakIdx / fs, detectSignal.loc[peakIdx]**0, 'ro'); plt.show()
     
-    vCat = motorData.loc[:, 'velocityCat'].astype(float)
-    # vCat = motorData.loc[:, 'position'].astype(float)
+    vCat = motorData.loc[:, 'velocityCat'].astype(float) - 1
 
     detectSignal = vCat.diff().fillna(0)
     minDist = 50e-3  # msec debounce
     peakIdx = peakutils.indexes(
         detectSignal.abs().values, thres=0.5,
         min_dist=int(fs*minDist),
-        thres_abs=True, keep_max = True)[1:]
-    peakIdx = detectSignal.index[peakIdx]
+        thres_abs=True, keep_max = False)
+    #  first pedal movement just gets it into position, discard,
+    #  then return to indexes into the dataframe
+    peakIdx = detectSignal.index[peakIdx[2:]]
     
-    onPeakIdx = peakIdx[::2]
-    offPeakIdx = peakIdx[1::2]
-    for thisIdx in onPeakIdx:
+    #  avoid bounce by looking into the future of vCat
+    futureOffset = int(minDist * fs)
+    for thisIdx in peakIdx:
         trialEvents['Time'].append(thisIdx / fs + tStart)
         trialEvents['Label'].append('movement')
-        trialEvents['Details'].append(1)
-    for thisIdx in offPeakIdx:
-        trialEvents['Time'].append(thisIdx / fs + tStart)
-        trialEvents['Label'].append('movement')
-        trialEvents['Details'].append(0)
+        trialEvents['Details'].append(vCat[thisIdx + futureOffset])
+    #  plt.plot(vCat[peakIdx + futureOffset].values, '-o'); plt.show()
     #  thisT = vCat.index / fs
-    #  tMask = (thisT > 200) & (thisT < 300)
+    #  tMask = (thisT > 100) & (thisT < 300)
     #  plt.plot(thisT[tMask], mPos.loc[tMask])
     #  plt.plot(peakIdx / fs, mPos.loc[peakIdx], 'bo')
     #  plt.plot(onPeakIdx / fs, mPos.loc[onPeakIdx], 'go')
     #  plt.plot(offPeakIdx / fs, mPos.loc[offPeakIdx], 'ro'); plt.show()
-    #  plt.plot(thisT, vCat)
-    #  plt.plot(onPeakIdx / fs, vCat.loc[onPeakIdx]**0-1, 'ro'); plt.show()
+    #  plt.plot(thisT[tMask], vCat[tMask])
+    #  plt.plot(onPeakIdx / fs, vCat.loc[onPeakIdx], 'ro'); plt.show()
     #  plt.plot(vCat.index / fs, detectSignal)
     #  plt.plot(onPeakIdx / fs, detectSignal.loc[onPeakIdx], 'go')
     #  plt.plot(offPeakIdx / fs, detectSignal.loc[offPeakIdx]**0-1, 'ro'); plt.show()
@@ -445,7 +442,6 @@ def getTrialsNew(motorData, fs, tStart, trialType = '2AFC'):
     trialEvents = pd.DataFrame(trialEvents)
     trialEvents.sort_values('Time', inplace = True)
     trialEvents.reset_index(drop=True, inplace = True)
-    #  pdb.set_trace()
     if trialType == '2AFC':
         #  !!!! TODO: changes to how we calculate movement break this, because we now track
         #  move on and move off 4 times a trial (to and back)

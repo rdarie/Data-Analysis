@@ -262,7 +262,7 @@ def preprocINS(
     insDataFilename = os.path.join(
         orcaExpPath, trialFilesStim['ns5FileName'] + '_ins.nix')
 
-    writer = neo.io.NixIO(filename=insDataFilename)
+    writer = neo.io.NixIO(filename=insDataFilename, mode='ow')
     writer.write_block(block)
     writer.close()
     return block
@@ -581,8 +581,8 @@ def getINSStimOnset(
                 tdDF.loc[plotMaskTD, 'amplitudeIncrease'],
                 'c--', label='amplitudeIncrease', lw = 1.5)
             
-            ax[2].legend(loc = 'upper left')    
-            statusAx.legend(loc = 'upper right')
+            ax[2].legend(loc='upper left')    
+            statusAx.legend(loc='upper right')
             ax[2].set_ylabel('Stim Amplitude (mA)')
             ax[2].set_xlabel('NSP Time (sec)')
             plt.suptitle('Stim State')
