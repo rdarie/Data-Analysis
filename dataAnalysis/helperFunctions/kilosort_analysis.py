@@ -2525,11 +2525,14 @@ def cmpToDF(arrayFilePath):
     cmpDF.dropna(inplace = True)
     return cmpDF
 
-def cmpDFToPrb(cmpDF, filePath=None, names=None):
+def cmpDFToPrb(cmpDF, filePath=None, names=None, banks=None):
     if names is not None:
         keepMask = cmpDF['elecName'].isin(names)
         cmpDF = cmpDF.loc[keepMask, :]
-    
+    if banks is not None:
+        keepMask = cmpDF['bank'].isin(banks)
+        cmpDF = cmpDF.loc[keepMask, :]
+
     cmpDF.reset_index(inplace=True, drop=True)
     prbDict = {}
     for idx, (name, group) in enumerate(cmpDF.groupby('elecName')):

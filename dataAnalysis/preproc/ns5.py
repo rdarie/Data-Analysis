@@ -20,7 +20,7 @@ from brPY.brpylib import NsxFile, NevFile, brpylib_ver
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import sys, os
+import sys, os, gc
 import pickle
 from copy import *
 import traceback
@@ -132,11 +132,15 @@ def spikeTrainsToSpikeDict(spiketrains):
     return spikes
 
 
-def analogSignalsToDataFrame(analogsignals, idxT='t'):
+def analogSignalsToDataFrame(
+        analogsignals, idxT='t', useChanNames=False):
     asigList = []
     for asig in analogsignals:
         if asig.shape[1] == 1:
-            colNames = [asig.name]
+            if useChanNames:
+                colNames = [asig.channel_index.name]
+            else:
+                colNames = [asig.name]
         else:
             colNames = [
                 asig.name +
@@ -258,31 +262,36 @@ def unpackAnalysisBlock(
         tdAsig = seg.filter(
             objects=AnalogSignal
             )
-        tdDFList.append(analogSignalsToDataFrame(tdAsig))
-    tdDF = pd.concat(tdDFList)
+        tdDFList.append(
+            analogSignalsToDataFrame(tdAsig, useChanNames=True))
+    tdDF = pd.concat(tdDFList, ignore_index=True, sort=True)
+    
     if binnedSpikePath is not None:
         reader = neo.io.nixio_fr.NixIO(
             filename=binnedSpikePath)
-        tStart = reader.get_signal_t_start(
-            block_index=0, seg_index=0)
-        fs = reader.get_signal_sampling_rate()
-        sigSize = reader.get_signal_size(
-            block_index=0, seg_index=0)
-        newX = np.arange(tStart, sigSize / fs, 1 / fs)
+        dummyBlock = reader.read_block(
+            block_index=0, lazy=True)
+        tStart = dummyBlock.segments[0].analogsignals[0].t_start
+        fs = dummyBlock.segments[0].analogsignals[0].sampling_rate
+        tStop = dummyBlock.segments[-1].analogsignals[0].t_stop
+        newX = np.arange(tStart, tStop, 1 / fs)
 
         tdDF = hf.interpolateDF(
             tdDF, newX, kind='linear',
             x='t')
     #  TODO use epochs for amplitude and movement!
-    stimStSer = eventsToDataFrame(
-        block.segments[0].events, idxT='t',
-        names=['property', 'value']
-        )
+    stimStSerList = []
+    for seg in block.segments:
+        stimStSerList.append(eventsToDataFrame(
+            seg.events, idxT='t',
+            names=['property', 'value']
+            ))
+    stimStSer = pd.concat(stimStSerList, ignore_index=True, sort=True)        
     #  serialize stimStatus
     expandCols = [
         'RateInHz', 'therapyStatus',
-        'activeGroup', 'program', 'trialSegment', 'movement']
-    deriveCols = ['amplitudeRound', 'movementRound', 'amplitude']
+        'activeGroup', 'trialSegment', 'movement']
+    deriveCols = ['amplitudeRound', 'movementRound']
     progAmpNames = rcsa_helpers.progAmpNames
     stimStatus = hf.stimStatusSerialtoLong(
         stimStSer, idxT='t', namePrefix='', expandCols=expandCols,
@@ -319,66 +328,75 @@ def loadSpikeMats(
         sigMask = np.isin(chanNames, chans)
         chanNames = chanNames[sigMask]
     chanIdx = reader.channel_name_to_index(chanNames)
-    tStart = reader.get_signal_t_start(
-        block_index=0, seg_index=0)
-    fs = reader.get_signal_sampling_rate(
-        channel_indexes=chanIdx
-        )
-    tStop = reader.get_signal_size(
-        block_index=0, seg_index=0
-        ) / fs + tStart
-    # convert to indices early to avoid floating point problems
-    winStartIdx = int(round(rasterOpts['windowSize'][0] * fs))
-    winStopIdx = int(round(rasterOpts['windowSize'][1] * fs))
     
-    intervalIdx = int(round(rasterOpts['binInterval'] * fs))
-    halfIntervalIdx = int(round(intervalIdx / 2))
-    
-    widthIdx = int(round(rasterOpts['binWidth'] * fs))
-    halfWidthIdx = int(round(widthIdx / 2))
-    
-    theBins = None
 
     spikeMats = {i: None for i in alignTimes.index}
     validTrials = pd.Series(True, index=alignTimes.index)
-    for idx, tOnset in alignTimes.iteritems():
+    
+    segOffset = 0
+    for segIdx in range(reader.segment_count(block_index=0)):
+        tStart = reader.get_signal_t_start(
+            block_index=0, seg_index=segIdx)
+        fs = reader.get_signal_sampling_rate(
+            channel_indexes=chanIdx
+            )
+        sigSize = reader.get_signal_size(
+            block_index=0, seg_index=segIdx
+            )
+        tStop = sigSize / fs + tStart
+        # convert to indices early to avoid floating point problems
+        winStartIdx = int(round(rasterOpts['windowSize'][0] * fs))
+        winStopIdx = int(round(rasterOpts['windowSize'][1] * fs))
         
-        idxOnset = round(tOnset * fs)
-        if (tStart * fs) > (idxOnset + winStartIdx - halfWidthIdx):
-            #  near the first edge
-            validTrials[idx] = False
-        elif (tStop * fs) < (idxOnset + winStopIdx + halfWidthIdx):
-            # near the ending edge
-            validTrials[idx] = False
-        else:
-            iStart = int(round(idxOnset + winStartIdx - halfWidthIdx))
-            iStop = int(round(idxOnset + winStopIdx + halfWidthIdx))
-            
-            rawSpikeMat = pd.DataFrame(
-                reader.get_analogsignal_chunk(
-                    block_index=0, seg_index=0,
-                    i_start=iStart, i_stop=iStop,
-                    channel_names=chanNames))
-            procSpikeMat = rawSpikeMat.rolling(
-                window=widthIdx, center=True
-                ).sum().dropna().iloc[::intervalIdx, :]
-                
-            procSpikeMat.columns = chanNames
-            procSpikeMat.columns.name = 'unit'
-            if theBins is None:
-                theBins = np.array(
-                    procSpikeMat.index -
-                    halfWidthIdx + winStartIdx) / fs
-            if absoluteBins:
-                procSpikeMat.index = theBins + idxOnset / fs
+        intervalIdx = int(round(rasterOpts['binInterval'] * fs))
+        halfIntervalIdx = int(round(intervalIdx / 2))
+        
+        widthIdx = int(round(rasterOpts['binWidth'] * fs))
+        halfWidthIdx = int(round(widthIdx / 2))
+        
+        theBins = None
+        timeMask = (alignTimes > tStart) & (alignTimes < tStop)
+        maskedTimes = alignTimes[timeMask]
+        #  pdb.set_trace()
+        for idx, tOnset in maskedTimes.iteritems():
+            idxOnset = round((tOnset - tStart) * fs)
+            if 0 > (idxOnset + winStartIdx - halfWidthIdx):
+                #  near the first edge
+                validTrials[idx] = False
+            elif (sigSize < (
+                    idxOnset + winStopIdx + halfWidthIdx)):
+                # near the ending edge
+                validTrials[idx] = False
             else:
-                procSpikeMat.index = theBins
-            procSpikeMat.index.name = 'bin'
-            #  convert to Hz
-            spikeMats[idx] = procSpikeMat / rasterOpts['binWidth']
-            if transposeSpikeMat:
-                spikeMats[idx] = spikeMats[idx].transpose()
-        #  plt.imshow(rawSpikeMat.values, aspect='equal'); plt.show()
+                iStart = int(round(idxOnset + winStartIdx - halfWidthIdx))
+                iStop = int(round(idxOnset + winStopIdx + halfWidthIdx))
+                
+                rawSpikeMat = pd.DataFrame(
+                    reader.get_analogsignal_chunk(
+                        block_index=0, seg_index=segIdx,
+                        i_start=iStart, i_stop=iStop,
+                        channel_names=chanNames))
+                #  print(rawSpikeMat.sum().sum())
+                procSpikeMat = rawSpikeMat.rolling(
+                    window=widthIdx, center=True
+                    ).sum().dropna().iloc[::intervalIdx, :]
+                    
+                procSpikeMat.columns = chanNames
+                procSpikeMat.columns.name = 'unit'
+                if theBins is None:
+                    theBins = np.array(
+                        procSpikeMat.index -
+                        halfWidthIdx + winStartIdx) / fs
+                if absoluteBins:
+                    procSpikeMat.index = theBins + idxOnset / fs
+                else:
+                    procSpikeMat.index = theBins
+                procSpikeMat.index.name = 'bin'
+                #  convert to Hz
+                spikeMats[idx] = procSpikeMat / rasterOpts['binWidth']
+                if transposeSpikeMat:
+                    spikeMats[idx] = spikeMats[idx].transpose()
+            #  plt.imshow(rawSpikeMat.values, aspect='equal'); plt.show()
     return spikeMats, validTrials
 
 
@@ -518,6 +536,10 @@ def getNIXData(
         'data': data,
         't': data['t']
         }
+    
+    #  for stp in block.filter(objects=SpikeTrainProxy):
+    #      print('original tstart: '.format(stp.t_start))
+    #      print('original tstop: '.format(stp.t_stop))
     if closeReader:
         reader.file.close()
         block = None
@@ -622,8 +644,10 @@ def blockToNix(
                     analogData.append(
                         pd.DataFrame(ainpData.magnitude, columns=[key]))
                     del ainpData
+                    gc.collect()
                 motorData = pd.concat(analogData, axis=1)
                 del analogData
+                gc.collect()
                 motorData = mea.processMotorData(
                     motorData, ainpAsig.sampling_rate.magnitude)
                 plotExample = False
@@ -660,6 +684,7 @@ def blockToNix(
                     motorAsig = writer._write_analogsignal(
                         motorAsig, nixblock, nixgroup)
                     del motorAsig
+                    gc.collect()
                 _, trialEvents = mea.getTrialsNew(
                     motorData, ainpAsig.sampling_rate.magnitude,
                     tStart, trialType=None)
@@ -670,6 +695,7 @@ def blockToNix(
                         'Details': 'rig_value'}, inplace=True)
                 #  pdb.set_trace()
                 del motorData
+                gc.collect()
                 eventList = eventDataFrameToEvents(
                     trialEvents,
                     idxT='Time',
@@ -685,6 +711,7 @@ def blockToNix(
                     # write out to file
                     event = writer._write_event(event, nixblock, nixgroup)
                     del event
+                    gc.collect()
                 del trialEvents, eventList
 
             if not pruneOutUnits:
@@ -749,6 +776,7 @@ def blockToNix(
                 # write out to file
                 asig = writer._write_analogsignal(asig, nixblock, nixgroup)
                 del asig
+                gc.collect()
 
             for irSigIdx, irSigProxy in enumerate(
                     seg.irregularlysampledsignals):
@@ -770,6 +798,7 @@ def blockToNix(
                 isig = writer._write_irregularlysampledsignal(
                     isig, nixblock, nixgroup)
                 del isig
+                gc.collect()
 
             for eventProxy in seg.events:
                 event = eventProxy.load(
@@ -780,6 +809,7 @@ def blockToNix(
                 # write out to file
                 event = writer._write_event(event, nixblock, nixgroup)
                 del event
+                gc.collect()
 
             for epochProxy in seg.epochs:
                 epoch = epochProxy.load(
@@ -790,6 +820,7 @@ def blockToNix(
                 # write out to file
                 epoch = writer._write_epoch(epoch, nixblock, nixgroup)
                 del epoch
+                gc.collect()
 
     # descend into ChannelIndexes
     for chanIdx in block.channel_indexes:
@@ -960,6 +991,7 @@ def loadWithArrayAnn(dataPath, fromRaw=False):
         reader = neo.io.nixio_fr.NixIO(filename=dataPath)
     else:
         reader = neo.io.NixIO(filename=dataPath)
+    #  pdb.set_trace()
     block = reader.read_block()
     block.create_relationship()  # need this!
     

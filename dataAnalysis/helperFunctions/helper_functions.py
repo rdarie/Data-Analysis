@@ -22,6 +22,7 @@ import pandas as pd
 import math as m
 import tables as pt
 import seaborn as sns
+import quantities as pq
 import rcsanalysis.packet_func as rcsa_helpers
 from neo import (
     Unit, AnalogSignal, Event, Epoch,
@@ -160,8 +161,8 @@ def filterDF(
 def interpolateDF(
         df, newX, kind='linear', fill_value='extrapolate',
         x=None, columns=None):
-    #  pdb.set_trace()
-
+    
+    # print('interpolatingDF')
     if x is None:
         oldX = np.array(df.index)
         if columns is None:
@@ -177,9 +178,16 @@ def interpolateDF(
         outputDF[x] = newX
     
     for columnName in columns:
+        if ('time' in columnName) or ('microseconds' in columnName):
+            #  fix for issue where you can't interpolate time with zeros meaningfully.
+            #  Probably better, in the future, to allow for fill value by column
+            useFill = 'extrapolate'
+        else:
+            useFill = fill_value
+
         interpFun = interpolate.interp1d(
             oldX, df[columnName], kind=kind,
-            fill_value=fill_value, bounds_error=False)
+            fill_value=useFill, bounds_error=False)
         outputDF[columnName] = interpFun(newX)
     return outputDF
 
@@ -254,6 +262,8 @@ def getINSTDFromJson(
             tdData['t'] = (
                 tdData['actual_time'] - INSReferenceTime) / (
                     datetime.timedelta(seconds=1))
+                    
+            #pdb.set_trace()
             tdData = tdData.drop_duplicates(
                 ['t']
                 ).sort_values('t').reset_index(drop=True)
@@ -276,7 +286,8 @@ def getINSTDFromJson(
                     datetime.timedelta(seconds=1))
 
                 tdData = interpolateDF(
-                    tdData, uniformT, x='t', columns=channelsPresent)
+                    tdData, uniformT, x='t',
+                    columns=channelsPresent, fill_value=(0, 0))
                 #  interpolating converts to floats, recover
                 tdData['microseconds'] = pd.to_timedelta(
                     tdData['microseconds'], unit='us')
@@ -412,11 +423,10 @@ def getINSAccelFromJson(
             accelData['t'] = (
                 accelData['actual_time'] - INSReferenceTime) / (
                     datetime.timedelta(seconds=1))
-
             accelData = accelData.drop_duplicates(
                 ['t']
                 ).sort_values('t').reset_index(drop=True)
-
+            #pdb.set_trace()
             if getInterpolated:
                 uniformT = np.arange(
                     accelData['t'].iloc[0],
@@ -434,7 +444,8 @@ def getINSAccelFromJson(
                     accelData['time_master'] - pd.Timestamp('2000-03-01')) / (
                     datetime.timedelta(seconds=1))
                 accelData = interpolateDF(
-                    accelData, uniformT, x='t', columns=channelsPresent)
+                    accelData, uniformT, x='t',
+                    columns=channelsPresent, fill_value=(0, 0))
                 #  interpolating converts to floats, recover
                 accelData['microseconds'] = pd.to_timedelta(
                     accelData['microseconds'], unit='us')
@@ -608,8 +619,11 @@ def peekAtTaps(
     for trialSegment in segmentsToPlot:
         #  NSP plotting Bounds
         trialSegment = int(trialSegment)
-        tStartNSP = sessionTapRangesNSP[trialIdx][trialSegment][0]
-        tStopNSP = sessionTapRangesNSP[trialIdx][trialSegment][1]
+        tStartNSP = (
+            sessionTapRangesNSP[trialIdx][trialSegment]['timeRanges'][0])
+        tStopNSP = (
+            sessionTapRangesNSP[trialIdx][trialSegment]['timeRanges'][1])
+        tDiffNSP = tStopNSP - tStartNSP
         #  Set up figures
         fig = plt.figure(tight_layout=True)
         ax = [None for i in range(3)]
@@ -623,6 +637,9 @@ def peekAtTaps(
                     trialIdx][trialSegment]['timeRanges']:
                 tStartINS = max(tStartINS, thisRange[0])
                 tStopINS = min(tStopINS, thisRange[1])
+            #  make it so that the total extent always matches, for easy comparison
+            tDiffINS = max(tStopINS - tStartINS, tDiffNSP)
+            tStopINS = tStartINS + tDiffINS
             ax[2] = fig.add_subplot(313)
         else:
             ax[2] = fig.add_subplot(313, sharex=ax[0])
@@ -639,7 +656,7 @@ def peekAtTaps(
                 accel[insX].loc[plotMask],
                 stats.zscore(accel['data'].loc[plotMask, columnName]),
                 label=columnName)   
-        ax[0].set_title('INS Data')
+        ax[0].set_title('INS Data Segment {}'.format(trialSegment))
         ax[0].set_ylabel('Z Score (a.u.)')
 
         dataColMask = np.array(['ins_td' in i for i in td['data'].columns])
@@ -650,7 +667,6 @@ def peekAtTaps(
                 label=columnName)
         
         ax[1].set_ylabel('Z Score (a.u.)')
-        ax[1].set_xlabel('Time (sec)')
 
         if allTapTimestampsINS is not None:
             if 'accChan' in tapDetectOpts[trialIdx][trialSegment].keys():
@@ -811,16 +827,21 @@ def eventsToDataFrame(
     eventDict.update({idxT: pd.Series(event.times.magnitude)})
     return pd.concat(eventDict, axis=1)
 
+
 def synchronizeINStoNSP(
         tapTimestampsNSP, tapTimestampsINS,
+        NSPTimeRanges=(None, None),
         td=None, accel=None, insBlock=None, trialSegment=None, degree=1
         ):
     # sanity check that the intervals match
     insDiff = tapTimestampsINS.diff().dropna().values
     nspDiff = tapTimestampsNSP.diff().dropna().values
+    print('Trial Segment {}'.format(trialSegment))
     print('On the INS, the diff() between taps was\n{}'.format(insDiff))
     print('On the NSP, the diff() between taps was\n{}'.format(nspDiff))
     print('This amounts to a difference of\n{}'.format(insDiff - nspDiff))
+    if (insDiff - nspDiff > 20e-3).any():
+        raise(Exception('Tap trains too different!'))
     #  pdb.set_trace()
     if degree > 0:
         synchPolyCoeffsINStoNSP = np.polyfit(
@@ -830,26 +851,29 @@ def synchronizeINStoNSP(
         synchPolyCoeffsINStoNSP = np.array([1, np.mean(timeOffset)])
     timeInterpFunINStoNSP = np.poly1d(synchPolyCoeffsINStoNSP)
     if td is not None:
-        td['NSPTime'] = pd.Series(
+        td.loc[:, 'NSPTime'] = pd.Series(
             timeInterpFunINStoNSP(td['t']), index=td['t'].index)
     # accel['originalTime'] = accel['t']
     if accel is not None:
-        accel['NSPTime'] = pd.Series(
+        accel.loc[:, 'NSPTime'] = pd.Series(
             timeInterpFunINStoNSP(accel['t']), index=accel['t'].index)
     if insBlock is not None:
         allUnits = [st.unit for st in insBlock.segments[0].spiketrains]
         for unit in allUnits:
-            if np.any([len(st.times) for st in unit.spiketrains]):
                 for st in unit.spiketrains:
-                    #  pdb.set_trace()
-                    segMask = np.array(
-                        st.annotations['trialSegments'],
-                        dtype=np.int) == trialSegment
-                    st.magnitude[segMask] = (
-                        timeInterpFunINStoNSP(st.times[segMask]))
-                    st.t_start = timeInterpFunINStoNSP(st.t_start)
-                    st.t_stop = timeInterpFunINStoNSP(st.t_stop)
-                    #  pdb.set_trace()
+                    if len(st.times):
+                        segMask = np.array(
+                            st.annotations['trialSegments'],
+                            dtype=np.int) == trialSegment
+                        st.magnitude[segMask] = (
+                            timeInterpFunINStoNSP(st.times[segMask]))
+                        #  kludgey fix for weirdness concerning t_start
+                        st.t_start = pq.s * (min(np.min(st.times.magnitude), NSPTimeRanges[0]) - 500)
+                        st.t_stop = pq.s * (max(np.max(st.times.magnitude), NSPTimeRanges[1]) + 500)
+                    else:
+                        st.t_start = pq.s * (NSPTimeRanges[0] - 500)
+                        st.t_stop = pq.s * (NSPTimeRanges[1] + 500)
+        #  pdb.set_trace()
         allEvents = insBlock.filter(objects=Event)
         eventsDF = eventsToDataFrame(allEvents, idxT='t')
         segMask = getStimSerialTrialSegMask(eventsDF, trialSegment)
@@ -861,6 +885,7 @@ def synchronizeINStoNSP(
 
 def timeOffsetBlock(block, timeOffset, masterTStart):
     for st in block.filter(objects=SpikeTrain):
+        #  pdb.set_trace()
         st.magnitude[:] = st.times.magnitude + timeOffset.magnitude
         st.t_start = masterTStart
         st.t_stop += timeOffset
@@ -895,6 +920,9 @@ def loadBlockProxyObjects(block):
         for stProxy in stProxyList:
             unit = stProxy.unit
             try:
+                print('unit is {}'.format(stProxy.unit.name))
+                print('spiketrain is {}'.format(stProxy.name))
+                print('tstop is {}'.format(stProxy.t_stop))
                 st = stProxy.load(load_waveforms=False)
                 st.left_sweep = None
                 #  seems like writing ins data breaks the
@@ -930,7 +958,7 @@ def extractSignalsFromBlock(
     newBlock = Block()
     newBlock.merge_annotations(block)
     for idx, seg in enumerate(block.segments):
-        newSeg = Segment()
+        newSeg = Segment(name=seg.name)
         newSeg.merge_annotations(seg)
         newBlock.segments.append(newSeg)
         for asig in seg.analogsignals:
@@ -944,13 +972,15 @@ def extractSignalsFromBlock(
 
     newChanIdxList = []
     for idx, chanIdx in enumerate(block.channel_indexes):
-        newChan = ChannelIndex(index=np.array([0]))
+        newChan = ChannelIndex(
+            name=chanIdx.name, index=np.array([0]))
         newChan.merge_annotations(chanIdx)
         keepThisChan = False
 
         for asig in chanIdx.analogsignals:
             if asig.name in keepSignals:
                 newChan.analogsignals.append(asig)
+                asig.channel_index = newChan
                 keepThisChan = True
 
         if keepSpikes:
@@ -959,6 +989,7 @@ def extractSignalsFromBlock(
                 #  newUnit = Unit()
                 #  newUnit.merge(unit)
                 newChan.units.append(unit)
+                unit.channel_index = newChan
         else:
             newChan.units = []
 
@@ -1082,16 +1113,18 @@ def stimStatusSerialtoLong(
         deriveCols=[], progAmpNames=[], dropDuplicates=True):
     
     #  pdb.set_trace()
+    fullExpandCols = copy(expandCols)
+    #  fixes issue with 'program' and 'amplitude' showing up unrequested
     if 'program' not in expandCols:
-        expandCols.append('program')
+        fullExpandCols.append('program')
     if 'activeGroup' not in expandCols:
-        expandCols.append('activeGroup')
+        fullExpandCols.append('activeGroup')
 
     stimStLong = pd.DataFrame(
-        index=stimStSer.index, columns=expandCols + [idxT])
+        index=stimStSer.index, columns=fullExpandCols + [idxT])
     #  fill req columns
     stimStLong[idxT] = stimStSer[idxT]
-    for pName in expandCols:
+    for pName in fullExpandCols:
         #  print(pName)
         stimStLong[pName] = np.nan
         pMask = stimStSer[namePrefix + 'property'] == pName
@@ -1105,6 +1138,7 @@ def stimStatusSerialtoLong(
     debugPlot = False
     if debugPlot:
         stimCat = pd.concat((stimStLong, stimStSer), axis=1)
+
     for idx, pName in enumerate(progAmpNames):
         stimStLong[pName] = np.nan
         pMask = (stimStSer[namePrefix + 'property'] == 'amplitude') & (
@@ -1119,6 +1153,7 @@ def stimStatusSerialtoLong(
     if debugPlot:
         stimStLong.loc[:, ['program'] + progAmpNames].plot()
         plt.show()
+
     ampIncrease = pd.Series(False, index=stimStLong.index)
     ampChange = pd.Series(False, index=stimStLong.index)
     for idx, pName in enumerate(progAmpNames):
@@ -1990,7 +2025,7 @@ def loadKinematics(folderPath, fileName, kinPosOpts = {
 
 def getGaitEvents(trigTimes, simiTable, whichColumns =  ['ToeUp_Left Y', 'ToeDown_Left Y'],
     plotting = False, fudge = 2, CameraFs = 100):
-    # NSP time of first camera trigger
+    # NSP time of first camera trigger (TODO is it the first one after a pause?)
     timeOffset = trigTimes[0]
     simiTable['Time'] = simiTable['Time'] + timeOffset
     simiDf = pd.DataFrame(simiTable[whichColumns])
