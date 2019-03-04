@@ -59,13 +59,14 @@ def getNSxData(
 def preprocNs5(
     fileName='Trial001',
     folderPath='./',
+    spikeStruct=None,
     elecIds=range(1, 97), startTimeS=0, dataTimeS='all',
     fillOverflow=True, removeJumps=True,
     chunkSize=900
     ):
 
     filePath = os.path.join(folderPath, fileName) + '.ns5'
-    dummyChannelData = hf.getNSxData(filePath, elecIds[0], startTimeS, dataTimeS)
+    dummyChannelData = getNSxData(filePath, elecIds[0], startTimeS, dataTimeS, spikeStruct)
 
     if dataTimeS == 'all':
         dataTimeS = dummyChannelData['data_time_s']
@@ -106,6 +107,7 @@ def preprocNs5(
         preprocNs5Section(
             fileName = fileName,
             folderPath = folderPath,
+            spikeStruct=spikeStruct,
             elecIds = elecIds, startTimeS = startTimeS + curSection * chunkSize,
             dataTimeS = thisDataTime,
             chunkSize = chunkSize,
@@ -115,6 +117,7 @@ def preprocNs5(
 def preprocNs5Section(
     fileName = 'Trial001',
     folderPath = './',
+    spikeStruct=None,
     elecIds = range(1, 97), startTimeS = 0, dataTimeS = 900,
     chunkSize = 900,
     curSection = 0, sectionsTotal = 1,
