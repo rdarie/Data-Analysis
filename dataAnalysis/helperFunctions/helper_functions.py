@@ -1,4 +1,4 @@
-
+'''
 try:
     import plotly
     import plotly.plotly as py
@@ -7,7 +7,7 @@ try:
     import plotly.graph_objs as go
 except:
     pass
-
+'''
 import psutil
 import matplotlib, pdb, sys, itertools, os, pickle, gc, random, string,\
 subprocess, collections, traceback, peakutils, math, argparse
@@ -63,6 +63,265 @@ import matplotlib.backends.backend_pdf
 from fractions import gcd
 import h5py
 LABELFONTSIZE = 5
+import mpl_toolkits.mplot3d.axes3d as p3
+from matplotlib.lines import Line2D
+import matplotlib.animation as animation
+from matplotlib.animation import FFMpegWriter
+from collections import OrderedDict
+
+
+def animateDFSubset3D(
+        unpackedFeatures, dataQuery, winWidth, nFrames, fps=100,
+        xyzList=['PC1', 'PC2', 'PC3'], showNow=False, ax=None,
+        colorCol='tdAmplitude', saveToFile='', pltKws=None, extraAni=False):
+
+    colorOpts = sns.cubehelix_palette(128)
+
+    def update_lines(idx, data, colorData, lines):
+        #  print(idx)
+        if idx >= winWidth:
+            for ptIdx in range(winWidth):
+                lines[ptIdx].set_data(
+                    data[0:2, idx - ptIdx - 1:idx - ptIdx + 1])
+                lines[ptIdx].set_3d_properties(
+                    data[2, idx - ptIdx - 1:idx - ptIdx + 1])
+                
+                colorIdx = colorData.iloc[idx - ptIdx]
+                rgbaColor = np.zeros((4))
+                rgbaColor[:3] = colorOpts[colorIdx]
+                rgbaColor[3] = (winWidth - ptIdx) / winWidth
+                lines[ptIdx].set_color(rgbaColor)
+        return lines
+    
+    featSubset = unpackedFeatures.query(dataQuery)
+    data = featSubset.loc[:, xyzList].transpose().values
+
+    _, colorBins = pd.cut(
+        unpackedFeatures[colorCol], 128, labels=False, retbins=True)
+    colorData = pd.cut(
+        featSubset[colorCol], colorBins, labels=False)
+    # Attaching 3D axis to the figure
+    if ax is None:
+        fig = plt.figure()
+        ax = p3.Axes3D(fig)
+    else:
+        fig = ax.figure
+    # initialize the line
+    lines = [None for i in range(winWidth)]
+    for idx in range(winWidth):
+        #print(idx)
+        #pdb.set_trace()
+        lines[idx] = ax.plot(
+            data[0, idx: idx + 2],
+            data[1, idx: idx + 2],
+            data[2, idx: idx + 2],
+            **pltKws)[0]
+        lines[idx].set_color([0, 0, 0, 0])
+
+    #  Setting the axes properties
+    #  pdb.set_trace()
+    
+    nuMax = featSubset[xyzList[0]].quantile(0.99)
+    nuMin = featSubset[xyzList[0]].quantile(0.01)
+    sigSpread = nuMax - nuMin
+    nuMax += sigSpread * 1e-2
+    nuMin -= sigSpread * 1e-2
+    ax.set_xlim3d([nuMin, nuMax])
+    ax.set_xticklabels([])
+    ax.set_xlabel(xyzList[0])
+
+    nuMax = featSubset[xyzList[1]].quantile(0.99)
+    nuMin = featSubset[xyzList[1]].quantile(0.01)
+    sigSpread = nuMax - nuMin
+    nuMax += sigSpread * 1e-2
+    nuMin -= sigSpread * 1e-2
+    ax.set_ylim3d([nuMin, nuMax])
+    ax.set_yticklabels([])
+    ax.set_ylabel(xyzList[1])
+
+    nuMax = featSubset[xyzList[2]].quantile(0.99)
+    nuMin = featSubset[xyzList[2]].quantile(0.01)
+    sigSpread = nuMax - nuMin
+    nuMax += sigSpread * 1e-2
+    nuMin -= sigSpread * 1e-2
+    ax.set_zlim3d([nuMin, nuMax])
+    ax.set_zticklabels([])
+    ax.set_zlabel(xyzList[2])
+
+    # Creating the Animation object
+    ani = animation.FuncAnimation(
+        fig, update_lines, frames=nFrames,
+        fargs=(data, colorData, lines),
+        interval=int(1e3/fps), blit=False)
+    
+    if saveToFile:
+        writer = FFMpegWriter(fps=int(fps), metadata=dict(artist='Me'), bitrate=3600)
+        ani.save(saveToFile, writer=writer, extra_anim=extraAni)
+    elif showNow:
+        plt.show()
+    return ani
+
+
+def animateAngle3D(
+        unpackedFeatures, dataQuery, winWidth, nFrames, showNow=False,
+        saveToFile='', pltKws={}, extraAni=False, ax=None, fps=100):
+    
+    featSubset = unpackedFeatures.query(dataQuery)
+    angleXYZ = pd.DataFrame(
+        0, index=featSubset['position'].index,
+        columns=['x', 'y', 'z'])
+    #pdb.set_trace()
+    angleXYZ['y'] = featSubset['position'].apply(np.deg2rad).apply(np.sin)
+    angleXYZ['z'] = featSubset['position'].apply(np.deg2rad).apply(np.cos)
+    data = np.zeros((3, 2))
+    
+    def update_lines(idx, angleXYZ, lines):
+        #  print(idx)
+        data = np.zeros((3, 2))
+        data[:, 1] = angleXYZ.transpose().values[:, idx]
+        #rint(data)
+        lines[0].set_data(data[0:2, :])
+        lines[0].set_3d_properties(data[2, :])
+        return lines
+    
+    data[:, 1] = angleXYZ.transpose().values[:, 0]
+
+    # Attaching 3D axis to the figure
+    if ax is None:
+        fig = plt.figure()
+        ax = p3.Axes3D(fig)
+    else:
+        fig = ax.figure
+    # initialize the line
+    lines = [None]
+    lines[0] = ax.plot(
+        data[0, 0:1], data[1, 0:1], data[2, 0:1], 'o-',
+        **pltKws)[0]
+    #  Setting the axes properties
+    #  pdb.set_trace()
+    
+    ax.set_xlim3d([-.5, .5])
+    ax.set_xticks([])
+    
+    ax.set_ylim3d([-1.1, 1.1])
+    ax.set_yticks([])
+    ax.set_ylabel('Pedal')
+
+    ax.set_zlim3d([-1.1, 1.1])
+    ax.set_zticks([])
+    # Creating the Animation object
+    ani = animation.FuncAnimation(
+        fig, update_lines, frames=nFrames,
+        fargs=(angleXYZ, lines),
+        interval=int(1e3/fps), blit=False)
+    
+    if saveToFile:
+        writer = FFMpegWriter(fps=int(fps), metadata=dict(artist='Me'), bitrate=3600)
+        ani.save(saveToFile, writer=writer, extra_anim=extraAni)
+    elif showNow:
+        plt.show()
+    return ani
+
+
+def animateDFSubset2D(
+        unpackedFeatures, dataQuery, winWidth, nFrames,
+        yCol={'feature': ['PC1']}, plotBlocking=True,
+        xCol={'feature': None}, axList=None, showNow=False, fps=100, 
+        colorCol='tdAmplitude', saveToFile='', pltKws={}, extraAni=None):
+    assert len(xCol.keys()) == len(yCol.keys())
+
+    featSubset = unpackedFeatures.query(dataQuery)
+    yCol = OrderedDict(yCol)
+    xCol = OrderedDict(xCol)
+    #  pdb.set_trace()
+    if axList is None:
+        if len(yCol.keys()) == 1:
+            fig, ax = plt.subplots()
+            axList = [ax]
+        else:
+            fig, axList = plt.subplots(len(yCol.keys()), 1)
+    else:
+        fig = axList[0].figure
+
+    nLines = np.sum([len(v) for k, v in yCol.items()])
+    lineList = [None for i in range(nLines)]
+    lineIdx = 0
+    for axIdx, (key, value) in enumerate(yCol.items()):
+        thisAx = axList[axIdx]
+        for colName in value:
+            if xCol[key] is None:
+                lineList[lineIdx] = thisAx.plot(
+                    featSubset[colName].iloc[:winWidth],
+                    **pltKws)[0]
+            else:
+                xColName = xCol[key]
+                lineList[lineIdx] = thisAx.plot(
+                    featSubset[xColName].iloc[:winWidth],
+                    featSubset[colName].iloc[:winWidth],
+                    **pltKws)[0]
+            lineIdx += 1
+        thisAx.set_ylabel(key)
+        # pdb.set_trace()
+        nuMax = featSubset.loc[:, value].quantile(0.99).max().max()
+        nuMin = featSubset.loc[:, value].quantile(0.01).min().min()
+        sigSpread = nuMax - nuMin
+        nuMax += sigSpread * 1e-2
+        nuMin -= sigSpread * 1e-2
+        thisAx.set_ylim(
+            bottom=nuMin,
+            top=nuMax)
+        if xCol[key] is None:
+            thisAx.set_xticklabels([])
+        else:
+            xColName = xCol[key]
+            nuMax = featSubset[xColName].quantile(0.99).max()
+            nuMin = featSubset[xColName].quantile(0.01).min()
+            sigSpread = nuMax - nuMin
+            nuMax += sigSpread * 1e-2
+            nuMin -= sigSpread * 1e-2
+            thisAx.set_xlim(
+                left=nuMin,
+                right=nuMax)
+            thisAx.set_xlabel(xColName)
+        #thisAx.legend()
+    
+    def init():  # only required for blitting to give a clean slate.
+        lineIdx = 0
+        for key, value in yCol.items():
+            for colName in value:
+                lineList[lineIdx].set_ydata([np.nan] * winWidth)
+                if xCol[key] is not None:
+                    lineList[lineIdx].set_xdata([np.nan] * winWidth)
+                lineIdx += 1
+        return lineList
+
+    def animate(idx):
+        if idx >= winWidth:
+            lineIdx = 0
+            for key, value in yCol.items():
+                for colName in value:
+                    lineData = (
+                        featSubset[colName].iloc[idx-winWidth:idx].values)
+                    lineList[lineIdx].set_ydata(lineData)
+                    if xCol[key] is not None:
+                        xColName = xCol[key]
+                        lineXData = (
+                            featSubset[xColName].iloc[idx-winWidth:idx].values)
+                        lineList[lineIdx].set_xdata(lineXData)
+                    lineIdx += 1
+                    # update the data.
+        return lineList
+    
+    ani = animation.FuncAnimation(
+        fig, animate, frames=nFrames,
+        init_func=init, interval=int(1e3/fps), blit=True)
+    if saveToFile:
+        writer = FFMpegWriter(fps=int(fps), metadata=dict(artist='Me'), bitrate=3600)
+        ani.save(saveToFile, writer=writer, extra_anim=extraAni)
+    elif showNow:
+        plt.show(block=plotBlocking)
+    return ani
+
 
 def getPlotOpts(names):
     """
@@ -113,8 +372,8 @@ def filterDF(
         highPass=None, highOrder=2,
         notch=False, filtFun='butter',
         columns=None):
+
     passedSeries = False
-    
     if isinstance(df, pd.Series):
         passedSeries = True
         df = pd.DataFrame(df.values, index=df.index, columns=['temp'])

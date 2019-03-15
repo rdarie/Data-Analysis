@@ -2497,55 +2497,6 @@ def trialBinnedArrayNameRetrieve(spikeNames):
 
     return arrayName, arrayInfo, rasterOpts
 
-def cmpToDF(arrayFilePath):
-    arrayMap = pd.read_table(
-        arrayFilePath,
-        skiprows = 13)
-    cmpDF = pd.DataFrame(
-        np.nan, index = range(146),
-        columns = [
-            'xcoords', 'ycoords', 'elecName',
-            'elecID', 'label', 'bank', 'bankID', 'nevID']
-        )
-    bankLookup = {'A': 0, 'B': 1, 'C': 2, 'D': 3, 'E': 4}
-    
-    for rowIdx, row in arrayMap.iterrows():
-        #  label matches non-digits index matches digit
-        elecName = re.split(r'\d*', row['label'])[0]
-        elecIdx = int(re.split(r'\D*', row['label'])[-1])
-        nevIdx = int(row['elec']) + bankLookup[row['bank']] * 32
-        cmpDF.loc[nevIdx, 'elecID'] = elecIdx
-        cmpDF.loc[nevIdx, 'nevID'] = nevIdx
-        cmpDF.loc[nevIdx, 'elecName'] = elecName
-        cmpDF.loc[nevIdx, 'xcoords'] = row['row']
-        cmpDF.loc[nevIdx, 'ycoords'] = row['//col']
-        cmpDF.loc[nevIdx, 'label'] = row['label']
-        cmpDF.loc[nevIdx, 'bank'] = row['bank']
-        cmpDF.loc[nevIdx, 'bankID'] = int(row['elec'])
-    cmpDF.dropna(inplace = True)
-    return cmpDF
-
-def cmpDFToPrb(cmpDF, filePath=None, names=None, banks=None):
-    if names is not None:
-        keepMask = cmpDF['elecName'].isin(names)
-        cmpDF = cmpDF.loc[keepMask, :]
-    if banks is not None:
-        keepMask = cmpDF['bank'].isin(banks)
-        cmpDF = cmpDF.loc[keepMask, :]
-
-    cmpDF.reset_index(inplace=True, drop=True)
-    prbDict = {}
-    for idx, (name, group) in enumerate(cmpDF.groupby('elecName')):
-        prbDict.update({idx: {
-            'channels': list(group.index),
-            'geometry': {
-                rName: (row['xcoords'], row['ycoords']) for rName, row in group.iterrows()}
-        }})
-    if filePath is not None:
-        with open(filePath, 'w') as f:
-            f.write('channel_groups = ' + str(prbDict))
-    return prbDict
-
 def loadSpikeInfo(arrayName, arrayInfo, forceRecalc = False):
 
     folderPath = arrayInfo['folderPath']

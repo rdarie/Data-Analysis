@@ -727,7 +727,7 @@ def insDataToBlock(
         stimStatusSerial, idxT='INSTime',
         annCol=['ins_property', 'ins_value']
         )
-    #pdb.set_trace()
+    #  pdb.set_trace()
     seg.events = stimEvents
     block.create_relationship()
         

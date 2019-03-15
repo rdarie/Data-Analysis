@@ -319,19 +319,24 @@ def unpackAnalysisBlock(
 
 def loadSpikeMats(
         dataPath, rasterOpts,
-        alignTimes, chans=None,
+        alignTimes=None, chans=None, loadAll=False,
         absoluteBins=False, transposeSpikeMat=False):
     reader = neo.io.nixio_fr.NixIO(filename=dataPath)
 
     chanNames = reader.header['signal_channels']['name']
+    #  pdb.set_trace()
     if chans is not None:
         sigMask = np.isin(chanNames, chans)
         chanNames = chanNames[sigMask]
     chanIdx = reader.channel_name_to_index(chanNames)
     
-
-    spikeMats = {i: None for i in alignTimes.index}
-    validTrials = pd.Series(True, index=alignTimes.index)
+    if not loadAll:
+        assert alignTimes is not None
+        spikeMats = {i: None for i in alignTimes.index}
+        validTrials = pd.Series(True, index=alignTimes.index)
+    else:
+        spikeMats = {i: None for i in range(reader.segment_count(block_index=0))}
+        validTrials = None
     
     segOffset = 0
     for segIdx in range(reader.segment_count(block_index=0)):
@@ -345,8 +350,6 @@ def loadSpikeMats(
             )
         tStop = sigSize / fs + tStart
         # convert to indices early to avoid floating point problems
-        winStartIdx = int(round(rasterOpts['windowSize'][0] * fs))
-        winStopIdx = int(round(rasterOpts['windowSize'][1] * fs))
         
         intervalIdx = int(round(rasterOpts['binInterval'] * fs))
         halfIntervalIdx = int(round(intervalIdx / 2))
@@ -355,22 +358,36 @@ def loadSpikeMats(
         halfWidthIdx = int(round(widthIdx / 2))
         
         theBins = None
-        timeMask = (alignTimes > tStart) & (alignTimes < tStop)
-        maskedTimes = alignTimes[timeMask]
-        #  pdb.set_trace()
+
+        if not loadAll:
+            winStartIdx = int(round(rasterOpts['windowSize'][0] * fs))
+            winStopIdx = int(round(rasterOpts['windowSize'][1] * fs))
+            timeMask = (alignTimes > tStart) & (alignTimes < tStop)
+            maskedTimes = alignTimes[timeMask]
+        else:
+            #  irrelevant, will load all
+            maskedTimes = pd.Series(np.nan)
+
         for idx, tOnset in maskedTimes.iteritems():
-            idxOnset = round((tOnset - tStart) * fs)
-            if 0 > (idxOnset + winStartIdx - halfWidthIdx):
+            if not loadAll:
+                idxOnset = int(round((tOnset - tStart) * fs))
+                #  can't not be ints
+                iStart = idxOnset + winStartIdx - halfWidthIdx
+                iStop = idxOnset + winStopIdx + halfWidthIdx
+            else:
+                winStartIdx = 0
+                iStart = 0
+                iStop = sigSize
+
+            if iStart < 0:
                 #  near the first edge
                 validTrials[idx] = False
-            elif (sigSize < (
-                    idxOnset + winStopIdx + halfWidthIdx)):
-                # near the ending edge
+            elif (sigSize < iStop):
+                #  near the ending edge
                 validTrials[idx] = False
             else:
-                iStart = int(round(idxOnset + winStartIdx - halfWidthIdx))
-                iStop = int(round(idxOnset + winStopIdx + halfWidthIdx))
-                
+                #  valid slices
+                #  
                 rawSpikeMat = pd.DataFrame(
                     reader.get_analogsignal_chunk(
                         block_index=0, seg_index=segIdx,
@@ -393,9 +410,14 @@ def loadSpikeMats(
                     procSpikeMat.index = theBins
                 procSpikeMat.index.name = 'bin'
                 #  convert to Hz
-                spikeMats[idx] = procSpikeMat / rasterOpts['binWidth']
+                #  pdb.set_trace()
+                if loadAll:
+                    smIdx = segIdx
+                else:
+                    smIdx = idx
+                spikeMats[smIdx] = procSpikeMat / widthIdx
                 if transposeSpikeMat:
-                    spikeMats[idx] = spikeMats[idx].transpose()
+                    spikeMats[smIdx] = spikeMats[smIdx].transpose()
             #  plt.imshow(rawSpikeMat.values, aspect='equal'); plt.show()
     return spikeMats, validTrials
 
@@ -631,89 +653,6 @@ def blockToNix(
             newSeg = block.segments[segParents[segIdx][chunkIdx]]
             newSeg, nixgroup = writer._write_segment_meta(newSeg, nixblock)
             
-            if eventInfo is not None:
-                #  process trial related events
-                analogData = []
-                for key, value in eventInfo['inputIDs'].items():
-                    ainpAsig = seg.filter(
-                        objects=AnalogSignalProxy,
-                        name=value)[0]
-                    ainpData = ainpAsig.load(
-                        time_slice=(tStart, tStop),
-                        magnitude_mode='rescaled')
-                    analogData.append(
-                        pd.DataFrame(ainpData.magnitude, columns=[key]))
-                    del ainpData
-                    gc.collect()
-                motorData = pd.concat(analogData, axis=1)
-                del analogData
-                gc.collect()
-                motorData = mea.processMotorData(
-                    motorData, ainpAsig.sampling_rate.magnitude)
-                plotExample = False
-                if plotExample:
-                    exampleTrace = motorData.loc[12e6:13e6, 'position']
-                    exampleTrace.plot()
-                    plt.show()
-                keepCols = [
-                    'position', 'velocity', 'velocityCat',
-                    'rightBut_int', 'leftBut_int',
-                    'rightLED_int', 'leftLED_int', 'simiTrigs_int']
-                for colName in keepCols:
-                    if trackMemory:
-                        print('writing motorData memory usage: {}'.format(
-                            hf.memory_usage_psutil()))
-                    chanIdx = ChannelIndex(
-                        name=colName,
-                        index=np.array([0]),
-                        channel_names=np.array([0]))
-                    block.channel_indexes.append(chanIdx)
-                    motorAsig = AnalogSignal(
-                        motorData[colName].values * pq.mV,
-                        name=colName,
-                        sampling_rate=ainpAsig.sampling_rate,
-                        dtype=np.float32)
-                    motorAsig.t_start = ainpAsig.t_start
-                    motorAsig.channel_index = chanIdx
-                    # assign ownership to containers
-                    chanIdx.analogsignals.append(motorAsig)
-                    newSeg.analogsignals.append(motorAsig)
-                    chanIdx.create_relationship()
-                    newSeg.create_relationship()
-                    # write out to file
-                    motorAsig = writer._write_analogsignal(
-                        motorAsig, nixblock, nixgroup)
-                    del motorAsig
-                    gc.collect()
-                _, trialEvents = mea.getTrialsNew(
-                    motorData, ainpAsig.sampling_rate.magnitude,
-                    tStart, trialType=None)
-                trialEvents.fillna(0)
-                trialEvents.rename(
-                    columns={
-                        'Label': 'rig_property',
-                        'Details': 'rig_value'}, inplace=True)
-                #  pdb.set_trace()
-                del motorData
-                gc.collect()
-                eventList = eventDataFrameToEvents(
-                    trialEvents,
-                    idxT='Time',
-                    annCol=['rig_property', 'rig_value'])
-                for event in eventList:
-                    #  pdb.set_trace()
-                    if trackMemory:
-                        print('writing motor events memory usage: {}'.format(
-                            hf.memory_usage_psutil()))
-                    event.segment = newSeg
-                    newSeg.events.append(event)
-                    newSeg.create_relationship()
-                    # write out to file
-                    event = writer._write_event(event, nixblock, nixgroup)
-                    del event
-                    gc.collect()
-                del trialEvents, eventList
-
             if not pruneOutUnits:
                 for stIdx, stProxy in enumerate(seg.spiketrains):
                     if trackMemory:
@@ -799,6 +738,89 @@ def blockToNix(
                     isig, nixblock, nixgroup)
                 del isig
                 gc.collect()
+
+            if eventInfo is not None:
+                #  process trial related events
+                analogData = []
+                for key, value in eventInfo['inputIDs'].items():
+                    ainpAsig = seg.filter(
+                        objects=AnalogSignalProxy,
+                        name=value)[0]
+                    ainpData = ainpAsig.load(
+                        time_slice=(tStart, tStop),
+                        magnitude_mode='rescaled')
+                    analogData.append(
+                        pd.DataFrame(ainpData.magnitude, columns=[key]))
+                    del ainpData
+                    gc.collect()
+                motorData = pd.concat(analogData, axis=1)
+                del analogData
+                gc.collect()
+                motorData = mea.processMotorData(
+                    motorData, ainpAsig.sampling_rate.magnitude)
+                plotExample = False
+                if plotExample:
+                    exampleTrace = motorData.loc[12e6:13e6, 'position']
+                    exampleTrace.plot()
+                    plt.show()
+                keepCols = [
+                    'position', 'velocity', 'velocityCat',
+                    'rightBut_int', 'leftBut_int',
+                    'rightLED_int', 'leftLED_int', 'simiTrigs_int']
+                for colName in keepCols:
+                    if trackMemory:
+                        print('writing motorData memory usage: {}'.format(
+                            hf.memory_usage_psutil()))
+                    chanIdx = ChannelIndex(
+                        name=colName,
+                        index=np.array([0]),
+                        channel_names=np.array([0]))
+                    block.channel_indexes.append(chanIdx)
+                    motorAsig = AnalogSignal(
+                        motorData[colName].values * pq.mV,
+                        name=colName,
+                        sampling_rate=ainpAsig.sampling_rate,
+                        dtype=np.float32)
+                    motorAsig.t_start = ainpAsig.t_start
+                    motorAsig.channel_index = chanIdx
+                    # assign ownership to containers
+                    chanIdx.analogsignals.append(motorAsig)
+                    newSeg.analogsignals.append(motorAsig)
+                    chanIdx.create_relationship()
+                    newSeg.create_relationship()
+                    # write out to file
+                    motorAsig = writer._write_analogsignal(
+                        motorAsig, nixblock, nixgroup)
+                    del motorAsig
+                    gc.collect()
+                _, trialEvents = mea.getTrialsNew(
+                    motorData, ainpAsig.sampling_rate.magnitude,
+                    tStart, trialType=None)
+                trialEvents.fillna(0)
+                trialEvents.rename(
+                    columns={
+                        'Label': 'rig_property',
+                        'Details': 'rig_value'}, inplace=True)
+                #  pdb.set_trace()
+                del motorData
+                gc.collect()
+                eventList = eventDataFrameToEvents(
+                    trialEvents,
+                    idxT='Time',
+                    annCol=['rig_property', 'rig_value'])
+                for event in eventList:
+                    #  pdb.set_trace()
+                    if trackMemory:
+                        print('writing motor events memory usage: {}'.format(
+                            hf.memory_usage_psutil()))
+                    event.segment = newSeg
+                    newSeg.events.append(event)
+                    newSeg.create_relationship()
+                    # write out to file
+                    event = writer._write_event(event, nixblock, nixgroup)
+                    del event
+                    gc.collect()
+                del trialEvents, eventList
 
             for eventProxy in seg.events:
                 event = eventProxy.load(
