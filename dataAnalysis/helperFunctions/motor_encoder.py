@@ -92,42 +92,48 @@ def processMotorData(motorData, fs, invertLookup=False):
         motorData[column] = (motorData[column] - minQ) / (maxQ - minQ)
         #threshold = (motorData[column].max() - motorData[column].min() ) / 2
         threshold = 0.5
-        motorData.loc[:, column + '_int'] = (motorData[column] > threshold).astype(int)
+        motorData.loc[:, column + '_int'] = (
+            motorData[column] > threshold).astype(int)
 
-    transitionMask, transitionIdx = getTransitionIdx(motorData, edgeType='both')
+    transitionMask, transitionIdx = getTransitionIdx(
+        motorData, edgeType='both')
     motorData['encoderState'] = 0
     motorData['count'] = 0
 
-    state1Mask = np.logical_and(motorData['A_int'] == 1, motorData['B_int'] == 1)
+    state1Mask = np.logical_and(
+        motorData['A_int'] == 1, motorData['B_int'] == 1)
     motorData.loc[state1Mask, 'encoderState'] = 1
-    state2Mask = np.logical_and(motorData['A_int'] == 1, motorData['B_int'] == 0)
+    state2Mask = np.logical_and(
+        motorData['A_int'] == 1, motorData['B_int'] == 0)
     motorData.loc[state2Mask, 'encoderState'] = 2
-    state3Mask = np.logical_and(motorData['A_int'] == 0, motorData['B_int'] == 0)
+    state3Mask = np.logical_and(
+        motorData['A_int'] == 0, motorData['B_int'] == 0)
     motorData.loc[state3Mask, 'encoderState'] = 3
-    state4Mask = np.logical_and(motorData['A_int'] == 0, motorData['B_int'] == 1)
+    state4Mask = np.logical_and(
+        motorData['A_int'] == 0, motorData['B_int'] == 1)
     motorData.loc[state4Mask, 'encoderState'] = 4
 
     incrementLookup = {
-            (1, 0) : 0,
-            (1, 1) : 0,
-            (1, 2) : +1,
-            (1, 3) : 0,
-            (1, 4) : -1,
-            (2, 0) : 0,
-            (2, 1) : -1,
-            (2, 2) : 0,
-            (2, 3) : +1,
-            (2, 4) : 0,
-            (3, 0) : 0,
-            (3, 1) : 0,
-            (3, 2) : -1,
-            (3, 3) : 0,
-            (3, 4) : +1,
-            (4, 0) : 0,
-            (4, 1) : +1,
-            (4, 2) : 0,
-            (4, 3) : -1,
-            (4, 4) : 0,
+            (1, 0): 0,
+            (1, 1): 0,
+            (1, 2): +1,
+            (1, 3): 0,
+            (1, 4): -1,
+            (2, 0): 0,
+            (2, 1): -1,
+            (2, 2): 0,
+            (2, 3): +1,
+            (2, 4): 0,
+            (3, 0): 0,
+            (3, 1): 0,
+            (3, 2): -1,
+            (3, 3): 0,
+            (3, 4): +1,
+            (4, 0): 0,
+            (4, 1): +1,
+            (4, 2): 0,
+            (4, 3): -1,
+            (4, 4): 0,
             }
 
     if invertLookup:
@@ -135,7 +141,8 @@ def processMotorData(motorData, fs, invertLookup=False):
             incrementLookup[key] = incrementLookup[key] * (-1)
 
     statesAtTransition = motorData.loc[transitionIdx, 'encoderState'].tolist()
-    transitionStatePairs = [(statesAtTransition[i], statesAtTransition[i-1]) for i in range(1, len(statesAtTransition))]
+    transitionStatePairs = [
+        (statesAtTransition[i], statesAtTransition[i-1]) for i in range(1, len(statesAtTransition))]
     count = [incrementLookup[pair] for pair in transitionStatePairs]
     #  pad with a zero to make up for the fact that the first one doesn't have a pair
     motorData.loc[transitionIdx, 'count'] = [0] + count
@@ -203,13 +210,13 @@ def getTrials(motorData, trialType='2AFC'):
 
             if transitionInPast < noMoveThreshold and transitionInFuture > moveThreshold and lookForStarts:
                 movementOnsetIdx.append(idx)
-                trialEvents = trialEvents.append({'Time':idx,'Label':'Movement Onset'}, ignore_index = True)
+                trialEvents = trialEvents.append({'Time':idx,'Label': 'Movement Onset'}, ignore_index = True)
                 for _ in range(skipAheadInc):
                     next(transitionIdxIter, None)
                 lookForStarts = False
             if transitionInPast > moveThreshold and transitionInFuture < noMoveThreshold and not lookForStarts:
                 movementOffsetIdx.append(idx)
-                trialEvents = trialEvents.append({'Time':idx,'Label':'Movement Offset'}, ignore_index = True)
+                trialEvents = trialEvents.append({'Time':idx,'Label': 'Movement Offset'}, ignore_index = True)
                 lookForStarts = True
 
     if len(movementOnsetIdx) > len(movementOffsetIdx):
@@ -445,6 +452,7 @@ def getTrialsNew(motorData, fs, tStart, trialType = '2AFC'):
     if trialType == '2AFC':
         #  !!!! TODO: changes to how we calculate movement break this, because we now track
         #  move on and move off 4 times a trial (to and back)
+        pdb.set_trace()
         while not (trialEvents.loc[:3,'Label'].str.contains('movement').all()) or trialEvents.loc[4:4,'Label'].str.contains('movement').all():
             #above expression is not true if the first 5 events do not make up a complete sequence
             #pdb.set_trace()

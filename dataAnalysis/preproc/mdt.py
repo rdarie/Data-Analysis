@@ -594,7 +594,7 @@ def getINSStimOnset(
     for thisUnit in block.list_units:
         if len(thisUnit.spiketrains) == 0:
             st = SpikeTrain(
-                name=thisUnit.name + '_{}'.format(int(segIdx)),
+                name='seg{}_{}'.format(int(segIdx), thisUnit.name),
                 times=[], units='sec', t_stop=spikeTStop,
                 t_start=spikeTStart)
             thisUnit.spiketrains.append(st)
@@ -620,7 +620,7 @@ def getINSStimOnset(
                         ))
             #  pdb.set_trace()
             newSt = SpikeTrain(
-                name=thisUnit.name + '_{}'.format(int(segIdx)),
+                name='seg{}_{}'.format(int(segIdx), thisUnit.name),
                 times=consolidatedTimes, units='sec', t_stop=spikeTStop,
                 t_start=spikeTStart, **consolidatedAnn, **arrayAnnNames)
             

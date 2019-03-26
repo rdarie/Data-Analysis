@@ -2,10 +2,16 @@ import tridesclous as tdc
 import pyqtgraph as pg
 import pandas as pd
 import numpy as np
-from matplotlib import pyplot
+#  from matplotlib import pyplot
 import time
 import os
 import re
+#  import pdb
+import quantities as pq
+import neo
+from neo.core import (
+    Block, Segment, ChannelIndex,
+    Unit, SpikeTrain)
 
 
 def cmpToDF(arrayFilePath):
@@ -41,14 +47,16 @@ def cmpDFToPrb(
         cmpDF, filePath=None,
         names=None, banks=None,
         contactSpacing=400,  # units of um
+        groupIn=None,
         prependDummy=0, appendDummy=0):
+
     if names is not None:
         keepMask = cmpDF['elecName'].isin(names)
         cmpDF = cmpDF.loc[keepMask, :]
     if banks is not None:
         keepMask = cmpDF['bank'].isin(banks)
         cmpDF = cmpDF.loc[keepMask, :]
-
+    #  import pdb; pdb.set_trace()
     cmpDF.reset_index(inplace=True, drop=True)
     prbDict = {}
 
@@ -64,11 +72,25 @@ def cmpDFToPrb(
     else:
         idxOffset = 0
 
-    for idx, (name, group) in enumerate(cmpDF.groupby('elecName')):
+    if groupIn is not None:
+        groupingCols = []
+        for key, spacing in groupIn.items():
+            uniqueValues = np.unique(cmpDF[key])
+            bins = int(round(len(uniqueValues) / spacing))
+            cmpDF[key + '_group'] = pd.cut(
+                cmpDF[key], bins, include_lowest=True, labels=False)
+            groupingCols.append(key + '_group')
+    else:
+        groupingCols = ['elecName']
+    for idx, (name, group) in enumerate(cmpDF.groupby(groupingCols)):
+        #  import pdb; pdb.set_trace()
+        #  group['nevID'].astype(int).values
         prbDict.update({idx + idxOffset: {
-            'channels': list(group.index + int(prependDummy)),
+            'channels': list(
+                group.index +
+                int(prependDummy)),
             'geometry': {
-                rName + int(prependDummy): (
+                int(rName) + int(prependDummy): (
                     contactSpacing * row['xcoords'],
                     contactSpacing * row['ycoords']) for rName, row in group.iterrows()}
         }})
@@ -94,6 +116,7 @@ def cmpDFToPrb(
 def initialize_catalogueconstructor(
         folderPath, fileName,
         triFolder, prbPath,
+        name='catalogue_constructor',
         removeExisting=False, fileFormat='NIX'):
     #  setup file source
     
@@ -115,9 +138,9 @@ def initialize_catalogueconstructor(
     #  setup probe file
     dataio.set_probe_file(prbPath)
     for chan_grp in dataio.channel_groups.keys():
-        catalogueconstructor = tdc.CatalogueConstructor(
-            dataio=dataio, chan_grp=chan_grp)
-        print(catalogueconstructor)
+        cc = tdc.CatalogueConstructor(
+            dataio=dataio, name=name, chan_grp=chan_grp)
+        print(cc)
 
     #import pdb; pdb.set_trace()
     return
@@ -125,11 +148,12 @@ def initialize_catalogueconstructor(
 
 def preprocess_signals_and_peaks(
         triFolder, chan_grp=0,
+        name='catalogue_constructor',
         chunksize=1024,
         highpass_freq=250.,
         lowpass_freq=5000.,
-        relative_threshold=4.,
-        peak_span=0.5e-3,
+        relative_threshold=5.,
+        peak_span=0.25e-3,
         common_ref_removal=True,
         noise_estimate_duration=60.,
         sample_snippet_duration=240.,
@@ -137,11 +161,11 @@ def preprocess_signals_and_peaks(
         peakdetector_engine='numpy'):
 
     dataio = tdc.DataIO(dirname=triFolder)
-    catalogueconstructor = tdc.CatalogueConstructor(
-        dataio=dataio, chan_grp=chan_grp)
+    cc = tdc.CatalogueConstructor(
+        dataio=dataio, name=name, chan_grp=chan_grp)
     print(dataio)
 
-    catalogueconstructor.set_preprocessor_params(
+    cc.set_preprocessor_params(
         chunksize=chunksize,
         signalpreprocessor_engine=signalpreprocessor_engine,
         memory_mode='memmap',
@@ -157,58 +181,58 @@ def preprocess_signals_and_peaks(
         )
 
     t1 = time.perf_counter()
-    catalogueconstructor.estimate_signals_noise(
+    cc.estimate_signals_noise(
         seg_num=0, duration=noise_estimate_duration)
     t2 = time.perf_counter()
     print('estimate_signals_noise took {} seconds'.format(t2-t1))
-
+    
     t1 = time.perf_counter()
-    catalogueconstructor.run_signalprocessor(
+    cc.run_signalprocessor(
         duration=sample_snippet_duration)
     t2 = time.perf_counter()
     print('run_signalprocessor took {} seconds'.format(t2-t1))
-
-    print(catalogueconstructor)
+    print(cc)
     return
 
 
-def extract_waveforms_pca_cluster(
+def extract_waveforms_pca(
         triFolder, chan_grp=0,
+        name='catalogue_constructor',
         wave_extract_mode='rand',
-        n_left=-16, n_right=48, nb_max=1000,
+        n_left=-48, n_right=80, nb_max=30000,
+        nb_noise_snippet=1000,
+        align_waveform=False,
         feature_method='neighborhood_pca',
         n_components_by_channel=10,
         n_components=10,
         n_components_by_neighborhood=10,
-        radius_um=600,
-        cluster_method='kmeans',
-        n_clusters=100,
-        auto_merge_threshold=0.9):
+        radius_um=600):
 
     dataio = tdc.DataIO(dirname=triFolder)
-    catalogueconstructor = tdc.CatalogueConstructor(
-        dataio=dataio, chan_grp=chan_grp)
+    cc = tdc.CatalogueConstructor(
+        dataio=dataio, name=name, chan_grp=chan_grp)
 
     if wave_extract_mode == 'all':
         nb_max = None
     t1 = time.perf_counter()
-    catalogueconstructor.extract_some_waveforms(
+    cc.extract_some_waveforms(
         mode=wave_extract_mode, n_left=n_left, n_right=n_right,
+        align_waveform=align_waveform,
         nb_max=nb_max)
-    #  catalogueconstructor.extract_some_waveforms(mode='all', n_left=-45, n_right=60)
+    #  cc.extract_some_waveforms(mode='all', n_left=-45, n_right=60)
     t2 = time.perf_counter()
     print('extract_some_waveforms took {} seconds'.format(t2-t1))
-
+    
     t1 = time.perf_counter()
-    catalogueconstructor.clean_waveforms(
+    cc.clean_waveforms(
         alien_value_threshold=100.)
     t2 = time.perf_counter()
     print('clean_waveforms took {} seconds'.format(t2-t1))
 
     #  extract_some_noise
     t1 = time.perf_counter()
-    catalogueconstructor.extract_some_noise(
-        nb_snippet=400)
+    cc.extract_some_noise(
+        nb_snippet=nb_noise_snippet)
     t2 = time.perf_counter()
     print('extract_some_noise took {} seconds'.format(t2-t1))
 
@@ -217,65 +241,99 @@ def extract_waveforms_pca_cluster(
     if feature_method == 'pca_by_channel':
         featureArgs.update({
             'n_components_by_channel': n_components_by_channel})
+    
     elif feature_method == 'neighborhood_pca':
         featureArgs.update({
             'n_components_by_neighborhood': n_components_by_neighborhood,
             'radius_um': radius_um})
+    
     elif feature_method == 'global_pca':
         featureArgs.update({
             'n_components': n_components})
-    catalogueconstructor.extract_some_features(
+    
+    cc.extract_some_features(
         method=feature_method, **featureArgs)
     t2 = time.perf_counter()
     print('project took {} seconds'.format(t2-t1))
+    print(cc)
+    return
+
+
+def cluster(
+        triFolder, chan_grp=0,
+        name='catalogue_constructor',
+        cluster_method='kmeans',
+        n_clusters=100,
+        dbscan_eps=0.5,
+        autoMerge=False,
+        auto_merge_threshold=0.9,
+        auto_make_catalog=True):
+
+    dataio = tdc.DataIO(dirname=triFolder)
+    cc = tdc.CatalogueConstructor(
+        dataio=dataio, name=name, chan_grp=chan_grp)
     
     t1 = time.perf_counter()
     clusterArgs = {}
     if cluster_method in ['kmeans', 'gmm', 'agglomerative']:
         clusterArgs.update({'n_clusters': n_clusters})
-    catalogueconstructor.find_clusters(
+    if cluster_method == 'dbscan':
+        clusterArgs.update({'eps': dbscan_eps})
+    cc.find_clusters(
         method=cluster_method, **clusterArgs)
     t2 = time.perf_counter()
     print('find_clusters took {} seconds'.format(t2-t1))
+
+    cc.trash_small_cluster(n=10)
     
-    t1 = time.perf_counter()
-    catalogueconstructor.compute_spike_waveforms_similarity()
-    catalogueconstructor.auto_merge_high_similarity(
-        threshold=auto_merge_threshold)
-    t2 = time.perf_counter()
-    print('auto_merge took {} seconds'.format(t2-t1))
+    if autoMerge:
+        print(cc)
+        t1 = time.perf_counter()
+        cc.compute_spike_waveforms_similarity()
+        cc.auto_merge_high_similarity(
+            threshold=auto_merge_threshold)
+        t2 = time.perf_counter()
+        print('auto_merge took {} seconds'.format(t2-t1))
     
-    print(catalogueconstructor)
+    if auto_make_catalog:
+        cc.make_catalogue_for_peeler()
+
+    print(cc)
     
-    catalogueconstructor.order_clusters(by='waveforms_rms')
+    cc.order_clusters(by='waveforms_rms')
     return
 
 
-def open_cataloguewindow(triFolder, chan_grp=0):
+def open_cataloguewindow(
+        triFolder, chan_grp=0,
+        name='catalogue_constructor'):
     dataio = tdc.DataIO(dirname=triFolder)
-    catalogueconstructor = tdc.CatalogueConstructor(
-        dataio=dataio, chan_grp=chan_grp)
+    cc = tdc.CatalogueConstructor(
+        dataio=dataio, name=name, chan_grp=chan_grp)
     
     app = pg.mkQApp()
-    win = tdc.CatalogueWindow(catalogueconstructor)
+    win = tdc.CatalogueWindow(cc)
     win.show()
     
     app.exec_()   
     return 
 
 
-def clean_catalogue(triFolder, chan_grp=0):
+def clean_catalogue(
+        triFolder,
+        name='catalogue_constructor', min_nb_peak=10, chan_grp=0):
     #  the catalogue need strong attention with teh catalogue windows.
     #  here a dirty way a cleaning is to take on the first 20 bigger cells
     #  the peeler will only detect them
     dataio = tdc.DataIO(dirname=triFolder)
-    cc = tdc.CatalogueConstructor(dataio=dataio, chan_grp=chan_grp)
+    cc = tdc.CatalogueConstructor(
+        dataio=dataio, name=name, chan_grp=chan_grp)
     
     #  re order by rms
     cc.order_clusters(by='waveforms_rms')
 
     #  re label >20 to trash (-1)
-    mask = cc.all_peaks['cluster_label'] > 20
+    mask = cc.all_peaks['nb_peak'] < min_nb_peak
     cc.all_peaks['cluster_label'][mask] = -1
     cc.on_new_cluster()
     
@@ -284,13 +342,22 @@ def clean_catalogue(triFolder, chan_grp=0):
     return
 
 
-def run_peeler(triFolder, chan_grp=0, duration=None):
+def run_peeler(
+        triFolder, chan_grp=0,
+        strict_multiplier=1.1,
+        debugging=False,
+        duration=None, useOpenCL=False):
     dataio = tdc.DataIO(dirname=triFolder)
     initial_catalogue = dataio.load_catalogue(chan_grp=chan_grp)
 
     print(dataio)
-    peeler = tdc.Peeler(dataio)
-    peeler.change_params(catalogue=initial_catalogue)
+    if useOpenCL:
+        peeler = tdc.Peeler_OpenCl(dataio)
+    else:
+        peeler = tdc.Peeler(dataio)
+    peeler.change_params(
+        catalogue=initial_catalogue,
+        strict_multiplier=strict_multiplier, debugging=debugging)
 
     t1 = time.perf_counter()
     peeler.run(duration=duration)
@@ -314,6 +381,121 @@ def export_spikes_after_peeler(triFolder):
     dataio = tdc.DataIO(dirname=triFolder)
     dataio.export_spikes(formats='csv')
     return
+
+
+def neo_block_after_peeler(triFolder, chan_grps=None):
+    dataio = tdc.DataIO(dirname=triFolder)
+
+    chanNames = np.array(
+        dataio.datasource.get_channel_names())
+    #  
+    blockName = 'tdc sorted spikes'
+    block = Block(name=blockName)
+
+    for segIdx in [0]:
+        seg = Segment()
+        block.segments.append(seg)
+
+        maxTime = (
+            dataio.get_segment_length(segIdx) /
+            dataio.sample_rate)
+    
+        for chan_grp in chan_grps:
+            #  chan_grp=0
+            channelIds = np.array(
+                dataio.channel_groups[chan_grp]['channels'])
+
+            catalogue = dataio.load_catalogue(chan_grp=chan_grp)
+            #  cc = tdc.CatalogueConstructor(
+            #      dataio=dataio, chan_grp=chan_grp)
+            
+            clustersDF = pd.DataFrame(catalogue['clusters'])
+            clustersDF['max_on_channel_id'] = (
+                channelIds[clustersDF['max_on_channel']])
+            
+            #  choose clusters that aren't tagged as so_bad
+            #  the trash spikes are excluded automatically
+            exportMask = ~clustersDF['tag'].isin(['so_bad'])
+            #  iterate over channels
+            channelGrouper = (
+                clustersDF.loc[exportMask, :].groupby('max_on_channel_id'))
+            #  keep track of how many units are on each channel
+            unitNumberLookup = {}
+            for idx, group in channelGrouper:
+                unitNumberLookup.update({
+                    cl: i for i, cl in (
+                        enumerate(pd.unique(group.cluster_label)))
+                    }
+                )
+                chanLabel = chanNames[idx]
+                #  create channel indexes
+                chanIdx = ChannelIndex(
+                    name='{}'.format(chanLabel),
+                    index=[idx])
+                block.channel_indexes.append(chanIdx)
+
+            #  iterate over units
+            unitGrouper = (
+                clustersDF.loc[exportMask, :].groupby('cell_label'))
+            for unitName, group in unitGrouper:
+                #  assert group['max_on_channel_id'] only has one element
+                chanId = group['max_on_channel_id'].values[0]
+                chanLabel = chanNames[chanId]
+                chanName = '{}'.format(chanLabel)
+                chanIdx = block.filter(objects=ChannelIndex, name=chanName)[0]
+                #  create unit indexes
+                thisUnit = Unit(
+                    name='{}#{}'.format(
+                        chanName, unitNumberLookup[unitName]))
+                print(thisUnit.name)
+                chanIdx.units.append(thisUnit)
+                thisUnit.channel_index = chanIdx
+                #  get spike times
+                spike = dataio.get_spikes(
+                    seg_num=segIdx, chan_grp=chan_grp)
+                unitMask = np.isin(
+                    spike['cluster_label'],
+                    group['cluster_label'])
+                spikeTimes = (
+                    (
+                        spike[unitMask]['index'] +
+                        spike[unitMask]['jitter']) /
+                    dataio.sample_rate)
+                #  import pdb; pdb.set_trace()
+                spikeWaveforms = dataio.get_some_waveforms(
+                    seg_num=segIdx, chan_grp=chan_grp,
+                    spike_indexes=spike[unitMask]['index'],
+                    n_left=catalogue['n_left'],
+                    n_right=catalogue['n_right']
+                    )
+                spikeWaveforms = np.swapaxes(
+                    spikeWaveforms,
+                    1, 2)
+                #  import pdb; pdb.set_trace()
+                st = SpikeTrain(
+                    name='seg{}_{}'.format(int(segIdx), thisUnit.name),
+                    times=spikeTimes, units='sec',
+                    waveforms=spikeWaveforms * pq.uV,
+                    t_stop=maxTime, t_start=0,
+                    left_sweep=catalogue['n_left'],
+                    sampling_rate=dataio.sample_rate * pq.Hz)
+                thisUnit.spiketrains.append(st)
+                seg.spiketrains.append(st)
+                st.unit = thisUnit
+
+            seg.create_relationship()
+
+    for chanIdx in block.channel_indexes:
+        chanIdx.create_relationship()
+    block.create_relationship()
+
+    triName = os.path.basename(os.path.normpath(triFolder))
+    writer = neo.io.NixIO(
+        filename=os.path.join(triFolder, triName + '.nix'),
+        mode='ow')
+    writer.write_block(block)
+    writer.close()
+    return block
 
 
 if __name__ == '__main__':
