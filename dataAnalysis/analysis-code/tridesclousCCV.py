@@ -12,23 +12,37 @@ Options:
 from docopt import docopt
 import tridesclous as tdc
 import dataAnalysis.helperFunctions.tridesclous_helpers as tdch
+import dataAnalysis.helperFunctions.helper_functions as hf
 from currentExperiment import *
+import os, gc
 
 arguments = docopt(__doc__)
 #  if overriding currentExperiment
 if arguments['--trialIdx']:
     print(arguments)
     trialIdx = int(arguments['--trialIdx'])
+    ns5FileName = 'Trial00{}'.format(trialIdx)
+    triFolder = os.path.join(
+        nspFolder, 'tdc_' + ns5FileName)
+
+#  catName = 'F:\\Murdoc Neural Recordings\\201901271000-Proprio\\tdc_Trial001\\channel_group_4\\catalogues\\initial\\catalogue.pickle'
+#  with open(catName, 'rb') as f:
+#      data = pickle.load(f)
 
 try:
     tdch.initialize_catalogueconstructor(
-        trialFilesFrom['utah']['folderPath'],
-        trialFilesFrom['utah']['ns5FileName'],
+        nspFolder,
+        ns5FileName,
         triFolder,
         nspPrbPath,
         removeExisting=False, fileFormat='Blackrock')
 except Exception:
     pass
+
+purgePeeler = False
+if purgePeeler:
+    tdch.purgePeelerResults(
+        triFolder, purgeAll=True)
 
 dataio = tdc.DataIO(dirname=triFolder)
 chansToAnalyze = sorted(list(dataio.channel_groups.keys()))
@@ -73,17 +87,19 @@ for chan_grp in chansToAnalyze:
 for chan_grp in chansToAnalyze:
         tdch.open_cataloguewindow(triFolder, chan_grp=chan_grp)
 
-chansToAnalyze = sorted(list(dataio.channel_groups.keys()))[:-1]
 for chan_grp in chansToAnalyze:
     #   chan_grp = 15
+    print('memory usage: {}'.format(
+        hf.memory_usage_psutil()))
     tdch.run_peeler(
         triFolder, strict_multiplier=2e-3,
         debugging=False,
-        useOpenCL=False, chan_grp=chan_grp)
-#
-chansToAnalyze = []
+        useOpenCL=False, chan_grp=chan_grp, progressbar=False)
+    gc.collect()
+
 for chan_grp in chansToAnalyze:
     tdch.open_PeelerWindow(triFolder, chan_grp=chan_grp)
 
+chansToAnalyze = sorted(list(dataio.channel_groups.keys()))[:-1]
 if chansToAnalyze:
     tdch.neo_block_after_peeler(triFolder, chan_grps=chansToAnalyze)

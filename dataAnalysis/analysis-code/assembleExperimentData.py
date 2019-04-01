@@ -32,55 +32,71 @@ from neo import (
 #  load options
 from currentExperiment import *
 
-trialList = [3]
-
-experimentDataPath = os.path.join(
-    trialFilesStim['ins']['folderPath'],
-    trialFilesStim['ins']['experimentName'],
-    trialFilesStim['ins']['experimentName'] + '_analyze.nix')
-for idx, trialIdx in enumerate(trialList):
-    #  trialIdx = 2
-    #  idx = 0
-    #  trialIdx = 3
-    #  idx = 1
-    analysisDataPath = os.path.join(
+trialList = [1, 2, 3, 4]
+suffixList = ['_binarized', '_analyze']
+#  suffixList = ['_analyze']
+#  suffixList = ['_binarized']
+for suffix in suffixList:
+    experimentDataPath = os.path.join(
         trialFilesStim['ins']['folderPath'],
         trialFilesStim['ins']['experimentName'],
-        'Trial00{}'.format(trialIdx) + '_analyze.nix')
-    if idx == 0:
-        masterBlock = preproc.loadWithArrayAnn(
-            analysisDataPath, fromRaw=False)
-        for st in masterBlock.filter(objects=SpikeTrain):
-            st.unit.name = st.name
-            st.unit.channel_index.name = st.name
-        for asig in masterBlock.filter(objects=AnalogSignal):
-            asig.channel_index.name = asig.name
-        masterTStart = masterBlock.filter(objects=AnalogSignal)[0].t_start
-        oldTStop = masterBlock.filter(objects=AnalogSignal)[0].t_stop
-        typesNeedRenaming = [Segment, SpikeTrain, AnalogSignal]
-        for objType in typesNeedRenaming:
-            for child in masterBlock.filter(objects=objType):
-                child.name = child.name + '_{}'.format(idx)
-    else:
-        dataBlock = preproc.loadWithArrayAnn(
-            analysisDataPath, fromRaw=False)
-        for st in dataBlock.filter(objects=SpikeTrain):
-            st.unit.name = st.name
-            st.unit.channel_index.name = st.name
-        for asig in dataBlock.filter(objects=AnalogSignal):
-            asig.channel_index.name = asig.name
-        tStart = dataBlock.filter(objects=AnalogSignal)[0].t_start
-        timeOffset = oldTStop - tStart
-        dataBlock = hf.timeOffsetBlock(dataBlock, timeOffset, masterTStart)
-        #  [i.times for i in dataBlock.filter(objects=SpikeTrain)]
-        #  [i.unit.channel_index.name for i in masterBlock.filter(objects=SpikeTrain)]
-        tStop = dataBlock.filter(objects=AnalogSignal)[0].t_stop
-        for objType in typesNeedRenaming:
-            for child in dataBlock.filter(objects=objType):
-                child.name = child.name + '_{}'.format(idx)
-        masterBlock.merge(dataBlock)
-        oldTStop = tStop
-masterBlock = preproc.purgeNixAnn(masterBlock)
-writer = neo.io.NixIO(filename=experimentDataPath)
-writer.write_block(masterBlock)
-writer.close()
+        trialFilesStim['ins']['experimentName'] + suffix + '.nix')
+    for idx, trialIdx in enumerate(trialList):
+        #  trialIdx = 2
+        #  idx = 0
+        #  trialIdx = 3
+        #  idx = 1
+        trialDataPath = os.path.join(
+            trialFilesStim['ins']['folderPath'],
+            trialFilesStim['ins']['experimentName'],
+            'Trial00{}'.format(trialIdx) + suffix + '.nix')
+        if idx == 0:
+            masterBlock = preproc.loadWithArrayAnn(
+                trialDataPath, fromRaw=False)
+            #  pdb.set_trace()
+            if suffix == '_analyze':
+                for st in masterBlock.filter(objects=SpikeTrain):
+                    st.unit.name = st.name
+                    st.unit.channel_index.name = st.name
+                for asig in masterBlock.filter(objects=AnalogSignal):
+                    asig.channel_index.name = asig.name
+            elif suffix == '_binarized':
+                for seg in masterBlock.segments:
+                    seg.spiketrains = []
+                for asig in masterBlock.filter(objects=AnalogSignal):
+                    asig.name = asig.channel_index.name
+            masterTStart = masterBlock.filter(objects=AnalogSignal)[0].t_start
+            oldTStop = masterBlock.filter(objects=AnalogSignal)[0].t_stop
+            typesNeedRenaming = [Segment, SpikeTrain, AnalogSignal, Event]
+            for objType in typesNeedRenaming:
+                for child in masterBlock.filter(objects=objType):
+                    child.name = 'seg{}_{}'.format(idx, child.name)
+        else:
+            dataBlock = preproc.loadWithArrayAnn(
+                trialDataPath, fromRaw=False)
+            if suffix == '_analyze':
+                for st in dataBlock.filter(objects=SpikeTrain):
+                    st.unit.name = st.name
+                    st.unit.channel_index.name = st.name
+                for asig in dataBlock.filter(objects=AnalogSignal):
+                    asig.channel_index.name = asig.name
+            elif suffix == '_binarized':
+                for seg in dataBlock.segments:
+                    seg.spiketrains = []
+                for asig in dataBlock.filter(objects=AnalogSignal):
+                    asig.name = asig.channel_index.name
+            tStart = dataBlock.filter(objects=AnalogSignal)[0].t_start
+            timeOffset = oldTStop - tStart
+            dataBlock = hf.timeOffsetBlock(dataBlock, timeOffset, masterTStart)
+            #  [i.times for i in dataBlock.filter(objects=SpikeTrain)]
+            #  [i.unit.channel_index.name for i in masterBlock.filter(objects=SpikeTrain)]
+            tStop = dataBlock.filter(objects=AnalogSignal)[0].t_stop
+            for objType in typesNeedRenaming:
+                for child in dataBlock.filter(objects=objType):
+                    child.name = 'seg{}_{}'.format(idx, child.name)
+            masterBlock.merge(dataBlock)
+            oldTStop = tStop
+    masterBlock = preproc.purgeNixAnn(masterBlock)
+    writer = neo.io.NixIO(filename=experimentDataPath)
+    writer.write_block(masterBlock)
+    writer.close()

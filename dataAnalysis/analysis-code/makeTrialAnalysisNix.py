@@ -1,3 +1,11 @@
+"""
+Usage:
+    makeTrialAnalysisNix.py [--trialIdx=trialIdx]
+
+Arguments:
+    trialIdx            which trial to analyze
+"""
+
 from neo.io.proxyobjects import (
     AnalogSignalProxy, SpikeTrainProxy, EventProxy)
 from neo import (
@@ -7,23 +15,56 @@ import neo
 from currentExperiment import *
 import dataAnalysis.helperFunctions.helper_functions as hf
 import numpy as np
+import pandas as pd
 import elephant.pandas_bridge as elphpdb
 import dataAnalysis.preproc.ns5 as preproc
 import dataAnalysis.preproc.mdt as preprocINS
 import quantities as pq
-nspReader = neo.io.nixio_fr.NixIO(filename=trialBasePath)
+import rcsanalysis.packet_func as rcsa_helpers
+import os
+from importlib import reload
+from docopt import docopt
 
+
+arguments = docopt(__doc__)
+#  if overriding currentExperiment
+if arguments['--trialIdx']:
+    print(arguments)
+    trialIdx = int(arguments['--trialIdx'])
+    ns5FileName = 'Trial00{}'.format(trialIdx)
+    trialBasePath = os.path.join(
+        nspFolder,
+        ns5FileName + '.nix')
+    analysisDataPath = os.path.join(
+        insFolder,
+        experimentName,
+        ns5FileName + '_analyze.nix')
+    binnedSpikePath = os.path.join(
+        insFolder,
+        experimentName,
+        ns5FileName + '_binarized.nix')
+
+
+samplingRate = 1 / rasterOpts['binInterval'] * pq.Hz
+
+nspReader = neo.io.nixio_fr.NixIO(filename=trialBasePath)
 nspBlock = nspReader.read_block(
     block_index=0, lazy=True,
     signal_group_mode='split-all')
+
 dataBlock = hf.extractSignalsFromBlock(
     nspBlock)
 dataBlock = hf.loadBlockProxyObjects(dataBlock)
 allSpikeTrains = dataBlock.filter(objects=SpikeTrain)
 for st in allSpikeTrains:
-        if st.waveforms is None:
-            st.sampling_rate = 3e4*pq.Hz
-            st.waveforms = np.array([]).reshape((0, 0, 0))*pq.mV
+    if 'arrayAnnNames' in st.annotations.keys():
+        for key in st.annotations['arrayAnnNames']:
+            #  fromRaw, the ann come back as tuple, need to recast
+            st.array_annotations.update(
+                {key: np.array(st.annotations[key])})
+    st.sampling_rate = samplingRate
+    if st.waveforms is None:
+        st.waveforms = np.array([]).reshape((0, 0, 0))*pq.mV
 
 #  tests...
 #  [i.unit.channel_index.name for i in insBlockJustSpikes.filter(objects=SpikeTrain)]
@@ -90,6 +131,15 @@ if testEventMerge:
         [rigProp], idxT='t'
         )
 
+dataBlock = preproc.purgeNixAnn(dataBlock)
+writer = neo.io.NixIO(filename=analysisDataPath)
+writer.write_block(dataBlock)
+writer.close()
+
+spikeMatBlock = preproc.calcBinarizedArray(
+    dataBlock, samplingRate,
+    binnedSpikePath, saveToFile=True)
+
 #  save ins time series
 tdChanNames = [
     i.name for i in nspBlock.filter(objects=AnalogSignalProxy)
@@ -101,42 +151,54 @@ tdBlock = hf.loadBlockProxyObjects(tdBlock)
 ins_events = [
     i for i in tdBlock.filter(objects=Event)
     if 'ins_' in i.name]
+tdDF = preproc.analogSignalsToDataFrame(
+    tdBlock.filter(objects=AnalogSignal))
+newT = pd.Series(
+    spikeMatBlock.filter(objects=AnalogSignal)[0].times.magnitude)
+tdInterp = hf.interpolateDF(
+    tdDF, newT,
+    kind='linear', fill_value=(0, 0),
+    x='t', columns=tdChanNames)
+
+expandCols = [
+        'RateInHz', 'therapyStatus',
+        'activeGroup', 'program', 'trialSegment']
+deriveCols = ['amplitudeRound', 'amplitude']
+progAmpNames = rcsa_helpers.progAmpNames
+
 stimStSer = preproc.eventsToDataFrame(
     ins_events, idxT='t'
     )
-tdDF = preproc.analogSignalsToDataFrame(
-    tdBlock.filter(objects=AnalogSignal))
-newT = np.arange()
+stimStatus = hf.stimStatusSerialtoLong(
+    stimStSer, idxT='t', expandCols=expandCols,
+    deriveCols=deriveCols, progAmpNames=progAmpNames)
+columnsToBeAdded = ['amplitude', 'program']
+infoFromStimStatus = hf.interpolateDF(
+    stimStatus, tdInterp['t'],
+    x='t', columns=columnsToBeAdded, kind='previous')
+tdInterp = pd.concat((
+    tdInterp,
+    infoFromStimStatus.drop(columns='t')),
+    axis=1)
+tdBlockInterp = preproc.dataFrameToAnalogSignals(
+    tdInterp,
+    idxT='t', useColNames=True,
+    dataCol=tdInterp.drop(columns='t').columns,
+    samplingRate=samplingRate)
+
+preproc.addBlockToNIX(
+    tdBlockInterp, segIdx=0,
+    writeSpikes=False, writeEvents=False,
+    fileName=ns5FileName + '_analyze',
+    folderPath=os.path.join(
+        insFolder,
+        experimentName),
+    nixBlockIdx=0, nixSegIdx=0,
+    )
+
 testSaveability = True
 #  pdb.set_trace()
 #  for st in dataBlock.filter(objects=SpikeTrain): print('{}: t_start={}'.format(st.name, st.t_start))
 #  for st in insBlockJustSpikes.filter(objects=SpikeTrain): print('{}: t_start={}'.format(st.name, st.t_start))
 #  for st in insBlock.filter(objects=SpikeTrain): print('{}: t_start={}'.format(st.name, st.t_start))
-dataBlock = preproc.purgeNixAnn(dataBlock)
-writer = neo.io.NixIO(filename=analysisDataPath)
-writer.write_block(dataBlock)
-writer.close()
-############################################################
-confirmNixAddition = False
-if confirmNixAddition:
-    for idx, oUnit in enumerate(insBlock.list_units):
-        if len(oUnit.spiketrains[0]):
-            st = oUnit.spiketrains[0]
-            break
 
-    trialBasePath = os.path.join(
-        trialFilesFrom['utah']['folderPath'],
-        trialFilesFrom['utah']['ns5FileName'])
-    loadedReader = neo.io.nixio_fr.NixIO(filename=trialBasePath + '.nix')
-    loadedBlock = loadedReader.read_block(
-        block_index=0,
-        lazy=True)
-    from neo.io.proxyobjects import SpikeTrainProxy
-    lStPrx = loadedBlock.filter(objects=SpikeTrainProxy, name=st.name)[0]
-    lSt = lStPrx.load()
-    plt.eventplot(st.times, label='original', lw=5)
-    plt.eventplot(lSt.times, label='loaded', colors='r')
-    plt.legend()
-    plt.show()
-    
-############################################################

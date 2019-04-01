@@ -1,10 +1,12 @@
-# -*- coding: utf-8 -*-
 """
-Created on Sat Jan  5 09:07:44 2019
+Usage:
+    synchronizeINStoNSP.py [--trialIdx=trialIdx]
 
-@author: Radu
+Arguments:
+    trialIdx            which trial to analyze
 """
 
+from docopt import docopt
 import matplotlib, pdb, pickle, traceback
 matplotlib.use('TkAgg')   # generate interactive output by default
 #  matplotlib.rcParams['agg.path.chunksize'] = 10000
@@ -48,6 +50,38 @@ from currentExperiment import *
 #  load INS Data
 ############################################################
 
+arguments = docopt(__doc__)
+#  if overriding currentExperiment
+if arguments['--trialIdx']:
+    print(arguments)
+    trialIdx = int(arguments['--trialIdx'])
+    ns5FileName = 'Trial00{}'.format(trialIdx)
+    insDataPath = os.path.join(
+        insFolder,
+        experimentName,
+        ns5FileName + '_ins.nix')
+    trialFilesStim = {
+        'ins': {
+            'origin': 'ins',
+            'experimentName': experimentName,
+            'folderPath': insFolder,
+            'ns5FileName': ns5FileName,
+            'jsonSessionNames': jsonSessionNames[trialIdx],
+            'elecIDs': range(17),
+            'excludeClus': [],
+            'forceRecalc': True,
+            'detectStim': True,
+            'getINSkwargs': {
+                'stimDetectOpts': stimDetectOpts,
+                'stimIti': 0, 'fixedDelay': 10e-3,
+                'minDist': 0.2, 'minDur': 0.2, 'thres': 3,
+                'gaussWid': 200e-3,
+                'gaussKerWid': 75e-3,
+                'maxSpikesPerGroup': 1, 'plotting': []  # range(1, 1000, 5)
+                }
+            }
+        }
+
 try:
     reader = neo.io.NixIO(filename=insDataPath, mode='ro')
 except:
@@ -77,24 +111,24 @@ startTime_s = None
 dataLength_s = None
 try:
     channelData, nspBlock = preproc.getNIXData(
-        fileName=trialFilesFrom['utah']['ns5FileName'],
-        folderPath=trialFilesFrom['utah']['folderPath'],
+        fileName=ns5FileName,
+        folderPath=nspFolder,
         elecIds=['ainp7'], startTime_s=startTime_s,
         dataLength_s=dataLength_s,
         signal_group_mode='split-all', closeReader=True)
 except Exception:
     traceback.print_exc()
     reader = preproc.preproc(
-        fileName=trialFilesFrom['utah']['ns5FileName'],
-        folderPath=trialFilesFrom['utah']['folderPath'],
+        fileName=ns5FileName,
+        folderPath=nspFolder,
         fillOverflow=False, removeJumps=False,
         eventInfo=trialFilesFrom['utah']['eventInfo'],
         spikeSource='tdc',
         chunkSize=2500
         )
     channelData, nspBlock = preproc.getNIXData(
-        fileName=trialFilesFrom['utah']['ns5FileName'],
-        folderPath=trialFilesFrom['utah']['folderPath'],
+        fileName=ns5FileName,
+        folderPath=nspFolder,
         elecIds=['ainp7'], startTime_s=startTime_s,
         dataLength_s=dataLength_s,
         signal_group_mode='split-all', closeReader=True)
@@ -105,8 +139,8 @@ except Exception:
 getTapsFromNev = False
 if getTapsFromNev:
     nevFilePath = os.path.join(
-        trialFilesFrom['utah']['folderPath'],
-        trialFilesFrom['utah']['ns5FileName'] + '.mat')
+        nspFolder,
+        ns5FileName + '.mat')
     tapSpikes = ksa.getNevMatSpikes(
         nevFilePath, nevIDs=[135],
         excludeClus=[], plotting=False)
@@ -254,8 +288,8 @@ if addingToNix:
     preproc.addBlockToNIX(
         insBlockJustSpikes, segIdx=0,
         writeAsigs=False, writeSpikes=True,
-        fileName=trialFilesFrom['utah']['ns5FileName'],
-        folderPath=trialFilesFrom['utah']['folderPath'],
+        fileName=ns5FileName,
+        folderPath=nspFolder,
         nixBlockIdx=0, nixSegIdx=0,
         )
     tdColumns = [
@@ -273,8 +307,8 @@ if addingToNix:
         forceColNames=tdColumns)
     preproc.addBlockToNIX(
         tdBlock, segIdx=0,
-        fileName=trialFilesFrom['utah']['ns5FileName'],
-        folderPath=trialFilesFrom['utah']['folderPath'],
+        fileName=ns5FileName,
+        folderPath=nspFolder,
         nixBlockIdx=0, nixSegIdx=0,
         )
     accelColumns = [
@@ -292,7 +326,7 @@ if addingToNix:
         forceColNames=accelColumns)
     preproc.addBlockToNIX(
         accelBlock, segIdx=0,
-        fileName=trialFilesFrom['utah']['ns5FileName'],
-        folderPath=trialFilesFrom['utah']['folderPath'],
+        fileName=ns5FileName,
+        folderPath=nspFolder,
         nixBlockIdx=0, nixSegIdx=0,
         )

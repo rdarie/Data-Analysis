@@ -11,13 +11,13 @@
 #SBATCH --array=1,2,3,4
 
 # Specify a job name:
-#SBATCH -J spike_sorting
+#SBATCH -J ins_synch
 
 # Specify an output file
-#SBATCH -o ../batch_logs/sorting-o-%j-%a.out
-#SBATCH -e ../batch_logs/sorting-e-%j-%a.out
+#SBATCH -o ../batch_logs/synchins-o-%j-%a.out
+#SBATCH -e ../batch_logs/synchins-e-%j-%a.out
 
 # Specify account details
 #SBATCH --account=bibs-dborton-condo
 
-python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/tridesclousCCV.py' --trialIdx=$SLURM_ARRAY_TASK_ID
+python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/synchronizeINStoNSP.py' --trialIdx=$SLURM_ARRAY_TASK_ID

@@ -11,10 +11,11 @@ trialIdx = 3
 experimentName = '201901271000-Proprio'
 deviceName = 'DeviceNPC700373H'
 #  remote paths
-remoteBasePath = '..'
-#  remoteBasePath = 'Z:\\data\\rdarie\\Murdoc Neural Recordings'
-jsonBaseFolder = os.path.join(remoteBasePath, 'ORCA Logs')
-folderPath = os.path.join(remoteBasePath, experimentName)
+#  remoteBasePath = '..'
+remoteBasePath = 'Z:\\data\\rdarie\\Murdoc Neural Recordings'
+insFolder = os.path.join(remoteBasePath, 'ORCA Logs')
+nspFolder = os.path.join(remoteBasePath, experimentName)
+ns5FileName = 'Trial00{}'.format(trialIdx)
 
 jsonSessionNames = {
     #  per trial
@@ -129,7 +130,7 @@ trialFilesFrom = {
     'utah': {
         'origin': 'mat',
         'experimentName': experimentName,
-        'folderPath': folderPath,
+        'folderPath': nspFolder,
         'ns5FileName': 'Trial00{}'.format(trialIdx),
         'elecIDs': list(range(1, 97)) + [135],
         'excludeClus': []
@@ -149,8 +150,8 @@ trialFilesStim = {
     'ins': {
         'origin': 'ins',
         'experimentName': experimentName,
-        'folderPath': jsonBaseFolder,
-        'ns5FileName': 'Trial00{}'.format(trialIdx),
+        'folderPath': insFolder,
+        'ns5FileName': ns5FileName,
         'jsonSessionNames': jsonSessionNames[trialIdx],
         'elecIDs': range(17),
         'excludeClus': [],
@@ -180,8 +181,7 @@ if miniRCTrial:
 
 nspPrbPath = os.path.join('.', 'nsp_map.prb')
 triFolder = os.path.join(
-    trialFilesFrom['utah']['folderPath'],
-    'tdc_' + trialFilesFrom['utah']['ns5FileName'])
+    nspFolder, 'tdc_' + ns5FileName)
 
 # make .prb file for spike sorting
 #  {'xcoords': 2, 'ycoords': 2}
@@ -191,7 +191,6 @@ tdch.cmpDFToPrb(
     cmpDF, filePath=nspPrbPath,
     names=['elec'],
     groupIn={'xcoords': 1, 'ycoords': 1}, appendDummy=16)
-
 
 #  should rename these to something more intuitive
 #  paths relevant to individual trials
@@ -211,6 +210,10 @@ insDataPath = os.path.join(
         trialFilesStim['ins']['experimentName'],
         trialFilesStim['ins']['ns5FileName'] + '_ins.nix'
     )
+binnedSpikePath = os.path.join(
+    trialFilesStim['ins']['folderPath'],
+    trialFilesStim['ins']['experimentName'],
+    trialFilesStim['ins']['ns5FileName'] + '_binarized.nix')
 
 #  paths relevant to the entire experimental day
 masterFeaturePath = os.path.join(
@@ -225,7 +228,7 @@ experimentDataPath = os.path.join(
     trialFilesStim['ins']['folderPath'],
     trialFilesStim['ins']['experimentName'],
     trialFilesStim['ins']['experimentName'] + '_analyze.nix')
-binnedSpikePath = os.path.join(
+experimentBinnedSpikePath = os.path.join(
     trialFilesStim['ins']['folderPath'],
     trialFilesStim['ins']['experimentName'],
     trialFilesStim['ins']['experimentName'] + '_binarized.nix')

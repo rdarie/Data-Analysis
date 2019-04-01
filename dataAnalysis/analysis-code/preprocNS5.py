@@ -1,9 +1,25 @@
+"""
+Usage:
+    preprocNS5.py [--trialIdx=trialIdx]
+
+Arguments:
+    trialIdx            which trial to analyze
+"""
+
+from docopt import docopt
 import dataAnalysis.preproc.ns5 as preproc
 from currentExperiment import *
-#   eventInfo=trialFilesFrom['utah']['eventInfo']
+
+arguments = docopt(__doc__)
+#  if overriding currentExperiment
+if arguments['--trialIdx']:
+    print(arguments)
+    trialIdx = int(arguments['--trialIdx'])
+    ns5FileName = 'Trial00{}'.format(trialIdx)
+
 reader = preproc.preproc(
-        fileName=trialFilesFrom['utah']['ns5FileName'],
-        folderPath=trialFilesFrom['utah']['folderPath'],
+        fileName=ns5FileName,
+        folderPath=nspFolder,
         fillOverflow=False, removeJumps=False,
         eventInfo=trialFilesFrom['utah']['eventInfo'],
         spikeSource='tdc', writeMode='ow',
