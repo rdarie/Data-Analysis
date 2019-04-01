@@ -529,6 +529,7 @@ def plotSpike(spikes, channel, showNow = False, ax = None,
                 else:
                     waveForms = spikes['Waveforms'][ChanIdx][unitMask, :]
                 thisSpike = np.nanmean(waveForms, axis = 0)
+                #  pdb.set_trace()
                 thisError = np.nanstd(waveForms, axis = 0)
                 timeRange = np.arange(len(thisSpike)) / spikes['basic_headers']['TimeStampResolution'] * 1e3
                 colorPalette = sns.color_palette(n_colors = 40)

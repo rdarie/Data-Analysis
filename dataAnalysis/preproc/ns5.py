@@ -32,6 +32,7 @@ try:
     from collections.abc import Iterable
 except ImportError:
     from collections import Iterable
+from elephant.conversion import binarize
 
 
 def spikeDictToSpikeTrains(
@@ -115,13 +116,14 @@ def spikeTrainsToSpikeDict(spiketrains):
         else:
             spikes['TimeStamps'][idx] = st.times.magnitude
         
-        theseWaveforms = np.swapaxes(st.waveforms, 1, 2)
+        theseWaveforms = np.squeeze(
+            np.swapaxes(st.waveforms, 1, 2))
         if len(spikes['Waveforms'][idx]):
             spikes['Waveforms'][idx] = np.stack((
                 spikes['Waveforms'][idx],
-                theseWaveforms), axis=-1)
+                theseWaveforms.magnitude), axis=-1)
         else:
-            spikes['Waveforms'][idx] = theseWaveforms
+            spikes['Waveforms'][idx] = theseWaveforms.magnitude
         
         classVals = st.times.magnitude ** 0 * idx
         if len(spikes['Classification'][idx]):
@@ -166,7 +168,8 @@ def dataFrameToAnalogSignals(
         probeName='insTD', samplingRate=500*pq.Hz,
         timeUnits=pq.s, measureUnits=pq.mV,
         dataCol=['channel_0', 'channel_1'],
-        useColNames=False, forceColNames=None, namePrefix=''):
+        useColNames=False, forceColNames=None,
+        namePrefix='', nameSuffix=''):
 
     if block is None:
         assert seg is None
@@ -178,9 +181,9 @@ def dataFrameToAnalogSignals(
         if forceColNames is not None:
             chanName = forceColNames[idx]
         elif useColNames:
-            chanName = namePrefix + colName
+            chanName = namePrefix + colName + nameSuffix
         else:
-            chanName = namePrefix + (probeName.lower() + '{}'.format(idx))
+            chanName = namePrefix + (probeName.lower() + '{}'.format(idx)) + nameSuffix
 
         arrayAnn = {
             'channel_names': np.array([chanName]),
@@ -204,8 +207,8 @@ def dataFrameToAnalogSignals(
         seg.analogsignals.append(asig)
         chanIdx.create_relationship()
     # assign parent to children
-    # block.create_relationship()
-    # seg.create_relationship()
+    block.create_relationship()
+    seg.create_relationship()
     return block
 
 
@@ -326,7 +329,7 @@ def loadSpikeMats(
 
     reader = neo.io.nixio_fr.NixIO(filename=dataPath)
     chanNames = reader.header['signal_channels']['name']
-    #  pdb.set_trace()
+    
     if chans is not None:
         sigMask = np.isin(chanNames, chans)
         chanNames = chanNames[sigMask]
@@ -357,7 +360,7 @@ def loadSpikeMats(
         intervalIdx = int(round(rasterOpts['binInterval'] * fs))
         halfIntervalIdx = int(round(intervalIdx / 2))
         
-        widthIdx = int(round(rasterOpts['binWidth'] * fs))
+        widthIdx = int(3 * round(rasterOpts['binWidth'] * fs))
         halfWidthIdx = int(round(widthIdx / 2))
         
         theBins = None
@@ -397,16 +400,21 @@ def loadSpikeMats(
                         i_start=iStart, i_stop=iStop,
                         channel_names=chanNames))
                 #  print(rawSpikeMat.sum().sum())
+                #  pdb.set_trace()
+                #  oneSpike = pd.Series(0, index=range(100))
+                #  oneSpike.iloc[50] = 1000
+                #  oneSpikeAverage = oneSpike.rolling(window=widthIdx, center=True, win_type='gaussian').mean(std=widthIdx/6).dropna()
                 procSpikeMat = rawSpikeMat.rolling(
-                    window=widthIdx, center=True
-                    ).sum().dropna().iloc[::intervalIdx, :]
+                    window=widthIdx, center=True,
+                    win_type='gaussian'
+                    ).mean(std=widthIdx/6).dropna().iloc[::intervalIdx, :]
                     
                 procSpikeMat.columns = chanNames
                 procSpikeMat.columns.name = 'unit'
                 if theBins is None:
+                    #  pdb.set_trace()
                     theBins = np.array(
-                        procSpikeMat.index -
-                        halfWidthIdx + winStartIdx) / fs
+                        procSpikeMat.index + winStartIdx) / fs
                 if absoluteBins:
                     procSpikeMat.index = theBins + idxOnset / fs
                 else:
@@ -418,7 +426,8 @@ def loadSpikeMats(
                     smIdx = segIdx
                 else:
                     smIdx = idx
-                spikeMats[smIdx] = procSpikeMat / widthIdx
+                    
+                spikeMats[smIdx] = procSpikeMat
                 if transposeSpikeMat:
                     spikeMats[smIdx] = spikeMats[smIdx].transpose()
             #  plt.imshow(rawSpikeMat.values, aspect='equal'); plt.show()
@@ -574,7 +583,7 @@ def getNIXData(
 #  TODO: write code that merges a dataframe and a spikesdict to a block
 def addBlockToNIX(
         newBlock, segIdx=0,
-        writeAsigs=True, writeSpikes=True,
+        writeAsigs=True, writeSpikes=True, writeEvents=True,
         fileName=None,
         folderPath=None,
         nixBlockIdx=0, nixSegIdx=0,
@@ -606,11 +615,15 @@ def addBlockToNIX(
         if chanIdx.analogsignals:
             maxIdx = max(maxIdx, max(chanIdx.index))
     
-    tempAsig = tempBlock.channel_indexes[0].analogsignals[0]
-
-    forceType = tempAsig.dtype
-    forceShape = tempAsig.shape[0]  # ? docs say shape[1], but that's confusing
-    forceFS = tempAsig.sampling_rate
+    tempAsigList = tempBlock.segments[nixSegIdx].filter(objects=AnalogSignalProxy)
+    
+    checkCompatible = False
+    if len(tempAsigList) > 0:
+        tempAsig = tempAsigList[0]
+        checkCompatible = True
+        forceType = tempAsig.dtype
+        forceShape = tempAsig.shape[0]  # ? docs say shape[1], but that's confusing
+        forceFS = tempAsig.sampling_rate
     reader.file.close()
     #  if newBlock was loaded from a nix file, strip the old nix_names away:
     
@@ -631,13 +644,16 @@ def addBlockToNIX(
     nixSegName = nixgroup.name
     newBlock.segments[segIdx].annotate(nix_name=nixSegName)
     #  TODO: double check that you can't add the same thing twice
-    for event in newBlock.segments[segIdx].events:
-        event = writer._write_event(event, nixblock, nixgroup)
+    if writeEvents:
+        for event in newBlock.segments[segIdx].events:
+            event = writer._write_event(event, nixblock, nixgroup)
     if writeAsigs:
         for asig in newBlock.segments[segIdx].analogsignals:
-            assert asig.dtype == forceType
-            assert asig.sampling_rate == forceFS
-            assert asig.shape[0] == forceShape
+            #  pdb.set_trace()
+            if checkCompatible:
+                assert asig.dtype == forceType
+                assert asig.sampling_rate == forceFS
+                assert asig.shape[0] == forceShape
             asig = writer._write_analogsignal(asig, nixblock, nixgroup)
         for isig in newBlock.segments[segIdx].irregularlysampledsignals:
             isig = writer._write_irregularlysampledsignal(
@@ -952,7 +968,7 @@ def blockToNix(
                     gc.collect()
                 _, trialEvents = mea.getTrialsNew(
                     motorData, ainpAsig.sampling_rate.magnitude,
-                    tStart, trialType="2AFC")
+                    tStart, trialType=None)
                 trialEvents.fillna(0)
                 trialEvents.rename(
                     columns={
@@ -1112,3 +1128,77 @@ def loadWithArrayAnn(dataPath, fromRaw=False):
                 st.array_annotations.update(
                     {key: np.array(st.annotations[key])})
     return block
+
+
+def calcBinarizedArray(
+        dataBlock, samplingRate, binnedSpikePath, saveToFile=True):
+    spikeMatBlock = Block()
+    spikeMatBlock.merge_annotations(dataBlock)
+
+    allSpikeTrains = [
+            i for i in dataBlock.filter(objects=SpikeTrain) if '#' in i.name]
+    
+    for st in allSpikeTrains:
+        if '#' in st.name:
+            chanList = spikeMatBlock.filter(
+                objects=ChannelIndex, name=st.unit.name)
+            if not len(chanList):
+                chanIdx = ChannelIndex(name=st.unit.name, index=np.array([0]))
+                #  print(chanIdx.name)
+                spikeMatBlock.channel_indexes.append(chanIdx)
+
+    for segIdx, seg in enumerate(dataBlock.segments):
+        newSeg = Segment(name='binned_{}'.format(segIdx))
+        newSeg.merge_annotations(seg)
+        spikeMatBlock.segments.append(newSeg)
+        tStart = dataBlock.segments[0].t_start
+        tStop = dataBlock.segments[0].t_stop
+
+        # make dummy binary spike train, in case ths chan didn't fire
+        segSpikeTrains = [
+            i for i in seg.filter(objects=SpikeTrain) if '#' in i.name]
+        
+        dummyBin = binarize(
+            segSpikeTrains[0],
+            sampling_rate=samplingRate,
+            t_start=tStart,
+            t_stop=tStop) * 0
+        #  pdb.set_trace()
+        for chanIdx in spikeMatBlock.channel_indexes:
+            #  print(chanIdx.name)
+            stList = seg.filter(
+                objects=SpikeTrain,
+                name='{}'.format(chanIdx.name)
+                )
+            if len(stList):
+                st = stList[0]
+                print(st.name)
+                stBin = binarize(
+                    st,
+                    sampling_rate=samplingRate,
+                    t_start=tStart,
+                    t_stop=tStop)
+                spikeMatBlock.segments[segIdx].spiketrains.append(st)
+                #  to do: link st to spikematblock's chidx and units
+            else:
+                stBin = dummyBin
+
+            asig = AnalogSignal(
+                stBin * samplingRate,
+                name='seg{}_{}'.format(segIdx, st.unit.name),
+                sampling_rate=samplingRate,
+                dtype=np.int,
+                **st.annotations)
+            asig.t_start = tStart
+
+            chanIdx.analogsignals.append(asig)
+            asig.channel_index = chanIdx
+            spikeMatBlock.segments[segIdx].analogsignals.append(asig)
+
+    spikeMatBlock.create_relationship()
+    spikeMatBlock = purgeNixAnn(spikeMatBlock)
+    if saveToFile:
+        writer = neo.io.NixIO(filename=binnedSpikePath)
+        writer.write_block(spikeMatBlock)
+        writer.close()
+    return spikeMatBlock

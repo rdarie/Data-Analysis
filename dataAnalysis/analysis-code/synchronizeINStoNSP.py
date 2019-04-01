@@ -233,8 +233,24 @@ if plottingFigures and False:
 ############################################################
 
 addingToNix = True
-insBlockJustSpikes = hf.extractSignalsFromBlock(insBlock)
+
 if addingToNix:
+    insBlockJustSpikes = hf.extractSignalsFromBlock(insBlock)
+    insSpikeTrains = insBlockJustSpikes.filter(objects=SpikeTrain)
+    #  reader = neo.io.nixio_fr.NixIO(filename=trialBasePath)
+    #  nspBlock = reader.read_block(lazy=True)
+    #  nspStP = nspBlock.filter(objects=SpikeTrainProxy)
+    #  nspSt = [i.load(load_waveforms=True) for i in nspStP]
+    
+    #  spikeReader = neo.io.nixio_fr.NixIO(filename=os.path.join(trialFilesFrom['utah']['folderPath'], 'tdc_' + trialFilesFrom['utah']['ns5FileName'], 'tdc_' + trialFilesFrom['utah']['ns5FileName'] + '.nix'))
+    #  tdcBlock = spikeReader.read_block(lazy=True)
+    #  tdcStP = tdcBlock.filter(objects=SpikeTrainProxy)
+    #  tdcSt = [i.load(load_waveforms=True) for i in tdcStP]
+
+    for st in insSpikeTrains:
+        if st.waveforms is None:
+            st.sampling_rate = 3e4*pq.Hz
+            st.waveforms = np.array([]).reshape((0, 0, 0))*pq.mV
     preproc.addBlockToNIX(
         insBlockJustSpikes, segIdx=0,
         writeAsigs=False, writeSpikes=True,
@@ -242,7 +258,9 @@ if addingToNix:
         folderPath=trialFilesFrom['utah']['folderPath'],
         nixBlockIdx=0, nixSegIdx=0,
         )
-    tdColumns = ['ins_td0', 'ins_td2', 'amplitude', 'program']
+    tdColumns = [
+        i for i in td['data'].columns
+        if 'ins_' in i]
     tdInterp = hf.interpolateDF(
         td['data'], channelData['t'],
         kind='linear', fill_value=(0, 0),
@@ -259,7 +277,6 @@ if addingToNix:
         folderPath=trialFilesFrom['utah']['folderPath'],
         nixBlockIdx=0, nixSegIdx=0,
         )
-
     accelColumns = [
         'ins_accx', 'ins_accy',
         'ins_accz', 'ins_accinertia']
@@ -279,124 +296,3 @@ if addingToNix:
         folderPath=trialFilesFrom['utah']['folderPath'],
         nixBlockIdx=0, nixSegIdx=0,
         )
-############################################################
-makeAnalysisNix = True
-
-nspReader = neo.io.nixio_fr.NixIO(filename=trialBasePath)
-nspBlock = nspReader.read_block(
-    block_index=0, lazy=True,
-    signal_group_mode='split-all')
-if addingToNix:
-    dataBlock = hf.extractSignalsFromBlock(
-        nspBlock, keepSignals=['position', 'velocityCat'] + tdColumns)
-    hf.loadBlockProxyObjects(dataBlock)
-    for asig in dataBlock.filter(objects=AnalogSignal):
-        chanIdx = asig.channel_index
-        oldName = chanIdx.name
-        newName = asig.name
-        print('name change from {} to {}'.format(
-            oldName, newName
-            ))
-        chanIdx.name = asig.name
-    dataBlock.segments[0].name = 'analysis seg'
-else:
-    dataBlock = hf.extractSignalsFromBlock(
-        nspBlock, keepSignals=['position', 'velocityCat'])
-    hf.loadBlockProxyObjects(dataBlock)
-    #  tests...
-    #  [i.unit.channel_index.name for i in insBlockJustSpikes.filter(objects=SpikeTrain)]
-    #  [i.channel_index.name for i in nspBlock.filter(objects=AnalogSignalProxy)]
-    #  [i.channel_index.name for i in dataBlock.filter(objects=AnalogSignal)]
-    
-    #  dataBlock already has the stim times if we wrote them to that file
-    #  if not, add them here
-    dataBlock.segments[0].name = 'analysis seg'
-    insBlockJustSpikes.segments[0].name = 'analysis seg'
-    dataBlock.merge(insBlockJustSpikes)
-#  merge events
-evList = []
-for key in ['property', 'value']:
-    #  key = 'property'
-    insProp = insBlock.filter(
-        objects=Event,
-        name='ins_' + key
-        )[0]
-    rigProp = dataBlock.filter(
-        objects=Event,
-        name='rig_' + key
-        )
-    if len(rigProp):
-        rigProp = rigProp[0]
-        allProp = insProp.merge(rigProp)
-        allProp.name = key
-
-        evSortIdx = np.argsort(allProp.times, kind='mergesort')
-        allProp = allProp[evSortIdx]
-        evList.append(allProp)
-    else:
-        #  mini RC's don't have rig_ events
-        allProp = insProp
-        allProp.name = key
-        evList.append(insProp)
-
-#  make concatenated event, for viewing
-concatLabels = np.array([
-    (elphpdb._convert_value_safe(evList[0].labels[i]) + ': ' +
-        elphpdb._convert_value_safe(evList[1].labels[i])) for
-    i in range(len(evList[0]))
-    ])
-concatEvent = Event(
-    name='concatenated_updates',
-    times=allProp.times,
-    labels=concatLabels
-    )
-concatEvent.merge_annotations(allProp)
-evList.append(concatEvent)
-dataBlock.segments[0].events = evList
-
-testEventMerge = False
-if testEventMerge:
-    insProp = dataBlock.filter(
-        objects=Event,
-        name='ins_property'
-        )[0]
-    allDF = preproc.eventsToDataFrame(
-        [insProp], idxT='t'
-        )
-    allDF[allDF['ins_property'] == 'movement']
-    rigDF = preproc.eventsToDataFrame(
-        [rigProp], idxT='t'
-        )
-testSaveability = True
-#  pdb.set_trace()
-#  for st in dataBlock.filter(objects=SpikeTrain): print('{}: t_start={}'.format(st.name, st.t_start))
-#  for st in insBlockJustSpikes.filter(objects=SpikeTrain): print('{}: t_start={}'.format(st.name, st.t_start))
-#  for st in insBlock.filter(objects=SpikeTrain): print('{}: t_start={}'.format(st.name, st.t_start))
-dataBlock = preproc.purgeNixAnn(dataBlock)
-writer = neo.io.NixIO(filename=analysisDataPath)
-writer.write_block(dataBlock)
-writer.close()
-############################################################
-confirmNixAddition = False
-if confirmNixAddition:
-    for idx, oUnit in enumerate(insBlock.list_units):
-        if len(oUnit.spiketrains[0]):
-            st = oUnit.spiketrains[0]
-            break
-
-    trialBasePath = os.path.join(
-        trialFilesFrom['utah']['folderPath'],
-        trialFilesFrom['utah']['ns5FileName'])
-    loadedReader = neo.io.nixio_fr.NixIO(filename=trialBasePath + '.nix')
-    loadedBlock = loadedReader.read_block(
-        block_index=0,
-        lazy=True)
-    from neo.io.proxyobjects import SpikeTrainProxy
-    lStPrx = loadedBlock.filter(objects=SpikeTrainProxy, name=st.name)[0]
-    lSt = lStPrx.load()
-    plt.eventplot(st.times, label='original', lw=5)
-    plt.eventplot(lSt.times, label='loaded', colors='r')
-    plt.legend()
-    plt.show()
-    
-############################################################

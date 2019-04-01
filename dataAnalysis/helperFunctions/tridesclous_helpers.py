@@ -6,6 +6,7 @@ import numpy as np
 import time
 import os
 import re
+import pdb
 #  import pdb
 import quantities as pq
 import neo
@@ -15,8 +16,8 @@ from neo.core import (
 
 
 def cmpToDF(arrayFilePath):
-    arrayMap = pd.read_table(
-        arrayFilePath,
+    arrayMap = pd.read_csv(
+        arrayFilePath, sep='\t',
         skiprows=13)
     cmpDF = pd.DataFrame(
         np.nan, index=range(146),
@@ -77,7 +78,8 @@ def cmpDFToPrb(
         for key, spacing in groupIn.items():
             uniqueValues = np.unique(cmpDF[key])
             bins = int(round(len(uniqueValues) / spacing))
-            cmpDF[key + '_group'] = pd.cut(
+            cmpDF[key + '_group'] = np.nan
+            cmpDF.loc[:, key + '_group'] = pd.cut(
                 cmpDF[key], bins, include_lowest=True, labels=False)
             groupingCols.append(key + '_group')
     else:
@@ -344,23 +346,25 @@ def clean_catalogue(
 
 def run_peeler(
         triFolder, chan_grp=0,
-        strict_multiplier=1.1,
-        debugging=False,
+        strict_multiplier=2e-3,
+        debugging=False, progressbar=False,
         duration=None, useOpenCL=False):
     dataio = tdc.DataIO(dirname=triFolder)
     initial_catalogue = dataio.load_catalogue(chan_grp=chan_grp)
-
-    print(dataio)
+    peeler = tdc.Peeler(dataio)
     if useOpenCL:
-        peeler = tdc.Peeler_OpenCl(dataio)
+        peeler.change_params(
+            catalogue=initial_catalogue,
+            strict_multiplier=strict_multiplier, debugging=debugging)
     else:
-        peeler = tdc.Peeler(dataio)
-    peeler.change_params(
-        catalogue=initial_catalogue,
-        strict_multiplier=strict_multiplier, debugging=debugging)
+        peeler.change_params(
+            catalogue=initial_catalogue,
+            use_sparse_template=False, sparse_threshold_mad=1.5,
+            use_opencl_with_sparse=False,
+            strict_multiplier=strict_multiplier, debugging=debugging)
 
     t1 = time.perf_counter()
-    peeler.run(duration=duration)
+    peeler.run(duration=duration, progressbar=progressbar)
     t2 = time.perf_counter()
     print('peeler.run_loop', t2-t1)
     return
@@ -496,6 +500,87 @@ def neo_block_after_peeler(triFolder, chan_grps=None):
     writer.write_block(block)
     writer.close()
     return block
+
+
+import shutil, os, json
+
+
+def purgePeelerResults(
+        triFolder, chan_grps=None, purgeAll=False):
+
+    if not purgeAll:
+        assert chan_grps is not None, 'Need to specify chan_grps!'
+
+        for chan_grp in chan_grps:
+            #  chan_grp = 0
+            segFolder = os.path.join(
+                triFolder, 'channel_group_{}'.format(chan_grp), 'segment_0')
+            shutil.rmtree(segFolder)
+            #  TODO implement selective removal of spikes or processed signs
+            """
+            arrayInfoPath = os.path.join(segFolder, "arrays.json")
+            with open(arrayInfoPath, "r") as f:
+                arraysInfo = json.load(f)
+            try:
+                arraysInfo.pop('spikes')
+                os.remove(os.path.join(segFolder, "spikes.raw"))
+            except Exception:
+                pass
+            os.remove(arrayInfoPath)
+            with open(arrayInfoPath, "w") as f:
+                json.dump(arraysInfo, f)
+            """
+    else:
+        #  purging all
+        grpFolders = [
+            f
+            for f in os.listdir(triFolder)
+            if os.path.isdir(os.path.join(triFolder, f))]
+        for grpFolder in grpFolders:
+            segFolder = os.path.join(
+                triFolder, grpFolder, 'segment_0')
+            shutil.rmtree(segFolder)
+    return
+
+
+def transferTemplates(
+        triFolderSource, triFolderDest, chan_grps, removeExisting=True):
+    #  triFolderSource = triFolder
+    #  triFolderDest = triFolder.replace('3', '1')
+    #  chan_grps = chansToAnalyze[:-1]
+    #  removeExisting = True
+    for chan_grp in chan_grps:
+        #  chan_grp = 0
+        grpFolderSource = os.path.join(
+            triFolderSource, 'channel_group_{}'.format(chan_grp))
+        catFolderSource = os.path.join(
+            grpFolderSource, 'catalogues', 'initial')
+        grpFolderDest = os.path.join(
+            triFolderDest, 'channel_group_{}'.format(chan_grp))
+        catFolderDest = os.path.join(
+            grpFolderDest, 'catalogues', 'initial')
+        assert os.path.exists(catFolderSource), 'source catalogue does not exist!'
+        assert os.path.exists(grpFolderDest), 'destination folder does not exist!'
+
+        catDoesntExist = not os.path.exists(catFolderDest)
+        catExistsButOverride = os.path.exists(catFolderDest) and removeExisting
+        if catDoesntExist or catExistsButOverride:
+            os.makedirs(catFolderDest, exist_ok=True)
+            #  list files in source...
+            allSrcFiles = [
+                os.path.join(catFolderSource, i)
+                for i in os.listdir(catFolderSource)]
+            #  and whittle down to files, not subfolders
+            srcFiles = [i for i in allSrcFiles if os.path.isfile(i)]
+            for fileName in srcFiles:
+                shutil.copy(fileName, catFolderDest)
+                """
+                tdch.run_peeler(
+                    triFolderDest, strict_multiplier=2e-3,
+                    debugging=False,
+                    useOpenCL=False, chan_grp=chan_grp)
+                """
+    return
 
 
 if __name__ == '__main__':

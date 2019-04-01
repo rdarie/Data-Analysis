@@ -254,14 +254,15 @@ def preprocINS(
     # export function
     orcaExpPath = os.path.join(
         trialFilesStim['folderPath'],
-        trialFilesStim['experimentName']
-    )
+        trialFilesStim['experimentName'])
+
     if not os.path.exists(orcaExpPath):
         os.makedirs(orcaExpPath)
 
     insDataFilename = os.path.join(
         orcaExpPath, trialFilesStim['ns5FileName'] + '_ins.nix')
 
+    #  pdb.set_trace()
     writer = neo.io.NixIO(filename=insDataFilename, mode='ow')
     writer.write_block(block)
     writer.close()
@@ -324,6 +325,7 @@ def getINSStimOnset(
             for key, value in theseDetOpts.items():
                 thisUnit.annotations.update({key: value})
             chanIdx.units.append(thisUnit)
+            thisUnit.channel_index = chanIdx
             #  for mdtIdx in thisElecConfig['cathodes']:
             #      chanIdx = block.filter(
             #          objects=ChannelIndex,
@@ -591,7 +593,7 @@ def getINSStimOnset(
             plt.show()
     
     createRelationship = True
-    for thisUnit in block.list_units:
+    for thisUnit in block.filter(objects=Unit):
         if len(thisUnit.spiketrains) == 0:
             st = SpikeTrain(
                 name='seg{}_{}'.format(int(segIdx), thisUnit.name),
@@ -619,9 +621,29 @@ def getINSStimOnset(
                         st.annotations[key]
                         ))
             #  pdb.set_trace()
+            unitDetectedOn = thisUnit.annotations['detectChannels']
+            timesIndex = tdDF.index[tdDF['t'].isin(consolidatedTimes)]
+            left_sweep_samples = 46
+            left_sweep = left_sweep_samples / fs
+            right_sweep_samples = 77
+            right_sweep = right_sweep_samples / fs
+            spike_duration = left_sweep + right_sweep
+            spikeWaveforms = np.zeros(
+                (
+                    timesIndex.shape[0], len(unitDetectedOn),
+                    left_sweep_samples + right_sweep_samples + 1),
+                dtype=np.float)
+            for idx, tIdx in enumerate(timesIndex):
+                thisWaveform = (
+                    tdDF.loc[
+                        tIdx - int(left_sweep * fs):tIdx + int(right_sweep * fs),
+                        unitDetectedOn])
+                spikeWaveforms[idx, :, :] = np.swapaxes(thisWaveform.values, 0, 1)
             newSt = SpikeTrain(
                 name='seg{}_{}'.format(int(segIdx), thisUnit.name),
                 times=consolidatedTimes, units='sec', t_stop=spikeTStop,
+                waveforms=spikeWaveforms * pq.mV, left_sweep=left_sweep,
+                sampling_rate=fs,
                 t_start=spikeTStart, **consolidatedAnn, **arrayAnnNames)
             
             newSt.unit = thisUnit
@@ -734,17 +756,19 @@ def insDataToBlock(
     return block
 
 
-def unpackINSBlock(block):
+def unpackINSBlock(block, unpackAccel=True):
     tdAsig = block.filter(
         objects=AnalogSignal,
         td=True
         )
+
     tdDF = ns5.analogSignalsToDataFrame(tdAsig)
-    accelAsig = block.filter(
-        objects=AnalogSignal,
-        accel=True
-        )
-    accelDF = ns5.analogSignalsToDataFrame(accelAsig)
+    if unpackAccel:
+        accelAsig = block.filter(
+            objects=AnalogSignal,
+            accel=True
+            )
+        accelDF = ns5.analogSignalsToDataFrame(accelAsig)
 
     events = block.filter(
         objects=Event
@@ -760,12 +784,12 @@ def unpackINSBlock(block):
         'activeGroup', 'program', 'trialSegment']
     deriveCols = ['amplitudeRound', 'amplitude']
     progAmpNames = rcsa_helpers.progAmpNames
-
+    #  pdb.set_trace()
     stimStatus = hf.stimStatusSerialtoLong(
         stimStSer, idxT='t', expandCols=expandCols,
         deriveCols=deriveCols, progAmpNames=progAmpNames)
     #  add stim info to traces
-    #  pdb.set_trace()
+    
     columnsToBeAdded = (
         expandCols + deriveCols + progAmpNames)
     infoFromStimStatus = hf.interpolateDF(
@@ -777,8 +801,11 @@ def unpackINSBlock(block):
         tdDF,
         infoFromStimStatus.drop(columns='t')),
         axis=1)
-    accelDF = pd.concat((
-        accelDF,
-        infoFromStimStatus['trialSegment']),
-        axis=1)
+    if unpackAccel:
+        accelDF = pd.concat((
+            accelDF,
+            infoFromStimStatus['trialSegment']),
+            axis=1)
+    else:
+        accelDF = False
     return tdDF, accelDF, stimStatus

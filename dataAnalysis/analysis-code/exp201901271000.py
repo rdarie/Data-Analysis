@@ -3,12 +3,11 @@ import os
 import dataAnalysis.helperFunctions.kilosort_analysis as ksa
 import dataAnalysis.helperFunctions.tridesclous_helpers as tdch
 
-trialIdx = 3
 miniRCTrial = False
 #  plottingFigures = False
 plottingFigures = False
 plotBlocking = True
-
+trialIdx = 3
 experimentName = '201901271000-Proprio'
 deviceName = 'DeviceNPC700373H'
 #  remote paths
@@ -192,3 +191,48 @@ tdch.cmpDFToPrb(
     cmpDF, filePath=nspPrbPath,
     names=['elec'],
     groupIn={'xcoords': 1, 'ycoords': 1}, appendDummy=16)
+
+
+#  should rename these to something more intuitive
+#  paths relevant to individual trials
+analysisDataPath = os.path.join(
+    trialFilesStim['ins']['folderPath'],
+    trialFilesStim['ins']['experimentName'],
+    trialFilesStim['ins']['ns5FileName'] + '_analyze.nix')
+trialBasePath = os.path.join(
+    trialFilesFrom['utah']['folderPath'],
+    trialFilesFrom['utah']['ns5FileName'] + '.nix')
+spikePath = os.path.join(
+        trialFilesFrom['utah']['folderPath'],
+        'tdc_' + trialFilesFrom['utah']['ns5FileName'],
+        'tdc_' + trialFilesFrom['utah']['ns5FileName'] + '.nix')
+insDataPath = os.path.join(
+        trialFilesStim['ins']['folderPath'],
+        trialFilesStim['ins']['experimentName'],
+        trialFilesStim['ins']['ns5FileName'] + '_ins.nix'
+    )
+
+#  paths relevant to the entire experimental day
+masterFeaturePath = os.path.join(
+    trialFilesStim['ins']['folderPath'],
+    trialFilesStim['ins']['experimentName'],
+    trialFilesStim['ins']['experimentName'] + '_MasterFeature.hdf')
+estimatorPath = os.path.join(
+    trialFilesStim['ins']['folderPath'],
+    trialFilesStim['ins']['experimentName'],
+    trialFilesStim['ins']['experimentName'] + '_estimator.joblib')
+experimentDataPath = os.path.join(
+    trialFilesStim['ins']['folderPath'],
+    trialFilesStim['ins']['experimentName'],
+    trialFilesStim['ins']['experimentName'] + '_analyze.nix')
+binnedSpikePath = os.path.join(
+    trialFilesStim['ins']['folderPath'],
+    trialFilesStim['ins']['experimentName'],
+    trialFilesStim['ins']['experimentName'] + '_binarized.nix')
+featurePath = os.path.join(
+    trialFilesStim['ins']['folderPath'],
+    trialFilesStim['ins']['experimentName'],
+    trialFilesStim['ins']['experimentName'] + '_features.hdf')
+figureFolder = os.path.join(
+    '..', 'figures'
+    )

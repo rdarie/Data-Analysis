@@ -66,9 +66,9 @@ aniFeat = hf.animateDFSubset3D(
 plotKws = {'linewidth': 2}
 aniPedal = hf.animateAngle3D(
     unpackedFeatures, dataQuery, winWidth, nFrames, ax=moveAx,
-    pltKws=plotKws, saveToFile='', extraAni=[aniFeat])
+    pltKws=plotKws, saveToFile=os.path.join(figureFolder, 'move.mp4'), extraAni=[aniFeat])
 plt.show()
-# move.mp4
+# os.path.join(figureFolder, 'move.mp4')
 
 dataQuery = '&'.join([
     '(bin > 429)',

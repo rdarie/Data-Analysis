@@ -1127,8 +1127,10 @@ def synchronizeINStoNSP(
                         st.magnitude[segMask] = (
                             timeInterpFunINStoNSP(st.times[segMask]))
                         #  kludgey fix for weirdness concerning t_start
-                        st.t_start = pq.s * (min(np.min(st.times.magnitude), NSPTimeRanges[0]) - 500)
-                        st.t_stop = pq.s * (max(np.max(st.times.magnitude), NSPTimeRanges[1]) + 500)
+                        st.t_start = pq.s * (
+                            min(np.min(st.times.magnitude), NSPTimeRanges[0]) - 500)
+                        st.t_stop = pq.s * (
+                            max(np.max(st.times.magnitude), NSPTimeRanges[1]) + 500)
                     else:
                         st.t_start = pq.s * (NSPTimeRanges[0] - 500)
                         st.t_stop = pq.s * (NSPTimeRanges[1] + 500)
@@ -1182,13 +1184,17 @@ def loadBlockProxyObjects(block):
                 print('unit is {}'.format(stProxy.unit.name))
                 print('spiketrain is {}'.format(stProxy.name))
                 print('tstop is {}'.format(stProxy.t_stop))
-                st = stProxy.load(load_waveforms=False)
-                st.left_sweep = None
+                assert stProxy.shape[0] > 0, 'no times for this spike'
+                st = stProxy.load(load_waveforms=True)
+                #  st.left_sweep = None
                 #  seems like writing ins data breaks the
                 #  waveforms. oh well, turning it off for now
             except Exception:
-                #  traceback.print_exc()
+                traceback.print_exc()
+                #  pdb.set_trace()
                 st = stProxy.load(load_waveforms=False)
+                if st.waveforms is None:
+                    st.waveforms = np.array([]).reshape((0, 0, 0))*pq.V
             #  link SpikeTrain and ID providing unit
             st.unit = unit
             # assign ownership to containers
@@ -1211,6 +1217,7 @@ def loadBlockProxyObjects(block):
     block.create_relationship()
     return block
     
+
 def extractSignalsFromBlock(
         block, keepSpikes=True,
         keepEvents=True, keepSignals=[]):
@@ -1371,7 +1378,7 @@ def stimStatusSerialtoLong(
         stimStSer, idxT='t', namePrefix='ins_', expandCols=[],
         deriveCols=[], progAmpNames=[], dropDuplicates=True):
     
-    #  pdb.set_trace()
+    
     fullExpandCols = copy(expandCols)
     #  fixes issue with 'program' and 'amplitude' showing up unrequested
     if 'program' not in expandCols:
@@ -1405,7 +1412,7 @@ def stimStatusSerialtoLong(
         stimStLong.loc[pMask, pName] = stimStSer.loc[pMask, namePrefix + 'value']
         stimStLong[pName].fillna(method='ffill', inplace=True)
         stimStLong[pName].fillna(method='bfill', inplace=True)
-
+    #  pdb.set_trace()
     if dropDuplicates:
         stimStLong.drop_duplicates(subset=idxT, keep='last', inplace=True)
     
