@@ -215,20 +215,43 @@ def dataFrameToAnalogSignals(
 def eventDataFrameToEvents(
         eventDF, idxT=None,
         annCol=None,
-        eventName='', tUnits=pq.s
+        eventName='', tUnits=pq.s,
+        makeList=True
         ):
-    eventList = []
-    for colName in annCol:
-        event = Event(
-            name=eventName + colName,
-            times=eventDF[idxT].values * tUnits,
-            labels=eventDF[colName].values
-            )
-        #  pdb.set_trace()
-        originalDType = type(eventDF[colName].values[0]).__name__
-        event.annotate(originalDType=originalDType)
-        eventList.append(event)
-    return eventList
+    if makeList:
+        eventList = []
+        for colName in annCol:
+            event = Event(
+                name=eventName + colName,
+                times=eventDF[idxT].values * tUnits,
+                labels=eventDF[colName].values
+                )
+            #  pdb.set_trace()
+            originalDType = type(eventDF[colName].values[0]).__name__
+            event.annotate(originalDType=originalDType)
+            eventList.append(event)
+        return eventList
+    else:
+        if annCol is None:
+            annCol = eventDF.drop(columns=idxT).columns
+            event = Event(
+                name=eventName,
+                times=eventDF[idxT].values * tUnits,
+                labels=np.array(eventDF.index)
+                )
+            event.annotations.update(
+                {
+                    'arrayAnnNames': [],
+                    'arrayAnnDTypes': []
+                    })
+            for colName in annCol:
+                event.array_annotations.update(
+                    {colName: eventDF[colName].values}
+                )
+                originalDType = type(eventDF[colName].values[0]).__name__
+                event.annotations['arrayAnnNames'].append(colName)
+                event.annotations['arrayAnnDTypes'].append(originalDType)
+        return event
 
 
 def eventsToDataFrame(
@@ -286,11 +309,19 @@ def unpackAnalysisBlock(
     #  TODO use epochs for amplitude and movement!
     
     stimStSerList = []
-    for seg in block.segments:
-        stimStSerList.append(eventsToDataFrame(
+    for segIdx, seg in enumerate(block.segments):
+        eventDF = eventsToDataFrame(
             seg.events, idxT='t',
-            names=['property', 'value']
-            ))
+            names=[
+                'seg{}_property'.format(segIdx),
+                'seg{}_value'.format(segIdx)]
+            )
+        eventDF.rename(
+            columns={
+                'seg{}_property'.format(segIdx): 'property',
+                'seg{}_value'.format(segIdx): 'value'
+            }, inplace=True)
+        stimStSerList.append(eventDF)
     stimStSer = pd.concat(stimStSerList, ignore_index=True, sort=True)        
     #  serialize stimStatus
     expandCols = [
@@ -344,7 +375,7 @@ def loadSpikeMats(
             i: None for i in range(reader.segment_count(block_index=0))}
         validTrials = None
     
-    segOffset = 0
+    #segOffset = 0
     for segIdx in range(reader.segment_count(block_index=0)):
         tStart = reader.get_signal_t_start(
             block_index=0, seg_index=segIdx)
@@ -358,7 +389,7 @@ def loadSpikeMats(
         # convert to indices early to avoid floating point problems
         
         intervalIdx = int(round(rasterOpts['binInterval'] * fs))
-        halfIntervalIdx = int(round(intervalIdx / 2))
+        #halfIntervalIdx = int(round(intervalIdx / 2))
         
         widthIdx = int(3 * round(rasterOpts['binWidth'] * fs))
         halfWidthIdx = int(round(widthIdx / 2))
@@ -400,7 +431,6 @@ def loadSpikeMats(
                         i_start=iStart, i_stop=iStop,
                         channel_names=chanNames))
                 #  print(rawSpikeMat.sum().sum())
-                #  pdb.set_trace()
                 #  oneSpike = pd.Series(0, index=range(100))
                 #  oneSpike.iloc[50] = 1000
                 #  oneSpikeAverage = oneSpike.rolling(window=widthIdx, center=True, win_type='gaussian').mean(std=widthIdx/6).dropna()
@@ -580,100 +610,170 @@ def getNIXData(
     return channelData, block
 
 
+def childBaseName(childName, searchTerm):
+    if searchTerm in childName:
+        baseName = '_'.join(childName.split('_')[1:])
+    else:
+        baseName = childName
+    return baseName
+
+
+def readBlockFixNames(
+        rawioReader,
+        block_index=0, signal_group_mode='split-all',
+        lazy=True):
+
+    dataBlock = rawioReader.read_block(
+        block_index=block_index, lazy=lazy,
+        signal_group_mode=signal_group_mode)
+    
+    #  
+    if dataBlock.name is None:
+        dataBlock.name = dataBlock.annotations['neo_name']
+    
+    #  on first segment, rename the chan_indexes and units
+    seg0 = dataBlock.segments[0]
+    asigLikeList = (
+        seg0.filter(objects=AnalogSignalProxy) +
+        seg0.filter(objects=AnalogSignal)
+        )
+    for asig in asigLikeList:
+        if 'seg' in asig.name:
+            asigBaseName = '_'.join(asig.name.split('_')[1:])
+        else:
+            asigBaseName = asig.name
+        if 'Channel group ' in asig.channel_index.name:
+            asig.channel_index.name = asigBaseName
+    
+    spikeTrainLikeList = (
+        seg0.filter(objects=SpikeTrainProxy) +
+        seg0.filter(objects=SpikeTrain)
+        )
+    for stp in spikeTrainLikeList:
+        # todo: use childBaseName function
+        if 'seg' in stp.name:
+            stpBaseName = '_'.join(stp.name.split('_')[1:])
+        else:
+            stpBaseName = stp.name
+        '''
+        if isinstance(rawioReader, neo.io.blackrockio.BlackrockIO):
+            unit = stp.unit
+            nameParser = re.search(r'ch(\d*)#(\d*)', unit.name)
+            chanId = nameParser.group(1)
+            unitId = nameParser.group(2)
+            chanIdx = [
+                i for i in dataBlock.channel_indexes
+                if int(chanId) in i.channel_ids][0]
+            stpBaseName = '{}#{}'.format(chanIdx.name, unitId)
+            stp.name = stpBaseName
+        '''
+        if 'ChannelIndex for ' in stp.unit.channel_index.name:
+            stp.unit.name = stpBaseName
+            stp.unit.channel_index.name = stpBaseName
+    
+    #  rename the children
+    typesNeedRenaming = [
+        SpikeTrainProxy, AnalogSignalProxy, EventProxy,
+        SpikeTrain, AnalogSignal, Event]
+    for segIdx, seg in enumerate(dataBlock.segments):
+        if seg.name is None:
+            seg.name = 'seg{}_'.format(segIdx)
+        else:
+            if 'seg{}_'.format(segIdx) not in seg.name:
+                seg.name = 'seg{}_{}'.format(segIdx, seg.name)
+        for objType in typesNeedRenaming:
+            for child in seg.filter(objects=objType):
+                if 'seg{}_'.format(segIdx) not in child.name:
+                    child.name = 'seg{}_{}'.format(segIdx, child.name)
+                #  todo: decide if below is needed
+                #  elif 'seg' in child.name:
+                #      childBaseName = '_'.join(child.name.split('_')[1:])
+                #      child.name = 'seg{}_{}'.format(segIdx, childBaseName)
+    return dataBlock
+
+
 #  TODO: write code that merges a dataframe and a spikesdict to a block
 def addBlockToNIX(
-        newBlock, segIdx=0,
+        newBlock, neoSegIdx=[0],
         writeAsigs=True, writeSpikes=True, writeEvents=True,
+        purgeNixNames=False,
         fileName=None,
         folderPath=None,
-        nixBlockIdx=0, nixSegIdx=0,
+        nixBlockIdx=0, nixSegIdx=[0],
         ):
     #  base file name
     trialBasePath = os.path.join(folderPath, fileName)
-    
     # peek at file to ensure compatibility
     reader = neo.io.nixio_fr.NixIO(filename=trialBasePath + '.nix')
     tempBlock = reader.read_block(
         block_index=nixBlockIdx,
-        lazy=True)
-
-    '''
-    #  future dev: find segment automatically
-    for segIdx, seg in enumerate(tempBlock.segments):
-        seg.events = [i.load() for i in seg.events]
-        seg.epochs = [i.load() for i in seg.epochs]
-
-    timeSlice = (
-        newBlock.segments[0].t_start,
-        newBlock.segments[0].t_stop)
-
-    _, segsWriteTo = preproc.findSegsIncluded(tempBlock, timeSlice)
-    '''
-
-    maxIdx = 0
-    for chanIdx in tempBlock.channel_indexes:
-        if chanIdx.analogsignals:
-            maxIdx = max(maxIdx, max(chanIdx.index))
+        lazy=True, signal_group_mode='split-all')
     
-    tempAsigList = tempBlock.segments[nixSegIdx].filter(objects=AnalogSignalProxy)
-    
-    checkCompatible = False
-    if len(tempAsigList) > 0:
-        tempAsig = tempAsigList[0]
-        checkCompatible = True
-        forceType = tempAsig.dtype
-        forceShape = tempAsig.shape[0]  # ? docs say shape[1], but that's confusing
-        forceFS = tempAsig.sampling_rate
+    checkCompatible = {i: False for i in nixSegIdx}
+    forceShape = {i: None for i in nixSegIdx}
+    forceType = {i: None for i in nixSegIdx}
+    forceFS = {i: None for i in nixSegIdx}
+    for nixIdx in nixSegIdx:
+        tempAsigList = tempBlock.segments[nixIdx].filter(
+            objects=AnalogSignalProxy)
+        if len(tempAsigList) > 0:
+            tempAsig = tempAsigList[0]
+            checkCompatible[nixIdx] = True
+            forceType[nixIdx] = tempAsig.dtype
+            forceShape[nixIdx] = tempAsig.shape[0]  # ? docs say shape[1], but that's confusing
+            forceFS[nixIdx] = tempAsig.sampling_rate
     reader.file.close()
     #  if newBlock was loaded from a nix file, strip the old nix_names away:
-    
-    for child in newBlock.children_recur:
-        child.annotations.pop('nix_name', None)
-        child.annotations.pop('neo_name', None)
-    for child in newBlock.data_children_recur:
-        child.annotations.pop('nix_name', None)
-        child.annotations.pop('neo_name', None)
+    #  todo: replace with function from this module
+    if purgeNixNames:
+        newBlock = purgeNixAnn(newBlock)
     
     writer = neo.io.NixIO(filename=trialBasePath + '.nix')
     nixblock = writer.nix_file.blocks[nixBlockIdx]
     nixblockName = nixblock.name
-    newBlock.annotate(nix_name=nixblockName)
+    if 'nix_name' in newBlock.annotations.keys():
+        assert newBlock.annotations['nix_name'] == nixblockName
+    else:
+        newBlock.annotate(nix_name=nixblockName)
 
-    #  for idx, segIdx in enumerate(segsWriteTo.index):
-    nixgroup = nixblock.groups[nixSegIdx]
-    nixSegName = nixgroup.name
-    newBlock.segments[segIdx].annotate(nix_name=nixSegName)
-    #  TODO: double check that you can't add the same thing twice
-    if writeEvents:
-        for event in newBlock.segments[segIdx].events:
-            event = writer._write_event(event, nixblock, nixgroup)
-    if writeAsigs:
-        for asig in newBlock.segments[segIdx].analogsignals:
-            #  pdb.set_trace()
-            if checkCompatible:
-                assert asig.dtype == forceType
-                assert asig.sampling_rate == forceFS
-                assert asig.shape[0] == forceShape
-            asig = writer._write_analogsignal(asig, nixblock, nixgroup)
-        for isig in newBlock.segments[segIdx].irregularlysampledsignals:
-            isig = writer._write_irregularlysampledsignal(
-                isig, nixblock, nixgroup)
-    
-    if writeSpikes:
-        alreadyWrittenSpikeTrainNames = []
-        for st in newBlock.segments[segIdx].spiketrains:
-            #  pdb.set_trace()
-            #  if st.name not in alreadyWrittenSpikeTrainNames:
-            alreadyWrittenSpikeTrainNames.append(st.name)
-            st = writer._write_spiketrain(st, nixblock, nixgroup)
-            #  print('already wrote {}'.format(alreadyWrittenSpikeTrainNames))
-    
-    alreadyWrittenChanNames = []
-    for chanIdx in newBlock.channel_indexes:
-        #  if chanIdx.name not in alreadyWrittenChanNames:
+    for idx, segIdx in enumerate(neoSegIdx):
+        nixIdx = nixSegIdx[idx]
+        newSeg = newBlock.segments[segIdx]
+        nixgroup = nixblock.groups[nixIdx]
+        
+        nixSegName = nixgroup.name
+        if 'nix_name' in newSeg.annotations.keys():
+            newSeg.annotations['nix_name'] == nixSegName
+        else:
+            newSeg.annotate(nix_name=nixSegName)
+        
+        if writeEvents:
+            eventList = np.array(newSeg.events)
+            eventOrder = np.argsort([i.name for i in eventList])
+            for event in eventList[eventOrder]:
+                event = writer._write_event(event, nixblock, nixgroup)
+        
+        if writeAsigs:
+            asigList = np.array(newSeg.filter(objects=AnalogSignal))
+            asigOrder = np.argsort([i.name for i in eventList])
+            for asig in asigList[asigOrder]:
+                if checkCompatible[nixIdx]:
+                    assert asig.dtype == forceType[nixIdx]
+                    assert asig.sampling_rate == forceFS[nixIdx]
+                    assert asig.shape[0] == forceShape[nixIdx]
+                asig = writer._write_analogsignal(asig, nixblock, nixgroup)
+            #  for isig in newSeg.filter(objects=IrregularlySampledSignal):
+            #      isig = writer._write_irregularlysampledsignal(
+            #          isig, nixblock, nixgroup)
+
+        if writeSpikes:
+            stList = np.array(newSeg.filter(objects=SpikeTrain))
+            stOrder = np.argsort(stList)
+            for st in stList[stOrder]:
+                st = writer._write_spiketrain(st, nixblock, nixgroup)
+
+    for chanIdx in newBlock.filter(objects=ChannelIndex):
         chanIdx = writer._write_channelindex(chanIdx, nixblock)
-        alreadyWrittenChanNames.append(chanIdx.name)
-        #  print('already wrote {}'.format(alreadyWrittenChanNames))
         #  auto descends into units inside of _write_channelindex
     writer._create_source_links(newBlock, nixblock)
     writer.close()
@@ -793,14 +893,6 @@ def blockToNix(
                     magnitude_mode='rescaled')
                 #  link AnalogSignal and ID providing channel_index
                 asig.channel_index = chanIdx
-                #  rename chanIndexes
-                if 'Channel group' in chanIdx.name:
-                    #  first visit to this chanIdx, rename it
-                    chanId = chanIdx.channel_ids[0]
-                    chanLabel = chanIdx.channel_names[0].decode()
-                    chanIdx.name = '{}'.format(chanLabel)
-
-                asig.name = 'seg{}_{}'.format(segIdx, chanIdx.name)
                 #  perform requested preproc operations
                 if fillOverflow:
                     # fill in overflow:
@@ -867,7 +959,7 @@ def blockToNix(
                     st.annotate(fromNSP=True)
                     #  !!! TODO, mark by origin (utah, nForm, ainp)
 
-                    #  rename chanIndexes
+                    #  rename chanIndexes TODO: replace in readBlockFixNames
                     if spikeSource == 'nev':
                         nameParser = re.search(r'ch(\d*)#(\d*)', unit.name)
                         if nameParser is not None:
@@ -1058,12 +1150,13 @@ def preproc(
     idx = 0
     for blkIdx in range(metadata['nb_block']):
         #  blkIdx = 0
-        block = reader.read_block(
+        block = readBlockFixNames(
+            reader,
             block_index=blkIdx, lazy=True,
             signal_group_mode=signal_group_mode)
         if spikeReader is not None:
-            spikeBlock = spikeReader.read_block(
-                block_index=blkIdx, lazy=True,
+            spikeBlock = readBlockFixNames(
+                spikeReader, block_index=blkIdx, lazy=True,
                 signal_group_mode=signal_group_mode)
             spikeBlock = purgeNixAnn(spikeBlock)
         else:
@@ -1084,42 +1177,33 @@ def preproc(
     return neo.io.nixio_fr.NixIO(filename=trialBasePath + '.nix')
 
 
-def calcSpikeMatsAndSave(block):
-
-    return block
-
-
-def purgeNixAnn(block):
-    block.annotations.pop('nix_name', None)
-    block.annotations.pop('neo_name', None)
+def purgeNixAnn(block, annNames=['nix_name', 'neo_name']):
+    for annName in annNames:
+        block.annotations.pop(annName, None)
     for child in block.children_recur:
         if child.annotations:
             child.annotations = {
-                k: v for
-                k, v in child.annotations.items() if k not in [
-                    'nix_name', 'neo_name']}
+                k: v
+                for k, v in child.annotations.items()
+                if k not in annNames}
     for child in block.data_children_recur:
         if child.annotations:
             child.annotations = {
-                k: v for
-                k, v in child.annotations.items() if k not in [
-                    'nix_name', 'neo_name']}
+                k: v
+                for k, v in child.annotations.items()
+                if k not in annNames}
     return block
 
 
 def loadWithArrayAnn(dataPath, fromRaw=False):
     if fromRaw:
         reader = neo.io.nixio_fr.NixIO(filename=dataPath)
+        block = readBlockFixNames(reader, lazy=False)
     else:
         reader = neo.io.NixIO(filename=dataPath)
-        
-    block = reader.read_block()
-    block.create_relationship()  # need this!
+        block = reader.read_block()
     
-    if fromRaw:
-        reader.file.close()
-    else:
-        reader.close()
+    block.create_relationship()  # need this!
 
     for st in block.filter(objects=SpikeTrain):
         if 'arrayAnnNames' in st.annotations.keys():
@@ -1127,12 +1211,20 @@ def loadWithArrayAnn(dataPath, fromRaw=False):
                 #  fromRaw, the ann come back as tuple, need to recast
                 st.array_annotations.update(
                     {key: np.array(st.annotations[key])})
+        if st.waveforms is None:
+            st.waveforms = np.array([]).reshape((0, 0, 0))*pq.mV
+    
+    if fromRaw:
+        reader.file.close()
+    else:
+        reader.close()
     return block
 
 
 def calcBinarizedArray(
         dataBlock, samplingRate, binnedSpikePath, saveToFile=True):
-    spikeMatBlock = Block()
+    
+    spikeMatBlock = Block(name=dataBlock.name + ' binarized')
     spikeMatBlock.merge_annotations(dataBlock)
 
     allSpikeTrains = [
@@ -1148,11 +1240,14 @@ def calcBinarizedArray(
                 spikeMatBlock.channel_indexes.append(chanIdx)
 
     for segIdx, seg in enumerate(dataBlock.segments):
-        newSeg = Segment(name='binned_{}'.format(segIdx))
+        newSeg = Segment(name='seg{}_'.format(segIdx))
         newSeg.merge_annotations(seg)
         spikeMatBlock.segments.append(newSeg)
-        tStart = dataBlock.segments[0].t_start
-        tStop = dataBlock.segments[0].t_stop
+        
+        #  tStart = dataBlock.segments[0].t_start
+        #  tStop = dataBlock.segments[0].t_stop
+        tStart = seg.t_start
+        tStop = seg.t_stop
 
         # make dummy binary spike train, in case ths chan didn't fire
         segSpikeTrains = [
@@ -1168,11 +1263,11 @@ def calcBinarizedArray(
             #  print(chanIdx.name)
             stList = seg.filter(
                 objects=SpikeTrain,
-                name='{}'.format(chanIdx.name)
+                name='seg{}_{}'.format(segIdx, chanIdx.name)
                 )
             if len(stList):
                 st = stList[0]
-                print(st.name)
+                print('binarizing {}'.format(st.name))
                 stBin = binarize(
                     st,
                     sampling_rate=samplingRate,
@@ -1181,24 +1276,28 @@ def calcBinarizedArray(
                 spikeMatBlock.segments[segIdx].spiketrains.append(st)
                 #  to do: link st to spikematblock's chidx and units
             else:
+                print('{} has no spikes'.format(st.name))
                 stBin = dummyBin
 
             asig = AnalogSignal(
                 stBin * samplingRate,
-                name='seg{}_{}'.format(segIdx, st.unit.name),
+                name='seg{}_{}_fr'.format(segIdx, st.unit.name),
                 sampling_rate=samplingRate,
                 dtype=np.int,
                 **st.annotations)
             asig.t_start = tStart
-
+            asig.annotate(binWidth=1 / samplingRate.magnitude)
             chanIdx.analogsignals.append(asig)
             asig.channel_index = chanIdx
             spikeMatBlock.segments[segIdx].analogsignals.append(asig)
+    
+    for chanIdx in spikeMatBlock.channel_indexes:
+        chanIdx.name = chanIdx.name + '_fr'
 
     spikeMatBlock.create_relationship()
     spikeMatBlock = purgeNixAnn(spikeMatBlock)
     if saveToFile:
         writer = neo.io.NixIO(filename=binnedSpikePath)
-        writer.write_block(spikeMatBlock)
+        writer.write_block(spikeMatBlock, use_obj_names=True)
         writer.close()
     return spikeMatBlock

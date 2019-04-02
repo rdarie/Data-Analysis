@@ -28,16 +28,13 @@ import quantities as pq
 dataReader = neo.io.nixio_fr.NixIO(
     filename=experimentDataPath)
 dataReader.parse_header()
-#  check units
-#  [i.sampling_rate for i in dataBlock.filter(objects=AnalogSignalProxy)]
-#  asig = dataBlock.filter(objects=AnalogSignal, name='elec95#0_fr')
-#  plt.plot(asig[0].magnitude[:1000]); plt.show()
+dataBlock = dataReader.read_block(
+    block_index=0, lazy=True,
+    signal_group_mode='split-all')
+
 interpolatedSpikeMats = {}
 blockIdx = 0
-for segIdx in range(dataReader.header['nb_segment'][blockIdx]):
-    dataSeg = dataReader.read_segment(
-        block_index=0, seg_index=segIdx, lazy=True,
-        signal_group_mode='split-all')
+for segIdx, dataSeg in enumerate(dataBlock.segments):
     asigProxysList = [
         asigP
         for asigP in dataSeg.filter(objects=AnalogSignalProxy)
@@ -52,7 +49,6 @@ for segIdx in range(dataReader.header['nb_segment'][blockIdx]):
     asigsDF.index.name = 'bin'
     interpolatedSpikeMats.update(
         {segIdx: asigsDF.drop(columns='t')})
-dataReader.file.close()
 
 masterSpikeMat = pd.concat(
     interpolatedSpikeMats, names=['segment', 'bin'])
@@ -67,25 +63,53 @@ features = estimator.fit_transform(masterSpikeMat.values)
 featuresDF = pd.DataFrame(
     features, index=masterSpikeMat.index, columns=compNames)
 
+masterBlock = Block()
+masterBlock.name = dataBlock.annotations['neo_name']
+
 for segIdx, group in featuresDF.groupby('segment'):
+    print('Loading FRs for segment {}'.format(segIdx))
     segFeaturesDF = group.xs(segIdx, axis='index')
     segFeaturesDF.reset_index(inplace=True)
+
+    dataSeg = dataBlock.segments[segIdx]
+    dummyAsig = dataSeg.filter(
+        objects=AnalogSignalProxy)[0].load(channel_indexes=[0])
+    samplingRate = dummyAsig.sampling_rate
+
     pcBlockInterp = preproc.dataFrameToAnalogSignals(
         segFeaturesDF,
         idxT='bin', useColNames=True,
         dataCol=segFeaturesDF.drop(columns='bin').columns,
-        samplingRate=asig.sampling_rate)
-    for asig in pcBlockInterp.filter(objects=AnalogSignal):
+        samplingRate=samplingRate)
+    pcBlockInterp.name = dataBlock.annotations['neo_name']
+    pcBlockInterp.annotate(
+        nix_name=dataBlock.annotations['neo_name'])
+    pcBlockInterp.segments[0].name = dataSeg.annotations['neo_name']
+    pcBlockInterp.segments[0].annotate(
+        nix_name=dataSeg.annotations['neo_name'])
+
+    asigList = pcBlockInterp.filter(objects=AnalogSignal)
+    for asig in asigList:
         asig.annotate(binWidth=rasterOpts['binWidth'])
-        #  asig.name = asig.name + '_PC'
-    preproc.addBlockToNIX(
-        pcBlockInterp, segIdx=0,
-        writeSpikes=False, writeEvents=False,
-        fileName=trialFilesStim['ins']['experimentName'] + '_analyze',
-        folderPath=os.path.join(
-            trialFilesStim['ins']['folderPath'],
-            trialFilesStim['ins']['experimentName']),
-        nixBlockIdx=0, nixSegIdx=segIdx,
-        )
+        asig.name = 'seg{}_{}'.format(segIdx, asig.name)
+        asig.annotate(nix_name=asig.name)
+    chanIdxList = pcBlockInterp.filter(objects=ChannelIndex)
+    for chanIdx in chanIdxList:
+        chanIdx.annotate(nix_name=chanIdx.name)
+
+    masterBlock.merge(pcBlockInterp)
+dataReader.file.close()
+
+allSegs = list(range(len(masterBlock.segments)))
+preproc.addBlockToNIX(
+    masterBlock, neoSegIdx=allSegs,
+    writeSpikes=False, writeEvents=False,
+    fileName=trialFilesStim['ins']['experimentName'] + '_analyze',
+    folderPath=os.path.join(
+        trialFilesStim['ins']['folderPath'],
+        trialFilesStim['ins']['experimentName']),
+    purgeNixNames=False,
+    nixBlockIdx=0, nixSegIdx=allSegs,
+    )
 
 dump(estimator, estimatorPath)

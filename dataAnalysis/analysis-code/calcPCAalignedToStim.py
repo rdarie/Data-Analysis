@@ -354,10 +354,10 @@ trainOnDifferentTimes = True
 if trainOnDifferentTimes:
     estimator = load(estimatorPath)
     features = estimator.transform(spikeMat2D.values)
-    nComp = 5
+    nComp = 105
     compNames = ['PC{}'.format(i+1) for i in range(nComp)]
 else:
-    nComp = 5
+    nComp = 105
     compNames = ['PC{}'.format(i+1) for i in range(nComp)]
     pca = PCA(n_components=nComp)
     estimator = Pipeline([('dimred', pca)])

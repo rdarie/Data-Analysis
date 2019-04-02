@@ -9,7 +9,7 @@ Arguments:
 from neo.io.proxyobjects import (
     AnalogSignalProxy, SpikeTrainProxy, EventProxy)
 from neo import (
-    Block, Segment, ChannelIndex,
+    Block, Segment, ChannelIndex, Unit,
     Event, AnalogSignal, SpikeTrain)
 import neo
 from currentExperiment import *
@@ -21,7 +21,7 @@ import dataAnalysis.preproc.ns5 as preproc
 import dataAnalysis.preproc.mdt as preprocINS
 import quantities as pq
 import rcsanalysis.packet_func as rcsa_helpers
-import os
+import os, pdb
 from importlib import reload
 from docopt import docopt
 
@@ -48,12 +48,12 @@ if arguments['--trialIdx']:
 samplingRate = 1 / rasterOpts['binInterval'] * pq.Hz
 
 nspReader = neo.io.nixio_fr.NixIO(filename=trialBasePath)
-nspBlock = nspReader.read_block(
-    block_index=0, lazy=True,
-    signal_group_mode='split-all')
-
+nspBlock = preproc.readBlockFixNames(nspReader, block_index=0)
+#  nspBlockRaw = nspReader.read_block(
+#      block_index=0, lazy=True,
+#      signal_group_mode='split-all')
 dataBlock = hf.extractSignalsFromBlock(
-    nspBlock)
+    nspBlock, keepSpikes=True)
 dataBlock = hf.loadBlockProxyObjects(dataBlock)
 allSpikeTrains = dataBlock.filter(objects=SpikeTrain)
 for st in allSpikeTrains:
@@ -73,33 +73,30 @@ for st in allSpikeTrains:
 #  [i.channel_index.name for i in dataBlock.filter(objects=AnalogSignal)]
 #  [i.channel_index.name for i in dataBlock.filter(objects=AnalogSignal)]
 
-#  dataBlock already has the stim times if we wrote them to that file
-#  if not, add them here
-dataBlock.segments[0].name = 'analysis seg'
 #  merge events
 evList = []
 for key in ['property', 'value']:
     #  key = 'property'
     insProp = dataBlock.filter(
         objects=Event,
-        name='ins_' + key
+        name='seg0_ins_' + key
         )[0]
     rigProp = dataBlock.filter(
         objects=Event,
-        name='rig_' + key
+        name='seg0_rig_' + key
         )
     if len(rigProp):
         rigProp = rigProp[0]
         allProp = insProp.merge(rigProp)
-        allProp.name = key
+        allProp.name = 'seg0_' + key
 
         evSortIdx = np.argsort(allProp.times, kind='mergesort')
         allProp = allProp[evSortIdx]
         evList.append(allProp)
     else:
-        #  mini RC's don't have rig_ events
+        #  mini RC's don't have rig_events
         allProp = insProp
-        allProp.name = key
+        allProp.name = 'seg0_' + key
         evList.append(insProp)
 
 #  make concatenated event, for viewing
@@ -109,7 +106,7 @@ concatLabels = np.array([
     i in range(len(evList[0]))
     ])
 concatEvent = Event(
-    name='concatenated_updates',
+    name='seg0_' + 'concatenated_updates',
     times=allProp.times,
     labels=concatLabels
     )
@@ -117,23 +114,9 @@ concatEvent.merge_annotations(allProp)
 evList.append(concatEvent)
 dataBlock.segments[0].events = evList
 
-testEventMerge = False
-if testEventMerge:
-    insProp = dataBlock.filter(
-        objects=Event,
-        name='ins_property'
-        )[0]
-    allDF = preproc.eventsToDataFrame(
-        [insProp], idxT='t'
-        )
-    allDF[allDF['ins_property'] == 'movement']
-    rigDF = preproc.eventsToDataFrame(
-        [rigProp], idxT='t'
-        )
-
 dataBlock = preproc.purgeNixAnn(dataBlock)
 writer = neo.io.NixIO(filename=analysisDataPath)
-writer.write_block(dataBlock)
+writer.write_block(dataBlock, use_obj_names=True)
 writer.close()
 
 spikeMatBlock = preproc.calcBinarizedArray(
@@ -143,7 +126,7 @@ spikeMatBlock = preproc.calcBinarizedArray(
 #  save ins time series
 tdChanNames = [
     i.name for i in nspBlock.filter(objects=AnalogSignalProxy)
-    if 'ins_td' in i.name] + ['position', 'velocityCat']
+    if 'ins_td' in i.name] + ['seg0_position', 'seg0_velocityCat']
 tdBlock = hf.extractSignalsFromBlock(
     nspBlock, keepSpikes=False, keepSignals=tdChanNames)
 tdBlock = hf.loadBlockProxyObjects(tdBlock)
@@ -170,12 +153,18 @@ stimStSer = preproc.eventsToDataFrame(
     ins_events, idxT='t'
     )
 stimStatus = hf.stimStatusSerialtoLong(
-    stimStSer, idxT='t', expandCols=expandCols,
+    stimStSer, idxT='t',  namePrefix='seg0_ins_',
+    expandCols=expandCols,
     deriveCols=deriveCols, progAmpNames=progAmpNames)
 columnsToBeAdded = ['amplitude', 'program']
 infoFromStimStatus = hf.interpolateDF(
     stimStatus, tdInterp['t'],
     x='t', columns=columnsToBeAdded, kind='previous')
+infoFromStimStatus.rename(
+    columns={
+        'amplitude': 'seg0_amplitude',
+        'program': 'seg0_program'
+    }, inplace=True)
 tdInterp = pd.concat((
     tdInterp,
     infoFromStimStatus.drop(columns='t')),
@@ -185,10 +174,12 @@ tdBlockInterp = preproc.dataFrameToAnalogSignals(
     idxT='t', useColNames=True,
     dataCol=tdInterp.drop(columns='t').columns,
     samplingRate=samplingRate)
-
+for chanIdx in tdBlockInterp.channel_indexes:
+    chanIdx.name = preproc.childBaseName(chanIdx.name, 'seg0')
 preproc.addBlockToNIX(
     tdBlockInterp, segIdx=0,
     writeSpikes=False, writeEvents=False,
+    purgeNixNames=False,
     fileName=ns5FileName + '_analyze',
     folderPath=os.path.join(
         insFolder,

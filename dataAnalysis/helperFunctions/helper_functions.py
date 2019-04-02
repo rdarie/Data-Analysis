@@ -1163,7 +1163,7 @@ def blockUniqueUnits(block):
     return
 
 def loadBlockProxyObjects(block):
-    #  prune out spike placeholders
+    #  prune out proxy objects
     #  (will get added back)
     for metaIdx, chanIdx in enumerate(block.channel_indexes):
         if chanIdx.units:
@@ -1181,9 +1181,9 @@ def loadBlockProxyObjects(block):
         for stProxy in stProxyList:
             unit = stProxy.unit
             try:
-                print('unit is {}'.format(stProxy.unit.name))
-                print('spiketrain is {}'.format(stProxy.name))
-                print('tstop is {}'.format(stProxy.t_stop))
+                #  print('unit is {}'.format(stProxy.unit.name))
+                #  print('spiketrain is {}'.format(stProxy.name))
+                #  print('tstop is {}'.format(stProxy.t_stop))
                 assert stProxy.shape[0] > 0, 'no times for this spike'
                 st = stProxy.load(load_waveforms=True)
                 #  st.left_sweep = None
@@ -1216,12 +1216,12 @@ def loadBlockProxyObjects(block):
         seg.epochs = [i.load() for i in seg.epochs]
     block.create_relationship()
     return block
-    
+
 
 def extractSignalsFromBlock(
         block, keepSpikes=True,
         keepEvents=True, keepSignals=[]):
-    newBlock = Block()
+    newBlock = Block(name=block.name)
     newBlock.merge_annotations(block)
     for idx, seg in enumerate(block.segments):
         newSeg = Segment(name=seg.name)
@@ -1252,8 +1252,6 @@ def extractSignalsFromBlock(
         if keepSpikes:
             for unit in chanIdx.units:
                 keepThisChan = True
-                #  newUnit = Unit()
-                #  newUnit.merge(unit)
                 newChan.units.append(unit)
                 unit.channel_index = newChan
         else:

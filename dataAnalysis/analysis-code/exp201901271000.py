@@ -11,8 +11,8 @@ trialIdx = 3
 experimentName = '201901271000-Proprio'
 deviceName = 'DeviceNPC700373H'
 #  remote paths
-#  remoteBasePath = '..'
-remoteBasePath = 'Z:\\data\\rdarie\\Murdoc Neural Recordings'
+remoteBasePath = '..'
+#  remoteBasePath = 'Z:\\data\\rdarie\\Murdoc Neural Recordings'
 insFolder = os.path.join(remoteBasePath, 'ORCA Logs')
 nspFolder = os.path.join(remoteBasePath, experimentName)
 ns5FileName = 'Trial00{}'.format(trialIdx)

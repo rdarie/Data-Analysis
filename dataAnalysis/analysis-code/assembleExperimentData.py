@@ -37,15 +37,13 @@ suffixList = ['_binarized', '_analyze']
 #  suffixList = ['_analyze']
 #  suffixList = ['_binarized']
 for suffix in suffixList:
+    print('assembling {}'.format(suffix))
     experimentDataPath = os.path.join(
         trialFilesStim['ins']['folderPath'],
         trialFilesStim['ins']['experimentName'],
         trialFilesStim['ins']['experimentName'] + suffix + '.nix')
     for idx, trialIdx in enumerate(trialList):
-        #  trialIdx = 2
-        #  idx = 0
-        #  trialIdx = 3
-        #  idx = 1
+        print('loading trial {}'.format(trialIdx))
         trialDataPath = os.path.join(
             trialFilesStim['ins']['folderPath'],
             trialFilesStim['ins']['experimentName'],
@@ -53,7 +51,7 @@ for suffix in suffixList:
         if idx == 0:
             masterBlock = preproc.loadWithArrayAnn(
                 trialDataPath, fromRaw=False)
-            #  pdb.set_trace()
+            """
             if suffix == '_analyze':
                 for st in masterBlock.filter(objects=SpikeTrain):
                     st.unit.name = st.name
@@ -61,19 +59,22 @@ for suffix in suffixList:
                 for asig in masterBlock.filter(objects=AnalogSignal):
                     asig.channel_index.name = asig.name
             elif suffix == '_binarized':
+            """
+            if suffix == '_binarized':
                 for seg in masterBlock.segments:
                     seg.spiketrains = []
-                for asig in masterBlock.filter(objects=AnalogSignal):
-                    asig.name = asig.channel_index.name
             masterTStart = masterBlock.filter(objects=AnalogSignal)[0].t_start
             oldTStop = masterBlock.filter(objects=AnalogSignal)[0].t_stop
-            typesNeedRenaming = [Segment, SpikeTrain, AnalogSignal, Event]
+            typesNeedRenaming = [SpikeTrain, AnalogSignal, Event]
+            masterBlock.segments[0].name = 'seg{}_'.format(idx)
             for objType in typesNeedRenaming:
                 for child in masterBlock.filter(objects=objType):
-                    child.name = 'seg{}_{}'.format(idx, child.name)
+                    childBaseName = preproc.childBaseName(child.name, 'seg')
+                    child.name = 'seg{}_{}'.format(idx, childBaseName)
         else:
             dataBlock = preproc.loadWithArrayAnn(
                 trialDataPath, fromRaw=False)
+            """
             if suffix == '_analyze':
                 for st in dataBlock.filter(objects=SpikeTrain):
                     st.unit.name = st.name
@@ -81,22 +82,24 @@ for suffix in suffixList:
                 for asig in dataBlock.filter(objects=AnalogSignal):
                     asig.channel_index.name = asig.name
             elif suffix == '_binarized':
+            """
+            if suffix == '_binarized':
                 for seg in dataBlock.segments:
                     seg.spiketrains = []
-                for asig in dataBlock.filter(objects=AnalogSignal):
-                    asig.name = asig.channel_index.name
             tStart = dataBlock.filter(objects=AnalogSignal)[0].t_start
             timeOffset = oldTStop - tStart
             dataBlock = hf.timeOffsetBlock(dataBlock, timeOffset, masterTStart)
             #  [i.times for i in dataBlock.filter(objects=SpikeTrain)]
             #  [i.unit.channel_index.name for i in masterBlock.filter(objects=SpikeTrain)]
             tStop = dataBlock.filter(objects=AnalogSignal)[0].t_stop
+            dataBlock.segments[0].name = 'seg{}_'.format(idx)
             for objType in typesNeedRenaming:
                 for child in dataBlock.filter(objects=objType):
-                    child.name = 'seg{}_{}'.format(idx, child.name)
+                    childBaseName = preproc.childBaseName(child.name, 'seg')
+                    child.name = 'seg{}_{}'.format(idx, childBaseName)
             masterBlock.merge(dataBlock)
             oldTStop = tStop
     masterBlock = preproc.purgeNixAnn(masterBlock)
     writer = neo.io.NixIO(filename=experimentDataPath)
-    writer.write_block(masterBlock)
+    writer.write_block(masterBlock, use_obj_names=True)
     writer.close()

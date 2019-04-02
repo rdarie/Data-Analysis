@@ -109,6 +109,7 @@ accel = {'data': accelDF, 't': accelDF['t']}
 ############################################################
 startTime_s = None
 dataLength_s = None
+#  !!!!!!!! Might be broken with new naming conventions
 try:
     channelData, nspBlock = preproc.getNIXData(
         fileName=ns5FileName,

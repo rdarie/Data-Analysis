@@ -34,23 +34,15 @@ plotDF = unpackedFeatures.query(dataQuery)
 
 #  plotDF = unpackedFeatures
 #  facet_kws={'despine': True, 'ylim': (-25, 200)}
-g = sns.relplot(
-    row='electrode', col='moveCat', col_order=moveCatOrder,
-    x='bin', y='PC1', hue='amplitude',
-    data=plotDF, kind='line', facet_kws={'despine': True})
-plt.show(block=False)
-plt.pause(3)
-plt.savefig(os.path.join(figureFolder, 'PC1.pdf'))
-plt.close()
-
-g = sns.relplot(
-    row='electrode', col='moveCat', col_order=moveCatOrder,
-    x='bin', y='PC2', hue='amplitude',
-    data=plotDF, kind='line', facet_kws={'despine': True})
-plt.show(block=False)
-plt.pause(3)
-plt.savefig(os.path.join(figureFolder, 'PC2.pdf'))
-plt.close()
+for pcNum in range(50):
+    g = sns.relplot(
+        row='electrode', col='moveCat', col_order=moveCatOrder,
+        x='bin', y='PC{}'.format(pcNum + 1), hue='amplitude',
+        data=plotDF, kind='line', facet_kws={'despine': True, 'ylim': (-25, 200)})
+    plt.show(block=False)
+    plt.pause(3)
+    plt.savefig(os.path.join(figureFolder, 'PC{}.pdf'.format(pcNum + 1)))
+    plt.close()
 
 g = sns.relplot(
     row='electrode', col='moveCat', col_order=moveCatOrder,
