@@ -39,11 +39,34 @@ dataBlock = dataReader.read_block(
     signal_group_mode='split-all')
 
 chansToPlot = ['PC1#0', 'PC2#0']
+waveformsDict = {}
 for segIdx, dataSeg in enumerate(dataBlock.segments):
     stProxys = dataSeg.filter(objects=SpikeTrainProxy)
     spiketrains = [
         stP.load(load_waveforms=True)
         for stP in stProxys
         if stP.name in chansToPlot]
+    spiketrains = preproc.loadContainerArrayAnn(
+        trainList=spiketrains)
+    waveformsDF = spikeTrainWaveformsToDF(spiketrains)
+    waveformsDict.update({segIdx: waveformsDF})
 
-    break
+allWaveforms = pd.concat(
+    waveformsDict,
+    names=['segment'] + waveformsDF.index.names)
+allWaveforms.columns.name = 'bin'
+allWaveforms = allWaveforms.stack().reset_index(name='signal')
+
+dataQuery = '&'.join([
+    '(RateInHz >= 100)',
+    '(feature==\'PC1#0\')',
+    '((pedalSizeCat == \'M\') | (pedalSizeCat == \'Control\'))',
+    ])
+plotDF = allWaveforms.query(dataQuery)
+
+g = sns.relplot(
+    x='bin', y='signal',
+    hue='amplitudeFuzzy',
+    col='pedalMovementCat', row='program',
+    height=5, aspect=.7, kind='line', data=plotDF)
+plt.show()

@@ -10,7 +10,7 @@ from neo.io.proxyobjects import (
     AnalogSignalProxy, SpikeTrainProxy, EventProxy)
 from neo import (
     Block, Segment, ChannelIndex, Unit,
-    Event, AnalogSignal, SpikeTrain)
+    Event, Epoch, AnalogSignal, SpikeTrain)
 import neo
 from currentExperiment import *
 import dataAnalysis.helperFunctions.helper_functions as hf
@@ -55,16 +55,45 @@ nspBlock = preproc.readBlockFixNames(nspReader, block_index=0)
 dataBlock = hf.extractSignalsFromBlock(
     nspBlock, keepSpikes=True)
 dataBlock = hf.loadBlockProxyObjects(dataBlock)
+'''
+for ev in dataBlock.segments[0].filter(objects=Event):
+    if len(ev.times):
+        print('{}.t_start={}'.format(ev.name, ev.times[0]))
+    else:
+        print('{} has no times'.format(ev.name))
+for st in dataBlock.segments[0].filter(objects=SpikeTrain):
+    if len(st.times):
+        print('{}.t_start={}'.format(st.name, st.t_start))
+    else:
+        print('{} has no times'.format(st.name))
+for st in nspBlock.segments[0].filter(objects=SpikeTrainProxy):
+    print('{}.t_start={}'.format(st.name, st.t_start))
+    
+for asig in dataBlock.segments[0].filter(objects=AnalogSignal):
+        print('{}.t_start={}'.format(asig.name, asig.t_start))
+'''
 allSpikeTrains = dataBlock.filter(objects=SpikeTrain)
-for st in allSpikeTrains:
-    if 'arrayAnnNames' in st.annotations.keys():
-        for key in st.annotations['arrayAnnNames']:
-            #  fromRaw, the ann come back as tuple, need to recast
-            st.array_annotations.update(
-                {key: np.array(st.annotations[key])})
-    st.sampling_rate = samplingRate
-    if st.waveforms is None:
-        st.waveforms = np.array([]).reshape((0, 0, 0))*pq.mV
+
+for segIdx, dataSeg in enumerate(dataBlock.segments):
+    tStart = nspReader.get_signal_t_start(
+        block_index=0, seg_index=segIdx) * pq.s
+    fs = nspReader.get_signal_sampling_rate(
+        channel_indexes=[0])
+    sigSize = nspReader.get_signal_size(
+        block_index=0, seg_index=segIdx
+        )
+    tStop = (sigSize / fs) * pq.s + tStart
+    for st in dataSeg.filter(objects=SpikeTrain):
+        st.t_start = tStart
+        st.t_stop = tStop
+        if 'arrayAnnNames' in st.annotations.keys():
+            for key in st.annotations['arrayAnnNames']:
+                #  fromRaw, the ann come back as tuple, need to recast
+                st.array_annotations.update(
+                   {key: np.array(st.annotations[key])})
+        st.sampling_rate = samplingRate
+        if st.waveforms is None:
+            st.waveforms = np.array([]).reshape((0, 0, 0))*pq.mV
 
 #  tests...
 #  [i.unit.channel_index.name for i in insBlockJustSpikes.filter(objects=SpikeTrain)]
@@ -177,14 +206,14 @@ tdBlockInterp = preproc.dataFrameToAnalogSignals(
 for chanIdx in tdBlockInterp.channel_indexes:
     chanIdx.name = preproc.childBaseName(chanIdx.name, 'seg0')
 preproc.addBlockToNIX(
-    tdBlockInterp, segIdx=0,
+    tdBlockInterp, neoSegIdx=[0],
     writeSpikes=False, writeEvents=False,
     purgeNixNames=False,
     fileName=ns5FileName + '_analyze',
     folderPath=os.path.join(
         insFolder,
         experimentName),
-    nixBlockIdx=0, nixSegIdx=0,
+    nixBlockIdx=0, nixSegIdx=[0],
     )
 
 testSaveability = True

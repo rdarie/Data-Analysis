@@ -94,7 +94,8 @@ def spikeDictToSpikeTrains(
     return block
 
 
-def spikeTrainsToSpikeDict(spiketrains):
+def spikeTrainsToSpikeDict(
+        spiketrains):
     nCh = len(spiketrains)
     spikes = {
         'ChannelID': [i for i in range(nCh)],
@@ -134,14 +135,21 @@ def spikeTrainsToSpikeDict(spiketrains):
     return spikes
 
 
-def spikeTrainWaveformsToDF(spiketrains):
-    rawWaveforms = pd.concat(
-        {
-            st.name: pd.DataFrame(
-                np.squeeze(st.waveforms))
-            for st in spiketrains
-        }, names=['signal', 'index'])
-    rawWaveforms.columns.name = 'bin'
+def spikeTrainWaveformsToDF(
+        spiketrains):
+    waveformsDict = {}
+    for st in spiketrains:
+        wfDF = pd.DataFrame(np.squeeze(st.waveforms))
+        annDict = {
+            k: pd.Series(v)
+            for k, v in st.array_annotations.items()}
+        annDF = pd.concat(annDict, axis=1).reset_index()
+        fullDF = pd.concat([wfDF, annDF], axis=1)
+        fullDF.set_index(annDF.columns.tolist(), inplace=True)
+        fullDF.columns.name = 'bin'
+        waveformsDict.update({st.name: fullDF})
+    waveformsDF = pd.concat(
+        waveformsDict, names=['feature'] + annDF.columns.tolist())
     return waveformsDF
 
 
@@ -482,7 +490,8 @@ def loadSpikeMats(
     return spikeMats, validTrials
 
 
-def findSegsIncluding(block, timeSlice=None):
+def findSegsIncluding(
+        block, timeSlice=None):
     segBoundsList = []
     for segIdx, seg in enumerate(block.segments):
         segBoundsList.append(pd.DataFrame({
@@ -501,7 +510,8 @@ def findSegsIncluding(block, timeSlice=None):
     return segBounds, requestedSegs
 
 
-def findSegsIncluded(block, timeSlice=None):
+def findSegsIncluded(
+        block, timeSlice=None):
     segBoundsList = []
     for segIdx, seg in enumerate(block.segments):
         segBoundsList.append(pd.DataFrame({
@@ -520,7 +530,8 @@ def findSegsIncluded(block, timeSlice=None):
     return segBounds, requestedSegs
 
 
-def getElecLookupTable(block, elecIds=None):
+def getElecLookupTable(
+        block, elecIds=None):
     lookupTableList = []
     for metaIdx, chanIdx in enumerate(block.channel_indexes):
         if chanIdx.analogsignals:
@@ -628,7 +639,8 @@ def getNIXData(
     return channelData, block
 
 
-def childBaseName(childName, searchTerm):
+def childBaseName(
+        childName, searchTerm):
     if searchTerm in childName:
         baseName = '_'.join(childName.split('_')[1:])
     else:
@@ -710,7 +722,6 @@ def readBlockFixNames(
     return dataBlock
 
 
-#  TODO: write code that merges a dataframe and a spikesdict to a block
 def addBlockToNIX(
         newBlock, neoSegIdx=[0],
         writeAsigs=True, writeSpikes=True, writeEvents=True,
@@ -1192,7 +1203,8 @@ def preproc(
     return neo.io.nixio_fr.NixIO(filename=trialBasePath + '.nix')
 
 
-def purgeNixAnn(block, annNames=['nix_name', 'neo_name']):
+def purgeNixAnn(
+        block, annNames=['nix_name', 'neo_name']):
     for annName in annNames:
         block.annotations.pop(annName, None)
     for child in block.children_recur:
@@ -1243,12 +1255,13 @@ def loadContainerArrayAnn(
                 st.array_annotations.update(
                     {key: np.array(st.annotations[key])})
         if hasattr(st, 'waveforms'):
-            if not st.waveforms:
+            if st.waveforms is None:
                 st.waveforms = np.array([]).reshape((0, 0, 0))*pq.mV
     return returnObj
 
 
-def loadWithArrayAnn(dataPath, fromRaw=False):
+def loadWithArrayAnn(
+        dataPath, fromRaw=False):
     if fromRaw:
         reader = neo.io.nixio_fr.NixIO(filename=dataPath)
         block = readBlockFixNames(reader, lazy=False)

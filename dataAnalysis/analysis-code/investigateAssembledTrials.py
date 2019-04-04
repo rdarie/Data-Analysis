@@ -27,10 +27,55 @@ dataBlock = dataReader.read_block(
     block_index=0, lazy=True,
     signal_group_mode='split-all')
 
+chanNames = ['elec44#0', 'elec91#0']
 masterSpikeMats, _ = preproc.loadSpikeMats(
     experimentBinnedSpikePath, rasterOpts,
-    chans=['elec44#0', 'elec91#0'],
+    chans=chanNames,
     loadAll=True)
+
+for segIdx, segSpikeMat in masterSpikeMats.items():
+    plt.plot(segSpikeMat.iloc[:, 2])
+plt.show()
+
+binnedBlock = binnedReader.read_block(
+    block_index=0, lazy=True,
+    signal_group_mode='split-all')
+for segIdx, dataSeg in enumerate(binnedBlock.segments):
+    asigProxyList = [
+        asigP
+        for asigP in dataSeg.filter(objects=AnalogSignalProxy)
+        if asigP.name in chanNames]
+    asigP = asigProxyList[0]
+    plt.plot(asigP.load().magnitude)
+plt.show()
+
+checkTimes = True
+for segIdx in range(dataReader.header['nb_segment'][0]):
+    print('t_start = {}'.format(dataReader.get_signal_t_start(0, segIdx)))
+trialReader = neo.io.nixio_fr.NixIO(
+    filename=analysisDataPath)
+for segIdx in range(trialReader.header['nb_segment'][0]):
+    print('t_start = {}'.format(trialReader.get_signal_t_start(0, segIdx)))
+insReader = neo.io.nixio_fr.NixIO(
+    filename=insDataPath)
+for segIdx in range(insReader.header['nb_segment'][0]):
+    print('t_start = {}'.format(insReader.get_signal_t_start(0, segIdx)))
+nspReader = neo.io.nixio_fr.NixIO(
+    filename=trialBasePath)
+for segIdx in range(nspReader.header['nb_segment'][0]):
+    print('t_start = {}'.format(nspReader.get_signal_t_start(0, segIdx)))
+tdcReader = neo.io.nixio_fr.NixIO(
+    filename=spikePath)
+tdcBlock = tdcReader.read_block(
+    block_index=0, lazy=True, signal_group_mode='split-all')
+for st in tdcBlock.segments[0].filter(objects=SpikeTrainProxy):
+    print('{}.t_start={}'.format(st.name, st.t_start))
+brmReader = neo.io.BlackrockIO(
+    filename=trialBasePath.replace('nix', 'ns5'))
+brmBlock = brmReader.read_block(
+    block_index=0, lazy=True, signal_group_mode='split-all')
+for st in brmBlock.segments[0].filter(objects=SpikeTrainProxy):
+    print('{}.t_start={}'.format(st.name, st.t_start))
 
 checkAccessMethods = False
 if checkAccessMethods:
@@ -69,6 +114,7 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
             except Exception:
                 traceback.print_exc()
 
+checkReferences = True
 for segIdx, dataSeg in enumerate(dataBlock.segments):
     stProxyList = [
         stP

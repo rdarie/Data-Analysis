@@ -55,8 +55,6 @@ windowSize = [i * pq.s for i in rasterOpts['windowSize']]
 #  
 masterBlock = Block()
 masterBlock.name = dataBlock.annotations['neo_name']
-masterBlock.annotate(
-    nix_name=dataBlock.annotations['neo_name'])
 #  make channels and units for triggered time series
 for chanName in chansToTrigger:
     chanIdx = ChannelIndex(name=chanName + '#0', index=[0])
@@ -69,7 +67,6 @@ for chanName in chansToTrigger:
 
 for segIdx, dataSeg in enumerate(dataBlock.segments):
     newSeg = Segment(name=dataSeg.annotations['neo_name'])
-    newSeg.annotate(nix_name=newSeg.name)
     masterBlock.segments.append(newSeg)
 
     alignEvents = [
@@ -78,8 +75,37 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
             objects=EventProxy, name=eventName)]
     alignEvents = preproc.loadContainerArrayAnn(trainList=alignEvents)[0]
     
+    '''
+    headLen = 3
+    alignEventsAnn = pd.concat(
+        [
+            pd.DataFrame(alignEvents[:headLen].array_annotations),
+            pd.Series(alignEvents[:headLen].times, name='t')
+            ], axis=1)
+    originalEvents = dataSeg.filter(
+        objects=EventProxy, name='concatenated_updates')[0].load()
+    tMask = (
+        (originalEvents >= (alignEventsAnn['t'].iloc[0] - 1)) &
+        (originalEvents <= (alignEventsAnn['t'].iloc[-1] + 1)))
+    originalEvents[tMask]
+    alignEventsAnn.transpose()
+    '''
+
     for chanName in chansToTrigger:
         asigP = dataSeg.filter(objects=AnalogSignalProxy, name=chanName)[0]
+        checkReferences = True
+        if checkReferences:
+            da = asigP._rawio.da_list['blocks'][blockIdx]['segments'][segIdx]['data']
+            print('segIdx {}, asigP.name {}'.format(
+                segIdx, asigP.name))
+            print('asigP._global_channel_indexes = {}'.format(
+                asigP._global_channel_indexes))
+            print('asigP references {}'.format(
+                da[asigP._global_channel_indexes[0]]))
+            try:
+                assert asigP.name in da[asigP._global_channel_indexes[0]].name
+            except Exception:
+                traceback.print_exc()
         rawWaveforms = [
             asigP.load(time_slice=(t + windowSize[0], t + windowSize[1]))
             for t in alignEvents]
@@ -118,15 +144,7 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
 
 dataReader.file.close()
 
-masterBlock.create_relationship()
-allSegs = list(range(len(masterBlock.segments)))
-preproc.addBlockToNIX(
-    masterBlock, neoSegIdx=allSegs,
-    writeAsigs=False, writeSpikes=True, writeEvents=False,
-    fileName=trialFilesStim['ins']['experimentName'] + '_analyze',
-    folderPath=os.path.join(
-        trialFilesStim['ins']['folderPath'],
-        trialFilesStim['ins']['experimentName']),
-    purgeNixNames=False,
-    nixBlockIdx=0, nixSegIdx=allSegs,
-    )
+masterBlock = preproc.purgeNixAnn(masterBlock)
+writer = neo.io.NixIO(filename=experimentDataPath)
+writer.write_block(masterBlock, use_obj_names=True)
+writer.close()

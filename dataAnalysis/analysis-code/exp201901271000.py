@@ -228,6 +228,10 @@ experimentDataPath = os.path.join(
     trialFilesStim['ins']['folderPath'],
     trialFilesStim['ins']['experimentName'],
     trialFilesStim['ins']['experimentName'] + '_analyze.nix')
+experimentTriggeredPath = os.path.join(
+    trialFilesStim['ins']['folderPath'],
+    trialFilesStim['ins']['experimentName'],
+    trialFilesStim['ins']['experimentName'] + '_triggered.nix')
 experimentBinnedSpikePath = os.path.join(
     trialFilesStim['ins']['folderPath'],
     trialFilesStim['ins']['experimentName'],

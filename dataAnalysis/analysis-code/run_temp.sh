@@ -20,4 +20,3 @@
 #SBATCH --account=bibs-dborton-condo
 
 python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcAlignTimes.py'
-python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcPCAalignedToStim.py'
