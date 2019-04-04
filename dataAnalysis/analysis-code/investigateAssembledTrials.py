@@ -27,14 +27,14 @@ dataBlock = dataReader.read_block(
     block_index=0, lazy=True,
     signal_group_mode='split-all')
 
-chanNames = ['elec44#0', 'elec91#0']
+chanNames = ['elec44#0_fr', 'elec91#0_fr']
 masterSpikeMats, _ = preproc.loadSpikeMats(
     experimentBinnedSpikePath, rasterOpts,
     chans=chanNames,
     loadAll=True)
 
 for segIdx, segSpikeMat in masterSpikeMats.items():
-    plt.plot(segSpikeMat.iloc[:, 2])
+    plt.plot(segSpikeMat.iloc[:, 1])
 plt.show()
 
 binnedBlock = binnedReader.read_block(

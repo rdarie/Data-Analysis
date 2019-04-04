@@ -46,9 +46,11 @@ for segIdx, segSpikeMat in masterSpikeMats.items():
     dummyAsig = dataSeg.filter(
         objects=AnalogSignalProxy)[0].load(channel_indexes=[0])
     samplingRate = dummyAsig.sampling_rate
+    newT = dummyAsig.times.magnitude
+    spikeMatDF['t'] = spikeMatDF['t'] + newT[0]
     
     segSpikeMatInterp = hf.interpolateDF(
-        spikeMatDF, pd.Series(dummyAsig.times.magnitude),
+        spikeMatDF, pd.Series(newT),
         kind='linear', fill_value=(0, 0),
         x='t')
     spikeMatBlockInterp = preproc.dataFrameToAnalogSignals(
@@ -75,7 +77,13 @@ for segIdx, segSpikeMat in masterSpikeMats.items():
 
     masterBlock.merge(spikeMatBlockInterp)
 dataReader.file.close()
-
+'''
+for segIdx, dataSeg in enumerate(masterBlock.segments):
+    plt.plot(
+        dataSeg.analogsignals[0].times.magnitude,
+        dataSeg.analogsignals[0].magnitude)
+plt.show()
+'''
 allSegs = list(range(len(masterBlock.segments)))
 
 preproc.addBlockToNIX(
