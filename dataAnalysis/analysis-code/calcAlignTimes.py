@@ -28,12 +28,9 @@ dataBlock = dataReader.read_block(
 for ev in dataBlock.filter(objects=EventProxy):
     ev.name = '_'.join(ev.name.split('_')[1:])
 
-"""
-    some categories need to be calculated,
-    others are available; "fuzzy" ones need their
-    alignment fixed
-"""
-
+#  some categories need to be calculated,
+#  others are available; "fuzzy" ones need their
+#  alignment fixed
 fuzzyCateg = [
     'amplitude', 'program', 'RateInHz']
 availableCateg = [
@@ -59,7 +56,7 @@ masterBlock.annotate(
     nix_name=dataBlock.annotations['neo_name'])
 
 blockIdx = 0
-checkReferences = True
+checkReferences = False
 for segIdx, dataSeg in enumerate(dataBlock.segments):
     signalsInSegment = [
         'seg{}_'.format(segIdx) + i
@@ -204,6 +201,7 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         categories[colName] = np.nan
     for colName in fuzzyCateg:
         categories[colName + 'Fuzzy'] = np.nan
+    #  scan through and calculate fuzzy values
     fudgeFactor = 300e-3  # seconds
     for idx, tOnset in alignTimes.iteritems():
         moveCat = categories.loc[idx, 'pedalMovementCat']
@@ -221,6 +219,8 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
             if len(ampOnset):
                 # greater if movement after stim
                 categories.loc[idx, 'stimOffset'] = tOnset - ampOnset.iloc[0]
+            else:
+                categories.loc[idx, 'stimOffset'] = 999
             ampOffset = theseAmps.loc[
                 ampDiff[ampDiff['amplitude'] < 0].index, 't']
             #  if there's an amp offset, use the last value where amp was on
@@ -243,19 +243,50 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
             for colName in fuzzyCateg:
                 categories.loc[idx, colName + 'Fuzzy'] = np.nan
     categories.fillna(method='ffill', inplace=True)
+    categories.fillna(method='bfill', inplace=True)
+    #  fix program labels
+    #  INS amplitudes are in 100s of uA
+    categories['amplitude'] = categories['amplitude'] / 10
+    '''
+    #  pull actual electrode names
+    categories['electrode'] = np.nan
+    for pName in pd.unique(categories['program']):
+        pMask = categories['program'] == pName
+        if pName == 999:
+            categories.loc[pMask, 'electrode'] = 'Control'
+        else:
+            unitName = 'g0p{}'.format(int(pName))
+            thisUnit = dataBlock.filter(objects=Unit, name=unitName)[0]
+            cathodes = thisUnit.annotations['cathodes']
+            anodes = thisUnit.annotations['anodes']
+            elecName = ''
+            if isinstance(anodes, Iterable):
+                elecName += '+ ' + ', '.join(['E{}'.format(i) for i in anodes])
+            else:
+                elecName += '+ E{}'.format(anodes)
+            elecName += ' '
+            if isinstance(cathodes, Iterable):
+                elecName += '- ' + ', '.join(['E{}'.format(i) for i in cathodes])
+            else:
+                elecName += '- E{}'.format(cathodes)
+            categories.loc[pMask, 'electrode'] = elecName
+    '''
+
     alignEventsDF = pd.concat([alignTimes, categories], axis=1)
+    
     alignEvents = preproc.eventDataFrameToEvents(
         alignEventsDF, idxT='t',
         annCol=None,
         eventName='seg{}_alignTimes'.format(segIdx), tUnits=pq.s,
         makeList=False)
+    
     alignEvents.annotate(nix_name=alignEvents.name)
     newSeg = Segment(name=dataSeg.annotations['neo_name'])
     newSeg.annotate(nix_name=dataSeg.annotations['neo_name'])
     newSeg.events.append(alignEvents)
     alignEvents.segment = newSeg
     masterBlock.segments.append(newSeg)
-    
+
 dataReader.file.close()
 
 masterBlock.create_relationship()
