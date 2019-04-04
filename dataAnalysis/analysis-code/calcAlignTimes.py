@@ -1,5 +1,4 @@
-import dataAnalysis.ephyviewer.scripts as vis_scripts
-import os, pdb
+import os, pdb, traceback
 from importlib import reload
 import neo
 from neo import (
@@ -26,11 +25,15 @@ dataReader = neo.io.nixio_fr.NixIO(
 dataBlock = dataReader.read_block(
     block_index=0, lazy=True,
     signal_group_mode='split-all')
+for ev in dataBlock.filter(objects=EventProxy):
+    ev.name = '_'.join(ev.name.split('_')[1:])
+
 """
     some categories need to be calculated,
     others are available; "fuzzy" ones need their
     alignment fixed
 """
+
 fuzzyCateg = [
     'amplitude', 'program', 'RateInHz']
 availableCateg = [
@@ -55,6 +58,8 @@ masterBlock.name = dataBlock.annotations['neo_name']
 masterBlock.annotate(
     nix_name=dataBlock.annotations['neo_name'])
 
+blockIdx = 0
+checkReferences = True
 for segIdx, dataSeg in enumerate(dataBlock.segments):
     signalsInSegment = [
         'seg{}_'.format(segIdx) + i
@@ -63,17 +68,46 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         asigP
         for asigP in dataSeg.filter(objects=AnalogSignalProxy)
         if asigP.annotations['neo_name'] in signalsInSegment]
-    asigP = asigProxysList[0]
+    eventProxysList = dataSeg.events
+    
+    if checkReferences:
+        for asigP in asigProxysList:
+            da = asigP._rawio.da_list['blocks'][blockIdx]['segments'][segIdx]['data']
+            print('segIdx {}, asigP.name {}'.format(
+                segIdx, asigP.name))
+            print('asigP._global_channel_indexes = {}'.format(
+                asigP._global_channel_indexes))
+            print('asigP references {}'.format(
+                da[asigP._global_channel_indexes[0]]))
+            try:
+                assert asigP.name in da[asigP._global_channel_indexes[0]].name
+            except Exception:
+                traceback.print_exc()
+        
+        for evP in eventProxysList:
+            print('segIdx {}, evP.name {}'.format(
+                segIdx, evP.name))
+            print('evP._event_channel_index = {}'.format(
+                 evP._event_channel_index))
+            evP_ch = evP._event_channel_index
+            mts = evP._rawio.file.blocks[blockIdx].groups[segIdx].multi_tags
+            try:
+                assert evP.name in mts[evP_ch].name
+            except Exception:
+                traceback.print_exc()
+    
     asigsList = [
         asigP.load()
         for asigP in asigProxysList]
     samplingRate = asigsList[0].sampling_rate
     asigsDF = preproc.analogSignalsToDataFrame(asigsList)
-    dataSeg.events = [ev.load() for ev in dataSeg.events]
+
+    dataSegEvents = [evP.load() for evP in eventProxysList]
     eventDF = preproc.eventsToDataFrame(
-        dataSeg.events, idxT='t',
+        dataSegEvents, idxT='t',
         names=['property', 'value']
         )
+        
     stimStatus = hf.stimStatusSerialtoLong(
         eventDF, idxT='t', namePrefix='', expandCols=expandCols,
         deriveCols=deriveCols, progAmpNames=progAmpNames)
@@ -90,6 +124,7 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
             'movement': 'pedalVelocityCat',
             'position': 'pedalPosition'},
         inplace=True)
+    
     atRest = (
         (tdDF['pedalVelocityCat'] == 1) &
         (tdDF['pedalVelocityCat'].shift(-1) == 0))
@@ -109,14 +144,12 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
     moveMask = movementOnOff == 1
     moveTimes = tdDF.loc[
         moveMask, 't']
-
     stopMask = movementOnOff == -1
     stopTimes = tdDF.loc[
         stopMask, 't']
     # if stopped before the first start, drop it
     dropIndices = stopTimes.index[stopTimes < moveTimes.iloc[0]]
     stopTimes.drop(index=dropIndices, inplace=True)
-    
     tdDF['pedalMovementCat'] = np.nan
     tdDF.loc[
         moveMask & (tdDF['pedalVelocityCat'] == 1),
@@ -131,16 +164,12 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         stopMask & (tdDF['pedalVelocityCat'].shift(1) == 1),
         'pedalMovementCat'] = 'reachedBase'
     #  get intervals halfway between move stop and move start
-
     pauseLens = moveTimes.shift(-1).values - stopTimes
     maskForLen = pauseLens > 1.5
-
     halfOffsets = (
         samplingRate.magnitude * (pauseLens / 2)).fillna(0).astype(int)
-
     otherTimesIdx = (stopTimes.index + halfOffsets.values)[maskForLen]
     otherTimes = tdDF.loc[otherTimesIdx, 't']
-    
     moveCategories = tdDF.loc[
         tdDF['t'].isin(moveTimes), fuzzyCateg + availableCateg
         ].reset_index(drop=True)
@@ -153,13 +182,11 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         tdDF['t'].isin(otherTimes), fuzzyCateg + availableCateg
         ].reset_index(drop=True)
     otherCategories['pedalMetaCat'] = 'rest'
-
     otherCategories['program'] = 999
     otherCategories['RateInHz'] = 999
     otherCategories['amplitude'] = 999
     otherCategories['pedalSizeCat'] = 'Control'
     otherCategories['pedalMovementCat'] = 'Control'
-    
     alignTimes = pd.concat((
         moveTimes, stopTimes, otherTimes),
         axis=0, ignore_index=True)
@@ -173,7 +200,6 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
     categories = categories.loc[alignTimes.index, :]
     alignTimes.reset_index(drop=True, inplace=True)
     categories.reset_index(drop=True, inplace=True)
-        
     for colName in calcFromTD:
         categories[colName] = np.nan
     for colName in fuzzyCateg:
@@ -185,20 +211,16 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         if metaCat == 'onset':
             tStart = max(0, tOnset - fudgeFactor)
             tStop = min(tdDF['t'].iloc[-1], tOnset + fudgeFactor)
-
             tdMaskPre = (tdDF['t'] > tStart) & (tdDF['t'] < tOnset)
             tdMaskPost = (tdDF['t'] > tOnset) & (tdDF['t'] < tStop)
             tdMask = (tdDF['t'] > tStart) & (tdDF['t'] < tStop)
-
             theseAmps = tdDF.loc[tdMask, ['t', 'amplitude']]
             ampDiff = theseAmps.diff()
-
             ampOnset = theseAmps.loc[
                 ampDiff[ampDiff['amplitude'] > 0].index, 't']
             if len(ampOnset):
                 # greater if movement after stim
                 categories.loc[idx, 'stimOffset'] = tOnset - ampOnset.iloc[0]
-
             ampOffset = theseAmps.loc[
                 ampDiff[ampDiff['amplitude'] < 0].index, 't']
             #  if there's an amp offset, use the last value where amp was on
@@ -210,19 +232,16 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
             for colName in fuzzyCateg:
                 nominalValue = categories.loc[idx, colName]
                 fuzzyValue = tdDF.loc[fuzzyIdx, colName]
-
                 if (nominalValue != fuzzyValue):
                     categories.loc[idx, colName + 'Fuzzy'] = fuzzyValue
                     print('nominally, {} is {}'.format(colName, nominalValue))
                     print('changed it to {}'.format(fuzzyValue))
                 else:
                     categories.loc[idx, colName + 'Fuzzy'] = nominalValue
-
         elif metaCat == 'offset':
             #  offsets inherit the amplitude of the onset
             for colName in fuzzyCateg:
                 categories.loc[idx, colName + 'Fuzzy'] = np.nan
-
     categories.fillna(method='ffill', inplace=True)
     alignEventsDF = pd.concat([alignTimes, categories], axis=1)
     alignEvents = preproc.eventDataFrameToEvents(
@@ -236,13 +255,14 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
     newSeg.events.append(alignEvents)
     alignEvents.segment = newSeg
     masterBlock.segments.append(newSeg)
+    
 dataReader.file.close()
 
 masterBlock.create_relationship()
 allSegs = list(range(len(masterBlock.segments)))
 preproc.addBlockToNIX(
     masterBlock, neoSegIdx=allSegs,
-    writeSpikes=False, writeEvents=False,
+    writeAsigs=False, writeSpikes=False, writeEvents=True,
     fileName=trialFilesStim['ins']['experimentName'] + '_analyze',
     folderPath=os.path.join(
         trialFilesStim['ins']['folderPath'],

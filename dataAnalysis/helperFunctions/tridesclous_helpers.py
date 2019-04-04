@@ -465,7 +465,7 @@ def neo_block_after_peeler(triFolder, chan_grps=None):
                         spike[unitMask]['index'] +
                         spike[unitMask]['jitter']) /
                     dataio.sample_rate)
-                #  import pdb; pdb.set_trace()
+                
                 spikeWaveforms = dataio.get_some_waveforms(
                     seg_num=segIdx, chan_grp=chan_grp,
                     spike_indexes=spike[unitMask]['index'],
@@ -475,7 +475,7 @@ def neo_block_after_peeler(triFolder, chan_grps=None):
                 spikeWaveforms = np.swapaxes(
                     spikeWaveforms,
                     1, 2)
-                #  import pdb; pdb.set_trace()
+                
                 st = SpikeTrain(
                     name='seg{}_{}'.format(int(segIdx), thisUnit.name),
                     times=spikeTimes, units='sec',

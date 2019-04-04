@@ -27,8 +27,7 @@ import quantities as pq
 
 masterSpikeMats, _ = preproc.loadSpikeMats(
     experimentBinnedSpikePath, rasterOpts,
-    chans=['elec44#0', 'elec91#0'],
-    loadAll=True)
+    loadAll=True, checkReferences=True)
 
 dataReader = neo.io.nixio_fr.NixIO(
     filename=experimentDataPath)

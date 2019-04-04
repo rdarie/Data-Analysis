@@ -1,5 +1,5 @@
 import dataAnalysis.ephyviewer.scripts as vis_scripts
-import os, pdb
+import os, pdb, traceback
 from importlib import reload
 import neo
 from neo import (
@@ -27,18 +27,31 @@ import quantities as pq
 
 dataReader = neo.io.nixio_fr.NixIO(
     filename=experimentDataPath)
-dataReader.parse_header()
 dataBlock = dataReader.read_block(
     block_index=0, lazy=True,
     signal_group_mode='split-all')
 
 interpolatedSpikeMats = {}
 blockIdx = 0
+checkReferences = True
 for segIdx, dataSeg in enumerate(dataBlock.segments):
     asigProxysList = [
         asigP
         for asigP in dataSeg.filter(objects=AnalogSignalProxy)
         if '_fr' in asigP.name]
+    if checkReferences:
+        for asigP in asigProxysList:
+            da = asigP._rawio.da_list['blocks'][blockIdx]['segments'][segIdx]['data']
+            print('segIdx {}, asigP.name {}'.format(
+                segIdx, asigP.name))
+            print('asigP._global_channel_indexes = {}'.format(
+                asigP._global_channel_indexes))
+            print('asigP references {}'.format(
+                da[asigP._global_channel_indexes[0]]))
+            try:
+                assert asigP.name in da[asigP._global_channel_indexes[0]].name
+            except Exception:
+                traceback.print_exc()
     asigsList = [
         asigP.load()
         for asigP in asigProxysList]

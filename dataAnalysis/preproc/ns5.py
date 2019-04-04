@@ -107,7 +107,6 @@ def spikeTrainsToSpikeDict(spiketrains):
         'extended_headers': []
         }
     for idx, st in enumerate(spiketrains):
-        #  pdb.set_trace()
         spikes['ChannelID'][idx] = st.name
         if len(spikes['TimeStamps'][idx]):
             spikes['TimeStamps'][idx] = np.stack((
@@ -133,6 +132,17 @@ def spikeTrainsToSpikeDict(spiketrains):
         else:
             spikes['Classification'][idx] = classVals
     return spikes
+
+
+def spikeTrainWaveformsToDF(spiketrains):
+    rawWaveforms = pd.concat(
+        {
+            st.name: pd.DataFrame(
+                np.squeeze(st.waveforms))
+            for st in spiketrains
+        }, names=['signal', 'index'])
+    rawWaveforms.columns.name = 'bin'
+    return waveformsDF
 
 
 def analogSignalsToDataFrame(
@@ -221,36 +231,37 @@ def eventDataFrameToEvents(
     if makeList:
         eventList = []
         for colName in annCol:
+            originalDType = type(eventDF[colName].values[0]).__name__
             event = Event(
                 name=eventName + colName,
                 times=eventDF[idxT].values * tUnits,
-                labels=eventDF[colName].values
+                labels=eventDF[colName].astype(originalDType).values
                 )
-            #  pdb.set_trace()
-            originalDType = type(eventDF[colName].values[0]).__name__
             event.annotate(originalDType=originalDType)
             eventList.append(event)
         return eventList
     else:
         if annCol is None:
             annCol = eventDF.drop(columns=idxT).columns
-            event = Event(
-                name=eventName,
-                times=eventDF[idxT].values * tUnits,
-                labels=np.array(eventDF.index)
-                )
+        event = Event(
+            name=eventName,
+            times=eventDF[idxT].values * tUnits,
+            labels=np.array(eventDF.index)
+            )
+        event.annotations.update(
+            {
+                'arrayAnnNames': [],
+                'arrayAnnDTypes': []
+                })
+        for colName in annCol:
+            originalDType = type(eventDF[colName].values[0]).__name__
+            arrayAnn = eventDF[colName].astype(originalDType).values
+            event.array_annotations.update(
+                {colName: arrayAnn})
+            event.annotations['arrayAnnNames'].append(colName)
+            event.annotations['arrayAnnDTypes'].append(originalDType)
             event.annotations.update(
-                {
-                    'arrayAnnNames': [],
-                    'arrayAnnDTypes': []
-                    })
-            for colName in annCol:
-                event.array_annotations.update(
-                    {colName: eventDF[colName].values}
-                )
-                originalDType = type(eventDF[colName].values[0]).__name__
-                event.annotations['arrayAnnNames'].append(colName)
-                event.annotations['arrayAnnDTypes'].append(originalDType)
+                {colName: arrayAnn})
         return event
 
 
@@ -259,11 +270,15 @@ def eventsToDataFrame(
         ):
     eventDict = {}
     
+    calculatedT = False
     for event in events:
         if names is not None:
             if event.name not in names:
                 continue
         if len(event.times):
+            if not calculatedT:
+                t = pd.Series(event.times.magnitude)
+                calculatedT = True
             #  print(event.name)
             values = event.array_annotations['labels']
             if isinstance(values[0], bytes):
@@ -276,7 +291,7 @@ def eventsToDataFrame(
             #  print(values.dtype)
             eventDict.update({
                 event.name: pd.Series(values)})
-    eventDict.update({idxT: pd.Series(event.times.magnitude)})
+    eventDict.update({idxT: t})
     return pd.concat(eventDict, axis=1)
 
 
@@ -356,7 +371,8 @@ def unpackAnalysisBlock(
 def loadSpikeMats(
         dataPath, rasterOpts,
         alignTimes=None, chans=None, loadAll=False,
-        absoluteBins=False, transposeSpikeMat=False):
+        absoluteBins=False, transposeSpikeMat=False,
+        checkReferences=False):
 
     reader = neo.io.nixio_fr.NixIO(filename=dataPath)
     chanNames = reader.header['signal_channels']['name']
@@ -375,8 +391,18 @@ def loadSpikeMats(
             i: None for i in range(reader.segment_count(block_index=0))}
         validTrials = None
     
-    #segOffset = 0
     for segIdx in range(reader.segment_count(block_index=0)):
+        if checkReferences:
+            for i, cIdx in enumerate(chanIdx):
+                da = reader.da_list['blocks'][
+                    0]['segments'][segIdx]['data'][cIdx]
+                print('name {}, da.name {}'.format(
+                    chanNames[i], da.name
+                    ))
+                try:
+                    assert chanNames[i] in da.name, 'reference problem!!'
+                except Exception:
+                    pass
         tStart = reader.get_signal_t_start(
             block_index=0, seg_index=segIdx)
         fs = reader.get_signal_sampling_rate(
@@ -424,16 +450,11 @@ def loadSpikeMats(
                 validTrials[idx] = False
             else:
                 #  valid slices
-                #  
                 rawSpikeMat = pd.DataFrame(
                     reader.get_analogsignal_chunk(
                         block_index=0, seg_index=segIdx,
                         i_start=iStart, i_stop=iStop,
                         channel_names=chanNames))
-                #  print(rawSpikeMat.sum().sum())
-                #  oneSpike = pd.Series(0, index=range(100))
-                #  oneSpike.iloc[50] = 1000
-                #  oneSpikeAverage = oneSpike.rolling(window=widthIdx, center=True, win_type='gaussian').mean(std=widthIdx/6).dropna()
                 procSpikeMat = rawSpikeMat.rolling(
                     window=widthIdx, center=True,
                     win_type='gaussian'
@@ -442,7 +463,6 @@ def loadSpikeMats(
                 procSpikeMat.columns = chanNames
                 procSpikeMat.columns.name = 'unit'
                 if theBins is None:
-                    #  pdb.set_trace()
                     theBins = np.array(
                         procSpikeMat.index + winStartIdx) / fs
                 if absoluteBins:
@@ -450,8 +470,6 @@ def loadSpikeMats(
                 else:
                     procSpikeMat.index = theBins
                 procSpikeMat.index.name = 'bin'
-                #  convert to Hz
-                #  pdb.set_trace()
                 if loadAll:
                     smIdx = segIdx
                 else:
@@ -748,15 +766,15 @@ def addBlockToNIX(
             newSeg.annotate(nix_name=nixSegName)
         
         if writeEvents:
-            eventList = np.array(newSeg.events)
+            eventList = newSeg.events
             eventOrder = np.argsort([i.name for i in eventList])
-            for event in eventList[eventOrder]:
+            for event in [eventList[i] for i in eventOrder]:
                 event = writer._write_event(event, nixblock, nixgroup)
         
         if writeAsigs:
-            asigList = np.array(newSeg.filter(objects=AnalogSignal))
-            asigOrder = np.argsort([i.name for i in eventList])
-            for asig in asigList[asigOrder]:
+            asigList = newSeg.filter(objects=AnalogSignal)
+            asigOrder = np.argsort([i.name for i in asigList])
+            for asig in [asigList[i] for i in asigOrder]:
                 if checkCompatible[nixIdx]:
                     assert asig.dtype == forceType[nixIdx]
                     assert asig.sampling_rate == forceFS[nixIdx]
@@ -767,9 +785,9 @@ def addBlockToNIX(
             #          isig, nixblock, nixgroup)
 
         if writeSpikes:
-            stList = np.array(newSeg.filter(objects=SpikeTrain))
-            stOrder = np.argsort(stList)
-            for st in stList[stOrder]:
+            stList = newSeg.filter(objects=SpikeTrain)
+            stOrder = np.argsort([i.name for i in stList])
+            for st in [stList[i] for i in stOrder]:
                 st = writer._write_spiketrain(st, nixblock, nixgroup)
 
     for chanIdx in newBlock.filter(objects=ChannelIndex):
@@ -973,7 +991,6 @@ def blockToNix(
                             unit.name = '{}#{}'.format(chanIdx.name, unitId)
                             chanIdx.units.append(unit)
                     elif spikeSource == 'tdc':
-                        #  pdb.set_trace()
                         #  tdc may or may not have the same channel ids, but it will have
                         #  consistent channel names
                         #  TODO: fix the fact that units inherit their st's name on load
@@ -1067,7 +1084,6 @@ def blockToNix(
                         'Label': 'rig_property',
                         'Details': 'rig_value'},
                     inplace=True)
-                #  pdb.set_trace()
                 del motorData
                 gc.collect()
                 eventList = eventDataFrameToEvents(
@@ -1075,7 +1091,6 @@ def blockToNix(
                     idxT='Time',
                     annCol=['rig_property', 'rig_value'])
                 for event in eventList:
-                    #  pdb.set_trace()
                     if trackMemory:
                         print('writing motor events memory usage: {}'.format(
                             hf.memory_usage_psutil()))
@@ -1195,6 +1210,44 @@ def purgeNixAnn(block, annNames=['nix_name', 'neo_name']):
     return block
 
 
+def loadContainerArrayAnn(
+        container=None, trainList=None
+        ):
+    assert (container is not None) or (trainList is not None)
+
+    spikesAndEvents = []
+    returnObj = []
+    if container is not None:
+        #  need the line below! (RD: don't remember why, consider removing)
+        container.create_relationship()
+        
+        spikesAndEvents += (
+            container.filter(objects=SpikeTrain) +
+            container.filter(objects=Event)
+            )
+        returnObj.append(container)
+    if trainList is not None:
+        spikesAndEvents += trainList
+        returnObj.append(trainList)
+    
+    if len(returnObj) == 1:
+        returnObj = returnObj[0]
+    else:
+        returnObj = tuple(returnObj)
+
+    for st in spikesAndEvents:
+        if 'arrayAnnNames' in st.annotations.keys():
+            for key in st.annotations['arrayAnnNames']:
+                #  fromRaw, the ann come back as tuple, need to recast
+                #  pdb.set_trace()
+                st.array_annotations.update(
+                    {key: np.array(st.annotations[key])})
+        if hasattr(st, 'waveforms'):
+            if not st.waveforms:
+                st.waveforms = np.array([]).reshape((0, 0, 0))*pq.mV
+    return returnObj
+
+
 def loadWithArrayAnn(dataPath, fromRaw=False):
     if fromRaw:
         reader = neo.io.nixio_fr.NixIO(filename=dataPath)
@@ -1205,14 +1258,7 @@ def loadWithArrayAnn(dataPath, fromRaw=False):
     
     block.create_relationship()  # need this!
 
-    for st in block.filter(objects=SpikeTrain):
-        if 'arrayAnnNames' in st.annotations.keys():
-            for key in st.annotations['arrayAnnNames']:
-                #  fromRaw, the ann come back as tuple, need to recast
-                st.array_annotations.update(
-                    {key: np.array(st.annotations[key])})
-        if st.waveforms is None:
-            st.waveforms = np.array([]).reshape((0, 0, 0))*pq.mV
+    block = loadContainerArrayAnn(block)
     
     if fromRaw:
         reader.file.close()
@@ -1258,7 +1304,6 @@ def calcBinarizedArray(
             sampling_rate=samplingRate,
             t_start=tStart,
             t_stop=tStop) * 0
-        #  pdb.set_trace()
         for chanIdx in spikeMatBlock.channel_indexes:
             #  print(chanIdx.name)
             stList = seg.filter(
