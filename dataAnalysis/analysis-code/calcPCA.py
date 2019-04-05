@@ -111,8 +111,14 @@ for segIdx, group in featuresDF.groupby('segment'):
         chanIdx.annotate(nix_name=chanIdx.name)
 
     masterBlock.merge(pcBlockInterp)
+'''
+for segIdx, dataSeg in enumerate(masterBlock.segments):
+    plt.plot(
+        dataSeg.analogsignals[0].times.magnitude,
+        dataSeg.analogsignals[0].magnitude)
+plt.show()
+'''
 dataReader.file.close()
-
 allSegs = list(range(len(masterBlock.segments)))
 preproc.addBlockToNIX(
     masterBlock, neoSegIdx=allSegs,

@@ -10,13 +10,16 @@
 #SBATCH --mem=48G
 
 # Specify a job name:
-#SBATCH -J calcAlignTimes
+#SBATCH -J calcAlignedPCA
 
 # Specify an output file
-#SBATCH -o ../batch_logs/calcAlignTimes-o-%j.out
-#SBATCH -e ../batch_logs/calcAlignTimes-e-%j.out
+#SBATCH -o ../batch_logs/calcAlignedPCA-o-%j.out
+#SBATCH -e ../batch_logs/calcAlignedPCA-e-%j.out
 
 # Specify account details
 #SBATCH --account=bibs-dborton-condo
 
+python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcFR.py'
+python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcPCA.py'
 python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcAlignTimes.py'
+python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcPCAalignedToStim.py'

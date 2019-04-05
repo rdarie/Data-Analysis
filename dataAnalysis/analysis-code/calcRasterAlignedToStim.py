@@ -31,28 +31,32 @@ from collections import Iterable
 from currentExperiment import *
 from joblib import dump, load
 import quantities as pq
+
 #  all experimental days
 dataReader = neo.io.nixio_fr.NixIO(
     filename=experimentDataPath)
 dataBlock = dataReader.read_block(
     block_index=0, lazy=True,
     signal_group_mode='split-all')
-
 for ev in dataBlock.filter(objects=EventProxy):
     ev.name = '_'.join(ev.name.split('_')[1:])
 
+binnedReader = neo.io.nixio_fr.NixIO(
+    filename=experimentBinnedSpikePath)
+binnedBlock = binnedReader.read_block(
+    block_index=0, lazy=True,
+    signal_group_mode='split-all')
+
+#  def eventTriggeredSpikes():
+#  dataBlock
+  
 chansToTrigger = np.unique([
     i.name
-    for i in dataBlock.filter(objects=AnalogSignalProxy)])
+    for i in binnedBlock.filter(objects=AnalogSignalProxy)])
 eventName = 'alignTimes'
 blockIdx = 0
 windowSize = [i * pq.s for i in rasterOpts['windowSize']]
-#  def eventTriggeredSpikes():
-#  dataBlock
-#  
-#  chansToTrigger = ['PC{}'.format(i), for i in range(10)]
-#  
-#  
+
 masterBlock = Block()
 masterBlock.name = dataBlock.annotations['neo_name']
 #  make channels and units for triggered time series
@@ -66,6 +70,7 @@ for chanName in chansToTrigger:
     masterBlock.channel_indexes.append(chanIdx)
 
 for segIdx, dataSeg in enumerate(dataBlock.segments):
+    binnedSeg = binnedBlock.segments[segIdx]
     newSeg = Segment(name=dataSeg.annotations['neo_name'])
     masterBlock.segments.append(newSeg)
 
@@ -93,7 +98,7 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
 
     for chanName in chansToTrigger:
         print('extracting channel {}'.format(chanName))
-        asigP = dataSeg.filter(objects=AnalogSignalProxy, name=chanName)[0]
+        asigP = binnedSeg.filter(objects=AnalogSignalProxy, name=chanName)[0]
         checkReferences = True
         if checkReferences:
             da = asigP._rawio.da_list['blocks'][blockIdx]['segments'][segIdx]['data']
@@ -144,6 +149,7 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         st.unit = thisUnit
 
 dataReader.file.close()
+binnedReader.file.close()
 
 masterBlock = preproc.purgeNixAnn(masterBlock)
 writer = neo.io.NixIO(filename=experimentTriggeredPath)

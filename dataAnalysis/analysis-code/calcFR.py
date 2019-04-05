@@ -57,7 +57,7 @@ for segIdx, segSpikeMat in masterSpikeMats.items():
         segSpikeMatInterp,
         idxT='t', useColNames=True,
         dataCol=segSpikeMatInterp.drop(columns='t').columns,
-        samplingRate=samplingRate, nameSuffix='_fr')
+        samplingRate=samplingRate)
     spikeMatBlockInterp.name = dataBlock.annotations['neo_name']
     spikeMatBlockInterp.annotate(
         nix_name=dataBlock.annotations['neo_name'])

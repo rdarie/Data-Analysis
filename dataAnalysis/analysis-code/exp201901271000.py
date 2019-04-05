@@ -14,7 +14,7 @@ deviceName = 'DeviceNPC700373H'
 remoteBasePath = '..'
 #  remoteBasePath = 'Z:\\data\\rdarie\\Murdoc Neural Recordings'
 insFolder = os.path.join(remoteBasePath, 'ORCA Logs')
-nspFolder = os.path.join(remoteBasePath, experimentName)
+nspFolder = os.path.join(remoteBasePath, 'raw', experimentName)
 ns5FileName = 'Trial00{}'.format(trialIdx)
 
 jsonSessionNames = {
@@ -195,51 +195,36 @@ tdch.cmpDFToPrb(
 #  should rename these to something more intuitive
 #  paths relevant to individual trials
 analysisDataPath = os.path.join(
-    trialFilesStim['ins']['folderPath'],
-    trialFilesStim['ins']['experimentName'],
+    remoteBasePath, 'processed', experimentName,
     trialFilesStim['ins']['ns5FileName'] + '_analyze.nix')
 trialBasePath = os.path.join(
-    trialFilesFrom['utah']['folderPath'],
+    nspFolder,
     trialFilesFrom['utah']['ns5FileName'] + '.nix')
 spikePath = os.path.join(
-        trialFilesFrom['utah']['folderPath'],
+        nspFolder,
         'tdc_' + trialFilesFrom['utah']['ns5FileName'],
         'tdc_' + trialFilesFrom['utah']['ns5FileName'] + '.nix')
 insDataPath = os.path.join(
-        trialFilesStim['ins']['folderPath'],
-        trialFilesStim['ins']['experimentName'],
+        remoteBasePath, 'processed', experimentName,
         trialFilesStim['ins']['ns5FileName'] + '_ins.nix'
     )
 binnedSpikePath = os.path.join(
-    trialFilesStim['ins']['folderPath'],
-    trialFilesStim['ins']['experimentName'],
+    remoteBasePath, 'processed', experimentName,
     trialFilesStim['ins']['ns5FileName'] + '_binarized.nix')
 
 #  paths relevant to the entire experimental day
-masterFeaturePath = os.path.join(
-    trialFilesStim['ins']['folderPath'],
-    trialFilesStim['ins']['experimentName'],
-    trialFilesStim['ins']['experimentName'] + '_MasterFeature.hdf')
 estimatorPath = os.path.join(
-    trialFilesStim['ins']['folderPath'],
-    trialFilesStim['ins']['experimentName'],
+    remoteBasePath, 'processed', experimentName,
     trialFilesStim['ins']['experimentName'] + '_estimator.joblib')
 experimentDataPath = os.path.join(
-    trialFilesStim['ins']['folderPath'],
-    trialFilesStim['ins']['experimentName'],
+    remoteBasePath, 'processed', experimentName,
     trialFilesStim['ins']['experimentName'] + '_analyze.nix')
 experimentTriggeredPath = os.path.join(
-    trialFilesStim['ins']['folderPath'],
-    trialFilesStim['ins']['experimentName'],
+    remoteBasePath, 'processed', experimentName,
     trialFilesStim['ins']['experimentName'] + '_triggered.nix')
 experimentBinnedSpikePath = os.path.join(
-    trialFilesStim['ins']['folderPath'],
-    trialFilesStim['ins']['experimentName'],
+    remoteBasePath, 'processed', experimentName,
     trialFilesStim['ins']['experimentName'] + '_binarized.nix')
-featurePath = os.path.join(
-    trialFilesStim['ins']['folderPath'],
-    trialFilesStim['ins']['experimentName'],
-    trialFilesStim['ins']['experimentName'] + '_features.hdf')
 figureFolder = os.path.join(
-    '..', 'figures'
+    remoteBasePath, experimentName, 'figures'
     )
