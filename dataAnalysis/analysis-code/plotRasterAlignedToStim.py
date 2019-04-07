@@ -31,6 +31,12 @@ unitsToPlot = [unitsToPlot[5]]
 #  unitsToPlot = ['PC{}#0'.format(i+1) for i in range(10)]
 #  unitsToPlot = ['PC3#0']
 
+dataQueryTemplate = '&'.join([
+    '(feature==\'{}\')',
+    '((RateInHz==100) | (RateInHz==999))',
+    '(signal==1000)',
+    ])
+
 for unitName in unitsToPlot:
     thisUnit = dataBlock.filter(
         objects=Unit, name=unitName)[0]
@@ -49,29 +55,18 @@ for unitName in unitsToPlot:
     allWaveforms.columns.name = 'bin'
     
     allWaveformsPlot = allWaveforms.stack().reset_index(name='signal')
-    dataQuery = '&'.join([
-        '(feature==\'{}\')',
-        '((RateInHz==100) | (RateInHz==999))',
-        '(signal==1000)',
-        ]).format(unitName)
+    dataQuery = dataQueryTemplate.format(unitName)
     plotDF = allWaveformsPlot.query(dataQuery)
+    
     asp.getRasterFacetIdx(
         plotDF, 'index',
         col='pedalMovementCat', row='program')
     g = sns.relplot(
         x='bin', y='index_facetIdx',
         hue='amplitudeFuzzy',
-        col='pedalMovementCat', row='program', ci='sd',
-        height=5, aspect=1.5, kind='scatter', data=plotDF)
-    g = sns.FacetGrid(
-        plotDF, sharey=False,
         col='pedalMovementCat', row='program',
-        hue='amplitudeFuzzy')
-    (g.map_dataframe(
-            asp.rasterPlot,
-            x='bin', y='index',
-            marker='|', linewidth=0.5, alpha=0.5)
-        .add_legend())
+        height=5, aspect=1.5, kind='scatter', data=plotDF,
+        facet_kws={'sharey': False}, marker='|')
     plt.suptitle(unitName)
     #  plt.show()
     #  block=False

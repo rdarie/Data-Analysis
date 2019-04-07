@@ -27,7 +27,12 @@ unitsToPlot = [
     for i in unitNames
     if 'PC' in i]
 
-unitsToPlot = [unitsToPlot[0]]
+dataQueryTemplate = '&'.join([
+        '(RateInHz >= 100)',
+        '(feature==\'{}\')',
+        '((pedalSizeCat == \'M\') | (pedalSizeCat == \'Control\'))',
+        ])
+        
 for unitName in unitsToPlot:
     thisUnit = dataBlock.filter(
         objects=Unit, name=unitName)[0]
@@ -46,18 +51,8 @@ for unitName in unitsToPlot:
     allWaveforms.columns.name = 'bin'
     
     allWaveformsPlot = allWaveforms.stack().reset_index(name='signal')
-    dataQuery = '&'.join([
-        '(RateInHz >= 100)',
-        '(feature==\'{}\')',
-        '((pedalSizeCat == \'M\') | (pedalSizeCat == \'Control\'))',
-        ]).format(unitName)
+    dataQuery = dataQueryTemplate.format(unitName)
     plotDF = allWaveformsPlot.query(dataQuery)
-    g = sns.FacetGrid(
-        plotDF, sharey=False,
-        col='pedalMovementCat', row='program',
-        hue='amplitudeFuzzy')
-    g.map_dataframe(
-            sns.lineplot, x='bin', y='signal', ci='sd')
     g = sns.relplot(
         x='bin', y='signal',
         hue='amplitudeFuzzy',
