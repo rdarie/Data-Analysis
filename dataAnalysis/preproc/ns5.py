@@ -147,7 +147,7 @@ def spikeTrainWaveformsToDF(
         fullDF = pd.concat([wfDF, annDF], axis=1)
         fullDF.set_index(annDF.columns.tolist(), inplace=True)
         fullDF.columns.name = 'bin'
-        waveformsDict.update({st.name: fullDF})
+        waveformsDict.update({childBaseName(st.name, 'seg'): fullDF})
     waveformsDF = pd.concat(
         waveformsDict, names=['feature'] + annDF.columns.tolist())
     return waveformsDF
@@ -177,6 +177,125 @@ def analogSignalsToDataFrame(
             asig.times.magnitude, columns=[idxT],
             index=range(asig.shape[0])))
     return pd.concat(asigList, axis=1)
+
+
+def analogSignalsAlignedToEvents(
+        eventBlock=None, signalBlock=None,
+        chansToTrigger=None, eventName=None,
+        windowSize=None, appendToExisting=False,
+        checkReferences=True,
+        fileName=None,
+        folderPath=None
+        ):
+    if signalBlock is None:
+        signalBlock = eventBlock
+    masterBlock = Block()
+    masterBlock.name = signalBlock.annotations['neo_name']
+    masterBlock.annotate(nix_name=signalBlock.annotations['neo_name'])
+    #  make channels and units for triggered time series
+    for chanName in chansToTrigger:
+        chanIdx = ChannelIndex(name=chanName + '#0', index=[0])
+        chanIdx.annotate(nix_name=chanIdx.name)
+        thisUnit = Unit(name=chanIdx.name)
+        thisUnit.annotate(nix_name=chanIdx.name)
+        chanIdx.units.append(thisUnit)
+        thisUnit.channel_index = chanIdx
+        masterBlock.channel_indexes.append(chanIdx)
+
+    for segIdx, eventSeg in enumerate(eventBlock.segments):
+        signalSeg = signalBlock.segments[segIdx]
+        # seg to contain triggered time series
+        newSeg = Segment(name=signalSeg.annotations['neo_name'])
+        newSeg.annotate(nix_name=signalSeg.annotations['neo_name'])
+        masterBlock.segments.append(newSeg)
+
+        alignEvents = [
+            i.load()
+            for i in eventSeg.filter(
+                objects=EventProxy, name=eventName)]
+        alignEvents = loadContainerArrayAnn(trainList=alignEvents)[0]
+
+        for chanName in chansToTrigger:
+            print('extracting channel {}'.format(chanName))
+            asigP = signalSeg.filter(
+                objects=AnalogSignalProxy, name=chanName)[0]
+            if checkReferences:
+                da = (
+                    asigP
+                    ._rawio
+                    .da_list['blocks'][0]['segments'][segIdx]['data'])
+                print('segIdx {}, asigP.name {}'.format(
+                    segIdx, asigP.name))
+                print('asigP._global_channel_indexes = {}'.format(
+                    asigP._global_channel_indexes))
+                print('asigP references {}'.format(
+                    da[asigP._global_channel_indexes[0]]))
+                try:
+                    assert (
+                        asigP.name
+                        in da[asigP._global_channel_indexes[0]].name)
+                except Exception:
+                    traceback.print_exc()
+            rawWaveforms = [
+                asigP.load(time_slice=(t + windowSize[0], t + windowSize[1]))
+                for t in alignEvents]
+
+            samplingRate = asigP.sampling_rate
+            waveformUnits = rawWaveforms[0].units
+            #  fix length
+            minLen = min([rW.shape[0] for rW in rawWaveforms])
+            rawWaveforms = [rW[:minLen] for rW in rawWaveforms]
+
+            spikeWaveforms = (
+                np.hstack([rW.magnitude for rW in rawWaveforms])
+                .transpose()[:, np.newaxis, :] * waveformUnits
+                )
+
+            thisUnit = masterBlock.filter(
+                objects=Unit, name=chanName + '#0')[0]
+            stAnn = {
+                k: v
+                for k, v in alignEvents.annotations.items()
+                if k not in ['nix_name', 'neo_name']
+                }
+            st = SpikeTrain(
+                name='seg{}_{}'.format(int(segIdx), thisUnit.name),
+                times=alignEvents.times,
+                waveforms=spikeWaveforms,
+                t_start=asigP.t_start, t_stop=asigP.t_stop,
+                left_sweep=windowSize[0] * (-1),
+                sampling_rate=samplingRate,
+                array_annotations=alignEvents.array_annotations,
+                **stAnn
+                )
+            st.annotate(nix_name=st.name)
+            thisUnit.spiketrains.append(st)
+            newSeg.spiketrains.append(st)
+            st.unit = thisUnit
+
+    eventBlock.filter(
+        objects=EventProxy)[0]._rawio.file.close()
+    if signalBlock is not eventBlock:
+        signalBlock.filter(
+            objects=AnalogSignalProxy)[0]._rawio.file.close()
+    if appendToExisting:
+        allSegs = list(range(len(masterBlock.segments)))
+        addBlockToNIX(
+            masterBlock, neoSegIdx=allSegs,
+            writeSpikes=True,
+            fileName=fileName,
+            folderPath=folderPath,
+            purgeNixNames=False,
+            nixBlockIdx=0, nixSegIdx=allSegs)
+    else:
+        experimentTriggeredPath = os.path.join(
+            folderPath, fileName + '.nix')
+        masterBlock = purgeNixAnn(masterBlock)
+        writer = neo.io.NixIO(filename=experimentTriggeredPath)
+        writer.write_block(masterBlock, use_obj_names=True)
+        writer.close()
+
+    return masterBlock
 
 
 def dataFrameToAnalogSignals(
@@ -761,7 +880,10 @@ def addBlockToNIX(
     nixblock = writer.nix_file.blocks[nixBlockIdx]
     nixblockName = nixblock.name
     if 'nix_name' in newBlock.annotations.keys():
-        assert newBlock.annotations['nix_name'] == nixblockName
+        try:
+            assert newBlock.annotations['nix_name'] == nixblockName
+        except Exception:
+            newBlock.annotations['nix_name'] = nixblockName
     else:
         newBlock.annotate(nix_name=nixblockName)
 
@@ -772,7 +894,10 @@ def addBlockToNIX(
         
         nixSegName = nixgroup.name
         if 'nix_name' in newSeg.annotations.keys():
-            newSeg.annotations['nix_name'] == nixSegName
+            try:
+                assert newSeg.annotations['nix_name'] == nixSegName
+            except Exception:
+                newSeg.annotations['nix_name'] = nixSegName
         else:
             newSeg.annotate(nix_name=nixSegName)
         
@@ -1269,7 +1394,7 @@ def loadWithArrayAnn(
         reader = neo.io.NixIO(filename=dataPath)
         block = reader.read_block()
     
-    block.create_relationship()  # need this!
+    #  block.create_relationship()  # need this!
 
     block = loadContainerArrayAnn(block)
     
@@ -1339,7 +1464,7 @@ def calcBinarizedArray(
 
             asig = AnalogSignal(
                 stBin * samplingRate,
-                name='seg{}_{}_fr'.format(segIdx, st.unit.name),
+                name='seg{}_{}_raster'.format(segIdx, st.unit.name),
                 sampling_rate=samplingRate,
                 dtype=np.int,
                 **st.annotations)
@@ -1350,7 +1475,7 @@ def calcBinarizedArray(
             spikeMatBlock.segments[segIdx].analogsignals.append(asig)
     
     for chanIdx in spikeMatBlock.channel_indexes:
-        chanIdx.name = chanIdx.name + '_fr'
+        chanIdx.name = chanIdx.name + '_raster'
 
     spikeMatBlock.create_relationship()
     spikeMatBlock = purgeNixAnn(spikeMatBlock)
