@@ -3,7 +3,7 @@ Usage:
     tridesclousCCV.py [--trialIdx=trialIdx] [--peeler] [--constructor]
 
 Arguments:
-    trialIdx            which trial to analyze
+    trialIdx           which trial to analyze
 
 Options:
     --peeler           visualize Peeler results

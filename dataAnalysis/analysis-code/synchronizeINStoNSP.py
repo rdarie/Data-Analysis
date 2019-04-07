@@ -287,11 +287,11 @@ if addingToNix:
             st.sampling_rate = 3e4*pq.Hz
             st.waveforms = np.array([]).reshape((0, 0, 0))*pq.mV
     preproc.addBlockToNIX(
-        insBlockJustSpikes, segIdx=0,
+        insBlockJustSpikes, neoSegIdx=[0],
         writeAsigs=False, writeSpikes=True,
         fileName=ns5FileName,
         folderPath=nspFolder,
-        nixBlockIdx=0, nixSegIdx=0,
+        nixBlockIdx=0, nixSegIdx=[0],
         )
     tdColumns = [
         i for i in td['data'].columns
@@ -307,10 +307,10 @@ if addingToNix:
         dataCol=tdColumns,
         forceColNames=tdColumns)
     preproc.addBlockToNIX(
-        tdBlock, segIdx=0,
+        tdBlock, neoSegIdx=[0],
         fileName=ns5FileName,
         folderPath=nspFolder,
-        nixBlockIdx=0, nixSegIdx=0,
+        nixBlockIdx=0, nixSegIdx=[0],
         )
     accelColumns = [
         'ins_accx', 'ins_accy',
@@ -326,8 +326,8 @@ if addingToNix:
         dataCol=accelColumns,
         forceColNames=accelColumns)
     preproc.addBlockToNIX(
-        accelBlock, segIdx=0,
+        accelBlock, neoSegIdx=[0],
         fileName=ns5FileName,
         folderPath=nspFolder,
-        nixBlockIdx=0, nixSegIdx=0,
+        nixBlockIdx=0, nixSegIdx=[0],
         )

@@ -69,30 +69,27 @@ for segIdx, segSpikeMat in masterSpikeMats.items():
     
     for asig in asigList:
         asig.annotate(binWidth=rasterOpts['binWidth'])
+        if '_raster' in asig.name:
+            asig.name = asig.name.replace('_raster', '_fr')
         asig.name = 'seg{}_{}'.format(segIdx, asig.name)
         asig.annotate(nix_name=asig.name)
     chanIdxList = spikeMatBlockInterp.filter(objects=ChannelIndex)
     for chanIdx in chanIdxList:
+        if '_raster' in chanIdx.name:
+            chanIdx.name = chanIdx.name.replace('_raster', '_fr')
         chanIdx.annotate(nix_name=chanIdx.name)
 
     masterBlock.merge(spikeMatBlockInterp)
+
 dataReader.file.close()
-'''
-for segIdx, dataSeg in enumerate(masterBlock.segments):
-    plt.plot(
-        dataSeg.analogsignals[0].times.magnitude,
-        dataSeg.analogsignals[0].magnitude)
-plt.show()
-'''
 allSegs = list(range(len(masterBlock.segments)))
 
 preproc.addBlockToNIX(
     masterBlock, neoSegIdx=allSegs,
     writeSpikes=False, writeEvents=False,
-    fileName=trialFilesStim['ins']['experimentName'] + '_analyze',
+    fileName=experimentName + '_analyze',
     folderPath=os.path.join(
-        trialFilesStim['ins']['folderPath'],
-        trialFilesStim['ins']['experimentName']),
+        remoteBasePath, 'processed', experimentName),
     purgeNixNames=False,
     nixBlockIdx=0, nixSegIdx=allSegs,
     )

@@ -7,6 +7,7 @@ from neo import (
 from neo.io.proxyobjects import (
     SpikeTrainProxy, EventProxy)
 import dataAnalysis.preproc.ns5 as preproc
+import dataAnalysis.plotting.aligned_signal_plots as asp
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
@@ -25,9 +26,11 @@ unitNames = np.unique([
 unitsToPlot = [
     i
     for i in unitNames
-    if 'PC' in i]
+    if (('_fr' in i) and ('_fr_fr' not in i))]
+unitsToPlot = [unitsToPlot[5]]
+#  unitsToPlot = ['PC{}#0'.format(i+1) for i in range(10)]
+#  unitsToPlot = ['PC3#0']
 
-unitsToPlot = [unitsToPlot[0]]
 for unitName in unitsToPlot:
     thisUnit = dataBlock.filter(
         objects=Unit, name=unitName)[0]
@@ -47,27 +50,33 @@ for unitName in unitsToPlot:
     
     allWaveformsPlot = allWaveforms.stack().reset_index(name='signal')
     dataQuery = '&'.join([
-        '(RateInHz >= 100)',
         '(feature==\'{}\')',
-        '((pedalSizeCat == \'M\') | (pedalSizeCat == \'Control\'))',
+        '((RateInHz==100) | (RateInHz==999))',
+        '(signal==1000)',
         ]).format(unitName)
     plotDF = allWaveformsPlot.query(dataQuery)
+    asp.getRasterFacetIdx(
+        plotDF, 'index',
+        col='pedalMovementCat', row='program')
+    g = sns.relplot(
+        x='bin', y='index_facetIdx',
+        hue='amplitudeFuzzy',
+        col='pedalMovementCat', row='program', ci='sd',
+        height=5, aspect=1.5, kind='scatter', data=plotDF)
     g = sns.FacetGrid(
         plotDF, sharey=False,
         col='pedalMovementCat', row='program',
         hue='amplitudeFuzzy')
-    g.map_dataframe(
-            sns.lineplot, x='bin', y='signal', ci='sd')
-    g = sns.relplot(
-        x='bin', y='signal',
-        hue='amplitudeFuzzy',
-        col='pedalMovementCat', row='program', ci='sd',
-        height=5, aspect=1.5, kind='line', data=plotDF)
+    (g.map_dataframe(
+            asp.rasterPlot,
+            x='bin', y='index',
+            marker='|', linewidth=0.5, alpha=0.5)
+        .add_legend())
     plt.suptitle(unitName)
-    plt.show()
+    #  plt.show()
     #  block=False
     #  plt.pause(3)
-    #  plt.savefig(
-    #      os.path.join(
-    #          figureFolder, 'alignedSignals', '{}.pdf'.format(chanName)))
-    #  plt.close()
+    plt.savefig(
+        os.path.join(
+            figureFolder, 'alignedRasters', '{}.pdf'.format(chanName)))
+    plt.close()

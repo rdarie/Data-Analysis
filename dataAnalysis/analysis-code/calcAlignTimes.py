@@ -296,8 +296,7 @@ preproc.addBlockToNIX(
     writeAsigs=False, writeSpikes=False, writeEvents=True,
     fileName=trialFilesStim['ins']['experimentName'] + '_analyze',
     folderPath=os.path.join(
-        trialFilesStim['ins']['folderPath'],
-        trialFilesStim['ins']['experimentName']),
+        remoteBasePath, 'processed', experimentName),
     purgeNixNames=False,
     nixBlockIdx=0, nixSegIdx=allSegs,
     )

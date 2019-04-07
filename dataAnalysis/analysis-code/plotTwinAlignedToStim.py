@@ -7,6 +7,7 @@ from neo import (
 from neo.io.proxyobjects import (
     SpikeTrainProxy, EventProxy)
 import dataAnalysis.preproc.ns5 as preproc
+import dataAnalysis.plotting.aligned_signal_plots as asp
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
@@ -27,7 +28,7 @@ unitsToPlot = [
     for i in unitNames
     if 'PC' in i]
 
-unitsToPlot = [unitsToPlot[0]]
+#  unitsToPlot = [unitsToPlot[0]]
 for unitName in unitsToPlot:
     thisUnit = dataBlock.filter(
         objects=Unit, name=unitName)[0]
@@ -52,16 +53,10 @@ for unitName in unitsToPlot:
         '((pedalSizeCat == \'M\') | (pedalSizeCat == \'Control\'))',
         ]).format(unitName)
     plotDF = allWaveformsPlot.query(dataQuery)
-    g = sns.FacetGrid(
-        plotDF, sharey=False,
-        col='pedalMovementCat', row='program',
-        hue='amplitudeFuzzy')
-    g.map_dataframe(
-            sns.lineplot, x='bin', y='signal', ci='sd')
     g = sns.relplot(
         x='bin', y='signal',
         hue='amplitudeFuzzy',
-        col='pedalMovementCat', row='program', ci='sd',
+        col='pedalMovementCat', row='program',
         height=5, aspect=1.5, kind='line', data=plotDF)
     plt.suptitle(unitName)
     plt.show()

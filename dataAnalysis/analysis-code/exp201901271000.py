@@ -226,5 +226,5 @@ experimentBinnedSpikePath = os.path.join(
     remoteBasePath, 'processed', experimentName,
     trialFilesStim['ins']['experimentName'] + '_binarized.nix')
 figureFolder = os.path.join(
-    remoteBasePath, experimentName, 'figures'
+    remoteBasePath, 'figures', experimentName
     )

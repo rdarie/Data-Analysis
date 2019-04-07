@@ -41,17 +41,18 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         if '_fr' in asigP.name]
     if checkReferences:
         for asigP in asigProxysList:
-            da = asigP._rawio.da_list['blocks'][blockIdx]['segments'][segIdx]['data']
-            print('segIdx {}, asigP.name {}'.format(
-                segIdx, asigP.name))
-            print('asigP._global_channel_indexes = {}'.format(
-                asigP._global_channel_indexes))
-            print('asigP references {}'.format(
-                da[asigP._global_channel_indexes[0]]))
-            try:
-                assert asigP.name in da[asigP._global_channel_indexes[0]].name
-            except Exception:
-                traceback.print_exc()
+            if checkReferences:
+                da = asigP._rawio.da_list['blocks'][blockIdx]['segments'][segIdx]['data']
+                print('segIdx {}, asigP.name {}'.format(
+                    segIdx, asigP.name))
+                print('asigP._global_channel_indexes = {}'.format(
+                    asigP._global_channel_indexes))
+                print('asigP references {}'.format(
+                    da[asigP._global_channel_indexes[0]]))
+                try:
+                    assert asigP.name in da[asigP._global_channel_indexes[0]].name
+                except Exception:
+                    traceback.print_exc()
     asigsList = [
         asigP.load()
         for asigP in asigProxysList]
@@ -111,22 +112,15 @@ for segIdx, group in featuresDF.groupby('segment'):
         chanIdx.annotate(nix_name=chanIdx.name)
 
     masterBlock.merge(pcBlockInterp)
-'''
-for segIdx, dataSeg in enumerate(masterBlock.segments):
-    plt.plot(
-        dataSeg.analogsignals[0].times.magnitude,
-        dataSeg.analogsignals[0].magnitude)
-plt.show()
-'''
+
 dataReader.file.close()
 allSegs = list(range(len(masterBlock.segments)))
 preproc.addBlockToNIX(
     masterBlock, neoSegIdx=allSegs,
     writeSpikes=False, writeEvents=False,
-    fileName=trialFilesStim['ins']['experimentName'] + '_analyze',
+    fileName=experimentName + '_analyze',
     folderPath=os.path.join(
-        trialFilesStim['ins']['folderPath'],
-        trialFilesStim['ins']['experimentName']),
+        remoteBasePath, 'processed', experimentName),
     purgeNixNames=False,
     nixBlockIdx=0, nixSegIdx=allSegs,
     )

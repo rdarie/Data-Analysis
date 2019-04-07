@@ -211,8 +211,7 @@ preproc.addBlockToNIX(
     purgeNixNames=False,
     fileName=ns5FileName + '_analyze',
     folderPath=os.path.join(
-        insFolder,
-        experimentName),
+        remoteBasePath, 'processed', experimentName),
     nixBlockIdx=0, nixSegIdx=[0],
     )
 
