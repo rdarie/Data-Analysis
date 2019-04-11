@@ -407,7 +407,8 @@ def getINSStimOnset(
             group.index[0] + fixedDelayIdx +
             delayByFreqIdx))
         expectedOffsetIdx = np.atleast_1d(
-            group.loc[groupAmpMask, 't'].index[-1])
+            np.array(group.loc[groupAmpMask, 't'].index[-1]) +
+            fixedDelayIdx + delayByFreqIdx)
         # if we know cycle value, use it to predict onsets
         thisElecConfig = elecConfiguration[activeGroup][activeProgram]
         if thisElecConfig['cyclingEnabled']:
@@ -435,9 +436,7 @@ def getINSStimOnset(
             expectedOnsetIdx = (
                 expectedOnsetIdx[expectedOnsetIdx < lastValidOnsetIdx])
             
-            ampOffMask = (
-                (group[ampColName] == 0) |
-                (group['therapyStatus'] <= 0))
+            ampOffMask = ~groupAmpMask
 
             if ampOffMask.any():
                 lastValidOffsetIdx = group.loc[ampOffMask, :].index[-1]
@@ -578,61 +577,61 @@ def getINSStimOnset(
             ax[1].plot(
                 tdDF['t'].loc[plotMaskTD],
                 correctionFactorOnset,
-                'b-', label='correctionFactorOnset')
+                'k-', label='correctionFactorOnset')
             ax[1].plot(
                 tdDF['t'].loc[plotMaskTD],
                 correctionFactorOffset,
-                'c--', label='correctionFactorOffset')
+                'k--', label='correctionFactorOffset')
 
             ax[1].plot(
                 tdDF['t'].loc[plotMaskTD],
                 onsetDetectSignalFull,
-                'k-', lw=0.5)
+                'k-', lw=0.25)
             ax[1].plot(
                 tdDF['t'].loc[plotMaskTD],
                 offsetDetectSignalFull,
-                'k-', lw=0.5)
+                'k-', lw=0.25)
             ax[1].plot(
                 tdDF['t'].loc[ROIMaskOnset[ROIMaskOnset].index],
                 onsetDetectSignalFull.loc[ROIMaskOnset],
-                'g-', label='onsetDetectSignal')
+                'b-', label='onsetDetectSignal')
             ax[1].plot(
                 tdDF['t'].loc[ROIMaskOffset[ROIMaskOffset].index],
                 offsetDetectSignalFull.loc[ROIMaskOffset],
-                'y--', label='offsetDetectSignal')
+                'r--', label='offsetDetectSignal')
                 
             ax[1].plot(
                 tdDF['t'].loc[onsetIdx],
                 onsetDetectSignalFull.loc[onsetIdx],
-                'yo', label='detected onset')
+                'bo', markersize=10, label='detected onset')
             ax[1].plot(
                 tdDF['t'].loc[offsetIdx],
                 offsetDetectSignalFull.loc[offsetIdx],
-                'go', label='detected offset')
+                'ro', markersize=10, label='detected offset')
 
             try:
                 ax[1].plot(
                     tdDF['t'].loc[originalOnsetIdx],
                     onsetDetectSignalFull.loc[originalOnsetIdx],
-                    'b*', label='original detected onset')
+                    'y*', label='original detected onset')
             except Exception:
                 pass
             try:
                 ax[1].plot(
                     tdDF['t'].loc[originalOffsetIdx],
                     offsetDetectSignalFull.loc[originalOffsetIdx],
-                    'b^', label='original detected offset')
+                    'y^', label='original detected offset')
             except Exception:
                 pass
 
             ax[1].plot(
                 tdDF['t'].loc[expectedOnsetIdx],
                 onsetDetectSignalFull.loc[expectedOnsetIdx],
-                'r*', label='expected onset')
+                'c*', label='expected onset')
             ax[1].plot(
                 tdDF['t'].loc[expectedOffsetIdx],
                 onsetDetectSignalFull.loc[expectedOffsetIdx],
-                'r^', label='expected offset')
+                'm^', label='expected offset')
             ax[1].axhline(
                 currentThresh,
                 color='r', label='detection Threshold')
@@ -666,15 +665,15 @@ def getINSStimOnset(
                 for linePos in tdDF['t'].loc[onsetIdx].values:
                     thisAx.axvline(
                         linePos,
-                        color='g')
+                        color='b')
                 for linePos in tdDF['t'].loc[offsetIdx].values:
                     thisAx.axvline(
                         linePos,
-                        color='y')
+                        color='r')
                 for linePos in tdDF['t'].loc[expectedOnsetIdx].values:
                     thisAx.axvline(
                         linePos,
-                        color='r')
+                        color='c')
                 for linePos in tdDF['t'].loc[expectedOffsetIdx].values:
                     thisAx.axvline(
                         linePos,
@@ -783,13 +782,12 @@ def extractArtifactTimestamps(
                 tdPow, fs, gaussWid / 2, order=2))
     else:
         correctionFactor = pd.Series(
-            tdSeg**0,
-            index=tdSeg.index)
+            (tdPow**0).values, index=tdPow.index)
     
     if enhanceExpected:
         assert expectedIdx is not None
         support = hf.gaussianSupport(
-            tdSeg, expectedIdx, gaussWid, fs)
+            tdPow, expectedIdx, gaussWid, fs)
         correctionFactor = correctionFactor * support
 
     detectSignalFull = hf.enhanceNoisyTriggers(
