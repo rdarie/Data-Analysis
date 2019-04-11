@@ -9,13 +9,18 @@ except:
     pass
 '''
 import psutil
-import matplotlib, pdb, sys, itertools, os, pickle, gc, random, string,\
+import pdb, sys, itertools, os, pickle, gc, random, string,\
 subprocess, collections, traceback, peakutils, math, argparse
 from collections.abc import Iterable
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 import matplotlib.ticker as ticker
 from matplotlib import cm
+import mpl_toolkits.mplot3d.axes3d as p3
+from matplotlib.lines import Line2D
+import matplotlib.animation as animation
+from matplotlib.animation import FFMpegWriter
+import matplotlib.backends.backend_pdf
 
 import numpy as np
 import pandas as pd
@@ -59,14 +64,9 @@ except:
 from scipy import interpolate
 from scipy import stats, signal, ndimage
 from copy import copy
-import matplotlib.backends.backend_pdf
 from fractions import gcd
 import h5py
 LABELFONTSIZE = 5
-import mpl_toolkits.mplot3d.axes3d as p3
-from matplotlib.lines import Line2D
-import matplotlib.animation as animation
-from matplotlib.animation import FFMpegWriter
 from collections import OrderedDict
 
 
@@ -323,29 +323,6 @@ def animateDFSubset2D(
     return ani
 
 
-def getPlotOpts(names):
-    """
-        Gets the colors to assign to n traces, where n is the length of the
-        names list, which contains the names of the n traces.
-    """
-    viridis_cmap = matplotlib.cm.get_cmap('viridis')
-    norm = colors.Normalize(vmin=0, vmax=255)
-    colorsRgb = [colors.colorConverter.to_rgb(viridis_cmap(norm(i)))
-                    for i in range(0, 255)]
-
-    plotColPlotly, plotColMPL = [], []
-    h = 1.0/(len(names)-1)
-
-    for k in range(len(names)):
-        C = list(map(np.uint8, np.array(viridis_cmap(k*h)[:3])*255))
-        plotColPlotly.append([k*h, 'rgb'+str((C[0], C[1], C[2]))])
-        plotColMPL.append(norm(C))
-
-    names2int = list(range(len(names)))
-    line_styles = ['-', '--', ':', '-.']
-    return viridis_cmap, norm, colorsRgb, plotColPlotly, plotColMPL, names2int, line_styles
-
-
 def getNEVData(filePath, elecIds):
     # Version control
     brpylib_ver_req = "1.3.1"
@@ -415,6 +392,18 @@ def filterDF(
     if passedSeries:
         filteredDF = filteredDF['temp']
     return filteredDF
+
+
+def closestSeries(takeFrom, compareTo):
+    closest = pd.Series(
+        np.nan, index=takeFrom.index)
+    for idx, value in enumerate(takeFrom.values):
+        closeValue = (
+            compareTo
+            .values
+            .flat[np.abs(compareTo.values - value).argmin()])
+        closest.iloc[idx] = closeValue
+    return closest
 
 
 def interpolateDF(
@@ -1147,9 +1136,13 @@ def synchronizeINStoNSP(
 def timeOffsetBlock(block, timeOffset, masterTStart):
     for st in block.filter(objects=SpikeTrain):
         #  pdb.set_trace()
-        st.magnitude[:] = st.times.magnitude + timeOffset.magnitude
-        st.t_start = masterTStart
-        st.t_stop += timeOffset
+        if len(st.times):
+            st.magnitude[:] = st.times.magnitude + timeOffset.magnitude
+            st.t_start = min(masterTStart, st.times[0] * 0.999)
+            st.t_stop = max(st.t_stop + timeOffset, st.times[-1] * 1.001)
+        else:
+            st.t_start += masterTStart
+            st.t_stop += timeOffset
     for asig in block.filter(objects=AnalogSignal):
         asig.t_start += timeOffset
     for event in block.filter(objects=Event):
@@ -1510,16 +1503,36 @@ def getINSDeviceConfig(
     return electrodeConfiguration, senseInfo
 
 
-def noisyTriggerCorrection(tdSeries, fs):
-    kernDur = 0.2
+def gaussianSupport(tdSeg, peakIdx, gaussWid, fs):
+    gaussWidIdx = min(int(gaussWid * fs), len(tdSeg.index)-1)
+    
+    gaussKern = signal.gaussian(
+        gaussWidIdx, gaussWidIdx/6)
+    gaussKern = gaussKern / np.max(gaussKern)
+    support = pd.Series(0, index=tdSeg.index)
+    support.loc[peakIdx] = 1
+    support.iloc[:] = np.convolve(
+        support.values,
+        gaussKern, mode='same'
+        )
+    support = support + 1
+    return support
+
+
+def noisyTriggerCorrection(
+    tdSeries, fs, kernDur, order=1, invert=False):
     kernNSamp = int(kernDur * fs)
     if kernNSamp > len(tdSeries):
         kernNSamp = round(len(tdSeries) - 2)
-    kern = np.concatenate((
-        np.linspace(0, 1, round(kernNSamp/2)),
-        np.array([0]),
-        np.linspace(-1, 0, round(kernNSamp/2))
-        ))
+    
+    for orderIdx in range(order):
+        gaussKern = signal.gaussian(
+            kernNSamp, kernNSamp/(6 * 2**orderIdx))
+        if orderIdx == 0:
+            kern = np.diff(gaussKern)
+        else:
+            kern += np.diff(gaussKern)
+    if invert: kern = -kern
         
     correctionFactor = pd.Series(
         np.convolve(kern, tdSeries, mode='same'),
@@ -1869,6 +1882,8 @@ def findTrains(dataSeries, peakIdx, iti, fs, minTrainLength, maxDistance = 1.5, 
     peakIdx = peakIdx[keepPeaks]
 
     return peakIdx, trainStartPeaks,trainEndPeaks
+
+
 
 def getTriggers(dataSeries, iti = .01, fs = 3e4, thres = 2.58,
     edgeType = 'rising',

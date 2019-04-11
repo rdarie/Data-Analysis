@@ -1,3 +1,5 @@
+import matplotlib
+matplotlib.use("PS")
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np

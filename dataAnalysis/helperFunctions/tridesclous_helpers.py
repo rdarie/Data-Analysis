@@ -7,12 +7,17 @@ import time
 import os
 import re
 import pdb
+import traceback
 #  import pdb
 import quantities as pq
 import neo
 from neo.core import (
     Block, Segment, ChannelIndex,
     Unit, SpikeTrain)
+import shutil
+import json
+import gc
+import dataAnalysis.helperFunctions.helper_functions as hf
 
 
 def cmpToDF(arrayFilePath):
@@ -346,27 +351,31 @@ def clean_catalogue(
 
 def run_peeler(
         triFolder, chan_grp=0,
-        strict_multiplier=2e-3,
+        shape_distance_threshold=2e-3,
         debugging=False, progressbar=False,
-        duration=None, useOpenCL=False):
+        duration=None, useOpenCL=False, trackTiming=False):
     dataio = tdc.DataIO(dirname=triFolder)
     initial_catalogue = dataio.load_catalogue(chan_grp=chan_grp)
     peeler = tdc.Peeler(dataio)
     if useOpenCL:
         peeler.change_params(
             catalogue=initial_catalogue,
-            strict_multiplier=strict_multiplier, debugging=debugging)
+            shape_distance_threshold=shape_distance_threshold,
+            debugging=debugging)
     else:
         peeler.change_params(
             catalogue=initial_catalogue,
             use_sparse_template=False, sparse_threshold_mad=1.5,
             use_opencl_with_sparse=False,
-            strict_multiplier=strict_multiplier, debugging=debugging)
+            shape_distance_threshold=shape_distance_threshold,
+            debugging=debugging)
 
-    t1 = time.perf_counter()
+    if trackTiming:
+        t1 = time.perf_counter()
     peeler.run(duration=duration, progressbar=progressbar)
-    t2 = time.perf_counter()
-    print('peeler.run_loop', t2-t1)
+    if trackTiming:
+        t2 = time.perf_counter()
+        print('peeler.run_loop', t2-t1)
     return
 
 
@@ -466,12 +475,27 @@ def neo_block_after_peeler(triFolder, chan_grps=None):
                         spike[unitMask]['jitter']) /
                     dataio.sample_rate)
                 
-                spikeWaveforms = dataio.get_some_waveforms(
-                    seg_num=segIdx, chan_grp=chan_grp,
-                    spike_indexes=spike[unitMask]['index'],
-                    n_left=catalogue['n_left'],
-                    n_right=catalogue['n_right']
-                    )
+                try:
+                    spikeWaveforms = dataio.get_some_waveforms(
+                        seg_num=segIdx, chan_grp=chan_grp,
+                        spike_indexes=spike[unitMask]['index'],
+                        n_left=catalogue['n_left'],
+                        n_right=catalogue['n_right']
+                        )
+                except Exception:
+                    traceback.print_exc()
+                    #  exclude edges if doesn't fit
+                    spikeWaveforms = dataio.get_some_waveforms(
+                        seg_num=segIdx, chan_grp=chan_grp,
+                        spike_indexes=spike[unitMask]['index'][1:-1],
+                        n_left=catalogue['n_left'],
+                        n_right=catalogue['n_right']
+                        )
+                    spikeTimes = (
+                        (
+                            spike[unitMask]['index'][1:-1] +
+                            spike[unitMask]['jitter'][1:-1]) /
+                        dataio.sample_rate)
                 spikeWaveforms = np.swapaxes(
                     spikeWaveforms,
                     1, 2)
@@ -500,9 +524,6 @@ def neo_block_after_peeler(triFolder, chan_grps=None):
     writer.write_block(block)
     writer.close()
     return block
-
-
-import shutil, os, json
 
 
 def purgePeelerResults(
@@ -537,9 +558,12 @@ def purgePeelerResults(
             for f in os.listdir(triFolder)
             if os.path.isdir(os.path.join(triFolder, f))]
         for grpFolder in grpFolders:
-            segFolder = os.path.join(
-                triFolder, grpFolder, 'segment_0')
-            shutil.rmtree(segFolder)
+            try:
+                segFolder = os.path.join(
+                    triFolder, grpFolder, 'segment_0')
+                shutil.rmtree(segFolder)
+            except Exception:
+                traceback.print_exc()
     return
 
 
@@ -576,10 +600,79 @@ def transferTemplates(
                 shutil.copy(fileName, catFolderDest)
                 """
                 tdch.run_peeler(
-                    triFolderDest, strict_multiplier=2e-3,
+                    triFolderDest, shape_distance_threshold=2e-3,
                     debugging=False,
                     useOpenCL=False, chan_grp=chan_grp)
                 """
+    return
+
+
+def batchPreprocess(
+        triFolder, chansToAnalyze,
+        relative_threshold=5.5
+        ):
+    print('Batch processing...')
+    try:
+        from mpi4py import MPI
+        COMM = MPI.COMM_WORLD
+        SIZE = COMM.Get_size()
+        RANK = COMM.Get_rank()
+    except Exception:
+        RANK = 0
+        SIZE = 1
+
+    print('RANK={}, SIZE={}'.format(RANK, SIZE))
+    for idx, chan_grp in enumerate(chansToAnalyze):
+        if idx % SIZE == RANK:
+            print('memory usage: {}'.format(
+                hf.memory_usage_psutil()))
+            preprocess_signals_and_peaks(
+                triFolder, chan_grp=chan_grp,
+                chunksize=2048,
+                signalpreprocessor_engine='numpy',
+                peakdetector_engine='numpy',
+                highpass_freq=300.,
+                lowpass_freq=5000.,
+                relative_threshold=relative_threshold,
+                peak_span=.5e-3,
+                common_ref_removal=False,
+                noise_estimate_duration=60.,
+                sample_snippet_duration=160.)
+
+            extract_waveforms_pca(
+                triFolder, feature_method='pca_by_channel',
+                n_components_by_channel=20, chan_grp=chan_grp)
+
+            cluster(
+                triFolder, cluster_method='kmeans',
+                n_clusters=5, chan_grp=chan_grp)
+    return
+
+
+def batchPeel(
+        triFolder, chansToAnalyze,
+        shape_distance_threshold=2e-2
+        ):
+    print('Batch peeling...')
+    try:
+        from mpi4py import MPI
+        COMM = MPI.COMM_WORLD
+        SIZE = COMM.Get_size()
+        RANK = COMM.Get_rank()
+    except Exception:
+        RANK = 0
+        SIZE = 1
+        
+    print('RANK={}, SIZE={}'.format(RANK, SIZE))
+    for idx, chan_grp in enumerate(chansToAnalyze):
+        if idx % SIZE == RANK:
+            print('memory usage: {}'.format(
+                hf.memory_usage_psutil()))
+            run_peeler(
+                triFolder, shape_distance_threshold=shape_distance_threshold,
+                debugging=False,
+                chan_grp=chan_grp, progressbar=False)
+            gc.collect()
     return
 
 

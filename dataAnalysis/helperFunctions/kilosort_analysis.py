@@ -450,7 +450,7 @@ def getSpikeStats(spikes, channel, whichStats = ['mean', 'std'], bounds = None, 
 
 def plotSpike(spikes, channel, showNow = False, ax = None,
     acrossArray = False, xcoords = None, ycoords = None,
-    axesLabel = False, errorMultiplier = 2, ignoreUnits = [],
+    axesLabel = False, errorMultiplier = 1, ignoreUnits = [],
     channelPlottingName = None, chanNameInLegend = True):
 
     if channelPlottingName is None:
@@ -509,6 +509,7 @@ def plotSpike(spikes, channel, showNow = False, ax = None,
                     waveForms = spikes['Waveforms'][ChanIdx][unitMask, :, idx]
                     thisSpike = np.nanmean(waveForms, axis = 0)
                     thisError = np.nanstd(waveForms, axis = 0)
+                    #  thisError = stats.sem(waveForms, nan_policy='omit')
                     timeRange = np.arange(len(thisSpike)) / spikes['basic_headers']['TimeStampResolution'] * 1e3
                     curAx.fill_between(timeRange, thisSpike - errorMultiplier*thisError,
                         thisSpike + errorMultiplier*thisError, alpha=0.4,
@@ -531,6 +532,7 @@ def plotSpike(spikes, channel, showNow = False, ax = None,
                 thisSpike = np.nanmean(waveForms, axis = 0)
                 #  pdb.set_trace()
                 thisError = np.nanstd(waveForms, axis = 0)
+                #  thisError = stats.sem(waveForms, nan_policy='omit')
                 timeRange = np.arange(len(thisSpike)) / spikes['basic_headers']['TimeStampResolution'] * 1e3
                 colorPalette = sns.color_palette(n_colors = 40)
 

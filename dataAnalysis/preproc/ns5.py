@@ -116,8 +116,11 @@ def spikeTrainsToSpikeDict(
         else:
             spikes['TimeStamps'][idx] = st.times.magnitude
         
-        theseWaveforms = np.squeeze(
-            np.swapaxes(st.waveforms, 1, 2))
+        theseWaveforms = np.swapaxes(
+            st.waveforms, 1, 2)
+        theseWaveforms = np.atleast_2d(np.squeeze(
+            theseWaveforms))
+            
         if len(spikes['Waveforms'][idx]):
             spikes['Waveforms'][idx] = np.stack((
                 spikes['Waveforms'][idx],
@@ -422,6 +425,7 @@ def eventsToDataFrame(
     return pd.concat(eventDict, axis=1)
 
 
+'''
 def unpackAnalysisBlock(
         block, interpolateToTimeSeries=False,
         binnedSpikePath=None):
@@ -493,6 +497,7 @@ def unpackAnalysisBlock(
             axis=1)
         #  tdDF.loc[3e5:4e5, ['program', 'amplitude']].plot(); plt.show()
     return tdDF, stimStatus
+'''
 
 
 def loadSpikeMats(
@@ -1161,9 +1166,10 @@ def blockToNix(
                 #  process trial related events
                 analogData = []
                 for key, value in eventInfo['inputIDs'].items():
+                    searchName = 'seg{}_'.format(segIdx) + value
                     ainpAsig = seg.filter(
                         objects=AnalogSignalProxy,
-                        name=value)[0]
+                        name=searchName)[0]
                     ainpData = ainpAsig.load(
                         time_slice=(tStart, tStop),
                         magnitude_mode='rescaled')
@@ -1382,6 +1388,8 @@ def loadContainerArrayAnn(
         if hasattr(st, 'waveforms'):
             if st.waveforms is None:
                 st.waveforms = np.array([]).reshape((0, 0, 0))*pq.mV
+            elif not len(st.waveforms):
+                st.waveforms = np.array([]).reshape((0, 0, 0))*pq.mV
     return returnObj
 
 
@@ -1396,7 +1404,7 @@ def loadWithArrayAnn(
     
     #  block.create_relationship()  # need this!
 
-    block = loadContainerArrayAnn(block)
+    block = loadContainerArrayAnn(container=block)
     
     if fromRaw:
         reader.file.close()
