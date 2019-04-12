@@ -1,11 +1,11 @@
 """
 Usage:
-    tridesclousCCV.py [--trialIdx=trialIdx] [--visuals] [--showProgressbar]
+    tridesclousLocal.py [--trialIdx=trialIdx] [--visuals] [--showProgressbar]
 
 Arguments:
-    trialIdx            which trial to analyze
 
 Options:
+    --trialIdx=trialIdx            which trial to analyze
     --visuals           include visualization steps
     --showProgressbar   show progress bar when running peeler
 """
@@ -16,7 +16,14 @@ import dataAnalysis.helperFunctions.tridesclous_helpers as tdch
 import dataAnalysis.helperFunctions.helper_functions as hf
 from currentExperiment import *
 import os, gc
+
 arguments = docopt(__doc__)
+'''
+arguments = {
+  "--showProgressbar": False,
+  "--trialIdx": "3",
+  "--visuals": False}
+'''
 
 #  if overriding currentExperiment
 if arguments['--trialIdx']:
@@ -25,11 +32,6 @@ if arguments['--trialIdx']:
     ns5FileName = 'Trial00{}'.format(trialIdx)
     triFolder = os.path.join(
         nspFolder, 'tdc_' + ns5FileName)
-showProgressBar = arguments['--showProgressbar']
-#  showProgressBar = True
-#  catName = 'F:\\Murdoc Neural Recordings\\201901271000-Proprio\\tdc_Trial001\\channel_group_4\\catalogues\\initial\\catalogue.pickle'
-#  with open(catName, 'rb') as f:
-#      data = pickle.load(f)
 
 try:
     tdch.initialize_catalogueconstructor(
@@ -89,22 +91,25 @@ for chan_grp in chansToAnalyze:
 for chan_grp in chansToAnalyze:
         tdch.open_cataloguewindow(triFolder, chan_grp=chan_grp)
 
-chansToAnalyze = sorted(list(dataio.channel_groups.keys()))[:-1]
+chansToAnalyze = chansToAnalyze[:-1]
 """
 chan_grp = 35
 tdch.purgePeelerResults(
     triFolder, chan_grps=[chan_grp])
 """
+
+chansToAnalyze = [1, 11, 21, 27, 41, 51, 61, 71, 81, 91]
 for chan_grp in chansToAnalyze:
-    print('memory usage: {}'.format(
-        hf.memory_usage_psutil()))
+    #  print('memory usage: {}'.format(
+    #      hf.memory_usage_psutil()))
+
     tdch.run_peeler(
-        triFolder, strict_multiplier=2e-3,
-        debugging=False,
-        useOpenCL=True, chan_grp=chan_grp, progressbar=showProgressBar)
+        triFolder, shape_distance_threshold=3e-2,
+        debugging=True,
+        chan_grp=chan_grp,
+        progressbar=arguments['--showProgressbar'])
     gc.collect()
 
-chansToAnalyze = []
 for chan_grp in chansToAnalyze:
     tdch.open_PeelerWindow(triFolder, chan_grp=chan_grp)
 

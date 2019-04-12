@@ -6,9 +6,9 @@
 # Default resources are 1 core with 2.8GB of memory.
 
 # Use more memory (32GB):
-#SBATCH --nodes=1
-#SBATCH --mem=32G
-#SBATCH --array=1,2,3,4
+#SBATCH --nodes=8
+#SBATCH --mem=16G
+#SBATCH --array=1,2,3,4,5
 
 # Specify a job name:
 #SBATCH -J spike_sorting
@@ -20,4 +20,6 @@
 # Specify account details
 #SBATCH --account=bibs-dborton-condo
 
-python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/tridesclousCCV.py' --trialIdx=$SLURM_ARRAY_TASK_ID
+# python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/tridesclousCCV.py' --trialIdx=$SLURM_ARRAY_TASK_ID --makeNeoBlock
+python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/generateSpikeReport.py' --trialIdx=$SLURM_ARRAY_TASK_ID
+

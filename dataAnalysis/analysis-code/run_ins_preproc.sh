@@ -11,13 +11,13 @@
 #SBATCH --array=1,2,3,4
 
 # Specify a job name:
-#SBATCH -J ins_preproc
+#SBATCH -J preprocIns
 
 # Specify an output file
-#SBATCH -o ../batch_logs/preprocins-o-%j-%a.out
-#SBATCH -e ../batch_logs/preprocins-e-%j-%a.out
+#SBATCH -o ../batch_logs/%j-%a-preprocIns.stdout
+#SBATCH -e ../batch_logs/%j-%a-preprocIns.errout
 
 # Specify account details
 #SBATCH --account=bibs-dborton-condo
 
-python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/preprocINSData.py' --trialIdx=$SLURM_ARRAY_TASK_ID
+python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/preprocINS.py' --trialIdx=$SLURM_ARRAY_TASK_ID

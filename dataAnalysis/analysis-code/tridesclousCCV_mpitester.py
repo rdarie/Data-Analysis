@@ -7,7 +7,6 @@ Arguments:
 
 Options:
     --trialIdx=trialIdx        which trial to analyze [default: 1]
-    --attemptMPI               whether to try to load MPI [default: False]
     --purgePeeler              delete previous sort results [default: False]
     --batchPreprocess          extract snippets and features, run clustering [default: False]
     --visConstructor           include visualization step for catalogue constructor [default: False]
@@ -20,62 +19,43 @@ from docopt import docopt
 import tridesclous as tdc
 import dataAnalysis.helperFunctions.tridesclous_helpers as tdch
 import dataAnalysis.helperFunctions.helper_functions as hf
+from currentExperiment import *
 import os, gc, traceback
-
 arguments = docopt(__doc__)
 
 try:
-    if not arguments['--attemptMPI']:
-        raise(Exception('MPI aborted by cmd line argument'))
     from mpi4py import MPI
     COMM = MPI.COMM_WORLD
     SIZE = COMM.Get_size()
     RANK = COMM.Get_rank()
     HAS_MPI = True
-except Exception:
-    traceback.print_exc()
+except:
     RANK = 0
-    SIZE = 1
     HAS_MPI = False
 
+
+#  if overriding currentExperiment
+if arguments['--trialIdx']:
+    print(arguments)
+    trialIdx = int(arguments['--trialIdx'])
+    ns5FileName = 'Trial00{}'.format(trialIdx)
+    triFolder = os.path.join(
+        nspFolder, 'tdc_' + ns5FileName)
+
+dataio = tdc.DataIO(dirname=triFolder)
+
 if RANK == 0:
-    from currentExperiment import *
-    #  if overriding currentExperiment
-    if arguments['--trialIdx']:
-        trialIdx = int(arguments['--trialIdx'])
-        ns5FileName = 'Trial00{}'.format(trialIdx)
-        triFolder = os.path.join(
-            nspFolder, 'tdc_' + ns5FileName)
     try:
-        tdch.initialize_catalogueconstructor(
-            nspFolder,
-            ns5FileName,
-            triFolder,
-            nspPrbPath,
-            removeExisting=False, fileFormat='Blackrock')
+        print('RANK == {}, tdch.initialize...'.format(RANK))
     except Exception:
-        pass
-else:
-    nspFolder = None
-    nspPrbPath = None
-    triFolder = None
+        traceback.print_exc()
 
-
-if HAS_MPI:
-    COMM.Barrier()  # sync MPI threads, waith for 0
-    nspFolder = COMM.bcast(nspFolder, root=0)
-    nspPrbPath = COMM.bcast(nspPrbPath, root=0)
-    triFolder = COMM.bcast(triFolder, root=0)
-
-
-if RANK == 0:
     if arguments['--purgePeeler']:
-        tdch.purgePeelerResults(
-            triFolder, purgeAll=True)
-    
-    dataio = tdc.DataIO(dirname=triFolder)
+        print('Purging Peeler')
+
     chansToAnalyze = sorted(list(dataio.channel_groups.keys()))
 else:
+    print('RANK == {}'.format(RANK))
     chansToAnalyze = None
 
 if HAS_MPI:
@@ -97,29 +77,25 @@ chansToAnalyze = [
 '''
 
 if arguments['--batchPreprocess']:
-    tdch.batchPreprocess(
-        triFolder, chansToAnalyze,
-        relative_threshold=5.5)
+    print('RANK = {}, batchPreproc'.format(RANK))
 
-chansToAnalyze = chansToAnalyze[:-1]
+chansToAnalyze = sorted(list(dataio.channel_groups.keys()))[:-1]
 
 if arguments['--visConstructor']:
     for idx, chan_grp in enumerate(chansToAnalyze):
         if idx % SIZE == RANK:
-            tdch.open_cataloguewindow(triFolder, chan_grp=chan_grp)
+            print('RANK = {}, visConstructor'.format(RANK))
 
 if arguments['--batchPeel']:
-    tdch.batchPeel(
-        triFolder, chansToAnalyze,
-        shape_distance_threshold=2e-2)
+    print('RANK = {}, batchPeeler'.format(RANK))
 
 if arguments['--visPeeler']:
     for idx, chan_grp in enumerate(chansToAnalyze):
         if idx % SIZE == RANK:
-            tdch.open_PeelerWindow(triFolder, chan_grp=chan_grp)
+            print('RANK = {}, visPeeler'.format(RANK))
 
 if HAS_MPI:
     COMM.Barrier()  # wait until all threads finish sorting
 
 if arguments['--makeNeoBlock'] and RANK == 0:
-    tdch.neo_block_after_peeler(triFolder, chan_grps=chansToAnalyze)
+    print('RANK = {}, makeNeoBLock'.format(RANK))

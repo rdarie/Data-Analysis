@@ -1,3 +1,4 @@
+import dataAnalysis.plotting.aligned_signal_plots as asp
 import os, pdb, traceback
 from importlib import reload
 import neo
@@ -7,7 +8,6 @@ from neo import (
 from neo.io.proxyobjects import (
     SpikeTrainProxy, EventProxy)
 import dataAnalysis.preproc.ns5 as preproc
-import dataAnalysis.plotting.aligned_signal_plots as asp
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
@@ -17,6 +17,8 @@ from currentExperiment import *
 from joblib import dump, load
 import quantities as pq
 
+sns.set_style("whitegrid")
+sns.set_context("talk")
 dataBlock = preproc.loadWithArrayAnn(
     experimentTriggeredPath)
 
@@ -27,11 +29,15 @@ unitNames = np.unique([
 rasterToPlot = [
     i
     for i in unitNames
-    if (('_fr' in i) and ('_fr_fr' not in i))]
+    if '_raster' in i]
 continuousToPlot = [
     i
     for i in unitNames
-    if '_fr_fr' in i]
+    if '_fr' in i]
+signalToPlot = [
+    i[:-3]
+    for i in unitNames
+    if '_fr' in i]
 
 dataQueryTemplate = '&'.join([
     '(RateInHz >= 100)',
@@ -84,6 +90,7 @@ for rasterName, continuousName in zip(rasterToPlot, continuousToPlot):
     
     dataQuery = dataQueryTemplate.format(continuousName)
     plotDFContinuous = allWaveformsContinuousPlot.query(dataQuery)
+    
     plotDF.loc[:, 'signal_twin'] = plotDFContinuous.loc[:, 'signal']
     
     asp.getRasterFacetIdx(
@@ -91,19 +98,20 @@ for rasterName, continuousName in zip(rasterToPlot, continuousToPlot):
         col='pedalMovementCat', row='program')
     
     g = asp.twin_relplot(
-        x='bin', y1='index_facetIdx', y2='signal_twin',
+        x='bin',
+        y1='index_facetIdx', y2='signal_twin',
+        query1='(signal == 1000)', query2=None,
         hue='amplitudeFuzzy',
         col='pedalMovementCat', row='program',
-        func1_kws={'marker': '|'}, func2_kws={'ci': 'sd'},
+        func1_kws={'marker': '|'}, func2_kws={'ci': 'sem'},
         facet1_kws={'sharey': False}, facet2_kws={},
-        query1='(signal == 1000)', query2=None,
         height=5, aspect=1.5, kind1='scatter', kind2='line', data=plotDF)
     
     plt.suptitle(dataQuery)
     #  plt.show()
     #  block=False
     #  plt.pause(3)
-    plt.savefig(
+    g.fig.savefig(
         os.path.join(
-            figureFolder, 'alignedSignals', '{}.pdf'.format(rasterName)))
-    plt.close()
+            alignedRastersFolder, '{}.pdf'.format(rasterName)))
+    plt.close(g.fig)

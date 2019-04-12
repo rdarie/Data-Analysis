@@ -17,6 +17,8 @@ from currentExperiment import *
 from joblib import dump, load
 import quantities as pq
 
+sns.set_style("whitegrid")
+sns.set_context("talk")
 dataBlock = preproc.loadWithArrayAnn(
     experimentTriggeredPath)
 
@@ -26,7 +28,7 @@ unitNames = np.unique([
 unitsToPlot = [
     i
     for i in unitNames
-    if (('_fr' in i) and ('_fr_fr' not in i))]
+    if '_raster' in i]
 unitsToPlot = [unitsToPlot[5]]
 #  unitsToPlot = ['PC{}#0'.format(i+1) for i in range(10)]
 #  unitsToPlot = ['PC3#0']
@@ -73,5 +75,5 @@ for unitName in unitsToPlot:
     #  plt.pause(3)
     plt.savefig(
         os.path.join(
-            figureFolder, 'alignedRasters', '{}.pdf'.format(chanName)))
+            alignedRastersFolder, '{}.pdf'.format(unitName)))
     plt.close()

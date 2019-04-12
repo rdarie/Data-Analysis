@@ -14,8 +14,8 @@
 #SBATCH -J ins_synch
 
 # Specify an output file
-#SBATCH -o ../batch_logs/synchins-o-%j-%a.out
-#SBATCH -e ../batch_logs/synchins-e-%j-%a.out
+#SBATCH -o ../batch_logs/%j-%a-synchins-o.stdout
+#SBATCH -e ../batch_logs/%j-%a-synchins-e.errout
 
 # Specify account details
 #SBATCH --account=bibs-dborton-condo

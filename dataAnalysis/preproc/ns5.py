@@ -138,6 +138,19 @@ def spikeTrainsToSpikeDict(
     return spikes
 
 
+def spikeTrainArrayAnnToDF(
+        spiketrains):
+    fullAnnotationsDict = {}
+    for st in spiketrains:
+        theseAnnDF = pd.DataFrame(st.array_annotations)
+        theseAnnDF['times'] = st.times
+        fullAnnotationsDict.update({childBaseName(st.name, 'seg'): theseAnnDF})
+    
+    annotationsDF = pd.concat(
+        fullAnnotationsDict, names=['name', 'index'])
+    return annotationsDF
+
+
 def spikeTrainWaveformsToDF(
         spiketrains):
     waveformsDict = {}

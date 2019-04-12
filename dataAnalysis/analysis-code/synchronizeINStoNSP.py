@@ -57,8 +57,7 @@ if arguments['--trialIdx']:
     trialIdx = int(arguments['--trialIdx'])
     ns5FileName = 'Trial00{}'.format(trialIdx)
     insDataPath = os.path.join(
-        insFolder,
-        experimentName,
+        remoteBasePath, 'processed', experimentName,
         ns5FileName + '_ins.nix')
     trialFilesStim = {
         'ins': {
@@ -84,7 +83,7 @@ if arguments['--trialIdx']:
 
 try:
     reader = neo.io.NixIO(filename=insDataPath, mode='ro')
-except:
+except Exception:
     insBlock = preprocINS.preprocINS(
         trialFilesStim['ins'], plottingFigures=False)
     reader = neo.io.NixIO(filename=insDataPath, mode='ro')
@@ -109,7 +108,6 @@ accel = {'data': accelDF, 't': accelDF['t']}
 ############################################################
 startTime_s = None
 dataLength_s = None
-#  !!!!!!!! Might be broken with new naming conventions
 try:
     channelData, nspBlock = preproc.getNIXData(
         fileName=ns5FileName,
@@ -119,22 +117,7 @@ try:
         signal_group_mode='split-all', closeReader=True)
 except Exception:
     traceback.print_exc()
-    reader = preproc.preproc(
-        fileName=ns5FileName,
-        folderPath=nspFolder,
-        fillOverflow=False, removeJumps=False,
-        eventInfo=trialFilesFrom['utah']['eventInfo'],
-        spikeSource='tdc',
-        chunkSize=2500
-        )
-    channelData, nspBlock = preproc.getNIXData(
-        fileName=ns5FileName,
-        folderPath=nspFolder,
-        elecIds=['ainp7'], startTime_s=startTime_s,
-        dataLength_s=dataLength_s,
-        signal_group_mode='split-all', closeReader=True)
 
-#  pdb.set_trace()
 #  Detect NSP taps
 ############################################################
 getTapsFromNev = False
@@ -291,6 +274,7 @@ if addingToNix:
         writeAsigs=False, writeSpikes=True,
         fileName=ns5FileName,
         folderPath=nspFolder,
+        purgeNixNames=True,
         nixBlockIdx=0, nixSegIdx=[0],
         )
     tdColumns = [
@@ -310,6 +294,7 @@ if addingToNix:
         tdBlock, neoSegIdx=[0],
         fileName=ns5FileName,
         folderPath=nspFolder,
+        purgeNixNames=True,
         nixBlockIdx=0, nixSegIdx=[0],
         )
     accelColumns = [
@@ -329,5 +314,6 @@ if addingToNix:
         accelBlock, neoSegIdx=[0],
         fileName=ns5FileName,
         folderPath=nspFolder,
+        purgeNixNames=True,
         nixBlockIdx=0, nixSegIdx=[0],
         )

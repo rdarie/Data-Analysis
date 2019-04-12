@@ -394,12 +394,18 @@ def filterDF(
     return filteredDF
 
 
-def closestSeries(takeFrom, compareTo):
+def closestSeries(takeFrom, compareTo, strictly='neither'):
     closest = pd.Series(
         np.nan, index=takeFrom.index)
     for idx, value in enumerate(takeFrom.values):
+        if strictly == 'greater':
+            lookIn = compareTo[compareTo > value]
+        if strictly == 'less':
+            lookIn = compareTo[compareTo < value]
+        else:
+            lookIn = compareTo
         closeValue = (
-            compareTo
+            lookIn
             .values
             .flat[np.abs(compareTo.values - value).argmin()])
         closest.iloc[idx] = closeValue
@@ -1504,18 +1510,21 @@ def getINSDeviceConfig(
 
 
 def gaussianSupport(tdSeg, peakIdx, gaussWid, fs):
-    gaussWidIdx = min(int(gaussWid * fs), len(tdSeg.index)-1)
+    kernNSamp = min(int(gaussWid * fs), len(tdSeg.index)-1)
     
     gaussKern = signal.gaussian(
-        gaussWidIdx, gaussWidIdx/6)
+        kernNSamp, kernNSamp/6)
+
+    gaussKern = gaussKern - np.min(gaussKern)
     gaussKern = gaussKern / np.max(gaussKern)
+
     support = pd.Series(0, index=tdSeg.index)
     support.loc[peakIdx] = 1
     support.iloc[:] = np.convolve(
         support.values,
         gaussKern, mode='same'
         )
-    support = support + 1
+    support = support + 1e-2
     return support
 
 
@@ -1532,6 +1541,7 @@ def noisyTriggerCorrection(
             kern = np.diff(gaussKern)
         else:
             kern += np.diff(gaussKern)
+    
     if invert: kern = -kern
         
     correctionFactor = pd.Series(
@@ -1539,7 +1549,7 @@ def noisyTriggerCorrection(
         index=tdSeries.index)
         
     correctionFactor = correctionFactor - correctionFactor.min()
-    correctionFactor = (correctionFactor / correctionFactor.max()) + 1
+    correctionFactor = (correctionFactor / correctionFactor.max()) + 1e-2
     return correctionFactor
 
 

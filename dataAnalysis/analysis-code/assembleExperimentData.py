@@ -39,27 +39,16 @@ suffixList = ['_binarized', '_analyze']
 for suffix in suffixList:
     print('assembling {}'.format(suffix))
     experimentDataPath = os.path.join(
-        trialFilesStim['ins']['folderPath'],
-        trialFilesStim['ins']['experimentName'],
-        trialFilesStim['ins']['experimentName'] + suffix + '.nix')
+        remoteBasePath, 'processed', experimentName,
+        experimentName + suffix + '.nix')
     for idx, trialIdx in enumerate(trialList):
         print('loading trial {}'.format(trialIdx))
         trialDataPath = os.path.join(
-            trialFilesStim['ins']['folderPath'],
-            trialFilesStim['ins']['experimentName'],
+            remoteBasePath, 'processed', experimentName,
             'Trial00{}'.format(trialIdx) + suffix + '.nix')
         if idx == 0:
             masterBlock = preproc.loadWithArrayAnn(
                 trialDataPath, fromRaw=False)
-            """
-            if suffix == '_analyze':
-                for st in masterBlock.filter(objects=SpikeTrain):
-                    st.unit.name = st.name
-                    st.unit.channel_index.name = st.name
-                for asig in masterBlock.filter(objects=AnalogSignal):
-                    asig.channel_index.name = asig.name
-            elif suffix == '_binarized':
-            """
             if suffix == '_binarized':
                 for seg in masterBlock.segments:
                     seg.spiketrains = []
@@ -67,22 +56,15 @@ for suffix in suffixList:
             oldTStop = masterBlock.filter(objects=AnalogSignal)[0].t_stop
             typesNeedRenaming = [SpikeTrain, AnalogSignal, Event]
             masterBlock.segments[0].name = 'seg{}_'.format(idx)
+            
             for objType in typesNeedRenaming:
                 for child in masterBlock.filter(objects=objType):
                     childBaseName = preproc.childBaseName(child.name, 'seg')
                     child.name = 'seg{}_{}'.format(idx, childBaseName)
+            
         else:
             dataBlock = preproc.loadWithArrayAnn(
                 trialDataPath, fromRaw=False)
-            """
-            if suffix == '_analyze':
-                for st in dataBlock.filter(objects=SpikeTrain):
-                    st.unit.name = st.name
-                    st.unit.channel_index.name = st.name
-                for asig in dataBlock.filter(objects=AnalogSignal):
-                    asig.channel_index.name = asig.name
-            elif suffix == '_binarized':
-            """
             if suffix == '_binarized':
                 for seg in dataBlock.segments:
                     seg.spiketrains = []
@@ -93,10 +75,12 @@ for suffix in suffixList:
             #  [i.unit.channel_index.name for i in masterBlock.filter(objects=SpikeTrain)]
             tStop = dataBlock.filter(objects=AnalogSignal)[0].t_stop
             dataBlock.segments[0].name = 'seg{}_'.format(idx)
+
             for objType in typesNeedRenaming:
                 for child in dataBlock.filter(objects=objType):
                     childBaseName = preproc.childBaseName(child.name, 'seg')
                     child.name = 'seg{}_{}'.format(idx, childBaseName)
+            
             masterBlock.merge(dataBlock)
             oldTStop = tStop
     masterBlock = preproc.purgeNixAnn(masterBlock)

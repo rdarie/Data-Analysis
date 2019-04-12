@@ -36,12 +36,10 @@ if arguments['--trialIdx']:
         nspFolder,
         ns5FileName + '.nix')
     analysisDataPath = os.path.join(
-        insFolder,
-        experimentName,
+        remoteBasePath, 'processed', experimentName,
         ns5FileName + '_analyze.nix')
     binnedSpikePath = os.path.join(
-        insFolder,
-        experimentName,
+        remoteBasePath, 'processed', experimentName,
         ns5FileName + '_binarized.nix')
 
 
@@ -84,8 +82,12 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         )
     tStop = (sigSize / fs) * pq.s + tStart
     for st in dataSeg.filter(objects=SpikeTrain):
-        st.t_start = tStart
-        st.t_stop = tStop
+        if len(st.times):
+            st.t_start = min(tStart, st.times[0] * 0.999)
+            st.t_stop = max(tStop, st.times[-1] * 1.001)
+        else:
+            st.t_start = tStart
+            st.t_stop = tStop
         if 'arrayAnnNames' in st.annotations.keys():
             for key in st.annotations['arrayAnnNames']:
                 #  fromRaw, the ann come back as tuple, need to recast

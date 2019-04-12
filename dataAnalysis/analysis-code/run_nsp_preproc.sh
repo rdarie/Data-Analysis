@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Request 24 hours of runtime:
-#SBATCH --time=72:00:00
+#SBATCH --time=1:00:00
 
 # Default resources are 1 core with 2.8GB of memory.
 
@@ -14,8 +14,8 @@
 #SBATCH -J nsp_preproc
 
 # Specify an output file
-#SBATCH -o ../batch_logs/preprocnsp-o-%j-%a.out
-#SBATCH -e ../batch_logs/preprocnsp-e-%j-%a.out
+#SBATCH -o ../batch_logs/%j-%a-preprocnsp.stdout
+#SBATCH -e ../batch_logs/%j-%a-preprocnsp.errout
 
 # Specify account details
 #SBATCH --account=bibs-dborton-condo
