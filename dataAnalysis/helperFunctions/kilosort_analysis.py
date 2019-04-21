@@ -464,12 +464,14 @@ def plotSpike(spikes, channel, showNow = False, ax = None,
         unitsLabelsOnThisChan = None
 
     if acrossArray:
+        '''
         sns.set_style("dark", {"axes.facecolor": ".9"})
         matplotlib.rc('xtick', labelsize=5)
         matplotlib.rc('ytick', labelsize=5)
         matplotlib.rc('legend', fontsize=5)
         matplotlib.rc('axes', xmargin=.01)
         matplotlib.rc('axes', ymargin=.01)
+        '''
         # Check that we didn't ask to plot the spikes across channels into a single axis
         assert ax is None
         # Check that we have waveform data everywhere
@@ -588,7 +590,8 @@ def plotISIHistogram(spikes, channel, showNow = False, ax = None,
             plt.show()
 
 #@profile
-def plotSpikePanel(spikeStruct, spikes):
+def plotSpikePanel(spikeStruct, spikes, labelFontSize=LABELFONTSIZE, padOverride=5e-3):
+    """
     sns.set_style("dark", {"axes.facecolor": ".9"})
     matplotlib.rc('xtick', labelsize=5)
     matplotlib.rc('ytick', labelsize=5)
@@ -596,16 +599,14 @@ def plotSpikePanel(spikeStruct, spikes):
     matplotlib.rc('axes', xmargin=.01)
     matplotlib.rc('axes', ymargin=.01)
 
-    """
     xIdx, yIdx = coordsToIndices(spikeStruct['xcoords'], spikeStruct['ycoords'])
     fig, ax = plt.subplots(nrows = max(np.unique(xIdx)) + 1,
         ncols = max(np.unique(yIdx)) + 1)
     """
-
     #spikeStruct.dropna(inplace = True)
     xIdx = np.array(spikeStruct['xcoords'].values - spikeStruct['xcoords'].min(), dtype = np.int)
     yIdx = np.array(spikeStruct['ycoords'].values - spikeStruct['ycoords'].min(), dtype = np.int)
-    #pdb.set_trace()
+    # pdb.set_trace()
 
     fig, ax = plt.subplots(nrows = int(max(np.unique(xIdx)) + 1),
         ncols = int(max(np.unique(yIdx)) + 1))
@@ -613,43 +614,42 @@ def plotSpikePanel(spikeStruct, spikes):
     axHighLims[:] = np.nan
     axLowLims = np.empty(ax.shape)
     axLowLims[:] = np.nan
+    with sns.color_palette("ch:2,-.1,dark=.3,light=0.8,reverse=1", 4):
+        for idx, channel in enumerate(spikes['ChannelID']):
+            curAx = ax[xIdx[idx], yIdx[idx]]
+            plotSpike(spikes, channel, ax=curAx)
+            curAxLim = curAx.get_ylim()
+            axHighLims[xIdx[idx], yIdx[idx]] = curAxLim[1]
+            axLowLims[xIdx[idx], yIdx[idx]] = curAxLim[0]
+        # get xLim from last axis that has spikes, in order to make the label
+        xLim = ax[xIdx[idx], yIdx[idx]].get_xlim()
+        sns.despine()
 
-    for idx, channel in enumerate(spikes['ChannelID']):
-        curAx = ax[xIdx[idx], yIdx[idx]]
-        plotSpike(spikes, channel, ax = curAx)
-        curAxLim = curAx.get_ylim()
-        axHighLims[xIdx[idx], yIdx[idx]] = curAxLim[1]
-        axLowLims[xIdx[idx], yIdx[idx]] = curAxLim[0]
-    # get xLim from last axis that has spikes, in order to make the label
-    xLim = ax[xIdx[idx], yIdx[idx]].get_xlim()
-    sns.despine()
+        newAxMin = np.nanmean(axLowLims) - .5 * np.nanstd(axLowLims)
+        newAxMax = np.nanmean(axHighLims) + .5 * np.nanstd(axHighLims)
 
-    newAxMin = np.nanmean(axLowLims) - .5 * np.nanstd(axLowLims)
-    newAxMax = np.nanmean(axHighLims) + .5 * np.nanstd(axHighLims)
-
-    for idx, channel in enumerate(spikes['ChannelID']):
-        curAx = ax[xIdx[idx], yIdx[idx]]
-        curAx.set_ylim(newAxMin, newAxMax)
-
-    for idx, curAx in enumerate(ax.flatten()):
-        if idx != 0:
-            curAx.tick_params(left=False, top=False, right=False, bottom=False,
-                labelleft=False, labeltop=False, labelright=False,
-                labelbottom=False)
-        else:
-            curAx.tick_params(left=True, top=False, right=False, bottom=True,
-                labelleft=True, labeltop=False, labelright=False,
-                labelbottom=True, direction = 'in')
-
+        for idx, channel in enumerate(spikes['ChannelID']):
+            curAx = ax[xIdx[idx], yIdx[idx]]
             curAx.set_ylim(newAxMin, newAxMax)
-            curAx.set_xlim(*xLim)
-            labelFontSize = LABELFONTSIZE
-            curAx.set_xlabel('msec', fontsize = labelFontSize,
-                labelpad = - 3 * labelFontSize)
-            curAx.set_ylabel('uV', fontsize = labelFontSize,
-                labelpad = - 3 * labelFontSize)
 
-    plt.tight_layout(0.005)
+        for idx, curAx in enumerate(ax.flatten()):
+            if idx != 0:
+                curAx.tick_params(left=False, top=False, right=False, bottom=False,
+                    labelleft=False, labeltop=False, labelright=False,
+                    labelbottom=False, labelsize=labelFontSize, length=labelFontSize)
+            else:
+                curAx.tick_params(left=True, top=False, right=False, bottom=True,
+                    labelleft=True, labeltop=False, labelright=False,
+                    labelbottom=True, direction = 'in', labelsize=labelFontSize, length=labelFontSize)
+
+                curAx.set_ylim(newAxMin, newAxMax)
+                curAx.set_xlim(*xLim)
+                curAx.set_xlabel('msec', fontsize = labelFontSize,
+                    labelpad = - 2 * labelFontSize)
+                curAx.set_ylabel(spikes['Units'], fontsize = labelFontSize,
+                    labelpad = - 2 * labelFontSize)
+
+        plt.tight_layout(pad=padOverride)
     return newAxMin, newAxMax
 
 def getTrialAxes(trialStats, alignTo, channel, separateBy = None, ax = None):

@@ -21,6 +21,7 @@ from scipy import stats, signal, ndimage
 import peakutils
 import seaborn as sns
 from scipy import interpolate
+from sklearn.preprocessing import MinMaxScaler
 
 def preprocINS(
         trialFilesStim,
@@ -198,7 +199,7 @@ def preprocINS(
         deriveCols=deriveCols, progAmpNames=progAmpNames)
 
     interpFunHUTtoINS = hf.getHUTtoINSSyncFun(
-        timeSync, degree=1, syncTo='HostUnixTime')
+        timeSync, degree=1, syncTo='PacketGenTime')
     for trialSegment in pd.unique(td['data']['trialSegment']):
         stimStatus = hf.synchronizeHUTtoINS(
             stimStatus, trialSegment, interpFunHUTtoINS[trialSegment])
@@ -326,16 +327,9 @@ def getINSStimOnset(
         anomalyOccured = False
         #  pad with paddingDuration msec ensure robust z-score
         paddingDuration = 150e-3
-        tStartPadded = max(
-            0,
-            group['t'].iloc[0] - paddingDuration)
-        tStopPadded = min(
-            group['t'].iloc[-1] + paddingDuration,
-            tdDF['t'].iloc[-1])
         
         tStart = group['t'].iloc[0]
         tStop = group['t'].iloc[-1]
-        plotMaskTD = (tdDF['t'] > tStartPadded) & (tdDF['t'] < tStopPadded)
         
         if (tStop - tStart) < minDur:
             print('group {} (tStop - tStart) < minDur'.format(name))
@@ -365,6 +359,18 @@ def getINSStimOnset(
                 .idxmax()))
         ampColName = 'program{}_amplitude'.format(activeProgram)
         thisAmplitude = group[ampColName].max()
+        #  stim artifacts will be in this temporal subset of the recording
+        groupAmpMask = (
+            (group[ampColName] == thisAmplitude) &
+            (group['therapyStatus'] > 0))
+        
+        tStartPadded = max(
+            0,
+            group.loc[ampOnMask, 't'].iloc[0] - paddingDuration)
+        tStopPadded = min(
+            group.loc[ampOnMask, 't'].iloc[-1] + paddingDuration,
+            tdDF['t'].iloc[-1])            
+        plotMaskTD = (tdDF['t'] > tStartPadded) & (tdDF['t'] < tStopPadded)
 
         activeGroup = (
             int(
@@ -388,31 +394,20 @@ def getINSStimOnset(
         delayByFreqIdx = int(fs * delayByFreq)
         #  load the appropriate detection options
         theseDetectOpts = stimDetectOpts[activeGroup][activeProgram]
-
+        #  calculate signal used for stim artifact detection
+        tdSeg = (tdDF.loc[
+            plotMaskTD,
+            theseDetectOpts['detectChannels'] + ['t']
+            ])
         #  how far after the nominal start and stop of stim should we look?
-        ROIPadding = 200e-3
-        
-        #  stim artifacts will be in this temporal subset of the recording
-        groupAmpMask = (
-            (group[ampColName] == thisAmplitude) &
-            (group['therapyStatus'] > 0))
-        #  ampOffMask = ~groupAmpMask
+        ROIPadding = [-gaussWid, gaussWid]
         #  make sure we didn't overextend onset estimates
         lastValidOnsetIdx = group.loc[groupAmpMask, 't'].index[-1]
         #  make sure we didn't overextend offset estimates
-        '''
-        if ampOffMask.any():
-            lastValidOffsetIdx = min(
-                group.loc[ampOffMask, :].index[-1] +
-                delayByFreqIdx + fixedDelayIdx + ROIPaddingIdx,
-                group.index[-1])
-        else:
-            #  program was interrupted by another program
-        '''
         lastValidOffsetIdx = min(
             lastValidOnsetIdx +
             delayByFreqIdx + fixedDelayIdx,
-            tdDF.loc[plotMaskTD, :].index[-1])
+            tdSeg.index[-1])
 
         # use the HUT derived stim onset to favor detection
         expectedOnsetIdx = np.atleast_1d(np.array(
@@ -447,39 +442,37 @@ def getINSStimOnset(
                     expectedOffsetIdx, [lastValidOffsetIdx])
         else:
             cyclePeriod = -1  # placeholder for no cycling
-                
-        #  calculate signal used for stim artifact detection
-        tdSeg = (tdDF.loc[plotMaskTD, theseDetectOpts['detectChannels']])
 
         tStartOnset = max(
             group['t'].iloc[0],
-            group.loc[expectedOnsetIdx[0], 't'] - fixedDelay)
+            tdSeg.loc[expectedOnsetIdx[0], 't'] + ROIPadding[0])
         tStopOnset = min(
-            group.loc[expectedOnsetIdx[-1], 't'] + ROIPadding,
+            tdSeg.loc[expectedOnsetIdx[-1], 't'] + ROIPadding[1],
             group['t'].iloc[-1])
         ROIMaskOnset = (
-            (tdDF.loc[tdSeg.index, 't'] > tStartOnset) &
-            (tdDF.loc[tdSeg.index, 't'] < tStopOnset))
+            (tdSeg['t'] > tStartOnset) &
+            (tdSeg['t'] < tStopOnset))
 
         tStartOffset = max(
-            tdDF.loc[tdSeg.index, 't'].iloc[0],
-            tdDF.loc[expectedOffsetIdx[0], 't'] - fixedDelay)
+            group['t'].iloc[0],
+            tdSeg.loc[expectedOffsetIdx[0], 't'] + ROIPadding[0])
+        #  tStop can't be off group
         tStopOffset = min(
-            tdDF.loc[expectedOffsetIdx[-1], 't'] + ROIPadding,
-            tdDF.loc[tdSeg.index, 't'].iloc[-1])
+            tdSeg.loc[expectedOffsetIdx[-1], 't'] + ROIPadding[1],
+            group['t'].iloc[-1])
         ROIMaskOffset = (
-            (tdDF.loc[tdSeg.index, 't'] > tStartOffset) &
-            (tdDF.loc[tdSeg.index, 't'] < tStopOffset))
+            (tdSeg['t'] > tStartOffset) &
+            (tdSeg['t'] < tStopOffset))
 
         (
             onsetIdx, theseOnsetTimestamps, onsetDifferenceFromExpected,
             onsetDifferenceFromLogged,
             anomalyOccured, originalOnsetIdx, correctionFactorOnset,
             onsetDetectSignalFull, currentThresh) = extractArtifactTimestamps(
-                tdSeg, tdDF, ROIMaskOnset,
+                tdSeg.drop(columns='t'), tdDF, ROIMaskOnset,
                 fs, gaussWid,
                 stimRate=stimRate,
-                closeThres=200e-3,
+                closeThres=gaussWid,
                 expectedIdx=expectedOnsetIdx,
                 enhanceEdges=True,
                 enhanceExpected=True,
@@ -490,15 +483,15 @@ def getINSStimOnset(
                 minDist=minDist, theseDetectOpts=theseDetectOpts,
                 maxSpikesPerGroup=maxSpikesPerGroup,
                 fixedDelayIdx=fixedDelayIdx, delayByFreqIdx=delayByFreqIdx,
-                keep_what='max', plotDetection=False
+                keep_what='max', plotDetection=False,
             )
 
         # recalculate expected off times based on detected on times
         if recalculateExpectedOffsets:
             expectedOnsetTimestamps = pd.Series(
-                tdDF['t'].loc[expectedOnsetIdx])
+                tdSeg['t'].loc[expectedOnsetIdx])
             expectedOffsetTimestamps = pd.Series(
-                tdDF['t'].loc[expectedOffsetIdx])
+                tdSeg['t'].loc[expectedOffsetIdx])
             if len(expectedOnsetTimestamps) == len(expectedOffsetTimestamps):
                 expectedTrainDurations = (
                     expectedOffsetTimestamps.values -
@@ -512,9 +505,9 @@ def getINSStimOnset(
                     expectedOnsetTimestamps.values)
 
             newExpectedOffsetTimestamps = hf.closestSeries(
-                theseOnsetTimestamps + expectedTrainDurations, tdDF['t'])
+                theseOnsetTimestamps + expectedTrainDurations, tdSeg['t'])
             expectedOffsetIdx = np.array(
-                tdDF['t'].loc[tdDF['t'].isin(newExpectedOffsetTimestamps.values)].index)
+                tdSeg['t'].loc[tdSeg['t'].isin(newExpectedOffsetTimestamps.values)].index)
         else:
             expectedOffsetIdx = np.array(expectedOffsetIdx)
         #  double check that we don't look overboard
@@ -525,10 +518,10 @@ def getINSStimOnset(
             offsetDifferenceFromLogged,
             anomalyOccured, originalOffsetIdx, correctionFactorOffset,
             offsetDetectSignalFull, currentThresh) = extractArtifactTimestamps(
-                tdSeg, tdDF, ROIMaskOffset,
+                tdSeg.drop(columns='t'), tdDF, ROIMaskOffset,
                 fs, gaussWid,
                 stimRate=stimRate,
-                closeThres=ROIPadding,
+                closeThres=gaussWid,
                 expectedIdx=expectedOffsetIdx,
                 enhanceEdges=True,
                 enhanceExpected=True,
@@ -587,6 +580,7 @@ def getINSStimOnset(
             print('{}'.format(onsetIdx))
 
             fig, ax = plt.subplots(3, 1, sharex=True)
+            '''
             if accelDF is not None:
                 plotMaskAccel = (accelDF['t'] > tStart) & (
                     accelDF['t'] < tStop)
@@ -595,6 +589,7 @@ def getINSStimOnset(
                     stats.zscore(
                         accelDF.loc[plotMaskAccel, 'ins_accinertia']),
                     '-', label='inertia')
+            '''
             for channelName in theseDetectOpts['detectChannels']:
                 ax[0].plot(
                     tdDF['t'].loc[plotMaskTD],
@@ -797,7 +792,7 @@ def extractArtifactTimestamps(
         minDist=None, theseDetectOpts=None,
         maxSpikesPerGroup=None,
         fixedDelayIdx=None, delayByFreqIdx=None,
-        keep_what=None, plotDetection=False
+        keep_what=None, plotDetection=False, plotKernel=False
         ):
 
     '''
@@ -807,34 +802,57 @@ def extractArtifactTimestamps(
         highOrder=5, notch=True)
     tdPow = tdPow.abs().sum(axis=1)
     '''
-    tdPow = tdSeg.abs().sum(axis=1)
     if plotDetection:
-        plt.plot(tdPow, 'b-', label='filtered signal')
+        for colName, tdCol in tdSeg.iteritems():
+            plt.plot(
+                tdCol.values,
+                'b-', label='original signal {}'.format(colName))
     # convolve with a future facing kernel
     if enhanceEdges:
-        correctionFactor = (
-            hf.noisyTriggerCorrection(
-                tdPow, fs, gaussWid, order=3))
-        if plotDetection:
-            plt.plot(correctionFactor, 'k-', label='edge enhancer')
+        edgeEnhancer = pd.Series(0, index=tdSeg.index)
+        for colName, tdCol in tdSeg.iteritems():
+            thisEdgeEnhancer = (
+                hf.noisyTriggerCorrection(
+                    tdCol, fs, gaussWid, order=2, plotKernel=plotKernel))
+            edgeEnhancer += thisEdgeEnhancer
+            if plotDetection:
+                plt.plot(
+                    thisEdgeEnhancer,
+                    'k-', label='edge enhancer {}'.format(colName))
+        
+        edgeEnhancer = pd.Series(
+            MinMaxScaler(feature_range=(1e-2, 1))
+            .fit_transform(edgeEnhancer.values.reshape(-1, 1))
+            .squeeze(),
+            index=tdSeg.index)
     else:
-        correctionFactor = pd.Series(
-            (tdPow**0).values, index=tdPow.index)
+        edgeEnhancer = pd.Series(
+            1, index=tdSeg.index)
+    
+    if plotDetection:
+        plt.plot(
+            edgeEnhancer.values,
+            'k-', label='final edge enhancer')
     
     if enhanceExpected:
         assert expectedIdx is not None
-        support = hf.gaussianSupport(
-            tdPow, expectedIdx, gaussWid, fs)
-        correctionFactor = correctionFactor**3 * support
-        correctionFactor = correctionFactor - correctionFactor.min()
-        correctionFactor = correctionFactor / correctionFactor.max() + 1e-2
+        expectedEnhancer = hf.gaussianSupport(
+            tdSeg, expectedIdx, gaussWid, fs)
+        #  pdb.set_trace()
+        correctionFactor = edgeEnhancer * expectedEnhancer
+        correctionFactor = pd.Series(
+            MinMaxScaler(feature_range=(1e-2, 1))
+            .fit_transform(correctionFactor.values.reshape(-1, 1))
+            .squeeze(),
+            index=tdSeg.index)
         if plotDetection:
-            plt.plot(support, 'k--', label='expected enhancer')
+            plt.plot(expectedEnhancer.values, 'k--', label='expected enhancer')
 
+    tdPow = tdSeg.abs().sum(axis=1)
     detectSignalFull = hf.enhanceNoisyTriggers(
         tdPow, correctionFactor)
     if plotDetection:
-        plt.plot(detectSignalFull, 'g-', label='detect signal')
+        plt.plot(detectSignalFull.values, 'g-', label='detect signal')
     detectSignal = detectSignalFull.loc[ROIMask]
     
     #  threshold proportional to amplitude

@@ -138,6 +138,56 @@ def spikeTrainsToSpikeDict(
     return spikes
 
 
+def channelIndexesToSpikeDict(
+        channel_indexes):
+    nCh = len(channel_indexes)
+    spikes = {
+        'ChannelID': [i for i in range(nCh)],
+        'Classification': [np.array([]) for i in range(nCh)],
+        'NEUEVWAV_HeaderIndices': [None for i in range(nCh)],
+        'TimeStamps': [np.array([]) for i in range(nCh)],
+        'Units': 'uV',
+        'Waveforms': [np.array([]) for i in range(nCh)],
+        'basic_headers': {'TimeStampResolution': 3e4},
+        'extended_headers': []
+        }
+    
+    maxUnit = 0
+    for idx, chIdx in enumerate(channel_indexes):
+        spikes['ChannelID'][idx] = chIdx.name
+        for unitIdx, thisUnit in enumerate(chIdx.units):
+            for stIdx, st in enumerate(thisUnit.spiketrains):
+                if len(spikes['TimeStamps'][idx]):
+                    spikes['TimeStamps'][idx] = np.concatenate((
+                        spikes['TimeStamps'][idx],
+                        st.times.magnitude), axis=0)
+                    
+                else:
+                    spikes['TimeStamps'][idx] = st.times.magnitude
+
+                theseWaveforms = np.swapaxes(
+                    st.waveforms, 1, 2)
+                theseWaveforms = np.atleast_2d(np.squeeze(
+                    theseWaveforms))
+
+                if len(spikes['Waveforms'][idx]):
+                    spikes['Waveforms'][idx] = np.concatenate((
+                        spikes['Waveforms'][idx],
+                        theseWaveforms.magnitude), axis=0)
+                else:
+                    spikes['Waveforms'][idx] = theseWaveforms.magnitude
+
+                classVals = st.times.magnitude ** 0 * maxUnit
+                maxUnit += 1
+                if len(spikes['Classification'][idx]):
+                    spikes['Classification'][idx] = np.concatenate((
+                        spikes['Classification'][idx],
+                        classVals), axis=0)
+                else:
+                    spikes['Classification'][idx] = classVals
+    return spikes
+
+
 def spikeTrainArrayAnnToDF(
         spiketrains):
     fullAnnotationsDict = {}
@@ -159,6 +209,7 @@ def spikeTrainWaveformsToDF(
         annDict = {
             k: pd.Series(v)
             for k, v in st.array_annotations.items()}
+        annDict.update({'t': pd.Series(st.times.magnitude)})
         annDF = pd.concat(annDict, axis=1).reset_index()
         fullDF = pd.concat([wfDF, annDF], axis=1)
         fullDF.set_index(annDF.columns.tolist(), inplace=True)
@@ -225,12 +276,12 @@ def analogSignalsAlignedToEvents(
         newSeg.annotate(nix_name=signalSeg.annotations['neo_name'])
         masterBlock.segments.append(newSeg)
 
-        alignEvents = [
+        alignEvents = ([
             i.load()
             for i in eventSeg.filter(
-                objects=EventProxy, name=eventName)]
+                objects=EventProxy, name=eventName)] +
+            eventSeg.filter(objects=Event))
         alignEvents = loadContainerArrayAnn(trainList=alignEvents)[0]
-
         for chanName in chansToTrigger:
             print('extracting channel {}'.format(chanName))
             asigP = signalSeg.filter(
@@ -252,6 +303,11 @@ def analogSignalsAlignedToEvents(
                         in da[asigP._global_channel_indexes[0]].name)
                 except Exception:
                     traceback.print_exc()
+            validMask = (
+                ((alignEvents + windowSize[1]) < asigP.t_stop) &
+                ((alignEvents + windowSize[0]) > asigP.t_start)
+                )
+            alignEvents = alignEvents[validMask]
             rawWaveforms = [
                 asigP.load(time_slice=(t + windowSize[0], t + windowSize[1]))
                 for t in alignEvents]
@@ -288,9 +344,11 @@ def analogSignalsAlignedToEvents(
             thisUnit.spiketrains.append(st)
             newSeg.spiketrains.append(st)
             st.unit = thisUnit
-
-    eventBlock.filter(
-        objects=EventProxy)[0]._rawio.file.close()
+    try:
+        eventBlock.filter(
+            objects=EventProxy)[0]._rawio.file.close()
+    except Exception:
+        traceback.print_exc()
     if signalBlock is not eventBlock:
         signalBlock.filter(
             objects=AnalogSignalProxy)[0]._rawio.file.close()
@@ -1123,11 +1181,18 @@ def blockToNix(
                         print('writing spiketrains mem usage: {}'.format(
                             hf.memory_usage_psutil()))
                     unit = stProxy.unit
-                    
-                    st = stProxy.load(
-                        time_slice=(tStart, tStop),
-                        magnitude_mode='rescaled',
-                        load_waveforms=True)
+                    try:
+                        st = stProxy.load(
+                            time_slice=(tStart, tStop),
+                            magnitude_mode='rescaled',
+                            load_waveforms=True)
+                    except Exception:
+                        st = stProxy.load(
+                            time_slice=(tStart, tStop),
+                            magnitude_mode='rescaled',
+                            load_waveforms=False)
+                        st.waveforms = np.array([]).reshape((0, 0, 0))*pq.mV
+
                     st.annotate(fromNSP=True)
                     #  !!! TODO, mark by origin (utah, nForm, ainp)
 

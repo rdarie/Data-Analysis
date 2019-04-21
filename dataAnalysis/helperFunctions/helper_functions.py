@@ -38,7 +38,7 @@ from neo.io.proxyobjects import (
 from sklearn.model_selection import StratifiedKFold, GridSearchCV, learning_curve
 from sklearn.metrics import roc_auc_score, make_scorer, f1_score, classification_report
 from sklearn.linear_model import LogisticRegression
-from sklearn.preprocessing import LabelBinarizer
+from sklearn.preprocessing import LabelBinarizer, MinMaxScaler
 import sklearn.pipeline
 from sklearn.feature_selection import RFE, RFECV
 
@@ -1114,7 +1114,14 @@ def synchronizeINStoNSP(
     if insBlock is not None:
         allUnits = [st.unit for st in insBlock.segments[0].spiketrains]
         for unit in allUnits:
+                tStart = NSPTimeRanges[0]
+                tStop = NSPTimeRanges[1]
+                uniqueSt = []
                 for st in unit.spiketrains:
+                    if st not in uniqueSt:
+                        uniqueSt.append(st)
+                    else:
+                        continue
                     if len(st.times):
                         segMask = np.array(
                             st.annotations['trialSegments'],
@@ -1122,13 +1129,18 @@ def synchronizeINStoNSP(
                         st.magnitude[segMask] = (
                             timeInterpFunINStoNSP(st.times[segMask]))
                         #  kludgey fix for weirdness concerning t_start
-                        st.t_start = pq.s * (
-                            min(np.min(st.times.magnitude), NSPTimeRanges[0]) - 500)
-                        st.t_stop = pq.s * (
-                            max(np.max(st.times.magnitude), NSPTimeRanges[1]) + 500)
+                        st.t_start = min(tStart, st.times[0] * 0.999)
+                        st.t_stop = min(tStop, st.times[-1] * 1.001)
+                        validMask = st < st.t_stop
+                        if ~validMask.all():
+                            print('Deleted some spikes')
+                            st = st[validMask]
+                            if 'arrayAnnNames' in st.annotations.keys():
+                                for key in st.annotations['arrayAnnNames']:
+                                    st.annotations[key] = np.array(st.annotations[key])[validMask]          
                     else:
-                        st.t_start = pq.s * (NSPTimeRanges[0] - 500)
-                        st.t_stop = pq.s * (NSPTimeRanges[1] + 500)
+                        st.t_start = tStart
+                        st.t_stop = tStop
         #  pdb.set_trace()
         allEvents = insBlock.filter(objects=Event)
         eventsDF = eventsToDataFrame(allEvents, idxT='t')
@@ -1261,11 +1273,12 @@ def extractSignalsFromBlock(
     newBlock.create_relationship()
     return newBlock
 
+
 def getHUTtoINSSyncFun(
         timeSyncData,
         degree=1, plotting=False,
         trialSegments=None,
-        syncTo='PacketGenTime'
+        syncTo='HostUnixTime'
         ):
     if trialSegments is None:
         trialSegments = pd.unique(timeSyncData['trialSegment'])
@@ -1375,7 +1388,6 @@ def stimStatusSerialtoLong(
         stimStSer, idxT='t', namePrefix='ins_', expandCols=[],
         deriveCols=[], progAmpNames=[], dropDuplicates=True):
     
-    
     fullExpandCols = copy(expandCols)
     #  fixes issue with 'program' and 'amplitude' showing up unrequested
     if 'program' not in expandCols:
@@ -1393,6 +1405,8 @@ def stimStatusSerialtoLong(
         pMask = stimStSer[namePrefix + 'property'] == pName
         pValues = stimStSer.loc[pMask, namePrefix + 'value']
         stimStLong.loc[pMask, pName] = pValues
+        if pName == 'movement':
+            stimStLong[pName].iloc[0] = 0
         stimStLong[pName].fillna(
             method='ffill', inplace=True)
         stimStLong[pName].fillna(
@@ -1441,6 +1455,17 @@ def stimStatusSerialtoLong(
     if 'amplitude' in deriveCols:
         stimStLong['amplitude'] = (
             stimStLong[progAmpNames].sum(axis=1))
+    if 'amplitudeCat' in deriveCols:
+        ampsForSum = copy(stimStLong[progAmpNames])
+        for colName in ampsForSum.columns:
+            if ampsForSum[colName].max() > 0:
+                ampsForSum[colName] = pd.cut(
+                    ampsForSum[colName], bins=4, labels=False)
+            else:
+                ampsForSum[colName] = pd.cut(ampsForSum[colName], bins=1, labels=False)
+        
+        stimStLong['amplitudeCat'] = (
+            ampsForSum.sum(axis=1))
     if debugPlot:
         stimStLong.loc[:, ['program'] + progAmpNames].plot()
         (10 * stimStLong['amplitudeRound'] / (stimStLong['amplitudeRound'].max())).plot()
@@ -1515,21 +1540,22 @@ def gaussianSupport(tdSeg, peakIdx, gaussWid, fs):
     gaussKern = signal.gaussian(
         kernNSamp, kernNSamp/6)
 
-    gaussKern = gaussKern - np.min(gaussKern)
-    gaussKern = gaussKern / np.max(gaussKern)
-
     support = pd.Series(0, index=tdSeg.index)
     support.loc[peakIdx] = 1
     support.iloc[:] = np.convolve(
         support.values,
         gaussKern, mode='same'
         )
-    support = support + 1e-2
+    support = pd.Series(
+        MinMaxScaler(feature_range=(1e-2, 1))
+        .fit_transform(support.values.reshape(-1, 1))
+        .squeeze(),
+        index=support.index)
     return support
 
 
 def noisyTriggerCorrection(
-    tdSeries, fs, kernDur, order=1, invert=False):
+    tdSeries, fs, kernDur, order=1, invert=False, plotKernel=False):
     kernNSamp = int(kernDur * fs)
     if kernNSamp > len(tdSeries):
         kernNSamp = round(len(tdSeries) - 2)
@@ -1543,13 +1569,14 @@ def noisyTriggerCorrection(
             kern += np.diff(gaussKern)
     
     if invert: kern = -kern
-        
-    correctionFactor = pd.Series(
+    if plotKernel: plt.plot(kern); plt.show()
+
+    correctionFactorUncorrected = pd.Series(
         np.convolve(kern, tdSeries, mode='same'),
         index=tdSeries.index)
-        
-    correctionFactor = correctionFactor - correctionFactor.min()
-    correctionFactor = (correctionFactor / correctionFactor.max()) + 1e-2
+    correctionFactor = np.abs(
+        stats.zscore(
+            correctionFactorUncorrected))
     return correctionFactor
 
 
@@ -1921,9 +1948,15 @@ def getTriggers(dataSeries, iti = .01, fs = 3e4, thres = 2.58,
     elif edgeType == 'both':
         triggersPrime = triggersPrime.abs()
     # moments when camera capture occured (iloc style indexes!)
+    if keep_max:
+        keep_what='max'
+    else:
+        keep_what='first'
+    
     triggersPrimeVals = triggersPrime.values.squeeze()
-    peakIdx = peakutils.indexes(triggersPrimeVals, thres=thres,
-        min_dist=width, thres_abs=True, keep_max = keep_max)
+    peakIdx = peakutils.indexes(
+        triggersPrimeVals, thres=thres,
+        min_dist=width, thres_abs=True, keep_what=keep_what)
     
     if minAmp is not None:
         #  pdb.set_trace()

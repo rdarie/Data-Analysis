@@ -13,18 +13,25 @@ from seaborn.relational import _ScatterPlotter, _LinePlotter
 
 
 def getRasterFacetIdx(
-        plotDF, y, row=None, col=None):
+        plotDF, y, row=None, col=None, hue=None):
     plotDF.loc[:, y + '_facetIdx'] = np.nan
     dummyG = sns.FacetGrid(
         plotDF,
         row=row, col=col)
     for name, group in dummyG.facet_data():
-        uniqueIdx = pd.unique(group[y])
-        idxLookup = {
-            uIdx: idx
-            for idx, uIdx in enumerate(uniqueIdx)}
-        plotDF.loc[group.index, y + '_facetIdx'] = (
-            group[y].map(idxLookup))
+        if hue is None:
+            subGroupBy = 'feature'
+        else:
+            subGroupBy = hue
+        idxOffset = 0
+        for subName, subGroup in group.groupby(subGroupBy):
+            uniqueIdx = pd.unique(group[y])
+            idxLookup = {
+                uIdx: idx + idxOffset
+                for idx, uIdx in enumerate(uniqueIdx)}
+            plotDF.loc[group.index, y + '_facetIdx'] = (
+                group[y].map(idxLookup))
+            idxOffset += uniqueIdx.shape[0]
     return plotDF
 
 

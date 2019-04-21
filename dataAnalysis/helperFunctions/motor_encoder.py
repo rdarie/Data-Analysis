@@ -403,7 +403,7 @@ def getTrialsNew(motorData, fs, tStart, trialType = '2AFC'):
         peakIdx = peakutils.indexes(
             detectSignal.values, thres=30,
             min_dist=int(minDist * fs), thres_abs=True,
-            keep_max=True)
+            keep_what='max')
         #  this catches both edges, skip every other one
         peakIdx = tdSeries.index[peakIdx[::2]]
         for thisIdx in peakIdx:
@@ -422,7 +422,7 @@ def getTrialsNew(motorData, fs, tStart, trialType = '2AFC'):
     peakIdx = peakutils.indexes(
         detectSignal.abs().values, thres=0.5,
         min_dist=int(fs*minDist),
-        thres_abs=True, keep_max = False)
+        thres_abs=True, keep_what='max')
     #  first pedal movement just gets it into position, discard,
     #  then return to indexes into the dataframe
     peakIdx = detectSignal.index[peakIdx[2:]]
@@ -452,7 +452,7 @@ def getTrialsNew(motorData, fs, tStart, trialType = '2AFC'):
     if trialType == '2AFC':
         #  !!!! TODO: changes to how we calculate movement break this, because we now track
         #  move on and move off 4 times a trial (to and back)
-        pdb.set_trace()
+        #  pdb.set_trace()
         while not (trialEvents.loc[:3,'Label'].str.contains('movement').all()) or trialEvents.loc[4:4,'Label'].str.contains('movement').all():
             #above expression is not true if the first 5 events do not make up a complete sequence
             #pdb.set_trace()
@@ -552,6 +552,7 @@ def getTrialsNew(motorData, fs, tStart, trialType = '2AFC'):
 
                 trialStats.loc[idx, 'Type'] = 0 if abs(trialStats.loc[idx, 'First']) < abs(trialStats.loc[idx, 'Second']) else 1
                 trialStats.loc[idx, 'Stimulus Duration'] = secondOffsetTime - firstOnsetTime
+            
             except Exception:
                 traceback.print_exc()
                 print('Error detected while calculating TrialStats!')
