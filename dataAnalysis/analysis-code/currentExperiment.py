@@ -1,8 +1,8 @@
-from exp201901271000 import *
+from exp201901261000 import *
 import os
 rasterOpts = {
-    'binInterval': 1e-3, 'binWidth': 26e-3,
-    'windowSize': (-.6, .6),
+    'binInterval': 1e-3, 'binWidth': 30e-3,
+    'windowSize': (-5, 5),
     'discardEmpty': None, 'maxSpikesTo': None, 'timeRange': None,
     'separateByFunArgs': None,
     'alignTo': None,

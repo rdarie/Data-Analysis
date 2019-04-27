@@ -43,14 +43,14 @@ if arguments['--trialIdx']:
             'detectStim': True,
             'getINSkwargs': {
                 'stimDetectOpts': stimDetectOpts,
-                'fixedDelay': 30e-3,
-                'delayByFreqMult': .5,
+                'fixedDelay': 0e-3,
+                'delayByFreqMult': 1,
                 'gaussWid': 100e-3,
                 'minDist': 0.2, 'minDur': 0.2,
                 'cyclePeriodCorrection': 17.5e-3,
                 'plotAnomalies': True,
                 'recalculateExpectedOffsets': False,
-                'maxSpikesPerGroup': 1, 'plotting': range(1, 1000, 5) # range(1, 1000, 5)
+                'maxSpikesPerGroup': 1, 'plotting': [] # range(1, 1000, 5)
                 }
             }
         }

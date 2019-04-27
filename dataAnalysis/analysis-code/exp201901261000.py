@@ -7,8 +7,8 @@ miniRCTrial = True
 #  plottingFigures = True
 plottingFigures = False
 plotBlocking = True
-trialIdx = 5
-experimentName = '201901271000-Proprio'
+trialIdx = 4
+experimentName = '201901261000-Proprio'
 deviceName = 'DeviceNPC700373H'
 #  remote paths
 remoteBasePath = '..'
@@ -18,108 +18,35 @@ nspFolder = os.path.join(remoteBasePath, 'raw', experimentName)
 ns5FileName = 'Trial00{}'.format(trialIdx)
 
 jsonSessionNames = {
-    #  per trial
-    1: ['Session1548605159361', 'Session1548605586940'],
-    2: ['Session1548606783930'],
-    3: ['Session1548608122565'],
-    4: ['Session1548609521574'],
-    5: ['Session1548611405556']
+    4: ['Session1548524126669'],
     }
 
 tapDetectOpts = {}
-tapDetectOpts[1] = {
-    #  per trialSegment
-    0: {
-        'timeRanges': [(14, 16)],
-        'tdChan': 'ins_td0',
-        'tdThres': 2,
-        'iti': 0.2,
-        'keepIndex': slice(None, 2)
-        },
-    1: {
-        'timeRanges': [(448, 450)],
-        'tdChan': 'ins_td0',
-        'tdThres': 2,
-        'iti': 0.2,
-        'keepIndex': slice(1, None)
-        }
-    }
-tapDetectOpts[2] = {
-    #  per trialSegment
-    0: {
-        'timeRanges': [(18, 20)],
-        'tdChan': 'ins_td0',
-        'tdThres': 2.5,
-        'iti': 0.2,
-        'keepIndex': slice(1, None)
-        }
-    }
-tapDetectOpts[3] = {
-    #  per trialSegment
-    0: {
-        'timeRanges': [(20, 22)],
-        'tdChan': 'ins_td0',
-        'tdThres': 2.5,
-        'iti': 0.2,
-        'keepIndex': slice(None)
-        }
-    }
 tapDetectOpts[4] = {
     #  per trialSegment
     0: {
-        'timeRanges': [(21, 24)],
-        'tdChan': 'ins_td0',
+        'timeRanges': [(15, 17)],
+        'tdChan': 'ins_td3',
         'tdThres': 2.5,
         'iti': 0.2,
-        'keepIndex': slice(None)
-        }
-    }
-tapDetectOpts[5] = {
-    #  per trialSegment
-    0: {
-        'timeRanges': [(22, 25)],
-        'tdChan': 'ins_td0',
-        'tdThres': 2.5,
-        'iti': 0.2,
-        'keepIndex': slice(None)
+        'keepIndex': slice(1, None)
         }
     }
 
 sessionTapRangesNSP = {
     #  per trialSegment
-    1: {
-        0: {'timeRanges': [212, 214], 'keepIndex': slice(None, 2)},
-        1: {'timeRanges': [647, 649], 'keepIndex': slice(1, None)}
-        },
-    2: {
-        0: {'timeRanges': [203, 205], 'keepIndex': slice(1, None)}
-        },
-    3: {
-        0: {'timeRanges': [105, 107], 'keepIndex': slice(None)}
-        },
     4: {
-        0: {'timeRanges': [140, 144], 'keepIndex': slice(None)}
-        },
-    5: {
-        0: {'timeRanges': [145, 148], 'keepIndex': slice(None)}
+        0: {'timeRanges': [938, 940], 'keepIndex': slice(None)}
         }
     }
 
 interpFunINStoNSP = {
     #  per trial
-    1: [None, None],
-    2: [None],
-    3: [None],
     4: [None],
-    5: [None]
     }
 interpFunHUTtoINS = {
     #  per trial
-    1: [None, None],
-    2: [None],
-    3: [None],
-    4: [None],
-    5: [None]
+    4: [None]
     }
 
 #  should rename to something more intuitive
@@ -155,12 +82,12 @@ trialFilesFrom = {
 trialFilesFrom['utah'].update(dict(eventInfo=eventInfo))
 
 #  get stim onset times (one set of params per program, assuming only group 0)
-stimDetectOpts = {0: {
-    0: {'detectChannels': ['ins_td0', 'ins_td2'], 'thres': 1},
-    1: {'detectChannels': ['ins_td0', 'ins_td2'], 'thres': 1},
-    2: {'detectChannels': ['ins_td0', 'ins_td2'], 'thres': 1},
-    3: {'detectChannels': ['ins_td0', 'ins_td2'], 'thres': 1}
-    }}
+stimDetectOpts = {grpIdx: {
+    0: {'detectChannels': ['ins_td2'], 'thres': 1},
+    1: {'detectChannels': ['ins_td2'], 'thres': 1},
+    2: {'detectChannels': ['ins_td2'], 'thres': 1},
+    3: {'detectChannels': ['ins_td2'], 'thres': 1}
+    } for grpIdx in range(4)}
 
 trialFilesStim = {
     'ins': {
@@ -250,7 +177,7 @@ figureFolder = os.path.join(
     )
 rasterOpts = {
     'binInterval': 1e-3, 'binWidth': 30e-3,
-    'windowSize': (-.5, .5),
+    'windowSize': (-5, 5),
     'discardEmpty': None, 'maxSpikesTo': None, 'timeRange': None,
     'separateByFunArgs': None,
     'alignTo': None,

@@ -590,7 +590,7 @@ def plotISIHistogram(spikes, channel, showNow = False, ax = None,
             plt.show()
 
 #@profile
-def plotSpikePanel(spikeStruct, spikes, labelFontSize=LABELFONTSIZE, padOverride=5e-3):
+def plotSpikePanel(spikeStruct, spikes, labelFontSize=LABELFONTSIZE, padOverride=5e-3, colorPal="ch:2,-.1,dark=.3,light=0.7,reverse=1"):
     """
     sns.set_style("dark", {"axes.facecolor": ".9"})
     matplotlib.rc('xtick', labelsize=5)
@@ -614,7 +614,7 @@ def plotSpikePanel(spikeStruct, spikes, labelFontSize=LABELFONTSIZE, padOverride
     axHighLims[:] = np.nan
     axLowLims = np.empty(ax.shape)
     axLowLims[:] = np.nan
-    with sns.color_palette("ch:2,-.1,dark=.3,light=0.8,reverse=1", 4):
+    with sns.color_palette(colorPal, 3):
         for idx, channel in enumerate(spikes['ChannelID']):
             curAx = ax[xIdx[idx], yIdx[idx]]
             plotSpike(spikes, channel, ax=curAx)

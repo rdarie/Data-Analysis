@@ -25,13 +25,13 @@ def getRasterFacetIdx(
             subGroupBy = hue
         idxOffset = 0
         for subName, subGroup in group.groupby(subGroupBy):
-            uniqueIdx = pd.unique(group[y])
+            uniqueIdx = pd.unique(subGroup[y])
             idxLookup = {
                 uIdx: idx + idxOffset
                 for idx, uIdx in enumerate(uniqueIdx)}
-            plotDF.loc[group.index, y + '_facetIdx'] = (
-                group[y].map(idxLookup))
-            idxOffset += uniqueIdx.shape[0]
+            plotDF.loc[subGroup.index, y + '_facetIdx'] = (
+                subGroup[y].map(idxLookup))
+            idxOffset += subGroup[y].map(idxLookup).max()
     return plotDF
 
 
@@ -147,6 +147,12 @@ def twin_relplot(
     for i, axList in enumerate(g1.axes):
         for j, ax in enumerate(axList):
             twin_axes[i, j] = ax.twinx()
+
+    if 'sharey' in facet2_kws.keys():
+        if facet2_kws['sharey']:
+            flatAx = twin_axes.flat
+            for ax in flatAx[1:]:
+                flatAx[0].get_shared_y_axes().join(flatAx[0], ax)
 
     facet2_kws = {} if facet2_kws is None else facet2_kws
     data2 = data.query(query2) if query2 is not None else data

@@ -10,7 +10,7 @@ import dataAnalysis.preproc.ns5 as preproc
 import numpy as np
 import pandas as pd
 #  load options
-from currentExperiment import *
+from exp201901271000 import *
 import quantities as pq
 
 #  source of events
@@ -36,6 +36,6 @@ preproc.analogSignalsAlignedToEvents(
     chansToTrigger=chansToTrigger, eventName=eventName,
     windowSize=windowSize, appendToExisting=False,
     checkReferences=False,
-    fileName=experimentName + '_triggered',
+    fileName=experimentName + '_triggered2',
     folderPath=os.path.join(
         remoteBasePath, 'processed', experimentName))

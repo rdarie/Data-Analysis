@@ -35,7 +35,7 @@ fuzzyCateg = [
     'amplitude', 'amplitudeCat', 'program', 'RateInHz']
 availableCateg = [
     'pedalVelocityCat', 'pedalMovementCat',
-    'pedalSizeCat', 'pedalSize', 'pedalMovementDuration']
+    'pedalSizeCat', 'pedalMovementDuration']
 calcFromTD = [
     'stimOffset']
 signalsInAsig = [
@@ -179,7 +179,7 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
     tdDF.loc[
         stopMask & (tdDF['pedalVelocityCat'].shift(1) == 1),
         'pedalMovementCat'] = 'reachedBase'
-        
+    
     assert (
         (tdDF['pedalMovementCat'] == 'outbound').sum() ==
         (tdDF['pedalMovementCat'] == 'reachedBase').sum())
@@ -204,17 +204,8 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
     tdDF['pedalSize'].interpolate(method='nearest', inplace=True)
     tdDF['pedalSize'].fillna(method='ffill', inplace=True)
     tdDF['pedalSize'].fillna(method='bfill', inplace=True)
-    pdb.set_trace()
     #  plt.plot(tdDF['t'], tdDF['pedalSize'])
     #  plt.plot(tdDF['t'], tdDF['pedalPosition']); plt.show()
-    '''
-    import seaborn as sns
-    ax = sns.distplot(tdDF.loc[midPeakIdx, 'pedalPosition'])
-    plt.savefig(
-        os.path.join(
-            figureFolder, 'debugPedalSize.pdf'))
-    plt.close()
-    '''
     tdDF['pedalSizeCat'] = pd.cut(
         tdDF['pedalSize'], movementSizeBins,
         labels=['XL', 'L', 'M', 'S', 'XS'])
@@ -264,7 +255,6 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
     otherCategories['program'] = 999
     otherCategories['RateInHz'] = 999
     otherCategories['amplitude'] = 999
-    otherCategories['pedalSize'] = 0
     otherCategories['amplitudeCat'] = 999
     otherCategories['pedalSizeCat'] = 'Control'
     otherCategories['pedalMovementCat'] = 'Control'
@@ -304,6 +294,7 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
     plt.plot(tdDF['amplitudeCat'], label=colName)
     plt.show()
     '''
+    enablePlots=True
     for idx, tOnset in alignTimes.iteritems():
         moveCat = categories.loc[idx, 'pedalMovementCat']
         metaCat = categories.loc[idx, 'pedalMetaCat']
@@ -329,16 +320,23 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
                 fuzzyIdx = ampDiff[ampDiff['amplitude'] < 0].index[0] - 1
             else:
                 fuzzyIdx = tdDF.loc[tdMask, :].index[-1]
-            #  pdb.set_trace()
+            fixApplied=False
             for colName in fuzzyCateg:
                 nominalValue = categories.loc[idx, colName]
                 fuzzyValue = tdDF.loc[fuzzyIdx, colName]
                 if (nominalValue != fuzzyValue):
+                    fixApplied=True
                     categories.loc[idx, colName + 'Fuzzy'] = fuzzyValue
                     print('nominally, {} is {}'.format(colName, nominalValue))
                     print('changed it to {}'.format(fuzzyValue))
                 else:
                     categories.loc[idx, colName + 'Fuzzy'] = nominalValue
+            if enablePlots and fixApplied:
+                for colName in fuzzyCateg:
+                    plt.plot(tdDF.loc[tdMask, 't'],tdDF.loc[tdMask, colName], label=colName)
+                plt.legend()
+                plt.show()
+            pdb.set_trace()
         elif metaCat == 'rest':
             for colName in fuzzyCateg:
                 categories.loc[idx, colName + 'Fuzzy'] = 999
@@ -382,7 +380,7 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
     alignEvents = preproc.eventDataFrameToEvents(
         alignEventsDF, idxT='t',
         annCol=None,
-        eventName='seg{}_alignTimes'.format(segIdx), tUnits=pq.s,
+        eventName='seg{}_alignTimesFixed'.format(segIdx), tUnits=pq.s,
         makeList=False)
     
     alignEvents.annotate(nix_name=alignEvents.name)

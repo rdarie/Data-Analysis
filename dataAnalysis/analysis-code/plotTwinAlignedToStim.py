@@ -20,7 +20,7 @@ import quantities as pq
 sns.set_style("whitegrid")
 sns.set_context("talk")
 dataBlock = preproc.loadWithArrayAnn(
-    experimentTriggeredPath)
+    trialTriggeredPath)
 
 unitNames = np.unique([
     i.name
@@ -30,10 +30,12 @@ rasterToPlot = [
     i
     for i in unitNames
     if '_raster' in i]
+
 continuousToPlot = [
     i
     for i in unitNames
     if '_fr' in i]
+    
 signalToPlot = [
     i[:-3]
     for i in unitNames
@@ -95,7 +97,7 @@ for rasterName, continuousName in zip(rasterToPlot, continuousToPlot):
     
     asp.getRasterFacetIdx(
         plotDF, 'index',
-        col='pedalMovementCat', row='program')
+        col='pedalMovementCat', row='program', hue='amplitudeFuzzy')
     
     g = asp.twin_relplot(
         x='bin',
@@ -108,10 +110,10 @@ for rasterName, continuousName in zip(rasterToPlot, continuousToPlot):
         height=5, aspect=1.5, kind1='scatter', kind2='line', data=plotDF)
     
     plt.suptitle(dataQuery)
-    #  plt.show()
+    plt.show()
     #  block=False
     #  plt.pause(3)
-    g.fig.savefig(
-        os.path.join(
-            alignedRastersFolder, '{}.pdf'.format(rasterName)))
-    plt.close(g.fig)
+    #  g.fig.savefig(
+    #      os.path.join(
+    #          alignedRastersFolder, '{}.pdf'.format(rasterName)))
+    #  plt.close(g.fig)

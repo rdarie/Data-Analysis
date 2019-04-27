@@ -58,12 +58,22 @@ annotationsDF.reset_index(inplace=True)
 for name, group in annotationsDF.groupby('name'):
     print('{}, {}'.format(name, pd.unique(group['amplitudes'])))
 dataQuery = ' & '.join([
-     '(amplitudes >= 700)'
+     '(amplitudes >= 600)'
     ])
 g = sns.catplot(
     x='amplitudes', y='offsetFromLogged',
     hue='rates', col='name', kind='box',
-    data=annotationsDF)
+    data=annotationsDF.query(dataQuery))
+plt.show()
+g = sns.catplot(
+    x='amplitudes', y='offsetFromExpected',
+    hue='rates', col='name', kind='box',
+    data=annotationsDF.query(dataQuery))
+plt.show()
+g = sns.catplot(
+    x='amplitudes', y='offsetFromExpected',
+    hue='rates', kind='box',
+    data=annotationsDF.query(dataQuery))
 plt.show()
 g = sns.lmplot(
     x='rates', y='offsetFromLogged',
@@ -77,11 +87,11 @@ g = sns.lmplot(
 plt.show()
 g = sns.regplot(
     x='rates', y='offsetFromLogged',
-    data=annotationsDF)
+    data=annotationsDF.query(dataQuery))
 plt.show()
 g = sns.regplot(
     x='rates', y='offsetFromExpected',
-    data=annotationsDF)
+    data=annotationsDF.query(dataQuery))
 plt.show()
 
 plotDF = pd.melt(
@@ -95,7 +105,7 @@ for name, group in plotDF.groupby('name'):
     print('{}, {}'.format(name, pd.unique(group['amplitudes'])))
 
 dataQuery = ' & '.join([
-     '(amplitudes > 600)',
+     '(amplitudes >= 600)',
      'measuredFrom == \'offsetFromExpected\''
     ])
 
@@ -134,6 +144,15 @@ plt.show()
 g = sns.FacetGrid(
     plotDF,
     row='measuredFrom', hue='amplitudes', aspect=1.5)
+g.map(annotated_distplot, 'offset')
+for ax in g.axes.flat:
+    ax.legend()
+plt.suptitle(ns5FileName)
+plt.show()
+
+g = sns.FacetGrid(
+    plotDF,
+    row='measuredFrom', aspect=1.5)
 g.map(annotated_distplot, 'offset')
 for ax in g.axes.flat:
     ax.legend()

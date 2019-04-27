@@ -84,7 +84,16 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
     for st in dataSeg.filter(objects=SpikeTrain):
         if len(st.times):
             st.t_start = min(tStart, st.times[0] * 0.999)
-            st.t_stop = max(tStop, st.times[-1] * 1.001)
+            st.t_stop = min(tStop, st.times[-1] * 1.001)
+            validMask = st < st.t_stop
+            if ~validMask.all():
+                print('Deleted some spikes')
+                st = st[validMask]
+                for key in st.array_annotations.keys():
+                    st.array_annotations[key] = st.array_annotations[key][validMask]
+                if 'arrayAnnNames' in st.annotations.keys():
+                    for key in st.annotations['arrayAnnNames']:
+                        st.annotations[key] = np.array(st.annotations[key])[validMask]
         else:
             st.t_start = tStart
             st.t_stop = tStop
@@ -155,9 +164,15 @@ spikeMatBlock = preproc.calcBinarizedArray(
     binnedSpikePath, saveToFile=True)
 
 #  save ins time series
-tdChanNames = [
-    i.name for i in nspBlock.filter(objects=AnalogSignalProxy)
-    if 'ins_td' in i.name] + ['seg0_position', 'seg0_velocityCat']
+if miniRCTrial:
+    tdChanNames = [
+        i.name for i in nspBlock.filter(objects=AnalogSignalProxy)
+        if 'ins_td' in i.name]
+else:
+    tdChanNames = [
+        i.name for i in nspBlock.filter(objects=AnalogSignalProxy)
+        if 'ins_td' in i.name] + ['seg0_position', 'seg0_velocityCat']
+
 tdBlock = hf.extractSignalsFromBlock(
     nspBlock, keepSpikes=False, keepSignals=tdChanNames)
 tdBlock = hf.loadBlockProxyObjects(tdBlock)
@@ -217,7 +232,7 @@ preproc.addBlockToNIX(
     nixBlockIdx=0, nixSegIdx=[0],
     )
 
-testSaveability = True
+#  testSaveability = True
 #  pdb.set_trace()
 #  for st in dataBlock.filter(objects=SpikeTrain): print('{}: t_start={}'.format(st.name, st.t_start))
 #  for st in insBlockJustSpikes.filter(objects=SpikeTrain): print('{}: t_start={}'.format(st.name, st.t_start))
