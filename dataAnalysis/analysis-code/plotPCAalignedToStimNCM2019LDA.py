@@ -40,6 +40,9 @@ continuousToPlot = [
     i
     for i in unitNames
     if '_fr' in i]
+#  continuousToPlot = continuousToPlot[:5]
+#  done extracting data
+pdb.set_trace()
     
 allAsig = []
 dataQueryTemplate = '&'.join([
@@ -49,8 +52,11 @@ dataQueryTemplate = '&'.join([
     ])
 
 for idx, unitName in enumerate(continuousToPlot):
+    print('Getting rasters for unit {}'.format(idx))
     asigWide, dataQuery = tempgca.getConditionAverages(dataBlock, unitName, dataQueryTemplate)
     allAsig.append(asigWide)
+#  done extracting data
+pdb.set_trace()
     
 allFeatures = np.hstack([
     i.values for i in allAsig])
@@ -72,6 +78,8 @@ trainTargets = trainTargets[subsetList].values
 
 estimator = Pipeline([('pca', PCA(n_components=int(len(trainTargets)/5))), ('lda', LDA())])
 estimator.fit(trainFeatures, trainTargets)
+#  done fitting estimator
+pdb.set_trace()
 
 nExamples = allTargets.value_counts().min()
 subsetList = []
@@ -108,13 +116,19 @@ palLookup = {
     start=0.1, rot=0.2, light=0.7, dark=0.3, reverse=False)}
 
 posDF = featuresDF.query('amplitudeCatFuzzy==0')
-nContourLevels = 10
+densityAlpha = 0.5
+markerAlpha = 0.75
+nContourLevels = 5
+ax = sns.scatterplot(
+    x='LD0', y='LD1', data=posDF,
+    linewidth=0, c=np.atleast_2d(palLookup[-1][4]), alpha=markerAlpha)
+
 ax = sns.kdeplot(
     posDF['LD0'], posDF['LD1'],
     n_levels=nContourLevels,
-    cmap=cmapLookup[-1],
-    shade=False, shade_lowest=False)
-'''
+    cmap=cmapLookup[-1], alpha=densityAlpha,
+    shade=True, shade_lowest=False)
+
 for name, group in posDF.groupby('pedalSizeCat'):
     plt.scatter(
         [group['LD0'].mean()], [group['LD1'].mean()],
@@ -122,36 +136,47 @@ for name, group in posDF.groupby('pedalSizeCat'):
         marker='+', label='size {}'.format(name))
 
 plt.legend()
-'''
 plt.savefig(os.path.join(figureFolder, 'motion_LDA.pdf'))
 plt.close()
+markerLookup = {'S': 's', 'M': 'o', 'L': 'X'}
 
-for name, group in featuresDF.groupby(['programFuzzy', 'pedalSizeCat']):
-    baselineDF = featuresDF.query(
-        '((programFuzzy==-1) & (amplitudeCatFuzzy==0) & (pedalSizeCat==\'{}\'))'.format(name[1])
-    )
-    testDF = group.query(
-        '(amplitudeCatFuzzy==3)'
-    )
+for name, group in featuresDF.groupby('programFuzzy'):
+    #baselineDF = featuresDF.query(
+    #    '((programFuzzy==-1) & (amplitudeCatFuzzy==0) & (pedalSizeCat==\'{}\'))'.format(name[1]))
+    ax = sns.scatterplot(
+        s=15, x='LD0', y='LD1', style='pedalSizeCat', data=posDF,
+        markers=markerLookup,
+        linewidth=0, c=np.atleast_2d(palLookup[-1][4]), alpha=markerAlpha, legend=False)
     ax = sns.kdeplot(
-        baselineDF['LD0'], baselineDF['LD1'],
+        posDF['LD0'], posDF['LD1'],
         cmap=cmapLookup[-1],
-        n_levels=nContourLevels,
-        shade=False, shade_lowest=False, label='baseline')
-    plt.scatter(
-        [baselineDF['LD0'].mean()], [baselineDF['LD1'].mean()],
-        s=30, c=np.atleast_2d(palLookup[-1][4]),
-        marker='+', label='size {}'.format(name))
+        n_levels=nContourLevels, alpha=densityAlpha,
+        shade=True, shade_lowest=False, label='baseline')
+    for subName, subGroup in posDF.groupby('pedalSizeCat'):
+        plt.scatter(
+            [subGroup['LD0'].mean()], [subGroup['LD1'].mean()],
+            s=30, c=np.atleast_2d(palLookup[-1][4]),
+            marker=markerLookup[subName], label='size {}'.format(subName))
+    # plot current observations
+    testDF = group.query(
+        '(amplitudeCatFuzzy==3)|(amplitudeCatFuzzy==2)')
+    ax = sns.scatterplot(
+        x='LD0', y='LD1', style='pedalSizeCat', data=testDF,
+        markers=markerLookup,
+        s=15, linewidth=0, c=np.atleast_2d(palLookup[name][4]),
+        alpha=markerAlpha, legend=False)
     ax = sns.kdeplot(
         testDF['LD0'], testDF['LD1'],
-        cmap=cmapLookup[name[0]],
-        n_levels=nContourLevels,
-        shade=False, shade_lowest=False, label='prg {}'.format(name))
-    plt.scatter(
-        [testDF['LD0'].mean()], [testDF['LD1'].mean()],
-        s=30, c=np.atleast_2d(palLookup[-1][4]),
-        marker='+', label='size {}'.format(name))
-
-    plt.legend()
-    plt.savefig(os.path.join(figureFolder, 'motionStim_LDA_{}.pdf'.format(name)))
+        cmap=cmapLookup[name],
+        n_levels=nContourLevels, alpha=densityAlpha,
+        shade=True, shade_lowest=False, label='stimulation')
+    for subName, subGroup in testDF.groupby('pedalSizeCat'):
+        plt.scatter(
+            [subGroup['LD0'].mean()], [subGroup['LD1'].mean()],
+            s=30, c=np.atleast_2d(palLookup[name][4]),
+            marker=markerLookup[subName])
+    lgd = plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+    plt.savefig(
+        os.path.join(figureFolder, 'motionStim_LDA_{}.pdf'.format(name)),
+        bbox_extra_artists=(lgd,), bbox_inches='tight')
     plt.close()
