@@ -13,8 +13,8 @@
 #SBATCH -J trial_assembly
 
 # Specify an output file
-#SBATCH -o ../batch_logs/assembler-o-%j.out
-#SBATCH -e ../batch_logs/assembler-e-%j.out
+#SBATCH -o ../batch_logs/%j-assembler.stdout
+#SBATCH -e ../batch_logs/%j-assembler.errout
 
 # Specify account details
 #SBATCH --account=bibs-dborton-condo

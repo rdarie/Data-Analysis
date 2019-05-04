@@ -8,14 +8,14 @@
 # Use more memory (32GB):
 #SBATCH --nodes=1
 #SBATCH --mem=32G
-#SBATCH --array=1,2,3,4
+#SBATCH --array=5
 
 # Specify a job name:
 #SBATCH -J analysis_maker
 
 # Specify an output file
-#SBATCH -o ../batch_logs/anmaker-o-%j-%a.out
-#SBATCH -e ../batch_logs/anmaker-e-%j-%a.out
+#SBATCH -o ../batch_logs/%j-%a-anmaker.stdout
+#SBATCH -e ../batch_logs/%j-%a-anmaker.errout
 
 # Specify account details
 #SBATCH --account=bibs-dborton-condo

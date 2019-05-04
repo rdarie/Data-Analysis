@@ -31,7 +31,8 @@ def getRasterFacetIdx(
                 for idx, uIdx in enumerate(uniqueIdx)}
             plotDF.loc[subGroup.index, y + '_facetIdx'] = (
                 subGroup[y].map(idxLookup))
-            idxOffset += subGroup[y].map(idxLookup).max()
+            idxOffset += len(uniqueIdx)
+            #  plotDF[y + '_facetIdx'].unique()
     return plotDF
 
 

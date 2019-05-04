@@ -7,8 +7,8 @@
 
 # Use more memory (32GB):
 #SBATCH --nodes=1
-#SBATCH --mem=48G
-#SBATCH --array=1,2,3,4
+#SBATCH --mem=96G
+#SBATCH --array=4
 
 # Specify a job name:
 #SBATCH -J nsp_preproc

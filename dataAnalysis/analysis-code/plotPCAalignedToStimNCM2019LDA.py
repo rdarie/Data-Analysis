@@ -23,6 +23,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.decomposition import PCA
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
 import random
+
 sns.set()
 sns.set_color_codes("dark")
 sns.set_context("talk")
@@ -86,7 +87,6 @@ featuresDF = featuresDF.iloc[subsetList, :]
 featuresDF.reset_index(inplace=True)
 featuresDF.loc[featuresDF['amplitudeCatFuzzy']==0, 'programFuzzy'] = -1
 
-
 cmapLookup = {
     -1: sns.cubehelix_palette(
     start=0, rot=-0.2, light=0.7, dark=0.3, reverse=False, as_cmap=True),
@@ -138,11 +138,19 @@ for name, group in featuresDF.groupby(['programFuzzy', 'pedalSizeCat']):
         cmap=cmapLookup[-1],
         n_levels=nContourLevels,
         shade=False, shade_lowest=False, label='baseline')
+    plt.scatter(
+        [baselineDF['LD0'].mean()], [baselineDF['LD1'].mean()],
+        s=30, c=np.atleast_2d(palLookup[-1][4]),
+        marker='+', label='size {}'.format(name))
     ax = sns.kdeplot(
         testDF['LD0'], testDF['LD1'],
         cmap=cmapLookup[name[0]],
         n_levels=nContourLevels,
         shade=False, shade_lowest=False, label='prg {}'.format(name))
+    plt.scatter(
+        [testDF['LD0'].mean()], [testDF['LD1'].mean()],
+        s=30, c=np.atleast_2d(palLookup[-1][4]),
+        marker='+', label='size {}'.format(name))
 
     plt.legend()
     plt.savefig(os.path.join(figureFolder, 'motionStim_LDA_{}.pdf'.format(name)))

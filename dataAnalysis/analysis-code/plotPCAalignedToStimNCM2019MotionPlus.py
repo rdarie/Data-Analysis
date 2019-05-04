@@ -112,13 +112,13 @@ for idx, (rasterName, continuousName) in enumerate(zip(rasterToPlot, continuousT
             g = asp.twin_relplot(
                 x='bin',
                 y2='fr', y1='t_facetIdx',
-                query2=None, query1='(raster == 1000)',
+                query2='(amplitudeCatFuzzy==0)|(amplitudeCatFuzzy==3)', query1='(raster == 1000)',
                 hue='amplitudeCatFuzzy',
                 col='programFuzzy',
                 palette=colorPal,
                 func1_kws={'marker': '|', 'alpha': 0.6}, func2_kws={'ci': 'sem'},
                 facet1_kws={'sharey': False}, facet2_kws={'sharey': True},
-                height=5, aspect=1.5, kind1='scatter', kind2='line', data=raster.query('(amplitudeCatFuzzy==0)|(amplitudeCatFuzzy==3)'))
+                height=5, aspect=1.5, kind1='scatter', kind2='line', data=raster)
             for (ro, co, hu), dataSubset in g.facet_data():
                 progIdx = g.col_names[co]
                 thesePvals = elecPvals.query('programFuzzy=={}'.format(progIdx))

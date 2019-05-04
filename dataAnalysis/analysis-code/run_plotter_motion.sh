@@ -7,14 +7,14 @@
 
 # Request memory:
 #SBATCH --nodes=1
-#SBATCH --mem=128G
+#SBATCH --mem=64G
 
 # Specify a job name:
-#SBATCH -J plotsMotionPlus
+#SBATCH -J plotsMotion
 
 # Specify an output file
-#SBATCH -o ../batch_logs/%j-plotsMotionPlus.stdout
-#SBATCH -e ../batch_logs/%j-plotsMotionPlus.errout
+#SBATCH -o ../batch_logs/%j-plotsMotion.stdout
+#SBATCH -e ../batch_logs/%j-plotsMotion.errout
 
 # Specify account details
 #SBATCH --account=bibs-dborton-condo

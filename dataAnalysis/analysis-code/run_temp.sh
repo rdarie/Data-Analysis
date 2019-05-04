@@ -7,7 +7,7 @@
 
 # Request memory:
 #SBATCH --nodes=1
-#SBATCH --mem=48G
+#SBATCH --mem=96G
 
 # Specify a job name:
 #SBATCH -J batchAnalysis
@@ -19,11 +19,14 @@
 # Specify account details
 #SBATCH --account=bibs-dborton-condo
 
-python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcPCA.py'
-python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcAlignTimes.py'
+# python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/assembleExperimentData.py'
+
+# python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcFR.py'
+# python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcPCA.py'
+# python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcAlignTimes.py'
 
 python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcPCAalignedToStim.py'
 python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcRasterAlignedToStim.py'
 
-python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/plotPCAalignedToStim.py'
-python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/plotTwinAlignedToStim.py'
+#  python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/plotPCAalignedToStim.py'
+#  python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/plotTwinAlignedToStim.py'

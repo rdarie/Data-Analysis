@@ -7,11 +7,11 @@
 #SBATCH --nodes=48
 #SBATCH --tasks=48
 #SBATCH --tasks-per-node=1
-#SBATCH --mem=16G
+#SBATCH --mem=32G
 
 # Specify a job name:
 #SBATCH -J spike_sort
-#SBATCH --array=5
+#SBATCH --array=4
 
 # Specify an output file
 #SBATCH -o ../batch_logs/%j-%a-spike_sort-o.out
@@ -22,4 +22,4 @@
 
 # Run a command
 module load mpi
-srun --mpi=pmi2 ./tridesclousCCV.py --trialIdx=$SLURM_ARRAY_TASK_ID --attemptMPI --batchPeel --purgePeeler
+srun --mpi=pmi2 ./tridesclousCCV.py --trialIdx=$SLURM_ARRAY_TASK_ID --attemptMPI --batchPeel --purgePeeler --makeNeoBlock

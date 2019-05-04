@@ -13,8 +13,8 @@
 #SBATCH -J calcAlignTimes
 
 # Specify an output file
-#SBATCH -o ../batch_logs/calcAlignTimes-o-%j.out
-#SBATCH -e ../batch_logs/calcAlignTimes-e-%j.out
+#SBATCH -o ../batch_logs/%j-calcAlignTimes.stdout
+#SBATCH -e ../batch_logs/%j-calcAlignTimes.errout
 
 # Specify account details
 #SBATCH --account=bibs-dborton-condo
