@@ -100,19 +100,22 @@ for idx, (rasterName, continuousName) in enumerate(zip(rasterToPlot, continuousT
             plt.close()
             pdb.set_trace()
             '''
+        if elecPvals.stack().notna().any():
+            flatPvals = elecPvals.stack()
+            _, fixedPvals, _, _ = mt(flatPvals.values, method='holm')
+            flatPvals.loc[:] = fixedPvals
+            flatPvals = flatPvals.unstack('bin')
+            elecPvals.loc[flatPvals.index, flatPvals.columns] = flatPvals
 
-        flatPvals = elecPvals.stack()
-        _, fixedPvals, _, _ = mt(flatPvals.values, method='holm')
-        flatPvals.loc[:] = fixedPvals
-        flatPvals = flatPvals.unstack('bin')
-        elecPvals.loc[flatPvals.index, flatPvals.columns] = flatPvals
-
-        elecPvals.loc[:, elecPvals.columns < 800] = 1
-        elecPvals.interpolate(method='ffill', axis=1, inplace=True)
-        elecPvals.fillna(1, inplace=True)
-        elecPvals = elecPvals * nUnits
-        elecPvals = elecPvals.stack().reset_index(name='pvalue')
-        elecPvals['significant'] = elecPvals['pvalue'] < pThresh
+            elecPvals.loc[:, elecPvals.columns < 800] = 1
+            elecPvals.interpolate(method='ffill', axis=1, inplace=True)
+            elecPvals.fillna(1, inplace=True)
+            elecPvals = elecPvals * nUnits
+            elecPvals = elecPvals.stack().reset_index(name='pvalue')
+            elecPvals['significant'] = elecPvals['pvalue'] < pThresh
+        else:
+            elecPvals.loc[:, :] = 1
+            elecPvals['significant'] = False
         allPvals.update({idx: elecPvals})
         if enablePlots:
             raster.loc[:, 'fr'] = asig.loc[:, 'fr']

@@ -151,40 +151,61 @@ def channelIndexesToSpikeDict(
         'basic_headers': {'TimeStampResolution': 3e4},
         'extended_headers': []
         }
-    
-    maxUnit = 0
+    #  allocate fields for annotations
+    dummyUnit = channel_indexes[0].units[0]
+    dummySt = [
+        st
+        for st in dummyUnit.spiketrains
+        if len(st.times)][0]
+    #  allocate fields for array annotations (per spike)
+    if dummySt.array_annotations:
+        for key in dummySt.array_annotations.keys():
+            spikes.update({key: [np.array([]) for i in range(nCh)]})
+        
+    maxUnitIdx = 0
     for idx, chIdx in enumerate(channel_indexes):
         spikes['ChannelID'][idx] = chIdx.name
         for unitIdx, thisUnit in enumerate(chIdx.units):
             for stIdx, st in enumerate(thisUnit.spiketrains):
+                print(
+                    'unit {} has {} spiketrains'.format(
+                        thisUnit.name,
+                        len(thisUnit.spiketrains)))
                 if len(spikes['TimeStamps'][idx]):
                     spikes['TimeStamps'][idx] = np.concatenate((
                         spikes['TimeStamps'][idx],
                         st.times.magnitude), axis=0)
-                    
                 else:
                     spikes['TimeStamps'][idx] = st.times.magnitude
-
+                #  reshape waveforms to comply with BRM convention
                 theseWaveforms = np.swapaxes(
                     st.waveforms, 1, 2)
                 theseWaveforms = np.atleast_2d(np.squeeze(
                     theseWaveforms))
-
+                #  append waveforms
                 if len(spikes['Waveforms'][idx]):
                     spikes['Waveforms'][idx] = np.concatenate((
                         spikes['Waveforms'][idx],
                         theseWaveforms.magnitude), axis=0)
                 else:
                     spikes['Waveforms'][idx] = theseWaveforms.magnitude
-
-                classVals = st.times.magnitude ** 0 * maxUnit
-                maxUnit += 1
-                if len(spikes['Classification'][idx]):
-                    spikes['Classification'][idx] = np.concatenate((
-                        spikes['Classification'][idx],
-                        classVals), axis=0)
-                else:
-                    spikes['Classification'][idx] = classVals
+                #  give each unit a global index
+                classVals = st.times.magnitude ** 0 * maxUnitIdx
+                st.array_annotations.update({'Classification': classVals})
+                #  expand array_annotations into spikes dict
+                for key, value in st.array_annotations.items():
+                    if len(spikes[key][idx]):
+                        spikes[key][idx] = np.concatenate((
+                            spikes[key][idx],
+                            value), axis=0)
+                    else:
+                        spikes[key][idx] = value
+                for key, value in st.annotations.items():
+                    if key not in spikes['basic_headers']:
+                        spikes['basic_headers'].update({key: {}})
+                    if value:
+                        spikes['basic_headers'][key].update({maxUnitIdx: value})
+                maxUnitIdx += 1
     return spikes
 
 
@@ -1458,11 +1479,19 @@ def loadContainerArrayAnn(
 
     for st in spikesAndEvents:
         if 'arrayAnnNames' in st.annotations.keys():
+            #  pdb.set_trace()
+            if isinstance(st.annotations['arrayAnnNames'], str):
+                st.annotations['arrayAnnNames'] = [st.annotations['arrayAnnNames']]
             for key in st.annotations['arrayAnnNames']:
                 #  fromRaw, the ann come back as tuple, need to recast
-                #  pdb.set_trace()
-                st.array_annotations.update(
-                    {key: np.array(st.annotations[key])})
+                try:
+                    if len(st.times) == 1:
+                        st.annotations[key] = [st.annotations[key]]
+                    st.array_annotations.update(
+                        {key: np.array(st.annotations[key])})
+                except Exception:
+                    traceback.print_exc()
+                    #pdb.set_trace()
         if hasattr(st, 'waveforms'):
             if st.waveforms is None:
                 st.waveforms = np.array([]).reshape((0, 0, 0))*pq.mV

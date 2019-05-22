@@ -2,13 +2,17 @@ import dataAnalysis.helperFunctions.helper_functions as hf
 import os
 import dataAnalysis.helperFunctions.kilosort_analysis as ksa
 import numpy as np
-
-import matplotlib
+import pdb
 from matplotlib.backends.backend_pdf import PdfPages
+import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 import seaborn as sns
-
-sns.set()
+import traceback
+sns.set(rc={
+    'figure.figsize': (12, 8),
+    'legend.fontsize': 10,
+    'legend.handlelength': 2
+    })
 
 
 def spikePDFReport(
@@ -16,23 +20,29 @@ def spikePDFReport(
         arrayName=None, arrayInfo=None,
         correctAlignmentSpikes=0,
         plotOpts={'type': 'ticks', 'errorBar': 'sem'},
-        trialStats=None, enableFR=False, rasterOpts={'alignTo': None}, newName=None):
+        trialStats=None, enableFR=False, rasterOpts={'alignTo': None},
+        newReportName=None):
 
     if correctAlignmentSpikes:  # correctAlignmentSpikes units in samples
         spikes = hf.correctSpikeAlignment(spikes, correctAlignmentSpikes)
 
-    if newName is None:
+    if newReportName is None:
         pdfName = os.path.join(folderPath, 'spikePDFReport.pdf')
     else:
-        pdfName = os.path.join(folderPath, newName + '.pdf')
+        pdfName = os.path.join(folderPath, newReportName + '.pdf')
 
     if any((arrayName is None, arrayInfo is None)):
         arrayName, arrayInfo, partialRasterOpts = (
-            ksa.trialBinnedSpikesNameRetrieve(newName))
+            ksa.trialBinnedSpikesNameRetrieve(newReportName))
         arrayInfo['nevIDs'] = spikes['ChannelID']
 
     with PdfPages(pdfName) as pdf:
-        ksa.plotSpikePanel(spikeStruct, spikes)
+        ksa.plotSpikePanel(
+            spikeStruct, spikes,
+            labelFontSize=1, padOverride=5e-2)
+        #  make spikepanel square
+        figWidth, _ = plt.gcf().get_size_inches()
+        plt.gcf().set_size_inches(figWidth, figWidth)
         pdf.savefig()
         plt.close()
 
@@ -48,19 +58,54 @@ def spikePDFReport(
             unitsOnThisChan = np.unique(spikes['Classification'][idx])
             if unitsOnThisChan is not None:
                 if len(unitsOnThisChan) > 0:
-                    fig, ax = plt.subplots(nrows=1, ncols=2)
-                    ksa.plotSpike(
-                        spikes, channel=channel, ax=ax[0],
-                        axesLabel=True)
-                    isiBins = np.linspace(0, 80, 40)
-                    kde_kws = {
-                        'clip': (isiBins[0] * 0.8, isiBins[-1] * 1.2),
-                        'bw': 'silverman', 'gridsize': 500}
-                    ksa.plotISIHistogram(
-                        spikes, channel=channel, bins=isiBins,
-                        ax=ax[1], kde_kws=kde_kws)
-                    pdf.savefig()
-                    plt.close()
+                    #  allocate axes
+                    fig = plt.figure(tight_layout={'pad': 0.01})
+                    gs = gridspec.GridSpec(2, 3)
+                    try:
+                        spikeAx = fig.add_subplot(gs[1, 0])
+                        spikesBadAx = fig.add_subplot(gs[1, 1])
+                        #  spikesBadAx.get_shared_y_axes().join(spikesBadAx, spikeAx)
+                        isiAx = fig.add_subplot(gs[0, :2])
+                        templateAx = fig.add_subplot(gs[0, 2])
+                        #  plot contents
+                        #  pdb.set_trace()
+                        ksa.plotSpike(
+                            spikes, channel=channel, ax=spikeAx,
+                            axesLabel=True,
+                            legendTags=[
+                                'tag', 'chan_grp'])
+                        hf.plot_spikes(
+                            spikes, channel=channel, ax=spikesBadAx,
+                            axesLabel=True)
+                        spikesBadAx.set_ylim([-12, 5])
+                        spikeAx.set_ylim([-12, 5])
+                    except Exception:
+                        traceback.print_exc()
+                    try:
+                        lastBin = 100
+                        isiBins = np.arange(0, lastBin, 2)
+                        distBins = np.linspace(0, 5, 25)
+                        kde_kws = {
+                            'clip': (isiBins[0] * 0.9, isiBins[-1] * 1.1),
+                            'bw': 'silverman', 'gridsize': 500}
+                        ksa.plotISIHistogram(
+                            spikes, channel=channel, bins=isiBins,
+                            ax=isiAx, kde_kws=kde_kws)
+                        #  pdb.set_trace()
+                        ksa.plotSpikePropertyHistogram(
+                            spikes, channel=channel, whichProp='templateDist',
+                            bins=distBins,
+                            ax=templateAx, kde_kws=kde_kws)
+                        isiAx.set_title(
+                            '{}: {}'.format(
+                                channel,
+                                isiAx.get_title()
+                            ))
+                        #  import pdb; pdb.set_trace()
+                        pdf.savefig()
+                        plt.close()
+                    except Exception:
+                        traceback.print_exc()
 
                     if len(spikes['Waveforms'][idx].shape) == 3:
                         ksa.plotSpike(
@@ -69,28 +114,4 @@ def spikePDFReport(
                             ycoords=spikeStruct['ycoords'])
                         pdf.savefig()
                         plt.close()
-
-                    if rasterOpts['alignTo'] is not None and trialStats is not None:
-                        spikeMats, categories, selectedIndices = ksa.loadTrialBinnedSpike(folderPath,
-                            arrayName, arrayInfo,
-                            channel,
-                            rasterOpts,
-                            trialStats=trialStats, spikes=spikes,
-                            correctAlignmentSpikes=0,
-                            forceRecalc=False)
-
-                        spikeMats, categories, plotFig, plotAx, uniqueCategories, curLine = hf.plotTrialRaster(
-                            trialStats=trialStats, channel=channel,
-                            spikeMats=spikeMats, categories=categories,
-                            plotOpts=plotOpts)
-
-                        #  plotAx = plotRaster(spikes, trialStats, alignTo = plotRastersAlignedTo, windowSize = (-0.5, 2), channel = channel, separateBy = plotRastersSeparatedBy)
-                        if enableFR:
-                            plotTrialFR(
-                                spikeMats=spikeMats, categories=categories,
-                                fig=plotFig, ax=plotAx,
-                                uniqueCategories=uniqueCategories, twin=True,
-                                plotOpts=plotOpts)
-                            #  plotFR(spikes, trialStats, alignTo = plotRastersAlignedTo, windowSize = (-0.5, 2), channel = channel, separateBy = plotRastersSeparatedBy, ax = plotAx, twin = True)
-                        pdf.savefig()
-                        plt.close()
+            #  break

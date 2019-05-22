@@ -448,10 +448,11 @@ def getSpikeStats(spikes, channel, whichStats = ['mean', 'std'], bounds = None, 
                 statsDict[unitName].update({'min':waveForms.min().min()})
     return statsDict
 
-def plotSpike(spikes, channel, showNow = False, ax = None,
-    acrossArray = False, xcoords = None, ycoords = None,
-    axesLabel = False, errorMultiplier = 1, ignoreUnits = [],
-    channelPlottingName = None, chanNameInLegend = True):
+def plotSpike(
+        spikes, channel, showNow = False, ax = None,
+        acrossArray = False, xcoords = None, ycoords = None,
+        axesLabel = False, errorMultiplier = 1, ignoreUnits = [],
+        channelPlottingName = None, chanNameInLegend = True, legendTags=[]):
 
     if channelPlottingName is None:
         channelPlottingName = str(channel)
@@ -464,14 +465,6 @@ def plotSpike(spikes, channel, showNow = False, ax = None,
         unitsLabelsOnThisChan = None
 
     if acrossArray:
-        '''
-        sns.set_style("dark", {"axes.facecolor": ".9"})
-        matplotlib.rc('xtick', labelsize=5)
-        matplotlib.rc('ytick', labelsize=5)
-        matplotlib.rc('legend', fontsize=5)
-        matplotlib.rc('axes', xmargin=.01)
-        matplotlib.rc('axes', ymargin=.01)
-        '''
         # Check that we didn't ask to plot the spikes across channels into a single axis
         assert ax is None
         # Check that we have waveform data everywhere
@@ -501,9 +494,22 @@ def plotSpike(spikes, channel, showNow = False, ax = None,
                 unitPlottingName = unitName
 
             if chanNameInLegend:
-                labelName = 'chan %s, unit %s (%d SDs)' % (channelPlottingName, unitPlottingName, errorMultiplier)
+                #  labelName = 'chan %s: unit %s (%d SDs)' % (channelPlottingName, unitPlottingName, errorMultiplier)
+                labelName = '{}'.format(channelPlottingName)
             else:
                 labelName = 'unit %s (%d SDs)' % (unitPlottingName, errorMultiplier)
+
+            for legendTag in legendTags:
+                if legendTag in spikes['basic_headers']:
+                    if unitName in spikes['basic_headers'][legendTag]:
+                        labelName += ' {}: {}'.format(
+                            legendTag,
+                            spikes['basic_headers'][legendTag][unitName]
+                        )
+                    else:
+                        print('{} not found in header!'.format(unitName))
+                else:
+                    print('{} not found! in legendTags'.format(legendTag))
 
             if acrossArray:
                 for idx, channel in enumerate(spikes['ChannelID']):
@@ -554,8 +560,9 @@ def plotSpike(spikes, channel, showNow = False, ax = None,
     return fig,ax
 
 #@profile
-def plotISIHistogram(spikes, channel, showNow = False, ax = None,
-    bins = None, kde = False, kde_kws = None):
+def plotISIHistogram(
+        spikes, channel, showNow = False, ax = None,
+        bins = None, kde = True, kde_kws = None):
     if ax is None:
         fig, ax = plt.subplots()
     else:
@@ -571,7 +578,7 @@ def plotISIHistogram(spikes, channel, showNow = False, ax = None,
             theseTimes = spikes['TimeStamps'][idx][unitMask]
             theseISI = np.diff(theseTimes) * 1e3 # units of msec
             #pdb.set_trace()
-            sns.distplot(theseISI, bins = bins, ax = ax,
+            sns.distplot(theseISI, bins = bins, ax = ax, norm_hist=True,
                 color = colorPalette[unitIdx], kde = kde, kde_kws = kde_kws)
             """
             fit_alpha, fit_loc, fit_beta = stats.gamma.fit(np.histogram(theseISI, bins = bins))
@@ -581,35 +588,60 @@ def plotISIHistogram(spikes, channel, showNow = False, ax = None,
 
             plt.hist(theseISI, bins = bins, color = colorPalette[unitIdx], density = False)
             """
-            plt.xlabel('ISI (msec)')
+            ax.set_xlabel('ISI (msec)')
             yAxLabel = 'Count (normalized)' if kde else 'Count'
-            plt.ylabel(yAxLabel)
+            ax.set_ylabel(yAxLabel)
             if bins is not None:
+                ax.set_title('Bin size: {} msec'.format(bins[1] - bins[0]))
                 ax.set_xlim(min(bins), max(bins))
         if showNow:
             plt.show()
 
-#@profile
-def plotSpikePanel(spikeStruct, spikes, labelFontSize=LABELFONTSIZE, padOverride=5e-3, colorPal="ch:2,-.1,dark=.3,light=0.7,reverse=1"):
-    """
-    sns.set_style("dark", {"axes.facecolor": ".9"})
-    matplotlib.rc('xtick', labelsize=5)
-    matplotlib.rc('ytick', labelsize=5)
-    matplotlib.rc('legend', fontsize=5)
-    matplotlib.rc('axes', xmargin=.01)
-    matplotlib.rc('axes', ymargin=.01)
 
-    xIdx, yIdx = coordsToIndices(spikeStruct['xcoords'], spikeStruct['ycoords'])
-    fig, ax = plt.subplots(nrows = max(np.unique(xIdx)) + 1,
-        ncols = max(np.unique(yIdx)) + 1)
-    """
-    #spikeStruct.dropna(inplace = True)
+def plotSpikePropertyHistogram(
+        spikes, channel, whichProp, showNow=False, ax=None,
+        bins=None, kde=True, kde_kws=None):
+    
+    if ax is None:
+        fig, ax = plt.subplots()
+    else:
+        fig = ax.figure
+
+    fig.set_tight_layout({'pad': 0.01})
+    idx = spikes['ChannelID'].index(channel)
+    unitsOnThisChan = np.unique(spikes['Classification'][idx])
+
+    if unitsOnThisChan is not None:
+        colorPalette = sns.color_palette(n_colors = 40)
+        for unitIdx, unitName in enumerate(unitsOnThisChan):
+            unitMask = spikes['Classification'][idx] == unitName
+            thisProp = spikes[whichProp][idx][unitMask]
+            sns.distplot(thisProp, bins=bins, ax=ax, norm_hist=True,
+                color = colorPalette[unitIdx], kde=kde, kde_kws=kde_kws)
+            ax.set_xlabel(whichProp)
+            yAxLabel = 'Count (normalized)' if kde else 'Count'
+            ax.set_ylabel(yAxLabel)
+            if bins is not None:
+                ax.set_title('Bin size: {} msec'.format(bins[1] - bins[0]))
+                ax.set_xlim(min(bins), max(bins))
+        if showNow:
+            plt.show()
+
+
+#@profile
+def plotSpikePanel(
+        spikeStruct, spikes, labelFontSize=LABELFONTSIZE,
+        padOverride=5e-3, figSize=(12, 8),
+        colorPal="ch:2,-.1,dark=.3,light=0.7,reverse=1"):
+    
+    sns.set_style("dark", {"axes.facecolor": ".9"})
     xIdx = np.array(spikeStruct['xcoords'].values - spikeStruct['xcoords'].min(), dtype = np.int)
     yIdx = np.array(spikeStruct['ycoords'].values - spikeStruct['ycoords'].min(), dtype = np.int)
     # pdb.set_trace()
 
     fig, ax = plt.subplots(nrows = int(max(np.unique(xIdx)) + 1),
         ncols = int(max(np.unique(yIdx)) + 1))
+    fig.set_size_inches(figSize)
     axHighLims = np.empty(ax.shape)
     axHighLims[:] = np.nan
     axLowLims = np.empty(ax.shape)

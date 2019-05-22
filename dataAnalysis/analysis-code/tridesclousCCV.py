@@ -10,10 +10,9 @@ Options:
     --attemptMPI               whether to try to load MPI [default: False]
     --purgePeeler              delete previous sort results [default: False]
     --batchPreprocess          extract snippets and features, run clustering [default: False]
-    --visConstructor           include visualization step for catalogue constructor [default: False]
     --batchPeel                run peeler [default: False]
-    --visPeeler                include visualization step for catalogue [default: False]
-    --makeNeoBlock             save peeler results to a neo block [default: False]
+    --makeCoarseNeoBlock       save peeler results to a neo block [default: False]
+    --makeStrictNeoBlock       save peeler results to a neo block [default: False]
 """
 
 from docopt import docopt
@@ -70,11 +69,11 @@ if HAS_MPI:
 
 if RANK == 0:
     if arguments['--purgePeeler']:
+        tdch.purgeNeoBlock(triFolder)
         tdch.purgePeelerResults(
             triFolder, purgeAll=True)
-    
     dataio = tdc.DataIO(dirname=triFolder)
-    chansToAnalyze = sorted(list(dataio.channel_groups.keys()))
+    chansToAnalyze = sorted(list(dataio.channel_groups.keys()))[:96]
 else:
     chansToAnalyze = None
 
@@ -99,27 +98,30 @@ chansToAnalyze = [
 if arguments['--batchPreprocess']:
     tdch.batchPreprocess(
         triFolder, chansToAnalyze,
-        relative_threshold=5.5)
-
-chansToAnalyze = chansToAnalyze[:-1]
-
-if arguments['--visConstructor']:
-    for idx, chan_grp in enumerate(chansToAnalyze):
-        if idx % SIZE == RANK:
-            tdch.open_cataloguewindow(triFolder, chan_grp=chan_grp)
+        n_components_by_channel=20,
+        cluster_method='agglomerative',
+        n_clusters=4,
+        align_waveform=True, subsample_ratio=10,
+        autoMerge=True, auto_merge_threshold=0.8,
+        relative_threshold=5, attemptMPI=HAS_MPI)
 
 if arguments['--batchPeel']:
     tdch.batchPeel(
         triFolder, chansToAnalyze,
-        shape_distance_threshold=2e-2)
-
-if arguments['--visPeeler']:
-    for idx, chan_grp in enumerate(chansToAnalyze):
-        if idx % SIZE == RANK:
-            tdch.open_PeelerWindow(triFolder, chan_grp=chan_grp)
+        shape_boundary_threshold=3.5,
+        shape_distance_threshold=1.75, attemptMPI=HAS_MPI)
 
 if HAS_MPI:
     COMM.Barrier()  # wait until all threads finish sorting
 
-if arguments['--makeNeoBlock'] and RANK == 0:
-    tdch.neo_block_after_peeler(triFolder, chan_grps=chansToAnalyze)
+if arguments['--makeCoarseNeoBlock'] and RANK == 0:
+    tdch.purgeNeoBlock(triFolder)
+    tdch.neo_block_after_peeler(
+        triFolder, chan_grps=chansToAnalyze,
+        minDist=None, refractoryPeriod=None, ignoreTags=[])
+
+if arguments['--makeStrictNeoBlock'] and RANK == 0:
+    tdch.purgeNeoBlock(triFolder)
+    tdch.neo_block_after_peeler(
+        triFolder, chan_grps=chansToAnalyze,
+        minDist=1.5, refractoryPeriod=3.5e-3, ignoreTags=['so_bad'])

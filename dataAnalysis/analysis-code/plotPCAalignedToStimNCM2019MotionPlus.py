@@ -84,13 +84,11 @@ for idx, (rasterName, continuousName) in enumerate(zip(rasterToPlot, continuousT
                 #  tstat, pvalue, df = ttest_ind(x1, x2)
                 tstat, pvalue = stats.ttest_ind(x1, x2, equal_var=False)
                 elecPvals.loc[progIdx, testBin] = pvalue
-
         flatPvals = elecPvals.stack()
         _, fixedPvals, _, _ = mt(flatPvals.values, method='holm')
         flatPvals.loc[:] = fixedPvals
         flatPvals = flatPvals.unstack('bin')
         elecPvals.loc[flatPvals.index, flatPvals.columns] = flatPvals
-
         elecPvals.interpolate(method='ffill', axis=1, inplace=True)
         elecPvals.fillna(1, inplace=True)
         elecPvals.loc[:, elecPvals.columns < 300] = 1
@@ -112,7 +110,7 @@ for idx, (rasterName, continuousName) in enumerate(zip(rasterToPlot, continuousT
             g = asp.twin_relplot(
                 x='bin',
                 y2='fr', y1='t_facetIdx',
-                query2='(amplitudeCatFuzzy==0)|(amplitudeCatFuzzy==3)', query1='(raster == 1000)',
+                query2=None, query1='(raster == 1000)',
                 hue='amplitudeCatFuzzy',
                 col='programFuzzy',
                 palette=colorPal,
@@ -137,7 +135,6 @@ for idx, (rasterName, continuousName) in enumerate(zip(rasterToPlot, continuousT
             plt.close()
     except Exception:
         traceback.print_exc()
-        pdb.set_trace()
 
 allPvalsDF = pd.concat(allPvals).reset_index()
 gPH = sns.catplot(
@@ -160,5 +157,3 @@ for ax in gPH.axes.flat:
         bar.set_width(newwidth)
 gPH.savefig(os.path.join(figureFolder, 'motionPlusStim_pCount.pdf'))
 plt.close()
-pdb.set_trace()
-# raster.query('(programFuzzy==0)&(amplitudeCatFuzzy==0)')

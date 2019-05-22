@@ -20,38 +20,46 @@ from statsmodels.stats.weightstats import ttest_ind
 
 
 def getConditionAverages(
-    dataBlock, unitName, dataQueryTemplate,
-    collapseSizes=True):
-    thisUnit = dataBlock.filter(
-        objects=Unit, name=unitName)[0]
-    waveformsDict = {}
-    uniqueSpiketrains = []
-    for i, st in enumerate(thisUnit.spiketrains):
-        if st not in uniqueSpiketrains:
-            uniqueSpiketrains.append(st)
-            waveformsDict.update({
-                i: preproc.spikeTrainWaveformsToDF([st])})
-    allWaveforms = pd.concat(
-        waveformsDict,
-        names=['segment'] + waveformsDict[0].index.names)
-    allWaveforms.columns.name = 'bin'
-    allWaveformsSkinny = allWaveforms.stack().reset_index(name='signal')
-    dataQuery = dataQueryTemplate.format(unitName)
-    aveDF = allWaveformsSkinny.query(dataQuery)
+        dataBlock, unitNames, dataQueryTemplate,
+        collapseSizes=True, verbose=False):
+    allUnits = [
+        i
+        for i in dataBlock.filter(objects=Unit)
+        if i.name in unitNames]
+    allWaveformsList = []
+    for thisUnit in allUnits:
+        if verbose:
+            print('Extracting {}'.format(thisUnit.name))
+        waveformsDict = {}
+        uniqueSpiketrains = []
+        for i, st in enumerate(thisUnit.spiketrains):
+            if st not in uniqueSpiketrains:
+                uniqueSpiketrains.append(st)
+                waveformsDict.update({
+                    i: preproc.spikeTrainWaveformsToDF([st])})
+        unitWaveforms = pd.concat(
+            waveformsDict,
+            names=['segment'] + waveformsDict[0].index.names)
+        allWaveformsList.append(unitWaveforms.query(dataQueryTemplate))
+    allWaveforms = pd.concat(allWaveformsList)
+    saveIndexNames = allWaveforms.index.names
+    allWaveforms.reset_index(inplace=True)
     
     if collapseSizes:
         try:
-            aveDF.loc[aveDF['pedalSizeCat'] == 'XL', 'pedalSizeCat'] = 'L'
-            aveDF.loc[aveDF['pedalSizeCat'] == 'XS', 'pedalSizeCat'] = 'S'
+            allWaveforms.loc[allWaveforms['pedalSizeCat'] == 'XL', 'pedalSizeCat'] = 'L'
+            allWaveforms.loc[allWaveforms['pedalSizeCat'] == 'XS', 'pedalSizeCat'] = 'S'
         except Exception:
-            pass
-    try:  
-        for idx, (name, group) in enumerate(aveDF.groupby(['segment', 'index'])):
+            traceback.print_exc()
+    try:
+        for idx, (name, group) in enumerate(allWaveforms.groupby(['segment', 'index'])):
             if group['amplitudeFuzzy'].sum() == 0:
-                aveDF.loc[group.index, 'programFuzzy'] = idx % 3
+                allWaveforms.loc[group.index, 'programFuzzy'] = idx % 3
     except Exception:
-        pass
+        traceback.print_exc()
     
-    aveDF.set_index(aveDF.columns.drop(['bin', 'signal']).tolist(), inplace=True)
-    returnDF = aveDF.pivot(columns='bin')['signal']
-    return returnDF, dataQuery
+    allWaveforms.set_index(
+        saveIndexNames,
+        inplace=True)
+    allWaveforms.columns.name = 'bin'
+    return allWaveforms

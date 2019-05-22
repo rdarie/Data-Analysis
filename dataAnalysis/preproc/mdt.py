@@ -23,6 +23,7 @@ import seaborn as sns
 from scipy import interpolate
 from sklearn.preprocessing import MinMaxScaler
 
+
 def preprocINS(
         trialFilesStim,
         insDataFilename,
@@ -277,13 +278,14 @@ def getINSStimOnset(
 
     segIdx = 0
     seg = block.segments[segIdx]
-
     fs = seg.analogsignals[0].sampling_rate
+    tdDF, accelDF, stimStatus = unpackINSBlock(block)
+
     #  assume a fixed delay between onset and stim
     fixedDelayIdx = int(fixedDelay * fs)
     print('Using a fixed delay of {} samples'.format(fixedDelayIdx))
     defaultOptsDict = {
-        'detectChannels': ['ins_td0', 'ins_td2']}
+        'detectChannels': [i for i in tdDF.columns if 'ins_td' in i]}
 
     if stimDetectOpts is None:
         stimDetectOpts = {
@@ -317,15 +319,13 @@ def getINSStimOnset(
                 thisUnit.annotations.update({key: value})
             chanIdx.units.append(thisUnit)
             thisUnit.channel_index = chanIdx
-
-    tdDF, accelDF, stimStatus = unpackINSBlock(block)
     
     spikeTStop = tdDF['t'].iloc[-1]
     spikeTStart = tdDF['t'].iloc[0]
     
     for name, group in tdDF.groupby('amplitudeRound'):
         anomalyOccured = False
-        #  pad with paddingDuration msec ensure robust z-score
+        #  pad with paddingDuration msec to ensure robust z-score
         paddingDuration = 150e-3
         
         tStart = group['t'].iloc[0]
@@ -444,7 +444,7 @@ def getINSStimOnset(
             cyclePeriod = -1  # placeholder for no cycling
 
         tStartOnset = max(
-            group['t'].iloc[0],
+            tdSeg['t'].iloc[0],
             tdSeg.loc[expectedOnsetIdx[0], 't'] + ROIPadding[0])
         tStopOnset = min(
             tdSeg.loc[expectedOnsetIdx[-1], 't'] + ROIPadding[1],
@@ -463,7 +463,7 @@ def getINSStimOnset(
         ROIMaskOffset = (
             (tdSeg['t'] > tStartOffset) &
             (tdSeg['t'] < tStopOffset))
-
+        
         (
             onsetIdx, theseOnsetTimestamps, onsetDifferenceFromExpected,
             onsetDifferenceFromLogged,
@@ -497,14 +497,14 @@ def getINSStimOnset(
                     expectedOffsetTimestamps.values -
                     expectedOnsetTimestamps.values)
             else:
-                dummyOffsets = hf.closestSeries(
+                dummyOffsets, _ = hf.closestSeries(
                     expectedOnsetTimestamps,
                     expectedOffsetTimestamps, strictly='greater')
                 expectedTrainDurations = (
                     dummyOffsets.values -
                     expectedOnsetTimestamps.values)
 
-            newExpectedOffsetTimestamps = hf.closestSeries(
+            newExpectedOffsetTimestamps, _ = hf.closestSeries(
                 theseOnsetTimestamps + expectedTrainDurations, tdSeg['t'])
             expectedOffsetIdx = np.array(
                 tdSeg['t'].loc[tdSeg['t'].isin(newExpectedOffsetTimestamps.values)].index)
@@ -540,7 +540,7 @@ def getINSStimOnset(
             theseOnsetTimestamps.iloc[:] = timeInterpFunINStoNSP[thisTrialSegment](
                 theseOnsetTimestamps.values)
         
-        closestOffsets = hf.closestSeries(
+        closestOffsets, _ = hf.closestSeries(
             theseOnsetTimestamps,
             theseOffsetTimestamps, strictly='greater')
         theseOnsetTimestamps = theseOnsetTimestamps.values * pq.s
@@ -738,7 +738,10 @@ def getINSStimOnset(
                         ))
             #  pdb.set_trace()
             unitDetectedOn = thisUnit.annotations['detectChannels']
-            timesIndex = tdDF.index[tdDF['t'].isin(consolidatedTimes)]
+            consolidatedTimes, timesIndex = hf.closestSeries(
+                takeFrom=pd.Series(consolidatedTimes),
+                compareTo=tdDF['t'])
+            timesIndex = np.array(timesIndex.values, dtype=np.int)
             left_sweep_samples = 46
             left_sweep = left_sweep_samples / fs
             right_sweep_samples = 77
@@ -754,14 +757,16 @@ def getINSStimOnset(
                     tdDF.loc[
                         tIdx - int(left_sweep * fs):tIdx + int(right_sweep * fs),
                         unitDetectedOn])
-                spikeWaveforms[idx, :, :] = np.swapaxes(thisWaveform.values, 0, 1)
+                spikeWaveforms[idx, :, :] = np.swapaxes(
+                    thisWaveform.values, 0, 1)
+            
             newSt = SpikeTrain(
                 name='seg{}_{}'.format(int(segIdx), thisUnit.name),
                 times=consolidatedTimes, units='sec', t_stop=spikeTStop,
                 waveforms=spikeWaveforms * pq.mV, left_sweep=left_sweep,
                 sampling_rate=fs,
                 t_start=spikeTStart, **consolidatedAnn, **arrayAnnNames)
-            
+            assert (consolidatedTimes.shape[0] == spikeWaveforms.shape[0])
             newSt.unit = thisUnit
             thisUnit.spiketrains = [newSt]
             if createRelationship:
@@ -794,7 +799,6 @@ def extractArtifactTimestamps(
         fixedDelayIdx=None, delayByFreqIdx=None,
         keep_what=None, plotDetection=False, plotKernel=False
         ):
-
     '''
     tdPow = hf.filterDF(
         tdSeg, fs,
@@ -819,7 +823,7 @@ def extractArtifactTimestamps(
                 plt.plot(
                     thisEdgeEnhancer,
                     'k-', label='edge enhancer {}'.format(colName))
-        
+        #  pdb.set_trace()
         edgeEnhancer = pd.Series(
             MinMaxScaler(feature_range=(1e-2, 1))
             .fit_transform(edgeEnhancer.values.reshape(-1, 1))
@@ -828,12 +832,10 @@ def extractArtifactTimestamps(
     else:
         edgeEnhancer = pd.Series(
             1, index=tdSeg.index)
-    
     if plotDetection:
         plt.plot(
             edgeEnhancer.values,
             'k-', label='final edge enhancer')
-    
     if enhanceExpected:
         assert expectedIdx is not None
         expectedEnhancer = hf.gaussianSupport(
@@ -847,7 +849,6 @@ def extractArtifactTimestamps(
             index=tdSeg.index)
         if plotDetection:
             plt.plot(expectedEnhancer.values, 'k--', label='expected enhancer')
-
     tdPow = tdSeg.abs().sum(axis=1)
     detectSignalFull = hf.enhanceNoisyTriggers(
         tdPow, correctionFactor)
@@ -910,7 +911,7 @@ def extractArtifactTimestamps(
             if plotAnomalies:
                 anomalyOccured = True
                 print('More timestamps than expected!')
-        closestExpected = hf.closestSeries(
+        closestExpected, _ = hf.closestSeries(
             theseTimestamps,
             expectedTimestamps)
         offsetFromExpected = (
@@ -931,7 +932,7 @@ def extractArtifactTimestamps(
             anomalyOccured = True
             print('fewer timestamps than expected!')
         #  fewer detections than expected
-        closestFound = hf.closestSeries(
+        closestFound, _ = hf.closestSeries(
             expectedTimestamps,
             theseTimestamps
             )
@@ -963,7 +964,7 @@ def extractArtifactTimestamps(
             interpFun(dummyT.loc[offsetTooFarMask].index))
     '''
     if offsetTooFarMask.any():
-        closestTimes = hf.closestSeries(
+        closestTimes, _ = hf.closestSeries(
             newTimestamps,
             tdDF['t'],
             )
@@ -975,7 +976,7 @@ def extractArtifactTimestamps(
         originalPeakIdx = None
         
     # save closest for diagnostics
-    closestExpected = hf.closestSeries(
+    closestExpected, _ = hf.closestSeries(
         theseTimestamps,
         expectedTimestamps)
     offsetFromExpected = (theseTimestamps - closestExpected).values * pq.s
@@ -983,7 +984,7 @@ def extractArtifactTimestamps(
     deadjustedIndices = expectedIdx - fixedDelayIdx - delayByFreqIdx
     loggedTimestamps = pd.Series(
         tdDF['t'].loc[deadjustedIndices])
-    closestToLogged = hf.closestSeries(
+    closestToLogged, _ = hf.closestSeries(
         theseTimestamps,
         loggedTimestamps)
     offsetFromLogged = (theseTimestamps - closestToLogged).values * pq.s

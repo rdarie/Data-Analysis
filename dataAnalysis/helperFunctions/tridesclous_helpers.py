@@ -5,10 +5,11 @@ import numpy as np
 #  from matplotlib import pyplot
 import time
 import os
+import glob
 import re
 import pdb
 import traceback
-#  import pdb
+from collections import Iterable, OrderedDict
 import quantities as pq
 import neo
 from neo.core import (
@@ -18,7 +19,8 @@ import shutil
 import json
 import gc
 import dataAnalysis.helperFunctions.helper_functions as hf
-
+from scipy.spatial.distance import minkowski
+import scipy.signal
 
 def cmpToDF(arrayFilePath):
     arrayMap = pd.read_csv(
@@ -50,6 +52,62 @@ def cmpToDF(arrayFilePath):
 
 
 def cmpDFToPrb(
+        cmpDF, filePath=None,
+        names=None, banks=None,
+        contactSpacing=400,  # units of um
+        groupIn=None):
+
+    if names is not None:
+        keepMask = cmpDF['elecName'].isin(names)
+        cmpDF = cmpDF.loc[keepMask, :]
+    if banks is not None:
+        keepMask = cmpDF['bank'].isin(banks)
+        cmpDF = cmpDF.loc[keepMask, :]
+    #  
+    cmpDF.reset_index(inplace=True, drop=True)
+    prbDict = {}
+    
+    if groupIn is not None:
+        groupingCols = []
+        for key, spacing in groupIn.items():
+            uniqueValues = np.unique(cmpDF[key])
+            bins = int(round(
+                (uniqueValues.max() - uniqueValues.min() + 1) / spacing))
+            cmpDF[key + '_group'] = np.nan
+            cmpDF.loc[:, key + '_group'] = pd.cut(
+                cmpDF[key], bins, include_lowest=True, labels=False)
+            groupingCols.append(key + '_group')
+    else:
+        groupingCols = ['elecName']
+    #  pdb.set_trace()
+    for idx, (name, group) in enumerate(cmpDF.groupby(groupingCols)):
+        theseChannels = []
+        theseGeoms = {}
+        for rName, row in group.iterrows():
+            theseChannels.append(int(rName))
+            theseGeoms.update({
+                int(rName): (
+                    contactSpacing * row['xcoords'],
+                    contactSpacing * row['ycoords'])})
+        prbDict.update({idx: {
+            'channels': theseChannels,
+            'geometry': theseGeoms
+            }})
+    """
+    tallyChans = []
+    tallyGeoms = {}
+    for k,v in prbDict.items():
+        tallyChans += v['channels']
+        tallyGeoms.update(v['geometry'])
+    import pdb; pdb.set_trace()
+    """
+    if filePath is not None:
+        with open(filePath, 'w') as f:
+            f.write('channel_groups = ' + str(prbDict))
+    return prbDict
+
+
+def cmpDFToPrbAddDummies(
         cmpDF, filePath=None,
         names=None, banks=None,
         contactSpacing=400,  # units of um
@@ -125,13 +183,11 @@ def initialize_catalogueconstructor(
         triFolder, prbPath,
         name='catalogue_constructor',
         removeExisting=False, fileFormat='NIX'):
-    #  setup file source
-    
+    #  set up file source
     if os.path.exists(triFolder) and removeExisting:
         #  remove is already exists
         import shutil
         shutil.rmtree(triFolder)
-
     if fileFormat == 'NIX':
         filePath = os.path.join(folderPath, fileName + '.nix')
     if fileFormat == 'Blackrock':
@@ -142,25 +198,25 @@ def initialize_catalogueconstructor(
         type=fileFormat, filenames=[filePath])
     print(dataio)  # check
 
-    #  setup probe file
+    #  set up probe file
     dataio.set_probe_file(prbPath)
     for chan_grp in dataio.channel_groups.keys():
         cc = tdc.CatalogueConstructor(
             dataio=dataio, name=name, chan_grp=chan_grp)
         print(cc)
-
-    #import pdb; pdb.set_trace()
     return
 
 
 def preprocess_signals_and_peaks(
         triFolder, chan_grp=0,
         name='catalogue_constructor',
-        chunksize=1024,
+        chunksize=4096,
         highpass_freq=250.,
         lowpass_freq=5000.,
+        filter_order=3,
+        smooth_size=5,
         relative_threshold=5.,
-        peak_span=0.25e-3,
+        peak_span=1e-3,
         common_ref_removal=True,
         noise_estimate_duration=60.,
         sample_snippet_duration=240.,
@@ -178,6 +234,8 @@ def preprocess_signals_and_peaks(
         memory_mode='memmap',
         highpass_freq=highpass_freq,
         lowpass_freq=lowpass_freq,
+        filter_order=filter_order,
+        smooth_size=smooth_size,
         common_ref_removal=common_ref_removal,
         #  peak detector
         peakdetector_engine=peakdetector_engine,
@@ -206,9 +264,10 @@ def extract_waveforms_pca(
         triFolder, chan_grp=0,
         name='catalogue_constructor',
         wave_extract_mode='rand',
-        n_left=-48, n_right=80, nb_max=30000,
-        nb_noise_snippet=1000,
+        n_left=-34, n_right=66, nb_max=90000,
+        nb_noise_snippet=2000,
         align_waveform=False,
+        subsample_ratio=20,
         feature_method='neighborhood_pca',
         n_components_by_channel=10,
         n_components=10,
@@ -224,7 +283,7 @@ def extract_waveforms_pca(
     t1 = time.perf_counter()
     cc.extract_some_waveforms(
         mode=wave_extract_mode, n_left=n_left, n_right=n_right,
-        align_waveform=align_waveform,
+        align_waveform=align_waveform, subsample_ratio=subsample_ratio,
         nb_max=nb_max)
     #  cc.extract_some_waveforms(mode='all', n_left=-45, n_right=60)
     t2 = time.perf_counter()
@@ -291,23 +350,25 @@ def cluster(
     t2 = time.perf_counter()
     print('find_clusters took {} seconds'.format(t2-t1))
 
-    cc.trash_small_cluster(n=10)
-    
     if autoMerge:
-        print(cc)
-        t1 = time.perf_counter()
-        cc.compute_spike_waveforms_similarity()
-        cc.auto_merge_high_similarity(
-            threshold=auto_merge_threshold)
-        t2 = time.perf_counter()
-        print('auto_merge took {} seconds'.format(t2-t1))
+        try:
+            print(cc)
+            t1 = time.perf_counter()
+            #  cc.compute_spike_waveforms_similarity()
+            cc.auto_merge_high_similarity(
+                threshold=auto_merge_threshold)
+            t2 = time.perf_counter()
+            print('auto_merge took {} seconds'.format(t2-t1))
+        except Exception:
+            traceback.print_exc()
+
+    cc.order_clusters(by='waveforms_rms')
+
+    cc.trash_small_cluster(n=25)
     
+    print(cc)
     if auto_make_catalog:
         cc.make_catalogue_for_peeler()
-
-    print(cc)
-    
-    cc.order_clusters(by='waveforms_rms')
     return
 
 
@@ -351,12 +412,15 @@ def clean_catalogue(
 
 def run_peeler(
         triFolder, chan_grp=0,
-        shape_distance_threshold=2e-3,
+        shape_distance_threshold=2,
+        shape_boundary_threshold=3,
         debugging=False, progressbar=False,
         duration=None, useOpenCL=False, trackTiming=False):
+
     dataio = tdc.DataIO(dirname=triFolder)
     initial_catalogue = dataio.load_catalogue(chan_grp=chan_grp)
     peeler = tdc.Peeler(dataio)
+
     if useOpenCL:
         peeler.change_params(
             catalogue=initial_catalogue,
@@ -365,14 +429,15 @@ def run_peeler(
     else:
         peeler.change_params(
             catalogue=initial_catalogue,
-            use_sparse_template=False, sparse_threshold_mad=1.5,
-            use_opencl_with_sparse=False,
             shape_distance_threshold=shape_distance_threshold,
+            shape_boundary_threshold=shape_boundary_threshold,
             debugging=debugging)
 
     if trackTiming:
         t1 = time.perf_counter()
+
     peeler.run(duration=duration, progressbar=progressbar)
+
     if trackTiming:
         t2 = time.perf_counter()
         print('peeler.run_loop', t2-t1)
@@ -396,7 +461,9 @@ def export_spikes_after_peeler(triFolder):
     return
 
 
-def neo_block_after_peeler(triFolder, chan_grps=None):
+def neo_block_after_peeler(
+        triFolder, chan_grps=None,
+        refractoryPeriod=None, minDist=None, ignoreTags=['so_bad']):
     dataio = tdc.DataIO(dirname=triFolder)
 
     chanNames = np.array(
@@ -412,26 +479,54 @@ def neo_block_after_peeler(triFolder, chan_grps=None):
         maxTime = (
             dataio.get_segment_length(segIdx) /
             dataio.sample_rate)
-    
+
+        catalogue = dataio.load_catalogue(chan_grp=chan_grps[0])
+        window1 = scipy.signal.triang(2 * int(-catalogue['n_left']) + 1)
+        window2 = scipy.signal.triang(2 * int(catalogue['n_right']) + 1)
+        window = np.concatenate(
+            (
+                window1[:int(-catalogue['n_left'])],
+                window2[int(catalogue['n_right']) + 1:]),
+            axis=-1)
+        #  discount edges a lot
+        window[window < 0.33] = 0.1
+        #  normalize to sum 1, so that the distance is an average
+        #  deviation
+        window = window / np.sum(window)
+        
         for chan_grp in chan_grps:
             #  chan_grp=0
             channelIds = np.array(
                 dataio.channel_groups[chan_grp]['channels'])
 
             catalogue = dataio.load_catalogue(chan_grp=chan_grp)
-            #  cc = tdc.CatalogueConstructor(
-            #      dataio=dataio, chan_grp=chan_grp)
             
             clustersDF = pd.DataFrame(catalogue['clusters'])
+            if not len(clustersDF) > 0:
+                # no events for this unit
+                continue
+
             clustersDF['max_on_channel_id'] = (
                 channelIds[clustersDF['max_on_channel']])
             
             #  choose clusters that aren't tagged as so_bad
-            #  the trash spikes are excluded automatically
-            exportMask = ~clustersDF['tag'].isin(['so_bad'])
-            #  iterate over channels
-            channelGrouper = (
-                clustersDF.loc[exportMask, :].groupby('max_on_channel_id'))
+            #  note that the trash spikes are excluded automatically
+            if len(ignoreTags):
+                exportMask = ~clustersDF['tag'].isin(ignoreTags)
+                #  iterate over channels
+                channelGrouper = (
+                    clustersDF.loc[exportMask, :].groupby('max_on_channel_id'))
+                #  iterate over units
+                unitGrouper = (
+                    clustersDF.loc[exportMask, :].groupby('cell_label'))
+            else:
+                #  iterate over channels
+                channelGrouper = (
+                    clustersDF.groupby('max_on_channel_id'))
+                #  iterate over units
+                unitGrouper = (
+                    clustersDF.groupby('cell_label'))
+
             #  keep track of how many units are on each channel
             unitNumberLookup = {}
             for idx, group in channelGrouper:
@@ -446,73 +541,157 @@ def neo_block_after_peeler(triFolder, chan_grps=None):
                     name='{}'.format(chanLabel),
                     index=[idx])
                 block.channel_indexes.append(chanIdx)
+                #  pdb.set_trace()
 
-            #  iterate over units
-            unitGrouper = (
-                clustersDF.loc[exportMask, :].groupby('cell_label'))
             for unitName, group in unitGrouper:
                 #  assert group['max_on_channel_id'] only has one element
                 chanId = group['max_on_channel_id'].values[0]
                 chanLabel = chanNames[chanId]
-                chanName = '{}'.format(chanLabel)
+                chanName = '{}'.format(chanLabel)  # sanitize to string
                 chanIdx = block.filter(objects=ChannelIndex, name=chanName)[0]
                 #  create unit indexes
                 thisUnit = Unit(
                     name='{}#{}'.format(
                         chanName, unitNumberLookup[unitName]))
                 print(thisUnit.name)
-                chanIdx.units.append(thisUnit)
-                thisUnit.channel_index = chanIdx
                 #  get spike times
                 spike = dataio.get_spikes(
                     seg_num=segIdx, chan_grp=chan_grp)
                 unitMask = np.isin(
                     spike['cluster_label'],
                     group['cluster_label'])
+                #  discard edges
+                edgeMask = (
+                    (spike['index'] + catalogue['n_left'] > 0) &
+                    (
+                        spike['index'] + catalogue['n_right'] <
+                        dataio.get_segment_length(segIdx))
+                )
+                unitMask = unitMask & edgeMask
+                if not unitMask.any():
+                    # no events for this unit
+                    continue
+
+                thisUnitIndices = spike[unitMask]['index']
                 spikeTimes = (
                     (
-                        spike[unitMask]['index'] +
+                        thisUnitIndices +
                         spike[unitMask]['jitter']) /
                     dataio.sample_rate)
-                
+
                 try:
                     spikeWaveforms = dataio.get_some_waveforms(
                         seg_num=segIdx, chan_grp=chan_grp,
-                        spike_indexes=spike[unitMask]['index'],
+                        spike_indexes=thisUnitIndices,
                         n_left=catalogue['n_left'],
                         n_right=catalogue['n_right']
                         )
                 except Exception:
                     traceback.print_exc()
-                    #  exclude edges if doesn't fit
-                    spikeWaveforms = dataio.get_some_waveforms(
-                        seg_num=segIdx, chan_grp=chan_grp,
-                        spike_indexes=spike[unitMask]['index'][1:-1],
-                        n_left=catalogue['n_left'],
-                        n_right=catalogue['n_right']
-                        )
-                    spikeTimes = (
-                        (
-                            spike[unitMask]['index'][1:-1] +
-                            spike[unitMask]['jitter'][1:-1]) /
-                        dataio.sample_rate)
+
                 spikeWaveforms = np.swapaxes(
                     spikeWaveforms,
                     1, 2)
                 
+                timesDF = pd.DataFrame(spikeTimes, columns=['times'])
+                timesDF['templateDist'] = np.nan
+                meanWaveform = np.mean(spikeWaveforms, axis=0)
+
+                for idx in timesDF.index:
+                    timesDF.loc[idx, 'templateDist'] = minkowski(
+                        spikeWaveforms[idx, :, :],
+                        meanWaveform, p=1, w=window)
+                
+                if minDist is not None:
+                    tooFar = timesDF.index[
+                        timesDF['templateDist'] > minDist]
+                    #  pdb.set_trace()
+                    timesDF.drop(index=tooFar, inplace=True)
+                    spikeTimes = spikeTimes[timesDF.index]
+                    spikeWaveforms = spikeWaveforms[timesDF.index, :, :]
+                    timesDF.reset_index(drop=True, inplace=True)
+                    #  plot distribution of distances to template
+                    debugging = False
+                    if debugging:
+                        import matplotlib.pyplot as plt
+                        import seaborn as sns
+                        ax = sns.distplot(timesDF['templateDist'])
+                        plt.savefig(
+                            os.path.join(
+                                '/gpfs/data/dborton/rdarie/tempdata',
+                                'templateHist_{}.png'.format(unitName)))
+                        plt.close()
+                timesDF['isi'] = timesDF['times'].diff().fillna(method='bfill')
+                if refractoryPeriod is not None:
+                    breaksRefractory = timesDF['isi'] < refractoryPeriod
+                    while breaksRefractory.any() and timesDF['times'].any():
+                        dropIndices = []
+                        for idx in timesDF.loc[breaksRefractory, :].index:
+                            thisSpikeDist = timesDF.loc[idx, 'templateDist']
+                            #  if the previous spike looks worse,
+                            #  we delete that one
+                            DFidx = timesDF.index.get_loc(idx)
+                            prevIdx = timesDF.index[DFidx - 1]
+                            prevSpikeDist = (
+                                timesDF.loc[prevIdx, 'templateDist'])
+                            if (thisSpikeDist > prevSpikeDist):
+                                dropIndices.append(idx)
+                            else:
+                                dropIndices.append(prevIdx)
+                        #  pdb.set_trace()
+                        timesDF.drop(
+                            index=pd.unique(dropIndices), inplace=True)
+                        timesDF['isi'] = timesDF['times'].diff().fillna(method='bfill')
+                        breaksRefractory = timesDF['isi'] < refractoryPeriod
+                
+                    spikeTimes = spikeTimes[timesDF.index]
+                    spikeWaveforms = spikeWaveforms[timesDF.index, :, :]
+                
+                if not spikeTimes.any():
+                    continue
+                
+                arrayAnn = {
+                    'templateDist': timesDF['templateDist'].values,
+                    'isi': timesDF['isi'].values}
+                arrayAnnNames = {'arrayAnnNames': list(arrayAnn.keys())}
+                #  pdb.set_trace()
+                if group['tag'].iloc[0] == '':
+                    if group['max_peak_amplitude'].iloc[0] < -7:
+                        group.loc[:, 'tag'] = 'good'
+                    else:
+                        group.loc[:, 'tag'] = 'so_good'
                 st = SpikeTrain(
                     name='seg{}_{}'.format(int(segIdx), thisUnit.name),
                     times=spikeTimes, units='sec',
                     waveforms=spikeWaveforms * pq.uV,
                     t_stop=maxTime, t_start=0,
                     left_sweep=catalogue['n_left'],
-                    sampling_rate=dataio.sample_rate * pq.Hz)
+                    sampling_rate=dataio.sample_rate * pq.Hz,
+                    **arrayAnn, **arrayAnnNames)
+                for colName in group.columns:
+                    v = group[colName].iloc[0]
+                    if v:
+                        '''
+                        print('{}, {}, type={}'.format(
+                            colName,
+                            v,
+                            type(v)))
+                        print('iterable? {}'.format(isinstance(v, Iterable)))
+                        '''
+                        st.annotations.update(
+                            {colName: v}
+                        )
+                #  pdb.set_trace()
+                st.annotations.update({'chan_grp': chan_grp})
+                
+                #  create relationships
+                chanIdx.units.append(thisUnit)
+                thisUnit.channel_index = chanIdx
                 thisUnit.spiketrains.append(st)
                 seg.spiketrains.append(st)
                 st.unit = thisUnit
-
+            #  end iterating unitGrouper
             seg.create_relationship()
-
     for chanIdx in block.channel_indexes:
         chanIdx.create_relationship()
     block.create_relationship()
@@ -526,17 +705,27 @@ def neo_block_after_peeler(triFolder, chan_grps=None):
     return block
 
 
+def purgeNeoBlock(triFolder):
+    trialName = 'tdc_' + triFolder.split('tdc_')[-1]
+    for fl in glob.glob(os.path.join(triFolder, trialName + '.nix')):
+        os.remove(fl)
+
+
 def purgePeelerResults(
         triFolder, chan_grps=None, purgeAll=False):
-
     if not purgeAll:
         assert chan_grps is not None, 'Need to specify chan_grps!'
 
         for chan_grp in chan_grps:
             #  chan_grp = 0
+            grpFolder = 'channel_group_{}'.format(chan_grp)
             segFolder = os.path.join(
-                triFolder, 'channel_group_{}'.format(chan_grp), 'segment_0')
+                triFolder, grpFolder, 'segment_0')
             shutil.rmtree(segFolder)
+            for fl in glob.glob(os.path.join(triFolder, grpFolder, 'nearMiss*.png')):
+                os.remove(fl)
+            for fl in glob.glob(os.path.join(triFolder, 'templateHist_{}.png'.format(chan_grp))):
+                os.remove(fl)
             #  TODO implement selective removal of spikes or processed signs
             """
             arrayInfoPath = os.path.join(segFolder, "arrays.json")
@@ -557,11 +746,15 @@ def purgePeelerResults(
             f
             for f in os.listdir(triFolder)
             if os.path.isdir(os.path.join(triFolder, f))]
+        for fl in glob.glob(os.path.join(triFolder, 'templateHist*.png')):
+            os.remove(fl)
         for grpFolder in grpFolders:
             try:
                 segFolder = os.path.join(
                     triFolder, grpFolder, 'segment_0')
                 shutil.rmtree(segFolder)
+                for fl in glob.glob(os.path.join(triFolder, grpFolder, 'nearMiss*.png')):
+                    os.remove(fl)
             except Exception:
                 traceback.print_exc()
     return
@@ -609,14 +802,26 @@ def transferTemplates(
 
 def batchPreprocess(
         triFolder, chansToAnalyze,
-        relative_threshold=5.5
+        relative_threshold=5.5,
+        peak_span=1e-3,
+        cluster_method='kmeans',
+        n_clusters=4,
+        common_ref_removal=False,
+        noise_estimate_duration=120.,
+        sample_snippet_duration=240.,
+        align_waveform=False, subsample_ratio=20,
+        autoMerge=False, auto_merge_threshold=0.8,
+        n_components_by_channel=15, attemptMPI=False
         ):
-    print('Batch processing...')
+    print('Batch preprocessing...')
     try:
-        from mpi4py import MPI
-        COMM = MPI.COMM_WORLD
-        SIZE = COMM.Get_size()
-        RANK = COMM.Get_rank()
+        if attemptMPI:
+            from mpi4py import MPI
+            COMM = MPI.COMM_WORLD
+            SIZE = COMM.Get_size()
+            RANK = COMM.Get_rank()
+        else:
+            raise(Exception('MPI aborted by cmd line argument'))
     except Exception:
         RANK = 0
         SIZE = 1
@@ -628,37 +833,58 @@ def batchPreprocess(
                 hf.memory_usage_psutil()))
             preprocess_signals_and_peaks(
                 triFolder, chan_grp=chan_grp,
-                chunksize=2048,
+                chunksize=4096,
                 signalpreprocessor_engine='numpy',
                 peakdetector_engine='numpy',
                 highpass_freq=300.,
-                lowpass_freq=5000.,
+                lowpass_freq=6000.,
+                filter_order=3,
+                smooth_size=5,
                 relative_threshold=relative_threshold,
-                peak_span=.5e-3,
-                common_ref_removal=False,
-                noise_estimate_duration=60.,
-                sample_snippet_duration=160.)
+                peak_span=peak_span,
+                common_ref_removal=common_ref_removal,
+                noise_estimate_duration=noise_estimate_duration,
+                sample_snippet_duration=sample_snippet_duration)
 
-            extract_waveforms_pca(
-                triFolder, feature_method='pca_by_channel',
-                n_components_by_channel=20, chan_grp=chan_grp)
+            successfulDimRed = False
+            attemptsCounter = 0
+            while (not successfulDimRed) & (attemptsCounter < 3):
+                try:
+                    extract_waveforms_pca(
+                        triFolder, feature_method='pca_by_channel',
+                        align_waveform=align_waveform, subsample_ratio=subsample_ratio,
+                        n_components_by_channel=n_components_by_channel,
+                        chan_grp=chan_grp)
+                    successfulDimRed = True
+                except Exception:
+                    traceback.print_exc()
+                    n_components_by_channel = (
+                        int(n_components_by_channel * 0.75))
+                    attemptsCounter += 1
 
             cluster(
-                triFolder, cluster_method='kmeans',
-                n_clusters=5, chan_grp=chan_grp)
+                triFolder, cluster_method=cluster_method,
+                n_clusters=n_clusters, chan_grp=chan_grp,
+                auto_make_catalog=False,
+                autoMerge=autoMerge, auto_merge_threshold=auto_merge_threshold)
     return
 
 
 def batchPeel(
         triFolder, chansToAnalyze,
-        shape_distance_threshold=2e-2
+        shape_distance_threshold=2,
+        shape_boundary_threshold=3,
+        attemptMPI=False
         ):
     print('Batch peeling...')
     try:
-        from mpi4py import MPI
-        COMM = MPI.COMM_WORLD
-        SIZE = COMM.Get_size()
-        RANK = COMM.Get_rank()
+        if attemptMPI:
+            from mpi4py import MPI
+            COMM = MPI.COMM_WORLD
+            SIZE = COMM.Get_size()
+            RANK = COMM.Get_rank()
+        else:
+            raise(Exception('MPI aborted by cmd line argument'))
     except Exception:
         RANK = 0
         SIZE = 1
@@ -670,7 +896,8 @@ def batchPeel(
                 hf.memory_usage_psutil()))
             run_peeler(
                 triFolder, shape_distance_threshold=shape_distance_threshold,
-                debugging=False,
+                shape_boundary_threshold=shape_boundary_threshold,
+                debugging=True,
                 chan_grp=chan_grp, progressbar=False)
             gc.collect()
     return

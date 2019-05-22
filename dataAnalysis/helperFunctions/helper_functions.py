@@ -21,7 +21,7 @@ from matplotlib.lines import Line2D
 import matplotlib.animation as animation
 from matplotlib.animation import FFMpegWriter
 import matplotlib.backends.backend_pdf
-
+import random 
 import numpy as np
 import pandas as pd
 import math as m
@@ -397,6 +397,8 @@ def filterDF(
 def closestSeries(takeFrom, compareTo, strictly='neither'):
     closest = pd.Series(
         np.nan, index=takeFrom.index)
+    closestIdx = pd.Series(
+        np.nan, index=takeFrom.index)
     for idx, value in enumerate(takeFrom.values):
         if strictly == 'greater':
             lookIn = compareTo[compareTo > value]
@@ -404,12 +406,14 @@ def closestSeries(takeFrom, compareTo, strictly='neither'):
             lookIn = compareTo[compareTo < value]
         else:
             lookIn = compareTo
+        idxMin = np.abs(compareTo.values - value).argmin()
         closeValue = (
             lookIn
             .values
-            .flat[np.abs(compareTo.values - value).argmin()])
+            .flat[idxMin])
         closest.iloc[idx] = closeValue
-    return closest
+        closestIdx.iloc[idx] = lookIn.index[idxMin]
+    return closest, closestIdx
 
 
 def interpolateDF(
@@ -3144,63 +3148,112 @@ def plotBinnedSpikes(spikeMat, show=True, normalizationType='linear',
         plt.show()
     return fi, im
 
-def plot_spikes(spikes, chans, ignoreUnits = []):
-    # Initialize plots
-    #pdb.set_trace()
-    colors      =  sns.color_palette(n_colors = 40)
-    line_styles = ['-', '--', ':', '-.']
-    f, axarr    = plt.subplots(len(chans))
-    if len(chans) == 1:
-        axarr = [axarr]
-    samp_per_ms = spikes['basic_headers']['TimeStampResolution'] / 1000.0
+def plot_spikes(
+        spikes, channel, ignoreUnits = [], showNow = False, ax = None,
+        acrossArray = False, xcoords = None, ycoords = None,
+        axesLabel = False, channelPlottingName = None, chanNameInLegend=True,
+        legendTags=[],
+        maskSpikes=None, maxSpikes=200, lineAlpha=0.01):
+        
+    if channelPlottingName is None:
+        channelPlottingName = str(channel)
 
-    for i in range(len(chans)):
+    ChanIdx = spikes['ChannelID'].index(channel)
+    unitsOnThisChan = pd.unique(spikes['Classification'][ChanIdx])
+    if 'ClassificationLabel' in spikes.keys():
+        unitsLabelsOnThisChan = pd.unique(spikes['ClassificationLabel'][ChanIdx])
+    else:
+        unitsLabelsOnThisChan = None
 
-        # Extract the channel index, then use that index to get unit ids, extended header index, and label index
-        ch_idx      = spikes['ChannelID'].index(chans[i])
+    if acrossArray:
+        # Check that we didn't ask to plot the spikes across channels into a single axis
+        assert ax is None
+        # Check that we have waveform data everywhere
+        assert len(spikes['Waveforms'][ChanIdx].shape) == 3
 
-        units       = sorted(list(set(spikes['Classification'][ch_idx])))
-        unitIds     = list(range(len(units)))
-        #ext_hdr_idx = spikes['NEUEVWAV_HeaderIndices'][ch_idx]
-        #lbl_idx     = next(idx for (idx, d) in enumerate(spikes['extended_headers'])
-        #                   if d['PacketID'] == 'NEUEVLBL' and d['ElectrodeID'] == chans[i])
+    if ax is None and not acrossArray:
+        fig, ax = plt.subplots()
+        fig.set_tight_layout({'pad': 0.01})
+    if ax is not None and not acrossArray:
+        fig = ax.figure
 
-        # loop through all spikes and plot based on unit classification
-        # note: no classifications in sampleData, i.e., only unit='none' exists in the sample data
-        ymin = 0; ymax = 0
-        t = np.arange(spikes['Waveforms'][0].shape[1]) / samp_per_ms
-
-        for j in range(len(units)):
-            if units[j] in [-1] + ignoreUnits:
+    if unitsOnThisChan is not None:
+        if acrossArray:
+            xIdx, yIdx = coordsToIndices(xcoords, ycoords)
+            fig, ax = plt.subplots(nrows = max(np.unique(xIdx)) + 1, ncols = max(np.unique(yIdx)) + 1)
+            fig.set_tight_layout({'pad': 0.01})
+        colorPalette = sns.color_palette(n_colors = 40)
+        for unitIdx, unitName in enumerate(unitsOnThisChan):
+            #print('ignoreUnits are {}'.format([-1] + ignoreUnits))
+            if unitName in [-1] + ignoreUnits:
+                #  always ignore units marked -1
                 continue
-            unit_idxs   = [idx for idx, unit in enumerate(spikes['Classification'][ch_idx]) if unit == units[j]]
-            unit_spikes = np.array(spikes['Waveforms'][ch_idx][unit_idxs])
+            unitMask = spikes['Classification'][ChanIdx] == unitName
 
-            if units[j] == 'none':
-                color_idx = 0; ln_sty_idx = 0
+            if 'ClassificationLabel' in spikes.keys():
+                unitPlottingName = unitsLabelsOnThisChan[unitIdx]
             else:
-                color_idx = (unitIds[j] % len(colors)) + 1
-                ln_sty_idx = unitIds[j] // len(colors)
-
-            for k in range(unit_spikes.shape[0]):
-
-                try:
-                    axarr[i].plot(t, unit_spikes[k], line_styles[ln_sty_idx], c = colors[color_idx])
-                    if min(unit_spikes[k]) < ymin: ymin = min(unit_spikes[k])
-                    if max(unit_spikes[k]) > ymax: ymax = max(unit_spikes[k])
-                except:
-                    #pdb.set_trace()
-                    pass
-
-        #if lbl_idx: axarr[i].set_ylabel(spikes['extended_headers'][lbl_idx]['Label'] + ' ($\mu$V)')
-        #else:       axarr[i].set_ylabel('Channel ' + str(chans[i]) + ' ($\mu$V)')
-        axarr[i].set_ylabel('Channel ' + str(chans[i]) + ' ' + spikes['Units'])
-        axarr[i].set_ylim((ymin * 1.05, ymax * 1.05))
-        axarr[i].locator_params(axis='y', nbins=10)
-
-    axarr[-1].set_xlabel('Time (ms)')
-    plt.tight_layout()
-    plt.show(block = False)
+                unitPlottingName = unitName
+            if chanNameInLegend:
+                labelName = 'chan %s, unit %s' % (channelPlottingName, unitPlottingName)
+            else:
+                labelName = 'unit %s' % (unitPlottingName)
+            for legendTag in legendTags:
+                if legendTag in spikes['basic_headers']:
+                    labelName = '{} {}: {}'.format(
+                        labelName,  legendTag,
+                        spikes['basic_headers'][legendTag][unitName]
+                    )
+            #  plot all channels aligned to this spike?
+            if acrossArray:
+                waveForms = spikes['Waveforms'][ChanIdx][unitMask, :, 0]
+                if maxSpikes < waveForms.shape[0]:
+                        selectIdx = random.sample(range(waveForms.shape[0]), maxSpikes)
+                for idx, channel in enumerate(spikes['ChannelID']):
+                    curAx = ax[xIdx[idx], yIdx[idx]]
+                    waveForms = spikes['Waveforms'][ChanIdx][unitMask, :, idx]
+                    if maskSpikes is not None:
+                        waveForms = waveForms[maskSpikes, :]
+                    if maxSpikes < waveForms.shape[0]:
+                        waveForms = waveForms[selectIdx]
+                    timeRange = np.arange(len(waveForms[0])) / spikes['basic_headers']['TimeStampResolution'] * 1e3
+                    for spIdx, thisSpike in enumerate(waveForms):
+                        thisLabel = labelName if idx == 0 else None
+                        curAx.plot(
+                            timeRange, thisSpike, label=thisLabel,
+                            linewidth=1, color=colorPalette[unitIdx], alpha=lineAlpha)
+                sns.despine()
+                for curAx in ax.flatten():
+                    curAx.tick_params(left='off', top='off', right='off',
+                    bottom='off', labelleft='off', labeltop='off',
+                    labelright='off', labelbottom='off')
+            else:
+                #  plot only on main chan
+                if len(spikes['Waveforms'][ChanIdx].shape) == 3:
+                    waveForms = spikes['Waveforms'][ChanIdx][unitMask, :, ChanIdx]
+                else:
+                    waveForms = spikes['Waveforms'][ChanIdx][unitMask, :]
+                
+                timeRange = np.arange(len(waveForms[0])) / spikes['basic_headers']['TimeStampResolution'] * 1e3
+                
+                if maskSpikes is not None:
+                    waveForms = waveForms[maskSpikes, :]
+                if maxSpikes < waveForms.shape[0]:
+                    waveForms = waveForms[random.sample(range(waveForms.shape[0]), maxSpikes), :]
+                for spIdx, thisSpike in enumerate(waveForms):
+                    thisLabel = labelName if spIdx == 0 else None
+                    ax.plot(
+                        timeRange, thisSpike,
+                        linewidth=1, color=colorPalette[unitIdx], alpha=lineAlpha, label=thisLabel)
+                ax.set_xlim(timeRange[0], timeRange[-1])
+                if axesLabel:
+                    ax.set_ylabel(spikes['Units'])
+                    ax.set_xlabel('Time (msec)')
+                    ax.set_title('Units on channel {}'.format(channelPlottingName))
+                    ax.legend()
+        if showNow:
+            plt.show()
+    return fig, ax
 
 def plot_events_raster(eventDf, names, collapse = False, usePlotly = True):
     # Initialize plots
