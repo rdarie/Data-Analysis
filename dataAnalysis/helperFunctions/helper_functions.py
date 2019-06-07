@@ -453,6 +453,52 @@ def interpolateDF(
 INSReferenceTime = pd.Timestamp('2018-03-01')
 
 
+def fixMalformedJson(jsonString, jsonType=''):
+    '''
+    Adapted from Medtronic RDK Matlab code
+    %--------------------------------------------------------------------------
+    % Copyright (c) Medtronic, Inc. 2017
+    %
+    % MEDTRONIC CONFIDENTIAL -- This document is the property of Medtronic
+    % PLC, and must be accounted for. Information herein is confidential trade
+    % secret information. Do not reproduce it, reveal it to unauthorized 
+    % persons, or send it outside Medtronic without proper authorization.
+    %--------------------------------------------------------------------------
+    %
+    % File Name: fixMalformedJson.m
+    % Autor: Ben Johnson (johnsb68)
+    %
+    % Description: This file contains the MATLAB function to fix a malformed 
+    % Summit JSON File due to improperly closing the SummitSystem session.
+    %
+    % -------------------------------------------------------------------------
+    %% Check and Apply Appropriate Fixes*************************************************
+    '''
+    
+    jsonString = jsonString.replace('INF', 'Inf')
+    
+    numOpenSqua = jsonString.count('[')
+    numOpenCurl = jsonString.count('{')
+    numClosedSqua = jsonString.count(']')
+    numClosedCurl = jsonString.count('}')
+
+    if (
+            (numOpenSqua != numClosedSqua) and
+            (('Log' in jsonType) or ('Settings' in jsonType))):
+        jsonStringOut = jsonString + ']'
+    elif (numOpenSqua != numClosedSqua) or (numOpenCurl != numClosedCurl):
+        nMissingSqua = numOpenSqua-numClosedSqua-1
+        nMissingCurl = numOpenCurl-numClosedCurl-1
+        jsonStringOut = (
+            jsonString +
+            '}' * nMissingCurl +
+            ']' * nMissingSqua +
+            '}]')
+    else:
+        jsonStringOut = jsonString
+    return jsonStringOut
+
+
 def getINSTDFromJson(
         folderPath, sessionNames,
         deviceName='DeviceNPC700373H', fs=500,
@@ -484,8 +530,14 @@ def getINSTDFromJson(
         except Exception:
             traceback.print_exc()
 
-            with open(os.path.join(jsonPath, 'RawDataTD.json'), 'r') as f:
-                timeDomainJson = json.load(f)
+            try:
+                with open(os.path.join(jsonPath, 'RawDataTD.json'), 'r') as f:
+                    timeDomainJson = json.load(f)
+            except Exception:
+                with open(os.path.join(jsonPath, 'RawDataTD.json'), 'r') as f:
+                    timeDomainJsonText = f.read()
+                    timeDomainJsonText = fixMalformedJson(timeDomainJsonText)
+                    timeDomainJson = json.loads(timeDomainJsonText)
 
             intersampleTickCount = (1/fs) / (100e-6)
 
@@ -605,8 +657,16 @@ def getINSTimeSyncFromJson(
 
         except Exception:
             traceback.print_exc()
-            with open(os.path.join(jsonPath, 'TimeSync.json'), 'r') as f:
-                timeSync = json.load(f)[0]
+            try:
+                with open(os.path.join(jsonPath, 'TimeSync.json'), 'r') as f:
+                    timeSync = json.load(f)[0]
+            except Exception:
+                with open(os.path.join(jsonPath, 'TimeSync.json'), 'r') as f:
+                    timeSyncText = f.read()
+                    timeSyncText = fixMalformedJson(timeSyncText)
+                    timeSync = json.loads(timeSyncText)[0]
+                    #  pdb.set_trace()
+            
             timeSyncData = rcsa_helpers.extract_time_sync_meta_data(timeSync)
 
             timeSyncData['trialSegment'] = idx
@@ -653,8 +713,15 @@ def getINSAccelFromJson(
         except Exception:
             traceback.print_exc()
 
-            with open(os.path.join(jsonPath, 'RawDataAccel.json'), 'r') as f:
-                accelJson = json.load(f)
+            try:
+                with open(os.path.join(jsonPath, 'RawDataAccel.json'), 'r') as f:
+                    accelJson = json.load(f)
+            except Exception:
+                with open(os.path.join(jsonPath, 'RawDataAccel.json'), 'r') as f:
+                    accelJsonText = f.read()
+                    accelJsonText = fixMalformedJson(accelJsonText)
+                    accelJson = json.loads(accelJsonText)
+
 
             intersampleTickCount = (1/fs) / (100e-6)
             accelMeta = rcsa_helpers.extract_accel_meta_data(accelJson)
@@ -861,18 +928,63 @@ def plotHUTtoINS(
     plt.show(block=plotBlocking)
     return
 
+def line_picker(line, mouseevent):
+    """
+    find the points within a certain distance from the mouseclick in
+    data coords and attach some extra attributes, pickx and picky
+    which are the data points that were picked
+    """
+    if mouseevent.xdata is None:
+        return False, dict()
+    xdata = line.get_xdata()
+    ydata = line.get_ydata()
+    maxd = 0.1
+    d = np.sqrt(
+        (xdata - mouseevent.xdata)**2 + (ydata - mouseevent.ydata)**2)
+    dmask = (d < maxd) & (d == min(d))
+    ind, = np.nonzero(dmask)
+    #  pdb.set_trace()
+    if len(ind):
+        pickx = xdata[ind]
+        picky = ydata[ind]
+        props = dict(ind=ind, pickx=pickx, picky=picky)
+        return True, props
+    else:
+        return False, dict()
+
 
 def peekAtTaps(
         td, accel,
         channelData, trialIdx,
         tapDetectOpts, sessionTapRangesNSP,
+        onlyPlotDetectChan=True,
         insX='t', plotBlocking=True,
         allTapTimestampsINS=None,
         allTapTimestampsNSP=None,
         segmentsToPlot=None):
-
+    sns.set_style('darkgrid')
     if segmentsToPlot is None:
         segmentsToPlot = pd.unique(td['data']['trialSegment'])
+
+    tempClick = {
+        'ins': [],
+        'nsp': []
+        }
+    clickDict = {
+        i: {
+            'ins': [],
+            'nsp': []
+            }
+        for i in segmentsToPlot}
+    
+    def onpick(event):
+        #  pdb.set_trace()
+        if 'INS' in event.artist.axes.get_title():
+            tempClick['ins'].append(event.pickx[0])
+            print('Clicked on ins {}'.format(event.pickx[0]))
+        elif 'NSP' in event.artist.axes.get_title():
+            tempClick['nsp'].append(event.pickx[0])
+            print('Clicked on nsp {}'.format(event.pickx[0]))
 
     for trialSegment in segmentsToPlot:
         #  NSP plotting Bounds
@@ -903,60 +1015,111 @@ def peekAtTaps(
             ax[2] = fig.add_subplot(313, sharex=ax[0])
             tStartINS = tStartNSP
             tStopINS = tStopNSP
+        
+        insTapsAx = ax[1]
+        twinAx = ax[2].twiny()
+        dataColMask = np.array(['ins_td' in i for i in td['data'].columns])
+        if 'accChan' in tapDetectOpts[trialIdx][trialSegment].keys():
+            detectOn = 'acc'
+            accAx = ax[1]
+            tdAx = ax[0]
+            accAx.get_shared_x_axes().join(accAx, twinAx)
+            accAx.get_shared_y_axes().join(accAx, twinAx)
+            accAxLineStyle = '.-'
+            tdAxLineStyle = '-'
+            if onlyPlotDetectChan:
+                accColumnNames = [tapDetectOpts[trialIdx][trialSegment]['accChan']]
+            else:
+                accColumnNames = [
+                    'ins_accx', 'ins_accy',
+                    'ins_accz', 'ins_accinertia']
+            tdColumnNames = td['data'].columns[dataColMask]
+        else:
+            detectOn = 'td'
+            accAx = ax[0]
+            tdAx = ax[1]
+            tdAx.get_shared_x_axes().join(tdAx, twinAx)
+            tdAx.get_shared_y_axes().join(tdAx, twinAx)
+            accAxLineStyle = '-'
+            tdAxLineStyle = '.-'
+            if onlyPlotDetectChan:
+                tdColumnNames = [tapDetectOpts[trialIdx][trialSegment]['tdChan']]
+            else:
+                tdColumnNames = td['data'].columns[dataColMask]
+            accColumnNames = [
+                'ins_accx', 'ins_accy',
+                'ins_accz', 'ins_accinertia']
 
         plotMask = (accel[insX] > tStartINS) & (accel[insX] < tStopINS)
         plotMaskTD = (td[insX] > tStartINS) & (td[insX] < tStopINS)
 
-        for columnName in [
-                'ins_accx', 'ins_accy',
-                'ins_accz', 'ins_accinertia']:
-            ax[0].plot(
+        for columnName in accColumnNames:
+            accAx.plot(
                 accel[insX].loc[plotMask],
                 stats.zscore(accel['data'].loc[plotMask, columnName]),
-                label=columnName)   
-        ax[0].set_title('INS Data Segment {}'.format(trialSegment))
-        ax[0].set_ylabel('Z Score (a.u.)')
+                accAxLineStyle,
+                label=columnName, picker=line_picker)
+            if detectOn == 'acc':
+                twinAx.plot(
+                    accel[insX].loc[plotMask],
+                    stats.zscore(accel['data'].loc[plotMask, columnName])
+                    )
+        accAx.set_title('INS Acc Segment {}'.format(trialSegment))
+        accAx.set_ylabel('Z Score (a.u.)')
 
-        dataColMask = np.array(['ins_td' in i for i in td['data'].columns])
-        for columnName in td['data'].columns[dataColMask]:
-            ax[1].plot(
+        for columnName in tdColumnNames:
+            tdAx.plot(
                 td[insX].loc[plotMaskTD],
                 stats.zscore(td['data'].loc[plotMaskTD, columnName]),
-                label=columnName)
-        
-        ax[1].set_ylabel('Z Score (a.u.)')
+                tdAxLineStyle,
+                label=columnName, picker=line_picker)
+            if detectOn == 'td':
+                twinAx.plot(
+                    td[insX].loc[plotMaskTD],
+                    stats.zscore(td['data'].loc[plotMaskTD, columnName])
+                    )
+        tdAx.set_ylabel('Z Score (a.u.)')
+        tdAx.set_title('INS TD Segment {}'.format(trialSegment))
 
         if allTapTimestampsINS is not None:
-            if 'accChan' in tapDetectOpts[trialIdx][trialSegment].keys():
-                insTapsAx = ax[0]
-            else:
-                insTapsAx = ax[1]
             insTapsAx.plot(
                 allTapTimestampsINS[trialSegment],
                 allTapTimestampsINS[trialSegment] ** 0 - 1,
                 'c*', label='tap peaks')
         
-        ax[1].legend()
-        ax[0].legend()
+        tdAx.legend()
+        accAx.legend()
 
-        plotChan(
-            channelData['data'], channelData['t'].values,
-            'ainp7', recordingUnits='uV', electrodeLabel='',
-            label="Analog Sync", mask=None, maskLabel=" ",
-            show=False, prevFig=fig, prevAx=ax[2],
-            zoomAxis=False, timeRange=(tStartNSP, tStopNSP)
-            )
+        tNSPMask = (channelData['t'] > tStartNSP) & (channelData['t'] < tStopNSP)
+        triggerTrace = channelData['data'].loc[tNSPMask, 'ainp7']
+        #  pdb.set_trace()
+        ax[2].plot(
+            channelData['t'].loc[tNSPMask],
+            stats.zscore(triggerTrace),
+            'c', label='Analog Sync', picker=line_picker)
 
         if allTapTimestampsNSP is not None:
             ax[2].plot(
                 allTapTimestampsNSP[trialSegment],
                 allTapTimestampsNSP[trialSegment] ** 0 - 1,
-                'c*', label='tap peaks')
+                'm*', label='tap peaks', picker=line_picker)
 
         ax[2].legend()
         ax[2].set_title('NSP Data')
+        fig.canvas.mpl_connect('pick_event', onpick)
         plt.show(block=plotBlocking)
-    return
+
+        for key, value in tempClick.items():
+            tempVal = pd.Series(value)
+            tempClick[key] = tempVal.loc[tempVal.diff().fillna(1) > 100e-3]
+            #  pdb.set_trace()
+        clickDict[trialSegment] = tempClick
+
+        tempClick = {
+            'ins': [],
+            'nsp': []
+            }
+    return clickDict
 
 
 def getINSTapTimestamp(
@@ -1097,7 +1260,8 @@ def synchronizeINStoNSP(
     print('Trial Segment {}'.format(trialSegment))
     print('On the INS, the diff() between taps was\n{}'.format(insDiff))
     print('On the NSP, the diff() between taps was\n{}'.format(nspDiff))
-    print('This amounts to a difference of\n{}'.format(insDiff - nspDiff))
+    print('This amounts to a msec difference of\n{}'.format(
+        (insDiff - nspDiff) * 1e3))
     if (insDiff - nspDiff > 20e-3).any():
         raise(Exception('Tap trains too different!'))
     #  pdb.set_trace()
@@ -1128,7 +1292,7 @@ def synchronizeINStoNSP(
                         continue
                     if len(st.times):
                         segMask = np.array(
-                            st.annotations['trialSegments'],
+                            st.annotations['trialSegment'],
                             dtype=np.int) == trialSegment
                         st.magnitude[segMask] = (
                             timeInterpFunINStoNSP(st.times[segMask]))
@@ -1173,9 +1337,11 @@ def timeOffsetBlock(block, timeOffset, masterTStart):
         epoch.magnitude[:] = epoch.magnitude + timeOffset.magnitude
     return block
 
+
 def blockUniqueUnits(block):
 
     return
+
 
 def loadBlockProxyObjects(block):
     #  prune out proxy objects
@@ -1322,6 +1488,7 @@ def getHUTtoINSSyncFun(
             plt.legend()
             plt.show()
     return timeInterpFunHUTtoINS
+
 
 def getStimSerialTrialSegMask(insDF, trialSegment):
     tsegMask = insDF['ins_property'] == 'trialSegment'
@@ -3153,7 +3320,7 @@ def plot_spikes(
         acrossArray = False, xcoords = None, ycoords = None,
         axesLabel = False, channelPlottingName = None, chanNameInLegend=True,
         legendTags=[],
-        maskSpikes=None, maxSpikes=200, lineAlpha=0.01):
+        maskSpikes=None, maxSpikes=200, lineAlpha=0.025):
         
     if channelPlottingName is None:
         channelPlottingName = str(channel)

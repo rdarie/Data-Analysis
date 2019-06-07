@@ -1,15 +1,23 @@
 #  options
 import os
-trialIdx = 1
-miniRCTrial = False
-#plottingFigures = False
-plottingFigures = True
-plotBlocking = True
+import dataAnalysis.helperFunctions.kilosort_analysis as ksa
+import dataAnalysis.helperFunctions.tridesclous_helpers as tdch
 
-experimentName = '201902010900-Proprio'
+miniRCTrial = False
+#  plottingFigures = True
+plottingFigures = False
+plotBlocking = True
+trialIdx = 1
+experimentName = '201901211000-Proprio'
 deviceName = 'DeviceNPC700373H'
-jsonBaseFolder = './ORCA Logs'
-folderPath = './' + experimentName
+#  remote paths
+remoteBasePath = '..'
+scratchPath = '/gpfs/scratch/rdarie/rdarie/Murdoc Neural Recordings'
+#  remoteBasePath = 'Z:\\data\\rdarie\\Murdoc Neural Recordings'
+insFolder = os.path.join(remoteBasePath, 'ORCA Logs')
+nspFolder = os.path.join(remoteBasePath, 'raw', experimentName)
+
+ns5FileName = 'Trial00{}'.format(trialIdx)
 
 jsonSessionNames = {
     1: ['Session1549035660603'],
@@ -19,6 +27,7 @@ jsonSessionNames = {
     5: ['Session1549041618954']
     }
 
+#  options for automatic tap detection on ins data
 tapDetectOpts = {}
 tapDetectOpts[1] = {
     0: {
@@ -74,19 +83,14 @@ sessionTapRangesNSP = {
     5: {0: {'timeRanges': [180, 190], 'keepIndex': slice(None)}},
     }
 
+#  make placeholders for interpolation functions
 interpFunINStoNSP = {
-    1: [None],
-    2: [None],
-    3: [None],
-    4: [None],
-    5: [None]
+    key: [None for i in value.keys()]
+    for key, value in sessionTapRangesNSP.items()
     }
 interpFunHUTtoINS = {
-    1: [None],
-    2: [None],
-    3: [None],
-    4: [None],
-    5: [None]
+    key: [None for i in value.keys()]
+    for key, value in sessionTapRangesNSP.items()
     }
 
 eventInfo = {
@@ -104,22 +108,21 @@ eventInfo = {
         'simiTrigs': 8,
         }
 }
-
+#  process int names into strings
 for key, value in eventInfo['inputIDs'].items():
     eventInfo['inputIDs'][key] = 'ainp{}'.format(value)
+
 trialFilesFrom = {
     'utah': {
         'origin': 'mat',
         'experimentName': experimentName,
-        'folderPath': folderPath,
-        'ns5FileName': 'Trial00{}'.format(trialIdx),
+        'folderPath': nspFolder,
+        'ns5FileName': ns5FileName,
         'elecIDs': list(range(1, 97)) + [135],
         'excludeClus': []
         }
     }
 trialFilesFrom['utah'].update(dict(eventInfo=eventInfo))
-#  DEBUGGING:
-trialFilesFrom['utah']['elecIDs'] = [70, 71, 135]
 
 #  get stim onset times (one set of params per program, assuming only group 0)
 stimDetectOpts = {0: {
@@ -133,8 +136,8 @@ trialFilesStim = {
     'ins': {
         'origin': 'ins',
         'experimentName': experimentName,
-        'folderPath': jsonBaseFolder,
-        'ns5FileName': 'Trial00{}'.format(trialIdx),
+        'folderPath': insFolder,
+        'ns5FileName': ns5FileName,
         'jsonSessionNames': jsonSessionNames[trialIdx],
         'elecIDs': range(17),
         'excludeClus': [],
@@ -142,39 +145,120 @@ trialFilesStim = {
         'detectStim': True,
         'getINSkwargs': {
             'stimDetectOpts': stimDetectOpts,
-            'stimIti': 0, 'fixedDelay': 10e-3,
-            'minDist': 0.2, 'minDur': 0.2, 'thres': 3,
-            'gaussWid': 200e-3,
-            'gaussKerWid': 75e-3,
+            'fixedDelay': -60e-3,
+            'delayByFreqMult': 1,
+            'gaussWid': 100e-3,
+            'minDist': 0.2, 'minDur': 0.2,
+            'cyclePeriodCorrection': 20e-3,
+            'plotAnomalies': True,
+            'recalculateExpectedOffsets': True,
             'maxSpikesPerGroup': 1, 'plotting': []  # range(1, 1000, 5)
             }
         }
     }
-if miniRCTrial:
-    trialFilesStim['ins']['getINSkwargs'].update({
+
+miniRCDetectionOpts = {
         'minDist': 1.2,
-        'gaussWid': 400e-3,
-        'gaussKerWid': 250e-3,
+        'gaussWid': 200e-3,
         'maxSpikesPerGroup': 0,
-    })
+    }
+if miniRCTrial:
+    trialFilesStim['ins']['getINSkwargs'].update(miniRCDetectionOpts)
     trialFilesFrom['utah'].update({
         'eventInfo': None
     })
+
+nspPrbPath = os.path.join('.', 'nsp_map.prb')
+triFolder = os.path.join(
+    nspFolder, 'tdc_Trial00{}'.format(1))
+'''
+triFolder = os.path.join(
+    scratchPath, 'tdc',
+    experimentName, 'tdc_Trial00{}'.format(1)
+    )
+if not os.path.exists(triFolder):
+    os.makedirs(triFolder, exist_ok=True)
+'''
+triFolderSource = triFolder
+triDestinations = [
+    'Trial00{}'.format(trialIdx)
+    for trialIdx in []]
+
+remakePrb = False
+nspCmpPath = os.path.join('.', 'nsp_map.cmp')
+cmpDF = tdch.cmpToDF(nspCmpPath)
+# make .prb file for spike sorting
+#  groupIn={'xcoords': 2, 'ycoords': 2}
+if remakePrb:
+    nspCsvPath = os.path.join('.', 'nsp_map.csv')
+    cmpDF.to_csv(nspCsvPath)
+    tdch.cmpDFToPrb(
+        cmpDF, filePath=nspPrbPath,
+        names=['elec', 'ainp'],
+        groupIn={'xcoords': 1, 'ycoords': 1})
+
+#  should rename these to something more intuitive
+#  paths relevant to individual trials
+processedFolder = os.path.join(
+    remoteBasePath, 'processed', experimentName)
+if not os.path.exists(processedFolder):
+    os.makedirs(processedFolder, exist_ok=True)
+analysisDataPath = os.path.join(
+    remoteBasePath, 'processed', experimentName,
+    ns5FileName + '_analyze.nix')
+trialBasePath = os.path.join(
+    nspFolder,
+    ns5FileName + '.nix')
+spikePath = os.path.join(
+    nspFolder,
+    'tdc_' + trialFilesFrom['utah']['ns5FileName'],
+    'tdc_' + trialFilesFrom['utah']['ns5FileName'] + '.nix')
+insDataPath = os.path.join(
+    remoteBasePath, 'raw', experimentName,
+    ns5FileName + '_ins.nix')
+binnedSpikePath = os.path.join(
+    remoteBasePath, 'processed', experimentName,
+    ns5FileName + '_binarized.nix')
+trialTriggeredPath = os.path.join(
+    remoteBasePath, 'processed', experimentName,
+    ns5FileName + '_triggered.nix')
+
+#  paths relevant to the entire experimental day
+estimatorPath = os.path.join(
+    remoteBasePath, 'processed', experimentName,
+    experimentName + '_estimator.joblib')
+experimentDataPath = os.path.join(
+    remoteBasePath, 'processed', experimentName,
+    experimentName + '_analyze.nix')
+experimentTriggeredPath = os.path.join(
+    remoteBasePath, 'processed', experimentName,
+    experimentName + '_triggered.nix')
+experimentBinnedSpikePath = os.path.join(
+    remoteBasePath, 'processed', experimentName,
+    experimentName + '_binarized.nix')
+
+#  figure paths
+figureFolder = os.path.join(
+    remoteBasePath, 'figures', experimentName
+    )
+alignedRastersFolder = os.path.join(figureFolder, 'alignedRasters')
+if not os.path.exists(alignedRastersFolder):
+    os.makedirs(alignedRastersFolder, exist_ok=True)
+alignedFeaturesFolder = os.path.join(figureFolder, 'alignedFeatures')
+if not os.path.exists(alignedFeaturesFolder):
+    os.makedirs(alignedFeaturesFolder, exist_ok=True)
+spikeSortingFiguresFolder = os.path.join(figureFolder, 'spikeSorting')
+if not os.path.exists(spikeSortingFiguresFolder):
+    os.makedirs(spikeSortingFiguresFolder, exist_ok=True)
+
 rasterOpts = {
-    'binInterval': (5) * 1e-3, 'binWidth': (20) * 1e-3,
-    'windowSize': (-.05, .15),
+    'binInterval': 1e-3, 'binWidth': 30e-3,
+    'windowSize': (-.5, .5),
     'discardEmpty': None, 'maxSpikesTo': None, 'timeRange': None,
     'separateByFunArgs': None,
+    'alignTo': None,
     'separateByFunKWArgs': {'type': 'Classification'}
     }
 plotOpts = {
     'type': 'ticks', 'errorBar': 'sem',
     'pageSize': (6, 12), 'removeOutliers': (0.01, 0.975)}
-    
-analysisDataPath = os.path.join(
-    trialFilesStim['ins']['folderPath'],
-    trialFilesStim['ins']['experimentName'],
-    trialFilesStim['ins']['ns5FileName'] + '_analyze.nix')
-trialBasePath = os.path.join(
-    trialFilesFrom['utah']['folderPath'],
-    trialFilesFrom['utah']['ns5FileName'] + '.nix')

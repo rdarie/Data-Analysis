@@ -167,10 +167,10 @@ def channelIndexesToSpikeDict(
         spikes['ChannelID'][idx] = chIdx.name
         for unitIdx, thisUnit in enumerate(chIdx.units):
             for stIdx, st in enumerate(thisUnit.spiketrains):
-                print(
-                    'unit {} has {} spiketrains'.format(
-                        thisUnit.name,
-                        len(thisUnit.spiketrains)))
+                #  print(
+                #      'unit {} has {} spiketrains'.format(
+                #          thisUnit.name,
+                #          len(thisUnit.spiketrains)))
                 if len(spikes['TimeStamps'][idx]):
                     spikes['TimeStamps'][idx] = np.concatenate((
                         spikes['TimeStamps'][idx],
@@ -203,8 +203,10 @@ def channelIndexesToSpikeDict(
                 for key, value in st.annotations.items():
                     if key not in spikes['basic_headers']:
                         spikes['basic_headers'].update({key: {}})
-                    if value:
+                    try:
                         spikes['basic_headers'][key].update({maxUnitIdx: value})
+                    except Exception:
+                        pass
                 maxUnitIdx += 1
     return spikes
 
@@ -218,7 +220,7 @@ def spikeTrainArrayAnnToDF(
         fullAnnotationsDict.update({childBaseName(st.name, 'seg'): theseAnnDF})
     
     annotationsDF = pd.concat(
-        fullAnnotationsDict, names=['name', 'index'])
+        fullAnnotationsDict, names=['name', 'index'], sort=True)
     return annotationsDF
 
 
@@ -805,7 +807,7 @@ def getNIXData(
     else:
         timeSlice = (None, None)
     segBounds, requestedSegs = findSegsIncluding(block, timeSlice)
-    
+    #  pdb.set_trace()
     data = pd.DataFrame(columns=elecIds + ['t'])
     for segIdx in requestedSegs.index:
         seg = block.segments[segIdx]
@@ -941,6 +943,7 @@ def readBlockFixNames(
 def addBlockToNIX(
         newBlock, neoSegIdx=[0],
         writeAsigs=True, writeSpikes=True, writeEvents=True,
+        asigNameList=None,
         purgeNixNames=False,
         fileName=None,
         folderPath=None,
@@ -1011,6 +1014,8 @@ def addBlockToNIX(
                 if checkCompatible[nixIdx]:
                     assert asig.dtype == forceType[nixIdx]
                     assert asig.sampling_rate == forceFS[nixIdx]
+                    print('asig.shape[0] = {}'.format(asig.shape[0]))
+                    print('forceShape[nixIdx] = {}'.format(forceShape[nixIdx]))
                     assert asig.shape[0] == forceShape[nixIdx]
                 asig = writer._write_analogsignal(asig, nixblock, nixgroup)
             #  for isig in newSeg.filter(objects=IrregularlySampledSignal):
@@ -1034,16 +1039,20 @@ def addBlockToNIX(
 def blockToNix(
         block, writer, chunkSize,
         segInitIdx,
+        equalChunks=True,
+        chunkList=None,
         fillOverflow=False,
         eventInfo=None,
         removeJumps=False, trackMemory=True,
-        spikeSource='', spikeBlock=None
+        asigNameList=None,
+        spikeSourceType='', spikeBlock=None,
+        calcRigEvents=True
         ):
     idx = segInitIdx
     #  prune out nev spike placeholders
     #  (will get added back on a chunk by chunk basis,
     #  if not pruning units)
-    if spikeSource == 'nev':
+    if spikeSourceType == 'nev':
         pruneOutUnits = False
     else:
         pruneOutUnits = True
@@ -1062,20 +1071,18 @@ def blockToNix(
                 for unit in chanIdx.units:
                     if unit.spiketrains:
                         unit.spiketrains = []
-
     #  remove chanIndexes assigned to units; makes more sense to
     #  only use chanIdx for asigs and spikes on that asig
     block.channel_indexes = (
         [chanIdx for chanIdx in block.channel_indexes if (
             chanIdx.analogsignals)])
-
+    #  pdb.set_trace()
     #  delete asig and irsig proxies from channel index list
     for metaIdx, chanIdx in enumerate(block.channel_indexes):
         if chanIdx.analogsignals:
             chanIdx.analogsignals = []
         if chanIdx.irregularlysampledsignals:
             chanIdx.irregularlysampledsignals = []
-    
     #  precalculate new segments
     newSegList = []
     oldSegList = block.segments
@@ -1085,11 +1092,16 @@ def blockToNix(
         segLen = seg.analogsignals[0].shape[0] / (
             seg.analogsignals[0].sampling_rate)
         nChunks = math.ceil(segLen / chunkSize)
-        actualChunkSize = (segLen / nChunks).magnitude
-        segParents.update({segIdx: {}})
+        #
+        if equalChunks:
+            actualChunkSize = (segLen / nChunks).magnitude
+        else:
+            actualChunkSize = chunkSize
+        if chunkList is None:
+            chunkList = range(nChunks)
 
-        for chunkIdx in range(nChunks):
-            #  for chunkIdx in [0, 1]:
+        segParents.update({segIdx: {}})
+        for chunkIdx in chunkList:
             tStart = chunkIdx * actualChunkSize
             tStop = (chunkIdx + 1) * actualChunkSize
 
@@ -1108,23 +1120,27 @@ def blockToNix(
             idx += 1
     block.segments = newSegList
     block, nixblock = writer.write_block_meta(block)
-
     # descend into Segments
     for segIdx, seg in enumerate(oldSegList):
         segLen = seg.analogsignals[0].shape[0] / (
             seg.analogsignals[0].sampling_rate)
         nChunks = math.ceil(segLen / chunkSize)
-        actualChunkSize = (segLen / nChunks).magnitude
-        
+        #
+        if equalChunks:
+            actualChunkSize = (segLen / nChunks).magnitude
+        else:
+            actualChunkSize = chunkSize
+        if chunkList is None:
+            chunkList = range(nChunks)
+        #
         if spikeBlock is not None:
             spikeSeg = spikeBlock.segments[segIdx]
         else:
             spikeSeg = seg
-
-        for chunkIdx in range(nChunks):
-            #  for chunkIdx in [0, 1]:
-            tStart = chunkIdx * actualChunkSize
-            tStop = (chunkIdx + 1) * actualChunkSize
+        #
+        for chunkIdx in chunkList:
+            tStart = chunkIdx * actualChunkSize * pq.s
+            tStop = (chunkIdx + 1) * actualChunkSize * pq.s
             print(
                 'PreprocNs5: starting chunk %d of %d' % (
                     chunkIdx + 1, nChunks))
@@ -1133,8 +1149,20 @@ def blockToNix(
                     hf.memory_usage_psutil()))
             newSeg = block.segments[segParents[segIdx][chunkIdx]]
             newSeg, nixgroup = writer._write_segment_meta(newSeg, nixblock)
-            
-            for aSigIdx, aSigProxy in enumerate(seg.analogsignals):
+            #  trim down list of analog signals if necessary
+            if asigNameList is not None:
+                aSigList = []
+                for a in seg.analogsignals:
+                    if np.any([n in a.name for n in asigNameList]):
+                        aSigList.append(a)
+            else:
+                aSigList = seg.analogsignals
+            #
+            for aSigIdx, aSigProxy in enumerate(aSigList):
+                if aSigIdx == 0:
+                    # check bounds
+                    tStart = max(tStart, aSigProxy.t_start)
+                    tStop = min(tStop, aSigProxy.t_stop)
                 if trackMemory:
                     print('writing asigs memory usage: {}'.format(
                         hf.memory_usage_psutil()))
@@ -1162,7 +1190,6 @@ def blockToNix(
                     badData.update(newBadData)
                     '''
                     pass
-
                 # assign ownership to containers
                 chanIdx.analogsignals.append(asig)
                 newSeg.analogsignals.append(asig)
@@ -1173,11 +1200,11 @@ def blockToNix(
                 asig = writer._write_analogsignal(asig, nixblock, nixgroup)
                 del asig
                 gc.collect()
-
+            #
             for irSigIdx, irSigProxy in enumerate(
                     seg.irregularlysampledsignals):
                 chanIdx = irSigProxy.channel_index
-
+                #
                 isig = irSigProxy.load(
                     time_slice=(tStart, tStop),
                     magnitude_mode='rescaled')
@@ -1195,8 +1222,8 @@ def blockToNix(
                     isig, nixblock, nixgroup)
                 del isig
                 gc.collect()
-
-            if spikeSource:
+            #
+            if len(spikeSourceType):
                 for stIdx, stProxy in enumerate(spikeSeg.spiketrains):
                     if trackMemory:
                         print('writing spiketrains mem usage: {}'.format(
@@ -1204,21 +1231,32 @@ def blockToNix(
                     unit = stProxy.unit
                     try:
                         st = stProxy.load(
-                            time_slice=(tStart, tStop),
                             magnitude_mode='rescaled',
                             load_waveforms=True)
                     except Exception:
                         st = stProxy.load(
-                            time_slice=(tStart, tStop),
                             magnitude_mode='rescaled',
                             load_waveforms=False)
                         st.waveforms = np.array([]).reshape((0, 0, 0))*pq.mV
-
-                    st.annotate(fromNSP=True)
-                    #  !!! TODO, mark by origin (utah, nForm, ainp)
-
+                    #  have to manually slice tStop and tStart because
+                    #  array annotations are not saved natively in the nix file
+                    #  (we're getting them as plain annotations)
+                    timeMask = np.array(
+                        (st.times > tStart) & (st.times <= tStop),
+                        dtype=np.bool)
+                    try:
+                        if 'arrayAnnNames' in st.annotations:
+                            for key in st.annotations['arrayAnnNames']:
+                                st.annotations[key] = np.array(
+                                    st.annotations[key])[timeMask]
+                        st = st[timeMask]
+                        st.t_start = tStart
+                        st.t_stop = tStop
+                    except Exception:
+                        traceback.print_exc()
+                        #  pdb.set_trace()
                     #  rename chanIndexes TODO: replace in readBlockFixNames
-                    if spikeSource == 'nev':
+                    if spikeSourceType == 'nev':
                         nameParser = re.search(r'ch(\d*)#(\d*)', unit.name)
                         if nameParser is not None:
                             # first time at this unit, rename it
@@ -1230,25 +1268,24 @@ def blockToNix(
                             unit.channel_index = chanIdx
                             unit.name = '{}#{}'.format(chanIdx.name, unitId)
                             chanIdx.units.append(unit)
-                    elif spikeSource == 'tdc':
-                        #  tdc may or may not have the same channel ids, but it will have
-                        #  consistent channel names
-                        #  TODO: fix the fact that units inherit their st's name on load
+                    elif spikeSourceType == 'tdc':
+                        #  tdc may or may not have the same channel ids, but
+                        #  it will have consistent channel names
+                        nameParser = re.search(
+                            r'([a-zA-Z0-9]*)#(\d*)', unit.name)
+                        chanLabel = nameParser.group(1)
+                        unitId = nameParser.group(2)
+                        chanIdx = [
+                            i for i in block.channel_indexes
+                            if chanLabel == i.name][0]
+                        #  print(unit.name)
                         if not (unit in chanIdx.units):
-                            nameParser = re.search(
-                                r'([a-zA-Z0-9]*)#(\d*)', unit.name)
-                            chanLabel = nameParser.group(1)
-                            unitId = nameParser.group(2)
-                            chanIdx = [
-                                i for i in block.channel_indexes
-                                if chanLabel.encode() in i.channel_names][0]
-                            # first time at this unit, rename it
+                            # first time at this unit, add to its chanIdx
                             unit.channel_index = chanIdx
                             chanIdx.units.append(unit)
-                            unit.name = '{}#{}'.format(chanIdx.name, unitId)
-
+                        #  except Exception:
+                        #      traceback.print_exc()
                     st.name = 'seg{}_{}'.format(segIdx, unit.name)
-
                     #  link SpikeTrain and ID providing unit
                     st.unit = unit
                     # assign ownership to containers
@@ -1260,9 +1297,8 @@ def blockToNix(
                     # write out to file
                     st = writer._write_spiketrain(st, nixblock, nixgroup)
                     del st
-
-            if eventInfo is not None:
-                #  process trial related events
+            #  process trial related events
+            if calcRigEvents:
                 analogData = []
                 for key, value in eventInfo['inputIDs'].items():
                     searchName = 'seg{}_'.format(segIdx) + value
@@ -1281,11 +1317,6 @@ def blockToNix(
                 gc.collect()
                 motorData = mea.processMotorData(
                     motorData, ainpAsig.sampling_rate.magnitude)
-                plotExample = False
-                if plotExample:
-                    exampleTrace = motorData.loc[12e6:13e6, 'position']
-                    exampleTrace.plot()
-                    plt.show()
                 keepCols = [
                     'position', 'velocity', 'velocityCat',
                     'rightBut_int', 'leftBut_int',
@@ -1318,7 +1349,7 @@ def blockToNix(
                     gc.collect()
                 _, trialEvents = mea.getTrialsNew(
                     motorData, ainpAsig.sampling_rate.magnitude,
-                    tStart, trialType=None)
+                    float(tStart.magnitude), trialType=None)
                 trialEvents.fillna(0)
                 trialEvents.rename(
                     columns={
@@ -1343,7 +1374,7 @@ def blockToNix(
                     del event
                     gc.collect()
                 del trialEvents, eventList
-
+            #
             for eventProxy in seg.events:
                 event = eventProxy.load(
                     time_slice=(tStart, tStop))
@@ -1354,7 +1385,7 @@ def blockToNix(
                 event = writer._write_event(event, nixblock, nixgroup)
                 del event
                 gc.collect()
-
+            #
             for epochProxy in seg.epochs:
                 epoch = epochProxy.load(
                     time_slice=(tStart, tStop))
@@ -1365,43 +1396,59 @@ def blockToNix(
                 epoch = writer._write_epoch(epoch, nixblock, nixgroup)
                 del epoch
                 gc.collect()
-
+    #
+    chanIdxDiscardNames = []
     # descend into ChannelIndexes
     for chanIdx in block.channel_indexes:
         if chanIdx.analogsignals or chanIdx.units:
             chanIdx = writer._write_channelindex(chanIdx, nixblock)
+        else:
+            chanIdxDiscardNames.append(chanIdx.name)
+    block.channel_indexes = [
+        i
+        for i in block.channel_indexes
+        if i.name not in chanIdxDiscardNames
+        ]
     writer._create_source_links(block, nixblock)
     return idx
 
 
 def preproc(
         fileName='Trial001',
-        folderPath='./',
+        rawFolderPath='./',
+        outputFolderPath='./',
         fillOverflow=True, removeJumps=True,
         eventInfo=None,
-        spikeSource='',
-        chunkSize=1800, writeMode='rw',
-        signal_group_mode='split-all', trialInfo=None
+        spikeSourceType='', spikePath=None,
+        chunkSize=1800, equalChunks=True,
+        chunkList=None,
+        writeMode='rw',
+        signal_group_mode='split-all', trialInfo=None,
+        asigNameList=None, nameSuffix='',
+        calcRigEvents=True
         ):
     #  base file name
-    trialBasePath = os.path.join(folderPath, fileName)
+    rawBasePath = os.path.join(rawFolderPath, fileName)
+    outputFilePath = os.path.join(
+        outputFolderPath,
+        fileName + nameSuffix + '.nix')
     #  instantiate reader, get metadata
     reader = neo.io.BlackrockIO(
-        filename=trialBasePath, nsx_to_load=5)
+        filename=rawBasePath, nsx_to_load=5)
     reader.parse_header()
     metadata = reader.header
     #  instantiate spike reader if requested
-    if spikeSource == 'tdc':
-        spikePath = os.path.join(
-            folderPath, 'tdc_' + fileName,
-            'tdc_' + fileName + '.nix')
+    if spikeSourceType == 'tdc':
+        if spikePath is None:
+            spikePath = os.path.join(
+                outputFolderPath, 'tdc_' + fileName,
+                'tdc_' + fileName + '.nix')
         spikeReader = neo.io.nixio_fr.NixIO(filename=spikePath)
     else:
         spikeReader = None
-
     #  instantiate writer
     writer = neo.io.NixIO(
-        filename=trialBasePath + '.nix', mode=writeMode)
+        filename=outputFilePath, mode=writeMode)
     #  absolute section index
     idx = 0
     for blkIdx in range(metadata['nb_block']):
@@ -1417,20 +1464,23 @@ def preproc(
             spikeBlock = purgeNixAnn(spikeBlock)
         else:
             spikeBlock = None
-
+        #
         idx = blockToNix(
             block, writer, chunkSize,
             segInitIdx=idx,
+            equalChunks=equalChunks,
+            chunkList=chunkList,
             fillOverflow=fillOverflow,
             removeJumps=removeJumps,
             eventInfo=eventInfo,
-            spikeSource=spikeSource,
-            spikeBlock=spikeBlock
+            asigNameList=asigNameList,
+            spikeSourceType=spikeSourceType,
+            spikeBlock=spikeBlock,
+            calcRigEvents=calcRigEvents
             )
-
     writer.close()
-
-    return neo.io.nixio_fr.NixIO(filename=trialBasePath + '.nix')
+    #
+    return neo.io.nixio_fr.NixIO(filename=outputFilePath)
 
 
 def purgeNixAnn(
@@ -1479,7 +1529,6 @@ def loadContainerArrayAnn(
 
     for st in spikesAndEvents:
         if 'arrayAnnNames' in st.annotations.keys():
-            #  pdb.set_trace()
             if isinstance(st.annotations['arrayAnnNames'], str):
                 st.annotations['arrayAnnNames'] = [st.annotations['arrayAnnNames']]
             for key in st.annotations['arrayAnnNames']:
@@ -1491,7 +1540,7 @@ def loadContainerArrayAnn(
                         {key: np.array(st.annotations[key])})
                 except Exception:
                     traceback.print_exc()
-                    #pdb.set_trace()
+                    #  pdb.set_trace()
         if hasattr(st, 'waveforms'):
             if st.waveforms is None:
                 st.waveforms = np.array([]).reshape((0, 0, 0))*pq.mV
@@ -1542,16 +1591,13 @@ def calcBinarizedArray(
         newSeg = Segment(name='seg{}_'.format(segIdx))
         newSeg.merge_annotations(seg)
         spikeMatBlock.segments.append(newSeg)
-        
         #  tStart = dataBlock.segments[0].t_start
         #  tStop = dataBlock.segments[0].t_stop
         tStart = seg.t_start
         tStop = seg.t_stop
-
         # make dummy binary spike train, in case ths chan didn't fire
         segSpikeTrains = [
             i for i in seg.filter(objects=SpikeTrain) if '#' in i.name]
-        
         dummyBin = binarize(
             segSpikeTrains[0],
             sampling_rate=samplingRate,

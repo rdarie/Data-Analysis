@@ -1,4 +1,4 @@
-"""
+"""02: Curate constructor clusters
 Usage:
     tridesclousVisualize [options]
 
@@ -15,6 +15,7 @@ import tridesclous as tdc
 import dataAnalysis.helperFunctions.tridesclous_helpers as tdch
 import dataAnalysis.helperFunctions.helper_functions as hf
 from currentExperiment import *
+#from exp201901211000 import *
 import os, gc, traceback
 
 arguments = docopt(__doc__)
@@ -51,9 +52,10 @@ chansToAnalyze = [
     81, 82, 83, 84, 85, 86, 87, 88, 89,
     90, 91, 92, 93, 94, 95]
 '''
+
 #  chansToAnalyze = chansToAnalyze[80:]
 #  chansToAnalyze = [1, 8, 43, 46, 50, 53, 57, 59, 62, 67, 73, 74, 82, 84, 90, 91]
-#  chansToAnalyze = [4]
+chansToAnalyze = [34, 81, 84, 92]
 print(chansToAnalyze)
 if viewConstructor:
     for chan_grp in chansToAnalyze:

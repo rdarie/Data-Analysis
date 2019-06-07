@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# 06a: Preprocess the NS5 File
 # Request 24 hours of runtime:
 #SBATCH --time=1:00:00
 
@@ -8,16 +9,16 @@
 # Use more memory (32GB):
 #SBATCH --nodes=1
 #SBATCH --mem=96G
-#SBATCH --array=4
+#SBATCH --array=1,2
 
 # Specify a job name:
 #SBATCH -J nsp_preproc
 
 # Specify an output file
-#SBATCH -o ../batch_logs/%j-%a-preprocnsp.stdout
-#SBATCH -e ../batch_logs/%j-%a-preprocnsp.errout
+#SBATCH -o ../batch_logs/%j-%a-nsp_preproc.stdout
+#SBATCH -e ../batch_logs/%j-%a-nsp_preproc.errout
 
 # Specify account details
 #SBATCH --account=bibs-dborton-condo
 
-python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/preprocNS5.py' --trialIdx=$SLURM_ARRAY_TASK_ID
+python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/preprocNS5.py' --trialIdx=$SLURM_ARRAY_TASK_ID --makeFull --makeTruncated

@@ -22,6 +22,7 @@ import dataAnalysis.helperFunctions.helper_functions as hf
 from scipy.spatial.distance import minkowski
 import scipy.signal
 
+
 def cmpToDF(arrayFilePath):
     arrayMap = pd.read_csv(
         arrayFilePath, sep='\t',
@@ -36,8 +37,9 @@ def cmpToDF(arrayFilePath):
     
     for rowIdx, row in arrayMap.iterrows():
         #  label matches non-digits index matches digit
-        elecName = re.split(r'\d*', row['label'])[0]
-        elecIdx = int(re.split(r'\D*', row['label'])[-1])
+        elecSplit = re.match(r'(\D*)(\d*)', row['label']).groups()
+        elecName = elecSplit[0]
+        elecIdx = int(elecSplit[-1])
         nevIdx = int(row['elec']) + bankLookup[row['bank']] * 32
         cmpDF.loc[nevIdx, 'elecID'] = elecIdx
         cmpDF.loc[nevIdx, 'nevID'] = nevIdx
@@ -463,7 +465,11 @@ def export_spikes_after_peeler(triFolder):
 
 def neo_block_after_peeler(
         triFolder, chan_grps=None,
-        refractoryPeriod=None, minDist=None, ignoreTags=['so_bad']):
+        shape_distance_threshold=None,
+        shape_boundary_threshold=None,
+        energy_reduction_threshold=None,
+        refractory_period=None, ignoreTags=['so_bad'],
+        FRThresh=1):
     dataio = tdc.DataIO(dirname=triFolder)
 
     chanNames = np.array(
@@ -489,11 +495,12 @@ def neo_block_after_peeler(
                 window2[int(catalogue['n_right']) + 1:]),
             axis=-1)
         #  discount edges a lot
-        window[window < 0.33] = 0.1
+        window[window < 0.5] = 0.1
         #  normalize to sum 1, so that the distance is an average
         #  deviation
-        window = window / np.sum(window)
-        
+        distance_window = (window) / np.sum(window)
+        boundary_window = window
+
         for chan_grp in chan_grps:
             #  chan_grp=0
             channelIds = np.array(
@@ -503,7 +510,7 @@ def neo_block_after_peeler(
             
             clustersDF = pd.DataFrame(catalogue['clusters'])
             if not len(clustersDF) > 0:
-                # no events for this unit
+                # no events from this entire channel
                 continue
 
             clustersDF['max_on_channel_id'] = (
@@ -568,128 +575,170 @@ def neo_block_after_peeler(
                         dataio.get_segment_length(segIdx))
                 )
                 unitMask = unitMask & edgeMask
-                if not unitMask.any():
-                    # no events for this unit
-                    continue
-
-                thisUnitIndices = spike[unitMask]['index']
-                spikeTimes = (
-                    (
-                        thisUnitIndices +
-                        spike[unitMask]['jitter']) /
-                    dataio.sample_rate)
-
                 try:
-                    spikeWaveforms = dataio.get_some_waveforms(
-                        seg_num=segIdx, chan_grp=chan_grp,
-                        spike_indexes=thisUnitIndices,
-                        n_left=catalogue['n_left'],
-                        n_right=catalogue['n_right']
-                        )
+                    if not unitMask.any():
+                        # no events for this unit
+                        raise Exception(
+                            '{} has no spikes'.format(thisUnit.name))
+
+                    thisUnitIndices = spike[unitMask]['index']
+                    spikeTimes = (
+                        (
+                            thisUnitIndices +
+                            spike[unitMask]['jitter']) /
+                        dataio.sample_rate)
+
+                    try:
+                        spikeWaveforms = dataio.get_some_waveforms(
+                            seg_num=segIdx, chan_grp=chan_grp,
+                            spike_indexes=thisUnitIndices,
+                            n_left=catalogue['n_left'],
+                            n_right=catalogue['n_right']
+                            )
+                    except Exception:
+                        traceback.print_exc()
+
+                    spikeWaveforms = np.swapaxes(
+                        spikeWaveforms,
+                        1, 2)
+
+                    timesDF = pd.DataFrame(spikeTimes, columns=['times'])
+                    timesDF['templateDist'] = np.nan
+                    timesDF['maxDeviation'] = np.nan
+                    timesDF['energyReduction'] = np.nan
+                    meanWaveform = np.mean(spikeWaveforms, axis=0)
+                    #  mirror naming convention from tdc
+                    pred_wf = meanWaveform
+                    norm_factor = 1
+                    for idx in timesDF.index:
+                        wf = spikeWaveforms[idx, :, :]
+                        wf_resid = (wf-pred_wf)
+                        normalized_deviation = (
+                            np.abs(wf_resid) *
+                            boundary_window)
+                        normalized_max_deviation = np.max(normalized_deviation)
+                        timesDF.loc[idx, 'maxDeviation'] = normalized_max_deviation
+                        pred_distance = minkowski(
+                            wf / norm_factor,
+                            pred_wf / norm_factor,
+                            p=1, w=distance_window)
+                        timesDF.loc[idx, 'templateDist'] = pred_distance
+                        energy_reduction = (
+                            (np.sum(wf**2) - np.sum(wf_resid**2)) /
+                            wf.shape[0])
+                        timesDF.loc[idx, 'energyReduction'] = energy_reduction
+
+                    if shape_boundary_threshold is not None:
+                        tooFar = timesDF.index[
+                            timesDF['maxDeviation'] > shape_boundary_threshold]
+                        #  pdb.set_trace()
+                        timesDF.drop(index=tooFar, inplace=True)
+                        spikeTimes = spikeTimes[timesDF.index]
+                        spikeWaveforms = spikeWaveforms[timesDF.index, :, :]
+                        timesDF.reset_index(drop=True, inplace=True)
+
+                    if shape_distance_threshold is not None:
+                        tooFar = timesDF.index[
+                            timesDF['templateDist'] > shape_distance_threshold]
+                        #  pdb.set_trace()
+                        timesDF.drop(index=tooFar, inplace=True)
+                        spikeTimes = spikeTimes[timesDF.index]
+                        spikeWaveforms = spikeWaveforms[timesDF.index, :, :]
+                        timesDF.reset_index(drop=True, inplace=True)
+
+                    timesDF['isi'] = timesDF['times'].diff().fillna(method='bfill')
+                    aveSpS = np.nanmedian(timesDF['isi']) ** (-1)
+                    #
+                    if refractory_period is not None:
+                        breaksRefractory = timesDF['isi'] < refractory_period
+                        while breaksRefractory.any() and timesDF['times'].any():
+                            dropIndices = []
+                            for idx in timesDF.loc[breaksRefractory, :].index:
+                                thisSpikeDist = timesDF.loc[idx, 'templateDist']
+                                #  if the previous spike looks worse,
+                                #  we delete that one
+                                DFidx = timesDF.index.get_loc(idx)
+                                prevIdx = timesDF.index[DFidx - 1]
+                                prevSpikeDist = (
+                                    timesDF.loc[prevIdx, 'templateDist'])
+                                if (thisSpikeDist > prevSpikeDist):
+                                    dropIndices.append(idx)
+                                else:
+                                    dropIndices.append(prevIdx)
+                            #  pdb.set_trace()
+                            timesDF.drop(
+                                index=pd.unique(dropIndices), inplace=True)
+                            timesDF['isi'] = timesDF['times'].diff().fillna(method='bfill')
+                            breaksRefractory = timesDF['isi'] < refractory_period
+
+                        spikeTimes = spikeTimes[timesDF.index]
+                        spikeWaveforms = spikeWaveforms[timesDF.index, :, :]
+
+                    if not spikeTimes.any():
+                        raise Exception(
+                            '{} has no spikes'.format(thisUnit.name))
+
+                    arrayAnn = {
+                        'templateDist': timesDF['templateDist'].values,
+                        'maxDeviation': timesDF['maxDeviation'].values,
+                        'energyReduction': timesDF['energyReduction'].values,
+                        'isi': timesDF['isi'].values}
+                    arrayAnnNames = {'arrayAnnNames': list(arrayAnn.keys())}
+                    #  pdb.set_trace()
+                    if group['tag'].iloc[0] == '':
+                        if group['max_peak_amplitude'].iloc[0] < -7:
+                            group.loc[:, 'tag'] = 'so_good'
+                        else:
+                            group.loc[:, 'tag'] = 'good'
+                    st = SpikeTrain(
+                        name='seg{}_{}'.format(int(segIdx), thisUnit.name),
+                        times=spikeTimes, units='sec',
+                        waveforms=spikeWaveforms * pq.uV,
+                        t_stop=maxTime, t_start=0,
+                        left_sweep=catalogue['n_left'],
+                        sampling_rate=dataio.sample_rate * pq.Hz,
+                        array_annotations=arrayAnn,
+                        **arrayAnn, **arrayAnnNames)
+                    for colName in group.columns:
+                        v = group[colName].iloc[0]
+                        if v:
+                            st.annotations.update(
+                                {colName: v}
+                            )
+                    #  pdb.set_trace()
+                    st.annotations.update({'chan_grp': chan_grp})
                 except Exception:
                     traceback.print_exc()
+                    arrayAnn = {
+                        'templateDist': np.array([]),
+                        'maxDeviation': np.array([]),
+                        'energyReduction': np.array([]),
+                        'isi': np.array([])}
+                    arrayAnnNames = {'arrayAnnNames': list(arrayAnn.keys())}
+                    st = SpikeTrain(
+                        name='seg{}_{}'.format(int(segIdx), thisUnit.name),
+                        times=np.array([]), units='sec',
+                        waveforms=np.array([]).reshape((0, 0, 0))*pq.uV,
+                        t_stop=maxTime, t_start=0,
+                        left_sweep=catalogue['n_left'],
+                        sampling_rate=dataio.sample_rate * pq.Hz,
+                        array_annotations=arrayAnn,
+                        **arrayAnn, **arrayAnnNames)
+                    for colName in group.columns:
+                        v = group[colName].iloc[0]
+                        if v:
+                            st.annotations.update(
+                                {colName: v}
+                            )
+                    st.annotations.update({'chan_grp': chan_grp})
 
-                spikeWaveforms = np.swapaxes(
-                    spikeWaveforms,
-                    1, 2)
-                
-                timesDF = pd.DataFrame(spikeTimes, columns=['times'])
-                timesDF['templateDist'] = np.nan
-                meanWaveform = np.mean(spikeWaveforms, axis=0)
-
-                for idx in timesDF.index:
-                    timesDF.loc[idx, 'templateDist'] = minkowski(
-                        spikeWaveforms[idx, :, :],
-                        meanWaveform, p=1, w=window)
-                
-                if minDist is not None:
-                    tooFar = timesDF.index[
-                        timesDF['templateDist'] > minDist]
-                    #  pdb.set_trace()
-                    timesDF.drop(index=tooFar, inplace=True)
-                    spikeTimes = spikeTimes[timesDF.index]
-                    spikeWaveforms = spikeWaveforms[timesDF.index, :, :]
-                    timesDF.reset_index(drop=True, inplace=True)
-                    #  plot distribution of distances to template
-                    debugging = False
-                    if debugging:
-                        import matplotlib.pyplot as plt
-                        import seaborn as sns
-                        ax = sns.distplot(timesDF['templateDist'])
-                        plt.savefig(
-                            os.path.join(
-                                '/gpfs/data/dborton/rdarie/tempdata',
-                                'templateHist_{}.png'.format(unitName)))
-                        plt.close()
-                timesDF['isi'] = timesDF['times'].diff().fillna(method='bfill')
-                if refractoryPeriod is not None:
-                    breaksRefractory = timesDF['isi'] < refractoryPeriod
-                    while breaksRefractory.any() and timesDF['times'].any():
-                        dropIndices = []
-                        for idx in timesDF.loc[breaksRefractory, :].index:
-                            thisSpikeDist = timesDF.loc[idx, 'templateDist']
-                            #  if the previous spike looks worse,
-                            #  we delete that one
-                            DFidx = timesDF.index.get_loc(idx)
-                            prevIdx = timesDF.index[DFidx - 1]
-                            prevSpikeDist = (
-                                timesDF.loc[prevIdx, 'templateDist'])
-                            if (thisSpikeDist > prevSpikeDist):
-                                dropIndices.append(idx)
-                            else:
-                                dropIndices.append(prevIdx)
-                        #  pdb.set_trace()
-                        timesDF.drop(
-                            index=pd.unique(dropIndices), inplace=True)
-                        timesDF['isi'] = timesDF['times'].diff().fillna(method='bfill')
-                        breaksRefractory = timesDF['isi'] < refractoryPeriod
-                
-                    spikeTimes = spikeTimes[timesDF.index]
-                    spikeWaveforms = spikeWaveforms[timesDF.index, :, :]
-                
-                if not spikeTimes.any():
-                    continue
-                
-                arrayAnn = {
-                    'templateDist': timesDF['templateDist'].values,
-                    'isi': timesDF['isi'].values}
-                arrayAnnNames = {'arrayAnnNames': list(arrayAnn.keys())}
-                #  pdb.set_trace()
-                if group['tag'].iloc[0] == '':
-                    if group['max_peak_amplitude'].iloc[0] < -7:
-                        group.loc[:, 'tag'] = 'good'
-                    else:
-                        group.loc[:, 'tag'] = 'so_good'
-                st = SpikeTrain(
-                    name='seg{}_{}'.format(int(segIdx), thisUnit.name),
-                    times=spikeTimes, units='sec',
-                    waveforms=spikeWaveforms * pq.uV,
-                    t_stop=maxTime, t_start=0,
-                    left_sweep=catalogue['n_left'],
-                    sampling_rate=dataio.sample_rate * pq.Hz,
-                    **arrayAnn, **arrayAnnNames)
-                for colName in group.columns:
-                    v = group[colName].iloc[0]
-                    if v:
-                        '''
-                        print('{}, {}, type={}'.format(
-                            colName,
-                            v,
-                            type(v)))
-                        print('iterable? {}'.format(isinstance(v, Iterable)))
-                        '''
-                        st.annotations.update(
-                            {colName: v}
-                        )
-                #  pdb.set_trace()
-                st.annotations.update({'chan_grp': chan_grp})
-                
                 #  create relationships
                 chanIdx.units.append(thisUnit)
                 thisUnit.channel_index = chanIdx
                 thisUnit.spiketrains.append(st)
                 seg.spiketrains.append(st)
                 st.unit = thisUnit
+
             #  end iterating unitGrouper
             seg.create_relationship()
     for chanIdx in block.channel_indexes:
@@ -809,6 +858,7 @@ def batchPreprocess(
         common_ref_removal=False,
         noise_estimate_duration=120.,
         sample_snippet_duration=240.,
+        chunksize=4096, n_left=-34, n_right=66,
         align_waveform=False, subsample_ratio=20,
         autoMerge=False, auto_merge_threshold=0.8,
         n_components_by_channel=15, attemptMPI=False
@@ -833,12 +883,12 @@ def batchPreprocess(
                 hf.memory_usage_psutil()))
             preprocess_signals_and_peaks(
                 triFolder, chan_grp=chan_grp,
-                chunksize=4096,
+                chunksize=chunksize,
                 signalpreprocessor_engine='numpy',
                 peakdetector_engine='numpy',
                 highpass_freq=300.,
                 lowpass_freq=6000.,
-                filter_order=3,
+                filter_order=4,
                 smooth_size=5,
                 relative_threshold=relative_threshold,
                 peak_span=peak_span,
@@ -852,7 +902,9 @@ def batchPreprocess(
                 try:
                     extract_waveforms_pca(
                         triFolder, feature_method='pca_by_channel',
-                        align_waveform=align_waveform, subsample_ratio=subsample_ratio,
+                        align_waveform=align_waveform,
+                        subsample_ratio=subsample_ratio,
+                        n_left=n_left, n_right=n_right,
                         n_components_by_channel=n_components_by_channel,
                         chan_grp=chan_grp)
                     successfulDimRed = True

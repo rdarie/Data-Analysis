@@ -1,5 +1,5 @@
 #!/bin/bash
-
+# 05: Assemble the spike nix file
 # Request 24 hours of runtime:
 #SBATCH --time=72:00:00
 
@@ -8,7 +8,7 @@
 # Use more memory (32GB):
 #SBATCH --nodes=1
 #SBATCH --mem=48G
-#SBATCH --array=1,2,3
+#SBATCH --array=1,2
 
 # Specify a job name:
 #SBATCH -J sorting_diagnostics

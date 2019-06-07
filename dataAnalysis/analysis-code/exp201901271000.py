@@ -223,7 +223,7 @@ spikePath = os.path.join(
         'tdc_' + trialFilesFrom['utah']['ns5FileName'],
         'tdc_' + trialFilesFrom['utah']['ns5FileName'] + '.nix')
 insDataPath = os.path.join(
-        remoteBasePath, 'processed', experimentName,
+        remoteBasePath, 'raw', experimentName,
         ns5FileName + '_ins.nix')
 binnedSpikePath = os.path.join(
     remoteBasePath, 'processed', experimentName,

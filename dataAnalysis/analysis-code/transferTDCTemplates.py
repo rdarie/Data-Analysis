@@ -1,3 +1,7 @@
+"""03: Transfer curated templates
+
+"""
+
 import tridesclous as tdc
 import dataAnalysis.helperFunctions.tridesclous_helpers as tdch
 from currentExperiment import *

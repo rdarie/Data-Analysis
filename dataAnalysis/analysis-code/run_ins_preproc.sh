@@ -1,21 +1,21 @@
 #!/bin/bash
 
+# 06b: Preprocess the INS Recording
 # Request 24 hours of runtime:
-#SBATCH --time=72:00:00
+#SBATCH --time=2:00:00
 
 # Default resources are 1 core with 2.8GB of memory.
-
-# Use more memory (32GB):
+# Request custom resources
 #SBATCH --nodes=1
-#SBATCH --mem=32G
-#SBATCH --array=4
+#SBATCH --mem=24G
+#SBATCH --array=1,2
 
 # Specify a job name:
-#SBATCH -J preprocIns
+#SBATCH -J ins_preproc
 
 # Specify an output file
-#SBATCH -o ../batch_logs/%j-%a-preprocIns.stdout
-#SBATCH -e ../batch_logs/%j-%a-preprocIns.errout
+#SBATCH -o ../batch_logs/%j-%a-ins_preproc.stdout
+#SBATCH -e ../batch_logs/%j-%a-ins_preproc.errout
 
 # Specify account details
 #SBATCH --account=bibs-dborton-condo

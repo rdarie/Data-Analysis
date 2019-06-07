@@ -3,18 +3,20 @@ import os
 import dataAnalysis.helperFunctions.kilosort_analysis as ksa
 import dataAnalysis.helperFunctions.tridesclous_helpers as tdch
 
-miniRCTrial = True
+miniRCTrial = False
 #  plottingFigures = True
 plottingFigures = False
 plotBlocking = True
-trialIdx = 4
-experimentName = '201901261000-Proprio'
+trialIdx = 3
+experimentName = '201901211000-Proprio'
 deviceName = 'DeviceNPC700373H'
 #  remote paths
 remoteBasePath = '..'
+scratchPath = '/gpfs/scratch/rdarie/rdarie/Murdoc Neural Recordings'
 #  remoteBasePath = 'Z:\\data\\rdarie\\Murdoc Neural Recordings'
 insFolder = os.path.join(remoteBasePath, 'ORCA Logs')
 nspFolder = os.path.join(remoteBasePath, 'raw', experimentName)
+
 ns5FileName = 'Trial00{}'.format(trialIdx)
 
 jsonSessionNames = {
@@ -40,15 +42,15 @@ sessionTapRangesNSP = {
         }
     }
 
+#  make placeholders for interpolation functions
 interpFunINStoNSP = {
-    #  per trial
-    4: [None],
+    key: [None for i in value.keys()]
+    for key, value in sessionTapRangesNSP.items()
     }
 interpFunHUTtoINS = {
-    #  per trial
-    4: [None]
+    key: [None for i in value.keys()]
+    for key, value in sessionTapRangesNSP.items()
     }
-
 #  should rename to something more intuitive
 eventInfo = {
     'inputIDs': {
@@ -65,7 +67,7 @@ eventInfo = {
         'simiTrigs': 8,
         }
     }
-
+#  process int names into strings
 for key, value in eventInfo['inputIDs'].items():
     eventInfo['inputIDs'][key] = 'ainp{}'.format(value)
 
@@ -150,7 +152,7 @@ spikePath = os.path.join(
         'tdc_' + trialFilesFrom['utah']['ns5FileName'],
         'tdc_' + trialFilesFrom['utah']['ns5FileName'] + '.nix')
 insDataPath = os.path.join(
-        remoteBasePath, 'processed', experimentName,
+        remoteBasePath, 'raw', experimentName,
         ns5FileName + '_ins.nix')
 binnedSpikePath = os.path.join(
     remoteBasePath, 'processed', experimentName,

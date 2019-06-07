@@ -430,9 +430,13 @@ def getTrialsNew(motorData, fs, tStart, trialType = '2AFC'):
     #  avoid bounce by looking into the future of vCat
     futureOffset = int(minDist * fs)
     for thisIdx in peakIdx:
-        trialEvents['Time'].append(thisIdx / fs + tStart)
-        trialEvents['Label'].append('movement')
-        trialEvents['Details'].append(vCat[thisIdx + futureOffset])
+        try:
+            futureIdx = min(vCat.index[-1], thisIdx + futureOffset)
+            trialEvents['Time'].append(thisIdx / fs + tStart)
+            trialEvents['Label'].append('movement')
+            trialEvents['Details'].append(vCat[futureIdx])
+        except:
+            traceback.print_exc()
     #  plt.plot(vCat[peakIdx + futureOffset].values, '-o'); plt.show()
     #  thisT = vCat.index / fs
     #  tMask = (thisT > 100) & (thisT < 300)

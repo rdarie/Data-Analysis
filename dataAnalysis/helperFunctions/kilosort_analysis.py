@@ -452,7 +452,7 @@ def plotSpike(
         spikes, channel, showNow = False, ax = None,
         acrossArray = False, xcoords = None, ycoords = None,
         axesLabel = False, errorMultiplier = 1, ignoreUnits = [],
-        channelPlottingName = None, chanNameInLegend = True, legendTags=[]):
+        channelPlottingName=None, chanNameInLegend=False, legendTags=[]):
 
     if channelPlottingName is None:
         channelPlottingName = str(channel)
@@ -495,9 +495,9 @@ def plotSpike(
 
             if chanNameInLegend:
                 #  labelName = 'chan %s: unit %s (%d SDs)' % (channelPlottingName, unitPlottingName, errorMultiplier)
-                labelName = '{}'.format(channelPlottingName)
+                labelName = '{}#{}'.format(channelPlottingName, unitPlottingName)
             else:
-                labelName = 'unit %s (%d SDs)' % (unitPlottingName, errorMultiplier)
+                labelName = '#{}'.format(unitPlottingName)
 
             for legendTag in legendTags:
                 if legendTag in spikes['basic_headers']:
@@ -562,38 +562,54 @@ def plotSpike(
 #@profile
 def plotISIHistogram(
         spikes, channel, showNow = False, ax = None,
-        bins = None, kde = True, kde_kws = None):
+        bins = None, kde = True, kde_kws = None, labelType='median'):
+
     if ax is None:
         fig, ax = plt.subplots()
     else:
         fig = ax.figure
 
+    fig.set_tight_layout({'pad': 0.01})
     idx = spikes['ChannelID'].index(channel)
     unitsOnThisChan = np.unique(spikes['Classification'][idx])
 
     if unitsOnThisChan is not None:
         colorPalette = sns.color_palette(n_colors = 40)
+        if labelType:
+            legendLines = []
+            legendEntries = []
+            cmap = sns.color_palette()
         for unitIdx, unitName in enumerate(unitsOnThisChan):
             unitMask = spikes['Classification'][idx] == unitName
             theseTimes = spikes['TimeStamps'][idx][unitMask]
             theseISI = np.diff(theseTimes) * 1e3 # units of msec
-            #pdb.set_trace()
-            sns.distplot(theseISI, bins = bins, ax = ax, norm_hist=True,
-                color = colorPalette[unitIdx], kde = kde, kde_kws = kde_kws)
-            """
-            fit_alpha, fit_loc, fit_beta = stats.gamma.fit(np.histogram(theseISI, bins = bins))
-            rv = stats.gamma(fit_alpha, loc = fit_loc, scale = fit_beta)
-            ax.plot(bins, rv.pdf(bins), 'k-', lw=2)
-            #pdb.set_trace()
-
-            plt.hist(theseISI, bins = bins, color = colorPalette[unitIdx], density = False)
-            """
+            if labelType:
+                legendLines.append(
+                    sns.mpl.lines.Line2D(
+                        [0], [0], color=cmap[unitIdx], lw=4))
+                if labelType == 'count':
+                    labelText = '{} spikes'.format(len(theseTimes))
+                if labelType == 'average':
+                    aveSpS = (np.nanmean(theseISI) / 1e3) ** (-1)
+                    labelText = 'mean {} sp/s'.format(aveSpS)
+                if labelType == 'median':
+                    aveSpS = (np.nanmedian(theseISI) / 1e3) ** (-1)
+                    extremeSpS = (np.nanquantile(theseISI, 0.1) / 1e3) ** (-1)
+                    labelText = 'median {:.2f} sp/s, 0.1 quantile {:.2f} sp/s'.format(aveSpS, extremeSpS)
+                legendEntries.append(labelText)
+            #  pdb.set_trace()
+            ax = sns.distplot(
+                theseISI, bins=bins, ax=ax, norm_hist=True,
+                color=colorPalette[unitIdx], kde=kde, kde_kws=kde_kws)
             ax.set_xlabel('ISI (msec)')
-            yAxLabel = 'Count (normalized)' if kde else 'Count'
+            yAxLabel = 'Probability density (per bin)' if kde else 'Count'
             ax.set_ylabel(yAxLabel)
             if bins is not None:
-                ax.set_title('Bin size: {} msec'.format(bins[1] - bins[0]))
-                ax.set_xlim(min(bins), max(bins))
+                if not isinstance(bins, np.str):
+                    ax.set_title('Bin size: {} msec'.format(bins[1] - bins[0]))
+                    ax.set_xlim(min(bins), max(bins))
+        if labelText:
+            ax.legend(legendLines, legendEntries)
         if showNow:
             plt.show()
 
@@ -632,7 +648,7 @@ def plotSpikePropertyHistogram(
 def plotSpikePanel(
         spikeStruct, spikes, labelFontSize=LABELFONTSIZE,
         padOverride=5e-3, figSize=(12, 8),
-        colorPal="ch:2,-.1,dark=.3,light=0.7,reverse=1"):
+        colorPal="ch:2,-.1,dark=.2,light=0.8,reverse=1"):
     
     sns.set_style("dark", {"axes.facecolor": ".9"})
     xIdx = np.array(spikeStruct['xcoords'].values - spikeStruct['xcoords'].min(), dtype = np.int)
@@ -646,7 +662,7 @@ def plotSpikePanel(
     axHighLims[:] = np.nan
     axLowLims = np.empty(ax.shape)
     axLowLims[:] = np.nan
-    with sns.color_palette(colorPal, 3):
+    with sns.color_palette(colorPal, 5):
         for idx, channel in enumerate(spikes['ChannelID']):
             curAx = ax[xIdx[idx], yIdx[idx]]
             plotSpike(spikes, channel, ax=curAx)

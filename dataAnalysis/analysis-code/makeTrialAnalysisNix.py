@@ -1,9 +1,9 @@
-"""
+"""08: Calculate binarized array and relevant analogsignals
 Usage:
-    makeTrialAnalysisNix.py [--trialIdx=trialIdx]
+    makeTrialAnalysisNix.py [options]
 
-Arguments:
-    trialIdx            which trial to analyze
+Options:
+    --trialIdx=trialIdx             which trial to analyze
 """
 
 from neo.io.proxyobjects import (
@@ -33,14 +33,21 @@ if arguments['--trialIdx']:
     trialIdx = int(arguments['--trialIdx'])
     ns5FileName = 'Trial00{}'.format(trialIdx)
     trialBasePath = os.path.join(
-        nspFolder,
+        #  remoteBasePath, 'processed', experimentName,
+        scratchFolder,
         ns5FileName + '.nix')
     analysisDataPath = os.path.join(
-        remoteBasePath, 'processed', experimentName,
+        #  remoteBasePath, 'processed', experimentName,
+        scratchFolder,
         ns5FileName + '_analyze.nix')
     binnedSpikePath = os.path.join(
-        remoteBasePath, 'processed', experimentName,
+        #  remoteBasePath, 'processed', experimentName,
+        scratchFolder,
         ns5FileName + '_binarized.nix')
+    miniRCTrial = miniRCTrialLookup[trialIdx]
+
+if miniRCTrial:
+    trialFilesStim['ins']['getINSkwargs'].update(miniRCDetectionOpts)
 
 
 samplingRate = 1 / rasterOpts['binInterval'] * pq.Hz
@@ -81,6 +88,10 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         block_index=0, seg_index=segIdx
         )
     tStop = (sigSize / fs) * pq.s + tStart
+    #
+    spikeList = dataSeg.filter(objects=SpikeTrain)
+    spikeList = preproc.loadContainerArrayAnn(trainList=spikeList)
+    '''
     for st in dataSeg.filter(objects=SpikeTrain):
         if len(st.times):
             st.t_start = min(tStart, st.times[0] * 0.999)
@@ -105,6 +116,8 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         st.sampling_rate = samplingRate
         if st.waveforms is None:
             st.waveforms = np.array([]).reshape((0, 0, 0))*pq.mV
+    '''
+
 
 #  tests...
 #  [i.unit.channel_index.name for i in insBlockJustSpikes.filter(objects=SpikeTrain)]
@@ -227,14 +240,6 @@ preproc.addBlockToNIX(
     writeSpikes=False, writeEvents=False,
     purgeNixNames=False,
     fileName=ns5FileName + '_analyze',
-    folderPath=os.path.join(
-        remoteBasePath, 'processed', experimentName),
+    folderPath=scratchFolder,
     nixBlockIdx=0, nixSegIdx=[0],
     )
-
-#  testSaveability = True
-#  pdb.set_trace()
-#  for st in dataBlock.filter(objects=SpikeTrain): print('{}: t_start={}'.format(st.name, st.t_start))
-#  for st in insBlockJustSpikes.filter(objects=SpikeTrain): print('{}: t_start={}'.format(st.name, st.t_start))
-#  for st in insBlock.filter(objects=SpikeTrain): print('{}: t_start={}'.format(st.name, st.t_start))
-

@@ -1,14 +1,15 @@
 #!/bin/bash
 
+# 08: Calculate binarized array and relevant analogsignals
 # Request 24 hours of runtime:
-#SBATCH --time=72:00:00
+#SBATCH --time=2:00:00
 
 # Default resources are 1 core with 2.8GB of memory.
 
 # Use more memory (32GB):
 #SBATCH --nodes=1
-#SBATCH --mem=32G
-#SBATCH --array=5
+#SBATCH --mem=96G
+#SBATCH --array=1,2
 
 # Specify a job name:
 #SBATCH -J analysis_maker

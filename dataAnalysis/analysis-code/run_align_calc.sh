@@ -1,5 +1,5 @@
 #!/bin/bash
-
+#  10: Calculate align Times
 # Request runtime:
 #SBATCH --time=72:00:00
 

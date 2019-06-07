@@ -1,14 +1,14 @@
-"""
+"""07: Combine INS and NSP Data
 Usage:
-    synchronizeINStoNSP.py [--trialIdx=trialIdx]
+    synchronizeINStoNSP [options]
 
-Arguments:
-    trialIdx            which trial to analyze
+Options:
+    --trialIdx=trialIdx             which trial to analyze
 """
 
 from docopt import docopt
 import matplotlib, pdb, pickle, traceback
-matplotlib.use('TkAgg')   # generate interactive output by default
+matplotlib.use('Qt5Agg')   # generate interactive output by default
 #  matplotlib.rcParams['agg.path.chunksize'] = 10000
 #  matplotlib.use('PS')   # noninteract output
 from matplotlib import pyplot as plt
@@ -56,123 +56,74 @@ if arguments['--trialIdx']:
     print(arguments)
     trialIdx = int(arguments['--trialIdx'])
     ns5FileName = 'Trial00{}'.format(trialIdx)
+    #  insDataPath = os.path.join(
+    #      remoteBasePath, 'raw', experimentName,
+    #      ns5FileName + '_ins.nix')
     insDataPath = os.path.join(
-        remoteBasePath, 'processed', experimentName,
+        scratchFolder,
         ns5FileName + '_ins.nix')
-    trialFilesStim = {
-        'ins': {
-            'origin': 'ins',
-            'experimentName': experimentName,
-            'folderPath': insFolder,
-            'ns5FileName': ns5FileName,
-            'jsonSessionNames': jsonSessionNames[trialIdx],
-            'elecIDs': range(17),
-            'excludeClus': [],
-            'forceRecalc': True,
-            'detectStim': True,
-            'getINSkwargs': {
-                'stimDetectOpts': stimDetectOpts,
-                'stimIti': 0, 'fixedDelay': 10e-3,
-                'minDist': 0.2, 'minDur': 0.2, 'thres': 3,
-                'gaussWid': 200e-3,
-                'gaussKerWid': 75e-3,
-                'maxSpikesPerGroup': 1, 'plotting': []  # range(1, 1000, 5)
-                }
-            }
-        }
-
-try:
-    reader = neo.io.NixIO(filename=insDataPath, mode='ro')
-except Exception:
-    insBlock = preprocINS.preprocINS(
-        trialFilesStim['ins'], plottingFigures=False)
-    reader = neo.io.NixIO(filename=insDataPath, mode='ro')
-
+    trialFilesStim['ins']['jsonSessionNames'] = jsonSessionNames[trialIdx]
+    trialFilesStim['ins']['ns5FileName'] = ns5FileName
+print('Loading INS Block...')
+'''
+reader = neo.io.NixIO(filename=insDataPath, mode='ro')
 insBlock = reader.read_block()
 insBlock.create_relationship()  # need this!
 reader.close()
 for st in insBlock.filter(objects=SpikeTrain):
-    print('unit is {}'.format(st.unit.name))
-    print('spiketrain is {}'.format(st.name))
+    #  print('unit is {}'.format(st.unit.name))
+    #  print('spiketrain is {}'.format(st.name))
     if 'arrayAnnNames' in st.annotations.keys():
         #  print(st.annotations['arrayAnnNames'])
         for key in st.annotations['arrayAnnNames']:
             st.array_annotations.update({key: st.annotations[key]})
-
-#  pdb.set_trace()
+'''
+insBlock = preproc.loadWithArrayAnn(insDataPath)
 tdDF, accelDF, stimStatus = preprocINS.unpackINSBlock(insBlock)
 td = {'data': tdDF, 't': tdDF['t']}
 accel = {'data': accelDF, 't': accelDF['t']}
-
 #  Load NSP Data
 ############################################################
 startTime_s = None
 dataLength_s = None
+print('Loading NSP Block...')
 try:
     channelData, nspBlock = preproc.getNIXData(
         fileName=ns5FileName,
-        folderPath=nspFolder,
+        folderPath=scratchFolder,
         elecIds=['ainp7'], startTime_s=startTime_s,
         dataLength_s=dataLength_s,
         signal_group_mode='split-all', closeReader=True)
 except Exception:
     traceback.print_exc()
 
-#  Detect NSP taps
-############################################################
-getTapsFromNev = False
-if getTapsFromNev:
-    nevFilePath = os.path.join(
-        nspFolder,
-        ns5FileName + '.mat')
-    tapSpikes = ksa.getNevMatSpikes(
-        nevFilePath, nevIDs=[135],
-        excludeClus=[], plotting=False)
-    tapSpikes = hf.correctSpikeAlignment(
-        tapSpikes, 9
-        )
-    print('{}'.format(tapSpikes['TimeStamps'][0]))
-
-if plottingFigures and False:
-    try:
-        hf.peekAtTaps(
-            td, accel,
-            channelData, trialIdx,
-            tapDetectOpts, sessionTapRangesNSP,
-            insX='t', plotBlocking=plotBlocking,
-            allTapTimestampsINS=None,
-            allTapTimestampsNSP=None,
-            segmentsToPlot=[0])
-    except Exception:
-        traceback.print_exc()
-
 allTapTimestampsNSP = []
+print('Detecting NSP Timestamps...')
 #  TODO: detect all in one, should be easy enough
+#  pdb.set_trace()
 for trialSegment in pd.unique(td['data']['trialSegment']):
     #  Where in NSP to look
     tStart = sessionTapRangesNSP[trialIdx][trialSegment]['timeRanges'][0]
     tStop = sessionTapRangesNSP[trialIdx][trialSegment]['timeRanges'][1]
-    if getTapsFromNev:
-        tapTimeStampsNSP = pd.Series(tapSpikes['TimeStamps'][0])
-        tapTimeStampsNSP = tapTimeStampsNSP.loc[
-            (tapTimeStampsNSP > tStart) & (tapTimeStampsNSP < tStop)
-            ]
-    else:
-        nspMask = (channelData['t'] > tStart) & (channelData['t'] < tStop)
-        tapIdxNSP = hf.getTriggers(
-            channelData['data'].loc[nspMask, 'ainp7'],
-            thres=2, iti=0.2, minAmp=1)
-        tapTimestampsNSP = channelData['t'].loc[tapIdxNSP]
+    nspMask = (channelData['t'] > tStart) & (channelData['t'] < tStop)
+    #
+    tapIdxNSP = hf.getTriggers(
+        channelData['data'].loc[nspMask, 'ainp7'],
+        thres=2, iti=0.2, minAmp=1)
+    tapTimestampsNSP = channelData['t'].loc[tapIdxNSP]
     keepIdx = sessionTapRangesNSP[trialIdx][trialSegment]['keepIndex']
-    tapTimestampsNSP = tapTimestampsNSP[keepIdx]
-    print('tSeg {}:\n nspTaps: {}'.format(
+    tapTimestampsNSP = tapTimestampsNSP.iloc[keepIdx]
+    print('tSeg {}: NSP Taps:\n{}'.format(
         trialSegment, tapTimestampsNSP))
+    print('diff:\n{}'.format(
+        tapTimestampsNSP.diff() * 1e3))
     allTapTimestampsNSP.append(tapTimestampsNSP)
 
-#  pdb.set_trace()
 #  Detect INS taps
 ############################################################
 allTapTimestampsINS = []
+print('Detecting INS Timestamps...')
+overrideSegments = overrideSegmentsForTapSync[trialIdx]
 for trialSegment in pd.unique(td['data']['trialSegment']):
     print('Trial Segment {}\n'.format(trialSegment))
     #  for trialSegment in [0, 1, 2]:
@@ -185,22 +136,24 @@ for trialSegment in pd.unique(td['data']['trialSegment']):
         tdGroup, accelGroup,
         tapDetectOpts[trialIdx][trialSegment]
         )
-    print('tSeg {}:\n nspTaps: {}'.format(
+    print('tSeg {}, INS Taps:\n{}'.format(
         trialSegment, tapTimestampsINS))
+    print('diff:\n{}'.format(
+        tapTimestampsINS.diff() * 1e3))
     allTapTimestampsINS.append(tapTimestampsINS)
 
-if plottingFigures:
-    try:
-        hf.peekAtTaps(
-            td, accel,
-            channelData, trialIdx,
-            tapDetectOpts, sessionTapRangesNSP,
-            insX='t', plotBlocking=True,
-            allTapTimestampsINS=allTapTimestampsINS,
-            allTapTimestampsNSP=allTapTimestampsNSP,
-            segmentsToPlot=[0])
-    except Exception:
-        traceback.print_exc()
+try:
+    clickDict = hf.peekAtTaps(
+        td, accel,
+        channelData, trialIdx,
+        tapDetectOpts, sessionTapRangesNSP,
+        insX='t', plotBlocking=plotBlocking,
+        allTapTimestampsINS=allTapTimestampsINS,
+        allTapTimestampsNSP=allTapTimestampsNSP,
+        )
+except Exception:
+    traceback.print_exc()
+    pdb.set_trace()
 
 # perform the sync
 ############################################################
@@ -209,13 +162,25 @@ accel['data']['NSPTime'] = np.nan
 allTapTimestampsINSAligned = []
 for trialSegment in pd.unique(td['data']['trialSegment']):
     trialSegment = int(trialSegment)
+
     accelGroupMask = accel['data']['trialSegment'] == trialSegment
     accelGroup = accel['data'].loc[accelGroupMask, :]
     tdGroupMask = td['data']['trialSegment'] == trialSegment
     tdGroup = td['data'].loc[tdGroupMask, :]
 
+    if len(clickDict[trialSegment]['ins']):
+        allTapTimestampsINS[trialSegment] = clickDict[trialSegment]['ins']
+    #
     theseTapTimestampsINS = allTapTimestampsINS[trialSegment]
+    if len(clickDict[trialSegment]['nsp']):
+        allTapTimestampsNSP[trialSegment] = clickDict[trialSegment]['nsp']
+    #
     theseTapTimestampsNSP = allTapTimestampsNSP[trialSegment]
+    
+    if trialSegment in overrideSegments.keys():
+        print('\t Overriding trialSegment {}'.format(trialSegment))
+        theseTapTimestampsINS = allTapTimestampsINS[overrideSegments[trialSegment]]
+        theseTapTimestampsNSP = allTapTimestampsNSP[overrideSegments[trialSegment]]
 
     tdGroup, accelGroup, insBlock, thisINStoNSP = hf.synchronizeINStoNSP(
         theseTapTimestampsNSP, theseTapTimestampsINS,
@@ -235,7 +200,7 @@ print(interpFunINStoNSP[trialIdx])
 td['NSPTime'] = td['data']['NSPTime']
 accel['NSPTime'] = accel['data']['NSPTime']
 
-if plottingFigures and False:
+if plottingFigures:
     try:
         hf.peekAtTaps(
             td, accel,
@@ -246,12 +211,9 @@ if plottingFigures and False:
             allTapTimestampsNSP=allTapTimestampsNSP)
     except Exception:
         traceback.print_exc()
-    
-
 ############################################################
 
 addingToNix = True
-
 if addingToNix:
     insBlockJustSpikes = hf.extractSignalsFromBlock(insBlock)
     insSpikeTrains = insBlockJustSpikes.filter(objects=SpikeTrain)
@@ -273,7 +235,7 @@ if addingToNix:
         insBlockJustSpikes, neoSegIdx=[0],
         writeAsigs=False, writeSpikes=True,
         fileName=ns5FileName,
-        folderPath=nspFolder,
+        folderPath=scratchFolder,
         purgeNixNames=True,
         nixBlockIdx=0, nixSegIdx=[0],
         )
@@ -293,7 +255,7 @@ if addingToNix:
     preproc.addBlockToNIX(
         tdBlock, neoSegIdx=[0],
         fileName=ns5FileName,
-        folderPath=nspFolder,
+        folderPath=scratchFolder,
         purgeNixNames=True,
         nixBlockIdx=0, nixSegIdx=[0],
         )
@@ -313,7 +275,7 @@ if addingToNix:
     preproc.addBlockToNIX(
         accelBlock, neoSegIdx=[0],
         fileName=ns5FileName,
-        folderPath=nspFolder,
+        folderPath=scratchFolder,
         purgeNixNames=True,
         nixBlockIdx=0, nixSegIdx=[0],
         )

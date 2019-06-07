@@ -39,6 +39,7 @@ def spikePDFReport(
     with PdfPages(pdfName) as pdf:
         ksa.plotSpikePanel(
             spikeStruct, spikes,
+            colorPal=None,
             labelFontSize=1, padOverride=5e-2)
         #  make spikepanel square
         figWidth, _ = plt.gcf().get_size_inches()
@@ -64,42 +65,60 @@ def spikePDFReport(
                     try:
                         spikeAx = fig.add_subplot(gs[1, 0])
                         spikesBadAx = fig.add_subplot(gs[1, 1])
-                        #  spikesBadAx.get_shared_y_axes().join(spikesBadAx, spikeAx)
-                        isiAx = fig.add_subplot(gs[0, :2])
-                        templateAx = fig.add_subplot(gs[0, 2])
-                        #  plot contents
-                        #  pdb.set_trace()
+                        #  spikesBadAx.get_shared_y_axes().join(
+                        #      spikesBadAx, spikeAx)
                         ksa.plotSpike(
                             spikes, channel=channel, ax=spikeAx,
                             axesLabel=True,
                             legendTags=[
-                                'tag', 'chan_grp'])
+                                'tag'])
+                        try:
+                            dummyUnit = unitsOnThisChan[0]
+                            chan_grp = (
+                                spikes
+                                ['basic_headers']['chan_grp'][dummyUnit]
+                            )
+                            spikeAx.set_title(
+                                'chan_grp {}: {}'.format(
+                                    chan_grp,
+                                    spikeAx.get_title()
+                                ))
+                        except Exception:
+                            traceback.print_exc()
                         hf.plot_spikes(
                             spikes, channel=channel, ax=spikesBadAx,
-                            axesLabel=True)
-                        spikesBadAx.set_ylim([-12, 5])
-                        spikeAx.set_ylim([-12, 5])
+                            axesLabel=True, maxSpikes=500, lineAlpha=0.025)
+                        spikesBadAx.set_ylim(spikeAx.get_ylim())
+                        #  spikeAx.set_ylim([-12, 5])
                     except Exception:
                         traceback.print_exc()
+
                     try:
-                        lastBin = 100
-                        isiBins = np.arange(0, lastBin, 2)
-                        distBins = np.linspace(0, 5, 25)
+                        isiAx = fig.add_subplot(gs[0, :2])
+                        templateAx = fig.add_subplot(gs[0, 2])
+                        lastBin = 150
+                        isiBins = np.arange(0, lastBin, 3)
+                        distBins = np.arange(0, 5, 0.2)
                         kde_kws = {
                             'clip': (isiBins[0] * 0.9, isiBins[-1] * 1.1),
                             'bw': 'silverman', 'gridsize': 500}
                         ksa.plotISIHistogram(
                             spikes, channel=channel, bins=isiBins,
                             ax=isiAx, kde_kws=kde_kws)
+                        isiAx.set_title(
+                            '{}: {}'.format(
+                                channel,
+                                isiAx.get_title()
+                            ))
                         #  pdb.set_trace()
                         ksa.plotSpikePropertyHistogram(
                             spikes, channel=channel, whichProp='templateDist',
                             bins=distBins,
                             ax=templateAx, kde_kws=kde_kws)
-                        isiAx.set_title(
+                        templateAx.set_title(
                             '{}: {}'.format(
-                                channel,
-                                isiAx.get_title()
+                                'shape distance',
+                                templateAx.get_title()
                             ))
                         #  import pdb; pdb.set_trace()
                         pdf.savefig()
@@ -114,4 +133,6 @@ def spikePDFReport(
                             ycoords=spikeStruct['ycoords'])
                         pdf.savefig()
                         plt.close()
-            #  break
+            #  if idx > 2:
+            #      break
+            #  for loop over channels

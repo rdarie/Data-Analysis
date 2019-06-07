@@ -1,14 +1,42 @@
-import os
+import os, pdb
 import dataAnalysis.helperFunctions.kilosort_analysis as ksa
 import dataAnalysis.helperFunctions.tridesclous_helpers as tdch
+import importlib
 
-#  from exp201901201200 import *
-from exp201901211000 import *
-'''
-def parseAnalysisOptions(optsDict):
+def parseAnalysisOptions(trialIdx, experimentShorthand):
+    optsModule = importlib.import_module(experimentShorthand, package=None)
+    expOpts = optsModule.getExpOpts()
+    globals().update(expOpts)
+    #  remote paths
+    remoteBasePath = '..'
+    scratchPath = '/gpfs/scratch/rdarie/rdarie/Murdoc Neural Recordings'
+    insFolder = os.path.join(remoteBasePath, 'ORCA Logs')
+    nspFolder = os.path.join(remoteBasePath, 'raw', experimentName)
+
     ns5FileName = 'Trial00{}'.format(trialIdx)
     miniRCTrial = miniRCTrialLookup[trialIdx]
 
+    defaultTapDetectOpts = {
+        'iti': 0.2,
+        'keepIndex': slice(None)
+        }
+    for trialKey in tapDetectOpts.keys():
+        for trialSegmentKey in tapDetectOpts[trialKey].keys():
+            for key in defaultTapDetectOpts.keys():
+                if key not in tapDetectOpts[trialKey][trialSegmentKey].keys():
+                    tapDetectOpts[trialKey][trialSegmentKey].update(
+                        {key: defaultTapDetectOpts[key]}
+                        )
+    defaultSessionTapRangesNSP = {
+        'keepIndex': slice(None)
+        }
+    for trialKey in sessionTapRangesNSP.keys():
+        for trialSegmentKey in sessionTapRangesNSP[trialKey].keys():
+            for key in defaultSessionTapRangesNSP.keys():
+                if key not in sessionTapRangesNSP[trialKey][trialSegmentKey].keys():
+                    sessionTapRangesNSP[trialKey][trialSegmentKey].update(
+                        {key: defaultSessionTapRangesNSP[key]}
+                        )
     #  make placeholders for interpolation functions
     interpFunINStoNSP = {
         key: [None for i in value.keys()]
@@ -19,29 +47,38 @@ def parseAnalysisOptions(optsDict):
         for key, value in sessionTapRangesNSP.items()
         }
 
-    scratchFolder = os.path.join(scratchPath, experimentName)
-    if not os.path.exists(scratchFolder):
-        os.makedirs(scratchFolder, exist_ok=True)
-
-    nspOpts = {
-        'excludeClus': [],
-        'calcRigEvents': None,
-        'spikeWindow': [-32, 64]
+    trialFilesFrom = {
+        'utah': {
+            'origin': 'mat',
+            'experimentName': experimentName,
+            'folderPath': nspFolder,
+            'ns5FileName': ns5FileName,
+            'calcRigEvents': True,
+            'spikeWindow': [-32, 64]
+            }
         }
-
-    insOpts = {
-        'elecIDs': range(17),
-        'excludeClus': [],
-        'forceRecalc': True,
-        'detectStim': True,
-        'stimDetectionOpts': None
+    spikeWindow = trialFilesFrom['utah']['spikeWindow']
+    
+    trialFilesStim = {
+        'ins': {
+            'origin': 'ins',
+            'experimentName': experimentName,
+            'folderPath': insFolder,
+            'ns5FileName': ns5FileName,
+            'jsonSessionNames': jsonSessionNames[trialIdx],
+            'elecIDs': range(17),
+            'excludeClus': [],
+            'forceRecalc': True,
+            'detectStim': True,
+            'getINSkwargs': {None}
+            }
         }
 
     stimDetectOptsByChannelDefault = {grpIdx: {
-        0: {'detectChannels': ['ins_td2', 'ins_td3'], 'thres': 1},
-        1: {'detectChannels': ['ins_td2', 'ins_td3'], 'thres': 1},
-        2: {'detectChannels': ['ins_td2', 'ins_td3'], 'thres': 1},
-        3: {'detectChannels': ['ins_td2', 'ins_td3'], 'thres': 1}
+        0: {'detectChannels': stimDetectChans, 'thres': stimDetectThres},
+        1: {'detectChannels': stimDetectChans, 'thres': stimDetectThres},
+        2: {'detectChannels': stimDetectChans, 'thres': stimDetectThres},
+        3: {'detectChannels': stimDetectChans, 'thres': stimDetectThres}
         } for grpIdx in range(4)}
 
     commonStimDetectionOpts = {
@@ -53,7 +90,6 @@ def parseAnalysisOptions(optsDict):
         'recalculateExpectedOffsets': True,
         'plotting': [],  # range(1, 1000, 5)
         }
-        
     miniRCStimDetectionOpts = {
             'minDist': 1.2,
             'gaussWid': 200e-3,
@@ -69,6 +105,7 @@ def parseAnalysisOptions(optsDict):
         'tapSync': 'ainp7',
         'simiTrigs': 'ainp8'
         }
+
     fullRigInputs = {
         'A+': 'ainp1',
         'B+': 'ainp2',
@@ -84,23 +121,23 @@ def parseAnalysisOptions(optsDict):
         'tapSync': 'ainp7',
         }
         
-    nspOpts['calcRigEvents'] = not miniRCTrial
+    trialFilesStim['ins']['getINSkwargs'].update(commonStimDetectionOpts)
     if miniRCTrial:
         #  override with settings for detecting cycling stim trains
-        insOpts['stimDetectionOpts'].update(miniRCStimDetectionOpts)
+        trialFilesStim['ins']['getINSkwargs'].update(miniRCStimDetectionOpts)
         #  only parse sync lines
         eventInfo = {'inputIDs': miniRCRigInputs}
     else:
-        insOpts['stimDetectionOpts'].update(fullStimDetectionOpts)
+        trialFilesStim['ins']['getINSkwargs'].update(fullStimDetectionOpts)
         #  should rename eventInfo to something more intuitive
         eventInfo = {'inputIDs': fullRigInputs}
-    nspOpts.update(dict(eventInfo=eventInfo))
-    insOpts['stimDetectionOpts'].update(commonStimDetectionOpts)
+
+    trialFilesFrom['utah']['calcRigEvents'] = not miniRCTrial
+    trialFilesFrom['utah'].update({'eventInfo': eventInfo})
     
     nspCmpPath = os.path.join('.', 'nsp_map.cmp')
     cmpDF = tdch.cmpToDF(nspCmpPath)
-    # make .prb file for spike sorting
-    #  groupIn={'xcoords': 2, 'ycoords': 2}
+
     if remakePrb:
         nspCsvPath = os.path.join('.', 'nsp_map.csv')
         cmpDF.to_csv(nspCsvPath)
@@ -116,14 +153,17 @@ def parseAnalysisOptions(optsDict):
     if not os.path.exists(processedFolder):
         os.makedirs(processedFolder, exist_ok=True)
 
+    scratchFolder = os.path.join(scratchPath, experimentName)
+    if not os.path.exists(scratchFolder):
+        os.makedirs(scratchFolder, exist_ok=True)
+
+    #  paths relevant to single trial files
     analysisDataPath = os.path.join(
-        #  remoteBasePath, 'processed', experimentName,
         scratchFolder,
         ns5FileName + '_analyze.nix')
     trialBasePath = os.path.join(
         scratchFolder,
         ns5FileName + '.nix')
-
     insDataPath = os.path.join(
         scratchFolder,
         ns5FileName + '_ins.nix')
@@ -155,6 +195,9 @@ def parseAnalysisOptions(optsDict):
     figureFolder = os.path.join(
         remoteBasePath, 'figures', experimentName
         )
+    if not os.path.exists(figureFolder):
+        os.makedirs(figureFolder, exist_ok=True)
+
     alignedRastersFolder = os.path.join(figureFolder, 'alignedRasters')
     if not os.path.exists(alignedRastersFolder):
         os.makedirs(alignedRastersFolder, exist_ok=True)
@@ -177,5 +220,17 @@ def parseAnalysisOptions(optsDict):
         'type': 'ticks', 'errorBar': 'sem',
         'pageSize': (6, 12), 'removeOutliers': (0.01, 0.975)}
 
-    return bla
-'''
+    try:
+        trialsToAssemble = []
+        for key in sorted(experimentsToAssemble.keys()):
+            val = experimentsToAssemble[key]
+            for trialIdx in val:
+                trialsToAssemble.append(
+                    os.path.join(
+                        scratchPath, key, 'Trial00{}.nix'.format(trialIdx)
+                    )
+                )
+    except Exception:
+        pass
+
+    return expOpts, locals()

@@ -28,7 +28,7 @@ annotationsList = []
 for trialIdx in [1, 2, 3, 4]:
     ns5FileName = 'Trial00{}'.format(trialIdx)
     insDataPath = os.path.join(
-        remoteBasePath, 'processed', experimentName,
+        remoteBasePath, 'raw', experimentName,
         ns5FileName + '_ins.nix'
     )
 

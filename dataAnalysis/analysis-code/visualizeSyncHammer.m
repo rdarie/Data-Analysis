@@ -1,6 +1,6 @@
 clear; clc; close all;
 
-dataSet = openNSx('read', 'uV', '../201901271000-Proprio/Trial003.ns5', 't:00:01','sec');
+dataSet = openNSx('read', 'uV', '../raw\201901271000-Proprio/Trial003.ns5', 't:00:01','sec');
 
 
 %motorA = dataSet.Data(97,:) - dataSet.Data(99,:);
@@ -35,7 +35,7 @@ hold on;
 % linkaxes([ax1,ax2],'x');
 
 %%
-nevSet = openNEV('201902010900-Proprio/Trial002.nev', 'nomat');
+nevSet = openNEV('../raw\201901271000-Proprio/Trial003.nev', 'nomat');
 %%
 ainp7Mask = nevSet.Data.Spikes.Electrode == 135;
 ainp7timeStamps = nevSet.Data.Spikes.TimeStamp(ainp7Mask) + 12;

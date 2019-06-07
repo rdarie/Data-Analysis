@@ -1,5 +1,5 @@
 #!/gpfs/runtime/opt/python/3.5.2/bin/python3
-"""
+"""01: Preprocess spikes, then 04: Run peeler and 05: Assemble the spike nix file
 Usage:
     tridesclousCCV.py [options]
 
@@ -44,7 +44,7 @@ if RANK == 0:
         trialIdx = int(arguments['--trialIdx'])
         ns5FileName = 'Trial00{}'.format(trialIdx)
         triFolder = os.path.join(
-            nspFolder, 'tdc_' + ns5FileName)
+            scratchFolder, 'tdc_' + ns5FileName)
     try:
         tdch.initialize_catalogueconstructor(
             nspFolder,
@@ -58,6 +58,7 @@ else:
     nspFolder = None
     nspPrbPath = None
     triFolder = None
+    spikeWindow = None
 
 
 if HAS_MPI:
@@ -65,6 +66,7 @@ if HAS_MPI:
     nspFolder = COMM.bcast(nspFolder, root=0)
     nspPrbPath = COMM.bcast(nspPrbPath, root=0)
     triFolder = COMM.bcast(triFolder, root=0)
+    spikeWindow = COMM.bcast(spikeWindow, root=0)
 
 
 if RANK == 0:
@@ -98,18 +100,22 @@ chansToAnalyze = [
 if arguments['--batchPreprocess']:
     tdch.batchPreprocess(
         triFolder, chansToAnalyze,
-        n_components_by_channel=20,
+        n_components_by_channel=15,
         cluster_method='agglomerative',
-        n_clusters=4,
-        align_waveform=True, subsample_ratio=10,
-        autoMerge=True, auto_merge_threshold=0.8,
-        relative_threshold=5, attemptMPI=HAS_MPI)
+        n_clusters=6,
+        noise_estimate_duration=900.,
+        sample_snippet_duration=900.,
+        chunksize=2**13, n_left=spikeWindow[0] - 2,
+        n_right=spikeWindow[1] + 2,
+        align_waveform=False, subsample_ratio=10,
+        autoMerge=True, auto_merge_threshold=0.85,
+        relative_threshold=6, attemptMPI=HAS_MPI)
 
 if arguments['--batchPeel']:
     tdch.batchPeel(
         triFolder, chansToAnalyze,
-        shape_boundary_threshold=3.5,
-        shape_distance_threshold=1.75, attemptMPI=HAS_MPI)
+        shape_boundary_threshold=3,
+        shape_distance_threshold=1.5, attemptMPI=HAS_MPI)
 
 if HAS_MPI:
     COMM.Barrier()  # wait until all threads finish sorting
@@ -118,10 +124,12 @@ if arguments['--makeCoarseNeoBlock'] and RANK == 0:
     tdch.purgeNeoBlock(triFolder)
     tdch.neo_block_after_peeler(
         triFolder, chan_grps=chansToAnalyze,
-        minDist=None, refractoryPeriod=None, ignoreTags=[])
+        shape_distance_threshold=None, refractory_period=None,
+        ignoreTags=['so_bad'])
 
 if arguments['--makeStrictNeoBlock'] and RANK == 0:
     tdch.purgeNeoBlock(triFolder)
     tdch.neo_block_after_peeler(
         triFolder, chan_grps=chansToAnalyze,
-        minDist=1.5, refractoryPeriod=3.5e-3, ignoreTags=['so_bad'])
+        shape_distance_threshold=None,
+        refractory_period=3.5e-3, ignoreTags=['so_bad'])
