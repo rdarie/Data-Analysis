@@ -6,20 +6,25 @@ import importlib
 def parseAnalysisOptions(trialIdx, experimentShorthand):
     optsModule = importlib.import_module(experimentShorthand, package=None)
     expOpts = optsModule.getExpOpts()
-    globals().update(expOpts)
+    #  globals().update(expOpts)
+    
     #  remote paths
     remoteBasePath = '..'
+    nspPrbPath = os.path.join('.', 'nsp_map.prb')
     scratchPath = '/gpfs/scratch/rdarie/rdarie/Murdoc Neural Recordings'
     insFolder = os.path.join(remoteBasePath, 'ORCA Logs')
+    experimentName = expOpts['experimentName']
     nspFolder = os.path.join(remoteBasePath, 'raw', experimentName)
 
     ns5FileName = 'Trial00{}'.format(trialIdx)
+    miniRCTrialLookup = expOpts['miniRCTrialLookup']
     miniRCTrial = miniRCTrialLookup[trialIdx]
 
     defaultTapDetectOpts = {
         'iti': 0.2,
         'keepIndex': slice(None)
         }
+    tapDetectOpts = expOpts['tapDetectOpts']
     for trialKey in tapDetectOpts.keys():
         for trialSegmentKey in tapDetectOpts[trialKey].keys():
             for key in defaultTapDetectOpts.keys():
@@ -30,6 +35,7 @@ def parseAnalysisOptions(trialIdx, experimentShorthand):
     defaultSessionTapRangesNSP = {
         'keepIndex': slice(None)
         }
+    sessionTapRangesNSP = expOpts['sessionTapRangesNSP']
     for trialKey in sessionTapRangesNSP.keys():
         for trialSegmentKey in sessionTapRangesNSP[trialKey].keys():
             for key in defaultSessionTapRangesNSP.keys():
@@ -58,7 +64,7 @@ def parseAnalysisOptions(trialIdx, experimentShorthand):
             }
         }
     spikeWindow = trialFilesFrom['utah']['spikeWindow']
-    
+    jsonSessionNames = expOpts['jsonSessionNames']
     trialFilesStim = {
         'ins': {
             'origin': 'ins',
@@ -73,7 +79,8 @@ def parseAnalysisOptions(trialIdx, experimentShorthand):
             'getINSkwargs': {None}
             }
         }
-
+    stimDetectChans = expOpts['stimDetectChans']
+    stimDetectThres = expOpts['stimDetectThres']
     stimDetectOptsByChannelDefault = {grpIdx: {
         0: {'detectChannels': stimDetectChans, 'thres': stimDetectThres},
         1: {'detectChannels': stimDetectChans, 'thres': stimDetectThres},
@@ -137,7 +144,8 @@ def parseAnalysisOptions(trialIdx, experimentShorthand):
     
     nspCmpPath = os.path.join('.', 'nsp_map.cmp')
     cmpDF = tdch.cmpToDF(nspCmpPath)
-
+    
+    remakePrb = expOpts['remakePrb']
     if remakePrb:
         nspCsvPath = os.path.join('.', 'nsp_map.csv')
         cmpDF.to_csv(nspCsvPath)
@@ -158,6 +166,16 @@ def parseAnalysisOptions(trialIdx, experimentShorthand):
         os.makedirs(scratchFolder, exist_ok=True)
 
     #  paths relevant to single trial files
+    triFolder = os.path.join(
+        scratchFolder, 'tdc_Trial00{}'.format(trialIdx))
+    
+    if isinstance(expOpts['triFolderSourceBase'], int):
+        triFolderSource = os.path.join(
+            scratchFolder, 'tdc_Trial00{}'.format(expOpts['triFolderSourceBase']))
+    else:
+        triFolderSource = os.path.join(
+            scratchPath, expOpts['triFolderSourceBase'])
+
     analysisDataPath = os.path.join(
         scratchFolder,
         ns5FileName + '_analyze.nix')
@@ -221,6 +239,7 @@ def parseAnalysisOptions(trialIdx, experimentShorthand):
         'pageSize': (6, 12), 'removeOutliers': (0.01, 0.975)}
 
     try:
+        experimentsToAssemble = expOpts['experimentsToAssemble']
         trialsToAssemble = []
         for key in sorted(experimentsToAssemble.keys()):
             val = experimentsToAssemble[key]

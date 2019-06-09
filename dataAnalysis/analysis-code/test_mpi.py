@@ -1,26 +1,26 @@
 #!/gpfs/runtime/opt/python/3.5.2/bin/python3
-"""
+"""01: Preprocess spikes, then 04: Run peeler and 05: Assemble the spike nix file
+
 Usage:
     tridesclousCCV.py [options]
 
-Arguments:
-
 Options:
     --trialIdx=trialIdx        which trial to analyze [default: 1]
+    --exp=exp                  which experimental day to analyze
+    --attemptMPI               whether to try to load MPI [default: False]
     --purgePeeler              delete previous sort results [default: False]
     --batchPreprocess          extract snippets and features, run clustering [default: False]
-    --visConstructor           include visualization step for catalogue constructor [default: False]
     --batchPeel                run peeler [default: False]
-    --visPeeler                include visualization step for catalogue [default: False]
-    --makeNeoBlock             save peeler results to a neo block [default: False]
+    --makeCoarseNeoBlock       save peeler results to a neo block [default: False]
+    --makeStrictNeoBlock       save peeler results to a neo block [default: False]
 """
 
 from docopt import docopt
 import traceback
+import dataAnalysis.helperFunctions.tridesclous_helpers as tdch
+import tridesclous as tdc
 
-print(__doc__)
 arguments = docopt(__doc__)
-print(arguments)
 
 try:
     from mpi4py import MPI
@@ -34,3 +34,48 @@ except Exception:
     HAS_MPI = False
 
 print(RANK)
+if RANK == 0:
+    from currentExperiment_alt import parseAnalysisOptions
+    expOpts, allOpts = parseAnalysisOptions(
+        int(arguments['--trialIdx']),
+        arguments['--exp'])
+    print("globals:")
+    print(globals().keys())
+    print('allOpts:')
+    print(allOpts.keys())
+    print('expOpts:')
+    print(expOpts.keys())
+    globals().update(expOpts)
+    globals().update(allOpts)
+    try:
+        tdch.initialize_catalogueconstructor(
+            nspFolder,
+            ns5FileName,
+            triFolder,
+            nspPrbPath,
+            removeExisting=False, fileFormat='Blackrock')
+    except Exception:
+        pass
+else:
+    nspFolder = None
+    nspPrbPath = None
+    triFolder = None
+    spikeWindow = None
+
+COMM.Barrier()  # sync MPI threads, waith for 0
+nspFolder = COMM.bcast(nspFolder, root=0)
+nspPrbPath = COMM.bcast(nspPrbPath, root=0)
+triFolder = COMM.bcast(triFolder, root=0)
+spikeWindow = COMM.bcast(spikeWindow, root=0)
+print(triFolder)
+
+if RANK == 0:
+    dataio = tdc.DataIO(dirname=triFolder)
+    chansToAnalyze = sorted(list(dataio.channel_groups.keys()))[:96]
+else:
+    chansToAnalyze = None
+
+print("RANK: {}".format(RANK))
+COMM.Barrier()  # sync MPI threads, waith for 0 to gather chansToAnalyze
+chansToAnalyze = COMM.bcast(chansToAnalyze, root=0)
+print("RANK: {}".format(RANK))

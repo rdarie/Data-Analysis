@@ -1,3 +1,13 @@
+"""  10b: Calculate Firing Rates
+Usage:
+    temp.py [options]
+
+Options:
+    --trialIdx=trialIdx             which trial to analyze
+    --exp=exp                       which experimental day to analyze
+    --processAll                    process entire experimental day? [default: False]
+"""
+
 import dataAnalysis.ephyviewer.scripts as vis_scripts
 import os, pdb
 from importlib import reload
@@ -20,17 +30,33 @@ import seaborn as sns
 from sklearn.decomposition import PCA
 from sklearn.pipeline import make_pipeline, Pipeline
 #  load options
-from currentExperiment import *
+#  from currentExperiment import *
 from joblib import dump, load
 from importlib import reload
 import quantities as pq
 
-masterSpikeMats, _ = preproc.loadSpikeMats(
-    experimentBinnedSpikePath, rasterOpts,
-    loadAll=True, checkReferences=True)
+from currentExperiment_alt import parseAnalysisOptions
+from docopt import docopt
+arguments = docopt(__doc__)
+expOpts, allOpts = parseAnalysisOptions(
+    int(arguments['--trialIdx']),
+    arguments['--exp'])
+globals().update(expOpts)
+globals().update(allOpts)
 
-dataReader = neo.io.nixio_fr.NixIO(
-    filename=experimentDataPath)
+if arguments['--processAll']:
+    masterSpikeMats, _ = preproc.loadSpikeMats(
+        experimentBinnedSpikePath, rasterOpts,
+        loadAll=True, checkReferences=False)
+    dataReader = neo.io.nixio_fr.NixIO(
+        filename=experimentDataPath)
+else:
+    masterSpikeMats, _ = preproc.loadSpikeMats(
+        binnedSpikePath, rasterOpts,
+        loadAll=True, checkReferences=False)
+    dataReader = neo.io.nixio_fr.NixIO(
+        filename=analysisDataPath)
+
 dataBlock = dataReader.read_block(
     block_index=0, lazy=True,
     signal_group_mode='split-all')
@@ -84,12 +110,21 @@ for segIdx, segSpikeMat in masterSpikeMats.items():
 dataReader.file.close()
 allSegs = list(range(len(masterBlock.segments)))
 
-preproc.addBlockToNIX(
-    masterBlock, neoSegIdx=allSegs,
-    writeSpikes=False, writeEvents=False,
-    fileName=experimentName + '_analyze',
-    folderPath=os.path.join(
-        remoteBasePath, 'processed', experimentName),
-    purgeNixNames=False,
-    nixBlockIdx=0, nixSegIdx=allSegs,
-    )
+if arguments['--processAll']:
+    preproc.addBlockToNIX(
+        masterBlock, neoSegIdx=allSegs,
+        writeSpikes=False, writeEvents=False,
+        fileName=experimentName + '_analyze',
+        folderPath=scratchFolder,
+        purgeNixNames=False,
+        nixBlockIdx=0, nixSegIdx=allSegs,
+        )
+else:
+    preproc.addBlockToNIX(
+        masterBlock, neoSegIdx=allSegs,
+        writeSpikes=False, writeEvents=False,
+        fileName=ns5FileName + '_analyze',
+        folderPath=scratchFolder,
+        purgeNixNames=False,
+        nixBlockIdx=0, nixSegIdx=allSegs,
+        )

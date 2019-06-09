@@ -12,8 +12,6 @@ import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 import seaborn as sns
-#  load options
-from exp201901271000 import *
 from joblib import dump, load
 import quantities as pq
 from statsmodels.stats.weightstats import ttest_ind
@@ -22,6 +20,7 @@ from statsmodels.stats.weightstats import ttest_ind
 def getConditionAverages(
         dataBlock, unitNames, dataQueryTemplate,
         collapseSizes=True, verbose=False):
+
     allUnits = [
         i
         for i in dataBlock.filter(objects=Unit)
@@ -40,7 +39,10 @@ def getConditionAverages(
         unitWaveforms = pd.concat(
             waveformsDict,
             names=['segment'] + waveformsDict[0].index.names)
-        allWaveformsList.append(unitWaveforms.query(dataQueryTemplate))
+        dataQuery = dataQueryTemplate.format(thisUnit.name)
+        pdb.set_trace()
+        allWaveformsList.append(unitWaveforms.query(dataQuery))
+    
     allWaveforms = pd.concat(allWaveformsList)
     saveIndexNames = allWaveforms.index.names
     allWaveforms.reset_index(inplace=True)
@@ -62,4 +64,4 @@ def getConditionAverages(
         saveIndexNames,
         inplace=True)
     allWaveforms.columns.name = 'bin'
-    return allWaveforms
+    return allWaveforms, dataQuery

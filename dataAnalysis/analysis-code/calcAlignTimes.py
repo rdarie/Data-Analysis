@@ -1,4 +1,12 @@
-#  10: Calculate align Times
+"""10a: Calculate align Times
+Usage:
+    temp.py [options]
+
+Options:
+    --trialIdx=trialIdx             which trial to analyze
+    --exp=exp                       which experimental day to analyze
+    --processAll                    process entire experimental day? [default: False]
+"""
 import os, pdb, traceback
 from importlib import reload
 import neo
@@ -17,12 +25,25 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from collections import Iterable
+
 #  load options
-from currentExperiment import *
+from currentExperiment_alt import parseAnalysisOptions
+from docopt import docopt
+arguments = docopt(__doc__)
+expOpts, allOpts = parseAnalysisOptions(
+    int(arguments['--trialIdx']),
+    arguments['--exp'])
+globals().update(expOpts)
+globals().update(allOpts)
 
 #  all experimental days
-dataReader = neo.io.nixio_fr.NixIO(
-    filename=experimentDataPath)
+if arguments['--processAll']:
+    dataReader = neo.io.nixio_fr.NixIO(
+        filename=experimentDataPath)
+else:
+    dataReader = neo.io.nixio_fr.NixIO(
+        filename=analysisDataPath)
+
 dataBlock = dataReader.read_block(
     block_index=0, lazy=True,
     signal_group_mode='split-all')
@@ -129,15 +150,18 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         movingAtAll = group['pedalVelocityCat'].fillna(0).abs()
         movementOnOff = movingAtAll.diff()
         taskMask = (
-            (group['t'] - tdDF['t'].iloc[0] > alignTimeBounds[segIdx][idx][0]) &
-            (group['t'] - tdDF['t'].iloc[0] < alignTimeBounds[segIdx][idx][1])
+            (group['t'] > alignTimeBounds[segIdx][idx][0]) &
+            (group['t'] < alignTimeBounds[segIdx][idx][1])
             )
         moveMaskForSeg = (movementOnOff == 1) & taskMask
         stopMaskForSeg = (movementOnOff == -1) & taskMask
-        pdb.set_trace()
-        #group.loc[moveMaskForSeg, 't'] - tdDF['t'].iloc[0]
-        assert stopMaskForSeg.sum() == moveMaskForSeg.sum(), 'unequal start and stop lengths' 
-        assert stopMaskForSeg.sum() % 4 == 0, 'number of movements not divisible by 4'
+        try:
+            #  group.loc[moveMaskForSeg, 't'] - tdDF['t'].iloc[0]
+            assert stopMaskForSeg.sum() == moveMaskForSeg.sum(), 'unequal start and stop lengths' 
+            assert stopMaskForSeg.sum() % 2 == 0, 'number of movements not divisible by 2'
+        except Exception:
+            traceback.print_exc()
+            #  pdb.set_trace()
         moveMask.loc[moveMaskForSeg.index[moveMaskForSeg]] = True
         stopMask.loc[stopMaskForSeg.index[stopMaskForSeg]] = True
     
@@ -380,11 +404,21 @@ dataReader.file.close()
 
 masterBlock.create_relationship()
 allSegs = list(range(len(masterBlock.segments)))
-preproc.addBlockToNIX(
-    masterBlock, neoSegIdx=allSegs,
-    writeAsigs=False, writeSpikes=False, writeEvents=True,
-    fileName=experimentName + '_analyze',
-    folderPath=scratchFolder,
-    purgeNixNames=False,
-    nixBlockIdx=0, nixSegIdx=allSegs,
-    )
+if arguments['--processAll']:
+    preproc.addBlockToNIX(
+        masterBlock, neoSegIdx=allSegs,
+        writeAsigs=False, writeSpikes=False, writeEvents=True,
+        fileName=experimentName + '_analyze',
+        folderPath=scratchFolder,
+        purgeNixNames=False,
+        nixBlockIdx=0, nixSegIdx=allSegs,
+        )
+else:
+    preproc.addBlockToNIX(
+        masterBlock, neoSegIdx=allSegs,
+        writeAsigs=False, writeSpikes=False, writeEvents=True,
+        fileName=ns5FileName + '_analyze',
+        folderPath=scratchFolder,
+        purgeNixNames=False,
+        nixBlockIdx=0, nixSegIdx=allSegs,
+        )

@@ -1,5 +1,4 @@
 #!/bin/bash
-
 # 01: Preprocess spikes
 # Request an hour of runtime:
 #SBATCH --time=2:00:00
@@ -12,7 +11,7 @@
 
 # Specify a job name:
 #SBATCH -J spike_sort_constructor
-#SBATCH --array=1
+#SBATCH --array=3
 
 # Specify an output file
 #SBATCH -o ../batch_logs/%j-%a-spike_sort_constructor.stdout
@@ -23,4 +22,4 @@
 
 # Run a command
 module load mpi
-srun --mpi=pmi2 ./tridesclousCCV.py --trialIdx=$SLURM_ARRAY_TASK_ID --attemptMPI --batchPreprocess
+srun --mpi=pmi2 ./tridesclousCCV.py --trialIdx=$SLURM_ARRAY_TASK_ID --exp=exp201901271000_alt --attemptMPI --batchPreprocess

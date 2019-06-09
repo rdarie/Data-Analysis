@@ -334,7 +334,7 @@ alignTimeBounds = [
     [
         #  per trialSegment
         [92, 527],
-        [775, 890]
+        [775, 887]
         ],
     [
         [210, 295]

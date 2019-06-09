@@ -1,3 +1,6 @@
+import os
+
+
 def getExpOpts():
     plottingFigures = False
     plotBlocking = True
@@ -90,4 +93,10 @@ def getExpOpts():
 
     stimDetectThres = 1
     stimDetectChans = ['ins_td2', 'ins_td3']
+    
+    triFolderSourceBase = os.path.join(
+        '201901211000-Proprio', 'tdc_Trial001')
+    triDestinations = [
+        'Trial00{}'.format(trialIdx)
+        for trialIdx in [1, 2]]
     return locals()

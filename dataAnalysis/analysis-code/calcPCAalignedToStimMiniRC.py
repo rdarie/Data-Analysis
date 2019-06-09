@@ -120,5 +120,4 @@ preproc.analogSignalsAlignedToEvents(
     windowSize=windowSize, appendToExisting=True,
     checkReferences=False,
     fileName=ns5FileName + '_triggered',
-    folderPath=os.path.join(
-        remoteBasePath, 'processed', experimentName))
+    folderPath=scratchFolder)

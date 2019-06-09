@@ -4,6 +4,7 @@ Usage:
 
 Options:
     --trialIdx=trialIdx        which trial to analyze [default: 1]
+    --exp=exp                  which experimental day to analyze
     --chan_start=chan_start    which chan_grp to start on [default: 0]
     --chan_stop=chan_stop      which chan_grp to stop on [default: 96]
     --peeler                   visualize Peeler results
@@ -14,11 +15,16 @@ from docopt import docopt
 import tridesclous as tdc
 import dataAnalysis.helperFunctions.tridesclous_helpers as tdch
 import dataAnalysis.helperFunctions.helper_functions as hf
-from currentExperiment import *
+from currentExperiment_alt import parseAnalysisOptions
 #from exp201901211000 import *
 import os, gc, traceback
 
 arguments = docopt(__doc__)
+expOpts, allOpts = parseAnalysisOptions(
+    int(arguments['--trialIdx']),
+    arguments['--exp'])
+globals().update(expOpts)
+globals().update(allOpts)
 #  if overriding currentExperiment
 if arguments['--trialIdx']:
     print(arguments)
@@ -55,8 +61,8 @@ chansToAnalyze = [
 
 #  chansToAnalyze = chansToAnalyze[80:]
 #  chansToAnalyze = [1, 8, 43, 46, 50, 53, 57, 59, 62, 67, 73, 74, 82, 84, 90, 91]
-chansToAnalyze = [34, 81, 84, 92]
-print(chansToAnalyze)
+#  chansToAnalyze = [34, 81, 84, 92]
+
 if viewConstructor:
     for chan_grp in chansToAnalyze:
         print('\n\n\n\nOn channel group {}\n\n\n\n'.format(chan_grp))

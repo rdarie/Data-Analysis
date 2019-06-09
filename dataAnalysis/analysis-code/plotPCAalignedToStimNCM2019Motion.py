@@ -1,3 +1,12 @@
+"""  13: Plot Firing Rates and Rasters aligned to Stim
+Usage:
+    temp.py [options]
+
+Options:
+    --trialIdx=trialIdx             which trial to analyze [default: 1]
+    --exp=exp                       which experimental day to analyze
+    --processAll                    process entire experimental day? [default: False]
+"""
 import dataAnalysis.plotting.aligned_signal_plots as asp
 import os, pdb, traceback
 from importlib import reload
@@ -13,13 +22,20 @@ import pandas as pd
 from matplotlib import pyplot as plt
 import seaborn as sns
 #  load options
-from exp201901271000 import *
 from joblib import dump, load
 import quantities as pq
 from statsmodels.stats.weightstats import ttest_ind
 from statsmodels.stats.multitest import multipletests as mt
 import getConditionAverages as tempgca
 from scipy import stats
+
+from currentExperiment_alt import parseAnalysisOptions
+from docopt import docopt
+arguments = docopt(__doc__)
+expOpts, allOpts = parseAnalysisOptions(
+    int(arguments['--trialIdx']), arguments['--exp'])
+globals().update(expOpts)
+globals().update(allOpts)
 
 sns.set()
 sns.set_color_codes("dark")
@@ -50,10 +66,12 @@ dataQueryTemplate = '&'.join([
     '(pedalSizeCat == \'M\')',
     '(bin>300)',
     ])
-
 enablePlots = True
 allPvals = {}
-colorPal = "ch:0,-.2,dark=.3,light=0.7,reverse=1" #  for firing rates
+colorPal = "ch:0,-.2,dark=.3,light=0.7,reverse=1"  # for firing rates
+rasterToPlot = [rasterToPlot[87]]
+continuousToPlot = [continuousToPlot[87]]
+
 for idx, (rasterName, continuousName) in enumerate(zip(rasterToPlot, continuousToPlot)):
     try:
         rasterWide, dataQuery = tempgca.getConditionAverages(dataBlock, rasterName, dataQueryTemplate)
@@ -115,6 +133,7 @@ for idx, (rasterName, continuousName) in enumerate(zip(rasterToPlot, continuousT
                     alignedRastersFolder, '{}_motion.pdf'.format(rasterName)))
             plt.close()
     except Exception:
+        pdb.set_trace()
         traceback.print_exc()
 
 allPvalsDF = pd.concat(allPvals).reset_index()

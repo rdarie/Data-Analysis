@@ -1,4 +1,4 @@
-"""  12: Calculate Firing Rates and Rasters aligned to Stim
+"""  11: Calculate Firing Rates aligned to Stim
 Usage:
     temp.py [options]
 
@@ -7,7 +7,6 @@ Options:
     --exp=exp                       which experimental day to analyze
     --processAll                    process entire experimental day? [default: False]
 """
-
 import os, pdb, traceback
 from importlib import reload
 import neo
@@ -15,7 +14,7 @@ from neo import (
     Block, Segment, ChannelIndex,
     Event, AnalogSignal, SpikeTrain, Unit)
 from neo.io.proxyobjects import (
-    AnalogSignalProxy, EventProxy)
+    AnalogSignalProxy, SpikeTrainProxy, EventProxy) 
 import dataAnalysis.preproc.ns5 as preproc
 import numpy as np
 import pandas as pd
@@ -38,23 +37,18 @@ for ev in eventBlock.filter(objects=EventProxy):
     ev.name = '_'.join(ev.name.split('_')[1:])
 
 #  source of analogsignals
-signalReader = neo.io.nixio_fr.NixIO(
-    filename=experimentBinnedSpikePath)
-signalBlock = signalReader.read_block(
-    block_index=0, lazy=True,
-    signal_group_mode='split-all')
+signalBlock = eventBlock
 
 chansToTrigger = np.unique([
     i.name
     for i in signalBlock.filter(objects=AnalogSignalProxy)])
-#  chansToTrigger = ['elec96#0_fr', 'elec44#0_fr']
 eventName = 'alignTimes'
 windowSize = [i * pq.s for i in rasterOpts['windowSize']]
-
+#  chansToTrigger = ['PC1', 'PC2']
 preproc.analogSignalsAlignedToEvents(
     eventBlock=eventBlock, signalBlock=signalBlock,
     chansToTrigger=chansToTrigger, eventName=eventName,
-    windowSize=windowSize, appendToExisting=True,
+    windowSize=windowSize, appendToExisting=False,
     checkReferences=False,
     fileName=experimentName + '_triggered',
     folderPath=scratchFolder)

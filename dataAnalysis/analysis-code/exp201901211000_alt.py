@@ -8,6 +8,7 @@ def getExpOpts():
         
     plottingFigures = False
     plotBlocking = True
+    remakePrb = False
 
     experimentName = '201901211000-Proprio'
     deviceName = 'DeviceNPC700373H'
@@ -102,16 +103,13 @@ def getExpOpts():
         3: {}
         }
 
-    stimDetectOpts = {grpIdx: {
-        0: {'detectChannels': ['ins_td2', 'ins_td3'], 'thres': 1},
-        1: {'detectChannels': ['ins_td2', 'ins_td3'], 'thres': 1},
-        2: {'detectChannels': ['ins_td2', 'ins_td3'], 'thres': 1},
-        3: {'detectChannels': ['ins_td2', 'ins_td3'], 'thres': 1}
-        } for grpIdx in range(4)}
-
     stimDetectThres = 1
     stimDetectChans = ['ins_td2', 'ins_td3']
 
+    triFolderSourceBase = 1
+    triDestinations = [
+        'Trial00{}'.format(trialIdx)
+        for trialIdx in [2, 3]]
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
         '201901201200-Proprio': [2],
@@ -131,7 +129,7 @@ def getExpOpts():
         [
             #  per trialSegment
             [92, 527],
-            [775, 890]
+            [775, 887]
             ],
         [
             [210, 295]

@@ -61,7 +61,7 @@ for unitName in unitsToPlot:
 
 #  amplitude averages
 unitsToPlot = ['amplitude#0']
-colorPal = "ch:1.2,-.2,dark=.3,light=0.7,reverse=1" #  for positions
+colorPal = "ch:1.2,-.2,dark=.3,light=0.7,reverse=1"  # for positions
 dataQueryTemplate = '&'.join([
         '(feature==\'{}\')',
         '(pedalMovementCat==\'midPeak\')',

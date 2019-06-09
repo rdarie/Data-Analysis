@@ -1,12 +1,12 @@
 #!/gpfs/runtime/opt/python/3.5.2/bin/python3
 """01: Preprocess spikes, then 04: Run peeler and 05: Assemble the spike nix file
+
 Usage:
     tridesclousCCV.py [options]
 
-Arguments:
-
 Options:
     --trialIdx=trialIdx        which trial to analyze [default: 1]
+    --exp=exp                  which experimental day to analyze
     --attemptMPI               whether to try to load MPI [default: False]
     --purgePeeler              delete previous sort results [default: False]
     --batchPreprocess          extract snippets and features, run clustering [default: False]
@@ -18,7 +18,6 @@ Options:
 from docopt import docopt
 import tridesclous as tdc
 import dataAnalysis.helperFunctions.tridesclous_helpers as tdch
-import dataAnalysis.helperFunctions.helper_functions as hf
 import os, gc, traceback
 
 arguments = docopt(__doc__)
@@ -38,13 +37,22 @@ except Exception:
     HAS_MPI = False
 
 if RANK == 0:
-    from currentExperiment import *
-    #  if overriding currentExperiment
-    if arguments['--trialIdx']:
-        trialIdx = int(arguments['--trialIdx'])
-        ns5FileName = 'Trial00{}'.format(trialIdx)
-        triFolder = os.path.join(
-            scratchFolder, 'tdc_' + ns5FileName)
+    from currentExperiment_alt import parseAnalysisOptions
+    expOpts, allOpts = parseAnalysisOptions(
+        int(arguments['--trialIdx']),
+        arguments['--exp'])
+    print("globals:")
+    print(globals().keys())
+    print('allOpts:')
+    print(allOpts.keys())
+    print('expOpts:')
+    print(expOpts.keys())
+    globals().update(expOpts)
+    globals().update(allOpts)
+    #  for key in allOpts.keys():
+    #      if key not in ['COMM', 'RANK', 'SIZE']:
+    #          exec(key + " = allOpts['" + key + "']")
+    #  print(triFolder)
     try:
         tdch.initialize_catalogueconstructor(
             nspFolder,
@@ -60,14 +68,12 @@ else:
     triFolder = None
     spikeWindow = None
 
-
 if HAS_MPI:
     COMM.Barrier()  # sync MPI threads, waith for 0
     nspFolder = COMM.bcast(nspFolder, root=0)
     nspPrbPath = COMM.bcast(nspPrbPath, root=0)
     triFolder = COMM.bcast(triFolder, root=0)
     spikeWindow = COMM.bcast(spikeWindow, root=0)
-
 
 if RANK == 0:
     if arguments['--purgePeeler']:
