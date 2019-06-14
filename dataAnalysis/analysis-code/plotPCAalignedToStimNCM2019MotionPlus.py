@@ -1,3 +1,12 @@
+"""  13: Plot Firing Rates and Rasters aligned to Stim
+Usage:
+    temp.py [options]
+
+Options:
+    --trialIdx=trialIdx             which trial to analyze [default: 1]
+    --exp=exp                       which experimental day to analyze
+    --processAll                    process entire experimental day? [default: False]
+"""
 import dataAnalysis.plotting.aligned_signal_plots as asp
 import os, pdb, traceback
 from importlib import reload
@@ -12,22 +21,33 @@ import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 import seaborn as sns
-#  load options
-from exp201901271000 import *
 from joblib import dump, load
 import quantities as pq
 from statsmodels.stats.weightstats import ttest_ind
 from statsmodels.stats.multitest import multipletests as mt
 import getConditionAverages as tempgca
 from scipy import stats
+from matplotlib.backends.backend_pdf import PdfPages
+
+from currentExperiment_alt import parseAnalysisOptions
+from docopt import docopt
+arguments = docopt(__doc__)
+expOpts, allOpts = parseAnalysisOptions(
+    int(arguments['--trialIdx']), arguments['--exp'])
+globals().update(expOpts)
+globals().update(allOpts)
 
 sns.set()
 sns.set_color_codes("dark")
 sns.set_context("talk")
 sns.set_style("dark")
 
-dataBlock = preproc.loadWithArrayAnn(
-    experimentTriggeredPath)
+if arguments['--processAll']:
+    dataBlock = preproc.loadWithArrayAnn(
+        experimentTriggeredPath)
+else:
+    dataBlock = preproc.loadWithArrayAnn(
+        trialTriggeredPath)
 
 unitNames = np.unique([
     i.name
@@ -43,112 +63,181 @@ continuousToPlot = [
     if '_fr' in i]
 nUnits = len(continuousToPlot)
 # during movement and stim
-dataQueryTemplate = '&'.join([
-    '(RateInHz==100)',
-    '(feature==\'{}\')',
+pedalSizeQuery = '(' + '|'.join([
+    '(pedalSizeCat == \'{}\')'.format(i)
+    for i in ['M', 'L', 'XL']
+    ]) + ')'
+dataQuery = '&'.join([
+    #  '(feature==\'{}\')',
+    '(RateInHzFuzzy==100)|(RateInHzFuzzy==0)',
     '(pedalMovementCat==\'outbound\')',
-    '(pedalSizeCat == \'M\')',
-    '(bin>300)',
+    pedalSizeQuery,
+    #  '(pedalDirection == \'CW\')'
     ])
-#  rasterToPlot = [rasterToPlot[0]]
-#  continuousToPlot = [continuousToPlot[0]]
+
 enablePlots = True
 allPvals = {}
-colorPal = "ch:0.6,-.2,dark=.3,light=0.7,reverse=1" #  for firing rates
-for idx, (rasterName, continuousName) in enumerate(zip(rasterToPlot, continuousToPlot)):
-    try:
-        rasterWide, dataQuery = tempgca.getConditionAverages(dataBlock, rasterName, dataQueryTemplate)
-        asigWide, dataQuery = tempgca.getConditionAverages(dataBlock, continuousName, dataQueryTemplate)
-        raster = rasterWide.stack().reset_index(name='raster')
-        asig = asigWide.stack().reset_index(name='fr')
-        refBin = 310
-        uniqProgs = np.array([0, 1, 2])
-        elecPvals = pd.DataFrame(
-            np.nan,
-            index=uniqProgs,
-            columns=asigWide.columns)
-        elecPvals.index.name='programFuzzy'
-        tTestWidth = 10
-        tTestStride = 10
-        testBins = np.arange(500, 1000, tTestStride)
-        pThresh = 1e-3
-        for progIdx in uniqProgs:
-            thisAsig = asigWide.query('(programFuzzy=={})'.format(progIdx))
-            uniqueAmps = thisAsig.index.get_level_values('amplitudeCatFuzzy').unique()
-            maxAmp = uniqueAmps.max()
-            minAmp = uniqueAmps.min()
-            #  testAmp = uniqueAmps[uniqueAmps < maxAmp * .8].max()
-            for testBin in testBins:
-                x1 = thisAsig.query('(amplitudeCatFuzzy=={})'.format(maxAmp)).loc[:, testBin:testBin + tTestWidth].stack()
-                x2 = thisAsig.query('(amplitudeCatFuzzy=={})'.format(minAmp)).loc[:, testBin:testBin + tTestWidth].stack()
-                #  tstat, pvalue, df = ttest_ind(x1, x2)
-                tstat, pvalue = stats.ttest_ind(x1, x2, equal_var=False)
-                elecPvals.loc[progIdx, testBin] = pvalue
-        flatPvals = elecPvals.stack()
+colorPal = "ch:0.6,-.2,dark=.3,light=0.7,reverse=1"  #  for firing rates
+rasterToPlot = ['elec75#0_raster#0', 'elec75#1_raster#0']
+continuousToPlot = ['elec75#0_fr#0', 'elec75#1_fr#0']
+
+pdfName = '{}_motionPlusStim.pdf'.format(experimentName)
+uniqProgs = np.array([0, 1, 2, 999])
+stimProgs = np.array([0, 1, 2])
+
+countingQuery = '&'.join([
+    '(pedalMovementCat==\'outbound\')',
+    '(pedalSizeCat != \'NA\')'
+    ])
+
+dummyAsig = tempgca.getConditionAverages(
+    dataBlock, continuousToPlot[0], collapseSizes=False,
+    dataQuery=countingQuery)
+dummyAsig.reset_index(inplace=True)
+countedNames = [
+    'segment', 'pedalSizeCat',
+    'RateInHzFuzzy', 'pedalMetaCat', 'pedalDirection']
+for countedName in countedNames:
+    print(dummyAsig[countedName].value_counts())
+    print('\n')
+
+import scipy
+def triggeredAsigCompareMeans(
+        asigWide, groupBy, testVar,
+        tStart=None, tStop=None,
+        testWidth=100, testStride=20,
+        correctMultiple=True):
+    
+    if tStart is None:
+        tStart = asigWide.columns[0]
+    if tStop is None:
+        tStop = asigWide.columns[-1]
+    testBins = np.arange(
+        tStart, tStop, testStride)
+    
+    if isinstance(groupBy, str):
+        pValIndex = pd.Index(
+            asigWide.groupby(groupBy).groups.keys())
+        pValIndex.name = groupBy
+    else:
+        pValIndex = pd.MultiIndex.from_tuples(
+            asigWide.groupby(groupBy).groups.keys(),
+            names=groupBy)
+
+    pVals = pd.DataFrame(
+        np.nan,
+        index=pValIndex,
+        columns=testBins)
+    pVals.columns.name = 'bin'
+    for testBin in testBins:
+        tMask = (
+            (asigWide.columns > testBin - testWidth / 2) &
+            (asigWide.columns < testBin + testWidth / 2)
+            )
+        testAsig = asigWide.loc[:, tMask]
+        for name, group in testAsig.groupby(groupBy):
+            testGroups = [
+                np.ravel(i)
+                for _, i in group.groupby(testVar)]
+            if len(testGroups) > 1:
+                stat, p = scipy.stats.kruskal(*testGroups)
+                pVals.loc[name, testBin] = p
+
+    if correctMultiple:
+        flatPvals = pVals.stack()
         _, fixedPvals, _, _ = mt(flatPvals.values, method='holm')
         flatPvals.loc[:] = fixedPvals
         flatPvals = flatPvals.unstack('bin')
-        elecPvals.loc[flatPvals.index, flatPvals.columns] = flatPvals
-        elecPvals.interpolate(method='ffill', axis=1, inplace=True)
-        elecPvals.fillna(1, inplace=True)
-        elecPvals.loc[:, elecPvals.columns < 300] = 1
-        #elecPvals = elecPvals * nUnits
-        elecPvals = elecPvals.stack().reset_index(name='pvalue')
-        elecPvals['significant'] = elecPvals['pvalue'] < pThresh
-        """
-        for progIdx, pvals in elecPvals.groupby('programFuzzy'):
-            ax = sns.distplot(np.log10(pvals['pvalue']), kde=False)
-        plt.savefig(os.path.join(figureFolder, 'miniRC_ttestvis.pdf'))
-        plt.close()
-        """
-        allPvals.update({idx: elecPvals})
-        if enablePlots:
-            raster.loc[:, 'fr'] = asig.loc[:, 'fr']
-            raster = asp.getRasterFacetIdx(
-                raster, 't',
-                col='programFuzzy', hue='amplitudeCatFuzzy')
-            g = asp.twin_relplot(
-                x='bin',
-                y2='fr', y1='t_facetIdx',
-                query2=None, query1='(raster == 1000)',
-                hue='amplitudeCatFuzzy',
-                col='programFuzzy',
-                palette=colorPal,
-                func1_kws={'marker': '|', 'alpha': 0.6}, func2_kws={'ci': 'sem'},
-                facet1_kws={'sharey': False}, facet2_kws={'sharey': True},
-                height=5, aspect=1.5, kind1='scatter', kind2='line', data=raster)
-            for (ro, co, hu), dataSubset in g.facet_data():
-                progIdx = g.col_names[co]
-                thesePvals = elecPvals.query('programFuzzy=={}'.format(progIdx))
-                if thesePvals['significant'].any():
-                    ymin, ymax = g.axes[ro, co].get_ylim()
-                    g.axes[ro, co].plot(
-                        thesePvals.loc[thesePvals['significant'], 'bin'],
-                        thesePvals.loc[thesePvals['significant'], 'bin'] ** 0 * ymax * 0.99,
-                        'm*')
-            plt.suptitle(dataQuery)
-            for ax in g.axes.flat:
-                ax.axvline(500, color='m')
-            g.savefig(
-                os.path.join(
-                    alignedRastersFolder, '{}_motionPlusStim.pdf'.format(rasterName)))
-            plt.close()
-    except Exception:
-        traceback.print_exc()
+        pVals.loc[flatPvals.index, flatPvals.columns] = flatPvals
 
-allPvalsDF = pd.concat(allPvals).reset_index()
+    return pVals
+
+
+with PdfPages(os.path.join(figureFolder, pdfName)) as pdf:
+    for idx, (rasterName, continuousName) in enumerate(zip(rasterToPlot, continuousToPlot)):
+        try:
+            rasterWide = tempgca.getConditionAverages(
+                dataBlock, rasterName, dataQuery,
+                makeControlProgram=True, duplicateControlsByProgram=True)
+            asigWide = tempgca.getConditionAverages(
+                dataBlock, continuousName, dataQuery,
+                makeControlProgram=True, duplicateControlsByProgram=True)
+            raster = rasterWide.stack().reset_index(name='raster')
+            asig = asigWide.stack().reset_index(name='fr')
+            
+            testStride = 20
+            elecPvals = triggeredAsigCompareMeans(
+                asigWide.query('programFuzzy != 999'),
+                groupBy=['pedalDirection', 'programFuzzy'], testVar='amplitudeCatFuzzy',
+                tStart=500, tStop=None,
+                testWidth=100, testStride=testStride)
+            #  correct for comparisons across units
+            elecPvals = elecPvals * len(rasterToPlot)
+
+            allPvals.update({idx: elecPvals})
+            if enablePlots:
+                raster.loc[:, 'fr'] = asig.loc[:, 'fr']
+                raster = asp.getRasterFacetIdx(
+                    raster, 't',
+                    col='programFuzzy', row='pedalDirection', hue='amplitudeCatFuzzy')
+                g = asp.twin_relplot(
+                    x='bin',
+                    y2='fr', y1='t_facetIdx',
+                    query2=None, query1='(raster == 1000)',
+                    hue='amplitudeCatFuzzy',
+                    col='programFuzzy', row='pedalDirection',
+                    palette=colorPal,
+                    func1_kws={'marker': '|', 'alpha': 0.6}, func2_kws={'ci': 'sem'},
+                    facet1_kws={'sharey': False}, facet2_kws={'sharey': True},
+                    height=5, aspect=1.5, kind1='scatter', kind2='line', data=raster)
+                for (ro, co, hu), dataSubset in g.facet_data():
+                    progIdx = g.col_names[co]
+                    rowIdx = g.row_names[ro]
+                    try:
+                        pQuery = '&'.join([
+                            '(programFuzzy=={})'.format(progIdx),
+                            '(pedalDirection==\'{}\')'.format(rowIdx),
+                        ])
+                        thesePvals = (
+                            elecPvals
+                            .query(pQuery))
+                        significantBins = (
+                            thesePvals
+                            .columns[np.ravel(thesePvals < pThresh)])
+                        if not significantBins.empty:
+                            ymin, ymax = g.axes[ro, co].get_ylim()
+                            g.axes[ro, co].plot(
+                                significantBins,
+                                significantBins ** 0 * ymax * 0.99,
+                                'm*')
+                    except Exception:
+                        traceback.print_exc()
+                        pdb.set_trace()
+                plt.suptitle(rasterName)
+                for ax in g.axes.flat:
+                    ax.axvline(500, color='m')
+                pdf.savefig()
+                plt.close()
+        except Exception:
+            traceback.print_exc()
+            #  pdb.set_trace()
+
+allPvalsWide = pd.concat(allPvals, names=['unit'] + elecPvals.index.names)
+allPvalsDF = pd.DataFrame(allPvalsWide.stack(), columns=['pvalue'])
+allPvalsDF['significant'] = allPvalsDF['pvalue'] < pThresh
+
 gPH = sns.catplot(
-    y='significant', x='bin', col='programFuzzy',
-    kind='bar', ci=None, data=allPvalsDF,
+    y='significant', x='bin', row='pedalDirection', col='programFuzzy',
+    kind='bar', ci=None, data=allPvalsDF.reset_index(),
     linewidth=0, color='m', dodge=False
     )
 for ax in gPH.axes.flat:
-    ax.set_ylim((0,1))
+    ax.set_ylim((0, 1))
     labels = ax.get_xticklabels()
     for i,l in enumerate(labels):
-        if (i%200 != 0): labels[i] = '' # skip every nth label
+        if (i%200 != 0): labels[i] = ''  # skip every nth label
     ax.set_xticklabels(labels, rotation=30)
-    newwidth = tTestStride
+    newwidth = testStride
     for bar in ax.patches:
         x = bar.get_x()
         width = bar.get_width()

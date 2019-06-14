@@ -1557,7 +1557,7 @@ def getINSStimLogFromJson(
 
 def stimStatusSerialtoLong(
         stimStSer, idxT='t', namePrefix='ins_', expandCols=[],
-        deriveCols=[], progAmpNames=[], dropDuplicates=True):
+        deriveCols=[], progAmpNames=[], dropDuplicates=True, amplitudeCatBins=4):
     
     fullExpandCols = copy(expandCols)
     #  fixes issue with 'program' and 'amplitude' showing up unrequested
@@ -1631,10 +1631,9 @@ def stimStatusSerialtoLong(
         for colName in ampsForSum.columns:
             if ampsForSum[colName].max() > 0:
                 ampsForSum[colName] = pd.cut(
-                    ampsForSum[colName], bins=4, labels=False)
+                    ampsForSum[colName], bins=amplitudeCatBins, labels=False)
             else:
                 ampsForSum[colName] = pd.cut(ampsForSum[colName], bins=1, labels=False)
-        
         stimStLong['amplitudeCat'] = (
             ampsForSum.sum(axis=1))
     if debugPlot:

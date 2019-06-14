@@ -4,41 +4,24 @@ Usage:
     preprocINSData.py [options]
 
 Options:
-    --trialIdx=trialIdx   which trial to analyze
+    --trialIdx=trialIdx        which trial to analyze
+    --exp=exp                  which experimental day to analyze
 """
 
 import dataAnalysis.preproc.mdt as preprocINS
-from docopt import docopt
 import os
-from currentExperiment import *
 import dataAnalysis.ephyviewer.scripts as vis_scripts
 from importlib import reload
 
+#  load options
+from currentExperiment_alt import parseAnalysisOptions
+from docopt import docopt
 arguments = docopt(__doc__)
-'''
-arguments = {
-    '--trialIdx': '5',
-    '--miniRCTrial': True
-    }
-'''
-#  if overriding currentExperiment
-if arguments['--trialIdx']:
-    print(arguments)
-    trialIdx = int(arguments['--trialIdx'])
-    ns5FileName = 'Trial00{}'.format(trialIdx)
-    #  insDataPath = os.path.join(
-    #      remoteBasePath, 'raw', experimentName,
-    #      ns5FileName + '_ins.nix'
-    #  )
-    insDataPath = os.path.join(
-        scratchFolder,
-        ns5FileName + '_ins.nix')
-    trialFilesStim['ins']['ns5FileName'] = ns5FileName
-    trialFilesStim['ins']['jsonSessionNames'] = jsonSessionNames[trialIdx]
-    miniRCTrial = miniRCTrialLookup[trialIdx]
-
-if miniRCTrial:
-    trialFilesStim['ins']['getINSkwargs'].update(miniRCDetectionOpts)
+expOpts, allOpts = parseAnalysisOptions(
+    int(arguments['--trialIdx']),
+    arguments['--exp'])
+globals().update(expOpts)
+globals().update(allOpts)
 
 insBlock = preprocINS.preprocINS(
     trialFilesStim['ins'],

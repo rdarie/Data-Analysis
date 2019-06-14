@@ -4,9 +4,8 @@ Usage:
 
 Options:
     --trialIdx=trialIdx             which trial to analyze
+    --exp=exp                       which experimental day to analyze
 """
-
-from docopt import docopt
 import matplotlib, pdb, pickle, traceback
 matplotlib.use('Qt5Agg')   # generate interactive output by default
 #  matplotlib.rcParams['agg.path.chunksize'] = 10000
@@ -46,24 +45,18 @@ from neo import (
 import neo
 import elephant.pandas_bridge as elphpdb
 
-from currentExperiment import *
+#  load options
+from currentExperiment_alt import parseAnalysisOptions
+from docopt import docopt
+arguments = docopt(__doc__)
+expOpts, allOpts = parseAnalysisOptions(
+    int(arguments['--trialIdx']),
+    arguments['--exp'])
+globals().update(expOpts)
+globals().update(allOpts)
 #  load INS Data
 ############################################################
 
-arguments = docopt(__doc__)
-#  if overriding currentExperiment
-if arguments['--trialIdx']:
-    print(arguments)
-    trialIdx = int(arguments['--trialIdx'])
-    ns5FileName = 'Trial00{}'.format(trialIdx)
-    #  insDataPath = os.path.join(
-    #      remoteBasePath, 'raw', experimentName,
-    #      ns5FileName + '_ins.nix')
-    insDataPath = os.path.join(
-        scratchFolder,
-        ns5FileName + '_ins.nix')
-    trialFilesStim['ins']['jsonSessionNames'] = jsonSessionNames[trialIdx]
-    trialFilesStim['ins']['ns5FileName'] = ns5FileName
 print('Loading INS Block...')
 '''
 reader = neo.io.NixIO(filename=insDataPath, mode='ro')
@@ -103,6 +96,7 @@ print('Detecting NSP Timestamps...')
 #  pdb.set_trace()
 for trialSegment in pd.unique(td['data']['trialSegment']):
     #  Where in NSP to look
+    #  pdb.set_trace()
     tStart = sessionTapRangesNSP[trialIdx][trialSegment]['timeRanges'][0]
     tStop = sessionTapRangesNSP[trialIdx][trialSegment]['timeRanges'][1]
     nspMask = (channelData['t'] > tStart) & (channelData['t'] < tStop)

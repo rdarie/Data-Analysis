@@ -1,15 +1,21 @@
-import matplotlib
-matplotlib.use("PS")
+from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 import pdb
 import seaborn as sns
+from tabulate import tabulate
+import dataAnalysis.helperFunctions.kilosort_analysis as ksa
+import dataAnalysis.preproc.ns5 as ns5
+from neo import (
+    Block, Segment, ChannelIndex,
+    Event, AnalogSignal, SpikeTrain, Unit)
 from seaborn.relational import *
 from seaborn.axisgrid import (
     Grid, dedent, _facet_docs, LooseVersion, mpl,
     utils, product, FacetGrid)
 from seaborn.relational import _ScatterPlotter, _LinePlotter
+import os
 
 
 def getRasterFacetIdx(
@@ -34,6 +40,401 @@ def getRasterFacetIdx(
             idxOffset += len(uniqueIdx)
             #  plotDF[y + '_facetIdx'].unique()
     return plotDF
+
+
+def plotNeuronsAligned(
+        dataBlock,
+        dataQuery=None,
+        figureFolder=None,
+        rowName=None,
+        rowControl=None,
+        colName=None,
+        colControl=None,
+        hueName=None,
+        testStride=None,
+        testWidth=None,
+        testTStart=None,
+        testTStop=None,
+        pThresh=1e-3,
+        duplicateControlsByProgram=True,
+        makeControlProgram=True,
+        enablePlots=True,
+        colorPal="ch:0.6,-.2,dark=.2,light=0.7,reverse=1",
+        printBreakDown=True,
+        pdfName='motionStim.pdf',
+        unitNames=None):
+    if unitNames is None:
+        allUnitNames = np.unique([
+            i.name
+            for i in dataBlock.filter(objects=Unit)])
+        unitNames = [
+            i.split('_raster')[0]
+            for i in allUnitNames
+            if '_raster' in i]
+    nUnits = len(unitNames)
+
+    with PdfPages(os.path.join(figureFolder, pdfName + '.pdf')) as pdf:
+        allPvals = {}
+        for idx, unitName in enumerate(unitNames):
+            rasterName = unitName + '_raster#0'
+            continuousName = unitName + '_fr#0'
+            rasterWide = ns5.getConditionAverages(
+                dataBlock, rasterName, dataQuery,
+                makeControlProgram=makeControlProgram,
+                duplicateControlsByProgram=duplicateControlsByProgram)
+            asigWide = ns5.getConditionAverages(
+                dataBlock, continuousName, dataQuery,
+                makeControlProgram=makeControlProgram,
+                duplicateControlsByProgram=duplicateControlsByProgram)
+            raster = rasterWide.stack().reset_index(name='raster')
+            asig = asigWide.stack().reset_index(name='fr')
+            #  set up significance testing
+            if (rowControl is None) and (colControl) is None:
+                # test all rows and columns
+                sigTestQuery = None
+            else:
+                sigTestQueryList = []
+                if rowControl is not None:
+                    if isinstance(rowControl, str):
+                        rowQ = '\'' + rowControl + '\''
+                    else:
+                        rowQ = rowControl
+                    sigTestQueryList.append(
+                        '({} != {})'.format(rowName, rowQ))
+                if colControl is not None:
+                    if isinstance(colControl, str):
+                        colQ = '\'' + colControl + '\''
+                    else:
+                        colQ = colControl
+                    sigTestQueryList.append(
+                        '({} != {})'.format(colName, colQ))
+                sigTestQuery = '&'.join(sigTestQueryList)
+            #  test each row and column separately
+            sigTestGroupBy = [
+                i
+                for i in [rowName, colName]
+                if i is not None
+                ]
+            #  get significance test results
+            elecPvals = ksa.triggeredAsigCompareMeans(
+                asigWide.query(sigTestQuery),
+                groupBy=sigTestGroupBy, testVar=hueName,
+                tStart=testTStart, tStop=testTStop,
+                testWidth=testWidth, testStride=testStride)
+            #  bonferroni correct for comparisons across units
+            elecPvals = elecPvals * nUnits
+            #  save sig test results to stack
+            allPvals.update({idx: elecPvals})
+            if enablePlots:
+                raster.loc[:, 'fr'] = asig.loc[:, 'fr']
+                raster = getRasterFacetIdx(
+                    raster, 't',
+                    col=colName, row=rowName, hue=hueName)
+                g = twin_relplot(
+                    x='bin',
+                    y2='fr', y1='t_facetIdx',
+                    query2=None, query1='(raster == 1000)',
+                    col=colName, row=rowName, hue=hueName,
+                    palette=colorPal,
+                    func1_kws={'marker': '|', 'alpha': 0.6},
+                    func2_kws={'ci': 'sem'},
+                    facet1_kws={'sharey': False},
+                    facet2_kws={'sharey': True},
+                    height=5, aspect=1.5,
+                    kind1='scatter', kind2='line',
+                    data=raster)
+                #  iterate through plot and add significance stars
+                for (ro, co, hu), dataSubset in g.facet_data():
+                    pQueryList = []
+                    rowFacetName = g.row_names[ro]
+                    if rowName is not None:
+                        if isinstance(rowFacetName, str):
+                            compareName = '\'' + rowFacetName + '\''
+                        else:
+                            compareName = rowFacetName
+                        pQueryList.append(
+                            '({} == {})'.format(rowName, compareName))
+                    colFacetName = g.col_names[co]
+                    if colName is not None:
+                        if isinstance(colFacetName, str):
+                            compareName = '\'' + colFacetName + '\''
+                        else:
+                            compareName = colFacetName
+                        pQueryList.append(
+                            '({} == {})'.format(colName, compareName))
+                    pQuery = '&'.join(pQueryList)
+                    thesePvals = elecPvals.query(pQuery)
+                    #  plot stars
+                    if not thesePvals.empty:
+                        significantBins = (
+                            thesePvals
+                            .columns[np.ravel(thesePvals < pThresh)])
+                        if not significantBins.empty:
+                            ymin, ymax = g.axes[ro, co].get_ylim()
+                            g.axes[ro, co].plot(
+                                significantBins,
+                                significantBins ** 0 * ymax * 0.99,
+                                'm*')
+                for ax in g.axes.flat:
+                    ax.axvline(testTStart, color='m')
+                pdf.savefig()
+                plt.close()
+    
+        if printBreakDown:
+            fig, ax = plt.subplots()
+            fig.set_size_inches(15, 15)
+            # print out description of how many observations there are
+            # for each condition
+            breakDownData = (
+                asigWide
+                .query(sigTestQuery)
+                .groupby(sigTestGroupBy + [hueName])
+                .agg('count')
+                .iloc[:, 0]
+            )
+            indexNames = [
+                i.replace('Fuzzy', '')
+                for i in breakDownData.index.names
+            ] + ['count']
+            breakDownData = breakDownData.reset_index()
+            breakDownData.columns = indexNames
+            breakDownText = (
+                '{}\n'.format(unitName) +
+                '# of observations:\n' +
+                tabulate(
+                    breakDownData, showindex=False,
+                    headers='keys', tablefmt='github',
+                    numalign='left', stralign='left')
+                )
+            #  pdb.set_trace()
+            fig.text(
+                0.5, 0.5, breakDownText,
+                fontsize=sns.plotting_context()['font.size'],
+                fontfamily='monospace',
+                va='center', ha='center',
+                wrap=True, transform=ax.transAxes)  # add text
+            pdf.savefig()
+            plt.close()
+    allPvalsWide = pd.concat(allPvals, names=['unit'] + elecPvals.index.names)
+    allPvalsDF = pd.DataFrame(allPvalsWide.stack(), columns=['pvalue'])
+    allPvalsDF['significant'] = allPvalsDF['pvalue'] < pThresh
+    plotSignificance(
+        allPvalsDF,
+        rowName=rowName, colName=colName,
+        testStride=testStride,
+        testWidth=testWidth,
+        pdfName=pdfName + '_pCount',
+        figureFolder=figureFolder)
+    return
+
+
+def plotAsigsAligned(
+        dataBlock,
+        dataQuery=None,
+        figureFolder=None,
+        rowName=None,
+        rowControl=None,
+        colName=None,
+        colControl=None,
+        hueName=None,
+        testStride=None,
+        testWidth=None,
+        testTStart=None,
+        testTStop=None,
+        pThresh=1e-3,
+        duplicateControlsByProgram=True,
+        makeControlProgram=True,
+        enablePlots=True,
+        linePlotEstimator='mean',
+        colorPal="ch:0.6,-.2,dark=.2,light=0.7,reverse=1",
+        printBreakDown=True,
+        pdfName='alignedAsigs.pdf',
+        unitNames=None):
+    
+    if unitNames is None:
+        unitNames = np.unique([
+            i.name
+            for i in dataBlock.filter(objects=Unit)])
+    nUnits = len(unitNames)
+    #  
+    with PdfPages(os.path.join(figureFolder, pdfName + '.pdf')) as pdf:
+        allPvals = {}
+        for idx, unitName in enumerate(unitNames):
+            asigWide = ns5.getConditionAverages(
+                dataBlock, unitName, dataQuery,
+                makeControlProgram=makeControlProgram,
+                duplicateControlsByProgram=duplicateControlsByProgram)
+            asig = asigWide.stack().reset_index(name='signal')
+            #  TEMP, check fixes to calcmotionstimaligntimes
+            #  pdb.set_trace()
+            #  asig['pedalSize'] = asig['pedalSize'] - 0.815
+            #  asig['pedalDirection'] = np.nan
+            #  asig.loc[asig['pedalSize'] > 0, 'pedalDirection'] = 'CW'
+            #  asig.loc[asig['pedalSize'] <= 0, 'pedalDirection'] = 'CCW'
+            #  END TEMP
+            #  set up significance testing
+            if (rowControl is None) and (colControl) is None:
+                # test all rows and columns
+                sigTestQuery = None
+            else:
+                sigTestQueryList = []
+                if rowControl is not None:
+                    if isinstance(rowControl, str):
+                        rowQ = '\'' + rowControl + '\''
+                    else:
+                        rowQ = rowControl
+                    sigTestQueryList.append(
+                        '({} != {})'.format(rowName, rowQ))
+                if colControl is not None:
+                    if isinstance(colControl, str):
+                        colQ = '\'' + colControl + '\''
+                    else:
+                        colQ = colControl
+                    sigTestQueryList.append(
+                        '({} != {})'.format(colName, colQ))
+                sigTestQuery = '&'.join(sigTestQueryList)
+            #  test each row and column separately
+            sigTestGroupBy = [
+                i
+                for i in [rowName, colName]
+                if i is not None
+                ]
+            #  get significance test results
+            elecPvals = ksa.triggeredAsigCompareMeans(
+                asigWide.query(sigTestQuery),
+                groupBy=sigTestGroupBy, testVar=hueName,
+                tStart=testTStart, tStop=testTStop,
+                testWidth=testWidth, testStride=testStride)
+            #  bonferroni correct for comparisons across units
+            elecPvals = elecPvals * nUnits
+            #  save sig test results to stack
+            allPvals.update({idx: elecPvals})
+            if enablePlots:
+                g = sns.relplot(
+                    x='bin', y='signal',
+                    col=colName, row=rowName, hue=hueName,
+                    ci='sem', estimator=linePlotEstimator,
+                    palette=colorPal,
+                    height=5, aspect=1.5, kind='line', data=asig)
+                #  iterate through plot and add significance stars
+                for (ro, co, hu), dataSubset in g.facet_data():
+                    #  pdb.set_trace()
+                    if co == 0:
+                        g.axes[ro, co].set_ylabel(unitName)
+                    pQueryList = []
+                    rowFacetName = g.row_names[ro]
+                    if rowName is not None:
+                        if isinstance(rowFacetName, str):
+                            compareName = '\'' + rowFacetName + '\''
+                        else:
+                            compareName = rowFacetName
+                        pQueryList.append(
+                            '({} == {})'.format(rowName, compareName))
+                    colFacetName = g.col_names[co]
+                    if colName is not None:
+                        if isinstance(colFacetName, str):
+                            compareName = '\'' + colFacetName + '\''
+                        else:
+                            compareName = colFacetName
+                        pQueryList.append(
+                            '({} == {})'.format(colName, compareName))
+                    pQuery = '&'.join(pQueryList)
+                    thesePvals = elecPvals.query(pQuery)
+                    #  plot stars
+                    if not thesePvals.empty:
+                        significantBins = (
+                            thesePvals
+                            .columns[np.ravel(thesePvals < pThresh)])
+                        if not significantBins.empty:
+                            ymin, ymax = g.axes[ro, co].get_ylim()
+                            g.axes[ro, co].plot(
+                                significantBins,
+                                significantBins ** 0 * ymax * 0.99,
+                                'm*')
+                for ax in g.axes.flat:
+                    ax.axvline(testTStart, color='m')
+                pdf.savefig()
+                plt.close()
+        #  print a table
+        if printBreakDown:
+            fig, ax = plt.subplots()
+            fig.set_size_inches(15, 15)
+            # print out description of how many observations there are
+            # for each condition
+            breakDownData = (
+                asigWide
+                .query(sigTestQuery)
+                .groupby(sigTestGroupBy + [hueName])
+                .agg('count')
+                .iloc[:, 0]
+            )
+            indexNames = [
+                i.replace('Fuzzy', '')
+                for i in breakDownData.index.names
+            ] + ['count']
+            breakDownData = breakDownData.reset_index()
+            breakDownData.columns = indexNames
+            breakDownText = (
+                '{}\n'.format(unitName) +
+                '# of observations:\n' +
+                tabulate(
+                    breakDownData, showindex=False,
+                    headers='keys', tablefmt='github',
+                    numalign='left', stralign='left')
+                )
+            #  pdb.set_trace()
+            fig.text(
+                0.5, 0.5, breakDownText,
+                fontsize=sns.plotting_context()['font.size'],
+                fontfamily='monospace',
+                va='center', ha='center',
+                wrap=True, transform=ax.transAxes)  # add text
+            pdf.savefig()
+            plt.close()
+    allPvalsWide = pd.concat(allPvals, names=['unit'] + elecPvals.index.names)
+    allPvalsDF = pd.DataFrame(allPvalsWide.stack(), columns=['pvalue'])
+    allPvalsDF['significant'] = allPvalsDF['pvalue'] < pThresh
+    plotSignificance(
+        allPvalsDF,
+        rowName=rowName, colName=colName,
+        testStride=testStride,
+        testWidth=testWidth,
+        pdfName=pdfName + '_pCount',
+        figureFolder=figureFolder)
+    return
+
+
+def plotSignificance(
+        pValsDF,
+        rowName=None, colName=None,
+        testStride=None,
+        testWidth=None,
+        pdfName='pCount',
+        figureFolder=None):
+
+    gPH = sns.catplot(
+        y='significant', x='bin',
+        row=rowName, col=colName,
+        kind='bar', ci=None, data=pValsDF.reset_index(),
+        linewidth=0, color='m', dodge=False
+        )
+    for ax in gPH.axes.flat:
+        ax.set_ylim((0, 1))
+        #  labels = ax.get_xticklabels()
+        #  for i,l in enumerate(labels):
+        #      if (i%200 != 0): labels[i] = ''  # skip every nth label
+        #  ax.set_xticklabels(labels, rotation=30)
+        newwidth = testStride
+        for bar in ax.patches:
+            x = bar.get_x()
+            width = bar.get_width()
+            centre = x + width/2.
+            bar.set_x(centre - newwidth/2.)
+            bar.set_width(newwidth)
+
+    gPH.savefig(os.path.join(figureFolder, pdfName + '.pdf'))
+    plt.close()
+    return
 
 
 def twin_relplot(

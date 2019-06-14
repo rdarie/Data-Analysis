@@ -116,11 +116,11 @@ def getExpOpts():
         '201901211000-Proprio': [1, 2, 3],
         }
 
-    movementSizeBins = [-0.9, -0.45, -0.2, 0.2, 0.55, 0.9]
+    movementSizeBins = [0, 0.25, 0.5, 1, 1.25, 1.5]
     alignTimeBounds = [
         #  each key is a trial
         [
-            [200, 667],
+            [247, 667],
             [1370, 1595],
             [2175, 2315],
             [2475, 2495]
@@ -140,4 +140,8 @@ def getExpOpts():
             [1367, 2024]
             ]
         ]
+    alignTimeLookup = {
+        'exp201901201200_alt': {2: 0},
+        'exp201901211000_alt': {1: 1, 2: 2, 3: 3},
+    }
     return locals()

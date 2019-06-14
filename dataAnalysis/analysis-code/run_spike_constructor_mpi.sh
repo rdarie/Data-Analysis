@@ -7,7 +7,7 @@
 #SBATCH --nodes=48
 #SBATCH --tasks=48
 #SBATCH --tasks-per-node=1
-#SBATCH --mem=48G
+#SBATCH --mem=80G
 
 # Specify a job name:
 #SBATCH -J spike_sort_constructor

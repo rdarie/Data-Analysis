@@ -229,6 +229,9 @@ def spikeTrainWaveformsToDF(
     waveformsDict = {}
     for st in spiketrains:
         wfDF = pd.DataFrame(np.squeeze(st.waveforms))
+        bins = np.array(
+            wfDF.columns, dtype=np.float) / st.sampling_rate - st.left_sweep
+        wfDF.columns = bins.magnitude
         annDict = {
             k: pd.Series(v)
             for k, v in st.array_annotations.items()}
@@ -298,7 +301,7 @@ def analogSignalsAlignedToEvents(
         newSeg = Segment(name=signalSeg.annotations['neo_name'])
         newSeg.annotate(nix_name=signalSeg.annotations['neo_name'])
         masterBlock.segments.append(newSeg)
-
+        #  pdb.set_trace()
         alignEvents = ([
             i.load()
             for i in eventSeg.filter(
@@ -375,6 +378,7 @@ def analogSignalsAlignedToEvents(
     if signalBlock is not eventBlock:
         signalBlock.filter(
             objects=AnalogSignalProxy)[0]._rawio.file.close()
+    
     if appendToExisting:
         allSegs = list(range(len(masterBlock.segments)))
         addBlockToNIX(
@@ -598,9 +602,11 @@ def loadSpikeMats(
         dataPath, rasterOpts,
         alignTimes=None, chans=None, loadAll=False,
         absoluteBins=False, transposeSpikeMat=False,
-        checkReferences=False):
+        checkReferences=False,
+        aggregateFun=None):
 
     reader = neo.io.nixio_fr.NixIO(filename=dataPath)
+    #  pdb.set_trace()
     chanNames = reader.header['signal_channels']['name']
     
     if chans is not None:
@@ -620,15 +626,12 @@ def loadSpikeMats(
     for segIdx in range(reader.segment_count(block_index=0)):
         if checkReferences:
             for i, cIdx in enumerate(chanIdx):
-                da = reader.da_list['blocks'][
-                    0]['segments'][segIdx]['data'][cIdx]
-                print('name {}, da.name {}'.format(
-                    chanNames[i], da.name
-                    ))
+                da = reader.da_list['blocks'][ 0]['segments'][segIdx]['data'][cIdx]
+                print('name {}, da.name {}'.format( chanNames[i], da.name ))
                 try:
                     assert chanNames[i] in da.name, 'reference problem!!'
                 except Exception:
-                    pass
+                    traceback.print_exc()
         tStart = reader.get_signal_t_start(
             block_index=0, seg_index=segIdx)
         fs = reader.get_signal_sampling_rate(
@@ -638,13 +641,16 @@ def loadSpikeMats(
             block_index=0, seg_index=segIdx
             )
         tStop = sigSize / fs + tStart
-        # convert to indices early to avoid floating point problems
+        #  convert to indices early to avoid floating point problems
         
         intervalIdx = int(round(rasterOpts['binInterval'] * fs))
-        #halfIntervalIdx = int(round(intervalIdx / 2))
+        #  halfIntervalIdx = int(round(intervalIdx / 2))
         
-        widthIdx = int(3 * round(rasterOpts['binWidth'] * fs))
+        widthIdx = int(round(rasterOpts['binWidth'] * fs))
         halfWidthIdx = int(round(widthIdx / 2))
+        
+        if rasterOpts['smoothKernelWidth'] is not None:
+            kernWidthIdx = int(round(rasterOpts['smoothKernelWidth'] * fs))
         
         theBins = None
 
@@ -661,8 +667,8 @@ def loadSpikeMats(
             if not loadAll:
                 idxOnset = int(round((tOnset - tStart) * fs))
                 #  can't not be ints
-                iStart = idxOnset + winStartIdx - halfWidthIdx
-                iStop = idxOnset + winStopIdx + halfWidthIdx
+                iStart = idxOnset + winStartIdx - int(3 * halfWidthIdx)
+                iStop = idxOnset + winStopIdx + int(3 * halfWidthIdx)
             else:
                 winStartIdx = 0
                 iStart = 0
@@ -676,16 +682,44 @@ def loadSpikeMats(
                 validTrials[idx] = False
             else:
                 #  valid slices
-                rawSpikeMat = pd.DataFrame(
-                    reader.get_analogsignal_chunk(
-                        block_index=0, seg_index=segIdx,
-                        i_start=iStart, i_stop=iStop,
-                        channel_names=chanNames))
-                procSpikeMat = rawSpikeMat.rolling(
-                    window=widthIdx, center=True,
-                    win_type='gaussian'
-                    ).mean(std=widthIdx/6).dropna().iloc[::intervalIdx, :]
-                    
+                try:
+                    rawSpikeMat = pd.DataFrame(
+                        reader.get_analogsignal_chunk(
+                            block_index=0, seg_index=segIdx,
+                            i_start=iStart, i_stop=iStop,
+                            channel_names=chanNames))
+                except Exception:
+                    traceback.print_exc()
+                    pdb.set_trace()
+                
+                if aggregateFun is None:
+                    procSpikeMat = rawSpikeMat.rolling(
+                        window=3 * widthIdx, center=True,
+                        win_type='gaussian'
+                        ).mean(std=halfWidthIdx)
+                else:
+                    procSpikeMat = rawSpikeMat.rolling(
+                        window=widthIdx, center=True
+                        ).apply(
+                            aggregateFun,
+                            raw=True,
+                            kwargs={'fs': fs, 'nSamp': widthIdx})
+
+                if rasterOpts['smoothKernelWidth'] is not None:
+                    procSpikeMat = (
+                        procSpikeMat
+                        .rolling(
+                            window=3 * kernWidthIdx, center=True,
+                            win_type='gaussian')
+                        .mean(std=kernWidthIdx/2)
+                        .dropna().iloc[::intervalIdx, :]
+                    )
+                else:
+                    procSpikeMat = (
+                        procSpikeMat
+                        .dropna().iloc[::intervalIdx, :]
+                    )
+
                 procSpikeMat.columns = chanNames
                 procSpikeMat.columns.name = 'unit'
                 if theBins is None:
@@ -937,6 +971,7 @@ def readBlockFixNames(
                 #  elif 'seg' in child.name:
                 #      childBaseName = '_'.join(child.name.split('_')[1:])
                 #      child.name = 'seg{}_{}'.format(segIdx, childBaseName)
+    
     return dataBlock
 
 
@@ -951,26 +986,28 @@ def addBlockToNIX(
         ):
     #  base file name
     trialBasePath = os.path.join(folderPath, fileName)
-    # peek at file to ensure compatibility
-    reader = neo.io.nixio_fr.NixIO(filename=trialBasePath + '.nix')
-    tempBlock = reader.read_block(
-        block_index=nixBlockIdx,
-        lazy=True, signal_group_mode='split-all')
-    
-    checkCompatible = {i: False for i in nixSegIdx}
-    forceShape = {i: None for i in nixSegIdx}
-    forceType = {i: None for i in nixSegIdx}
-    forceFS = {i: None for i in nixSegIdx}
-    for nixIdx in nixSegIdx:
-        tempAsigList = tempBlock.segments[nixIdx].filter(
-            objects=AnalogSignalProxy)
-        if len(tempAsigList) > 0:
-            tempAsig = tempAsigList[0]
-            checkCompatible[nixIdx] = True
-            forceType[nixIdx] = tempAsig.dtype
-            forceShape[nixIdx] = tempAsig.shape[0]  # ? docs say shape[1], but that's confusing
-            forceFS[nixIdx] = tempAsig.sampling_rate
-    reader.file.close()
+    if writeAsigs:
+        # peek at file to ensure compatibility
+        reader = neo.io.nixio_fr.NixIO(filename=trialBasePath + '.nix')
+        tempBlock = reader.read_block(
+            block_index=nixBlockIdx,
+            lazy=True, signal_group_mode='split-all')
+
+        checkCompatible = {i: False for i in nixSegIdx}
+        forceShape = {i: None for i in nixSegIdx}
+        forceType = {i: None for i in nixSegIdx}
+        forceFS = {i: None for i in nixSegIdx}
+        for nixIdx in nixSegIdx:
+            tempAsigList = tempBlock.segments[nixIdx].filter(
+                objects=AnalogSignalProxy)
+            if len(tempAsigList) > 0:
+                tempAsig = tempAsigList[0]
+                checkCompatible[nixIdx] = True
+                forceType[nixIdx] = tempAsig.dtype
+                forceShape[nixIdx] = tempAsig.shape[0]  # ? docs say shape[1], but that's confusing
+                forceFS[nixIdx] = tempAsig.sampling_rate
+        
+        reader.file.close()
     #  if newBlock was loaded from a nix file, strip the old nix_names away:
     #  todo: replace with function from this module
     if purgeNixNames:
@@ -1014,8 +1051,8 @@ def addBlockToNIX(
                 if checkCompatible[nixIdx]:
                     assert asig.dtype == forceType[nixIdx]
                     assert asig.sampling_rate == forceFS[nixIdx]
-                    print('asig.shape[0] = {}'.format(asig.shape[0]))
-                    print('forceShape[nixIdx] = {}'.format(forceShape[nixIdx]))
+                    #  print('asig.shape[0] = {}'.format(asig.shape[0]))
+                    #  print('forceShape[nixIdx] = {}'.format(forceShape[nixIdx]))
                     assert asig.shape[0] == forceShape[nixIdx]
                 asig = writer._write_analogsignal(asig, nixblock, nixgroup)
             #  for isig in newSeg.filter(objects=IrregularlySampledSignal):
@@ -1033,6 +1070,7 @@ def addBlockToNIX(
         #  auto descends into units inside of _write_channelindex
     writer._create_source_links(newBlock, nixblock)
     writer.close()
+    print('Done adding block to Nix.')
     return newBlock
 
 
@@ -1559,7 +1597,6 @@ def loadWithArrayAnn(
         block = reader.read_block()
     
     #  block.create_relationship()  # need this!
-
     block = loadContainerArrayAnn(container=block)
     
     if fromRaw:
@@ -1645,3 +1682,158 @@ def calcBinarizedArray(
         writer.write_block(spikeMatBlock, use_obj_names=True)
         writer.close()
     return spikeMatBlock
+
+
+def calcFR(
+        binnedPath, dataPath,
+        suffix='fr',
+        aggregateFun=None,
+        rasterOpts=None):
+
+    print('Loading rasters...')
+    masterSpikeMats, _ = loadSpikeMats(
+        binnedPath, rasterOpts,
+        aggregateFun=aggregateFun,
+        loadAll=True, checkReferences=False)
+    print('Loading data file...')
+    dataReader = neo.io.nixio_fr.NixIO(
+        filename=dataPath)
+    dataBlock = dataReader.read_block(
+        block_index=0, lazy=True,
+        signal_group_mode='split-all')
+    masterBlock = Block()
+    masterBlock.name = dataBlock.annotations['neo_name']
+
+    for segIdx, segSpikeMat in masterSpikeMats.items():
+        print('Calculating FR for segment {}'.format(segIdx))
+        spikeMatDF = segSpikeMat.reset_index().rename(
+            columns={'bin': 't'})
+
+        dataSeg = dataBlock.segments[segIdx]
+        dummyAsig = dataSeg.filter(
+            objects=AnalogSignalProxy)[0].load(channel_indexes=[0])
+        samplingRate = dummyAsig.sampling_rate
+        newT = dummyAsig.times.magnitude
+        spikeMatDF['t'] = spikeMatDF['t'] + newT[0]
+
+        segSpikeMatInterp = hf.interpolateDF(
+            spikeMatDF, pd.Series(newT),
+            kind='linear', fill_value=(0, 0),
+            x='t')
+        spikeMatBlockInterp = dataFrameToAnalogSignals(
+            segSpikeMatInterp,
+            idxT='t', useColNames=True,
+            dataCol=segSpikeMatInterp.drop(columns='t').columns,
+            samplingRate=samplingRate)
+        spikeMatBlockInterp.name = dataBlock.annotations['neo_name']
+        spikeMatBlockInterp.annotate(
+            nix_name=dataBlock.annotations['neo_name'])
+        spikeMatBlockInterp.segments[0].name = dataSeg.annotations['neo_name']
+        spikeMatBlockInterp.segments[0].annotate(
+            nix_name=dataSeg.annotations['neo_name'])
+        asigList = spikeMatBlockInterp.filter(objects=AnalogSignal)
+        for asig in asigList:
+            asig.annotate(binWidth=rasterOpts['binWidth'])
+            if '_raster' in asig.name:
+                asig.name = asig.name.replace('_raster', '_' + suffix)
+            asig.name = 'seg{}_{}'.format(segIdx, asig.name)
+            asig.annotate(nix_name=asig.name)
+        chanIdxList = spikeMatBlockInterp.filter(objects=ChannelIndex)
+        for chanIdx in chanIdxList:
+            if '_raster' in chanIdx.name:
+                chanIdx.name = chanIdx.name.replace('_raster', '_' + suffix)
+            chanIdx.annotate(nix_name=chanIdx.name)
+
+        masterBlock.merge(spikeMatBlockInterp)
+
+    dataReader.file.close()
+    
+    return masterBlock
+
+
+def getConditionAverages(
+        dataBlock, unitNames, dataQuery=None,
+        collapseSizes=True, verbose=False,
+        duplicateControlsByProgram=False,
+        makeControlProgram=False):
+
+    allUnits = [
+        i
+        for i in dataBlock.filter(objects=Unit)
+        if i.name in unitNames]
+    allWaveformsList = []
+    for thisUnit in allUnits:
+        if verbose:
+            print('Extracting {}'.format(thisUnit.name))
+        waveformsDict = {}
+        uniqueSpiketrains = []
+        for i, st in enumerate(thisUnit.spiketrains):
+            if st not in uniqueSpiketrains:
+                uniqueSpiketrains.append(st)
+                waveformsDict.update({
+                    i: spikeTrainWaveformsToDF([st])})
+        unitWaveforms = pd.concat(
+            waveformsDict,
+            names=['segment'] + waveformsDict[0].index.names)
+        unitWaveforms.columns = pd.Index(unitWaveforms.columns, dtype=float)
+        if dataQuery is not None:
+            allWaveformsList.append(unitWaveforms.query(dataQuery))
+        else:
+            allWaveformsList.append(unitWaveforms)
+    
+    allWaveforms = pd.concat(allWaveformsList)
+    saveIndexNames = allWaveforms.index.names
+    allWaveforms.reset_index(inplace=True)
+    # unitWaveforms.reset_index(inplace=True)
+    # pdb.set_trace()
+    if collapseSizes:
+        try:
+            allWaveforms.loc[allWaveforms['pedalSizeCat'] == 'XL', 'pedalSizeCat'] = 'L'
+            allWaveforms.loc[allWaveforms['pedalSizeCat'] == 'XS', 'pedalSizeCat'] = 'S'
+        except Exception:
+            traceback.print_exc()
+    
+    if makeControlProgram:
+        try:
+            allWaveforms.loc[allWaveforms['amplitudeFuzzy'] == 0, 'programFuzzy'] = 999
+            allWaveforms.loc[allWaveforms['amplitudeFuzzy'] == 0, 'electrodeFuzzy'] = 'control'
+        except Exception:
+            traceback.print_exc()
+
+    if duplicateControlsByProgram:
+        noStimWaveforms = (
+            allWaveforms
+            .loc[allWaveforms['amplitudeFuzzy'] == 0, :]
+            )
+        stimWaveforms = (
+            allWaveforms
+            .loc[allWaveforms['amplitudeFuzzy'] != 0, :]
+            .copy()
+            )
+        uniqProgs = stimWaveforms['programFuzzy'].unique()
+        progElecLookup = {}
+        for progIdx in uniqProgs:
+            theseStimDF = stimWaveforms.loc[
+                stimWaveforms['programFuzzy'] == progIdx,
+                'electrodeFuzzy']
+            #  print(theseStimDF)
+            elecIdx = theseStimDF.iloc[0]
+            progElecLookup.update({progIdx: elecIdx})
+
+        if makeControlProgram:
+            uniqProgs = np.append(uniqProgs, 999)
+            progElecLookup.update({999: 'control'})
+            
+        for progIdx in uniqProgs:
+            dummyWaveforms = noStimWaveforms.copy()
+            dummyWaveforms.loc[:, 'programFuzzy'] = progIdx
+            dummyWaveforms.loc[:, 'electrodeFuzzy'] = progElecLookup[progIdx]
+            stimWaveforms = pd.concat([stimWaveforms, dummyWaveforms])
+        stimWaveforms.reset_index(drop=True, inplace=True)
+        allWaveforms = stimWaveforms
+
+    allWaveforms.set_index(
+        saveIndexNames,
+        inplace=True)
+    allWaveforms.columns.name = 'bin'
+    return allWaveforms

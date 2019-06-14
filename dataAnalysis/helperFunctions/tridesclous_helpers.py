@@ -758,6 +758,7 @@ def purgeNeoBlock(triFolder):
     trialName = 'tdc_' + triFolder.split('tdc_')[-1]
     for fl in glob.glob(os.path.join(triFolder, trialName + '.nix')):
         os.remove(fl)
+    return
 
 
 def purgePeelerResults(

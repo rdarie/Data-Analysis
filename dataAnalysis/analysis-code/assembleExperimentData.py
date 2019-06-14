@@ -1,4 +1,11 @@
-#  09: Assemble binarized array and relevant analogsignals
+"""   09: Assemble binarized array and relevant analogsignals
+Usage:
+    temp.py [options]
+
+Options:
+    --trialIdx=trialIdx             which trial to analyze [default: 1]
+    --exp=exp                       which experimental day to analyze
+"""
 import dataAnalysis.ephyviewer.scripts as vis_scripts
 import os, pdb
 from importlib import reload
@@ -30,8 +37,16 @@ from sklearn.metrics import mean_squared_error, r2_score
 from neo import (
     Unit, AnalogSignal, Event, Epoch,
     Block, Segment, ChannelIndex, SpikeTrain)
+
 #  load options
-from currentExperiment import *
+from currentExperiment_alt import parseAnalysisOptions
+from docopt import docopt
+arguments = docopt(__doc__)
+expOpts, allOpts = parseAnalysisOptions(
+    int(arguments['--trialIdx']),
+    arguments['--exp'])
+globals().update(expOpts)
+globals().update(allOpts)
 
 applyTimeOffset = False
 suffixList = ['_binarized', '_analyze']

@@ -76,7 +76,7 @@ def parseAnalysisOptions(trialIdx, experimentShorthand):
             'excludeClus': [],
             'forceRecalc': True,
             'detectStim': True,
-            'getINSkwargs': {None}
+            'getINSkwargs': {}
             }
         }
     stimDetectChans = expOpts['stimDetectChans']
@@ -188,25 +188,27 @@ def parseAnalysisOptions(trialIdx, experimentShorthand):
     binnedSpikePath = os.path.join(
         scratchFolder,
         ns5FileName + '_binarized.nix')
-    trialTriggeredPath = os.path.join(
+    trialTriggeredShortPath = os.path.join(
         scratchFolder,
-        ns5FileName + '_triggered.nix')
+        ns5FileName + '_triggered_short.nix')
+    trialTriggeredLongPath = os.path.join(
+        scratchFolder,
+        ns5FileName + '_triggered_long.nix')
 
     #  paths relevant to the entire experimental day
     estimatorPath = os.path.join(
-        #  remoteBasePath, 'processed', experimentName,
         scratchFolder,
         experimentName + '_estimator.joblib')
     experimentDataPath = os.path.join(
-        #  remoteBasePath, 'processed', experimentName,
         scratchFolder,
         experimentName + '_analyze.nix')
-    experimentTriggeredPath = os.path.join(
-        #  remoteBasePath, 'processed', experimentName,
+    experimentTriggeredShortPath = os.path.join(
         scratchFolder,
-        experimentName + '_triggered.nix')
+        experimentName + '_triggered_short.nix')
+    experimentTriggeredLongPath = os.path.join(
+        scratchFolder,
+        experimentName + '_triggered_long.nix')
     experimentBinnedSpikePath = os.path.join(
-        #  remoteBasePath, 'processed', experimentName,
         scratchFolder,
         experimentName + '_binarized.nix')
 
@@ -216,19 +218,20 @@ def parseAnalysisOptions(trialIdx, experimentShorthand):
     if not os.path.exists(figureFolder):
         os.makedirs(figureFolder, exist_ok=True)
 
-    alignedRastersFolder = os.path.join(figureFolder, 'alignedRasters')
-    if not os.path.exists(alignedRastersFolder):
-        os.makedirs(alignedRastersFolder, exist_ok=True)
-    alignedFeaturesFolder = os.path.join(figureFolder, 'alignedFeatures')
-    if not os.path.exists(alignedFeaturesFolder):
-        os.makedirs(alignedFeaturesFolder, exist_ok=True)
+    #  alignedRastersFolder = os.path.join(figureFolder, 'alignedRasters')
+    #  if not os.path.exists(alignedRastersFolder):
+    #      os.makedirs(alignedRastersFolder, exist_ok=True)
+    #  alignedFeaturesFolder = os.path.join(figureFolder, 'alignedFeatures')
+    #  if not os.path.exists(alignedFeaturesFolder):
+    #      os.makedirs(alignedFeaturesFolder, exist_ok=True)
     spikeSortingFiguresFolder = os.path.join(figureFolder, 'spikeSorting')
     if not os.path.exists(spikeSortingFiguresFolder):
         os.makedirs(spikeSortingFiguresFolder, exist_ok=True)
 
     rasterOpts = {
-        'binInterval': 1e-3, 'binWidth': 30e-3,
-        'windowSize': (-.5, .5),
+        'binInterval': 1e-3, 'binWidth': 30e-3, 'smoothKernelWidth': 50e-3,
+        'shortWindowSize': (-.5, .5),
+        'longWindowSize': (-4.5, 4.5),
         'discardEmpty': None, 'maxSpikesTo': None, 'timeRange': None,
         'separateByFunArgs': None,
         'alignTo': None,
@@ -238,15 +241,16 @@ def parseAnalysisOptions(trialIdx, experimentShorthand):
         'type': 'ticks', 'errorBar': 'sem',
         'pageSize': (6, 12), 'removeOutliers': (0.01, 0.975)}
 
+    pThresh = 1e-3
     try:
         experimentsToAssemble = expOpts['experimentsToAssemble']
         trialsToAssemble = []
         for key in sorted(experimentsToAssemble.keys()):
             val = experimentsToAssemble[key]
-            for trialIdx in val:
+            for tIdx in val:
                 trialsToAssemble.append(
                     os.path.join(
-                        scratchPath, key, 'Trial00{}.nix'.format(trialIdx)
+                        scratchPath, key, 'Trial00{}.nix'.format(tIdx)
                     )
                 )
     except Exception:

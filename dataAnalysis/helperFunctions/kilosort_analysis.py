@@ -8,6 +8,7 @@ import numpy as np
 from scipy.ndimage.filters import gaussian_filter1d
 from scipy import stats, ndimage, signal
 import scipy.io
+from statsmodels.stats.multitest import multipletests as mt
 import pandas as pd
 import matplotlib
 from matplotlib.backends.backend_pdf import PdfPages
@@ -1169,6 +1170,60 @@ def plotSpikeTriggeredFR(spikesFrom = None, spikesTo = None,
             showNow = showNow, plotOpts = plotOpts, rasterOpts = rasterOpts)
     plt.tight_layout(pad = 0.01)
     return spikeMats, fig, ax
+
+
+def triggeredAsigCompareMeans(
+        asigWide, groupBy, testVar,
+        tStart=None, tStop=None,
+        testWidth=100e-3, testStride=20e-3,
+        correctMultiple=True):
+    
+    if tStart is None:
+        tStart = asigWide.columns[0]
+    if tStop is None:
+        tStop = asigWide.columns[-1]
+    testBins = np.arange(
+        tStart, tStop, testStride)
+
+    if (isinstance(groupBy, list)) and (len(groupBy) == 1):
+        sigTestGroupBy = sigTestGroupBy[0]
+    
+    if isinstance(groupBy, str):
+        pValIndex = pd.Index(
+            asigWide.groupby(groupBy).groups.keys())
+        pValIndex.name = groupBy
+    else:
+        pValIndex = pd.MultiIndex.from_tuples(
+            asigWide.groupby(groupBy).groups.keys(),
+            names=groupBy)
+
+    pVals = pd.DataFrame(
+        np.nan,
+        index=pValIndex,
+        columns=testBins)
+    pVals.columns.name = 'bin'
+    for testBin in testBins:
+        tMask = (
+            (asigWide.columns > testBin - testWidth / 2) &
+            (asigWide.columns < testBin + testWidth / 2)
+            )
+        testAsig = asigWide.loc[:, tMask]
+        for name, group in testAsig.groupby(groupBy):
+            testGroups = [
+                np.ravel(i)
+                for _, i in group.groupby(testVar)]
+            if len(testGroups) > 1:
+                stat, p = scipy.stats.kruskal(*testGroups)
+                pVals.loc[name, testBin] = p
+
+    if correctMultiple:
+        flatPvals = pVals.stack()
+        _, fixedPvals, _, _ = mt(flatPvals.values, method='holm')
+        flatPvals.loc[:] = fixedPvals
+        flatPvals = flatPvals.unstack('bin')
+        pVals.loc[flatPvals.index, flatPvals.columns] = flatPvals
+
+    return pVals
 
 def modOnset(spikeMat):
     preWindow = 0

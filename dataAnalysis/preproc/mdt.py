@@ -318,7 +318,7 @@ def getINSStimOnset(
         recalculateExpectedOffsets=False,
         fixedDelay=0e-3, delayByFreqMult=0,
         cyclePeriodCorrection=18e-3,
-        stimDetectOpts=None,
+        stimDetectOptsByChannel=None,
         plotAnomalies=False,
         spikeWindow=[-32, 64],
         plotting=[]):
@@ -334,8 +334,8 @@ def getINSStimOnset(
     defaultOptsDict = {
         'detectChannels': [i for i in tdDF.columns if 'ins_td' in i]}
 
-    if stimDetectOpts is None:
-        stimDetectOpts = {
+    if stimDetectOptsByChannel is None:
+        stimDetectOptsByChannel = {
             grpIdx: {progIdx: defaultOptsDict for progIdx in range(4)}
             for grpIdx in range(4)}
     
@@ -358,7 +358,7 @@ def getINSStimOnset(
             thisUnit.annotate(cathodes=thisElecConfig['cathodes'])
             thisUnit.annotate(anodes=thisElecConfig['anodes'])
             try:
-                theseDetOpts = stimDetectOpts[
+                theseDetOpts = stimDetectOptsByChannel[
                     groupIdx][progIdx]
             except Exception:
                 theseDetOpts = defaultOptsDict
@@ -446,7 +446,7 @@ def getINSStimOnset(
         delayByFreq = (delayByFreqMult / stimRate)
         delayByFreqIdx = int(fs * delayByFreq)
         #  load the appropriate detection options
-        theseDetectOpts = stimDetectOpts[activeGroup][activeProgram]
+        theseDetectOpts = stimDetectOptsByChannel[activeGroup][activeProgram]
         #  calculate signal used for stim artifact detection
         tdSeg = (tdDF.loc[
             plotMaskTD,

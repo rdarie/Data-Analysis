@@ -43,23 +43,29 @@ expOpts, allOpts = parseAnalysisOptions(
 globals().update(expOpts)
 globals().update(allOpts)
 
-rasterOpts.update({
-    'binWidth': 50e-3,
-    'smoothKernelWidth': None})
+
+def aggregateFun(
+        DF, fs=None, nSamp=None):
+    # if a bin is nonzero, it encodes the
+    # firing rate of 1 spike/bin
+    tSpan = nSamp / fs  # how wide is the window?
+    spikeCount = np.sqrt(
+        np.sum(DF / fs))
+    return spikeCount / tSpan
 
 if arguments['--processAll']:
     masterBlock = preproc.calcFR(
         experimentBinnedSpikePath,
         experimentDataPath,
-        suffix='fr',
-        aggregateFun=None,
+        suffix='fr_sqrt',
+        aggregateFun=aggregateFun,
         rasterOpts=rasterOpts)
 else:
     masterBlock = preproc.calcFR(
         binnedSpikePath,
         analysisDataPath,
-        suffix='fr',
-        aggregateFun=None,
+        suffix='fr_sqrt',
+        aggregateFun=aggregateFun,
         rasterOpts=rasterOpts)
 
 allSegs = list(range(len(masterBlock.segments)))

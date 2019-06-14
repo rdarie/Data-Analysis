@@ -8,7 +8,7 @@
 # Use more memory (32GB):
 #SBATCH --nodes=1
 #SBATCH --mem=48G
-#SBATCH --array=1,2
+#SBATCH --array=1,2,3,4,5
 
 # Specify a job name:
 #SBATCH -J sorting_diagnostics
@@ -20,7 +20,10 @@
 # Specify account details
 #SBATCH --account=bibs-dborton-condo
 
-python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/tridesclousCCV.py' --trialIdx=$SLURM_ARRAY_TASK_ID --makeCoarseNeoBlock
-python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/generateSpikeReport.py' --trialIdx=$SLURM_ARRAY_TASK_ID --nameSuffix=_coarse
-python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/tridesclousCCV.py' --trialIdx=$SLURM_ARRAY_TASK_ID --makeStrictNeoBlock
-python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/generateSpikeReport.py' --trialIdx=$SLURM_ARRAY_TASK_ID --nameSuffix=_final
+# EXP="exp201901211000_alt"
+EXP="exp201901271000_alt"
+
+#  python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/tridesclousCCV.py' --trialIdx=$SLURM_ARRAY_TASK_ID --makeCoarseNeoBlock --exp=$EXP
+python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/plotSpikeReport.py' --trialIdx=$SLURM_ARRAY_TASK_ID --nameSuffix=_coarse --exp=$EXP
+python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/tridesclousCCV.py' --trialIdx=$SLURM_ARRAY_TASK_ID --makeStrictNeoBlock --exp=$EXP
+python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/plotSpikeReport.py' --trialIdx=$SLURM_ARRAY_TASK_ID --nameSuffix=_final --exp=$EXP

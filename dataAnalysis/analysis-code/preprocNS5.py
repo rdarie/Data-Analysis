@@ -5,33 +5,23 @@ Usage:
 
 Options:
     --trialIdx=trialIdx             which trial to analyze
+    --exp=exp                       which experimental day to analyze
     --makeFull                      whether to make a .nix file that has all raw traces [default: False]
     --makeTruncated                 whether to make a .nix file that only has analog inputs [default: False]
 """
 
-from docopt import docopt
 import dataAnalysis.preproc.ns5 as preproc
-from currentExperiment import *
 import pdb
 
+#  load options
+from currentExperiment_alt import parseAnalysisOptions
+from docopt import docopt
 arguments = docopt(__doc__)
-#  if overriding currentExperiment
-if arguments['--trialIdx']:
-    print(arguments)
-    trialIdx = int(arguments['--trialIdx'])
-    ns5FileName = 'Trial00{}'.format(trialIdx)
-    miniRCTrial = miniRCTrialLookup[trialIdx]
-    #
-    trialFilesFrom['utah']['calcRigEvents'] = not miniRCTrial
-    #
-    if miniRCTrial:
-        trialFilesFrom['utah'].update({
-            'eventInfo': {'inputIDs': miniRCRigInputs}
-        })
-    else:
-        trialFilesFrom['utah'].update({
-            'eventInfo': {'inputIDs': fullRigInputs}
-        })
+expOpts, allOpts = parseAnalysisOptions(
+    int(arguments['--trialIdx']),
+    arguments['--exp'])
+globals().update(expOpts)
+globals().update(allOpts)
 
 chunkSize = 2600
 chunkList = [0]

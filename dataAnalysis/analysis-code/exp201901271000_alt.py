@@ -120,4 +120,31 @@ def getExpOpts():
         'Trial00{}'.format(trialIdx)
         for trialIdx in [1, 2, 4, 5]]
     
+    #  Options relevant to the assembled trial files
+    experimentsToAssemble = {
+        '201901271000-Proprio': [1, 2, 3, 4],
+        }
+
+    movementSizeBins = [0, 0.25, 0.5, 1, 1.25, 1.5]
+    alignTimeBounds = [
+        #  each key is a trial
+        [
+            [257, 552],
+            [670, 1343],
+            ],
+        #  per trial
+        [
+            #  per trialSegment
+            [238, 1198],
+            ],
+        [
+            [171, 1050]
+            ],
+        [
+            [185, 1501],
+            ]
+        ]
+    alignTimeLookup = {
+        'exp201901271000_alt': {1: 0, 2: 1, 3: 2, 4: 3},
+    }
     return locals()

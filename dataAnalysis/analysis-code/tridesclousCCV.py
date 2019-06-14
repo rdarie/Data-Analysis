@@ -49,10 +49,6 @@ if RANK == 0:
     print(expOpts.keys())
     globals().update(expOpts)
     globals().update(allOpts)
-    #  for key in allOpts.keys():
-    #      if key not in ['COMM', 'RANK', 'SIZE']:
-    #          exec(key + " = allOpts['" + key + "']")
-    #  print(triFolder)
     try:
         tdch.initialize_catalogueconstructor(
             nspFolder,
@@ -108,14 +104,14 @@ if arguments['--batchPreprocess']:
         triFolder, chansToAnalyze,
         n_components_by_channel=15,
         cluster_method='agglomerative',
-        n_clusters=6,
+        n_clusters=5,
         noise_estimate_duration=900.,
         sample_snippet_duration=900.,
         chunksize=2**13, n_left=spikeWindow[0] - 2,
         n_right=spikeWindow[1] + 2,
         align_waveform=False, subsample_ratio=10,
         autoMerge=True, auto_merge_threshold=0.85,
-        relative_threshold=6, attemptMPI=HAS_MPI)
+        relative_threshold=5.5, attemptMPI=HAS_MPI)
 
 if arguments['--batchPeel']:
     tdch.batchPeel(

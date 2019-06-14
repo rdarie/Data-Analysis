@@ -70,12 +70,15 @@ spikeWindow = COMM.bcast(spikeWindow, root=0)
 print(triFolder)
 
 if RANK == 0:
+    tdch.purgeNeoBlock(triFolder)
+    tdch.purgePeelerResults(
+        triFolder, purgeAll=True)
     dataio = tdc.DataIO(dirname=triFolder)
     chansToAnalyze = sorted(list(dataio.channel_groups.keys()))[:96]
 else:
     chansToAnalyze = None
 
-print("RANK: {}".format(RANK))
+print("triFolder: {}".format(triFolder))
 COMM.Barrier()  # sync MPI threads, waith for 0 to gather chansToAnalyze
 chansToAnalyze = COMM.bcast(chansToAnalyze, root=0)
 print("RANK: {}".format(RANK))

@@ -25,13 +25,6 @@ expOpts, allOpts = parseAnalysisOptions(
     arguments['--exp'])
 globals().update(expOpts)
 globals().update(allOpts)
-#  if overriding currentExperiment
-if arguments['--trialIdx']:
-    print(arguments)
-    trialIdx = int(arguments['--trialIdx'])
-    ns5FileName = 'Trial00{}'.format(trialIdx)
-    triFolder = os.path.join(
-        nspFolder, 'tdc_' + ns5FileName)
 
 viewPeeler = False
 if arguments['--peeler']:
@@ -61,7 +54,7 @@ chansToAnalyze = [
 
 #  chansToAnalyze = chansToAnalyze[80:]
 #  chansToAnalyze = [1, 8, 43, 46, 50, 53, 57, 59, 62, 67, 73, 74, 82, 84, 90, 91]
-#  chansToAnalyze = [34, 81, 84, 92]
+chansToAnalyze = [3, 6, 33, 91]
 
 if viewConstructor:
     for chan_grp in chansToAnalyze:
