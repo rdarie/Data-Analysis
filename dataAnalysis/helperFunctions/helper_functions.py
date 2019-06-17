@@ -971,10 +971,7 @@ def peekAtTaps(
         'nsp': []
         }
     clickDict = {
-        i: {
-            'ins': [],
-            'nsp': []
-            }
+        i: tempClick
         for i in segmentsToPlot}
     
     def onpick(event):

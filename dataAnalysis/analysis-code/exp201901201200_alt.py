@@ -99,4 +99,17 @@ def getExpOpts():
     triDestinations = [
         'Trial00{}'.format(trialIdx)
         for trialIdx in [1, 2]]
+    
+    alignTimeBoundsLookup = {
+        #  each key is a trial
+        1: [
+            [144, 829]
+        ],
+        2: [
+            [247, 667],
+            [1370, 1595],
+            [2175, 2315],
+            [2475, 2495]
+            ],
+        }
     return locals()

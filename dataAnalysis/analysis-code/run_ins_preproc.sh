@@ -8,7 +8,7 @@
 # Request custom resources
 #SBATCH --nodes=1
 #SBATCH --mem=24G
-#SBATCH --array=1,2
+#SBATCH --array=3,4,5
 
 # Specify a job name:
 #SBATCH -J ins_preproc

@@ -188,12 +188,6 @@ def parseAnalysisOptions(trialIdx, experimentShorthand):
     binnedSpikePath = os.path.join(
         scratchFolder,
         ns5FileName + '_binarized.nix')
-    trialTriggeredShortPath = os.path.join(
-        scratchFolder,
-        ns5FileName + '_triggered_short.nix')
-    trialTriggeredLongPath = os.path.join(
-        scratchFolder,
-        ns5FileName + '_triggered_long.nix')
 
     #  paths relevant to the entire experimental day
     estimatorPath = os.path.join(
@@ -202,12 +196,6 @@ def parseAnalysisOptions(trialIdx, experimentShorthand):
     experimentDataPath = os.path.join(
         scratchFolder,
         experimentName + '_analyze.nix')
-    experimentTriggeredShortPath = os.path.join(
-        scratchFolder,
-        experimentName + '_triggered_short.nix')
-    experimentTriggeredLongPath = os.path.join(
-        scratchFolder,
-        experimentName + '_triggered_long.nix')
     experimentBinnedSpikePath = os.path.join(
         scratchFolder,
         experimentName + '_binarized.nix')
@@ -230,8 +218,9 @@ def parseAnalysisOptions(trialIdx, experimentShorthand):
 
     rasterOpts = {
         'binInterval': 1e-3, 'binWidth': 30e-3, 'smoothKernelWidth': 50e-3,
-        'shortWindowSize': (-.5, .5),
-        'longWindowSize': (-4.5, 4.5),
+        'shortWindow': (-.5, .5),
+        'longWindow': (-4.5, 4.5),
+        'miniRCWindow': (-1, 1),
         'discardEmpty': None, 'maxSpikesTo': None, 'timeRange': None,
         'separateByFunArgs': None,
         'alignTo': None,

@@ -117,15 +117,31 @@ def getExpOpts():
         }
 
     movementSizeBins = [0, 0.25, 0.5, 1, 1.25, 1.5]
+    alignTimeBoundsLookup = {
+        #  per trial
+        1: [
+            #  per trialSegment
+            [92, 527],
+            [775, 887]
+            ],
+        2: [
+            [210, 295]
+            ],
+        3: [
+            [80, 430],
+            [917, 1163],
+            [1367, 2024]
+            ]
+        }
+    
     alignTimeBounds = [
-        #  each key is a trial
+        #  per trial
         [
             [247, 667],
             [1370, 1595],
             [2175, 2315],
             [2475, 2495]
             ],
-        #  per trial
         [
             #  per trialSegment
             [92, 527],
@@ -140,8 +156,4 @@ def getExpOpts():
             [1367, 2024]
             ]
         ]
-    alignTimeLookup = {
-        'exp201901201200_alt': {2: 0},
-        'exp201901211000_alt': {1: 1, 2: 2, 3: 3},
-    }
     return locals()

@@ -12,12 +12,10 @@ Options:
     --hueControl=hueControl         hues to exclude from comparison
     --colName=colName               break down by col  [default: electrode]
     --colControl=colControl         cols to exclude from comparison [default: control]
-    --alignQuery=alignQuery         what will the plot be aligned to? [default: (pedalMovementCat==\'outbound\')]
+    --alignQuery=alignQuery         what will the plot be aligned to? [default: (stimCat==\'stimOn\')]
     --window=window                 process with short window? [default: shortWindow]
 """
-import matplotlib
-matplotlib.use('PS')   # generate postscript output by default
-import os
+
 import dataAnalysis.plotting.aligned_signal_plots as asp
 import dataAnalysis.preproc.ns5 as preproc
 import seaborn as sns
@@ -56,37 +54,31 @@ if arguments['--processAll']:
         os.path.join(
             scratchFolder,
             experimentName + '_triggered_{}.nix'.format(arguments['--window'])))
-    pdfName = '{}_{}_neurons_by_{}_aligned_to_{}'.format(
+    pdfName = '{}_{}_asigs_by_{}_aligned_to_{}'.format(
         experimentName, arguments['--window'], hueName, arguments['--alignQuery'])
 else:
     dataBlock = preproc.loadWithArrayAnn(
         os.path.join(
             scratchFolder,
             ns5FileName + '_triggered_{}.nix'.format(arguments['--window'])))
-    pdfName = '{}_{}_{}_neurons_by_{}_aligned_to_{}'.format(
+    pdfName = '{}_{}_{}_asigs_by_{}_aligned_to_{}'.format(
         experimentName, arguments['--trialIdx'], arguments['--window'], hueName, arguments['--alignQuery'])
-
-# during movement and stim
-pedalSizeQuery = '(' + '|'.join([
-    '(pedalSizeCat == \'{}\')'.format(i)
-    for i in ['M', 'L', 'XL']
-    ]) + ')'
 
 dataQuery = '&'.join([
     '((RateInHzFuzzy==100)|(RateInHzFuzzy==0))',
-    #  '((amplitudeCatFuzzy==3)|(amplitudeCatFuzzy==0))',
-    arguments['--alignQuery'],
-    pedalSizeQuery,
-    #  '(pedalDirection == \'CW\')'
+    #  '((amplitudeCatFuzzy>=2)|(amplitudeCatFuzzy==0))',
+    arguments['--alignQuery']
     ])
 testStride = 20e-3
 testWidth = 100e-3
 testTStart = 0
 testTStop = 500e-3
 colorPal = "ch:0.6,-.2,dark=.2,light=0.7,reverse=1"  #  for firing rates
-unitNames = None  # ['elec75#0', 'elec75#1']
-
-asp.plotNeuronsAligned(
+unitNames = [
+    'amplitude#0', 'ins_td3#0', 'ins_td2#0',
+    'position#0']
+#  unitNames = ['ins_td3#0', 'position#0']
+asp.plotAsigsAligned(
     dataBlock,
     dataQuery=dataQuery,
     figureFolder=figureFolder,
@@ -100,6 +92,7 @@ asp.plotNeuronsAligned(
     testTStart=testTStart,
     testTStop=testTStop,
     pThresh=pThresh,
+    #  linePlotEstimator=None,
     duplicateControlsByProgram=True,
     makeControlProgram=True,
     enablePlots=True,

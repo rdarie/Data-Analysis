@@ -12,12 +12,11 @@ Options:
     --hueControl=hueControl         hues to exclude from comparison
     --colName=colName               break down by col  [default: electrode]
     --colControl=colControl         cols to exclude from comparison [default: control]
-    --alignQuery=alignQuery         what will the plot be aligned to? [default: (pedalMovementCat==\'outbound\')]
+    --alignQuery=alignQuery         what will the plot be aligned to? [default: (stimCat==\'stimOn\')]
     --window=window                 process with short window? [default: shortWindow]
 """
 import matplotlib
 matplotlib.use('PS')   # generate postscript output by default
-import os
 import dataAnalysis.plotting.aligned_signal_plots as asp
 import dataAnalysis.preproc.ns5 as preproc
 import seaborn as sns
@@ -66,18 +65,10 @@ else:
     pdfName = '{}_{}_{}_neurons_by_{}_aligned_to_{}'.format(
         experimentName, arguments['--trialIdx'], arguments['--window'], hueName, arguments['--alignQuery'])
 
-# during movement and stim
-pedalSizeQuery = '(' + '|'.join([
-    '(pedalSizeCat == \'{}\')'.format(i)
-    for i in ['M', 'L', 'XL']
-    ]) + ')'
-
 dataQuery = '&'.join([
     '((RateInHzFuzzy==100)|(RateInHzFuzzy==0))',
     #  '((amplitudeCatFuzzy==3)|(amplitudeCatFuzzy==0))',
-    arguments['--alignQuery'],
-    pedalSizeQuery,
-    #  '(pedalDirection == \'CW\')'
+    arguments['--alignQuery']
     ])
 testStride = 20e-3
 testWidth = 100e-3

@@ -5,6 +5,7 @@ Usage:
 Options:
     --trialIdx=trialIdx             which trial to analyze
     --exp=exp                       which experimental day to analyze
+    --curateManually                whether to manually confirm synch [default: False]
 """
 import matplotlib, pdb, pickle, traceback
 matplotlib.use('Qt5Agg')   # generate interactive output by default
@@ -136,18 +137,26 @@ for trialSegment in pd.unique(td['data']['trialSegment']):
         tapTimestampsINS.diff() * 1e3))
     allTapTimestampsINS.append(tapTimestampsINS)
 
-try:
-    clickDict = hf.peekAtTaps(
-        td, accel,
-        channelData, trialIdx,
-        tapDetectOpts, sessionTapRangesNSP,
-        insX='t', plotBlocking=plotBlocking,
-        allTapTimestampsINS=allTapTimestampsINS,
-        allTapTimestampsNSP=allTapTimestampsNSP,
-        )
-except Exception:
-    traceback.print_exc()
-    pdb.set_trace()
+if arguments['--curateManually']:
+    try:
+        clickDict = hf.peekAtTaps(
+            td, accel,
+            channelData, trialIdx,
+            tapDetectOpts, sessionTapRangesNSP,
+            insX='t', plotBlocking=plotBlocking,
+            allTapTimestampsINS=allTapTimestampsINS,
+            allTapTimestampsNSP=allTapTimestampsNSP,
+            )
+    except Exception:
+        traceback.print_exc()
+        #  pdb.set_trace()
+else:
+    clickDict = {
+        i: {
+            'ins': [],
+            'nsp': []
+            }
+        for i in pd.unique(td['data']['trialSegment'])}
 
 # perform the sync
 ############################################################

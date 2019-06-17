@@ -1753,11 +1753,11 @@ def calcFR(
     return masterBlock
 
 
-def getConditionAverages(
+def alignedAsigsToDF(
         dataBlock, unitNames, dataQuery=None,
-        collapseSizes=True, verbose=False,
+        collapseSizes=True, verbose=True,
         duplicateControlsByProgram=False,
-        makeControlProgram=False):
+        makeControlProgram=False, removeFuzzyName=False):
 
     allUnits = [
         i
@@ -1834,8 +1834,23 @@ def getConditionAverages(
         stimWaveforms.reset_index(drop=True, inplace=True)
         allWaveforms = stimWaveforms
 
+    if removeFuzzyName:
+        fuzzyNamesBase = [
+            i.replace('Fuzzy', '')
+            for i in saveIndexNames
+            if 'Fuzzy' in i]
+        colRenamer = {n + 'Fuzzy': n for n in fuzzyNamesBase}
+        fuzzyNamesBase = [
+            i
+            for i in fuzzyNamesBase
+            if i in allWaveforms.columns]
+        allWaveforms.drop(columns=fuzzyNamesBase, inplace=True)
+        allWaveforms.rename(columns=colRenamer, inplace=True)
+        saveIndexNames = np.unique(
+            [i.replace('Fuzzy', '') for i in saveIndexNames])
+    
     allWaveforms.set_index(
-        saveIndexNames,
+        list(saveIndexNames),
         inplace=True)
     allWaveforms.columns.name = 'bin'
     return allWaveforms

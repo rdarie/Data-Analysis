@@ -6,7 +6,7 @@ Options:
     --trialIdx=trialIdx             which trial to analyze [default: 1]
     --exp=exp                       which experimental day to analyze
     --processAll                    process entire experimental day? [default: False]
-    --processShort                  process with short window? [default: False]
+    --window=window                 process with short window? [default: shortWindow]
 """
 
 import os, pdb, traceback
@@ -63,40 +63,20 @@ chansToTrigger = np.unique([
 eventName = 'motionStimAlignTimes'
 
 if arguments['--processAll']:
-    if arguments['--processShort']:
-        preproc.analogSignalsAlignedToEvents(
-            eventBlock=eventBlock, signalBlock=signalBlock,
-            chansToTrigger=chansToTrigger, eventName=eventName,
-            windowSize=[i * pq.s for i in rasterOpts['shortWindowSize']],
-            appendToExisting=True,
-            checkReferences=False,
-            fileName=experimentName + '_triggered_short',
-            folderPath=scratchFolder)
-    else:
-        preproc.analogSignalsAlignedToEvents(
-            eventBlock=eventBlock, signalBlock=signalBlock,
-            chansToTrigger=chansToTrigger, eventName=eventName,
-            windowSize=[i * pq.s for i in rasterOpts['longWindowSize']],
-            appendToExisting=True,
-            checkReferences=False,
-            fileName=experimentName + '_triggered_long',
-            folderPath=scratchFolder)
+    preproc.analogSignalsAlignedToEvents(
+        eventBlock=eventBlock, signalBlock=signalBlock,
+        chansToTrigger=chansToTrigger, eventName=eventName,
+        windowSize=[i * pq.s for i in rasterOpts[arguments['--window']]],
+        appendToExisting=True,
+        checkReferences=False,
+        fileName=experimentName + '_triggered_{}'.format(arguments['--window']),
+        folderPath=scratchFolder)
 else:
-    if arguments['--processShort']:
-        preproc.analogSignalsAlignedToEvents(
-            eventBlock=eventBlock, signalBlock=signalBlock,
-            chansToTrigger=chansToTrigger, eventName=eventName,
-            windowSize=[i * pq.s for i in rasterOpts['shortWindowSize']],
-            appendToExisting=True,
-            checkReferences=False,
-            fileName=ns5FileName + '_triggered_short',
-            folderPath=scratchFolder)
-    else:
-        preproc.analogSignalsAlignedToEvents(
-            eventBlock=eventBlock, signalBlock=signalBlock,
-            chansToTrigger=chansToTrigger, eventName=eventName,
-            windowSize=[i * pq.s for i in rasterOpts['longWindowSize']],
-            appendToExisting=True,
-            checkReferences=False,
-            fileName=ns5FileName + '_triggered_long',
-            folderPath=scratchFolder)
+    preproc.analogSignalsAlignedToEvents(
+        eventBlock=eventBlock, signalBlock=signalBlock,
+        chansToTrigger=chansToTrigger, eventName=eventName,
+        windowSize=[i * pq.s for i in rasterOpts[arguments['--window']]],
+        appendToExisting=True,
+        checkReferences=False,
+        fileName=ns5FileName + '_triggered_{}'.format(arguments['--window']),
+        folderPath=scratchFolder)

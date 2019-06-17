@@ -8,16 +8,19 @@ Options:
     --processAll                    process entire experimental day? [default: False]
     --rowName=rowName               break down by row  [default: pedalDirection]
     --rowControl=rowControl         rows to exclude from comparison
-    --hueName=hueName               break down by hue  [default: amplitudeCatFuzzy]
+    --hueName=hueName               break down by hue  [default: amplitudeCat]
     --hueControl=hueControl         hues to exclude from comparison
-    --colName=colName               break down by col  [default: electrodeFuzzy]
+    --colName=colName               break down by col  [default: electrode]
     --colControl=colControl         cols to exclude from comparison [default: control]
-    --processShort                  process with short window? [default: False]
+    --alignQuery=alignQuery         what will the plot be aligned to? [default: (pedalMovementCat==\'outbound\')]
+    --window=window                 process with short window? [default: shortWindow]
+    
 """
+
 import dataAnalysis.plotting.aligned_signal_plots as asp
 import dataAnalysis.preproc.ns5 as preproc
 import seaborn as sns
-
+import os
 from currentExperiment_alt import parseAnalysisOptions
 from docopt import docopt
 arguments = docopt(__doc__)
@@ -48,27 +51,19 @@ except Exception:
     hueControl = arguments['--hueControl']
 
 if arguments['--processAll']:
-    if arguments['--processShort']:
-        dataBlock = preproc.loadWithArrayAnn(
-            experimentTriggeredShortPath)
-        pdfName = '{}_short_asigs_by_{}'.format(
-            experimentName, hueName)
-    else:
-        dataBlock = preproc.loadWithArrayAnn(
-            experimentTriggeredLongPath)
-        pdfName = '{}_long_asigs_by_{}'.format(
-            experimentName, hueName)
+    dataBlock = preproc.loadWithArrayAnn(
+        os.path.join(
+            scratchFolder,
+            experimentName + '_triggered_{}.nix'.format(arguments['--window'])))
+    pdfName = '{}_{}_asigs_by_{}_aligned_to_{}'.format(
+        experimentName, arguments['--window'], hueName, arguments['--alignQuery'])
 else:
-    if arguments['--processShort']:
-        dataBlock = preproc.loadWithArrayAnn(
-            trialTriggeredShortPath)
-        pdfName = '{}_{}_short_asigs_by_{}'.format(
-            experimentName, arguments['--trialIdx'], hueName)
-    else:
-        dataBlock = preproc.loadWithArrayAnn(
-            trialTriggeredLongPath)
-        pdfName = '{}_{}_long_asigs_by_{}'.format(
-            experimentName, arguments['--trialIdx'], hueName)
+    dataBlock = preproc.loadWithArrayAnn(
+        os.path.join(
+            scratchFolder,
+            ns5FileName + '_triggered_{}.nix'.format(arguments['--window'])))
+    pdfName = '{}_{}_{}_asigs_by_{}_aligned_to_{}'.format(
+        experimentName, arguments['--trialIdx'], arguments['--window'], hueName, arguments['--alignQuery'])
 
 # during movement and stim
 pedalSizeQuery = '(' + '|'.join([
@@ -79,7 +74,7 @@ pedalSizeQuery = '(' + '|'.join([
 dataQuery = '&'.join([
     '((RateInHzFuzzy==100)|(RateInHzFuzzy==0))',
     #  '((amplitudeCatFuzzy>=2)|(amplitudeCatFuzzy==0))',
-    '(pedalMovementCat==\'outbound\')',
+    arguments['--alignQuery'],
     pedalSizeQuery,
     #  '(pedalDirection == \'CW\')'
     ])
@@ -88,10 +83,10 @@ testWidth = 100e-3
 testTStart = 0
 testTStop = 500e-3
 colorPal = "ch:0.6,-.2,dark=.2,light=0.7,reverse=1"  #  for firing rates
-#  unitNames = [
-#      'amplitude#0', 'ins_td3#0',
-#      'position#0', 'elec75#0_fr#0', 'elec75#1_fr#0']
-unitNames = None  # ['ins_td3#0', 'position#0']
+unitNames = [
+    'amplitude#0', 'ins_td3#0', 'ins_td2#0',
+    'position#0']
+#  unitNames = ['ins_td3#0', 'position#0']
 asp.plotAsigsAligned(
     dataBlock,
     dataQuery=dataQuery,

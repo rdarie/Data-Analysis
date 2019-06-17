@@ -19,8 +19,8 @@
 # Specify account details
 #SBATCH --account=bibs-dborton-condo
 
-EXP="exp201901211000_alt"
-# EXP="exp201901271000_alt"
+# EXP="exp201901211000_alt"
+EXP="exp201901271000_alt"
 
 #  python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/assembleExperimentData.py' --exp=$EXP
 #  python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcMotionStimAlignTimes.py' --trialIdx=1 --exp=$EXP --processAll --plotParamHistograms

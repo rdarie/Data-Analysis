@@ -1213,9 +1213,12 @@ def triggeredAsigCompareMeans(
                 np.ravel(i)
                 for _, i in group.groupby(testVar)]
             if len(testGroups) > 1:
-                stat, p = scipy.stats.kruskal(*testGroups)
-                pVals.loc[name, testBin] = p
-
+                try:
+                    stat, p = scipy.stats.kruskal(*testGroups)
+                    pVals.loc[name, testBin] = p
+                except Exception:
+                    traceback.print_exc()
+                    pVals.loc[name, testBin] = 1
     if correctMultiple:
         flatPvals = pVals.stack()
         _, fixedPvals, _, _ = mt(flatPvals.values, method='holm')

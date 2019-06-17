@@ -78,14 +78,16 @@ def plotNeuronsAligned(
         for idx, unitName in enumerate(unitNames):
             rasterName = unitName + '_raster#0'
             continuousName = unitName + '_fr#0'
-            rasterWide = ns5.getConditionAverages(
+            rasterWide = ns5.alignedAsigsToDF(
                 dataBlock, rasterName, dataQuery,
                 makeControlProgram=makeControlProgram,
-                duplicateControlsByProgram=duplicateControlsByProgram)
-            asigWide = ns5.getConditionAverages(
+                duplicateControlsByProgram=duplicateControlsByProgram,
+                removeFuzzyName=True)
+            asigWide = ns5.alignedAsigsToDF(
                 dataBlock, continuousName, dataQuery,
                 makeControlProgram=makeControlProgram,
-                duplicateControlsByProgram=duplicateControlsByProgram)
+                duplicateControlsByProgram=duplicateControlsByProgram,
+                removeFuzzyName=True)
             raster = rasterWide.stack().reset_index(name='raster')
             asig = asigWide.stack().reset_index(name='fr')
             #  set up significance testing
@@ -145,6 +147,8 @@ def plotNeuronsAligned(
                     data=raster)
                 #  iterate through plot and add significance stars
                 for (ro, co, hu), dataSubset in g.facet_data():
+                    if co == 0:
+                        g.axes[ro, co].set_ylabel(unitName)
                     pQueryList = []
                     rowFacetName = g.row_names[ro]
                     if rowName is not None:
@@ -192,10 +196,11 @@ def plotNeuronsAligned(
                 .agg('count')
                 .iloc[:, 0]
             )
-            indexNames = [
-                i.replace('Fuzzy', '')
-                for i in breakDownData.index.names
-            ] + ['count']
+            #  indexNames = [
+            #      i.replace('Fuzzy', '')
+            #      for i in breakDownData.index.names
+            #  ] + ['count']
+            indexNames = breakDownData.index.names + ['count']
             breakDownData = breakDownData.reset_index()
             breakDownData.columns = indexNames
             breakDownText = (
@@ -256,22 +261,16 @@ def plotAsigsAligned(
             i.name
             for i in dataBlock.filter(objects=Unit)])
     nUnits = len(unitNames)
-    #  
+    
     with PdfPages(os.path.join(figureFolder, pdfName + '.pdf')) as pdf:
         allPvals = {}
         for idx, unitName in enumerate(unitNames):
-            asigWide = ns5.getConditionAverages(
+            asigWide = ns5.alignedAsigsToDF(
                 dataBlock, unitName, dataQuery,
                 makeControlProgram=makeControlProgram,
-                duplicateControlsByProgram=duplicateControlsByProgram)
+                duplicateControlsByProgram=duplicateControlsByProgram,
+                removeFuzzyName=True)
             asig = asigWide.stack().reset_index(name='signal')
-            #  TEMP, check fixes to calcmotionstimaligntimes
-            #  pdb.set_trace()
-            #  asig['pedalSize'] = asig['pedalSize'] - 0.815
-            #  asig['pedalDirection'] = np.nan
-            #  asig.loc[asig['pedalSize'] > 0, 'pedalDirection'] = 'CW'
-            #  asig.loc[asig['pedalSize'] <= 0, 'pedalDirection'] = 'CCW'
-            #  END TEMP
             #  set up significance testing
             if (rowControl is None) and (colControl) is None:
                 # test all rows and columns
@@ -318,7 +317,6 @@ def plotAsigsAligned(
                     height=5, aspect=1.5, kind='line', data=asig)
                 #  iterate through plot and add significance stars
                 for (ro, co, hu), dataSubset in g.facet_data():
-                    #  pdb.set_trace()
                     if co == 0:
                         g.axes[ro, co].set_ylabel(unitName)
                     pQueryList = []
@@ -368,10 +366,11 @@ def plotAsigsAligned(
                 .agg('count')
                 .iloc[:, 0]
             )
-            indexNames = [
-                i.replace('Fuzzy', '')
-                for i in breakDownData.index.names
-            ] + ['count']
+            #  indexNames = [
+            #      i.replace('Fuzzy', '')
+            #      for i in breakDownData.index.names
+            #  ] + ['count']
+            indexNames = breakDownData.index.names + ['count']
             breakDownData = breakDownData.reset_index()
             breakDownData.columns = indexNames
             breakDownText = (
