@@ -88,10 +88,10 @@ testWidth = 100e-3
 testTStart = 0
 testTStop = 500e-3
 colorPal = "ch:0.6,-.2,dark=.2,light=0.7,reverse=1"  #  for firing rates
-unitNames = [
-    'amplitude#0', 'ins_td2#0', 'ins_td3#0',
-    'position#0', 'program#0', 'velocityCat#0']
-#  unitNames = None  # ['ins_td3#0', 'position#0']
+#  unitNames = [
+#      'amplitude#0', 'ins_td3#0',
+#      'position#0', 'elec75#0_fr#0', 'elec75#1_fr#0']
+unitNames = None  # ['ins_td3#0', 'position#0']
 asp.plotAsigsAligned(
     dataBlock,
     dataQuery=dataQuery,

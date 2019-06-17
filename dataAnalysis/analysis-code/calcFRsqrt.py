@@ -43,6 +43,7 @@ expOpts, allOpts = parseAnalysisOptions(
 globals().update(expOpts)
 globals().update(allOpts)
 
+chanNames = None  # ['elec75#0_raster', 'elec75#1_raster']
 
 def aggregateFun(
         DF, fs=None, nSamp=None):
@@ -59,6 +60,7 @@ if arguments['--processAll']:
         experimentDataPath,
         suffix='fr_sqrt',
         aggregateFun=aggregateFun,
+        chanNames=chanNames,
         rasterOpts=rasterOpts)
 else:
     masterBlock = preproc.calcFR(
@@ -66,6 +68,7 @@ else:
         analysisDataPath,
         suffix='fr_sqrt',
         aggregateFun=aggregateFun,
+        chanNames=chanNames,
         rasterOpts=rasterOpts)
 
 allSegs = list(range(len(masterBlock.segments)))

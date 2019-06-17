@@ -606,12 +606,12 @@ def loadSpikeMats(
         aggregateFun=None):
 
     reader = neo.io.nixio_fr.NixIO(filename=dataPath)
-    #  pdb.set_trace()
     chanNames = reader.header['signal_channels']['name']
     
     if chans is not None:
         sigMask = np.isin(chanNames, chans)
         chanNames = chanNames[sigMask]
+        
     chanIdx = reader.channel_name_to_index(chanNames)
     
     if not loadAll:
@@ -1688,12 +1688,14 @@ def calcFR(
         binnedPath, dataPath,
         suffix='fr',
         aggregateFun=None,
+        chanNames=None,
         rasterOpts=None):
 
     print('Loading rasters...')
     masterSpikeMats, _ = loadSpikeMats(
         binnedPath, rasterOpts,
         aggregateFun=aggregateFun,
+        chans=chanNames,
         loadAll=True, checkReferences=False)
     print('Loading data file...')
     dataReader = neo.io.nixio_fr.NixIO(

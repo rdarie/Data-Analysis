@@ -50,7 +50,9 @@ chansToTrigger = np.unique([
     for i in signalBlock.filter(objects=AnalogSignalProxy)])
 eventName = 'motionStimAlignTimes'
 
-#  chansToTrigger = ['ins_td3', 'position', 'amplitude', 'elec75#0_fr', 'elec75#1_fr']
+#  chansToTrigger = [
+#      'ins_td3', 'position', 'amplitude',
+#      'elec75#0_fr', 'elec75#1_fr']
 
 if arguments['--processAll']:
     if arguments['--processShort']:

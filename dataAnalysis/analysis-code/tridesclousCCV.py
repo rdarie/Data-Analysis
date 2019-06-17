@@ -133,5 +133,5 @@ if arguments['--makeStrictNeoBlock'] and RANK == 0:
     tdch.purgeNeoBlock(triFolder)
     tdch.neo_block_after_peeler(
         triFolder, chan_grps=chansToAnalyze,
-        shape_distance_threshold=None,
-        refractory_period=3.5e-3, ignoreTags=['so_bad'])
+        shape_distance_threshold=None, refractory_period=3.5e-3,
+        ignoreTags=['so_bad'])

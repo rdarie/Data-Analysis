@@ -25,10 +25,10 @@ EXP="exp201901211000_alt"
 #  python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/assembleExperimentData.py' --exp=$EXP
 #  python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcMotionStimAlignTimes.py' --trialIdx=1 --exp=$EXP --processAll --plotParamHistograms
 python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcFR.py' --trialIdx=1 --exp=$EXP --processAll
-#  python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcFRsqrt.py' --trialIdx=1 --exp=$EXP --processAll
-#  python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcAsigsAlignedToMotion.py' --exp=$EXP --processAll --processShort
-#  python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/plotAsigsAlignedToMotionStim.py' --exp=$EXP --processAll --processShort
-#  python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcRasterAlignedToMotion.py' --exp=$EXP --processAll --processShort
-#  python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/plotNeuronsAlignedToMotionStim.py' --exp=$EXP --processAll --processShort
-#  python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcAsigsAlignedToMotion.py' --exp=$EXP --processAll
-#  python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcRasterAlignedToMotion.py' --exp=$EXP --processAll
+python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcFRsqrt.py' --trialIdx=1 --exp=$EXP --processAll
+python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcAsigsAlignedToMotion.py' --exp=$EXP --processAll --processShort
+python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/plotAsigsAlignedToMotionStim.py' --exp=$EXP --processAll --processShort
+python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcRasterAlignedToMotion.py' --exp=$EXP --processAll --processShort
+python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/plotNeuronsAlignedToMotionStim.py' --exp=$EXP --processAll --processShort
+python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcAsigsAlignedToMotion.py' --exp=$EXP --processAll
+python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcRasterAlignedToMotion.py' --exp=$EXP --processAll

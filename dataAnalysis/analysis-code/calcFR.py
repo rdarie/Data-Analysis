@@ -43,6 +43,8 @@ expOpts, allOpts = parseAnalysisOptions(
 globals().update(expOpts)
 globals().update(allOpts)
 
+chanNames = None  # ['elec75#0_raster', 'elec75#1_raster']
+
 rasterOpts.update({
     'binWidth': 50e-3,
     'smoothKernelWidth': None})
@@ -53,6 +55,7 @@ if arguments['--processAll']:
         experimentDataPath,
         suffix='fr',
         aggregateFun=None,
+        chanNames=chanNames,
         rasterOpts=rasterOpts)
 else:
     masterBlock = preproc.calcFR(
@@ -60,6 +63,7 @@ else:
         analysisDataPath,
         suffix='fr',
         aggregateFun=None,
+        chanNames=chanNames,
         rasterOpts=rasterOpts)
 
 allSegs = list(range(len(masterBlock.segments)))
