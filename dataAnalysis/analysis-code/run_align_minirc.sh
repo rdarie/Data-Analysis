@@ -25,9 +25,9 @@ EXP="exp201901201200_alt"
 MINIRCIDX="1"
 
 #  python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcStimAlignTimes.py' --trialIdx=$MINIRCIDX --exp=$EXP
-python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcFR.py' --trialIdx=$MINIRCIDX --exp=$EXP
-python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcFRsqrt.py' --trialIdx=$MINIRCIDX --exp=$EXP
-python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcAsigsAlignedToStim.py' --trialIdx=$MINIRCIDX --exp=$EXP
-python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcRasterAlignedToStim.py' --trialIdx=$MINIRCIDX --exp=$EXP
-python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcAsigsAlignedToStim.py' --trialIdx=$MINIRCIDX --exp=$EXP --processShort
-python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcRasterAlignedToStim.py' --trialIdx=$MINIRCIDX --exp=$EXP --processShort
+#  python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcFR.py' --trialIdx=$MINIRCIDX --exp=$EXP
+#  python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcFRsqrt.py' --trialIdx=$MINIRCIDX --exp=$EXP
+#  python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcAsigsAlignedToStim.py' --trialIdx=$MINIRCIDX --exp=$EXP
+#  python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcRasterAlignedToStim.py' --trialIdx=$MINIRCIDX --exp=$EXP
+python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcAsigsAlignedToStim.py' --trialIdx=$MINIRCIDX --exp=$EXP --window=miniRCWindow
+python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcRasterAlignedToStim.py' --trialIdx=$MINIRCIDX --exp=$EXP --window=miniRCWindow

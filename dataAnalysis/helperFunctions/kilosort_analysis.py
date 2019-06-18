@@ -1186,7 +1186,7 @@ def triggeredAsigCompareMeans(
         tStart, tStop, testStride)
 
     if (isinstance(groupBy, list)) and (len(groupBy) == 1):
-        sigTestGroupBy = sigTestGroupBy[0]
+        groupBy = groupBy[0]
     
     if isinstance(groupBy, str):
         pValIndex = pd.Index(

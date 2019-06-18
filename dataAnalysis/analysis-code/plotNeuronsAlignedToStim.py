@@ -6,9 +6,9 @@ Options:
     --trialIdx=trialIdx             which trial to analyze [default: 1]
     --exp=exp                       which experimental day to analyze
     --processAll                    process entire experimental day? [default: False]
-    --rowName=rowName               break down by row  [default: pedalDirection]
+    --rowName=rowName               break down by row
     --rowControl=rowControl         rows to exclude from comparison
-    --hueName=hueName               break down by hue  [default: amplitudeCat]
+    --hueName=hueName               break down by hue  [default: amplitude]
     --hueControl=hueControl         hues to exclude from comparison
     --colName=colName               break down by col  [default: electrode]
     --colControl=colControl         cols to exclude from comparison [default: control]
@@ -20,7 +20,7 @@ matplotlib.use('PS')   # generate postscript output by default
 import dataAnalysis.plotting.aligned_signal_plots as asp
 import dataAnalysis.preproc.ns5 as preproc
 import seaborn as sns
-
+import os
 from currentExperiment_alt import parseAnalysisOptions
 from docopt import docopt
 arguments = docopt(__doc__)
@@ -54,26 +54,29 @@ if arguments['--processAll']:
     dataBlock = preproc.loadWithArrayAnn(
         os.path.join(
             scratchFolder,
-            experimentName + '_triggered_{}.nix'.format(arguments['--window'])))
+            experimentName + '_triggered_{}.nix'.format(
+                arguments['--window'])))
     pdfName = '{}_{}_neurons_by_{}_aligned_to_{}'.format(
-        experimentName, arguments['--window'], hueName, arguments['--alignQuery'])
+        experimentName, arguments['--window'],
+        hueName, arguments['--alignQuery'])
 else:
     dataBlock = preproc.loadWithArrayAnn(
         os.path.join(
             scratchFolder,
             ns5FileName + '_triggered_{}.nix'.format(arguments['--window'])))
     pdfName = '{}_{}_{}_neurons_by_{}_aligned_to_{}'.format(
-        experimentName, arguments['--trialIdx'], arguments['--window'], hueName, arguments['--alignQuery'])
+        experimentName, arguments['--trialIdx'], arguments['--window'],
+        hueName, arguments['--alignQuery'])
 
 dataQuery = '&'.join([
-    '((RateInHzFuzzy==100)|(RateInHzFuzzy==0))',
+    '((RateInHz==100)|(RateInHz==0))',
     #  '((amplitudeCatFuzzy==3)|(amplitudeCatFuzzy==0))',
     arguments['--alignQuery']
     ])
 testStride = 20e-3
 testWidth = 100e-3
 testTStart = 0
-testTStop = 500e-3
+testTStop = 5
 colorPal = "ch:0.6,-.2,dark=.2,light=0.7,reverse=1"  #  for firing rates
 unitNames = None  # ['elec75#0', 'elec75#1']
 
@@ -90,6 +93,10 @@ asp.plotNeuronsAligned(
     testWidth=testWidth,
     testTStart=testTStart,
     testTStop=testTStop,
+    removeFuzzyName=False,
+    amplitudeColumn='amplitude',
+    programColumn='program',
+    electrodeColumn='electrode',
     pThresh=pThresh,
     duplicateControlsByProgram=True,
     makeControlProgram=True,

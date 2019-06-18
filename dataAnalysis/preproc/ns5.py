@@ -1755,8 +1755,11 @@ def calcFR(
 
 def alignedAsigsToDF(
         dataBlock, unitNames, dataQuery=None,
-        collapseSizes=True, verbose=True,
+        collapseSizes=False, verbose=True,
         duplicateControlsByProgram=False,
+        amplitudeColumn='amplitudeFuzzy',
+        programColumn='programFuzzy',
+        electrodeColumn='electrodeFuzzy',
         makeControlProgram=False, removeFuzzyName=False):
 
     allUnits = [
@@ -1797,27 +1800,27 @@ def alignedAsigsToDF(
     
     if makeControlProgram:
         try:
-            allWaveforms.loc[allWaveforms['amplitudeFuzzy'] == 0, 'programFuzzy'] = 999
-            allWaveforms.loc[allWaveforms['amplitudeFuzzy'] == 0, 'electrodeFuzzy'] = 'control'
+            allWaveforms.loc[allWaveforms[amplitudeColumn] == 0, programColumn] = 999
+            allWaveforms.loc[allWaveforms[amplitudeColumn] == 0, electrodeColumn] = 'control'
         except Exception:
             traceback.print_exc()
 
     if duplicateControlsByProgram:
         noStimWaveforms = (
             allWaveforms
-            .loc[allWaveforms['amplitudeFuzzy'] == 0, :]
+            .loc[allWaveforms[amplitudeColumn] == 0, :]
             )
         stimWaveforms = (
             allWaveforms
-            .loc[allWaveforms['amplitudeFuzzy'] != 0, :]
+            .loc[allWaveforms[amplitudeColumn] != 0, :]
             .copy()
             )
-        uniqProgs = stimWaveforms['programFuzzy'].unique()
+        uniqProgs = stimWaveforms[programColumn].unique()
         progElecLookup = {}
         for progIdx in uniqProgs:
             theseStimDF = stimWaveforms.loc[
-                stimWaveforms['programFuzzy'] == progIdx,
-                'electrodeFuzzy']
+                stimWaveforms[programColumn] == progIdx,
+                electrodeColumn]
             #  print(theseStimDF)
             elecIdx = theseStimDF.iloc[0]
             progElecLookup.update({progIdx: elecIdx})
@@ -1828,8 +1831,8 @@ def alignedAsigsToDF(
             
         for progIdx in uniqProgs:
             dummyWaveforms = noStimWaveforms.copy()
-            dummyWaveforms.loc[:, 'programFuzzy'] = progIdx
-            dummyWaveforms.loc[:, 'electrodeFuzzy'] = progElecLookup[progIdx]
+            dummyWaveforms.loc[:, programColumn] = progIdx
+            dummyWaveforms.loc[:, electrodeColumn] = progElecLookup[progIdx]
             stimWaveforms = pd.concat([stimWaveforms, dummyWaveforms])
         stimWaveforms.reset_index(drop=True, inplace=True)
         allWaveforms = stimWaveforms

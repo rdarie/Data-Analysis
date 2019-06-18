@@ -24,7 +24,7 @@ EXP="exp201901211000_alt"
 
 #  python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/plotNeuronsAlignedToMotionStim.py' --exp=$EXP --processAll
 #  python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/plotAsigsAlignedToMotionStim.py' --exp=$EXP --processAll
-python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/plotNeuronsAlignedToMotionStim.py' --exp=$EXP --processAll  --processShort
-python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/plotAsigsAlignedToMotionStim.py' --exp=$EXP --processAll  --processShort
-python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/plotNeuronsAlignedToMotionStim.py' --exp=$EXP --processAll  --processShort --alignQuery=\(pedalMovementCat=='return'\)
-python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/plotAsigsAlignedToMotionStim.py' --exp=$EXP --processAll  --processShort --alignQuery=\(pedalMovementCat=='return'\)
+python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/plotNeuronsAlignedToMotionStim.py' --exp=$EXP --processAll  --window=shortWindow
+python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/plotAsigsAlignedToMotionStim.py' --exp=$EXP --processAll  --window=shortWindow
+python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/plotNeuronsAlignedToMotionStim.py' --exp=$EXP --processAll  --window=shortWindow --alignQuery=\(pedalMovementCat==''return''\)
+python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/plotAsigsAlignedToMotionStim.py' --exp=$EXP --processAll  --window=shortWindow --alignQuery=\(pedalMovementCat==''return''\)

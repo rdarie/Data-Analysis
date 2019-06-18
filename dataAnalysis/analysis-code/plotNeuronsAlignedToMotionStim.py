@@ -55,16 +55,20 @@ if arguments['--processAll']:
     dataBlock = preproc.loadWithArrayAnn(
         os.path.join(
             scratchFolder,
-            experimentName + '_triggered_{}.nix'.format(arguments['--window'])))
+            experimentName + '_triggered_{}.nix'.format(
+                arguments['--window'])))
     pdfName = '{}_{}_neurons_by_{}_aligned_to_{}'.format(
-        experimentName, arguments['--window'], hueName, arguments['--alignQuery'])
+        experimentName, arguments['--window'],
+        hueName, arguments['--alignQuery'])
 else:
     dataBlock = preproc.loadWithArrayAnn(
         os.path.join(
             scratchFolder,
-            ns5FileName + '_triggered_{}.nix'.format(arguments['--window'])))
+            ns5FileName + '_triggered_{}.nix'.format(
+                arguments['--window'])))
     pdfName = '{}_{}_{}_neurons_by_{}_aligned_to_{}'.format(
-        experimentName, arguments['--trialIdx'], arguments['--window'], hueName, arguments['--alignQuery'])
+        experimentName, arguments['--trialIdx'],
+        arguments['--window'], hueName, arguments['--alignQuery'])
 
 # during movement and stim
 pedalSizeQuery = '(' + '|'.join([

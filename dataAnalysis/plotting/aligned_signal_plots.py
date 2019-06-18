@@ -55,9 +55,14 @@ def plotNeuronsAligned(
         testWidth=None,
         testTStart=None,
         testTStop=None,
+        removeFuzzyName=True,
         pThresh=1e-3,
         duplicateControlsByProgram=True,
         makeControlProgram=True,
+        amplitudeColumn='amplitudeFuzzy',
+        programColumn='programFuzzy',
+        electrodeColumn='electrodeFuzzy',
+        collapseSizes=False,
         enablePlots=True,
         colorPal="ch:0.6,-.2,dark=.2,light=0.7,reverse=1",
         printBreakDown=True,
@@ -82,12 +87,20 @@ def plotNeuronsAligned(
                 dataBlock, rasterName, dataQuery,
                 makeControlProgram=makeControlProgram,
                 duplicateControlsByProgram=duplicateControlsByProgram,
-                removeFuzzyName=True)
+                amplitudeColumn=amplitudeColumn,
+                programColumn=programColumn,
+                electrodeColumn=electrodeColumn,
+                collapseSizes=collapseSizes,
+                removeFuzzyName=removeFuzzyName)
             asigWide = ns5.alignedAsigsToDF(
                 dataBlock, continuousName, dataQuery,
                 makeControlProgram=makeControlProgram,
                 duplicateControlsByProgram=duplicateControlsByProgram,
-                removeFuzzyName=True)
+                amplitudeColumn=amplitudeColumn,
+                programColumn=programColumn,
+                electrodeColumn=electrodeColumn,
+                collapseSizes=collapseSizes,
+                removeFuzzyName=removeFuzzyName)
             raster = rasterWide.stack().reset_index(name='raster')
             asig = asigWide.stack().reset_index(name='fr')
             #  set up significance testing
@@ -150,22 +163,24 @@ def plotNeuronsAligned(
                     if co == 0:
                         g.axes[ro, co].set_ylabel(unitName)
                     pQueryList = []
-                    rowFacetName = g.row_names[ro]
-                    if rowName is not None:
-                        if isinstance(rowFacetName, str):
-                            compareName = '\'' + rowFacetName + '\''
-                        else:
-                            compareName = rowFacetName
-                        pQueryList.append(
-                            '({} == {})'.format(rowName, compareName))
-                    colFacetName = g.col_names[co]
-                    if colName is not None:
-                        if isinstance(colFacetName, str):
-                            compareName = '\'' + colFacetName + '\''
-                        else:
-                            compareName = colFacetName
-                        pQueryList.append(
-                            '({} == {})'.format(colName, compareName))
+                    if len(g.row_names):
+                        rowFacetName = g.row_names[ro]
+                        if rowName is not None:
+                            if isinstance(rowFacetName, str):
+                                compareName = '\'' + rowFacetName + '\''
+                            else:
+                                compareName = rowFacetName
+                            pQueryList.append(
+                                '({} == {})'.format(rowName, compareName))
+                    if len(g.col_names):
+                        colFacetName = g.col_names[co]
+                        if colName is not None:
+                            if isinstance(colFacetName, str):
+                                compareName = '\'' + colFacetName + '\''
+                            else:
+                                compareName = colFacetName
+                            pQueryList.append(
+                                '({} == {})'.format(colName, compareName))
                     pQuery = '&'.join(pQueryList)
                     thesePvals = elecPvals.query(pQuery)
                     #  plot stars
@@ -246,22 +261,25 @@ def plotAsigsAligned(
         testWidth=None,
         testTStart=None,
         testTStop=None,
+        removeFuzzyName=True,
         pThresh=1e-3,
         duplicateControlsByProgram=True,
         makeControlProgram=True,
+        amplitudeColumn='amplitudeFuzzy',
+        programColumn='programFuzzy',
+        electrodeColumn='electrodeFuzzy',
+        collapseSizes=False,
         enablePlots=True,
         linePlotEstimator='mean',
         colorPal="ch:0.6,-.2,dark=.2,light=0.7,reverse=1",
         printBreakDown=True,
         pdfName='alignedAsigs.pdf',
         unitNames=None):
-    
     if unitNames is None:
         unitNames = np.unique([
             i.name
             for i in dataBlock.filter(objects=Unit)])
     nUnits = len(unitNames)
-    
     with PdfPages(os.path.join(figureFolder, pdfName + '.pdf')) as pdf:
         allPvals = {}
         for idx, unitName in enumerate(unitNames):
@@ -269,7 +287,11 @@ def plotAsigsAligned(
                 dataBlock, unitName, dataQuery,
                 makeControlProgram=makeControlProgram,
                 duplicateControlsByProgram=duplicateControlsByProgram,
-                removeFuzzyName=True)
+                amplitudeColumn=amplitudeColumn,
+                programColumn=programColumn,
+                electrodeColumn=electrodeColumn,
+                collapseSizes=collapseSizes,
+                removeFuzzyName=removeFuzzyName)
             asig = asigWide.stack().reset_index(name='signal')
             #  set up significance testing
             if (rowControl is None) and (colControl) is None:
@@ -320,22 +342,24 @@ def plotAsigsAligned(
                     if co == 0:
                         g.axes[ro, co].set_ylabel(unitName)
                     pQueryList = []
-                    rowFacetName = g.row_names[ro]
-                    if rowName is not None:
-                        if isinstance(rowFacetName, str):
-                            compareName = '\'' + rowFacetName + '\''
-                        else:
-                            compareName = rowFacetName
-                        pQueryList.append(
-                            '({} == {})'.format(rowName, compareName))
-                    colFacetName = g.col_names[co]
-                    if colName is not None:
-                        if isinstance(colFacetName, str):
-                            compareName = '\'' + colFacetName + '\''
-                        else:
-                            compareName = colFacetName
-                        pQueryList.append(
-                            '({} == {})'.format(colName, compareName))
+                    if len(g.row_names):
+                        rowFacetName = g.row_names[ro]
+                        if rowName is not None:
+                            if isinstance(rowFacetName, str):
+                                compareName = '\'' + rowFacetName + '\''
+                            else:
+                                compareName = rowFacetName
+                            pQueryList.append(
+                                '({} == {})'.format(rowName, compareName))
+                    if len(g.col_names):
+                        colFacetName = g.col_names[co]
+                        if colName is not None:
+                            if isinstance(colFacetName, str):
+                                compareName = '\'' + colFacetName + '\''
+                            else:
+                                compareName = colFacetName
+                            pQueryList.append(
+                                '({} == {})'.format(colName, compareName))
                     pQuery = '&'.join(pQueryList)
                     thesePvals = elecPvals.query(pQuery)
                     #  plot stars
