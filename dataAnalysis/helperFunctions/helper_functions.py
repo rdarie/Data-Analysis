@@ -1226,7 +1226,7 @@ def getINSTapTimestamp(
 
     return tapTimestamps, peakIdx
 
-
+'''
 def eventsToDataFrame(
         events, idxT='t'
         ):
@@ -1244,7 +1244,7 @@ def eventsToDataFrame(
             event.name: pd.Series(values)})
     eventDict.update({idxT: pd.Series(event.times.magnitude)})
     return pd.concat(eventDict, axis=1)
-
+'''
 
 def synchronizeINStoNSP(
         tapTimestampsNSP, tapTimestampsINS,

@@ -25,6 +25,7 @@ import seaborn as sns
 from currentExperiment_alt import parseAnalysisOptions
 from docopt import docopt
 arguments = docopt(__doc__)
+
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['--trialIdx']), arguments['--exp'])
 globals().update(expOpts)
@@ -51,25 +52,6 @@ try:
 except Exception:
     hueControl = arguments['--hueControl']
 
-if arguments['--processAll']:
-    dataBlock = preproc.loadWithArrayAnn(
-        os.path.join(
-            scratchFolder,
-            experimentName + '_triggered_{}.nix'.format(
-                arguments['--window'])))
-    pdfName = '{}_{}_neurons_by_{}_aligned_to_{}'.format(
-        experimentName, arguments['--window'],
-        hueName, arguments['--alignQuery'])
-else:
-    dataBlock = preproc.loadWithArrayAnn(
-        os.path.join(
-            scratchFolder,
-            ns5FileName + '_triggered_{}.nix'.format(
-                arguments['--window'])))
-    pdfName = '{}_{}_{}_neurons_by_{}_aligned_to_{}'.format(
-        experimentName, arguments['--trialIdx'],
-        arguments['--window'], hueName, arguments['--alignQuery'])
-
 # during movement and stim
 pedalSizeQuery = '(' + '|'.join([
     '(pedalSizeCat == \'{}\')'.format(i)
@@ -89,6 +71,25 @@ testTStart = 0
 testTStop = 500e-3
 colorPal = "ch:0.6,-.2,dark=.2,light=0.7,reverse=1"  #  for firing rates
 unitNames = None  # ['elec75#0', 'elec75#1']
+
+if arguments['--processAll']:
+    dataBlock = preproc.loadWithArrayAnn(
+        os.path.join(
+            scratchFolder,
+            experimentName + '_triggered_{}.nix'.format(
+                arguments['--window'])))
+    pdfName = '{}_{}_neurons_by_{}_aligned_to_{}'.format(
+        experimentName, arguments['--window'],
+        hueName, arguments['--alignQuery'])
+else:
+    dataBlock = preproc.loadWithArrayAnn(
+        os.path.join(
+            scratchFolder,
+            ns5FileName + '_triggered_{}.nix'.format(
+                arguments['--window'])))
+    pdfName = '{}_{}_{}_neurons_by_{}_aligned_to_{}'.format(
+        experimentName, arguments['--trialIdx'],
+        arguments['--window'], hueName, arguments['--alignQuery'])
 
 asp.plotNeuronsAligned(
     dataBlock,

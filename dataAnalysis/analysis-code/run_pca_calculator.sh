@@ -7,16 +7,20 @@
 
 # Request memory:
 #SBATCH --nodes=1
-#SBATCH --mem=48G
+#SBATCH --mem=96G
 
 # Specify a job name:
 #SBATCH -J calc_pca
 
 # Specify an output file
-#SBATCH -o ../batch_logs/calc_pca-o-%j.out
-#SBATCH -e ../batch_logs/calc_pca-e-%j.out
+#SBATCH -o ../batch_logs/%j-calc_pca.stdout
+#SBATCH -e ../batch_logs/%j-calc_pca.errout
 
 # Specify account details
 #SBATCH --account=bibs-dborton-condo
 
-python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcPCA.py'
+# EXP="exp201901211000_alt"
+EXP="exp201901271000_alt"
+# EXP="exp201901201200_alt"
+
+python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcPCA.py' --exp=$EXP --processAll

@@ -7,16 +7,24 @@
 
 # Request memory:
 #SBATCH --nodes=1
-#SBATCH --mem=48G
+#SBATCH --mem=96G
 
 # Specify a job name:
-#SBATCH -J plotPCA
+#SBATCH -J extract_PCA
 
 # Specify an output file
-#SBATCH -o ../batch_logs/plotPCA-o-%j.out
-#SBATCH -e ../batch_logs/plotPCA-e-%j.out
+#SBATCH -o ../batch_logs/%j-extract_PCA.stdout
+#SBATCH -e ../batch_logs/%j-extract_PCA.errout
 
 # Specify account details
 #SBATCH --account=bibs-dborton-condo
 
-python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcPCAalignedToStim.py'
+EXP="exp201901211000_alt"
+# EXP="exp201901271000_alt"
+# EXP="exp201901201200_alt"
+ESTIMATOR="201901211000-Proprio_pca"
+# ESTIMATOR="201901271000-Proprio_pca"
+# ESTIMATOR="201901201200-Proprio_pca"
+
+#  python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/applyPCAtoAsig.py' --exp=$EXP --processAll --estimator=$ESTIMATOR
+python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/applyPCAtoTriggered.py' --exp=$EXP --processAll --estimator=$ESTIMATOR

@@ -43,7 +43,10 @@ expOpts, allOpts = parseAnalysisOptions(
 globals().update(expOpts)
 globals().update(allOpts)
 
-chanNames = None  # ['elec75#0_raster', 'elec75#1_raster']
+chanNames = None
+#  chanNames = [
+#      'elec75#0_raster', 'elec75#1_raster', 'elec83#0_raster',
+#      'elec78#0_raster', 'elec78#1_raster']
 
 def aggregateFun(
         DF, fs=None, nSamp=None):

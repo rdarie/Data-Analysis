@@ -6,7 +6,7 @@ Options:
     --trialIdx=trialIdx             which trial to analyze [default: 1]
     --exp=exp                       which experimental day to analyze
     --processAll                    process entire experimental day? [default: False]
-    --window=window                 process with short window? [default: shortWindow]
+    --window=window                 process with short window? [default: short]
 """
 import os, pdb, traceback
 from importlib import reload
@@ -58,17 +58,17 @@ if arguments['--processAll']:
     preproc.analogSignalsAlignedToEvents(
         eventBlock=eventBlock, signalBlock=signalBlock,
         chansToTrigger=chansToTrigger, eventName=eventName,
-        windowSize=[i * pq.s for i in rasterOpts[arguments['--window']]],
+        windowSize=[i * pq.s for i in rasterOpts['windowSizes'][arguments['--window']]],
         appendToExisting=False,
         checkReferences=False,
-        fileName=experimentName + '_triggered_{}'.format(arguments['--window']),
+        fileName=experimentName + '_trig_{}'.format(arguments['--window']),
         folderPath=scratchFolder)
 else:
     preproc.analogSignalsAlignedToEvents(
         eventBlock=eventBlock, signalBlock=signalBlock,
         chansToTrigger=chansToTrigger, eventName=eventName,
-        windowSize=[i * pq.s for i in rasterOpts[arguments['--window']]],
+        windowSize=[i * pq.s for i in rasterOpts['windowSizes'][arguments['--window']]],
         appendToExisting=False,
         checkReferences=False,
-        fileName=ns5FileName + '_triggered_{}'.format(arguments['--window']),
+        fileName=ns5FileName + '_trig_{}'.format(arguments['--window']),
         folderPath=scratchFolder)

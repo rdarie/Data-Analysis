@@ -6,7 +6,8 @@ Options:
     --trialIdx=trialIdx             which trial to analyze [default: 1]
     --exp=exp                       which experimental day to analyze
     --processAll                    process entire experimental day? [default: False]
-    --window=window                 process with short window? [default: shortWindow]
+    --window=window                 process with short window? [default: short]
+    --searchTerm=searchTerm         how to restrict channels? [default: (chanName.str.endswith(\'fr\'))]
 """
 import os, pdb, traceback
 from importlib import reload
@@ -15,7 +16,7 @@ from neo import (
     Block, Segment, ChannelIndex,
     Event, AnalogSignal, SpikeTrain, Unit)
 from neo.io.proxyobjects import (
-    AnalogSignalProxy, SpikeTrainProxy, EventProxy) 
+    AnalogSignalProxy, SpikeTrainProxy, EventProxy)
 import dataAnalysis.preproc.ns5 as preproc
 import numpy as np
 import pandas as pd
@@ -24,7 +25,9 @@ import quantities as pq
 from currentExperiment_alt import parseAnalysisOptions
 from docopt import docopt
 arguments = docopt(__doc__)
-expOpts, allOpts = parseAnalysisOptions(int(arguments['--trialIdx']), arguments['--exp'])
+expOpts, allOpts = parseAnalysisOptions(
+    int(arguments['--trialIdx']),
+    arguments['--exp'])
 globals().update(expOpts)
 globals().update(allOpts)
 
@@ -45,30 +48,35 @@ for ev in eventBlock.filter(objects=EventProxy):
 #  source of analogsignals
 signalBlock = eventBlock
 
-chansToTrigger = np.unique([
-    i.name
-    for i in signalBlock.filter(objects=AnalogSignalProxy)])
+chansToTrigger = pd.DataFrame(
+    np.unique([
+        i.name
+        for i in signalBlock.filter(objects=AnalogSignalProxy)]),
+    columns=['chanName'])
+pdb.set_trace()
+# chansToTrigger = [
+#     'elec75#0_fr_sqrt', 'elec75#1_fr_sqrt',
+#     'elec83#0_fr_sqrt', 'elec78#0_fr_sqrt',
+#     'elec78#1_fr_sqrt']
+
 eventName = 'motionStimAlignTimes'
-
-#  chansToTrigger = [
-#      'ins_td3', 'position', 'amplitude',
-#      'elec75#0_fr', 'elec75#1_fr']
-
 if arguments['--processAll']:
     preproc.analogSignalsAlignedToEvents(
         eventBlock=eventBlock, signalBlock=signalBlock,
         chansToTrigger=chansToTrigger, eventName=eventName,
-        windowSize=[i * pq.s for i in rasterOpts[arguments['--window']]],
+        windowSize=[i * pq.s for i in rasterOpts['windowSizes'][arguments['--window']]],
         appendToExisting=False,
         checkReferences=False,
-        fileName=experimentName + '_triggered_{}'.format(arguments['--window']),
+        fileName=experimentName + '_trig_{}_{}'.format(
+            arguments['--searchTerm'], arguments['--window']),
         folderPath=scratchFolder)
 else:
     preproc.analogSignalsAlignedToEvents(
         eventBlock=eventBlock, signalBlock=signalBlock,
         chansToTrigger=chansToTrigger, eventName=eventName,
-        windowSize=[i * pq.s for i in rasterOpts[arguments['--window']]],
+        windowSize=[i * pq.s for i in rasterOpts['windowSizes'][arguments['--window']]],
         appendToExisting=False,
         checkReferences=False,
-        fileName=ns5FileName + '_triggered_{}'.format(arguments['--window']),
+        fileName=ns5FileName + '_trig_{}_{}'.format(
+            arguments['--searchTerm'], arguments['--window']),
         folderPath=scratchFolder)

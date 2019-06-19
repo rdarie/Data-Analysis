@@ -10,11 +10,11 @@
 #SBATCH --mem=64G
 
 # Specify a job name:
-#SBATCH -J plotsMotionPlus
+#SBATCH -J plotsStim
 
 # Specify an output file
-#SBATCH -o ../batch_logs/%j-plotsMotionPlus.stdout
-#SBATCH -e ../batch_logs/%j-plotsMotionPlus.errout
+#SBATCH -o ../batch_logs/%j-plotsStim.stdout
+#SBATCH -e ../batch_logs/%j-plotsStim.errout
 
 # Specify account details
 #SBATCH --account=bibs-dborton-condo
@@ -24,5 +24,5 @@
 EXP="exp201901201200_alt"
 MINIRCIDX="1"
 
-python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/plotAsigsAlignedToStim.py' --exp=$EXP --trialIdx=MINIRCIDX  --window=shortWindow
-python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/plotNeuronsAlignedToStim.py' --exp=$EXP --trialIdx=MINIRCIDX  --window=shortWindow
+python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/plotAsigsAlignedToStim.py' --exp=$EXP --trialIdx=$MINIRCIDX  --window=miniRCWindow
+python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/plotNeuronsAlignedToStim.py' --exp=$EXP --trialIdx=$MINIRCIDX  --window=miniRCWindow

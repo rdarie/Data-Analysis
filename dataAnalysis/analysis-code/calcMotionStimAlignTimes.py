@@ -49,8 +49,7 @@ if arguments['--processAll']:
         filename=experimentDataPath)
 else:
     alignTimeBounds = [
-        alignTimeBounds[
-            alignTimeLookup[arguments['--exp']][int(arguments['--trialIdx'])]]
+        alignTimeBoundsLookup[int(arguments['--trialIdx'])]
     ]
     dataReader = neo.io.nixio_fr.NixIO(
         filename=analysisDataPath)

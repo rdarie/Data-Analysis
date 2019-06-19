@@ -218,9 +218,11 @@ def parseAnalysisOptions(trialIdx, experimentShorthand):
 
     rasterOpts = {
         'binInterval': 1e-3, 'binWidth': 30e-3, 'smoothKernelWidth': 50e-3,
-        'shortWindow': (-.5, .5),
-        'longWindow': (-4.5, 4.5),
-        'miniRCWindow': (-1, 1),
+        'windowSizes': {
+            'short': (-.5, .5),
+            'long': (-4.5, 4.5),
+            'miniRC': (-1, 1)
+        },
         'discardEmpty': None, 'maxSpikesTo': None, 'timeRange': None,
         'separateByFunArgs': None,
         'alignTo': None,
