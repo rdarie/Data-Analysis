@@ -7,6 +7,9 @@ Options:
     --exp=exp                       which experimental day to analyze
     --processAll                    process entire experimental day? [default: False]
     --window=window                 process with short window? [default: short]
+    --chanQuery=chanQuery           how to restrict channels? [default: (chanName.str.endswith(\'fr\'))]
+    --blockName=blockName           name for new block [default: fr]
+    --eventName=eventName           name of events object to align to [default: motionStimAlignTimes]
 """
 
 import os, pdb, traceback
@@ -55,28 +58,33 @@ signalBlock = signalReader.read_block(
     block_index=0, lazy=True,
     signal_group_mode='split-all')
 
-chansToTrigger = np.unique([
-    i.name
-    for i in signalBlock.filter(objects=AnalogSignalProxy)])
-
+chansToTrigger = None
+windowSize = [
+    i * pq.s
+    for i in rasterOpts['windowSizes'][arguments['--window']]]
 #  chansToTrigger = ['elec75#0_raster', 'elec75#1_raster']
-eventName = 'stimAlignTimes'
 
 if arguments['--processAll']:
     preproc.analogSignalsAlignedToEvents(
         eventBlock=eventBlock, signalBlock=signalBlock,
-        chansToTrigger=chansToTrigger, eventName=eventName,
-        windowSize=[i * pq.s for i in rasterOpts['windowSizes'][arguments['--window']]],
+        chansToTrigger=chansToTrigger,
+        chanQuery=arguments['--chanQuery'],
+        eventName=arguments['--eventName'],
+        windowSize=windowSize,
         appendToExisting=True,
         checkReferences=False,
-        fileName=experimentName + '_trig_{}'.format(arguments['--window']),
+        fileName=experimentName + '_trig_{}_{}'.format(
+            arguments['--blockName'], arguments['--window']),
         folderPath=scratchFolder)
 else:
     preproc.analogSignalsAlignedToEvents(
         eventBlock=eventBlock, signalBlock=signalBlock,
-        chansToTrigger=chansToTrigger, eventName=eventName,
-        windowSize=[i * pq.s for i in rasterOpts['windowSizes'][arguments['--window']]],
+        chansToTrigger=chansToTrigger,
+        chanQuery=arguments['--chanQuery'],
+        eventName=arguments['--eventName'],
+        windowSize=windowSize,
         appendToExisting=True,
         checkReferences=False,
-        fileName=ns5FileName + '_trig_{}'.format(arguments['--window']),
+        fileName=ns5FileName + '_trig_{}_{}'.format(
+            arguments['--blockName'], arguments['--window']),
         folderPath=scratchFolder)

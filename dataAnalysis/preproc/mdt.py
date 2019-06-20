@@ -5,8 +5,8 @@ from neo import (
     Segment, ChannelIndex, SpikeTrain, Unit)
 import neo
 import elephant as elph
-import dataAnalysis.helperFunctions.helper_functions as hf
-import dataAnalysis.helperFunctions.kilosort_analysis as ksa
+import dataAnalysis.helperFunctions.helper_functions_new as hf
+import dataAnalysis.helperFunctions.kilosort_analysis_new as ksa
 import rcsanalysis.packet_func as rcsa_helpers
 import dataAnalysis.preproc.ns5 as ns5
 import matplotlib.pyplot as plt

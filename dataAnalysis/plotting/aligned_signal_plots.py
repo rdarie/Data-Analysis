@@ -5,7 +5,7 @@ import numpy as np
 import pdb
 import seaborn as sns
 from tabulate import tabulate
-import dataAnalysis.helperFunctions.kilosort_analysis as ksa
+import dataAnalysis.helperFunctions.kilosort_analysis_new as ksa
 import dataAnalysis.preproc.ns5 as ns5
 from neo import (
     Block, Segment, ChannelIndex,
@@ -43,7 +43,8 @@ def getRasterFacetIdx(
 
 
 def plotNeuronsAligned(
-        dataBlock,
+        rasterBlock,
+        frBlock,
         dataQuery=None,
         figureFolder=None,
         rowName=None,
@@ -67,24 +68,23 @@ def plotNeuronsAligned(
         colorPal="ch:0.6,-.2,dark=.2,light=0.7,reverse=1",
         printBreakDown=True,
         pdfName='motionStim.pdf',
-        unitNames=None):
-    if unitNames is None:
-        allUnitNames = np.unique([
-            i.name
-            for i in dataBlock.filter(objects=Unit)])
-        unitNames = [
+        chanNames=None, chanQuery=None):
+    if chanNames is None:
+        allChanNames = ns5.listChanNames(
+            rasterBlock, chanQuery, objType=Unit)
+        chanNames = [
             i.split('_raster')[0]
-            for i in allUnitNames
+            for i in allChanNames
             if '_raster' in i]
-    nUnits = len(unitNames)
+    nUnits = len(chanNames)
 
     with PdfPages(os.path.join(figureFolder, pdfName + '.pdf')) as pdf:
         allPvals = {}
-        for idx, unitName in enumerate(unitNames):
+        for idx, unitName in enumerate(chanNames):
             rasterName = unitName + '_raster#0'
             continuousName = unitName + '_fr#0'
             rasterWide = ns5.alignedAsigsToDF(
-                dataBlock, rasterName, dataQuery,
+                rasterBlock, rasterName, dataQuery,
                 makeControlProgram=makeControlProgram,
                 duplicateControlsByProgram=duplicateControlsByProgram,
                 amplitudeColumn=amplitudeColumn,
@@ -93,7 +93,7 @@ def plotNeuronsAligned(
                 collapseSizes=collapseSizes,
                 removeFuzzyName=removeFuzzyName)
             asigWide = ns5.alignedAsigsToDF(
-                dataBlock, continuousName, dataQuery,
+                frBlock, continuousName, dataQuery,
                 makeControlProgram=makeControlProgram,
                 duplicateControlsByProgram=duplicateControlsByProgram,
                 amplitudeColumn=amplitudeColumn,
@@ -274,15 +274,14 @@ def plotAsigsAligned(
         colorPal="ch:0.6,-.2,dark=.2,light=0.7,reverse=1",
         printBreakDown=True,
         pdfName='alignedAsigs.pdf',
-        unitNames=None):
-    if unitNames is None:
-        unitNames = np.unique([
-            i.name
-            for i in dataBlock.filter(objects=Unit)])
-    nUnits = len(unitNames)
+        chanNames=None, chanQuery=None):
+    if chanNames is None:
+        chanNames = ns5.listChanNames(
+            dataBlock, chanQuery, objType=Unit)
+    nUnits = len(chanNames)
     with PdfPages(os.path.join(figureFolder, pdfName + '.pdf')) as pdf:
         allPvals = {}
-        for idx, unitName in enumerate(unitNames):
+        for idx, unitName in enumerate(chanNames):
             asigWide = ns5.alignedAsigsToDF(
                 dataBlock, unitName, dataQuery,
                 makeControlProgram=makeControlProgram,

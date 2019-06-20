@@ -1,4 +1,4 @@
-"""  12: Calculate Firing Rates and Rasters aligned to Stim
+"""  11: Calculate Firing Rates aligned to Stim
 Usage:
     temp.py [options]
 
@@ -7,8 +7,10 @@ Options:
     --exp=exp                       which experimental day to analyze
     --processAll                    process entire experimental day? [default: False]
     --window=window                 process with short window? [default: short]
+    --chanQuery=chanQuery           how to restrict channels? [default: (chanName.str.endswith(\'fr\'))]
+    --blockName=blockName           name for new block [default: fr]
+    --eventName=eventName           name of events object to align to [default: motionStimAlignTimes]
 """
-
 import os, pdb, traceback
 from importlib import reload
 import neo
@@ -16,7 +18,7 @@ from neo import (
     Block, Segment, ChannelIndex,
     Event, AnalogSignal, SpikeTrain, Unit)
 from neo.io.proxyobjects import (
-    AnalogSignalProxy, EventProxy)
+    AnalogSignalProxy, SpikeTrainProxy, EventProxy)
 import dataAnalysis.preproc.ns5 as preproc
 import numpy as np
 import pandas as pd
@@ -25,7 +27,9 @@ import quantities as pq
 from currentExperiment_alt import parseAnalysisOptions
 from docopt import docopt
 arguments = docopt(__doc__)
-expOpts, allOpts = parseAnalysisOptions(int(arguments['--trialIdx']), arguments['--exp'])
+expOpts, allOpts = parseAnalysisOptions(
+    int(arguments['--trialIdx']),
+    arguments['--exp'])
 globals().update(expOpts)
 globals().update(allOpts)
 
@@ -44,39 +48,39 @@ for ev in eventBlock.filter(objects=EventProxy):
     ev.name = '_'.join(ev.name.split('_')[1:])
 
 #  source of analogsignals
-if arguments['--processAll']:
-    signalReader = neo.io.nixio_fr.NixIO(
-        filename=experimentBinnedSpikePath)
-else:
-    signalReader = neo.io.nixio_fr.NixIO(
-        filename=binnedSpikePath)
+signalBlock = eventBlock
 
-signalBlock = signalReader.read_block(
-    block_index=0, lazy=True,
-    signal_group_mode='split-all')
+chansToTrigger = None
+# chansToTrigger = [
+#     'elec75#0_fr_sqrt', 'elec75#1_fr_sqrt',
+#     'elec83#0_fr_sqrt', 'elec78#0_fr_sqrt',
+#     'elec78#1_fr_sqrt']
 
-chansToTrigger = np.unique([
-    i.name
-    for i in signalBlock.filter(objects=AnalogSignalProxy)])
-
-#  chansToTrigger = ['elec75#0_raster', 'elec75#1_raster']
-eventName = 'motionStimAlignTimes'
+windowSize = [
+    i * pq.s
+    for i in rasterOpts['windowSizes'][arguments['--window']]]
 
 if arguments['--processAll']:
     preproc.analogSignalsAlignedToEvents(
         eventBlock=eventBlock, signalBlock=signalBlock,
-        chansToTrigger=chansToTrigger, eventName=eventName,
-        windowSize=[i * pq.s for i in rasterOpts['windowSizes'][arguments['--window']]],
-        appendToExisting=True,
+        chansToTrigger=chansToTrigger,
+        chanQuery=arguments['--chanQuery'],
+        eventName=arguments['--eventName'],
+        windowSize=windowSize,
+        appendToExisting=False,
         checkReferences=False,
-        fileName=experimentName + '_trig_{}'.format(arguments['--window']),
+        fileName=experimentName + '_trig_{}_{}'.format(
+            arguments['--blockName'], arguments['--window']),
         folderPath=scratchFolder)
 else:
     preproc.analogSignalsAlignedToEvents(
         eventBlock=eventBlock, signalBlock=signalBlock,
-        chansToTrigger=chansToTrigger, eventName=eventName,
-        windowSize=[i * pq.s for i in rasterOpts['windowSizes'][arguments['--window']]],
-        appendToExisting=True,
+        chansToTrigger=chansToTrigger,
+        chanQuery=arguments['--chanQuery'],
+        eventName=arguments['--eventName'],
+        windowSize=windowSize,
+        appendToExisting=False,
         checkReferences=False,
-        fileName=ns5FileName + '_trig_{}'.format(arguments['--window']),
+        fileName=ns5FileName + '_trig_{}_{}'.format(
+            arguments['--blockName'], arguments['--window']),
         folderPath=scratchFolder)

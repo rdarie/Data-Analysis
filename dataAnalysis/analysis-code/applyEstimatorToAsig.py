@@ -9,23 +9,23 @@ Options:
     --estimator=estimator                  filename for resulting estimator
 """
 import os
-import dataAnalysis.plotting.aligned_signal_plots as asp
-import dataAnalysis.preproc.ns5 as preproc
-import seaborn as sns
-import numpy as np
-import quantities as pq
+import dataAnalysis.preproc.ns5 as ns5
+#  import dataAnalysis.plotting.aligned_signal_plots as asp
+#  import seaborn as sns
+#  import numpy as np
+#  import quantities as pq
 import pandas as pd
 import pdb
-import dataAnalysis.preproc.ns5 as ns5
 from neo import (
-    Block, Segment, ChannelIndex,
-    Event, AnalogSignal, SpikeTrain, Unit)
+    Block, ChannelIndex, AnalogSignal,
+    #  Segment, Event, SpikeTrain, Unit
+    )
 from neo.io.proxyobjects import (
-    AnalogSignalProxy, SpikeTrainProxy, EventProxy) 
+    AnalogSignalProxy,
+    #  SpikeTrainProxy, EventProxy
+    )
 import neo
-
-from sklearn.decomposition import PCA
-from sklearn.pipeline import make_pipeline, Pipeline
+import traceback
 import joblib as jb
 import pickle
 from currentExperiment_alt import parseAnalysisOptions
@@ -61,7 +61,6 @@ for uName in estimatorMetadata['inputFeatures']:
         unitNames.append(uName[:-2])
     else:
         unitNames.append(uName)
-unitNames = sorted(unitNames)
 
 interpolatedSpikeMats = {}
 blockIdx = 0
@@ -88,7 +87,7 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
     asigsList = [
         asigP.load()
         for asigP in asigProxysList]
-    asigsDF = preproc.analogSignalsToDataFrame(asigsList)
+    asigsDF = ns5.analogSignalsToDataFrame(asigsList)
     asigsDF.index = asigsDF['t']
     asigsDF.index.name = 't'
     interpolatedSpikeMats.update(
@@ -118,7 +117,7 @@ for segIdx, group in featuresDF.groupby('segment'):
         objects=AnalogSignalProxy)[0].load(channel_indexes=[0])
     samplingRate = dummyAsig.sampling_rate
     
-    featureBlock = preproc.dataFrameToAnalogSignals(
+    featureBlock = ns5.dataFrameToAnalogSignals(
         segFeaturesDF,
         idxT='t', useColNames=True,
         dataCol=segFeaturesDF.drop(columns='t').columns,
@@ -142,7 +141,7 @@ for segIdx, group in featuresDF.groupby('segment'):
 dataReader.file.close()
 allSegs = list(range(len(masterBlock.segments)))
 fileName = os.path.basename(filePath).replace('.nix', '')
-preproc.addBlockToNIX(
+ns5.addBlockToNIX(
     masterBlock, neoSegIdx=allSegs,
     writeSpikes=False, writeEvents=False,
     fileName=fileName,

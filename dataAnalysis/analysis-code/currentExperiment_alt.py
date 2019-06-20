@@ -1,7 +1,8 @@
 import os, pdb
-import dataAnalysis.helperFunctions.kilosort_analysis as ksa
-import dataAnalysis.helperFunctions.tridesclous_helpers as tdch
+#  import dataAnalysis.helperFunctions.kilosort_analysis as ksa
+import dataAnalysis.helperFunctions.probe_metadata as prb_meta
 import importlib
+
 
 def parseAnalysisOptions(trialIdx, experimentShorthand):
     optsModule = importlib.import_module(experimentShorthand, package=None)
@@ -143,13 +144,13 @@ def parseAnalysisOptions(trialIdx, experimentShorthand):
     trialFilesFrom['utah'].update({'eventInfo': eventInfo})
     
     nspCmpPath = os.path.join('.', 'nsp_map.cmp')
-    cmpDF = tdch.cmpToDF(nspCmpPath)
+    cmpDF = prb_meta.cmpToDF(nspCmpPath)
     
     remakePrb = expOpts['remakePrb']
     if remakePrb:
         nspCsvPath = os.path.join('.', 'nsp_map.csv')
         cmpDF.to_csv(nspCsvPath)
-        tdch.cmpDFToPrb(
+        prb_meta.cmpDFToPrb(
             cmpDF, filePath=nspPrbPath,
             names=['elec', 'ainp'],
             groupIn={'xcoords': 1, 'ycoords': 1})

@@ -15,13 +15,13 @@ from neo import (
     Block, Segment, ChannelIndex,
     Event, AnalogSignal, SpikeTrain, Unit)
 from neo.io.proxyobjects import (
-    AnalogSignalProxy, SpikeTrainProxy, EventProxy) 
+    AnalogSignalProxy, SpikeTrainProxy, EventProxy)
 import quantities as pq
-import dataAnalysis.helperFunctions.kilosort_analysis as ksa
-import dataAnalysis.helperFunctions.helper_functions as hf
+#  import dataAnalysis.helperFunctions.kilosort_analysis_new as ksa
+import dataAnalysis.helperFunctions.helper_functions_new as hf
 import rcsanalysis.packet_func as rcsa_helpers
-import dataAnalysis.preproc.ns5 as preproc
-import dataAnalysis.preproc.mdt as preprocINS
+import dataAnalysis.preproc.ns5 as ns5
+#  import dataAnalysis.preproc.mdt as preprocINS
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -92,7 +92,7 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
             except Exception:
                 traceback.print_exc()
     dataSegEvents = [evP.load() for evP in eventProxysList]
-    eventDF = preproc.eventsToDataFrame(
+    eventDF = ns5.eventsToDataFrame(
         dataSegEvents, idxT='t',
         names=['property', 'value']
         )
@@ -161,7 +161,7 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
                 elecName += '- E{}'.format(cathodes)
             alignEventsDF.loc[pMask, 'electrode'] = elecName
 
-    alignEvents = preproc.eventDataFrameToEvents(
+    alignEvents = ns5.eventDataFrameToEvents(
         alignEventsDF, idxT='t',
         annCol=None,
         eventName='seg{}_stimAlignTimes'.format(segIdx),
@@ -190,7 +190,7 @@ dataReader.file.close()
 masterBlock.create_relationship()
 allSegs = list(range(len(masterBlock.segments)))
 if arguments['--processAll']:
-    preproc.addBlockToNIX(
+    ns5.addBlockToNIX(
         masterBlock, neoSegIdx=allSegs,
         writeAsigs=False, writeSpikes=False, writeEvents=True,
         fileName=experimentName + '_analyze',
@@ -199,7 +199,7 @@ if arguments['--processAll']:
         nixBlockIdx=0, nixSegIdx=allSegs,
         )
 else:
-    preproc.addBlockToNIX(
+    ns5.addBlockToNIX(
         masterBlock, neoSegIdx=allSegs,
         writeAsigs=False, writeSpikes=False, writeEvents=True,
         fileName=ns5FileName + '_analyze',

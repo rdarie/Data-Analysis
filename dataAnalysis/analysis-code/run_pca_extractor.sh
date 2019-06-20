@@ -19,11 +19,11 @@
 # Specify account details
 #SBATCH --account=bibs-dborton-condo
 
-EXP="exp201901211000_alt"
-# EXP="exp201901271000_alt"
+# EXP="exp201901211000_alt"
+EXP="exp201901271000_alt"
 # EXP="exp201901201200_alt"
-ESTIMATOR="201901211000-Proprio_pca"
-# ESTIMATOR="201901271000-Proprio_pca"
+# ESTIMATOR="201901211000-Proprio_pca"
+ESTIMATOR="201901271000-Proprio_pca"
 # ESTIMATOR="201901201200-Proprio_pca"
 
 #  python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/applyPCAtoAsig.py' --exp=$EXP --processAll --estimator=$ESTIMATOR

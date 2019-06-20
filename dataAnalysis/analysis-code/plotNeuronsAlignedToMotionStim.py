@@ -13,7 +13,8 @@ Options:
     --colName=colName               break down by col  [default: electrode]
     --colControl=colControl         cols to exclude from comparison [default: control]
     --alignQuery=alignQuery         what will the plot be aligned to? [default: (pedalMovementCat==\'outbound\')]
-    --window=window                 process with short window? [default: shortWindow]
+    --window=window                 process with short window? [default: short]
+    --chanQuery=chanQuery           how to restrict channels?
 """
 import matplotlib
 matplotlib.use('PS')   # generate postscript output by default
@@ -70,29 +71,40 @@ testWidth = 100e-3
 testTStart = 0
 testTStop = 500e-3
 colorPal = "ch:0.6,-.2,dark=.2,light=0.7,reverse=1"  #  for firing rates
-unitNames = None  # ['elec75#0', 'elec75#1']
 
 if arguments['--processAll']:
-    dataBlock = preproc.loadWithArrayAnn(
+    rasterBlock = preproc.loadWithArrayAnn(
         os.path.join(
             scratchFolder,
-            experimentName + '_triggered_{}.nix'.format(
-                arguments['--window'])))
-    pdfName = '{}_{}_neurons_by_{}_aligned_to_{}'.format(
-        experimentName, arguments['--window'],
+            experimentName + '_trig_{}_{}.nix'.format(
+                arguments['--blockName'], arguments['--window'])))
+    frBlock = preproc.loadWithArrayAnn(
+        os.path.join(
+            scratchFolder,
+            experimentName + '_trig_{}_{}.nix'.format(
+                arguments['--blockName'], arguments['--window'])))
+    pdfName = '{}_{}_{}_neurons_by_{}_aligned_to_{}'.format(
+        experimentName, arguments['--blockName'], arguments['--window'],
         hueName, arguments['--alignQuery'])
 else:
-    dataBlock = preproc.loadWithArrayAnn(
+    rasterBlock = preproc.loadWithArrayAnn(
         os.path.join(
             scratchFolder,
-            ns5FileName + '_triggered_{}.nix'.format(
-                arguments['--window'])))
-    pdfName = '{}_{}_{}_neurons_by_{}_aligned_to_{}'.format(
+            ns5FileName + '_trig_{}_{}.nix'.format(
+                arguments['--blockName'], arguments['--window'])))
+    frBlock = preproc.loadWithArrayAnn(
+        os.path.join(
+            scratchFolder,
+            ns5FileName + '_trig_{}_{}.nix'.format(
+                arguments['--blockName'], arguments['--window'])))
+    pdfName = '{}_{}_{}_{}_neurons_by_{}_aligned_to_{}'.format(
         experimentName, arguments['--trialIdx'],
-        arguments['--window'], hueName, arguments['--alignQuery'])
+        arguments['--blockName'], arguments['--window'],
+        hueName, arguments['--alignQuery'])
 
 asp.plotNeuronsAligned(
-    dataBlock,
+    rasterBlock,
+    frBlock,
     dataQuery=dataQuery,
     figureFolder=figureFolder,
     rowName=rowName,
@@ -111,4 +123,4 @@ asp.plotNeuronsAligned(
     colorPal=colorPal,
     printBreakDown=True,
     pdfName=pdfName,
-    unitNames=unitNames)
+    chanNames=None, chanQuery=arguments['--chanQuery'])

@@ -1,6 +1,6 @@
-import dataAnalysis.helperFunctions.helper_functions as hf
+import dataAnalysis.helperFunctions.helper_functions_new as hf
 import os
-import dataAnalysis.helperFunctions.kilosort_analysis as ksa
+import dataAnalysis.helperFunctions.kilosort_analysis_new as ksa
 import numpy as np
 import pdb
 from matplotlib.backends.backend_pdf import PdfPages
@@ -31,10 +31,10 @@ def spikePDFReport(
     else:
         pdfName = os.path.join(folderPath, newReportName + '.pdf')
 
-    if any((arrayName is None, arrayInfo is None)):
-        arrayName, arrayInfo, partialRasterOpts = (
-            ksa.trialBinnedSpikesNameRetrieve(newReportName))
-        arrayInfo['nevIDs'] = spikes['ChannelID']
+    #  if any((arrayName is None, arrayInfo is None)):
+    #      arrayName, arrayInfo, partialRasterOpts = (
+    #          ksa.trialBinnedSpikesNameRetrieve(newReportName))
+    #      arrayInfo['nevIDs'] = spikes['ChannelID']
 
     with PdfPages(pdfName) as pdf:
         ksa.plotSpikePanel(

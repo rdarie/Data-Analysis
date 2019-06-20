@@ -7,22 +7,20 @@ Options:
     --exp=exp                              which experimental day to analyze
     --processAll                           process entire experimental day? [default: False]
     --alignQuery=alignQuery                what will the plot be aligned to? [default: (pedalMovementCat==\'midPeak\')]
-    --window=window                        process with short window? [default: longWindow]
+    --window=window                        process with short window? [default: long]
     --estimatorName=estimatorName          filename for resulting estimator [default: pca]
+    --unitQuery=unitQuery                  how to restrict channels? [default: (chanName.str.endswith(\'fr_sqrt#0\'))]
 """
 
 import os
-import dataAnalysis.plotting.aligned_signal_plots as asp
-import dataAnalysis.helperFunctions.helper_functions as hf
-import dataAnalysis.preproc.ns5 as preproc
-import seaborn as sns
-import numpy as np
-import pandas as pd
+import dataAnalysis.helperFunctions.helper_functions_new as hf
+#  import numpy as np
+#  import pandas as pd
 import pdb
 import dataAnalysis.preproc.ns5 as ns5
-from neo import (
-    Block, Segment, ChannelIndex,
-    Event, AnalogSignal, SpikeTrain, Unit)
+#  from neo import (
+#      Block, Segment, ChannelIndex,
+#      Event, AnalogSignal, SpikeTrain, Unit)
 import neo
 from sklearn.decomposition import PCA, IncrementalPCA
 from sklearn.pipeline import make_pipeline, Pipeline
@@ -40,7 +38,7 @@ globals().update(allOpts)
 if arguments['--processAll']:
     triggeredPath = os.path.join(
         scratchFolder,
-        experimentName + '_triggered_{}.nix'.format(
+        experimentName + '_trig_fr_sqrt_{}.nix'.format(
             arguments['--window']))
     estimatorPath = os.path.join(
         scratchFolder,
@@ -48,7 +46,7 @@ if arguments['--processAll']:
 else:
     triggeredPath = os.path.join(
         scratchFolder,
-        ns5FileName + '_triggered_{}.nix'.format(
+        ns5FileName + '_trig_fr_sqrt_{}.nix'.format(
             arguments['--window']))
     estimatorPath = os.path.join(
         scratchFolder,
@@ -69,37 +67,29 @@ alignedAsigsKWargs = dict(
     amplitudeColumn='amplitudeFuzzy',
     programColumn='programFuzzy',
     electrodeColumn='electrodeFuzzy',
+    transposeToColumns='feature', concatOn='columns',
     removeFuzzyName=False)
 
 dataQuery = '&'.join([
     #  '((RateInHz==100)|(RateInHz==0))',
     arguments['--alignQuery']
     ])
-
+    
 #  unitNames = [
 #      'elec75#0_fr_sqrt#0', 'elec75#1_fr_sqrt#0',
 #      'elec78#0_fr_sqrt#0', 'elec78#1_fr_sqrt#0',
 #      'elec83#0_fr_sqrt#0']
 unitNames = None
-if unitNames is None:
-    unitNames = list(np.unique(
-        [
-            i.name
-            for i in dataBlock.filter(objects=Unit)
-            if '_fr_sqrt' in i.name]
-        ))
-nUnits = len(unitNames)
 
-asigWide = ns5.alignedAsigsToDF(
-    dataBlock, unitNames, dataQuery,
+masterSpikeMat = ns5.alignedAsigsToDF(
+    dataBlock, unitNames,
+    unitQuery=arguments['--unitQuery'], dataQuery=dataQuery,
     **alignedAsigsKWargs)
 
-print('about to clear vars, memory usage: {}'.format(
+print('about to clear vars, memory usage: {:.2f} MB'.format(
     hf.memory_usage_psutil()))
-#  make sure they are sorted by unitNames
-masterSpikeMat = asigWide.stack().unstack('feature')[unitNames]
 #  free up memory
-del asigWide, dataBlock
+del dataBlock
 gc.collect()
 
 nComp = masterSpikeMat.shape[1]
@@ -107,7 +97,7 @@ pca = IncrementalPCA(
     n_components=nComp,
     batch_size=int(5 * nComp))
 estimator = Pipeline([('dimred', pca)])
-print('starting fit, memory usage: {}'.format(
+print('starting fit, memory usage: {:.2f} MB'.format(
     hf.memory_usage_psutil()))
 
 estimator.fit(masterSpikeMat.values)
@@ -118,7 +108,7 @@ estimatorMetadata = {
     'trainingDataPath': os.path.basename(triggeredPath),
     'path': os.path.basename(estimatorPath),
     'name': arguments['--estimatorName'],
-    'inputFeatures': unitNames,
+    'inputFeatures': masterSpikeMat.columns.to_list(),
     'dataQuery': dataQuery,
     'alignedAsigsKWargs': alignedAsigsKWargs
     }

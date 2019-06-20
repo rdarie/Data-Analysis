@@ -13,8 +13,9 @@ Options:
     --colName=colName               break down by col  [default: electrode]
     --colControl=colControl         cols to exclude from comparison [default: control]
     --alignQuery=alignQuery         what will the plot be aligned to? [default: (pedalMovementCat==\'outbound\')]
-    --window=window                 process with short window? [default: shortWindow]
-    
+    --window=window                 process with short window? [default: short]
+    --chanQuery=chanQuery           how to restrict channels? [default: (chanName.str.contains(\'pca\'))]
+    --blockName=blockName           name for new block [default: pca]
 """
 
 import dataAnalysis.plotting.aligned_signal_plots as asp
@@ -54,16 +55,21 @@ if arguments['--processAll']:
     dataBlock = preproc.loadWithArrayAnn(
         os.path.join(
             scratchFolder,
-            experimentName + '_triggered_{}.nix'.format(arguments['--window'])))
-    pdfName = '{}_{}_asigs_by_{}_aligned_to_{}'.format(
-        experimentName, arguments['--window'], hueName, arguments['--alignQuery'])
+            experimentName + '_trig_{}_{}.nix'.format(
+                arguments['--blockName'], arguments['--window'])))
+    pdfName = '{}_{}_{}_by_{}_aligned_to_{}'.format(
+        experimentName, arguments['--blockName'],
+        arguments['--window'], hueName, arguments['--alignQuery'])
 else:
     dataBlock = preproc.loadWithArrayAnn(
         os.path.join(
             scratchFolder,
-            ns5FileName + '_triggered_{}.nix'.format(arguments['--window'])))
-    pdfName = '{}_{}_{}_asigs_by_{}_aligned_to_{}'.format(
-        experimentName, arguments['--trialIdx'], arguments['--window'], hueName, arguments['--alignQuery'])
+            ns5FileName + '_trig_{}_{}.nix'.format(
+                arguments['--blockName'], arguments['--window'])))
+    pdfName = '{}_{}_{}_{}_by_{}_aligned_to_{}'.format(
+        experimentName, arguments['--trialIdx'],
+        arguments['--blockName'], arguments['--window'],
+        hueName, arguments['--alignQuery'])
 
 # during movement and stim
 pedalSizeQuery = '(' + '|'.join([
@@ -83,9 +89,7 @@ testWidth = 100e-3
 testTStart = 0
 testTStop = 500e-3
 colorPal = "ch:0.6,-.2,dark=.2,light=0.7,reverse=1"  #  for firing rates
-unitNames = [
-    'pca0#0', 'pca1#0', 'pca2#0']
-#  unitNames = ['ins_td3#0', 'position#0']
+
 asp.plotAsigsAligned(
     dataBlock,
     dataQuery=dataQuery,
@@ -107,4 +111,4 @@ asp.plotAsigsAligned(
     colorPal=colorPal,
     printBreakDown=True,
     pdfName=pdfName,
-    unitNames=unitNames)
+    chanNames=None, chanQuery=arguments['--chanQuery'])
