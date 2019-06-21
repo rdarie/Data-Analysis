@@ -67,7 +67,7 @@ def plotNeuronsAligned(
         enablePlots=True,
         colorPal="ch:0.6,-.2,dark=.2,light=0.7,reverse=1",
         printBreakDown=True,
-        pdfName='motionStim.pdf',
+        pdfName='motionStim.pdf', limitPages=None,
         chanNames=None, chanQuery=None):
     if chanNames is None:
         allChanNames = ns5.listChanNames(
@@ -77,14 +77,15 @@ def plotNeuronsAligned(
             for i in allChanNames
             if '_raster' in i]
     nUnits = len(chanNames)
-
+    #
     with PdfPages(os.path.join(figureFolder, pdfName + '.pdf')) as pdf:
         allPvals = {}
         for idx, unitName in enumerate(chanNames):
             rasterName = unitName + '_raster#0'
             continuousName = unitName + '_fr#0'
             rasterWide = ns5.alignedAsigsToDF(
-                rasterBlock, rasterName, dataQuery,
+                rasterBlock, [rasterName],
+                unitQuery=None, dataQuery=dataQuery,
                 makeControlProgram=makeControlProgram,
                 duplicateControlsByProgram=duplicateControlsByProgram,
                 amplitudeColumn=amplitudeColumn,
@@ -93,7 +94,8 @@ def plotNeuronsAligned(
                 collapseSizes=collapseSizes,
                 removeFuzzyName=removeFuzzyName)
             asigWide = ns5.alignedAsigsToDF(
-                frBlock, continuousName, dataQuery,
+                frBlock, [continuousName],
+                unitQuery=None, dataQuery=dataQuery,
                 makeControlProgram=makeControlProgram,
                 duplicateControlsByProgram=duplicateControlsByProgram,
                 amplitudeColumn=amplitudeColumn,
@@ -198,7 +200,9 @@ def plotNeuronsAligned(
                     ax.axvline(testTStart, color='m')
                 pdf.savefig()
                 plt.close()
-    
+            if limitPages is not None:
+                if idx >= limitPages:
+                    break
         if printBreakDown:
             fig, ax = plt.subplots()
             fig.set_size_inches(15, 15)
@@ -273,7 +277,7 @@ def plotAsigsAligned(
         linePlotEstimator='mean',
         colorPal="ch:0.6,-.2,dark=.2,light=0.7,reverse=1",
         printBreakDown=True,
-        pdfName='alignedAsigs.pdf',
+        pdfName='alignedAsigs.pdf', limitPages=None,
         chanNames=None, chanQuery=None):
     if chanNames is None:
         chanNames = ns5.listChanNames(
@@ -283,7 +287,8 @@ def plotAsigsAligned(
         allPvals = {}
         for idx, unitName in enumerate(chanNames):
             asigWide = ns5.alignedAsigsToDF(
-                dataBlock, unitName, dataQuery,
+                dataBlock, [unitName],
+                unitQuery=None, dataQuery=dataQuery,
                 makeControlProgram=makeControlProgram,
                 duplicateControlsByProgram=duplicateControlsByProgram,
                 amplitudeColumn=amplitudeColumn,
@@ -376,6 +381,9 @@ def plotAsigsAligned(
                     ax.axvline(testTStart, color='m')
                 pdf.savefig()
                 plt.close()
+            if limitPages is not None:
+                if idx >= limitPages:
+                    break
         #  print a table
         if printBreakDown:
             fig, ax = plt.subplots()

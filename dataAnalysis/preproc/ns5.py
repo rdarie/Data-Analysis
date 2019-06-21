@@ -2,22 +2,24 @@
 """
 @author: Radu Darie
 """
-import neo
+from neo.io import NixIO, nixio_fr, BlackrockIO
+from neo.io.proxyobjects import (
+    AnalogSignalProxy, SpikeTrainProxy, EventProxy)
 from neo.core import (Block, Segment, ChannelIndex,
     AnalogSignal, Unit, SpikeTrain, Event)
-from neo.io.proxyobjects import (
-    AnalogSignalProxy, SpikeTrainProxy, EventProxy) 
 import quantities as pq
 #  from quantities import mV, kHz, s, uV
 import math, pdb
 #  from copy import copy
 import dataAnalysis.helperFunctions.helper_functions_new as hf
 import dataAnalysis.helperFunctions.profiling as prf
-import dataAnalysis.helperFunctions.motor_encoder as mea
+import dataAnalysis.helperFunctions.motor_encoder_new as mea
 #  from brPY.brpylib import NsxFile, NevFile, brpylib_ver
 #  import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import dask.dataframe as dd
+#  import modin.pandas as mpd
 import os, gc
 #  import pickle
 #  from copy import *
@@ -32,6 +34,48 @@ try:
 except ImportError:
     from collections import Iterable
 from elephant.conversion import binarize
+
+
+def analogSignalsToDataFrame(
+        analogsignals, idxT='t', useChanNames=False):
+    asigList = []
+    for asig in analogsignals:
+        if asig.shape[1] == 1:
+            if useChanNames:
+                colNames = [asig.channel_index.name]
+            else:
+                colNames = [asig.name]
+        else:
+            colNames = [
+                asig.name +
+                '_{}'.format(i) for i in
+                asig.channel_index.channel_ids
+                ]
+        asigList.append(
+            pd.DataFrame(
+                asig.magnitude, columns=colNames,
+                index=range(asig.shape[0])))
+    asigList.append(
+        pd.DataFrame(
+            asig.times.magnitude, columns=[idxT],
+            index=range(asig.shape[0])))
+    return pd.concat(asigList, axis=1)
+
+
+def listChanNames(
+        dataBlock, chanQuery,
+        objType=AnalogSignalProxy):
+    chansToTrigger = pd.DataFrame(
+        np.unique([
+            i.name
+            for i in dataBlock.filter(objects=objType)]),
+        columns=['chanName'])
+    if chanQuery is not None:
+        chansToTrigger = chansToTrigger.query(
+            chanQuery, engine='python')['chanName'].to_list()
+    else:
+        chansToTrigger = chansToTrigger['chanName'].to_list()
+    return chansToTrigger
 
 
 def spikeDictToSpikeTrains(
@@ -55,8 +99,8 @@ def spikeDictToSpikeTrains(
         nixChanName = probeName + '{}'.format(chanName)
         chanIdx = ChannelIndex(
             name=nixChanName,
-            index=np.array([idx]),
-            channel_names=np.array([nixChanName]))
+            index=np.asarray([idx]),
+            channel_names=np.asarray([nixChanName]))
         block.channel_indexes.append(chanIdx)
         
         for unitIdx, unitName in enumerate(unitsOnThisChan):
@@ -98,11 +142,11 @@ def spikeTrainsToSpikeDict(
     nCh = len(spiketrains)
     spikes = {
         'ChannelID': [i for i in range(nCh)],
-        'Classification': [np.array([]) for i in range(nCh)],
+        'Classification': [np.asarray([]) for i in range(nCh)],
         'NEUEVWAV_HeaderIndices': [None for i in range(nCh)],
-        'TimeStamps': [np.array([]) for i in range(nCh)],
+        'TimeStamps': [np.asarray([]) for i in range(nCh)],
         'Units': 'uV',
-        'Waveforms': [np.array([]) for i in range(nCh)],
+        'Waveforms': [np.asarray([]) for i in range(nCh)],
         'basic_headers': {'TimeStampResolution': 3e4},
         'extended_headers': []
         }
@@ -142,11 +186,11 @@ def channelIndexesToSpikeDict(
     nCh = len(channel_indexes)
     spikes = {
         'ChannelID': [i for i in range(nCh)],
-        'Classification': [np.array([]) for i in range(nCh)],
+        'Classification': [np.asarray([]) for i in range(nCh)],
         'NEUEVWAV_HeaderIndices': [None for i in range(nCh)],
-        'TimeStamps': [np.array([]) for i in range(nCh)],
+        'TimeStamps': [np.asarray([]) for i in range(nCh)],
         'Units': 'uV',
-        'Waveforms': [np.array([]) for i in range(nCh)],
+        'Waveforms': [np.asarray([]) for i in range(nCh)],
         'basic_headers': {'TimeStampResolution': 3e4},
         'extended_headers': []
         }
@@ -159,7 +203,7 @@ def channelIndexesToSpikeDict(
     #  allocate fields for array annotations (per spike)
     if dummySt.array_annotations:
         for key in dummySt.array_annotations.keys():
-            spikes.update({key: [np.array([]) for i in range(nCh)]})
+            spikes.update({key: [np.asarray([]) for i in range(nCh)]})
         
     maxUnitIdx = 0
     for idx, chIdx in enumerate(channel_indexes):
@@ -229,10 +273,49 @@ def unitSpikeTrainArrayAnnToDF(
     return annotationsDF
 
 
+def transposeSpikeDF(
+    spikeDF, idxLabels, transposeToColumns, setIndex=False):
+    # START manual unstack dask
+    # spikeDD = dd.from_pandas(spikeDF, npartitions=2)
+    # spikeDD.set_index(idxLabels, inplace=True)
+    # bla = lambda x: print(x.name)
+    # x = spikeDD.groupby([transposeToColumns]).apply(bla).compute()
+    pdb.set_trace()
+    newColumnNames = np.atleast_1d(transposeToColumns)
+    spikeDF.index.name = 'metaDataIdx'
+    metaDataCols = np.setdiff1d(idxLabels, newColumnNames)
+    metaData = spikeDF.loc[:, metaDataCols].copy()
+    newSpikeDF = spikeDF.drop(columns=metaDataCols).reset_index()
+    newSpikeDF.set_index(np.append(newColumnNames, 'metaDataIdx').tolist(), inplace=True)
+    newSpikeDF = newSpikeDF.stack().unstack(newColumnNames)
+    # END manual unstack
+
+    # START manual unstack pandas
+    # newColumnList = []
+    # for name, group in spikeDF.groupby(by=transposeToColumns):
+    #     stacked = group.stack()
+    #     if isinstance(stacked, pd.Series):
+    #         stacked = stacked.to_frame(name=name)
+    #     newColumnList.append(stacked)
+    # #  pdb.set_trace()
+    # newSpikeDF = pd.concat(newColumnList, axis='columns')
+    # newSpikeDF.index = newSpikeDF.index.droplevel(transposeToColumns)
+    # newSpikeDF.columns.name = transposeToColumns
+    # END manual unstack
+    #
+    #  START regular unstack
+    #  spikeDF.set_index(idxLabels, inplace=True)
+    #  newSpikeDF = spikeDF.stack().unstack(transposeToColumns)
+    #  END regular unstack
+    idxLabels = newSpikeDF.index.names
+    newSpikeDF.reset_index(inplace=True)
+    return newSpikeDF, idxLabels
+
+
 #  renamed spikeTrainWaveformsToDF to unitSpikeTrainWaveformsToDF
 def unitSpikeTrainWaveformsToDF(
         spikeTrainContainer, loadArrayAnnotations=True,
-        transposeToColumns='bin'):
+        transposeToColumns='bin', setIndex=True, verbose=False):
     #  list contains different segments
     if isinstance(spikeTrainContainer, ChannelIndex):
         assert len(spikeTrainContainer.units) == 0
@@ -247,7 +330,7 @@ def unitSpikeTrainWaveformsToDF(
         if st not in uniqueSpiketrains:
             uniqueSpiketrains.append(st)
     #
-    waveformsDict = {}
+    waveformsList = []
     for segIdx, stIn in enumerate(uniqueSpiketrains):
         #  make sure is not a proxyObj
         if isinstance(stIn, SpikeTrainProxy):
@@ -256,121 +339,189 @@ def unitSpikeTrainWaveformsToDF(
                 st = loadObjArrayAnn(st)
         else:
             st = stIn
-        wfDF = pd.DataFrame(np.squeeze(st.waveforms))
-        bins = np.array(
-            wfDF.columns, dtype=np.float) / st.sampling_rate - st.left_sweep
+        wfDF = pd.DataFrame(np.squeeze(st.waveforms), dtype='float32')
+        bins = np.asarray(
+            wfDF.columns) / st.sampling_rate - st.left_sweep
         wfDF.columns = bins.magnitude
+        idxLabels = ['feature', 'segment', 'originalIndex']
         if loadArrayAnnotations:
-            annDict = {
-                k: v
-                for k, v in st.array_annotations.items()}
-            annDict.update({'t': st.times.magnitude})
+            annDict = {}
+            for k, values in st.array_annotations.items():
+                if isinstance(values[0], str):
+                    v = np.asarray(values, dtype='str')
+                else:
+                    v = np.asarray(values)
+                annDict.update({k: v})
+            annDict.update(
+                {'t': np.asarray(st.times.magnitude)})
             annDF = pd.DataFrame(annDict)
+            idxLabels += annDF.columns.to_list()
             spikeDF = annDF.join(wfDF)
-            idxLabels = annDF.columns.to_list() + ['feature', 'originalIndex']
+            del wfDF, annDF, st
         else:
             spikeDF = wfDF
-            idxLabels = ['feature', 'originalIndex']
-        
-        #  free memory
-        del st
-        gc.collect()
+            del wfDF, st
 
         spikeDF.loc[:, 'feature'] = spikeTrainContainer.name
+        spikeDF.loc[:, 'segment'] = segIdx
         spikeDF.loc[:, 'originalIndex'] = spikeDF.index
-        spikeDF.set_index(idxLabels, inplace=True)
         spikeDF.columns.name = 'bin'
-        #
-        if transposeToColumns != 'bin':
-            spikeDF = spikeDF.stack().unstack(transposeToColumns)
-        waveformsDict.update({segIdx: spikeDF})
-    waveformsDF = pd.concat(
-            waveformsDict, axis='index',
-            names=['segment'] + idxLabels, sort=True)
-    waveformsDF.columns.name = transposeToColumns
+        waveformsList.append(spikeDF)
+    waveformsDF = pd.concat(waveformsList, axis='index', ignore_index=True)
+    if verbose:
+        prf.print_memory_usage('before transposing waveforms')
+    if transposeToColumns != 'bin':
+        waveformsDF = transposeSpikeDF(
+            waveformsDF, idxLabels, transposeToColumns)
+    else:
+        
+    if setIndex:
+        waveformsDF.set_index(idxLabels, inplace=True)
+    if verbose:
+        prf.print_memory_usage('after transposing waveforms')
     return waveformsDF
 
 
 def concatenateUnitSpikeTrainWaveformsDF(
         units, dataQuery=None,
         transposeToColumns='bin', concatOn='index',
-        verbose=False):
-    
+        setIndex=True, verbose=False):
     waveformsList = []
     #  unitNames = []
     for idx, thisUnit in enumerate(units):
         if verbose:
             print('concatenating unitDF {}'.format(thisUnit.name))
         unitWaveforms = unitSpikeTrainWaveformsToDF(
-            thisUnit, transposeToColumns=transposeToColumns)
-        print(unitWaveforms.info(memory_usage='deep'))
+            thisUnit, transposeToColumns=transposeToColumns,
+            verbose=verbose)
+        #  unitWaveforms.info(memory_usage='deep')
         if dataQuery is not None:
             unitWaveforms = unitWaveforms.query(dataQuery)
-        
-        if concatOn == 'index':
-            unitWaveforms = unitWaveforms.T
-        #  waveformsList.append(unitWaveforms)
         if idx == 0:
-            allWaveforms = unitWaveforms
+            idxLabels = unitWaveforms.index.names
+        if (concatOn == 'columns') and (idx > 0):
+            waveformsList.append(unitWaveforms.reset_index(drop=True))
         else:
-            allWaveforms = allWaveforms.join(unitWaveforms)
-        #  free memory
+            waveformsList.append(unitWaveforms.reset_index())
         del unitWaveforms
-        gc.collect()
         if verbose:
-            print('memory usage: {:.2f} MB'.format(prf.memory_usage_psutil()))
-        pdb.set_trace()
-    
-    if concatOn == 'index':
-        allWaveforms = allWaveforms.T
-    # allWaveforms = pd.concat(waveformsList, axis=concatOn)
+            print('memory usage: {:.1f} MB'.format(prf.memory_usage_psutil()))
     if verbose:
         print(
-            'finished concatenating, memory usage: {:.2f} MB'
+            'about to join all, memory usage: {:.1f} MB'
+            .format(prf.memory_usage_psutil()))
+    #  pdb.set_trace()
+    ignoreIndex = (concatOn == 'index')
+    allWaveforms = pd.concat(
+        waveformsList, axis=concatOn, ignore_index=ignoreIndex)
+    if setIndex:
+        allWaveforms.set_index(idxLabels, inplace=True)
+    del waveformsList
+    if verbose:
+        print(
+            'finished concatenating, memory usage: {:.1f} MB'
             .format(prf.memory_usage_psutil()))
     return allWaveforms
 
 
-def analogSignalsToDataFrame(
-        analogsignals, idxT='t', useChanNames=False):
-    asigList = []
-    for asig in analogsignals:
-        if asig.shape[1] == 1:
-            if useChanNames:
-                colNames = [asig.channel_index.name]
-            else:
-                colNames = [asig.name]
-        else:
-            colNames = [
-                asig.name +
-                '_{}'.format(i) for i in
-                asig.channel_index.channel_ids
-                ]
-        asigList.append(
-            pd.DataFrame(
-                asig.magnitude, columns=colNames,
-                index=range(asig.shape[0])))
-    asigList.append(
-        pd.DataFrame(
-            asig.times.magnitude, columns=[idxT],
-            index=range(asig.shape[0])))
-    return pd.concat(asigList, axis=1)
+def alignedAsigsToDF(
+        dataBlock, unitNames,
+        unitQuery=None, dataQuery=None,
+        collapseSizes=False, verbose=False,
+        duplicateControlsByProgram=False,
+        amplitudeColumn='amplitudeFuzzy',
+        programColumn='programFuzzy',
+        electrodeColumn='electrodeFuzzy',
+        transposeToColumns='bin', concatOn='index',
+        makeControlProgram=False, removeFuzzyName=False):
+    
+    #  channels to trigger
+    if unitNames is None:
+        unitNames = listChanNames(dataBlock, unitQuery, objType=Unit)
+    
+    allUnits = []
+    for uName in unitNames:
+        allUnits += dataBlock.filter(objects=Unit, name=uName)
+    
+    allWaveforms = concatenateUnitSpikeTrainWaveformsDF(
+        allUnits,
+        transposeToColumns=transposeToColumns, concatOn=concatOn,
+        verbose=verbose)
 
+    idxLabels = allWaveforms.index.names
+    allWaveforms.reset_index(inplace=True)
 
-def listChanNames(
-        dataBlock, chanQuery,
-        objType=AnalogSignalProxy):
-    chansToTrigger = pd.DataFrame(
-        np.unique([
-            i.name
-            for i in dataBlock.filter(objects=objType)]),
-        columns=['chanName'])
-    if chanQuery is not None:
-        chansToTrigger = chansToTrigger.query(
-            chanQuery, engine='python')['chanName'].to_list()
-    else:
-        chansToTrigger = chansToTrigger['chanName'].to_list()
-    return chansToTrigger
+    if collapseSizes:
+        try:
+            allWaveforms.loc[allWaveforms['pedalSizeCat'] == 'XL', 'pedalSizeCat'] = 'L'
+            allWaveforms.loc[allWaveforms['pedalSizeCat'] == 'XS', 'pedalSizeCat'] = 'S'
+        except Exception:
+            traceback.print_exc()
+    if makeControlProgram:
+        try:
+            allWaveforms.loc[allWaveforms[amplitudeColumn] == 0, programColumn] = 999
+            allWaveforms.loc[allWaveforms[amplitudeColumn] == 0, electrodeColumn] = 'control'
+        except Exception:
+            traceback.print_exc()
+
+    if duplicateControlsByProgram:
+        noStimWaveforms = (
+            allWaveforms
+            .loc[allWaveforms[amplitudeColumn] == 0, :]
+            )
+        stimWaveforms = (
+            allWaveforms
+            .loc[allWaveforms[amplitudeColumn] != 0, :]
+            .copy()
+            )
+        uniqProgs = stimWaveforms[programColumn].unique()
+        progElecLookup = {}
+        for progIdx in uniqProgs:
+            theseStimDF = stimWaveforms.loc[
+                stimWaveforms[programColumn] == progIdx,
+                electrodeColumn]
+            elecIdx = theseStimDF.iloc[0]
+            progElecLookup.update({progIdx: elecIdx})
+
+        if makeControlProgram:
+            uniqProgs = np.append(uniqProgs, 999)
+            progElecLookup.update({999: 'control'})
+            
+        for progIdx in uniqProgs:
+            dummyWaveforms = noStimWaveforms.copy()
+            dummyWaveforms.loc[:, programColumn] = progIdx
+            dummyWaveforms.loc[:, electrodeColumn] = progElecLookup[progIdx]
+            stimWaveforms = pd.concat([stimWaveforms, dummyWaveforms])
+        stimWaveforms.reset_index(drop=True, inplace=True)
+        allWaveforms = stimWaveforms
+
+    if removeFuzzyName:
+        fuzzyNamesBase = [
+            i.replace('Fuzzy', '')
+            for i in idxLabels
+            if 'Fuzzy' in i]
+        colRenamer = {n + 'Fuzzy': n for n in fuzzyNamesBase}
+        fuzzyNamesBasePresent = [
+            i
+            for i in fuzzyNamesBase
+            if i in allWaveforms.columns]
+        allWaveforms.drop(columns=fuzzyNamesBasePresent, inplace=True)
+        allWaveforms.rename(columns=colRenamer, inplace=True)
+        idxLabels = np.unique(
+            [i.replace('Fuzzy', '') for i in idxLabels])
+
+    allWaveforms.set_index(
+        list(idxLabels),
+        inplace=True)
+    allWaveforms.columns.name = transposeToColumns
+    if transposeToColumns == 'feature':
+        zipNames = zip(allWaveforms.columns.to_list(), unitNames)
+        try:
+            assert np.all([i == j for i, j in zipNames]), 'columns out of requested order!'
+        except Exception:
+            pdb.set_trace()
+            allWaveforms.reindex(columns=unitNames)
+    return allWaveforms
 
 
 def analogSignalsAlignedToEvents(
@@ -509,115 +660,15 @@ def analogSignalsAlignedToEvents(
             nixBlockIdx=0, nixSegIdx=allSegs)
     else:
         masterBlock = purgeNixAnn(masterBlock)
-        writer = neo.io.NixIO(filename=triggeredPath)
+        writer = NixIO(filename=triggeredPath)
         writer.write_block(masterBlock, use_obj_names=True)
         writer.close()
 
     return masterBlock
 
 
-def alignedAsigsToDF(
-        dataBlock, unitNames,
-        unitQuery=None, dataQuery=None,
-        collapseSizes=False, verbose=True,
-        duplicateControlsByProgram=False,
-        amplitudeColumn='amplitudeFuzzy',
-        programColumn='programFuzzy',
-        electrodeColumn='electrodeFuzzy',
-        transposeToColumns='bin', concatOn='index',
-        makeControlProgram=False, removeFuzzyName=False):
-    
-    #  channels to trigger
-    if unitNames is None:
-        unitNames = listChanNames(dataBlock, unitQuery, objType=Unit)
-    
-    allUnits = []
-    for uName in unitNames:
-        allUnits += dataBlock.filter(objects=Unit, name=uName)
-    
-    allWaveforms = concatenateUnitSpikeTrainWaveformsDF(
-        allUnits,
-        transposeToColumns=transposeToColumns, concatOn=concatOn,
-        verbose=verbose)
-
-    saveIndexNames = allWaveforms.index.names
-    allWaveforms.reset_index(inplace=True)
-
-    if collapseSizes:
-        try:
-            allWaveforms.loc[allWaveforms['pedalSizeCat'] == 'XL', 'pedalSizeCat'] = 'L'
-            allWaveforms.loc[allWaveforms['pedalSizeCat'] == 'XS', 'pedalSizeCat'] = 'S'
-        except Exception:
-            traceback.print_exc()
-    if makeControlProgram:
-        try:
-            allWaveforms.loc[allWaveforms[amplitudeColumn] == 0, programColumn] = 999
-            allWaveforms.loc[allWaveforms[amplitudeColumn] == 0, electrodeColumn] = 'control'
-        except Exception:
-            traceback.print_exc()
-
-    if duplicateControlsByProgram:
-        noStimWaveforms = (
-            allWaveforms
-            .loc[allWaveforms[amplitudeColumn] == 0, :]
-            )
-        stimWaveforms = (
-            allWaveforms
-            .loc[allWaveforms[amplitudeColumn] != 0, :]
-            .copy()
-            )
-        uniqProgs = stimWaveforms[programColumn].unique()
-        progElecLookup = {}
-        for progIdx in uniqProgs:
-            theseStimDF = stimWaveforms.loc[
-                stimWaveforms[programColumn] == progIdx,
-                electrodeColumn]
-            elecIdx = theseStimDF.iloc[0]
-            progElecLookup.update({progIdx: elecIdx})
-
-        if makeControlProgram:
-            uniqProgs = np.append(uniqProgs, 999)
-            progElecLookup.update({999: 'control'})
-            
-        for progIdx in uniqProgs:
-            dummyWaveforms = noStimWaveforms.copy()
-            dummyWaveforms.loc[:, programColumn] = progIdx
-            dummyWaveforms.loc[:, electrodeColumn] = progElecLookup[progIdx]
-            stimWaveforms = pd.concat([stimWaveforms, dummyWaveforms])
-        stimWaveforms.reset_index(drop=True, inplace=True)
-        allWaveforms = stimWaveforms
-
-    if removeFuzzyName:
-        fuzzyNamesBase = [
-            i.replace('Fuzzy', '')
-            for i in saveIndexNames
-            if 'Fuzzy' in i]
-        colRenamer = {n + 'Fuzzy': n for n in fuzzyNamesBase}
-        fuzzyNamesBasePresent = [
-            i
-            for i in fuzzyNamesBase
-            if i in allWaveforms.columns]
-        allWaveforms.drop(columns=fuzzyNamesBasePresent, inplace=True)
-        allWaveforms.rename(columns=colRenamer, inplace=True)
-        saveIndexNames = np.unique(
-            [i.replace('Fuzzy', '') for i in saveIndexNames])
-    
-    allWaveforms.set_index(
-        list(saveIndexNames),
-        inplace=True)
-    allWaveforms.columns.name = transposeToColumns
-    if transposeToColumns == 'feature':
-        zipNames = zip(allWaveforms.columns.to_list(), unitNames)
-        try:
-            assert np.all([i == j for i, j in zipNames]), 'columns out of requested order!'
-        except Exception:
-            pdb.set_trace()
-            allWaveforms.reindex(columns=unitNames)
-    return allWaveforms
-
-
 def alignedAsigDFtoSpikeTrain(
-        allWaveforms, dataBlock):
+        allWaveforms, dataBlock=None):
     masterBlock = Block()
     masterBlock.name = dataBlock.annotations['neo_name']
     masterBlock.annotate(nix_name=dataBlock.annotations['neo_name'])
@@ -652,25 +703,25 @@ def alignedAsigDFtoSpikeTrain(
                 thisUnit = masterBlock.filter(
                     objects=Unit, name=featName + '#0')[0]
             #
-            spikeWaveforms = featGroup.values[:, np.newaxis, :]
+            spikeWaveforms = featGroup.to_numpy()[:, np.newaxis, :]
             arrAnnDF = featGroup.index.to_frame()
             spikeTimes = arrAnnDF['t']
             arrAnnDF.drop(columns='t', inplace=True)
             arrAnn = {}
-            colsToKeep = arrAnnDF.columns.drop(['index', 'feature', 'segment'])
+            colsToKeep = arrAnnDF.columns.drop(['originalIndex', 'feature', 'segment'])
             for cName in colsToKeep:
-                values = arrAnnDF[cName].values
+                values = arrAnnDF[cName].to_numpy()
                 #  print('{} dtype {}'.format(values, values.dtype))
                 if isinstance(values[0], str):
                     values = values.astype('U')
-                if isinstance(values[0], np.float64):
-                    values = values.astype(np.float32)
+                # if isinstance(values[0], np.float64):
+                #     values = values.astype(np.float32)
                 arrAnn.update({str(cName): values.flatten()})
             arrayAnnNames = {
                 'arrayAnnNames': list(arrAnn.keys())}
             st = SpikeTrain(
                 name='seg{}_{}'.format(int(segIdx), thisUnit.name),
-                times=spikeTimes.values * exSt.units,
+                times=spikeTimes.to_numpy() * exSt.units,
                 waveforms=spikeWaveforms * pq.dimensionless,
                 t_start=exSt.t_start, t_stop=exSt.t_stop,
                 left_sweep=exSt.left_sweep,
@@ -710,16 +761,16 @@ def dataFrameToAnalogSignals(
             chanName = namePrefix + (probeName.lower() + '{}'.format(idx)) + nameSuffix
 
         arrayAnn = {
-            'channel_names': np.array([chanName]),
-            'channel_ids': np.array([idx], dtype=np.int)
+            'channel_names': np.asarray([chanName]),
+            'channel_ids': np.asarray([idx], dtype=np.int)
             }
         chanIdx = ChannelIndex(
             name=chanName,
-            index=np.array([idx]),
-            channel_names=np.array([chanName]))
+            index=np.asarray([idx]),
+            channel_names=np.asarray([chanName]))
         block.channel_indexes.append(chanIdx)
         asig = AnalogSignal(
-            df[colName].values*measureUnits,
+            df[colName].to_numpy()*measureUnits,
             name=chanName,
             sampling_rate=samplingRate,
             dtype=np.float32,
@@ -745,11 +796,11 @@ def eventDataFrameToEvents(
     if makeList:
         eventList = []
         for colName in annCol:
-            originalDType = type(eventDF[colName].values[0]).__name__
+            originalDType = type(eventDF[colName].to_numpy()[0]).__name__
             event = Event(
                 name=eventName + colName,
-                times=eventDF[idxT].values * tUnits,
-                labels=eventDF[colName].astype(originalDType).values
+                times=eventDF[idxT].to_numpy() * tUnits,
+                labels=eventDF[colName].astype(originalDType).to_numpy()
                 )
             event.annotate(originalDType=originalDType)
             eventList.append(event)
@@ -759,8 +810,8 @@ def eventDataFrameToEvents(
             annCol = eventDF.drop(columns=idxT).columns
         event = Event(
             name=eventName,
-            times=eventDF[idxT].values * tUnits,
-            labels=np.array(eventDF.index)
+            times=eventDF[idxT].to_numpy() * tUnits,
+            labels=np.asarray(eventDF.index)
             )
         event.annotations.update(
             {
@@ -768,8 +819,8 @@ def eventDataFrameToEvents(
                 'arrayAnnDTypes': []
                 })
         for colName in annCol:
-            originalDType = type(eventDF[colName].values[0]).__name__
-            arrayAnn = eventDF[colName].astype(originalDType).values
+            originalDType = type(eventDF[colName].to_numpy()[0]).__name__
+            arrayAnn = eventDF[colName].astype(originalDType).to_numpy()
             event.array_annotations.update(
                 {colName: arrayAnn})
             event.annotations['arrayAnnNames'].append(colName)
@@ -801,7 +852,7 @@ def eventsToDataFrame(
                 if 'np.' not in dtypeStr:
                     dtypeStr = 'np.' + dtypeStr
                 originalDType = eval(dtypeStr)
-                values = np.array(values, dtype=originalDType)
+                values = np.asarray(values, dtype=originalDType)
             #  print(values.dtype)
             eventDict.update({
                 event.name: pd.Series(values)})
@@ -816,7 +867,7 @@ def loadSpikeMats(
         checkReferences=False,
         aggregateFun=None):
 
-    reader = neo.io.nixio_fr.NixIO(filename=dataPath)
+    reader = nixio_fr.NixIO(filename=dataPath)
     chanNames = reader.header['signal_channels']['name']
     
     if chans is not None:
@@ -934,7 +985,7 @@ def loadSpikeMats(
                 procSpikeMat.columns = chanNames
                 procSpikeMat.columns.name = 'unit'
                 if theBins is None:
-                    theBins = np.array(
+                    theBins = np.asarray(
                         procSpikeMat.index + winStartIdx) / fs
                 if absoluteBins:
                     procSpikeMat.index = theBins + idxOnset / fs
@@ -949,7 +1000,7 @@ def loadSpikeMats(
                 spikeMats[smIdx] = procSpikeMat
                 if transposeSpikeMat:
                     spikeMats[smIdx] = spikeMats[smIdx].transpose()
-            #  plt.imshow(rawSpikeMat.values, aspect='equal'); plt.show()
+            #  plt.imshow(rawSpikeMat.to_numpy(), aspect='equal'); plt.show()
     return spikeMats, validTrials
 
 
@@ -1000,7 +1051,7 @@ def getElecLookupTable(
         if chanIdx.analogsignals:
             #  print(chanIdx.name)
             lookupTableList.append(pd.DataFrame({
-                'channelNames': np.array(chanIdx.channel_names, dtype=np.str),
+                'channelNames': np.asarray(chanIdx.channel_names, dtype=np.str),
                 'index': chanIdx.index,
                 'metaIndex': metaIdx * chanIdx.index**0,
                 'localIndex': (
@@ -1029,7 +1080,7 @@ def getNIXData(
     if reader is None:
         assert (fileName is not None) and (folderPath is not None)
         filePath = os.path.join(folderPath, fileName) + '.nix'
-        reader = neo.io.nixio_fr.NixIO(filename=filePath)
+        reader = nixio_fr.NixIO(filename=filePath)
 
     block = reader.read_block(
         block_index=blockIdx, lazy=True,
@@ -1047,8 +1098,8 @@ def getNIXData(
     if dataLength_s is not None:
         assert startTime_s is not None
         timeSlice = (
-            startTime_s * s,
-            (startTime_s + dataLength_s) * s)
+            startTime_s * pq.s,
+            (startTime_s + dataLength_s) * pq.s)
     else:
         timeSlice = (None, None)
     segBounds, requestedSegs = findSegsIncluding(block, timeSlice)
@@ -1076,11 +1127,11 @@ def getNIXData(
                 )
             reqData = asig.load(
                 time_slice=thisTimeSlice,
-                channel_indexes=theseRequestedIndices['localIndex'].values)
+                channel_indexes=theseRequestedIndices['localIndex'].to_numpy())
             segData = pd.concat((
                     segData,
                     pd.DataFrame(
-                        reqData.magnitude, columns=theseElecIds.values)),
+                        reqData.magnitude, columns=theseElecIds.to_numpy())),
                 axis=1)
         segT = reqData.times
         segData['t'] = segT
@@ -1199,7 +1250,7 @@ def addBlockToNIX(
     trialBasePath = os.path.join(folderPath, fileName)
     if writeAsigs:
         # peek at file to ensure compatibility
-        reader = neo.io.nixio_fr.NixIO(filename=trialBasePath + '.nix')
+        reader = nixio_fr.NixIO(filename=trialBasePath + '.nix')
         tempBlock = reader.read_block(
             block_index=nixBlockIdx,
             lazy=True, signal_group_mode='split-all')
@@ -1224,7 +1275,7 @@ def addBlockToNIX(
     if purgeNixNames:
         newBlock = purgeNixAnn(newBlock)
     
-    writer = neo.io.NixIO(filename=trialBasePath + '.nix')
+    writer = NixIO(filename=trialBasePath + '.nix')
     nixblock = writer.nix_file.blocks[nixBlockIdx]
     nixblockName = nixblock.name
     if 'nix_name' in newBlock.annotations.keys():
@@ -1294,7 +1345,7 @@ def loadStProxy(stProxy):
         st = stProxy.load(
             magnitude_mode='rescaled',
             load_waveforms=False)
-        st.waveforms = np.array([]).reshape((0, 0, 0))*pq.mV
+        st.waveforms = np.asarray([]).reshape((0, 0, 0))*pq.mV
     return st
 
 
@@ -1407,7 +1458,7 @@ def blockToNix(
                 'PreprocNs5: starting chunk %d of %d' % (
                     chunkIdx + 1, nChunks))
             if trackMemory:
-                print('memory usage: {:.2f} MB'.format(
+                print('memory usage: {:.1f} MB'.format(
                     prf.memory_usage_psutil()))
             newSeg = block.segments[segParents[segIdx][chunkIdx]]
             newSeg, nixgroup = writer._write_segment_meta(newSeg, nixblock)
@@ -1426,7 +1477,7 @@ def blockToNix(
                     tStart = max(tStart, aSigProxy.t_start)
                     tStop = min(tStop, aSigProxy.t_stop)
                 if trackMemory:
-                    print('writing asigs memory usage: {:.2f} MB'.format(
+                    print('writing asigs memory usage: {:.1f} MB'.format(
                         prf.memory_usage_psutil()))
                 chanIdx = aSigProxy.channel_index
                 asig = aSigProxy.load(
@@ -1495,13 +1546,13 @@ def blockToNix(
                     #  have to manually slice tStop and tStart because
                     #  array annotations are not saved natively in the nix file
                     #  (we're getting them as plain annotations)
-                    timeMask = np.array(
+                    timeMask = np.asarray(
                         (st.times > tStart) & (st.times <= tStop),
                         dtype=np.bool)
                     try:
                         if 'arrayAnnNames' in st.annotations:
                             for key in st.annotations['arrayAnnNames']:
-                                st.annotations[key] = np.array(
+                                st.annotations[key] = np.asarray(
                                     st.annotations[key])[timeMask]
                         st = st[timeMask]
                         st.t_start = tStart
@@ -1577,15 +1628,15 @@ def blockToNix(
                     'rightLED_int', 'leftLED_int', 'simiTrigs_int']
                 for colName in keepCols:
                     if trackMemory:
-                        print('writing motorData memory usage: {:.2f} MB'.format(
+                        print('writing motorData memory usage: {:.1f} MB'.format(
                             prf.memory_usage_psutil()))
                     chanIdx = ChannelIndex(
                         name=colName,
-                        index=np.array([0]),
-                        channel_names=np.array([0]))
+                        index=np.asarray([0]),
+                        channel_names=np.asarray([0]))
                     block.channel_indexes.append(chanIdx)
                     motorAsig = AnalogSignal(
-                        motorData[colName].values * pq.mV,
+                        motorData[colName].to_numpy() * pq.mV,
                         name=colName,
                         sampling_rate=ainpAsig.sampling_rate,
                         dtype=np.float32)
@@ -1601,7 +1652,7 @@ def blockToNix(
                         motorAsig, nixblock, nixgroup)
                     del motorAsig
                     gc.collect()
-                _, trialEvents = mea.getTrialsNew(
+                _, trialEvents = mea.getTrials(
                     motorData, ainpAsig.sampling_rate.magnitude,
                     float(tStart.magnitude), trialType=None)
                 trialEvents.fillna(0)
@@ -1619,7 +1670,7 @@ def blockToNix(
                 for event in eventList:
                     if trackMemory:
                         print(
-                            'writing motor events memory usage: {:.2f} MB'
+                            'writing motor events memory usage: {:.1f} MB'
                             .format(prf.memory_usage_psutil()))
                     event.segment = newSeg
                     newSeg.events.append(event)
@@ -1688,7 +1739,7 @@ def preproc(
         outputFolderPath,
         fileName + nameSuffix + '.nix')
     #  instantiate reader, get metadata
-    reader = neo.io.BlackrockIO(
+    reader = BlackrockIO(
         filename=rawBasePath, nsx_to_load=5)
     reader.parse_header()
     metadata = reader.header
@@ -1698,11 +1749,11 @@ def preproc(
             spikePath = os.path.join(
                 outputFolderPath, 'tdc_' + fileName,
                 'tdc_' + fileName + '.nix')
-        spikeReader = neo.io.nixio_fr.NixIO(filename=spikePath)
+        spikeReader = nixio_fr.NixIO(filename=spikePath)
     else:
         spikeReader = None
     #  instantiate writer
-    writer = neo.io.NixIO(
+    writer = NixIO(
         filename=outputFilePath, mode=writeMode)
     #  absolute section index
     idx = 0
@@ -1735,7 +1786,7 @@ def preproc(
             )
     writer.close()
     #
-    return neo.io.nixio_fr.NixIO(filename=outputFilePath)
+    return nixio_fr.NixIO(filename=outputFilePath)
 
 
 def purgeNixAnn(
@@ -1797,25 +1848,25 @@ def loadObjArrayAnn(st):
                 if len(st.times) == 1:
                     st.annotations[key] = [st.annotations[key]]
                 st.array_annotations.update(
-                    {key: np.array(st.annotations[key])})
+                    {key: np.asarray(st.annotations[key])})
             except Exception:
                 traceback.print_exc()
                 #  pdb.set_trace()
     if hasattr(st, 'waveforms'):
         if st.waveforms is None:
-            st.waveforms = np.array([]).reshape((0, 0, 0))*pq.mV
+            st.waveforms = np.asarray([]).reshape((0, 0, 0))*pq.mV
         elif not len(st.waveforms):
-            st.waveforms = np.array([]).reshape((0, 0, 0))*pq.mV
+            st.waveforms = np.asarray([]).reshape((0, 0, 0))*pq.mV
     return st
 
 
 def loadWithArrayAnn(
         dataPath, fromRaw=False):
     if fromRaw:
-        reader = neo.io.nixio_fr.NixIO(filename=dataPath)
+        reader = nixio_fr.NixIO(filename=dataPath)
         block = readBlockFixNames(reader, lazy=False)
     else:
-        reader = neo.io.NixIO(filename=dataPath)
+        reader = NixIO(filename=dataPath)
         block = reader.read_block()
     
     #  block.create_relationship()  # need this!
@@ -1842,7 +1893,7 @@ def calcBinarizedArray(
             chanList = spikeMatBlock.filter(
                 objects=ChannelIndex, name=st.unit.name)
             if not len(chanList):
-                chanIdx = ChannelIndex(name=st.unit.name, index=np.array([0]))
+                chanIdx = ChannelIndex(name=st.unit.name, index=np.asarray([0]))
                 #  print(chanIdx.name)
                 spikeMatBlock.channel_indexes.append(chanIdx)
 
@@ -1900,7 +1951,7 @@ def calcBinarizedArray(
     spikeMatBlock.create_relationship()
     spikeMatBlock = purgeNixAnn(spikeMatBlock)
     if saveToFile:
-        writer = neo.io.NixIO(filename=binnedSpikePath)
+        writer = NixIO(filename=binnedSpikePath)
         writer.write_block(spikeMatBlock, use_obj_names=True)
         writer.close()
     return spikeMatBlock
@@ -1912,7 +1963,7 @@ def calcFR(
         aggregateFun=None,
         chanNames=None,
         rasterOpts=None):
-
+    #
     print('Loading rasters...')
     masterSpikeMats, _ = loadSpikeMats(
         binnedPath, rasterOpts,
@@ -1920,14 +1971,14 @@ def calcFR(
         chans=chanNames,
         loadAll=True, checkReferences=False)
     print('Loading data file...')
-    dataReader = neo.io.nixio_fr.NixIO(
+    dataReader = nixio_fr.NixIO(
         filename=dataPath)
     dataBlock = dataReader.read_block(
         block_index=0, lazy=True,
         signal_group_mode='split-all')
     masterBlock = Block()
     masterBlock.name = dataBlock.annotations['neo_name']
-
+    #
     for segIdx, segSpikeMat in masterSpikeMats.items():
         print('Calculating FR for segment {}'.format(segIdx))
         spikeMatDF = segSpikeMat.reset_index().rename(
@@ -1969,7 +2020,6 @@ def calcFR(
             chanIdx.annotate(nix_name=chanIdx.name)
 
         masterBlock.merge(spikeMatBlockInterp)
-
+    #
     dataReader.file.close()
-    
     return masterBlock

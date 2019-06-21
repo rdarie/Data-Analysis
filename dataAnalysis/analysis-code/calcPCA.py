@@ -86,7 +86,7 @@ masterSpikeMat = ns5.alignedAsigsToDF(
     unitQuery=arguments['--unitQuery'], dataQuery=dataQuery,
     **alignedAsigsKWargs)
 
-print('about to clear vars, memory usage: {:.2f} MB'.format(
+print('about to clear vars, memory usage: {:.1f} MB'.format(
     hf.memory_usage_psutil()))
 #  free up memory
 del dataBlock
@@ -97,7 +97,7 @@ pca = IncrementalPCA(
     n_components=nComp,
     batch_size=int(5 * nComp))
 estimator = Pipeline([('dimred', pca)])
-print('starting fit, memory usage: {:.2f} MB'.format(
+print('starting fit, memory usage: {:.1f} MB'.format(
     hf.memory_usage_psutil()))
 
 estimator.fit(masterSpikeMat.values)

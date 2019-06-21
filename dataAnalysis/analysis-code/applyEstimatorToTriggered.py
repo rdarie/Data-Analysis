@@ -11,10 +11,10 @@ Options:
     --estimator=estimator                  estimator filename
     --chanQuery=chanQuery                  how to restrict channels?
 """
-import os
 #  import dataAnalysis.plotting.aligned_signal_plots as asp
 #  import dataAnalysis.helperFunctions.helper_functions_new as hf
 import dataAnalysis.helperFunctions.profiling as prf
+import os
 #  import seaborn as sns
 #  import numpy as np
 #  import quantities as pq
@@ -26,13 +26,9 @@ import dataAnalysis.preproc.ns5 as ns5
 #      Event, AnalogSignal, SpikeTrain, Unit)
 #  from neo.io.proxyobjects import (
 #      AnalogSignalProxy, SpikeTrainProxy, EventProxy) 
-import neo
-#  import gc
 import joblib as jb
 import pickle
-
-print('about to import exp opts, memory usage: {:.2f} MB'.format(
-    prf.memory_usage_psutil()))
+#  import gc
 
 from currentExperiment_alt import parseAnalysisOptions
 from docopt import docopt
@@ -41,6 +37,8 @@ expOpts, allOpts = parseAnalysisOptions(
     int(arguments['--trialIdx']), arguments['--exp'])
 globals().update(expOpts)
 globals().update(allOpts)
+
+verbose = True
 
 estimatorPath = os.path.join(
     scratchFolder,
@@ -52,9 +50,6 @@ with open(
         arguments['--estimator'] + '_meta.pickle'),
         'rb') as f:
     estimatorMetadata = pickle.load(f)
-
-print('about to load data, memory usage: {:.2f} MB'.format(
-    prf.memory_usage_psutil()))
 
 if arguments['--processAll']:
     triggeredPath = os.path.join(
@@ -75,7 +70,9 @@ else:
         ns5FileName + '_trig_{}_{}'.format(
             estimatorMetadata['name'], arguments['--window']))
 
-dataReader = neo.io.nixio_fr.NixIO(
+if verbose:
+    prf.print_memory_usage('before load data')
+dataReader = ns5.nixio_fr.NixIO(
     filename=triggeredPath)
 dataBlock = dataReader.read_block(
     block_index=0, lazy=True,
@@ -91,30 +88,34 @@ else:
         arguments['--alignQuery']
     ])
 
-print('about to extract waveforms, memory usage: {:.2f} MB'.format(
-    prf.memory_usage_psutil()))
-
+if verbose:
+    prf.print_memory_usage('before load firing rates')
 unitNames = estimatorMetadata['inputFeatures']
 masterSpikeMat = ns5.alignedAsigsToDF(
     dataBlock, unitNames, dataQuery,
-    **estimatorMetadata['alignedAsigsKWargs'])
-print(
-    'just loaded data, memory usage: {:.2f} MB'
-    .format(prf.memory_usage_psutil()))
+    **estimatorMetadata['alignedAsigsKWargs'], verbose=True)
+if verbose:
+    prf.print_memory_usage('after load firing rates')
 
-features = estimator.transform(masterSpikeMat.values)
+features = estimator.transform(masterSpikeMat.to_numpy())
+if verbose:
+    prf.print_memory_usage('after estimator.transform')
 featureNames = [
     estimatorMetadata['name'] + '{}'.format(i)
     for i in range(features.shape[1])]
+if verbose:
+    prf.print_memory_usage('before unstack featuresDF')
 featuresDF = pd.DataFrame(
     features, index=masterSpikeMat.index, columns=featureNames)
 featuresDF.columns.name = 'feature'
 allWaveforms = featuresDF.stack().unstack('bin')
-
+if verbose:
+    prf.print_memory_usage('after unstack featuresDF')
+del masterSpikeMat, featuresDF
 masterBlock = ns5.alignedAsigDFtoSpikeTrain(allWaveforms, dataBlock)
 dataReader.file.close()
-#  print('memory usage: {:.2f} MB'.format(prf.memory_usage_psutil()))
+#  print('memory usage: {:.1f} MB'.format(prf.memory_usage_psutil()))
 masterBlock = ns5.purgeNixAnn(masterBlock)
-writer = neo.io.NixIO(filename=outputPath + '.nix')
-writer.write_block(masterBlock, use_obj_names=True)
-writer.close()
+#  writer = ns5.NixIO(filename=outputPath + '.nix')
+#  writer.write_block(masterBlock, use_obj_names=True)
+#  writer.close()

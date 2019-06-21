@@ -15,11 +15,11 @@ Options:
     --alignQuery=alignQuery         what will the plot be aligned to? [default: (pedalMovementCat==\'outbound\')]
     --window=window                 process with short window? [default: short]
     --chanQuery=chanQuery           how to restrict channels? [default: (chanName.str.contains(\'pca\'))]
-    --blockName=blockName           name for new block [default: pca]
+    --blockName=blockName           which trig_ block to pull [default: pca]
 """
 
 import dataAnalysis.plotting.aligned_signal_plots as asp
-import dataAnalysis.preproc.ns5 as preproc
+import dataAnalysis.preproc.ns5 as ns5
 import seaborn as sns
 import os
 from currentExperiment_alt import parseAnalysisOptions
@@ -52,7 +52,7 @@ except Exception:
     hueControl = arguments['--hueControl']
 
 if arguments['--processAll']:
-    dataBlock = preproc.loadWithArrayAnn(
+    dataBlock = ns5.loadWithArrayAnn(
         os.path.join(
             scratchFolder,
             experimentName + '_trig_{}_{}.nix'.format(
@@ -61,7 +61,7 @@ if arguments['--processAll']:
         experimentName, arguments['--blockName'],
         arguments['--window'], hueName, arguments['--alignQuery'])
 else:
-    dataBlock = preproc.loadWithArrayAnn(
+    dataBlock = ns5.loadWithArrayAnn(
         os.path.join(
             scratchFolder,
             ns5FileName + '_trig_{}_{}.nix'.format(

@@ -1,35 +1,35 @@
-import os, sys, pdb
-import quantities as pq
+#  import os, sys, pdb
+#  import quantities as pq
 from neo import (
     Unit, ChannelIndex, Block,
     Segment, SpikeTrain, Event, AnalogSignal)
-from tempfile import mkdtemp
+#  from tempfile import mkdtemp
 import numpy as np
-from scipy.ndimage.filters import gaussian_filter1d
-from scipy import stats, ndimage, signal
+#  from scipy.ndimage.filters import gaussian_filter1d
+#  from scipy import stats, ndimage, signal
 import scipy.io
 from statsmodels.stats.multitest import multipletests as mt
 import pandas as pd
-import matplotlib
-from matplotlib.backends.backend_pdf import PdfPages
+#  from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib import pyplot as plt
 from fractions import gcd
 import seaborn as sns
-from importlib import reload
-import dataAnalysis.helperFunctions.motor_encoder as mea
-import dataAnalysis.helperFunctions.helper_functions as hf
-import dataAnalysis.preproc.ns5 as preproc
-import line_profiler
-import pickle
-import h5py
+#  from importlib import reload
+#  import dataAnalysis.helperFunctions.motor_encoder_new as mea
+#  import dataAnalysis.helperFunctions.helper_functions_new as hf
+#  import dataAnalysis.preproc.ns5 as preproc
+#  import line_profiler
+#  import pickle
+#  import h5py
 import traceback
-import collections
-import itertools
-import re, json
-import math as m
-import copy
-import peakutils
-import rcsanalysis.packet_func as rcsa_helpers
+#  import collections
+#  import itertools
+import re
+#  import json
+#  import math as m
+#  import copy
+#  import peakutils
+#  import rcsanalysis.packet_func as rcsa_helpers
 LABELFONTSIZE = 10
 
 '''
@@ -62,9 +62,9 @@ def coordsToIndices(xcoords, ycoords):
 
     xSpacing = np.ufunc.reduce(np.frompyfunc(gcd, 2, 1), xcoords)
     ySpacing = np.ufunc.reduce(np.frompyfunc(gcd, 2, 1), ycoords)
-    xIdx = np.array(np.divide(xcoords, xSpacing), dtype = np.int)
+    xIdx = np.array(np.divide(xcoords, xSpacing), dtype=np.int)
     xIdx = xIdx - min(xIdx)
-    yIdx = np.array(np.divide(ycoords, ySpacing), dtype = np.int)
+    yIdx = np.array(np.divide(ycoords, ySpacing), dtype=np.int)
     yIdx = yIdx - min(yIdx)
 
     return xIdx, yIdx

@@ -7,7 +7,7 @@
 
 # Request memory:
 #SBATCH --nodes=1
-#SBATCH --mem=48G
+#SBATCH --mem=96G
 
 # Specify a job name:
 #SBATCH -J alignTemp
@@ -27,5 +27,6 @@ EXP="exp201901211000_alt"
 #  python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcFRsqrt.py' --trialIdx=3 --exp=$EXP
 #  python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcAlignedAsigs.py' --trialIdx=3 --exp=$EXP --chanQuery="(not(chanName.str.contains('elec')or(chanName.str.contains('pca')))" --blockName=other
 #  python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcAlignedAsigs.py' --exp=$EXP --trialIdx=3 --chanQuery="(chanName.str.endswith('fr'))" --blockName=fr
-python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcAlignedAsigs.py' --exp=$EXP --trialIdx=3 --chanQuery="(chanName.str.endswith('fr_sqrt'))" --blockName=fr_sqrt
+#  python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcAlignedAsigs.py' --exp=$EXP --trialIdx=3 --chanQuery="(chanName.str.endswith('fr_sqrt'))" --blockName=fr_sqrt
+python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/applyEstimatorToTriggered.py' --exp=$EXP --trialIdx=3 --estimator=Trial003_pca 
 #  python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcAlignedRasters.py' --exp=$EXP --trialIdx=3 --chanQuery="(chanName.str.endswith('raster'))" --blockName=raster
