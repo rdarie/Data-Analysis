@@ -109,7 +109,7 @@ masterBlock = Block()
 masterBlock.name = dataBlock.annotations['neo_name']
 
 for segIdx, group in featuresDF.groupby('segment'):
-    print('Calculating trajectories for segment {}'.format(segIdx))
+    print('Saving trajectories for segment {}'.format(segIdx))
     segFeaturesDF = group.reset_index().drop(columns='segment')
     
     dataSeg = dataBlock.segments[segIdx]

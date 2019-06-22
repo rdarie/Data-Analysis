@@ -54,7 +54,6 @@ else:
         ns5FileName + '_' + arguments['--estimatorName'] + '.joblib')
 
 prf.print_memory_usage('before load data')
-
 dataReader = ns5.nixio_fr.NixIO(
     filename=triggeredPath)
 dataBlock = dataReader.read_block(
@@ -74,40 +73,35 @@ dataQuery = '&'.join([
     #  '((RateInHz==100)|(RateInHz==0))',
     arguments['--alignQuery']
     ])
-    
-#  unitNames = [
-#      'elec75#0_fr_sqrt#0', 'elec75#1_fr_sqrt#0',
-#      'elec78#0_fr_sqrt#0', 'elec78#1_fr_sqrt#0',
-#      'elec83#0_fr_sqrt#0']
+
 unitNames = None
-
-masterSpikeMat = ns5.alignedAsigsToDF(
-    dataBlock, unitNames,
-    unitQuery=arguments['--unitQuery'], dataQuery=dataQuery, verbose=True,
-    setIndex=False, getMetaData=False, decimate=2,
-    **alignedAsigsKWargs).to_numpy()
-prf.print_memory_usage('just loaded firing rates')
-dataReader.file.close()
-#  free up memory
-del dataBlock
-gc.collect()
-
-nComp = masterSpikeMat.shape[1]
-pca = IncrementalPCA(
+nSeg = len(dataBlock.segments)
+nComp = 50
+estimator = IncrementalPCA(
     n_components=nComp,
     batch_size=int(3 * nComp))
-estimator = Pipeline([('dimred', pca)])
-prf.print_memory_usage('starting fit')
 
-estimator.fit(masterSpikeMat)
+for segIdx in range(nSeg):
+    alignedAsigsDF = ns5.alignedAsigsToDF(
+        dataBlock, unitNames,
+        unitQuery=arguments['--unitQuery'], dataQuery=dataQuery, verbose=True,
+        setIndex=False, getMetaData=False, decimate=2, whichSegments=[segIdx],
+        **alignedAsigsKWargs)
+    prf.print_memory_usage('just loaded firing rates, fitting')
+    estimator.partial_fit(alignedAsigsDF.to_numpy())
+    saveColumns = alignedAsigsDF.columns.to_list()
+    del alignedAsigsDF
+    gc.collect()
 
+dataReader.file.close()
 jb.dump(estimator, estimatorPath)
 
 estimatorMetadata = {
     'trainingDataPath': os.path.basename(triggeredPath),
     'path': os.path.basename(estimatorPath),
     'name': arguments['--estimatorName'],
-    'inputFeatures': masterSpikeMat.columns.to_list(),
+    'inputBlockName': arguments['--inputBlockName'],
+    'inputFeatures': saveColumns,
     'dataQuery': dataQuery,
     'alignedAsigsKWargs': alignedAsigsKWargs
     }

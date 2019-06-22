@@ -22,7 +22,7 @@ def get_memory_usage():
 
 def print_memory_usage(prefix='profiling', placeholder=None):
     if placeholder is None:
-        placeholder = ': memory usage: {:.1f} MB'
+        placeholder = ': using {:.1f} MB'
     mem = get_memory_usage()
     print(prefix + placeholder.format(mem))
     return

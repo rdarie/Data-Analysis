@@ -54,8 +54,8 @@ with open(
 if arguments['--processAll']:
     triggeredPath = os.path.join(
         scratchFolder,
-        experimentName + '_trig_fr_sqrt_{}.nix'.format(
-            arguments['--window']))
+        experimentName + '_trig_{}_{}.nix'.format(
+            estimatorMetadata['inputBlockName'], arguments['--window']))
     outputPath = os.path.join(
         scratchFolder,
         experimentName + '_trig_{}_{}'.format(
@@ -63,8 +63,8 @@ if arguments['--processAll']:
 else:
     triggeredPath = os.path.join(
         scratchFolder,
-        ns5FileName + '_trig_fr_sqrt_{}.nix'.format(
-            arguments['--window']))
+        ns5FileName + '_trig_{}_{}.nix'.format(
+            estimatorMetadata['inputBlockName'], arguments['--window']))
     outputPath = os.path.join(
         scratchFolder,
         ns5FileName + '_trig_{}_{}'.format(
@@ -91,31 +91,34 @@ else:
 if verbose:
     prf.print_memory_usage('before load firing rates')
 unitNames = estimatorMetadata['inputFeatures']
-masterSpikeMat = ns5.alignedAsigsToDF(
+alignedAsigsDF = ns5.alignedAsigsToDF(
     dataBlock, unitNames, dataQuery,
     **estimatorMetadata['alignedAsigsKWargs'], verbose=True)
 if verbose:
     prf.print_memory_usage('after load firing rates')
 
-features = estimator.transform(masterSpikeMat.to_numpy())
+features = estimator.transform(alignedAsigsDF.to_numpy())
 if verbose:
     prf.print_memory_usage('after estimator.transform')
 featureNames = [
-    estimatorMetadata['name'] + '{}'.format(i)
+    estimatorMetadata['name'] + '{:0>3}'.format(i)
     for i in range(features.shape[1])]
-if verbose:
-    prf.print_memory_usage('before unstack featuresDF')
-featuresDF = pd.DataFrame(
-    features, index=masterSpikeMat.index, columns=featureNames)
-featuresDF.columns.name = 'feature'
-allWaveforms = featuresDF.stack().unstack('bin')
-if verbose:
-    prf.print_memory_usage('after unstack featuresDF')
-del masterSpikeMat, featuresDF
-masterBlock = ns5.alignedAsigDFtoSpikeTrain(allWaveforms, dataBlock)
+#
+alignedFeaturesDF = pd.DataFrame(
+    features, index=alignedAsigsDF.index, columns=featureNames)
+alignedFeaturesDF.columns.name = 'feature'
+#  idxLabels = alignedFeaturesDF.index.names
+#  alignedFeaturesDF.reset_index(inplace=True)
+#  if verbose:
+#      prf.print_memory_usage('before unstack alignedFeaturesDF')
+#  allWaveforms, metaData = ns5.transposeSpikeDF(alignedFeaturesDF, idxLabels, 'bin', setIndex=True)
+#  if verbose:
+#      prf.print_memory_usage('after unstack alignedFeaturesDF')
+del alignedAsigsDF
+masterBlock = ns5.alignedAsigDFtoSpikeTrain(alignedFeaturesDF, dataBlock)
 dataReader.file.close()
 #  print('memory usage: {:.1f} MB'.format(prf.memory_usage_psutil()))
 masterBlock = ns5.purgeNixAnn(masterBlock)
-#  writer = ns5.NixIO(filename=outputPath + '.nix')
-#  writer.write_block(masterBlock, use_obj_names=True)
-#  writer.close()
+writer = ns5.NixIO(filename=outputPath + '.nix')
+writer.write_block(masterBlock, use_obj_names=True)
+writer.close()

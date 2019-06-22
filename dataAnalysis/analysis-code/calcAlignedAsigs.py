@@ -13,13 +13,12 @@ Options:
 """
 import os, pdb, traceback
 from importlib import reload
-import neo
 from neo import (
     Block, Segment, ChannelIndex,
     Event, AnalogSignal, SpikeTrain, Unit)
 from neo.io.proxyobjects import (
     AnalogSignalProxy, SpikeTrainProxy, EventProxy)
-import dataAnalysis.preproc.ns5 as preproc
+import dataAnalysis.preproc.ns5 as ns5
 import numpy as np
 import pandas as pd
 import quantities as pq
@@ -33,12 +32,13 @@ expOpts, allOpts = parseAnalysisOptions(
 globals().update(expOpts)
 globals().update(allOpts)
 
+verbose = True
 #  source of events
 if arguments['--processAll']:
-    eventReader = neo.io.nixio_fr.NixIO(
+    eventReader = ns5.nixio_fr.NixIO(
         filename=experimentDataPath)
 else:
-    eventReader = neo.io.nixio_fr.NixIO(
+    eventReader = ns5.nixio_fr.NixIO(
         filename=analysisDataPath)
 
 eventBlock = eventReader.read_block(
@@ -61,7 +61,7 @@ windowSize = [
     for i in rasterOpts['windowSizes'][arguments['--window']]]
 
 if arguments['--processAll']:
-    preproc.analogSignalsAlignedToEvents(
+    ns5.getAsigsAlignedToEvents(
         eventBlock=eventBlock, signalBlock=signalBlock,
         chansToTrigger=chansToTrigger,
         chanQuery=arguments['--chanQuery'],
@@ -69,11 +69,12 @@ if arguments['--processAll']:
         windowSize=windowSize,
         appendToExisting=False,
         checkReferences=False,
+        verbose=verbose,
         fileName=experimentName + '_trig_{}_{}'.format(
             arguments['--blockName'], arguments['--window']),
-        folderPath=scratchFolder)
+        folderPath=scratchFolder, chunkSize=alignedAsigsChunkSize)
 else:
-    preproc.analogSignalsAlignedToEvents(
+    ns5.getAsigsAlignedToEvents(
         eventBlock=eventBlock, signalBlock=signalBlock,
         chansToTrigger=chansToTrigger,
         chanQuery=arguments['--chanQuery'],
@@ -81,6 +82,7 @@ else:
         windowSize=windowSize,
         appendToExisting=False,
         checkReferences=False,
+        verbose=verbose,
         fileName=ns5FileName + '_trig_{}_{}'.format(
             arguments['--blockName'], arguments['--window']),
-        folderPath=scratchFolder)
+        folderPath=scratchFolder, chunkSize=alignedAsigsChunkSize)

@@ -217,6 +217,7 @@ def parseAnalysisOptions(trialIdx, experimentShorthand):
     if not os.path.exists(spikeSortingFiguresFolder):
         os.makedirs(spikeSortingFiguresFolder, exist_ok=True)
 
+    alignedAsigsChunkSize = 250
     rasterOpts = {
         'binInterval': 1e-3, 'binWidth': 30e-3, 'smoothKernelWidth': 50e-3,
         'windowSizes': {

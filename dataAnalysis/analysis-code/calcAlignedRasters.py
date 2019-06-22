@@ -14,13 +14,13 @@ Options:
 
 import os, pdb, traceback
 from importlib import reload
-import neo
+#import neo
 from neo import (
     Block, Segment, ChannelIndex,
     Event, AnalogSignal, SpikeTrain, Unit)
 from neo.io.proxyobjects import (
     AnalogSignalProxy, EventProxy)
-import dataAnalysis.preproc.ns5 as preproc
+import dataAnalysis.preproc.ns5 as ns5
 import numpy as np
 import pandas as pd
 import quantities as pq
@@ -34,10 +34,10 @@ globals().update(allOpts)
 
 #  source of events
 if arguments['--processAll']:
-    eventReader = neo.io.nixio_fr.NixIO(
+    eventReader = ns5.nixio_fr.NixIO(
         filename=experimentDataPath)
 else:
-    eventReader = neo.io.nixio_fr.NixIO(
+    eventReader = ns5.nixio_fr.NixIO(
         filename=analysisDataPath)
 
 eventBlock = eventReader.read_block(
@@ -48,10 +48,10 @@ for ev in eventBlock.filter(objects=EventProxy):
 
 #  source of analogsignals
 if arguments['--processAll']:
-    signalReader = neo.io.nixio_fr.NixIO(
+    signalReader = ns5.nixio_fr.NixIO(
         filename=experimentBinnedSpikePath)
 else:
-    signalReader = neo.io.nixio_fr.NixIO(
+    signalReader = ns5.nixio_fr.NixIO(
         filename=binnedSpikePath)
 
 signalBlock = signalReader.read_block(
@@ -65,7 +65,7 @@ windowSize = [
 #  chansToTrigger = ['elec75#0_raster', 'elec75#1_raster']
 
 if arguments['--processAll']:
-    preproc.analogSignalsAlignedToEvents(
+    ns5.getAsigsAlignedToEvents(
         eventBlock=eventBlock, signalBlock=signalBlock,
         chansToTrigger=chansToTrigger,
         chanQuery=arguments['--chanQuery'],
@@ -75,9 +75,9 @@ if arguments['--processAll']:
         checkReferences=False,
         fileName=experimentName + '_trig_{}_{}'.format(
             arguments['--blockName'], arguments['--window']),
-        folderPath=scratchFolder)
+        folderPath=scratchFolder, chunkSize=alignedAsigsChunkSize)
 else:
-    preproc.analogSignalsAlignedToEvents(
+    ns5.getAsigsAlignedToEvents(
         eventBlock=eventBlock, signalBlock=signalBlock,
         chansToTrigger=chansToTrigger,
         chanQuery=arguments['--chanQuery'],
@@ -87,4 +87,4 @@ else:
         checkReferences=False,
         fileName=ns5FileName + '_trig_{}_{}'.format(
             arguments['--blockName'], arguments['--window']),
-        folderPath=scratchFolder)
+        folderPath=scratchFolder, chunkSize=alignedAsigsChunkSize)

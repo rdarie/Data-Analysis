@@ -7,7 +7,7 @@
 
 # Request memory:
 #SBATCH --nodes=1
-#SBATCH --mem=96G
+#SBATCH --mem=59G
 
 # Specify a job name:
 #SBATCH -J calc_pca
@@ -23,4 +23,4 @@
 EXP="exp201901271000_alt"
 # EXP="exp201901201200_alt"
 
-python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcPCA.py' --exp=$EXP --processAll
+python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcPCAinChunks.py' --exp=$EXP --processAll
