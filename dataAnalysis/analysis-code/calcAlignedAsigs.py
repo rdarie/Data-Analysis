@@ -32,7 +32,7 @@ expOpts, allOpts = parseAnalysisOptions(
 globals().update(expOpts)
 globals().update(allOpts)
 
-verbose = True
+verbose = False
 #  source of events
 if arguments['--processAll']:
     eventReader = ns5.nixio_fr.NixIO(

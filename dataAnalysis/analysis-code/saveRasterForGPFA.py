@@ -9,7 +9,6 @@ Options:
     --verbose                              print diagnostics? [default: False]
     --alignQuery=alignQuery                choose a subset of the data?
     --window=window                        process with short window? [default: short]
-    --estimator=estimator                  estimator filename
     --chanQuery=chanQuery                  how to restrict channels?
 """
 #  import dataAnalysis.plotting.aligned_signal_plots as asp
@@ -39,37 +38,26 @@ expOpts, allOpts = parseAnalysisOptions(
 globals().update(expOpts)
 globals().update(allOpts)
 
-verbose = True
-
-estimatorPath = os.path.join(
-    scratchFolder,
-    arguments['--estimator'] + '.joblib')
-
-with open(
-    os.path.join(
-        scratchFolder,
-        arguments['--estimator'] + '_meta.pickle'),
-        'rb') as f:
-    estimatorMetadata = pickle.load(f)
+verbose = arguments['--verbose']
 
 if arguments['--processAll']:
     triggeredPath = os.path.join(
         scratchFolder,
-        experimentName + '_trig_{}_{}.nix'.format(
-            estimatorMetadata['inputBlockName'], arguments['--window']))
+        experimentName + '_trig_raster_{}.nix'.format(
+            arguments['--window']))
     outputPath = os.path.join(
         scratchFolder,
-        experimentName + '_trig_{}_{}'.format(
-            estimatorMetadata['name'], arguments['--window']))
+        experimentName + '_trig_raster_{}'.format(
+            arguments['--window']))
 else:
     triggeredPath = os.path.join(
         scratchFolder,
-        ns5FileName + '_trig_{}_{}.nix'.format(
-            estimatorMetadata['inputBlockName'], arguments['--window']))
+        ns5FileName + '_trig_raster_{}.nix'.format(
+            arguments['--window']))
     outputPath = os.path.join(
         scratchFolder,
-        ns5FileName + '_trig_{}_{}'.format(
-            estimatorMetadata['name'], arguments['--window']))
+        ns5FileName + '_trig_raster_{}'.format(
+            arguments['--window']))
 
 if verbose:
     prf.print_memory_usage('before load data')
@@ -79,9 +67,6 @@ dataBlock = dataReader.read_block(
     block_index=0, lazy=True,
     signal_group_mode='split-all')
 
-estimator = jb.load(
-    os.path.join(scratchFolder, estimatorMetadata['path']))
-
 if arguments['--alignQuery'] is None:
     dataQuery = None
 else:
@@ -89,37 +74,22 @@ else:
         arguments['--alignQuery']
     ])
 
+alignedAsigsKWargs = dict(
+    duplicateControlsByProgram=False,
+    makeControlProgram=True,
+    amplitudeColumn='amplitudeFuzzy',
+    programColumn='programFuzzy',
+    electrodeColumn='electrodeFuzzy',
+    transposeToColumns='feature', concatOn='columns',
+    removeFuzzyName=False)
+
 if verbose:
     prf.print_memory_usage('before load firing rates')
-unitNames = estimatorMetadata['inputFeatures']
+unitNames = None
 alignedAsigsDF = ns5.alignedAsigsToDF(
     dataBlock, unitNames, dataQuery,
-    **estimatorMetadata['alignedAsigsKWargs'], verbose=True)
+    **alignedAsigsKWargs, verbose=True)
 if verbose:
     prf.print_memory_usage('after load firing rates')
 
-features = estimator.transform(alignedAsigsDF.to_numpy())
-if verbose:
-    prf.print_memory_usage('after estimator.transform')
-featureNames = [
-    estimatorMetadata['name'] + '{:0>3}'.format(i)
-    for i in range(features.shape[1])]
-#
-alignedFeaturesDF = pd.DataFrame(
-    features, index=alignedAsigsDF.index, columns=featureNames)
-alignedFeaturesDF.columns.name = 'feature'
-#  idxLabels = alignedFeaturesDF.index.names
-#  alignedFeaturesDF.reset_index(inplace=True)
-#  if verbose:
-#      prf.print_memory_usage('before unstack alignedFeaturesDF')
-#  allWaveforms, metaData = ns5.transposeSpikeDF(alignedFeaturesDF, idxLabels, 'bin', setIndex=True)
-#  if verbose:
-#      prf.print_memory_usage('after unstack alignedFeaturesDF')
-del alignedAsigsDF
-masterBlock = ns5.alignedAsigDFtoSpikeTrain(alignedFeaturesDF, dataBlock)
-dataReader.file.close()
-#  print('memory usage: {:.1f} MB'.format(prf.memory_usage_psutil()))
-masterBlock = ns5.purgeNixAnn(masterBlock)
-writer = ns5.NixIO(filename=outputPath + '.nix')
-writer.write_block(masterBlock, use_obj_names=True)
-writer.close()
+pdb.set_trace()

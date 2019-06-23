@@ -6,6 +6,7 @@ Options:
     --trialIdx=trialIdx             which trial to analyze [default: 1]
     --exp=exp                       which experimental day to analyze
     --processAll                    process entire experimental day? [default: False]
+    --verbose                       print diagnostics? [default: True]
     --rowName=rowName               break down by row  [default: pedalDirection]
     --rowControl=rowControl         rows to exclude from comparison
     --hueName=hueName               break down by hue  [default: amplitudeCat]
@@ -111,4 +112,4 @@ asp.plotAsigsAligned(
     colorPal=colorPal,
     printBreakDown=True,
     pdfName=pdfName,
-    chanNames=None, chanQuery=arguments['--chanQuery'])
+    chanNames=None, chanQuery=arguments['--chanQuery'], verbose=arguments['--verbose'])

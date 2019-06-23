@@ -68,7 +68,7 @@ def plotNeuronsAligned(
         colorPal="ch:0.6,-.2,dark=.2,light=0.7,reverse=1",
         printBreakDown=True,
         pdfName='motionStim.pdf', limitPages=None,
-        chanNames=None, chanQuery=None):
+        chanNames=None, chanQuery=None, verbose=False):
     if chanNames is None:
         allChanNames = ns5.listChanNames(
             rasterBlock, chanQuery, objType=Unit)
@@ -91,8 +91,8 @@ def plotNeuronsAligned(
                 amplitudeColumn=amplitudeColumn,
                 programColumn=programColumn,
                 electrodeColumn=electrodeColumn,
-                collapseSizes=collapseSizes,
-                removeFuzzyName=removeFuzzyName)
+                collapseSizes=collapseSizes, verbose=verbose,
+                removeFuzzyName=removeFuzzyName, metaDataToCategories=False)
             asigWide = ns5.alignedAsigsToDF(
                 frBlock, [continuousName],
                 unitQuery=None, dataQuery=dataQuery,
@@ -101,8 +101,8 @@ def plotNeuronsAligned(
                 amplitudeColumn=amplitudeColumn,
                 programColumn=programColumn,
                 electrodeColumn=electrodeColumn,
-                collapseSizes=collapseSizes,
-                removeFuzzyName=removeFuzzyName)
+                collapseSizes=collapseSizes, verbose=verbose,
+                removeFuzzyName=removeFuzzyName, metaDataToCategories=False)
             raster = rasterWide.stack().reset_index(name='raster')
             asig = asigWide.stack().reset_index(name='fr')
             #  set up significance testing
@@ -278,7 +278,7 @@ def plotAsigsAligned(
         colorPal="ch:0.6,-.2,dark=.2,light=0.7,reverse=1",
         printBreakDown=True,
         pdfName='alignedAsigs.pdf', limitPages=None,
-        chanNames=None, chanQuery=None):
+        chanNames=None, chanQuery=None, verbose=False):
     if chanNames is None:
         chanNames = ns5.listChanNames(
             dataBlock, chanQuery, objType=Unit)
@@ -294,8 +294,8 @@ def plotAsigsAligned(
                 amplitudeColumn=amplitudeColumn,
                 programColumn=programColumn,
                 electrodeColumn=electrodeColumn,
-                collapseSizes=collapseSizes,
-                removeFuzzyName=removeFuzzyName)
+                collapseSizes=collapseSizes, verbose=verbose,
+                removeFuzzyName=removeFuzzyName, metaDataToCategories=False)
             asig = asigWide.stack().reset_index(name='signal')
             #  set up significance testing
             if (rowControl is None) and (colControl) is None:

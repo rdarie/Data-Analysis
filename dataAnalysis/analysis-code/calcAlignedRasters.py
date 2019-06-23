@@ -7,8 +7,8 @@ Options:
     --exp=exp                       which experimental day to analyze
     --processAll                    process entire experimental day? [default: False]
     --window=window                 process with short window? [default: short]
-    --chanQuery=chanQuery           how to restrict channels? [default: (chanName.str.endswith(\'fr\'))]
-    --blockName=blockName           name for new block [default: fr]
+    --chanQuery=chanQuery           how to restrict channels? [default: (chanName.str.endswith(\'raster\'))]
+    --blockName=blockName           name for new block [default: raster]
     --eventName=eventName           name of events object to align to [default: motionStimAlignTimes]
 """
 
@@ -32,6 +32,7 @@ expOpts, allOpts = parseAnalysisOptions(int(arguments['--trialIdx']), arguments[
 globals().update(expOpts)
 globals().update(allOpts)
 
+verbose = False
 #  source of events
 if arguments['--processAll']:
     eventReader = ns5.nixio_fr.NixIO(
@@ -73,6 +74,7 @@ if arguments['--processAll']:
         windowSize=windowSize,
         appendToExisting=True,
         checkReferences=False,
+        verbose=verbose,
         fileName=experimentName + '_trig_{}_{}'.format(
             arguments['--blockName'], arguments['--window']),
         folderPath=scratchFolder, chunkSize=alignedAsigsChunkSize)
@@ -85,6 +87,7 @@ else:
         windowSize=windowSize,
         appendToExisting=True,
         checkReferences=False,
+        verbose=verbose,
         fileName=ns5FileName + '_trig_{}_{}'.format(
             arguments['--blockName'], arguments['--window']),
         folderPath=scratchFolder, chunkSize=alignedAsigsChunkSize)

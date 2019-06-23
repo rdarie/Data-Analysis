@@ -340,7 +340,7 @@ def unitSpikeTrainWaveformsToDF(
         spikeTrainContainer, loadArrayAnnotations=True,
         transposeToColumns='bin', fastTranspose=True,
         setIndex=True, getMetaData=True,
-        verbose=False, decimate=1, whichSegments=None):
+        verbose=False, decimate=1, whichSegments=None, procFun=None):
     #  list contains different segments from *one* unit
     if isinstance(spikeTrainContainer, ChannelIndex):
         assert len(spikeTrainContainer.units) == 0
@@ -352,7 +352,7 @@ def unitSpikeTrainWaveformsToDF(
     # TODO check if really need to assert uniqueness?
     uniqueSpiketrains = []
     for st in spiketrains:
-        if st not in uniqueSpiketrains:
+        if not np.any([st is i for i in uniqueSpiketrains]):
             uniqueSpiketrains.append(st)
     #  subsampling options
     decimate = int(decimate)
@@ -375,17 +375,21 @@ def unitSpikeTrainWaveformsToDF(
         else:
             st = stIn
         #  extract bins spaced by decimate argument
-        wfDF = pd.DataFrame(
+        wf = np.asarray(
             np.squeeze(st.waveforms)[:, ::decimate],
             dtype='float32')
-        if verbose:
-            print('wfDF.shape = {}'.format(wfDF.shape))
+        wfDF = pd.DataFrame(wf)
+        #  if verbose:
+        #      print('wfDF.shape = {}'.format(wfDF.shape))
         bins = (
             (
                 np.asarray(wfDF.columns) /
                 (st.sampling_rate / decimate)) -
             st.left_sweep)
         wfDF.columns = bins.magnitude
+
+        if procFun is not None:
+            wfDF = procFun(wfDF)
         idxLabels = ['feature', 'segment', 'originalIndex']
         if loadArrayAnnotations:
             annDict = {}
@@ -440,7 +444,8 @@ def concatenateUnitSpikeTrainWaveformsDF(
         units, dataQuery=None,
         transposeToColumns='bin', concatOn='index',
         setIndex=True, getMetaData=True, verbose=False,
-        metaDataToCategories=True, decimate=1, whichSegments=None):
+        metaDataToCategories=True, decimate=1,
+        whichSegments=None, procFun=None):
     
     if setIndex:
         getMetaData = True
@@ -452,7 +457,8 @@ def concatenateUnitSpikeTrainWaveformsDF(
             print('concatenating unitDF {}'.format(thisUnit.name))
         unitWaveforms = unitSpikeTrainWaveformsToDF(
             thisUnit, transposeToColumns=transposeToColumns,
-            verbose=verbose, decimate=decimate, whichSegments=whichSegments)
+            verbose=verbose, decimate=decimate,
+            whichSegments=whichSegments, procFun=procFun)
         if dataQuery is not None:
             unitWaveforms = unitWaveforms.query(dataQuery)
         if idx == 0:
@@ -466,7 +472,7 @@ def concatenateUnitSpikeTrainWaveformsDF(
             unitWaveforms.reset_index(drop=not getMetaData, inplace=True)
             if getMetaData and metaDataToCategories:
                 # convert metadata to categoricals to free memory
-                pdb.set_trace()
+                # pdb.set_trace()
                 unitWaveforms[idxLabels] = (
                     unitWaveforms[idxLabels]
                     .astype('category')
@@ -503,8 +509,8 @@ def alignedAsigsToDF(
         electrodeColumn='electrodeFuzzy',
         transposeToColumns='bin', concatOn='index',
         decimate=1, whichSegments=None,
-        setIndex=True, getMetaData=True,
-        makeControlProgram=False, removeFuzzyName=False):
+        setIndex=True, getMetaData=True, metaDataToCategories=True,
+        makeControlProgram=False, removeFuzzyName=False, procFun=None):
     
     #  channels to trigger
     if unitNames is None:
@@ -518,7 +524,8 @@ def alignedAsigsToDF(
         allUnits,
         transposeToColumns=transposeToColumns, concatOn=concatOn,
         verbose=verbose, decimate=decimate, whichSegments=whichSegments,
-        setIndex=setIndex, getMetaData=getMetaData)
+        setIndex=setIndex, procFun=procFun,
+        getMetaData=getMetaData, metaDataToCategories=metaDataToCategories)
 
     manipulateIndex = np.any(
         [
@@ -630,6 +637,7 @@ def getAsigsAlignedToEvents(
         thisUnit.channel_index = chanIdx
         masterBlock.channel_indexes.append(chanIdx)
 
+    totalNSegs = 0
     for segIdx, eventSeg in enumerate(eventBlock.segments):
         if verbose:
             print(
@@ -660,13 +668,14 @@ def getAsigsAlignedToEvents(
                         allAlignEvents[i * chunkSize:])
         for subSegIdx, alignEvents in enumerate(alignEventGroups):
             # seg to contain triggered time series
-            newSeg = Segment(name='seg{}_'.format(subSegIdx))
+            newSeg = Segment(name='seg{}_'.format(int(totalNSegs)))
+            totalNSegs += 1
             newSeg.annotate(nix_name=newSeg.name)
             masterBlock.segments.append(newSeg)
             for chanName in chansToTrigger:
                 if verbose:
                     print(
-                        'analogSignalsAlignedToEvents on channel {}'
+                        'getAsigsAlignedToEvents on channel {}'
                         .format(chanName))
                 asigP = signalSeg.filter(
                     objects=AnalogSignalProxy, name=chanName)[0]
@@ -732,7 +741,7 @@ def getAsigsAlignedToEvents(
                     for k in alignEvents.annotations['arrayAnnNames']
                 }
                 st = SpikeTrain(
-                    name='seg{}_{}'.format(int(subSegIdx), thisUnit.name),
+                    name='seg{}_{}'.format(int(totalNSegs), thisUnit.name),
                     times=alignEvents.times,
                     waveforms=spikeWaveforms,
                     t_start=asigP.t_start, t_stop=asigP.t_stop,
@@ -792,6 +801,7 @@ def alignedAsigDFtoSpikeTrain(
             stProxy = exSt
             exSt = loadStProxy(stProxy)
             exSt = loadObjArrayAnn(exSt)
+        print('exSt.left_sweep is {}'.format(exSt.left_sweep))
         # seg to contain triggered time series
         newSeg = Segment(name=dataSeg.annotations['neo_name'])
         newSeg.annotate(nix_name=dataSeg.annotations['neo_name'])
