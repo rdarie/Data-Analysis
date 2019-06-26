@@ -27,13 +27,6 @@ from neo import (
 from neo.io.proxyobjects import (
     AnalogSignalProxy, SpikeTrainProxy, EventProxy) 
 
-#  from sklearn.model_selection import StratifiedKFold, GridSearchCV, learning_curve
-#  from sklearn.metrics import roc_auc_score, make_scorer, f1_score, classification_report
-#  from sklearn.linear_model import LogisticRegression
-#  from sklearn.preprocessing import LabelBinarizer, MinMaxScaler
-#  import sklearn.pipeline
-#  from sklearn.feature_selection import RFE, RFECV
-
 import datetime
 from datetime import datetime as dt
 import json
@@ -95,8 +88,8 @@ def animateDFSubset3D(
     # initialize the line
     lines = [None for i in range(winWidth)]
     for idx in range(winWidth):
-        #print(idx)
-        #pdb.set_trace()
+        # print(idx)
+        # pdb.set_trace()
         lines[idx] = ax.plot(
             data[0, idx: idx + 2],
             data[1, idx: idx + 2],
@@ -405,27 +398,27 @@ def closestSeries(takeFrom, compareTo, strictly='neither'):
 def interpolateDF(
         df, newX, kind='linear', fill_value='extrapolate',
         x=None, columns=None):
-    
-    # print('interpolatingDF')
     if x is None:
         oldX = np.array(df.index)
         if columns is None:
-            columns = df.columns
+            columns = df.columns.to_list()
         outputDF = pd.DataFrame(index=newX, columns=columns)
     else:
         oldX = np.array(df[x])
         if columns is None:
             columns = list(
                 df.columns[~df.columns.isin([x])])
-
         outputDF = pd.DataFrame(columns=columns+[x])
         outputDF[x] = newX
     
     for columnName in columns:
-        if ('time' in columnName) or ('microseconds' in columnName):
-            #  fix for issue where you can't interpolate time with zeros meaningfully.
-            #  Probably better, in the future, to allow for fill value by column
-            useFill = 'extrapolate'
+        if isinstance(columnName, Iterable):
+            if ('time' in columnName) or ('microseconds' in columnName):
+                #  fix for issue where you can't interpolate time with zeros meaningfully.
+                #  Probably better, in the future, to allow for fill value by column
+                useFill = 'extrapolate'
+            else:
+                useFill = fill_value
         else:
             useFill = fill_value
 
@@ -556,7 +549,7 @@ def getINSTDFromJson(
                 tdData['actual_time'] - INSReferenceTime) / (
                     datetime.timedelta(seconds=1))
                     
-            #pdb.set_trace()
+            #  pdb.set_trace()
             tdData = tdData.drop_duplicates(
                 ['t']
                 ).sort_values('t').reset_index(drop=True)

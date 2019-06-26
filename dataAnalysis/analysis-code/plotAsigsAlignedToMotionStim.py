@@ -17,6 +17,7 @@ Options:
     --window=window                 process with short window? [default: short]
     --chanQuery=chanQuery           how to restrict channels? [default: (chanName.str.contains(\'pca\'))]
     --blockName=blockName           which trig_ block to pull [default: pca]
+    --selector=selector             filename if using a unit selector
 """
 
 import dataAnalysis.plotting.aligned_signal_plots as asp
@@ -25,6 +26,7 @@ import seaborn as sns
 import os
 from currentExperiment_alt import parseAnalysisOptions
 from docopt import docopt
+import dill as pickle
 arguments = docopt(__doc__)
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['--trialIdx']), arguments['--exp'])
@@ -67,8 +69,8 @@ else:
             scratchFolder,
             ns5FileName + '_trig_{}_{}.nix'.format(
                 arguments['--blockName'], arguments['--window'])))
-    pdfName = '{}_{}_{}_{}_by_{}_aligned_to_{}'.format(
-        experimentName, arguments['--trialIdx'],
+    pdfName = '{}_{}_{}_by_{}_aligned_to_{}'.format(
+        arguments['--trialIdx'],
         arguments['--blockName'], arguments['--window'],
         hueName, arguments['--alignQuery'])
 
@@ -91,6 +93,19 @@ testTStart = 0
 testTStop = 500e-3
 colorPal = "ch:0.6,-.2,dark=.2,light=0.7,reverse=1"  #  for firing rates
 
+if arguments['--selector'] is not None:
+    with open(
+        os.path.join(
+            scratchFolder,
+            arguments['--selector'] + '.pickle'),
+            'rb') as f:
+        selectorMetadata = pickle.load(f)
+    chanNames = [
+        i.replace('_raster#0', '')
+        for i in selectorMetadata['outputFeatures']]
+else:
+    chanNames = None
+
 asp.plotAsigsAligned(
     dataBlock,
     dataQuery=dataQuery,
@@ -112,4 +127,4 @@ asp.plotAsigsAligned(
     colorPal=colorPal,
     printBreakDown=True,
     pdfName=pdfName,
-    chanNames=None, chanQuery=arguments['--chanQuery'], verbose=arguments['--verbose'])
+    chanNames=chanNames, chanQuery=arguments['--chanQuery'], verbose=arguments['--verbose'])

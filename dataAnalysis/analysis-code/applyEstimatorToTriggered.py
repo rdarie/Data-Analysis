@@ -108,13 +108,7 @@ featureNames = [
 alignedFeaturesDF = pd.DataFrame(
     features, index=alignedAsigsDF.index, columns=featureNames)
 alignedFeaturesDF.columns.name = 'feature'
-#  idxLabels = alignedFeaturesDF.index.names
-#  alignedFeaturesDF.reset_index(inplace=True)
-#  if verbose:
-#      prf.print_memory_usage('before unstack alignedFeaturesDF')
-#  allWaveforms, metaData = ns5.transposeSpikeDF(alignedFeaturesDF, idxLabels, 'bin', setIndex=True)
-#  if verbose:
-#      prf.print_memory_usage('after unstack alignedFeaturesDF')
+
 del alignedAsigsDF
 masterBlock = ns5.alignedAsigDFtoSpikeTrain(alignedFeaturesDF, dataBlock)
 dataReader.file.close()

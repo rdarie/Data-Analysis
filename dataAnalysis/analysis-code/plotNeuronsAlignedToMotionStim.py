@@ -14,7 +14,8 @@ Options:
     --colControl=colControl         cols to exclude from comparison [default: control]
     --alignQuery=alignQuery         what will the plot be aligned to? [default: (pedalMovementCat==\'outbound\')]
     --window=window                 process with short window? [default: short]
-    --chanQuery=chanQuery           how to restrict channels?
+    --unitQuery=unitQuery           how to restrict channels?
+    --selector=selector             filename if using a unit selector
 """
 import matplotlib
 matplotlib.use('PS')   # generate postscript output by default
@@ -22,6 +23,8 @@ import os
 import dataAnalysis.plotting.aligned_signal_plots as asp
 import dataAnalysis.preproc.ns5 as preproc
 import seaborn as sns
+import dill as pickle
+import pdb
 
 from currentExperiment_alt import parseAnalysisOptions
 from docopt import docopt
@@ -34,7 +37,7 @@ globals().update(allOpts)
 
 sns.set()
 sns.set_color_codes("dark")
-sns.set_context("talk")
+sns.set_context("notebook")
 sns.set_style("white")
 
 rowName = arguments['--rowName']
@@ -76,31 +79,44 @@ if arguments['--processAll']:
     rasterBlock = preproc.loadWithArrayAnn(
         os.path.join(
             scratchFolder,
-            experimentName + '_trig_{}_{}.nix'.format(
-                arguments['--blockName'], arguments['--window'])))
+            experimentName + '_trig_raster_{}.nix'.format(
+                arguments['--window'])))
     frBlock = preproc.loadWithArrayAnn(
         os.path.join(
             scratchFolder,
-            experimentName + '_trig_{}_{}.nix'.format(
-                arguments['--blockName'], arguments['--window'])))
-    pdfName = '{}_{}_{}_neurons_by_{}_aligned_to_{}'.format(
-        experimentName, arguments['--blockName'], arguments['--window'],
+            experimentName + '_trig_fr_{}.nix'.format(
+                arguments['--window'])))
+    pdfName = '{}_{}_neurons_by_{}_aligned_to_{}'.format(
+        experimentName, arguments['--window'],
         hueName, arguments['--alignQuery'])
 else:
     rasterBlock = preproc.loadWithArrayAnn(
         os.path.join(
             scratchFolder,
-            ns5FileName + '_trig_{}_{}.nix'.format(
-                arguments['--blockName'], arguments['--window'])))
+            ns5FileName + '_trig_raster_{}.nix'.format(
+                arguments['--window'])))
     frBlock = preproc.loadWithArrayAnn(
         os.path.join(
             scratchFolder,
-            ns5FileName + '_trig_{}_{}.nix'.format(
-                arguments['--blockName'], arguments['--window'])))
-    pdfName = '{}_{}_{}_{}_neurons_by_{}_aligned_to_{}'.format(
+            ns5FileName + '_trig_fr_{}.nix'.format(
+                arguments['--window'])))
+    pdfName = '{}_{}_neurons_by_{}_aligned_to_{}'.format(
         experimentName, arguments['--trialIdx'],
-        arguments['--blockName'], arguments['--window'],
+        arguments['--window'],
         hueName, arguments['--alignQuery'])
+
+if arguments['--selector'] is not None:
+    with open(
+        os.path.join(
+            scratchFolder,
+            arguments['--selector'] + '.pickle'),
+            'rb') as f:
+        selectorMetadata = pickle.load(f)
+    unitNames = [
+        i.replace('_raster#0', '')
+        for i in selectorMetadata['outputFeatures']]
+else:
+    unitNames = None
 
 asp.plotNeuronsAligned(
     rasterBlock,
@@ -123,4 +139,4 @@ asp.plotNeuronsAligned(
     colorPal=colorPal,
     printBreakDown=True,
     pdfName=pdfName,
-    chanNames=None, chanQuery=arguments['--chanQuery'])
+    chanNames=unitNames, chanQuery=arguments['--unitQuery'])

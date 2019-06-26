@@ -5,6 +5,7 @@ from neo import (
     Segment, SpikeTrain, Event, AnalogSignal)
 #  from tempfile import mkdtemp
 import numpy as np
+import pdb
 #  from scipy.ndimage.filters import gaussian_filter1d
 #  from scipy import stats, ndimage, signal
 import scipy.io
@@ -1242,13 +1243,18 @@ def triggeredAsigCompareMeans(
             (asigWide.columns < testBin + testWidth / 2)
             )
         testAsig = asigWide.loc[:, tMask]
+        
         for name, group in testAsig.groupby(groupBy):
             testGroups = [
                 np.ravel(i)
                 for _, i in group.groupby(testVar)]
+            groupSizes = [i.shape[0] for i in testGroups]
+            maxSize = int(np.mean(groupSizes))
+            testGroups = [t[:maxSize] for t in testGroups]
             if len(testGroups) > 1:
                 try:
-                    stat, p = scipy.stats.kruskal(*testGroups)
+                    # stat, p = scipy.stats.kruskal(*testGroups)
+                    stat, p = scipy.stats.f_oneway(*testGroups)
                     pVals.loc[name, testBin] = p
                 except Exception:
                     traceback.print_exc()

@@ -6,11 +6,12 @@ Options:
     --trialIdx=trialIdx                    which trial to analyze [default: 1]
     --exp=exp                              which experimental day to analyze
     --processAll                           process entire experimental day? [default: False]
+    --verbose                              print diagnostics? [default: False]
     --alignQuery=alignQuery                what will the plot be aligned to? [default: (pedalMovementCat==\'midPeak\')]
     --window=window                        process with short window? [default: long]
-    --estimatorName=estimatorName          filename for resulting estimator [default: pca]
-    --inputBlockName=inputBlockName        filename for resulting estimator [default: fr_sqrt]
-    --unitQuery=unitQuery                  how to restrict channels? [default: (chanName.str.endswith(\'fr_sqrt#0\'))]
+    --selectorName=selectorName            filename for resulting selector [default: minfr]
+    --inputBlockName=inputBlockName        filename for inputs [default: raster]
+    --unitQuery=unitQuery                  how to restrict channels? [default: (chanName.str.endswith(\'raster#0\'))]
 """
 
 import os
@@ -23,9 +24,6 @@ import dataAnalysis.preproc.ns5 as ns5
 #      Block, Segment, ChannelIndex,
 #      Event, AnalogSignal, SpikeTrain, Unit)
 #  import neo
-from sklearn.decomposition import PCA, IncrementalPCA
-from sklearn.pipeline import make_pipeline, Pipeline
-import joblib as jb
 import dill as pickle
 from currentExperiment_alt import parseAnalysisOptions
 from docopt import docopt
@@ -41,19 +39,20 @@ if arguments['--processAll']:
         scratchFolder,
         experimentName + '_trig_{}_{}.nix'.format(
             arguments['--inputBlockName'], arguments['--window']))
-    estimatorPath = os.path.join(
+    selectorPath = os.path.join(
         scratchFolder,
-        experimentName + '_' + arguments['--estimatorName'] + '.joblib')
+        experimentName + '_' + arguments['--selectorName'] + '.pickle')
 else:
     triggeredPath = os.path.join(
         scratchFolder,
         ns5FileName + '_trig_{}_{}.nix'.format(
             arguments['--inputBlockName'], arguments['--window']))
-    estimatorPath = os.path.join(
+    selectorPath = os.path.join(
         scratchFolder,
-        ns5FileName + '_' + arguments['--estimatorName'] + '.joblib')
+        ns5FileName + '_' + arguments['--selectorName'] + '.pickle')
 
-prf.print_memory_usage('before load data')
+if arguments['--processAll']:
+    prf.print_memory_usage('before load data')
 
 dataReader = ns5.nixio_fr.NixIO(
     filename=triggeredPath)
@@ -61,13 +60,13 @@ dataBlock = dataReader.read_block(
     block_index=0, lazy=True,
     signal_group_mode='split-all')
 
+
 alignedAsigsKWargs = dict(
     duplicateControlsByProgram=False,
     makeControlProgram=True,
     amplitudeColumn='amplitudeFuzzy',
     programColumn='programFuzzy',
     electrodeColumn='electrodeFuzzy',
-    transposeToColumns='feature', concatOn='columns',
     removeFuzzyName=False)
 
 if arguments['--alignQuery'] is None:
@@ -76,44 +75,47 @@ else:
     dataQuery = '&'.join([
         arguments['--alignQuery']
     ])
-    
-#  unitNames = [
-#      'elec75#0_fr_sqrt#0', 'elec75#1_fr_sqrt#0',
-#      'elec78#0_fr_sqrt#0', 'elec78#1_fr_sqrt#0',
-#      'elec83#0_fr_sqrt#0']
+
 unitNames = None
 
-masterSpikeMat = ns5.alignedAsigsToDF(
+
+def procFun(wfDF):
+    return wfDF.mean(axis=1).to_frame()
+
+
+alignedRastersDF = ns5.alignedAsigsToDF(
     dataBlock, unitNames,
-    unitQuery=arguments['--unitQuery'], dataQuery=dataQuery, verbose=True,
-    getMetaData=False, decimate=5,
-    **alignedAsigsKWargs).to_numpy()
-prf.print_memory_usage('just loaded firing rates')
+    unitQuery=arguments['--unitQuery'], dataQuery=dataQuery,
+    transposeToColumns='feature', concatOn='columns',
+    verbose=True, procFun=procFun,
+    **alignedAsigsKWargs)
+prf.print_memory_usage('just loaded rasters')
 dataReader.file.close()
 #  free up memory
 del dataBlock
 gc.collect()
 
-nComp = masterSpikeMat.shape[1]
-pca = IncrementalPCA(
-    n_components=nComp,
-    batch_size=int(3 * nComp))
-estimator = Pipeline([('dimred', pca)])
-prf.print_memory_usage('starting fit')
 
-estimator.fit(masterSpikeMat)
+def selFun(rastersDF, meanFRThresh=5):
+    assert rastersDF.columns.name == 'feature'
+    unitMask = rastersDF.mean(axis=0) > meanFRThresh
+    return unitMask[unitMask].index.to_list()
 
-jb.dump(estimator, estimatorPath)
 
-estimatorMetadata = {
+selectorMetadata = {
     'trainingDataPath': os.path.basename(triggeredPath),
-    'path': os.path.basename(estimatorPath),
-    'name': arguments['--estimatorName'],
-    'inputFeatures': masterSpikeMat.columns.to_list(),
+    'path': os.path.basename(selectorPath),
+    'name': arguments['--selectorName'],
+    'inputBlockName': arguments['--inputBlockName'],
+    'inputFeatures': alignedRastersDF.columns.to_list(),
+    'outputFeatures': selFun(alignedRastersDF),
     'dataQuery': dataQuery,
-    'alignedAsigsKWargs': alignedAsigsKWargs
+    'alignedAsigsKWargs': alignedAsigsKWargs,
+    'selFun': selFun,
+    'procFun': procFun,
+    'selFunInputs': {'meanFRThresh': 5}
     }
 
-with open(estimatorPath.replace('.joblib', '_meta.pickle'), 'wb') as f:
+with open(selectorPath, 'wb') as f:
     pickle.dump(
-        estimatorMetadata, f)
+        selectorMetadata, f)

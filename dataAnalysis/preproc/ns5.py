@@ -274,6 +274,7 @@ def unitSpikeTrainArrayAnnToDF(
 
 
 def getSpikeDFMetadata(spikeDF, metaDataCols):
+    spikeDF.reset_index(inplace=True)
     metaDataCols = np.atleast_1d(metaDataCols)
     spikeDF.index.name = 'metaDataIdx'
     metaDataDF = spikeDF.loc[:, metaDataCols].copy()
@@ -282,40 +283,24 @@ def getSpikeDFMetadata(spikeDF, metaDataCols):
 
 
 def transposeSpikeDF(
-        spikeDF, idxLabels, transposeToColumns,
-        setIndex=False, getMetaData=False, fastTranspose=False):
+        spikeDF, transposeToColumns,
+        fastTranspose=False):
     
-    if fastTranspose:
-        #  fast but memory inefficient
-        spikeDF.set_index(idxLabels, inplace=True)
-        if setIndex:
-            return spikeDF.stack().unstack(transposeToColumns)
-        else:
-            return spikeDF.stack().unstack(transposeToColumns).reset_index()
-        
     newColumnNames = np.atleast_1d(transposeToColumns).tolist()
     originalColumnNames = np.atleast_1d(spikeDF.columns.names)
-    metaDataCols = np.setdiff1d(idxLabels, newColumnNames).tolist()
-    
-    if getMetaData or setIndex:
-        newSpikeDF, metaDataDF = getSpikeDFMetadata(spikeDF, metaDataCols)
+    metaDataCols = np.setdiff1d(spikeDF.index.names, newColumnNames).tolist()
+    if fastTranspose:
+        #  fast but memory inefficient
+        return spikeDF.stack().unstack(transposeToColumns)
     else:
-        newSpikeDF = spikeDF.drop(columns=metaDataCols).reset_index()
-    del spikeDF
-    gc.collect()
-    #  both options work, figure out which is more efficient
-    #  newSpikeDF = (
-    #      newSpikeDF
-    #      .pivot(index='metaDataIdx', columns=transposeToColumns)
-    #      .stack(originalColumnNames)
-    #      )
-    newSpikeDF.set_index(
-        np.append(newColumnNames, 'metaDataIdx').tolist(),
-        inplace=True)
-    newSpikeDF = newSpikeDF.stack().unstack(newColumnNames)
-    newSpikeDF.reset_index(inplace=True)
-    #
-    if setIndex:
+        raise(Warning('Caution! transposeSpikeDF might not be working, needs testing RD 06252019'))
+        #  stash annotations, transpose, recover annotations
+        newSpikeDF, metaDataDF = getSpikeDFMetadata(spikeDF, metaDataCols)
+        del spikeDF
+        gc.collect()
+        #
+        newSpikeDF = newSpikeDF.stack().unstack(newColumnNames)
+        newSpikeDF.reset_index(inplace=True)
         #  set the index
         newIdxLabels = np.concatenate(
             [originalColumnNames, metaDataCols]).tolist()
@@ -328,19 +313,15 @@ def transposeSpikeDF(
             .drop(columns=['metaDataIdx'])
             .set_index(newIdxLabels))
         return newSpikeDF
-    elif getMetaData:
-        #  add the remaining annotations to the metadata stack
-        return newSpikeDF, metaDataDF
-    else:
-        return newSpikeDF.drop(columns=originalColumnNames)
 
 
 #  renamed spikeTrainWaveformsToDF to unitSpikeTrainWaveformsToDF
 def unitSpikeTrainWaveformsToDF(
-        spikeTrainContainer, loadArrayAnnotations=True,
+        spikeTrainContainer,
+        dataQuery=None,
         transposeToColumns='bin', fastTranspose=True,
-        setIndex=True, getMetaData=True,
-        verbose=False, decimate=1, whichSegments=None, procFun=None):
+        getMetaData=True, verbose=False, decimate=1,
+        whichSegments=None, procFun=None):
     #  list contains different segments from *one* unit
     if isinstance(spikeTrainContainer, ChannelIndex):
         assert len(spikeTrainContainer.units) == 0
@@ -370,7 +351,8 @@ def unitSpikeTrainWaveformsToDF(
         #  make sure is not a proxyObj
         if isinstance(stIn, SpikeTrainProxy):
             st = loadStProxy(stIn)
-            if loadArrayAnnotations:
+            if (getMetaData) or (dataQuery is not None):
+                # if there's a query, get metadata temporarily to resolve it
                 st = loadObjArrayAnn(st)
         else:
             st = stIn
@@ -387,80 +369,87 @@ def unitSpikeTrainWaveformsToDF(
                 (st.sampling_rate / decimate)) -
             st.left_sweep)
         wfDF.columns = bins.magnitude
-
         if procFun is not None:
             wfDF = procFun(wfDF)
-        idxLabels = ['feature', 'segment', 'originalIndex']
-        if loadArrayAnnotations:
+        idxLabels = ['segment', 'originalIndex', 't']
+        wfDF.loc[:, 't'] = np.asarray(st.times.magnitude)
+        if (getMetaData) or (dataQuery is not None):
+            # if there's a query, get metadata temporarily to resolve it
             annDict = {}
             for k, values in st.array_annotations.items():
+                if isinstance(getMetaData, Iterable):
+                    # if selecting metadata fields, check that
+                    # the key is in the provided list
+                    if k not in getMetaData:
+                        continue
                 if isinstance(values[0], str):
                     v = np.asarray(values, dtype='str')
                 else:
                     v = np.asarray(values)
                 annDict.update({k: v})
-            annDict.update(
-                {'t': np.asarray(st.times.magnitude)})
             annDF = pd.DataFrame(annDict)
-            idxLabels += annDF.columns.to_list()
+            annColumns = annDF.columns.to_list()
+            if getMetaData:
+                idxLabels += annColumns
             spikeDF = annDF.join(wfDF)
-            del wfDF, annDF, st
         else:
             spikeDF = wfDF
             del wfDF, st
-
-        spikeDF.loc[:, 'feature'] = spikeTrainContainer.name
         spikeDF.loc[:, 'segment'] = segIdx
         spikeDF.loc[:, 'originalIndex'] = spikeDF.index
         spikeDF.columns.name = 'bin'
+        if dataQuery is not None:
+            spikeDF.query(dataQuery, inplace=True)
+            if not getMetaData:
+                spikeDF.drop(columns=annColumns, inplace=True)
         waveformsList.append(spikeDF)
-    #  pdb.set_trace()
-    waveformsDF = pd.concat(waveformsList, axis='index', ignore_index=True)
+    #
+    waveformsDF = pd.concat(
+        waveformsList, axis='index',
+        #ignore_index=True
+        )
     if verbose:
         prf.print_memory_usage('before transposing waveforms')
-    if transposeToColumns != 'bin':
-        if setIndex:
-            waveformsDF = transposeSpikeDF(
-                waveformsDF, idxLabels,
-                transposeToColumns,
-                fastTranspose=fastTranspose, setIndex=True)
-            return waveformsDF
-        else:
-            waveformsDF, metadataDF = transposeSpikeDF(
-                waveformsDF, idxLabels, transposeToColumns,
-                setIndex=False, getMetaData=getMetaData)
-            return waveformsDF, metadataDF
-    else:
-        if setIndex:
-            waveformsDF.set_index(idxLabels, inplace=True)
-            return waveformsDF
-        else:
-            waveformsDF, metadataDF = getSpikeDFMetadata(
-                spikeDF, idxLabels)
-            return waveformsDF, metadataDF
+    #
+    if transposeToColumns == 'feature':
+        # stack the bin, name the feature column
+        waveformsDF.set_index(idxLabels, inplace=True)
+        waveformsDF = waveformsDF.stack().to_frame(name=spikeTrainContainer.name)
+        idxLabels.append('bin')
+        waveformsDF.columns.name = 'feature'
+        waveformsDF.reset_index(inplace=True)
+    elif transposeToColumns == 'bin':
+        # add the feature column
+        waveformsDF.loc[:, 'feature'] = spikeTrainContainer.name
+        idxLabels.append('feature')
+        waveformsDF.columns.name = 'bin'
+    #
+    waveformsDF.set_index(idxLabels, inplace=True)
+    if transposeToColumns != waveformsDF.columns.name:
+        waveformsDF = transposeSpikeDF(
+            waveformsDF, transposeToColumns,
+            fastTranspose=fastTranspose)
+    return waveformsDF
 
 
 def concatenateUnitSpikeTrainWaveformsDF(
         units, dataQuery=None,
         transposeToColumns='bin', concatOn='index',
-        setIndex=True, getMetaData=True, verbose=False,
-        metaDataToCategories=True, decimate=1,
+        fastTranspose=True, getMetaData=True, verbose=False,
+        metaDataToCategories=False, decimate=1,
         whichSegments=None, procFun=None):
     
-    if setIndex:
-        getMetaData = True
-        
     waveformsList = []
     
     for idx, thisUnit in enumerate(units):
         if verbose:
             print('concatenating unitDF {}'.format(thisUnit.name))
         unitWaveforms = unitSpikeTrainWaveformsToDF(
-            thisUnit, transposeToColumns=transposeToColumns,
+            thisUnit, dataQuery=dataQuery,
+            transposeToColumns=transposeToColumns,
+            fastTranspose=fastTranspose, getMetaData=getMetaData,
             verbose=verbose, decimate=decimate,
             whichSegments=whichSegments, procFun=procFun)
-        if dataQuery is not None:
-            unitWaveforms = unitWaveforms.query(dataQuery)
         if idx == 0:
             idxLabels = unitWaveforms.index.names
         if (concatOn == 'columns') and (idx > 0):
@@ -469,8 +458,8 @@ def concatenateUnitSpikeTrainWaveformsDF(
         else:
             # first time, or if concatenating indices,
             # keep the the metadata
-            unitWaveforms.reset_index(drop=not getMetaData, inplace=True)
-            if getMetaData and metaDataToCategories:
+            unitWaveforms.reset_index(inplace=True)
+            if metaDataToCategories:
                 # convert metadata to categoricals to free memory
                 # pdb.set_trace()
                 unitWaveforms[idxLabels] = (
@@ -486,16 +475,17 @@ def concatenateUnitSpikeTrainWaveformsDF(
             'about to join all, memory usage: {:.1f} MB'
             .format(prf.memory_usage_psutil()))
     #  if concatenating indexes, reset the index of the result
-    ignoreIndex = (concatOn == 'index')
+    #  ignoreIndex = (concatOn == 'index')
     allWaveforms = pd.concat(
-        waveformsList, axis=concatOn, ignore_index=ignoreIndex)
-    if setIndex:
-        allWaveforms.set_index(idxLabels, inplace=True)
+        waveformsList, axis=concatOn,
+        #ignore_index=ignoreIndex
+        )
     del waveformsList
     if verbose:
         print(
             'finished concatenating, memory usage: {:.1f} MB'
             .format(prf.memory_usage_psutil()))
+    allWaveforms.set_index(idxLabels, inplace=True)
     return allWaveforms
 
 
@@ -507,9 +497,9 @@ def alignedAsigsToDF(
         amplitudeColumn='amplitudeFuzzy',
         programColumn='programFuzzy',
         electrodeColumn='electrodeFuzzy',
-        transposeToColumns='bin', concatOn='index',
+        transposeToColumns='bin', concatOn='index', fastTranspose=True,
         decimate=1, whichSegments=None,
-        setIndex=True, getMetaData=True, metaDataToCategories=True,
+        getMetaData=True, metaDataToCategories=True,
         makeControlProgram=False, removeFuzzyName=False, procFun=None):
     
     #  channels to trigger
@@ -521,10 +511,11 @@ def alignedAsigsToDF(
         allUnits += dataBlock.filter(objects=Unit, name=uName)
     
     allWaveforms = concatenateUnitSpikeTrainWaveformsDF(
-        allUnits,
+        allUnits, dataQuery=dataQuery,
         transposeToColumns=transposeToColumns, concatOn=concatOn,
+        fastTranspose=fastTranspose,
         verbose=verbose, decimate=decimate, whichSegments=whichSegments,
-        setIndex=setIndex, procFun=procFun,
+        procFun=procFun,
         getMetaData=getMetaData, metaDataToCategories=metaDataToCategories)
 
     manipulateIndex = np.any(
@@ -532,7 +523,7 @@ def alignedAsigsToDF(
             collapseSizes, duplicateControlsByProgram,
             makeControlProgram, removeFuzzyName
             ])
-    if manipulateIndex and setIndex:
+    if manipulateIndex:
         idxLabels = allWaveforms.index.names
         allWaveforms.reset_index(inplace=True)
 
@@ -598,7 +589,7 @@ def alignedAsigsToDF(
         allWaveforms.set_index(
             list(idxLabels),
             inplace=True)
-    allWaveforms.columns.name = transposeToColumns
+    
     if transposeToColumns == 'feature':
         zipNames = zip(allWaveforms.columns.to_list(), unitNames)
         try:
@@ -669,7 +660,6 @@ def getAsigsAlignedToEvents(
         for subSegIdx, alignEvents in enumerate(alignEventGroups):
             # seg to contain triggered time series
             newSeg = Segment(name='seg{}_'.format(int(totalNSegs)))
-            totalNSegs += 1
             newSeg.annotate(nix_name=newSeg.name)
             masterBlock.segments.append(newSeg)
             for chanName in chansToTrigger:
@@ -754,6 +744,7 @@ def getAsigsAlignedToEvents(
                 thisUnit.spiketrains.append(st)
                 newSeg.spiketrains.append(st)
                 st.unit = thisUnit
+            totalNSegs += 1
     try:
         eventBlock.filter(
             objects=EventProxy)[0]._rawio.file.close()
@@ -785,6 +776,132 @@ def getAsigsAlignedToEvents(
     return masterBlock
 
 
+def getAsigsAlignedToEventsOneUnit(
+        eventBlock=None, eventName=None, chansToAlign=None,
+        windowSize=None, chunkSize=None,
+        checkReferences=False, verbose=False
+        ):
+    #  make channels and units for triggered time series
+    thisUnit = Unit(name=eventName)
+    
+    allAlignEvents = []
+    for segIdx, eventSeg in enumerate(eventBlock.segments):
+        evPs = eventSeg.filter(
+            objects=EventProxy, name=eventName)
+        if len(evPs):
+            event = evPs[0].load()
+            event = loadObjArrayAnn(event)
+        else:
+            evs = eventSeg.filter(objects=Event, name=eventName)
+            event = evs[0]
+        if segIdx == 0:
+            skipAnnNames = (
+                list(event.annotations['arrayAnnNames']) +
+                ['nix_name', 'neo_name']
+                )
+        if chunkSize is None:
+            alignEventGroups = [event]
+        else:
+            nChunks = int(event.shape[0] / chunkSize)
+            alignEventGroups = []
+            for i in range(nChunks):
+                if i < (nChunks - 1):
+                    alignEventGroups.append(
+                        event[i * chunkSize: (i + 1) * chunkSize])
+                else:
+                    alignEventGroups.append(
+                        event[i * chunkSize:])
+        allAlignEvents.append(alignEventGroups)
+    
+    samplingRate = chansToAlign[0].analogsignals[0].sampling_rate
+    nominalWinLen = int(
+        (windowSize[1] - windowSize[0]) *
+        samplingRate - 1)
+    signalBlock = chansToAlign[0].block
+    
+    totalNSegs = 0
+    for segIdx, signalSeg in enumerate(signalBlock.segments):
+        for subSegIdx, alignEvents in enumerate(allAlignEvents[segIdx]):
+            spikeWaveforms = np.zeros((alignEvents.shape[0], len(chansToAlign), nominalWinLen))
+            asigTStart = chansToAlign[0].analogsignals[segIdx].t_start
+            asigTStop = chansToAlign[0].analogsignals[segIdx].t_stop
+            validMask = (
+                ((
+                    alignEvents + windowSize[1] +
+                    samplingRate ** (-1)) < asigTStart) &
+                ((
+                    alignEvents + windowSize[0] -
+                    samplingRate ** (-1)) > asigTStop)
+                )
+            alignEvents = alignEvents[validMask]
+            for chanIdx in chansToAlign:
+                asigP = chanIdx.filter(objects=AnalogSignalProxy)[segIdx]
+                if checkReferences:
+                    da = (
+                        asigP
+                        ._rawio
+                        .da_list['blocks'][0]['segments'][segIdx]['data'])
+                    print('segIdx {}, asigP.name {}'.format(
+                        segIdx, asigP.name))
+                    print('asigP._global_channel_indexes = {}'.format(
+                        asigP._global_channel_indexes))
+                    print('asigP references {}'.format(
+                        da[asigP._global_channel_indexes[0]]))
+                    try:
+                        assert (
+                            asigP.name
+                            in da[asigP._global_channel_indexes[0]].name)
+                    except Exception:
+                        traceback.print_exc()
+                rawWaveforms = [
+                    asigP.load(
+                        time_slice=(t + windowSize[0], t + windowSize[1]))
+                    for t in alignEvents]
+                waveformUnits = rawWaveforms[0].units
+                #  fix length if roundoff error
+                #  minLen = min([rW.shape[0] for rW in rawWaveforms])
+                rawWaveforms = [rW[:nominalWinLen] for rW in rawWaveforms]
+                theseSpikeWaveforms = (
+                    np.hstack([rW.magnitude for rW in rawWaveforms])
+                    .transpose()[:, np.newaxis, :] * waveformUnits
+                    )
+                metaIndex = np.nan  # TODO: Figure out how to stack these
+                spikeWaveforms[:, metaIndex, :] = theseSpikeWaveforms
+            stAnn = {
+                k: v
+                for k, v in alignEvents.annotations.items()
+                if k not in skipAnnNames
+                }
+            stArrayAnn = {
+                k: alignEvents.array_annotations[k]
+                for k in alignEvents.annotations['arrayAnnNames']
+            }
+            st = SpikeTrain(
+                name='seg{}_{}'.format(int(totalNSegs), thisUnit.name),
+                times=alignEvents.times,
+                waveforms=spikeWaveforms,
+                t_start=asigP.t_start, t_stop=asigP.t_stop,
+                left_sweep=windowSize[0] * (-1),
+                sampling_rate=samplingRate,
+                **stArrayAnn,
+                **stAnn
+                )
+            st.annotate(nix_name=st.name)
+            thisUnit.spiketrains.append(st)
+            st.unit = thisUnit
+            totalNSegs += 1
+    try:
+        eventBlock.filter(
+            objects=EventProxy)[0]._rawio.file.close()
+    except Exception:
+        traceback.print_exc()
+    if signalBlock is not eventBlock:
+        signalBlock.filter(
+            objects=AnalogSignalProxy)[0]._rawio.file.close()
+    
+    return thisUnit
+
+
 def alignedAsigDFtoSpikeTrain(
         allWaveforms, dataBlock=None):
     masterBlock = Block()
@@ -794,6 +911,7 @@ def alignedAsigDFtoSpikeTrain(
         print('Saving trajectoriess for segment {}'.format(segIdx))
         dataSeg = dataBlock.segments[segIdx]
         exSt = dataSeg.spiketrains[0]
+        
         if isinstance(exSt, SpikeTrainProxy):
             print(
                 'alignedAsigDFtoSpikeTrain basing seg {} on {}'
@@ -802,10 +920,12 @@ def alignedAsigDFtoSpikeTrain(
             exSt = loadStProxy(stProxy)
             exSt = loadObjArrayAnn(exSt)
         print('exSt.left_sweep is {}'.format(exSt.left_sweep))
+        wfBins = ((np.arange(exSt.waveforms.shape[2]) /(exSt.sampling_rate)) -exSt.left_sweep).magnitude
         # seg to contain triggered time series
         newSeg = Segment(name=dataSeg.annotations['neo_name'])
         newSeg.annotate(nix_name=dataSeg.annotations['neo_name'])
         masterBlock.segments.append(newSeg)
+        #
         if group.columns.name == 'bin':
             grouper = group.groupby('feature')
             colsAre = 'bin'
@@ -827,16 +947,19 @@ def alignedAsigDFtoSpikeTrain(
             else:
                 thisUnit = masterBlock.filter(
                     objects=Unit, name=featName + '#0')[0]
-            #  pdb.set_trace()
             if colsAre == 'bin':
                 spikeWaveformsDF = featGroup
             elif colsAre == 'feature':
-                idxLabels = featGroup.index.names
-                tempDF = featGroup.reset_index()
-                tempDF.columns.name = 'feature'
+                if isinstance(featGroup, pd.Series):
+                    featGroup = featGroup.to_frame(name=featName)
+                    featGroup.columns.name = 'feature'
                 spikeWaveformsDF = transposeSpikeDF(
-                    tempDF, idxLabels,
-                    'bin', setIndex=True, fastTranspose=True)
+                    featGroup,
+                    'bin', fastTranspose=True)
+            if len(spikeWaveformsDF.columns) != len(wfBins):
+                wfDF = spikeWaveformsDF.reset_index(drop=True).T
+                wfDF = hf.interpolateDF(wfDF, wfBins)
+                spikeWaveformsDF = wfDF.T.set_index(spikeWaveformsDF.index)
             spikeWaveforms = spikeWaveformsDF.to_numpy()[:, np.newaxis, :]
             arrAnnDF = spikeWaveformsDF.index.to_frame()
             spikeTimes = arrAnnDF['t']
@@ -845,11 +968,8 @@ def alignedAsigDFtoSpikeTrain(
             colsToKeep = arrAnnDF.columns.drop(['originalIndex', 'feature', 'segment'])
             for cName in colsToKeep:
                 values = arrAnnDF[cName].to_numpy()
-                #  print('{} dtype {}'.format(values, values.dtype))
                 if isinstance(values[0], str):
                     values = values.astype('U')
-                # if isinstance(values[0], np.float64):
-                #     values = values.astype(np.float32)
                 arrAnn.update({str(cName): values.flatten()})
             arrayAnnNames = {
                 'arrayAnnNames': list(arrAnn.keys())}
@@ -863,7 +983,6 @@ def alignedAsigDFtoSpikeTrain(
                 **arrAnn, **arrayAnnNames
                 )
             st.annotate(nix_name=st.name)
-            
             thisUnit.spiketrains.append(st)
             newSeg.spiketrains.append(st)
             st.unit = thisUnit
@@ -1333,18 +1452,6 @@ def readBlockFixNames(
             stpBaseName = '_'.join(stp.name.split('_')[1:])
         else:
             stpBaseName = stp.name
-        '''
-        if isinstance(rawioReader, neo.io.blackrockio.BlackrockIO):
-            unit = stp.unit
-            nameParser = re.search(r'ch(\d*)#(\d*)', unit.name)
-            chanId = nameParser.group(1)
-            unitId = nameParser.group(2)
-            chanIdx = [
-                i for i in dataBlock.channel_indexes
-                if int(chanId) in i.channel_ids][0]
-            stpBaseName = '{}#{}'.format(chanIdx.name, unitId)
-            stp.name = stpBaseName
-        '''
         if 'ChannelIndex for ' in stp.unit.channel_index.name:
             stp.unit.name = stpBaseName
             stp.unit.channel_index.name = stpBaseName

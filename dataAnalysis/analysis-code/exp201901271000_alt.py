@@ -166,4 +166,5 @@ def getExpOpts():
             [185, 1501],
             ]
         ]
+    gpfaRunIdx = 1
     return locals()

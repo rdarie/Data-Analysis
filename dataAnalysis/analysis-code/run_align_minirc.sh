@@ -19,19 +19,19 @@
 # Specify account details
 #SBATCH --account=bibs-dborton-condo
 
-EXP="exp201901201200_alt"
+# EXP="exp201901201200_alt"
 # EXP="exp201901211000_alt"
-# EXP="exp201901271000_alt"
-MINIRCIDX="1"
+EXP="exp201901271000_alt"
+MINIRCIDX="5"
 
-#  python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcStimAlignTimes.py' --trialIdx=$MINIRCIDX --exp=$EXP
-#  python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcFR.py' --trialIdx=$MINIRCIDX --exp=$EXP
-#  python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcFRsqrt.py' --trialIdx=$MINIRCIDX --exp=$EXP
-#  python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcAlignedAsigs.py' --exp=$EXP --trialIdx=$MINIRCIDX --eventName=stimAlignTimes --chanQuery="(not(chanName.str.contains('elec')or(chanName.str.contains('pca')))" --blockName=other
-#  python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcAlignedAsigs.py' --exp=$EXP --trialIdx=$MINIRCIDX --eventName=stimAlignTimes --chanQuery="(chanName.str.endswith('fr'))" --blockName=fr
-#  python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcAlignedAsigs.py' --exp=$EXP --trialIdx=$MINIRCIDX --eventName=stimAlignTimes --chanQuery="(chanName.str.endswith('fr_sqrt'))" --blockName=fr_sqrt
-#  python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcAlignedRasters.py' --exp=$EXP --trialIdx=$MINIRCIDX --eventName=stimAlignTimes --chanQuery="(chanName.str.endswith('raster'))" --blockName=raster
-python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcAlignedAsigs.py' --exp=$EXP --trialIdx=$MINIRCIDX --window=miniRC --eventName=stimAlignTimes --chanQuery="(not(chanName.str.contains('elec')or(chanName.str.contains('pca')))" --blockName=other
-python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcAlignedAsigs.py' --exp=$EXP --trialIdx=$MINIRCIDX --window=miniRC --eventName=stimAlignTimes --chanQuery="(chanName.str.endswith('fr'))" --blockName=fr
-python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcAlignedAsigs.py' --exp=$EXP --trialIdx=$MINIRCIDX --window=miniRC --eventName=stimAlignTimes --chanQuery="(chanName.str.endswith('fr_sqrt'))" --blockName=fr_sqrt
-python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcAlignedRasters.py' --exp=$EXP --trialIdx=$MINIRCIDX --window=miniRC --eventName=stimAlignTimes --chanQuery="(chanName.str.endswith('raster'))" --blockName=raster
+#  python3 './calcFR.py' --trialIdx=$MINIRCIDX --exp=$EXP
+#  python3 './calcFRsqrt.py' --trialIdx=$MINIRCIDX --exp=$EXP
+#  python3 './calcAlignedAsigs.py' --exp=$EXP --trialIdx=$MINIRCIDX --eventName=stimAlignTimes --chanQuery="(not(chanName.str.contains('elec')or(chanName.str.contains('pca')))" --blockName=other
+#  python3 './calcStimAlignTimes.py' --trialIdx=$MINIRCIDX --exp=$EXP
+#  python3 './calcAlignedAsigs.py' --exp=$EXP --trialIdx=$MINIRCIDX --eventName=stimAlignTimes --chanQuery="(chanName.str.endswith('fr'))" --blockName=fr
+#  python3 './calcAlignedAsigs.py' --exp=$EXP --trialIdx=$MINIRCIDX --eventName=stimAlignTimes --chanQuery="(chanName.str.endswith('fr_sqrt'))" --blockName=fr_sqrt
+#  python3 './calcAlignedRasters.py' --exp=$EXP --trialIdx=$MINIRCIDX --eventName=stimAlignTimes --chanQuery="(chanName.str.endswith('raster'))" --blockName=raster
+#  python3 './calcAlignedAsigs.py' --exp=$EXP --trialIdx=$MINIRCIDX --window=miniRC --eventName=stimAlignTimes --chanQuery="(not(chanName.str.contains('elec')or(chanName.str.contains('pca')))" --blockName=other
+#  python3 './calcAlignedAsigs.py' --exp=$EXP --trialIdx=$MINIRCIDX --window=miniRC --eventName=stimAlignTimes --chanQuery="(chanName.str.endswith('fr'))" --blockName=fr
+#  python3 './calcAlignedAsigs.py' --exp=$EXP --trialIdx=$MINIRCIDX --window=miniRC --eventName=stimAlignTimes --chanQuery="(chanName.str.endswith('fr_sqrt'))" --blockName=fr_sqrt
+python3 './calcAlignedRasters.py' --exp=$EXP --trialIdx=$MINIRCIDX --window=miniRC --eventName=stimAlignTimes --chanQuery="(chanName.str.endswith('raster'))" --blockName=raster

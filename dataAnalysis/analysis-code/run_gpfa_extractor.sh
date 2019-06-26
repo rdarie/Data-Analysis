@@ -10,11 +10,11 @@
 #SBATCH --mem=59G
 
 # Specify a job name:
-#SBATCH -J calc_pca
+#SBATCH -J extract_GPFA
 
 # Specify an output file
-#SBATCH -o ../batch_logs/%j-calc_pca.stdout
-#SBATCH -e ../batch_logs/%j-calc_pca.errout
+#SBATCH -o ../batch_logs/%j-extract_GPFA.stdout
+#SBATCH -e ../batch_logs/%j-extract_GPFA.errout
 
 # Specify account details
 #SBATCH --account=bibs-dborton-condo
@@ -26,5 +26,4 @@ EXP="exp201901271000_alt"
 SELECTOR="201901271000-Proprio_minfr"
 # SELECTOR="201901201200-Proprio_minfr"
 
-# python3 './selectUnitsByMeanFR.py' --exp=$EXP --processAll
-python3 './calcPCAinChunks.py' --exp=$EXP --processAll --selector=$SELECTOR
+python3 './applyGPFAtoTriggered.py' --exp=$EXP --processAll --selector=$SELECTOR --verbose

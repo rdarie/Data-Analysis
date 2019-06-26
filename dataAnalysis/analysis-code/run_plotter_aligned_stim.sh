@@ -22,7 +22,8 @@
 # EXP="exp201901211000_alt"
 # EXP="exp201901271000_alt"
 EXP="exp201901201200_alt"
+# SELECTOR="201901201200-Proprio_minfr"
 MINIRCIDX="1"
 
-python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/plotAsigsAlignedToStim.py' --exp=$EXP --trialIdx=$MINIRCIDX  --window=miniRCWindow
-python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/plotNeuronsAlignedToStim.py' --exp=$EXP --trialIdx=$MINIRCIDX  --window=miniRCWindow
+python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/plotAsigsAlignedToStim.py' --exp=$EXP --trialIdx=$MINIRCIDX  --window=miniRC --blockName=gpfa --chanQuery="(chanName.str.contains('gpfa'))"
+# python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/plotNeuronsAlignedToStim.py' --exp=$EXP --trialIdx=$MINIRCIDX  --window=miniRC  --selector=$SELECTOR

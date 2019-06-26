@@ -282,6 +282,7 @@ def plotAsigsAligned(
     if chanNames is None:
         chanNames = ns5.listChanNames(
             dataBlock, chanQuery, objType=Unit)
+    #[i.name for i in dataBlock.filter(objects=Unit)]
     nUnits = len(chanNames)
     with PdfPages(os.path.join(figureFolder, pdfName + '.pdf')) as pdf:
         allPvals = {}
@@ -441,27 +442,28 @@ def plotSignificance(
         testWidth=None,
         pdfName='pCount',
         figureFolder=None):
-
     gPH = sns.catplot(
         y='significant', x='bin',
         row=rowName, col=colName,
         kind='bar', ci=None, data=pValsDF.reset_index(),
         linewidth=0, color='m', dodge=False
         )
+    targetNLabels = 6
     for ax in gPH.axes.flat:
+        labels = ax.get_xticklabels()
         ax.set_ylim((0, 1))
-        #  labels = ax.get_xticklabels()
-        #  for i,l in enumerate(labels):
-        #      if (i%200 != 0): labels[i] = ''  # skip every nth label
-        #  ax.set_xticklabels(labels, rotation=30)
-        newwidth = testStride
+        skipEvery = len(labels) // targetNLabels
+        for i, l in enumerate(labels):
+            if (i % skipEvery != 0): labels[i] = ''  # skip every nth labe
+        ax.set_xticklabels(labels, rotation=30)
+        newwidth = (ax.get_xticks()[1] - ax.get_xticks()[0])
         for bar in ax.patches:
             x = bar.get_x()
+            print(x)
             width = bar.get_width()
             centre = x + width/2.
             bar.set_x(centre - newwidth/2.)
             bar.set_width(newwidth)
-
     gPH.savefig(os.path.join(figureFolder, pdfName + '.pdf'))
     plt.close()
     return

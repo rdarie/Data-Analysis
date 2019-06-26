@@ -20,6 +20,15 @@ def parseAnalysisOptions(trialIdx, experimentShorthand):
     ns5FileName = 'Trial00{}'.format(trialIdx)
     miniRCTrialLookup = expOpts['miniRCTrialLookup']
     miniRCTrial = miniRCTrialLookup[trialIdx]
+    
+    gpfaOpts = {
+        'xDim': 12,
+        'segLength': 20,
+        'binWidth': 30,
+        'kernSD': 50,
+        'runIdx': expOpts['gpfaRunIdx'],
+        'installFolder': '/gpfs_home/rdarie/Github/NeuralTraj'
+    }
 
     defaultTapDetectOpts = {
         'iti': 0.2,
@@ -233,7 +242,6 @@ def parseAnalysisOptions(trialIdx, experimentShorthand):
     plotOpts = {
         'type': 'ticks', 'errorBar': 'sem',
         'pageSize': (6, 12), 'removeOutliers': (0.01, 0.975)}
-
     pThresh = 1e-3
     try:
         experimentsToAssemble = expOpts['experimentsToAssemble']

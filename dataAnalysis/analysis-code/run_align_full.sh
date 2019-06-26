@@ -19,18 +19,20 @@
 # Specify account details
 #SBATCH --account=bibs-dborton-condo
 
+#  root /gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code
 #  EXP="exp201901211000_alt"
 EXP="exp201901271000_alt"
 
-#  python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/assembleExperimentData.py' --exp=$EXP
-#  python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcMotionStimAlignTimes.py' --trialIdx=1 --exp=$EXP --processAll --plotParamHistograms
-#  python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcFR.py' --trialIdx=1 --exp=$EXP --processAll
-#  python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcFRsqrt.py' --trialIdx=1 --exp=$EXP --processAll
-#  python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcAlignedAsigs.py' --exp=$EXP --processAll --chanQuery="(not(chanName.str.contains('elec')))" --blockName=other
-#  python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcAlignedAsigs.py' --exp=$EXP --processAll --chanQuery="(chanName.str.endswith('fr'))" --blockName=fr
-python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcAlignedAsigs.py' --exp=$EXP --processAll --chanQuery="(chanName.str.endswith('fr_sqrt'))" --blockName=fr_sqrt
-python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcAlignedRasters.py' --exp=$EXP --processAll --chanQuery="(chanName.str.endswith('raster'))" --blockName=raster
-#  python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcAlignedAsigs.py' --window=long --exp=$EXP --processAll --chanQuery="(not(chanName.str.contains('elec')))" --blockName=other
-#  python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcAlignedAsigs.py' --window=long --exp=$EXP --processAll --chanQuery="(chanName.str.endswith('fr'))" --blockName=fr
-#  python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcAlignedAsigs.py' --window=long --exp=$EXP --processAll --chanQuery="(chanName.str.endswith('fr_sqrt'))" --blockName=fr_sqrt
-#  python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcAlignedRasters.py' --window=long --exp=$EXP --processAll --chanQuery="(chanName.str.endswith('raster'))" --blockName=raster
+#  python3 './assembleExperimentData.py' --exp=$EXP
+#  python3 './calcMotionStimAlignTimes.py' --trialIdx=1 --exp=$EXP --processAll --plotParamHistograms
+#  python3 './calcFR.py' --trialIdx=1 --exp=$EXP --processAll
+#  python3 './calcFRsqrt.py' --trialIdx=1 --exp=$EXP --processAll
+#  python3 './calcAlignedAsigs.py' --exp=$EXP --processAll --chanQuery="(not(chanName.str.contains('elec')))" --blockName=other
+#  python3 './calcAlignedAsigs.py' --exp=$EXP --processAll --chanQuery="(chanName.str.endswith('fr'))" --blockName=fr
+#  python3 './calcAlignedAsigs.py' --exp=$EXP --processAll --chanQuery="(chanName.str.endswith('fr_sqrt'))" --blockName=fr_sqrt
+#  python3 './calcAlignedRasters.py' --exp=$EXP --processAll --chanQuery="(chanName.str.endswith('raster'))" --blockName=raster
+#  python3 './calcAlignedAsigs.py' --exp=$EXP --processAll --window=long --chanQuery="(not(chanName.str.contains('elec')))" --blockName=other
+#  python3 './calcAlignedAsigs.py' --exp=$EXP --processAll --window=long --chanQuery="(chanName.str.endswith('fr'))" --blockName=fr
+#  python3 './calcAlignedAsigs.py' --exp=$EXP --processAll --window=long --chanQuery="(chanName.str.endswith('fr_sqrt'))" --blockName=fr_sqrt
+#  python3 './calcAlignedRasters.py' --exp=$EXP --processAll --window=long --chanQuery="(chanName.str.endswith('raster'))" --blockName=raster
+#  python3 './selectUnitsByMeanFR.py' --exp=$EXP --processAll

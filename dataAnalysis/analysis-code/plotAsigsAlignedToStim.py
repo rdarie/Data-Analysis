@@ -16,6 +16,7 @@ Options:
     --window=window                 process with short window? [default: short]
     --chanQuery=chanQuery           how to restrict channels? [default: (chanName.str.endswith(\'fr\'))]
     --blockName=blockName           name for new block [default: fr]
+    --selector=selector             filename if using a unit selector
 """
 
 import dataAnalysis.plotting.aligned_signal_plots as asp
@@ -57,7 +58,7 @@ if arguments['--processAll']:
             scratchFolder,
             experimentName + '_trig_{}_{}.nix'.format(
                 arguments['--blockName'], arguments['--window'])))
-    pdfName = '{}_{}_{}_asigs_by_{}_aligned_to_{}'.format(
+    pdfName = '{}_{}_{}_by_{}_aligned_to_{}'.format(
         experimentName, arguments['--blockName'], arguments['--window'],
         hueName, arguments['--alignQuery'])
 else:
@@ -66,13 +67,13 @@ else:
             scratchFolder,
             ns5FileName + '_trig_{}_{}.nix'.format(
                 arguments['--blockName'], arguments['--window'])))
-    pdfName = '{}_{}_{}_{}_asigs_by_{}_aligned_to_{}'.format(
-        experimentName, arguments['--trialIdx'],
+    pdfName = '{}_{}_{}_by_{}_aligned_to_{}'.format(
+        arguments['--trialIdx'],
         arguments['--blockName'], arguments['--window'],
         hueName, arguments['--alignQuery'])
 
 dataQuery = '&'.join([
-    '((RateInHz==100)|(RateInHz==0))',
+    #'((RateInHz==100)|(RateInHz==0))',
     arguments['--alignQuery']
     ])
 testStride = 20e-3

@@ -6,10 +6,12 @@ Options:
     --trialIdx=trialIdx                    which trial to analyze [default: 1]
     --exp=exp                              which experimental day to analyze
     --processAll                           process entire experimental day? [default: False]
+    --verbose                              print diagnostics? [default: False]
     --alignQuery=alignQuery                what will the plot be aligned to? [default: (pedalMovementCat==\'midPeak\')]
     --window=window                        process with short window? [default: long]
     --estimatorName=estimatorName          filename for resulting estimator [default: pca]
-    --inputBlockName=inputBlockName        filename for resulting estimator [default: fr_sqrt]
+    --selector=selector                    filename if using a unit selector
+    --inputBlockName=inputBlockName        filename for input block [default: fr_sqrt]
     --unitQuery=unitQuery                  how to restrict channels? [default: (chanName.str.endswith(\'fr_sqrt#0\'))]
 """
 
@@ -26,7 +28,7 @@ import dataAnalysis.preproc.ns5 as ns5
 from sklearn.decomposition import PCA, IncrementalPCA
 from sklearn.pipeline import make_pipeline, Pipeline
 import joblib as jb
-import pickle
+import dill as pickle
 from currentExperiment_alt import parseAnalysisOptions
 from docopt import docopt
 import gc
@@ -35,6 +37,19 @@ expOpts, allOpts = parseAnalysisOptions(
     int(arguments['--trialIdx']), arguments['--exp'])
 globals().update(expOpts)
 globals().update(allOpts)
+
+if arguments['--selector'] is not None:
+    with open(
+        os.path.join(
+            scratchFolder,
+            arguments['--selector'] + '.pickle'),
+            'rb') as f:
+        selectorMetadata = pickle.load(f)
+    unitNames = [
+        i.replace('raster', 'fr_sqrt')
+        for i in selectorMetadata['outputFeatures']]
+else:
+    unitNames = None
 
 if arguments['--processAll']:
     triggeredPath = os.path.join(
@@ -54,6 +69,7 @@ else:
         ns5FileName + '_' + arguments['--estimatorName'] + '.joblib')
 
 prf.print_memory_usage('before load data')
+print(triggeredPath)
 dataReader = ns5.nixio_fr.NixIO(
     filename=triggeredPath)
 dataBlock = dataReader.read_block(
@@ -69,23 +85,25 @@ alignedAsigsKWargs = dict(
     transposeToColumns='feature', concatOn='columns',
     removeFuzzyName=False)
 
-dataQuery = '&'.join([
-    #  '((RateInHz==100)|(RateInHz==0))',
-    arguments['--alignQuery']
+if arguments['--alignQuery'] is None:
+    dataQuery = None
+else:
+    dataQuery = '&'.join([
+        arguments['--alignQuery']
     ])
 
-unitNames = None
 nSeg = len(dataBlock.segments)
 nComp = 50
 estimator = IncrementalPCA(
     n_components=nComp,
-    batch_size=int(3 * nComp))
+    batch_size=int(5 * nComp))
 
 for segIdx in range(nSeg):
     alignedAsigsDF = ns5.alignedAsigsToDF(
         dataBlock, unitNames,
-        unitQuery=arguments['--unitQuery'], dataQuery=dataQuery, verbose=True,
-        setIndex=False, getMetaData=False, decimate=2, whichSegments=[segIdx],
+        unitQuery=arguments['--unitQuery'], dataQuery=dataQuery,
+        verbose=True,
+        getMetaData=False, decimate=5, whichSegments=[segIdx],
         **alignedAsigsKWargs)
     prf.print_memory_usage('just loaded firing rates, fitting')
     estimator.partial_fit(alignedAsigsDF.to_numpy())
