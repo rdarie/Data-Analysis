@@ -8,12 +8,12 @@ Options:
     --exp=exp                       which experimental day to analyze
 """
 
-from currentExperiment_alt import parseAnalysisOptions
+from currentExperiment import parseAnalysisOptions
 from docopt import docopt
 import pdb
 
-arguments = docopt(__doc__)
-expOpts, allOpts = parseAnalysisOptions(int(arguments['--trialIdx']), arguments['--exp'])
+arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
+expOpts, allOpts = parseAnalysisOptions(int(arguments['trialIdx']), arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
 pdb.set_trace()

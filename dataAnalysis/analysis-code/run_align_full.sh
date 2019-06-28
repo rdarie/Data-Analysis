@@ -19,18 +19,18 @@
 # Specify account details
 #SBATCH --account=bibs-dborton-condo
 
-EXP="exp201901211000_alt"
-# EXP="exp201901271000_alt"
+# EXP="exp201901211000"
+EXP="exp201901271000"
 
 #  python3 './assembleExperimentData.py' --exp=$EXP
 #  python3 './calcMotionStimAlignTimes.py' --trialIdx=1 --exp=$EXP --processAll --plotParamHistograms
 #  python3 './calcFR.py' --exp=$EXP --processAll
 #  python3 './calcFRsqrt.py' --exp=$EXP --processAll
-#  python3 './calcAlignedAsigs.py' --exp=$EXP --processAll --chanQuery="(chanName.str.endswith('fr'))" --blockName=fr
-#  python3 './calcAlignedAsigs.py' --exp=$EXP --processAll --chanQuery="(chanName.str.endswith('fr_sqrt'))" --blockName=fr_sqrt
-#  python3 './calcAlignedRasters.py' --exp=$EXP --processAll --chanQuery="(chanName.str.endswith('raster'))" --blockName=raster
-#  python3 './calcAlignedAsigs.py' --exp=$EXP --processAll --chanQuery="not((chanName.str.contains('elec'))or(chanName.str.contains('pca')))" --blockName=other
-python3 './calcAlignedAsigs.py' --exp=$EXP --processAll --window=long --chanQuery="(chanName.str.endswith('fr'))" --blockName=fr
-python3 './calcAlignedAsigs.py' --exp=$EXP --processAll --window=long --chanQuery="(chanName.str.endswith('fr_sqrt'))" --blockName=fr_sqrt
-python3 './calcAlignedRasters.py' --exp=$EXP --processAll --window=long --chanQuery="(chanName.str.endswith('raster'))" --blockName=raster
-python3 './calcAlignedAsigs.py' --exp=$EXP --processAll --window=long --chanQuery="not((chanName.str.contains('elec'))or(chanName.str.contains('pca')))" --blockName=other
+#  python3 './calcAlignedAsigs.py' --exp=$EXP --processAll --unitQuery="(chanName.str.endswith('fr'))" --blockName=fr
+#  python3 './calcAlignedAsigs.py' --exp=$EXP --processAll --unitQuery="(chanName.str.endswith('fr_sqrt'))" --blockName=fr_sqrt
+#  python3 './calcAlignedRasters.py' --exp=$EXP --processAll --unitQuery="(chanName.str.endswith('raster'))" --blockName=raster
+#  python3 './calcAlignedAsigs.py' --exp=$EXP --processAll --unitQuery="not((chanName.str.contains('elec'))or(chanName.str.contains('pca')))" --blockName=other
+python3 './calcAlignedAsigs.py' --exp=$EXP --processAll --window=long --unitQuery="(chanName.str.endswith('fr'))" --blockName=fr
+python3 './calcAlignedAsigs.py' --exp=$EXP --processAll --window=long --unitQuery="(chanName.str.endswith('fr_sqrt'))" --blockName=fr_sqrt
+python3 './calcAlignedRasters.py' --exp=$EXP --processAll --window=long --unitQuery="(chanName.str.endswith('raster'))" --blockName=raster
+python3 './calcAlignedAsigs.py' --exp=$EXP --processAll --window=long --unitQuery="not((chanName.str.contains('elec'))or(chanName.str.contains('pca')))" --blockName=other

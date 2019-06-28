@@ -35,28 +35,28 @@ import dill as pickle
 #  import gc
 import subprocess
 
-from currentExperiment_alt import parseAnalysisOptions
+from currentExperiment import parseAnalysisOptions
 from docopt import docopt
-arguments = docopt(__doc__)
+arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
-    int(arguments['--trialIdx']), arguments['--exp'])
+    int(arguments['trialIdx']), arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
 
-verbose = arguments['--verbose']
+verbose = arguments['verbose']
 
-if arguments['--processAll']:
+if arguments['processAll']:
     prefix = experimentName
 else:
     prefix = ns5FileName
 triggeredPath = os.path.join(
     scratchFolder,
     prefix + '_raster_{}.nix'.format(
-        arguments['--window']))
+        arguments['window']))
 
 intermediatePath = triggeredPath.replace(
     '.nix',
-    '_for_gpfa_{}.mat'.format(arguments['--alignSuffix']))
+    '_for_gpfa_{}.mat'.format(arguments['alignSuffix']))
 
 if verbose:
     prf.print_memory_usage('before load data')
@@ -66,23 +66,23 @@ dataBlock = dataReader.read_block(
     block_index=0, lazy=True,
     signal_group_mode='split-all')
 
-if arguments['--alignQuery'] is None:
+if arguments['alignQuery'] is None:
     dataQuery = None
-elif len(arguments['--alignQuery']) == 0:
+elif len(arguments['alignQuery']) == 0:
     dataQuery = None
 else:
     dataQuery = '&'.join([
-        arguments['--alignQuery']
+        arguments['alignQuery']
     ])
 
 if verbose:
     prf.print_memory_usage('before load firing rates')
 
-if arguments['--selector'] is not None:
+if arguments['selector'] is not None:
     with open(
         os.path.join(
             scratchFolder,
-            arguments['--selector'] + '.pickle'),
+            arguments['selector'] + '.pickle'),
             'rb') as f:
         selectorMetadata = pickle.load(f)
     unitNames = selectorMetadata['outputFeatures']
@@ -102,7 +102,7 @@ if miniRCTrial:
 
 alignedRastersDF = ns5.alignedAsigsToDF(
     dataBlock, unitNames,
-    unitQuery=arguments['--unitQuery'], dataQuery=dataQuery,
+    unitQuery=arguments['unitQuery'], dataQuery=dataQuery,
     procFun=lambda wfdf: wfdf > 0,
     transposeToColumns='bin', concatOn='index',
     **alignedAsigsKWargs, verbose=True)

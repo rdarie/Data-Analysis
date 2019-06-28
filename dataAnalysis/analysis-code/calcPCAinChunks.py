@@ -29,20 +29,20 @@ from sklearn.decomposition import PCA, IncrementalPCA
 from sklearn.pipeline import make_pipeline, Pipeline
 import joblib as jb
 import dill as pickle
-from currentExperiment_alt import parseAnalysisOptions
+from currentExperiment import parseAnalysisOptions
 from docopt import docopt
 import gc
-arguments = docopt(__doc__)
+arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
-    int(arguments['--trialIdx']), arguments['--exp'])
+    int(arguments['trialIdx']), arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
 
-if arguments['--selector'] is not None:
+if arguments['selector'] is not None:
     with open(
         os.path.join(
             scratchFolder,
-            arguments['--selector'] + '.pickle'),
+            arguments['selector'] + '.pickle'),
             'rb') as f:
         selectorMetadata = pickle.load(f)
     unitNames = [
@@ -57,7 +57,7 @@ alignedAsigsKWargs = dict(
     transposeToColumns='feature', concatOn='columns',
     removeFuzzyName=False)
 
-if arguments['--processAll']:
+if arguments['processAll']:
     prefix = experimentName
 else:
     prefix = ns5FileName
@@ -65,10 +65,10 @@ else:
 triggeredPath = os.path.join(
     scratchFolder,
     prefix + '_{}_{}.nix'.format(
-        arguments['--inputBlockName'], arguments['--window']))
+        arguments['inputBlockName'], arguments['window']))
 estimatorPath = os.path.join(
     scratchFolder,
-    prefix + '_' + arguments['--estimatorName'] + '.joblib')
+    prefix + '_' + arguments['estimatorName'] + '.joblib')
 
 prf.print_memory_usage('before load data')
 print(triggeredPath)
@@ -78,11 +78,11 @@ dataBlock = dataReader.read_block(
     block_index=0, lazy=True,
     signal_group_mode='split-all')
 
-if arguments['--alignQuery'] is None:
+if arguments['alignQuery'] is None:
     dataQuery = None
 else:
     dataQuery = '&'.join([
-        arguments['--alignQuery']
+        arguments['alignQuery']
     ])
 
 nSeg = len(dataBlock.segments)
@@ -94,7 +94,7 @@ estimator = IncrementalPCA(
 for segIdx in range(nSeg):
     alignedAsigsDF = ns5.alignedAsigsToDF(
         dataBlock, unitNames,
-        unitQuery=arguments['--unitQuery'], dataQuery=dataQuery,
+        unitQuery=arguments['unitQuery'], dataQuery=dataQuery,
         verbose=True,
         getMetaData=False, decimate=5, whichSegments=[segIdx],
         **alignedAsigsKWargs)
@@ -110,8 +110,8 @@ jb.dump(estimator, estimatorPath)
 estimatorMetadata = {
     'trainingDataPath': os.path.basename(triggeredPath),
     'path': os.path.basename(estimatorPath),
-    'name': arguments['--estimatorName'],
-    'inputBlockName': arguments['--inputBlockName'],
+    'name': arguments['estimatorName'],
+    'inputBlockName': arguments['inputBlockName'],
     'inputFeatures': saveColumns,
     'dataQuery': dataQuery,
     'alignedAsigsKWargs': alignedAsigsKWargs

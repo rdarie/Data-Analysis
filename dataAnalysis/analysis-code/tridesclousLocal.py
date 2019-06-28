@@ -17,7 +17,7 @@ import dataAnalysis.helperFunctions.helper_functions as hf
 from currentExperiment import *
 import os, gc
 
-arguments = docopt(__doc__)
+arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 '''
 arguments = {
   "--showProgressbar": False,
@@ -26,9 +26,9 @@ arguments = {
 '''
 
 #  if overriding currentExperiment
-if arguments['--trialIdx']:
+if arguments['trialIdx']:
     print(arguments)
-    trialIdx = int(arguments['--trialIdx'])
+    trialIdx = int(arguments['trialIdx'])
     ns5FileName = 'Trial00{}'.format(trialIdx)
     triFolder = os.path.join(
         nspFolder, 'tdc_' + ns5FileName)
@@ -107,7 +107,7 @@ for chan_grp in chansToAnalyze:
         triFolder, shape_distance_threshold=3e-2,
         debugging=True,
         chan_grp=chan_grp,
-        progressbar=arguments['--showProgressbar'])
+        progressbar=arguments['showProgressbar'])
     gc.collect()
 
 for chan_grp in chansToAnalyze:

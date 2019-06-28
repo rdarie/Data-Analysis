@@ -22,4 +22,4 @@
 # Run a command
 module load mpi
 # module load python/3.5.2
-srun --mpi=pmi2 ./test_mpi.py --trialIdx=1 --exp=exp201901271000_alt
+srun --mpi=pmi2 ./test_mpi.py --trialIdx=1 --exp=exp201901271000

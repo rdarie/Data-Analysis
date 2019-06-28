@@ -15,26 +15,26 @@ from docopt import docopt
 import tridesclous as tdc
 import dataAnalysis.helperFunctions.tridesclous_helpers as tdch
 import dataAnalysis.helperFunctions.helper_functions as hf
-from currentExperiment_alt import parseAnalysisOptions
+from currentExperiment import parseAnalysisOptions
 #from exp201901211000 import *
 import os, gc, traceback
 
-arguments = docopt(__doc__)
+arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
-    int(arguments['--trialIdx']),
-    arguments['--exp'])
+    int(arguments['trialIdx']),
+    arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
 
 viewPeeler = False
-if arguments['--peeler']:
-    viewPeeler = arguments['--peeler']
+if arguments['peeler']:
+    viewPeeler = arguments['peeler']
 viewConstructor = False
-if arguments['--constructor']:
-    viewConstructor = arguments['--constructor']
+if arguments['constructor']:
+    viewConstructor = arguments['constructor']
 
-chan_start = int(arguments['--chan_start'])
-chan_stop = int(arguments['--chan_stop'])
+chan_start = int(arguments['chan_start'])
+chan_stop = int(arguments['chan_stop'])
 dataio = tdc.DataIO(dirname=triFolder)
 chansToAnalyze = sorted(list(dataio.channel_groups.keys()))[chan_start:chan_stop]
 

@@ -7,7 +7,7 @@ Options:
     --exp=exp                       which experimental day to analyze
     --processAll                    process entire experimental day? [default: False]
     --window=window                 process with short window? [default: short]
-    --chanQuery=chanQuery           how to restrict channels?
+    --unitQuery=unitQuery           how to restrict channels?
     --selector=selector             filename if using a unit selector
     --alignQuery=alignQuery         what will the plot be aligned to? [default: (pedalMovementCat==\'outbound\')]
     --nameSuffix=nameSuffix         add an identifier to the pdf name? [default: alignedToOutbound]
@@ -30,12 +30,12 @@ import seaborn as sns
 import dill as pickle
 import pdb
 
-from currentExperiment_alt import parseAnalysisOptions
+from currentExperiment import parseAnalysisOptions
 from docopt import docopt
-arguments = docopt(__doc__)
+arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 
 expOpts, allOpts = parseAnalysisOptions(
-    int(arguments['--trialIdx']), arguments['--exp'])
+    int(arguments['trialIdx']), arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
 
@@ -44,21 +44,21 @@ sns.set_color_codes("dark")
 sns.set_context("notebook")
 sns.set_style("white")
 
-rowName = arguments['--rowName']
+rowName = arguments['rowName']
 try:
-    rowControl = int(arguments['--rowControl'])
+    rowControl = int(arguments['rowControl'])
 except Exception:
-    rowControl = arguments['--rowControl']
-colName = arguments['--colName']
+    rowControl = arguments['rowControl']
+colName = arguments['colName']
 try:
-    colControl = int(arguments['--colControl'])
+    colControl = int(arguments['colControl'])
 except Exception:
-    colControl = arguments['--colControl']
-hueName = arguments['--hueName']
+    colControl = arguments['colControl']
+hueName = arguments['hueName']
 try:
-    hueControl = int(arguments['--hueControl'])
+    hueControl = int(arguments['hueControl'])
 except Exception:
-    hueControl = arguments['--hueControl']
+    hueControl = arguments['hueControl']
 
 # during movement and stim
 pedalSizeQuery = '(' + '|'.join([
@@ -69,7 +69,7 @@ pedalSizeQuery = '(' + '|'.join([
 dataQuery = '&'.join([
     '((RateInHzFuzzy==100)|(RateInHzFuzzy==0))',
     #  '((amplitudeCatFuzzy==3)|(amplitudeCatFuzzy==0))',
-    arguments['--alignQuery'],
+    arguments['alignQuery'],
     pedalSizeQuery,
     #  '(pedalDirection == \'CW\')'
     ])
@@ -79,7 +79,7 @@ testTStart = 0
 testTStop = 500e-3
 colorPal = "ch:0.6,-.2,dark=.2,light=0.7,reverse=1"  #  for firing rates
 
-if arguments['--processAll']:
+if arguments['processAll']:
     prefix = experimentName
 else:
     prefix = ns5FileName
@@ -87,22 +87,22 @@ rasterBlock = preproc.loadWithArrayAnn(
     os.path.join(
         scratchFolder,
         prefix + '_raster_{}.nix'.format(
-            arguments['--window'])))
+            arguments['window'])))
 frBlock = preproc.loadWithArrayAnn(
     os.path.join(
         scratchFolder,
         prefix + '_fr_{}.nix'.format(
-            arguments['--window'])))
+            arguments['window'])))
 pdfName = '{}_{}_neurons_{}'.format(
     prefix,
-    arguments['--window'],
-    arguments['--nameSuffix'])
+    arguments['window'],
+    arguments['nameSuffix'])
 
-if arguments['--selector'] is not None:
+if arguments['selector'] is not None:
     with open(
         os.path.join(
             scratchFolder,
-            arguments['--selector'] + '.pickle'),
+            arguments['selector'] + '.pickle'),
             'rb') as f:
         selectorMetadata = pickle.load(f)
     unitNames = [
@@ -115,7 +115,7 @@ asp.plotNeuronsAligned(
     rasterBlock,
     frBlock,
     dataQuery=dataQuery,
-    chanNames=unitNames, chanQuery=arguments['--chanQuery'],
+    chanNames=unitNames, chanQuery=arguments['unitQuery'],
     figureFolder=figureFolder,
     rowName=rowName,
     rowControl=rowControl,

@@ -7,7 +7,7 @@ Options:
     --exp=exp                       which experimental day to analyze
     --processAll                    process entire experimental day? [default: False]
     --window=window                 process with short window? [default: short]
-    --chanQuery=chanQuery           how to restrict channels? [default: (chanName.str.endswith(\'fr\'))]
+    --unitQuery=unitQuery           how to restrict channels? [default: (chanName.str.endswith(\'fr\'))]
     --blockName=blockName           name for new block [default: fr]
     --eventName=eventName           name of events object to align to [default: motionStimAlignTimes]
 """
@@ -23,18 +23,18 @@ import numpy as np
 import pandas as pd
 import quantities as pq
 
-from currentExperiment_alt import parseAnalysisOptions
+from currentExperiment import parseAnalysisOptions
 from docopt import docopt
-arguments = docopt(__doc__)
+arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
-    int(arguments['--trialIdx']),
-    arguments['--exp'])
+    int(arguments['trialIdx']),
+    arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
 
 verbose = False
 #  source of events
-if arguments['--processAll']:
+if arguments['processAll']:
     eventReader = ns5.nixio_fr.NixIO(
         filename=experimentDataPath)
 else:
@@ -56,13 +56,13 @@ chansToAlignNames = None
 #     'elec83#0_fr_sqrt', 'elec78#0_fr_sqrt',
 #     'elec78#1_fr_sqrt']
 if chansToAlignNames is None:
-    chansToAlignNames = ns5.listChanNames(signalBlock, arguments['--chanQuery'])
+    chansToAlignNames = ns5.listChanNames(signalBlock, arguments['unitQuery'])
 chansToAlign = []
 for n in chansToAlignNames:
     chansToAlign.append(signalBlock.filter(objects=ChannelIndex, name=n))
 
 windowSize = [
     i * pq.s
-    for i in rasterOpts['windowSizes'][arguments['--window']]]
+    for i in rasterOpts['windowSizes'][arguments['window']]]
 
 pdb.set_trace()

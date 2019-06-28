@@ -19,19 +19,19 @@
 # Specify account details
 #SBATCH --account=bibs-dborton-condo
 
-# EXP="exp201901201200_alt"
-# EXP="exp201901211000_alt"
-EXP="exp201901271000_alt"
+# EXP="exp201901201200"
+# EXP="exp201901211000"
+EXP="exp201901271000"
 MINIRCIDX="5"
 
 #  python3 './calcFR.py' --trialIdx=$MINIRCIDX --exp=$EXP
 #  python3 './calcFRsqrt.py' --trialIdx=$MINIRCIDX --exp=$EXP
 #  python3 './calcStimAlignTimes.py' --trialIdx=$MINIRCIDX --exp=$EXP
-#  python3 './calcAlignedAsigs.py' --exp=$EXP --trialIdx=$MINIRCIDX --eventName=stimAlignTimes --chanQuery="(chanName.str.endswith('fr'))" --blockName=fr
-#  python3 './calcAlignedAsigs.py' --exp=$EXP --trialIdx=$MINIRCIDX --eventName=stimAlignTimes --chanQuery="(chanName.str.endswith('fr_sqrt'))" --blockName=fr_sqrt
-#  python3 './calcAlignedRasters.py' --exp=$EXP --trialIdx=$MINIRCIDX --eventName=stimAlignTimes --chanQuery="(chanName.str.endswith('raster'))" --blockName=raster
-#  python3 './calcAlignedAsigs.py' --exp=$EXP --trialIdx=$MINIRCIDX --eventName=stimAlignTimes --chanQuery="not((chanName.str.contains('elec'))or(chanName.str.contains('pca')))" --blockName=other
-#  python3 './calcAlignedAsigs.py' --exp=$EXP --trialIdx=$MINIRCIDX --window=miniRC --eventName=stimAlignTimes --chanQuery="(chanName.str.endswith('fr'))" --blockName=fr
-#  python3 './calcAlignedAsigs.py' --exp=$EXP --trialIdx=$MINIRCIDX --window=miniRC --eventName=stimAlignTimes --chanQuery="(chanName.str.endswith('fr_sqrt'))" --blockName=fr_sqrt
-#  python3 './calcAlignedRasters.py' --exp=$EXP --trialIdx=$MINIRCIDX --window=miniRC --eventName=stimAlignTimes --chanQuery="(chanName.str.endswith('raster'))" --blockName=raster
-#  python3 './calcAlignedAsigs.py' --exp=$EXP --trialIdx=$MINIRCIDX --window=miniRC --eventName=stimAlignTimes --chanQuery="not((chanName.str.contains('elec'))or(chanName.str.contains('pca')))" --blockName=other
+#  python3 './calcAlignedAsigs.py' --exp=$EXP --trialIdx=$MINIRCIDX --eventName=stimAlignTimes --unitQuery="(chanName.str.endswith('fr'))" --blockName=fr
+#  python3 './calcAlignedAsigs.py' --exp=$EXP --trialIdx=$MINIRCIDX --eventName=stimAlignTimes --unitQuery="(chanName.str.endswith('fr_sqrt'))" --blockName=fr_sqrt
+#  python3 './calcAlignedRasters.py' --exp=$EXP --trialIdx=$MINIRCIDX --eventName=stimAlignTimes --unitQuery="(chanName.str.endswith('raster'))" --blockName=raster
+#  python3 './calcAlignedAsigs.py' --exp=$EXP --trialIdx=$MINIRCIDX --eventName=stimAlignTimes --unitQuery="not((chanName.str.contains('elec'))or(chanName.str.contains('pca')))" --blockName=other
+#  python3 './calcAlignedAsigs.py' --exp=$EXP --trialIdx=$MINIRCIDX --window=miniRC --eventName=stimAlignTimes --unitQuery="(chanName.str.endswith('fr'))" --blockName=fr
+#  python3 './calcAlignedAsigs.py' --exp=$EXP --trialIdx=$MINIRCIDX --window=miniRC --eventName=stimAlignTimes --unitQuery="(chanName.str.endswith('fr_sqrt'))" --blockName=fr_sqrt
+#  python3 './calcAlignedRasters.py' --exp=$EXP --trialIdx=$MINIRCIDX --window=miniRC --eventName=stimAlignTimes --unitQuery="(chanName.str.endswith('raster'))" --blockName=raster
+#  python3 './calcAlignedAsigs.py' --exp=$EXP --trialIdx=$MINIRCIDX --window=miniRC --eventName=stimAlignTimes --unitQuery="not((chanName.str.contains('elec'))or(chanName.str.contains('pca')))" --blockName=other

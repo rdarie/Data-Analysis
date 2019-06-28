@@ -25,28 +25,28 @@ import dataAnalysis.preproc.ns5 as ns5
 #      Event, AnalogSignal, SpikeTrain, Unit)
 #  import neo
 import dill as pickle
-from currentExperiment_alt import parseAnalysisOptions
+from currentExperiment import parseAnalysisOptions
 from docopt import docopt
 import gc
-arguments = docopt(__doc__)
+arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
-    int(arguments['--trialIdx']), arguments['--exp'])
+    int(arguments['trialIdx']), arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
 
-if arguments['--processAll']:
+if arguments['processAll']:
     prefix = experimentName
 else:
     prefix = ns5FileName
 triggeredPath = os.path.join(
     scratchFolder,
     ns5FileName + '_{}_{}.nix'.format(
-        arguments['--inputBlockName'], arguments['--window']))
+        arguments['inputBlockName'], arguments['window']))
 selectorPath = os.path.join(
     scratchFolder,
-    ns5FileName + '_' + arguments['--selectorName'] + '.pickle')
+    ns5FileName + '_' + arguments['selectorName'] + '.pickle')
 
-if arguments['--verbose']:
+if arguments['verbose']:
     prf.print_memory_usage('before load data')
 
 dataReader = ns5.nixio_fr.NixIO(
@@ -60,11 +60,11 @@ alignedAsigsKWargs = dict(
     makeControlProgram=True,
     removeFuzzyName=False)
 
-if arguments['--alignQuery'] is None:
+if arguments['alignQuery'] is None:
     dataQuery = None
 else:
     dataQuery = '&'.join([
-        arguments['--alignQuery']
+        arguments['alignQuery']
     ])
 
 unitNames = None
@@ -76,7 +76,7 @@ def procFun(wfDF):
 
 alignedRastersDF = ns5.alignedAsigsToDF(
     dataBlock, unitNames,
-    unitQuery=arguments['--unitQuery'], dataQuery=dataQuery,
+    unitQuery=arguments['unitQuery'], dataQuery=dataQuery,
     transposeToColumns='feature', concatOn='columns',
     verbose=True, procFun=procFun,
     **alignedAsigsKWargs)
@@ -96,8 +96,8 @@ def selFun(rastersDF, meanFRThresh=5):
 selectorMetadata = {
     'trainingDataPath': os.path.basename(triggeredPath),
     'path': os.path.basename(selectorPath),
-    'name': arguments['--selectorName'],
-    'inputBlockName': arguments['--inputBlockName'],
+    'name': arguments['selectorName'],
+    'inputBlockName': arguments['inputBlockName'],
     'inputFeatures': alignedRastersDF.columns.to_list(),
     'outputFeatures': selFun(alignedRastersDF),
     'dataQuery': dataQuery,

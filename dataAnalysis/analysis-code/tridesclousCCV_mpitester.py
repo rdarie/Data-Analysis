@@ -21,7 +21,7 @@ import dataAnalysis.helperFunctions.tridesclous_helpers as tdch
 import dataAnalysis.helperFunctions.helper_functions as hf
 from currentExperiment import *
 import os, gc, traceback
-arguments = docopt(__doc__)
+arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 
 try:
     from mpi4py import MPI
@@ -35,9 +35,9 @@ except:
 
 
 #  if overriding currentExperiment
-if arguments['--trialIdx']:
+if arguments['trialIdx']:
     print(arguments)
-    trialIdx = int(arguments['--trialIdx'])
+    trialIdx = int(arguments['trialIdx'])
     ns5FileName = 'Trial00{}'.format(trialIdx)
     triFolder = os.path.join(
         nspFolder, 'tdc_' + ns5FileName)
@@ -50,7 +50,7 @@ if RANK == 0:
     except Exception:
         traceback.print_exc()
 
-    if arguments['--purgePeeler']:
+    if arguments['purgePeeler']:
         print('Purging Peeler')
 
     chansToAnalyze = sorted(list(dataio.channel_groups.keys()))
@@ -76,20 +76,20 @@ chansToAnalyze = [
     90, 91, 92, 93, 94, 95]
 '''
 
-if arguments['--batchPreprocess']:
+if arguments['batchPreprocess']:
     print('RANK = {}, batchPreproc'.format(RANK))
 
 chansToAnalyze = sorted(list(dataio.channel_groups.keys()))[:-1]
 
-if arguments['--visConstructor']:
+if arguments['visConstructor']:
     for idx, chan_grp in enumerate(chansToAnalyze):
         if idx % SIZE == RANK:
             print('RANK = {}, visConstructor'.format(RANK))
 
-if arguments['--batchPeel']:
+if arguments['batchPeel']:
     print('RANK = {}, batchPeeler'.format(RANK))
 
-if arguments['--visPeeler']:
+if arguments['visPeeler']:
     for idx, chan_grp in enumerate(chansToAnalyze):
         if idx % SIZE == RANK:
             print('RANK = {}, visPeeler'.format(RANK))
@@ -97,5 +97,5 @@ if arguments['--visPeeler']:
 if HAS_MPI:
     COMM.Barrier()  # wait until all threads finish sorting
 
-if arguments['--makeNeoBlock'] and RANK == 0:
+if arguments['makeNeoBlock'] and RANK == 0:
     print('RANK = {}, makeNeoBLock'.format(RANK))

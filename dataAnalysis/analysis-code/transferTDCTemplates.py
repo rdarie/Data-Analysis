@@ -11,12 +11,12 @@ Options:
 import tridesclous as tdc
 import dataAnalysis.helperFunctions.tridesclous_helpers as tdch
 import traceback
-from currentExperiment_alt import parseAnalysisOptions
+from currentExperiment import parseAnalysisOptions
 from docopt import docopt
-arguments = docopt(__doc__)
+arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
-    int(arguments['--trialIdx']),
-    arguments['--exp'])
+    int(arguments['trialIdx']),
+    arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
 

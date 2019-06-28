@@ -36,32 +36,32 @@ import subprocess
 import h5py
 #  import gc
 
-from currentExperiment_alt import parseAnalysisOptions
+from currentExperiment import parseAnalysisOptions
 from docopt import docopt
-arguments = docopt(__doc__)
+arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
-    int(arguments['--trialIdx']), arguments['--exp'])
+    int(arguments['trialIdx']), arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
 
-if arguments['--processAll']:
+if arguments['processAll']:
     prefix = experimentName
 else:
     prefix = ns5FileName
 triggeredPath = os.path.join(
     scratchFolder,
     prefix + '_trig_raster_{}.nix'.format(
-        arguments['--window']))
+        arguments['window']))
 
 modelPath = os.path.join(
     scratchFolder, 'gpfa_results',
-    '{}_{}'.format(prefix, arguments['--modelSuffix']),
+    '{}_{}'.format(prefix, arguments['modelSuffix']),
     'gpfa_xDim{:0>2}'.format(gpfaOpts['xDim']) + '.mat'
     )
 intermediatePath = triggeredPath.replace('.nix', '_for_gpfa_temp.mat')
 outputPath = triggeredPath.replace('.nix', '_from_gpfa_temp.mat')
 
-if arguments['--verbose']:
+if arguments['verbose']:
     print('Loading {}...'.format(triggeredPath))
     prf.print_memory_usage('before load data')
 dataReader = ns5.nixio_fr.NixIO(
@@ -70,23 +70,23 @@ dataBlock = dataReader.read_block(
     block_index=0, lazy=True,
     signal_group_mode='split-all')
 
-if arguments['--alignQuery'] is None:
+if arguments['alignQuery'] is None:
     dataQuery = None
-elif len(arguments['--alignQuery']) == 0:
+elif len(arguments['alignQuery']) == 0:
     dataQuery = None
 else:
     dataQuery = '&'.join([
-        arguments['--alignQuery']
+        arguments['alignQuery']
     ])
 
-if arguments['--verbose']:
+if arguments['verbose']:
     prf.print_memory_usage('before load firing rates')
 
-if arguments['--selector'] is not None:
+if arguments['selector'] is not None:
     with open(
         os.path.join(
             scratchFolder,
-            arguments['--selector'] + '.pickle'),
+            arguments['selector'] + '.pickle'),
             'rb') as f:
         selectorMetadata = pickle.load(f)
     unitNames = selectorMetadata['outputFeatures']
@@ -106,17 +106,17 @@ if miniRCTrial:
 
 alignedRastersDF = ns5.alignedAsigsToDF(
     dataBlock, unitNames,
-    unitQuery=arguments['--unitQuery'], dataQuery=dataQuery,
+    unitQuery=arguments['unitQuery'], dataQuery=dataQuery,
     procFun=lambda wfdf: wfdf > 0,
     transposeToColumns='bin', concatOn='index',
     getMetaData=True,
-    **alignedAsigsKWargs, verbose=arguments['--verbose'])
+    **alignedAsigsKWargs, verbose=arguments['verbose'])
 
 #  keepMetaCols = ['segment', 'originalIndex', 'feature']
 #  dropMetaCols = np.setdiff1d(alignedRastersDF.index.names, keepMetaCols).tolist()
 #  alignedRastersDF.index = alignedRastersDF.index.droplevel(dropMetaCols)
 
-if arguments['--verbose']:
+if arguments['verbose']:
     prf.print_memory_usage('after load firing rates')
 
 intermediateMatAlreadyExists = False
@@ -153,7 +153,7 @@ alignedFactors = []
 featureNames = ['gpfa{:0>3}'.format(i)for i in range(gpfaOpts['xDim'])]
 
 exSt = dataBlock.filter(objects=SpikeTrainProxy)[0]
-winSize = rasterOpts['windowSizes'][arguments['--window']]
+winSize = rasterOpts['windowSizes'][arguments['window']]
 nBins = int((winSize[1] - winSize[0]) * exSt.sampling_rate.magnitude /gpfaOpts['binWidth'] - 1)
 bins = (np.arange(nBins) * gpfaOpts['binWidth'] + gpfaOpts['binWidth'] / 2 ) / 1e3 + winSize[0]
 

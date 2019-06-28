@@ -9,7 +9,7 @@ Options:
     --verbose                       print diagnostics? [default: True]
     --alignQuery=alignQuery         what will the plot be aligned to? [default: (pedalMovementCat==\'midPeak\')]
     --window=window                 process with short window? [default: short]
-    --chanQuery=chanQuery           how to restrict channels? [default: (chanName.str.contains(\'pca\'))]
+    --unitQuery=unitQuery           how to restrict channels? [default: (chanName.str.contains(\'pca\'))]
     --blockName=blockName           which trig_ block to pull [default: pca]
     --selector=selector             filename if using a unit selector
 """
@@ -42,11 +42,11 @@ import dill as pickle
 # from matplotlib.animation import FFMpegWriter
 # from collections import OrderedDict
 
-from currentExperiment_alt import parseAnalysisOptions
+from currentExperiment import parseAnalysisOptions
 from docopt import docopt
-arguments = docopt(__doc__)
+arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
-    int(arguments['--trialIdx']), arguments['--exp'])
+    int(arguments['trialIdx']), arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
 
@@ -57,17 +57,17 @@ sns.set_color_codes("dark")
 sns.set_context("notebook")
 sns.set_style("white")
 
-if arguments['--processAll']:
+if arguments['processAll']:
     prefix = experimentName
 else:
     prefix = ns5FileName
 triggeredPath = os.path.join(
     scratchFolder,
     prefix + '_{}_{}.nix'.format(
-        arguments['--blockName'], arguments['--window']))
+        arguments['blockName'], arguments['window']))
 print('loading {}'.format(triggeredPath))
 dataBlock = ns5.loadWithArrayAnn(triggeredPath)
-otherBlock = ns5.loadWithArrayAnn(triggeredPath.replace(arguments['--blockName'], 'other'))
+otherBlock = ns5.loadWithArrayAnn(triggeredPath.replace(arguments['blockName'], 'other'))
 # during movement and stim
 pedalSizeQuery = '(' + '|'.join([
     '(pedalSizeCat == \'{}\')'.format(i)
@@ -81,21 +81,21 @@ dataQuery = '&'.join([
     #  '(pedalDirection == \'CW\')'
     ])
 
-if arguments['--alignQuery'] is not None:
-    if len(arguments['--alignQuery']):
+if arguments['alignQuery'] is not None:
+    if len(arguments['alignQuery']):
         dataQuery = '&'.join([
             dataQuery,
-            arguments['--alignQuery'],
+            arguments['alignQuery'],
             ])
-if not len(arguments['--chanQuery']):
-    arguments['--chanQuery'] = None
+if not len(arguments['unitQuery']):
+    arguments['unitQuery'] = None
 colorPal = "ch:0.6,-.2,dark=.2,light=0.7,reverse=1"  #  for firing rates
 
-if arguments['--selector'] is not None:
+if arguments['selector'] is not None:
     with open(
         os.path.join(
             scratchFolder,
-            arguments['--selector'] + '.pickle'),
+            arguments['selector'] + '.pickle'),
             'rb') as f:
         selectorMetadata = pickle.load(f)
     chanNames = [

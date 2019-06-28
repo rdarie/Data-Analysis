@@ -24,28 +24,28 @@ import dataAnalysis.preproc.ns5 as ns5
 #      Event, AnalogSignal, SpikeTrain, Unit)
 #  import neo
 import dill as pickle
-from currentExperiment_alt import parseAnalysisOptions
+from currentExperiment import parseAnalysisOptions
 from docopt import docopt
 import gc
-arguments = docopt(__doc__)
+arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
-    int(arguments['--trialIdx']), arguments['--exp'])
+    int(arguments['trialIdx']), arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
 
-if arguments['--processAll']:
+if arguments['processAll']:
     prefix = experimentName
 else:
     prefix = ns5FileName
 triggeredPath = os.path.join(
     scratchFolder,
     prefix + '_{}_{}.nix'.format(
-        arguments['--inputBlockName'], arguments['--window']))
+        arguments['inputBlockName'], arguments['window']))
 selectorPath = os.path.join(
     scratchFolder,
-    prefix + '_' + arguments['--selectorName'] + '.pickle')
+    prefix + '_' + arguments['selectorName'] + '.pickle')
 #
-if arguments['--verbose']:
+if arguments['verbose']:
     prf.print_memory_usage('before load data')
 #
 dataReader = ns5.nixio_fr.NixIO(
@@ -54,11 +54,11 @@ dataBlock = dataReader.read_block(
     block_index=0, lazy=True,
     signal_group_mode='split-all')
 #
-if arguments['--alignQuery'] is None:
+if arguments['alignQuery'] is None:
     dataQuery = None
 else:
     dataQuery = '&'.join([
-        arguments['--alignQuery']
+        arguments['alignQuery']
     ])
 
 alignedAsigsKWargs = dict(
@@ -66,7 +66,7 @@ alignedAsigsKWargs = dict(
     makeControlProgram=False,
     removeFuzzyName=False)
 specificKWargs = dict(
-    unitQuery=arguments['--unitQuery'], dataQuery=dataQuery,
+    unitQuery=arguments['unitQuery'], dataQuery=dataQuery,
     transposeToColumns='bin', concatOn='index',
     getMetaData=False, decimate=5,
     verbose=False, procFun=None)
@@ -81,7 +81,7 @@ from copy import copy
 unitNames = None
 if unitNames is None:
         unitNames = ns5.listChanNames(
-            dataBlock, arguments['--unitQuery'], objType=Unit)
+            dataBlock, arguments['unitQuery'], objType=Unit)
 remainingUnits = copy(unitNames)
 
 correlationDF = pd.DataFrame(
@@ -89,7 +89,7 @@ correlationDF = pd.DataFrame(
 meanFRDF = pd.Series(0, index=unitNames, dtype='float32')
 for idxOuter, firstUnit in enumerate(unitNames):
     remainingUnits.remove(firstUnit)
-    if arguments['--verbose']:
+    if arguments['verbose']:
         prf.print_memory_usage(' firstUnit: {}'.format(firstUnit))
         print('{} secondary units to analyze'.format(len(remainingUnits)))
     firstDF = ns5.alignedAsigsToDF(
@@ -99,7 +99,7 @@ for idxOuter, firstUnit in enumerate(unitNames):
     meanFRDF[firstUnit] = firstDF.mean().mean()
     # print('firstDF uses {:.1f} MB'.format(firstDF.memory_usage(deep=True).sum() / 2**10))
     for idxInner, secondUnit in enumerate(remainingUnits):
-        if arguments['--verbose']:
+        if arguments['verbose']:
             prf.print_memory_usage('secondUnit: {}'.format(secondUnit))
         secondDF = ns5.alignedAsigsToDF(
             dataBlock, [secondUnit],
@@ -109,7 +109,7 @@ for idxOuter, firstUnit in enumerate(unitNames):
         correlationDF.loc[firstUnit, secondUnit], _ = pearsonr(
             firstDF.to_numpy().flatten(), secondDF.to_numpy().flatten())
 
-if arguments['--verbose']:
+if arguments['verbose']:
     prf.print_memory_usage('just loaded frs')
 dataReader.file.close()
 #  free up memory
@@ -126,7 +126,7 @@ f, ax = plt.subplots(figsize=(11, 9))
 cmap = sns.diverging_palette(220, 10, as_cmap=True)
 # Draw the heatmap with the mask and correct aspect ratio
 from matplotlib.backends.backend_pdf import PdfPages
-with PdfPages(os.path.join(figureFolder, 'unit_correlation_{}.pdf'.format(arguments['--selectorName']))) as pdf:
+with PdfPages(os.path.join(figureFolder, 'unit_correlation_{}.pdf'.format(arguments['selectorName']))) as pdf:
     sns.heatmap(
         correlationDF.to_numpy(), mask=mask, cmap=cmap, center=0,
         square=True, linewidths=.5, cbar_kws={"shrink": .5})
@@ -146,8 +146,8 @@ thisCorrThresh = 0.85
 selectorMetadata = {
     'trainingDataPath': os.path.basename(triggeredPath),
     'path': os.path.basename(selectorPath),
-    'name': arguments['--selectorName'],
-    'inputBlockName': arguments['--inputBlockName'],
+    'name': arguments['selectorName'],
+    'inputBlockName': arguments['inputBlockName'],
     'inputFeatures': correlationDF.columns.to_list(),
     'outputFeatures': selFun(meanFRDF, correlationDF, corrThresh=thisCorrThresh),
     'dataQuery': dataQuery,

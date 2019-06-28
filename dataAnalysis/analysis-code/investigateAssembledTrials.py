@@ -88,7 +88,7 @@ if checkAccessMethods:
         block_index=0, seg_index=segIdx,
         i_start=1000000, i_stop=1100000,
         channel_names=chanNames)
-    plt.plot(byName, '--', label='byName', lw=5)
+    plt.plot(byName, '', label='byName', lw=5)
     plt.plot(byIndex, label='byIndex')
     plt.legend()
     plt.show()

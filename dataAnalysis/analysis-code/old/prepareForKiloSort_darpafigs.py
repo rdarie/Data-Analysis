@@ -15,14 +15,14 @@ from docopt import docopt
 import itertools, os, sys, math
 from scipy import signal
 
-arguments = docopt(__doc__)
+arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 
 plotting = True
-if arguments['--plotting']:
+if arguments['plotting']:
     plotting = True
 
-if arguments['--filePath']:
-    filePath = arguments['--filePath']
+if arguments['filePath']:
+    filePath = arguments['filePath']
     #filePath = 'Z:\\data\\rdarie\\Murdoc Neural Recordings\\201804250947-Proprio\\Trial003.ns5'
     dataDir = os.path.dirname(os.path.abspath(filePath))
 
@@ -44,13 +44,13 @@ nsxFile.extended_headers[0]
 # Extract data - note: data will be returned based on *SORTED* elec_ids, see cont_data['elec_ids']
 dummyData = nsxFile.getdata(1)
 
-if arguments['--nSec']:
-    if arguments['--nSec'] != 'all':
-        data_time_s = float(arguments['--nSec']) # 'all' is default for all
+if arguments['nSec']:
+    if arguments['nSec'] != 'all':
+        data_time_s = float(arguments['nSec']) # 'all' is default for all
         #data_time_s = 180
         maxTime_s = min( data_time_s, dummyData['data_time_s'])
     else:
-        data_time_s = arguments['--nSec']
+        data_time_s = arguments['nSec']
         maxTime_s = dummyData['data_time_s']
 
 # Create filters

@@ -224,7 +224,19 @@ def parseAnalysisOptions(trialIdx, experimentShorthand):
     spikeSortingFiguresFolder = os.path.join(figureFolder, 'spikeSorting')
     if not os.path.exists(spikeSortingFiguresFolder):
         os.makedirs(spikeSortingFiguresFolder, exist_ok=True)
-
+    
+    alignedAsigsKWargs = {}
+    if miniRCTrial:
+        alignedAsigsKWargs.update(dict(
+            amplitudeColumn='amplitude',
+            programColumn='program',
+            electrodeColumn='electrode'))
+    else:
+        alignedAsigsKWargs.update(dict(
+            amplitudeColumn='amplitudeFuzzy',
+            programColumn='programFuzzy',
+            electrodeColumn='electrodeFuzzy'))
+    
     alignedAsigsChunkSize = 500
     rasterOpts = {
         'binInterval': 1e-3, 'binWidth': 30e-3, 'smoothKernelWidth': 50e-3,

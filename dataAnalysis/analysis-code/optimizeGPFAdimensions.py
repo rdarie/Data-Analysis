@@ -34,25 +34,25 @@ import dill as pickle
 #  import gc
 import subprocess
 
-from currentExperiment_alt import parseAnalysisOptions
+from currentExperiment import parseAnalysisOptions
 from docopt import docopt
-arguments = docopt(__doc__)
+arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
-    int(arguments['--trialIdx']), arguments['--exp'])
+    int(arguments['trialIdx']), arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
 
-verbose = arguments['--verbose']
+verbose = arguments['verbose']
 
-if arguments['--processAll']:
+if arguments['processAll']:
     prefix = experimentName
 else:
     prefix = ns5FileName
 intermediatePath = os.path.join(
     scratchFolder,
     prefix + '_raster_{}_for_gpfa_{}.mat'.format(
-        arguments['--window'], arguments['--alignSuffix']))
-runIdx = '{}_{}'.format(prefix, arguments['--alignSuffix'])
+        arguments['window'], arguments['alignSuffix']))
+runIdx = '{}_{}'.format(prefix, arguments['alignSuffix'])
 # dataPath, xDim, segLength, binWidth, kernSD, runIdx, baseDir, runOpti
 gpfaArg = ', '.join([
     '\'' + intermediatePath + '\'',
@@ -67,7 +67,7 @@ gpfaArg = ', '.join([
 execStr = 'matlab-threaded -r \"optimize_gpfa({}); exit\"'.format(gpfaArg)
 print(execStr)
 
-if not arguments['--dryRun']:
+if not arguments['dryRun']:
     result = subprocess.run([execStr], shell=True)
 # stdout=subprocess.PIPE
 #print(result.stdout)

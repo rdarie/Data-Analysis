@@ -22,4 +22,4 @@
 
 # Run a command
 module load mpi
-srun --mpi=pmi2 ./tridesclousCCV.py --trialIdx=$SLURM_ARRAY_TASK_ID --exp=exp201901271000_alt --attemptMPI --batchPreprocess
+srun --mpi=pmi2 ./tridesclousCCV.py --trialIdx=$SLURM_ARRAY_TASK_ID --exp=exp201901271000 --attemptMPI --batchPreprocess

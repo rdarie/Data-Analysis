@@ -20,10 +20,10 @@ import tridesclous as tdc
 import dataAnalysis.helperFunctions.tridesclous_helpers as tdch
 import os, gc, traceback
 
-arguments = docopt(__doc__)
+arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 
 try:
-    if not arguments['--attemptMPI']:
+    if not arguments['attemptMPI']:
         raise(Exception('MPI aborted by cmd line argument'))
     from mpi4py import MPI
     COMM = MPI.COMM_WORLD
@@ -37,10 +37,10 @@ except Exception:
     HAS_MPI = False
 
 if RANK == 0:
-    from currentExperiment_alt import parseAnalysisOptions
+    from currentExperiment import parseAnalysisOptions
     expOpts, allOpts = parseAnalysisOptions(
-        int(arguments['--trialIdx']),
-        arguments['--exp'])
+        int(arguments['trialIdx']),
+        arguments['exp'])
     print("globals:")
     print(globals().keys())
     print('allOpts:')
@@ -72,7 +72,7 @@ if HAS_MPI:
     spikeWindow = COMM.bcast(spikeWindow, root=0)
 
 if RANK == 0:
-    if arguments['--purgePeeler']:
+    if arguments['purgePeeler']:
         tdch.purgeNeoBlock(triFolder)
         tdch.purgePeelerResults(
             triFolder, purgeAll=True)
@@ -99,7 +99,7 @@ chansToAnalyze = [
     90, 91, 92, 93, 94, 95]
 '''
 
-if arguments['--batchPreprocess']:
+if arguments['batchPreprocess']:
     tdch.batchPreprocess(
         triFolder, chansToAnalyze,
         n_components_by_channel=15,
@@ -113,7 +113,7 @@ if arguments['--batchPreprocess']:
         autoMerge=True, auto_merge_threshold=0.85,
         relative_threshold=5.5, attemptMPI=HAS_MPI)
 
-if arguments['--batchPeel']:
+if arguments['batchPeel']:
     tdch.batchPeel(
         triFolder, chansToAnalyze,
         shape_boundary_threshold=3,
@@ -122,14 +122,14 @@ if arguments['--batchPeel']:
 if HAS_MPI:
     COMM.Barrier()  # wait until all threads finish sorting
 
-if arguments['--makeCoarseNeoBlock'] and RANK == 0:
+if arguments['makeCoarseNeoBlock'] and RANK == 0:
     tdch.purgeNeoBlock(triFolder)
     tdch.neo_block_after_peeler(
         triFolder, chan_grps=chansToAnalyze,
         shape_distance_threshold=None, refractory_period=None,
         ignoreTags=['so_bad'])
 
-if arguments['--makeStrictNeoBlock'] and RANK == 0:
+if arguments['makeStrictNeoBlock'] and RANK == 0:
     tdch.purgeNeoBlock(triFolder)
     tdch.neo_block_after_peeler(
         triFolder, chan_grps=chansToAnalyze,

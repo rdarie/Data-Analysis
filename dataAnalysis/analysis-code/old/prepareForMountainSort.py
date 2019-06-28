@@ -19,18 +19,18 @@ import itertools
 from docopt import docopt
 import os
 
-arguments = docopt(__doc__)
+arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 
 plotting = False
-if arguments['--plotting']:
+if arguments['plotting']:
     plotting = True
-if arguments['--whichChan']:
-    whichChan = float(arguments['--whichChan'])
+if arguments['whichChan']:
+    whichChan = float(arguments['whichChan'])
 else:
     whichChan = 1
 
-if arguments['--filePath']:
-    filePath = arguments['--filePath']
+if arguments['filePath']:
+    filePath = arguments['filePath']
     #filePath = 'Z:\\data\\rdarie\\Murdoc Neural Recordings\\201804271016-Proprio\\Trial002.ns5'
     dataDir = os.path.dirname(os.path.abspath(filePath))
 
@@ -50,13 +50,13 @@ elecGroupNames = ['Utah', 'NForm']
 start_time_s = 0 # 0 is default for all
     #import pdb; pdb.set_trace()
 
-if arguments['--nSec']:
-    if arguments['--nSec'] != 'all':
-        data_time_s = float(arguments['--nSec']) # 'all' is default for all
+if arguments['nSec']:
+    if arguments['nSec'] != 'all':
+        data_time_s = float(arguments['nSec']) # 'all' is default for all
         maxTime_s = min( data_time_s, dummyData['data_time_s'])
         #data_time_s = 2
     else:
-        data_time_s = arguments['--nSec']
+        data_time_s = arguments['nSec']
         maxTime_s = dummyData['data_time_s']
 
 # Create filters

@@ -27,26 +27,26 @@ from sklearn.decomposition import PCA, IncrementalPCA
 from sklearn.pipeline import make_pipeline, Pipeline
 import joblib as jb
 import dill as pickle
-from currentExperiment_alt import parseAnalysisOptions
+from currentExperiment import parseAnalysisOptions
 from docopt import docopt
 import gc
-arguments = docopt(__doc__)
+arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
-    int(arguments['--trialIdx']), arguments['--exp'])
+    int(arguments['trialIdx']), arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
 
-if arguments['--processAll']:
+if arguments['processAll']:
     prefix = experimentName
 else:
     prefix = ns5FileName
 triggeredPath = os.path.join(
     scratchFolder,
     prefix + '_{}_{}.nix'.format(
-        arguments['--inputBlockName'], arguments['--window']))
+        arguments['inputBlockName'], arguments['window']))
 estimatorPath = os.path.join(
     scratchFolder,
-    prefix + '_' + arguments['--estimatorName'] + '.joblib')
+    prefix + '_' + arguments['estimatorName'] + '.joblib')
 
 prf.print_memory_usage('before load data')
 
@@ -62,18 +62,18 @@ alignedAsigsKWargs = dict(
     transposeToColumns='feature', concatOn='columns',
     removeFuzzyName=False)
 
-if arguments['--alignQuery'] is None:
+if arguments['alignQuery'] is None:
     dataQuery = None
 else:
     dataQuery = '&'.join([
-        arguments['--alignQuery']
+        arguments['alignQuery']
     ])
 
-if arguments['--selector'] is not None:
+if arguments['selector'] is not None:
     with open(
         os.path.join(
             scratchFolder,
-            arguments['--selector'] + '.pickle'),
+            arguments['selector'] + '.pickle'),
             'rb') as f:
         selectorMetadata = pickle.load(f)
     unitNames = [
@@ -90,7 +90,7 @@ alignedAsigsKWargs = dict(
 
 masterSpikeMat = ns5.alignedAsigsToDF(
     dataBlock, unitNames,
-    unitQuery=arguments['--unitQuery'], dataQuery=dataQuery, verbose=True,
+    unitQuery=arguments['unitQuery'], dataQuery=dataQuery, verbose=True,
     getMetaData=False, decimate=5,
     **alignedAsigsKWargs).to_numpy()
 prf.print_memory_usage('just loaded firing rates')
@@ -113,7 +113,7 @@ jb.dump(estimator, estimatorPath)
 estimatorMetadata = {
     'trainingDataPath': os.path.basename(triggeredPath),
     'path': os.path.basename(estimatorPath),
-    'name': arguments['--estimatorName'],
+    'name': arguments['estimatorName'],
     'inputFeatures': masterSpikeMat.columns.to_list(),
     'dataQuery': dataQuery,
     'alignedAsigsKWargs': alignedAsigsKWargs

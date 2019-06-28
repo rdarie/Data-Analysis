@@ -20,7 +20,7 @@ import traceback
 import dataAnalysis.helperFunctions.tridesclous_helpers as tdch
 import tridesclous as tdc
 
-arguments = docopt(__doc__)
+arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 
 try:
     from mpi4py import MPI
@@ -35,10 +35,10 @@ except Exception:
 
 print(RANK)
 if RANK == 0:
-    from currentExperiment_alt import parseAnalysisOptions
+    from currentExperiment import parseAnalysisOptions
     expOpts, allOpts = parseAnalysisOptions(
-        int(arguments['--trialIdx']),
-        arguments['--exp'])
+        int(arguments['trialIdx']),
+        arguments['exp'])
     print("globals:")
     print(globals().keys())
     print('allOpts:')

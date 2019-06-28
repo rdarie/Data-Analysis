@@ -24,33 +24,33 @@ import dataAnalysis.preproc.ns5 as ns5
 #      Event, AnalogSignal, SpikeTrain, Unit)
 #  import neo
 import dill as pickle
-from currentExperiment_alt import parseAnalysisOptions
+from currentExperiment import parseAnalysisOptions
 from docopt import docopt
 import gc
-arguments = docopt(__doc__)
+arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
-    int(arguments['--trialIdx']), arguments['--exp'])
+    int(arguments['trialIdx']), arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
 
-if arguments['--processAll']:
+if arguments['processAll']:
     triggeredPath = os.path.join(
         scratchFolder,
         experimentName + '_trig_{}_{}.nix'.format(
-            arguments['--inputBlockName'], arguments['--window']))
+            arguments['inputBlockName'], arguments['window']))
     selectorPath = os.path.join(
         scratchFolder,
-        experimentName + '_' + arguments['--selectorName'] + '.pickle')
+        experimentName + '_' + arguments['selectorName'] + '.pickle')
 else:
     triggeredPath = os.path.join(
         scratchFolder,
         ns5FileName + '_trig_{}_{}.nix'.format(
-            arguments['--inputBlockName'], arguments['--window']))
+            arguments['inputBlockName'], arguments['window']))
     selectorPath = os.path.join(
         scratchFolder,
-        ns5FileName + '_' + arguments['--selectorName'] + '.pickle')
+        ns5FileName + '_' + arguments['selectorName'] + '.pickle')
 #
-if arguments['--verbose']:
+if arguments['verbose']:
     prf.print_memory_usage('before load data')
 #
 dataReader = ns5.nixio_fr.NixIO(
@@ -59,16 +59,16 @@ dataBlock = dataReader.read_block(
     block_index=0, lazy=True,
     signal_group_mode='split-all')
 #
-if arguments['--alignQuery'] is None:
+if arguments['alignQuery'] is None:
     dataQuery = None
 else:
     dataQuery = '&'.join([
-        arguments['--alignQuery']
+        arguments['alignQuery']
     ])
 #
 #import warnings
 #warnings.filterwarnings('error')
-if arguments['--verbose']:
+if arguments['verbose']:
     prf.print_memory_usage('after load data')
 
 alignedAsigsKWargs = dict(
@@ -79,7 +79,7 @@ alignedAsigsKWargs = dict(
     electrodeColumn='electrodeFuzzy',
     removeFuzzyName=False)
 specificKWargs = dict(
-    unitQuery=arguments['--unitQuery'], dataQuery=dataQuery,
+    unitQuery=arguments['unitQuery'], dataQuery=dataQuery,
     transposeToColumns='feature', concatOn='columns',
     getMetaData=False, decimate=5,
     verbose=False, procFun=None)
@@ -102,7 +102,7 @@ for n in correlationDF.index:
     correlationDF.loc[n, n] = 0
 meanFRDF = masterSpikeMat.mean()
 
-if arguments['--verbose']:
+if arguments['verbose']:
     prf.print_memory_usage('just loaded frs')
 dataReader.file.close()
 #  free up memory
@@ -119,7 +119,7 @@ f, ax = plt.subplots(figsize=(11, 9))
 cmap = sns.diverging_palette(220, 10, as_cmap=True)
 # Draw the heatmap with the mask and correct aspect ratio
 from matplotlib.backends.backend_pdf import PdfPages
-with PdfPages(os.path.join(figureFolder, 'unit_correlation_{}.pdf'.format(arguments['--selectorName']))) as pdf:
+with PdfPages(os.path.join(figureFolder, 'unit_correlation_{}.pdf'.format(arguments['selectorName']))) as pdf:
     sns.heatmap(
         correlationDF.to_numpy(), mask=mask, cmap=cmap, center=0,
         square=True, linewidths=.5, cbar_kws={"shrink": .5})
@@ -139,8 +139,8 @@ thisCorrThresh = 0.85
 selectorMetadata = {
     'trainingDataPath': os.path.basename(triggeredPath),
     'path': os.path.basename(selectorPath),
-    'name': arguments['--selectorName'],
-    'inputBlockName': arguments['--inputBlockName'],
+    'name': arguments['selectorName'],
+    'inputBlockName': arguments['inputBlockName'],
     'inputFeatures': correlationDF.columns.to_list(),
     'outputFeatures': selFun(meanFRDF, correlationDF, corrThresh=thisCorrThresh),
     'dataQuery': dataQuery,

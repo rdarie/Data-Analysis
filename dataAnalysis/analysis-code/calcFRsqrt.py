@@ -34,12 +34,12 @@ from importlib import reload
 import quantities as pq
 
 #  load options
-from currentExperiment_alt import parseAnalysisOptions
+from currentExperiment import parseAnalysisOptions
 from docopt import docopt
-arguments = docopt(__doc__)
+arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
-    int(arguments['--trialIdx']),
-    arguments['--exp'])
+    int(arguments['trialIdx']),
+    arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
 
@@ -57,7 +57,7 @@ def aggregateFun(
         np.sum(DF / fs))
     return spikeCount / tSpan
 
-if arguments['--processAll']:
+if arguments['processAll']:
     masterBlock = preproc.calcFR(
         experimentBinnedSpikePath,
         experimentDataPath,
@@ -76,7 +76,7 @@ else:
 
 allSegs = list(range(len(masterBlock.segments)))
 
-if arguments['--processAll']:
+if arguments['processAll']:
     preproc.addBlockToNIX(
         masterBlock, neoSegIdx=allSegs,
         writeSpikes=False, writeEvents=False,

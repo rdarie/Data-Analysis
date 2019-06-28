@@ -22,15 +22,15 @@ import dataAnalysis.preproc.mdt as preprocINS
 from importlib import reload
 import os, pdb
 
-from currentExperiment_alt import parseAnalysisOptions
+from currentExperiment import parseAnalysisOptions
 from docopt import docopt
-arguments = docopt(__doc__)
-expOpts, allOpts = parseAnalysisOptions(int(arguments['--trialIdx']), arguments['--exp'])
+arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
+expOpts, allOpts = parseAnalysisOptions(int(arguments['trialIdx']), arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
 
-if arguments['--nameSuffix']:
-    nameSuffix = arguments['--nameSuffix']
+if arguments['nameSuffix']:
+    nameSuffix = arguments['nameSuffix']
 else:
     nameSuffix = ''
 

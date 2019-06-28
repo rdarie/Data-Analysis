@@ -29,12 +29,12 @@ import matplotlib.pyplot as plt
 from collections import Iterable
 
 #  load options
-from currentExperiment_alt import parseAnalysisOptions
+from currentExperiment import parseAnalysisOptions
 from docopt import docopt
-arguments = docopt(__doc__)
+arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
-    int(arguments['--trialIdx']),
-    arguments['--exp'])
+    int(arguments['trialIdx']),
+    arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
 
@@ -44,11 +44,11 @@ insReader = neo.NixIO(
 insBlock = insReader.read_block(0)
 
 #  all experimental days?
-if arguments['--processAll']:
+if arguments['processAll']:
     dataReader = neo.io.nixio_fr.NixIO(
         filename=experimentDataPath)
 else:
-    alignTimeBounds = alignTimeBoundsLookup[int(arguments['--trialIdx'])]    
+    alignTimeBounds = alignTimeBoundsLookup[int(arguments['trialIdx'])]    
     dataReader = neo.io.nixio_fr.NixIO(
         filename=analysisDataPath)
 
@@ -189,7 +189,7 @@ dataReader.file.close()
 
 masterBlock.create_relationship()
 allSegs = list(range(len(masterBlock.segments)))
-if arguments['--processAll']:
+if arguments['processAll']:
     ns5.addBlockToNIX(
         masterBlock, neoSegIdx=allSegs,
         writeAsigs=False, writeSpikes=False, writeEvents=True,

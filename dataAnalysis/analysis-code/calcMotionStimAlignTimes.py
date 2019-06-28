@@ -29,12 +29,12 @@ import matplotlib.pyplot as plt
 from collections import Iterable
 
 #  load options
-from currentExperiment_alt import parseAnalysisOptions
+from currentExperiment import parseAnalysisOptions
 from docopt import docopt
-arguments = docopt(__doc__)
+arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
-    int(arguments['--trialIdx']),
-    arguments['--exp'])
+    int(arguments['trialIdx']),
+    arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
 
@@ -44,12 +44,12 @@ insReader = neo.NixIO(
 insBlock = insReader.read_block(0)
 
 #  all experimental days?
-if arguments['--processAll']:
+if arguments['processAll']:
     dataReader = neo.io.nixio_fr.NixIO(
         filename=experimentDataPath)
 else:
     alignTimeBounds = [
-        alignTimeBoundsLookup[int(arguments['--trialIdx'])]
+        alignTimeBoundsLookup[int(arguments['trialIdx'])]
     ]
     dataReader = neo.io.nixio_fr.NixIO(
         filename=analysisDataPath)
@@ -225,7 +225,7 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         tdDF.loc[group.index, 'pedalSize'] = group['pedalSize'] - pedalNeutralPoint
     #  plt.plot(tdDF['t'], tdDF['pedalSize'])
     #  plt.plot(tdDF['t'], tdDF['pedalPosition']); plt.show()
-    if (segIdx == 0) and arguments['--plotParamHistograms']:
+    if (segIdx == 0) and arguments['plotParamHistograms']:
         ax = sns.distplot(
             tdDF.loc[midPeakIdx, 'pedalSize'],
             bins=200, kde=False)
@@ -391,7 +391,7 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
 
     uniqProgs = pd.unique(categories['programFuzzy'])
     #  plot these if we need to reset the category
-    if (segIdx == 0) and arguments['--plotParamHistograms']:
+    if (segIdx == 0) and arguments['plotParamHistograms']:
         fig, ax = plt.subplots(len(uniqProgs), 1, sharex=True)
         for idx, pName in enumerate(uniqProgs):
             ax[idx] = sns.distplot(
@@ -485,7 +485,7 @@ dataReader.file.close()
 
 masterBlock.create_relationship()
 allSegs = list(range(len(masterBlock.segments)))
-if arguments['--processAll']:
+if arguments['processAll']:
     preproc.addBlockToNIX(
         masterBlock, neoSegIdx=allSegs,
         writeAsigs=False, writeSpikes=False, writeEvents=True,
