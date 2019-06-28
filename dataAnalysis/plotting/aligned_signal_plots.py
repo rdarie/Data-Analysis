@@ -452,19 +452,21 @@ def plotAsigsAligned(
 
 def plotCorrelationMatrix(correlationDF, pdfPath):
     #  based on https://seaborn.pydata.org/examples/many_pairwise_correlations.html
-    mask = np.zeros_like(argumen, dtype=np.bool)
+    mask = np.zeros_like(correlationDF, dtype=np.bool)
     mask[np.tril_indices_from(mask)] = True
     # Set up the matplotlib figure
     f, ax = plt.subplots(figsize=(11, 9))
     # Generate a custom diverging colormap
     cmap = sns.diverging_palette(220, 10, as_cmap=True)
     # Draw the heatmap with the mask and correct aspect ratio
+    for n in correlationDF.index:
+        correlationDF.loc[n,n] = 0
     with PdfPages(pdfPath) as pdf:
         ax = sns.heatmap(
             correlationDF.to_numpy(), mask=mask, cmap=cmap, center=0,
             square=True, linewidths=.5, cbar_kws={"shrink": .5})
-        ax.set_xticklabels()
-        ax.set_yticklabels()
+        ax.set_xticklabels([])
+        ax.set_yticklabels([])
         pdf.savefig()
         plt.close()
     return

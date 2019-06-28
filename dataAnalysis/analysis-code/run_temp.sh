@@ -26,4 +26,7 @@ EXP="exp201901211000"
 SELECTOR="201901211000-Proprio_minfr"
 # SELECTOR="201901201200-Proprio_minfr"
 
-python3 './calcUnitCorrelationFast.py' --exp=$EXP --trialIdx=3 --window=short --verbose --plotting
+# python3 './calcUnitMeanFR.py' --exp=$EXP --trialIdx=3 --window=short --verbose
+# python3 './calcUnitCorrelation.py' --exp=$EXP --trialIdx=3 --window=short --verbose --plotting
+# python3 './selectUnitsByMeanFRandCorrelation.py' --exp=$EXP --trialIdx=3 --window=short
+python3 './plotNeuronsAlignedToMotionStim.py' --exp=$EXP --processAll --window=short --selector=$SELECTOR

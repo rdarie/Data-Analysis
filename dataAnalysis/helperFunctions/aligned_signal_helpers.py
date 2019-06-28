@@ -43,7 +43,8 @@ def processUnitQueryArgs(
 
 def applyFun(
         triggeredPath=None, resultPath=None, resultName=None,
-        fun=None, lazy=None, loadArgs=None,
+        fun=None, funArgs=[], funKWargs={},
+        lazy=None, loadArgs={},
         loadType='all', applyType='self',
         verbose=False):
     if verbose:
@@ -64,9 +65,9 @@ def applyFun(
         if verbose:
             prf.print_memory_usage('just loaded alignedAsigs')
         if applyType == 'self':
-            result = getattr(alignedAsigsDF, fun)()
+            result = getattr(alignedAsigsDF, fun)(*funArgs, **funKWargs)
         if applyType == 'func':
-            result = fun(alignedAsigsDF)
+            result = fun(alignedAsigsDF, *funArgs, **funKWargs)
     elif loadType == 'elementwise':
         if loadArgs['unitNames'] is None:
             unitNames = ns5.listChanNames(
@@ -108,8 +109,6 @@ def applyFun(
                 result.loc[firstUnit, secondUnit], _ = fun(
                     firstDF.to_numpy().flatten(),
                     secondDF.to_numpy().flatten())
-                if idxInner > 5: break
-            if idxOuter > 5: break
     result.to_hdf(resultPath, resultName, format='table')
     if lazy:
         dataReader.file.close()

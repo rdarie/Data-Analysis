@@ -63,6 +63,7 @@ correlationDF = ash.applyFun(
     fun="corr", lazy=arguments['lazy'],
     verbose=arguments['verbose'],
     loadArgs=alignedAsigsKWargs)
+    
 #  TODO turn into general pairwise analysis
 if arguments['plotting']:
     import matplotlib
