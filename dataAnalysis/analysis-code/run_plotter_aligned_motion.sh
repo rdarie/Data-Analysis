@@ -25,12 +25,12 @@ EXP="exp201901271000"
 SELECTOR="201901271000-Proprio_minfr"
 # SELECTOR="201901201200-Proprio_minfr"
 
-#  python3 './plotNeuronsAlignedToMotionStim.py' --exp=$EXP --processAll
-#  python3 './plotAsigsAlignedToMotionStim.py' --exp=$EXP --processAll
-#  python3 './plotNeuronsAlignedToMotionStim.py' --exp=$EXP --processAll  --window=short --selector=$SELECTOR
-#  python3 './plotAsigsAlignedToMotionStim.py' --exp=$EXP --processAll  --window=short
-#  python3 './plotAsigsAlignedToMotionStim.py' --exp=$EXP --processAll --window=long --blockName=other --unitQuery= --alignQuery="(pedalMovementCat=='outbound')" --rowName= --colName=pedalDirection --colControl=NA --hueControl=NA --hueName=pedalSizeCat
-#  python3 './plotAsigsAlignedToMotionStim.py' --exp=$EXP --processAll --window=short --blockName=other --unitQuery=
-#  python3 './plotAsigsAlignedToMotionStim.py' --exp=$EXP --processAll --window=long --blockName=pca --unitQuery="(chanName.str.contains('pca'))"
-#  python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/plotNeuronsAlignedToMotionStim.py' --exp=$EXP --processAll  --window=short --alignQuery="(pedalMovementCat=='return')"
-#  python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/plotAsigsAlignedToMotionStim.py' --exp=$EXP --processAll  --window=short --alignQuery="(pedalMovementCat=='return')"
+#  python3 './plotAlignedNeurons.py' --exp=$EXP --processAll
+#  python3 './plotAlignedAsigs.py' --exp=$EXP --processAll
+#  python3 './plotAlignedNeurons.py' --exp=$EXP --processAll  --window=short --selector=$SELECTOR
+#  python3 './plotAlignedAsigs.py' --exp=$EXP --processAll  --window=short
+#  python3 './plotAlignedAsigs.py' --exp=$EXP --processAll --window=long --blockName=other --unitQuery= --alignQuery="(pedalMovementCat=='outbound')" --rowName= --colName=pedalDirection --colControl=NA --hueControl=NA --hueName=pedalSizeCat
+#  python3 './plotAlignedAsigs.py' --exp=$EXP --processAll --window=short --blockName=other --unitQuery=
+#  python3 './plotAlignedAsigs.py' --exp=$EXP --processAll --window=long --blockName=pca --unitQuery="(chanName.str.contains('pca'))"
+#  python3 './plotAlignedNeurons.py' --exp=$EXP --processAll  --window=short --alignQuery="(pedalMovementCat=='return')"
+#  python3 './plotAlignedAsigs.py' --exp=$EXP --processAll  --window=short --alignQuery="(pedalMovementCat=='return')"

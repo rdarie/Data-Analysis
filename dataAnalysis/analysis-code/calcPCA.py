@@ -3,18 +3,22 @@ Usage:
     temp.py [options]
 
 Options:
-    --trialIdx=trialIdx                    which trial to analyze [default: 1]
     --exp=exp                              which experimental day to analyze
+    --trialIdx=trialIdx                    which trial to analyze [default: 1]
     --processAll                           process entire experimental day? [default: False]
-    --alignQuery=alignQuery                what will the plot be aligned to? [default: (pedalMovementCat==\'midPeak\')]
     --window=window                        process with short window? [default: long]
+    --verbose                              print diagnostics? [default: False]
+    --lazy                                 load from raw, or regular? [default: False]
+    --alignQuery=alignQuery                what will the plot be aligned to? [default: midPeak]
     --estimatorName=estimatorName          filename for resulting estimator [default: pca]
     --inputBlockName=inputBlockName        filename for resulting estimator [default: fr_sqrt]
-    --unitQuery=unitQuery                  how to restrict channels? [default: (chanName.str.endswith(\'fr_sqrt#0\'))]
+    --unitQuery=unitQuery                  how to restrict channels? [default: fr_sqrt]
+    --selector=selector                    filename if using a unit selector
 """
 
 import os
 import dataAnalysis.helperFunctions.profiling as prf
+import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
 #  import numpy as np
 #  import pandas as pd
 import pdb
@@ -36,6 +40,16 @@ expOpts, allOpts = parseAnalysisOptions(
 globals().update(expOpts)
 globals().update(allOpts)
 
+alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **arguments)
+alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
+    namedQueries, scratchFolder, **arguments)
+
+alignedAsigsKWargs.update(dict(
+    duplicateControlsByProgram=False,
+    makeControlProgram=True,
+    transposeToColumns='feature', concatOn='columns',
+    removeFuzzyName=False, getMetaData=False, decimate=5))
+
 if arguments['processAll']:
     prefix = experimentName
 else:
@@ -49,52 +63,14 @@ estimatorPath = os.path.join(
     prefix + '_' + arguments['estimatorName'] + '.joblib')
 
 prf.print_memory_usage('before load data')
-
-dataReader = ns5.nixio_fr.NixIO(
-    filename=triggeredPath)
-dataBlock = dataReader.read_block(
-    block_index=0, lazy=True,
-    signal_group_mode='split-all')
-
-alignedAsigsKWargs = dict(
-    duplicateControlsByProgram=False,
-    makeControlProgram=True,
-    transposeToColumns='feature', concatOn='columns',
-    removeFuzzyName=False)
-
-if arguments['alignQuery'] is None:
-    dataQuery = None
-else:
-    dataQuery = '&'.join([
-        arguments['alignQuery']
-    ])
-
-if arguments['selector'] is not None:
-    with open(
-        os.path.join(
-            scratchFolder,
-            arguments['selector'] + '.pickle'),
-            'rb') as f:
-        selectorMetadata = pickle.load(f)
-    unitNames = [
-        i.replace(selectorMetadata['inputBlockName'], 'fr_sqrt')
-        for i in selectorMetadata['outputFeatures']]
-else:
-    unitNames = None
-
-alignedAsigsKWargs = dict(
-    duplicateControlsByProgram=False,
-    makeControlProgram=True,
-    transposeToColumns='feature', concatOn='columns',
-    removeFuzzyName=False)
+dataReader, dataBlock = ns5.blockFromPath(triggeredPath, lazy=arguments['lazy'])
 
 masterSpikeMat = ns5.alignedAsigsToDF(
-    dataBlock, unitNames,
-    unitQuery=arguments['unitQuery'], dataQuery=dataQuery, verbose=True,
-    getMetaData=False, decimate=5,
+    dataBlock,
     **alignedAsigsKWargs).to_numpy()
 prf.print_memory_usage('just loaded firing rates')
-dataReader.file.close()
+if arguments['lazy']:
+    dataReader.file.close()
 #  free up memory
 del dataBlock
 gc.collect()
@@ -115,7 +91,6 @@ estimatorMetadata = {
     'path': os.path.basename(estimatorPath),
     'name': arguments['estimatorName'],
     'inputFeatures': masterSpikeMat.columns.to_list(),
-    'dataQuery': dataQuery,
     'alignedAsigsKWargs': alignedAsigsKWargs
     }
 

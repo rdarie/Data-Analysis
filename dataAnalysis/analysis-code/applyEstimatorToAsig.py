@@ -10,6 +10,8 @@ Options:
 """
 import os
 import dataAnalysis.preproc.ns5 as ns5
+import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
+from namedQueries import namedQueries
 #  import dataAnalysis.plotting.aligned_signal_plots as asp
 #  import seaborn as sns
 #  import numpy as np

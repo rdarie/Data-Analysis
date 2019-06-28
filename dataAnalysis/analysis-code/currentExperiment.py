@@ -250,6 +250,12 @@ def parseAnalysisOptions(trialIdx, experimentShorthand):
         'alignTo': None,
         'separateByFunKWArgs': {'type': 'Classification'}
         }
+    
+    testStride = 20e-3
+    testWidth = 100e-3
+    testTStart = 0
+    testTStop = 500e-3
+    
     plotOpts = {
         'type': 'ticks', 'errorBar': 'sem',
         'pageSize': (6, 12), 'removeOutliers': (0.01, 0.975)}

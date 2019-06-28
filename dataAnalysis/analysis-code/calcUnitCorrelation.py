@@ -6,7 +6,7 @@ Options:
     --exp=exp                              which experimental day to analyze
     --trialIdx=trialIdx                    which trial to analyze [default: 1]
     --processAll                           process entire experimental day? [default: False]
-    --lazy                                 load from raw, or regular? [default: True]
+    --lazy                                 load from raw, or regular? [default: False]
     --verbose                              print diagnostics? [default: False]
     --plotting                             plot out the correlation matrix? [default: True]
     --inputBlockName=inputBlockName        filename for inputs [default: fr]
@@ -63,7 +63,7 @@ correlationDF = ash.applyFun(
     fun="corr", lazy=arguments['lazy'],
     verbose=arguments['verbose'],
     loadArgs=alignedAsigsKWargs)
-    
+
 #  TODO turn into general pairwise analysis
 if arguments['plotting']:
     import matplotlib

@@ -2121,6 +2121,19 @@ def loadWithArrayAnn(
     return block
 
 
+def blockFromPath(dataPath, lazy=False):
+    if lazy:
+        dataReader = nixio_fr.NixIO(
+            filename=dataPath)
+        dataBlock = dataReader.read_block(
+            block_index=0, lazy=True,
+            signal_group_mode='split-all')
+    else:
+        dataReader = None
+        dataBlock = loadWithArrayAnn(dataPath)
+    return dataReader, dataBlock
+
+
 def calcBinarizedArray(
         dataBlock, samplingRate, binnedSpikePath, saveToFile=True):
     

@@ -18,6 +18,35 @@ from seaborn.relational import _ScatterPlotter, _LinePlotter
 import os
 
 
+def processRowColArguments(arguments):
+    outDict = {}
+    outDict['rowName'] = arguments['rowName'] if len(arguments['rowName']) else None
+    if outDict['rowName'] is not None:
+        try:
+            outDict['rowControl'] = int(arguments['rowControl'])
+        except Exception:
+            outDict['rowControl'] = arguments['rowControl']
+    else:
+        outDict['rowControl'] = None
+    outDict['colName'] = arguments['colName'] if len(arguments['colName']) else None
+    if outDict['colName'] is not None:
+        try:
+            outDict['colControl'] = int(arguments['colControl'])
+        except Exception:
+            outDict['colControl'] = arguments['colControl']
+    else:
+        outDict['colControl'] = None
+    outDict['hueName'] = arguments['hueName'] if len(arguments['hueName']) else None
+    if outDict['hueName'] is not None:
+        try:
+            outDict['hueControl'] = int(arguments['hueControl'])
+        except Exception:
+            outDict['hueControl'] = arguments['hueControl']
+    else:
+        outDict['hueControl'] = None
+    return outDict
+
+
 def getRasterFacetIdx(
         plotDF, y, row=None, col=None, hue=None):
     plotDF.loc[:, y + '_facetIdx'] = np.nan
@@ -45,65 +74,51 @@ def getRasterFacetIdx(
 def plotNeuronsAligned(
         rasterBlock,
         frBlock,
-        dataQuery=None,
-        chanNames=None, chanQuery=None,
+        loadArgs={},
         figureFolder=None,
         rowName=None,
         rowControl=None,
         colName=None,
         colControl=None,
         hueName=None,
+        hueControl=None,
         testStride=None,
         testWidth=None,
         testTStart=None,
         testTStop=None,
-        removeFuzzyName=True,
         pThresh=1e-3,
-        duplicateControlsByProgram=True,
-        makeControlProgram=True,
-        amplitudeColumn='amplitudeFuzzy',
-        programColumn='programFuzzy',
-        electrodeColumn='electrodeFuzzy',
-        collapseSizes=False,
         enablePlots=True,
+        linePlotEstimator='mean',
         colorPal="ch:0.6,-.2,dark=.2,light=0.7,reverse=1",
-        printBreakDown=True,
+        printBreakDown=True, xBounds=None,
         pdfName='motionStim.pdf', limitPages=None,
         verbose=False):
-    if chanNames is None:
+
+    if loadArgs['unitNames'] is None:
         allChanNames = ns5.listChanNames(
-            rasterBlock, chanQuery, objType=Unit)
-        chanNames = [
+            rasterBlock, loadArgs['unitQuery'], objType=Unit)
+        loadArgs['unitNames'] = [
             i.split('_raster')[0]
             for i in allChanNames
             if '_raster' in i]
-    nUnits = len(chanNames)
-    #
+    else:
+        loadArgs['unitNames'] = [i.replace('_#0', '') for i in loadArgs['unitNames']]
+    
+    nUnits = len(loadArgs['unitNames'])
+    unitNames = loadArgs.pop('unitNames')
+    loadArgs.pop('unitQuery')
+
     with PdfPages(os.path.join(figureFolder, pdfName + '.pdf')) as pdf:
         allPvals = {}
-        for idx, unitName in enumerate(chanNames):
+        for idx, unitName in enumerate(unitNames):
             rasterName = unitName + '_raster#0'
             continuousName = unitName + '_fr#0'
             rasterWide = ns5.alignedAsigsToDF(
                 rasterBlock, [rasterName],
-                unitQuery=None, dataQuery=dataQuery,
-                makeControlProgram=makeControlProgram,
-                duplicateControlsByProgram=duplicateControlsByProgram,
-                amplitudeColumn=amplitudeColumn,
-                programColumn=programColumn,
-                electrodeColumn=electrodeColumn,
-                collapseSizes=collapseSizes, verbose=verbose,
-                removeFuzzyName=removeFuzzyName, metaDataToCategories=False)
+                **loadArgs)
             asigWide = ns5.alignedAsigsToDF(
                 frBlock, [continuousName],
-                unitQuery=None, dataQuery=dataQuery,
-                makeControlProgram=makeControlProgram,
-                duplicateControlsByProgram=duplicateControlsByProgram,
-                amplitudeColumn=amplitudeColumn,
-                programColumn=programColumn,
-                electrodeColumn=electrodeColumn,
-                collapseSizes=collapseSizes, verbose=verbose,
-                removeFuzzyName=removeFuzzyName, metaDataToCategories=False)
+                **loadArgs)
             raster = rasterWide.stack().reset_index(name='raster')
             asig = asigWide.stack().reset_index(name='fr')
             #  set up significance testing
@@ -255,50 +270,39 @@ def plotNeuronsAligned(
 
 def plotAsigsAligned(
         dataBlock,
-        dataQuery=None,
-        chanNames=None, chanQuery=None,
+        loadArgs={},
         figureFolder=None,
         rowName=None,
         rowControl=None,
         colName=None,
         colControl=None,
         hueName=None,
+        hueControl=None,
         testStride=None,
         testWidth=None,
         testTStart=None,
         testTStop=None,
-        removeFuzzyName=True,
         pThresh=1e-3,
-        duplicateControlsByProgram=True,
-        makeControlProgram=True,
-        amplitudeColumn='amplitudeFuzzy',
-        programColumn='programFuzzy',
-        electrodeColumn='electrodeFuzzy',
-        collapseSizes=False,
         enablePlots=True,
         linePlotEstimator='mean',
         colorPal="ch:0.6,-.2,dark=.2,light=0.7,reverse=1",
         printBreakDown=True, xBounds=None,
         pdfName='alignedAsigs.pdf', limitPages=None,
         verbose=False):
-    if chanNames is None:
-        chanNames = ns5.listChanNames(
-            dataBlock, chanQuery, objType=Unit)
-    #[i.name for i in dataBlock.filter(objects=Unit)]
-    nUnits = len(chanNames)
+    
+    if loadArgs['unitNames'] is None:
+        loadArgs['unitNames'] = ns5.listChanNames(
+            dataBlock, loadArgs['unitQuery'], objType=Unit)
+    
+    nUnits = len(loadArgs['unitNames'])
+    unitNames = loadArgs.pop('unitNames')
+    loadArgs.pop('unitQuery')
     with PdfPages(os.path.join(figureFolder, pdfName + '.pdf')) as pdf:
         allPvals = {}
-        for idx, unitName in enumerate(chanNames):
+        for idx, unitName in enumerate(unitNames):
             asigWide = ns5.alignedAsigsToDF(
                 dataBlock, [unitName],
-                unitQuery=None, dataQuery=dataQuery,
-                makeControlProgram=makeControlProgram,
-                duplicateControlsByProgram=duplicateControlsByProgram,
-                amplitudeColumn=amplitudeColumn,
-                programColumn=programColumn,
-                electrodeColumn=electrodeColumn,
-                collapseSizes=collapseSizes, verbose=verbose,
-                removeFuzzyName=removeFuzzyName, metaDataToCategories=False)
+                **loadArgs)
             asig = asigWide.stack().reset_index(name='signal')
             #  set up significance testing
             if (rowControl is None) and (colControl is None):
@@ -496,7 +500,6 @@ def plotSignificance(
         newwidth = (ax.get_xticks()[1] - ax.get_xticks()[0])
         for bar in ax.patches:
             x = bar.get_x()
-            print(x)
             width = bar.get_width()
             centre = x + width/2.
             bar.set_x(centre - newwidth/2.)

@@ -19,7 +19,8 @@ def processAlignQueryArgs(namedQueries, alignQuery=None, **kwargs):
 
 
 def processUnitQueryArgs(
-        namedQueries, scratchFolder, selector=None, unitQuery=None, **kwargs):
+        namedQueries, scratchFolder, selector=None, unitQuery=None,
+        inputBlockName='', **kwargs):
     #
     if selector is not None:
         with open(
@@ -29,9 +30,9 @@ def processUnitQueryArgs(
                 'rb') as f:
             selectorMetadata = pickle.load(f)
         unitNames = [
-            i.replace(selectorMetadata['inputBlockName'], '')
+            '{}_{}#0'.format(i, inputBlockName)
             for i in selectorMetadata['outputFeatures']]
-        unitQuery = None
+        outputQuery = None
     else:
         unitNames = None
         if unitQuery in namedQueries['unit']:
@@ -49,14 +50,7 @@ def applyFun(
         verbose=False):
     if verbose:
         prf.print_memory_usage('about to load dataBlock')
-    if lazy:
-        dataReader = ns5.nixio_fr.NixIO(
-            filename=triggeredPath)
-        dataBlock = dataReader.read_block(
-            block_index=0, lazy=True,
-            signal_group_mode='split-all')
-    else:
-        dataBlock = ns5.loadWithArrayAnn(triggeredPath)
+    dataReader, dataBlock = ns5.blockFromPath(triggeredPath, lazy=lazy)
     if verbose:
         prf.print_memory_usage('done loading dataBlock')
     if loadType == 'all':

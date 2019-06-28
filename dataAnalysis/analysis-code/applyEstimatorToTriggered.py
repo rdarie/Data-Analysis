@@ -15,6 +15,8 @@ Options:
 #  import dataAnalysis.plotting.aligned_signal_plots as asp
 #  import dataAnalysis.helperFunctions.helper_functions_new as hf
 import dataAnalysis.helperFunctions.profiling as prf
+import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
+from namedQueries import namedQueries
 import os
 #  import seaborn as sns
 #  import numpy as np
@@ -51,7 +53,6 @@ with open(
         arguments['estimator'] + '_meta.pickle'),
         'rb') as f:
     estimatorMetadata = pickle.load(f)
-
 estimator = jb.load(
     os.path.join(scratchFolder, estimatorMetadata['path']))
 
@@ -70,25 +71,19 @@ outputPath = os.path.join(
 
 if verbose:
     prf.print_memory_usage('before load data')
-dataReader = ns5.nixio_fr.NixIO(
-    filename=triggeredPath)
-dataBlock = dataReader.read_block(
-    block_index=0, lazy=True,
-    signal_group_mode='split-all')
+dataReader, dataBlock = ns5.blockFromPath(
+    triggeredPath, lazy=arguments['lazy'])
 
-if arguments['alignQuery'] is None:
-    dataQuery = None
-else:
-    dataQuery = '&'.join([
-        arguments['alignQuery']
-    ])
+alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(
+    namedQueries, **arguments)
+alignedAsigsKWargs.update(estimatorMetaData['alignedAsigsKWargs'])
+alignedAsigsKWargs.update(dict(getMetaData=True, decimate=1))
 
 if verbose:
     prf.print_memory_usage('before load firing rates')
 unitNames = estimatorMetadata['inputFeatures']
 alignedAsigsDF = ns5.alignedAsigsToDF(
-    dataBlock, unitNames, dataQuery,
-    **estimatorMetadata['alignedAsigsKWargs'], verbose=True)
+    dataBlock, **alignedAsigsKWargs)
 if verbose:
     prf.print_memory_usage('after load firing rates')
 

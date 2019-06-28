@@ -1,0 +1,99 @@
+"""  13: Plot Firing Rates and Rasters aligned to Stim
+Usage:
+    temp.py [options]
+
+Options:
+    --exp=exp                       which experimental day to analyze
+    --trialIdx=trialIdx             which trial to analyze [default: 1]
+    --processAll                    process entire experimental day? [default: False]
+    --lazy                          load from raw, or regular? [default: False]
+    --verbose                       print diagnostics? [default: False]
+    --window=window                 process with short window? [default: short]
+    --unitQuery=unitQuery           how to restrict channels?
+    --selector=selector             filename if using a unit selector
+    --alignQuery=alignQuery         what will the plot be aligned to? [default: outboundWithStim]
+    --rowName=rowName               break down by row  [default: pedalDirection]
+    --rowControl=rowControl         rows to exclude from comparison
+    --hueName=hueName               break down by hue  [default: amplitudeCat]
+    --hueControl=hueControl         hues to exclude from comparison
+    --colName=colName               break down by col  [default: electrode]
+    --colControl=colControl         cols to exclude from comparison [default: control]
+"""
+import matplotlib
+matplotlib.rcParams['pdf.fonttype'] = 42
+matplotlib.rcParams['ps.fonttype'] = 42
+matplotlib.use('PS')   # generate postscript output by default
+import seaborn as sns
+sns.set()
+sns.set_color_codes("dark")
+sns.set_context("notebook")
+sns.set_style("white")
+
+import os
+import dataAnalysis.plotting.aligned_signal_plots as asp
+import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
+import dataAnalysis.preproc.ns5 as ns5
+import dill as pickle
+import pdb
+
+from currentExperiment import parseAnalysisOptions
+from docopt import docopt
+from namedQueries import namedQueries
+arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
+expOpts, allOpts = parseAnalysisOptions(
+    int(arguments['trialIdx']), arguments['exp'])
+globals().update(expOpts)
+globals().update(allOpts)
+
+rowColOpts = asp.processRowColArguments(arguments)
+colorPal = "ch:0.6,-.2,dark=.2,light=0.7,reverse=1"  #  for firing rates
+
+alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **arguments)
+alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
+    namedQueries, scratchFolder, **arguments)
+alignedAsigsKWargs.update(dict(
+    duplicateControlsByProgram=True,
+    makeControlProgram=True,
+    metaDataToCategories=False, removeFuzzyName=True))
+
+if arguments['processAll']:
+    prefix = experimentName
+else:
+    prefix = ns5FileName
+rasterBlockPath = os.path.join(
+    scratchFolder,
+    prefix + '_raster_{}.nix'.format(
+        arguments['window']))
+rasterReader, rasterBlock = ns5.blockFromPath(
+    rasterBlockPath, lazy=arguments['lazy'])
+frBlockPath = os.path.join(
+    scratchFolder,
+    prefix + '_fr_{}.nix'.format(
+        arguments['window']))
+frReader, frBlock = ns5.blockFromPath(
+    frBlockPath, lazy=arguments['lazy'])
+pdfName = '{}_{}_neurons_{}'.format(
+    prefix,
+    arguments['window'],
+    arguments['alignQuery'])
+
+asp.plotNeuronsAligned(
+    rasterBlock,
+    frBlock,
+    loadArgs=alignedAsigsKWargs,
+    figureFolder=figureFolder,
+    **rowColOpts,
+    testStride=testStride,
+    testWidth=testWidth,
+    testTStart=testTStart,
+    testTStop=testTStop,
+    pThresh=pThresh,
+    enablePlots=True,
+    colorPal=colorPal,
+    printBreakDown=True,
+    pdfName=pdfName,
+    verbose=arguments['verbose'])
+
+if arguments['lazy']:
+    frReader.close()
+    rasterReader.close()
