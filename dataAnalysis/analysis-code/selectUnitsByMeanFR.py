@@ -35,23 +35,18 @@ globals().update(expOpts)
 globals().update(allOpts)
 
 if arguments['--processAll']:
-    triggeredPath = os.path.join(
-        scratchFolder,
-        experimentName + '_trig_{}_{}.nix'.format(
-            arguments['--inputBlockName'], arguments['--window']))
-    selectorPath = os.path.join(
-        scratchFolder,
-        experimentName + '_' + arguments['--selectorName'] + '.pickle')
+    prefix = experimentName
 else:
-    triggeredPath = os.path.join(
-        scratchFolder,
-        ns5FileName + '_trig_{}_{}.nix'.format(
-            arguments['--inputBlockName'], arguments['--window']))
-    selectorPath = os.path.join(
-        scratchFolder,
-        ns5FileName + '_' + arguments['--selectorName'] + '.pickle')
+    prefix = ns5FileName
+triggeredPath = os.path.join(
+    scratchFolder,
+    ns5FileName + '_{}_{}.nix'.format(
+        arguments['--inputBlockName'], arguments['--window']))
+selectorPath = os.path.join(
+    scratchFolder,
+    ns5FileName + '_' + arguments['--selectorName'] + '.pickle')
 
-if arguments['--processAll']:
+if arguments['--verbose']:
     prf.print_memory_usage('before load data')
 
 dataReader = ns5.nixio_fr.NixIO(
@@ -60,13 +55,9 @@ dataBlock = dataReader.read_block(
     block_index=0, lazy=True,
     signal_group_mode='split-all')
 
-
 alignedAsigsKWargs = dict(
     duplicateControlsByProgram=False,
     makeControlProgram=True,
-    amplitudeColumn='amplitudeFuzzy',
-    programColumn='programFuzzy',
-    electrodeColumn='electrodeFuzzy',
     removeFuzzyName=False)
 
 if arguments['--alignQuery'] is None:

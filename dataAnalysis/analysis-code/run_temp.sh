@@ -40,9 +40,10 @@ SELECTOR="201901271000-Proprio_minfr"
 #  python3 './selectUnitsByMeanFR.py' --exp=$EXP --trialIdx=3 --window=short --verbose
 #  python3 './selectUnitsByMeanFRandCorrelation.py' --exp=$EXP --trialIdx=3 --window=short --verbose
 #  python3 './calcPCAinChunks.py' --exp=$EXP --trialIdx=3 --window=short --selector=Trial003_minmeanfr --verbose
-python3 './saveRasterForGPFA.py' --exp=$EXP --trialIdx=5 --window=miniRC --selector=$SELECTOR --alignQuery="" --alignSuffix=stim
-python3 './saveRasterForGPFA.py' --exp=$EXP --trialIdx=5 --window=miniRC --selector=$SELECTOR --alignQuery="(amplitude==0)" --alignSuffix=noStim
+#  python3 './saveRasterForGPFA.py' --exp=$EXP --trialIdx=5 --window=miniRC --selector=$SELECTOR --alignQuery="" --alignSuffix=stim
+#  python3 './saveRasterForGPFA.py' --exp=$EXP --trialIdx=5 --window=miniRC --selector=$SELECTOR --alignQuery="(amplitude==0)" --alignSuffix=noStim
 #  python3 './plotAsigsAlignedToMotionStim.py' --exp=$EXP --trialIdx=3 --window=short --blockName=gpfa --chanQuery="(chanName.str.contains('gpfa'))" --alignQuery="(pedalMovementCat=='midPeak')"
 #  python3 './applyGPFAtoTriggered.py' --exp=$EXP --trialIdx=3 --window=short --selector=$SELECTOR --verbose
 #  python3 './optimizeGPFAdimensions.py' --exp=$EXP --trialIdx=3 --window=short --selector=$SELECTOR --verbose
 #  python3 './plotGPFAoptimization.py' --exp=$EXP --runIdx=1
+python3 './plotPCA3D.py' --exp=$EXP --processAll --window=long

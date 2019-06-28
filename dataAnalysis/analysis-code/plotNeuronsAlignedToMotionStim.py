@@ -6,19 +6,23 @@ Options:
     --trialIdx=trialIdx             which trial to analyze [default: 1]
     --exp=exp                       which experimental day to analyze
     --processAll                    process entire experimental day? [default: False]
+    --window=window                 process with short window? [default: short]
+    --chanQuery=chanQuery           how to restrict channels?
+    --selector=selector             filename if using a unit selector
+    --alignQuery=alignQuery         what will the plot be aligned to? [default: (pedalMovementCat==\'outbound\')]
+    --nameSuffix=nameSuffix         add an identifier to the pdf name? [default: alignedToOutbound]
     --rowName=rowName               break down by row  [default: pedalDirection]
     --rowControl=rowControl         rows to exclude from comparison
     --hueName=hueName               break down by hue  [default: amplitudeCat]
     --hueControl=hueControl         hues to exclude from comparison
     --colName=colName               break down by col  [default: electrode]
     --colControl=colControl         cols to exclude from comparison [default: control]
-    --alignQuery=alignQuery         what will the plot be aligned to? [default: (pedalMovementCat==\'outbound\')]
-    --window=window                 process with short window? [default: short]
-    --unitQuery=unitQuery           how to restrict channels?
-    --selector=selector             filename if using a unit selector
 """
 import matplotlib
+matplotlib.rcParams['pdf.fonttype'] = 42
+matplotlib.rcParams['ps.fonttype'] = 42
 matplotlib.use('PS')   # generate postscript output by default
+
 import os
 import dataAnalysis.plotting.aligned_signal_plots as asp
 import dataAnalysis.preproc.ns5 as preproc
@@ -76,34 +80,23 @@ testTStop = 500e-3
 colorPal = "ch:0.6,-.2,dark=.2,light=0.7,reverse=1"  #  for firing rates
 
 if arguments['--processAll']:
-    rasterBlock = preproc.loadWithArrayAnn(
-        os.path.join(
-            scratchFolder,
-            experimentName + '_trig_raster_{}.nix'.format(
-                arguments['--window'])))
-    frBlock = preproc.loadWithArrayAnn(
-        os.path.join(
-            scratchFolder,
-            experimentName + '_trig_fr_{}.nix'.format(
-                arguments['--window'])))
-    pdfName = '{}_{}_neurons_by_{}_aligned_to_{}'.format(
-        experimentName, arguments['--window'],
-        hueName, arguments['--alignQuery'])
+    prefix = experimentName
 else:
-    rasterBlock = preproc.loadWithArrayAnn(
-        os.path.join(
-            scratchFolder,
-            ns5FileName + '_trig_raster_{}.nix'.format(
-                arguments['--window'])))
-    frBlock = preproc.loadWithArrayAnn(
-        os.path.join(
-            scratchFolder,
-            ns5FileName + '_trig_fr_{}.nix'.format(
-                arguments['--window'])))
-    pdfName = '{}_{}_neurons_by_{}_aligned_to_{}'.format(
-        experimentName, arguments['--trialIdx'],
-        arguments['--window'],
-        hueName, arguments['--alignQuery'])
+    prefix = ns5FileName
+rasterBlock = preproc.loadWithArrayAnn(
+    os.path.join(
+        scratchFolder,
+        prefix + '_raster_{}.nix'.format(
+            arguments['--window'])))
+frBlock = preproc.loadWithArrayAnn(
+    os.path.join(
+        scratchFolder,
+        prefix + '_fr_{}.nix'.format(
+            arguments['--window'])))
+pdfName = '{}_{}_neurons_{}'.format(
+    prefix,
+    arguments['--window'],
+    arguments['--nameSuffix'])
 
 if arguments['--selector'] is not None:
     with open(
@@ -113,7 +106,7 @@ if arguments['--selector'] is not None:
             'rb') as f:
         selectorMetadata = pickle.load(f)
     unitNames = [
-        i.replace('_raster#0', '')
+        i.replace(selectorMetadata['inputBlockName'] + '#0', '')
         for i in selectorMetadata['outputFeatures']]
 else:
     unitNames = None
@@ -122,6 +115,7 @@ asp.plotNeuronsAligned(
     rasterBlock,
     frBlock,
     dataQuery=dataQuery,
+    chanNames=unitNames, chanQuery=arguments['--chanQuery'],
     figureFolder=figureFolder,
     rowName=rowName,
     rowControl=rowControl,
@@ -138,5 +132,4 @@ asp.plotNeuronsAligned(
     enablePlots=True,
     colorPal=colorPal,
     printBreakDown=True,
-    pdfName=pdfName,
-    chanNames=unitNames, chanQuery=arguments['--unitQuery'])
+    pdfName=pdfName)

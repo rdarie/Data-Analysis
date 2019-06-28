@@ -37,21 +37,16 @@ globals().update(expOpts)
 globals().update(allOpts)
 
 if arguments['--processAll']:
-    triggeredPath = os.path.join(
-        scratchFolder,
-        experimentName + '_trig_{}_{}.nix'.format(
-            arguments['--inputBlockName'], arguments['--window']))
-    estimatorPath = os.path.join(
-        scratchFolder,
-        experimentName + '_' + arguments['--estimatorName'] + '.joblib')
+    prefix = experimentName
 else:
-    triggeredPath = os.path.join(
-        scratchFolder,
-        ns5FileName + '_trig_{}_{}.nix'.format(
-            arguments['--inputBlockName'], arguments['--window']))
-    estimatorPath = os.path.join(
-        scratchFolder,
-        ns5FileName + '_' + arguments['--estimatorName'] + '.joblib')
+    prefix = ns5FileName
+triggeredPath = os.path.join(
+    scratchFolder,
+    prefix + '_{}_{}.nix'.format(
+        arguments['--inputBlockName'], arguments['--window']))
+estimatorPath = os.path.join(
+    scratchFolder,
+    prefix + '_' + arguments['--estimatorName'] + '.joblib')
 
 prf.print_memory_usage('before load data')
 
@@ -64,9 +59,6 @@ dataBlock = dataReader.read_block(
 alignedAsigsKWargs = dict(
     duplicateControlsByProgram=False,
     makeControlProgram=True,
-    amplitudeColumn='amplitudeFuzzy',
-    programColumn='programFuzzy',
-    electrodeColumn='electrodeFuzzy',
     transposeToColumns='feature', concatOn='columns',
     removeFuzzyName=False)
 
@@ -76,12 +68,25 @@ else:
     dataQuery = '&'.join([
         arguments['--alignQuery']
     ])
-    
-#  unitNames = [
-#      'elec75#0_fr_sqrt#0', 'elec75#1_fr_sqrt#0',
-#      'elec78#0_fr_sqrt#0', 'elec78#1_fr_sqrt#0',
-#      'elec83#0_fr_sqrt#0']
-unitNames = None
+
+if arguments['--selector'] is not None:
+    with open(
+        os.path.join(
+            scratchFolder,
+            arguments['--selector'] + '.pickle'),
+            'rb') as f:
+        selectorMetadata = pickle.load(f)
+    unitNames = [
+        i.replace(selectorMetadata['inputBlockName'], 'fr_sqrt')
+        for i in selectorMetadata['outputFeatures']]
+else:
+    unitNames = None
+
+alignedAsigsKWargs = dict(
+    duplicateControlsByProgram=False,
+    makeControlProgram=True,
+    transposeToColumns='feature', concatOn='columns',
+    removeFuzzyName=False)
 
 masterSpikeMat = ns5.alignedAsigsToDF(
     dataBlock, unitNames,

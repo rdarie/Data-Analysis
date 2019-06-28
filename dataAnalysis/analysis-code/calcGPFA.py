@@ -7,8 +7,7 @@ Options:
     --processAll                           process entire experimental day? [default: False]
     --exp=exp                              which experimental day to analyze
     --verbose                              print diagnostics? [default: False]
-    --alignSuffix=alignSuffix              what name to append in order to identify the align query? [default: midPeak]
-    --runIdx=runIdx                        which run [default: 1]
+    --inputDataName=inputDataName          what name to append in order to identify the align query? [default: midPeak]
     --window=window                        process with short window? [default: long]
 """
 #  import dataAnalysis.plotting.aligned_signal_plots as asp
@@ -47,34 +46,23 @@ if arguments['--processAll']:
     prefix = experimentName
 else:
     prefix = ns5FileName
+
 intermediatePath = os.path.join(
     scratchFolder,
-    prefix + '_trig_raster_{}_for_gpfa_{}.mat'.format(
-        arguments['--window'], arguments['--alignSuffix']))
+    prefix + '_raster_{}_for_gpfa_{}.mat'.format(
+        arguments['--window'], arguments['--inputDataName']))
 
+modelName = '{}_{}'.format(prefix, arguments['--inputDataName'])
 # dataPath, xDim, segLength, binWidth, kernSD, runIdx, baseDir
-gpfaArg = '(' + ', '.join([
+gpfaArg = ', '.join([
     '\'' + intermediatePath + '\'',
     '{}'.format(gpfaOpts['xDim']),
     '{}'.format(gpfaOpts['segLength']),
     '{}'.format(gpfaOpts['binWidth']),
     '{}'.format(gpfaOpts['kernSD']),
-    '{}'.format(arguments['--runIdx']),
+    '\'{}\''.format(modelName),
     '\'' + scratchFolder + '\'',
-    ]) + ')'
-execStr = 'matlab -r \"calculate_gpfa{}; exit\"'.format(gpfaArg)
+    ])
+execStr = 'matlab -r \"calculate_gpfa({}); exit\"'.format(gpfaArg)
 print(execStr)
 result = subprocess.run([execStr], shell=True)
-
-modelFolder = os.path.join(
-    scratchFolder, 'gpfa_results',
-    'run{:0>3}'.format(gpfaOpts['runIdx'])
-    )
-newFolderName = os.path.join(
-    scratchFolder, 'gpfa_results',
-    '{}_{}'.format(prefix, arguments['--alignSuffix'])
-    )
-os.rename(modelFolder, newFolderName)
-# stdout=subprocess.PIPE
-#print(result.stdout)
-# plt.spy(alignedRasterList[2]); plt.show()

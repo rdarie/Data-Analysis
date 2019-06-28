@@ -28,8 +28,8 @@ SELECTOR="201901271000-Proprio_minfr"
 
 # python3 './selectUnitsByMeanFR.py' --exp=$EXP --processAll
 # python3 './selectUnitsByMeanFRandCorrelationFast.py' --exp=$EXP --processAll --verbose
-# python3 './optimizeGPFAdimensions.py' --exp=$EXP --processAll --alignSuffix=midPeak
-python3 './plotGPFAoptimization.py' --exp=$EXP --processAll --alignSuffix=midPeak
+# python3 './optimizeGPFAdimensions.py' --exp=$EXP --processAll --alignSuffix=midPeakNoStim
+python3 './plotGPFAoptimization.py' --exp=$EXP --processAll --alignSuffix=midPeakNoStim
 # python3 './applyGPFAtoTriggered.py' --exp=$EXP --processAll --alignQuery="(amplitudeCat==0)" --alignSuffix=midPeakNoStim
 
 # python3 './optimizeGPFAdimensions.py' --exp=$EXP --trialIdx=1 --window=miniRC --alignSuffix=stim

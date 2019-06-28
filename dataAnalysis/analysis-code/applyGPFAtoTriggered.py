@@ -8,9 +8,9 @@ Options:
     --exp=exp                              which experimental day to analyze
     --verbose                              print diagnostics? [default: False]
     --alignQuery=alignQuery                choose a subset of the data?
-    --alignSuffix=alignSuffix              what name to append in order to identify the align query? [default: midPeak]
+    --modelSuffix=modelSuffix              what name to append in order to identify the gpfa model? [default: midPeak]
     --selector=selector                    filename if using a unit selector
-    --window=window                        process with short window? [default: long]
+    --window=window                        process with short window? [default: short]
     --unitQuery=unitQuery                  how to restrict channels? [default: (chanName.str.endswith(\'raster#0\'))]
 """
 #  import dataAnalysis.plotting.aligned_signal_plots as asp
@@ -55,13 +55,14 @@ triggeredPath = os.path.join(
 
 modelPath = os.path.join(
     scratchFolder, 'gpfa_results',
-    '{}_{}'.format(prefix, arguments['--alignSuffix']),
+    '{}_{}'.format(prefix, arguments['--modelSuffix']),
     'gpfa_xDim{:0>2}'.format(gpfaOpts['xDim']) + '.mat'
     )
-intermediatePath = triggeredPath.replace('.nix', '_for_gpfa_{}.mat'.format(arguments['--alignSuffix']))
-outputPath = triggeredPath.replace('.nix', '_from_gpfa_{}.mat'.format(arguments['--alignSuffix']))
+intermediatePath = triggeredPath.replace('.nix', '_for_gpfa_temp.mat')
+outputPath = triggeredPath.replace('.nix', '_from_gpfa_temp.mat')
 
 if arguments['--verbose']:
+    print('Loading {}...'.format(triggeredPath))
     prf.print_memory_usage('before load data')
 dataReader = ns5.nixio_fr.NixIO(
     filename=triggeredPath)
@@ -94,10 +95,7 @@ else:
     unitNames = None
     alignedAsigsKWargs = dict(
         duplicateControlsByProgram=False,
-        makeControlProgram=False,
-        amplitudeColumn='amplitudeFuzzy',
-        programColumn='programFuzzy',
-        electrodeColumn='electrodeFuzzy',
+        makeControlProgram=True,
         removeFuzzyName=False)
 
 if miniRCTrial:
@@ -121,7 +119,7 @@ alignedRastersDF = ns5.alignedAsigsToDF(
 if arguments['--verbose']:
     prf.print_memory_usage('after load firing rates')
 
-intermediateMatAlreadyExists = True
+intermediateMatAlreadyExists = False
 if not intermediateMatAlreadyExists:
     alignedRasterList = [
         g.to_numpy(dtype='uint8')
@@ -137,13 +135,13 @@ if not intermediateMatAlreadyExists:
 outputMatAlreadyExists = False
 if not outputMatAlreadyExists:
     # dataPath, modelPath, outputPath, baseDir
-    gpfaArg = '(' + ', '.join([
+    gpfaArg = ', '.join([
         '\'' + intermediatePath + '\'',
         '\'' + modelPath + '\'',
         '\'' + outputPath + '\'',
         '\'' + scratchFolder + '\'',
-        ]) + ')'
-    execStr = 'matlab -r \"extract_gpfa{}; exit\"'.format(gpfaArg)
+        ])
+    execStr = 'matlab -r \"extract_gpfa({}); exit\"'.format(gpfaArg)
     print(execStr)
     result = subprocess.run([execStr], shell=True)
 
@@ -157,7 +155,7 @@ featureNames = ['gpfa{:0>3}'.format(i)for i in range(gpfaOpts['xDim'])]
 exSt = dataBlock.filter(objects=SpikeTrainProxy)[0]
 winSize = rasterOpts['windowSizes'][arguments['--window']]
 nBins = int((winSize[1] - winSize[0]) * exSt.sampling_rate.magnitude /gpfaOpts['binWidth'] - 1)
-bins = (np.arange(nBins) * gpfaOpts['binWidth'] + gpfaOpts['binWidth'] / 2) / 1e3
+bins = (np.arange(nBins) * gpfaOpts['binWidth'] + gpfaOpts['binWidth'] / 2 ) / 1e3 + winSize[0]
 
 for tIdx, grp in enumerate(f['seqNew']['xsm']):
     name = h5py.h5r.get_name(grp[0], f.id)

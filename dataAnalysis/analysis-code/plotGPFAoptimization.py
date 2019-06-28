@@ -14,7 +14,10 @@ Options:
 #  import dataAnalysis.plotting.aligned_signal_plots as asp
 #  import dataAnalysis.helperFunctions.helper_functions_new as hf
 import matplotlib
-# matplotlib.use('PS')   # generate postscript output by default
+matplotlib.rcParams['pdf.fonttype'] = 42
+matplotlib.rcParams['ps.fonttype'] = 42
+matplotlib.use('PS')   # generate postscript output by default
+
 import matplotlib.pyplot as plt
 import seaborn as sns
 import dataAnalysis.helperFunctions.profiling as prf
@@ -57,38 +60,38 @@ sns.set_context("notebook")
 sns.set_style("white")
 verbose = arguments['--verbose']
 
-modelPath = os.path.join(
-    scratchFolder, 'gpfa_results',
-    '{}_{}'.format(prefix, arguments['--alignSuffix']),
-    'predErrorVsDim.mat'
-    )
-f = h5py.File(modelPath, 'r')
-nMethods = f['method']['name'].shape[0]
-fields = [i for i in f['method'].keys()]
-results = {f: [] for f in fields}
+trainSetNames = ['midPeak', 'midPeakNoStim']
+modelNames = ['fa', 'pca', 'ppca', 'gpfa']
+modelResults = {k: {} for k in trainSetNames}
 
-for fieldName in fields:
-    for idx in range(nMethods):
-        ref = h5py.h5r.get_name(f['method'][fieldName][idx, 0], f.id)
-        dataArray = f[ref].value
-        if fieldName == 'name':
-            letters = [chr(i) for i in dataArray]
-            results[fieldName].append(''.join(letters))
-        else:
-            results[fieldName].append(dataArray.flatten())
-resultsDF = pd.DataFrame(results)
-resultsByName = {}
-for idx in range(nMethods):
-    name = results['name'][idx]
-    values = {}
-    for k, v in results.items():
-        if k not in ['name', 'numTrials']:
-            values.update({k: v[idx]})
-    resultsByName.update({name: pd.DataFrame(values)})
+for trainSetName in trainSetNames:
+    modelPath = os.path.join(
+        scratchFolder, 'gpfa_results',
+        '{}_{}'.format(prefix, trainSetName),
+        'predErrorVsDim.mat'
+        )
+    with h5py.File(modelPath, 'r') as f:
+        nEntries = f['D']['name'].shape[1]
+        fields = ['method', 'sse', 'r2', 'xDim']
+        results = {f: [] for f in fields}
 
-data = pd.concat(resultsByName, names=['method']).reset_index()
-ax = sns.lineplot(x='xDim', y='sse', hue='method', data=data)
-plt.show()
+        for fieldName in fields:
+            for idx in range(nEntries):
+                ref = h5py.h5r.get_name(f['D'][fieldName][0, idx], f.id)
+                dataArray = f[ref].value
+                if fieldName == 'method':
+                    letters = [chr(i) for i in dataArray]
+                    results[fieldName].append(''.join(letters))
+                elif fieldName in ['sse', 'r2', 'xDim']:
+                    results[fieldName].append(dataArray.flatten()[0])
+        resultsDF = pd.DataFrame(results)
+    modelResults[trainSetName] = resultsDF
+
+modelResultsDF = pd.concat(modelResults, names=['trainSet']).reset_index()
+ax = sns.lineplot(x='xDim', y='sse', hue='method', style='trainSet', data=modelResultsDF)
+plt.savefig(os.path.join(figureFolder, 'gpfa_reconstruction_error.pdf'))
+plt.close()
+#pdb.set_trace()
 # stdout=subprocess.PIPE
 #print(result.stdout)
 # plt.spy(alignedRasterList[2]); plt.show()

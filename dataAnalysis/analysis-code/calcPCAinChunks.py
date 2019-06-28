@@ -46,27 +46,29 @@ if arguments['--selector'] is not None:
             'rb') as f:
         selectorMetadata = pickle.load(f)
     unitNames = [
-        i.replace('raster', 'fr_sqrt')
+        i.replace(selectorMetadata['inputBlockName'], 'fr_sqrt')
         for i in selectorMetadata['outputFeatures']]
 else:
     unitNames = None
 
+alignedAsigsKWargs = dict(
+    duplicateControlsByProgram=False,
+    makeControlProgram=True,
+    transposeToColumns='feature', concatOn='columns',
+    removeFuzzyName=False)
+
 if arguments['--processAll']:
-    triggeredPath = os.path.join(
-        scratchFolder,
-        experimentName + '_trig_{}_{}.nix'.format(
-            arguments['--inputBlockName'], arguments['--window']))
-    estimatorPath = os.path.join(
-        scratchFolder,
-        experimentName + '_' + arguments['--estimatorName'] + '.joblib')
+    prefix = experimentName
 else:
-    triggeredPath = os.path.join(
-        scratchFolder,
-        ns5FileName + '_trig_{}_{}.nix'.format(
-            arguments['--inputBlockName'], arguments['--window']))
-    estimatorPath = os.path.join(
-        scratchFolder,
-        ns5FileName + '_' + arguments['--estimatorName'] + '.joblib')
+    prefix = ns5FileName
+
+triggeredPath = os.path.join(
+    scratchFolder,
+    prefix + '_{}_{}.nix'.format(
+        arguments['--inputBlockName'], arguments['--window']))
+estimatorPath = os.path.join(
+    scratchFolder,
+    prefix + '_' + arguments['--estimatorName'] + '.joblib')
 
 prf.print_memory_usage('before load data')
 print(triggeredPath)
@@ -76,15 +78,6 @@ dataBlock = dataReader.read_block(
     block_index=0, lazy=True,
     signal_group_mode='split-all')
 
-alignedAsigsKWargs = dict(
-    duplicateControlsByProgram=False,
-    makeControlProgram=True,
-    amplitudeColumn='amplitudeFuzzy',
-    programColumn='programFuzzy',
-    electrodeColumn='electrodeFuzzy',
-    transposeToColumns='feature', concatOn='columns',
-    removeFuzzyName=False)
-
 if arguments['--alignQuery'] is None:
     dataQuery = None
 else:
@@ -93,7 +86,7 @@ else:
     ])
 
 nSeg = len(dataBlock.segments)
-nComp = 50
+nComp = len(unitNames)
 estimator = IncrementalPCA(
     n_components=nComp,
     batch_size=int(5 * nComp))

@@ -34,21 +34,16 @@ globals().update(expOpts)
 globals().update(allOpts)
 
 if arguments['--processAll']:
-    triggeredPath = os.path.join(
-        scratchFolder,
-        experimentName + '_trig_{}_{}.nix'.format(
-            arguments['--inputBlockName'], arguments['--window']))
-    selectorPath = os.path.join(
-        scratchFolder,
-        experimentName + '_' + arguments['--selectorName'] + '.pickle')
+    prefix = experimentName
 else:
-    triggeredPath = os.path.join(
-        scratchFolder,
-        ns5FileName + '_trig_{}_{}.nix'.format(
-            arguments['--inputBlockName'], arguments['--window']))
-    selectorPath = os.path.join(
-        scratchFolder,
-        ns5FileName + '_' + arguments['--selectorName'] + '.pickle')
+    prefix = ns5FileName
+triggeredPath = os.path.join(
+    scratchFolder,
+    prefix + '_{}_{}.nix'.format(
+        arguments['--inputBlockName'], arguments['--window']))
+selectorPath = os.path.join(
+    scratchFolder,
+    prefix + '_' + arguments['--selectorName'] + '.pickle')
 #
 if arguments['--verbose']:
     prf.print_memory_usage('before load data')
@@ -65,16 +60,10 @@ else:
     dataQuery = '&'.join([
         arguments['--alignQuery']
     ])
-#
-#import warnings
-#warnings.filterwarnings('error')
 
 alignedAsigsKWargs = dict(
     duplicateControlsByProgram=False,
     makeControlProgram=False,
-    amplitudeColumn='amplitudeFuzzy',
-    programColumn='programFuzzy',
-    electrodeColumn='electrodeFuzzy',
     removeFuzzyName=False)
 specificKWargs = dict(
     unitQuery=arguments['--unitQuery'], dataQuery=dataQuery,
@@ -137,9 +126,9 @@ f, ax = plt.subplots(figsize=(11, 9))
 cmap = sns.diverging_palette(220, 10, as_cmap=True)
 # Draw the heatmap with the mask and correct aspect ratio
 from matplotlib.backends.backend_pdf import PdfPages
-with PdfPages(os.path.join(figureFolder, 'unit_correlation.pdf')) as pdf:
+with PdfPages(os.path.join(figureFolder, 'unit_correlation_{}.pdf'.format(arguments['--selectorName']))) as pdf:
     sns.heatmap(
-        correlationDF.to_numpy(), mask=mask, cmap=cmap, vmax=.3, center=0,
+        correlationDF.to_numpy(), mask=mask, cmap=cmap, center=0,
         square=True, linewidths=.5, cbar_kws={"shrink": .5})
     pdf.savefig()
     plt.close()
@@ -147,13 +136,12 @@ with PdfPages(os.path.join(figureFolder, 'unit_correlation.pdf')) as pdf:
 
 def selFun(
         meanDF, corrDF, meanThresh=5,
-        corrThresh=0.9):
+        corrThresh=0.85):
     unitMask = ((meanDF > meanThresh) & (corrDF.max() < corrThresh))
     return unitMask[unitMask].index.to_list()
 
 
-thisCorrThresh = 0.9
-pdb.set_trace()
+thisCorrThresh = 0.85
 
 selectorMetadata = {
     'trainingDataPath': os.path.basename(triggeredPath),

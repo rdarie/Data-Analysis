@@ -46,6 +46,7 @@ def plotNeuronsAligned(
         rasterBlock,
         frBlock,
         dataQuery=None,
+        chanNames=None, chanQuery=None,
         figureFolder=None,
         rowName=None,
         rowControl=None,
@@ -68,7 +69,7 @@ def plotNeuronsAligned(
         colorPal="ch:0.6,-.2,dark=.2,light=0.7,reverse=1",
         printBreakDown=True,
         pdfName='motionStim.pdf', limitPages=None,
-        chanNames=None, chanQuery=None, verbose=False):
+        verbose=False):
     if chanNames is None:
         allChanNames = ns5.listChanNames(
             rasterBlock, chanQuery, objType=Unit)
@@ -137,7 +138,7 @@ def plotNeuronsAligned(
                 asigWide.query(sigTestQuery),
                 groupBy=sigTestGroupBy, testVar=hueName,
                 tStart=testTStart, tStop=testTStop,
-                testWidth=testWidth, testStride=testStride)
+                testWidth=testWidth, testStride=testStride, correctMultiple=False)
             #  bonferroni correct for comparisons across units
             elecPvals = elecPvals * nUnits
             #  save sig test results to stack
@@ -255,6 +256,7 @@ def plotNeuronsAligned(
 def plotAsigsAligned(
         dataBlock,
         dataQuery=None,
+        chanNames=None, chanQuery=None,
         figureFolder=None,
         rowName=None,
         rowControl=None,
@@ -276,9 +278,9 @@ def plotAsigsAligned(
         enablePlots=True,
         linePlotEstimator='mean',
         colorPal="ch:0.6,-.2,dark=.2,light=0.7,reverse=1",
-        printBreakDown=True,
+        printBreakDown=True, xBounds=None,
         pdfName='alignedAsigs.pdf', limitPages=None,
-        chanNames=None, chanQuery=None, verbose=False):
+        verbose=False):
     if chanNames is None:
         chanNames = ns5.listChanNames(
             dataBlock, chanQuery, objType=Unit)
@@ -299,9 +301,10 @@ def plotAsigsAligned(
                 removeFuzzyName=removeFuzzyName, metaDataToCategories=False)
             asig = asigWide.stack().reset_index(name='signal')
             #  set up significance testing
-            if (rowControl is None) and (colControl) is None:
+            if (rowControl is None) and (colControl is None):
                 # test all rows and columns
                 sigTestQuery = None
+                sigTestAsig = asigWide
             else:
                 sigTestQueryList = []
                 if rowControl is not None:
@@ -319,20 +322,24 @@ def plotAsigsAligned(
                     sigTestQueryList.append(
                         '({} != {})'.format(colName, colQ))
                 sigTestQuery = '&'.join(sigTestQueryList)
+                sigTestAsig = asigWide.query(sigTestQuery)
             #  test each row and column separately
             sigTestGroupBy = [
                 i
                 for i in [rowName, colName]
                 if i is not None
                 ]
+            if not len(sigTestGroupBy):
+                sigTestGroupBy = None
             #  get significance test results
             elecPvals = ksa.triggeredAsigCompareMeans(
-                asigWide.query(sigTestQuery),
+                sigTestAsig,
                 groupBy=sigTestGroupBy, testVar=hueName,
                 tStart=testTStart, tStop=testTStop,
-                testWidth=testWidth, testStride=testStride)
+                testWidth=testWidth, testStride=testStride, correctMultiple=False)
             #  bonferroni correct for comparisons across units
-            elecPvals = elecPvals * nUnits
+            print('len of pvals = {}'.format(elecPvals.shape[0] * elecPvals.shape[1]))
+            elecPvals = elecPvals * nUnits * elecPvals.shape[0] * elecPvals.shape[1]
             #  save sig test results to stack
             allPvals.update({idx: elecPvals})
             if enablePlots:
@@ -366,7 +373,10 @@ def plotAsigsAligned(
                             pQueryList.append(
                                 '({} == {})'.format(colName, compareName))
                     pQuery = '&'.join(pQueryList)
-                    thesePvals = elecPvals.query(pQuery)
+                    if len(pQuery):
+                        thesePvals = elecPvals.query(pQuery)
+                    else:
+                        thesePvals = elecPvals
                     #  plot stars
                     if not thesePvals.empty:
                         significantBins = (
@@ -379,6 +389,8 @@ def plotAsigsAligned(
                                 significantBins ** 0 * ymax * 0.99,
                                 'm*')
                 for ax in g.axes.flat:
+                    if xBounds is not None:
+                        ax.set_xlim(xBounds)
                     ax.axvline(testTStart, color='m')
                 pdf.savefig()
                 plt.close()
@@ -391,10 +403,13 @@ def plotAsigsAligned(
             fig.set_size_inches(15, 15)
             # print out description of how many observations there are
             # for each condition
+            if sigTestGroupBy is not None:
+                breakDownBy = sigTestGroupBy + [hueName]
+            else:
+                breakDownBy = [hueName]
             breakDownData = (
-                asigWide
-                .query(sigTestQuery)
-                .groupby(sigTestGroupBy + [hueName])
+                sigTestAsig
+                .groupby(breakDownBy)
                 .agg('count')
                 .iloc[:, 0]
             )

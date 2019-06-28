@@ -9,6 +9,7 @@ Options:
     --verbose                              print diagnostics? [default: False]
     --alignQuery=alignQuery                choose a subset of the data? [default: (pedalMovementCat==\'midPeak\')]
     --alignSuffix=alignSuffix              what name to append in order to identify the align query? [default: midPeak]
+    --dryRun                               actually run the code? [default: True]
     --window=window                        process with short window? [default: long]
 """
 #  import dataAnalysis.plotting.aligned_signal_plots as asp
@@ -49,32 +50,25 @@ else:
     prefix = ns5FileName
 intermediatePath = os.path.join(
     scratchFolder,
-    prefix + '_trig_raster_{}_for_gpfa_{}.mat'.format(
+    prefix + '_raster_{}_for_gpfa_{}.mat'.format(
         arguments['--window'], arguments['--alignSuffix']))
-
-# dataPath, xDim, segLength, binWidth, kernSD, runIdx, baseDir
+runIdx = '{}_{}'.format(prefix, arguments['--alignSuffix'])
+# dataPath, xDim, segLength, binWidth, kernSD, runIdx, baseDir, runOpti
 gpfaArg = ', '.join([
     '\'' + intermediatePath + '\'',
     '{}'.format(gpfaOpts['xDim']),
     '{}'.format(gpfaOpts['segLength']),
     '{}'.format(gpfaOpts['binWidth']),
     '{}'.format(gpfaOpts['kernSD']),
-    '{}'.format(gpfaOpts['runIdx']),
+    '\'{}\''.format(runIdx),
     '\'' + scratchFolder + '\'',
+    'false'
     ])
 execStr = 'matlab-threaded -r \"optimize_gpfa({}); exit\"'.format(gpfaArg)
 print(execStr)
-result = subprocess.run([execStr], shell=True)
 
-modelFolder = os.path.join(
-    scratchFolder, 'gpfa_results',
-    'run{:0>3}'.format(gpfaOpts['runIdx'])
-    )
-newFolderName = os.path.join(
-    scratchFolder, 'gpfa_results',
-    '{}_{}'.format(prefix, arguments['--alignSuffix'])
-    )
-os.rename(modelFolder, newFolderName)
+if not arguments['--dryRun']:
+    result = subprocess.run([execStr], shell=True)
 # stdout=subprocess.PIPE
 #print(result.stdout)
 # plt.spy(alignedRasterList[2]); plt.show()

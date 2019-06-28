@@ -779,7 +779,7 @@ def getAsigsAlignedToEvents(
 def getAsigsAlignedToEventsOneUnit(
         eventBlock=None, eventName=None, chansToAlign=None,
         windowSize=None, chunkSize=None,
-        checkReferences=False, verbose=False
+        checkReferences=False, verbose=False, 
         ):
     #  make channels and units for triggered time series
     thisUnit = Unit(name=eventName)
@@ -903,7 +903,7 @@ def getAsigsAlignedToEventsOneUnit(
 
 
 def alignedAsigDFtoSpikeTrain(
-        allWaveforms, dataBlock=None):
+        allWaveforms, dataBlock=None, matchSamplingRate=True):
     masterBlock = Block()
     masterBlock.name = dataBlock.annotations['neo_name']
     masterBlock.annotate(nix_name=dataBlock.annotations['neo_name'])
@@ -956,10 +956,11 @@ def alignedAsigDFtoSpikeTrain(
                 spikeWaveformsDF = transposeSpikeDF(
                     featGroup,
                     'bin', fastTranspose=True)
-            if len(spikeWaveformsDF.columns) != len(wfBins):
-                wfDF = spikeWaveformsDF.reset_index(drop=True).T
-                wfDF = hf.interpolateDF(wfDF, wfBins)
-                spikeWaveformsDF = wfDF.T.set_index(spikeWaveformsDF.index)
+            if matchSamplingRate:
+                if len(spikeWaveformsDF.columns) != len(wfBins):
+                    wfDF = spikeWaveformsDF.reset_index(drop=True).T
+                    wfDF = hf.interpolateDF(wfDF, wfBins)
+                    spikeWaveformsDF = wfDF.T.set_index(spikeWaveformsDF.index)
             spikeWaveforms = spikeWaveformsDF.to_numpy()[:, np.newaxis, :]
             arrAnnDF = spikeWaveformsDF.index.to_frame()
             spikeTimes = arrAnnDF['t']

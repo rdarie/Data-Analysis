@@ -22,9 +22,9 @@
 # EXP="exp201901211000_alt"
 EXP="exp201901271000_alt"
 # EXP="exp201901201200_alt"
-# ESTIMATOR="201901211000-Proprio_pca_midPeak"
+# ESTIMATOR="201901211000-Proprio_pca"
 ESTIMATOR="201901271000-Proprio_pca"
-# ESTIMATOR="201901201200-Proprio_pca_midPeak"
+# ESTIMATOR="201901201200-Proprio_pca"
 
 #  python3 './applyEstimatorToAsig.py' --exp=$EXP --processAll --estimator=$ESTIMATOR
-python3 './applyEstimatorToTriggered.py' --exp=$EXP --processAll --window=long --estimator=$ESTIMATOR
+python3 './plotDimensionality.py' --exp=$EXP --processAll

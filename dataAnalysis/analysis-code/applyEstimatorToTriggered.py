@@ -52,24 +52,21 @@ with open(
         'rb') as f:
     estimatorMetadata = pickle.load(f)
 
+estimator = jb.load(
+    os.path.join(scratchFolder, estimatorMetadata['path']))
+
 if arguments['--processAll']:
-    triggeredPath = os.path.join(
-        scratchFolder,
-        experimentName + '_trig_{}_{}.nix'.format(
-            estimatorMetadata['inputBlockName'], arguments['--window']))
-    outputPath = os.path.join(
-        scratchFolder,
-        experimentName + '_trig_{}_{}'.format(
-            estimatorMetadata['name'], arguments['--window']))
+    prefix = experimentName
 else:
-    triggeredPath = os.path.join(
-        scratchFolder,
-        ns5FileName + '_trig_{}_{}.nix'.format(
-            estimatorMetadata['inputBlockName'], arguments['--window']))
-    outputPath = os.path.join(
-        scratchFolder,
-        ns5FileName + '_trig_{}_{}'.format(
-            estimatorMetadata['name'], arguments['--window']))
+    prefix = ns5FileName
+triggeredPath = os.path.join(
+    scratchFolder,
+    prefix + '_{}_{}.nix'.format(
+        estimatorMetadata['inputBlockName'], arguments['--window']))
+outputPath = os.path.join(
+    scratchFolder,
+    prefix + '_{}_{}'.format(
+        estimatorMetadata['name'], arguments['--window']))
 
 if verbose:
     prf.print_memory_usage('before load data')
@@ -78,9 +75,6 @@ dataReader = ns5.nixio_fr.NixIO(
 dataBlock = dataReader.read_block(
     block_index=0, lazy=True,
     signal_group_mode='split-all')
-
-estimator = jb.load(
-    os.path.join(scratchFolder, estimatorMetadata['path']))
 
 if arguments['--alignQuery'] is None:
     dataQuery = None

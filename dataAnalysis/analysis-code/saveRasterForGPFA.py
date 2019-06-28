@@ -51,7 +51,7 @@ else:
     prefix = ns5FileName
 triggeredPath = os.path.join(
     scratchFolder,
-    prefix + '_trig_raster_{}.nix'.format(
+    prefix + '_raster_{}.nix'.format(
         arguments['--window']))
 
 intermediatePath = triggeredPath.replace(
@@ -92,19 +92,13 @@ else:
     alignedAsigsKWargs = dict(
         duplicateControlsByProgram=False,
         makeControlProgram=True,
-        amplitudeColumn='amplitudeFuzzy',
-        programColumn='programFuzzy',
-        electrodeColumn='electrodeFuzzy',
         removeFuzzyName=False)
 
 if miniRCTrial:
     alignedAsigsKWargs.update(dict(
-        duplicateControlsByProgram=False,
-        makeControlProgram=True,
         amplitudeColumn='amplitude',
         programColumn='program',
-        electrodeColumn='electrode',
-        removeFuzzyName=False))
+        electrodeColumn='electrode'))
 
 alignedRastersDF = ns5.alignedAsigsToDF(
     dataBlock, unitNames,

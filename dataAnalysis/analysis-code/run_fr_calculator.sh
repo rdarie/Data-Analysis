@@ -22,4 +22,5 @@
 # EXP="exp201901211000_alt"
 EXP="exp201901271000_alt"
 
-python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcFR.py' --trialIdx=1 --exp=$EXP --processAll
+python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcFR.py' --exp=$EXP --processAll
+python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcFRsqrt.py' --exp=$EXP --processAll

@@ -7,7 +7,7 @@ Options:
     --exp=exp                       which experimental day to analyze
     --processAll                    process entire experimental day? [default: False]
     --window=window                 process with short window? [default: short]
-    --chanQuery=chanQuery           how to restrict channels? [default: (chanName.str.endswith(\'fr\'))]
+    --chanQuery=chanQuery           how to restrict channels if not providing a list? [default: (chanName.str.endswith(\'fr\'))]
     --blockName=blockName           name for new block [default: fr]
     --eventName=eventName           name of events object to align to [default: motionStimAlignTimes]
 """
@@ -51,38 +51,26 @@ for ev in eventBlock.filter(objects=EventProxy):
 signalBlock = eventBlock
 
 chansToTrigger = None
-# chansToTrigger = [
-#     'elec75#0_fr_sqrt', 'elec75#1_fr_sqrt',
-#     'elec83#0_fr_sqrt', 'elec78#0_fr_sqrt',
-#     'elec78#1_fr_sqrt']
+# chansToTrigger = ns5.listChanNames(signalBlock, chanQuery)
 
 windowSize = [
     i * pq.s
     for i in rasterOpts['windowSizes'][arguments['--window']]]
 
 if arguments['--processAll']:
-    ns5.getAsigsAlignedToEvents(
-        eventBlock=eventBlock, signalBlock=signalBlock,
-        chansToTrigger=chansToTrigger,
-        chanQuery=arguments['--chanQuery'],
-        eventName=arguments['--eventName'],
-        windowSize=windowSize,
-        appendToExisting=False,
-        checkReferences=False,
-        verbose=verbose,
-        fileName=experimentName + '_trig_{}_{}'.format(
-            arguments['--blockName'], arguments['--window']),
-        folderPath=scratchFolder, chunkSize=alignedAsigsChunkSize)
+    prefix = experimentName
 else:
-    ns5.getAsigsAlignedToEvents(
-        eventBlock=eventBlock, signalBlock=signalBlock,
-        chansToTrigger=chansToTrigger,
-        chanQuery=arguments['--chanQuery'],
-        eventName=arguments['--eventName'],
-        windowSize=windowSize,
-        appendToExisting=False,
-        checkReferences=False,
-        verbose=verbose,
-        fileName=ns5FileName + '_trig_{}_{}'.format(
-            arguments['--blockName'], arguments['--window']),
-        folderPath=scratchFolder, chunkSize=alignedAsigsChunkSize)
+    prefix = ns5FileName
+
+ns5.getAsigsAlignedToEvents(
+    eventBlock=eventBlock, signalBlock=signalBlock,
+    chansToTrigger=chansToTrigger,
+    chanQuery=arguments['--chanQuery'],
+    eventName=arguments['--eventName'],
+    windowSize=windowSize,
+    appendToExisting=False,
+    checkReferences=False,
+    verbose=verbose,
+    fileName=prefix + '_{}_{}'.format(
+        arguments['--blockName'], arguments['--window']),
+    folderPath=scratchFolder, chunkSize=alignedAsigsChunkSize)

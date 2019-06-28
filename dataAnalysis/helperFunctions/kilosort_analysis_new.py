@@ -1225,13 +1225,15 @@ def triggeredAsigCompareMeans(
     
     if isinstance(groupBy, str):
         pValIndex = pd.Index(
-            asigWide.groupby(groupBy).groups.keys())
+            asigWide.groupby(by=groupBy).groups.keys())
         pValIndex.name = groupBy
+    elif groupBy is None:
+        pValIndex = pd.Index(['all'])
+        pValIndex.name = 'all'
     else:
         pValIndex = pd.MultiIndex.from_tuples(
-            asigWide.groupby(groupBy).groups.keys(),
+            asigWide.groupby(by=groupBy).groups.keys(),
             names=groupBy)
-
     pVals = pd.DataFrame(
         np.nan,
         index=pValIndex,
@@ -1243,8 +1245,11 @@ def triggeredAsigCompareMeans(
             (asigWide.columns < testBin + testWidth / 2)
             )
         testAsig = asigWide.loc[:, tMask]
-        
-        for name, group in testAsig.groupby(groupBy):
+        if groupBy is not None:
+            groupIter = testAsig.groupby(groupBy)
+        else:
+            groupIter = {'all': testAsig}.items()
+        for name, group in groupIter:
             testGroups = [
                 np.ravel(i)
                 for _, i in group.groupby(testVar)]

@@ -7,19 +7,25 @@ Options:
     --exp=exp                       which experimental day to analyze
     --processAll                    process entire experimental day? [default: False]
     --verbose                       print diagnostics? [default: True]
+    --window=window                 process with short window? [default: short]
+    --blockName=blockName           which trig_ block to pull [default: pca]
+    --chanQuery=chanQuery           how to restrict channels? [default: (chanName.str.contains(\'pca\'))]
+    --selector=selector             filename if using a unit selector
+    --alignQuery=alignQuery         what will the plot be aligned to? [default: (pedalMovementCat==\'outbound\')]
+    --nameSuffix=nameSuffix         add an identifier to the pdf name? [default: alignedToOutbound]
+    --selector=selector             filename if using a unit selector
     --rowName=rowName               break down by row  [default: pedalDirection]
     --rowControl=rowControl         rows to exclude from comparison
     --hueName=hueName               break down by hue  [default: amplitudeCat]
     --hueControl=hueControl         hues to exclude from comparison
     --colName=colName               break down by col  [default: electrode]
     --colControl=colControl         cols to exclude from comparison [default: control]
-    --alignQuery=alignQuery         what will the plot be aligned to? [default: (pedalMovementCat==\'outbound\')]
-    --window=window                 process with short window? [default: short]
-    --chanQuery=chanQuery           how to restrict channels? [default: (chanName.str.contains(\'pca\'))]
-    --blockName=blockName           which trig_ block to pull [default: pca]
-    --selector=selector             filename if using a unit selector
 """
-
+import matplotlib
+matplotlib.rcParams['pdf.fonttype'] = 42
+matplotlib.rcParams['ps.fonttype'] = 42
+matplotlib.use('PS')   # generate postscript output by default
+import pdb
 import dataAnalysis.plotting.aligned_signal_plots as asp
 import dataAnalysis.preproc.ns5 as ns5
 import seaborn as sns
@@ -38,41 +44,44 @@ sns.set_color_codes("dark")
 sns.set_context("talk")
 sns.set_style("white")
 
-rowName = arguments['--rowName']
-try:
-    rowControl = int(arguments['--rowControl'])
-except Exception:
-    rowControl = arguments['--rowControl']
-colName = arguments['--colName']
-try:
-    colControl = int(arguments['--colControl'])
-except Exception:
-    colControl = arguments['--colControl']
-hueName = arguments['--hueName']
-try:
-    hueControl = int(arguments['--hueControl'])
-except Exception:
-    hueControl = arguments['--hueControl']
+rowName = arguments['--rowName'] if len(arguments['--rowName']) else None
+if rowName is not None:
+    try:
+        rowControl = int(arguments['--rowControl'])
+    except Exception:
+        rowControl = arguments['--rowControl']
+else:
+    rowControl = None
+colName = arguments['--colName'] if len(arguments['--colName']) else None
+if colName is not None:
+    try:
+        colControl = int(arguments['--colControl'])
+    except Exception:
+        colControl = arguments['--colControl']
+else:
+    colControl = None
+hueName = arguments['--hueName'] if len(arguments['--hueName']) else None
+if hueName is not None:
+    try:
+        hueControl = int(arguments['--hueControl'])
+    except Exception:
+        hueControl = arguments['--hueControl']
+else:
+    hueControl = None
 
 if arguments['--processAll']:
-    dataBlock = ns5.loadWithArrayAnn(
-        os.path.join(
-            scratchFolder,
-            experimentName + '_trig_{}_{}.nix'.format(
-                arguments['--blockName'], arguments['--window'])))
-    pdfName = '{}_{}_{}_by_{}_aligned_to_{}'.format(
-        experimentName, arguments['--blockName'],
-        arguments['--window'], hueName, arguments['--alignQuery'])
+    prefix = experimentName
 else:
-    dataBlock = ns5.loadWithArrayAnn(
-        os.path.join(
-            scratchFolder,
-            ns5FileName + '_trig_{}_{}.nix'.format(
-                arguments['--blockName'], arguments['--window'])))
-    pdfName = '{}_{}_{}_by_{}_aligned_to_{}'.format(
-        arguments['--trialIdx'],
-        arguments['--blockName'], arguments['--window'],
-        hueName, arguments['--alignQuery'])
+    prefix = ns5FileName
+triggeredPath = os.path.join(
+    scratchFolder,
+    prefix + '_{}_{}.nix'.format(
+        arguments['--blockName'], arguments['--window']))
+print('loading {}'.format(triggeredPath))
+dataBlock = ns5.loadWithArrayAnn(triggeredPath)
+pdfName = '{}_{}_{}_{}'.format(
+    prefix, arguments['--blockName'], arguments['--window'],
+    arguments['--nameSuffix'])
 
 # during movement and stim
 pedalSizeQuery = '(' + '|'.join([
@@ -83,10 +92,19 @@ pedalSizeQuery = '(' + '|'.join([
 dataQuery = '&'.join([
     '((RateInHzFuzzy==100)|(RateInHzFuzzy==0))',
     #  '((amplitudeCatFuzzy>=2)|(amplitudeCatFuzzy==0))',
-    arguments['--alignQuery'],
-    pedalSizeQuery,
+    #  pedalSizeQuery,
     #  '(pedalDirection == \'CW\')'
     ])
+
+# dataQuery = '(amplitudeCatFuzzy==0)'
+if arguments['--alignQuery'] is not None:
+    if len(arguments['--alignQuery']):
+        dataQuery = '&'.join([
+            dataQuery,
+            arguments['--alignQuery'],
+            ])
+if not len(arguments['--chanQuery']):
+    arguments['--chanQuery'] = None
 testStride = 20e-3
 testWidth = 100e-3
 testTStart = 0
@@ -101,7 +119,7 @@ if arguments['--selector'] is not None:
             'rb') as f:
         selectorMetadata = pickle.load(f)
     chanNames = [
-        i.replace('_raster#0', '')
+        i.replace(selectorMetadata['inputBlockName'], '')
         for i in selectorMetadata['outputFeatures']]
 else:
     chanNames = None
@@ -109,6 +127,7 @@ else:
 asp.plotAsigsAligned(
     dataBlock,
     dataQuery=dataQuery,
+    chanNames=chanNames, chanQuery=arguments['--chanQuery'],
     figureFolder=figureFolder,
     rowName=rowName,
     rowControl=rowControl,
@@ -127,4 +146,4 @@ asp.plotAsigsAligned(
     colorPal=colorPal,
     printBreakDown=True,
     pdfName=pdfName,
-    chanNames=chanNames, chanQuery=arguments['--chanQuery'], verbose=arguments['--verbose'])
+    verbose=arguments['--verbose'])

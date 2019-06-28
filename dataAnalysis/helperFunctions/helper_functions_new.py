@@ -57,7 +57,7 @@ def animateDFSubset3D(
     colorOpts = sns.cubehelix_palette(128)
 
     def update_lines(idx, data, colorData, lines):
-        #  print(idx)
+        # print(lines)
         if idx >= winWidth:
             for ptIdx in range(winWidth):
                 lines[ptIdx].set_data(
@@ -98,7 +98,6 @@ def animateDFSubset3D(
         lines[idx].set_color([0, 0, 0, 0])
 
     #  Setting the axes properties
-    #  pdb.set_trace()
     
     nuMax = featSubset[xyzList[0]].quantile(0.99)
     nuMin = featSubset[xyzList[0]].quantile(0.01)
@@ -147,11 +146,11 @@ def animateAngle3D(
     
     featSubset = unpackedFeatures.query(dataQuery)
     angleXYZ = pd.DataFrame(
-        0, index=featSubset['position'].index,
+        0, index=featSubset['position#0'].index,
         columns=['x', 'y', 'z'])
     #pdb.set_trace()
-    angleXYZ['y'] = featSubset['position'].apply(np.deg2rad).apply(np.sin)
-    angleXYZ['z'] = featSubset['position'].apply(np.deg2rad).apply(np.cos)
+    angleXYZ['y'] = featSubset['position#0'].apply(np.deg2rad).apply(np.sin)
+    angleXYZ['z'] = featSubset['position#0'].apply(np.deg2rad).apply(np.cos)
     data = np.zeros((3, 2))
     
     def update_lines(idx, angleXYZ, lines):

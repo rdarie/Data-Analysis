@@ -22,11 +22,10 @@ def parseAnalysisOptions(trialIdx, experimentShorthand):
     miniRCTrial = miniRCTrialLookup[trialIdx]
     
     gpfaOpts = {
-        'xDim': 12,
+        'xDim': 3,
         'segLength': 20,
         'binWidth': 30,
         'kernSD': 50,
-        'runIdx': expOpts['gpfaRunIdx'],
         'installFolder': '/gpfs_home/rdarie/Github/NeuralTraj'
     }
 
@@ -231,7 +230,7 @@ def parseAnalysisOptions(trialIdx, experimentShorthand):
         'binInterval': 1e-3, 'binWidth': 30e-3, 'smoothKernelWidth': 50e-3,
         'windowSizes': {
             'short': (-.5, .5),
-            'long': (-4.5, 4.5),
+            'long': (-2.25, 2.25),
             'miniRC': (-1, 1)
         },
         'discardEmpty': None, 'maxSpikesTo': None, 'timeRange': None,
@@ -242,7 +241,7 @@ def parseAnalysisOptions(trialIdx, experimentShorthand):
     plotOpts = {
         'type': 'ticks', 'errorBar': 'sem',
         'pageSize': (6, 12), 'removeOutliers': (0.01, 0.975)}
-    pThresh = 1e-3
+    pThresh = 1e-24
     try:
         experimentsToAssemble = expOpts['experimentsToAssemble']
         trialsToAssemble = []

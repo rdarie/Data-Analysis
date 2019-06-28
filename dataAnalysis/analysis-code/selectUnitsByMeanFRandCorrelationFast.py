@@ -98,6 +98,8 @@ masterSpikeMat = ns5.alignedAsigsToDF(
 
 unitNames = masterSpikeMat.columns.to_list()
 correlationDF = masterSpikeMat.corr()
+for n in correlationDF.index:
+    correlationDF.loc[n, n] = 0
 meanFRDF = masterSpikeMat.mean()
 
 if arguments['--verbose']:
@@ -117,9 +119,9 @@ f, ax = plt.subplots(figsize=(11, 9))
 cmap = sns.diverging_palette(220, 10, as_cmap=True)
 # Draw the heatmap with the mask and correct aspect ratio
 from matplotlib.backends.backend_pdf import PdfPages
-with PdfPages(os.path.join(figureFolder, 'unit_correlation.pdf')) as pdf:
+with PdfPages(os.path.join(figureFolder, 'unit_correlation_{}.pdf'.format(arguments['--selectorName']))) as pdf:
     sns.heatmap(
-        correlationDF.to_numpy(), mask=mask, cmap=cmap, vmax=.3, center=0,
+        correlationDF.to_numpy(), mask=mask, cmap=cmap, center=0,
         square=True, linewidths=.5, cbar_kws={"shrink": .5})
     pdf.savefig()
     plt.close()
@@ -127,12 +129,12 @@ with PdfPages(os.path.join(figureFolder, 'unit_correlation.pdf')) as pdf:
 
 def selFun(
         meanDF, corrDF, meanThresh=5,
-        corrThresh=0.9):
+        corrThresh=0.85):
     unitMask = ((meanDF > meanThresh) & (corrDF.max() < corrThresh))
     return unitMask[unitMask].index.to_list()
 
 
-thisCorrThresh = 0.9
+thisCorrThresh = 0.85
 
 selectorMetadata = {
     'trainingDataPath': os.path.basename(triggeredPath),

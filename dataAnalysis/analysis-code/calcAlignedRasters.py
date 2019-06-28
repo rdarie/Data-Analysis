@@ -66,28 +66,18 @@ windowSize = [
 #  chansToTrigger = ['elec75#0_raster', 'elec75#1_raster']
 
 if arguments['--processAll']:
-    ns5.getAsigsAlignedToEvents(
-        eventBlock=eventBlock, signalBlock=signalBlock,
-        chansToTrigger=chansToTrigger,
-        chanQuery=arguments['--chanQuery'],
-        eventName=arguments['--eventName'],
-        windowSize=windowSize,
-        appendToExisting=True,
-        checkReferences=False,
-        verbose=verbose,
-        fileName=experimentName + '_trig_{}_{}'.format(
-            arguments['--blockName'], arguments['--window']),
-        folderPath=scratchFolder, chunkSize=alignedAsigsChunkSize)
+    prefix = experimentName
 else:
-    ns5.getAsigsAlignedToEvents(
-        eventBlock=eventBlock, signalBlock=signalBlock,
-        chansToTrigger=chansToTrigger,
-        chanQuery=arguments['--chanQuery'],
-        eventName=arguments['--eventName'],
-        windowSize=windowSize,
-        appendToExisting=True,
-        checkReferences=False,
-        verbose=verbose,
-        fileName=ns5FileName + '_trig_{}_{}'.format(
-            arguments['--blockName'], arguments['--window']),
-        folderPath=scratchFolder, chunkSize=alignedAsigsChunkSize)
+    prefix = ns5FileName
+ns5.getAsigsAlignedToEvents(
+    eventBlock=eventBlock, signalBlock=signalBlock,
+    chansToTrigger=chansToTrigger,
+    chanQuery=arguments['--chanQuery'],
+    eventName=arguments['--eventName'],
+    windowSize=windowSize,
+    appendToExisting=True,
+    checkReferences=False,
+    verbose=verbose,
+    fileName=prefix + '_{}_{}'.format(
+        arguments['--blockName'], arguments['--window']),
+    folderPath=scratchFolder, chunkSize=alignedAsigsChunkSize)

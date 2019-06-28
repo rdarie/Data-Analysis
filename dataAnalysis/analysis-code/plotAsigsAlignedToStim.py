@@ -6,18 +6,24 @@ Options:
     --trialIdx=trialIdx             which trial to analyze [default: 1]
     --exp=exp                       which experimental day to analyze
     --processAll                    process entire experimental day? [default: False]
+    --window=window                 process with short window? [default: short]
+    --blockName=blockName           name for new block [default: fr]
+    --chanQuery=chanQuery           how to restrict channels? [default: (chanName.str.endswith(\'fr\'))]
+    --selector=selector             filename if using a unit selector
+    --alignQuery=alignQuery         what will the plot be aligned to? [default: (stimCat==\'stimOn\')]
+    --nameSuffix=nameSuffix         add an identifier to the pdf name? [default: alignedToStimOn]
+    --selector=selector             filename if using a unit selector
     --rowName=rowName               break down by row
     --rowControl=rowControl         rows to exclude from comparison
     --hueName=hueName               break down by hue  [default: amplitude]
     --hueControl=hueControl         hues to exclude from comparison
     --colName=colName               break down by col  [default: electrode]
     --colControl=colControl         cols to exclude from comparison [default: control]
-    --alignQuery=alignQuery         what will the plot be aligned to? [default: (stimCat==\'stimOn\')]
-    --window=window                 process with short window? [default: short]
-    --chanQuery=chanQuery           how to restrict channels? [default: (chanName.str.endswith(\'fr\'))]
-    --blockName=blockName           name for new block [default: fr]
-    --selector=selector             filename if using a unit selector
 """
+import matplotlib
+matplotlib.rcParams['pdf.fonttype'] = 42
+matplotlib.rcParams['ps.fonttype'] = 42
+matplotlib.use('PS')   # generate postscript output by default
 
 import dataAnalysis.plotting.aligned_signal_plots as asp
 import dataAnalysis.preproc.ns5 as preproc
@@ -53,27 +59,22 @@ except Exception:
     hueControl = arguments['--hueControl']
 
 if arguments['--processAll']:
-    dataBlock = preproc.loadWithArrayAnn(
-        os.path.join(
-            scratchFolder,
-            experimentName + '_trig_{}_{}.nix'.format(
-                arguments['--blockName'], arguments['--window'])))
-    pdfName = '{}_{}_{}_by_{}_aligned_to_{}'.format(
-        experimentName, arguments['--blockName'], arguments['--window'],
-        hueName, arguments['--alignQuery'])
+    prefix = experimentName
 else:
-    dataBlock = preproc.loadWithArrayAnn(
-        os.path.join(
-            scratchFolder,
-            ns5FileName + '_trig_{}_{}.nix'.format(
-                arguments['--blockName'], arguments['--window'])))
-    pdfName = '{}_{}_{}_by_{}_aligned_to_{}'.format(
-        arguments['--trialIdx'],
-        arguments['--blockName'], arguments['--window'],
-        hueName, arguments['--alignQuery'])
+    prefix = ns5FileName
+
+dataBlock = preproc.loadWithArrayAnn(
+    os.path.join(
+        scratchFolder,
+        prefix + '_{}_{}.nix'.format(
+            arguments['--blockName'], arguments['--window'])))
+pdfName = '{}_{}_{}_{}'.format(
+    prefix,
+    arguments['--blockName'], arguments['--window'],
+    arguments['--nameSuffix'])
 
 dataQuery = '&'.join([
-    #'((RateInHz==100)|(RateInHz==0))',
+    '((RateInHz==100)|(RateInHz==0))',
     arguments['--alignQuery']
     ])
 testStride = 20e-3
@@ -82,9 +83,23 @@ testTStart = 0
 testTStop = 500e-3
 colorPal = "ch:0.6,-.2,dark=.2,light=0.7,reverse=1"  #  for firing rates
 
+if arguments['--selector'] is not None:
+    with open(
+        os.path.join(
+            scratchFolder,
+            arguments['--selector'] + '.pickle'),
+            'rb') as f:
+        selectorMetadata = pickle.load(f)
+    chanNames = [
+        i.replace(selectorMetadata['inputBlockName'], '')
+        for i in selectorMetadata['outputFeatures']]
+else:
+    chanNames = None
+
 asp.plotAsigsAligned(
     dataBlock,
     dataQuery=dataQuery,
+    chanNames=chanNames, chanQuery=arguments['--chanQuery'],
     figureFolder=figureFolder,
     rowName=rowName,
     rowControl=rowControl,
@@ -106,5 +121,4 @@ asp.plotAsigsAligned(
     enablePlots=True,
     colorPal=colorPal,
     printBreakDown=True,
-    pdfName=pdfName,
-    chanNames=None, chanQuery=arguments['--chanQuery'])
+    pdfName=pdfName)
