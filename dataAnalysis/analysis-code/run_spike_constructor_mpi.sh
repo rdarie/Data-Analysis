@@ -7,11 +7,11 @@
 #SBATCH --nodes=48
 #SBATCH --tasks=48
 #SBATCH --tasks-per-node=1
-#SBATCH --mem=80G
+#SBATCH --mem=59G
 
 # Specify a job name:
 #SBATCH -J spike_sort_constructor
-#SBATCH --array=3
+#SBATCH --array=2
 
 # Specify an output file
 #SBATCH -o ../batch_logs/%j-%a-spike_sort_constructor.stdout
@@ -21,5 +21,6 @@
 #SBATCH --account=bibs-dborton-condo
 
 # Run a command
+EXP="exp201901221000"
 module load mpi
-srun --mpi=pmi2 ./tridesclousCCV.py --trialIdx=$SLURM_ARRAY_TASK_ID --exp=exp201901271000 --attemptMPI --batchPreprocess
+srun --mpi=pmi2 ./tridesclousCCV.py --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID --attemptMPI --batchPreprocess

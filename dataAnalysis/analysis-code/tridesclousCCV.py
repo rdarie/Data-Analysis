@@ -5,8 +5,8 @@ Usage:
     tridesclousCCV.py [options]
 
 Options:
-    --trialIdx=trialIdx        which trial to analyze [default: 1]
     --exp=exp                  which experimental day to analyze
+    --trialIdx=trialIdx        which trial to analyze [default: 1]
     --attemptMPI               whether to try to load MPI [default: False]
     --purgePeeler              delete previous sort results [default: False]
     --batchPreprocess          extract snippets and features, run clustering [default: False]
@@ -105,8 +105,8 @@ if arguments['batchPreprocess']:
         n_components_by_channel=15,
         cluster_method='agglomerative',
         n_clusters=5,
-        noise_estimate_duration=900.,
-        sample_snippet_duration=900.,
+        noise_estimate_duration=400.,
+        sample_snippet_duration=400.,
         chunksize=2**13, n_left=spikeWindow[0] - 2,
         n_right=spikeWindow[1] + 2,
         align_waveform=False, subsample_ratio=10,

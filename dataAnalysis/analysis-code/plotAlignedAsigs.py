@@ -57,7 +57,6 @@ alignedAsigsKWargs.update(dict(
     makeControlProgram=True,
     metaDataToCategories=False,
     removeFuzzyName=True))
-
 if arguments['processAll']:
     prefix = experimentName
 else:

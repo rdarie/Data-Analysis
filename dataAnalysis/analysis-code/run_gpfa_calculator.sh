@@ -19,15 +19,11 @@
 # Specify account details
 #SBATCH --account=bibs-dborton-condo
 
-# EXP="exp201901211000"
-EXP="exp201901271000"
+EXP="exp201901211000"
+# EXP="exp201901271000"
 # EXP="exp201901201200"
-# SELECTOR="201901211000-Proprio_minfr"
-SELECTOR="201901271000-Proprio_minfrmaxcorr"
-# SELECTOR="201901201200-Proprio_minfr"
+SELECTOR="201901211000-Proprio_minfrmaxcorr"
+# SELECTOR="201901271000-Proprio_minfrmaxcorr"
+# SELECTOR="201901201200-Proprio_minfrmaxcorr"
 
-# python3 './selectUnitsByMeanFR.py' --exp=$EXP --processAll
-# python3 './selectUnitsByMeanFRandCorrelationFast.py' --exp=$EXP --processAll --verbose
-# python3 './saveRasterForGPFA.py' --exp=$EXP --processAll --selector=$SELECTOR --verbose
-python3 './calcGPFA.py' --exp=$EXP --processAll --verbose --inputDataName=midPeak
-# python3 './calcGPFA.py' --exp=$EXP --processAll --verbose --alignSuffix=midPeakNoStim
+python3 './calcGPFA.py' --exp=$EXP --processAll --window=long --alignQuery=midPeak --selector=$SELECTOR --verbose --lazy

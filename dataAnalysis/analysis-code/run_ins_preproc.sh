@@ -8,7 +8,7 @@
 # Request custom resources
 #SBATCH --nodes=1
 #SBATCH --mem=24G
-#SBATCH --array=3,4,5
+#SBATCH --array=2,3
 
 # Specify a job name:
 #SBATCH -J ins_preproc
@@ -21,6 +21,8 @@
 #SBATCH --account=bibs-dborton-condo
 
 # EXP="exp201901211000"
-EXP="exp201901271000"
+EXP="exp201901221000"
+# EXP="exp201901231000"
+# EXP="exp201901271000"
 
-python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/preprocINS.py' --trialIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP
+python3 './preprocINS.py' --trialIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP

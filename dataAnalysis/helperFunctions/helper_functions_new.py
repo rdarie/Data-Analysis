@@ -4,6 +4,7 @@ import sys, os
 #  import itertools, pickle, gc, string, random
 #  import subprocess, collections, math, argparse
 import peakutils
+import random
 from collections.abc import Iterable
 import matplotlib.pyplot as plt
 #  import matplotlib.colors as colors
@@ -25,8 +26,8 @@ from neo import (
     Unit, AnalogSignal, Event, Epoch,
     Block, Segment, ChannelIndex, SpikeTrain)
 from neo.io.proxyobjects import (
-    AnalogSignalProxy, SpikeTrainProxy, EventProxy) 
-
+    AnalogSignalProxy, SpikeTrainProxy, EventProxy)
+from sklearn.preprocessing import MinMaxScaler
 import datetime
 from datetime import datetime as dt
 import json
@@ -1060,6 +1061,20 @@ def peekAtTaps(
                 allTapTimestampsINS[trialSegment] ** 0 - 1,
                 'c*', label='tap peaks')
         
+        xmin, xmax = ax[1].get_xlim()
+        xTicks = np.arange(xmin, xmax, 0.05)
+        ax[0].set_xticks(xTicks)
+        ax[0].set_yticks([])
+        ax[0].set_xticklabels([])
+        ax[0].grid(which='major', color='b', alpha=0.75)
+        ax[1].set_xticks(xTicks)
+        ax[1].set_yticks([])
+        ax[1].set_xticklabels([])
+        ax[1].grid(which='major', color='b', alpha=0.75)
+        twinAx.set_xticks(xTicks)
+        twinAx.set_yticks([])
+        twinAx.set_xticklabels([])
+        twinAx.grid(which='major', color='b', alpha=0.75)
         tdAx.legend()
         accAx.legend()
 
@@ -1067,10 +1082,15 @@ def peekAtTaps(
         triggerTrace = channelData['data'].loc[tNSPMask, 'ainp7']
         #  pdb.set_trace()
         ax[2].plot(
-            channelData['t'].loc[tNSPMask],
-            stats.zscore(triggerTrace),
+            channelData['t'].loc[tNSPMask].iloc[::30],
+            stats.zscore(triggerTrace.iloc[::30]),
             'c', label='Analog Sync', picker=line_picker)
-
+        xmin, xmax = ax[2].get_xlim()
+        xTicks2 = np.arange(xmin, xmax, 0.05)
+        ax[2].set_xticks(xTicks2)
+        ax[2].set_yticks([])
+        ax[2].set_xticklabels([])
+        ax[2].grid(which='major', color='c', alpha=0.75)
         if allTapTimestampsNSP is not None:
             ax[2].plot(
                 allTapTimestampsNSP[trialSegment],
@@ -1201,76 +1221,6 @@ def getINSTapTimestamp(
         peakIdx = tdPeakIdx
 
     return tapTimestamps, peakIdx
-
-
-def synchronizeINStoNSP(
-        tapTimestampsNSP, tapTimestampsINS,
-        NSPTimeRanges=(None, None),
-        td=None, accel=None, insBlock=None, trialSegment=None, degree=1
-        ):
-    # sanity check that the intervals match
-    insDiff = tapTimestampsINS.diff().dropna().values
-    nspDiff = tapTimestampsNSP.diff().dropna().values
-    print('Trial Segment {}'.format(trialSegment))
-    print('On the INS, the diff() between taps was\n{}'.format(insDiff))
-    print('On the NSP, the diff() between taps was\n{}'.format(nspDiff))
-    print('This amounts to a msec difference of\n{}'.format(
-        (insDiff - nspDiff) * 1e3))
-    if (insDiff - nspDiff > 20e-3).any():
-        raise(Exception('Tap trains too different!'))
-    #  pdb.set_trace()
-    if degree > 0:
-        synchPolyCoeffsINStoNSP = np.polyfit(
-            x=tapTimestampsINS.values, y=tapTimestampsNSP.values, deg=degree)
-    else:
-        timeOffset = tapTimestampsNSP.values - tapTimestampsINS.values
-        synchPolyCoeffsINStoNSP = np.array([1, np.mean(timeOffset)])
-    timeInterpFunINStoNSP = np.poly1d(synchPolyCoeffsINStoNSP)
-    if td is not None:
-        td.loc[:, 'NSPTime'] = pd.Series(
-            timeInterpFunINStoNSP(td['t']), index=td['t'].index)
-    # accel['originalTime'] = accel['t']
-    if accel is not None:
-        accel.loc[:, 'NSPTime'] = pd.Series(
-            timeInterpFunINStoNSP(accel['t']), index=accel['t'].index)
-    if insBlock is not None:
-        allUnits = [st.unit for st in insBlock.segments[0].spiketrains]
-        for unit in allUnits:
-                tStart = NSPTimeRanges[0]
-                tStop = NSPTimeRanges[1]
-                uniqueSt = []
-                for st in unit.spiketrains:
-                    if st not in uniqueSt:
-                        uniqueSt.append(st)
-                    else:
-                        continue
-                    if len(st.times):
-                        segMask = np.array(
-                            st.annotations['trialSegment'],
-                            dtype=np.int) == trialSegment
-                        st.magnitude[segMask] = (
-                            timeInterpFunINStoNSP(st.times[segMask]))
-                        #  kludgey fix for weirdness concerning t_start
-                        st.t_start = min(tStart, st.times[0] * 0.999)
-                        st.t_stop = min(tStop, st.times[-1] * 1.001)
-                        validMask = st < st.t_stop
-                        if ~validMask.all():
-                            print('Deleted some spikes')
-                            st = st[validMask]
-                            if 'arrayAnnNames' in st.annotations.keys():
-                                for key in st.annotations['arrayAnnNames']:
-                                    st.annotations[key] = np.array(st.annotations[key])[validMask]          
-                    else:
-                        st.t_start = tStart
-                        st.t_stop = tStop
-        #  pdb.set_trace()
-        allEvents = insBlock.filter(objects=Event)
-        eventsDF = eventsToDataFrame(allEvents, idxT='t')
-        segMask = getStimSerialTrialSegMask(eventsDF, trialSegment)
-        for event in allEvents:
-            event.magnitude[segMask] = (
-                timeInterpFunINStoNSP(event.times[segMask]))
-    return td, accel, insBlock, timeInterpFunINStoNSP
 
 
 def timeOffsetBlock(block, timeOffset, masterTStart):
@@ -1442,15 +1392,6 @@ def getHUTtoINSSyncFun(
             plt.legend()
             plt.show()
     return timeInterpFunHUTtoINS
-
-
-def getStimSerialTrialSegMask(insDF, trialSegment):
-    tsegMask = insDF['ins_property'] == 'trialSegment'
-    tseg = pd.Series(np.nan, index=insDF.index)
-    tseg.loc[tsegMask] = insDF.loc[tsegMask, 'ins_value']
-    tseg.fillna(method='ffill', inplace=True)
-    segmentMask = tseg == trialSegment
-    return segmentMask
 
 
 def synchronizeHUTtoINS(
@@ -3334,114 +3275,6 @@ def plotBinnedSpikes(spikeMat, show=True, normalizationType='linear',
         plt.show()
     return fi, im
 '''
-
-
-def plot_spikes(
-        spikes, channel, ignoreUnits = [], showNow = False, ax = None,
-        acrossArray = False, xcoords = None, ycoords = None,
-        axesLabel = False, channelPlottingName = None, chanNameInLegend=True,
-        legendTags=[],
-        maskSpikes=None, maxSpikes=200, lineAlpha=0.025):
-        
-    if channelPlottingName is None:
-        channelPlottingName = str(channel)
-
-    ChanIdx = spikes['ChannelID'].index(channel)
-    unitsOnThisChan = pd.unique(spikes['Classification'][ChanIdx])
-    if 'ClassificationLabel' in spikes.keys():
-        unitsLabelsOnThisChan = pd.unique(spikes['ClassificationLabel'][ChanIdx])
-    else:
-        unitsLabelsOnThisChan = None
-
-    if acrossArray:
-        # Check that we didn't ask to plot the spikes across channels into a single axis
-        assert ax is None
-        # Check that we have waveform data everywhere
-        assert len(spikes['Waveforms'][ChanIdx].shape) == 3
-
-    if ax is None and not acrossArray:
-        fig, ax = plt.subplots()
-        fig.set_tight_layout({'pad': 0.01})
-    if ax is not None and not acrossArray:
-        fig = ax.figure
-
-    if unitsOnThisChan is not None:
-        if acrossArray:
-            xIdx, yIdx = coordsToIndices(xcoords, ycoords)
-            fig, ax = plt.subplots(nrows = max(np.unique(xIdx)) + 1, ncols = max(np.unique(yIdx)) + 1)
-            fig.set_tight_layout({'pad': 0.01})
-        colorPalette = sns.color_palette(n_colors = 40)
-        for unitIdx, unitName in enumerate(unitsOnThisChan):
-            #print('ignoreUnits are {}'.format([-1] + ignoreUnits))
-            if unitName in [-1] + ignoreUnits:
-                #  always ignore units marked -1
-                continue
-            unitMask = spikes['Classification'][ChanIdx] == unitName
-
-            if 'ClassificationLabel' in spikes.keys():
-                unitPlottingName = unitsLabelsOnThisChan[unitIdx]
-            else:
-                unitPlottingName = unitName
-            if chanNameInLegend:
-                labelName = 'chan %s, unit %s' % (channelPlottingName, unitPlottingName)
-            else:
-                labelName = 'unit %s' % (unitPlottingName)
-            for legendTag in legendTags:
-                if legendTag in spikes['basic_headers']:
-                    labelName = '{} {}: {}'.format(
-                        labelName,  legendTag,
-                        spikes['basic_headers'][legendTag][unitName]
-                    )
-            #  plot all channels aligned to this spike?
-            if acrossArray:
-                waveForms = spikes['Waveforms'][ChanIdx][unitMask, :, 0]
-                if maxSpikes < waveForms.shape[0]:
-                        selectIdx = random.sample(range(waveForms.shape[0]), maxSpikes)
-                for idx, channel in enumerate(spikes['ChannelID']):
-                    curAx = ax[xIdx[idx], yIdx[idx]]
-                    waveForms = spikes['Waveforms'][ChanIdx][unitMask, :, idx]
-                    if maskSpikes is not None:
-                        waveForms = waveForms[maskSpikes, :]
-                    if maxSpikes < waveForms.shape[0]:
-                        waveForms = waveForms[selectIdx]
-                    timeRange = np.arange(len(waveForms[0])) / spikes['basic_headers']['TimeStampResolution'] * 1e3
-                    for spIdx, thisSpike in enumerate(waveForms):
-                        thisLabel = labelName if idx == 0 else None
-                        curAx.plot(
-                            timeRange, thisSpike, label=thisLabel,
-                            linewidth=1, color=colorPalette[unitIdx], alpha=lineAlpha)
-                sns.despine()
-                for curAx in ax.flatten():
-                    curAx.tick_params(left='off', top='off', right='off',
-                    bottom='off', labelleft='off', labeltop='off',
-                    labelright='off', labelbottom='off')
-            else:
-                #  plot only on main chan
-                if len(spikes['Waveforms'][ChanIdx].shape) == 3:
-                    waveForms = spikes['Waveforms'][ChanIdx][unitMask, :, ChanIdx]
-                else:
-                    waveForms = spikes['Waveforms'][ChanIdx][unitMask, :]
-                
-                timeRange = np.arange(len(waveForms[0])) / spikes['basic_headers']['TimeStampResolution'] * 1e3
-                
-                if maskSpikes is not None:
-                    waveForms = waveForms[maskSpikes, :]
-                if maxSpikes < waveForms.shape[0]:
-                    waveForms = waveForms[random.sample(range(waveForms.shape[0]), maxSpikes), :]
-                for spIdx, thisSpike in enumerate(waveForms):
-                    thisLabel = labelName if spIdx == 0 else None
-                    ax.plot(
-                        timeRange, thisSpike,
-                        linewidth=1, color=colorPalette[unitIdx], alpha=lineAlpha, label=thisLabel)
-                ax.set_xlim(timeRange[0], timeRange[-1])
-                if axesLabel:
-                    ax.set_ylabel(spikes['Units'])
-                    ax.set_xlabel('Time (msec)')
-                    ax.set_title('Units on channel {}'.format(channelPlottingName))
-                    ax.legend()
-        if showNow:
-            plt.show()
-    return fig, ax
 
 
 '''

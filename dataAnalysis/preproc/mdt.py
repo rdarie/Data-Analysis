@@ -251,15 +251,15 @@ def preprocINS(
         #  if we did stim detection, recalculate stimStatusSerial
         stimSpikes = block.filter(objects=SpikeTrain)
         stimSpikes = ns5.loadContainerArrayAnn(trainList=stimSpikes)
-        stimSpikesDF = ns5.spikeTrainArrayAnnToDF(stimSpikes)
+        stimSpikesDF = ns5.unitSpikeTrainArrayAnnToDF(stimSpikes)
         stimSpikesDF['ratePeriod'] = stimSpikesDF['RateInHz'] ** (-1)
         onsetEvents = pd.melt(
             stimSpikesDF,
-            id_vars=['times'],
+            id_vars=['t'],
             value_vars=['program', 'amplitude', 'RateInHz', 'pulseWidth'],
             var_name='ins_property', value_name='ins_value')
         
-        onsetEvents.rename(columns={'times': 'INSTime'}, inplace=True)
+        onsetEvents.rename(columns={'t': 'INSTime'}, inplace=True)
         offsetEvents = pd.melt(
             stimSpikesDF,
             id_vars=['endTime'],
@@ -544,8 +544,9 @@ def getINSStimOnset(
 
         # recalculate expected off times based on detected on times
         if recalculateExpectedOffsets:
-            expectedOnsetTimestamps = pd.Series(
-                tdSeg['t'].loc[expectedOnsetIdx])
+            # expectedOnsetTimestamps = pd.Series(
+            #     tdSeg['t'].loc[expectedOnsetIdx])
+            expectedOnsetTimestamps = theseOnsetTimestamps
             expectedOffsetTimestamps = pd.Series(
                 tdSeg['t'].loc[expectedOffsetIdx])
             if len(expectedOnsetTimestamps) == len(expectedOffsetTimestamps):
@@ -559,7 +560,6 @@ def getINSStimOnset(
                 expectedTrainDurations = (
                     dummyOffsets.values -
                     expectedOnsetTimestamps.values)
-
             newExpectedOffsetTimestamps, _ = hf.closestSeries(
                 theseOnsetTimestamps + expectedTrainDurations, tdSeg['t'])
             expectedOffsetIdx = np.array(

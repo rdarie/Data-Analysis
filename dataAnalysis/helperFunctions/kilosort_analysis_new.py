@@ -13,7 +13,6 @@ from statsmodels.stats.multitest import multipletests as mt
 import pandas as pd
 #  from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib import pyplot as plt
-from fractions import gcd
 import seaborn as sns
 #  from importlib import reload
 #  import dataAnalysis.helperFunctions.motor_encoder_new as mea
@@ -57,18 +56,6 @@ def loadParamsPy(filePath):
 
     return locals()
 '''
-
-
-def coordsToIndices(xcoords, ycoords):
-
-    xSpacing = np.ufunc.reduce(np.frompyfunc(gcd, 2, 1), xcoords)
-    ySpacing = np.ufunc.reduce(np.frompyfunc(gcd, 2, 1), ycoords)
-    xIdx = np.array(np.divide(xcoords, xSpacing), dtype=np.int)
-    xIdx = xIdx - min(xIdx)
-    yIdx = np.array(np.divide(ycoords, ySpacing), dtype=np.int)
-    yIdx = yIdx - min(yIdx)
-
-    return xIdx, yIdx
 
 
 '''
@@ -470,118 +457,6 @@ def getSpikeStats(spikes, channel, whichStats = ['mean', 'std'], bounds = None, 
 '''
 
 
-def plotSpike(
-        spikes, channel, showNow = False, ax = None,
-        acrossArray = False, xcoords = None, ycoords = None,
-        axesLabel = False, errorMultiplier = 1, ignoreUnits = [],
-        channelPlottingName=None, chanNameInLegend=False, legendTags=[]):
-
-    if channelPlottingName is None:
-        channelPlottingName = str(channel)
-
-    ChanIdx = spikes['ChannelID'].index(channel)
-    unitsOnThisChan = pd.unique(spikes['Classification'][ChanIdx])
-    if 'ClassificationLabel' in spikes.keys():
-        unitsLabelsOnThisChan = pd.unique(spikes['ClassificationLabel'][ChanIdx])
-    else:
-        unitsLabelsOnThisChan = None
-
-    if acrossArray:
-        # Check that we didn't ask to plot the spikes across channels into a single axis
-        assert ax is None
-        # Check that we have waveform data everywhere
-        assert len(spikes['Waveforms'][ChanIdx].shape) == 3
-
-    if ax is None and not acrossArray:
-        fig, ax = plt.subplots()
-    if ax is not None and not acrossArray:
-        fig = ax.figure
-
-    if unitsOnThisChan is not None:
-        if acrossArray:
-            xIdx, yIdx = coordsToIndices(xcoords, ycoords)
-            fig, ax = plt.subplots(nrows = max(np.unique(xIdx)) + 1, ncols = max(np.unique(yIdx)) + 1)
-
-        colorPalette = sns.color_palette(n_colors = 40)
-        for unitIdx, unitName in enumerate(unitsOnThisChan):
-            #print('ignoreUnits are {}'.format([-1] + ignoreUnits))
-            if unitName in [-1] + ignoreUnits:
-                continue
-
-            unitMask = spikes['Classification'][ChanIdx] == unitName
-
-            if 'ClassificationLabel' in spikes.keys():
-                unitPlottingName = unitsLabelsOnThisChan[unitIdx]
-            else:
-                unitPlottingName = unitName
-
-            if chanNameInLegend:
-                #  labelName = 'chan %s: unit %s (%d SDs)' % (channelPlottingName, unitPlottingName, errorMultiplier)
-                labelName = '{}#{}'.format(channelPlottingName, unitPlottingName)
-            else:
-                labelName = '#{}'.format(unitPlottingName)
-
-            for legendTag in legendTags:
-                if legendTag in spikes['basic_headers']:
-                    if unitName in spikes['basic_headers'][legendTag]:
-                        labelName += ' {}: {}'.format(
-                            legendTag,
-                            spikes['basic_headers'][legendTag][unitName]
-                        )
-                    else:
-                        print('{} not found in header!'.format(unitName))
-                else:
-                    print('{} not found! in legendTags'.format(legendTag))
-
-            if acrossArray:
-                for idx, channel in enumerate(spikes['ChannelID']):
-                    curAx = ax[xIdx[idx], yIdx[idx]]
-                    waveForms = spikes['Waveforms'][ChanIdx][unitMask, :, idx]
-                    thisSpike = np.nanmean(waveForms, axis = 0)
-                    thisError = np.nanstd(waveForms, axis = 0)
-                    #  thisError = stats.sem(waveForms, nan_policy='omit')
-                    timeRange = np.arange(len(thisSpike)) / spikes['basic_headers']['TimeStampResolution'] * 1e3
-                    curAx.fill_between(timeRange, thisSpike - errorMultiplier*thisError,
-                        thisSpike + errorMultiplier*thisError, alpha=0.4,
-                        facecolor=colorPalette[unitIdx],
-                        label=labelName)
-                    curAx.plot(timeRange, thisSpike, linewidth=1, color=colorPalette[unitIdx])
-
-                sns.despine()
-                for curAx in ax.flatten():
-                    curAx.tick_params(left='off', top='off', right='off',
-                    bottom='off', labelleft='off', labeltop='off',
-                    labelright='off', labelbottom='off')
-                plt.tight_layout(pad = 0.01)
-
-            else:
-                if len(spikes['Waveforms'][ChanIdx].shape) == 3:
-                    waveForms = spikes['Waveforms'][ChanIdx][unitMask, :, ChanIdx]
-                else:
-                    waveForms = spikes['Waveforms'][ChanIdx][unitMask, :]
-                thisSpike = np.nanmean(waveForms, axis = 0)
-                #  pdb.set_trace()
-                thisError = np.nanstd(waveForms, axis = 0)
-                #  thisError = stats.sem(waveForms, nan_policy='omit')
-                timeRange = np.arange(len(thisSpike)) / spikes['basic_headers']['TimeStampResolution'] * 1e3
-                colorPalette = sns.color_palette(n_colors = 40)
-
-                ax.fill_between(timeRange, thisSpike - errorMultiplier*thisError,
-                    thisSpike + errorMultiplier*thisError, alpha=0.4,
-                    facecolor=colorPalette[unitIdx],
-                    label=labelName)
-                ax.plot(timeRange, thisSpike, linewidth=1, color=colorPalette[unitIdx])
-                if axesLabel:
-                    ax.set_ylabel(spikes['Units'])
-                    ax.set_xlabel('Time (msec)')
-                    ax.set_title('Units on channel {}'.format(channelPlottingName))
-                    ax.legend()
-        if showNow:
-            plt.show()
-
-    return fig,ax
-
-
 
 def plotISIHistogram(
         spikes, channel, showNow = False, ax = None,
@@ -665,63 +540,6 @@ def plotSpikePropertyHistogram(
                 ax.set_xlim(min(bins), max(bins))
         if showNow:
             plt.show()
-
-
-#@profile
-def plotSpikePanel(
-        spikeStruct, spikes, labelFontSize=LABELFONTSIZE,
-        padOverride=5e-3, figSize=(12, 8),
-        colorPal="ch:2,-.1,dark=.2,light=0.8,reverse=1"):
-    
-    sns.set_style("dark", {"axes.facecolor": ".9"})
-    xIdx = np.array(spikeStruct['xcoords'].values - spikeStruct['xcoords'].min(), dtype = np.int)
-    yIdx = np.array(spikeStruct['ycoords'].values - spikeStruct['ycoords'].min(), dtype = np.int)
-    # pdb.set_trace()
-
-    fig, ax = plt.subplots(nrows = int(max(np.unique(xIdx)) + 1),
-        ncols = int(max(np.unique(yIdx)) + 1))
-    fig.set_size_inches(figSize)
-    axHighLims = np.empty(ax.shape)
-    axHighLims[:] = np.nan
-    axLowLims = np.empty(ax.shape)
-    axLowLims[:] = np.nan
-    with sns.color_palette(colorPal, 5):
-        for idx, channel in enumerate(spikes['ChannelID']):
-            curAx = ax[xIdx[idx], yIdx[idx]]
-            plotSpike(spikes, channel, ax=curAx)
-            curAxLim = curAx.get_ylim()
-            axHighLims[xIdx[idx], yIdx[idx]] = curAxLim[1]
-            axLowLims[xIdx[idx], yIdx[idx]] = curAxLim[0]
-        # get xLim from last axis that has spikes, in order to make the label
-        xLim = ax[xIdx[idx], yIdx[idx]].get_xlim()
-        sns.despine()
-
-        newAxMin = np.nanmean(axLowLims) - .5 * np.nanstd(axLowLims)
-        newAxMax = np.nanmean(axHighLims) + .5 * np.nanstd(axHighLims)
-
-        for idx, channel in enumerate(spikes['ChannelID']):
-            curAx = ax[xIdx[idx], yIdx[idx]]
-            curAx.set_ylim(newAxMin, newAxMax)
-
-        for idx, curAx in enumerate(ax.flatten()):
-            if idx != 0:
-                curAx.tick_params(left=False, top=False, right=False, bottom=False,
-                    labelleft=False, labeltop=False, labelright=False,
-                    labelbottom=False, labelsize=labelFontSize, length=labelFontSize)
-            else:
-                curAx.tick_params(left=True, top=False, right=False, bottom=True,
-                    labelleft=True, labeltop=False, labelright=False,
-                    labelbottom=True, direction = 'in', labelsize=labelFontSize, length=labelFontSize)
-
-                curAx.set_ylim(newAxMin, newAxMax)
-                curAx.set_xlim(*xLim)
-                curAx.set_xlabel('msec', fontsize = labelFontSize,
-                    labelpad = - 2 * labelFontSize)
-                curAx.set_ylabel(spikes['Units'], fontsize = labelFontSize,
-                    labelpad = - 2 * labelFontSize)
-
-        plt.tight_layout(pad=padOverride)
-    return newAxMin, newAxMax
 
 
 '''

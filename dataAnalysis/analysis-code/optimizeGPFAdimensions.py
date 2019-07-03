@@ -3,56 +3,74 @@ Usage:
     temp.py [options]
 
 Options:
+    --exp=exp                              which experimental day to analyze
     --trialIdx=trialIdx                    which trial to analyze [default: 1]
     --processAll                           process entire experimental day? [default: False]
-    --exp=exp                              which experimental day to analyze
+    --lazy                                 load from raw, or regular? [default: False]
     --verbose                              print diagnostics? [default: False]
-    --alignQuery=alignQuery                choose a subset of the data? [default: (pedalMovementCat==\'midPeak\')]
-    --alignSuffix=alignSuffix              what name to append in order to identify the align query? [default: midPeak]
-    --dryRun                               actually run the code? [default: True]
     --window=window                        process with short window? [default: long]
+    --alignQuery=alignQuery                choose a data subset? [default: outboundWithStim]
+    --selector=selector                    filename if using a unit selector
+    --unitQuery=unitQuery                  how to restrict channels?
 """
-#  import dataAnalysis.plotting.aligned_signal_plots as asp
-#  import dataAnalysis.helperFunctions.helper_functions_new as hf
 import dataAnalysis.helperFunctions.profiling as prf
+import dataAnalysis.neuralTrajInterface.neural_traj_interface as nti
+import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
 import os
-#  import seaborn as sns
-#  import numpy as np
-#  import quantities as pq
 import pandas as pd
 import numpy as np
 import scipy.io as sio
 import pdb
 import dataAnalysis.preproc.ns5 as ns5
-#  from neo import (
-#      Block, Segment, ChannelIndex,
-#      Event, AnalogSignal, SpikeTrain, Unit)
-#  from neo.io.proxyobjects import (
-#      AnalogSignalProxy, SpikeTrainProxy, EventProxy)
 import joblib as jb
 import dill as pickle
-#  import gc
 import subprocess
 
 from currentExperiment import parseAnalysisOptions
 from docopt import docopt
+from namedQueries import namedQueries
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['trialIdx']), arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
 
-verbose = arguments['verbose']
+alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **arguments)
+alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
+    namedQueries, scratchFolder, **arguments)
+alignedAsigsKWargs['verbose'] = arguments['verbose']
+
+alignedAsigsKWargs.update(dict(
+    duplicateControlsByProgram=False,
+    makeControlProgram=True,
+    removeFuzzyName=False, getMetaData=False,
+    procFun=lambda wfdf: wfdf > 0,
+    transposeToColumns='bin', concatOn='index'))
 
 if arguments['processAll']:
     prefix = experimentName
 else:
     prefix = ns5FileName
+
 intermediatePath = os.path.join(
     scratchFolder,
     prefix + '_raster_{}_for_gpfa_{}.mat'.format(
-        arguments['window'], arguments['alignSuffix']))
-runIdx = '{}_{}'.format(prefix, arguments['alignSuffix'])
+        arguments['window'], arguments['alignQuery']))
+modelName = '{}_{}_{}'.format(prefix, arguments['window'], arguments['alignQuery'])
+
+if not os.path.exists(intermediatePath):
+    triggeredPath = os.path.join(
+        scratchFolder,
+        prefix + '_raster_{}.nix'.format(
+            arguments['window']))
+    dataReader, dataBlock = ns5.blockFromPath(
+        triggeredPath,
+        lazy=arguments['lazy'])
+    alignedRastersDF = ns5.alignedAsigsToDF(
+        dataBlock, **alignedAsigsKWargs)
+    nti.saveRasterForNeuralTraj(alignedRastersDF, intermediatePath)
+    if arguments['lazy']:
+        dataReader.file.close()
 # dataPath, xDim, segLength, binWidth, kernSD, runIdx, baseDir, runOpti
 gpfaArg = ', '.join([
     '\'' + intermediatePath + '\'',
@@ -60,15 +78,10 @@ gpfaArg = ', '.join([
     '{}'.format(gpfaOpts['segLength']),
     '{}'.format(gpfaOpts['binWidth']),
     '{}'.format(gpfaOpts['kernSD']),
-    '\'{}\''.format(runIdx),
+    '\'{}\''.format(modelName),
     '\'' + scratchFolder + '\'',
-    'false'
+    'true'
     ])
 execStr = 'matlab-threaded -r \"optimize_gpfa({}); exit\"'.format(gpfaArg)
 print(execStr)
-
-if not arguments['dryRun']:
-    result = subprocess.run([execStr], shell=True)
-# stdout=subprocess.PIPE
-#print(result.stdout)
-# plt.spy(alignedRasterList[2]); plt.show()
+result = subprocess.run([execStr], shell=True)

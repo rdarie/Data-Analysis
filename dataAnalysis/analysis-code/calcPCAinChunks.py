@@ -8,9 +8,10 @@ Options:
     --processAll                           process entire experimental day? [default: False]
     --window=window                        process with short window? [default: long]
     --lazy                                 load from raw, or regular? [default: False]
+    --verbose                              print diagnostics? [default: False]
     --unitQuery=unitQuery                  how to restrict channels? [default: fr_sqrt]
     --inputBlockName=inputBlockName        filename for input block [default: fr_sqrt]
-    --alignQuery=alignQuery                what will the plot be aligned to? [default: outboundWithStim]
+    --alignQuery=alignQuery                what will the plot be aligned to? [default: midPeak]
     --estimatorName=estimatorName          filename for resulting estimator [default: pca]
     --selector=selector                    filename if using a unit selector
 """
@@ -19,14 +20,8 @@ import os
 import dataAnalysis.helperFunctions.profiling as prf
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
 from namedQueries import namedQueries
-#  import numpy as np
-#  import pandas as pd
 import pdb
 import dataAnalysis.preproc.ns5 as ns5
-#  from neo import (
-#      Block, Segment, ChannelIndex,
-#      Event, AnalogSignal, SpikeTrain, Unit)
-#  import neo
 from sklearn.decomposition import PCA, IncrementalPCA
 from sklearn.pipeline import make_pipeline, Pipeline
 import joblib as jb
@@ -43,12 +38,12 @@ globals().update(allOpts)
 alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **arguments)
 alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
     namedQueries, scratchFolder, **arguments)
-
 alignedAsigsKWargs.update(dict(
     duplicateControlsByProgram=False,
     makeControlProgram=True,
     transposeToColumns='feature', concatOn='columns',
     removeFuzzyName=False, getMetaData=False, decimate=5))
+alignedAsigsKWargs['verbose'] = arguments['verbose']
 
 if arguments['processAll']:
     prefix = experimentName
@@ -58,13 +53,20 @@ triggeredPath = os.path.join(
     scratchFolder,
     prefix + '_{}_{}.nix'.format(
         arguments['inputBlockName'], arguments['window']))
+fullEstimatorName = '{}_{}_{}_{}'.format(
+    prefix,
+    arguments['estimatorName'],
+    arguments['window'],
+    arguments['alignQuery'])
 estimatorPath = os.path.join(
     scratchFolder,
-    prefix + '_' + arguments['estimatorName'] + '.joblib')
+    fullEstimatorName + '.joblib')
 
-prf.print_memory_usage('before load data')
-print(triggeredPath)
-dataReader, dataBlock = ns5.blockFromPath(triggeredPath, lazy=arguments['lazy'])
+if arguments['verbose']:
+    prf.print_memory_usage('before load data')
+print('loading {}'.format(triggeredPath))
+dataReader, dataBlock = ns5.blockFromPath(
+    triggeredPath, lazy=arguments['lazy'])
 
 nSeg = len(dataBlock.segments)
 nComp = len(alignedAsigsKWargs['unitNames'])
@@ -73,6 +75,8 @@ estimator = IncrementalPCA(
     batch_size=int(5 * nComp))
 
 for segIdx in range(nSeg):
+    if arguments['verbose']:
+        prf.print_memory_usage('fitting on segment {}'.format(segIdx))
     alignedAsigsDF = ns5.alignedAsigsToDF(
         dataBlock,
         whichSegments=[segIdx],

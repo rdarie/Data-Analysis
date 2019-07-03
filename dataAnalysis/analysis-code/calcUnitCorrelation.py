@@ -11,7 +11,7 @@ Options:
     --plotting                             plot out the correlation matrix? [default: True]
     --inputBlockName=inputBlockName        filename for inputs [default: fr]
     --window=window                        process with short window? [default: long]
-    --unitQuery=unitQuery                  how to restrict channels if not supplying a list? [default: fr#]
+    --unitQuery=unitQuery                  how to restrict channels if not supplying a list? [default: fr]
     --alignQuery=alignQuery                query what the units will be aligned to? [default: midPeak]
     --selector=selector                    filename if using a unit selector
     --resultName=resultName                filename for result [default: corr]

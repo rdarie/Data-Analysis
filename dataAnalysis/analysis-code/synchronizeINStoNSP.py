@@ -7,21 +7,21 @@ Options:
     --exp=exp                       which experimental day to analyze
     --curateManually                whether to manually confirm synch [default: False]
 """
-import matplotlib, pdb, pickle, traceback
+import matplotlib, pdb, traceback
 matplotlib.use('Qt5Agg')   # generate interactive output by default
 #  matplotlib.rcParams['agg.path.chunksize'] = 10000
 #  matplotlib.use('PS')   # noninteract output
 from matplotlib import pyplot as plt
-
+import dill as pickle
 from scipy import stats
 from importlib import reload
 from datetime import datetime as dt
 import peakutils
 import numpy as np
 import pandas as pd
-import dataAnalysis.helperFunctions.kilosort_analysis as ksa
-import dataAnalysis.helperFunctions.motor_encoder as mea
-import dataAnalysis.helperFunctions.helper_functions as hf
+import dataAnalysis.helperFunctions.kilosort_analysis_new as ksa
+import dataAnalysis.helperFunctions.motor_encoder_new as mea
+import dataAnalysis.helperFunctions.helper_functions_new as hf
 import dataAnalysis.helperFunctions.estimateElectrodeImpedances as eti
 import dataAnalysis.preproc.ns5 as preproc
 import dataAnalysis.preproc.mdt as preprocINS
@@ -57,7 +57,9 @@ globals().update(expOpts)
 globals().update(allOpts)
 #  load INS Data
 ############################################################
-
+synchFunPath = os.path.join(
+    scratchFolder,
+    '{}_{}_synchFun.pickle'.format(experimentName, ns5FileName))
 print('Loading INS Block...')
 '''
 reader = neo.io.NixIO(filename=insDataPath, mode='ro')
@@ -116,86 +118,92 @@ for trialSegment in pd.unique(td['data']['trialSegment']):
 
 #  Detect INS taps
 ############################################################
-allTapTimestampsINS = []
-print('Detecting INS Timestamps...')
-overrideSegments = overrideSegmentsForTapSync[trialIdx]
-for trialSegment in pd.unique(td['data']['trialSegment']):
-    print('Trial Segment {}\n'.format(trialSegment))
-    #  for trialSegment in [0, 1, 2]:
-    accelGroupMask = accel['data']['trialSegment'] == trialSegment
-    accelGroup = accel['data'].loc[accelGroupMask, :]
-    tdGroupMask = td['data']['trialSegment'] == trialSegment
-    tdGroup = td['data'].loc[tdGroupMask, :]
+if not os.path.exists(synchFunPath):
+    allTapTimestampsINS = []
+    print('Detecting INS Timestamps...')
+    overrideSegments = overrideSegmentsForTapSync[trialIdx]
+    for trialSegment in pd.unique(td['data']['trialSegment']):
+        print('Trial Segment {}\n'.format(trialSegment))
+        #  for trialSegment in [0, 1, 2]:
+        accelGroupMask = accel['data']['trialSegment'] == trialSegment
+        accelGroup = accel['data'].loc[accelGroupMask, :]
+        tdGroupMask = td['data']['trialSegment'] == trialSegment
+        tdGroup = td['data'].loc[tdGroupMask, :]
 
-    tapTimestampsINS, peakIdx = hf.getINSTapTimestamp(
-        tdGroup, accelGroup,
-        tapDetectOpts[trialIdx][trialSegment]
-        )
-    print('tSeg {}, INS Taps:\n{}'.format(
-        trialSegment, tapTimestampsINS))
-    print('diff:\n{}'.format(
-        tapTimestampsINS.diff() * 1e3))
-    allTapTimestampsINS.append(tapTimestampsINS)
-
-if arguments['curateManually']:
-    try:
-        clickDict = hf.peekAtTaps(
-            td, accel,
-            channelData, trialIdx,
-            tapDetectOpts, sessionTapRangesNSP,
-            insX='t', plotBlocking=plotBlocking,
-            allTapTimestampsINS=allTapTimestampsINS,
-            allTapTimestampsNSP=allTapTimestampsNSP,
+        tapTimestampsINS, peakIdx = hf.getINSTapTimestamp(
+            tdGroup, accelGroup,
+            tapDetectOpts[trialIdx][trialSegment]
             )
-    except Exception:
-        traceback.print_exc()
-        #  pdb.set_trace()
+        print('tSeg {}, INS Taps:\n{}'.format(
+            trialSegment, tapTimestampsINS))
+        print('diff:\n{}'.format(
+            tapTimestampsINS.diff() * 1e3))
+        allTapTimestampsINS.append(tapTimestampsINS)
+
+    if arguments['curateManually']:
+        try:
+            clickDict = hf.peekAtTaps(
+                td, accel,
+                channelData, trialIdx,
+                tapDetectOpts, sessionTapRangesNSP,
+                insX='t', plotBlocking=plotBlocking,
+                allTapTimestampsINS=allTapTimestampsINS,
+                allTapTimestampsNSP=allTapTimestampsNSP,
+                )
+        except Exception:
+            traceback.print_exc()
+            #  pdb.set_trace()
+    else:
+        clickDict = {
+            i: {
+                'ins': [],
+                'nsp': []
+                }
+            for i in pd.unique(td['data']['trialSegment'])}
+
+    # perform the sync
+    ############################################################
+    td['data']['NSPTime'] = np.nan
+    accel['data']['NSPTime'] = np.nan
+    allTapTimestampsINSAligned = []
+    for trialSegment in pd.unique(td['data']['trialSegment']):
+        trialSegment = int(trialSegment)
+
+        accelGroupMask = accel['data']['trialSegment'] == trialSegment
+        accelGroup = accel['data'].loc[accelGroupMask, :]
+        tdGroupMask = td['data']['trialSegment'] == trialSegment
+        tdGroup = td['data'].loc[tdGroupMask, :]
+
+        if len(clickDict[trialSegment]['ins']):
+            allTapTimestampsINS[trialSegment] = clickDict[trialSegment]['ins']
+        #
+        theseTapTimestampsINS = allTapTimestampsINS[trialSegment]
+        if len(clickDict[trialSegment]['nsp']):
+            allTapTimestampsNSP[trialSegment] = clickDict[trialSegment]['nsp']
+        #
+        theseTapTimestampsNSP = allTapTimestampsNSP[trialSegment]
+
+        if trialSegment in overrideSegments.keys():
+            print('\t Overriding trialSegment {}'.format(trialSegment))
+            theseTapTimestampsINS = allTapTimestampsINS[overrideSegments[trialSegment]]
+            theseTapTimestampsNSP = allTapTimestampsNSP[overrideSegments[trialSegment]]
+
+        tdGroup, accelGroup, insBlock, thisINStoNSP = preproc.synchronizeINStoNSP(
+            theseTapTimestampsNSP, theseTapTimestampsINS,
+            NSPTimeRanges=(channelData['t'].iloc[0], channelData['t'].iloc[-1]),
+            td=tdGroup, accel=accelGroup, insBlock=insBlock,
+            trialSegment=trialSegment, degree=0)
+        td['data'].loc[tdGroupMask, 'NSPTime'] = tdGroup['NSPTime']
+        accel['data'].loc[accelGroupMask, 'NSPTime'] = accelGroup['NSPTime']
+
+        interpFunINStoNSP[trialIdx][trialSegment] = thisINStoNSP
+        allTapTimestampsINSAligned.append(thisINStoNSP(
+            theseTapTimestampsINS))
+    with open(synchFunPath, 'wb') as f:
+        pickle.dump(interpFunINStoNSP, f)
 else:
-    clickDict = {
-        i: {
-            'ins': [],
-            'nsp': []
-            }
-        for i in pd.unique(td['data']['trialSegment'])}
-
-# perform the sync
-############################################################
-td['data']['NSPTime'] = np.nan
-accel['data']['NSPTime'] = np.nan
-allTapTimestampsINSAligned = []
-for trialSegment in pd.unique(td['data']['trialSegment']):
-    trialSegment = int(trialSegment)
-
-    accelGroupMask = accel['data']['trialSegment'] == trialSegment
-    accelGroup = accel['data'].loc[accelGroupMask, :]
-    tdGroupMask = td['data']['trialSegment'] == trialSegment
-    tdGroup = td['data'].loc[tdGroupMask, :]
-
-    if len(clickDict[trialSegment]['ins']):
-        allTapTimestampsINS[trialSegment] = clickDict[trialSegment]['ins']
-    #
-    theseTapTimestampsINS = allTapTimestampsINS[trialSegment]
-    if len(clickDict[trialSegment]['nsp']):
-        allTapTimestampsNSP[trialSegment] = clickDict[trialSegment]['nsp']
-    #
-    theseTapTimestampsNSP = allTapTimestampsNSP[trialSegment]
-    
-    if trialSegment in overrideSegments.keys():
-        print('\t Overriding trialSegment {}'.format(trialSegment))
-        theseTapTimestampsINS = allTapTimestampsINS[overrideSegments[trialSegment]]
-        theseTapTimestampsNSP = allTapTimestampsNSP[overrideSegments[trialSegment]]
-
-    tdGroup, accelGroup, insBlock, thisINStoNSP = hf.synchronizeINStoNSP(
-        theseTapTimestampsNSP, theseTapTimestampsINS,
-        NSPTimeRanges=(channelData['t'].iloc[0], channelData['t'].iloc[-1]),
-        td=tdGroup, accel=accelGroup, insBlock=insBlock,
-        trialSegment=trialSegment, degree=0)
-    td['data'].loc[tdGroupMask, 'NSPTime'] = tdGroup['NSPTime']
-    accel['data'].loc[accelGroupMask, 'NSPTime'] = accelGroup['NSPTime']
-
-    interpFunINStoNSP[trialIdx][trialSegment] = thisINStoNSP
-    allTapTimestampsINSAligned.append(thisINStoNSP(
-        theseTapTimestampsINS))
+    with open(synchFunPath, 'rb') as f:
+        interpFunINStoNSP = pickle.load(f)
 
 print('Interpolation between INS and NSP: ')
 print(interpFunINStoNSP[trialIdx])

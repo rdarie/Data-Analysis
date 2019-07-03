@@ -7,6 +7,8 @@ Options:
     --exp=exp                              which experimental day to analyze
     --processAll                           process entire experimental day? [default: False]
     --estimator=estimator                  filename for resulting estimator
+    --verbose                              print diagnostics? [default: False]
+    --lazy                                 load from raw, or regular? [default: False]
 """
 import os
 import dataAnalysis.preproc.ns5 as ns5
@@ -44,12 +46,8 @@ if arguments['processAll']:
 else:
     filePath = analysisDataPath
 
-dataReader = neo.io.nixio_fr.NixIO(
-    filename=filePath)
-dataBlock = dataReader.read_block(
-    block_index=0, lazy=True,
-    signal_group_mode='split-all')
-
+dataReader, dataBlock = ns5.blockFromPath(
+    filePath, lazy=arguments['lazy'])
 estimatorPath = os.path.join(
     scratchFolder,
     arguments['estimator'] + '.joblib')
@@ -58,7 +56,7 @@ with open(os.path.join(scratchFolder, arguments['estimator'] + '_meta.pickle'), 
 estimator = jb.load(os.path.join(scratchFolder, estimatorMetadata['path']))
 
 unitNames = []
-for uName in estimatorMetadata['inputFeatures']:
+for uName in estimatorMetadata['alignedAsigsKWargs']['unitNames']:
     if uName[-2:] == '#0':
         unitNames.append(uName[:-2])
     else:
@@ -140,7 +138,8 @@ for segIdx, group in featuresDF.groupby('segment'):
         chanIdx.annotate(nix_name=chanIdx.name)
     masterBlock.merge(featureBlock)
 
-dataReader.file.close()
+if arguments['lazy']:
+    dataReader.file.close()
 allSegs = list(range(len(masterBlock.segments)))
 fileName = os.path.basename(filePath).replace('.nix', '')
 ns5.addBlockToNIX(

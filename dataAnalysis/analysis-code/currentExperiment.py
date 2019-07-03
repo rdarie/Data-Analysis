@@ -4,7 +4,7 @@ import dataAnalysis.helperFunctions.probe_metadata as prb_meta
 import importlib
 
 
-def parseAnalysisOptions(trialIdx, experimentShorthand):
+def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
     optsModule = importlib.import_module(experimentShorthand, package=None)
     expOpts = optsModule.getExpOpts()
     #  globals().update(expOpts)
@@ -16,9 +16,22 @@ def parseAnalysisOptions(trialIdx, experimentShorthand):
     insFolder = os.path.join(remoteBasePath, 'ORCA Logs')
     experimentName = expOpts['experimentName']
     nspFolder = os.path.join(remoteBasePath, 'raw', experimentName)
-
+    oeFolder = os.path.join(remoteBasePath, 'raw', experimentName, 'open_ephys')
     ns5FileName = 'Trial00{}'.format(trialIdx)
     miniRCTrialLookup = expOpts['miniRCTrialLookup']
+    
+    try:
+        openEphysChanNames = expOpts['openEphysChanNames']
+    except Exception:
+        openEphysChanNames = []
+    openEphysFilterArgs = dict(    
+        notchFreq=60,
+        notchOrder=2,
+        notchWidth=4,
+        nNotchHarmonics=5,
+        lowPassFreq=500,
+        lowPassOrder=2)
+
     miniRCTrial = miniRCTrialLookup[trialIdx]
     
     gpfaOpts = {

@@ -54,7 +54,6 @@ chansToAnalyze = [
 
 #  chansToAnalyze = chansToAnalyze[80:]
 #  chansToAnalyze = [1, 8, 43, 46, 50, 53, 57, 59, 62, 67, 73, 74, 82, 84, 90, 91]
-chansToAnalyze = [3, 6, 33, 91]
 
 if viewConstructor:
     for chan_grp in chansToAnalyze:

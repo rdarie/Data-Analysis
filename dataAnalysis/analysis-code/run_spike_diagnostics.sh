@@ -8,7 +8,7 @@
 # Use more memory (32GB):
 #SBATCH --nodes=1
 #SBATCH --mem=48G
-#SBATCH --array=1,2,3,4,5
+#SBATCH --array=1,2,3
 
 # Specify a job name:
 #SBATCH -J sorting_diagnostics
@@ -21,7 +21,7 @@
 #SBATCH --account=bibs-dborton-condo
 
 # EXP="exp201901211000"
-EXP="exp201901271000"
+EXP="exp201901221000"
 
 #  python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/tridesclousCCV.py' --trialIdx=$SLURM_ARRAY_TASK_ID --makeCoarseNeoBlock --exp=$EXP
 python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/plotSpikeReport.py' --trialIdx=$SLURM_ARRAY_TASK_ID --nameSuffix=_coarse --exp=$EXP

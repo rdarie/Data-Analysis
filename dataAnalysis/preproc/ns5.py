@@ -254,7 +254,7 @@ def channelIndexesToSpikeDict(
     return spikes
 
 
-#  renamed spikeTrainArrayAnnToDF to unitSpikeTrainArrayAnnToDF
+#  renamed unitSpikeTrainArrayAnnToDF to unitSpikeTrainArrayAnnToDF
 def unitSpikeTrainArrayAnnToDF(
         spikeTrainContainer):
     #  list contains different segments
@@ -263,6 +263,8 @@ def unitSpikeTrainArrayAnnToDF(
         spiketrains = spikeTrainContainer.units[0].spiketrains
     elif isinstance(spikeTrainContainer, Unit):
         spiketrains = spikeTrainContainer.spiketrains
+    elif isinstance(spikeTrainContainer, list):
+        spiketrains = spikeTrainContainer
     fullAnnotationsDict = {}
     for segIdx, st in enumerate(spiketrains):
         theseAnnDF = pd.DataFrame(st.array_annotations)
@@ -490,7 +492,7 @@ def concatenateUnitSpikeTrainWaveformsDF(
 
 
 def alignedAsigsToDF(
-        dataBlock, unitNames,
+        dataBlock, unitNames=None,
         unitQuery=None, dataQuery=None,
         collapseSizes=False, verbose=False,
         duplicateControlsByProgram=False,
@@ -523,7 +525,7 @@ def alignedAsigsToDF(
             collapseSizes, duplicateControlsByProgram,
             makeControlProgram, removeFuzzyName
             ])
-    if manipulateIndex:
+    if manipulateIndex and getMetaData:
         idxLabels = allWaveforms.index.names
         allWaveforms.reset_index(inplace=True)
 
@@ -911,7 +913,6 @@ def alignedAsigDFtoSpikeTrain(
         print('Saving trajectoriess for segment {}'.format(segIdx))
         dataSeg = dataBlock.segments[segIdx]
         exSt = dataSeg.spiketrains[0]
-        
         if isinstance(exSt, SpikeTrainProxy):
             print(
                 'alignedAsigDFtoSpikeTrain basing seg {} on {}'
@@ -920,7 +921,7 @@ def alignedAsigDFtoSpikeTrain(
             exSt = loadStProxy(stProxy)
             exSt = loadObjArrayAnn(exSt)
         print('exSt.left_sweep is {}'.format(exSt.left_sweep))
-        wfBins = ((np.arange(exSt.waveforms.shape[2]) /(exSt.sampling_rate)) -exSt.left_sweep).magnitude
+        wfBins = ((np.arange(exSt.waveforms.shape[2]) / (exSt.sampling_rate)) - exSt.left_sweep).magnitude
         # seg to contain triggered time series
         newSeg = Segment(name=dataSeg.annotations['neo_name'])
         newSeg.annotate(nix_name=dataSeg.annotations['neo_name'])
@@ -1258,6 +1259,85 @@ def loadSpikeMats(
     return spikeMats, validTrials
 
 
+def getStimSerialTrialSegMask(insDF, trialSegment):
+    tsegMask = insDF['ins_property'] == 'trialSegment'
+    tseg = pd.Series(np.nan, index=insDF.index)
+    tseg.loc[tsegMask] = insDF.loc[tsegMask, 'ins_value']
+    tseg.fillna(method='ffill', inplace=True)
+    segmentMask = tseg == trialSegment
+    return segmentMask
+
+
+def synchronizeINStoNSP(
+        tapTimestampsNSP, tapTimestampsINS,
+        NSPTimeRanges=(None, None),
+        td=None, accel=None, insBlock=None, trialSegment=None, degree=1
+        ):
+    # sanity check that the intervals match
+    insDiff = tapTimestampsINS.diff().dropna().values
+    nspDiff = tapTimestampsNSP.diff().dropna().values
+    print('Trial Segment {}'.format(trialSegment))
+    print('On the INS, the diff() between taps was\n{}'.format(insDiff))
+    print('On the NSP, the diff() between taps was\n{}'.format(nspDiff))
+    print('This amounts to a msec difference of\n{}'.format(
+        (insDiff - nspDiff) * 1e3))
+    if (insDiff - nspDiff > 20e-3).any():
+        raise(Exception('Tap trains too different!'))
+    #  pdb.set_trace()
+    if degree > 0:
+        synchPolyCoeffsINStoNSP = np.polyfit(
+            x=tapTimestampsINS.values, y=tapTimestampsNSP.values, deg=degree)
+    else:
+        timeOffset = tapTimestampsNSP.values - tapTimestampsINS.values
+        synchPolyCoeffsINStoNSP = np.array([1, np.mean(timeOffset)])
+    timeInterpFunINStoNSP = np.poly1d(synchPolyCoeffsINStoNSP)
+    if td is not None:
+        td.loc[:, 'NSPTime'] = pd.Series(
+            timeInterpFunINStoNSP(td['t']), index=td['t'].index)
+    # accel['originalTime'] = accel['t']
+    if accel is not None:
+        accel.loc[:, 'NSPTime'] = pd.Series(
+            timeInterpFunINStoNSP(accel['t']), index=accel['t'].index)
+    if insBlock is not None:
+        allUnits = [st.unit for st in insBlock.segments[0].spiketrains]
+        for unit in allUnits:
+                tStart = NSPTimeRanges[0]
+                tStop = NSPTimeRanges[1]
+                uniqueSt = []
+                for st in unit.spiketrains:
+                    if st not in uniqueSt:
+                        uniqueSt.append(st)
+                    else:
+                        continue
+                    if len(st.times):
+                        segMask = np.array(
+                            st.annotations['trialSegment'],
+                            dtype=np.int) == trialSegment
+                        st.magnitude[segMask] = (
+                            timeInterpFunINStoNSP(st.times[segMask]))
+                        #  kludgey fix for weirdness concerning t_start
+                        st.t_start = min(tStart, st.times[0] * 0.999)
+                        st.t_stop = min(tStop, st.times[-1] * 1.001)
+                        validMask = st < st.t_stop
+                        if ~validMask.all():
+                            print('Deleted some spikes')
+                            st = st[validMask]
+                            if 'arrayAnnNames' in st.annotations.keys():
+                                for key in st.annotations['arrayAnnNames']:
+                                    st.annotations[key] = np.array(st.annotations[key])[validMask]
+                    else:
+                        st.t_start = tStart
+                        st.t_stop = tStop
+        #  pdb.set_trace()
+        allEvents = insBlock.filter(objects=Event)
+        eventsDF = eventsToDataFrame(allEvents, idxT='t')
+        segMask = getStimSerialTrialSegMask(eventsDF, trialSegment)
+        for event in allEvents:
+            event.magnitude[segMask] = (
+                timeInterpFunINStoNSP(event.times[segMask]))
+    return td, accel, insBlock, timeInterpFunINStoNSP
+
+
 def findSegsIncluding(
         block, timeSlice=None):
     segBoundsList = []
@@ -1427,7 +1507,8 @@ def readBlockFixNames(
     
     #  
     if dataBlock.name is None:
-        dataBlock.name = dataBlock.annotations['neo_name']
+        if 'neo_name' in dataBlock.annotations:
+            dataBlock.name = dataBlock.annotations['neo_name']
     
     #  on first segment, rename the chan_indexes and units
     seg0 = dataBlock.segments[0]

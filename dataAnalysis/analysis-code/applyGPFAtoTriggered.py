@@ -3,46 +3,51 @@ Usage:
     temp.py [options]
 
 Options:
+    --exp=exp                              which experimental day to analyze
     --trialIdx=trialIdx                    which trial to analyze [default: 1]
     --processAll                           process entire experimental day? [default: False]
-    --exp=exp                              which experimental day to analyze
+    --lazy                                 load from raw, or regular? [default: False]
     --verbose                              print diagnostics? [default: False]
-    --alignQuery=alignQuery                choose a subset of the data?
-    --modelSuffix=modelSuffix              what name to append in order to identify the gpfa model? [default: midPeak]
+    --window=window                        process with short window? [default: long]
+    --alignQuery=alignQuery                choose a data subset? [default: midPeak]
+    --inputBlockName=inputBlockName        filename for inputs [default: raster]
     --selector=selector                    filename if using a unit selector
-    --window=window                        process with short window? [default: short]
-    --unitQuery=unitQuery                  how to restrict channels? [default: (chanName.str.endswith(\'raster#0\'))]
+    --unitQuery=unitQuery                  how to restrict channels?
 """
-#  import dataAnalysis.plotting.aligned_signal_plots as asp
-#  import dataAnalysis.helperFunctions.helper_functions_new as hf
+
 import dataAnalysis.helperFunctions.profiling as prf
+import dataAnalysis.neuralTrajInterface.neural_traj_interface as nti
+import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
 import os
-#  import seaborn as sns
-#  import numpy as np
-#  import quantities as pq
 import pandas as pd
 import numpy as np
-import scipy.io as sio
 import pdb
 import dataAnalysis.preproc.ns5 as ns5
-#  from neo import (
-#      Block, Segment, ChannelIndex,
-#      Event, AnalogSignal, SpikeTrain, Unit)
-#  from neo.io.proxyobjects import (
-#      AnalogSignalProxy, SpikeTrainProxy, EventProxy)
 import joblib as jb
 import dill as pickle
 import subprocess
 import h5py
-#  import gc
 
 from currentExperiment import parseAnalysisOptions
 from docopt import docopt
+from namedQueries import namedQueries
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['trialIdx']), arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
+
+alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **arguments)
+alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
+    namedQueries, scratchFolder, **arguments)
+alignedAsigsKWargs['verbose'] = arguments['verbose']
+
+alignedAsigsKWargs.update(dict(
+    duplicateControlsByProgram=False,
+    makeControlProgram=True,
+    removeFuzzyName=False, getMetaData=True,
+    procFun=lambda wfdf: wfdf > 0,
+    transposeToColumns='bin', concatOn='index'))
 
 if arguments['processAll']:
     prefix = experimentName
@@ -50,90 +55,32 @@ else:
     prefix = ns5FileName
 triggeredPath = os.path.join(
     scratchFolder,
-    prefix + '_trig_raster_{}.nix'.format(
+    prefix + '_raster_{}.nix'.format(
         arguments['window']))
-
+intermediatePath = os.path.join(
+    scratchFolder,
+    prefix + '_raster_{}_for_gpfa_{}.mat'.format(
+        arguments['window'], arguments['alignQuery']))
+outputPath = os.path.join(
+    scratchFolder,
+    prefix + '_raster_{}_from_gpfa_{}.mat'.format(
+        arguments['window'], arguments['alignQuery']))
+modelName = '{}_{}_{}'.format(prefix, arguments['window'], arguments['alignQuery'])
 modelPath = os.path.join(
     scratchFolder, 'gpfa_results',
-    '{}_{}'.format(prefix, arguments['modelSuffix']),
+    modelName,
     'gpfa_xDim{:0>2}'.format(gpfaOpts['xDim']) + '.mat'
     )
-intermediatePath = triggeredPath.replace('.nix', '_for_gpfa_temp.mat')
-outputPath = triggeredPath.replace('.nix', '_from_gpfa_temp.mat')
-
-if arguments['verbose']:
-    print('Loading {}...'.format(triggeredPath))
-    prf.print_memory_usage('before load data')
-dataReader = ns5.nixio_fr.NixIO(
-    filename=triggeredPath)
-dataBlock = dataReader.read_block(
-    block_index=0, lazy=True,
-    signal_group_mode='split-all')
-
-if arguments['alignQuery'] is None:
-    dataQuery = None
-elif len(arguments['alignQuery']) == 0:
-    dataQuery = None
-else:
-    dataQuery = '&'.join([
-        arguments['alignQuery']
-    ])
-
-if arguments['verbose']:
-    prf.print_memory_usage('before load firing rates')
-
-if arguments['selector'] is not None:
-    with open(
-        os.path.join(
-            scratchFolder,
-            arguments['selector'] + '.pickle'),
-            'rb') as f:
-        selectorMetadata = pickle.load(f)
-    unitNames = selectorMetadata['outputFeatures']
-    alignedAsigsKWargs = selectorMetadata['alignedAsigsKWargs']
-else:
-    unitNames = None
-    alignedAsigsKWargs = dict(
-        duplicateControlsByProgram=False,
-        makeControlProgram=True,
-        removeFuzzyName=False)
-
-if miniRCTrial:
-    alignedAsigsKWargs.update(dict(
-        amplitudeColumn='amplitude',
-        programColumn='program',
-        electrodeColumn='electrode'))
-
+dataReader, dataBlock = ns5.blockFromPath(
+    triggeredPath,
+    lazy=arguments['lazy'])
 alignedRastersDF = ns5.alignedAsigsToDF(
-    dataBlock, unitNames,
-    unitQuery=arguments['unitQuery'], dataQuery=dataQuery,
-    procFun=lambda wfdf: wfdf > 0,
-    transposeToColumns='bin', concatOn='index',
-    getMetaData=True,
-    **alignedAsigsKWargs, verbose=arguments['verbose'])
+    dataBlock, **alignedAsigsKWargs)
 
-#  keepMetaCols = ['segment', 'originalIndex', 'feature']
-#  dropMetaCols = np.setdiff1d(alignedRastersDF.index.names, keepMetaCols).tolist()
-#  alignedRastersDF.index = alignedRastersDF.index.droplevel(dropMetaCols)
+if not os.path.exists(intermediatePath):
+    nti.saveRasterForNeuralTraj(alignedRastersDF, intermediatePath)
 
-if arguments['verbose']:
-    prf.print_memory_usage('after load firing rates')
-
-intermediateMatAlreadyExists = False
-if not intermediateMatAlreadyExists:
-    alignedRasterList = [
-        g.to_numpy(dtype='uint8')
-        for n, g in alignedRastersDF.groupby(['segment', 'originalIndex'])]
-    trialIDs = [
-        np.atleast_2d(i).astype('uint16')
-        for i in range(len(alignedRasterList))]
-    structDType = np.dtype([('trialId', 'O'), ('spikes', 'O')])
-
-    dat = np.array(list(zip(trialIDs, alignedRasterList)), dtype=structDType)
-    sio.savemat(intermediatePath, {'dat': dat})
-
-outputMatAlreadyExists = False
-if not outputMatAlreadyExists:
+if not os.path.exists(outputPath):
     # dataPath, modelPath, outputPath, baseDir
     gpfaArg = ', '.join([
         '\'' + intermediatePath + '\'',
@@ -172,8 +119,9 @@ alignedRastersDF.index = alignedRastersDF.index.droplevel('bin')
 factorsDF.set_index(alignedRastersDF.index, append=True, inplace=True)
 
 masterBlock = ns5.alignedAsigDFtoSpikeTrain(factorsDF, dataBlock)
-dataReader.file.close()
-#  print('memory usage: {:.1f} MB'.format(prf.memory_usage_psutil()))
+
+if arguments['lazy']:
+    dataReader.file.close()
 masterBlock = ns5.purgeNixAnn(masterBlock)
 writer = ns5.NixIO(filename=triggeredPath.replace('raster', 'gpfa'))
 writer.write_block(masterBlock, use_obj_names=True)

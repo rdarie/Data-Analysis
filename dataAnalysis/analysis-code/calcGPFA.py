@@ -3,44 +3,50 @@ Usage:
     temp.py [options]
 
 Options:
+    --exp=exp                              which experimental day to analyze
     --trialIdx=trialIdx                    which trial to analyze [default: 1]
     --processAll                           process entire experimental day? [default: False]
-    --exp=exp                              which experimental day to analyze
+    --lazy                                 load from raw, or regular? [default: False]
     --verbose                              print diagnostics? [default: False]
-    --inputDataName=inputDataName          what name to append in order to identify the align query? [default: midPeak]
     --window=window                        process with short window? [default: long]
+    --inputBlockName=inputBlockName        filename for inputs [default: raster]
+    --alignQuery=alignQuery                choose a data subset? [default: midPeak]
+    --selector=selector                    filename if using a unit selector
+    --unitQuery=unitQuery                  how to restrict channels?
 """
-#  import dataAnalysis.plotting.aligned_signal_plots as asp
-#  import dataAnalysis.helperFunctions.helper_functions_new as hf
 import dataAnalysis.helperFunctions.profiling as prf
+import dataAnalysis.neuralTrajInterface.neural_traj_interface as nti
+import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
 import os
-#  import seaborn as sns
-#  import numpy as np
-#  import quantities as pq
 import pandas as pd
 import numpy as np
 import scipy.io as sio
 import pdb
 import dataAnalysis.preproc.ns5 as ns5
-#  from neo import (
-#      Block, Segment, ChannelIndex,
-#      Event, AnalogSignal, SpikeTrain, Unit)
-#  from neo.io.proxyobjects import (
-#      AnalogSignalProxy, SpikeTrainProxy, EventProxy)
 import joblib as jb
 import dill as pickle
-#  import gc
 import subprocess
 
 from currentExperiment import parseAnalysisOptions
 from docopt import docopt
+from namedQueries import namedQueries
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['trialIdx']), arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
 
-verbose = arguments['verbose']
+alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **arguments)
+alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
+    namedQueries, scratchFolder, **arguments)
+alignedAsigsKWargs['verbose'] = arguments['verbose']
+
+alignedAsigsKWargs.update(dict(
+    duplicateControlsByProgram=False,
+    makeControlProgram=True,
+    removeFuzzyName=False, getMetaData=False,
+    procFun=lambda wfdf: wfdf > 0,
+    transposeToColumns='bin', concatOn='index'))
 
 if arguments['processAll']:
     prefix = experimentName
@@ -50,9 +56,26 @@ else:
 intermediatePath = os.path.join(
     scratchFolder,
     prefix + '_raster_{}_for_gpfa_{}.mat'.format(
-        arguments['window'], arguments['inputDataName']))
+        arguments['window'], arguments['alignQuery']))
+modelName = '{}_{}_{}'.format(
+    prefix,
+    arguments['window'],
+    arguments['alignQuery'])
 
-modelName = '{}_{}'.format(prefix, arguments['inputDataName'])
+if not os.path.exists(intermediatePath):
+    triggeredPath = os.path.join(
+        scratchFolder,
+        prefix + '_raster_{}.nix'.format(
+            arguments['window']))
+    dataReader, dataBlock = ns5.blockFromPath(
+        triggeredPath,
+        lazy=arguments['lazy'])
+    alignedRastersDF = ns5.alignedAsigsToDF(
+        dataBlock, **alignedAsigsKWargs)
+    nti.saveRasterForNeuralTraj(alignedRastersDF, intermediatePath)
+    if arguments['lazy']:
+        dataReader.file.close()
+    
 # dataPath, xDim, segLength, binWidth, kernSD, runIdx, baseDir
 gpfaArg = ', '.join([
     '\'' + intermediatePath + '\'',

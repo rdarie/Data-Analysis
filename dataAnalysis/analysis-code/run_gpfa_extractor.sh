@@ -22,8 +22,8 @@
 # EXP="exp201901211000"
 EXP="exp201901271000"
 # EXP="exp201901201200"
-# SELECTOR="201901211000-Proprio_minfr"
+# SELECTOR="201901211000-Proprio_minfrmaxcorr"
 SELECTOR="201901271000-Proprio_minfrmaxcorr"
 # SELECTOR="201901201200-Proprio_minfr"
 
-python3 './applyGPFAtoTriggered.py' --exp=$EXP --window=long --processAll --selector=$SELECTOR --verbose
+python3 './applyGPFAtoTriggered.py' --exp=$EXP --processAll --window=long --alignQuery=midPeak --selector=$SELECTOR --verbose --lazy

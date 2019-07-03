@@ -388,6 +388,7 @@ def plotAsigsAligned(
                             .columns[np.ravel(thesePvals < pThresh)])
                         if not significantBins.empty:
                             ymin, ymax = g.axes[ro, co].get_ylim()
+                            g.axes[ro, co].autoscale(False)
                             g.axes[ro, co].plot(
                                 significantBins,
                                 significantBins ** 0 * ymax * 0.99,

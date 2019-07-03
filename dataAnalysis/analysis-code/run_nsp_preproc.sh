@@ -9,7 +9,7 @@
 # Use more memory (32GB):
 #SBATCH --nodes=1
 #SBATCH --mem=96G
-#SBATCH --array=3,4,5
+#SBATCH --array=3
 
 # Specify a job name:
 #SBATCH -J nsp_preproc
@@ -22,6 +22,8 @@
 #SBATCH --account=bibs-dborton-condo
 
 # EXP="exp201901211000"
-EXP="exp201901271000"
+# EXP="exp201901271000"
+EXP="exp201901221000"
+# EXP="exp201901231000"
 
-python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/preprocNS5.py' --trialIdx=$SLURM_ARRAY_TASK_ID --makeFull --makeTruncated --exp=$EXP
+python3 './preprocNS5.py' --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID --makeTruncated

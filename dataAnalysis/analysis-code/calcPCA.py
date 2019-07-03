@@ -58,10 +58,14 @@ triggeredPath = os.path.join(
     scratchFolder,
     prefix + '_{}_{}.nix'.format(
         arguments['inputBlockName'], arguments['window']))
+fullEstimatorName = '{}_{}_{}_{}'.format(
+    prefix,
+    arguments['estimatorName'],
+    arguments['window'],
+    arguments['alignQuery'])
 estimatorPath = os.path.join(
     scratchFolder,
-    prefix + '_' + arguments['estimatorName'] + '.joblib')
-
+    fullEstimatorName + '.joblib')
 prf.print_memory_usage('before load data')
 dataReader, dataBlock = ns5.blockFromPath(triggeredPath, lazy=arguments['lazy'])
 

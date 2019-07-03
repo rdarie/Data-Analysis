@@ -19,14 +19,19 @@
 # Specify account details
 #SBATCH --account=bibs-dborton-condo
 
-# EXP="exp201901211000"
-EXP="exp201901271000"
-# EXP="exp201901201200"
-# SELECTOR="201901211000-Proprio_minfr"
-SELECTOR="201901271000-Proprio_minfr"
-# SELECTOR="201901201200-Proprio_minfr"
-# python3 './selectUnitsByMeanFR.py' --exp=$EXP --processAll
-python3 './calcPCAinChunks.py' --exp=$EXP --processAll --alignQuery="(pedalMovementCat=='midPeak')&(amplitudeCat>=0)" --estimatorName="pca_midPeakOnlyStim_full" --selector=$SELECTOR
 EXP="exp201901211000"
-SELECTOR="201901211000-Proprio_minfr"
-python3 './calcPCAinChunks.py' --exp=$EXP --processAll --alignQuery="(pedalMovementCat=='midPeak')&(amplitudeCat>=0)" --estimatorName="pca_midPeakOnlyStim_full" --selector=$SELECTOR
+# EXP="exp201901271000"
+SELECTOR="201901211000-Proprio_minfrmaxcorr"
+# SELECTOR="201901271000-Proprio_minfrmaxcorr"
+ESTIMATOR="201901211000-Proprio_pca_long_midPeak"
+# ESTIMATOR="201901271000-Proprio_pca_long_midPeak"
+
+#  python3 './calcUnitMeanFR.py' --exp=$EXP --processAll --window=long --verbose
+#  python3 './calcUnitCorrelation.py' --exp=$EXP --processAll --window=long --verbose --plotting
+#  python3 './selectUnitsByMeanFRandCorrelation.py' --exp=$EXP --processAll --window=long
+#  python3 './plotAlignedNeurons.py' --exp=$EXP --processAll --window=long --selector=$SELECTOR
+#  python3 './calcPCAinChunks.py' --exp=$EXP --processAll --window=long --selector=$SELECTOR --lazy --verbose
+#  python3 './applyEstimatorToTriggered.py' --exp=$EXP --processAll --window=long --estimator=$ESTIMATOR --lazy --verbose
+#  python3 './plotAlignedAsigs.py' --exp=$EXP --processAll --window=long --verbose
+#  python3 './applyEstimatorToTriggered.py' --exp=$EXP --processAll --window=short --estimator=$ESTIMATOR --lazy --verbose
+python3 './plotAlignedAsigs.py' --exp=$EXP --processAll --window=long --alignQuery=midPeakWithStim --rowName=pedalSizeCat --verbose

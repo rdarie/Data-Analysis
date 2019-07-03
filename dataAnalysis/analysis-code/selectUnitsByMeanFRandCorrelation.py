@@ -54,7 +54,7 @@ def selFun(
     unitMask = ((meanDF > meanThresh) & (corrDF.max() < corrThresh))
     return unitMask[unitMask].index.to_list()
 
-thisCorrThresh = 0.85
+thisCorrThresh = 0.9
 outputFeatures = selFun(meanFRDF, corrDF, corrThresh=thisCorrThresh)
 selectorMetadata = {
     'trainingDataPath': os.path.basename(resultPath),

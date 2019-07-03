@@ -5,7 +5,7 @@ Usage:
 
 Options:
     --trialIdx=trialIdx            which trial to analyze [default: 1]
-    --exp=exp                       which experimental day to analyze
+    --exp=exp                      which experimental day to analyze
     --nameSuffix=nameSuffix        add anything to the output name?
 """
 import matplotlib

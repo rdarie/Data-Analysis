@@ -23,11 +23,14 @@
 EXP="exp201901211000"
 # EXP="exp201901201200"
 # SELECTOR="201901211000-Proprio_minfr"
-SELECTOR="Trial003_minfrmaxcorr"
+SELECTOR="201901211000-Proprio_minfrmaxcorr"
 # SELECTOR="201901201200-Proprio_minfr"
+ESTIMATOR="201901211000-Proprio_pca"
 
-# python3 './calcUnitMeanFR.py' --exp=$EXP --trialIdx=3 --window=short --verbose
-# python3 './calcUnitCorrelation.py' --exp=$EXP --trialIdx=3 --window=short --verbose --plotting
-# python3 './selectUnitsByMeanFRandCorrelation.py' --exp=$EXP --trialIdx=3 --window=short
-# python3 './plotAlignedAsigs.py' --exp=$EXP --trialIdx=3 --window=short --selector=$SELECTOR --inputBlockName=fr
-python3 './calcPCAinChunks.py' --exp=$EXP --trialIdx=3 --window=short --selector=$SELECTOR --lazy
+python3 './calcUnitMeanFR.py' --exp=$EXP --processAll --window=long --verbose
+python3 './calcUnitCorrelation.py' --exp=$EXP --processAll --window=long --verbose --plotting
+python3 './selectUnitsByMeanFRandCorrelation.py' --exp=$EXP --processAll --window=long
+python3 './plotAlignedNeurons.py' --exp=$EXP --processAll --window=long --selector=$SELECTOR
+python3 './calcPCAinChunks.py' --exp=$EXP --processAll --window=long --selector=$SELECTOR --lazy --verbose
+python3 './applyEstimatorToTriggered.py' --exp=$EXP --processAll --window=long --estimator=$ESTIMATOR --lazy --verbose
+python3 './plotAlignedAsigs.py' --exp=$EXP --processAll --window=long --verbose
