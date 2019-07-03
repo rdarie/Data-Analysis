@@ -219,7 +219,11 @@ def compose_mainviewer_from_sources(sources, mainviewer=None):
         view = TraceViewer(source=sig_source, name='signal {}'.format(i))
         view.params['scale_mode'] = 'same_for_all'
         view.params['display_labels'] = True
-        view.auto_scale()
+        view.params['xsize'] = 12
+        try:
+            view.auto_scale()
+        except Exception:
+            view.params['scale_mode'] = 'real_scale'
         if i==0:
             mainviewer.add_view(view)
         else:

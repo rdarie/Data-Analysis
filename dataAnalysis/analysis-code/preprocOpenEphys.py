@@ -9,7 +9,7 @@ Options:
 import dataAnalysis.preproc.open_ephys as ppOE
 import dataAnalysis.preproc.ns5 as ns5
 import numpy as np
-import pdb
+import pdb, traceback
 import quantities as pq
 import os
 #  load options
@@ -25,8 +25,13 @@ trialList = [
     f
     for f in os.listdir(oeFolder)
     if not os.path.isfile(os.path.join(oeFolder, f))]
+
 for folderPath in trialList:
-    ppOE.preprocOpenEphysFolder(
-        os.path.join(oeFolder, folderPath),
-        chanNames=openEphysChanNames,
-        **openEphysFilterArgs)
+    try:
+        print('Loading {}...'.format(folderPath))
+        ppOE.preprocOpenEphysFolder(
+            os.path.join(oeFolder, folderPath),
+            chanNames=openEphysChanNames,
+            **openEphysFilterArgs)
+    except Exception:
+        traceback.print_exc()
