@@ -3,9 +3,7 @@ import os
 
 def getExpOpts():
     #
-    miniRCTrialLookup = {
-        1: False,
-        }
+    miniRCTrialLookup = {i: True for i in range(1, 10)}
         
     plottingFigures = False
     plotBlocking = True
@@ -16,9 +14,8 @@ def getExpOpts():
     
     jsonSessionNames = {
         #  per trial
-        1: [
-            'Session1548258716429', 'Session1548259084797',
-            'Session1548260509595', 'Session1548260943898']
+        i: []
+        for i in range(1, 10)
         }
     
     openEphysChanNames = {

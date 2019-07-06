@@ -1,4 +1,4 @@
-"""06a: Preprocess the NS5 File
+"""06c: Preprocess the open ephys recording File
 
 Usage:
     preprocNS5.py [options]
@@ -21,17 +21,19 @@ expOpts, allOpts = parseAnalysisOptions(
 globals().update(expOpts)
 globals().update(allOpts)
 
-trialList = [
+trialList = sorted([
     f
     for f in os.listdir(oeFolder)
-    if not os.path.isfile(os.path.join(oeFolder, f))]
+    if (not os.path.isfile(os.path.join(oeFolder, f))) and ('Trial008' in f)
+    ])
 
+# pdb.set_trace()
 for folderPath in trialList:
     try:
         print('Loading {}...'.format(folderPath))
         ppOE.preprocOpenEphysFolder(
             os.path.join(oeFolder, folderPath),
-            chanNames=openEphysChanNames,
-            **openEphysFilterArgs)
+            chanNames=openEphysChanNames, plotting=True,
+            filterOpts=openEphysFilterOpts)
     except Exception:
         traceback.print_exc()

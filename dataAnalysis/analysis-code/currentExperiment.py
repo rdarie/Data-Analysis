@@ -17,21 +17,26 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
     experimentName = expOpts['experimentName']
     nspFolder = os.path.join(remoteBasePath, 'raw', experimentName)
     oeFolder = os.path.join(remoteBasePath, 'raw', experimentName, 'open_ephys')
-    ns5FileName = 'Trial00{}'.format(trialIdx)
+    sipFolder = os.path.join(remoteBasePath, 'raw', experimentName, 'ins_sip')
+    ns5FileName = 'Trial{:0>3}'.format(trialIdx)
     miniRCTrialLookup = expOpts['miniRCTrialLookup']
     
     try:
         openEphysChanNames = expOpts['openEphysChanNames']
     except Exception:
         openEphysChanNames = []
-    openEphysFilterArgs = dict(    
-        notchFreq=60,
-        notchOrder=2,
-        notchWidth=4,
-        nNotchHarmonics=5,
-        lowPassFreq=500,
-        lowPassOrder=2)
-
+    openEphysFilterOpts = {
+        'bandstop': {
+            'Wn': 60,
+            'nHarmonics': 1,
+            'Q': 6,
+            'N': 2,
+            'rp': 5,
+            'rs': 40,
+            'btype': 'bandstop',
+            'ftype': 'ellip'
+        }
+    }
     miniRCTrial = miniRCTrialLookup[trialIdx]
     
     gpfaOpts = {
@@ -189,11 +194,11 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
 
     #  paths relevant to single trial files
     triFolder = os.path.join(
-        scratchFolder, 'tdc_Trial00{}'.format(trialIdx))
+        scratchFolder, 'tdc_Trial{:0>3}'.format(trialIdx))
     
     if isinstance(expOpts['triFolderSourceBase'], int):
         triFolderSource = os.path.join(
-            scratchFolder, 'tdc_Trial00{}'.format(expOpts['triFolderSourceBase']))
+            scratchFolder, 'tdc_Trial{:0>3}'.format(expOpts['triFolderSourceBase']))
     else:
         triFolderSource = os.path.join(
             scratchPath, expOpts['triFolderSourceBase'])
@@ -254,8 +259,9 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
     rasterOpts = {
         'binInterval': 1e-3, 'binWidth': 30e-3, 'smoothKernelWidth': 50e-3,
         'windowSizes': {
-            'short': (-.5, .5),
+            'short': (-0.5, 0.5),
             'long': (-2.25, 2.25),
+            'RC': (-0.2, 0.5),
             'miniRC': (-1, 1)
         },
         'discardEmpty': None, 'maxSpikesTo': None, 'timeRange': None,

@@ -21,9 +21,10 @@
 
 # EXP="exp201901211000"
 # EXP="exp201901271000"
-EXP="exp201901201200"
+# EXP="exp201901201200"
+EXP="exp201812051000"
 # SELECTOR="201901201200-Proprio_minfr"
 MINIRCIDX="1"
 
-python3 './plotAsigsAlignedToStim.py' --exp=$EXP --trialIdx=$MINIRCIDX  --window=miniRC --blockName=gpfa --unitQuery="(chanName.str.contains('gpfa'))"
+python3 './plotAlignedAsigs.py' --exp=$EXP --trialIdx=$MINIRCIDX  --window=short --inputBlockName=other --unitQuery="all" --alignQuery="stimOn" --rowName= --hueName="amplitude"
 # python3 './plotNeuronsAlignedToStim.py' --exp=$EXP --trialIdx=$MINIRCIDX  --window=miniRC  --selector=$SELECTOR

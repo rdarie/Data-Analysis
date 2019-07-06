@@ -72,6 +72,7 @@ pdfName = '{}_{}_{}_{}'.format(
     arguments['window'],
     arguments['alignQuery'])
 
+alignedAsigsKWargs.update({'decimate': 30})
 asp.plotAsigsAligned(
     dataBlock,
     loadArgs=alignedAsigsKWargs,
@@ -79,15 +80,15 @@ asp.plotAsigsAligned(
     **rowColOpts,
     testStride=testStride,
     testWidth=testWidth,
-    testTStart=testTStart,
-    testTStop=testTStop,
+    testTStart=0,
+    testTStop=rasterOpts['windowSizes'][arguments['window']][1],
     pThresh=pThresh,
     #  linePlotEstimator=None,
     enablePlots=True,
     colorPal=colorPal,
     printBreakDown=True,
     pdfName=pdfName,
-    verbose=arguments['verbose'])
+    verbose=arguments['verbose'], xBounds=[-50e-3, 300e-3])
 
 if arguments['lazy']:
     frReader.close()

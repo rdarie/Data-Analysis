@@ -1,6 +1,6 @@
 import psutil
 import pdb, traceback
-import sys, os
+import sys, os, itertools
 #  import itertools, pickle, gc, string, random
 #  import subprocess, collections, math, argparse
 import peakutils
@@ -322,6 +322,7 @@ def getNEVData(filePath, elecIds):
     return spikes
 '''
 
+
 def filterDF(
         df, fs,
         lowPass=None, lowOrder=2,
@@ -372,6 +373,30 @@ def filterDF(
         filteredDF = filteredDF['temp']
     return filteredDF
 
+
+def plotFilterResponse(filterOpts):
+    b, a = signal.iirfilter(**filterOpts)
+    w, h = signal.freqz(b, a, fs=filterOpts['fs'])
+    angles = np.unwrap(np.angle(h))
+    fig, ax1 = plt.subplots()
+    ax1.semilogx(w, 20 * np.log10(np.maximum(abs(h), 1e-5)))
+    ax1.set_xscale('log')
+    ax1.set_title('{} filter frequency response'.format(filterOpts['btype']))
+    ax1.set_xlabel('Frequency [Hz]')
+    ax1.set_ylabel('Amplitude [dB]')
+    ax2 = ax1.twinx()
+    ax2.plot(w, angles, 'g')
+    ax2.set_ylabel('Angle (radians)', color='g')
+    if isinstance(filterOpts['Wn'], list):
+        for Wn in filterOpts['Wn']:
+            ax1.axvline(
+                Wn, color='green', linestyle='--')  # cutoff frequency
+    else:
+        ax1.axvline(
+            filterOpts['Wn'],
+            color='green', linestyle='--')  # cutoff frequency
+    plt.show()
+    return
 
 def closestSeries(takeFrom, compareTo, strictly='neither'):
     closest = pd.Series(
@@ -1883,10 +1908,12 @@ def confirmTriggersPlot(peakIdx, dataSeries, fs, whichPeak = 0, nSec = 2):
     f = plt.figure()
     plt.plot(dataSeries.index[dataSlice] - indent, dataSeries.iloc[dataSlice])
     plt.plot(peakIdx[peakSlice] - indent, dataSeries.iloc[peakIdx[peakSlice]], 'r*')
+    plt.title('dataSeries and found triggers')
     plt.show(block = False)
 
     f = plt.figure()
     sns.distplot(np.diff(peakIdx))
+    plt.title('distance between triggers (# samples)')
     plt.xlabel('distance between triggers (# samples)')
     plt.show(block = True)
 
@@ -1997,11 +2024,12 @@ def findTrains(dataSeries, peakIdx, iti, fs, minTrainLength, maxDistance = 1.5, 
     return peakIdx, trainStartPeaks,trainEndPeaks
 
 
-def getTriggers(dataSeries, iti = .01, fs = 3e4, thres = 2.58,
-    edgeType = 'rising',
-    minAmp = None,
-    minTrainLength = None,
-    expectedTime = None, keep_max = True, plotting = False):
+def getTriggers(
+        dataSeries, iti = .01, fs = 3e4, thres = 2.58,
+        edgeType = 'rising',
+        minAmp = None,
+        minTrainLength = None,
+        expectedTime = None, keep_max = True, plotting = False):
     # iti: expected inter trigger interval
 
     # minimum distance between triggers (units of samples), 5% wiggle room
@@ -2015,6 +2043,7 @@ def getTriggers(dataSeries, iti = .01, fs = 3e4, thres = 2.58,
 
     if plotting:
         f = plt.figure()
+        plt.title('getTriggers(), stats.zscore(dataSeries.diff())')
         plt.plot(triggersPrime)
         plt.show(block = False)
 
@@ -2034,9 +2063,12 @@ def getTriggers(dataSeries, iti = .01, fs = 3e4, thres = 2.58,
         min_dist=width, thres_abs=True, keep_what=keep_what)
     
     if minAmp is not None:
-        #  pdb.set_trace()
+        if edgeType == 'falling':
+            peekAhead = - 25
+        else:
+            peekAhead = 25
         triggersZScore = stats.zscore(dataSeries)
-        triggersAtPeaks = triggersZScore[peakIdx]
+        triggersAtPeaks = triggersZScore[peakIdx + peekAhead]
         peakIdx = peakIdx[triggersAtPeaks > minAmp]
 
     # check that the # of triggers matches the number of frames
@@ -2095,9 +2127,9 @@ def getTriggers(dataSeries, iti = .01, fs = 3e4, thres = 2.58,
         confirmTriggersPlot(peakIdx, dataSeries, fs)
         if minAmp is not None:
             plt.plot(triggersZScore)
-            plt.plot(triggersZScore[peakIdx], '*')
+            plt.plot(peakIdx, triggersZScore[peakIdx], '*')
             plt.title('Z scored trace')
-            plt.show(block = True)
+            plt.show(block=True)
 
     return dataSeries.index[peakIdx]
 
@@ -2150,27 +2182,30 @@ def getAngles(anglesFile,
     return proc
 '''
 
-'''
-def getTensTrigs(tensThresh, ampThresh, channelData, referenceTimes, plotting = False):
 
+def getTensTrigs(
+        diffThresh=None, magThresh=None, tensAsig=None,
+        referenceTimes=None, plotting = False):
     iti = .1
-    minTrainLength = 5 * iti * 1e3
-
-    peakIdx = getTriggers(channelData['data']['TensSync'], iti = iti, fs = channelData['samp_per_s'],
-        thres = tensThresh, keep_max = False, minAmp = ampThresh, plotting = plotting)
-    peakMask = channelData['data'].index.isin(peakIdx)
-
-    peakTimes = channelData['t'][peakMask] * 1e3
+    minTrainLength = 5 * iti
+    tensSrs = pd.Series(tensAsig.magnitude.flatten())
+    peakIdx = getTriggers(
+        tensSrs,
+        iti=iti, fs=tensAsig.sampling_rate.magnitude,
+        thres=diffThresh, keep_max=False,
+        minAmp=magThresh, plotting=plotting)
+    peakMask = tensSrs.index.isin(peakIdx)
+    peakTimes = pd.Series(tensAsig.times.magnitude)[peakMask]
 
     # identify trains of peaks
     peakDiff = peakTimes.diff()
     peakDiff.iloc[0] = iti * 2e3 #fudge it so that the first one is taken
-    trainStartIdx = peakTimes.index[peakDiff > iti * 1.1 * 1e3]
+    trainStartIdx = peakTimes.index[peakDiff > iti * 1.1]
     trainStarts = peakTimes[trainStartIdx]
 
     peakFwdDiff = peakTimes.diff(periods = -1).abs()
     peakFwdDiff.iloc[-1] = iti * 2e3 #fudge it so that the first one is taken
-    trainEndIdx = peakTimes.index[peakFwdDiff > iti * 1.1 * 1e3]
+    trainEndIdx = peakTimes.index[peakFwdDiff > iti * 1.1]
     trainEnds = peakTimes[trainEndIdx]
 
     if plotting:
@@ -2186,13 +2221,14 @@ def getTensTrigs(tensThresh, ampThresh, channelData, referenceTimes, plotting = 
         if validTrains[idx]:
             keepPeaks.loc[idxIntoPeaks:trainEndIdx[idx]] = True
             nTrains += 1
-            #pdb.set_trace()
-            if nTrains > maxTrain: break;
+            if nTrains > maxTrain: break
 
     peakTimes = peakTimes[keepPeaks]
-    peakIdx = np.array(peakTimes.index)
-
+    peakIdx = peakIdx[keepPeaks]
+    
     if plotting:
+        print('Distances between trains: {}'.format(trainStarts[validTrains].diff()))
+        plt.plot(tensAsig.times, tensAsig.magnitude / np.max(tensAsig.magnitude), 'k-', label = 'unaligned OpE TENS Trace')
         plt.plot(peakTimes, peakTimes ** 0, 'co', label = 'unaligned OpE TENS Pulses (valid Trains)')
         plt.plot(trainStarts, trainStarts ** 0 -1, 'go', label = 'unaligned OpE TENS Train Start')
         plt.plot(trainEnds, trainEnds ** 0 +1, 'ro', label = 'unaligned OpE TENS Train End')
@@ -2200,7 +2236,10 @@ def getTensTrigs(tensThresh, ampThresh, channelData, referenceTimes, plotting = 
         plt.show()
 
     nDetectedMismatch = len(peakIdx) - len(referenceTimes)
+    # (referenceTimes.diff() * 1e3).fillna(0).astype('int').unique()
+    # (peakTimes.diff() * 1e3).fillna(0).astype('int').unique()
     print('peakIdx is {} samples long, referenceTimes is {} samples long'.format(len(peakIdx), len(referenceTimes)))
+    
     if nDetectedMismatch != 0:
         if nDetectedMismatch > 0:
             shorterTimes = referenceTimes
@@ -2217,6 +2256,7 @@ def getTensTrigs(tensThresh, ampThresh, channelData, referenceTimes, plotting = 
             alignedShorterTimes = shorterTimes - shorterTimes.iloc[0]
             newRmsDiff = np.mean((alignedCorrectTimes.values - alignedShorterTimes.values) ** 2)
             if newRmsDiff < rmsDiff:
+                # print('found better peakIdx subset')
                 keepTimes = correctTimes
         #pdb.set_trace()
 
@@ -2226,7 +2266,7 @@ def getTensTrigs(tensThresh, ampThresh, channelData, referenceTimes, plotting = 
             referenceTimes = referenceTimes[referenceTimes.isin(keepTimes)]
 
     peakIdx = np.array(peakTimes.index)
-    peakMask = channelData['data'].index.isin(peakIdx)
+    peakMask = tensSrs.index.isin(peakIdx)
 
     if plotting:
         plt.plot(peakTimes, peakTimes ** 0, 'co', label = 'unaligned OpE TENS Pulses')
@@ -2237,8 +2277,8 @@ def getTensTrigs(tensThresh, ampThresh, channelData, referenceTimes, plotting = 
         plt.show()
         #pdb.set_trace()
 
-    return peakIdx, peakTimes / 1e3, peakMask, referenceTimes
-'''
+    return peakIdx, peakTimes, peakMask, referenceTimes
+
 
 '''
 def optimizeTensThresholds(diffThresholds, ampThresholds, channelData, plotting = False):

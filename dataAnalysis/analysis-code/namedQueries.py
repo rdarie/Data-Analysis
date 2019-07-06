@@ -2,6 +2,7 @@ namedQueries = {
     'align': {
         'midPeak': "(pedalMovementCat=='midPeak')",
         'outbound': "(pedalMovementCat=='outbound')",
+        'stimOn': "(stimCat=='stimOn')",
         'CCW': "(pedalDirection=='CCW')",
         'CW': "(pedalDirection=='CW')",
         'RateInHz==50or0Fuzzy': '((RateInHzFuzzy==50)|(RateInHzFuzzy==0))',
@@ -12,6 +13,7 @@ namedQueries = {
         'fr_sqrt': "(chanName.str.endswith('fr_sqrt#0'))",
         'all': "(chanName.str.endswith('#0'))",
         'pca': "(chanName.str.contains('pca'))",
+        'oech': "(chanName.str.contains('CH'))",
         'rig': "not((chanName.str.contains('elec'))or(chanName.str.contains('pca')))"
     }
 }

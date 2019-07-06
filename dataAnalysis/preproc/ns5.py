@@ -650,7 +650,7 @@ def getAsigsAlignedToEvents(
         if chunkSize is None:
             alignEventGroups = [allAlignEvents]
         else:
-            nChunks = int(allAlignEvents.shape[0] / chunkSize)
+            nChunks = math.ceil(allAlignEvents.shape[0] / chunkSize)
             alignEventGroups = []
             for i in range(nChunks):
                 if i < (nChunks - 1):
@@ -1000,13 +1000,11 @@ def dataFrameToAnalogSignals(
         dataCol=['channel_0', 'channel_1'],
         useColNames=False, forceColNames=None,
         namePrefix='', nameSuffix=''):
-
     if block is None:
         assert seg is None
-        block = Block()
-        seg = Segment(name=probeName + ' segment')
+        block = Block(name=probeName)
+        seg = Segment(name='seg0_' + probeName)
         block.segments.append(seg)
-
     for idx, colName in enumerate(dataCol):
         if forceColNames is not None:
             chanName = forceColNames[idx]
@@ -1014,23 +1012,25 @@ def dataFrameToAnalogSignals(
             chanName = namePrefix + colName + nameSuffix
         else:
             chanName = namePrefix + (probeName.lower() + '{}'.format(idx)) + nameSuffix
-
-        arrayAnn = {
-            'channel_names': np.asarray([chanName]),
-            'channel_ids': np.asarray([idx], dtype=np.int)
-            }
+        # ann = {
+        #     'channel_names': np.asarray([chanName]),
+        #     'channel_ids': np.asarray([idx], dtype=np.int)
+        #     }
         chanIdx = ChannelIndex(
             name=chanName,
+            # index=None,
             index=np.asarray([idx]),
-            channel_names=np.asarray([chanName]))
+            # channel_names=np.asarray([chanName])
+            )
         block.channel_indexes.append(chanIdx)
         asig = AnalogSignal(
-            df[colName].to_numpy()*measureUnits,
-            name=chanName,
+            df[colName].to_numpy() * measureUnits,
+            name='seg0_' + chanName,
             sampling_rate=samplingRate,
             dtype=np.float32,
-            array_annotations=arrayAnn)
-        asig.t_start = df[idxT].iloc[0]*timeUnits
+            # **ann
+            )
+        asig.t_start = df[idxT].iloc[0] * timeUnits
         asig.channel_index = chanIdx
         # assign ownership to containers
         chanIdx.analogsignals.append(asig)
@@ -1591,13 +1591,12 @@ def addBlockToNIX(
                 forceType[nixIdx] = tempAsig.dtype
                 forceShape[nixIdx] = tempAsig.shape[0]  # ? docs say shape[1], but that's confusing
                 forceFS[nixIdx] = tempAsig.sampling_rate
-        
         reader.file.close()
     #  if newBlock was loaded from a nix file, strip the old nix_names away:
     #  todo: replace with function from this module
     if purgeNixNames:
         newBlock = purgeNixAnn(newBlock)
-    
+    #
     writer = NixIO(filename=trialBasePath + '.nix')
     nixblock = writer.nix_file.blocks[nixBlockIdx]
     nixblockName = nixblock.name
@@ -1608,12 +1607,11 @@ def addBlockToNIX(
             newBlock.annotations['nix_name'] = nixblockName
     else:
         newBlock.annotate(nix_name=nixblockName)
-
+    #
     for idx, segIdx in enumerate(neoSegIdx):
         nixIdx = nixSegIdx[idx]
         newSeg = newBlock.segments[segIdx]
         nixgroup = nixblock.groups[nixIdx]
-        
         nixSegName = nixgroup.name
         if 'nix_name' in newSeg.annotations.keys():
             try:
@@ -1622,13 +1620,13 @@ def addBlockToNIX(
                 newSeg.annotations['nix_name'] = nixSegName
         else:
             newSeg.annotate(nix_name=nixSegName)
-        
+        #
         if writeEvents:
             eventList = newSeg.events
             eventOrder = np.argsort([i.name for i in eventList])
             for event in [eventList[i] for i in eventOrder]:
                 event = writer._write_event(event, nixblock, nixgroup)
-        
+        #
         if writeAsigs:
             asigList = newSeg.filter(objects=AnalogSignal)
             asigOrder = np.argsort([i.name for i in asigList])
@@ -1643,13 +1641,13 @@ def addBlockToNIX(
             #  for isig in newSeg.filter(objects=IrregularlySampledSignal):
             #      isig = writer._write_irregularlysampledsignal(
             #          isig, nixblock, nixgroup)
-
+        #
         if writeSpikes:
             stList = newSeg.filter(objects=SpikeTrain)
             stOrder = np.argsort([i.name for i in stList])
             for st in [stList[i] for i in stOrder]:
                 st = writer._write_spiketrain(st, nixblock, nixgroup)
-
+    #
     for chanIdx in newBlock.filter(objects=ChannelIndex):
         chanIdx = writer._write_channelindex(chanIdx, nixblock)
         #  auto descends into units inside of _write_channelindex
@@ -2192,7 +2190,6 @@ def loadWithArrayAnn(
         reader = NixIO(filename=dataPath)
         block = reader.read_block()
     
-    #  block.create_relationship()  # need this!
     block = loadContainerArrayAnn(container=block)
     
     if fromRaw:

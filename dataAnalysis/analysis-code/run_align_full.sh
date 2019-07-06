@@ -30,7 +30,8 @@ EXP="exp201901271000"
 #  python3 './calcAlignedAsigs.py' --exp=$EXP --processAll --unitQuery="(chanName.str.endswith('fr_sqrt'))" --blockName=fr_sqrt
 #  python3 './calcAlignedRasters.py' --exp=$EXP --processAll --unitQuery="(chanName.str.endswith('raster'))" --blockName=raster
 #  python3 './calcAlignedAsigs.py' --exp=$EXP --processAll --unitQuery="not((chanName.str.contains('elec'))or(chanName.str.contains('pca')))" --blockName=other
-python3 './calcAlignedAsigs.py' --exp=$EXP --processAll --window=long --unitQuery="(chanName.str.endswith('fr'))" --blockName=fr
-python3 './calcAlignedAsigs.py' --exp=$EXP --processAll --window=long --unitQuery="(chanName.str.endswith('fr_sqrt'))" --blockName=fr_sqrt
-python3 './calcAlignedRasters.py' --exp=$EXP --processAll --window=long --unitQuery="(chanName.str.endswith('raster'))" --blockName=raster
+#  python3 './calcAlignedAsigs.py' --exp=$EXP --processAll --window=long --unitQuery="(chanName.str.endswith('fr'))" --blockName=fr
+#  python3 './calcAlignedAsigs.py' --exp=$EXP --processAll --window=long --unitQuery="(chanName.str.endswith('fr_sqrt'))" --blockName=fr_sqrt
+#  python3 './calcAlignedRasters.py' --exp=$EXP --processAll --window=long --unitQuery="(chanName.str.endswith('raster'))" --blockName=raster
+python3 './calcAlignedAsigs.py' --exp=$EXP --processAll --window=short --unitQuery="not((chanName.str.contains('elec'))or(chanName.str.contains('pca')))" --blockName=other
 python3 './calcAlignedAsigs.py' --exp=$EXP --processAll --window=long --unitQuery="not((chanName.str.contains('elec'))or(chanName.str.contains('pca')))" --blockName=other
