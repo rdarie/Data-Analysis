@@ -26,15 +26,26 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
     except Exception:
         openEphysChanNames = []
     openEphysFilterOpts = {
+        'matched': {
+            'type': 'sin',
+            'Wn': 60,
+            'nHarmonics': 10,
+            'nCycles': 3
+        },
         'bandstop': {
             'Wn': 60,
             'nHarmonics': 1,
-            'Q': 6,
-            'N': 2,
-            'rp': 5,
-            'rs': 40,
+            'Q': 20,
+            'N': 4,
+            'rp': 1,
             'btype': 'bandstop',
-            'ftype': 'ellip'
+            'ftype': 'cheby1'
+        },
+        'low': {
+            'Wn': 500,
+            'N': 4,
+            'btype': 'low',
+            'ftype': 'butter'
         }
     }
     miniRCTrial = miniRCTrialLookup[trialIdx]
@@ -269,16 +280,21 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
         'alignTo': None,
         'separateByFunKWArgs': {'type': 'Classification'}
         }
-    
-    testStride = 20e-3
-    testWidth = 100e-3
-    testTStart = 0
-    testTStop = 500e-3
-    
+    statsTestOpts = dict(
+        testStride=20e-3,
+        testWidth=100e-3,
+        tStart=0,
+        tStop=500e-3,
+        pThresh=1e-24,
+        correctMultiple=True
+        )
+    relplotKWArgs = dict(
+        ci='sem', estimator='mean',
+        palette="ch:0.6,-.2,dark=.2,light=0.7,reverse=1",
+        height=5, aspect=1.5, kind='line')
     plotOpts = {
         'type': 'ticks', 'errorBar': 'sem',
         'pageSize': (6, 12), 'removeOutliers': (0.01, 0.975)}
-    pThresh = 1e-24
     try:
         experimentsToAssemble = expOpts['experimentsToAssemble']
         trialsToAssemble = []

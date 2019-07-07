@@ -28,7 +28,6 @@ EXP="exp201812051000"
 # python3 './preprocINSfromSIP.py' --exp=$EXP
 # python3 './preprocOpenEphys.py' --exp=$EXP
 # python3 './synchronizeOpenEphysToINS.py' --exp=$EXP
-python3 './calcAlignedAsigs.py' --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID --window=RC --unitQuery="oech" --blockName=other --eventName=stimAlignTimes
-python3 './plotAlignedAsigs.py' --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID --window=RC --inputBlockName=other --unitQuery="all" --alignQuery="stimOn" --rowName= --hueName="amplitude"
-
-
+# python3 './assembleExperimentData.py' --exp=$EXP --processAsigs
+# python3 './calcAlignedAsigs.py' --exp=$EXP --processAll --window=RC --chanQuery="oech" --blockName=RC --eventName=stimAlignTimes
+python3 './plotAlignedAsigs.py' --exp=$EXP --processAll --window=RC --inputBlockName=RC --unitQuery="oech" --alignQuery="stimOn" --rowName= --styleName= --hueName="amplitude"

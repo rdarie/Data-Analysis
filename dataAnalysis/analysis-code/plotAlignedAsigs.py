@@ -14,11 +14,13 @@ Options:
     --alignQuery=alignQuery                what will the plot be aligned to? [default: outboundWithStim]
     --selector=selector                    filename if using a unit selector
     --rowName=rowName                      break down by row  [default: pedalDirection]
-    --rowControl=rowControl                rows to exclude from comparison
+    --rowControl=rowControl                rows to exclude from stats test
     --hueName=hueName                      break down by hue  [default: amplitudeCat]
-    --hueControl=hueControl                hues to exclude from comparison
+    --hueControl=hueControl                hues to exclude from stats test
+    --styleName=styleName                  break down by style [default: RateInHz]
+    --styleControl=hueControl              styles to exclude from stats test
     --colName=colName                      break down by col  [default: electrode]
-    --colControl=colControl                cols to exclude from comparison [default: control]
+    --colControl=colControl                cols to exclude from stats test [default: control]
 """
 import matplotlib
 matplotlib.rcParams['pdf.fonttype'] = 42
@@ -35,6 +37,7 @@ import os
 from currentExperiment import parseAnalysisOptions
 from docopt import docopt
 import dill as pickle
+import pandas as pd
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['trialIdx']), arguments['exp'])
@@ -71,24 +74,33 @@ pdfName = '{}_{}_{}_{}'.format(
     prefix, arguments['inputBlockName'],
     arguments['window'],
     arguments['alignQuery'])
-
+statsTestPath = os.path.join(scratchFolder, pdfName + '_stats.h5')
+#  Overrides
+xBounds=[-50e-3, 300e-3]
+statsTestOpts.update({'tStop': rasterOpts['windowSizes'][arguments['window']][1]})
 alignedAsigsKWargs.update({'decimate': 30})
+#  End Overrides
+if os.path.exists(statsTestPath):
+    sigValsWide = pd.read_hdf(statsTestPath, 'sig')
+else:
+    (
+        pValsWide, statValsWide,
+        sigValsWide) = ash.facetGridCompareMeans(
+        dataBlock, statsTestPath,
+        loadArgs=alignedAsigsKWargs,
+        rowColOpts=rowColOpts,
+        statsTestOpts=statsTestOpts)
 asp.plotAsigsAligned(
     dataBlock,
+    verbose=arguments['verbose'],
     loadArgs=alignedAsigsKWargs,
+    sigTestResults=sigValsWide,
     figureFolder=figureFolder,
-    **rowColOpts,
-    testStride=testStride,
-    testWidth=testWidth,
-    testTStart=0,
-    testTStop=rasterOpts['windowSizes'][arguments['window']][1],
-    pThresh=pThresh,
-    #  linePlotEstimator=None,
-    enablePlots=True,
-    colorPal=colorPal,
     printBreakDown=True,
-    pdfName=pdfName,
-    verbose=arguments['verbose'], xBounds=[-50e-3, 300e-3])
+    enablePlots=True,
+    pdfName=pdfName, xBounds=xBounds,
+    **rowColOpts,
+    relplotKWArgs=relplotKWArgs)
 
 if arguments['lazy']:
     frReader.close()

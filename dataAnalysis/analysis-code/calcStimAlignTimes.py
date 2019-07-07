@@ -27,7 +27,6 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 from collections import Iterable
-
 #  load options
 from currentExperiment import parseAnalysisOptions
 from docopt import docopt
@@ -37,12 +36,10 @@ expOpts, allOpts = parseAnalysisOptions(
     arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
-
 #  fetch stim details
 insReader = neo.NixIO(
     filename=insDataPath)
 insBlock = insReader.read_block(0)
-
 #  all experimental days?
 if arguments['processAll']:
     dataReader = neo.io.nixio_fr.NixIO(

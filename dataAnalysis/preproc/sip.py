@@ -7,16 +7,18 @@ insTimeRollover = 65536
 
 def loadSip(basePath, msecPerSample=2):
     insDataPath = basePath + '-Data.txt'
-    insTimeSeries = pd.read_csv(insDataPath, sep='	', skiprows=2)
-    if insTimeSeries.isnull().sum().sum() > 0:
-        print('Error in loadSip() Trying Again')
-        insTimeSeries = pd.read_csv(
-            insDataPath, sep='	', skiprows=3,
-            names=[
-                'SampleNumber ', ' SenseChannel1 ',
-                ' SenseChannel2 ', ' StimulationClass ',
-                ' PacketNumber ', ' Timestamp ', ' IsDroppedPacket '])
+    insTimeSeries = pd.read_csv(insDataPath, sep='\t', skiprows=2)
     insTimeSeries.rename(columns=str.strip, inplace=True)
+    if insTimeSeries.isnull().any().any():
+        numNull = insTimeSeries.isnull().any(axis='index').sum()
+        print(Warning('Error in loadSip(); assuming missing SenseChans'))
+        senseChanNames = [i for i in insTimeSeries.columns if 'Sense' in i]
+        dropSenseChans = senseChanNames[len(senseChanNames) - numNull:]
+        newChanNames = (
+            insTimeSeries.columns.drop(dropSenseChans).tolist() +
+            dropSenseChans)
+        insTimeSeries.columns = newChanNames
+        insTimeSeries.fillna(0, inplace=True)
     packetNumDiff = insTimeSeries['PacketNumber'].diff(periods=-1).fillna(-1)
     packetNumDiff[packetNumDiff == 255] -= 256
     # packetIntervals = insTimeSeries['Timestamp'].diff()
@@ -38,7 +40,10 @@ def loadSip(basePath, msecPerSample=2):
                 curTimestamp += insTimeRollover
             lastTimestamp = curTimestamp
         nSamples = insTimeSeries.loc[prevIdx:dfIdx, :].shape[0]
-        offsets = np.arange(- (nSamples - 1) * msecPerSample, msecPerSample, msecPerSample)
+        offsets = np.arange(
+            - (nSamples - 1) * msecPerSample,
+            msecPerSample,
+            msecPerSample)
         insTimeSeries.loc[
             prevIdx:dfIdx,
             'calculatedTimestamp'] = curTimestamp * .1 + offsets

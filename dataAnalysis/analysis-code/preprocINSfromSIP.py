@@ -46,25 +46,29 @@ trialMetadata = {}
 baseNameList = sorted([
     f.split('-Data')[0]
     for f in os.listdir(sipFolder)
-    if '-Data' in f])
+    if ('-Data' in f)
+    ])
 
 for baseName in baseNameList:
-    #  if 'Trial01' in baseName:
-    if True:
-        try:
-            sipBasePath = os.path.join(
-                sipFolder, baseName)
-            outputPath = sipBasePath + '.nix'
-            if os.path.exists(outputPath):
-                os.remove(outputPath)
-            insTimeSeries = sip.loadSip(sipBasePath)
-            dataCol = [i for i in insTimeSeries.columns if 'Sense' in i]
-            insBlock = ns5.dataFrameToAnalogSignals(
-                insTimeSeries, idxT='calculatedTimestamp',
-                samplingRate=500*pq.Hz,
-                dataCol=dataCol, useColNames=True)
-            writer = NixIO(filename=outputPath)
-            writer.write_block(insBlock, use_obj_names=True)
-            writer.close()
-        except Exception:
-            traceback.print_exc()
+    try:
+        sipBasePath = os.path.join(
+            sipFolder, baseName)
+        outputPath = sipBasePath + '.nix'
+        if os.path.exists(outputPath):
+            os.remove(outputPath)
+        print('Loading {}...'.format(sipBasePath))
+        insTimeSeries = sip.loadSip(sipBasePath)
+        dataCol = [
+            i
+            for i in insTimeSeries.columns
+            if 'Sense' in i]
+        insBlock = ns5.dataFrameToAnalogSignals(
+            insTimeSeries, idxT='calculatedTimestamp',
+            samplingRate=500*pq.Hz,
+            probeName='ins_{}'.format(baseName),
+            dataCol=dataCol, useColNames=True)
+        writer = NixIO(filename=outputPath)
+        writer.write_block(insBlock, use_obj_names=True)
+        writer.close()
+    except Exception:
+        traceback.print_exc()

@@ -44,6 +44,14 @@ def processRowColArguments(arguments):
             outDict['hueControl'] = arguments['hueControl']
     else:
         outDict['hueControl'] = None
+    outDict['styleName'] = arguments['styleName'] if len(arguments['styleName']) else None
+    if outDict['styleName'] is not None:
+        try:
+            outDict['styleControl'] = int(arguments['styleControl'])
+        except Exception:
+            outDict['styleControl'] = arguments['styleControl']
+    else:
+        outDict['styleControl'] = None
     return outDict
 
 
@@ -75,24 +83,22 @@ def plotNeuronsAligned(
         rasterBlock,
         frBlock,
         loadArgs={},
-        figureFolder=None,
-        rowName=None,
-        rowControl=None,
-        colName=None,
-        colControl=None,
-        hueName=None,
-        hueControl=None,
+        verbose=False,
+        figureFolder=None, pdfName='alignedAsigs.pdf',
+        limitPages=None, printBreakDown=True,
+        enablePlots=True,
+        rowName=None, rowControl=None,
+        colName=None, colControl=None,
+        hueName=None, hueControl=None,
+        styleName=None, styleControl=None,
         testStride=None,
         testWidth=None,
         testTStart=None,
         testTStop=None,
         pThresh=1e-3,
-        enablePlots=True,
         linePlotEstimator='mean',
         colorPal="ch:0.6,-.2,dark=.2,light=0.7,reverse=1",
-        printBreakDown=True, xBounds=None,
-        pdfName='motionStim.pdf', limitPages=None,
-        verbose=False):
+        xBounds=None):
 
     if loadArgs['unitNames'] is None:
         allChanNames = ns5.listChanNames(
@@ -271,29 +277,20 @@ def plotNeuronsAligned(
 def plotAsigsAligned(
         dataBlock,
         loadArgs={},
-        figureFolder=None,
-        rowName=None,
-        rowControl=None,
-        colName=None,
-        colControl=None,
-        hueName=None,
-        hueControl=None,
-        testStride=None,
-        testWidth=None,
-        testTStart=None,
-        testTStop=None,
-        pThresh=1e-3,
-        enablePlots=True,
-        linePlotEstimator='mean',
-        colorPal="ch:0.6,-.2,dark=.2,light=0.7,reverse=1",
-        printBreakDown=True, xBounds=None,
-        pdfName='alignedAsigs.pdf', limitPages=None,
-        verbose=False):
-    
+        sigTestResults=None,
+        verbose=False,
+        figureFolder=None, pdfName='alignedAsigs.pdf',
+        limitPages=None, printBreakDown=True, enablePlots=True,
+        rowName=None, rowControl=None,
+        colName=None, colControl=None,
+        hueName=None, hueControl=None,
+        styleName=None, styleControl=None,
+        relplotKWArgs={},
+        xBounds=None
+        ):
     if loadArgs['unitNames'] is None:
         loadArgs['unitNames'] = ns5.listChanNames(
             dataBlock, loadArgs['unitQuery'], objType=Unit)
-    
     nUnits = len(loadArgs['unitNames'])
     unitNames = loadArgs.pop('unitNames')
     loadArgs.pop('unitQuery')
@@ -350,9 +347,7 @@ def plotAsigsAligned(
                 g = sns.relplot(
                     x='bin', y='signal',
                     col=colName, row=rowName, hue=hueName,
-                    ci='sem', estimator=linePlotEstimator,
-                    palette=colorPal,
-                    height=5, aspect=1.5, kind='line', data=asig)
+                    **relplotKWArgs, data=asig)
                 #  iterate through plot and add significance stars
                 for (ro, co, hu), dataSubset in g.facet_data():
                     if co == 0:

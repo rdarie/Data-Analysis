@@ -5,6 +5,8 @@ Usage:
 Options:
     --trialIdx=trialIdx             which trial to analyze [default: 1]
     --exp=exp                       which experimental day to analyze
+    --processAsigs                  whether to process the analog signals [default: False]
+    --processRasters                whether to process the rasters [default: False]
 """
 import dataAnalysis.ephyviewer.scripts as vis_scripts
 import os, pdb
@@ -49,9 +51,12 @@ globals().update(expOpts)
 globals().update(allOpts)
 
 applyTimeOffset = False
-suffixList = ['_binarized', '_analyze']
-#  suffixList = ['_analyze']
-#  suffixList = ['_binarized']
+suffixList = []
+if arguments['processAsigs']:
+    suffixList.append('_analyze')
+if arguments['processRasters']:
+    suffixList.append('_binarized')
+
 for suffix in suffixList:
     print('assembling {}'.format(suffix))
     experimentDataPath = os.path.join(
@@ -63,6 +68,7 @@ for suffix in suffixList:
         if idx == 0:
             masterBlock = preproc.loadWithArrayAnn(
                 trialDataPath, fromRaw=False)
+            masterBlock.name = experimentName + suffix
             if suffix == '_binarized':
                 for seg in masterBlock.segments:
                     seg.spiketrains = []
@@ -70,7 +76,7 @@ for suffix in suffixList:
                 masterTStart = masterBlock.filter(objects=AnalogSignal)[0].t_start
                 oldTStop = masterBlock.filter(objects=AnalogSignal)[0].t_stop
             typesNeedRenaming = [SpikeTrain, AnalogSignal, Event]
-            masterBlock.segments[0].name = 'seg{}_'.format(idx)
+            masterBlock.segments[0].name = 'seg{}_{}'.format(idx, masterBlock.name)
             for objType in typesNeedRenaming:
                 for child in masterBlock.filter(objects=objType):
                     childBaseName = preproc.childBaseName(child.name, 'seg')
@@ -78,6 +84,7 @@ for suffix in suffixList:
         else:
             dataBlock = preproc.loadWithArrayAnn(
                 trialDataPath, fromRaw=False)
+            dataBlock.name = masterBlock.name
             if suffix == '_binarized':
                 for seg in dataBlock.segments:
                     seg.spiketrains = []
@@ -88,13 +95,11 @@ for suffix in suffixList:
                 #  [i.times for i in dataBlock.filter(objects=SpikeTrain)]
                 #  [i.unit.channel_index.name for i in masterBlock.filter(objects=SpikeTrain)]
                 tStop = dataBlock.filter(objects=AnalogSignal)[0].t_stop
-            dataBlock.segments[0].name = 'seg{}_'.format(idx)
-
+            dataBlock.segments[0].name = 'seg{}_{}'.format(idx, masterBlock.name)
             for objType in typesNeedRenaming:
                 for child in dataBlock.filter(objects=objType):
                     childBaseName = preproc.childBaseName(child.name, 'seg')
                     child.name = 'seg{}_{}'.format(idx, childBaseName)
-            
             masterBlock.merge(dataBlock)
             if applyTimeOffset:
                 oldTStop = tStop

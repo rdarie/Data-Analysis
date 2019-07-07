@@ -9,7 +9,6 @@ import pdb
 #  from scipy.ndimage.filters import gaussian_filter1d
 #  from scipy import stats, ndimage, signal
 import scipy.io
-from statsmodels.stats.multitest import multipletests as mt
 import pandas as pd
 #  from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib import pyplot as plt
@@ -1024,72 +1023,6 @@ def plotSpikeTriggeredFR(spikesFrom = None, spikesTo = None,
     plt.tight_layout(pad = 0.01)
     return spikeMats, fig, ax
 '''
-
-def triggeredAsigCompareMeans(
-        asigWide, groupBy, testVar,
-        tStart=None, tStop=None,
-        testWidth=100e-3, testStride=20e-3,
-        correctMultiple=True):
-    
-    if tStart is None:
-        tStart = asigWide.columns[0]
-    if tStop is None:
-        tStop = asigWide.columns[-1]
-    testBins = np.arange(
-        tStart, tStop, testStride)
-
-    if (isinstance(groupBy, list)) and (len(groupBy) == 1):
-        groupBy = groupBy[0]
-    
-    if isinstance(groupBy, str):
-        pValIndex = pd.Index(
-            asigWide.groupby(by=groupBy).groups.keys())
-        pValIndex.name = groupBy
-    elif groupBy is None:
-        pValIndex = pd.Index(['all'])
-        pValIndex.name = 'all'
-    else:
-        pValIndex = pd.MultiIndex.from_tuples(
-            asigWide.groupby(by=groupBy).groups.keys(),
-            names=groupBy)
-    pVals = pd.DataFrame(
-        np.nan,
-        index=pValIndex,
-        columns=testBins)
-    pVals.columns.name = 'bin'
-    for testBin in testBins:
-        tMask = (
-            (asigWide.columns > testBin - testWidth / 2) &
-            (asigWide.columns < testBin + testWidth / 2)
-            )
-        testAsig = asigWide.loc[:, tMask]
-        if groupBy is not None:
-            groupIter = testAsig.groupby(groupBy)
-        else:
-            groupIter = {'all': testAsig}.items()
-        for name, group in groupIter:
-            testGroups = [
-                np.ravel(i)
-                for _, i in group.groupby(testVar)]
-            groupSizes = [i.shape[0] for i in testGroups]
-            maxSize = int(np.mean(groupSizes))
-            testGroups = [t[:maxSize] for t in testGroups]
-            if len(testGroups) > 1:
-                try:
-                    # stat, p = scipy.stats.kruskal(*testGroups)
-                    stat, p = scipy.stats.f_oneway(*testGroups)
-                    pVals.loc[name, testBin] = p
-                except Exception:
-                    traceback.print_exc()
-                    pVals.loc[name, testBin] = 1
-    if correctMultiple:
-        flatPvals = pVals.stack()
-        _, fixedPvals, _, _ = mt(flatPvals.values, method='holm')
-        flatPvals.loc[:] = fixedPvals
-        flatPvals = flatPvals.unstack('bin')
-        pVals.loc[flatPvals.index, flatPvals.columns] = flatPvals
-
-    return pVals
 
 '''
 def modOnset(spikeMat):

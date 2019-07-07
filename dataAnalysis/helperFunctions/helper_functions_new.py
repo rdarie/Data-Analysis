@@ -374,19 +374,10 @@ def filterDF(
     return filteredDF
 
 
-def plotFilterResponse(filterOpts):
-    b, a = signal.iirfilter(**filterOpts)
-    w, h = signal.freqz(b, a, fs=filterOpts['fs'])
-    angles = np.unwrap(np.angle(h))
-    fig, ax1 = plt.subplots()
-    ax1.semilogx(w, 20 * np.log10(np.maximum(abs(h), 1e-5)))
-    ax1.set_xscale('log')
-    ax1.set_title('{} filter frequency response'.format(filterOpts['btype']))
-    ax1.set_xlabel('Frequency [Hz]')
-    ax1.set_ylabel('Amplitude [dB]')
-    ax2 = ax1.twinx()
-    ax2.plot(w, angles, 'g')
-    ax2.set_ylabel('Angle (radians)', color='g')
+def plotFilterOptsResponse(filterOpts):
+    sos = signal.iirfilter(**filterOpts, output='sos')
+    fig, ax1, ax2 = plotFilterResponse(sos, filterOpts['fs'])
+    ax1.set_title('{}'.format(filterOpts['btype']))
     if isinstance(filterOpts['Wn'], list):
         for Wn in filterOpts['Wn']:
             ax1.axvline(
@@ -397,6 +388,21 @@ def plotFilterResponse(filterOpts):
             color='green', linestyle='--')  # cutoff frequency
     plt.show()
     return
+
+
+def plotFilterResponse(sos, fs):
+    w, h = signal.sosfreqz(sos, fs=fs)
+    angles = np.unwrap(np.angle(h))
+    fig, ax1 = plt.subplots()
+    ax1.semilogx(w, 20 * np.log10(np.maximum(abs(h), 1e-5)))
+    ax1.set_xscale('log')
+    ax1.set_xlabel('Frequency [Hz]')
+    ax1.set_ylabel('Amplitude [dB]')
+    ax2 = ax1.twinx()
+    ax2.plot(w, angles, 'g')
+    ax2.set_ylabel('Angle (radians)', color='g')
+    return fig, ax1, ax2
+
 
 def closestSeries(takeFrom, compareTo, strictly='neither'):
     closest = pd.Series(

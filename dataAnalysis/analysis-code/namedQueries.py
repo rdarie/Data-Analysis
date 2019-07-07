@@ -13,8 +13,14 @@ namedQueries = {
         'fr_sqrt': "(chanName.str.endswith('fr_sqrt#0'))",
         'all': "(chanName.str.endswith('#0'))",
         'pca': "(chanName.str.contains('pca'))",
-        'oech': "(chanName.str.contains('CH'))",
+        'oech': "((chanName.str.contains('CH'))or(chanName.str.contains('Sense')))",
         'rig': "not((chanName.str.contains('elec'))or(chanName.str.contains('pca')))"
+    },
+    'chan': {
+        'fr': "(chanName.str.endswith('fr'))",
+        'fr_sqrt': "(chanName.str.endswith('fr_sqrt'))",
+        'raster': "(chanName.str.endswith('raster'))",
+        'oech': "((chanName.str.contains('CH'))or(chanName.str.contains('Sense')))",
     }
 }
 namedQueries['align'].update({

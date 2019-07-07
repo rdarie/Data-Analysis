@@ -7,7 +7,7 @@ Options:
     --exp=exp                       which experimental day to analyze
     --processAll                    process entire experimental day? [default: False]
     --window=window                 process with short window? [default: short]
-    --unitQuery=unitQuery           how to restrict channels if not providing a list? [default: (chanName.str.endswith(\'fr\'))]
+    --chanQuery=chanQuery           how to restrict channels if not providing a list? [default: fr]
     --blockName=blockName           name for new block [default: fr]
     --eventName=eventName           name of events object to align to [default: motionStimAlignTimes]
 """
@@ -23,6 +23,8 @@ import numpy as np
 import pandas as pd
 import quantities as pq
 
+import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
+from namedQueries import namedQueries
 from currentExperiment import parseAnalysisOptions
 from docopt import docopt
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
@@ -31,7 +33,8 @@ expOpts, allOpts = parseAnalysisOptions(
     arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
-
+arguments['chanNames'], arguments['chanQuery'] = ash.processChannelQueryArgs(
+    namedQueries, scratchFolder, **arguments)
 verbose = False
 #  source of events
 if arguments['processAll']:
@@ -50,9 +53,6 @@ for ev in eventBlock.filter(objects=EventProxy):
 #  source of analogsignals
 signalBlock = eventBlock
 
-chansToTrigger = None
-# chansToTrigger = ns5.listChanNames(signalBlock, chanQuery)
-
 windowSize = [
     i * pq.s
     for i in rasterOpts['windowSizes'][arguments['window']]]
@@ -64,13 +64,13 @@ else:
 
 ns5.getAsigsAlignedToEvents(
     eventBlock=eventBlock, signalBlock=signalBlock,
-    chansToTrigger=chansToTrigger,
-    chanQuery=arguments['unitQuery'],
+    chansToTrigger=arguments['chanNames'],
+    chanQuery=arguments['chanQuery'],
     eventName=arguments['eventName'],
     windowSize=windowSize,
     appendToExisting=False,
     checkReferences=False,
     verbose=verbose,
-    fileName=prefix + '_{}_{}'.format(
-        arguments['blockName'], arguments['window']),
+    fileName='{}_{}_{}'.format(
+        prefix, arguments['blockName'], arguments['window']),
     folderPath=scratchFolder, chunkSize=alignedAsigsChunkSize)

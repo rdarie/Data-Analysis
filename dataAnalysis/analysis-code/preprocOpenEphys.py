@@ -24,7 +24,7 @@ globals().update(allOpts)
 trialList = sorted([
     f
     for f in os.listdir(oeFolder)
-    if (not os.path.isfile(os.path.join(oeFolder, f))) and ('Trial008' in f)
+    if (not os.path.isfile(os.path.join(oeFolder, f))) # and ('Trial008' in f)
     ])
 
 # pdb.set_trace()
@@ -33,7 +33,7 @@ for folderPath in trialList:
         print('Loading {}...'.format(folderPath))
         ppOE.preprocOpenEphysFolder(
             os.path.join(oeFolder, folderPath),
-            chanNames=openEphysChanNames, plotting=True,
+            chanNames=openEphysChanNames, # plotting=True,
             filterOpts=openEphysFilterOpts)
     except Exception:
         traceback.print_exc()

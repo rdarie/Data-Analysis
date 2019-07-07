@@ -95,8 +95,7 @@ def getExpOpts():
         for trialIdx in [1]]
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        '201901201200-Proprio': [2],
-        '201901211000-Proprio': [1, 2, 3],
+        '201812051000-PadawanRecruitmentCurve': [1, 2, 4, 5, 7, 8, 9],
         }
 
     movementSizeBins = [0, 0.25, 0.5, 1, 1.25, 1.5]

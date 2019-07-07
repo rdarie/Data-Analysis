@@ -271,7 +271,7 @@ for trialIdx in trialsToAnalyze:
     # make events objects
     alignEventsDF = pd.DataFrame({
         't': alignedPulseTimes,
-        'amplitude': trialInfoDF.loc[trialIdx, 'insStimAmps'].flatten()})
+        'amplitude': np.around(trialInfoDF.loc[trialIdx, 'insStimAmps'].flatten(), decimals=3)})
     # pdb.set_trace()
     alignEventsDF.loc[:, 'stimCat'] = 'stimOn'
     alignEventsDF.loc[:, 'RateInHz'] = 2

@@ -7,7 +7,7 @@ Options:
     --exp=exp                       which experimental day to analyze
     --processAll                    process entire experimental day? [default: False]
     --window=window                 process with short window? [default: short]
-    --unitQuery=unitQuery           how to restrict channels? [default: (chanName.str.endswith(\'raster\'))]
+    --unitQuery=unitQuery           how to restrict channels? [default: raster]
     --blockName=blockName           name for new block [default: raster]
     --eventName=eventName           name of events object to align to [default: motionStimAlignTimes]
 """
