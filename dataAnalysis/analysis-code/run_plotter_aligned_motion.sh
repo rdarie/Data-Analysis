@@ -25,8 +25,8 @@ SELECTOR="201901211000-Proprio_minfrmaxcorr"
 # SELECTOR="201901271000-Proprio_minfrmaxcorr"
 # SELECTOR="201901201200-Proprio_minfrmaxcorr"
 BLOCKNAME="gpfa"
-python3 './plotAlignedAsigs.py' --exp=$EXP --processAll --window=long --inputBlockName=$BLOCKNAME --unitQuery=all --alignQuery=midPeakWithStim100HzCCW --rowName=pedalSizeCat
-python3 './plotAlignedAsigs.py' --exp=$EXP --processAll --window=long --inputBlockName=$BLOCKNAME --unitQuery=all --alignQuery=midPeakWithStim50HzCCW --rowName=pedalSizeCat
-python3 './plotAlignedAsigs.py' --exp=$EXP --processAll --window=long --inputBlockName=$BLOCKNAME --unitQuery=all --alignQuery=midPeakWithStim100HzCW --rowName=pedalSizeCat
-python3 './plotAlignedAsigs.py' --exp=$EXP --processAll --window=long --inputBlockName=$BLOCKNAME --unitQuery=all --alignQuery=midPeakWithStim50HzCW --rowName=pedalSizeCat
-#  python3 './plotAlignedNeurons.py' --exp=$EXP --processAll --window=long --alignQuery=midPeakWithStim100HzCCW --rowName=pedalSizeCat --selector=$SELECTOR
+#  python3 './plotAlignedAsigs.py' --exp=$EXP --processAll --window=long --inputBlockName=$BLOCKNAME --unitQuery=all --alignQuery=midPeakWithStim100HzCCW --rowName=pedalSizeCat
+#  python3 './plotAlignedAsigs.py' --exp=$EXP --processAll --window=long --inputBlockName=$BLOCKNAME --unitQuery=all --alignQuery=midPeakWithStim50HzCCW --rowName=pedalSizeCat
+#  python3 './plotAlignedAsigs.py' --exp=$EXP --processAll --window=long --inputBlockName=$BLOCKNAME --unitQuery=all --alignQuery=midPeakWithStim100HzCW --rowName=pedalSizeCat
+#  python3 './plotAlignedAsigs.py' --exp=$EXP --processAll --window=long --inputBlockName=$BLOCKNAME --unitQuery=all --alignQuery=midPeakWithStim50HzCW --rowName=pedalSizeCat
+python3 './plotAlignedNeurons.py' --exp=$EXP --processAll --window=long --alignQuery=midPeakWithStim100HzCCW --rowName=pedalSizeCat --selector=$SELECTOR

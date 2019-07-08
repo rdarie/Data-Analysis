@@ -389,7 +389,16 @@ def unitSpikeTrainWaveformsToDF(
                 else:
                     v = np.asarray(values)
                 annDict.update({k: v})
+            skipAnnNames = (
+                stIn.annotations['arrayAnnNames'] +
+                ['arrayAnnNames', 'arrayAnnDTypes',
+                'nix_name', 'neo_name', 'id']
+            )
             annDF = pd.DataFrame(annDict)
+            for k, value in st.annotations.items():
+                if k not in skipAnnNames:
+                    annDF.loc[:, k] = value
+            # pdb.set_trace()
             annColumns = annDF.columns.to_list()
             if getMetaData:
                 idxLabels += annColumns
@@ -719,15 +728,23 @@ def getAsigsAlignedToEvents(
                 #
                 thisUnit = masterBlock.filter(
                     objects=Unit, name=chanName + '#0')[0]
-                skipAnnNames = (
+                skipEventAnnNames = (
                     list(alignEvents.annotations['arrayAnnNames']) +
                     ['nix_name', 'neo_name']
                     )
                 stAnn = {
                     k: v
                     for k, v in alignEvents.annotations.items()
-                    if k not in skipAnnNames
+                    if k not in skipEventAnnNames
                     }
+                skipAsigAnnNames = (
+                    ['channel_id', 'nix_name', 'neo_name']
+                    )
+                stAnn.update({
+                    k: v
+                    for k, v in asigP.annotations.items()
+                    if k not in skipAsigAnnNames
+                })
                 stArrayAnn = {
                     k: alignEvents.array_annotations[k]
                     for k in alignEvents.annotations['arrayAnnNames']

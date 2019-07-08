@@ -208,7 +208,7 @@ def compareMeansGrouped(
         flatPvals.loc[:] = fixedPvals
         flatPvals = flatPvals.unstack('bin')
         pVals.loc[flatPvals.index, flatPvals.columns] = flatPvals
-    significanceVals = pVals > pThresh
+    significanceVals = pVals < pThresh
     return pVals, statVals, significanceVals
 
 
@@ -221,8 +221,9 @@ def facetGridCompareMeans(
     if loadArgs['unitNames'] is None:
         loadArgs['unitNames'] = ns5.listChanNames(
             dataBlock, loadArgs['unitQuery'], objType=ns5.Unit)
-    unitNames = loadArgs.pop('unitNames')
-    loadArgs.pop('unitQuery')
+    originalUnitNames = loadArgs.pop('unitNames')
+    unitNames = originalUnitNames
+    originalUnitQuery = loadArgs.pop('unitQuery')
     #  set up significance testing
     if (rowColOpts['rowControl'] is None) and (rowColOpts['colControl'] is None):
         # test all rows and columns
@@ -288,10 +289,13 @@ def facetGridCompareMeans(
         flatPvals.loc[:] = fixedPvals
         flatPvals = flatPvals.unstack('bin')
         allPValsWide.loc[flatPvals.index, flatPvals.columns] = flatPvals
-        allSigValsWide = allPValsWide > statsTestOpts['pThresh']
+        allSigValsWide = allPValsWide < statsTestOpts['pThresh']
     allPValsWide.to_hdf(statsTestPath, 'p', format='table')
     allStatValsWide = pd.concat(allStatVals, names=['unit'] + statVals.index.names)
     allStatValsWide.to_hdf(statsTestPath, 'stat', format='table')
     allSigValsWide = pd.concat(allSigVals, names=['unit'] + sigVals.index.names)
     allSigValsWide.to_hdf(statsTestPath, 'sig', format='table')
+    # give these back in case needed (dictionaries are passed by reference)
+    loadArgs['unitNames'] = originalUnitNames
+    loadArgs['unitQuery'] = originalUnitQuery
     return allPValsWide, allStatValsWide, allSigValsWide

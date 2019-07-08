@@ -50,7 +50,6 @@ sns.set_context("talk")
 sns.set_style("white")
 
 rowColOpts = asp.processRowColArguments(arguments)
-colorPal = "ch:0.6,-.2,dark=.2,light=0.7,reverse=1"  #  for firing rates
 
 alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **arguments)
 alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
@@ -79,9 +78,14 @@ statsTestPath = os.path.join(scratchFolder, pdfName + '_stats.h5')
 xBounds=[-50e-3, 300e-3]
 statsTestOpts.update({'tStop': rasterOpts['windowSizes'][arguments['window']][1]})
 alignedAsigsKWargs.update({'decimate': 30})
+
+
+
+
 #  End Overrides
 if os.path.exists(statsTestPath):
     sigValsWide = pd.read_hdf(statsTestPath, 'sig')
+    sigValsWide.columns.name = 'bin'
 else:
     (
         pValsWide, statValsWide,
@@ -98,10 +102,16 @@ asp.plotAsigsAligned(
     figureFolder=figureFolder,
     printBreakDown=True,
     enablePlots=True,
-    pdfName=pdfName, xBounds=xBounds,
+    plotProcFuns=[asp.yLabelsEMG, asp.xLabelsTime, asp.truncateLegend],
+    pdfName=pdfName,
     **rowColOpts,
     relplotKWArgs=relplotKWArgs)
+asp.plotSignificance(
+    sigValsWide,
+    pdfName=pdfName + '_pCount',
+    figureFolder=figureFolder,
+    **rowColOpts,
+    **statsTestOpts)
 
 if arguments['lazy']:
-    frReader.close()
-    rasterReader.close()
+    dataReader.close()

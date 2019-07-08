@@ -16,6 +16,8 @@ Options:
     --rowControl=rowControl         rows to exclude from comparison
     --hueName=hueName               break down by hue  [default: amplitudeCat]
     --hueControl=hueControl         hues to exclude from comparison
+    --styleName=styleName           break down by style [default: RateInHz]
+    --styleControl=hueControl       styles to exclude from stats test
     --colName=colName               break down by col  [default: electrode]
     --colControl=colControl         cols to exclude from comparison [default: control]
 """
@@ -33,9 +35,10 @@ import os
 import dataAnalysis.plotting.aligned_signal_plots as asp
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
 import dataAnalysis.preproc.ns5 as ns5
+import pandas as pd
 import dill as pickle
 import pdb
-
+from copy import deepcopy
 from currentExperiment import parseAnalysisOptions
 from docopt import docopt
 from namedQueries import namedQueries
@@ -72,27 +75,50 @@ frBlockPath = os.path.join(
         arguments['window']))
 frReader, frBlock = ns5.blockFromPath(
     frBlockPath, lazy=arguments['lazy'])
-pdfName = '{}_{}_neurons_{}'.format(
+pdfName = '{}_neurons_{}_{}'.format(
     prefix,
     arguments['window'],
     arguments['alignQuery'])
+statsTestOpts.update({'tStop': rasterOpts['windowSizes'][arguments['window']][1]})
+statsTestPath = os.path.join(scratchFolder, pdfName + '_stats.h5')
+#  End Overrides
+if os.path.exists(statsTestPath):
+    sigValsWide = pd.read_hdf(statsTestPath, 'sig')
+    sigValsWide.columns.name = 'bin'
+else:
+    alignedAsigsKWargsStats = deepcopy(alignedAsigsKWargs)
+    if alignedAsigsKWargsStats['unitNames'] is not None:
+        alignedAsigsKWargsStats['unitNames'] = [
+            i.replace('_#0', '_fr#0')
+            for i in alignedAsigsKWargsStats['unitNames']
+        ]
+    (
+        pValsWide, statValsWide,
+        sigValsWide) = ash.facetGridCompareMeans(
+        frBlock, statsTestPath,
+        loadArgs=alignedAsigsKWargsStats,
+        rowColOpts=rowColOpts,
+        statsTestOpts=statsTestOpts)
 
 asp.plotNeuronsAligned(
     rasterBlock,
     frBlock,
+    verbose=arguments['verbose'],
     loadArgs=alignedAsigsKWargs,
+    sigTestResults=sigValsWide,
+    figureFolder=figureFolder,
+    printBreakDown=True,
+    enablePlots=True,
+    plotProcFuns=[asp.xLabelsTime, asp.truncateLegend],
+    pdfName=pdfName,
+    **rowColOpts,
+    twinRelplotKWArgs=twinRelplotKWArgs)
+asp.plotSignificance(
+    sigValsWide,
+    pdfName=pdfName + '_pCount',
     figureFolder=figureFolder,
     **rowColOpts,
-    testStride=testStride,
-    testWidth=testWidth,
-    testTStart=testTStart,
-    testTStop=testTStop,
-    pThresh=pThresh,
-    enablePlots=True,
-    colorPal=colorPal,
-    printBreakDown=True,
-    pdfName=pdfName,
-    verbose=arguments['verbose'])
+    **statsTestOpts)
 
 if arguments['lazy']:
     frReader.close()

@@ -292,6 +292,15 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
         ci='sem', estimator='mean',
         palette="ch:0.6,-.2,dark=.2,light=0.7,reverse=1",
         height=5, aspect=1.5, kind='line')
+    twinRelplotKWArgs = dict(
+        palette="ch:0.6,-.2,dark=.2,light=0.7,reverse=1",
+        func1_kws={'marker': '|', 'alpha': 0.6},
+        func2_kws={'ci': 'sem'},
+        facet1_kws={'sharey': False},
+        facet2_kws={'sharey': True},
+        height=5, aspect=1.5,
+        kind1='scatter', kind2='line'
+    )
     plotOpts = {
         'type': 'ticks', 'errorBar': 'sem',
         'pageSize': (6, 12), 'removeOutliers': (0.01, 0.975)}
