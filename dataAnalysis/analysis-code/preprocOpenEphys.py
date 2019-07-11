@@ -12,6 +12,7 @@ import numpy as np
 import pdb, traceback
 import quantities as pq
 import os
+import shutil
 #  load options
 from currentExperiment import parseAnalysisOptions
 from docopt import docopt
@@ -20,20 +21,36 @@ expOpts, allOpts = parseAnalysisOptions(
     experimentShorthand=arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
-
+#
 trialList = sorted([
     f
     for f in os.listdir(oeFolder)
-    if (not os.path.isfile(os.path.join(oeFolder, f))) # and ('Trial008' in f)
+    if (not os.path.isfile(os.path.join(oeFolder, f))) and ('Trial001' in f)
     ])
-
-# pdb.set_trace()
+invEmgTrialLookup = {v: k for k, v in openEphysBaseNames.items()}
+#
 for folderPath in trialList:
     try:
         print('Loading {}...'.format(folderPath))
+        emgBaseName = os.path.basename(folderPath)
+        trialIdx = invEmgTrialLookup[emgBaseName]
         ppOE.preprocOpenEphysFolder(
             os.path.join(oeFolder, folderPath),
-            chanNames=openEphysChanNames, # plotting=True,
+            chanNames=openEphysChanNames, plotting=False,
+            ignoreSegments=openEphysIgnoreSegments[trialIdx],
+            makeFiltered=True,
             filterOpts=openEphysFilterOpts)
+        emgDataPath = os.path.join(
+            oeFolder, folderPath, emgBaseName + '_filtered.nix'
+        )
+        outputPath = os.path.join(
+            scratchFolder, 'Trial{:0>3}_oe.nix'.format(trialIdx))
+        shutil.copyfile(emgDataPath, outputPath)
+        emgRawDataPath = os.path.join(
+            oeFolder, folderPath, emgBaseName + '.nix'
+        )
+        outputPath = os.path.join(
+            scratchFolder, 'Trial{:0>3}_raw_oe.nix'.format(trialIdx))
+        shutil.copyfile(emgRawDataPath, outputPath)
     except Exception:
         traceback.print_exc()

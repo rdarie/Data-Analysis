@@ -5,6 +5,7 @@ from neo import (
     Segment, ChannelIndex, SpikeTrain, Unit)
 import neo
 import elephant as elph
+from collections.abc import Iterable
 import dataAnalysis.helperFunctions.helper_functions_new as hf
 import dataAnalysis.helperFunctions.kilosort_analysis_new as ksa
 import rcsanalysis.packet_func as rcsa_helpers
@@ -14,7 +15,8 @@ import numpy as np
 import traceback
 #  import sys
 #  import pickle
-#  from copy import *
+from copy import copy
+import dataAnalysis.preproc.mdt_constants as mdt_constants
 import quantities as pq
 #  import argparse, linecache
 from scipy import stats, signal, ndimage
@@ -22,6 +24,1058 @@ import peakutils
 import seaborn as sns
 from scipy import interpolate
 from sklearn.preprocessing import MinMaxScaler
+import datetime
+from datetime import datetime as dt
+import json
+
+INSReferenceTime = pd.Timestamp('2018-03-01')
+
+def fixMalformedJson(jsonString, jsonType=''):
+    '''
+    Adapted from Medtronic RDK Matlab code
+    %--------------------------------------------------------------------------
+    % Copyright (c) Medtronic, Inc. 2017
+    %
+    % MEDTRONIC CONFIDENTIAL -- This document is the property of Medtronic
+    % PLC, and must be accounted for. Information herein is confidential trade
+    % secret information. Do not reproduce it, reveal it to unauthorized 
+    % persons, or send it outside Medtronic without proper authorization.
+    %--------------------------------------------------------------------------
+    %
+    % File Name: fixMalformedJson.m
+    % Autor: Ben Johnson (johnsb68)
+    %
+    % Description: This file contains the MATLAB function to fix a malformed 
+    % Summit JSON File due to improperly closing the SummitSystem session.
+    %
+    % -------------------------------------------------------------------------
+    %% Check and Apply Appropriate Fixes*************************************************
+    '''
+    
+    jsonString = jsonString.replace('INF', 'Inf')
+    
+    numOpenSqua = jsonString.count('[')
+    numOpenCurl = jsonString.count('{')
+    numClosedSqua = jsonString.count(']')
+    numClosedCurl = jsonString.count('}')
+
+    if (
+            (numOpenSqua != numClosedSqua) and
+            (('Log' in jsonType) or ('Settings' in jsonType))):
+        jsonStringOut = jsonString + ']'
+    elif (numOpenSqua != numClosedSqua) or (numOpenCurl != numClosedCurl):
+        nMissingSqua = numOpenSqua-numClosedSqua-1
+        nMissingCurl = numOpenCurl-numClosedCurl-1
+        jsonStringOut = (
+            jsonString +
+            '}' * nMissingCurl +
+            ']' * nMissingSqua +
+            '}]')
+    else:
+        jsonStringOut = jsonString
+    return jsonStringOut
+
+
+def getINSTDFromJson(
+        folderPath, sessionNames,
+        deviceName='DeviceNPC700373H', fs=500,
+        forceRecalc=True, getInterpolated=True
+        ):
+
+    if not isinstance(sessionNames, Iterable):
+        sessionNames = [sessionNames]
+
+    tdSessions = []
+    for idx, sessionName in enumerate(sessionNames):
+        jsonPath = os.path.join(folderPath, sessionName, deviceName)
+        try:
+            if forceRecalc:
+                raise(Exception('Debugging, always extract fresh'))
+
+            if getInterpolated:
+                csvFname = 'RawDataTD_interpolated.csv'
+            else:
+                csvFname = 'RawDataTD.csv'
+            tdData = pd.read_csv(os.path.join(jsonPath, csvFname))
+
+            #  loading from csv removes datetime formatting, recover it:
+            tdData['microseconds'] = pd.to_timedelta(
+                tdData['microseconds'], unit='us')
+            tdData['time_master'] = pd.to_datetime(
+                tdData['time_master'])
+
+        except Exception:
+            traceback.print_exc()
+
+            try:
+                with open(os.path.join(jsonPath, 'RawDataTD.json'), 'r') as f:
+                    timeDomainJson = json.load(f)
+            except Exception:
+                with open(os.path.join(jsonPath, 'RawDataTD.json'), 'r') as f:
+                    timeDomainJsonText = f.read()
+                    timeDomainJsonText = fixMalformedJson(timeDomainJsonText)
+                    timeDomainJson = json.loads(timeDomainJsonText)
+
+            intersampleTickCount = int((1/fs) / (100e-6))
+
+            timeDomainMeta = rcsa_helpers.extract_td_meta_data(timeDomainJson)
+            #  pdb.set_trace()
+            # assume n channels is constant for all assembled sessions
+            nChan = int(timeDomainMeta[0, 8])
+                    
+            timeDomainMeta = rcsa_helpers.code_micro_and_macro_packet_loss(
+                timeDomainMeta)
+
+            timeDomainMeta, packetsNeededFixing =\
+                rcsa_helpers.correct_meta_matrix_time_displacement(
+                    timeDomainMeta, intersampleTickCount)
+                    
+            timeDomainMeta = rcsa_helpers.code_micro_and_macro_packet_loss(
+                timeDomainMeta)
+            #  pdb.set_trace()
+            #  num_real_points, num_macro_rollovers, loss_as_scalar =\
+            #      rcsa_helpers.calculate_statistics(
+            #          timeDomainMeta, intersampleTickCount)
+
+            timeDomainValues = rcsa_helpers.unpacker_td(
+                timeDomainMeta, timeDomainJson, intersampleTickCount)
+
+            #  save the noninterpolated files to disk
+            tdData = rcsa_helpers.save_to_disk(
+                timeDomainValues, os.path.join(
+                    jsonPath, 'RawDataTD.csv'),
+                time_format='full', data_type='td', num_cols=nChan)
+
+            tdData['t'] = (
+                tdData['actual_time'] - INSReferenceTime) / (
+                    datetime.timedelta(seconds=1))
+                    
+            #  pdb.set_trace()
+            tdData = tdData.drop_duplicates(
+                ['t']
+                ).sort_values('t').reset_index(drop=True)
+
+            if getInterpolated:
+                uniformT = np.arange(
+                    tdData['t'].iloc[0],
+                    tdData['t'].iloc[-1] + 1/fs,
+                    1/fs)
+                channelsPresent = [
+                    i for i in tdData.columns if 'channel_' in i]
+                channelsPresent += [
+                    'time_master', 'microseconds']
+
+                #  convert to floats before interpolating
+                tdData['microseconds'] = tdData['microseconds'] / (
+                    datetime.timedelta(microseconds=1))
+                tdData['time_master'] = (
+                    tdData['time_master'] - pd.Timestamp('2000-03-01')) / (
+                    datetime.timedelta(seconds=1))
+                tdData = hf.interpolateDF(
+                    tdData, uniformT, x='t',
+                    columns=channelsPresent, fill_value=(0, 0))
+                #  interpolating converts to floats, recover
+                tdData['microseconds'] = pd.to_timedelta(
+                    tdData['microseconds'], unit='us')
+                tdData['time_master'] = pd.to_datetime(
+                    tdData['time_master'], unit='s',
+                    origin=pd.Timestamp('2000-03-01'))
+                #  tdData['actual_time'] = tdData['time_master'] + (
+                #      tdData['microseconds'])
+                
+            tdData['trialSegment'] = idx
+
+            if getInterpolated:
+                tdData.to_csv(
+                    os.path.join(jsonPath, 'RawDataTD_interpolated.csv'))
+            else:
+                tdData.to_csv(
+                    os.path.join(jsonPath, 'RawDataTD.csv'))
+
+        tdSessions.append(tdData)
+
+    td = {
+        'data': pd.concat(tdSessions, ignore_index=True),
+        't': None
+        }
+    
+    td['t'] = td['data']['t']
+
+    td['data']['INSTime'] = td['data']['t']
+    td['INSTime'] = td['t']
+    #  pdb.set_trace()
+    return td
+
+
+def getINSTimeSyncFromJson(
+        folderPath, sessionNames,
+        deviceName='DeviceNPC700373H',
+        forceRecalc=True
+        ):
+
+    if not isinstance(sessionNames, Iterable):
+        sessionNames = [sessionNames]
+    tsSessions = []
+    for idx, sessionName in enumerate(sessionNames):
+        jsonPath = os.path.join(folderPath, sessionName, deviceName)
+        try:
+            if forceRecalc:
+                raise(Exception('Debugging, always extract fresh'))
+
+            timeSyncData = pd.read_csv(os.path.join(jsonPath, 'TimeSync.csv'))
+            #  loading from csv removes datetime formatting, recover it:
+            timeSyncData['microseconds'] = pd.to_timedelta(
+                timeSyncData['microseconds'], unit='us')
+            timeSyncData['time_master'] = pd.to_datetime(
+                timeSyncData['time_master'])
+            timeSyncData['actual_time'] = pd.to_datetime(
+                timeSyncData['actual_time'])
+
+        except Exception:
+            traceback.print_exc()
+            try:
+                with open(os.path.join(jsonPath, 'TimeSync.json'), 'r') as f:
+                    timeSync = json.load(f)[0]
+            except Exception:
+                with open(os.path.join(jsonPath, 'TimeSync.json'), 'r') as f:
+                    timeSyncText = f.read()
+                    timeSyncText = fixMalformedJson(timeSyncText)
+                    timeSync = json.loads(timeSyncText)[0]
+                    #  pdb.set_trace()
+            
+            timeSyncData = rcsa_helpers.extract_time_sync_meta_data(timeSync)
+
+            timeSyncData['trialSegment'] = idx
+            timeSyncData.to_csv(os.path.join(jsonPath, 'TimeSync.csv'))
+
+        timeSyncData['t'] = (
+            timeSyncData['actual_time'] - INSReferenceTime) / (
+                datetime.timedelta(seconds=1))
+        timeSyncData.to_csv(os.path.join(jsonPath, 'TimeSync.csv'))
+        tsSessions.append(timeSyncData)
+
+    allTimeSync = pd.concat(tsSessions, ignore_index=True)
+    return allTimeSync
+
+
+def getINSAccelFromJson(
+        folderPath, sessionNames,
+        deviceName='DeviceNPC700373H', fs=64,
+        forceRecalc=True, getInterpolated=True
+        ):
+
+    if not isinstance(sessionNames, Iterable):
+        sessionNames = [sessionNames]
+
+    accelSessions = []
+    for idx, sessionName in enumerate(sessionNames):
+        jsonPath = os.path.join(folderPath, sessionName, deviceName)
+        try:
+            if forceRecalc:
+                raise(Exception('Debugging, always extract fresh'))
+                
+            if getInterpolated:
+                csvFname = 'RawDataAccel_interpolated.csv'
+            else:
+                csvFname = 'RawDataAccel.csv'
+            accelData = pd.read_csv(os.path.join(jsonPath, csvFname))
+
+            #  loading from csv removes datetime formatting, recover it:
+            accelData['microseconds'] = pd.to_timedelta(
+                accelData['microseconds'], unit='us')
+            accelData['time_master'] = pd.to_datetime(
+                accelData['time_master'])
+
+        except Exception:
+            traceback.print_exc()
+
+            try:
+                with open(os.path.join(jsonPath, 'RawDataAccel.json'), 'r') as f:
+                    accelJson = json.load(f)
+            except Exception:
+                with open(os.path.join(jsonPath, 'RawDataAccel.json'), 'r') as f:
+                    accelJsonText = f.read()
+                    accelJsonText = fixMalformedJson(accelJsonText)
+                    accelJson = json.loads(accelJsonText)
+
+            intersampleTickCount = int((1/fs) / (100e-6))
+            accelMeta = rcsa_helpers.extract_accel_meta_data(accelJson)
+
+            accelMeta = rcsa_helpers.code_micro_and_macro_packet_loss(
+                accelMeta)
+
+            accelMeta, packetsNeededFixing =\
+                rcsa_helpers.correct_meta_matrix_time_displacement(
+                    accelMeta, intersampleTickCount)
+
+            accelMeta = rcsa_helpers.code_micro_and_macro_packet_loss(
+                accelMeta)
+
+            accelDataValues = rcsa_helpers.unpacker_accel(
+                accelMeta, accelJson, intersampleTickCount)
+                
+            #  save the noninterpolated files to disk
+            accelData = rcsa_helpers.save_to_disk(
+                accelDataValues, os.path.join(
+                    jsonPath, 'RawDataAccel.csv'),
+                time_format='full', data_type='accel')
+
+            accelData['t'] = (
+                accelData['actual_time'] - INSReferenceTime) / (
+                    datetime.timedelta(seconds=1))
+            accelData = accelData.drop_duplicates(
+                ['t']
+                ).sort_values('t').reset_index(drop=True)
+            #pdb.set_trace()
+            if getInterpolated:
+                uniformT = np.arange(
+                    accelData['t'].iloc[0],
+                    accelData['t'].iloc[-1] + 1/fs,
+                    1/fs)
+                channelsPresent = [
+                    i for i in accelData.columns if 'accel_' in i]
+                channelsPresent += [
+                    'time_master', 'microseconds']
+
+                #  convert to floats before interpolating
+                accelData['microseconds'] = accelData['microseconds'] / (
+                    datetime.timedelta(microseconds=1))
+                accelData['time_master'] = (
+                    accelData['time_master'] - pd.Timestamp('2000-03-01')) / (
+                    datetime.timedelta(seconds=1))
+                accelData = hf.interpolateDF(
+                    accelData, uniformT, x='t',
+                    columns=channelsPresent, fill_value=(0, 0))
+                #  interpolating converts to floats, recover
+                accelData['microseconds'] = pd.to_timedelta(
+                    accelData['microseconds'], unit='us')
+                accelData['time_master'] = pd.to_datetime(
+                    accelData['time_master'], unit='s',
+                    origin=pd.Timestamp('2000-03-01'))
+
+            inertia = accelData['accel_x']**2 +\
+                accelData['accel_y']**2 +\
+                accelData['accel_z']**2
+            inertia = inertia.apply(np.sqrt)
+            accelData['inertia'] = inertia
+
+            accelData['trialSegment'] = idx
+
+            if getInterpolated:
+                accelData.to_csv(
+                    os.path.join(jsonPath, 'RawDataAccel_interpolated.csv'))
+            else:
+                accelData.to_csv(
+                    os.path.join(jsonPath, 'RawDataAccel.csv'))
+
+        accelSessions.append(accelData)
+
+    accel = {
+        'data': pd.concat(accelSessions, ignore_index=True),
+        't': None
+        }
+
+    accel['t'] = accel['data']['t']
+    accel['INSTime'] = accel['data']['t']
+    accel['data']['INSTime'] = accel['t']
+    return accel
+
+
+def realignINSTimestamps(
+        dataStruct, trialSegment, alignmentFactor
+        ):
+
+    if isinstance(dataStruct, pd.DataFrame):
+        segmentMask = dataStruct['trialSegment'] == trialSegment
+        dataStruct.loc[segmentMask, 't'] = (
+            dataStruct.loc[segmentMask, 'microseconds'] + alignmentFactor) / (
+                pd.Timedelta(1, unit='s'))
+
+        if 'INSTime' in dataStruct.columns:
+            dataStruct.loc[
+                segmentMask, 'INSTime'] = dataStruct.loc[segmentMask, 't']
+
+    elif isinstance(dataStruct, dict):
+        segmentMask = dataStruct['data']['trialSegment'] == trialSegment
+        dataStruct['data'].loc[segmentMask, 't'] = (
+            dataStruct['data'].loc[
+                segmentMask, 'microseconds'] + alignmentFactor) / (
+                    pd.Timedelta(1, unit='s'))
+
+        if 'INSTime' in dataStruct['data'].columns:
+            dataStruct['data'].loc[
+                segmentMask, 'INSTime'] = dataStruct[
+                    'data'].loc[segmentMask, 't']
+
+        #  ['INSTime'] is a reference to ['t']  for the dict
+        dataStruct['t'].loc[segmentMask] = dataStruct[
+            'data']['t'].loc[segmentMask]
+        if 'INSTime' in dataStruct.keys():
+            dataStruct['INSTime'].loc[
+                segmentMask] = dataStruct['t'].loc[segmentMask]
+    return dataStruct
+
+
+def plotHUTtoINS(
+        td, accel, plotStimStatus,
+        tStartTD, tStopTD,
+        tStartStim=None, tStopStim=None,
+        tdX='t', stimX='INSTime', dataCols=['channel_0', 'channel_1'],
+        sharex=True,
+        plotBlocking=True, plotEachPacket=False,
+        annotatePacketName=False
+        ):
+    # check match between INS time and HUT time
+    if stimX == 'INSTime':
+        fig, ax = plt.subplots(3, 1, sharex=sharex)
+        unitsCorrection = 1
+        tStartStim = tStartTD
+        tStopStim = tStopTD
+    elif stimX == 'HostUnixTime':
+        fig, ax = plt.subplots(3, 1)
+        unitsCorrection = 1e-3
+
+    plotMaskTD = (td[tdX] > tStartTD) & (td[tdX] < tStopTD)
+    plotMaskAccel = (accel[tdX] > tStartTD) & (accel[tdX] < tStopTD)
+    plotMaskStim = (plotStimStatus[stimX] * unitsCorrection > tStartStim) &\
+        (plotStimStatus[stimX] * unitsCorrection < tStopStim)
+
+    if plotEachPacket:
+        tdIterator = td['data'].loc[plotMaskTD, :].groupby('packetIdx')
+    else:
+        tdIterator = enumerate([td['data'].loc[plotMaskTD, :]])
+
+    for name, group in tdIterator:
+        for columnName in dataCols:
+            ax[0].plot(
+                group.loc[:, tdX],
+                group.loc[:, columnName],
+                '-', label=columnName)
+            if annotatePacketName:
+                ax[0].text(
+                    group[tdX].iloc[-1],
+                    group[columnName].iloc[-1],
+                    '{}'.format(name))
+    #  ax[0].legend()
+    ax[0].set_title('INS Data')
+    ax[1].set_ylabel('TD Data')
+
+    if plotEachPacket:
+        accelIterator = accel['data'].loc[plotMaskAccel, :].groupby('packetIdx')
+    else:
+        accelIterator = enumerate([accel['data'].loc[plotMaskAccel, :]])
+
+    for name, group in accelIterator:
+        for columnName in ['inertia']:
+            ax[1].plot(
+                group.loc[:, tdX],
+                group.loc[:, columnName],
+                '-', label=columnName)
+    #  ax[1].legend()
+    ax[1].set_ylabel('Inertia')
+    progAmpNames = [
+        'program{}_amplitude'.format(progIdx) for progIdx in range(4)]
+    #  progPWNames = [
+    #      'program{}_pw'.format(progIdx) for progIdx in range(4)]
+    statusAx = ax[2].twinx()
+    for columnName in progAmpNames:
+        ax[2].plot(
+            plotStimStatus[stimX].loc[plotMaskStim]*unitsCorrection,
+            plotStimStatus.loc[plotMaskStim, columnName],
+            lw=2.5, label=columnName)
+    
+    statusAx.plot(
+        plotStimStatus[stimX].loc[plotMaskStim]*unitsCorrection,
+        plotStimStatus.loc[plotMaskStim, 'amplitudeIncrease'],
+        'c--', label='amplitudeIncrease')
+    statusAx.plot(
+        plotStimStatus[stimX].loc[plotMaskStim]*unitsCorrection,
+        plotStimStatus.loc[plotMaskStim, 'therapyStatus'],
+        '--', label='therapyStatus')
+    statusAx.plot(
+        plotStimStatus[stimX].loc[plotMaskStim]*unitsCorrection,
+        plotStimStatus.loc[plotMaskStim, 'RateInHz']/100,
+        '--', label='RateInHz')
+    statusAx.legend()
+    ax[2].set_ylabel('Stim Amplitude (mA)')
+    ax[2].set_xlabel('INS Time (sec)')
+    plt.suptitle('Stim State')
+    plt.show(block=plotBlocking)
+    return
+
+
+def line_picker(line, mouseevent):
+    """
+    find the points within a certain distance from the mouseclick in
+    data coords and attach some extra attributes, pickx and picky
+    which are the data points that were picked
+    """
+    if mouseevent.xdata is None:
+        return False, dict()
+    xdata = line.get_xdata()
+    ydata = line.get_ydata()
+    maxd = 0.1
+    d = np.sqrt(
+        (xdata - mouseevent.xdata)**2 + (ydata - mouseevent.ydata)**2)
+    dmask = (d < maxd) & (d == min(d))
+    ind, = np.nonzero(dmask)
+    #  pdb.set_trace()
+    if len(ind):
+        pickx = xdata[ind]
+        picky = ydata[ind]
+        props = dict(ind=ind, pickx=pickx, picky=picky)
+        return True, props
+    else:
+        return False, dict()
+
+
+def peekAtTaps(
+        td, accel,
+        channelData, trialIdx,
+        tapDetectOpts, sessionTapRangesNSP,
+        onlyPlotDetectChan=True,
+        insX='t', plotBlocking=True,
+        allTapTimestampsINS=None,
+        allTapTimestampsNSP=None,
+        segmentsToPlot=None):
+    sns.set_style('darkgrid')
+    if segmentsToPlot is None:
+        segmentsToPlot = pd.unique(td['data']['trialSegment'])
+
+    tempClick = {
+        'ins': [],
+        'nsp': []
+        }
+    clickDict = {
+        i: tempClick
+        for i in segmentsToPlot}
+    
+    def onpick(event):
+        #  pdb.set_trace()
+        if 'INS' in event.artist.axes.get_title():
+            tempClick['ins'].append(event.pickx[0])
+            print('Clicked on ins {}'.format(event.pickx[0]))
+        elif 'NSP' in event.artist.axes.get_title():
+            tempClick['nsp'].append(event.pickx[0])
+            print('Clicked on nsp {}'.format(event.pickx[0]))
+
+    for trialSegment in segmentsToPlot:
+        #  NSP plotting Bounds
+        trialSegment = int(trialSegment)
+        tStartNSP = (
+            sessionTapRangesNSP[trialIdx][trialSegment]['timeRanges'][0])
+        tStopNSP = (
+            sessionTapRangesNSP[trialIdx][trialSegment]['timeRanges'][1])
+        tDiffNSP = tStopNSP - tStartNSP
+        #  Set up figures
+        fig = plt.figure(tight_layout=True)
+        ax = [None for i in range(3)]
+        ax[0] = fig.add_subplot(311)
+        ax[1] = fig.add_subplot(312, sharex=ax[0])
+        if insX == 't':
+            # INS plotting bounds
+            tStartINS = td['t'].iloc[0]
+            tStopINS = td['t'].iloc[-1]
+            for thisRange in tapDetectOpts[
+                    trialIdx][trialSegment]['timeRanges']:
+                tStartINS = max(tStartINS, thisRange[0])
+                tStopINS = min(tStopINS, thisRange[1])
+            #  make it so that the total extent always matches, for easy comparison
+            tDiffINS = max(tStopINS - tStartINS, tDiffNSP)
+            tStopINS = tStartINS + tDiffINS
+            ax[2] = fig.add_subplot(313)
+        else:
+            ax[2] = fig.add_subplot(313, sharex=ax[0])
+            tStartINS = tStartNSP
+            tStopINS = tStopNSP
+        
+        insTapsAx = ax[1]
+        twinAx = ax[2].twiny()
+        dataColMask = np.array(['ins_td' in i for i in td['data'].columns])
+        if 'accChan' in tapDetectOpts[trialIdx][trialSegment].keys():
+            detectOn = 'acc'
+            accAx = ax[1]
+            tdAx = ax[0]
+            accAx.get_shared_x_axes().join(accAx, twinAx)
+            accAx.get_shared_y_axes().join(accAx, twinAx)
+            accAxLineStyle = '.-'
+            tdAxLineStyle = '-'
+            if onlyPlotDetectChan:
+                accColumnNames = [tapDetectOpts[trialIdx][trialSegment]['accChan']]
+            else:
+                accColumnNames = [
+                    'ins_accx', 'ins_accy',
+                    'ins_accz', 'ins_accinertia']
+            tdColumnNames = td['data'].columns[dataColMask]
+        else:
+            detectOn = 'td'
+            accAx = ax[0]
+            tdAx = ax[1]
+            tdAx.get_shared_x_axes().join(tdAx, twinAx)
+            tdAx.get_shared_y_axes().join(tdAx, twinAx)
+            accAxLineStyle = '-'
+            tdAxLineStyle = '.-'
+            if onlyPlotDetectChan:
+                tdColumnNames = [tapDetectOpts[trialIdx][trialSegment]['tdChan']]
+            else:
+                tdColumnNames = td['data'].columns[dataColMask]
+            accColumnNames = [
+                'ins_accx', 'ins_accy',
+                'ins_accz', 'ins_accinertia']
+
+        plotMask = (accel[insX] > tStartINS) & (accel[insX] < tStopINS)
+        plotMaskTD = (td[insX] > tStartINS) & (td[insX] < tStopINS)
+
+        for columnName in accColumnNames:
+            accAx.plot(
+                accel[insX].loc[plotMask],
+                stats.zscore(accel['data'].loc[plotMask, columnName]),
+                accAxLineStyle,
+                label=columnName, picker=line_picker)
+            if detectOn == 'acc':
+                twinAx.plot(
+                    accel[insX].loc[plotMask],
+                    stats.zscore(accel['data'].loc[plotMask, columnName])
+                    )
+        accAx.set_title('INS Acc Segment {}'.format(trialSegment))
+        accAx.set_ylabel('Z Score (a.u.)')
+
+        for columnName in tdColumnNames:
+            tdAx.plot(
+                td[insX].loc[plotMaskTD],
+                stats.zscore(td['data'].loc[plotMaskTD, columnName]),
+                tdAxLineStyle,
+                label=columnName, picker=line_picker)
+            if detectOn == 'td':
+                twinAx.plot(
+                    td[insX].loc[plotMaskTD],
+                    stats.zscore(td['data'].loc[plotMaskTD, columnName])
+                    )
+        tdAx.set_ylabel('Z Score (a.u.)')
+        tdAx.set_title('INS TD Segment {}'.format(trialSegment))
+
+        if allTapTimestampsINS is not None:
+            insTapsAx.plot(
+                allTapTimestampsINS[trialSegment],
+                allTapTimestampsINS[trialSegment] ** 0 - 1,
+                'c*', label='tap peaks')
+        
+        xmin, xmax = ax[1].get_xlim()
+        xTicks = np.arange(xmin, xmax, 0.05)
+        ax[0].set_xticks(xTicks)
+        ax[0].set_yticks([])
+        ax[0].set_xticklabels([])
+        ax[0].grid(which='major', color='b', alpha=0.75)
+        ax[1].set_xticks(xTicks)
+        ax[1].set_yticks([])
+        ax[1].set_xticklabels([])
+        ax[1].grid(which='major', color='b', alpha=0.75)
+        twinAx.set_xticks(xTicks)
+        twinAx.set_yticks([])
+        twinAx.set_xticklabels([])
+        twinAx.grid(which='major', color='b', alpha=0.75)
+        tdAx.legend()
+        accAx.legend()
+
+        tNSPMask = (channelData['t'] > tStartNSP) & (channelData['t'] < tStopNSP)
+        triggerTrace = channelData['data'].loc[tNSPMask, 'ainp7']
+        #  pdb.set_trace()
+        ax[2].plot(
+            channelData['t'].loc[tNSPMask].iloc[::30],
+            stats.zscore(triggerTrace.iloc[::30]),
+            'c', label='Analog Sync', picker=line_picker)
+        xmin, xmax = ax[2].get_xlim()
+        xTicks2 = np.arange(xmin, xmax, 0.05)
+        ax[2].set_xticks(xTicks2)
+        ax[2].set_yticks([])
+        ax[2].set_xticklabels([])
+        ax[2].grid(which='major', color='c', alpha=0.75)
+        if allTapTimestampsNSP is not None:
+            ax[2].plot(
+                allTapTimestampsNSP[trialSegment],
+                allTapTimestampsNSP[trialSegment] ** 0 - 1,
+                'm*', label='tap peaks', picker=line_picker)
+
+        ax[2].legend()
+        ax[2].set_title('NSP Data')
+        fig.canvas.mpl_connect('pick_event', onpick)
+        plt.show(block=plotBlocking)
+
+        for key, value in tempClick.items():
+            tempVal = pd.Series(value)
+            tempClick[key] = tempVal.loc[tempVal.diff().fillna(1) > 100e-3]
+            #  pdb.set_trace()
+        clickDict[trialSegment] = tempClick
+
+        tempClick = {
+            'ins': [],
+            'nsp': []
+            }
+    return clickDict
+
+
+def getINSTapTimestamp(
+        td=None, accel=None,
+        tapDetectOpts={}, plotting=False
+        ):
+
+    if 'timeRanges' in tapDetectOpts.keys():
+        timeRanges = tapDetectOpts['timeRanges']
+    else:
+        timeRanges = None
+
+    if 'keepIndex' in tapDetectOpts.keys():
+        keepIndex = tapDetectOpts['keepIndex']
+    else:
+        keepIndex = slice(None)
+
+    if 'iti' in tapDetectOpts.keys():
+        iti = tapDetectOpts['iti']
+    else:
+        iti = 0.25
+    #  itiWiggle = 0.05
+
+    if 'accChan' in tapDetectOpts.keys():
+        assert accel is not None
+
+        if not isinstance(accel, dict):
+            accel = {
+                'data': accel,
+                't': accel['t']
+                }
+
+        if timeRanges is None:
+            tdMask = td['t'] > 0
+        else:
+            for idx, timeSegment in enumerate(timeRanges):
+                if idx == 0:
+                    accelMask = (accel['t'] > timeSegment[0]) & (
+                        accel['t'] < timeSegment[1])
+                else:
+                    accelMask = accelMask | (
+                        (accel['t'] > timeSegment[0]) & (
+                            accel['t'] < timeSegment[1]))
+
+        tapDetectSignal = accel['data'].loc[
+            accelMask, tapDetectOpts['accChan']]
+        
+        accelPeakIdx = hf.getTriggers(
+            tapDetectSignal, iti=iti, fs=500, thres=tapDetectOpts['accThres'],
+            edgeType='both', minAmp=None,
+            expectedTime=None, keep_max=False, plotting=plotting)
+        '''
+
+        # minimum distance between triggers (units of samples), 5% wiggle room
+        width = int(64 * iti * (1 - itiWiggle))
+        ilocPeakIdx = peakutils.indexes(
+            accel['data']['inertia_z'].loc[accelMask].values, thres=accThres,
+            min_dist=width, thres_abs=True, keep_max=True)
+        accelPeakIdx = accel['data']['inertia_z'].loc[accelMask].index[ilocPeakIdx]
+        '''
+        accelPeakIdx = accelPeakIdx[keepIndex]
+        print('Accel Timestamps \n{}'.format(accel['t'].loc[accelPeakIdx]))
+
+        tapTimestamps = accel['t'].loc[accelPeakIdx]
+        peakIdx = accelPeakIdx
+
+    if 'tdChan' in tapDetectOpts.keys():
+        assert td is not None
+        if not isinstance(td, dict):
+            td = {
+                'data': td,
+                't': td['t']
+                }
+
+        if timeRanges is None:
+            tdMask = td['t'] > 0
+        else:
+            for idx, timeSegment in enumerate(timeRanges):
+                if idx == 0:
+                    tdMask = (td['t'] > timeSegment[0]) & (
+                        td['t'] < timeSegment[1])
+                else:
+                    tdMask = tdMask | (
+                        (td['t'] > timeSegment[0]) & (
+                            td['t'] < timeSegment[1]))
+
+        tapDetectSignal = td['data'].loc[tdMask, tapDetectOpts['tdChan']]
+
+        tdPeakIdx = hf.getTriggers(
+            tapDetectSignal, iti=iti, fs=500, thres=tapDetectOpts['tdThres'],
+            edgeType='both', minAmp=None,
+            expectedTime=None, keep_max=False, plotting=plotting)
+        '''
+
+        # minimum distance between triggers (units of samples), 5% wiggle room
+        width = int(500 * iti * (1 - itiWiggle))
+        ilocPeakIdx = peakutils.indexes(
+            tapDetectSignal.loc[tdMask].values, thres=tdThres,
+            min_dist=width, thres_abs=True, keep_max=True)
+        tdPeakIdx = tapDetectSignal.loc[tdMask].index[ilocPeakIdx]
+        '''
+        tdPeakIdx = tdPeakIdx[keepIndex]
+        print('TD Timestamps \n{}'.format(td['t'].loc[tdPeakIdx]))
+
+        tapTimestamps = td['t'].loc[tdPeakIdx]
+        peakIdx = tdPeakIdx
+
+    return tapTimestamps, peakIdx
+
+
+def getStimSerialTrialSegMask(insDF, trialSegment):
+    tsegMask = insDF['ins_property'] == 'trialSegment'
+    tseg = pd.Series(np.nan, index=insDF.index)
+    tseg.loc[tsegMask] = insDF.loc[tsegMask, 'ins_value']
+    tseg.fillna(method='ffill', inplace=True)
+    segmentMask = tseg == trialSegment
+    return segmentMask
+
+
+def getHUTtoINSSyncFun(
+        timeSyncData,
+        degree=1, plotting=False,
+        trialSegments=None,
+        syncTo='HostUnixTime'
+        ):
+    if trialSegments is None:
+        trialSegments = pd.unique(timeSyncData['trialSegment'])
+    timeInterpFunHUTtoINS = [None for i in trialSegments]
+
+    for trialSegment in trialSegments:
+        segmentMask = timeSyncData['trialSegment'] == trialSegment
+
+        if degree > 0:
+            synchPolyCoeffsHUTtoINS = np.polyfit(
+                x=timeSyncData.loc[segmentMask, syncTo].values,
+                y=timeSyncData.loc[segmentMask, 't'].values,
+                deg=degree)
+            #  print(
+            #      'synchPolyCoeffsHUTtoINS = {}'.format(
+            #          synchPolyCoeffsHUTtoINS))
+        else:
+            timeOffset = timeSyncData.loc[
+                segmentMask, 't'].values - timeSyncData.loc[
+                    segmentMask, syncTo].values * 1e-3
+            synchPolyCoeffsHUTtoINS = np.array([1e-3, np.mean(timeOffset)])
+        #  pdb.set_trace()
+        timeInterpFunHUTtoINS[trialSegment] = np.poly1d(
+            synchPolyCoeffsHUTtoINS)
+        if plotting:
+            plt.plot(
+                timeSyncData.loc[segmentMask, syncTo].values * 1e-3,
+                timeSyncData.loc[segmentMask, 't'].values, 'bo',
+                label='original')
+            plt.plot(
+                timeSyncData.loc[segmentMask, syncTo].values * 1e-3,
+                timeInterpFunHUTtoINS(
+                    timeSyncData[syncTo].values), 'r-',
+                label='first degree polynomial fit')
+            plt.xlabel('Host Unix Time (msec)')
+            plt.ylabel('INS Time (sec)')
+            plt.legend()
+            plt.show()
+    return timeInterpFunHUTtoINS
+
+
+def synchronizeHUTtoINS(
+        insDF, trialSegment, interpFun
+        ):
+    if 'INSTime' not in insDF.columns:
+        insDF['INSTime'] = np.nan
+    if 'trialSegment' in insDF.columns:
+        segmentMask = insDF['trialSegment'] == trialSegment
+    else:
+        #  event dataframes don't have an explicit trialSegment
+        segmentMask = getStimSerialTrialSegMask(insDF, trialSegment)
+    insDF.loc[segmentMask, 'INSTime'] = interpFun(
+        insDF.loc[segmentMask, 'HostUnixTime'])
+    return insDF
+
+
+def getINSStimLogFromJson(
+        folderPath, sessionNames,
+        deviceName='DeviceNPC700373H',
+        absoluteStartTime=None, logForm='serial'):
+    allStimStatus = []
+    
+    for idx, sessionName in enumerate(sessionNames):
+        jsonPath = os.path.join(folderPath, sessionName, deviceName)
+        with open(os.path.join(jsonPath, 'StimLog.json'), 'r') as f:
+            stimLog = json.load(f)
+
+        progAmpNames = rcsa_helpers.progAmpNames
+        stripProgName = rcsa_helpers.strip_prog_name
+        if logForm == 'serial':
+            stimStatus = rcsa_helpers.extract_stim_meta_data_events(
+                stimLog, trialSegment=idx)
+
+        elif logForm == 'long':
+            stimStatus = rcsa_helpers.extract_stim_meta_data(stimLog)
+            stimStatus['activeProgram'] = stimStatus.loc[
+                :, progAmpNames].idxmax(axis=1).apply(stripProgName)
+            stimStatus['maxAmp'] = stimStatus.loc[:, progAmpNames].max(axis=1)
+            stimStatus['trialSegment'] = idx
+        
+        allStimStatus.append(stimStatus)
+    allStimStatusDF = pd.concat(allStimStatus, ignore_index=True)
+    #  if all we're doing is turn something off, don't consider it a new round
+    #  pdb.set_trace()
+    if logForm == 'long':
+        ampPositive = allStimStatusDF['maxAmp'].diff().fillna(0) >= 0
+        allStimStatusDF['amplitudeIncrease'] = (
+            allStimStatusDF['amplitudeChange'] & ampPositive)
+        allStimStatusDF['amplitudeRound'] = allStimStatusDF[
+            'amplitudeIncrease'].astype(np.float).cumsum()
+    return allStimStatusDF
+
+
+def stimStatusSerialtoLong(
+        stimStSer, idxT='t', namePrefix='ins_', expandCols=[],
+        deriveCols=[], progAmpNames=[], dropDuplicates=True, amplitudeCatBins=4):
+    
+    fullExpandCols = copy(expandCols)
+    #  fixes issue with 'program' and 'amplitude' showing up unrequested
+    if 'program' not in expandCols:
+        fullExpandCols.append('program')
+    if 'activeGroup' not in expandCols:
+        fullExpandCols.append('activeGroup')
+
+    stimStLong = pd.DataFrame(
+        index=stimStSer.index, columns=fullExpandCols + [idxT])
+    #  fill req columns
+    stimStLong[idxT] = stimStSer[idxT]
+    for pName in fullExpandCols:
+        #  print(pName)
+        stimStLong[pName] = np.nan
+        pMask = stimStSer[namePrefix + 'property'] == pName
+        pValues = stimStSer.loc[pMask, namePrefix + 'value']
+        stimStLong.loc[pMask, pName] = pValues
+        if pName == 'movement':
+            stimStLong[pName].iloc[0] = 0
+        stimStLong[pName].fillna(
+            method='ffill', inplace=True)
+        stimStLong[pName].fillna(
+            method='bfill', inplace=True)
+
+    debugPlot = False
+    if debugPlot:
+        stimCat = pd.concat((stimStLong, stimStSer), axis=1)
+
+    for idx, pName in enumerate(progAmpNames):
+        stimStLong[pName] = np.nan
+        pMask = (stimStSer[namePrefix + 'property'] == 'amplitude') & (
+            stimStLong['program'] == idx)
+        stimStLong.loc[pMask, pName] = stimStSer.loc[pMask, namePrefix + 'value']
+        stimStLong[pName].fillna(method='ffill', inplace=True)
+        stimStLong[pName].fillna(method='bfill', inplace=True)
+    #  pdb.set_trace()
+    if dropDuplicates:
+        stimStLong.drop_duplicates(subset=idxT, keep='last', inplace=True)
+    
+    if debugPlot:
+        stimStLong.loc[:, ['program'] + progAmpNames].plot()
+        plt.show()
+
+    ampIncrease = pd.Series(False, index=stimStLong.index)
+    ampChange = pd.Series(False, index=stimStLong.index)
+    for idx, pName in enumerate(progAmpNames):
+        ampIncrease = ampIncrease | (stimStLong[pName].diff().fillna(0) > 0)
+        ampChange = ampChange | (stimStLong[pName].diff().fillna(0) != 0)
+        if debugPlot:
+            plt.plot(stimStLong[pName].diff().fillna(0), label=pName)
+    
+    if debugPlot:
+        stimStLong.loc[:, ['program'] + progAmpNames].plot()
+        ampIncrease.astype(float).plot(style='ro')
+        ampChange.astype(float).plot(style='go')
+        plt.legend()
+        plt.show()
+
+    if 'amplitudeRound' in deriveCols:
+        stimStLong['amplitudeRound'] = (
+            ampIncrease.astype(np.float).cumsum())
+    if 'movementRound' in deriveCols:
+        stimStLong['movementRound'] = (
+            stimStLong['movement'].abs().cumsum())
+    if 'amplitude' in deriveCols:
+        stimStLong['amplitude'] = (
+            stimStLong[progAmpNames].sum(axis=1))
+    if 'amplitudeCat' in deriveCols:
+        ampsForSum = copy(stimStLong[progAmpNames])
+        for colName in ampsForSum.columns:
+            if ampsForSum[colName].max() > 0:
+                ampsForSum[colName] = pd.cut(
+                    ampsForSum[colName], bins=amplitudeCatBins, labels=False)
+            else:
+                ampsForSum[colName] = pd.cut(ampsForSum[colName], bins=1, labels=False)
+        stimStLong['amplitudeCat'] = (
+            ampsForSum.sum(axis=1))
+    if debugPlot:
+        stimStLong.loc[:, ['program'] + progAmpNames].plot()
+        (10 * stimStLong['amplitudeRound'] / (stimStLong['amplitudeRound'].max())).plot()
+        plt.show()
+    return stimStLong
+
+
+def getINSDeviceConfig(
+        folderPath, sessionName, deviceName='DeviceNPC700373H'):
+    jsonPath = os.path.join(folderPath, sessionName, deviceName)
+
+    with open(os.path.join(jsonPath, 'DeviceSettings.json'), 'r') as f:
+        deviceSettings = json.load(f)
+    with open(os.path.join(jsonPath, 'StimLog.json'), 'r') as f:
+        stimLog = json.load(f)
+
+    progIndices = list(range(4))
+    groupIndices = list(range(4))
+    elecIndices = list(range(17))
+
+    electrodeConfiguration = [
+        [{'cathodes': [], 'anodes': []} for i in progIndices] for j in groupIndices]
+    
+    dfIndex = pd.MultiIndex.from_product(
+        [groupIndices, progIndices],
+        names=['group', 'program'])
+
+    electrodeStatus = pd.DataFrame(index=dfIndex, columns=elecIndices)
+    electrodeType = pd.DataFrame(index=dfIndex, columns=elecIndices)
+
+    for groupIdx in groupIndices:
+        groupTherapyConfig = deviceSettings[0][
+            'TherapyConfigGroup{}'.format(groupIdx)]
+        groupPrograms = groupTherapyConfig['programs']
+        for progIdx in progIndices:
+            electrodeConfiguration[groupIdx][progIdx].update({
+                'cycleOffTime': groupTherapyConfig['cycleOffTime'],
+                'cycleOnTime': groupTherapyConfig['cycleOnTime'],
+                'cyclingEnabled': groupTherapyConfig['cyclingEnabled']
+                })
+            for elecIdx in elecIndices:
+                electrodeStatus.loc[(groupIdx, progIdx), elecIdx] =\
+                    not groupPrograms[progIdx]['electrodes']['electrodes'][elecIdx]['isOff']
+                electrodeType.loc[(groupIdx, progIdx), elecIdx] =\
+                    groupPrograms[progIdx]['electrodes']['electrodes'][elecIdx]['electrodeType']
+                if electrodeStatus.loc[(groupIdx, progIdx), elecIdx]:
+                    if electrodeType.loc[(groupIdx, progIdx), elecIdx] == 1:
+                        electrodeConfiguration[groupIdx][progIdx]['anodes'].append(elecIdx)
+                    else:
+                        electrodeConfiguration[groupIdx][progIdx]['cathodes'].append(elecIdx)
+    #  pdb.set_trace()
+    #  process senseInfo
+    senseInfo = pd.DataFrame(
+        deviceSettings[0]['SensingConfig']['timeDomainChannels'])
+    senseInfo['sampleRate'] = senseInfo['sampleRate'].apply(
+        lambda x: mdt_constants.sampleRate[x])
+    senseInfo['minusInput'] = senseInfo['minusInput'].apply(
+        lambda x: mdt_constants.muxIdx[x])
+    senseInfo['plusInput'] = senseInfo['plusInput'].apply(
+        lambda x: mdt_constants.muxIdx[x])
+    senseInfo.loc[(2, 3), ('minusInput', 'plusInput')] += 8
+    senseInfo.loc[:, ('minusInput', 'plusInput')].fillna(17, inplace=True)
+    senseInfo = senseInfo.loc[senseInfo['sampleRate'].notnull(), :]
+    senseInfo.reset_index(inplace=True)
+    senseInfo.rename(columns={'index': 'senseChan'}, inplace=True)
+    return electrodeConfiguration, senseInfo
 
 
 def preprocINS(
@@ -33,12 +1087,12 @@ def preprocINS(
     jsonBaseFolder = trialFilesStim['folderPath']
     jsonSessionNames = trialFilesStim['jsonSessionNames']
 
-    td = hf.getINSTDFromJson(
+    td = getINSTDFromJson(
         jsonBaseFolder, jsonSessionNames, getInterpolated=True,
         forceRecalc=trialFilesStim['forceRecalc'])
 
     elecConfiguration, senseInfo = (
-        hf.getINSDeviceConfig(jsonBaseFolder, jsonSessionNames[0])
+        getINSDeviceConfig(jsonBaseFolder, jsonSessionNames[0])
         )
     renamer = {}
     tdDataCols = []
@@ -50,17 +1104,17 @@ def preprocINS(
             renamer.update({colName: updatedName})
     td['data'].rename(columns=renamer, inplace=True)
 
-    accel = hf.getINSAccelFromJson(
+    accel = getINSAccelFromJson(
         jsonBaseFolder, jsonSessionNames, getInterpolated=True,
         forceRecalc=trialFilesStim['forceRecalc'])
 
-    timeSync = hf.getINSTimeSyncFromJson(
+    timeSync = getINSTimeSyncFromJson(
         jsonBaseFolder, jsonSessionNames,
         forceRecalc=True)
 
-    stimStatusSerial = hf.getINSStimLogFromJson(
+    stimStatusSerial = getINSStimLogFromJson(
         jsonBaseFolder, jsonSessionNames)
-    #  packets are aligned to hf.INSReferenceTime, for convenience
+    #  packets are aligned to INSReferenceTime, for convenience
     #  (otherwise the values in ['t'] would be huge)
     #  align them to the more reasonable minimum first timestamp across packets
 
@@ -137,11 +1191,11 @@ def preprocINS(
         alignmentFactor[rolledOver] += rolloverSeconds
         print('alignmentFactor\n{}'.format(alignmentFactor))
     
-        accel = hf.realignINSTimestamps(
+        accel = realignINSTimestamps(
             accel, trialSegment, alignmentFactor.loc['accel'])
-        td = hf.realignINSTimestamps(
+        td = realignINSTimestamps(
             td, trialSegment, alignmentFactor.loc['td'])
-        timeSync = hf.realignINSTimestamps(
+        timeSync = realignINSTimestamps(
             timeSync, trialSegment, alignmentFactor.loc['timeSync'])
 
     #  Check timeSync
@@ -192,16 +1246,16 @@ def preprocINS(
         ['RateInHz', 'therapyStatus', 'trialSegment'] +
         progAmpNames)
     deriveCols = ['amplitudeRound']
-    stimStatus = hf.stimStatusSerialtoLong(
+    stimStatus = stimStatusSerialtoLong(
         stimStatusSerial, idxT='HostUnixTime', expandCols=expandCols,
         deriveCols=deriveCols, progAmpNames=progAmpNames)
 
-    interpFunHUTtoINS = hf.getHUTtoINSSyncFun(
+    interpFunHUTtoINS = getHUTtoINSSyncFun(
         timeSync, degree=1, syncTo='PacketGenTime')
     for trialSegment in pd.unique(td['data']['trialSegment']):
-        stimStatus = hf.synchronizeHUTtoINS(
+        stimStatus = synchronizeHUTtoINS(
             stimStatus, trialSegment, interpFunHUTtoINS[trialSegment])
-        stimStatusSerial = hf.synchronizeHUTtoINS(
+        stimStatusSerial = synchronizeHUTtoINS(
             stimStatusSerial, trialSegment, interpFunHUTtoINS[trialSegment])
     #  sync Host PC Unix time to NSP
     HUTtoINSPlotting = True
@@ -227,22 +1281,21 @@ def preprocINS(
         plotStimStatus = pd.concat(
             plotStimStatusList,
             ignore_index=True)
-
     if HUTtoINSPlotting and plottingFigures:
         tStartTD = 200
         tStopTD = 300
-        hf.plotHUTtoINS(
+        plotHUTtoINS(
             td, accel, plotStimStatus,
             tStartTD, tStopTD,
             sharex=True, dataCols=tdDataCols,
             plotBlocking=plotBlocking
             )
-
+    #
     block = insDataToBlock(
         td, accel, stimStatusSerial,
         senseInfo, trialFilesStim,
         tdDataCols=tdDataCols)
-
+    #   
     #  stim detection
     if trialFilesStim['detectStim']:
         block = getINSStimOnset(
@@ -258,7 +1311,6 @@ def preprocINS(
             id_vars=['t'],
             value_vars=['program', 'amplitude', 'RateInHz', 'pulseWidth'],
             var_name='ins_property', value_name='ins_value')
-        
         onsetEvents.rename(columns={'t': 'INSTime'}, inplace=True)
         offsetEvents = pd.melt(
             stimSpikesDF,
@@ -294,12 +1346,43 @@ def preprocINS(
             .sort_values('INSTime', kind='mergesort')
             .reset_index(drop=True)
             )
-        #  pdb.set_trace()
         newStimEvents = ns5.eventDataFrameToEvents(
             newStimStatusSerial, idxT='INSTime',
+            eventName='seg0_',
             annCol=['ins_property', 'ins_value']
             )
+        # pdb.set_trace()
         block.segments[0].events = newStimEvents
+        for ev in newStimEvents:
+            ev.segment = block.segments[0]
+        # make labels
+        labelNames = [
+            'RateInHz', 'program', 'therapyStatus',
+            'activeGroup', 'pulseWidth', 'amplitude']
+        labelIndices = []
+        for labelName in labelNames:
+            placeHolder = (
+                newStimStatusSerial
+                .loc[
+                    newStimStatusSerial['ins_property'] == labelName,
+                    'ins_value']
+                .reset_index())
+            labelIndices += (
+                placeHolder
+                .loc[placeHolder['ins_value'].diff() != 0, 'index']
+                .to_list())
+        labelIndices = np.sort(labelIndices, kind='mergesort')
+        statusLabels = newStimStatusSerial.loc[labelIndices, :]
+        concatLabels = np.array([
+            '{}'.format(row)
+            for rowIdx, row in statusLabels.loc[:, ['ins_property', 'ins_value']].iterrows()])
+        concatEvents = Event(
+            name='seg0_concatenatedEvents',
+            times=statusLabels['INSTime'].to_numpy() * pq.s,
+            labels=concatLabels
+            )
+        block.segments[0].events.append(concatEvents)
+        concatEvents.segment = block.segments[0]
         block.create_relationship()
     #
     writer = neo.io.NixIO(filename=insDataFilename, mode='ow')
@@ -320,6 +1403,7 @@ def getINSStimOnset(
         cyclePeriodCorrection=18e-3,
         stimDetectOptsByChannel=None,
         plotAnomalies=False,
+        treatAsSinglePulses=False,
         spikeWindow=[-32, 64],
         plotting=[]):
 
@@ -472,6 +1556,7 @@ def getINSStimOnset(
             np.array(lastValidOffsetIdx))
         # if we know cycle value, use it to predict onsets
         thisElecConfig = elecConfiguration[activeGroup][activeProgram]
+        
         if thisElecConfig['cyclingEnabled']:
             cyclePeriod = (
                 thisElecConfig['cycleOffTime']['time'] +
@@ -609,13 +1694,35 @@ def getINSStimOnset(
                 objects=Unit,
                 name=electrodeCombo
                 )[0]
-
+            if treatAsSinglePulses:
+                tempOnTimes = []
+                tempOffTimes = []
+                tempOnDiffsE = []
+                tempOnDiffsL = []
+                for idx, onTime in enumerate(theseOnsetTimestamps):
+                    offTime = closestOffsets[idx]
+                    interPulseInterval = 1 / (stimRate * pq.Hz)
+                    pulseOnTimes = np.arange(
+                        onTime, offTime + interPulseInterval,
+                        interPulseInterval) * onTime.units
+                    pulseOffTimes = pulseOnTimes + 10 * stimPW * pq.us
+                    tempOnTimes.append(pulseOnTimes)
+                    tempOffTimes.append(pulseOffTimes)
+                    onDiffE = onsetDifferenceFromExpected[idx]
+                    tempOnDiffsE.append(pulseOnTimes ** 0 * onDiffE)
+                    onDiffL = onsetDifferenceFromLogged[idx]
+                    tempOnDiffsL.append(pulseOnTimes ** 0 * onDiffL)
+                theseOnsetTimestamps = np.concatenate(tempOnTimes)
+                closestOffsets = np.concatenate(tempOffTimes)
+                onsetDifferenceFromExpected = np.concatenate(tempOnDiffsE)
+                onsetDifferenceFromLogged = np.concatenate(tempOnDiffsL)
+            #
             ampList = theseOnsetTimestamps ** 0 * 100 * thisAmplitude * pq.uA
             rateList = theseOnsetTimestamps ** 0 * stimRate * pq.Hz
-            pwList = theseOnsetTimestamps ** 0 * 10 * stimPW * pq.ms
+            pwList = theseOnsetTimestamps ** 0 * 10 * stimPW * pq.us
             programList = theseOnsetTimestamps ** 0 * activeProgram * pq.dimensionless
             tSegList = theseOnsetTimestamps ** 0 * thisTrialSegment
-            
+            #
             arrayAnn = {
                 'amplitude': ampList, 'RateInHz': rateList,
                 'pulseWidth': pwList,
@@ -624,7 +1731,7 @@ def getINSStimOnset(
                 'program': programList,
                 'offsetFromExpected': onsetDifferenceFromExpected,
                 'offsetFromLogged': onsetDifferenceFromLogged}
-        
+            #
             st = SpikeTrain(
                 times=theseOnsetTimestamps, t_stop=spikeTStop,
                 t_start=spikeTStart,
@@ -1100,10 +2207,10 @@ def insDataToBlock(
         x='t', columns=accelColumns)
     tStart = fullX[0]
 
-    blockName = trialFilesStim['experimentName'] + ' ins data'
+    blockName = trialFilesStim['experimentName'] + '_ins'
     block = Block(name=blockName)
     block.annotate(jsonSessionNames=trialFilesStim['jsonSessionNames'])
-    seg = Segment(name='seg0_')
+    seg = Segment(name='seg0_' + blockName)
     block.segments.append(seg)
 
     for idx, colName in enumerate(tdDataCols):
@@ -1190,7 +2297,7 @@ def unpackINSBlock(block, unpackAccel=True):
         'activeGroup', 'program', 'trialSegment']
     deriveCols = ['amplitudeRound', 'amplitude']
     progAmpNames = rcsa_helpers.progAmpNames
-    stimStatus = hf.stimStatusSerialtoLong(
+    stimStatus = stimStatusSerialtoLong(
         stimStSer, idxT='t', expandCols=expandCols,
         deriveCols=deriveCols, progAmpNames=progAmpNames)
     #  add stim info to traces

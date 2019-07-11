@@ -146,7 +146,7 @@ def compareMeansGrouped(
     if tStop is None:
         tStop = asigWide.columns[-1]
     testBins = np.arange(
-        tStart, tStop, testStride)
+        tStart + testWidth / 2, tStop - testWidth / 2, testStride)
 
     if (isinstance(groupBy, list)) and (len(groupBy) == 1):
         groupBy = groupBy[0]

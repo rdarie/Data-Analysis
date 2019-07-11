@@ -20,6 +20,7 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
     sipFolder = os.path.join(remoteBasePath, 'raw', experimentName, 'ins_sip')
     ns5FileName = 'Trial{:0>3}'.format(trialIdx)
     miniRCTrialLookup = expOpts['miniRCTrialLookup']
+    RCTrialLookup = expOpts['RCTrialLookup']
     
     try:
         openEphysChanNames = expOpts['openEphysChanNames']
@@ -36,19 +37,26 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
             'Wn': 60,
             'nHarmonics': 1,
             'Q': 20,
-            'N': 4,
+            'N': 8,
             'rp': 1,
             'btype': 'bandstop',
             'ftype': 'cheby1'
         },
-        'low': {
-            'Wn': 500,
-            'N': 4,
-            'btype': 'low',
+        #'low': {
+        #    'Wn': 1000,
+        #    'N': 8,
+        #    'btype': 'low',
+        #    'ftype': 'butter'
+        #},
+        'high': {
+            'Wn': 20,
+            'N': 8,
+            'btype': 'high',
             'ftype': 'butter'
         }
     }
     miniRCTrial = miniRCTrialLookup[trialIdx]
+    RCTrial = RCTrialLookup[trialIdx]
     
     gpfaOpts = {
         'xDim': 3,
@@ -62,7 +70,7 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
         'iti': 0.2,
         'keepIndex': slice(None)
         }
-    tapDetectOpts = expOpts['tapDetectOpts']
+    tapDetectOpts = expOpts['synchInfo']['ins']
     for trialKey in tapDetectOpts.keys():
         for trialSegmentKey in tapDetectOpts[trialKey].keys():
             for key in defaultTapDetectOpts.keys():
@@ -73,7 +81,7 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
     defaultSessionTapRangesNSP = {
         'keepIndex': slice(None)
         }
-    sessionTapRangesNSP = expOpts['sessionTapRangesNSP']
+    sessionTapRangesNSP = expOpts['synchInfo']['nsp']
     for trialKey in sessionTapRangesNSP.keys():
         for trialSegmentKey in sessionTapRangesNSP[trialKey].keys():
             for key in defaultSessionTapRangesNSP.keys():
@@ -139,18 +147,29 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
             'minDist': 1.2,
             'gaussWid': 200e-3,
             'maxSpikesPerGroup': 0,
+            'treatAsSinglePulses': False
+        }
+    RCStimDetectionOpts = {
+        'minDist': 0.5,
+        'gaussWid': 200e-3,
+        'maxSpikesPerGroup': 1,
+        'treatAsSinglePulses': True
         }
     fullStimDetectionOpts = {
         'minDist': 0.2,
         'gaussWid': 100e-3,
         'maxSpikesPerGroup': 1,
+        'treatAsSinglePulses': False
         }
 
     miniRCRigInputs = {
         'tapSync': 'ainp7',
         'simiTrigs': 'ainp8'
         }
-
+    RCRigInputs = {
+        'tapSync': 'ainp7',
+        'simiTrigs': 'ainp8'
+        }
     fullRigInputs = {
         'A+': 'ainp1',
         'B+': 'ainp2',
@@ -165,19 +184,23 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
         'simiTrigs': 'ainp8',
         'tapSync': 'ainp7',
         }
-        
+    #
     trialFilesStim['ins']['getINSkwargs'].update(commonStimDetectionOpts)
     if miniRCTrial:
         #  override with settings for detecting cycling stim trains
         trialFilesStim['ins']['getINSkwargs'].update(miniRCStimDetectionOpts)
         #  only parse sync lines
         eventInfo = {'inputIDs': miniRCRigInputs}
+    elif RCTrial:
+        trialFilesStim['ins']['getINSkwargs'].update(RCStimDetectionOpts)
+        #  should rename eventInfo to something more intuitive
+        eventInfo = {'inputIDs': fullRigInputs}
     else:
         trialFilesStim['ins']['getINSkwargs'].update(fullStimDetectionOpts)
         #  should rename eventInfo to something more intuitive
         eventInfo = {'inputIDs': fullRigInputs}
-
-    trialFilesFrom['utah']['calcRigEvents'] = not miniRCTrial
+    #
+    trialFilesFrom['utah']['calcRigEvents'] = not (miniRCTrial or RCTrial)
     trialFilesFrom['utah'].update({'eventInfo': eventInfo})
     
     nspCmpPath = os.path.join('.', 'nsp_map.cmp')
@@ -191,18 +214,15 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
             cmpDF, filePath=nspPrbPath,
             names=['elec', 'ainp'],
             groupIn={'xcoords': 1, 'ycoords': 1})
-
     #  should rename these to something more intuitive
     #  paths relevant to individual trials
     processedFolder = os.path.join(
         remoteBasePath, 'processed', experimentName)
     if not os.path.exists(processedFolder):
         os.makedirs(processedFolder, exist_ok=True)
-
     scratchFolder = os.path.join(scratchPath, experimentName)
     if not os.path.exists(scratchFolder):
         os.makedirs(scratchFolder, exist_ok=True)
-
     #  paths relevant to single trial files
     triFolder = os.path.join(
         scratchFolder, 'tdc_Trial{:0>3}'.format(trialIdx))
@@ -213,7 +233,6 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
     else:
         triFolderSource = os.path.join(
             scratchPath, expOpts['triFolderSourceBase'])
-
     analysisDataPath = os.path.join(
         scratchFolder,
         ns5FileName + '_analyze.nix')
@@ -223,10 +242,15 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
     insDataPath = os.path.join(
         scratchFolder,
         ns5FileName + '_ins.nix')
+    oeDataPath = os.path.join(
+        scratchFolder,
+        ns5FileName + '_oe.nix')
+    oeRawDataPath = os.path.join(
+        scratchFolder,
+        ns5FileName + '_raw_oe.nix')
     binnedSpikePath = os.path.join(
         scratchFolder,
         ns5FileName + '_binarized.nix')
-
     #  paths relevant to the entire experimental day
     estimatorPath = os.path.join(
         scratchFolder,
@@ -237,13 +261,13 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
     experimentBinnedSpikePath = os.path.join(
         scratchFolder,
         experimentName + '_binarized.nix')
-
+    #
     figureFolder = os.path.join(
         remoteBasePath, 'figures', experimentName
         )
     if not os.path.exists(figureFolder):
         os.makedirs(figureFolder, exist_ok=True)
-
+    #
     #  alignedRastersFolder = os.path.join(figureFolder, 'alignedRasters')
     #  if not os.path.exists(alignedRastersFolder):
     #      os.makedirs(alignedRastersFolder, exist_ok=True)
@@ -253,9 +277,9 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
     spikeSortingFiguresFolder = os.path.join(figureFolder, 'spikeSorting')
     if not os.path.exists(spikeSortingFiguresFolder):
         os.makedirs(spikeSortingFiguresFolder, exist_ok=True)
-    
+    #
     alignedAsigsKWargs = {}
-    if miniRCTrial:
+    if (miniRCTrial or RCTrial):
         alignedAsigsKWargs.update(dict(
             amplitudeColumn='amplitude',
             programColumn='program',
@@ -265,7 +289,7 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
             amplitudeColumn='amplitudeFuzzy',
             programColumn='programFuzzy',
             electrodeColumn='electrodeFuzzy'))
-    
+    #
     alignedAsigsChunkSize = 500
     rasterOpts = {
         'binInterval': 1e-3, 'binWidth': 30e-3, 'smoothKernelWidth': 50e-3,

@@ -86,7 +86,6 @@ def plotSpikePanel(
 
 
 def coordsToIndices(xcoords, ycoords):
-
     xSpacing = np.ufunc.reduce(np.frompyfunc(gcd, 2, 1), xcoords)
     ySpacing = np.ufunc.reduce(np.frompyfunc(gcd, 2, 1), ycoords)
     xIdx = np.array(np.divide(xcoords, xSpacing), dtype=np.int)
@@ -177,22 +176,23 @@ def plotSpike(
 
                 sns.despine()
                 for curAx in ax.flatten():
-                    curAx.tick_params(left='off', top='off', right='off',
-                    bottom='off', labelleft='off', labeltop='off',
-                    labelright='off', labelbottom='off')
-                plt.tight_layout(pad = 0.01)
+                    curAx.tick_params(
+                        left='off', top='off', right='off',
+                        bottom='off', labelleft='off', labeltop='off',
+                        labelright='off', labelbottom='off')
+                plt.tight_layout(pad=0.01)
 
             else:
                 if len(spikes['Waveforms'][ChanIdx].shape) == 3:
                     waveForms = spikes['Waveforms'][ChanIdx][unitMask, :, ChanIdx]
                 else:
                     waveForms = spikes['Waveforms'][ChanIdx][unitMask, :]
-                thisSpike = np.nanmean(waveForms, axis = 0)
+                thisSpike = np.nanmean(waveForms, axis=0)
                 #  pdb.set_trace()
-                thisError = np.nanstd(waveForms, axis = 0)
+                thisError = np.nanstd(waveForms, axis=0)
                 #  thisError = stats.sem(waveForms, nan_policy='omit')
                 timeRange = np.arange(len(thisSpike)) / spikes['basic_headers']['TimeStampResolution'] * 1e3
-                colorPalette = sns.color_palette(n_colors = 40)
+                colorPalette = sns.color_palette(n_colors=40)
 
                 ax.fill_between(timeRange, thisSpike - errorMultiplier*thisError,
                     thisSpike + errorMultiplier*thisError, alpha=0.4,
@@ -206,8 +206,7 @@ def plotSpike(
                     ax.legend()
         if showNow:
             plt.show()
-
-    return fig,ax
+    return fig, ax
 
 
 def plot_spikes(

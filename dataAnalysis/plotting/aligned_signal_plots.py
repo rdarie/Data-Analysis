@@ -280,13 +280,13 @@ def plotAsigsAligned(
                 #  iterate through plot and add significance stars
                 for (ro, co, hu), dataSubset in g.facet_data():
                     #  print('(ro, co, hu) = {}'.format((ro, co, hu)))
-                    if len(plotProcFuns):
-                        for procFun in plotProcFuns:
-                            procFun(g, ro, co, hu, dataSubset)
                     if sigTestResults is not None:
                         addSignificanceStars(
                             g, sigTestResults.query("unit == '{}'".format(unitName)),
                             ro, co, hu, dataSubset)
+                    if len(plotProcFuns):
+                        for procFun in plotProcFuns:
+                            procFun(g, ro, co, hu, dataSubset)
                 pdf.savefig()
                 plt.close()
             if limitPages is not None:
@@ -308,6 +308,13 @@ def yLabelsEMG(g, ro, co, hu, dataSubset):
         else:
             g.axes[ro, co].set_ylabel(dataSubset['feature'].unique()[0])
     return
+
+
+def genXLimSetter(newLims):
+    def xLimSetter(g, ro, co, hu, dataSubset):
+        g.axes[ro, co].set_xlim(newLims)
+        return
+    return xLimSetter
 
 
 def xLabelsTime(g, ro, co, hu, dataSubset):

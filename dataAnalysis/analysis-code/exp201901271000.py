@@ -7,7 +7,7 @@ def getExpOpts():
         4: False,
         5: True
         }
-
+    RCTrialLookup = {i: False for i in miniRCTrialLookup.keys()}
     plottingFigures = False
     plotBlocking = True
     remakePrb = False

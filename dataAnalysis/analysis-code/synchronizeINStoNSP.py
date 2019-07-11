@@ -23,8 +23,8 @@ import dataAnalysis.helperFunctions.kilosort_analysis_new as ksa
 import dataAnalysis.helperFunctions.motor_encoder_new as mea
 import dataAnalysis.helperFunctions.helper_functions_new as hf
 import dataAnalysis.helperFunctions.estimateElectrodeImpedances as eti
-import dataAnalysis.preproc.ns5 as preproc
-import dataAnalysis.preproc.mdt as preprocINS
+import dataAnalysis.preproc.ns5 as ns5
+import dataAnalysis.preproc.mdt as mdt
 import dataAnalysis.preproc.mdt_constants as mdt_constants
 
 import h5py
@@ -74,8 +74,8 @@ for st in insBlock.filter(objects=SpikeTrain):
         for key in st.annotations['arrayAnnNames']:
             st.array_annotations.update({key: st.annotations[key]})
 '''
-insBlock = preproc.loadWithArrayAnn(insDataPath)
-tdDF, accelDF, stimStatus = preprocINS.unpackINSBlock(insBlock)
+insBlock = ns5.loadWithArrayAnn(insDataPath)
+tdDF, accelDF, stimStatus = mdt.unpackINSBlock(insBlock)
 td = {'data': tdDF, 't': tdDF['t']}
 accel = {'data': accelDF, 't': accelDF['t']}
 #  Load NSP Data
@@ -84,7 +84,7 @@ startTime_s = None
 dataLength_s = None
 print('Loading NSP Block...')
 try:
-    channelData, nspBlock = preproc.getNIXData(
+    channelData, nspBlock = ns5.getNIXData(
         fileName=ns5FileName,
         folderPath=scratchFolder,
         elecIds=['ainp7'], startTime_s=startTime_s,
@@ -188,7 +188,7 @@ if not os.path.exists(synchFunPath):
             theseTapTimestampsINS = allTapTimestampsINS[overrideSegments[trialSegment]]
             theseTapTimestampsNSP = allTapTimestampsNSP[overrideSegments[trialSegment]]
 
-        tdGroup, accelGroup, insBlock, thisINStoNSP = preproc.synchronizeINStoNSP(
+        tdGroup, accelGroup, insBlock, thisINStoNSP = ns5.synchronizeINStoNSP(
             theseTapTimestampsNSP, theseTapTimestampsINS,
             NSPTimeRanges=(channelData['t'].iloc[0], channelData['t'].iloc[-1]),
             td=tdGroup, accel=accelGroup, insBlock=insBlock,
@@ -242,7 +242,7 @@ if addingToNix:
         if st.waveforms is None:
             st.sampling_rate = 3e4*pq.Hz
             st.waveforms = np.array([]).reshape((0, 0, 0))*pq.mV
-    preproc.addBlockToNIX(
+    ns5.addBlockToNIX(
         insBlockJustSpikes, neoSegIdx=[0],
         writeAsigs=False, writeSpikes=True,
         fileName=ns5FileName,
@@ -257,13 +257,13 @@ if addingToNix:
         td['data'], channelData['t'],
         kind='linear', fill_value=(0, 0),
         x='NSPTime', columns=tdColumns)
-    tdBlock = preproc.dataFrameToAnalogSignals(
+    tdBlock = ns5.dataFrameToAnalogSignals(
         tdInterp,
         idxT='NSPTime',
         probeName='insTD', samplingRate=3e4*pq.Hz,
         dataCol=tdColumns,
         forceColNames=tdColumns)
-    preproc.addBlockToNIX(
+    ns5.addBlockToNIX(
         tdBlock, neoSegIdx=[0],
         fileName=ns5FileName,
         folderPath=scratchFolder,
@@ -277,13 +277,13 @@ if addingToNix:
         accel['data'], channelData['t'],
         kind='linear', fill_value=(0, 0),
         x='NSPTime', columns=accelColumns)
-    accelBlock = preproc.dataFrameToAnalogSignals(
+    accelBlock = ns5.dataFrameToAnalogSignals(
         accelInterp,
         idxT='NSPTime',
         probeName='insAccel', samplingRate=3e4*pq.Hz,
         dataCol=accelColumns,
         forceColNames=accelColumns)
-    preproc.addBlockToNIX(
+    ns5.addBlockToNIX(
         accelBlock, neoSegIdx=[0],
         fileName=ns5FileName,
         folderPath=scratchFolder,

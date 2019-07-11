@@ -19,14 +19,16 @@
 # Specify account details
 #SBATCH --account=bibs-dborton-condo
 
-# EXP="exp201901211000"
-# EXP="exp201901211000"
-EXP="exp201812051000"
+# EXP="exp201812051000"
+# EXP="exp201901070700"
 # EXP="exp201901201200"
+# EXP="exp201901211000"
+# EXP="exp201901221200"
 # SELECTOR="201901211000-Proprio_minfr"
 # SELECTOR="201901211000-Proprio_minfrmaxcorr"
 # SELECTOR="201901201200-Proprio_minfr"
 # ESTIMATOR="201901211000-Proprio_pca"
 
-python3 './calcAlignedAsigs.py' --exp=$EXP --trialIdx=1 --window=short --unitQuery="not((chanName.str.contains('elec'))or(chanName.str.contains('pca')))" --blockName=other --eventName=stimAlignTimes
+python3 ./preprocINS.py --exp=$EXP --trialIdx=1
+# python3 './calcAlignedAsigs.py' --exp=$EXP --trialIdx=1 --window=short --unitQuery="not((chanName.str.contains('elec'))or(chanName.str.contains('pca')))" --blockName=other --eventName=stimAlignTimes
 # python3 './calcAlignedAsigs.py' --exp=$EXP --trialIdx=1 --window=long --unitQuery="not((chanName.str.contains('elec'))or(chanName.str.contains('pca')))" --blockName=other --eventName=stimAlignTimes

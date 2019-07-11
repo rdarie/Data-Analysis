@@ -323,7 +323,7 @@ def unitSpikeTrainWaveformsToDF(
         dataQuery=None,
         transposeToColumns='bin', fastTranspose=True,
         getMetaData=True, verbose=False, decimate=1,
-        whichSegments=None, procFun=None):
+        whichSegments=None, windowSize=None, procFun=None):
     #  list contains different segments from *one* unit
     if isinstance(spikeTrainContainer, ChannelIndex):
         assert len(spikeTrainContainer.units) == 0
@@ -370,7 +370,12 @@ def unitSpikeTrainWaveformsToDF(
                 np.asarray(wfDF.columns) /
                 (st.sampling_rate / decimate)) -
             st.left_sweep)
-        wfDF.columns = bins.magnitude
+        wfDF.columns = np.around(bins.magnitude, decimals=6)
+        if windowSize is not None:
+            winMask = (
+                (wfDF.columns >= windowSize[0]) &
+                (wfDF.columns <= windowSize[1]))
+            wfDF = wfDF.loc[:, winMask]
         if procFun is not None:
             wfDF = procFun(wfDF)
         idxLabels = ['segment', 'originalIndex', 't']
@@ -391,9 +396,10 @@ def unitSpikeTrainWaveformsToDF(
                 annDict.update({k: v})
             skipAnnNames = (
                 stIn.annotations['arrayAnnNames'] +
-                ['arrayAnnNames', 'arrayAnnDTypes',
-                'nix_name', 'neo_name', 'id']
-            )
+                [
+                    'arrayAnnNames', 'arrayAnnDTypes',
+                    'nix_name', 'neo_name', 'id']
+                )
             annDF = pd.DataFrame(annDict)
             for k, value in st.annotations.items():
                 if k not in skipAnnNames:
@@ -417,7 +423,7 @@ def unitSpikeTrainWaveformsToDF(
     #
     waveformsDF = pd.concat(
         waveformsList, axis='index',
-        #ignore_index=True
+        # ignore_index=True
         )
     if verbose:
         prf.print_memory_usage('before transposing waveforms')
@@ -447,7 +453,7 @@ def concatenateUnitSpikeTrainWaveformsDF(
         units, dataQuery=None,
         transposeToColumns='bin', concatOn='index',
         fastTranspose=True, getMetaData=True, verbose=False,
-        metaDataToCategories=False, decimate=1,
+        metaDataToCategories=False, decimate=1, windowSize=None,
         whichSegments=None, procFun=None):
     
     waveformsList = []
@@ -459,7 +465,7 @@ def concatenateUnitSpikeTrainWaveformsDF(
             thisUnit, dataQuery=dataQuery,
             transposeToColumns=transposeToColumns,
             fastTranspose=fastTranspose, getMetaData=getMetaData,
-            verbose=verbose, decimate=decimate,
+            verbose=verbose, decimate=decimate, windowSize=windowSize,
             whichSegments=whichSegments, procFun=procFun)
         if idx == 0:
             idxLabels = unitWaveforms.index.names
@@ -509,7 +515,7 @@ def alignedAsigsToDF(
         programColumn='programFuzzy',
         electrodeColumn='electrodeFuzzy',
         transposeToColumns='bin', concatOn='index', fastTranspose=True,
-        decimate=1, whichSegments=None,
+        decimate=1, whichSegments=None, windowSize=None,
         getMetaData=True, metaDataToCategories=True,
         makeControlProgram=False, removeFuzzyName=False, procFun=None):
     
@@ -526,7 +532,7 @@ def alignedAsigsToDF(
         transposeToColumns=transposeToColumns, concatOn=concatOn,
         fastTranspose=fastTranspose,
         verbose=verbose, decimate=decimate, whichSegments=whichSegments,
-        procFun=procFun,
+        windowSize=windowSize, procFun=procFun,
         getMetaData=getMetaData, metaDataToCategories=metaDataToCategories)
 
     manipulateIndex = np.any(
@@ -1116,8 +1122,10 @@ def eventsToDataFrame(
             if not calculatedT:
                 t = pd.Series(event.times.magnitude)
                 calculatedT = True
-            #  print(event.name)
-            values = event.array_annotations['labels']
+            try:
+                values = event.array_annotations['labels']
+            except Exception:
+                values = event.labels
             if isinstance(values[0], bytes):
                 #  event came from hdf, need to recover dtype
                 dtypeStr = event.annotations['originalDType'].split(';')[-1]
@@ -1274,15 +1282,6 @@ def loadSpikeMats(
                     spikeMats[smIdx] = spikeMats[smIdx].transpose()
             #  plt.imshow(rawSpikeMat.to_numpy(), aspect='equal'); plt.show()
     return spikeMats, validTrials
-
-
-def getStimSerialTrialSegMask(insDF, trialSegment):
-    tsegMask = insDF['ins_property'] == 'trialSegment'
-    tseg = pd.Series(np.nan, index=insDF.index)
-    tseg.loc[tsegMask] = insDF.loc[tsegMask, 'ins_value']
-    tseg.fillna(method='ffill', inplace=True)
-    segmentMask = tseg == trialSegment
-    return segmentMask
 
 
 def synchronizeINStoNSP(
@@ -2232,11 +2231,11 @@ def blockFromPath(dataPath, lazy=False):
 def calcBinarizedArray(
         dataBlock, samplingRate, binnedSpikePath, saveToFile=True):
     
-    spikeMatBlock = Block(name=dataBlock.name + ' binarized')
+    spikeMatBlock = Block(name=dataBlock.name + '_binarized')
     spikeMatBlock.merge_annotations(dataBlock)
 
     allSpikeTrains = [
-            i for i in dataBlock.filter(objects=SpikeTrain) if '#' in i.name]
+        i for i in dataBlock.filter(objects=SpikeTrain) if '#' in i.name]
     
     for st in allSpikeTrains:
         if '#' in st.name:
@@ -2248,7 +2247,7 @@ def calcBinarizedArray(
                 spikeMatBlock.channel_indexes.append(chanIdx)
 
     for segIdx, seg in enumerate(dataBlock.segments):
-        newSeg = Segment(name='seg{}_'.format(segIdx))
+        newSeg = Segment(name='seg{}_{}'.format(segIdx, spikeMatBlock.name))
         newSeg.merge_annotations(seg)
         spikeMatBlock.segments.append(newSeg)
         #  tStart = dataBlock.segments[0].t_start

@@ -8,7 +8,7 @@
 # Request custom resources
 #SBATCH --nodes=1
 #SBATCH --mem=24G
-#SBATCH --array=2,3
+#SBATCH --array=1,2,3,4
 
 # Specify a job name:
 #SBATCH -J ins_preproc
@@ -20,8 +20,9 @@
 # Specify account details
 #SBATCH --account=bibs-dborton-condo
 
+EXP="exp201901070700"
 # EXP="exp201901211000"
-EXP="exp201901221000"
+# EXP="exp201901221000"
 # EXP="exp201901231000"
 # EXP="exp201901271000"
 

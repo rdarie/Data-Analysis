@@ -47,7 +47,7 @@ globals().update(allOpts)
 sns.set()
 sns.set_color_codes("dark")
 sns.set_context("talk")
-sns.set_style("white")
+sns.set_style("whitegrid")
 
 rowColOpts = asp.processRowColArguments(arguments)
 
@@ -63,6 +63,7 @@ if arguments['processAll']:
     prefix = experimentName
 else:
     prefix = ns5FileName
+#
 triggeredPath = os.path.join(
     scratchFolder,
     prefix + '_{}_{}.nix'.format(
@@ -75,14 +76,14 @@ pdfName = '{}_{}_{}_{}'.format(
     arguments['alignQuery'])
 statsTestPath = os.path.join(scratchFolder, pdfName + '_stats.h5')
 #  Overrides
-xBounds=[-50e-3, 300e-3]
-statsTestOpts.update({'tStop': rasterOpts['windowSizes'][arguments['window']][1]})
-alignedAsigsKWargs.update({'decimate': 30})
-
-
-
-
+# alignedAsigsKWargs.update({'decimate': 15})
+alignedAsigsKWargs.update({'windowSize': (-25e-3, 175e-3)})
+statsTestOpts.update({
+    'testStride': 5e-3,
+    'testWidth': 20e-3,
+    'tStop': 75e-3})
 #  End Overrides
+#  Get stats results
 if os.path.exists(statsTestPath):
     sigValsWide = pd.read_hdf(statsTestPath, 'sig')
     sigValsWide.columns.name = 'bin'
@@ -102,7 +103,10 @@ asp.plotAsigsAligned(
     figureFolder=figureFolder,
     printBreakDown=True,
     enablePlots=True,
-    plotProcFuns=[asp.yLabelsEMG, asp.xLabelsTime, asp.truncateLegend],
+    plotProcFuns=[
+        asp.yLabelsEMG, asp.xLabelsTime,
+        asp.truncateLegend,
+        asp.genXLimSetter(alignedAsigsKWargs['windowSize'])],
     pdfName=pdfName,
     **rowColOpts,
     relplotKWArgs=relplotKWArgs)

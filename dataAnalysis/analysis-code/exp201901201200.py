@@ -23,7 +23,7 @@ def getExpOpts():
         1: True,
         2: False
         }
-
+    RCTrialLookup = {i: False for i in miniRCTrialLookup.keys()}
     tapDetectOpts = {
         #  each key is a trial
         1: {

@@ -3,7 +3,8 @@ import os
 
 def getExpOpts():
     #
-    miniRCTrialLookup = {i: True for i in range(1, 10)}
+    miniRCTrialLookup = {i: False for i in range(1, 10)}
+    RCTrialLookup = {i: True for i in range(1, 10)}
         
     plottingFigures = False
     plotBlocking = True
