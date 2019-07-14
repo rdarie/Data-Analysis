@@ -1516,30 +1516,36 @@ def getINSStimOnset(
             therapyOnTimes.loc[idx, 'on'] = foundTimestamp
             localIdx = [tdSeg.index.get_loc(i) for i in foundTimestamp]
             therapyOnTimes.loc[idx, 'onIdx'] = tMask.index[tMask][localIdx]
-    therapyDiff = pd.Series(0, index=tdDF.index)
-    therapyDiff.loc[therapyOnTimes['onIdx']] = 1
-    tdDF.loc[:, 'therapyRound'] = therapyDiff.cumsum()
+    trueTherapyDiff = pd.Series(0, index=tdDF.index)
+    trueTherapyDiff.loc[therapyOnTimes['onIdx']] = 1
+    tdDF.loc[:, 'therapyRound'] = trueTherapyDiff.cumsum()
     tdDF.loc[:, 'slot'] = np.nan
-    plottingSlots = True
+    plottingSlots = False
+    tdDF['t'] = np.around(tdDF['t'], decimals=4)
     for idx, (name, group) in enumerate(tdDF.groupby('trialSegment')):
-        groupPeriod = 1 / group['RateInHz'].iloc[0]
-        tWindow = (group['t'].iloc[0], group['t'].iloc[0] + groupPeriod)
+        groupPeriod = np.float64(np.around(group['RateInHz'].iloc[0] ** (-1), decimals=4))
+        tWindow = [group['t'].iloc[0], group['t'].iloc[0] + groupPeriod]
+        tWindow[1] = np.around(tWindow[1], decimals=4)
         if plottingSlots:
+            restartPlotting = True
+            plotIdx = 1
             sns.set()
             sns.set_style("whitegrid")
             sns.set_color_codes("dark")
             cPal = sns.color_palette(n_colors=len(allDataCol) + 4)
             cLookup = {n: cPal[i] for i, n in enumerate(allDataCol)}
             cLookup.update({i: cPal[i+len(allDataCol)] for i in range(4)})
-            fig, ax = plt.subplots()
-            for colName in allDataCol:
-                ax.plot(
-                    group['t'],
-                    stats.zscore(group[colName]),
-                    '-', c=cLookup[colName],
-                    label='original signal {}'.format(colName))
-            ax.set_xlabel('Time (sec)')
         while group['t'].iloc[-1] > tWindow[1]:
+            if plottingSlots:
+                if restartPlotting:
+                    fig, ax = plt.subplots()
+                    for colName in allDataCol:
+                        ax.plot(
+                            group['t'],
+                            stats.zscore(group[colName]),
+                            '-', c=cLookup[colName],
+                            label='original signal {}'.format(colName))
+                    ax.set_xlabel('Time (sec)')
             tMask = hf.getTimeMaskFromRanges(group['t'], [tWindow])
             for sIdx in range(4):
                 sWin = (tWindow[0] + sIdx * groupPeriod / 4, tWindow[0] + (sIdx + 1) * groupPeriod / 4)
@@ -1547,15 +1553,21 @@ def getINSStimOnset(
                 tdDF.loc[sMask, 'slot'] = sIdx
                 if plottingSlots:
                     ax.axvspan(sWin[0], sWin[1], facecolor=cLookup[sIdx], alpha=0.5, zorder=-100)
-            newGroupPeriod = 1 / group.loc[group['t'] > tWindow[1], 'RateInHz'].iloc[0]
+            newGroupPeriod = np.float64(np.around(group.loc[group['t'] > tWindow[1], 'RateInHz'].iloc[0] ** (-1), decimals=4))
             if newGroupPeriod != groupPeriod:
                 if plottingSlots:
                     ax.axvline(group.loc[tMask, 't'].iloc[-1])
             groupPeriod = newGroupPeriod
-            tWindow = (group.loc[tMask, 't'].iloc[-1], group.loc[tMask, 't'].iloc[-1] + groupPeriod)
-        if plottingSlots:
-            plt.show()
-    ## find offsets
+            tWindow = [group.loc[tMask, 't'].iloc[-1], group.loc[tMask, 't'].iloc[-1] + groupPeriod]
+            tWindow[1] = np.around(tWindow[1], decimals=4)
+            if plottingSlots:
+                if tWindow[1] // 100 > plotIdx:
+                    plt.show()
+                    plotIdx += 1
+                    restartPlotting = True
+                else:
+                    restartPlotting = False
+    # find offsets
     therapyOffsetIdx = tdDF.index[therapyDiff == -1]
     # if tdDF['therapyStatus'].iloc[-1] == 1:
     #     therapyOffsetIdx = pd.Index(
@@ -1578,84 +1590,69 @@ def getINSStimOnset(
         detectSignal, foundTimestamp = extractArtifactTimestampsNew(
             tdSeg, fs,
             gaussWid=gaussWid,
-            thresh=2,
+            thresh=1,
             enhanceEdges=True,
-            plotDetection=True
+            plotDetection=True,
+            threshMethod='peaks',
+            keepWhat='last'
             )
         if foundTimestamp is not None:
             therapyOffTimes.loc[idx, 'off'] = foundTimestamp
-            localIdx = tdSeg.index.get_loc(foundTimestamp)
-            therapyOffTimes.loc[idx, 'offIdx'] = tdDF.index[localIdx]
-        pdb.set_trace()
+            localIdx = [tdSeg.index.get_loc(i) for i in foundTimestamp]
+            therapyOffTimes.loc[idx, 'offIdx'] = tMask.index[tMask][localIdx]
     for name, group in tdDF.groupby('amplitudeRound'):
         anomalyOccured = False
         # check that this round is worth analyzing
-        tStart = group['t'].iloc[0]
-        tStop = group['t'].iloc[-1]
-        if (tStop - tStart) < minDur:
-            print('group {} (tStop - tStart) < minDur'.format(name))
-            continue
-        if (group['amplitude'] > 0).any():
-            ampOnMask = group['amplitude'] > 0
-        else:
+        groupAmpMask = (
+            (group['amplitude'] > 0) &
+            (group['therapyStatus'] > 0))
+        if not groupAmpMask.any():
             print('Amplitude never turned on!')
             continue
-        activeState = (
-            bool(
-                group
-                .loc[ampOnMask, 'therapyStatus']
-                .value_counts()
-                .idxmax()))
-        if not activeState:
-            print('group {} Therapy not active!'.format(name))
-            continue
+        #  how far after the nominal start and stop of stim should we look?
+        ROIPadding = [-gaussWid, gaussWid]
+        stimRate = (
+            group
+            .loc[groupAmpMask, 'RateInHz']
+            .value_counts()
+            .idxmax())
+        #  changes to stim happen at least a full period after the request
+        delayByFreq = (delayByFreqMult / stimRate)
+        delayByFreqIdx = int(fs * delayByFreq)
+        #
         activeProgram = (
             int(
                 group
-                .loc[ampOnMask, 'program']
+                .loc[groupAmpMask, 'program']
                 .value_counts()
                 .idxmax()))
         activeGroup = (
             int(
                 group
-                .loc[ampOnMask, 'activeGroup']
+                .loc[groupAmpMask, 'activeGroup']
                 .value_counts()
                 .idxmax()))
         thisTrialSegment = (
             int(
                 group
-                .loc[ampOnMask, 'trialSegment']
+                .loc[groupAmpMask, 'trialSegment']
                 .value_counts()
                 .idxmax()))
-        stimRate = (
-            group
-            .loc[ampOnMask, 'RateInHz']
-            .value_counts()
-            .idxmax())
         stimPW = (
             group
-            .loc[ampOnMask, 'pulseWidth']
+            .loc[groupAmpMask, 'pulseWidth']
             .value_counts()
             .idxmax())
-        #  pad with paddingDuration msec to ensure robust z-score
-        paddingDuration = 5 / stimRate
-        #  changes to stim happen at least a full period after the request
-        delayByFreq = (delayByFreqMult / stimRate)
-        delayByFreqIdx = int(fs * delayByFreq)
-        # pdb.set_trace()
         ampColName = 'program{}_amplitude'.format(activeProgram)
         thisAmplitude = group[ampColName].max()
-        #  stim artifacts will be in this temporal subset of the recording
-        groupAmpMask = (
-            (group[ampColName] == thisAmplitude) &
-            (group['therapyStatus'] > 0))
-        # assert (groupAmpMask == ampOnMask).all()
+        #  pad with paddingDuration msec to ensure robust z-score
+        paddingDuration = 5 / stimRate
         tStartPadded = max(
             tdDF['t'].iloc[0],
             group.loc[groupAmpMask, 't'].iloc[0] - paddingDuration)
         tStopPadded = min(
             group.loc[groupAmpMask, 't'].iloc[-1] + paddingDuration,
-            tdDF['t'].iloc[-1])            
+            tdDF['t'].iloc[-1])
         plotMaskTD = (tdDF['t'] > tStartPadded) & (tdDF['t'] < tStopPadded)
         #  load the appropriate detection options
         theseDetectOpts = stimDetectOptsByChannel[activeGroup][activeProgram]
@@ -1664,8 +1661,6 @@ def getINSStimOnset(
             plotMaskTD,
             theseDetectOpts['detectChannels'] + ['t']
             ])
-        #  how far after the nominal start and stop of stim should we look?
-        ROIPadding = [-gaussWid, gaussWid]
         #  make sure we didn't overextend onset estimates
         firstValidOnsetIdx = tdSeg.index[0]
         lastValidOnsetIdx = group.loc[groupAmpMask, 't'].index[-1]
@@ -2195,13 +2190,19 @@ def extractArtifactTimestampsNew(
             thres=thresh,
             min_dist=int(fs / stimRate), thres_abs=True,
             keep_what=keepWhat)
-        idxLocal = np.atleast_1d(idxLocal)
+        if keepWhat == 'last':
+            idxLocal = np.atleast_1d(idxLocal[-1])
+        else:
+            idxLocal = np.atleast_1d(idxLocal[0])
     elif threshMethod == 'cross':
         crossIdx, crossMask = hf.getThresholdCrossings(
             detectSignal, thresh=thresh,
             iti=1/stimRate, fs=fs,
             absVal=False)
-        idxLocal = np.atleast_1d(np.flatnonzero(crossMask)[0])
+        if keepWhat == 'last':
+            idxLocal = np.atleast_1d(np.flatnonzero(crossMask)[-1])
+        else:
+            idxLocal = np.atleast_1d(np.flatnonzero(crossMask)[0])
     if len(idxLocal):
         foundTimestamp = tdSeg.index[idxLocal]
         if plotDetection:
