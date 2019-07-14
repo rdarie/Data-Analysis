@@ -95,14 +95,13 @@ def getExpOpts():
                 'iti': 0.1, 'keepIndex': slice(None)},
             },
         2: {
-            0: {'timeRanges': [101, 103], 'keepIndex': slice(None)}
+            
             },
         3: {
-            #  per trialSegment
-            0: {'timeRanges': [60, 64], 'keepIndex': slice(None)},
+            
             },
         4: {
-            0: {'timeRanges': [101, 103], 'keepIndex': slice(None)}
+            
             }
         }
     
@@ -125,9 +124,19 @@ def getExpOpts():
         }
 
     # options for stim artifact detection
-    stimDetectThres = 1.5
-    stimDetectChans = ['ins_td1', 'ins_td3']
-
+    detectStim = True
+    stimDetectThresDefault = 2
+    stimDetectChansDefault = ['ins_td0', 'ins_td1']
+    stimDetectOptsByChannelSpecific = {
+        #group
+        0: {
+            #program
+            0: {'detectChannels': stimDetectChansDefault, 'thres': stimDetectThresDefault},
+            1: {'detectChannels': stimDetectChansDefault, 'thres': stimDetectThresDefault},
+            2: {'detectChannels': stimDetectChansDefault, 'thres': stimDetectThresDefault},
+            3: {'detectChannels': stimDetectChansDefault, 'thres': stimDetectThresDefault}
+        }}
+    # stimDetectChans = None
     triFolderSourceBase = 1
     triDestinations = [
         'Trial00{}'.format(trialIdx)
@@ -143,39 +152,30 @@ def getExpOpts():
         #  per trial
         1: [
             #  per trialSegment
-            [92, 527],
-            [775, 887]
+            [177, 1189],
             ],
         2: [
-            [210, 295]
+            []
             ],
         3: [
-            [80, 430],
-            [917, 1163],
-            [1367, 2024]
+            [],
             ]
         }
     
     alignTimeBounds = [
         #  per trial
         [
-            [247, 667],
-            [1370, 1595],
-            [2175, 2315],
-            [2475, 2495]
+            [177, 1189],
             ],
         [
             #  per trialSegment
-            [92, 527],
-            [775, 887]
+            [],
             ],
         [
-            [210, 295]
+            []
             ],
         [
-            [80, 430],
-            [917, 1163],
-            [1367, 2024]
+            [],
             ]
         ]
     gpfaRunIdx = 1

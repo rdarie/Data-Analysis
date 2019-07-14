@@ -51,9 +51,11 @@ sns.set_style("whitegrid")
 
 rowColOpts = asp.processRowColArguments(arguments)
 
-alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **arguments)
-alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
-    namedQueries, scratchFolder, **arguments)
+alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(
+    namedQueries, **arguments)
+alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = (
+    ash.processUnitQueryArgs(
+        namedQueries, scratchFolder, **arguments))
 alignedAsigsKWargs.update(dict(
     duplicateControlsByProgram=True,
     makeControlProgram=True,
@@ -76,12 +78,12 @@ pdfName = '{}_{}_{}_{}'.format(
     arguments['alignQuery'])
 statsTestPath = os.path.join(scratchFolder, pdfName + '_stats.h5')
 #  Overrides
-# alignedAsigsKWargs.update({'decimate': 15})
-alignedAsigsKWargs.update({'windowSize': (-25e-3, 175e-3)})
+#  alignedAsigsKWargs.update({'decimate': 15})
+alignedAsigsKWargs.update({'windowSize': (-250e-3, 250e-3)})
 statsTestOpts.update({
-    'testStride': 5e-3,
-    'testWidth': 20e-3,
-    'tStop': 75e-3})
+    'testStride': 20e-3,
+    'testWidth': 50e-3,
+    'tStop': 250e-3})
 #  End Overrides
 #  Get stats results
 if os.path.exists(statsTestPath):

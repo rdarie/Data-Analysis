@@ -44,7 +44,7 @@ globals().update(allOpts)
 
 trialInfo = {}
 
-insTimingPath = os.path.join(sipFolder, 'RecruitmentCurveStimTimings_RD.mat')
+insTimingPath = os.path.join(sipFolder, 'RecruitmentCurveStimTimings_RD_Fixed.mat')
 # pulse times in msec
 with h5py.File(insTimingPath, "r") as insTimingRecord:
     #  print(insTimingRecord['pulseTimings/AllTENSPulses'].shape)
@@ -52,9 +52,12 @@ with h5py.File(insTimingPath, "r") as insTimingRecord:
     trialInfo['insTensTimes'] = {i: None for i in range(nTrials)}
     trialInfo['insPulseTimes'] = {i: None for i in range(nTrials)}
     trialInfo['insStimAmps'] = {i: None for i in range(nTrials)}
+    trialInfo['insTensExcludeMask'] = {i: None for i in range(nTrials)}
     for i in range(nTrials):
         trialInfo['insTensTimes'][i] = np.array(
-            insTimingRecord[insTimingRecord['pulseTimings/AllTENSPulses'][i][0]]).flatten() / 500
+            insTimingRecord[insTimingRecord['pulseTimings/AllTENSPulses'][i][0]]).flatten() / 1000
+        trialInfo['insTensExcludeMask'][i] = np.array(
+            insTimingRecord[insTimingRecord['pulseTimings/TENSExlusionMask'][i][0]]).flatten().astype('bool')
         # allTENSPulses record is in samples, convert to seconds
         trialInfo['insPulseTimes'][i] = np.array(
             insTimingRecord[insTimingRecord['pulseTimings/INS'][i][0]]) / 1000
@@ -105,7 +108,7 @@ trialInfo['discardTime'] = {
 
 #  discard first n seconds
 trialInfo['timestampOffset'] = {
-    0: 18e-3,
+    0: 0,
     1: 0,
     2: 0,
     3: 0,
@@ -127,64 +130,7 @@ trialInfo['artifactChan'] = {
     7: 'SenseChannel3',
     8: 'SenseChannel3',
 }
-
-tensRangesINS = {
-    #  each key is a trial
-    0: {
-        #  each key is a trialSegment
-        0: {
-            'timeRanges': [(), ()], 'chan': 'SenseChannel1',
-            'thres': 2, 'iti': 0.1, 'keepIndex': slice(None)},
-        },
-    1: {
-        #  each key is a trialSegment(18.6, 19), (74.85, 74.95)
-        0: {
-            'timeRanges': [(), ()], 'chan': 'SenseChannel1',
-            'thres': 2, 'iti': 0.1, 'keepIndex': slice(None)},
-        },
-    2: {
-        #  each key is a trialSegment(18.6, 19), (74.85, 74.95)
-        0: {
-            'timeRanges': [(18.6, 19), (74.85, 74.95)], 'chan': 'SenseChannel1',
-            'thres': 2, 'iti': 0.1, 'keepIndex': slice(None)},
-        },
-    3: {
-        #  each key is a trialSegment(18.6, 19), (74.85, 74.95)
-        0: {
-            'timeRanges': [(), ()], 'chan': 'SenseChannel1',
-            'thres': 2, 'iti': 0.1, 'keepIndex': slice(None)},
-        },
-    4: {
-        #  each key is a trialSegment(18.6, 19), (74.85, 74.95)
-        0: {
-            'timeRanges': [(), ()], 'chan': 'SenseChannel1',
-            'thres': 2, 'iti': 0.1, 'keepIndex': slice(None)},
-        },
-    5: {
-        #  each key is a trialSegment(18.6, 19), (74.85, 74.95)
-        0: {
-            'timeRanges': [(), ()], 'chan': 'SenseChannel1',
-            'thres': 2, 'iti': 0.1, 'keepIndex': slice(None)},
-        },
-    6: {
-        #  each key is a trialSegment(18.6, 19), (74.85, 74.95)
-        0: {
-            'timeRanges': [(), ()], 'chan': 'SenseChannel1',
-            'thres': 2, 'iti': 0.1, 'keepIndex': slice(None)},
-        },
-    7: {
-        #  each key is a trialSegment(18.6, 19), (74.85, 74.95)
-        0: {
-            'timeRanges': [(), ()], 'chan': 'SenseChannel1',
-            'thres': 2, 'iti': 0.1, 'keepIndex': slice(None)},
-        },
-    8: {
-        #  each key is a trialSegment(18.6, 19), (74.85, 74.95)
-        0: {
-            'timeRanges': [(), ()], 'chan': 'SenseChannel1',
-            'thres': 2, 'iti': 0.1, 'keepIndex': slice(None)},
-        }
-    }
+plotting = True
 trialInfoDF = pd.DataFrame(trialInfo)
 trialsToAnalyze = [0, 1, 3, 4, 6, 7, 8]
 # trialsToAnalyze = [0]
@@ -221,33 +167,32 @@ for trialIdx in trialsToAnalyze:
     if np.any(trialInfoDF.loc[trialIdx, 'insTensTimes']):
         insTensTimes = pd.Series(trialInfoDF.loc[trialIdx, 'insTensTimes']) - trialInfoDF.loc[trialIdx, 'timestampOffset']
     else:
-        insTensChanName = tensRangesINS[trialIdx][0]['chan']
-        insTensChan = insBlock.filter(objects=ChannelIndex, name=insTensChanName)[0]
-        insTensAsig = insTensChan.analogsignals[0]
-        timeMask = np.zeros_like(insTensAsig.magnitude, dtype=np.bool)
-        tUnits = insTensAsig.times.units
-        for tStart, tEnd in tensRangesINS[trialIdx][0]['timeRanges']:
-            thisMask = (
-                (insTensAsig.times >= tStart * tUnits) &
-                (insTensAsig.times <= tEnd * tUnits)
-                )
-            timeMask = timeMask | thisMask[:, np.newaxis]
-        insTensAsig[~timeMask] = 0 * insTensAsig.units
-        (
-            peakIdx, insTensTimes, peakMask, _) = hf.getTensTrigs(
-                diffThresh=tensRangesINS[trialIdx][0]['thres'],
-                tensAsig=insTensAsig, plotting=True)
+        continue
     (
         peakIdx, openEphysTensTimes,
-        peakMask, insTensTimes) = hf.getTensTrigs(
+        peakMask, insTensTimesChosen) = hf.getTensTrigs(
             diffThresh=10, magThresh=15,
             tensAsig=tensSyncAsig, referenceTimes=insTensTimes,
             plotting=False)
+    oeChosenMask = insTensTimes.isin(insTensTimesChosen).to_numpy()
+    keepMask = ~(trialInfoDF.loc[trialIdx, 'insTensExcludeMask'][oeChosenMask])
+    #pdb.set_trace()
     synchPolyCoeffs = np.polyfit(
-        x=insTensTimes.values,
-        y=openEphysTensTimes.values,
+        x=insTensTimesChosen.values[keepMask],
+        y=openEphysTensTimes.values[keepMask],
         deg=1)
     timeInterpFun = np.poly1d(synchPolyCoeffs)
+    alignedPulseTimes = timeInterpFun(
+        trialInfoDF.loc[trialIdx, 'insPulseTimes']).flatten()
+    alignedTensTimes = timeInterpFun(insTensTimesChosen).flatten()
+    if plotting:
+        fig, ax = plt.subplots()
+        plt.plot(insTensTimesChosen, openEphysTensTimes, 'bo')
+        ax.set_xlabel('Open Ephys and unaligned INS times (sec)')
+        plt.show()
+        plt.plot(alignedTensTimes - openEphysTensTimes, 'ro')
+        ax.set_xlabel('Difference between Open Ephys and aligned INS times (sec)')
+        plt.show()
     insDF['oeT'] = timeInterpFun(insDF['insT'])
     # get a new dummy asig, in case we truncated the tenssync one
     dummyAsig = emgBlock.filter(objects=AnalogSignal)[0]
@@ -264,10 +209,6 @@ for trialIdx in trialsToAnalyze:
         dataCol=interpCols,
         forceColNames=interpCols)
     #
-    alignedPulseTimes = timeInterpFun(
-        trialInfoDF.loc[trialIdx, 'insPulseTimes'] - trialInfoDF.loc[trialIdx, 'timestampOffset']).flatten()
-    alignedTensTimes = timeInterpFun(
-        trialInfoDF.loc[trialIdx, 'insTensTimes'] - trialInfoDF.loc[trialIdx, 'timestampOffset']).flatten()
     # make events objects
     alignEventsDF = pd.DataFrame({
         't': alignedPulseTimes,

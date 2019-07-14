@@ -8,9 +8,12 @@ Options:
     --exp=exp                  which experimental day to analyze
 """
 
+import matplotlib
+matplotlib.rcParams['pdf.fonttype'] = 42
+matplotlib.rcParams['ps.fonttype'] = 42
+matplotlib.use('Qt5Agg')   # generate postscript output by default
 import dataAnalysis.preproc.mdt as preprocINS
 import os
-import dataAnalysis.ephyviewer.scripts as vis_scripts
 from importlib import reload
 
 #  load options

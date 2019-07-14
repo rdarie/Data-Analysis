@@ -15,6 +15,7 @@ namedQueries = {
         'pca': "(chanName.str.contains('pca'))",
         'oech': "(chanName.str.contains('CH'))",
         'oechorsense': "((chanName.str.contains('CH'))or(chanName.str.contains('Sense')))",
+        'oechorins': "((chanName.str.contains('CH'))or(chanName.str.contains('ins')))",
         'rig': "not((chanName.str.contains('elec'))or(chanName.str.contains('pca')))"
     },
     'chan': {

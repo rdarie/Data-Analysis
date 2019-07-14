@@ -42,12 +42,12 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
             'btype': 'bandstop',
             'ftype': 'cheby1'
         },
-        #'low': {
-        #    'Wn': 1000,
-        #    'N': 8,
-        #    'btype': 'low',
-        #    'ftype': 'butter'
-        #},
+        'low': {
+            'Wn': 1000,
+            'N': 8,
+            'btype': 'low',
+            'ftype': 'butter'
+        },
         'high': {
             'Wn': 20,
             'N': 8,
@@ -121,27 +121,28 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
             'elecIDs': range(17),
             'excludeClus': [],
             'forceRecalc': True,
-            'detectStim': True,
+            'detectStim': expOpts['detectStim'],
             'getINSkwargs': {}
             }
         }
-    stimDetectChans = expOpts['stimDetectChans']
-    stimDetectThres = expOpts['stimDetectThres']
+    stimDetectChansDefault = expOpts['stimDetectChansDefault']
+    stimDetectThresDefault = expOpts['stimDetectThresDefault']
     stimDetectOptsByChannelDefault = {grpIdx: {
-        0: {'detectChannels': stimDetectChans, 'thres': stimDetectThres},
-        1: {'detectChannels': stimDetectChans, 'thres': stimDetectThres},
-        2: {'detectChannels': stimDetectChans, 'thres': stimDetectThres},
-        3: {'detectChannels': stimDetectChans, 'thres': stimDetectThres}
+        0: {'detectChannels': stimDetectChansDefault, 'thres': stimDetectThresDefault},
+        1: {'detectChannels': stimDetectChansDefault, 'thres': stimDetectThresDefault},
+        2: {'detectChannels': stimDetectChansDefault, 'thres': stimDetectThresDefault},
+        3: {'detectChannels': stimDetectChansDefault, 'thres': stimDetectThresDefault}
         } for grpIdx in range(4)}
-
+    stimDetectOptsByChannel = stimDetectOptsByChannelDefault
+    stimDetectOptsByChannel.update(expOpts['stimDetectOptsByChannelSpecific'])
     commonStimDetectionOpts = {
         'stimDetectOptsByChannel': stimDetectOptsByChannelDefault,
-        'fixedDelay': -60e-3,
-        'delayByFreqMult': 1, 'minDur': 0.2,
+        'fixedDelay': 0e-3,
+        'delayByFreqMult': .5, 'minDur': 0.2,
         'cyclePeriodCorrection': 20e-3,
         'plotAnomalies': False,
         'recalculateExpectedOffsets': True,
-        'plotting': [],  # range(1, 1000, 5)
+        'plotting': []  # range(1, 1000, 5) []
         }
     miniRCStimDetectionOpts = {
             'minDist': 1.2,
@@ -150,8 +151,8 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
             'treatAsSinglePulses': False
         }
     RCStimDetectionOpts = {
-        'minDist': 0.5,
-        'gaussWid': 200e-3,
+        'minDist': 0.25,
+        'gaussWid': 150e-3,
         'maxSpikesPerGroup': 1,
         'treatAsSinglePulses': True
         }
@@ -296,7 +297,7 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
         'windowSizes': {
             'short': (-0.5, 0.5),
             'long': (-2.25, 2.25),
-            'RC': (-0.2, 0.5),
+            'RC': (-0.33, 0.33),
             'miniRC': (-1, 1)
         },
         'discardEmpty': None, 'maxSpikesTo': None, 'timeRange': None,

@@ -158,10 +158,14 @@ for insEv in insSeg.filter(objects=Event):
     interpEv.segment = insInterpBlock.segments[segIdx]
 alignedTensTimes = timeInterpFun(insTensTimes).flatten()
 if plotting:
-    plt.plot(insTensTimes, emgTensTimes, 'bo')
+    fig, ax = plt.subplots()
+    ax.plot(insTensTimes, emgTensTimes, 'bo')
+    fig, ax = plt.subplots()
+    ax.plot(insTensTimes - emgTensTimes, 'bo')
     ax.set_xlabel('Difference between Open Ephys and unaligned INS times (sec)')
     plt.show()
-    plt.plot(alignedTensTimes - emgTensTimes, 'ro')
+    fig, ax = plt.subplots()
+    ax.plot(alignedTensTimes - emgTensTimes, 'ro')
     ax.set_xlabel('Difference between Open Ephys and aligned INS times (sec)')
     plt.show()
 tensEvents = Event(

@@ -34,8 +34,22 @@ def getExpOpts():
         'CH12': 'Left Quadriceps Central Central',
         'ADC1': 'KinectSync',
         'ADC2': 'TensSync'}
+    
+    openEphysBaseNames = {
+        1: '201812051000-PadawanRecruitmentCurve_Trial001-1-EMG',
+        2: '201812051000-PadawanRecruitmentCurve_Trial002-2-EMG',
+        3: '201812051000-PadawanRecruitmentCurve_Trial003-2-EMG',
+        4: '201812051000-PadawanRecruitmentCurve_Trial004-2-EMG',
+        5: '201812051000-PadawanRecruitmentCurve_Trial005-2-EMG',
+        6: '201812051000-PadawanRecruitmentCurve_Trial007-2-EMG',
+        7: '201812051000-PadawanRecruitmentCurve_Trial008-1-EMG',
+        8: '201812051000-PadawanRecruitmentCurve_Trial009-1-EMG',
+        }
+    openEphysIgnoreSegments = {k: None for k in openEphysBaseNames.keys()}
     #  options for automatic tap detection on ins data
-    tapDetectOpts = {
+    synchInfo = {'oe': {}, 'ins': {}, 'nsp': {}}
+    #  options for automatic tap detection on ins data
+    synchInfo['ins'] = {
         #  per trial
         1: {
             #  per trialSegment
@@ -70,7 +84,7 @@ def getExpOpts():
             }
         }
 
-    sessionTapRangesNSP = {
+    synchInfo['nsp'] = {
         #  per trial
         1: {
             #  per trialSegment
@@ -79,11 +93,6 @@ def getExpOpts():
             2: {'timeRanges': [669, 672], 'keepIndex': slice(None)},
             3: {'timeRanges': [669, 672], 'keepIndex': slice(None)}
             }
-        }
-
-    overrideSegmentsForTapSync = {
-        #  each key is a trial
-        1: {},
         }
 
     stimDetectThres = 1

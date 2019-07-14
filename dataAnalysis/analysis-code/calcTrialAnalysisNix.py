@@ -51,12 +51,10 @@ trialBasePath = os.path.join(
 )
 nspReader = neo.io.nixio_fr.NixIO(filename=trialBasePath)
 nspBlock = preproc.readBlockFixNames(nspReader, block_index=0)
-#  nspBlockRaw = nspReader.read_block(
-#      block_index=0, lazy=True,
-#      signal_group_mode='split-all')
-dataBlock = hf.extractSignalsFromBlock(
+
+spikesBlock = hf.extractSignalsFromBlock(
     nspBlock, keepSpikes=True)
-dataBlock = hf.loadBlockProxyObjects(dataBlock)
+spikesBlock = hf.loadBlockProxyObjects(spikesBlock)
 #  save ins time series
 arguments['chanNames'], arguments['chanQuery'] = ash.processChannelQueryArgs(
     namedQueries, scratchFolder, **arguments)
@@ -64,82 +62,23 @@ tdChanNames = ns5.listChanNames(nspBlock, arguments['chanQuery'], objType=Analog
 if not (miniRCTrial or RCTrial):
     tdChanNames += ['seg0_position', 'seg0_velocityCat']
 
-'''
-for ev in dataBlock.segments[0].filter(objects=Event):
-    if len(ev.times):
-        print('{}.t_start={}'.format(ev.name, ev.times[0]))
-    else:
-        print('{} has no times'.format(ev.name))
-for st in dataBlock.segments[0].filter(objects=SpikeTrain):
-    if len(st.times):
-        print('{}.t_start={}'.format(st.name, st.t_start))
-    else:
-        print('{} has no times'.format(st.name))
-for st in nspBlock.segments[0].filter(objects=SpikeTrainProxy):
-    print('{}.t_start={}'.format(st.name, st.t_start))
-    
-for asig in dataBlock.segments[0].filter(objects=AnalogSignal):
-        print('{}.t_start={}'.format(asig.name, asig.t_start))
-'''
 allSpikeTrains = [
-        i for i in dataBlock.filter(objects=SpikeTrain) if '#' in i.name]
+    i
+    for i in spikesBlock.filter(objects=SpikeTrain)
+    if '#' in i.name]
 if len(allSpikeTrains):
-    for segIdx, dataSeg in enumerate(dataBlock.segments):
-        #tStart = nspReader.get_signal_t_start(
-        #    block_index=0, seg_index=segIdx) * pq.s
-        #fs = nspReader.get_signal_sampling_rate(
-        #    channel_indexes=[0])
-        #sigSize = nspReader.get_signal_size(
-        #    block_index=0, seg_index=segIdx
-        #    )
-        #tStop = (sigSize / fs) * pq.s + tStart
-        #
+    for segIdx, dataSeg in enumerate(spikesBlock.segments):
         spikeList = dataSeg.filter(objects=SpikeTrain)
         spikeList = preproc.loadContainerArrayAnn(trainList=spikeList)
-        '''
-        for st in dataSeg.filter(objects=SpikeTrain):
-            if len(st.times):
-                st.t_start = min(tStart, st.times[0] * 0.999)
-                st.t_stop = min(tStop, st.times[-1] * 1.001)
-                validMask = st < st.t_stop
-                if ~validMask.all():
-                    print('Deleted some spikes')
-                    st = st[validMask]
-                    for key in st.array_annotations.keys():
-                        st.array_annotations[key] = st.array_annotations[key][validMask]
-                    if 'arrayAnnNames' in st.annotations.keys():
-                        for key in st.annotations['arrayAnnNames']:
-                            st.annotations[key] = np.array(st.annotations[key])[validMask]
-            else:
-                st.t_start = tStart
-                st.t_stop = tStop
-            if 'arrayAnnNames' in st.annotations.keys():
-                for key in st.annotations['arrayAnnNames']:
-                    #  fromRaw, the ann come back as tuple, need to recast
-                    st.array_annotations.update(
-                       {key: np.array(st.annotations[key])})
-            st.sampling_rate = samplingRate
-            if st.waveforms is None:
-                st.waveforms = np.array([]).reshape((0, 0, 0))*pq.mV
-        '''
-
-
-#  tests...
-#  [i.unit.channel_index.name for i in insBlockJustSpikes.filter(objects=SpikeTrain)]
-#  [i.channel_index.name for i in nspBlock.filter(objects=AnalogSignalProxy)]
-#  [i.name for i in nspBlock.filter(objects=AnalogSignalProxy)]
-#  [i.channel_index.name for i in dataBlock.filter(objects=AnalogSignal)]
-#  [i.channel_index.name for i in dataBlock.filter(objects=AnalogSignal)]
-
 #  merge events
 evList = []
 for key in ['property', 'value']:
     #  key = 'property'
-    insProp = dataBlock.filter(
+    insProp = spikesBlock.filter(
         objects=Event,
         name='seg0_ins_' + key
         )[0]
-    rigProp = dataBlock.filter(
+    rigProp = spikesBlock.filter(
         objects=Event,
         name='seg0_rig_' + key
         )
@@ -156,7 +95,6 @@ for key in ['property', 'value']:
         allProp = insProp
         allProp.name = 'seg0_' + key
         evList.append(insProp)
-
 #  make concatenated event, for viewing
 concatLabels = np.array([
     (elphpdb._convert_value_safe(evList[0].labels[i]) + ': ' +
@@ -170,16 +108,16 @@ concatEvent = Event(
     )
 concatEvent.merge_annotations(allProp)
 evList.append(concatEvent)
-dataBlock.segments[0].events = evList
-
-dataBlock = preproc.purgeNixAnn(dataBlock)
+spikesBlock.segments[0].events = evList
+#
+spikesBlock = preproc.purgeNixAnn(spikesBlock)
 writer = neo.io.NixIO(filename=analysisDataPath)
-writer.write_block(dataBlock, use_obj_names=True)
+writer.write_block(spikesBlock, use_obj_names=True)
 writer.close()
-
+#
 if len(allSpikeTrains):
     spikeMatBlock = preproc.calcBinarizedArray(
-        dataBlock, samplingRate,
+        spikesBlock, samplingRate,
         binnedSpikePath, saveToFile=True)
     newT = pd.Series(
         spikeMatBlock.filter(objects=AnalogSignal)[0].times.magnitude)
@@ -188,11 +126,11 @@ else:
     newT = pd.Series(
         np.arange(
             dummyT.t_start, dummyT.t_stop + 1/samplingRate, 1/samplingRate))
-
+#
 tdBlock = hf.extractSignalsFromBlock(
     nspBlock, keepSpikes=False, keepSignals=tdChanNames)
 tdBlock = hf.loadBlockProxyObjects(tdBlock)
-
+#
 ins_events = [
     i for i in tdBlock.filter(objects=Event)
     if 'ins_' in i.name]
@@ -210,7 +148,7 @@ expandCols = [
         'activeGroup', 'program', 'trialSegment']
 deriveCols = ['amplitudeRound', 'amplitude']
 progAmpNames = rcsa_helpers.progAmpNames
-
+#
 stimStSer = preproc.eventsToDataFrame(
     ins_events, idxT='t'
     )

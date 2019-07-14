@@ -175,7 +175,8 @@ def preprocOpenEphysFolder(
         folderPath,
         chIds='all', adcIds='all',
         chanNames=None, overwriteExisting=False,
-        filterOpts={}, makeFiltered=True, ignoreSegments=None, 
+        filterOpts={}, makeFiltered=True, ignoreSegments=None,
+        loadMat=False,
         startTimeS=0, dataTimeS=900,
         chunkSize=900,
         curSection=0, sectionsTotal=1, plotting=False,
@@ -189,18 +190,21 @@ def preprocOpenEphysFolder(
         folderPath, os.path.basename(folderPath) + '_filtered.nix')
     if os.path.exists(cleanOutputPath) and overwriteExisting:
         os.remove(cleanOutputPath)
-    matPath = os.path.join(
-        folderPath, os.path.basename(folderPath) + '.mat')
-    if not os.path.exists(matPath):
-        execStr = 'matlab -r \"preprocOpenEphysFolder({}); exit\"'.format(folderPath)
-        result = subprocess.run([execStr], shell=True)
+    
     if not os.path.exists(outputPath):
-        # rawBlock = openEphysFolderToNixBlock(
-        #     folderPath, adcIds=adcIds, chanNames=chanNames)
-        fileName = os.path.basename(folderPath)
-        rawBlock = openEphysMatToNixBlock(
-            folderPath, fileName,
-            ignoreSegments=ignoreSegments, chanNames=chanNames)
+        if not loadMat:
+            rawBlock = openEphysFolderToNixBlock(
+                folderPath, adcIds=adcIds, chanNames=chanNames)
+        else:
+            matPath = os.path.join(
+                folderPath, os.path.basename(folderPath) + '.mat')
+            if not os.path.exists(matPath):
+                execStr = 'matlab -r \"preprocOpenEphysFolder({}); exit\"'.format(folderPath)
+                result = subprocess.run([execStr], shell=True)
+            fileName = os.path.basename(folderPath)
+            rawBlock = openEphysMatToNixBlock(
+                folderPath, fileName,
+                ignoreSegments=ignoreSegments, chanNames=chanNames)
         writer = NixIO(filename=outputPath)
         writer.write_block(rawBlock, use_obj_names=True)
         writer.close()

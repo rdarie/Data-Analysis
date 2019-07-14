@@ -415,7 +415,7 @@ def plotFilterResponse(sos, fs):
     return fig, ax1, ax2
 
 
-def closestSeries(takeFrom, compareTo, strictly='neither'):
+def closestSeries(takeFrom=None, compareTo=None, strictly='neither'):
     closest = pd.Series(
         np.nan, index=takeFrom.index)
     closestIdx = pd.Series(
@@ -616,11 +616,13 @@ def gaussianSupport(tdSeg, peakIdx, gaussWid, fs):
 
 
 def noisyTriggerCorrection(
-    tdSeries, fs, kernDur, order=1, invert=False, plotKernel=False):
+        tdSeries, fs, kernDur, order=1,
+        applyZScore=True, applyAbsVal=True,
+        applyScaler=None,
+        invert=False, plotKernel=False):
     kernNSamp = int(kernDur * fs)
     if kernNSamp > len(tdSeries):
         kernNSamp = round(len(tdSeries) - 2)
-    
     for orderIdx in range(order):
         gaussKern = signal.gaussian(
             kernNSamp, kernNSamp/(6 * 2**orderIdx))
@@ -628,23 +630,64 @@ def noisyTriggerCorrection(
             kern = np.diff(gaussKern)
         else:
             kern += np.diff(gaussKern)
-    
-    if invert: kern = -kern
-    if plotKernel: plt.plot(kern); plt.show()
-
-    correctionFactorUncorrected = pd.Series(
-        np.convolve(kern, tdSeries, mode='same'),
-        index=tdSeries.index)
-    correctionFactor = np.abs(
-        stats.zscore(
-            correctionFactorUncorrected))
+    if invert:
+        kern = -kern
+    kern = kern / np.sum(kern)
+    if plotKernel:
+        fig, ax = plt.subplots()
+        ax.plot(kern)
+        ax.set_title('noisy trigger correction kernel')
+    correctionFactor = np.convolve(
+        kern, tdSeries, mode='same')
+    if applyZScore:
+        correctionFactor = stats.zscore(
+            correctionFactor)
+    if applyAbsVal:
+        correctionFactor = np.abs(
+            correctionFactor)
+    if applyScaler is not None:
+        correctionFactor = (
+            applyScaler
+            .fit_transform(correctionFactor.reshape(-1, 1))
+            .squeeze()
+        )
     return correctionFactor
 
 
+def enhanceNoisyTriggers(
+        tdSeries, correctionFactor=None,
+        applyZScore=True, applyAbsVal=True,
+        applyScaler=None):
+    if correctionFactor is None:
+        correctionFactor = 1
+    elif isinstance(correctionFactor, pd.Series):
+        cF = correctionFactor.to_numpy()
+    else:
+        cF = correctionFactor
+    triggerSignal = pd.Series(
+        ndimage.sobel(tdSeries, mode='reflect'))
+    triggerSignal = triggerSignal.fillna(0).to_numpy()
+    triggerSignal = triggerSignal * cF
+    if applyZScore:
+        triggerSignal = stats.zscore(triggerSignal)
+    if applyAbsVal:
+        triggerSignal = np.abs(triggerSignal)
+    if applyScaler is not None:
+        triggerSignal = (
+            applyScaler
+            .fit_transform(triggerSignal.reshape(-1, 1))
+            .squeeze()
+        )
+    return triggerSignal
+
+
 def getTimeMaskFromRanges(times, timeRanges):
-    # times is a pq array
-    timeMask = np.zeros_like(times.magnitude, dtype=np.bool)
-    tUnits = times.units
+    if not isinstance(times, pq.Quantity):
+        timeMask = np.zeros_like(times, dtype=np.bool)
+        tUnits = 1
+    else:
+        timeMask = np.zeros_like(times.magnitude, dtype=np.bool)
+        tUnits = times.units
     for tStart, tEnd in timeRanges:
         thisMask = (
             (times >= tStart * tUnits) &
@@ -652,16 +695,6 @@ def getTimeMaskFromRanges(times, timeRanges):
             )
         timeMask = timeMask | thisMask
     return timeMask
-
-def enhanceNoisyTriggers(tdSeries, correctionFactor):
-    stimDetectSignal = pd.Series(
-        ndimage.sobel(tdSeries, mode='reflect'),
-        index=tdSeries.index)
-    stimDetectSignal.iloc[:] = stimDetectSignal.values * correctionFactor.values
-    stimDetectSignal = stimDetectSignal.fillna(0)
-    stimDetectSignal.iloc[:] = stats.zscore(stimDetectSignal)
-    stimDetectSignal = stimDetectSignal.abs()
-    return stimDetectSignal
 
 
 '''
@@ -1281,15 +1314,6 @@ def getTensTrigs(
         peakTimes, referenceTimes = chooseTriggers(peakTimes, referenceTimes)
         peakIdx = np.array(peakTimes.index)
         peakMask = tensSrs.index.isin(peakIdx)
-
-    if plotting:
-        plt.plot(peakTimes, peakTimes ** 0, 'co', label = 'unaligned OpE TENS Pulses')
-        plt.plot(trainStarts, trainStarts ** 0 -1, 'go', label = 'unaligned OpE TENS Train Start')
-        plt.plot(trainEnds, trainEnds ** 0 +1, 'ro', label = 'unaligned OpE TENS Train End')
-        plt.plot(referenceTimes, referenceTimes ** 0, 'ko', label = 'unaligned INS TENS Pulses')
-        plt.legend()
-        plt.show()
-        #pdb.set_trace()
 
     return peakIdx, peakTimes, peakMask, referenceTimes
 

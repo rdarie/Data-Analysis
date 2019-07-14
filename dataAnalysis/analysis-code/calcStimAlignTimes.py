@@ -21,6 +21,7 @@ import quantities as pq
 import dataAnalysis.helperFunctions.helper_functions_new as hf
 import rcsanalysis.packet_func as rcsa_helpers
 import dataAnalysis.preproc.ns5 as ns5
+import dataAnalysis.preproc.mdt as mdt
 #  import dataAnalysis.preproc.mdt as preprocINS
 import numpy as np
 import pandas as pd
@@ -93,11 +94,14 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         dataSegEvents, idxT='t',
         names=['property', 'value']
         )
-    stimStatus = hf.stimStatusSerialtoLong(
+    stimStatus = mdt.stimStatusSerialtoLong(
         eventDF, idxT='t', namePrefix='', expandCols=expandCols,
         deriveCols=deriveCols, progAmpNames=progAmpNames)
     
-    tMask = stimStatus['t'] > 0
+    tMask = (
+        (stimStatus['t'] > alignTimeBounds[segIdx][0]) &
+        (stimStatus['t'] < alignTimeBounds[segIdx][1])
+        )
     stimStatus = stimStatus.loc[tMask, :].reset_index(drop=True)
 
     ampMask = stimStatus['amplitude'] > 0
@@ -116,7 +120,8 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
             ampOn = group.query('amplitude>0')
             if len(ampOn):
                 tStart = ampOn['t'].iloc[0]
-                tPrev = stimStatus.loc[ampOn.index[0] - 1, 't']
+                prevIdx = max(ampOn.index[0] - 1, stimStatus.index[0])
+                tPrev = stimStatus.loc[prevIdx, 't']
                 midTimes.append((tStart + tPrev) / 2)
     offCategories = stimStatus.loc[
         offIdx,

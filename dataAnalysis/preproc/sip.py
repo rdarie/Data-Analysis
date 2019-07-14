@@ -19,11 +19,52 @@ def loadSip(basePath, msecPerSample=2):
             dropSenseChans)
         insTimeSeries.columns = newChanNames
         insTimeSeries.fillna(0, inplace=True)
-    packetNumDiff = insTimeSeries['PacketNumber'].diff(periods=-1).fillna(-1)
-    packetNumDiff[packetNumDiff == 255] -= 256
+    packetNumDiff = insTimeSeries['PacketNumber'].diff().fillna(0)
+    packetNumDiff[packetNumDiff == -255] += 256
     # packetIntervals = insTimeSeries['Timestamp'].diff()
     # packetIntervals[packetIntervals < 0] += insTimeRollover
-    packetEnd = insTimeSeries.index[packetNumDiff != 0].tolist()
+    packetRolledOver = packetNumDiff != 0
+    packetEnd = (insTimeSeries.index[packetRolledOver] - 1).tolist() + [insTimeSeries.index[-1]]
+    packetRolloverGroup = packetRolledOver.cumsum()
+    metadata = insTimeSeries.loc[packetEnd, ['PacketNumber', 'Timestamp']]
+    allFrameLengths = metadata['Timestamp'].diff()
+    frameLength = allFrameLengths.value_counts().idxmax()
+    metadata['rolloverGroup'] = (allFrameLengths < 0).cumsum()
+    for name, group in metadata.groupby('rolloverGroup'):
+        # duplicateSysTick = group.duplicated('systemTick')
+        duplicateSysTick = group['Timestamp'].diff() == 0
+        if duplicateSysTick.any():
+            duplicateIdxs = duplicateSysTick.index[np.flatnonzero(duplicateSysTick)]
+            for duplicateIdx in duplicateIdxs:
+                sysTickVal = group.loc[duplicateIdx, 'Timestamp']
+                allOccurences = group.loc[group['Timestamp'] == sysTickVal, :]
+                assert len(allOccurences) == 2
+                #  'dataTypeSequence' rolls over, correct for it
+                specialCase = (
+                    (allOccurences['PacketNumber'] == 255).any() &
+                    (allOccurences['PacketNumber'] == 0).any()
+                )
+                if specialCase:
+                    idxNeedsChanging = allOccurences['PacketNumber'].idxmax()
+                else:
+                    idxNeedsChanging = allOccurences['PacketNumber'].idxmin()
+                metadata.loc[idxNeedsChanging, 'Timestamp'] -= frameLength
+    metadata['PacketSize'] = packetRolloverGroup.value_counts().sort_index().to_numpy(dtype='int')
+    metadata['FirstTimestamp'] = metadata['Timestamp'] - 10 * msecPerSample * (metadata['PacketSize'] - 1)
+    metadata['SampleOverlap'] = (metadata['Timestamp'] - metadata['FirstTimestamp'].shift(-1).values).fillna(- 10 * msecPerSample)
+    metadata['packetsOverlapFuture'] = metadata['SampleOverlap'] > 0
+    idxNeedsChanging = metadata.index[metadata['packetsOverlapFuture']]
+    ilocNeedsChanging = np.flatnonzero(metadata['packetsOverlapFuture'])
+    nextGoodSysTicks = metadata['Timestamp'].iloc[ilocNeedsChanging + 1]
+    nextGoodPacketSizes = metadata['PacketSize'].iloc[ilocNeedsChanging + 1]
+    correctedSysTicks = (
+        nextGoodSysTicks.to_numpy() -
+        nextGoodPacketSizes.to_numpy() * msecPerSample)
+    metadata.loc[idxNeedsChanging, 'Timestamp'] = correctedSysTicks
+    for name in packetRolloverGroup.unique():
+        indices = packetRolloverGroup.index[packetRolloverGroup == name]
+        newT = metadata.iloc[name]['Timestamp']
+        insTimeSeries.loc[indices, 'Timestamp'] = newT
     timestampNRollover = 0
     for idx, dfIdx in enumerate(packetEnd):
         if idx == 0:
