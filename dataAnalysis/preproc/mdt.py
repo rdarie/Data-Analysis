@@ -902,27 +902,27 @@ def getINSStimLogFromJson(
         jsonPath = os.path.join(folderPath, sessionName, deviceName)
         with open(os.path.join(jsonPath, 'StimLog.json'), 'r') as f:
             stimLog = json.load(f)
-        progAmpNames = rcsa_helpers.progAmpNames
-        stripProgName = rcsa_helpers.strip_prog_name
+        # progAmpNames = rcsa_helpers.progAmpNames
+        # stripProgName = rcsa_helpers.strip_prog_name
         if logForm == 'serial':
             stimStatus = rcsa_helpers.extract_stim_meta_data_events(
                 stimLog, trialSegment=idx)
-        elif logForm == 'long':
-            stimStatus = rcsa_helpers.extract_stim_meta_data(stimLog)
-            stimStatus['activeProgram'] = stimStatus.loc[
-                :, progAmpNames].idxmax(axis=1).apply(stripProgName)
-            stimStatus['maxAmp'] = stimStatus.loc[:, progAmpNames].max(axis=1)
-            stimStatus['trialSegment'] = idx
+        # elif logForm == 'long':
+        #     stimStatus = rcsa_helpers.extract_stim_meta_data(stimLog)
+        #     stimStatus['activeProgram'] = stimStatus.loc[
+        #         :, progAmpNames].idxmax(axis=1).apply(stripProgName)
+        #     stimStatus['maxAmp'] = stimStatus.loc[:, progAmpNames].max(axis=1)
+        #     stimStatus['trialSegment'] = idx
         allStimStatus.append(stimStatus)
     allStimStatusDF = pd.concat(allStimStatus, ignore_index=True)
     #  if all we're doing is turn something off, don't consider it a new round
     #  pdb.set_trace()
-    if logForm == 'long':
-        ampPositive = allStimStatusDF['maxAmp'].diff().fillna(0) >= 0
-        allStimStatusDF['amplitudeIncrease'] = (
-            allStimStatusDF['amplitudeChange'] & ampPositive)
-        allStimStatusDF['amplitudeRound'] = allStimStatusDF[
-            'amplitudeIncrease'].astype(np.float).cumsum()
+    # if logForm == 'long':
+    #     ampPositive = allStimStatusDF['maxAmp'].diff().fillna(0) >= 0
+    #     allStimStatusDF['amplitudeIncrease'] = (
+    #         allStimStatusDF['amplitudeChange'] & ampPositive)
+    #     allStimStatusDF['amplitudeRound'] = allStimStatusDF[
+    #         'amplitudeIncrease'].astype(np.float).cumsum()
     return allStimStatusDF
 
 
@@ -980,14 +980,14 @@ def stimStatusSerialtoLong(
         ampChange = ampChange | (stimStLong[pName].diff().fillna(0) != 0)
         if debugPlot:
             plt.plot(stimStLong[pName].diff().fillna(0), label=pName)
-    
+    # 
     if debugPlot:
         stimStLong.loc[:, ['program'] + progAmpNames].plot()
         ampIncrease.astype(float).plot(style='ro')
         ampChange.astype(float).plot(style='go')
         plt.legend()
         plt.show()
-
+    # 
     if 'amplitudeRound' in deriveCols:
         stimStLong['amplitudeRound'] = (
             ampIncrease.astype(np.float).cumsum())
@@ -1510,13 +1510,52 @@ def getINSStimOnset(
             gaussWid=gaussWid,
             thresh=2,
             enhanceEdges=True,
-            plotDetection=True
+            plotDetection=False
             )
         if foundTimestamp is not None:
             therapyOnTimes.loc[idx, 'on'] = foundTimestamp
             localIdx = [tdSeg.index.get_loc(i) for i in foundTimestamp]
-            therapyOnTimes.loc[idx, 'onIdx'] = tdDF.index[localIdx]
-        pdb.set_trace()
+            therapyOnTimes.loc[idx, 'onIdx'] = tMask.index[tMask][localIdx]
+    therapyDiff = pd.Series(0, index=tdDF.index)
+    therapyDiff.loc[therapyOnTimes['onIdx']] = 1
+    tdDF.loc[:, 'therapyRound'] = therapyDiff.cumsum()
+    tdDF.loc[:, 'slot'] = np.nan
+    plottingSlots = True
+    for idx, (name, group) in enumerate(tdDF.groupby('trialSegment')):
+        groupPeriod = 1 / group['RateInHz'].iloc[0]
+        tWindow = (group['t'].iloc[0], group['t'].iloc[0] + groupPeriod)
+        if plottingSlots:
+            sns.set()
+            sns.set_style("whitegrid")
+            sns.set_color_codes("dark")
+            cPal = sns.color_palette(n_colors=len(allDataCol) + 4)
+            cLookup = {n: cPal[i] for i, n in enumerate(allDataCol)}
+            cLookup.update({i: cPal[i+len(allDataCol)] for i in range(4)})
+            fig, ax = plt.subplots()
+            for colName in allDataCol:
+                ax.plot(
+                    group['t'],
+                    stats.zscore(group[colName]),
+                    '-', c=cLookup[colName],
+                    label='original signal {}'.format(colName))
+            ax.set_xlabel('Time (sec)')
+        while group['t'].iloc[-1] > tWindow[1]:
+            tMask = hf.getTimeMaskFromRanges(group['t'], [tWindow])
+            for sIdx in range(4):
+                sWin = (tWindow[0] + sIdx * groupPeriod / 4, tWindow[0] + (sIdx + 1) * groupPeriod / 4)
+                sMask = hf.getTimeMaskFromRanges(tdDF['t'], [sWin])
+                tdDF.loc[sMask, 'slot'] = sIdx
+                if plottingSlots:
+                    ax.axvspan(sWin[0], sWin[1], facecolor=cLookup[sIdx], alpha=0.5, zorder=-100)
+            newGroupPeriod = 1 / group.loc[group['t'] > tWindow[1], 'RateInHz'].iloc[0]
+            if newGroupPeriod != groupPeriod:
+                if plottingSlots:
+                    ax.axvline(group.loc[tMask, 't'].iloc[-1])
+            groupPeriod = newGroupPeriod
+            tWindow = (group.loc[tMask, 't'].iloc[-1], group.loc[tMask, 't'].iloc[-1] + groupPeriod)
+        if plottingSlots:
+            plt.show()
+    ## find offsets
     therapyOffsetIdx = tdDF.index[therapyDiff == -1]
     # if tdDF['therapyStatus'].iloc[-1] == 1:
     #     therapyOffsetIdx = pd.Index(
@@ -1544,7 +1583,7 @@ def getINSStimOnset(
             plotDetection=True
             )
         if foundTimestamp is not None:
-            therapyOffTimes.loc[idx, 'on'] = foundTimestamp
+            therapyOffTimes.loc[idx, 'off'] = foundTimestamp
             localIdx = tdSeg.index.get_loc(foundTimestamp)
             therapyOffTimes.loc[idx, 'offIdx'] = tdDF.index[localIdx]
         pdb.set_trace()

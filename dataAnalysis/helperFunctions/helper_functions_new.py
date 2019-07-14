@@ -690,7 +690,7 @@ def getTimeMaskFromRanges(times, timeRanges):
         tUnits = times.units
     for tStart, tEnd in timeRanges:
         thisMask = (
-            (times >= tStart * tUnits) &
+            (times > tStart * tUnits) &
             (times <= tEnd * tUnits)
             )
         timeMask = timeMask | thisMask
