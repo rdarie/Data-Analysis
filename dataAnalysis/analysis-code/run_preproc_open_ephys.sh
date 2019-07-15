@@ -2,14 +2,14 @@
 
 # 06a: Preprocess the NS5 File
 # Request 24 hours of runtime:
-#SBATCH --time=1:00:00
+#SBATCH --time=2:00:00
 
 # Default resources are 1 core with 2.8GB of memory.
 
 # Use more memory (32GB):
 #SBATCH --nodes=1
-#SBATCH --mem=12G
-#SBATCH --array=1,2,4,5,7,8,9
+#SBATCH --mem=32G
+#SBATCH --array=1
 
 # Specify a job name:
 #SBATCH -J nsp_preproc
@@ -26,7 +26,7 @@
 # EXP="exp201812051000"
 EXP="exp201901070700"
 
-python3 ./preprocINS.py --exp=$EXP --trialIdx=1
+# python3 ./preprocINS.py --exp=$EXP --trialIdx=1
 # python3 ./preprocINSfromSIP.py --exp=$EXP
 # python3 ./preprocOpenEphys.py --exp=$EXP --trialIdx=1 --loadMat
 # python3 ./synchronizeOpenEphysToINSSIP.py --exp=$EXP
@@ -35,4 +35,4 @@ python3 ./preprocINS.py --exp=$EXP --trialIdx=1
 # python3 ./calcStimAlignTimes.py --trialIdx=1 --exp=$EXP
 # python3 ./assembleExperimentData.py --exp=$EXP --processAsigs
 # python3 ./calcAlignedAsigs.py --exp=$EXP --trialIdx=1 --window=RC --chanQuery="oechorins" --blockName=RC --eventName=stimAlignTimes
-# python3 ./plotAlignedAsigs.py --exp=$EXP --trialIdx=1 --window=RC --inputBlockName=RC --unitQuery="oechorins" --alignQuery="stimOn" --rowName= --styleName= --hueName="amplitude"
+python3 ./plotAlignedAsigs.py --exp=$EXP --trialIdx=1 --window=RC --inputBlockName=RC --unitQuery="oechorins" --alignQuery="stimOn" --rowName= --styleName= --hueName="amplitude"

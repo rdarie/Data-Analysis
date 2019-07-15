@@ -125,8 +125,8 @@ def getExpOpts():
 
     # options for stim artifact detection
     detectStim = True
-    stimDetectThresDefault = 2
-    stimDetectChansDefault = ['ins_td0', 'ins_td1']
+    stimDetectThresDefault = 5
+    stimDetectChansDefault = ['ins_td0', 'ins_td1', 'ins_td2', 'ins_td3']
     stimDetectOptsByChannelSpecific = {
         #group
         0: {

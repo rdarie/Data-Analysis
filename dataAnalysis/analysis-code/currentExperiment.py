@@ -142,7 +142,7 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
         'cyclePeriodCorrection': 20e-3,
         'plotAnomalies': False,
         'recalculateExpectedOffsets': True,
-        'plotting': []  # range(1, 1000, 5) []
+        'plotting': range(1000)  # range(1, 1000, 5) []
         }
     miniRCStimDetectionOpts = {
             'minDist': 1.2,

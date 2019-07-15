@@ -596,7 +596,7 @@ def extractSignalsFromBlock(
 
 
 def gaussianSupport(tdSeg, peakIdx, gaussWid, fs):
-    kernNSamp = min(int(gaussWid * fs), len(tdSeg.index)-1)
+    kernNSamp = min(int(gaussWid * fs), len(tdSeg.index) - 1)
     
     gaussKern = signal.gaussian(
         kernNSamp, kernNSamp/6)
@@ -632,7 +632,7 @@ def noisyTriggerCorrection(
             kern += np.diff(gaussKern)
     if invert:
         kern = -kern
-    kern = kern / np.sum(kern)
+    kern = kern / np.sum(np.abs(kern))
     if plotKernel:
         fig, ax = plt.subplots()
         ax.plot(kern)
