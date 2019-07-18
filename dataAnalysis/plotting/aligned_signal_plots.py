@@ -158,7 +158,7 @@ def addSignificanceStars(
     pQueryList = []
     if len(g.row_names):
         rowFacetName = g.row_names[ro]
-        rowName = dataSubset.columns[dataSubset.isin(g.row_names).any()][0]
+        rowName = g._row_var
         if rowName is not None:
             if isinstance(rowFacetName, str):
                 compareName = '\'' + rowFacetName + '\''
@@ -168,7 +168,7 @@ def addSignificanceStars(
                 '({} == {})'.format(rowName, compareName))
     if len(g.col_names):
         colFacetName = g.col_names[co]
-        colName = dataSubset.columns[dataSubset.isin(g.col_names).any()][0]
+        colName = g._col_var
         if colName is not None:
             if isinstance(colFacetName, str):
                 compareName = '\'' + colFacetName + '\''

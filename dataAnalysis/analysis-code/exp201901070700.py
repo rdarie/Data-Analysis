@@ -122,19 +122,24 @@ def getExpOpts():
             0: {'timeRanges': [101, 103], 'keepIndex': slice(None)}
             }
         }
-
     # options for stim artifact detection
     detectStim = True
-    stimDetectThresDefault = 5
+    stimDetectThresDefault = 2
     stimDetectChansDefault = ['ins_td0', 'ins_td1', 'ins_td2', 'ins_td3']
+    stimDetectOverrideStartTimes = {
+        1: [600.740],
+        2: None,
+        3: None,
+        4: None,
+    }
     stimDetectOptsByChannelSpecific = {
         #group
         0: {
             #program
-            0: {'detectChannels': stimDetectChansDefault, 'thres': stimDetectThresDefault},
-            1: {'detectChannels': stimDetectChansDefault, 'thres': stimDetectThresDefault},
-            2: {'detectChannels': stimDetectChansDefault, 'thres': stimDetectThresDefault},
-            3: {'detectChannels': stimDetectChansDefault, 'thres': stimDetectThresDefault}
+            0: {'detectChannels': ['ins_td0', 'ins_td1', 'ins_td2'], 'thres': stimDetectThresDefault},
+            1: {'detectChannels': ['ins_td3'], 'thres': stimDetectThresDefault},
+            2: {'detectChannels': ['ins_td0', 'ins_td1', 'ins_td2'], 'thres': stimDetectThresDefault},
+            3: {'detectChannels': ['ins_td3'], 'thres': stimDetectThresDefault}
         }}
     # stimDetectChans = None
     triFolderSourceBase = 1

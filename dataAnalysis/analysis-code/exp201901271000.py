@@ -24,8 +24,8 @@ def getExpOpts():
         5: ['Session1548611405556']
         }
 
-    tapDetectOpts = {}
-    tapDetectOpts[1] = {
+    synchInfo = {'ins': {}, 'nsp': {}}
+    synchInfo['ins'][1] = {
         #  per trialSegment
         0: {
             'timeRanges': [(14, 16)],
@@ -42,7 +42,7 @@ def getExpOpts():
             'keepIndex': slice(1, None)
             }
         }
-    tapDetectOpts[2] = {
+    synchInfo['ins'][2] = {
         #  per trialSegment
         0: {
             'timeRanges': [(18, 20)],
@@ -52,7 +52,7 @@ def getExpOpts():
             'keepIndex': slice(1, None)
             }
         }
-    tapDetectOpts[3] = {
+    synchInfo['ins'][3] = {
         #  per trialSegment
         0: {
             'timeRanges': [(20, 22)],
@@ -62,7 +62,7 @@ def getExpOpts():
             'keepIndex': slice(None)
             }
         }
-    tapDetectOpts[4] = {
+    synchInfo['ins'][4] = {
         #  per trialSegment
         0: {
             'timeRanges': [(21, 24)],
@@ -72,7 +72,7 @@ def getExpOpts():
             'keepIndex': slice(None)
             }
         }
-    tapDetectOpts[5] = {
+    synchInfo['ins'][5] = {
         #  per trialSegment
         0: {
             'timeRanges': [(22, 25)],
@@ -83,7 +83,7 @@ def getExpOpts():
             }
         }
 
-    sessionTapRangesNSP = {
+    synchInfo['nsp'] = {
         #  per trialSegment
         1: {
             0: {'timeRanges': [212, 214], 'keepIndex': slice(None, 2)},
@@ -111,10 +111,20 @@ def getExpOpts():
         4: {},
         5: {}
         }
-
-    stimDetectThres = 1
-    stimDetectChans = ['ins_td0', 'ins_td2']
-
+    
+    detectStim = True
+    stimDetectThresDefault = 1
+    stimDetectChansDefault = ['ins_td0', 'ins_td2']
+    stimDetectOptsByChannelSpecific = {
+        #group
+        0: {
+            #program
+            0: {'detectChannels': stimDetectChansDefault, 'thres': stimDetectThresDefault},
+            1: {'detectChannels': stimDetectChansDefault, 'thres': stimDetectThresDefault},
+            2: {'detectChannels': stimDetectChansDefault, 'thres': stimDetectThresDefault},
+            3: {'detectChannels': stimDetectChansDefault, 'thres': stimDetectThresDefault}
+        }}
+        
     triFolderSourceBase = 3
     triDestinations = [
         'Trial00{}'.format(trialIdx)

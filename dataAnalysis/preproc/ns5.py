@@ -359,9 +359,17 @@ def unitSpikeTrainWaveformsToDF(
         else:
             st = stIn
         #  extract bins spaced by decimate argument
+        if not st.times.any():
+            continue
+        if verbose:
+            print('extracting wf from {}'.format(stIn.segment))
         wf = np.asarray(
             np.squeeze(st.waveforms)[:, ::decimate],
             dtype='float32')
+        if wf.ndim == 3:
+            print('Waveforms from more than one channel!')
+            if wf.shape[1] > 0:
+                wf = wf[:, 0, :]
         wfDF = pd.DataFrame(wf)
         #  if verbose:
         #      print('wfDF.shape = {}'.format(wfDF.shape))
@@ -394,8 +402,9 @@ def unitSpikeTrainWaveformsToDF(
                 else:
                     v = np.asarray(values)
                 annDict.update({k: v})
+            #pdb.set_trace()
             skipAnnNames = (
-                stIn.annotations['arrayAnnNames'] +
+                st.annotations['arrayAnnNames'] +
                 [
                     'arrayAnnNames', 'arrayAnnDTypes',
                     'nix_name', 'neo_name', 'id']
@@ -455,10 +464,13 @@ def concatenateUnitSpikeTrainWaveformsDF(
         fastTranspose=True, getMetaData=True, verbose=False,
         metaDataToCategories=False, decimate=1, windowSize=None,
         whichSegments=None, procFun=None):
-    
+    allUnits = []
+    for thisUnit in units:
+        hasAnySpikes = [st.times.any() for st in thisUnit.spiketrains]
+        if np.any(hasAnySpikes):
+            allUnits.append(thisUnit)
     waveformsList = []
-    
-    for idx, thisUnit in enumerate(units):
+    for idx, thisUnit in enumerate(allUnits):
         if verbose:
             print('concatenating unitDF {}'.format(thisUnit.name))
         unitWaveforms = unitSpikeTrainWaveformsToDF(
@@ -1346,8 +1358,11 @@ def synchronizeINStoNSP(
                         st.t_stop = tStop
         #  pdb.set_trace()
         allEvents = insBlock.filter(objects=Event)
+        allEvents = [ev for ev in allEvents if 'concatenate' not in ev.name]
         eventsDF = eventsToDataFrame(allEvents, idxT='t')
-        segMask = getStimSerialTrialSegMask(eventsDF, trialSegment)
+        newNames = {i: childBaseName(i, 'seg') for i in eventsDF.columns}
+        eventsDF.rename(columns=newNames, inplace=True)
+        segMask = hf.getStimSerialTrialSegMask(eventsDF, trialSegment)
         for event in allEvents:
             event.magnitude[segMask] = (
                 timeInterpFunINStoNSP(event.times[segMask]))
@@ -2179,6 +2194,8 @@ def loadObjArrayAnn(st):
     if 'arrayAnnNames' in st.annotations.keys():
         if isinstance(st.annotations['arrayAnnNames'], str):
             st.annotations['arrayAnnNames'] = [st.annotations['arrayAnnNames']]
+        elif isinstance(st.annotations['arrayAnnNames'], tuple):
+            st.annotations['arrayAnnNames'] = [i for i in st.annotations['arrayAnnNames']]
         for key in st.annotations['arrayAnnNames']:
             #  fromRaw, the ann come back as tuple, need to recast
             try:

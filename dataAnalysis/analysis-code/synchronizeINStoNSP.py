@@ -130,7 +130,7 @@ if not os.path.exists(synchFunPath):
         tdGroupMask = td['data']['trialSegment'] == trialSegment
         tdGroup = td['data'].loc[tdGroupMask, :]
 
-        tapTimestampsINS, peakIdx = hf.getINSTapTimestamp(
+        tapTimestampsINS, peakIdx = mdt.getINSTapTimestamp(
             tdGroup, accelGroup,
             tapDetectOpts[trialIdx][trialSegment]
             )

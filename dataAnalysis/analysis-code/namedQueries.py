@@ -99,3 +99,9 @@ namedQueries['align'].update({
         namedQueries['align']['CW']
         ])
     })
+namedQueries['align'].update({
+    'stimOnLowRate': '&'.join([
+        namedQueries['align']['stimOn'],
+        "(RateInHz < 5)"
+        ])
+    })

@@ -7,7 +7,7 @@ Options:
     --trialIdx=trialIdx                    which trial to analyze [default: 1]
     --processAll                           process entire experimental day? [default: False]
     --verbose                              print diagnostics? [default: True]
-    --lazy                                 load from raw, or regular? [default: True]
+    --lazy                                 load from raw, or regular? [default: False]
     --window=window                        process with short window? [default: short]
     --inputBlockName=inputBlockName        which trig_ block to pull [default: pca]
     --unitQuery=unitQuery                  how to restrict channels if not supplying a list? [default: pca]
@@ -59,8 +59,7 @@ alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = (
 alignedAsigsKWargs.update(dict(
     duplicateControlsByProgram=True,
     makeControlProgram=True,
-    metaDataToCategories=False,
-    removeFuzzyName=True))
+    metaDataToCategories=False))
 if arguments['processAll']:
     prefix = experimentName
 else:
@@ -78,12 +77,12 @@ pdfName = '{}_{}_{}_{}'.format(
     arguments['alignQuery'])
 statsTestPath = os.path.join(scratchFolder, pdfName + '_stats.h5')
 #  Overrides
-#  alignedAsigsKWargs.update({'decimate': 15})
-alignedAsigsKWargs.update({'windowSize': (-250e-3, 250e-3)})
+alignedAsigsKWargs.update({'decimate': 10})
+alignedAsigsKWargs.update({'windowSize': (-25e-3, 75e-3)})
 statsTestOpts.update({
-    'testStride': 20e-3,
-    'testWidth': 50e-3,
-    'tStop': 250e-3})
+    'testStride': 10e-3,
+    'testWidth': 20e-3,
+    'tStop': 100e-3})
 #  End Overrides
 #  Get stats results
 if os.path.exists(statsTestPath):
@@ -97,6 +96,7 @@ else:
         loadArgs=alignedAsigsKWargs,
         rowColOpts=rowColOpts,
         statsTestOpts=statsTestOpts)
+
 asp.plotAsigsAligned(
     dataBlock,
     verbose=arguments['verbose'],

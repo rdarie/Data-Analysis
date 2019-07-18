@@ -274,7 +274,7 @@ def facetGridCompareMeans(
             sigTestAsig = asigWide.query(sigTestQuery)
         else:
             sigTestAsig = asigWide
-        #  get significance test results
+        #  get significance test results (correct for multiple comparionsons at the end, not here)
         pVals, statVals, sigVals = compareMeansGrouped(
             sigTestAsig, testVar=sigTestVar,
             groupBy=sigTestGroupBy, correctMultiple=False,

@@ -595,14 +595,18 @@ def extractSignalsFromBlock(
     return newBlock
 
 
-def gaussianSupport(tdSeg, peakIdx, gaussWid, fs):
+def gaussianSupport(
+    tdSeg=None, peakIdx=None,
+    gaussWid=None, fs=None, support=None):
     kernNSamp = min(int(gaussWid * fs), len(tdSeg.index) - 1)
     
     gaussKern = signal.gaussian(
         kernNSamp, kernNSamp/6)
 
-    support = pd.Series(0, index=tdSeg.index)
-    support.loc[peakIdx] = 1
+    if support is None:
+        support = pd.Series(0, index=tdSeg.index)
+        support.loc[peakIdx] = 1
+    # pdb.set_trace()
     support.iloc[:] = np.convolve(
         support.values,
         gaussKern, mode='same'
@@ -726,6 +730,16 @@ def getBadSpikesMask(spikes, nStd = 5, whichChan = 0, plotting = False, deleteBa
             spikes['TimeStamps'][idx] = np.array(spikes['TimeStamps'][idx])[np.logical_not(badMask[idx])]
     return badMask
 '''
+
+
+def getStimSerialTrialSegMask(insDF, trialSegment):
+    tsegMask = insDF['ins_property'] == 'trialSegment'
+    tseg = pd.Series(np.nan, index=insDF.index)
+    tseg.loc[tsegMask] = insDF.loc[tsegMask, 'ins_value']
+    tseg.fillna(method='ffill', inplace=True)
+    segmentMask = tseg == trialSegment
+    return segmentMask
+
 
 def fillInOverflow(channelData, plotting=False, fillMethod='constant'):
     # TODO merge this into getBadContinuousMask

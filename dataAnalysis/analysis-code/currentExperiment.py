@@ -135,14 +135,18 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
         } for grpIdx in range(4)}
     stimDetectOptsByChannel = stimDetectOptsByChannelDefault
     stimDetectOptsByChannel.update(expOpts['stimDetectOptsByChannelSpecific'])
+    if 'stimDetectOverrideStartTimes' in expOpts:
+        overrideStartTimes = expOpts['stimDetectOverrideStartTimes'][trialIdx]
+    else:
+        overrideStartTimes = None
     commonStimDetectionOpts = {
         'stimDetectOptsByChannel': stimDetectOptsByChannelDefault,
         'fixedDelay': 0e-3,
         'delayByFreqMult': .5, 'minDur': 0.2,
         'cyclePeriodCorrection': 20e-3,
         'plotAnomalies': False,
-        'recalculateExpectedOffsets': True,
-        'plotting': range(1000)  # range(1, 1000, 5) []
+        'overrideStartTimes': overrideStartTimes,
+        'plotting':  range(1000) # range(1, 1000, 5) [] range(1000)
         }
     miniRCStimDetectionOpts = {
             'minDist': 1.2,
@@ -154,7 +158,7 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
         'minDist': 0.25,
         'gaussWid': 150e-3,
         'maxSpikesPerGroup': 1,
-        'treatAsSinglePulses': True
+        'treatAsSinglePulses': False
         }
     fullStimDetectionOpts = {
         'minDist': 0.2,
@@ -284,12 +288,14 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
         alignedAsigsKWargs.update(dict(
             amplitudeColumn='amplitude',
             programColumn='program',
-            electrodeColumn='electrode'))
+            electrodeColumn='electrode',
+            removeFuzzyName=False))
     else:
         alignedAsigsKWargs.update(dict(
             amplitudeColumn='amplitudeFuzzy',
             programColumn='programFuzzy',
-            electrodeColumn='electrodeFuzzy'))
+            electrodeColumn='electrodeFuzzy',
+            removeFuzzyName=True))
     #
     alignedAsigsChunkSize = 500
     rasterOpts = {

@@ -149,12 +149,10 @@ def processMotorData(motorData, fs, invertLookup=False):
     #  pdb.set_trace()
     motorData['velocity'] = motorData['count'] / 180e2
     motorData['position'] = motorData['velocity'].cumsum()
-
     detectSignal = hf.filterDF(
             motorData['velocity'], fs, filtFun='bessel',
             lowPass=500, lowOrder=2)
     #  motorData['velocity'] = detectSignal.values
-    
     detectSignal.iloc[:] = stats.zscore(detectSignal)
     bins = np.array([-1.5, 1.5])
     detectSignal.iloc[:] = np.digitize(detectSignal.values, bins)
@@ -401,7 +399,7 @@ def getTrialsNew(motorData, fs, tStart, trialType = '2AFC'):
             detectSignal, correctionFactor)
         minDist = 150e-3  # sec debounce
         peakIdx = peakutils.indexes(
-            detectSignal.values, thres=30,
+            detectSignal, thres=30,
             min_dist=int(minDist * fs), thres_abs=True,
             keep_what='max')
         #  this catches both edges, skip every other one

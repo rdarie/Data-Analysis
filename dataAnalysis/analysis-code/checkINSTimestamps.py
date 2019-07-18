@@ -1,113 +1,59 @@
 """
 Usage:
-    checkINSTimestamps [--trialIdx=trialIdx]
+    checkINSTimestamps [options]
 
 Options:
-    --trialIdx=trialIdx   which trial to analyze
+    --trialIdx=trialIdx        which trial to analyze [default: 1]
+    --exp=exp                  which experimental day to analyze
 """
 
-from docopt import docopt
+import matplotlib
+matplotlib.rcParams['pdf.fonttype'] = 42
+matplotlib.rcParams['ps.fonttype'] = 42
+matplotlib.use('Qt5Agg')   # generate postscript output by default
 import os
 import pdb
-import dataAnalysis.preproc.ns5 as preproc
+import dataAnalysis.preproc.ns5 as ns5
 from neo import (
     Block, Segment, ChannelIndex, Unit,
     Event, AnalogSignal, SpikeTrain)
 import neo
-from currentExperiment import *
 from matplotlib import pyplot as plt
-import seaborn as sns
 import numpy as np
 import pandas as pd
 from importlib import reload
+#  load options
+from currentExperiment import parseAnalysisOptions
+from docopt import docopt
+arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
+expOpts, allOpts = parseAnalysisOptions(
+    int(arguments['trialIdx']),
+    arguments['exp'])
+globals().update(expOpts)
+globals().update(allOpts)
 
-sns.set_style('whitegrid')
-sns.set_context('poster', font_scale=.5)
+import seaborn as sns
+sns.set()
+sns.set_color_codes("dark")
+sns.set_style("whitegrid")
+sns.set_context("talk", font_scale=.5)
 
 annotationsList = []
-for trialIdx in [1, 2, 3, 4]:
+for trialIdx in [1]:
     ns5FileName = 'Trial00{}'.format(trialIdx)
     insDataPath = os.path.join(
-        remoteBasePath, 'raw', experimentName,
+        scratchFolder,
         ns5FileName + '_ins.nix'
     )
-
-    insBlock = preproc.loadWithArrayAnn(
+    insBlock = ns5.loadWithArrayAnn(
         insDataPath, fromRaw=False)
-
-    allUnits = []
-    for thisUnit in insBlock.filter(objects=Unit):
-        spiketrains = []
-        keepUnit = False
-        waveformsDict = {}
-        for st in thisUnit.spiketrains:
-            if (st not in spiketrains) and len(st):
-                spiketrains.append(st)
-                keepUnit = True
-        if keepUnit:
-            thisUnit.spiketrains = spiketrains
-            allUnits.append(thisUnit)
+    theseAnnDF = ns5.concatenateUnitSpikeTrainWaveformsDF(
+        insBlock.filter(objects=Unit), verbose=True)
+    annotationsList.append(theseAnnDF.index.to_frame().reset_index(drop=True))
     
-    for unitIdx, thisUnit in enumerate(allUnits):
-        annotationsList.append(preproc.spikeTrainArrayAnnToDF(
-            thisUnit.spiketrains))
-
 annotationsDF = pd.concat(annotationsList)
-annotationsDF.reset_index(inplace=True)
-
-for name, group in annotationsDF.groupby('name'):
-    print('{}, {}'.format(name, pd.unique(group['amplitudes'])))
-dataQuery = ' & '.join([
-     '(amplitudes >= 600)'
-    ])
-g = sns.catplot(
-    x='amplitudes', y='offsetFromLogged',
-    hue='rates', col='name', kind='box',
-    data=annotationsDF.query(dataQuery))
-plt.show()
-g = sns.catplot(
-    x='amplitudes', y='offsetFromExpected',
-    hue='rates', col='name', kind='box',
-    data=annotationsDF.query(dataQuery))
-plt.show()
-g = sns.catplot(
-    x='amplitudes', y='offsetFromExpected',
-    hue='rates', kind='box',
-    data=annotationsDF.query(dataQuery))
-plt.show()
-g = sns.lmplot(
-    x='rates', y='offsetFromLogged',
-    hue='amplitudes', col='name',
-    data=annotationsDF.query(dataQuery))
-plt.show()
-g = sns.lmplot(
-    x='rates', y='offsetFromExpected',
-    hue='amplitudes', col='name',
-    data=annotationsDF.query(dataQuery))
-plt.show()
-g = sns.regplot(
-    x='rates', y='offsetFromLogged',
-    data=annotationsDF.query(dataQuery))
-plt.show()
-g = sns.regplot(
-    x='rates', y='offsetFromExpected',
-    data=annotationsDF.query(dataQuery))
-plt.show()
-
-plotDF = pd.melt(
-    annotationsDF,
-    id_vars=['name', 'amplitudes', 'rates'],
-    value_vars=['offsetFromExpected', 'offsetFromLogged'],
-    var_name='measuredFrom',
-    value_name='offset')
-
-for name, group in plotDF.groupby('name'):
-    print('{}, {}'.format(name, pd.unique(group['amplitudes'])))
-
-dataQuery = ' & '.join([
-     '(amplitudes >= 600)',
-     'measuredFrom == \'offsetFromExpected\''
-    ])
+for name, group in annotationsDF.groupby('feature'):
+    print('{}, {}'.format(name, pd.unique(group['amplitude'])))
 
 
 def annotated_distplot(x, **kwargs):
@@ -123,9 +69,64 @@ def annotated_distplot(x, **kwargs):
     print(kwargs['label'])
     sns.distplot(x, **kwargs)
 
+
+plotDF = pd.melt(
+    annotationsDF,
+    id_vars=['feature', 'amplitude', 'RateInHz'],
+    value_vars=['offsetFromExpected', 'offsetFromLogged'],
+    var_name='measuredFrom',
+    value_name='offset')
+dataQuery = ' & '.join([
+     '(amplitude > 0)'
+    ])
+pdb.set_trace()
+g = sns.catplot(
+    x='amplitude', y='offsetFromLogged',
+    hue='RateInHz', col='feature', kind='box',
+    data=annotationsDF.query(dataQuery))
+plt.suptitle('offsetFromLogged'); plt.show()
+g = sns.catplot(
+    x='amplitude', y='offsetFromExpected',
+    hue='RateInHz', col='feature', kind='box',
+    data=annotationsDF.query(dataQuery))
+plt.suptitle('offsetFromExpected'); plt.show()
+g = sns.catplot(
+    x='amplitude', y='offsetFromExpected',
+    hue='RateInHz', kind='box',
+    data=annotationsDF.query(dataQuery))
+plt.suptitle('offsetFromExpected'); plt.show()
+#
+g = sns.lmplot(
+    x='RateInHz', y='offsetFromLogged',
+    hue='amplitude', col='feature',
+    data=annotationsDF.query(dataQuery))
+plt.suptitle('offsetFromLogged'); plt.show()
+g = sns.lmplot(
+    x='RateInHz', y='offsetFromExpected',
+    hue='amplitude', col='feature',
+    data=annotationsDF.query(dataQuery), x_jitter=.1)
+plt.suptitle('offsetFromExpected'); plt.show()
+g = sns.regplot(
+    x='RateInHz', y='offsetFromLogged',
+    data=annotationsDF.query(dataQuery), x_jitter=.1)
+plt.suptitle('offsetFromLogged'); plt.show()
+g = sns.regplot(
+    x='RateInHz', y='offsetFromExpected',
+    data=annotationsDF.query(dataQuery), x_jitter=.1)
+plt.suptitle('offsetFromExpected'); plt.show()
+
+for name, group in plotDF.groupby('feature'):
+    print('{}, {}'.format(name, pd.unique(group['amplitude'])))
+
+dataQuery = ' & '.join([
+     '(amplitude >= 0)',
+     "measuredFrom == 'offsetFromExpected'"
+    ])
+
+
 g = sns.FacetGrid(
     plotDF.query(dataQuery),
-    row='measuredFrom', col='name', hue='rates', aspect=1.5)
+    row='measuredFrom', col='feature', hue='RateInHz', aspect=1.5)
 g.map(annotated_distplot, 'offset')
 for ax in g.axes.flat:
     ax.legend()
@@ -134,7 +135,7 @@ plt.show()
 
 g = sns.FacetGrid(
     plotDF.query(dataQuery),
-    row='measuredFrom', hue='rates', aspect=1.5)
+    row='measuredFrom', hue='RateInHz', aspect=1.5)
 g.map(annotated_distplot, 'offset')
 for ax in g.axes.flat:
     ax.legend()
@@ -143,7 +144,7 @@ plt.show()
 
 g = sns.FacetGrid(
     plotDF,
-    row='measuredFrom', hue='amplitudes', aspect=1.5)
+    row='measuredFrom', hue='amplitude', aspect=1.5)
 g.map(annotated_distplot, 'offset')
 for ax in g.axes.flat:
     ax.legend()
@@ -154,7 +155,10 @@ g = sns.FacetGrid(
     plotDF,
     row='measuredFrom', aspect=1.5)
 g.map(annotated_distplot, 'offset')
+g.axes.flat[-1].set_xlabel('Time difference (sec)')
+
 for ax in g.axes.flat:
     ax.legend()
-plt.suptitle(ns5FileName)
+
+plt.suptitle('No slot detection')
 plt.show()

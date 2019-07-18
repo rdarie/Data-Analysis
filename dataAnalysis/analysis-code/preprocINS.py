@@ -15,7 +15,6 @@ matplotlib.use('Qt5Agg')   # generate postscript output by default
 import dataAnalysis.preproc.mdt as preprocINS
 import os
 from importlib import reload
-
 #  load options
 from currentExperiment import parseAnalysisOptions
 from docopt import docopt

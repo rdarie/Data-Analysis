@@ -407,7 +407,7 @@ def getTrials(motorData, fs, tStart, trialType='2AFC'):
             detectSignal, correctionFactor)
         minDist = 150e-3  # sec debounce
         peakIdx = peakutils.indexes(
-            detectSignal.values, thres=30,
+            detectSignal, thres=30,
             min_dist=int(minDist * fs), thres_abs=True,
             keep_what='max')
         #  this catches both edges, skip every other one
@@ -420,9 +420,7 @@ def getTrials(motorData, fs, tStart, trialType='2AFC'):
         #  plt.plot(peakIdx / fs, tdSeries.loc[peakIdx]**0, 'ro'); plt.show()
         #  plt.plot(tdSeries.index / fs, detectSignal)
         #  plt.plot(peakIdx / fs, detectSignal.loc[peakIdx]**0, 'ro'); plt.show()
-    
     vCat = motorData.loc[:, 'velocityCat'].astype(float) - 1
-
     detectSignal = vCat.diff().fillna(0)
     minDist = 50e-3  # msec debounce
     peakIdx = peakutils.indexes(

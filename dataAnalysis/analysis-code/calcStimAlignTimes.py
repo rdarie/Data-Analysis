@@ -7,6 +7,7 @@ Options:
     --exp=exp                            which experimental day to analyze
     --processAll                         process entire experimental day? [default: False]
     --plotParamHistograms                plot pedal size, amplitude, duration distributions? [default: False]
+    --makeControl                        make control align times? [default: False]
 """
 import os, pdb, traceback
 from importlib import reload
@@ -110,33 +111,36 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         availableCateg + ['t']]
     categories['stimCat'] = 'stimOn'
     
-    offIdx = []
-    midTimes = []
-    for name, group in stimStatus.groupby('amplitudeRound'):
-        ampOff = group.query('amplitude==0')
-        if len(ampOff):
-            offIdx.append(ampOff.index[0])
-        if name > 0:
-            ampOn = group.query('amplitude>0')
-            if len(ampOn):
-                tStart = ampOn['t'].iloc[0]
-                prevIdx = max(ampOn.index[0] - 1, stimStatus.index[0])
-                tPrev = stimStatus.loc[prevIdx, 't']
-                midTimes.append((tStart + tPrev) / 2)
-    offCategories = stimStatus.loc[
-        offIdx,
-        availableCateg + ['t']]
-    offCategories['stimCat'] = 'stimOff'
+    if arguments['makeControl']:
+        offIdx = []
+        midTimes = []
+        for name, group in stimStatus.groupby('amplitudeRound'):
+            ampOff = group.query('amplitude==0')
+            if len(ampOff):
+                offIdx.append(ampOff.index[0])
+            if name > 0:
+                ampOn = group.query('amplitude>0')
+                if len(ampOn):
+                    tStart = ampOn['t'].iloc[0]
+                    prevIdx = max(ampOn.index[0] - 1, stimStatus.index[0])
+                    tPrev = stimStatus.loc[prevIdx, 't']
+                    midTimes.append((tStart + tPrev) / 2)
+        offCategories = stimStatus.loc[
+            offIdx,
+            availableCateg + ['t']]
+        offCategories['stimCat'] = 'stimOff'
     
-    midCategories = pd.DataFrame(midTimes, columns=['t'])
-    midCategories['stimCat'] = 'control'
-    midCategories['amplitude'] = 0
-    midCategories['program'] = 999
-    midCategories['RateInHz'] = 0
+        midCategories = pd.DataFrame(midTimes, columns=['t'])
+        midCategories['stimCat'] = 'control'
+        midCategories['amplitude'] = 0
+        midCategories['program'] = 999
+        midCategories['RateInHz'] = 0
 
-    alignEventsDF = pd.concat((
-        categories, offCategories, midCategories),
-        axis=0, ignore_index=True, sort=True)
+        alignEventsDF = pd.concat((
+            categories, offCategories, midCategories),
+            axis=0, ignore_index=True, sort=True)
+    else:
+        alignEventsDF = categories
     alignEventsDF.sort_values('t', inplace=True, kind='mergesort')
     #  pdb.set_trace()
     uniqProgs = pd.unique(alignEventsDF['program'])

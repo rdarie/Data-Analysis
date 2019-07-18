@@ -8,7 +8,7 @@
 # Use more memory (32GB):
 #SBATCH --nodes=1
 #SBATCH --mem=32G
-#SBATCH --array=1,2,3,4,5
+#SBATCH --array=2,3,4
 
 # Specify a job name:
 #SBATCH -J ins_synch
@@ -22,6 +22,6 @@
 
 # EXP="exp201901211000"
 EXP="exp201901271000"
-EXP="exp201901221000"
+# EXP="exp201901221000"
 
 python3 './synchronizeINStoNSP.py' --trialIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP
