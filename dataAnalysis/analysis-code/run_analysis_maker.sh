@@ -25,4 +25,4 @@
 # EXP="exp201901211000"
 EXP="exp201901271000"
 
-python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/calcTrialAnalysisNix.py' --trialIdx=$SLURM_ARRAY_TASK_ID  --exp=$EXP
+python3 './calcTrialAnalysisNix.py' --trialIdx=$SLURM_ARRAY_TASK_ID  --exp=$EXP

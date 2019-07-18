@@ -113,7 +113,7 @@ def getExpOpts():
         }
     
     detectStim = True
-    stimDetectThresDefault = 1
+    stimDetectThresDefault = 4
     stimDetectChansDefault = ['ins_td0', 'ins_td2']
     stimDetectOptsByChannelSpecific = {
         #group

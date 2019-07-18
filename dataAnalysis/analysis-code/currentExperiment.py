@@ -146,7 +146,7 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
         'cyclePeriodCorrection': 20e-3,
         'plotAnomalies': False,
         'overrideStartTimes': overrideStartTimes,
-        'plotting':  range(1000) # range(1, 1000, 5) [] range(1000)
+        'plotting': [] # range(1, 1000, 5) [] range(1000)
         }
     miniRCStimDetectionOpts = {
             'minDist': 1.2,
@@ -158,7 +158,7 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
         'minDist': 0.25,
         'gaussWid': 150e-3,
         'maxSpikesPerGroup': 1,
-        'treatAsSinglePulses': False
+        'treatAsSinglePulses': True
         }
     fullStimDetectionOpts = {
         'minDist': 0.2,

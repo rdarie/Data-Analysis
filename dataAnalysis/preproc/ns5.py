@@ -466,7 +466,15 @@ def concatenateUnitSpikeTrainWaveformsDF(
         whichSegments=None, procFun=None):
     allUnits = []
     for thisUnit in units:
-        hasAnySpikes = [st.times.any() for st in thisUnit.spiketrains]
+        hasAnySpikes = []
+        for stIn in thisUnit.spiketrains:
+            if isinstance(stIn, SpikeTrainProxy):
+                st = stIn.load(
+                    magnitude_mode='rescaled',
+                    load_waveforms=False)
+            else:
+                st = stIn
+            hasAnySpikes.append(st.times.any())
         if np.any(hasAnySpikes):
             allUnits.append(thisUnit)
     waveformsList = []

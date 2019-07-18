@@ -21,4 +21,4 @@
 
 # EXP="exp201901211000"
 EXP="exp201812051000"
-python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/assembleExperimentData.py' --exp=$EXP --processAsigs
+python3 './assembleExperimentData.py' --exp=$EXP --processAsigs
