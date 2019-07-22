@@ -650,7 +650,8 @@ def getAsigsAlignedToEvents(
         signalBlock = eventBlock
     #  channels to trigger
     if chansToTrigger is None:
-        chansToTrigger = listChanNames(signalBlock, chanQuery)
+        chansToTrigger = listChanNames(
+            signalBlock, chanQuery, objType=ChannelIndex)
     #  allocate block for spiketrains
     masterBlock = Block()
     masterBlock.name = signalBlock.annotations['neo_name']
@@ -664,48 +665,61 @@ def getAsigsAlignedToEvents(
         chanIdx.units.append(thisUnit)
         thisUnit.channel_index = chanIdx
         masterBlock.channel_indexes.append(chanIdx)
-
     totalNSegs = 0
+    #  print([evSeg.events[3].name for evSeg in eventBlock.segments])
     for segIdx, eventSeg in enumerate(eventBlock.segments):
         if verbose:
             print(
-                'analogSignalsAlignedToEvents on segment {}'
+                'getAsigsAlignedToEvents on segment {}'
                 .format(segIdx))
-        
+        #
         signalSeg = signalBlock.segments[segIdx]
-
-        allAlignEvents = ([
-            i.load()
-            for i in eventSeg.filter(
-                objects=EventProxy, name=eventName)] +
-            eventSeg.filter(objects=Event, name=eventName))
-        allAlignEvents = loadContainerArrayAnn(
-            trainList=allAlignEvents)[0]
-        
+        thisEventName = 'seg{}_{}'.format(segIdx, eventName)
+        # allAlignEventsList = ([
+        #     i.load()
+        #     for i in eventSeg.filter(
+        #         objects=EventProxy, name=thisEventName)] +
+        #     eventSeg.filter(objects=Event, name=thisEventName))
+        # 
+        # assert len(eventSeg.filter(name=thisEventName)) == 1
+        allEvIn = eventSeg.filter(name=thisEventName)[0]
+        if isinstance(allEvIn, EventProxy):
+            allAlignEvents = loadObjArrayAnn(allEvIn.load())
+        elif isinstance(allEvIn, Event):
+            allAlignEvents = allEvIn
+        else:
+            raise(Exception('{} must be an Event or EventProxy!'.format(eventName)))
+        #
         if chunkSize is None:
             alignEventGroups = [allAlignEvents]
         else:
-            nChunks = math.ceil(allAlignEvents.shape[0] / chunkSize)
+            nChunks = int(math.floor(allAlignEvents.shape[0] / chunkSize))
             alignEventGroups = []
             for i in range(nChunks):
-                if i < (nChunks - 1):
+                if not (i == (nChunks - 1)):
+                    # not last one
                     alignEventGroups.append(
                         allAlignEvents[i * chunkSize: (i + 1) * chunkSize])
                 else:
                     alignEventGroups.append(
                         allAlignEvents[i * chunkSize:])
+        # pdb.set_trace()
         for subSegIdx, alignEvents in enumerate(alignEventGroups):
             # seg to contain triggered time series
             newSeg = Segment(name='seg{}_'.format(int(totalNSegs)))
             newSeg.annotate(nix_name=newSeg.name)
             masterBlock.segments.append(newSeg)
             for chanName in chansToTrigger:
+                asigName = 'seg{}_{}'.format(segIdx, chanName)
                 if verbose:
                     print(
                         'getAsigsAlignedToEvents on channel {}'
                         .format(chanName))
-                asigP = signalSeg.filter(
-                    objects=AnalogSignalProxy, name=chanName)[0]
+                # assert len(signalSeg.filter(name=asigName)) == 1
+                matchingAsigPs = signalSeg.filter(
+                    objects=AnalogSignalProxy, name=asigName)
+                
+                asigP = matchingAsigPs[0]
                 if checkReferences:
                     da = (
                         asigP
@@ -734,13 +748,13 @@ def getAsigsAlignedToEvents(
                         alignEvents + windowSize[0] -
                         asigP.sampling_rate ** (-1)) > asigP.t_start)
                     )
-                
+                #
                 alignEvents = alignEvents[validMask]
                 rawWaveforms = [
                     asigP.load(
                         time_slice=(t + windowSize[0], t + windowSize[1]))
                     for t in alignEvents]
-
+                #
                 samplingRate = asigP.sampling_rate
                 waveformUnits = rawWaveforms[0].units
                 #  fix length if roundoff error
@@ -847,7 +861,7 @@ def getAsigsAlignedToEventsOneUnit(
         if chunkSize is None:
             alignEventGroups = [event]
         else:
-            nChunks = int(event.shape[0] / chunkSize)
+            nChunks = int(np.floor(event.shape[0] / chunkSize))
             alignEventGroups = []
             for i in range(nChunks):
                 if i < (nChunks - 1):
@@ -1539,16 +1553,13 @@ def readBlockFixNames(
         rawioReader,
         block_index=0, signal_group_mode='split-all',
         lazy=True):
-
     dataBlock = rawioReader.read_block(
         block_index=block_index, lazy=lazy,
         signal_group_mode=signal_group_mode)
-    
     #  
     if dataBlock.name is None:
         if 'neo_name' in dataBlock.annotations:
             dataBlock.name = dataBlock.annotations['neo_name']
-    
     #  on first segment, rename the chan_indexes and units
     seg0 = dataBlock.segments[0]
     asigLikeList = (
@@ -1556,27 +1567,18 @@ def readBlockFixNames(
         seg0.filter(objects=AnalogSignal)
         )
     for asig in asigLikeList:
-        if 'seg' in asig.name:
-            asigBaseName = '_'.join(asig.name.split('_')[1:])
-        else:
-            asigBaseName = asig.name
+        asigBaseName = childBaseName(asig.name, 'seg')
         if 'Channel group ' in asig.channel_index.name:
             asig.channel_index.name = asigBaseName
-    
     spikeTrainLikeList = (
         seg0.filter(objects=SpikeTrainProxy) +
         seg0.filter(objects=SpikeTrain)
         )
     for stp in spikeTrainLikeList:
-        # todo: use childBaseName function
-        if 'seg' in stp.name:
-            stpBaseName = '_'.join(stp.name.split('_')[1:])
-        else:
-            stpBaseName = stp.name
+        stpBaseName = childBaseName(stp.name, 'seg')
         if 'ChannelIndex for ' in stp.unit.channel_index.name:
             stp.unit.name = stpBaseName
             stp.unit.channel_index.name = stpBaseName
-    
     #  rename the children
     typesNeedRenaming = [
         SpikeTrainProxy, AnalogSignalProxy, EventProxy,
@@ -1586,16 +1588,23 @@ def readBlockFixNames(
             seg.name = 'seg{}_'.format(segIdx)
         else:
             if 'seg{}_'.format(segIdx) not in seg.name:
-                seg.name = 'seg{}_{}'.format(segIdx, seg.name)
+                seg.name = (
+                    'seg{}_{}'
+                    .format(
+                        segIdx,
+                        childBaseName(seg.name, 'seg')))
         for objType in typesNeedRenaming:
             for child in seg.filter(objects=objType):
                 if 'seg{}_'.format(segIdx) not in child.name:
-                    child.name = 'seg{}_{}'.format(segIdx, child.name)
+                    child.name = (
+                        'seg{}_{}'
+                        .format(
+                            segIdx,
+                            childBaseName(child.name, 'seg')))
                 #  todo: decide if below is needed
                 #  elif 'seg' in child.name:
                 #      childBaseName = '_'.join(child.name.split('_')[1:])
                 #      child.name = 'seg{}_{}'.format(segIdx, childBaseName)
-    
     return dataBlock
 
 
@@ -2172,13 +2181,13 @@ def loadContainerArrayAnn(
         container=None, trainList=None
         ):
     assert (container is not None) or (trainList is not None)
-
+    #
     spikesAndEvents = []
     returnObj = []
     if container is not None:
         #  need the line below! (RD: don't remember why, consider removing)
         container.create_relationship()
-        
+        #
         spikesAndEvents += (
             container.filter(objects=SpikeTrain) +
             container.filter(objects=Event)
@@ -2187,12 +2196,12 @@ def loadContainerArrayAnn(
     if trainList is not None:
         spikesAndEvents += trainList
         returnObj.append(trainList)
-    
+    #
     if len(returnObj) == 1:
         returnObj = returnObj[0]
     else:
         returnObj = tuple(returnObj)
-
+    #
     for st in spikesAndEvents:
         st = loadObjArrayAnn(st)
     return returnObj
@@ -2213,7 +2222,7 @@ def loadObjArrayAnn(st):
                     {key: np.asarray(st.annotations[key])})
             except Exception:
                 traceback.print_exc()
-                #  pdb.set_trace()
+                # pdb.set_trace()
     if hasattr(st, 'waveforms'):
         if st.waveforms is None:
             st.waveforms = np.asarray([]).reshape((0, 0, 0))*pq.mV
@@ -2244,9 +2253,10 @@ def blockFromPath(dataPath, lazy=False):
     if lazy:
         dataReader = nixio_fr.NixIO(
             filename=dataPath)
-        dataBlock = dataReader.read_block(
-            block_index=0, lazy=True,
-            signal_group_mode='split-all')
+        dataBlock = readBlockFixNames(dataReader, lazy=True)
+        #  dataBlock = dataReader.read_block(
+        #      block_index=0, lazy=True,
+        #      signal_group_mode='split-all')
     else:
         dataReader = None
         dataBlock = loadWithArrayAnn(dataPath)

@@ -109,7 +109,11 @@ concatEvent = Event(
 concatEvent.merge_annotations(allProp)
 evList.append(concatEvent)
 spikesBlock.segments[0].events = evList
-#
+for ev in evList:
+    ev.segment = spikesBlock.segments[0]
+# print([asig.name for asig in spikesBlock.filter(objects=AnalogSignal)])
+# print([st.name for st in spikesBlock.filter(objects=SpikeTrain)])
+# print([ev.name for ev in spikesBlock.filter(objects=Event)])
 spikesBlock = preproc.purgeNixAnn(spikesBlock)
 writer = neo.io.NixIO(filename=analysisDataPath)
 writer.write_block(spikesBlock, use_obj_names=True)
@@ -130,7 +134,7 @@ else:
 tdBlock = hf.extractSignalsFromBlock(
     nspBlock, keepSpikes=False, keepSignals=tdChanNames)
 tdBlock = hf.loadBlockProxyObjects(tdBlock)
-#
+
 ins_events = [
     i for i in tdBlock.filter(objects=Event)
     if 'ins_' in i.name]
@@ -174,8 +178,16 @@ tdBlockInterp = preproc.dataFrameToAnalogSignals(
     idxT='t', useColNames=True,
     dataCol=tdInterp.drop(columns='t').columns,
     samplingRate=samplingRate)
-for chanIdx in tdBlockInterp.channel_indexes:
-    chanIdx.name = preproc.childBaseName(chanIdx.name, 'seg0')
+# 
+# print([asig.name for asig in tdBlockInterp.filter(objects=AnalogSignal)])
+# print([st.name for st in tdBlockInterp.filter(objects=SpikeTrain)])
+# print([ev.name for ev in tdBlockInterp.filter(objects=Event)])
+# print([chIdx.name for chIdx in tdBlockInterp.filter(objects=ChannelIndex)])
+typesNeedRenaming = [ChannelIndex, AnalogSignal]
+for objType in typesNeedRenaming:
+    for child in tdBlockInterp.filter(objects=objType):
+        child.name = preproc.childBaseName(child.name, 'seg')
+# pdb.set_trace()
 preproc.addBlockToNIX(
     tdBlockInterp, neoSegIdx=[0],
     writeSpikes=False, writeEvents=False,

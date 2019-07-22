@@ -50,8 +50,8 @@ def getExpOpts():
     openEphysIgnoreSegments = {
         1: [0],
         2: None,
-        3: None,
-        4: None,
+        3: [0],
+        4: [1],
     }
     #
     openEphysBaseNames = {i: 'Trial{:0>3}_EMG'.format(i) for i in RCTrialLookup.keys()}
@@ -69,19 +69,41 @@ def getExpOpts():
             #  per trialSegment
             0: {
                 'timeRanges': [(261, 273), (1339, 1352)],
-                'chanName': 'CH4', 'thresh': 2,
-                'iti': 0.1, 'keepIndex': slice(None),
-                'overrideSegments': {}
+                'tdChan': 'ins_td0',
+                'tdThres': 2.5,
+                'iti': 0.2,
+                'keepIndex': slice(None)
                 }
             },
         2: {
-            
+            #  per trialSegment
+            0: {
+                'timeRanges': [(37.9, 51.8), (1137, 1147)],
+                'tdChan': 'ins_td0',
+                'tdThres': 2.5,
+                'iti': 0.2,
+                'keepIndex': slice(None)
+                }
             },
         3: {
-            
+            #  per trialSegment
+            0: {
+                'timeRanges': [(15, 24), (898, 904)],
+                'tdChan': 'ins_td0',
+                'tdThres': 2.5,
+                'iti': 0.2,
+                'keepIndex': slice(None)
+                }            
             },
         4: {
-            
+            #  per trialSegment
+            0: {
+                'timeRanges': [(920, 931)],
+                'tdChan': 'ins_td0',
+                'tdThres': 2.5,
+                'iti': 0.2,
+                'keepIndex': slice(None)
+                }            
             }
         }
 
@@ -95,13 +117,25 @@ def getExpOpts():
                 'iti': 0.1, 'keepIndex': slice(None)},
             },
         2: {
-            
+            #  per trialSegment
+            0: {
+                'timeRanges': [(227.796, 241.50), (1327.08, 1336.38)],
+                'chanName': 'CH13', 'thresh': 40,
+                'iti': 0.1, 'keepIndex': slice(None)},
             },
         3: {
-            
+            #  per trialSegment
+            0: {
+                'timeRanges': [(180.273, 187.877), (1063.614, 1068.417)],
+                'chanName': 'CH13', 'thresh': 40,
+                'iti': 0.1, 'keepIndex': slice(None)},
             },
         4: {
-            
+            #  per trialSegment
+            0: {
+                'timeRanges': [(890.654, 900.359)],
+                'chanName': 'CH13', 'thresh': 40,
+                'iti': 0.1, 'keepIndex': slice(None)},
             }
         }
     
@@ -124,23 +158,45 @@ def getExpOpts():
         }
     # options for stim artifact detection
     detectStim = True
-    stimDetectThresDefault = 2
+    stimDetectThresDefault = 15
     stimDetectChansDefault = ['ins_td0', 'ins_td1', 'ins_td2', 'ins_td3']
     stimDetectOverrideStartTimes = {
         1: [600.740],
-        2: None,
-        3: None,
+        2: [322.320, 860.524],
+        3: [123.124],
         4: None,
     }
     stimDetectOptsByChannelSpecific = {
-        #group
+        #  group
         0: {
-            #program
-            0: {'detectChannels': ['ins_td0', 'ins_td1', 'ins_td2'], 'thres': stimDetectThresDefault},
-            1: {'detectChannels': ['ins_td3'], 'thres': stimDetectThresDefault},
-            2: {'detectChannels': ['ins_td0', 'ins_td1', 'ins_td2'], 'thres': stimDetectThresDefault},
+            #  program
+            0: {'detectChannels': ['ins_td3'], 'thres': 25},
+            1: {'detectChannels': ['ins_td3'], 'thres': 25},
+            2: {'detectChannels': ['ins_td0', 'ins_td1', 'ins_td2'], 'thres': 25},
+            3: {'detectChannels': ['ins_td3'], 'thres': 25}
+        },
+        1: {
+            #  program
+            0: {'detectChannels': ['ins_td0', 'ins_td2', 'ins_td3'], 'thres': stimDetectThresDefault},
+            1: {'detectChannels': ['ins_td1'], 'thres': stimDetectThresDefault},
+            2: {'detectChannels': ['ins_td0', 'ins_td2', 'ins_td3'], 'thres': stimDetectThresDefault},
+            3: {'detectChannels': ['ins_td0', 'ins_td2', 'ins_td3'], 'thres': stimDetectThresDefault}
+        },
+        2: {
+            #  program
+            0: {'detectChannels': ['ins_td0', 'ins_td1'], 'thres': stimDetectThresDefault},
+            1: {'detectChannels': stimDetectChansDefault, 'thres': stimDetectThresDefault},
+            2: {'detectChannels': ['ins_td2'], 'thres': stimDetectThresDefault},
             3: {'detectChannels': ['ins_td3'], 'thres': stimDetectThresDefault}
-        }}
+        },
+        #  1: {  # trial004 has a different group 1 configured
+        #      #  program
+        #      0: {'detectChannels': ['ins_td0', 'ins_td2', 'ins_td3'], 'thres': stimDetectThresDefault},
+        #      1: {'detectChannels': ['ins_td1'], 'thres': stimDetectThresDefault},
+        #      2: {'detectChannels': ['ins_td0', 'ins_td2', 'ins_td3'], 'thres': stimDetectThresDefault},
+        #      3: {'detectChannels': ['ins_td1', 'ins_td3'], 'thres': stimDetectThresDefault}
+        #  }
+        }
     # stimDetectChans = None
     triFolderSourceBase = 1
     triDestinations = [
@@ -148,8 +204,7 @@ def getExpOpts():
         for trialIdx in [2, 3]]
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        '201901201200-Proprio': [2],
-        '201901211000-Proprio': [1, 2, 3],
+        '201901070700-ProprioRC': [1, 2, 3, 4],
         }
 
     movementSizeBins = [0, 0.25, 0.5, 1, 1.25, 1.5]
@@ -160,28 +215,21 @@ def getExpOpts():
             [177, 1189],
             ],
         2: [
-            []
+            [242, 1326]
             ],
         3: [
-            [],
+            [188, 1060],
+            ],
+        4: [
+            [0, 890],
             ]
         }
-    
     alignTimeBounds = [
         #  per trial
-        [
-            [177, 1189],
-            ],
-        [
-            #  per trialSegment
-            [],
-            ],
-        [
-            []
-            ],
-        [
-            [],
-            ]
+        [177, 1189],
+        [242, 1326],
+        [188, 1060],
+        [0, 890]
         ]
     gpfaRunIdx = 1
     return locals()

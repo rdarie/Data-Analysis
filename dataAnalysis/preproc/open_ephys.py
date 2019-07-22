@@ -84,6 +84,9 @@ def openEphysMatToNixBlock(
                         'Recording appears paused at t = {}'
                         .format(t[tJumps]))
                     print(
+                       'Recording ends at t = {}'
+                       .format(t[-1]))
+                    print(
                         'Removing segments {}'.format(ignoreSegments))
                 keepMask = np.isin(segmentAnn, ignoreSegments, invert=True)
                 t = t[keepMask]
@@ -98,6 +101,10 @@ def openEphysMatToNixBlock(
                 print(
                     'Recording appears paused at t = {}'
                     .format(t[tJumps]))
+                print(
+                    'Recording ends at t = {}'
+                    .format(t[-1]))
+
             #
             for segIdx in np.unique(segmentAnn):
                 if cIdx == 0:
@@ -120,7 +127,7 @@ def openEphysMatToNixBlock(
                 asig.annotate(label=thisLabel)
                 # pdb.set_trace()
                 maxTimeError = (asig.times.magnitude - t[segMask]).max()
-                assert maxTimeError < 1e-6, 'timestamps inconsistent!'
+                assert maxTimeError < (10 * sampleRate) ** (-1), 'timestamps inconsistent! maxError = {}'.format(maxTimeError)
                 asig.channel_index = chanIdx
                 # assign ownership to containers
                 chanIdx.analogsignals.append(asig)

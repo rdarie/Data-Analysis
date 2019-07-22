@@ -741,17 +741,18 @@ def getStimSerialTrialSegMask(insDF, trialSegment):
     return segmentMask
 
 
-def fillInOverflow(channelData, plotting=False, fillMethod='constant'):
+def fillInOverflow(
+        channelData, plotting=False, fillMethod='constant'):
     # TODO merge this into getBadContinuousMask
-    overflowMask = pd.DataFrame(False, index = channelData.index,
-        columns = channelData.columns,
-        dtype = np.bool).to_sparse(fill_value=False)
+    overflowMask = pd.DataFrame(
+        False, index=channelData.index,
+        columns=channelData.columns,
+        dtype=np.bool).to_sparse(fill_value=False)
     #pdb.set_trace()
     columnList = list(channelData.columns)
     nChan = len(columnList)
     for idx, row in channelData.iteritems():
-
-        ch_idx  = columnList.index(idx)
+        ch_idx = columnList.index(idx)
         col_idx = channelData.columns.get_loc(idx)
 
         if os.fstat(0) == os.fstat(1):

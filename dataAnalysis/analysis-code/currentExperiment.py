@@ -120,6 +120,7 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
             'jsonSessionNames': jsonSessionNames[trialIdx],
             'elecIDs': range(17),
             'excludeClus': [],
+            'upsampleRate': 8,
             'forceRecalc': True,
             'detectStim': expOpts['detectStim'],
             'getINSkwargs': {}
@@ -141,29 +142,26 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
         overrideStartTimes = None
     commonStimDetectionOpts = {
         'stimDetectOptsByChannel': stimDetectOptsByChannelDefault,
-        'fixedDelay': 0e-3,
-        'delayByFreqMult': .5, 'minDur': 0.2,
+        'offsetFromPeak': 4e-3,
         'cyclePeriodCorrection': 20e-3,
+        'predictSlots': True, 'snapToGrid': True,
         'plotAnomalies': False,
         'overrideStartTimes': overrideStartTimes,
-        'plotting': [] # range(1, 1000, 5) [] range(1000)
+        'plotting': []  # range(1, 1000, 5) [] range(1000)
         }
     miniRCStimDetectionOpts = {
-            'minDist': 1.2,
-            'gaussWid': 200e-3,
-            'maxSpikesPerGroup': 0,
-            'treatAsSinglePulses': False
+        'minDist': 1.2,
+        'gaussWid': 100e-3,
+        'treatAsSinglePulses': False
         }
     RCStimDetectionOpts = {
         'minDist': 0.25,
-        'gaussWid': 150e-3,
-        'maxSpikesPerGroup': 1,
+        'gaussWid': 120e-3,
         'treatAsSinglePulses': True
         }
     fullStimDetectionOpts = {
         'minDist': 0.2,
         'gaussWid': 100e-3,
-        'maxSpikesPerGroup': 1,
         'treatAsSinglePulses': False
         }
 

@@ -100,9 +100,20 @@ for suffix in suffixList:
                 for child in dataBlock.filter(objects=objType):
                     childBaseName = preproc.childBaseName(child.name, 'seg')
                     child.name = 'seg{}_{}'.format(idx, childBaseName)
+            # print([asig.name for asig in dataBlock.filter(objects=AnalogSignal)])
+            # print([st.name for st in dataBlock.filter(objects=SpikeTrain)])
+            # print([ev.name for ev in dataBlock.filter(objects=Event)])
+            # print([chIdx.name for chIdx in dataBlock.filter(objects=ChannelIndex)])
+            # pdb.set_trace()
             masterBlock.merge(dataBlock)
             if applyTimeOffset:
                 oldTStop = tStop
+    # pdb.set_trace()
+    # print([evSeg.events[0].name for evSeg in masterBlock.segments])
+    # print([asig.name for asig in masterBlock.filter(objects=AnalogSignal)])
+    # print([st.name for st in masterBlock.filter(objects=SpikeTrain)])
+    # print([ev.name for ev in masterBlock.filter(objects=Event)])
+    # print([chIdx.name for chIdx in masterBlock.filter(objects=ChannelIndex)])
     masterBlock = preproc.purgeNixAnn(masterBlock)
     writer = neo.io.NixIO(filename=experimentDataPath)
     writer.write_block(masterBlock, use_obj_names=True)

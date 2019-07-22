@@ -53,6 +53,8 @@ for trialIdx in [1]:
     
 annotationsDF = pd.concat(annotationsList)
 annotationsDF.sort_values(by='t', inplace=True)
+annotationsDF.reset_index(inplace=True)
+annotationsDF['offsetFromExpectedModulus'] = annotationsDF['offsetFromExpected'] % (annotationsDF['RateInHz'] ** (-1) / 2)
 for name, group in annotationsDF.groupby('feature'):
     print('{}, {}'.format(name, pd.unique(group['amplitude'])))
 
@@ -74,12 +76,12 @@ def annotated_distplot(x, **kwargs):
 plotDF = pd.melt(
     annotationsDF,
     id_vars=['feature', 'amplitude', 'RateInHz', 'usedSlotToDetect', 'usedExpectedT'],
-    value_vars=['offsetFromExpected', 'offsetFromLogged'],
+    value_vars=['offsetFromExpected', 'offsetFromLogged', 'offsetFromExpectedModulus'],
     var_name='measuredFrom',
     value_name='offset')
 dataQuery = ' & '.join([
     '(amplitude > 0)',
-    #'(usedSlotToDetect == True)'
+    '(usedSlotToDetect == True)'
     ])
 pdb.set_trace()
 g = sns.catplot(
@@ -106,16 +108,21 @@ plt.suptitle('offsetFromLogged'); plt.show()
 g = sns.lmplot(
     x='RateInHz', y='offsetFromExpected',
     hue='amplitude', col='feature',
-    data=annotationsDF.query(dataQuery), x_jitter=10)
+    data=annotationsDF.query(dataQuery), x_jitter=5)
 plt.suptitle('offsetFromExpected'); plt.show()
 g = sns.regplot(
     x='RateInHz', y='offsetFromLogged',
-    data=annotationsDF.query(dataQuery), x_jitter=.1)
+    data=annotationsDF.query(dataQuery), x_jitter=5)
 plt.suptitle('offsetFromLogged'); plt.show()
 g = sns.regplot(
     x='RateInHz', y='offsetFromExpected',
     data=annotationsDF.query(dataQuery), x_jitter=5)
 plt.suptitle('offsetFromExpected'); plt.show()
+#
+g = sns.regplot(
+    x='RateInHz', y='offsetFromExpectedModulus',
+    data=annotationsDF.query(dataQuery), x_jitter=5)
+plt.suptitle('offsetFromExpectedModulus'); plt.show()
 
 for name, group in plotDF.groupby('feature'):
     print('{}, {}'.format(name, pd.unique(group['amplitude'])))
@@ -123,7 +130,7 @@ for name, group in plotDF.groupby('feature'):
 dataQuery = ' & '.join([
      '(amplitude >= 0)',
      "measuredFrom == 'offsetFromExpected'",
-     # '(usedSlotToDetect == True)'
+     '(usedSlotToDetect == True)'
     ])
 
 g = sns.FacetGrid(

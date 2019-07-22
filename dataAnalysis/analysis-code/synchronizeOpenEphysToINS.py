@@ -6,14 +6,18 @@ Usage:
 Options:
     --exp=exp                       which experimental day to analyze
     --trialIdx=trialIdx             which trial to analyze [default: 1]
+    --showPlots                     whether to show diagnostic plots (must have display) [default: False]
 """
 
-import matplotlib, pdb, pickle, traceback
+import matplotlib
 matplotlib.rcParams['agg.path.chunksize'] = 10000
-#matplotlib.use('PS')   # generate interactive output by default
-#matplotlib.use('TkAgg')   # generate interactive output by default
+matplotlib.rcParams['pdf.fonttype'] = 42
+matplotlib.rcParams['ps.fonttype'] = 42
+matplotlib.use('Qt5Agg')  # generate interactive qt output
+#matplotlib.use('PS')
+#matplotlib.use('TkAgg')
 from matplotlib import pyplot as plt
-
+import pdb, pickle, traceback
 import numpy as np
 import pandas as pd
 from statsmodels import robust
@@ -47,7 +51,7 @@ from currentExperiment import parseAnalysisOptions
 from docopt import docopt
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
-    experimentShorthand=arguments['exp'])
+    int(arguments['trialIdx']), arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
 synchFunPath = os.path.join(
@@ -94,7 +98,7 @@ vMask = np.array([float(i) for i in evValues.labels]) > 0
 evMask = propMask & vMask & timeMask
 insTensTimes = pd.Series(evValues[evMask].magnitude)
 emgTensTimes = pd.Series(emgTensTimes.values)
-plotting = True
+plotting = arguments['showPlots']
 if plotting:
     fig, ax = plt.subplots()
     ax.plot(emgSyncAsig.times, emgSyncAsig)

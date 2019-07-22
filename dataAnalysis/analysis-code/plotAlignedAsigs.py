@@ -78,11 +78,11 @@ pdfName = '{}_{}_{}_{}'.format(
 statsTestPath = os.path.join(scratchFolder, pdfName + '_stats.h5')
 #  Overrides
 alignedAsigsKWargs.update({'decimate': 10})
-alignedAsigsKWargs.update({'windowSize': (-25e-3, 75e-3)})
+alignedAsigsKWargs.update({'windowSize': (-50e-3, 250e-3)})
 statsTestOpts.update({
     'testStride': 10e-3,
     'testWidth': 20e-3,
-    'tStop': 100e-3})
+    'tStop': 250e-3})
 #  End Overrides
 #  Get stats results
 if os.path.exists(statsTestPath):

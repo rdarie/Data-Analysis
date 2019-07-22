@@ -76,7 +76,7 @@ masterBlock.annotate(
 blockIdx = 0
 checkReferences = False
 for segIdx, dataSeg in enumerate(dataBlock.segments):
-    print('Calculating stim align times for trial {}'.format(segIdx))
+    print('Calculating stim align times for trial {}'.format(segIdx + 1))
     eventProxysList = dataSeg.events
     if checkReferences:
         for evP in eventProxysList:
@@ -98,19 +98,20 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
     stimStatus = mdt.stimStatusSerialtoLong(
         eventDF, idxT='t', namePrefix='', expandCols=expandCols,
         deriveCols=deriveCols, progAmpNames=progAmpNames)
-    
+    print('Usign alignTimeBounds {}'.format(alignTimeBounds[segIdx]))
+    #  pdb.set_trace()
     tMask = (
         (stimStatus['t'] > alignTimeBounds[segIdx][0]) &
         (stimStatus['t'] < alignTimeBounds[segIdx][1])
         )
     stimStatus = stimStatus.loc[tMask, :].reset_index(drop=True)
-
+    #
     ampMask = stimStatus['amplitude'] > 0
     categories = stimStatus.loc[
         ampMask,
         availableCateg + ['t']]
     categories['stimCat'] = 'stimOn'
-    
+    #
     if arguments['makeControl']:
         offIdx = []
         midTimes = []
@@ -129,20 +130,20 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
             offIdx,
             availableCateg + ['t']]
         offCategories['stimCat'] = 'stimOff'
-    
+        #
         midCategories = pd.DataFrame(midTimes, columns=['t'])
         midCategories['stimCat'] = 'control'
         midCategories['amplitude'] = 0
         midCategories['program'] = 999
         midCategories['RateInHz'] = 0
-
+        #
         alignEventsDF = pd.concat((
             categories, offCategories, midCategories),
             axis=0, ignore_index=True, sort=True)
     else:
         alignEventsDF = categories
     alignEventsDF.sort_values('t', inplace=True, kind='mergesort')
-    #  pdb.set_trace()
+    #
     uniqProgs = pd.unique(alignEventsDF['program'])
     #  pull actual electrode names
     alignEventsDF['electrode'] = np.nan
@@ -166,14 +167,14 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
             else:
                 elecName += '- E{}'.format(cathodes)
             alignEventsDF.loc[pMask, 'electrode'] = elecName
-
+    #
     alignEvents = ns5.eventDataFrameToEvents(
         alignEventsDF, idxT='t',
         annCol=None,
         eventName='seg{}_stimAlignTimes'.format(segIdx),
         tUnits=pq.s, makeList=False)
     alignEvents.annotate(nix_name=alignEvents.name)
-    #  pdb.set_trace()
+    #
     concatLabelsDF = alignEventsDF
     concatLabels = np.array([
         '{}'.format(row)
@@ -190,6 +191,7 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
     alignEvents.segment = newSeg
     concatEvents.segment = newSeg
     masterBlock.segments.append(newSeg)
+    print('Saving events {}'.format(alignEvents.name))
 
 dataReader.file.close()
 

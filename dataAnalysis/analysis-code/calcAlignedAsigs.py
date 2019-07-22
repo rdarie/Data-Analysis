@@ -6,6 +6,7 @@ Options:
     --trialIdx=trialIdx             which trial to analyze [default: 1]
     --exp=exp                       which experimental day to analyze
     --processAll                    process entire experimental day? [default: False]
+    --lazy                          load from raw, or regular? [default: False]
     --window=window                 process with short window? [default: short]
     --chanQuery=chanQuery           how to restrict channels if not providing a list? [default: fr]
     --blockName=blockName           name for new block [default: fr]
@@ -38,17 +39,16 @@ arguments['chanNames'], arguments['chanQuery'] = ash.processChannelQueryArgs(
 verbose = False
 #  source of events
 if arguments['processAll']:
-    eventReader = ns5.nixio_fr.NixIO(
-        filename=experimentDataPath)
+    eventPath = experimentDataPath
 else:
-    eventReader = ns5.nixio_fr.NixIO(
-        filename=analysisDataPath)
-
-eventBlock = eventReader.read_block(
-    block_index=0, lazy=True,
-    signal_group_mode='split-all')
-for ev in eventBlock.filter(objects=EventProxy):
-    ev.name = '_'.join(ev.name.split('_')[1:])
+    eventPath = analysisDataPath
+eventReader, eventBlock = ns5.blockFromPath(
+    eventPath, lazy=arguments['lazy'])
+#  eventBlock = eventReader.read_block(
+#      block_index=0, lazy=True,
+#      signal_group_mode='split-all')
+#  for ev in eventBlock.filter(objects=EventProxy):
+#      ev.name = '_'.join(ev.name.split('_')[1:])
 
 #  source of analogsignals
 signalBlock = eventBlock
