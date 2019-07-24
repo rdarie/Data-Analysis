@@ -285,7 +285,10 @@ def facetGridCompareMeans(
     allPValsWide = pd.concat(allPVals, names=['unit'] + pVals.index.names)
     if correctMultiple:
         flatPvals = allPValsWide.stack()
-        _, fixedPvals, _, _ = mt(flatPvals.values, method='holm')
+        try:
+            _, fixedPvals, _, _ = mt(flatPvals.values, method='holm')
+        except Exception:
+            fixedPvals = flatPvals.values / flatPvals.size
         flatPvals.loc[:] = fixedPvals
         flatPvals = flatPvals.unstack('bin')
         allPValsWide.loc[flatPvals.index, flatPvals.columns] = flatPvals

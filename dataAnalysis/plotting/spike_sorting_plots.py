@@ -340,7 +340,7 @@ def spikePDFReport(
     #      arrayInfo['nevIDs'] = spikes['ChannelID']
 
     with PdfPages(pdfName) as pdf:
-        ksa.plotSpikePanel(
+        plotSpikePanel(
             spikeStruct, spikes,
             colorPal=None,
             labelFontSize=1, padOverride=5e-2)

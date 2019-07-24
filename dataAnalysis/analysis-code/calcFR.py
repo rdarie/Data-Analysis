@@ -5,6 +5,7 @@ Usage:
 Options:
     --trialIdx=trialIdx             which trial to analyze [default: 1]
     --exp=exp                       which experimental day to analyze
+    --suffix=suffix                 does the analyze file have a name?
     --processAll                    process entire experimental day? [default: False]
 """
 
@@ -46,8 +47,17 @@ globals().update(allOpts)
 chanNames = None  # ['elec75#0_raster', 'elec75#1_raster']
 
 rasterOpts.update({
-    'binWidth': 50e-3,
+    'binWidth': 5e-3,
     'smoothKernelWidth': None})
+
+if arguments['suffix'] is None:
+    arguments['suffix'] = ''
+else:
+    arguments['suffix'] = '_' + arguments['suffix']
+    experimentBinnedSpikePath = experimentBinnedSpikePath.replace('.nix', '{}.nix'.format(arguments['suffix']))
+    experimentDataPath = experimentDataPath.replace('.nix', '{}.nix'.format(arguments['suffix']))
+    binnedSpikePath = binnedSpikePath.replace('.nix', '{}.nix'.format(arguments['suffix']))
+    analysisDataPath = analysisDataPath.replace('.nix', '{}.nix'.format(arguments['suffix']))
 
 if arguments['processAll']:
     masterBlock = preproc.calcFR(
@@ -72,7 +82,7 @@ if arguments['processAll']:
     preproc.addBlockToNIX(
         masterBlock, neoSegIdx=allSegs,
         writeSpikes=False, writeEvents=False,
-        fileName=experimentName + '_analyze',
+        fileName=experimentName + '_analyze{}'.format(arguments['suffix']),
         folderPath=scratchFolder,
         purgeNixNames=False,
         nixBlockIdx=0, nixSegIdx=allSegs,
@@ -81,7 +91,7 @@ else:
     preproc.addBlockToNIX(
         masterBlock, neoSegIdx=allSegs,
         writeSpikes=False, writeEvents=False,
-        fileName=ns5FileName + '_analyze',
+        fileName=ns5FileName + '_analyze{}'.format(arguments['suffix']),
         folderPath=scratchFolder,
         purgeNixNames=False,
         nixBlockIdx=0, nixSegIdx=allSegs,

@@ -82,6 +82,12 @@ pdfName = '{}_neurons_{}_{}'.format(
     arguments['alignQuery'])
 statsTestOpts.update({'tStop': rasterOpts['windowSizes'][arguments['window']][1]})
 statsTestPath = os.path.join(scratchFolder, pdfName + '_stats.h5')
+#  Overrides
+alignedAsigsKWargs.update({'windowSize': (-10e-3, 60e-3)})
+statsTestOpts.update({
+    'testStride': 10e-3,
+    'testWidth': 5e-3,
+    'tStop': 60e-3})
 #  End Overrides
 if os.path.exists(statsTestPath):
     sigValsWide = pd.read_hdf(statsTestPath, 'sig')

@@ -8,6 +8,7 @@ Options:
     --processAll                    process entire experimental day? [default: False]
     --lazy                          load from raw, or regular? [default: False]
     --window=window                 process with short window? [default: short]
+    --suffix=suffix                 does the analyze file have a name?
     --chanQuery=chanQuery           how to restrict channels if not providing a list? [default: fr]
     --blockName=blockName           name for new block [default: fr]
     --eventName=eventName           name of events object to align to [default: motionStimAlignTimes]
@@ -36,7 +37,15 @@ globals().update(expOpts)
 globals().update(allOpts)
 arguments['chanNames'], arguments['chanQuery'] = ash.processChannelQueryArgs(
     namedQueries, scratchFolder, **arguments)
-verbose = False
+verbose = True
+
+if arguments['suffix'] is None:
+    arguments['suffix'] = ''
+else:
+    arguments['suffix'] = '_' + arguments['suffix']
+    experimentDataPath = experimentDataPath.replace('.nix', '{}.nix'.format(arguments['suffix']))
+    analysisDataPath = analysisDataPath.replace('.nix', '{}.nix'.format(arguments['suffix']))
+
 #  source of events
 if arguments['processAll']:
     eventPath = experimentDataPath
@@ -56,7 +65,12 @@ signalBlock = eventBlock
 windowSize = [
     i * pq.s
     for i in rasterOpts['windowSizes'][arguments['window']]]
-
+#  arguments['chanNames'] = [
+#      'elec85#0_fr', 'elec85#1_fr',
+#      'elec71#1_fr', 'elec71#2_fr',
+#      'elec75#0_fr', 'elec75#1_fr',
+#      'elec77#0_fr', 'elec77#1_fr', 'elec77#2_fr',
+#      ]
 if arguments['processAll']:
     prefix = experimentName
 else:

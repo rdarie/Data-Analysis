@@ -68,7 +68,7 @@ def getExpOpts():
         1: {
             #  per trialSegment
             0: {
-                'timeRanges': [(261, 273), (1339, 1352)],
+                'timeRanges': [(261.6, 271.8), (1339.6, 1351.5)],
                 'tdChan': 'ins_td0',
                 'tdThres': 2.5,
                 'iti': 0.2,
@@ -78,7 +78,7 @@ def getExpOpts():
         2: {
             #  per trialSegment
             0: {
-                'timeRanges': [(37.9, 51.8), (1137, 1147)],
+                'timeRanges': [(37.9, 51.8), (1137.1, 1146.55)],
                 'tdChan': 'ins_td0',
                 'tdThres': 2.5,
                 'iti': 0.2,
@@ -88,7 +88,7 @@ def getExpOpts():
         3: {
             #  per trialSegment
             0: {
-                'timeRanges': [(15, 24), (898, 904)],
+                'timeRanges': [(15.5, 23.25), (898.8, 903.9)],
                 'tdChan': 'ins_td0',
                 'tdThres': 2.5,
                 'iti': 0.2,
@@ -106,7 +106,6 @@ def getExpOpts():
                 }            
             }
         }
-
     synchInfo['oe'] = {
         #  per trial
         1: {
@@ -119,7 +118,7 @@ def getExpOpts():
         2: {
             #  per trialSegment
             0: {
-                'timeRanges': [(227.796, 241.50), (1327.08, 1336.38)],
+                'timeRanges': [(227.796, 241.60), (1327.075, 1336.38)],
                 'chanName': 'CH13', 'thresh': 40,
                 'iti': 0.1, 'keepIndex': slice(None)},
             },
@@ -198,10 +197,10 @@ def getExpOpts():
         #  }
         }
     # stimDetectChans = None
-    triFolderSourceBase = 1
+    triFolderSourceBase = 2
     triDestinations = [
         'Trial00{}'.format(trialIdx)
-        for trialIdx in [2, 3]]
+        for trialIdx in [1, 3, 4]]
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
         '201901070700-ProprioRC': [1, 2, 3, 4],

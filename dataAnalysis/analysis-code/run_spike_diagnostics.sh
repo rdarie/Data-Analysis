@@ -21,9 +21,10 @@
 #SBATCH --account=bibs-dborton-condo
 
 # EXP="exp201901211000"
-EXP="exp201901221000"
-
-#  python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/tridesclousCCV.py' --trialIdx=$SLURM_ARRAY_TASK_ID --makeCoarseNeoBlock --exp=$EXP
-python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/plotSpikeReport.py' --trialIdx=$SLURM_ARRAY_TASK_ID --nameSuffix=_coarse --exp=$EXP
-python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/tridesclousCCV.py' --trialIdx=$SLURM_ARRAY_TASK_ID --makeStrictNeoBlock --exp=$EXP
-python3 '/gpfs/data/dborton/rdarie/Murdoc Neural Recordings/analysis-code/plotSpikeReport.py' --trialIdx=$SLURM_ARRAY_TASK_ID --nameSuffix=_final --exp=$EXP
+# EXP="exp201901221000"
+EXP="exp201901070700"
+#  python3 './tridesclousVisualize.py' --trialIdx=2 --exp=$EXP --constructor
+#  python3 './tridesclousCCV.py' --trialIdx=$SLURM_ARRAY_TASK_ID --makeCoarseNeoBlock --exp=$EXP
+python3 './plotSpikeReport.py' --trialIdx=$SLURM_ARRAY_TASK_ID --nameSuffix=_coarse --exp=$EXP
+python3 './tridesclousCCV.py' --trialIdx=$SLURM_ARRAY_TASK_ID --makeStrictNeoBlock --exp=$EXP
+python3 './plotSpikeReport.py' --trialIdx=$SLURM_ARRAY_TASK_ID --nameSuffix=_final --exp=$EXP

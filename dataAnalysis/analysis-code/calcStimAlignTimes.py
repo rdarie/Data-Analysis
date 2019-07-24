@@ -7,6 +7,7 @@ Options:
     --exp=exp                            which experimental day to analyze
     --processAll                         process entire experimental day? [default: False]
     --plotParamHistograms                plot pedal size, amplitude, duration distributions? [default: False]
+    --suffix=suffix                      does the analyze file have a name?
     --makeControl                        make control align times? [default: False]
 """
 import os, pdb, traceback
@@ -43,6 +44,14 @@ insReader = neo.NixIO(
     filename=insDataPath)
 insBlock = insReader.read_block(0)
 #  all experimental days?
+
+if arguments['suffix'] is None:
+    arguments['suffix'] = ''
+else:
+    arguments['suffix'] = '_' + arguments['suffix']
+    experimentDataPath = experimentDataPath.replace('.nix', '{}.nix'.format(arguments['suffix']))
+    analysisDataPath = analysisDataPath.replace('.nix', '{}.nix'.format(arguments['suffix']))
+
 if arguments['processAll']:
     dataReader = neo.io.nixio_fr.NixIO(
         filename=experimentDataPath)
@@ -201,7 +210,7 @@ if arguments['processAll']:
     ns5.addBlockToNIX(
         masterBlock, neoSegIdx=allSegs,
         writeAsigs=False, writeSpikes=False, writeEvents=True,
-        fileName=experimentName + '_analyze',
+        fileName=experimentName + '_analyze{}'.format(arguments['suffix']),
         folderPath=scratchFolder,
         purgeNixNames=False,
         nixBlockIdx=0, nixSegIdx=allSegs,
@@ -210,7 +219,7 @@ else:
     ns5.addBlockToNIX(
         masterBlock, neoSegIdx=allSegs,
         writeAsigs=False, writeSpikes=False, writeEvents=True,
-        fileName=ns5FileName + '_analyze',
+        fileName=ns5FileName + '_analyze{}'.format(arguments['suffix']),
         folderPath=scratchFolder,
         purgeNixNames=False,
         nixBlockIdx=0, nixSegIdx=allSegs,

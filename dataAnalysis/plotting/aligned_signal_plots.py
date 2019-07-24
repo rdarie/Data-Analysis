@@ -95,7 +95,7 @@ def plotNeuronsAligned(
         twinRelplotKWArgs={},
         plotProcFuns=[],
         ):
-
+    # pdb.set_trace()
     if loadArgs['unitNames'] is None:
         allChanNames = ns5.listChanNames(
             rasterBlock, loadArgs['unitQuery'], objType=Unit)

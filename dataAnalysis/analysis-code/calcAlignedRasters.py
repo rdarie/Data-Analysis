@@ -7,7 +7,9 @@ Options:
     --exp=exp                       which experimental day to analyze
     --processAll                    process entire experimental day? [default: False]
     --window=window                 process with short window? [default: short]
-    --unitQuery=unitQuery           how to restrict channels? [default: raster]
+    --lazy                          load from raw, or regular? [default: False]
+    --suffix=suffix                 does the analyze file have a name?
+    --chanQuery=chanQuery           how to restrict channels? [default: raster]
     --blockName=blockName           name for new block [default: raster]
     --eventName=eventName           name of events object to align to [default: motionStimAlignTimes]
 """
@@ -25,57 +27,67 @@ import numpy as np
 import pandas as pd
 import quantities as pq
 
+import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
+from namedQueries import namedQueries
 from currentExperiment import parseAnalysisOptions
 from docopt import docopt
-arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
-expOpts, allOpts = parseAnalysisOptions(int(arguments['trialIdx']), arguments['exp'])
+arguments = {
+    arg.lstrip('-'): value
+    for arg, value in docopt(__doc__).items()}
+expOpts, allOpts = parseAnalysisOptions(
+    int(arguments['trialIdx']), arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
+arguments['chanNames'], arguments['chanQuery'] = ash.processChannelQueryArgs(
+    namedQueries, scratchFolder, **arguments)
 
-verbose = False
+if arguments['suffix'] is None:
+    arguments['suffix'] = ''
+else:
+    arguments['suffix'] = '_' + arguments['suffix']
+    experimentBinnedSpikePath = experimentBinnedSpikePath.replace('.nix', '{}.nix'.format(arguments['suffix']))
+    binnedSpikePath = binnedSpikePath.replace('.nix', '{}.nix'.format(arguments['suffix']))
+    
+verbose = True
 #  source of events
 if arguments['processAll']:
-    eventReader = ns5.nixio_fr.NixIO(
-        filename=experimentDataPath)
+    eventPath = experimentDataPath
 else:
-    eventReader = ns5.nixio_fr.NixIO(
-        filename=analysisDataPath)
-
-eventBlock = eventReader.read_block(
-    block_index=0, lazy=True,
-    signal_group_mode='split-all')
-for ev in eventBlock.filter(objects=EventProxy):
-    ev.name = '_'.join(ev.name.split('_')[1:])
+    eventPath = analysisDataPath
+eventReader, eventBlock = ns5.blockFromPath(
+    eventPath, lazy=arguments['lazy'])
 
 #  source of analogsignals
 if arguments['processAll']:
-    signalReader = ns5.nixio_fr.NixIO(
-        filename=experimentBinnedSpikePath)
+    signalPath = experimentBinnedSpikePath
 else:
-    signalReader = ns5.nixio_fr.NixIO(
-        filename=binnedSpikePath)
+    signalPath = binnedSpikePath
 
-signalBlock = signalReader.read_block(
-    block_index=0, lazy=True,
-    signal_group_mode='split-all')
+signalReader, signalBlock = ns5.blockFromPath(
+    signalPath, lazy=arguments['lazy'])
 
-chansToTrigger = None
 windowSize = [
     i * pq.s
     for i in rasterOpts['windowSizes'][arguments['window']]]
-#  chansToTrigger = ['elec75#0_raster', 'elec75#1_raster']
+#   arguments['chanNames'] = [
+#       'elec85#0_raster', 'elec85#1_raster',
+#       'elec71#1_raster', 'elec71#2_raster',
+#       'elec75#0_raster', 'elec75#1_raster',
+#       'elec77#0_raster', 'elec77#1_raster', 'elec77#2_raster',
+#       ]
 
 if arguments['processAll']:
     prefix = experimentName
 else:
     prefix = ns5FileName
+
 ns5.getAsigsAlignedToEvents(
     eventBlock=eventBlock, signalBlock=signalBlock,
-    chansToTrigger=chansToTrigger,
-    chanQuery=arguments['unitQuery'],
+    chansToTrigger=arguments['chanNames'],
+    chanQuery=arguments['chanQuery'],
     eventName=arguments['eventName'],
     windowSize=windowSize,
-    appendToExisting=True,
+    appendToExisting=False,
     checkReferences=False,
     verbose=verbose,
     fileName=prefix + '_{}_{}'.format(

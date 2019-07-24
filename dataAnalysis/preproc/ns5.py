@@ -346,7 +346,7 @@ def unitSpikeTrainWaveformsToDF(
         ]
     #
     waveformsList = []
-    #  pdb.set_trace()
+    #
     for segIdx, stIn in enumerate(uniqueSpiketrains):
         if verbose:
             print('extracting spiketrain from {}'.format(stIn.segment))
@@ -402,7 +402,7 @@ def unitSpikeTrainWaveformsToDF(
                 else:
                     v = np.asarray(values)
                 annDict.update({k: v})
-            #pdb.set_trace()
+            #
             skipAnnNames = (
                 st.annotations['arrayAnnNames'] +
                 [
@@ -413,7 +413,7 @@ def unitSpikeTrainWaveformsToDF(
             for k, value in st.annotations.items():
                 if k not in skipAnnNames:
                     annDF.loc[:, k] = value
-            # pdb.set_trace()
+            #
             annColumns = annDF.columns.to_list()
             if getMetaData:
                 idxLabels += annColumns
@@ -498,7 +498,7 @@ def concatenateUnitSpikeTrainWaveformsDF(
             unitWaveforms.reset_index(inplace=True)
             if metaDataToCategories:
                 # convert metadata to categoricals to free memory
-                # pdb.set_trace()
+                #
                 unitWaveforms[idxLabels] = (
                     unitWaveforms[idxLabels]
                     .astype('category')
@@ -632,7 +632,7 @@ def alignedAsigsToDF(
         try:
             assert np.all([i == j for i, j in zipNames]), 'columns out of requested order!'
         except Exception:
-            #  pdb.set_trace()
+            #
             allWaveforms.reindex(columns=unitNames)
     return allWaveforms
 
@@ -675,13 +675,7 @@ def getAsigsAlignedToEvents(
         #
         signalSeg = signalBlock.segments[segIdx]
         thisEventName = 'seg{}_{}'.format(segIdx, eventName)
-        # allAlignEventsList = ([
-        #     i.load()
-        #     for i in eventSeg.filter(
-        #         objects=EventProxy, name=thisEventName)] +
-        #     eventSeg.filter(objects=Event, name=thisEventName))
-        # 
-        # assert len(eventSeg.filter(name=thisEventName)) == 1
+        assert len(eventSeg.filter(name=thisEventName)) == 1
         allEvIn = eventSeg.filter(name=thisEventName)[0]
         if isinstance(allEvIn, EventProxy):
             allAlignEvents = loadObjArrayAnn(allEvIn.load())
@@ -693,7 +687,9 @@ def getAsigsAlignedToEvents(
         if chunkSize is None:
             alignEventGroups = [allAlignEvents]
         else:
-            nChunks = int(math.floor(allAlignEvents.shape[0] / chunkSize))
+            nChunks = max(
+                int(np.floor(allAlignEvents.shape[0] / chunkSize)),
+                1)
             alignEventGroups = []
             for i in range(nChunks):
                 if not (i == (nChunks - 1)):
@@ -703,9 +699,12 @@ def getAsigsAlignedToEvents(
                 else:
                     alignEventGroups.append(
                         allAlignEvents[i * chunkSize:])
-        # pdb.set_trace()
         for subSegIdx, alignEvents in enumerate(alignEventGroups):
             # seg to contain triggered time series
+            if verbose:
+                print(
+                    'getAsigsAlignedToEvents on subSegment {} of {}'
+                    .format(subSegIdx, len(alignEventGroups)))
             newSeg = Segment(name='seg{}_'.format(int(totalNSegs)))
             newSeg.annotate(nix_name=newSeg.name)
             masterBlock.segments.append(newSeg)
@@ -715,47 +714,54 @@ def getAsigsAlignedToEvents(
                     print(
                         'getAsigsAlignedToEvents on channel {}'
                         .format(chanName))
-                # assert len(signalSeg.filter(name=asigName)) == 1
-                matchingAsigPs = signalSeg.filter(
-                    objects=AnalogSignalProxy, name=asigName)
                 
-                asigP = matchingAsigPs[0]
-                if checkReferences:
-                    da = (
-                        asigP
-                        ._rawio
-                        .da_list['blocks'][0]['segments'][segIdx]['data'])
-                    print('segIdx {}, asigP.name {}'.format(
-                        segIdx, asigP.name))
-                    print('asigP._global_channel_indexes = {}'.format(
-                        asigP._global_channel_indexes))
-                    print('asigP references {}'.format(
-                        da[asigP._global_channel_indexes[0]]))
-                    try:
-                        assert (
-                            asigP.name
-                            in da[asigP._global_channel_indexes[0]].name)
-                    except Exception:
-                        traceback.print_exc()
+                assert len(signalSeg.filter(name=asigName)) == 1
+                asig = signalSeg.filter(name=asigName)[0]
                 nominalWinLen = int(
                     (windowSize[1] - windowSize[0]) *
-                    asigP.sampling_rate - 1)
+                    asig.sampling_rate - 1)
                 validMask = (
                     ((
                         alignEvents + windowSize[1] +
-                        asigP.sampling_rate ** (-1)) < asigP.t_stop) &
+                        asig.sampling_rate ** (-1)) < asig.t_stop) &
                     ((
                         alignEvents + windowSize[0] -
-                        asigP.sampling_rate ** (-1)) > asigP.t_start)
+                        asig.sampling_rate ** (-1)) > asig.t_start)
                     )
                 #
                 alignEvents = alignEvents[validMask]
-                rawWaveforms = [
-                    asigP.load(
-                        time_slice=(t + windowSize[0], t + windowSize[1]))
-                    for t in alignEvents]
+                if isinstance(asig, AnalogSignalProxy):
+                    if checkReferences:
+                        da = (
+                            asig
+                            ._rawio
+                            .da_list['blocks'][0]['segments'][segIdx]['data'])
+                        print('segIdx {}, asig.name {}'.format(
+                            segIdx, asig.name))
+                        print('asig._global_channel_indexes = {}'.format(
+                            asig._global_channel_indexes))
+                        print('asig references {}'.format(
+                            da[asig._global_channel_indexes[0]]))
+                        try:
+                            assert (
+                                asig.name
+                                in da[asig._global_channel_indexes[0]].name)
+                        except Exception:
+                            traceback.print_exc()
+                    rawWaveforms = [
+                        asig.load(
+                            time_slice=(t + windowSize[0], t + windowSize[1]))
+                        for t in alignEvents]
+                elif isinstance(asig, AnalogSignal):
+                    rawWaveforms = []
+                    #pdb.set_trace()
+                    for t in alignEvents:
+                        asigMask = (asig.times > t + windowSize[0]) & (asig.times < t + windowSize[1])
+                        rawWaveforms.append(asig[asigMask[:, np.newaxis]])
+                else:
+                    raise(Exception('{} must be an AnalogSignal or AnalogSignalProxy!'.format(asigName)))
                 #
-                samplingRate = asigP.sampling_rate
+                samplingRate = asig.sampling_rate
                 waveformUnits = rawWaveforms[0].units
                 #  fix length if roundoff error
                 #  minLen = min([rW.shape[0] for rW in rawWaveforms])
@@ -782,7 +788,7 @@ def getAsigsAlignedToEvents(
                     )
                 stAnn.update({
                     k: v
-                    for k, v in asigP.annotations.items()
+                    for k, v in asig.annotations.items()
                     if k not in skipAsigAnnNames
                 })
                 stArrayAnn = {
@@ -793,7 +799,7 @@ def getAsigsAlignedToEvents(
                     name='seg{}_{}'.format(int(totalNSegs), thisUnit.name),
                     times=alignEvents.times,
                     waveforms=spikeWaveforms,
-                    t_start=asigP.t_start, t_stop=asigP.t_stop,
+                    t_start=asig.t_start, t_stop=asig.t_stop,
                     left_sweep=windowSize[0] * (-1),
                     sampling_rate=samplingRate,
                     **stArrayAnn,
@@ -810,8 +816,11 @@ def getAsigsAlignedToEvents(
     except Exception:
         traceback.print_exc()
     if signalBlock is not eventBlock:
-        signalBlock.filter(
-            objects=AnalogSignalProxy)[0]._rawio.file.close()
+        try:
+            signalBlock.filter(
+                objects=AnalogSignalProxy)[0]._rawio.file.close()
+        except Exception:
+            traceback.print_exc()
     triggeredPath = os.path.join(
         folderPath, fileName + '.nix')
     if not os.path.exists(triggeredPath):
@@ -861,7 +870,9 @@ def getAsigsAlignedToEventsOneUnit(
         if chunkSize is None:
             alignEventGroups = [event]
         else:
-            nChunks = int(np.floor(event.shape[0] / chunkSize))
+            nChunks = max(
+                int(np.floor(event.shape[0] / chunkSize)),
+                1)
             alignEventGroups = []
             for i in range(nChunks):
                 if i < (nChunks - 1):
@@ -1162,11 +1173,14 @@ def eventsToDataFrame(
                 values = event.labels
             if isinstance(values[0], bytes):
                 #  event came from hdf, need to recover dtype
-                dtypeStr = event.annotations['originalDType'].split(';')[-1]
-                if 'np.' not in dtypeStr:
-                    dtypeStr = 'np.' + dtypeStr
-                originalDType = eval(dtypeStr)
-                values = np.asarray(values, dtype=originalDType)
+                if 'originalDType' in event.annotations:
+                    dtypeStr = event.annotations['originalDType'].split(';')[-1]
+                    if 'np.' not in dtypeStr:
+                        dtypeStr = 'np.' + dtypeStr
+                    originalDType = eval(dtypeStr)
+                    values = np.asarray(values, dtype=originalDType)
+                else:
+                    values = np.asarray(values, dtype=np.str)
             #  print(values.dtype)
             eventDict.update({
                 event.name: pd.Series(values)})
@@ -1266,7 +1280,7 @@ def loadSpikeMats(
                             channel_names=chanNames))
                 except Exception:
                     traceback.print_exc()
-                    #  pdb.set_trace()
+                    #
                 
                 if aggregateFun is None:
                     procSpikeMat = rawSpikeMat.rolling(
@@ -1333,7 +1347,7 @@ def synchronizeINStoNSP(
         (insDiff - nspDiff) * 1e3))
     if (insDiff - nspDiff > 20e-3).any():
         raise(Exception('Tap trains too different!'))
-    #  pdb.set_trace()
+    #
     if degree > 0:
         synchPolyCoeffsINStoNSP = np.polyfit(
             x=tapTimestampsINS.values, y=tapTimestampsNSP.values, deg=degree)
@@ -1378,7 +1392,7 @@ def synchronizeINStoNSP(
                     else:
                         st.t_start = tStart
                         st.t_stop = tStop
-        #  pdb.set_trace()
+        #
         allEvents = insBlock.filter(objects=Event)
         allEvents = [ev for ev in allEvents if 'concatenate' not in ev.name]
         eventsDF = eventsToDataFrame(allEvents, idxT='t')
@@ -1490,7 +1504,7 @@ def getNIXData(
     else:
         timeSlice = (None, None)
     segBounds, requestedSegs = findSegsIncluding(block, timeSlice)
-    #  pdb.set_trace()
+    #
     data = pd.DataFrame(columns=elecIds + ['t'])
     for segIdx in requestedSegs.index:
         seg = block.segments[segIdx]
@@ -1758,7 +1772,7 @@ def blockToNix(
     block.channel_indexes = (
         [chanIdx for chanIdx in block.channel_indexes if (
             chanIdx.analogsignals)])
-    #  pdb.set_trace()
+    #
     #  delete asig and irsig proxies from channel index list
     for metaIdx, chanIdx in enumerate(block.channel_indexes):
         if chanIdx.analogsignals:
@@ -1928,7 +1942,7 @@ def blockToNix(
                         st.t_stop = tStop
                     except Exception:
                         traceback.print_exc()
-                        #  pdb.set_trace()
+                        #
                     #  rename chanIndexes TODO: replace in readBlockFixNames
                     if spikeSourceType == 'nev':
                         nameParser = re.search(r'ch(\d*)#(\d*)', unit.name)
@@ -2213,6 +2227,7 @@ def loadObjArrayAnn(st):
             st.annotations['arrayAnnNames'] = [st.annotations['arrayAnnNames']]
         elif isinstance(st.annotations['arrayAnnNames'], tuple):
             st.annotations['arrayAnnNames'] = [i for i in st.annotations['arrayAnnNames']]
+        #
         for key in st.annotations['arrayAnnNames']:
             #  fromRaw, the ann come back as tuple, need to recast
             try:
@@ -2222,7 +2237,6 @@ def loadObjArrayAnn(st):
                     {key: np.asarray(st.annotations[key])})
             except Exception:
                 traceback.print_exc()
-                # pdb.set_trace()
     if hasattr(st, 'waveforms'):
         if st.waveforms is None:
             st.waveforms = np.asarray([]).reshape((0, 0, 0))*pq.mV
@@ -2395,7 +2409,7 @@ def calcFR(
             asig.annotate(binWidth=rasterOpts['binWidth'])
             if '_raster' in asig.name:
                 asig.name = asig.name.replace('_raster', '_' + suffix)
-            asig.name = 'seg{}_{}'.format(segIdx, asig.name)
+            asig.name = 'seg{}_{}'.format(segIdx, childBaseName(asig.name, 'seg'))
             asig.annotate(nix_name=asig.name)
         chanIdxList = spikeMatBlockInterp.filter(objects=ChannelIndex)
         for chanIdx in chanIdxList:

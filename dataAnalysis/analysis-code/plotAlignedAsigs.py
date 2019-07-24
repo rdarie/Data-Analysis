@@ -77,12 +77,12 @@ pdfName = '{}_{}_{}_{}'.format(
     arguments['alignQuery'])
 statsTestPath = os.path.join(scratchFolder, pdfName + '_stats.h5')
 #  Overrides
-alignedAsigsKWargs.update({'decimate': 10})
-alignedAsigsKWargs.update({'windowSize': (-50e-3, 250e-3)})
+#  alignedAsigsKWargs.update({'decimate': 10})
+alignedAsigsKWargs.update({'windowSize': (-10e-3, 60e-3)})
 statsTestOpts.update({
     'testStride': 10e-3,
-    'testWidth': 20e-3,
-    'tStop': 250e-3})
+    'testWidth': 5e-3,
+    'tStop': 60e-3})
 #  End Overrides
 #  Get stats results
 if os.path.exists(statsTestPath):
@@ -120,4 +120,4 @@ asp.plotSignificance(
     **statsTestOpts)
 
 if arguments['lazy']:
-    dataReader.close()
+    dataReader.file.close()

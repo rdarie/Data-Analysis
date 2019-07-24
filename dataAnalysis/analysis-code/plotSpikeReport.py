@@ -10,6 +10,8 @@ Options:
 """
 import matplotlib
 matplotlib.use('PS')
+matplotlib.rcParams['pdf.fonttype'] = 42
+matplotlib.rcParams['ps.fonttype'] = 42
 import neo
 from neo.core import (Block, Segment, ChannelIndex,
     AnalogSignal, Unit, SpikeTrain, Event)

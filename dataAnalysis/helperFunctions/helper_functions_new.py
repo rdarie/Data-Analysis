@@ -533,7 +533,6 @@ def loadBlockProxyObjects(block):
             # assign ownership to containers
             unit.spiketrains.append(st)
             seg.spiketrains.append(st)
-
         sigProxyList = seg.analogsignals
         seg.analogsignals = []
         for aSigProxy in sigProxyList:
@@ -1257,9 +1256,9 @@ def chooseTriggers(
 
 
 def getTensTrigs(
-        diffThresh=None, magThresh=None, tensAsig=None,
+        diffThresh=None, magThresh=None, tensAsig=None, iti=.1,
         referenceTimes=None, plotting = False, peakFinder='maxDiff'):
-    iti = .1
+    
     minTrainLength = 5 * iti
     maxTrain = 3
     fs=tensAsig.sampling_rate.magnitude

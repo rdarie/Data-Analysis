@@ -164,14 +164,12 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
         'gaussWid': 100e-3,
         'treatAsSinglePulses': False
         }
-
     miniRCRigInputs = {
         'tapSync': 'ainp7',
         'simiTrigs': 'ainp8'
         }
     RCRigInputs = {
-        'tapSync': 'ainp7',
-        'simiTrigs': 'ainp8'
+        'kinectSync': 'ainp16',
         }
     fullRigInputs = {
         'A+': 'ainp1',
@@ -197,7 +195,7 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
     elif RCTrial:
         trialFilesStim['ins']['getINSkwargs'].update(RCStimDetectionOpts)
         #  should rename eventInfo to something more intuitive
-        eventInfo = {'inputIDs': fullRigInputs}
+        eventInfo = {'inputIDs': RCRigInputs}
     else:
         trialFilesStim['ins']['getINSkwargs'].update(fullStimDetectionOpts)
         #  should rename eventInfo to something more intuitive
@@ -295,9 +293,10 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
             electrodeColumn='electrodeFuzzy',
             removeFuzzyName=True))
     #
-    alignedAsigsChunkSize = 500
+    alignedAsigsChunkSize = 15000
     rasterOpts = {
-        'binInterval': 1e-3, 'binWidth': 30e-3, 'smoothKernelWidth': 50e-3,
+        # 'binInterval': 1e-3, 'binWidth': 30e-3, 'smoothKernelWidth': 50e-3,
+        'binInterval': 0.2e-3, 'binWidth': 5e-3, 'smoothKernelWidth': 10e-3,
         'windowSizes': {
             'short': (-0.5, 0.5),
             'long': (-2.25, 2.25),
@@ -319,10 +318,10 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
         )
     relplotKWArgs = dict(
         ci='sem', estimator='mean',
-        palette="ch:0.6,-.2,dark=.2,light=0.7,reverse=1",
+        palette="ch:1.6,-.2,dark=.2,light=0.7,reverse=1",
         height=5, aspect=1.5, kind='line')
     twinRelplotKWArgs = dict(
-        palette="ch:0.6,-.2,dark=.2,light=0.7,reverse=1",
+        palette="ch:1.6,-.2,dark=.2,light=0.7,reverse=1",
         func1_kws={'marker': '|', 'alpha': 0.6},
         func2_kws={'ci': 'sem'},
         facet1_kws={'sharey': False},

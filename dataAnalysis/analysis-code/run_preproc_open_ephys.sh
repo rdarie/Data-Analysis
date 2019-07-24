@@ -21,18 +21,27 @@
 # Specify account details
 #SBATCH --account=bibs-dborton-condo
 
+#$SLURM_ARRAY_TASK_ID
 # EXP="exp201901211000"
 # EXP="exp201901271000"
 # EXP="exp201812051000"
 EXP="exp201901070700"
-
+RCTRIALIDX="2"
 # python3 ./preprocINS.py --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID
 # python3 ./preprocINSfromSIP.py --exp=$EXP
 # python3 ./preprocOpenEphys.py --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID --loadMat
 # python3 ./synchronizeOpenEphysToINSSIP.py --exp=$EXP
-# python3 ./synchronizeOpenEphysToINS.py --exp=$EXP --trialIdx=1
-python3 ./calcTrialAnalysisNix.py --trialIdx=$SLURM_ARRAY_TASK_ID  --exp=$EXP --chanQuery="oechorins" --samplingRate=30000
+# python3 ./synchronizeOpenEphysToINS.py --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID
+# python3 ./synchronizeOpenEphysToINS.py --exp=$EXP --trialIdx=$RCTRIALIDX --showPlots
+# python3 './preprocNS5.py' --exp=$EXP --trialIdx=$RCTRIALIDX --makeTruncated
+# python3 ./synchronizeOpenEphysToNSP.py --exp=$EXP --trialIdx=2 --showPlots
+# python3 ./calcTrialAnalysisNix.py --trialIdx=$RCTRIALIDX  --exp=$EXP --chanQuery="all" --suffix=fast --samplingRate=30000 
+# python3 './calcFR.py' --trialIdx=$RCTRIALIDX --exp=$EXP --suffix=fast
+# python3 ./calcStimAlignTimes.py --trialIdx=$RCTRIALIDX --exp=$EXP --suffix=fast
 # python3 ./assembleExperimentData.py --exp=$EXP --processAsigs
-# python3 ./calcStimAlignTimes.py --processAll --exp=$EXP
-# python3 ./calcAlignedAsigs.py --exp=$EXP --processAll --window=RC --lazy --chanQuery="oechorins" --blockName=RC --eventName=stimAlignTimes
-# python3 ./plotAlignedAsigs.py --exp=$EXP --processAll --lazy --window=RC --inputBlockName=RC --unitQuery="oechorins" --alignQuery="stimOnLowRate" --rowName= --colName="program" --colControl="999" --styleName= --hueName="amplitude"
+python3 ./calcAlignedAsigs.py --exp=$EXP --trialIdx=$RCTRIALIDX --window=RC --lazy --chanQuery="oechorins" --blockName=RC --eventName=stimAlignTimes --suffix=fast
+python3 ./calcAlignedAsigs.py --exp=$EXP --trialIdx=$RCTRIALIDX --window=RC --lazy --eventName=stimAlignTimes --chanQuery=fr --blockName=fr --suffix=fast
+python3 ./calcAlignedRasters.py --exp=$EXP --trialIdx=$RCTRIALIDX --window=RC --lazy --eventName=stimAlignTimes --chanQuery=raster --blockName=raster --suffix=fast
+# python3 ./plotAlignedAsigs.py --exp=$EXP --trialIdx=$RCTRIALIDX --window=RC --lazy --inputBlockName=RC --unitQuery="oechorins" --alignQuery="stimOnLowRate" --rowName= --colName="program" --colControl="999" --styleName= --hueName="amplitude"
+# python3 ./plotAlignedAsigs.py --exp=$EXP --trialIdx=$RCTRIALIDX --window=RC --lazy --inputBlockName=fr --unitQuery="fr" --alignQuery="stimOnLowRate" --rowName= --colName="program" --colControl="999" --styleName= --hueName="amplitude"
+python3 ./plotAlignedNeurons.py --exp=$EXP --trialIdx=$RCTRIALIDX --window=RC --lazy --alignQuery="stimOnLowRate" --rowName= --colName="program" --colControl="999" --styleName= --hueName="amplitude"

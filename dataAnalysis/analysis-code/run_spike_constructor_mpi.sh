@@ -11,7 +11,7 @@
 
 # Specify a job name:
 #SBATCH -J spike_sort_constructor
-#SBATCH --array=2
+#SBATCH --array=1,4
 
 # Specify an output file
 #SBATCH -o ../batch_logs/%j-%a-spike_sort_constructor.stdout
@@ -21,6 +21,7 @@
 #SBATCH --account=bibs-dborton-condo
 
 # Run a command
-EXP="exp201901221000"
+# EXP="exp201901221000"
+EXP="exp201901070700"
 module load mpi
 srun --mpi=pmi2 ./tridesclousCCV.py --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID --attemptMPI --batchPreprocess

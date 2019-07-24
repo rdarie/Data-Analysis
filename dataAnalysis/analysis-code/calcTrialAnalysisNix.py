@@ -5,6 +5,7 @@ Usage:
 Options:
     --trialIdx=trialIdx             which trial to analyze
     --exp=exp                       which experimental day to analyze
+    --suffix=suffix                 append a name to the resulting blocks?
     --chanQuery=chanQuery           how to restrict channels if not providing a list? [default: fr]
     --samplingRate=samplingRate     subsample the result??
 """
@@ -39,15 +40,20 @@ expOpts, allOpts = parseAnalysisOptions(
     arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
-
+arguments['chanNames'], arguments['chanQuery'] = ash.processChannelQueryArgs(
+    namedQueries, scratchFolder, **arguments)
+if arguments['suffix'] is None:
+    arguments['suffix'] = ''
+else:
+    arguments['suffix'] = '_' + arguments['suffix']
 if arguments['samplingRate'] is not None:
     samplingRate = float(arguments['samplingRate']) * pq.Hz
 else:
-    samplingRate = 1 / rasterOpts['binInterval'] * pq.Hz
+    samplingRate = float(1 / rasterOpts['binInterval']) * pq.Hz
 #pdb.set_trace()
 trialBasePath = os.path.join(
     scratchFolder,
-    ns5FileName + '_oe.nix'
+    ns5FileName + '.nix'
 )
 nspReader = neo.io.nixio_fr.NixIO(filename=trialBasePath)
 nspBlock = preproc.readBlockFixNames(nspReader, block_index=0)
@@ -56,8 +62,6 @@ spikesBlock = hf.extractSignalsFromBlock(
     nspBlock, keepSpikes=True)
 spikesBlock = hf.loadBlockProxyObjects(spikesBlock)
 #  save ins time series
-arguments['chanNames'], arguments['chanQuery'] = ash.processChannelQueryArgs(
-    namedQueries, scratchFolder, **arguments)
 tdChanNames = ns5.listChanNames(nspBlock, arguments['chanQuery'], objType=AnalogSignalProxy)
 if not (miniRCTrial or RCTrial):
     tdChanNames += ['seg0_position', 'seg0_velocityCat']
@@ -115,14 +119,18 @@ for ev in evList:
 # print([st.name for st in spikesBlock.filter(objects=SpikeTrain)])
 # print([ev.name for ev in spikesBlock.filter(objects=Event)])
 spikesBlock = preproc.purgeNixAnn(spikesBlock)
-writer = neo.io.NixIO(filename=analysisDataPath)
+writer = neo.io.NixIO(
+    filename=analysisDataPath.replace(
+        '.nix', '{}.nix'.format(arguments['suffix'])))
 writer.write_block(spikesBlock, use_obj_names=True)
 writer.close()
 #
 if len(allSpikeTrains):
     spikeMatBlock = preproc.calcBinarizedArray(
         spikesBlock, samplingRate,
-        binnedSpikePath, saveToFile=True)
+        binnedSpikePath.replace(
+            '.nix', '{}.nix'.format(arguments['suffix'])),
+        saveToFile=True)
     newT = pd.Series(
         spikeMatBlock.filter(objects=AnalogSignal)[0].times.magnitude)
 else:
@@ -192,7 +200,7 @@ preproc.addBlockToNIX(
     tdBlockInterp, neoSegIdx=[0],
     writeSpikes=False, writeEvents=False,
     purgeNixNames=False,
-    fileName=ns5FileName + '_analyze',
+    fileName=ns5FileName + '_analyze{}'.format(arguments['suffix']),
     folderPath=scratchFolder,
     nixBlockIdx=0, nixSegIdx=[0],
     )

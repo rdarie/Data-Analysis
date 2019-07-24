@@ -106,12 +106,12 @@ if arguments['batchPreprocess']:
         cluster_method='agglomerative',
         n_clusters=5,
         noise_estimate_duration=400.,
-        sample_snippet_duration=400.,
+        sample_snippet_duration=800.,
         chunksize=2**13, n_left=spikeWindow[0] - 2,
         n_right=spikeWindow[1] + 2,
         align_waveform=False, subsample_ratio=10,
-        autoMerge=True, auto_merge_threshold=0.85,
-        relative_threshold=5.5, attemptMPI=HAS_MPI)
+        autoMerge=True, auto_merge_threshold=0.99,
+        relative_threshold=4.5, attemptMPI=HAS_MPI)
 
 if arguments['batchPeel']:
     tdch.batchPeel(
