@@ -47,6 +47,8 @@ else:
     arguments['suffix'] = '_' + arguments['suffix']
     experimentBinnedSpikePath = experimentBinnedSpikePath.replace('.nix', '{}.nix'.format(arguments['suffix']))
     binnedSpikePath = binnedSpikePath.replace('.nix', '{}.nix'.format(arguments['suffix']))
+    experimentDataPath = experimentDataPath.replace('.nix', '{}.nix'.format(arguments['suffix']))
+    analysisDataPath = analysisDataPath.replace('.nix', '{}.nix'.format(arguments['suffix']))
     
 verbose = True
 #  source of events

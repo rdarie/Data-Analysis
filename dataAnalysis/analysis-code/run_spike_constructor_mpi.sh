@@ -11,7 +11,7 @@
 
 # Specify a job name:
 #SBATCH -J spike_sort_constructor
-#SBATCH --array=1,4
+#SBATCH --array=2,3,4
 
 # Specify an output file
 #SBATCH -o ../batch_logs/%j-%a-spike_sort_constructor.stdout

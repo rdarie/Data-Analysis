@@ -116,10 +116,12 @@ asp.plotNeuronsAligned(
     figureFolder=figureFolder,
     printBreakDown=True,
     enablePlots=True,
-    plotProcFuns=[asp.xLabelsTime, asp.truncateLegend],
+    plotProcFuns=[
+        asp.xLabelsTime, asp.genLegendRounder(decimals=2),
+        asp.yLabelsEMG, asp.genVLineAdder(0, nrnVLineOpts)],
     pdfName=pdfName,
     **rowColOpts,
-    twinRelplotKWArgs=twinRelplotKWArgs)
+    twinRelplotKWArgs=nrnRelplotKWArgs)
 asp.plotSignificance(
     sigValsWide,
     pdfName=pdfName + '_pCount',

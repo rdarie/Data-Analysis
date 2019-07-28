@@ -107,7 +107,8 @@ asp.plotAsigsAligned(
     enablePlots=True,
     plotProcFuns=[
         asp.yLabelsEMG, asp.xLabelsTime,
-        asp.truncateLegend,
+        asp.asp.genVLineAdder(0, vLineOpts),
+        asp.genLegendRounder(decimals=2),
         asp.genXLimSetter(alignedAsigsKWargs['windowSize'])],
     pdfName=pdfName,
     **rowColOpts,

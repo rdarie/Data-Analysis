@@ -98,7 +98,7 @@ chansToAnalyze = [
     81, 82, 83, 84, 85, 86, 87, 88, 89,
     90, 91, 92, 93, 94, 95]
 '''
-
+chansToAnalyze = [70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80]
 if arguments['batchPreprocess']:
     tdch.batchPreprocess(
         triFolder, chansToAnalyze,
@@ -110,14 +110,14 @@ if arguments['batchPreprocess']:
         chunksize=2**13, n_left=spikeWindow[0] - 2,
         n_right=spikeWindow[1] + 2,
         align_waveform=False, subsample_ratio=10,
-        autoMerge=True, auto_merge_threshold=0.99,
-        relative_threshold=4.5, attemptMPI=HAS_MPI)
+        autoMerge=False, auto_merge_threshold=0.99,
+        relative_threshold=5, attemptMPI=HAS_MPI)
 
 if arguments['batchPeel']:
     tdch.batchPeel(
         triFolder, chansToAnalyze,
-        shape_boundary_threshold=3,
-        shape_distance_threshold=1.5, attemptMPI=HAS_MPI)
+        # shape_boundary_threshold=3,
+        shape_distance_threshold=2, attemptMPI=HAS_MPI)
 
 if HAS_MPI:
     COMM.Barrier()  # wait until all threads finish sorting
@@ -127,11 +127,11 @@ if arguments['makeCoarseNeoBlock'] and RANK == 0:
     tdch.neo_block_after_peeler(
         triFolder, chan_grps=chansToAnalyze,
         shape_distance_threshold=None, refractory_period=None,
-        ignoreTags=['so_bad'])
+        ignoreTags=[])
 
 if arguments['makeStrictNeoBlock'] and RANK == 0:
     tdch.purgeNeoBlock(triFolder)
     tdch.neo_block_after_peeler(
         triFolder, chan_grps=chansToAnalyze,
-        shape_distance_threshold=None, refractory_period=3.5e-3,
+        shape_distance_threshold=None, refractory_period=1.5e-3,
         ignoreTags=['so_bad'])

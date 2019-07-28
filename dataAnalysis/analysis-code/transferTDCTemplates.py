@@ -24,7 +24,7 @@ import os
 
 dataio = tdc.DataIO(dirname=triFolderSource)
 chansToAnalyze = sorted(list(dataio.channel_groups.keys()))[:96]
-
+# import pdb; pdb.set_trace()
 for fileNameDest in triDestinations:
     #  import pdb; pdb.set_trace()
     triFolderDest = os.path.join(
@@ -39,7 +39,6 @@ for fileNameDest in triDestinations:
     except Exception:
         traceback.print_exc()
         #  pass
-    #  
     tdch.transferTemplates(
         triFolderSource, triFolderDest,
         chansToAnalyze)

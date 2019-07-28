@@ -210,6 +210,8 @@ def channelIndexesToSpikeDict(
         spikes['ChannelID'][idx] = chIdx.name
         for unitIdx, thisUnit in enumerate(chIdx.units):
             for stIdx, st in enumerate(thisUnit.spiketrains):
+                if not len(st.times):
+                    continue
                 #  print(
                 #      'unit {} has {} spiketrains'.format(
                 #          thisUnit.name,
@@ -227,9 +229,13 @@ def channelIndexesToSpikeDict(
                     theseWaveforms))
                 #  append waveforms
                 if len(spikes['Waveforms'][idx]):
-                    spikes['Waveforms'][idx] = np.concatenate((
-                        spikes['Waveforms'][idx],
-                        theseWaveforms.magnitude), axis=0)
+                    try:
+                        spikes['Waveforms'][idx] = np.concatenate((
+                            spikes['Waveforms'][idx],
+                            theseWaveforms.magnitude), axis=0)
+                    except Exception:
+                        traceback.print_exc()
+                        pdb.set_trace()
                 else:
                     spikes['Waveforms'][idx] = theseWaveforms.magnitude
                 #  give each unit a global index
@@ -775,7 +781,6 @@ def getAsigsAlignedToEvents(
                 thisUnit = masterBlock.filter(
                     objects=Unit, name=chanName + '#0')[0]
                 skipEventAnnNames = (
-                    list(alignEvents.annotations['arrayAnnNames']) +
                     ['nix_name', 'neo_name']
                     )
                 stAnn = {
@@ -791,10 +796,6 @@ def getAsigsAlignedToEvents(
                     for k, v in asig.annotations.items()
                     if k not in skipAsigAnnNames
                 })
-                stArrayAnn = {
-                    k: alignEvents.array_annotations[k]
-                    for k in alignEvents.annotations['arrayAnnNames']
-                }
                 st = SpikeTrain(
                     name='seg{}_{}'.format(int(totalNSegs), thisUnit.name),
                     times=alignEvents.times,
@@ -802,7 +803,6 @@ def getAsigsAlignedToEvents(
                     t_start=asig.t_start, t_stop=asig.t_stop,
                     left_sweep=windowSize[0] * (-1),
                     sampling_rate=samplingRate,
-                    **stArrayAnn,
                     **stAnn
                     )
                 st.annotate(nix_name=st.name)
@@ -843,7 +843,7 @@ def getAsigsAlignedToEvents(
 
     return masterBlock
 
-
+'''
 def getAsigsAlignedToEventsOneUnit(
         eventBlock=None, eventName=None, chansToAlign=None,
         windowSize=None, chunkSize=None,
@@ -970,7 +970,7 @@ def getAsigsAlignedToEventsOneUnit(
             objects=AnalogSignalProxy)[0]._rawio.file.close()
     
     return thisUnit
-
+'''
 
 def alignedAsigDFtoSpikeTrain(
         allWaveforms, dataBlock=None, matchSamplingRate=True):
@@ -2279,13 +2279,13 @@ def blockFromPath(dataPath, lazy=False):
 
 def calcBinarizedArray(
         dataBlock, samplingRate, binnedSpikePath, saveToFile=True):
-    
+    #
     spikeMatBlock = Block(name=dataBlock.name + '_binarized')
     spikeMatBlock.merge_annotations(dataBlock)
-
+    #
     allSpikeTrains = [
         i for i in dataBlock.filter(objects=SpikeTrain) if '#' in i.name]
-    
+    #
     for st in allSpikeTrains:
         if '#' in st.name:
             chanList = spikeMatBlock.filter(
@@ -2294,7 +2294,10 @@ def calcBinarizedArray(
                 chanIdx = ChannelIndex(name=st.unit.name, index=np.asarray([0]))
                 #  print(chanIdx.name)
                 spikeMatBlock.channel_indexes.append(chanIdx)
-
+                thisUnit = Unit(name=st.unit.name)
+                chanIdx.units.append(thisUnit)
+                thisUnit.channel_index = chanIdx
+    #
     for segIdx, seg in enumerate(dataBlock.segments):
         newSeg = Segment(name='seg{}_{}'.format(segIdx, spikeMatBlock.name))
         newSeg.merge_annotations(seg)
@@ -2327,25 +2330,38 @@ def calcBinarizedArray(
                     t_stop=tStop)
                 spikeMatBlock.segments[segIdx].spiketrains.append(st)
                 #  to do: link st to spikematblock's chidx and units
+                assert len(chanIdx.filter(objects=Unit)) == 1
+                thisUnit = chanIdx.filter(objects=Unit)[0]
+                thisUnit.spiketrains.append(st)
+                st.unit = thisUnit
+                st.segment = spikeMatBlock.segments[segIdx]
             else:
                 print('{} has no spikes'.format(st.name))
                 stBin = dummyBin
-
+            skipStAnnNames = (
+                list(st.annotations['arrayAnnNames']) +
+                ['nix_name', 'neo_name', 'arrayAnnNames']
+                )
+            asigAnn = {
+                k: v
+                for k, v in st.annotations.items()
+                if k not in skipStAnnNames
+                }
             asig = AnalogSignal(
                 stBin * samplingRate,
                 name='seg{}_{}_raster'.format(segIdx, st.unit.name),
                 sampling_rate=samplingRate,
                 dtype=np.int,
-                **st.annotations)
+                **asigAnn)
             asig.t_start = tStart
             asig.annotate(binWidth=1 / samplingRate.magnitude)
             chanIdx.analogsignals.append(asig)
             asig.channel_index = chanIdx
             spikeMatBlock.segments[segIdx].analogsignals.append(asig)
-    
+    #
     for chanIdx in spikeMatBlock.channel_indexes:
         chanIdx.name = chanIdx.name + '_raster'
-
+    #
     spikeMatBlock.create_relationship()
     spikeMatBlock = purgeNixAnn(spikeMatBlock)
     if saveToFile:

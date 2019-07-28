@@ -35,13 +35,12 @@ RCTRIALIDX="2"
 # python3 ./synchronizeOpenEphysToINS.py --exp=$EXP --trialIdx=$RCTRIALIDX --showPlots
 # python3 './preprocNS5.py' --exp=$EXP --trialIdx=$RCTRIALIDX --makeTruncated
 # python3 ./synchronizeOpenEphysToNSP.py --exp=$EXP --trialIdx=2 --showPlots
-# python3 ./calcTrialAnalysisNix.py --trialIdx=$RCTRIALIDX  --exp=$EXP --chanQuery="all" --suffix=fast --samplingRate=30000 
-# python3 './calcFR.py' --trialIdx=$RCTRIALIDX --exp=$EXP --suffix=fast
+# python3 ./calcTrialAnalysisNix.py --trialIdx=$RCTRIALIDX  --exp=$EXP --chanQuery="all" --suffix=fast
+# python3 ./calcFR.py --trialIdx=$RCTRIALIDX --exp=$EXP --suffix=fast
 # python3 ./calcStimAlignTimes.py --trialIdx=$RCTRIALIDX --exp=$EXP --suffix=fast
 # python3 ./assembleExperimentData.py --exp=$EXP --processAsigs
-python3 ./calcAlignedAsigs.py --exp=$EXP --trialIdx=$RCTRIALIDX --window=RC --lazy --chanQuery="oechorins" --blockName=RC --eventName=stimAlignTimes --suffix=fast
-python3 ./calcAlignedAsigs.py --exp=$EXP --trialIdx=$RCTRIALIDX --window=RC --lazy --eventName=stimAlignTimes --chanQuery=fr --blockName=fr --suffix=fast
-python3 ./calcAlignedRasters.py --exp=$EXP --trialIdx=$RCTRIALIDX --window=RC --lazy --eventName=stimAlignTimes --chanQuery=raster --blockName=raster --suffix=fast
+# python3 ./calcAlignedAsigs.py --exp=$EXP --trialIdx=$RCTRIALIDX --window=RC --lazy --eventName=stimAlignTimes --chanQuery=fr --blockName=fr --suffix=fast
+# python3 ./calcAlignedRasters.py --exp=$EXP --trialIdx=$RCTRIALIDX --window=RC --lazy --eventName=stimAlignTimes --chanQuery=raster --blockName=raster --suffix=fast
+python3 ./plotAlignedNeurons.py --exp=$EXP --trialIdx=$RCTRIALIDX --window=RC --lazy --alignQuery="stimOnLowRate" --rowName= --colName="electrode" --colControl="control" --styleName= --hueName="amplitude"
+# python3 ./calcAlignedAsigs.py --exp=$EXP --trialIdx=$RCTRIALIDX --window=RC --lazy --chanQuery="oechorins" --blockName=RC --eventName=stimAlignTimes --suffix=fast
 # python3 ./plotAlignedAsigs.py --exp=$EXP --trialIdx=$RCTRIALIDX --window=RC --lazy --inputBlockName=RC --unitQuery="oechorins" --alignQuery="stimOnLowRate" --rowName= --colName="program" --colControl="999" --styleName= --hueName="amplitude"
-# python3 ./plotAlignedAsigs.py --exp=$EXP --trialIdx=$RCTRIALIDX --window=RC --lazy --inputBlockName=fr --unitQuery="fr" --alignQuery="stimOnLowRate" --rowName= --colName="program" --colControl="999" --styleName= --hueName="amplitude"
-python3 ./plotAlignedNeurons.py --exp=$EXP --trialIdx=$RCTRIALIDX --window=RC --lazy --alignQuery="stimOnLowRate" --rowName= --colName="program" --colControl="999" --styleName= --hueName="amplitude"

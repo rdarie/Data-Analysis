@@ -117,8 +117,10 @@ def plotNeuronsAligned(
             asigWide = ns5.alignedAsigsToDF(
                 frBlock, [continuousName],
                 **loadArgs)
+            # pdb.set_trace()
             raster = rasterWide.stack().reset_index(name='raster')
             asig = asigWide.stack().reset_index(name='fr')
+            oneSpikePerBinHz = int(np.round(np.diff(rasterWide.columns)[0] ** (-1)))
             if enablePlots:
                 raster.loc[:, 'fr'] = asig.loc[:, 'fr']
                 raster = getRasterFacetIdx(
@@ -127,7 +129,7 @@ def plotNeuronsAligned(
                 g = twin_relplot(
                     x='bin',
                     y2='fr', y1='t_facetIdx',
-                    query2=None, query1='(raster == 1000)',
+                    query2=None, query1='(raster == {})'.format(oneSpikePerBinHz),
                     col=colName, row=rowName, hue=hueName,
                     **twinRelplotKWArgs,
                     data=raster)
@@ -321,17 +323,27 @@ def xLabelsTime(g, ro, co, hu, dataSubset):
     if ro == g.axes.shape[0] - 1:
         g.axes[ro, co].set_xlabel('Time (sec)')
     return
-    
 
-def truncateLegend(g, ro, co, hu, dataSubset):
-    # pdb.set_trace()
-    g.axes[ro, co].axvline(0, color='m')
-    leg = g._legend
-    for t in leg.texts:
-        # truncate label text to 4 characters
-        t.set_text(t.get_text()[:4])
-    return
 
+def genVLineAdder(pos, patchOpts):
+    def addVline(g, ro, co, hu, dataSubset):
+        g.axes[ro, co].axvline(pos, **patchOpts)
+        return
+    return addVline
+
+
+def genLegendRounder(decimals=2):
+    def formatLegend(g, ro, co, hu, dataSubset):
+        leg = g._legend
+        for t in leg.texts:
+            if t.get_text().replace('.', '', 1).isdigit():
+                # truncate label text to 4 characters
+                textNumeric = np.round(
+                    float(t.get_text()),
+                    decimals=decimals)
+                t.set_text('{}'.format(textNumeric))
+        return
+    return formatLegend
 
 def plotCorrelationMatrix(correlationDF, pdfPath):
     #  based on https://seaborn.pydata.org/examples/many_pairwise_correlations.html

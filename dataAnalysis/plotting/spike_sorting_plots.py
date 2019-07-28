@@ -413,6 +413,16 @@ def spikePDFReport(
                                 channel,
                                 isiAx.get_title()
                             ))
+                        noiseHarmonics = [
+                            i * 1e3 * (60) ** (-1)
+                            for i in range(1,10)]
+                        for noiseHarmonic in noiseHarmonics:
+                            isiAx.axvline(
+                                noiseHarmonic, color='b', linestyle='--', zorder=0)
+                        stimHarmonics = [100]
+                        for stimHarmonic in stimHarmonics:
+                            isiAx.axvline(
+                                stimHarmonic, color='r', linestyle='--', zorder=0)
                         #  pdb.set_trace()
                         ksa.plotSpikePropertyHistogram(
                             spikes, channel=channel, whichProp='templateDist',
