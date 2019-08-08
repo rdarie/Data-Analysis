@@ -3,10 +3,10 @@ Usage:
     temp.py [options]
 
 Options:
-    --trialIdx=trialIdx             which trial to analyze [default: 1]
-    --exp=exp                       which experimental day to analyze
-    --suffix=suffix                 does the analyze file have a name?
-    --processAll                    process entire experimental day? [default: False]
+    --trialIdx=trialIdx               which trial to analyze [default: 1]
+    --exp=exp                         which experimental day to analyze
+    --analysisName=analysisName       append a name to the resulting blocks? [default: default]
+    --processAll                      process entire experimental day? [default: False]
 """
 
 import dataAnalysis.ephyviewer.scripts as vis_scripts
@@ -44,20 +44,21 @@ expOpts, allOpts = parseAnalysisOptions(
 globals().update(expOpts)
 globals().update(allOpts)
 
+analysisSubFolder = os.path.join(
+    scratchFolder, arguments['analysisName']
+    )
+if not os.path.exists(analysisSubFolder):
+    os.makedirs(analysisSubFolder, exist_ok=True)
 chanNames = None  # ['elec75#0_raster', 'elec75#1_raster']
 
 rasterOpts.update({
     'binWidth': 5e-3,
     'smoothKernelWidth': None})
 
-if arguments['suffix'] is None:
-    arguments['suffix'] = ''
-else:
-    arguments['suffix'] = '_' + arguments['suffix']
-    experimentBinnedSpikePath = experimentBinnedSpikePath.replace('.nix', '{}.nix'.format(arguments['suffix']))
-    experimentDataPath = experimentDataPath.replace('.nix', '{}.nix'.format(arguments['suffix']))
-    binnedSpikePath = binnedSpikePath.replace('.nix', '{}.nix'.format(arguments['suffix']))
-    analysisDataPath = analysisDataPath.replace('.nix', '{}.nix'.format(arguments['suffix']))
+experimentBinnedSpikePath = experimentBinnedSpikePath.format(arguments['analysisName'])
+experimentDataPath = experimentDataPath.format(arguments['analysisName'])
+binnedSpikePath = binnedSpikePath.format(arguments['analysisName'])
+analysisDataPath = analysisDataPath.format(arguments['analysisName'])
 
 if arguments['processAll']:
     masterBlock = preproc.calcFR(
@@ -77,13 +78,12 @@ else:
         rasterOpts=rasterOpts)
 
 allSegs = list(range(len(masterBlock.segments)))
-
 if arguments['processAll']:
     preproc.addBlockToNIX(
         masterBlock, neoSegIdx=allSegs,
         writeSpikes=False, writeEvents=False,
-        fileName=experimentName + '_analyze{}'.format(arguments['suffix']),
-        folderPath=scratchFolder,
+        fileName=experimentName + '_analyze',
+        folderPath=analysisSubFolder,
         purgeNixNames=False,
         nixBlockIdx=0, nixSegIdx=allSegs,
         )
@@ -91,8 +91,8 @@ else:
     preproc.addBlockToNIX(
         masterBlock, neoSegIdx=allSegs,
         writeSpikes=False, writeEvents=False,
-        fileName=ns5FileName + '_analyze{}'.format(arguments['suffix']),
-        folderPath=scratchFolder,
+        fileName=ns5FileName + '_analyze',
+        folderPath=analysisSubFolder,
         purgeNixNames=False,
         nixBlockIdx=0, nixSegIdx=allSegs,
         )

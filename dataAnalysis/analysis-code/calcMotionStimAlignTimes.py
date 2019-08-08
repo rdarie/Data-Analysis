@@ -5,6 +5,7 @@ Usage:
 Options:
     --trialIdx=trialIdx                  which trial to analyze [default: 1]
     --exp=exp                            which experimental day to analyze
+    --analysisName=analysisName          append a name to the resulting blocks? [default: default]
     --processAll                         process entire experimental day? [default: False]
     --plotParamHistograms                plot pedal size, amplitude, duration distributions? [default: False]
 """
@@ -37,7 +38,11 @@ expOpts, allOpts = parseAnalysisOptions(
     arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
-
+analysisSubFolder = os.path.join(
+    scratchFolder, arguments['analysisName']
+    )
+if not os.path.exists(analysisSubFolder):
+    os.makedirs(analysisSubFolder, exist_ok=True)
 #  fetch stim details
 insReader = neo.NixIO(
     filename=insDataPath)
@@ -46,13 +51,13 @@ insBlock = insReader.read_block(0)
 #  all experimental days?
 if arguments['processAll']:
     dataReader = neo.io.nixio_fr.NixIO(
-        filename=experimentDataPath)
+        filename=experimentDataPath.format(arguments['analysisName']))
 else:
     alignTimeBounds = [
         alignTimeBoundsLookup[int(arguments['trialIdx'])]
     ]
     dataReader = neo.io.nixio_fr.NixIO(
-        filename=analysisDataPath)
+        filename=analysisDataPath.format(arguments['analysisName']))
 
 dataBlock = dataReader.read_block(
     block_index=0, lazy=True,
@@ -482,7 +487,6 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
     masterBlock.segments.append(newSeg)
 
 dataReader.file.close()
-
 masterBlock.create_relationship()
 allSegs = list(range(len(masterBlock.segments)))
 if arguments['processAll']:
@@ -490,7 +494,7 @@ if arguments['processAll']:
         masterBlock, neoSegIdx=allSegs,
         writeAsigs=False, writeSpikes=False, writeEvents=True,
         fileName=experimentName + '_analyze',
-        folderPath=scratchFolder,
+        folderPath=analysisSubFolder,
         purgeNixNames=False,
         nixBlockIdx=0, nixSegIdx=allSegs,
         )
@@ -499,7 +503,7 @@ else:
         masterBlock, neoSegIdx=allSegs,
         writeAsigs=False, writeSpikes=False, writeEvents=True,
         fileName=ns5FileName + '_analyze',
-        folderPath=scratchFolder,
+        folderPath=analysisSubFolder,
         purgeNixNames=False,
         nixBlockIdx=0, nixSegIdx=allSegs,
         )

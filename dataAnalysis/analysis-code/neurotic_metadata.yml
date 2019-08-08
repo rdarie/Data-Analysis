@@ -1,0 +1,36 @@
+murdoc example:
+    description:             This is an example from murdoc
+    data_dir:                Z:/data/rdarie/Murdoc Neural Recordings/scratch/201901070700-ProprioRC
+    # remote_data_dir:       https://web.gin.g-node.org/jpgill86/neurotic-data/raw/master/examples/example-data
+    data_file:               Trial003_full.nix
+    # video_file:              video.mp4
+    # annotations_file:        annotations.csv
+    # epoch_encoder_file:      epoch-encoder.csv
+    # tridesclous_file:        tdc_Trial003/export/epoch-encoder.csv
+
+    plots:
+        - channel: elec75
+          units: uV
+          ylim: [-2100, -1500]
+
+        - channel: elec73
+          units: uV
+          ylim: [-2100, -1500]
+
+        # - channel: BN2
+        #   units: uV
+        #   ylim: [-120, 120]
+
+        # - channel: BN3
+        #   units: uV
+        #   ylim: [-150, 150]
+
+        # - channel: Force
+        #   units: mN
+        #   ylim: [-10, 300]
+
+    # tridesclous_channels:
+    #     0: [Channel A, Channel B]
+    #     1: [Channel A]
+    #     2: [Channel B]
+    #     3: [Channel B]

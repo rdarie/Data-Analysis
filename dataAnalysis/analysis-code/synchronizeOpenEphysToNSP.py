@@ -56,30 +56,33 @@ nspSeg = nspBlock.segments[segIdx]
 oeSeg = oeBlock.segments[segIdx]
 
 fs = 30000
+nCrossings = 50000
 #
 oeSyncAsig = oeSeg.filter(name='seg0_ADC1')[0]
-tStart = 97
-tStop = 600
+tStart = 24
+tStop = 200
+oeThresh = -2
 oeTimeMask = hf.getTimeMaskFromRanges(
     oeSyncAsig.times, [(tStart, tStop)])
 oeSrs = pd.Series(oeSyncAsig.magnitude[oeTimeMask].flatten())
 oePeakIdx, oeCrossMask = hf.getThresholdCrossings(
-    oeSrs, thresh=-2,
+    oeSrs, thresh=oeThresh,
     iti=1e-4, fs=fs,
     absVal=False, plotting=plotting, keep_max=False)
-oeTimes = oeSyncAsig.times[oeTimeMask][oeCrossMask][:100]
+oeTimes = oeSyncAsig.times[oeTimeMask][oeCrossMask][:nCrossings]
 #
 nspSyncAsig = nspSeg.filter(name='seg0_ainp16')[0]
-tStart = 91
-tStop = 600
+tStart = 17
+tStop = 200
+nspThresh = 600
 nspTimeMask = hf.getTimeMaskFromRanges(
     nspSyncAsig.times, [(tStart, tStop)])
 nspSrs = pd.Series(nspSyncAsig.magnitude[nspTimeMask].flatten())
 nspPeakIdx, nspCrossMask = hf.getThresholdCrossings(
-    nspSrs, thresh=600,
+    nspSrs, thresh=nspThresh,
     iti=1e-4, fs=fs,
     absVal=False, plotting=plotting, keep_max=False)
-nspTimes = nspSyncAsig.times[nspTimeMask][nspCrossMask][:100]
+nspTimes = nspSyncAsig.times[nspTimeMask][nspCrossMask][:nCrossings]
 assert np.max(np.abs((np.diff(oeTimes) - np.diff(nspTimes)))) < 1e-4
 
 synchPolyCoeffs = np.polyfit(
@@ -104,7 +107,7 @@ oeDF['nspT'] = timeInterpFun(oeDF['oeT'])
 dummyAsig = nspSeg.filter(objects=AnalogSignal)[0]
 newT = pd.Series(dummyAsig.times.magnitude)
 interpCols = oeDF.columns.drop(['oeT', 'nspT'])
-pdb.set_trace()
+
 oeInterp = hf.interpolateDF(
     oeDF, newT,
     kind='linear', fill_value=(0, 0),

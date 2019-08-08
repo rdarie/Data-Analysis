@@ -7,7 +7,7 @@ Options:
     --exp=exp                            which experimental day to analyze
     --processAll                         process entire experimental day? [default: False]
     --plotParamHistograms                plot pedal size, amplitude, duration distributions? [default: False]
-    --suffix=suffix                      does the analyze file have a name?
+    --analysisName=analysisName          append a name to the resulting blocks? [default: default]
     --makeControl                        make control align times? [default: False]
 """
 import os, pdb, traceback
@@ -39,19 +39,18 @@ expOpts, allOpts = parseAnalysisOptions(
     arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
+analysisSubFolder = os.path.join(
+    scratchFolder, arguments['analysisName']
+    )
+if not os.path.exists(analysisSubFolder):
+    os.makedirs(analysisSubFolder, exist_ok=True)
+experimentDataPath = experimentDataPath.format(arguments['analysisName'])
+analysisDataPath = analysisDataPath.format(arguments['analysisName'])
 #  fetch stim details
 insReader = neo.NixIO(
     filename=insDataPath)
 insBlock = insReader.read_block(0)
 #  all experimental days?
-
-if arguments['suffix'] is None:
-    arguments['suffix'] = ''
-else:
-    arguments['suffix'] = '_' + arguments['suffix']
-    experimentDataPath = experimentDataPath.replace('.nix', '{}.nix'.format(arguments['suffix']))
-    analysisDataPath = analysisDataPath.replace('.nix', '{}.nix'.format(arguments['suffix']))
-
 if arguments['processAll']:
     dataReader = neo.io.nixio_fr.NixIO(
         filename=experimentDataPath)
@@ -67,7 +66,7 @@ for ev in dataBlock.filter(objects=EventProxy):
     ev.name = '_'.join(ev.name.split('_')[1:])
 
 availableCateg = [
-    'amplitude', 'program', 'RateInHz']
+    'amplitude', 'program', 'activeGroup', 'RateInHz']
 
 progAmpNames = rcsa_helpers.progAmpNames
 expandCols = [
@@ -156,12 +155,13 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
     uniqProgs = pd.unique(alignEventsDF['program'])
     #  pull actual electrode names
     alignEventsDF['electrode'] = np.nan
-    for pName in uniqProgs:
-        pMask = alignEventsDF['program'] == pName
+    for name, group in alignEventsDF.groupby(['activeGroup', 'program']):
+        gName = int(name[0])
+        pName = int(name[1])
         if pName == 999:
-            alignEventsDF.loc[pMask, 'electrode'] = 'control'
+            alignEventsDF.loc[group.index, 'electrode'] = 'control'
         else:
-            unitName = 'g0p{}'.format(int(pName))
+            unitName = 'g{}p{}'.format(gName, pName)
             thisUnit = insBlock.filter(objects=Unit, name=unitName)[0]
             cathodes = thisUnit.annotations['cathodes']
             anodes = thisUnit.annotations['anodes']
@@ -175,7 +175,7 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
                 elecName += '- ' + ', '.join(['E{}'.format(i) for i in cathodes])
             else:
                 elecName += '- E{}'.format(cathodes)
-            alignEventsDF.loc[pMask, 'electrode'] = elecName
+            alignEventsDF.loc[group.index, 'electrode'] = elecName
     #
     alignEvents = ns5.eventDataFrameToEvents(
         alignEventsDF, idxT='t',
@@ -210,8 +210,8 @@ if arguments['processAll']:
     ns5.addBlockToNIX(
         masterBlock, neoSegIdx=allSegs,
         writeAsigs=False, writeSpikes=False, writeEvents=True,
-        fileName=experimentName + '_analyze{}'.format(arguments['suffix']),
-        folderPath=scratchFolder,
+        fileName=experimentName + '_analyze',
+        folderPath=analysisSubFolder,
         purgeNixNames=False,
         nixBlockIdx=0, nixSegIdx=allSegs,
         )
@@ -219,8 +219,8 @@ else:
     ns5.addBlockToNIX(
         masterBlock, neoSegIdx=allSegs,
         writeAsigs=False, writeSpikes=False, writeEvents=True,
-        fileName=ns5FileName + '_analyze{}'.format(arguments['suffix']),
-        folderPath=scratchFolder,
+        fileName=ns5FileName + '_analyze',
+        folderPath=analysisSubFolder,
         purgeNixNames=False,
         nixBlockIdx=0, nixSegIdx=allSegs,
         )

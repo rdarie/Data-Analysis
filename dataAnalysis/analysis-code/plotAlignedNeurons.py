@@ -3,28 +3,30 @@ Usage:
     temp.py [options]
 
 Options:
-    --exp=exp                       which experimental day to analyze
-    --trialIdx=trialIdx             which trial to analyze [default: 1]
-    --processAll                    process entire experimental day? [default: False]
-    --lazy                          load from raw, or regular? [default: False]
-    --verbose                       print diagnostics? [default: False]
-    --window=window                 process with short window? [default: short]
-    --unitQuery=unitQuery           how to restrict channels?
-    --selector=selector             filename if using a unit selector
-    --alignQuery=alignQuery         what will the plot be aligned to? [default: outboundWithStim]
-    --rowName=rowName               break down by row  [default: pedalDirection]
-    --rowControl=rowControl         rows to exclude from comparison
-    --hueName=hueName               break down by hue  [default: amplitudeCat]
-    --hueControl=hueControl         hues to exclude from comparison
-    --styleName=styleName           break down by style [default: RateInHz]
-    --styleControl=hueControl       styles to exclude from stats test
-    --colName=colName               break down by col  [default: electrode]
-    --colControl=colControl         cols to exclude from comparison [default: control]
+    --exp=exp                         which experimental day to analyze
+    --trialIdx=trialIdx               which trial to analyze [default: 1]
+    --analysisName=analysisName       append a name to the resulting blocks? [default: default]
+    --processAll                      process entire experimental day? [default: False]
+    --lazy                            load from raw, or regular? [default: False]
+    --verbose                         print diagnostics? [default: False]
+    --window=window                   process with short window? [default: short]
+    --unitQuery=unitQuery             how to restrict channels?
+    --selector=selector               filename if using a unit selector
+    --alignQuery=alignQuery           what will the plot be aligned to? [default: outboundWithStim]
+    --rowName=rowName                 break down by row  [default: pedalDirection]
+    --rowControl=rowControl           rows to exclude from comparison
+    --hueName=hueName                 break down by hue  [default: amplitudeCat]
+    --hueControl=hueControl           hues to exclude from comparison
+    --styleName=styleName             break down by style [default: RateInHz]
+    --styleControl=hueControl         styles to exclude from stats test
+    --colName=colName                 break down by col  [default: electrode]
+    --colControl=colControl           cols to exclude from comparison [default: control]
 """
 import matplotlib
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
-matplotlib.use('PS')   # generate postscript output by default
+# matplotlib.use('PS')   # generate postscript output 
+matplotlib.use('QT5Agg')   # generate postscript output
 
 import seaborn as sns
 sns.set()
@@ -48,13 +50,17 @@ expOpts, allOpts = parseAnalysisOptions(
     int(arguments['trialIdx']), arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
-
+analysisSubFolder = os.path.join(
+    scratchFolder, arguments['analysisName']
+    )
+if not os.path.exists(analysisSubFolder):
+    os.makedirs(analysisSubFolder, exist_ok=True)
 rowColOpts = asp.processRowColArguments(arguments)
 colorPal = "ch:0.6,-.2,dark=.2,light=0.7,reverse=1"  #  for firing rates
 
 alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **arguments)
 alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
-    namedQueries, scratchFolder, **arguments)
+    namedQueries, analysisSubFolder, **arguments)
 alignedAsigsKWargs.update(dict(
     duplicateControlsByProgram=True,
     makeControlProgram=True,
@@ -65,15 +71,17 @@ if arguments['processAll']:
 else:
     prefix = ns5FileName
 rasterBlockPath = os.path.join(
-    scratchFolder,
+    analysisSubFolder,
     prefix + '_raster_{}.nix'.format(
         arguments['window']))
+print('loading {}'.format(rasterBlockPath))
 rasterReader, rasterBlock = ns5.blockFromPath(
     rasterBlockPath, lazy=arguments['lazy'])
 frBlockPath = os.path.join(
-    scratchFolder,
+    analysisSubFolder,
     prefix + '_fr_{}.nix'.format(
         arguments['window']))
+print('loading {}'.format(frBlockPath))
 frReader, frBlock = ns5.blockFromPath(
     frBlockPath, lazy=arguments['lazy'])
 pdfName = '{}_neurons_{}_{}'.format(
@@ -81,13 +89,14 @@ pdfName = '{}_neurons_{}_{}'.format(
     arguments['window'],
     arguments['alignQuery'])
 statsTestOpts.update({'tStop': rasterOpts['windowSizes'][arguments['window']][1]})
-statsTestPath = os.path.join(scratchFolder, pdfName + '_stats.h5')
+statsTestPath = os.path.join(analysisSubFolder, pdfName + '_stats.h5')
 #  Overrides
 alignedAsigsKWargs.update({'windowSize': (-10e-3, 60e-3)})
 statsTestOpts.update({
-    'testStride': 10e-3,
-    'testWidth': 5e-3,
+    'testStride': 5e-3,
+    'testWidth': 10e-3,
     'tStop': 60e-3})
+limitPages = None
 #  End Overrides
 if os.path.exists(statsTestPath):
     sigValsWide = pd.read_hdf(statsTestPath, 'sig')
@@ -103,6 +112,7 @@ else:
         pValsWide, statValsWide,
         sigValsWide) = ash.facetGridCompareMeans(
         frBlock, statsTestPath,
+        limitPages=limitPages,
         loadArgs=alignedAsigsKWargsStats,
         rowColOpts=rowColOpts,
         statsTestOpts=statsTestOpts)
@@ -110,6 +120,7 @@ else:
 asp.plotNeuronsAligned(
     rasterBlock,
     frBlock,
+    limitPages=limitPages,
     verbose=arguments['verbose'],
     loadArgs=alignedAsigsKWargs,
     sigTestResults=sigValsWide,
@@ -118,7 +129,8 @@ asp.plotNeuronsAligned(
     enablePlots=True,
     plotProcFuns=[
         asp.xLabelsTime, asp.genLegendRounder(decimals=2),
-        asp.yLabelsEMG, asp.genVLineAdder(0, nrnVLineOpts)],
+        asp.genDespiner(right=False, left=True, trim=True),
+        asp.genVLineAdder(0, nrnVLineOpts)],
     pdfName=pdfName,
     **rowColOpts,
     twinRelplotKWArgs=nrnRelplotKWArgs)

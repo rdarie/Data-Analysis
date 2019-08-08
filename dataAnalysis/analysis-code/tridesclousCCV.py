@@ -13,6 +13,7 @@ Options:
     --batchPeel                run peeler [default: False]
     --makeCoarseNeoBlock       save peeler results to a neo block [default: False]
     --makeStrictNeoBlock       save peeler results to a neo block [default: False]
+    --exportSpikesCSV          save peeler results to a csv file [default: False]
 """
 
 from docopt import docopt
@@ -98,20 +99,32 @@ chansToAnalyze = [
     81, 82, 83, 84, 85, 86, 87, 88, 89,
     90, 91, 92, 93, 94, 95]
 '''
-chansToAnalyze = [70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80]
 if arguments['batchPreprocess']:
     tdch.batchPreprocess(
         triFolder, chansToAnalyze,
-        n_components_by_channel=15,
-        cluster_method='agglomerative',
-        n_clusters=5,
-        noise_estimate_duration=400.,
-        sample_snippet_duration=800.,
-        chunksize=2**13, n_left=spikeWindow[0] - 2,
-        n_right=spikeWindow[1] + 2,
-        align_waveform=False, subsample_ratio=10,
+        relative_threshold=4,
+        highpass_freq=300.,
+        lowpass_freq=3000.,
+        filter_order=8,
+        featureOpts={
+            'method': 'global_umap',
+            'n_components': 5,
+            'n_neighbors': 30,
+            'min_dist': 0,
+        },
+        clusterOpts={
+            'method': 'hdbscan',
+            'min_cluster_size': 30},
+        noise_estimate_duration='all',
+        sample_snippet_duration='all',
+        chunksize=2**20,
+        extractOpts=dict(
+            mode='rand',
+            n_left=spikeWindow[0] - 2,
+            n_right=spikeWindow[1] + 2,
+            nb_max=10000, align_waveform=False),
         autoMerge=False, auto_merge_threshold=0.99,
-        relative_threshold=5, attemptMPI=HAS_MPI)
+        attemptMPI=HAS_MPI)
 
 if arguments['batchPeel']:
     tdch.batchPeel(
@@ -121,6 +134,9 @@ if arguments['batchPeel']:
 
 if HAS_MPI:
     COMM.Barrier()  # wait until all threads finish sorting
+
+if arguments['exportSpikesCSV'] and RANK == 0:
+    tdch.export_spikes_after_peeler(triFolder)
 
 if arguments['makeCoarseNeoBlock'] and RANK == 0:
     tdch.purgeNeoBlock(triFolder)

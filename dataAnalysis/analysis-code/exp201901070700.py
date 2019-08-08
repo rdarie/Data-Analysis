@@ -197,10 +197,10 @@ def getExpOpts():
         #  }
         }
     # stimDetectChans = None
-    triFolderSourceBase = 1
+    triFolderSourceBase = 2
     triDestinations = [
         'Trial00{}'.format(trialIdx)
-        for trialIdx in [2, 3, 4]]
+        for trialIdx in [1, 3, 4]]
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
         '201901070700-ProprioRC': [1, 2, 3, 4],

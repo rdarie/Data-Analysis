@@ -17,7 +17,7 @@ from seaborn.axisgrid import (
     utils, product, FacetGrid)
 from seaborn.relational import _ScatterPlotter, _LinePlotter
 import os
-
+import traceback
 
 def processRowColArguments(arguments):
     outDict = {}
@@ -59,24 +59,29 @@ def processRowColArguments(arguments):
 def getRasterFacetIdx(
         plotDF, y, row=None, col=None, hue=None):
     plotDF.loc[:, y + '_facetIdx'] = np.nan
-    dummyG = sns.FacetGrid(
-        plotDF,
-        row=row, col=col)
-    for name, group in dummyG.facet_data():
+    breakDownBy = [
+        i
+        for i in [row, col]
+        if i is not None]
+    if len(breakDownBy) == 1:
+        breakDownBy = breakDownBy[0]
+    for name, group in plotDF.groupby(breakDownBy):
         if hue is None:
-            subGroupBy = 'feature'
+            if 'feature' in group.columns:
+                subGroupBy = 'feature'
+            else:
+                subGroupBy = 'fr'
         else:
             subGroupBy = hue
         idxOffset = 0
         for subName, subGroup in group.groupby(subGroupBy):
-            uniqueIdx = pd.unique(subGroup[y])
+            uniqueIdx = np.unique(subGroup[y])
             idxLookup = {
                 uIdx: idx + idxOffset
                 for idx, uIdx in enumerate(uniqueIdx)}
             plotDF.loc[subGroup.index, y + '_facetIdx'] = (
                 subGroup[y].map(idxLookup))
             idxOffset += len(uniqueIdx)
-            #  plotDF[y + '_facetIdx'].unique()
     return plotDF
 
 
@@ -117,11 +122,23 @@ def plotNeuronsAligned(
             asigWide = ns5.alignedAsigsToDF(
                 frBlock, [continuousName],
                 **loadArgs)
-            # pdb.set_trace()
             raster = rasterWide.stack().reset_index(name='raster')
             asig = asigWide.stack().reset_index(name='fr')
             oneSpikePerBinHz = int(np.round(np.diff(rasterWide.columns)[0] ** (-1)))
             if enablePlots:
+                # pdb.set_trace()
+                if colName is not None:
+                    colOrder = np.unique(rasterWide.index.to_frame()[colName])
+                else:
+                    colOrder = None
+                if rowName is not None:
+                    rowOrder = np.unique(rasterWide.index.to_frame()[rowName])
+                else:
+                    rowOrder = None
+                if hueName is not None:
+                    hueOrder = np.unique(rasterWide.index.to_frame()[hueName])
+                else:
+                    hueOrder = None
                 raster.loc[:, 'fr'] = asig.loc[:, 'fr']
                 raster = getRasterFacetIdx(
                     raster, 't',
@@ -131,6 +148,7 @@ def plotNeuronsAligned(
                     y2='fr', y1='t_facetIdx',
                     query2=None, query1='(raster == {})'.format(oneSpikePerBinHz),
                     col=colName, row=rowName, hue=hueName,
+                    col_order=colOrder, row_order=rowOrder, hue_order=hueOrder,
                     **twinRelplotKWArgs,
                     data=raster)
                 #  iterate through plot and add significance stars
@@ -138,9 +156,10 @@ def plotNeuronsAligned(
                     if len(plotProcFuns):
                         for procFun in plotProcFuns:
                             procFun(g, ro, co, hu, dataSubset)
+                    g.twin_axes[ro, co].set_ylabel('Firing Rate (spk/s)')
                     if sigTestResults is not None:
                         addSignificanceStars(
-                            g, sigTestResults.query("unit == '{}'".format(unitName)),
+                            g, sigTestResults.query("unit == '{}'".format(continuousName)),
                             ro, co, hu, dataSubset)
                 pdf.savefig()
                 plt.close()
@@ -210,6 +229,7 @@ def calcBreakDown(asigWide, rowName, colName, hueName):
         .agg('count')
         .iloc[:, 0]
     )
+    # pdb.set_trace()
     indexNames = breakDownData.index.names + ['count']
     breakDownData = breakDownData.reset_index()
     breakDownData.columns = indexNames
@@ -293,7 +313,7 @@ def plotAsigsAligned(
                 plt.close()
             if limitPages is not None:
                 if idx >= limitPages:
-                    break  
+                    break
         if printBreakDown:
             breakDownData, breakDownText, fig, ax = printBreakdown(asigWide, rowName, colName, hueName)
             breakDownData.to_csv(os.path.join(figureFolder, pdfName + '_trialsBreakDown.txt'), sep='\t')
@@ -303,13 +323,36 @@ def plotAsigsAligned(
 
 
 def yLabelsEMG(g, ro, co, hu, dataSubset):
-    # pdb.set_trace()
-    if co == 0:
+    if (co == 0) and len(g.axes):
         if 'label' in dataSubset.columns:
             g.axes[ro, co].set_ylabel(dataSubset['label'].unique()[0])
-        else:
+        elif 'feature' in dataSubset.columns:
             g.axes[ro, co].set_ylabel(dataSubset['feature'].unique()[0])
     return
+
+
+def genDespiner(
+        top=True, right=True,
+        left=False, bottom=False,
+        offset=None, trim=False):
+    def despiner(g, ro, co, hu, dataSubset):
+        if left:
+            g.axes[ro, co].set_yticks([])
+        sns.despine(
+            ax=g.axes[ro, co],
+            top=top, left=left,
+            right=right, bottom=bottom,
+            offset=offset, trim=trim
+            )
+        if hasattr(g, 'twin_axes'):
+            sns.despine(
+                ax=g.twin_axes[ro, co],
+                top=top, left=left,
+                right=right, bottom=bottom,
+                offset=offset, trim=trim
+                )
+        return
+    return despiner
 
 
 def genXLimSetter(newLims):
@@ -344,6 +387,7 @@ def genLegendRounder(decimals=2):
                 t.set_text('{}'.format(textNumeric))
         return
     return formatLegend
+
 
 def plotCorrelationMatrix(correlationDF, pdfPath):
     #  based on https://seaborn.pydata.org/examples/many_pairwise_correlations.html
@@ -531,14 +575,18 @@ def twin_relplot(
     )
     
     # Draw the plot
-    g1.map_dataframe(
-        func1, x, y1,
-        hue=hue, size=size, style=style,
-        **plot_kws1)
-    g2.map_dataframe(
-        func2, x, y2,
-        hue=hue, size=size, style=style,
-        **plot_kws2)
+    try:
+        g1.map_dataframe(
+            func1, x, y1,
+            hue=hue, size=size, style=style,
+            **plot_kws1)
+        g2.map_dataframe(
+            func2, x, y2,
+            hue=hue, size=size, style=style,
+            **plot_kws2)
+    except Exception:
+        traceback.print_exc()
+        pass
 
     # Show the legend
     if legend:
@@ -552,7 +600,7 @@ def twin_relplot(
             g2.add_legend(
                 legend_data=p2.legend_data,
                 label_order=p2.legend_order)
-
+    g1.twin_axes = twin_axes
     return g1
 
 

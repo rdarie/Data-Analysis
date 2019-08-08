@@ -5,6 +5,7 @@ Usage:
 Options:
     --trialIdx=trialIdx             which trial to analyze [default: 1]
     --exp=exp                       which experimental day to analyze
+    --analysisName=analysisName     append a name to the resulting blocks? [default: default]
     --processAsigs                  whether to process the analog signals [default: False]
     --processRasters                whether to process the rasters [default: False]
 """
@@ -60,11 +61,15 @@ if arguments['processRasters']:
 for suffix in suffixList:
     print('assembling {}'.format(suffix))
     experimentDataPath = os.path.join(
-        scratchFolder,
+        scratchFolder, arguments['analysisName'],
         experimentName + suffix + '.nix')
     for idx, trialBasePath in enumerate(trialsToAssemble):
         print('loading trial {}'.format(trialBasePath))
-        trialDataPath = trialBasePath.replace('.nix', suffix + '.nix')
+        trialDataPath = (
+            trialBasePath
+            .format(arguments['analysisName'])
+            .replace('.nix', suffix + '.nix')
+            )
         if idx == 0:
             masterBlock = preproc.loadWithArrayAnn(
                 trialDataPath, fromRaw=False)

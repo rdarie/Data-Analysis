@@ -3,15 +3,15 @@ Usage:
     temp.py [options]
 
 Options:
-    --trialIdx=trialIdx             which trial to analyze [default: 1]
-    --exp=exp                       which experimental day to analyze
-    --processAll                    process entire experimental day? [default: False]
-    --lazy                          load from raw, or regular? [default: False]
-    --window=window                 process with short window? [default: short]
-    --suffix=suffix                 does the analyze file have a name?
-    --chanQuery=chanQuery           how to restrict channels if not providing a list? [default: fr]
-    --blockName=blockName           name for new block [default: fr]
-    --eventName=eventName           name of events object to align to [default: motionStimAlignTimes]
+    --trialIdx=trialIdx               which trial to analyze [default: 1]
+    --exp=exp                         which experimental day to analyze
+    --processAll                      process entire experimental day? [default: False]
+    --lazy                            load from raw, or regular? [default: False]
+    --window=window                   process with short window? [default: short]
+    --analysisName=analysisName       append a name to the resulting blocks? [default: default]
+    --chanQuery=chanQuery             how to restrict channels if not providing a list? [default: fr]
+    --blockName=blockName             name for new block [default: fr]
+    --eventName=eventName             name of events object to align to [default: motionStimAlignTimes]
 """
 import os, pdb, traceback
 from importlib import reload
@@ -37,14 +37,15 @@ globals().update(expOpts)
 globals().update(allOpts)
 arguments['chanNames'], arguments['chanQuery'] = ash.processChannelQueryArgs(
     namedQueries, scratchFolder, **arguments)
+analysisSubFolder = os.path.join(
+    scratchFolder, arguments['analysisName']
+    )
+if not os.path.exists(analysisSubFolder):
+    os.makedirs(analysisSubFolder, exist_ok=True)
 verbose = True
 
-if arguments['suffix'] is None:
-    arguments['suffix'] = ''
-else:
-    arguments['suffix'] = '_' + arguments['suffix']
-    experimentDataPath = experimentDataPath.replace('.nix', '{}.nix'.format(arguments['suffix']))
-    analysisDataPath = analysisDataPath.replace('.nix', '{}.nix'.format(arguments['suffix']))
+experimentDataPath = experimentDataPath.format(arguments['analysisName'])
+analysisDataPath = analysisDataPath.format(arguments['analysisName'])
 
 #  source of events
 if arguments['processAll']:
@@ -87,4 +88,4 @@ ns5.getAsigsAlignedToEvents(
     verbose=verbose,
     fileName='{}_{}_{}'.format(
         prefix, arguments['blockName'], arguments['window']),
-    folderPath=scratchFolder, chunkSize=alignedAsigsChunkSize)
+    folderPath=analysisSubFolder, chunkSize=alignedAsigsChunkSize)

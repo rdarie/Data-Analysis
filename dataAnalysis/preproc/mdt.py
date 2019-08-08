@@ -1014,7 +1014,7 @@ def stimStatusSerialtoLong(
             stimStLong['program'] == idx)
         stimStLong.loc[pMask, pName] = stimStSer.loc[pMask, namePrefix + 'value']
         stimStLong[pName].fillna(method='ffill', inplace=True)
-        stimStLong[pName].fillna(method='bfill', inplace=True)
+        stimStLong[pName].fillna(value=0, inplace=True)
     #  pdb.set_trace()
     if dropDuplicates:
         stimStLong.drop_duplicates(subset=idxT, keep='last', inplace=True)
@@ -1037,7 +1037,7 @@ def stimStatusSerialtoLong(
         ampChange.astype(float).plot(style='go')
         plt.legend()
         plt.show()
-    # 
+    #
     if 'amplitudeRound' in deriveCols:
         stimStLong['amplitudeRound'] = (
             ampIncrease.astype(np.float).cumsum())
@@ -1764,6 +1764,8 @@ def getINSStimOnset(
                 )
             allPossibleTimestamps = tdSeg.loc[possibleOnsetIdx, 't']
             print('allPossibleTimestamps {}\n'.format(allPossibleTimestamps))
+            if len(allPossibleTimestamps) == 0:
+                pdb.set_trace()
             expectedOnsetIdx = possibleOnsetIdx[np.argmax(uncertaintyVals)]
             expectedTimestamp = tdSeg.loc[expectedOnsetIdx, 't']
             ROIBasis = pd.Series(

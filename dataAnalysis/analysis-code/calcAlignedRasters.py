@@ -3,15 +3,15 @@ Usage:
     temp.py [options]
 
 Options:
-    --trialIdx=trialIdx             which trial to analyze [default: 1]
-    --exp=exp                       which experimental day to analyze
-    --processAll                    process entire experimental day? [default: False]
-    --window=window                 process with short window? [default: short]
-    --lazy                          load from raw, or regular? [default: False]
-    --suffix=suffix                 does the analyze file have a name?
-    --chanQuery=chanQuery           how to restrict channels? [default: raster]
-    --blockName=blockName           name for new block [default: raster]
-    --eventName=eventName           name of events object to align to [default: motionStimAlignTimes]
+    --trialIdx=trialIdx                 which trial to analyze [default: 1]
+    --exp=exp                           which experimental day to analyze
+    --processAll                        process entire experimental day? [default: False]
+    --window=window                     process with short window? [default: short]
+    --lazy                              load from raw, or regular? [default: False]
+    --analysisName=analysisName         append a name to the resulting blocks? [default: default]
+    --chanQuery=chanQuery               how to restrict channels? [default: raster]
+    --blockName=blockName               name for new block [default: raster]
+    --eventName=eventName               name of events object to align to [default: motionStimAlignTimes]
 """
 
 import os, pdb, traceback
@@ -40,15 +40,15 @@ globals().update(expOpts)
 globals().update(allOpts)
 arguments['chanNames'], arguments['chanQuery'] = ash.processChannelQueryArgs(
     namedQueries, scratchFolder, **arguments)
-
-if arguments['suffix'] is None:
-    arguments['suffix'] = ''
-else:
-    arguments['suffix'] = '_' + arguments['suffix']
-    experimentBinnedSpikePath = experimentBinnedSpikePath.replace('.nix', '{}.nix'.format(arguments['suffix']))
-    binnedSpikePath = binnedSpikePath.replace('.nix', '{}.nix'.format(arguments['suffix']))
-    experimentDataPath = experimentDataPath.replace('.nix', '{}.nix'.format(arguments['suffix']))
-    analysisDataPath = analysisDataPath.replace('.nix', '{}.nix'.format(arguments['suffix']))
+analysisSubFolder = os.path.join(
+    scratchFolder, arguments['analysisName']
+    )
+if not os.path.exists(analysisSubFolder):
+    os.makedirs(analysisSubFolder, exist_ok=True)
+experimentBinnedSpikePath = experimentBinnedSpikePath.format(arguments['analysisName'])
+binnedSpikePath = binnedSpikePath.format(arguments['analysisName'])
+experimentDataPath = experimentDataPath.format(arguments['analysisName'])
+analysisDataPath = analysisDataPath.format(arguments['analysisName'])
     
 verbose = True
 #  source of events
@@ -94,4 +94,4 @@ ns5.getAsigsAlignedToEvents(
     verbose=verbose,
     fileName=prefix + '_{}_{}'.format(
         arguments['blockName'], arguments['window']),
-    folderPath=scratchFolder, chunkSize=alignedAsigsChunkSize)
+    folderPath=analysisSubFolder, chunkSize=alignedAsigsChunkSize)

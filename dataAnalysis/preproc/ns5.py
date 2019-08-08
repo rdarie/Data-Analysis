@@ -10,6 +10,7 @@ from neo.core import (Block, Segment, ChannelIndex,
 import quantities as pq
 #  from quantities import mV, kHz, s, uV
 import math, pdb
+from scipy import stats, signal, fftpack
 #  from copy import copy
 import dataAnalysis.helperFunctions.helper_functions_new as hf
 import dataAnalysis.helperFunctions.profiling as prf
@@ -235,7 +236,6 @@ def channelIndexesToSpikeDict(
                             theseWaveforms.magnitude), axis=0)
                     except Exception:
                         traceback.print_exc()
-                        pdb.set_trace()
                 else:
                     spikes['Waveforms'][idx] = theseWaveforms.magnitude
                 #  give each unit a global index
@@ -681,6 +681,7 @@ def getAsigsAlignedToEvents(
         #
         signalSeg = signalBlock.segments[segIdx]
         thisEventName = 'seg{}_{}'.format(segIdx, eventName)
+        # pdb.set_trace()
         assert len(eventSeg.filter(name=thisEventName)) == 1
         allEvIn = eventSeg.filter(name=thisEventName)[0]
         if isinstance(allEvIn, EventProxy):
@@ -760,7 +761,6 @@ def getAsigsAlignedToEvents(
                         for t in alignEvents]
                 elif isinstance(asig, AnalogSignal):
                     rawWaveforms = []
-                    #pdb.set_trace()
                     for t in alignEvents:
                         asigMask = (asig.times > t + windowSize[0]) & (asig.times < t + windowSize[1])
                         rawWaveforms.append(asig[asigMask[:, np.newaxis]])
@@ -1737,8 +1737,8 @@ def blockToNix(
         segInitIdx,
         equalChunks=True,
         chunkList=None,
-        fillOverflow=False,
         eventInfo=None,
+        fillOverflow=False, calcAverageLFP=False,
         removeJumps=False, trackMemory=True,
         asigNameList=None,
         spikeSourceType='', spikeBlock=None,
@@ -1772,7 +1772,18 @@ def blockToNix(
     block.channel_indexes = (
         [chanIdx for chanIdx in block.channel_indexes if (
             chanIdx.analogsignals)])
-    #
+    if calcAverageLFP:
+        lastIndex = len(block.channel_indexes)
+        lastID = block.channel_indexes[-1].channel_ids[0] + 1
+        aveLFPChIdx = ChannelIndex(
+            index=[lastIndex],
+            channel_names=['zScoredAverage'],
+            channel_ids=[lastID],
+            name='zScoredAverage',
+            file_origin=block.channel_indexes[-1].file_origin
+        )
+        aveLFPChIdx.merge_annotations(block.channel_indexes[-1])
+        block.channel_indexes.append(aveLFPChIdx)
     #  delete asig and irsig proxies from channel index list
     for metaIdx, chanIdx in enumerate(block.channel_indexes):
         if chanIdx.analogsignals:
@@ -1853,50 +1864,134 @@ def blockToNix(
                         aSigList.append(a)
             else:
                 aSigList = seg.analogsignals
-            #
-            for aSigIdx, aSigProxy in enumerate(aSigList):
+            lfpAsigList = [
+                a
+                for a in seg.analogsignals
+                if ('ainp' not in a.name)
+                ]
+            nLfpAsigs = len(lfpAsigList)
+            for aSigIdx, aSigProxy in enumerate(seg.analogsignals):
                 if aSigIdx == 0:
                     # check bounds
                     tStart = max(tStart, aSigProxy.t_start)
                     tStop = min(tStop, aSigProxy.t_stop)
-                if trackMemory:
-                    print('writing asigs memory usage: {:.1f} MB'.format(
-                        prf.memory_usage_psutil()))
-                chanIdx = aSigProxy.channel_index
-                asig = aSigProxy.load(
-                    time_slice=(tStart, tStop),
-                    magnitude_mode='rescaled')
-                #  link AnalogSignal and ID providing channel_index
-                asig.channel_index = chanIdx
-                #  perform requested preproc operations
-                if fillOverflow:
-                    # fill in overflow:
-                    '''
-                    timeSection['data'], overflowMask = hf.fillInOverflow(
-                        timeSection['data'], fillMethod = 'average')
-                    badData.update({'overflow': overflowMask})
-                    '''
-                    pass
-                if removeJumps:
-                    # find unusual jumps in derivative or amplitude
-                    '''
-                    timeSection['data'], newBadData = hf.fillInJumps(timeSection['data'],
+                loadThisOne = (
+                    (aSigProxy in aSigList) or
+                    (calcAverageLFP and (aSigProxy in lfpAsigList))
+                )
+                if loadThisOne:
+                    if trackMemory:
+                        print('writing asigs memory usage: {:.1f} MB'.format(
+                            prf.memory_usage_psutil()))
+                    chanIdx = aSigProxy.channel_index
+                    asig = aSigProxy.load(
+                        time_slice=(tStart, tStop),
+                        magnitude_mode='rescaled')
+                    #  link AnalogSignal and ID providing channel_index
+                    asig.channel_index = chanIdx
+                    #  perform requested preproc operations
+                    if fillOverflow:
+                        # fill in overflow:
+                        '''
+                        timeSection['data'], overflowMask = hf.fillInOverflow(
+                            timeSection['data'], fillMethod = 'average')
+                        badData.update({'overflow': overflowMask})
+                        '''
+                        pass
+                    if removeJumps:
+                        # find unusual jumps in derivative or amplitude
+                        '''
+                        timeSection['data'], newBadData = hf.fillInJumps(timeSection['data'],
                         timeSection['samp_per_s'], smoothing_ms = 0.5, nStdDiff = 50,
                         nStdAmp = 100)
-                    badData.update(newBadData)
-                    '''
-                    pass
+                        badData.update(newBadData)
+                        '''
+                        pass
+                    if calcAverageLFP:
+                        normalAsig = stats.zscore(asig)
+                        if aSigIdx == 0:
+                            averageLFP = normalAsig / nLfpAsigs
+                            averageLFP.array_annotations = {}
+                        else:
+                            averageLFP += normalAsig / nLfpAsigs
+                    if (aSigProxy in aSigList):
+                        # assign ownership to containers
+                        chanIdx.analogsignals.append(asig)
+                        newSeg.analogsignals.append(asig)
+                        # assign parent to children
+                        chanIdx.create_relationship()
+                        newSeg.create_relationship()
+                        # write out to file
+                        asig = writer._write_analogsignal(
+                            asig, nixblock, nixgroup)
+                    del asig
+                    gc.collect()
+            if calcAverageLFP:
+                averageLFP.name = 'seg{}_zScoredAverage'.format(segIdx)
+                chanIdx = block.filter(
+                    objects=ChannelIndex,
+                    name='zScoredAverage')[0]
                 # assign ownership to containers
-                chanIdx.analogsignals.append(asig)
-                newSeg.analogsignals.append(asig)
+                chanIdx.analogsignals.append(averageLFP)
+                newSeg.analogsignals.append(averageLFP)
                 # assign parent to children
                 chanIdx.create_relationship()
                 newSeg.create_relationship()
                 # write out to file
-                asig = writer._write_analogsignal(asig, nixblock, nixgroup)
-                del asig
-                gc.collect()
-            #
+                averageLFP = writer._write_analogsignal(
+                    averageLFP, nixblock, nixgroup)
+                w0 = 60
+                bandQ = 20
+                bw = w0/bandQ
+                noiseSos = signal.iirfilter(
+                    N=8, Wn=[w0 - bw/2, w0 + bw/2],
+                    btype='band', ftype='butter',
+                    analog=False, fs=float(averageLFP.sampling_rate),
+                    output='sos')
+                # signal.hilbert does not have an option to zero pad
+                
+                nextLen = fftpack.helper.next_fast_len(averageLFP.shape[0])
+                deficit = int(nextLen - averageLFP.shape[0])
+                lDef = int(np.floor(deficit / 2))
+                rDef = int(np.ceil(deficit / 2))
+                temp = np.pad(
+                    averageLFP.magnitude.flatten(),
+                    (lDef, rDef), mode='constant')
+                lineNoise = signal.sosfiltfilt(
+                    noiseSos, temp, axis=0)
+                lineNoiseH = signal.hilbert(lineNoise)
+                lineNoise = lineNoise[lDef:-rDef]
+                lineNoiseH = lineNoiseH[lDef:-rDef]
+                lineNoisePhase = np.angle(lineNoiseH)
+                lineNoisePhaseDF = pd.DataFrame(
+                    lineNoisePhase,
+                    index=averageLFP.times,
+                    columns=['phase']
+                    )
+                plotHilbert = False
+                if plotHilbert:
+                    lineNoiseFreq = (
+                        np.diff(np.unwrap(lineNoisePhase)) /
+                        (2.0*np.pi) * float(averageLFP.sampling_rate))
+                    lineNoiseEnvelope = np.abs(lineNoiseH)
+                    import matplotlib.pyplot as plt
+                    i1 = 300000; i2 = 330000
+                    fig, ax = plt.subplots(2, 1, sharex=True)
+                    ax[0].plot(averageLFP.times[i1:i2], averageLFP.magnitude[i1:i2, :])
+                    ax[0].plot(averageLFP.times[i1:i2], lineNoise[i1:i2])
+                    ax[0].plot(averageLFP.times[i1:i2], lineNoiseEnvelope[i1:i2])
+                    axFr = ax[1].twinx()
+                    ax[1].plot(
+                        averageLFP.times[i1:i2], lineNoisePhase[i1:i2],
+                        c='r', label='phase')
+                    ax[1].legend()
+                    axFr.plot(
+                        averageLFP.times[i1:i2], lineNoiseFreq[i1:i2],
+                        label='freq')
+                    axFr.set_ylim([59, 61])
+                    axFr.legend()
+                    plt.show()
+                    
             for irSigIdx, irSigProxy in enumerate(
                     seg.irregularlysampledsignals):
                 chanIdx = irSigProxy.channel_index
@@ -1975,6 +2070,19 @@ def blockToNix(
                         #      traceback.print_exc()
                     st.name = 'seg{}_{}'.format(segIdx, unit.name)
                     #  link SpikeTrain and ID providing unit
+                    if calcAverageLFP:
+                        st.annotations['arrayAnnNames'] = list(st.annotations['arrayAnnNames'])
+                        st.annotations['arrayAnnNames'].append('phase60hz')
+                        phase60hz = hf.interpolateDF(
+                            lineNoisePhaseDF,
+                            newX=st.times, columns=['phase']).to_numpy().flatten()
+                        st.annotations.update({'phase60hz': phase60hz})
+                        plotPhaseDist = False
+                        if plotPhaseDist:
+                            import matplotlib.pyplot as plt
+                            import seaborn as sns
+                            sns.distplot(phase60hz)
+                            plt.show()
                     st.unit = unit
                     # assign ownership to containers
                     unit.spiketrains.append(st)
@@ -2107,6 +2215,7 @@ def preproc(
         rawFolderPath='./',
         outputFolderPath='./',
         fillOverflow=True, removeJumps=True,
+        calcAverageLFP=False,
         eventInfo=None,
         spikeSourceType='', spikePath=None,
         chunkSize=1800, equalChunks=True,
@@ -2161,6 +2270,7 @@ def preproc(
             chunkList=chunkList,
             fillOverflow=fillOverflow,
             removeJumps=removeJumps,
+            calcAverageLFP=calcAverageLFP,
             eventInfo=eventInfo,
             asigNameList=asigNameList,
             spikeSourceType=spikeSourceType,

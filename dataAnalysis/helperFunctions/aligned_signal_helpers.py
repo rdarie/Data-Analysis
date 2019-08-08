@@ -139,7 +139,8 @@ def compareMeansGrouped(
         tStart=None, tStop=None,
         testWidth=100e-3, testStride=20e-3,
         pThresh=1e-3,
-        correctMultiple=True):
+        correctMultiple=True,
+        plotting=False):
     
     if tStart is None:
         tStart = asigWide.columns[0]
@@ -194,8 +195,14 @@ def compareMeansGrouped(
             testGroups = [t[:maxSize] for t in testGroups]
             if len(testGroups) > 1:
                 try:
-                    # stat, p = stats.kruskal(*testGroups)
-                    stat, p = stats.f_oneway(*testGroups)
+                    stat, p = stats.kruskal(*testGroups, nan_policy='raise')
+                    # stat, p = stats.f_oneway(*testGroups)
+                    if plotting:
+                        import matplotlib.pyplot as plt
+                        import seaborn as sns
+                        for tGrp in testGroups:
+                            sns.distplot(tGrp, kde=False)
+                        plt.show()
                     pVals.loc[name, testBin] = p
                     statVals.loc[name, testBin] = stat
                 except Exception:
@@ -214,6 +221,7 @@ def compareMeansGrouped(
 
 def facetGridCompareMeans(
         dataBlock, statsTestPath,
+        limitPages=None,
         loadArgs={},
         rowColOpts={},
         statsTestOpts={}):
@@ -282,6 +290,9 @@ def facetGridCompareMeans(
         allPVals.update({unitName: pVals})
         allStatVals.update({unitName: statVals})
         allSigVals.update({unitName: sigVals})
+        if limitPages is not None:
+            if idx >= limitPages:
+                break
     allPValsWide = pd.concat(allPVals, names=['unit'] + pVals.index.names)
     if correctMultiple:
         flatPvals = allPValsWide.stack()

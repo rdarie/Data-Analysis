@@ -24,8 +24,9 @@
 # Run a command
 # EXP="exp201901211000"
 # EXP="exp201901231000"
-EXP="exp201901070700"
-RCTRIALIDX="2"
+# EXP="exp201901070700"
+EXP="exp201901271000"
+RCTRIALIDX="3"
 # Constructor
 python3 ./tridesclousCCV.py --trialIdx=$RCTRIALIDX --exp=$EXP  --batchPreprocess
 python3 ./tridesclousVisualize.py --trialIdx=$RCTRIALIDX --exp=$EXP  --constructor
@@ -34,3 +35,5 @@ python3 ./transferTDCTemplates.py --trialIdx=$RCTRIALIDX --exp=$EXP
 # Peeler
 python3 ./tridesclousCCV.py --trialIdx=$RCTRIALIDX --exp=$EXP --purgePeeler --batchPeel
 python3 ./tridesclousVisualize.py --trialIdx=$RCTRIALIDX --exp=$EXP  --peeler
+#
+python3 ./tridesclousCCV.py --trialIdx=$RCTRIALIDX --exp=$EXP --exportSpikesCSV

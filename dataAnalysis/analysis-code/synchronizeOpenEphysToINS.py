@@ -209,7 +209,6 @@ ax[1].set_ylim(ax[2].get_ylim())
 ax[1].set_xticks([0, len(alignedTensTimes) - 1])
 ax[1].set_xticklabels(['{}'.format(np.round(i)) for i in (insTensTimes.iloc[0], insTensTimes.iloc[-1])])
 plt.show()
-pdb.set_trace()
 # end if plotting
 tensEvents = Event(
     name='seg{}_TENS'.format(segIdx),

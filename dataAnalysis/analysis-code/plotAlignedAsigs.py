@@ -5,6 +5,7 @@ Usage:
 Options:
     --exp=exp                              which experimental day to analyze
     --trialIdx=trialIdx                    which trial to analyze [default: 1]
+    --analysisName=analysisName            append a name to the resulting blocks? [default: default]
     --processAll                           process entire experimental day? [default: False]
     --verbose                              print diagnostics? [default: True]
     --lazy                                 load from raw, or regular? [default: False]
@@ -43,7 +44,11 @@ expOpts, allOpts = parseAnalysisOptions(
     int(arguments['trialIdx']), arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
-
+analysisSubFolder = os.path.join(
+    scratchFolder, arguments['analysisName']
+    )
+if not os.path.exists(analysisSubFolder):
+    os.makedirs(analysisSubFolder, exist_ok=True)
 sns.set()
 sns.set_color_codes("dark")
 sns.set_context("talk")
@@ -55,7 +60,7 @@ alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(
     namedQueries, **arguments)
 alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = (
     ash.processUnitQueryArgs(
-        namedQueries, scratchFolder, **arguments))
+        namedQueries, analysisSubFolder, **arguments))
 alignedAsigsKWargs.update(dict(
     duplicateControlsByProgram=True,
     makeControlProgram=True,
@@ -66,7 +71,7 @@ else:
     prefix = ns5FileName
 #
 triggeredPath = os.path.join(
-    scratchFolder,
+    analysisSubFolder,
     prefix + '_{}_{}.nix'.format(
         arguments['inputBlockName'], arguments['window']))
 print('loading {}'.format(triggeredPath))
@@ -75,7 +80,7 @@ pdfName = '{}_{}_{}_{}'.format(
     prefix, arguments['inputBlockName'],
     arguments['window'],
     arguments['alignQuery'])
-statsTestPath = os.path.join(scratchFolder, pdfName + '_stats.h5')
+statsTestPath = os.path.join(analysisSubFolder, pdfName + '_stats.h5')
 #  Overrides
 #  alignedAsigsKWargs.update({'decimate': 10})
 alignedAsigsKWargs.update({'windowSize': (-10e-3, 60e-3)})
@@ -107,7 +112,7 @@ asp.plotAsigsAligned(
     enablePlots=True,
     plotProcFuns=[
         asp.yLabelsEMG, asp.xLabelsTime,
-        asp.asp.genVLineAdder(0, vLineOpts),
+        asp.genVLineAdder(0, vLineOpts),
         asp.genLegendRounder(decimals=2),
         asp.genXLimSetter(alignedAsigsKWargs['windowSize'])],
     pdfName=pdfName,

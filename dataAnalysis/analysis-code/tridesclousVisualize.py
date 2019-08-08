@@ -54,7 +54,7 @@ chansToAnalyze = [
 
 #  chansToAnalyze = chansToAnalyze[80:]
 #  chansToAnalyze = [11, 14, 16, 18, 20, 22, 29, 36, 37, 39, 41, 48, 51, 52, 59, 60, 64, 66, 73, 75, 77, 80, 81, 88, 95]
-
+#  chansToAnalyze = [2, 3, 7, 10, 19, 20, 26, 27, 52, 53, 54, 59, 66, 80, 81, 91, 92, 93]
 if viewConstructor:
     for chan_grp in chansToAnalyze:
         print('\n\n\n\nOn channel group {}\n\n\n\n'.format(chan_grp))

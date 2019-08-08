@@ -8,11 +8,12 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
     optsModule = importlib.import_module(experimentShorthand, package=None)
     expOpts = optsModule.getExpOpts()
     #  globals().update(expOpts)
-    
     #  remote paths
     remoteBasePath = '..'
-    nspPrbPath = os.path.join('.', 'nsp_map.prb')
     scratchPath = '/gpfs/scratch/rdarie/rdarie/Murdoc Neural Recordings'
+    #  remoteBasePath = os.path.join('E:', 'Murdoc Neural Recordings')
+    #  scratchPath = os.path.join('E:', 'Murdoc Neural Recordings', 'scratch')
+    nspPrbPath = os.path.join('.', 'nsp_map.prb')
     insFolder = os.path.join(remoteBasePath, 'ORCA Logs')
     experimentName = expOpts['experimentName']
     nspFolder = os.path.join(remoteBasePath, 'raw', experimentName)
@@ -106,7 +107,7 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
             'folderPath': nspFolder,
             'ns5FileName': ns5FileName,
             'calcRigEvents': True,
-            'spikeWindow': [-32, 64]
+            'spikeWindow': [-25, 50]
             }
         }
     spikeWindow = trialFilesFrom['utah']['spikeWindow']
@@ -142,6 +143,7 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
         overrideStartTimes = None
     commonStimDetectionOpts = {
         'stimDetectOptsByChannel': stimDetectOptsByChannelDefault,
+        'spikeWindow': spikeWindow,
         'offsetFromPeak': 4e-3,
         'cyclePeriodCorrection': 20e-3,
         'predictSlots': True, 'snapToGrid': True,
@@ -214,6 +216,7 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
         prb_meta.cmpDFToPrb(
             cmpDF, filePath=nspPrbPath,
             names=['elec', 'ainp'],
+            #names=['elec'],
             groupIn={'xcoords': 1, 'ycoords': 1})
     #  should rename these to something more intuitive
     #  paths relevant to individual trials
@@ -235,7 +238,7 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
         triFolderSource = os.path.join(
             scratchPath, expOpts['triFolderSourceBase'])
     analysisDataPath = os.path.join(
-        scratchFolder,
+        scratchFolder, '{}',
         ns5FileName + '_analyze.nix')
     trialBasePath = os.path.join(
         scratchFolder,
@@ -250,17 +253,17 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
         scratchFolder,
         ns5FileName + '_raw_oe.nix')
     binnedSpikePath = os.path.join(
-        scratchFolder,
+        scratchFolder, '{}',
         ns5FileName + '_binarized.nix')
     #  paths relevant to the entire experimental day
     estimatorPath = os.path.join(
         scratchFolder,
         experimentName + '_estimator.joblib')
     experimentDataPath = os.path.join(
-        scratchFolder,
+        scratchFolder, '{}',
         experimentName + '_analyze.nix')
     experimentBinnedSpikePath = os.path.join(
-        scratchFolder,
+        scratchFolder, '{}',
         experimentName + '_binarized.nix')
     #
     figureFolder = os.path.join(
@@ -313,7 +316,7 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
         testWidth=100e-3,
         tStart=0,
         tStop=500e-3,
-        pThresh=1e-24,
+        pThresh=1e-2,
         correctMultiple=True
         )
     relplotKWArgs = dict(
@@ -342,7 +345,7 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
             for tIdx in val:
                 trialsToAssemble.append(
                     os.path.join(
-                        scratchPath, key, 'Trial00{}.nix'.format(tIdx)
+                        scratchPath, key, '{}', 'Trial00{}.nix'.format(tIdx)
                     )
                 )
     except Exception:

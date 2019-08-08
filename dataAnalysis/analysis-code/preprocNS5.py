@@ -35,6 +35,7 @@ if arguments['makeTruncated']:
         rawFolderPath=nspFolder,
         outputFolderPath=scratchFolder,
         fillOverflow=False, removeJumps=False,
+        calcAverageLFP=True,
         eventInfo=trialFilesFrom['utah']['eventInfo'],
         asigNameList=analogInputNames,
         spikeSourceType='tdc', writeMode='ow',

@@ -309,7 +309,7 @@ def preprocOpenEphysBlock(
     if 'low' in fOpts:
         fOpts['low']['fs'] = samplingRate
         sos = signal.iirfilter(
-                **fOpts['low'], output='sos')
+            **fOpts['low'], output='sos')
         #filterSOSList.append(sos)
         filterCoeffs = np.concatenate([filterCoeffs, sos])
         if plotting:

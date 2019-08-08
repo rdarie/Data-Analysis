@@ -5,6 +5,7 @@ Usage:
 Options:
     --trialIdx=trialIdx                    which trial to analyze [default: 1]
     --exp=exp                              which experimental day to analyze
+    --analysisName=analysisName            append a name to the resulting blocks? [default: default]
     --processAll                           process entire experimental day? [default: False]
     --estimator=estimator                  filename for resulting estimator
     --verbose                              print diagnostics? [default: False]
@@ -39,12 +40,16 @@ expOpts, allOpts = parseAnalysisOptions(
     int(arguments['trialIdx']), arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
-
+analysisSubFolder = os.path.join(
+    scratchFolder, arguments['analysisName']
+    )
+if not os.path.exists(analysisSubFolder):
+    os.makedirs(analysisSubFolder, exist_ok=True)
 #  source of signal
 if arguments['processAll']:
-    filePath = experimentDataPath
+    filePath = experimentDataPath.format(arguments['analysisName'])
 else:
-    filePath = analysisDataPath
+    filePath = analysisDataPath.format(arguments['analysisName'])
 
 dataReader, dataBlock = ns5.blockFromPath(
     filePath, lazy=arguments['lazy'])
@@ -146,7 +151,7 @@ ns5.addBlockToNIX(
     masterBlock, neoSegIdx=allSegs,
     writeSpikes=False, writeEvents=False,
     fileName=fileName,
-    folderPath=scratchFolder,
+    folderPath=analysisSubFolder,
     purgeNixNames=False,
     nixBlockIdx=0, nixSegIdx=allSegs,
     )
