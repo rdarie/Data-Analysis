@@ -49,11 +49,18 @@ analysisSubFolder = os.path.join(
     )
 if not os.path.exists(analysisSubFolder):
     os.makedirs(analysisSubFolder, exist_ok=True)
-chanNames = None  # ['elec75#0_raster', 'elec75#1_raster']
+
+if overrideChanNames is not None:
+    chanNames = [i + '_raster' for i in overrideChanNames]
+else:
+    chanNames = None
 
 rasterOpts.update({
     'binWidth': 5e-3,
     'smoothKernelWidth': None})
+# rasterOpts.update({
+#     'binWidth': 50e-3,
+#     'smoothKernelWidth': None})
 
 experimentBinnedSpikePath = experimentBinnedSpikePath.format(arguments['analysisName'])
 experimentDataPath = experimentDataPath.format(arguments['analysisName'])

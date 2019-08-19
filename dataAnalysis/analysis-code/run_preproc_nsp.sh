@@ -9,7 +9,7 @@
 # Use more memory (32GB):
 #SBATCH --nodes=1
 #SBATCH --mem=96G
-#SBATCH --array=1,2,3,4
+#SBATCH --array=4
 
 # Specify a job name:
 #SBATCH -J nsp_preproc
@@ -22,10 +22,10 @@
 #SBATCH --account=bibs-dborton-condo
 
 # EXP="exp201901211000"
-# EXP="exp201901271000"
+EXP="exp201901271000"
 # EXP="exp201901221000"
 # EXP="exp201901231000"
-EXP="exp201901070700"
+# EXP="exp201901070700"
 
-# python3 './preprocNS5.py' --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID --makeTruncated
-python3 './preprocNS5.py' --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID --makeFull
+python3 './preprocNS5.py' --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID --makeTruncated
+# python3 './preprocNS5.py' --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID --makeFull

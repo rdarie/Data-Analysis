@@ -26,9 +26,10 @@ Options:
 import matplotlib
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
-matplotlib.use('PS')   # generate postscript output by default
+# matplotlib.use('PS')   # generate postscript output
+matplotlib.use('Qt5Agg')   # generate interactive output
 import seaborn as sns
-
+import matplotlib.pyplot as plt
 from namedQueries import namedQueries
 import pdb
 import dataAnalysis.plotting.aligned_signal_plots as asp
@@ -39,6 +40,8 @@ from currentExperiment import parseAnalysisOptions
 from docopt import docopt
 import dill as pickle
 import pandas as pd
+import numpy as np
+from sklearn.preprocessing import RobustScaler, MinMaxScaler
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['trialIdx']), arguments['exp'])
@@ -56,75 +59,58 @@ sns.set_style("whitegrid")
 
 rowColOpts = asp.processRowColArguments(arguments)
 
-alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(
-    namedQueries, **arguments)
-alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = (
-    ash.processUnitQueryArgs(
-        namedQueries, analysisSubFolder, **arguments))
-alignedAsigsKWargs.update(dict(
-    duplicateControlsByProgram=True,
-    makeControlProgram=True,
-    metaDataToCategories=False))
 if arguments['processAll']:
     prefix = experimentName
 else:
     prefix = ns5FileName
-#
-triggeredPath = os.path.join(
+
+resultPath = os.path.join(
     analysisSubFolder,
-    prefix + '_{}_{}.nix'.format(
+    prefix + '_{}_{}_calc.h5'.format(
         arguments['inputBlockName'], arguments['window']))
-print('loading {}'.format(triggeredPath))
-dataReader, dataBlock = ns5.blockFromPath(triggeredPath, lazy=arguments['lazy'])
-pdfName = '{}_{}_{}_{}'.format(
-    prefix, arguments['inputBlockName'],
-    arguments['window'],
-    arguments['alignQuery'])
-statsTestPath = os.path.join(analysisSubFolder, pdfName + '_stats.h5')
+print('loading {}'.format(resultPath))
+pdfPath = os.path.join(
+    figureFolder,
+    prefix + '_{}_{}_{}.pdf'.format(
+        arguments['inputBlockName'], arguments['window'],
+        'meanRAUC'))
 #  Overrides
-#  alignedAsigsKWargs.update({'decimate': 10})
-alignedAsigsKWargs.update({'windowSize': (-50e-3, 150e-3)})
-statsTestOpts.update({
-    'testStride': 10e-3,
-    'testWidth': 5e-3,
-    'tStop': 150e-3})
+limitPages = None
 #  End Overrides
-#  Get stats results
-if os.path.exists(statsTestPath):
-    sigValsWide = pd.read_hdf(statsTestPath, 'sig')
-    sigValsWide.columns.name = 'bin'
-else:
-    (
-        pValsWide, statValsWide,
-        sigValsWide) = ash.facetGridCompareMeans(
-        dataBlock, statsTestPath,
-        loadArgs=alignedAsigsKWargs,
-        rowColOpts=rowColOpts,
-        statsTestOpts=statsTestOpts)
-#
-asp.plotAsigsAligned(
-    dataBlock,
-    verbose=arguments['verbose'],
-    loadArgs=alignedAsigsKWargs,
-    sigTestResults=sigValsWide,
-    figureFolder=figureFolder,
-    printBreakDown=True,
-    enablePlots=True,
-    plotProcFuns=[
-        asp.genYLabelChanger(lookupDict=openEphysChanNames, removeMatch='#0'),
-        asp.xLabelsTime,
-        asp.genVLineAdder(0, vLineOpts),
-        asp.genLegendRounder(decimals=2),
-        asp.genXLimSetter(alignedAsigsKWargs['windowSize'])],
-    pdfName=pdfName,
-    **rowColOpts,
-    relplotKWArgs=relplotKWArgs)
-asp.plotSignificance(
-    sigValsWide,
-    pdfName=pdfName + '_pCount',
-    figureFolder=figureFolder,
-    **rowColOpts,
-    **statsTestOpts)
-#
-if arguments['lazy']:
-    dataReader.file.close()
+RecCurve = pd.read_hdf(resultPath, 'meanRAUC')
+
+plotRC = RecCurve.reset_index()
+plotRC['normalizedRAUC'] = np.nan
+plotRC['featureName'] = np.nan
+plotRC['EMGSide'] = np.nan
+plotRC['EMGSite'] = np.nan
+plotRC['EMGFeature'] = False
+for name, group in plotRC.groupby('feature'):
+    plotRC.loc[group.index, 'normalizedRAUC'] = (
+        MinMaxScaler()
+        .fit_transform(
+            group['rauc'].to_numpy().reshape(-1, 1)))
+    featName = name.replace('#0', '')
+    for key in openEphysChanNames.keys():
+        if key == featName:
+            featName = openEphysChanNames[key]
+            plotRC.loc[group.index, 'featureName'] = featName
+            plotRC.loc[group.index, 'EMGSite'] = featName.split(' ')[1]
+            plotRC.loc[group.index, 'EMGSide'] = featName.split(' ')[0]
+            plotRC.loc[group.index, 'EMGFeature'] = True
+plotRC.loc[plotRC['EMGFeature'], 'EMG Location'] = (
+    plotRC.loc[plotRC['EMGFeature'], 'EMGSide'] + ' ' +
+    plotRC.loc[plotRC['EMGFeature'], 'EMGSite']
+    )
+plotRC = plotRC.query("EMGFeature & (kruskalP < 1e-3)")
+g = sns.relplot(
+    col='electrode', col_wrap=5, col_order=np.unique(plotRC['electrode']),
+    x='amplitude', y='normalizedRAUC',
+    style='EMGSide', style_order=['Right', 'Left', 'Central'],
+    hue='EMGSite', hue_order=np.unique(plotRC['EMGSite']),
+    kind='line', data=plotRC,
+    height=5, aspect=1.5, ci='sd', estimator='mean',
+    )
+# for (ro, co, hu), dataSubset in g.facet_data():
+#     break
+plt.savefig(pdfPath)

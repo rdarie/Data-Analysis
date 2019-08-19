@@ -8,7 +8,7 @@
 # Request custom resources
 #SBATCH --nodes=1
 #SBATCH --mem=24G
-#SBATCH --array=1,2,3,4
+#SBATCH --array=1,3,4,5
 
 # Specify a job name:
 #SBATCH -J ins_preproc
@@ -20,10 +20,10 @@
 # Specify account details
 #SBATCH --account=bibs-dborton-condo
 
-EXP="exp201901070700"
+# EXP="exp201901070700"
 # EXP="exp201901211000"
 # EXP="exp201901221000"
 # EXP="exp201901231000"
-# EXP="exp201901271000"
+EXP="exp201901271000"
 
-python3 './preprocINS.py' --trialIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP
+python3 './preprocINS.py' --trialIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --showPlots

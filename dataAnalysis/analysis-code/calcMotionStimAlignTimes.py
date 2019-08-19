@@ -72,7 +72,7 @@ fuzzyCateg = [
     'amplitude', 'amplitudeCat', 'program', 'RateInHz']
 availableCateg = [
     'pedalVelocityCat', 'pedalMovementCat', 'pedalDirection',
-    'pedalSizeCat', 'pedalSize', 'pedalMovementDuration']
+    'pedalSizeCat', 'pedalSize', 'activeGroup', 'pedalMovementDuration']
 calcFromTD = [
     'stimOffset']
 signalsInAsig = [
@@ -94,7 +94,7 @@ masterBlock.annotate(
 blockIdx = 0
 checkReferences = False
 for segIdx, dataSeg in enumerate(dataBlock.segments):
-    print('Calculating align times for trial {}'.format(segIdx))
+    print('Calculating motion+stim align times for trial {}'.format(segIdx))
     signalsInSegment = [
         'seg{}_'.format(segIdx) + i
         for i in signalsInAsig]
@@ -209,7 +209,6 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
     assert (
         (tdDF['pedalMovementCat'] == 'outbound').sum() ==
         (tdDF['pedalMovementCat'] == 'return').sum())
-    
     #  calculate movement sizes (relative to starting point)
     midPeakIdx = ((
         returnMask[returnMask].index +
@@ -433,12 +432,14 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         plt.close()
     #  pull actual electrode names
     categories['electrodeFuzzy'] = np.nan
-    for pName in uniqProgs:
+    for name, group in categories.groupby(['activeGroup', 'programFuzzy']):
+        gName = int(name[0])
+        pName = int(name[1])
         pMask = categories['programFuzzy'] == pName
         if pName == 999:
             categories.loc[pMask, 'electrodeFuzzy'] = 'control'
         else:
-            unitName = 'g0p{}'.format(int(pName))
+            unitName = 'g{}p{}'.format(gName, pName)
             thisUnit = insBlock.filter(objects=Unit, name=unitName)[0]
             cathodes = thisUnit.annotations['cathodes']
             anodes = thisUnit.annotations['anodes']

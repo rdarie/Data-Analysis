@@ -50,8 +50,8 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
             'ftype': 'butter'
         },
         'high': {
-            'Wn': 20,
-            'N': 8,
+            'Wn': 15,
+            'N': 10,
             'btype': 'high',
             'ftype': 'butter'
         }
@@ -296,6 +296,9 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
             electrodeColumn='electrodeFuzzy',
             removeFuzzyName=True))
     #
+    overrideChanNames = None
+    # overrideChanNames = [
+    #     'elec75#0', 'elec75#1', 'elec83#0', 'elec78#0', 'elec78#1']
     alignedAsigsChunkSize = 15000
     rasterOpts = {
         # 'binInterval': 1e-3, 'binWidth': 30e-3, 'smoothKernelWidth': 50e-3,

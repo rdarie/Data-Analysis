@@ -67,7 +67,6 @@ for ev in dataBlock.filter(objects=EventProxy):
 
 availableCateg = [
     'amplitude', 'program', 'activeGroup', 'RateInHz']
-
 progAmpNames = rcsa_helpers.progAmpNames
 expandCols = [
     'RateInHz', 'movement', 'program', 'trialSegment']

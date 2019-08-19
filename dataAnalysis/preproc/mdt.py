@@ -120,7 +120,7 @@ def getINSTDFromJson(
             intersampleTickCount = int((1/fs) / (100e-6))
 
             timeDomainMeta = rcsa_helpers.extract_td_meta_data(timeDomainJson)
-            #  pdb.set_trace()
+            
             # assume n channels is constant for all assembled sessions
             nChan = int(timeDomainMeta[0, 8])
                     
@@ -133,7 +133,7 @@ def getINSTDFromJson(
                     
             timeDomainMeta = rcsa_helpers.code_micro_and_macro_packet_loss(
                 timeDomainMeta)
-            #  pdb.set_trace()
+            
             #  num_real_points, num_macro_rollovers, loss_as_scalar =\
             #      rcsa_helpers.calculate_statistics(
             #          timeDomainMeta, intersampleTickCount)
@@ -151,7 +151,7 @@ def getINSTDFromJson(
                 tdData['actual_time'] - INSReferenceTime) / (
                     datetime.timedelta(seconds=1))
                     
-            #  pdb.set_trace()
+            
             tdData = tdData.drop_duplicates(
                 ['t']
                 ).sort_values('t').reset_index(drop=True)
@@ -206,7 +206,7 @@ def getINSTDFromJson(
 
     td['data']['INSTime'] = td['data']['t']
     td['INSTime'] = td['t']
-    #  pdb.set_trace()
+    
     return td
 
 
@@ -244,7 +244,7 @@ def getINSTimeSyncFromJson(
                     timeSyncText = f.read()
                     timeSyncText = fixMalformedJson(timeSyncText)
                     timeSync = json.loads(timeSyncText)[0]
-                    #  pdb.set_trace()
+                    
             
             timeSyncData = rcsa_helpers.extract_time_sync_meta_data(timeSync)
 
@@ -329,7 +329,7 @@ def getINSAccelFromJson(
             accelData = accelData.drop_duplicates(
                 ['t']
                 ).sort_values('t').reset_index(drop=True)
-            #pdb.set_trace()
+            
             if getInterpolated:
                 uniformT = np.arange(
                     accelData['t'].iloc[0],
@@ -522,7 +522,7 @@ def line_picker(line, mouseevent):
         (xdata - mouseevent.xdata)**2 + (ydata - mouseevent.ydata)**2)
     dmask = (d < maxd) & (d == min(d))
     ind, = np.nonzero(dmask)
-    #  pdb.set_trace()
+    
     if len(ind):
         pickx = xdata[ind]
         picky = ydata[ind]
@@ -554,7 +554,7 @@ def peekAtTaps(
         for i in segmentsToPlot}
     
     def onpick(event):
-        #  pdb.set_trace()
+        
         if 'INS' in event.artist.axes.get_title():
             tempClick['ins'].append(event.pickx[0])
             print('Clicked on ins {}'.format(event.pickx[0]))
@@ -682,7 +682,7 @@ def peekAtTaps(
 
         tNSPMask = (channelData['t'] > tStartNSP) & (channelData['t'] < tStopNSP)
         triggerTrace = channelData['data'].loc[tNSPMask, 'ainp7']
-        #  pdb.set_trace()
+        
         ax[2].plot(
             channelData['t'].loc[tNSPMask].iloc[::30],
             stats.zscore(triggerTrace.iloc[::30]),
@@ -707,7 +707,7 @@ def peekAtTaps(
         for key, value in tempClick.items():
             tempVal = pd.Series(value)
             tempClick[key] = tempVal.loc[tempVal.diff().fillna(1) > 100e-3]
-            #  pdb.set_trace()
+            
         clickDict[trialSegment] = tempClick
 
         tempClick = {
@@ -859,7 +859,7 @@ def getHUTtoINSSyncFun(
                     tsTimeChunk['t'].values -
                     tsTimeChunk[syncTo].values * 1e-3)
                 synchPolyCoeffsHUTtoINS = np.array([1e-3, np.mean(timeOffset)])
-            # pdb.set_trace()
+            
             thisFun = np.poly1d(synchPolyCoeffsHUTtoINS)
             thisInterpDict = {
                 'fun': thisFun,
@@ -912,7 +912,7 @@ def synchronizeHUTtoINS(
         segmentMask = hf.getStimSerialTrialSegMask(insDF, trialSegment)
     for idx, interpFunDict in enumerate(interpFunDictList):
         interpFun = interpFunDict['fun']
-        #pdb.set_trace()
+        
         if idx == 0:
             timeChunkIdx = insDF.loc[segmentMask, :].index[
                 (insDF.loc[segmentMask, 'HostUnixTime'] < interpFunDict['tStopHUT'])
@@ -928,11 +928,11 @@ def synchronizeHUTtoINS(
                 ]
         #  if not timeChunkIdx.any():
         #      lookAhead = 1
-        #      pdb.set_trace()
+        #      
         #      while not timeChunkIdx.any():
         #          nextInterpFunDict = interpFunDictList[idx + lookAhead]
         #          interpFun = nextInterpFunDict['fun']
-        #          #  pdb.set_trace()
+        #          
         #          timeChunkIdx = insDF.loc[segmentMask, :].index[
         #              (insDF.loc[segmentMask, 'HostUnixTime'] <= nextInterpFunDict['tStartHUT'])
         #              ]
@@ -966,7 +966,7 @@ def getINSStimLogFromJson(
         allStimStatus.append(stimStatus)
     allStimStatusDF = pd.concat(allStimStatus, ignore_index=True)
     #  if all we're doing is turn something off, don't consider it a new round
-    #  pdb.set_trace()
+    
     # if logForm == 'long':
     #     ampPositive = allStimStatusDF['maxAmp'].diff().fillna(0) >= 0
     #     allStimStatusDF['amplitudeIncrease'] = (
@@ -978,15 +978,15 @@ def getINSStimLogFromJson(
 
 def stimStatusSerialtoLong(
         stimStSer, idxT='t', namePrefix='ins_', expandCols=[],
-        deriveCols=[], progAmpNames=[], dropDuplicates=True, amplitudeCatBins=4):
-    
+        deriveCols=[], progAmpNames=[], dropDuplicates=True,
+        amplitudeCatBins=4):
     fullExpandCols = copy(expandCols)
     #  fixes issue with 'program' and 'amplitude' showing up unrequested
     if 'program' not in expandCols:
         fullExpandCols.append('program')
     if 'activeGroup' not in expandCols:
         fullExpandCols.append('activeGroup')
-
+    #
     stimStLong = pd.DataFrame(
         index=stimStSer.index, columns=fullExpandCols + [idxT])
     #  fill req columns
@@ -1003,11 +1003,11 @@ def stimStatusSerialtoLong(
             method='ffill', inplace=True)
         stimStLong[pName].fillna(
             method='bfill', inplace=True)
-
+    #
     debugPlot = False
     if debugPlot:
         stimCat = pd.concat((stimStLong, stimStSer), axis=1)
-
+    #
     for idx, pName in enumerate(progAmpNames):
         stimStLong[pName] = np.nan
         pMask = (stimStSer[namePrefix + 'property'] == 'amplitude') & (
@@ -1015,14 +1015,14 @@ def stimStatusSerialtoLong(
         stimStLong.loc[pMask, pName] = stimStSer.loc[pMask, namePrefix + 'value']
         stimStLong[pName].fillna(method='ffill', inplace=True)
         stimStLong[pName].fillna(value=0, inplace=True)
-    #  pdb.set_trace()
+    
     if dropDuplicates:
         stimStLong.drop_duplicates(subset=idxT, keep='last', inplace=True)
-    
+    #
     if debugPlot:
         stimStLong.loc[:, ['program'] + progAmpNames].plot()
         plt.show()
-
+        #
     ampIncrease = pd.Series(False, index=stimStLong.index)
     ampChange = pd.Series(False, index=stimStLong.index)
     for idx, pName in enumerate(progAmpNames):
@@ -1030,7 +1030,7 @@ def stimStatusSerialtoLong(
         ampChange = ampChange | (stimStLong[pName].diff().fillna(0) != 0)
         if debugPlot:
             plt.plot(stimStLong[pName].diff().fillna(0), label=pName)
-    # 
+    #
     if debugPlot:
         stimStLong.loc[:, ['program'] + progAmpNames].plot()
         ampIncrease.astype(float).plot(style='ro')
@@ -1054,7 +1054,8 @@ def stimStatusSerialtoLong(
                 ampsForSum[colName] = pd.cut(
                     ampsForSum[colName], bins=amplitudeCatBins, labels=False)
             else:
-                ampsForSum[colName] = pd.cut(ampsForSum[colName], bins=1, labels=False)
+                ampsForSum[colName] = pd.cut(
+                    ampsForSum[colName], bins=1, labels=False)
         stimStLong['amplitudeCat'] = (
             ampsForSum.sum(axis=1))
     if debugPlot:
@@ -1107,7 +1108,7 @@ def getINSDeviceConfig(
                         electrodeConfiguration[groupIdx][progIdx]['anodes'].append(elecIdx)
                     else:
                         electrodeConfiguration[groupIdx][progIdx]['cathodes'].append(elecIdx)
-    #  pdb.set_trace()
+    
     #  process senseInfo
     senseInfo = pd.DataFrame(
         deviceSettings[0]['SensingConfig']['timeDomainChannels'])
@@ -1312,9 +1313,8 @@ def preprocINS(
             stimStatus, trialSegment, interpFunHUTtoINS[trialSegment])
         stimStatusSerial = synchronizeHUTtoINS(
             stimStatusSerial, trialSegment, interpFunHUTtoINS[trialSegment])
-    #  pdb.set_trace()
     #  sync Host PC Unix time to NSP
-    HUTtoINSPlotting = True
+    HUTtoINSPlotting = False
     if HUTtoINSPlotting and plottingFigures:
         plottingColumns = deriveCols + expandCols + progAmpNames
         plotStimStatusList = []
@@ -1422,7 +1422,7 @@ def preprocINS(
             eventName='seg0_',
             annCol=['ins_property', 'ins_value']
             )
-        # pdb.set_trace()
+        
         block.segments[0].events = newStimEvents
         for ev in newStimEvents:
             ev.segment = block.segments[0]
@@ -1496,7 +1496,7 @@ def getINSStimOnset(
     segIdx = 0
     seg = block.segments[segIdx]
     fs = seg.analogsignals[0].sampling_rate
-    # pdb.set_trace()
+    # 
     # WIP: treat as single at the stimStatus level
     tdDF, accelDF, stimStatus = unpackINSBlock(
         block, convertStimToSinglePulses=False)
@@ -1709,7 +1709,7 @@ def getINSStimOnset(
         gaussWidIdx = int(gaussWid * fs)
         nominalStimOnIdx = group.index[0]
         nominalStimOnT = tdSeg.loc[nominalStimOnIdx, 't']
-        # pdb.set_trace()
+        # 
         lastAmplitude = tdDF.loc[max(nominalStimOnIdx - 1, 0), ampColName]
         if (lastRate != stimRate):
             # recalculate every time we increment amplitude from zero
@@ -1739,13 +1739,6 @@ def getINSStimOnset(
             possibleSlotStartIdx = tdSeg.index[slotStartMask]
             print('possibleSlotStartIdx is {}\n'.format(possibleSlotStartIdx))
             if len(possibleSlotStartIdx) > 1:
-                #  allPossibleSlotStart = tdSeg.loc[possibleSlotStartIdx, 't']
-                #  should this be normalized by probability mass in each slot?
-                #  stimOnUncertainty = np.exp(
-                #      (-0.5) * (
-                #          (tdSeg['t'] - nominalStimOnT) /
-                #          (gaussWid / 2)) ** 2
-                #          ).cumsum()
                 stimOnUncertainty = pd.Series(
                     stats.norm.cdf(tdSeg['t'], nominalStimOnT, (gaussWid / 2)),
                     index=tdSeg.index)
@@ -1754,6 +1747,7 @@ def getINSStimOnset(
                 uncertaintyValsDF.iloc[0] = stimOnUncertainty[possibleSlotStartMask].iloc[0]
                 uncertaintyVals = uncertaintyValsDF.to_numpy()
                 keepMask = uncertaintyVals > .1
+                keepMask[np.argmax(uncertaintyVals)] = True
                 possibleSlotStartIdx = possibleSlotStartIdx[keepMask]
                 uncertaintyVals = uncertaintyVals[keepMask]
             else:
@@ -1764,8 +1758,10 @@ def getINSStimOnset(
                 )
             allPossibleTimestamps = tdSeg.loc[possibleOnsetIdx, 't']
             print('allPossibleTimestamps {}\n'.format(allPossibleTimestamps))
-            if len(allPossibleTimestamps) == 0:
-                pdb.set_trace()
+            try:
+                assert len(allPossibleTimestamps) > 0
+            except Exception:
+                traceback.print_exc()
             expectedOnsetIdx = possibleOnsetIdx[np.argmax(uncertaintyVals)]
             expectedTimestamp = tdSeg.loc[expectedOnsetIdx, 't']
             ROIBasis = pd.Series(
@@ -1784,7 +1780,7 @@ def getINSStimOnset(
             ROIMaskOnset = (
                 (tdSeg['t'] >= tStartOnset) &
                 (tdSeg['t'] <= tStopOnset))
-            #pdb.set_trace()
+            
             slotMatchesMask = tdDF.loc[tdSeg.index, 'slot'].shift(-int(np.round(slotSize/16))) == activeProgram
             ROIMaskOnset = ROIMaskOnset & slotMatchesMask
         else:
@@ -1848,7 +1844,7 @@ def getINSStimOnset(
         for i in foundTimestamp:
             localIdx.append(tdSegDetect.index.get_loc(i))
         foundIdx = tdSeg.index[localIdx]
-        # pdb.set_trace()
+        
         if (not resolvedSlots) and predictSlots and (lastAmplitude == 0):
             # have not resolved phase between slots and recording for this segment
             therSegDF = tdDF.loc[tdDF['therapyRound'] == thisTherapyRound, :]
@@ -1856,7 +1852,7 @@ def getINSStimOnset(
             rateDiff = therSegDF['RateInHz'].diff().fillna(method='bfill')
             rateChangeTimes = therSegDF.loc[rateDiff != 0, 't']
             print('Calculating slots for segment {}'.format(thisTherapyRound))
-            #pdb.set_trace()
+            
             groupRate = therSegDF.loc[foundIdx, 'RateInHz'].iloc[0]
             groupPeriod = np.float64(groupRate ** (-1))
             rateChangePeriods = (
@@ -1874,7 +1870,7 @@ def getINSStimOnset(
             nominalOffset = np.ceil((groupPeriod * (activeProgram * 1/4)) * fs.magnitude) / fs.magnitude
             startTime = (foundTimestamp[0] - nominalOffset)
             exitLoop = False
-            # pdb.set_trace()
+            
             while (not exitLoop):
                 startIdx = therSegDF.index[therSegDF['t'] >= startTime][0]
                 nextRateChange = rateChangeTimes - startTime
@@ -1938,7 +1934,7 @@ def getINSStimOnset(
                     slotAx.axvline(t)
                 slotAx.legend()
         # done resolving slots
-        # pdb.set_trace()
+        
         if plottingEnabled:
             tdSegSlotDiff = tdDF.loc[plotMaskTD, 'slot'].diff()
             slotEdges = (
@@ -1972,7 +1968,7 @@ def getINSStimOnset(
                 theseOnsetTimestamps = np.atleast_1d(slotMatchesTime.loc[timeMatchesMask].iloc[0]) * pq.s
             except Exception:
                 theseOnsetTimestamps = np.atleast_1d(foundTimestamp[0]) * pq.s
-            #pdb.set_trace()
+            
         else:
             theseOnsetTimestamps = np.atleast_1d(foundTimestamp[0]) * pq.s
         onsetDifferenceFromExpected = (
@@ -2354,7 +2350,7 @@ def extractArtifactTimestamps(
         assert expectedIdx is not None
         if expandExpectedByStimRate:
             print(' ')
-            # pdb.set_trace()
+            
         expectedEnhancer = hf.gaussianSupport(
             tdSeg, expectedIdx, gaussWid, fs)
         #
@@ -2387,7 +2383,7 @@ def extractArtifactTimestamps(
         ax.axhline(currentThresh, color='r')
         ax.legend()
         plt.show()
-    # pdb.set_trace()
+    
     detectSignal = detectSignalFull.loc[ROIMask]
     idxLocal = peakutils.indexes(
         detectSignal.values,

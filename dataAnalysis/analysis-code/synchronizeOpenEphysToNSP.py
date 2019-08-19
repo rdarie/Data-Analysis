@@ -59,12 +59,13 @@ fs = 30000
 nCrossings = 50000
 #
 oeSyncAsig = oeSeg.filter(name='seg0_ADC1')[0]
-tStart = 24
-tStop = 200
+tStart = synchInfo['oe'][trialIdx][0]['timeRangesKinect'][0][0]
+tStop = synchInfo['oe'][trialIdx][0]['timeRangesKinect'][0][1]
 oeThresh = -2
 oeTimeMask = hf.getTimeMaskFromRanges(
     oeSyncAsig.times, [(tStart, tStop)])
 oeSrs = pd.Series(oeSyncAsig.magnitude[oeTimeMask].flatten())
+print('On trial {}, detecting OE threshold crossings.'.format(trialIdx))
 oePeakIdx, oeCrossMask = hf.getThresholdCrossings(
     oeSrs, thresh=oeThresh,
     iti=1e-4, fs=fs,
@@ -72,12 +73,13 @@ oePeakIdx, oeCrossMask = hf.getThresholdCrossings(
 oeTimes = oeSyncAsig.times[oeTimeMask][oeCrossMask][:nCrossings]
 #
 nspSyncAsig = nspSeg.filter(name='seg0_ainp16')[0]
-tStart = 17
-tStop = 200
+tStart = synchInfo['nsp'][trialIdx][0]['timeRangesKinect'][0][0]
+tStop = synchInfo['nsp'][trialIdx][0]['timeRangesKinect'][0][1]
 nspThresh = 600
 nspTimeMask = hf.getTimeMaskFromRanges(
     nspSyncAsig.times, [(tStart, tStop)])
 nspSrs = pd.Series(nspSyncAsig.magnitude[nspTimeMask].flatten())
+print('On trial {}, detecting NSP threshold crossings.'.format(trialIdx))
 nspPeakIdx, nspCrossMask = hf.getThresholdCrossings(
     nspSrs, thresh=nspThresh,
     iti=1e-4, fs=fs,

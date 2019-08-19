@@ -3,9 +3,10 @@ Usage:
     temp.py [options]
 
 Options:
-    --trialIdx=trialIdx             which trial to analyze [default: 1]
-    --exp=exp                       which experimental day to analyze
-    --processAll                    process entire experimental day? [default: False]
+    --trialIdx=trialIdx               which trial to analyze [default: 1]
+    --exp=exp                         which experimental day to analyze
+    --processAll                      process entire experimental day? [default: False]
+    --analysisName=analysisName       append a name to the resulting blocks? [default: default]
 """
 
 import dataAnalysis.ephyviewer.scripts as vis_scripts
@@ -43,10 +44,21 @@ expOpts, allOpts = parseAnalysisOptions(
 globals().update(expOpts)
 globals().update(allOpts)
 
-chanNames = None
-#  chanNames = [
-#      'elec75#0_raster', 'elec75#1_raster', 'elec83#0_raster',
-#      'elec78#0_raster', 'elec78#1_raster']
+analysisSubFolder = os.path.join(
+    scratchFolder, arguments['analysisName']
+    )
+if not os.path.exists(analysisSubFolder):
+    os.makedirs(analysisSubFolder, exist_ok=True)
+
+experimentBinnedSpikePath = experimentBinnedSpikePath.format(arguments['analysisName'])
+experimentDataPath = experimentDataPath.format(arguments['analysisName'])
+binnedSpikePath = binnedSpikePath.format(arguments['analysisName'])
+analysisDataPath = analysisDataPath.format(arguments['analysisName'])
+
+if overrideChanNames is not None:
+    chanNames = [i + '_raster' for i in overrideChanNames]
+else:
+    chanNames = None
 
 def aggregateFun(
         DF, fs=None, nSamp=None):
@@ -81,7 +93,7 @@ if arguments['processAll']:
         masterBlock, neoSegIdx=allSegs,
         writeSpikes=False, writeEvents=False,
         fileName=experimentName + '_analyze',
-        folderPath=scratchFolder,
+        folderPath=analysisSubFolder,
         purgeNixNames=False,
         nixBlockIdx=0, nixSegIdx=allSegs,
         )
@@ -90,7 +102,7 @@ else:
         masterBlock, neoSegIdx=allSegs,
         writeSpikes=False, writeEvents=False,
         fileName=ns5FileName + '_analyze',
-        folderPath=scratchFolder,
+        folderPath=analysisSubFolder,
         purgeNixNames=False,
         nixBlockIdx=0, nixSegIdx=allSegs,
         )

@@ -64,9 +64,8 @@ spikesBlock = hf.extractSignalsFromBlock(
 spikesBlock = hf.loadBlockProxyObjects(spikesBlock)
 #  save ins time series
 tdChanNames = ns5.listChanNames(nspBlock, arguments['chanQuery'], objType=AnalogSignalProxy)
-if not (miniRCTrial or RCTrial):
-    tdChanNames += ['seg0_position', 'seg0_velocityCat']
-
+#  if not (miniRCTrial or RCTrial):
+#      tdChanNames += ['seg0_position', 'seg0_velocityCat']
 allSpikeTrains = [
     i
     for i in spikesBlock.filter(objects=SpikeTrain)
@@ -194,8 +193,6 @@ typesNeedRenaming = [ChannelIndex, AnalogSignal]
 for objType in typesNeedRenaming:
     for child in tdBlockInterp.filter(objects=objType):
         child.name = preproc.childBaseName(child.name, 'seg')
-# pdb.set_trace()
-
 preproc.addBlockToNIX(
     tdBlockInterp, neoSegIdx=[0],
     writeSpikes=False, writeEvents=False,

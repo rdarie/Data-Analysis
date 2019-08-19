@@ -99,6 +99,7 @@ chansToAnalyze = [
     81, 82, 83, 84, 85, 86, 87, 88, 89,
     90, 91, 92, 93, 94, 95]
 '''
+chansToAnalyze = [0]
 if arguments['batchPreprocess']:
     tdch.batchPreprocess(
         triFolder, chansToAnalyze,
@@ -114,7 +115,9 @@ if arguments['batchPreprocess']:
         },
         clusterOpts={
             'method': 'hdbscan',
-            'min_cluster_size': 30},
+            'min_cluster_size': 50,
+            'min_samples': 20,
+            'allow_single_cluster': True},
         noise_estimate_duration='all',
         sample_snippet_duration='all',
         chunksize=2**20,

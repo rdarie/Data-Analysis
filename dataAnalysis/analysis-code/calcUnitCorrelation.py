@@ -60,7 +60,7 @@ alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUn
 correlationDF = ash.applyFun(
     triggeredPath=triggeredPath, resultPath=resultPath,
     resultName=arguments['resultName'],
-    fun="corr", lazy=arguments['lazy'],
+    fun="corr", applyType='self', lazy=arguments['lazy'],
     verbose=arguments['verbose'],
     loadArgs=alignedAsigsKWargs)
 

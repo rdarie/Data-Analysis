@@ -22,11 +22,12 @@
 #SBATCH --account=bibs-dborton-condo
 
 # Run a command
-# EXP="exp201901211000"
 # EXP="exp201901231000"
 # EXP="exp201901070700"
-EXP="exp201901271000"
-RCTRIALIDX="3"
+# EXP="exp201901271000"
+# EXP="exp201901231000"
+EXP="exp201901211000"
+RCTRIALIDX="1"
 # Constructor
 python3 ./tridesclousCCV.py --trialIdx=$RCTRIALIDX --exp=$EXP  --batchPreprocess
 python3 ./tridesclousVisualize.py --trialIdx=$RCTRIALIDX --exp=$EXP  --constructor

@@ -12,7 +12,7 @@
 
 # Specify a job name:
 #SBATCH -J spike_sort_peeler
-#SBATCH --array=1,2,3,4,5
+#SBATCH --array=1,2,3
 
 # Specify an output file
 #SBATCH -o ../batch_logs/%j-%a-spike_sort_peeler.stdout
@@ -22,9 +22,9 @@
 #SBATCH --account=bibs-dborton-condo
 
 # Run a command
-# EXP="exp201901211000"
+EXP="exp201901211000"
 # EXP="exp201901231000"
 # EXP="exp201901070700"
-EXP="exp201901271000"
+# EXP="exp201901271000"
 module load mpi
 srun --mpi=pmi2 ./tridesclousCCV.py --trialIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --attemptMPI --purgePeeler --batchPeel

@@ -118,18 +118,19 @@ for trialSegment in pd.unique(td['data']['trialSegment']):
 
 #  Detect INS taps
 ############################################################
+td['data']['NSPTime'] = np.nan
+accel['data']['NSPTime'] = np.nan
+allTapTimestampsINSAligned = []
+allTapTimestampsINS = []
 if not os.path.exists(synchFunPath):
-    allTapTimestampsINS = []
     print('Detecting INS Timestamps...')
     overrideSegments = overrideSegmentsForTapSync[trialIdx]
-    for trialSegment in pd.unique(td['data']['trialSegment']):
-        print('Trial Segment {}\n'.format(trialSegment))
-        #  for trialSegment in [0, 1, 2]:
+    for trialSegment in pd.unique(td['data']['trialSegment']).astype(int):
+        print('detecting INS taps on trial segment {}\n'.format(trialSegment))
         accelGroupMask = accel['data']['trialSegment'] == trialSegment
         accelGroup = accel['data'].loc[accelGroupMask, :]
         tdGroupMask = td['data']['trialSegment'] == trialSegment
         tdGroup = td['data'].loc[tdGroupMask, :]
-
         tapTimestampsINS, peakIdx = mdt.getINSTapTimestamp(
             tdGroup, accelGroup,
             tapDetectOpts[trialIdx][trialSegment]
@@ -139,10 +140,9 @@ if not os.path.exists(synchFunPath):
         print('diff:\n{}'.format(
             tapTimestampsINS.diff() * 1e3))
         allTapTimestampsINS.append(tapTimestampsINS)
-
     if arguments['curateManually']:
         try:
-            clickDict = hf.peekAtTaps(
+            clickDict = mdt.peekAtTaps(
                 td, accel,
                 channelData, trialIdx,
                 tapDetectOpts, sessionTapRangesNSP,
@@ -152,7 +152,6 @@ if not os.path.exists(synchFunPath):
                 )
         except Exception:
             traceback.print_exc()
-            #  pdb.set_trace()
     else:
         clickDict = {
             i: {
@@ -160,42 +159,37 @@ if not os.path.exists(synchFunPath):
                 'nsp': []
                 }
             for i in pd.unique(td['data']['trialSegment'])}
-
     # perform the sync
     ############################################################
-    td['data']['NSPTime'] = np.nan
-    accel['data']['NSPTime'] = np.nan
-    allTapTimestampsINSAligned = []
-    for trialSegment in pd.unique(td['data']['trialSegment']):
-        trialSegment = int(trialSegment)
-
+    for trialSegment in pd.unique(td['data']['trialSegment']).astype(int):
         accelGroupMask = accel['data']['trialSegment'] == trialSegment
         accelGroup = accel['data'].loc[accelGroupMask, :]
         tdGroupMask = td['data']['trialSegment'] == trialSegment
         tdGroup = td['data'].loc[tdGroupMask, :]
-
+        # if overriding with manually identified points
         if len(clickDict[trialSegment]['ins']):
             allTapTimestampsINS[trialSegment] = clickDict[trialSegment]['ins']
-        #
         theseTapTimestampsINS = allTapTimestampsINS[trialSegment]
+        # if overriding with manually identified points
         if len(clickDict[trialSegment]['nsp']):
             allTapTimestampsNSP[trialSegment] = clickDict[trialSegment]['nsp']
-        #
         theseTapTimestampsNSP = allTapTimestampsNSP[trialSegment]
-
+        #
         if trialSegment in overrideSegments.keys():
             print('\t Overriding trialSegment {}'.format(trialSegment))
             theseTapTimestampsINS = allTapTimestampsINS[overrideSegments[trialSegment]]
             theseTapTimestampsNSP = allTapTimestampsNSP[overrideSegments[trialSegment]]
-
+        #
         tdGroup, accelGroup, insBlock, thisINStoNSP = ns5.synchronizeINStoNSP(
-            theseTapTimestampsNSP, theseTapTimestampsINS,
-            NSPTimeRanges=(channelData['t'].iloc[0], channelData['t'].iloc[-1]),
+            tapTimestampsNSP=theseTapTimestampsNSP,
+            tapTimestampsINS=theseTapTimestampsINS,
+            NSPTimeRanges=(
+                channelData['t'].iloc[0], channelData['t'].iloc[-1]),
             td=tdGroup, accel=accelGroup, insBlock=insBlock,
             trialSegment=trialSegment, degree=0)
         td['data'].loc[tdGroupMask, 'NSPTime'] = tdGroup['NSPTime']
         accel['data'].loc[accelGroupMask, 'NSPTime'] = accelGroup['NSPTime']
-
+        #
         interpFunINStoNSP[trialIdx][trialSegment] = thisINStoNSP
         allTapTimestampsINSAligned.append(thisINStoNSP(
             theseTapTimestampsINS))
@@ -204,13 +198,31 @@ if not os.path.exists(synchFunPath):
 else:
     with open(synchFunPath, 'rb') as f:
         interpFunINStoNSP = pickle.load(f)
-
-print('Interpolation between INS and NSP: ')
-print(interpFunINStoNSP[trialIdx])
-
+    theseInterpFun = interpFunINStoNSP[trialIdx]
+    td['data']['NSPTime'] = np.nan
+    accel['data']['NSPTime'] = np.nan
+    for trialSegment in pd.unique(td['data']['trialSegment']).astype(int):
+        accelGroupMask = accel['data']['trialSegment'] == trialSegment
+        accelGroup = accel['data'].loc[accelGroupMask, :]
+        tdGroupMask = td['data']['trialSegment'] == trialSegment
+        tdGroup = td['data'].loc[tdGroupMask, :]
+        #
+        tdGroup, accelGroup, insBlock, thisINStoNSP = ns5.synchronizeINStoNSP(
+            precalculatedFun=theseInterpFun[trialSegment],
+            NSPTimeRanges=(
+                channelData['t'].iloc[0], channelData['t'].iloc[-1]),
+            td=tdGroup, accel=accelGroup, insBlock=insBlock,
+            trialSegment=trialSegment, degree=0)
+        #
+        td['data'].loc[tdGroupMask, 'NSPTime'] = tdGroup['NSPTime']
+        accel['data'].loc[accelGroupMask, 'NSPTime'] = accelGroup['NSPTime']
+#
+print(
+    'Interpolation between INS and NSP: {}'
+    .format(interpFunINStoNSP[trialIdx]))
 td['NSPTime'] = td['data']['NSPTime']
 accel['NSPTime'] = accel['data']['NSPTime']
-
+#
 if plottingFigures:
     try:
         hf.peekAtTaps(
@@ -223,7 +235,6 @@ if plottingFigures:
     except Exception:
         traceback.print_exc()
 ############################################################
-
 addingToNix = True
 if addingToNix:
     insBlockJustSpikes = hf.extractSignalsFromBlock(insBlock)
@@ -232,12 +243,10 @@ if addingToNix:
     #  nspBlock = reader.read_block(lazy=True)
     #  nspStP = nspBlock.filter(objects=SpikeTrainProxy)
     #  nspSt = [i.load(load_waveforms=True) for i in nspStP]
-    
     #  spikeReader = neo.io.nixio_fr.NixIO(filename=os.path.join(trialFilesFrom['utah']['folderPath'], 'tdc_' + trialFilesFrom['utah']['ns5FileName'], 'tdc_' + trialFilesFrom['utah']['ns5FileName'] + '.nix'))
     #  tdcBlock = spikeReader.read_block(lazy=True)
     #  tdcStP = tdcBlock.filter(objects=SpikeTrainProxy)
     #  tdcSt = [i.load(load_waveforms=True) for i in tdcStP]
-
     for st in insSpikeTrains:
         if st.waveforms is None:
             st.sampling_rate = 3e4*pq.Hz

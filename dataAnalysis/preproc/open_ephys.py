@@ -243,30 +243,8 @@ def preprocOpenEphysBlock(
         curSection=0, sectionsTotal=1,
         plotting=False,
         fillOverflow=False, removeJumps=True):
-    #filterSOSList = []
-    filterCoeffs = np.ndarray(shape=(0, 6))
-    samplingRate = dataBlock.filter(objects=AnalogSignal)[0].sampling_rate.magnitude
     fOpts = deepcopy(filterOpts)
-    if 'bandstop' in fOpts:
-        nNotchHarmonics = fOpts['bandstop'].pop('nHarmonics')
-        notchFreq = fOpts['bandstop'].pop('Wn')
-        notchQ = fOpts['bandstop'].pop('Q')
-        fOpts['bandstop']['fs'] = samplingRate
-        for harmonicOrder in range(1, nNotchHarmonics + 1):
-            # bNotch, aNotch = signal.iirnotch(
-            #     2 * harmonicOrder * notchFreq / samplingRate,
-            #     notchQ
-            # )
-            w0 = harmonicOrder * notchFreq
-            bw = w0/notchQ
-            fOpts['bandstop']['Wn'] = [w0 - bw/2, w0 + bw/2]
-            sos = signal.iirfilter(
-                    **fOpts['bandstop'], output='sos')
-            #filterSOSList.append(sos)
-            filterCoeffs = np.concatenate([filterCoeffs, sos])
-            if plotting:
-                hf.plotFilterOptsResponse(fOpts['bandstop'])
-    #
+    samplingRate = dataBlock.filter(objects=AnalogSignal)[0].sampling_rate.magnitude
     if 'matched' in fOpts:
         matchType = fOpts['matched']['type']
         matchFreq = fOpts['matched']['Wn']
@@ -296,30 +274,27 @@ def preprocOpenEphysBlock(
         if plotting:
             axK.set_title('matched filter kernels')
             axK.set_xlabel('Time (sec)')
-    
-    if 'high' in fOpts:
-        fOpts['high']['fs'] = samplingRate
-        sos = signal.iirfilter(
-                **fOpts['high'], output='sos')
-        #filterSOSList.append(sos)
-        filterCoeffs = np.concatenate([filterCoeffs, sos])
-        if plotting:
-            hf.plotFilterOptsResponse(fOpts['high'])
-    #
-    if 'low' in fOpts:
-        fOpts['low']['fs'] = samplingRate
-        sos = signal.iirfilter(
-            **fOpts['low'], output='sos')
-        #filterSOSList.append(sos)
-        filterCoeffs = np.concatenate([filterCoeffs, sos])
-        if plotting:
-            hf.plotFilterOptsResponse(fOpts['low'])
 
     def filterFun(sig, filterCoeffs=None):
         sig[:] = signal.sosfiltfilt(
             filterCoeffs, sig.magnitude.flatten())[:, np.newaxis] * sig.units
         return sig
 
+    filterOptsHP = {
+        k: v
+        for k, v in filterOpts.items()
+        if k in ['bandstop', 'high']
+    }
+    filterOptsLP = {
+        k: v
+        for k, v in filterOpts.items()
+        if k in ['low']
+    }
+    filterCoeffsHP = hf.makeFilterCoeffsSOS(
+        filterOptsHP, samplingRate, plotting=plotting)
+    filterCoeffsLP = hf.makeFilterCoeffsSOS(
+        filterOptsLP, samplingRate, plotting=plotting)
+    #
     nChannels = len(dataBlock.channel_indexes)
     for cIdx, chanIdx in enumerate(dataBlock.channel_indexes):
         hf.printProgress(
@@ -335,9 +310,9 @@ def preprocOpenEphysBlock(
             assert len(asigList) == 1
             asig = asigList[0]
             if plotting:
-                # maxIdx = min(asig.shape[0], 2 * int(asig.sampling_rate))
-                # tMask = (asig.times > 419.9) & (asig.times < 420.9)
-                tMask = (asig.times > 1e4) & (asig.times < 1e4 + 1)
+                tMax = float(min(asig.times[-1], 1e4)) * asig.times.units
+                tMin = tMax - 1 * asig.times.units
+                tMask = (asig.times > tMin) & (asig.times <= tMax)
                 if 'matched' in fOpts:
                     fig, (axBA, axM) = plt.subplots(2, sharex=True)
                     cPalette = sns.color_palette(n_colors=numKernels)
@@ -346,12 +321,6 @@ def preprocOpenEphysBlock(
                 axBA.plot(
                     asig.times[tMask], asig.magnitude[tMask],
                     label='Original')
-                #  envelope = np.abs(signal.hilbert(asig.magnitude))
-                #  envelope -= np.mean(envelope)
-                #  axBA.plot(
-                #      asig.times[tMask], envelope[tMask],
-                #      label='Hilbert')
-                #
             if 'matched' in fOpts:
                 if matchType == 'sin':
                     for hOrder, kernel in enumerate(noiseKernels):
@@ -374,6 +343,7 @@ def preprocOpenEphysBlock(
                                 label='after match order {}'.format(hOrder + 1))
                 if matchType == 'empirical':
                     # find phase
+                    notchFreq = fOpts['bandstop'].pop('Wn')
                     shortKernel = asig.flatten()[:int(samplingRate / notchFreq)]
                     phaseIdx = np.argmin(shortKernel)
                     # pdb.set_trace()
@@ -402,7 +372,9 @@ def preprocOpenEphysBlock(
                             asig.times[tMask], asig.magnitude[tMask],
                             label='after match')
             #
-            asig[:] = filterFun(asig, filterCoeffs=filterCoeffs)
+            asig[:] = filterFun(asig, filterCoeffs=filterCoeffsHP)
+            asig[:] = np.abs(asig[:])
+            asig[:] = filterFun(asig, filterCoeffs=filterCoeffsLP)
             #
             if plotting:
                 axBA.plot(

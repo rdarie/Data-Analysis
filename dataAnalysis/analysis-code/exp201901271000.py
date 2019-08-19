@@ -32,14 +32,14 @@ def getExpOpts():
             'tdChan': 'ins_td0',
             'tdThres': 2,
             'iti': 0.2,
-            'keepIndex': slice(None, 2)
+            'keepIndex': slice(None)
             },
         1: {
             'timeRanges': [(448, 450)],
             'tdChan': 'ins_td0',
             'tdThres': 2,
             'iti': 0.2,
-            'keepIndex': slice(1, None)
+            'keepIndex': slice(None)
             }
         }
     synchInfo['ins'][2] = {
@@ -49,7 +49,7 @@ def getExpOpts():
             'tdChan': 'ins_td0',
             'tdThres': 2.5,
             'iti': 0.2,
-            'keepIndex': slice(1, None)
+            'keepIndex': slice(None)
             }
         }
     synchInfo['ins'][3] = {
@@ -86,11 +86,11 @@ def getExpOpts():
     synchInfo['nsp'] = {
         #  per trialSegment
         1: {
-            0: {'timeRanges': [212, 214], 'keepIndex': slice(None, 2)},
-            1: {'timeRanges': [647, 649], 'keepIndex': slice(1, None)}
+            0: {'timeRanges': [212, 214], 'keepIndex': slice(None)},
+            1: {'timeRanges': [647, 649], 'keepIndex': slice(None)}
             },
         2: {
-            0: {'timeRanges': [203, 205], 'keepIndex': slice(1, None)}
+            0: {'timeRanges': [203, 205], 'keepIndex': slice(None)}
             },
         3: {
             0: {'timeRanges': [105, 107], 'keepIndex': slice(None)}
@@ -176,5 +176,4 @@ def getExpOpts():
             [185, 1501],
             ]
         ]
-    gpfaRunIdx = 1
     return locals()

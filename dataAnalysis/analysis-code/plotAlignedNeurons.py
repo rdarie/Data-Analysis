@@ -25,8 +25,8 @@ Options:
 import matplotlib
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
-# matplotlib.use('PS')   # generate postscript output 
-matplotlib.use('QT5Agg')   # generate postscript output
+matplotlib.use('PS')   # generate postscript output 
+# matplotlib.use('QT5Agg')   # generate postscript output
 
 import seaborn as sns
 sns.set()
@@ -91,11 +91,11 @@ pdfName = '{}_neurons_{}_{}'.format(
 statsTestOpts.update({'tStop': rasterOpts['windowSizes'][arguments['window']][1]})
 statsTestPath = os.path.join(analysisSubFolder, pdfName + '_stats.h5')
 #  Overrides
-alignedAsigsKWargs.update({'windowSize': (-10e-3, 60e-3)})
+alignedAsigsKWargs.update({'windowSize': (-50e-3, 250e-3)})
 statsTestOpts.update({
     'testStride': 5e-3,
     'testWidth': 10e-3,
-    'tStop': 60e-3})
+    'tStop': 250e-3})
 limitPages = None
 #  End Overrides
 if os.path.exists(statsTestPath):

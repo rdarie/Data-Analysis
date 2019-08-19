@@ -6,6 +6,7 @@ Usage:
 Options:
     --exp=exp                       which experimental day to analyze
     --trialIdx=trialIdx             which trial to analyze [default: 1]
+    --plotting                      plot diagnostic figures? [default: False]
     --loadMat                       choose loader [default: False]
 """
 import dataAnalysis.preproc.open_ephys as ppOE
@@ -40,7 +41,7 @@ emgBaseName = os.path.basename(folderPath)
 #trialIdx = invEmgTrialLookup[emgBaseName]
 ppOE.preprocOpenEphysFolder(
     os.path.join(oeFolder, folderPath),
-    chanNames=openEphysChanNames, plotting=False,
+    chanNames=openEphysChanNames, plotting=arguments['plotting'],
     ignoreSegments=openEphysIgnoreSegments[trialIdx],
     makeFiltered=True, loadMat=arguments['loadMat'],
     filterOpts=openEphysFilterOpts)

@@ -35,18 +35,19 @@ def getExpOpts():
         'CH4': 'Right Hamstring Distal Lateral',
         'CH5': 'Right Quadriceps Central',
         'CH6': 'Right Hamstring Proximal Medial',
-        'CH7': 'Right Lower Back',
-        'CH8': 'Left Lower Back',
+        'CH7': 'Right Lower-Back',
+        'CH8': 'Left Lower-Back',
         'CH9': 'Left Calf Proximal Medial',
         'CH10': 'Left Shin Proximal',
         'CH11': 'Left Hamstring Proximal Medial',
         'CH12': 'Left Hamstring Distal Lateral',
         'CH13': 'Left Quadriceps Central',
         'CH14': 'Left Calf Lateral',
-        'CH15': 'Central Back',
+        'CH15': 'Central Lower-Back',
         'ADC1': 'KinectSync',
         'ADC2': 'TensSync'}
-    #
+    EMGSides = ['Right', 'Left', 'Central']
+    EMGSites = ['Calf', 'Shin', 'Hamstring', 'Quadriceps', 'Back']
     openEphysIgnoreSegments = {
         1: [0],
         2: None,
@@ -112,6 +113,7 @@ def getExpOpts():
             #  per trialSegment
             0: {
                 'timeRanges': [(123.79, 133.92), (1201.94, 1213.65)],
+                'timeRangesKinect': [(33, 233)],
                 'chanName': 'CH4', 'thresh': 40,
                 'iti': 0.1, 'keepIndex': slice(None)},
             },
@@ -119,6 +121,7 @@ def getExpOpts():
             #  per trialSegment
             0: {
                 'timeRanges': [(227.796, 241.60), (1327.075, 1336.38)],
+                'timeRangesKinect': [(97, 297)],
                 'chanName': 'CH13', 'thresh': 40,
                 'iti': 0.1, 'keepIndex': slice(None)},
             },
@@ -126,6 +129,7 @@ def getExpOpts():
             #  per trialSegment
             0: {
                 'timeRanges': [(180.273, 187.877), (1063.614, 1068.417)],
+                'timeRangesKinect': [(26.5, 226.5)],
                 'chanName': 'CH13', 'thresh': 40,
                 'iti': 0.1, 'keepIndex': slice(None)},
             },
@@ -133,6 +137,7 @@ def getExpOpts():
             #  per trialSegment
             0: {
                 'timeRanges': [(890.654, 900.359)],
+                'timeRangesKinect': [(24, 224)],
                 'chanName': 'CH13', 'thresh': 40,
                 'iti': 0.1, 'keepIndex': slice(None)},
             }
@@ -142,18 +147,27 @@ def getExpOpts():
         #  per trial
         1: {
             #  per trialSegment
-            0: {'timeRanges': [60, 64], 'keepIndex': slice(None)},
+            0: {'timeRanges': [60, 64], 'keepIndex': slice(None),
+                'timeRangesKinect': [(47.6, 247.6)]}
             },
         2: {
-            0: {'timeRanges': [101, 103], 'keepIndex': slice(None)}
+            0: {'timeRanges': [101, 103], 'keepIndex': slice(None),
+                'timeRangesKinect': [(91, 291)]}
             },
         3: {
             #  per trialSegment
-            0: {'timeRanges': [60, 64], 'keepIndex': slice(None)},
+            0: {'timeRanges': [60, 64], 'keepIndex': slice(None),
+                'timeRangesKinect': [(21, 221)]}
             },
         4: {
-            0: {'timeRanges': [101, 103], 'keepIndex': slice(None)}
+            0: {'timeRanges': [101, 103], 'keepIndex': slice(None),
+                'timeRangesKinect': [(17, 217)]}
             }
+        }
+
+    overrideSegmentsForTapSync = {
+        #  each key is a trial
+        1: {},
         }
     # options for stim artifact detection
     detectStim = True
@@ -163,7 +177,7 @@ def getExpOpts():
         1: [600.740],
         2: [322.320, 860.524],
         3: [123.124],
-        4: None,
+        4: [75.788, 240.794],
     }
     stimDetectOptsByChannelSpecific = {
         #  group
@@ -174,13 +188,13 @@ def getExpOpts():
             2: {'detectChannels': ['ins_td0', 'ins_td1', 'ins_td2'], 'thres': 25},
             3: {'detectChannels': ['ins_td3'], 'thres': 25}
         },
-        1: {
-            #  program
-            0: {'detectChannels': ['ins_td0', 'ins_td2', 'ins_td3'], 'thres': stimDetectThresDefault},
-            1: {'detectChannels': ['ins_td1'], 'thres': stimDetectThresDefault},
-            2: {'detectChannels': ['ins_td0', 'ins_td2', 'ins_td3'], 'thres': stimDetectThresDefault},
-            3: {'detectChannels': ['ins_td0', 'ins_td2', 'ins_td3'], 'thres': stimDetectThresDefault}
-        },
+        # 1: {
+        #     #  program
+        #     0: {'detectChannels': ['ins_td0', 'ins_td2', 'ins_td3'], 'thres': stimDetectThresDefault},
+        #     1: {'detectChannels': ['ins_td1'], 'thres': stimDetectThresDefault},
+        #     2: {'detectChannels': ['ins_td0', 'ins_td2', 'ins_td3'], 'thres': stimDetectThresDefault},
+        #     3: {'detectChannels': ['ins_td0', 'ins_td2', 'ins_td3'], 'thres': stimDetectThresDefault}
+        # },
         2: {
             #  program
             0: {'detectChannels': ['ins_td0', 'ins_td1'], 'thres': stimDetectThresDefault},
@@ -188,13 +202,13 @@ def getExpOpts():
             2: {'detectChannels': ['ins_td2'], 'thres': stimDetectThresDefault},
             3: {'detectChannels': ['ins_td3'], 'thres': stimDetectThresDefault}
         },
-        #  1: {  # trial004 has a different group 1 configured
-        #      #  program
-        #      0: {'detectChannels': ['ins_td0', 'ins_td2', 'ins_td3'], 'thres': stimDetectThresDefault},
-        #      1: {'detectChannels': ['ins_td1'], 'thres': stimDetectThresDefault},
-        #      2: {'detectChannels': ['ins_td0', 'ins_td2', 'ins_td3'], 'thres': stimDetectThresDefault},
-        #      3: {'detectChannels': ['ins_td1', 'ins_td3'], 'thres': stimDetectThresDefault}
-        #  }
+        1: {  # trial004 has a different group 1 configured
+            #  program
+            0: {'detectChannels': ['ins_td0', 'ins_td2', 'ins_td3'], 'thres': stimDetectThresDefault},
+            1: {'detectChannels': ['ins_td0'], 'thres': stimDetectThresDefault},
+            2: {'detectChannels': ['ins_td0', 'ins_td2', 'ins_td3'], 'thres': stimDetectThresDefault},
+            3: {'detectChannels': ['ins_td1', 'ins_td3'], 'thres': stimDetectThresDefault}
+        }
         }
     # stimDetectChans = None
     triFolderSourceBase = 2
@@ -230,5 +244,4 @@ def getExpOpts():
         [188, 1060],
         [0, 890]
         ]
-    gpfaRunIdx = 1
     return locals()

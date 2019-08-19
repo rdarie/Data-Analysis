@@ -2,6 +2,7 @@ import dill as pickle
 import os
 import dataAnalysis.preproc.ns5 as ns5
 import dataAnalysis.helperFunctions.profiling as prf
+import dataAnalysis.helperFunctions.helper_functions_new as hf
 import pandas as pd
 import numpy as np
 from scipy import stats
@@ -71,11 +72,15 @@ def applyFun(
         triggeredPath=None, resultPath=None, resultName=None,
         fun=None, funArgs=[], funKWargs={},
         lazy=None, loadArgs={},
+        secondaryPath=None, secondaryUnitQuery=None,
         loadType='all', applyType='self',
         verbose=False):
     if verbose:
         prf.print_memory_usage('about to load dataBlock')
     dataReader, dataBlock = ns5.blockFromPath(triggeredPath, lazy=lazy)
+    if secondaryPath is not None:
+        secondaryReader, secondaryBlock = ns5.blockFromPath(
+            secondaryPath, lazy=lazy)
     if verbose:
         prf.print_memory_usage('done loading dataBlock')
     if loadType == 'all':
@@ -93,26 +98,38 @@ def applyFun(
                 dataBlock, loadArgs['unitQuery'], objType=ns5.Unit)
         loadArgs.pop('unitNames')
         loadArgs.pop('unitQuery')
-        result = pd.Series(
-            0, index=unitNames, dtype='float32')
         for idxOuter, firstUnit in enumerate(unitNames):
             if verbose:
                 prf.print_memory_usage(' firstUnit: {}'.format(firstUnit))
             firstDF = ns5.alignedAsigsToDF(
                 dataBlock, [firstUnit],
                 **loadArgs)
-            result.loc[firstUnit] = fun(firstDF)
+            tempRes = fun(firstDF, *funArgs, **funKWargs)
+            if idxOuter == 0:
+                result = [
+                    pd.Series(
+                        0, index=unitNames, dtype='float32')
+                    for i in range(len(tempRes))]
+            for i in range(len(tempRes)):
+                result[i].loc[firstUnit] = tempRes[i]
     elif loadType == 'pairwise':
         if loadArgs['unitNames'] is None:
             unitNames = ns5.listChanNames(
                 dataBlock, loadArgs['unitQuery'], objType=ns5.Unit)
         loadArgs.pop('unitNames')
         loadArgs.pop('unitQuery')
-        remainingUnits = copy(unitNames)
-        result = pd.DataFrame(
-            0, index=unitNames, columns=unitNames, dtype='float32')
+        if secondaryUnitQuery is None:
+            remainingUnits = copy(unitNames)
+        else:
+            if secondaryPath is None:
+                remainingUnits = ns5.listChanNames(
+                    dataBlock, secondaryUnitQuery, objType=ns5.Unit)
+            else:
+                remainingUnits = ns5.listChanNames(
+                    secondaryBlock, secondaryUnitQuery, objType=ns5.Unit)
         for idxOuter, firstUnit in enumerate(unitNames):
-            remainingUnits.remove(firstUnit)
+            if secondaryUnitQuery is None:
+                remainingUnits.remove(firstUnit)
             if verbose:
                 prf.print_memory_usage(' firstUnit: {}'.format(firstUnit))
                 print('{} secondary units to analyze'.format(len(remainingUnits)))
@@ -122,15 +139,80 @@ def applyFun(
             for idxInner, secondUnit in enumerate(remainingUnits):
                 if verbose:
                     prf.print_memory_usage('secondUnit: {}'.format(secondUnit))
-                secondDF = ns5.alignedAsigsToDF(
-                    dataBlock, [secondUnit],
-                    **loadArgs)
-                result.loc[firstUnit, secondUnit], _ = fun(
-                    firstDF.to_numpy().flatten(),
-                    secondDF.to_numpy().flatten())
-    result.to_hdf(resultPath, resultName, format='table')
+                if secondaryPath is None:
+                    secondDF = ns5.alignedAsigsToDF(
+                        dataBlock, [secondUnit],
+                        **loadArgs)
+                else:
+                    secondDF = ns5.alignedAsigsToDF(
+                        secondaryBlock, [secondUnit],
+                        **loadArgs)
+                tempRes = fun(
+                    firstDF, secondDF, *funArgs, **funKWargs)
+                if (idxInner == 0) and (idxOuter == 0):
+                    result = [
+                        pd.DataFrame(
+                            0, index=unitNames,
+                            columns=remainingUnits, dtype='float32')
+                        for i in range(len(tempRes))]
+                for i in range(len(tempRes)):
+                    result[i].loc[firstUnit, secondUnit] = tempRes[i]
+    for i in range(len(resultName)):
+        result[i].to_hdf(resultPath, resultName[i], format='table')
     if lazy:
         dataReader.file.close()
+    return result
+
+
+def applyFunGrouped(
+        asigWide, groupBy, testVar,
+        fun=None, funArgs=[], funKWargs={},
+        resultNames=None,
+        plotting=False):
+    #
+    if (isinstance(groupBy, list)) and (len(groupBy) == 1):
+        groupBy = groupBy[0]
+    if isinstance(groupBy, str):
+        resultIndex = pd.Index(
+            sorted(asigWide.groupby(by=groupBy).groups.keys()))
+        resultIndex.name = groupBy
+    elif groupBy is None:
+        resultIndex = pd.Index(['all'])
+        resultIndex.name = 'all'
+    else:
+        resultIndex = pd.MultiIndex.from_tuples(
+            sorted(asigWide.groupby(by=groupBy).groups.keys()),
+            names=groupBy)
+    #
+    if (isinstance(testVar, list)) and (len(testVar) == 1):
+        testVar = testVar[0]
+    if isinstance(testVar, str):
+        resultColumns = pd.Index(
+            sorted(asigWide.groupby(by=testVar).groups.keys()))
+        resultColumns.name = testVar
+    elif testVar is None:
+        resultColumns = pd.Index(['all'])
+        resultColumns.name = 'all'
+    else:
+        resultColumns = pd.MultiIndex.from_tuples(
+            sorted(asigWide.groupby(by=testVar).groups.keys()),
+            names=testVar)
+    blankResult = pd.DataFrame(
+        np.nan, index=resultIndex, columns=resultColumns)
+    #
+    result = {
+        rName: blankResult
+        for rName in resultNames}
+    if groupBy is not None:
+        groupIter = asigWide.groupby(groupBy)
+    else:
+        groupIter = {'all': asigWide}.items()
+    for name, group in groupIter:
+        for subName, subGroup in group.groupby(testVar):
+            tempRes = fun(subGroup, *funArgs, **funKWargs)
+            for resIdx, res in enumerate(np.atleast_1d(tempRes)):
+                rName = resultNames[resIdx]
+                result[rName].loc[name, subName] = res
     return result
 
 
@@ -219,9 +301,84 @@ def compareMeansGrouped(
     return pVals, statVals, significanceVals
 
 
+def facetGridApplyFunGrouped(
+        dataBlock, resultPath,
+        fun=None, funArgs=[], funKWargs={},
+        resultNames=None,
+        loadArgs={},
+        rowColOpts={},
+        limitPages=None, plotting=False, verbose=False):
+    #  get list of units
+    if loadArgs['unitNames'] is None:
+        loadArgs['unitNames'] = ns5.listChanNames(
+            dataBlock, loadArgs['unitQuery'], objType=ns5.Unit)
+    originalUnitNames = loadArgs.pop('unitNames')
+    unitNames = originalUnitNames
+    originalUnitQuery = loadArgs.pop('unitQuery')
+    #  set up significance testing
+    if (rowColOpts['rowControl'] is None) and (rowColOpts['colControl'] is None):
+        # test all rows and columns
+        subQuery = None
+    else:
+        subQueryList = []
+        if rowColOpts['rowControl'] is not None:
+            if isinstance(rowColOpts['rowControl'], str):
+                rowQ = '\'' + rowColOpts['rowControl'] + '\''
+            else:
+                rowQ = rowColOpts['rowControl']
+            subQueryList.append(
+                '({} != {})'.format(rowColOpts['rowName'], rowQ))
+        if rowColOpts['colControl'] is not None:
+            if isinstance(rowColOpts['colControl'], str):
+                colQ = '\'' + rowColOpts['colControl'] + '\''
+            else:
+                colQ = rowColOpts['colControl']
+            subQueryList.append(
+                '({} != {})'.format(rowColOpts['colName'], colQ))
+        subQuery = '&'.join(subQueryList)
+    #  test each row and column separately
+    rowColGroupBy = [
+        i
+        for i in [rowColOpts['rowName'], rowColOpts['colName']]
+        if i is not None
+        ]
+    if not len(rowColGroupBy):
+        rowColGroupBy = None
+    # hue and/or style variable will index the result
+    indVar = [
+        i
+        for i in [rowColOpts['hueName'], rowColOpts['styleName']]
+        if i is not None
+        ]
+    assert indVar is not None
+    allRes = {}
+    for idx, unitName in enumerate(unitNames):
+        if verbose:
+            print('on unit {}'.format(unitName))
+        asigWide = ns5.alignedAsigsToDF(
+            dataBlock, [unitName],
+            **loadArgs)
+        if subQuery is not None:
+            asigWide = asigWide.query(subQuery)
+        #  get results
+        tempRes = applyFunGrouped(
+            asigWide, rowColGroupBy, indVar,
+            fun=fun, funArgs=funArgs, funKWargs=funKWargs,
+            resultNames=resultNames,
+            plotting=plotting)
+        allRes.update({unitName: tempRes})
+        if limitPages is not None:
+            if idx >= limitPages:
+                break
+    # give these back in case needed (dictionaries are passed by reference)
+    loadArgs['unitNames'] = originalUnitNames
+    loadArgs['unitQuery'] = originalUnitQuery
+    return allRes
+
+
 def facetGridCompareMeans(
         dataBlock, statsTestPath,
-        limitPages=None,
+        limitPages=None, verbose=False,
         loadArgs={},
         rowColOpts={},
         statsTestOpts={}):
@@ -275,6 +432,8 @@ def facetGridCompareMeans(
     allStatVals = {}
     allSigVals = {}
     for idx, unitName in enumerate(unitNames):
+        if verbose:
+            print('on unit {}'.format(unitName))
         asigWide = ns5.alignedAsigsToDF(
             dataBlock, [unitName],
             **loadArgs)
@@ -313,3 +472,40 @@ def facetGridCompareMeans(
     loadArgs['unitNames'] = originalUnitNames
     loadArgs['unitQuery'] = originalUnitQuery
     return allPValsWide, allStatValsWide, allSigValsWide
+
+
+def meanRAUC(
+        asigWide, baseline=None,
+        tStart=None, tStop=None):
+    rAUCDF = rAUC(
+        asigWide, baseline=baseline,
+        tStart=tStart, tStop=tStop)
+    return rAUCDF.mean()
+
+
+def rAUC(
+        asigWide, baseline=None,
+        tStart=None, tStop=None):
+    #
+    if tStart is None:
+        tStart = asigWide.columns[0]
+    if tStop is None:
+        tStop = asigWide.columns[-1]
+    tMask = hf.getTimeMaskFromRanges(
+        asigWide.columns, [(tStart, tStop)])
+    if baseline is not None:
+        if baseline == 'mean':
+            bLine = asigWide.mean(axis=1)
+        elif baseline == 'median':
+            bLine = asigWide.median(axis=1)
+        else:
+            bLine = baseline
+    else:
+        bLine = 0
+    dt = asigWide.columns[1] - asigWide.columns[0]
+    # pdb.set_trace()
+    rAUCDF = (
+        asigWide.loc[:, tMask]
+        .subtract(bLine, axis='index')
+        .abs().sum(axis=1) * dt)
+    return rAUCDF

@@ -39,6 +39,8 @@ from currentExperiment import parseAnalysisOptions
 from docopt import docopt
 import dill as pickle
 import pandas as pd
+import numpy as np
+from scipy import stats
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['trialIdx']), arguments['exp'])
@@ -62,9 +64,11 @@ alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = (
     ash.processUnitQueryArgs(
         namedQueries, analysisSubFolder, **arguments))
 alignedAsigsKWargs.update(dict(
-    duplicateControlsByProgram=True,
-    makeControlProgram=True,
-    metaDataToCategories=False))
+    duplicateControlsByProgram=False,
+    makeControlProgram=False,
+    metaDataToCategories=False,
+    removeFuzzyName=False,
+    transposeToColumns='bin', concatOn='index'))
 if arguments['processAll']:
     prefix = experimentName
 else:
@@ -74,57 +78,57 @@ triggeredPath = os.path.join(
     analysisSubFolder,
     prefix + '_{}_{}.nix'.format(
         arguments['inputBlockName'], arguments['window']))
+resultPath = os.path.join(
+    analysisSubFolder,
+    prefix + '_{}_{}_calc.h5'.format(
+        arguments['inputBlockName'], arguments['window']))
 print('loading {}'.format(triggeredPath))
 dataReader, dataBlock = ns5.blockFromPath(triggeredPath, lazy=arguments['lazy'])
-pdfName = '{}_{}_{}_{}'.format(
-    prefix, arguments['inputBlockName'],
-    arguments['window'],
-    arguments['alignQuery'])
-statsTestPath = os.path.join(analysisSubFolder, pdfName + '_stats.h5')
 #  Overrides
+limitPages = None
+resultName = 'meanRAUC'
 #  alignedAsigsKWargs.update({'decimate': 10})
-alignedAsigsKWargs.update({'windowSize': (-50e-3, 150e-3)})
-statsTestOpts.update({
-    'testStride': 10e-3,
-    'testWidth': 5e-3,
-    'tStop': 150e-3})
+alignedAsigsKWargs.update({'windowSize': (-10e-3, 50e-3)})
+funKWargs = dict(
+    baseline='median',
+    tStart=None, tStop=None)
 #  End Overrides
-#  Get stats results
-if os.path.exists(statsTestPath):
-    sigValsWide = pd.read_hdf(statsTestPath, 'sig')
-    sigValsWide.columns.name = 'bin'
-else:
-    (
-        pValsWide, statValsWide,
-        sigValsWide) = ash.facetGridCompareMeans(
-        dataBlock, statsTestPath,
-        loadArgs=alignedAsigsKWargs,
-        rowColOpts=rowColOpts,
-        statsTestOpts=statsTestOpts)
-#
-asp.plotAsigsAligned(
+asigWide = ns5.alignedAsigsToDF(
     dataBlock,
-    verbose=arguments['verbose'],
+    **alignedAsigsKWargs)
+rAUCDF = ash.rAUC(
+    asigWide, baseline=None,
+    tStart=None, tStop=None).to_frame(name='rauc')
+rAUCDF['kruskalStat'] = np.nan
+rAUCDF['kruskalP'] = np.nan
+for name, group in rAUCDF.groupby(['electrode', 'feature']):
+    subGroups = [i['rauc'].to_numpy() for n, i in group.groupby('amplitude')]
+    try:
+        stat, pval = stats.kruskal(*subGroups, nan_policy='omit')
+        rAUCDF.loc[group.index, 'kruskalStat'] = stat
+        rAUCDF.loc[group.index, 'kruskalP'] = pval
+    except Exception:
+        rAUCDF.loc[group.index, 'kruskalStat'] = 0
+        rAUCDF.loc[group.index, 'kruskalP'] = 1
+        
+rAUCDF.to_hdf(resultPath, resultName, format='table')
+
+"""
+RecCurve = ash.facetGridApplyFunGrouped(
+    dataBlock, resultPath,
+    fun=ash.rAUC, funArgs=[], funKWargs=funKWargs,
+    resultNames=resultNames,
+    limitPages=limitPages,
     loadArgs=alignedAsigsKWargs,
-    sigTestResults=sigValsWide,
-    figureFolder=figureFolder,
-    printBreakDown=True,
-    enablePlots=True,
-    plotProcFuns=[
-        asp.genYLabelChanger(lookupDict=openEphysChanNames, removeMatch='#0'),
-        asp.xLabelsTime,
-        asp.genVLineAdder(0, vLineOpts),
-        asp.genLegendRounder(decimals=2),
-        asp.genXLimSetter(alignedAsigsKWargs['windowSize'])],
-    pdfName=pdfName,
-    **rowColOpts,
-    relplotKWArgs=relplotKWArgs)
-asp.plotSignificance(
-    sigValsWide,
-    pdfName=pdfName + '_pCount',
-    figureFolder=figureFolder,
-    **rowColOpts,
-    **statsTestOpts)
+    rowColOpts=rowColOpts, verbose=arguments['verbose'])
 #
+for rName in resultNames:
+    tempResDict = {}
+    for uName, uResults in RecCurve.items():
+        tempResDict.update({uName: uResults[rName]})
+    tempResDF = pd.concat(tempResDict)
+    tempResDF.index.names = ['unit'] + uResults[rName].index.names
+    tempResDF.to_hdf(resultPath, rName, format='table')
+"""
 if arguments['lazy']:
     dataReader.file.close()

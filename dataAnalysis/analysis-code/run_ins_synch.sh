@@ -24,4 +24,5 @@
 EXP="exp201901271000"
 # EXP="exp201901221000"
 
-python3 './synchronizeINStoNSP.py' --trialIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP
+python3 './synchronizeINStoNSP.py' --trialIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP 
+# python3 './synchronizeINStoNSP.py' --trialIdx="4" --exp=$EXP --curateManually

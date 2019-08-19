@@ -105,44 +105,44 @@ insTensTimes, emgTensTimes = hf.chooseTriggers(
     insTensTimes, emgTensTimes,
     iti=None,
     plotting=plotting, verbose=True)
-#if plotting:
-fig, axEmg = plt.subplots()
-axINS = axEmg.twiny()
-emgPlotAsig = emgChanIdxs[4].analogsignals[0]
-emgPlotTimeMask = hf.getTimeMaskFromRanges(
-    emgPlotAsig.times,
-    [(emgTensTimes.iloc[0] - 0.05, emgTensTimes.iloc[0] + 0.15)])
-axEmg.plot(
-    emgPlotAsig.times[emgPlotTimeMask],
-    stats.zscore(emgPlotAsig[emgPlotTimeMask[:, np.newaxis]]), 'g-', label='Raw EMG')
-# emgPlotAsigZ = np.mean(emgAsigsZ, axis=0)[:, np.newaxis] * emgPlotAsig.units
-# axEmg.plot(emgPlotAsig.times[emgPlotTimeMask], stats.zscore(emgPlotAsigZ[emgPlotTimeMask[:, np.newaxis]]), '--', label='Processed EMG')
-insPlotAsig = insBlock.filter(name='seg0_ins_td1')[0]
-insPeakMask = hf.getTimeMaskFromRanges(
-    insPlotAsig.times,
-    [(insTensTimes.iloc[0] - 0.05, insTensTimes.iloc[0] + 0.15)])
-axINS.plot(
-    insPlotAsig.times.magnitude[insPeakMask],
-    stats.zscore(insPlotAsig.magnitude[insPeakMask[:, np.newaxis]]),
-    'r', label='Raw INS Recording')
-axINS.plot(
-    insTensTimes,
-    insTensTimes ** 0 - 1, 'm*',
-    label='INS Pulse Times')
-axEmg.plot(
-    emgTensTimes,
-    emgTensTimes ** 0 - 1, 'yo',
-    label='EMG Pulse Times')
-axEmg.set_xlabel('Time (sec)')
-axEmg.set_ylabel('A.U.')
-axEmg.set_xlim((emgTensTimes.iloc[0] - 0.05, emgTensTimes.iloc[0] + 0.15))
-axEmg.legend(loc='lower left')
-axINS.set_xlim((insTensTimes.iloc[0] - 0.05, insTensTimes.iloc[0] + 0.15))
-axINS.set_title('EMG to INS Synch')
-axINS.set_xlabel('Time (sec)')
-axINS.set_ylabel('A.U.')
-axINS.legend(loc='upper right')
-plt.show()
+if plotting:
+    fig, axEmg = plt.subplots()
+    axINS = axEmg.twiny()
+    emgPlotAsig = emgChanIdxs[4].analogsignals[0]
+    emgPlotTimeMask = hf.getTimeMaskFromRanges(
+        emgPlotAsig.times,
+        [(emgTensTimes.iloc[0] - 0.05, emgTensTimes.iloc[0] + 0.15)])
+    axEmg.plot(
+        emgPlotAsig.times[emgPlotTimeMask],
+        stats.zscore(emgPlotAsig[emgPlotTimeMask[:, np.newaxis]]), 'g-', label='Raw EMG')
+    # emgPlotAsigZ = np.mean(emgAsigsZ, axis=0)[:, np.newaxis] * emgPlotAsig.units
+    # axEmg.plot(emgPlotAsig.times[emgPlotTimeMask], stats.zscore(emgPlotAsigZ[emgPlotTimeMask[:, np.newaxis]]), '--', label='Processed EMG')
+    insPlotAsig = insBlock.filter(name='seg0_ins_td1')[0]
+    insPeakMask = hf.getTimeMaskFromRanges(
+        insPlotAsig.times,
+        [(insTensTimes.iloc[0] - 0.05, insTensTimes.iloc[0] + 0.15)])
+    axINS.plot(
+        insPlotAsig.times.magnitude[insPeakMask],
+        stats.zscore(insPlotAsig.magnitude[insPeakMask[:, np.newaxis]]),
+        'r', label='Raw INS Recording')
+    axINS.plot(
+        insTensTimes,
+        insTensTimes ** 0 - 1, 'm*',
+        label='INS Pulse Times')
+    axEmg.plot(
+        emgTensTimes,
+        emgTensTimes ** 0 - 1, 'yo',
+        label='EMG Pulse Times')
+    axEmg.set_xlabel('Time (sec)')
+    axEmg.set_ylabel('A.U.')
+    axEmg.set_xlim((emgTensTimes.iloc[0] - 0.05, emgTensTimes.iloc[0] + 0.15))
+    axEmg.legend(loc='lower left')
+    axINS.set_xlim((insTensTimes.iloc[0] - 0.05, insTensTimes.iloc[0] + 0.15))
+    axINS.set_title('EMG to INS Synch')
+    axINS.set_xlabel('Time (sec)')
+    axINS.set_ylabel('A.U.')
+    axINS.legend(loc='upper right')
+    plt.show()
 #end if plotting
 synchPolyCoeffs = np.polyfit(
     x=insTensTimes,
@@ -188,27 +188,27 @@ for insEv in insSeg.filter(objects=Event):
     insInterpBlock.segments[segIdx].events.append(interpEv)
     interpEv.segment = insInterpBlock.segments[segIdx]
 alignedTensTimes = timeInterpFun(insTensTimes).flatten()
-# if plotting:
-fig, ax = plt.subplots(1, 3)
-ax[0].plot(insTensTimes, emgTensTimes, 'bo', label='Synchronization pulse times')
-ax[0].plot(insTensTimes, alignedTensTimes, 'k--', label='Clock drift and offset model')
-ax[0].set_xlabel('INS Time (sec)')
-ax[0].set_ylabel('EMG Time (sec)')
-ax[0].legend()
-ax[0].set_xlim((insTensTimes.iloc[10] - 0.25, insTensTimes.iloc[10] + 1))
-ax[0].set_ylim((alignedTensTimes[10] - 0.25, alignedTensTimes[10] + 1))
-ax[1].plot((emgTensTimes - alignedTensTimes) * 1e6, 'bo')
-ax[1].set_ylabel('Timestamp residual (usec)')
-ax[1].set_xlabel('INS Time (sec)')
-ax[2] = sns.distplot((emgTensTimes - alignedTensTimes) * 1e6, ax=ax[2], vertical=True)
-ax[2].set_yticklabels([])
-ax[2].set_xticks([])
-ax[2].set_ylabel(None)
-ax[2].set_xlabel('Residual distribution')
-ax[1].set_ylim(ax[2].get_ylim())
-ax[1].set_xticks([0, len(alignedTensTimes) - 1])
-ax[1].set_xticklabels(['{}'.format(np.round(i)) for i in (insTensTimes.iloc[0], insTensTimes.iloc[-1])])
-plt.show()
+if plotting:
+    fig, ax = plt.subplots(1, 3)
+    ax[0].plot(insTensTimes, emgTensTimes, 'bo', label='Synchronization pulse times')
+    ax[0].plot(insTensTimes, alignedTensTimes, 'k--', label='Clock drift and offset model')
+    ax[0].set_xlabel('INS Time (sec)')
+    ax[0].set_ylabel('EMG Time (sec)')
+    ax[0].legend()
+    ax[0].set_xlim((insTensTimes.iloc[10] - 0.25, insTensTimes.iloc[10] + 1))
+    ax[0].set_ylim((alignedTensTimes[10] - 0.25, alignedTensTimes[10] + 1))
+    ax[1].plot((emgTensTimes - alignedTensTimes) * 1e6, 'bo')
+    ax[1].set_ylabel('Timestamp residual (usec)')
+    ax[1].set_xlabel('INS Time (sec)')
+    ax[2] = sns.distplot((emgTensTimes - alignedTensTimes) * 1e6, ax=ax[2], vertical=True)
+    ax[2].set_yticklabels([])
+    ax[2].set_xticks([])
+    ax[2].set_ylabel(None)
+    ax[2].set_xlabel('Residual distribution')
+    ax[1].set_ylim(ax[2].get_ylim())
+    ax[1].set_xticks([0, len(alignedTensTimes) - 1])
+    ax[1].set_xticklabels(['{}'.format(np.round(i)) for i in (insTensTimes.iloc[0], insTensTimes.iloc[-1])])
+    plt.show()
 # end if plotting
 tensEvents = Event(
     name='seg{}_TENS'.format(segIdx),

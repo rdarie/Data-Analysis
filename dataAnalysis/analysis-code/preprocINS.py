@@ -6,6 +6,7 @@ Usage:
 Options:
     --trialIdx=trialIdx        which trial to analyze
     --exp=exp                  which experimental day to analyze
+    --showPlots                show plots? [default: False]
 """
 
 import matplotlib
@@ -27,4 +28,4 @@ globals().update(allOpts)
 
 insBlock = preprocINS.preprocINS(
     trialFilesStim['ins'],
-    insDataPath, plottingFigures=False)
+    insDataPath, plottingFigures=arguments['showPlots'])

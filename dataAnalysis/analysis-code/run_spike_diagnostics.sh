@@ -8,7 +8,7 @@
 # Use more memory (32GB):
 #SBATCH --nodes=1
 #SBATCH --mem=48G
-#SBATCH --array=1,2,3,4,5
+#SBATCH --array=1
 
 # Specify a job name:
 #SBATCH -J sorting_diagnostics
@@ -23,7 +23,8 @@
 # EXP="exp201901211000"
 # EXP="exp201901221000"
 # EXP="exp201901070700"
-EXP="exp201901271000"
+# EXP="exp201901271000"
+EXP="exp201901231000"
 #SLURM_ARRAY_TASK_ID="2"
 #python3 './tridesclousCCV.py' --trialIdx=$SLURM_ARRAY_TASK_ID --makeCoarseNeoBlock --exp=$EXP
 #python3 './plotSpikeReport.py' --trialIdx=$SLURM_ARRAY_TASK_ID --nameSuffix=_coarse --exp=$EXP

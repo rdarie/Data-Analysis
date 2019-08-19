@@ -19,6 +19,7 @@ from seaborn.relational import _ScatterPlotter, _LinePlotter
 import os
 import traceback
 
+
 def processRowColArguments(arguments):
     outDict = {}
     outDict['rowName'] = arguments['rowName'] if len(arguments['rowName']) else None
@@ -126,7 +127,6 @@ def plotNeuronsAligned(
             asig = asigWide.stack().reset_index(name='fr')
             oneSpikePerBinHz = int(np.round(np.diff(rasterWide.columns)[0] ** (-1)))
             if enablePlots:
-                # pdb.set_trace()
                 if colName is not None:
                     colOrder = np.unique(rasterWide.index.to_frame()[colName])
                 else:
@@ -208,12 +208,12 @@ def addSignificanceStars(
         significantTimes = significantBins.columns[significantBins.to_numpy().flatten()].to_numpy()
         if len(significantTimes):
             ymin, ymax = g.axes[ro, co].get_ylim()
-            g.axes[ro, co].autoscale(False)
+            # g.axes[ro, co].autoscale(False)
             g.axes[ro, co].plot(
                 significantTimes,
-                significantTimes ** 0 * ymax * 0.99,
+                significantTimes ** 0 * ymax * 0.95,
                 'm*')
-            g.axes[ro, co].autoscale(True)
+            # g.axes[ro, co].autoscale(True)
 
 
 def calcBreakDown(asigWide, rowName, colName, hueName):
@@ -295,9 +295,22 @@ def plotAsigsAligned(
                 **loadArgs)
             asig = asigWide.stack().reset_index(name='signal')
             if enablePlots:
+                if colName is not None:
+                    colOrder = np.unique(asigWide.index.to_frame()[colName])
+                else:
+                    colOrder = None
+                if rowName is not None:
+                    rowOrder = np.unique(asigWide.index.to_frame()[rowName])
+                else:
+                    rowOrder = None
+                if hueName is not None:
+                    hueOrder = np.unique(asigWide.index.to_frame()[hueName])
+                else:
+                    hueOrder = None
                 g = sns.relplot(
                     x='bin', y='signal',
                     col=colName, row=rowName, hue=hueName,
+                    col_order=colOrder, row_order=rowOrder, hue_order=hueOrder,
                     **relplotKWArgs, data=asig)
                 #  iterate through plot and add significance stars
                 for (ro, co, hu), dataSubset in g.facet_data():
@@ -320,6 +333,19 @@ def plotAsigsAligned(
             pdf.savefig()
             plt.close()
     return
+
+
+def genYLabelChanger(lookupDict={}, removeMatch=''):
+    def yLabelChanger(g, ro, co, hu, dataSubset):
+        if (co == 0) and len(g.axes):
+            featName = dataSubset['feature'].unique()[0]
+            featName = featName.replace(removeMatch, '')
+            for key in lookupDict.keys():
+                if key == featName:
+                    featName = lookupDict[key]
+            g.axes[ro, co].set_ylabel(featName)
+        return
+    return yLabelChanger
 
 
 def yLabelsEMG(g, ro, co, hu, dataSubset):

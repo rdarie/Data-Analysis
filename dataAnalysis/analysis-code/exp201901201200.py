@@ -2,13 +2,22 @@ import os
 
 
 def getExpOpts():
+    #
+    miniRCTrialLookup = {
+        1: True,
+        2: False
+        }
+    RCTrialLookup = {
+        i: False
+        for i in miniRCTrialLookup.keys()}
+    #
     plottingFigures = False
     plotBlocking = True
     remakePrb = False
-
+    #
     experimentName = '201901201200-Proprio'
     deviceName = 'DeviceNPC700373H'
-
+    #
     jsonSessionNames = {
         #  each key is a trial
         1: ['Session1548006829607'],
@@ -18,13 +27,9 @@ def getExpOpts():
             'Session1548010328823',
             'Session1548010624175']
         }
-
-    miniRCTrialLookup = {
-        1: True,
-        2: False
-        }
-    RCTrialLookup = {i: False for i in miniRCTrialLookup.keys()}
-    tapDetectOpts = {
+    synchInfo = {'ins': {}, 'nsp': {}}
+    #  options for automatic tap detection on ins data
+    synchInfo['ins'] = {
         #  each key is a trial
         1: {
             #  each key is a trialSegment
@@ -69,7 +74,7 @@ def getExpOpts():
             }
         }
 
-    sessionTapRangesNSP = {
+    synchInfo['nsp'] = {
         #  each key is a trial
         1: {
             #  each key is a trialSegment
@@ -82,7 +87,6 @@ def getExpOpts():
             3: {'timeRanges': [2436, 2438], 'keepIndex': [0, 1]}
             }
         }
-
     #  if not possible to use taps, override with good taps from another segment
     #  not ideal, because segments are only synchronized to the nearest **second**
     overrideSegmentsForTapSync = {
@@ -90,10 +94,26 @@ def getExpOpts():
         1: {},
         2: {1: 0}  # override segment 1 based on segment 0
         }
+    # options for stim artifact detection
+    detectStim = True
+    stimDetectThresDefault = 15
+    stimDetectChansDefault = ['ins_td2', 'ins_td3']
+    #
+    stimDetectOverrideStartTimes = {
+        1: None,
+        2: None,
+    }
+    stimDetectOptsByChannelSpecific = {
+        # group
+        0: {
+            # program
+            0: {'detectChannels': stimDetectChansDefault, 'thres': stimDetectThresDefault},
+            1: {'detectChannels': stimDetectChansDefault, 'thres': stimDetectThresDefault},
+            2: {'detectChannels': stimDetectChansDefault, 'thres': stimDetectThresDefault},
+            3: {'detectChannels': stimDetectChansDefault, 'thres': stimDetectThresDefault}
+        }
+    }
 
-    stimDetectThres = 1
-    stimDetectChans = ['ins_td2', 'ins_td3']
-    
     triFolderSourceBase = os.path.join(
         '201901211000-Proprio', 'tdc_Trial001')
     triDestinations = [

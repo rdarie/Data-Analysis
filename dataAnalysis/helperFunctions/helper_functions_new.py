@@ -42,7 +42,7 @@ import json
 
 from scipy import stats, signal, ndimage, interpolate
 from statsmodels import robust
-from copy import copy
+from copy import copy, deepcopy
 #  from fractions import gcd
 #  import h5py
 from collections import OrderedDict
@@ -385,6 +385,44 @@ def filterDF(
     return filteredDF
 
 
+def makeFilterCoeffsSOS(
+        filterOpts, samplingRate, plotting=False):
+    fOpts = deepcopy(filterOpts)
+    filterCoeffsSOS = np.ndarray(shape=(0, 6))
+    #
+    if 'bandstop' in fOpts:
+        nNotchHarmonics = fOpts['bandstop'].pop('nHarmonics')
+        notchFreq = fOpts['bandstop'].pop('Wn')
+        notchQ = fOpts['bandstop'].pop('Q')
+        fOpts['bandstop']['fs'] = samplingRate
+        for harmonicOrder in range(1, nNotchHarmonics + 1):
+            w0 = harmonicOrder * notchFreq
+            bw = w0/notchQ
+            fOpts['bandstop']['Wn'] = [w0 - bw/2, w0 + bw/2]
+            sos = signal.iirfilter(
+                    **fOpts['bandstop'], output='sos')
+            filterCoeffsSOS = np.concatenate([filterCoeffsSOS, sos])
+            if plotting:
+                plotFilterOptsResponse(fOpts['bandstop'])
+    #
+    if 'high' in fOpts:
+        fOpts['high']['fs'] = samplingRate
+        sos = signal.iirfilter(
+                **fOpts['high'], output='sos')
+        filterCoeffsSOS = np.concatenate([filterCoeffsSOS, sos])
+        if plotting:
+            plotFilterOptsResponse(fOpts['high'])
+    #
+    if 'low' in fOpts:
+        fOpts['low']['fs'] = samplingRate
+        sos = signal.iirfilter(
+            **fOpts['low'], output='sos')
+        filterCoeffsSOS = np.concatenate([filterCoeffsSOS, sos])
+        if plotting:
+            plotFilterOptsResponse(fOpts['low'])
+    return filterCoeffsSOS
+
+
 def plotFilterOptsResponse(filterOpts):
     sos = signal.iirfilter(**filterOpts, output='sos')
     fig, ax1, ax2 = plotFilterResponse(sos, filterOpts['fs'])
@@ -573,13 +611,13 @@ def extractSignalsFromBlock(
             name=chanIdx.name, index=np.array([0]))
         newChan.merge_annotations(chanIdx)
         keepThisChan = False
-
+        #
         for asig in chanIdx.analogsignals:
             if asig.name in keepSignals:
                 newChan.analogsignals.append(asig)
                 asig.channel_index = newChan
                 keepThisChan = True
-
+        #
         if keepSpikes:
             for unit in chanIdx.units:
                 keepThisChan = True
@@ -587,7 +625,7 @@ def extractSignalsFromBlock(
                 unit.channel_index = newChan
         else:
             newChan.units = []
-
+        #
         if keepThisChan:
             newBlock.channel_indexes.append(newChan)
     newBlock.create_relationship()
