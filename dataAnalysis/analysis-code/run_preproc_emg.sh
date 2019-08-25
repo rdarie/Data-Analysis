@@ -2,7 +2,7 @@
 
 # 06a: Preprocess the NS5 File
 # Request 24 hours of runtime:
-#SBATCH --time=6:00:00
+#SBATCH --time=72:00:00
 
 # Default resources are 1 core with 2.8GB of memory.
 
@@ -41,16 +41,16 @@ EXP="exp201901070700"
 #
 # python3 ./assembleExperimentData.py --exp=$EXP --processAsigs --processRasters --analysisName="shortGaussian"
 #
-python3 ./calcAlignedAsigs.py --exp=$EXP --processAll --window="RC" --lazy --analysisName="shortGaussian" --chanQuery="oechorins" --blockName=RC --eventName=stimAlignTimes
-python3 ./plotAlignedAsigs.py --exp=$EXP --processAll --window="RC" --lazy --analysisName="shortGaussian" --inputBlockName="RC" --unitQuery="oechorins" --alignQuery="stimOnLowRate" --rowName= --colName="electrode" --colControl="control" --styleName= --hueName="amplitude"
+# python3 ./calcAlignedAsigs.py --exp=$EXP --processAll --window="RC" --lazy --analysisName="shortGaussian" --chanQuery="oechorins" --blockName=RC --eventName=stimAlignTimes
+# python3 ./plotAlignedAsigs.py --exp=$EXP --processAll --window="RC" --lazy --analysisName="shortGaussian" --inputBlockName="RC" --unitQuery="oechorins" --alignQuery="stimOnLowRate" --rowName= --colName="electrode" --colControl="control" --styleName= --hueName="amplitude"
 #
-python3 ./calcAlignedAsigs.py --exp=$EXP --processAll --window="RC" --lazy --analysisName="shortGaussian" --eventName=stimAlignTimes --chanQuery=fr --blockName=fr
-python3 ./calcAlignedRasters.py --exp=$EXP --processAll --window="RC" --lazy --analysisName="shortGaussian" --eventName=stimAlignTimes --chanQuery=raster --blockName=raster
-python3 ./plotAlignedNeurons.py --exp=$EXP --processAll --window="RC" --lazy --analysisName="shortGaussian" --alignQuery="stimOnLowRate" --rowName= --colName="electrode" --colControl="control" --styleName= --hueName="amplitude"
+# python3 ./calcAlignedAsigs.py --exp=$EXP --processAll --window="RC" --lazy --analysisName="shortGaussian" --eventName=stimAlignTimes --chanQuery=fr --blockName=fr
+# python3 ./calcAlignedRasters.py --exp=$EXP --processAll --window="RC" --lazy --analysisName="shortGaussian" --eventName=stimAlignTimes --chanQuery=raster --blockName=raster
+# python3 ./plotAlignedNeurons.py --exp=$EXP --processAll --window="RC" --lazy --analysisName="shortGaussian" --alignQuery="stimOnLowRate" --rowName= --colName="electrode" --colControl="control" --styleName= --hueName="amplitude"
 #
-python3 ./calcRecruitment.py --exp=$EXP --processAll --window="RC" --lazy --analysisName="shortGaussian" --inputBlockName="RC" --unitQuery="oechorins" --alignQuery="stimOnLowRate" --rowName= --colName="electrode" --colControl="control" --styleName= --hueName="amplitude" --verbose
-python3 ./plotRecruitment.py --exp=$EXP --processAll --window="RC" --lazy --analysisName="shortGaussian" --inputBlockName="RC" --unitQuery="oechorins" --alignQuery="stimOnLowRate" --rowName= --colName="electrode" --colControl="control" --styleName= --hueName="amplitude" --verbose
+# python3 ./calcRecruitment.py --exp=$EXP --processAll --window="RC" --lazy --analysisName="shortGaussian" --inputBlockName="RC" --unitQuery="oechorins" --alignQuery="stimOnLowRate" --rowName= --colName="electrode" --colControl="control" --styleName= --hueName="amplitude" --verbose
+# python3 ./plotRecruitment.py --exp=$EXP --processAll --window="RC" --lazy --analysisName="shortGaussian" --inputBlockName="RC" --unitQuery="oechorins" --alignQuery="stimOnLowRate" --rowName= --colName="electrode" --colControl="control" --styleName= --hueName="amplitude" --verbose
 #
-# python3 ./calcUnitCorrelationToAsig.py --exp=$EXP --processAll --window="RC" --lazy --analysisName="shortGaussian" --inputBlockName="fr" --secondaryBlockName="RC" --alignQuery="stimOnLowRate" --unitQuery="fr" --plotting --verbose
-# python3 ./plotMatrixOfScalars.py --exp=$EXP --resultName="emgMaxCrossCorr" --processAll --window="RC" --analysisName="shortGaussian" --inputBlockName="fr" --secondaryBlockName="RC" --verbose
-# python3 ./plotMatrixOfScalars.py --exp=$EXP --resultName="emgMaxCrossCorrLag" --processAll --window="RC" --analysisName="shortGaussian" --inputBlockName="fr" --secondaryBlockName="RC" --verbose
+python3 ./calcUnitCorrelationToAsig.py --exp=$EXP --processAll --window="RC" --lazy --analysisName="shortGaussian" --inputBlockName="fr" --secondaryBlockName="RC" --alignQuery="stimOnLowRate" --unitQuery="fr" --verbose
+python3 ./plotMatrixOfScalars.py --exp=$EXP --resultName="emgMaxCrossCorr" --processAll --window="RC" --analysisName="shortGaussian" --inputBlockName="fr" --secondaryBlockName="RC" --verbose
+python3 ./plotMatrixOfScalars.py --exp=$EXP --resultName="emgMaxCrossCorrLag" --processAll --window="RC" --analysisName="shortGaussian" --inputBlockName="fr" --secondaryBlockName="RC" --verbose

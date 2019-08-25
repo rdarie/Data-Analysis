@@ -35,8 +35,15 @@ expOpts, allOpts = parseAnalysisOptions(
     arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
-arguments['chanNames'], arguments['chanQuery'] = ash.processChannelQueryArgs(
-    namedQueries, scratchFolder, **arguments)
+
+
+if (overrideChanNames is not None) and (arguments['chanQuery'] in ['fr', 'fr_sqrt', 'raster']):
+    arguments['chanNames'] = [i + '_{}'.format(arguments['chanQuery']) for i in overrideChanNames]
+    arguments['chanQuery'] = None
+else:
+    arguments['chanNames'], arguments['chanQuery'] = ash.processChannelQueryArgs(
+        namedQueries, scratchFolder, **arguments)
+
 analysisSubFolder = os.path.join(
     scratchFolder, arguments['analysisName']
     )
@@ -52,6 +59,7 @@ if arguments['processAll']:
     eventPath = experimentDataPath
 else:
     eventPath = analysisDataPath
+
 eventReader, eventBlock = ns5.blockFromPath(
     eventPath, lazy=arguments['lazy'])
 #  eventBlock = eventReader.read_block(

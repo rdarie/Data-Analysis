@@ -19,7 +19,7 @@
 # Specify account details
 #SBATCH --account=bibs-dborton-condo
 
-EXP="exp201812051000"
+# EXP="exp201812051000"
 # EXP="exp201901070700"
 # EXP="exp201901201200"
 # EXP="exp201901211000"
@@ -28,14 +28,17 @@ EXP="exp201812051000"
 # SELECTOR="201901211000-Proprio_minfrmaxcorr"
 # SELECTOR="201901201200-Proprio_minfr"
 # ESTIMATOR="201901211000-Proprio_pca"
-
-# python3 ./preprocINS.py --exp=$EXP --trialIdx=1
-# python3 ./preprocINSfromSIP.py --exp=$EXP
-python3 ./preprocOpenEphys.py --exp=$EXP
-python3 ./synchronizeOpenEphysToINSSIP.py --exp=$EXP
-# python3 ./synchronizeOpenEphysToINS.py --exp=$EXP --trialIdx=1
-# python3 ./calcTrialAnalysisNix.py --exp=$EXP --trialIdx=1 --chanQuery=oechorins --samplingRate=30000
-# python3 ./calcStimAlignTimes.py --trialIdx=1 --exp=$EXP
-python3 ./assembleExperimentData.py --exp=$EXP --processAsigs
-python3 ./calcAlignedAsigs.py --exp=$EXP --processAll --window=RC --chanQuery="oechorins" --blockName=RC --eventName=stimAlignTimes
-python3 ./plotAlignedAsigs.py --exp=$EXP --processAll --window=RC --inputBlockName=RC --unitQuery="oechorins" --alignQuery="stimOn" --rowName= --styleName= --hueName="amplitude"
+EXP="exp201901271000"
+TRIALIDX="1"
+# python3 ./assembleExperimentData.py --exp=$EXP --processAsigs --processRasters
+# python3 ./calcAlignedAsigs.py --exp=$EXP --trialIdx=$TRIALIDX --lazy --window="long" --chanQuery="fr" --blockName="fr"
+# python3 ./calcAlignedAsigs.py --exp=$EXP --trialIdx=$TRIALIDX --lazy --window="long" --chanQuery="fr_sqrt" --blockName="fr_sqrt"
+# python3 ./calcAlignedAsigs.py --exp=$EXP --trialIdx=$TRIALIDX --lazy --window="long" --chanQuery="rig" --blockName="rig"
+python3 ./calcUnitRegressionToAsig.py --exp=$EXP --trialIdx=$TRIALIDX --lazy --inputBlockName="fr_sqrt" --secondaryBlockName="rig" --alignQuery="midPeak" --unitQuery="fr_sqrt" --verbose
+# 
+# python3 ./calcAlignedRasters.py --exp=$EXP --trialIdx=$TRIALIDX --lazy --window="long" --chanQuery="raster" --blockName="raster"
+# python3 ./plotAlignedNeurons.py --exp=$EXP --trialIdx=$TRIALIDX --lazy --window="long" --alignQuery="midPeakWithStim100HzCCW" --rowName="pedalSizeCat"
+# python3 ./calcAlignedAsigs.py --exp=$EXP --trialIdx=$TRIALIDX --lazy --window="short" --chanQuery="fr" --blockName="fr"
+# python3 ./calcAlignedAsigs.py --exp=$EXP --trialIdx=$TRIALIDX --lazy --window="short" --chanQuery="fr_sqrt" --blockName="fr_sqrt"
+# python3 ./calcAlignedRasters.py --exp=$EXP --trialIdx=$TRIALIDX --lazy --window="short" --chanQuery="raster" --blockName="raster"
+# python3 ./plotAlignedNeurons.py --exp=$EXP --trialIdx=$TRIALIDX --lazy --window="short" --alignQuery="midPeakWithStim100HzCCW" --rowName="pedalSizeCat"

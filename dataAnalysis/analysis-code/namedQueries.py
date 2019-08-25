@@ -26,7 +26,8 @@ namedQueries = {
         'oech': "(chanName.str.contains('CH'))",
         'oechorsense': "((chanName.str.contains('CH'))or(chanName.str.contains('Sense')))",
         'oechorins': "((chanName.str.contains('CH'))or(chanName.str.contains('ins')))",
-        'notoeaux': "not((chanName.str.contains('AUX')))"
+        'notoeaux': "not((chanName.str.contains('AUX')))",
+        'rig': "not((chanName.str.contains('elec'))or(chanName.str.contains('pca')))"
     }
 }
 namedQueries['align'].update({

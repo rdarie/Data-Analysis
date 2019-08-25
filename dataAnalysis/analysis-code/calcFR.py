@@ -55,12 +55,12 @@ if overrideChanNames is not None:
 else:
     chanNames = None
 
-rasterOpts.update({
-    'binWidth': 5e-3,
-    'smoothKernelWidth': None})
 # rasterOpts.update({
-#     'binWidth': 50e-3,
+#     'binWidth': 5e-3,
 #     'smoothKernelWidth': None})
+rasterOpts.update({
+    'binWidth': 50e-3,
+    'smoothKernelWidth': None})
 
 experimentBinnedSpikePath = experimentBinnedSpikePath.format(arguments['analysisName'])
 experimentDataPath = experimentDataPath.format(arguments['analysisName'])

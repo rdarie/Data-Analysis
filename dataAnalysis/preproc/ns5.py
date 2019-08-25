@@ -65,11 +65,18 @@ def analogSignalsToDataFrame(
 
 def listChanNames(
         dataBlock, chanQuery,
-        objType=AnalogSignalProxy):
+        objType=AnalogSignalProxy, condition=None):
+    allChanList = [
+        i.name
+        for i in dataBlock.filter(objects=objType)]
+    if condition == 'hasAsigs':
+        allChanList = [
+            i
+            for i in allChanList
+            if len(dataBlock.filter(objects=objType, name=i)[0].analogsignals)
+        ]
     chansToTrigger = pd.DataFrame(
-        np.unique([
-            i.name
-            for i in dataBlock.filter(objects=objType)]),
+        np.unique(allChanList),
         columns=['chanName'])
     if chanQuery is not None:
         chansToTrigger = chansToTrigger.query(
@@ -657,7 +664,7 @@ def getAsigsAlignedToEvents(
     #  channels to trigger
     if chansToTrigger is None:
         chansToTrigger = listChanNames(
-            signalBlock, chanQuery, objType=ChannelIndex)
+            signalBlock, chanQuery, objType=ChannelIndex, condition='hasAsigs')
     #  allocate block for spiketrains
     masterBlock = Block()
     masterBlock.name = signalBlock.annotations['neo_name']

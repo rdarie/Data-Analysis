@@ -157,6 +157,44 @@ def applyFun(
                         for i in range(len(tempRes))]
                 for i in range(len(tempRes)):
                     result[i].loc[firstUnit, secondUnit] = tempRes[i]
+    elif loadType == 'oneToMany':
+        if loadArgs['unitNames'] is None:
+            unitNames = ns5.listChanNames(
+                dataBlock, loadArgs['unitQuery'], objType=ns5.Unit)
+        loadArgs.pop('unitNames')
+        loadArgs.pop('unitQuery')
+        if secondaryUnitQuery is None:
+            targetUnits = copy(unitNames)
+        else:
+            if secondaryPath is None:
+                targetUnits = ns5.listChanNames(
+                    dataBlock, secondaryUnitQuery, objType=ns5.Unit)
+            else:
+                targetUnits = ns5.listChanNames(
+                    secondaryBlock, secondaryUnitQuery, objType=ns5.Unit)
+        for idxOuter, firstUnit in enumerate(unitNames):
+            if verbose:
+                prf.print_memory_usage(' firstUnit: {}'.format(firstUnit))
+            firstDF = ns5.alignedAsigsToDF(
+                dataBlock, [firstUnit],
+                **loadArgs)
+            if secondaryPath is None:
+                secondDF = ns5.alignedAsigsToDF(
+                    dataBlock, targetUnits,
+                    **loadArgs)
+            else:
+                secondDF = ns5.alignedAsigsToDF(
+                    secondaryBlock, targetUnits,
+                    **loadArgs)
+            tempRes = fun(
+                firstDF, secondDF, *funArgs, **funKWargs)
+            if (idxOuter == 0):
+                result = [
+                    pd.Series(
+                        0, index=unitNames, dtype='float32')
+                    for i in range(len(tempRes))]
+            for i in range(len(tempRes)):
+                result[i].loc[firstUnit] = tempRes[i]
     for i in range(len(resultName)):
         result[i].to_hdf(resultPath, resultName[i], format='table')
     if lazy:

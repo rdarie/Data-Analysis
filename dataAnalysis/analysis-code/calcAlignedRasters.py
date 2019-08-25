@@ -38,8 +38,14 @@ expOpts, allOpts = parseAnalysisOptions(
     int(arguments['trialIdx']), arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
-arguments['chanNames'], arguments['chanQuery'] = ash.processChannelQueryArgs(
-    namedQueries, scratchFolder, **arguments)
+
+if (overrideChanNames is not None) and (arguments['chanQuery'] in ['fr', 'fr_sqrt', 'raster']):
+    arguments['chanNames'] = [i + '_{}'.format(arguments['chanQuery']) for i in overrideChanNames]
+    arguments['chanQuery'] = None
+else:
+    arguments['chanNames'], arguments['chanQuery'] = ash.processChannelQueryArgs(
+        namedQueries, scratchFolder, **arguments)
+
 analysisSubFolder = os.path.join(
     scratchFolder, arguments['analysisName']
     )
@@ -49,7 +55,7 @@ experimentBinnedSpikePath = experimentBinnedSpikePath.format(arguments['analysis
 binnedSpikePath = binnedSpikePath.format(arguments['analysisName'])
 experimentDataPath = experimentDataPath.format(arguments['analysisName'])
 analysisDataPath = analysisDataPath.format(arguments['analysisName'])
-    
+
 verbose = True
 #  source of events
 if arguments['processAll']:

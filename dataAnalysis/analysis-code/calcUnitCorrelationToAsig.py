@@ -59,7 +59,7 @@ alignedAsigsKWargs.update(dict(
     duplicateControlsByProgram=False,
     makeControlProgram=False,
     removeFuzzyName=False,
-    decimate=5,
+    decimate=1,
     transposeToColumns='bin', concatOn='index',
     getMetaData=False,
     verbose=False, procFun=None))
@@ -68,20 +68,48 @@ alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **argu
 alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
     namedQueries, scratchFolder, **arguments)
 
-def corFun(x, y, xBounds=None, yBounds=None):
+from sklearn.preprocessing import scale, robust_scale
+
+def corFun(
+        x, y,
+        xBounds=None, yBounds=None,
+        plotting=False):
     maskX = (x.columns > xBounds[0]) & (x.columns < xBounds[1])
     maskY = (y.columns > yBounds[0]) & (y.columns < yBounds[1])
+    scaledX = x.stack()
+    scaledX.iloc[:] = robust_scale(scaledX.to_numpy())
+    scaledX = scaledX.unstack(level='bin')
+    scaledY = y.stack()
+    scaledY.iloc[:] = robust_scale(scaledY.to_numpy())
+    scaledY = scaledY.unstack(level='bin')
     dt = x.columns[1] - x.columns[0]
     allMaxCorr = np.zeros(x.index.shape[0], dtype=np.float)
     allMaxLag = np.zeros(x.index.shape[0], dtype=np.int)
-    for idx in range(x.index.shape[0]):
+    for idx in range(scaledX.index.shape[0]):
         cor = np.correlate(
-            np.abs(x.iloc[idx, :].loc[maskX]),
-            np.abs(y.iloc[idx, :].loc[maskY]))
+            (scaledX.iloc[idx, :].loc[maskX]),
+            (scaledY.iloc[idx, :].loc[maskY]))
         lag = np.argmax(cor)
         allMaxLag[idx] = np.atleast_1d(lag)[0]
         allMaxCorr[idx] = cor[allMaxLag[idx]]
+    if plotting:
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+        #
+        fig, ax = plt.subplots()
+        ax.plot(x.columns, scaledX.mean(axis=0), label='FR')
+        ax.plot(y.columns, scaledY.mean(axis=0), label='EMG')
+        ax.legend()
+        plt.show()
+        ax = sns.distplot(allMaxLag, bins=100)
+        ax.set_xlabel('maximum lag')
+        plt.show()
+        ax = sns.distplot(allMaxCorr, bins=100)
+        ax.set_xlabel('maximum correlation')
+        plt.show()
+        #
     return np.mean(allMaxCorr), np.mean(allMaxLag) * dt
+
 
 resultNames = ['emgMaxCrossCorr', 'emgMaxCrossCorrLag']
 
@@ -89,7 +117,10 @@ resDFList = ash.applyFun(
     triggeredPath=triggeredPath, resultPath=resultPath,
     resultName=resultNames,
     fun=corFun, applyType='func', loadType='pairwise',
-    funKWargs={'xBounds': [0, 0.3], 'yBounds': [0, 0.15]},
+    funKWargs={
+        'xBounds': [0, 0.3],
+        'yBounds': [0, 0.15],
+        'plotting': arguments['plotting']},
     lazy=arguments['lazy'],
     verbose=arguments['verbose'],
     secondaryPath=secondaryPath,

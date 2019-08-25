@@ -166,6 +166,7 @@ stimStatus = hf.stimStatusSerialtoLong(
     stimStSer, idxT='t',  namePrefix='seg0_ins_',
     expandCols=expandCols,
     deriveCols=deriveCols, progAmpNames=progAmpNames)
+pdb.set_trace()
 columnsToBeAdded = ['amplitude', 'program']
 infoFromStimStatus = hf.interpolateDF(
     stimStatus, tdInterp['t'],
