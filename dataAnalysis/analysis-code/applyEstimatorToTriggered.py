@@ -81,7 +81,8 @@ if arguments['verbose']:
     prf.print_memory_usage('after estimator.transform')
 featureNames = [
     estimatorMetadata['name'] + '{:0>3}'.format(i)
-    for i in range(features.shape[1])]
+    for i in range(features.shape[1])
+    ]
 
 alignedFeaturesDF = pd.DataFrame(
     features, index=alignedAsigsDF.index, columns=featureNames)

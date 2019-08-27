@@ -39,6 +39,11 @@ expOpts, allOpts = parseAnalysisOptions(
     int(arguments['trialIdx']), arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
+analysisSubFolder = os.path.join(
+    scratchFolder, arguments['analysisName']
+    )
+if not os.path.exists(analysisSubFolder):
+    os.makedirs(analysisSubFolder, exist_ok=True)
 
 alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **arguments)
 alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
@@ -55,7 +60,7 @@ if arguments['processAll']:
 else:
     prefix = ns5FileName
 triggeredPath = os.path.join(
-    scratchFolder,
+    analysisSubFolder,
     prefix + '_{}_{}.nix'.format(
         arguments['inputBlockName'], arguments['window']))
 fullEstimatorName = '{}_{}_{}_{}'.format(
@@ -64,7 +69,7 @@ fullEstimatorName = '{}_{}_{}_{}'.format(
     arguments['window'],
     arguments['alignQuery'])
 estimatorPath = os.path.join(
-    scratchFolder,
+    analysisSubFolder,
     fullEstimatorName + '.joblib')
 prf.print_memory_usage('before load data')
 dataReader, dataBlock = ns5.blockFromPath(triggeredPath, lazy=arguments['lazy'])

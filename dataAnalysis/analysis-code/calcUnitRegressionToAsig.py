@@ -15,6 +15,7 @@ Options:
     --window=window                           process with short window? [default: long]
     --unitQuery=unitQuery                     how to restrict channels if not supplying a list? [default: fr]
     --alignQuery=alignQuery                   query what the units will be aligned to? [default: midPeak]
+    --estimatorName=estimatorName             filename for resulting estimator [default: tdr]
     --selector=selector                       filename if using a unit selector
 """
 import matplotlib
@@ -38,7 +39,10 @@ from docopt import docopt
 from currentExperiment import parseAnalysisOptions
 from namedQueries import namedQueries
 import dataAnalysis.preproc.ns5 as ns5
+from dataAnalysis.custom_transformers.tdr import TargetedDimensionalityReduction
 import statsmodels.api as sm
+import joblib as jb
+import dill as pickle
 
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
@@ -68,7 +72,15 @@ resultPath = os.path.join(
     analysisSubFolder,
     prefix + '_{}_{}_calc.h5'.format(
         arguments['inputBlockName'], arguments['window']))
-#
+fullEstimatorName = '{}_{}_{}_{}'.format(
+    prefix,
+    arguments['estimatorName'],
+    arguments['window'],
+    arguments['alignQuery'])
+estimatorPath = os.path.join(
+    analysisSubFolder,
+    fullEstimatorName + '.joblib')
+
 alignedAsigsKWargs.update(dict(
     duplicateControlsByProgram=True,
     makeControlProgram=False,
@@ -100,7 +112,7 @@ targetLoadArgs = alignedAsigsKWargs.copy()
 targetDF = ns5.alignedAsigsToDF(
     dataBlock,
     **targetLoadArgs)
-targetDF.columns = [i[:-2] for i in targetDF.columns]
+# targetDF.columns = [i[:-2] for i in targetDF.columns]
 targetDF = targetDF.apply(stats.zscore, raw=True)
 featureLoadArgs = alignedAsigsKWargs.copy()
 unitNames = ['position#0', 'amplitude#0', 'velocity#0']
@@ -108,153 +120,55 @@ featureLoadArgs['unitNames'] = unitNames
 featureLoadArgs['unitQuery'] = None
 featuresDF = ns5.alignedAsigsToDF(
     regressorBlock, **featureLoadArgs)
-featuresDF.columns = [i[:-2] for i in featuresDF.columns]
-
-nPosBins = int(np.ceil((featuresDF['position'].max() - featuresDF['position'].min()) / 0.05))
-featuresDF['positionBin'] = pd.cut(featuresDF['position'], bins=nPosBins, labels=False).to_numpy()
+# featuresDF.columns = [i[:-2] for i in featuresDF.columns]
+nPosBins = int(np.ceil((featuresDF['position#0'].max() - featuresDF['position#0'].min()) / 0.05))
+featuresDF['positionBin'] = pd.cut(featuresDF['position#0'], bins=nPosBins, labels=False).to_numpy()
 targetDF['positionBin'] = featuresDF['positionBin'].to_numpy()
 featuresDF.set_index('positionBin', drop=True, append=True, inplace=True)
 targetDF.set_index('positionBin', drop=True, append=True, inplace=True)
 #
 metaDF = featuresDF.index.to_frame().reset_index(drop=True)
-featuresDF['RateInHz'] = metaDF['RateInHz'].to_numpy() * featuresDF['amplitude'] ** 0
-featuresDF['accel'] = featuresDF['velocity'].diff().fillna(0).to_numpy()
+featuresDF['RateInHz#0'] = metaDF['RateInHz'].to_numpy() * featuresDF['amplitude#0'] ** 0
+featuresDF['accel#0'] = featuresDF['velocity#0'].diff().fillna(0).to_numpy()
 uniquePrograms = np.unique(metaDF['program'])
-
-from sklearn.base import TransformerMixin
-
-
-class TargetedDimensionalityReduction(TransformerMixin):
-    def __init__(
-            self, timeAxis=None,
-            featuresDF=None, targetDF=None):
-        pass
-
-    def fit(self, X, y=None):
-        return self
-
-    def transform(self, X):
-        return [[1] for _ in X]
-
-
-uniquePositionBins = np.unique(metaDF['positionBin'])
-uniqueUnits = targetDF.columns.to_numpy()
-betaIndex = pd.MultiIndex.from_product([uniqueUnits, uniquePositionBins], names=['unit', 'positionBin'])
-regressorNames = np.concatenate([['intercept'], featuresDF.columns.to_numpy()])
-betas = {
-    i: pd.DataFrame(np.nan, index=betaIndex, columns=regressorNames)
-    for i in uniquePrograms}
-#
 plotting = True
-if plotting:
-    ax = sns.distplot(featuresDF['position'])
-    plt.show()
-regressionList = []
-for name, yIndex in metaDF.groupby(['program', 'positionBin']):
-    programName = name[0]
-    posBinName = name[1]
-    groupMask = metaDF.index.isin(yIndex.index)
-    x = featuresDF.loc[groupMask, :].to_numpy()
-    x2 = sm.add_constant(x, has_constant='add')
-    for colName in targetDF:
-        y = targetDF.loc[groupMask, colName].to_numpy()
-        reg = sm.OLS(y, x2).fit()
-        # print(reg.summary())
-        yhat = reg.predict(x2)
-        # predictionDF.loc[groupMask, colName] = yhat
-        # print('reg.params is nan: {}'.format(np.isnan(reg.params).any()))
-        betas[programName].loc[(colName, posBinName), :] = reg.params
-        regressionList.append(
-            {
-                'program': programName, 'positionBin': posBinName,
-                'unit': colName, 'reg': reg
-                }
-        )
-    betas[programName].dropna(inplace=True)
-    betas[programName].columns.name = 'taskVariable'
-
-#
-from sklearn.decomposition import PCA
-nComponents = 20
-pca = PCA(n_components=nComponents)
+nPCAComponents = 20
 conditionNames = [
     'RateInHz', 'program', 'amplitudeCat',
     'pedalSizeCat', 'pedalVelocityCat', 'positionBin']
-conditionAverages = targetDF.groupby(conditionNames).agg('mean')
-pca.fit(conditionAverages.to_numpy())
-# check that "denoising" works as expected
-checkDenoising = False
-if checkDenoising:
-    denoisedCondAve = pd.DataFrame(
-        pca.inverse_transform(pca.transform(conditionAverages)),
-        index=conditionAverages.index, columns=conditionAverages.columns)
-    D = np.zeros((conditionAverages.shape[1], conditionAverages.shape[1]))
-    for idx in range(nComponents):
-        D += np.dot(
-            np.atleast_2d(pca.components_[idx, :]).transpose(),
-            np.atleast_2d(pca.components_[idx, :]))
-    compareDenoisedCA = pd.DataFrame(
-        np.dot(D, conditionAverages.transpose()).transpose(),
-        index=conditionAverages.index, columns=conditionAverages.columns)
-    plt.plot(compareDenoisedCA[exampleNeuronName].to_numpy(), linestyle='-', label='D*CA')
-    plt.plot(denoisedCondAve[exampleNeuronName].to_numpy(), linestyle='--', label='inv_trans(trans(CA))')
-    plt.legend()
-    plt.show()
-transposedBetas = {i: betas[i].unstack(level='positionBin').transpose() for i in uniquePrograms}
-denoisedBetas = {i: pd.DataFrame(pca.inverse_transform(pca.transform(transposedBetas[i])), index=transposedBetas[i].index, columns=transposedBetas[i].columns) for i in uniquePrograms}
-#
-pdb.set_trace()
-for progName, targetGroup in targetDF.groupby('program'):
-    if progName == 999:
-        continue
-    maxBins = []
-    for name, group in denoisedBetas[progName].groupby('taskVariable'):
-        maxBins.append((group ** 2).sum(axis='columns').idxmax())
-    betaMax = transposedBetas[progName].loc[maxBins, :]
-    q, r = np.linalg.qr(betaMax.transpose())
-    conditionNames = [
-        'RateInHz', 'amplitudeCat',
-        'pedalSizeCat', 'pedalVelocityCat', 'bin']
-    #  conditionAveragesT = targetGroup.groupby(conditionNames).agg('mean')
-    #  conditionAveragesProjected = pd.DataFrame(
-    #      np.dot(q.transpose(), conditionAveragesT.transpose()).transpose(),
-    #      index=conditionAveragesT.index, columns=['TDR_{}'.format(i) for i in regressorNames])
-    #  conditionAveragesProjected.columns.name = 'feature'
-    #  conditionAveragesProjected.reset_index(inplace=True)
+for progName, idxVals in metaDF.groupby('program'):
+    groupMask = metaDF.index.isin(idxVals.index)
+    targetGroup = targetDF.loc[groupMask, :]
+    featureGroup = featuresDF.loc[groupMask, :]
+    # pdb.set_trace()
+    tdr = TargetedDimensionalityReduction(
+        timeAxisName='positionBin',
+        nPCAComponents=nPCAComponents, conditionNames=conditionNames,
+        featuresDF=featureGroup, targetDF=targetGroup, plotting=False)
+    tdr.fit()
     targetGroupProjected = pd.DataFrame(
-        np.dot(q.transpose(), targetGroup.transpose()).transpose(),
-        index=targetGroup.index, columns=['TDR_{}'.format(i) for i in regressorNames])
+        tdr.transform(targetGroup),
+        index=targetGroup.index,
+        columns=['TDR_{}'.format(i) for i in tdr.regressorNames])
     targetGroupProjected.columns.name = 'feature'
     targetGroupProjected.reset_index(inplace=True)
     if plotting:
         fig, ax = plt.subplots()
         sns.lineplot(
-            x='bin', y='TDR_velocity', hue='pedalSizeCat',
-            data=targetGroupProjected, ax=ax)
+            x='bin', y='TDR_velocity#0', hue='pedalSizeCat',
+            data=targetGroupProjected, ci='sd', ax=ax)
         plt.show()
-    break
-
-predictionDF = pd.DataFrame(np.nan, index=targetDF.index, columns=targetDF.columns)
-
-if plotting:
-    fullTargetDF = targetDF.copy()
-    fullTargetDF['position'] = featuresDF.loc[:, 'position'].to_numpy()
-    fullTargetDF.reset_index(inplace=True)
-    # fullTargetDF.sort_values(by=['position'], inplace=True, kind='mergesort')
-    fullPredictionDF = predictionDF.copy()
-    fullPredictionDF['position'] = featuresDF.loc[:, 'position'].to_numpy()
-    fullPredictionDF.reset_index(inplace=True)
-    # fullPredictionDF.sort_values(by=['position'], inplace=True, kind='mergesort')
-    exampleNeuronName = 'elec75#1_fr_sqrt'
-    fig, ax = plt.subplots()
-    sns.lineplot(
-        x='bin', y=exampleNeuronName,
-        data=fullTargetDF, ax=ax, ci='sem')
-    sns.lineplot(
-        x='bin', y=exampleNeuronName,
-        data=fullPredictionDF, ax=ax, ci='sem')
-    plt.show()
-
-writeOut = True
-if not writeOut:
-    raise(Exception('Overriding writeout step'))
+    thisEstimatorPath = estimatorPath.replace(
+        '.joblib', '_prog{}.joblib'.format(int(progName)))
+    jb.dump(tdr, thisEstimatorPath)
+    estimatorMetadata = {
+        'trainingDataPath': os.path.basename(triggeredPath),
+        'path': os.path.basename(thisEstimatorPath),
+        'name': arguments['estimatorName'],
+        'inputFeatures': targetDF.columns.to_list(),
+        'outputFeatures': tdr.regressorNames,
+        'alignedAsigsKWargs': alignedAsigsKWargs,
+        }
+    with open(thisEstimatorPath.replace('.joblib', '_meta.pickle'), 'wb') as f:
+        pickle.dump(
+            estimatorMetadata, f)

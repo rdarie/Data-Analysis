@@ -591,6 +591,7 @@ def alignedAsigsToDF(
                 traceback.print_exc()
 
         if duplicateControlsByProgram:
+            # pdb.set_trace()
             noStimWaveforms = (
                 allWaveforms
                 .loc[allWaveforms[amplitudeColumn] == 0, :]
@@ -613,13 +614,13 @@ def alignedAsigsToDF(
                 uniqProgs = np.append(uniqProgs, 999)
                 progElecLookup.update({999: 'control'})
 
-                for progIdx in uniqProgs:
-                    dummyWaveforms = noStimWaveforms.copy()
-                    dummyWaveforms.loc[:, programColumn] = progIdx
-                    dummyWaveforms.loc[:, electrodeColumn] = progElecLookup[progIdx]
-                    stimWaveforms = pd.concat([stimWaveforms, dummyWaveforms])
-                stimWaveforms.reset_index(drop=True, inplace=True)
-                allWaveforms = stimWaveforms
+            for progIdx in uniqProgs:
+                dummyWaveforms = noStimWaveforms.copy()
+                dummyWaveforms.loc[:, programColumn] = progIdx
+                dummyWaveforms.loc[:, electrodeColumn] = progElecLookup[progIdx]
+                stimWaveforms = pd.concat([stimWaveforms, dummyWaveforms])
+            stimWaveforms.reset_index(drop=True, inplace=True)
+            allWaveforms = stimWaveforms
 
         if removeFuzzyName:
             fuzzyNamesBase = [
