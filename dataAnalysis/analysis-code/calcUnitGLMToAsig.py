@@ -114,9 +114,19 @@ def calcUnitRegressionToAsig():
         **targetLoadArgs)
     #
     featureLoadArgs = alignedAsigsKWargs.copy()
+    addLags = {
+        'position#0': [5],
+        'velocity#0': [5],
+        'program0_amplitude#0': [5],
+        'program1_amplitude#0': [5],
+        'program2_amplitude#0': [5],
+        'program3_amplitude#0': [5]
+        }
     unitNames = ['position#0', 'program0_amplitude#0', 'program1_amplitude#0', 'program2_amplitude#0', 'program3_amplitude#0', 'velocity#0']
     featureLoadArgs['unitNames'] = unitNames
     featureLoadArgs['unitQuery'] = None
+    featureLoadArgs['addLags'] = addLags
+    featureLoadArgs['rollingWindow'] = 10
     featuresDF = ns5.alignedAsigsToDF(
         regressorBlock, **featureLoadArgs)
     # posBinResolution = 0.025 # *100 in degrees
@@ -157,8 +167,8 @@ def calcUnitRegressionToAsig():
         (MinMaxScaler(), ['program{}_ACR#0'.format(pNum) for pNum in range(4)]),
         ]
     targetScalers = []
-    import warnings
-    warnings.filterwarnings('error')
+    # import warnings
+    # warnings.filterwarnings('error')
     #
     addLags = {
         'position_x#0': [5],

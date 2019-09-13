@@ -107,7 +107,6 @@ class TargetedDimensionalityReduction(TransformerMixin):
         self.featuresDF = extendedFeaturesDF.iloc[::decimate, :]
         #
         if self.addIntercept:
-            pdb.set_trace()
             self.featuresDF.loc[:, ('intercept', 0)] = 1
         self.metaDF = self.featuresDF.index.to_frame().reset_index(drop=True)
         uniqueBins = np.unique(self.metaDF[timeAxisName])

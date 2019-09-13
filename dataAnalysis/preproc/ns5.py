@@ -335,7 +335,8 @@ def unitSpikeTrainWaveformsToDF(
         spikeTrainContainer,
         dataQuery=None,
         transposeToColumns='bin', fastTranspose=True,
-        getMetaData=True, verbose=False, decimate=1,
+        lags=None, decimate=1, rollingWindow=None,
+        getMetaData=True, verbose=False,
         whichSegments=None, windowSize=None, procFun=None):
     #  list contains different segments from *one* unit
     if isinstance(spikeTrainContainer, ChannelIndex):
@@ -377,19 +378,21 @@ def unitSpikeTrainWaveformsToDF(
         if verbose:
             print('extracting wf from {}'.format(stIn.segment))
         wf = np.asarray(
-            np.squeeze(st.waveforms)[:, ::decimate],
+            np.squeeze(st.waveforms),
             dtype='float32')
         if wf.ndim == 3:
             print('Waveforms from more than one channel!')
             if wf.shape[1] > 0:
                 wf = wf[:, 0, :]
         wfDF = pd.DataFrame(wf)
+        # TODO: replace this with rolling window and decimate
+        # wfDF = wfDF.iloc[:, ::decimate]
+        # samplingRate = st.sampling_rate / decimate
         #  if verbose:
         #      print('wfDF.shape = {}'.format(wfDF.shape))
+        samplingRate = st.sampling_rate
         bins = (
-            (
-                np.asarray(wfDF.columns) /
-                (st.sampling_rate / decimate)) -
+            np.asarray(wfDF.columns) / samplingRate -
             st.left_sweep)
         wfDF.columns = np.around(bins.magnitude, decimals=6)
         if windowSize is not None:
@@ -448,27 +451,57 @@ def unitSpikeTrainWaveformsToDF(
                 spikeDF.drop(columns=annColumns, inplace=True)
         waveformsList.append(spikeDF)
     #
-    waveformsDF = pd.concat(
-        waveformsList, axis='index',
-        # ignore_index=True
-        )
+    zeroLagWaveformsDF = pd.concat(waveformsList, axis='index')
     if verbose:
         prf.print_memory_usage('before transposing waveforms')
+    # TODO implement lags and rolling window addition here
+    metaDF = zeroLagWaveformsDF.loc[:, idxLabels].copy()
+    zeroLagWaveformsDF.drop(columns=idxLabels, inplace=True)
+    if lags is None:
+        lags = [0]
+    laggedWaveformsDict = {(spikeTrainContainer.name, k): None for k in lags}
+    for lag in lags:
+        if isinstance(lag, int):
+            shiftedWaveform = zeroLagWaveformsDF.shift(lag, axis='columns')
+            if rollingWindow is not None:
+                shiftedWaveform = (
+                    shiftedWaveform
+                    .rolling(rollingWindow, axis='columns', center=True)
+                    .mean())
+            laggedWaveformsDict[
+                (spikeTrainContainer.name, lag)] = (
+                    shiftedWaveform.iloc[:, ::decimate])
+        if isinstance(lag, tuple):
+            shiftedWaveform = (
+                zeroLagWaveformsDF
+                .shift(lag[0], axis='columns')
+                .rolling(lag[1], axis='columns', center=True)
+                .mean())
+            laggedWaveformsDict[
+                (spikeTrainContainer.name, lag)] = (
+                    shiftedWaveform.iloc[:, ::decimate])
+    waveformsDF = pd.concat(
+        laggedWaveformsDict,
+        names=['feature', 'lag', 'originalDummy']).reset_index()
+    waveformsDF = pd.concat(
+        [
+            metaDF.reset_index(drop=True),
+            waveformsDF.drop(columns='originalDummy')],
+        axis='columns')
     #
     if transposeToColumns == 'feature':
         # stack the bin, name the feature column
-        waveformsDF.set_index(idxLabels, inplace=True)
-        waveformsDF = waveformsDF.stack().to_frame(name=spikeTrainContainer.name)
+        waveformsDF.set_index(sorted(idxLabels + ['feature', 'lag']), inplace=True)
+        waveformsDF = waveformsDF.stack(level='bin').unstack(level=['feature', 'lag'])
         idxLabels.append('bin')
         waveformsDF.columns.name = 'feature'
-        waveformsDF.reset_index(inplace=True)
     elif transposeToColumns == 'bin':
         # add the feature column
         waveformsDF.loc[:, 'feature'] = spikeTrainContainer.name
-        idxLabels.append('feature')
+        idxLabels += ['feature', 'lag']
         waveformsDF.columns.name = 'bin'
+        waveformsDF.set_index(idxLabels, inplace=True)
     #
-    waveformsDF.set_index(idxLabels, inplace=True)
     if transposeToColumns != waveformsDF.columns.name:
         waveformsDF = transposeSpikeDF(
             waveformsDF, transposeToColumns,
@@ -480,7 +513,8 @@ def concatenateUnitSpikeTrainWaveformsDF(
         units, dataQuery=None,
         transposeToColumns='bin', concatOn='index',
         fastTranspose=True, getMetaData=True, verbose=False,
-        metaDataToCategories=False, decimate=1, windowSize=None,
+        addLags=None, decimate=1, rollingWindow=None,
+        metaDataToCategories=False, windowSize=None,
         whichSegments=None, procFun=None):
     allUnits = []
     for thisUnit in units:
@@ -499,11 +533,16 @@ def concatenateUnitSpikeTrainWaveformsDF(
     for idx, thisUnit in enumerate(allUnits):
         if verbose:
             print('concatenating unitDF {}'.format(thisUnit.name))
+        lags = None
+        if addLags is not None:
+            if thisUnit in addLags:
+                lags = addLags[thisUnit]
         unitWaveforms = unitSpikeTrainWaveformsToDF(
             thisUnit, dataQuery=dataQuery,
             transposeToColumns=transposeToColumns,
             fastTranspose=fastTranspose, getMetaData=getMetaData,
-            verbose=verbose, decimate=decimate, windowSize=windowSize,
+            lags=lags, decimate=decimate, rollingWindow=rollingWindow,
+            verbose=verbose, windowSize=windowSize,
             whichSegments=whichSegments, procFun=procFun)
         if idx == 0:
             idxLabels = unitWaveforms.index.names
@@ -554,7 +593,8 @@ def alignedAsigsToDF(
         programColumn='programFuzzy',
         electrodeColumn='electrodeFuzzy',
         transposeToColumns='bin', concatOn='index', fastTranspose=True,
-        decimate=1, whichSegments=None, windowSize=None,
+        addLags=None, decimate=1, rollingWindow=None,
+        whichSegments=None, windowSize=None,
         getMetaData=True, metaDataToCategories=True,
         makeControlProgram=False, removeFuzzyName=False, procFun=None):
     #  channels to trigger
@@ -567,7 +607,8 @@ def alignedAsigsToDF(
         allUnits, dataQuery=dataQuery,
         transposeToColumns=transposeToColumns, concatOn=concatOn,
         fastTranspose=fastTranspose,
-        verbose=verbose, decimate=decimate, whichSegments=whichSegments,
+        addLags=addLags, decimate=decimate, rollingWindow=rollingWindow,
+        verbose=verbose, whichSegments=whichSegments,
         windowSize=windowSize, procFun=procFun,
         getMetaData=getMetaData, metaDataToCategories=metaDataToCategories)
     #
@@ -579,6 +620,7 @@ def alignedAsigsToDF(
     if manipulateIndex and getMetaData:
         idxLabels = allWaveforms.index.names
         allWaveforms.reset_index(inplace=True)
+        pdb.set_trace()
         if collapseSizes:
             try:
                 allWaveforms.loc[allWaveforms['pedalSizeCat'] == 'XL', 'pedalSizeCat'] = 'L'
@@ -642,13 +684,13 @@ def alignedAsigsToDF(
             list(idxLabels),
             inplace=True)
     if transposeToColumns == 'feature':
-        zipNames = zip(allWaveforms.columns.to_list(), unitNames)
+        zipNames = zip(allWaveforms.columns.get_level_values('feature').to_list(), unitNames)
         try:
             assert np.all([i == j for i, j in zipNames]), 'columns out of requested order!'
         except Exception:
-            #
+            traceback.print_exc()
             allWaveforms.reindex(columns=unitNames)
-    #allWaveforms.sort_index(level=['segment', 'originalIndex', 't'], inplace=True, kind='mergesort')
+    # allWaveforms.sort_index(level=['segment', 'originalIndex', 't'], inplace=True, kind='mergesort')
     return allWaveforms
 
 
