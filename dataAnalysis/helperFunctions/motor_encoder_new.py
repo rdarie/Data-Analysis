@@ -62,29 +62,14 @@ def getMotorData(
 
 
 def processMotorData(motorData, fs, invertLookup=False):
-    #  pdb.set_trace()
+    #
     motorData['A'] = motorData['A+'] - motorData['A-']
     motorData['B'] = motorData['B+'] - motorData['B-']
     motorData['Z'] = motorData['Z+'] - motorData['Z-']
-    
-    #  pdb.set_trace();plt.plot(motorData.loc[:,('B+', 'A-')]);plt.show()
-
     motorData.drop(
         ['A+', 'A-', 'B+', 'B-', 'Z+', 'Z-'],
         axis=1, inplace=True)
-
-    """
-    # use gaussian mixture model to digitize analog trace
-    levelEstimators = {name : GaussianMixture(n_components=2, covariance_type= 'spherical', max_iter=200, random_state=0) for name in motorData.columns}
-    for key, estimator in levelEstimators.items():
-        estimator.fit(motorData[key].values.reshape(-1, 1))
-        motorData.loc[:,key + 'int'] = levelEstimators[key].predict(motorData[key].values.reshape(-1,1))
-        if debounce is not None:
-            motorData.loc[:,key] = debounceLine(dataLine, debounce)
-    """
-    """
     # use signal range to digitize analog trace
-    """
     for column in motorData.columns:
         #  for column in ['A','B','Z']:
         minQ = motorData[column].quantile(q=0.05)
@@ -97,12 +82,12 @@ def processMotorData(motorData, fs, invertLookup=False):
         threshold = 0.5
         motorData.loc[:, column + '_int'] = (
             motorData[column] > threshold).astype(int)
-
+    #
     transitionMask, transitionIdx = getTransitionIdx(
         motorData, edgeType='both')
     motorData['encoderState'] = 0
     motorData['count'] = 0
-
+    #
     state1Mask = np.logical_and(
         motorData['A_int'] == 1, motorData['B_int'] == 1)
     motorData.loc[state1Mask, 'encoderState'] = 1
@@ -115,7 +100,7 @@ def processMotorData(motorData, fs, invertLookup=False):
     state4Mask = np.logical_and(
         motorData['A_int'] == 0, motorData['B_int'] == 1)
     motorData.loc[state4Mask, 'encoderState'] = 4
-
+    #
     incrementLookup = {
             (1, 0): 0,
             (1, 1): 0,
@@ -138,33 +123,31 @@ def processMotorData(motorData, fs, invertLookup=False):
             (4, 3): -1,
             (4, 4): 0,
             }
-
+    #
     if invertLookup:
         for key, value in incrementLookup.items():
             incrementLookup[key] = incrementLookup[key] * (-1)
-
+    #
     statesAtTransition = motorData.loc[transitionIdx, 'encoderState'].tolist()
     transitionStatePairs = [
         (statesAtTransition[i], statesAtTransition[i-1]) for i in range(1, len(statesAtTransition))]
     count = [incrementLookup[pair] for pair in transitionStatePairs]
     #  pad with a zero to make up for the fact that the first one doesn't have a pair
     motorData.loc[transitionIdx, 'count'] = [0] + count
-    #  pdb.set_trace()
-    motorData['velocity'] = motorData['count'] / 180e2
-    motorData['position'] = motorData['velocity'].cumsum()
-
+    #
+    rawVelocity = motorData['count'] / 180e2
+    motorData['position'] = rawVelocity.cumsum()
+    #
     detectSignal = hf.filterDF(
-            motorData['velocity'], fs, filtFun='bessel',
-            lowPass=500, lowOrder=2)
-    #  motorData['velocity'] = detectSignal.values
-    
+            rawVelocity, fs, filtFun='butter',
+            lowPass=500, lowOrder=4)
+    motorData['velocity'] = detectSignal.to_numpy()
+    #
     detectSignal.iloc[:] = stats.zscore(detectSignal)
     bins = np.array([-1.5, 1.5])
     detectSignal.iloc[:] = np.digitize(detectSignal.values, bins)
     motorData['velocityCat'] = detectSignal
-    #  motorData['stateChanges'] = motorData['encoderState'].diff().abs() != 0
     #  pdb.set_trace()
-
     return motorData
 
 
@@ -385,13 +368,11 @@ def getTrials(motorData, fs, tStart, trialType='2AFC'):
         'leftBut_int': 'Left Button Onset',
         'leftLED_int': 'Left LED Onset'
         }
-    
     analyzeColumns = [
         'rightLED_int', 'leftLED_int',
         'rightBut_int', 'leftBut_int']
     for colName in analyzeColumns:
         tdSeries = motorData.loc[:, colName].astype(float)
-        
         fancyCorrection = False
         if fancyCorrection:
             correctionFactor = hf.noisyTriggerCorrection(tdSeries, fs)

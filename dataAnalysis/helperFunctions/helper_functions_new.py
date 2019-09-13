@@ -340,15 +340,15 @@ def filterDF(
         highPass=None, highOrder=2,
         notch=False, filtFun='butter',
         columns=None):
-
+    #
     passedSeries = False
     if isinstance(df, pd.Series):
         passedSeries = True
         df = pd.DataFrame(df.values, index=df.index, columns=['temp'])
         columns = ['temp']
     elif columns is None:
-            columns = df.columns
-
+        columns = df.columns
+    #
     if (lowPass is not None) and (highPass is not None):
         if notch:
             btype = 'bandstop'
@@ -364,22 +364,21 @@ def filterDF(
         btype = 'high'
         Wn = 2 * highPass / fs
         filtOrder = lowOrder
-
+    #
     if filtFun == 'butter':
-        b, a = signal.butter(
-            filtOrder, Wn=Wn, btype=btype, analog=False)
+        sos = signal.butter(
+            filtOrder, Wn=Wn, btype=btype, analog=False, output='sos')
     elif filtFun == 'bessel':
-        b, a = signal.bessel(
-            filtOrder, Wn=Wn, btype=btype, analog=False)
+        sos = signal.bessel(
+            filtOrder, Wn=Wn, btype=btype, analog=False, output='sos')
     elif filtFun == 'ellip':
-        b, a = signal.ellip(
-            filtOrder, rp=5, rs=10, Wn=Wn, btype=btype, analog=False)
-
+        sos = signal.ellip(
+            filtOrder, rp=5, rs=10, Wn=Wn, btype=btype, analog=False, output='sos')
+    #
     filteredDF = pd.DataFrame(df[columns])
-    
     for column in filteredDF.columns:
         filteredDF.loc[:, column] = (
-            signal.filtfilt(b, a, filteredDF[column]))
+            signal.sosfiltfilt(sos, filteredDF[column].to_numpy()))
     if passedSeries:
         filteredDF = filteredDF['temp']
     return filteredDF
@@ -1136,7 +1135,10 @@ def getTriggers(
         else:
             peekAhead = 25
         triggersZScore = stats.zscore(dataSeries)
-        triggersAtPeaks = triggersZScore[peakIdx + peekAhead]
+        whereToLook = peakIdx + peekAhead
+        if whereToLook[-1] > triggersZScore.size:
+            whereToLook[-1] = int(triggersZScore.size - 1)
+        triggersAtPeaks = triggersZScore[whereToLook]
         peakIdx = peakIdx[triggersAtPeaks > minAmp]
 
     # check that the # of triggers matches the number of frames

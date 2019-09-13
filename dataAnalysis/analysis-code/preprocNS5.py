@@ -10,7 +10,7 @@ Options:
     --makeTruncated                 whether to make a .nix file that only has analog inputs [default: False]
 """
 
-import dataAnalysis.preproc.ns5 as preproc
+import dataAnalysis.preproc.ns5 as ns5
 import pdb
 
 #  load options
@@ -30,7 +30,7 @@ equalChunks = False
 if arguments['makeTruncated']:
     analogInputNames = sorted(
         trialFilesFrom['utah']['eventInfo']['inputIDs'].values())
-    reader = preproc.preproc(
+    reader =ns5.preproc(
         fileName=ns5FileName,
         rawFolderPath=nspFolder,
         outputFolderPath=scratchFolder,
@@ -44,7 +44,7 @@ if arguments['makeTruncated']:
         )
 
 if arguments['makeFull']:
-    reader = preproc.preproc(
+    reader = ns5.preproc(
         fileName=ns5FileName,
         rawFolderPath=nspFolder,
         outputFolderPath=scratchFolder,

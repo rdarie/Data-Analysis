@@ -5,18 +5,22 @@ namedQueries = {
         'stimOn': "(stimCat=='stimOn')",
         'CCW': "(pedalDirection=='CCW')",
         'CW': "(pedalDirection=='CW')",
+        'noStim': "(amplitude==0)",
         'RateInHz==50or0Fuzzy': '((RateInHzFuzzy==50)|(RateInHzFuzzy==0))',
-        'RateInHz==100or0Fuzzy': '((RateInHzFuzzy==100)|(RateInHzFuzzy==0))'
+        'RateInHz==100or0Fuzzy': '((RateInHzFuzzy==100)|(RateInHzFuzzy==0))',
+        'RateInHz==50or0': '((RateInHz==50)|(RateInHz==0))',
+        'RateInHz==100or0': '((RateInHz==100)|(RateInHz==0))'
     },
     'unit': {
         'fr': "(chanName.str.endswith('fr#0'))",
         'fr_sqrt': "(chanName.str.endswith('fr_sqrt#0'))",
+        'raster': "(chanName.str.endswith('raster#0'))",
         'all': "(chanName.str.endswith('#0'))",
         'pca': "(chanName.str.contains('pca'))",
         'oech': "(chanName.str.contains('CH'))",
         'oechorsense': "((chanName.str.contains('CH'))or(chanName.str.contains('Sense')))",
         'oechorins': "((chanName.str.contains('CH'))or(chanName.str.contains('ins')))",
-        'rig': "not((chanName.str.contains('elec'))or(chanName.str.contains('pca')))"
+        'rig': "not((chanName.str.contains('elec'))or(chanName.str.contains('pca'))or(chanName.str.contains('ainp')))"
     },
     'chan': {
         'all': "(chanName.notna())",
@@ -45,14 +49,14 @@ namedQueries['align'].update({
 namedQueries['align'].update({
     'outboundWithStim100HzCCW': '&'.join([
         namedQueries['align']['pedalSizeCat>M'],
-        namedQueries['align']['RateInHz==100or0Fuzzy'],
+        namedQueries['align']['RateInHz==100or0'],
         namedQueries['align']['outbound'],
         namedQueries['align']['CCW']
         ])
     })
 namedQueries['align'].update({
     'midPeakWithStim100HzCCW': '&'.join([
-        namedQueries['align']['RateInHz==100or0Fuzzy'],
+        namedQueries['align']['RateInHz==100or0'],
         namedQueries['align']['midPeak'],
         namedQueries['align']['CCW']
         ])
@@ -60,14 +64,21 @@ namedQueries['align'].update({
 namedQueries['align'].update({
     'outboundWithStim50HzCCW': '&'.join([
         namedQueries['align']['pedalSizeCat>M'],
-        namedQueries['align']['RateInHz==50or0Fuzzy'],
+        namedQueries['align']['RateInHz==50or0'],
         namedQueries['align']['outbound'],
         namedQueries['align']['CCW']
         ])
     })
 namedQueries['align'].update({
     'midPeakWithStim50HzCCW': '&'.join([
-        namedQueries['align']['RateInHz==50or0Fuzzy'],
+        namedQueries['align']['RateInHz==50or0'],
+        namedQueries['align']['midPeak'],
+        namedQueries['align']['CCW']
+        ])
+    })
+namedQueries['align'].update({
+    'midPeakNoStimCCW': '&'.join([
+        namedQueries['align']['noStim'],
         namedQueries['align']['midPeak'],
         namedQueries['align']['CCW']
         ])
@@ -75,14 +86,14 @@ namedQueries['align'].update({
 namedQueries['align'].update({
     'outboundWithStim100HzCW': '&'.join([
         namedQueries['align']['pedalSizeCat>M'],
-        namedQueries['align']['RateInHz==100or0Fuzzy'],
+        namedQueries['align']['RateInHz==100or0'],
         namedQueries['align']['outbound'],
         namedQueries['align']['CW']
         ])
     })
 namedQueries['align'].update({
     'midPeakWithStim100HzCW': '&'.join([
-        namedQueries['align']['RateInHz==100or0Fuzzy'],
+        namedQueries['align']['RateInHz==100or0'],
         namedQueries['align']['midPeak'],
         namedQueries['align']['CW']
         ])
@@ -90,14 +101,21 @@ namedQueries['align'].update({
 namedQueries['align'].update({
     'outboundWithStim50HzCW': '&'.join([
         namedQueries['align']['pedalSizeCat>M'],
-        namedQueries['align']['RateInHz==50or0Fuzzy'],
+        namedQueries['align']['RateInHz==50or0'],
         namedQueries['align']['outbound'],
         namedQueries['align']['CW']
         ])
     })
 namedQueries['align'].update({
     'midPeakWithStim50HzCW': '&'.join([
-        namedQueries['align']['RateInHz==50or0Fuzzy'],
+        namedQueries['align']['RateInHz==50or0'],
+        namedQueries['align']['midPeak'],
+        namedQueries['align']['CW']
+        ])
+    })
+namedQueries['align'].update({
+    'midPeakNoStimCW': '&'.join([
+        namedQueries['align']['noStim'],
         namedQueries['align']['midPeak'],
         namedQueries['align']['CW']
         ])

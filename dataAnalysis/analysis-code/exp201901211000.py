@@ -106,7 +106,7 @@ def getExpOpts():
         }
     # options for stim artifact detection
     detectStim = True
-    stimDetectThresDefault = 15
+    stimDetectThresDefault = 5
     stimDetectChansDefault = ['ins_td2', 'ins_td3']
     stimDetectOverrideStartTimes = {
         1: None,

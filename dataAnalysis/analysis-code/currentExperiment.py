@@ -121,7 +121,7 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
             'jsonSessionNames': jsonSessionNames[trialIdx],
             'elecIDs': range(17),
             'excludeClus': [],
-            'upsampleRate': 8,
+            'upsampleRate': 4,
             'forceRecalc': True,
             'detectStim': expOpts['detectStim'],
             'getINSkwargs': {}
@@ -310,8 +310,7 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
             'short': (-0.5, 0.5),
             'long': (-2.25, 2.25),
             'RC': (-0.33, 0.33),
-            'miniRC': (-1, 1)
-        },
+            'miniRC': (-1, 1)},
         'discardEmpty': None, 'maxSpikesTo': None, 'timeRange': None,
         'separateByFunArgs': None,
         'alignTo': None,

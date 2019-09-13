@@ -16,12 +16,12 @@ Options:
     --selector=selector                    filename if using a unit selector
     --rowName=rowName                      break down by row  [default: pedalDirection]
     --rowControl=rowControl                rows to exclude from stats test
-    --hueName=hueName                      break down by hue  [default: amplitudeCat]
+    --hueName=hueName                      break down by hue  [default: amplitude]
     --hueControl=hueControl                hues to exclude from stats test
     --styleName=styleName                  break down by style [default: RateInHz]
     --styleControl=hueControl              styles to exclude from stats test
-    --colName=colName                      break down by col  [default: electrode]
-    --colControl=colControl                cols to exclude from stats test [default: control]
+    --colName=colName                      break down by col  [default: program]
+    --colControl=colControl                cols to exclude from stats test [default: 999]
 """
 import matplotlib
 matplotlib.rcParams['pdf.fonttype'] = 42
@@ -39,6 +39,7 @@ from currentExperiment import parseAnalysisOptions
 from docopt import docopt
 import dill as pickle
 import pandas as pd
+
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['trialIdx']), arguments['exp'])
@@ -82,12 +83,19 @@ pdfName = '{}_{}_{}_{}'.format(
     arguments['alignQuery'])
 statsTestPath = os.path.join(analysisSubFolder, pdfName + '_stats.h5')
 #  Overrides
-#  alignedAsigsKWargs.update({'decimate': 10})
-alignedAsigsKWargs.update({'windowSize': (-50e-3, 150e-3)})
+alignedAsigsKWargs.update({'decimate': 10})
+#  pdb.set_trace()
+#  alignedAsigsKWargs.update({'windowSize': (-50e-3, 150e-3)})
+alignedAsigsKWargs.update({
+    'electrodeColumn': 'electrode',
+    'removeFuzzyName': False,
+    'programColumn': 'program',
+    'amplitudeColumn': 'amplitude'
+})
 statsTestOpts.update({
-    'testStride': 10e-3,
-    'testWidth': 5e-3,
-    'tStop': 150e-3})
+    'testStride': 50e-3,
+    'testWidth': 100e-3,
+    'tStop': 2000e-3})
 #  End Overrides
 #  Get stats results
 if os.path.exists(statsTestPath):
@@ -111,11 +119,12 @@ asp.plotAsigsAligned(
     printBreakDown=True,
     enablePlots=True,
     plotProcFuns=[
-        asp.genYLabelChanger(lookupDict=openEphysChanNames, removeMatch='#0'),
+        asp.genYLabelChanger(lookupDict={}, removeMatch='#0'),
         asp.xLabelsTime,
         asp.genVLineAdder(0, vLineOpts),
         asp.genLegendRounder(decimals=2),
-        asp.genXLimSetter(alignedAsigsKWargs['windowSize'])],
+        # asp.genXLimSetter(alignedAsigsKWargs['windowSize'])
+        ],
     pdfName=pdfName,
     **rowColOpts,
     relplotKWArgs=relplotKWArgs)

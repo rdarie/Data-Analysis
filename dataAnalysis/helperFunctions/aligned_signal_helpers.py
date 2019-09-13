@@ -261,7 +261,7 @@ def compareMeansGrouped(
         pThresh=1e-3,
         correctMultiple=True,
         plotting=False):
-    
+
     if tStart is None:
         tStart = asigWide.columns[0]
     if tStop is None:
@@ -274,7 +274,7 @@ def compareMeansGrouped(
 
     if (isinstance(testVar, list)) and (len(testVar) == 1):
         testVar = testVar[0]
-    
+    # pdb.set_trace()
     if isinstance(groupBy, str):
         testIndex = pd.Index(
             asigWide.groupby(by=groupBy).groups.keys())
@@ -297,10 +297,13 @@ def compareMeansGrouped(
         columns=testBins)
     statVals.columns.name = 'bin'
     for testBin in testBins:
+        #  try:
         tMask = (
             (asigWide.columns > testBin - testWidth / 2) &
             (asigWide.columns < testBin + testWidth / 2)
             )
+        #  except Exception:
+        #      pdb.set_trace()
         testAsig = asigWide.loc[:, tMask]
         if groupBy is not None:
             groupIter = testAsig.groupby(groupBy)
@@ -492,14 +495,13 @@ def facetGridCompareMeans(
                 break
     allPValsWide = pd.concat(allPVals, names=['unit'] + pVals.index.names)
     if correctMultiple:
-        flatPvals = allPValsWide.stack()
+        origShape = allPValsWide.shape
+        flatPvals = allPValsWide.to_numpy().reshape(-1)
         try:
-            _, fixedPvals, _, _ = mt(flatPvals.values, method='holm')
+            _, fixedPvals, _, _ = mt(flatPvals, method='holm')
         except Exception:
-            fixedPvals = flatPvals.values / flatPvals.size
-        flatPvals.loc[:] = fixedPvals
-        flatPvals = flatPvals.unstack('bin')
-        allPValsWide.loc[flatPvals.index, flatPvals.columns] = flatPvals
+            fixedPvals = flatPvals * flatPvals.size
+        allPValsWide.iloc[:, :] = fixedPvals.reshape(origShape)
         allSigValsWide = allPValsWide < statsTestOpts['pThresh']
     allPValsWide.to_hdf(statsTestPath, 'p', format='table')
     allStatValsWide = pd.concat(allStatVals, names=['unit'] + statVals.index.names)

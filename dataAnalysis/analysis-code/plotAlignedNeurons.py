@@ -57,7 +57,7 @@ if not os.path.exists(analysisSubFolder):
     os.makedirs(analysisSubFolder, exist_ok=True)
 rowColOpts = asp.processRowColArguments(arguments)
 colorPal = "ch:0.6,-.2,dark=.2,light=0.7,reverse=1"  #  for firing rates
-
+#
 alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **arguments)
 alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
     namedQueries, analysisSubFolder, **arguments)
@@ -65,7 +65,7 @@ alignedAsigsKWargs.update(dict(
     duplicateControlsByProgram=True,
     makeControlProgram=True,
     metaDataToCategories=False, removeFuzzyName=True))
-
+#
 if arguments['processAll']:
     prefix = experimentName
 else:

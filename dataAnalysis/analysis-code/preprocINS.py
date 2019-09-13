@@ -26,6 +26,25 @@ expOpts, allOpts = parseAnalysisOptions(
 globals().update(expOpts)
 globals().update(allOpts)
 
-insBlock = preprocINS.preprocINS(
-    trialFilesStim['ins'],
-    insDataPath, plottingFigures=arguments['showPlots'])
+import line_profiler
+import atexit
+#profile = line_profiler.LineProfiler()
+#atexit.register(profile.print_stats)
+
+#@profile
+def preprocINSWrapper(
+        trialFilesStim=None,
+        insDataPath=None,
+        arguments=None
+        ):
+    insBlock = preprocINS.preprocINS(
+        trialFilesStim['ins'],
+        insDataPath, plottingFigures=arguments['showPlots'])
+    return
+
+
+if __name__ == "__main__":
+    preprocINSWrapper(
+        trialFilesStim=trialFilesStim,
+        insDataPath=insDataPath,
+        arguments=arguments)

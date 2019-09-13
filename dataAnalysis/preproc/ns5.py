@@ -424,6 +424,11 @@ def unitSpikeTrainWaveformsToDF(
                 )
             annDF = pd.DataFrame(annDict)
             for k, value in st.annotations.items():
+                if isinstance(getMetaData, Iterable):
+                    # if selecting metadata fields, check that
+                    # the key is in the provided list
+                    if k not in getMetaData:
+                        continue
                 if k not in skipAnnNames:
                     annDF.loc[:, k] = value
             #
@@ -528,7 +533,7 @@ def concatenateUnitSpikeTrainWaveformsDF(
     #  ignoreIndex = (concatOn == 'index')
     allWaveforms = pd.concat(
         waveformsList, axis=concatOn,
-        #ignore_index=ignoreIndex
+        # ignore_index=ignoreIndex
         )
     del waveformsList
     if verbose:
@@ -536,6 +541,7 @@ def concatenateUnitSpikeTrainWaveformsDF(
             'finished concatenating, memory usage: {:.1f} MB'
             .format(prf.memory_usage_psutil()))
     allWaveforms.set_index(idxLabels, inplace=True)
+    allWaveforms.sort_index(level=['segment', 'originalIndex', 't'], inplace=True, kind='mergesort')
     return allWaveforms
 
 
@@ -551,15 +557,12 @@ def alignedAsigsToDF(
         decimate=1, whichSegments=None, windowSize=None,
         getMetaData=True, metaDataToCategories=True,
         makeControlProgram=False, removeFuzzyName=False, procFun=None):
-    
     #  channels to trigger
     if unitNames is None:
         unitNames = listChanNames(dataBlock, unitQuery, objType=Unit)
-    
     allUnits = []
     for uName in unitNames:
         allUnits += dataBlock.filter(objects=Unit, name=uName)
-    
     allWaveforms = concatenateUnitSpikeTrainWaveformsDF(
         allUnits, dataQuery=dataQuery,
         transposeToColumns=transposeToColumns, concatOn=concatOn,
@@ -567,7 +570,7 @@ def alignedAsigsToDF(
         verbose=verbose, decimate=decimate, whichSegments=whichSegments,
         windowSize=windowSize, procFun=procFun,
         getMetaData=getMetaData, metaDataToCategories=metaDataToCategories)
-
+    #
     manipulateIndex = np.any(
         [
             collapseSizes, duplicateControlsByProgram,
@@ -576,7 +579,6 @@ def alignedAsigsToDF(
     if manipulateIndex and getMetaData:
         idxLabels = allWaveforms.index.names
         allWaveforms.reset_index(inplace=True)
-
         if collapseSizes:
             try:
                 allWaveforms.loc[allWaveforms['pedalSizeCat'] == 'XL', 'pedalSizeCat'] = 'L'
@@ -589,9 +591,8 @@ def alignedAsigsToDF(
                 allWaveforms.loc[allWaveforms[amplitudeColumn] == 0, electrodeColumn] = 'control'
             except Exception:
                 traceback.print_exc()
-
         if duplicateControlsByProgram:
-            # pdb.set_trace()
+            #
             noStimWaveforms = (
                 allWaveforms
                 .loc[allWaveforms[amplitudeColumn] == 0, :]
@@ -609,11 +610,11 @@ def alignedAsigsToDF(
                     electrodeColumn]
                 elecIdx = theseStimDF.iloc[0]
                 progElecLookup.update({progIdx: elecIdx})
-
+            #
             if makeControlProgram:
                 uniqProgs = np.append(uniqProgs, 999)
                 progElecLookup.update({999: 'control'})
-
+            #
             for progIdx in uniqProgs:
                 dummyWaveforms = noStimWaveforms.copy()
                 dummyWaveforms.loc[:, programColumn] = progIdx
@@ -621,7 +622,7 @@ def alignedAsigsToDF(
                 stimWaveforms = pd.concat([stimWaveforms, dummyWaveforms])
             stimWaveforms.reset_index(drop=True, inplace=True)
             allWaveforms = stimWaveforms
-
+        #
         if removeFuzzyName:
             fuzzyNamesBase = [
                 i.replace('Fuzzy', '')
@@ -636,11 +637,10 @@ def alignedAsigsToDF(
             allWaveforms.rename(columns=colRenamer, inplace=True)
             idxLabels = np.unique(
                 [i.replace('Fuzzy', '') for i in idxLabels])
-
+        #
         allWaveforms.set_index(
             list(idxLabels),
             inplace=True)
-    
     if transposeToColumns == 'feature':
         zipNames = zip(allWaveforms.columns.to_list(), unitNames)
         try:
@@ -648,6 +648,7 @@ def alignedAsigsToDF(
         except Exception:
             #
             allWaveforms.reindex(columns=unitNames)
+    #allWaveforms.sort_index(level=['segment', 'originalIndex', 't'], inplace=True, kind='mergesort')
     return allWaveforms
 
 
@@ -689,8 +690,12 @@ def getAsigsAlignedToEvents(
         #
         signalSeg = signalBlock.segments[segIdx]
         thisEventName = 'seg{}_{}'.format(segIdx, eventName)
-        # pdb.set_trace()
-        assert len(eventSeg.filter(name=thisEventName)) == 1
+        #
+        try:
+            assert len(eventSeg.filter(name=thisEventName)) == 1
+        except Exception:
+            traceback.print_exc()
+            pdb.set_trace()
         allEvIn = eventSeg.filter(name=thisEventName)[0]
         if isinstance(allEvIn, EventProxy):
             allAlignEvents = loadObjArrayAnn(allEvIn.load())

@@ -23,9 +23,8 @@
 EXP="exp201901271000"
 # EXP="exp201901201200"
 # ESTIMATOR="201901211000-Proprio_pca_long_midPeak"
-ESTIMATOR="201901271000-Proprio_pca_long_midPeak"
-# ESTIMATOR="201901201200-Proprio_pca_long_midPeak"
+# ESTIMATOR="201901271000-Proprio_pca_long_midPeak"
+ESTIMATOR="201901271000-Proprio_tdrAcr_long_midPeak"
 
 #  python3 './applyEstimatorToAsig.py' --exp=$EXP --processAll --estimator=$ESTIMATOR
-#  python3 './applyEstimatorToTriggered.py' --exp=$EXP --processAll --window=long --alignQuery=midPeak --estimator=$ESTIMATOR --lazy --verbose
-python3 './plotAlignedAsigs.py' --exp=$EXP --processAll --window=long --alignQuery=midPeakWithStim --rowName=pedalSizeCat --verbose
+python3 './applyEstimatorToTriggered.py' --exp=$EXP --processAll --window="long" --alignQuery="midPeak" --estimator=$ESTIMATOR --lazy --profile --verbose

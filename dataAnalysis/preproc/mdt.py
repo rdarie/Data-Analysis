@@ -167,13 +167,13 @@ def getINSTDFromJson(
                     i for i in tdData.columns if 'channel_' in i]
                 channelsPresent += [
                     'time_master', 'microseconds']
-
                 #  convert to floats before interpolating
                 tdData['microseconds'] = tdData['microseconds'] / (
                     datetime.timedelta(microseconds=1))
                 tdData['time_master'] = (
                     tdData['time_master'] - pd.Timestamp('2000-03-01')) / (
                     datetime.timedelta(seconds=1))
+                # pdb.set_trace()
                 tdData = hf.interpolateDF(
                     tdData, uniformT, x='t', kind='cubic',
                     columns=channelsPresent, fill_value=(0, 0))
@@ -952,27 +952,11 @@ def getINSStimLogFromJson(
         jsonPath = os.path.join(folderPath, sessionName, deviceName)
         with open(os.path.join(jsonPath, 'StimLog.json'), 'r') as f:
             stimLog = json.load(f)
-        # progAmpNames = rcsa_helpers.progAmpNames
-        # stripProgName = rcsa_helpers.strip_prog_name
         if logForm == 'serial':
             stimStatus = rcsa_helpers.extract_stim_meta_data_events(
                 stimLog, trialSegment=idx)
-        # elif logForm == 'long':
-        #     stimStatus = rcsa_helpers.extract_stim_meta_data(stimLog)
-        #     stimStatus['activeProgram'] = stimStatus.loc[
-        #         :, progAmpNames].idxmax(axis=1).apply(stripProgName)
-        #     stimStatus['maxAmp'] = stimStatus.loc[:, progAmpNames].max(axis=1)
-        #     stimStatus['trialSegment'] = idx
         allStimStatus.append(stimStatus)
     allStimStatusDF = pd.concat(allStimStatus, ignore_index=True)
-    #  if all we're doing is turn something off, don't consider it a new round
-    
-    # if logForm == 'long':
-    #     ampPositive = allStimStatusDF['maxAmp'].diff().fillna(0) >= 0
-    #     allStimStatusDF['amplitudeIncrease'] = (
-    #         allStimStatusDF['amplitudeChange'] & ampPositive)
-    #     allStimStatusDF['amplitudeRound'] = allStimStatusDF[
-    #         'amplitudeIncrease'].astype(np.float).cumsum()
     return allStimStatusDF
 
 
@@ -1705,9 +1689,10 @@ def getINSStimOnset(
             theseDetectOpts['detectChannels'] + ['t']
             ])
         # use the HUT derived stim onset to favor detection
-        #minROIWid = 150e-3 # StimLog timestamps only reliable within 50 msec
+        # minROIWid = 150e-3 # StimLog timestamps only reliable within 50 msec
         gaussWidIdx = int(gaussWid * fs)
-        nominalStimOnIdx = group.index[0]
+        nominalStimOnIdx = group.loc[groupAmpMask, 't'].index[0]
+        # pdb.set_trace()
         nominalStimOnT = tdSeg.loc[nominalStimOnIdx, 't']
         # 
         lastAmplitude = tdDF.loc[max(nominalStimOnIdx - 1, 0), ampColName]

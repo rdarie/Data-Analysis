@@ -96,7 +96,7 @@ def getExpOpts():
         }
     # options for stim artifact detection
     detectStim = True
-    stimDetectThresDefault = 15
+    stimDetectThresDefault = 5
     stimDetectChansDefault = ['ins_td2', 'ins_td3']
     #
     stimDetectOverrideStartTimes = {
@@ -113,13 +113,14 @@ def getExpOpts():
             3: {'detectChannels': stimDetectChansDefault, 'thres': stimDetectThresDefault}
         }
     }
-
+    #
     triFolderSourceBase = os.path.join(
         '201901211000-Proprio', 'tdc_Trial001')
     triDestinations = [
         'Trial00{}'.format(trialIdx)
         for trialIdx in [1, 2]]
-    
+    #
+    movementSizeBins = [0, 0.25, 0.5, 1, 1.25, 1.5]
     alignTimeBoundsLookup = {
         #  each key is a trial
         1: [
@@ -132,5 +133,4 @@ def getExpOpts():
             [2475, 2495]
             ],
         }
-    gpfaRunIdx = 1
     return locals()

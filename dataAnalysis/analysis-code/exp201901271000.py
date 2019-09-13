@@ -102,7 +102,8 @@ def getExpOpts():
             0: {'timeRanges': [145, 148], 'keepIndex': slice(None)}
             }
         }
-
+    #  if not possible to use taps, override with good taps from another segment
+    #  not ideal, because segments are only synchronized to the nearest **second**
     overrideSegmentsForTapSync = {
         #  each key is a trial
         1: {},
@@ -111,7 +112,7 @@ def getExpOpts():
         4: {},
         5: {}
         }
-    
+    # options for stim artifact detection
     detectStim = True
     stimDetectThresDefault = 4
     stimDetectChansDefault = ['ins_td0', 'ins_td2']

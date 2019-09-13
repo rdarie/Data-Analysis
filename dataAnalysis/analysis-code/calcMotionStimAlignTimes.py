@@ -9,6 +9,16 @@ Options:
     --processAll                         process entire experimental day? [default: False]
     --plotParamHistograms                plot pedal size, amplitude, duration distributions? [default: False]
 """
+import matplotlib
+matplotlib.rcParams['pdf.fonttype'] = 42
+matplotlib.rcParams['ps.fonttype'] = 42
+matplotlib.use('PS')   # generate postscript output by default
+import matplotlib.pyplot as plt
+import seaborn as sns
+sns.set()
+sns.set_color_codes("dark")
+sns.set_context("talk")
+sns.set_style("whitegrid")
 import os, pdb, traceback
 from importlib import reload
 import neo
@@ -18,15 +28,13 @@ from neo import (
 from neo.io.proxyobjects import (
     AnalogSignalProxy, SpikeTrainProxy, EventProxy) 
 import quantities as pq
-import dataAnalysis.helperFunctions.kilosort_analysis as ksa
-import dataAnalysis.helperFunctions.helper_functions as hf
+import dataAnalysis.helperFunctions.kilosort_analysis_new as ksa
+import dataAnalysis.helperFunctions.helper_functions_new as hf
 import rcsanalysis.packet_func as rcsa_helpers
 import dataAnalysis.preproc.ns5 as preproc
 import dataAnalysis.preproc.mdt as preprocINS
 import numpy as np
 import pandas as pd
-import seaborn as sns
-import matplotlib.pyplot as plt
 from collections import Iterable
 
 #  load options
@@ -80,7 +88,7 @@ signalsInAsig = [
 
 progAmpNames = rcsa_helpers.progAmpNames
 expandCols = [
-    'RateInHz', 'movement', 'program', 'trialSegment']
+    'RateInHz', 'movement', 'program', 'activeGroup', 'trialSegment']
 deriveCols = ['amplitude', 'amplitudeCat']
 columnsToBeAdded = (
     expandCols + deriveCols + progAmpNames)
@@ -138,7 +146,7 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         dataSegEvents, idxT='t',
         names=['property', 'value']
         )
-    stimStatus = hf.stimStatusSerialtoLong(
+    stimStatus = preprocINS.stimStatusSerialtoLong(
         eventDF, idxT='t', namePrefix='', expandCols=expandCols,
         deriveCols=deriveCols, progAmpNames=progAmpNames)
     infoFromStimStatus = hf.interpolateDF(

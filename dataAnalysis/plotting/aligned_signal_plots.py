@@ -161,6 +161,7 @@ def plotNeuronsAligned(
                         addSignificanceStars(
                             g, sigTestResults.query("unit == '{}'".format(continuousName)),
                             ro, co, hu, dataSubset)
+                plt.suptitle(unitName)
                 pdf.savefig()
                 plt.close()
             if limitPages is not None:

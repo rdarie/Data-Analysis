@@ -9,7 +9,7 @@
 # Use more memory (32GB):
 #SBATCH --nodes=1
 #SBATCH --mem=96G
-#SBATCH --array=4
+#SBATCH --array=1,2
 
 # Specify a job name:
 #SBATCH -J analysis_calc
@@ -21,11 +21,11 @@
 # Specify account details
 #SBATCH --account=bibs-dborton-condo
 
-# EXP="exp201901201200"
+EXP="exp201901201200"
 # EXP="exp201901211000"
-EXP="exp201901271000"
+# EXP="exp201901271000"
 
-# python3 ./calcTrialAnalysisNix.py --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID --chanQuery="all"
-# python3 ./calcMotionStimAlignTimes.py --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID --plotParamHistograms
-# python3 ./calcFR.py --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID
+python3 ./calcTrialAnalysisNix.py --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID --chanQuery="all"
+python3 ./calcFR.py --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID
 python3 ./calcFRsqrt.py --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID
+python3 ./calcMotionStimAlignTimes.py --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID --plotParamHistograms

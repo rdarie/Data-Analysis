@@ -51,6 +51,6 @@ EXP="exp201901070700"
 # python3 ./calcRecruitment.py --exp=$EXP --processAll --window="RC" --lazy --analysisName="shortGaussian" --inputBlockName="RC" --unitQuery="oechorins" --alignQuery="stimOnLowRate" --rowName= --colName="electrode" --colControl="control" --styleName= --hueName="amplitude" --verbose
 # python3 ./plotRecruitment.py --exp=$EXP --processAll --window="RC" --lazy --analysisName="shortGaussian" --inputBlockName="RC" --unitQuery="oechorins" --alignQuery="stimOnLowRate" --rowName= --colName="electrode" --colControl="control" --styleName= --hueName="amplitude" --verbose
 #
-python3 ./calcUnitCorrelationToAsig.py --exp=$EXP --processAll --window="RC" --lazy --analysisName="shortGaussian" --inputBlockName="fr" --secondaryBlockName="RC" --alignQuery="stimOnLowRate" --unitQuery="fr" --verbose
+# python3 ./calcUnitCorrelationToAsig.py --exp=$EXP --processAll --window="RC" --lazy --analysisName="shortGaussian" --inputBlockName="fr" --secondaryBlockName="RC" --alignQuery="stimOnLowRate" --unitQuery="fr" --verbose
 python3 ./plotMatrixOfScalars.py --exp=$EXP --resultName="emgMaxCrossCorr" --processAll --window="RC" --analysisName="shortGaussian" --inputBlockName="fr" --secondaryBlockName="RC" --verbose
 python3 ./plotMatrixOfScalars.py --exp=$EXP --resultName="emgMaxCrossCorrLag" --processAll --window="RC" --analysisName="shortGaussian" --inputBlockName="fr" --secondaryBlockName="RC" --verbose

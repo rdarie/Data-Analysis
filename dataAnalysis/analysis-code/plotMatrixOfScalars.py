@@ -16,8 +16,8 @@ Options:
 import matplotlib
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
-#matplotlib.use('PS')   # generate postscript output
-matplotlib.use('Qt5Agg')   # generate interactive output
+matplotlib.use('PS')   # generate postscript output
+# matplotlib.use('Qt5Agg')   # generate interactive output
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.colors import ListedColormap
 import matplotlib.pyplot as plt
@@ -79,7 +79,7 @@ if plotDist:
     plt.show()
 dataFlat = np.ravel(plotDF)
 vMin, vMax = np.quantile(dataFlat, [0.05, 0.95])
-pdb.set_trace()
+# pdb.set_trace()
 with PdfPages(pdfPath) as pdf:
     f, ax = plt.subplots()
     w = 4 # size in inches
