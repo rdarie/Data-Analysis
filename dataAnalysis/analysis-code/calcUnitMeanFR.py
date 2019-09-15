@@ -14,6 +14,7 @@ Options:
     --alignQuery=alignQuery                query what the units will be aligned to? [default: midPeak]
     --selector=selector                    filename if using a unit selector
     --resultName=resultName                filename for result [default: meanFR]
+    --analysisName=analysisName            append a name to the resulting blocks? [default: default]
 """
 
 import pdb
@@ -29,16 +30,22 @@ expOpts, allOpts = parseAnalysisOptions(
 globals().update(expOpts)
 globals().update(allOpts)
 
+analysisSubFolder = os.path.join(
+    scratchFolder, arguments['analysisName']
+    )
+if not os.path.exists(analysisSubFolder):
+    os.makedirs(analysisSubFolder, exist_ok=True)
+#
 if arguments['processAll']:
     prefix = experimentName
 else:
     prefix = ns5FileName
 triggeredPath = os.path.join(
-    scratchFolder,
+    analysisSubFolder,
     prefix + '_{}_{}.nix'.format(
         arguments['inputBlockName'], arguments['window']))
 resultPath = os.path.join(
-    scratchFolder,
+    analysisSubFolder,
     prefix + '_{}_{}_calc.h5'.format(
         arguments['inputBlockName'], arguments['window']))
 #

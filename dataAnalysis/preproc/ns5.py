@@ -480,24 +480,36 @@ def unitSpikeTrainWaveformsToDF(
             laggedWaveformsDict[
                 (spikeTrainContainer.name, lag)] = (
                     shiftedWaveform.iloc[:, ::decimate])
-    waveformsDF = pd.concat(
-        laggedWaveformsDict,
-        names=['feature', 'lag', 'originalDummy']).reset_index()
-    waveformsDF = pd.concat(
-        [
-            metaDF.reset_index(drop=True),
-            waveformsDF.drop(columns='originalDummy')],
-        axis='columns')
     #
     if transposeToColumns == 'feature':
         # stack the bin, name the feature column
-        waveformsDF.set_index(sorted(idxLabels + ['feature', 'lag']), inplace=True)
-        waveformsDF = waveformsDF.stack(level='bin').unstack(level=['feature', 'lag'])
-        idxLabels.append('bin')
+        # pdb.set_trace()
+        for idx, (key, value) in enumerate(laggedWaveformsDict.items()):
+            if idx == 0:
+                stackedIndexDF = pd.concat(
+                    [metaDF, value], axis='columns')
+                stackedIndexDF.set_index(idxLabels, inplace=True)
+                # don't drop nans for now - might need to keep track of them
+                # if we need to equalize to another array later
+                newIndex = stackedIndexDF.stack(dropna=False).index
+                idxLabels.append('bin')
+            laggedWaveformsDict[key] = value.stack(dropna=False).to_frame(name=key).reset_index(drop=True)
+        waveformsDF = pd.concat(
+            laggedWaveformsDict.values(),
+            axis='columns')
+        waveformsDF.columns.names = ['feature', 'lag']
+        waveformsDF.index = newIndex
         waveformsDF.columns.name = 'feature'
     elif transposeToColumns == 'bin':
         # add the feature column
-        waveformsDF.loc[:, 'feature'] = spikeTrainContainer.name
+        waveformsDF = pd.concat(
+            laggedWaveformsDict,
+            names=['feature', 'lag', 'originalDummy']).reset_index()
+        waveformsDF = pd.concat(
+            [
+                metaDF.reset_index(drop=True),
+                waveformsDF.drop(columns='originalDummy')],
+            axis='columns')
         idxLabels += ['feature', 'lag']
         waveformsDF.columns.name = 'bin'
         waveformsDF.set_index(idxLabels, inplace=True)
@@ -535,8 +547,8 @@ def concatenateUnitSpikeTrainWaveformsDF(
             print('concatenating unitDF {}'.format(thisUnit.name))
         lags = None
         if addLags is not None:
-            if thisUnit in addLags:
-                lags = addLags[thisUnit]
+            if thisUnit.name in addLags:
+                lags = addLags[thisUnit.name]
         unitWaveforms = unitSpikeTrainWaveformsToDF(
             thisUnit, dataQuery=dataQuery,
             transposeToColumns=transposeToColumns,
@@ -580,7 +592,11 @@ def concatenateUnitSpikeTrainWaveformsDF(
             'finished concatenating, memory usage: {:.1f} MB'
             .format(prf.memory_usage_psutil()))
     allWaveforms.set_index(idxLabels, inplace=True)
-    allWaveforms.sort_index(level=['segment', 'originalIndex', 't'], inplace=True, kind='mergesort')
+    allWaveforms.sort_index(
+        level=['segment', 'originalIndex', 't'],
+        axis='index', inplace=True, kind='mergesort')
+    allWaveforms.sort_index(
+        axis='columns', inplace=True, kind='mergesort')
     return allWaveforms
 
 
@@ -620,7 +636,7 @@ def alignedAsigsToDF(
     if manipulateIndex and getMetaData:
         idxLabels = allWaveforms.index.names
         allWaveforms.reset_index(inplace=True)
-        pdb.set_trace()
+        # pdb.set_trace()
         if collapseSizes:
             try:
                 allWaveforms.loc[allWaveforms['pedalSizeCat'] == 'XL', 'pedalSizeCat'] = 'L'
@@ -683,14 +699,17 @@ def alignedAsigsToDF(
         allWaveforms.set_index(
             list(idxLabels),
             inplace=True)
+        allWaveforms.columns = allWaveforms.columns.remove_unused_levels()
     if transposeToColumns == 'feature':
-        zipNames = zip(allWaveforms.columns.get_level_values('feature').to_list(), unitNames)
+        zipNames = zip(pd.unique(allWaveforms.columns.get_level_values('feature')).tolist(), unitNames)
         try:
             assert np.all([i == j for i, j in zipNames]), 'columns out of requested order!'
         except Exception:
+            pdb.set_trace()
             traceback.print_exc()
             allWaveforms.reindex(columns=unitNames)
-    # allWaveforms.sort_index(level=['segment', 'originalIndex', 't'], inplace=True, kind='mergesort')
+    allWaveforms.sort_index(
+        axis='columns', inplace=True, kind='mergesort')
     return allWaveforms
 
 

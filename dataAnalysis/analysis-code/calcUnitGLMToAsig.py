@@ -82,7 +82,8 @@ def calcUnitRegressionToAsig():
     estimatorPath = os.path.join(
         analysisSubFolder,
         fullEstimatorName + '.joblib')
-
+    rollingWindow = 10
+    spkConversionFactor = 100
     alignedAsigsKWargs.update(dict(
         duplicateControlsByProgram=False,
         makeControlProgram=False,
@@ -102,65 +103,102 @@ def calcUnitRegressionToAsig():
     alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
         namedQueries, scratchFolder, **arguments)
     #
-    dataReader, dataBlock = ns5.blockFromPath(
-        triggeredPath, lazy=arguments['lazy'])
     regressorReader, regressorBlock = ns5.blockFromPath(
         regressorPath, lazy=arguments['lazy'])
     #
+    addLags = {
+        'position#0': [0, 25, 50],
+        'velocity#0': [0, 25, 50],
+        'program0_amplitude#0': [0, 50],
+        'program1_amplitude#0': [0, 50],
+        'program2_amplitude#0': [0, 50],
+        'program3_amplitude#0': [0, 50]
+        }
+    unitNames = sorted([
+        'position#0', 'velocity#0',
+        'program0_amplitude#0', 'program1_amplitude#0',
+        'program2_amplitude#0', 'program3_amplitude#0'])
+    featureLoadArgs = alignedAsigsKWargs.copy()
+    featureLoadArgs['unitNames'] = unitNames
+    featureLoadArgs['unitQuery'] = None
+    featureLoadArgs['addLags'] = addLags
+    featureLoadArgs['rollingWindow'] = rollingWindow
+    featuresDF = ns5.alignedAsigsToDF(
+        regressorBlock, **featureLoadArgs)
+    #
+    dataReader, dataBlock = ns5.blockFromPath(
+        triggeredPath, lazy=arguments['lazy'])
+    #
     targetLoadArgs = alignedAsigsKWargs.copy()
+    targetLoadArgs['rollingWindow'] = rollingWindow
     #
     targetDF = ns5.alignedAsigsToDF(
         dataBlock,
         **targetLoadArgs)
     #
-    featureLoadArgs = alignedAsigsKWargs.copy()
-    addLags = {
-        'position#0': [5],
-        'velocity#0': [5],
-        'program0_amplitude#0': [5],
-        'program1_amplitude#0': [5],
-        'program2_amplitude#0': [5],
-        'program3_amplitude#0': [5]
-        }
-    unitNames = ['position#0', 'program0_amplitude#0', 'program1_amplitude#0', 'program2_amplitude#0', 'program3_amplitude#0', 'velocity#0']
-    featureLoadArgs['unitNames'] = unitNames
-    featureLoadArgs['unitQuery'] = None
-    featureLoadArgs['addLags'] = addLags
-    featureLoadArgs['rollingWindow'] = 10
-    featuresDF = ns5.alignedAsigsToDF(
-        regressorBlock, **featureLoadArgs)
-    # posBinResolution = 0.025 # *100 in degrees
-    # nPosBins = int(np.ceil((featuresDF['position#0'].max() - featuresDF['position#0'].min()) / posBinResolution))
-    # 
-    # featuresDF['positionBin'] = pd.cut(featuresDF['position#0'], bins=nPosBins, labels=False).to_numpy()
-    # targetDF['positionBin'] = featuresDF['positionBin'].to_numpy()
+    dropIndex = featuresDF.index[featuresDF.isna().T.any()]
+    targetDF.drop(index=dropIndex, inplace=True)
+    featuresDF.drop(index=dropIndex, inplace=True)
+    #
     featuresDF['positionBin'] = 0
     targetDF['positionBin'] = 0
     featuresDF.set_index('positionBin', drop=True, append=True, inplace=True)
+    featuresDF.columns = featuresDF.columns.remove_unused_levels()
     targetDF.set_index('positionBin', drop=True, append=True, inplace=True)
+    targetDF.columns = targetDF.columns.remove_unused_levels()
     #
-    metaDF = featuresDF.index.to_frame().reset_index(drop=True)
+    metaData = featuresDF.index.copy()
     # # independent model
     # for pNum in range(4):
     #     featuresDF['program{}_RateInHz#0'.format(pNum)] = metaDF['RateInHz'].to_numpy() * (featuresDF['program{}_amplitude#0'.format(pNum)] ** 0)
     # featuresDF['accel#0'] = featuresDF['velocity#0'].diff().fillna(0).to_numpy()
     # ACR model
-    for pNum in range(4):
-        featuresDF['program{}_ACR#0'.format(pNum)] = (
-            metaDF['RateInHz'].to_numpy() *
-            (featuresDF['program{}_amplitude#0'.format(pNum)])
-            )
-    featuresDF['position_x#0'] = np.cos(featuresDF['position#0'] * 100 * 2 * np.pi / 360)
-    featuresDF['position_y#0'] = np.sin(featuresDF['position#0'] * 100 * 2 * np.pi / 360)
-    featuresDF['velocity_x#0'] = featuresDF['position_y#0'] * (-1) * (featuresDF['velocity#0'] * 3e2)
-    featuresDF['velocity_y#0'] = featuresDF['position_x#0'] * (featuresDF['velocity#0'] * 3e2)
-    # pdb.set_trace()
-    featuresDF.drop(
-        columns=[
-            'program{}_amplitude#0'.format(pNum)
-            for pNum in range(4)] + ['position#0', 'velocity#0'],
-        inplace=True)
-    featuresDF.sort_index(axis='columns', kind='mergesort', inplace=True)
+    progAmpNames = ['program{}_amplitude#0'.format(pNum) for pNum in range(4)]
+    dropColumns = []
+    featuresDF.reset_index(inplace=True, drop=True)
+    try:
+        for name in featuresDF.columns:
+            featureName = name[0]
+            lag = name[1]
+            if featureName in progAmpNames:
+                acrName = featureName.replace('amplitude', 'ACR')
+                featuresDF.loc[:, (acrName, lag)] = (
+                    metaData.get_level_values('RateInHz').to_numpy() *
+                    (featuresDF.loc[:, name])
+                    )
+                dropColumns.append(name)
+            elif featureName == 'position#0':
+                featuresDF.loc[:, ('position_x#0', lag)] = (
+                    np.cos(
+                        featuresDF.loc[:, (slice('position#0'), slice(lag))] *
+                        100 * 2 * np.pi / 360))
+                featuresDF.sort_index(axis='columns', inplace=True)
+                featuresDF.loc[:, ('position_y#0', lag)] = (
+                    np.sin(
+                        featuresDF.loc[:, (slice('position#0'), slice(lag))] *
+                        100 * 2 * np.pi / 360))
+                featuresDF.sort_index(axis='columns', inplace=True)
+                dropColumns.append(name)
+        for name in featuresDF.columns:
+            featureName = name[0]
+            lag = name[1]
+            if featureName == 'velocity#0':
+                featuresDF.loc[:, ('velocity_x#0', lag)] = (
+                    featuresDF.loc[:, (slice('position_y#0'), slice(lag))] *
+                    (-1) *
+                    (featuresDF.loc[:, (slice('velocity#0'), slice(lag))] * 3e2))
+                featuresDF.sort_index(axis='columns', inplace=True)
+                featuresDF.loc[:, ('velocity_y#0', lag)] = (
+                    featuresDF.loc[:, (slice('position_x#0'), slice(lag))] *
+                    (featuresDF.loc[:, (slice('velocity#0'), slice(lag))] * 3e2))
+                featuresDF.sort_index(axis='columns', inplace=True)
+                dropColumns.append(name)
+    except Exception:
+        traceback.print_exc()
+        pdb.set_trace()
+    featuresDF.drop(columns=dropColumns, inplace=True)
+    featuresDF.columns = featuresDF.columns.remove_unused_levels()
+    featuresDF.index = metaData
     featureScalers = [
         (MinMaxScaler(), ['position_x#0', 'position_y#0']),
         (MinMaxScaler(), ['velocity_x#0', 'velocity_y#0']),
@@ -169,17 +207,6 @@ def calcUnitRegressionToAsig():
     targetScalers = []
     # import warnings
     # warnings.filterwarnings('error')
-    #
-    addLags = {
-        'position_x#0': [5],
-        'position_y#0': [5],
-        'velocity_x#0': [5],
-        'velocity_y#0': [5],
-        'program0_ACR#0': [5],
-        'program1_ACR#0': [5],
-        'program2_ACR#0': [5],
-        'program3_ACR#0': [5]
-        }
     # pdb.set_trace()
     nPCAComponents = 12
     conditionNames = [
@@ -187,11 +214,11 @@ def calcUnitRegressionToAsig():
         'pedalVelocityCat', 'positionBin']
     #
     addInterceptToTDR = True
-    decimateTDR = 5
+    decimateTDR = 1
     rollingWindow = 10
     tdr = TargetedDimensionalityReduction(
         featuresDF=featuresDF,
-        targetDF=pd.DataFrame(targetDF, dtype=np.int),
+        targetDF=pd.DataFrame(targetDF / spkConversionFactor, dtype=np.int),
         model=sm.GLM,
         modelKWargs={'family': sm.families.Poisson()},
         featureScalers=featureScalers, targetScalers=targetScalers,

@@ -10,6 +10,7 @@ Options:
     --verbose                              print diagnostics? [default: False]
     --window=window                        process with short window? [default: long]
     --inputBlockName=inputBlockName        filename for inputs [default: fr]
+    --analysisName=analysisName            append a name to the resulting blocks? [default: default]
     --selectorName=selectorName            filename for resulting selector [default: minfrmaxcorr]
 """
 import os
@@ -30,16 +31,22 @@ expOpts, allOpts = parseAnalysisOptions(
 globals().update(expOpts)
 globals().update(allOpts)
 
+analysisSubFolder = os.path.join(
+    scratchFolder, arguments['analysisName']
+    )
+if not os.path.exists(analysisSubFolder):
+    os.makedirs(analysisSubFolder, exist_ok=True)
+#
 if arguments['processAll']:
     prefix = experimentName
 else:
     prefix = ns5FileName
 resultPath = os.path.join(
-    scratchFolder,
+    analysisSubFolder,
     prefix + '_{}_{}_calc.h5'.format(
         arguments['inputBlockName'], arguments['window']))
 selectorPath = os.path.join(
-    scratchFolder,
+    analysisSubFolder,
     prefix + '_{}.pickle'.format(
         arguments['selectorName']))
 

@@ -7,6 +7,7 @@ from statsmodels.stats.multitest import multipletests as mt
 import pdb, traceback
 import statsmodels
 
+
 class TargetedDimensionalityReduction(TransformerMixin):
     def __init__(
             self,
@@ -26,85 +27,50 @@ class TargetedDimensionalityReduction(TransformerMixin):
         self.conditionNames = conditionNames
         self.addIntercept = addIntercept
         #
-        for scaler, listOfColumns in featureScalers:
-            try:
-                originalShape = featuresDF.loc[:, listOfColumns].shape
-                scaledVal = (
-                    scaler
-                    .fit_transform(
-                        featuresDF.loc[:, listOfColumns]
+        def applyScalers(DF, listOfScalers):
+            for scaler, listOfColumns in listOfScalers:
+                try:
+                    featuresMatchMaskAll = (
+                        DF
+                        .columns
+                        .get_level_values('feature')
+                        .isin(listOfColumns))
+                    trainIndices = []
+                    for colName in listOfColumns:
+                        featuresMatchMask = (
+                            DF
+                            .columns
+                            .get_level_values('feature')
+                            .isin([colName]))
+                        firstLag = (
+                            DF.columns
+                            .get_level_values('lag')[featuresMatchMask][0])
+                        trainIndices.append((colName, firstLag))
+                    scaler.fit(
+                        DF.loc[:, trainIndices]
                         .to_numpy().reshape(-1, 1))
-                    .reshape(originalShape))
-                featuresDF.loc[:, listOfColumns] = scaledVal
-            except Exception:
-                traceback.print_exc()
-                pdb.set_trace()
+                    originalShape = DF.iloc[:, featuresMatchMaskAll].shape
+                    scaledVal = scaler.transform(
+                        (
+                            DF
+                            .iloc[:, featuresMatchMaskAll]
+                            .to_numpy().reshape(-1, 1))
+                        ).reshape(originalShape)
+                    DF.iloc[:, featuresMatchMaskAll] = scaledVal
+                except Exception:
+                    traceback.print_exc()
+                    pdb.set_trace()
+            return DF
         #
-        for scaler, listOfColumns in targetScalers:
-            try:
-                originalShape = targetDF.loc[:, listOfColumns].shape
-                scaledVal = (
-                    scaler
-                    .fit_transform(
-                        targetDF.loc[:, listOfColumns]
-                        .to_numpy().reshape(-1, 1))
-                    .reshape(originalShape))
-                targetDF.loc[:, listOfColumns] = scaledVal
-            except Exception:
-                traceback.print_exc()
-                pdb.set_trace()
-        #
-        extendedColumns = []
-        for key in sorted(featuresDF.columns):
-            extendedColumns += [(key, valueItem) for valueItem in addLags[key]]
-        extendedColumnIndex = pd.MultiIndex.from_tuples(
-            sorted(extendedColumns), names=['taskVariable', 'lag'])
-        # trick to avoid indexing nonsense: remove index and add back at the end
-        extendedFeaturesDF = pd.DataFrame(
-            np.nan,
-            index=range(len(featuresDF.index)),
-            columns=extendedColumnIndex)
-        targetDF.reset_index(drop=True, inplace=True)
-        for name, group in featuresDF.reset_index().groupby(['segment', 't']):
-            targetDF.loc[group.index, :] = (
-                targetDF.loc[group.index, :]
-                .rolling(rollingWindow, center=True)
-                .mean())
-            for feature, lag in extendedColumns:
-                if isinstance(lag, int):
-                    shiftedFeature = (
-                        group[feature]
-                        .shift(lag))
-                    if rollingWindow is not None:
-                        shiftedFeature = (
-                            shiftedFeature
-                            .rolling(rollingWindow, center=True)
-                            .mean())
-                    extendedFeaturesDF.loc[
-                        group.index, (feature, lag)] = shiftedFeature
-                if isinstance(lag, tuple):
-                    shiftedFeature = (
-                        group[feature]
-                        .shift(lag[0])
-                        .rolling(lag[1], center=True)
-                        .mean())
-                    extendedFeaturesDF.loc[
-                        group.index, (feature, lag)] = shiftedFeature
-        extendedFeaturesDF.drop(
-            columns=(
-                extendedFeaturesDF
-                .columns[extendedFeaturesDF.nunique() == 1]),
-            inplace=True)
-        # indexes must be equal (interchangeable)!
-        targetDF.index = featuresDF.index
-        extendedFeaturesDF.index = featuresDF.index
-        dropIndex = extendedFeaturesDF.index[extendedFeaturesDF.isna().T.any()]
-        extendedFeaturesDF.drop(index=dropIndex, inplace=True)
+        dropIndex = featuresDF.index[featuresDF.isna().T.any()]
         targetDF.drop(index=dropIndex, inplace=True)
         featuresDF.drop(index=dropIndex, inplace=True)
+        #
+        featuresDF = applyScalers(featuresDF, featureScalers)
+        targetDF = applyScalers(targetDF, targetScalers)
         # finally, decimate if need to
         self.targetDF = targetDF.iloc[::decimate, :]
-        self.featuresDF = extendedFeaturesDF.iloc[::decimate, :]
+        self.featuresDF = featuresDF.iloc[::decimate, :]
         #
         if self.addIntercept:
             self.featuresDF.loc[:, ('intercept', 0)] = 1
@@ -132,6 +98,7 @@ class TargetedDimensionalityReduction(TransformerMixin):
                 x = self.featuresDF.loc[groupMask, :]
                 x.columns = x.columns.to_list()
                 y = self.targetDF.loc[groupMask, colName]
+                # pdb.set_trace()
                 reg = self.model(y, x, **self.modelKWargs)
                 regResults = reg.fit()
                 if self.verbose:
@@ -172,7 +139,7 @@ class TargetedDimensionalityReduction(TransformerMixin):
         self.regressorNames = (
             self.regressorNames
             .drop(dropColumns)
-            .unique(level='taskVariable'))
+            .unique(level='feature'))
         conditionAverages = self.targetDF.groupby(self.conditionNames).agg('mean')
         self.pca.fit(conditionAverages.to_numpy())
         transposedBetas = (
@@ -184,7 +151,7 @@ class TargetedDimensionalityReduction(TransformerMixin):
             index=transposedBetas.index,
             columns=transposedBetas.columns)
         maxBins = []
-        for name, group in denoisedBetas.groupby('taskVariable'):
+        for name, group in denoisedBetas.groupby('feature'):
             maxBins.append((group ** 2).sum(axis='columns').idxmax())
         self.betaMax = denoisedBetas.loc[maxBins, :].transpose()
         self.q, r = np.linalg.qr(self.betaMax)
