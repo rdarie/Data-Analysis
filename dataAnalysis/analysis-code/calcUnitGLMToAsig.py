@@ -41,7 +41,7 @@ from namedQueries import namedQueries
 import dataAnalysis.preproc.ns5 as ns5
 from dataAnalysis.custom_transformers.tdr import TargetedDimensionalityReduction
 import statsmodels.api as sm
-import mlencoding as spykesml
+import MLencoding as spykesml
 # from pyglmnet import GLM
 import joblib as jb
 import dill as pickle

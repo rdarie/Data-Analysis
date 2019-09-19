@@ -23,7 +23,7 @@
 # ESTIMATOR="201901211000-Proprio_tdrAcr_long_midPeak"
 # BLOCKNAME="tdrAcr"
 EXP="exp201901271000"
-GLMBLOCKNAME="tdrAcrGLM"
+GLMBLOCKNAME="tdrAcrKKGLM"
 OLSBLOCKNAME="tdrAcr"
 GLMESTIMATOR="201901271000-Proprio_${GLMBLOCKNAME}_long_midPeak"
 OLSESTIMATOR="201901271000-Proprio_${OLSBLOCKNAME}_long_midPeak"
@@ -40,7 +40,7 @@ source activate nda
 # python3 ./calcUnitOLSToAsig.py --exp=$EXP --processAll --inputBlockName="fr_sqrt" --secondaryBlockName="rig" --alignQuery="midPeak" --unitQuery="fr_sqrt" --estimatorName=$OLSBLOCKNAME --verbose --plotting
 # python3 ./evaluateUnitOLSToAsig.py --exp=$EXP --estimator=$OLSESTIMATOR --lazy --profile --verbose
 #
-python3 ./calcUnitGLMToAsig.py --exp=$EXP --processAll --selector=$SELECTOR --inputBlockName="raster" --secondaryBlockName="rig" --alignQuery="midPeak" --unitQuery="raster" --estimatorName=$GLMBLOCKNAME --verbose
+python3 ./calcUnitKKGLMToAsig.py --exp=$EXP --processAll --selector=$SELECTOR --inputBlockName="raster" --secondaryBlockName="rig" --alignQuery="midPeak" --unitQuery="raster" --estimatorName=$GLMBLOCKNAME --verbose
 # python3 ./evaluateUnitGLMToAsig.py --exp=$EXP --estimator=$GLMESTIMATOR --lazy --profile --verbose
 #
 # python3 ./applyEstimatorToTriggered.py --exp=$EXP --processAll --window="long" --alignQuery="midPeak" --estimator=$ESTIMATOR --lazy --profile --verbose
