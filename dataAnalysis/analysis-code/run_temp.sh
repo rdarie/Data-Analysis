@@ -30,13 +30,13 @@
 # ESTIMATOR="201901211000-Proprio_pca"
 EXP="exp201901271000"
 TRIALIDX="1"
-GLMBLOCKNAME="tdrAcrGLM"
+GLMBLOCKNAME="tdrAcrKKGLM"
 OLSBLOCKNAME="tdrAcr"
 GLMESTIMATOR="Trial001_${GLMBLOCKNAME}_long_midPeak"
 OLSESTIMATOR="Trial001_${OLSBLOCKNAME}_long_midPeak"
-# SELECTOR="Trial001_minfrmaxcorr"
+#
 SELECTOR="Trial001_minfrmaxcorr"
-# SELECTOR="Trial001_minfrmaxcorr"
+#
 
 # python3 ./calcTrialAnalysisNix.py --exp=$EXP --trialIdx=$TRIALIDX --chanQuery="all"
 # python3 ./calcMotionStimAlignTimes.py --exp=$EXP --trialIdx=$TRIALIDX --plotParamHistograms
@@ -49,15 +49,15 @@ SELECTOR="Trial001_minfrmaxcorr"
 # python3 ./calcAlignedAsigs.py --exp=$EXP --trialIdx=$TRIALIDX --lazy --window="long" --chanQuery="fr" --blockName="fr"
 # python3 ./calcAlignedAsigs.py --exp=$EXP --trialIdx=$TRIALIDX --lazy --window="long" --chanQuery="rig" --blockName="rig"
 # 
-python3 ./calcUnitMeanFR.py --exp=$EXP --trialIdx=$TRIALIDX --inputBlockName="fr" --alignQuery="midPeak" --unitQuery="fr" --verbose
+# python3 ./calcUnitMeanFR.py --exp=$EXP --trialIdx=$TRIALIDX --inputBlockName="fr" --alignQuery="midPeak" --unitQuery="fr" --verbose
 # python3 ./calcUnitCorrelation.py --exp=$EXP --trialIdx=$TRIALIDX --inputBlockName="fr" --alignQuery="midPeak" --unitQuery="fr" --verbose
 # python3 ./selectUnitsByMeanFRandCorrelation.py --exp=$EXP --trialIdx=$TRIALIDX --verbose
 # 
 # python3 ./calcUnitOLSToAsig.py --exp=$EXP --trialIdx=$TRIALIDX --inputBlockName="fr_sqrt" --secondaryBlockName="rig" --alignQuery="midPeak" --unitQuery="fr_sqrt" --estimatorName=$OLSBLOCKNAME --verbose --plotting
 # python3 ./evaluateUnitOLSToAsig.py --exp=$EXP --estimator=$OLSESTIMATOR --lazy --profile --verbose
 # 
-# python3 ./calcUnitGLMToAsig.py --exp=$EXP --trialIdx=$TRIALIDX --inputBlockName="raster" --secondaryBlockName="rig" --alignQuery="midPeak" --unitQuery="raster" --estimatorName=$GLMBLOCKNAME --verbose
-# python3 ./evaluateUnitGLMToAsig.py --exp=$EXP --estimator=$GLMESTIMATOR --lazy --profile --verbose
+python3 ./calcUnitKKGLMToAsig.py --exp=$EXP --trialIdx=$TRIALIDX --selector=$SELECTOR --inputBlockName="raster" --secondaryBlockName="rig" --alignQuery="midPeak" --unitQuery="raster" --estimatorName=$GLMBLOCKNAME --verbose --plotting
+# python3 ./evaluateUnitKKGLMToAsig.py --exp=$EXP --estimator=$GLMESTIMATOR --lazy --profile --verbose
 # 
 # python3 './applyEstimatorToTriggered.py' --exp=$EXP --trialIdx=$TRIALIDX --window="short" --alignQuery="outboundWithStim100HzCCW" --estimator=$ESTIMATOR --lazy --profile
 # 

@@ -1,13 +1,3 @@
-'''
-try:
-    import plotly
-    import plotly.plotly as py
-    import plotly.tools as tls
-    import plotly.figure_factory as ff
-    import plotly.graph_objs as go
-except:
-    pass
-'''
 import psutil
 import pdb, sys, itertools, os, pickle, gc, random, string,\
 subprocess, collections, traceback, peakutils, math, argparse

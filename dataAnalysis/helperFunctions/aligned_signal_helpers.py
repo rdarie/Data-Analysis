@@ -69,7 +69,7 @@ def processUnitQueryArgs(
 
 
 def applyFun(
-        triggeredPath=None, resultPath=None, resultName=None,
+        triggeredPath=None, resultPath=None, resultNames=None,
         fun=None, funArgs=[], funKWargs={},
         lazy=None, loadArgs={},
         secondaryPath=None, secondaryUnitQuery=None,
@@ -90,8 +90,12 @@ def applyFun(
             prf.print_memory_usage('just loaded alignedAsigs')
         if applyType == 'self':
             result = getattr(alignedAsigsDF, fun)(*funArgs, **funKWargs)
+            if (not isinstance(result, list)) or (not isinstance(result, tuple)):
+                result = [result]
         if applyType == 'func':
             result = fun(alignedAsigsDF, *funArgs, **funKWargs)
+            if (not isinstance(result, list)) or (not isinstance(result, tuple)):
+                result = [result]
     elif loadType == 'elementwise':
         if loadArgs['unitNames'] is None:
             unitNames = ns5.listChanNames(
@@ -195,8 +199,8 @@ def applyFun(
                     for i in range(len(tempRes))]
             for i in range(len(tempRes)):
                 result[i].loc[firstUnit] = tempRes[i]
-    for i in range(len(resultName)):
-        result[i].to_hdf(resultPath, resultName[i], format='table')
+    for i in range(len(resultNames)):
+        result[i].to_hdf(resultPath, resultNames[i], format='fixed')
     if lazy:
         dataReader.file.close()
     return result
@@ -503,11 +507,11 @@ def facetGridCompareMeans(
             fixedPvals = flatPvals * flatPvals.size
         allPValsWide.iloc[:, :] = fixedPvals.reshape(origShape)
         allSigValsWide = allPValsWide < statsTestOpts['pThresh']
-    allPValsWide.to_hdf(statsTestPath, 'p', format='table')
+    allPValsWide.to_hdf(statsTestPath, 'p', format='fixed')
     allStatValsWide = pd.concat(allStatVals, names=['unit'] + statVals.index.names)
-    allStatValsWide.to_hdf(statsTestPath, 'stat', format='table')
+    allStatValsWide.to_hdf(statsTestPath, 'stat', format='fixed')
     allSigValsWide = pd.concat(allSigVals, names=['unit'] + sigVals.index.names)
-    allSigValsWide.to_hdf(statsTestPath, 'sig', format='table')
+    allSigValsWide.to_hdf(statsTestPath, 'sig', format='fixed')
     # give these back in case needed (dictionaries are passed by reference)
     loadArgs['unitNames'] = originalUnitNames
     loadArgs['unitQuery'] = originalUnitQuery

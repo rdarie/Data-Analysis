@@ -2,7 +2,6 @@ from sklearn.base import TransformerMixin
 from sklearn.decomposition import PCA
 import pandas as pd
 import numpy as np
-import statsmodels.api as sm
 from statsmodels.stats.multitest import multipletests as mt
 import pdb, traceback
 import statsmodels
@@ -19,8 +18,7 @@ class TargetedDimensionalityReduction(TransformerMixin):
     def __init__(
             self,
             featuresDF=None, targetDF=None,
-            model=None, modelKWargs={},
-            regAlpha=None, regL1Wt=None, nCV=None,
+            model=None, modelKWargs={}, nCV=None,
             featureScalers=None, targetScalers=None,
             addLags=None, decimate=1, rollingWindow=None,
             timeAxisName=None, alpha=0.01,
@@ -35,9 +33,11 @@ class TargetedDimensionalityReduction(TransformerMixin):
         self.conditionNames = conditionNames
         self.addIntercept = addIntercept
         self.alpha = alpha
-        self.regAlpha = regAlpha
-        self.regL1Wt = regL1Wt
         self.nCV = nCV
+        #
+        if (model.tunemodel == 'glm'):
+            model.set_params({'cv': nCV})
+        model.set_params(modelKWargs)
         #
         def applyScalers(DF, listOfScalers):
             for scaler, listOfColumns in listOfScalers:
@@ -103,57 +103,31 @@ class TargetedDimensionalityReduction(TransformerMixin):
     def fit(self, X=None, y=None):
         for binName, yIndex in self.metaDF.groupby(self.timeAxisName):
             groupMask = self.metaDF.index.isin(yIndex.index)
-            pvals = pd.DataFrame(
-                np.nan, index=self.betas.index,
-                columns=self.betas.columns)
-            for colName in self.targetDF:
-                x = self.featuresDF.loc[groupMask, :]
-                x.columns = x.columns.to_list()
-                y = self.targetDF.loc[groupMask, colName]
-                # pdb.set_trace()
-                reg = self.model(y, x, **self.modelKWargs)
-                if self.regAlpha is None:
-                    regResults = reg.fit()
-                else:
-                    regResults = reg.fit_regularized(
-                        alpha=self.regAlpha, L1_wt=self.regL1Wt, refit=True)
-
-                if self.verbose:
-                    print(regResults.summary())
-                try:
-                    # OLS models don't have llf or pseudor2
-                    # it's fine if this fails
-                    #
-                    # Statsmodels suggests this formula
-                    # pr2 = 1 - (regResults.llf / regResults.llnull)
-                    # Benjamin et al 2018 suggests this formula
-                    pr2 = 1 - (regResults.deviance / regResults.null_deviance)
-                    if self.verbose:
-                        print('McFadden pseudo-R-squared: {})'.format(pr2))
-                except Exception:
-                    traceback.print_exc()
-                self.betas.loc[(colName, binName), :] = regResults.params
-                pvals.loc[(colName, binName), :] = regResults.pvalues
+            for idx, colName in enumerate(self.targetDF):
+                print('Fitting neuron {}...'.format(colName))
+                x = self.featuresDF.loc[groupMask, :].to_numpy()
+                y = self.targetDF.loc[groupMask, colName].to_numpy()
+                self.model.fit(x, y)
+                if (idx == 0) and (self.model.tunemodel == 'glm'):
+                    self.model.set_params(
+                        {'reg_lambda': [self.model.model.reg_lambda]})
+                #
+                self.betas.loc[(colName, binName), :] = self.model.model.beta_
                 thisResult = {
                     self.timeAxisName: binName,
-                    'unit': colName, 'reg': regResults
+                    'unit': colName, 'reg': self.model.model.copy()
                     }
                 try:
                     # OLS models don't have llf or pseudor2
                     # it's fine if this fails
+                    pr2 = max(self.model.GLMCV.scores_)
+                    print('pseudoR2 = {:.4f}'.format(pr2))
                     thisResult.update({'pseudorsquared': pr2})
                 except Exception:
                     traceback.print_exc()
                 self.regressionList.append(thisResult)
-        self.betas.dropna(inplace=True)
-        origShape = pvals.shape
-        flatPvals = pvals.to_numpy().reshape(-1)
-        try:
-            _, fixedPvals, _, _ = mt(flatPvals, method='holm')
-        except Exception:
-            fixedPvals = flatPvals * flatPvals.size
-        pvals.iloc[:, :] = fixedPvals.reshape(origShape)
-        significantBetas = pvals < self.alpha
+        # self.betas.dropna(inplace=True)
+        significantBetas = self.betas.notna()
         dropColumns = significantBetas.columns[~significantBetas.any()]
         # self.betas.drop(columns=dropColumns, inplace=True)
         self.regressorNames = (
@@ -194,7 +168,7 @@ class TargetedDimensionalityReduction(TransformerMixin):
         y = self.targetDF[unitName].to_numpy()
         #
         if True:
-            fig, ax = plt.subplots(3, 1, sharex=True)
+            fig, ax = plt.subplots(3, 1)
             ax[0].plot(y / max(y), label='original')
             ax[0].plot(prediction, label='prediction')
             ax[0].set_title('{}: pR^2 = {}'.format(unitName, rsquared.loc[rsquared['rsquared'].idxmax(), 'rsquared']))

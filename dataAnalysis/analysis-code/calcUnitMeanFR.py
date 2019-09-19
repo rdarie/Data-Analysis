@@ -64,7 +64,7 @@ alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUn
 
 meanFRDF = ash.applyFun(
     triggeredPath=triggeredPath, resultPath=resultPath,
-    resultName=arguments['resultName'],
+    resultNames=[arguments['resultName']],
     fun="mean", funKWargs={'axis': 'index'}, lazy=arguments['lazy'],
     verbose=arguments['verbose'],
     loadArgs=alignedAsigsKWargs)

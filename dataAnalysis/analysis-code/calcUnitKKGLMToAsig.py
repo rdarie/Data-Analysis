@@ -21,7 +21,7 @@ Options:
 import matplotlib
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
-# matplotlib.use('Qt5Agg')   # generate postscript output by default
+matplotlib.use('Qt5Agg')   # generate postscript output by default
 import matplotlib.pyplot as plt
 import seaborn as sns
 sns.set()
@@ -39,10 +39,8 @@ from docopt import docopt
 from currentExperiment import parseAnalysisOptions
 from namedQueries import namedQueries
 import dataAnalysis.preproc.ns5 as ns5
-from dataAnalysis.custom_transformers.tdr import TargetedDimensionalityReduction
-import statsmodels.api as sm
-import mlencoding as spykesml
-# from pyglmnet import GLM
+from dataAnalysis.custom_transformers.tdr_spykesML import TargetedDimensionalityReduction
+from MLencoding import MLencoding
 import joblib as jb
 import dill as pickle
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
@@ -220,9 +218,11 @@ def calcUnitRegressionToAsig():
     tdr = TargetedDimensionalityReduction(
         featuresDF=featuresDF,
         targetDF=pd.DataFrame(targetDF * spkConversionFactor, dtype=np.int),
-        model=sm.GLM,
-        modelKWargs={'family': sm.families.Poisson()},
-        regAlpha=0.001, regL1Wt=0.5,
+        model=MLencoding(tunemodel='glm'),
+        modelKWargs={
+            'reg_lambda': np.logspace(np.log(0.05), np.log(0.0001), 3, base=np.exp(1)),
+            'score_metric': 'pseudo_R2'},
+        nCV=2,
         featureScalers=featureScalers, targetScalers=targetScalers,
         timeAxisName='positionBin',
         addIntercept=addInterceptToTDR,
