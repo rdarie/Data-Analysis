@@ -20,6 +20,7 @@ namedQueries = {
         'oech': "(chanName.str.contains('CH'))",
         'oechorsense': "((chanName.str.contains('CH'))or(chanName.str.contains('Sense')))",
         'oechorins': "((chanName.str.contains('CH'))or(chanName.str.contains('ins')))",
+        'neural': "((chanName.str.contains('elec'))or(chanName.str.contains('nform')))or(chanName.str.contains('utah'))",
         'rig': "not((chanName.str.contains('elec'))or(chanName.str.contains('pca'))or(chanName.str.contains('ainp')))"
     },
     'chan': {

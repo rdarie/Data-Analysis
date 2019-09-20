@@ -69,7 +69,8 @@ estimator = jb.load(
     os.path.join(analysisSubFolder, estimatorMetadata['path']))
 #
 rsquared = np.array([regDict['pseudorsquared'] for regDict in estimator.regressionList if np.isfinite(regDict['pseudorsquared'])])
-ax = sns.distplot(rsquared)
+
+ax = sns.distplot(rsquared[rsquared>0])
 ax.set_title('R^2 for population of units')
 ax.set_ylabel('Count')
 ax.set_xlabel('R^2')
@@ -83,25 +84,9 @@ plt.close()
 betas = estimator.betas
 betaMax = estimator.betaMax.stack(level='positionBin')
 #
-pvals = pd.DataFrame(np.nan, index=betas.index, columns=betas.columns)
-for idx, regDict in enumerate(estimator.regressionList):
-    pvals.iloc[idx, :] = regDict['reg'].pvalues
 
-# pdb.set_trace()
-origShape = pvals.shape
-flatPvals = pvals.to_numpy().reshape(-1)
-try:
-    _, fixedPvals, _, _ = mt(flatPvals, method='holm')
-except Exception:
-    fixedPvals = flatPvals / flatPvals.size
-pvals.iloc[:, :] = fixedPvals.reshape(origShape)
-pvalsMax = pvals.loc[:, betaMax.columns]
-betaMax.columns = betaMax.columns.droplevel('lag')
-pvalsMax.columns = betaMax.columns
-#
-alpha = 0.01
-significantBetas = pvals < alpha
-significantBetaMax = pvalsMax < alpha
+significantBetas = betas.notna()
+significantBetaMax = betaMax.notna()
 print((significantBetas).aggregate('sum'))
 #
 betasForPlot = (
@@ -156,19 +141,3 @@ pdfPath = os.path.join(
 plt.tight_layout()
 plt.savefig(pdfPath)
 plt.close()
-#
-g = sns.FacetGrid(
-    pd.melt(pvals, var_name='coefficient', value_name='p-value'),
-    col="coefficient", margin_titles=True)
-bins = np.linspace(0, 1e-24, 10)
-g.map(
-    plt.hist, 'p-value',
-    bins=bins
-    )
-pdfPath = os.path.join(
-    figureFolder,
-    '{}_evaluation_pvalues.pdf'.format(
-        arguments['estimator']))
-plt.savefig(pdfPath)
-plt.close()
-#

@@ -40,8 +40,8 @@ source activate nda
 # python3 ./calcUnitOLSToAsig.py --exp=$EXP --processAll --inputBlockName="fr_sqrt" --secondaryBlockName="rig" --alignQuery="midPeak" --unitQuery="fr_sqrt" --estimatorName=$OLSBLOCKNAME --verbose --plotting
 # python3 ./evaluateUnitOLSToAsig.py --exp=$EXP --estimator=$OLSESTIMATOR --lazy --profile --verbose
 #
-python3 ./calcUnitKKGLMToAsig.py --exp=$EXP --processAll --selector=$SELECTOR --inputBlockName="raster" --secondaryBlockName="rig" --alignQuery="midPeak" --unitQuery="raster" --estimatorName=$GLMBLOCKNAME --verbose
-# python3 ./evaluateUnitGLMToAsig.py --exp=$EXP --estimator=$GLMESTIMATOR --lazy --profile --verbose
+# python3 ./calcUnitKKGLMToAsig.py --exp=$EXP --processAll --selector=$SELECTOR --inputBlockName="raster" --secondaryBlockName="rig" --alignQuery="midPeak" --unitQuery="raster" --estimatorName=$GLMBLOCKNAME --verbose
+python3 ./evaluateUnitKKGLMToAsig.py --exp=$EXP --estimator=$GLMESTIMATOR --lazy --profile --verbose
 #
 # python3 ./applyEstimatorToTriggered.py --exp=$EXP --processAll --window="long" --alignQuery="midPeak" --estimator=$ESTIMATOR --lazy --profile --verbose
 # python3 ./plotAlignedAsigs.py --exp=$EXP --processAll --window="long" --inputBlockName=$BLOCKNAME --unitQuery="all" --alignQuery="midPeakWithStim100HzCCW" --rowName="pedalSizeCat"
