@@ -39,3 +39,4 @@ python3 ./tridesclousCCV.py --trialIdx=$RCTRIALIDX --exp=$EXP --purgePeeler --ba
 python3 ./tridesclousVisualize.py --trialIdx=$RCTRIALIDX --exp=$EXP  --peeler
 #
 python3 ./tridesclousCCV.py --trialIdx=$RCTRIALIDX --exp=$EXP --exportSpikesCSV
+python3 ./tridesclousCCV.py --trialIdx=$RCTRIALIDX --exp=$EXP --purgePeelerDiagnostics

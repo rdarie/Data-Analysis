@@ -5,15 +5,16 @@ Usage:
     tridesclousCCV.py [options]
 
 Options:
-    --exp=exp                  which experimental day to analyze
-    --trialIdx=trialIdx        which trial to analyze [default: 1]
-    --attemptMPI               whether to try to load MPI [default: False]
-    --purgePeeler              delete previous sort results [default: False]
-    --batchPreprocess          extract snippets and features, run clustering [default: False]
-    --batchPeel                run peeler [default: False]
-    --makeCoarseNeoBlock       save peeler results to a neo block [default: False]
-    --makeStrictNeoBlock       save peeler results to a neo block [default: False]
-    --exportSpikesCSV          save peeler results to a csv file [default: False]
+    --exp=exp                      which experimental day to analyze
+    --trialIdx=trialIdx            which trial to analyze [default: 1]
+    --attemptMPI                   whether to try to load MPI [default: False]
+    --purgePeeler                  delete previous sort results [default: False]
+    --purgePeelerDiagnostics       delete previous sort results [default: False]
+    --batchPreprocess              extract snippets and features, run clustering [default: False]
+    --batchPeel                    run peeler [default: False]
+    --makeCoarseNeoBlock           save peeler results to a neo block [default: False]
+    --makeStrictNeoBlock           save peeler results to a neo block [default: False]
+    --exportSpikesCSV              save peeler results to a csv file [default: False]
 """
 
 from docopt import docopt
@@ -77,6 +78,9 @@ if RANK == 0:
         tdch.purgeNeoBlock(triFolder)
         tdch.purgePeelerResults(
             triFolder, purgeAll=True)
+    if arguments['purgePeelerDiagnostics']:
+        tdch.purgePeelerResults(
+            triFolder, diagnosticsOnly=True, purgeAll=True)
     dataio = tdc.DataIO(dirname=triFolder)
     chansToAnalyze = sorted(list(dataio.channel_groups.keys()))[:96]
 else:

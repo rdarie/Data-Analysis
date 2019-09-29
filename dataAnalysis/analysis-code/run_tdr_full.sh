@@ -29,6 +29,7 @@ GLMESTIMATOR="201901271000-Proprio_${GLMBLOCKNAME}_long_midPeak"
 OLSESTIMATOR="201901271000-Proprio_${OLSBLOCKNAME}_long_midPeak"
 SELECTOR="201901271000-Proprio_minfrmaxcorr"
 source activate nda
+
 # python3 ./calcUnitLeastSquaresToAsig.py --exp=$EXP --processAll --inputBlockName="fr_sqrt" --secondaryBlockName="rig" --alignQuery="midPeak" --unitQuery="fr_sqrt" --estimatorName=$BLOCKNAME --verbose --plotting
 # python3 ./calcUnitGLMToAsig.py --exp=$EXP --processAll --inputBlockName="fr" --secondaryBlockName="rig" --alignQuery="midPeak" --unitQuery="fr" --estimatorName=$BLOCKNAME --verbose --plotting
 # python3 ./evaluateUnitGLMToAsig.py --exp=$EXP --estimator=$ESTIMATOR --lazy --profile --verbose

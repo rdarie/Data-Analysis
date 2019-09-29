@@ -68,6 +68,7 @@ with open(
 estimator = jb.load(
     os.path.join(analysisSubFolder, estimatorMetadata['path']))
 #
+pdb.set_trace()
 rsquared = np.array([regDict['pseudorsquared'] for regDict in estimator.regressionList if np.isfinite(regDict['pseudorsquared'])])
 
 ax = sns.distplot(rsquared[rsquared>0])
@@ -122,9 +123,10 @@ pdfPath = os.path.join(
         arguments['estimator']))
 plt.savefig(pdfPath)
 plt.close()
-# TODO: betas from different lags don't appear as the same datapoint in the pairgrid
-g = sns.pairplot(betasForPairgrid, vars=significantNames)
-#
+
+with sns.plotting_context('notebook', font_scale=0.75):
+    g = sns.pairplot(betasForPairgrid, vars=significantNames)
+
 for r in range(g.axes.shape[0]):
     newLim = g.axes[r, r].get_xlim()
     for c in range(g.axes.shape[1]):
@@ -132,12 +134,12 @@ for r in range(g.axes.shape[0]):
         g.axes[r, c].yaxis.set_major_formatter(ticker.EngFormatter())
         if c != r:
             g.axes[r, c].set_ylim(newLim)
-#
+
 pdfPath = os.path.join(
     figureFolder,
     '{}_evaluation_betas.pdf'.format(
         arguments['estimator']))
-#
+
 plt.tight_layout()
 plt.savefig(pdfPath)
 plt.close()

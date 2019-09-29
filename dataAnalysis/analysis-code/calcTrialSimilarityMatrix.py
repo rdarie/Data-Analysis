@@ -32,7 +32,6 @@ import numpy as np
 import pandas as pd
 import quantities as pq
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
-#
 #   you can specify options related to the analysis via the command line arguments,
 #   or by saving variables in the currentExperiment.py file, or the individual exp2019xxxxxxxx.py files
 #
@@ -85,6 +84,7 @@ else:
 #   i.e. how many seconds of data to select around the triggering time
 #   since neo uses the quantities package (pq for short) to keep track of units of measurement,
 #   here i am converting that window information into seconds
+pdb.set_trace()
 windowSize = [
     i * pq.s
     for i in rasterOpts['windowSizes'][arguments['window']]]
@@ -117,7 +117,6 @@ if arguments['unitNames'] is None:
 #       I already have a function to do this for the AnalogSignals
 #       you can look at it for reference (dataAnalysis.preproc.ns5.getAsigsAlignedToEvents())
 
-#
 #   2) calculate the similarity matrix (elephant implements this!)
 
 #   3) t-sne the similarity matrix (scikit learn implements this!)

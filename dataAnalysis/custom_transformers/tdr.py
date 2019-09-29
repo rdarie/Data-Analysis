@@ -1,4 +1,4 @@
-from sklearn.base import TransformerMixin
+from sklearn.base import TransformerMixin, BaseEstimator, RegressorMixin
 from sklearn.decomposition import PCA
 import pandas as pd
 import numpy as np
@@ -15,7 +15,36 @@ sns.set_context("talk")
 sns.set_style("whitegrid")
 
 
+class SMWrapper(BaseEstimator, RegressorMixin):
+    """
+        A universal sklearn-style wrapper for statsmodels regressors
+        based on https://stackoverflow.com/questions/41045752/using-statsmodel-estimations-with-scikit-learn-cross-validation-is-it-possible/
+        by David Dale
+    """
+    def __init__(
+            self, model_class, model_kwargs={},
+            regAlpha=None, regL1Wt=None, regRefit=True):
+        self.model_class = model_class
+        self.model_kwargs = model_kwargs
+        self.regAlpha = regAlpha
+        self.regL1Wt = regL1Wt
+        self.regRefit = regRefit
+
+    def fit(self, X, y):
+        self.model_ = self.model_class(y, X, **self.model_kwargs)
+        if self.regAlpha is None:
+            self.results_ = self.model_.fit()
+        else:
+            self.results_ = self.model_.fit_regularized(
+                alpha=self.regAlpha, L1_wt=self.regL1Wt,
+                refit=self.regRefit)
+
+    def predict(self, X):
+        return self.results_.predict(X)
+
+
 class TargetedDimensionalityReduction(TransformerMixin):
+
     def __init__(
             self,
             featuresDF=None, targetDF=None,
@@ -23,7 +52,7 @@ class TargetedDimensionalityReduction(TransformerMixin):
             regAlpha=None, regL1Wt=None, nCV=None,
             featureScalers=None, targetScalers=None,
             addLags=None, decimate=1, rollingWindow=None,
-            timeAxisName=None, alpha=0.01,
+            timeAxisName=None, tTestAlpha=0.01,
             nPCAComponents=None, conditionNames=None,
             addIntercept=True,
             plotting=False, verbose=False):
@@ -34,7 +63,7 @@ class TargetedDimensionalityReduction(TransformerMixin):
         self.timeAxisName = timeAxisName
         self.conditionNames = conditionNames
         self.addIntercept = addIntercept
-        self.alpha = alpha
+        self.tTestAlpha = tTestAlpha
         self.regAlpha = regAlpha
         self.regL1Wt = regL1Wt
         self.nCV = nCV
@@ -126,6 +155,7 @@ class TargetedDimensionalityReduction(TransformerMixin):
                     #
                     # Statsmodels suggests this formula
                     # pr2 = 1 - (regResults.llf / regResults.llnull)
+                    # 
                     # Benjamin et al 2018 suggests this formula
                     pr2 = 1 - (regResults.deviance / regResults.null_deviance)
                     if self.verbose:
@@ -153,7 +183,7 @@ class TargetedDimensionalityReduction(TransformerMixin):
         except Exception:
             fixedPvals = flatPvals * flatPvals.size
         pvals.iloc[:, :] = fixedPvals.reshape(origShape)
-        significantBetas = pvals < self.alpha
+        significantBetas = pvals < self.tTestAlpha
         dropColumns = significantBetas.columns[~significantBetas.any()]
         # self.betas.drop(columns=dropColumns, inplace=True)
         self.regressorNames = (
@@ -202,12 +232,12 @@ class TargetedDimensionalityReduction(TransformerMixin):
             ax[0].set_ylabel('normalized (spk/s)')
         for idx, beta in enumerate(thisReg.params):
             x = beta * self.featuresDF.iloc[:, idx].to_numpy()
-            if thisReg.pvalues[idx] < self.alpha:
+            if thisReg.pvalues[idx] < self.tTestAlpha:
                 ax[1].plot(x, label='{}'.format(self.featuresDF.iloc[:, idx].name))
             else:
                 ax[2].plot(x, ls='--', label='{}'.format(self.featuresDF.iloc[:, idx].name))
-        ax[1].set_title('p < {} regressors'.format(self.alpha))
-        ax[2].set_title('p > {} regressors'.format(self.alpha))
+        ax[1].set_title('p < {} regressors'.format(self.tTestAlpha))
+        ax[2].set_title('p > {} regressors'.format(self.tTestAlpha))
         for thisAx in ax:
             thisAx.legend()
         plt.show()

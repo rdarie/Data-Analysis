@@ -631,19 +631,20 @@ def purgeNeoBlock(triFolder):
 
 
 def purgePeelerResults(
-        triFolder, chan_grps=None, purgeAll=False):
+        triFolder, chan_grps=None, purgeAll=False, diagnosticsOnly=False):
     if not purgeAll:
         assert chan_grps is not None, 'Need to specify chan_grps!'
 
         for chan_grp in chan_grps:
             #  chan_grp = 0
             grpFolder = 'channel_group_{}'.format(chan_grp)
-            segFolder = os.path.join(
-                triFolder, grpFolder, 'segment_0')
-            shutil.rmtree(segFolder)
+            if not diagnosticsOnly:
+                segFolder = os.path.join(
+                    triFolder, grpFolder, 'segment_0')
+                shutil.rmtree(segFolder)
             for fl in glob.glob(os.path.join(triFolder, grpFolder, 'nearMiss*.png')):
                 os.remove(fl)
-            for fl in glob.glob(os.path.join(triFolder, 'templateHist_{}.pdf'.format(chan_grp))):
+            for fl in glob.glob(os.path.join(triFolder, 'templateHist_{}.png'.format(chan_grp))):
                 os.remove(fl)
             #  TODO implement selective removal of spikes or processed signs
             """
@@ -671,9 +672,10 @@ def purgePeelerResults(
             os.remove(fl)
         for grpFolder in grpFolders:
             try:
-                segFolder = os.path.join(
-                    triFolder, grpFolder, 'segment_0')
-                shutil.rmtree(segFolder)
+                if not diagnosticsOnly:
+                    segFolder = os.path.join(
+                        triFolder, grpFolder, 'segment_0')
+                    shutil.rmtree(segFolder)
                 for fl in glob.glob(os.path.join(triFolder, grpFolder, 'nearMiss*.png')):
                     os.remove(fl)
             except Exception:
