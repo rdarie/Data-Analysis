@@ -695,7 +695,8 @@ def alignedAsigsToDF(
         allWaveforms.set_index(
             list(idxLabels),
             inplace=True)
-        allWaveforms.columns = allWaveforms.columns.remove_unused_levels()
+        if isinstance(allWaveforms.columns, pd.MultiIndex):
+            allWaveforms.columns = allWaveforms.columns.remove_unused_levels()
     if transposeToColumns == 'feature':
         zipNames = zip(pd.unique(allWaveforms.columns.get_level_values('feature')).tolist(), unitNames)
         try:

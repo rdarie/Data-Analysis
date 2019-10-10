@@ -27,6 +27,7 @@ import dataAnalysis.helperFunctions.profiling as prf
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
 from namedQueries import namedQueries
 import os
+from scipy import stats
 import pandas as pd
 import numpy as np
 import pdb
@@ -67,8 +68,96 @@ with open(
     estimatorMetadata = pickle.load(f)
 estimator = jb.load(
     os.path.join(analysisSubFolder, estimatorMetadata['path']))
-#
-rsquared = np.array([regDict['pseudorsquared'] for regDict in estimator.regressionList if np.isfinite(regDict['pseudorsquared'])])
+# pdb.set_trace()
+with sns.plotting_context('notebook', font_scale=1):
+    estimator.plot_xy()
+regressorH5Path = os.path.join(
+    analysisSubFolder,
+    estimatorMetadata['trainingDataPath']
+    .replace('_raster', '_{}_rig'.format(estimatorMetadata['name']))
+    .replace('.nix', '.h5')
+    )
+featuresDF = pd.read_hdf(regressorH5Path, 'feature')
+for idx, (name, regDict) in enumerate(estimator.regressionList.items()):
+    reg = regDict['reg']
+    gs = regDict['gridSearchCV']
+    if idx == 0:
+        regressorNames = []
+        regressorTypes = []
+        regressorLags = []
+        for paramIdx, featureMask in enumerate(gs.param_grid['featureMask']):
+            theseFeatureNames = featuresDF.iloc[:, featureMask].columns
+            regressorNames.append(theseFeatureNames)
+            regressorLags.append(theseFeatureNames.to_list()[0][1])
+            if np.any(['Hz' in i[0] for i in theseFeatureNames.to_list()]):
+                regressorTypes.append('iar')
+            elif np.any(['ACR' in i[0] for i in theseFeatureNames.to_list()]):
+                regressorTypes.append('acr')
+            else:
+                regressorTypes.append('kin')
+        regressorIndex = pd.MultiIndex.from_arrays(
+            [regressorTypes, regressorLags], names=('type', 'lag'))
+        targetNames = [i[0] for i in estimator.regressionList.keys()]
+        regressionScores = pd.DataFrame(np.nan, index=regressorIndex, columns=targetNames)
+    regressionScores.loc[:, name[0]] = gs.cv_results_['mean_test_score']
+    regressionScores.columns.name = 'target'
+
+maxScore = (
+    regressionScores
+    .groupby('type').agg('max')
+    .unstack().reset_index()
+    .rename(columns={0: 'score'}))
+from itertools import combinations
+uniqueTypes = maxScore['type'].unique()
+tTestPval = pd.DataFrame(np.nan, index=uniqueTypes, columns=uniqueTypes)
+for names in combinations(uniqueTypes, 2):
+    stat, pval = stats.ttest_rel(
+        maxScore.loc[maxScore['type'] == names[0], 'score'].to_numpy(),
+        maxScore.loc[maxScore['type'] == names[1], 'score'].to_numpy()
+        )
+    tTestPval.loc[names[0], names[1]] = pval
+f, ax = plt.subplots(figsize=(7, 6))
+sns.boxplot(
+    x="score", y="type", data=maxScore,
+    whis="range", palette="vlag")
+sns.swarmplot(
+    x="score", y="type", data=maxScore,
+    size=3, color=".3", linewidth=0)
+
+pdfPath = os.path.join(
+    figureFolder,
+    '{}_evaluation_rsq.pdf'.format(
+        arguments['estimator']))
+plt.savefig(pdfPath)
+plt.close()
+
+maxLag = (
+    regressionScores
+    .groupby('type').agg('idxmax')
+    .unstack().reset_index()
+    .rename(columns={0: 'lag'}))
+maxLag['lag'] = maxLag['lag'].apply(lambda x: x[1])
+f, ax = plt.subplots(figsize=(7, 6))
+sns.boxplot(
+    x="lag", y="type", data=maxLag,
+    whis="range", palette="vlag")
+sns.swarmplot(
+    x="lag", y="type", data=maxLag,
+    size=3, color=".3", linewidth=0)
+rsquared = np.array(
+    [
+        regDict['mean_test_score']
+        for unit, regDict in estimator.regressionList.items()
+        if np.isfinite(regDict['mean_test_score'])])
+
+pdfPath = os.path.join(
+    figureFolder,
+    '{}_evaluation_lags.pdf'.format(
+        arguments['estimator']))
+plt.savefig(pdfPath)
+plt.close()
+
+'''
 ax = sns.distplot(rsquared)
 ax.set_title('R^2 for population of units')
 ax.set_ylabel('Count')
@@ -79,29 +168,17 @@ pdfPath = os.path.join(
         arguments['estimator']))
 plt.savefig(pdfPath)
 plt.close()
-
+'''
+#
 betas = estimator.betas
-betaMax = estimator.betaMax.stack(level='positionBin')
-#
-pvals = pd.DataFrame(np.nan, index=betas.index, columns=betas.columns)
-for idx, regDict in enumerate(estimator.regressionList):
-    pvals.iloc[idx, :] = regDict['reg'].pvalues
-
-# pdb.set_trace()
-origShape = pvals.shape
-flatPvals = pvals.to_numpy().reshape(-1)
-try:
-    _, fixedPvals, _, _ = mt(flatPvals, method='holm')
-except Exception:
-    fixedPvals = flatPvals / flatPvals.size
-pvals.iloc[:, :] = fixedPvals.reshape(origShape)
-pvalsMax = pvals.loc[:, betaMax.columns]
-betaMax.columns = betaMax.columns.droplevel('lag')
-pvalsMax.columns = betaMax.columns
-#
-alpha = 0.01
-significantBetas = pvals < alpha
-significantBetaMax = pvalsMax < alpha
+betas.index.names = ['unit', 'unit_lag']
+betas.columns.names = ['regressor', 'regressor_lag']
+pvals = estimator.pvals
+pvals.index.names = ['unit', 'unit_lag']
+pvals.columns.names = ['regressor', 'regressor_lag']
+significantBetas = estimator.significantBetas
+significantBetas.index.names = ['unit', 'unit_lag']
+significantBetas.columns.names = ['regressor', 'regressor_lag']
 print((significantBetas).aggregate('sum'))
 #
 betasForPlot = (
@@ -110,65 +187,59 @@ betasForPlot = (
     .stack().stack()
     .to_frame(name='beta').reset_index())
 betasForPlot['beta_abs'] = betasForPlot['beta'].abs()
-betasForPairgrid = (
-    betaMax
-    .mask(~significantBetaMax)
-    )
-significantNames = betasForPairgrid.columns[betasForPairgrid.notna().any()].to_list()
+betasForPairgrid = betasForPlot.pivot(
+    index='unit', columns='regressor', values='beta_abs')
 #
-betaStats = betasForPlot.groupby(['unit', 'feature']).agg({'beta': ['mean', 'std']}).dropna()
+significantNames = (
+    betasForPairgrid
+    .columns[betasForPairgrid.notna().any()]
+    .to_list())
+#
+betaStats = (
+    betasForPlot
+    .groupby(['unit', 'regressor'])
+    .agg({'beta': ['mean', 'std']}))
 betaStats.columns = betaStats.columns.droplevel(0)
 betaStats['cv'] = betaStats['std'] / betaStats['mean']
-g = sns.FacetGrid(
-    betasForPlot,
-    sharex=False, sharey=False,
-    col="feature", hue='lag')
-# bins = np.linspace(0, 1e-24, 10)
-g.map(
-    plt.hist, 'beta_abs',
-    # bins=bins
-    ).add_legend().set_titles("{col_name}")
-for ax in g.axes.flat:
-    ax.xaxis.set_major_formatter(ticker.EngFormatter())
 #
-pdfPath = os.path.join(
-    figureFolder,
-    '{}_evaluation_betasAllBins.pdf'.format(
-        arguments['estimator']))
-plt.savefig(pdfPath)
-plt.close()
-# TODO: betas from different lags don't appear as the same datapoint in the pairgrid
-g = sns.pairplot(betasForPairgrid, vars=significantNames)
+with sns.plotting_context('notebook', font_scale=0.75):
+    g = sns.FacetGrid(
+        betasForPlot,
+        sharex=False, sharey=False,
+        col='regressor', hue='regressor_lag')
+    # bins = np.linspace(0, 1e-24, 10)
+    g.map(
+        plt.hist, 'beta_abs',
+        # bins=bins
+        ).add_legend().set_titles("{col_name}")
+    for ax in g.axes.flat:
+        ax.xaxis.set_major_formatter(ticker.EngFormatter())
+    #
+    pdfPath = os.path.join(
+        figureFolder,
+        '{}_evaluation_betasAllBins.pdf'.format(
+            arguments['estimator']))
+    plt.savefig(pdfPath)
+    plt.close()
+    # plt.show()
 #
-for r in range(g.axes.shape[0]):
-    newLim = g.axes[r, r].get_xlim()
-    for c in range(g.axes.shape[1]):
-        g.axes[r, c].xaxis.set_major_formatter(ticker.EngFormatter())
-        g.axes[r, c].yaxis.set_major_formatter(ticker.EngFormatter())
-        if c != r:
-            g.axes[r, c].set_ylim(newLim)
-#
-pdfPath = os.path.join(
-    figureFolder,
-    '{}_evaluation_betas.pdf'.format(
-        arguments['estimator']))
-#
-plt.tight_layout()
-plt.savefig(pdfPath)
-plt.close()
-#
-g = sns.FacetGrid(
-    pd.melt(pvals, var_name='coefficient', value_name='p-value'),
-    col="coefficient", margin_titles=True)
-bins = np.linspace(0, 1e-24, 10)
-g.map(
-    plt.hist, 'p-value',
-    bins=bins
-    )
-pdfPath = os.path.join(
-    figureFolder,
-    '{}_evaluation_pvalues.pdf'.format(
-        arguments['estimator']))
-plt.savefig(pdfPath)
-plt.close()
-#
+with sns.plotting_context('notebook', font_scale=0.75):
+    g = sns.pairplot(betasForPairgrid, vars=significantNames)
+    #
+    for r in range(g.axes.shape[0]):
+        newLim = g.axes[r, r].get_xlim()
+        for c in range(g.axes.shape[1]):
+            g.axes[r, c].xaxis.set_major_formatter(ticker.EngFormatter())
+            g.axes[r, c].yaxis.set_major_formatter(ticker.EngFormatter())
+            if c != r:
+                g.axes[r, c].set_ylim(newLim)
+    #
+    pdfPath = os.path.join(
+        figureFolder,
+        '{}_evaluation_betas.pdf'.format(
+            arguments['estimator']))
+    #
+    plt.tight_layout()
+    plt.savefig(pdfPath)
+    plt.close()
+    # plt.show()

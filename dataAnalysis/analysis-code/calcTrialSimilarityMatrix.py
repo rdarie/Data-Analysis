@@ -12,7 +12,6 @@ Options:
     --unitQuery=unitQuery             how to select channels if not supplying a list? [default: neural]
     --alignQuery=alignQuery           query what the units will be aligned to? [default: midPeak]
     --selector=selector               filename if using a unit selector
-    --eventName=eventName             name of events object to align to [default: motionStimAlignTimes]
 """
 #  The text block above is used by the docopt package to parse command line arguments
 #  e.g. you can call <python3 calcTrialSimilarityMatrix.py> to run with default arguments

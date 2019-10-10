@@ -39,12 +39,13 @@ from docopt import docopt
 from currentExperiment import parseAnalysisOptions
 from namedQueries import namedQueries
 import dataAnalysis.preproc.ns5 as ns5
-from dataAnalysis.custom_transformers.tdr import TargetedDimensionalityReduction
+from dataAnalysis.custom_transformers.tdr import SMWrapper, TargetedDimensionalityReduction, SingleNeuronRegression
 import statsmodels.api as sm
 import MLencoding as spykesml
 # from pyglmnet import GLM
 import joblib as jb
 import dill as pickle
+from itertools import product
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
@@ -84,7 +85,8 @@ def calcUnitRegressionToAsig():
     estimatorPath = os.path.join(
         analysisSubFolder,
         fullEstimatorName + '.joblib')
-    rollingWindow = 10
+    #
+    rollingWindow = 30
     spkConversionFactor = (rollingWindow * 1e-3)
     alignedAsigsKWargs.update(dict(
         duplicateControlsByProgram=False,
@@ -97,168 +99,284 @@ def calcUnitRegressionToAsig():
             'pedalMovementCat', 'pedalMovementDuration',
             'pedalSize', 'pedalSizeCat', 'pedalVelocityCat',
             'program', 'segment', 't'],
-        decimate=20,
+        decimate=10,
         metaDataToCategories=False,
         verbose=False, procFun=None))
     #
     alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **arguments)
     alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
         namedQueries, analysisSubFolder, **arguments)
-    #
-    regressorReader, regressorBlock = ns5.blockFromPath(
-        regressorPath, lazy=arguments['lazy'])
-    #
+    # lags in units of the _analyze file sample rate
     addLags = {
-        'position#0': [50],
-        'velocity#0': [50],
-        'program0_amplitude#0': [50],
-        'program1_amplitude#0': [50],
-        'program2_amplitude#0': [50],
-        'program3_amplitude#0': [50]
+        'position#0': list(range(-200, 210, 20)),
+        'velocity#0': list(range(-200, 210, 20)),
+        'program0_amplitude#0': list(range(-200, 210, 20)),
+        'program1_amplitude#0': list(range(-200, 210, 20)),
+        'program2_amplitude#0': list(range(-200, 210, 20)),
+        'program3_amplitude#0': list(range(-200, 210, 20))
         }
     featureNames = sorted([
         'position#0', 'velocity#0',
         'program0_amplitude#0', 'program1_amplitude#0',
         'program2_amplitude#0', 'program3_amplitude#0'
         ])
-    featureScalers = [
-        (MinMaxScaler(), ['position_x#0', 'position_y#0']),
-        (MinMaxScaler(), ['velocity_x#0', 'velocity_y#0']),
-        (MinMaxScaler(), ['program{}_ACR#0'.format(pNum) for pNum in range(4)]),
-        ]
     featureLoadArgs = alignedAsigsKWargs.copy()
     featureLoadArgs['unitNames'] = featureNames
     featureLoadArgs['unitQuery'] = None
     featureLoadArgs['addLags'] = addLags
-    featureLoadArgs['rollingWindow'] = rollingWindow
-    featuresDF = ns5.alignedAsigsToDF(
-        regressorBlock, **featureLoadArgs)
-    #
-    dataReader, dataBlock = ns5.blockFromPath(
-        triggeredPath, lazy=arguments['lazy'])
+    # featureLoadArgs['rollingWindow'] = rollingWindow
     #
     targetLoadArgs = alignedAsigsKWargs.copy()
     targetLoadArgs['rollingWindow'] = rollingWindow
     #
-    targetDF = ns5.alignedAsigsToDF(
-        dataBlock,
-        **targetLoadArgs)
+    reloadFeatures = True
+    featuresMetaDataPath = estimatorPath.replace(
+        '.joblib', '_features_meta.pickle')
+    regressorH5Path = os.path.join(
+        analysisSubFolder,
+        prefix + '_{}_{}_{}.h5'.format(
+            arguments['estimatorName'],
+            arguments['secondaryBlockName'], arguments['window']))
+    targetH5Path = os.path.join(
+        analysisSubFolder,
+        prefix + '_{}_{}_{}.h5'.format(
+            arguments['estimatorName'],
+            arguments['inputBlockName'], arguments['window']))
     #
-    dropIndex = featuresDF.index[featuresDF.isna().T.any()]
-    targetDF.drop(index=dropIndex, inplace=True)
-    featuresDF.drop(index=dropIndex, inplace=True)
+    if os.path.exists(featuresMetaDataPath):
+        with open(featuresMetaDataPath, 'rb') as f:
+            featuresMetaData = pickle.load(f)
+        sameFeatures = (featuresMetaData['featureLoadArgs'] == featureLoadArgs)
+        sameTargets = (featuresMetaData['targetLoadArgs'] == targetLoadArgs)
+        if sameFeatures and sameTargets:
+            reloadFeatures = False
+            featuresDF = pd.read_hdf(regressorH5Path, 'feature')
+            targetDF = pd.read_hdf(targetH5Path, 'target')
     #
-    featuresDF['positionBin'] = 0
-    targetDF['positionBin'] = 0
-    featuresDF.set_index('positionBin', drop=True, append=True, inplace=True)
-    featuresDF.columns = featuresDF.columns.remove_unused_levels()
-    targetDF.set_index('positionBin', drop=True, append=True, inplace=True)
-    targetDF.columns = targetDF.columns.remove_unused_levels()
+    ACRModel = True  # activation charge rate
+    IARModel = True  # independent amplitude and rate
+    if reloadFeatures:
+        regressorReader, regressorBlock = ns5.blockFromPath(
+            regressorPath, lazy=arguments['lazy'])
+        featuresDF = ns5.alignedAsigsToDF(
+            regressorBlock, **featureLoadArgs)
+        dataReader, dataBlock = ns5.blockFromPath(
+            triggeredPath, lazy=arguments['lazy'])
+        #
+        targetDF = ns5.alignedAsigsToDF(
+            dataBlock,
+            **targetLoadArgs)
+        #
+        dropIndex = featuresDF.index[featuresDF.isna().T.any()]
+        targetDF.drop(index=dropIndex, inplace=True)
+        featuresDF.drop(index=dropIndex, inplace=True)
+        #
+        targetDF = pd.DataFrame(targetDF * spkConversionFactor, dtype=np.int)
+        # derive regressors from saved traces (should move further upstream)
+        progAmpNames = ['program{}_amplitude#0'.format(pNum) for pNum in range(4)]
+        progAmpLookup = {'program{}_amplitude#0'.format(pNum): pNum for pNum in range(4)}
+        dropColumns = []
+        metaData = featuresDF.index.copy()
+        # activeProgram = metaData.get_level_values('program').to_numpy()
+        # trialAmplitude = metaData.get_level_values('amplitude').to_numpy()
+        stimRate = metaData.get_level_values('RateInHz').to_numpy()
+        uniqueRates = np.unique(stimRate[stimRate > 0])
+        featuresDF.reset_index(inplace=True, drop=True)
+        try:
+            for name in featuresDF.columns:
+                featureName = name[0]
+                lag = name[1]
+                if featureName in progAmpNames:
+                    thisProgram = progAmpLookup[featureName]
+                    if ACRModel:
+                        acrName = 'p{}_ACR#0'.format(thisProgram)
+                        featuresDF.loc[:, (acrName, lag)] = (
+                            stimRate *
+                            (featuresDF.loc[:, name])
+                            )
+                    if IARModel:
+                        for rate in uniqueRates:
+                            iarName = 'p{}_{}Hz#0'.format(thisProgram, int(rate))
+                            featuresDF.loc[:, (iarName, lag)] = (
+                                (stimRate == rate) *
+                                (featuresDF.loc[:, name])
+                                )
+                    dropColumns.append(name)
+                elif featureName == 'position#0':
+                    featuresDF.loc[:, ('position_x#0', lag)] = ((
+                        np.cos(
+                            featuresDF.loc[:, ('position#0', lag)] *
+                            100 * 2 * np.pi / 360))
+                        .to_numpy())
+                    featuresDF.sort_index(axis='columns', inplace=True)
+                    featuresDF.loc[:, ('position_y#0', lag)] = ((
+                        np.sin(
+                            featuresDF.loc[:, ('position#0', lag)] *
+                            100 * 2 * np.pi / 360))
+                        .to_numpy())
+                    featuresDF.sort_index(axis='columns', inplace=True)
+                    dropColumns.append(name)
+            for name in featuresDF.columns:
+                # velocities require position
+                featureName = name[0]
+                lag = name[1]
+                if featureName == 'velocity#0':
+                    featuresDF.loc[:, ('velocity_x#0', lag)] = ((
+                        featuresDF.loc[:, ('position_y#0', lag)] *
+                        (-1) *
+                        (featuresDF.loc[:, ('velocity#0', lag)] * 3e2))
+                        .to_numpy())
+                    featuresDF.sort_index(axis='columns', inplace=True)
+                    featuresDF.loc[:, ('velocity_y#0', lag)] = ((
+                        featuresDF.loc[:, ('position_x#0', lag)] *
+                        (featuresDF.loc[:, ('velocity#0', lag)] * 3e2))
+                        .to_numpy())
+                    featuresDF.sort_index(axis='columns', inplace=True)
+                    dropColumns.append(name)
+        except Exception:
+            traceback.print_exc()
+            pdb.set_trace()
+        featuresDF.drop(columns=dropColumns, inplace=True)
+        featuresDF.columns = featuresDF.columns.remove_unused_levels()
+        featuresDF.index = metaData
+        #
+        featuresMetaData = {
+            'targetLoadArgs': targetLoadArgs,
+            'featureLoadArgs': featureLoadArgs
+        }
+        with open(featuresMetaDataPath, 'wb') as f:
+            pickle.dump(featuresMetaData, f)
+        featuresDF.to_hdf(regressorH5Path, 'feature')
+        targetDF.to_hdf(targetH5Path, 'target')
     #
-    metaData = featuresDF.index.copy()
-    # # independent model
-    # for pNum in range(4):
-    #     featuresDF['program{}_RateInHz#0'.format(pNum)] = metaDF['RateInHz'].to_numpy() * (featuresDF['program{}_amplitude#0'.format(pNum)] ** 0)
-    # featuresDF['accel#0'] = featuresDF['velocity#0'].diff().fillna(0).to_numpy()
-    # ACR model
-    progAmpNames = ['program{}_amplitude#0'.format(pNum) for pNum in range(4)]
-    dropColumns = []
-    featuresDF.reset_index(inplace=True, drop=True)
-    try:
-        for name in featuresDF.columns:
-            featureName = name[0]
-            lag = name[1]
-            if featureName in progAmpNames:
-                acrName = featureName.replace('amplitude', 'ACR')
-                featuresDF.loc[:, (acrName, lag)] = (
-                    metaData.get_level_values('RateInHz').to_numpy() *
-                    (featuresDF.loc[:, name])
-                    )
-                dropColumns.append(name)
-            elif featureName == 'position#0':
-                featuresDF.loc[:, ('position_x#0', lag)] = (
-                    np.cos(
-                        featuresDF.loc[:, (slice('position#0'), slice(lag))] *
-                        100 * 2 * np.pi / 360))
-                featuresDF.sort_index(axis='columns', inplace=True)
-                featuresDF.loc[:, ('position_y#0', lag)] = (
-                    np.sin(
-                        featuresDF.loc[:, (slice('position#0'), slice(lag))] *
-                        100 * 2 * np.pi / 360))
-                featuresDF.sort_index(axis='columns', inplace=True)
-                dropColumns.append(name)
-        for name in featuresDF.columns:
-            featureName = name[0]
-            lag = name[1]
-            if featureName == 'velocity#0':
-                featuresDF.loc[:, ('velocity_x#0', lag)] = (
-                    featuresDF.loc[:, (slice('position_y#0'), slice(lag))] *
-                    (-1) *
-                    (featuresDF.loc[:, (slice('velocity#0'), slice(lag))] * 3e2))
-                featuresDF.sort_index(axis='columns', inplace=True)
-                featuresDF.loc[:, ('velocity_y#0', lag)] = (
-                    featuresDF.loc[:, (slice('position_x#0'), slice(lag))] *
-                    (featuresDF.loc[:, (slice('velocity#0'), slice(lag))] * 3e2))
-                featuresDF.sort_index(axis='columns', inplace=True)
-                dropColumns.append(name)
-    except Exception:
-        traceback.print_exc()
-        pdb.set_trace()
-    featuresDF.drop(columns=dropColumns, inplace=True)
-    featuresDF.columns = featuresDF.columns.remove_unused_levels()
-    featuresDF.index = metaData
     targetScalers = []
+    featureScalers = [
+        (MinMaxScaler(), ['position_x#0', 'position_y#0']),
+        (MinMaxScaler(), ['velocity_x#0', 'velocity_y#0'])
+        ]
+    columnInfo = (
+        featuresDF
+        .columns.to_frame()
+        .reset_index(drop=True))
+    #
+    if ACRModel:
+        featureScalers.append(
+            (
+                MinMaxScaler(),
+                [i for i in columnInfo['feature'].unique() if 'ACR' in i]))
+    if IARModel:
+        featureScalers.append(
+            (
+                MinMaxScaler(),
+                [i for i in columnInfo['feature'].unique() if 'Hz' in i]))
     # import warnings
     # warnings.filterwarnings('error')
-    # pdb.set_trace()
-    nPCAComponents = 12
+    nPCAComponents = None
     conditionNames = [
         'RateInHz', 'program', 'amplitudeCat',
-        'pedalVelocityCat', 'positionBin']
+        ]
     #
     addInterceptToTDR = True
-    tdr = TargetedDimensionalityReduction(
+    modelKWargs = {
+        'sm_class': sm.GLM,
+        'sm_kwargs': {'family': sm.families.Poisson()},
+        # 'regAlpha': 1e-4,
+        'regAlpha': None,
+        'regL1Wt': 0.5, 'regRefit': True,
+        }
+    # generate combinations of feature masks to select lags
+    ILModel = False  # independent lags model
+    SLModel = False  # single sensory lag model
+    SLAltModel = True  # single sensory lag, 3 sets (kin only, kin+acr, kin+iar)
+    if ILModel:
+        regressorGroups = {
+            'kinematic': (
+                (columnInfo['feature'].str.contains('position')) |
+                (columnInfo['feature'].str.contains('velocity'))),
+            'stimulation': (
+                (columnInfo['feature'].str.contains('ACR')) |
+                (columnInfo['feature'].str.contains('Hz')))
+            }
+    if SLModel:
+        regressorGroups = {
+            'all': (
+                (columnInfo['feature'].str.contains('position')) |
+                (columnInfo['feature'].str.contains('program')) |
+                (columnInfo['feature'].str.contains('ACR')) |
+                (columnInfo['feature'].str.contains('Hz')))
+            }
+    if SLAltModel:
+        regressorGroups = {
+            'kinematic': (
+                (columnInfo['feature'].str.contains('position')) |
+                (columnInfo['feature'].str.contains('velocity'))),
+            'kinandacr': (
+                (columnInfo['feature'].str.contains('position')) |
+                (columnInfo['feature'].str.contains('velocity')) |
+                (columnInfo['feature'].str.contains('ACR'))),
+            'kinandiar': (
+                (columnInfo['feature'].str.contains('position')) |
+                (columnInfo['feature'].str.contains('velocity')) |
+                (columnInfo['feature'].str.contains('Hz'))),
+            'acr': (
+                (columnInfo['feature'].str.contains('ACR'))),
+            'iar': (
+                (columnInfo['feature'].str.contains('Hz')))
+            }
+    #
+    featureSubsets = {k: [] for k in regressorGroups.keys()}
+    for key, maskArray in regressorGroups.items():
+        lags = columnInfo.loc[maskArray, 'lag'].unique()
+        for lag in lags:
+            subMask = columnInfo.loc[:, 'lag'] == lag
+            subMask = maskArray & subMask
+            theseIndexes = subMask.index[subMask].to_list()
+            featureSubsets[key].append(theseIndexes)
+    #
+    featureSubsetsList = []
+    if ILModel or SLModel:
+        for indexSet in product(*featureSubsets.values()):
+            fullSet = sorted(sum(indexSet, []))
+            if addInterceptToTDR:
+                fullSet += [-1]
+            featureSubsetsList.append(fullSet)
+    if SLAltModel:
+        featureSubsetsList = sorted(sum(featureSubsets.values(), []))
+        if addInterceptToTDR:
+            featureSubsetsList = [i + [-1] for i in featureSubsetsList]
+    gridParams = {
+        # 'regAlpha': np.round(
+        #     np.logspace(
+        #         np.log(0.05), np.log(0.0001), 5, base=np.exp(1)),
+        #     decimals=6),
+        'featureMask': featureSubsetsList
+    }
+    snr = SingleNeuronRegression(
         featuresDF=featuresDF,
-        targetDF=pd.DataFrame(targetDF * spkConversionFactor, dtype=np.int),
-        model=sm.GLM,
-        modelKWargs={'family': sm.families.Poisson()},
-        regAlpha=0.001, regL1Wt=0.5,
+        targetDF=targetDF,
         featureScalers=featureScalers, targetScalers=targetScalers,
-        timeAxisName='positionBin',
         addIntercept=addInterceptToTDR,
-        nPCAComponents=nPCAComponents, conditionNames=conditionNames,
+        model=SMWrapper,
+        modelKWargs=modelKWargs, cv=3, conditionNames=conditionNames,
         verbose=arguments['verbose'], plotting=arguments['plotting'])
-    tdr.fit()
+    snr.apply_gridSearchCV(gridParams)
+    snr.fit()
     estimatorMetadata = {
         'trainingDataPath': os.path.basename(triggeredPath),
         'path': os.path.basename(estimatorPath),
         'name': arguments['estimatorName'],
         'inputFeatures': targetDF.columns.to_list(),
-        'outputFeatures': tdr.regressorNames,
         'alignedAsigsKWargs': alignedAsigsKWargs,
         }
     with open(estimatorPath.replace('.joblib', '_meta.pickle'), 'wb') as f:
         pickle.dump(
             estimatorMetadata, f)
-    # pdb.set_trace()
+    
     if arguments['plotting']:
-        '''
-        targetGroupProjected = pd.DataFrame(
-            tdr.transform(targetDF),
-            index=targetDF.index,
-            columns=['TDR_{}'.format(i) for i in tdr.regressorNames])
-        targetGroupProjected.columns.name = 'feature'
-        targetGroupProjected.reset_index(inplace=True)
-        fig, ax = plt.subplots()
-        sns.lineplot(
-            x='bin', y='TDR_velocity_x#0', hue='pedalSizeCat',
-            data=targetGroupProjected, ci='sd', ax=ax)
-        plt.show()
-        '''
-        tdr.plot_xy()
+        snr.plot_xy()
     #
-    tdr.clear_data()
-    jb.dump(tdr, estimatorPath)
+    # snr.clear_data()
+    jb.dump(snr, estimatorPath)
     return
 
 
