@@ -27,6 +27,7 @@ import dataAnalysis.preproc.ns5 as ns5
 import quantities as pq
 import rcsanalysis.packet_func as rcsa_helpers
 import os, pdb
+import traceback
 from importlib import reload
 #  load options
 from currentExperiment import parseAnalysisOptions
@@ -51,21 +52,16 @@ def calcTrialAnalysisNix():
         samplingRate = float(arguments['samplingRate']) * pq.Hz
     else:
         samplingRate = float(1 / rasterOpts['binInterval']) * pq.Hz
-    #pdb.set_trace()
-    trialBasePath = os.path.join(
-        scratchFolder,
-        ns5FileName + '.nix'
-    )
+    #
     nspReader = neo.io.nixio_fr.NixIO(filename=trialBasePath)
     nspBlock = ns5.readBlockFixNames(nspReader, block_index=0)
-
+    #
     spikesBlock = hf.extractSignalsFromBlock(
         nspBlock, keepSpikes=True)
     spikesBlock = hf.loadBlockProxyObjects(spikesBlock)
     #  save ins time series
-    tdChanNames = ns5.listChanNames(nspBlock, arguments['chanQuery'], objType=AnalogSignalProxy)
-    #  if not (miniRCTrial or RCTrial):
-    #      tdChanNames += ['seg0_position', 'seg0_velocityCat']
+    tdChanNames = ns5.listChanNames(
+        nspBlock, arguments['chanQuery'], objType=AnalogSignalProxy)
     allSpikeTrains = [
         i
         for i in spikesBlock.filter(objects=SpikeTrain)
@@ -74,6 +70,9 @@ def calcTrialAnalysisNix():
         for segIdx, dataSeg in enumerate(spikesBlock.segments):
             spikeList = dataSeg.filter(objects=SpikeTrain)
             spikeList = ns5.loadContainerArrayAnn(trainList=spikeList)
+    #  parse any serial events
+    forceData = hf.parseFSE103Events(
+        spikesBlock, delay=9e-3, clipLimit=1e9, formatForce='f')
     #  merge events
     evList = []
     for key in ['property', 'value']:
@@ -95,7 +94,7 @@ def calcTrialAnalysisNix():
             allProp = allProp[evSortIdx]
             evList.append(allProp)
         else:
-            #  mini RC's don't have rig_events
+            #  RC's don't have rig_events
             allProp = insProp
             allProp.name = 'seg0_' + key
             evList.append(insProp)
@@ -148,7 +147,6 @@ def calcTrialAnalysisNix():
         expandCols=expandCols,
         deriveCols=deriveCols, progAmpNames=progAmpNames)
     columnsToBeAdded = ['amplitude', 'program'] + progAmpNames
-    # pdb.set_trace()
     # calc binarized and get new time axis
     if len(allSpikeTrains):
         spikeMatBlock = ns5.calcBinarizedArray(
@@ -179,10 +177,23 @@ def calcTrialAnalysisNix():
             'amplitude': 'seg0_amplitude',
             'program': 'seg0_program'
         }, inplace=True)
-    tdInterp = pd.concat((
-        tdInterp,
-        infoFromStimStatus.drop(columns='t')),
-        axis=1)
+    if forceData is not None:
+        forceDataInterp = hf.interpolateDF(
+            forceData, newT,
+            kind='linear', fill_value=(0, 0),
+            x='NSP Timestamp', columns=['forceX', 'forceY', 'forceZ'])
+        tdInterp = pd.concat((
+            tdInterp,
+            infoFromStimStatus.drop(columns='t'),
+            forceDataInterp.drop(columns='NSP Timestamp')),
+            axis=1)
+    else:
+        tdInterp = pd.concat((
+            tdInterp,
+            infoFromStimStatus.drop(columns='t')),
+            axis=1)
+    #  sanitizeColumns = [i if i.startswith('seg0_') else ('seg0_' + i) for i in tdInterp.columns]
+    #  tdInterp.columns = sanitizeColumns
     tdBlockInterp = ns5.dataFrameToAnalogSignals(
         tdInterp,
         idxT='t', useColNames=True,

@@ -50,6 +50,7 @@ import elephant as elph
 import umap
 import dill as pickle
 import joblib as jb
+from sklearn.manifold import TSNE
 #   you can specify options related to the analysis via the command line arguments,
 #   or by saving variables in the currentExperiment.py file, or the individual exp2019xxxxxxxx.py files
 #
@@ -100,7 +101,7 @@ alignedAsigsKWargs.update(dict(
     duplicateControlsByProgram=False,
     makeControlProgram=False,
     transposeToColumns='bin', concatOn='index',
-    removeFuzzyName=True,
+    removeFuzzyName=False,
     getMetaData=[
         'RateInHz', 'activeGroup', 'amplitude', 'amplitudeCat',
         'bin', 'electrode', 'pedalDirection', 'pedalMetaCat',
@@ -129,6 +130,11 @@ ssimsOpts = {
             'n_neighbors': 20, 'min_dist': 0.1,
             'n_components': 2, 'metric': 'euclidean'}
             }
+    #  {
+    #      'reducerClass': TSNE,
+    #      'reducerKWargs': {
+    #          'n_components': 2}
+    #          }
     }
 similarityMetaDataPath = triggeredPath.replace(
     '.nix', '_similarity_meta.pickle')
@@ -142,14 +148,17 @@ if os.path.exists(similarityMetaDataPath):
     sameDistOpts = (similarityMetaData['ssimsOpts']['distanceOpts'] == ssimsOpts['distanceOpts'])
     sameRedOpts = (similarityMetaData['ssimsOpts']['reducerOpts'] == ssimsOpts['reducerOpts'])
     if sameFeatures and sameDistOpts:
+        print('Reusing distance matrix')
         reloadFeatures = False
         simDF = pd.read_hdf(similarityH5Path, 'similarity')
     if sameRedOpts:
+        print('Reusing estimator')
         reloadEstimator = False
         estimator = jb.load(estimatorPath)
 #
 if reloadFeatures or reloadEstimator:
     globals().update(ssimsOpts)
+
 if reloadFeatures:
     if arguments['verbose']:
         print('Loading dataBlock: {}'.format(triggeredPath))
@@ -199,7 +208,7 @@ if reloadEstimator:
     estimator = reducerOpts['reducerClass'](**reducerOpts['reducerKWargs'])
     estimator.fit(simDF)
     jb.dump(estimator, estimatorPath)
-
+pdb.set_trace()
 similarityMetaData = {
     'alignedAsigsKWargs': alignedAsigsKWargs,
     'ssimsOpts': ssimsOpts
@@ -207,32 +216,56 @@ similarityMetaData = {
 with open(similarityMetaDataPath, 'wb') as f:
     pickle.dump(similarityMetaData, f)
 
+if 'embedding_' in dir(estimator):
+    embedding_ = estimator.embedding_
+else:
+    embedding_ = estimator.fit_transform(simDF.to_numpy())
+#
+trainingQuery = "(pedalSizeCat == 'M')"
+alignedAsigsKWargs['getMetaData'] = [
+    'RateInHzFuzzy', 'activeGroup', 'amplitudeFuzzy', 'amplitudeFuzzyCat',
+    'bin', 'electrodeFuzzy', 'pedalDirection', 'pedalMetaCat',
+    'pedalMovementCat', 'pedalMovementDuration',
+    'pedalSize', 'pedalSizeCat', 'pedalVelocityCat',
+    'programFuzzy', 'segment', 't']
+if trainingQuery is not None:
+    trainDF = simDF.query(trainingQuery)
+    embIndex = trainDF.index
+else:
+    trainDF = simDF
+    embIndex = simDF.index
+embedding_ = estimator.fit_transform(trainDF.to_numpy())
 embedding = pd.DataFrame(
-    estimator.embedding_,
-    index=simDF.index,
+    embedding_,
+    index=rasterDF.query(trainingQuery).index,
+    #index=embIndex,
     columns=[
         '{}_{}'.format(arguments['estimatorName'], i)
-        for i in range(estimator.embedding_.shape[1])])
-
+        for i in range(embedding_.shape[1])])
 embPlot = embedding.reset_index()
-embPlot['ACR'] = (
-    embPlot['amplitude'] *
-    embPlot['RateInHz'] /
+embPlot['ACRFuzzy'] = (
+    embPlot['amplitudeFuzzy'] *
+    embPlot['RateInHzFuzzy'] /
     1000)
 pdfPath = os.path.join(
     figureFolder,
     prefix + '_{}_ssims.pdf'.format(
         arguments['estimatorName']))
 cPalette = 'ch:0,0.4,dark=.2,light=0.6'
+embPlot['amplitudeFuzzy'] = embPlot['amplitudeFuzzy'] / 1e3
+embPlot['amplitudeFuzzy'] = embPlot['amplitudeFuzzy'].round(decimals = 1)
 ax = sns.scatterplot(
     x='{}_0'.format(arguments['estimatorName']),
     y='{}_1'.format(arguments['estimatorName']),
-    hue='t',
-    size='ACR', sizes=(50, 200),
-    style='program',
-    data=embPlot.query("(pedalSizeCat == 'M')"),
+    hue='amplitudeFuzzy',
+    size='amplitudeFuzzy', sizes=(50, 200),
+    style='electrodeFuzzy',
+    data=(
+        embPlot
+        .query("(programFuzzy == 0) | (programFuzzy == 2)")
+        ),
     palette=cPalette
-    )
+    ); plt.show()
 plt.savefig(pdfPath)
 # plt.close()
 plt.show()

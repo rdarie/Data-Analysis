@@ -38,6 +38,8 @@ OLSESTIMATOR="Trial001_${OLSBLOCKNAME}_long_midPeak"
 SELECTOR="Trial001_minfrmaxcorr"
 #
 module load anaconda/3-5.2.0
+. /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
+conda activate
 source activate nda
 # python3 ./calcTrialAnalysisNix.py --exp=$EXP --trialIdx=$TRIALIDX --chanQuery="all"
 # python3 ./calcMotionStimAlignTimes.py --exp=$EXP --trialIdx=$TRIALIDX --plotParamHistograms

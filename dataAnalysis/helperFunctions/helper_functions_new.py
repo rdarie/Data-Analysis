@@ -5,6 +5,7 @@ import sys, os, itertools
 #  import subprocess, collections, math, argparse
 import peakutils
 import random
+from tqdm import tqdm
 from collections.abc import Iterable
 import matplotlib.pyplot as plt
 #  import matplotlib.colors as colors
@@ -31,6 +32,7 @@ from sklearn.preprocessing import MinMaxScaler
 import datetime
 from datetime import datetime as dt
 import json
+from ctypes import c_uint8, c_uint32, c_float, Union, Array
 #  from tkinter import filedialog
 
 #  try:
@@ -3618,3 +3620,97 @@ def memory_usage_psutil():
     mem = process.memory_info()[0] / float(2 ** 20)
     return mem
 
+
+class asBytes(Array):
+    _type_ = c_uint8
+    _length_ = 4
+
+class exposedVar(Union):
+    _fields_ = [
+            ('bts', asBytes),
+            ('uint32', c_uint32),
+            ('float', c_float)
+            ]
+    
+def parseFSE103Events(spikesBlock, delay=0, clipLimit=100, formatForce='f'):
+    #
+    def readNBytes(packetData, i, n, byteOrder='bigEndian'):
+        reading = exposedVar()
+        for j in range(n):
+            if byteOrder == 'bigEndian':
+                k = n - j - 1
+            elif byteOrder == 'smallEndian':
+                k = j
+            reading.bts[k] = int(packetData.labels[i])
+            i += 1
+        return reading, i
+    #
+    def readUInt32(packetData, i):
+        reading, i = readNBytes(packetData, i, 4)
+        return reading.uint32, i
+    #
+    def readFloat(packetData, i):
+        reading, i = readNBytes(packetData, i, 4)
+        return reading.float, i
+    #
+    try:
+        packetData = spikesBlock.filter(
+            objects=Event, name='seg0_serial_input_port')[0]
+    except Exception:
+        traceback.print_exc()
+        return
+    data = pd.DataFrame(
+        [], index=[], columns=[
+            'forceX', 'forceY', 'forceZ',
+            'Device Timestamp', 'NSP Timestamp'])
+    i = 0
+    readingIdx = 0
+    nPackets = len(packetData)
+    progBar = tqdm(total=nPackets)
+    while i < nPackets:
+        progBar.update(n=20)
+        try:
+            wrongMessage = False
+            # First byte (0x0D)
+            firstByte = int(packetData.labels[i])
+            i += 1
+            while firstByte != 0x0D:
+                firstByte = int(packetData.labels[i])
+                i += 1
+            # Message Size
+            messageSize = int(packetData.labels[i])
+            i += 1
+            # Message Type
+            messageType = int(packetData.labels[i])
+            i += 1
+            if bin(messageType) != bin(ord(formatForce)):
+                tqdm.write("Wrong message at {}".format(i))
+                i += messageSize - 3
+                wrongMessage = True
+            if not wrongMessage:
+                thisReading = pd.DataFrame(
+                    np.zeros((1, len(data.columns))),
+                    index=[readingIdx], columns=data.columns)
+                thisReading.loc[readingIdx, 'NSP Timestamp'] = float(packetData.times[i])
+                devTimeStamp, i = readUInt32(packetData, i)
+                thisReading.loc[readingIdx, 'Device Timestamp'] = devTimeStamp
+                forceX, i = readFloat(packetData, i)
+                thisReading.loc[readingIdx, 'forceX'] = forceX
+                forceY, i = readFloat(packetData, i)
+                thisReading.loc[readingIdx, 'forceY'] = forceY
+                forceZ, i = readFloat(packetData, i)
+                thisReading.loc[readingIdx, 'forceZ'] = forceZ
+            # Last byte should be (0xFF)
+            lastByte = int(packetData.labels[i])
+            i += 1
+            if lastByte == 0xFF and not wrongMessage:
+                data = data.append(thisReading)
+                readingIdx += 1
+        except Exception:
+            continue
+    progBar.close()
+    data['NSP Timestamp'] += delay
+    data.loc[:, ('forceX', 'forceY', 'forceZ')] = (
+        data.loc[:, ('forceX', 'forceY', 'forceZ')]
+        .clip(lower=-1*clipLimit, upper=1*clipLimit))
+    return data

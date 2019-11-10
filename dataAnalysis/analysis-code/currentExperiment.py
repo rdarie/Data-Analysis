@@ -1,4 +1,4 @@
-import os, pdb
+import os, pdb, platform
 #  import dataAnalysis.helperFunctions.kilosort_analysis as ksa
 import dataAnalysis.helperFunctions.probe_metadata as prb_meta
 import importlib
@@ -9,10 +9,12 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
     expOpts = optsModule.getExpOpts()
     #  globals().update(expOpts)
     #  remote paths
-    remoteBasePath = '..'
-    scratchPath = '/gpfs/scratch/rdarie/rdarie/Murdoc Neural Recordings'
-    #  remoteBasePath = os.path.join('E:', 'Murdoc Neural Recordings')
-    #  scratchPath = os.path.join('E:', 'Murdoc Neural Recordings', 'scratch')
+    if platform.system() == 'Linux':
+        remoteBasePath = '..'
+        scratchPath = '/gpfs/scratch/rdarie/rdarie/Murdoc Neural Recordings'
+    else:
+        remoteBasePath = os.path.join('E:', 'Murdoc Neural Recordings')
+        scratchPath = os.path.join('E:', 'Murdoc Neural Recordings', 'scratch')
     nspPrbPath = os.path.join('.', 'nsp_map.prb')
     insFolder = os.path.join(remoteBasePath, 'ORCA Logs')
     experimentName = expOpts['experimentName']
@@ -55,7 +57,7 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
             'btype': 'high',
             'ftype': 'butter'
         }
-    }
+        }
     miniRCTrial = miniRCTrialLookup[trialIdx]
     RCTrial = RCTrialLookup[trialIdx]
     

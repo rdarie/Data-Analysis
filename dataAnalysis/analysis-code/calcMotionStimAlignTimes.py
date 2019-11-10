@@ -464,15 +464,22 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
             categories.loc[pMask, 'electrodeFuzzy'] = elecName
 
     alignEventsDF = pd.concat([alignTimes, categories], axis=1)
+    stripColumnNames = [
+        i.replace('Fuzzy', '')
+        for i in alignEventsDF.columns
+        if (('Fuzzy' in i) and (i.replace('Fuzzy', '') in alignEventsDF.columns))]
+    alignEventsDF.drop(columns=stripColumnNames, inplace=True)
+    alignEventsDF.columns = [i.replace('Fuzzy', '') for i in alignEventsDF.columns]
+    pdb.set_trace()
     alignEvents = preproc.eventDataFrameToEvents(
         alignEventsDF, idxT='t',
         annCol=None,
         eventName='seg{}_motionStimAlignTimes'.format(segIdx),
         tUnits=pq.s, makeList=False)
     alignEvents.annotate(nix_name=alignEvents.name)
-    #  pdb.set_trace()
+    #
     concatLabelColumns = [
-        i + 'Fuzzy'
+        i
         for i in fuzzyCateg + ['electrode']
         ] + [
             'pedalMovementCat', 'pedalMetaCat',
