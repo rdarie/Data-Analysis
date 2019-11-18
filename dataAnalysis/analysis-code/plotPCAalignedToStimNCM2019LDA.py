@@ -17,7 +17,6 @@ from exp201901271000 import *
 from joblib import dump, load
 import quantities as pq
 from statsmodels.stats.weightstats import ttest_ind
-import getConditionAverages as tempgca
 
 from sklearn.pipeline import Pipeline
 from sklearn.decomposition import PCA
@@ -93,8 +92,6 @@ featuresDF.reset_index(inplace=True)
 featuresDF.loc[featuresDF['amplitudeFuzzy'] == 0, 'programFuzzy'] = -1
 
 posDF = featuresDF.query('amplitudeFuzzy==0')
-
-pdb.set_trace()
 
 meanMarkerAlpha = 1
 meanMarkerSize = 60

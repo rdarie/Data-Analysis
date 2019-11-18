@@ -470,7 +470,7 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         if (('Fuzzy' in i) and (i.replace('Fuzzy', '') in alignEventsDF.columns))]
     alignEventsDF.drop(columns=stripColumnNames, inplace=True)
     alignEventsDF.columns = [i.replace('Fuzzy', '') for i in alignEventsDF.columns]
-    pdb.set_trace()
+    
     alignEvents = preproc.eventDataFrameToEvents(
         alignEventsDF, idxT='t',
         annCol=None,

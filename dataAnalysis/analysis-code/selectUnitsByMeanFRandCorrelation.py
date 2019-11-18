@@ -63,7 +63,7 @@ def selFun(
     return unitMask[unitMask].index.to_list()
 
 
-thisCorrThresh = 1
+thisCorrThresh = .95
 outputFeatures = selFun(meanFRDF, corrDF, corrThresh=thisCorrThresh)
 
 

@@ -3032,11 +3032,11 @@ def readPiJsonLog(filePaths, zeroTime = False):
     return logs, trialStatsAll
 '''
 
-'''
-def plotConfusionMatrix(cm, classes,
-                          normalize=False,
-                          title='Confusion matrix',
-                          cmap=plt.cm.Blues):
+def plotConfusionMatrix(
+        cm, classes,
+        normalize=False,
+        title='Confusion matrix',
+        cmap=plt.cm.Blues):
     """
     This function prints and plots the confusion matrix.
     Normalization can be applied by setting `normalize=True`.
@@ -3052,7 +3052,6 @@ def plotConfusionMatrix(cm, classes,
 
     plt.imshow(cm, interpolation='nearest', cmap=cmap)
 
-    #np.set_printoptions(precision=2)
     plt.title(title)
     tick_marks = np.arange(len(classes))
     plt.xticks(tick_marks, classes, rotation=45)
@@ -3071,7 +3070,6 @@ def plotConfusionMatrix(cm, classes,
     plt.xlabel('Predicted label')
 
     return fi
-'''
 
 '''
 def plotFeature(X, y):
@@ -3658,7 +3656,9 @@ def parseFSE103Events(spikesBlock, delay=0, clipLimit=100, formatForce='f'):
             objects=Event, name='seg0_serial_input_port')[0]
     except Exception:
         traceback.print_exc()
-        return
+        return None
+    if not len(packetData):
+        return None
     data = pd.DataFrame(
         [], index=[], columns=[
             'forceX', 'forceY', 'forceZ',

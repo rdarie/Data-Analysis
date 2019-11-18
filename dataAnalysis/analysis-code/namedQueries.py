@@ -71,10 +71,43 @@ namedQueries['align'].update({
         ])
     })
 namedQueries['align'].update({
-    'midPeakWithStim50HzCCW': '&'.join([
-        namedQueries['align']['RateInHz==50or0'],
+    'midPeakCCW': '&'.join([
         namedQueries['align']['midPeak'],
         namedQueries['align']['CCW']
+        ])
+    })
+namedQueries['align'].update({
+    'midPeakCW': '&'.join([
+        namedQueries['align']['midPeak'],
+        namedQueries['align']['CW']
+        ])
+    })
+namedQueries['align'].update({
+    'midPeakM_CCW': '&'.join([
+        namedQueries['align']['midPeak'],
+        namedQueries['align']['CCW'],
+        "(pedalSizeCat=='M')"
+        ])
+    })
+namedQueries['align'].update({
+    'midPeakM_CW': '&'.join([
+        namedQueries['align']['midPeak'],
+        namedQueries['align']['CW'],
+        "(pedalSizeCat=='M')"
+        ])
+    })
+namedQueries['align'].update({
+    'outboundM_CCW': '&'.join([
+        namedQueries['align']['outbound'],
+        namedQueries['align']['CCW'],
+        "(pedalSizeCat=='M')"
+        ])
+    })
+namedQueries['align'].update({
+    'outboundM_CW': '&'.join([
+        namedQueries['align']['outbound'],
+        namedQueries['align']['CW'],
+        "(pedalSizeCat=='M')"
         ])
     })
 namedQueries['align'].update({
@@ -82,6 +115,12 @@ namedQueries['align'].update({
         namedQueries['align']['noStim'],
         namedQueries['align']['midPeak'],
         namedQueries['align']['CCW']
+        ])
+    })
+namedQueries['align'].update({
+    'midPeakNoStim': '&'.join([
+        namedQueries['align']['noStim'],
+        namedQueries['align']['midPeak'],
         ])
     })
 namedQueries['align'].update({

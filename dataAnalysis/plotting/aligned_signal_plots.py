@@ -389,6 +389,16 @@ def genXLimSetter(newLims):
     return xLimSetter
 
 
+def genYLimSetter(newLims):
+    def yLimSetter(g, ro, co, hu, dataSubset):
+        oldLims = g.axes[ro, co].get_ylim()
+        g.axes[ro, co].set_ylim(
+            [max(oldLims[0], newLims[0]), min(oldLims[1], newLims[1])]
+        )
+        return
+    return yLimSetter
+
+
 def xLabelsTime(g, ro, co, hu, dataSubset):
     if ro == g.axes.shape[0] - 1:
         g.axes[ro, co].set_xlabel('Time (sec)')

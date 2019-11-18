@@ -1976,6 +1976,8 @@ def getINSStimOnset(
             .loc[stimOffIdx, 't']
             ) * pq.s
         #
+        # pdb.set_trace()
+        # elecConfiguration
         electrodeCombo = 'g{:d}p{:d}'.format(activeGroup, activeProgram)
         if len(theseOnsetTimestamps):
             thisUnit = block.filter(

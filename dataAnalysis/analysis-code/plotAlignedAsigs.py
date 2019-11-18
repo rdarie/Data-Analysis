@@ -96,6 +96,7 @@ statsTestOpts.update({
     'testStride': 50e-3,
     'testWidth': 100e-3,
     'tStop': 2000e-3})
+limitPages = None
 #  End Overrides
 #  Get stats results
 if os.path.exists(statsTestPath):
@@ -108,10 +109,12 @@ else:
         dataBlock, statsTestPath,
         loadArgs=alignedAsigsKWargs,
         rowColOpts=rowColOpts,
+        limitPages=limitPages,
         statsTestOpts=statsTestOpts)
 #
 asp.plotAsigsAligned(
     dataBlock,
+    limitPages=limitPages,
     verbose=arguments['verbose'],
     loadArgs=alignedAsigsKWargs,
     sigTestResults=sigValsWide,
@@ -123,7 +126,7 @@ asp.plotAsigsAligned(
         asp.xLabelsTime,
         asp.genVLineAdder(0, vLineOpts),
         asp.genLegendRounder(decimals=2),
-        # asp.genXLimSetter(alignedAsigsKWargs['windowSize'])
+        asp.genYLimSetter([0, 150])
         ],
     pdfName=pdfName,
     **rowColOpts,

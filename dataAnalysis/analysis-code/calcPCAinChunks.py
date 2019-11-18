@@ -26,9 +26,9 @@ from sklearn.decomposition import PCA, IncrementalPCA
 from sklearn.pipeline import make_pipeline, Pipeline
 import joblib as jb
 import dill as pickle
+import gc
 from currentExperiment import parseAnalysisOptions
 from docopt import docopt
-import gc
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['trialIdx']), arguments['exp'])

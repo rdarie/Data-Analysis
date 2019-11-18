@@ -21,15 +21,15 @@
 #SBATCH --account=bibs-dborton-condo
 
 # Request custom resources
-#SBATCH --array=1,2
+#SBATCH --array=1,2,3,4
 
-SLURM_ARRAY_TASK_ID="2"
+# SLURM_ARRAY_TASK_ID="2"
 # EXP="exp201901070700"
 # EXP="exp201901201200"
-EXP="exp201901211000"
+# EXP="exp201901211000"
 # EXP="exp201901221000"
 # EXP="exp201901231000"
-# EXP="exp201901271000"
+EXP="exp201901271000"
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
@@ -38,7 +38,7 @@ conda activate
 source activate nda
 python --version
 
-# python ./calcTrialAnalysisNix.py --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID --chanQuery="all"
+python ./calcTrialAnalysisNix.py --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID --chanQuery="all"
 python ./calcFR.py --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID
 python ./calcFRsqrt.py --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID
 python ./calcMotionStimAlignTimes.py --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID --plotParamHistograms

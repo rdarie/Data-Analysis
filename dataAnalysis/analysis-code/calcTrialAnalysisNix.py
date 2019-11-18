@@ -123,7 +123,6 @@ def calcTrialAnalysisNix():
     writer.write_block(spikesBlock, use_obj_names=True)
     writer.close()
     #
-    #
     tdBlock = hf.extractSignalsFromBlock(
         nspBlock, keepSpikes=False, keepSignals=tdChanNames)
     tdBlock = hf.loadBlockProxyObjects(tdBlock)
@@ -192,8 +191,7 @@ def calcTrialAnalysisNix():
             tdInterp,
             infoFromStimStatus.drop(columns='t')),
             axis=1)
-    #  sanitizeColumns = [i if i.startswith('seg0_') else ('seg0_' + i) for i in tdInterp.columns]
-    #  tdInterp.columns = sanitizeColumns
+    #
     tdBlockInterp = ns5.dataFrameToAnalogSignals(
         tdInterp,
         idxT='t', useColNames=True,

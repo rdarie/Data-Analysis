@@ -91,7 +91,7 @@ pdfName = '{}_neurons_{}_{}'.format(
 statsTestOpts.update({'tStop': rasterOpts['windowSizes'][arguments['window']][1]})
 statsTestPath = os.path.join(analysisSubFolder, pdfName + '_stats.h5')
 #  Overrides
-alignedAsigsKWargs.update({'windowSize': (-50e-3, 250e-3)})
+alignedAsigsKWargs.update({'windowSize': (-1000e-3, 1000e-3)})
 statsTestOpts.update({
     'testStride': 5e-3,
     'testWidth': 10e-3,
@@ -130,6 +130,7 @@ asp.plotNeuronsAligned(
     plotProcFuns=[
         asp.xLabelsTime, asp.genLegendRounder(decimals=2),
         asp.genDespiner(right=False, left=True, trim=True),
+        asp.genYLimSetter((0, 150)),
         asp.genVLineAdder(0, nrnVLineOpts)],
     pdfName=pdfName,
     **rowColOpts,

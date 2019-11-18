@@ -7,14 +7,14 @@
 
 # Request memory:
 #SBATCH --nodes=1
-#SBATCH --mem=59G
+#SBATCH --mem=128G
 
 # Specify a job name:
-#SBATCH -J calc_pca
+#SBATCH -J plotsMGH
 
 # Specify an output file
-#SBATCH -o ../batch_logs/%j-calc_pca.stdout
-#SBATCH -e ../batch_logs/%j-calc_pca.errout
+#SBATCH -o ../batch_logs/%j-plotsMGH.stdout
+#SBATCH -e ../batch_logs/%j-plotsMGH.errout
 
 # Specify account details
 #SBATCH --account=bibs-dborton-condo
@@ -38,7 +38,7 @@ conda activate
 source activate nda
 python --version
 
-#  python3 ./calcUnitMeanFR.py --exp=$EXP --processAll --inputBlockName="fr" --alignQuery="midPeak" --unitQuery="fr" --verbose
-#  python3 ./calcUnitCorrelation.py --exp=$EXP --processAll --inputBlockName="fr" --alignQuery="midPeak" --unitQuery="fr" --verbose
-python3 ./selectUnitsByMeanFRandCorrelation.py --exp=$EXP --processAll --verbose
-#  python3 ./calcPCAinChunks.py --exp=$EXP --processAll --window=long --selector=$SELECTOR $LAZINESS --verbose
+# python3 ./calcUnitMeanFR.py --exp=$EXP --processAll --inputBlockName="fr" --alignQuery="midPeak" --unitQuery="fr" --verbose
+# python3 ./calcUnitCorrelation.py --exp=$EXP --processAll --inputBlockName="fr" --alignQuery="midPeak" --unitQuery="fr" --verbose
+# python3 ./selectUnitsByMeanFRandCorrelation.py --exp=$EXP --processAll --verbose
+python3 ./plotMGH2019.py --exp=$EXP --processAll $LAZINESS --window="long" --selector=$SELECTOR --verbose

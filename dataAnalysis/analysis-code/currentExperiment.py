@@ -284,19 +284,23 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
     if not os.path.exists(spikeSortingFiguresFolder):
         os.makedirs(spikeSortingFiguresFolder, exist_ok=True)
     #
-    alignedAsigsKWargs = {}
-    if (miniRCTrial or RCTrial):
-        alignedAsigsKWargs.update(dict(
-            amplitudeColumn='amplitude',
-            programColumn='program',
-            electrodeColumn='electrode',
-            removeFuzzyName=False))
-    else:
-        alignedAsigsKWargs.update(dict(
-            amplitudeColumn='amplitudeFuzzy',
-            programColumn='programFuzzy',
-            electrodeColumn='electrodeFuzzy',
-            removeFuzzyName=True))
+    alignedAsigsKWargs = dict(
+        amplitudeColumn='amplitude',
+        programColumn='program',
+        electrodeColumn='electrode',
+        removeFuzzyName=False)
+    # if (miniRCTrial or RCTrial):
+    #     alignedAsigsKWargs.update(dict(
+    #         amplitudeColumn='amplitude',
+    #         programColumn='program',
+    #         electrodeColumn='electrode',
+    #         removeFuzzyName=False))
+    # else:
+    #     alignedAsigsKWargs.update(dict(
+    #         amplitudeColumn='amplitudeFuzzy',
+    #         programColumn='programFuzzy',
+    #         electrodeColumn='electrodeFuzzy',
+    #         removeFuzzyName=True))
     #
     overrideChanNames = None
     # overrideChanNames = [
