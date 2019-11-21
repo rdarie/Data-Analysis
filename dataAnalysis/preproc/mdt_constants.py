@@ -7,6 +7,13 @@ sampleRate = {
     240: None
     }
 
+cycleUnits = {
+    # ushort, convert to seconds
+    0: 100e-3,
+    1: 1,
+    2: 10,
+    }
+
 muxIdx = {
     0: None,
     1: 0,

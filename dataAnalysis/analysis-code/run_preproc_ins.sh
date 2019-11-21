@@ -36,6 +36,6 @@ conda activate
 source activate nda
 python --version
 
-SLURM_ARRAY_TASK_ID=1
-python3 './preprocINS.py' --trialIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP
+# SLURM_ARRAY_TASK_ID=1
+python3 './preprocINS.py' --trialIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --showPlots
 # python3 './preprocINS.py' --trialIdx=1 --exp=$EXP --showPlots

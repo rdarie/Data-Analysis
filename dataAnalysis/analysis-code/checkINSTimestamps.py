@@ -83,7 +83,7 @@ dataQuery = ' & '.join([
     '(amplitude > 0)',
     '(usedSlotToDetect == True)'
     ])
-pdb.set_trace()
+
 g = sns.catplot(
     x='amplitude', y='offsetFromLogged',
     hue='RateInHz', col='feature', kind='box',

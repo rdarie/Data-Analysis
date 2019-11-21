@@ -165,7 +165,7 @@ insInterpBlock = ns5.dataFrameToAnalogSignals(
     probeName='insTD', samplingRate=dummyAsig.sampling_rate,
     dataCol=interpCols,
     forceColNames=interpCols)
-#pdb.set_trace()
+##)
 for iAsig in insInterpBlock.filter(objects=AnalogSignal):
     origAsigList = insBlock.filter(objects=AnalogSignal, name=iAsig.name)
     if len(origAsigList):
@@ -238,7 +238,7 @@ alignEvents = ns5.eventDataFrameToEvents(
 alignEvents.annotate(nix_name=alignEvents.name)
 insInterpBlock.segments[0].events.append(alignEvents)
 alignEvents.segment = insInterpBlock.segments[0]
-#  pdb.set_trace()
+#  #)
 concatLabelsDF = alignEventsDF
 concatLabels = np.array([
     '{}'.format(row)

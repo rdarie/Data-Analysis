@@ -48,7 +48,7 @@ dummyData = nsxFile.getdata(1)
 elec_ids = range(1,97)
 elecGroupNames = ['Utah', 'NForm']
 start_time_s = 0 # 0 is default for all
-    #import pdb; pdb.set_trace()
+    #import pdb; #)
 
 if arguments['nSec']:
     if arguments['nSec'] != 'all':

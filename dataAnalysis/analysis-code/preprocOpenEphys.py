@@ -24,7 +24,7 @@ expOpts, allOpts = parseAnalysisOptions(
     int(arguments['trialIdx']), arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
-# pdb.set_trace()
+# #)
 # trialList = sorted([
 #     f
 #     for f in os.listdir(oeFolder)

@@ -176,7 +176,7 @@ for trialIdx in trialsToAnalyze:
             plotting=False)
     oeChosenMask = insTensTimes.isin(insTensTimesChosen).to_numpy()
     keepMask = ~(trialInfoDF.loc[trialIdx, 'insTensExcludeMask'][oeChosenMask])
-    #pdb.set_trace()
+    ##)
     synchPolyCoeffs = np.polyfit(
         x=insTensTimesChosen.values[keepMask],
         y=openEphysTensTimes.values[keepMask],
@@ -213,7 +213,7 @@ for trialIdx in trialsToAnalyze:
     alignEventsDF = pd.DataFrame({
         't': alignedPulseTimes,
         'amplitude': np.around(trialInfoDF.loc[trialIdx, 'insStimAmps'].flatten(), decimals=3)})
-    # pdb.set_trace()
+    # #)
     alignEventsDF.loc[:, 'stimCat'] = 'stimOn'
     alignEventsDF.loc[:, 'RateInHz'] = 2
     alignEventsDF.loc[:, 'program'] = 0
@@ -226,7 +226,7 @@ for trialIdx in trialsToAnalyze:
     alignEvents.annotate(nix_name=alignEvents.name)
     insInterpBlock.segments[0].events.append(alignEvents)
     alignEvents.segment = insInterpBlock.segments[0]
-    #  pdb.set_trace()
+    #  #)
     concatLabelsDF = alignEventsDF
     concatLabels = np.array([
         '{}'.format(row)

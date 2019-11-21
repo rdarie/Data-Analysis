@@ -91,7 +91,7 @@ modelResultsDF = pd.concat(modelResults, names=['trainSet']).reset_index()
 ax = sns.lineplot(x='xDim', y='sse', hue='method', style='trainSet', data=modelResultsDF)
 plt.savefig(os.path.join(figureFolder, 'gpfa_reconstruction_error.pdf'))
 plt.close()
-#pdb.set_trace()
+##)
 # stdout=subprocess.PIPE
 #print(result.stdout)
 # plt.spy(alignedRasterList[2]); plt.show()

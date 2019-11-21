@@ -64,5 +64,3 @@ for n in chansToAlignNames:
 windowSize = [
     i * pq.s
     for i in rasterOpts['windowSizes'][arguments['window']]]
-
-pdb.set_trace()

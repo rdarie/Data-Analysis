@@ -33,7 +33,7 @@ if not os.path.exists(subDir):
 
 elec_ids = range(1,97) # 'all' is default for all (1-indexed)
 start_time_s = 0 # 0 is default for all
-    #import pdb; pdb.set_trace()
+    #import pdb; #)
 
 # Open file and extract headers
 nsxFile = NsxFile(filePath)

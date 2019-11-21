@@ -83,7 +83,7 @@ else:
 #   i.e. how many seconds of data to select around the triggering time
 #   since neo uses the quantities package (pq for short) to keep track of units of measurement,
 #   here i am converting that window information into seconds
-pdb.set_trace()
+
 windowSize = [
     i * pq.s
     for i in rasterOpts['windowSizes'][arguments['window']]]

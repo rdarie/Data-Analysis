@@ -173,7 +173,7 @@ def getINSTDFromJson(
                 tdData['time_master'] = (
                     tdData['time_master'] - pd.Timestamp('2000-03-01')) / (
                     datetime.timedelta(seconds=1))
-                # pdb.set_trace()
+                # 
                 tdData = hf.interpolateDF(
                     tdData, uniformT, x='t', kind='cubic',
                     columns=channelsPresent, fill_value=(0, 0))
@@ -1692,7 +1692,7 @@ def getINSStimOnset(
         # minROIWid = 150e-3 # StimLog timestamps only reliable within 50 msec
         gaussWidIdx = int(gaussWid * fs)
         nominalStimOnIdx = group.loc[groupAmpMask, 't'].index[0]
-        # pdb.set_trace()
+        # 
         nominalStimOnT = tdSeg.loc[nominalStimOnIdx, 't']
         # 
         lastAmplitude = tdDF.loc[max(nominalStimOnIdx - 1, 0), ampColName]
@@ -1807,6 +1807,7 @@ def getINSStimOnset(
         ROIMaskOnset.iloc[-1] = True
         tdSegDetect = tdSeg.set_index('t')
         plottingEnabled = (name in plotting) # and (not resolvedSlots)
+        
         detectSignal, foundTimestamp, usedExpectedT = extractArtifactTimestampsNew(
             tdSegDetect,
             fs,
@@ -1975,8 +1976,6 @@ def getINSStimOnset(
             group
             .loc[stimOffIdx, 't']
             ) * pq.s
-        #
-        # pdb.set_trace()
         # elecConfiguration
         electrodeCombo = 'g{:d}p{:d}'.format(activeGroup, activeProgram)
         if len(theseOnsetTimestamps):
@@ -1984,6 +1983,44 @@ def getINSStimOnset(
                 objects=Unit,
                 name=electrodeCombo
                 )[0]
+            thisElecConfig = elecConfiguration[activeGroup][activeProgram]
+            if thisElecConfig['cyclingEnabled']:
+                thisCycleOnTime = (
+                    thisElecConfig['cycleOnTime']['time'] *
+                    mdt_constants.cycleUnits[thisElecConfig['cycleOnTime']['units']] *
+                    pq.s
+                    )
+                thisCycleOffTime = (
+                    thisElecConfig['cycleOffTime']['time'] *
+                    mdt_constants.cycleUnits[thisElecConfig['cycleOffTime']['units']] *
+                    pq.s
+                    )
+                tempOnTimes = []
+                tempOffTimes = []
+                tempOnDiffsE = []
+                tempOnDiffsL = []
+                for idx, onTime in enumerate(theseOnsetTimestamps):
+                    offTime = theseOffsetTimestamps[idx]
+                    # pdb.set_trace()
+                    interCycleInterval = (
+                        thisCycleOffTime +
+                        cyclePeriodCorrection * pq.s +
+                        thisCycleOnTime)
+                    pulseOnTimes = np.arange(
+                        onTime, offTime,
+                        interCycleInterval) * onTime.units
+                    pulseOffTimes = pulseOnTimes + thisCycleOnTime
+                    tempOnTimes.append(pulseOnTimes)
+                    tempOffTimes.append(pulseOffTimes)
+                    onDiffE = onsetDifferenceFromExpected[idx]
+                    tempOnDiffsE.append(pulseOnTimes ** 0 * onDiffE)
+                    onDiffL = onsetDifferenceFromLogged[idx]
+                    tempOnDiffsL.append(pulseOnTimes ** 0 * onDiffL)
+                #
+                theseOnsetTimestamps = np.concatenate(tempOnTimes) * onTime.units
+                theseOffsetTimestamps = np.concatenate(tempOffTimes) * offTime.units
+                onsetDifferenceFromExpected = np.concatenate(tempOnDiffsE) * onTime.units
+                onsetDifferenceFromLogged = np.concatenate(tempOnDiffsL) * offTime.units
             if treatAsSinglePulses:
                 tempOnTimes = []
                 tempOffTimes = []
@@ -2002,10 +2039,11 @@ def getINSStimOnset(
                     tempOnDiffsE.append(pulseOnTimes ** 0 * onDiffE)
                     onDiffL = onsetDifferenceFromLogged[idx]
                     tempOnDiffsL.append(pulseOnTimes ** 0 * onDiffL)
-                theseOnsetTimestamps = np.concatenate(tempOnTimes)
-                theseOffsetTimestamps = np.concatenate(tempOffTimes)
-                onsetDifferenceFromExpected = np.concatenate(tempOnDiffsE)
-                onsetDifferenceFromLogged = np.concatenate(tempOnDiffsL)
+                theseOnsetTimestamps = np.concatenate(tempOnTimes) * onTime.units
+                theseOffsetTimestamps = np.concatenate(tempOffTimes) * offTime.units
+                onsetDifferenceFromExpected = np.concatenate(tempOnDiffsE) * onTime.units
+                onsetDifferenceFromLogged = np.concatenate(tempOnDiffsL) * offTime.units
+            #
             ampList = theseOnsetTimestamps ** 0 * 100 * thisAmplitude * pq.uA
             rateList = theseOnsetTimestamps ** 0 * stimRate * pq.Hz
             pwList = theseOnsetTimestamps ** 0 * 10 * stimPW * pq.us

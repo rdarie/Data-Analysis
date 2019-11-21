@@ -235,7 +235,6 @@ def calcUnitRegressionToAsig():
                     dropColumns.append(name)
         except Exception:
             traceback.print_exc()
-            pdb.set_trace()
         featuresDF.drop(columns=dropColumns, inplace=True)
         featuresDF.columns = featuresDF.columns.remove_unused_levels()
         featuresDF.index = metaData

@@ -49,7 +49,7 @@ spChanIdx = [
 #  [i.name for i in spChanIdx]
 #  [len(i.units) for i in dataBlock.filter(objects=ChannelIndex)]
 #  ['elec' in i.name for i in dataBlock.filter(objects=ChannelIndex)]
-#  pdb.set_trace()
+#  #)
 spikes = preproc.channelIndexesToSpikeDict(spChanIdx)
 
 spikes['Units'] = 'a.u. (z-score)'

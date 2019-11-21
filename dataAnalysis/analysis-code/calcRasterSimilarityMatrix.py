@@ -208,7 +208,7 @@ if reloadEstimator:
     estimator = reducerOpts['reducerClass'](**reducerOpts['reducerKWargs'])
     estimator.fit(simDF)
     jb.dump(estimator, estimatorPath)
-pdb.set_trace()
+
 similarityMetaData = {
     'alignedAsigsKWargs': alignedAsigsKWargs,
     'ssimsOpts': ssimsOpts

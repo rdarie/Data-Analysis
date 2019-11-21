@@ -144,7 +144,7 @@ def calcUnitRegressionToAsig():
     featuresDF['position_y#0'] = np.sin(featuresDF['position#0'] * 100 * 2 * np.pi / 360)
     featuresDF['velocity_x#0'] = featuresDF['position_y#0'] * (-1) * (featuresDF['velocity#0'] * 3e2)
     featuresDF['velocity_y#0'] = featuresDF['position_x#0'] * (featuresDF['velocity#0'] * 3e2)
-    # pdb.set_trace()
+    # #)
     featuresDF.drop(
         columns=[
             'program{}_amplitude#0'.format(pNum)
@@ -170,7 +170,7 @@ def calcUnitRegressionToAsig():
         'program2_ACR#0': [1],
         'program3_ACR#0': [1]
         }
-    # pdb.set_trace()
+    # #)
     nPCAComponents = 12
     conditionNames = [
         'RateInHz', 'program', 'amplitudeCat',
@@ -200,7 +200,7 @@ def calcUnitRegressionToAsig():
     with open(estimatorPath.replace('.joblib', '_meta.pickle'), 'wb') as f:
         pickle.dump(
             estimatorMetadata, f)
-    # pdb.set_trace()
+    # #)
     if arguments['plotting']:
         '''
         targetGroupProjected = pd.DataFrame(

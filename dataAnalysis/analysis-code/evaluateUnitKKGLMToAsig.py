@@ -68,7 +68,7 @@ with open(
 estimator = jb.load(
     os.path.join(analysisSubFolder, estimatorMetadata['path']))
 #
-pdb.set_trace()
+
 rsquared = np.array([regDict['pseudorsquared'] for regDict in estimator.regressionList if np.isfinite(regDict['pseudorsquared'])])
 
 ax = sns.distplot(rsquared[rsquared>0])

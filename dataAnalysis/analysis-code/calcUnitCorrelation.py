@@ -64,7 +64,6 @@ alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **argu
 alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
     namedQueries, scratchFolder, **arguments)
 
-pdb.set_trace()
 correlationDF = ash.applyFun(
     triggeredPath=triggeredPath, resultPath=resultPath,
     resultNames=[arguments['resultName']],

@@ -96,10 +96,10 @@ except Exception:
 allTapTimestampsNSP = []
 print('Detecting NSP Timestamps...')
 #  TODO: detect all in one, should be easy enough
-#  pdb.set_trace()
+#  #)
 for trialSegment in pd.unique(td['data']['trialSegment']):
     #  Where in NSP to look
-    #  pdb.set_trace()
+    #  #)
     tStart = sessionTapRangesNSP[trialIdx][trialSegment]['timeRanges'][0]
     tStop = sessionTapRangesNSP[trialIdx][trialSegment]['timeRanges'][1]
     nspMask = (channelData['t'] > tStart) & (channelData['t'] < tStop)

@@ -106,7 +106,7 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         eventDF, idxT='t', namePrefix='', expandCols=expandCols,
         deriveCols=deriveCols, progAmpNames=progAmpNames)
     print('Usign alignTimeBounds {}'.format(alignTimeBounds[segIdx]))
-    #  pdb.set_trace()
+    #  #)
     tMask = (
         (stimStatus['t'] > alignTimeBounds[segIdx][0]) &
         (stimStatus['t'] < alignTimeBounds[segIdx][1])

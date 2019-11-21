@@ -25,7 +25,7 @@ expOpts, allOpts = parseAnalysisOptions(
 globals().update(expOpts)
 globals().update(allOpts)
 
-pdb.set_trace()
+#)
 sessionNames = pd.DataFrame([
     f
     for f in os.listdir(insFolder)

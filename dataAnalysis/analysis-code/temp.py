@@ -16,4 +16,4 @@ arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(int(arguments['trialIdx']), arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
-pdb.set_trace()
+#)

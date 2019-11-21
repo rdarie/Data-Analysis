@@ -13,6 +13,7 @@ import matplotlib
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
 matplotlib.use('Qt5Agg')   # generate interactive qt output
+# matplotlib.use('PS')   # generate offline postscript
 import dataAnalysis.preproc.mdt as preprocINS
 import os
 from importlib import reload

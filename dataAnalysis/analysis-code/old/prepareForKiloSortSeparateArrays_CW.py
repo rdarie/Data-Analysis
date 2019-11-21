@@ -31,7 +31,7 @@ fileName = (os.path.basename(filePath).split('.'))[0]
 all_elec_ids = [range(1,65), range(65,97)] # 'all' is default for all (1-indexed)
 elecGroupNames = ['Utah', 'NForm']
 start_time_s = 0 # 0 is default for all
-    #import pdb; pdb.set_trace()
+    #import pdb; #)
 
 # Open file and extract headers
 nsxFile = NsxFile(filePath)
@@ -61,7 +61,7 @@ del dummyData
 timeGroupBy_s = 250 #extract groups of 100 seconds
 timeRanges = range(0, timeGroupBy_s * math.ceil(maxTime_s / timeGroupBy_s), timeGroupBy_s)
 
-#pdb.set_trace()
+##)
 for elecGroupIdx, elec_ids in enumerate(all_elec_ids):
     for idx, timeStart in enumerate(timeRanges):
         timeMax = min(timeStart + timeGroupBy_s, maxTime_s)

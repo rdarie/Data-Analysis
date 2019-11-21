@@ -84,7 +84,7 @@ pdfName = '{}_{}_{}_{}'.format(
 statsTestPath = os.path.join(analysisSubFolder, pdfName + '_stats.h5')
 #  Overrides
 alignedAsigsKWargs.update({'decimate': 10})
-#  pdb.set_trace()
+#  #)
 #  alignedAsigsKWargs.update({'windowSize': (-50e-3, 150e-3)})
 alignedAsigsKWargs.update({
     'electrodeColumn': 'electrode',
