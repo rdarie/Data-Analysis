@@ -62,7 +62,8 @@ for suffix in suffixList:
     print('assembling {}'.format(suffix))
     experimentDataPath = os.path.join(
         scratchFolder, arguments['analysisName'],
-        experimentName + suffix + '.nix')
+        assembledName +
+        suffix + '.nix')
     for idx, trialBasePath in enumerate(trialsToAssemble):
         print('loading trial {}'.format(trialBasePath))
         trialDataPath = (

@@ -7,22 +7,24 @@ Options:
     --trialIdx=trialIdx                    which trial to analyze [default: 1]
     --processAll                           process entire experimental day? [default: False]
     --lazy                                 load from raw, or regular? [default: False]
+    --saveResults                          load from raw, or regular? [default: False]
     --verbose                              print diagnostics? [default: False]
-    --plotting                             plot out the correlation matrix? [default: True]
+    --plotting                             plot results?
     --inputBlockName=inputBlockName        filename for inputs [default: fr]
     --window=window                        process with short window? [default: long]
     --unitQuery=unitQuery                  how to restrict channels if not supplying a list? [default: fr]
-    --alignQuery=alignQuery                query what the units will be aligned to? [default: midPeak]
+    --alignQuery=alignQuery                query what the units will be aligned to? [default: all]
     --selector=selector                    filename if using a unit selector
-    --resultName=resultName                filename for result [default: corr]
+    --resultName=resultName                filename for result [default: meanFR]
     --analysisName=analysisName            append a name to the resulting blocks? [default: default]
 """
 
 import pdb
 import os
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
-#  import numpy as np
-#  import pandas as pd
+import dataAnalysis.helperFunctions.helper_functions_new as hf
+import dataAnalysis.preproc.ns5 as ns5
+
 from docopt import docopt
 from currentExperiment import parseAnalysisOptions
 from namedQueries import namedQueries
@@ -62,32 +64,56 @@ alignedAsigsKWargs.update(dict(
 #
 alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **arguments)
 alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
-    namedQueries, scratchFolder, **arguments)
+    namedQueries, analysisSubFolder, **arguments)
+if arguments['verbose']:
+    print('Loading dataBlock: {}'.format(triggeredPath))
+dataReader, dataBlock = ns5.blockFromPath(
+    triggeredPath, lazy=arguments['lazy'])
+if arguments['verbose']:
+    print('Loading alignedAsigs: {}'.format(triggeredPath))
+frDF = ns5.alignedAsigsToDF(
+    dataBlock, **alignedAsigsKWargs)
+# reject outliers
+from scipy.stats import zscore
 
-correlationDF = ash.applyFun(
-    triggeredPath=triggeredPath, resultPath=resultPath,
-    resultNames=[arguments['resultName']],
-    fun="corr", applyType='self', lazy=arguments['lazy'],
-    verbose=arguments['verbose'],
-    loadArgs=alignedAsigsKWargs)[0]
+def findOutliers(
+        frDF, sdThresh=10, countThresh=10):
+    nOutliers = (frDF.abs() > sdThresh).any().sum()
+    tooMuch = (nOutliers > countThresh)
+    if tooMuch:
+        try:
+            print('Found {} outlier channels'.format(nOutliers))
+            print(
+                    frDF
+                    .index
+                    .get_level_values('t')
+                    .unique()
+                )
+        except Exception:
+            pass
+    return nOutliers, tooMuch
 
-#  TODO turn into general pairwise analysis
+testVar = None
+groupBy = ['segment', 'originalIndex']
+resultNames = ['nOutliers', 'rejectTrial']
+outlierTrials = ash.applyFunGrouped(
+    frDF.apply(zscore), groupBy, testVar,
+    fun=findOutliers, funArgs=[], funKWargs={},
+    resultNames=resultNames,
+    plotting=False)
+
 if arguments['plotting']:
-    import matplotlib
-    matplotlib.rcParams['pdf.fonttype'] = 42
-    matplotlib.rcParams['ps.fonttype'] = 42
-    matplotlib.use('PS')   # generate postscript output by default
-    import seaborn as sns
-    import dataAnalysis.plotting.aligned_signal_plots as asp
-    
-    sns.set()
-    sns.set_color_codes("dark")
-    sns.set_context("talk")
-    sns.set_style("white")
-
-    pdfPath = os.path.join(
-        figureFolder,
-        prefix + '_{}_{}_{}.pdf'.format(
-            arguments['inputBlockName'], arguments['window'],
-            arguments['resultName']))
-    asp.plotCorrelationMatrix(correlationDF, pdfPath)
+    import pandas as pd
+    outlierCount = pd.concat(
+        [
+            frDF.index.to_frame().query('bin==0').reset_index(drop=True),
+            outlierTrials['nOutliers'].reset_index(drop=True)],
+        axis='columns')
+    print(outlierCount.loc[outlierCount['all'] > 0, :])
+    outlierCount.loc[outlierCount['all'] > 0, :].to_csv(os.path.join(figureFolder, 'outlierTrials.csv'))
+print('found {} outlier trials in total'.format(outlierTrials['rejectTrial'].sum()))
+if arguments['saveResults']:
+    for resName in resultNames:
+        outlierTrials[resName].to_hdf(resultPath, resName, format='fixed')
+    else:
+        pdb.set_trace()

@@ -1,8 +1,14 @@
 namedQueries = {
     'align': {
+        'all': "(t>0)",
         'midPeak': "(pedalMovementCat=='midPeak')",
         'outbound': "(pedalMovementCat=='outbound')",
         'stimOn': "(stimCat=='stimOn')",
+        'outboundXS': "(pedalSizeCat=='XS')&(pedalMovementCat=='outbound')",
+        'outboundS': "(pedalSizeCat=='S')&(pedalMovementCat=='outbound')",
+        'outboundM': "(pedalSizeCat=='M')&(pedalMovementCat=='outbound')",
+        'outboundL': "(pedalSizeCat=='L')&(pedalMovementCat=='outbound')",
+        'outboundXL': "(pedalSizeCat=='XL')&(pedalMovementCat=='outbound')",
         'CCW': "(pedalDirection=='CCW')",
         'CW': "(pedalDirection=='CW')",
         'noStim': "(amplitude==0)",

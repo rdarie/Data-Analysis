@@ -188,7 +188,7 @@ def plotSpike(
                 else:
                     waveForms = spikes['Waveforms'][ChanIdx][unitMask, :]
                 thisSpike = np.nanmean(waveForms, axis=0)
-                #  pdb.set_trace()
+                #  
                 thisError = np.nanstd(waveForms, axis=0)
                 #  thisError = stats.sem(waveForms, nan_policy='omit')
                 timeRange = np.arange(len(thisSpike)) / spikes['basic_headers']['TimeStampResolution'] * 1e3
@@ -423,7 +423,7 @@ def spikePDFReport(
                         for stimHarmonic in stimHarmonics:
                             isiAx.axvline(
                                 stimHarmonic, color='r', linestyle='--', zorder=0)
-                        #  pdb.set_trace()
+                        #  
                         ksa.plotSpikePropertyHistogram(
                             spikes, channel=channel, whichProp='templateDist',
                             bins=distBins,
@@ -433,7 +433,7 @@ def spikePDFReport(
                                 'shape distance',
                                 templateAx.get_title()
                             ))
-                        #  import pdb; pdb.set_trace()
+                        #  import pdb; 
                         pdf.savefig()
                         plt.close()
                     except Exception:

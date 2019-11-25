@@ -70,7 +70,7 @@ alignedAsigsKWargs.update(dict(
     removeFuzzyName=False,
     transposeToColumns='bin', concatOn='index'))
 if arguments['processAll']:
-    prefix = experimentName
+    prefix = assembledName
 else:
     prefix = ns5FileName
 #

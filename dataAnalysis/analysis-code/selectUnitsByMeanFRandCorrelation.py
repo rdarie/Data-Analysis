@@ -38,7 +38,7 @@ if not os.path.exists(analysisSubFolder):
     os.makedirs(analysisSubFolder, exist_ok=True)
 #
 if arguments['processAll']:
-    prefix = experimentName
+    prefix = assembledName
 else:
     prefix = ns5FileName
 resultPath = os.path.join(
@@ -49,28 +49,28 @@ selectorPath = os.path.join(
     analysisSubFolder,
     prefix + '_{}.pickle'.format(
         arguments['selectorName']))
-
+#
 meanFRDF = pd.read_hdf(resultPath, 'meanFR')
 corrDF = pd.read_hdf(resultPath, 'corr')
 for n in corrDF.index:
     corrDF.loc[n, n] = 0
-
-
+#
 def selFun(
         meanDF, corrDF, meanThresh=5,
         corrThresh=0.85):
     unitMask = ((meanDF > meanThresh) & (corrDF.abs().max() < corrThresh))
     return unitMask[unitMask].index.to_list()
-
-
+#
 thisCorrThresh = .95
-outputFeatures = selFun(meanFRDF, corrDF, corrThresh=thisCorrThresh)
-
-
+thisMeanThresh = 5
+outputFeatures = selFun(
+    meanFRDF, corrDF,
+    meanThresh=thisMeanThresh,
+    corrThresh=thisCorrThresh)
+#
 def trimSuffix(featureName, suffix):
     return featureName.replace('_{}#0'.format(suffix), '')
-
-
+#
 selectorMetadata = {
     'trainingDataPath': os.path.basename(resultPath),
     'path': os.path.basename(selectorPath),
@@ -85,7 +85,7 @@ selectorMetadata = {
     'selFun': selFun,
     'selFunInputs': {'meanThresh': 5, 'corrThresh': thisCorrThresh}
     }
-
+#
 with open(selectorPath, 'wb') as f:
     pickle.dump(
         selectorMetadata, f)

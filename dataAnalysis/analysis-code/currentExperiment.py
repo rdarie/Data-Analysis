@@ -18,6 +18,7 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
     nspPrbPath = os.path.join('.', 'nsp_map.prb')
     insFolder = os.path.join(remoteBasePath, 'ORCA Logs')
     experimentName = expOpts['experimentName']
+    assembledName = ''
     nspFolder = os.path.join(remoteBasePath, 'raw', experimentName)
     oeFolder = os.path.join(remoteBasePath, 'raw', experimentName, 'open_ephys')
     sipFolder = os.path.join(remoteBasePath, 'raw', experimentName, 'ins_sip')
@@ -258,15 +259,12 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
         scratchFolder, '{}',
         ns5FileName + '_binarized.nix')
     #  paths relevant to the entire experimental day
-    estimatorPath = os.path.join(
-        scratchFolder,
-        experimentName + '_estimator.joblib')
     experimentDataPath = os.path.join(
         scratchFolder, '{}',
-        experimentName + '_analyze.nix')
+        assembledName + '_analyze.nix')
     experimentBinnedSpikePath = os.path.join(
         scratchFolder, '{}',
-        experimentName + '_binarized.nix')
+        assembledName + '_binarized.nix')
     #
     figureFolder = os.path.join(
         remoteBasePath, 'figures', experimentName
@@ -274,15 +272,18 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
     if not os.path.exists(figureFolder):
         os.makedirs(figureFolder, exist_ok=True)
     #
-    #  alignedRastersFolder = os.path.join(figureFolder, 'alignedRasters')
-    #  if not os.path.exists(alignedRastersFolder):
-    #      os.makedirs(alignedRastersFolder, exist_ok=True)
-    #  alignedFeaturesFolder = os.path.join(figureFolder, 'alignedFeatures')
-    #  if not os.path.exists(alignedFeaturesFolder):
-    #      os.makedirs(alignedFeaturesFolder, exist_ok=True)
+    alignedRastersFolder = os.path.join(figureFolder, 'alignedRasters')
+    if not os.path.exists(alignedRastersFolder):
+        os.makedirs(alignedRastersFolder, exist_ok=True)
+    alignedFeaturesFolder = os.path.join(figureFolder, 'alignedFeatures')
+    if not os.path.exists(alignedFeaturesFolder):
+        os.makedirs(alignedFeaturesFolder, exist_ok=True)
     spikeSortingFiguresFolder = os.path.join(figureFolder, 'spikeSorting')
     if not os.path.exists(spikeSortingFiguresFolder):
         os.makedirs(spikeSortingFiguresFolder, exist_ok=True)
+    GLMFiguresFolder = os.path.join(figureFolder, 'GLM')
+    if not os.path.exists(GLMFiguresFolder):
+        os.makedirs(GLMFiguresFolder, exist_ok=True)
     #
     alignedAsigsKWargs = dict(
         amplitudeColumn='amplitude',
@@ -335,9 +336,13 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
         palette="ch:1.6,-.2,dark=.2,light=0.7,reverse=1",
         height=5, aspect=1.5, kind='line')
     vLineOpts = {'color': 'm'}
+    asigSigStarOpts = {
+        'color': 'm',
+        'marker': '*'
+    }
     nrnRelplotKWArgs = dict(
         palette="ch:1.6,-.2,dark=.2,light=0.7,reverse=1",
-        func1_kws={'marker': '|', 'alpha': 0.6},
+        func1_kws={'marker': 'd', 'alpha': 0.2},
         func2_kws={'ci': 'sem'},
         facet1_kws={'sharey': False},
         facet2_kws={'sharey': True},
@@ -345,6 +350,10 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
         kind1='scatter', kind2='line'
     )
     nrnVLineOpts = {'color': 'y'}
+    nrnSigStarOpts = {
+        'color': 'y',
+        'marker': '*'
+    }
     plotOpts = {
         'type': 'ticks', 'errorBar': 'sem',
         'pageSize': (6, 12), 'removeOutliers': (0.01, 0.975)}

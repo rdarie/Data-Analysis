@@ -21,7 +21,7 @@
 
 EXP="exp201901211000"
 # EXP="exp201901271000"
-SELECTOR="201901211000-Proprio_minfrmaxcorr"
+SELECTOR="_minfrmaxcorr"
 # SELECTOR="201901271000-Proprio_minfrmaxcorr"
 # SELECTOR="201901201200-Proprio_minfrmaxcorr"
 
@@ -32,16 +32,18 @@ conda activate
 source activate nda
 python --version
 
-for BLOCKNAME in fr
+#  for BLOCKNAME in rig
+#      do
+#          #  python3 './plotAlignedAsigs.py' --exp=$EXP --processAll --window="long" --inputBlockName=$BLOCKNAME --unitQuery="all" --selector=$SELECTOR --alignQuery="midPeakWithStim100HzCCW" --rowName="pedalSizeCat"
+#          #  python3 './plotAlignedAsigs.py' --exp=$EXP --processAll --window="long" --inputBlockName=$BLOCKNAME --unitQuery="all" --selector=$SELECTOR --alignQuery="midPeakWithStim50HzCCW" --rowName="pedalSizeCat"
+#          #  python3 './plotAlignedAsigs.py' --exp=$EXP --processAll --window="long" --inputBlockName=$BLOCKNAME --unitQuery="all" --selector=$SELECTOR --alignQuery="midPeakWithStim100HzCW" --rowName="pedalSizeCat"
+#          #  python3 './plotAlignedAsigs.py' --exp=$EXP --processAll --window="long" --inputBlockName=$BLOCKNAME --unitQuery="all" --selector=$SELECTOR --alignQuery="midPeakWithStim50HzCW" --rowName="pedalSizeCat"
+#          #  python3 './plotAlignedAsigs.py' --exp=$EXP --processAll --window="long" --inputBlockName=$BLOCKNAME --unitQuery="rig" --selector=$SELECTOR --alignQuery="midPeakCW" --rowName="pedalSizeCat"
+#          #  python3 './plotAlignedAsigs.py' --exp=$EXP --processAll --window="long" --inputBlockName=$BLOCKNAME --unitQuery="rig" --selector=$SELECTOR --alignQuery="midPeakWithStim100HzCCW" --rowName="pedalSizeCat"
+#          #  python3 './plotAlignedAsigs.py' --exp=$EXP --processAll --window="long" --inputBlockName=$BLOCKNAME --unitQuery=$BLOCKNAME --selector=$SELECTOR --alignQuery="midPeakM_CW" --rowName="pedalSizeCat"
+#          #  python3 './plotAlignedAsigs.py' --exp=$EXP --processAll --window="long" --inputBlockName=$BLOCKNAME --unitQuery=$BLOCKNAME --selector=$SELECTOR --alignQuery="midPeakM_CCW" --rowName="pedalSizeCat"
+#      done
+for QUERY in outboundXS outboundS outboundM outboundL outboundXL
     do
-        #  python3 './plotAlignedAsigs.py' --exp=$EXP --processAll --window="long" --inputBlockName=$BLOCKNAME --unitQuery="all" --alignQuery="midPeakWithStim100HzCCW" --rowName="pedalSizeCat"
-        #  python3 './plotAlignedAsigs.py' --exp=$EXP --processAll --window="long" --inputBlockName=$BLOCKNAME --unitQuery="all" --alignQuery="midPeakWithStim50HzCCW" --rowName="pedalSizeCat"
-        #  python3 './plotAlignedAsigs.py' --exp=$EXP --processAll --window="long" --inputBlockName=$BLOCKNAME --unitQuery="all" --alignQuery="midPeakWithStim100HzCW" --rowName="pedalSizeCat"
-        #  python3 './plotAlignedAsigs.py' --exp=$EXP --processAll --window="long" --inputBlockName=$BLOCKNAME --unitQuery="all" --alignQuery="midPeakWithStim50HzCW" --rowName="pedalSizeCat"
-        #  python3 './plotAlignedAsigs.py' --exp=$EXP --processAll --window="long" --inputBlockName=$BLOCKNAME --unitQuery="rig" --alignQuery="midPeakCW" --rowName="pedalSizeCat"
-        #  python3 './plotAlignedAsigs.py' --exp=$EXP --processAll --window="long" --inputBlockName=$BLOCKNAME --unitQuery="rig" --alignQuery="midPeakWithStim100HzCCW" --rowName="pedalSizeCat"
-        #  python3 './plotAlignedAsigs.py' --exp=$EXP --processAll --window="long" --inputBlockName=$BLOCKNAME --unitQuery=$BLOCKNAME --alignQuery="midPeakM_CW" --rowName="pedalSizeCat"
-        #  python3 './plotAlignedAsigs.py' --exp=$EXP --processAll --window="long" --inputBlockName=$BLOCKNAME --unitQuery=$BLOCKNAME --alignQuery="midPeakM_CCW" --rowName="pedalSizeCat"
-        python3 './plotAlignedNeurons.py' --exp=$EXP --processAll --window="long" --alignQuery="outboundM_CW" --rowName="pedalSizeCat"
-        python3 './plotAlignedNeurons.py' --exp=$EXP --processAll --window="long" --alignQuery="outboundM_CCW" --rowName="pedalSizeCat"
+        python3 './plotAlignedNeurons.py' --exp=$EXP --processAll --window="long" --maskOutlierTrials --alignQuery=$QUERY --selector=$SELECTOR --rowName="pedalDirection"
     done

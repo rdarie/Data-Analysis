@@ -145,7 +145,7 @@ def calcTrialAnalysisNix():
         stimStSer, idxT='t',  namePrefix='seg0_ins_',
         expandCols=expandCols,
         deriveCols=deriveCols, progAmpNames=progAmpNames)
-    columnsToBeAdded = ['amplitude', 'program'] + progAmpNames
+    columnsToBeAdded = ['amplitude', 'program', 'RateInHz'] + progAmpNames
     # calc binarized and get new time axis
     if len(allSpikeTrains):
         spikeMatBlock = ns5.calcBinarizedArray(
@@ -171,11 +171,11 @@ def calcTrialAnalysisNix():
     infoFromStimStatus = hf.interpolateDF(
         stimStatus, tdInterp['t'],
         x='t', columns=columnsToBeAdded, kind='previous')
-    infoFromStimStatus.rename(
-        columns={
-            'amplitude': 'seg0_amplitude',
-            'program': 'seg0_program'
-        }, inplace=True)
+    #  infoFromStimStatus.rename(
+    #      columns={
+    #          'amplitude': 'seg0_amplitude',
+    #          'program': 'seg0_program'
+    #      }, inplace=True)
     if forceData is not None:
         forceDataInterp = hf.interpolateDF(
             forceData, newT,
@@ -192,6 +192,35 @@ def calcTrialAnalysisNix():
             infoFromStimStatus.drop(columns='t')),
             axis=1)
     #
+    tdInterp.columns = [i.replace('seg0_', '') for i in tdInterp.columns]
+    if 'position' in tdInterp.columns:
+        tdInterp.loc[:, 'position_x'] = ((
+            np.cos(
+                tdInterp.loc[:, 'position'] *
+                100 * 2 * np.pi / 360))
+            .to_numpy())
+        tdInterp.sort_index(axis='columns', inplace=True)
+        tdInterp.loc[:, 'position_y'] = ((
+            np.sin(
+                tdInterp.loc[:, 'position'] *
+                100 * 2 * np.pi / 360))
+            .to_numpy())
+        tdInterp.loc[:, 'velocity_x'] = ((
+            tdInterp.loc[:, 'position_y'] *
+            (-1) *
+            (tdInterp.loc[:, 'velocity'] * 3e2))
+            .to_numpy())
+        tdInterp.loc[:, 'velocity_y'] = ((
+            tdInterp.loc[:, 'position_x'] *
+            (tdInterp.loc[:, 'velocity'] * 3e2))
+            .to_numpy())
+    for pName in progAmpNames:
+        if pName in tdInterp.columns:
+            tdInterp.loc[:, pName.replace('amplitude', 'ACR')] = (
+                tdInterp.loc[:, pName] *
+                tdInterp.loc[:, 'RateInHz'])
+    tdInterp.sort_index(axis='columns', inplace=True)
+    # tdInterp.columns = ['seg0_{}'.format(i) for i in tdInterp.columns]
     tdBlockInterp = ns5.dataFrameToAnalogSignals(
         tdInterp,
         idxT='t', useColNames=True,
@@ -201,10 +230,10 @@ def calcTrialAnalysisNix():
     # print([st.name for st in tdBlockInterp.filter(objects=SpikeTrain)])
     # print([ev.name for ev in tdBlockInterp.filter(objects=Event)])
     # print([chIdx.name for chIdx in tdBlockInterp.filter(objects=ChannelIndex)])
-    typesNeedRenaming = [ChannelIndex, AnalogSignal]
-    for objType in typesNeedRenaming:
-        for child in tdBlockInterp.filter(objects=objType):
-            child.name = ns5.childBaseName(child.name, 'seg')
+    #  typesNeedRenaming = [ChannelIndex]
+    #  for objType in typesNeedRenaming:
+    #      for child in tdBlockInterp.filter(objects=objType):
+    #          child.name = ns5.childBaseName(child.name, 'seg')
     ns5.addBlockToNIX(
         tdBlockInterp, neoSegIdx=[0],
         writeSpikes=False, writeEvents=False,

@@ -35,4 +35,4 @@ conda activate
 source activate nda
 python --version
 
-python './shuttleFilesToFromScratch.py' --trialIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --dataToScratch
+python './shuttleFilesToFromScratch.py' --trialIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --removeDate

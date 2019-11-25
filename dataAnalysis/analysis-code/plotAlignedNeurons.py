@@ -12,6 +12,7 @@ Options:
     --window=window                   process with short window? [default: short]
     --unitQuery=unitQuery             how to restrict channels?
     --selector=selector               filename if using a unit selector
+    --maskOutlierTrials               delete outlier trials? [default: False]
     --alignQuery=alignQuery           what will the plot be aligned to? [default: outboundWithStim]
     --rowName=rowName                 break down by row  [default: pedalDirection]
     --rowControl=rowControl           rows to exclude from comparison
@@ -42,6 +43,7 @@ import pandas as pd
 import dill as pickle
 import pdb
 from copy import deepcopy
+#
 from currentExperiment import parseAnalysisOptions
 from docopt import docopt
 from namedQueries import namedQueries
@@ -55,21 +57,29 @@ analysisSubFolder = os.path.join(
     )
 if not os.path.exists(analysisSubFolder):
     os.makedirs(analysisSubFolder, exist_ok=True)
+figureStatsFolder = os.path.join(
+    analysisSubFolder, 'figureStats'
+    )
+if not os.path.exists(figureStatsFolder):
+    os.makedirs(figureStatsFolder, exist_ok=True)
 rowColOpts = asp.processRowColArguments(arguments)
-colorPal = "ch:0.6,-.2,dark=.2,light=0.7,reverse=1"  #  for firing rates
+# colorPal = "ch:0.6,-.2,dark=.2,light=0.7,reverse=1" #  for firing rates
+#
+if arguments['processAll']:
+    prefix = assembledName
+else:
+    prefix = ns5FileName
 #
 alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **arguments)
 alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
     namedQueries, analysisSubFolder, **arguments)
+alignedAsigsKWargs['outlierTrials'] = ash.processOutlierTrials(
+    analysisSubFolder, prefix, **arguments)
 alignedAsigsKWargs.update(dict(
     duplicateControlsByProgram=True,
     makeControlProgram=True,
-    metaDataToCategories=False, removeFuzzyName=True))
+    metaDataToCategories=False))
 #
-if arguments['processAll']:
-    prefix = experimentName
-else:
-    prefix = ns5FileName
 rasterBlockPath = os.path.join(
     analysisSubFolder,
     prefix + '_raster_{}.nix'.format(
@@ -81,6 +91,7 @@ frBlockPath = os.path.join(
     analysisSubFolder,
     prefix + '_fr_{}.nix'.format(
         arguments['window']))
+
 print('loading {}'.format(frBlockPath))
 frReader, frBlock = ns5.blockFromPath(
     frBlockPath, lazy=arguments['lazy'])
@@ -88,8 +99,9 @@ pdfName = '{}_neurons_{}_{}'.format(
     prefix,
     arguments['window'],
     arguments['alignQuery'])
-statsTestOpts.update({'tStop': rasterOpts['windowSizes'][arguments['window']][1]})
-statsTestPath = os.path.join(analysisSubFolder, pdfName + '_stats.h5')
+statsTestPath = os.path.join(figureStatsFolder, pdfName + '_stats.h5')
+statsTestOpts.update({
+    'tStop': rasterOpts['windowSizes'][arguments['window']][1]})
 #  Overrides
 alignedAsigsKWargs.update({'windowSize': (-1000e-3, 1000e-3)})
 statsTestOpts.update({
@@ -124,7 +136,7 @@ asp.plotNeuronsAligned(
     verbose=arguments['verbose'],
     loadArgs=alignedAsigsKWargs,
     sigTestResults=sigValsWide,
-    figureFolder=figureFolder,
+    figureFolder=alignedRastersFolder,
     printBreakDown=True,
     enablePlots=True,
     plotProcFuns=[
@@ -134,11 +146,11 @@ asp.plotNeuronsAligned(
         asp.genVLineAdder(0, nrnVLineOpts)],
     pdfName=pdfName,
     **rowColOpts,
-    twinRelplotKWArgs=nrnRelplotKWArgs)
+    twinRelplotKWArgs=nrnRelplotKWArgs, sigStarOpts=nrnSigStarOpts)
 asp.plotSignificance(
     sigValsWide,
     pdfName=pdfName + '_pCount',
-    figureFolder=figureFolder,
+    figureFolder=alignedRastersFolder,
     **rowColOpts,
     **statsTestOpts)
 

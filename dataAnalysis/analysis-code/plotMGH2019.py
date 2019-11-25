@@ -13,6 +13,7 @@ Options:
     --inputBlockName=inputBlockName              filename for input block [default: fr_sqrt]
     --alignQuery=alignQuery                      query what the units will be aligned to? [default: midPeak]
     --selector=selector                          filename if using a unit selector
+    --maskOutlierTrials                          delete outlier trials? [default: False]
     --estimatorName=estimatorName                filename for resulting estimator [default: pca]
     --verbose                                    print diagnostics? [default: False]
     --plotting                                   plot out the correlation matrix? [default: True]
@@ -81,7 +82,7 @@ if not os.path.exists(analysisSubFolder):
     os.makedirs(analysisSubFolder, exist_ok=True)
 #
 if arguments['processAll']:
-    prefix = experimentName
+    prefix = assembledName
 else:
     prefix = ns5FileName
 #

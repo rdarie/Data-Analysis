@@ -14,6 +14,7 @@ Options:
     --unitQuery=unitQuery                  how to restrict channels if not supplying a list? [default: pca]
     --alignQuery=alignQuery                what will the plot be aligned to? [default: outboundWithStim]
     --selector=selector                    filename if using a unit selector
+    --maskOutlierTrials                    delete outlier trials? [default: False]
     --rowName=rowName                      break down by row  [default: pedalDirection]
     --rowControl=rowControl                rows to exclude from stats test
     --hueName=hueName                      break down by hue  [default: amplitude]
@@ -62,12 +63,14 @@ alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(
 alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = (
     ash.processUnitQueryArgs(
         namedQueries, analysisSubFolder, **arguments))
+alignedAsigsKWargs['outlierTrials'] = ash.processOutlierTrials(
+    analysisSubFolder, prefix, **arguments)
 alignedAsigsKWargs.update(dict(
     duplicateControlsByProgram=True,
     makeControlProgram=True,
     metaDataToCategories=False))
 if arguments['processAll']:
-    prefix = experimentName
+    prefix = assembledName
 else:
     prefix = ns5FileName
 #
@@ -118,7 +121,7 @@ asp.plotAsigsAligned(
     verbose=arguments['verbose'],
     loadArgs=alignedAsigsKWargs,
     sigTestResults=sigValsWide,
-    figureFolder=figureFolder,
+    figureFolder=alignedFeaturesFolder,
     printBreakDown=True,
     enablePlots=True,
     plotProcFuns=[
@@ -130,11 +133,11 @@ asp.plotAsigsAligned(
         ],
     pdfName=pdfName,
     **rowColOpts,
-    relplotKWArgs=relplotKWArgs)
+    relplotKWArgs=relplotKWArgs, sigStarOpts=asigSigStarOpts)
 asp.plotSignificance(
     sigValsWide,
     pdfName=pdfName + '_pCount',
-    figureFolder=figureFolder,
+    figureFolder=alignedFeaturesFolder,
     **rowColOpts,
     **statsTestOpts)
 #

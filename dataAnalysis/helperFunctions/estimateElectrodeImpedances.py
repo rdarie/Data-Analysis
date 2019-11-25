@@ -90,7 +90,7 @@ def ETITransient(S, I, PW, R_s, openCircuitV = 0, r_f = None, c_dl = None,
     C_dl = pd.Series(0, index = I.index)
 
     for curT, curI in I.items():
-        #pdb.set_trace()
+        #
         curR_f = faradaicResistance(S, curV, r_f = r_f, J_0 = J_0, r_min = r_min) # ohms
 
 

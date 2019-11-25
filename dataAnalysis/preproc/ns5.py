@@ -441,6 +441,7 @@ def unitSpikeTrainWaveformsToDF(
         spikeDF.loc[:, 'segment'] = segIdx
         spikeDF.loc[:, 'originalIndex'] = spikeDF.index
         spikeDF.columns.name = 'bin'
+        #
         if dataQuery is not None:
             spikeDF.query(dataQuery, inplace=True)
             if not getMetaData:
@@ -479,7 +480,7 @@ def unitSpikeTrainWaveformsToDF(
     #
     if transposeToColumns == 'feature':
         # stack the bin, name the feature column
-        # pdb.set_trace()
+        # 
         for idx, (key, value) in enumerate(laggedWaveformsDict.items()):
             if idx == 0:
                 stackedIndexDF = pd.concat(
@@ -601,13 +602,14 @@ def alignedAsigsToDF(
         unitQuery=None, dataQuery=None,
         collapseSizes=False, verbose=False,
         duplicateControlsByProgram=False,
-        amplitudeColumn='amplitudeFuzzy',
-        programColumn='programFuzzy',
-        electrodeColumn='electrodeFuzzy',
+        amplitudeColumn='amplitude',
+        programColumn='program',
+        electrodeColumn='electrode',
         transposeToColumns='bin', concatOn='index', fastTranspose=True,
         addLags=None, decimate=1, rollingWindow=None,
         whichSegments=None, windowSize=None,
         getMetaData=True, metaDataToCategories=True,
+        outlierTrials=None,
         makeControlProgram=False, removeFuzzyName=False, procFun=None):
     #  channels to trigger
     if unitNames is None:
@@ -629,10 +631,21 @@ def alignedAsigsToDF(
             collapseSizes, duplicateControlsByProgram,
             makeControlProgram, removeFuzzyName
             ])
+    if outlierTrials is not None:
+        def rejectionLookup(entry):
+            key = []
+            for subKey in outlierTrials.index.names:
+                keyIdx = allWaveforms.index.names.index(subKey)
+                key.append(entry[keyIdx])
+            # print(key)
+            return outlierTrials.loc[tuple(key), :][0]
+        # pdb.set_trace()
+        outlierMask = np.asarray(allWaveforms.index.map(rejectionLookup), dtype=np.bool)
+        allWaveforms = allWaveforms.loc[~outlierMask, :]
     if manipulateIndex and getMetaData:
         idxLabels = allWaveforms.index.names
         allWaveforms.reset_index(inplace=True)
-        # pdb.set_trace()
+        # 
         if collapseSizes:
             try:
                 allWaveforms.loc[allWaveforms['pedalSizeCat'] == 'XL', 'pedalSizeCat'] = 'L'
@@ -697,12 +710,12 @@ def alignedAsigsToDF(
             inplace=True)
         if isinstance(allWaveforms.columns, pd.MultiIndex):
             allWaveforms.columns = allWaveforms.columns.remove_unused_levels()
+    #
     if transposeToColumns == 'feature':
         zipNames = zip(pd.unique(allWaveforms.columns.get_level_values('feature')).tolist(), unitNames)
         try:
             assert np.all([i == j for i, j in zipNames]), 'columns out of requested order!'
         except Exception:
-            pdb.set_trace()
             traceback.print_exc()
             allWaveforms.reindex(columns=unitNames)
     allWaveforms.sort_index(
@@ -753,7 +766,7 @@ def getAsigsAlignedToEvents(
             assert len(eventSeg.filter(name=thisEventName)) == 1
         except Exception:
             traceback.print_exc()
-            pdb.set_trace()
+            
         allEvIn = eventSeg.filter(name=thisEventName)[0]
         if isinstance(allEvIn, EventProxy):
             allAlignEvents = loadObjArrayAnn(allEvIn.load())

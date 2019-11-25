@@ -55,7 +55,7 @@ def getMotorData(
         #idx = analogData['elec_ids'].index(value)
         newColNames[value] = key
 
-    #pdb.set_trace()
+    #
     motorData = analogData['data'].rename(columns = newColNames)
     return processMotorData(motorData)
 '''
@@ -147,7 +147,7 @@ def processMotorData(motorData, fs, invertLookup=False):
     bins = np.array([-1.5, 1.5])
     detectSignal.iloc[:] = np.digitize(detectSignal.values, bins)
     motorData['velocityCat'] = detectSignal
-    #  pdb.set_trace()
+    #  
     return motorData
 
 
@@ -159,7 +159,7 @@ def getTrials(motorData, trialType='2AFC'):
     leftLEDdiff = motorData['leftLED_int'].diff()
     leftButdiff = motorData['leftBut_int'].diff()
 
-    #pdb.set_trace()
+    #
     rightLEDOnsetIdx = motorData.index[rightLEDdiff == -1].tolist()
     rightButEdges = rightButdiff == 1
     rightButOnsetIdx = []
@@ -236,7 +236,7 @@ def getTrials(motorData, trialType='2AFC'):
     for idx in motorData.index[leftButEdges].tolist():
         #check that we're not out of bounds])
         #if idx > 161400 and idx < 161600:
-        #    pdb.set_trace()
+        #    
         if idx - windowLen >= firstIdx and idx + windowLen <= lastIdx:
     #        if not skipAhead:
             transitionInPast = sum(motorData['leftBut_int'][idx - windowLen : idx])
@@ -259,11 +259,11 @@ def getTrials(motorData, trialType='2AFC'):
     if trialType == '2AFC':
         while not (trialEvents.loc[:3,'Label'].str.contains('Movement').all()) or trialEvents.loc[4:4,'Label'].str.contains('Movement').all():
             #above expression is not true if the first 5 events do not make up a complete sequence
-            #pdb.set_trace()
+            #
             trialEvents.drop(0, inplace = True)
             trialEvents.reset_index(drop=True, inplace = True)
 
-        #pdb.set_trace()
+        #
         trialStartIdx = trialEvents.index[trialEvents['Label'] == 'Movement Onset']
         trialStartIdx = trialStartIdx[range(0,len(trialStartIdx),2)]
         eventsToTrack = ['First',
@@ -350,7 +350,7 @@ def getTrials(motorData, trialType='2AFC'):
                 trialStats.loc[idx, 'Stimulus Duration'] = secondOffsetTime - firstOnsetTime
             except:
                 print('Error detected!')
-                #pdb.set_trace()
+                #
     return trialStats, trialEvents
 '''
 
@@ -441,14 +441,14 @@ def getTrials(motorData, fs, tStart, trialType='2AFC'):
     if trialType == '2AFC':
         #  !!!! TODO: changes to how we calculate movement break this, because we now track
         #  move on and move off 4 times a trial (to and back)
-        #  pdb.set_trace()
+        #  
         while not (trialEvents.loc[:3,'Label'].str.contains('movement').all()) or trialEvents.loc[4:4,'Label'].str.contains('movement').all():
             #above expression is not true if the first 5 events do not make up a complete sequence
-            #pdb.set_trace()
+            #
             trialEvents.drop(0, inplace=True)
             trialEvents.reset_index(drop=True, inplace = True)
 
-        #pdb.set_trace()
+        #
         trialStartIdx = trialEvents.index[trialEvents['Label'] == 'Movement Onset']
         trialStartIdx = trialStartIdx[range(0,len(trialStartIdx),2)]
         eventsToTrack = ['First',
@@ -545,7 +545,7 @@ def getTrials(motorData, fs, tStart, trialType='2AFC'):
             except Exception:
                 traceback.print_exc()
                 print('Error detected while calculating TrialStats!')
-                #pdb.set_trace()
+                #
     else:
         trialStats = None
     return trialStats, trialEvents
@@ -586,7 +586,7 @@ def plotTrialEvents(trialEvents, plotRange = None, colorOffset = 0, ax = None, s
             RLOnIdx = RLOnIdx[np.logical_and(RLOnIdx > plotRange[0], RLOnIdx < plotRange[1])]
         if 'Left LED Onset' in subset or subset is None:
             LLOnIdx = LLOnIdx[np.logical_and(LLOnIdx > plotRange[0], LLOnIdx < plotRange[1])]
-    #pdb.set_trace()
+    #
     #ax.vlines(trialSpikeTimes - startTime / 3e1, lineToPlot, lineToPlot + 1, colors = [colorPalette[unitIdx]], linewidths = [0.5])
     colorPalette = sns.color_palette()
 
@@ -640,22 +640,22 @@ def plotMotor(motorData, plotRange = (0,-1), idxUnits = 'samples',
     plotX = xAxis[::subsampleFactor] * unitConversionFactor
     motorDataPlot = motorDataPlot.iloc[::subsampleFactor]
     #motorDataSub = pd.DataFrame(motorData.iloc[::subsampleFactor, :].values, index = motorData.index[::subsampleFactor], columns = motorData.columns)
-    #pdb.set_trace()
+    #
     for idx, column in enumerate(subset):
-        #pdb.set_trace()
+        #
         #ax[idx].plot(xAxis, motorData.loc[slice(plotRange[0], plotRange[1]), column], label = column)
         if collapse:
             idx = 0
 
         ax[idx].plot(plotX, motorDataPlot.loc[:, column], label = column)
         #ax[idx].legend(loc = 1)
-    #pdb.set_trace()
+    #
     return fig, ax
 '''
 '''
 def getStimID(trialStats, nBins = 9):
     #trialStats.columns
-    #pdb.set_trace()
+    #
     firstThrowMag = trialStats.loc[:,'First']
     secondThrowMag = trialStats.loc[:,'Second']
     """
@@ -729,7 +729,7 @@ def plotAverageAnalog(motorData, trialStats, alignTo, separateBy = None, subset 
 
         for trialIdx, startTime in enumerate(trialStats[alignTo]):
             try:
-                #pdb.set_trace()
+                #
                 #print('Getting %s trace for trial %s' % (column, trialIdx))
                 thisLocMask = np.logical_and(motorDataSub.index.values > startTime + timeWindow[0] * 30 , motorDataSub.index.values < startTime + timeWindow[-1]* 30)
                 tempTrace = motorDataSub.loc[thisLocMask, column].copy()
@@ -746,7 +746,7 @@ def plotAverageAnalog(motorData, trialStats, alignTo, separateBy = None, subset 
             except:
                 pass
 
-        #pdb.set_trace()
+        #
         if separateBy is not None:
             meanTrace = {category : pd.Series(index = timeWindow[:-1]) for category in uniqueCategories}
             errorTrace ={category : pd.Series(index = timeWindow[:-1]) for category in uniqueCategories}
@@ -785,7 +785,7 @@ def plotAverageAnalog(motorData, trialStats, alignTo, separateBy = None, subset 
                     axMax = thisAxMax
         for thisAx in ax:
             thisAx.set_ylim(axMin, axMax)
-            #pdb.set_trace()
+            #
     return fig, ax
 '''
 if __name__ == "__main__":

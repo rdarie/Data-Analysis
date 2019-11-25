@@ -214,7 +214,7 @@ def compose_mainviewer_from_sources(sources, mainviewer=None):
         mainviewer = MainViewer(show_auto_scale=True)
     
     for i, sig_source in enumerate(sources['signal']):
-        #  import pdb; pdb.set_trace()
+        #  import pdb; 
         #  RD 02-23-2019
         view = TraceViewer(source=sig_source, name='signal {}'.format(i))
         view.params['scale_mode'] = 'same_for_all'

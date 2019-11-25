@@ -22,9 +22,7 @@
 # EXP="exp201901211000"
 EXP="exp201901201200"
 # EXP="exp201901271000"
-# SELECTOR="201901211000-Proprio_minfrmaxcorr"
-# SELECTOR="201901271000-Proprio_minfrmaxcorr"
-# SELECTOR="201901201200-Proprio_minfrmaxcorr"
+SELECTOR="Trial001_minfrmaxcorr"
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
@@ -34,5 +32,5 @@ source activate nda
 python --version
 MINIRCIDX="1"
 
-python3 './plotAlignedAsigs.py' --exp=$EXP --trialIdx=$MINIRCIDX  --window="long" --inputBlockName="fr" --unitQuery="all" --alignQuery="stimOn" --rowName= --hueName="amplitude"
-# python3 './plotNeuronsAlignedToStim.py' --exp=$EXP --trialIdx=$MINIRCIDX  --window=miniRC  --selector=$SELECTOR
+# python3 './plotAlignedAsigs.py' --exp=$EXP --trialIdx=$MINIRCIDX  --window="long" --inputBlockName="fr" --unitQuery="all" --alignQuery="stimOn" --rowName= --hueName="amplitude"
+python3 './plotAlignedNeurons.py' --exp=$EXP --trialIdx=$MINIRCIDX  --selector=$SELECTOR --maskOutlierTrials --window="long" --unitQuery="all" --alignQuery="stimOn" --rowName= --hueName="amplitude"

@@ -11,7 +11,8 @@ from copy import copy
 import pdb, traceback
 
 
-def processAlignQueryArgs(namedQueries, alignQuery=None, **kwargs):
+def processAlignQueryArgs(
+        namedQueries, alignQuery=None, **kwargs):
     if (alignQuery is None) or (not len(alignQuery)):
         dataQuery = None
     else:
@@ -44,10 +45,24 @@ def processChannelQueryArgs(
     return chanNames, outputQuery
 
 
+def processOutlierTrials(
+        analysisSubFolder, prefix,
+        maskOutlierTrials=False, window=None,
+        **kwargs
+        ):
+    if maskOutlierTrials:
+        resultPath = os.path.join(
+            analysisSubFolder,
+            prefix + '_{}_{}_calc.h5'.format('fr', window))
+        return pd.read_hdf(resultPath, 'rejectTrial')
+    else:
+        return None
+
+
 def processUnitQueryArgs(
-        namedQueries, scratchFolder, selector=None, unitQuery=None,
+        namedQueries, scratchFolder,
+        selector=None, unitQuery=None,
         inputBlockName='', **kwargs):
-    #
     if selector is not None:
         with open(
             os.path.join(
@@ -211,7 +226,9 @@ def applyFunGrouped(
         fun=None, funArgs=[], funKWargs={},
         resultNames=None,
         plotting=False):
-    #
+    # groupBy refers to index groups
+    # testVar refers to column groups
+    # really should rename these to something more intuitive
     if (isinstance(groupBy, list)) and (len(groupBy) == 1):
         groupBy = groupBy[0]
     if isinstance(groupBy, str):
@@ -239,21 +256,26 @@ def applyFunGrouped(
         resultColumns = pd.MultiIndex.from_tuples(
             sorted(asigWide.groupby(by=testVar).groups.keys()),
             names=testVar)
-    blankResult = pd.DataFrame(
-        np.nan, index=resultIndex, columns=resultColumns)
     #
     result = {
-        rName: blankResult
+        rName: pd.DataFrame(
+            np.nan, index=resultIndex, columns=resultColumns)
         for rName in resultNames}
     if groupBy is not None:
         groupIter = asigWide.groupby(groupBy)
     else:
         groupIter = {'all': asigWide}.items()
     for name, group in groupIter:
-        for subName, subGroup in group.groupby(testVar):
+        if testVar is not None:
+            subGroupIter = group.groupby(testVar)
+        else:
+            subGroupIter = {'all': group}.items()
+        for subName, subGroup in subGroupIter:
             tempRes = fun(subGroup, *funArgs, **funKWargs)
+            # 
             for resIdx, res in enumerate(np.atleast_1d(tempRes)):
                 rName = resultNames[resIdx]
+                # print('{}, {}, {}'.format(rName, name, subName))
                 result[rName].loc[name, subName] = res
     return result
 
@@ -278,7 +300,7 @@ def compareMeansGrouped(
 
     if (isinstance(testVar, list)) and (len(testVar) == 1):
         testVar = testVar[0]
-    # pdb.set_trace()
+    # 
     if isinstance(groupBy, str):
         testIndex = pd.Index(
             asigWide.groupby(by=groupBy).groups.keys())
@@ -307,7 +329,7 @@ def compareMeansGrouped(
             (asigWide.columns < testBin + testWidth / 2)
             )
         #  except Exception:
-        #      pdb.set_trace()
+        #      
         testAsig = asigWide.loc[:, tMask]
         if groupBy is not None:
             groupIter = testAsig.groupby(groupBy)
@@ -547,7 +569,7 @@ def rAUC(
     else:
         bLine = 0
     dt = asigWide.columns[1] - asigWide.columns[0]
-    # pdb.set_trace()
+    # 
     rAUCDF = (
         asigWide.loc[:, tMask]
         .subtract(bLine, axis='index')

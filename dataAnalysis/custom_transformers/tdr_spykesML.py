@@ -71,7 +71,7 @@ class TargetedDimensionalityReduction(TransformerMixin):
                     DF.iloc[:, featuresMatchMaskAll] = scaledVal
                 except Exception:
                     traceback.print_exc()
-                    pdb.set_trace()
+                    
             return DF
         #
         dropIndex = featuresDF.index[featuresDF.isna().T.any()]

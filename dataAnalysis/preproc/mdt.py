@@ -2001,7 +2001,7 @@ def getINSStimOnset(
                 tempOnDiffsL = []
                 for idx, onTime in enumerate(theseOnsetTimestamps):
                     offTime = theseOffsetTimestamps[idx]
-                    # pdb.set_trace()
+                    # 
                     interCycleInterval = (
                         thisCycleOffTime +
                         cyclePeriodCorrection * pq.s +

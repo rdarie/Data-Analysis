@@ -50,7 +50,7 @@ if not os.path.exists(analysisSubFolder):
     os.makedirs(analysisSubFolder, exist_ok=True)
 #
 if arguments['processAll']:
-    prefix = experimentName
+    prefix = assembledName
 else:
     prefix = ns5FileName
 resultPath = os.path.join(

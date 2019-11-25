@@ -61,7 +61,7 @@ def cmpDFToPrb(
             groupingCols.append(key + '_group')
     else:
         groupingCols = ['elecName']
-    #  pdb.set_trace()
+    #  
     for idx, (name, group) in enumerate(cmpDF.groupby(groupingCols)):
         theseChannels = []
         theseGeoms = {}
@@ -81,7 +81,7 @@ def cmpDFToPrb(
     for k,v in prbDict.items():
         tallyChans += v['channels']
         tallyGeoms.update(v['geometry'])
-    import pdb; pdb.set_trace()
+    import pdb; 
     """
     if filePath is not None:
         with open(filePath, 'w') as f:
@@ -102,7 +102,7 @@ def cmpDFToPrbAddDummies(
     if banks is not None:
         keepMask = cmpDF['bank'].isin(banks)
         cmpDF = cmpDF.loc[keepMask, :]
-    #  import pdb; pdb.set_trace()
+    #  import pdb; 
     cmpDF.reset_index(inplace=True, drop=True)
     prbDict = {}
 
@@ -130,7 +130,7 @@ def cmpDFToPrbAddDummies(
     else:
         groupingCols = ['elecName']
     for idx, (name, group) in enumerate(cmpDF.groupby(groupingCols)):
-        #  import pdb; pdb.set_trace()
+        #  import pdb; 
         #  group['nevID'].astype(int).values
         prbDict.update({idx + idxOffset: {
             'channels': list(
@@ -144,7 +144,7 @@ def cmpDFToPrbAddDummies(
         lastChan = group.index[-1] + int(prependDummy)
 
     if appendDummy > 0:
-        #  pdb.set_trace()
+        #  
         appendChanList = list(range(lastChan + 1, lastChan + appendDummy + 1))
         prbDict.update({idx + idxOffset + 1: {
             'channels': appendChanList,

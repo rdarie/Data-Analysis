@@ -276,7 +276,7 @@ for name, group in trialStatsByStimID:
                 #idx, outcome = next(enumerate(datum['x']))
                 pairBinnedStats.loc[outcome, name] = datum['y'][idx]
 
-#pdb.set_trace()
+#
 pairBinnedPlotData = []
 for name in outcomeLongNames:
     pairBinnedPlotData.append(go.Bar(

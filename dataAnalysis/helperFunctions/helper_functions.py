@@ -100,7 +100,7 @@ def animateDFSubset3D(
     lines = [None for i in range(winWidth)]
     for idx in range(winWidth):
         #print(idx)
-        #pdb.set_trace()
+        #
         lines[idx] = ax.plot(
             data[0, idx: idx + 2],
             data[1, idx: idx + 2],
@@ -109,7 +109,7 @@ def animateDFSubset3D(
         lines[idx].set_color([0, 0, 0, 0])
 
     #  Setting the axes properties
-    #  pdb.set_trace()
+    #  
     
     nuMax = featSubset[xyzList[0]].quantile(0.99)
     nuMin = featSubset[xyzList[0]].quantile(0.01)
@@ -160,7 +160,7 @@ def animateAngle3D(
     angleXYZ = pd.DataFrame(
         0, index=featSubset['position'].index,
         columns=['x', 'y', 'z'])
-    #pdb.set_trace()
+    #
     angleXYZ['y'] = featSubset['position'].apply(np.deg2rad).apply(np.sin)
     angleXYZ['z'] = featSubset['position'].apply(np.deg2rad).apply(np.cos)
     data = np.zeros((3, 2))
@@ -188,7 +188,7 @@ def animateAngle3D(
         data[0, 0:1], data[1, 0:1], data[2, 0:1], 'o-',
         **pltKws)[0]
     #  Setting the axes properties
-    #  pdb.set_trace()
+    #  
     
     ax.set_xlim3d([-.5, .5])
     ax.set_xticks([])
@@ -223,7 +223,7 @@ def animateDFSubset2D(
     featSubset = unpackedFeatures.query(dataQuery)
     yCol = OrderedDict(yCol)
     xCol = OrderedDict(xCol)
-    #  pdb.set_trace()
+    #  
     if axList is None:
         if len(yCol.keys()) == 1:
             fig, ax = plt.subplots()
@@ -251,7 +251,7 @@ def animateDFSubset2D(
                     **pltKws)[0]
             lineIdx += 1
         thisAx.set_ylabel(key)
-        # pdb.set_trace()
+        # 
         nuMax = featSubset.loc[:, value].quantile(0.99).max().max()
         nuMin = featSubset.loc[:, value].quantile(0.01).min().min()
         sigSpread = nuMax - nuMin
@@ -532,7 +532,7 @@ def getINSTDFromJson(
             intersampleTickCount = (1/fs) / (100e-6)
 
             timeDomainMeta = rcsa_helpers.extract_td_meta_data(timeDomainJson)
-            #  pdb.set_trace()
+            #  
             # assume n channels is constant
             nChan = int(timeDomainMeta[0, 8])
                     
@@ -545,7 +545,7 @@ def getINSTDFromJson(
                     
             timeDomainMeta = rcsa_helpers.code_micro_and_macro_packet_loss(
                 timeDomainMeta)
-            #  pdb.set_trace()
+            #  
             #  num_real_points, num_macro_rollovers, loss_as_scalar =\
             #      rcsa_helpers.calculate_statistics(
             #          timeDomainMeta, intersampleTickCount)
@@ -563,7 +563,7 @@ def getINSTDFromJson(
                 tdData['actual_time'] - INSReferenceTime) / (
                     datetime.timedelta(seconds=1))
                     
-            #pdb.set_trace()
+            #
             tdData = tdData.drop_duplicates(
                 ['t']
                 ).sort_values('t').reset_index(drop=True)
@@ -617,7 +617,7 @@ def getINSTDFromJson(
 
     td['data']['INSTime'] = td['data']['t']
     td['INSTime'] = td['t']
-    #  pdb.set_trace()
+    #  
     return td
 
 
@@ -655,7 +655,7 @@ def getINSTimeSyncFromJson(
                     timeSyncText = f.read()
                     timeSyncText = fixMalformedJson(timeSyncText)
                     timeSync = json.loads(timeSyncText)[0]
-                    #  pdb.set_trace()
+                    #  
             
             timeSyncData = rcsa_helpers.extract_time_sync_meta_data(timeSync)
 
@@ -741,7 +741,7 @@ def getINSAccelFromJson(
             accelData = accelData.drop_duplicates(
                 ['t']
                 ).sort_values('t').reset_index(drop=True)
-            #pdb.set_trace()
+            #
             if getInterpolated:
                 uniformT = np.arange(
                     accelData['t'].iloc[0],
@@ -933,7 +933,7 @@ def line_picker(line, mouseevent):
         (xdata - mouseevent.xdata)**2 + (ydata - mouseevent.ydata)**2)
     dmask = (d < maxd) & (d == min(d))
     ind, = np.nonzero(dmask)
-    #  pdb.set_trace()
+    #  
     if len(ind):
         pickx = xdata[ind]
         picky = ydata[ind]
@@ -965,7 +965,7 @@ def peekAtTaps(
         for i in segmentsToPlot}
     
     def onpick(event):
-        #  pdb.set_trace()
+        #  
         if 'INS' in event.artist.axes.get_title():
             tempClick['ins'].append(event.pickx[0])
             print('Clicked on ins {}'.format(event.pickx[0]))
@@ -1079,7 +1079,7 @@ def peekAtTaps(
 
         tNSPMask = (channelData['t'] > tStartNSP) & (channelData['t'] < tStopNSP)
         triggerTrace = channelData['data'].loc[tNSPMask, 'ainp7']
-        #  pdb.set_trace()
+        #  
         ax[2].plot(
             channelData['t'].loc[tNSPMask],
             stats.zscore(triggerTrace),
@@ -1099,7 +1099,7 @@ def peekAtTaps(
         for key, value in tempClick.items():
             tempVal = pd.Series(value)
             tempClick[key] = tempVal.loc[tempVal.diff().fillna(1) > 100e-3]
-            #  pdb.set_trace()
+            #  
         clickDict[trialSegment] = tempClick
 
         tempClick = {
@@ -1251,7 +1251,7 @@ def synchronizeINStoNSP(
         (insDiff - nspDiff) * 1e3))
     if (insDiff - nspDiff > 20e-3).any():
         raise(Exception('Tap trains too different!'))
-    #  pdb.set_trace()
+    #  
     if degree > 0:
         synchPolyCoeffsINStoNSP = np.polyfit(
             x=tapTimestampsINS.values, y=tapTimestampsNSP.values, deg=degree)
@@ -1296,7 +1296,7 @@ def synchronizeINStoNSP(
                     else:
                         st.t_start = tStart
                         st.t_stop = tStop
-        #  pdb.set_trace()
+        #  
         allEvents = insBlock.filter(objects=Event)
         eventsDF = eventsToDataFrame(allEvents, idxT='t')
         segMask = getStimSerialTrialSegMask(eventsDF, trialSegment)
@@ -1308,7 +1308,7 @@ def synchronizeINStoNSP(
 
 def timeOffsetBlock(block, timeOffset, masterTStart):
     for st in block.filter(objects=SpikeTrain):
-        #  pdb.set_trace()
+        #  
         if len(st.times):
             st.magnitude[:] = st.times.magnitude + timeOffset.magnitude
             st.t_start = min(masterTStart, st.times[0] * 0.999)
@@ -1359,7 +1359,7 @@ def loadBlockProxyObjects(block):
                 #  waveforms. oh well, turning it off for now
             except Exception:
                 traceback.print_exc()
-                #  pdb.set_trace()
+                #  
                 st = stProxy.load(load_waveforms=False)
                 if st.waveforms is None:
                     st.waveforms = np.array([]).reshape((0, 0, 0))*pq.V
@@ -1457,7 +1457,7 @@ def getHUTtoINSSyncFun(
                 segmentMask, 't'].values - timeSyncData.loc[
                     segmentMask, syncTo].values * 1e-3
             synchPolyCoeffsHUTtoINS = np.array([1e-3, np.mean(timeOffset)])
-        #  pdb.set_trace()
+        #  
         timeInterpFunHUTtoINS[trialSegment] = np.poly1d(
             synchPolyCoeffsHUTtoINS)
         if plotting:
@@ -1498,7 +1498,7 @@ def synchronizeHUTtoINS(
         traceback.print_exc()
         #  event dataframes don't have an explicit trialSegment
         segmentMask = getStimSerialTrialSegMask(insDF, trialSegment)
-        #  pdb.set_trace()
+        #  
     insDF.loc[segmentMask, 'INSTime'] = interpFun(
         insDF.loc[segmentMask, 'HostUnixTime'])
 
@@ -1532,7 +1532,7 @@ def getINSStimLogFromJson(
         allStimStatus.append(stimStatus)
     allStimStatusDF = pd.concat(allStimStatus, ignore_index=True)
     #  if all we're doing is turn something off, don't consider it a new round
-    #  pdb.set_trace()
+    #  
     if logForm == 'long':
         ampPositive = allStimStatusDF['maxAmp'].diff().fillna(0) >= 0
         allStimStatusDF['amplitudeIncrease'] = (
@@ -1581,7 +1581,7 @@ def stimStatusSerialtoLong(
         stimStLong.loc[pMask, pName] = stimStSer.loc[pMask, namePrefix + 'value']
         stimStLong[pName].fillna(method='ffill', inplace=True)
         stimStLong[pName].fillna(method='bfill', inplace=True)
-    #  pdb.set_trace()
+    #  
     if dropDuplicates:
         stimStLong.drop_duplicates(subset=idxT, keep='last', inplace=True)
     
@@ -1673,7 +1673,7 @@ def getINSDeviceConfig(
                         electrodeConfiguration[groupIdx][progIdx]['anodes'].append(elecIdx)
                     else:
                         electrodeConfiguration[groupIdx][progIdx]['cathodes'].append(elecIdx)
-    #  pdb.set_trace()
+    #  
     #  process senseInfo
     senseInfo = pd.DataFrame(
         deviceSettings[0]['SensingConfig']['timeDomainChannels'])
@@ -1780,7 +1780,7 @@ def fillInOverflow(channelData, plotting = False, fillMethod = 'constant'):
     overflowMask = pd.DataFrame(False, index = channelData.index,
         columns = channelData.columns,
         dtype = np.bool).to_sparse(fill_value=False)
-    #pdb.set_trace()
+    #
     columnList = list(channelData.columns)
     nChan = len(columnList)
     for idx, row in channelData.iteritems():
@@ -1800,14 +1800,14 @@ def fillInOverflow(channelData, plotting = False, fillMethod = 'constant'):
         # negative dips are the start of the dip
 
         dipCutoff = 3e3 # 3000 uV jumps are probably caused by artifact
-        #pdb.set_trace()
+        #
         # peakutils works on a percentage of the range of values
         dipThresh = (dipCutoff - rowDiff.min()) / (rowDiff.max() - rowDiff.min())
         dipStarts = peakutils.indexes(-rowDiff, thres=dipThresh)
         dipEnds = []
 
         if dipStarts.any() and plotting:
-            #pdb.set_trace()
+            #
             plt.figure()
             plt.plot(row)
             plt.plot(rowDiff)
@@ -1916,12 +1916,12 @@ def fillInJumps(channelData, samp_per_s, smoothing_ms = 1, badThresh = 1e-3,
         dRowStd  = dRowVals.std()
         dMaxAcceptable = dRowBar + nStdDiff * dRowStd
         dMinAcceptable = dRowBar - nStdDiff * dRowStd
-        #pdb.set_trace()
+        #
 
         # append to previous list of outliers
         dOutliers = np.logical_or(dRow > dMaxAcceptable, dRow < dMinAcceptable)
         dOutliers = np.convolve(dOutliers, shortSmoothKern, 'same') > 0
-        #pdb.set_trace()
+        #
         badMask['perChannelDer'].loc[:, idx]=np.array(dOutliers, dtype = bool)
 
         #add to the cummulative derivative (will check it at the end for flat periods signifying signal cutout)
@@ -2041,7 +2041,7 @@ def findTrains(dataSeries, peakIdx, iti, fs, minTrainLength, maxDistance = 1.5, 
     minPeriod = iti * (1 - itiWiggle)
 
     peakDiff = foundTime.diff()
-    #pdb.set_trace()
+    #
     peakDiff.iloc[0] = iti * 2e3 #fudge it so that the first one is taken
     trainStartIdx = foundTime.index[peakDiff > (iti * maxDistance)]
     trainStarts = foundTime[trainStartIdx]
@@ -2051,25 +2051,25 @@ def findTrains(dataSeries, peakIdx, iti, fs, minTrainLength, maxDistance = 1.5, 
     trainEndIdx = foundTime.index[peakFwdDiff > (iti * maxDistance)]
     trainEnds = foundTime[trainEndIdx]
 
-    #pdb.set_trace()
+    #
     trainLengths = (trainEnds.values - trainStarts.values)
     validTrains = trainLengths > minTrainLength
     keepPeaks = pd.Series(False, index = foundTime.index)
     nTrains = 0
     for idx, idxIntoPeaks in enumerate(trainStartIdx):
         #print('{}, {}'.format(idx, idxIntoPeaks))
-        #pdb.set_trace()
+        #
         thisMeanPeriod = peakDiff.loc[idxIntoPeaks:trainEndIdx[idx]].iloc[1:].mean()
         if validTrains[idx] and thisMeanPeriod > minPeriod:
             keepPeaks.loc[idxIntoPeaks:trainEndIdx[idx]] = True
             nTrains += 1
-            #pdb.set_trace()
+            #
             if maxTrain:
                 if nTrains > maxTrain: break;
         else:
             validTrains[idx] = False
 
-    #pdb.set_trace()
+    #
     trainStartPeaks = peakIdx[trainStartIdx[validTrains]]
     trainEndPeaks = peakIdx[trainEndIdx[validTrains]]
     foundTime = foundTime[keepPeaks]
@@ -2116,7 +2116,7 @@ def getTriggers(dataSeries, iti = .01, fs = 3e4, thres = 2.58,
         min_dist=width, thres_abs=True, keep_what=keep_what)
     
     if minAmp is not None:
-        #  pdb.set_trace()
+        #  
         triggersZScore = stats.zscore(dataSeries)
         triggersAtPeaks = triggersZScore[peakIdx]
         peakIdx = peakIdx[triggersAtPeaks > minAmp]
@@ -2147,7 +2147,7 @@ def getTriggers(dataSeries, iti = .01, fs = 3e4, thres = 2.58,
         # identify trains of peaks
         peakDiff = foundTime.diff()
         peakDiff.iloc[0] = iti * 2e3 #fudge it so that the first one is taken
-        #pdb.set_trace()
+        #
         trainStartIdx = foundTime.index[peakDiff > (iti * 2)]
         trainStarts = foundTime[trainStartIdx]
 
@@ -2166,10 +2166,10 @@ def getTriggers(dataSeries, iti = .01, fs = 3e4, thres = 2.58,
             if validTrains[idx]:
                 keepPeaks.loc[idxIntoPeaks:trainEndIdx[idx]] = True
                 nTrains += 1
-                #pdb.set_trace()
+                #
                 if nTrains > maxTrain: break;
 
-        #pdb.set_trace()
+        #
         foundTime = foundTime[keepPeaks]
         peakIdx = peakIdx[keepPeaks]
 
@@ -2263,7 +2263,7 @@ def getTensTrigs(tensThresh, ampThresh, channelData, referenceTimes, plotting = 
         if validTrains[idx]:
             keepPeaks.loc[idxIntoPeaks:trainEndIdx[idx]] = True
             nTrains += 1
-            #pdb.set_trace()
+            #
             if nTrains > maxTrain: break;
 
     peakTimes = peakTimes[keepPeaks]
@@ -2289,13 +2289,13 @@ def getTensTrigs(tensThresh, ampThresh, channelData, referenceTimes, plotting = 
         rmsDiff = np.inf
         keepTimes = np.array(longerTimes[:len(shorterTimes)])
         for correctTimes in itertools.combinations(longerTimes, len(shorterTimes)):
-            #pdb.set_trace()
+            #
             alignedCorrectTimes = pd.Series(correctTimes) - correctTimes[0]
             alignedShorterTimes = shorterTimes - shorterTimes.iloc[0]
             newRmsDiff = np.mean((alignedCorrectTimes.values - alignedShorterTimes.values) ** 2)
             if newRmsDiff < rmsDiff:
                 keepTimes = correctTimes
-        #pdb.set_trace()
+        #
 
         if nDetectedMismatch > 0:
             peakTimes = peakTimes[peakTimes.isin(keepTimes)]
@@ -2312,7 +2312,7 @@ def getTensTrigs(tensThresh, ampThresh, channelData, referenceTimes, plotting = 
         plt.plot(referenceTimes, referenceTimes ** 0, 'ko', label = 'unaligned INS TENS Pulses')
         plt.legend()
         plt.show()
-        #pdb.set_trace()
+        #
 
     return peakIdx, peakTimes / 1e3, peakMask, referenceTimes
 
@@ -2406,7 +2406,7 @@ def getKinematics(kinematicsFile,
 
     # reorder alphabetically by columns
     raw = raw.reindex(columns = headings)
-    #pdb.set_trace()
+    #
 
     if reIndex is not None:
         uniqueHeadings = set([name[:-2] for name in headings])
@@ -2535,7 +2535,7 @@ def getGaitEvents(trigTimes, simiTable, whichColumns =  ['ToeUp_Left Y', 'ToeDow
         trigHist, trigBins = np.histogram(np.diff(trigTimes))
         totalNSPTime = np.diff(trigTimes).sum()
         np.savetxt('getGaitEvents-trigTimes.txt', trigTimes, fmt = '%4.4f', delimiter = ' \n')
-        pdb.set_trace()
+        
     #
     simiDf['NSPTime'] = pd.Series(trigTimes, index = simiDf.index)
 
@@ -2590,7 +2590,7 @@ def assignLabels(timeVector, lbl, fnc, CameraFs = 100, oversizeWindow = None):
         # create a false time vector with 10x as many samples as the camera sample rate
         pseudoTime = np.arange(timeVector[0], timeVector[-1] + dt, 0.1/CameraFs)
         oversampledFnc = fnc(pseudoTime)
-        #pdb.set_trace()
+        #
         if oversizeWindow is None:
             timeBins = np.append(timeVector, timeVector[-1] + dt)
             #
@@ -2602,7 +2602,7 @@ def assignLabels(timeVector, lbl, fnc, CameraFs = 100, oversizeWindow = None):
             timeStart = timeVector[0] - binWidth / 2
 
             timeEnd = timeVector[-1] + binWidth / 2
-            #pdb.set_trace()
+            #
             mat, binCenters, binLeftEdges = binnedEvents(
                 [pseudoTime[oversampledFnc > 0]], [0], [0],
                 binInterval, binWidth, timeStart, timeEnd)
@@ -2617,7 +2617,7 @@ def assignLabels(timeVector, lbl, fnc, CameraFs = 100, oversizeWindow = None):
             if len(mat) != len(timeVector):
                 mat = mat[:-1]
             labels = pd.Series([lbl if x > 0 else 'Neither' for x in mat])
-            #pdb.set_trace()
+            #
     return labels
 
 def getSpectrogram(channelData, elec_ids, samp_per_s, start_time_s, dataT, winLen_s, stepLen_s = 0.02, R = 20, fr_start = None, fr_stop = None, whichChan = 1, plotting = False):
@@ -2639,7 +2639,7 @@ def getSpectrogram(channelData, elec_ids, samp_per_s, start_time_s, dataT, winLe
     fr_samp = int(NFFT / 2) + 1
     fr = np.arange(fr_samp) * samp_per_s / (2 * fr_samp)
 
-    #pdb.set_trace()
+    #
     if fr_start is not None:
         fr_start_idx = np.where(fr > fr_start)[0][0]
     else:
@@ -2650,21 +2650,21 @@ def getSpectrogram(channelData, elec_ids, samp_per_s, start_time_s, dataT, winLe
     else:
         fr_stop_idx = -1
 
-    #pdb.set_trace()
+    #
     fr = fr[fr_start_idx : fr_stop_idx]
     fr_samp = len(fr)
 
     columnList = list(channelData.columns)
     if HASLIBTFR:
         origin = 'libtfr'
-        #pdb.set_trace()
+        #
         t = start_time_s + np.arange(nWindows + 1) * stepLen_s + NFFT / Fs * 0.5
         spectrum = np.zeros((nChan, nWindows + 1, fr_samp))
         # generate a transform object with size equal to signal length and ntapers tapers
         D = libtfr.mfft_dpss(NFFT, nw, nTapers, NFFT)
-        #pdb.set_trace()
+        #
         for col,signal in channelData.iteritems():
-            #pdb.set_trace()
+            #
             idx = columnList.index(col)
             if os.fstat(0) == os.fstat(1):
                 endChar = '\r'
@@ -2703,10 +2703,10 @@ def getSpectrogram(channelData, elec_ids, samp_per_s, start_time_s, dataT, winLe
         #hdr_idx = channelData['ExtendedHeaderIndices'][ch_idx]
 
         P = spectrum[ch_idx,:,:]
-        #pdb.set_trace()
+        #
         plotSpectrum(P, Fs, start_time_s, dataT[-1], fr = fr, t = t, show = True, fr_start = fr_start, fr_stop = fr_stop)
 
-    #pdb.set_trace()
+    #
 
     return {'PSD' : pd.Panel(spectrum, items = elec_ids, major_axis = t, minor_axis = fr),
             'fr' : fr,
@@ -2748,21 +2748,21 @@ def plotChan(channelData, dataT, whichChan, recordingUnits = 'uV', electrodeLabe
         else:
             ax = prevAx
 
-    #  pdb.set_trace()
+    #  
     #channelDataForPlotting = channelData.drop(['Labels', 'LabelsNumeric'], axis = 1) if 'Labels' in channelData.columns else channelData
     channelDataForPlotting = channelData.loc[:,ch_idx]
     tMask = np.logical_and(dataT > timeRange[0], dataT < timeRange[1])
     tSlice = slice(np.flatnonzero(tMask)[0], np.flatnonzero(tMask)[-1])
     tPlot = dataT[tSlice]
 
-    #pdb.set_trace()
+    #
     ax.plot(tPlot, channelDataForPlotting[tSlice], label = label)
 
     if np.any(mask):
         for idx, thisMask in enumerate(mask):
             thisMask = thisMask[tSlice]
             ax.plot(tPlot[thisMask], channelDataForPlotting[tSlice][thisMask], 'o', label = maskLabel[idx])
-    #pdb.set_trace()
+    #
     #channelData['data'][ch_idx].fillna(0, inplace = True)
 
     if zoomAxis:
@@ -2818,7 +2818,7 @@ def plotChanWithSpikesandStim(\
     for unitIdx, unitName in enumerate(stimUnitsOnThisChan):
         unitMask = spikesStim['Classification'][stimChIdx] == unitName
         timeMask = np.logical_and(spikesStim['TimeStamps'][stimChIdx] > startTimeS, spikesStim['TimeStamps'][stimChIdx] < startTimeS + dataTimeS)
-        #pdb.set_trace()
+        #
         theseTimes = spikesStim['TimeStamps'][stimChIdx][np.logical_and(unitMask, timeMask)]
         for spikeTime in theseTimes:
             timeMaskContinuous = np.logical_and(channelData['t'] > spikeTime, channelData['t'] < spikeTime + spikeSnippetLen)
@@ -2875,14 +2875,14 @@ def pdfReport(cleanData, origData, badData = None,
             plt.close(f)
 
             if spectrum:
-                #pdb.set_trace()
+                #
                 P =  clean_data_spectrum["PSD"][idx,:,:]
-                #pdb.set_trace()
+                #
                 f = plotSpectrum(P, Fs, origData['start_time_s'], origData['start_time_s'] + origData['data_time_s'], fr = fr, t = t, timeRange = (origData['start_time_s'],origData['start_time_s']+nSecPlot), show = False, fr_start = fr_start, fr_stop = fr_stop)
                 pdf.savefig(f)
                 plt.close(f)
 
-        #pdb.set_trace()
+        #
         generateLastPage = False
         print('\nOn last page of pdf report')
         if generateLastPage:
@@ -2911,7 +2911,7 @@ def plotSpectrum(P, fs, start_time_s, end_time_s, fr_start = 10, fr_stop = 600, 
         tMask = np.logical_and(t > timeRange[0], t < timeRange[1])
         P = P[tMask, :]
         t = t[tMask]
-        #pdb.set_trace()
+        #
 
     zMin, zMax = P.min(), P.max()
 
@@ -2952,7 +2952,7 @@ def catSpikesGenerator(nBins = None, type = 'RMS', timePoint = None, subSet = sl
     if type == 'minPeak':
         def catSpikes(spikes, chanIdx):
             val = abs(spikes['Waveforms'][chanIdx][:,subSet].min(axis = 1))
-            #pdb.set_trace()
+            #
             if calcBounds:
                 bounds = np.linspace(val.min() * 0.99, val.max() * 1.01, nBins + 1)
             return np.digitize(val, bounds)
@@ -3012,7 +3012,7 @@ def binnedEvents(timeStamps, chans,
             )
         except Exception:
             traceback.print_exc()
-            pdb.set_trace()
+            
             
     spikeMatDF = pd.DataFrame(spikeMat.transpose(), index = chans, columns = binCenters)
     return spikeMatDF, binCenters, binLeftEdges
@@ -3048,7 +3048,7 @@ def binnedSpikesAligned(spikes, alignTimes, binInterval, binWidth, channel,
                         trialSpikeTimes = allSpikeTimes[trialTimeMask] - startTime
                         timeStampsToAnalyze.append(trialSpikeTimes)
                         trialID.append(rowIdx)
-                        #pdb.set_trace()
+                        #
                     else:
                         if not discardEmpty:
                             timeStampsToAnalyze.append(np.array([]))
@@ -3191,7 +3191,7 @@ def binnedArray(spikes, rasterOpts, timeStart, chans = None):
 
         except Exception:
             traceback.print_exc()
-            pdb.set_trace()
+            
     return spikeMats
 
 def trialBinnedArray(spikes, rasterOpts, trialStats, chans = None):
@@ -3240,7 +3240,7 @@ def binnedSpikes(spikes, binInterval, binWidth, timeStart, timeEnd,
                     timeStamps.append(allTimeStamps[idx][unitMask])
                     ChannelID.append(unitName)
 
-    #pdb.set_trace()
+    #
     spikeMat, binCenters, binLeftEdges = binnedEvents(timeStamps, ChannelID,
         timeStart = timeStart, timeEnd = timeEnd, binInterval = binInterval, binWidth = binWidth)
 
@@ -3254,7 +3254,7 @@ def plotBinnedSpikes(spikeMat, show=True, normalizationType='linear',
     else:
         fi = ax.figure
 
-    #pdb.set_trace()
+    #
     if zAxis is not None:
         zMin, zMax = zAxis
     else:
@@ -3281,7 +3281,7 @@ def plotBinnedSpikes(spikeMat, show=True, normalizationType='linear',
     chanIdx = np.arange(len(spikeMat.index)+1)
     timeVals = np.linspace(spikeMat.columns[0], spikeMat.columns[-1],
         len(spikeMat.columns) + 1)
-    #pdb.set_trace()
+    #
     im = ax.pcolormesh(timeVals, chanIdx, spikeMat, norm = nor, cmap = 'plasma')
     ax.set_xlim([timeVals[0], timeVals[-1]])
     #ax.xaxis.set_major_formatter(ticker.StrMethodFormatter('{x:.0f}'))
@@ -3658,7 +3658,7 @@ def plot_trial_stats(trialStatsDf, usePlotly = True, separate = None, debugging 
                 if debugging:
                     print(y)
                 x = [outcomeLongName[on] for on in sorted(conditionStats['Outcome'].unique())]
-                #pdb.set_trace()
+                #
                 data.append(go.Bar(
                     x=x,
                     y= [i / sum(y) for i in y],
@@ -3744,7 +3744,7 @@ def plot_raster(spikes, chans):
 
     for idx, chan in enumerate(chans):
         # Extract the channel index, then use that index to get unit ids, extended header index, and label index
-        #pdb.set_trace()
+        #
         ch_idx      = spikes['ChannelID'].index(chan)
         units       = sorted(list(set(spikes['Classification'][ch_idx])))
         ext_hdr_idx = spikes['NEUEVWAV_HeaderIndices'][ch_idx]
@@ -3910,7 +3910,7 @@ def readPiJsonLog(filePaths, zeroTime = False):
 
         # if the last trial didn't have time to end, remove its entries from the list of events
         print('On file %s' % filePath)
-        #pdb.set_trace()
+        #
         while not trialRelevant.iloc[-1, :]['Label'] in ['correct button', 'incorrect button', 'button timed out']:
             trialRelevant.drop(trialRelevant.index[len(trialRelevant)-1], inplace = True)
 
@@ -4015,7 +4015,7 @@ def plotFeature(X, y):
         vmin=zMin, vmax=zMax))
     ax = fi.axes[0]
     clrs = ['b', 'r', 'g']
-    #pdb.set_trace()
+    #
     for idx, label in enumerate(np.unique(y)):
         if label != 0: ax.plot(t[y.values == label], dummyVar[y.values == label], 'o', c = clrs[idx])
     #plt.show()
@@ -4095,14 +4095,14 @@ def selectFromX(X, support):
     return X[:,support]
 
 def ROCAUC_ScoreFunction(estimator, X, y):
-    #pdb.set_trace()
+    #
     binarizer = LabelBinarizer()
     binarizer.fit([0,1,2])
     average = 'macro'
     if hasattr(estimator, 'decision_function'):
         score = roc_auc_score(binarizer.transform(y), estimator.decision_function(X), average = average)
     elif hasattr(estimator, 'predict_proba'):
-        #pdb.set_trace()
+        #
         score = roc_auc_score(binarizer.transform(y), estimator.predict_proba(X), average = average)
     else: # default to f1 score
         score = f1_score(y, estimator.predict(X), average = average)

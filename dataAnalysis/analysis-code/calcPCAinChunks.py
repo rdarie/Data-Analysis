@@ -46,7 +46,7 @@ alignedAsigsKWargs.update(dict(
 alignedAsigsKWargs['verbose'] = arguments['verbose']
 
 if arguments['processAll']:
-    prefix = experimentName
+    prefix = assembledName
 else:
     prefix = ns5FileName
 triggeredPath = os.path.join(

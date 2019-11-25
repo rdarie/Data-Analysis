@@ -115,7 +115,7 @@ def openEphysMatToNixBlock(
                     seg = block.segments[segIdx]
                 segMask = segmentAnn == segIdx
                 # if chanIdx.name == 'CH1':
-                # pdb.set_trace()
+                # 
                 asig = AnalogSignal(
                     dataArray[segMask] * headerDict['bitVolts'] * pq.V,
                     t_start=np.float32(t[segMask][0]) * pq.s,
@@ -125,7 +125,7 @@ def openEphysMatToNixBlock(
                     **headerDict
                     )
                 asig.annotate(label=thisLabel)
-                # pdb.set_trace()
+                # 
                 maxTimeError = (asig.times.magnitude - t[segMask]).max()
                 assert maxTimeError < (10 * sampleRate) ** (-1), 'timestamps inconsistent! maxError = {}'.format(maxTimeError)
                 asig.channel_index = chanIdx
@@ -346,7 +346,7 @@ def preprocOpenEphysBlock(
                     notchFreq = fOpts['bandstop'].pop('Wn')
                     shortKernel = asig.flatten()[:int(samplingRate / notchFreq)]
                     phaseIdx = np.argmin(shortKernel)
-                    # pdb.set_trace()
+                    # 
                     kernel = asig.flatten()[phaseIdx:phaseIdx + nMatchSamples]
                     kernel = kernel / np.sum(np.abs(kernel))
                     noiseModel = signal.correlate(

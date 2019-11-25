@@ -50,7 +50,7 @@ globals().update(expOpts)
 globals().update(allOpts)
 
 if arguments['processAll']:
-    prefix = experimentName
+    prefix = assembledName
 else:
     prefix = ns5FileName
 

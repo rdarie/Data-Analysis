@@ -41,7 +41,7 @@ from namedQueries import namedQueries
 import dataAnalysis.preproc.ns5 as ns5
 from dataAnalysis.custom_transformers.tdr import SMWrapper, TargetedDimensionalityReduction, SingleNeuronRegression
 import statsmodels.api as sm
-import MLencoding as spykesml
+# import MLencoding as spykesml
 # from pyglmnet import GLM
 import joblib as jb
 import dill as pickle
@@ -62,7 +62,7 @@ def calcUnitRegressionToAsig():
         os.makedirs(analysisSubFolder, exist_ok=True)
     #
     if arguments['processAll']:
-        prefix = experimentName
+        prefix = assembledName
     else:
         prefix = ns5FileName
     triggeredPath = os.path.join(
@@ -92,33 +92,42 @@ def calcUnitRegressionToAsig():
         duplicateControlsByProgram=False,
         makeControlProgram=False,
         transposeToColumns='feature', concatOn='columns',
-        removeFuzzyName=True,
+        removeFuzzyName=False,
         getMetaData=[
             'RateInHz', 'activeGroup', 'amplitude', 'amplitudeCat',
             'bin', 'electrode', 'pedalDirection', 'pedalMetaCat',
             'pedalMovementCat', 'pedalMovementDuration',
             'pedalSize', 'pedalSizeCat', 'pedalVelocityCat',
             'program', 'segment', 't'],
-        decimate=10,
+        decimate=1,
         metaDataToCategories=False,
         verbose=False, procFun=None))
     #
     alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **arguments)
     alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
         namedQueries, analysisSubFolder, **arguments)
+    alignedAsigsKWargs['outlierTrials'] = ash.processOutlierTrials(
+        analysisSubFolder, prefix, **arguments)
     # lags in units of the _analyze file sample rate
     addLags = {
         'position#0': list(range(-200, 210, 20)),
         'velocity#0': list(range(-200, 210, 20)),
+        'position_x#0': list(range(-200, 210, 20)),
+        'velocity_x#0': list(range(-200, 210, 20)),
+        'position_y#0': list(range(-200, 210, 20)),
+        'velocity_y#0': list(range(-200, 210, 20)),
         'program0_amplitude#0': list(range(-200, 210, 20)),
         'program1_amplitude#0': list(range(-200, 210, 20)),
         'program2_amplitude#0': list(range(-200, 210, 20)),
-        'program3_amplitude#0': list(range(-200, 210, 20))
+        'program3_amplitude#0': list(range(-200, 210, 20)),
+        'program0_ACR#0': list(range(-200, 210, 20)),
+        'program1_ACR#0': list(range(-200, 210, 20)),
+        'program2_ACR#0': list(range(-200, 210, 20)),
+        'program3_ACR#0': list(range(-200, 210, 20))
         }
     featureNames = sorted([
-        'position#0', 'velocity#0',
-        'program0_amplitude#0', 'program1_amplitude#0',
-        'program2_amplitude#0', 'program3_amplitude#0'
+        i
+        for i in addLags.keys()
         ])
     featureLoadArgs = alignedAsigsKWargs.copy()
     featureLoadArgs['unitNames'] = featureNames
@@ -173,6 +182,7 @@ def calcUnitRegressionToAsig():
         #
         targetDF = pd.DataFrame(targetDF * spkConversionFactor, dtype=np.int)
         # derive regressors from saved traces (should move further upstream)
+        '''
         progAmpNames = ['program{}_amplitude#0'.format(pNum) for pNum in range(4)]
         progAmpLookup = {'program{}_amplitude#0'.format(pNum): pNum for pNum in range(4)}
         dropColumns = []
@@ -238,6 +248,7 @@ def calcUnitRegressionToAsig():
         featuresDF.drop(columns=dropColumns, inplace=True)
         featuresDF.columns = featuresDF.columns.remove_unused_levels()
         featuresDF.index = metaData
+        '''
         #
         featuresMetaData = {
             'targetLoadArgs': targetLoadArgs,

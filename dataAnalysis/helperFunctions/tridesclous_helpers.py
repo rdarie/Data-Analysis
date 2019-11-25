@@ -358,7 +358,7 @@ def neo_block_after_peeler(
                 continue
             #
             clustersDF = pd.DataFrame(catalogue['clusters'])
-            #pdb.set_trace()
+            #
             if not len(clustersDF) > 0:
                 # no events from this entire channel
                 continue
@@ -483,7 +483,7 @@ def neo_block_after_peeler(
                     if shape_boundary_threshold is not None:
                         tooFar = timesDF.index[
                             timesDF['maxDeviation'] > shape_boundary_threshold]
-                        #  pdb.set_trace()
+                        #  
                         timesDF.drop(index=tooFar, inplace=True)
                         spikeTimes = spikeTimes[timesDF.index]
                         spikeWaveforms = spikeWaveforms[timesDF.index, :, :]
@@ -491,7 +491,7 @@ def neo_block_after_peeler(
                     if shape_distance_threshold is not None:
                         tooFar = timesDF.index[
                             timesDF['templateDist'] > shape_distance_threshold]
-                        #  pdb.set_trace()
+                        #  
                         timesDF.drop(index=tooFar, inplace=True)
                         spikeTimes = spikeTimes[timesDF.index]
                         spikeWaveforms = spikeWaveforms[timesDF.index, :, :]
@@ -515,7 +515,7 @@ def neo_block_after_peeler(
                                     dropIndices.append(idx)
                                 else:
                                     dropIndices.append(prevIdx)
-                            #  pdb.set_trace()
+                            #  
                             timesDF.drop(
                                 index=pd.unique(dropIndices), inplace=True)
                             timesDF['isi'] = timesDF['times'].diff().fillna(method='bfill')
@@ -534,7 +534,7 @@ def neo_block_after_peeler(
                         #  'energyReduction': timesDF['energyReduction'].values,
                         'isi': timesDF['isi'].values}
                     arrayAnnNames = {'arrayAnnNames': list(arrayAnn.keys())}
-                    #  pdb.set_trace()
+                    #  
                     if group['tag'].iloc[0] == '':
                         if group['max_peak_amplitude'].iloc[0] < -7:
                             group.loc[:, 'tag'] = 'so_good'
@@ -542,7 +542,7 @@ def neo_block_after_peeler(
                             group.loc[:, 'tag'] = 'good'
                     if plotting:
                         fitBreakDown = pd.cut(timesDF['templateDist'], nCats)
-                        # pdb.set_trace()
+                        # 
                         uniqueCats = fitBreakDown.unique().sort_values()
                         for pltIdx, cat in enumerate(uniqueCats):
                             catIdx = fitBreakDown.index[fitBreakDown == cat]
@@ -556,7 +556,7 @@ def neo_block_after_peeler(
                                 sort=False, ax=ax[uIdx][pltIdx],
                                 estimator=None, alpha=0.1)
                             ax[uIdx][pltIdx].set_title('{}'.format(cat))
-                        # pdb.set_trace()
+                        # 
                     st = SpikeTrain(
                         name='seg{}_{}'.format(int(segIdx), thisUnit.name),
                         times=spikeTimes, units='sec',
@@ -572,7 +572,7 @@ def neo_block_after_peeler(
                             st.annotations.update(
                                 {colName: v}
                             )
-                    #  pdb.set_trace()
+                    #  
                     st.annotations.update({'chan_grp': chan_grp})
                 except Exception:
                     traceback.print_exc()
@@ -598,7 +598,6 @@ def neo_block_after_peeler(
                                 {colName: v}
                             )
                     st.annotations.update({'chan_grp': chan_grp})
-
                 #  create relationships
                 chanIdx.units.append(thisUnit)
                 thisUnit.channel_index = chanIdx

@@ -60,7 +60,7 @@ sns.set_style("whitegrid")
 rowColOpts = asp.processRowColArguments(arguments)
 
 if arguments['processAll']:
-    prefix = experimentName
+    prefix = assembledName
 else:
     prefix = ns5FileName
 

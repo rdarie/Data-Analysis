@@ -81,7 +81,7 @@ windowSize = [
 #      'elec77#0_fr', 'elec77#1_fr', 'elec77#2_fr',
 #      ]
 if arguments['processAll']:
-    prefix = experimentName
+    prefix = assembledName
 else:
     prefix = ns5FileName
 

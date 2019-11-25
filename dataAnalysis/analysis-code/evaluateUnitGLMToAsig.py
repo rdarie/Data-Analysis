@@ -125,7 +125,7 @@ sns.swarmplot(
     size=3, color=".3", linewidth=0)
 
 pdfPath = os.path.join(
-    figureFolder,
+    GLMFiguresFolder,
     '{}_evaluation_rsq.pdf'.format(
         arguments['estimator']))
 plt.savefig(pdfPath)
@@ -151,7 +151,7 @@ rsquared = np.array(
         if np.isfinite(regDict['mean_test_score'])])
 
 pdfPath = os.path.join(
-    figureFolder,
+    GLMFiguresFolder,
     '{}_evaluation_lags.pdf'.format(
         arguments['estimator']))
 plt.savefig(pdfPath)
@@ -163,7 +163,7 @@ ax.set_title('R^2 for population of units')
 ax.set_ylabel('Count')
 ax.set_xlabel('R^2')
 pdfPath = os.path.join(
-    figureFolder,
+    GLMFiguresFolder,
     '{}_evaluation_rsq.pdf'.format(
         arguments['estimator']))
 plt.savefig(pdfPath)
@@ -216,7 +216,7 @@ with sns.plotting_context('notebook', font_scale=0.75):
         ax.xaxis.set_major_formatter(ticker.EngFormatter())
     #
     pdfPath = os.path.join(
-        figureFolder,
+        GLMFiguresFolder,
         '{}_evaluation_betasAllBins.pdf'.format(
             arguments['estimator']))
     plt.savefig(pdfPath)
@@ -235,7 +235,7 @@ with sns.plotting_context('notebook', font_scale=0.75):
                 g.axes[r, c].set_ylim(newLim)
     #
     pdfPath = os.path.join(
-        figureFolder,
+        GLMFiguresFolder,
         '{}_evaluation_betas.pdf'.format(
             arguments['estimator']))
     #

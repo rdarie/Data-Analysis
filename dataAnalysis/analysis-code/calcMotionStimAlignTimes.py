@@ -8,6 +8,7 @@ Options:
     --analysisName=analysisName          append a name to the resulting blocks? [default: default]
     --processAll                         process entire experimental day? [default: False]
     --plotParamHistograms                plot pedal size, amplitude, duration distributions? [default: False]
+    --lazy                               load from raw, or regular? [default: False]
 """
 import matplotlib
 matplotlib.rcParams['pdf.fonttype'] = 42
@@ -57,6 +58,7 @@ insReader = neo.NixIO(
 insBlock = insReader.read_block(0)
 
 #  all experimental days?
+'''
 if arguments['processAll']:
     dataReader = neo.io.nixio_fr.NixIO(
         filename=experimentDataPath.format(arguments['analysisName']))
@@ -72,7 +74,22 @@ dataBlock = dataReader.read_block(
     signal_group_mode='split-all')
 for ev in dataBlock.filter(objects=EventProxy):
     ev.name = '_'.join(ev.name.split('_')[1:])
-
+'''
+if arguments['processAll']:
+    prefix = assembledName
+else:
+    alignTimeBounds = [
+        alignTimeBoundsLookup[int(arguments['trialIdx'])]
+    ]
+    prefix = ns5FileName
+dataBlockPath = os.path.join(
+    analysisSubFolder,
+    prefix + '_analyze.nix')
+print('loading {}'.format(dataBlockPath))
+dataReader, dataBlock = preproc.blockFromPath(
+    dataBlockPath, lazy=arguments['lazy'])
+# print([asig.name for asig in dataBlock.filter(objects=EventProxy)])
+# print([asig.name for asig in dataBlock.filter(objects=Event)])
 #  some categories need to be calculated,
 #  others are available; "fuzzy" ones need their
 #  alignment fixed
@@ -103,6 +120,9 @@ blockIdx = 0
 checkReferences = False
 for segIdx, dataSeg in enumerate(dataBlock.segments):
     print('Calculating motion+stim align times for trial {}'.format(segIdx))
+    # pdb.set_trace()
+    # print([asig.name for asig in dataSeg.filter(objects=AnalogSignalProxy)])
+    # print([asig.name for asig in dataSeg.filter(objects=AnalogSignal)])
     signalsInSegment = [
         'seg{}_'.format(segIdx) + i
         for i in signalsInAsig]
@@ -139,20 +159,23 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         asigP.load()
         for asigP in asigProxysList]
     samplingRate = asigsList[0].sampling_rate
+    # asigsDF = preproc.analogSignalsToDataFrame(asigsList, useChanNames=True)
+    # pdb.set_trace()
     asigsDF = preproc.analogSignalsToDataFrame(asigsList)
+    asigsDF.columns = [i.replace('seg{}_'.format(segIdx), '') for i in asigsDF.columns]
 
     dataSegEvents = [evP.load() for evP in eventProxysList]
     eventDF = preproc.eventsToDataFrame(
         dataSegEvents, idxT='t',
-        names=['property', 'value']
+        names=['seg{}_property'.format(segIdx), 'seg{}_value'.format(segIdx)]
         )
+    eventDF.columns = [i.replace('seg{}_'.format(segIdx), '') for i in eventDF.columns]
     stimStatus = preprocINS.stimStatusSerialtoLong(
         eventDF, idxT='t', namePrefix='', expandCols=expandCols,
         deriveCols=deriveCols, progAmpNames=progAmpNames)
     infoFromStimStatus = hf.interpolateDF(
         stimStatus, asigsDF['t'],
         x='t', columns=columnsToBeAdded, kind='previous')
-
     tdDF = pd.concat((
         asigsDF,
         infoFromStimStatus.drop(columns='t')),
@@ -162,7 +185,6 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
             'movement': 'pedalVelocityCat',
             'position': 'pedalPosition'},
         inplace=True)
-
     #  get alignment times
     moveMask = pd.Series(False, index=tdDF.index)
     stopMask = pd.Series(False, index=tdDF.index)

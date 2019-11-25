@@ -49,7 +49,6 @@ def applyScalers(DF, listOfScalers):
             DF.iloc[:, featuresMatchMaskAll] = scaledVal
         except Exception:
             traceback.print_exc()
-            pdb.set_trace()
     return DF
 
 
@@ -95,7 +94,7 @@ class SMWrapper(BaseEstimator, RegressorMixin):
                 y, X.iloc[:, self.featureMask],
                 **self.sm_kwargs)
         except Exception:
-            pdb.set_trace()
+            traceback.print_exc()
         if self.regAlpha is None:
             self.results_ = self.model_.fit()
         else:
@@ -146,8 +145,8 @@ class SingleNeuronRegression():
         for idx, (name, group) in enumerate(trialInfo.groupby(conditionNames)):
             trialInfo.loc[group.index, 'group'] = idx
         prelimSkf = StratifiedKFold(n_splits=self.cv, shuffle=True)
-        # pdb.set_trace()
-        # WIP: trick to keep trials continuous
+        # 
+        # WIP: trick to keep trials continuous under cross val
         binMask = (trialInfo['bin'] == trialInfo['bin'].iloc[0])
         idxGen = prelimSkf.split(
             trialInfo.iloc[binMask.to_numpy(), 0].to_numpy(),
@@ -169,7 +168,7 @@ class SingleNeuronRegression():
         self.XTest.columns = self.XTest.columns.to_list()
         self.yTest = targetDF.iloc[testMask, :]
         # self.yTest.columns = self.yTest.columns.to_list()
-        # pdb.set_trace()
+        # 
         self.betas = pd.DataFrame(
             0, index=targetDF.columns, columns=featuresDF.columns)
         self.pvals = pd.DataFrame(

@@ -98,10 +98,10 @@ def plotNeuronsAligned(
         colName=None, colControl=None,
         hueName=None, hueControl=None,
         styleName=None, styleControl=None,
-        twinRelplotKWArgs={},
+        twinRelplotKWArgs={}, sigStarOpts={},
         plotProcFuns=[],
         ):
-    # pdb.set_trace()
+    # 
     if loadArgs['unitNames'] is None:
         allChanNames = ns5.listChanNames(
             rasterBlock, loadArgs['unitQuery'], objType=Unit)
@@ -160,7 +160,7 @@ def plotNeuronsAligned(
                     if sigTestResults is not None:
                         addSignificanceStars(
                             g, sigTestResults.query("unit == '{}'".format(continuousName)),
-                            ro, co, hu, dataSubset)
+                            ro, co, hu, dataSubset, sigStarOpts=sigStarOpts)
                 plt.suptitle(unitName)
                 pdf.savefig()
                 plt.close()
@@ -176,7 +176,7 @@ def plotNeuronsAligned(
 
 
 def addSignificanceStars(
-        g, sigTestResults, ro, co, hu, dataSubset):
+        g, sigTestResults, ro, co, hu, dataSubset, sigStarOpts):
     pQueryList = []
     if len(g.row_names):
         rowFacetName = g.row_names[ro]
@@ -213,7 +213,7 @@ def addSignificanceStars(
             g.axes[ro, co].plot(
                 significantTimes,
                 significantTimes ** 0 * ymax * 0.95,
-                'm*')
+                **sigStarOpts)
             # g.axes[ro, co].autoscale(True)
 
 
@@ -230,7 +230,7 @@ def calcBreakDown(asigWide, rowName, colName, hueName):
         .agg('count')
         .iloc[:, 0]
     )
-    # pdb.set_trace()
+    # 
     indexNames = breakDownData.index.names + ['count']
     breakDownData = breakDownData.reset_index()
     breakDownData.columns = indexNames
@@ -252,7 +252,7 @@ def printBreakdown(asigWide, rowName, colName, hueName):
     # print out description of how many observations there are
     # for each condition
     breakDownData, breakDownText = calcBreakDown(asigWide, rowName, colName, hueName)
-    #  pdb.set_trace()
+    #  
     textHandle = fig.text(
         0.5, 0.5, breakDownText,
         fontsize=sns.plotting_context()['font.size'],
@@ -263,7 +263,7 @@ def printBreakdown(asigWide, rowName, colName, hueName):
     # fig.canvas.draw()
     # bb = textHandle.get_bbox_patch().get_extents()
     # bbFigCoords = bb.transformed(fig.transFigure.inverted())
-    # pdb.set_trace()
+    # 
     fig.set_size_inches(12, 24)
     # fig.set_size_inches(bbFigCoords.width, bbFigCoords.height)
     # bb.transformed(fig.transFigure.inverted()).width
@@ -281,7 +281,7 @@ def plotAsigsAligned(
         colName=None, colControl=None,
         hueName=None, hueControl=None,
         styleName=None, styleControl=None,
-        relplotKWArgs={},
+        relplotKWArgs={}, sigStarOpts={},
         plotProcFuns=[],
         ):
     if loadArgs['unitNames'] is None:
@@ -319,7 +319,7 @@ def plotAsigsAligned(
                     if sigTestResults is not None:
                         addSignificanceStars(
                             g, sigTestResults.query("unit == '{}'".format(unitName)),
-                            ro, co, hu, dataSubset)
+                            ro, co, hu, dataSubset, sigStarOpts=sigStarOpts)
                     if len(plotProcFuns):
                         for procFun in plotProcFuns:
                             procFun(g, ro, co, hu, dataSubset)
@@ -428,7 +428,7 @@ def genLegendRounder(decimals=2):
 
 def plotCorrelationMatrix(correlationDF, pdfPath):
     #  based on https://seaborn.pydata.org/examples/many_pairwise_correlations.html
-    mask = np.zeros_like(correlationDF, dtype=np.bool)
+    mask = np.zeros_like(correlationDF.to_numpy(), dtype=np.bool)
     mask[np.tril_indices_from(mask)] = True
     # Set up the matplotlib figure
     f, ax = plt.subplots(figsize=(11, 9))

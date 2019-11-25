@@ -24,8 +24,8 @@
 #SBATCH --array=1
 
 # EXP="exp201901070700"
-EXP="exp201901201200"
-# EXP="exp201901211000"
+# EXP="exp201901201200"
+EXP="exp201901211000"
 # EXP="exp201901221000"
 # EXP="exp201901231000"
 # EXP="exp201901271000"
@@ -37,5 +37,6 @@ conda activate
 source activate nda
 python --version
 
-python3 ./preprocNS5.py --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID --makeTruncated
-# python3 ./preprocNS5.py --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID --makeFull
+SLURM_ARRAY_TASK_ID=3
+# python3 ./preprocNS5.py --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID --makeTruncated
+python3 ./preprocNS5.py --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID --makeFull
