@@ -1,4 +1,4 @@
-#!/gpfs/runtime/opt/python/3.5.2/bin/python3
+#!/users/rdarie/anaconda/nda/bin/python
 """01: Preprocess spikes, then 04: Run peeler and 05: Assemble the spike nix file
 
 Usage:
@@ -15,6 +15,8 @@ Options:
     --makeCoarseNeoBlock           save peeler results to a neo block [default: False]
     --makeStrictNeoBlock           save peeler results to a neo block [default: False]
     --exportSpikesCSV              save peeler results to a csv file [default: False]
+    --chan_start=chan_start        which chan_grp to start on [default: 0]
+    --chan_stop=chan_stop          which chan_grp to stop on [default: 24]
 """
 
 from docopt import docopt
@@ -23,6 +25,8 @@ import dataAnalysis.helperFunctions.tridesclous_helpers as tdch
 import os, gc, traceback
 
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
+chan_start = int(arguments['chan_start'])
+chan_stop = int(arguments['chan_stop'])
 
 try:
     if not arguments['attemptMPI']:
@@ -43,12 +47,12 @@ if RANK == 0:
     expOpts, allOpts = parseAnalysisOptions(
         int(arguments['trialIdx']),
         arguments['exp'])
-    print("globals:")
-    print(globals().keys())
-    print('allOpts:')
-    print(allOpts.keys())
-    print('expOpts:')
-    print(expOpts.keys())
+    #  print("globals:")
+    #  print(globals().keys())
+    #  print('allOpts:')
+    #  print(allOpts.keys())
+    #  print('expOpts:')
+    #  print(expOpts.keys())
     globals().update(expOpts)
     globals().update(allOpts)
     try:
@@ -82,7 +86,8 @@ if RANK == 0:
         tdch.purgePeelerResults(
             triFolder, diagnosticsOnly=True, purgeAll=True)
     dataio = tdc.DataIO(dirname=triFolder)
-    chansToAnalyze = sorted(list(dataio.channel_groups.keys()))[:96]
+    # TODO: automatically find ephys channels based on name
+    chansToAnalyze = sorted(list(dataio.channel_groups.keys()))[chan_start:chan_stop]
 else:
     chansToAnalyze = None
 
@@ -124,6 +129,7 @@ if arguments['batchPreprocess']:
             'allow_single_cluster': True},
         noise_estimate_duration='all',
         sample_snippet_duration='all',
+        common_ref_removal=True,
         chunksize=2**20,
         extractOpts=dict(
             mode='rand',
@@ -136,7 +142,7 @@ if arguments['batchPreprocess']:
 if arguments['batchPeel']:
     tdch.batchPeel(
         triFolder, chansToAnalyze,
-        # shape_boundary_threshold=3,
+        shape_boundary_threshold=3,
         shape_distance_threshold=2, attemptMPI=HAS_MPI)
 
 if HAS_MPI:

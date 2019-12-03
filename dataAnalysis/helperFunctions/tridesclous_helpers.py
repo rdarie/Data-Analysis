@@ -259,7 +259,7 @@ def run_peeler(
         triFolder, chan_grp=0,
         shape_distance_threshold=2,
         shape_boundary_threshold=3,
-        energy_reduction_threshold=15,
+        confidence_threshold=0.6,
         debugging=False, progressbar=False,
         duration=None, useOpenCL=False, trackTiming=False):
 
@@ -279,7 +279,7 @@ def run_peeler(
             catalogue=initial_catalogue,
             shape_distance_threshold=shape_distance_threshold,
             shape_boundary_threshold=shape_boundary_threshold,
-            energy_reduction_threshold=energy_reduction_threshold,
+            confidence_threshold=confidence_threshold,
             debugging=debugging)
 
     if trackTiming:
@@ -314,7 +314,6 @@ def neo_block_after_peeler(
         triFolder, chan_grps=None,
         shape_distance_threshold=None,
         shape_boundary_threshold=None,
-        energy_reduction_threshold=None,
         refractory_period=None, ignoreTags=['so_bad'],
         plotting=False,
         FRThresh=1):
@@ -332,7 +331,10 @@ def neo_block_after_peeler(
         maxTime = (
             dataio.get_segment_length(segIdx) /
             dataio.sample_rate)
-        catalogue = dataio.load_catalogue(chan_grp=chan_grps[0])
+        catalogue = None
+        i = 0
+        while catalogue is None:
+            catalogue = dataio.load_catalogue(chan_grp=chan_grps[i])
         n_left = int(1.5 * catalogue['n_left'])
         n_right = int(1.5 * catalogue['n_right'])
         window1 = scipy.signal.triang(2 * int(-n_left) + 1)
@@ -407,6 +409,7 @@ def neo_block_after_peeler(
             for uIdx, (unitName, group) in enumerate(unitGrouper):
                 #  assert group['max_on_channel_id'] only has one element
                 chanId = group['max_on_channel_id'].values[0]
+                idxOfChanLabel = np.argwhere(channelIds == chanId).flatten()[0]
                 chanLabel = chanNames[chanId]
                 chanName = '{}'.format(chanLabel)  # sanitize to string
                 chanIdx = block.filter(objects=ChannelIndex, name=chanName)[0]
@@ -459,12 +462,13 @@ def neo_block_after_peeler(
                     timesDF['templateDist'] = spike[unitMask]['feature_distance']
                     timesDF['maxDeviation'] = np.nan
                     timesDF['energyReduction'] = np.nan
-                    meanWaveform = np.mean(spikeWaveforms, axis=0)
+                    meanWaveform = np.mean(spikeWaveforms[:, idxOfChanLabel, :], axis=0)
                     #  mirror naming convention from tdc
                     pred_wf = meanWaveform
                     norm_factor = 1
                     for idx in timesDF.index:
-                        wf = spikeWaveforms[idx, :, :]
+                        # pdb.set_trace()
+                        wf = spikeWaveforms[idx, idxOfChanLabel, :]
                         wf_resid = (wf-pred_wf)
                         normalized_deviation = (
                             np.abs(wf_resid) *
@@ -546,7 +550,7 @@ def neo_block_after_peeler(
                         uniqueCats = fitBreakDown.unique().sort_values()
                         for pltIdx, cat in enumerate(uniqueCats):
                             catIdx = fitBreakDown.index[fitBreakDown == cat]
-                            pltWvf = pd.DataFrame(spikeWaveforms[catIdx, 0, :])
+                            pltWvf = pd.DataFrame(spikeWaveforms[catIdx, idxOfChanLabel, :])
                             pltWvf = pltWvf.unstack().reset_index()
                             pltWvf.columns = ['bin', 'index', 'signal']
                             sns.lineplot(
@@ -557,10 +561,11 @@ def neo_block_after_peeler(
                                 estimator=None, alpha=0.1)
                             ax[uIdx][pltIdx].set_title('{}'.format(cat))
                         # 
+                    # pdb.set_trace()
                     st = SpikeTrain(
                         name='seg{}_{}'.format(int(segIdx), thisUnit.name),
                         times=spikeTimes, units='sec',
-                        waveforms=spikeWaveforms * pq.uV,
+                        waveforms=spikeWaveforms[:, idxOfChanLabel, :][:, None, :] * pq.uV,
                         t_stop=maxTime, t_start=0,
                         left_sweep=n_left,
                         sampling_rate=dataio.sample_rate * pq.Hz,
@@ -807,7 +812,7 @@ def batchPeel(
         triFolder, chansToAnalyze,
         shape_distance_threshold=2,
         shape_boundary_threshold=3,
-        energy_reduction_threshold=15,
+        confidence_threshold=0.6,
         attemptMPI=False
         ):
     print('Batch peeling...')
@@ -832,7 +837,7 @@ def batchPeel(
                 run_peeler(
                     triFolder, shape_distance_threshold=shape_distance_threshold,
                     shape_boundary_threshold=shape_boundary_threshold,
-                    energy_reduction_threshold=energy_reduction_threshold,
+                    confidence_threshold=confidence_threshold,
                     debugging=True,
                     chan_grp=chan_grp, progressbar=False)
                 gc.collect()

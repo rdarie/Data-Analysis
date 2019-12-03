@@ -5,6 +5,10 @@ import importlib
 
 
 def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
+    plottingFigures = False
+    plotBlocking = True
+    remakePrb = False
+    #
     optsModule = importlib.import_module(experimentShorthand, package=None)
     expOpts = optsModule.getExpOpts()
     #  globals().update(expOpts)
@@ -212,7 +216,6 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
     nspCmpPath = os.path.join('.', 'nsp_map.cmp')
     cmpDF = prb_meta.cmpToDF(nspCmpPath)
     
-    remakePrb = expOpts['remakePrb']
     if remakePrb:
         nspCsvPath = os.path.join('.', 'nsp_map.csv')
         cmpDF.to_csv(nspCsvPath)
@@ -220,7 +223,7 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
             cmpDF, filePath=nspPrbPath,
             names=['elec', 'ainp'],
             #names=['elec'],
-            groupIn={'xcoords': 1, 'ycoords': 1})
+            groupIn={'xcoords': 2, 'ycoords': 2})
     #  should rename these to something more intuitive
     #  paths relevant to individual trials
     processedFolder = os.path.join(

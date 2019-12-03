@@ -7,10 +7,7 @@ def getExpOpts():
         4: False,
         5: True
         }
-    RCTrialLookup = {i: False for i in miniRCTrialLookup.keys()}
-    plottingFigures = False
-    plotBlocking = True
-    remakePrb = False
+    RCTrialLookup = {i: False for i in miniRCTrialLookup.keys()} 
     
     experimentName = '201901271000-Proprio'
     deviceName = 'DeviceNPC700373H'

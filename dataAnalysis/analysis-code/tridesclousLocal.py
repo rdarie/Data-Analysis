@@ -48,6 +48,11 @@ if purgePeeler:
     tdch.purgePeelerResults(
         triFolder, purgeAll=True)
 
+purgeDiagnostics = False
+if purgeDiagnostics:
+    tdch.purgePeelerResults(
+        triFolder, purgeAll=True, diagnosticsOnly=True)
+
 dataio = tdc.DataIO(dirname=triFolder)
 chansToAnalyze = sorted(list(dataio.channel_groups.keys()))
 

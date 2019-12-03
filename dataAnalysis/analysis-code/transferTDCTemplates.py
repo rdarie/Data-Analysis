@@ -6,6 +6,8 @@ Options:
     --trialIdx=trialIdx             which trial to analyze [default: 1]
     --exp=exp                       which experimental day to analyze
     --processAll                    process entire experimental day? [default: False]
+    --chan_start=chan_start         which chan_grp to start on [default: 0]
+    --chan_stop=chan_stop           which chan_grp to stop on [default: 24]
 """
 
 import tridesclous as tdc
@@ -23,7 +25,9 @@ globals().update(allOpts)
 import os
 
 dataio = tdc.DataIO(dirname=triFolderSource)
-chansToAnalyze = sorted(list(dataio.channel_groups.keys()))[:96]
+chan_start = int(arguments['chan_start'])
+chan_stop = int(arguments['chan_stop'])
+chansToAnalyze = sorted(list(dataio.channel_groups.keys()))[chan_start:chan_stop]
 # import pdb; #)
 for fileNameDest in triDestinations:
     #  import pdb; #)

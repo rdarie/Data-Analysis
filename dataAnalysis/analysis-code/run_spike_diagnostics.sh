@@ -20,17 +20,24 @@
 #SBATCH --account=bibs-dborton-condo
 
 # Request custom resources
-#SBATCH --array=1,2,3
+#SBATCH --array=1,2,3,4,5
 
-EXP="exp201901211000"
+# EXP="exp201901211000"
 # EXP="exp201901201200"
 # EXP="exp201901221000"
 # EXP="exp201901070700"
-# EXP="exp201901271000"
+ EXP="exp201901271000"
 # EXP="exp201901231000"
+
+module load anaconda/3-5.2.0
+. /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
+conda activate
+source activate nda
+python --version
 
 #SLURM_ARRAY_TASK_ID="2"
 #python3 './tridesclousCCV.py' --trialIdx=$SLURM_ARRAY_TASK_ID --makeCoarseNeoBlock --exp=$EXP
 #python3 './plotSpikeReport.py' --trialIdx=$SLURM_ARRAY_TASK_ID --nameSuffix=_coarse --exp=$EXP
 python3 './tridesclousCCV.py' --trialIdx=$SLURM_ARRAY_TASK_ID --makeStrictNeoBlock --exp=$EXP
 python3 './plotSpikeReport.py' --trialIdx=$SLURM_ARRAY_TASK_ID --nameSuffix=_final --exp=$EXP
+python3 './tridesclousCCV.py' --trialIdx=$SLURM_ARRAY_TASK_ID --purgePeelerDiagnostics --exp=$EXP

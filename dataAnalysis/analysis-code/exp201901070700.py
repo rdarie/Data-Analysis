@@ -12,10 +12,7 @@ def getExpOpts():
         3: True,
         4: True
         }
-        
-    plottingFigures = False
-    plotBlocking = True
-    remakePrb = False
+         
 
     experimentName = '201901070700-ProprioRC'
     deviceName = 'DeviceNPC700373H'

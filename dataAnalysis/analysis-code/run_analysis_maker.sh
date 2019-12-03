@@ -21,11 +21,11 @@
 #SBATCH --account=bibs-dborton-condo
 
 # Request custom resources
-#SBATCH --array=2
+#SBATCH --array=1,2,3
 
 # EXP="exp201901070700"
-EXP="exp201901201200"
-# EXP="exp201901211000"
+# EXP="exp201901201200"
+EXP="exp201901211000"
 # EXP="exp201901221000"
 # EXP="exp201901231000"
 # EXP="exp201901271000"

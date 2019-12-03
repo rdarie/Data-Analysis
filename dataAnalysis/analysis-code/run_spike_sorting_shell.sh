@@ -23,20 +23,29 @@
 
 # Run a command
 # EXP="exp201901070700"
-EXP="exp201901201200"
+# EXP="exp201901201200"
 # EXP="exp201901211000"
 # EXP="exp201901221000"
 # EXP="exp201901231000"
-# EXP="exp201901271000"
-RCTRIALIDX="1"
+EXP="exp201901271000"
+TRIALIDX="1"
+
+module load anaconda/3-5.2.0
+. /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
+conda activate
+source activate nda
+python --version
+
 # Constructor
-python3 ./tridesclousCCV.py --trialIdx=$RCTRIALIDX --exp=$EXP  --batchPreprocess
-python3 ./tridesclousVisualize.py --trialIdx=$RCTRIALIDX --exp=$EXP  --constructor
+# python3 ./tridesclousCCV.py --trialIdx=$TRIALIDX --exp=$EXP  --batchPreprocess
+# python3 ./tridesclousVisualize.py --trialIdx=$TRIALIDX --exp=$EXP  --constructor
 # Transfer
-python3 ./transferTDCTemplates.py --trialIdx=$RCTRIALIDX --exp=$EXP
+# python3 ./transferTDCTemplates.py --trialIdx=$TRIALIDX --exp=$EXP
 # Peeler
-python3 ./tridesclousCCV.py --trialIdx=$RCTRIALIDX --exp=$EXP --purgePeeler --batchPeel
-python3 ./tridesclousVisualize.py --trialIdx=$RCTRIALIDX --exp=$EXP  --peeler
+# python3 ./tridesclousCCV.py --trialIdx=$TRIALIDX --exp=$EXP --purgePeeler --batchPeel
+# python3 ./tridesclousVisualize.py --trialIdx=$TRIALIDX --exp=$EXP  --peeler
 #
-python3 ./tridesclousCCV.py --trialIdx=$RCTRIALIDX --exp=$EXP --exportSpikesCSV
-python3 ./tridesclousCCV.py --trialIdx=$RCTRIALIDX --exp=$EXP --purgePeelerDiagnostics
+# python3 ./tridesclousCCV.py --trialIdx=$TRIALIDX --exp=$EXP --exportSpikesCSV
+# python3 ./tridesclousCCV.py --trialIdx=$TRIALIDX --exp=$EXP --purgePeelerDiagnostics
+# python3 './tridesclousCCV.py' --trialIdx=$TRIALIDX --makeStrictNeoBlock --exp=$EXP
+# python3 './plotSpikeReport.py' --trialIdx=$TRIALIDX --nameSuffix=_final --exp=$EXP

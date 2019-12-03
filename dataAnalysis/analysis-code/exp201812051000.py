@@ -5,10 +5,7 @@ def getExpOpts():
     #
     miniRCTrialLookup = {i: False for i in range(1, 10)}
     RCTrialLookup = {i: True for i in range(1, 10)}
-        
-    plottingFigures = False
-    plotBlocking = True
-    remakePrb = False
+         
 
     experimentName = '201812051000-PadawanRecruitmentCurve'
     deviceName = 'DeviceNPC'
