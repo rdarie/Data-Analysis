@@ -43,7 +43,7 @@ if arguments['processAll']:
 else:
     prefix = ns5FileName
 triggeredPath = os.path.join(
-    analysisSubFolder,
+    alignSubFolder,
     prefix + '_{}_{}.nix'.format(
         arguments['inputBlockName'], arguments['window']))
 secondaryPath = os.path.join(
@@ -51,7 +51,7 @@ secondaryPath = os.path.join(
     prefix + '_{}_{}.nix'.format(
         arguments['secondaryBlockName'], arguments['window']))
 resultPath = os.path.join(
-    analysisSubFolder,
+    alignSubFolder,
     prefix + '_{}_{}_calc.h5'.format(
         arguments['inputBlockName'], arguments['window']))
 #

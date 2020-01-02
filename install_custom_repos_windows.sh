@@ -13,7 +13,7 @@ RepoList=(\
 "spykesML" \
 "Data-Analysis"\
 )
-
+python setup.py develop --user
 cd ../
 for i in ${RepoList[*]}; do
     echo $GitRepoRoot$i".git"

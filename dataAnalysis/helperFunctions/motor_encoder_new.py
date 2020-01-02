@@ -130,7 +130,8 @@ def processMotorData(motorData, fs, invertLookup=False):
     #
     statesAtTransition = motorData.loc[transitionIdx, 'encoderState'].tolist()
     transitionStatePairs = [
-        (statesAtTransition[i], statesAtTransition[i-1]) for i in range(1, len(statesAtTransition))]
+        (statesAtTransition[i], statesAtTransition[i-1])
+        for i in range(1, len(statesAtTransition))]
     count = [incrementLookup[pair] for pair in transitionStatePairs]
     #  pad with a zero to make up for the fact that the first one doesn't have a pair
     motorData.loc[transitionIdx, 'count'] = [0] + count

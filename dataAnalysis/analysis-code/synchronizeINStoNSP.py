@@ -62,18 +62,18 @@ synchFunPath = os.path.join(
     '{}_{}_synchFun.pickle'.format(experimentName, ns5FileName))
 print('Loading INS Block...')
 '''
-reader = neo.io.NixIO(filename=insDataPath, mode='ro')
-insBlock = reader.read_block()
-insBlock.create_relationship()  # need this!
-reader.close()
-for st in insBlock.filter(objects=SpikeTrain):
-    #  print('unit is {}'.format(st.unit.name))
-    #  print('spiketrain is {}'.format(st.name))
-    if 'arrayAnnNames' in st.annotations.keys():
-        #  print(st.annotations['arrayAnnNames'])
-        for key in st.annotations['arrayAnnNames']:
-            st.array_annotations.update({key: st.annotations[key]})
-'''
+    reader = neo.io.NixIO(filename=insDataPath, mode='ro')
+    insBlock = reader.read_block()
+    insBlock.create_relationship()  # need this!
+    reader.close()
+    for st in insBlock.filter(objects=SpikeTrain):
+        #  print('unit is {}'.format(st.unit.name))
+        #  print('spiketrain is {}'.format(st.name))
+        if 'arrayAnnNames' in st.annotations.keys():
+            #  print(st.annotations['arrayAnnNames'])
+            for key in st.annotations['arrayAnnNames']:
+                st.array_annotations.update({key: st.annotations[key]})
+    '''
 insBlock = ns5.loadWithArrayAnn(insDataPath)
 tdDF, accelDF, stimStatus = mdt.unpackINSBlock(insBlock)
 td = {'data': tdDF, 't': tdDF['t']}
@@ -84,7 +84,7 @@ startTime_s = None
 dataLength_s = None
 print('Loading NSP Block...')
 try:
-    channelData, nspBlock = ns5.getNIXData(
+    channelData, _ = ns5.getNIXData(
         fileName=ns5FileName,
         folderPath=scratchFolder,
         elecIds=['ainp7'], startTime_s=startTime_s,
@@ -167,15 +167,16 @@ if not os.path.exists(synchFunPath):
         tdGroupMask = td['data']['trialSegment'] == trialSegment
         tdGroup = td['data'].loc[tdGroupMask, :]
         # if overriding with manually identified points
-        if len(clickDict[trialSegment]['ins']):
-            allTapTimestampsINS[trialSegment] = clickDict[trialSegment]['ins']
-        theseTapTimestampsINS = allTapTimestampsINS[trialSegment]
-        # if overriding with manually identified points
-        if len(clickDict[trialSegment]['nsp']):
-            allTapTimestampsNSP[trialSegment] = clickDict[trialSegment]['nsp']
-        theseTapTimestampsNSP = allTapTimestampsNSP[trialSegment]
-        #
-        if trialSegment in overrideSegments.keys():
+        if not (trialSegment in overrideSegments.keys()):
+            if len(clickDict[trialSegment]['ins']):
+                allTapTimestampsINS[trialSegment] = clickDict[trialSegment]['ins']
+            theseTapTimestampsINS = allTapTimestampsINS[trialSegment]
+            # if overriding with manually identified points
+            if len(clickDict[trialSegment]['nsp']):
+                allTapTimestampsNSP[trialSegment] = clickDict[trialSegment]['nsp']
+            theseTapTimestampsNSP = allTapTimestampsNSP[trialSegment]
+            #
+        else:
             print('\t Overriding trialSegment {}'.format(trialSegment))
             theseTapTimestampsINS = allTapTimestampsINS[overrideSegments[trialSegment]]
             theseTapTimestampsNSP = allTapTimestampsNSP[overrideSegments[trialSegment]]

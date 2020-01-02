@@ -11,12 +11,16 @@ Options:
     --window=window                        process with short window? [default: long]
     --inputBlockName=inputBlockName        filename for inputs [default: fr]
     --analysisName=analysisName            append a name to the resulting blocks? [default: default]
+    --alignFolderName=alignFolderName      append a name to the resulting blocks? [default: motion]
     --selectorName=selectorName            filename for resulting selector [default: minfrmaxcorr]
 """
 import os
 #  import numpy as np
 #  import pandas as pd
 import pdb
+import re
+from datetime import datetime as dt
+import numpy as np
 #  from neo import (
 #      Block, Segment, ChannelIndex,
 #      Event, AnalogSignal, SpikeTrain, Unit)
@@ -25,6 +29,7 @@ import dill as pickle
 from currentExperiment import parseAnalysisOptions
 from docopt import docopt
 import pandas as pd
+import dataAnalysis.preproc.ns5 as ns5
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['trialIdx']), arguments['exp'])
@@ -37,16 +42,20 @@ analysisSubFolder = os.path.join(
 if not os.path.exists(analysisSubFolder):
     os.makedirs(analysisSubFolder, exist_ok=True)
 #
+alignSubFolder = os.path.join(analysisSubFolder, arguments['alignFolderName'])
+if not os.path.exists(alignSubFolder):
+    os.makedirs(alignSubFolder, exist_ok=True)
+#
 if arguments['processAll']:
     prefix = assembledName
 else:
     prefix = ns5FileName
 resultPath = os.path.join(
-    analysisSubFolder,
+    alignSubFolder,
     prefix + '_{}_{}_calc.h5'.format(
         arguments['inputBlockName'], arguments['window']))
 selectorPath = os.path.join(
-    analysisSubFolder,
+    alignSubFolder,
     prefix + '_{}.pickle'.format(
         arguments['selectorName']))
 #
@@ -54,18 +63,37 @@ meanFRDF = pd.read_hdf(resultPath, 'meanFR')
 corrDF = pd.read_hdf(resultPath, 'corr')
 for n in corrDF.index:
     corrDF.loc[n, n] = 0
-#
+impedanceDF = pd.Series(np.nan, index=meanFRDF.index)
+for (feature, lag) in impedanceDF.index:
+    chName = feature.split('#')[0]
+    impedanceDF[(feature, lag)] = impedances.loc[chName, 'impedance']
+
+
 def selFun(
-        meanDF, corrDF, meanThresh=5,
-        corrThresh=0.85):
-    unitMask = ((meanDF > meanThresh) & (corrDF.abs().max() < corrThresh))
+        meanDF, corrDF, impedanceDF, 
+        meanThresh=5, corrThresh=0.95, impedanceBounds=(1, 500)):
+    # meanDF=meanFRDF; meanThresh=5; corrThresh=0.95; impedanceBounds=(1, 500)
+    meanMask = (meanDF > meanThresh)
+    impedanceMask = (
+        (impedanceDF > impedanceBounds[0]) &
+        (impedanceDF < impedanceBounds[1])
+        )
+    unitMask = meanMask & impedanceMask
+    corrMask = (corrDF.loc[unitMask, unitMask].abs().max() < corrThresh)
+    for unitIdx in unitMask.index:
+        if unitIdx in corrMask.index:
+            unitMask.loc[unitIdx] = unitMask.loc[unitIdx] & corrMask.loc[unitIdx]
     return unitMask[unitMask].index.to_list()
-#
-thisCorrThresh = .95
-thisMeanThresh = 5
+
+
+# meanDF=meanFRDF; meanThresh=5; corrThresh=0.95
+# import matplotlib.pyplot as plt
+# plt.hist(impedanceDF, bins='sqrt'); plt.show()
+thisCorrThresh = .85
+thisMeanThresh = 3
+# import pdb; pdb.set_trace()
 outputFeatures = selFun(
-    meanFRDF, corrDF,
-    meanThresh=thisMeanThresh,
+    meanFRDF, corrDF, impedanceDF, meanThresh=thisMeanThresh,
     corrThresh=thisCorrThresh)
 #
 def trimSuffix(featureName, suffix):

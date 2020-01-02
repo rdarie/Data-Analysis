@@ -83,7 +83,7 @@ else:
     prefix = ns5FileName
 #
 triggeredPath = os.path.join(
-    analysisSubFolder,
+    alignSubFolder,
     prefix + '_raster_{}.nix'.format(arguments['window']))
 fullEstimatorName = '{}_{}_{}_{}'.format(
     prefix,

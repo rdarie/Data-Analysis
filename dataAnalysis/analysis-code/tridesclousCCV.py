@@ -16,7 +16,7 @@ Options:
     --makeStrictNeoBlock           save peeler results to a neo block [default: False]
     --exportSpikesCSV              save peeler results to a csv file [default: False]
     --chan_start=chan_start        which chan_grp to start on [default: 0]
-    --chan_stop=chan_stop          which chan_grp to stop on [default: 24]
+    --chan_stop=chan_stop          which chan_grp to stop on [default: 25]
 """
 
 from docopt import docopt
@@ -88,6 +88,7 @@ if RANK == 0:
     dataio = tdc.DataIO(dirname=triFolder)
     # TODO: automatically find ephys channels based on name
     chansToAnalyze = sorted(list(dataio.channel_groups.keys()))[chan_start:chan_stop]
+    print('Analyzing channels:\n{}'.format(chansToAnalyze))
 else:
     chansToAnalyze = None
 
@@ -112,7 +113,7 @@ chansToAnalyze = [
 if arguments['batchPreprocess']:
     tdch.batchPreprocess(
         triFolder, chansToAnalyze,
-        relative_threshold=4,
+        relative_threshold=5,
         highpass_freq=300.,
         lowpass_freq=3000.,
         filter_order=8,
@@ -143,6 +144,7 @@ if arguments['batchPeel']:
     tdch.batchPeel(
         triFolder, chansToAnalyze,
         shape_boundary_threshold=3,
+        confidence_threshold=0.6,
         shape_distance_threshold=2, attemptMPI=HAS_MPI)
 
 if HAS_MPI:

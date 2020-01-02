@@ -44,13 +44,12 @@ except ImportError:
     # for Python3
     from tkinter import filedialog   ## notice lowercase 't' in tkinter here
 
-try:
-    import libtfr
-    HASLIBTFR = True
-except:
-    import scipy.signal
-    HASLIBTFR = False
-
+#try:
+#    import libtfr
+#    HASLIBTFR = True
+#except:
+import scipy.signal
+HASLIBTFR = False
 from scipy import interpolate
 from scipy import stats, signal, ndimage
 from copy import copy

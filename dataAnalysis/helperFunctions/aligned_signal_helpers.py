@@ -46,13 +46,13 @@ def processChannelQueryArgs(
 
 
 def processOutlierTrials(
-        analysisSubFolder, prefix,
+        alignSubFolder, prefix,
         maskOutlierTrials=False, window=None,
         **kwargs
         ):
     if maskOutlierTrials:
         resultPath = os.path.join(
-            analysisSubFolder,
+            alignSubFolder,
             prefix + '_{}_{}_calc.h5'.format('fr', window))
         return pd.read_hdf(resultPath, 'rejectTrial')
     else:

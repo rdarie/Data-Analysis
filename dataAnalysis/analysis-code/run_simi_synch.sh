@@ -19,7 +19,7 @@
 # Specify account details
 #SBATCH --account=bibs-dborton-condo
 # Request custom resources
-#SBATCH --array=1,2,3,4,5
+#SBATCH --array=1
 
 # EXP="exp201901070700"
 # EXP="exp201901201200"
@@ -36,5 +36,4 @@ source activate nda
 python --version
 
 # SLURM_ARRAY_TASK_ID=1
-# python3 './synchronizeINStoNSP.py' --trialIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP 
-python3 './synchronizeINStoNSP.py' --trialIdx=5 --exp=$EXP --curateManually
+python3 './synchronizeSIMItoNSP.py' --trialIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP

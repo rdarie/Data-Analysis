@@ -16,6 +16,7 @@ Options:
     --selector=selector                    filename if using a unit selector
     --resultName=resultName                filename for result [default: corr]
     --analysisName=analysisName            append a name to the resulting blocks? [default: default]
+    --alignFolderName=alignFolderName      append a name to the resulting blocks? [default: motion]
 """
 
 import pdb
@@ -38,16 +39,20 @@ analysisSubFolder = os.path.join(
 if not os.path.exists(analysisSubFolder):
     os.makedirs(analysisSubFolder, exist_ok=True)
 #
+alignSubFolder = os.path.join(analysisSubFolder, arguments['alignFolderName'])
+if not os.path.exists(alignSubFolder):
+    os.makedirs(alignSubFolder, exist_ok=True)
+#
 if arguments['processAll']:
     prefix = assembledName
 else:
     prefix = ns5FileName
 triggeredPath = os.path.join(
-    analysisSubFolder,
+    alignSubFolder,
     prefix + '_{}_{}.nix'.format(
         arguments['inputBlockName'], arguments['window']))
 resultPath = os.path.join(
-    analysisSubFolder,
+    alignSubFolder,
     prefix + '_{}_{}_calc.h5'.format(
         arguments['inputBlockName'], arguments['window']))
 #

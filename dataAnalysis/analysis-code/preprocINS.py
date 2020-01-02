@@ -4,16 +4,17 @@ Usage:
     preprocINSData.py [options]
 
 Options:
-    --trialIdx=trialIdx        which trial to analyze
-    --exp=exp                  which experimental day to analyze
-    --showPlots                show plots? [default: False]
+    --trialIdx=trialIdx              which trial to analyze
+    --exp=exp                        which experimental day to analyze
+    --showPlots                      show plots? [default: False]
+    --disableStimDetection           disable stimulation time detection? [default: False]
 """
 
 import matplotlib
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
-matplotlib.use('Qt5Agg')   # generate interactive qt output
-# matplotlib.use('PS')   # generate offline postscript
+# matplotlib.use('Qt5Agg')   # generate interactive qt output
+matplotlib.use('PS')   # generate offline postscript
 import dataAnalysis.preproc.mdt as preprocINS
 import os
 from importlib import reload
@@ -38,6 +39,8 @@ def preprocINSWrapper(
         insDataPath=None,
         arguments=None
         ):
+    if arguments['disableStimDetection']:
+        trialFilesStim['ins']['detectStim'] = False
     insBlock = preprocINS.preprocINS(
         trialFilesStim['ins'],
         insDataPath, plottingFigures=arguments['showPlots'])

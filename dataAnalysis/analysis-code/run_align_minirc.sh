@@ -19,21 +19,26 @@
 # Specify account details
 #SBATCH --account=bibs-dborton-condo
 
-EXP="exp201901201200"
-# EXP="exp201901211000"
-# EXP="exp201901271000"
+# EXP="exp201901201200"
+# EXP="exp201901221000"
+EXP="exp201901271000"
 # EXP="exp201901070700"
-MINIRCIDX="1"
+MINIRCIDX="5"
 LAZINESS="--lazy"
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
 conda activate
-
 source activate nda
 python --version
 
-python3 ./calcAlignedAsigs.py --exp=$EXP --trialIdx=$MINIRCIDX  --window="long" $LAZINESS --eventName=stimAlignTimes --chanQuery="fr" --blockName="fr"
-python3 ./calcAlignedAsigs.py --exp=$EXP --trialIdx=$MINIRCIDX  --window="long" $LAZINESS --eventName=stimAlignTimes --chanQuery="rig" --blockName="rig"
-python3 ./calcAlignedAsigs.py --exp=$EXP --trialIdx=$MINIRCIDX  --window="long" $LAZINESS --eventName=stimAlignTimes --chanQuery="fr_sqrt" --blockName="fr_sqrt"
-python3 ./calcAlignedRasters.py --exp=$EXP --trialIdx=$MINIRCIDX  --window="long" $LAZINESS --eventName=stimAlignTimes --chanQuery="raster" --blockName="raster"
+python3 ./calcAlignedAsigs.py --exp=$EXP --trialIdx=$MINIRCIDX  --window="long" $LAZINESS --eventName=stimAlignTimes --chanQuery="fr" --blockName="fr"  --alignFolderName=stim
+python3 ./calcAlignedAsigs.py --exp=$EXP --trialIdx=$MINIRCIDX  --window="long" $LAZINESS --eventName=stimAlignTimes --chanQuery="rig" --blockName="rig"  --alignFolderName=stim
+python3 ./calcAlignedAsigs.py --exp=$EXP --trialIdx=$MINIRCIDX  --window="long" $LAZINESS --eventName=stimAlignTimes --chanQuery="fr_sqrt" --blockName="fr_sqrt"  --alignFolderName=stim
+python3 ./calcAlignedRasters.py --exp=$EXP --trialIdx=$MINIRCIDX  --window="long" $LAZINESS --eventName=stimAlignTimes --chanQuery="raster" --blockName="raster"  --alignFolderName=stim
+
+python3 ./calcUnitMeanFR.py --exp=$EXP --trialIdx=$MINIRCIDX --inputBlockName="fr" --alignQuery="stimOn" --unitQuery="fr" --verbose  --alignFolderName=stim
+python3 ./calcUnitCorrelation.py --exp=$EXP --trialIdx=$MINIRCIDX --inputBlockName="fr" --alignQuery="stimOn" --unitQuery="fr" --verbose --plotting  --alignFolderName=stim
+python3 ./calcTrialOutliers.py --exp=$EXP --trialIdx=$MINIRCIDX --inputBlockName="fr" --alignQuery="stimOn" --unitQuery="fr" --verbose --plotting  --alignFolderName=stim
+python3 ./selectUnitsByMeanFRandCorrelation.py --exp=$EXP --trialIdx=$MINIRCIDX --verbose  --analysisName=defaultStim
+python3 ./calcTrialOutliers.py --exp=$EXP --trialIdx=$MINIRCIDX --inputBlockName="fr" --alignQuery="stimOn" --unitQuery="fr" --verbose --plotting  --alignFolderName=stim

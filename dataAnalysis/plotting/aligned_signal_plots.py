@@ -1,5 +1,6 @@
 from matplotlib.backends.backend_pdf import PdfPages
-from matplotlib.patches import FancyBboxPatch
+from matplotlib.collections import PatchCollection
+from matplotlib.patches import FancyBboxPatch, Rectangle
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
@@ -101,7 +102,7 @@ def plotNeuronsAligned(
         twinRelplotKWArgs={}, sigStarOpts={},
         plotProcFuns=[],
         ):
-    # 
+    #
     if loadArgs['unitNames'] is None:
         allChanNames = ns5.listChanNames(
             rasterBlock, loadArgs['unitQuery'], objType=Unit)
@@ -125,7 +126,9 @@ def plotNeuronsAligned(
                 **loadArgs)
             raster = rasterWide.stack().reset_index(name='raster')
             asig = asigWide.stack().reset_index(name='fr')
-            oneSpikePerBinHz = int(np.round(np.diff(rasterWide.columns)[0] ** (-1)))
+            oneSpikePerBinHz = int(
+                np.round(
+                    np.diff(rasterWide.columns)[0] ** (-1)))
             if enablePlots:
                 if colName is not None:
                     colOrder = np.unique(rasterWide.index.to_frame()[colName])
@@ -165,7 +168,7 @@ def plotNeuronsAligned(
                 pdf.savefig()
                 plt.close()
             if limitPages is not None:
-                if idx >= limitPages:
+                if idx >= (limitPages - 1):
                     break
         if printBreakDown:
             breakDownData, breakDownText, fig, ax = printBreakdown(asigWide, rowName, colName, hueName)
@@ -326,7 +329,7 @@ def plotAsigsAligned(
                 pdf.savefig()
                 plt.close()
             if limitPages is not None:
-                if idx >= limitPages:
+                if idx >= (limitPages - 1):
                     break
         if printBreakDown:
             breakDownData, breakDownText, fig, ax = printBreakdown(asigWide, rowName, colName, hueName)
@@ -399,6 +402,16 @@ def genYLimSetter(newLims):
     return yLimSetter
 
 
+def genYLimSetterTwin(newLims):
+    def yLimSetter(g, ro, co, hu, dataSubset):
+        oldLims = g.twin_axes[ro, co].get_ylim()
+        g.twin_axes[ro, co].set_ylim(
+            [max(oldLims[0], newLims[0]), min(oldLims[1], newLims[1])]
+        )
+        return
+    return yLimSetter
+
+
 def xLabelsTime(g, ro, co, hu, dataSubset):
     if ro == g.axes.shape[0] - 1:
         g.axes[ro, co].set_xlabel('Time (sec)')
@@ -410,6 +423,26 @@ def genVLineAdder(pos, patchOpts):
         g.axes[ro, co].axvline(pos, **patchOpts)
         return
     return addVline
+
+
+def genBlockShader(patchOpts):
+    def shadeBlocks(g, ro, co, hu, dataSubset):
+        if hu % 2 == 0:
+            g.axes[ro, co].axhspan(
+                dataSubset[g._y_var].min(), dataSubset[g._y_var].max(),
+                **patchOpts
+            )
+            # Create list for all the patches
+            # y = (dataSubset[g._y_var].max() + dataSubset[g._y_var].min()) / 2
+            # height = (dataSubset[g._y_var].max() - dataSubset[g._y_var].min())
+            # xLim = g.axes[ro, co].get_xlim()
+            # x = (xLim[0] + xLim[1]) / 2
+            # width = (xLim[1] - xLim[0])
+            # rect = Rectangle((x, y), width, height, **patchOpts)
+            # # Add collection to axes
+            # g.axes[ro, co].add_patch(rect)
+            return
+    return shadeBlocks
 
 
 def genLegendRounder(decimals=2):
@@ -586,6 +619,9 @@ def twin_relplot(
     g1 = FacetGrid(
         data=data1, row=row, col=col, col_wrap=col_wrap,
         row_order=row_order, col_order=col_order,
+        # 12/30/19
+        hue=hue, hue_order=hue_order,
+        #
         height=height, aspect=aspect, dropna=False,
         **facet1_kws
     )
@@ -607,6 +643,9 @@ def twin_relplot(
         data=data2, fig=g1.fig, axes=twin_axes,
         row=row, col=col, col_wrap=col_wrap,
         row_order=row_order, col_order=col_order,
+        # 12/30/19
+        hue=hue, hue_order=hue_order,
+        #
         height=height, aspect=aspect, dropna=False,
         **facet2_kws
     )

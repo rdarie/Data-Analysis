@@ -77,6 +77,7 @@ for ev in dataBlock.filter(objects=EventProxy):
 '''
 if arguments['processAll']:
     prefix = assembledName
+    alignTimeBounds = [] # not working as of 12/31/19
 else:
     alignTimeBounds = [
         alignTimeBoundsLookup[int(arguments['trialIdx'])]
@@ -357,7 +358,7 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
     for colName in fuzzyCateg:
         categories[colName + 'Fuzzy'] = np.nan
     #  scan through and calculate fuzzy values
-    fudgeFactor = 500e-3  # seconds
+    motionStimAlignFudgeFactor = 500e-3  # seconds
     '''
     import seaborn as sns
     for colName in progAmpNames:
@@ -371,8 +372,8 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         moveCat = categories.loc[idx, 'pedalMovementCat']
         metaCat = categories.loc[idx, 'pedalMetaCat']
         if moveCat == 'outbound':
-            tStart = max(0, tOnset - fudgeFactor)
-            tStop = min(tdDF['t'].iloc[-1], tOnset + fudgeFactor)
+            tStart = max(0, tOnset - motionStimAlignFudgeFactor)
+            tStop = min(tdDF['t'].iloc[-1], tOnset + motionStimAlignFudgeFactor)
             tdMaskPre = (tdDF['t'] > tStart) & (tdDF['t'] < tOnset)
             tdMaskPost = (tdDF['t'] > tOnset) & (tdDF['t'] < tStop)
             tdMask = (tdDF['t'] > tStart) & (tdDF['t'] < tStop)

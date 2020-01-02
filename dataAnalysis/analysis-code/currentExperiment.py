@@ -1,4 +1,4 @@
-import os, pdb, platform
+import os, pdb, re, platform
 #  import dataAnalysis.helperFunctions.kilosort_analysis as ksa
 import dataAnalysis.helperFunctions.probe_metadata as prb_meta
 import importlib
@@ -24,6 +24,7 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
     experimentName = expOpts['experimentName']
     assembledName = ''
     nspFolder = os.path.join(remoteBasePath, 'raw', experimentName)
+    simiFolder = os.path.join(remoteBasePath, 'processed', experimentName, 'simi')
     oeFolder = os.path.join(remoteBasePath, 'raw', experimentName, 'open_ephys')
     sipFolder = os.path.join(remoteBasePath, 'raw', experimentName, 'ins_sip')
     ns5FileName = 'Trial{:0>3}'.format(trialIdx)
@@ -215,6 +216,10 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
     
     nspCmpPath = os.path.join('.', 'nsp_map.cmp')
     cmpDF = prb_meta.cmpToDF(nspCmpPath)
+    experimentDateStr = re.search('(\d*)', experimentName).groups()[0]
+    impedances = prb_meta.getLatestImpedance(recordingDateStr=experimentDateStr)
+    impedances['elec'] = cmpDF['label'].iloc[:impedances.shape[0]].to_numpy()
+    impedances.set_index('elec', inplace=True)
     
     if remakePrb:
         nspCsvPath = os.path.join('.', 'nsp_map.csv')
@@ -335,8 +340,10 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
         correctMultiple=True
         )
     relplotKWArgs = dict(
-        ci='sem', estimator='mean',
-        palette="ch:1.6,-.2,dark=.2,light=0.7,reverse=1",
+        ci='sem',
+        #  estimator='mean',
+        estimator=None, units='t',
+        palette="ch:0.6,-.3,dark=.1,light=0.7,reverse=1",
         height=5, aspect=1.5, kind='line')
     vLineOpts = {'color': 'm'}
     asigSigStarOpts = {
@@ -344,8 +351,8 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
         'marker': '*'
     }
     nrnRelplotKWArgs = dict(
-        palette="ch:1.6,-.2,dark=.2,light=0.7,reverse=1",
-        func1_kws={'marker': 'd', 'alpha': 0.2},
+        palette="ch:1.6,-.3,dark=.1,light=0.7,reverse=1",
+        func1_kws={'marker': 'd', 'alpha': 0.2, 'rasterized': True},
         func2_kws={'ci': 'sem'},
         facet1_kws={'sharey': False},
         facet2_kws={'sharey': True},
@@ -353,6 +360,9 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
         kind1='scatter', kind2='line'
     )
     nrnVLineOpts = {'color': 'y'}
+    nrnBlockShadingOpts = {
+        'facecolor': nrnVLineOpts['color'],
+        'alpha': 0.1, 'zorder': -100}
     nrnSigStarOpts = {
         'color': 'y',
         'marker': '*'

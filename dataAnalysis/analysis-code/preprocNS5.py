@@ -23,7 +23,7 @@ expOpts, allOpts = parseAnalysisOptions(
 globals().update(expOpts)
 globals().update(allOpts)
 
-chunkSize = 2900
+chunkSize = 4000
 chunkList = [0]
 equalChunks = False
 

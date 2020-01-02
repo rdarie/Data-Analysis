@@ -102,20 +102,68 @@ namedQueries['align'].update({
         "(pedalSizeCat=='M')"
         ])
     })
+###
 namedQueries['align'].update({
-    'outboundM_CCW': '&'.join([
-        namedQueries['align']['outbound'],
+    'outboundXS_CW': '&'.join([
+        namedQueries['align']['outboundXS'],
+        namedQueries['align']['CW'],
+        ])
+    })
+namedQueries['align'].update({
+    'outboundXS_CCW': '&'.join([
+        namedQueries['align']['outboundXS'],
         namedQueries['align']['CCW'],
-        "(pedalSizeCat=='M')"
+        ])
+    })
+namedQueries['align'].update({
+    'outboundS_CW': '&'.join([
+        namedQueries['align']['outboundS'],
+        namedQueries['align']['CW'],
+        ])
+    })
+namedQueries['align'].update({
+    'outboundS_CCW': '&'.join([
+        namedQueries['align']['outboundS'],
+        namedQueries['align']['CCW'],
         ])
     })
 namedQueries['align'].update({
     'outboundM_CW': '&'.join([
-        namedQueries['align']['outbound'],
+        namedQueries['align']['outboundM'],
         namedQueries['align']['CW'],
-        "(pedalSizeCat=='M')"
         ])
     })
+namedQueries['align'].update({
+    'outboundM_CCW': '&'.join([
+        namedQueries['align']['outboundM'],
+        namedQueries['align']['CCW'],
+        ])
+    })
+namedQueries['align'].update({
+    'outboundL_CW': '&'.join([
+        namedQueries['align']['outboundL'],
+        namedQueries['align']['CW'],
+        ])
+    })
+namedQueries['align'].update({
+    'outboundL_CCW': '&'.join([
+        namedQueries['align']['outboundL'],
+        namedQueries['align']['CCW'],
+        ])
+    })
+namedQueries['align'].update({
+    'outboundXL_CW': '&'.join([
+        namedQueries['align']['outboundXL'],
+        namedQueries['align']['CW'],
+        ])
+    })
+namedQueries['align'].update({
+    'outboundXL_CCW': '&'.join([
+        namedQueries['align']['outboundXL'],
+        namedQueries['align']['CCW'],
+        ])
+    })
+###
 namedQueries['align'].update({
     'midPeakNoStimCCW': '&'.join([
         namedQueries['align']['noStim'],

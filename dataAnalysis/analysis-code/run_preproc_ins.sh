@@ -2,12 +2,12 @@
 
 # 06b: Preprocess the INS Recording
 # Request 24 hours of runtime:
-#SBATCH --time=6:00:00
+#SBATCH --time=24:00:00
 
 # Default resources are 1 core with 2.8GB of memory.
 # Request custom resources
 #SBATCH --nodes=1
-#SBATCH --mem=24G
+#SBATCH --mem=96G
 
 # Specify a job name:
 #SBATCH -J ins_preproc
@@ -20,7 +20,7 @@
 #SBATCH --account=bibs-dborton-condo
 
 # Request custom resources
-#SBATCH --array=1,2,3,4,5
+#SBATCH --array=5
 
 # EXP="exp201901070700"
 # EXP="exp201901201200"
@@ -36,6 +36,6 @@ conda activate
 source activate nda
 python --version
 
-# SLURM_ARRAY_TASK_ID=1
+# SLURM_ARRAY_TASK_ID=5
 python3 './preprocINS.py' --trialIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP
-# python3 './preprocINS.py' --trialIdx=1 --exp=$EXP --showPlots
+# python3 './preprocINS.py' --trialIdx=5 --exp=$EXP --disableStimDetection

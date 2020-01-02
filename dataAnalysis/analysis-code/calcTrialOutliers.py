@@ -17,6 +17,7 @@ Options:
     --selector=selector                    filename if using a unit selector
     --resultName=resultName                filename for result [default: meanFR]
     --analysisName=analysisName            append a name to the resulting blocks? [default: default]
+    --alignFolderName=alignFolderName      append a name to the resulting blocks? [default: motion]
 """
 
 import pdb
@@ -40,16 +41,20 @@ analysisSubFolder = os.path.join(
 if not os.path.exists(analysisSubFolder):
     os.makedirs(analysisSubFolder, exist_ok=True)
 #
+alignSubFolder = os.path.join(analysisSubFolder, arguments['alignFolderName'])
+if not os.path.exists(alignSubFolder):
+    os.makedirs(alignSubFolder, exist_ok=True)
+#
 if arguments['processAll']:
     prefix = assembledName
 else:
     prefix = ns5FileName
 triggeredPath = os.path.join(
-    analysisSubFolder,
+    alignSubFolder,
     prefix + '_{}_{}.nix'.format(
         arguments['inputBlockName'], arguments['window']))
 resultPath = os.path.join(
-    analysisSubFolder,
+    alignSubFolder,
     prefix + '_{}_{}_calc.h5'.format(
         arguments['inputBlockName'], arguments['window']))
 #
@@ -64,7 +69,7 @@ alignedAsigsKWargs.update(dict(
 #
 alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **arguments)
 alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
-    namedQueries, analysisSubFolder, **arguments)
+    namedQueries, alignSubFolder, **arguments)
 if arguments['verbose']:
     print('Loading dataBlock: {}'.format(triggeredPath))
 dataReader, dataBlock = ns5.blockFromPath(
@@ -77,7 +82,7 @@ frDF = ns5.alignedAsigsToDF(
 from scipy.stats import zscore
 
 def findOutliers(
-        frDF, sdThresh=10, countThresh=10):
+        frDF, sdThresh=8, countThresh=10):
     nOutliers = (frDF.abs() > sdThresh).any().sum()
     tooMuch = (nOutliers > countThresh)
     if tooMuch:
@@ -115,5 +120,3 @@ print('found {} outlier trials in total'.format(outlierTrials['rejectTrial'].sum
 if arguments['saveResults']:
     for resName in resultNames:
         outlierTrials[resName].to_hdf(resultPath, resName, format='fixed')
-    else:
-        pdb.set_trace()

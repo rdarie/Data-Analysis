@@ -20,32 +20,25 @@
 #SBATCH --account=bibs-dborton-condo
 
 # EXP="exp201901070700"
+# EXP="exp201901201200"
+# EXP="exp201901211000"
 # EXP="exp201901221000"
 # EXP="exp201901231000"
-# EXP="exp201901271000"
-EXP="exp201901211000"
-TRIALSELECTOR=--processAll
-LAZINESS="--lazy"
+EXP="exp201901271000"
+
 SELECTOR="_minfrmaxcorr"
 
-# EXP="exp201901201200"
-# LAZINESS="--lazy"
-# TRIALSELECTOR=--trialIdx=1
+LAZINESS="--lazy"
+TRIALSELECTOR=--trialIdx=5
+# TRIALSELECTOR=--processAll
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
 conda activate
-
 source activate nda
 python --version
 
 # python3 ./calcUnitMeanFR.py --exp=$EXP $TRIALSELECTOR --inputBlockName="fr" --alignQuery="midPeak" --unitQuery="fr" --verbose
 # python3 ./calcUnitCorrelation.py --exp=$EXP $TRIALSELECTOR --inputBlockName="fr" --alignQuery="midPeak" --unitQuery="fr" --verbose --plotting
 # python3 ./selectUnitsByMeanFRandCorrelation.py --exp=$EXP $TRIALSELECTOR --verbose
-python3 ./calcTrialOutliers.py --exp=$EXP $TRIALSELECTOR --selector=$SELECTOR --saveResults --inputBlockName="fr" --alignQuery="all" --unitQuery="fr" --verbose
-
-# minirc
-# python3 ./calcUnitMeanFR.py --exp=$EXP $TRIALSELECTOR --inputBlockName="fr" --alignQuery="stimOn" --unitQuery="fr" --verbose
-# python3 ./calcUnitCorrelation.py --exp=$EXP $TRIALSELECTOR --inputBlockName="fr" --alignQuery="stimOn" --unitQuery="fr" --verbose --plotting
-# python3 ./calcTrialOutliers.py --exp=$EXP $TRIALSELECTOR --inputBlockName="fr" --alignQuery="stimOn" --unitQuery="fr" --verbose --plotting
-# python3 ./selectUnitsByMeanFRandCorrelation.py --exp=$EXP $TRIALSELECTOR --verbose
+# python3 ./calcTrialOutliers.py --exp=$EXP $TRIALSELECTOR --selector=$SELECTOR --saveResults --plotting --inputBlockName="fr" --alignQuery="all" --unitQuery="fr" --verbose

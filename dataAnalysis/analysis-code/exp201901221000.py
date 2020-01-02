@@ -5,7 +5,9 @@ def getExpOpts():
         2: False,
         3: False
         }
-    RCTrialLookup = {i: False for i in miniRCTrialLookup.keys()} 
+    RCTrialLookup = {
+        i: False
+        for i in miniRCTrialLookup.keys()}
 
     experimentName = '201901221000-Proprio'
     deviceName = 'DeviceNPC700373H'
@@ -16,9 +18,9 @@ def getExpOpts():
         2: ['Session1548173292049'],
         3: ['Session1548174549812', 'Session1548176296411', 'Session1548176490066']
         }
-
+    synchInfo = {'ins': {}, 'nsp': {}}
     #  options for automatic tap detection on ins data
-    tapDetectOpts = {
+    synchInfo['ins'] = {
         #  per trial
         1: {
             #  per trialSegment
@@ -34,8 +36,8 @@ def getExpOpts():
             #  per trialSegment
             0: {
                 'timeRanges': [(127, 130)],
-                'tdChan': 'ins_td3',
-                'tdThres': 2,
+                'accChan': 'ins_accinertia',
+                'accThres': 2,
                 'iti': 0.2,
                 'keepIndex': slice(None)
                 }
@@ -58,15 +60,15 @@ def getExpOpts():
                 },
             2: {
                 'timeRanges': [(1958, 1961)],
-                'tdChan': 'ins_td3',
-                'tdThres': 2,
+                'accChan': 'ins_accinertia',
+                'accThres': 2,
                 'iti': 0.2,
                 'keepIndex': slice(None)
                 }
             }
         }
-
-    sessionTapRangesNSP = {
+    #
+    synchInfo['nsp'] = {
         #  per trial
         1: {
             #  per trialSegment
@@ -91,24 +93,41 @@ def getExpOpts():
                 'keepIndex': slice(None)}
             }
         }
-
+    #  if not possible to use taps, override with good taps from another segment
+    #  not ideal, because segments are only synchronized to the nearest **second**
     overrideSegmentsForTapSync = {
         #  each key is a trial
         1: {},
         2: {},
-        3: {}
+        3: {1: 0}
         }
+    # options for stim artifact detection
+    detectStim = True
+    stimDetectThresDefault = 5
+    stimDetectChansDefault = ['ins_td2', 'ins_td3']
+    stimDetectOverrideStartTimes = {
+        1: None,
+        2: None,
+        3: None,
+    }
 
-    stimDetectThres = 1
-    stimDetectChans = ['ins_td2', 'ins_td3']
-
-    triFolderSourceBase = 3
+    stimDetectOptsByChannelSpecific = {
+        # group
+        0: {
+            # program
+            0: {'detectChannels': stimDetectChansDefault, 'thres': stimDetectThresDefault},
+            1: {'detectChannels': stimDetectChansDefault, 'thres': stimDetectThresDefault},
+            2: {'detectChannels': stimDetectChansDefault, 'thres': stimDetectThresDefault},
+            3: {'detectChannels': stimDetectChansDefault, 'thres': stimDetectThresDefault}
+        }
+    }
+    triFolderSourceBase = 2
     triDestinations = [
         'Trial00{}'.format(trialIdx)
-        for trialIdx in [1, 2]]
+        for trialIdx in [1, 3]]
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        '201901221200-Proprio': [2],
+        '201901221000-Proprio': [2],
         '201901231000-Proprio': [1, 2, 3],
         }
 
@@ -117,15 +136,15 @@ def getExpOpts():
         #  per trial
         1: [
             #  per trialSegment
-            [92, 527]
+            [230, 850],
             ],
         2: [
-            [210, 295]
+            [190, 447]
             ],
         3: [
-            [80, 430],
-            [917, 1163],
-            [1367, 2024]
+            [130, 1408],
+            [1835, 1856],
+            [2005, 2768]
             ]
         }
     return locals()

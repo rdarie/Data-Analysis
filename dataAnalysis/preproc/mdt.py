@@ -92,7 +92,6 @@ def getINSTDFromJson(
         try:
             if forceRecalc:
                 raise(Exception('Debugging, always extract fresh'))
-
             if getInterpolated:
                 csvFname = 'RawDataTD_interpolated.csv'
             else:

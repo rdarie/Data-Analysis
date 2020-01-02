@@ -54,7 +54,7 @@ if arguments['processAll']:
 else:
     prefix = ns5FileName
 resultPath = os.path.join(
-    analysisSubFolder,
+    alignSubFolder,
     prefix + '_{}_{}_calc.h5'.format(
         arguments['inputBlockName'], arguments['window']))
 pdfPath = os.path.join(

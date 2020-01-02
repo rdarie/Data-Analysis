@@ -4,14 +4,14 @@
 #SBATCH --time=1:00:00
 
 # Use 2 nodes with 8 tasks each, for 16 MPI tasks:
-#SBATCH --nodes=25
-#SBATCH --tasks=25
+#SBATCH --nodes=26
+#SBATCH --tasks=26
 #SBATCH --tasks-per-node=1
 #SBATCH --mem=32G
 
 # Specify a job name:
 #SBATCH -J spike_sort_constructor
-#SBATCH --array=3
+#SBATCH --array=2
 
 # Specify an output file
 #SBATCH -o ../batch_logs/%j-%a-spike_sort_constructor.stdout
@@ -23,9 +23,9 @@
 # Run a command
 # EXP="exp201901070700"
 # EXP="exp201901211000"
-# EXP="exp201901221000"
+EXP="exp201901221000"
 # EXP="exp201901231000"
-EXP="exp201901271000"
+# EXP="exp201901271000"
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh

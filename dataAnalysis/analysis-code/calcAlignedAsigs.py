@@ -3,15 +3,16 @@ Usage:
     temp.py [options]
 
 Options:
-    --trialIdx=trialIdx               which trial to analyze [default: 1]
-    --exp=exp                         which experimental day to analyze
-    --processAll                      process entire experimental day? [default: False]
-    --lazy                            load from raw, or regular? [default: False]
-    --window=window                   process with short window? [default: short]
-    --analysisName=analysisName       append a name to the resulting blocks? [default: default]
-    --chanQuery=chanQuery             how to restrict channels if not providing a list? [default: fr]
-    --blockName=blockName             name for new block [default: fr]
-    --eventName=eventName             name of events object to align to [default: motionStimAlignTimes]
+    --trialIdx=trialIdx                    which trial to analyze [default: 1]
+    --exp=exp                              which experimental day to analyze
+    --processAll                           process entire experimental day? [default: False]
+    --lazy                                 load from raw, or regular? [default: False]
+    --window=window                        process with short window? [default: short]
+    --analysisName=analysisName            append a name to the resulting blocks? [default: default]
+    --alignFolderName=alignFolderName      append a name to the resulting blocks? [default: motion]
+    --chanQuery=chanQuery                  how to restrict channels if not providing a list? [default: fr]
+    --blockName=blockName                  name for new block [default: fr]
+    --eventName=eventName                  name of events object to align to [default: motionStimAlignTimes]
 """
 import os, pdb, traceback
 from importlib import reload
@@ -49,6 +50,9 @@ analysisSubFolder = os.path.join(
     )
 if not os.path.exists(analysisSubFolder):
     os.makedirs(analysisSubFolder, exist_ok=True)
+alignSubFolder = os.path.join(analysisSubFolder, arguments['alignFolderName'])
+if not os.path.exists(alignSubFolder):
+    os.makedirs(alignSubFolder, exist_ok=True)
 verbose = True
 
 experimentDataPath = experimentDataPath.format(arguments['analysisName'])
@@ -96,4 +100,6 @@ ns5.getAsigsAlignedToEvents(
     verbose=verbose,
     fileName='{}_{}_{}'.format(
         prefix, arguments['blockName'], arguments['window']),
-    folderPath=analysisSubFolder, chunkSize=alignedAsigsChunkSize)
+    folderPath=alignSubFolder,
+    chunkSize=alignedAsigsChunkSize
+    )

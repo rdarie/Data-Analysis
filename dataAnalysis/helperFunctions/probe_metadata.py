@@ -1,6 +1,20 @@
 import pandas as pd
 import numpy as np
 import re
+from datetime import datetime as dt
+
+
+def getLatestImpedance(recordingDate=None, recordingDateStr=None, block=None):
+    impedances = pd.read_hdf('./impedances.h5', 'impedance')
+    if recordingDate is None:
+        if recordingDateStr is not None:
+            recordingDate = dt.strptime(recordingDateStr, '%Y%m%d%H%M')
+        else:
+            recordingDate = block.rec_datetime
+    pastDates = impedances.loc[impedances['date'] <= recordingDate, 'date']
+    lastDate = np.max(pastDates)
+    impedances = impedances.loc[impedances['date'] == lastDate, :]
+    return impedances
 
 
 def cmpToDF(arrayFilePath):

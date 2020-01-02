@@ -3,15 +3,16 @@ Usage:
     temp.py [options]
 
 Options:
-    --trialIdx=trialIdx                 which trial to analyze [default: 1]
-    --exp=exp                           which experimental day to analyze
-    --processAll                        process entire experimental day? [default: False]
-    --window=window                     process with short window? [default: short]
-    --lazy                              load from raw, or regular? [default: False]
-    --analysisName=analysisName         append a name to the resulting blocks? [default: default]
-    --chanQuery=chanQuery               how to restrict channels? [default: raster]
-    --blockName=blockName               name for new block [default: raster]
-    --eventName=eventName               name of events object to align to [default: motionStimAlignTimes]
+    --trialIdx=trialIdx                    which trial to analyze [default: 1]
+    --exp=exp                              which experimental day to analyze
+    --processAll                           process entire experimental day? [default: False]
+    --window=window                        process with short window? [default: short]
+    --lazy                                 load from raw, or regular? [default: False]
+    --chanQuery=chanQuery                  how to restrict channels? [default: raster]
+    --blockName=blockName                  name for new block [default: raster]
+    --eventName=eventName                  name of events object to align to [default: motionStimAlignTimes]
+    --analysisName=analysisName            append a name to the resulting blocks? [default: default]
+    --alignFolderName=alignFolderName      append a name to the resulting blocks? [default: motion]
 """
 
 import os, pdb, traceback
@@ -51,6 +52,9 @@ analysisSubFolder = os.path.join(
     )
 if not os.path.exists(analysisSubFolder):
     os.makedirs(analysisSubFolder, exist_ok=True)
+alignSubFolder = os.path.join(analysisSubFolder, arguments['alignFolderName'])
+if not os.path.exists(alignSubFolder):
+    os.makedirs(alignSubFolder, exist_ok=True)
 experimentBinnedSpikePath = experimentBinnedSpikePath.format(arguments['analysisName'])
 binnedSpikePath = binnedSpikePath.format(arguments['analysisName'])
 experimentDataPath = experimentDataPath.format(arguments['analysisName'])

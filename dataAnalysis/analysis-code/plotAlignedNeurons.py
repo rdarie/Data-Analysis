@@ -3,30 +3,31 @@ Usage:
     temp.py [options]
 
 Options:
-    --exp=exp                         which experimental day to analyze
-    --trialIdx=trialIdx               which trial to analyze [default: 1]
-    --analysisName=analysisName       append a name to the resulting blocks? [default: default]
-    --processAll                      process entire experimental day? [default: False]
-    --lazy                            load from raw, or regular? [default: False]
-    --verbose                         print diagnostics? [default: False]
-    --window=window                   process with short window? [default: short]
-    --unitQuery=unitQuery             how to restrict channels?
-    --selector=selector               filename if using a unit selector
-    --maskOutlierTrials               delete outlier trials? [default: False]
-    --alignQuery=alignQuery           what will the plot be aligned to? [default: outboundWithStim]
-    --rowName=rowName                 break down by row  [default: pedalDirection]
-    --rowControl=rowControl           rows to exclude from comparison
-    --hueName=hueName                 break down by hue  [default: amplitudeCat]
-    --hueControl=hueControl           hues to exclude from comparison
-    --styleName=styleName             break down by style [default: RateInHz]
-    --styleControl=hueControl         styles to exclude from stats test
-    --colName=colName                 break down by col  [default: electrode]
-    --colControl=colControl           cols to exclude from comparison [default: control]
+    --exp=exp                              which experimental day to analyze
+    --trialIdx=trialIdx                    which trial to analyze [default: 1]
+    --processAll                           process entire experimental day? [default: False]
+    --lazy                                 load from raw, or regular? [default: False]
+    --verbose                              print diagnostics? [default: False]
+    --window=window                        process with short window? [default: short]
+    --unitQuery=unitQuery                  how to restrict channels?
+    --selector=selector                    filename if using a unit selector
+    --maskOutlierTrials                    delete outlier trials? [default: False]
+    --alignQuery=alignQuery                what will the plot be aligned to? [default: outboundWithStim]
+    --rowName=rowName                      break down by row  [default: pedalDirection]
+    --rowControl=rowControl                rows to exclude from comparison
+    --hueName=hueName                      break down by hue  [default: amplitude]
+    --hueControl=hueControl                hues to exclude from comparison
+    --styleName=styleName                  break down by style [default: RateInHz]
+    --styleControl=hueControl              styles to exclude from stats test
+    --colName=colName                      break down by col  [default: electrode]
+    --colControl=colControl                cols to exclude from comparison [default: control]
+    --analysisName=analysisName            append a name to the resulting blocks? [default: default]
+    --alignFolderName=alignFolderName      append a name to the resulting blocks? [default: motion]
 """
 import matplotlib
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
-matplotlib.use('PS')   # generate postscript output 
+matplotlib.use('Agg')   # generate postscript output
 # matplotlib.use('QT5Agg')   # generate postscript output
 
 import seaborn as sns
@@ -52,18 +53,23 @@ expOpts, allOpts = parseAnalysisOptions(
     int(arguments['trialIdx']), arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
+#
 analysisSubFolder = os.path.join(
     scratchFolder, arguments['analysisName']
     )
 if not os.path.exists(analysisSubFolder):
     os.makedirs(analysisSubFolder, exist_ok=True)
+#
+alignSubFolder = os.path.join(analysisSubFolder, arguments['alignFolderName'])
+if not os.path.exists(alignSubFolder):
+    os.makedirs(alignSubFolder, exist_ok=True)
+#
 figureStatsFolder = os.path.join(
-    analysisSubFolder, 'figureStats'
+    alignSubFolder, 'figureStats'
     )
 if not os.path.exists(figureStatsFolder):
     os.makedirs(figureStatsFolder, exist_ok=True)
 rowColOpts = asp.processRowColArguments(arguments)
-# colorPal = "ch:0.6,-.2,dark=.2,light=0.7,reverse=1" #  for firing rates
 #
 if arguments['processAll']:
     prefix = assembledName
@@ -72,23 +78,23 @@ else:
 #
 alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **arguments)
 alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
-    namedQueries, analysisSubFolder, **arguments)
+    namedQueries, alignSubFolder, **arguments)
 alignedAsigsKWargs['outlierTrials'] = ash.processOutlierTrials(
-    analysisSubFolder, prefix, **arguments)
+    alignSubFolder, prefix, **arguments)
 alignedAsigsKWargs.update(dict(
     duplicateControlsByProgram=True,
     makeControlProgram=True,
     metaDataToCategories=False))
 #
 rasterBlockPath = os.path.join(
-    analysisSubFolder,
+    alignSubFolder,
     prefix + '_raster_{}.nix'.format(
         arguments['window']))
 print('loading {}'.format(rasterBlockPath))
 rasterReader, rasterBlock = ns5.blockFromPath(
     rasterBlockPath, lazy=arguments['lazy'])
 frBlockPath = os.path.join(
-    analysisSubFolder,
+    alignSubFolder,
     prefix + '_fr_{}.nix'.format(
         arguments['window']))
 
@@ -103,17 +109,20 @@ statsTestPath = os.path.join(figureStatsFolder, pdfName + '_stats.h5')
 statsTestOpts.update({
     'tStop': rasterOpts['windowSizes'][arguments['window']][1]})
 #  Overrides
+################################################################
 alignedAsigsKWargs.update({'windowSize': (-1000e-3, 1000e-3)})
 statsTestOpts.update({
-    'testStride': 5e-3,
+    'testStride': 10e-3,
     'testWidth': 10e-3,
     'tStop': 250e-3})
 limitPages = None
 #  End Overrides
+################################################################
 if os.path.exists(statsTestPath):
     sigValsWide = pd.read_hdf(statsTestPath, 'sig')
     sigValsWide.columns.name = 'bin'
 else:
+    print('Recalculating t test results')
     alignedAsigsKWargsStats = deepcopy(alignedAsigsKWargs)
     if alignedAsigsKWargsStats['unitNames'] is not None:
         alignedAsigsKWargsStats['unitNames'] = [
@@ -142,8 +151,9 @@ asp.plotNeuronsAligned(
     plotProcFuns=[
         asp.xLabelsTime, asp.genLegendRounder(decimals=2),
         asp.genDespiner(right=False, left=True, trim=True),
-        asp.genYLimSetter((0, 150)),
-        asp.genVLineAdder(0, nrnVLineOpts)],
+        asp.genYLimSetterTwin((0, 150)),
+        asp.genVLineAdder(0, nrnVLineOpts),
+        asp.genBlockShader(nrnBlockShadingOpts)],
     pdfName=pdfName,
     **rowColOpts,
     twinRelplotKWArgs=nrnRelplotKWArgs, sigStarOpts=nrnSigStarOpts)

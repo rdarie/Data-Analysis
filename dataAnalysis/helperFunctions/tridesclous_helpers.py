@@ -463,6 +463,8 @@ def neo_block_after_peeler(
                     timesDF['maxDeviation'] = np.nan
                     timesDF['energyReduction'] = np.nan
                     meanWaveform = np.mean(spikeWaveforms[:, idxOfChanLabel, :], axis=0)
+                    #  TODO: compare mean waveforms; if sufficiently, similar, collapse the two units
+                    #  pdb.set_trace()
                     #  mirror naming convention from tdc
                     pred_wf = meanWaveform
                     norm_factor = 1
@@ -831,7 +833,9 @@ def batchPeel(
     print('RANK={}, SIZE={}'.format(RANK, SIZE))
     for idx, chan_grp in enumerate(chansToAnalyze):
         if idx % SIZE == RANK:
-            print('memory usage: {}'.format(
+        # if idx == 24:
+            print('chan_grp {}, memory usage: {}'.format(
+                chan_grp,
                 prf.memory_usage_psutil()))
             try:
                 run_peeler(

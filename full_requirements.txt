@@ -27,7 +27,6 @@ ipython==7.8.0            # via line-profiler
 jedi==0.15.1              # via ipython
 joblib==0.13.2
 kiwisolver==1.1.0         # via matplotlib
-libtfr==2.1.2
 line-profiler==2.1.2
 lmfit==0.9.14
 matplotlib==3.0.3

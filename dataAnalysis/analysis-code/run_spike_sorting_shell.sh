@@ -26,8 +26,8 @@
 # EXP="exp201901201200"
 # EXP="exp201901211000"
 # EXP="exp201901221000"
-# EXP="exp201901231000"
-EXP="exp201901271000"
+EXP="exp201901231000"
+# EXP="exp201901271000"
 TRIALIDX="1"
 
 module load anaconda/3-5.2.0
@@ -40,7 +40,7 @@ python --version
 # python3 ./tridesclousCCV.py --trialIdx=$TRIALIDX --exp=$EXP  --batchPreprocess
 # python3 ./tridesclousVisualize.py --trialIdx=$TRIALIDX --exp=$EXP  --constructor
 # Transfer
-# python3 ./transferTDCTemplates.py --trialIdx=$TRIALIDX --exp=$EXP
+python3 ./transferTDCTemplates.py --trialIdx=$TRIALIDX --exp=$EXP
 # Peeler
 # python3 ./tridesclousCCV.py --trialIdx=$TRIALIDX --exp=$EXP --purgePeeler --batchPeel
 # python3 ./tridesclousVisualize.py --trialIdx=$TRIALIDX --exp=$EXP  --peeler

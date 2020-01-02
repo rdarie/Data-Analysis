@@ -52,10 +52,14 @@ insReader = neo.NixIO(
 insBlock = insReader.read_block(0)
 #  all experimental days?
 if arguments['processAll']:
+    alignTimeBounds = []
     dataReader = neo.io.nixio_fr.NixIO(
         filename=experimentDataPath)
 else:
-    alignTimeBounds = alignTimeBoundsLookup[int(arguments['trialIdx'])]    
+    # alignTimeBounds = alignTimeBoundsLookup[experimentName][int(arguments['trialIdx'])]
+    alignTimeBounds = [
+        alignTimeBoundsLookup[int(arguments['trialIdx'])]
+    ]
     dataReader = neo.io.nixio_fr.NixIO(
         filename=analysisDataPath)
 
@@ -108,8 +112,8 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
     print('Usign alignTimeBounds {}'.format(alignTimeBounds[segIdx]))
     #  #)
     tMask = (
-        (stimStatus['t'] > alignTimeBounds[segIdx][0]) &
-        (stimStatus['t'] < alignTimeBounds[segIdx][1])
+        (stimStatus['t'] > alignTimeBounds[segIdx][0][0]) &
+        (stimStatus['t'] < alignTimeBounds[segIdx][-1][1])
         )
     stimStatus = stimStatus.loc[tMask, :].reset_index(drop=True)
     #

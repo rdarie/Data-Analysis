@@ -5,6 +5,7 @@ import sys, os, itertools
 #  import subprocess, collections, math, argparse
 import peakutils
 import random
+import vg
 from tqdm import tqdm
 from collections.abc import Iterable
 import matplotlib.pyplot as plt
@@ -1045,7 +1046,6 @@ def getThresholdCrossings(
 
 
 def findTrains(
-        #dataSrs,
         peakTimes=None,
         peakIdx=None, fs=None, iti=None,
         minTrainLength=None, maxDistance=1.5, maxTrain=False, plotting=False):
@@ -1061,12 +1061,12 @@ def findTrains(
     # identify trains of peaks
     itiWiggle = 0.05
     minPeriod = iti * (1 - itiWiggle)
-
+    #
     peakDiff = foundTime.diff()
     peakDiff.iloc[0] = iti * 2e3 #fudge it so that the first one is taken
     trainStartIdx = foundTime.index[peakDiff > (iti * maxDistance)]
     trainStarts = foundTime[trainStartIdx]
-
+    #
     peakFwdDiff = foundTime.diff(periods = -1) * (-1)
     peakFwdDiff.iloc[-1] = iti * 2e3 #fudge it so that the last one is taken
     trainEndIdx = foundTime.index[peakFwdDiff > (iti * maxDistance)]
@@ -1089,14 +1089,13 @@ def findTrains(
                 if nTrains > maxTrain: break
         else:
             validTrains[idx] = False
-
     #
     trainStartIdx = trainStartIdx[validTrains]
     trainEndIdx = trainEndIdx[validTrains]
     peakIdx = peakIdx[keepPeaks]
     foundTime = foundTime[peakIdx]
 
-    return peakIdx, peakTimes, trainStartIdx, trainEndIdx
+    return peakIdx, foundTime, trainStartIdx, trainEndIdx
 
 
 def getTriggers(
@@ -1189,7 +1188,7 @@ def getTriggers(
                 keepPeaks.loc[idxIntoPeaks:trainEndIdx[idx]] = True
                 nTrains += 1
                 #
-                if nTrains > maxTrain: break;
+                if nTrains > maxTrain: break
 
         #
         foundTime = foundTime[keepPeaks]
@@ -1300,7 +1299,7 @@ def chooseTriggers(
 def getTensTrigs(
         diffThresh=None, magThresh=None, tensAsig=None, iti=.1,
         referenceTimes=None, plotting = False, peakFinder='maxDiff'):
-    
+    #
     minTrainLength = 5 * iti
     maxTrain = 3
     fs=tensAsig.sampling_rate.magnitude
@@ -1495,31 +1494,52 @@ def loadAngles(folderPath, fileName, kinAngleOpts = {
     return angles
 '''
 
-'''
-def getKinematics(kinematicsFile,
-    trigTimes = None,
-    simiData = None, thres = None,
-    selectHeaders = None, selectTime = None,
-    flip = None, reIndex = None, lowCutoff = None):
-    # TODO: unify with mujoco stuff
-    raw = pd.read_table(kinematicsFile, index_col = 0, skiprows = [1])
-
+def getKinematics(
+        kinematicsPath,
+        trigTimes=None,
+        trigSeries=None,
+        nspTime=None,
+        fps=100, thres=None,
+        plotting=False,
+        selectHeaders=None, selectTime=None,
+        flip=None, reIndex=None, calcAngles=[],
+        filterOpts={}
+    ):
+    #
+    fs = int(nspTime.diff().iloc[-1] ** (-1))
+    if thres is None:
+        minQ = trigSeries.quantile(q=0.05)
+        maxQ = trigSeries.quantile(q=0.95)
+        magThresh = (maxQ - minQ) / 2
+    else:
+        magThresh = thres
     if trigTimes is None:
-        peakIdx, trigTimes = getCameraTriggers(simiData, thres = thres, expectedTime = raw.index)
-
-    raw = pd.DataFrame(raw.values, index = trigTimes, columns = raw.columns)
-    raw.index = np.around(raw.index, 3)
-
+        # get Triggers
+        peakIdx, _ = getThresholdCrossings(
+            trigSeries, thresh=magThresh,
+            iti=fps**(-1), fs=fs,
+            absVal=False, plotting=plotting,
+            keep_max=False)
+        peakIdx, _, trainStartPeaks, trainEndPeaks = findTrains(
+            peakIdx=peakIdx, iti=fps**(-1),
+            fs=fs,
+            minTrainLength=10, maxDistance=1.5,
+            plotting=plotting)
+    # get time of first simi frame in NSP time:
+    trigTimes = nspTime[peakIdx[peakIdx >= trainStartPeaks[-1]]]
+    timeOffset = trigTimes.iloc[0]
+    # TODO: unify with mujoco stuff
+    raw = pd.read_csv(
+        kinematicsPath, sep='\t', index_col=0, skiprows=[1])
+    raw.index.name = 't'
+    raw.index = np.around(raw.index + timeOffset, 3)
     if selectTime:
         raw = raw.loc[slice(selectTime[0], selectTime[1]), :]
-
     headings = sorted(raw.columns) # get column names
     coordinates = ['x', 'y', 'z']
-
     # reorder alphabetically by columns
     raw = raw.reindex(columns = headings)
     #
-
     if reIndex is not None:
         uniqueHeadings = set([name[:-2] for name in headings])
         oldIndex = raw.columns
@@ -1536,14 +1556,13 @@ def getKinematics(kinematicsFile,
         raw.columns = newIndex
         headings = sorted(newIndex)
         raw = raw.reindex_axis(headings, axis = 1)
-
+    #
     if flip is not None:
         uniqueHeadings = set([name[:-2] for name in headings])
         for name in uniqueHeadings:
             for flipAxis in flip:
                 raw.loc[:,name + ' ' + flipAxis] = -raw.loc[:,name + ' ' + flipAxis]
     # create multiIndex column names
-
     if selectHeaders is not None:
         expandedHeadings = [
             name + ' X' for name in selectHeaders
@@ -1559,18 +1578,31 @@ def getKinematics(kinematicsFile,
         uniqueHeadings = set([name[:-2] for name in headings])
         indexPD = pd.MultiIndex.from_product([sorted(uniqueHeadings),
             coordinates], names=['joint', 'coordinate'])
-
-    proc = pd.DataFrame(raw.values, columns = indexPD, index = raw.index)
-
-    if lowCutoff is not None:
-        fr = 1 / 0.01
-        Wn = 2 * lowCutoff / fr
-        b, a = signal.butter(12, Wn, analog=False)
-        for column in proc:
-            proc.loc[:, column] = signal.filtfilt(b, a, proc.loc[:, column])
-
+    #
+    proc = pd.DataFrame(raw.to_numpy(), columns=indexPD, index=raw.index)
+    proc = (
+        proc
+        .interpolate(axis=0)
+        .fillna(method='bfill', axis=0)
+        .fillna(method='ffill', axis=0)
+        )
+    if filterOpts:
+        proc = filterDF(
+            proc, fps, **filterOpts)
+    #
+    if len(calcAngles):
+        for angleSet in calcAngles:
+            def ja(c):
+                # (j)oint (a)ngles from (c)oords
+                v1 = c[:, 3:6] - c[:, :3]
+                v2 = c[:, 3:6] - c[:, 6:9]
+                return vg.angle(v1, v2)
+            #
+            proc.loc[:, (angleSet[1], 'angle')] = (
+                ja(proc.loc[:, (angleSet, slice(None))].to_numpy())
+                )
+    #
     return proc
-'''
 
 '''
 def loadKinematics(folderPath, fileName, kinPosOpts = {

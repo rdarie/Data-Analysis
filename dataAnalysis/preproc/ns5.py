@@ -15,10 +15,11 @@ from scipy import stats, signal, fftpack
 import dataAnalysis.helperFunctions.helper_functions_new as hf
 import dataAnalysis.helperFunctions.profiling as prf
 import dataAnalysis.helperFunctions.motor_encoder_new as mea
+import dataAnalysis.helperFunctions.probe_metadata as prb_meta
 #
 import numpy as np
 import pandas as pd
-#
+from datetime import datetime as dt
 import os, gc
 import traceback
 from functools import reduce
@@ -1462,7 +1463,7 @@ def synchronizeINStoNSP(
                     continue
                 if len(st.times):
                     segMask = np.array(
-                        st.annotations['trialSegment'],
+                        st.array_annotations['trialSegment'],
                         dtype=np.int) == trialSegment
                     st.magnitude[segMask] = (
                         timeInterpFunINStoNSP(st.times[segMask].magnitude))
@@ -1476,7 +1477,7 @@ def synchronizeINStoNSP(
                         # delete invalid spikes
                         if 'arrayAnnNames' in st.annotations.keys():
                             for key in st.annotations['arrayAnnNames']:
-                                st.annotations[key] = np.array(st.annotations[key])[validMask]
+                                st.annotations[key] = np.array(st.array_annotations[key])
                 else:
                     st.t_start = tStart
                     st.t_stop = tStop
@@ -1830,7 +1831,8 @@ def blockToNix(
         removeJumps=False, trackMemory=True,
         asigNameList=None,
         spikeSourceType='', spikeBlock=None,
-        calcRigEvents=True
+        calcRigEvents=True,
+        normalizeByImpedance=True
         ):
     idx = segInitIdx
     #  prune out nev spike placeholders
@@ -1916,6 +1918,8 @@ def blockToNix(
     block.segments = newSegList
     block, nixblock = writer.write_block_meta(block)
     # descend into Segments
+    if normalizeByImpedance:
+        impedances = prb_meta.getLatestImpedance(block)
     for segIdx, seg in enumerate(oldSegList):
         segLen = seg.analogsignals[0].shape[0] / (
             seg.analogsignals[0].sampling_rate)
@@ -1978,6 +1982,9 @@ def blockToNix(
                     #  link AnalogSignal and ID providing channel_index
                     asig.channel_index = chanIdx
                     #  perform requested preproc operations
+                    if normalizeByImpedance:
+                        # pdb.set_trace()
+                        asig.magnitude[:] = (asig.magnitude - np.mean(asig.magnitude)) / np.min(impedances.loc[impedances['elec'] == chanIdx.name, 'impedance'])
                     if fillOverflow:
                         # fill in overflow:
                         '''
@@ -2311,7 +2318,7 @@ def preproc(
         writeMode='rw',
         signal_group_mode='split-all', trialInfo=None,
         asigNameList=None, nameSuffix='',
-        calcRigEvents=True
+        calcRigEvents=True, normalizeByImpedance=False
         ):
     #  base file name
     rawBasePath = os.path.join(rawFolderPath, fileName)
@@ -2363,7 +2370,8 @@ def preproc(
             asigNameList=asigNameList,
             spikeSourceType=spikeSourceType,
             spikeBlock=spikeBlock,
-            calcRigEvents=calcRigEvents
+            calcRigEvents=calcRigEvents,
+            normalizeByImpedance=normalizeByImpedance
             )
     writer.close()
     #

@@ -6,7 +6,7 @@ Options:
     --trialIdx=trialIdx        which trial to analyze [default: 1]
     --exp=exp                  which experimental day to analyze
     --chan_start=chan_start    which chan_grp to start on [default: 0]
-    --chan_stop=chan_stop      which chan_grp to stop on [default: 24]
+    --chan_stop=chan_stop      which chan_grp to stop on [default: 25]
     --peeler                   visualize Peeler results
     --constructor              visualize Catalogue Constructor Results
 """

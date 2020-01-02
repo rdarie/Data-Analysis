@@ -26,32 +26,32 @@ def getExpOpts():
         1: {
             #  per trialSegment
             0: {
-                'timeRanges': [(115, 119)],
-                'accChan': 'ins_accinertia',
-                'accThres': 2,
+                'timeRanges': [(41, 43)],
+                'tdChan': 'ins_td2',
+                'tdThres': 2,
                 'iti': 0.2,
                 'keepIndex': slice(None)
                 },
             1: {
-                'timeRanges': [(725, 728)],
-                'accChan': 'ins_accinertia',
-                'accThres': 1,
+                'timeRanges': [(378, 380)],
+                'accChan': 'ins_accz',
+                'accThres': 2,
                 'iti': 0.2,
-                'keepIndex': slice(None, 2)
+                'keepIndex': slice(None)
                 },
             2: {
-                'timeRanges': [(725, 728)],
-                'accChan': 'ins_accinertia',
-                'accThres': 1,
+                'timeRanges': [(1809, 1811)],
+                'accChan': 'ins_accz',
+                'accThres': 2,
                 'iti': 0.2,
-                'keepIndex': slice(None, 2)
+                'keepIndex': slice(None)
                 },
             3: {
-                'timeRanges': [(725, 728)],
-                'accChan': 'ins_accinertia',
-                'accThres': 1,
+                'timeRanges': [(2237, 2239)],
+                'accChan': 'ins_accz',
+                'accThres': 2,
                 'iti': 0.2,
-                'keepIndex': slice(None, 2)
+                'keepIndex': slice(None)
                 }
             }
         }
@@ -59,10 +59,10 @@ def getExpOpts():
         #  per trial
         1: {
             #  per trialSegment
-            0: {'timeRanges': [60, 64], 'keepIndex': slice(None)},
-            1: {'timeRanges': [669, 672], 'keepIndex': slice(None)},
-            2: {'timeRanges': [669, 672], 'keepIndex': slice(None)},
-            3: {'timeRanges': [669, 672], 'keepIndex': slice(None)}
+            0: {'timeRanges': [61, 63], 'keepIndex': slice(None)},
+            1: {'timeRanges': [398, 400], 'keepIndex': slice(None)},
+            2: {'timeRanges': [1829, 1831], 'keepIndex': slice(None)},
+            3: {'timeRanges': [2256, 2258], 'keepIndex': slice(None)}
             }
         }
     #  if not possible to use taps, override with good taps from another segment
@@ -88,11 +88,15 @@ def getExpOpts():
             3: {'detectChannels': stimDetectChansDefault, 'thres': stimDetectThresDefault}
         }
     }
-    triFolderSourceBase = 1
-    triDestinations = []
+    triFolderSourceBase = os.path.join(
+        '201901221000-Proprio', 'tdc_Trial002')
+    triDestinations = [
+        'Trial00{}'.format(trialIdx)
+        for trialIdx in [1]]
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        '201901231200-Proprio': [1]
+        '201901221000-Proprio': [2, 3],
+        '201901231000-Proprio': [1]
         }
     #
     movementSizeBins = [0, 0.25, 0.5, 1, 1.25, 1.5]
@@ -100,21 +104,11 @@ def getExpOpts():
         #  per trial
         1: [
             #  per trialSegment
-            [92, 527],
-            [775, 887],
-            [775, 887],
-            [775, 887]
+            [90, 239.5],
+            [412, 1679.5],
+            [1897, 1967.8],
+            [2284, 3419]
             ]
         }
     #
-    alignTimeBounds = [
-        #  per trial
-        [
-            #  per trialSegment
-            [92, 527],
-            [775, 887],
-            [775, 887],
-            [775, 887]
-            ]
-        ]
     return locals()
