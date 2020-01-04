@@ -355,7 +355,7 @@ def compareMeansGrouped(
                     pVals.loc[name, testBin] = p
                     statVals.loc[name, testBin] = stat
                 except Exception:
-                    traceback.print_exc()
+                    #  traceback.print_exc()
                     pVals.loc[name, testBin] = 1
                     statVals.loc[name, testBin] = np.nan
     if correctMultiple:

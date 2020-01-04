@@ -22,11 +22,13 @@
 EXP="exp201901211000"
 # EXP="exp201901271000"
 # EXP="exp201901231000"
-# SELECTOR="201901271000-Proprio_minfrmaxcorr"
-# SELECTOR="201901201200-Proprio_minfrmaxcorr"
-SELECTOR="_minfrmaxcorr"
+UNITSELECTOR="--selector=_minfrmaxcorr"
+# UNITSELECTOR=""
 # OUTLIERSWITCH=""
 OUTLIERSWITCH="--maskOutlierTrials"
+WINDOW="--window=long"
+# TRIALSELECTOR="--trialIdx=2"
+TRIALSELECTOR="--processAll"
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
@@ -34,11 +36,13 @@ conda activate
 source activate nda
 python --version
 
-for QUERY in outboundM outboundXS outboundS outboundL outboundXL
+# python3 ./calcTrialOutliers.py --exp=$EXP $TRIALSELECTOR $UNITSELECTOR --saveResults --plotting --inputBlockName="fr" --alignQuery="all" --unitQuery="fr" --verbose
+#
+for QUERY in outboundXS outboundS outboundM outboundL outboundXL
     do
         for BLOCKNAME in rig
             do
-                python3 './plotAlignedAsigs.py' --exp=$EXP --processAll --window="long" --inputBlockName=$BLOCKNAME --unitQuery=$BLOCKNAME --alignQuery=$QUERY --rowName="pedalDirection" --verbose $OUTLIERSWITCH
+                python3 './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $WINDOW --inputBlockName=$BLOCKNAME --unitQuery=$BLOCKNAME --alignQuery=$QUERY --rowName="pedalDirection" $OUTLIERSWITCH --verbose
             done
-        python3 './plotAlignedNeurons.py' --exp=$EXP --processAll --window="long" --alignQuery=$QUERY --selector=$SELECTOR --rowName="pedalDirection" --verbose $OUTLIERSWITCH
+        python3 './plotAlignedNeurons.py' --exp=$EXP $TRIALSELECTOR $WINDOW --alignQuery=$QUERY $UNITSELECTOR --rowName="pedalDirection" $OUTLIERSWITCH --verbose
     done

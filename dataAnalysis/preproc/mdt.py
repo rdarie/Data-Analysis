@@ -80,7 +80,7 @@ def fixMalformedJson(jsonString, jsonType=''):
 def getINSTDFromJson(
         folderPath, sessionNames,
         deviceName='DeviceNPC700373H', fs=500,
-        forceRecalc=True, getInterpolated=True, upsampleRate=None,
+        forceRecalc=True, getInterpolated=True, upsampleRate=None, interpKind='linear'
         ):
 
     if not isinstance(sessionNames, Iterable):
@@ -174,7 +174,7 @@ def getINSTDFromJson(
                     datetime.timedelta(seconds=1))
                 # 
                 tdData = hf.interpolateDF(
-                    tdData, uniformT, x='t', kind='cubic',
+                    tdData, uniformT, x='t', kind=interpKind,
                     columns=channelsPresent, fill_value=(0, 0))
                 #  interpolating converts to floats, recover
                 tdData['microseconds'] = pd.to_timedelta(
@@ -1132,9 +1132,13 @@ def preprocINS(
         upsampleRate = trialFilesStim['upsampleRate']
     else:
         upsampleRate = None
+    if 'interpKind' in trialFilesStim:
+        interpKind = trialFilesStim['interpKind']
+    else:
+        interpKind = 'linear'
     td = getINSTDFromJson(
         jsonBaseFolder, jsonSessionNames, getInterpolated=True,
-        fs=fs, upsampleRate=upsampleRate,
+        fs=fs, upsampleRate=upsampleRate, interpKind=interpKind,
         forceRecalc=trialFilesStim['forceRecalc'])
     renamer = {}
     tdDataCols = []
@@ -1983,6 +1987,7 @@ def getINSStimOnset(
                 name=electrodeCombo
                 )[0]
             thisElecConfig = elecConfiguration[activeGroup][activeProgram]
+            # pdb.set_trace()
             if thisElecConfig['cyclingEnabled']:
                 thisCycleOnTime = (
                     thisElecConfig['cycleOnTime']['time'] *
@@ -2009,6 +2014,10 @@ def getINSStimOnset(
                         onTime, offTime,
                         interCycleInterval) * onTime.units
                     pulseOffTimes = pulseOnTimes + thisCycleOnTime
+                    # if cycle shuts down early because of new command
+                    if offTime < pulseOffTimes[-1]:
+                        print('Replaced {} with {}'.format(pulseOffTimes[-1], offTime))
+                        pulseOffTimes[-1] = offTime
                     tempOnTimes.append(pulseOnTimes)
                     tempOffTimes.append(pulseOffTimes)
                     onDiffE = onsetDifferenceFromExpected[idx]

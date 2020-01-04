@@ -130,6 +130,7 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
             'elecIDs': range(17),
             'excludeClus': [],
             'upsampleRate': 4,
+            'interpKind': 'linear',
             'forceRecalc': True,
             'detectStim': expOpts['detectStim'],
             'getINSkwargs': {}

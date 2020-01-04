@@ -409,10 +409,12 @@ def getTrials(motorData, fs, tStart, trialType='2AFC'):
         detectSignal.abs().values, thres=0.5,
         min_dist=int(fs*minDist),
         thres_abs=True, keep_what='max')
-    #  first pedal movement just gets it into position, discard,
+    #  prior to using alignTime bounds, first pedal movement just gets it into position, discard,
     #  then return to indexes into the dataframe
-    peakIdx = detectSignal.index[peakIdx[2:]]
+    #  peakIdx = detectSignal.index[peakIdx[2:]]
     
+    #  when using alignTime bounds, use all
+    peakIdx = detectSignal.index[peakIdx[:]]
     #  avoid bounce by looking into the future of vCat
     futureOffset = int(minDist * fs)
     for thisIdx in peakIdx:

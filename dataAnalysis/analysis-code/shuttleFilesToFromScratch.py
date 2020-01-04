@@ -11,13 +11,14 @@ Options:
     --scratchToData                   process entire experimental day? [default: False]
     --removeSource                    process entire experimental day? [default: False]
     --removeDate                      process entire experimental day? [default: False]
+    --removePNGs                      process entire experimental day? [default: False]
 """
 
 #  load options
-import pdb
+import pdb, traceback
 from currentExperiment import parseAnalysisOptions
 from docopt import docopt
-import shutil, os
+import shutil, os, glob
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['trialIdx']),
@@ -70,3 +71,14 @@ if arguments['removeDate']:
                     os.path.join(
                         analysisSubFolder,
                         fileName.replace(experimentName, assembledName)))
+
+if arguments['removePNGs']:
+    # Get a list of all the file paths that ends with .txt from in specified directory
+    fileList = glob.glob('{}/**/*.png'.format(scratchFolder), recursive=True)
+    # Iterate over the list of filepaths & remove each file.
+    for filePath in fileList:
+        try:
+            os.remove(filePath)
+        except Exception:
+            traceback.print_exc()
+            print("Error while deleting file : ", filePath)

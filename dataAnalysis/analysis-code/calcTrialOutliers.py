@@ -78,13 +78,14 @@ if arguments['verbose']:
     print('Loading alignedAsigs: {}'.format(triggeredPath))
 frDF = ns5.alignedAsigsToDF(
     dataBlock, **alignedAsigsKWargs)
-# reject outliers
+# reject outlier trials
 from scipy.stats import zscore
 
+
 def findOutliers(
-        frDF, sdThresh=8, countThresh=10):
-    nOutliers = (frDF.abs() > sdThresh).any().sum()
-    tooMuch = (nOutliers > countThresh)
+        frDF, sdThresh=6, countThresh=10):
+    nOutliers = (frDF.abs().quantile(q=0.9) > sdThresh).sum()
+    tooMuch = (nOutliers >= countThresh)
     if tooMuch:
         try:
             print('Found {} outlier channels'.format(nOutliers))
@@ -97,6 +98,7 @@ def findOutliers(
         except Exception:
             pass
     return nOutliers, tooMuch
+
 
 testVar = None
 groupBy = ['segment', 'originalIndex']
@@ -115,8 +117,9 @@ if arguments['plotting']:
             outlierTrials['nOutliers'].reset_index(drop=True)],
         axis='columns')
     print(outlierCount.loc[outlierCount['all'] > 0, :])
-    outlierCount.loc[outlierCount['all'] > 0, :].to_csv(os.path.join(figureFolder, 'outlierTrials.csv'))
+    outlierCount.loc[outlierCount['all'] > 10, :].to_csv(os.path.join(figureFolder, 'outlierTrials.csv'))
 print('found {} outlier trials in total'.format(outlierTrials['rejectTrial'].sum()))
+
 if arguments['saveResults']:
     for resName in resultNames:
         outlierTrials[resName].to_hdf(resultPath, resName, format='fixed')

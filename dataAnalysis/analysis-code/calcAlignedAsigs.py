@@ -13,6 +13,7 @@ Options:
     --chanQuery=chanQuery                  how to restrict channels if not providing a list? [default: fr]
     --blockName=blockName                  name for new block [default: fr]
     --eventName=eventName                  name of events object to align to [default: motionStimAlignTimes]
+    --verbose                              print diagnostics? [default: False]
 """
 import os, pdb, traceback
 from importlib import reload
@@ -53,7 +54,6 @@ if not os.path.exists(analysisSubFolder):
 alignSubFolder = os.path.join(analysisSubFolder, arguments['alignFolderName'])
 if not os.path.exists(alignSubFolder):
     os.makedirs(alignSubFolder, exist_ok=True)
-verbose = True
 
 experimentDataPath = experimentDataPath.format(arguments['analysisName'])
 analysisDataPath = analysisDataPath.format(arguments['analysisName'])
@@ -97,7 +97,7 @@ ns5.getAsigsAlignedToEvents(
     windowSize=windowSize,
     appendToExisting=False,
     checkReferences=False,
-    verbose=verbose,
+    verbose=arguments['verbose'],
     fileName='{}_{}_{}'.format(
         prefix, arguments['blockName'], arguments['window']),
     folderPath=alignSubFolder,

@@ -11,11 +11,11 @@
 #SBATCH --mem=96G
 
 # Specify a job name:
-#SBATCH -J analysis_calc
+#SBATCH -J analysis_mini_20190127
 
 # Specify an output file
-#SBATCH -o ../batch_logs/%j-%a-analysis_calc_mini.stdout
-#SBATCH -e ../batch_logs/%j-%a-analysis_calc_mini.errout
+#SBATCH -o ../batch_logs/%j-%a-analysis_mini_20190127.stdout
+#SBATCH -e ../batch_logs/%j-%a-analysis_mini_20190127.errout
 
 # Specify account details
 #SBATCH --account=bibs-dborton-condo
@@ -41,4 +41,3 @@ python --version
 python ./calcTrialAnalysisNix.py --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID --chanQuery="all"
 python ./calcStimAlignTimes.py --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID --plotParamHistograms
 python ./calcFR.py --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID
-python ./calcFRsqrt.py --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID

@@ -1828,6 +1828,7 @@ def blockToNix(
         chunkList=None,
         eventInfo=None,
         fillOverflow=False, calcAverageLFP=False,
+        motorEncoderMask=None,
         removeJumps=False, trackMemory=True,
         asigNameList=None,
         spikeSourceType='', spikeBlock=None,
@@ -1984,7 +1985,13 @@ def blockToNix(
                     #  perform requested preproc operations
                     if normalizeByImpedance:
                         # pdb.set_trace()
-                        asig.magnitude[:] = (asig.magnitude - np.mean(asig.magnitude)) / np.min(impedances.loc[impedances['elec'] == chanIdx.name, 'impedance'])
+                        elecNameMatchMask = impedances['elec'] == chanIdx.name
+                        asig.magnitude[:] = (
+                            (asig.magnitude - np.mean(asig.magnitude)) /
+                            np.min(
+                                impedances.loc[elecNameMatchMask, 'impedance']
+                                )
+                            )
                     if fillOverflow:
                         # fill in overflow:
                         '''
@@ -2086,7 +2093,6 @@ def blockToNix(
                     axFr.set_ylim([59, 61])
                     axFr.legend()
                     plt.show()
-                    
             for irSigIdx, irSigProxy in enumerate(
                     seg.irregularlysampledsignals):
                 chanIdx = irSigProxy.channel_index
@@ -2206,6 +2212,25 @@ def blockToNix(
                 motorData = pd.concat(analogData, axis=1)
                 del analogData
                 gc.collect()
+                if motorEncoderMask is not None:
+                    ainpData = ainpAsig.load(
+                        time_slice=(tStart, tStop),
+                        magnitude_mode='rescaled')
+                    ainpTime = ainpData.times.magnitude
+                    meTimeMask = np.zeros_like(ainpTime, dtype=np.bool)
+                    for meTimeBounds in motorEncoderMask:
+                        meTimeMask = (
+                            meTimeMask |
+                            (
+                                (ainpTime > meTimeBounds[0]) &
+                                (ainpTime < meTimeBounds[1])
+                                )
+                            )
+                    columnsToOverride = ['A-', 'A+', 'B-', 'B+', 'Z-', 'Z+']
+                    for colName in columnsToOverride:
+                        motorData.loc[~meTimeMask, colName] = motorData.loc[:, colName].quantile(q=0.05)
+                    del ainpData, ainpTime
+                    gc.collect()
                 motorData = mea.processMotorData(
                     motorData, ainpAsig.sampling_rate.magnitude)
                 keepCols = [
@@ -2310,6 +2335,7 @@ def preproc(
         rawFolderPath='./',
         outputFolderPath='./',
         fillOverflow=True, removeJumps=True,
+        motorEncoderMask=None,
         calcAverageLFP=False,
         eventInfo=None,
         spikeSourceType='', spikePath=None,
@@ -2365,6 +2391,7 @@ def preproc(
             chunkList=chunkList,
             fillOverflow=fillOverflow,
             removeJumps=removeJumps,
+            motorEncoderMask=motorEncoderMask,
             calcAverageLFP=calcAverageLFP,
             eventInfo=eventInfo,
             asigNameList=asigNameList,

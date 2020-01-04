@@ -102,7 +102,7 @@ kin = hf.getKinematics(
 
 ############################################################
 kin.columns = ['_'.join(i) for i in kin.columns]
-pdb.set_trace()
+# pdb.set_trace()
 addingToNix = True
 if addingToNix:
     kinInterp = hf.interpolateDF(

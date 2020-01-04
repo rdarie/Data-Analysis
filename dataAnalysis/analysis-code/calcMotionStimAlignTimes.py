@@ -37,7 +37,7 @@ import dataAnalysis.preproc.mdt as preprocINS
 import numpy as np
 import pandas as pd
 from collections import Iterable
-
+import sys
 #  load options
 from currentExperiment import parseAnalysisOptions
 from docopt import docopt
@@ -47,6 +47,7 @@ expOpts, allOpts = parseAnalysisOptions(
     arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
+
 analysisSubFolder = os.path.join(
     scratchFolder, arguments['analysisName']
     )
@@ -56,33 +57,20 @@ if not os.path.exists(analysisSubFolder):
 insReader = neo.NixIO(
     filename=insDataPath)
 insBlock = insReader.read_block(0)
-
-#  all experimental days?
-'''
-if arguments['processAll']:
-    dataReader = neo.io.nixio_fr.NixIO(
-        filename=experimentDataPath.format(arguments['analysisName']))
-else:
-    alignTimeBounds = [
-        alignTimeBoundsLookup[int(arguments['trialIdx'])]
-    ]
-    dataReader = neo.io.nixio_fr.NixIO(
-        filename=analysisDataPath.format(arguments['analysisName']))
-
-dataBlock = dataReader.read_block(
-    block_index=0, lazy=True,
-    signal_group_mode='split-all')
-for ev in dataBlock.filter(objects=EventProxy):
-    ev.name = '_'.join(ev.name.split('_')[1:])
-'''
+# 
 if arguments['processAll']:
     prefix = assembledName
     alignTimeBounds = [] # not working as of 12/31/19
-else:
-    alignTimeBounds = [
-        alignTimeBoundsLookup[int(arguments['trialIdx'])]
-    ]
-    prefix = ns5FileName
+    print('calcMotionStimAlignTimes does not support aggregate files')
+    sys.exit()
+# trick to allow joint processing of minirc and regular trials
+if (miniRCTrial or RCTrial):
+    print('skipping RC trial')
+    sys.exit()
+alignTimeBounds = [
+    alignTimeBoundsLookup[int(arguments['trialIdx'])]
+]
+prefix = ns5FileName
 dataBlockPath = os.path.join(
     analysisSubFolder,
     prefix + '_analyze.nix')
@@ -374,28 +362,41 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         if moveCat == 'outbound':
             tStart = max(0, tOnset - motionStimAlignFudgeFactor)
             tStop = min(tdDF['t'].iloc[-1], tOnset + motionStimAlignFudgeFactor)
-            tdMaskPre = (tdDF['t'] > tStart) & (tdDF['t'] < tOnset)
-            tdMaskPost = (tdDF['t'] > tOnset) & (tdDF['t'] < tStop)
+            #  tdMaskPre = (tdDF['t'] > tStart) & (tdDF['t'] < tOnset)
+            #  tdMaskPost = (tdDF['t'] > tOnset) & (tdDF['t'] < tStop)
             tdMask = (tdDF['t'] > tStart) & (tdDF['t'] < tStop)
             theseAmps = tdDF.loc[tdMask, ['t', 'amplitude']]
-            ampDiff = theseAmps.diff()
-            ampOnset = theseAmps.loc[
-                ampDiff[ampDiff['amplitude'] > 0].index, 't']
-            if len(ampOnset):
+            theseAmps['diff'] = theseAmps['amplitude'].diff()
+            # ampOnset, ampOffset are times when the amplitude turned on and off
+            ampOnsetIdx = theseAmps[theseAmps['diff'] > 0].index
+            # pdb.set_trace()
+            if len(ampOnsetIdx):
+                tAmpOnset = theseAmps.loc[ampOnsetIdx, 't'].iloc[0]
                 # greater if movement after stim
-                categories.loc[idx, 'stimOffset'] = tOnset - ampOnset.iloc[0]
+                categories.loc[idx, 'stimOffset'] = tOnset - tAmpOnset
+                ampOffsetMask = (
+                    (theseAmps['diff'] < 0) &
+                    (theseAmps['t'] > tAmpOnset)
+                    )
+                if ampOffsetMask.any():
+                    ampOffsetIdx = theseAmps.loc[ampOffsetMask, :].index
+                else:
+                    ampOffsetIdx = pd.Index([theseAmps.index[-1]])
+                fuzzyIdx = int((ampOnsetIdx[0] + ampOffsetIdx[0]) / 2)
             else:
+                ampOnsetIdx = pd.Index([theseAmps.index[0]])
                 categories.loc[idx, 'stimOffset'] = 999
-            ampOffset = theseAmps.loc[
-                ampDiff[ampDiff['amplitude'] < 0].index, 't']
-            if len(ampOffset):
-                #  if the stim ever turns off
-                #  use the last value where amp was on
-                fuzzyIdx = ampDiff[ampDiff['amplitude'] < 0].index[0] - 1
-            else:
-                #  use the last value (amp stayed constant,
-                #  including the case where it was zero throughout)
-                fuzzyIdx = tdDF.loc[tdMask, :].index[-1]
+                # ampOffsetMask = (theseAmps['diff'] < 0)
+                fuzzyIdx = theseAmps.index[-1]
+            #
+            # if len(ampOffsetIdx):
+            #     #  if the stim ever turns off
+            #     #  use the last value where amp was on
+            #     fuzzyIdx = theseAmps.loc[ampOffsetIdx].index[0] - 1
+            # else:
+            #     #  use the last value (amp stayed constant,
+            #     #  including the case where it was zero throughout)
+            #     fuzzyIdx = tdDF.loc[tdMask, :].index[-1]
             for colName in fuzzyCateg:
                 nominalValue = categories.loc[idx, colName]
                 fuzzyValue = tdDF.loc[fuzzyIdx, colName]
@@ -420,12 +421,12 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
     #  fill in the nans for the offset and midpeak times
     categories.fillna(method='ffill', inplace=True)
     categories.fillna(method='bfill', inplace=True)
-        
+    #
     for colName in ['RateInHz', 'RateInHzFuzzy']:
         categories.loc[categories['amplitudeCatFuzzy'] == 0, colName] = 0
-
+    #
     uniqProgs = pd.unique(categories['programFuzzy'])
-    #  plot these if we need to reset the category
+    #  plot these if we need to reset the amplitude category
     if (segIdx == 0) and arguments['plotParamHistograms']:
         fig, ax = plt.subplots(len(uniqProgs), 1, sharex=True)
         for idx, pName in enumerate(uniqProgs):

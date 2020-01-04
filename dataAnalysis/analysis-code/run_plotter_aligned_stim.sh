@@ -20,10 +20,12 @@
 #SBATCH --account=bibs-dborton-condo
 
 # EXP="exp201901221000"
-# EXP="exp201901201200"
-EXP="exp201901271000"
+EXP="exp201901201200"
+# EXP="exp201901271000"
 # SELECTOR="Trial005_minfrmaxcorr"
 SELECTOR="_minfrmaxcorr"
+TRIALSELECTOR="--trialIdx=1"
+# TRIALSELECTOR="--processAll"
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
@@ -31,11 +33,7 @@ conda activate
 
 source activate nda
 python --version
-MINIRCIDX="5"
 
 #  --maskOutlierTrials
-python3 './plotAlignedAsigs.py' --exp=$EXP --trialIdx=$MINIRCIDX  --window="long" --inputBlockName="rig" --unitQuery="all" --alignQuery="stimOn" --rowName= --hueName="amplitude" --analysisName=defaultStim
-python3 './plotAlignedNeurons.py' --exp=$EXP --trialIdx=$MINIRCIDX  --selector=$SELECTOR --window="long" --unitQuery="all" --alignQuery="stimOn" --rowName= --hueName="amplitude" --analysisName=defaultStim
-#
-python3 './plotAlignedAsigs.py' --exp=$EXP --processAll  --window="long" --inputBlockName="rig" --unitQuery="all" --alignQuery="stimOn" --rowName= --hueName="amplitude" --analysisName=defaultStim
-python3 './plotAlignedNeurons.py' --exp=$EXP --processAll  --selector=$SELECTOR --window="long" --unitQuery="all" --alignQuery="stimOn" --rowName= --hueName="amplitude" --analysisName=defaultStim
+python3 './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR  --window="long" --inputBlockName="rig" --unitQuery="all" --alignQuery="stimOn" --rowName= --hueName="amplitude" --alignFolderName=stim
+python3 './plotAlignedNeurons.py' --exp=$EXP $TRIALSELECTOR  --selector=$SELECTOR --window="long" --unitQuery="all" --alignQuery="stimOn" --rowName= --hueName="amplitude" --alignFolderName=stim

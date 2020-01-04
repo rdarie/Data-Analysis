@@ -10,11 +10,11 @@
 #SBATCH --mem=96G
 
 # Specify a job name:
-#SBATCH -J alignFull
+#SBATCH -J alignFull_20190127
 
 # Specify an output file
-#SBATCH -o ../batch_logs/%j-alignFull.stdout
-#SBATCH -e ../batch_logs/%j-alignFull.errout
+#SBATCH -o ../batch_logs/%j-alignFull_20190127.stdout
+#SBATCH -e ../batch_logs/%j-alignFull_20190127.errout
 
 # Specify account details
 #SBATCH --account=bibs-dborton-condo
@@ -27,6 +27,9 @@
 EXP="exp201901271000"
 LAZINESS="--lazy"
 WINDOW="--window=long"
+# TRIALSELECTOR="--trialIdx=2"
+TRIALSELECTOR="--processAll"
+UNITSELECTOR="--selector=_minfrmaxcorr"
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
@@ -34,13 +37,13 @@ conda activate
 source activate nda
 python --version
 
-python3 ./assembleExperimentData.py --exp=$EXP --processAsigs --processRasters
-python3 ./calcAlignedAsigs.py --exp=$EXP --processAll $LAZINESS $WINDOW --chanQuery="fr_sqrt" --blockName="fr_sqrt"
-python3 ./calcAlignedAsigs.py --exp=$EXP --processAll $LAZINESS $WINDOW --chanQuery="rig" --blockName="rig"
-python3 ./calcAlignedAsigs.py --exp=$EXP --processAll $LAZINESS $WINDOW --chanQuery="fr" --blockName="fr"
-python3 ./calcAlignedRasters.py --exp=$EXP --processAll $LAZINESS $WINDOW --chanQuery="raster" --blockName="raster"
+# python3 ./assembleExperimentData.py --exp=$EXP --processAsigs --processRasters
+# python3 ./calcAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $LAZINESS $WINDOW --chanQuery="fr_sqrt" --blockName="fr_sqrt"
+python3 ./calcAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $LAZINESS $WINDOW --chanQuery="rig" --blockName="rig" --verbose
+python3 ./calcAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $LAZINESS $WINDOW --chanQuery="fr" --blockName="fr" --verbose
+python3 ./calcAlignedRasters.py --exp=$EXP $TRIALSELECTOR $LAZINESS $WINDOW --chanQuery="raster" --blockName="raster" --verbose
 # qa
-python3 ./calcUnitMeanFR.py --exp=$EXP --processAll --inputBlockName="fr" --alignQuery="midPeak" --unitQuery="fr" --verbose
-python3 ./calcUnitCorrelation.py --exp=$EXP --processAll --inputBlockName="fr" --alignQuery="midPeak" --unitQuery="fr" --verbose --plotting
-python3 ./selectUnitsByMeanFRandCorrelation.py --exp=$EXP --processAll --verbose
-python3 ./calcTrialOutliers.py --exp=$EXP --processAll --selector=$SELECTOR --saveResults --plotting --inputBlockName="fr" --alignQuery="all" --unitQuery="fr" --verbose
+python3 ./calcUnitMeanFR.py --exp=$EXP $TRIALSELECTOR --inputBlockName="fr" --alignQuery="midPeak" --unitQuery="fr" --verbose
+python3 ./calcUnitCorrelation.py --exp=$EXP $TRIALSELECTOR --inputBlockName="fr" --alignQuery="midPeak" --unitQuery="fr" --verbose --plotting
+python3 ./selectUnitsByMeanFRandCorrelation.py --exp=$EXP $TRIALSELECTOR --verbose
+python3 ./calcTrialOutliers.py --exp=$EXP $TRIALSELECTOR $UNITSELECTOR --saveResults --plotting --inputBlockName="fr" --alignQuery="all" --unitQuery="fr" --verbose

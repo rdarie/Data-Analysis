@@ -10,19 +10,19 @@
 #SBATCH --mem=96G
 
 # Specify a job name:
-#SBATCH -J tdrFull
+#SBATCH -J glmFull_20190121
 
 # Specify an output file
-#SBATCH -o ../batch_logs/%j-tdrFull.stdout
-#SBATCH -e ../batch_logs/%j-tdrFull.errout
+#SBATCH -o ../batch_logs/%j-glmFull_20190121.stdout
+#SBATCH -e ../batch_logs/%j-glmFull_20190121.errout
 
 # Specify account details
 #SBATCH --account=bibs-dborton-condo
 
-# EXP="exp201901211000"
-EXP="exp201901271000"
-ESTIMATOR="201901271000-Proprio_glmAcr_long_midPeak"
-BLOCKNAME="glmAcr"
+EXP="exp201901211000"
+# EXP="exp201901271000"
+ESTIMATOR="_glm_long_midPeak"
+BLOCKNAME="glm"
 python3 ./calcUnitGLMToAsig.py --exp=$EXP --processAll --inputBlockName="raster" --secondaryBlockName="rig" --alignQuery="midPeak" --unitQuery="raster" --estimatorName=$BLOCKNAME --verbose
 # python3 ./evaluateUnitRegressionToAsig.py --exp=$EXP --estimator=$ESTIMATOR --lazy --profile --verbose
 # python3 ./applyEstimatorToTriggered.py --exp=$EXP --processAll --window="long" --alignQuery="midPeak" --estimator=$ESTIMATOR --lazy --profile --verbose

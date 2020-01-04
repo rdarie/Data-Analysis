@@ -557,14 +557,14 @@ def loadBlockProxyObjects(block):
                 #  print('unit is {}'.format(stProxy.unit.name))
                 #  print('spiketrain is {}'.format(stProxy.name))
                 #  print('tstop is {}'.format(stProxy.t_stop))
-                assert stProxy.shape[0] > 0, 'no times for this spike'
+                assert stProxy.shape[0] > 0
                 st = stProxy.load(load_waveforms=True)
                 #  st.left_sweep = None
                 #  seems like writing ins data breaks the
                 #  waveforms. oh well, turning it off for now
             except Exception:
-                traceback.print_exc()
-                #  
+                # traceback.print_exc()
+                print('no times for spike {}'.format(stProxy.name))
                 st = stProxy.load(load_waveforms=False)
                 if st.waveforms is None:
                     st.waveforms = np.array([]).reshape((0, 0, 0))*pq.V

@@ -13,6 +13,7 @@ Options:
     --eventName=eventName                  name of events object to align to [default: motionStimAlignTimes]
     --analysisName=analysisName            append a name to the resulting blocks? [default: default]
     --alignFolderName=alignFolderName      append a name to the resulting blocks? [default: motion]
+    --verbose                              print diagnostics? [default: False]
 """
 
 import os, pdb, traceback
@@ -60,7 +61,6 @@ binnedSpikePath = binnedSpikePath.format(arguments['analysisName'])
 experimentDataPath = experimentDataPath.format(arguments['analysisName'])
 analysisDataPath = analysisDataPath.format(arguments['analysisName'])
 
-verbose = True
 #  source of events
 if arguments['processAll']:
     eventPath = experimentDataPath
@@ -101,7 +101,7 @@ ns5.getAsigsAlignedToEvents(
     windowSize=windowSize,
     appendToExisting=False,
     checkReferences=False,
-    verbose=verbose,
+    verbose=arguments['verbose'],
     fileName=prefix + '_{}_{}'.format(
         arguments['blockName'], arguments['window']),
-    folderPath=analysisSubFolder, chunkSize=alignedAsigsChunkSize)
+    folderPath=alignSubFolder, chunkSize=alignedAsigsChunkSize)

@@ -9,6 +9,7 @@ Options:
     --plotParamHistograms                plot pedal size, amplitude, duration distributions? [default: False]
     --analysisName=analysisName          append a name to the resulting blocks? [default: default]
     --makeControl                        make control align times? [default: False]
+    --lazy                               load from raw, or regular? [default: False]
 """
 import os, pdb, traceback
 from importlib import reload
@@ -51,17 +52,17 @@ insReader = neo.NixIO(
     filename=insDataPath)
 insBlock = insReader.read_block(0)
 #  all experimental days?
-if arguments['processAll']:
-    alignTimeBounds = []
-    dataReader = neo.io.nixio_fr.NixIO(
-        filename=experimentDataPath)
-else:
-    # alignTimeBounds = alignTimeBoundsLookup[experimentName][int(arguments['trialIdx'])]
-    alignTimeBounds = [
-        alignTimeBoundsLookup[int(arguments['trialIdx'])]
+#  if arguments['processAll']:
+#      alignTimeBounds = []
+#      dataReader = neo.io.nixio_fr.NixIO(
+#          filename=experimentDataPath)
+#  else:
+#      # alignTimeBounds = alignTimeBoundsLookup[experimentName][int(arguments['trialIdx'])]
+alignTimeBounds = [
+    alignTimeBoundsLookup[int(arguments['trialIdx'])]
     ]
-    dataReader = neo.io.nixio_fr.NixIO(
-        filename=analysisDataPath)
+dataReader = neo.io.nixio_fr.NixIO(
+    filename=analysisDataPath)
 
 dataBlock = dataReader.read_block(
     block_index=0, lazy=True,

@@ -10,6 +10,7 @@ Options:
     --verbose                                 print diagnostics? [default: False]
     --plotting                                plot out the correlation matrix? [default: True]
     --analysisName=analysisName               append a name to the resulting blocks? [default: default]
+    --alignFolderName=alignFolderName         append a name to the resulting blocks? [default: motion]
     --inputBlockName=inputBlockName           filename for inputs [default: raster]
     --secondaryBlockName=secondaryBlockName   filename for secondary inputs [default: rig]
     --window=window                           process with short window? [default: long]
@@ -60,21 +61,26 @@ def calcUnitRegressionToAsig():
         )
     if not os.path.exists(analysisSubFolder):
         os.makedirs(analysisSubFolder, exist_ok=True)
+    alignSubFolder = os.path.join(
+        analysisSubFolder, arguments['analysisName']
+        )
+    if not os.path.exists(alignSubFolder):
+        os.makedirs(alignSubFolder, exist_ok=True)
     #
     if arguments['processAll']:
         prefix = assembledName
     else:
         prefix = ns5FileName
     triggeredPath = os.path.join(
-        analysisSubFolder,
+        alignSubFolder,
         prefix + '_{}_{}.nix'.format(
             arguments['inputBlockName'], arguments['window']))
     regressorPath = os.path.join(
-        analysisSubFolder,
+        alignSubFolder,
         prefix + '_{}_{}.nix'.format(
             arguments['secondaryBlockName'], arguments['window']))
     resultPath = os.path.join(
-        analysisSubFolder,
+        alignSubFolder,
         prefix + '_{}_{}_calc.h5'.format(
             arguments['inputBlockName'], arguments['window']))
     fullEstimatorName = '{}_{}_{}_{}'.format(
@@ -83,7 +89,7 @@ def calcUnitRegressionToAsig():
         arguments['window'],
         arguments['alignQuery'])
     estimatorPath = os.path.join(
-        analysisSubFolder,
+        alignSubFolder,
         fullEstimatorName + '.joblib')
     #
     rollingWindow = 30
@@ -142,12 +148,12 @@ def calcUnitRegressionToAsig():
     featuresMetaDataPath = estimatorPath.replace(
         '.joblib', '_features_meta.pickle')
     regressorH5Path = os.path.join(
-        analysisSubFolder,
+        alignSubFolder,
         prefix + '_{}_{}_{}.h5'.format(
             arguments['estimatorName'],
             arguments['secondaryBlockName'], arguments['window']))
     targetH5Path = os.path.join(
-        analysisSubFolder,
+        alignSubFolder,
         prefix + '_{}_{}_{}.h5'.format(
             arguments['estimatorName'],
             arguments['inputBlockName'], arguments['window']))
@@ -182,73 +188,6 @@ def calcUnitRegressionToAsig():
         #
         targetDF = pd.DataFrame(targetDF * spkConversionFactor, dtype=np.int)
         # derive regressors from saved traces (should move further upstream)
-        '''
-        progAmpNames = ['program{}_amplitude#0'.format(pNum) for pNum in range(4)]
-        progAmpLookup = {'program{}_amplitude#0'.format(pNum): pNum for pNum in range(4)}
-        dropColumns = []
-        metaData = featuresDF.index.copy()
-        # activeProgram = metaData.get_level_values('program').to_numpy()
-        # trialAmplitude = metaData.get_level_values('amplitude').to_numpy()
-        stimRate = metaData.get_level_values('RateInHz').to_numpy()
-        uniqueRates = np.unique(stimRate[stimRate > 0])
-        featuresDF.reset_index(inplace=True, drop=True)
-        try:
-            for name in featuresDF.columns:
-                featureName = name[0]
-                lag = name[1]
-                if featureName in progAmpNames:
-                    thisProgram = progAmpLookup[featureName]
-                    if ACRModel:
-                        acrName = 'p{}_ACR#0'.format(thisProgram)
-                        featuresDF.loc[:, (acrName, lag)] = (
-                            stimRate *
-                            (featuresDF.loc[:, name])
-                            )
-                    if IARModel:
-                        for rate in uniqueRates:
-                            iarName = 'p{}_{}Hz#0'.format(thisProgram, int(rate))
-                            featuresDF.loc[:, (iarName, lag)] = (
-                                (stimRate == rate) *
-                                (featuresDF.loc[:, name])
-                                )
-                    dropColumns.append(name)
-                elif featureName == 'position#0':
-                    featuresDF.loc[:, ('position_x#0', lag)] = ((
-                        np.cos(
-                            featuresDF.loc[:, ('position#0', lag)] *
-                            100 * 2 * np.pi / 360))
-                        .to_numpy())
-                    featuresDF.sort_index(axis='columns', inplace=True)
-                    featuresDF.loc[:, ('position_y#0', lag)] = ((
-                        np.sin(
-                            featuresDF.loc[:, ('position#0', lag)] *
-                            100 * 2 * np.pi / 360))
-                        .to_numpy())
-                    featuresDF.sort_index(axis='columns', inplace=True)
-                    dropColumns.append(name)
-            for name in featuresDF.columns:
-                # velocities require position
-                featureName = name[0]
-                lag = name[1]
-                if featureName == 'velocity#0':
-                    featuresDF.loc[:, ('velocity_x#0', lag)] = ((
-                        featuresDF.loc[:, ('position_y#0', lag)] *
-                        (-1) *
-                        (featuresDF.loc[:, ('velocity#0', lag)] * 3e2))
-                        .to_numpy())
-                    featuresDF.sort_index(axis='columns', inplace=True)
-                    featuresDF.loc[:, ('velocity_y#0', lag)] = ((
-                        featuresDF.loc[:, ('position_x#0', lag)] *
-                        (featuresDF.loc[:, ('velocity#0', lag)] * 3e2))
-                        .to_numpy())
-                    featuresDF.sort_index(axis='columns', inplace=True)
-                    dropColumns.append(name)
-        except Exception:
-            traceback.print_exc()
-        featuresDF.drop(columns=dropColumns, inplace=True)
-        featuresDF.columns = featuresDF.columns.remove_unused_levels()
-        featuresDF.index = metaData
-        '''
         #
         featuresMetaData = {
             'targetLoadArgs': targetLoadArgs,
