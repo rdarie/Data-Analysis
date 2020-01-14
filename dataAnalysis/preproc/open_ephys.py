@@ -206,7 +206,7 @@ def preprocOpenEphysFolder(
             matPath = os.path.join(
                 folderPath, os.path.basename(folderPath) + '.mat')
             if not os.path.exists(matPath):
-                execStr = 'matlab -r \"preprocOpenEphysFolder({}); exit\"'.format(folderPath)
+                execStr = 'matlab -r \"preprocOpenEphysFolder(\'{}\'); exit\"'.format(folderPath)
                 result = subprocess.run([execStr], shell=True)
             fileName = os.path.basename(folderPath)
             rawBlock = openEphysMatToNixBlock(

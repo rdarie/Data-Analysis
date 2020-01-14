@@ -1,14 +1,20 @@
 from sklearn.base import TransformerMixin, BaseEstimator, RegressorMixin
 from sklearn.decomposition import PCA
 from sklearn.model_selection import cross_val_score, GridSearchCV, StratifiedKFold
+from sklearn.model_selection._split import _BaseKFold
 from sklearn.metrics import make_scorer
 import pandas as pd
 import numpy as np
 import statsmodels.api as sm
 from statsmodels.stats.multitest import multipletests as mt
 import pdb, traceback
+import os
+import joblib as jb
 import statsmodels
-
+from patsy import (
+    ModelDesc, EvalEnvironment, Term, Sum, Treatment, INTERCEPT,
+    EvalFactor, LookupFactor, demo_data, dmatrix, dmatrices)
+import pyglmnet
 import matplotlib.pyplot as plt
 import seaborn as sns
 sns.set()
@@ -17,7 +23,7 @@ sns.set_context("talk")
 sns.set_style("whitegrid")
 
 
-def applyScalers(DF, listOfScalers):
+def applyScalersGrouped(DF, listOfScalers):
     for scaler, listOfColumns in listOfScalers:
         try:
             featuresMatchMaskAll = (
@@ -57,9 +63,10 @@ def poisson_pseudoR2(estimator, X, y):
     # This is our scoring function. Implements pseudo-R2
     #
     # yhat is the prediction
-    yhat = estimator.results_.predict(X).to_numpy()
+    # yhat = estimator.results_.predict(X)
+    yhat = estimator.predict(X)
     # y null is the mean of the training data
-    ynull = np.mean(estimator.model_.endog)
+    ynull = np.mean(y)
     yhat = yhat.reshape(y.shape)
     eps = np.spacing(1)
     L1 = np.sum(y*np.log(eps+yhat) - yhat)
@@ -70,6 +77,52 @@ def poisson_pseudoR2(estimator, X, y):
     return R2
 
 
+class trialAwareStratifiedKFold:
+    def __init__(
+            self, n_splits=5, shuffle=False, random_state=None,
+            stratifyFactors=None, continuousFactors=None):
+        self.n_splits = n_splits
+        self.shuffle = shuffle
+        self.random_state = random_state
+        self.stratifyFactors = stratifyFactors
+        self.continuousFactors = continuousFactors
+
+    def split(self, X, y=None, groups=None):
+        trialInfo = (
+            X
+            .index.to_frame()
+            .reset_index(drop=True)
+            .loc[:, self.stratifyFactors + self.continuousFactors])
+        if (self.stratifyFactors is not None):
+            for idx, (name, group) in enumerate(trialInfo.groupby(self.stratifyFactors)):
+                trialInfo.loc[group.index, 'stratifyGroup'] = idx
+        else:
+            trialInfo.loc[:, 'stratifyGroup'] = 1
+        if (self.continuousFactors is not None):
+            for idx, (name, group) in enumerate(trialInfo.groupby(self.continuousFactors)):
+                trialInfo.loc[group.index, 'continuousGroup'] = idx
+            continuousDF = trialInfo.drop_duplicates('continuousGroup')
+        else:
+            trialInfo.loc[:, 'continuousGroup'] = 1
+            continuousDF = trialInfo
+        skf = StratifiedKFold(
+            n_splits=self.n_splits,
+            shuffle=self.shuffle, random_state=self.random_state)
+        folds = []
+        for tr, te in skf.split(continuousDF, continuousDF['stratifyGroup']):
+            trainCG = continuousDF['continuousGroup'].iloc[tr]
+            trainMask = trialInfo['continuousGroup'].isin(trainCG)
+            trainIdx = trialInfo.loc[trainMask, :].index.to_list()
+            testCG = continuousDF['continuousGroup'].iloc[te]
+            testMask = trialInfo['continuousGroup'].isin(testCG)
+            testIdx = trialInfo.loc[testMask, :].index.to_list()
+            folds.append((trainIdx, testIdx))
+        return folds
+
+    def get_n_splits(self, X=None, y=None, groups=None):
+        return self.n_splits
+
+
 class SMWrapper(BaseEstimator, RegressorMixin):
     """
         A universal sklearn-style wrapper for statsmodels regressors
@@ -77,138 +130,139 @@ class SMWrapper(BaseEstimator, RegressorMixin):
         by David Dale
     """
     def __init__(
-            self, sm_class, sm_kwargs={},
-            featureMask=slice(None),
-            regAlpha=None, regL1Wt=None, regRefit=True):
+            self, sm_class, family=None,
+            alpha=None, L1_wt=None, refit=None,
+            maxiter=100, tol=1e-8, disp=False
+            ):
         self.sm_class = sm_class
-        self.sm_kwargs = sm_kwargs
-        self.regAlpha = regAlpha
-        self.regL1Wt = regL1Wt
-        self.regRefit = regRefit
-        self.featureMask = featureMask
+        self.family = family
+        self.alpha = alpha
+        self.L1_wt = L1_wt
+        self.refit = refit
+        self.maxiter = maxiter
+        self.tol = tol
+        self.disp = disp
         pass
-
+    #
     def fit(self, X, y):
+        model_opts = {}
+        for key in dir(self):
+            if key in ['family']:
+                model_opts.update({key: getattr(self, key)})
         try:
             self.model_ = self.sm_class(
-                y, X.iloc[:, self.featureMask],
-                **self.sm_kwargs)
+                y, X, **model_opts)
         except Exception:
             traceback.print_exc()
-        if self.regAlpha is None:
-            self.results_ = self.model_.fit()
+        #
+        regular_opts = {}
+        for key in dir(self):
+            if key in ['alpha', 'L1_wt', 'refit']:
+                if getattr(self, key) is not None:
+                    regular_opts.update({key: getattr(self, key)})
+        fit_opts = {}
+        for key in dir(self):
+            if key in ['maxiter', 'tol', 'disp']:
+                if getattr(self, key) is not None:
+                    fit_opts.update({key: getattr(self, key)})
+        if not len(regular_opts.keys()):
+            self.results_ = self.model_.fit(**fit_opts)
         else:
+            if 'tol' in fit_opts:
+                tol = fit_opts.pop('tol')
+                fit_opts['cnvrg_tol'] = tol
+            if 'disp' in fit_opts:
+                fit_opts.pop('disp')
             self.results_ = self.model_.fit_regularized(
-                alpha=self.regAlpha, L1_wt=self.regL1Wt,
-                refit=self.regRefit)
-
+                **regular_opts, **fit_opts)
+    #
     def predict(self, X):
-        return self.results_.predict(X.iloc[:, self.featureMask])
-
+        return self.results_.predict(X)
+    #
     def score(self, X, y=None):
-        if 'Poisson' in str(self.sm_kwargs['family']):
-            return poisson_pseudoR2(self, X.iloc[:, self.featureMask], y)
+        if 'family' in dir(self):
+            if 'Poisson' in str(self.family):
+                return poisson_pseudoR2(self, X, y)
 
 
 class SingleNeuronRegression():
-
     def __init__(
             self,
-            featuresDF=None, targetDF=None,
-            featureScalers=None, targetScalers=None, addIntercept=True,
+            xTrain=None, yTrain=None,
+            xTest=None, yTest=None,
+            cv_folds=None,
             model=None, modelKWargs={},
-            cv=None, tTestAlpha=0.01, conditionNames=None,
+            tTestAlpha=0.01,
             plotting=False, verbose=False):
-        self.addIntercept = addIntercept
         #
         self.model = model
         self.modelKWargs = modelKWargs
-        #
-        self.cv = cv
         #
         self.tTestAlpha = tTestAlpha
         #
         self.plotting = plotting
         self.verbose = verbose
         #
-        featuresDF = applyScalers(featuresDF, featureScalers)
-        targetDF = applyScalers(targetDF, targetScalers)
+        self.cv_folds = cv_folds
+        self.xTrain = xTrain
+        self.xTest = xTest
+        self.yTrain = yTrain
+        self.yTest = yTest
         #
-        if self.addIntercept:
-            featuresDF.loc[:, ('intercept', 0)] = 1
-        #
-        trialInfo = (
-            featuresDF
-            .index.to_frame()
-            .reset_index(drop=True)
-            .loc[:, conditionNames + ['bin']])
-        for idx, (name, group) in enumerate(trialInfo.groupby(conditionNames)):
-            trialInfo.loc[group.index, 'group'] = idx
-        prelimSkf = StratifiedKFold(n_splits=self.cv, shuffle=True)
-        # 
-        # WIP: trick to keep trials continuous under cross val
-        binMask = (trialInfo['bin'] == trialInfo['bin'].iloc[0])
-        idxGen = prelimSkf.split(
-            trialInfo.iloc[binMask.to_numpy(), 0].to_numpy(),
-            trialInfo.loc[binMask.to_numpy(), 'group'].to_numpy())
-        skfIndex = [i for i in idxGen]
-        idxTest = trialInfo.iloc[binMask.to_numpy(), 0].index[(skfIndex[0][1])]
-        idxTrain = trialInfo.iloc[binMask.to_numpy(), 0].index[(np.concatenate([i[1] for i in skfIndex[1:]]))]
-        trialInfo['split'] = np.nan
-        trialInfo.iloc[idxTrain, -1] = 'train'
-        trialInfo.iloc[idxTest, -1] = 'test'
-        trialInfo.fillna(method='ffill', inplace=True)
-        trainMask = (trialInfo['split'] == 'train').to_numpy()
-        testMask = (trialInfo['split'] == 'test').to_numpy()
-        self.XTrain = featuresDF.iloc[trainMask, :]
-        self.XTrain.columns = self.XTrain.columns.to_list()
-        self.yTrain = targetDF.iloc[trainMask, :]
-        # self.yTrain.columns = self.yTrain.columns.to_list()
-        self.XTest = featuresDF.iloc[testMask, :]
-        self.XTest.columns = self.XTest.columns.to_list()
-        self.yTest = targetDF.iloc[testMask, :]
-        # self.yTest.columns = self.yTest.columns.to_list()
-        # 
         self.betas = pd.DataFrame(
-            0, index=targetDF.columns, columns=featuresDF.columns)
+            0,
+            index=self.yTrain.columns,
+            columns=self.xTrain.columns)
+        #
+        self.significantBetas = pd.DataFrame(
+            False,
+            index=self.yTrain.columns,
+            columns=self.xTrain.columns)
+        #
         self.pvals = pd.DataFrame(
             np.nan, index=self.betas.index,
             columns=self.betas.columns)
-        self.regressionList = {k: {} for k in targetDF.columns}
-        for colName in self.yTrain:
+        #
+        self.regressionList = {}
+        for idx, colName in enumerate(self.yTrain.columns):
             reg = self.model(**self.modelKWargs)
-            self.regressionList[colName].update({'reg': reg})
+            self.regressionList[colName] = ({'reg': reg})
         pass
 
     def cross_val_score(self):
         #  fit the regression models
-        for colName in self.yTrain:
+        for idx, colName in enumerate(self.yTrain.columns):
             y = self.yTrain.loc[:, colName]
+            reg = self.regressionList[colName]['reg']
             scores = cross_val_score(
-                self.regressionList[colName]['reg'],
-                self.XTrain, y, cv=self.cv - 1)
+                reg, self.xTrain.to_numpy(),
+                y.to_numpy(),
+                error_score='raise', cv=iter(self.cv_folds))
             if self.verbose:
                 print('{}: mean score {}, std {}'.format(
                     colName, np.mean(scores), np.std(scores)
                     ))
             self.regressionList[colName].update({
-                'scoresCV': scores
+                'cross_val_mean_test_score': np.mean(scores),
+                'cross_val_std_test_score': np.std(scores),
                 })
         return
 
     def apply_gridSearchCV(self, gridParams):
         #  fit the regression models
-        for colName in self.yTrain:
+        for idx, colName in enumerate(self.yTrain.columns):
             y = self.yTrain.loc[:, colName]
             reg = self.regressionList[colName]['reg']
-            gs = GridSearchCV(reg, gridParams, refit=False, cv=self.cv - 1)
-            gs.fit(self.XTrain, y)
+            gs = GridSearchCV(
+                reg, gridParams, refit=False,
+                error_score='raise',
+                cv=iter(self.cv_folds))
+            gs.fit(self.xTrain.to_numpy(), y.to_numpy())
             bestIndex = gs.best_index_
             reg.set_params(**gs.best_params_)
             self.regressionList[colName].update({
-                'gridSearchCV': gs,
-                'mean_test_score': gs.cv_results_['mean_test_score'][bestIndex],
-                'std_test_score': gs.cv_results_['std_test_score'][bestIndex],
+                'gridsearch_mean_test_score': gs.cv_results_['mean_test_score'][bestIndex],
+                'gridsearch_std_test_score': gs.cv_results_['std_test_score'][bestIndex],
                 })
             if self.verbose:
                 print("Best parameters set found:\n{}".format(
@@ -217,23 +271,88 @@ class SingleNeuronRegression():
 
     def fit(self):
         #  fit the regression models
-        for colName in self.yTrain:
+        for idx, colName in enumerate(self.yTrain.columns):
             y = self.yTrain.loc[:, colName]
             reg = self.regressionList[colName]['reg']
-            reg.fit(self.XTrain, y)
-            if self.verbose and hasattr(reg, 'results_'):
-                if hasattr(reg.results_, 'summary'):
-                    print(reg.results_.summary())
-                    print('params \n')
-                    print(reg.results_.params)
+            print('fitting model {}'.format(colName))
+            if isinstance(reg, (pyglmnet.GLM)):
+                trackingLoss = True
+                self.regressionList[colName]['iterScore'] = []
+                self.regressionList[colName]['iterBetaNorm'] = []
+                if trackingLoss:
+                    dummyReg = reg.copy()
+                    #
+                    def printLoss(beta):
+                        printLoss.counter += 1
+                        dummyReg.beta_ = beta
+                        dummyReg.beta0_ = 0
+                        iterScore = poisson_pseudoR2(
+                            dummyReg,
+                            self.xTrain.to_numpy(), y.to_numpy())
+                        (
+                            self
+                            .regressionList[colName]['iterScore']
+                            .append(iterScore)
+                            )
+                        betaNorm = np.linalg.norm(beta)
+                        (
+                            self
+                            .regressionList[colName]['iterBetaNorm']
+                            .append(betaNorm)
+                            )
+                        print(
+                            'iter {}; pR2 = {:.6f}; betaNorm = {:.6f}'
+                            .format(printLoss.counter, iterScore, betaNorm),
+                            end='\r')
+                    #
+                    printLoss.counter = 0
+                    reg.callback = printLoss
+                reg.fit(self.xTrain.to_numpy(), y.to_numpy())
+                if trackingLoss:
+                    self.regressionList[colName]['iterScore'] = np.asarray(
+                        self.regressionList[colName]['iterScore']
+                    )
+                    self.regressionList[colName]['iterBetaNorm'] = np.asarray(
+                        self.regressionList[colName]['iterBetaNorm']
+                    )
+                    if True:
+                        fig, ax = plt.subplots(2, 1, sharex=True)
+                        ax[0].plot(self.regressionList[colName]['iterScore'])
+                        ax[0].set_title('iterScore')
+                        ax[1].plot(self.regressionList[colName]['iterBetaNorm'])
+                        ax[1].set_title('iterBetaNorm')
+                        plt.show()
+                    del dummyReg
+            else:
+                reg.fit(self.xTrain, y)
+            pr2 = poisson_pseudoR2(
+                reg,
+                self.xTest.to_numpy(),
+                self.yTest.loc[:, colName].to_numpy())
+            self.regressionList[colName].update({
+                'validationScore': pr2
+                })
+            if self.verbose:
+                if hasattr(reg, 'results_'):
+                    if hasattr(reg.results_, 'summary'):
+                        try:
+                            print(reg.results_.summary())
+                            print('params \n')
+                            print(reg.results_.params)
+                        except Exception:
+                            pass
+                print('test pR2 = {}'.format(pr2))
+                train_pr2 = poisson_pseudoR2(
+                    reg,
+                    self.xTrain.to_numpy(),
+                    self.yTrain.loc[:, colName].to_numpy())
+                print('train_pr2 = {}'.format(train_pr2))
             if hasattr(reg, 'results_'):
-                self.betas.loc[colName, self.betas.columns[reg.featureMask]] = reg.results_.params
+                self.betas.loc[colName, :] = reg.results_.params
                 if hasattr(reg.results_, 'pvals'):
-                    self.pvals.loc[colName, self.pvals.columns[reg.featureMask]] = reg.results_.pvalues
-        #
-        self.significantBetas = None
+                    self.pvals.loc[colName, :] = reg.results_.pvalues
         if hasattr(reg, 'results_'):
-            if hasattr(reg.results_, 'pvals'):
+            if hasattr(reg.results_, 'pvalues'):
                 origShape = self.pvals.shape
                 flatPvals = self.pvals.to_numpy().reshape(-1)
                 try:
@@ -242,52 +361,82 @@ class SingleNeuronRegression():
                     fixedPvals = flatPvals * flatPvals.size
                 self.pvals.iloc[:, :] = fixedPvals.reshape(origShape)
                 self.significantBetas = self.pvals < self.tTestAlpha
-        if self.significantBetas is None:
-            self.significantBetas = self.betas > 0
+            else:
+                # L1 weights encourage the parameter to go to zero;
+                # assume significant by default
+                self.significantBetas = self.betas.abs() > 0
         return self
 
     def clear_data(self):
-        del self.XTrain, self.yTrain, self.XTest, self.yTest
+        for idx, colName in enumerate(self.yTrain.columns):
+            reg = self.regressionList[colName]['reg']
+            if hasattr(reg, 'model_'):
+                del reg.model_.endog, reg.model_.exog
+            if hasattr(reg, 'results_'):
+                if hasattr(reg.results_, 'remove_data'):
+                    reg.results_.remove_data()
+                if hasattr(reg.results_, 'fittedvalues'):
+                    del reg.results_.fittedvalues
+        del self.xTrain, self.yTrain, self.xTest, self.yTest
         return
 
-    def plot_xy(self):
+    def plot_xy(
+            self,
+            showNow=False, smoothY=10,
+            maxPR2=None, unitName=None,
+            useInvLink=False):
         scores = [
             {
-                'unit': k, 'score': v['mean_test_score'],
-                'std_score': v['std_test_score']}
+                'unit': k, 'score': v['gridsearch_mean_test_score'],
+                'std_score': v['gridsearch_std_test_score']}
             for k, v in self.regressionList.items()]
         scoresDF = pd.DataFrame(scores)
-        unitName = scoresDF.loc[scoresDF['score'].idxmax(), 'unit']
+        if unitName is None:
+            if maxPR2 is not None:
+                uIdx = (
+                    scoresDF
+                    .loc[scoresDF['score'] < maxPR2, 'score']
+                    .idxmax()
+                    )
+            else:
+                uIdx = scoresDF['score'].idxmax()
+            unitName = scoresDF.loc[uIdx, 'unit']
+        else:
+            uIdx = scoresDF.loc[scoresDF['unit'] == unitName, :].index[0]
         thisReg = self.regressionList[unitName]
-        prediction = thisReg['reg'].predict(self.XTest).to_numpy()
-        y = self.yTest[unitName].to_numpy()
+        prediction = thisReg['reg'].predict(self.xTest).to_numpy()
+        yPlot = self.yTest[unitName].rolling(smoothY).mean()
         #
         if True:
             fig, ax = plt.subplots(3, 1, sharex=True)
-            ax[0].plot(y / max(y), label='original')
+            ax[0].plot(yPlot.to_numpy(), label='original')
             ax[0].plot(prediction, label='prediction')
             ax[0].set_title('{}: pR^2 = {:.2f}'.format(
                 unitName,
-                scoresDF.loc[scoresDF['score'].idxmax(), 'score']))
+                scoresDF.loc[uIdx, 'score']))
             ax[0].set_xlabel('samples')
             ax[0].set_ylabel('normalized (spk/s)')
+        if useInvLink:
+            transFun = thisReg['reg'].results_.model.family.link.inverse
+        else:
+            transFun = lambda x: x
         for idx, beta in enumerate(thisReg['reg'].results_.params):
-            dfIdx = thisReg['reg'].featureMask[idx]
-            x = beta * self.XTest.iloc[:, dfIdx].to_numpy()
-            if thisReg['reg'].results_.pvalues[idx] < self.tTestAlpha:
+            xPartial = beta * self.xTest.iloc[:, idx].to_numpy()
+            if self.significantBetas.loc[unitName, :].iloc[idx]:
                 ax[1].plot(
-                    x,
-                    label='{}'.format(self.XTest.iloc[:, dfIdx].name))
+                    transFun(xPartial),
+                    label='{}'.format(self.xTest.columns[idx]))
             else:
                 ax[2].plot(
-                    x, ls='--',
-                    label='{}'.format(self.XTest.iloc[:, dfIdx].name))
+                    xPartial, ls='--',
+                    label='{}'.format(self.xTest.columns[idx]))
         ax[1].set_title('p < {} regressors'.format(self.tTestAlpha))
         ax[2].set_title('p > {} regressors'.format(self.tTestAlpha))
         for thisAx in ax:
-            thisAx.legend()
-        plt.show()
-        return
+            thisAx.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        if showNow:
+            plt.show()
+        return fig, ax
 
 
 class TargetedDimensionalityReduction(TransformerMixin):
@@ -298,13 +447,13 @@ class TargetedDimensionalityReduction(TransformerMixin):
             featureScalers=None, targetScalers=None, addIntercept=True,
             model=None, modelKWargs={}, cv=None,
             tTestAlpha=0.01,
-            nPCAComponents=None, conditionNames=None,
+            nPCAComponents=None, stratifyFactors=None,
             enableTDR=True,
             plotting=False, verbose=False):
         #
         self.plotting = plotting
         self.verbose = verbose
-        self.conditionNames = conditionNames
+        self.stratifyFactors = stratifyFactors
         self.regressorNames = featuresDF.columns.copy()
         #
         self.regression_ = SingleNeuronRegression(

@@ -19,8 +19,8 @@
 # Specify account details
 #SBATCH --account=bibs-dborton-condo
 
-EXP="exp201901211000"
-# EXP="exp201901271000"
+# EXP="exp201901211000"
+EXP="exp201901271000"
 # EXP="exp201901231000"
 UNITSELECTOR="--selector=_minfrmaxcorr"
 # UNITSELECTOR=""
@@ -44,5 +44,5 @@ for QUERY in outboundXS outboundS outboundM outboundL outboundXL
             do
                 python3 './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $WINDOW --inputBlockName=$BLOCKNAME --unitQuery=$BLOCKNAME --alignQuery=$QUERY --rowName="pedalDirection" $OUTLIERSWITCH --verbose
             done
-        python3 './plotAlignedNeurons.py' --exp=$EXP $TRIALSELECTOR $WINDOW --alignQuery=$QUERY $UNITSELECTOR --rowName="pedalDirection" $OUTLIERSWITCH --verbose
+        # python3 './plotAlignedNeurons.py' --exp=$EXP $TRIALSELECTOR $WINDOW --alignQuery=$QUERY $UNITSELECTOR --rowName="pedalDirection" $OUTLIERSWITCH --verbose
     done

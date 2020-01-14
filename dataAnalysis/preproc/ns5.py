@@ -466,6 +466,13 @@ def unitSpikeTrainWaveformsToDF(
                     shiftedWaveform
                     .rolling(rollingWindow, axis='columns', center=True)
                     .mean())
+                if False:
+                    pdb.set_trace()
+                    import matplotlib.pyplot as plt
+                    oldShiftedWaveform = zeroLagWaveformsDF.shift(lag, axis='columns')
+                    plt.plot(oldShiftedWaveform.iloc[0, :])
+                    plt.plot(shiftedWaveform.iloc[0, :])
+                    plt.show()
             laggedWaveformsDict[
                 (spikeTrainContainer.name, lag)] = (
                     shiftedWaveform.iloc[:, ::decimate])
@@ -719,6 +726,8 @@ def alignedAsigsToDF(
         except Exception:
             traceback.print_exc()
             allWaveforms.reindex(columns=unitNames)
+    if isinstance(allWaveforms.columns, pd.MultiIndex):
+        allWaveforms.columns = allWaveforms.columns.remove_unused_levels()
     allWaveforms.sort_index(
         axis='columns', inplace=True, kind='mergesort')
     return allWaveforms
@@ -1378,7 +1387,7 @@ def loadSpikeMats(
                             aggregateFun,
                             raw=True,
                             kwargs={'fs': fs, 'nSamp': widthIdx})
-
+                #
                 if rasterOpts['smoothKernelWidth'] is not None:
                     procSpikeMat = (
                         procSpikeMat

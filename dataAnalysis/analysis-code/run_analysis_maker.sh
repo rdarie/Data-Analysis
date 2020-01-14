@@ -11,11 +11,11 @@
 #SBATCH --mem=96G
 
 # Specify a job name:
-#SBATCH -J analysis_calc_20190120
+#SBATCH -J analysis_calc_20190127
 
 # Specify an output file
-#SBATCH -o ../batch_logs/%j-%a-analysis_calc_20190120.stdout
-#SBATCH -e ../batch_logs/%j-%a-analysis_calc_20190120.errout
+#SBATCH -o ../batch_logs/%j-%a-analysis_calc_20190127.stdout
+#SBATCH -e ../batch_logs/%j-%a-analysis_calc_20190127.errout
 
 # Specify account details
 #SBATCH --account=bibs-dborton-condo
@@ -38,7 +38,7 @@ source activate nda
 python --version
 
 # SLURM_ARRAY_TASK_ID=1
-python3 ./synchronizeSIMItoNSP.py --trialIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP
+# python ./synchronizeSIMItoNSP.py --trialIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP
 python ./calcTrialAnalysisNix.py --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID --chanQuery="all"
 python ./calcMotionStimAlignTimes.py --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID --plotParamHistograms $LAZINESS
 python ./calcStimAlignTimes.py --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID --plotParamHistograms $LAZINESS

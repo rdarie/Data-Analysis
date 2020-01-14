@@ -11,8 +11,9 @@ Options:
     --lazy                                 load from raw, or regular? [default: False]
     --alignQuery=alignQuery                choose a subset of the data?
     --analysisName=analysisName            append a name to the resulting blocks? [default: default]
-    --window=window                        process with short window? [default: short]
-    --estimator=estimator                  estimator filename
+    --alignFolderName=alignFolderName      append a name to the resulting blocks? [default: motion]
+    --window=window                        process with short window? [default: long]
+    --estimatorName=estimator              estimator filename
     --unitQuery=unitQuery                  how to restrict channels?
     --inputBlockName=inputBlockName        filename for resulting estimator [default: fr_sqrt]
 """
@@ -20,13 +21,20 @@ Options:
 import matplotlib
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
-# matplotlib.use('PS')  # generate postscript output 
+# matplotlib.use('Agg')  # generate postscript output 
 matplotlib.use('QT5Agg')  # generate postscript output
 import matplotlib.pyplot as plt
+import seaborn as sns
+sns.set()
+sns.set_color_codes("dark")
+sns.set_context("notebook")
+sns.set_style("white")
+import matplotlib.ticker as ticker
+#
 import dataAnalysis.helperFunctions.profiling as prf
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
 from namedQueries import namedQueries
-import os
+import os, glob
 from scipy import stats
 import pandas as pd
 import numpy as np
@@ -34,14 +42,10 @@ import pdb
 import dataAnalysis.preproc.ns5 as ns5
 import joblib as jb
 import pickle
-
 from statsmodels.stats.multitest import multipletests as mt
-import seaborn as sns
-sns.set()
-sns.set_color_codes("dark")
-sns.set_context("notebook")
-sns.set_style("white")
-import matplotlib.ticker as ticker
+from patsy import (
+    ModelDesc, EvalEnvironment, Term, Sum, Treatment, INTERCEPT,
+    EvalFactor, LookupFactor, demo_data, dmatrix, dmatrices)
 #
 from currentExperiment import parseAnalysisOptions
 from docopt import docopt
@@ -56,135 +60,152 @@ analysisSubFolder = os.path.join(
     )
 if not os.path.exists(analysisSubFolder):
     os.makedirs(analysisSubFolder, exist_ok=True)
-#
-estimatorPath = os.path.join(
-    analysisSubFolder,
-    arguments['estimator'] + '.joblib')
-with open(
-    os.path.join(
-        analysisSubFolder,
-        arguments['estimator'] + '_meta.pickle'),
-        'rb') as f:
-    estimatorMetadata = pickle.load(f)
-estimator = jb.load(
-    os.path.join(analysisSubFolder, estimatorMetadata['path']))
-# #)
-with sns.plotting_context('notebook', font_scale=1):
-    estimator.plot_xy()
-regressorH5Path = os.path.join(
-    analysisSubFolder,
-    estimatorMetadata['trainingDataPath']
-    .replace('_raster', '_{}_rig'.format(estimatorMetadata['name']))
-    .replace('.nix', '.h5')
+alignSubFolder = os.path.join(
+    analysisSubFolder, arguments['alignFolderName']
     )
-featuresDF = pd.read_hdf(regressorH5Path, 'feature')
-for idx, (name, regDict) in enumerate(estimator.regressionList.items()):
-    reg = regDict['reg']
-    gs = regDict['gridSearchCV']
-    if idx == 0:
-        regressorNames = []
-        regressorTypes = []
-        regressorLags = []
-        for paramIdx, featureMask in enumerate(gs.param_grid['featureMask']):
-            theseFeatureNames = featuresDF.iloc[:, featureMask].columns
-            regressorNames.append(theseFeatureNames)
-            regressorLags.append(theseFeatureNames.to_list()[0][1])
-            if np.any(['Hz' in i[0] for i in theseFeatureNames.to_list()]):
-                regressorTypes.append('iar')
-            elif np.any(['ACR' in i[0] for i in theseFeatureNames.to_list()]):
-                regressorTypes.append('acr')
-            else:
-                regressorTypes.append('kin')
-        regressorIndex = pd.MultiIndex.from_arrays(
-            [regressorTypes, regressorLags], names=('type', 'lag'))
-        targetNames = [i[0] for i in estimator.regressionList.keys()]
-        regressionScores = pd.DataFrame(np.nan, index=regressorIndex, columns=targetNames)
-    regressionScores.loc[:, name[0]] = gs.cv_results_['mean_test_score']
-    regressionScores.columns.name = 'target'
-
-maxScore = (
-    regressionScores
-    .groupby('type').agg('max')
-    .unstack().reset_index()
-    .rename(columns={0: 'score'}))
-from itertools import combinations
-uniqueTypes = maxScore['type'].unique()
-tTestPval = pd.DataFrame(np.nan, index=uniqueTypes, columns=uniqueTypes)
-for names in combinations(uniqueTypes, 2):
-    stat, pval = stats.ttest_rel(
-        maxScore.loc[maxScore['type'] == names[0], 'score'].to_numpy(),
-        maxScore.loc[maxScore['type'] == names[1], 'score'].to_numpy()
-        )
-    tTestPval.loc[names[0], names[1]] = pval
-f, ax = plt.subplots(figsize=(7, 6))
-sns.boxplot(
-    x="score", y="type", data=maxScore,
-    whis="range", palette="vlag")
-sns.swarmplot(
-    x="score", y="type", data=maxScore,
-    size=3, color=".3", linewidth=0)
-
-pdfPath = os.path.join(
-    GLMFiguresFolder,
-    '{}_evaluation_rsq.pdf'.format(
-        arguments['estimator']))
-plt.savefig(pdfPath)
-plt.close()
-
-maxLag = (
-    regressionScores
-    .groupby('type').agg('idxmax')
-    .unstack().reset_index()
-    .rename(columns={0: 'lag'}))
-maxLag['lag'] = maxLag['lag'].apply(lambda x: x[1])
-f, ax = plt.subplots(figsize=(7, 6))
-sns.boxplot(
-    x="lag", y="type", data=maxLag,
-    whis="range", palette="vlag")
-sns.swarmplot(
-    x="lag", y="type", data=maxLag,
-    size=3, color=".3", linewidth=0)
-rsquared = np.array(
-    [
-        regDict['mean_test_score']
-        for unit, regDict in estimator.regressionList.items()
-        if np.isfinite(regDict['mean_test_score'])])
-
-pdfPath = os.path.join(
-    GLMFiguresFolder,
-    '{}_evaluation_lags.pdf'.format(
-        arguments['estimator']))
-plt.savefig(pdfPath)
-plt.close()
-
-'''
-ax = sns.distplot(rsquared)
-ax.set_title('R^2 for population of units')
-ax.set_ylabel('Count')
-ax.set_xlabel('R^2')
-pdfPath = os.path.join(
-    GLMFiguresFolder,
-    '{}_evaluation_rsq.pdf'.format(
-        arguments['estimator']))
-plt.savefig(pdfPath)
-plt.close()
-'''
+if not os.path.exists(alignSubFolder):
+    os.makedirs(alignSubFolder, exist_ok=True)
 #
-betas = estimator.betas
-betas.index.names = ['unit', 'unit_lag']
-betas.columns.names = ['regressor', 'regressor_lag']
-pvals = estimator.pvals
-pvals.index.names = ['unit', 'unit_lag']
-pvals.columns.names = ['regressor', 'regressor_lag']
-significantBetas = estimator.significantBetas
-significantBetas.index.names = ['unit', 'unit_lag']
-significantBetas.columns.names = ['regressor', 'regressor_lag']
-print((significantBetas).aggregate('sum'))
+if arguments['processAll']:
+    prefix = assembledName
+else:
+    prefix = ns5FileName
+fullEstimatorName = '{}_{}_{}_{}'.format(
+    prefix,
+    arguments['estimatorName'],
+    arguments['window'],
+    arguments['alignQuery'])
+#
+featuresMetaDataPath = os.path.join(
+    alignSubFolder,
+    fullEstimatorName, 'features_meta.pickle')
+#
+dummyEstimatorMetadataPath = os.path.join(
+   alignSubFolder,
+   fullEstimatorName, 'var_000', 'estimator_metadata.pickle')
+with open(dummyEstimatorMetadataPath, 'rb') as f:
+    dummyEstimatorMetadata = pickle.load(f)
+targetH5Path = dummyEstimatorMetadata['targetPath']
+targetDF = pd.read_hdf(targetH5Path, 'target')
+regressorH5Path = targetH5Path.replace(
+    '_raster', '_rig')
+featuresDF = pd.read_hdf(regressorH5Path, 'feature')
+# confirm targetDF
+if False:
+    exampleUnitName = 'elec75#0_p000'
+    averageTarget = targetDF[exampleUnitName].unstack(level='bin')
+    plt.plot(averageTarget.mean().to_numpy()); plt.show()
+saveR2 = {}
+variantList = range(15)
+if DEBUGGING:
+    variantList = [1]
+for variantName in ['var_{:03d}'.format(i) for i in variantList]:
+    estimatorFiguresFolder = os.path.join(
+        GLMFiguresFolder, fullEstimatorName)
+    if not os.path.exists(estimatorFiguresFolder):
+        os.makedirs(estimatorFiguresFolder, exist_ok=True)
+    #
+    estimatorMetadataPath = os.path.join(
+       alignSubFolder,
+       fullEstimatorName, variantName, 'estimator_metadata.pickle')
+    with open(estimatorMetadataPath, 'rb') as f:
+        estimatorMetadata = pickle.load(f)
+    estimatorPath = os.path.join(
+        alignSubFolder,
+        fullEstimatorName, variantName, 'estimator.joblib')
+    if os.path.exists(estimatorPath):
+        print('loading {}'.format(estimatorPath))
+        estimator = jb.load(estimatorPath)
+    else:
+        partialMatches = sorted(glob.glob(
+            os.path.join(
+                alignSubFolder, fullEstimatorName, variantName,
+                'estimator_*.joblib')))
+        if len(partialMatches):
+            print('loading {}'.format(partialMatches[0]))
+            estimator = jb.load(partialMatches[0])
+            for otherMatch in partialMatches[1:]:
+                print('loading {}'.format(otherMatch))
+                newEstimator = jb.load(otherMatch)
+                estimator.regressionList.update(newEstimator.regressionList)
+                estimator.betas = pd.concat([estimator.betas, newEstimator.betas])
+                if hasattr(estimator, 'pvals'):
+                    estimator.pvals = pd.concat(
+                        [estimator.pvals, newEstimator.pvals])
+                if hasattr(estimator, 'significantBetas'):
+                    estimator.significantBetas = pd.concat([
+                        estimator.significantBetas,
+                        newEstimator.significantBetas
+                        ])
+                os.remove(otherMatch)
+            os.remove(partialMatches[0])
+            jb.dump(estimator, estimatorPath)
+    #
+    descStr = estimatorMetadata['modelDescStr']
+    desc = ModelDesc.from_formula(descStr)
+    train = estimatorMetadata['trainIdx']
+    test = estimatorMetadata['testIdx']
+    estimator.xTrain = dmatrix(
+        desc, featuresDF.iloc[train, :],
+        return_type='dataframe')
+    estimator.xTest = dmatrix(
+        desc, featuresDF.iloc[test, :],
+        return_type='dataframe')
+    estimator.yTrain = targetDF.iloc[train, :]
+    estimator.yTest = targetDF.iloc[test, :]
+    for idx, colName in enumerate(estimator.yTrain.columns):
+        reg = estimator.regressionList[colName]['reg']
+        if hasattr(reg, 'model_'):
+            reg.model_.endog = estimator.xTrain
+            reg.model_.exog = estimator.yTrain.loc[:, colName]
+    ######################################################################
+    with sns.plotting_context('notebook', font_scale=1):
+        fig, ax = estimator.plot_xy()
+        # fig, ax = estimator.plot_xy(maxPR2=0.025)
+        # fig, ax = estimator.plot_xy(unitName='elec75#1_p000', smoothY=10)
+        for cAx in ax:
+            cAx.set_xlim([100, 2000])
+        pdfPath = os.path.join(
+            estimatorFiguresFolder,
+            'traces_example_{}.pdf'.format(
+                variantName))
+        fig.savefig(
+            pdfPath,
+            bbox_extra_artists=(i.get_legend() for i in ax),
+            bbox_inches='tight')
+        fig.savefig(
+            pdfPath.replace('.pdf', '.png'),
+            bbox_extra_artists=(i.get_legend() for i in ax),
+            bbox_inches='tight')
+        plt.close()
+    #
+    pR2 = pd.DataFrame(
+        np.nan,
+        index=estimator.regressionList.keys(),
+        columns=['gs', 'cv', 'valid'])
+    for unit, regDict in estimator.regressionList.items():
+        pR2.loc[unit, 'gs'] = regDict['gridsearch_mean_test_score']
+        pR2.loc[unit, 'cv'] = regDict['cross_val_mean_test_score']
+        pR2.loc[unit, 'valid'] = regDict['validationScore']
+    saveR2[variantName] = pR2
+    ax = sns.distplot(pR2['valid'])
+    ax.set_title('pseudoR^2 for population of units')
+    ax.set_ylabel('Count')
+    ax.set_xlabel('pseudoR^2')
+    ax.set_xlim([-0.025, .15])
+    pdfPath = os.path.join(
+        estimatorFiguresFolder,
+        'rsq_distribution_{}.pdf'.format(
+            variantName))
+    plt.savefig(pdfPath)
+    plt.savefig(pdfPath.replace('.pdf', '.png'))
+    plt.close()
+#
+if DEBUGGING:
+    pdb.set_trace()
 #
 betasForPlot = (
-    betas
-    .mask(~significantBetas)
-    .stack().stack()
+    estimator.betas.mask(~estimator.significantBetas).stack().stack()
     .to_frame(name='beta').reset_index())
 betasForPlot['beta_abs'] = betasForPlot['beta'].abs()
 betasForPairgrid = betasForPlot.pivot(
@@ -218,7 +239,7 @@ with sns.plotting_context('notebook', font_scale=0.75):
     pdfPath = os.path.join(
         GLMFiguresFolder,
         '{}_evaluation_betasAllBins.pdf'.format(
-            arguments['estimator']))
+            fullEstimatorName))
     plt.savefig(pdfPath)
     plt.close()
     # plt.show()
@@ -237,7 +258,7 @@ with sns.plotting_context('notebook', font_scale=0.75):
     pdfPath = os.path.join(
         GLMFiguresFolder,
         '{}_evaluation_betas.pdf'.format(
-            arguments['estimator']))
+            fullEstimatorName))
     #
     plt.tight_layout()
     plt.savefig(pdfPath)

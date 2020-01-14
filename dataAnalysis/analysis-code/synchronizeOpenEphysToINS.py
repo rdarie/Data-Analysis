@@ -6,14 +6,15 @@ Usage:
 Options:
     --exp=exp                       which experimental day to analyze
     --trialIdx=trialIdx             which trial to analyze [default: 1]
-    --showPlots                     whether to show diagnostic plots (must have display) [default: False]
+    --plotting                     whether to show diagnostic plots (must have display) [default: False]
 """
 
 import matplotlib
 matplotlib.rcParams['agg.path.chunksize'] = 10000
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
-matplotlib.use('Qt5Agg')  # generate interactive qt output
+# matplotlib.use('Qt5Agg')  # generate interactive qt out
+matplotlib.use('Agg')
 #matplotlib.use('PS')
 #matplotlib.use('TkAgg')
 from matplotlib import pyplot as plt
@@ -98,13 +99,13 @@ vMask = np.array([float(i) for i in evValues.labels]) > 0
 evMask = propMask & vMask & timeMask
 insTensTimes = pd.Series(evValues[evMask].magnitude)
 emgTensTimes = pd.Series(emgTensTimes.values)
-plotting = arguments['showPlots']
+plotting = arguments['plotting']
 
 print('insTensTimes, emgTensTimes = hf.chooseTriggers(')
 insTensTimes, emgTensTimes = hf.chooseTriggers(
     insTensTimes, emgTensTimes,
     iti=None,
-    plotting=plotting, verbose=True)
+    plotting=False, verbose=True)
 if plotting:
     fig, axEmg = plt.subplots()
     axINS = axEmg.twiny()
@@ -142,7 +143,9 @@ if plotting:
     axINS.set_xlabel('Time (sec)')
     axINS.set_ylabel('A.U.')
     axINS.legend(loc='upper right')
-    plt.show()
+    #  plt.show()
+    plt.savefig(os.path.join(figureFolder, '{}_emg_synch_traces.png'.format(arguments['trialIdx'])))
+    plt.close()
 #end if plotting
 synchPolyCoeffs = np.polyfit(
     x=insTensTimes,
@@ -188,6 +191,10 @@ for insEv in insSeg.filter(objects=Event):
     insInterpBlock.segments[segIdx].events.append(interpEv)
     interpEv.segment = insInterpBlock.segments[segIdx]
 alignedTensTimes = timeInterpFun(insTensTimes).flatten()
+# pdb.set_trace()
+experimentDurationSec = emgTensTimes.iloc[-1] - emgTensTimes.iloc[0]
+totalDrift = (synchPolyCoeffs[0] - 1) * experimentDurationSec
+print('~ {:.1f} msec drift over {:.1f} minutes'.format(totalDrift * 1e3, experimentDurationSec / 60))
 if plotting:
     fig, ax = plt.subplots(1, 3)
     ax[0].plot(insTensTimes, emgTensTimes, 'bo', label='Synchronization pulse times')
@@ -208,7 +215,10 @@ if plotting:
     ax[1].set_ylim(ax[2].get_ylim())
     ax[1].set_xticks([0, len(alignedTensTimes) - 1])
     ax[1].set_xticklabels(['{}'.format(np.round(i)) for i in (insTensTimes.iloc[0], insTensTimes.iloc[-1])])
-    plt.show()
+    fig.suptitle('~ {} msec drift over {} minutes'.format(totalDrift * 1e3, experimentDurationSec / 60))
+    plt.savefig(os.path.join(figureFolder, '{}_emg_synch_summary.png'.format(arguments['trialIdx'])))
+    plt.close()
+    # plt.show()
 # end if plotting
 tensEvents = Event(
     name='seg{}_TENS'.format(segIdx),

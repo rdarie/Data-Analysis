@@ -14,7 +14,7 @@ def getExpOpts():
         }
          
 
-    experimentName = '201901070700-ProprioRC'
+    experimentName = '201901070700-Proprio'
     deviceName = 'DeviceNPC700373H'
     
     jsonSessionNames = {

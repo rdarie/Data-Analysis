@@ -90,7 +90,8 @@ filterOpts = dict(
     lowPass=10, lowOrder=2,
     highPass=None, highOrder=2,
     notch=False, filtFun='butter',
-    columns=None)
+    columns=None
+    )
 kin = hf.getKinematics(
     kinematicsPath,
     trigTimes=None,
@@ -98,7 +99,9 @@ kin = hf.getKinematics(
     nspTime=channelData['data']['t'],
     thres=None,
     selectHeaders=None, selectTime=None,
-    flip=None, reIndex=None, calcAngles=calcAngles, filterOpts=filterOpts)
+    flip=None, reIndex=None,
+    calcAngles=calcAngles, filterOpts=filterOpts
+    )
 
 ############################################################
 kin.columns = ['_'.join(i) for i in kin.columns]

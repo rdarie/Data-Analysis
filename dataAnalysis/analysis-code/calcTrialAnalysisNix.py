@@ -171,6 +171,7 @@ def calcTrialAnalysisNix():
     infoFromStimStatus = hf.interpolateDF(
         stimStatus, tdInterp['t'],
         x='t', columns=columnsToBeAdded, kind='previous')
+    # TODO: fix RateInHz
     #  infoFromStimStatus.rename(
     #      columns={
     #          'amplitude': 'seg0_amplitude',
@@ -193,6 +194,9 @@ def calcTrialAnalysisNix():
             axis=1)
     #
     tdInterp.columns = [i.replace('seg0_', '') for i in tdInterp.columns]
+    tdInterp.loc[:, 'RateInHz'] = (
+        tdInterp.loc[:, 'RateInHz'] *
+        (tdInterp.loc[:, 'amplitude'] ** 0))
     if 'position' in tdInterp.columns:
         tdInterp.loc[:, 'position_x'] = ((
             np.cos(
@@ -220,6 +224,14 @@ def calcTrialAnalysisNix():
                 tdInterp.loc[:, pName] *
                 tdInterp.loc[:, 'RateInHz'])
     tdInterp.sort_index(axis='columns', inplace=True)
+    for cName in tdInterp.columns:
+        if '_angle' in cName:
+            thisVelocity = tdInterp.loc[:, cName].diff().fillna(0)
+            tdInterp.loc[:, cName.replace('_angle', '_angular_velocity')] = (
+                thisVelocity)
+            tdInterp.loc[:, cName.replace('_angle', '_angular_acceleration')] = (
+                thisVelocity.diff().fillna(0))
+
     # tdInterp.columns = ['seg0_{}'.format(i) for i in tdInterp.columns]
     tdBlockInterp = ns5.dataFrameToAnalogSignals(
         tdInterp,
