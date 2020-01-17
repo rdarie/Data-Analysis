@@ -38,7 +38,7 @@ import os, glob
 from scipy import stats
 import pandas as pd
 import numpy as np
-import pdb
+import pdb, traceback
 import dataAnalysis.preproc.ns5 as ns5
 import joblib as jb
 import pickle
@@ -65,7 +65,7 @@ alignSubFolder = os.path.join(
     )
 if not os.path.exists(alignSubFolder):
     os.makedirs(alignSubFolder, exist_ok=True)
-#
+DEBUGGING = True
 if arguments['processAll']:
     prefix = assembledName
 else:
@@ -96,9 +96,40 @@ if False:
     averageTarget = targetDF[exampleUnitName].unstack(level='bin')
     plt.plot(averageTarget.mean().to_numpy()); plt.show()
 saveR2 = {}
+saveEstimatorParams = {}
 variantList = range(15)
 if DEBUGGING:
-    variantList = [1]
+    showNow = True
+    variantList = [0]
+else:
+    showNow = False
+
+
+def calcMinIter(iterBetaNorm, tol_list=[1e-6], plotting=False):
+    if isinstance(iterBetaNorm, pd.Series):
+        ibn = iterBetaNorm
+    else:
+        ibn = pd.Series(iterBetaNorm)
+    updateSize = ibn.diff().abs() / ibn.shift(1)
+    terminateIndices = []
+    if plotting:
+        fig, ax = plt.subplots()
+        ax.plot(ibn)
+    for tol in tol_list:
+        tolMask = updateSize >= tol
+        if (~tolMask).any():
+            idxOverTol = updateSize.index[tolMask]
+            terminIdx = idxOverTol.max()
+        else:
+            terminIdx = updateSize.index[-1]
+        terminateIndices.append(terminIdx)
+        if plotting:
+            ax.plot(terminIdx, ibn[terminIdx], '*')
+    if plotting:
+        return terminateIndices, fig, ax
+    else:
+        return terminateIndices
+
 for variantName in ['var_{:03d}'.format(i) for i in variantList]:
     estimatorFiguresFolder = os.path.join(
         GLMFiguresFolder, fullEstimatorName)
@@ -145,49 +176,94 @@ for variantName in ['var_{:03d}'.format(i) for i in variantList]:
     desc = ModelDesc.from_formula(descStr)
     train = estimatorMetadata['trainIdx']
     test = estimatorMetadata['testIdx']
-    estimator.xTrain = dmatrix(
-        desc, featuresDF.iloc[train, :],
-        return_type='dataframe')
-    estimator.xTest = dmatrix(
-        desc, featuresDF.iloc[test, :],
-        return_type='dataframe')
-    estimator.yTrain = targetDF.iloc[train, :]
-    estimator.yTest = targetDF.iloc[test, :]
-    for idx, colName in enumerate(estimator.yTrain.columns):
-        reg = estimator.regressionList[colName]['reg']
+    try:
+        estimator.xTrain = dmatrix(
+            desc, featuresDF.iloc[train, :],
+            return_type='dataframe')
+        estimator.xTest = dmatrix(
+            desc, featuresDF.iloc[test, :],
+            return_type='dataframe')
+        estimator.yTrain = targetDF.iloc[train, :]
+        estimator.yTest = targetDF.iloc[test, :]
+    except Exception:
+        traceback.print_exc()
+    for idx, unitName in enumerate(estimator.regressionList.keys()):
+        reg = estimator.regressionList[unitName]['reg']
         if hasattr(reg, 'model_'):
-            reg.model_.endog = estimator.xTrain
-            reg.model_.exog = estimator.yTrain.loc[:, colName]
+            try:
+                reg.model_.endog = estimator.xTrain
+                reg.model_.exog = estimator.yTrain.loc[:, unitName]
+            except Exception:
+                traceback.print_exc()
     ######################################################################
     with sns.plotting_context('notebook', font_scale=1):
-        fig, ax = estimator.plot_xy()
-        # fig, ax = estimator.plot_xy(maxPR2=0.025)
-        # fig, ax = estimator.plot_xy(unitName='elec75#1_p000', smoothY=10)
-        for cAx in ax:
-            cAx.set_xlim([100, 2000])
-        pdfPath = os.path.join(
-            estimatorFiguresFolder,
-            'traces_example_{}.pdf'.format(
-                variantName))
-        fig.savefig(
-            pdfPath,
-            bbox_extra_artists=(i.get_legend() for i in ax),
-            bbox_inches='tight')
-        fig.savefig(
-            pdfPath.replace('.pdf', '.png'),
-            bbox_extra_artists=(i.get_legend() for i in ax),
-            bbox_inches='tight')
-        plt.close()
+        try:
+            fig, ax = estimator.plot_xy(smoothY=20)
+            # fig, ax = estimator.plot_xy(maxPR2=0.025)
+            # fig, ax = estimator.plot_xy(unitName='elec75#1_p000', smoothY=10)
+            for cAx in ax:
+                cAx.set_xlim([100, 2000])
+            pdfPath = os.path.join(
+                estimatorFiguresFolder,
+                'traces_example_{}.pdf'.format(
+                    variantName))
+            fig.savefig(
+                pdfPath,
+                bbox_extra_artists=(i.get_legend() for i in ax),
+                bbox_inches='tight')
+            fig.savefig(
+                pdfPath.replace('.pdf', '.png'),
+                bbox_extra_artists=(i.get_legend() for i in ax),
+                bbox_inches='tight')
+            if showNow:
+                plt.show()
+            else:
+                plt.close()
+        except Exception:
+            traceback.print_exc()
     #
     pR2 = pd.DataFrame(
         np.nan,
         index=estimator.regressionList.keys(),
         columns=['gs', 'cv', 'valid'])
+    estimatorParams = pd.DataFrame(
+        np.nan,
+        index=estimator.regressionList.keys(),
+        columns=['minIter', 'reg_lambda'])
+    toleranceParamsList = []
+    tolList = [1e-6]
     for unit, regDict in estimator.regressionList.items():
-        pR2.loc[unit, 'gs'] = regDict['gridsearch_mean_test_score']
-        pR2.loc[unit, 'cv'] = regDict['cross_val_mean_test_score']
-        pR2.loc[unit, 'valid'] = regDict['validationScore']
+        if 'gridsearch_best_mean_test_score' in regDict:
+            pR2.loc[unit, 'gs'] = regDict['gridsearch_best_mean_test_score']
+        if 'cross_val_mean_test_score' in regDict:
+            pR2.loc[unit, 'cv'] = regDict['cross_val_mean_test_score']
+        if 'validationScore' in regDict:
+            pR2.loc[unit, 'valid'] = regDict['validationScore']
+        if 'iterBetaNorm' in regDict:
+            iterBetaNorm = regDict['iterBetaNorm']
+            iterScore = regDict['iterScore']
+            termIndices = calcMinIter(iterBetaNorm, tol_list=tolList)
+            theseParams = pd.DataFrame(
+                {
+                    'tol': [tolList[i] for i in range(len(tolList))],
+                    'minIter': [termIndices[i] for i in range(len(tolList))],
+                    'score': [iterScore[termIndices[i]] for i in range(len(tolList))]
+                }
+            )
+            theseParams['marginalIter'] = theseParams['minIter'].diff()
+            theseParams['marginalScore'] = theseParams['score'].diff()
+            toleranceParamsList.append(theseParams)
+            estimatorParams.loc[unit, 'minIter'] = termIndices[-1]
+        toleranceParams = pd.concat(toleranceParamsList, ignore_index=True)
+        if hasattr(regDict['reg'], 'reg_lambda'):
+            estimatorParams.loc[unit, 'reg_lambda'] = (
+                regDict['reg'].reg_lambda
+            )
+        if 'gridsearch' in regDict:
+            gs = regDict['gridsearch']
     saveR2[variantName] = pR2
+    saveEstimatorParams[variantName] = estimatorParams
+    #
     ax = sns.distplot(pR2['valid'])
     ax.set_title('pseudoR^2 for population of units')
     ax.set_ylabel('Count')
@@ -199,7 +275,89 @@ for variantName in ['var_{:03d}'.format(i) for i in variantList]:
             variantName))
     plt.savefig(pdfPath)
     plt.savefig(pdfPath.replace('.pdf', '.png'))
-    plt.close()
+    #
+    nBins = 200
+if True:
+    fig, ax = plt.subplots(3, 1)
+    fig.set_tight_layout(True)
+    for idx, (tol, group) in enumerate(toleranceParams.groupby('tol')):
+        labelText = '{}'.format(tol)
+        scoreCounts, scoreBins = np.histogram(group['score'], nBins)
+        ax[0].plot(scoreBins[:-1], scoreCounts.cumsum() / scoreCounts.sum(), label=labelText)
+        if tol != tolList[0]:
+            scoreCounts, scoreBins = np.histogram(group['marginalScore'], nBins)
+            ax[1].plot(scoreBins[:-1], scoreCounts.cumsum() / scoreCounts.sum(), label=labelText)
+        scoreCounts, scoreBins = np.histogram(group['minIter'], nBins)
+        ax[2].plot(scoreBins[:-1], scoreCounts.cumsum() / scoreCounts.sum(), label=labelText)
+        if idx == 0:
+            ax[0].set_xlim((group['score'].quantile(0.05), group['score'].quantile(0.95)))
+            ax[1].set_xlim((group['marginalScore'].quantile(0.05), group['marginalScore'].quantile(0.95)))
+            ax[2].set_xlim((group['minIter'].quantile(0.05), group['minIter'].quantile(0.95)))
+        else:
+            ax[0].set_xlim(
+                (
+                    min(ax[0].get_xlim()[0], group['score'].quantile(0.05)),
+                    max(ax[0].get_xlim()[1], group['score'].quantile(0.95)))
+                )
+            ax[1].set_xlim(
+                (
+                    min(ax[1].get_xlim()[0], group['marginalScore'].quantile(0.05)),
+                    max(ax[1].get_xlim()[1], group['marginalScore'].quantile(0.95)))
+                )
+            ax[2].set_xlim(
+                (
+                    min(ax[2].get_xlim()[0], group['minIter'].quantile(0.05)),
+                    max(ax[2].get_xlim()[1], group['minIter'].quantile(0.95)))
+                )
+    ax[0].set_xlabel('Validation Score')
+    ax[1].set_xlabel(
+        'marginal score (vs. tol={0:.2E})'.format(tolList[0]))
+    ax[1].set_ylabel('Count')
+    ax[2].set_xlabel('Iteration count')
+    plt.legend()
+    #
+    pdfPath = os.path.join(
+        estimatorFiguresFolder,
+        'minIter_distribution_{}.pdf'.format(
+            variantName))
+    plt.savefig(pdfPath)
+    plt.savefig(pdfPath.replace('.pdf', '.png'))
+    if showNow:
+        plt.show()
+    else:
+        plt.close()
+    #
+    fig, ax = plt.subplots(3, 1)
+    fig.set_tight_layout(True)
+    for tol, group in toleranceParams.groupby('tol'):
+        sns.distplot(
+            group['score'], ax=ax[0], kde=False,
+            label='{0:.2E}'.format(tol), cumulative=True)
+        if tol != tolList[0]:
+            sns.distplot(
+                group['marginalScore'], ax=ax[1],
+                kde=False, label='{0:.2E}'.format(tol), cumulative=True)
+        sns.distplot(
+            group['minIter'], ax=ax[2], kde=False,
+            bins=np.arange(0, 10000, 100), label='{0:.2E}'.format(tol), cumulative=True)
+    ax[0].set_xlabel('Validation Score')
+    ax[1].set_xlabel(
+        'marginal score (vs. tol={0:.2E})'.format(tolList[0]))
+    ax[1].set_ylabel('Count')
+    ax[2].set_xlabel('Iteration count')
+    plt.legend()
+    #
+    pdfPath = os.path.join(
+        estimatorFiguresFolder,
+        'minIter_distribution_{}.pdf'.format(
+            variantName))
+    plt.savefig(pdfPath)
+    plt.savefig(pdfPath.replace('.pdf', '.png'))
+    if showNow:
+        plt.show()
+    else:
+        plt.close()
+    #
 #
 if DEBUGGING:
     pdb.set_trace()

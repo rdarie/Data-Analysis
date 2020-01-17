@@ -386,7 +386,8 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
         pass
     DEBUGGING = True
     glmOptsLookup = {
-        'glm_20msec': dict(rollingWindow=20, decimate=10),
-        'glm_20msec_hires': dict(rollingWindow=20, decimate=2),
+        'glm_50msec': dict(rollingWindow=50, decimate=50),
+        'glm_20msec': dict(rollingWindow=20, decimate=20),
+        'glm_1msec': dict(rollingWindow=None, decimate=1),
     }
     return expOpts, locals()

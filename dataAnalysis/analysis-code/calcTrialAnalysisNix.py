@@ -160,6 +160,62 @@ def calcTrialAnalysisNix():
             np.arange(
                 dummyT.t_start, dummyT.t_stop + 1/samplingRate, 1/samplingRate))
     #
+    if 'seg0_position' in tdDF.columns:
+        tdDF.loc[:, 'seg0_position_x'] = ((
+            np.cos(
+                tdDF.loc[:, 'seg0_position'] *
+                100 * 2 * np.pi / 360))
+            .to_numpy())
+        tdDF.sort_index(axis='columns', inplace=True)
+        tdDF.loc[:, 'seg0_position_y'] = ((
+            np.sin(
+                tdDF.loc[:, 'seg0_position'] *
+                100 * 2 * np.pi / 360))
+            .to_numpy())
+        tdDF.loc[:, 'seg0_velocity_x'] = ((
+            tdDF.loc[:, 'seg0_position_y'] *
+            (-1) *
+            (tdDF.loc[:, 'seg0_velocity'] * 3e2))
+            .to_numpy())
+        tdDF.loc[:, 'seg0_velocity_y'] = ((
+            tdDF.loc[:, 'seg0_position_x'] *
+            (tdDF.loc[:, 'seg0_velocity'] * 3e2))
+            .to_numpy())
+        tdChanNames += [
+            'seg0_position_x', 'seg0_position_y',
+            'seg0_velocity_x', 'seg0_velocity_y']
+    origTimeStep = tdDF['t'].iloc[1] - tdDF['t'].iloc[0]
+    # smooth by simi fps
+    smoothWindowStd = int(1 / (origTimeStep * 100))
+    #
+    debugVelCalc = False
+    if debugVelCalc:
+        import matplotlib.pyplot as plt
+    for cName in tdDF.columns:
+        if '_angle' in cName:
+            if debugVelCalc:
+                pdb.set_trace()
+            thisVelocity = (
+                tdDF.loc[:, cName].diff()
+                .rolling(6 * smoothWindowStd, center=True, win_type='gaussian')
+                .mean(std=smoothWindowStd).fillna(0) / origTimeStep)
+            thisAcceleration = (
+                thisVelocity.diff()
+                .rolling(6 * smoothWindowStd, center=True, win_type='gaussian')
+                .mean(std=smoothWindowStd).fillna(0) / origTimeStep)
+            if debugVelCalc:
+                plt.plot(thisVelocity.iloc[1000000:1030000])
+                plt.plot(tdDF.loc[:, cName].iloc[1000000:1030000].diff() / origTimeStep)
+                plt.show()
+            tdDF.loc[:, cName.replace('_angle', '_angular_velocity')] = (
+                thisVelocity)
+            tdDF.loc[:, cName.replace('_angle', '_angular_acceleration')] = (
+                thisAcceleration)
+            tdChanNames += [
+                cName.replace('_angle', '_angular_velocity'),
+                cName.replace('_angle', '_angular_acceleration')
+                ]
+    #
     if samplingRate != tdBlock.filter(objects=AnalogSignal)[0].sampling_rate:
         tdInterp = hf.interpolateDF(
             tdDF, newT,
@@ -171,12 +227,6 @@ def calcTrialAnalysisNix():
     infoFromStimStatus = hf.interpolateDF(
         stimStatus, tdInterp['t'],
         x='t', columns=columnsToBeAdded, kind='previous')
-    # TODO: fix RateInHz
-    #  infoFromStimStatus.rename(
-    #      columns={
-    #          'amplitude': 'seg0_amplitude',
-    #          'program': 'seg0_program'
-    #      }, inplace=True)
     if forceData is not None:
         forceDataInterp = hf.interpolateDF(
             forceData, newT,
@@ -196,42 +246,14 @@ def calcTrialAnalysisNix():
     tdInterp.columns = [i.replace('seg0_', '') for i in tdInterp.columns]
     tdInterp.loc[:, 'RateInHz'] = (
         tdInterp.loc[:, 'RateInHz'] *
-        (tdInterp.loc[:, 'amplitude'] ** 0))
-    if 'position' in tdInterp.columns:
-        tdInterp.loc[:, 'position_x'] = ((
-            np.cos(
-                tdInterp.loc[:, 'position'] *
-                100 * 2 * np.pi / 360))
-            .to_numpy())
-        tdInterp.sort_index(axis='columns', inplace=True)
-        tdInterp.loc[:, 'position_y'] = ((
-            np.sin(
-                tdInterp.loc[:, 'position'] *
-                100 * 2 * np.pi / 360))
-            .to_numpy())
-        tdInterp.loc[:, 'velocity_x'] = ((
-            tdInterp.loc[:, 'position_y'] *
-            (-1) *
-            (tdInterp.loc[:, 'velocity'] * 3e2))
-            .to_numpy())
-        tdInterp.loc[:, 'velocity_y'] = ((
-            tdInterp.loc[:, 'position_x'] *
-            (tdInterp.loc[:, 'velocity'] * 3e2))
-            .to_numpy())
+        (tdInterp.loc[:, 'amplitude'].abs() > 0))
     for pName in progAmpNames:
         if pName in tdInterp.columns:
             tdInterp.loc[:, pName.replace('amplitude', 'ACR')] = (
                 tdInterp.loc[:, pName] *
                 tdInterp.loc[:, 'RateInHz'])
     tdInterp.sort_index(axis='columns', inplace=True)
-    for cName in tdInterp.columns:
-        if '_angle' in cName:
-            thisVelocity = tdInterp.loc[:, cName].diff().fillna(0)
-            tdInterp.loc[:, cName.replace('_angle', '_angular_velocity')] = (
-                thisVelocity)
-            tdInterp.loc[:, cName.replace('_angle', '_angular_acceleration')] = (
-                thisVelocity.diff().fillna(0))
-
+    
     # tdInterp.columns = ['seg0_{}'.format(i) for i in tdInterp.columns]
     tdBlockInterp = ns5.dataFrameToAnalogSignals(
         tdInterp,

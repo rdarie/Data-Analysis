@@ -108,6 +108,7 @@ kin.columns = ['_'.join(i) for i in kin.columns]
 # pdb.set_trace()
 addingToNix = True
 if addingToNix:
+    # TODO: filter after upsampling to remove sharp edges
     kinInterp = hf.interpolateDF(
         kin.reset_index(), channelData['t'],
         kind='linear', fill_value=(0, 0),

@@ -185,6 +185,143 @@ class SMWrapper(BaseEstimator, RegressorMixin):
                 return poisson_pseudoR2(self, X, y)
 
 
+class pyglmnetWrapper(pyglmnet.GLM):
+
+    def __init__(
+            self, distr='poisson', alpha=0.5,
+            Tau=None, group=None,
+            reg_lambda=0.1,
+            solver='batch-gradient',
+            learning_rate=2e-1, max_iter=1000,
+            tol=1e-6, eta=2.0, score_metric='deviance',
+            fit_intercept=True,
+            random_state=0, callback=None, verbose=False,
+            track_convergence=False):
+        self.track_convergence = track_convergence
+        super().__init__(
+            distr=distr, alpha=alpha,
+            Tau=Tau, group=group,
+            reg_lambda=reg_lambda,
+            solver=solver,
+            learning_rate=learning_rate, max_iter=max_iter,
+            tol=tol, eta=eta, score_metric=score_metric,
+            fit_intercept=fit_intercept,
+            random_state=random_state, callback=callback, verbose=verbose)
+
+    def _set_cv(cv, estimator=None, X=None, y=None):
+        if hasattr(X, 'to_numpy'):
+            xFit = X.to_numpy()
+        else:
+            xFit = X
+        if hasattr(y, 'to_numpy'):
+            yFit = y.to_numpy()
+        else:
+            yFit = y
+        super()._set_cv(cv, estimator=estimator, X=xFit, y=yFit)
+
+    def __repr__(self):
+        return super().__repr__()
+
+    def copy(self):
+        return super().copy()
+
+    def _prox(self, beta, thresh):
+        return super()._prox(beta, thresh)
+
+    def _cdfast(self, X, y, ActiveSet, beta, rl, fit_intercept=True):
+        if hasattr(X, 'to_numpy'):
+            xFit = X.to_numpy()
+        else:
+            xFit = X
+        if hasattr(y, 'to_numpy'):
+            yFit = y.to_numpy()
+        else:
+            yFit = y
+        return super()._cdfast(
+            xFit, yFit, ActiveSet, beta, rl,
+            fit_intercept=fit_intercept)
+
+    def fit(self, X, y):
+        if self.track_convergence:
+            dummyReg = self.copy()
+            self.iterScore = []
+            self.iterBetaNorm = []
+
+            def printLoss(beta):
+                if hasattr(printLoss, 'counter'):
+                    printLoss.counter += 1
+                else:
+                    printLoss.counter = 1
+                dummyReg.beta_ = beta
+                dummyReg.beta0_ = 0
+                thisIterScore = poisson_pseudoR2(
+                    dummyReg, X, y)
+                self.iterScore.append(thisIterScore)
+                thisBetaNorm = np.linalg.norm(beta)
+                self.iterBetaNorm.append(thisBetaNorm)
+                if self.verbose:
+                    print(
+                        'iter {}; pR2 = {:.6f}; betaNorm = {:.6f}'
+                        .format(printLoss.counter, thisIterScore, thisBetaNorm),
+                        end='\r')
+            if self.callback is not None:
+                self.originalCallback = self.callback
+                raise(NotImplementedError)
+            else:
+                self.callback = printLoss
+        #
+        if hasattr(X, 'to_numpy'):
+            xFit = X.to_numpy()
+        else:
+            xFit = X
+        if hasattr(y, 'to_numpy'):
+            yFit = y.to_numpy()
+        else:
+            yFit = y
+        super().fit(xFit, yFit)
+        #
+        if self.track_convergence:
+            self.callback = None
+            del dummyReg
+        return self
+
+    def predict(self, X):
+        if hasattr(X, 'to_numpy'):
+            xFit = X.to_numpy()
+        else:
+            xFit = X
+        return super().predict(xFit)
+
+    def predict_proba(self, X):
+        if hasattr(X, 'to_numpy'):
+            xFit = X.to_numpy()
+        else:
+            xFit = X
+        return super().predict_proba(xFit)
+
+    def fit_predict(self, X, y):
+        if hasattr(X, 'to_numpy'):
+            xFit = X.to_numpy()
+        else:
+            xFit = X
+        if hasattr(y, 'to_numpy'):
+            yFit = y.to_numpy()
+        else:
+            yFit = y
+        return super().fit_predict(xFit, yFit)
+
+    def score(self, X, y):
+        if hasattr(X, 'to_numpy'):
+            xFit = X.to_numpy()
+        else:
+            xFit = X
+        if hasattr(y, 'to_numpy'):
+            yFit = y.to_numpy()
+        else:
+            yFit = y
+        return super().score(xFit, yFit)
+
+
 class SingleNeuronRegression():
     def __init__(
             self,
@@ -214,10 +351,7 @@ class SingleNeuronRegression():
             index=self.yTrain.columns,
             columns=self.xTrain.columns)
         #
-        self.significantBetas = pd.DataFrame(
-            False,
-            index=self.yTrain.columns,
-            columns=self.xTrain.columns)
+        self.significantBetas = None
         #
         self.pvals = pd.DataFrame(
             np.nan, index=self.betas.index,
@@ -228,7 +362,11 @@ class SingleNeuronRegression():
             reg = self.model(**self.modelKWargs)
             self.regressionList[colName] = ({'reg': reg})
         pass
-
+    
+    def dispatchParams(self, newParams):
+        for idx, colName in enumerate(self.yTrain.columns):
+            self.regressionList[colName]['reg'].set_params(**newParams)
+        
     def cross_val_score(self):
         #  fit the regression models
         for idx, colName in enumerate(self.yTrain.columns):
@@ -261,8 +399,9 @@ class SingleNeuronRegression():
             bestIndex = gs.best_index_
             reg.set_params(**gs.best_params_)
             self.regressionList[colName].update({
-                'gridsearch_mean_test_score': gs.cv_results_['mean_test_score'][bestIndex],
-                'gridsearch_std_test_score': gs.cv_results_['std_test_score'][bestIndex],
+                'gridsearch_best_mean_test_score': gs.cv_results_['mean_test_score'][bestIndex],
+                'gridsearch_best_std_test_score': gs.cv_results_['std_test_score'][bestIndex],
+                'gridsearch': gs,
                 })
             if self.verbose:
                 print("Best parameters set found:\n{}".format(
@@ -275,56 +414,7 @@ class SingleNeuronRegression():
             y = self.yTrain.loc[:, colName]
             reg = self.regressionList[colName]['reg']
             print('fitting model {}'.format(colName))
-            if isinstance(reg, (pyglmnet.GLM)):
-                trackingLoss = True
-                self.regressionList[colName]['iterScore'] = []
-                self.regressionList[colName]['iterBetaNorm'] = []
-                if trackingLoss:
-                    dummyReg = reg.copy()
-                    #
-                    def printLoss(beta):
-                        printLoss.counter += 1
-                        dummyReg.beta_ = beta
-                        dummyReg.beta0_ = 0
-                        iterScore = poisson_pseudoR2(
-                            dummyReg,
-                            self.xTrain.to_numpy(), y.to_numpy())
-                        (
-                            self
-                            .regressionList[colName]['iterScore']
-                            .append(iterScore)
-                            )
-                        betaNorm = np.linalg.norm(beta)
-                        (
-                            self
-                            .regressionList[colName]['iterBetaNorm']
-                            .append(betaNorm)
-                            )
-                        print(
-                            'iter {}; pR2 = {:.6f}; betaNorm = {:.6f}'
-                            .format(printLoss.counter, iterScore, betaNorm),
-                            end='\r')
-                    #
-                    printLoss.counter = 0
-                    reg.callback = printLoss
-                reg.fit(self.xTrain.to_numpy(), y.to_numpy())
-                if trackingLoss:
-                    self.regressionList[colName]['iterScore'] = np.asarray(
-                        self.regressionList[colName]['iterScore']
-                    )
-                    self.regressionList[colName]['iterBetaNorm'] = np.asarray(
-                        self.regressionList[colName]['iterBetaNorm']
-                    )
-                    if True:
-                        fig, ax = plt.subplots(2, 1, sharex=True)
-                        ax[0].plot(self.regressionList[colName]['iterScore'])
-                        ax[0].set_title('iterScore')
-                        ax[1].plot(self.regressionList[colName]['iterBetaNorm'])
-                        ax[1].set_title('iterBetaNorm')
-                        plt.show()
-                    del dummyReg
-            else:
-                reg.fit(self.xTrain, y)
+            reg.fit(self.xTrain, y)
             pr2 = poisson_pseudoR2(
                 reg,
                 self.xTest.to_numpy(),
@@ -332,6 +422,12 @@ class SingleNeuronRegression():
             self.regressionList[colName].update({
                 'validationScore': pr2
                 })
+            if hasattr(reg, 'track_convergence'):
+                if reg.track_convergence:
+                    self.regressionList[colName]['iterScore'] = np.asarray(
+                        reg.iterScore)
+                    self.regressionList[colName]['iterBetaNorm'] = np.asarray(
+                        reg.iterBetaNorm)
             if self.verbose:
                 if hasattr(reg, 'results_'):
                     if hasattr(reg.results_, 'summary'):
@@ -351,6 +447,8 @@ class SingleNeuronRegression():
                 self.betas.loc[colName, :] = reg.results_.params
                 if hasattr(reg.results_, 'pvals'):
                     self.pvals.loc[colName, :] = reg.results_.pvalues
+            elif hasattr(reg, 'beta_'):
+                self.betas.loc[colName, :] = reg.beta_
         if hasattr(reg, 'results_'):
             if hasattr(reg.results_, 'pvalues'):
                 origShape = self.pvals.shape
@@ -361,10 +459,10 @@ class SingleNeuronRegression():
                     fixedPvals = flatPvals * flatPvals.size
                 self.pvals.iloc[:, :] = fixedPvals.reshape(origShape)
                 self.significantBetas = self.pvals < self.tTestAlpha
-            else:
-                # L1 weights encourage the parameter to go to zero;
-                # assume significant by default
-                self.significantBetas = self.betas.abs() > 0
+        if self.significantBetas is None:
+            # L1 weights encourage the parameter to go to zero;
+            # assume significant by default
+            self.significantBetas = self.betas.abs() > 0
         return self
 
     def clear_data(self):
@@ -387,8 +485,8 @@ class SingleNeuronRegression():
             useInvLink=False):
         scores = [
             {
-                'unit': k, 'score': v['gridsearch_mean_test_score'],
-                'std_score': v['gridsearch_std_test_score']}
+                'unit': k, 'score': v['gridsearch_best_mean_test_score'],
+                'std_score': v['gridsearch_best_std_test_score']}
             for k, v in self.regressionList.items()]
         scoresDF = pd.DataFrame(scores)
         if unitName is None:
@@ -404,12 +502,14 @@ class SingleNeuronRegression():
         else:
             uIdx = scoresDF.loc[scoresDF['unit'] == unitName, :].index[0]
         thisReg = self.regressionList[unitName]
-        prediction = thisReg['reg'].predict(self.xTest).to_numpy()
-        yPlot = self.yTest[unitName].rolling(smoothY).mean()
-        #
+        prediction = thisReg['reg'].predict(self.xTest)
+        if hasattr(prediction, 'to_numpy'):
+            prediction = prediction.to_numpy()
+        yPlot = (self.yTest[unitName].rolling(smoothY, center=True).mean())
         if True:
             fig, ax = plt.subplots(3, 1, sharex=True)
-            ax[0].plot(yPlot.to_numpy(), label='original')
+            # ax[0].plot(self.yTest[unitName].to_numpy(), label='original')
+            ax[0].plot(yPlot.to_numpy(), label='smoothed original')
             ax[0].plot(prediction, label='prediction')
             ax[0].set_title('{}: pR^2 = {:.2f}'.format(
                 unitName,
@@ -420,7 +520,7 @@ class SingleNeuronRegression():
             transFun = thisReg['reg'].results_.model.family.link.inverse
         else:
             transFun = lambda x: x
-        for idx, beta in enumerate(thisReg['reg'].results_.params):
+        for idx, beta in enumerate(self.betas.loc[unitName, :]):
             xPartial = beta * self.xTest.iloc[:, idx].to_numpy()
             if self.significantBetas.loc[unitName, :].iloc[idx]:
                 ax[1].plot(
