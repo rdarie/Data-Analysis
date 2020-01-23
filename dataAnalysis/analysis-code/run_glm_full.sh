@@ -1,15 +1,15 @@
 #!/bin/bash
 #  10: Calculate align Times
 # Request runtime:
-#SBATCH --time=24:00:00
+#SBATCH --time=72:00:00
 
 # Default resources are 1 core with 2.8GB of memory.
 
 # Request memory:
-#SBATCH --nodes=54
-#SBATCH --tasks=108
-#SBATCH --tasks-per-node=2
-#SBATCH --mem=36G
+#SBATCH --nodes=36
+#SBATCH --tasks=36
+#SBATCH --tasks-per-node=1
+#SBATCH --mem=48G
 
 # Specify a job name:
 #SBATCH -J glmFull_20190127
@@ -24,10 +24,11 @@
 # EXP="exp201901211000"
 EXP="exp201901271000"
 # ESTIMATOR="glm_20msec_hires"
-ESTIMATOR="glm_50msec"
+ESTIMATOR="glm_1msec"
 
 # UNITSELECTOR=""
-UNITSELECTOR="--selector=_minfrmaxcorr"
+# UNITSELECTOR="--selector=_minfrmaxcorr"
+UNITSELECTOR="--selector=_minfrmaxcorrminamp"
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
@@ -37,7 +38,7 @@ python --version
 
 module load mpi
 srun --mpi=pmi2 python ./calcUnitGLMToAsig.py --exp=$EXP --processAll --inputBlockName="raster" --unitQuery="raster" $UNITSELECTOR --secondaryBlockName="rig" --alignQuery="midPeak" --estimatorName=$ESTIMATOR --verbose --attemptMPI
-# python3 ./calcUnitGLMToAsig.py --exp=$EXP --processAll --inputBlockName="raster" --unitQuery="raster" $UNITSELECTOR --secondaryBlockName="rig" --alignQuery="midPeak" --estimatorName=$ESTIMATOR --verbose
+# python3 ./calcUnitGLMToAsig.py --exp=$EXP --processAll --inputBlockName="raster" --unitQuery="raster" $UNITSELECTOR --secondaryBlockName="rig" --alignQuery="midPeak" --estimatorName=$ESTIMATOR --verbose --plotting
 
 # python3 ./evaluateUnitGLMToAsig.py --exp=$EXP --processAll --alignQuery="midPeak" --estimatorName=$ESTIMATOR --lazy --verbose
 

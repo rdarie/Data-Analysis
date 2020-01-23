@@ -466,6 +466,10 @@ def unitSpikeTrainWaveformsToDF(
                     shiftedWaveform
                     .rolling(rollingWindow, axis='columns', center=True)
                     .mean())
+                # account for centering
+                seekIdx = int(rollingWindow/2)
+            else:
+                seekIdx = 0
                 if False:
                     pdb.set_trace()
                     import matplotlib.pyplot as plt
@@ -475,7 +479,7 @@ def unitSpikeTrainWaveformsToDF(
                     plt.show()
             laggedWaveformsDict[
                 (spikeTrainContainer.name, lag)] = (
-                    shiftedWaveform.iloc[:, ::decimate])
+                    shiftedWaveform.iloc[:, seekIdx::decimate].copy())
         if isinstance(lag, tuple):
             shiftedWaveform = (
                 zeroLagWaveformsDF
@@ -484,7 +488,7 @@ def unitSpikeTrainWaveformsToDF(
                 .mean())
             laggedWaveformsDict[
                 (spikeTrainContainer.name, lag)] = (
-                    shiftedWaveform.iloc[:, ::decimate])
+                    shiftedWaveform.iloc[:, ::decimate].copy())
     #
     if transposeToColumns == 'feature':
         # stack the bin, name the feature column

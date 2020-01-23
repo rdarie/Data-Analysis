@@ -97,10 +97,13 @@ if False:
     plt.plot(averageTarget.mean().to_numpy()); plt.show()
 saveR2 = {}
 saveEstimatorParams = {}
-variantList = range(15)
+# pdb.set_trace()
+varFolders = sorted(glob.glob(os.path.join(alignSubFolder, fullEstimatorName, 'var_*')))
+variantList = [os.path.basename(i) for i in varFolders]
+# variantList = range(15)
 if DEBUGGING:
     showNow = True
-    variantList = [0]
+    variantList = ['var_000']
 else:
     showNow = False
 
@@ -130,7 +133,8 @@ def calcMinIter(iterBetaNorm, tol_list=[1e-6], plotting=False):
     else:
         return terminateIndices
 
-for variantName in ['var_{:03d}'.format(i) for i in variantList]:
+
+for variantName in variantList:
     estimatorFiguresFolder = os.path.join(
         GLMFiguresFolder, fullEstimatorName)
     if not os.path.exists(estimatorFiguresFolder):
@@ -198,7 +202,7 @@ for variantName in ['var_{:03d}'.format(i) for i in variantList]:
     ######################################################################
     with sns.plotting_context('notebook', font_scale=1):
         try:
-            fig, ax = estimator.plot_xy(smoothY=20)
+            fig, ax = estimator.plot_xy(smoothY=25)
             # fig, ax = estimator.plot_xy(maxPR2=0.025)
             # fig, ax = estimator.plot_xy(unitName='elec75#1_p000', smoothY=10)
             for cAx in ax:
@@ -231,7 +235,7 @@ for variantName in ['var_{:03d}'.format(i) for i in variantList]:
         index=estimator.regressionList.keys(),
         columns=['minIter', 'reg_lambda'])
     toleranceParamsList = []
-    tolList = [1e-6]
+    tolList = [1e-2, 1e-4, 1e-6]
     for unit, regDict in estimator.regressionList.items():
         if 'gridsearch_best_mean_test_score' in regDict:
             pR2.loc[unit, 'gs'] = regDict['gridsearch_best_mean_test_score']
@@ -277,7 +281,7 @@ for variantName in ['var_{:03d}'.format(i) for i in variantList]:
     plt.savefig(pdfPath.replace('.pdf', '.png'))
     #
     nBins = 200
-if True:
+    #
     fig, ax = plt.subplots(3, 1)
     fig.set_tight_layout(True)
     for idx, (tol, group) in enumerate(toleranceParams.groupby('tol')):
@@ -326,42 +330,100 @@ if True:
         plt.show()
     else:
         plt.close()
+    
     #
-    fig, ax = plt.subplots(3, 1)
-    fig.set_tight_layout(True)
-    for tol, group in toleranceParams.groupby('tol'):
-        sns.distplot(
-            group['score'], ax=ax[0], kde=False,
-            label='{0:.2E}'.format(tol), cumulative=True)
-        if tol != tolList[0]:
-            sns.distplot(
-                group['marginalScore'], ax=ax[1],
-                kde=False, label='{0:.2E}'.format(tol), cumulative=True)
-        sns.distplot(
-            group['minIter'], ax=ax[2], kde=False,
-            bins=np.arange(0, 10000, 100), label='{0:.2E}'.format(tol), cumulative=True)
-    ax[0].set_xlabel('Validation Score')
-    ax[1].set_xlabel(
-        'marginal score (vs. tol={0:.2E})'.format(tolList[0]))
-    ax[1].set_ylabel('Count')
-    ax[2].set_xlabel('Iteration count')
-    plt.legend()
-    #
-    pdfPath = os.path.join(
-        estimatorFiguresFolder,
-        'minIter_distribution_{}.pdf'.format(
-            variantName))
-    plt.savefig(pdfPath)
-    plt.savefig(pdfPath.replace('.pdf', '.png'))
-    if showNow:
-        plt.show()
-    else:
-        plt.close()
+    #  fig, ax = plt.subplots(3, 1)
+    #  fig.set_tight_layout(True)
+    #  for tol, group in toleranceParams.groupby('tol'):
+    #      sns.distplot(
+    #          group['score'], ax=ax[0], kde=False,
+    #          label='{0:.2E}'.format(tol), cumulative=True)
+    #      if tol != tolList[0]:
+    #          sns.distplot(
+    #              group['marginalScore'], ax=ax[1],
+    #              kde=False, label='{0:.2E}'.format(tol), cumulative=True)
+    #      sns.distplot(
+    #          group['minIter'], ax=ax[2], kde=False,
+    #          bins=np.arange(0, 10000, 100), label='{0:.2E}'.format(tol), cumulative=True)
+    #  ax[0].set_xlabel('Validation Score')
+    #  ax[1].set_xlabel(
+    #      'marginal score (vs. tol={0:.2E})'.format(tolList[0]))
+    #  ax[1].set_ylabel('Count')
+    #  ax[2].set_xlabel('Iteration count')
+    #  plt.legend()
+    #  #
+    #  pdfPath = os.path.join(
+    #      estimatorFiguresFolder,
+    #      'minIter_distribution_{}.pdf'.format(
+    #          variantName))
+    #  plt.savefig(pdfPath)
+    #  plt.savefig(pdfPath.replace('.pdf', '.png'))
+    #  if showNow:
+    #      plt.show()
+    #  else:
+    #      plt.close()
     #
 #
+
+# def plot_average_xy
+maxPR2 = None
+unitName = None
+scores = [
+    {
+        'unit': k, 'score': v['gridsearch_best_mean_test_score'],
+        'std_score': v['gridsearch_best_std_test_score']}
+    for k, v in estimator.regressionList.items()]
+scoresDF = pd.DataFrame(scores)
+if unitName is None:
+    if maxPR2 is not None:
+        uIdx = (
+            scoresDF
+            .loc[scoresDF['score'] < maxPR2, 'score']
+            .idxmax()
+            )
+    else:
+        uIdx = scoresDF['score'].idxmax()
+    unitName = scoresDF.loc[uIdx, 'unit']
+else:
+    uIdx = scoresDF.loc[scoresDF['unit'] == unitName, :].index[0]
+thisReg = estimator.regressionList[unitName]
+
+estimator.yHat = pd.DataFrame(
+    np.nan,
+    index=estimator.yTest.index, columns=estimator.yTest.columns)
+#
+estimator.yHat.loc[:, unitName] = thisReg['reg'].predict(estimator.xTest)
+allY = pd.concat(
+    {
+        'test_data': estimator.yTest,
+        'test_prediction': estimator.yHat},
+    names=['regressionDataType'])
 if DEBUGGING:
     pdb.set_trace()
-#
+'''>>> allY.index.names
+    FrozenList([
+        'regressionDataType', 'segment', 'originalIndex',
+        't', 'RateInHz', 'activeGroup', 'amplitude',
+        'amplitudeCat', 'electrode', 'pedalDirection',
+        'pedalMetaCat', 'pedalMovementCat', 'pedalMovementDuration',
+        'pedalSize', 'pedalSizeCat', 'pedalVelocityCat', 'program', 'bin'])
+
+'''
+dataQuery = '&'.join([
+    #'RateInHz==100',
+    '(pedalSizeCat=="M")'
+    ])
+ax = sns.relplot(
+    x='bin', y=unitName,
+    data=allY.query(dataQuery).reset_index(),
+    style='regressionDataType',
+    hue='amplitude',
+    col='electrode',
+    kind='line')
+plt.show()
+trialInfo = estimator.yTest.index.to_frame()
+print('Test set contains {} trials'.format(nTrials))
+########################################################################
 betasForPlot = (
     estimator.betas.mask(~estimator.significantBetas).stack().stack()
     .to_frame(name='beta').reset_index())

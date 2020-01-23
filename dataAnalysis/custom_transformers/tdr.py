@@ -17,6 +17,7 @@ from patsy import (
 import pyglmnet
 import matplotlib.pyplot as plt
 import seaborn as sns
+import scipy.linalg
 sns.set()
 sns.set_color_codes("dark")
 sns.set_context("talk")
@@ -56,6 +57,76 @@ def applyScalersGrouped(DF, listOfScalers):
         except Exception:
             traceback.print_exc()
     return DF
+
+
+def raisedCos(x, c, dc):
+    argCos = (x - c) * np.pi / dc / 2
+    argCos[argCos > np.pi] = np.pi
+    argCos[argCos < - np.pi] = - np.pi
+    return (np.cos(argCos) + 1) / 2
+
+
+import scipy.optimize
+#
+def raisedCosBoundary(b, DT, minX, nb):
+    eps = 1e-20
+    nlin = lambda x: np.log(x + eps)
+    # fun = lambda c0: (nb - 1) * nlin(c0 + b) + 2 * nlin(c0 + DT + b) - (nb - 1) * nlin(minX + b)
+    def fun(c0):
+        return raisedCos(
+            np.asarray([nlin(minX + b)]),
+            np.asarray([nlin(c0 + b)]),
+            np.asarray([nlin(c0 + DT + b) - nlin(c0 + b)]) / (nb - 1)
+            )[0]
+    return scipy.optimize.root(fun, minX * 2).x
+
+def makeRaisedCosBasis(
+        nb, dt, endpoints, b=0.01, zflag=False):
+    """
+        Make nonlinearly stretched basis consisting of raised cosines
+        Inputs:  nb = # of basis vectors
+                 dt = time bin separation for representing basis
+                 endpoints = 2-vector containg [1st_peak  last_peak], the peak 
+                         (i.e. center) of the last raised cosine basis vectors
+                 b = offset for nonlinear stretching of x axis:  y = log(x+b) 
+                     (larger b -> more nearly linear stretching)
+                 zflag = flag for making (if = 1) finest-timescale basis
+                         vector constant below its peak
+        
+         Outputs:  iht = time lattice on which basis is defined
+                   ihbas = orthogonalized basis
+                   ihbasis = basis itself
+        
+         Example call
+         iht, ihbas, ihbasis = makeRaisedCosBasis(10, .01, [0, 10], .1);
+    """
+    #
+    eps = 1e-20
+    nlin = lambda x: np.log(x + eps)
+    invnl = lambda x: np.exp(x) - eps
+    assert b > 0
+    if isinstance(endpoints, list):
+        endpoints = np.array(endpoints)
+    #
+    yrnge = nlin(endpoints + b)
+    db = np.diff(yrnge)/(nb-1)  # spacing between raised cosine peaks
+    ctrs = np.arange(yrnge[0], yrnge[1] + db, db)  # centers for basis vectors
+    # pdb.set_trace()
+    if ctrs.size > nb:
+        ctrs = ctrs[:-1]
+    mxt = invnl(yrnge[1]+2*db) - b  # maximum time bin
+    iht = np.arange(0, mxt, dt)
+    nt = iht.size
+    #
+    repIht = np.vstack([nlin(iht+b) for i in range(nb)]).transpose()
+    repCtrs = np.vstack([ctrs for i in range(nt)])
+    ihbasis = raisedCos(repIht, repCtrs, db)
+    if zflag:
+        tMask = iht < endpoints[0]
+        ihbasis[tMask, 0] = 1
+    orthobas = scipy.linalg.orth(ihbasis)
+    # orthobas, _ = scipy.linalg.qr(ihbasis)
+    return iht, orthobas, ihbasis
 
 
 def poisson_pseudoR2(estimator, X, y):
@@ -252,6 +323,7 @@ class pyglmnetWrapper(pyglmnet.GLM):
                     printLoss.counter += 1
                 else:
                     printLoss.counter = 1
+                #
                 dummyReg.beta_ = beta
                 dummyReg.beta0_ = 0
                 thisIterScore = poisson_pseudoR2(
@@ -259,10 +331,16 @@ class pyglmnetWrapper(pyglmnet.GLM):
                 self.iterScore.append(thisIterScore)
                 thisBetaNorm = np.linalg.norm(beta)
                 self.iterBetaNorm.append(thisBetaNorm)
+                #
+                if hasattr(printLoss, 'prev_beta'):
+                    deltaBeta = np.linalg.norm(beta - printLoss.prev_beta)
+                else:
+                    deltaBeta = 0
+                printLoss.prev_beta = beta
                 if self.verbose:
                     print(
-                        'iter {}; pR2 = {:.6f}; betaNorm = {:.6f}'
-                        .format(printLoss.counter, thisIterScore, thisBetaNorm),
+                        'iter {}; pR2 = {:.6f}; betaNorm = {:.6f}; deltaBeta = {:.6f}'
+                        .format(printLoss.counter, thisIterScore, thisBetaNorm, deltaBeta),
                         end='\r')
             if self.callback is not None:
                 self.originalCallback = self.callback

@@ -45,9 +45,7 @@ from docopt import docopt
 from currentExperiment import parseAnalysisOptions
 from namedQueries import namedQueries
 import dataAnalysis.preproc.ns5 as ns5
-from dataAnalysis.custom_transformers.tdr import (
-    SMWrapper, pyglmnetWrapper, trialAwareStratifiedKFold,
-    applyScalersGrouped, SingleNeuronRegression)
+from dataAnalysis.custom_transformers.tdr import *
 import statsmodels.api as sm
 # import MLencoding as spykesml
 # from pyglmnet import GLM
@@ -76,58 +74,6 @@ except Exception:
     RANK = 0
     SIZE = 1
     HAS_MPI = False
-import scipy.linalg
-
-
-def raisedCos(x, c, dc):
-    argCos = (x-c)*np.pi/dc/2
-    argCos[argCos > np.pi] = np.pi
-    argCos[argCos < -np.pi] = -np.pi
-    return (np.cos(argCos) + 1) / 2
-
-
-def makeRaisedCosBasis(
-        nb, dt, endpoints, b=0.01, zflag=0):
-    """
-        Make nonlinearly stretched basis consisting of raised cosines
-        Inputs:  nb = # of basis vectors
-                 dt = time bin separation for representing basis
-                 endpoints = 2-vector containg [1st_peak  last_peak], the peak 
-                         (i.e. center) of the last raised cosine basis vectors
-                 b = offset for nonlinear stretching of x axis:  y = log(x+b) 
-                     (larger b -> more nearly linear stretching)
-                 zflag = flag for making (if = 1) finest-timescale basis
-                         vector constant below its peak
-        
-         Outputs:  iht = time lattice on which basis is defined
-                   ihbas = orthogonalized basis
-                   ihbasis = basis itself
-        
-         Example call
-         iht, ihbas, ihbasis = makeRaisedCosBasis(10, .01, [0, 10], .1);
-    """
-    eps = 1e-20
-    nlin = lambda x: np.log(x + eps)
-    invnl = lambda x: np.exp(x) - eps
-    assert b > 0
-    if isinstance(endpoints, list):
-        endpoints = np.array(endpoints)
-    #
-    yrnge = nlin(endpoints + b)
-    db = np.diff(yrnge)/(nb-1)      # spacing between raised cosine peaks
-    ctrs = np.arange(yrnge[0], yrnge[1] + db, db)  # centers for basis vectors
-    mxt = invnl(yrnge[1]+2*db) - b  # maximum time bin
-    iht = np.arange(0, mxt, dt)
-    nt = iht.size
-    #
-    repIht = np.vstack([nlin(iht+b) for i in range(nb)]).transpose()
-    repCtrs = np.vstack([ctrs for i in range(nt)])
-    ihbasis = raisedCos(repIht, repCtrs, db)
-    if zflag:
-        tMask = iht < endpoints[0]
-        ihbasis[tMask, 0] = 1
-    orthobas = scipy.linalg.orth(ihbasis)
-    return iht, orthobas, ihbasis
 
 
 def calcUnitRegressionToAsig():
@@ -185,13 +131,13 @@ def calcUnitRegressionToAsig():
     alignedAsigsKWargs['outlierTrials'] = ash.processOutlierTrials(
         alignSubFolder, prefix, **arguments)
     # lags in units of the _analyze file sample rate
-    lagsInvestigated = [50, 100, 250]
+    lagsInvestigated = [100, 250]
     lagsInvestigated += [(-1) * i for i in lagsInvestigated]
     lagsInvestigated = [0] + sorted(lagsInvestigated)
     if DEBUGGING:
         lagsInvestigated = [0]
-        alignedAsigsKWargs['unitNames'] = [
-            'elec10#0_raster#0', 'elec75#1_raster#0']
+        # alignedAsigsKWargs['unitNames'] = [
+        #     'elec10#0_raster#0', 'elec75#1_raster#0']
     addLags = {
         # 'position#0': lagsInvestigated,
         # 'velocity#0': lagsInvestigated,
@@ -221,12 +167,35 @@ def calcUnitRegressionToAsig():
         'K_Right_angular_acceleration#0': lagsInvestigated,
         'M_Right_angular_acceleration#0': lagsInvestigated,
         }
+    
     addHistoryTerms = {
-        'nb': 7,
+        'nb': 3,
         'dt': rasterOpts['binInterval'],
-        'endpoints': [0, .250],
-        'b': 0.01}
-
+        'endpoints': [
+            1.5 * rasterOpts['binInterval'] * alignedAsigsKWargs['decimate'],
+            .300],
+        'b': 0.01,
+        'zflag': False
+        }
+    # make sure history terms don't bleed into current bins
+    historyLen = .3
+    historyEdge = raisedCosBoundary(
+        addHistoryTerms['b'], historyLen,
+        rasterOpts['binInterval'] * alignedAsigsKWargs['decimate'] / 2,
+        addHistoryTerms['nb']
+        )
+    addHistoryTerms['endpoints'] = [historyEdge[0], historyEdge[0] + historyLen]
+    # pdb.set_trace()
+    if addHistoryTerms:
+        iht, orthobas, ihbasis = makeRaisedCosBasis(**addHistoryTerms)
+        if DEBUGGING and arguments['plotting']:
+            fig, ax = plt.subplots(2, 1, sharex=True)
+            ax[0].plot(iht, ihbasis)
+            ax[0].set_title('raised cos basis')
+            ax[1].plot(iht, orthobas)
+            ax[1].set_title('orthogonalized basis')
+            plt.show()
+    #
     featureNames = sorted([i for i in addLags.keys()])
     featureLoadArgs = alignedAsigsKWargs.copy()
     featureLoadArgs['unitNames'] = featureNames
@@ -244,6 +213,7 @@ def calcUnitRegressionToAsig():
             arguments['secondaryBlockName'], arguments['window']))
     cv_kwargs = dict(
         n_splits=5,
+        shuffle=True,
         stratifyFactors=['RateInHz', 'program', 'amplitudeCat'],
         continuousFactors=['segment', 'originalIndex'])
     #
@@ -268,18 +238,23 @@ def calcUnitRegressionToAsig():
             targetDF = ns5.alignedAsigsToDF(
                 dataBlock, **targetLoadArgs)
             if addHistoryTerms:
-                iht, orthobas, ihbasis = makeRaisedCosBasis(**addHistoryTerms)
                 historyLoadArgs = targetLoadArgs.copy()
-                historyLoadArgs['rollingWindow'] = None
-                historyLoadArgs['decimate'] = 1
+                # historyLoadArgs['rollingWindow'] = None
+                # historyLoadArgs['decimate'] = 1
+                historyTerms = []
                 for colIdx in range(addHistoryTerms['nb']):
-                    thisBasis = ihbasis[:, colIdx]
+                    if arguments['verbose']:
+                        print('Calculating history term {}'.format(colIdx + 1))
+                    thisBasis = ihbasis[:, colIdx] / np.sum(ihbasis[:, colIdx])
+                    # thisBasis = orthobas[:, colIdx]
                     #
                     def pFun(x):
                         x.iloc[:, :] = np.apply_along_axis(
                             np.convolve, 1, x.to_numpy(),
-                            thisBasis / np.sum(thisBasis), mode='same')
+                            thisBasis, mode='same')
                         return x
+                    # if DEBUGGING:
+                    #     pdb.set_trace()
                     historyLoadArgs['procFun'] = pFun
                     historyDF = ns5.alignedAsigsToDF(
                         dataBlock, **historyLoadArgs)
@@ -287,19 +262,28 @@ def calcUnitRegressionToAsig():
                     historyBins = historyDF.index.get_level_values('bin')
                     targetBins = targetDF.index.get_level_values('bin')
                     binOverlap = historyBins.isin(targetBins)
-                    if True:
+                    assert binOverlap.all()
+                    historyDF.rename(
+                        columns={
+                            i: i.replace('raster', 'cos_{}'.format(colIdx)).replace('#', '_')
+                            for i in historyDF.columns.get_level_values('feature')
+                            },
+                        inplace=True)
+                    # if DEBUGGING and arguments['plotting']:
+                    if False:
                         # decFactor = targetLoadArgs['decimate']
-                        pdb.set_trace()
                         plt.plot(historyDF.iloc[binOverlap, 0].to_numpy())
                         plt.plot(targetDF.iloc[:, 0].to_numpy())
                         plt.show()
-            #
+                    historyTerms.append(historyDF.iloc[binOverlap, :].copy())
             print('Loading {}'.format(regressorPath))
             regressorReader, regressorBlock = ns5.blockFromPath(
                 regressorPath, lazy=arguments['lazy'])
             featuresDF = ns5.alignedAsigsToDF(
                 regressorBlock, **featureLoadArgs)
-            #
+            if addHistoryTerms:
+                featuresDF = pd.concat(
+                    [featuresDF] + historyTerms, axis='columns')
             dropMask = np.logical_or.reduce([
                 targetDF.isna().T.any(),
                 featuresDF.isna().T.any()])
@@ -420,40 +404,42 @@ def calcUnitRegressionToAsig():
     #
     # statistical model specific options
     # for statsmodels wrapper
-    modelArguments = dict(
-        modelKWargs={
-            'sm_class': sm.GLM,
-            'family': sm.families.Poisson(),
-            'alpha': None, 'L1_wt': None,
-            'refit': None,
-            # 'alpha': 1e-3, 'L1_wt': .1,
-            # 'refit': False,
-            'maxiter': 250, 'disp': True
-            },
-        model=SMWrapper
-    )
-    gridParams = {
-        'alpha': np.logspace(
-            np.log(0.05), np.log(0.0001),
-            7, base=np.exp(1))
-        }
+    #  modelArguments = dict(
+    #      modelKWargs={
+    #          'sm_class': sm.GLM,
+    #          'family': sm.families.Poisson(),
+    #          'alpha': None, 'L1_wt': None,
+    #          'refit': None,
+    #          # 'alpha': 1e-3, 'L1_wt': .1,
+    #          # 'refit': False,
+    #          'maxiter': 250, 'disp': True
+    #          },
+    #      model=SMWrapper
+    #  )
+    #  gridParams = {
+    #      'alpha': np.logspace(
+    #          np.log(0.05), np.log(0.0001),
+    #          3, base=np.exp(1))
+    #      }
     modelArguments = dict(
         modelKWargs=dict(
             distr='softplus', alpha=0.1, reg_lambda=1e-3,
             fit_intercept=False,
-            # verbose='DEBUG',
-            verbose=False,
+            verbose=DEBUGGING,
+            #verbose=arguments['verbose'],
             # solver='batch-gradient',
-            solver='cdfast',
-            max_iter=10000, tol=1e-06,
+            # solver='cdfast',
+            max_iter=1000, tol=1e-04, learning_rate=2e-1,
             score_metric='pseudo_R2', track_convergence=True),
         model=pyglmnetWrapper
     )
+    if DEBUGGING:
+        modelArguments['modelKWargs']['max_iter'] = 20
     gridParams = [
         {
             'reg_lambda': np.logspace(
                 np.log(5e-2), np.log(1e-4),
-                7, base=np.exp(1))}
+                5, base=np.exp(1))}
         ]
     # elastic_net L1 weight, maxiter and regularization params
     # chosen based on Benjamin et al 2017
@@ -483,7 +469,10 @@ def calcUnitRegressionToAsig():
                     ]
             ]
             )
-        descStr = ' + '.join([kinematicDescStr, stimDescStr])
+        historyDescStr = ' + '.join([
+            i
+            for i in featuresDF.columns if '_cos' in i])
+        descStr = ' + '.join([kinematicDescStr, stimDescStr, historyDescStr])
         allModelDescStr.append(descStr)
     #
     for modelIdx, descStr in enumerate(allModelDescStr):
@@ -496,16 +485,16 @@ def calcUnitRegressionToAsig():
             desc,
             featuresDF.iloc[test, :],
             return_type='dataframe')
-        if DEBUGGING:
-            fig, ax = plt.subplots()
-            featureBins = np.linspace(-3, 3, 100)
-            for featName in xTrain.columns:
-                print('{}: {}'.format(featName, xTrain[featName].unique()))
-                sns.distplot(
-                    xTrain[featName], bins=featureBins,
-                    ax=ax, label=featName, kde=False)
-            plt.legend()
-            plt.show()
+        #  if DEBUGGING and arguments['plotting']:
+        #      fig, ax = plt.subplots()
+        #      featureBins = np.linspace(-3, 3, 100)
+        #      for featName in xTrain.columns:
+        #          print('{}: {}'.format(featName, xTrain[featName].unique()))
+        #          sns.distplot(
+        #              xTrain[featName], bins=featureBins,
+        #              ax=ax, label=featName, kde=False)
+        #      plt.legend()
+        #      plt.show()
         snr = SingleNeuronRegression(
             xTrain=xTrain, yTrain=yTrain,
             xTest=xTest, yTest=yTest,
@@ -521,8 +510,8 @@ def calcUnitRegressionToAsig():
             pass
         #
         # tolFindParams = {
-        #     'max_iter': 50000,
-        #     'tol': 1e-10}
+        #     'max_iter': 5000,
+        #     'tol': 1e-6}
         # snr.dispatchParams(tolFindParams)
         snr.fit()
         if not DEBUGGING:
