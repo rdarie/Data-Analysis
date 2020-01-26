@@ -21,7 +21,8 @@
 
 # EXP="exp201901070700"
 # EXP="exp201901201200"
-EXP="exp201901211000"
+# EXP="exp201901211000"
+EXP="expRippleSaline"
 # EXP="exp201901221000"
 # EXP="exp201901231000"
 # EXP="exp201901271000"
@@ -29,7 +30,7 @@ LAZINESS="--lazy"
 WINDOW="--window=long"
 # TRIALSELECTOR="--trialIdx=2"
 TRIALSELECTOR="--processAll"
-UNITSELECTOR="--selector=_minfrmaxcorr"
+UNITSELECTOR="--selector=_minfrmaxcorrminamp"
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
@@ -37,4 +38,5 @@ conda activate
 source activate nda
 python --version
 
-python3 ./calcTrialOutliers.py --exp=$EXP $TRIALSELECTOR $UNITSELECTOR --plotting --inputBlockName="fr" --alignQuery="all" --unitQuery="fr" --verbose
+SLURM_ARRAY_TASK_ID=1
+python3 ./preprocNS5.py --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID --previewMotorEncoder

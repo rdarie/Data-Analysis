@@ -129,6 +129,18 @@ def makeRaisedCosBasis(
     return iht, orthobas, ihbasis
 
 
+def _poisson_pseudoR2(y, yhat):
+    ynull = np.mean(y)
+    yhat = yhat.reshape(y.shape)
+    eps = np.spacing(1)
+    L1 = np.sum((y)*np.log(eps+(yhat)) - (yhat))
+    # L1_v = y*np.log(eps+yhat) - yhat
+    L0 = np.sum((y)*np.log(eps+(ynull)) - (ynull))
+    LS = np.sum((y)*np.log(eps+(y)) - (y))
+    R2 = 1-(LS-L1)/(LS-L0)
+    return R2
+
+
 def poisson_pseudoR2(estimator, X, y):
     # adapted from https://github.com/KordingLab/spykesMLs
     # This is our scoring function. Implements pseudo-R2
@@ -137,15 +149,7 @@ def poisson_pseudoR2(estimator, X, y):
     # yhat = estimator.results_.predict(X)
     yhat = estimator.predict(X)
     # y null is the mean of the training data
-    ynull = np.mean(y)
-    yhat = yhat.reshape(y.shape)
-    eps = np.spacing(1)
-    L1 = np.sum(y*np.log(eps+yhat) - yhat)
-    # L1_v = y*np.log(eps+yhat) - yhat
-    L0 = np.sum(y*np.log(eps+ynull) - ynull)
-    LS = np.sum(y*np.log(eps+y) - y)
-    R2 = 1-(LS-L1)/(LS-L0)
-    return R2
+    return _poisson_pseudoR2(y, yhat)
 
 
 class trialAwareStratifiedKFold:

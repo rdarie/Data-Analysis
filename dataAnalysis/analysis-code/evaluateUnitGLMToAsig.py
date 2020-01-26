@@ -7,6 +7,8 @@ Options:
     --trialIdx=trialIdx                    which trial to analyze [default: 1]
     --processAll                           process entire experimental day? [default: False]
     --verbose                              print diagnostics? [default: False]
+    --debugging                            print diagnostics? [default: False]
+    --makePredictionPDF                    make pdf of y vs yhat? [default: False]
     --profile                              print time and mem diagnostics? [default: False]
     --lazy                                 load from raw, or regular? [default: False]
     --alignQuery=alignQuery                choose a subset of the data?
@@ -30,6 +32,7 @@ sns.set_color_codes("dark")
 sns.set_context("notebook")
 sns.set_style("white")
 import matplotlib.ticker as ticker
+from matplotlib.backends.backend_pdf import PdfPages
 #
 import dataAnalysis.helperFunctions.profiling as prf
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
@@ -46,6 +49,7 @@ from statsmodels.stats.multitest import multipletests as mt
 from patsy import (
     ModelDesc, EvalEnvironment, Term, Sum, Treatment, INTERCEPT,
     EvalFactor, LookupFactor, demo_data, dmatrix, dmatrices)
+from dataAnalysis.custom_transformers.tdr import _poisson_pseudoR2
 #
 from currentExperiment import parseAnalysisOptions
 from docopt import docopt
@@ -65,7 +69,6 @@ alignSubFolder = os.path.join(
     )
 if not os.path.exists(alignSubFolder):
     os.makedirs(alignSubFolder, exist_ok=True)
-DEBUGGING = True
 if arguments['processAll']:
     prefix = assembledName
 else:
@@ -97,13 +100,12 @@ if False:
     plt.plot(averageTarget.mean().to_numpy()); plt.show()
 saveR2 = {}
 saveEstimatorParams = {}
-# pdb.set_trace()
 varFolders = sorted(glob.glob(os.path.join(alignSubFolder, fullEstimatorName, 'var_*')))
 variantList = [os.path.basename(i) for i in varFolders]
 # variantList = range(15)
-if DEBUGGING:
+if arguments['debugging']:
     showNow = True
-    variantList = ['var_000']
+    # variantList = ['var_000']
 else:
     showNow = False
 
@@ -268,17 +270,25 @@ for variantName in variantList:
     saveR2[variantName] = pR2
     saveEstimatorParams[variantName] = estimatorParams
     #
-    ax = sns.distplot(pR2['valid'])
-    ax.set_title('pseudoR^2 for population of units')
-    ax.set_ylabel('Count')
-    ax.set_xlabel('pseudoR^2')
-    ax.set_xlim([-0.025, .15])
+    fig, ax = plt.subplots(2, 1)
+    sns.distplot(pR2['valid'], ax=ax[0])
+    ax[0].set_title('pseudoR^2 (median {0:.3f})'.format(pR2['valid'].median()))
+    ax[0].set_ylabel('Count')
+    ax[0].set_xlabel('pseudoR^2')
+    ax[0].set_xlim([-0.025, .15])
+    sns.boxplot(data=pR2['valid'], ax=ax[1], orient="h")
+    ax[1].set_xlabel('pseudoR^2')
+    ax[1].set_xlim([-0.025, .15])
     pdfPath = os.path.join(
         estimatorFiguresFolder,
         'rsq_distribution_{}.pdf'.format(
             variantName))
     plt.savefig(pdfPath)
     plt.savefig(pdfPath.replace('.pdf', '.png'))
+    if showNow:
+        plt.show()
+    else:
+        plt.close()
     #
     nBins = 200
     #
@@ -330,100 +340,142 @@ for variantName in variantList:
         plt.show()
     else:
         plt.close()
-    
-    #
-    #  fig, ax = plt.subplots(3, 1)
-    #  fig.set_tight_layout(True)
-    #  for tol, group in toleranceParams.groupby('tol'):
-    #      sns.distplot(
-    #          group['score'], ax=ax[0], kde=False,
-    #          label='{0:.2E}'.format(tol), cumulative=True)
-    #      if tol != tolList[0]:
-    #          sns.distplot(
-    #              group['marginalScore'], ax=ax[1],
-    #              kde=False, label='{0:.2E}'.format(tol), cumulative=True)
-    #      sns.distplot(
-    #          group['minIter'], ax=ax[2], kde=False,
-    #          bins=np.arange(0, 10000, 100), label='{0:.2E}'.format(tol), cumulative=True)
-    #  ax[0].set_xlabel('Validation Score')
-    #  ax[1].set_xlabel(
-    #      'marginal score (vs. tol={0:.2E})'.format(tolList[0]))
-    #  ax[1].set_ylabel('Count')
-    #  ax[2].set_xlabel('Iteration count')
-    #  plt.legend()
-    #  #
-    #  pdfPath = os.path.join(
-    #      estimatorFiguresFolder,
-    #      'minIter_distribution_{}.pdf'.format(
-    #          variantName))
-    #  plt.savefig(pdfPath)
-    #  plt.savefig(pdfPath.replace('.pdf', '.png'))
-    #  if showNow:
-    #      plt.show()
-    #  else:
-    #      plt.close()
-    #
-#
 
-# def plot_average_xy
-maxPR2 = None
-unitName = None
-scores = [
-    {
-        'unit': k, 'score': v['gridsearch_best_mean_test_score'],
-        'std_score': v['gridsearch_best_std_test_score']}
-    for k, v in estimator.regressionList.items()]
-scoresDF = pd.DataFrame(scores)
-if unitName is None:
-    if maxPR2 is not None:
-        uIdx = (
-            scoresDF
-            .loc[scoresDF['score'] < maxPR2, 'score']
-            .idxmax()
-            )
+    # def plot_average_xy
+    estimator.yHat = pd.DataFrame(
+        np.nan,
+        index=estimator.yTest.index, columns=estimator.yTest.columns)
+    #
+    for unitName, thisReg in estimator.regressionList.items():
+        estimator.yHat.loc[:, unitName] = thisReg['reg'].predict(estimator.xTest)
+    #
+    allY = pd.concat(
+        {
+            'test_data': estimator.yTest,
+            'test_prediction': estimator.yHat},
+        names=['regressionDataType'])
+    #
+    dataQuery = '&'.join([
+        '((RateInHz==100)|(amplitude==0))',
+        '(pedalSizeCat=="M")'
+        ])
+    #
+    #
+    # maxPR2 = None
+    # unitName = None
+    # scores = [
+    #     {
+    #         'unit': k, 'score': v['gridsearch_best_mean_test_score'],
+    #         'std_score': v['gridsearch_best_std_test_score']}
+    #     for k, v in estimator.regressionList.items()]
+    # scoresDF = pd.DataFrame(scores)
+    # #
+    # if unitName is None:
+    #     if maxPR2 is not None:
+    #         uIdx = (
+    #             scoresDF
+    #             .loc[scoresDF['score'] < maxPR2, 'score']
+    #             .idxmax()
+    #             )
+    #     else:
+    #         uIdx = scoresDF['score'].idxmax()
+    #     unitName = scoresDF.loc[uIdx, 'unit']
+    # else:
+    #     uIdx = scoresDF.loc[scoresDF['unit'] == unitName, :].index[0]
+    #
+    '''>>> allY.index.names
+        FrozenList([
+            'regressionDataType', 'segment', 'originalIndex',
+            't', 'RateInHz', 'activeGroup', 'amplitude',
+            'amplitudeCat', 'electrode', 'pedalDirection',
+            'pedalMetaCat', 'pedalMovementCat', 'pedalMovementDuration',
+            'pedalSize', 'pedalSizeCat', 'pedalVelocityCat', 'program', 'bin'])
+    '''
+    trialInfo = estimator.yTest.index.to_frame(index=False)
+    nBins = trialInfo['bin'].unique().size
+    nTrials = trialInfo.groupby([
+        'RateInHz', 'amplitude',
+        'electrode', 'pedalSizeCat'])['bin'].count() / nBins
+    print('Test set contains:\n{}'.format(nTrials))
+    ########################################################################
+    rollingWindowList = [1, 20, 30, 50, 100, 200]
+    pR2smoothDict = {
+        i: pd.DataFrame(
+            np.nan,
+            index=estimator.regressionList.keys(),
+            columns=['pR2'])
+        for i in rollingWindowList
+        }
+    for uIdx, unitName in enumerate(sorted(estimator.regressionList.keys())):
+        thisReg = estimator.regressionList[unitName]['reg']
+        yhat = pd.Series(
+            thisReg.predict(estimator.xTest),
+            index=estimator.yTest[unitName].index)
+        for rIdx, rollingWindow in enumerate(rollingWindowList):
+            pR2smoothDict[rollingWindow].loc[unitName, 'pR2'] = _poisson_pseudoR2(
+                estimator.yTest[unitName].rolling(rollingWindow, center=True).mean().dropna().iloc[int(rollingWindow/2)::rollingWindow].to_numpy(),
+                yhat.rolling(rollingWindow, center=True).mean().dropna().iloc[int(rollingWindow/2)::rollingWindow].to_numpy())
+    #
+    pR2smooth = pd.concat(pR2smoothDict, names=['rollingWindow']).reset_index()
+    #
+    #
+    cPalettes = sns.color_palette()
+    fig, ax = plt.subplots(2, 1, sharex=True)
+    for rIdx, rollingWindow in enumerate(rollingWindowList):
+        rMask = pR2smooth['rollingWindow'] == rollingWindow
+        lblText = '{} sample average; (median pR2 {:.3f})'.format(
+            rollingWindow, pR2smooth.loc[rMask, 'pR2'].median())
+        sns.distplot(
+            pR2smooth.loc[rMask, 'pR2'], ax=ax[0],
+            label=lblText, color=cPalettes[rIdx])
+    #
+    sns.boxplot(
+        x='pR2', y='rollingWindow',
+        data=pR2smooth,
+        ax=ax[1], orient="h", palette=cPalettes)
+    ax[0].legend()
+    ax[0].set_ylabel('Count')
+    # ax[0].set_xlabel('pseudoR^2')
+    # ax[0].set_xlim([-0.025, .15])
+    ax[1].set_xlabel('pseudoR^2')
+    ax[1].set_xlim([-0.025, .15])
+    #
+    pdfPath = os.path.join(
+        estimatorFiguresFolder,
+        'rsq_distribution_binSize_{}.pdf'.format(
+            variantName))
+    plt.savefig(pdfPath)
+    plt.savefig(pdfPath.replace('.pdf', '.png'))
+    if showNow:
+        plt.show()
     else:
-        uIdx = scoresDF['score'].idxmax()
-    unitName = scoresDF.loc[uIdx, 'unit']
-else:
-    uIdx = scoresDF.loc[scoresDF['unit'] == unitName, :].index[0]
-thisReg = estimator.regressionList[unitName]
-
-estimator.yHat = pd.DataFrame(
-    np.nan,
-    index=estimator.yTest.index, columns=estimator.yTest.columns)
-#
-estimator.yHat.loc[:, unitName] = thisReg['reg'].predict(estimator.xTest)
-allY = pd.concat(
-    {
-        'test_data': estimator.yTest,
-        'test_prediction': estimator.yHat},
-    names=['regressionDataType'])
-if DEBUGGING:
-    pdb.set_trace()
-'''>>> allY.index.names
-    FrozenList([
-        'regressionDataType', 'segment', 'originalIndex',
-        't', 'RateInHz', 'activeGroup', 'amplitude',
-        'amplitudeCat', 'electrode', 'pedalDirection',
-        'pedalMetaCat', 'pedalMovementCat', 'pedalMovementDuration',
-        'pedalSize', 'pedalSizeCat', 'pedalVelocityCat', 'program', 'bin'])
-
-'''
-dataQuery = '&'.join([
-    #'RateInHz==100',
-    '(pedalSizeCat=="M")'
-    ])
-ax = sns.relplot(
-    x='bin', y=unitName,
-    data=allY.query(dataQuery).reset_index(),
-    style='regressionDataType',
-    hue='amplitude',
-    col='electrode',
-    kind='line')
-plt.show()
-trialInfo = estimator.yTest.index.to_frame()
-print('Test set contains {} trials'.format(nTrials))
-########################################################################
+        plt.close()
+    if arguments['makePredictionPDF']:
+        rollingWindow = 20
+        plotData = (
+            allY.query(dataQuery)
+            .rolling(rollingWindow).mean()
+            .dropna().iloc[int(rollingWindow/2)::rollingWindow]
+            .reset_index())
+        pdfPath = os.path.join(
+            estimatorFiguresFolder,
+            'prediction_examples_{}.pdf'.format(
+                variantName))
+        with PdfPages(pdfPath) as pdf:
+            for uIdx, unitName in enumerate(sorted(estimator.regressionList.keys())):
+                thisReg = estimator.regressionList[unitName]
+                print('Plotting {}'.format(unitName))
+                ax = sns.relplot(
+                    x='bin', y=unitName,
+                    data=plotData,
+                    style='regressionDataType',
+                    hue='amplitude',
+                    col='electrode',
+                    kind='line')
+                plt.suptitle('pR^2 = {:.3f}'.format(thisReg['validationScore']))
+                pdf.savefig()
+                plt.close()
+    #####################################################################
 betasForPlot = (
     estimator.betas.mask(~estimator.significantBetas).stack().stack()
     .to_frame(name='beta').reset_index())

@@ -2389,6 +2389,11 @@ def preproc(
             reader,
             block_index=blkIdx, lazy=True,
             signal_group_mode=signal_group_mode)
+        # ripple debugging
+        # pdb.set_trace()
+        # allSptProx = block.filter(objects=SpikeTrainProxy)
+        # allSpt = [i.load() for i in allSptProx]
+        # print([i.annotations['unit_id'] for i in allSpt])
         if spikeReader is not None:
             spikeBlock = readBlockFixNames(
                 spikeReader, block_index=blkIdx, lazy=True,

@@ -9,6 +9,7 @@ Options:
     --processAll                              process entire experimental day? [default: False]
     --lazy                                    load from raw, or regular? [default: False]
     --verbose                                 print diagnostics? [default: False]
+    --debugging                               print diagnostics? [default: False]
     --attemptMPI                              whether to try to load MPI [default: False]
     --plotting                                plot out the correlation matrix? [default: True]
     --analysisName=analysisName               append a name to the resulting blocks? [default: default]
@@ -130,11 +131,25 @@ def calcUnitRegressionToAsig():
         namedQueries, alignSubFolder, **arguments)
     alignedAsigsKWargs['outlierTrials'] = ash.processOutlierTrials(
         alignSubFolder, prefix, **arguments)
+    #
+    featuresMetaDataPath = os.path.join(
+        estimatorSubFolder, 'features_meta.pickle')
+    targetH5Path = os.path.join(
+        estimatorSubFolder, prefix + '_{}_{}.h5'.format(
+            arguments['inputBlockName'], arguments['window']))
+    regressorH5Path = os.path.join(
+        estimatorSubFolder, prefix + '_{}_{}.h5'.format(
+            arguments['secondaryBlockName'], arguments['window']))
+    cv_kwargs = dict(
+        n_splits=5,
+        shuffle=True,
+        stratifyFactors=['RateInHz', 'program', 'amplitudeCat'],
+        continuousFactors=['segment', 'originalIndex'])
     # lags in units of the _analyze file sample rate
-    lagsInvestigated = [100, 250]
+    lagsInvestigated = [25, 50, 100, 200]
     lagsInvestigated += [(-1) * i for i in lagsInvestigated]
     lagsInvestigated = [0] + sorted(lagsInvestigated)
-    if DEBUGGING:
+    if arguments['debugging'] and not os.path.exists(featuresMetaDataPath):
         lagsInvestigated = [0]
         # alignedAsigsKWargs['unitNames'] = [
         #     'elec10#0_raster#0', 'elec75#1_raster#0']
@@ -169,26 +184,27 @@ def calcUnitRegressionToAsig():
         }
     
     addHistoryTerms = {
-        'nb': 3,
+        'nb': 7,
         'dt': rasterOpts['binInterval'],
         'endpoints': [
-            1.5 * rasterOpts['binInterval'] * alignedAsigsKWargs['decimate'],
+            2 * rasterOpts['binInterval'] * alignedAsigsKWargs['decimate'],
             .300],
         'b': 0.01,
         'zflag': False
         }
     # make sure history terms don't bleed into current bins
-    historyLen = .3
-    historyEdge = raisedCosBoundary(
-        addHistoryTerms['b'], historyLen,
-        rasterOpts['binInterval'] * alignedAsigsKWargs['decimate'] / 2,
-        addHistoryTerms['nb']
-        )
-    addHistoryTerms['endpoints'] = [historyEdge[0], historyEdge[0] + historyLen]
+    if rasterOpts['binInterval'] > 1e-3:
+        historyLen = .3
+        historyEdge = raisedCosBoundary(
+            addHistoryTerms['b'], historyLen,
+            rasterOpts['binInterval'] * alignedAsigsKWargs['decimate'] / 2,
+            addHistoryTerms['nb']
+            )
+        addHistoryTerms['endpoints'] = [historyEdge[0], historyEdge[0] + historyLen]
     # pdb.set_trace()
     if addHistoryTerms:
         iht, orthobas, ihbasis = makeRaisedCosBasis(**addHistoryTerms)
-        if DEBUGGING and arguments['plotting']:
+        if arguments['debugging'] and arguments['plotting']:
             fig, ax = plt.subplots(2, 1, sharex=True)
             ax[0].plot(iht, ihbasis)
             ax[0].set_title('raised cos basis')
@@ -203,21 +219,7 @@ def calcUnitRegressionToAsig():
     featureLoadArgs['addLags'] = addLags
     targetLoadArgs = alignedAsigsKWargs.copy()
     #
-    featuresMetaDataPath = os.path.join(
-        estimatorSubFolder, 'features_meta.pickle')
-    targetH5Path = os.path.join(
-        estimatorSubFolder, prefix + '_{}_{}.h5'.format(
-            arguments['inputBlockName'], arguments['window']))
-    regressorH5Path = os.path.join(
-        estimatorSubFolder, prefix + '_{}_{}.h5'.format(
-            arguments['secondaryBlockName'], arguments['window']))
-    cv_kwargs = dict(
-        n_splits=5,
-        shuffle=True,
-        stratifyFactors=['RateInHz', 'program', 'amplitudeCat'],
-        continuousFactors=['segment', 'originalIndex'])
-    #
-    if RANK == 0:
+    if (RANK == 0):
         if os.path.exists(featuresMetaDataPath):
             with open(featuresMetaDataPath, 'rb') as f:
                 featuresMetaData = pickle.load(f)
@@ -225,175 +227,182 @@ def calcUnitRegressionToAsig():
             sameTargets = (featuresMetaData['targetLoadArgs'] == targetLoadArgs)
             if sameFeatures and sameTargets:
                 reloadFeatures = False
-                featuresDF = pd.read_hdf(regressorH5Path, 'feature')
-                targetDF = pd.read_hdf(targetH5Path, 'target')
             else:
                 reloadFeatures = True
         else:
             reloadFeatures = True
-        if reloadFeatures:
-            print('Loading {}'.format(triggeredPath))
-            dataReader, dataBlock = ns5.blockFromPath(
-                triggeredPath, lazy=arguments['lazy'])
-            targetDF = ns5.alignedAsigsToDF(
-                dataBlock, **targetLoadArgs)
-            if addHistoryTerms:
-                historyLoadArgs = targetLoadArgs.copy()
-                # historyLoadArgs['rollingWindow'] = None
-                # historyLoadArgs['decimate'] = 1
-                historyTerms = []
-                for colIdx in range(addHistoryTerms['nb']):
-                    if arguments['verbose']:
-                        print('Calculating history term {}'.format(colIdx + 1))
-                    thisBasis = ihbasis[:, colIdx] / np.sum(ihbasis[:, colIdx])
-                    # thisBasis = orthobas[:, colIdx]
-                    #
-                    def pFun(x):
-                        x.iloc[:, :] = np.apply_along_axis(
-                            np.convolve, 1, x.to_numpy(),
-                            thisBasis, mode='same')
-                        return x
-                    # if DEBUGGING:
-                    #     pdb.set_trace()
-                    historyLoadArgs['procFun'] = pFun
-                    historyDF = ns5.alignedAsigsToDF(
-                        dataBlock, **historyLoadArgs)
-                    #
-                    historyBins = historyDF.index.get_level_values('bin')
-                    targetBins = targetDF.index.get_level_values('bin')
-                    binOverlap = historyBins.isin(targetBins)
-                    assert binOverlap.all()
-                    historyDF.rename(
-                        columns={
-                            i: i.replace('raster', 'cos_{}'.format(colIdx)).replace('#', '_')
-                            for i in historyDF.columns.get_level_values('feature')
-                            },
-                        inplace=True)
-                    # if DEBUGGING and arguments['plotting']:
-                    if False:
-                        # decFactor = targetLoadArgs['decimate']
-                        plt.plot(historyDF.iloc[binOverlap, 0].to_numpy())
-                        plt.plot(targetDF.iloc[:, 0].to_numpy())
-                        plt.show()
-                    historyTerms.append(historyDF.iloc[binOverlap, :].copy())
-            print('Loading {}'.format(regressorPath))
-            regressorReader, regressorBlock = ns5.blockFromPath(
-                regressorPath, lazy=arguments['lazy'])
-            featuresDF = ns5.alignedAsigsToDF(
-                regressorBlock, **featureLoadArgs)
-            if addHistoryTerms:
-                featuresDF = pd.concat(
-                    [featuresDF] + historyTerms, axis='columns')
-            dropMask = np.logical_or.reduce([
-                targetDF.isna().T.any(),
-                featuresDF.isna().T.any()])
-            dropIndex = targetDF.index[dropMask]
-            targetDF.drop(index=dropIndex, inplace=True)
-            featuresDF.drop(index=dropIndex, inplace=True)
-            #  Standardize units (count/window)
-            #  targetDF = pd.DataFrame(targetDF, dtype=np.int)
-            columnInfo = (
-                featuresDF
-                .columns.to_frame()
-                .reset_index(drop=True))
-            #
-            targetScalers = []
-            featureScalers = []
-            ########################
-            # group features by units and scale together
-            ########################
-            #
-            # featureScalers.append([
-            #     (MinMaxScaler(), ['position_x#0', 'position_y#0']),
-            #     (MinMaxScaler(), ['velocity_x#0', 'velocity_y#0'])
-            #     ])
-            # featureScalers.append(
-            #     (
-            #         MaxAbsScaler(),
-            #         [
-            #             i
-            #             for i in columnInfo['feature'].unique()
-            #             if 'Hz' in i]))
-            # featureScalers.append(
-            #     (
-            #         MaxAbsScaler(),
-            #         [
-            #             i
-            #             for i in columnInfo['feature'].unique()
-            #             if 'amplitude' in i]))
-            # featureScalers.append(
-            #     (
-            #         StandardScaler(),
-            #         [
-            #             i
-            #             for i in columnInfo['feature'].unique()
-            #             if 'angle' in i]))
-            # featureScalers.append(
-            #     (
-            #         StandardScaler(),
-            #         [
-            #             i
-            #             for i in columnInfo['feature'].unique()
-            #             if 'angular_velocity' in i]))
-            # featureScalers.append(
-            #     (
-            #         MinMaxScaler(),
-            #         [i for i in columnInfo['feature'].unique() if 'ACR' in i]))
-            #
-            ############################################################
-            # scale each feature independently
-            ############################################################
-            for featName in columnInfo['feature'].unique():
-                if ('amplitude' in featName) or ('Hz' in featName):
-                    featureScalers.append((MaxAbsScaler(), [featName]))
-                else:
-                    featureScalers.append((StandardScaler(), [featName]))
-            ############################################################
-            featuresDF = applyScalersGrouped(featuresDF, featureScalers)
-            targetDF = applyScalersGrouped(targetDF, targetScalers)
-            #
-            featuresDF.columns = [
-                '{}_{:+04d}'.format(*i).replace('#0', '').replace('+', 'p').replace('-', 'm')
-                for i in featuresDF.columns]
-            targetDF.columns = [
-                '{}_{:+04d}'.format(*i).replace('_raster#0', '').replace('+', 'p').replace('-', 'm')
-                for i in targetDF.columns]
-            #
             featuresMetaData = {
                 'targetLoadArgs': targetLoadArgs,
                 'featureLoadArgs': featureLoadArgs
             }
-            with open(featuresMetaDataPath, 'wb') as f:
-                pickle.dump(featuresMetaData, f)
-            featuresDF.to_hdf(regressorH5Path, 'feature')
-            targetDF.to_hdf(targetH5Path, 'target')
+    else:
+        reloadFeatures = None
+        featuresMetaData = None
+    if HAS_MPI:
+        COMM.Barrier()  # sync MPI threads, wait for 0
+        reloadFeatures = COMM.bcast(reloadFeatures, root=0)
+        featuresMetaData = COMM.bcast(featuresMetaData, root=0)
+    if reloadFeatures and (RANK == 0):
+        print('Loading {}'.format(triggeredPath))
+        dataReader, dataBlock = ns5.blockFromPath(
+            triggeredPath, lazy=arguments['lazy'])
+        targetDF = ns5.alignedAsigsToDF(
+            dataBlock, **targetLoadArgs)
+        if addHistoryTerms:
+            historyLoadArgs = targetLoadArgs.copy()
+            # historyLoadArgs['rollingWindow'] = None
+            # historyLoadArgs['decimate'] = 1
+            historyTerms = []
+            for colIdx in range(addHistoryTerms['nb']):
+                if arguments['verbose']:
+                    print('Calculating history term {}'.format(colIdx + 1))
+                thisBasis = ihbasis[:, colIdx] / np.sum(ihbasis[:, colIdx])
+                # thisBasis = orthobas[:, colIdx]
+                #
+                def pFun(x):
+                    x.iloc[:, :] = np.apply_along_axis(
+                        np.convolve, 1, x.to_numpy(),
+                        thisBasis, mode='same')
+                    return x
+                # if arguments['debugging']:
+                #     pdb.set_trace()
+                historyLoadArgs['procFun'] = pFun
+                historyDF = ns5.alignedAsigsToDF(
+                    dataBlock, **historyLoadArgs)
+                #
+                historyBins = historyDF.index.get_level_values('bin')
+                targetBins = targetDF.index.get_level_values('bin')
+                binOverlap = historyBins.isin(targetBins)
+                assert binOverlap.all()
+                historyDF.rename(
+                    columns={
+                        i: i.replace('raster', 'cos_{}'.format(colIdx)).replace('#', '_')
+                        for i in historyDF.columns.get_level_values('feature')
+                        },
+                    inplace=True)
+                # if arguments['debugging'] and arguments['plotting']:
+                if False:
+                    # decFactor = targetLoadArgs['decimate']
+                    plt.plot(historyDF.iloc[binOverlap, 0].to_numpy())
+                    plt.plot(targetDF.iloc[:, 0].to_numpy())
+                    plt.show()
+                historyTerms.append(historyDF.iloc[binOverlap, :].copy())
+        print('Loading {}'.format(regressorPath))
+        regressorReader, regressorBlock = ns5.blockFromPath(
+            regressorPath, lazy=arguments['lazy'])
+        featuresDF = ns5.alignedAsigsToDF(
+            regressorBlock, **featureLoadArgs)
+        if addHistoryTerms:
+            featuresDF = pd.concat(
+                [featuresDF] + historyTerms, axis='columns')
+        dropMask = np.logical_or.reduce([
+            targetDF.isna().T.any(),
+            featuresDF.isna().T.any()])
+        dropIndex = targetDF.index[dropMask]
+        targetDF.drop(index=dropIndex, inplace=True)
+        featuresDF.drop(index=dropIndex, inplace=True)
+        #  Standardize units (count/window)
+        #  targetDF = pd.DataFrame(targetDF, dtype=np.int)
+        columnInfo = (
+            featuresDF
+            .columns.to_frame()
+            .reset_index(drop=True))
         #
+        targetScalers = []
+        featureScalers = []
+        ########################
+        # group features by units and scale together
+        ########################
+        #
+        # featureScalers.append([
+        #     (MinMaxScaler(), ['position_x#0', 'position_y#0']),
+        #     (MinMaxScaler(), ['velocity_x#0', 'velocity_y#0'])
+        #     ])
+        # featureScalers.append(
+        #     (
+        #         MaxAbsScaler(),
+        #         [
+        #             i
+        #             for i in columnInfo['feature'].unique()
+        #             if 'Hz' in i]))
+        # featureScalers.append(
+        #     (
+        #         MaxAbsScaler(),
+        #         [
+        #             i
+        #             for i in columnInfo['feature'].unique()
+        #             if 'amplitude' in i]))
+        # featureScalers.append(
+        #     (
+        #         StandardScaler(),
+        #         [
+        #             i
+        #             for i in columnInfo['feature'].unique()
+        #             if 'angle' in i]))
+        # featureScalers.append(
+        #     (
+        #         StandardScaler(),
+        #         [
+        #             i
+        #             for i in columnInfo['feature'].unique()
+        #             if 'angular_velocity' in i]))
+        # featureScalers.append(
+        #     (
+        #         MinMaxScaler(),
+        #         [i for i in columnInfo['feature'].unique() if 'ACR' in i]))
+        #
+        ############################################################
+        # scale each feature independently
+        ############################################################
+        for featName in columnInfo['feature'].unique():
+            if ('amplitude' in featName) or ('Hz' in featName):
+                featureScalers.append((MaxAbsScaler(), [featName]))
+            else:
+                featureScalers.append((StandardScaler(), [featName]))
+        ############################################################
+        featuresDF = applyScalersGrouped(featuresDF, featureScalers)
+        targetDF = applyScalersGrouped(targetDF, targetScalers)
+        #
+        featuresDF.columns = [
+            '{}_{:+04d}'.format(*i).replace('#0', '').replace('+', 'p').replace('-', 'm')
+            for i in featuresDF.columns]
+        targetDF.columns = [
+            '{}_{:+04d}'.format(*i).replace('_raster#0', '').replace('+', 'p').replace('-', 'm')
+            for i in targetDF.columns]
+        #
+        with open(featuresMetaDataPath, 'wb') as f:
+            pickle.dump(featuresMetaData, f)
+        featuresDF.to_hdf(regressorH5Path, 'feature')
+        targetDF.to_hdf(targetH5Path, 'target')
+    else:
+        if HAS_MPI:
+            # wait for RANK 0 to create the h5 files
+            COMM.Barrier()
+        featuresDF = pd.read_hdf(regressorH5Path, 'feature')
+        targetDF = pd.read_hdf(targetH5Path, 'target')
+    if (RANK == 0):
         prelimCV = trialAwareStratifiedKFold(**cv_kwargs).split(featuresDF)
         (train, test) = prelimCV[0]
-        yTrain = targetDF.iloc[train, :]
-        yTest = targetDF.iloc[test, :]
-        #
         cv_kwargs['n_splits'] -= 1
         cv = trialAwareStratifiedKFold(**cv_kwargs)
-        cv_folds = cv.split(yTrain)
-        #
     else:
-        featuresDF = None
-        yTrain = None
-        yTest = None
-        cv_folds = None
         train = None
         test = None
+        cv = None
+    if HAS_MPI:
+        # wait for RANK 0 to create the h5 files
+        COMM.Barrier()
+        train = COMM.bcast(train, root=0)
+        test = COMM.bcast(test, root=0)
+        cv = COMM.bcast(cv, root=0)
+    #
+    yTrain = targetDF.iloc[train, :]
+    yTest = targetDF.iloc[test, :]
+    cv_folds = cv.split(yTrain)
     #
     if HAS_MPI:
         # !! OverflowError: cannot serialize a bytes object larger than 4 GiB
         COMM.Barrier()  # sync MPI threads, wait for 0
-        featuresDF = COMM.bcast(featuresDF, root=0)
-        yTrain = COMM.bcast(yTrain, root=0)
-        yTest = COMM.bcast(yTest, root=0)
-        cv_folds = COMM.bcast(cv_folds, root=0)
-        test = COMM.bcast(test, root=0)
-        train = COMM.bcast(train, root=0)
         # subselect this RANK's units
         yColIdx = range(RANK, yTrain.shape[1], SIZE)
         print(
@@ -425,15 +434,17 @@ def calcUnitRegressionToAsig():
         modelKWargs=dict(
             distr='softplus', alpha=0.1, reg_lambda=1e-3,
             fit_intercept=False,
-            verbose=DEBUGGING,
-            #verbose=arguments['verbose'],
+            verbose=arguments['debugging'],
+            # verbose=arguments['verbose'],
             # solver='batch-gradient',
             # solver='cdfast',
-            max_iter=1000, tol=1e-04, learning_rate=2e-1,
+            max_iter=500, tol=1e-04, learning_rate=2e-1,
             score_metric='pseudo_R2', track_convergence=True),
         model=pyglmnetWrapper
     )
-    if DEBUGGING:
+    if HAS_MPI:
+        modelArguments['modelKWargs']['verbose'] = False
+    if arguments['debugging']:
         modelArguments['modelKWargs']['max_iter'] = 20
     gridParams = [
         {
@@ -485,7 +496,7 @@ def calcUnitRegressionToAsig():
             desc,
             featuresDF.iloc[test, :],
             return_type='dataframe')
-        #  if DEBUGGING and arguments['plotting']:
+        #  if arguments['debugging'] and arguments['plotting']:
         #      fig, ax = plt.subplots()
         #      featureBins = np.linspace(-3, 3, 100)
         #      for featName in xTrain.columns:
@@ -504,7 +515,7 @@ def calcUnitRegressionToAsig():
             plotting=arguments['plotting']
             )
         #
-        if not DEBUGGING:
+        if not arguments['debugging']:
             snr.apply_gridSearchCV(gridParams)
         else:
             pass
@@ -514,7 +525,7 @@ def calcUnitRegressionToAsig():
         #     'tol': 1e-6}
         # snr.dispatchParams(tolFindParams)
         snr.fit()
-        if not DEBUGGING:
+        if not arguments['debugging']:
             snr.clear_data()
         else:
             for unitName in snr.regressionList.keys():
@@ -543,7 +554,7 @@ def calcUnitRegressionToAsig():
                 'testIdx': test,
                 'alignedAsigsKWargs': alignedAsigsKWargs,
                 }
-            if not DEBUGGING:
+            if not arguments['debugging']:
                 with open(estimatorMetadataPath, 'wb') as f:
                     pickle.dump(
                         estimatorMetadata, f)
@@ -553,7 +564,7 @@ def calcUnitRegressionToAsig():
         else:
             if arguments['plotting']:
                 snr.plot_xy()
-        if not DEBUGGING:
+        if not arguments['debugging']:
             jb.dump(snr, estimatorPath)
         if HAS_MPI:
             COMM.Barrier()  # sync MPI threads, wait for 0

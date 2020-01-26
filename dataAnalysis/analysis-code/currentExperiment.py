@@ -384,7 +384,6 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
                 )
     except Exception:
         pass
-    DEBUGGING = False
     glmOptsLookup = {
         'glm_50msec': dict(rollingWindow=50, decimate=50),
         'glm_20msec': dict(rollingWindow=20, decimate=20),

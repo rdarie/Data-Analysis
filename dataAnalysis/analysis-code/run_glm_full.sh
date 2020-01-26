@@ -1,7 +1,7 @@
 #!/bin/bash
 #  10: Calculate align Times
 # Request runtime:
-#SBATCH --time=72:00:00
+#SBATCH --time=250:00:00
 
 # Default resources are 1 core with 2.8GB of memory.
 
@@ -37,7 +37,7 @@ source activate nda
 python --version
 
 module load mpi
-srun --mpi=pmi2 python ./calcUnitGLMToAsig.py --exp=$EXP --processAll --inputBlockName="raster" --unitQuery="raster" $UNITSELECTOR --secondaryBlockName="rig" --alignQuery="midPeak" --estimatorName=$ESTIMATOR --verbose --attemptMPI
+srun --mpi=pmi2 python3 -u ./calcUnitGLMToAsig.py --exp=$EXP --processAll --inputBlockName="raster" --unitQuery="raster" $UNITSELECTOR --secondaryBlockName="rig" --alignQuery="midPeak" --estimatorName=$ESTIMATOR --verbose --attemptMPI
 # python3 ./calcUnitGLMToAsig.py --exp=$EXP --processAll --inputBlockName="raster" --unitQuery="raster" $UNITSELECTOR --secondaryBlockName="rig" --alignQuery="midPeak" --estimatorName=$ESTIMATOR --verbose --plotting
 
 # python3 ./evaluateUnitGLMToAsig.py --exp=$EXP --processAll --alignQuery="midPeak" --estimatorName=$ESTIMATOR --lazy --verbose
