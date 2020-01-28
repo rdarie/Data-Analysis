@@ -9,7 +9,7 @@
 #SBATCH --nodes=36
 #SBATCH --tasks=36
 #SBATCH --tasks-per-node=1
-#SBATCH --mem=48G
+#SBATCH --mem=96G
 
 # Specify a job name:
 #SBATCH -J glmFull_20190127

@@ -264,8 +264,6 @@ def calcUnitRegressionToAsig():
                         np.convolve, 1, x.to_numpy(),
                         thisBasis, mode='same')
                     return x
-                # if arguments['debugging']:
-                #     pdb.set_trace()
                 historyLoadArgs['procFun'] = pFun
                 historyDF = ns5.alignedAsigsToDF(
                     dataBlock, **historyLoadArgs)
@@ -301,8 +299,10 @@ def calcUnitRegressionToAsig():
         dropIndex = targetDF.index[dropMask]
         targetDF.drop(index=dropIndex, inplace=True)
         featuresDF.drop(index=dropIndex, inplace=True)
-        #  Standardize units (count/window)
-        #  targetDF = pd.DataFrame(targetDF, dtype=np.int)
+        
+        #  Standardize units (count/bin)
+        targetDF = pd.DataFrame(targetDF * rasterOpts['binInterval'], dtype=np.int)
+        # pdb.set_trace()
         columnInfo = (
             featuresDF
             .columns.to_frame()
@@ -410,6 +410,10 @@ def calcUnitRegressionToAsig():
             .format(RANK, yColIdx))
         yTrain = yTrain.iloc[:, yColIdx]
         yTest = yTest.iloc[:, yColIdx]
+    if arguments['debugging']:
+        yColDbList = ['elec10#0_raster#0', 'elec75#1_raster#0']
+        yTrain = yTrain.loc[:, yColDbList]
+        yTest = yTest.loc[:, yColDbList]
     #
     # statistical model specific options
     # for statsmodels wrapper
@@ -445,7 +449,7 @@ def calcUnitRegressionToAsig():
     if HAS_MPI:
         modelArguments['modelKWargs']['verbose'] = False
     if arguments['debugging']:
-        modelArguments['modelKWargs']['max_iter'] = 20
+        modelArguments['modelKWargs']['max_iter'] = 500
     gridParams = [
         {
             'reg_lambda': np.logspace(
@@ -524,7 +528,13 @@ def calcUnitRegressionToAsig():
         #     'max_iter': 5000,
         #     'tol': 1e-6}
         # snr.dispatchParams(tolFindParams)
+        if arguments['debugging']:
+            from ttictoc import tic, toc
+            tic()
         snr.fit()
+        if arguments['debugging']:
+            toc()
+            pdb.set_trace()
         if not arguments['debugging']:
             snr.clear_data()
         else:

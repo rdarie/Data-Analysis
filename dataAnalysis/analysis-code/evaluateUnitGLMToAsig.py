@@ -82,13 +82,20 @@ fullEstimatorName = '{}_{}_{}_{}'.format(
 featuresMetaDataPath = os.path.join(
     alignSubFolder,
     fullEstimatorName, 'features_meta.pickle')
-#
+# if arguments['debugging']:
+#     featuresMetaDataPath = os.path.join(
+#         alignSubFolder,
+#         fullEstimatorName, 'bak', 'features_meta.pickle')
 dummyEstimatorMetadataPath = os.path.join(
    alignSubFolder,
    fullEstimatorName, 'var_000', 'estimator_metadata.pickle')
 with open(dummyEstimatorMetadataPath, 'rb') as f:
     dummyEstimatorMetadata = pickle.load(f)
+#
 targetH5Path = dummyEstimatorMetadata['targetPath']
+# if arguments['debugging']:
+#     targetH5Path = os.path.join(
+#         alignSubFolder, fullEstimatorName, 'bak', '_raster_long.h5')
 targetDF = pd.read_hdf(targetH5Path, 'target')
 regressorH5Path = targetH5Path.replace(
     '_raster', '_rig')
@@ -105,7 +112,8 @@ variantList = [os.path.basename(i) for i in varFolders]
 # variantList = range(15)
 if arguments['debugging']:
     showNow = True
-    # variantList = ['var_000']
+    # variantList = ['bak/var_000']
+    variantList = ['var_000']
 else:
     showNow = False
 
@@ -137,6 +145,7 @@ def calcMinIter(iterBetaNorm, tol_list=[1e-6], plotting=False):
 
 
 for variantName in variantList:
+    variantBaseName = os.path.basename(variantName)
     estimatorFiguresFolder = os.path.join(
         GLMFiguresFolder, fullEstimatorName)
     if not os.path.exists(estimatorFiguresFolder):
@@ -212,7 +221,7 @@ for variantName in variantList:
             pdfPath = os.path.join(
                 estimatorFiguresFolder,
                 'traces_example_{}.pdf'.format(
-                    variantName))
+                    variantBaseName))
             fig.savefig(
                 pdfPath,
                 bbox_extra_artists=(i.get_legend() for i in ax),
@@ -282,7 +291,7 @@ for variantName in variantList:
     pdfPath = os.path.join(
         estimatorFiguresFolder,
         'rsq_distribution_{}.pdf'.format(
-            variantName))
+            variantBaseName))
     plt.savefig(pdfPath)
     plt.savefig(pdfPath.replace('.pdf', '.png'))
     if showNow:
@@ -333,7 +342,7 @@ for variantName in variantList:
     pdfPath = os.path.join(
         estimatorFiguresFolder,
         'minIter_distribution_{}.pdf'.format(
-            variantName))
+            variantBaseName))
     plt.savefig(pdfPath)
     plt.savefig(pdfPath.replace('.pdf', '.png'))
     if showNow:
@@ -443,7 +452,7 @@ for variantName in variantList:
     pdfPath = os.path.join(
         estimatorFiguresFolder,
         'rsq_distribution_binSize_{}.pdf'.format(
-            variantName))
+            variantBaseName))
     plt.savefig(pdfPath)
     plt.savefig(pdfPath.replace('.pdf', '.png'))
     if showNow:
@@ -460,7 +469,7 @@ for variantName in variantList:
         pdfPath = os.path.join(
             estimatorFiguresFolder,
             'prediction_examples_{}.pdf'.format(
-                variantName))
+                variantBaseName))
         with PdfPages(pdfPath) as pdf:
             for uIdx, unitName in enumerate(sorted(estimator.regressionList.keys())):
                 thisReg = estimator.regressionList[unitName]
