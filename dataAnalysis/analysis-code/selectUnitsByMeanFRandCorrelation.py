@@ -117,3 +117,4 @@ selectorMetadata = {
 with open(selectorPath, 'wb') as f:
     pickle.dump(
         selectorMetadata, f)
+print('Selected {} units'.format(len(outputFeatures)))

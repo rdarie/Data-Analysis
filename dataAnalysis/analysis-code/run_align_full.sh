@@ -29,7 +29,7 @@ LAZINESS="--lazy"
 WINDOW="--window=long"
 # TRIALSELECTOR="--trialIdx=2"
 TRIALSELECTOR="--processAll"
-UNITSELECTOR="--selector=minfrmaxcorrminamp"
+UNITSELECTOR="--selector=minfrmaxcorr"
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
@@ -45,5 +45,9 @@ python3 ./calcAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $LAZINESS $WINDOW --chan
 # qa
 # python3 ./calcUnitMeanFR.py --exp=$EXP $TRIALSELECTOR --inputBlockName="fr" --alignQuery="midPeak" --unitQuery="fr" --verbose
 # python3 ./calcUnitCorrelation.py --exp=$EXP $TRIALSELECTOR --inputBlockName="fr" --alignQuery="midPeak" --unitQuery="fr" --verbose --plotting
+
 # python3 ./selectUnitsByMeanFRandCorrelationAndAmplitude.py --exp=$EXP $TRIALSELECTOR $UNITSELECTOR --verbose
+# or
+# python3 ./selectUnitsByMeanFRandCorrelation.py --exp=$EXP $TRIALSELECTOR $UNITSELECTOR --verbose
+
 # python3 ./calcTrialOutliers.py --exp=$EXP $TRIALSELECTOR $UNITSELECTOR --saveResults --plotting --inputBlockName="fr" --alignQuery="all" --unitQuery="fr" --verbose

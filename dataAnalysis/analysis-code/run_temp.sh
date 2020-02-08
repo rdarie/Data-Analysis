@@ -22,10 +22,11 @@
 # EXP="exp201901070700"
 # EXP="exp201901201200"
 # EXP="exp201901211000"
-EXP="expRippleSaline"
+# EXP="expRippleSaline"
 # EXP="exp201901221000"
 # EXP="exp201901231000"
 # EXP="exp201901271000"
+EXP="exp202001231400"
 LAZINESS="--lazy"
 WINDOW="--window=long"
 # TRIALSELECTOR="--trialIdx=2"
@@ -38,5 +39,5 @@ conda activate
 source activate nda
 python --version
 
-SLURM_ARRAY_TASK_ID=1
-python3 ./preprocNS5.py --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID --previewMotorEncoder
+SLURM_ARRAY_TASK_ID="1"
+python3 ./quickPlot.py --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID

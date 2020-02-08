@@ -9,6 +9,8 @@ import statsmodels.api as sm
 from statsmodels.stats.multitest import multipletests as mt
 import pdb, traceback
 import os
+import scipy.optimize
+from itertools import product
 import joblib as jb
 import statsmodels
 from patsy import (
@@ -22,6 +24,51 @@ sns.set()
 sns.set_color_codes("dark")
 sns.set_context("talk")
 sns.set_style("whitegrid")
+
+
+def timeShift(x, lag):
+    return (
+        x.shift(lag)
+        .fillna(method='ffill', axis=0)
+        .fillna(method='bfill', axis=0)
+        )
+
+
+def shiftSmooth(x, lag=0, winWidth=1):
+    halfRollingWin = int(np.ceil(winWidth/2))
+    return (
+        x.rolling(winWidth, center=True, win_type='gaussian')
+        .mean(std=halfRollingWin)
+        .shift(lag)
+        .fillna(method='ffill', axis=0)
+        .fillna(method='bfill', axis=0)
+        )
+
+
+def shiftSmoothDecimate(x, lag=0, winWidth=1, decimate=1):
+    halfRollingWin = int(np.ceil(winWidth/2))
+    procDF = shiftSmooth(x, lag=lag, winWidth=winWidth)
+    if winWidth == 1:
+        return procDF.iloc[::decimate]
+    else:
+        return procDF.iloc[:, halfRollingWin:-halfRollingWin:decimate]
+
+
+def stimDescStr(progList, lagList, smoothFactor):
+    sf = smoothFactor
+    return ' + '.join([
+        (
+            '(shiftSmooth({}, {}, {}) * shiftSmooth({}, {}, {}))'
+            .format('RateInHz', l, sf, p, l, sf))
+        for p, l in product(progList, lagList)
+        ])
+
+
+def kinematicDescStr(kinList, lagList):
+    return ' + '.join([
+        'timeShift({}, {})'.format(k, l)
+        for k, l in product(kinList, lagList)
+        ])
 
 
 def applyScalersGrouped(DF, listOfScalers):
@@ -59,6 +106,20 @@ def applyScalersGrouped(DF, listOfScalers):
     return DF
 
 
+def applyScalersGroupedNoLag(DF, listOfScalers):
+    for scaler, listOfColumns in listOfScalers:
+        featuresMatchMask = (
+            DF
+            .columns
+            .isin(listOfColumns))
+        originalShape = DF.iloc[:, featuresMatchMask].shape
+        scaledVal = scaler.fit_transform(
+            DF.loc[:, featuresMatchMask]
+            .to_numpy().reshape(-1, 1)).reshape(originalShape)
+        DF.iloc[:, featuresMatchMask] = scaledVal
+    return DF
+
+
 def raisedCos(x, c, dc):
     argCos = (x - c) * np.pi / dc / 2
     argCos[argCos > np.pi] = np.pi
@@ -66,9 +127,8 @@ def raisedCos(x, c, dc):
     return (np.cos(argCos) + 1) / 2
 
 
-import scipy.optimize
 #
-def raisedCosBoundary(b, DT, minX, nb):
+def raisedCosBoundary(b=None, DT=None, minX=None, nb=None, plotting=False):
     eps = 1e-20
     nlin = lambda x: np.log(x + eps)
     # fun = lambda c0: (nb - 1) * nlin(c0 + b) + 2 * nlin(c0 + DT + b) - (nb - 1) * nlin(minX + b)
@@ -78,6 +138,11 @@ def raisedCosBoundary(b, DT, minX, nb):
             np.asarray([nlin(c0 + b)]),
             np.asarray([nlin(c0 + DT + b) - nlin(c0 + b)]) / (nb - 1)
             )[0]
+    if plotting:
+        plotC0 = np.linspace(-minX, minX * 20, 1000)
+        plt.plot(plotC0, fun(plotC0))
+        plt.title('solving for cos basis')
+        plt.show()
     return scipy.optimize.root(fun, minX * 2).x
 
 def makeRaisedCosBasis(
@@ -125,6 +190,8 @@ def makeRaisedCosBasis(
         tMask = iht < endpoints[0]
         ihbasis[tMask, 0] = 1
     orthobas = scipy.linalg.orth(ihbasis)
+    for colIdx in range(ihbasis.shape[1]):
+        ihbasis[:, colIdx] = ihbasis[:, colIdx] / np.sum(ihbasis[:, colIdx])
     # orthobas, _ = scipy.linalg.qr(ihbasis)
     return iht, orthobas, ihbasis
 
@@ -152,6 +219,22 @@ def poisson_pseudoR2(estimator, X, y):
     return _poisson_pseudoR2(y, yhat)
 
 
+def _FUDE(y, yhat1, yhat2, distr='softplus'):
+    # based on Goodman et al 2019
+    fude = (
+        1 -
+        (
+            pyglmnet._logL(distr, y, yhat1) /
+            pyglmnet._logL(distr, y, yhat2)))
+    return fude
+
+
+def FUDE(estimator1, estimator2, X, y, distr='softplus'):
+    yhat1 = estimator1.predict(X)
+    yhat2 = estimator2.predict(X)
+    return _FUDE(y, yhat1, yhat2, distr)
+     
+     
 class trialAwareStratifiedKFold:
     def __init__(
             self, n_splits=5, shuffle=False, random_state=None,
@@ -261,7 +344,6 @@ class SMWrapper(BaseEstimator, RegressorMixin):
 
 
 class pyglmnetWrapper(pyglmnet.GLM):
-
     def __init__(
             self, distr='poisson', alpha=0.5,
             Tau=None, group=None,
@@ -454,10 +536,15 @@ class SingleNeuronRegression():
         for idx, colName in enumerate(self.yTrain.columns):
             y = self.yTrain.loc[:, colName]
             reg = self.regressionList[colName]['reg']
+            if hasattr(reg, 'track_convergence'):
+                saveConvergenceState = reg.track_convergence
+                reg.track_convergence = False
             scores = cross_val_score(
                 reg, self.xTrain.to_numpy(),
                 y.to_numpy(),
                 error_score='raise', cv=iter(self.cv_folds))
+            if hasattr(reg, 'track_convergence'):
+                reg.track_convergence = saveConvergenceState
             if self.verbose:
                 print('{}: mean score {}, std {}'.format(
                     colName, np.mean(scores), np.std(scores)
@@ -473,11 +560,16 @@ class SingleNeuronRegression():
         for idx, colName in enumerate(self.yTrain.columns):
             y = self.yTrain.loc[:, colName]
             reg = self.regressionList[colName]['reg']
+            if hasattr(reg, 'track_convergence'):
+                saveConvergenceState = reg.track_convergence
+                reg.track_convergence = False
             gs = GridSearchCV(
                 reg, gridParams, refit=False,
                 error_score='raise',
                 cv=iter(self.cv_folds))
             gs.fit(self.xTrain.to_numpy(), y.to_numpy())
+            if hasattr(reg, 'track_convergence'):
+                reg.track_convergence = saveConvergenceState
             bestIndex = gs.best_index_
             reg.set_params(**gs.best_params_)
             self.regressionList[colName].update({
@@ -564,11 +656,9 @@ class SingleNeuronRegression():
             self,
             showNow=False, smoothY=10,
             maxPR2=None, unitName=None,
-            useInvLink=False):
+            useInvLink=False, showLegend=False):
         scores = [
-            {
-                'unit': k, 'score': v['gridsearch_best_mean_test_score'],
-                'std_score': v['gridsearch_best_std_test_score']}
+            {'unit': k, 'score': v['validationScore']}
             for k, v in self.regressionList.items()]
         scoresDF = pd.DataFrame(scores)
         if unitName is None:
@@ -614,8 +704,9 @@ class SingleNeuronRegression():
                     label='{}'.format(self.xTest.columns[idx]))
         ax[1].set_title('p < {} regressors'.format(self.tTestAlpha))
         ax[2].set_title('p > {} regressors'.format(self.tTestAlpha))
-        for thisAx in ax:
-            thisAx.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        if showLegend:
+            for thisAx in ax:
+                thisAx.legend(loc='center left', bbox_to_anchor=(1, 0.5))
         if showNow:
             plt.show()
         return fig, ax

@@ -22,9 +22,6 @@ Options:
     --estimatorName=estimatorName             filename for resulting estimator [default: tdr]
     --selector=selector                       filename if using a unit selector
     --maskOutlierTrials                       delete outlier trials? [default: False]
-    --ensembleHistoryTerms                    include ensemble history? [default: False]
-    --stimTerms                               include stim history? [default: False]
-    --kinematicTerms                          include kinematic history? [default: False]
 """
 import matplotlib
 matplotlib.rcParams['pdf.fonttype'] = 42
@@ -144,55 +141,13 @@ def calcUnitRegressionToAsig():
         estimatorSubFolder, prefix + '_{}_{}.h5'.format(
             arguments['secondaryBlockName'], arguments['window']))
     cv_kwargs = dict(
-        n_splits=5,
+        n_splits=7,
         shuffle=True,
         stratifyFactors=['RateInHz', 'program', 'amplitudeCat'],
         continuousFactors=['segment', 'originalIndex'])
-    # lags in units of the _analyze file sample rate
-    lagsInvestigated = [50, 150]
-    lagsInvestigated += [(-1) * i for i in lagsInvestigated]
-    lagsInvestigated = [0] + sorted(lagsInvestigated)
-    def formatLag(name, lag):
-        return '{}_{:+04d}'.format(name, lag).replace('+', 'p').replace('-', 'm')
-    if arguments['debugging'] and not os.path.exists(featuresMetaDataPath):
-        lagsInvestigated = [0]
-        # alignedAsigsKWargs['unitNames'] = [
-        #     'elec10#0_raster#0', 'elec75#1_raster#0']
-    addLags = {
-        # 'position#0': lagsInvestigated,
-        # 'velocity#0': lagsInvestigated,
-        # 'position_x#0': lagsInvestigated,
-        # 'velocity_x#0': lagsInvestigated,
-        # 'position_y#0': lagsInvestigated,
-        # 'velocity_y#0': lagsInvestigated,
-        'RateInHz#0': lagsInvestigated,
-        'amplitude#0': lagsInvestigated,
-        'program0_amplitude#0': lagsInvestigated,
-        'program1_amplitude#0': lagsInvestigated,
-        'program2_amplitude#0': lagsInvestigated,
-        'program3_amplitude#0': lagsInvestigated,
-        #
-        # 'program0_ACR#0': lagsInvestigated,
-        # 'program1_ACR#0': lagsInvestigated,
-        # 'program2_ACR#0': lagsInvestigated,
-        # 'program3_ACR#0': lagsInvestigated,
-        #
-        'GT_Right_angle#0': lagsInvestigated,
-        'K_Right_angle#0': lagsInvestigated,
-        'M_Right_angle#0': lagsInvestigated,
-        'GT_Right_angular_velocity#0': lagsInvestigated,
-        'K_Right_angular_velocity#0': lagsInvestigated,
-        'M_Right_angular_velocity#0': lagsInvestigated,
-        'GT_Right_angular_acceleration#0': lagsInvestigated,
-        'K_Right_angular_acceleration#0': lagsInvestigated,
-        'M_Right_angular_acceleration#0': lagsInvestigated,
-        }
     addHistoryTerms = {
-        'nb': 5,
+        'nb': 7,
         'dt': rasterOpts['binInterval'],
-        'endpoints': [
-            2 * rasterOpts['binInterval'] * alignedAsigsKWargs['decimate'],
-            .300],
         'b': 0.001,
         'zflag': False
         }
@@ -204,10 +159,12 @@ def calcUnitRegressionToAsig():
         nb=addHistoryTerms['nb'], plotting=(arguments['debugging'] and arguments['plotting'])
         )
     addHistoryTerms['endpoints'] = [historyEdge[0], historyEdge[0] + historyLen]
-    # pdb.set_trace()
     if addHistoryTerms:
         iht, orthobas, ihbasis = makeRaisedCosBasis(**addHistoryTerms)
-        if arguments['debugging'] and arguments['plotting']:
+        addHistoryTerms['nb'] = orthobas.shape[1]
+        # pdb.set_trace()
+        plotTheBases = arguments['debugging'] and arguments['plotting']
+        if plotTheBases:
             fig, ax = plt.subplots(2, 1, sharex=True)
             ax[0].plot(iht, ihbasis)
             ax[0].set_title('raised cos basis')
@@ -242,28 +199,121 @@ def calcUnitRegressionToAsig():
             verbose=arguments['verbose'],
             solver='L-BFGS-B',
             # solver='cdfast',
-            max_iter=50, tol=1e-6, learning_rate=2e-1,
+            max_iter=100, tol=1e-5, learning_rate=2e-1,
             score_metric='pseudo_R2', track_convergence=True),
         model=pyglmnetWrapper
         )
-    # if HAS_MPI:
-    #     modelArguments['modelKWargs']['verbose'] = False
-    if arguments['debugging']:
-        modelArguments['modelKWargs']['max_iter'] = 20
+    kList = [
+        'GT_Right_angle',
+        'K_Right_angle',
+        'M_Right_angle',
+        'GT_Right_angular_velocity',
+        'K_Right_angular_velocity',
+        'M_Right_angular_velocity',
+        'GT_Right_angular_acceleration',
+        'K_Right_angular_acceleration',
+        'M_Right_angular_acceleration'
+        ]
+    pList = [
+        'program0_amplitude', 'program1_amplitude',
+        'program2_amplitude', 'program3_amplitude'
+        ]
+    #
+    countPerBin = rasterOpts['binInterval'] * alignedAsigsKWargs['decimate']
+    if(RANK == 0):
+        # find existing variants
+        variantMetaDataPath = os.path.join(
+            estimatorSubFolder, 'variant_metadata.pickle')
+        varFolders = sorted(glob.glob(os.path.join(estimatorSubFolder, 'var_*')))
+        existingVarSubFolders = [os.path.basename(i) for i in varFolders]
+        if len(existingVarSubFolders):
+            assert os.path.exists(variantMetaDataPath), 'Missing saved model info!'
+            with open(variantMetaDataPath, 'rb') as f:
+                allModelOpts = pickle.load(f)
+        else:
+            timeLags = [
+                int(i / countPerBin)
+                for i in [0, 75e-3, 150e-3, -150e-3]
+            ]
+            if arguments['verbose'] and (RANK == 0):
+                print('timeLags = {}'.format(timeLags))
+            allModelOpts = []
+            for eht in [True, False]:
+                for kt in [True, False]:
+                    for st in [True, False]:
+                        if not any([eht, kt, st]):
+                            continue
+                        if kt:
+                            allKinLags = timeLags
+                        else:
+                            allKinLags = [0]
+                        if st:
+                            allStimLags = timeLags
+                        else:
+                            allStimLags = [0]
+                        allModelOpts += [
+                            {
+                                'kinLag': allKinLags,
+                                'stimLag': allStimLags,
+                                'ensembleHistoryTerms': eht,
+                                'stimTerms': st,
+                                'kinematicTerms': kt}
+                            ]
+                        if not any([kt, st]):
+                            continue
+                        for ktl in allKinLags:
+                            for stl in allStimLags:
+                                allModelOpts += [
+                                    {
+                                        'kinLag': [ktl],
+                                        'stimLag': [stl],
+                                        'ensembleHistoryTerms': eht,
+                                        'stimTerms': st,
+                                        'kinematicTerms': kt}
+                                    ]
+            with open(variantMetaDataPath, 'wb') as f:
+                pickle.dump(
+                    allModelOpts, f)
+    else:
+        allModelOpts = None
+        existingVarSubFolders = None
+    #
+    if HAS_MPI:
+        COMM.Barrier()  # sync MPI threads, wait for 0
+        allModelOpts = COMM.bcast(allModelOpts, root=0)
+        existingVarSubFolders = COMM.bcast(existingVarSubFolders, root=0)
+        modelArguments['modelKWargs']['verbose'] = False
+    # if arguments['debugging']:
+    #     modelArguments['modelKWargs']['max_iter'] = 20
     gridParams = [
         {
             'reg_lambda': np.logspace(
                 np.log(5e-2), np.log(1e-4),
-                3, base=np.exp(1))}
+                7, base=np.exp(1))}
         ]
     # elastic_net L1 weight, maxiter and regularization params
     # chosen based on Benjamin et al 2017
     #
-    featureNames = sorted([i for i in addLags.keys()])
+    featureNames = sorted([
+        'RateInHz#0',
+        'amplitude#0',
+        'program0_amplitude#0',
+        'program1_amplitude#0',
+        'program2_amplitude#0',
+        'program3_amplitude#0',
+        'GT_Right_angle#0',
+        'K_Right_angle#0',
+        'M_Right_angle#0',
+        'GT_Right_angular_velocity#0',
+        'K_Right_angular_velocity#0',
+        'M_Right_angular_velocity#0',
+        'GT_Right_angular_acceleration#0',
+        'K_Right_angular_acceleration#0',
+        'M_Right_angular_acceleration#0',
+        ])
     featureLoadArgs = alignedAsigsKWargs.copy()
     featureLoadArgs['unitNames'] = featureNames
     featureLoadArgs['unitQuery'] = None
-    featureLoadArgs['addLags'] = addLags
     targetLoadArgs = alignedAsigsKWargs.copy()
     # check if we need to recalculate saved features
     if (RANK == 0):
@@ -282,6 +332,10 @@ def calcUnitRegressionToAsig():
                 'targetLoadArgs': targetLoadArgs,
                 'featureLoadArgs': featureLoadArgs
             }
+            if addHistoryTerms:
+                featuresMetaData['ihbasis'] = ihbasis
+                featuresMetaData['iht'] = iht
+                featuresMetaData['addHistoryTerms'] = addHistoryTerms
     else:
         reloadFeatures = None
         featuresMetaData = None
@@ -297,14 +351,12 @@ def calcUnitRegressionToAsig():
             dataBlock, **targetLoadArgs)
         if addHistoryTerms:
             historyLoadArgs = targetLoadArgs.copy()
-            # historyLoadArgs['rollingWindow'] = None
-            # historyLoadArgs['decimate'] = 1
             historyTerms = []
             for colIdx in range(addHistoryTerms['nb']):
-                if arguments['verbose']:
+                if arguments['verbose'] and (RANK == 0):
                     print('Calculating history term {}'.format(colIdx + 1))
-                thisBasis = ihbasis[:, colIdx] / np.sum(ihbasis[:, colIdx])
-                # thisBasis = orthobas[:, colIdx]
+                # thisBasis = ihbasis[:, colIdx] / np.sum(ihbasis[:, colIdx])
+                thisBasis = orthobas[:, colIdx]
                 #
                 def pFun(x):
                     x.iloc[:, :] = np.apply_along_axis(
@@ -347,12 +399,11 @@ def calcUnitRegressionToAsig():
         targetDF.drop(index=dropIndex, inplace=True)
         featuresDF.drop(index=dropIndex, inplace=True)
         #  Standardize units (count/bin)
-        targetDF = pd.DataFrame(targetDF * rasterOpts['binInterval'] * alignedAsigsKWargs['decimate'])
+        targetDF = targetDF * countPerBin
         columnInfo = (
             featuresDF
             .columns.to_frame()
             .reset_index(drop=True))
-        #
         targetScalers = []
         featureScalers = []
         ############################################################
@@ -368,10 +419,10 @@ def calcUnitRegressionToAsig():
         targetDF = applyScalersGrouped(targetDF, targetScalers)
         #
         featuresDF.columns = [
-            '{}_{:+04d}'.format(*i).replace('#0', '').replace('+', 'p').replace('-', 'm')
+            '{}'.format(i[0]).replace('#0', '')
             for i in featuresDF.columns]
         targetDF.columns = [
-            '{}_{:+04d}'.format(*i).replace('_raster#0', '').replace('+', 'p').replace('-', 'm')
+            '{}'.format(i[0]).replace('_raster#0', '')
             for i in targetDF.columns]
         #
         with open(featuresMetaDataPath, 'wb') as f:
@@ -400,8 +451,8 @@ def calcUnitRegressionToAsig():
         test = COMM.bcast(test, root=0)
         cv = COMM.bcast(cv, root=0)
     #
-    yTrain = targetDF.iloc[train, :]
-    yTest = targetDF.iloc[test, :]
+    yTrain = targetDF.iloc[train, :].copy()
+    yTest = targetDF.iloc[test, :].copy()
     cv_folds = cv.split(yTrain)
     #
     if HAS_MPI:
@@ -412,90 +463,52 @@ def calcUnitRegressionToAsig():
         print(
             'Process {}, running regression for units {}'
             .format(RANK, yColIdx))
-        yTrain = yTrain.iloc[:, yColIdx]
-        yTest = yTest.iloc[:, yColIdx]
+        yTrain = yTrain.iloc[:, yColIdx].copy()
+        yTest = yTest.iloc[:, yColIdx].copy()
+    #
     if arguments['debugging']:
         yColDbList = ['elec10#0_p000', 'elec75#1_p000']
-        yTrain = yTrain.loc[:, yColDbList]
-        yTest = yTest.loc[:, yColDbList]
+        yTrain = yTrain.loc[:, yColDbList].copy()
+        yTest = yTest.loc[:, yColDbList].copy()
     #
-    allModelDescStr = []
-    for lag in lagsInvestigated:
-        kinematicDescStr = ' + '.join([
-            formatLag('GT_Right_angle', lag),
-            formatLag('K_Right_angle', lag),
-            formatLag('M_Right_angle', lag),
-            formatLag('GT_Right_angular_velocity', lag),
-            formatLag('K_Right_angular_velocity', lag),
-            formatLag('M_Right_angular_velocity', lag),
-            formatLag('GT_Right_angular_acceleration', lag),
-            formatLag('K_Right_angular_acceleration', lag),
-            formatLag('M_Right_angular_acceleration', lag)
-        ])
-        stimDescStr = ' + '.join(
-            [
-                '{}'.format(formatLag('RateInHz', lag)) + ' * ' + i
-                for i in [
-                    formatLag('program0_amplitude', lag), formatLag('program1_amplitude', lag),
-                    formatLag('program2_amplitude', lag), formatLag('program3_amplitude', lag)
-                    ]
-            ]
-            )
-        historyDescStr = ' + '.join([
-            i
-            for i in featuresDF.columns if '_cos' in i])
-        descStrList = []
-        if arguments['ensembleHistoryTerms']:
-            descStrList.append(historyDescStr)
-        if arguments['stimTerms']:
-            descStrList.append(stimDescStr)
-        if arguments['kinematicTerms']:
-            descStrList.append(kinematicDescStr)
-        descStr = ' + '.join(descStrList)
-        allModelDescStr.append(descStr)
-    # find existing variants
-    varFolders = sorted(glob.glob(os.path.join(estimatorSubFolder, 'var_*')))
-    if len(varFolders):
-        varIdx = [int(os.path.basename(i)[-3:]) for i in varFolders]
-        maxVarIdx = max(varIdx) + 1
-    else:
-        maxVarIdx = 0
-    for modelIdx, descStr in enumerate(allModelDescStr):
-        desc = ModelDesc.from_formula(descStr)
-        xTrain = dmatrix(
-            desc,
-            featuresDF.iloc[train, :],
-            return_type='dataframe')
-        xTest = dmatrix(
-            desc,
-            featuresDF.iloc[test, :],
-            return_type='dataframe')
-        #  if arguments['debugging'] and arguments['plotting']:
-        #      fig, ax = plt.subplots()
-        #      featureBins = np.linspace(-3, 3, 100)
-        #      for featName in xTrain.columns:
-        #          print('{}: {}'.format(featName, xTrain[featName].unique()))
-        #          sns.distplot(
-        #              xTrain[featName], bins=featureBins,
-        #              ax=ax, label=featName, kde=False)
-        #      plt.legend()
-        #      plt.show()
-        snr = SingleNeuronRegression(
-            xTrain=xTrain, yTrain=yTrain,
-            xTest=xTest, yTest=yTest,
-            cv_folds=cv_folds,
-            **modelArguments,
-            verbose=arguments['verbose'],
-            plotting=arguments['plotting']
-            )
+    del targetDF
+    # pdb.set_trace()
+    # bla1 = dmatrix(kinematicDescStr(kList, allLagOpts[0]['kinLag']), featuresDF.iloc[train, :], return_type='dataframe')
+    # bla2 = dmatrix(kinematicDescStr(kList, allLagOpts[-1]['kinLag']), featuresDF.iloc[train, :], return_type='dataframe')
+    # plt.plot(bla1)
+    # plt.plot(bla2)
+    for modelIdx, modelOpts in enumerate(allModelOpts):
+        varBaseName = 'var_{:03d}'.format(modelIdx)
         variantSubFolder = os.path.join(
             estimatorSubFolder,
-            'var_{:03d}'.format(modelIdx + maxVarIdx)
+            varBaseName
             )
+        if len(existingVarSubFolders):
+            if varBaseName in existingVarSubFolders:
+                continue
+        if arguments['verbose'] and (RANK == 0):
+            print('Running model variant {}'.format(varBaseName))
+        descStrList = []
+        if modelOpts['kinematicTerms']:
+            descStrList.append(kinematicDescStr(kList, modelOpts['kinLag']))
+        if modelOpts['stimTerms']:
+            descStrList.append(stimDescStr(pList, modelOpts['stimLag']))
+        if modelOpts['ensembleHistoryTerms']:
+            historyDescStr = ' + '.join([
+                i
+                for i in featuresDF.columns if '_cos' in i
+                ])
+            descStrList.append(historyDescStr)
+        #
+        descStr = ' + '.join(descStrList)
+        #
         estimatorPath = os.path.join(
             variantSubFolder, 'estimator.joblib')
         estimatorMetadataPath = os.path.join(
             variantSubFolder, 'estimator_metadata.pickle')
+        if HAS_MPI:
+            estimatorPath = estimatorPath.replace(
+                'estimator', 'estimator_{:03d}'.format(RANK))
         if RANK == 0:
             if not os.path.exists(variantSubFolder):
                 os.makedirs(variantSubFolder, exist_ok=True)
@@ -514,10 +527,29 @@ def calcUnitRegressionToAsig():
                 with open(estimatorMetadataPath, 'wb') as f:
                     pickle.dump(
                         estimatorMetadata, f)
-        # if not arguments['debugging']:
-        #     snr.apply_gridSearchCV(gridParams)
-        # else:
-        #     pass
+        #
+        desc = ModelDesc.from_formula(descStr)
+        xTrain = dmatrix(
+            desc,
+            featuresDF.iloc[train, :],
+            return_type='dataframe')
+        xTest = dmatrix(
+            desc,
+            featuresDF.iloc[test, :],
+            return_type='dataframe')
+        #
+        snr = SingleNeuronRegression(
+            xTrain=xTrain, yTrain=yTrain,
+            xTest=xTest, yTest=yTest,
+            cv_folds=cv_folds,
+            **modelArguments,
+            verbose=arguments['verbose'],
+            plotting=arguments['plotting']
+            )
+        if not arguments['debugging']:
+            snr.apply_gridSearchCV(gridParams)
+        else:
+            pass
         #
         # tolFindParams = {
         #     'max_iter': 5000,
@@ -532,19 +564,9 @@ def calcUnitRegressionToAsig():
         if arguments['debugging']:
             toc()
             pdb.set_trace()
+        #
         if not arguments['debugging']:
             snr.clear_data()
-        else:
-            for unitName in snr.regressionList.keys():
-                reg = snr.regressionList[unitName]['reg']
-                print(snr.regressionList[unitName]['validationScore'])
-        #
-        if HAS_MPI:
-            estimatorPath = estimatorPath.replace(
-                'estimator', 'estimator_{:03d}'.format(RANK))
-        else:
-            if arguments['plotting']:
-                snr.plot_xy()
         if not arguments['debugging']:
             jb.dump(snr, estimatorPath)
         if HAS_MPI:

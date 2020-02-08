@@ -382,11 +382,6 @@ def unitSpikeTrainWaveformsToDF(
             if wf.shape[1] > 0:
                 wf = wf[:, 0, :]
         wfDF = pd.DataFrame(wf)
-        # TODO: replace this with rolling window and decimate
-        # wfDF = wfDF.iloc[:, ::decimate]
-        # samplingRate = st.sampling_rate / decimate
-        #  if verbose:
-        #      print('wfDF.shape = {}'.format(wfDF.shape))
         samplingRate = st.sampling_rate
         bins = (
             np.asarray(wfDF.columns) / samplingRate -
@@ -462,16 +457,18 @@ def unitSpikeTrainWaveformsToDF(
         if isinstance(lag, int):
             shiftedWaveform = zeroLagWaveformsDF.shift(lag, axis='columns')
             if rollingWindow is not None:
+                halfRollingWin = int(np.ceil(rollingWindow/2))
+                seekIdx = slice(halfRollingWin, -halfRollingWin, decimate)
                 shiftedWaveform = (
                     shiftedWaveform
-                    .rolling(rollingWindow, axis='columns', center=True)
-                    .mean())
-                # account for centering
-                seekIdx = int(rollingWindow/2)
+                    .rolling(
+                        window=rollingWindow, win_type='gaussian',
+                        axis='columns', center=True)
+                    .mean(std=halfRollingWin))
             else:
-                seekIdx = 0
+                halfRollingWin = 0
+                seekIdx = slice(None, None, decimate)
                 if False:
-                    pdb.set_trace()
                     import matplotlib.pyplot as plt
                     oldShiftedWaveform = zeroLagWaveformsDF.shift(lag, axis='columns')
                     plt.plot(oldShiftedWaveform.iloc[0, :])
@@ -479,16 +476,20 @@ def unitSpikeTrainWaveformsToDF(
                     plt.show()
             laggedWaveformsDict[
                 (spikeTrainContainer.name, lag)] = (
-                    shiftedWaveform.iloc[:, seekIdx::decimate].copy())
+                    shiftedWaveform.iloc[:, seekIdx].copy())
         if isinstance(lag, tuple):
+            halfRollingWin = int(np.ceil(lag[1]/2))
+            seekIdx = slice(halfRollingWin, -halfRollingWin, decimate)
             shiftedWaveform = (
                 zeroLagWaveformsDF
                 .shift(lag[0], axis='columns')
-                .rolling(lag[1], axis='columns', center=True)
-                .mean())
+                .rolling(
+                    window=lag[1], win_type='gaussian',
+                    axis='columns', center=True)
+                .mean(std=halfRollingWin))
             laggedWaveformsDict[
                 (spikeTrainContainer.name, lag)] = (
-                    shiftedWaveform.iloc[:, ::decimate].copy())
+                    shiftedWaveform.iloc[:, seekIdx].copy())
     #
     if transposeToColumns == 'feature':
         # stack the bin, name the feature column
