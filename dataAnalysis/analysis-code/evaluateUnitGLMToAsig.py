@@ -123,7 +123,7 @@ variantList = [os.path.basename(i) for i in varFolders]
 if arguments['debugging']:
     showNow = False
     # variantList = ['bak/var_000']
-    variantList = ['var_{:03d}'.format(i) for i in range(53)]
+    variantList = ['var_{:03d}'.format(i) for i in range(55)]
 else:
     showNow = False
 
@@ -133,14 +133,14 @@ def calcMinIter(iterBetaNorm, tol_list=[1e-6], plotting=False):
         ibn = iterBetaNorm
     else:
         ibn = pd.Series(iterBetaNorm)
-    updateSize = ibn.diff().abs() / ibn.shift(1)
+    updateSize = (ibn.diff().abs() / ibn.shift(1)).fillna(0)
     terminateIndices = []
     if plotting:
         fig, ax = plt.subplots()
         ax.plot(ibn)
     for tol in tol_list:
         tolMask = updateSize >= tol
-        if (~tolMask).any():
+        if (tolMask).any():
             idxOverTol = updateSize.index[tolMask]
             terminIdx = idxOverTol.max()
         else:
@@ -165,7 +165,6 @@ variantInfo = pd.DataFrame(
 for variantName in variantList:
     variantIdx = int(variantName[-3:])
     modelOpts = allModelOpts[variantIdx]
-    variantInfo.loc[variantName, 'stimSmooth'] = modelOpts['stimSmooth']
     singleLag = (
         len(modelOpts['kinLag']) == 1 and
         len(modelOpts['stimLag']) == 1)
@@ -189,6 +188,14 @@ for variantName in variantList:
        fullEstimatorName, variantName, 'estimator_metadata.pickle')
     with open(estimatorMetadataPath, 'rb') as f:
         estimatorMetadata = pickle.load(f)
+    
+    cBasis = estimatorMetadata['cBasis']
+    def applyCBasis(x, cbCol):
+        return np.convolve(
+            x.to_numpy(),
+            cBasis[cbCol].to_numpy(),
+            mode='same')
+
     estimatorPath = os.path.join(
         estimatorSubFolder, variantName, 'estimator.joblib')
     if os.path.exists(estimatorPath):
@@ -256,31 +263,33 @@ for variantName in variantList:
     if arguments['plottingIndividual']:
         cPalettes = sns.color_palette()
         #
-        # with sns.plotting_context('notebook', font_scale=1):
-        #     try:
-        #         fig, ax = estimator.plot_xy(smoothY=rollingWindow)
-        #         # fig, ax = estimator.plot_xy(maxPR2=0.025)
-        #         # fig, ax = estimator.plot_xy(unitName='elec75#1_p000', smoothY=10)
-        #         for cAx in ax:
-        #             cAx.set_xlim([100, 2000])
-        #         pdfPath = os.path.join(
-        #             estimatorFiguresFolder,
-        #             'traces_example_{}.pdf'.format(
-        #                 variantName))
-        #         fig.savefig(
-        #             pdfPath,
-        #             bbox_extra_artists=(i.get_legend() for i in ax),
-        #             bbox_inches='tight')
-        #         fig.savefig(
-        #             pdfPath.replace('.pdf', '.png'),
-        #             bbox_extra_artists=(i.get_legend() for i in ax),
-        #             bbox_inches='tight')
-        #         if showNow:
-        #             plt.show()
-        #         else:
-        #             plt.close()
-        #     except Exception:
-        #         traceback.print_exc()
+        with sns.plotting_context('notebook', font_scale=1):
+            try:
+                fig, ax = estimator.plot_xy(smoothY=rollingWindow)
+                # fig, ax = estimator.plot_xy(maxPR2=0.025)
+                # fig, ax = estimator.plot_xy(unitName='elec75#1_p000', smoothY=10)
+                for cAx in ax:
+                    cAx.set_xlim([100, 2000])
+                pdfPath = os.path.join(
+                    estimatorFiguresFolder,
+                    'traces_example_{}.pdf'.format(
+                        variantName))
+                fig.savefig(
+                    pdfPath,
+                    # bbox_extra_artists=(i.get_legend() for i in ax),
+                    # bbox_inches='tight'
+                    )
+                fig.savefig(
+                    pdfPath.replace('.pdf', '.png'),
+                    # bbox_extra_artists=(i.get_legend() for i in ax),
+                    # bbox_inches='tight'
+                    )
+                if showNow:
+                    plt.show()
+                else:
+                    plt.close()
+            except Exception:
+                traceback.print_exc()
     #
     pR2 = pd.DataFrame(
         np.nan,
@@ -309,19 +318,16 @@ for variantName in variantList:
             iterBetaNorm = regDict['iterBetaNorm']
             iterScore = regDict['iterScore']
             termIndices = calcMinIter(iterBetaNorm, tol_list=tolList)
-            theseParams = pd.DataFrame(
-                {
-                    'tol': [
-                        tolList[i]
-                        for i in range(len(tolList))],
-                    'minIter': [
-                        termIndices[i]
-                        for i in range(len(tolList))],
-                    'score': [
-                        iterScore[termIndices[i]]
-                        for i in range(len(tolList))]
-                }
-            )
+            theseParams = pd.DataFrame({
+                'tol': [
+                    tolList[i]
+                    for i in range(len(tolList))],
+                'minIter': [
+                    termIndices[i]
+                    for i in range(len(tolList))],
+                'score': [
+                    iterScore[termIndices[i]]
+                    for i in range(len(tolList))]})
             theseParams['marginalIter'] = theseParams['minIter'].diff()
             theseParams['marginalScore'] = theseParams['score'].diff()
             toleranceParamsList.append(theseParams)

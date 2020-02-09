@@ -27,7 +27,7 @@
 # EXP="exp201901211000"
 EXP="exp201901271000"
 # ESTIMATOR="glm_20msec"
-ESTIMATOR="glm_1msec"
+ESTIMATOR="glm_50msec"
 
 # UNITSELECTOR=""
 # UNITSELECTOR="--selector=_minfrmaxcorr"
@@ -41,7 +41,7 @@ source activate nda
 python --version
 
 module load mpi
-srun --mpi=pmi2 python3 -u ./calcUnitGLMToAsigV3.py --exp=$EXP --processAll --inputBlockName="raster" --unitQuery="raster" $UNITSELECTOR --secondaryBlockName="rig" --alignQuery="midPeak" --estimatorName=$ESTIMATOR --verbose --attemptMPI
-# python3 -u ./calcUnitGLMToAsigV3.py --exp=$EXP --processAll --inputBlockName="raster" --unitQuery="raster" $UNITSELECTOR --secondaryBlockName="rig" --alignQuery="midPeak" --estimatorName=$ESTIMATOR --verbose --plotting --debugging
+srun --mpi=pmi2 python3 -u ./calcUnitGLMToAsigV2.py --exp=$EXP --processAll --inputBlockName="raster" --unitQuery="raster" $UNITSELECTOR --secondaryBlockName="rig" --alignQuery="midPeak" --estimatorName=$ESTIMATOR --verbose --attemptMPI
+# python3 -u ./calcUnitGLMToAsigV2.py --exp=$EXP --processAll --inputBlockName="raster" --unitQuery="raster" $UNITSELECTOR --secondaryBlockName="rig" --alignQuery="midPeak" --estimatorName=$ESTIMATOR --verbose --plotting --dryRun --debugging
 
-# python3 ./evaluateUnitGLMToAsig.py --exp=$EXP --processAll --alignQuery="midPeak" --estimatorName=$ESTIMATOR --lazy --verbose --plottingOverall --debugging --makePredictionPDF
+# python3 ./evaluateUnitGLMToAsig.py --exp=$EXP --processAll --alignQuery="midPeak" --estimatorName=$ESTIMATOR --lazy --verbose --plottingIndividual --debugging --makePredictionPDF

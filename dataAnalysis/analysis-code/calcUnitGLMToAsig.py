@@ -22,9 +22,6 @@ Options:
     --estimatorName=estimatorName             filename for resulting estimator [default: tdr]
     --selector=selector                       filename if using a unit selector
     --maskOutlierTrials                       delete outlier trials? [default: False]
-    --ensembleHistoryTerms                    include ensemble history? [default: False]
-    --stimTerms                               include stim history? [default: False]
-    --kinematicTerms                          include kinematic history? [default: False]
 """
 import matplotlib
 matplotlib.rcParams['pdf.fonttype'] = 42
@@ -91,7 +88,6 @@ def calcUnitRegressionToAsig():
         )
     if not os.path.exists(alignSubFolder):
         os.makedirs(alignSubFolder, exist_ok=True)
-    #
     if arguments['processAll']:
         prefix = assembledName
     else:
@@ -113,7 +109,7 @@ def calcUnitRegressionToAsig():
         alignSubFolder, fullEstimatorName)
     if not os.path.exists(estimatorSubFolder):
         os.makedirs(estimatorSubFolder, exist_ok=True)
-    #
+    subsampleOpts = glmOptsLookup[arguments['estimatorName']]
     alignedAsigsKWargs.update(dict(
         duplicateControlsByProgram=False,
         makeControlProgram=False,
@@ -125,10 +121,9 @@ def calcUnitRegressionToAsig():
             'pedalMovementCat', 'pedalMovementDuration',
             'pedalSize', 'pedalSizeCat', 'pedalVelocityCat',
             'program', 'segment', 't'],
-        **glmOptsLookup[arguments['estimatorName']],
+        **subsampleOpts,
         metaDataToCategories=False,
         verbose=False, procFun=None))
-    #
     alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **arguments)
     alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
         namedQueries, alignSubFolder, **arguments)
@@ -143,78 +138,76 @@ def calcUnitRegressionToAsig():
     regressorH5Path = os.path.join(
         estimatorSubFolder, prefix + '_{}_{}.h5'.format(
             arguments['secondaryBlockName'], arguments['window']))
+    #
+    kList = [
+        'GT_Right_angle',
+        'K_Right_angle',
+        'M_Right_angle',
+        'GT_Right_angular_velocity',
+        'K_Right_angular_velocity',
+        'M_Right_angular_velocity',
+        'GT_Right_angular_acceleration',
+        'K_Right_angular_acceleration',
+        'M_Right_angular_acceleration'
+        ]
+    pList = [
+        'program0_amplitude', 'program1_amplitude',
+        'program2_amplitude', 'program3_amplitude'
+        ]
+    #
+    featureNames = sorted([
+        'RateInHz#0',
+        'amplitude#0'] +
+        [k + '#0' for k in kList] +
+        [p + '#0' for p in pList]
+        )
+    #
+    countPerBin = rasterOpts['binInterval'] * winSize
+    binSize = rasterOpts['binInterval'] * subsampleOpts['decimate']
+    #
+    featureLoadArgs = alignedAsigsKWargs.copy()
+    featureLoadArgs['unitNames'] = featureNames.copy()
+    featureLoadArgs['unitQuery'] = None
+    targetLoadArgs = alignedAsigsKWargs.copy()
+    #
     cv_kwargs = dict(
-        n_splits=5,
+        n_splits=7,
         shuffle=True,
         stratifyFactors=['RateInHz', 'program', 'amplitudeCat'],
         continuousFactors=['segment', 'originalIndex'])
-    # lags in units of the _analyze file sample rate
-    lagsInvestigated = [50, 150]
-    lagsInvestigated += [(-1) * i for i in lagsInvestigated]
-    lagsInvestigated = [0] + sorted(lagsInvestigated)
-    def formatLag(name, lag):
-        return '{}_{:+04d}'.format(name, lag).replace('+', 'p').replace('-', 'm')
-    if arguments['debugging'] and not os.path.exists(featuresMetaDataPath):
-        lagsInvestigated = [0]
-        # alignedAsigsKWargs['unitNames'] = [
-        #     'elec10#0_raster#0', 'elec75#1_raster#0']
-    addLags = {
-        # 'position#0': lagsInvestigated,
-        # 'velocity#0': lagsInvestigated,
-        # 'position_x#0': lagsInvestigated,
-        # 'velocity_x#0': lagsInvestigated,
-        # 'position_y#0': lagsInvestigated,
-        # 'velocity_y#0': lagsInvestigated,
-        'RateInHz#0': lagsInvestigated,
-        'amplitude#0': lagsInvestigated,
-        'program0_amplitude#0': lagsInvestigated,
-        'program1_amplitude#0': lagsInvestigated,
-        'program2_amplitude#0': lagsInvestigated,
-        'program3_amplitude#0': lagsInvestigated,
-        #
-        # 'program0_ACR#0': lagsInvestigated,
-        # 'program1_ACR#0': lagsInvestigated,
-        # 'program2_ACR#0': lagsInvestigated,
-        # 'program3_ACR#0': lagsInvestigated,
-        #
-        'GT_Right_angle#0': lagsInvestigated,
-        'K_Right_angle#0': lagsInvestigated,
-        'M_Right_angle#0': lagsInvestigated,
-        'GT_Right_angular_velocity#0': lagsInvestigated,
-        'K_Right_angular_velocity#0': lagsInvestigated,
-        'M_Right_angular_velocity#0': lagsInvestigated,
-        'GT_Right_angular_acceleration#0': lagsInvestigated,
-        'K_Right_angular_acceleration#0': lagsInvestigated,
-        'M_Right_angular_acceleration#0': lagsInvestigated,
-        }
+    #
+    addStimDiff = True
+    #
     addHistoryTerms = {
         'nb': 5,
         'dt': rasterOpts['binInterval'],
-        'endpoints': [
-            2 * rasterOpts['binInterval'] * alignedAsigsKWargs['decimate'],
-            .300],
         'b': 0.001,
         'zflag': False
         }
     # make sure history terms don't bleed into current bins
-    historyLen = .3
+    historyLen = .25
+    plotTheBases = (arguments['debugging'] and arguments['plotting'])
+    winSize = subsampleOpts['rollingWindow'] if subsampleOpts['rollingWindow'] is not None else 1
     historyEdge = raisedCosBoundary(
         b=addHistoryTerms['b'], DT=historyLen,
-        minX=max(rasterOpts['binInterval'] * alignedAsigsKWargs['decimate'] / 2, 1e-3),
-        nb=addHistoryTerms['nb'], plotting=(arguments['debugging'] and arguments['plotting'])
+        minX=max(rasterOpts['binInterval'] * winSize / 2, 1e-3),
+        nb=addHistoryTerms['nb'], plotting=plotTheBases
         )
     addHistoryTerms['endpoints'] = [historyEdge[0], historyEdge[0] + historyLen]
-    # pdb.set_trace()
     if addHistoryTerms:
         iht, orthobas, ihbasis = makeRaisedCosBasis(**addHistoryTerms)
-        if arguments['debugging'] and arguments['plotting']:
+        # addHistoryTerms['nb'] = orthobas.shape[1]
+        if plotTheBases:
             fig, ax = plt.subplots(2, 1, sharex=True)
             ax[0].plot(iht, ihbasis)
             ax[0].set_title('raised cos basis')
             ax[1].plot(iht, orthobas)
             ax[1].set_title('orthogonalized basis')
-            plt.show()
-    #
+            ax[1].set_xlabel('Time (sec)')
+            if arguments['debugging']:
+                plt.show()
+            else:
+                plt.close()
     # statistical model specific options
     # for statsmodels wrapper
     #  modelArguments = dict(
@@ -236,35 +229,103 @@ def calcUnitRegressionToAsig():
     #      }
     modelArguments = dict(
         modelKWargs=dict(
-            distr='softplus', alpha=0.1, reg_lambda=1e-4,
+            distr='softplus', alpha=0.25, reg_lambda=1e-4,
             fit_intercept=False,
             # verbose=arguments['debugging'],
             verbose=arguments['verbose'],
             solver='L-BFGS-B',
             # solver='cdfast',
-            max_iter=50, tol=1e-6, learning_rate=2e-1,
+            max_iter=100, tol=1e-5, learning_rate=2e-1,
             score_metric='pseudo_R2', track_convergence=True),
         model=pyglmnetWrapper
         )
-    # if HAS_MPI:
-    #     modelArguments['modelKWargs']['verbose'] = False
-    if arguments['debugging']:
-        modelArguments['modelKWargs']['max_iter'] = 20
+    # if arguments['debugging']:
+    #     modelArguments['modelKWargs']['max_iter'] = 20
     gridParams = [
         {
-            'reg_lambda': np.logspace(
-                np.log(5e-2), np.log(1e-4),
-                3, base=np.exp(1))}
+            'reg_lambda': np.round(
+                np.logspace(
+                    np.log(5e-2), np.log(1e-4),
+                    7, base=np.exp(1)),
+                decimals=5)}
         ]
     # elastic_net L1 weight, maxiter and regularization params
     # chosen based on Benjamin et al 2017
+    if(RANK == 0):
+        # find existing variants
+        variantMetaDataPath = os.path.join(
+            estimatorSubFolder, 'variant_metadata.pickle')
+        varFolders = sorted(
+            glob.glob(os.path.join(estimatorSubFolder, 'var_*')))
+        existingVarSubFolders = [os.path.basename(i) for i in varFolders]
+        if len(existingVarSubFolders):
+            assert os.path.exists(variantMetaDataPath), 'Missing saved model info!'
+            with open(variantMetaDataPath, 'rb') as f:
+                allModelOpts = pickle.load(f)
+        else:
+            timeLags = list(np.unique([
+                int(np.ceil(i / binSize))
+                for i in [0, 75e-3, 150e-3, -150e-3]
+                ]))
+            stimSmoothKernels = list(np.unique([
+                int(np.ceil(i / binSize))
+                for i in [25e-3, 50e-3]
+                ]))
+            if arguments['verbose'] and (RANK == 0):
+                print('timeLags = {}'.format(timeLags))
+            allModelOpts = []
+            orderList = [False, True]
+            # orderList = [True, False]
+            for eht in orderList:
+                for kt in orderList:
+                    for st in orderList:
+                        if not any([eht, kt, st]):
+                            continue
+                        if kt:
+                            allKinLags = timeLags
+                        else:
+                            allKinLags = [0]
+                        if st:
+                            allStimLags = timeLags
+                            allStimSmooth = stimSmoothKernels
+                        else:
+                            allStimLags = [0]
+                            allStimSmooth = [1]
+                        for sts in allStimSmooth:
+                            allModelOpts += [
+                                {
+                                    'kinLag': allKinLags,
+                                    'stimLag': allStimLags,
+                                    'stimSmooth': sts,
+                                    'ensembleHistoryTerms': eht,
+                                    'stimTerms': st,
+                                    'kinematicTerms': kt}
+                                ]
+                            if not any([kt, st]):
+                                continue
+                            for ktl in allKinLags:
+                                for stl in allStimLags:
+                                    allModelOpts += [
+                                        {
+                                            'kinLag': [ktl],
+                                            'stimLag': [stl],
+                                            'stimSmooth': sts,
+                                            'ensembleHistoryTerms': eht,
+                                            'stimTerms': st,
+                                            'kinematicTerms': kt}
+                                        ]
+            with open(variantMetaDataPath, 'wb') as f:
+                pickle.dump(
+                    allModelOpts, f)
+    else:
+        allModelOpts = None
+        existingVarSubFolders = None
     #
-    featureNames = sorted([i for i in addLags.keys()])
-    featureLoadArgs = alignedAsigsKWargs.copy()
-    featureLoadArgs['unitNames'] = featureNames
-    featureLoadArgs['unitQuery'] = None
-    featureLoadArgs['addLags'] = addLags
-    targetLoadArgs = alignedAsigsKWargs.copy()
+    if HAS_MPI:
+        COMM.Barrier()  # sync MPI threads, wait for 0
+        allModelOpts = COMM.bcast(allModelOpts, root=0)
+        existingVarSubFolders = COMM.bcast(existingVarSubFolders, root=0)
+        modelArguments['modelKWargs']['verbose'] = False
     # check if we need to recalculate saved features
     if (RANK == 0):
         if os.path.exists(featuresMetaDataPath):
@@ -282,6 +343,10 @@ def calcUnitRegressionToAsig():
                 'targetLoadArgs': targetLoadArgs,
                 'featureLoadArgs': featureLoadArgs
             }
+            if addHistoryTerms:
+                featuresMetaData['ihbasis'] = ihbasis
+                featuresMetaData['iht'] = iht
+                featuresMetaData['addHistoryTerms'] = addHistoryTerms
     else:
         reloadFeatures = None
         featuresMetaData = None
@@ -290,54 +355,118 @@ def calcUnitRegressionToAsig():
         reloadFeatures = COMM.bcast(reloadFeatures, root=0)
         featuresMetaData = COMM.bcast(featuresMetaData, root=0)
     if reloadFeatures and (RANK == 0):
-        print('Loading {}'.format(triggeredPath))
-        dataReader, dataBlock = ns5.blockFromPath(
-            triggeredPath, lazy=arguments['lazy'])
-        targetDF = ns5.alignedAsigsToDF(
-            dataBlock, **targetLoadArgs)
-        if addHistoryTerms:
-            historyLoadArgs = targetLoadArgs.copy()
-            # historyLoadArgs['rollingWindow'] = None
-            # historyLoadArgs['decimate'] = 1
-            historyTerms = []
-            for colIdx in range(addHistoryTerms['nb']):
-                if arguments['verbose']:
-                    print('Calculating history term {}'.format(colIdx + 1))
-                thisBasis = ihbasis[:, colIdx] / np.sum(ihbasis[:, colIdx])
-                # thisBasis = orthobas[:, colIdx]
-                #
-                def pFun(x):
-                    x.iloc[:, :] = np.apply_along_axis(
-                        np.convolve, 1, x.to_numpy(),
-                        thisBasis, mode='same')
-                    return x
-                historyLoadArgs['procFun'] = pFun
-                historyDF = ns5.alignedAsigsToDF(
-                    dataBlock, **historyLoadArgs)
-                #
-                historyBins = historyDF.index.get_level_values('bin')
-                targetBins = targetDF.index.get_level_values('bin')
-                binOverlap = historyBins.isin(targetBins)
-                assert binOverlap.all()
-                historyDF.rename(
-                    columns={
-                        i: i.replace('raster', 'cos_{}'.format(colIdx)).replace('#', '_')
-                        for i in historyDF.columns.get_level_values('feature')
-                        },
-                    inplace=True)
-                # if arguments['debugging'] and arguments['plotting']:
-                if False:
-                    # decFactor = targetLoadArgs['decimate']
-                    plt.plot(historyDF.iloc[binOverlap, 0].to_numpy())
-                    plt.plot(targetDF.iloc[:, 0].to_numpy())
-                    plt.show()
-                historyTerms.append(historyDF.iloc[binOverlap, :].copy())
         print('Loading {}'.format(regressorPath))
         regressorReader, regressorBlock = ns5.blockFromPath(
             regressorPath, lazy=arguments['lazy'])
         featuresDF = ns5.alignedAsigsToDF(
             regressorBlock, **featureLoadArgs)
+        #
+        featuresDF.columns = [
+            '{}'.format(i[0]).replace('#0', '').replace('#', '_')
+            for i in featuresDF.columns]
+        if addStimDiff:
+            def pFun(x):
+                return x.diff(axis='columns').fillna(0)
+            diffLoadArgs = featureLoadArgs.copy()
+            diffLoadArgs['procFun'] = pFun
+            diffLoadArgs['unitNames'] = [p + '#0' for p in pList]
+            if arguments['verbose'] and (RANK == 0):
+                print('Calculating diff terms')
+            diffDF = ns5.alignedAsigsToDF(
+                regressorBlock, **diffLoadArgs)
+            #
+            diffDF.columns = [
+                i[0].replace('amplitude#0', 'dAmpDt')
+                for i in diffDF.columns]
+            featuresDF = pd.concat(
+                [featuresDF, diffDF], axis='columns')
+            stimDiffNames = diffDF.columns.to_list()
+            pList += stimDiffNames
+        # sanity check diff terms
+        if arguments['plotting']:
+            for _, g in featuresDF.query('program==0').groupby(['segment', 't']): break
+            firstTrialIdx = g.index
+            firstTrialT = (
+                featuresDF.loc[firstTrialIdx, :].index
+                .get_level_values('bin'))
+            plt.plot(firstTrialT, diffDF.loc[firstTrialIdx, 'program0_dAmpDt'].to_numpy())
+            plt.plot(firstTrialT, featuresDF.loc[firstTrialIdx, 'program0_amplitude'].to_numpy())
+            if arguments['debugging']:
+                plt.show()
+            else:
+                plt.close()
+        print('Loading {}'.format(triggeredPath))
+        #
+        if arguments['debugging']:
+            yColDbList = ['elec10#0_raster#0', 'elec75#1_raster#0']
+            alignedAsigsKWargs['unitNames'] = yColDbList
+            alignedAsigsKWargs['unitQuery'] = None
+        dataReader, dataBlock = ns5.blockFromPath(
+            triggeredPath, lazy=arguments['lazy'])
+        targetDF = ns5.alignedAsigsToDF(
+            dataBlock, **targetLoadArgs)
+        targetDF.columns = [
+            '{}'.format(i[0]).replace('_raster#0', '').replace('#', '_')
+            for i in targetDF.columns]
         if addHistoryTerms:
+            historyLoadArgs = targetLoadArgs.copy()
+            historyTerms = []
+            for colIdx in range(addHistoryTerms['nb']):
+                if arguments['verbose'] and (RANK == 0):
+                    print('Calculating history term {}'.format(colIdx + 1))
+                thisBasis = ihbasis[:, colIdx]
+                # thisBasis = orthobas[:, colIdx]
+                def shiftConvolve(c):
+                    origSize = c.size
+                    halfSize = int(np.ceil(thisBasis.size/2))
+                    fullConv = pd.Series(np.convolve(
+                        c,
+                        thisBasis, mode='full')).shift(halfSize).fillna(0)
+                    return fullConv.iloc[halfSize:].iloc[:origSize].to_numpy()
+                def pFun(x):
+                    x.iloc[:, :] = np.apply_along_axis(
+                        shiftConvolve, 1, x.to_numpy())
+                    return x
+                #  #  Test the convolution
+                #  if True:
+                #      testTarget = pd.Series((firstTrialT ** 0) - 1)
+                #      testTarget = pd.Series(targetDF.loc[firstTrialIdx, 'elec10_0'])
+                #      testTarget[firstTrialT == 0] = 1
+                #      testConv = pd.Series(np.convolve(testTarget.to_numpy(), thisBasis, mode='same'))
+                #      testConvShift = pd.Series(shiftConvolve(testTarget))
+                #      plt.plot(firstTrialT, testTarget, label='target')
+                #      plt.plot(firstTrialT, testConv, label='normal conv')
+                #      plt.plot(firstTrialT, testConvShift, label='shifted conv')
+                #      plt.legend()
+                #      plt.show()
+                historyLoadArgs['procFun'] = pFun
+                historyDF = ns5.alignedAsigsToDF(
+                    dataBlock, **historyLoadArgs)
+                #
+                historyDF.columns = [
+                    '{}_cos_{}'.format(
+                        i[0].replace('_raster#0', '').replace('#', '_'),
+                        colIdx)
+                    for i in historyDF.columns]
+                if plotTheBases:
+                    plt.plot(
+                        firstTrialT,
+                        historyDF
+                        .loc[firstTrialIdx, 'elec10_0_cos_{}'.format(colIdx)]
+                        .to_numpy())
+                historyTerms.append(historyDF.copy())
+                if arguments['debugging']:
+                    addHistoryTerms['nb'] = 1
+                    break
+            # sanity check diff terms
+            if plotTheBases:
+                plt.plot(
+                    firstTrialT,
+                    targetDF.loc[firstTrialIdx, 'elec10_0'].to_numpy())
+                if arguments['debugging']:
+                    plt.show()
+                else:
+                    plt.close()
             featuresDF = pd.concat(
                 [featuresDF] + historyTerms, axis='columns')
         dropMask = np.logical_or.reduce([
@@ -347,37 +476,73 @@ def calcUnitRegressionToAsig():
         targetDF.drop(index=dropIndex, inplace=True)
         featuresDF.drop(index=dropIndex, inplace=True)
         #  Standardize units (count/bin)
-        targetDF = pd.DataFrame(targetDF * rasterOpts['binInterval'] * alignedAsigsKWargs['decimate'])
-        columnInfo = (
-            featuresDF
-            .columns.to_frame()
-            .reset_index(drop=True))
-        #
-        targetScalers = []
-        featureScalers = []
+        targetDF = targetDF * countPerBin
+        # columnInfo = (
+        #     featuresDF
+        #     .columns.to_frame()
+        #     .reset_index(drop=True))
         ############################################################
         # scale each feature independently
         ############################################################
-        for featName in columnInfo['feature'].unique():
-            if ('amplitude' in featName) or ('Hz' in featName):
+        targetScalers = []
+        featureScalers = []
+        for featName in featuresDF.columns:
+            if ('amplitude' in featName) or ('Hz' in featName) or ('dAmpDt' in featName):
                 featureScalers.append((MaxAbsScaler(), [featName]))
             else:
                 featureScalers.append((StandardScaler(), [featName]))
+        if addHistoryTerms:
+            for hTBaseName in targetDF.columns:
+                matchingNames = [
+                    i
+                    for i in featuresDF.columns
+                    if hTBaseName in i
+                    ]
+                if len(matchingNames):
+                    featureScalers.append((StandardScaler(), matchingNames))
         ############################################################
-        featuresDF = applyScalersGrouped(featuresDF, featureScalers)
-        targetDF = applyScalersGrouped(targetDF, targetScalers)
+        # featuresDF[('program0_dAmpDt', 0)].abs().max()
+        featuresDF = applyScalersGroupedNoLag(featuresDF, featureScalers)
+        targetDF = applyScalersGroupedNoLag(targetDF, targetScalers) 
         #
-        featuresDF.columns = [
-            '{}_{:+04d}'.format(*i).replace('#0', '').replace('+', 'p').replace('-', 'm')
-            for i in featuresDF.columns]
-        targetDF.columns = [
-            '{}_{:+04d}'.format(*i).replace('_raster#0', '').replace('+', 'p').replace('-', 'm')
-            for i in targetDF.columns]
-        #
+        featuresMetaData['featureScalers'] = featureScalers
+        featuresMetaData['targetScalers'] = targetScalers
         with open(featuresMetaDataPath, 'wb') as f:
             pickle.dump(featuresMetaData, f)
+        #
         featuresDF.to_hdf(regressorH5Path, 'feature')
         targetDF.to_hdf(targetH5Path, 'target')
+        if arguments['plotting']:
+            pdfPath = os.path.join(GLMFiguresFolder, 'check_features.pdf')
+            plt.plot(
+                firstTrialT,
+                targetDF.loc[firstTrialIdx, 'elec10_0'].to_numpy(),
+                label='target')
+            if addHistoryTerms:
+                for colIdx in range(addHistoryTerms['nb']):
+                    cosBaseLabel = 'elec10_0_cos_{}'.format(colIdx)
+                    plt.plot(
+                        firstTrialT,
+                        featuresDF
+                        .loc[firstTrialIdx, cosBaseLabel]
+                        .to_numpy(), label=cosBaseLabel)
+            plt.plot(
+                firstTrialT,
+                featuresDF.loc[firstTrialIdx, 'program0_dAmpDt'].to_numpy(),
+                label='program0_dAmpDt')
+            plt.plot(
+                firstTrialT,
+                featuresDF.loc[firstTrialIdx, 'program0_amplitude'].to_numpy(),
+                label='program0_amplitude')
+            plt.legend()
+            plt.savefig(
+                pdfPath,
+                bbox_extra_artists=(plt.gca().get_legend(),),
+                bbox_inches='tight')
+            if arguments['debugging']:
+                plt.show()
+            else:
+                plt.close()
     if HAS_MPI:
         # wait for RANK 0 to create the h5 files
         COMM.Barrier()
@@ -400,8 +565,8 @@ def calcUnitRegressionToAsig():
         test = COMM.bcast(test, root=0)
         cv = COMM.bcast(cv, root=0)
     #
-    yTrain = targetDF.iloc[train, :]
-    yTest = targetDF.iloc[test, :]
+    yTrain = targetDF.iloc[train, :].copy()
+    yTest = targetDF.iloc[test, :].copy()
     cv_folds = cv.split(yTrain)
     #
     if HAS_MPI:
@@ -412,90 +577,48 @@ def calcUnitRegressionToAsig():
         print(
             'Process {}, running regression for units {}'
             .format(RANK, yColIdx))
-        yTrain = yTrain.iloc[:, yColIdx]
-        yTest = yTest.iloc[:, yColIdx]
-    if arguments['debugging']:
-        yColDbList = ['elec10#0_p000', 'elec75#1_p000']
-        yTrain = yTrain.loc[:, yColDbList]
-        yTest = yTest.loc[:, yColDbList]
+        yTrain = yTrain.iloc[:, yColIdx].copy()
+        yTest = yTest.iloc[:, yColIdx].copy()
     #
-    allModelDescStr = []
-    for lag in lagsInvestigated:
-        kinematicDescStr = ' + '.join([
-            formatLag('GT_Right_angle', lag),
-            formatLag('K_Right_angle', lag),
-            formatLag('M_Right_angle', lag),
-            formatLag('GT_Right_angular_velocity', lag),
-            formatLag('K_Right_angular_velocity', lag),
-            formatLag('M_Right_angular_velocity', lag),
-            formatLag('GT_Right_angular_acceleration', lag),
-            formatLag('K_Right_angular_acceleration', lag),
-            formatLag('M_Right_angular_acceleration', lag)
-        ])
-        stimDescStr = ' + '.join(
-            [
-                '{}'.format(formatLag('RateInHz', lag)) + ' * ' + i
-                for i in [
-                    formatLag('program0_amplitude', lag), formatLag('program1_amplitude', lag),
-                    formatLag('program2_amplitude', lag), formatLag('program3_amplitude', lag)
-                    ]
-            ]
-            )
-        historyDescStr = ' + '.join([
-            i
-            for i in featuresDF.columns if '_cos' in i])
-        descStrList = []
-        if arguments['ensembleHistoryTerms']:
-            descStrList.append(historyDescStr)
-        if arguments['stimTerms']:
-            descStrList.append(stimDescStr)
-        if arguments['kinematicTerms']:
-            descStrList.append(kinematicDescStr)
-        descStr = ' + '.join(descStrList)
-        allModelDescStr.append(descStr)
-    # find existing variants
-    varFolders = sorted(glob.glob(os.path.join(estimatorSubFolder, 'var_*')))
-    if len(varFolders):
-        varIdx = [int(os.path.basename(i)[-3:]) for i in varFolders]
-        maxVarIdx = max(varIdx) + 1
-    else:
-        maxVarIdx = 0
-    for modelIdx, descStr in enumerate(allModelDescStr):
-        desc = ModelDesc.from_formula(descStr)
-        xTrain = dmatrix(
-            desc,
-            featuresDF.iloc[train, :],
-            return_type='dataframe')
-        xTest = dmatrix(
-            desc,
-            featuresDF.iloc[test, :],
-            return_type='dataframe')
-        #  if arguments['debugging'] and arguments['plotting']:
-        #      fig, ax = plt.subplots()
-        #      featureBins = np.linspace(-3, 3, 100)
-        #      for featName in xTrain.columns:
-        #          print('{}: {}'.format(featName, xTrain[featName].unique()))
-        #          sns.distplot(
-        #              xTrain[featName], bins=featureBins,
-        #              ax=ax, label=featName, kde=False)
-        #      plt.legend()
-        #      plt.show()
-        snr = SingleNeuronRegression(
-            xTrain=xTrain, yTrain=yTrain,
-            xTest=xTest, yTest=yTest,
-            cv_folds=cv_folds,
-            **modelArguments,
-            verbose=arguments['verbose'],
-            plotting=arguments['plotting']
-            )
+    if arguments['debugging']:
+        yColDbList = ['elec10_0', 'elec75_1']
+        yTrain = yTrain.loc[:, yColDbList].copy()
+        yTest = yTest.loc[:, yColDbList].copy()
+    #
+    del targetDF
+    #
+    for modelIdx, modelOpts in enumerate(allModelOpts):
+        varBaseName = 'var_{:03d}'.format(modelIdx)
         variantSubFolder = os.path.join(
             estimatorSubFolder,
-            'var_{:03d}'.format(modelIdx + maxVarIdx)
+            varBaseName
             )
+        if len(existingVarSubFolders):
+            if varBaseName in existingVarSubFolders:
+                continue
+        if arguments['verbose'] and (RANK == 0):
+            print('Running model variant {}'.format(varBaseName))
+        descStrList = []
+        if modelOpts['kinematicTerms']:
+            descStrList.append(kinematicDescStr(kList, modelOpts['kinLag']))
+        if modelOpts['stimTerms']:
+            descStrList.append(stimDescStr(pList, modelOpts['stimLag'], modelOpts['stimSmooth']))
+        if modelOpts['ensembleHistoryTerms']:
+            historyDescStr = ' + '.join([
+                i
+                for i in featuresDF.columns if '_cos' in i
+                ])
+            descStrList.append(historyDescStr)
+        #
+        descStr = ' + '.join(descStrList)
+        #
         estimatorPath = os.path.join(
             variantSubFolder, 'estimator.joblib')
         estimatorMetadataPath = os.path.join(
             variantSubFolder, 'estimator_metadata.pickle')
+        if HAS_MPI:
+            estimatorPath = estimatorPath.replace(
+                'estimator', 'estimator_{:03d}'.format(RANK))
         if RANK == 0:
             if not os.path.exists(variantSubFolder):
                 os.makedirs(variantSubFolder, exist_ok=True)
@@ -514,11 +637,73 @@ def calcUnitRegressionToAsig():
                 with open(estimatorMetadataPath, 'wb') as f:
                     pickle.dump(
                         estimatorMetadata, f)
-        # if not arguments['debugging']:
-        #     snr.apply_gridSearchCV(gridParams)
-        # else:
-        #     pass
         #
+        desc = ModelDesc.from_formula(descStr)
+        xTrain = dmatrix(
+            desc,
+            featuresDF.iloc[train, :],
+            return_type='dataframe')
+        xTest = dmatrix(
+            desc,
+            featuresDF.iloc[test, :],
+            return_type='dataframe')
+        #
+        if arguments['plotting'] and (modelIdx == len(allModelOpts) - 1):
+            for _, g in xTest.query('program==0').groupby(['segment', 't']): break
+            firstTrialIdx = g.index
+            firstTrialT = (
+                xTest.loc[firstTrialIdx, :].index
+                .get_level_values('bin'))
+            pdfPath = os.path.join(GLMFiguresFolder, 'check_xy_test.pdf')
+            plt.plot(
+                firstTrialT,
+                yTest.loc[firstTrialIdx, 'elec10_0'].to_numpy(),
+                label='target')
+            if addHistoryTerms:
+                for colIdx in range(addHistoryTerms['nb']):
+                    cosBaseLabel = 'elec10_0_cos_{}'.format(colIdx)
+                    plt.plot(
+                        firstTrialT,
+                        xTest
+                        .loc[firstTrialIdx, cosBaseLabel]
+                        .to_numpy(), label=cosBaseLabel)
+            if addStimDiff:
+                stimDiffName = (
+                    'shiftSmooth(program0_dAmpDt, {}, {})'
+                    .format(modelOpts['stimLag'][0], modelOpts['stimSmooth']))
+                plt.plot(
+                    firstTrialT,
+                    xTest.loc[firstTrialIdx, stimDiffName].to_numpy(),
+                    label='program0_dAmpDt')
+            stimName = (
+                'shiftSmooth(program0_amplitude, {}, {})'
+                .format(modelOpts['stimLag'][0], modelOpts['stimSmooth']))
+            plt.plot(
+                firstTrialT,
+                xTest.loc[firstTrialIdx, stimName].to_numpy(),
+                label='program0_amplitude')
+            plt.legend()
+            plt.savefig(
+                pdfPath,
+                bbox_extra_artists=(plt.gca().get_legend(),),
+                bbox_inches='tight')
+            if arguments['debugging']:
+                plt.show()
+            else:
+                plt.close()
+        snr = SingleNeuronRegression(
+            xTrain=xTrain, yTrain=yTrain,
+            xTest=xTest, yTest=yTest,
+            cv_folds=cv_folds,
+            **modelArguments,
+            verbose=arguments['verbose'],
+            plotting=arguments['plotting']
+            )
+        #
+        if not arguments['debugging']:
+            snr.apply_gridSearchCV(gridParams)
+        else:
+            pass
         # tolFindParams = {
         #     'max_iter': 5000,
         #     'tol': 1e-6}
@@ -532,19 +717,9 @@ def calcUnitRegressionToAsig():
         if arguments['debugging']:
             toc()
             pdb.set_trace()
+        #
         if not arguments['debugging']:
             snr.clear_data()
-        else:
-            for unitName in snr.regressionList.keys():
-                reg = snr.regressionList[unitName]['reg']
-                print(snr.regressionList[unitName]['validationScore'])
-        #
-        if HAS_MPI:
-            estimatorPath = estimatorPath.replace(
-                'estimator', 'estimator_{:03d}'.format(RANK))
-        else:
-            if arguments['plotting']:
-                snr.plot_xy()
         if not arguments['debugging']:
             jb.dump(snr, estimatorPath)
         if HAS_MPI:

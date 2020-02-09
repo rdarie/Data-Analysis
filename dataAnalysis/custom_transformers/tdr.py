@@ -54,23 +54,6 @@ def shiftSmoothDecimate(x, lag=0, winWidth=1, decimate=1):
         return procDF.iloc[:, halfRollingWin:-halfRollingWin:decimate]
 
 
-def stimDescStr(progList, lagList, smoothFactor):
-    sf = smoothFactor
-    return ' + '.join([
-        (
-            '(shiftSmooth({}, {}, {}) * shiftSmooth({}, {}, {}))'
-            .format('RateInHz', l, sf, p, l, sf))
-        for p, l in product(progList, lagList)
-        ])
-
-
-def kinematicDescStr(kinList, lagList):
-    return ' + '.join([
-        'timeShift({}, {})'.format(k, l)
-        for k, l in product(kinList, lagList)
-        ])
-
-
 def applyScalersGrouped(DF, listOfScalers):
     for scaler, listOfColumns in listOfScalers:
         try:
@@ -145,7 +128,25 @@ def raisedCosBoundary(b=None, DT=None, minX=None, nb=None, plotting=False):
         plt.show()
     return scipy.optimize.root(fun, minX * 2).x
 
+
 def makeRaisedCosBasis(
+        nb, dt, endpoints):
+    """
+        Make nonlinearly stretched basis consisting of raised cosines
+    """
+    db = (endpoints[1] - endpoints[0]) / (nb - 1)
+    # centers for basis vectors
+    ctrs = np.round(np.arange(endpoints[0], endpoints[1] + db, db), decimals=3)
+    iht = np.arange(endpoints[0] - 3 * db / 2, endpoints[1] + 3 * db / 2, dt)
+    repIht = np.vstack([iht for i in range(nb)]).transpose()
+    nt = iht.size
+    repCtrs = np.vstack([ctrs for i in range(nt)])
+    ihbasis = raisedCos(repIht, repCtrs, db)
+    for colIdx in range(ihbasis.shape[1]):
+        ihbasis[:, colIdx] = ihbasis[:, colIdx] / np.sum(ihbasis[:, colIdx])
+    return pd.DataFrame(ihbasis, index=iht, columns=ctrs)
+
+def makeLogRaisedCosBasis(
         nb, dt, endpoints, b=0.01, zflag=False):
     """
         Make nonlinearly stretched basis consisting of raised cosines
@@ -193,7 +194,7 @@ def makeRaisedCosBasis(
     for colIdx in range(ihbasis.shape[1]):
         ihbasis[:, colIdx] = ihbasis[:, colIdx] / np.sum(ihbasis[:, colIdx])
     # orthobas, _ = scipy.linalg.qr(ihbasis)
-    return iht, orthobas, ihbasis
+    return pd.DataFrame(ihbasis, index=iht, columns=ctrs), pd.DataFrame(orthobas, index=iht)
 
 
 def _poisson_pseudoR2(y, yhat):
