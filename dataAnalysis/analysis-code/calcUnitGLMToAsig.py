@@ -144,10 +144,6 @@ def calcUnitRegressionToAsig():
     regressorH5Path = os.path.join(
         estimatorSubFolder, prefix + '_{}_{}.h5'.format(
             arguments['secondaryBlockName'], arguments['window']))
-    if(RANK == 0):
-        # find existing variants
-        variantMetaDataPath = os.path.join(
-            estimatorSubFolder, 'variant_metadata.xlsx')
     #
     kList = ['GT_Right', 'K_Right', 'M_Right']
     angleList = ['{}_angle'.format(i) for i in kList]
@@ -185,68 +181,88 @@ def calcUnitRegressionToAsig():
     #
     plotTheBases = (arguments['debugging'] and arguments['plotting'])
     showNow = arguments['debugging']
-    covariateBasisTerms = {
-        'nb': 21,
-        'dt': rasterOpts['binInterval'],
-        'endpoints': [-covariateHistoryLen, covariateHistoryLen]
-        }
-    cBasis = makeRaisedCosBasis(**covariateBasisTerms)
-    if plotTheBases:
-        fig, ax = plt.subplots(2, 1, sharex=True)
-        ax[0].plot(cBasis)
-        ax[1].set_title('raised cos basis')
-    cBasis = (
-        cBasis.rolling(winSize, center=True, win_type='gaussian')
-        .mean(std=halfWinSize).iloc[halfWinSize:-halfWinSize:subsampleOpts['decimate']]
-        .fillna(method='ffill', axis=0)
-        .fillna(method='bfill', axis=0))
-    cBasis.to_excel(variantMetaDataPath, sheet_name='covariateBasis')
-    if plotTheBases:
-        ax[1].plot(cBasis)
-        ax[1].set_xlabel('Time (sec)')
-        if showNow:
-            plt.show()
+
+    if(RANK == 0):
+        # find existing variants
+        variantMetaDataPath = os.path.join(
+            estimatorSubFolder, 'variant_metadata.xlsx')
+        if not os.path.exists(variantMetaDataPath):
+            covariateBasisTerms = {
+                'nb': 21,
+                'dt': rasterOpts['binInterval'],
+                'endpoints': [-covariateHistoryLen, covariateHistoryLen]
+                }
+            cBasis = makeRaisedCosBasis(**covariateBasisTerms)
+            if plotTheBases:
+                fig, ax = plt.subplots(2, 1, sharex=True)
+                ax[0].plot(cBasis)
+                ax[1].set_title('raised cos basis')
+            cBasis = (
+                cBasis.rolling(winSize, center=True, win_type='gaussian')
+                .mean(std=halfWinSize).iloc[halfWinSize:-halfWinSize:subsampleOpts['decimate']]
+                .fillna(method='ffill', axis=0)
+                .fillna(method='bfill', axis=0))
+            cBasis.to_excel(variantMetaDataPath, sheet_name='covariateBasis')
+            if plotTheBases:
+                ax[1].plot(cBasis)
+                ax[1].set_xlabel('Time (sec)')
+                if showNow:
+                    plt.show()
+                else:
+                    plt.close()
+            addHistoryTerms = {
+                'nb': 5,
+                'dt': rasterOpts['binInterval'],
+                'b': 0.001,
+                'zflag': False
+                }
+            # make sure history terms don't bleed into current bins
+            historyEdge = raisedCosBoundary(
+                b=addHistoryTerms['b'], DT=ensembleHistoryLen,
+                minX=max(rasterOpts['binInterval'] * winSize / 2, 1e-3),
+                nb=addHistoryTerms['nb'], plotting=plotTheBases
+                )
+            addHistoryTerms['endpoints'] = [historyEdge[0], historyEdge[0] + ensembleHistoryLen]
+            if addHistoryTerms:
+                ihbasisDF, orthobasisDF = makeLogRaisedCosBasis(**addHistoryTerms)
+                iht = np.array(ihbasisDF.index)
+                ihbasis = ihbasisDF.to_numpy()
+                orthobas = orthobasisDF.to_numpy()
+                # addHistoryTerms['nb'] = orthobas.shape[1]
+                if plotTheBases:
+                    fig, ax = plt.subplots(2, 1, sharex=True)
+                    ax[0].plot(iht, ihbasis)
+                    ax[0].set_title('raised log cos basis')
+                    ax[1].plot(iht, orthobas)
+                    ax[1].set_title('orthogonalized log cos basis')
+                    ax[1].set_xlabel('Time (sec)')
+                    if arguments['debugging']:
+                        plt.show()
+                    else:
+                        plt.close()
+                with pd.ExcelWriter(variantMetaDataPath, mode='a') as writer:
+                    ihbasisDF.to_excel(writer, sheet_name='ensembleBasis')
+                raise(Exception('Please specify variants now.'))
         else:
-            plt.close()
+            cBasis = pd.read_excel(variantMetaDataPath, sheet_name='covariateBasis', index_col=0)
+            ihbasisDF = pd.read_excel(variantMetaDataPath, sheet_name='ensembleBasis', index_col=0)
+            iht = np.array(ihbasisDF.index)
+            ihbasis = ihbasisDF.to_numpy()
+    else:
+        cBasis = None
+        iht = None
+        ihbasis = None
+    if HAS_MPI:
+        COMM.Barrier()  # sync MPI threads, wait for 0
+        cBasis = COMM.bcast(cBasis, root=0)
+        iht = COMM.bcast(cBasis, root=0)
+        ihbasis = COMM.bcast(cBasis, root=0)
 
     def applyCBasis(vec, cbCol):
         return np.convolve(
             vec.to_numpy(),
             cBasis[cbCol].to_numpy(),
             mode='same')
-
-    addHistoryTerms = {
-        'nb': 5,
-        'dt': rasterOpts['binInterval'],
-        'b': 0.001,
-        'zflag': False
-        }
-    # make sure history terms don't bleed into current bins
-    historyEdge = raisedCosBoundary(
-        b=addHistoryTerms['b'], DT=ensembleHistoryLen,
-        minX=max(rasterOpts['binInterval'] * winSize / 2, 1e-3),
-        nb=addHistoryTerms['nb'], plotting=plotTheBases
-        )
-    addHistoryTerms['endpoints'] = [historyEdge[0], historyEdge[0] + ensembleHistoryLen]
-    if addHistoryTerms:
-        ihbasisDF, orthobasisDF = makeLogRaisedCosBasis(**addHistoryTerms)
-        iht = np.array(ihbasisDF.index)
-        ihbasis = ihbasisDF.to_numpy()
-        orthobas = orthobasisDF.to_numpy()
-        # addHistoryTerms['nb'] = orthobas.shape[1]
-        if plotTheBases:
-            fig, ax = plt.subplots(2, 1, sharex=True)
-            ax[0].plot(iht, ihbasis)
-            ax[0].set_title('raised log cos basis')
-            ax[1].plot(iht, orthobas)
-            ax[1].set_title('orthogonalized log cos basis')
-            ax[1].set_xlabel('Time (sec)')
-            if arguments['debugging']:
-                plt.show()
-            else:
-                plt.close()
-        with pd.ExcelWriter(variantMetaDataPath, mode='a') as writer:
-            ihbasisDF.to_excel(writer, sheet_name='ensembleBasis')
     # statistical model specific options
     # for statsmodels wrapper
     #  modelArguments = dict(
@@ -292,79 +308,16 @@ def calcUnitRegressionToAsig():
     # chosen based on Benjamin et al 2017
     if(RANK == 0):
         # find existing variants
-        variantMetaDataPath = os.path.join(
-            estimatorSubFolder, 'variant_metadata.pickle')
         varFolders = sorted(
             glob.glob(os.path.join(estimatorSubFolder, 'var_*')))
         existingVarSubFolders = [os.path.basename(i) for i in varFolders]
-        if len(existingVarSubFolders):
-            assert os.path.exists(variantMetaDataPath), 'Missing saved model info!'
-            with open(variantMetaDataPath, 'rb') as f:
-                allModelOpts = pickle.load(f)
-        else:
-            timeLags = [
-                [i for i in cBasis.columns if i > 0],
-                [i for i in cBasis.columns if i < 0],
-                [i for i in cBasis.columns],
-                [cBasis.columns[0]],
-                [cBasis.columns[-1]],
-                [cBasis.columns[int(covariateBasisTerms['nb']/2)]],
-            ]
-            stimSplineFuns = ['bs({}, df=3)', '{}']
-            if arguments['verbose'] and (RANK == 0):
-                print('timeLags = {}'.format(timeLags))
-            allModelOpts = []
-            # orderList = [False, True]
-            # orderList = [True, False]
-            for eht in [False, True]:
-                for st in [True, False]:
-                    for stdi in [False, True]:
-                        for kt in [False, True]:
-                            for acct in [False, True]:
-                                if not any([eht, kt, st]):
-                                    continue
-                                if stdi and (not st):
-                                    continue
-                                if acct and (not kt):
-                                    continue
-                                if eht and (not stdi):
-                                    continue
-                                if eht and (not acct):
-                                    continue
-                                if not any([kt, st]):
-                                    useTimeLags = [timeLags[-1]]
-                                else:
-                                    useTimeLags = [i for i in timeLags]
-                                #
-                                if st:
-                                    allSplineFun = [i for i in stimSplineFuns]
-                                else:
-                                    allSplineFun = [stimSplineFuns[0]]
-                                for tl in useTimeLags:
-                                    for sp in allSplineFun:
-                                        allModelOpts += [
-                                            {
-                                                'kinLag': tl,
-                                                'stimLag': tl,
-                                                'ensembleHistoryTerms': eht,
-                                                'stimTerms': st,
-                                                'angleTerms': kt,
-                                                'velTerms': kt,
-                                                'accTerms': acct,
-                                                'stimSplineFun': sp,
-                                                'addStimDiff': stdi,
-                                                'addIntercept': True}
-                                            ]
-            with open(variantMetaDataPath, 'wb') as f:
-                pickle.dump(
-                    allModelOpts, f)
+        varMetaData = pd.read_excel(variantMetaDataPath, sheet_name='variantInfo')
     else:
-        allModelOpts = None
+        varMetaData = None
         existingVarSubFolders = None
-    pdb.set_trace()
     if HAS_MPI:
         COMM.Barrier()  # sync MPI threads, wait for 0
-        allModelOpts = COMM.bcast(allModelOpts, root=0)
+        varMetaData = COMM.bcast(varMetaData, root=0)
         existingVarSubFolders = COMM.bcast(existingVarSubFolders, root=0)
         modelArguments['modelKWargs']['verbose'] = False
     # check if we need to recalculate saved features
@@ -384,10 +337,8 @@ def calcUnitRegressionToAsig():
                 'targetLoadArgs': targetLoadArgs,
                 'featureLoadArgs': featureLoadArgs
             }
-            if addHistoryTerms:
-                featuresMetaData['ihbasis'] = ihbasis
-                featuresMetaData['iht'] = iht
-                featuresMetaData['addHistoryTerms'] = addHistoryTerms
+            featuresMetaData['ihbasis'] = ihbasis
+            featuresMetaData['iht'] = iht
     else:
         reloadFeatures = None
         featuresMetaData = None
@@ -405,35 +356,6 @@ def calcUnitRegressionToAsig():
         featuresDF.columns = [
             '{}'.format(i[0]).replace('#0', '').replace('#', '_')
             for i in featuresDF.columns]
-        # if addStimDiff:
-        #     def pFun(x):
-        #         return x.diff(axis='columns').fillna(0)
-        #     diffLoadArgs = featureLoadArgs.copy()
-        #     diffLoadArgs['procFun'] = pFun
-        #     diffLoadArgs['unitNames'] = [p + '#0' for p in pList]
-        #     if arguments['verbose'] and (RANK == 0):
-        #         print('Calculating diff terms')
-        #     diffDF = ns5.alignedAsigsToDF(
-        #         regressorBlock, **diffLoadArgs)
-        #     #
-        #     diffDF.columns = [
-        #         i[0].replace('amplitude#0', 'dAmpDt')
-        #         for i in diffDF.columns]
-        #     featuresDF = pd.concat(
-        #         [featuresDF, diffDF], axis='columns')
-        # sanity check diff terms
-        # if arguments['plotting']:
-        #     for _, g in featuresDF.query('program==0').groupby(['segment', 't']): break
-        #     firstTrialIdx = g.index
-        #     firstTrialT = (
-        #         featuresDF.loc[firstTrialIdx, :].index
-        #         .get_level_values('bin'))
-        #     plt.plot(firstTrialT, diffDF.loc[firstTrialIdx, 'program0_dAmpDt'].to_numpy())
-        #     plt.plot(firstTrialT, featuresDF.loc[firstTrialIdx, 'program0_amplitude'].to_numpy())
-        #     if arguments['debugging']:
-        #         plt.show()
-        #     else:
-        #         plt.close()
         print('Loading {}'.format(triggeredPath))
         #
         # if arguments['debugging']:
@@ -447,72 +369,53 @@ def calcUnitRegressionToAsig():
         targetDF.columns = [
             '{}'.format(i[0]).replace('_raster#0', '').replace('#', '_')
             for i in targetDF.columns]
-        if addHistoryTerms:
-            historyLoadArgs = targetLoadArgs.copy()
-            historyTerms = []
-            for colIdx in range(addHistoryTerms['nb']):
-                if arguments['verbose'] and (RANK == 0):
-                    print('Calculating history term {}'.format(colIdx + 1))
-                thisBasis = ihbasis[:, colIdx]
-                # thisBasis = orthobas[:, colIdx]
-                def shiftConvolve(c):
-                    origSize = c.size
-                    halfSize = int(np.ceil(thisBasis.size/2))
-                    fullConv = pd.Series(np.convolve(
-                        c,
-                        thisBasis, mode='full')).shift(halfSize).fillna(0)
-                    return fullConv.iloc[halfSize:].iloc[:origSize].to_numpy()
-                def pFun(x):
-                    x.iloc[:, :] = np.apply_along_axis(
-                        shiftConvolve, 1, x.to_numpy())
-                    return x
-                #  #  Test the convolution
-                #  if True:
-                #      testTarget = pd.Series((firstTrialT ** 0) - 1)
-                #      testTarget = pd.Series(targetDF.loc[firstTrialIdx, 'elec10_0'])
-                #      testTarget[firstTrialT == 0] = 1
-                #      testConv = pd.Series(np.convolve(testTarget.to_numpy(), thisBasis, mode='same'))
-                #      testConvShift = pd.Series(shiftConvolve(testTarget))
-                #      plt.plot(firstTrialT, testTarget, label='target')
-                #      plt.plot(firstTrialT, testConv, label='normal conv')
-                #      plt.plot(firstTrialT, testConvShift, label='shifted conv')
-                #      plt.legend()
-                #      plt.show()
-                historyLoadArgs['procFun'] = pFun
-                historyDF = ns5.alignedAsigsToDF(
-                    dataBlock, **historyLoadArgs)
-                #
-                historyDF.columns = [
-                    '{}_cos_{}'.format(
-                        i[0].replace('_raster#0', '').replace('#', '_'),
-                        colIdx)
-                    for i in historyDF.columns]
-                if plotTheBases:
-                    for _, g in featuresDF.query('program==0').groupby(['segment', 't']): break
-                    firstTrialIdx = g.index
-                    firstTrialT = (
-                        featuresDF.loc[firstTrialIdx, :].index
-                        .get_level_values('bin'))
-                    plt.plot(
-                        firstTrialT,
-                        historyDF
-                        .loc[firstTrialIdx, 'elec10_0_cos_{}'.format(colIdx)]
-                        .to_numpy())
-                historyTerms.append(historyDF.copy())
-                # if arguments['debugging']:
-                #     addHistoryTerms['nb'] = 1
-                #     break
-            # sanity check diff terms
+        #
+        historyLoadArgs = targetLoadArgs.copy()
+        historyTerms = []
+        for colIdx in range(ihbasis.shape[1]):
+            if arguments['verbose'] and (RANK == 0):
+                print('Calculating history term {}'.format(colIdx + 1))
+            thisBasis = ihbasis[:, colIdx]
+            # thisBasis = orthobas[:, colIdx]
+            def pFun(x):
+                x.iloc[:, :] = np.apply_along_axis(
+                    np.convolve, 1, x.to_numpy(), thisBasis)
+                return x
+            historyLoadArgs['procFun'] = pFun
+            historyDF = ns5.alignedAsigsToDF(
+                dataBlock, **historyLoadArgs)
+            #
+            historyDF.columns = [
+                '{}_cos_{}'.format(
+                    i[0].replace('_raster#0', '').replace('#', '_'),
+                    colIdx)
+                for i in historyDF.columns]
             if plotTheBases:
+                for _, g in featuresDF.query('program==0').groupby(['segment', 't']): break
+                firstTrialIdx = g.index
+                firstTrialT = (
+                    featuresDF.loc[firstTrialIdx, :].index
+                    .get_level_values('bin'))
                 plt.plot(
                     firstTrialT,
-                    targetDF.loc[firstTrialIdx, 'elec10_0'].to_numpy())
-                if arguments['debugging']:
-                    plt.show()
-                else:
-                    plt.close()
-            featuresDF = pd.concat(
-                [featuresDF] + historyTerms, axis='columns')
+                    historyDF
+                    .loc[firstTrialIdx, 'elec10_0_cos_{}'.format(colIdx)]
+                    .to_numpy())
+            historyTerms.append(historyDF.copy())
+            # if arguments['debugging']:
+            #     addHistoryTerms['nb'] = 1
+            #     break
+        # sanity check diff terms
+        if plotTheBases:
+            plt.plot(
+                firstTrialT,
+                targetDF.loc[firstTrialIdx, 'elec10_0'].to_numpy())
+            if arguments['debugging']:
+                plt.show()
+            else:
+                plt.close()
+        featuresDF = pd.concat(
+            [featuresDF] + historyTerms, axis='columns')
         dropMask = np.logical_or.reduce([
             targetDF.isna().T.any(),
             featuresDF.isna().T.any()])
@@ -556,42 +459,6 @@ def calcUnitRegressionToAsig():
         #
         featuresDF.to_hdf(regressorH5Path, 'feature')
         targetDF.to_hdf(targetH5Path, 'target')
-        if arguments['plotting']:
-            for _, g in featuresDF.query('program==0').groupby(['segment', 't']): break
-            firstTrialIdx = g.index
-            firstTrialT = (
-                featuresDF.loc[firstTrialIdx, :].index
-                .get_level_values('bin'))
-            pdfPath = os.path.join(GLMFiguresFolder, 'check_features.pdf')
-            plt.plot(
-                firstTrialT,
-                targetDF.loc[firstTrialIdx, 'elec10_0'].to_numpy(),
-                label='target')
-            if addHistoryTerms:
-                for colIdx in range(addHistoryTerms['nb']):
-                    cosBaseLabel = 'elec10_0_cos_{}'.format(colIdx)
-                    plt.plot(
-                        firstTrialT,
-                        featuresDF
-                        .loc[firstTrialIdx, cosBaseLabel]
-                        .to_numpy(), label=cosBaseLabel)
-            plt.plot(
-                firstTrialT,
-                featuresDF.loc[firstTrialIdx, 'program0_dAmpDt'].to_numpy(),
-                label='program0_dAmpDt')
-            plt.plot(
-                firstTrialT,
-                featuresDF.loc[firstTrialIdx, 'program0_amplitude'].to_numpy(),
-                label='program0_amplitude')
-            plt.legend()
-            plt.savefig(
-                pdfPath,
-                bbox_extra_artists=(plt.gca().get_legend(),),
-                bbox_inches='tight')
-            if arguments['debugging']:
-                plt.show()
-            else:
-                plt.close()
     if HAS_MPI:
         # wait for RANK 0 to create the h5 files
         COMM.Barrier()
@@ -636,15 +503,12 @@ def calcUnitRegressionToAsig():
     #
     del targetDF
     #
-    for modelIdx, modelOpts in enumerate(allModelOpts):
+    for modelIdx, modelOpts in varMetaData.iterrows():
         varBaseName = 'var_{:03d}'.format(modelIdx)
         variantSubFolder = os.path.join(
             estimatorSubFolder,
             varBaseName
             )
-        if len(existingVarSubFolders):
-            if varBaseName in existingVarSubFolders:
-                continue
         if arguments['verbose'] and (RANK == 0):
             print('Running model variant {}'.format(varBaseName))
         #
@@ -679,23 +543,24 @@ def calcUnitRegressionToAsig():
                 ModelDesc([], [Term([])]),
                 featuresDF.iloc[test, :],
                 return_type='dataframe'))
-        if modelOpts['angleTerms']:
-            kinDescList = []
+        #
+        kinDescList = []
+        if modelOpts['angle']:
             kinDescList += [
                 Term([LookupFactor('{}'.format(k))])
                 for k in angleList
                 ]
-            if modelOpts['velTerms']:
-                kinDescList += [
-                    Term([LookupFactor('{}'.format(k))])
-                    for k in velList
-                    ]
-            if modelOpts['accTerms']:
-                kinDescList += [
-                    Term([LookupFactor('{}'.format(k))])
-                    for k in accList
-                    ]
-            #
+        if modelOpts['angularVelocity']:
+            kinDescList += [
+                Term([LookupFactor('{}'.format(k))])
+                for k in velList
+                ]
+        if modelOpts['angularAcceleration']:
+            kinDescList += [
+                Term([LookupFactor('{}'.format(k))])
+                for k in accList
+                ]
+        if len(kinDescList):
             kinModelDesc = ModelDesc([], kinDescList)
             # TODO ensure this works
             if RANK == 0:
@@ -704,38 +569,43 @@ def calcUnitRegressionToAsig():
                 kinModelDesc,
                 featuresDF,
                 return_type='dataframe')
+            kinLags = [
+                np.float(i)
+                for i in cBasis.columns
+                if (
+                    (np.float(i) >= modelOpts['minKinLag']) and
+                    (np.float(i) <= modelOpts['maxKinLag']))]
             kinDescListFinal = [
                 Term([EvalFactor('applyCBasis(Q("{}"), {:.3f})'.format(k.name(), l))])
-                for k, l in product(kinDescList, modelOpts['kinLag'])
+                for k, l in product(kinDescList, kinLags)
                 ]
+            kinModelDescFinal = ModelDesc([], kinDescListFinal)
+            if RANK == 0:
+                estimatorMetadata['kinModelDescFinal'] = (
+                    kinModelDescFinal.describe())
             xTrainList.append(dmatrix(
-                ModelDesc([], kinDescListFinal),
+                kinModelDescFinal,
                 kinX.iloc[train, :],
                 return_type='dataframe'))
             xTestList.append(dmatrix(
-                ModelDesc([], kinDescListFinal),
+                kinModelDescFinal,
                 kinX.iloc[test, :],
                 return_type='dataframe'))
-        if modelOpts['stimTerms']:
-            def f1(p):
-                return EvalFactor('bs({}, df=3)'.format(p))
-            def f2(p):
-                return LookupFactor('{}'.format(p))
-            if 'bs' in modelOpts['stimSplineFun']:
-                stimSplineFun = lambda p: EvalFactor(modelOpts['stimSplineFun'].format(p))
-            else:
-                stimSplineFun = lambda p: LookupFactor(modelOpts['stimSplineFun'].format(p))
-            stimDescList = []
+        stimDescList = []
+        if modelOpts['separateRate']:
+            stimDescList += [Term([LookupFactor('RateInHz')])]
+        if any([modelOpts['stim'], modelOpts['stimVelocity']]):
             stimDescList += [
-                Term([stimSplineFun(p)])
+                Term([eval(modelOpts['stimAmpSpline'].format(p))])
                 for p in pList
                 ]
             stimDescList += [
-                Term([stimSplineFun(p), LookupFactor('RateInHz')])
+                Term([
+                    eval(modelOpts['stimAmpSpline'].format(p)),
+                    LookupFactor('RateInHz')])
                 for p in pList
                 ]
             stimModelDesc = ModelDesc([], stimDescList)
-            # TODO ensure saving the modelDesc works
             if RANK == 0:
                 estimatorMetadata['stimModelDesc'] = stimModelDesc.describe()
             stimXTrain = dmatrix(
@@ -745,56 +615,57 @@ def calcUnitRegressionToAsig():
             stimXTest = build_design_matrices(
                 [stimXTrain.design_info], featuresDF.iloc[test, :],
                 return_type='dataframe')[0]
-            stimDescListFinal = [
-                Term([EvalFactor('applyCBasis(Q("{}"), {:.3f})'.format(p, l))])
-                for p, l in product(stimXTrain.columns, modelOpts['stimLag'])
-                ]
-            if modelOpts['addStimDiff']:
+            stimLags = [
+                np.float(i)
+                for i in cBasis.columns
+                if (
+                    (np.float(i) >= modelOpts['minStimLag']) and
+                    (np.float(i) <= modelOpts['maxStimLag']))]
+            stimDescListFinal = []
+            if modelOpts['stim']:
+                stimDescListFinal += [
+                    Term([EvalFactor('applyCBasis(Q("{}"), {:.3f})'.format(p, l))])
+                    for p, l in product(stimXTrain.columns, stimLags)
+                    ]
+            if modelOpts['stimVelocity']:
                 deriv = lambda x: pd.Series(x).diff().fillna(0).to_numpy()
                 stimDescListFinal += [
                     Term([EvalFactor('deriv(applyCBasis(Q("{}"), {:.3f}))'.format(p, l))])
-                    for p, l in product(stimXTrain.columns, modelOpts['stimLag'])
+                    for p, l in product(stimXTrain.columns, stimLags)
                     ]
+            stimModelDescFinal = ModelDesc([], stimDescListFinal)
+            if RANK == 0:
+                estimatorMetadata['stimModelDescFinal'] = stimModelDescFinal.describe()
             stimXTrainFinal = dmatrix(
-                ModelDesc([], stimDescListFinal),
+                stimModelDescFinal,
                 stimXTrain,
                 return_type='dataframe')
             xTrainList.append(stimXTrainFinal)
             stimXTestFinal = dmatrix(
-                ModelDesc([], stimDescListFinal),
+                stimModelDescFinal,
                 stimXTest,
                 return_type='dataframe')
             xTestList.append(stimXTestFinal)
-            
-        if modelOpts['ensembleHistoryTerms']:
+        if modelOpts['ensembleTerms']:
             histDescList = [
                 Term([LookupFactor(histTerm)])
                 for histTerm in featuresDF.columns if '_cos' in histTerm
                 ]
             #
+            histDesc = ModelDesc([], histDescList)
+            if RANK == 0:
+                estimatorMetadata['histDesc'] = histDesc.describe()
             xTrainList.append(dmatrix(
-                ModelDesc([], histDescList),
+                histDesc,
                 featuresDF.iloc[train, :],
                 return_type='dataframe'))
             xTestList.append(dmatrix(
-                ModelDesc([], histDescList),
+                histDesc,
                 featuresDF.iloc[test, :],
                 return_type='dataframe'))
         #
         xTrain = pd.concat(xTrainList, axis='columns')
         xTest = pd.concat(xTestList, axis='columns')
-        #
-        if RANK == 0:
-            estimatorMetadata.update({
-                'inputFeatures': yTrain.columns.to_list(),
-                'modelFeatures': xTest.columns.to_list()
-                })
-            if not os.path.exists(variantSubFolder):
-                os.makedirs(variantSubFolder, exist_ok=True)
-            if not arguments['debugging']:
-                with open(estimatorMetadataPath, 'wb') as f:
-                    pickle.dump(
-                        estimatorMetadata, f)
         #
         if arguments['plotting'] and (RANK == 0) and (not HAS_MPI):
             with sns.plotting_context(context='notebook', font_scale=.75):
@@ -812,7 +683,7 @@ def calcUnitRegressionToAsig():
                     firstTrialT,
                     yTest.loc[firstTrialIdx, 'elec10_0'].to_numpy(),
                     label='target')
-                if modelOpts['stimTerms']:
+                if modelOpts['stim']:
                     maNames = [
                         i
                         for i in plotDF.columns
@@ -849,7 +720,7 @@ def calcUnitRegressionToAsig():
                             firstTrialT,
                             plotDF.loc[firstTrialIdx, sta4].to_numpy(),
                             label=sta4)
-                if modelOpts['angleTerms']:
+                if modelOpts['angle']:
                     ktNames = [
                         i
                         for i in xTest.columns
@@ -859,6 +730,7 @@ def calcUnitRegressionToAsig():
                             firstTrialT,
                             xTest.loc[firstTrialIdx, sta1].to_numpy(),
                             label=sta1)
+                if modelOpts['angularVelocity']:
                     ktNames = [
                         i
                         for i in xTest.columns
@@ -868,6 +740,7 @@ def calcUnitRegressionToAsig():
                             firstTrialT,
                             xTest.loc[firstTrialIdx, sta1].to_numpy(),
                             label=sta1)
+                if modelOpts['angularAcceleration']:
                     ktNames = [
                         i
                         for i in xTest.columns
@@ -877,8 +750,8 @@ def calcUnitRegressionToAsig():
                             firstTrialT,
                             xTest.loc[firstTrialIdx, sta1].to_numpy(),
                             label=sta1)
-                if modelOpts['ensembleHistoryTerms']:
-                    for colIdx in range(addHistoryTerms['nb']):
+                if modelOpts['ensembleTerms']:
+                    for colIdx in range(ihbasis.shape[1]):
                         cosBaseLabel = 'elec10_0_cos_{}'.format(colIdx)
                         ax[8].plot(
                             firstTrialT,
@@ -896,6 +769,11 @@ def calcUnitRegressionToAsig():
                 else:
                     plt.close()
         #
+        if len(existingVarSubFolders):
+            if varBaseName in existingVarSubFolders:
+                print(' variant {} already exists! skipping...'.format(varBaseName))
+                continue
+        
         snr = SingleNeuronRegression(
             xTrain=xTrain, yTrain=yTrain,
             xTest=xTest, yTest=yTest,
@@ -904,6 +782,18 @@ def calcUnitRegressionToAsig():
             verbose=arguments['verbose'],
             plotting=arguments['plotting']
             )
+        #
+        if (RANK == 0) and (not arguments['dryRun']):
+            estimatorMetadata.update({
+                'inputFeatures': yTrain.columns.to_list(),
+                'modelFeatures': xTest.columns.to_list()
+                })
+            if not os.path.exists(variantSubFolder):
+                os.makedirs(variantSubFolder, exist_ok=True)
+            if not arguments['debugging']:
+                with open(estimatorMetadataPath, 'wb') as f:
+                    pickle.dump(
+                        estimatorMetadata, f)
         #
         if not arguments['dryRun']:
             snr.apply_gridSearchCV(gridParams)
@@ -921,8 +811,7 @@ def calcUnitRegressionToAsig():
             snr.fit()
         #
         if arguments['debugging']:
-            toc()
-            pdb.set_trace()
+            print('{:.3f} seconds elapsed'.format(toc()))
         #
         if not arguments['debugging']:
             snr.clear_data()

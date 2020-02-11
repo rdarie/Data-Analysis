@@ -53,7 +53,7 @@ import pyglmnet
 from statsmodels.stats.multitest import multipletests as mt
 from patsy import (
     ModelDesc, EvalEnvironment, Term, Sum, Treatment, INTERCEPT,
-    EvalFactor, LookupFactor, demo_data, dmatrix, dmatrices)
+    EvalFactor, LookupFactor, demo_data, dmatrix, dmatrices, build_design_matrices)
 from dataAnalysis.custom_transformers.tdr import *
 from dataAnalysis.custom_transformers.tdr import _poisson_pseudoR2, _FUDE
 #
@@ -93,15 +93,9 @@ if not os.path.exists(estimatorFiguresFolder):
     os.makedirs(estimatorFiguresFolder, exist_ok=True)
 #
 variantMetaDataPath = os.path.join(
-    estimatorSubFolder, 'variant_metadata.pickle')
-with open(variantMetaDataPath, 'rb') as f:
-    allModelOpts = pickle.load(f)
+    estimatorSubFolder, 'variant_metadata.xlsx')
 featuresMetaDataPath = os.path.join(
     estimatorSubFolder, 'features_meta.pickle')
-dummyEstimatorMetadataPath = os.path.join(
-   estimatorSubFolder, 'var_001', 'estimator_metadata.pickle')
-with open(dummyEstimatorMetadataPath, 'rb') as f:
-    dummyEstimatorMetadata = pickle.load(f)
 featuresMetaDataPath = os.path.join(
     estimatorSubFolder, 'features_meta.pickle')
 with open(featuresMetaDataPath, 'rb') as f:
@@ -109,21 +103,28 @@ with open(featuresMetaDataPath, 'rb') as f:
     ihbasis = featuresMetaData['ihbasis']
     iht = featuresMetaData['iht']
 #
-targetH5Path = dummyEstimatorMetadata['targetPath']
-targetDF = pd.read_hdf(targetH5Path, 'target')
-regressorH5Path = targetH5Path.replace(
-    '_raster', '_rig')
-featuresDF = pd.read_hdf(regressorH5Path, 'feature')
+cBasis = pd.read_excel(
+    variantMetaDataPath, sheet_name='covariateBasis', index_col=0)
+def applyCBasis(vec, cbCol):
+    return np.convolve(
+        vec.to_numpy(),
+        cBasis[cbCol].to_numpy(),
+        mode='same')
+#
+ihbasisDF = pd.read_excel(
+    variantMetaDataPath, sheet_name='ensembleBasis', index_col=0)
+variantInfo = pd.read_excel(variantMetaDataPath, sheet_name='variantInfo')
+iht = np.array(ihbasisDF.index)
+ihbasis = ihbasisDF.to_numpy()
 saveR2 = {}
 saveEstimatorParams = {}
 saveBetas = {}
 varFolders = sorted(glob.glob(os.path.join(alignSubFolder, fullEstimatorName, 'var_*')))
 variantList = [os.path.basename(i) for i in varFolders]
-# variantList = range(15)
+
 if arguments['debugging']:
     showNow = False
-    # variantList = ['bak/var_000']
-    variantList = ['var_{:03d}'.format(i) for i in range(12)]
+    variantList = ['var_{:03d}'.format(i) for i in range(2)]
 else:
     showNow = False
 
@@ -154,66 +155,67 @@ def calcMinIter(iterBetaNorm, tol_list=[1e-6], plotting=False):
         return terminateIndices
 
 
-variantInfo = pd.DataFrame(
-    np.nan,
-    index=variantList,
-    columns=[
-        'kinLag', 'terms',
-        'stimLag', 'singleLag', 'equalLag'])
 for variantName in variantList:
     variantIdx = int(variantName[-3:])
-    modelOpts = allModelOpts[variantIdx]
-    singleLag = (
-        len(modelOpts['kinLag']) == 1 and
-        len(modelOpts['stimLag']) == 1)
-    variantInfo.loc[variantName, 'singleLag'] = singleLag
-    if singleLag:
-        variantInfo.loc[variantName, 'stimLag'] = modelOpts['stimLag'][0]
-        variantInfo.loc[variantName, 'kinLag'] = modelOpts['kinLag'][0]
-    variantInfo.loc[variantName, 'stimLagStr'] = (
-        '{} - {}'.format(modelOpts['stimLag'][0], modelOpts['stimLag'][-1]))
-    variantInfo.loc[variantName, 'kinLagStr'] = (
-        '{} - {}'.format(modelOpts['kinLag'][0], modelOpts['kinLag'][-1]))
-    equalLag = modelOpts['kinLag'] == modelOpts['stimLag']
-    variantInfo.loc[variantName, 'equalLag'] = equalLag
+    variantInfo.loc[variantIdx, 'singleLag'] = (
+        (
+            variantInfo.loc[variantIdx, 'minKinLag'] ==
+            variantInfo.loc[variantIdx, 'maxKinLag']) and
+        (
+            variantInfo.loc[variantIdx, 'minStimLag'] ==
+            variantInfo.loc[variantIdx, 'maxStimLag'])
+        )
+    if variantInfo.loc[variantIdx, 'singleLag']:
+        variantInfo.loc[variantIdx, 'stimLag'] = (
+            variantInfo.loc[variantIdx, 'minStimLag'])
+        variantInfo.loc[variantIdx, 'kinLag'] = (
+            variantInfo.loc[variantIdx, 'minKinLag'])
+    variantInfo.loc[variantIdx, 'stimLagStr'] = (
+        '{:.3f} to {:.3f}'.format(
+            variantInfo.loc[variantIdx, 'minStimLag'],
+            variantInfo.loc[variantIdx, 'maxStimLag']))
+    variantInfo.loc[variantIdx, 'kinLagStr'] = (
+        '{:.3f} to {:.3f}'.format(
+            variantInfo.loc[variantIdx, 'minKinLag'],
+            variantInfo.loc[variantIdx, 'maxKinLag']))
+    equalLag = (
+        variantInfo.loc[variantIdx, 'kinLagStr'] ==
+        variantInfo.loc[variantIdx, 'kinLagStr'])
+    variantInfo.loc[variantIdx, 'equalLag'] = equalLag
     terms = ''
-    if modelOpts['ensembleHistoryTerms']:
+    if variantInfo.loc[variantIdx, 'ensembleTerms']:
         terms += 'e'
-    if modelOpts['angleTerms']:
+    if variantInfo.loc[variantIdx, 'angle']:
         terms += 'k'
-    if modelOpts['velTerms']:
+    if variantInfo.loc[variantIdx, 'angularVelocity']:
         terms += 'v'
-    if modelOpts['accTerms']:
+    if variantInfo.loc[variantIdx, 'angularAcceleration']:
         terms += 'a'
-    if modelOpts['stimTerms']:
+    if variantInfo.loc[variantIdx, 'stim']:
         terms += 's'
-    if modelOpts['addStimDiff']:
+    if variantInfo.loc[variantIdx, 'stimVelocity']:
         terms += 'd'
-    variantInfo.loc[variantName, 'terms'] = terms
-    variantInfo.loc[variantName, 'stimSplineFun'] = modelOpts['stimSplineFun']
-    #
+    variantInfo.loc[variantIdx, 'terms'] = terms
+
 print(variantInfo)
 csvPath = os.path.join(
     estimatorFiguresFolder,
     'variant_info.csv')
 variantInfo.to_csv(csvPath)
 
-pdb.set_trace()
+targetH5Path = os.path.join(
+    estimatorSubFolder, '_raster_long.h5')
+targetDF = pd.read_hdf(targetH5Path, 'target')
+regressorH5Path = targetH5Path.replace('_raster', '_rig')
+featuresDF = pd.read_hdf(regressorH5Path, 'feature')
 
 for variantName in variantList:
+    variantIdx = int(variantName[-3:])
     estimatorMetadataPath = os.path.join(
        alignSubFolder,
        fullEstimatorName, variantName, 'estimator_metadata.pickle')
     with open(estimatorMetadataPath, 'rb') as f:
         estimatorMetadata = pickle.load(f)
-    
-    cBasis = estimatorMetadata['cBasis']
-    def applyCBasis(x, cbCol):
-        return np.convolve(
-            x.to_numpy(),
-            cBasis[cbCol].to_numpy(),
-            mode='same')
-
     estimatorPath = os.path.join(
         estimatorSubFolder, variantName, 'estimator.joblib')
     if os.path.exists(estimatorPath):
@@ -243,22 +245,72 @@ for variantName in variantList:
                 os.remove(otherMatch)
             os.remove(partialMatches[0])
             jb.dump(estimator, estimatorPath)
-    #
-    descStr = estimatorMetadata['modelDescStr']
-    desc = ModelDesc.from_formula(descStr)
     train = estimatorMetadata['trainIdx']
     test = estimatorMetadata['testIdx']
-    try:
-        estimator.xTrain = dmatrix(
-            desc, featuresDF.iloc[train, :],
+    xTrainList = []
+    xTestList = []
+    if variantInfo.loc[variantIdx, 'addIntercept']:
+        xTrainList.append(dmatrix(
+            ModelDesc([], [Term([])]),
+            featuresDF.iloc[train, :],
+            return_type='dataframe'))
+        xTestList.append(dmatrix(
+            ModelDesc([], [Term([])]),
+            featuresDF.iloc[test, :],
+            return_type='dataframe'))
+    if 'kinModelDesc' in estimatorMetadata.keys():
+        kinModelDesc = ModelDesc.from_formula(estimatorMetadata['kinModelDesc'])
+        kinXTrain = dmatrix(
+            kinModelDesc,
+            featuresDF.iloc[train, :],
             return_type='dataframe')
-        estimator.xTest = dmatrix(
-            desc, featuresDF.iloc[test, :],
+        kinXTest = build_design_matrices(
+            [kinXTrain.design_info], featuresDF.iloc[test, :],
+            return_type='dataframe')[0]
+        kinModelDescFinal = ModelDesc.from_formula(estimatorMetadata['kinModelDescFinal'])
+        kinXTrainFinal = dmatrix(
+            kinModelDescFinal,
+            kinXTrain,
             return_type='dataframe')
-        estimator.yTrain = targetDF.iloc[train, :]
-        estimator.yTest = targetDF.iloc[test, :]
-    except Exception:
-        traceback.print_exc()
+        xTrainList.append(kinXTrainFinal)
+        kinXTestFinal = dmatrix(
+            kinModelDescFinal,
+            kinXTest,
+            return_type='dataframe')
+        xTestList.append(kinXTestFinal)
+    if 'stimModelDesc' in estimatorMetadata.keys():
+        stimModelDesc = ModelDesc.from_formula(estimatorMetadata['stimModelDesc'])
+        stimXTrain = dmatrix(
+            stimModelDesc,
+            featuresDF.iloc[train, :],
+            return_type='dataframe')
+        stimXTest = build_design_matrices(
+            [stimXTrain.design_info], featuresDF.iloc[test, :],
+            return_type='dataframe')[0]
+        stimModelDescFinal = ModelDesc.from_formula(estimatorMetadata['stimModelDescFinal'])
+        stimXTrainFinal = dmatrix(
+            stimModelDescFinal,
+            stimXTrain,
+            return_type='dataframe')
+        xTrainList.append(stimXTrainFinal)
+        stimXTestFinal = dmatrix(
+            stimModelDescFinal,
+            stimXTest,
+            return_type='dataframe')
+        xTestList.append(stimXTestFinal)
+    if 'histDesc' in estimatorMetadata.keys():
+        histDesc = ModelDesc.from_formula(estimatorMetadata['histDesc'])
+        xTrainList.append(dmatrix(
+            histDesc,
+            featuresDF.iloc[train, :],
+            return_type='dataframe'))
+        xTestList.append(dmatrix(
+            histDesc,
+            featuresDF.iloc[test, :],
+            return_type='dataframe'))
+    # TODO: fix this based on new, two-pass, model descs
+    estimator.xTrain = pd.concat(xTrainList, axis='columns')
+    estimator.xTest = pd.concat(xTestList, axis='columns')
     for idx, unitName in enumerate(estimator.regressionList.keys()):
         reg = estimator.regressionList[unitName]['reg']
         if hasattr(reg, 'model_'):
@@ -353,8 +405,8 @@ for variantName in variantList:
     #
     toleranceParams = pd.concat(toleranceParamsList, ignore_index=True)
     #######################################################
-    variantInfo.loc[variantName, 'median_valid'] = pR2['valid'].median()
-    variantInfo.loc[variantName, 'median_gs'] = pR2['gs'].median()
+    variantInfo.loc[variantIdx, 'median_valid'] = pR2['valid'].median()
+    variantInfo.loc[variantIdx, 'median_gs'] = pR2['gs'].median()
     saveR2[variantName] = pR2
     saveEstimatorParams[variantName] = estimatorParams
     saveBetas[variantName] = {
@@ -578,7 +630,7 @@ for variantName in variantList:
                     '{}: pR^2 = {:.3f} ({} model)'.format(
                         unitName,
                         thisReg['validationScore'],
-                        variantInfo.loc[variantName, 'terms']))
+                        variantInfo.loc[variantIdx, 'terms']))
                 pdf.savefig()
                 plt.close()
                 #  if arguments['debugging']:
