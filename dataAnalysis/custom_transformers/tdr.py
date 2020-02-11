@@ -194,7 +194,13 @@ def makeLogRaisedCosBasis(
     for colIdx in range(ihbasis.shape[1]):
         ihbasis[:, colIdx] = ihbasis[:, colIdx] / np.sum(ihbasis[:, colIdx])
     # orthobas, _ = scipy.linalg.qr(ihbasis)
-    return pd.DataFrame(ihbasis, index=iht, columns=ctrs), pd.DataFrame(orthobas, index=iht)
+    ihbDF = pd.DataFrame(ihbasis, index=iht, columns=np.round(ctrs, decimals=3))
+    orthobasDF = pd.DataFrame(orthobas, index=iht)
+    #
+    negiht = np.sort(iht[iht > 0] * (-1))
+    negBDF = pd.DataFrame(0, index=negiht, columns=ihbDF.columns)
+    negOrthobasDF = pd.DataFrame(0, index=negiht, columns=orthobasDF.columns)
+    return pd.concat([negBDF, ihbDF]), pd.concat([negOrthobasDF, orthobasDF])
 
 
 def _poisson_pseudoR2(y, yhat):

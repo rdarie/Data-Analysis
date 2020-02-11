@@ -123,7 +123,7 @@ variantList = [os.path.basename(i) for i in varFolders]
 if arguments['debugging']:
     showNow = False
     # variantList = ['bak/var_000']
-    variantList = ['var_{:03d}'.format(i) for i in range(55)]
+    variantList = ['var_{:03d}'.format(i) for i in range(12)]
 else:
     showNow = False
 
@@ -160,8 +160,6 @@ variantInfo = pd.DataFrame(
     columns=[
         'kinLag', 'terms',
         'stimLag', 'singleLag', 'equalLag'])
-
-
 for variantName in variantList:
     variantIdx = int(variantName[-3:])
     modelOpts = allModelOpts[variantIdx]
@@ -171,18 +169,38 @@ for variantName in variantList:
     variantInfo.loc[variantName, 'singleLag'] = singleLag
     if singleLag:
         variantInfo.loc[variantName, 'stimLag'] = modelOpts['stimLag'][0]
-        variantInfo.loc[variantName, 'kinLag'] = modelOpts['stimLag'][0]
+        variantInfo.loc[variantName, 'kinLag'] = modelOpts['kinLag'][0]
+    variantInfo.loc[variantName, 'stimLagStr'] = (
+        '{} - {}'.format(modelOpts['stimLag'][0], modelOpts['stimLag'][-1]))
+    variantInfo.loc[variantName, 'kinLagStr'] = (
+        '{} - {}'.format(modelOpts['kinLag'][0], modelOpts['kinLag'][-1]))
     equalLag = modelOpts['kinLag'] == modelOpts['stimLag']
     variantInfo.loc[variantName, 'equalLag'] = equalLag
     terms = ''
     if modelOpts['ensembleHistoryTerms']:
         terms += 'e'
-    if modelOpts['kinematicTerms']:
+    if modelOpts['angleTerms']:
         terms += 'k'
+    if modelOpts['velTerms']:
+        terms += 'v'
+    if modelOpts['accTerms']:
+        terms += 'a'
     if modelOpts['stimTerms']:
         terms += 's'
+    if modelOpts['addStimDiff']:
+        terms += 'd'
     variantInfo.loc[variantName, 'terms'] = terms
+    variantInfo.loc[variantName, 'stimSplineFun'] = modelOpts['stimSplineFun']
     #
+print(variantInfo)
+csvPath = os.path.join(
+    estimatorFiguresFolder,
+    'variant_info.csv')
+variantInfo.to_csv(csvPath)
+
+pdb.set_trace()
+
+for variantName in variantList:
     estimatorMetadataPath = os.path.join(
        alignSubFolder,
        fullEstimatorName, variantName, 'estimator_metadata.pickle')
@@ -575,12 +593,7 @@ for unitName, thisReg in estimator.regressionList.items():
                 thisReg['reg'].distr,
                 estimator.yTest[unitName], estimator.yTest[unitName])
 # plots to compare between models (saveR2 saveEstimatorParams saveBetas)
-print(variantInfo)
-csvPath = os.path.join(
-    estimatorFiguresFolder,
-    'variant_info.csv')
-variantInfo.to_csv(csvPath)
-#
+
 bestVariants = pd.DataFrame(index=[], columns=variantInfo.columns)
 for name, group in variantInfo.groupby('terms'):
     maxVarIdx = group['median_valid'].idxmax()
