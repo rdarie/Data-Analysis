@@ -452,13 +452,17 @@ def unitSpikeTrainWaveformsToDF(
     zeroLagWaveformsDF.drop(columns=idxLabels, inplace=True)
     if lags is None:
         lags = [0]
-    laggedWaveformsDict = {(spikeTrainContainer.name, k): None for k in lags}
+    laggedWaveformsDict = {
+        (spikeTrainContainer.name, k): None for k in lags}
     for lag in lags:
         if isinstance(lag, int):
-            shiftedWaveform = zeroLagWaveformsDF.shift(lag, axis='columns')
+            shiftedWaveform = zeroLagWaveformsDF.shift(
+                lag, axis='columns')
             if rollingWindow is not None:
                 halfRollingWin = int(np.ceil(rollingWindow/2))
-                seekIdx = slice(halfRollingWin, -halfRollingWin, decimate)
+                seekIdx = slice(
+                    halfRollingWin, -halfRollingWin+1, decimate)
+                # seekIdx = slice(None, None, decimate)
                 shiftedWaveform = (
                     shiftedWaveform
                     .rolling(
@@ -470,7 +474,8 @@ def unitSpikeTrainWaveformsToDF(
                 seekIdx = slice(None, None, decimate)
                 if False:
                     import matplotlib.pyplot as plt
-                    oldShiftedWaveform = zeroLagWaveformsDF.shift(lag, axis='columns')
+                    oldShiftedWaveform = zeroLagWaveformsDF.shift(
+                        lag, axis='columns')
                     plt.plot(oldShiftedWaveform.iloc[0, :])
                     plt.plot(shiftedWaveform.iloc[0, :])
                     plt.show()
@@ -479,8 +484,9 @@ def unitSpikeTrainWaveformsToDF(
                     shiftedWaveform.iloc[:, seekIdx].copy())
         if isinstance(lag, tuple):
             halfRollingWin = int(np.ceil(lag[1]/2))
-            # seekIdx = slice(halfRollingWin, -halfRollingWin, decimate)
-            seekIdx = slice(None, None, decimate)
+            seekIdx = slice(
+                halfRollingWin, -halfRollingWin+1, decimate)
+            # seekIdx = slice(None, None, decimate)
             shiftedWaveform = (
                 zeroLagWaveformsDF
                 .shift(lag[0], axis='columns')

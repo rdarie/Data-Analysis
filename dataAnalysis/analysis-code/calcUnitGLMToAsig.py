@@ -24,17 +24,7 @@ Options:
     --selector=selector                       filename if using a unit selector
     --maskOutlierTrials                       delete outlier trials? [default: False]
 """
-import matplotlib
-matplotlib.rcParams['pdf.fonttype'] = 42
-matplotlib.rcParams['ps.fonttype'] = 42
-# matplotlib.use('Qt5Agg')   # generate postscript output by default
-matplotlib.use('Agg')   # generate postscript output by default
-import matplotlib.pyplot as plt
-import seaborn as sns
-sns.set()
-sns.set_color_codes("dark")
-sns.set_context("talk")
-sns.set_style("whitegrid")
+
 import pdb, traceback
 from patsy import (
     ModelDesc, EvalEnvironment, Term, Sum, Treatment, INTERCEPT,
@@ -65,7 +55,21 @@ expOpts, allOpts = parseAnalysisOptions(
     int(arguments['trialIdx']), arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
-
+#
+import matplotlib
+matplotlib.rcParams['pdf.fonttype'] = 42
+matplotlib.rcParams['ps.fonttype'] = 42
+if arguments['debugging']:
+    matplotlib.use('Qt5Agg')   # interactive
+else:
+    matplotlib.use('Agg')   # headless
+import matplotlib.pyplot as plt
+import seaborn as sns
+sns.set()
+sns.set_color_codes("dark")
+sns.set_context("talk")
+sns.set_style("whitegrid")
+#
 try:
     if not arguments['attemptMPI']:
         raise(Exception('MPI aborted by cmd line argument'))
@@ -106,7 +110,7 @@ def calcUnitRegressionToAsig():
     if not os.path.exists(estimatorFiguresFolder):
         os.makedirs(estimatorFiguresFolder, exist_ok=True)
     #
-    subsampleOpts = glmOptsLookup[arguments['estimatorName']]
+    subsampleOpts = glmOptsLookup[arguments['estimatorName']]['subsampleOpts']
     ensembleHistoryLen = glmOptsLookup['ensembleHistoryLen']
     covariateHistoryLen = glmOptsLookup['covariateHistoryLen']
     winSize = subsampleOpts['rollingWindow'] if subsampleOpts['rollingWindow'] is not None else 1
@@ -197,15 +201,16 @@ def calcUnitRegressionToAsig():
             estimatorSubFolder, 'variant_metadata.xlsx')
         if not os.path.exists(variantMetaDataPath):
             covariateBasisTerms = {
-                'nb': glmOptsLookup['nCovariateBasisTerms'],
+                # 'nb': glmOptsLookup['nCovariateBasisTerms'],
+                'spacing': glmOptsLookup[arguments['estimatorName']]['covariateSpacing'],
                 'dt': rasterOpts['binInterval'],
                 'endpoints': [-covariateHistoryLen, covariateHistoryLen]
                 }
             cBasis = makeRaisedCosBasis(**covariateBasisTerms)
             if arguments['plotting']:
                 pdfPath = os.path.join(
-                    GLMFiguresFolder, 'covariate_basis.pdf'
-                    )
+                    estimatorFiguresFolder, 'covariate_basis.pdf')
+                print('saving {}'.format(pdfPath))
                 fig, ax = plt.subplots(2, 1, sharex=True)
                 ax[0].plot(cBasis)
                 ax[0].set_xlabel('Time (sec)')
@@ -214,8 +219,7 @@ def calcUnitRegressionToAsig():
             cBasis = (
                 cBasis.rolling(winSize, center=True, win_type='gaussian')
                 .mean(std=halfWinSize).iloc[::subsampleOpts['decimate'], ::2]
-                .fillna(0, axis=0)
-                .fillna(0, axis=0))
+                .fillna(0, axis=0).fillna(0, axis=1))
             cBasis.to_excel(variantMetaDataPath, sheet_name='covariateBasis')
             if arguments['plotting']:
                 ax[1].plot(cBasis)
@@ -251,7 +255,7 @@ def calcUnitRegressionToAsig():
                 # addHistoryTerms['nb'] = orthobas.shape[1]
                 if arguments['plotting']:
                     pdfPath = os.path.join(
-                        GLMFiguresFolder, 'history_basis.pdf'
+                        estimatorFiguresFolder, 'history_basis.pdf'
                         )
                     fig, ax = plt.subplots(2, 1, sharex=True)
                     ax[0].plot(iht, ihbasis)
@@ -403,10 +407,12 @@ def calcUnitRegressionToAsig():
             sourceAlignSubFolder = os.path.join(
                 sourceAnalysisSubFolder, sourceOpt['alignFolderName']
                 )
-            targetLoadArgs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, alignQuery=sourceOpt['alignQuery'])
+            targetLoadArgs['dataQuery'] = ash.processAlignQueryArgs(
+                namedQueries, alignQuery=sourceOpt['alignQuery'])
             targetLoadArgs['outlierTrials'] = ash.processOutlierTrials(
                 sourceAlignSubFolder, sourceOpt['prefix'], **arguments)
-            featureLoadArgs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, alignQuery=sourceOpt['alignQuery'])
+            featureLoadArgs['dataQuery'] = ash.processAlignQueryArgs(
+                namedQueries, alignQuery=sourceOpt['alignQuery'])
             featureLoadArgs['outlierTrials'] = ash.processOutlierTrials(
                 sourceAlignSubFolder, sourceOpt['prefix'], **arguments)
             triggeredPath = os.path.join(
@@ -467,6 +473,7 @@ def calcUnitRegressionToAsig():
                         .loc[firstTrialIdx, 'elec10_0_cos_{}'.format(colIdx)]
                         .to_numpy())
                 historyTerms.append(historyDF.copy())
+                # if debugging, only calculate first history basis term
                 if arguments['debugging']:
                     break
             # sanity check diff terms
@@ -538,20 +545,22 @@ def calcUnitRegressionToAsig():
         (train, test) = prelimCV[0]
         cv_kwargs['n_splits'] -= 1
         cv = trialAwareStratifiedKFold(**cv_kwargs)
+        cv_folds = cv.split(targetDF.iloc[train, :])
     else:
         train = None
         test = None
         cv = None
+        cv_folds = None
     if HAS_MPI:
         # wait for RANK 0 to create the h5 files
         COMM.Barrier()
         train = COMM.bcast(train, root=0)
         test = COMM.bcast(test, root=0)
         cv = COMM.bcast(cv, root=0)
+        cv_folds = COMM.bcast(cv_folds, root=0)
     #
     yTrain = targetDF.iloc[train, :].copy()
     yTest = targetDF.iloc[test, :].copy()
-    cv_folds = cv.split(yTrain)
     #
     if HAS_MPI:
         # !! OverflowError: cannot serialize a bytes object larger than 4 GiB
@@ -666,9 +675,11 @@ def calcUnitRegressionToAsig():
                 kinX.iloc[test, :],
                 return_type='dataframe'))
         stimDescList = []
-        if modelOpts['separateRate']:
-            stimDescList += [Term([LookupFactor('RateInHz')])]
-        if any([modelOpts['stim'], modelOpts['stimVelocity']]):
+        #
+        presentPrograms = [p for p in pList if modelOpts[p]]
+        if len(presentPrograms):
+            if modelOpts['separateRate']:
+                stimDescList += [Term([LookupFactor('RateInHz')])]
             stimDescList += [
                 Term([eval(modelOpts['stimAmpSpline'].format(p))])
                 for p in pList
@@ -677,7 +688,7 @@ def calcUnitRegressionToAsig():
                 Term([
                     eval(modelOpts['stimAmpSpline'].format(p)),
                     LookupFactor('RateInHz')])
-                for p in pList
+                for p in presentPrograms
                 ]
             stimModelDesc = ModelDesc([], stimDescList)
             if RANK == 0:
@@ -696,11 +707,10 @@ def calcUnitRegressionToAsig():
                     (np.float(i) >= modelOpts['minStimLag']) and
                     (np.float(i) <= modelOpts['maxStimLag']))]
             stimDescListFinal = []
-            if modelOpts['stim']:
-                stimDescListFinal += [
-                    Term([EvalFactor('applyCBasis(Q("{}"), {:.3f})'.format(p, l))])
-                    for p, l in product(stimXTrain.columns, stimLags)
-                    ]
+            stimDescListFinal += [
+                Term([EvalFactor('applyCBasis(Q("{}"), {:.3f})'.format(p, l))])
+                for p, l in product(stimXTrain.columns, stimLags)
+                ]
             if modelOpts['stimVelocity']:
                 deriv = lambda x: pd.Series(x).diff().fillna(0).to_numpy()
                 stimDescListFinal += [
@@ -771,11 +781,12 @@ def calcUnitRegressionToAsig():
                     firstTrialT,
                     yTest.loc[firstTrialIdx, :].iloc[:, -1].to_numpy(),
                     label='target')
-                if modelOpts['stim']:
+                if len(presentPrograms):
+                    exampleProgramName = presentPrograms[0].replace('_amplitude', '')
                     maNames = [
                         i
                         for i in plotDF.columns
-                        if ('RateInHz' in i) and not ('deriv' in i) and ('program0' in i)]
+                        if ('RateInHz' in i) and not ('deriv' in i) and (exampleProgramName in i)]
                     for sta1 in maNames:
                         ax[1].plot(
                             firstTrialT,
@@ -784,7 +795,7 @@ def calcUnitRegressionToAsig():
                     mdNames = [
                         i
                         for i in plotDF.columns
-                        if ('RateInHz' in i) and ('deriv' in i) and ('program0' in i)]
+                        if ('RateInHz' in i) and ('deriv' in i) and (exampleProgramName in i)]
                     for sta2 in mdNames:
                         ax[2].plot(
                             firstTrialT,
@@ -793,7 +804,7 @@ def calcUnitRegressionToAsig():
                     saNames = [
                         i
                         for i in plotDF.columns
-                        if not ('RateInHz' in i) and not ('deriv' in i) and ('program0' in i)]
+                        if not ('RateInHz' in i) and not ('deriv' in i) and (exampleProgramName in i)]
                     for sta3 in saNames:
                         ax[3].plot(
                             firstTrialT,
@@ -802,7 +813,7 @@ def calcUnitRegressionToAsig():
                     sdNames = [
                         i
                         for i in plotDF.columns
-                        if not ('RateInHz' in i) and ('deriv' in i) and ('program0' in i)]
+                        if not ('RateInHz' in i) and ('deriv' in i) and (exampleProgramName in i)]
                     for sta4 in sdNames:
                         ax[4].plot(
                             firstTrialT,

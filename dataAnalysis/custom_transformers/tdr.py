@@ -113,7 +113,8 @@ def raisedCos(x, c, dc):
 
 
 #
-def raisedCosBoundary(b=None, DT=None, minX=None, nb=None, plotting=False):
+def raisedCosBoundary(
+        b=None, DT=None, minX=None, nb=None, plotting=False):
     eps = 1e-20
     nlin = lambda x: np.log(x + eps)
     # fun = lambda c0: (nb - 1) * nlin(c0 + b) + 2 * nlin(c0 + DT + b) - (nb - 1) * nlin(minX + b)
@@ -132,18 +133,26 @@ def raisedCosBoundary(b=None, DT=None, minX=None, nb=None, plotting=False):
 
 
 def makeRaisedCosBasis(
-        nb, dt, endpoints):
+        nb=None, spacing=None, dt=None, endpoints=None):
     """
         Make nonlinearly stretched basis consisting of raised cosines
     """
-    db = (endpoints[1] - endpoints[0]) / (nb - 1)
+    if spacing is None:
+        spacing = (endpoints[1] - endpoints[0]) / (nb - 1)
+    else:
+        assert (nb is None)
     # centers for basis vectors
-    ctrs = np.round(np.arange(endpoints[0], endpoints[1] + db, db), decimals=3)
-    iht = np.arange(endpoints[0] - 3 * db / 2, endpoints[1] + 3 * db / 2, dt)
+    ctrs = np.round(np.arange(
+        endpoints[0], endpoints[1] + spacing, spacing), decimals=3)
+    if nb is None:
+        nb = len(ctrs)
+    iht = np.arange(
+        endpoints[0] - 2 * spacing,
+        endpoints[1] + 2 * spacing + dt, dt)
     repIht = np.vstack([iht for i in range(nb)]).transpose()
     nt = iht.size
     repCtrs = np.vstack([ctrs for i in range(nt)])
-    ihbasis = raisedCos(repIht, repCtrs, db)
+    ihbasis = raisedCos(repIht, repCtrs, spacing)
     for colIdx in range(ihbasis.shape[1]):
         ihbasis[:, colIdx] = ihbasis[:, colIdx] / np.sum(ihbasis[:, colIdx])
     return pd.DataFrame(ihbasis, index=iht, columns=ctrs)

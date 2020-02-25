@@ -394,11 +394,20 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
     glmOptsLookup = {
         'ensembleHistoryLen': .30,
         'covariateHistoryLen': .30,
-        'nCovariateBasisTerms': 61,
-        'glm_50msec': dict(rollingWindow=50, decimate=50),
-        'glm_30msec': dict(rollingWindow=30, decimate=30),
-        'glm_20msec': dict(rollingWindow=20, decimate=20),
-        'glm_10msec': dict(rollingWindow=10, decimate=10),
-        'glm_1msec': dict(rollingWindow=None, decimate=1),
+        'nHistoryBasisTerms': 2,
+        'glm_50msec': dict(
+            subsampleOpts=dict(rollingWindow=50, decimate=50),
+            covariateSpacing=25e-3),
+        'glm_30msec': dict(
+            subsampleOpts=dict(rollingWindow=30, decimate=30),
+            covariateSpacing=15e-3),
+        'glm_20msec': dict(
+            subsampleOpts=dict(rollingWindow=20, decimate=20),
+            covariateSpacing=10e-3),
+        'glm_10msec': dict(
+            subsampleOpts=dict(rollingWindow=10, decimate=10),
+            covariateSpacing=10e-3),
+        'glm_1msec': dict(
+            rollingWindow=None, decimate=1, covariateSpacing=10e-3),
     }
     return expOpts, locals()

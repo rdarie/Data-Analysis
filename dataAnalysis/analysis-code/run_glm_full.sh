@@ -27,12 +27,12 @@
 # EXP="exp201901211000"
 EXP="exp201901271000"
 # ESTIMATOR="glm_20msec"
-ESTIMATOR="glm_30msec"
+ESTIMATOR="glm_50msec"
 
 # UNITSELECTOR=""
-UNITSELECTOR="--selector=_minfrmaxcorr"
+# UNITSELECTOR="--selector=_minfrmaxcorr"
 # UNITSELECTOR="--selector=_minfrmaxcorrminamp"
-# UNITSELECTOR="--selector=_glm_30msec_long_midPeak_maxmod"
+UNITSELECTOR="--selector=_glm_30msec_long_midPeak_maxmod"
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
