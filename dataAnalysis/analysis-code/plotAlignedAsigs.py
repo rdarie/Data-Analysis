@@ -14,12 +14,13 @@ Options:
     --alignQuery=alignQuery                what will the plot be aligned to? [default: outboundWithStim]
     --selector=selector                    filename if using a unit selector
     --maskOutlierTrials                    delete outlier trials? [default: False]
+    --enableOverrides                      delete outlier trials? [default: False]
     --rowName=rowName                      break down by row  [default: pedalDirection]
     --rowControl=rowControl                rows to exclude from stats test
     --hueName=hueName                      break down by hue  [default: amplitude]
     --hueControl=hueControl                hues to exclude from stats test
     --styleName=styleName                  break down by style [default: RateInHz]
-    --styleControl=hueControl              styles to exclude from stats test
+    --styleControl=styleControl            styles to exclude from stats test
     --colName=colName                      break down by col  [default: electrode]
     --colControl=colControl                cols to exclude from stats test [default: control]
     --analysisName=analysisName            append a name to the resulting blocks? [default: default]
@@ -98,14 +99,24 @@ statsTestPath = os.path.join(figureStatsFolder, pdfName + '_stats.h5')
 #############################################
 #  Overrides
 alignedAsigsKWargs.update({'decimate': 10})
-alignedAsigsKWargs.update({'windowSize': (-1000e-3, 1000e-3)})
-statsTestOpts.update({
-    'testStride': 30e-3,
-    'testWidth': 30e-3,
-    'tStop': 300e-3})
 limitPages = None
+if arguments['enableOverrides']:
+    alignedAsigsKWargs.update({'windowSize': (-1000e-3, 1000e-3)})
+    currWindow = rasterOpts['windowSizes'][arguments['window']]
+    fullWinSize = currWindow[1] - currWindow[0]
+    redWinSize = (
+        alignedAsigsKWargs['windowSize'][1] -
+        alignedAsigsKWargs['windowSize'][0])
+    relplotKWArgs['aspect'] = (
+        relplotKWArgs['aspect'] * redWinSize / fullWinSize)
+    # statsTestOpts.update({
+    #     'testStride': 500e-3,
+    #     'testWidth': 500e-3,
+    #     'tStart': -2000e-3,
+    #     'tStop': 2250e-3})
+    
 #  End Overrides
-#  
+
 #  Get stats results
 if os.path.exists(statsTestPath):
     sigValsWide = pd.read_hdf(statsTestPath, 'sig')

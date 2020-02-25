@@ -41,4 +41,4 @@ python --version
 # python3 ./calcUnitMeanFR.py --exp=$EXP $TRIALSELECTOR --inputBlockName="fr" --alignQuery="midPeak" --unitQuery="fr" --verbose
 # python3 ./calcUnitCorrelation.py --exp=$EXP $TRIALSELECTOR --inputBlockName="fr" --alignQuery="midPeak" --unitQuery="fr" --verbose --plotting
 # python3 ./selectUnitsByMeanFRandCorrelation.py --exp=$EXP $TRIALSELECTOR --verbose
-# python3 ./calcTrialOutliers.py --exp=$EXP $TRIALSELECTOR --selector=$SELECTOR --saveResults --plotting --inputBlockName="fr" --alignQuery="all" --unitQuery="fr" --verbose
+python3 ./calcTrialOutliers.py --exp=$EXP $TRIALSELECTOR --selector=$SELECTOR --saveResults --plotting --alignQuery="all" --verbose --alignFolderName=stim

@@ -333,31 +333,35 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
         'separateByFunKWArgs': {'type': 'Classification'}
         }
     statsTestOpts = dict(
-        testStride=20e-3,
-        testWidth=100e-3,
-        tStart=0,
-        tStop=500e-3,
+        testStride=500e-3,
+        testWidth=500e-3,
+        tStart=None,
+        tStop=None,
         pThresh=1e-2,
         correctMultiple=True
         )
     relplotKWArgs = dict(
         ci='sem',
-        #  estimator='mean',
-        estimator=None, units='t',
+        estimator='mean',
+        # estimator=None, units='t',
         palette="ch:0.6,-.3,dark=.1,light=0.7,reverse=1",
-        height=5, aspect=1.5, kind='line')
+        height=5, aspect=3, kind='line')
     vLineOpts = {'color': 'm'}
     asigSigStarOpts = {
         'color': 'm',
+        'linestyle': 'None',
+        'markersize': 20,
         'marker': '*'
     }
     nrnRelplotKWArgs = dict(
         palette="ch:1.6,-.3,dark=.1,light=0.7,reverse=1",
-        func1_kws={'marker': 'd', 'alpha': 0.2, 'rasterized': True},
+        func1_kws={
+            'marker': 'd', 's': 15, 'edgecolors': 'face',
+            'alpha': 0.2, 'rasterized': True},
         func2_kws={'ci': 'sem'},
         facet1_kws={'sharey': False},
         facet2_kws={'sharey': True},
-        height=5, aspect=1.5,
+        height=5, aspect=3,
         kind1='scatter', kind2='line'
     )
     nrnVLineOpts = {'color': 'y'}
@@ -366,11 +370,14 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
         'alpha': 0.1, 'zorder': -100}
     nrnSigStarOpts = {
         'color': 'y',
+        #'edgecolors': 'face',
+        'linestyle': 'None',
+        'markersize': 20,
         'marker': '*'
     }
     plotOpts = {
         'type': 'ticks', 'errorBar': 'sem',
-        'pageSize': (6, 12), 'removeOutliers': (0.01, 0.975)}
+        'pageSize': (6, 22), 'removeOutliers': (0.01, 0.975)}
     try:
         experimentsToAssemble = expOpts['experimentsToAssemble']
         trialsToAssemble = []
@@ -385,10 +392,13 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
     except Exception:
         pass
     glmOptsLookup = {
-        'glm_50msec': dict(rollingWindow=50, decimate=25),
-        'glm_30msec': dict(rollingWindow=30, decimate=15),
-        'glm_20msec': dict(rollingWindow=20, decimate=10),
-        'glm_10msec': dict(rollingWindow=10, decimate=5),
+        'ensembleHistoryLen': .30,
+        'covariateHistoryLen': .30,
+        'nCovariateBasisTerms': 61,
+        'glm_50msec': dict(rollingWindow=50, decimate=50),
+        'glm_30msec': dict(rollingWindow=30, decimate=30),
+        'glm_20msec': dict(rollingWindow=20, decimate=20),
+        'glm_10msec': dict(rollingWindow=10, decimate=10),
         'glm_1msec': dict(rollingWindow=None, decimate=1),
     }
     return expOpts, locals()

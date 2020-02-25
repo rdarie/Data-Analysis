@@ -9,7 +9,7 @@ from scipy import stats
 from statsmodels.stats.multitest import multipletests as mt
 from copy import copy
 import pdb, traceback
-
+import pingouin as pg
 
 def processAlignQueryArgs(
         namedQueries, alignQuery=None, **kwargs):
@@ -53,7 +53,7 @@ def processOutlierTrials(
     if maskOutlierTrials:
         resultPath = os.path.join(
             alignSubFolder,
-            prefix + '_{}_{}_calc.h5'.format('fr', window))
+            prefix + '_{}_outliers.h5'.format(window))
         return pd.read_hdf(resultPath, 'rejectTrial')
     else:
         return None
@@ -337,20 +337,36 @@ def compareMeansGrouped(
             groupIter = {'all': testAsig}.items()
         for name, group in groupIter:
             testGroups = [
-                np.ravel(i)
-                for _, i in group.groupby(testVar)]
-            groupSizes = [i.shape[0] for i in testGroups]
-            maxSize = int(np.mean(groupSizes))
-            testGroups = [t[:maxSize] for t in testGroups]
+                # np.ravel(i)
+                i.mean(axis=1).to_numpy()
+                for nm, i in group.groupby(testVar)]
+            # groupSizes = [i.shape[0] for i in testGroups]
+            # maxSize = int(np.mean(groupSizes))
+            # testGroups = [t[:maxSize] for t in testGroups]
             if len(testGroups) > 1:
+                # pdb.set_trace()
                 try:
+                    isNormal = [pg.normality(tg)['normal'].iloc[0] for tg in testGroups]
+                    equalVariance = pg.homoscedasticity(testGroups)
                     stat, p = stats.kruskal(*testGroups, nan_policy='raise')
                     # stat, p = stats.f_oneway(*testGroups)
                     if plotting:
                         import matplotlib.pyplot as plt
                         import seaborn as sns
-                        for tGrp in testGroups:
-                            sns.distplot(tGrp, kde=False)
+                        distBins = np.linspace(
+                            group.min().min(), group.max().max(), 250)
+                        fig, ax = plt.subplots(len(testGroups), 1, sharex=True)
+                        for tIdx, tGrp in enumerate(testGroups):
+                            sns.distplot(
+                                tGrp, bins=distBins, kde=False, ax=ax[tIdx])
+                        featName = pd.unique(
+                            asigWide.index.get_level_values('feature'))
+                        if len(featName):
+                            ax[tIdx].set_xlabel('{}'.format(featName[0]))
+                        plt.suptitle(
+                            't = {:.3f}; p = {:.6f}'
+                            .format(stat, p))
+                        # plt.suptitle('sample size {}'.format(tMask.sum()))
                         plt.show()
                     pVals.loc[name, testBin] = p
                     statVals.loc[name, testBin] = stat
@@ -367,6 +383,115 @@ def compareMeansGrouped(
     significanceVals = pVals < pThresh
     return pVals, statVals, significanceVals
 
+def compareISIsGrouped(
+        asigWide, groupBy, testVar,
+        tStart=None, tStop=None,
+        testWidth=100e-3, testStride=20e-3,
+        pThresh=1e-3,
+        correctMultiple=True,
+        plotting=False):
+
+    if tStart is None:
+        tStart = asigWide.columns[0]
+    if tStop is None:
+        tStop = asigWide.columns[-1]
+    testBins = np.arange(
+        tStart + testWidth / 2, tStop - testWidth / 2, testStride)
+
+    if (isinstance(groupBy, list)) and (len(groupBy) == 1):
+        groupBy = groupBy[0]
+
+    if (isinstance(testVar, list)) and (len(testVar) == 1):
+        testVar = testVar[0]
+    # 
+    if isinstance(groupBy, str):
+        testIndex = pd.Index(
+            asigWide.groupby(by=groupBy).groups.keys())
+        testIndex.name = groupBy
+    elif groupBy is None:
+        testIndex = pd.Index(['all'])
+        testIndex.name = 'all'
+    else:
+        testIndex = pd.MultiIndex.from_tuples(
+            asigWide.groupby(by=groupBy).groups.keys(),
+            names=groupBy)
+    pVals = pd.DataFrame(
+        np.nan,
+        index=testIndex,
+        columns=testBins)
+    pVals.columns.name = 'bin'
+    statVals = pd.DataFrame(
+        np.nan,
+        index=testIndex,
+        columns=testBins)
+    statVals.columns.name = 'bin'
+    for testBin in testBins:
+        #  try:
+        tMask = (
+            (asigWide.columns > testBin - testWidth / 2) &
+            (asigWide.columns < testBin + testWidth / 2)
+            )
+        #  except Exception:
+        #      
+        testAsig = asigWide.loc[:, tMask]
+        if groupBy is not None:
+            groupIter = testAsig.groupby(groupBy)
+        else:
+            groupIter = {'all': testAsig}.items()
+        for name, group in groupIter:
+            # pdb.set_trace()
+            def getSC(rasterDF):
+                # listISI = []
+                listSpikeCount = []
+                for rIdx, row in rasterDF.iterrows():
+                    # spikeTimes = row.index[row > 0]
+                    listSpikeCount.append(np.sqrt((row > 0).sum()))
+                    # if any(spikeTimes):
+                    #     listISI += (np.diff(spikeTimes).tolist())
+                return listSpikeCount
+            testGroups = [
+                getSC(i)
+                for nm, i in group.groupby(testVar)]
+            # groupSizes = [i.shape[0] for i in testGroups]
+            # maxSize = int(np.mean(groupSizes))
+            # testGroups = [t[:maxSize] for t in testGroups]
+            if len(testGroups) > 1:
+                # pdb.set_trace()
+                try:
+                    isNormal = [pg.normality(tg)['normal'].iloc[0] for tg in testGroups]
+                    equalVariance = pg.homoscedasticity(testGroups)
+                    stat, p = stats.kruskal(*testGroups, nan_policy='raise')
+                    # stat, p = stats.f_oneway(*testGroups)
+                    if plotting:
+                        import matplotlib.pyplot as plt
+                        import seaborn as sns
+                        fig, ax = plt.subplots(len(testGroups), 1, sharex=True)
+                        for tIdx, tGrp in enumerate(testGroups):
+                            sns.distplot(
+                                tGrp, kde=False, ax=ax[tIdx])
+                        featName = pd.unique(
+                            asigWide.index.get_level_values('feature'))
+                        if len(featName):
+                            ax[tIdx].set_xlabel('{}'.format(featName[0]))
+                        plt.suptitle(
+                            't = {:.3f}; p = {:.6f}'
+                            .format(stat, p))
+                        # plt.suptitle('sample size {}'.format(tMask.sum()))
+                        plt.show()
+                    pVals.loc[name, testBin] = p
+                    statVals.loc[name, testBin] = stat
+                except Exception:
+                    #  traceback.print_exc()
+                    pVals.loc[name, testBin] = 1
+                    statVals.loc[name, testBin] = np.nan
+    if correctMultiple:
+        flatPvals = pVals.stack()
+        _, fixedPvals, _, _ = mt(flatPvals.values, method='holm')
+        flatPvals.loc[:] = fixedPvals
+        flatPvals = flatPvals.unstack('bin')
+        pVals.loc[flatPvals.index, flatPvals.columns] = flatPvals
+    significanceVals = pVals < pThresh
+    return pVals, statVals, significanceVals
 
 def facetGridApplyFunGrouped(
         dataBlock, resultPath,
@@ -446,6 +571,7 @@ def facetGridApplyFunGrouped(
 def facetGridCompareMeans(
         dataBlock, statsTestPath,
         limitPages=None, verbose=False,
+        compareISIs=False,
         loadArgs={},
         rowColOpts={},
         statsTestOpts={}):
@@ -509,10 +635,16 @@ def facetGridCompareMeans(
         else:
             sigTestAsig = asigWide
         #  get significance test results (correct for multiple comparionsons at the end, not here)
-        pVals, statVals, sigVals = compareMeansGrouped(
-            sigTestAsig, testVar=sigTestVar,
-            groupBy=sigTestGroupBy, correctMultiple=False,
-            **statsTestOpts)
+        if not compareISIs:
+            pVals, statVals, sigVals = compareMeansGrouped(
+                sigTestAsig, testVar=sigTestVar,
+                groupBy=sigTestGroupBy, correctMultiple=False,
+                **statsTestOpts)
+        else:
+            pVals, statVals, sigVals = compareISIsGrouped(
+                sigTestAsig, testVar=sigTestVar,
+                groupBy=sigTestGroupBy, correctMultiple=False,
+                **statsTestOpts)
         allPVals.update({unitName: pVals})
         allStatVals.update({unitName: statVals})
         allSigVals.update({unitName: sigVals})

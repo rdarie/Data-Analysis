@@ -50,4 +50,4 @@ python3 ./calcAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $LAZINESS $WINDOW --chan
 # or
 # python3 ./selectUnitsByMeanFRandCorrelation.py --exp=$EXP $TRIALSELECTOR $UNITSELECTOR --verbose
 
-# python3 ./calcTrialOutliers.py --exp=$EXP $TRIALSELECTOR $UNITSELECTOR --saveResults --plotting --inputBlockName="fr" --alignQuery="all" --unitQuery="fr" --verbose
+# python3 ./calcTrialOutliers.py --exp=$EXP $TRIALSELECTOR $UNITSELECTOR --saveResults --plotting --alignQuery="all" --verbose

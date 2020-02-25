@@ -102,6 +102,36 @@ namedQueries['align'].update({
         "(pedalSizeCat=='M')"
         ])
     })
+namedQueries['align'].update({
+    'midPeakS': '&'.join([
+        namedQueries['align']['midPeak'],
+        "(pedalSizeCat=='S')"
+        ])
+    })
+namedQueries['align'].update({
+    'midPeakXS': '&'.join([
+        namedQueries['align']['midPeak'],
+        "(pedalSizeCat=='XS')"
+        ])
+    })
+namedQueries['align'].update({
+    'midPeakM': '&'.join([
+        namedQueries['align']['midPeak'],
+        "(pedalSizeCat=='M')"
+        ])
+    })
+namedQueries['align'].update({
+    'midPeakL': '&'.join([
+        namedQueries['align']['midPeak'],
+        "(pedalSizeCat=='L')"
+        ])
+    })
+namedQueries['align'].update({
+    'midPeakXL': '&'.join([
+        namedQueries['align']['midPeak'],
+        "(pedalSizeCat=='XL')"
+        ])
+    })
 ###
 namedQueries['align'].update({
     'outboundXS_CW': '&'.join([

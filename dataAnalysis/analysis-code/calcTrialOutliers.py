@@ -10,12 +10,10 @@ Options:
     --saveResults                          load from raw, or regular? [default: False]
     --verbose                              print diagnostics? [default: False]
     --plotting                             plot results?
-    --inputBlockName=inputBlockName        filename for inputs [default: fr]
     --window=window                        process with short window? [default: long]
-    --unitQuery=unitQuery                  how to restrict channels if not supplying a list? [default: fr]
+    --unitQuery=unitQuery                  how to restrict channels if not supplying a list? [default: all]
     --alignQuery=alignQuery                query what the units will be aligned to? [default: all]
     --selector=selector                    filename if using a unit selector
-    --resultName=resultName                filename for result [default: meanFR]
     --analysisName=analysisName            append a name to the resulting blocks? [default: default]
     --alignFolderName=alignFolderName      append a name to the resulting blocks? [default: motion]
 """
@@ -25,10 +23,16 @@ import os
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
 import dataAnalysis.helperFunctions.helper_functions_new as hf
 import dataAnalysis.preproc.ns5 as ns5
-
+from scipy.stats import zscore, chi2
+import pingouin as pg
+import pandas as pd
+import numpy as np
+from copy import deepcopy
 from docopt import docopt
 from currentExperiment import parseAnalysisOptions
 from namedQueries import namedQueries
+from sklearn.covariance import EmpiricalCovariance, MinCovDet, EllipticEnvelope
+from sklearn.utils.random import sample_without_replacement as swr
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['trialIdx']), arguments['exp'])
@@ -49,77 +53,294 @@ if arguments['processAll']:
     prefix = assembledName
 else:
     prefix = ns5FileName
-triggeredPath = os.path.join(
+frPath = os.path.join(
     alignSubFolder,
     prefix + '_{}_{}.nix'.format(
-        arguments['inputBlockName'], arguments['window']))
+        'fr', arguments['window']))
+rigPath = os.path.join(
+    alignSubFolder,
+    prefix + '_{}_{}.nix'.format(
+        'rig', arguments['window']))
 resultPath = os.path.join(
     alignSubFolder,
-    prefix + '_{}_{}_calc.h5'.format(
-        arguments['inputBlockName'], arguments['window']))
+    prefix + '_{}_outliers.h5'.format(
+        arguments['window']))
 #
 alignedAsigsKWargs.update(dict(
     duplicateControlsByProgram=False,
-    makeControlProgram=False,
-    removeFuzzyName=False,
-    decimate=5,
+    makeControlProgram=False, removeFuzzyName=False, decimate=10,
     transposeToColumns='feature', concatOn='columns',
-    getMetaData=False,
-    verbose=False, procFun=None))
+    getMetaData=False, verbose=False, procFun=None))
 #
 alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **arguments)
 alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
-    namedQueries, alignSubFolder, **arguments)
+    namedQueries, alignSubFolder, inputBlockName='fr', **arguments)
+#
 if arguments['verbose']:
-    print('Loading dataBlock: {}'.format(triggeredPath))
-dataReader, dataBlock = ns5.blockFromPath(
-    triggeredPath, lazy=arguments['lazy'])
+    print('Loading dataBlock: {}'.format(frPath))
+frReader, frBlock = ns5.blockFromPath(
+    frPath, lazy=arguments['lazy'])
 if arguments['verbose']:
-    print('Loading alignedAsigs: {}'.format(triggeredPath))
+    print('Loading alignedAsigs: {}'.format(frPath))
 frDF = ns5.alignedAsigsToDF(
-    dataBlock, **alignedAsigsKWargs)
-# reject outlier trials
-from scipy.stats import zscore
+    frBlock, **alignedAsigsKWargs)
+#
+rigKWargs = deepcopy(alignedAsigsKWargs)
+arguments.pop('selector')
+rigKWargs['unitNames'], rigKWargs['unitQuery'] = ash.processUnitQueryArgs(
+    namedQueries, alignSubFolder, inputBlockName='rig', **arguments)
+if arguments['verbose']:
+    print('Loading dataBlock: {}'.format(rigPath))
+rigReader, rigBlock = ns5.blockFromPath(
+    rigPath, lazy=arguments['lazy'])
+if arguments['verbose']:
+    print('Loading alignedAsigs: {}'.format(rigPath))
+rigDF = ns5.alignedAsigsToDF(
+    rigBlock, **rigKWargs)
+rigDF.fillna(0, inplace=True)
+rigColumnSelect = [
+    i for i in rigDF.columns
+    if (
+        # ('_Right_x' in i[0]) or ('_Right_y' in i[0]) or
+        # ('_Right_z' in i[0]) or
+        ('ins_' in i[0])
+        )]
+
+outlierLogPath = os.path.join(
+    figureFolder,
+    prefix + '_{}_outlierTrials.txt'.format(arguments['window']))
+if os.path.exists(outlierLogPath):
+    os.remove(outlierLogPath)
 
 
 def findOutliers(
-        frDF, sdThresh=6, countThresh=10):
-    nOutliers = (frDF.abs().quantile(q=0.9) > sdThresh).sum()
-    tooMuch = (nOutliers >= countThresh)
+        frDF, qThresh=None, countThresh=10, plotting=False):
+    if qThresh is None:
+        qThresh = 1 - 1e-6
+    sdThresh = chi2.interval(qThresh, 1)
+    sdThreshMV = chi2.interval(qThresh, len(frDF.columns))
+    #
+    averageDeviation = np.sqrt((frDF.quantile(q=0.9) ** 2).sum())
+    # if not (np.isfinite(averageDeviation)):
+    #     pdb.set_trace()
+    highFeatures = (frDF.quantile(q=0.9) > sdThresh[1])
+    nOutliers = highFeatures.sum()
+    outlierLabels = ' '.join([
+        i[0][:-2]
+        for i in highFeatures.index[highFeatures].to_list()])
+    # tooMuch = (nOutliers >= countThresh)
+    tooMuch = (averageDeviation >= sdThreshMV[1])
+    seg = (
+        frDF
+        .index
+        .get_level_values('segment')
+        .unique())
+    t = (
+        frDF
+        .index
+        .get_level_values('t')
+        .unique())
+    # if (nOutliers >= countThresh) / 2:
     if tooMuch:
+        # pdb.set_trace()
         try:
-            print('Found {} outlier channels'.format(nOutliers))
-            print(
-                    frDF
-                    .index
-                    .get_level_values('t')
-                    .unique()
-                )
+            summaryMessage = [
+                'segment {} time {}\n'.format(seg[0], t[0]),
+                (outlierLabels + '\n'),
+                'average deviation, {} > {}\n'.format(averageDeviation, sdThreshMV[1]),
+                'Found {} outlier channels\n'.format(nOutliers)]
+            print(summaryMessage)
+            with open(outlierLogPath, 'a') as f:
+                f.writelines(summaryMessage)
         except Exception:
             pass
-    return nOutliers, tooMuch
+        if plotting:
+            import matplotlib.pyplot as plt
+            import seaborn as sns
+            bins = np.linspace(sdThresh[0], sdThresh[1], 200)
+            #  fig, ax = plt.subplots(len(frDF.columns), 1, sharex=True)
+            fig, ax = plt.subplots(1, 1, sharex=True)
+            for cIdx, cName in enumerate(frDF.columns):
+                sns.distplot(
+                    frDF[cName], kde=False, ax=ax,
+                    bins=bins, label=cName[0])
+            plt.suptitle('limits are {}'.format(sdThresh))
+            plt.show()
+    return nOutliers, averageDeviation, tooMuch, outlierLabels, seg[0], t[0]
 
+
+def findOutliers2(
+        mahalDistDF, qThresh=None, sdThresh=None,
+        nDim=1, multiplier=1):
+    if sdThresh is None:
+        if qThresh is None:
+            qThresh = 1 - 1e-12
+        sdThresh = multiplier * chi2.interval(qThresh, nDim)[1]
+    seg = (
+        mahalDistDF
+        .index
+        .get_level_values('segment')
+        .unique())
+    t = (
+        mahalDistDF
+        .index
+        .get_level_values('t')
+        .unique())
+    # print('Outlier thresh is {}'.format(sdThresh))
+    averageDeviation = (mahalDistDF).quantile(q=0.9)[0]
+    #averageDeviation = (mahalDistDF).max()[0]
+    tooMuch = (averageDeviation >= sdThresh)
+    if tooMuch:
+        try:
+            summaryMessage = [
+                'segment {} time {}\n'.format(seg[0], t[0]),
+                'average deviation {} > {}\n'.format(
+                    averageDeviation, sdThresh)]
+            print(summaryMessage)
+            with open(outlierLogPath, 'a') as f:
+                f.writelines(summaryMessage)
+        except Exception:
+            pass
+    # else:
+    #     print(
+    #         'segment {} time {} average deviation {} < {}'.format(
+    #             seg[0], t[0], averageDeviation, sdThresh))
+    return averageDeviation, tooMuch, seg[0], t[0]
+
+
+def applyMad(ser):
+    if np.median(ser) == 0:
+        return np.abs(zscore(ser))
+    else:
+        return np.abs(ser - np.median(ser)) / pg.mad(ser)
 
 testVar = None
-groupBy = ['segment', 'originalIndex']
-resultNames = ['nOutliers', 'rejectTrial']
-outlierTrials = ash.applyFunGrouped(
-    frDF.apply(zscore), groupBy, testVar,
-    fun=findOutliers, funArgs=[], funKWargs={},
+groupBy = ['segment', 'originalIndex', 't']
+resultNames = [
+    'averageDeviation', 'rejectTrial', 'seg', 't']
+
+supportFraction = 0.75
+print('working with {} samples'.format(frDF.shape[0]))
+# randSample = swr(rigDF.shape[0], 100000)
+randSample = slice(None, None, 5)
+#
+testQThresh = 1 - 1e-6
+print('For rig, sd tresh is {}'.format(chi2.interval((testQThresh), len(rigColumnSelect))))
+print('For fr, sd tresh is {}'.format(chi2.interval((testQThresh), len(frDF.columns))))
+print('For df 1 sd tresh is {}'.format(chi2.interval((testQThresh), 1)))
+# np.sqrt(frMahalDist.xs(798, level='originalIndex').xs(1, level='segment'))
+if arguments['verbose']:
+    print('Calculating covariance matrix...')
+rigSub = (rigDF.loc[:, rigColumnSelect].to_numpy())
+rigCov = (
+    MinCovDet()
+    # EllipticEnvelope()
+    .fit(rigSub[randSample, :]))
+rigMahalDist = pd.DataFrame(
+    rigCov.mahalanobis(rigSub),
+    # rigCov.decision_function(rigSub),
+    # rigCov.mahalanobis(rigSub - rigCov.location_),
+    # rigCov.dist_,
+    index=rigDF.index, columns=['mahalDist'])
+# bla = rigCov.mahalanobis(
+#     rigDF.loc[:, rigColumnSelect].to_numpy() - rigCov.location_)
+outlierTrialsRig = ash.applyFunGrouped(
+    # rigDF.loc[:, rigColumnSelect].apply(applyMad, raw=True),
+    rigMahalDist,
+    groupBy, testVar,
+    fun=findOutliers2, funArgs=[],
+    funKWargs=dict(sdThresh=1000, multiplier=6, nDim=len(rigColumnSelect)),
     resultNames=resultNames,
     plotting=False)
-
+#
+pdb.set_trace()
+if arguments['verbose']:
+    print('Calculating covariance matrix...')
+frCov = (
+    MinCovDet()
+    .fit(np.sqrt(frDF).to_numpy()[randSample, :]))
+# u, s, v = np.linalg.svd(frCov.covariance_)
+# projMat = u[:, -20:]
+# projFR = (np.sqrt(frDF) - np.sqrt(frDF).mean(axis=0)).to_numpy().dot(projMat)
+# frMahalDist = pd.DataFrame(
+#     ((projFR ** 2).sum(axis=1)),
+#     # empCov.mahalanobis(frDF.to_numpy()),
+#     # frCov.dist_,
+#     index=frDF.index, columns=['mahalDist'])# 
+###
+empCov = EmpiricalCovariance().fit(np.sqrt(frDF).to_numpy()[randSample, :])
+frMahalDist = pd.DataFrame(
+    frCov.mahalanobis(np.sqrt(frDF).to_numpy()),
+    #frCov.mahalanobis(np.sqrt(frDF).to_numpy() - frCov.location_),
+    # empCov.mahalanobis(frDF.to_numpy()),
+    # frCov.dist_,
+    index=frDF.index, columns=['mahalDist'])
+outlierTrialsFr = ash.applyFunGrouped(
+    frMahalDist,
+    # frDF.apply(applyMad, raw=True),
+    groupBy, testVar,
+    fun=findOutliers2, funArgs=[],
+    funKWargs=dict(multiplier=2, nDim=len(frDF.columns)),
+    resultNames=resultNames,
+    plotting=False)
+#outlierTrialsFr['rejectTrial'].sum()
+outlierTrials = {
+    k: pd.DataFrame(
+        np.nan,
+        index=outlierTrialsFr[k].index,
+        columns=outlierTrialsFr[k].columns)
+    for k in resultNames}
+pdb.set_trace()
 if arguments['plotting']:
-    import pandas as pd
-    outlierCount = pd.concat(
-        [
-            frDF.index.to_frame().query('bin==0').reset_index(drop=True),
-            outlierTrials['nOutliers'].reset_index(drop=True)],
-        axis='columns')
-    print(outlierCount.loc[outlierCount['all'] > 0, :])
-    outlierCount.loc[outlierCount['all'] > 10, :].to_csv(os.path.join(figureFolder, 'outlierTrials.csv'))
-print('found {} outlier trials in total'.format(outlierTrials['rejectTrial'].sum()))
-
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    fig, ax = plt.subplots(2, 1)
+    sns.distplot(
+        (rigMahalDist),
+        #outlierTrialsRig['averageDeviation'],
+        ax=ax[0], kde=False)
+    ax[0].set_xlabel('Rig')
+    # sns.distplot(
+    #     (frMahalDist),
+    #     #outlierTrialsFr['averageDeviation'],
+    #     ax=ax[1], kde=False)
+    # ax[1].set_xlabel('Fr')
+    plt.show(block=False)
+if arguments['plotting']:
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    fig, ax = plt.subplots(2, 1)
+    sns.boxplot(
+        outlierTrialsRig['averageDeviation'],
+        ax=ax[0])
+    ax[0].set_xlabel('Rig')
+    #sns.boxplot(
+    #    outlierTrialsFr['averageDeviation'],
+    #    ax=ax[1])
+    #ax[1].set_xlabel('Fr')
+    plt.show(block=False)
+if arguments['plotting']:
+    fig, ax = plt.subplots(2, 1, sharex=True)
+    bla = (frMahalDist.xs(992, level='originalIndex').xs(3, level='segment'))
+    ax[0].plot(
+        bla.index.get_level_values('bin').to_numpy(),
+        bla.to_numpy())
+    bla = (frDF.xs(992, level='originalIndex').xs(3, level='segment'))
+    ax[1].plot(
+        bla.index.get_level_values('bin').to_numpy(),
+        bla.to_numpy())
+    plt.show()
+# outlierTrialsFr['averageDeviation'].xs(3, level='segment').sort_values('all')
+# outlierTrialsRig['averageDeviation'].xs(3, level='segment').sort_values('all')
+# outlierTrialsFr['averageDeviation'].xs(992, level='originalIndex').xs(3, level='segment')
+outlierTrials['averageDeviation'] = (
+    outlierTrialsRig['averageDeviation'] +
+    outlierTrialsFr['averageDeviation'])
+outlierTrials['rejectTrial'] = (
+    (outlierTrialsRig['rejectTrial']).astype(np.bool) |
+    (outlierTrialsFr['rejectTrial']).astype(np.bool))
 if arguments['saveResults']:
-    for resName in resultNames:
-        outlierTrials[resName].to_hdf(resultPath, resName, format='fixed')
+    outlierTrials['averageDeviation'].to_hdf(
+        resultPath, 'averageDeviation', format='fixed')
+    outlierTrials['rejectTrial'].to_hdf(
+        resultPath, 'rejectTrial', format='fixed')

@@ -16,6 +16,7 @@ Options:
     --rowName=rowName                      break down by row  [default: pedalDirection]
     --rowControl=rowControl                rows to exclude from comparison
     --hueName=hueName                      break down by hue  [default: amplitude]
+    --enableOverrides                      delete outlier trials? [default: False]
     --hueControl=hueControl                hues to exclude from comparison
     --styleName=styleName                  break down by style [default: RateInHz]
     --styleControl=hueControl              styles to exclude from stats test
@@ -110,12 +111,23 @@ statsTestOpts.update({
     'tStop': rasterOpts['windowSizes'][arguments['window']][1]})
 #  Overrides
 ################################################################
-alignedAsigsKWargs.update({'windowSize': (-1000e-3, 1000e-3)})
-statsTestOpts.update({
-    'testStride': 10e-3,
-    'testWidth': 10e-3,
-    'tStop': 250e-3})
 limitPages = None
+if arguments['enableOverrides']:
+    alignedAsigsKWargs.update({'windowSize': (-1000e-3, 1000e-3)})
+    currWindow = rasterOpts['windowSizes'][arguments['window']]
+    fullWinSize = currWindow[1] - currWindow[0]
+    redWinSize = (
+        alignedAsigsKWargs['windowSize'][1] -
+        alignedAsigsKWargs['windowSize'][0])
+    nrnRelplotKWArgs['aspect'] = (
+        nrnRelplotKWArgs['aspect'] * redWinSize / fullWinSize)
+    # alignedAsigsKWargs.update({'decimate': 10})
+    # statsTestOpts.update({
+    #     'plotting': True,
+    #     'testStride': 500e-3,
+    #     'testWidth': 500e-3,
+    #     'tStart': -2000e-3,
+    #     'tStop': 2250e-3})
 #  End Overrides
 ################################################################
 if os.path.exists(statsTestPath):
@@ -126,14 +138,15 @@ else:
     alignedAsigsKWargsStats = deepcopy(alignedAsigsKWargs)
     if alignedAsigsKWargsStats['unitNames'] is not None:
         alignedAsigsKWargsStats['unitNames'] = [
-            i.replace('_#0', '_fr#0')
+            i.replace('_#0', '_raster#0')
             for i in alignedAsigsKWargsStats['unitNames']
         ]
     (
         pValsWide, statValsWide,
         sigValsWide) = ash.facetGridCompareMeans(
-        frBlock, statsTestPath,
+        rasterBlock, statsTestPath,
         limitPages=limitPages,
+        compareISIs=True,
         loadArgs=alignedAsigsKWargsStats,
         rowColOpts=rowColOpts,
         statsTestOpts=statsTestOpts)

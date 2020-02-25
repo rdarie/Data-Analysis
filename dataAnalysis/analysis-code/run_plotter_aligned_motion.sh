@@ -1,13 +1,13 @@
 #!/bin/bash
 
 # Request runtime:
-#SBATCH --time=72:00:00
+#SBATCH --time=12:00:00
 
 # Default resources are 1 core with 2.8GB of memory.
 
 # Request memory:
 #SBATCH --nodes=1
-#SBATCH --mem=64G
+#SBATCH --mem=32G
 
 # Specify a job name:
 #SBATCH -J plotsMotionStim
@@ -36,13 +36,13 @@ conda activate
 source activate nda
 python --version
 
-# python3 ./calcTrialOutliers.py --exp=$EXP $TRIALSELECTOR $UNITSELECTOR --saveResults --plotting --inputBlockName="fr" --alignQuery="all" --unitQuery="fr" --verbose
+#python3 ./calcTrialOutliers.py --exp=$EXP $TRIALSELECTOR $UNITSELECTOR --saveResults --plotting --alignQuery="all" --verbose
 #
-for QUERY in outboundXS outboundS outboundM outboundL outboundXL
+for QUERY in midPeakM midPeakXS midPeakS midPeakL midPeakXL
     do
         for BLOCKNAME in rig
             do
                 python3 './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $WINDOW --inputBlockName=$BLOCKNAME --unitQuery=$BLOCKNAME --alignQuery=$QUERY --rowName="pedalDirection" $OUTLIERSWITCH --verbose
             done
-        # python3 './plotAlignedNeurons.py' --exp=$EXP $TRIALSELECTOR $WINDOW --alignQuery=$QUERY $UNITSELECTOR --rowName="pedalDirection" $OUTLIERSWITCH --verbose
+        python3 './plotAlignedNeurons.py' --exp=$EXP $TRIALSELECTOR $WINDOW --alignQuery=$QUERY $UNITSELECTOR --rowName="pedalDirection" $OUTLIERSWITCH --verbose
     done

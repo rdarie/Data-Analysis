@@ -19,7 +19,7 @@ from seaborn.axisgrid import (
 from seaborn.relational import _ScatterPlotter, _LinePlotter
 import os
 import traceback
-
+from copy import deepcopy
 
 def processRowColArguments(arguments):
     outDict = {}
@@ -114,13 +114,20 @@ def plotNeuronsAligned(
         loadArgs['unitNames'] = [i.replace('_#0', '') for i in loadArgs['unitNames']]
     unitNames = loadArgs.pop('unitNames')
     loadArgs.pop('unitQuery')
+    rasterLoadArgs = deepcopy(loadArgs)
+    # rasterLoadArgs.pop('decimate')
     with PdfPages(os.path.join(figureFolder, pdfName + '.pdf')) as pdf:
+        if sigTestResults is not None:
+            unitRanks = (
+                sigTestResults.sum(axis=1).groupby('unit')
+                .sum().sort_values(ascending=False).index)
+            unitNames = [i.replace('_raster#0', '') for i in unitRanks]
         for idx, unitName in enumerate(unitNames):
             rasterName = unitName + '_raster#0'
             continuousName = unitName + '_fr#0'
             rasterWide = ns5.alignedAsigsToDF(
                 rasterBlock, [rasterName],
-                **loadArgs)
+                **rasterLoadArgs)
             asigWide = ns5.alignedAsigsToDF(
                 frBlock, [continuousName],
                 **loadArgs)
@@ -131,15 +138,15 @@ def plotNeuronsAligned(
                     np.diff(rasterWide.columns)[0] ** (-1)))
             if enablePlots:
                 if colName is not None:
-                    colOrder = np.unique(rasterWide.index.to_frame()[colName])
+                    colOrder = sorted(np.unique(rasterWide.index.to_frame()[colName]))
                 else:
                     colOrder = None
                 if rowName is not None:
-                    rowOrder = np.unique(rasterWide.index.to_frame()[rowName])
+                    rowOrder = sorted(np.unique(rasterWide.index.to_frame()[rowName]))
                 else:
                     rowOrder = None
                 if hueName is not None:
-                    hueOrder = np.unique(rasterWide.index.to_frame()[hueName])
+                    hueOrder = sorted(np.unique(rasterWide.index.to_frame()[hueName]))
                 else:
                     hueOrder = None
                 raster.loc[:, 'fr'] = asig.loc[:, 'fr']
@@ -160,9 +167,10 @@ def plotNeuronsAligned(
                         for procFun in plotProcFuns:
                             procFun(g, ro, co, hu, dataSubset)
                     g.twin_axes[ro, co].set_ylabel('Firing Rate (spk/s)')
+                    g.axes[ro, co].set_ylabel('')
                     if sigTestResults is not None:
                         addSignificanceStars(
-                            g, sigTestResults.query("unit == '{}'".format(continuousName)),
+                            g, sigTestResults.query("unit == '{}'".format(rasterName)),
                             ro, co, hu, dataSubset, sigStarOpts=sigStarOpts)
                 plt.suptitle(unitName)
                 pdf.savefig()
@@ -210,6 +218,7 @@ def addSignificanceStars(
     if not significantBins.empty:
         assert significantBins.shape[0] == 1
         significantTimes = significantBins.columns[significantBins.to_numpy().flatten()].to_numpy()
+        # pdb.set_trace()
         if len(significantTimes):
             ymin, ymax = g.axes[ro, co].get_ylim()
             # g.axes[ro, co].autoscale(False)
@@ -300,15 +309,15 @@ def plotAsigsAligned(
             asig = asigWide.stack().reset_index(name='signal')
             if enablePlots:
                 if colName is not None:
-                    colOrder = np.unique(asigWide.index.to_frame()[colName])
+                    colOrder = sorted(np.unique(asigWide.index.to_frame()[colName]))
                 else:
                     colOrder = None
                 if rowName is not None:
-                    rowOrder = np.unique(asigWide.index.to_frame()[rowName])
+                    rowOrder = sorted(np.unique(asigWide.index.to_frame()[rowName]))
                 else:
                     rowOrder = None
                 if hueName is not None:
-                    hueOrder = np.unique(asigWide.index.to_frame()[hueName])
+                    hueOrder = sorted(np.unique(asigWide.index.to_frame()[hueName]))
                 else:
                     hueOrder = None
                 g = sns.relplot(
@@ -341,7 +350,7 @@ def plotAsigsAligned(
 
 def genYLabelChanger(lookupDict={}, removeMatch=''):
     def yLabelChanger(g, ro, co, hu, dataSubset):
-        if (co == 0) and len(g.axes):
+        if (co == 0) and len(g.axes) and (not dataSubset.empty):
             featName = dataSubset['feature'].unique()[0]
             featName = featName.replace(removeMatch, '')
             for key in lookupDict.keys():
@@ -353,7 +362,7 @@ def genYLabelChanger(lookupDict={}, removeMatch=''):
 
 
 def yLabelsEMG(g, ro, co, hu, dataSubset):
-    if (co == 0) and len(g.axes):
+    if (co == 0) and len(g.axes) and (not dataSubset.empty):
         if 'label' in dataSubset.columns:
             g.axes[ro, co].set_ylabel(dataSubset['label'].unique()[0])
         elif 'feature' in dataSubset.columns:
@@ -498,7 +507,7 @@ def plotSignificance(
         for ax in gPH.axes.flat:
             labels = ax.get_xticklabels()
             ax.set_ylim((0, 1))
-            skipEvery = len(labels) // targetNLabels
+            skipEvery = len(labels) // targetNLabels + 1
             for i, l in enumerate(labels):
                 if (i % skipEvery != 0): labels[i] = ''  # skip every nth labe
             ax.set_xticklabels(labels, rotation=30)

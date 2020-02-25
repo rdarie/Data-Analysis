@@ -479,7 +479,8 @@ def unitSpikeTrainWaveformsToDF(
                     shiftedWaveform.iloc[:, seekIdx].copy())
         if isinstance(lag, tuple):
             halfRollingWin = int(np.ceil(lag[1]/2))
-            seekIdx = slice(halfRollingWin, -halfRollingWin, decimate)
+            # seekIdx = slice(halfRollingWin, -halfRollingWin, decimate)
+            seekIdx = slice(None, None, decimate)
             shiftedWaveform = (
                 zeroLagWaveformsDF
                 .shift(lag[0], axis='columns')
@@ -622,7 +623,7 @@ def alignedAsigsToDF(
         addLags=None, decimate=1, rollingWindow=None,
         whichSegments=None, windowSize=None,
         getMetaData=True, metaDataToCategories=True,
-        outlierTrials=None,
+        outlierTrials=None, invertOutlierMask=False,
         makeControlProgram=False, removeFuzzyName=False, procFun=None):
     #  channels to trigger
     if unitNames is None:
@@ -652,8 +653,12 @@ def alignedAsigsToDF(
                 key.append(entry[keyIdx])
             # print(key)
             return outlierTrials.loc[tuple(key), :][0]
-        # pdb.set_trace()
-        outlierMask = np.asarray(allWaveforms.index.map(rejectionLookup), dtype=np.bool)
+        #
+        outlierMask = np.asarray(
+            allWaveforms.index.map(rejectionLookup),
+            dtype=np.bool)
+        if invertOutlierMask:
+            outlierMask = ~outlierMask
         allWaveforms = allWaveforms.loc[~outlierMask, :]
     if manipulateIndex and getMetaData:
         idxLabels = allWaveforms.index.names

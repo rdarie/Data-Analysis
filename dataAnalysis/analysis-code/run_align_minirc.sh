@@ -27,7 +27,7 @@ TRIALSELECTOR="--trialIdx=1"
 # TRIALSELECTOR="--processAll"
 UNITSELECTOR="--selector=_minfrmaxcorr"
 LAZINESS="--lazy"
-WINDOW="--window=long"
+WINDOW="--window=miniRC"
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh

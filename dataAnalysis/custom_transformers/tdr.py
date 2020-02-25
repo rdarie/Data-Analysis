@@ -1,6 +1,8 @@
 from sklearn.base import TransformerMixin, BaseEstimator, RegressorMixin
 from sklearn.decomposition import PCA
-from sklearn.model_selection import cross_val_score, GridSearchCV, StratifiedKFold
+from sklearn.model_selection import (
+    cross_val_score, cross_validate,
+    GridSearchCV, StratifiedKFold)
 from sklearn.model_selection._split import _BaseKFold
 from sklearn.metrics import make_scorer
 import pandas as pd
@@ -258,6 +260,7 @@ class trialAwareStratifiedKFold:
             .index.to_frame()
             .reset_index(drop=True)
             .loc[:, self.stratifyFactors + self.continuousFactors])
+        # pdb.set_trace()
         if (self.stratifyFactors is not None):
             for idx, (name, group) in enumerate(trialInfo.groupby(self.stratifyFactors)):
                 trialInfo.loc[group.index, 'stratifyGroup'] = idx
@@ -562,7 +565,33 @@ class SingleNeuronRegression():
                 })
         return
 
-    def apply_gridSearchCV(self, gridParams):
+    def cross_validate(self):
+        #  fit the regression models
+        for idx, colName in enumerate(self.yTrain.columns):
+            y = self.yTrain.loc[:, colName]
+            reg = self.regressionList[colName]['reg']
+            if hasattr(reg, 'track_convergence'):
+                saveConvergenceState = reg.track_convergence
+                reg.track_convergence = False
+            scores = cross_validate(
+                reg, self.xTrain.to_numpy(),
+                y.to_numpy(), return_estimator=True,
+                error_score='raise', cv=iter(self.cv_folds))
+            if hasattr(reg, 'track_convergence'):
+                reg.track_convergence = saveConvergenceState
+            if self.verbose:
+                print('{}: mean score {}, std {}'.format(
+                    colName, np.mean(scores['test_score']),
+                    np.std(scores['test_score'])
+                    ))
+            self.regressionList[colName].update({
+                'cross_val_mean_test_score': np.mean(scores['test_score']),
+                'cross_val_std_test_score': np.std(scores['test_score']),
+                'cross_val': scores
+                })
+        return
+
+    def GridSearchCV(self, gridParams):
         #  fit the regression models
         for idx, colName in enumerate(self.yTrain.columns):
             y = self.yTrain.loc[:, colName]
@@ -661,8 +690,8 @@ class SingleNeuronRegression():
 
     def plot_xy(
             self,
-            showNow=False, smoothY=10,
-            maxPR2=None, unitName=None,
+            showNow=False, smoothY=10, binInterval=1e-3, decimated=1,
+            selT=slice(None), maxPR2=None, unitName=None, winSize=1,
             useInvLink=False, showLegend=False):
         scores = [
             {'unit': k, 'score': v['validationScore']}
@@ -685,32 +714,43 @@ class SingleNeuronRegression():
         if hasattr(prediction, 'to_numpy'):
             prediction = prediction.to_numpy()
         yPlot = (self.yTest[unitName].rolling(smoothY, center=True).mean())
-        if True:
-            fig, ax = plt.subplots(3, 1, sharex=True)
-            # ax[0].plot(self.yTest[unitName].to_numpy(), label='original')
-            ax[0].plot(yPlot.to_numpy(), label='smoothed original')
-            ax[0].plot(prediction, label='prediction')
-            ax[0].set_title('{}: pR^2 = {:.2f}'.format(
-                unitName,
-                scoresDF.loc[uIdx, 'score']))
-            ax[0].set_xlabel('samples')
-            ax[0].set_ylabel('normalized (spk/s)')
+        fig, ax = plt.subplots(3, 1, sharex=True)
+        # ax[0].plot(self.yTest[unitName].to_numpy(), label='original')
+        binSize = binInterval * decimated
+        countPerBin = binInterval * winSize
+        xRange = np.arange(yPlot[selT].shape[0]) * binSize
+        ax[0].plot(xRange, yPlot[selT].to_numpy() / countPerBin, label='smoothed original')
+        ax[0].plot(xRange, prediction[selT] / countPerBin, label='prediction')
+        ax[0].set_title('{}: pR^2 = {:.2f}'.format(
+            unitName,
+            scoresDF.loc[uIdx, 'score']))
+        ax[0].set_xlabel('Time (sec)')
+        ax[0].set_ylabel('(spk/s)')
         if useInvLink:
-            transFun = thisReg['reg'].results_.model.family.link.inverse
+            if hasattr(thisReg['reg'], 'results_'):
+                transFun = thisReg['reg'].results_.model.family.link.inverse
+            else:
+                transFun = lambda x: np.exp(x)
         else:
             transFun = lambda x: x
         for idx, beta in enumerate(self.betas.loc[unitName, :]):
             xPartial = beta * self.xTest.iloc[:, idx].to_numpy()
-            if self.significantBetas.loc[unitName, :].iloc[idx]:
-                ax[1].plot(
-                    transFun(xPartial),
+            if idx == 0:
+                ax[0].plot(
+                    xRange, transFun(xPartial[selT]) / countPerBin, 'r--',
                     label='{}'.format(self.xTest.columns[idx]))
             else:
-                ax[2].plot(
-                    xPartial, ls='--',
-                    label='{}'.format(self.xTest.columns[idx]))
+                if self.significantBetas.loc[unitName, :].iloc[idx]:
+                    ax[1].plot(
+                        xRange, transFun(xPartial[selT]),
+                        label='{}'.format(self.xTest.columns[idx]))
+                else:
+                    ax[2].plot(
+                        xRange, xPartial[selT], ls='--',
+                        label='{}'.format(self.xTest.columns[idx]))
         ax[1].set_title('p < {} regressors'.format(self.tTestAlpha))
         ax[2].set_title('p > {} regressors'.format(self.tTestAlpha))
+        ax[2].set_xlabel('Time (sec)')
         if showLegend:
             for thisAx in ax:
                 thisAx.legend(loc='center left', bbox_to_anchor=(1, 0.5))
