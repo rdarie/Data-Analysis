@@ -130,8 +130,7 @@ def calcUnitRegressionToAsig():
             'analysisName': 'default',
             'alignFolderName': 'motion',
             'prefix': '',
-            'alignQuery': 'midPeak',
-            'windowSize': (-1750e-3, 1750e-3),
+            'alignQuery': 'midPeak'
             }
         ]
     alignedAsigsKWargs.update(dict(
@@ -176,18 +175,15 @@ def calcUnitRegressionToAsig():
         'program0_amplitude', 'program1_amplitude',
         'program2_amplitude', 'program3_amplitude'
         ]
-    deriv = lambda x: pd.Series(x).diff().fillna(0).to_numpy()
     #
     featureLoadArgs = alignedAsigsKWargs.copy()
     featureLoadArgs['unitNames'] = sorted([
-        'position#0', 'velocity#0',
         'RateInHz#0',
         'amplitude#0'] +
         [k + '#0' for k in angleList] +
         [k + '#0' for k in velList] +
         [k + '#0' for k in accList] +
-        [p + '#0' for p in pList] +
-        [p.replace('amplitude', 'dAmpDt') + '#0' for p in pList]
+        [p + '#0' for p in pList]
         )
     featureLoadArgs['unitQuery'] = None
     targetLoadArgs = alignedAsigsKWargs.copy()
@@ -241,12 +237,14 @@ def calcUnitRegressionToAsig():
                 'nb': glmOptsLookup['nHistoryBasisTerms'],
                 'dt': rasterOpts['binInterval'],
                 'b': 0.001,
-                'zflag': False}
+                'zflag': False
+                }
             # make sure history terms don't bleed into current bins
             historyEdge = raisedCosBoundary(
                 b=addHistoryTerms['b'], DT=ensembleHistoryLen,
                 minX=max(rasterOpts['binInterval'] * winSize / 2, 1e-3),
-                nb=addHistoryTerms['nb'], plotting=arguments['debugging'])
+                nb=addHistoryTerms['nb'], plotting=arguments['debugging']
+                )
             addHistoryTerms['endpoints'] = [
                 historyEdge[0], historyEdge[0] + ensembleHistoryLen]
             if addHistoryTerms:
@@ -327,7 +325,6 @@ def calcUnitRegressionToAsig():
             max_iter=100, tol=1e-5, learning_rate=2e-1,
             score_metric='pseudo_R2', track_convergence=True),
         model=pyglmnetWrapper,
-        sampleSizeLimit=int(1.25e6)
         )
     # if arguments['debugging']:
     #     modelArguments['modelKWargs']['max_iter'] = 20
@@ -406,9 +403,11 @@ def calcUnitRegressionToAsig():
             sourceScratchFolder = os.path.join(
                 scratchPath, sourceOpt['experimentName'])
             sourceAnalysisSubFolder = os.path.join(
-                sourceScratchFolder, sourceOpt['analysisName'])
+                sourceScratchFolder, sourceOpt['analysisName']
+                )
             sourceAlignSubFolder = os.path.join(
-                sourceAnalysisSubFolder, sourceOpt['alignFolderName'])
+                sourceAnalysisSubFolder, sourceOpt['alignFolderName']
+                )
             targetLoadArgs['dataQuery'] = ash.processAlignQueryArgs(
                 namedQueries, alignQuery=sourceOpt['alignQuery'])
             targetLoadArgs['outlierTrials'] = ash.processOutlierTrials(
@@ -417,8 +416,6 @@ def calcUnitRegressionToAsig():
                 namedQueries, alignQuery=sourceOpt['alignQuery'])
             featureLoadArgs['outlierTrials'] = ash.processOutlierTrials(
                 sourceAlignSubFolder, sourceOpt['prefix'], **arguments)
-            featureLoadArgs['windowSize'] = sourceOpt['windowSize']
-            targetLoadArgs['windowSize'] = sourceOpt['windowSize']
             triggeredPath = os.path.join(
                 sourceAlignSubFolder,
                 sourceOpt['prefix'] + '_{}_{}.nix'.format(
@@ -437,18 +434,14 @@ def calcUnitRegressionToAsig():
                 '{}'.format(i[0]).replace('#0', '').replace('#', '_')
                 for i in partialFeaturesDF.columns]
             print('Loading {}'.format(triggeredPath))
-            targetReader, targetBlock = ns5.blockFromPath(
+            dataReader, dataBlock = ns5.blockFromPath(
                 triggeredPath, lazy=arguments['lazy'])
             partialTargetDF = ns5.alignedAsigsToDF(
-                targetBlock, **targetLoadArgs)
+                dataBlock, **targetLoadArgs)
             partialTargetDF.columns = [
                 '{}'.format(i[0]).replace('_raster#0', '').replace('#', '_')
                 for i in partialTargetDF.columns]
-            # pdb.set_trace()
-            # check for point process assumption
-            # print((partialTargetDF * countPerBin).quantile(0.99).sort_values())
-            # print(((partialTargetDF * countPerBin > 1).sum() / partialTargetDF.shape[0]).sort_values())
-            historyLoadArgs = targetLoadArgs.copy()
+            #
             historyLoadArgs = targetLoadArgs.copy()
             historyTerms = []
             for colIdx in range(ihbasis.shape[1]):
@@ -463,7 +456,7 @@ def calcUnitRegressionToAsig():
                     return x
                 historyLoadArgs['procFun'] = pFun
                 historyDF = ns5.alignedAsigsToDF(
-                    targetBlock, **historyLoadArgs)
+                    dataBlock, **historyLoadArgs)
                 #
                 historyDF.columns = [
                     '{}_cos_{}'.format(
@@ -550,20 +543,14 @@ def calcUnitRegressionToAsig():
         featuresDF = pd.read_hdf(regressorH5Path, 'feature')
         targetDF = pd.read_hdf(targetH5Path, 'target')
     if (RANK == 0):
+        # restrict features to relevant portions depending on trial duration
+        pdb.set_trace()
+        #
         prelimCV = trialAwareStratifiedKFold(**cv_kwargs).split(featuresDF)
         (train, test) = prelimCV[0]
         cv_kwargs['n_splits'] -= 1
         cv = trialAwareStratifiedKFold(**cv_kwargs)
         cv_folds = cv.split(targetDF.iloc[train, :])
-        #  if modelArguments['sampleSizeLimit'] is not None:
-        #      if len(train) > modelArguments['sampleSizeLimit']:
-        #          train = np.random.choice(
-        #              train, size=modelArguments['sampleSizeLimit']).tolist()
-        #      for fIdx, folds in enumerate(cv_folds):
-        #          if len(folds[0]) > modelArguments['sampleSizeLimit']:
-        #              newFold = np.random.choice(
-        #                  folds[0], size=modelArguments['sampleSizeLimit']).tolist()
-        #              cv_folds[fIdx] = (newFold, folds[1])
     else:
         train = None
         test = None
@@ -584,18 +571,18 @@ def calcUnitRegressionToAsig():
     #     # !! OverflowError: cannot serialize a bytes object larger than 4 GiB
     #     COMM.Barrier()  # sync MPI threads, wait for 0
     #     # subselect this RANK's units
-    yColIdx = range(RANK, targetDF.shape[1], SIZE)
+    # yColIdx = range(RANK, yTrain.shape[1], SIZE)
     print(
         'Process {}, running regression for units {}'
         .format(RANK, yColIdx))
-    yTrain = targetDF.iloc[train, yColIdx].copy()
-    yTest = targetDF.iloc[test, yColIdx].copy()
+    yTrain = yTrain.iloc[train, yColIdx].copy()
+    yTest = yTest.iloc[test, yColIdx].copy()
     #
     # if arguments['debugging']:
     #     yColDbList = ['elec10_0', 'elec75_1']
     #     yTrain = yTrain.loc[:, yColDbList].copy()
     #     yTest = yTest.loc[:, yColDbList].copy()
-    del targetDF, featuresDF
+    del targetDF
     #
     for modelIdx, modelOpts in varMetaData.iterrows():
         varBaseName = 'var_{:03d}'.format(modelIdx)
@@ -631,8 +618,7 @@ def calcUnitRegressionToAsig():
                 'alignedAsigsKWargs': alignedAsigsKWargs,
                 'cBasis': cBasis,
                 }
-        # reload features DF (will offload to save memory)
-        featuresDF = pd.read_hdf(regressorH5Path, 'feature')
+        #
         xTrainList = []
         xTestList = []
         if modelOpts['addIntercept']:
@@ -725,7 +711,6 @@ def calcUnitRegressionToAsig():
                 if (
                     (np.float(i) >= modelOpts['minStimLag']) and
                     (np.float(i) <= modelOpts['maxStimLag']))]
-            #
             stimDescListFinal = []
             if modelOpts['stimAmplitude']:
                 stimDescListFinal += [
@@ -733,10 +718,10 @@ def calcUnitRegressionToAsig():
                     for p, l in product(stimXTrain.columns, stimLags)
                     ]
             if modelOpts['stimVelocity']:
-                derivColumns = [i for i in stimXTrain.columns if 'amplitude' in i]
+                deriv = lambda x: pd.Series(x).diff().fillna(0).to_numpy()
                 stimDescListFinal += [
                     Term([EvalFactor('deriv(applyCBasis(Q("{}"), {:.3f}))'.format(p, l))])
-                    for p, l in product(derivColumns, stimLags)
+                    for p, l in product(stimXTrain.columns, stimLags)
                     ]
             stimModelDescFinal = ModelDesc([], stimDescListFinal)
             if RANK == 0:
@@ -1017,9 +1002,6 @@ def calcUnitRegressionToAsig():
                     plt.show()
                 else:
                     plt.close()
-        #
-        # offload stuff from memory
-        del xTrainList, xTestList, featuresDF
         #
         snr = SingleNeuronRegression(
             xTrain=xTrain, yTrain=yTrain,

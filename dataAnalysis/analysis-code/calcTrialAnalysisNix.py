@@ -186,7 +186,8 @@ def calcTrialAnalysisNix():
             'seg0_velocity_x', 'seg0_velocity_y']
     origTimeStep = tdDF['t'].iloc[1] - tdDF['t'].iloc[0]
     # smooth by simi fps
-    smoothWindowStd = int(1 / (origTimeStep * 100))
+    simiFps = 100
+    smoothWindowStd = int(1 / (origTimeStep * simiFps * 2))
     #
     debugVelCalc = False
     if debugVelCalc:
@@ -252,6 +253,10 @@ def calcTrialAnalysisNix():
             tdInterp.loc[:, pName.replace('amplitude', 'ACR')] = (
                 tdInterp.loc[:, pName] *
                 tdInterp.loc[:, 'RateInHz'])
+            tdInterp.loc[:, pName.replace('amplitude', 'dAmpDt')] = (
+                tdInterp.loc[:, pName].diff()
+                .rolling(6 * smoothWindowStd, center=True, win_type='gaussian')
+                .mean(std=smoothWindowStd).fillna(0) / origTimeStep)
     tdInterp.sort_index(axis='columns', inplace=True)
     
     # tdInterp.columns = ['seg0_{}'.format(i) for i in tdInterp.columns]

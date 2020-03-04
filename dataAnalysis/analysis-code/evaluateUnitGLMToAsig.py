@@ -10,6 +10,7 @@ Options:
     --debugging                            print diagnostics? [default: False]
     --makePredictionPDF                    make pdf of y vs yhat? [default: False]
     --plottingCovariateFilters             make pdf of y vs yhat? [default: False]
+    --makeCovariatePDF                     make pdf of y vs yhat? [default: False]
     --profile                              print time and mem diagnostics? [default: False]
     --lazy                                 load from raw, or regular? [default: False]
     --plottingIndividual                   plots? [default: False]
@@ -22,23 +23,6 @@ Options:
     --unitQuery=unitQuery                  how to restrict channels?
     --inputBlockName=inputBlockName        filename for resulting estimator [default: fr_sqrt]
 """
-#
-import matplotlib
-import matplotlib.ticker as ticker
-matplotlib.rcParams['pdf.fonttype'] = 42
-matplotlib.rcParams['ps.fonttype'] = 42
-# matplotlib.use('Agg')  # generate postscript output 
-matplotlib.use('QT5Agg')  # generate postscript output
-import matplotlib.pyplot as plt
-import seaborn as sns
-sns.set()
-sns.set_color_codes("dark")
-sns.set_context("notebook")
-sns.set_style("white")
-import matplotlib.ticker as ticker
-from matplotlib.backends.backend_pdf import PdfPages
-import matplotlib.gridspec as gridspec
-#
 import dataAnalysis.helperFunctions.profiling as prf
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
 from namedQueries import namedQueries
@@ -52,6 +36,7 @@ import dataAnalysis.preproc.ns5 as ns5
 import joblib as jb
 import pickle
 import pyglmnet
+from tqdm import tqdm
 from statsmodels.stats.multitest import multipletests as mt
 from patsy import (
     ModelDesc, EvalEnvironment, Term, Sum, Treatment, INTERCEPT,
@@ -66,6 +51,21 @@ expOpts, allOpts = parseAnalysisOptions(
     int(arguments['trialIdx']), arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
+#
+import matplotlib
+# matplotlib.use('Agg')  # generate postscript output 
+matplotlib.use('QT5Agg')  # generate postscript output
+import matplotlib.ticker as ticker
+matplotlib.rcParams['pdf.fonttype'] = 42
+matplotlib.rcParams['ps.fonttype'] = 42
+import matplotlib.pyplot as plt
+import seaborn as sns
+sns.set()
+sns.set_color_codes("dark")
+sns.set_context("notebook")
+sns.set_style("dark")
+from matplotlib.backends.backend_pdf import PdfPages
+import matplotlib.gridspec as gridspec
 #
 analysisSubFolder = os.path.join(
     scratchFolder, arguments['analysisName']
@@ -104,8 +104,8 @@ varFolders = sorted(
 variantList = [os.path.basename(i) for i in varFolders]
 if arguments['debugging']:
     showNow = False
-    # variantList = ['var_{:03d}'.format(i) for i in range(10)]
-    variantList = ['var_{:03d}'.format(i) for i in [2, 10, 20]]
+    variantList = ['var_{:03d}'.format(i) for i in range(16)]
+    # variantList = ['var_{:03d}'.format(i) for i in [0]]
 else:
     showNow = False
 
@@ -124,23 +124,62 @@ def applyCBasis(vec, cbCol):
         cBasis[cbCol].to_numpy(),
         mode='same')
 
+useInvLink = True
+if useInvLink:
+    invLinkFun = lambda x: np.exp(x)
+else:
+    invLinkFun = lambda x: x
 
-if arguments['plottingOverall']:
-    pdfPath = os.path.join(
-        estimatorFiguresFolder,
-        'covariate_basis.pdf')
-    plt.plot(cBasis)
-    plt.xlabel('Time (sec)')
-    plt.savefig(pdfPath)
-    plt.savefig(pdfPath.replace('.pdf', '.png'))
-    if showNow:
-        plt.show()
-    else:
-        plt.close()
-
+# if arguments['plottingOverall']:
+#     pdfPath = os.path.join(
+#         estimatorFiguresFolder,
+#         'covariate_basis.pdf')
+#     plt.plot(cBasis)
+#     plt.xlabel('Time (sec)')
+#     plt.savefig(pdfPath)
+#     plt.savefig(pdfPath.replace('.pdf', '.png'))
+#     if showNow:
+#         plt.show()
+#     else:
+#         plt.close()
+#
+covPalette = sns.color_palette("Set1", n_colors=7)
+covFilterPlotOpts = {
+    'GT_Right_angle': {'c': covPalette[0], 'ls': '-', 'lw': 3},
+    'K_Right_angle': {'c': covPalette[1], 'ls': '-', 'lw': 3},
+    'M_Right_angle': {'c': covPalette[2], 'ls': '-', 'lw': 3},
+    'GT_Right_angular_velocity': {'c': covPalette[0], 'ls': '--', 'lw': 3},
+    'K_Right_angular_velocity': {'c': covPalette[1], 'ls': '--', 'lw': 3},
+    'M_Right_angular_velocity': {'c': covPalette[2], 'ls': '--', 'lw': 3},
+    'GT_Right_angular_acceleration':{'c': covPalette[0], 'ls': '.', 'lw': 3},
+    'K_Right_angular_acceleration':{'c': covPalette[1], 'ls': '.', 'lw': 3},
+    'M_Right_angular_acceleration':{'c': covPalette[2], 'ls': '.', 'lw': 3},
+    'program0_amplitude': {'c': covPalette[3], 'ls': '-', 'lw': 3},
+    'program1_amplitude': {'c': covPalette[4], 'ls': '-', 'lw': 3},
+    'program2_amplitude': {'c': covPalette[5], 'ls': '-', 'lw': 3},
+    'program3_amplitude': {'c': covPalette[6], 'ls': '-', 'lw': 3},
+    'program0_amplitude:RateInHz': {'c': covPalette[3], 'ls': '-', 'lw': 1},
+    'program1_amplitude:RateInHz': {'c': covPalette[4], 'ls': '-', 'lw': 1},
+    'program2_amplitude:RateInHz': {'c': covPalette[5], 'ls': '-', 'lw': 1},
+    'program3_amplitude:RateInHz': {'c': covPalette[6], 'ls': '-', 'lw': 1},
+    'deriv(program0_amplitude)':{'c': covPalette[3], 'ls': '--', 'lw': 3},
+    'deriv(program1_amplitude)':{'c': covPalette[4], 'ls': '--', 'lw': 3},
+    'deriv(program2_amplitude)':{'c': covPalette[5], 'ls': '--', 'lw': 3},
+    'deriv(program3_amplitude)':{'c': covPalette[6], 'ls': '--', 'lw': 3},
+    'deriv(program0_amplitude):RateInHz':{'c': covPalette[3], 'ls': '--', 'lw': 1},
+    'deriv(program1_amplitude):RateInHz':{'c': covPalette[4], 'ls': '--', 'lw': 1},
+    'deriv(program2_amplitude):RateInHz':{'c': covPalette[5], 'ls': '--', 'lw': 1},
+    'deriv(program3_amplitude):RateInHz':{'c': covPalette[6], 'ls': '--', 'lw': 1},
+    }
+termsToCovLookup = {
+    'kvsdP1P2P3': 'program0_amplitude',
+    'kvsdP0P2P3': 'program1_amplitude',
+    'kvsdP0P1P3': 'program2_amplitude',
+    'kvsdP0P1P2': 'program3_amplitude',
+    }
 binSize = (
     rasterOpts['binInterval'] *
-    glmOptsLookup[arguments['estimatorName']]['decimate'])
+    glmOptsLookup[arguments['estimatorName']]['subsampleOpts']['decimate'])
 rollingWindow = int(60e-3 / binSize)
 deriv = lambda x: pd.Series(x).diff().fillna(0).to_numpy()
 #
@@ -153,7 +192,7 @@ ihbasis = ihbasisDF.to_numpy()
 saveR2 = {}
 saveEstimatorParams = {}
 saveBetas = {}
-
+saveLL = {}
 
 def calcMinIter(iterBetaNorm, tol_list=[1e-6], plotting=False):
     if isinstance(iterBetaNorm, pd.Series):
@@ -222,12 +261,20 @@ for variantName in variantList:
     if variantInfo.loc[variantIdx, 'angularAcceleration']:
         terms += 'a'
         variantInfo.loc[variantIdx, 'anyKin'] = True
-    if variantInfo.loc[variantIdx, 'stim']:
+    if variantInfo.loc[variantIdx, 'stimAmplitude']:
         terms += 's'
         variantInfo.loc[variantIdx, 'anyStim'] = True
     if variantInfo.loc[variantIdx, 'stimVelocity']:
         terms += 'd'
         variantInfo.loc[variantIdx, 'anyStim'] = True
+    if variantInfo.loc[variantIdx, 'program0_amplitude']:
+        terms += 'P0'
+    if variantInfo.loc[variantIdx, 'program1_amplitude']:
+        terms += 'P1'
+    if variantInfo.loc[variantIdx, 'program2_amplitude']:
+        terms += 'P2'
+    if variantInfo.loc[variantIdx, 'program3_amplitude']:
+        terms += 'P3'
     variantInfo.loc[variantIdx, 'kinAndStim'] = (
         variantInfo.loc[variantIdx, 'anyKin'] and
         variantInfo.loc[variantIdx, 'anyStim']
@@ -289,6 +336,7 @@ for vIdx, variantName in enumerate(variantList):
     if vIdx == 0:
         train = estimatorMetadata['trainIdx']
         test = estimatorMetadata['testIdx']
+        cv_folds = estimatorMetadata['cv_folds']
     xTrainList = []
     xTestList = []
     if variantInfo.loc[variantIdx, 'addIntercept']:
@@ -351,7 +399,6 @@ for vIdx, variantName in enumerate(variantList):
             featuresDF.iloc[test, :],
             return_type='dataframe'))
     #
-    #
     unitNames = estimator.regressionList.keys()
     #
     estimator.xTrain = pd.concat(xTrainList, axis='columns')
@@ -367,6 +414,15 @@ for vIdx, variantName in enumerate(variantList):
             estimator.yHat = pd.read_hdf(store, '/yHat')
             pR2 = pd.read_hdf(store, '/pR2')
             unitNames = pR2.sort_values('valid', ascending=False).index.to_list()
+            estimator.xFiltered = {}
+            for unitName in unitNames:
+                estimator.xFiltered[unitName] = pd.read_hdf(
+                    store, '/xFiltered/{}'.format(unitName))
+            cvBetaKeys = sorted([i for i in store.keys() if 'cvBetas' in i])
+            cvBetas = [
+                pd.read_hdf(store, k)
+                for k in cvBetaKeys]
+            saveCVBetas = len(cvBetas) > 0
             estimatorParams = pd.read_hdf(store, '/estimatorParams')
             pR2smooth = pd.read_hdf(store, '/pR2smooth')
             rollingWindowList = pd.unique(pR2smooth['rollingWindow']).tolist()
@@ -402,25 +458,31 @@ for vIdx, variantName in enumerate(variantList):
                     covariateSplineFiltersMedianDF[cName] = pd.read_hdf(
                         estimatorDiagnosticsPath, '/'.join([
                             '/covariateFilters', 'timeAmplitude',
-                            '{}/median'.format(safeName)
-                        ]))
+                            '{}/median'.format(safeName)]))
                     covariateSplineFiltersHBDF[cName] = pd.read_hdf(
                         estimatorDiagnosticsPath, '/'.join([
                             '/covariateFilters', 'timeAmplitude',
-                            '{}/hb'.format(safeName)
-                        ]))
+                            '{}/hb'.format(safeName)]))
                     covariateSplineFiltersLBDF[cName] = pd.read_hdf(
                         estimatorDiagnosticsPath, '/'.join([
                             '/covariateFilters', 'timeAmplitude',
-                            '{}/lb'.format(safeName)
-                        ]))
+                            '{}/lb'.format(safeName)]))
                 except Exception:
                     traceback.print_exc()
     else:
+        # estimator.yTestHat = pd.DataFrame(
+        #     np.nan,
+        #     index=estimator.yTest.index,
+        #     columns=estimator.yTest.columns)
+        # estimator.yTrainHat = pd.DataFrame(
+        #     np.nan,
+        #     index=estimator.yTrain.index,
+        #     columns=estimator.yTrain.columns)
         estimator.yHat = pd.DataFrame(
             np.nan,
-            index=estimator.yTest.index,
-            columns=estimator.yTest.columns)
+            index=targetDF.index,
+            columns=targetDF.columns)
+        #
         pR2 = pd.DataFrame(
             np.nan,
             index=unitNames,
@@ -446,14 +508,14 @@ for vIdx, variantName in enumerate(variantList):
         #
         for uIdx, unitName in enumerate(unitNames):
             regDict = estimator.regressionList[unitName]
-            estimator.yHat.loc[:, unitName] = (
+            estimator.yHat.loc[:, unitName].iloc[test] = (
                 regDict['reg'].predict(estimator.xTest))
             if hasattr(regDict['reg'], 'get_params'):
                 if 'distr' in regDict['reg'].get_params():
                     pR2.loc[unitName, 'valid_LL'] = pyglmnet._logL(
                         regDict['reg'].distr,
                         estimator.yTest[unitName],
-                        estimator.yHat[unitName])
+                        estimator.yHat[unitName].iloc[test])
                     pyglmnet._logL(
                         regDict['reg'].distr,
                         estimator.yTest[unitName],
@@ -496,6 +558,9 @@ for vIdx, variantName in enumerate(variantList):
                         for i in cv_scores['estimator']]
                 for cvIdx, cvEst in enumerate(cv_scores['estimator']):
                     cvBetas[cvIdx].loc[unitName, :] = cvEst.beta_
+                    cv_test = cv_folds[cvIdx][1]
+                    estimator.yHat.loc[:, unitName].iloc[train].iloc[cv_test] = (
+                        cvEst.predict(estimator.xTrain.iloc[cv_test, :]))
             else:
                 saveCVBetas = False
             if 'iterBetaNorm' in regDict:
@@ -522,7 +587,7 @@ for vIdx, variantName in enumerate(variantList):
                     .rolling(thisRollingWindow, center=True).mean()
                     .dropna().iloc[int(thisRollingWindow/2)::thisRollingWindow]
                     .to_numpy(),
-                    estimator.yHat[unitName]
+                    estimator.yHat[unitName].iloc[test]
                     .rolling(thisRollingWindow, center=True).mean()
                     .dropna().iloc[int(thisRollingWindow/2)::thisRollingWindow]
                     .to_numpy())
@@ -530,7 +595,7 @@ for vIdx, variantName in enumerate(variantList):
         pR2smooth = pd.concat(pR2smoothDict, names=['rollingWindow']).reset_index()
         toleranceParams = pd.concat(toleranceParamsList, ignore_index=True)
         #
-        unitNames = pR2.sort_values('valid').index.to_list()
+        unitNames = pR2.sort_values('valid', ascending=False).index.to_list()
         #
         covariateSplines = []
         regex1 = r'\"bs\(([\S\s]*), df=([\d]+)\)\[([\d]+)\][:]*([\S\s]*)\"'#
@@ -592,12 +657,21 @@ for vIdx, variantName in enumerate(variantList):
                 i: pd.DataFrame(index=cBasis.index, columns=[])
                 for i in unitNames}
             for esb in estimatorBetasList]
+        estimator.xFiltered = {
+            i: pd.DataFrame(index=featuresDF.index, columns=[])
+            for i in unitNames}
         covariateSplineFilters = [
             {i: {} for i in unitNames}
             for esb in estimatorBetasList]
         anyCovariateSplineFilters = False
-        for esbIdx, estimatorBetas in enumerate(estimatorBetasList):
-            for cName in estimatorBetas.columns:
+        for esbIdx, estimatorBetas in (enumerate(estimatorBetasList)):
+            print(
+                'Calculating covariate filters for fold {} of {}\n'
+                .format(esbIdx+1, len(estimatorBetasList)))
+            for cIdx, cName in enumerate(tqdm(estimatorBetas.columns)):
+                # print(
+                #     'Calculating covariate filters for term {} of {}'
+                #     .format(cIdx+1, len(estimatorBetas.columns)))
                 matches = re.search(regex2, cName, re.MULTILINE)
                 if matches:
                     covariateName = matches.groups()[1]
@@ -606,9 +680,9 @@ for vIdx, variantName in enumerate(variantList):
                     splineMatches = re.search(regex3, covariateName, re.MULTILINE)
                     #
                     if not splineMatches:
-                        covariateSaveName = covariateName
+                        covSaveName = covariateName
                         if derivTerm:
-                            covariateSaveName = 'deriv({})'.format(covariateSaveName)
+                            covSaveName = 'deriv({})'.format(covSaveName)
                     else:
                         anyCovariateSplineFilters = True
                         mainCovariateName = splineMatches.groups()[0]
@@ -617,33 +691,47 @@ for vIdx, variantName in enumerate(variantList):
                         splName = covariateName.split(':')[0]
                         spl = dummyX[splName]
                         interactName = splineMatches.groups()[3]
-                        covariateSaveName = mainCovariateName
+                        covSaveName = mainCovariateName
                         if derivTerm:
-                            covariateSaveName = 'deriv({})'.format(covariateSaveName)
+                            covSaveName = 'deriv({})'.format(covSaveName)
                         if interactName:
-                            covariateSaveName = covariateSaveName + ':' + interactName
-                    #
-                    for targetIdx in estimatorBetas.index:
-                        thisCoefficient = estimatorBetas.loc[targetIdx, cName]
-                        if not splineMatches:
-                            if not (covariateSaveName in covariateFilters[esbIdx][targetIdx]):
-                                covariateFilters[esbIdx][targetIdx][covariateSaveName] = 0
-                            covariateFilters[esbIdx][targetIdx][covariateSaveName] += (
-                                cBasis[lag] * thisCoefficient)
-                        else:
-                            alreadyStarted = (
-                                covariateSaveName in covariateSplineFilters[esbIdx][targetIdx])
-                            if not alreadyStarted:
-                                covariateSplineFilters[esbIdx][targetIdx][covariateSaveName] = (
+                            covSaveName = covSaveName + ':' + interactName
+                    for unitName in (unitNames):
+                        thisCoefficient = estimatorBetas.loc[unitName, cName]
+                        alreadyStarted = (
+                            covSaveName in covariateFilters[esbIdx][unitName])
+                        if not alreadyStarted:
+                            # create an entry in the list of filters
+                            covariateFilters[esbIdx][unitName][covSaveName] = 0
+                            # create an entry in the list of predictions
+                            estimator.xFiltered[unitName].loc[:, covSaveName] = 0
+                            if splineMatches:
+                                # create an entry in the list of amp dependent filters
+                                covariateSplineFilters[esbIdx][unitName][covSaveName] = (
                                     pd.DataFrame(
                                         np.zeros((
                                             cBasis.shape[0],
                                             dummyCovariate.shape[0])),
                                         index=cBasis.index,
                                         columns=dummyCovariate[mainCovariateName]))
-                            covariateSplineFilters[esbIdx][targetIdx][covariateSaveName] += (
+                        # validation fold goes last
+                        if esbIdx == (len(estimatorBetasList) - 1):
+                            estimator.xFiltered[unitName].loc[:, covSaveName].iloc[test] += (
+                                thisCoefficient * estimator.xTest[cName])
+                        elif saveCVBetas:
+                            cv_test = cv_folds[esbIdx][1]
+                            estimator.xFiltered[unitName].loc[:, covSaveName].iloc[train].iloc[cv_test] += (
+                                thisCoefficient * estimator.xTrain[cName].iloc[cv_test])
+                        if not splineMatches:
+                            covariateFilters[esbIdx][unitName][covSaveName] += (
+                                cBasis[lag] * thisCoefficient)
+                        else:
+                            if not alreadyStarted:
+                                covariateFilters[esbIdx][unitName][covSaveName] = 0
+                            thisSplineFilter = (
                                 np.outer(cBasis[lag], spl) * thisCoefficient)
-                            # spline
+                            covariateFilters[esbIdx][unitName][covSaveName] += (thisSplineFilter[:, -1])
+                            covariateSplineFilters[esbIdx][unitName][covSaveName] += thisSplineFilter
         #
         regularFilterNames = covariateFilters[0][unitNames[0]].columns
         covariateFiltersMedian = {
@@ -724,6 +812,8 @@ for vIdx, variantName in enumerate(variantList):
         covariateFiltersMagnitude = pd.concat(
             covariateFiltersMagnitudeDict, axis='columns').T
         ##################################################################
+        # estimator.yTestHat.to_hdf(estimatorDiagnosticsPath, '/yTestHat')
+        # estimator.yTrainHat.to_hdf(estimatorDiagnosticsPath, '/yTrainHat')
         estimator.yHat.to_hdf(estimatorDiagnosticsPath, '/yHat')
         pR2.to_hdf(estimatorDiagnosticsPath, '/pR2')
         estimatorParams.to_hdf(estimatorDiagnosticsPath, '/estimatorParams')
@@ -740,7 +830,11 @@ for vIdx, variantName in enumerate(variantList):
             estimatorDiagnosticsPath, '/covariateFilters/temporal/hb')
         covariateFiltersLBDF.to_hdf(
             estimatorDiagnosticsPath, '/covariateFilters/temporal/lb')
-        # pdb.set_trace()
+        #
+        for unitName in unitNames:
+            estimator.xFiltered[unitName].to_hdf(
+                estimatorDiagnosticsPath,
+                '/xFiltered/{}'.format(unitName))
         if anyCovariateSplineFilters:
             pd.Series(splineFilterNames).to_hdf(
                 estimatorDiagnosticsPath,
@@ -791,11 +885,14 @@ for vIdx, variantName in enumerate(variantList):
             continue
     allY = pd.concat(
             {
-                'test_data': estimator.yTest,
-                'test_prediction': estimator.yHat},
+                'validation_data': estimator.yTest,
+                'validation_prediction': estimator.yHat.iloc[test, :],
+                'cv_test_data': estimator.yTrain,
+                'cv_test_prediction': estimator.yHat.iloc[train, :]},
             names=['regressionDataType'])
     #
     dataQuery = '&'.join([
+        '((regressionDataType=="cv_test_prediction")|(regressionDataType=="cv_test_data"))',
         # '((RateInHz==100)|(amplitude==0))',
         # '(amplitude==0)',
         '(pedalSizeCat=="M")'
@@ -804,7 +901,12 @@ for vIdx, variantName in enumerate(variantList):
     #######################################################
     variantInfo.loc[variantIdx, 'median_valid'] = pR2['valid'].median()
     variantInfo.loc[variantIdx, 'median_gs'] = pR2['gs'].median()
-    saveR2[variantName] = pR2
+    logL = pR2.loc[:, 'valid_LL'].copy().to_frame(name='LL')
+    logL.name = 'valid'
+    saveR2[variantName] = pR2.drop('valid_LL', axis=1)
+    saveLL[variantName] = logL
+    estimatorParams['nSigBeta'] = estimator.significantBetas.sum(axis=1)
+    #
     saveEstimatorParams[variantName] = estimatorParams
     saveBetas[variantName] = {
         'betas': estimator.betas,
@@ -824,12 +926,12 @@ for vIdx, variantName in enumerate(variantList):
                 # fig, ax = estimator.plot_xy(maxPR2=0.025)
                 fig, ax = estimator.plot_xy(
                     # unitName='elec10_2',
-                    smoothY=5,
+                    smoothY=rollingWindow,
                     binInterval=rasterOpts['binInterval'],
-                    decimated=glmOptsLookup[arguments['estimatorName']]['decimate'],
-                    winSize=glmOptsLookup[arguments['estimatorName']]['rollingWindow'],
+                    decimated=glmOptsLookup[arguments['estimatorName']]['subsampleOpts']['decimate'],
+                    winSize=glmOptsLookup[arguments['estimatorName']]['subsampleOpts']['rollingWindow'],
                     selT=slice(1900, 2500),
-                    useInvLink=True)
+                    useInvLink=useInvLink)
                 # for cAx in ax:
                 #     cAx.set_xlim([100, 2000])
                 fig.savefig(
@@ -1000,14 +1102,13 @@ for vIdx, variantName in enumerate(variantList):
         if arguments['plottingCovariateFilters']:
             pdfPath = os.path.join(
                 estimatorFiguresFolder,
-                'covariate_filters_{}.pdf'.format(variantName))
+                'covariate_kernels_{}.pdf'.format(variantName))
             with PdfPages(pdfPath) as pdf:
                 for uIdx, unitName in enumerate(unitNames):
                     filterGroupMedian = covariateFiltersMedianDF.loc[unitName, :].unstack(level='covariate')
                     filterGroupHB = covariateFiltersHBDF.loc[unitName, :].unstack(level='covariate')
                     filterGroupLB = covariateFiltersLBDF.loc[unitName, :].unstack(level='covariate')
                     print('Printing {} covariate filters'.format(unitName))
-                    covPalette = sns.color_palette("Set1", n_colors=25)
                     if not filterGroupMedian.empty:
                         fig = plt.figure(figsize=(12, 9))
                         gs = gridspec.GridSpec(nrows=1, ncols=1)
@@ -1015,14 +1116,21 @@ for vIdx, variantName in enumerate(variantList):
                         for cIdx, cName in enumerate(filterGroupMedian.columns):
                             ax0.fill_between(
                                 filterGroupLB.index,
-                                filterGroupLB[cName], filterGroupHB[cName],
-                                facecolor=covPalette[cIdx], alpha=0.3)
-                            ax0.plot(filterGroupMedian[cName], c=covPalette[cIdx], label=cName)
+                                invLinkFun(filterGroupLB[cName]),
+                                invLinkFun(filterGroupHB[cName]),
+                                facecolor=covFilterPlotOpts[cName]['c'], alpha=0.3)
+                            ax0.plot(
+                                filterGroupMedian.index,
+                                invLinkFun(filterGroupMedian[cName]),
+                                **covFilterPlotOpts[cName], label=cName)
                         ax0.set_title(
                             'cell {} covariate weights, model {}'
                             .format(unitName, variantName))
-                        plt.legend()
-                        pdf.savefig()
+                        plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+                        pdf.savefig(
+                            bbox_extra_artists=(ax0.get_legend(),),
+                            bbox_inches='tight'
+                            )
                         if showNow:
                             plt.show()
                         else:
@@ -1045,17 +1153,23 @@ for vIdx, variantName in enumerate(variantList):
                             vmax = splFiltHB.max().max()
                             ax0 = fig.add_subplot(gs[0, 0])
                             sns.heatmap(
-                                splFiltLB, ax=ax0, center=0, vmin=vmin, vmax=vmax, cbar=False, cmap="coolwarm",
+                                invLinkFun(splFiltLB), ax=ax0, center=invLinkFun(0),
+                                vmin=invLinkFun(vmin), vmax=invLinkFun(vmax),
+                                cbar=False, cmap="coolwarm",
                                 xticklabels=10, yticklabels=5, edgecolors='face')
                             ax0.set_title('lower bound')
                             ax1 = fig.add_subplot(gs[0, 1])
                             sns.heatmap(
-                                splFilt, ax=ax1, center=0, vmin=vmin, vmax=vmax, cbar=False,  cmap="coolwarm",
+                                invLinkFun(splFilt), ax=ax1, center=invLinkFun(0),
+                                vmin=invLinkFun(vmin), vmax=invLinkFun(vmax),
+                                cbar=False,  cmap="coolwarm",
                                 xticklabels=10, yticklabels=5, edgecolors='face')
                             ax1.set_title('median')
                             ax2 = fig.add_subplot(gs[0, 2])
                             sns.heatmap(
-                                splFiltHB, ax=ax2, center=0, vmin=vmin, vmax=vmax, cbar=True,  cmap="coolwarm",
+                                invLinkFun(splFiltHB), ax=ax2, center=invLinkFun(0),
+                                vmin=invLinkFun(vmin), vmax=invLinkFun(vmax),
+                                cbar=True,  cmap="coolwarm",
                                 xticklabels=10, yticklabels=5, edgecolors='face')
                             ax2.set_title('higher bound')
                             plt.suptitle(
@@ -1068,6 +1182,49 @@ for vIdx, variantName in enumerate(variantList):
                                 plt.show()
                             else:
                                 plt.close()
+        #
+        if arguments['makeCovariatePDF']:
+            filteredDataQuery = '&'.join([
+                # '((RateInHz==100)|(amplitude==0))',
+                # '(amplitude==0)',
+                '(pedalSizeCat=="M")'
+                ])
+            print('Rolling window is {}'.format(rollingWindow))
+            pdfPath = os.path.join(
+                estimatorFiguresFolder,
+                'covariate_gains_{}.pdf'.format(
+                    variantName))
+            with PdfPages(pdfPath) as pdf:
+                for uIdx, unitName in enumerate(unitNames):
+                    xFiltPlot = invLinkFun(estimator.xFiltered[unitName].query(filteredDataQuery))
+                    xFiltPlot.columns.names=['feature']
+                    if uIdx == 0:
+                        allBins = xFiltPlot.index.get_level_values('bin')
+                        plotBins = allBins.unique()[int(rollingWindow/2)::rollingWindow]
+                        plotMask = allBins.isin(plotBins)
+                    xFiltPlot = (
+                        xFiltPlot
+                        .rolling(rollingWindow, center=True).mean()
+                        .iloc[plotMask, :]
+                        .dropna().stack().to_frame(name='gain'))
+                    xFiltPlot.reset_index(inplace=True)
+                    print('Plotting {}'.format(unitName))
+                    g = sns.relplot(
+                        x='bin', y='gain',
+                        data=xFiltPlot, hue='amplitude', row='feature',
+                        col='electrode', **relplotKWArgs)
+                    g.axes.flatten()[0].set_ylim([
+                        xFiltPlot['gain'].quantile(0.01),
+                        xFiltPlot['gain'].quantile(0.99)])
+                    plt.suptitle(
+                        '{}: pR^2 = {:.3f} ({} model)'.format(
+                            unitName, estimator.regressionList[unitName]['validationScore'],
+                            variantInfo.loc[variantIdx, 'terms']))
+                    pdf.savefig()
+                    plt.close()
+                    if arguments['debugging']:
+                        if uIdx > 1:
+                            break
         #
         if arguments['makePredictionPDF']:
             print('Rolling window is {}'.format(rollingWindow))
@@ -1118,120 +1275,133 @@ for unitName, thisReg in estimator.regressionList.items():
             LLSat[unitName] = pyglmnet._logL(
                 thisReg['reg'].distr,
                 estimator.yTest[unitName], estimator.yTest[unitName])
+LLSat.reset_index(drop=True, inplace=True)
 # plots to compare between models (saveR2 saveEstimatorParams saveBetas)
 
-allR2 = pd.concat(saveR2, names=['variant', 'target']).stack().reset_index()
-allR2.columns = ['variant', 'target', 'grp', 'pR2']
+allEstParam = pd.concat(saveEstimatorParams, names=['variantName', 'target']).reset_index()
+allPR2 = pd.concat(saveR2, names=['variantName', 'target']).stack().to_frame(name='pR2')
+allPR2.index.names=['variantName', 'target', 'grp']
+allBeta = pd.concat(
+    {k: v['betas'] for k, v in saveBetas.items()},
+    names=['variantName', 'target']).stack().reset_index()
+allBeta.columns = ['variantName', 'target', 'covariate', 'beta']
+bestVariants = pd.DataFrame(index=[], columns=variantInfo.columns)
+for name, group in variantInfo.groupby('terms'):
+    maxVarIdx = group['median_valid'].idxmax()
+    bestVariants.loc[maxVarIdx, :] = variantInfo.loc[maxVarIdx, :]
+#
+allLL = pd.concat(saveLL, names=['variantName', 'target'])
+allLL['grp'] = 'valid'
+allLL.set_index('grp', append=True, inplace=True)
+allScores = pd.concat([allPR2, allLL], axis=1)
+allScores.index.names = ['variantName', 'target', 'grp']
+allScores.reset_index(inplace=True)
 mappingTargets = [
     'terms', 'stimAmpSpline', 'stimLagStr',
     'kinLagStr', 'anyKin', 'anyStim', 'kinAndStim',
     'kinOnly', 'stimOnly']
 for mappingTarget in mappingTargets:
     mapping = dict(variantInfo[['variantName', mappingTarget]].values)
-    allR2[mappingTarget] = allR2['variant'].map(mapping)
-allR2['kinOnly'] = allR2['terms'] == ('kva')
-allR2['stimOnly'] = allR2['terms'] == ('sd')
-allR2['kinAndStim'] = allR2['terms'] == ('kvasd')
-allR2['gs_split_all'] = allR2['grp'].str.contains('split')
-allR2['splinedStim'] = allR2['stimAmpSpline'].str.contains('bs')
-#
-stimLagR2 = allR2.query('(gs_split_all) and (stimOnly) and (splinedStim)')
-stimLagVarList = stimLagR2['variant'].unique()
-#
-stimLagPairedT = pd.DataFrame(
-    np.nan, index=stimLagVarList, columns=stimLagVarList)
-stimLagPairedPval = pd.DataFrame(
-    np.nan, index=stimLagVarList, columns=stimLagVarList)
-for pairName in (combinations(stimLagVarList,2)):
-    x = stimLagR2.query('variant == "{}"'.format(pairName[0]))
-    y = stimLagR2.query('variant == "{}"'.format(pairName[1]))
-    T, pv = stats.wilcoxon(x['pR2'], y['pR2'], zero_method='pratt', correction=True)
-    stimLagPairedT.loc[pairName] = T
-    stimLagPairedPval.loc[pairName] = pv
-#
-kinLagR2 = allR2.query('(gs_split_all) and (kinOnly)')
-kinLagVarList = kinLagR2['variant'].unique()
-kinLagPairedT = pd.DataFrame(
-    np.nan, index=kinLagVarList, columns=kinLagVarList)
-kinLagPairedPval = pd.DataFrame(
-    np.nan, index=kinLagVarList, columns=kinLagVarList)
-for pairName in (combinations(kinLagVarList,2)):
-    x = kinLagR2.query('variant == "{}"'.format(pairName[0]))
-    y = kinLagR2.query('variant == "{}"'.format(pairName[1]))
-    # all(x['grp'].values == y['grp'].values)
-    T, pv = stats.wilcoxon(x['pR2'], y['pR2'], zero_method='pratt', correction=True)
-    kinLagPairedT.loc[pairName] = T
-    kinLagPairedPval.loc[pairName] = pv
-#
-lagR2 = allR2.query('(gs_split_all) and (kinAndStim)')
-lagVarList = lagR2['variant'].unique()
-lagPairedT = pd.DataFrame(
-    np.nan, index=lagVarList, columns=lagVarList)
-lagPairedPval = pd.DataFrame(
-    np.nan, index=lagVarList, columns=lagVarList)
-for pairName in (combinations(lagVarList,2)):
-    x = lagR2.query('variant == "{}"'.format(pairName[0]))
-    y = lagR2.query('variant == "{}"'.format(pairName[1]))
-    # all(x['grp'].values == y['grp'].values)
-    T, pv = stats.wilcoxon(x['pR2'], y['pR2'], zero_method='pratt', correction=True)
-    lagPairedT.loc[pairName] = T
-    lagPairedPval.loc[pairName] = pv
-#
-if arguments['plottingOverall']:
-    pdfPath = os.path.join(
-        estimatorFiguresFolder,
-        'dynamic_and_nonlinear.pdf')
-    fig = plt.figure(figsize=(20, 10))
-    gs = gridspec.GridSpec(nrows=3, ncols=1)
-    ax0 = fig.add_subplot(gs[0, 0])
-    sns.boxplot(
-        y='kinLagStr', x='pR2', hue='grp',
-        data=allR2.query('((grp=="gs") or (grp=="valid")) and (kinOnly)'),
-        ax=ax0, orient='h')
-    ax0.set_xlim([lagR2['pR2'].quantile(0.05), lagR2['pR2'].quantile(0.95)])
-    ax1 = fig.add_subplot(gs[2, 0])
-    sns.boxplot(
-        y='stimLagStr', x='pR2', hue='stimAmpSpline',
-        data=stimLagR2,
-        ax=ax1, orient='h', palette="Set2")
-    ax1.set_xlim([lagR2['pR2'].quantile(0.05), lagR2['pR2'].quantile(0.95)])
-    ax2 = fig.add_subplot(gs[1, 0])
-    sns.boxplot(
-        y='stimLagStr', x='pR2', hue='stimAmpSpline',
-        data=lagR2,
-        ax=ax2, orient='h', palette="Set3")
-    ax2.set_xlim([lagR2['pR2'].quantile(0.05), lagR2['pR2'].quantile(0.95)])
-    plt.savefig(pdfPath)
-    plt.savefig(pdfPath.replace('.pdf', '.png'))
-    if showNow:
-        plt.show()
-    else:
-        plt.close()
+    allScores[mappingTarget] = allScores['variantName'].map(mapping)
+mappingTargets = ['nSigBeta']
+for mappingTarget in mappingTargets:
+    sourceMap = {(r['variantName'], r['target']): r[mappingTarget] for n, r in allEstParam.iterrows()}
+    targetMap = pd.Series([(r['variantName'], r['target']) for n, r in allScores.iterrows()]).map(sourceMap)
+    allScores[mappingTarget] = targetMap
+# allR2['kinOnly'] = ~allR2['terms'].str.contains('P')
+# allR2['stimOnly'] = ~allR2['terms'].str.contains('k')
+# allR2['kinAndStim'] = allR2['terms'].str.contains('P') & allR2['terms'].str.contains('k')
+allScores['gs_split_all'] = allScores['grp'].str.contains('split')
+allScores['splinedStim'] = allScores['stimAmpSpline'].str.contains('bs')
 
-allBeta = pd.concat(
-    {k: v['betas'] for k, v in saveBetas.items()},
-    names=['variant', 'target']).stack().reset_index()
-
-bestVariants = pd.DataFrame(index=[], columns=variantInfo.columns)
-for name, group in variantInfo.groupby('terms'):
-    maxVarIdx = group['median_valid'].idxmax()
-    bestVariants.loc[maxVarIdx, :] = variantInfo.loc[maxVarIdx, :]
-bestValidation = pd.concat({
-    i: saveR2[bestVariants.query("terms == '{}'".format(i))['variantName'].iloc[0]]['valid']
-    for i in bestVariants['terms'].to_list()},
-    axis=1, sort=True)
-bestValidationLL = pd.concat({
-    i: saveR2[bestVariants.query("terms == '{}'".format(i))['variantName'].iloc[0]]['valid_LL']
-    for i in bestVariants['terms'].to_list()},
-    axis=1, sort=True)
-bestBetasSignificance = pd.concat({
-    i: saveBetas[bestVariants.query("terms == '{}'".format(i))['variantName'].iloc[0]]['significantBetas']
-    for i in bestVariants['terms'].to_list()},
-    axis=0, sort=True, names=['terms', 'target']).fillna(False)
-bestBetas = pd.concat({
-    i: saveBetas[bestVariants.query("terms == '{}'".format(i))['variantName'].iloc[0]]['betas']
-    for i in bestVariants['terms'].to_list()},
-    axis=0, sort=True, names=['terms', 'target'])
+# stimLagR2 = allR2.query('(gs_split_all) and (stimOnly) and (splinedStim)')
+# stimLagVarList = stimLagR2['variantName'].unique()
+# #
+# stimLagPairedT = pd.DataFrame(
+#     np.nan, index=stimLagVarList, columns=stimLagVarList)
+# stimLagPairedPval = pd.DataFrame(
+#     np.nan, index=stimLagVarList, columns=stimLagVarList)
+# for pairName in (combinations(stimLagVarList,2)):
+#     x = stimLagR2.query('variantName == "{}"'.format(pairName[0]))
+#     y = stimLagR2.query('variantName == "{}"'.format(pairName[1]))
+#     T, pv = stats.wilcoxon(x['pR2'], y['pR2'], zero_method='pratt', correction=True)
+#     stimLagPairedT.loc[pairName] = T
+#     stimLagPairedPval.loc[pairName] = pv
+# #
+# kinLagR2 = allR2.query('(gs_split_all) and (kinOnly)')
+# kinLagVarList = kinLagR2['variantName'].unique()
+# kinLagPairedT = pd.DataFrame(
+#     np.nan, index=kinLagVarList, columns=kinLagVarList)
+# kinLagPairedPval = pd.DataFrame(
+#     np.nan, index=kinLagVarList, columns=kinLagVarList)
+# for pairName in (combinations(kinLagVarList,2)):
+#     x = kinLagR2.query('variant == "{}"'.format(pairName[0]))
+#     y = kinLagR2.query('variant == "{}"'.format(pairName[1]))
+#     # all(x['grp'].values == y['grp'].values)
+#     T, pv = stats.wilcoxon(x['pR2'], y['pR2'], zero_method='pratt', correction=True)
+#     kinLagPairedT.loc[pairName] = T
+#     kinLagPairedPval.loc[pairName] = pv
+# #
+# lagR2 = allR2.query('(gs_split_all) and (kinAndStim)')
+# lagVarList = lagR2['variantName'].unique()
+# lagPairedT = pd.DataFrame(
+#     np.nan, index=lagVarList, columns=lagVarList)
+# lagPairedPval = pd.DataFrame(
+#     np.nan, index=lagVarList, columns=lagVarList)
+# for pairName in (combinations(lagVarList,2)):
+#     x = lagR2.query('variantName == "{}"'.format(pairName[0]))
+#     y = lagR2.query('variantName == "{}"'.format(pairName[1]))
+#     # all(x['grp'].values == y['grp'].values)
+#     T, pv = stats.wilcoxon(x['pR2'], y['pR2'], zero_method='pratt', correction=True)
+#     lagPairedT.loc[pairName] = T
+#     lagPairedPval.loc[pairName] = pv
+#
+# if arguments['plottingOverall']:
+#     pdfPath = os.path.join(
+#         estimatorFiguresFolder,
+#         'dynamic_and_nonlinear.pdf')
+#     fig = plt.figure(figsize=(20, 10))
+#     gs = gridspec.GridSpec(nrows=3, ncols=1)
+#     ax0 = fig.add_subplot(gs[0, 0])
+#     sns.boxplot(
+#         y='kinLagStr', x='pR2', hue='grp',
+#         data=allR2.query('((grp=="gs") or (grp=="valid")) and (kinOnly)'),
+#         ax=ax0, orient='h')
+#     ax0.set_xlim([lagR2['pR2'].quantile(0.05), lagR2['pR2'].quantile(0.95)])
+#     ax1 = fig.add_subplot(gs[2, 0])
+#     sns.boxplot(
+#         y='stimLagStr', x='pR2', hue='stimAmpSpline',
+#         data=stimLagR2,
+#         ax=ax1, orient='h', palette="Set2")
+#     ax1.set_xlim([lagR2['pR2'].quantile(0.05), lagR2['pR2'].quantile(0.95)])
+#     ax2 = fig.add_subplot(gs[1, 0])
+#     sns.boxplot(
+#         y='stimLagStr', x='pR2', hue='stimAmpSpline',
+#         data=lagR2,
+#         ax=ax2, orient='h', palette="Set3")
+#     ax2.set_xlim([lagR2['pR2'].quantile(0.05), lagR2['pR2'].quantile(0.95)])
+#     plt.savefig(pdfPath)
+#     plt.savefig(pdfPath.replace('.pdf', '.png'))
+#     if showNow:
+#         plt.show()
+#     else:
+#         plt.close()
+# bestValidation = pd.concat({
+#     i: allScores[bestVariants.query("terms == '{}'".format(i))['variantName'].iloc[0]]['valid']
+#     for i in bestVariants['terms'].to_list()},
+#     axis=1, sort=True)
+# bestValidationLL = pd.concat({
+#     i: saveR2[bestVariants.query("terms == '{}'".format(i))['variantName'].iloc[0]]['valid_LL']
+#     for i in bestVariants['terms'].to_list()},
+#     axis=1, sort=True)
+# bestBetasSignificance = pd.concat({
+#     i: saveBetas[bestVariants.query("terms == '{}'".format(i))['variantName'].iloc[0]]['significantBetas']
+#     for i in bestVariants['terms'].to_list()},
+#     axis=0, sort=True, names=['terms', 'target']).fillna(False)
+# bestBetas = pd.concat({
+#     i: saveBetas[bestVariants.query("terms == '{}'".format(i))['variantName'].iloc[0]]['betas']
+#     for i in bestVariants['terms'].to_list()},
+#     axis=0, sort=True, names=['terms', 'target'])
 
 # maxOverallVariant = variantInfo['median_valid'].idxmax()
 # mostModulated = saveR2[maxOverallVariant].sort_values('valid').index.to_list()
@@ -1246,55 +1416,114 @@ bestBetas = pd.concat({
 #     pickle.dump(mostModSelector, f)
 
 
-def plotPR2Diff(p1, p2, ll1, ll2, lls, color=None):
-    deltaPR2 = p2 - p1
-    FUDE = 1 - (lls - ll2) / (lls - ll1)
-    print(FUDE.sort_values(ascending=False).index)
+def plotPR2Diff(
+        reducedScores, fullScores,
+        ll_sat, color=None, chi2Alpha=0.01):
+    p_full = fullScores['pR2']
+    p_red = reducedScores['pR2']
+    ll_full = fullScores['LL']
+    ll_red = reducedScores['LL']
+    nSigBeta_full = fullScores['nSigBeta']
+    nSigBeta_red = reducedScores['nSigBeta']
+    redName = reducedScores['terms'].unique()[0]
+    fullName = fullScores['terms'].unique()[0]
+    deltaPR2 = p_full - p_red
+    dev_full = 2 * ll_sat - 2 * ll_full #
+    dev_red = 2 * ll_sat - 2 * ll_red # 
+    aic_full = -2 * ll_full + 2 * nSigBeta_full
+    aic_red = -2 * ll_red + 2 * nSigBeta_red
+    dAIC = aic_full - aic_red
+    dDev =  dev_red - dev_full
+    dNBeta = nSigBeta_full - nSigBeta_red
+    chi2PVal = pd.Series(np.nan, index=fullScores.index)
+    for rIdx, row in fullScores.iterrows():
+        x = dDev[rIdx]
+        nDof = dNBeta[rIdx]
+        chi2PVal[rIdx] = 1 - scipy.stats.chi2.cdf(x, nDof)
+    _, fixedPVals, _, _ = mt(chi2PVal.to_numpy(), method='holm')
+    chi2FixedPVals = pd.Series(fixedPVals, index=chi2PVal.index)
+    chi2Sig = chi2FixedPVals < chi2Alpha
+    print('{} units pass the chi2 test'.format(chi2Sig.sum()))
+    FUDE = 1 - (dev_full) / (dev_red)
+    # print(fullScores.loc[FUDE.sort_values(ascending=False).index, 'target'])
+    #
     fig = plt.figure(figsize=(12, 9))
     gs = gridspec.GridSpec(nrows=2, ncols=2, width_ratios=[1, 1])
-    ax0 = fig.add_subplot(gs[:, 0])
-    sns.scatterplot(x=p1, y=p2, ax=ax0, color=color)
-    ax0.plot([0, 1], [0, 1], 'k--')
-    maxP = max(p1.max(), p2.max())
-    ax0.set_xlim((0, maxP))
-    ax0.set_ylim((0, maxP))
-    ax0.set_xlabel(p1.name)
-    ax0.set_ylabel(p2.name)
-    ax0.set_title(
-        'pR^2 of {} vs {} (median difference {:0.3f})'
-        .format(p1.name, p2.name, deltaPR2.median()))
     ax = [
+        fig.add_subplot(gs[:, 0]),
         fig.add_subplot(gs[0, 1]),
         fig.add_subplot(gs[1, 1])
         ]
-    sns.distplot(FUDE, ax=ax[0], color=color)
-    ax[0].set_ylabel('Count')
-    ax[0].set_title('FUDE (median {:0.3f})'.format(FUDE.median()))
-    # ax[0].set_xlim([-0.025, .15])
-    sns.boxplot(data=FUDE, ax=ax[1], orient="h", color=color)
-    ax[1].set_xlabel('FUDE')
-    # ax[1].set_xlim([-0.025, .15])
+    scatterData = {'full': p_full, 'reduced': p_red, 'name': 'pR^2'}
+    maxP = max(scatterData['reduced'].max(), scatterData['full'].max())
+    markers = {0: 's', 1: 'o'}
+    colorOpts = {0: 'w', 1: color}
+    sns.scatterplot(
+        x=scatterData['reduced'], y=scatterData['full'],
+        hue=chi2Sig.astype(int), style=chi2Sig.astype(int),
+        markers=markers, palette=colorOpts,
+        ax=ax[0], edgecolors='face')
+    ax[0].plot([0, maxP], [0, maxP], 'k--')
+    ax[0].set_xlim((0, maxP))
+    ax[0].set_ylim((0, maxP))
+    ax[0].set_xlabel(redName)
+    ax[0].set_ylabel(fullName)
+    ax[0].set_title(
+        '{} of {} vs {} (median difference {:0.3f})'
+        .format(
+            scatterData['name'], fullName, redName,
+            (scatterData['full'] - scatterData['reduced']).median()))
+    #
+    densityData = {'data': dDev, 'name': 'dDev'}
+    sns.violinplot(
+        densityData['data'], ax=ax[1], color=color, scale='count',
+        inner="stick", cut=0, orient="h", bw=.2)
+    ax[1].set_xlim([
+        densityData['data'].quantile(0.01),
+        densityData['data'].quantile(0.99)])
+    ax[1].set_ylabel('Count')
+    ax[1].set_title(
+        '{} (median {:0.3f})'
+        .format(densityData['name'], densityData['data'].median()))
+    # ax[1].set_xlabel('{}'.format(densityData['name']))
+    #
+    densityData = {'data': FUDE, 'name': 'FUDE'}
+    sns.violinplot(
+        densityData['data'], ax=ax[2], color=color, scale='count',
+        inner="stick", cut=0, orient="h", bw=.2)
+    ax[2].set_xlim([
+        densityData['data'].quantile(0.01),
+        densityData['data'].quantile(0.99)])
+    ax[2].set_ylabel('Count')
+    ax[2].set_title(
+        '{} (median {:0.3f})'
+        .format(densityData['name'], densityData['data'].median()))
+    # ax[2].set_xlabel('{}'.format(densityData['name']))
+    # pdb.set_trace()
     pdfPath = os.path.join(
         estimatorFiguresFolder,
-        'rsq_diff_{}_vs_{}.pdf'.format(p1.name, p2.name))
+        'rsq_diff_{}_vs_{}.pdf'.format(redName, fullName))
     plt.savefig(pdfPath)
     plt.savefig(pdfPath.replace('.pdf', '.png'))
     if showNow:
         plt.show()
     else:
         plt.close()
+    return dAIC, FUDE, chi2PVal
 
+fullModelTerms = 'kvsdP0P1P2P3'
+fullVariant = bestVariants.query('terms=="{}"'.format(fullModelTerms)).iloc[0]
+fullScores = allScores.query(
+    '(variantName == "{}") & (grp == "valid")'
+    .format(fullVariant['variantName'])).reset_index(drop=True)
+nestedVariants = bestVariants.query('terms!="{}"'.format(fullModelTerms))
 
+pdb.set_trace()
 if arguments['plottingOverall']:
-    try:
-        plotPR2Diff(
-            bestValidation['kva'], bestValidation['kvasd'],
-            bestValidationLL['kva'], bestValidationLL['kvasd'], LLSat, color='b')
-    except Exception:
-        pass
-    try:
-        plotPR2Diff(
-            bestValidation['sd'], bestValidation['kvasd'],
-            bestValidationLL['sd'], bestValidationLL['kvasd'], LLSat, color='r')
-    except Exception:
-        pass
+    for varIdx, (_, nestedVariant) in enumerate(nestedVariants.iterrows()):
+        reducedScores = allScores.query(
+            '(variantName == "{}") & (grp == "valid")'
+            .format(nestedVariant['variantName'])).reset_index(drop=True)
+        dAIC, FUDE, chi2PVal = plotPR2Diff(
+            reducedScores, fullScores, LLSat,
+            color=covFilterPlotOpts[termsToCovLookup[nestedVariant['terms']]]['c'])

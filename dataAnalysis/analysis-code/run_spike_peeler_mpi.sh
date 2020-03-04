@@ -21,15 +21,16 @@
 #SBATCH --account=bibs-dborton-condo
 
 # Request custom resources
-#SBATCH --array=1
+#SBATCH --array=1,2,3,4
 
 # Run a command
 # EXP="exp201901070700"
 # EXP="exp201901201200"
 # EXP="exp201901211000"
-EXP="exp201901221000"
+# EXP="exp201901221000"
 # EXP="exp201901231000"
-# EXP="exp201901271000"
+# EXP="exp201901261000"
+EXP="exp201901271000"
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh

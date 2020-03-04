@@ -20,13 +20,14 @@
 #SBATCH --account=bibs-dborton-condo
 
 # Request custom resources
-#SBATCH --array=1,3
+#SBATCH --array=4
 
 # EXP="exp201901070700"
 # EXP="exp201901201200"
 # EXP="exp201901211000"
-EXP="exp201901221000"
+# EXP="exp201901221000"
 # EXP="exp201901231000"
+EXP="exp201901261000"
 # EXP="exp201901271000"
 
 module load anaconda/3-5.2.0
@@ -36,6 +37,6 @@ conda activate
 source activate nda
 python --version
 
-# SLURM_ARRAY_TASK_ID=2
+SLURM_ARRAY_TASK_ID=4
 python3 './preprocINS.py' --trialIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP
 # python3 './preprocINS.py' --trialIdx=2 --exp=$EXP --disableStimDetection

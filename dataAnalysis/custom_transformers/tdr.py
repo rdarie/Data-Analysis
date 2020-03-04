@@ -133,7 +133,7 @@ def raisedCosBoundary(
 
 
 def makeRaisedCosBasis(
-        nb=None, spacing=None, dt=None, endpoints=None):
+        nb=None, spacing=None, dt=None, endpoints=None, normalize=False):
     """
         Make nonlinearly stretched basis consisting of raised cosines
     """
@@ -153,12 +153,13 @@ def makeRaisedCosBasis(
     nt = iht.size
     repCtrs = np.vstack([ctrs for i in range(nt)])
     ihbasis = raisedCos(repIht, repCtrs, spacing)
-    for colIdx in range(ihbasis.shape[1]):
-        ihbasis[:, colIdx] = ihbasis[:, colIdx] / np.sum(ihbasis[:, colIdx])
+    if normalize:
+        for colIdx in range(ihbasis.shape[1]):
+            ihbasis[:, colIdx] = ihbasis[:, colIdx] / np.sum(ihbasis[:, colIdx])
     return pd.DataFrame(ihbasis, index=iht, columns=ctrs)
 
 def makeLogRaisedCosBasis(
-        nb, dt, endpoints, b=0.01, zflag=False):
+        nb, dt, endpoints, b=0.01, zflag=False, normalize=False):
     """
         Make nonlinearly stretched basis consisting of raised cosines
         Inputs:  nb = # of basis vectors
@@ -202,8 +203,9 @@ def makeLogRaisedCosBasis(
         tMask = iht < endpoints[0]
         ihbasis[tMask, 0] = 1
     orthobas = scipy.linalg.orth(ihbasis)
-    for colIdx in range(ihbasis.shape[1]):
-        ihbasis[:, colIdx] = ihbasis[:, colIdx] / np.sum(ihbasis[:, colIdx])
+    if normalize:
+        for colIdx in range(ihbasis.shape[1]):
+            ihbasis[:, colIdx] = ihbasis[:, colIdx] / np.sum(ihbasis[:, colIdx])
     # orthobas, _ = scipy.linalg.qr(ihbasis)
     ihbDF = pd.DataFrame(ihbasis, index=iht, columns=np.round(ctrs, decimals=3))
     orthobasDF = pd.DataFrame(orthobas, index=iht)
@@ -269,7 +271,7 @@ class trialAwareStratifiedKFold:
             .index.to_frame()
             .reset_index(drop=True)
             .loc[:, self.stratifyFactors + self.continuousFactors])
-        # pdb.set_trace()
+        # 
         if (self.stratifyFactors is not None):
             for idx, (name, group) in enumerate(trialInfo.groupby(self.stratifyFactors)):
                 trialInfo.loc[group.index, 'stratifyGroup'] = idx
@@ -512,16 +514,26 @@ class SingleNeuronRegression():
             xTest=None, yTest=None,
             cv_folds=None,
             model=None, modelKWargs={},
+            sampleSizeLimit=None,
             tTestAlpha=0.01,
             plotting=False, verbose=False):
         #
         self.model = model
         self.modelKWargs = modelKWargs
         #
+        self.sampleSizeLimit = sampleSizeLimit
+        #
         self.tTestAlpha = tTestAlpha
         #
         self.plotting = plotting
         self.verbose = verbose
+        #
+        if sampleSizeLimit is not None:
+            for fIdx, folds in enumerate(cv_folds):
+                if len(folds[0]) > sampleSizeLimit:
+                    newFold = np.random.choice(
+                        folds[0], size=sampleSizeLimit).tolist()
+                    cv_folds[fIdx] = (newFold, folds[1])
         #
         self.cv_folds = cv_folds
         self.xTrain = xTrain
@@ -633,7 +645,13 @@ class SingleNeuronRegression():
             y = self.yTrain.loc[:, colName]
             reg = self.regressionList[colName]['reg']
             print('fitting model {}'.format(colName))
-            reg.fit(self.xTrain, y)
+            seekIdx = slice(None)
+            if self.sampleSizeLimit is not None:
+                if self.xTrain.shape[0] > self.sampleSizeLimit:
+                    seekIdx = np.random.choice(
+                        self.xTrain.shape[0],
+                        size=self.sampleSizeLimit).tolist()
+            reg.fit(self.xTrain.iloc[seekIdx, :], y.iloc[seekIdx])
             pr2 = poisson_pseudoR2(
                 reg,
                 self.xTest.to_numpy(),

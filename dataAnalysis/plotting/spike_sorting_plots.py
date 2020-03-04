@@ -400,7 +400,7 @@ def spikePDFReport(
                         isiAx = fig.add_subplot(gs[0, :2])
                         templateAx = fig.add_subplot(gs[0, 2])
                         lastBin = 150
-                        isiBins = np.arange(0, lastBin, 3)
+                        isiBins = np.arange(0, lastBin, 1)
                         distBins = np.arange(0, 5, 0.2)
                         kde_kws = {
                             'clip': (isiBins[0] * 0.9, isiBins[-1] * 1.1),

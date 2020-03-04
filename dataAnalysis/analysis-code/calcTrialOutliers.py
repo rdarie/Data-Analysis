@@ -98,11 +98,12 @@ if arguments['verbose']:
 rigDF = ns5.alignedAsigsToDF(
     rigBlock, **rigKWargs)
 rigDF.fillna(0, inplace=True)
+
 rigColumnSelect = [
     i for i in rigDF.columns
     if (
-        # ('_Right_x' in i[0]) or ('_Right_y' in i[0]) or
-        # ('_Right_z' in i[0]) or
+        ('_Right_x' in i[0]) or ('_Right_y' in i[0]) or
+        ('_Right_z' in i[0]) or
         ('ins_' in i[0])
         )]
 
@@ -122,7 +123,6 @@ def findOutliers(
     #
     averageDeviation = np.sqrt((frDF.quantile(q=0.9) ** 2).sum())
     # if not (np.isfinite(averageDeviation)):
-    #     pdb.set_trace()
     highFeatures = (frDF.quantile(q=0.9) > sdThresh[1])
     nOutliers = highFeatures.sum()
     outlierLabels = ' '.join([
@@ -142,7 +142,6 @@ def findOutliers(
         .unique())
     # if (nOutliers >= countThresh) / 2:
     if tooMuch:
-        # pdb.set_trace()
         try:
             summaryMessage = [
                 'segment {} time {}\n'.format(seg[0], t[0]),
@@ -219,7 +218,6 @@ groupBy = ['segment', 'originalIndex', 't']
 resultNames = [
     'averageDeviation', 'rejectTrial', 'seg', 't']
 
-supportFraction = 0.75
 print('working with {} samples'.format(frDF.shape[0]))
 # randSample = swr(rigDF.shape[0], 100000)
 randSample = slice(None, None, 5)
@@ -231,53 +229,33 @@ print('For df 1 sd tresh is {}'.format(chi2.interval((testQThresh), 1)))
 # np.sqrt(frMahalDist.xs(798, level='originalIndex').xs(1, level='segment'))
 if arguments['verbose']:
     print('Calculating covariance matrix...')
+supportFraction = 0.99
 rigSub = (rigDF.loc[:, rigColumnSelect].to_numpy())
 rigCov = (
-    MinCovDet()
-    # EllipticEnvelope()
+    MinCovDet(support_fraction=supportFraction)
     .fit(rigSub[randSample, :]))
 rigMahalDist = pd.DataFrame(
     rigCov.mahalanobis(rigSub),
-    # rigCov.decision_function(rigSub),
-    # rigCov.mahalanobis(rigSub - rigCov.location_),
-    # rigCov.dist_,
     index=rigDF.index, columns=['mahalDist'])
-# bla = rigCov.mahalanobis(
-#     rigDF.loc[:, rigColumnSelect].to_numpy() - rigCov.location_)
 outlierTrialsRig = ash.applyFunGrouped(
-    # rigDF.loc[:, rigColumnSelect].apply(applyMad, raw=True),
     rigMahalDist,
     groupBy, testVar,
     fun=findOutliers2, funArgs=[],
-    funKWargs=dict(sdThresh=1000, multiplier=6, nDim=len(rigColumnSelect)),
+    funKWargs=dict(multiplier=200, nDim=len(rigColumnSelect)),
     resultNames=resultNames,
     plotting=False)
 #
-pdb.set_trace()
 if arguments['verbose']:
     print('Calculating covariance matrix...')
 frCov = (
     MinCovDet()
     .fit(np.sqrt(frDF).to_numpy()[randSample, :]))
-# u, s, v = np.linalg.svd(frCov.covariance_)
-# projMat = u[:, -20:]
-# projFR = (np.sqrt(frDF) - np.sqrt(frDF).mean(axis=0)).to_numpy().dot(projMat)
-# frMahalDist = pd.DataFrame(
-#     ((projFR ** 2).sum(axis=1)),
-#     # empCov.mahalanobis(frDF.to_numpy()),
-#     # frCov.dist_,
-#     index=frDF.index, columns=['mahalDist'])# 
 ###
-empCov = EmpiricalCovariance().fit(np.sqrt(frDF).to_numpy()[randSample, :])
 frMahalDist = pd.DataFrame(
     frCov.mahalanobis(np.sqrt(frDF).to_numpy()),
-    #frCov.mahalanobis(np.sqrt(frDF).to_numpy() - frCov.location_),
-    # empCov.mahalanobis(frDF.to_numpy()),
-    # frCov.dist_,
     index=frDF.index, columns=['mahalDist'])
 outlierTrialsFr = ash.applyFunGrouped(
     frMahalDist,
-    # frDF.apply(applyMad, raw=True),
     groupBy, testVar,
     fun=findOutliers2, funArgs=[],
     funKWargs=dict(multiplier=2, nDim=len(frDF.columns)),
@@ -290,7 +268,7 @@ outlierTrials = {
         index=outlierTrialsFr[k].index,
         columns=outlierTrialsFr[k].columns)
     for k in resultNames}
-pdb.set_trace()
+
 if arguments['plotting']:
     import matplotlib.pyplot as plt
     import seaborn as sns

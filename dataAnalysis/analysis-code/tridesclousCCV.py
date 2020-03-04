@@ -47,12 +47,6 @@ if RANK == 0:
     expOpts, allOpts = parseAnalysisOptions(
         int(arguments['trialIdx']),
         arguments['exp'])
-    #  print("globals:")
-    #  print(globals().keys())
-    #  print('allOpts:')
-    #  print(allOpts.keys())
-    #  print('expOpts:')
-    #  print(expOpts.keys())
     globals().update(expOpts)
     globals().update(allOpts)
     try:
@@ -113,14 +107,14 @@ chansToAnalyze = [
 if arguments['batchPreprocess']:
     tdch.batchPreprocess(
         triFolder, chansToAnalyze,
-        relative_threshold=5,
+        relative_threshold=5.5,
         highpass_freq=300.,
         lowpass_freq=3000.,
         filter_order=8,
         featureOpts={
             'method': 'global_umap',
             'n_components': 5,
-            'n_neighbors': 30,
+            'n_neighbors': 50,
             'min_dist': 0,
         },
         clusterOpts={
@@ -164,5 +158,5 @@ if arguments['makeStrictNeoBlock'] and RANK == 0:
     tdch.purgeNeoBlock(triFolder)
     tdch.neo_block_after_peeler(
         triFolder, chan_grps=chansToAnalyze,
-        shape_distance_threshold=None, refractory_period=1.5e-3,
+        shape_distance_threshold=None, refractory_period=2.5e-3,
         ignoreTags=['so_bad'])

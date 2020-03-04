@@ -29,7 +29,7 @@ LAZINESS="--lazy"
 WINDOW="--window=long"
 # TRIALSELECTOR="--trialIdx=2"
 TRIALSELECTOR="--processAll"
-UNITSELECTOR="--selector=minfrmaxcorr"
+UNITSELECTOR="--selector=_minfrmaxcorr"
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
@@ -40,14 +40,14 @@ python --version
 python3 ./assembleExperimentData.py --exp=$EXP --processAsigs --processRasters
 # python3 ./calcAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $LAZINESS $WINDOW --chanQuery="fr_sqrt" --blockName="fr_sqrt"
 python3 ./calcAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $LAZINESS $WINDOW --chanQuery="rig" --blockName="rig" --verbose
-# python3 ./calcAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $LAZINESS $WINDOW --chanQuery="fr" --blockName="fr" --verbose
-# python3 ./calcAlignedRasters.py --exp=$EXP $TRIALSELECTOR $LAZINESS $WINDOW --chanQuery="raster" --blockName="raster" --verbose
+python3 ./calcAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $LAZINESS $WINDOW --chanQuery="fr" --blockName="fr" --verbose
+python3 ./calcAlignedRasters.py --exp=$EXP $TRIALSELECTOR $LAZINESS $WINDOW --chanQuery="raster" --blockName="raster" --verbose
 # qa
-# python3 ./calcUnitMeanFR.py --exp=$EXP $TRIALSELECTOR --inputBlockName="fr" --alignQuery="midPeak" --unitQuery="fr" --verbose
-# python3 ./calcUnitCorrelation.py --exp=$EXP $TRIALSELECTOR --inputBlockName="fr" --alignQuery="midPeak" --unitQuery="fr" --verbose --plotting
+python3 ./calcUnitMeanFR.py --exp=$EXP $TRIALSELECTOR --inputBlockName="fr" --alignQuery="midPeak" --unitQuery="fr" --verbose
+python3 ./calcUnitCorrelation.py --exp=$EXP $TRIALSELECTOR --inputBlockName="fr" --alignQuery="midPeak" --unitQuery="fr" --verbose --plotting
 
 # python3 ./selectUnitsByMeanFRandCorrelationAndAmplitude.py --exp=$EXP $TRIALSELECTOR $UNITSELECTOR --verbose
 # or
 # python3 ./selectUnitsByMeanFRandCorrelation.py --exp=$EXP $TRIALSELECTOR $UNITSELECTOR --verbose
 
-# python3 ./calcTrialOutliers.py --exp=$EXP $TRIALSELECTOR $UNITSELECTOR --saveResults --plotting --alignQuery="all" --verbose
+# python3 ./calcTrialOutliers.py --exp=$EXP $TRIALSELECTOR $UNITSELECTOR --plotting --alignQuery="all" --verbose --saveResults

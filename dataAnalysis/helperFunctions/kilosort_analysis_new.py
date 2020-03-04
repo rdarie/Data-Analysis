@@ -458,8 +458,8 @@ def getSpikeStats(spikes, channel, whichStats = ['mean', 'std'], bounds = None, 
 
 
 def plotISIHistogram(
-        spikes, channel, showNow = False, ax = None,
-        bins = None, kde = True, kde_kws = None, labelType='median'):
+        spikes, channel, showNow=False, ax=None,
+        bins=None, kde=True, kde_kws=None, labelType='median'):
 
     if ax is None:
         fig, ax = plt.subplots()
@@ -471,7 +471,7 @@ def plotISIHistogram(
     unitsOnThisChan = np.unique(spikes['Classification'][idx])
 
     if unitsOnThisChan is not None:
-        colorPalette = sns.color_palette(n_colors = 40)
+        colorPalette = sns.color_palette(n_colors=40)
         if labelType:
             legendLines = []
             legendEntries = []

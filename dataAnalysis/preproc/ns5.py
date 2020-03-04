@@ -463,12 +463,18 @@ def unitSpikeTrainWaveformsToDF(
                 seekIdx = slice(
                     halfRollingWin, -halfRollingWin+1, decimate)
                 # seekIdx = slice(None, None, decimate)
+                #shiftedWaveform = (
+                #    shiftedWaveform
+                #    .rolling(
+                #        window=rollingWindow, win_type='gaussian',
+                #        axis='columns', center=True)
+                #    .mean(std=halfRollingWin))
                 shiftedWaveform = (
                     shiftedWaveform
                     .rolling(
-                        window=rollingWindow, win_type='gaussian',
+                        window=rollingWindow, 
                         axis='columns', center=True)
-                    .mean(std=halfRollingWin))
+                    .mean())
             else:
                 halfRollingWin = 0
                 seekIdx = slice(None, None, decimate)

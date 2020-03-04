@@ -342,6 +342,7 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
         )
     relplotKWArgs = dict(
         ci='sem',
+        # ci=95, n_boot=1000,
         estimator='mean',
         # estimator=None, units='t',
         palette="ch:0.6,-.3,dark=.1,light=0.7,reverse=1",
@@ -370,7 +371,7 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
         'alpha': 0.1, 'zorder': -100}
     nrnSigStarOpts = {
         'color': 'y',
-        #'edgecolors': 'face',
+        # 'edgecolors': 'face',
         'linestyle': 'None',
         'markersize': 20,
         'marker': '*'
@@ -394,7 +395,7 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
     glmOptsLookup = {
         'ensembleHistoryLen': .30,
         'covariateHistoryLen': .30,
-        'nHistoryBasisTerms': 2,
+        'nHistoryBasisTerms': 5,
         'glm_50msec': dict(
             subsampleOpts=dict(rollingWindow=50, decimate=50),
             covariateSpacing=25e-3),
@@ -407,7 +408,14 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
         'glm_10msec': dict(
             subsampleOpts=dict(rollingWindow=10, decimate=10),
             covariateSpacing=10e-3),
+        'glm_5msec': dict(
+            subsampleOpts=dict(rollingWindow=5, decimate=5),
+            covariateSpacing=10e-3),
+        'glm_3msec': dict(
+            subsampleOpts=dict(rollingWindow=3, decimate=3),
+            covariateSpacing=10e-3),
         'glm_1msec': dict(
-            rollingWindow=None, decimate=1, covariateSpacing=10e-3),
+            subsampleOpts=dict(rollingWindow=None, decimate=1),
+            covariateSpacing=10e-3),
     }
     return expOpts, locals()

@@ -521,7 +521,6 @@ def neo_block_after_peeler(
                                     dropIndices.append(idx)
                                 else:
                                     dropIndices.append(prevIdx)
-                            #  
                             timesDF.drop(
                                 index=pd.unique(dropIndices), inplace=True)
                             timesDF['isi'] = timesDF['times'].diff().fillna(method='bfill')

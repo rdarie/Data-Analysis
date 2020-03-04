@@ -1,13 +1,13 @@
 #!/bin/bash
 
 # Request runtime:
-#SBATCH --time=12:00:00
+#SBATCH --time=24:00:00
 
 # Default resources are 1 core with 2.8GB of memory.
 
 # Request memory:
 #SBATCH --nodes=1
-#SBATCH --mem=32G
+#SBATCH --mem=48G
 
 # Specify a job name:
 #SBATCH -J plotsMotionStim
@@ -24,8 +24,8 @@ EXP="exp201901271000"
 # EXP="exp201901231000"
 UNITSELECTOR="--selector=_minfrmaxcorr"
 # UNITSELECTOR=""
-# OUTLIERSWITCH=""
-OUTLIERSWITCH="--maskOutlierTrials"
+OUTLIERSWITCH=""
+# OUTLIERSWITCH="--maskOutlierTrials"
 WINDOW="--window=long"
 # TRIALSELECTOR="--trialIdx=2"
 TRIALSELECTOR="--processAll"
@@ -42,7 +42,7 @@ for QUERY in midPeakM midPeakXS midPeakS midPeakL midPeakXL
     do
         for BLOCKNAME in rig
             do
-                python3 './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $WINDOW --inputBlockName=$BLOCKNAME --unitQuery=$BLOCKNAME --alignQuery=$QUERY --rowName="pedalDirection" $OUTLIERSWITCH --verbose
+                python3 './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $WINDOW --inputBlockName=$BLOCKNAME --unitQuery=$BLOCKNAME --alignQuery=$QUERY --hueName="amplitudeCat" --rowName="pedalDirection" $OUTLIERSWITCH --verbose
             done
-        python3 './plotAlignedNeurons.py' --exp=$EXP $TRIALSELECTOR $WINDOW --alignQuery=$QUERY $UNITSELECTOR --rowName="pedalDirection" $OUTLIERSWITCH --verbose
+        python3 './plotAlignedNeurons.py' --exp=$EXP $TRIALSELECTOR $WINDOW --alignQuery=$QUERY $UNITSELECTOR --hueName="amplitudeCat" --rowName="pedalDirection" $OUTLIERSWITCH --verbose
     done
