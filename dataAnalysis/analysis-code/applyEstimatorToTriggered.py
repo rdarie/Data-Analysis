@@ -4,7 +4,7 @@ Usage:
 
 Options:
     --exp=exp                              which experimental day to analyze
-    --trialIdx=trialIdx                    which trial to analyze [default: 1]
+    --blockIdx=blockIdx                    which trial to analyze [default: 1]
     --processAll                           process entire experimental day? [default: False]
     --verbose                              print diagnostics? [default: False]
     --profile                              print time and mem diagnostics? [default: False]
@@ -31,7 +31,7 @@ from currentExperiment import parseAnalysisOptions
 from docopt import docopt
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
-    int(arguments['trialIdx']), arguments['exp'])
+    int(arguments['blockIdx']), arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
 #

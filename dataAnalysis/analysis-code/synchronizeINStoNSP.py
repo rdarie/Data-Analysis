@@ -3,7 +3,7 @@ Usage:
     synchronizeINStoNSP [options]
 
 Options:
-    --trialIdx=trialIdx             which trial to analyze
+    --blockIdx=blockIdx             which trial to analyze
     --exp=exp                       which experimental day to analyze
     --curateManually                whether to manually confirm synch [default: False]
 """
@@ -51,7 +51,7 @@ from currentExperiment import parseAnalysisOptions
 from docopt import docopt
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
-    int(arguments['trialIdx']),
+    int(arguments['blockIdx']),
     arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
@@ -100,15 +100,15 @@ print('Detecting NSP Timestamps...')
 for trialSegment in pd.unique(td['data']['trialSegment']):
     #  Where in NSP to look
     #  #)
-    tStart = sessionTapRangesNSP[trialIdx][trialSegment]['timeRanges'][0]
-    tStop = sessionTapRangesNSP[trialIdx][trialSegment]['timeRanges'][1]
+    tStart = sessionTapRangesNSP[blockIdx][trialSegment]['timeRanges'][0]
+    tStop = sessionTapRangesNSP[blockIdx][trialSegment]['timeRanges'][1]
     nspMask = (channelData['t'] > tStart) & (channelData['t'] < tStop)
     #
     tapIdxNSP = hf.getTriggers(
         channelData['data'].loc[nspMask, 'ainp7'],
         thres=2, iti=0.2, minAmp=1)
     tapTimestampsNSP = channelData['t'].loc[tapIdxNSP]
-    keepIdx = sessionTapRangesNSP[trialIdx][trialSegment]['keepIndex']
+    keepIdx = sessionTapRangesNSP[blockIdx][trialSegment]['keepIndex']
     tapTimestampsNSP = tapTimestampsNSP.iloc[keepIdx]
     print('tSeg {}: NSP Taps:\n{}'.format(
         trialSegment, tapTimestampsNSP))
@@ -124,7 +124,7 @@ allTapTimestampsINSAligned = []
 allTapTimestampsINS = []
 if not os.path.exists(synchFunPath):
     print('Detecting INS Timestamps...')
-    overrideSegments = overrideSegmentsForTapSync[trialIdx]
+    overrideSegments = overrideSegmentsForTapSync[blockIdx]
     for trialSegment in pd.unique(td['data']['trialSegment']).astype(int):
         print('detecting INS taps on trial segment {}\n'.format(trialSegment))
         accelGroupMask = accel['data']['trialSegment'] == trialSegment
@@ -133,7 +133,7 @@ if not os.path.exists(synchFunPath):
         tdGroup = td['data'].loc[tdGroupMask, :]
         tapTimestampsINS, peakIdx = mdt.getINSTapTimestamp(
             tdGroup, accelGroup,
-            tapDetectOpts[trialIdx][trialSegment]
+            tapDetectOpts[blockIdx][trialSegment]
             )
         print('tSeg {}, INS Taps:\n{}'.format(
             trialSegment, tapTimestampsINS))
@@ -144,7 +144,7 @@ if not os.path.exists(synchFunPath):
         try:
             clickDict = mdt.peekAtTaps(
                 td, accel,
-                channelData, trialIdx,
+                channelData, blockIdx,
                 tapDetectOpts, sessionTapRangesNSP,
                 insX='t', plotBlocking=plotBlocking,
                 allTapTimestampsINS=allTapTimestampsINS,
@@ -191,7 +191,7 @@ if not os.path.exists(synchFunPath):
         td['data'].loc[tdGroupMask, 'NSPTime'] = tdGroup['NSPTime']
         accel['data'].loc[accelGroupMask, 'NSPTime'] = accelGroup['NSPTime']
         #
-        interpFunINStoNSP[trialIdx][trialSegment] = thisINStoNSP
+        interpFunINStoNSP[blockIdx][trialSegment] = thisINStoNSP
         allTapTimestampsINSAligned.append(thisINStoNSP(
             theseTapTimestampsINS))
     with open(synchFunPath, 'wb') as f:
@@ -199,7 +199,7 @@ if not os.path.exists(synchFunPath):
 else:
     with open(synchFunPath, 'rb') as f:
         interpFunINStoNSP = pickle.load(f)
-    theseInterpFun = interpFunINStoNSP[trialIdx]
+    theseInterpFun = interpFunINStoNSP[blockIdx]
     td['data']['NSPTime'] = np.nan
     accel['data']['NSPTime'] = np.nan
     for trialSegment in pd.unique(td['data']['trialSegment']).astype(int):
@@ -220,7 +220,7 @@ else:
 #
 print(
     'Interpolation between INS and NSP: {}'
-    .format(interpFunINStoNSP[trialIdx]))
+    .format(interpFunINStoNSP[blockIdx]))
 td['NSPTime'] = td['data']['NSPTime']
 accel['NSPTime'] = accel['data']['NSPTime']
 #
@@ -228,7 +228,7 @@ if plottingFigures:
     try:
         hf.peekAtTaps(
             td, accel,
-            channelData, trialIdx,
+            channelData, blockIdx,
             tapDetectOpts, sessionTapRangesNSP,
             insX='NSPTime',
             allTapTimestampsINS=allTapTimestampsINSAligned,

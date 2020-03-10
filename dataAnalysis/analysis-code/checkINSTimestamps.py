@@ -3,7 +3,7 @@ Usage:
     checkINSTimestamps [options]
 
 Options:
-    --trialIdx=trialIdx        which trial to analyze [default: 1]
+    --blockIdx=blockIdx        which trial to analyze [default: 1]
     --exp=exp                  which experimental day to analyze
 """
 
@@ -27,7 +27,7 @@ from currentExperiment import parseAnalysisOptions
 from docopt import docopt
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
-    int(arguments['trialIdx']),
+    int(arguments['blockIdx']),
     arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
@@ -39,8 +39,8 @@ sns.set_style("whitegrid")
 sns.set_context("talk", font_scale=.5)
 
 annotationsList = []
-for trialIdx in [1]:
-    ns5FileName = 'Trial00{}'.format(trialIdx)
+for blockIdx in [1]:
+    ns5FileName = 'Block00{}'.format(blockIdx)
     insDataPath = os.path.join(
         scratchFolder,
         ns5FileName + '_ins.nix'

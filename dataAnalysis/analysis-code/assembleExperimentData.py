@@ -3,7 +3,7 @@ Usage:
     temp.py [options]
 
 Options:
-    --trialIdx=trialIdx             which trial to analyze [default: 1]
+    --blockIdx=blockIdx             which trial to analyze [default: 1]
     --exp=exp                       which experimental day to analyze
     --analysisName=analysisName     append a name to the resulting blocks? [default: default]
     --processAsigs                  whether to process the analog signals [default: False]
@@ -46,7 +46,7 @@ from currentExperiment import parseAnalysisOptions
 from docopt import docopt
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
-    int(arguments['trialIdx']),
+    int(arguments['blockIdx']),
     arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)

@@ -3,8 +3,8 @@ import os
 
 def getExpOpts():
     #
-    miniRCTrialLookup = {i: False for i in range(1, 10)}
-    RCTrialLookup = {i: True for i in range(1, 10)}
+    miniRCBlockLookup = {i: False for i in range(1, 10)}
+    RCBlockLookup = {i: True for i in range(1, 10)}
          
 
     experimentName = '201812051000-PadawanRecruitmentCurve'
@@ -33,14 +33,14 @@ def getExpOpts():
         'ADC2': 'TensSync'}
     
     openEphysBaseNames = {
-        1: '201812051000-PadawanRecruitmentCurve_Trial001-1-EMG',
-        2: '201812051000-PadawanRecruitmentCurve_Trial002-2-EMG',
-        3: '201812051000-PadawanRecruitmentCurve_Trial003-2-EMG',
-        4: '201812051000-PadawanRecruitmentCurve_Trial004-2-EMG',
-        5: '201812051000-PadawanRecruitmentCurve_Trial005-2-EMG',
-        6: '201812051000-PadawanRecruitmentCurve_Trial007-2-EMG',
-        7: '201812051000-PadawanRecruitmentCurve_Trial008-1-EMG',
-        8: '201812051000-PadawanRecruitmentCurve_Trial009-1-EMG',
+        1: '201812051000-PadawanRecruitmentCurve_Block001-1-EMG',
+        2: '201812051000-PadawanRecruitmentCurve_Block002-2-EMG',
+        3: '201812051000-PadawanRecruitmentCurve_Block003-2-EMG',
+        4: '201812051000-PadawanRecruitmentCurve_Block004-2-EMG',
+        5: '201812051000-PadawanRecruitmentCurve_Block005-2-EMG',
+        6: '201812051000-PadawanRecruitmentCurve_Block007-2-EMG',
+        7: '201812051000-PadawanRecruitmentCurve_Block008-1-EMG',
+        8: '201812051000-PadawanRecruitmentCurve_Block009-1-EMG',
         }
     openEphysIgnoreSegments = {k: None for k in openEphysBaseNames.keys()}
     #  options for automatic tap detection on ins data
@@ -96,10 +96,10 @@ def getExpOpts():
     stimDetectChans = ['ins_td2', 'ins_td3']
 
     triFolderSourceBase = os.path.join(
-        '201901221000-Proprio', 'tdc_Trial003')
+        '201901221000-Proprio', 'tdc_Block003')
     triDestinations = [
-        'Trial00{}'.format(trialIdx)
-        for trialIdx in [1]]
+        'Block00{}'.format(blockIdx)
+        for blockIdx in [1]]
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
         '201812051000-PadawanRecruitmentCurve': [1, 2, 4, 5, 7, 8, 9],

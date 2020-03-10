@@ -36,4 +36,4 @@ source activate nda
 python --version
 
 # SLURM_ARRAY_TASK_ID=1
-python3 './synchronizeSIMItoNSP.py' --trialIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP
+python3 './synchronizeSIMItoNSP.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP

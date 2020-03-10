@@ -38,4 +38,4 @@ source activate nda
 python --version
 
 SLURM_ARRAY_TASK_ID=4
-python './shuttleFilesToFromScratch.py' --trialIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --removePNGs
+python './shuttleFilesToFromScratch.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --removePNGs

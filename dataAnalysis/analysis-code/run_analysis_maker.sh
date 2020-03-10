@@ -38,8 +38,8 @@ source activate nda
 python --version
 
 # SLURM_ARRAY_TASK_ID=1
-# python ./synchronizeSIMItoNSP.py --trialIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP
-python ./calcTrialAnalysisNix.py --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID --chanQuery="all"
-python ./calcMotionStimAlignTimes.py --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID --plotParamHistograms $LAZINESS
-python ./calcStimAlignTimes.py --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID --plotParamHistograms $LAZINESS
-python ./calcFR.py --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID
+# python ./synchronizeSIMItoNSP.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP
+python ./calcBlockAnalysisNix.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --chanQuery="all"
+python ./calcMotionStimAlignTimes.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --plotParamHistograms $LAZINESS
+python ./calcStimAlignTimes.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --plotParamHistograms $LAZINESS
+python ./calcFR.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID

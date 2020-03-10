@@ -25,9 +25,9 @@ EXP="exp201901271000"
 UNITSELECTOR="--selector=_minfrmaxcorr"
 # UNITSELECTOR=""
 OUTLIERSWITCH=""
-# OUTLIERSWITCH="--maskOutlierTrials"
+# OUTLIERSWITCH="--maskOutlierBlocks"
 WINDOW="--window=long"
-# TRIALSELECTOR="--trialIdx=2"
+# TRIALSELECTOR="--blockIdx=2"
 TRIALSELECTOR="--processAll"
 
 module load anaconda/3-5.2.0
@@ -36,7 +36,7 @@ conda activate
 source activate nda
 python --version
 
-#python3 ./calcTrialOutliers.py --exp=$EXP $TRIALSELECTOR $UNITSELECTOR --saveResults --plotting --alignQuery="all" --verbose
+#python3 ./calcBlockOutliers.py --exp=$EXP $TRIALSELECTOR $UNITSELECTOR --saveResults --plotting --alignQuery="all" --verbose
 #
 for QUERY in midPeakM midPeakXS midPeakS midPeakL midPeakXL
     do

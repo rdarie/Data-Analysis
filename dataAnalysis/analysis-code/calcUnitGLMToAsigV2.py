@@ -5,7 +5,7 @@ Usage:
 
 Options:
     --exp=exp                                 which experimental day to analyze
-    --trialIdx=trialIdx                       which trial to analyze [default: 1]
+    --blockIdx=blockIdx                       which trial to analyze [default: 1]
     --processAll                              process entire experimental day? [default: False]
     --lazy                                    load from raw, or regular? [default: False]
     --verbose                                 print diagnostics? [default: False]
@@ -22,7 +22,7 @@ Options:
     --alignQuery=alignQuery                   query what the units will be aligned to? [default: midPeak]
     --estimatorName=estimatorName             filename for resulting estimator [default: tdr]
     --selector=selector                       filename if using a unit selector
-    --maskOutlierTrials                       delete outlier trials? [default: False]
+    --maskOutlierBlocks                       delete outlier trials? [default: False]
 """
 import matplotlib
 matplotlib.rcParams['pdf.fonttype'] = 42
@@ -60,7 +60,7 @@ from itertools import product
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, MaxAbsScaler, RobustScaler
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
-    int(arguments['trialIdx']), arguments['exp'])
+    int(arguments['blockIdx']), arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
 
@@ -133,7 +133,7 @@ def calcUnitRegressionToAsig():
     alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **arguments)
     alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
         namedQueries, alignSubFolder, **arguments)
-    alignedAsigsKWargs['outlierTrials'] = ash.processOutlierTrials(
+    alignedAsigsKWargs['outlierBlocks'] = ash.processOutlierBlocks(
         alignSubFolder, prefix, **arguments)
     #
     featuresMetaDataPath = os.path.join(

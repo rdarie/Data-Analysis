@@ -4,7 +4,7 @@ Usage:
     generateSpikeReport [options]
 
 Options:
-    --trialIdx=trialIdx            which trial to analyze [default: 1]
+    --blockIdx=blockIdx            which trial to analyze [default: 1]
     --exp=exp                      which experimental day to analyze
     --nameSuffix=nameSuffix        add anything to the output name?
 """
@@ -27,7 +27,7 @@ import os, pdb
 from currentExperiment import parseAnalysisOptions
 from docopt import docopt
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
-expOpts, allOpts = parseAnalysisOptions(int(arguments['trialIdx']), arguments['exp'])
+expOpts, allOpts = parseAnalysisOptions(int(arguments['blockIdx']), arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
 

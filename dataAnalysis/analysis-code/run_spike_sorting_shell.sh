@@ -38,15 +38,15 @@ source activate nda
 python --version
 
 # Constructor
-# python3 ./tridesclousCCV.py --trialIdx=$TRIALIDX --exp=$EXP  --batchPreprocess
-# python3 ./tridesclousVisualize.py --trialIdx=$TRIALIDX --exp=$EXP  --constructor
+# python3 ./tridesclousCCV.py --blockIdx=$TRIALIDX --exp=$EXP  --batchPreprocess
+# python3 ./tridesclousVisualize.py --blockIdx=$TRIALIDX --exp=$EXP  --constructor
 # Transfer
-python3 ./transferTDCTemplates.py --trialIdx=$TRIALIDX --exp=$EXP
+python3 ./transferTDCTemplates.py --blockIdx=$TRIALIDX --exp=$EXP
 # Peeler
-# python3 ./tridesclousCCV.py --trialIdx=$TRIALIDX --exp=$EXP --purgePeeler --batchPeel
-# python3 ./tridesclousVisualize.py --trialIdx=$TRIALIDX --exp=$EXP  --peeler
+# python3 ./tridesclousCCV.py --blockIdx=$TRIALIDX --exp=$EXP --purgePeeler --batchPeel
+# python3 ./tridesclousVisualize.py --blockIdx=$TRIALIDX --exp=$EXP  --peeler
 #
-# python3 ./tridesclousCCV.py --trialIdx=$TRIALIDX --exp=$EXP --exportSpikesCSV
-# python3 ./tridesclousCCV.py --trialIdx=$TRIALIDX --exp=$EXP --purgePeelerDiagnostics
-# python3 './tridesclousCCV.py' --trialIdx=$TRIALIDX --makeStrictNeoBlock --exp=$EXP
-# python3 './plotSpikeReport.py' --trialIdx=$TRIALIDX --nameSuffix=_final --exp=$EXP
+# python3 ./tridesclousCCV.py --blockIdx=$TRIALIDX --exp=$EXP --exportSpikesCSV
+# python3 ./tridesclousCCV.py --blockIdx=$TRIALIDX --exp=$EXP --purgePeelerDiagnostics
+# python3 './tridesclousCCV.py' --blockIdx=$TRIALIDX --makeStrictNeoBlock --exp=$EXP
+# python3 './plotSpikeReport.py' --blockIdx=$TRIALIDX --nameSuffix=_final --exp=$EXP

@@ -48,12 +48,12 @@ insTimingPath = os.path.join(sipFolder, 'RecruitmentCurveStimTimings_RD_Fixed.ma
 # pulse times in msec
 with h5py.File(insTimingPath, "r") as insTimingRecord:
     #  print(insTimingRecord['pulseTimings/AllTENSPulses'].shape)
-    nTrials = len(np.array(insTimingRecord['pulseTimings/AllTENSPulses']))
-    trialInfo['insTensTimes'] = {i: None for i in range(nTrials)}
-    trialInfo['insPulseTimes'] = {i: None for i in range(nTrials)}
-    trialInfo['insStimAmps'] = {i: None for i in range(nTrials)}
-    trialInfo['insTensExcludeMask'] = {i: None for i in range(nTrials)}
-    for i in range(nTrials):
+    nBlocks = len(np.array(insTimingRecord['pulseTimings/AllTENSPulses']))
+    trialInfo['insTensTimes'] = {i: None for i in range(nBlocks)}
+    trialInfo['insPulseTimes'] = {i: None for i in range(nBlocks)}
+    trialInfo['insStimAmps'] = {i: None for i in range(nBlocks)}
+    trialInfo['insTensExcludeMask'] = {i: None for i in range(nBlocks)}
+    for i in range(nBlocks):
         trialInfo['insTensTimes'][i] = np.array(
             insTimingRecord[insTimingRecord['pulseTimings/AllTENSPulses'][i][0]]).flatten() / 1000
         trialInfo['insTensExcludeMask'][i] = np.array(
@@ -66,19 +66,19 @@ with h5py.File(insTimingPath, "r") as insTimingRecord:
             insTimingRecord[insTimingRecord['pulseTimings/stimAmps'][i][0]])
 
 trialInfo['sipBaseNames'] = {
-    i: 'RCTrial{:0>2}'.format(i + 1) for i in range(nTrials)
+    i: 'RCBlock{:0>2}'.format(i + 1) for i in range(nBlocks)
     }
 
 trialInfo['emgBaseNames'] = {
-    0: 'Trial001-1-EMG',
-    1: 'Trial002-2-EMG',
-    2: 'Trial003-2-EMG',
-    3: 'Trial004-2-EMG',
-    4: 'Trial005-2-EMG',
+    0: 'Block001-1-EMG',
+    1: 'Block002-2-EMG',
+    2: 'Block003-2-EMG',
+    3: 'Block004-2-EMG',
+    4: 'Block005-2-EMG',
     5: None,
-    6: 'Trial007-2-EMG',
-    7: 'Trial008-1-EMG',
-    8: 'Trial009-1-EMG',
+    6: 'Block007-2-EMG',
+    7: 'Block008-1-EMG',
+    8: 'Block009-1-EMG',
     }
 
 trialInfo['electrode'] = {
@@ -135,9 +135,9 @@ trialInfoDF = pd.DataFrame(trialInfo)
 trialsToAnalyze = [0, 1, 3, 4, 6, 7, 8]
 # trialsToAnalyze = [0]
 
-for trialIdx in trialsToAnalyze:
+for blockIdx in trialsToAnalyze:
     insDataPath = os.path.join(
-        sipFolder, trialInfoDF.loc[trialIdx, 'sipBaseNames'] + '.nix')
+        sipFolder, trialInfoDF.loc[blockIdx, 'sipBaseNames'] + '.nix')
     print('Loading {}...'.format(insDataPath))
     insBlock = ns5.loadWithArrayAnn(insDataPath)
     insDF = ns5.analogSignalsToDataFrame(
@@ -146,7 +146,7 @@ for trialIdx in trialsToAnalyze:
     #
     emgFullName = (
         experimentName + '_' +
-        trialInfoDF.loc[trialIdx, 'emgBaseNames'])
+        trialInfoDF.loc[blockIdx, 'emgBaseNames'])
     print('Loading {}...'.format(emgFullName))
     emgDataPath = os.path.join(oeFolder, emgFullName, emgFullName + '_filtered.nix')
     emgBlock = ns5.loadWithArrayAnn(emgDataPath)
@@ -160,12 +160,12 @@ for trialIdx in trialsToAnalyze:
         if i.annotations['label'] == 'TensSync'][0]
     tensSyncAsig = tensSyncChanIdx.analogsignals[0]
     #
-    if not np.isnan(trialInfoDF.loc[trialIdx, 'discardTime']):
-        newTStart = tensSyncAsig.t_start + trialInfoDF.loc[trialIdx, 'discardTime'] * pq.s
+    if not np.isnan(trialInfoDF.loc[blockIdx, 'discardTime']):
+        newTStart = tensSyncAsig.t_start + trialInfoDF.loc[blockIdx, 'discardTime'] * pq.s
         firstIdx = np.flatnonzero(tensSyncAsig.times > newTStart)[0]
         tensSyncAsig = tensSyncAsig[firstIdx:]
-    if np.any(trialInfoDF.loc[trialIdx, 'insTensTimes']):
-        insTensTimes = pd.Series(trialInfoDF.loc[trialIdx, 'insTensTimes']) - trialInfoDF.loc[trialIdx, 'timestampOffset']
+    if np.any(trialInfoDF.loc[blockIdx, 'insTensTimes']):
+        insTensTimes = pd.Series(trialInfoDF.loc[blockIdx, 'insTensTimes']) - trialInfoDF.loc[blockIdx, 'timestampOffset']
     else:
         continue
     (
@@ -175,7 +175,7 @@ for trialIdx in trialsToAnalyze:
             tensAsig=tensSyncAsig, referenceTimes=insTensTimes,
             plotting=False)
     oeChosenMask = insTensTimes.isin(insTensTimesChosen).to_numpy()
-    keepMask = ~(trialInfoDF.loc[trialIdx, 'insTensExcludeMask'][oeChosenMask])
+    keepMask = ~(trialInfoDF.loc[blockIdx, 'insTensExcludeMask'][oeChosenMask])
     ##)
     synchPolyCoeffs = np.polyfit(
         x=insTensTimesChosen.values[keepMask],
@@ -183,7 +183,7 @@ for trialIdx in trialsToAnalyze:
         deg=1)
     timeInterpFun = np.poly1d(synchPolyCoeffs)
     alignedPulseTimes = timeInterpFun(
-        trialInfoDF.loc[trialIdx, 'insPulseTimes']).flatten()
+        trialInfoDF.loc[blockIdx, 'insPulseTimes']).flatten()
     alignedTensTimes = timeInterpFun(insTensTimesChosen).flatten()
     if plotting:
         fig, ax = plt.subplots()
@@ -212,12 +212,12 @@ for trialIdx in trialsToAnalyze:
     # make events objects
     alignEventsDF = pd.DataFrame({
         't': alignedPulseTimes,
-        'amplitude': np.around(trialInfoDF.loc[trialIdx, 'insStimAmps'].flatten(), decimals=3)})
+        'amplitude': np.around(trialInfoDF.loc[blockIdx, 'insStimAmps'].flatten(), decimals=3)})
     # #)
     alignEventsDF.loc[:, 'stimCat'] = 'stimOn'
     alignEventsDF.loc[:, 'RateInHz'] = 2
     alignEventsDF.loc[:, 'program'] = 0
-    alignEventsDF.loc[:, 'electrode'] = trialInfoDF.loc[trialIdx, 'electrode']
+    alignEventsDF.loc[:, 'electrode'] = trialInfoDF.loc[blockIdx, 'electrode']
     alignEvents = ns5.eventDataFrameToEvents(
         alignEventsDF,
         idxT='t', annCol=None,
@@ -256,5 +256,5 @@ for trialIdx in trialsToAnalyze:
         nixBlockIdx=0, nixSegIdx=[0],
         )
     outputPath = os.path.join(
-        scratchFolder, 'Trial{:0>3}_analyze.nix'.format(trialIdx + 1))
+        scratchFolder, 'Block{:0>3}_analyze.nix'.format(blockIdx + 1))
     shutil.copyfile(emgDataPath, outputPath)

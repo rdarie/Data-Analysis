@@ -2082,7 +2082,6 @@ def blockToNix(
                     analog=False, fs=float(averageLFP.sampling_rate),
                     output='sos')
                 # signal.hilbert does not have an option to zero pad
-                
                 nextLen = fftpack.helper.next_fast_len(averageLFP.shape[0])
                 deficit = int(nextLen - averageLFP.shape[0])
                 lDef = int(np.floor(deficit / 2))

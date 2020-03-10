@@ -1,11 +1,11 @@
 """
 Usage:
-    tridesclousLocal.py [--trialIdx=trialIdx] [--visuals] [--showProgressbar]
+    tridesclousLocal.py [--blockIdx=blockIdx] [--visuals] [--showProgressbar]
 
 Arguments:
 
 Options:
-    --trialIdx=trialIdx            which trial to analyze
+    --blockIdx=blockIdx            which trial to analyze
     --visuals           include visualization steps
     --showProgressbar   show progress bar when running peeler
 """
@@ -21,15 +21,15 @@ arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 '''
 arguments = {
   "--showProgressbar": False,
-  "--trialIdx": "3",
+  "--blockIdx": "3",
   "--visuals": False}
 '''
 
 #  if overriding currentExperiment
-if arguments['trialIdx']:
+if arguments['blockIdx']:
     print(arguments)
-    trialIdx = int(arguments['trialIdx'])
-    ns5FileName = 'Trial00{}'.format(trialIdx)
+    blockIdx = int(arguments['blockIdx'])
+    ns5FileName = 'Block00{}'.format(blockIdx)
     triFolder = os.path.join(
         nspFolder, 'tdc_' + ns5FileName)
 

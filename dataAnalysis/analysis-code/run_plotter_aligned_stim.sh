@@ -22,9 +22,9 @@
 # EXP="exp201901221000"
 # EXP="exp201901201200"
 EXP="exp201901271000"
-# SELECTOR="Trial005_minfrmaxcorr"
+# SELECTOR="Block005_minfrmaxcorr"
 SELECTOR="_minfrmaxcorr"
-TRIALSELECTOR="--trialIdx=5"
+TRIALSELECTOR="--blockIdx=5"
 # TRIALSELECTOR="--processAll"
 
 module load anaconda/3-5.2.0
@@ -34,6 +34,6 @@ conda activate
 source activate nda
 python --version
 
-#  --maskOutlierTrials
-python3 './plotAlignedNeurons.py' --exp=$EXP $TRIALSELECTOR --selector=$SELECTOR --window="long" --unitQuery="all" --alignQuery="stimOn" --rowName= --hueName="amplitude" --alignFolderName=stim --enableOverrides --maskOutlierTrials
-python3 './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR --window="long" --inputBlockName="rig" --unitQuery="all" --alignQuery="stimOn" --rowName= --hueName="amplitude" --alignFolderName=stim --enableOverrides --maskOutlierTrials
+#  --maskOutlierBlocks
+python3 './plotAlignedNeurons.py' --exp=$EXP $TRIALSELECTOR --selector=$SELECTOR --window="long" --unitQuery="all" --alignQuery="stimOn" --rowName= --hueName="amplitude" --alignFolderName=stim --enableOverrides --maskOutlierBlocks
+python3 './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR --window="long" --inputBlockName="rig" --unitQuery="all" --alignQuery="stimOn" --rowName= --hueName="amplitude" --alignFolderName=stim --enableOverrides --maskOutlierBlocks

@@ -4,7 +4,7 @@ Usage:
 
 Options:
     --exp=exp                              which experimental day to analyze
-    --trialIdx=trialIdx                    which trial to analyze [default: 1]
+    --blockIdx=blockIdx                    which trial to analyze [default: 1]
     --analysisName=analysisName            append a name to the resulting blocks? [default: default]
     --processAll                           process entire experimental day? [default: False]
     --verbose                              print diagnostics? [default: True]
@@ -43,7 +43,7 @@ import numpy as np
 from scipy import stats
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
-    int(arguments['trialIdx']), arguments['exp'])
+    int(arguments['blockIdx']), arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
 analysisSubFolder = os.path.join(

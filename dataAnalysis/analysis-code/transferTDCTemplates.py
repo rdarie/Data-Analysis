@@ -3,7 +3,7 @@ Usage:
     temp.py [options]
 
 Options:
-    --trialIdx=trialIdx             which trial to analyze [default: 1]
+    --blockIdx=blockIdx             which trial to analyze [default: 1]
     --exp=exp                       which experimental day to analyze
     --processAll                    process entire experimental day? [default: False]
     --chan_start=chan_start         which chan_grp to start on [default: 0]
@@ -17,7 +17,7 @@ from currentExperiment import parseAnalysisOptions
 from docopt import docopt
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
-    int(arguments['trialIdx']),
+    int(arguments['blockIdx']),
     arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)

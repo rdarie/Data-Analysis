@@ -5,7 +5,7 @@ Usage:
     tridesclousCCV.py [options]
 
 Options:
-    --trialIdx=trialIdx        which trial to analyze [default: 1]
+    --blockIdx=blockIdx        which trial to analyze [default: 1]
     --exp=exp                  which experimental day to analyze
     --attemptMPI               whether to try to load MPI [default: False]
     --purgePeeler              delete previous sort results [default: False]
@@ -37,7 +37,7 @@ print(RANK)
 if RANK == 0:
     from currentExperiment import parseAnalysisOptions
     expOpts, allOpts = parseAnalysisOptions(
-        int(arguments['trialIdx']),
+        int(arguments['blockIdx']),
         arguments['exp'])
     print("globals:")
     print(globals().keys())

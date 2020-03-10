@@ -48,14 +48,14 @@ progLocationLookup = {
     'nostim': 3
     }
 
-#  trialIdx = 1
+#  blockIdx = 1
 plotStimStatusAll = pd.DataFrame()
 plotErrorStatusAll = pd.DataFrame()
-runningTotalAverageTrials = 0
+runningTotalAverageBlocks = 0
 seshList = list(jsonSessionNames.keys())
 
-for trialIdx in seshList:
-    jsonPath = os.path.join(insFolder, jsonSessionNames[trialIdx], deviceName)
+for blockIdx in seshList:
+    jsonPath = os.path.join(insFolder, jsonSessionNames[blockIdx], deviceName)
 
     with open(os.path.join(jsonPath, 'DeviceSettings.json'), 'r') as f:
         deviceSettings = json.load(f)
@@ -67,24 +67,24 @@ for trialIdx in seshList:
         timeSync = json.load(f)
 
     elecConfiguration, senseInfo = (
-        hf.getINSDeviceConfig(insFolder, jsonSessionNames[trialIdx])
+        hf.getINSDeviceConfig(insFolder, jsonSessionNames[blockIdx])
         )
     print('Sensing options:')
     print(senseInfo)
     try:
-        with open(os.path.join(insFolder, jsonSessionNames[trialIdx], '.MDT_SummitTest', jsonSessionNames[trialIdx] + '.json'), 'r') as f:
+        with open(os.path.join(insFolder, jsonSessionNames[blockIdx], '.MDT_SummitTest', jsonSessionNames[blockIdx] + '.json'), 'r') as f:
             commentsLog = json.load(f)
             print(commentsLog)
     except Exception:
         #traceback.print_exc()
-        print('{} no commment, '.format(jsonSessionNames[trialIdx]))
+        print('{} no commment, '.format(jsonSessionNames[blockIdx]))
 
     sessionTimeStamp = float(
-        jsonSessionNames[trialIdx].split('Session')[-1]
+        jsonSessionNames[blockIdx].split('Session')[-1]
         ) / 1e3
 
     sessionTime = datetime.fromtimestamp(sessionTimeStamp)
-    print('Session {} Started at {}'.format(jsonSessionNames[trialIdx], sessionTime))
+    print('Session {} Started at {}'.format(jsonSessionNames[blockIdx], sessionTime))
     # added to hf.getINSDeviceConfig
     group0Programs = deviceSettings[0]['TherapyConfigGroup0']['programs']
     electrodeStatus = pd.DataFrame(index=range(4), columns=range(17))
@@ -203,7 +203,7 @@ for trialIdx in seshList:
         ( stimStatus['HostUnixTime'] / 1e3).apply(datetime.fromtimestamp)
 
     stimDuration = stimStatus['HostUnixDateTime'].iloc[-1] - stimStatus['HostUnixDateTime'].iloc[0]
-    print('{} duration was {}'.format(jsonSessionNames[trialIdx], stimDuration))
+    print('{} duration was {}'.format(jsonSessionNames[blockIdx], stimDuration))
 
     countMultiplier = {
         'caudal': 0.25,
@@ -219,16 +219,16 @@ for trialIdx in seshList:
         for location in ['caudal', 'rostral', 'midline']:
             
             if progLocationLookup[location] in stimStartCount.index:
-                nTrials = (
+                nBlocks = (
                     stimStartCount[
                         progLocationLookup[location]] * 
                         countMultiplier[location])
-                print('Frequency {}, category {}: {} trials'.format(name, location, nTrials))
-                trialCounts.append(nTrials)
+                print('Frequency {}, category {}: {} trials'.format(name, location, nBlocks))
+                trialCounts.append(nBlocks)
         
-    averageNTrials = np.nanmean(trialCounts)
-    runningTotalAverageTrials += averageNTrials
-    print('Average {} trials per condition'.format(averageNTrials))
+    averageNBlocks = np.nanmean(trialCounts)
+    runningTotalAverageBlocks += averageNBlocks
+    print('Average {} trials per condition'.format(averageNBlocks))
 
     #  Plot stim status over time for this trial
     plottingRange = np.arange(
@@ -284,9 +284,9 @@ ax[2].set_xlabel('Host Unix Time (sec)')
 plt.suptitle('Stim State')
 plt.show()
 print(' ')
-print('Total average trials = {}'.format(runningTotalAverageTrials))
+print('Total average trials = {}'.format(runningTotalAverageBlocks))
 print('Total average trials per condition = {}'.format(
     round(
-        runningTotalAverageTrials / 3)
+        runningTotalAverageBlocks / 3)
         )
     )

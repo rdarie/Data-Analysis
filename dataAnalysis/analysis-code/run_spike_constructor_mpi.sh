@@ -34,4 +34,4 @@ source activate nda
 python --version
 
 module load mpi
-srun --mpi=pmi2 python3 -u ./tridesclousCCV.py --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID --attemptMPI --batchPreprocess
+srun --mpi=pmi2 python3 -u ./tridesclousCCV.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --attemptMPI --batchPreprocess

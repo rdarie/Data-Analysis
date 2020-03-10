@@ -4,7 +4,7 @@ import dataAnalysis.helperFunctions.probe_metadata as prb_meta
 import importlib
 
 
-def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
+def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
     plottingFigures = False
     plotBlocking = True
     remakePrb = False
@@ -27,9 +27,10 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
     simiFolder = os.path.join(remoteBasePath, 'processed', experimentName, 'simi')
     oeFolder = os.path.join(remoteBasePath, 'raw', experimentName, 'open_ephys')
     sipFolder = os.path.join(remoteBasePath, 'raw', experimentName, 'ins_sip')
-    ns5FileName = 'Trial{:0>3}'.format(trialIdx)
-    miniRCTrialLookup = expOpts['miniRCTrialLookup']
-    RCTrialLookup = expOpts['RCTrialLookup']
+    ns5FileName = 'Block{:0>3}'.format(blockIdx)
+    miniRCBlockLookup = expOpts['miniRCBlockLookup']
+    RCBlockLookup = expOpts['RCBlockLookup']
+    RippleBlockLookup = expOpts['RippleBlockLookup']
     
     try:
         openEphysChanNames = expOpts['openEphysChanNames']
@@ -64,9 +65,9 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
             'ftype': 'butter'
         }
         }
-    miniRCTrial = miniRCTrialLookup[trialIdx]
-    RCTrial = RCTrialLookup[trialIdx]
-    
+    miniRCBlock = miniRCBlockLookup[blockIdx]
+    RCBlock = RCBlockLookup[blockIdx]
+    RippleBlock = RippleBlockLookup[blockIdx]
     gpfaOpts = {
         'xDim': 3,
         'segLength': 20,
@@ -126,7 +127,7 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
             'experimentName': experimentName,
             'folderPath': insFolder,
             'ns5FileName': ns5FileName,
-            'jsonSessionNames': jsonSessionNames[trialIdx],
+            'jsonSessionNames': jsonSessionNames[blockIdx],
             'elecIDs': range(17),
             'excludeClus': [],
             'upsampleRate': 4,
@@ -147,7 +148,7 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
     stimDetectOptsByChannel = stimDetectOptsByChannelDefault
     stimDetectOptsByChannel.update(expOpts['stimDetectOptsByChannelSpecific'])
     if 'stimDetectOverrideStartTimes' in expOpts:
-        overrideStartTimes = expOpts['stimDetectOverrideStartTimes'][trialIdx]
+        overrideStartTimes = expOpts['stimDetectOverrideStartTimes'][blockIdx]
     else:
         overrideStartTimes = None
     commonStimDetectionOpts = {
@@ -198,21 +199,24 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
         }
     #
     trialFilesStim['ins']['getINSkwargs'].update(commonStimDetectionOpts)
-    if miniRCTrial:
+    if miniRCBlock:
         #  override with settings for detecting cycling stim trains
         trialFilesStim['ins']['getINSkwargs'].update(miniRCStimDetectionOpts)
         #  only parse sync lines
         eventInfo = {'inputIDs': miniRCRigInputs}
-    elif RCTrial:
+    elif RCBlock:
         trialFilesStim['ins']['getINSkwargs'].update(RCStimDetectionOpts)
         #  should rename eventInfo to something more intuitive
         eventInfo = {'inputIDs': RCRigInputs}
+    elif RippleBlock:
+        #  should rename eventInfo to something more intuitive
+        eventInfo = {'inputIDs': dict()}
     else:
         trialFilesStim['ins']['getINSkwargs'].update(fullStimDetectionOpts)
         #  should rename eventInfo to something more intuitive
         eventInfo = {'inputIDs': fullRigInputs}
     #
-    trialFilesFrom['utah']['calcRigEvents'] = not (miniRCTrial or RCTrial)
+    trialFilesFrom['utah']['calcRigEvents'] = not (miniRCBlock or RCBlock)
     trialFilesFrom['utah'].update({'eventInfo': eventInfo})
     
     nspCmpPath = os.path.join('.', 'nsp_map.cmp')
@@ -241,11 +245,11 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
         os.makedirs(scratchFolder, exist_ok=True)
     #  paths relevant to single trial files
     triFolder = os.path.join(
-        scratchFolder, 'tdc_Trial{:0>3}'.format(trialIdx))
+        scratchFolder, 'tdc_Block{:0>3}'.format(blockIdx))
     
     if isinstance(expOpts['triFolderSourceBase'], int):
         triFolderSource = os.path.join(
-            scratchFolder, 'tdc_Trial{:0>3}'.format(expOpts['triFolderSourceBase']))
+            scratchFolder, 'tdc_Block{:0>3}'.format(expOpts['triFolderSourceBase']))
     else:
         triFolderSource = os.path.join(
             scratchPath, expOpts['triFolderSourceBase'])
@@ -299,7 +303,7 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
         programColumn='program',
         electrodeColumn='electrode',
         removeFuzzyName=False)
-    # if (miniRCTrial or RCTrial):
+    # if (miniRCBlock or RCBlock):
     #     alignedAsigsKWargs.update(dict(
     #         amplitudeColumn='amplitude',
     #         programColumn='program',
@@ -387,7 +391,7 @@ def parseAnalysisOptions(trialIdx=1, experimentShorthand=None):
             for tIdx in val:
                 trialsToAssemble.append(
                     os.path.join(
-                        scratchPath, key, '{}', 'Trial00{}.nix'.format(tIdx)
+                        scratchPath, key, '{}', 'Block00{}.nix'.format(tIdx)
                     )
                 )
     except Exception:

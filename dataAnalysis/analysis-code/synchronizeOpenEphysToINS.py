@@ -5,7 +5,7 @@ Usage:
 
 Options:
     --exp=exp                       which experimental day to analyze
-    --trialIdx=trialIdx             which trial to analyze [default: 1]
+    --blockIdx=blockIdx             which trial to analyze [default: 1]
     --plotting                     whether to show diagnostic plots (must have display) [default: False]
 """
 
@@ -52,7 +52,7 @@ from currentExperiment import parseAnalysisOptions
 from docopt import docopt
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
-    int(arguments['trialIdx']), arguments['exp'])
+    int(arguments['blockIdx']), arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
 synchFunPath = os.path.join(
@@ -77,12 +77,12 @@ emgAsigsZ = np.vstack([
 emgSyncAsig = emgChanIdxs[0].analogsignals[0]
 emgSyncAsig[:] = np.mean(emgAsigsZ, axis=0)[:, np.newaxis] * emgSyncAsig.units
 timeMask = hf.getTimeMaskFromRanges(
-    emgSyncAsig.times, synchInfo['oe'][trialIdx][0]['timeRanges'])
+    emgSyncAsig.times, synchInfo['oe'][blockIdx][0]['timeRanges'])
 timeMask = timeMask[:, np.newaxis]
 emgSyncAsig[~timeMask] = 0 * emgSyncAsig.units
 (
     peakIdx, emgTensTimes, peakMask, _) = hf.getTensTrigs(
-        magThresh=synchInfo['oe'][trialIdx][0]['thresh'],
+        magThresh=synchInfo['oe'][blockIdx][0]['thresh'],
         tensAsig=emgSyncAsig, plotting=False, peakFinder='cross')
 #
 evProperties = insSeg.filter(
@@ -93,7 +93,7 @@ evValues = insSeg.filter(
     objects=Event,
     name='seg{}_ins_value'.format(segIdx))[0]
 timeMask = hf.getTimeMaskFromRanges(
-    evValues.times, synchInfo['ins'][trialIdx][0]['timeRanges'])
+    evValues.times, synchInfo['ins'][blockIdx][0]['timeRanges'])
 propMask = evProperties.labels == 'amplitude'
 vMask = np.array([float(i) for i in evValues.labels]) > 0
 evMask = propMask & vMask & timeMask
@@ -144,7 +144,7 @@ if plotting:
     axINS.set_ylabel('A.U.')
     axINS.legend(loc='upper right')
     #  plt.show()
-    plt.savefig(os.path.join(figureFolder, '{}_emg_synch_traces.png'.format(arguments['trialIdx'])))
+    plt.savefig(os.path.join(figureFolder, '{}_emg_synch_traces.png'.format(arguments['blockIdx'])))
     plt.close()
 #end if plotting
 synchPolyCoeffs = np.polyfit(
@@ -216,7 +216,7 @@ if plotting:
     ax[1].set_xticks([0, len(alignedTensTimes) - 1])
     ax[1].set_xticklabels(['{}'.format(np.round(i)) for i in (insTensTimes.iloc[0], insTensTimes.iloc[-1])])
     fig.suptitle('~ {} msec drift over {} minutes'.format(totalDrift * 1e3, experimentDurationSec / 60))
-    plt.savefig(os.path.join(figureFolder, '{}_emg_synch_summary.png'.format(arguments['trialIdx'])))
+    plt.savefig(os.path.join(figureFolder, '{}_emg_synch_summary.png'.format(arguments['blockIdx'])))
     plt.close()
     # plt.show()
 # end if plotting
@@ -234,12 +234,12 @@ alignedPulseTimes = timeInterpFun(evValues[stimOnMask].times.magnitude).flatten(
 # make events objects
 alignEventsDF = pd.DataFrame({
     't': alignedPulseTimes,
-    'amplitude': np.around(trialInfoDF.loc[trialIdx, 'insStimAmps'].flatten(), decimals=3)})
+    'amplitude': np.around(trialInfoDF.loc[blockIdx, 'insStimAmps'].flatten(), decimals=3)})
 
 alignEventsDF.loc[:, 'stimCat'] = 'stimOn'
 alignEventsDF.loc[:, 'RateInHz'] = 2
 alignEventsDF.loc[:, 'program'] = 0
-alignEventsDF.loc[:, 'electrode'] = trialInfoDF.loc[trialIdx, 'electrode']
+alignEventsDF.loc[:, 'electrode'] = trialInfoDF.loc[blockIdx, 'electrode']
 alignEvents = ns5.eventDataFrameToEvents(
     alignEventsDF,
     idxT='t', annCol=None,

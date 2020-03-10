@@ -41,8 +41,8 @@ source activate nda
 python --version
 
 # module load mpi
-# srun --mpi=pmi2 python3 -u ./calcUnitGLMToAsig.py --exp=$EXP --processAll --inputBlockName="raster" --unitQuery="raster" $UNITSELECTOR --secondaryBlockName="rig" --alignQuery="midPeak" --maskOutlierTrials --estimatorName=$ESTIMATOR --verbose --plotting --attemptMPI
-# python3 -u ./calcUnitGLMToAsig.py --exp=$EXP --processAll --inputBlockName="raster" --unitQuery="raster" $UNITSELECTOR --secondaryBlockName="rig" --alignQuery="midPeak" --maskOutlierTrials --estimatorName=$ESTIMATOR --verbose --plotting --debugging --dryRun
+# srun --mpi=pmi2 python3 -u ./calcUnitGLMToAsig.py --exp=$EXP --processAll --inputBlockName="raster" --unitQuery="raster" $UNITSELECTOR --secondaryBlockName="rig" --alignQuery="midPeak" --maskOutlierBlocks --estimatorName=$ESTIMATOR --verbose --plotting --attemptMPI
+# python3 -u ./calcUnitGLMToAsig.py --exp=$EXP --processAll --inputBlockName="raster" --unitQuery="raster" $UNITSELECTOR --secondaryBlockName="rig" --alignQuery="midPeak" --maskOutlierBlocks --estimatorName=$ESTIMATOR --verbose --plotting --debugging --dryRun
 
 # debugging
 python3 -u ./evaluateUnitGLMToAsig.py --exp=$EXP --processAll --alignQuery="midPeak" --estimatorName=$ESTIMATOR --lazy --verbose --debugging --plottingOverall --plottingIndividual --plottingCovariateFilters --makePredictionPDF

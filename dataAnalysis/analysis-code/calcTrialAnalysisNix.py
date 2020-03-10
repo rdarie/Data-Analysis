@@ -1,9 +1,9 @@
 """08: Calculate binarized array and relevant analogsignals
 Usage:
-    calcTrialAnalysisNix.py [options]
+    calcBlockAnalysisNix.py [options]
 
 Options:
-    --trialIdx=trialIdx               which trial to analyze
+    --blockIdx=blockIdx               which trial to analyze
     --exp=exp                         which experimental day to analyze
     --analysisName=analysisName       append a name to the resulting blocks? [default: default]
     --chanQuery=chanQuery             how to restrict channels if not providing a list? [default: fr]
@@ -34,13 +34,13 @@ from currentExperiment import parseAnalysisOptions
 from docopt import docopt
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
-    int(arguments['trialIdx']),
+    int(arguments['blockIdx']),
     arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
 
 
-def calcTrialAnalysisNix():
+def calcBlockAnalysisNix():
     arguments['chanNames'], arguments['chanQuery'] = ash.processChannelQueryArgs(
         namedQueries, scratchFolder, **arguments)
     analysisSubFolder = os.path.join(
@@ -293,9 +293,9 @@ if __name__ == "__main__":
         else:
             nameSuffix = 'not_lazy'
         prf.profileFunction(
-            topFun=calcTrialAnalysisNix,
+            topFun=calcBlockAnalysisNix,
             modulesToProfile=[ash, ns5, hf],
             outputBaseFolder=os.path.join(remoteBasePath, 'batch_logs'),
             nameSuffix=nameSuffix)
     else:
-        calcTrialAnalysisNix()
+        calcBlockAnalysisNix()

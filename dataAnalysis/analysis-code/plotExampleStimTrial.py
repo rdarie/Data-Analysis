@@ -44,11 +44,11 @@ binnedSpikePath = os.path.join(
 experimentDataPath = os.path.join(
     trialFilesStim['ins']['folderPath'],
     trialFilesStim['ins']['experimentName'],
-    'Trial001_analyze.nix')
+    'Block001_analyze.nix')
 binnedSpikePath = os.path.join(
     trialFilesStim['ins']['folderPath'],
     trialFilesStim['ins']['experimentName'],
-    'Trial001_binarized.nix')
+    'Block001_binarized.nix')
 '''
 dataBlock = preproc.loadWithArrayAnn(
     experimentDataPath, fromRaw=False)

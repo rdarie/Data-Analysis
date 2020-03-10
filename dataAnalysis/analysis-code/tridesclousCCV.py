@@ -6,7 +6,7 @@ Usage:
 
 Options:
     --exp=exp                      which experimental day to analyze
-    --trialIdx=trialIdx            which trial to analyze [default: 1]
+    --blockIdx=blockIdx            which trial to analyze [default: 1]
     --attemptMPI                   whether to try to load MPI [default: False]
     --purgePeeler                  delete previous sort results [default: False]
     --purgePeelerDiagnostics       delete previous sort results [default: False]
@@ -45,7 +45,7 @@ except Exception:
 if RANK == 0:
     from currentExperiment import parseAnalysisOptions
     expOpts, allOpts = parseAnalysisOptions(
-        int(arguments['trialIdx']),
+        int(arguments['blockIdx']),
         arguments['exp'])
     globals().update(expOpts)
     globals().update(allOpts)

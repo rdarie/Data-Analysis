@@ -38,5 +38,5 @@ source activate nda
 python --version
 
 SLURM_ARRAY_TASK_ID=4
-python3 './preprocINS.py' --trialIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP
-# python3 './preprocINS.py' --trialIdx=2 --exp=$EXP --disableStimDetection
+python3 './preprocINS.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP
+# python3 './preprocINS.py' --blockIdx=2 --exp=$EXP --disableStimDetection

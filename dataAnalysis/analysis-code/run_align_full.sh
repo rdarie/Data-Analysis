@@ -27,7 +27,7 @@
 EXP="exp201901271000"
 LAZINESS="--lazy"
 WINDOW="--window=long"
-# TRIALSELECTOR="--trialIdx=2"
+# TRIALSELECTOR="--blockIdx=2"
 TRIALSELECTOR="--processAll"
 UNITSELECTOR="--selector=_minfrmaxcorr"
 
@@ -50,4 +50,4 @@ python3 ./calcUnitCorrelation.py --exp=$EXP $TRIALSELECTOR --inputBlockName="fr"
 # or
 # python3 ./selectUnitsByMeanFRandCorrelation.py --exp=$EXP $TRIALSELECTOR $UNITSELECTOR --verbose
 
-# python3 ./calcTrialOutliers.py --exp=$EXP $TRIALSELECTOR $UNITSELECTOR --plotting --alignQuery="all" --verbose --saveResults
+# python3 ./calcBlockOutliers.py --exp=$EXP $TRIALSELECTOR $UNITSELECTOR --plotting --alignQuery="all" --verbose --saveResults

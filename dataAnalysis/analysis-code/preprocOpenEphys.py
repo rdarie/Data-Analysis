@@ -5,7 +5,7 @@ Usage:
 
 Options:
     --exp=exp                       which experimental day to analyze
-    --trialIdx=trialIdx             which trial to analyze [default: 1]
+    --blockIdx=blockIdx             which trial to analyze [default: 1]
     --plotting                      plot diagnostic figures? [default: False]
     --loadMat                       choose loader [default: False]
 """
@@ -21,39 +21,39 @@ from currentExperiment import parseAnalysisOptions
 from docopt import docopt
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
-    int(arguments['trialIdx']), arguments['exp'])
+    int(arguments['blockIdx']), arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
 # #)
 # trialList = sorted([
 #     f
 #     for f in os.listdir(oeFolder)
-#     if (not os.path.isfile(os.path.join(oeFolder, f))) # and ('Trial001' in f)
+#     if (not os.path.isfile(os.path.join(oeFolder, f))) # and ('Block001' in f)
 #     ])
-invEmgTrialLookup = {
+invEmgBlockLookup = {
     v: k
     for k, v in openEphysBaseNames.items()}
-folderPath = openEphysBaseNames[trialIdx]
+folderPath = openEphysBaseNames[blockIdx]
 #
-# for trialIdx, folderPath in openEphysBaseNames.items():
+# for blockIdx, folderPath in openEphysBaseNames.items():
 print('Loading {}...'.format(folderPath))
 emgBaseName = os.path.basename(folderPath)
-#trialIdx = invEmgTrialLookup[emgBaseName]
+#blockIdx = invEmgBlockLookup[emgBaseName]
 ppOE.preprocOpenEphysFolder(
     os.path.join(oeFolder, folderPath),
     chanNames=openEphysChanNames, plotting=arguments['plotting'],
-    ignoreSegments=openEphysIgnoreSegments[trialIdx],
+    ignoreSegments=openEphysIgnoreSegments[blockIdx],
     makeFiltered=True, loadMat=arguments['loadMat'],
     filterOpts=openEphysFilterOpts)
 emgDataPath = os.path.join(
     oeFolder, folderPath, emgBaseName + '_filtered.nix'
 )
 outputPath = os.path.join(
-    scratchFolder, 'Trial{:0>3}_oe.nix'.format(trialIdx))
+    scratchFolder, 'Block{:0>3}_oe.nix'.format(blockIdx))
 shutil.copyfile(emgDataPath, outputPath)
 emgRawDataPath = os.path.join(
     oeFolder, folderPath, emgBaseName + '.nix'
 )
 outputPath = os.path.join(
-    scratchFolder, 'Trial{:0>3}_raw_oe.nix'.format(trialIdx))
+    scratchFolder, 'Block{:0>3}_raw_oe.nix'.format(blockIdx))
 shutil.copyfile(emgRawDataPath, outputPath)

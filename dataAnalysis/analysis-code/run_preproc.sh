@@ -38,6 +38,6 @@ python --version
 
 # SLURM_ARRAY_TASK_ID=2
 # once the synchronization has happened once
-python3 './preprocNS5.py' --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID --makeTruncated --maskMotorEncoder
-python3 './preprocINS.py' --trialIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP
-python3 './synchronizeINStoNSP.py' --trialIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP
+python3 './preprocNS5.py' --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --makeTruncated --maskMotorEncoder
+python3 './preprocINS.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP
+python3 './synchronizeINStoNSP.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP

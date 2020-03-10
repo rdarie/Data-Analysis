@@ -3,14 +3,14 @@ import os
 
 def getExpOpts():
     #
-    miniRCTrialLookup = {
+    miniRCBlockLookup = {
         1: True,
         2: False
         }
     #
-    RCTrialLookup = {
+    RCBlockLookup = {
         i: False
-        for i in miniRCTrialLookup.keys()}
+        for i in miniRCBlockLookup.keys()}
     #
     experimentName = '201901201200-Proprio'
     deviceName = 'DeviceNPC700373H'
@@ -112,10 +112,10 @@ def getExpOpts():
     }
     #
     triFolderSourceBase = os.path.join(
-        '201901211000-Proprio', 'tdc_Trial001')
+        '201901211000-Proprio', 'tdc_Block001')
     triDestinations = [
-        'Trial00{}'.format(trialIdx)
-        for trialIdx in [1, 2]]
+        'Block00{}'.format(blockIdx)
+        for blockIdx in [1, 2]]
     #
     movementSizeBins = [0, 0.25, 0.5, 1, 1.25, 1.5]
     alignTimeBoundsLookup = {

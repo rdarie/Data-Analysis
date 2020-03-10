@@ -6,7 +6,7 @@ Usage:
 Arguments:
 
 Options:
-    --trialIdx=trialIdx        which trial to analyze [default: 1]
+    --blockIdx=blockIdx        which trial to analyze [default: 1]
     --purgePeeler              delete previous sort results [default: False]
     --batchPreprocess          extract snippets and features, run clustering [default: False]
     --visConstructor           include visualization step for catalogue constructor [default: False]
@@ -35,10 +35,10 @@ except:
 
 
 #  if overriding currentExperiment
-if arguments['trialIdx']:
+if arguments['blockIdx']:
     print(arguments)
-    trialIdx = int(arguments['trialIdx'])
-    ns5FileName = 'Trial00{}'.format(trialIdx)
+    blockIdx = int(arguments['blockIdx'])
+    ns5FileName = 'Block00{}'.format(blockIdx)
     triFolder = os.path.join(
         nspFolder, 'tdc_' + ns5FileName)
 

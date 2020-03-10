@@ -23,7 +23,7 @@ EXP="exp201901201200"
 # EXP="exp201901221000"
 # EXP="exp201901271000"
 # EXP="exp201901070700"
-TRIALSELECTOR="--trialIdx=1"
+TRIALSELECTOR="--blockIdx=1"
 # TRIALSELECTOR="--processAll"
 UNITSELECTOR="--selector=_minfrmaxcorr"
 LAZINESS="--lazy"
@@ -40,4 +40,4 @@ python3 ./calcAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS --even
 #  python3 ./calcAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS --eventName=stimAlignTimes --chanQuery="fr_sqrt" --blockName="fr_sqrt"  --alignFolderName=stim
 python3 ./calcAlignedRasters.py --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS --eventName=stimAlignTimes --chanQuery="raster" --blockName="raster"  --alignFolderName=stim
 #  
-python3 ./calcTrialOutliers.py --exp=$EXP $TRIALSELECTOR $UNITSELECTOR --inputBlockName="fr" --alignQuery="stimOn" --unitQuery="fr" --verbose --plotting  --alignFolderName=stim
+python3 ./calcBlockOutliers.py --exp=$EXP $TRIALSELECTOR $UNITSELECTOR --inputBlockName="fr" --alignQuery="stimOn" --unitQuery="fr" --verbose --plotting  --alignFolderName=stim

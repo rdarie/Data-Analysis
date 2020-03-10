@@ -5,7 +5,7 @@ Usage:
 
 Options:
     --exp=exp                                 which experimental day to analyze
-    --trialIdx=trialIdx                       which trial to analyze [default: 1]
+    --blockIdx=blockIdx                       which trial to analyze [default: 1]
     --processAll                              process entire experimental day? [default: False]
     --lazy                                    load from raw, or regular? [default: False]
     --verbose                                 print diagnostics? [default: False]
@@ -22,7 +22,7 @@ Options:
     --alignQuery=alignQuery                   query what the units will be aligned to? [default: midPeak]
     --estimatorName=estimatorName             filename for resulting estimator [default: tdr]
     --selector=selector                       filename if using a unit selector
-    --maskOutlierTrials                       delete outlier trials? [default: False]
+    --maskOutlierBlocks                       delete outlier trials? [default: False]
 """
 
 import pdb, traceback
@@ -52,7 +52,7 @@ from itertools import product
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, MaxAbsScaler, RobustScaler
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
-    int(arguments['trialIdx']), arguments['exp'])
+    int(arguments['blockIdx']), arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
 #
@@ -122,7 +122,7 @@ def calcUnitRegressionToAsig():
         #     'experimentName': '201901271000-Proprio',
         #     'analysisName': 'default',
         #     'alignFolderName': 'stim',
-        #     'prefix': 'Trial005',
+        #     'prefix': 'Block005',
         #     'alignQuery': 'stimOn'
         #     },
         {
@@ -155,7 +155,7 @@ def calcUnitRegressionToAsig():
     alignedAsigsKWargs['unitNames'] = uN
     alignedAsigsKWargs['unitQuery'] = uQ
     #
-    alignedAsigsKWargs['outlierTrials'] = ash.processOutlierTrials(
+    alignedAsigsKWargs['outlierBlocks'] = ash.processOutlierBlocks(
         alignSubFolder, prefix, **arguments)
     #
     featuresMetaDataPath = os.path.join(
@@ -410,11 +410,11 @@ def calcUnitRegressionToAsig():
                 )
             targetLoadArgs['dataQuery'] = ash.processAlignQueryArgs(
                 namedQueries, alignQuery=sourceOpt['alignQuery'])
-            targetLoadArgs['outlierTrials'] = ash.processOutlierTrials(
+            targetLoadArgs['outlierBlocks'] = ash.processOutlierBlocks(
                 sourceAlignSubFolder, sourceOpt['prefix'], **arguments)
             featureLoadArgs['dataQuery'] = ash.processAlignQueryArgs(
                 namedQueries, alignQuery=sourceOpt['alignQuery'])
-            featureLoadArgs['outlierTrials'] = ash.processOutlierTrials(
+            featureLoadArgs['outlierBlocks'] = ash.processOutlierBlocks(
                 sourceAlignSubFolder, sourceOpt['prefix'], **arguments)
             triggeredPath = os.path.join(
                 sourceAlignSubFolder,
@@ -465,14 +465,14 @@ def calcUnitRegressionToAsig():
                     for i in historyDF.columns]
                 if arguments['plotting']:
                     for _, g in partialFeaturesDF.query('program==0').groupby(['segment', 't']): break
-                    firstTrialIdx = g.index
-                    firstTrialT = (
-                        partialFeaturesDF.loc[firstTrialIdx, :].index
+                    firstBlockIdx = g.index
+                    firstBlockT = (
+                        partialFeaturesDF.loc[firstBlockIdx, :].index
                         .get_level_values('bin'))
                     plt.plot(
-                        firstTrialT,
+                        firstBlockT,
                         historyDF
-                        .loc[firstTrialIdx, 'elec10_0_cos_{}'.format(colIdx)]
+                        .loc[firstBlockIdx, 'elec10_0_cos_{}'.format(colIdx)]
                         .to_numpy())
                 historyTerms.append(historyDF.copy())
                 # if debugging, only calculate first history basis term
@@ -481,8 +481,8 @@ def calcUnitRegressionToAsig():
             # sanity check diff terms
             if arguments['plotting']:
                 plt.plot(
-                    firstTrialT,
-                    partialTargetDF.loc[firstTrialIdx, 'elec10_0'].to_numpy())
+                    firstBlockT,
+                    partialTargetDF.loc[firstBlockIdx, 'elec10_0'].to_numpy())
                 if arguments['debugging']:
                     plt.show()
                 else:
@@ -785,16 +785,16 @@ def calcUnitRegressionToAsig():
                     exProgNum = 0
                 plotQuer = 'program=={}'.format(exProgNum)
                 for _, g in plotDF.query(plotQuer).groupby(['segment', 't']): break
-                firstTrialIdx = g.index
-                firstTrialT = (
-                    plotDF.loc[firstTrialIdx, :].index
+                firstBlockIdx = g.index
+                firstBlockT = (
+                    plotDF.loc[firstBlockIdx, :].index
                     .get_level_values('bin'))
                 pdfPath = os.path.join(
                     estimatorFiguresFolder,
                     'check_xy_test_{}.pdf'.format(varBaseName))
                 ax[0].plot(
-                    firstTrialT,
-                    yTest.loc[firstTrialIdx, :].iloc[:, -1].to_numpy(),
+                    firstBlockT,
+                    yTest.loc[firstBlockIdx, :].iloc[:, -1].to_numpy(),
                     c='k', lw=2,
                     label='target')
                 if len(presentPrograms):
@@ -805,14 +805,14 @@ def calcUnitRegressionToAsig():
                             if ('RateInHz' in i) and not ('deriv' in i) and (exampleProgramName in i)]
                         origTrace = (
                             featuresDF.iloc[test, :].loc[
-                                firstTrialIdx,
+                                firstBlockIdx,
                                 presentPrograms[0]].to_numpy() *
                             featuresDF.iloc[test, :].loc[
-                                firstTrialIdx,
+                                firstBlockIdx,
                                 'RateInHz'].to_numpy())
                         origAx = ax[1].twinx()
                         origAx.plot(
-                            firstTrialT,
+                            firstBlockT,
                             origTrace, lw=2,
                             c='k', label=presentPrograms[0] + ':Rate')
                         origAx.legend()
@@ -823,8 +823,8 @@ def calcUnitRegressionToAsig():
                             else:
                                 cl = cPalette[0]
                             ax[1].plot(
-                                firstTrialT,
-                                plotDF.loc[firstTrialIdx, nm].to_numpy(),
+                                firstBlockT,
+                                plotDF.loc[firstBlockIdx, nm].to_numpy(),
                                 c=cl, alpha=0.3)
                     if modelOpts['rateInteraction'] and modelOpts['stimVelocity']:
                         mdNames = [
@@ -833,11 +833,11 @@ def calcUnitRegressionToAsig():
                             if ('RateInHz' in i) and ('deriv' in i) and (exampleProgramName in i)]
                         origTrace = deriv(
                             featuresDF.iloc[test, :].loc[
-                                firstTrialIdx,
+                                firstBlockIdx,
                                 presentPrograms[0]])
                         origAx = ax[2].twinx()
                         origAx.plot(
-                            firstTrialT,
+                            firstBlockT,
                             origTrace, lw=2,
                             c='k', label='deriv(' + presentPrograms[0] + '):Rate')
                         origAx.legend()
@@ -848,8 +848,8 @@ def calcUnitRegressionToAsig():
                             else:
                                 cl = cPalette[0]
                             ax[2].plot(
-                                firstTrialT,
-                                plotDF.loc[firstTrialIdx, nm].to_numpy(),
+                                firstBlockT,
+                                plotDF.loc[firstBlockIdx, nm].to_numpy(),
                                 c=cl, alpha=0.3)
                     if modelOpts['stimAmplitude']:
                         saNames = [
@@ -858,11 +858,11 @@ def calcUnitRegressionToAsig():
                             if not ('RateInHz' in i) and not ('deriv' in i) and (exampleProgramName in i)]
                         origTrace = (
                             featuresDF.iloc[test, :].loc[
-                                firstTrialIdx,
+                                firstBlockIdx,
                                 presentPrograms[0]].to_numpy())
                         origAx = ax[3].twinx()
                         origAx.plot(
-                            firstTrialT,
+                            firstBlockT,
                             origTrace, lw=2,
                             c='k', label=presentPrograms[0])
                         origAx.legend()
@@ -873,8 +873,8 @@ def calcUnitRegressionToAsig():
                             else:
                                 cl = cPalette[0]
                             ax[3].plot(
-                                firstTrialT,
-                                plotDF.loc[firstTrialIdx, nm].to_numpy(),
+                                firstBlockT,
+                                plotDF.loc[firstBlockIdx, nm].to_numpy(),
                                 c=cl, alpha=0.3)
                     if modelOpts['stimVelocity']:
                         sdNames = [
@@ -883,11 +883,11 @@ def calcUnitRegressionToAsig():
                             if not ('RateInHz' in i) and ('deriv' in i) and (exampleProgramName in i)]
                         origTrace = deriv(
                             featuresDF.iloc[test, :].loc[
-                                firstTrialIdx,
+                                firstBlockIdx,
                                 presentPrograms[0]].to_numpy())
                         origAx = ax[4].twinx()
                         origAx.plot(
-                            firstTrialT,
+                            firstBlockT,
                             origTrace, lw=2,
                             c='k', label='deriv(' + presentPrograms[0])
                         origAx.legend()
@@ -898,8 +898,8 @@ def calcUnitRegressionToAsig():
                             else:
                                 cl = cPalette[0]
                             ax[4].plot(
-                                firstTrialT,
-                                plotDF.loc[firstTrialIdx, nm].to_numpy(),
+                                firstBlockT,
+                                plotDF.loc[firstBlockIdx, nm].to_numpy(),
                                 c=cl, alpha=0.3)
                 cPalette = sns.color_palette("Set2", n_colors=8)
                 if modelOpts['angle']:
@@ -907,9 +907,9 @@ def calcUnitRegressionToAsig():
                     origTrace = kinX.iloc[test, :]
                     for kIdx, nm in enumerate(kList):
                         origAx.plot(
-                            firstTrialT,
+                            firstBlockT,
                             kinX.iloc[test, :].loc[
-                                firstTrialIdx,
+                                firstBlockIdx,
                                 nm + '_angle'].to_numpy(),
                             c=cPalette[kIdx],
                             label=nm + '_angle')
@@ -926,17 +926,17 @@ def calcUnitRegressionToAsig():
                         elif 'M' in nm:
                             cl = cPalette[2]
                         ax[5].plot(
-                            firstTrialT,
-                            xTest.loc[firstTrialIdx, nm].to_numpy(),
+                            firstBlockT,
+                            xTest.loc[firstBlockIdx, nm].to_numpy(),
                             c=cl, alpha=0.3)
                 if modelOpts['angularVelocity']:
                     origAx = ax[6].twinx()
                     origTrace = kinX.iloc[test, :]
                     for kIdx, nm in enumerate(kList):
                         origAx.plot(
-                            firstTrialT,
+                            firstBlockT,
                             kinX.iloc[test, :].loc[
-                                firstTrialIdx,
+                                firstBlockIdx,
                                 nm + '_angular_velocity'].to_numpy(),
                             c=cPalette[kIdx],
                             label=nm + '_angular_velocity')
@@ -953,17 +953,17 @@ def calcUnitRegressionToAsig():
                         elif 'M' in nm:
                             cl = cPalette[2]
                         ax[6].plot(
-                            firstTrialT,
-                            xTest.loc[firstTrialIdx, nm].to_numpy(),
+                            firstBlockT,
+                            xTest.loc[firstBlockIdx, nm].to_numpy(),
                             c=cl, alpha=0.3)
                 if modelOpts['angularAcceleration']:
                     origAx = ax[7].twinx()
                     origTrace = kinX.iloc[test, :]
                     for kIdx, nm in enumerate(kList):
                         origAx.plot(
-                            firstTrialT,
+                            firstBlockT,
                             kinX.iloc[test, :].loc[
-                                firstTrialIdx,
+                                firstBlockIdx,
                                 nm + '_angular_acceleration'].to_numpy(),
                             label=nm + '_angular_acceleration',
                             c=cPalette[kIdx])
@@ -980,17 +980,17 @@ def calcUnitRegressionToAsig():
                         elif 'M' in nm:
                             cl = cPalette[2]
                         ax[7].plot(
-                            firstTrialT,
-                            xTest.loc[firstTrialIdx, nm].to_numpy(),
+                            firstBlockT,
+                            xTest.loc[firstBlockIdx, nm].to_numpy(),
                             # label=nm,
                             c=cl, alpha=0.3)
                 if modelOpts['ensembleTerms']:
                     for colIdx in range(ihbasis.shape[1]):
                         cosBaseLabel = 'cos_{}'.format(colIdx)
                         ax[0].plot(
-                            firstTrialT,
+                            firstBlockT,
                             xTest
-                            .loc[firstTrialIdx, :].iloc[:, -(colIdx + 1)]
+                            .loc[firstBlockIdx, :].iloc[:, -(colIdx + 1)]
                             .to_numpy(), c='k', alpha=0.3, label=cosBaseLabel)
                 for thisAx in ax:
                     thisAx.legend()

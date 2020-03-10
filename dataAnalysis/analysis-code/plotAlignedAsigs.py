@@ -4,7 +4,7 @@ Usage:
 
 Options:
     --exp=exp                              which experimental day to analyze
-    --trialIdx=trialIdx                    which trial to analyze [default: 1]
+    --blockIdx=blockIdx                    which trial to analyze [default: 1]
     --processAll                           process entire experimental day? [default: False]
     --verbose                              print diagnostics? [default: True]
     --lazy                                 load from raw, or regular? [default: False]
@@ -13,7 +13,7 @@ Options:
     --unitQuery=unitQuery                  how to restrict channels if not supplying a list? [default: pca]
     --alignQuery=alignQuery                what will the plot be aligned to? [default: outboundWithStim]
     --selector=selector                    filename if using a unit selector
-    --maskOutlierTrials                    delete outlier trials? [default: False]
+    --maskOutlierBlocks                    delete outlier trials? [default: False]
     --enableOverrides                      delete outlier trials? [default: False]
     --rowName=rowName                      break down by row  [default: pedalDirection]
     --rowControl=rowControl                rows to exclude from stats test
@@ -51,7 +51,7 @@ import pandas as pd
 
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
-    int(arguments['trialIdx']), arguments['exp'])
+    int(arguments['blockIdx']), arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
 analysisSubFolder = os.path.join(
@@ -79,7 +79,7 @@ alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(
 alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = (
     ash.processUnitQueryArgs(
         namedQueries, analysisSubFolder, **arguments))
-alignedAsigsKWargs['outlierTrials'] = ash.processOutlierTrials(
+alignedAsigsKWargs['outlierBlocks'] = ash.processOutlierBlocks(
     alignSubFolder, prefix, **arguments)
 alignedAsigsKWargs.update(dict(
     duplicateControlsByProgram=True,

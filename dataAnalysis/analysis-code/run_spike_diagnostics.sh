@@ -37,8 +37,8 @@ source activate nda
 python --version
 
 #SLURM_ARRAY_TASK_ID="2"
-#python3 './tridesclousCCV.py' --trialIdx=$SLURM_ARRAY_TASK_ID --makeCoarseNeoBlock --exp=$EXP
-#python3 './plotSpikeReport.py' --trialIdx=$SLURM_ARRAY_TASK_ID --nameSuffix=_coarse --exp=$EXP
-#python3 './tridesclousCCV.py' --trialIdx=$SLURM_ARRAY_TASK_ID --makeStrictNeoBlock --exp=$EXP
-python3 './plotSpikeReport.py' --trialIdx=$SLURM_ARRAY_TASK_ID --nameSuffix=_final --exp=$EXP
-# python3 './tridesclousCCV.py' --trialIdx=$SLURM_ARRAY_TASK_ID --purgePeelerDiagnostics --exp=$EXP
+#python3 './tridesclousCCV.py' --blockIdx=$SLURM_ARRAY_TASK_ID --makeCoarseNeoBlock --exp=$EXP
+#python3 './plotSpikeReport.py' --blockIdx=$SLURM_ARRAY_TASK_ID --nameSuffix=_coarse --exp=$EXP
+#python3 './tridesclousCCV.py' --blockIdx=$SLURM_ARRAY_TASK_ID --makeStrictNeoBlock --exp=$EXP
+python3 './plotSpikeReport.py' --blockIdx=$SLURM_ARRAY_TASK_ID --nameSuffix=_final --exp=$EXP
+# python3 './tridesclousCCV.py' --blockIdx=$SLURM_ARRAY_TASK_ID --purgePeelerDiagnostics --exp=$EXP

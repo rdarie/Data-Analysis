@@ -26,7 +26,7 @@
 EXP="exp201901271000"
 LAZINESS="--lazy"
 WINDOW="--window=long"
-TRIALSELECTOR="--trialIdx=5"
+TRIALSELECTOR="--blockIdx=5"
 # TRIALSELECTOR="--processAll"
 
 module load anaconda/3-5.2.0
@@ -40,4 +40,4 @@ python3 ./calcAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS --even
 #  python3 ./calcAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS --eventName=stimAlignTimes --chanQuery="fr_sqrt" --blockName="fr_sqrt"  --alignFolderName=stim
 python3 ./calcAlignedRasters.py --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS --eventName=stimAlignTimes --chanQuery="raster" --blockName="raster"  --alignFolderName=stim
 # qa
-python3 ./calcTrialOutliers.py --exp=$EXP $TRIALSELECTOR --inputBlockName="fr" --alignQuery="stimOn" --unitQuery="fr" --verbose --plotting --alignFolderName=stim
+python3 ./calcBlockOutliers.py --exp=$EXP $TRIALSELECTOR --inputBlockName="fr" --alignQuery="stimOn" --unitQuery="fr" --verbose --plotting --alignFolderName=stim

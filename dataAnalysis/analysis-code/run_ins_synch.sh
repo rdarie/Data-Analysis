@@ -36,5 +36,5 @@ conda activate
 source activate nda
 python --version
 
-#  python3 './synchronizeINStoNSP.py' --trialIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP 
-python3 './synchronizeINStoNSP.py' --trialIdx=4 --exp=$EXP --curateManually
+#  python3 './synchronizeINStoNSP.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP 
+python3 './synchronizeINStoNSP.py' --blockIdx=4 --exp=$EXP --curateManually

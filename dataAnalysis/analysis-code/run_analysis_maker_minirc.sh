@@ -42,6 +42,6 @@ source activate nda
 python --version
 
 # SLURM_ARRAY_TASK_ID=1
-python ./calcTrialAnalysisNix.py --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID --chanQuery="all"
-python ./calcStimAlignTimes.py --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID --plotParamHistograms
-python ./calcFR.py --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID
+python ./calcBlockAnalysisNix.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --chanQuery="all"
+python ./calcStimAlignTimes.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --plotParamHistograms
+python ./calcFR.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID

@@ -29,7 +29,7 @@
 EXP="exp202001231400"
 LAZINESS="--lazy"
 WINDOW="--window=long"
-# TRIALSELECTOR="--trialIdx=2"
+# TRIALSELECTOR="--blockIdx=2"
 TRIALSELECTOR="--processAll"
 UNITSELECTOR="--selector=_minfrmaxcorrminamp"
 
@@ -40,4 +40,4 @@ source activate nda
 python --version
 
 SLURM_ARRAY_TASK_ID="1"
-python3 ./quickPlot.py --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID
+python3 ./quickPlot.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID

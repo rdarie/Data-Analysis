@@ -3,7 +3,7 @@ Usage:
     calcSimilarityMatrix.py [options]
 
 Options:
-    --trialIdx=trialIdx               which trial to analyze [default: 1]
+    --blockIdx=blockIdx               which trial to analyze [default: 1]
     --exp=exp                         which experimental day to analyze [default: exp201901271000]
     --processAll                      process entire experimental day? [default: False]
     --lazy                            load from raw, or regular? [default: False]
@@ -14,8 +14,8 @@ Options:
     --selector=selector               filename if using a unit selector
 """
 #  The text block above is used by the docopt package to parse command line arguments
-#  e.g. you can call <python3 calcTrialSimilarityMatrix.py> to run with default arguments
-#  but you can also specify, for instance <python3 calcTrialSimilarityMatrix.py --trialIdx=2>
+#  e.g. you can call <python3 calcBlockSimilarityMatrix.py> to run with default arguments
+#  but you can also specify, for instance <python3 calcBlockSimilarityMatrix.py --blockIdx=2>
 #  to load trial 002 instead of trial001 which is the default
 #
 #  regular package imports
@@ -43,7 +43,7 @@ arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 #  this stuff imports variables from the currentExperiment.py and exp2019xxxxxxxx.py files
 from currentExperiment import parseAnalysisOptions
 expOpts, allOpts = parseAnalysisOptions(
-    int(arguments['trialIdx']),
+    int(arguments['blockIdx']),
     arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)

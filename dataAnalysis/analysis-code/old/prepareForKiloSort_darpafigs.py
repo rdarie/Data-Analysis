@@ -23,7 +23,7 @@ if arguments['plotting']:
 
 if arguments['filePath']:
     filePath = arguments['filePath']
-    #filePath = 'Z:\\data\\rdarie\\Murdoc Neural Recordings\\201804250947-Proprio\\Trial003.ns5'
+    #filePath = 'Z:\\data\\rdarie\\Murdoc Neural Recordings\\201804250947-Proprio\\Block003.ns5'
     dataDir = os.path.dirname(os.path.abspath(filePath))
 
 fileName = (os.path.basename(filePath).split('.'))[0] + '_darpa'

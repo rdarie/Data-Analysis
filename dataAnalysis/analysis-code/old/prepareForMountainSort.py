@@ -31,7 +31,7 @@ else:
 
 if arguments['filePath']:
     filePath = arguments['filePath']
-    #filePath = 'Z:\\data\\rdarie\\Murdoc Neural Recordings\\201804271016-Proprio\\Trial002.ns5'
+    #filePath = 'Z:\\data\\rdarie\\Murdoc Neural Recordings\\201804271016-Proprio\\Block002.ns5'
     dataDir = os.path.dirname(os.path.abspath(filePath))
 
 fileName = (os.path.basename(filePath).split('.'))[0]

@@ -4,7 +4,7 @@ Usage:
 
 Options:
     --exp=exp                              which experimental day to analyze
-    --trialIdx=trialIdx                    which trial to analyze [default: 1]
+    --blockIdx=blockIdx                    which trial to analyze [default: 1]
     --processAll                           process entire experimental day? [default: False]
     --lazy                                 load from raw, or regular? [default: False]
     --verbose                              print diagnostics? [default: False]
@@ -37,12 +37,12 @@ from neo.core import (Block, Segment, ChannelIndex,
 import dataAnalysis.preproc.ns5 as ns5
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
-    int(arguments['trialIdx']), arguments['exp'])
+    int(arguments['blockIdx']), arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
 
 rawBasePath = os.path.join(
-    nspFolder, 'Trial001.ns5')
+    nspFolder, 'Block001.ns5')
 reader = BlackrockIO(
     filename=rawBasePath, nsx_to_load=5)
 dataBlock = ns5.readBlockFixNames(
@@ -88,7 +88,7 @@ for sigPair in pairs:
     dataBlock.segments[0].analogsignals[sigPair[0]] = rerefAsig
 
 savePath = os.path.join(
-    nspFolder, 'Trial001.nix')
+    nspFolder, 'Block001.nix')
 writer = NixIO(filename=savePath)
 writer.write_block(dataBlock, use_obj_names=True)
 writer.close()

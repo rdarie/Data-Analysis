@@ -33,17 +33,17 @@ conda activate
 source activate nda
 python --version
 
-python3 ./preprocOpenEphys.py --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID --loadMat
-python3 ./preprocINS.py --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID
-python3 ./synchronizeOpenEphysToINS.py --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID --plotting
+python3 ./preprocOpenEphys.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --loadMat
+python3 ./preprocINS.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID
+python3 ./synchronizeOpenEphysToINS.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --plotting
 # python3 ./preprocINSfromSIP.py --exp=$EXP
 # python3 ./synchronizeOpenEphysToINSSIP.py --exp=$EXP
-# python3 ./preprocNS5.py --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID --makeTruncated
-# python3 ./synchronizeOpenEphysToNSP.py --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID
-# python3 ./calcTrialAnalysisNix.py --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID --chanQuery="all" --analysisName=shortGaussian
-# python3 ./calcStimAlignTimes.py --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID --analysisName=shortGaussian
-# python3 ./calcFR.py --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID --analysisName=shortGaussian
-# python3 ./calcFRsqrt.py --exp=$EXP --trialIdx=$SLURM_ARRAY_TASK_ID --analysisName=shortGaussian
+# python3 ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --makeTruncated
+# python3 ./synchronizeOpenEphysToNSP.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID
+# python3 ./calcBlockAnalysisNix.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --chanQuery="all" --analysisName=shortGaussian
+# python3 ./calcStimAlignTimes.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --analysisName=shortGaussian
+# python3 ./calcFR.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --analysisName=shortGaussian
+# python3 ./calcFRsqrt.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --analysisName=shortGaussian
 #
 # python3 ./assembleExperimentData.py --exp=$EXP --processAsigs --processRasters --analysisName="shortGaussian"
 #

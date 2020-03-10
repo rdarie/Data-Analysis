@@ -1,13 +1,13 @@
 def getExpOpts():
     #
-    miniRCTrialLookup = {
+    miniRCBlockLookup = {
         1: False,
         2: False,
         3: False,
         4: False,
         5: True
         }
-    RCTrialLookup = {i: False for i in miniRCTrialLookup.keys()} 
+    RCBlockLookup = {i: False for i in miniRCBlockLookup.keys()} 
     
     experimentName = '202001231400-Duke-Spontaneous'
     deviceName = 'DeviceNPC700373H'
@@ -141,8 +141,8 @@ def getExpOpts():
         
     triFolderSourceBase = 3
     triDestinations = [
-        'Trial00{}'.format(trialIdx)
-        for trialIdx in [1, 2, 4, 5]]
+        'Block00{}'.format(blockIdx)
+        for blockIdx in [1, 2, 4, 5]]
     
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {

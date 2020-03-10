@@ -1,12 +1,12 @@
 def getExpOpts():
     #
-    miniRCTrialLookup = {
+    miniRCBlockLookup = {
         1: False,
         2: False,
         3: False,
         4: False
         }
-    RCTrialLookup = {
+    RCBlockLookup = {
         1: True,
         2: True,
         3: True,
@@ -52,12 +52,12 @@ def getExpOpts():
         4: [1],
     }
     #
-    openEphysBaseNames = {i: 'Trial{:0>3}_EMG'.format(i) for i in RCTrialLookup.keys()}
-    RCTrialInfo = {'oe': {}, 'ins': {}, 'nsp': {}}
+    openEphysBaseNames = {i: 'Block{:0>3}_EMG'.format(i) for i in RCBlockLookup.keys()}
+    RCBlockInfo = {'oe': {}, 'ins': {}, 'nsp': {}}
     #  discard first n seconds
-    RCTrialInfo['oe']['discardTime'] = {
+    RCBlockInfo['oe']['discardTime'] = {
         i: None
-        for i in RCTrialLookup.keys()}
+        for i in RCBlockLookup.keys()}
 
     synchInfo = {'oe': {}, 'ins': {}, 'nsp': {}}
     #  options for automatic tap detection on ins data
@@ -210,8 +210,8 @@ def getExpOpts():
     # stimDetectChans = None
     triFolderSourceBase = 2
     triDestinations = [
-        'Trial00{}'.format(trialIdx)
-        for trialIdx in [1, 3, 4]]
+        'Block00{}'.format(blockIdx)
+        for blockIdx in [1, 3, 4]]
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
         '201901070700-ProprioRC': [1, 2, 3, 4],
