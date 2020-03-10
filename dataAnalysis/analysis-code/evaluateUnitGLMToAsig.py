@@ -53,8 +53,8 @@ globals().update(expOpts)
 globals().update(allOpts)
 #
 import matplotlib
-# matplotlib.use('Agg')  # generate postscript output 
-matplotlib.use('QT5Agg')  # generate postscript output
+matplotlib.use('Agg')  # generate postscript output 
+# matplotlib.use('QT5Agg')  # generate postscript output
 import matplotlib.ticker as ticker
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
@@ -104,8 +104,8 @@ varFolders = sorted(
 variantList = [os.path.basename(i) for i in varFolders]
 if arguments['debugging']:
     showNow = False
-    variantList = ['var_{:03d}'.format(i) for i in range(16)]
-    # variantList = ['var_{:03d}'.format(i) for i in [0]]
+    # variantList = ['var_{:03d}'.format(i) for i in range(1)]
+    variantList = ['var_{:03d}'.format(i) for i in [0]]
 else:
     showNow = False
 
