@@ -23,17 +23,6 @@
 # Request custom resources
 #SBATCH --array=5
 
-# EXP="exp201901070700"
-#
-# EXP="exp201901201200"
-# EXP="exp201901211000"
-#
-# EXP="exp201901221000"
-# EXP="exp201901231000"
-#
-# EXP="exp201901261000"
-# EXP="exp201901271000"
-#
 EXP="exp202003091200"
 
 
@@ -43,7 +32,7 @@ conda activate
 source activate nda
 python --version
 
-SLURM_ARRAY_TASK_ID=1
-python ./calcTrialAnalysisNix.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --chanQuery="all"
+SLURM_ARRAY_TASK_ID=2
+python ./calcISIAnalysisNix.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --chanQuery="all"
 # python ./calcStimAlignTimes.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --plotParamHistograms
 # python ./calcFR.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID

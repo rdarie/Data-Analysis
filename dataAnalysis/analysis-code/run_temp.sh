@@ -26,7 +26,10 @@
 # EXP="exp201901221000"
 # EXP="exp201901231000"
 # EXP="exp201901271000"
-EXP="exp202001231400"
+# EXP="exp202001231400"
+#
+EXP="exp202003091200"
+
 LAZINESS="--lazy"
 WINDOW="--window=long"
 # TRIALSELECTOR="--blockIdx=2"
@@ -40,4 +43,5 @@ source activate nda
 python --version
 
 SLURM_ARRAY_TASK_ID="1"
-python3 ./quickPlot.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID
+# python3 ./quickPlotRipple.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID
+python3 ./saveImpedances.py --exp=$EXP --processAll --ripple

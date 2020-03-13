@@ -36,7 +36,7 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
         openEphysChanNames = expOpts['openEphysChanNames']
     except Exception:
         openEphysChanNames = []
-    openEphysFilterOpts = {
+    EMGFilterOpts = {
         'matched': {
             'type': 'sin',
             'Wn': 60,
@@ -61,6 +61,29 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
         'high': {
             'Wn': 15,
             'N': 10,
+            'btype': 'high',
+            'ftype': 'butter'
+        }
+        }
+    LFPFilterOpts = {
+        'bandstop': {
+            'Wn': 60,
+            'nHarmonics': 1,
+            'Q': 20,
+            'N': 8,
+            'rp': 1,
+            'btype': 'bandstop',
+            'ftype': 'cheby1'
+        },
+        'low': {
+            'Wn': 1000,
+            'N': 4,
+            'btype': 'low',
+            'ftype': 'butter'
+        },
+        'high': {
+            'Wn': 5,
+            'N': 4,
             'btype': 'high',
             'ftype': 'butter'
         }
@@ -222,10 +245,10 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
     nspCmpPath = os.path.join('.', 'nsp_map.cmp')
     cmpDF = prb_meta.cmpToDF(nspCmpPath)
     experimentDateStr = re.search('(\d*)', experimentName).groups()[0]
-    impedances = prb_meta.getLatestImpedance(recordingDateStr=experimentDateStr)
+    impedances = prb_meta.getLatestImpedance(recordingDateStr=experimentDateStr, elecType='utah')
     impedances['elec'] = cmpDF['label'].iloc[:impedances.shape[0]].to_numpy()
     impedances.set_index('elec', inplace=True)
-    
+    impedancesRipple = prb_meta.getLatestImpedance(recordingDateStr=experimentDateStr, elecType='isi_paddle')
     if remakePrb:
         nspCsvPath = os.path.join('.', 'nsp_map.csv')
         cmpDF.to_csv(nspCsvPath)

@@ -8,6 +8,7 @@ Options:
     --analysisName=analysisName       append a name to the resulting blocks? [default: default]
     --chanQuery=chanQuery             how to restrict channels if not providing a list? [default: fr]
     --samplingRate=samplingRate       subsample the result??
+    --mergeINSandNSPEvents            if there's an INS block, merge with NSP block? [default: False]
 """
 
 from neo.io.proxyobjects import (
@@ -74,46 +75,47 @@ def calcBlockAnalysisNix():
     forceData = hf.parseFSE103Events(
         spikesBlock, delay=9e-3, clipLimit=1e9, formatForce='f')
     #  merge events
-    evList = []
-    for key in ['property', 'value']:
-        #  key = 'property'
-        insProp = spikesBlock.filter(
-            objects=Event,
-            name='seg0_ins_' + key
-            )[0]
-        rigProp = spikesBlock.filter(
-            objects=Event,
-            name='seg0_rig_' + key
-            )
-        if len(rigProp):
-            rigProp = rigProp[0]
-            allProp = insProp.merge(rigProp)
-            allProp.name = 'seg0_' + key
+    if arguments['mergeINSandNSPEvents']:
+        evList = []
+        for key in ['property', 'value']:
+            #  key = 'property'
+            insProp = spikesBlock.filter(
+                objects=Event,
+                name='seg0_ins_' + key
+                )[0]
+            rigProp = spikesBlock.filter(
+                objects=Event,
+                name='seg0_rig_' + key
+                )
+            if len(rigProp):
+                rigProp = rigProp[0]
+                allProp = insProp.merge(rigProp)
+                allProp.name = 'seg0_' + key
 
-            evSortIdx = np.argsort(allProp.times, kind='mergesort')
-            allProp = allProp[evSortIdx]
-            evList.append(allProp)
-        else:
-            #  RC's don't have rig_events
-            allProp = insProp
-            allProp.name = 'seg0_' + key
-            evList.append(insProp)
-    #  make concatenated event, for viewing
-    concatLabels = np.array([
-        (elphpdb._convert_value_safe(evList[0].labels[i]) + ': ' +
-            elphpdb._convert_value_safe(evList[1].labels[i])) for
-        i in range(len(evList[0]))
-        ])
-    concatEvent = Event(
-        name='seg0_' + 'concatenated_updates',
-        times=allProp.times,
-        labels=concatLabels
-        )
-    concatEvent.merge_annotations(allProp)
-    evList.append(concatEvent)
-    spikesBlock.segments[0].events = evList
-    for ev in evList:
-        ev.segment = spikesBlock.segments[0]
+                evSortIdx = np.argsort(allProp.times, kind='mergesort')
+                allProp = allProp[evSortIdx]
+                evList.append(allProp)
+            else:
+                #  RC's don't have rig_events
+                allProp = insProp
+                allProp.name = 'seg0_' + key
+                evList.append(insProp)
+        #  make concatenated event, for viewing
+        concatLabels = np.array([
+            (elphpdb._convert_value_safe(evList[0].labels[i]) + ': ' +
+                elphpdb._convert_value_safe(evList[1].labels[i])) for
+            i in range(len(evList[0]))
+            ])
+        concatEvent = Event(
+            name='seg0_' + 'concatenated_updates',
+            times=allProp.times,
+            labels=concatLabels
+            )
+        concatEvent.merge_annotations(allProp)
+        evList.append(concatEvent)
+        spikesBlock.segments[0].events = evList
+        for ev in evList:
+            ev.segment = spikesBlock.segments[0]
     # print([asig.name for asig in spikesBlock.filter(objects=AnalogSignal)])
     # print([st.name for st in spikesBlock.filter(objects=SpikeTrain)])
     # print([ev.name for ev in spikesBlock.filter(objects=Event)])

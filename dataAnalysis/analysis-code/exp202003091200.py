@@ -15,7 +15,12 @@ def getExpOpts():
     
     experimentName = '202003091200-ISI'
     deviceName = None
-    
+    rippleMapFile = 'isi_nano1caudal_xAyBzC_ortho_nano2rostral_xAyBzC_inverted.map'
+    asigNameList = [
+        ['caudalZ_e{:02d}_a'.format(i) for i in range(17, 25) if i not in [21]],
+        ['rostralY_e{:02d}_a'.format(i) for i in range(9, 16)],
+        ['rostralZ_e{:02d}_a'.format(i) for i in range(17, 25) if i not in [24]]
+        ]
     jsonSessionNames = {
         #  per trial
         1: [],

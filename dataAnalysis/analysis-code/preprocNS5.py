@@ -14,6 +14,7 @@ Options:
 """
 
 import dataAnalysis.preproc.ns5 as ns5
+import dataAnalysis.helperFunctions.probe_metadata as prb_meta
 import pdb
 
 #  load options
@@ -86,15 +87,20 @@ if arguments['makeFull']:
         )
 #
 if arguments['ISI']:
+    mapDF = prb_meta.mapToDF(rippleMapFile)
     reader = ns5.preproc(
         fileName=ns5FileName,
         rawFolderPath=nspFolder,
-        outputFolderPath=scratchFolder,
+        outputFolderPath=scratchFolder, mapDF=mapDF,
         fillOverflow=False, removeJumps=False,
         motorEncoderMask=motorEncoderMask,
         eventInfo=trialFilesFrom['utah']['eventInfo'],
         spikeSourceType='nev', writeMode='ow',
         chunkSize=chunkSize, equalChunks=equalChunks,
         chunkList=chunkList,
-        calcRigEvents=trialFilesFrom['utah']['calcRigEvents']
+        calcRigEvents=trialFilesFrom['utah']['calcRigEvents'],
+        normalizeByImpedance=False, removeMeanAcross=True,
+        asigNameList=asigNameList,
+        LFPFilterOpts=LFPFilterOpts,
+        calcAverageLFP=True,
         )

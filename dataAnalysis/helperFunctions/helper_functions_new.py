@@ -1048,7 +1048,7 @@ def getThresholdCrossings(
 def findTrains(
         peakTimes=None,
         peakIdx=None, fs=None, iti=None,
-        minTrainLength=None, maxDistance=1.5, maxTrain=False, plotting=False):
+        minTrainLength=0, maxDistance=1.5, maxTrain=False, plotting=False):
     #peakMask = dataSrs.index.isin(peakIdx)
     #foundTime = pd.Series((dataSrs.index[peakIdx] - dataSrs.index[peakIdx[0]]) / fs)
     if peakTimes is not None:
@@ -1059,7 +1059,9 @@ def findTrains(
         assert fs is not None
         foundTime = pd.Series(peakIdx / fs, index=peakIdx)
     # identify trains of peaks
+    #
     itiWiggle = 0.05
+    assert iti is not None
     minPeriod = iti * (1 - itiWiggle)
     #
     peakDiff = foundTime.diff()
@@ -1074,14 +1076,19 @@ def findTrains(
 
     #
     trainLengths = (trainEnds.values - trainStarts.values)
-    validTrains = trainLengths > minTrainLength
+    # pdb.set_trace()
+    validTrains = trainLengths >= minTrainLength
     keepPeaks = pd.Series(False, index = foundTime.index)
     nTrains = 0
     for idx, idxIntoPeaks in enumerate(trainStartIdx):
         #print('{}, {}'.format(idx, idxIntoPeaks))
-        #
-        thisMeanPeriod = peakDiff.loc[idxIntoPeaks:trainEndIdx[idx]].iloc[1:].mean()
-        if validTrains[idx] and thisMeanPeriod > minPeriod:
+        theseDiffs = peakDiff.loc[idxIntoPeaks:trainEndIdx[idx]]
+        thisMeanPeriod = theseDiffs.iloc[1:].mean()
+        thisOneValid = (
+            (validTrains[idx] and thisMeanPeriod > minPeriod) or
+            ((minTrainLength == 0) and theseDiffs.size == 1) # accept single pulses
+            )
+        if thisOneValid:
             keepPeaks.loc[idxIntoPeaks:trainEndIdx[idx]] = True
             nTrains += 1
             #

@@ -44,7 +44,7 @@ ppOE.preprocOpenEphysFolder(
     chanNames=openEphysChanNames, plotting=arguments['plotting'],
     ignoreSegments=openEphysIgnoreSegments[blockIdx],
     makeFiltered=True, loadMat=arguments['loadMat'],
-    filterOpts=openEphysFilterOpts)
+    filterOpts=EMGFilterOpts)
 emgDataPath = os.path.join(
     oeFolder, folderPath, emgBaseName + '_filtered.nix'
 )

@@ -4,8 +4,12 @@ import re
 from datetime import datetime as dt
 
 
-def getLatestImpedance(recordingDate=None, recordingDateStr=None, block=None):
+def getLatestImpedance(
+        recordingDate=None, recordingDateStr=None,
+        block=None, elecType=None):
     impedances = pd.read_hdf('./impedances.h5', 'impedance')
+    if elecType is not None:
+        impedances = impedances.query('elecType == "{}"'.format(elecType))
     if recordingDate is None:
         if recordingDateStr is not None:
             recordingDate = dt.strptime(recordingDateStr, '%Y%m%d%H%M')
@@ -24,7 +28,7 @@ def cmpToDF(arrayFilePath):
     cmpDF = pd.DataFrame(
         np.nan, index=range(146),
         columns=[
-            'xcoords', 'ycoords', 'elecName',
+            'xcoords', 'ycoords', 'zcoords', 'elecName',
             'elecID', 'label', 'bank', 'bankID', 'nevID']
         )
     bankLookup = {'A': 0, 'B': 1, 'C': 2, 'D': 3, 'E': 4, 'F': 5}
@@ -40,9 +44,44 @@ def cmpToDF(arrayFilePath):
         cmpDF.loc[nevIdx, 'elecName'] = elecName
         cmpDF.loc[nevIdx, 'xcoords'] = row['row']
         cmpDF.loc[nevIdx, 'ycoords'] = row['//col']
+        cmpDF.loc[nevIdx, 'zcoords'] = 0
         cmpDF.loc[nevIdx, 'label'] = row['label']
         cmpDF.loc[nevIdx, 'bank'] = row['bank']
         cmpDF.loc[nevIdx, 'bankID'] = int(row['elec'])
+    cmpDF.dropna(inplace=True)
+    return cmpDF
+
+
+def mapToDF(arrayFilePath):
+    arrayMap = pd.read_csv(
+        arrayFilePath, sep='; ',
+        skiprows=10, header=None, engine='python',
+        names=['FE', 'electrode', 'position'])
+    cmpDF = pd.DataFrame(
+        np.nan, index=range(146),
+        columns=[
+            'xcoords', 'ycoords', 'zcoords', 'elecName',
+            'elecID', 'label', 'bank', 'bankID', 'nevID']
+        )
+    bankLookup = {'A.1': 0, 'A.2': 1, 'A.3': 2}
+    for rowIdx, row in arrayMap.iterrows():
+        processor, port, FEslot, channel = row['FE'].split('.')
+        bankName = '{}.{}'.format(port, FEslot)
+        array, electrodeFull = row['electrode'].split('.')
+        electrode, electrodeRep = electrodeFull.split('_')
+        x, y , z = row['position'].split('.')
+        nevIdx = int(channel) - 1 + bankLookup[bankName] * 32
+        cmpDF.loc[nevIdx, 'elecID'] = int(electrode[1:])
+        cmpDF.loc[nevIdx, 'nevID'] = nevIdx
+        cmpDF.loc[nevIdx, 'elecName'] = array
+        cmpDF.loc[nevIdx, 'xcoords'] = float(x)
+        cmpDF.loc[nevIdx, 'ycoords'] = float(y)
+        cmpDF.loc[nevIdx, 'zcoords'] = float(z)
+        cmpDF.loc[nevIdx, 'label'] = row['electrode'].replace('.', '_')
+        cmpDF.loc[nevIdx, 'bank'] = bankName
+        cmpDF.loc[nevIdx, 'bankID'] = int(channel)
+        cmpDF.loc[nevIdx, 'FE'] = row['FE']
+    #
     cmpDF.dropna(inplace=True)
     return cmpDF
 

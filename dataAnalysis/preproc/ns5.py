@@ -1686,7 +1686,8 @@ def childBaseName(
 def readBlockFixNames(
         rawioReader,
         block_index=0, signal_group_mode='split-all',
-        lazy=True):
+        lazy=True, mapDF=None):
+    
     dataBlock = rawioReader.read_block(
         block_index=block_index, lazy=lazy,
         signal_group_mode=signal_group_mode)
@@ -1700,19 +1701,55 @@ def readBlockFixNames(
         seg0.filter(objects=AnalogSignalProxy) +
         seg0.filter(objects=AnalogSignal)
         )
+    if mapDF is not None:
+        asigOrigNames = [
+            'raw {:d}'.format(i + 1)
+            for i in mapDF.index]
+        asigNameChanger = dict(zip(asigOrigNames, mapDF['label']))
+    else:
+        asigNameChanger = dict()
     for asig in asigLikeList:
         asigBaseName = childBaseName(asig.name, 'seg')
+        asig.name = (
+            asigNameChanger[asigBaseName]
+            if asigBaseName in asigNameChanger
+            else asigBaseName)
         if 'Channel group ' in asig.channel_index.name:
-            asig.channel_index.name = asigBaseName
+            asig.channel_index.name = (
+                asigNameChanger[asigBaseName]
+                if asigBaseName in asigNameChanger
+                else asigBaseName)
     spikeTrainLikeList = (
         seg0.filter(objects=SpikeTrainProxy) +
         seg0.filter(objects=SpikeTrain)
         )
     for stp in spikeTrainLikeList:
         stpBaseName = childBaseName(stp.name, 'seg')
+        nameParser = re.search(r'ch(\d*)#(\d*)', stpBaseName)
+        if nameParser is not None:
+            # first time at this unit, rename it
+            chanId = int(nameParser.group(1))
+            unitId = int(nameParser.group(2))
+            if chanId >= 5121:
+                isRippleStimChan = True
+                chanId = chanId - 5120
+            else:
+                isRippleStimChan = False
+            asigBaseName = 'raw {}'.format(chanId)
+            if mapDF is not None:
+                chanIdLabel = (
+                    asigNameChanger[asigBaseName]
+                    if asigBaseName in asigNameChanger
+                    else asigBaseName)
+            else:
+                chanIdLabel = asigBaseName
+            if isRippleStimChan:
+                stp.name = '{}_stim#{}'.format(chanIdLabel, unitId)
+            else:
+                stp.name = '{}#{}'.format(chanIdLabel, unitId)
         if 'ChannelIndex for ' in stp.unit.channel_index.name:
-            stp.unit.name = stpBaseName
-            stp.unit.channel_index.name = stpBaseName
+            stp.unit.name = stp.name
+            stp.unit.channel_index.name = stp.name.replace('_stim#0', '')
     #  rename the children
     typesNeedRenaming = [
         SpikeTrainProxy, AnalogSignalProxy, EventProxy,
@@ -1733,8 +1770,7 @@ def readBlockFixNames(
                     child.name = (
                         'seg{}_{}'
                         .format(
-                            segIdx,
-                            childBaseName(child.name, 'seg')))
+                            segIdx, childBaseName(child.name, 'seg')))
                 #  todo: decide if below is needed
                 #  elif 'seg' in child.name:
                 #      childBaseName = '_'.join(child.name.split('_')[1:])
@@ -1864,7 +1900,8 @@ def blockToNix(
         asigNameList=None,
         spikeSourceType='', spikeBlock=None,
         calcRigEvents=True,
-        normalizeByImpedance=True
+        normalizeByImpedance=True, removeMeanAcross=False,
+        LFPFilterOpts=None
         ):
     idx = segInitIdx
     #  prune out nev spike placeholders
@@ -1903,9 +1940,26 @@ def blockToNix(
             channel_ids=[lastID],
             name='zScoredAverage',
             file_origin=block.channel_indexes[-1].file_origin
-        )
+            )
         aveLFPChIdx.merge_annotations(block.channel_indexes[-1])
         block.channel_indexes.append(aveLFPChIdx)
+        if removeMeanAcross:
+            if asigNameList is None:
+                nMeanChans = 1
+            else:
+                nMeanChans = len(asigNameList)
+            meanChIdxList = []
+            for meanChIdx in range(nMeanChans):
+                tempChIdx = ChannelIndex(
+                    index=[lastIndex + meanChIdx],
+                    channel_names=['rawAverage{}'.format(meanChIdx)],
+                    channel_ids=[lastID + meanChIdx],
+                    name='rawAverage{}'.format(meanChIdx),
+                    file_origin=block.channel_indexes[-1].file_origin
+                    )
+                tempChIdx.merge_annotations(block.channel_indexes[-1])
+                block.channel_indexes.append(tempChIdx)
+                meanChIdxList.append(tempChIdx)
     #  delete asig and irsig proxies from channel index list
     for metaIdx, chanIdx in enumerate(block.channel_indexes):
         if chanIdx.analogsignals:
@@ -1982,83 +2036,115 @@ def blockToNix(
             newSeg, nixgroup = writer._write_segment_meta(newSeg, nixblock)
             #  trim down list of analog signals if necessary
             if asigNameList is not None:
+                asigNameListSeg = []
+                if removeMeanAcross:
+                    meanGroups = {}
+                for subListIdx, subList in enumerate(asigNameList):
+                    subListSeg = ['seg{}_{}'.format(segIdx, a) for a in subList]
+                    asigNameListSeg += subListSeg
+                    if removeMeanAcross:
+                        meanGroups[subListIdx] = subListSeg
                 aSigList = []
                 for a in seg.analogsignals:
-                    if np.any([n in a.name for n in asigNameList]):
+                    if np.any([n in a.name for n in asigNameListSeg]):
                         aSigList.append(a)
             else:
                 aSigList = seg.analogsignals
-            lfpAsigList = [
-                a
-                for a in seg.analogsignals
-                if ('ainp' not in a.name)
-                ]
+                asigNameListSeg = [a.name for a in seg.analogsignals]
+            nAsigs = len(aSigList)
+            if asigNameList is not None:
+                lfpAsigList = aSigList
+            else:
+                lfpAsigList = [
+                    a
+                    for a in seg.analogsignals
+                    if ('ainp' not in a.name)
+                    ]
             nLfpAsigs = len(lfpAsigList)
-            for aSigIdx, aSigProxy in enumerate(seg.analogsignals):
-                if aSigIdx == 0:
-                    # check bounds
-                    tStart = max(tStart, aSigProxy.t_start)
-                    tStop = min(tStop, aSigProxy.t_stop)
-                loadThisOne = (
-                    (aSigProxy in aSigList) or
-                    (calcAverageLFP and (aSigProxy in lfpAsigList))
-                )
-                if loadThisOne:
-                    if trackMemory:
-                        print('writing asigs memory usage: {:.1f} MB'.format(
-                            prf.memory_usage_psutil()))
-                    chanIdx = aSigProxy.channel_index
-                    asig = aSigProxy.load(
-                        time_slice=(tStart, tStop),
-                        magnitude_mode='rescaled')
-                    #  link AnalogSignal and ID providing channel_index
-                    asig.channel_index = chanIdx
-                    #  perform requested preproc operations
-                    if normalizeByImpedance:
-                        # pdb.set_trace()
-                        elecNameMatchMask = impedances['elec'] == chanIdx.name
-                        asig.magnitude[:] = (
-                            (asig.magnitude - np.mean(asig.magnitude)) /
-                            np.min(
-                                impedances.loc[elecNameMatchMask, 'impedance']
+            # second pass through asigs, to save
+            if LFPFilterOpts is not None:
+                def filterFun(sig, filterCoeffs=None):
+                    sig[:] = signal.sosfiltfilt(
+                        filterCoeffs, sig.magnitude.flatten())[:, np.newaxis] * sig.units
+                    return sig
+                filterCoeffs = hf.makeFilterCoeffsSOS(
+                    LFPFilterOpts, float(seg.analogsignals[0].sampling_rate))
+            # first pass through asigs, if removing mean across channels
+            if removeMeanAcross or calcAverageLFP:
+                for aSigIdx, aSigProxy in enumerate(seg.analogsignals):
+                    if aSigIdx == 0:
+                        # check bounds
+                        tStart = max(tStart, aSigProxy.t_start)
+                        tStop = min(tStop, aSigProxy.t_stop)
+                    loadThisOne = (
+                        (aSigProxy in aSigList) or
+                        (calcAverageLFP and (aSigProxy in lfpAsigList))
+                    )
+                    if loadThisOne:
+                        if trackMemory:
+                            print(
+                                'Extracting asig for mean, memory usage: {:.1f} MB'.format(
+                                    prf.memory_usage_psutil()))
+                        chanIdx = aSigProxy.channel_index
+                        asig = aSigProxy.load(
+                            time_slice=(tStart, tStop),
+                            magnitude_mode='rescaled')
+                        if 'tempLFPStore' not in locals():
+                            tempLFPStore = pd.DataFrame(
+                                np.zeros((asig.shape[0], nAsigs), dtype=np.float32),
+                                columns=asigNameListSeg)
+                        #  perform requested preproc operations
+                        if normalizeByImpedance:
+                            elecNameMatchMask = impedances['elec'] == chanIdx.name
+                            asig.magnitude[:] = (
+                                (asig.magnitude - np.mean(asig.magnitude)) /
+                                np.min(
+                                    impedances.loc[elecNameMatchMask, 'impedance']
+                                    )
                                 )
-                            )
-                    if fillOverflow:
-                        # fill in overflow:
-                        '''
-                        timeSection['data'], overflowMask = hf.fillInOverflow(
-                            timeSection['data'], fillMethod = 'average')
-                        badData.update({'overflow': overflowMask})
-                        '''
-                        pass
-                    if removeJumps:
-                        # find unusual jumps in derivative or amplitude
-                        '''
-                        timeSection['data'], newBadData = hf.fillInJumps(timeSection['data'],
-                        timeSection['samp_per_s'], smoothing_ms = 0.5, nStdDiff = 50,
-                        nStdAmp = 100)
-                        badData.update(newBadData)
-                        '''
-                        pass
-                    if calcAverageLFP:
-                        normalAsig = stats.zscore(asig)
-                        if aSigIdx == 0:
-                            averageLFP = normalAsig / nLfpAsigs
-                            averageLFP.array_annotations = {}
-                        else:
-                            averageLFP += normalAsig / nLfpAsigs
-                    if (aSigProxy in aSigList):
-                        # assign ownership to containers
-                        chanIdx.analogsignals.append(asig)
-                        newSeg.analogsignals.append(asig)
-                        # assign parent to children
-                        chanIdx.create_relationship()
-                        newSeg.create_relationship()
-                        # write out to file
-                        asig = writer._write_analogsignal(
-                            asig, nixblock, nixgroup)
-                    del asig
-                    gc.collect()
+                        if fillOverflow:
+                            # fill in overflow:
+                            '''
+                            timeSection['data'], overflowMask = hf.fillInOverflow(
+                                timeSection['data'], fillMethod = 'average')
+                            badData.update({'overflow': overflowMask})
+                            '''
+                            pass
+                        if removeJumps:
+                            # find unusual jumps in derivative or amplitude
+                            '''
+                            timeSection['data'], newBadData = hf.fillInJumps(timeSection['data'],
+                            timeSection['samp_per_s'], smoothing_ms = 0.5, nStdDiff = 50,
+                            nStdAmp = 100)
+                            badData.update(newBadData)
+                            '''
+                            pass
+                        if calcAverageLFP:
+                            normalAsig = stats.zscore(asig)
+                            if 'averageLFP' not in locals():
+                                averageLFP = normalAsig / nLfpAsigs
+                                averageLFP.array_annotations = {}
+                            else:
+                                averageLFP += normalAsig / nLfpAsigs
+                        if removeMeanAcross:
+                            tempLFPStore.loc[:, aSigProxy.name] = asig.magnitude.flatten()
+                        del asig
+                        gc.collect()
+                if removeMeanAcross:
+                    if trackMemory:
+                        print(
+                            'Calculating asig mean, memory usage: {:.1f} MB'.format(
+                                prf.memory_usage_psutil()))
+                    meanLFP = np.zeros(
+                        (tempLFPStore.shape[0], len(asigNameList)),
+                        dtype=np.float32)
+                    for subListIdx, subList in enumerate(asigNameList):
+                        meanLFP[:, subListIdx] = (
+                            tempLFPStore
+                            .loc[:, meanGroups[subListIdx]]
+                            .mean(axis=1))
+                    del tempLFPStore
+                gc.collect()
             if calcAverageLFP:
                 averageLFP.name = 'seg{}_zScoredAverage'.format(segIdx)
                 chanIdx = block.filter(
@@ -2073,6 +2159,27 @@ def blockToNix(
                 # write out to file
                 averageLFP = writer._write_analogsignal(
                     averageLFP, nixblock, nixgroup)
+                if removeMeanAcross:
+                    for mIdx, meanChIdx in enumerate(meanChIdxList):
+                        meanAsig = AnalogSignal(
+                            meanLFP[:, mIdx],
+                            units=averageLFP.units,
+                            sampling_rate=averageLFP.sampling_rate,
+                            name='seg{}_{}'.format(segIdx, meanChIdx.name)
+                        )
+                        # assign ownership to containers
+                        meanChIdx.analogsignals.append(meanAsig)
+                        newSeg.analogsignals.append(meanAsig)
+                        # assign parent to children
+                        meanChIdx.create_relationship()
+                        newSeg.create_relationship()
+                        # write out to file
+                        if LFPFilterOpts is not None:
+                            meanAsig[:] = filterFun(
+                                meanAsig, filterCoeffs=filterCoeffs)
+                        meanAsig = writer._write_analogsignal(
+                            meanAsig, nixblock, nixgroup)
+                #
                 w0 = 60
                 bandQ = 20
                 bw = w0/bandQ
@@ -2123,6 +2230,75 @@ def blockToNix(
                     axFr.set_ylim([59, 61])
                     axFr.legend()
                     plt.show()
+            for aSigIdx, aSigProxy in enumerate(seg.analogsignals):
+                if aSigIdx == 0:
+                    # check bounds
+                    tStart = max(tStart, aSigProxy.t_start)
+                    tStop = min(tStop, aSigProxy.t_stop)
+                loadThisOne = (
+                    (aSigProxy in aSigList) or
+                    (calcAverageLFP and (aSigProxy in lfpAsigList))
+                )
+                if loadThisOne:
+                    if trackMemory:
+                        print('writing asigs memory usage: {:.1f} MB'.format(
+                            prf.memory_usage_psutil()))
+                    chanIdx = aSigProxy.channel_index
+                    asig = aSigProxy.load(
+                        time_slice=(tStart, tStop),
+                        magnitude_mode='rescaled')
+                    #  link AnalogSignal and ID providing channel_index
+                    asig.channel_index = chanIdx
+                    #  perform requested preproc operations
+                    if normalizeByImpedance:
+                        elecNameMatchMask = impedances['elec'] == chanIdx.name
+                        asig.magnitude[:] = (
+                            (asig.magnitude - np.mean(asig.magnitude)) /
+                            np.min(
+                                impedances.loc[elecNameMatchMask, 'impedance']
+                                )
+                            )
+                    if fillOverflow:
+                        # fill in overflow:
+                        '''
+                        timeSection['data'], overflowMask = hf.fillInOverflow(
+                            timeSection['data'], fillMethod = 'average')
+                        badData.update({'overflow': overflowMask})
+                        '''
+                        pass
+                    if removeJumps:
+                        # find unusual jumps in derivative or amplitude
+                        '''
+                        timeSection['data'], newBadData = hf.fillInJumps(timeSection['data'],
+                        timeSection['samp_per_s'], smoothing_ms = 0.5, nStdDiff = 50,
+                        nStdAmp = 100)
+                        badData.update(newBadData)
+                        '''
+                        pass
+                    if removeMeanAcross:
+                        for k, cols in meanGroups.items():
+                            if asig.name in cols:
+                                whichColumnToSubtract = k
+                        asig.magnitude[:] = np.atleast_2d(
+                            asig.magnitude.flatten() -
+                            meanLFP[:, whichColumnToSubtract]).transpose()
+                        asig.magnitude[:] = (
+                            asig.magnitude -
+                            np.median(asig.magnitude))
+                    if LFPFilterOpts is not None:
+                        asig[:] = filterFun(asig, filterCoeffs=filterCoeffs)
+                    if (aSigProxy in aSigList):
+                        # assign ownership to containers
+                        chanIdx.analogsignals.append(asig)
+                        newSeg.analogsignals.append(asig)
+                        # assign parent to children
+                        chanIdx.create_relationship()
+                        newSeg.create_relationship()
+                        # write out to file
+                        asig = writer._write_analogsignal(
+                            asig, nixblock, nixgroup)
+                    del asig
+                    gc.collect()
             for irSigIdx, irSigProxy in enumerate(
                     seg.irregularlysampledsignals):
                 chanIdx = irSigProxy.channel_index
@@ -2168,41 +2344,29 @@ def blockToNix(
                         st.t_stop = tStop
                     except Exception:
                         traceback.print_exc()
-                        #
-                    #  rename chanIndexes TODO: replace in readBlockFixNames
-                    if spikeSourceType == 'nev':
-                        nameParser = re.search(r'ch(\d*)#(\d*)', unit.name)
-                        if nameParser is not None:
-                            # first time at this unit, rename it
-                            chanId = nameParser.group(1)
-                            unitId = nameParser.group(2)
-                            chanIdx = [
-                                    i for i in block.channel_indexes
-                                    if int(chanId) in i.channel_ids][0]
-                            unit.channel_index = chanIdx
-                            unit.name = '{}#{}'.format(chanIdx.name, unitId)
-                            chanIdx.units.append(unit)
-                    elif spikeSourceType == 'tdc':
-                        #  tdc may or may not have the same channel ids, but
-                        #  it will have consistent channel names
-                        nameParser = re.search(
-                            r'([a-zA-Z0-9]*)#(\d*)', unit.name)
-                        chanLabel = nameParser.group(1)
-                        unitId = nameParser.group(2)
-                        chanIdx = [
-                            i for i in block.channel_indexes
-                            if chanLabel == i.name][0]
-                        #  print(unit.name)
-                        if not (unit in chanIdx.units):
-                            # first time at this unit, add to its chanIdx
-                            unit.channel_index = chanIdx
-                            chanIdx.units.append(unit)
-                        #  except Exception:
-                        #      traceback.print_exc()
+                    #  tdc may or may not have the same channel ids, but
+                    #  it will have consistent channel names
+                    nameParser = re.search(
+                        r'([a-zA-Z0-9]*)#(\d*)', unit.name)
+                    chanLabel = nameParser.group(1)
+                    unitId = nameParser.group(2)
+                    #
+                    chIdxName = unit.name.replace('_stim', '').split('#')[0]
+                    chanIdx = block.filter(objects=ChannelIndex, name=chIdxName)[0]
+                    #  print(unit.name)
+                    if not (unit in chanIdx.units):
+                        # first time at this unit, add to its chanIdx
+                        unit.channel_index = chanIdx
+                        chanIdx.units.append(unit)
+                    #  except Exception:
+                    #      traceback.print_exc()
                     st.name = 'seg{}_{}'.format(segIdx, unit.name)
                     #  link SpikeTrain and ID providing unit
                     if calcAverageLFP:
-                        st.annotations['arrayAnnNames'] = list(st.annotations['arrayAnnNames'])
+                        if 'arrayAnnNames' in st.annotations:
+                            st.annotations['arrayAnnNames'] = list(st.annotations['arrayAnnNames'])
+                        else:
+                            st.annotations['arrayAnnNames'] = []
                         st.annotations['arrayAnnNames'].append('phase60hz')
                         phase60hz = hf.interpolateDF(
                             lineNoisePhaseDF,
@@ -2224,7 +2388,7 @@ def blockToNix(
                     # write out to file
                     st = writer._write_spiketrain(st, nixblock, nixgroup)
                     del st
-            #  process trial related events
+            #  process proprio trial related events
             if calcRigEvents:
                 analogData = []
                 for key, value in eventInfo['inputIDs'].items():
@@ -2363,7 +2527,7 @@ def blockToNix(
 def preproc(
         fileName='Trial001',
         rawFolderPath='./',
-        outputFolderPath='./',
+        outputFolderPath='./', mapDF=None,
         fillOverflow=True, removeJumps=True,
         motorEncoderMask=None,
         calcAverageLFP=False,
@@ -2374,7 +2538,8 @@ def preproc(
         writeMode='rw',
         signal_group_mode='split-all', trialInfo=None,
         asigNameList=None, nameSuffix='',
-        calcRigEvents=True, normalizeByImpedance=False
+        calcRigEvents=True, normalizeByImpedance=False, removeMeanAcross=False,
+        LFPFilterOpts=None
         ):
     #  base file name
     rawBasePath = os.path.join(rawFolderPath, fileName)
@@ -2405,9 +2570,8 @@ def preproc(
         block = readBlockFixNames(
             reader,
             block_index=blkIdx, lazy=True,
-            signal_group_mode=signal_group_mode)
+            signal_group_mode=signal_group_mode, mapDF=mapDF)
         # ripple debugging
-        # pdb.set_trace()
         # allSptProx = block.filter(objects=SpikeTrainProxy)
         # allSpt = [i.load() for i in allSptProx]
         # print([i.annotations['unit_id'] for i in allSpt])
@@ -2433,7 +2597,9 @@ def preproc(
             spikeSourceType=spikeSourceType,
             spikeBlock=spikeBlock,
             calcRigEvents=calcRigEvents,
-            normalizeByImpedance=normalizeByImpedance
+            normalizeByImpedance=normalizeByImpedance,
+            removeMeanAcross=removeMeanAcross,
+            LFPFilterOpts=LFPFilterOpts
             )
     writer.close()
     #
