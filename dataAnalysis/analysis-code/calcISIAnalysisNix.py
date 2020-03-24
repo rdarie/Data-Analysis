@@ -43,7 +43,7 @@ expOpts, allOpts = parseAnalysisOptions(
     arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
-
+alignTimeBounds = alignTimeBoundsLookup[int(arguments['blockIdx'])]
 
 def calcISIBlockAnalysisNix():
     arguments['chanNames'], arguments['chanQuery'] = ash.processChannelQueryArgs(
@@ -92,6 +92,11 @@ def calcISIBlockAnalysisNix():
                 dummyT.t_start,
                 dummyT.t_stop + 1/samplingRate,
                 1/samplingRate))
+    # Start parsing autologger info
+    # jsonPath = os.path.join(folderPath, sessionName, deviceName)
+    #     with open(os.path.join(jsonPath, 'StimLog.json'), 'r') as f:
+    #         stimLog = json.load(f)
+    #
     allStimTrains = [
         i
         for i in spikesBlock.filter(objects=SpikeTrain)
@@ -124,7 +129,7 @@ def calcISIBlockAnalysisNix():
                 transformWvfDiff = lambda x: np.squeeze(scaler.transform(x.reshape(-1, 1)))
                 wvfDiffStd = wvfDiffAbs.apply(transformWvfDiff, axis=1, raw=True)
                 if arguments['plotting']:
-                    plt.plot(wvfDiffStd.T, 'o-'); plt.title('standardized abs diff'); plt.show()
+                    plt.plot(wvfDiffStd.T, 'o-'); plt.title('{} standardized abs diff'.format(st.name)); plt.show()
                 # TODO: check if it's necessary to exclude some samples from being centered
                 samplesNeedFix = wvfDiffStd.abs().iloc[:, 0] > 0
                 print('{} out of {} samples need fixing'.format(samplesNeedFix.sum(), samplesNeedFix.size))
@@ -136,7 +141,8 @@ def calcISIBlockAnalysisNix():
                 wvfDiffStd.fillna(method='bfill', axis=1, inplace=True)
                 wvf = wvf.apply(lambda x: x - x[0], axis=1, raw=True)
                 #
-                idxPeak = int(wvfDiffStd.idxmax(axis=1).median())
+                idxPeak, _ = stats.mode(wvfDiffStd.idxmax(axis=1), axis=None)
+                idxPeak = int(idxPeak)
                 amplitudes = wvf.apply(lambda x: (x[idxPeak] - x[0]) * 1e-6, axis=1, raw=True).to_numpy() * pq.V
                 st.annotations['amplitude'] = amplitudes
                 st.array_annotations['amplitude'] = amplitudes
@@ -153,19 +159,18 @@ def calcISIBlockAnalysisNix():
                     st.annotations['arrayAnnNames'] = ['pw']
                 #
                 ampWithinSpec = np.abs(amplitudes) < 4
+                plotMask = st.times > 0 #< 1360
                 if arguments['plotting']:
-                    plt.plot(st.sampling_period * np.arange(wvf.shape[1]), wvf.iloc[ampWithinSpec, :].T * 1e-6, 'o-'); plt.title('fixed wvf'); plt.show()
-                    plt.plot(st.sampling_period * np.arange(wvf.shape[1]), (wvfDiffStd).iloc[:, :].T * 1e-6, 'o-'); plt.title('fixed diff');
-                    plt.plot(st.sampling_period * np.arange(wvf.shape[1]), (wvfDiffStd).iloc[:, :].mean().T * 1e-6, 'o-', lw=3); plt.title('fixed diff'); plt.show()
+                    plt.plot(st.sampling_period * np.arange(wvf.shape[1]), wvf.iloc[plotMask, :].T * 1e-6, 'o-'); plt.title('{} fixed wvf peak at {}'.format(st.name, idxPeak)); plt.show()
+                    plt.plot(st.sampling_period * np.arange(wvf.shape[1]), (wvfDiffStd).iloc[:, :].T * 1e-6, 'o-');
+                    plt.plot(st.sampling_period * np.arange(wvf.shape[1]), (wvfDiffStd).iloc[:, :].mean().T * 1e-6, 'o-', lw=3); plt.title('{} fixed diff peak at {}'.format(st.name, idxPeak)); plt.show()
                 matchingAsig = nspBlock.filter(objects=AnalogSignalProxy, name='seg0_'+ chanName)
                 if len(matchingAsig):
                     keepStimRasterList.append(chanName)
                     elecImpedance = (
                         impedancesRipple
-                        .loc[
-                            impedancesRipple['elec'] == chanName,
-                            'impedance'])
-                    currents = amplitudes / (elecImpedance.iloc[0] * 1e3 * pq.kOhm)
+                        .loc[impedancesRipple['elec'] == chanName, 'impedance'])
+                    currents = amplitudes / (elecImpedance.iloc[0] * pq.kOhm)
                     st.annotations['current'] = currents
                     st.array_annotations['current'] = currents
                     if 'arrayAnnNames' in st.annotations:
@@ -178,64 +183,139 @@ def calcISIBlockAnalysisNix():
             trainDurations = trainEndIdx - trainStartIdx
             #
             if not trainStartIdx.empty:
-                startCategories = pd.DataFrame(activeTimes[trainStartIdx], columns=['t'])
+                startCategories = pd.DataFrame(
+                    activeTimes[trainStartIdx].to_numpy(),
+                    # index=range(activeTimes[trainStartIdx].size),
+                    columns=['t'])
                 startCategories = startCategories.reindex(columns=[
-                    'amplitude', 'current', 'program',
+                    'amplitude', 'amplitudeCat', 'current', 'program',
                     'activeGroup', 'pw', 'electrode',
                     'RateInHz', 'trainDuration', 't'])
                 #
                 latestProgram = 0
-                for idx, (idxStart, idxEnd) in enumerate(zip(trainStartIdx, trainEndIdx)):
-                    stimRasterRow = stimRastersDF.loc[idxStart, :].drop(['t'])
+                for idx, (idxStart, idxEnd) in enumerate(
+                        zip(trainStartIdx, trainEndIdx)):
+                    stimRasterRow = (
+                        stimRastersDF
+                        .loc[idxStart, keepStimRasterList])
                     activeChans = stimRasterRow.index[stimRasterRow > 0]
                     if not activeChans.empty:
-                        stimRasterAmplitude = pd.Series(np.nan, index=activeChans)
-                        stimRasterCurrent = pd.Series(np.nan, index=activeChans)
+                        stimRasterAmplitude = pd.Series(
+                            np.nan, index=activeChans)
+                        stimRasterCurrent = pd.Series(
+                            np.nan, index=activeChans)
                         for activeChanIdx, activeChan in enumerate(activeChans):
                             #
                             st = [
                                 i
                                 for i in spikeList
-                                if i.unit.channel_index.name == activeChan][0] #  + '_stim#0'
+                                if i.unit.channel_index.name == activeChan][0] # + '_stim#0'
                             theseTimesMask = (
-                                (st.times - stimRastersDF.loc[idxStart, 't']* pq.s >= -5e-4 * pq.s) &
-                                (st.times - stimRastersDF.loc[idxEnd, 't']* pq.s <= 5e-4 * pq.s)
+                                (st.times >= stimRastersDF.loc[idxStart, 't'] * pq.s - 1.1 * samplingRate ** (-1) / 2) &
+                                (st.times <= stimRastersDF.loc[idxEnd, 't'] * pq.s + 1.1 * samplingRate ** (-1) / 2)
                                 )
                             theseTimes = st.times[theseTimesMask]
-                            if not theseTimes.size:
+                            if not theseTimesMask.sum():
                                 pdb.set_trace()
-                            stimRasterAmplitude[activeChan] = np.mean(st.annotations['amplitude'][theseTimesMask])
-                            stimRasterCurrent[activeChan] = np.mean(st.annotations['current'][theseTimesMask])
+                            stimRasterAmplitude[activeChan] = np.mean(
+                                st.annotations['amplitude'][theseTimesMask])
+                            stimRasterCurrent[activeChan] = np.mean(
+                                st.annotations['current'][theseTimesMask])
                             if activeChanIdx == 0:
                                 if theseTimes.size == 1:
-                                    startCategories.loc[idx, 'trainDuration'] = 0
-                                    startCategories.loc[idx, 'RateInHz'] = 0
+                                    startCategories.loc[
+                                        idx, 'trainDuration'] = 0
+                                    startCategories.loc[
+                                        idx, 'RateInHz'] = 0
                                 else:
-                                    startCategories.loc[idx, 'trainDuration'] = theseTimes[-1] - theseTimes[0]
-                                    startCategories.loc[idx, 'RateInHz'] = np.diff(theseTimes).mean() ** (-1)
-                                startCategories.loc[idx, 'pw'] = np.mean(st.annotations['pw'][theseTimesMask])
-                        startCategories.loc[idx, 'current'] = np.mean(st.annotations['current'][theseTimesMask])
+                                    startCategories.loc[
+                                        idx, 'trainDuration'] = (
+                                            theseTimes[-1] -
+                                            theseTimes[0])
+                                    startCategories.loc[
+                                        idx, 'RateInHz'] = (
+                                            np.diff(theseTimes).mean() ** (-1))
+                                startCategories.loc[
+                                    idx, 'pw'] = np.mean(
+                                        st.annotations['pw'][theseTimesMask])
                         startCategories.loc[idx, 'activeGroup'] = 1
                         electrodeShortHand = ''
                         negativeAmps = stimRasterCurrent < 0
                         if (negativeAmps).any():
                             electrodeShortHand += '-'
                             totalCathode = stimRasterCurrent[negativeAmps].sum()
+                            startCategories.loc[idx, 'current'] = totalCathode
+                            averageImpedance = np.mean(impedancesRipple.loc[impedancesRipple['elec'].isin(stimRasterCurrent[negativeAmps].index), 'impedance'])
+                            startCategories.loc[idx, 'amplitude'] = totalCathode * averageImpedance
                             for cName in stimRasterCurrent[negativeAmps].index:
                                 electrodeShortHand += cName[:-2]
                         positiveAmps = stimRasterCurrent > 0
                         if (positiveAmps).any():
                             electrodeShortHand += '-'
-                            totalCathode = stimRasterCurrent[positiveAmps].sum()
+                            # totalAnode = stimRasterCurrent[positiveAmps].sum()
                             for cName in stimRasterCurrent[positiveAmps].index:
                                 electrodeShortHand += cName[:-2]
                         startCategories.loc[idx, 'electrode'] = electrodeShortHand
-                        if electrodeShortHand in startCategories['electrode'].unique().tolist() and idx != 0:
+                        if electrodeShortHand not in startCategories['electrode'].unique().tolist() and idx != 0:
                             latestProgram += 1
                         startCategories.loc[idx, 'program'] = latestProgram
-                    # pdb.set_trace()
+                #
+                stopCategories = startCategories.copy()
+                stopCategories['t'] = activeTimes[trainEndIdx].to_numpy()
+                maxAmp = startCategories['amplitude'].max()
+                minAmp = startCategories['amplitude'].min()
+                ampBinRes = 0.2
+                ampBins = np.arange(
+                    (np.floor(minAmp / ampBinRes) - 1) * ampBinRes,
+                    (np.ceil(maxAmp / ampBinRes) + 1) * ampBinRes,
+                    ampBinRes)
+                ampBins[0] -= 0.01
+                ampBins[-1] += 0.01
+                ampCats = pd.cut(startCategories['amplitude'], ampBins)
+                startCategories['amplitudeCat'] = ampCats.astype(np.str)
+                stopCategories['amplitudeCat'] = ampCats.astype(np.str)
+                startCategories['stimCat'] = 'stimOn'
+                stopCategories['stimCat'] = 'stimOff'
+                #
+                startCategories.dropna(inplace=True)
+                stopCategories.dropna(inplace=True)
+        #
+        alignEventsDF = pd.concat((
+            startCategories, stopCategories),
+            axis=0, ignore_index=True, sort=True)
+        # remove events outside manually identified time bounds
+        keepMask = pd.Series(False, index=alignEventsDF.index)
+        for atb in alignTimeBounds:
 
-    
+            keepMask = (
+                keepMask |
+                (
+                    (alignEventsDF['t'] >= atb[0]) &
+                    (alignEventsDF['t'] <= atb[1])))
+        alignEventsDF.drop(
+            index=alignEventsDF.index[~keepMask], inplace=True)
+        alignEventsDF.sort_values('t', inplace=True, kind='mergesort')
+        alignEvents = ns5.eventDataFrameToEvents(
+            alignEventsDF, idxT='t',
+            annCol=None,
+            eventName='seg{}_stimAlignTimes'.format(segIdx),
+            tUnits=pq.s, makeList=False)
+        alignEvents.annotate(nix_name=alignEvents.name)
+        #
+        concatLabelsDF = alignEventsDF
+        concatLabels = np.array([
+            '{}'.format(row)
+            for rowIdx, row in concatLabelsDF.iterrows()])
+        concatEvents = Event(
+            name='seg{}_stimAlignTimesConcatenated'.format(segIdx),
+            times=alignEvents.times,
+            labels=concatLabels
+            )
+        dataSeg.events.append(alignEvents)
+        dataSeg.events.append(concatEvents)
+        alignEvents.segment = dataSeg
+        concatEvents.segment = dataSeg
+    #
     spikesBlock = ns5.purgeNixAnn(spikesBlock)
     writer = neo.io.NixIO(
         filename=analysisDataPath.format(arguments['analysisName']))
@@ -248,7 +328,6 @@ def calcISIBlockAnalysisNix():
     #
     tdDF = ns5.analogSignalsToDataFrame(
         tdBlock.filter(objects=AnalogSignal))
-    
     #
     currentSamplingRate = tdBlock.filter(
         objects=AnalogSignal)[0].sampling_rate

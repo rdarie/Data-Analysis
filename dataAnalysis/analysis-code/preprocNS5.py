@@ -11,6 +11,7 @@ Options:
     --makeTruncated                 whether to make a .nix file that only has analog inputs [default: False]
     --maskMotorEncoder              whether to ignore motor encoder activity outside the alignTimeBounds window [default: False]
     --ISI                           special options for parsing Ripple files from ISI [default: False]
+    --ISIRaw                        special options for parsing Ripple files from ISI [default: False]
 """
 
 import dataAnalysis.preproc.ns5 as ns5
@@ -71,7 +72,7 @@ if arguments['makeTruncated']:
         chunkSize=chunkSize, equalChunks=equalChunks,
         chunkList=chunkList, calcRigEvents=trialFilesFrom['utah']['calcRigEvents']
         )
-# 
+###################################################################################
 if arguments['makeFull']:
     reader = ns5.preproc(
         fileName=ns5FileName,
@@ -85,7 +86,7 @@ if arguments['makeFull']:
         chunkList=chunkList, nameSuffix='_full',
         calcRigEvents=trialFilesFrom['utah']['calcRigEvents']
         )
-#
+##################################################################################
 if arguments['ISI']:
     mapDF = prb_meta.mapToDF(rippleMapFile)
     reader = ns5.preproc(
@@ -99,8 +100,27 @@ if arguments['ISI']:
         chunkSize=chunkSize, equalChunks=equalChunks,
         chunkList=chunkList,
         calcRigEvents=trialFilesFrom['utah']['calcRigEvents'],
-        normalizeByImpedance=False, removeMeanAcross=True,
+        normalizeByImpedance=False, removeMeanAcross=False,
         asigNameList=asigNameList,
+        LFPFilterOpts=LFPFilterOpts,
+        calcAverageLFP=True,
+        )
+##################################################################################
+if arguments['ISIRaw']:
+    mapDF = prb_meta.mapToDF(rippleMapFile)
+    reader = ns5.preproc(
+        fileName=ns5FileName,
+        rawFolderPath=nspFolder,
+        outputFolderPath=scratchFolder, mapDF=None,
+        fillOverflow=False, removeJumps=False,
+        motorEncoderMask=motorEncoderMask,
+        eventInfo=trialFilesFrom['utah']['eventInfo'],
+        spikeSourceType='nev', writeMode='ow',
+        chunkSize=chunkSize, equalChunks=equalChunks,
+        chunkList=chunkList,
+        calcRigEvents=trialFilesFrom['utah']['calcRigEvents'],
+        normalizeByImpedance=False, removeMeanAcross=False,
+        asigNameList=None, nameSuffix='_raw',
         LFPFilterOpts=LFPFilterOpts,
         calcAverageLFP=True,
         )

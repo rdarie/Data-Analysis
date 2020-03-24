@@ -109,7 +109,7 @@ rigColumnSelect = [
 
 outlierLogPath = os.path.join(
     figureFolder,
-    prefix + '_{}_outlierBlocks.txt'.format(arguments['window']))
+    prefix + '_{}_outlierTrials.txt'.format(arguments['window']))
 if os.path.exists(outlierLogPath):
     os.remove(outlierLogPath)
 
@@ -237,7 +237,7 @@ rigCov = (
 rigMahalDist = pd.DataFrame(
     rigCov.mahalanobis(rigSub),
     index=rigDF.index, columns=['mahalDist'])
-outlierBlocksRig = ash.applyFunGrouped(
+outlierTrialsRig = ash.applyFunGrouped(
     rigMahalDist,
     groupBy, testVar,
     fun=findOutliers2, funArgs=[],
@@ -254,19 +254,19 @@ frCov = (
 frMahalDist = pd.DataFrame(
     frCov.mahalanobis(np.sqrt(frDF).to_numpy()),
     index=frDF.index, columns=['mahalDist'])
-outlierBlocksFr = ash.applyFunGrouped(
+outlierTrialsFr = ash.applyFunGrouped(
     frMahalDist,
     groupBy, testVar,
     fun=findOutliers2, funArgs=[],
     funKWargs=dict(multiplier=2, nDim=len(frDF.columns)),
     resultNames=resultNames,
     plotting=False)
-#outlierBlocksFr['rejectBlock'].sum()
-outlierBlocks = {
+#outlierTrialsFr['rejectBlock'].sum()
+outlierTrials = {
     k: pd.DataFrame(
         np.nan,
-        index=outlierBlocksFr[k].index,
-        columns=outlierBlocksFr[k].columns)
+        index=outlierTrialsFr[k].index,
+        columns=outlierTrialsFr[k].columns)
     for k in resultNames}
 
 if arguments['plotting']:
@@ -275,12 +275,12 @@ if arguments['plotting']:
     fig, ax = plt.subplots(2, 1)
     sns.distplot(
         (rigMahalDist),
-        #outlierBlocksRig['averageDeviation'],
+        #outlierTrialsRig['averageDeviation'],
         ax=ax[0], kde=False)
     ax[0].set_xlabel('Rig')
     # sns.distplot(
     #     (frMahalDist),
-    #     #outlierBlocksFr['averageDeviation'],
+    #     #outlierTrialsFr['averageDeviation'],
     #     ax=ax[1], kde=False)
     # ax[1].set_xlabel('Fr')
     plt.show(block=False)
@@ -289,11 +289,11 @@ if arguments['plotting']:
     import seaborn as sns
     fig, ax = plt.subplots(2, 1)
     sns.boxplot(
-        outlierBlocksRig['averageDeviation'],
+        outlierTrialsRig['averageDeviation'],
         ax=ax[0])
     ax[0].set_xlabel('Rig')
     #sns.boxplot(
-    #    outlierBlocksFr['averageDeviation'],
+    #    outlierTrialsFr['averageDeviation'],
     #    ax=ax[1])
     #ax[1].set_xlabel('Fr')
     plt.show(block=False)
@@ -308,17 +308,17 @@ if arguments['plotting']:
         bla.index.get_level_values('bin').to_numpy(),
         bla.to_numpy())
     plt.show()
-# outlierBlocksFr['averageDeviation'].xs(3, level='segment').sort_values('all')
-# outlierBlocksRig['averageDeviation'].xs(3, level='segment').sort_values('all')
-# outlierBlocksFr['averageDeviation'].xs(992, level='originalIndex').xs(3, level='segment')
-outlierBlocks['averageDeviation'] = (
-    outlierBlocksRig['averageDeviation'] +
-    outlierBlocksFr['averageDeviation'])
-outlierBlocks['rejectBlock'] = (
-    (outlierBlocksRig['rejectBlock']).astype(np.bool) |
-    (outlierBlocksFr['rejectBlock']).astype(np.bool))
+# outlierTrialsFr['averageDeviation'].xs(3, level='segment').sort_values('all')
+# outlierTrialsRig['averageDeviation'].xs(3, level='segment').sort_values('all')
+# outlierTrialsFr['averageDeviation'].xs(992, level='originalIndex').xs(3, level='segment')
+outlierTrials['averageDeviation'] = (
+    outlierTrialsRig['averageDeviation'] +
+    outlierTrialsFr['averageDeviation'])
+outlierTrials['rejectBlock'] = (
+    (outlierTrialsRig['rejectBlock']).astype(np.bool) |
+    (outlierTrialsFr['rejectBlock']).astype(np.bool))
 if arguments['saveResults']:
-    outlierBlocks['averageDeviation'].to_hdf(
+    outlierTrials['averageDeviation'].to_hdf(
         resultPath, 'averageDeviation', format='fixed')
-    outlierBlocks['rejectBlock'].to_hdf(
+    outlierTrials['rejectBlock'].to_hdf(
         resultPath, 'rejectBlock', format='fixed')

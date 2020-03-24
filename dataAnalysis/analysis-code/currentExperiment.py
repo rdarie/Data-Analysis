@@ -70,20 +70,20 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
             'Wn': 60,
             'nHarmonics': 1,
             'Q': 20,
-            'N': 8,
+            'N': 1,
             'rp': 1,
             'btype': 'bandstop',
-            'ftype': 'cheby1'
+            'ftype': 'butter'
         },
         'low': {
             'Wn': 1000,
-            'N': 4,
+            'N': 2,
             'btype': 'low',
             'ftype': 'butter'
         },
         'high': {
             'Wn': 5,
-            'N': 4,
+            'N': 2,
             'btype': 'high',
             'ftype': 'butter'
         }
@@ -350,6 +350,7 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
         'binInterval': 1e-3, 'binWidth': 30e-3, 'smoothKernelWidth': 50e-3,
         # 'binInterval': 0.2e-3, 'binWidth': 5e-3, 'smoothKernelWidth': 10e-3,
         'windowSizes': {
+            'extraShort': (-0.25, 0.25),
             'short': (-0.5, 0.5),
             'long': (-2.25, 2.25),
             'RC': (-0.33, 0.33),

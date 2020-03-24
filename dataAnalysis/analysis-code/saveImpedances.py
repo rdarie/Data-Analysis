@@ -6,7 +6,7 @@ Options:
     --exp=exp                           which experimental day to analyze [default: exp201901271000]
     --processAll                        process all experimental days? [default: False]
     --verbose                           print diagnostics? [default: False]
-    --plotting                          plot out the correlation matrix? [default: True]
+    --plotting                          plot out the correlation matrix? [default: False]
     --ripple                            impedances saved with Trellis? [default: False]
     --blackrock                         impedances saved with Central? [default: False]
 """
@@ -44,6 +44,7 @@ import quantities as pq
 import dill as pickle
 from datetime import datetime as dt
 import glob, re
+import importlib
 #   you can specify options related to the analysis via the command line arguments,
 #   or by saving variables in the currentExperiment.py file, or the individual exp2019xxxxxxxx.py files
 #
@@ -105,7 +106,14 @@ if arguments['ripple']:
     else:
         fileList = []
     for filename in fileList:
-        mapDF = prb_meta.mapToDF(rippleMapFile)
+        recDateStr = [i for i in (re.findall('(\d*)', filename)) if len(i)]
+        if not len(recDateStr):
+            continue
+        recDate = dt.strptime(recDateStr[0], '%Y%m%d%H%M')
+        experimentShorthand = 'exp{}'.format(recDateStr[0])
+        optsModule = importlib.import_module(experimentShorthand, package=None)
+        expOpts = optsModule.getExpOpts()
+        mapDF = prb_meta.mapToDF(expOpts['rippleMapFile'])
         folderPath = os.path.dirname(filename)
         newImpedances = pd.read_csv(
             filename, sep='\s+', skiprows=10,
@@ -117,6 +125,7 @@ if arguments['ripple']:
                 return np.nan
             else:
                 return float(x)
+        
         newImpedances['impedance'] = (
             newImpedances['Mag(kOhms)']
             .apply(impedanceToNumeric))
@@ -136,16 +145,11 @@ if arguments['ripple']:
                 '{:03d}'.format(int(feBreakout.loc[rowIdx][2]))
                 )
         newImpedances['elec'] = FE.map(dict(zip(mapDF['FE'], mapDF['label'])))
-        recDateStr = [i for i in (re.findall('(\d*)', filename)) if len(i)]
-        if not len(recDateStr):
-            continue
-        recDate = dt.strptime(recDateStr[0], '%Y%m%d%H%M')
         newImpedances['date'] = recDate
         newImpedances['elecType'] = 'isi_paddle'
         newImpedances.dropna(inplace=True)
         saveImpedances = newImpedances.loc[
             :, ['impedance', 'elec', 'elecType', 'date']]
         impList.append(saveImpedances)
-    allImpedances = pd.concat(impList)
+    allImpedances = pd.concat(impList, sort=True)
     allImpedances.to_hdf('./impedances.h5', 'impedance')
-        

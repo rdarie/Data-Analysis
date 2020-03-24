@@ -3,46 +3,54 @@ def getExpOpts():
     miniRCBlockLookup = {
         1: False,
         2: False,
+        3: False,
+        4: False,
         }
     RCBlockLookup = {
         1: True,
         2: True,
+        3: True,
+        4: True,
         }
     RippleBlockLookup = {
         1: True,
         2: True,
+        3: True,
+        4: True,
         }
     
-    experimentName = '202003091200-ISI'
+    experimentName = '202003201200-Peep'
     deviceName = None
-    rippleMapFile = 'isi_nano1caudal_xAyBzC_ortho_nano2rostral_xAyBzC_inverted.map'
+    rippleMapFile = 'isi_nano1caudal_xAyBzC_ortho_nano2rostral_xAyBzC_ortho.map'
     asigNameList = [
-        ['caudalZ_e{:02d}_a'.format(i) for i in range(17, 25) if i not in [21]],
-        ['rostralY_e{:02d}_a'.format(i) for i in range(9, 16)],
-        ['rostralZ_e{:02d}_a'.format(i) for i in range(17, 25) if i not in [24]]
+        ['caudalX_e{:02d}_a'.format(i) for i in range(1, 9)],
+        ['caudalY_e{:02d}_a'.format(i) for i in range(9, 17)],
+        ['caudalZ_e{:02d}_a'.format(i) for i in range(17, 25)],
+        ['rostralX_e{:02d}_a'.format(i) for i in range(1, 9)],
+        ['rostralY_e{:02d}_a'.format(i) for i in range(9, 17)],
+        ['rostralZ_e{:02d}_a'.format(i) for i in range(17, 25)]
         ]
     jsonSessionNames = {
-        #  per trial
+        #  per block
         1: [],
         2: [],
+        3: [],
+        4: [],
         }
 
     synchInfo = {'ins': {}, 'nsp': {}}
     synchInfo['ins'][1] = dict()
-    synchInfo['ins'][2] = dict()
     
 
     synchInfo['nsp'] = {
         #  per trialSegment
         1: dict(),
-        2: dict()
         }
     #  if not possible to use taps, override with good taps from another segment
     #  not ideal, because segments are only synchronized to the nearest **second**
     overrideSegmentsForTapSync = {
         #  each key is a trial
         1: {},
-        2: {},
         }
     # options for stim artifact detection
     detectStim = False
@@ -71,10 +79,5 @@ def getExpOpts():
         1: [
             [1, 1077]
             ],
-        #  per trial
-        2: [
-            #  per trialSegment
-            [400, 1404], [1536, 2260],
-            ]
         }
     return locals()

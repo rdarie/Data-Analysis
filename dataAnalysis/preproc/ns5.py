@@ -1257,6 +1257,7 @@ def eventDataFrameToEvents(
                 'arrayAnnNames': [],
                 'arrayAnnDTypes': []
                 })
+        # pdb.set_trace()
         for colName in annCol:
             originalDType = type(eventDF[colName].to_numpy()[0]).__name__
             arrayAnn = eventDF[colName].astype(originalDType).to_numpy()
@@ -1691,6 +1692,7 @@ def readBlockFixNames(
     dataBlock = rawioReader.read_block(
         block_index=block_index, lazy=lazy,
         signal_group_mode=signal_group_mode)
+    headerSignalChan = pd.DataFrame(rawioReader.header['signal_channels']).set_index('id')
     #  
     if dataBlock.name is None:
         if 'neo_name' in dataBlock.annotations:
@@ -1702,9 +1704,8 @@ def readBlockFixNames(
         seg0.filter(objects=AnalogSignal)
         )
     if mapDF is not None:
-        asigOrigNames = [
-            'raw {:d}'.format(i + 1)
-            for i in mapDF.index]
+        # [len(a.name) for a in asigLikeList]
+        asigOrigNames = [headerSignalChan.loc[int(i+1), 'name'] for i in mapDF['nevID']]
         asigNameChanger = dict(zip(asigOrigNames, mapDF['label']))
     else:
         asigNameChanger = dict()
@@ -1735,12 +1736,16 @@ def readBlockFixNames(
                 chanId = chanId - 5120
             else:
                 isRippleStimChan = False
-            asigBaseName = 'raw {}'.format(chanId)
+            # pdb.set_trace()
+            asigBaseName = headerSignalChan.loc[chanId, 'name']
             if mapDF is not None:
-                chanIdLabel = (
-                    asigNameChanger[asigBaseName]
-                    if asigBaseName in asigNameChanger
-                    else asigBaseName)
+                if asigBaseName in asigNameChanger:
+                    chanIdLabel = (
+                        asigNameChanger[asigBaseName]
+                        if asigBaseName in asigNameChanger
+                        else asigBaseName)
+                else:
+                    chanIdLabel = asigBaseName
             else:
                 chanIdLabel = asigBaseName
             if isRippleStimChan:
@@ -1749,7 +1754,8 @@ def readBlockFixNames(
                 stp.name = '{}#{}'.format(chanIdLabel, unitId)
         if 'ChannelIndex for ' in stp.unit.channel_index.name:
             stp.unit.name = stp.name
-            stp.unit.channel_index.name = stp.name.replace('_stim#0', '')
+            # stp.unit.channel_index.name = stp.name.replace('_stim#0', '')
+            stp.unit.channel_index.name = chanIdLabel
     #  rename the children
     typesNeedRenaming = [
         SpikeTrainProxy, AnalogSignalProxy, EventProxy,
@@ -2070,7 +2076,8 @@ def blockToNix(
                 filterCoeffs = hf.makeFilterCoeffsSOS(
                     LFPFilterOpts, float(seg.analogsignals[0].sampling_rate))
             # first pass through asigs, if removing mean across channels
-            if removeMeanAcross or calcAverageLFP:
+            # pdb.set_trace()
+            if (removeMeanAcross or calcAverageLFP):
                 for aSigIdx, aSigProxy in enumerate(seg.analogsignals):
                     if aSigIdx == 0:
                         # check bounds
@@ -2079,7 +2086,7 @@ def blockToNix(
                     loadThisOne = (
                         (aSigProxy in aSigList) or
                         (calcAverageLFP and (aSigProxy in lfpAsigList))
-                    )
+                        )
                     if loadThisOne:
                         if trackMemory:
                             print(
@@ -2091,17 +2098,18 @@ def blockToNix(
                             magnitude_mode='rescaled')
                         if 'tempLFPStore' not in locals():
                             tempLFPStore = pd.DataFrame(
-                                np.zeros((asig.shape[0], nAsigs), dtype=np.float32),
+                                np.zeros(
+                                    (asig.shape[0], nAsigs),
+                                    dtype=np.float32),
                                 columns=asigNameListSeg)
                         #  perform requested preproc operations
                         if normalizeByImpedance:
-                            elecNameMatchMask = impedances['elec'] == chanIdx.name
+                            elNmMatchMsk = impedances['elec'] == chanIdx.name
                             asig.magnitude[:] = (
                                 (asig.magnitude - np.mean(asig.magnitude)) /
                                 np.min(
-                                    impedances.loc[elecNameMatchMask, 'impedance']
-                                    )
-                                )
+                                    impedances.loc[elNmMatchMsk, 'impedance']
+                                    ))
                         if fillOverflow:
                             # fill in overflow:
                             '''
@@ -2251,11 +2259,11 @@ def blockToNix(
                     asig.channel_index = chanIdx
                     #  perform requested preproc operations
                     if normalizeByImpedance:
-                        elecNameMatchMask = impedances['elec'] == chanIdx.name
+                        elNmMatchMsk = impedances['elec'] == chanIdx.name
                         asig.magnitude[:] = (
                             (asig.magnitude - np.mean(asig.magnitude)) /
                             np.min(
-                                impedances.loc[elecNameMatchMask, 'impedance']
+                                impedances.loc[elNmMatchMsk, 'impedance']
                                 )
                             )
                     if fillOverflow:

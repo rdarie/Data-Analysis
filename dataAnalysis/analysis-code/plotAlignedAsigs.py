@@ -79,7 +79,7 @@ alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(
 alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = (
     ash.processUnitQueryArgs(
         namedQueries, analysisSubFolder, **arguments))
-alignedAsigsKWargs['outlierBlocks'] = ash.processOutlierBlocks(
+alignedAsigsKWargs['outlierTrials'] = ash.processOutlierTrials(
     alignSubFolder, prefix, **arguments)
 alignedAsigsKWargs.update(dict(
     duplicateControlsByProgram=True,
@@ -98,10 +98,10 @@ pdfName = '{}_{}_{}_{}'.format(
 statsTestPath = os.path.join(figureStatsFolder, pdfName + '_stats.h5')
 #############################################
 #  Overrides
-alignedAsigsKWargs.update({'decimate': 10})
+alignedAsigsKWargs.update({'decimate': 1})
 limitPages = None
 if arguments['enableOverrides']:
-    alignedAsigsKWargs.update({'windowSize': (-1000e-3, 1000e-3)})
+    alignedAsigsKWargs.update({'windowSize': (-50e-3, 150e-3)})
     currWindow = rasterOpts['windowSizes'][arguments['window']]
     fullWinSize = currWindow[1] - currWindow[0]
     redWinSize = (
@@ -109,12 +109,11 @@ if arguments['enableOverrides']:
         alignedAsigsKWargs['windowSize'][0])
     relplotKWArgs['aspect'] = (
         relplotKWArgs['aspect'] * redWinSize / fullWinSize)
-    # statsTestOpts.update({
-    #     'testStride': 500e-3,
-    #     'testWidth': 500e-3,
-    #     'tStart': -2000e-3,
-    #     'tStop': 2250e-3})
-    
+    statsTestOpts.update({
+        'testStride': 50e-3,
+        'testWidth': 50e-3,
+        'tStart': 0,
+        'tStop': 100e-3})
 #  End Overrides
 
 #  Get stats results

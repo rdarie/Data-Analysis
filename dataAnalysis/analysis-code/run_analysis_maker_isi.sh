@@ -33,6 +33,6 @@ source activate nda
 python --version
 
 SLURM_ARRAY_TASK_ID=2
-python ./calcISIAnalysisNix.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --chanQuery="all"
+python ./calcISIAnalysisNix.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --chanQuery="all" --plotting
 # python ./calcStimAlignTimes.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --plotParamHistograms
 # python ./calcFR.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID

@@ -80,7 +80,7 @@ else:
 alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **arguments)
 alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
     namedQueries, alignSubFolder, **arguments)
-alignedAsigsKWargs['outlierBlocks'] = ash.processOutlierBlocks(
+alignedAsigsKWargs['outlierTrials'] = ash.processOutlierTrials(
     alignSubFolder, prefix, **arguments)
 alignedAsigsKWargs.update(dict(
     duplicateControlsByProgram=True,
