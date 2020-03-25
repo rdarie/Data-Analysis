@@ -29,10 +29,8 @@
 # EXP="exp201901221000"
 # EXP="exp201901231000"
 # EXP="exp201901261000"
-# EXP="exp201901271000"
-# EXP="exp202003091200"
-# EXP="exp202003131100"
-EXP="exp202003131100"
+EXP="exp201901271000"
+
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh

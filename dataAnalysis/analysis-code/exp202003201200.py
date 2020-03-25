@@ -22,14 +22,16 @@ def getExpOpts():
     experimentName = '202003201200-Peep'
     deviceName = None
     rippleMapFile = 'isi_nano1caudal_xAyBzC_ortho_nano2rostral_xAyBzC_ortho.map'
+    # exclude caudal_e08, rostral_e03 and rostral_e016
     asigNameList = [
-        ['caudalX_e{:02d}_a'.format(i) for i in range(1, 9)],
-        ['caudalY_e{:02d}_a'.format(i) for i in range(9, 17)],
+        ['caudalX_e{:02d}_a'.format(i) for i in range(1, 8)] +
+        ['caudalY_e{:02d}_a'.format(i) for i in range(9, 17)] +
         ['caudalZ_e{:02d}_a'.format(i) for i in range(17, 25)],
-        ['rostralX_e{:02d}_a'.format(i) for i in range(1, 9)],
-        ['rostralY_e{:02d}_a'.format(i) for i in range(9, 17)],
+        ['rostralX_e{:02d}_a'.format(i) for i in range(1, 9) if i not in [3]] +
+        ['rostralY_e{:02d}_a'.format(i) for i in range(9, 16)] +
         ['rostralZ_e{:02d}_a'.format(i) for i in range(17, 25)]
         ]
+    ainpNameList = ['analog 1']
     jsonSessionNames = {
         #  per block
         1: [],
@@ -40,7 +42,6 @@ def getExpOpts():
 
     synchInfo = {'ins': {}, 'nsp': {}}
     synchInfo['ins'][1] = dict()
-    
 
     synchInfo['nsp'] = {
         #  per trialSegment
@@ -77,7 +78,7 @@ def getExpOpts():
     movementSizeBins = [0, 0.25, 0.5, 1, 1.25, 1.5]
     alignTimeBoundsLookup = {
         1: [
-            [1, 1077]
+            [1, 2000]
             ],
         }
     return locals()

@@ -129,6 +129,9 @@ def calcISIBlockAnalysisNix():
                 del st
                 unit.create_relationship()
                 seg.create_relationship()
+            else:
+                pass
+            pdb.set_trace()
         if mustDoubleSpikeWvfLen:
             for stIdx, st in enumerate(spikesBlock.filter(objects=SpikeTrain)):
                 if st.waveforms.shape[-1] == originalSpikeWvfLen:
@@ -160,7 +163,7 @@ def calcISIBlockAnalysisNix():
         'elec': [],
         'nominalWaveform': [],
         'nominalCurrent': [],
-        'rateInHz': [],
+        'RateInHz': [],
         'trainDur': [],
         'firstPW': [],
         'secondPW': [],
@@ -191,7 +194,7 @@ def calcISIBlockAnalysisNix():
             nominalIdxMax = np.argmax(np.abs(np.asarray(nominalWaveform)))
             stimDict['nominalCurrent'].append(nominalWaveform[nominalIdxMax])
             thisStimPeriod = (stimCmd['period'] / (30000 * pq.Hz))
-            stimDict['rateInHz'].append(thisStimPeriod ** (-1))
+            stimDict['RateInHz'].append(thisStimPeriod ** (-1))
             stimDict['trainDur'].append((stimCmd['repeats']) * thisStimPeriod)
     
     stimDict['labels'] = np.asarray([
@@ -202,6 +205,9 @@ def calcISIBlockAnalysisNix():
         times=np.asarray(stimDict.pop('t')) / (30000 * pq.Hz),
         labels=stimDict.pop('labels'))
     stimEvents.annotations['arrayAnnNames'] = [k for k in stimDict.keys()]
+    stimEvents.annotations['nix_name'] = stimEvents.name
+    spikesBlock.segments[0].events.append(stimEvents)
+    stimEvents.segment = spikesBlock.segments[0]
     #
     for k in stimEvents.annotations['arrayAnnNames']:
         stimEvents.array_annotations[k] = stimDict[k]
@@ -269,7 +275,7 @@ def calcISIBlockAnalysisNix():
                     st.annotations['arrayAnnNames'] = ['pw']
                 #
                 ampWithinSpec = np.abs(amplitudes) < 4
-                plotMask = st.times > 0 #< 1360
+                plotMask = st.times > 0 # < 1360
                 if arguments['plotting']:
                     plt.plot(st.sampling_period * np.arange(wvf.shape[1]), wvf.iloc[plotMask, :].T * 1e-6, 'o-'); plt.title('{} fixed wvf peak at {}'.format(st.name, idxPeak)); plt.show()
                     plt.plot(st.sampling_period * np.arange(wvf.shape[1]), (wvfDiffStd).iloc[:, :].T * 1e-6, 'o-');
@@ -289,6 +295,12 @@ def calcISIBlockAnalysisNix():
                         st.annotations['arrayAnnNames'] = ['current']
             stimActive = stimRastersDF[keepStimRasterList].sum(axis=1) > 0
             activeTimes = stimRastersDF.loc[stimActive, 't']
+            #
+            stimEvents[:] = (
+                stimEvents.times -
+                stimEvents.times[0] +
+                activeTimes.min() * pq.s)
+            #
             peakIdx, _, trainStartIdx, trainEndIdx = hf.findTrains(
                 peakTimes=activeTimes, iti=10e-3)
             trainDurations = trainEndIdx - trainStartIdx
@@ -299,7 +311,7 @@ def calcISIBlockAnalysisNix():
                     # index=range(activeTimes[trainStartIdx].size),
                     columns=['t'])
                 startCategories = startCategories.reindex(columns=[
-                    'amplitude', 'amplitudeCat', 'current', 'program',
+                    'amplitude', 'current', 'program',
                     'activeGroup', 'pw', 'electrode',
                     'RateInHz', 'trainDuration', 't'])
                 #
@@ -373,21 +385,21 @@ def calcISIBlockAnalysisNix():
                 #
                 stopCategories = startCategories.copy()
                 stopCategories['t'] = activeTimes[trainEndIdx].to_numpy()
-                maxAmp = startCategories['amplitude'].max()
-                minAmp = startCategories['amplitude'].min()
-                ampBinRes = 0.2
-                ampBins = np.arange(
-                    (np.floor(minAmp / ampBinRes) - 1) * ampBinRes,
-                    (np.ceil(maxAmp / ampBinRes) + 1) * ampBinRes,
-                    ampBinRes)
-                ampBins[0] -= 0.01
-                ampBins[-1] += 0.01
-                ampCats = pd.cut(startCategories['amplitude'], ampBins)
-                startCategories['amplitudeCat'] = ampCats.astype(np.str)
-                stopCategories['amplitudeCat'] = ampCats.astype(np.str)
+                # maxAmp = startCategories['amplitude'].max()
+                # minAmp = startCategories['amplitude'].min()
+                # ampBinRes = 0.2
+                # ampBins = np.arange(
+                #     (np.floor(minAmp / ampBinRes) - 1) * ampBinRes,
+                #     (np.ceil(maxAmp / ampBinRes) + 1) * ampBinRes,
+                #     ampBinRes)
+                # ampBins[0] -= 0.01
+                # ampBins[-1] += 0.01
+                # ampCats = pd.cut(startCategories['amplitude'], ampBins)
+                # startCategories['amplitudeCat'] = ampCats.astype(np.str)
+                # stopCategories['amplitudeCat'] = ampCats.astype(np.str)
                 startCategories['stimCat'] = 'stimOn'
                 stopCategories['stimCat'] = 'stimOff'
-                #
+                pdb.set_trace()
                 startCategories.dropna(inplace=True)
                 stopCategories.dropna(inplace=True)
         #
@@ -397,7 +409,6 @@ def calcISIBlockAnalysisNix():
         # remove events outside manually identified time bounds
         keepMask = pd.Series(False, index=alignEventsDF.index)
         for atb in alignTimeBounds:
-
             keepMask = (
                 keepMask |
                 (

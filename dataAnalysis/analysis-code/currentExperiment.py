@@ -36,6 +36,7 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
         openEphysChanNames = expOpts['openEphysChanNames']
     except Exception:
         openEphysChanNames = []
+    #
     EMGFilterOpts = {
         'matched': {
             'type': 'sin',
@@ -64,7 +65,8 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
             'btype': 'high',
             'ftype': 'butter'
         }
-        }
+    }
+    #
     LFPFilterOpts = {
         'bandstop': {
             'Wn': 60,
@@ -87,7 +89,7 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
             'btype': 'high',
             'ftype': 'butter'
         }
-        }
+    }
     miniRCBlock = miniRCBlockLookup[blockIdx]
     RCBlock = RCBlockLookup[blockIdx]
     RippleBlock = RippleBlockLookup[blockIdx]
@@ -249,6 +251,7 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
     impedances['elec'] = cmpDF['label'].iloc[:impedances.shape[0]].to_numpy()
     impedances.set_index('elec', inplace=True)
     impedancesRipple = prb_meta.getLatestImpedance(recordingDateStr=experimentDateStr, elecType='isi_paddle')
+    #
     if remakePrb:
         nspCsvPath = os.path.join('.', 'nsp_map.csv')
         cmpDF.to_csv(nspCsvPath)

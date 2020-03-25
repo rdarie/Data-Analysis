@@ -1902,7 +1902,7 @@ def blockToNix(
         fillOverflow=False, calcAverageLFP=False,
         motorEncoderMask=None,
         removeJumps=False, trackMemory=True,
-        asigNameList=None,
+        asigNameList=None, ainpNameList=None,
         spikeSourceType='', spikeBlock=None,
         calcRigEvents=True,
         normalizeByImpedance=True, removeMeanAcross=False,
@@ -2054,8 +2054,26 @@ def blockToNix(
                     if np.any([n in a.name for n in asigNameListSeg]):
                         aSigList.append(a)
             else:
-                aSigList = seg.analogsignals
-                asigNameListSeg = [a.name for a in seg.analogsignals]
+                aSigList = [
+                    a
+                    for a in seg.analogsignals
+                    if ~(('ainp' in a.name) or ('analog' in a.name))]
+                asigNameListSeg = [a.name for a in aSigList]
+            if ainpNameList is not None:
+                ainpNameListSeg = [
+                    'seg{}_{}'.format(segIdx, a)
+                    for a in ainpNameList]
+                ainpList = []
+                for a in seg.analogsignals:
+                    if np.any([n in a.name for n in ainpNameListSeg]):
+                        ainpList.append(a)
+            else:
+                ainpList = [
+                    a
+                    for a in seg.analogsignals
+                    if (('ainp' in a.name) or ('analog' in a.name))]
+                ainpNameListSeg = [a.name for a in aSigList]
+            #  
             nAsigs = len(aSigList)
             if asigNameList is not None:
                 lfpAsigList = aSigList
@@ -2063,7 +2081,7 @@ def blockToNix(
                 lfpAsigList = [
                     a
                     for a in seg.analogsignals
-                    if ('ainp' not in a.name)
+                    if ~(('ainp' in a.name) or ('analog' in a.name))
                     ]
             nLfpAsigs = len(lfpAsigList)
             # second pass through asigs, to save
@@ -2075,7 +2093,6 @@ def blockToNix(
                 filterCoeffs = hf.makeFilterCoeffsSOS(
                     LFPFilterOpts, float(seg.analogsignals[0].sampling_rate))
             # first pass through asigs, if removing mean across channels
-            # pdb.set_trace()
             if (removeMeanAcross or calcAverageLFP):
                 for aSigIdx, aSigProxy in enumerate(seg.analogsignals):
                     if aSigIdx == 0:
@@ -2149,7 +2166,7 @@ def blockToNix(
                         meanLFP[:, subListIdx] = (
                             tempLFPStore
                             .loc[:, meanGroups[subListIdx]]
-                            .mean(axis=1))
+                            .median(axis=1))
                     del tempLFPStore
                 gc.collect()
             if calcAverageLFP:
@@ -2244,7 +2261,8 @@ def blockToNix(
                     tStop = min(tStop, aSigProxy.t_stop)
                 loadThisOne = (
                     (aSigProxy in aSigList) or
-                    (calcAverageLFP and (aSigProxy in lfpAsigList))
+                    (calcAverageLFP and (aSigProxy in lfpAsigList)) or
+                    (aSigProxy in ainpList)
                 )
                 if loadThisOne:
                     if trackMemory:
@@ -2257,7 +2275,7 @@ def blockToNix(
                     #  link AnalogSignal and ID providing channel_index
                     asig.channel_index = chanIdx
                     #  perform requested preproc operations
-                    if normalizeByImpedance:
+                    if normalizeByImpedance and (aSigProxy not in ainpList):
                         elNmMatchMsk = impedances['elec'] == chanIdx.name
                         asig.magnitude[:] = (
                             (asig.magnitude - np.mean(asig.magnitude)) /
@@ -2282,7 +2300,7 @@ def blockToNix(
                         badData.update(newBadData)
                         '''
                         pass
-                    if removeMeanAcross:
+                    if removeMeanAcross and (aSigProxy not in ainpList):
                         for k, cols in meanGroups.items():
                             if asig.name in cols:
                                 whichColumnToSubtract = k
@@ -2292,9 +2310,9 @@ def blockToNix(
                         asig.magnitude[:] = (
                             asig.magnitude -
                             np.median(asig.magnitude))
-                    if LFPFilterOpts is not None:
+                    if (LFPFilterOpts is not None) and (aSigProxy not in ainpList):
                         asig[:] = filterFun(asig, filterCoeffs=filterCoeffs)
-                    if (aSigProxy in aSigList):
+                    if (aSigProxy in aSigList) or (aSigProxy in ainpList):
                         # assign ownership to containers
                         chanIdx.analogsignals.append(asig)
                         newSeg.analogsignals.append(asig)
@@ -2544,7 +2562,7 @@ def preproc(
         chunkList=None,
         writeMode='rw',
         signal_group_mode='split-all', trialInfo=None,
-        asigNameList=None, nameSuffix='',
+        asigNameList=None, ainpNameList=None, nameSuffix='',
         calcRigEvents=True, normalizeByImpedance=False, removeMeanAcross=False,
         LFPFilterOpts=None
         ):
@@ -2600,7 +2618,7 @@ def preproc(
             motorEncoderMask=motorEncoderMask,
             calcAverageLFP=calcAverageLFP,
             eventInfo=eventInfo,
-            asigNameList=asigNameList,
+            asigNameList=asigNameList, ainpNameList=ainpNameList,
             spikeSourceType=spikeSourceType,
             spikeBlock=spikeBlock,
             calcRigEvents=calcRigEvents,

@@ -16,7 +16,7 @@ Options:
 
 import dataAnalysis.preproc.ns5 as ns5
 import dataAnalysis.helperFunctions.probe_metadata as prb_meta
-import pdb
+import pdb, traceback, shutil
 
 #  load options
 from currentExperiment import parseAnalysisOptions
@@ -100,11 +100,16 @@ if arguments['ISI']:
         chunkSize=chunkSize, equalChunks=equalChunks,
         chunkList=chunkList,
         calcRigEvents=trialFilesFrom['utah']['calcRigEvents'],
-        normalizeByImpedance=False, removeMeanAcross=False,
-        asigNameList=asigNameList,
+        normalizeByImpedance=False, removeMeanAcross=True,
+        asigNameList=asigNameList, ainpNameList=ainpNameList,
         LFPFilterOpts=LFPFilterOpts,
         calcAverageLFP=True,
         )
+    try:
+        jsonPath = trialBasePath.replace('.nix', '_autoStimLog.json')
+        shutil.copyfile()
+    except Exception:
+        traceback.print_exc()
 ##################################################################################
 if arguments['ISIRaw']:
     mapDF = prb_meta.mapToDF(rippleMapFile)
@@ -120,7 +125,7 @@ if arguments['ISIRaw']:
         chunkList=chunkList,
         calcRigEvents=trialFilesFrom['utah']['calcRigEvents'],
         normalizeByImpedance=False, removeMeanAcross=False,
-        asigNameList=None, nameSuffix='_raw',
+        asigNameList=None, ainpNameList=None, nameSuffix='_raw',
         LFPFilterOpts=LFPFilterOpts,
         calcAverageLFP=True,
         )
