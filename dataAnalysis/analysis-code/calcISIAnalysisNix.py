@@ -34,6 +34,8 @@ import rcsanalysis.packet_func as rcsa_helpers
 import os, pdb
 import traceback
 from importlib import reload
+import json
+from copy import deepcopy
 #  load options
 from currentExperiment import parseAnalysisOptions
 from docopt import docopt
@@ -77,6 +79,63 @@ def calcISIBlockAnalysisNix():
             spikeList = dataSeg.filter(objects=SpikeTrain)
             spikeList = ns5.loadContainerArrayAnn(trainList=spikeList)
     # calc binarized and get new time axis
+    allStimTrains = [
+        i
+        for i in spikesBlock.filter(objects=SpikeTrain)
+        if '_stim' in i.name]
+    if len(allStimTrains):
+        mustDoubleSpikeWvfLen = False
+        for stIdx, st in enumerate(allStimTrains):
+            if stIdx == 0:
+                originalSpikeWvfLen = st.waveforms.shape[-1]
+            theseTimes = pd.Series(st.times)
+            # if a stim train is longer than 1.7 msec
+            # it gets split into two spikes
+            maskContinued = theseTimes.diff() < 1.8e-3
+            #
+            if maskContinued.any():
+                mustDoubleSpikeWvfLen = True
+                maskContinuedSources = maskContinued.shift(-1).fillna(False)
+                assert maskContinued.sum() == maskContinuedSources.sum()
+                secondVolIdx = maskContinued.index[maskContinued]
+                notADuplicateMask = (~maskContinued).to_numpy()
+                firstVolIdx = maskContinuedSources.index[maskContinuedSources]
+                newWaveforms = np.concatenate(
+                    [
+                        st.waveforms[firstVolIdx, :, :],
+                        st.waveforms[secondVolIdx, :, :]],
+                    axis=-1) * st.waveforms.units
+                # expand all, to catch single size spikes
+                st.waveforms = np.concatenate(
+                    [
+                        st.waveforms, np.zeros_like(st.waveforms)],
+                    axis=-1) * st.waveforms.units
+                unit = st.unit
+                uIdx = np.flatnonzero([np.all(i == st) for i in unit.spiketrains])[0]
+                seg = st.segment
+                segIdx = np.flatnonzero([np.all(i == st) for i in seg.spiketrains])[0]
+                #
+                newSt = deepcopy(st[notADuplicateMask])
+                newSt.waveforms = newWaveforms
+                for k in newSt.array_annotations.keys():
+                    newSt.array_annotations[k] = st.array_annotations[k][notADuplicateMask]
+                    if k in st.annotations:
+                        newSt.annotations[k] = st.array_annotations[k][notADuplicateMask]
+                unit.spiketrains[uIdx] = newSt
+                newSt.unit = unit
+                seg.spiketrains[segIdx] = newSt
+                newSt.segment = seg
+                allStimTrains[stIdx] = newSt
+                del st
+                unit.create_relationship()
+                seg.create_relationship()
+        if mustDoubleSpikeWvfLen:
+            for stIdx, st in enumerate(spikesBlock.filter(objects=SpikeTrain)):
+                if st.waveforms.shape[-1] == originalSpikeWvfLen:
+                    st.waveforms = np.concatenate(
+                        [
+                            st.waveforms, np.zeros_like(st.waveforms)],
+                        axis=-1) * st.waveforms.units
     if len(allSpikeTrains):
         spikeMatBlock = ns5.calcBinarizedArray(
             deepcopy(spikesBlock), samplingRate,
@@ -93,17 +152,68 @@ def calcISIBlockAnalysisNix():
                 dummyT.t_stop + 1/samplingRate,
                 1/samplingRate))
     # Start parsing autologger info
-    # jsonPath = os.path.join(folderPath, sessionName, deviceName)
-    #     with open(os.path.join(jsonPath, 'StimLog.json'), 'r') as f:
-    #         stimLog = json.load(f)
+    jsonPath = trialBasePath.replace('.nix', '_autoStimLog.json')
+    with open(jsonPath, 'r') as f:
+        stimLog = json.load(f)
+    stimDict = {
+        't': [],
+        'elec': [],
+        'nominalWaveform': [],
+        'nominalCurrent': [],
+        'rateInHz': [],
+        'trainDur': [],
+        'firstPW': [],
+        'secondPW': [],
+        }
+    allNominalWaveforms = []
+    for idx, entry in enumerate(stimLog):
+        t = entry['t']
+        allStimCmd = entry['stimCmd']
+        ampQuanta = 20 * pq.uA  # TODO: read from settings
+        for stimCmd in allStimCmd:
+            # each stimCmd represents one electrode
+            nominalWaveform = []
+            lastAmplitude = 0
+            for phase in stimCmd['seq']:
+                if phase['enable']:
+                    phAmp = ampQuanta * phase['ampl'] * (-1) * ((-1) ** phase['pol'])
+                    phaseWaveform = [phAmp for i in range(31 * phase['length'])]
+                else:
+                    phaseWaveform = [0 for i in range(31 * phase['length'])]
+                phaseWaveform[:phase['delay']] = [lastAmplitude for i in range(phase['delay'])]
+                lastAmplitude = phaseWaveform[-1]
+                nominalWaveform += phaseWaveform
+            stimDict['t'].append(t)
+            stimDict['firstPW'].append(stimCmd['seq'][0]['length'] / (30000 * pq.Hz))
+            stimDict['secondPW'].append(stimCmd['seq'][2]['length'] / (30000 * pq.Hz))
+            stimDict['elec'].append(stimCmd['elec'] * pq.dimensionless)
+            allNominalWaveforms.append(np.asarray(nominalWaveform))
+            nominalIdxMax = np.argmax(np.abs(np.asarray(nominalWaveform)))
+            stimDict['nominalCurrent'].append(nominalWaveform[nominalIdxMax])
+            thisStimPeriod = (stimCmd['period'] / (30000 * pq.Hz))
+            stimDict['rateInHz'].append(thisStimPeriod ** (-1))
+            stimDict['trainDur'].append((stimCmd['repeats']) * thisStimPeriod)
+    
+    stimDict['labels'] = np.asarray([
+        'stim update {}'.format(i)
+        for i in range(len(stimDict['elec']))])
+    stimEvents = Event(
+        name='seg0_stimEvents',
+        times=np.asarray(stimDict.pop('t')) / (30000 * pq.Hz),
+        labels=stimDict.pop('labels'))
+    stimEvents.annotations['arrayAnnNames'] = [k for k in stimDict.keys()]
     #
-    allStimTrains = [
-        i
-        for i in spikesBlock.filter(objects=SpikeTrain)
-        if '_stim' in i.name]
+    for k in stimEvents.annotations['arrayAnnNames']:
+        stimEvents.array_annotations[k] = stimDict[k]
+        stimEvents.annotations[k] = stimDict.pop(k)
+    stimEvents.annotations['nominalWaveforms'] = np.vstack(allNominalWaveforms)
+    #
     if len(allStimTrains):
         for segIdx, dataSeg in enumerate(spikesBlock.segments):
-            spikeList = dataSeg.filter(objects=SpikeTrain)
+            spikeList = [
+                st
+                for st in dataSeg.filter(objects=SpikeTrain)
+                if '_stim' in st.name]
             stimRasters = [
                 sr
                 for sr in spikeMatBlock.segments[segIdx].analogsignals
@@ -164,7 +274,7 @@ def calcISIBlockAnalysisNix():
                     plt.plot(st.sampling_period * np.arange(wvf.shape[1]), wvf.iloc[plotMask, :].T * 1e-6, 'o-'); plt.title('{} fixed wvf peak at {}'.format(st.name, idxPeak)); plt.show()
                     plt.plot(st.sampling_period * np.arange(wvf.shape[1]), (wvfDiffStd).iloc[:, :].T * 1e-6, 'o-');
                     plt.plot(st.sampling_period * np.arange(wvf.shape[1]), (wvfDiffStd).iloc[:, :].mean().T * 1e-6, 'o-', lw=3); plt.title('{} fixed diff peak at {}'.format(st.name, idxPeak)); plt.show()
-                matchingAsig = nspBlock.filter(objects=AnalogSignalProxy, name='seg0_'+ chanName)
+                matchingAsig = nspBlock.filter(objects=AnalogSignalProxy, name='seg0_' + chanName)
                 if len(matchingAsig):
                     keepStimRasterList.append(chanName)
                     elecImpedance = (
@@ -179,10 +289,11 @@ def calcISIBlockAnalysisNix():
                         st.annotations['arrayAnnNames'] = ['current']
             stimActive = stimRastersDF[keepStimRasterList].sum(axis=1) > 0
             activeTimes = stimRastersDF.loc[stimActive, 't']
-            peakIdx, _, trainStartIdx, trainEndIdx = hf.findTrains(peakTimes=activeTimes, iti=10e-3)
+            peakIdx, _, trainStartIdx, trainEndIdx = hf.findTrains(
+                peakTimes=activeTimes, iti=10e-3)
             trainDurations = trainEndIdx - trainStartIdx
             #
-            if not trainStartIdx.empty:
+            if len(trainStartIdx):
                 startCategories = pd.DataFrame(
                     activeTimes[trainStartIdx].to_numpy(),
                     # index=range(activeTimes[trainStartIdx].size),
@@ -205,7 +316,7 @@ def calcISIBlockAnalysisNix():
                         stimRasterCurrent = pd.Series(
                             np.nan, index=activeChans)
                         for activeChanIdx, activeChan in enumerate(activeChans):
-                            #
+                            # pdb.set_trace()
                             st = [
                                 i
                                 for i in spikeList

@@ -1754,8 +1754,7 @@ def readBlockFixNames(
                 stp.name = '{}#{}'.format(chanIdLabel, unitId)
         if 'ChannelIndex for ' in stp.unit.channel_index.name:
             stp.unit.name = stp.name
-            # stp.unit.channel_index.name = stp.name.replace('_stim#0', '')
-            stp.unit.channel_index.name = chanIdLabel
+            stp.unit.channel_index.name = stp.name.replace('_stim#0', '').replace('#0', '')
     #  rename the children
     typesNeedRenaming = [
         SpikeTrainProxy, AnalogSignalProxy, EventProxy,
@@ -2807,6 +2806,8 @@ def calcBinarizedArray(
     spikeMatBlock.create_relationship()
     spikeMatBlock = purgeNixAnn(spikeMatBlock)
     if saveToFile:
+        if os.path.exists(binnedSpikePath):
+            os.remove(binnedSpikePath)
         writer = NixIO(filename=binnedSpikePath)
         writer.write_block(spikeMatBlock, use_obj_names=True)
         writer.close()

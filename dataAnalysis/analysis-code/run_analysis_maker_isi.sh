@@ -23,7 +23,8 @@
 # Request custom resources
 #SBATCH --array=5
 
-EXP="exp202003091200"
+# EXP="exp202003091200"
+EXP="exp202003201200"
 
 
 module load anaconda/3-5.2.0
@@ -32,7 +33,8 @@ conda activate
 source activate nda
 python --version
 
-SLURM_ARRAY_TASK_ID=2
-python ./calcISIAnalysisNix.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --chanQuery="all" --plotting
+SLURM_ARRAY_TASK_ID=1
+python ./calcISIAnalysisNix.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --chanQuery="all"
+# python ./calcISIAnalysisNix.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --chanQuery="all" --plotting
 # python ./calcStimAlignTimes.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --plotParamHistograms
 # python ./calcFR.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID
