@@ -47,7 +47,7 @@ if (overrideChanNames is not None) and (arguments['chanQuery'] in ['fr', 'fr_sqr
 else:
     arguments['chanNames'], arguments['chanQuery'] = ash.processChannelQueryArgs(
         namedQueries, scratchFolder, **arguments)
-
+# pdb.set_trace()
 analysisSubFolder = os.path.join(
     scratchFolder, arguments['analysisName']
     )
@@ -74,7 +74,7 @@ if arguments['processAll']:
     signalPath = experimentBinnedSpikePath
 else:
     signalPath = binnedSpikePath
-
+#
 signalReader, signalBlock = ns5.blockFromPath(
     signalPath, lazy=arguments['lazy'])
 

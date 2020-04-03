@@ -6,6 +6,7 @@ Options:
     --exp=exp                              which experimental day to analyze
     --blockIdx=blockIdx                    which trial to analyze [default: 1]
     --analysisName=analysisName            append a name to the resulting blocks? [default: default]
+    --alignFolderName=alignFolderName      append a name to the resulting blocks? [default: motion]
     --processAll                           process entire experimental day? [default: False]
     --verbose                              print diagnostics? [default: True]
     --lazy                                 load from raw, or regular? [default: False]
@@ -14,20 +15,16 @@ Options:
     --unitQuery=unitQuery                  how to restrict channels if not supplying a list? [default: pca]
     --alignQuery=alignQuery                what will the plot be aligned to? [default: outboundWithStim]
     --selector=selector                    filename if using a unit selector
-    --rowName=rowName                      break down by row  [default: pedalDirection]
-    --rowControl=rowControl                rows to exclude from stats test
-    --hueName=hueName                      break down by hue  [default: amplitudeCat]
-    --hueControl=hueControl                hues to exclude from stats test
-    --styleName=styleName                  break down by style [default: RateInHz]
-    --styleControl=hueControl              styles to exclude from stats test
-    --colName=colName                      break down by col  [default: electrode]
-    --colControl=colControl                cols to exclude from stats test [default: control]
 """
 import matplotlib
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
 matplotlib.use('PS')   # generate postscript output by default
 import seaborn as sns
+sns.set()
+sns.set_color_codes("dark")
+sns.set_context("talk")
+sns.set_style("whitegrid")
 
 from namedQueries import namedQueries
 import pdb
@@ -46,18 +43,14 @@ expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']), arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
+#
 analysisSubFolder = os.path.join(
     scratchFolder, arguments['analysisName']
     )
-if not os.path.exists(analysisSubFolder):
-    os.makedirs(analysisSubFolder, exist_ok=True)
-sns.set()
-sns.set_color_codes("dark")
-sns.set_context("talk")
-sns.set_style("whitegrid")
-
-rowColOpts = asp.processRowColArguments(arguments)
-
+alignSubFolder = os.path.join(
+    analysisSubFolder, arguments['alignFolderName']
+    )
+#
 alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(
     namedQueries, **arguments)
 alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = (
@@ -68,7 +61,9 @@ alignedAsigsKWargs.update(dict(
     makeControlProgram=False,
     metaDataToCategories=False,
     removeFuzzyName=False,
-    transposeToColumns='bin', concatOn='index'))
+    decimate=1,
+    windowSize=(2e-3, 12e-3),
+    transposeToColumns='bin', concatOn='index',))
 if arguments['processAll']:
     prefix = assembledName
 else:
@@ -87,18 +82,15 @@ dataReader, dataBlock = ns5.blockFromPath(triggeredPath, lazy=arguments['lazy'])
 #  Overrides
 limitPages = None
 resultName = 'meanRAUC'
-#  alignedAsigsKWargs.update({'decimate': 10})
-alignedAsigsKWargs.update({'windowSize': (-10e-3, 50e-3)})
 funKWargs = dict(
-    baseline='median',
+    baseline='mean',
     tStart=None, tStop=None)
 #  End Overrides
 asigWide = ns5.alignedAsigsToDF(
-    dataBlock,
-    **alignedAsigsKWargs)
+    dataBlock, **alignedAsigsKWargs)
+
 rAUCDF = ash.rAUC(
-    asigWide, baseline=None,
-    tStart=None, tStop=None).to_frame(name='rauc')
+    asigWide, **funKWargs).to_frame(name='rauc')
 rAUCDF['kruskalStat'] = np.nan
 rAUCDF['kruskalP'] = np.nan
 for name, group in rAUCDF.groupby(['electrode', 'feature']):
@@ -110,7 +102,7 @@ for name, group in rAUCDF.groupby(['electrode', 'feature']):
     except Exception:
         rAUCDF.loc[group.index, 'kruskalStat'] = 0
         rAUCDF.loc[group.index, 'kruskalP'] = 1
-        
+
 rAUCDF.to_hdf(resultPath, resultName, format='table')
 
 """

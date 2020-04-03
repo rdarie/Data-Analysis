@@ -19,17 +19,15 @@
 # Specify account details
 #SBATCH --account=bibs-dborton-condo
 
-# EXP="exp201901201200"
-# EXP="exp201901211000"
-# EXP="exp201901221000"
-# EXP="exp201901231000"
-# EXP="exp201901271000"
-EXP="exp202003091200"
+# EXP="exp202003091200"
+EXP="exp202003201200"
 
-LAZINESS="--lazy"
-WINDOW="--window=extraShort"
-TRIALSELECTOR="--blockIdx=1"
-# TRIALSELECTOR="--processAll"
+# LAZINESS="--lazy"
+LAZINESS=""
+WINDOW="--window=miniRC"
+# TRIALSELECTOR="--blockIdx=2"
+TRIALSELECTOR="--processAll"
+ANALYSISSELECTOR="--analysisName=emg"
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
@@ -37,9 +35,6 @@ conda activate
 source activate nda
 python --version
 
-# python3 ./calcAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS --eventName=stimAlignTimes --chanQuery="fr" --blockName="fr"  --alignFolderName=stim
-python3 ./calcAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS --eventName=stimAlignTimes --chanQuery="all" --blockName="lfp"  --alignFolderName=stim
-#  python3 ./calcAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS --eventName=stimAlignTimes --chanQuery="fr_sqrt" --blockName="fr_sqrt"  --alignFolderName=stim
-# python3 ./calcAlignedRasters.py --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS --eventName=stimAlignTimes --chanQuery="raster" --blockName="raster"  --alignFolderName=stim
-# qa
-# python3 ./calcBlockOutliers.py --exp=$EXP $TRIALSELECTOR --inputBlockName="fr" --alignQuery="stimOn" --unitQuery="fr" --verbose --plotting --alignFolderName=stim
+# python3 ./assembleExperimentData.py --exp=$EXP --processAsigs --processRasters $ANALYSISSELECTOR 
+# python3 ./calcAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ANALYSISSELECTOR --eventName=stimAlignTimes --chanQuery="all" --blockName="lfp"  --alignFolderName=stim
+python3 ./calcAlignedRasters.py --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ANALYSISSELECTOR --eventName=stimAlignTimes --chanQuery="all"  --alignFolderName=stim

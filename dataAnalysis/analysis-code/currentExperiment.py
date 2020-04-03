@@ -350,8 +350,8 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
     #     'elec75#0', 'elec75#1', 'elec83#0', 'elec78#0', 'elec78#1']
     alignedAsigsChunkSize = 15000
     rasterOpts = {
-        'binInterval': 1e-3, 'binWidth': 30e-3, 'smoothKernelWidth': 50e-3,
-        # 'binInterval': 0.2e-3, 'binWidth': 5e-3, 'smoothKernelWidth': 10e-3,
+        # 'binInterval': 1e-3, 'binWidth': 30e-3, 'smoothKernelWidth': 50e-3,
+        'binInterval': 0.2e-3, 'binWidth': 5e-3, 'smoothKernelWidth': 10e-3,
         'windowSizes': {
             'extraShort': (-0.25, 0.25),
             'short': (-0.5, 0.5),
@@ -377,7 +377,7 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
         estimator='mean',
         # estimator=None, units='t',
         palette="ch:0.6,-.3,dark=.1,light=0.7,reverse=1",
-        height=5, aspect=3, kind='line')
+        height=6, aspect=15, kind='line')
     vLineOpts = {'color': 'm'}
     asigSigStarOpts = {
         'color': 'm',
@@ -400,6 +400,9 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
     nrnBlockShadingOpts = {
         'facecolor': nrnVLineOpts['color'],
         'alpha': 0.1, 'zorder': -100}
+    raucShadingOpts = {
+        'facecolor': vLineOpts['color'],
+        'alpha': 0.1, 'zorder': -100}
     nrnSigStarOpts = {
         'color': 'y',
         # 'edgecolors': 'face',
@@ -409,7 +412,8 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
     }
     plotOpts = {
         'type': 'ticks', 'errorBar': 'sem',
-        'pageSize': (6, 22), 'removeOutliers': (0.01, 0.975)}
+        'pageSize': (6, 22),
+        'removeOutliers': (0.01, 0.975)}
     try:
         experimentsToAssemble = expOpts['experimentsToAssemble']
         trialsToAssemble = []
@@ -418,7 +422,8 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
             for tIdx in val:
                 trialsToAssemble.append(
                     os.path.join(
-                        scratchPath, key, '{}', 'Block00{}.nix'.format(tIdx)
+                        scratchPath, key, '{}',
+                        'Block00{}.nix'.format(tIdx)
                     )
                 )
     except Exception:

@@ -85,12 +85,14 @@ alignedAsigsKWargs.update(dict(
     duplicateControlsByProgram=True,
     makeControlProgram=True,
     metaDataToCategories=False))
+
 triggeredPath = os.path.join(
     alignSubFolder,
     prefix + '_{}_{}.nix'.format(
         arguments['inputBlockName'], arguments['window']))
 print('loading {}'.format(triggeredPath))
-dataReader, dataBlock = ns5.blockFromPath(triggeredPath, lazy=arguments['lazy'])
+dataReader, dataBlock = ns5.blockFromPath(
+    triggeredPath, lazy=arguments['lazy'])
 pdfName = '{}_{}_{}_{}'.format(
     prefix, arguments['inputBlockName'],
     arguments['window'],
@@ -99,9 +101,10 @@ statsTestPath = os.path.join(figureStatsFolder, pdfName + '_stats.h5')
 #############################################
 #  Overrides
 alignedAsigsKWargs.update({'decimate': 1})
+alignedAsigsKWargs.update({'amplitudeColumn': arguments['hueName']})
 limitPages = None
 if arguments['enableOverrides']:
-    alignedAsigsKWargs.update({'windowSize': (-50e-3, 150e-3)})
+    alignedAsigsKWargs.update({'windowSize': (-20e-3, 50e-3)})
     currWindow = rasterOpts['windowSizes'][arguments['window']]
     fullWinSize = currWindow[1] - currWindow[0]
     redWinSize = (
@@ -110,10 +113,10 @@ if arguments['enableOverrides']:
     relplotKWArgs['aspect'] = (
         relplotKWArgs['aspect'] * redWinSize / fullWinSize)
     statsTestOpts.update({
-        'testStride': 50e-3,
-        'testWidth': 50e-3,
-        'tStart': 0,
-        'tStop': 100e-3})
+        'testStride': 5e-3,
+        'testWidth': 5e-3,
+        'tStart': -5e-3,
+        'tStop': 30e-3})
 #  End Overrides
 
 #  Get stats results
@@ -137,11 +140,14 @@ asp.plotAsigsAligned(
     loadArgs=alignedAsigsKWargs,
     sigTestResults=sigValsWide,
     figureFolder=alignedFeaturesFolder,
-    printBreakDown=True,
     enablePlots=True,
+    # minNObservations=10,
     plotProcFuns=[
-        asp.genYLabelChanger(lookupDict={}, removeMatch='#0'),
+        asp.genYLabelChanger(
+            lookupDict={}, removeMatch='#0'),
+        asp.genYLimSetter(newLims=[-75, 100], forceLims=True),
         asp.xLabelsTime,
+        asp.genBlockVertShader([2e-3, 12e-3], raucShadingOpts),
         asp.genVLineAdder(0, vLineOpts),
         asp.genLegendRounder(decimals=2),
         ],

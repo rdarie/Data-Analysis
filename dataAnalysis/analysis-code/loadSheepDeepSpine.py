@@ -1,0 +1,57 @@
+import pandas as pd
+import numpy as np
+import pdb
+import matplotlib.pyplot as plt
+
+# data is aligned to stim onset
+# cropEdgesTimes controls the size of the window that is loaded
+cropEdgesTimes = [-100e-3, 400e-3]
+inputPath = '/gpfs/scratch/rdarie/rdarie/Murdoc Neural Recordings/202003201200-Peep/emg/stim/_lfp_miniRC_export.h5'
+with pd.HDFStore(inputPath, 'r') as store:
+    # each trial has its own eesKey, get list of all
+    allEESKeys = [
+        i
+        for i in store.keys()
+        if ('stim' in i)]
+    # allocate lists to hold data from each trial
+    eesList = []
+    emgList = []
+    for idx, eesKey in enumerate(sorted(allEESKeys)):
+        # data for this trial is stored in a pd.dataframe
+        stimData = pd.read_hdf(store, eesKey)
+        # metadata is stored in a dictionary
+        eesMetadata = store.get_storer(eesKey).attrs.metadata
+        # extract column names from first trial
+        if idx == 0:
+            eesColumns = [cn[0] for cn in stimData.columns if cn[1] == 'amplitude']
+            emgColumns = [cn[0] for cn in stimData.columns if cn[1] == 'EMG']
+            metadataColumns = sorted([k for k in eesMetadata.keys()])
+            eesColIdx = [cn for cn in stimData.columns if cn[1] == 'amplitude']
+            emgColIdx = [cn for cn in stimData.columns if cn[1] == 'EMG']
+            metaDataDF = pd.DataFrame(
+                None, index=range(len(allEESKeys)),
+                columns=metadataColumns)
+        metaDataDF.loc[idx, :] = eesMetadata
+        # get mask for requested time points
+        cropEdgesMask = (
+            (stimData.index >= cropEdgesTimes[0]) &
+            (stimData.index <= cropEdgesTimes[1]))
+        eesList.append(stimData.loc[cropEdgesMask, eesColIdx])
+        emgList.append(stimData.loc[cropEdgesMask, emgColIdx])
+# ees information saved in the ees file
+eesNP = np.stack(eesList)
+# eesNP.shape = trials x time x channel
+emgNP = np.stack(emgList)
+# eesNP.shape = trials x time x channel
+metadataNP = metaDataDF.to_numpy()
+# metadataNP.shape = trials x metadata type
+# metadata column names are in metadataColumns
+# globalIdx is the index of the trial
+# combinationIdx is the index of the particular combination
+# of rate, active electrodes and amplitude
+print('finished loading.')
+# pdb.set_trace()
+plt.plot(eesNP[0, :, 0])
+plt.plot(emgNP[0, :, 0])
+plt.show()
+# pdb.set_trace()

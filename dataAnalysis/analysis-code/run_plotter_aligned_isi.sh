@@ -19,13 +19,16 @@
 # Specify account details
 #SBATCH --account=bibs-dborton-condo
 
-# EXP="exp201901221000"
-# EXP="exp201901201200"
-EXP="exp201901271000"
+EXP="exp202003201200"
+EXP="exp202003091200"
 # SELECTOR="Block005_minfrmaxcorr"
 SELECTOR="_minfrmaxcorr"
-TRIALSELECTOR="--blockIdx=1"
+# WINDOW="--window=miniRC"
+WINDOW="--window=extraShort"
 # TRIALSELECTOR="--processAll"
+TRIALSELECTOR="--blockIdx=2"
+ANALYSISSELECTOR="--analysisName=emg"
+ANALYSISSELECTOR="--analysisName=default"
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
@@ -33,6 +36,7 @@ conda activate
 
 source activate nda
 python --version
-EXP="exp202003091200"
 #  --maskOutlierBlocks
-python3 './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR --window="extraShort" --inputBlockName="lfp" --unitQuery="all" --alignQuery="stimOn" --rowName= --rowControl= --colControl= --hueName="amplitudeCat" --alignFolderName=stim --enableOverrides
+python3 './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR --inputBlockName="lfp" --unitQuery="all" --alignQuery="stimOff" --rowName= --rowControl= --colControl= --hueName="amplitudeCat" --alignFolderName=stim --enableOverrides
+# python3 './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR --inputBlockName="lfp" --unitQuery="all" --alignQuery="stimOff" --rowName= --rowControl= --colControl= --hueName="nominalCurrent" --alignFolderName=stim --enableOverrides
+# python3 './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR --inputBlockName="lfp" --unitQuery="all" --alignQuery="stimOn" --rowName= --rowControl= --colControl= --hueName="nominalCurrent" --alignFolderName=stim --enableOverrides

@@ -677,7 +677,8 @@ for vIdx, variantName in enumerate(variantList):
                     covariateName = matches.groups()[1]
                     derivTerm = matches.groups()[0] is not None
                     lag = np.float(matches.groups()[2])
-                    splineMatches = re.search(regex3, covariateName, re.MULTILINE)
+                    splineMatches = re.search(
+                        regex3, covariateName, re.MULTILINE)
                     #
                     if not splineMatches:
                         covSaveName = covariateName

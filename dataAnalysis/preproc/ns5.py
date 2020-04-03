@@ -1196,10 +1196,7 @@ def dataFrameToAnalogSignals(
             chanName = namePrefix + colName + nameSuffix
         else:
             chanName = namePrefix + (probeName.lower() + '{}'.format(idx)) + nameSuffix
-        # ann = {
-        #     'channel_names': np.asarray([chanName]),
-        #     'channel_ids': np.asarray([idx], dtype=np.int)
-        #     }
+        #
         chanIdx = ChannelIndex(
             name=chanName,
             # index=None,
@@ -1687,7 +1684,7 @@ def childBaseName(
 def readBlockFixNames(
         rawioReader,
         block_index=0, signal_group_mode='split-all',
-        lazy=True, mapDF=None):
+        lazy=True, mapDF=None, reduceChannelIndexes=False):
     
     dataBlock = rawioReader.read_block(
         block_index=block_index, lazy=lazy,
@@ -1753,8 +1750,27 @@ def readBlockFixNames(
             else:
                 stp.name = '{}#{}'.format(chanIdLabel, unitId)
         if 'ChannelIndex for ' in stp.unit.channel_index.name:
+            newChanName = stp.name.replace('_stim#0', '').replace('#0', '')
             stp.unit.name = stp.name
-            stp.unit.channel_index.name = stp.name.replace('_stim#0', '').replace('#0', '')
+            stp.unit.channel_index.name = newChanName
+            # units and analogsignals have different channel_indexes when loaded by nix
+            # add them to each other's parent list
+            allMatchingChIdx = dataBlock.filter(
+                objects=ChannelIndex, name=newChanName)
+            if (len(allMatchingChIdx) > 1) and reduceChannelIndexes:
+                assert len(allMatchingChIdx) == 2
+                targetChIdx = [
+                    ch
+                    for ch in allMatchingChIdx
+                    if ch is not stp.unit.channel_index][0]
+                oldChIdx = stp.unit.channel_index
+                targetChIdx.units.append(stp.unit)
+                stp.unit.channel_index = targetChIdx
+                oldChIdx.units.remove(stp.unit)
+                if not (len(oldChIdx.units) or len(oldChIdx.analogsignals)):
+                    dataBlock.channel_indexes.remove(oldChIdx)
+                del oldChIdx
+                targetChIdx.create_relationship()
     #  rename the children
     typesNeedRenaming = [
         SpikeTrainProxy, AnalogSignalProxy, EventProxy,
@@ -1893,7 +1909,7 @@ def loadStProxy(stProxy):
     return st
 
 
-def blockToNix(
+def preprocBlockToNix(
         block, writer, chunkSize,
         segInitIdx,
         equalChunks=True,
@@ -2608,7 +2624,7 @@ def preproc(
         else:
             spikeBlock = None
         #
-        idx = blockToNix(
+        idx = preprocBlockToNix(
             block, writer, chunkSize,
             segInitIdx=idx,
             equalChunks=equalChunks,

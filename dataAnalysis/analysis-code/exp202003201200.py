@@ -40,8 +40,11 @@ def getExpOpts():
         4: [],
         }
 
-    synchInfo = {'ins': {}, 'nsp': {}}
-    synchInfo['ins'][1] = dict()
+    synchInfo = {'delsys': {}, 'nsp': {}, 'ins': {}}
+    synchInfo['delsys'][1] = { 'timeRanges': [0.5, 3924]}
+    synchInfo['delsys'][2] = { 'timeRanges': [0.5, 3924]}
+    synchInfo['delsys'][3] = { 'timeRanges': [0.5, 3924]}
+    synchInfo['delsys'][4] = { 'timeRanges': [0.5, 821]}
 
     synchInfo['nsp'] = {
         #  per trialSegment
@@ -58,27 +61,53 @@ def getExpOpts():
     stimDetectThresDefault = 4
     stimDetectChansDefault = ['ins_td0', 'ins_td2']
     stimDetectOptsByChannelSpecific = {
-        #group
+        # group
         0: {
-            #program
+            # program
             0: {'detectChannels': stimDetectChansDefault, 'thres': stimDetectThresDefault},
             1: {'detectChannels': stimDetectChansDefault, 'thres': stimDetectThresDefault},
             2: {'detectChannels': stimDetectChansDefault, 'thres': stimDetectThresDefault},
             3: {'detectChannels': stimDetectChansDefault, 'thres': stimDetectThresDefault}
         }}
-        
     triFolderSourceBase = 1
     triDestinations = []
-    
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        '202003091200': [1, 2],
+        # For emg analysis - emg missing from block 2
+        '202003201200-Peep': [3, 4],
+        # For lfp analysis - all time ranges are valid
+        # '202003201200-Peep': [2, 3, 4],
         }
 
     movementSizeBins = [0, 0.25, 0.5, 1, 1.25, 1.5]
+    # For lfp analysis - all time ranges are valid
+    #  alignTimeBoundsLookup = {
+    #      1: [
+    #          [1, 2000]
+    #          ],
+    #      2: [
+    #          [1, 675]
+    #          ],
+    #      3: [
+    #          [1, 1623]
+    #          ],
+    #      4: [
+    #          [1, 800]
+    #          ],
+    #      }
+    # For emg analysis - emg missing for some time ranges
     alignTimeBoundsLookup = {
         1: [
             [1, 2000]
+            ],
+        2: [
+            [1, 60]
+            ],
+        3: [
+            [1, 1500]
+            ],
+        4: [
+            [1, 795]
             ],
         }
     return locals()

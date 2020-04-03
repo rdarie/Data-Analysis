@@ -1005,26 +1005,29 @@ def compareClocks(foundTime, expectedTime, thresh):
 
 def getThresholdCrossings(
         dataSrs, thresh=None, absVal=False,
-        edgeType='rising', fs=3e4, iti=None, plotting=False, keep_max=True):
+        edgeType='rising', fs=3e4, iti=None,
+        plotting=False, keep_max=True, itiWiggle=0.05):
     if absVal:
         dsToSearch = dataSrs.abs()
     else:
         dsToSearch = dataSrs
-    nextDS = dsToSearch.shift(1)
+    nextDS = dsToSearch.shift(1).fillna(method='bfill')
+    # pdb.set_trace()
     if edgeType == 'rising':
-        crossMask = ((dsToSearch >= thresh) & (nextDS < thresh)) |\
-            ((dsToSearch > thresh) & (nextDS <= thresh))
+        crossMask = (
+            (dsToSearch >= thresh) & (nextDS < thresh) |
+            (dsToSearch > thresh) & (nextDS <= thresh))
     else:
-        crossMask = ((dsToSearch <= thresh) & (nextDS > thresh)) |\
-            ((dsToSearch < thresh) & (nextDS >= thresh))
+        crossMask = (
+            (dsToSearch <= thresh) & (nextDS > thresh) |
+            (dsToSearch < thresh) & (nextDS >= thresh))
     crossIdx = dataSrs.index[crossMask]
     if iti is not None:
-        itiWiggle = 0.05
         min_dist = int(fs * iti * (1 - itiWiggle))
         y = dsToSearch.abs().to_numpy()
         peaks = np.array([dsToSearch.index.get_loc(i) for i in crossIdx])
         if peaks.size > 1 and min_dist > 1:
-            # print(len(peaks))
+            print(len(peaks))
             if keep_max:
                 highest = peaks[np.argsort(y[peaks])][::-1]
             else:

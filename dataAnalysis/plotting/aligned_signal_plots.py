@@ -93,14 +93,14 @@ def plotNeuronsAligned(
         loadArgs={},
         sigTestResults=None,
         verbose=False,
-        figureFolder=None, pdfName='alignedAsigs.pdf',
-        limitPages=None, printBreakDown=True, enablePlots=True,
+        figureFolder=None, pdfName='alignedNeurons.pdf',
+        limitPages=None, enablePlots=True,
         rowName=None, rowControl=None,
         colName=None, colControl=None,
         hueName=None, hueControl=None,
         styleName=None, styleControl=None,
         twinRelplotKWArgs={}, sigStarOpts={},
-        plotProcFuns=[],
+        plotProcFuns=[], minNObservations=0,
         ):
     #
     if loadArgs['unitNames'] is None:
@@ -131,24 +131,53 @@ def plotNeuronsAligned(
             asigWide = ns5.alignedAsigsToDF(
                 frBlock, [continuousName],
                 **loadArgs)
-            raster = rasterWide.stack().reset_index(name='raster')
-            asig = asigWide.stack().reset_index(name='fr')
             oneSpikePerBinHz = int(
                 np.round(
                     np.diff(rasterWide.columns)[0] ** (-1)))
             if enablePlots:
+                indexInfo = asigWide.index.to_frame()
+                if idx == 0:
+                    breakDownData, breakDownText, fig, ax = printBreakdown(
+                        asigWide, rowName, colName, hueName)
+                    breakDownData.to_csv(
+                        os.path.join(
+                            figureFolder,
+                            pdfName + '_trialsBreakDown.txt'),
+                        sep='\t')
+                    pdf.savefig()
+                    plt.close()
+                    if minNObservations > 0:
+                        underMinLabels = (
+                            breakDownData
+                            .loc[breakDownData['count'] < minNObservations, :]
+                            .drop(columns=['count']))
+                        dropLabels = pd.Series(
+                            False,
+                            index=asigWide.index)
+                        for rIdx, row in underMinLabels.iterrows():
+                            theseBad = pd.Series(True, index=asigWide.index)
+                            for cName in row.index:
+                                theseBad = theseBad & (indexInfo[cName] == row[cName])
+                            dropLabels = dropLabels | (theseBad)
+                        minObsKeepMask = ~dropLabels.to_numpy()
+                if minNObservations > 0:
+                    asigWide = asigWide.loc[minObsKeepMask, :]
+                    rasterWide = rasterWide.loc[minObsKeepMask, :]
+                indexInfo = rasterWide.index.to_frame()
                 if colName is not None:
-                    colOrder = sorted(np.unique(rasterWide.index.to_frame()[colName]))
+                    colOrder = sorted(np.unique(indexInfo[colName]))
                 else:
                     colOrder = None
                 if rowName is not None:
-                    rowOrder = sorted(np.unique(rasterWide.index.to_frame()[rowName]))
+                    rowOrder = sorted(np.unique(indexInfo[rowName]))
                 else:
                     rowOrder = None
                 if hueName is not None:
-                    hueOrder = sorted(np.unique(rasterWide.index.to_frame()[hueName]))
+                    hueOrder = sorted(np.unique(indexInfo[hueName]))
                 else:
                     hueOrder = None
+                raster = rasterWide.stack().reset_index(name='raster')
+                asig = asigWide.stack().reset_index(name='fr')
                 raster.loc[:, 'fr'] = asig.loc[:, 'fr']
                 raster = getRasterFacetIdx(
                     raster, 't',
@@ -178,11 +207,6 @@ def plotNeuronsAligned(
             if limitPages is not None:
                 if idx >= (limitPages - 1):
                     break
-        if printBreakDown:
-            breakDownData, breakDownText, fig, ax = printBreakdown(asigWide, rowName, colName, hueName)
-            breakDownData.to_csv(os.path.join(figureFolder, pdfName + '_trialsBreakDown.txt'), sep='\t')
-            pdf.savefig()
-            plt.close()
     return
 
 
@@ -218,7 +242,6 @@ def addSignificanceStars(
     if not significantBins.empty:
         assert significantBins.shape[0] == 1
         significantTimes = significantBins.columns[significantBins.to_numpy().flatten()].to_numpy()
-        # pdb.set_trace()
         if len(significantTimes):
             ymin, ymax = g.axes[ro, co].get_ylim()
             # g.axes[ro, co].autoscale(False)
@@ -288,13 +311,13 @@ def plotAsigsAligned(
         sigTestResults=None,
         verbose=False,
         figureFolder=None, pdfName='alignedAsigs.pdf',
-        limitPages=None, printBreakDown=True, enablePlots=True,
+        limitPages=None, enablePlots=True,
         rowName=None, rowControl=None,
         colName=None, colControl=None,
         hueName=None, hueControl=None,
         styleName=None, styleControl=None,
         relplotKWArgs={}, sigStarOpts={},
-        plotProcFuns=[],
+        plotProcFuns=[], minNObservations=0,
         ):
     if loadArgs['unitNames'] is None:
         loadArgs['unitNames'] = ns5.listChanNames(
@@ -306,20 +329,50 @@ def plotAsigsAligned(
             asigWide = ns5.alignedAsigsToDF(
                 dataBlock, [unitName],
                 **loadArgs)
-            asig = asigWide.stack().reset_index(name='signal')
             if enablePlots:
+                indexInfo = asigWide.index.to_frame()
+                if idx == 0:
+                    breakDownData, breakDownText, fig, ax = printBreakdown(
+                        asigWide, rowName, colName, hueName)
+                    breakDownData.to_csv(
+                        os.path.join(
+                            figureFolder,
+                            pdfName + '_trialsBreakDown.txt'),
+                        sep='\t')
+                    pdf.savefig()
+                    plt.close()
+                    if minNObservations > 0:
+                        #
+                        underMinLabels = (
+                            breakDownData
+                            .loc[breakDownData['count'] < minNObservations, :]
+                            .drop(columns=['count']))
+                        dropLabels = pd.Series(
+                            False,
+                            index=asigWide.index)
+                        for rIdx, row in underMinLabels.iterrows():
+                            theseBad = pd.Series(True, index=asigWide.index)
+                            for cName in row.index:
+                                theseBad = theseBad & (indexInfo[cName] == row[cName])
+                            dropLabels = dropLabels | (theseBad)
+                        minObsKeepMask = ~dropLabels.to_numpy()
+                if minNObservations > 0:
+                    #
+                    asigWide = asigWide.loc[minObsKeepMask, :]
+                    indexInfo = asigWide.index.to_frame()
                 if colName is not None:
-                    colOrder = sorted(np.unique(asigWide.index.to_frame()[colName]))
+                    colOrder = sorted(np.unique(indexInfo[colName]))
                 else:
                     colOrder = None
                 if rowName is not None:
-                    rowOrder = sorted(np.unique(asigWide.index.to_frame()[rowName]))
+                    rowOrder = sorted(np.unique(indexInfo[rowName]))
                 else:
                     rowOrder = None
                 if hueName is not None:
-                    hueOrder = sorted(np.unique(asigWide.index.to_frame()[hueName]))
+                    hueOrder = sorted(np.unique(indexInfo[hueName]))
                 else:
                     hueOrder = None
+                asig = asigWide.stack().reset_index(name='signal')
                 g = sns.relplot(
                     x='bin', y='signal',
                     col=colName, row=rowName, hue=hueName,
@@ -330,7 +383,8 @@ def plotAsigsAligned(
                     #  print('(ro, co, hu) = {}'.format((ro, co, hu)))
                     if sigTestResults is not None:
                         addSignificanceStars(
-                            g, sigTestResults.query("unit == '{}'".format(unitName)),
+                            g, sigTestResults.query(
+                                "unit == '{}'".format(unitName)),
                             ro, co, hu, dataSubset, sigStarOpts=sigStarOpts)
                     if len(plotProcFuns):
                         for procFun in plotProcFuns:
@@ -340,11 +394,6 @@ def plotAsigsAligned(
             if limitPages is not None:
                 if idx >= (limitPages - 1):
                     break
-        if printBreakDown:
-            breakDownData, breakDownText, fig, ax = printBreakdown(asigWide, rowName, colName, hueName)
-            breakDownData.to_csv(os.path.join(figureFolder, pdfName + '_trialsBreakDown.txt'), sep='\t')
-            pdf.savefig()
-            plt.close()
     return
 
 
@@ -401,12 +450,30 @@ def genXLimSetter(newLims):
     return xLimSetter
 
 
-def genYLimSetter(newLims):
+def genYLimSetter(newLims=None, quantileLims=None, forceLims=False):
     def yLimSetter(g, ro, co, hu, dataSubset):
         oldLims = g.axes[ro, co].get_ylim()
-        g.axes[ro, co].set_ylim(
-            [max(oldLims[0], newLims[0]), min(oldLims[1], newLims[1])]
-        )
+        if newLims is not None:
+            if forceLims:
+                g.axes[ro, co].set_ylim(newLims)
+            else:
+                g.axes[ro, co].set_ylim(
+                    [
+                        max(oldLims[0], newLims[0]),
+                        min(oldLims[1], newLims[1])]
+                )
+        if quantileLims is not None:
+            quantileFrac = (1 - quantileLims) / 2
+            qLims = g.data['signal'].quantile(
+                [quantileFrac, 1 - quantileFrac]).to_list()
+            if forceLims:
+                g.axes[ro, co].set_ylim(qLims)
+            else:
+                g.axes[ro, co].set_ylim(
+                    [
+                        max(oldLims[0], qLims[0]),
+                        min(oldLims[1], qLims[1])]
+                )
         return
     return yLimSetter
 
@@ -441,6 +508,24 @@ def genBlockShader(patchOpts):
                 dataSubset[g._y_var].min(), dataSubset[g._y_var].max(),
                 **patchOpts
             )
+            # Create list for all the patches
+            # y = (dataSubset[g._y_var].max() + dataSubset[g._y_var].min()) / 2
+            # height = (dataSubset[g._y_var].max() - dataSubset[g._y_var].min())
+            # xLim = g.axes[ro, co].get_xlim()
+            # x = (xLim[0] + xLim[1]) / 2
+            # width = (xLim[1] - xLim[0])
+            # rect = Rectangle((x, y), width, height, **patchOpts)
+            # # Add collection to axes
+            # g.axes[ro, co].add_patch(rect)
+            return
+    return shadeBlocks
+
+
+def genBlockVertShader(lims, patchOpts):
+    def shadeBlocks(g, ro, co, hu, dataSubset):
+        if hu == 0:
+            g.axes[ro, co].axvspan(
+                lims[0], lims[1], **patchOpts)
             # Create list for all the patches
             # y = (dataSubset[g._y_var].max() + dataSubset[g._y_var].min()) / 2
             # height = (dataSubset[g._y_var].max() - dataSubset[g._y_var].min())

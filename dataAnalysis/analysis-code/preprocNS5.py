@@ -16,7 +16,7 @@ Options:
 
 import dataAnalysis.preproc.ns5 as ns5
 import dataAnalysis.helperFunctions.probe_metadata as prb_meta
-import pdb, traceback, shutil
+import pdb, traceback, shutil, os
 
 #  load options
 from currentExperiment import parseAnalysisOptions
@@ -106,8 +106,9 @@ if arguments['ISI']:
         calcAverageLFP=True,
         )
     try:
-        jsonPath = trialBasePath.replace('.nix', '_autoStimLog.json')
-        shutil.copyfile()
+        jsonSrcPath = os.path.join(nspFolder, ns5FileName + '_autoStimLog.json')
+        jsonDestPath = trialBasePath.replace('.nix', '_autoStimLog.json')
+        shutil.copyfile(jsonSrcPath, jsonDestPath)
     except Exception:
         traceback.print_exc()
 ##################################################################################

@@ -159,7 +159,6 @@ asp.plotNeuronsAligned(
     loadArgs=alignedAsigsKWargs,
     sigTestResults=sigValsWide,
     figureFolder=alignedRastersFolder,
-    printBreakDown=True,
     enablePlots=True,
     plotProcFuns=[
         asp.xLabelsTime, asp.genLegendRounder(decimals=2),
