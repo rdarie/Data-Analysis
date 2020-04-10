@@ -25,7 +25,7 @@ SELECTOR="_minfrmaxcorr"
 WINDOW="--window=miniRC"
 TRIALSELECTOR="--processAll"
 # TRIALSELECTOR="--blockIdx=2"
-ANALYSISSELECTOR="--analysisName=emg"
+ANALYSISSELECTOR="--analysisName=emgStretchTime"
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
@@ -34,4 +34,5 @@ conda activate
 source activate nda
 python --version
 
-python loadSheepDeepSpine.py
+python "./exportForDeepSpine.py" --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR --alignFolderName=stim --inputBlockName="lfp" --unitQuery="isichoremg" --alignQuery="stimOn"
+# python loadSheepDeepSpine.py

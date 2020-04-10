@@ -22,12 +22,20 @@
 # EXP="exp202003091200"
 EXP="exp202003201200"
 
-# LAZINESS="--lazy"
-LAZINESS=""
-WINDOW="--window=miniRC"
+LAZINESS="--lazy"
+# LAZINESS=""
+# WINDOW="--window=miniRC"
+WINDOW="--window=short"
+# WINDOW="--window=extraShort"
 # TRIALSELECTOR="--blockIdx=2"
 TRIALSELECTOR="--processAll"
-ANALYSISSELECTOR="--analysisName=emg"
+# ANALYSISSELECTOR="--analysisName=emg"
+# ANALYSISSELECTOR="--analysisName=default"
+# ANALYSISSELECTOR="--analysisName=emgStretchTime"
+ANALYSISSELECTOR="--analysisName=emgHiRes"
+#
+#UNITSELECTOR="--unitQuery=all"
+UNITSELECTOR="--unitQuery=isiemg"
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
@@ -35,6 +43,7 @@ conda activate
 source activate nda
 python --version
 
-# python3 ./assembleExperimentData.py --exp=$EXP --processAsigs --processRasters $ANALYSISSELECTOR 
-# python3 ./calcAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ANALYSISSELECTOR --eventName=stimAlignTimes --chanQuery="all" --blockName="lfp"  --alignFolderName=stim
-python3 ./calcAlignedRasters.py --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ANALYSISSELECTOR --eventName=stimAlignTimes --chanQuery="all"  --alignFolderName=stim
+python3 ./assembleExperimentData.py --exp=$EXP --processAsigs --processRasters $ANALYSISSELECTOR 
+python3 ./calcAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ANALYSISSELECTOR --eventName=stimAlignTimes --chanQuery="all" --blockName="lfp"  --alignFolderName=stim
+# python3 ./calcAlignedRasters.py --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ANALYSISSELECTOR --eventName=stimAlignTimes --chanQuery="all"  --alignFolderName=stim
+# python3 ./calcTrialOutliers.py --exp=$EXP --alignFolderName=stim --inputBlockName="lfp" $TRIALSELECTOR $ANALYSISSELECTOR $UNITSELECTOR $WINDOW --plotting --alignQuery="all" --verbose

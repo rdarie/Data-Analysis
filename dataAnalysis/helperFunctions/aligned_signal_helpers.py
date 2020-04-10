@@ -11,6 +11,7 @@ from copy import copy
 import pdb, traceback
 import pingouin as pg
 
+
 def processAlignQueryArgs(
         namedQueries, alignQuery=None, **kwargs):
     if (alignQuery is None) or (not len(alignQuery)):

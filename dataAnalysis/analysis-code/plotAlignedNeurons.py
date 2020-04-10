@@ -164,7 +164,7 @@ asp.plotNeuronsAligned(
         asp.xLabelsTime, asp.genLegendRounder(decimals=2),
         asp.genDespiner(right=False, left=True, trim=True),
         asp.genYLimSetterTwin((0, 150)),
-        asp.genVLineAdder(0, nrnVLineOpts),
+        asp.genVLineAdder([0], nrnVLineOpts),
         asp.genBlockShader(nrnBlockShadingOpts)],
     pdfName=pdfName,
     **rowColOpts,

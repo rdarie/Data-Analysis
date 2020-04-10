@@ -21,18 +21,20 @@
 #SBATCH --account=bibs-dborton-condo
 
 # Request custom resources
-#SBATCH --array=2,3,4
+#SBATCH --array=3,4
 
 EXP="exp202003201200"
-EXP="exp202003091200"
+# EXP="exp202003091200"
 # SELECTOR="Block005_minfrmaxcorr"
 SELECTOR="_minfrmaxcorr"
+WINDOW="--window=short"
 # WINDOW="--window=miniRC"
-WINDOW="--window=extraShort"
+# WINDOW="--window=extraShort"
 # TRIALSELECTOR="--processAll"
-TRIALSELECTOR="--blockIdx=2"
-ANALYSISSELECTOR="--analysisName=emg"
-ANALYSISSELECTOR="--analysisName=default"
+# TRIALSELECTOR="--blockIdx=2"
+# ANALYSISSELECTOR="--analysisName=emg"
+# ANALYSISSELECTOR="--analysisName=emgStretchTime"
+ANALYSISSELECTOR="--analysisName=emgHiRes"
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
@@ -41,6 +43,4 @@ source activate nda
 python --version
 
 # SLURM_ARRAY_TASK_ID=2
-python ./calcISIAnalysisNix.py --exp=$EXP $TRIALSELECTOR --chanQuery="all" $ANALYSISSELECTOR
-# python ./calcStimAlignTimes.py --exp=$EXP $TRIALSELECTOR --plotParamHistograms
-# python ./calcFR.py --exp=$EXP $TRIALSELECTOR
+python ./calcISIAnalysisNix.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --chanQuery="all" $ANALYSISSELECTOR

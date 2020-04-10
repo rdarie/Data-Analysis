@@ -733,7 +733,7 @@ def getTimeMaskFromRanges(times, timeRanges):
         tUnits = times.units
     for tStart, tEnd in timeRanges:
         thisMask = (
-            (times > tStart * tUnits) &
+            (times >= tStart * tUnits) &
             (times <= tEnd * tUnits)
             )
         timeMask = timeMask | thisMask
@@ -981,7 +981,7 @@ def confirmTriggersPlot(peakIdx, dataSeries, fs, whichPeak=0, nSec=2):
 
     figDist, axDist = plt.subplots()
     if len(peakIdx) > 5:
-        sns.distplot(np.diff(peakIdx))
+        sns.distplot(np.diff(peakIdx), kde=False)
     plt.title('distance between triggers (# samples)')
     plt.xlabel('distance between triggers (# samples)')
     return fig, ax, figDist, axDist

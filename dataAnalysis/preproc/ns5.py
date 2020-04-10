@@ -605,6 +605,7 @@ def concatenateUnitSpikeTrainWaveformsDF(
             .format(prf.memory_usage_psutil()))
     #  if concatenating indexes, reset the index of the result
     #  ignoreIndex = (concatOn == 'index')
+    #  pdb.set_trace()
     allWaveforms = pd.concat(
         waveformsList, axis=concatOn,
         # ignore_index=ignoreIndex
@@ -1689,7 +1690,8 @@ def readBlockFixNames(
     dataBlock = rawioReader.read_block(
         block_index=block_index, lazy=lazy,
         signal_group_mode=signal_group_mode)
-    headerSignalChan = pd.DataFrame(rawioReader.header['signal_channels']).set_index('id')
+    headerSignalChan = pd.DataFrame(
+        rawioReader.header['signal_channels']).set_index('id')
     #  
     if dataBlock.name is None:
         if 'neo_name' in dataBlock.annotations:
@@ -1713,10 +1715,15 @@ def readBlockFixNames(
             if asigBaseName in asigNameChanger
             else asigBaseName)
         if 'Channel group ' in asig.channel_index.name:
-            asig.channel_index.name = (
+            newChanName = (
                 asigNameChanger[asigBaseName]
                 if asigBaseName in asigNameChanger
                 else asigBaseName)
+            asig.channel_index.name = newChanName
+            if 'neo_name' in asig.channel_index.annotations:
+                asig.channel_index.annotations['neo_name'] = newChanName
+            if 'nix_name' in asig.channel_index.annotations:
+                asig.channel_index.annotations['nix_name'] = newChanName
     spikeTrainLikeList = (
         seg0.filter(objects=SpikeTrainProxy) +
         seg0.filter(objects=SpikeTrain)
@@ -2738,11 +2745,12 @@ def loadWithArrayAnn(
     return block
 
 
-def blockFromPath(dataPath, lazy=False):
+def blockFromPath(dataPath, lazy=False, reduceChannelIndexes=False):
     if lazy:
         dataReader = nixio_fr.NixIO(
             filename=dataPath)
-        dataBlock = readBlockFixNames(dataReader, lazy=True)
+        dataBlock = readBlockFixNames(
+            dataReader, lazy=True, reduceChannelIndexes=reduceChannelIndexes)
         #  dataBlock = dataReader.read_block(
         #      block_index=0, lazy=True,
         #      signal_group_mode='split-all')

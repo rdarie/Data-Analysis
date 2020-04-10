@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 import pdb
+import math
 import seaborn as sns
 from tabulate import tabulate
 import dataAnalysis.helperFunctions.kilosort_analysis_new as ksa
@@ -312,9 +313,9 @@ def plotAsigsAligned(
         verbose=False,
         figureFolder=None, pdfName='alignedAsigs.pdf',
         limitPages=None, enablePlots=True,
-        rowName=None, rowControl=None,
-        colName=None, colControl=None,
-        hueName=None, hueControl=None,
+        rowName=None, rowControl=None, rowOrder=None,
+        colName=None, colControl=None, colOrder=None,
+        hueName=None, hueControl=None, hueOrder=None,
         styleName=None, styleControl=None,
         relplotKWArgs={}, sigStarOpts={},
         plotProcFuns=[], minNObservations=0,
@@ -360,19 +361,41 @@ def plotAsigsAligned(
                     #
                     asigWide = asigWide.loc[minObsKeepMask, :]
                     indexInfo = asigWide.index.to_frame()
-                if colName is not None:
-                    colOrder = sorted(np.unique(indexInfo[colName]))
+                if colOrder is None:
+                    if colName is not None:
+                        colOrder = sorted(np.unique(indexInfo[colName]))
+                    else:
+                        colOrder = None
                 else:
-                    colOrder = None
-                if rowName is not None:
-                    rowOrder = sorted(np.unique(indexInfo[rowName]))
+                    # ensure we didn't drop any of the col_names
+                    colOrder = [
+                        cn
+                        for cn in colOrder
+                        if cn in sorted(np.unique(indexInfo[colName]))]
+                if rowOrder is None:
+                    if rowName is not None:
+                        rowOrder = sorted(np.unique(indexInfo[rowName]))
+                    else:
+                        rowOrder = None
                 else:
-                    rowOrder = None
-                if hueName is not None:
-                    hueOrder = sorted(np.unique(indexInfo[hueName]))
+                    # ensure we didn't drop any of the row_names
+                    rowOrder = [
+                        rn
+                        for rn in rowOrder
+                        if rn in sorted(np.unique(indexInfo[rowName]))]
+                if hueOrder is None:
+                    if hueName is not None:
+                        hueOrder = sorted(np.unique(indexInfo[hueName]))
+                    else:
+                        hueOrder = None
                 else:
-                    hueOrder = None
+                    # ensure we didn't drop any of the hue_names
+                    hueOrder = [
+                        hn
+                        for hn in hueOrder
+                        if hn in sorted(np.unique(indexInfo[hueName]))]
                 asig = asigWide.stack().reset_index(name='signal')
+                #
                 g = sns.relplot(
                     x='bin', y='signal',
                     col=colName, row=rowName, hue=hueName,
@@ -401,7 +424,10 @@ def genYLabelChanger(lookupDict={}, removeMatch=''):
     def yLabelChanger(g, ro, co, hu, dataSubset):
         if (co == 0) and len(g.axes) and (not dataSubset.empty):
             featName = dataSubset['feature'].unique()[0]
-            featName = featName.replace(removeMatch, '')
+            try:
+                featName = featName.replace(removeMatch, '')
+            except Exception:
+                pass
             for key in lookupDict.keys():
                 if key == featName:
                     featName = lookupDict[key]
@@ -417,6 +443,99 @@ def yLabelsEMG(g, ro, co, hu, dataSubset):
         elif 'feature' in dataSubset.columns:
             g.axes[ro, co].set_ylabel(dataSubset['feature'].unique()[0])
     return
+
+
+def genGridAnnotator(
+        xpos=0, ypos=0, template='', colNames=[],
+        textOpts={}, shared=True,
+        dropna=True, dropNaNCol='segment', coord='ax'):
+
+    def gridAnnotator(g, ro, co, hu, dataSubset):
+        topLeftCol = ((ro == 0) and (co == 0))
+        emptySubset = (
+            (dataSubset.empty) or
+            (dataSubset[dropNaNCol].isna().all()))
+        if ((topLeftCol) or (not shared)) and not emptySubset:
+            dataEntries = []
+            for cn in colNames:
+                if dropna:
+                    dataEntries.append(' '.join([
+                        '{}'.format(entry)
+                        for entry in dataSubset[cn].unique()
+                        if not pd.isnull(entry)
+                        ]))
+                else:
+                    dataEntries.append(' '.join([
+                        '{}'.format(entry)
+                        for entry in dataSubset[cn].unique()
+                        ]))
+            xText = template.format(*dataEntries)
+            if coord == 'ax':
+                trnsf = g.axes[ro, co].transAxes
+            else:
+                trnsf = None
+            g.axes[ro, co].text(
+                xpos, xpos, xText,
+                transform=trnsf, **textOpts)
+        return
+    return gridAnnotator
+
+
+def genTicksToScale(
+        lineOpts={}, textOpts={}, shared=True,
+        xUnitFactor=1, yUnitFactor=1,
+        xUnits='', yUnits='', dropNaNCol='segment'):
+    limFrac = 0.2
+
+    def ticksToScale(g, ro, co, hu, dataSubset):
+        topLeftCol = ((ro == 0) and (co == 0))
+        emptySubset = (
+            (dataSubset.empty) or
+            (dataSubset[dropNaNCol].isna().all()))
+        if ((topLeftCol) or (not shared)) and not emptySubset:
+            xLim = g.axes[ro, co].get_xlim()
+            yLim = g.axes[ro, co].get_ylim()
+            odX = limFrac * (xLim[1] - xLim[0])
+            odY = limFrac * (yLim[1] - yLim[0])
+            # round to nearest order of magnitude
+            if odX > 1:
+                xOrdMag = -np.floor(np.log10(odX)) + 3
+            else:
+                xOrdMag = -np.floor(np.log10(odX)) + 2
+            dX = np.round(odX, decimals=int(xOrdMag))
+            if odY > 1:
+                yOrdMag = -np.floor(np.log10(odY)) + 3
+            else:
+                yOrdMag = -np.floor(np.log10(odY)) + 2
+            dY = np.round(odY, decimals=int(yOrdMag))
+            if odX > 0 and odY > 0:
+                # positions of scale-bar
+                scaleX = xLim[0] + np.asarray([odX,    odX, dX+odX])
+                scaleY = yLim[0] + np.asarray([dY+odY, odY, odY])
+                #
+                # g.axes[ro, co].autoscale(enable=False)
+                g.axes[ro, co].plot(scaleX, scaleY, 'k-', **lineOpts)
+                #
+                xText = '{:.3f}'.format(dX * xUnitFactor)
+                if xUnits:
+                    xText += ' {}'.format(xUnits)
+                g.axes[ro, co].text(
+                    scaleX[0], scaleY[1], xText,
+                    horizontalalignment='left',
+                    verticalalignment='top', **textOpts)
+                #
+                yText = '{:.3f}'.format(dY * yUnitFactor)
+                if yUnits:
+                    yText += ' {}'.format(yUnits)
+                g.axes[ro, co].text(
+                    scaleX[0], scaleY[1], yText,
+                    horizontalalignment='right',
+                    verticalalignment='bottom',
+                    rotation='vertical', **textOpts)
+        g.axes[ro, co].set_yticks([])
+        g.axes[ro, co].set_xticks([])
+        return
+    return ticksToScale
 
 
 def genDespiner(
@@ -494,16 +613,21 @@ def xLabelsTime(g, ro, co, hu, dataSubset):
     return
 
 
-def genVLineAdder(pos, patchOpts):
+def genVLineAdder(posList, patchOpts, dropNaNCol='segment'):
     def addVline(g, ro, co, hu, dataSubset):
-        g.axes[ro, co].axvline(pos, **patchOpts)
+        emptySubset = (
+            (dataSubset.empty) or
+            (dataSubset[dropNaNCol].isna().all()))
+        if not emptySubset:
+            for pos in posList:
+                g.axes[ro, co].axvline(pos, **patchOpts)
         return
     return addVline
 
 
 def genBlockShader(patchOpts):
     def shadeBlocks(g, ro, co, hu, dataSubset):
-        if hu % 2 == 0:
+        if (hu % 2) == 0:
             g.axes[ro, co].axhspan(
                 dataSubset[g._y_var].min(), dataSubset[g._y_var].max(),
                 **patchOpts
@@ -521,9 +645,12 @@ def genBlockShader(patchOpts):
     return shadeBlocks
 
 
-def genBlockVertShader(lims, patchOpts):
+def genBlockVertShader(lims, patchOpts, dropNaNCol='segment'):
     def shadeBlocks(g, ro, co, hu, dataSubset):
-        if hu == 0:
+        emptySubset = (
+            (dataSubset.empty) or
+            (dataSubset[dropNaNCol].isna().all()))
+        if (hu == 0) and not emptySubset:
             g.axes[ro, co].axvspan(
                 lims[0], lims[1], **patchOpts)
             # Create list for all the patches
@@ -542,13 +669,15 @@ def genBlockVertShader(lims, patchOpts):
 def genLegendRounder(decimals=2):
     def formatLegend(g, ro, co, hu, dataSubset):
         leg = g._legend
-        for t in leg.texts:
-            if t.get_text().replace('.', '', 1).isdigit():
-                # truncate label text to 4 characters
-                textNumeric = np.round(
-                    float(t.get_text()),
-                    decimals=decimals)
-                t.set_text('{}'.format(textNumeric))
+        if leg is not None:
+            for t in leg.texts:
+                # check if numeric
+                if t.get_text().replace('.', '', 1).isdigit():
+                    # truncate label text to 4 characters
+                    textNumeric = np.round(
+                        float(t.get_text()),
+                        decimals=decimals)
+                    t.set_text('{}'.format(textNumeric))
         return
     return formatLegend
 
@@ -1604,4 +1733,3 @@ class FacetGridShadow(Grid):
                 if append:
                     axes.append(ax)
             return np.array(axes, object).flat
-

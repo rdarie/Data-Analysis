@@ -41,15 +41,20 @@ def getExpOpts():
         }
 
     synchInfo = {'delsys': {}, 'nsp': {}, 'ins': {}}
-    synchInfo['delsys'][1] = { 'timeRanges': [0.5, 3924]}
-    synchInfo['delsys'][2] = { 'timeRanges': [0.5, 3924]}
-    synchInfo['delsys'][3] = { 'timeRanges': [0.5, 3924]}
-    synchInfo['delsys'][4] = { 'timeRanges': [0.5, 821]}
+    synchInfo['delsys'][1] = {'timeRanges': [0, 3924], 'chooseCrossings': slice(None)}
+    synchInfo['delsys'][2] = {'timeRanges': [0, 3924], 'chooseCrossings': slice(None, 1000)}
+    synchInfo['delsys'][3] = {'timeRanges': [0, 3924], 'chooseCrossings': slice(None)}
+    # synchInfo['delsys'][3] = {'timeRanges': [0, 3924], 'chooseCrossings': slice(None, 59000)}
+    synchInfo['delsys'][4] = {'timeRanges': [0, 822], 'chooseCrossings': slice(None)}
+    # synchInfo['delsys'][4] = {'timeRanges': [0, 822], 'chooseCrossings': [i for i in range(1000)] + [i for i in range(-1000, -1)]}
+    #
+    synchInfo['nsp'][1] = {'timeRanges': [0, 3924], 'chooseCrossings': slice(None)}
+    synchInfo['nsp'][2] = {'timeRanges': [0, 3924], 'chooseCrossings': slice(None, 1000)}
+    synchInfo['nsp'][3] = {'timeRanges': [0, 3924], 'chooseCrossings': slice(None)}
+    # synchInfo['nsp'][3] = {'timeRanges': [0, 3924], 'chooseCrossings': slice(None, 59000)}
+    synchInfo['nsp'][4] = {'timeRanges': [0, 802], 'chooseCrossings': slice(None)}
+    # synchInfo['nsp'][4] = {'timeRanges': [0, 802], 'chooseCrossings': [i for i in range(1000)] + [i for i in range(-1000, -1)]}
 
-    synchInfo['nsp'] = {
-        #  per trialSegment
-        1: dict(),
-        }
     #  if not possible to use taps, override with good taps from another segment
     #  not ideal, because segments are only synchronized to the nearest **second**
     overrideSegmentsForTapSync = {
@@ -110,4 +115,17 @@ def getExpOpts():
             [1, 795]
             ],
         }
+    rowColOverrides = {
+        'electrode': [
+            '-caudalY_e12+caudalX_e05',
+            '-caudalY_e13+caudalZ_e20',
+            '-caudalX_e06+caudalX_e02',
+            '-caudalZ_e17+caudalZ_e21',
+            '-rostralY_e12+rostralZ_e24',
+            '-rostralZ_e19+rostralZ_e24',
+            '-rostralY_e14+rostralZ_e21',
+            '-rostralZ_e17+rostralZ_e21',
+            '-rostralY_e12+rostralX_e05',
+            ]
+    }
     return locals()

@@ -121,7 +121,7 @@ kinKey = '/sling/kinematics'
 with pd.HDFStore(outputPath) as store:
     nullKinematics.to_hdf(store, kinKey)
 eesIdx = 0
-pdb.set_trace()
+# pdb.set_trace()
 for stimName, stimGroup in asigWide.groupby(['electrode', 'RateInHz', 'nominalCurrent']):
     if stimGroup.groupby(['segment', 't']).ngroups < 10:
         continue

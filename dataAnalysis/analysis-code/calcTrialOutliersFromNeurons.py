@@ -8,7 +8,6 @@ Options:
     --processAll                           process entire experimental day? [default: False]
     --lazy                                 load from raw, or regular? [default: False]
     --saveResults                          load from raw, or regular? [default: False]
-    --inputBlockName=inputBlockName        which trig_ block to pull [default: pca]
     --verbose                              print diagnostics? [default: False]
     --plotting                             plot results?
     --window=window                        process with short window? [default: long]
@@ -54,14 +53,14 @@ if arguments['processAll']:
     prefix = assembledName
 else:
     prefix = ns5FileName
-
-triggeredPath = os.path.join(
+frPath = os.path.join(
     alignSubFolder,
     prefix + '_{}_{}.nix'.format(
-        arguments['inputBlockName'], arguments['window']))
-print('loading {}'.format(triggeredPath))
-dataReader, dataBlock = ns5.blockFromPath(
-    triggeredPath, lazy=arguments['lazy'])
+        'fr', arguments['window']))
+rigPath = os.path.join(
+    alignSubFolder,
+    prefix + '_{}_{}.nix'.format(
+        'rig', arguments['window']))
 resultPath = os.path.join(
     alignSubFolder,
     prefix + '_{}_outliers.h5'.format(
@@ -76,9 +75,37 @@ alignedAsigsKWargs.update(dict(
 alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **arguments)
 alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
     namedQueries, alignSubFolder, inputBlockName='fr', **arguments)
+#
+if arguments['verbose']:
+    print('Loading dataBlock: {}'.format(frPath))
+frReader, frBlock = ns5.blockFromPath(
+    frPath, lazy=arguments['lazy'])
+if arguments['verbose']:
+    print('Loading alignedAsigs: {}'.format(frPath))
+frDF = ns5.alignedAsigsToDF(
+    frBlock, **alignedAsigsKWargs)
+#
+rigKWargs = deepcopy(alignedAsigsKWargs)
+arguments.pop('selector')
+rigKWargs['unitNames'], rigKWargs['unitQuery'] = ash.processUnitQueryArgs(
+    namedQueries, alignSubFolder, inputBlockName='rig', **arguments)
+if arguments['verbose']:
+    print('Loading dataBlock: {}'.format(rigPath))
+rigReader, rigBlock = ns5.blockFromPath(
+    rigPath, lazy=arguments['lazy'])
+if arguments['verbose']:
+    print('Loading alignedAsigs: {}'.format(rigPath))
+rigDF = ns5.alignedAsigsToDF(
+    rigBlock, **rigKWargs)
+rigDF.fillna(0, inplace=True)
 
-dataDF = ns5.alignedAsigsToDF(
-    dataBlock, **alignedAsigsKWargs)
+rigColumnSelect = [
+    i for i in rigDF.columns
+    if (
+        ('_Right_x' in i[0]) or ('_Right_y' in i[0]) or
+        ('_Right_z' in i[0]) or
+        ('ins_' in i[0])
+        )]
 
 outlierLogPath = os.path.join(
     figureFolder,
@@ -86,7 +113,62 @@ outlierLogPath = os.path.join(
 if os.path.exists(outlierLogPath):
     os.remove(outlierLogPath)
 
+
 def findOutliers(
+        frDF, qThresh=None, countThresh=10, plotting=False):
+    if qThresh is None:
+        qThresh = 1 - 1e-6
+    sdThresh = chi2.interval(qThresh, 1)
+    sdThreshMV = chi2.interval(qThresh, len(frDF.columns))
+    #
+    averageDeviation = np.sqrt((frDF.quantile(q=0.9) ** 2).sum())
+    # if not (np.isfinite(averageDeviation)):
+    highFeatures = (frDF.quantile(q=0.9) > sdThresh[1])
+    nOutliers = highFeatures.sum()
+    outlierLabels = ' '.join([
+        i[0][:-2]
+        for i in highFeatures.index[highFeatures].to_list()])
+    # tooMuch = (nOutliers >= countThresh)
+    tooMuch = (averageDeviation >= sdThreshMV[1])
+    seg = (
+        frDF
+        .index
+        .get_level_values('segment')
+        .unique())
+    t = (
+        frDF
+        .index
+        .get_level_values('t')
+        .unique())
+    # if (nOutliers >= countThresh) / 2:
+    if tooMuch:
+        try:
+            summaryMessage = [
+                'segment {} time {}\n'.format(seg[0], t[0]),
+                (outlierLabels + '\n'),
+                'average deviation, {} > {}\n'.format(averageDeviation, sdThreshMV[1]),
+                'Found {} outlier channels\n'.format(nOutliers)]
+            print(summaryMessage)
+            with open(outlierLogPath, 'a') as f:
+                f.writelines(summaryMessage)
+        except Exception:
+            pass
+        if plotting:
+            import matplotlib.pyplot as plt
+            import seaborn as sns
+            bins = np.linspace(sdThresh[0], sdThresh[1], 200)
+            #  fig, ax = plt.subplots(len(frDF.columns), 1, sharex=True)
+            fig, ax = plt.subplots(1, 1, sharex=True)
+            for cIdx, cName in enumerate(frDF.columns):
+                sns.distplot(
+                    frDF[cName], kde=False, ax=ax,
+                    bins=bins, label=cName[0])
+            plt.suptitle('limits are {}'.format(sdThresh))
+            plt.show()
+    return nOutliers, averageDeviation, tooMuch, outlierLabels, seg[0], t[0]
+
+
+def findOutliers2(
         mahalDistDF, qThresh=None, sdThresh=None,
         nDim=1, multiplier=1):
     if sdThresh is None:
@@ -136,27 +218,57 @@ groupBy = ['segment', 'originalIndex', 't']
 resultNames = [
     'averageDeviation', 'rejectBlock', 'seg', 't']
 
-print('working with {} samples'.format(dataDF.shape[0]))
+print('working with {} samples'.format(frDF.shape[0]))
+# randSample = swr(rigDF.shape[0], 100000)
 randSample = slice(None, None, 5)
 #
+testQThresh = 1 - 1e-6
+print('For rig, sd tresh is {}'.format(chi2.interval((testQThresh), len(rigColumnSelect))))
+print('For fr, sd tresh is {}'.format(chi2.interval((testQThresh), len(frDF.columns))))
+print('For df 1 sd tresh is {}'.format(chi2.interval((testQThresh), 1)))
+# np.sqrt(frMahalDist.xs(798, level='originalIndex').xs(1, level='segment'))
 if arguments['verbose']:
     print('Calculating covariance matrix...')
 supportFraction = 0.99
-covMat = (
-    MinCovDet()
-    .fit(dataDF.to_numpy()[randSample, :]))
-###
-frMahalDist = pd.DataFrame(
-    covMat.mahalanobis(dataDF.to_numpy()),
-    index=dataDF.index, columns=['mahalDist'])
-outlierTrials = ash.applyFunGrouped(
-    frMahalDist,
+rigSub = (rigDF.loc[:, rigColumnSelect].to_numpy())
+rigCov = (
+    MinCovDet(support_fraction=supportFraction)
+    .fit(rigSub[randSample, :]))
+rigMahalDist = pd.DataFrame(
+    rigCov.mahalanobis(rigSub),
+    index=rigDF.index, columns=['mahalDist'])
+outlierTrialsRig = ash.applyFunGrouped(
+    rigMahalDist,
     groupBy, testVar,
-    fun=findOutliers, funArgs=[],
-    funKWargs=dict(multiplier=2, nDim=len(dataDF.columns)),
+    fun=findOutliers2, funArgs=[],
+    funKWargs=dict(multiplier=200, nDim=len(rigColumnSelect)),
     resultNames=resultNames,
     plotting=False)
-pdb.set_trace()
+#
+if arguments['verbose']:
+    print('Calculating covariance matrix...')
+frCov = (
+    MinCovDet()
+    .fit(np.sqrt(frDF).to_numpy()[randSample, :]))
+###
+frMahalDist = pd.DataFrame(
+    frCov.mahalanobis(np.sqrt(frDF).to_numpy()),
+    index=frDF.index, columns=['mahalDist'])
+outlierTrialsFr = ash.applyFunGrouped(
+    frMahalDist,
+    groupBy, testVar,
+    fun=findOutliers2, funArgs=[],
+    funKWargs=dict(multiplier=2, nDim=len(frDF.columns)),
+    resultNames=resultNames,
+    plotting=False)
+#outlierTrialsFr['rejectBlock'].sum()
+outlierTrials = {
+    k: pd.DataFrame(
+        np.nan,
+        index=outlierTrialsFr[k].index,
+        columns=outlierTrialsFr[k].columns)
+    for k in resultNames}
+
 if arguments['plotting']:
     import matplotlib.pyplot as plt
     import seaborn as sns
@@ -191,7 +303,7 @@ if arguments['plotting']:
     ax[0].plot(
         bla.index.get_level_values('bin').to_numpy(),
         bla.to_numpy())
-    bla = (dataDF.xs(992, level='originalIndex').xs(3, level='segment'))
+    bla = (frDF.xs(992, level='originalIndex').xs(3, level='segment'))
     ax[1].plot(
         bla.index.get_level_values('bin').to_numpy(),
         bla.to_numpy())

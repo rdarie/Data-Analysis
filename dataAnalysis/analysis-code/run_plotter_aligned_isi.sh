@@ -20,16 +20,26 @@
 #SBATCH --account=bibs-dborton-condo
 
 EXP="exp202003201200"
-EXP="exp202003091200"
+# EXP="exp202003091200"
+#
 # SELECTOR="Block005_minfrmaxcorr"
 SELECTOR="_minfrmaxcorr"
+#
 # WINDOW="--window=miniRC"
-WINDOW="--window=extraShort"
-# TRIALSELECTOR="--processAll"
-TRIALSELECTOR="--blockIdx=2"
-ANALYSISSELECTOR="--analysisName=emg"
-ANALYSISSELECTOR="--analysisName=default"
-
+WINDOW="--window=short"
+# WINDOW="--window=extraShort"
+#
+TRIALSELECTOR="--processAll"
+# TRIALSELECTOR="--blockIdx=2"
+#
+# ANALYSISSELECTOR="--analysisName=emg"
+# ANALYSISSELECTOR="--analysisName=default"
+# ANALYSISSELECTOR="--analysisName=emgStretchTime"
+ANALYSISSELECTOR="--analysisName=emgHiRes"
+#
+UNITSELECTOR="--unitQuery=all"
+# UNITSELECTOR="--unitQuery=isiemg"
+# UNITSELECTOR="--unitQuery=isichoremg"
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
 conda activate
@@ -37,6 +47,9 @@ conda activate
 source activate nda
 python --version
 #  --maskOutlierBlocks
-python3 './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR --inputBlockName="lfp" --unitQuery="all" --alignQuery="stimOff" --rowName= --rowControl= --colControl= --hueName="amplitudeCat" --alignFolderName=stim --enableOverrides
-# python3 './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR --inputBlockName="lfp" --unitQuery="all" --alignQuery="stimOff" --rowName= --rowControl= --colControl= --hueName="nominalCurrent" --alignFolderName=stim --enableOverrides
-# python3 './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR --inputBlockName="lfp" --unitQuery="all" --alignQuery="stimOn" --rowName= --rowControl= --colControl= --hueName="nominalCurrent" --alignFolderName=stim --enableOverrides
+# python3 './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR --inputBlockName="lfp" $UNITSELECTOR --alignQuery="stimOff" --rowName= --rowControl= --colControl= --hueName="nominalCurrent" --alignFolderName=stim --enableOverrides
+# python3 './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR --inputBlockName="lfp" $UNITSELECTOR --alignQuery="stimOn" --rowName= --rowControl= --colControl= --hueName="nominalCurrent" --alignFolderName=stim --enableOverrides
+# python3 './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR --inputBlockName="lfp" $UNITSELECTOR --alignQuery="stimOn" --rowName= --rowControl= --colControl= --hueName="nominalCurrent" --alignFolderName=stim --enableOverrides --individualTraces
+
+# python3 './plotRippleStimSpikeReport.py' --exp=$EXP $TRIALSELECTOR $ANALYSISSELECTOR
+python3 './plotRippleStimSpikeReport.py' --exp=$EXP $TRIALSELECTOR $WINDOW $UNITSELECTOR $ANALYSISSELECTOR --alignQuery="stimOn" --alignFolderName=stim --inputBlockName="lfp" --groupPagesBy="electrode"

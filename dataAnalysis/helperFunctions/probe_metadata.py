@@ -83,6 +83,13 @@ def mapToDF(arrayFilePath):
         cmpDF.loc[nevIdx, 'FE'] = row['FE']
     #
     cmpDF.dropna(inplace=True)
+    # import pdb; pdb.set_trace()
+    # xIdx = np.array(
+    #     cmpDF['xcoords'].values - cmpDF['xcoords'].min(),
+    #     dtype=np.int)
+    # yIdx = np.array(
+    #     cmpDF['ycoords'].values - cmpDF['ycoords'].min(),
+    #     dtype=np.int)
     return cmpDF
 
 

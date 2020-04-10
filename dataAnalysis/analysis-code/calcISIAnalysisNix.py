@@ -88,7 +88,7 @@ def calcISIBlockAnalysisNix():
         i
         for i in spikesBlock.filter(objects=SpikeTrain)
         if '_stim' in i.name]
-    
+
     if len(allStimTrains):
         mustDoubleSpikeWvfLen = True
 
@@ -217,19 +217,20 @@ def calcISIBlockAnalysisNix():
                 dummyT.t_start,
                 dummyT.t_stop + 1/samplingRate,
                 1/samplingRate))
+    #
+    etpJsonPath = './isiElectrodeProgramLookup.json'
+    if os.path.exists(etpJsonPath):
+        with open(etpJsonPath, 'r') as f:
+            electrodeToProgramLookup = json.load(f)
+            latestProgram = len(electrodeToProgramLookup.keys())
+    else:
+        electrodeToProgramLookup = {}
+        latestProgram = 0
     # Start parsing autologger info
     jsonPath = trialBasePath.replace('.nix', '_autoStimLog.json')
     if os.path.exists(jsonPath):
         with open(jsonPath, 'r') as f:
             stimLog = json.load(f)
-        etpJsonPath = './isiElectrodeProgramLookup.json'
-        if os.path.exists(etpJsonPath):
-            with open(etpJsonPath, 'r') as f:
-                electrodeToProgramLookup = json.load(f)
-                latestProgram = len(electrodeToProgramLookup.keys())
-        else:
-            electrodeToProgramLookup = {}
-            latestProgram = 0
         stimDict = {
             't': [],
             'elec': [],
@@ -338,20 +339,22 @@ def calcISIBlockAnalysisNix():
                 chanName = st.unit.channel_index.name
                 # matchingChIdx = nspBlock.filter(objects=ChannelIndex, name=chanName)
                 rippleChanNum = int(mapDF.loc[mapDF['label'] == chanName, 'nevID'] + 1)
-                # find which events in the stim log reference this spiketrain
-                thisStEventsMask = stimEvents.array_annotations['elec'] == rippleChanNum
-                theseUpdates = pd.DataFrame({
-                    k: v[thisStEventsMask]
-                    for k, v in stimEvents.array_annotations.items()
-                    })
-                theseUpdates.index = stimEvents[thisStEventsMask].times
-                theseUpdates.index.name = 't'
-                # create entries for each pulse of the spiketrain
-                newIndex = np.unique(np.concatenate([
-                    stimEvents[thisStEventsMask].times.magnitude,
-                    st.times.magnitude]))
-                allUpdates = theseUpdates.reindex(newIndex, method='ffill')
-                stAnnotations = allUpdates.loc[allUpdates.index.isin(st.times.magnitude), :]
+                if stimEvents is not None:
+                    # find which events in the stim log reference this spiketrain
+                    thisStEventsMask = stimEvents.array_annotations['elec'] == rippleChanNum
+                    theseUpdates = pd.DataFrame({
+                        k: v[thisStEventsMask]
+                        for k, v in stimEvents.array_annotations.items()
+                        })
+                    theseUpdates.index = stimEvents[thisStEventsMask].times
+                    theseUpdates.index.name = 't'
+                    # create entries for each pulse of the spiketrain
+                    newIndex = np.unique(np.concatenate([
+                        stimEvents[thisStEventsMask].times.magnitude,
+                        st.times.magnitude]))
+                    allUpdates = theseUpdates.reindex(newIndex, method='ffill')
+                    stAnnotations = allUpdates.loc[
+                        allUpdates.index.isin(st.times.magnitude), :]
                 #
                 wvf = pd.DataFrame(np.atleast_2d(np.squeeze(st.waveforms)))
                 wvfDiff = wvf.diff(-1, axis=1).fillna(0)
@@ -408,7 +411,8 @@ def calcISIBlockAnalysisNix():
                 amplitudes = wvf.apply(
                     lambda x: (x[idxPeak] - x[0]) * 1e-6,
                     axis=1, raw=True).to_numpy() * pq.V
-                #
+                # pdb.set_trace()
+                # np.isnan(amplitudes).any()
                 st.annotations['amplitude'] = amplitudes
                 st.array_annotations['amplitude'] = amplitudes
                 if 'arrayAnnNames' in st.annotations:
@@ -428,6 +432,10 @@ def calcISIBlockAnalysisNix():
                     st.annotations['firstPW'] = pws
                     st.array_annotations['firstPW'] = pws
                     st.annotations['arrayAnnNames'].append('firstPW')
+                    secPws = amplitudes ** 0 * (lastValidIdx - idxPeak) * st.sampling_period
+                    st.annotations['secondPW'] = secPws
+                    st.array_annotations['secondPW'] = secPws
+                    st.annotations['arrayAnnNames'].append('secondPW')
                     # try to estimate current
                     matchingAsig = nspBlock.filter(objects=AnalogSignalProxy, name='seg0_' + chanName)
                     if len(matchingAsig):
@@ -451,7 +459,6 @@ def calcISIBlockAnalysisNix():
                         st.array_annotations[annName] = (
                             stAnnotations[annName].to_numpy() *
                             eventUnits[annName])
-            
             peakIdx, _, trainStartIdx, trainEndIdx = hf.findTrains(
                 peakTimes=activeTimes, iti=10e-3)
             trainDurations = trainEndIdx - trainStartIdx
@@ -525,13 +532,12 @@ def calcISIBlockAnalysisNix():
                                     # assert np.diff(theseTimes).mean()
                                     startCategories.loc[idx, 'trainDur'] = nominalTrainDur
                                     startCategories.loc[idx, 'RateInHz'] = nominalRate
-                                #
-                                startCategories.loc[
-                                    idx, 'firstPW'] = np.round(np.mean(
-                                        st.annotations['firstPW'][theseTimesMask]) * 1e6)
                                 startCategories.loc[
                                     idx, 'secondPW'] = np.round(np.mean(
                                         st.annotations['secondPW'][theseTimesMask]) * 1e6)
+                                startCategories.loc[
+                                    idx, 'firstPW'] = np.round(np.mean(
+                                        st.annotations['firstPW'][theseTimesMask]) * 1e6)
                         startCategories.loc[idx, 'activeGroup'] = 1
                         electrodeShortHand = ''
                         negativeAmps = stimRasterCurrent < 0
@@ -549,15 +555,21 @@ def calcISIBlockAnalysisNix():
                         positiveAmps = stimRasterCurrent > 0
                         if (positiveAmps).any():
                             electrodeShortHand += '+'
-                            # totalAnode = stimRasterCurrent[positiveAmps].sum()
+                            totalAnode = stimRasterCurrent[positiveAmps].sum()
                             for cName in stimRasterCurrent[positiveAmps].index:
                                 electrodeShortHand += cName[:-2]
+                            if np.isnan(startCategories.loc[idx, 'nominalCurrent']):
+                                startCategories.loc[idx, 'nominalCurrent'] = totalAnode
                         startCategories.loc[idx, 'electrode'] = electrodeShortHand
                         if (electrodeShortHand not in electrodeToProgramLookup):
                             electrodeToProgramLookup[electrodeShortHand] = latestProgram
                             latestProgram += 1
                         startCategories.loc[idx, 'program'] = electrodeToProgramLookup[electrodeShortHand]
                 #
+                currCats = pd.cut(
+                    startCategories['nominalCurrent'],
+                    np.arange(-2, 2, 0.2))
+                startCategories['nominalCurrentCat'] = currCats.astype('str')
                 stopCategories = startCategories.copy()
                 #
                 stopCategories['t'] = (
@@ -580,12 +592,12 @@ def calcISIBlockAnalysisNix():
                 # stopCategories['amplitudeCat'] = ampCats.astype(np.str)
                 startCategories['stimCat'] = 'stimOn'
                 stopCategories['stimCat'] = 'stimOff'
-                #
+                # pdb.set_trace()
                 startCategories.dropna(inplace=True)
                 stopCategories.dropna(inplace=True)
         #
-        # with open(etpJsonPath, 'w') as f:
-        #     json.dump(electrodeToProgramLookup, f)
+        with open(etpJsonPath, 'w') as f:
+            json.dump(electrodeToProgramLookup, f)
         alignEventsDF = pd.concat((
             startCategories, stopCategories),
             axis=0, ignore_index=True, sort=True)
@@ -622,20 +634,20 @@ def calcISIBlockAnalysisNix():
             dataSeg.events.append(concatEvents)
             alignEvents.segment = dataSeg
             concatEvents.segment = dataSeg
-    #
-    if len(allStimTrains):
-        for seg in spikesBlock.segments:
-            for st in allStimTrains:
-                if st in seg.spiketrains:
-                    seg.spiketrains.remove(st)
-        allStimUnits = [un for un in spikesBlock.filter(objects=Unit) if '_stim' in un.name]
-        del allStimTrains
-        # delChanIndices = []
-        for chIdx in spikesBlock.channel_indexes:
-            for stUn in allStimUnits:
-                if stUn in chIdx.units:
-                    chIdx.units.remove(stUn)
-        del allStimUnits
+    #  Delete stim trains, because they won't be consistent across assembled files
+    # if len(allStimTrains):
+    #     for seg in spikesBlock.segments:
+    #         for st in allStimTrains:
+    #             if st in seg.spiketrains:
+    #                 seg.spiketrains.remove(st)
+    #     allStimUnits = [un for un in spikesBlock.filter(objects=Unit) if '_stim' in un.name]
+    #     del allStimTrains
+    #     # delChanIndices = []
+    #     for chIdx in spikesBlock.channel_indexes:
+    #         for stUn in allStimUnits:
+    #             if stUn in chIdx.units:
+    #                 chIdx.units.remove(stUn)
+    #     del allStimUnits
     #
     tdBlock = hf.extractSignalsFromBlock(
         nspBlock, keepSpikes=False, keepSignals=tdChanNames)

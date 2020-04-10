@@ -117,13 +117,14 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
         'keepIndex': slice(None)
         }
     sessionTapRangesNSP = expOpts['synchInfo']['nsp']
-    for trialKey in sessionTapRangesNSP.keys():
-        for trialSegmentKey in sessionTapRangesNSP[trialKey].keys():
-            for key in defaultSessionTapRangesNSP.keys():
-                if key not in sessionTapRangesNSP[trialKey][trialSegmentKey].keys():
-                    sessionTapRangesNSP[trialKey][trialSegmentKey].update(
-                        {key: defaultSessionTapRangesNSP[key]}
-                        )
+    if not RippleBlock:
+        for trialKey in sessionTapRangesNSP.keys():
+            for trialSegmentKey in sessionTapRangesNSP[trialKey].keys():
+                for key in defaultSessionTapRangesNSP.keys():
+                    if key not in sessionTapRangesNSP[trialKey][trialSegmentKey].keys():
+                        sessionTapRangesNSP[trialKey][trialSegmentKey].update(
+                            {key: defaultSessionTapRangesNSP[key]}
+                            )
     #  make placeholders for interpolation functions
     interpFunINStoNSP = {
         key: [None for i in value.keys()]
@@ -351,7 +352,8 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
     alignedAsigsChunkSize = 15000
     rasterOpts = {
         # 'binInterval': 1e-3, 'binWidth': 30e-3, 'smoothKernelWidth': 50e-3,
-        'binInterval': 0.2e-3, 'binWidth': 5e-3, 'smoothKernelWidth': 10e-3,
+        # 'binInterval': 0.2e-3, 'binWidth': 5e-3, 'smoothKernelWidth': 10e-3,
+        'binInterval': 10e3 ** (-1), 'binWidth': 5e-3, 'smoothKernelWidth': 10e-3,
         'windowSizes': {
             'extraShort': (-0.25, 0.25),
             'short': (-0.5, 0.5),
@@ -377,14 +379,17 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
         estimator='mean',
         # estimator=None, units='t',
         palette="ch:0.6,-.3,dark=.1,light=0.7,reverse=1",
-        height=6, aspect=15, kind='line')
+        height=6, aspect=30, kind='line')
     vLineOpts = {'color': 'm'}
+    asigPlotShadingOpts = {
+        'facecolor': vLineOpts['color'],
+        'alpha': 0.1, 'zorder': -100}
     asigSigStarOpts = {
         'color': 'm',
         'linestyle': 'None',
         'markersize': 20,
         'marker': '*'
-    }
+        }
     nrnRelplotKWArgs = dict(
         palette="ch:1.6,-.3,dark=.1,light=0.7,reverse=1",
         func1_kws={
@@ -394,22 +399,17 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
         facet1_kws={'sharey': False},
         facet2_kws={'sharey': True},
         height=5, aspect=3,
-        kind1='scatter', kind2='line'
-    )
+        kind1='scatter', kind2='line')
     nrnVLineOpts = {'color': 'y'}
     nrnBlockShadingOpts = {
         'facecolor': nrnVLineOpts['color'],
-        'alpha': 0.1, 'zorder': -100}
-    raucShadingOpts = {
-        'facecolor': vLineOpts['color'],
         'alpha': 0.1, 'zorder': -100}
     nrnSigStarOpts = {
         'color': 'y',
         # 'edgecolors': 'face',
         'linestyle': 'None',
         'markersize': 20,
-        'marker': '*'
-    }
+        'marker': '*'}
     plotOpts = {
         'type': 'ticks', 'errorBar': 'sem',
         'pageSize': (6, 22),

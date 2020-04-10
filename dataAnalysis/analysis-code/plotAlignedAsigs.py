@@ -15,6 +15,7 @@ Options:
     --selector=selector                    filename if using a unit selector
     --maskOutlierBlocks                    delete outlier trials? [default: False]
     --enableOverrides                      delete outlier trials? [default: False]
+    --individualTraces                     mean+sem or individual traces? [default: False]
     --rowName=rowName                      break down by row  [default: pedalDirection]
     --rowControl=rowControl                rows to exclude from stats test
     --hueName=hueName                      break down by hue  [default: amplitude]
@@ -32,11 +33,6 @@ matplotlib.rcParams['ps.fonttype'] = 42
 matplotlib.use('Agg')   # generate postscript output
 # matplotlib.use('QT5Agg')   # generate postscript output
 
-import seaborn as sns
-sns.set()
-sns.set_color_codes("dark")
-sns.set_context("notebook")
-sns.set_style("white")
 
 from namedQueries import namedQueries
 import pdb
@@ -48,7 +44,12 @@ from currentExperiment import parseAnalysisOptions
 from docopt import docopt
 import dill as pickle
 import pandas as pd
-
+import numpy as np
+import seaborn as sns
+sns.set()
+sns.set_color_codes("dark")
+sns.set_context("notebook")
+sns.set_style("white")
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']), arguments['exp'])
@@ -68,6 +69,13 @@ figureStatsFolder = os.path.join(
     )
 if not os.path.exists(figureStatsFolder):
     os.makedirs(figureStatsFolder, exist_ok=True)
+#
+alignedFeaturesFolder = os.path.join(
+    figureFolder, arguments['analysisName'],
+    'alignedFeatures')
+if not os.path.exists(alignedFeaturesFolder):
+    os.makedirs(alignedFeaturesFolder, exist_ok=True)
+#
 rowColOpts = asp.processRowColArguments(arguments)
 if arguments['processAll']:
     prefix = assembledName
@@ -103,20 +111,32 @@ statsTestPath = os.path.join(figureStatsFolder, pdfName + '_stats.h5')
 alignedAsigsKWargs.update({'decimate': 1})
 alignedAsigsKWargs.update({'amplitudeColumn': arguments['hueName']})
 limitPages = None
+if arguments['individualTraces']:
+    relplotKWArgs['estimator'] = None
+    relplotKWArgs['units'] = 't'
+    pdfName += '_traces'
+    rowColOpts['hueName'] = 't'
+    relplotKWArgs['legend'] = 'brief'
+    relplotKWArgs['palette'] = "ch:0,6,dark=.3,light=0.7,reverse=1"
 if arguments['enableOverrides']:
-    alignedAsigsKWargs.update({'windowSize': (-20e-3, 50e-3)})
+    if 'rowColOverrides' in locals():
+        if rowColOpts['colName'] in rowColOverrides:
+            rowColOpts['colOrder'] = rowColOverrides[rowColOpts['colName']]
+    alignedAsigsKWargs.update({'windowSize': (-10e-3, 40e-3)})
     currWindow = rasterOpts['windowSizes'][arguments['window']]
     fullWinSize = currWindow[1] - currWindow[0]
     redWinSize = (
         alignedAsigsKWargs['windowSize'][1] -
         alignedAsigsKWargs['windowSize'][0])
-    relplotKWArgs['aspect'] = (
-        relplotKWArgs['aspect'] * redWinSize / fullWinSize)
+    relplotKWArgs['facet_kws'] = {'sharey': False}
+    relplotKWArgs['aspect'] = 2
+    # relplotKWArgs['aspect'] = (
+    #     relplotKWArgs['aspect'] * redWinSize / fullWinSize)
     statsTestOpts.update({
-        'testStride': 5e-3,
-        'testWidth': 5e-3,
-        'tStart': -5e-3,
-        'tStop': 30e-3})
+        'testStride': 10e-3,
+        'testWidth': 10e-3,
+        'tStart': 0e-3,
+        'tStop': alignedAsigsKWargs['windowSize'][1]})
 #  End Overrides
 
 #  Get stats results
@@ -133,6 +153,8 @@ else:
         limitPages=limitPages,
         statsTestOpts=statsTestOpts)
 #
+# import warnings
+# warnings.filterwarnings("error")
 asp.plotAsigsAligned(
     dataBlock,
     limitPages=limitPages,
@@ -141,14 +163,25 @@ asp.plotAsigsAligned(
     sigTestResults=sigValsWide,
     figureFolder=alignedFeaturesFolder,
     enablePlots=True,
-    # minNObservations=10,
+    minNObservations=10,
     plotProcFuns=[
+        asp.genTicksToScale(
+            lineOpts={'lw': 2}, shared=False,
+            # for evoked lfp report
+            xUnitFactor=1e3, yUnitFactor=1,
+            xUnits='msec', yUnits='uV'
+            ),
         asp.genYLabelChanger(
             lookupDict={}, removeMatch='#0'),
-        asp.genYLimSetter(newLims=[-75, 100], forceLims=True),
+        # asp.genYLimSetter(newLims=[-75, 100], forceLims=True),
         asp.xLabelsTime,
-        asp.genBlockVertShader([2e-3, 12e-3], raucShadingOpts),
-        asp.genVLineAdder(0, vLineOpts),
+        asp.genBlockVertShader([
+                max(0e-3, alignedAsigsKWargs['windowSize'][0]),
+                min(300e-3, alignedAsigsKWargs['windowSize'][1])],
+            asigPlotShadingOpts),
+        asp.genVLineAdder(
+            np.arange(0, min(300e-3, alignedAsigsKWargs['windowSize'][1]), 10e-3),
+            vLineOpts),
         asp.genLegendRounder(decimals=2),
         ],
     pdfName=pdfName,

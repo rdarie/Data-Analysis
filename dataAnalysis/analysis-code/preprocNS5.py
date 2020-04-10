@@ -53,8 +53,7 @@ if arguments['previewMotorEncoder']:
         chunkSize=chunkSize, equalChunks=equalChunks,
         chunkList=chunkList,
         nameSuffix='_motorPreview',
-        calcRigEvents=trialFilesFrom['utah']['calcRigEvents']
-        )
+        calcRigEvents=trialFilesFrom['utah']['calcRigEvents'])
 #
 if arguments['makeTruncated']:
     analogInputNames = sorted(
@@ -70,8 +69,7 @@ if arguments['makeTruncated']:
         asigNameList=analogInputNames,
         spikeSourceType='tdc', writeMode='ow',
         chunkSize=chunkSize, equalChunks=equalChunks,
-        chunkList=chunkList, calcRigEvents=trialFilesFrom['utah']['calcRigEvents']
-        )
+        chunkList=chunkList, calcRigEvents=trialFilesFrom['utah']['calcRigEvents'])
 ###################################################################################
 if arguments['makeFull']:
     reader = ns5.preproc(
@@ -84,8 +82,7 @@ if arguments['makeFull']:
         spikeSourceType='tdc', writeMode='ow',
         chunkSize=chunkSize, equalChunks=equalChunks,
         chunkList=chunkList, nameSuffix='_full',
-        calcRigEvents=trialFilesFrom['utah']['calcRigEvents']
-        )
+        calcRigEvents=trialFilesFrom['utah']['calcRigEvents'])
 ##################################################################################
 if arguments['ISI']:
     mapDF = prb_meta.mapToDF(rippleMapFile)
@@ -100,17 +97,15 @@ if arguments['ISI']:
         chunkSize=chunkSize, equalChunks=equalChunks,
         chunkList=chunkList,
         calcRigEvents=trialFilesFrom['utah']['calcRigEvents'],
-        normalizeByImpedance=False, removeMeanAcross=True,
+        normalizeByImpedance=False, removeMeanAcross=False,
         asigNameList=asigNameList, ainpNameList=ainpNameList,
-        LFPFilterOpts=LFPFilterOpts,
-        calcAverageLFP=True,
-        )
-    try:
-        jsonSrcPath = os.path.join(nspFolder, ns5FileName + '_autoStimLog.json')
-        jsonDestPath = trialBasePath.replace('.nix', '_autoStimLog.json')
-        shutil.copyfile(jsonSrcPath, jsonDestPath)
-    except Exception:
-        traceback.print_exc()
+        LFPFilterOpts=LFPFilterOpts, calcAverageLFP=True)
+    # try:
+    #     jsonSrcPath = os.path.join(nspFolder, ns5FileName + '_autoStimLog.json')
+    #     jsonDestPath = trialBasePath.replace('.nix', '_autoStimLog.json')
+    #     shutil.copyfile(jsonSrcPath, jsonDestPath)
+    # except Exception:
+    #     traceback.print_exc()
 ##################################################################################
 if arguments['ISIRaw']:
     mapDF = prb_meta.mapToDF(rippleMapFile)
@@ -127,6 +122,4 @@ if arguments['ISIRaw']:
         calcRigEvents=trialFilesFrom['utah']['calcRigEvents'],
         normalizeByImpedance=False, removeMeanAcross=False,
         asigNameList=None, ainpNameList=None, nameSuffix='_raw',
-        LFPFilterOpts=LFPFilterOpts,
-        calcAverageLFP=True,
-        )
+        LFPFilterOpts=LFPFilterOpts, calcAverageLFP=True)

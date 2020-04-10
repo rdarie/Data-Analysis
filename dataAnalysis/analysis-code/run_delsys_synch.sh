@@ -7,7 +7,7 @@
 
 # Use more memory (32GB):
 #SBATCH --nodes=1
-#SBATCH --mem=32G
+#SBATCH --mem=96G
 
 # Specify a job name:
 #SBATCH -J delsys_synch
@@ -19,7 +19,7 @@
 # Specify account details
 #SBATCH --account=bibs-dborton-condo
 # Request custom resources
-#SBATCH --array=1,2,3
+#SBATCH --array=3,4
 
 EXP="exp202003201200"
 
@@ -31,5 +31,5 @@ conda activate
 source activate nda
 python --version
 
-SLURM_ARRAY_TASK_ID=3
-python3 './synchronizeDelsysToNSP.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP
+# SLURM_ARRAY_TASK_ID=4
+python3 -u './synchronizeDelsysToNSP.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --plotting
