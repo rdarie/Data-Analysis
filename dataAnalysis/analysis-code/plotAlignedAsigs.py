@@ -14,6 +14,7 @@ Options:
     --alignQuery=alignQuery                what will the plot be aligned to? [default: outboundWithStim]
     --selector=selector                    filename if using a unit selector
     --maskOutlierBlocks                    delete outlier trials? [default: False]
+    --invertOutlierBlocks                  delete outlier trials? [default: False]
     --enableOverrides                      delete outlier trials? [default: False]
     --individualTraces                     mean+sem or individual traces? [default: False]
     --rowName=rowName                      break down by row  [default: pedalDirection]
@@ -115,20 +116,22 @@ if arguments['individualTraces']:
     relplotKWArgs['estimator'] = None
     relplotKWArgs['units'] = 't'
     pdfName += '_traces'
-    rowColOpts['hueName'] = 't'
-    relplotKWArgs['legend'] = 'brief'
-    relplotKWArgs['palette'] = "ch:0,6,dark=.3,light=0.7,reverse=1"
+    # rowColOpts['hueName'] = 't'
+    # relplotKWArgs['palette'] = "ch:0,6,dark=.3,light=0.7,reverse=1"
+if arguments['invertOutlierBlocks']:
+    pdfName += '_outliers'
 if arguments['enableOverrides']:
+    relplotKWArgs['legend'] = 'brief'
     if 'rowColOverrides' in locals():
         if rowColOpts['colName'] in rowColOverrides:
             rowColOpts['colOrder'] = rowColOverrides[rowColOpts['colName']]
-    alignedAsigsKWargs.update({'windowSize': (-10e-3, 40e-3)})
+    alignedAsigsKWargs.update({'windowSize': (-100e-3, 400e-3)})
     currWindow = rasterOpts['windowSizes'][arguments['window']]
     fullWinSize = currWindow[1] - currWindow[0]
     redWinSize = (
         alignedAsigsKWargs['windowSize'][1] -
         alignedAsigsKWargs['windowSize'][0])
-    relplotKWArgs['facet_kws'] = {'sharey': False}
+    # relplotKWArgs['facet_kws'] = {'sharey': False}
     relplotKWArgs['aspect'] = 2
     # relplotKWArgs['aspect'] = (
     #     relplotKWArgs['aspect'] * redWinSize / fullWinSize)
@@ -179,9 +182,9 @@ asp.plotAsigsAligned(
                 max(0e-3, alignedAsigsKWargs['windowSize'][0]),
                 min(300e-3, alignedAsigsKWargs['windowSize'][1])],
             asigPlotShadingOpts),
-        asp.genVLineAdder(
-            np.arange(0, min(300e-3, alignedAsigsKWargs['windowSize'][1]), 10e-3),
-            vLineOpts),
+        # asp.genVLineAdder(
+        #     np.arange(0, min(300e-3, alignedAsigsKWargs['windowSize'][1]), 10e-3),
+        #     vLineOpts),
         asp.genLegendRounder(decimals=2),
         ],
     pdfName=pdfName,

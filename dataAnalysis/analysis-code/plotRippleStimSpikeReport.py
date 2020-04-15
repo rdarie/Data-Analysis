@@ -14,6 +14,9 @@ Options:
     --analysisName=analysisName            append a name to the resulting blocks? [default: default]
     --inputBlockName=inputBlockName        which trig_ block to pull
     --unitQuery=unitQuery                  how to restrict channels if not supplying a list? [default: isichoremg]
+    --maskOutlierBlocks                    delete outlier trials? [default: False]
+    --invertOutlierBlocks                  delete outlier trials? [default: False]
+    --individualTraces                     mean+sem or individual traces? [default: False]
     --alignQuery=alignQuery                what will the plot be aligned to? [default: all]
     --hueName=hueName                      break down by hue  [default: nominalCurrent]
     --hueControl=hueControl                hues to exclude from stats test
@@ -109,14 +112,18 @@ alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(
 alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = (
     ash.processUnitQueryArgs(
         namedQueries, analysisSubFolder, **arguments))
+alignedAsigsKWargs['outlierTrials'] = ash.processOutlierTrials(
+    alignSubFolder, prefix, **arguments)
 alignedAsigsKWargs.update(dict(
     duplicateControlsByProgram=False,
     makeControlProgram=False,
     metaDataToCategories=False,
-    removeFuzzyName=False,
-    decimate=1,
+    removeFuzzyName=False, decimate=1,
     transposeToColumns='feature', concatOn='columns',))
 rippleMapDF = prb_meta.mapToDF(rippleMapFile)
+rippleMapDF.loc[
+    rippleMapDF['label'].str.contains('caudal'),
+    'ycoords'] += 800
 delsysMapDF = pd.DataFrame({
     'label': [
         'LBicepsBrachiiEmgEnv',   'RBicepsBrachiiEmgEnv',
@@ -142,8 +149,11 @@ mapsDict = {
 # alignedAsigsKWargs.update(dict(
 #     windowSize=(6e-5, 1.2e-3)))
 # for evoked lfp report
+# alignedAsigsKWargs.update(dict(
+#     windowSize=(-350e-3, 350e-3)))
 alignedAsigsKWargs.update(dict(
-    windowSize=(-10e-3, 40e-3)))
+    windowSize=(-100e-3, 400e-3)))
+alignedAsigsKWargs.update(dict(decimate=1))
 flipInfo = {
     'ripple': {'lr': True, 'ud': True},
     'delsys': {'lr': False, 'ud': False}
@@ -198,9 +208,14 @@ plotProcFuns = [
             'horizontalalignment': 'right'
         }, shared=False),
     # for evoked lfp report, add stim times
-    asp.genVLineAdder(
-        np.arange(0, min(300e-3, alignedAsigsKWargs['windowSize'][1]), 10e-3),
-        vLineOpts)]
+    asp.genBlockVertShader([
+            max(0e-3, alignedAsigsKWargs['windowSize'][0]),
+            min(300e-3, alignedAsigsKWargs['windowSize'][1])],
+        asigPlotShadingOpts),
+    # asp.genVLineAdder(
+    #     np.arange(0, min(300e-3, alignedAsigsKWargs['windowSize'][1]), 10e-3),
+    #     vLineOpts)
+        ]
 mapSpecificPlotProcFuns = {
     'ripple': [
         asp.genTicksToScale(
@@ -216,19 +231,27 @@ mapSpecificPlotProcFuns = {
     'delsys': [
         asp.genTicksToScale(
             lineOpts={'lw': 2}, shared=False,
-            xUnitFactor=1e3, yUnitFactor=1,
+            xUnitFactor=1e3, yUnitFactor=1e6,
             xUnits='msec', yUnits='mV',
             )]}
 addSpacesFromMap = True
 extraSpaces = {
     'ripple': [
         (34, 52), (85, 260),
-        (34, 364), (34, 1052),
-        (85, 1260)],
+        (34, 364), (34, 852),
+        (85, 1060)],
     'delsys': [
         (1, 2), (4, 2)
         ]}
+# pdb.set_trace()
 limitPages = None
+if arguments['individualTraces']:
+    relplotKWArgs['alpha'] = 0.3
+    relplotKWArgs['estimator'] = None
+    relplotKWArgs['units'] = 't'
+    pdfName = pdfName.replace('.pdf', '_traces.pdf')
+if arguments['invertOutlierBlocks']:
+    pdfName = pdfName.replace('.pdf', '_outliers.pdf')
 ################
 # from here on we can start defining a function
 print('loading {}'.format(dataPath))
@@ -236,6 +259,7 @@ dataReader, dataBlock = preproc.blockFromPath(
     dataPath, lazy=arguments['lazy'])
 asigWide = preproc.alignedAsigsToDF(
     dataBlock, **alignedAsigsKWargs)
+#
 asigStack = (
     asigWide
     .stack(level=['feature', 'lag'])

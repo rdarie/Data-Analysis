@@ -60,7 +60,7 @@ alignedAsigsKWargs.update(dict(
     duplicateControlsByProgram=False,
     makeControlProgram=False,
     removeFuzzyName=False,
-    decimate=5,
+    decimate=1, windowSize=(0, 300e-3),
     transposeToColumns='feature', concatOn='columns',
     getMetaData=False,
     verbose=False, procFun=None))
@@ -72,7 +72,8 @@ alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUn
 correlationDF = ash.applyFun(
     triggeredPath=triggeredPath, resultPath=resultPath,
     resultNames=[arguments['resultName']],
-    fun="corr", applyType='self', lazy=arguments['lazy'],
+    fun="corr", loadType='all', applyType='self',
+    lazy=arguments['lazy'],
     verbose=arguments['verbose'],
     loadArgs=alignedAsigsKWargs)[0]
 
@@ -89,9 +90,13 @@ if arguments['plotting']:
     sns.set_color_codes("dark")
     sns.set_context("talk")
     sns.set_style("white")
-
+    figureOutputFolder = os.path.join(
+        figureFolder, arguments['analysisName'])
+    if not os.path.exists(figureOutputFolder):
+        os.makedirs(figureOutputFolder, exist_ok=True)
+    #
     pdfPath = os.path.join(
-        figureFolder,
+        figureOutputFolder,
         prefix + '_{}_{}_{}.pdf'.format(
             arguments['inputBlockName'], arguments['window'],
             arguments['resultName']))

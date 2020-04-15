@@ -21,7 +21,7 @@
 #SBATCH --account=bibs-dborton-condo
 
 # Request custom resources
-#SBATCH --array=2,3,4
+#SBATCH --array=3,4
 
 # EXP="exp201901070700"
 # EXP="exp201901201200"
@@ -41,5 +41,5 @@ source activate nda
 python --version
 
 # SLURM_ARRAY_TASK_ID=2
-python3 ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --ISI
+python3 ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --ISI --transferISIStimLog
 # python3 ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --previewEncoder

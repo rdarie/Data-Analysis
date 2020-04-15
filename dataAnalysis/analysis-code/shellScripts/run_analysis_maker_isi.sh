@@ -32,9 +32,9 @@ WINDOW="--window=short"
 # WINDOW="--window=extraShort"
 # TRIALSELECTOR="--processAll"
 # TRIALSELECTOR="--blockIdx=2"
-# ANALYSISSELECTOR="--analysisName=emg"
+ANALYSISSELECTOR="--analysisName=emg1msec"
 # ANALYSISSELECTOR="--analysisName=emgStretchTime"
-ANALYSISSELECTOR="--analysisName=emgHiRes"
+# ANALYSISSELECTOR="--analysisName=emgHiRes"
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
@@ -42,5 +42,5 @@ conda activate
 source activate nda
 python --version
 
-# SLURM_ARRAY_TASK_ID=2
-python ./calcISIAnalysisNix.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --chanQuery="all" $ANALYSISSELECTOR
+# SLURM_ARRAY_TASK_ID=4
+python -u './calcISIAnalysisNix.py' --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --chanQuery="all" $ANALYSISSELECTOR

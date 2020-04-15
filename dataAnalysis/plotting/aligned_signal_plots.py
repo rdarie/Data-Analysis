@@ -1,6 +1,7 @@
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.collections import PatchCollection
 from matplotlib.patches import FancyBboxPatch, Rectangle
+import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
@@ -516,7 +517,7 @@ def genTicksToScale(
                 # g.axes[ro, co].autoscale(enable=False)
                 g.axes[ro, co].plot(scaleX, scaleY, 'k-', **lineOpts)
                 #
-                xText = '{:.3f}'.format(dX * xUnitFactor)
+                xText = '{:.1f}'.format(dX * xUnitFactor)
                 if xUnits:
                     xText += ' {}'.format(xUnits)
                 g.axes[ro, co].text(
@@ -524,7 +525,7 @@ def genTicksToScale(
                     horizontalalignment='left',
                     verticalalignment='top', **textOpts)
                 #
-                yText = '{:.3f}'.format(dY * yUnitFactor)
+                yText = '{:.1f}'.format(dY * yUnitFactor)
                 if yUnits:
                     yText += ' {}'.format(yUnits)
                 g.axes[ro, co].text(
@@ -682,23 +683,38 @@ def genLegendRounder(decimals=2):
     return formatLegend
 
 
-def plotCorrelationMatrix(correlationDF, pdfPath):
+def plotCorrelationMatrix(
+        correlationDF, pdfPath,
+        fig_kws=dict(constrained_layout=True, figsize=(11, 9)),
+        gridspec_kws=dict(ncols=2, nrows=1, width_ratios=[10, 1]),
+        heatmap_kws={},
+        xticklabels_kws={}, yticklabels_kws={},
+        maskType='upper'):
     #  based on https://seaborn.pydata.org/examples/many_pairwise_correlations.html
     mask = np.zeros_like(correlationDF.to_numpy(), dtype=np.bool)
-    mask[np.tril_indices_from(mask)] = True
+    if maskType == 'upper':
+        mask[np.triu_indices_from(mask, k=0)] = True
+    elif maskType == 'lower':
+        mask[np.tril_indices_from(mask, k=1)] = True
     # Set up the matplotlib figure
-    f, ax = plt.subplots(figsize=(11, 9))
+    f = plt.figure(**fig_kws)
+    spec = gridspec.GridSpec(figure=f, **gridspec_kws)
+    ax = f.add_subplot(spec[0, 0])
+    cbAx = f.add_subplot(spec[0, 1])
     # Generate a custom diverging colormap
     cmap = sns.diverging_palette(220, 10, as_cmap=True)
     # Draw the heatmap with the mask and correct aspect ratio
-    for n in correlationDF.index:
-        correlationDF.loc[n, n] = 0
+    # for n in correlationDF.index:
+    #     correlationDF.loc[n, n] = 0
     with PdfPages(pdfPath) as pdf:
-        ax = sns.heatmap(
-            correlationDF.to_numpy(), mask=mask, cmap=cmap, center=0,
-            square=True, linewidths=.5, cbar_kws={"shrink": .5})
-        ax.set_xticklabels([])
-        ax.set_yticklabels([])
+        sns.heatmap(
+            correlationDF, mask=mask, cmap=cmap, center=0,
+            square=True, linewidths=.5, ax=ax, cbar_ax=cbAx,
+            cbar_kws={"shrink": .5}, **heatmap_kws)
+        if xticklabels_kws:
+            ax.set_xticklabels(ax.get_xticklabels(), **xticklabels_kws)
+        if yticklabels_kws:
+            ax.set_yticklabels(ax.get_yticklabels(), **yticklabels_kws)
         pdf.savefig()
         plt.close()
     return

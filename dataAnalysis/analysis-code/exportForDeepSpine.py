@@ -8,6 +8,7 @@ Options:
     --analysisName=analysisName            append a name to the resulting blocks? [default: default]
     --alignFolderName=alignFolderName      append a name to the resulting blocks? [default: motion]
     --processAll                           process entire experimental day? [default: False]
+    --maskOutlierBlocks                    delete outlier trials? [default: False]
     --verbose                              print diagnostics? [default: True]
     --lazy                                 load from raw, or regular? [default: False]
     --window=window                        process with short window? [default: short]
@@ -53,24 +54,26 @@ analysisSubFolder = os.path.join(
 alignSubFolder = os.path.join(
     analysisSubFolder, arguments['alignFolderName']
     )
-#
+if arguments['processAll']:
+    prefix = assembledName
+else:
+    prefix = ns5FileName
 alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(
     namedQueries, **arguments)
 alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = (
     ash.processUnitQueryArgs(
         namedQueries, analysisSubFolder, **arguments))
+outlierTrialNames = ash.processOutlierTrials(
+    alignSubFolder, prefix, **arguments)
+
 alignedAsigsKWargs.update(dict(
     duplicateControlsByProgram=False,
     makeControlProgram=False,
     metaDataToCategories=False,
     removeFuzzyName=False,
-    decimate=5,
+    decimate=1,
     windowSize=(-250e-3, 750e-3),
     transposeToColumns='feature', concatOn='columns',))
-if arguments['processAll']:
-    prefix = assembledName
-else:
-    prefix = ns5FileName
 #
 triggeredPath = os.path.join(
     alignSubFolder,
@@ -121,14 +124,15 @@ kinKey = '/sling/kinematics'
 with pd.HDFStore(outputPath) as store:
     nullKinematics.to_hdf(store, kinKey)
 eesIdx = 0
-# pdb.set_trace()
+
 for stimName, stimGroup in asigWide.groupby(['electrode', 'RateInHz', 'nominalCurrent']):
     if stimGroup.groupby(['segment', 't']).ngroups < 10:
         continue
+    print(stimName)
     matches = re.search(elecRegex, stimName[0])
     cathodeName = matches.groups()[0]
     anodeName = matches.groups()[1]
-    for trialIdx, (trialName, trialGroup) in enumerate(stimGroup.groupby(['segment', 't'])):
+    for trialIdx, (trialName, trialGroup) in enumerate(stimGroup.groupby(['segment', 'originalIndex', 't'])):
         stimKey = '/sling/sheep/spindle_0/biophysical/ees_{:0>3}/stim'.format(eesIdx)
         #
         eesIdx += 1
@@ -142,12 +146,17 @@ for stimName, stimGroup in asigWide.groupby(['electrode', 'RateInHz', 'nominalCu
             if ('caudal' in cName) or ('rostral' in cName):
                 lfpName = cName[:-4]
                 theseResults.loc[:, (lfpName, 'lfp')] = trialGroup[cName].to_numpy()
+        # pdb.set_trace()
         with pd.HDFStore(outputPath) as store:
             theseResults.to_hdf(store, stimKey)
-            store.get_storer(stimKey).attrs.metadata = {
+            thisMetadata = {
                 'globalIdx': eesIdx, 'combinationIdx': trialIdx,
                 'electrode': stimName[0], 'RateInHz': stimName[1],
                 'amplitude': stimName[2]}
+            if arguments['maskOutlierBlocks']:
+                thisMetadata['outlierTrial'] = outlierTrialNames.loc[
+                    trialName, 'all']
+            store.get_storer(stimKey).attrs.metadata = thisMetadata
 
 if arguments['lazy']:
     dataReader.file.close()

@@ -48,14 +48,19 @@ def processChannelQueryArgs(
 
 def processOutlierTrials(
         alignSubFolder, prefix,
-        maskOutlierTrials=False, window=None,
+        maskOutlierBlocks=False,
+        invertOutlierBlocks=False,
+        window=None,
         **kwargs
         ):
-    if maskOutlierTrials:
+    if maskOutlierBlocks:
         resultPath = os.path.join(
             alignSubFolder,
             prefix + '_{}_outliers.h5'.format(window))
-        return pd.read_hdf(resultPath, 'rejectTrial')
+        oBlocks = pd.read_hdf(resultPath, 'rejectBlock')
+        if invertOutlierBlocks:
+            oBlocks = ~oBlocks.astype(np.bool)
+        return oBlocks
     else:
         return None
 
@@ -92,7 +97,7 @@ def applyFun(
         loadType='all', applyType='self',
         verbose=False):
     if verbose:
-        prf.print_memory_usage('about to load dataBlock')
+        prf.print_memory_usage('about to load dataBlock {}'.format(triggeredPath))
     dataReader, dataBlock = ns5.blockFromPath(triggeredPath, lazy=lazy)
     if secondaryPath is not None:
         secondaryReader, secondaryBlock = ns5.blockFromPath(

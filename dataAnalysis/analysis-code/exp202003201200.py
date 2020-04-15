@@ -22,12 +22,12 @@ def getExpOpts():
     experimentName = '202003201200-Peep'
     deviceName = None
     rippleMapFile = 'isi_nano1caudal_xAyBzC_ortho_nano2rostral_xAyBzC_ortho.map'
-    # exclude caudal_e08, rostral_e03 and rostral_e016
+    # exclude dummy electrodes 8 and 16
     asigNameList = [
         ['caudalX_e{:02d}_a'.format(i) for i in range(1, 8)] +
-        ['caudalY_e{:02d}_a'.format(i) for i in range(9, 17)] +
-        ['caudalZ_e{:02d}_a'.format(i) for i in range(17, 25)],
-        ['rostralX_e{:02d}_a'.format(i) for i in range(1, 9) if i not in [3]] +
+        ['caudalY_e{:02d}_a'.format(i) for i in range(9, 16)] +
+        ['caudalZ_e{:02d}_a'.format(i) for i in range(17, 25)] +
+        ['rostralX_e{:02d}_a'.format(i) for i in range(1, 8)] +
         ['rostralY_e{:02d}_a'.format(i) for i in range(9, 16)] +
         ['rostralZ_e{:02d}_a'.format(i) for i in range(17, 25)]
         ]
@@ -128,4 +128,12 @@ def getExpOpts():
             '-rostralY_e12+rostralX_e05',
             ]
     }
+    outlierDetectColumns = [
+        'LPeroneusLongusEmg#0',
+        'LSemitendinosusEmg#0',
+        'LVastusLateralisEmg#0',
+        'RPeroneusLongusEmg#0',
+        'RSemitendinosusEmg#0',
+        'RVastusLateralisEmg#0'
+        ]
     return locals()

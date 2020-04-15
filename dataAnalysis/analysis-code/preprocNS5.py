@@ -11,6 +11,7 @@ Options:
     --makeTruncated                 whether to make a .nix file that only has analog inputs [default: False]
     --maskMotorEncoder              whether to ignore motor encoder activity outside the alignTimeBounds window [default: False]
     --ISI                           special options for parsing Ripple files from ISI [default: False]
+    --transferISIStimLog            special options for parsing Ripple files from ISI [default: False]
     --ISIRaw                        special options for parsing Ripple files from ISI [default: False]
 """
 
@@ -100,12 +101,13 @@ if arguments['ISI']:
         normalizeByImpedance=False, removeMeanAcross=False,
         asigNameList=asigNameList, ainpNameList=ainpNameList,
         LFPFilterOpts=LFPFilterOpts, calcAverageLFP=True)
-    # try:
-    #     jsonSrcPath = os.path.join(nspFolder, ns5FileName + '_autoStimLog.json')
-    #     jsonDestPath = trialBasePath.replace('.nix', '_autoStimLog.json')
-    #     shutil.copyfile(jsonSrcPath, jsonDestPath)
-    # except Exception:
-    #     traceback.print_exc()
+    if arguments['transferISIStimLog']:
+        try:
+            jsonSrcPath = os.path.join(nspFolder, ns5FileName + '_autoStimLog.json')
+            jsonDestPath = trialBasePath.replace('.nix', '_autoStimLog.json')
+            shutil.copyfile(jsonSrcPath, jsonDestPath)
+        except Exception:
+            traceback.print_exc()
 ##################################################################################
 if arguments['ISIRaw']:
     mapDF = prb_meta.mapToDF(rippleMapFile)
