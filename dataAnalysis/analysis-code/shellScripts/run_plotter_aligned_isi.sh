@@ -37,7 +37,8 @@ TRIALSELECTOR="--processAll"
 # ANALYSISSELECTOR="--analysisName=default"
 # ANALYSISSELECTOR="--analysisName=emgStretchTime"
 # ANALYSISSELECTOR="--analysisName=emgHiRes"
-ANALYSISSELECTOR="--analysisName=emg1msec"
+# ANALYSISSELECTOR="--analysisName=emg1msec"
+ANALYSISSELECTOR="--analysisName=emg1msecSmooth"
 #
 # UNITSELECTOR="--unitQuery=all"
 UNITSELECTOR="--unitQuery=isiemgenv"
@@ -50,9 +51,10 @@ source activate nda
 python --version
 #  --maskOutlierBlocks
 python3 './plotRippleStimSpikeReport.py' --exp=$EXP $TRIALSELECTOR $WINDOW $UNITSELECTOR $ANALYSISSELECTOR --alignQuery="stimOn" --alignFolderName=stim --inputBlockName="lfp" --groupPagesBy="electrode" --maskOutlierBlocks --invertOutlierBlocks --individualTraces
-# python3 './plotRippleStimSpikeReport.py' --exp=$EXP $TRIALSELECTOR $WINDOW $UNITSELECTOR $ANALYSISSELECTOR --alignQuery="stimOn" --alignFolderName=stim --inputBlockName="lfp" --groupPagesBy="electrode" --maskOutlierBlocks --invertOutlierBlocks
+python3 './plotRippleStimSpikeReport.py' --exp=$EXP $TRIALSELECTOR $WINDOW $UNITSELECTOR $ANALYSISSELECTOR --alignQuery="stimOn" --alignFolderName=stim --inputBlockName="lfp" --groupPagesBy="electrode" --maskOutlierBlocks --invertOutlierBlocks
 python3 './plotRippleStimSpikeReport.py' --exp=$EXP $TRIALSELECTOR $WINDOW $UNITSELECTOR $ANALYSISSELECTOR --alignQuery="stimOn" --alignFolderName=stim --inputBlockName="lfp" --groupPagesBy="electrode" --maskOutlierBlocks --individualTraces
-# python3 './plotRippleStimSpikeReport.py' --exp=$EXP $TRIALSELECTOR $WINDOW $UNITSELECTOR $ANALYSISSELECTOR --alignQuery="stimOn" --alignFolderName=stim --inputBlockName="lfp" --groupPagesBy="electrode" --maskOutlierBlocks
+python3 './plotRippleStimSpikeReport.py' --exp=$EXP $TRIALSELECTOR $WINDOW $UNITSELECTOR $ANALYSISSELECTOR --alignQuery="stimOn" --alignFolderName=stim --inputBlockName="lfp" --groupPagesBy="electrode" --maskOutlierBlocks
+
 # python3 './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR --inputBlockName="lfp" $UNITSELECTOR --alignQuery="stimOff" --rowName= --rowControl= --colControl= --hueName="nominalCurrent" --alignFolderName=stim --enableOverrides
 # python3 './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR --inputBlockName="lfp" $UNITSELECTOR --alignQuery="stimOn" --rowName= --rowControl= --colControl= --hueName="nominalCurrent" --alignFolderName=stim --enableOverrides
 # python3 './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR --inputBlockName="lfp" $UNITSELECTOR --alignQuery="stimOn" --rowName= --rowControl= --colControl= --hueName="nominalCurrent" --alignFolderName=stim --enableOverrides --individualTraces

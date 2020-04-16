@@ -28,7 +28,8 @@ TRIALSELECTOR="--processAll"
 # TRIALSELECTOR="--blockIdx=2"
 # ANALYSISSELECTOR="--analysisName=emgStretchTime"
 # ANALYSISSELECTOR="--analysisName=emgHiRes"
-ANALYSISSELECTOR="--analysisName=emg1msec"
+# ANALYSISSELECTOR="--analysisName=emg1msec"
+ANALYSISSELECTOR="--analysisName=emg1msecSmooth"
 # UNITSELECTOR="--unitQuery=all"
 UNITSELECTOR="--unitQuery=isiemgenv"
 # UNITSELECTOR="--unitQuery=isispinaloremg"
@@ -40,8 +41,9 @@ conda activate
 source activate nda
 python --version
 
-UNITSELECTOR="--unitQuery=isispinaloremg"
-python "./exportForDeepSpine.py" --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR --alignFolderName=stim --inputBlockName="lfp" $UNITSELECTOR --maskOutlierBlocks --alignQuery="stimOn"
-# UNITSELECTOR="--unitQuery=isiemgenv"
-# python "./calcTargetNoiseCeiling.py" --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR --alignFolderName=stim --inputBlockName="lfp" $UNITSELECTOR --maskOutlierBlocks --alignQuery="stimOn" --plotting
-python "loadSheepDeepSpine.py"
+# UNITSELECTOR="--unitQuery=isispinaloremg"
+# python "./exportForDeepSpine.py" --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR --alignFolderName=stim --inputBlockName="lfp" $UNITSELECTOR --maskOutlierBlocks --alignQuery="stimOn"
+UNITSELECTOR="--unitQuery=isiemgenv"
+python "./calcTargetNoiseCeiling.py" --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR --alignFolderName=stim --inputBlockName="lfp" $UNITSELECTOR --maskOutlierBlocks --alignQuery="stimOn" --plotting
+python "./calcEpochEffect.py" --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR --alignFolderName=stim --inputBlockName="lfp" $UNITSELECTOR --maskOutlierBlocks --alignQuery="stimOn" --plotting
+# python "loadSheepDeepSpine.py"

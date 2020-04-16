@@ -148,7 +148,6 @@ def findOutliers(
     #             seg[0], t[0], deviation, sdThresh))
     return deviation, tooMuch, seg[0], t[0]
 
-
 def applyMad(ser):
     if np.median(ser) == 0:
         return np.abs(zscore(ser))
@@ -163,16 +162,19 @@ resultNames = [
 print('working with {} samples'.format(dataDF.shape[0]))
 randSample = slice(None, None, None)
 # tBoundsCovCalc = [0, 150e-3]
-allEpochs = dataDF.index.get_level_values('bin')
-epochs = pd.cut(allEpochs, bins=5)
-epochs.name = 'epoch'
 
-dataDF.set_index(pd.Index(epochs, name='epoch'), append=True, inplace=True)
+epochs = pd.cut(
+    dataDF.index.get_level_values('bin'),
+    bins=10)
+dataDF.set_index(
+    pd.Index(epochs, name='epoch'),
+    append=True, inplace=True)
 mahalDist = pd.DataFrame(
     np.nan,
     index=dataDF.index, columns=['mahalDist'])
 #
 groupNames = ['electrode', 'nominalCurrent', 'epoch']
+# groupNames = ['electrode', 'nominalCurrent']
 # groupNames = ['electrode']
 # groupNames = ['nominalCurrent']
 # groupNames = None
@@ -201,25 +203,26 @@ for name, group in tqdm(grouper):
         covMat = EmpiricalCovariance().fit(subData)
     mahalDist.loc[group.index, 'mahalDist'] = covMat.mahalanobis(
         group.to_numpy())
-
+#
 outlierTrials = ash.applyFunGrouped(
     mahalDist,
     groupBy, testVar,
     fun=findOutliers, funArgs=[],
-    funKWargs=dict(multiplier=4, nDim=len(dataDF.columns)),
+    funKWargs=dict(multiplier=10, nDim=len(dataDF.columns)),
     # funKWargs=dict(sdThresh=300),
     resultNames=resultNames,
     plotting=False)
-
+#
 print(outlierTrials['deviation'].sort_values('all').tail())
 print('Outlier proportion was:')
 print(outlierTrials['rejectBlock']['all'].sum() / outlierTrials['rejectBlock']['all'].size)
 
-if arguments['plotting']:
-    import matplotlib.pyplot as plt
-    import seaborn as sns
-    plt.plot(mahalDist.to_numpy())
-    plt.show()
+# if arguments['plotting']:
+#     import matplotlib.pyplot as plt
+#     import seaborn as sns
+#     plt.plot(mahalDist.to_numpy())
+#     plt.show()
+#
 if arguments['plotting']:
     fig, ax = plt.subplots()
     hist, binEdges = np.histogram(
@@ -229,18 +232,30 @@ if arguments['plotting']:
             outlierTrials['deviation']['all'].max() + 10,
             10)
         )
+    cumFrac = np.cumsum(hist) / hist.sum()
+    mask = (cumFrac > 0.85) & (cumFrac < 0.99)
     ax.plot(
-        binEdges[:-1],
-        np.cumsum(hist) / hist.sum())
+        binEdges[:-1][mask],
+        cumFrac[mask]
+        )
     ax.set_xlabel('mahalanobis distance')
-    plt.show(block=False)
-if arguments['plotting']:
-    fig, ax = plt.subplots(2, 1)
-    sns.boxplot(
-        outlierTrials['deviation'],
-        ax=ax[0])
-    ax[0].set_xlabel(arguments['unitQuery'])
-    plt.show(block=False)
+    ax.set_ylabel('cummulative fraction')
+    pdfName = os.path.join(
+        figureOutputFolder,
+        'mh_dist_histogram_by_condition_and_epoch_robust.pdf')
+    plt.savefig(
+        pdfName, bbox_inches='tight', pad_inches=0)
+    plt.close()
+    plt.show()
+#
+# if arguments['plotting']:
+#     fig, ax = plt.subplots(2, 1)
+#     sns.boxplot(
+#         outlierTrials['deviation'],
+#         ax=ax[0])
+#     ax[0].set_xlabel(arguments['unitQuery'])
+#     plt.show(block=False)
+# #
 if arguments['plotting']:
     theseOutliers = (
         outlierTrials['deviation']
@@ -248,9 +263,12 @@ if arguments['plotting']:
             outlierTrials['rejectBlock']['all'].astype(np.bool),
             'all']).sort_values()
     nRowCol = int(np.ceil(np.sqrt(theseOutliers.size)))
-    fig, ax = plt.subplots(
-        nRowCol, nRowCol, sharex=True, sharey=True)
-    fig.set_size_inches(2 * nRowCol, 3 * nRowCol)
+    emgFig, emgAx = plt.subplots(
+        nRowCol, nRowCol, sharex=True)
+    emgFig.set_size_inches(3 * nRowCol, 2 * nRowCol)
+    mhFig, mhAx = plt.subplots(
+        nRowCol, nRowCol, sharex=True)
+    mhFig.set_size_inches(3 * nRowCol, 2 * nRowCol)
     # for idx, (name, group) in enumerate(dataDF.loc[fullOutMask, :].groupby(theseOutliers.index.names)):
     for idx, (name, row) in enumerate(theseOutliers.items()):
         outlierDataMasks = []
@@ -258,20 +276,33 @@ if arguments['plotting']:
             outlierDataMasks.append(dataDF.index.get_level_values(levelName) == name[lvlIdx])
         fullOutMask = np.logical_and.reduce(outlierDataMasks)
         for cN in dataDF.columns:
-            ax.flat[idx].plot(
+            emgAx.flat[idx].plot(
                 dataDF.loc[fullOutMask, :].index.get_level_values('bin'),
                 dataDF.loc[fullOutMask, cN], label=cN[0])
-            ax.flat[idx].text(
+            emgAx.flat[idx].text(
                 1, 1, 'dev = {:.2f}'.format(row),
                 va='top', ha='right',
-                transform=ax.flat[idx].transAxes)
-    leg = ax.flat[0].legend(
+                transform=emgAx.flat[idx].transAxes)
+        mhAx.flat[idx].plot(
+            mahalDist.loc[fullOutMask, :].index.get_level_values('bin'),
+            mahalDist.loc[fullOutMask, 'mahalDist'], label='mahalDist')
+        mhAx.flat[idx].text(
+            1, 1, 'dev = {:.2f}'.format(row),
+            va='top', ha='right',
+            transform=mhAx.flat[idx].transAxes)
+    emgLeg = emgAx.flat[0].legend(
         bbox_to_anchor=(1.01, 1.01),
         loc='upper left',
-        bbox_transform=ax[0, -1].transAxes)
-    ax.flat[0].set_ylim([-25, 50])
+        bbox_transform=emgAx[0, -1].transAxes)
+    mhLeg = mhAx.flat[0].legend(
+        bbox_to_anchor=(1.01, 1.01),
+        loc='upper left',
+        bbox_transform=mhAx[0, -1].transAxes)
+    # emgAx.flat[0].set_ylim([-25, 50])
     pdfName = os.path.join(figureOutputFolder, 'outlier_trials_by_condition_and_epoch_robust.pdf')
-    fig.savefig(pdfName, bbox_inches='tight', pad_inches=0, bbox_extra_artists=[leg])
+    emgFig.savefig(pdfName, bbox_inches='tight', pad_inches=0, bbox_extra_artists=[emgLeg])
+    pdfName = os.path.join(figureOutputFolder, 'mh_dist_by_condition_and_epoch_robust.pdf')
+    mhFig.savefig(pdfName, bbox_inches='tight', pad_inches=0, bbox_extra_artists=[mhLeg])
     plt.show()
     outlierDataMasks = []
     for lvlIdx, levelName in enumerate(theseOutliers.index.names):
@@ -279,20 +310,24 @@ if arguments['plotting']:
     indexInfo = dataDF.index.to_frame().reset_index(drop=True)
     fullOutMask = np.logical_and.reduce(outlierDataMasks)
     firstBinMask = indexInfo['bin'] == indexInfo['bin'].unique()[0]
-    indexInfo.loc[fullOutMask & firstBinMask, :].groupby(['electrode', 'nominalCurrent'])['RateInHz'].value_counts()
-
-if arguments['plotting']:
-    fig, ax = plt.subplots(2, 1, sharex=True)
-    bla = (mahalDist.xs(992, level='originalIndex').xs(3, level='segment'))
-    ax[0].plot(
-        bla.index.get_level_values('bin').to_numpy(),
-        bla.to_numpy())
-    bla = (dataDF.xs(992, level='originalIndex').xs(3, level='segment'))
-    ax[1].plot(
-        bla.index.get_level_values('bin').to_numpy(),
-        bla.to_numpy())
-    plt.show()
-# 
+    print(
+        indexInfo
+        .loc[fullOutMask & firstBinMask, :]
+        .groupby(['electrode', 'nominalCurrent'])['RateInHz']
+        .value_counts())
+#
+# if arguments['plotting']:
+#     fig, ax = plt.subplots(2, 1, sharex=True)
+#     bla = (mahalDist.xs(992, level='originalIndex').xs(3, level='segment'))
+#     ax[0].plot(
+#         bla.index.get_level_values('bin').to_numpy(),
+#         bla.to_numpy())
+#     bla = (dataDF.xs(992, level='originalIndex').xs(3, level='segment'))
+#     ax[1].plot(
+#         bla.index.get_level_values('bin').to_numpy(),
+#         bla.to_numpy())
+#     plt.show()
+# pdb.set_trace()
 if arguments['saveResults']:
     if os.path.exists(resultPath):
         os.remove(resultPath)

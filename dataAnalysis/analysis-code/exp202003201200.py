@@ -132,8 +132,8 @@ def getExpOpts():
         'LPeroneusLongusEmg#0',
         'LSemitendinosusEmg#0',
         'LVastusLateralisEmg#0',
-        'RPeroneusLongusEmg#0',
-        'RSemitendinosusEmg#0',
-        'RVastusLateralisEmg#0'
+        # 'RPeroneusLongusEmg#0',
+        # 'RSemitendinosusEmg#0',
+        # 'RVastusLateralisEmg#0'
         ]
     return locals()

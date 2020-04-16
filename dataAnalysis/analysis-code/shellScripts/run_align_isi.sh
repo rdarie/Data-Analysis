@@ -33,7 +33,8 @@ TRIALSELECTOR="--processAll"
 # ANALYSISSELECTOR="--analysisName=default"
 # ANALYSISSELECTOR="--analysisName=emgStretchTime"
 # ANALYSISSELECTOR="--analysisName=emgHiRes"
-ANALYSISSELECTOR="--analysisName=emg1msec"
+# ANALYSISSELECTOR="--analysisName=emg1msec"
+ANALYSISSELECTOR="--analysisName=emg1msecSmooth"
 #
 # UNITSELECTOR="--unitQuery=all"
 UNITSELECTOR="--unitQuery=isiemgraw"
@@ -49,7 +50,7 @@ python --version
 # python3 ./assembleExperimentData.py --exp=$EXP --processAsigs --processRasters $ANALYSISSELECTOR 
 # python3 ./calcAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ANALYSISSELECTOR --eventName=stimAlignTimes --chanQuery="all" --blockName="lfp"  --alignFolderName=stim
 
-python3 ./calcTrialOutliers.py --exp=$EXP --alignFolderName=stim --inputBlockName="lfp" $TRIALSELECTOR $ANALYSISSELECTOR $UNITSELECTOR $WINDOW --alignQuery="stimOn" --saveResults --verbose
+python3 ./calcTrialOutliers.py --exp=$EXP --alignFolderName=stim --inputBlockName="lfp" $TRIALSELECTOR $ANALYSISSELECTOR $UNITSELECTOR $WINDOW --alignQuery="stimOn" --saveResults --verbose --plotting
 
 # python3 ./calcUnitCorrelation.py --exp=$EXP $TRIALSELECTOR $UNITSELECTOR $ANALYSISSELECTOR $WINDOW --resultName="corr" --alignQuery="stimOn" --alignFolderName=stim --inputBlockName="lfp" --verbose --plotting
 

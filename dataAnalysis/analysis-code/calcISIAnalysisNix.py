@@ -660,14 +660,27 @@ def calcISIBlockAnalysisNix():
     #
     emgCols = [cn for cn in tdDF.columns if 'Emg' in cn]
     if len(emgCols):
-        cornerFrequency = 100
-        sos = signal.butter(
-            4, cornerFrequency, 'low',
+        sosHP = signal.butter(
+            2, 40, 'high',
             fs=float(currentSamplingRate), output='sos')
+        cornerFrequencyLP = 40
+        sosLP = signal.butter(
+            2, cornerFrequencyLP, 'low',
+            fs=float(currentSamplingRate), output='sos')
+        if False:
+            t = np.arange(0, .1, currentSamplingRate.magnitude ** (-1))
+            x = np.zeros_like(t)
+            x[int(x.size/2)] = 1
+            y = signal.sosfiltfilt(sosLP, x)
+            plt.plot(t, y); plt.show()
         for cName in emgCols:
             procName = cName.replace('Emg', 'EmgEnv')
-            procEmg = (tdDF[cName] - tdDF[cName].mean()).abs()
-            tdDF[procName] = signal.sosfiltfilt(sos, procEmg.to_numpy())
+            preprocEmg = signal.sosfiltfilt(
+                sosHP,
+                (tdDF[cName] - tdDF[cName].mean()).to_numpy())
+            # 
+            tdDF[procName] = signal.sosfiltfilt(
+                sosLP, np.abs(preprocEmg))
             tdChanNames.append(procName)
             #
     if samplingRate != currentSamplingRate:
