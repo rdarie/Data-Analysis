@@ -21,7 +21,8 @@
 # Request custom resources
 #SBATCH --array=3,4
 
-EXP="exp202003201200"
+# EXP="exp202003201200"
+EXP="exp202003191400"
 
 LAZINESS="--lazy"
 
@@ -31,5 +32,5 @@ conda activate
 source activate nda
 python --version
 
-# SLURM_ARRAY_TASK_ID=4
+SLURM_ARRAY_TASK_ID=4
 python3 -u './synchronizeDelsysToNSP.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --plotting

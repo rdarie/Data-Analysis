@@ -228,7 +228,6 @@ if arguments['plotting']:
             plt.show()
         # for pageIdx, (pageName, pageGroup) in enumerate(tqdm(noiseCeil.groupby('electrode'))):
 
-pdb.set_trace()
 if arguments['plotting']:
     plotNoiseCeil = (
         noiseCeil
@@ -267,5 +266,6 @@ if arguments['plotting']:
     # ax.set_ylim([-1, 1])
     fig.savefig(os.path.join(figureOutputFolder, 'noise_ceil_scatterplot.pdf'))
     plt.show()
+pdb.set_trace()
 keepMask = ((plotNoiseCeil > 0.4) & (plotCovar > 0.1))
 keepFeats = plotNoiseCeil[keepMask].index.to_frame().reset_index(drop=True)

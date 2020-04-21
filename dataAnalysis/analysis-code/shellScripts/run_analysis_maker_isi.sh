@@ -21,19 +21,22 @@
 #SBATCH --account=bibs-dborton-condo
 
 # Request custom resources
-#SBATCH --array=3,4
+#SBATCH --array=1,3,4
 
 EXP="exp202003201200"
+# EXP="exp202003191400"
 # EXP="exp202003091200"
 # SELECTOR="Block005_minfrmaxcorr"
 SELECTOR="_minfrmaxcorr"
-WINDOW="--window=short"
+# WINDOW="--window=short"
 # WINDOW="--window=miniRC"
-# WINDOW="--window=extraShort"
+WINDOW="--window=extraShort"
 # TRIALSELECTOR="--processAll"
 # TRIALSELECTOR="--blockIdx=2"
 # ANALYSISSELECTOR="--analysisName=emg1msec"
-ANALYSISSELECTOR="--analysisName=emg1msecSmooth"
+# ANALYSISSELECTOR="--analysisName=emg1msecSmooth"
+# ANALYSISSELECTOR="--analysisName=emg1msecNoLFPFilterSmoothEMG"
+ANALYSISSELECTOR="--analysisName=lfpFullRes"
 # ANALYSISSELECTOR="--analysisName=emgStretchTime"
 # ANALYSISSELECTOR="--analysisName=emgHiRes"
 
@@ -43,5 +46,5 @@ conda activate
 source activate nda
 python --version
 
-# SLURM_ARRAY_TASK_ID=4
+SLURM_ARRAY_TASK_ID=4
 python -u './calcISIAnalysisNix.py' --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --chanQuery="all" $ANALYSISSELECTOR

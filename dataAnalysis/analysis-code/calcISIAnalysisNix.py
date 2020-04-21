@@ -285,7 +285,7 @@ def calcISIBlockAnalysisNix():
                 stimDict['trainDur'].append((stimCmd['repeats']) * thisStimPeriod)
         stimDict['labels'] = np.asarray([
             'stim update {}'.format(i)
-            for i in range(len(stimDict['elec']))])    
+            for i in range(len(stimDict['elec']))])
         rawStimEventTimes = np.asarray(stimDict.pop('t')) / (30000) * pq.s
         # rawStimEventTimes = rawStimEventTimes - rawStimEventTimes[0] + activeTimes.min() * pq.s
         # rawStimEventTimes = rawStimEventTimes.magnitude * rawStimEventTimes.units.simplified
@@ -411,8 +411,6 @@ def calcISIBlockAnalysisNix():
                 amplitudes = wvf.apply(
                     lambda x: (x[idxPeak] - x[0]) * 1e-6,
                     axis=1, raw=True).to_numpy() * pq.V
-                # pdb.set_trace()
-                # np.isnan(amplitudes).any()
                 st.annotations['amplitude'] = amplitudes
                 st.array_annotations['amplitude'] = amplitudes
                 if 'arrayAnnNames' in st.annotations:
@@ -592,7 +590,6 @@ def calcISIBlockAnalysisNix():
                 # stopCategories['amplitudeCat'] = ampCats.astype(np.str)
                 startCategories['stimCat'] = 'stimOn'
                 stopCategories['stimCat'] = 'stimOff'
-                # pdb.set_trace()
                 startCategories.dropna(inplace=True)
                 stopCategories.dropna(inplace=True)
         #
@@ -652,6 +649,27 @@ def calcISIBlockAnalysisNix():
     tdBlock = hf.extractSignalsFromBlock(
         nspBlock, keepSpikes=False, keepSignals=tdChanNames)
     tdBlock = hf.loadBlockProxyObjects(tdBlock)
+    
+    pdb.set_trace()
+    if len(allStimTrains):
+        for segIdx, dataSeg in enumerate(spikesBlock.segments):
+            spikeList = [
+                st
+                for st in dataSeg.filter(objects=SpikeTrain)
+                if '_stim' in st.name]
+            for stIdx, st in enumerate(spikeList):
+                chanName = st.unit.channel_index.name
+                matchingAsig = tdBlock.filter(objects=AnalogSignalProxy, name='seg0_' + chanName)
+                if len(matchingAsig):
+                    stitchStimArtifact = True
+                    if stitchStimArtifact:
+                        tIdx = 0
+                        wvfT = np.arange(st.times[tIdx], st.times[tIdx] + st.sampling_period * st.waveforms.shape[-1], st.sampling_period)
+                        wvfT = wvfT[:st.waveforms.shape[-1]]
+                        fig, ax = plt.subplots()
+                        ax.plot(wvfT, np.squeeze(st.waveforms[tIdx, :, :]))
+                        asigTMask = matchingAsig[0].times > wvfT[0]
+                        plt.show()
     tdDF = ns5.analogSignalsToDataFrame(
         tdBlock.filter(objects=AnalogSignal))
     #
@@ -683,6 +701,50 @@ def calcISIBlockAnalysisNix():
                 sosLP, np.abs(preprocEmg))
             tdChanNames.append(procName)
             #
+    if len(allStimTrains):
+        # fill in blank period
+        stimMask = (stimRastersDF.drop(columns='t') > 0).any(axis='columns')
+        # blankingDur = 0.5e-3 + np.round(stAnnotations['totalPW'].max(), decimals=3) - 2 * currentSamplingRate.magnitude ** (-1)
+        # blankingDur = stAnnotations['totalPW'].max() + 5 * currentSamplingRate.magnitude ** (-1)
+        blankingDur = stAnnotations['totalPW'].max()
+        #  TODO: get fixed part from metadata and make robust to
+        #  different blanks per stim config stAnnotations['secondPW']
+        kernelT = np.arange(
+            # -blankingDur,
+            -blankingDur + currentSamplingRate.magnitude ** (-1),
+            # blankingDur,
+            blankingDur + currentSamplingRate.magnitude ** (-1),
+            currentSamplingRate.magnitude ** (-1))
+        kernel = np.zeros_like(kernelT)
+        kernel[kernelT > 0] = 1
+        blankMask = (
+            np.convolve(kernel, stimMask, 'same') > 0)[:tdDF.shape[0]]
+        checkBlankMask = False
+        if checkBlankMask:
+            plotIdx = slice(2000000, 2020000)
+            fig, ax = plt.subplots()
+            twAx = ax.twinx()
+            ax.plot(
+                tdDF['t'].iloc[plotIdx],
+                tdDF.iloc[plotIdx, 1], 'b.-', lw=2)
+        spinalLfpChans = [
+            cN
+            for cN in tdDF.columns
+            if 'rostral' in cN or 'caudal' in cN]
+        # tdDF.loc[
+        #     blankMask, spinalLfpChans] = np.nan
+        # tdDF.interpolate(axis=0, method='cubic', inplace=True)
+        # tdDF.loc[
+        #     blankMask, spinalLfpChans] = 0
+        if checkBlankMask:
+            ax.plot(
+                tdDF['t'].iloc[plotIdx],
+                tdDF.iloc[plotIdx, 1].interpolate(axis=0, method='cubic'), 'g--', lw=2)
+            twAx.plot(
+                tdDF['t'].iloc[plotIdx],
+                blankMask[plotIdx], 'r')
+            plt.show()
+
     if samplingRate != currentSamplingRate:
         tdInterp = hf.interpolateDF(
             tdDF, newT,

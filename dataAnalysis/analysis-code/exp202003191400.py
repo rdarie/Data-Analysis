@@ -19,7 +19,7 @@ def getExpOpts():
         4: True,
         }
     
-    experimentName = '202003201200-Peep'
+    experimentName = '202003191400-Peep'
     deviceName = None
     rippleMapFile = 'isi_nano1caudal_xAyBzC_ortho_nano2rostral_xAyBzC_ortho.map'
     # exclude dummy electrodes 8 and 16
@@ -41,18 +41,18 @@ def getExpOpts():
         }
 
     synchInfo = {'delsys': {}, 'nsp': {}, 'ins': {}}
-    synchInfo['delsys'][1] = {'timeRanges': [0, 1001], 'chooseCrossings': slice(None)}
-    synchInfo['delsys'][2] = {'timeRanges': [0, 3924], 'chooseCrossings': slice(None, 1000)}
-    synchInfo['delsys'][3] = {'timeRanges': [0, 3924], 'chooseCrossings': slice(None)}
+    synchInfo['delsys'][1] = {'timeRanges': [0, 400], 'chooseCrossings': slice(None)}
+    synchInfo['delsys'][2] = {'timeRanges': [0, 240], 'chooseCrossings': slice(None)}
+    synchInfo['delsys'][3] = {'timeRanges': [0, 390], 'chooseCrossings': slice(None)}
     # synchInfo['delsys'][3] = {'timeRanges': [0, 3924], 'chooseCrossings': slice(None, 59000)}
-    synchInfo['delsys'][4] = {'timeRanges': [0, 822], 'chooseCrossings': slice(None)}
+    synchInfo['delsys'][4] = {'timeRanges': [0, 645], 'chooseCrossings': slice(None)}
     # synchInfo['delsys'][4] = {'timeRanges': [0, 822], 'chooseCrossings': [i for i in range(1000)] + [i for i in range(-1000, -1)]}
     #
-    synchInfo['nsp'][1] = {'timeRanges': [0, 3924], 'chooseCrossings': slice(None)}
-    synchInfo['nsp'][2] = {'timeRanges': [0, 3924], 'chooseCrossings': slice(None, 1000)}
-    synchInfo['nsp'][3] = {'timeRanges': [0, 3924], 'chooseCrossings': slice(None)}
+    synchInfo['nsp'][1] = {'timeRanges': [0, 545], 'chooseCrossings': slice(None)}
+    synchInfo['nsp'][2] = {'timeRanges': [0, 222], 'chooseCrossings': slice(None)}
+    synchInfo['nsp'][3] = {'timeRanges': [0, 375], 'chooseCrossings': slice(None)}
     # synchInfo['nsp'][3] = {'timeRanges': [0, 3924], 'chooseCrossings': slice(None, 59000)}
-    synchInfo['nsp'][4] = {'timeRanges': [0, 802], 'chooseCrossings': slice(None)}
+    synchInfo['nsp'][4] = {'timeRanges': [0, 640], 'chooseCrossings': slice(None)}
     # synchInfo['nsp'][4] = {'timeRanges': [0, 802], 'chooseCrossings': [i for i in range(1000)] + [i for i in range(-1000, -1)]}
 
     #  if not possible to use taps, override with good taps from another segment
@@ -78,10 +78,7 @@ def getExpOpts():
     triDestinations = []
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        # For emg analysis - emg missing from block 2
-        '202003201200-Peep': [3, 4],
-        # For lfp analysis - all time ranges are valid
-        # '202003201200-Peep': [2, 3, 4],
+        '202003191400-Peep': [1, 2, 3, 4],
         }
 
     movementSizeBins = [0, 0.25, 0.5, 1, 1.25, 1.5]
@@ -103,31 +100,31 @@ def getExpOpts():
     # For emg analysis - emg missing for some time ranges
     alignTimeBoundsLookup = {
         1: [
-            [1, 2000]
+            [0, 545]
             ],
         2: [
-            [1, 60]
+            [0, 222]
             ],
         3: [
-            [1, 1500]
+            [0, 375]
             ],
         4: [
-            [1, 795]
+            [0, 640]
             ],
         }
-    rowColOverrides = {
-        'electrode': [
-            '-caudalY_e12+caudalX_e05',
-            '-caudalY_e13+caudalZ_e20',
-            '-caudalX_e06+caudalX_e02',
-            '-caudalZ_e17+caudalZ_e21',
-            '-rostralY_e12+rostralZ_e24',
-            '-rostralZ_e19+rostralZ_e24',
-            '-rostralY_e14+rostralZ_e21',
-            '-rostralZ_e17+rostralZ_e21',
-            '-rostralY_e12+rostralX_e05',
-            ]
-    }
+    # rowColOverrides = {
+    #     'electrode': [
+    #         '-caudalY_e12+caudalX_e05',
+    #         '-caudalY_e13+caudalZ_e20',
+    #         '-caudalX_e06+caudalX_e02',
+    #         '-caudalZ_e17+caudalZ_e21',
+    #         '-rostralY_e12+rostralZ_e24',
+    #         '-rostralZ_e19+rostralZ_e24',
+    #         '-rostralY_e14+rostralZ_e21',
+    #         '-rostralZ_e17+rostralZ_e21',
+    #         '-rostralY_e12+rostralX_e05',
+    #         ]
+    # }
     outlierDetectColumns = [
         'LPeroneusLongusEmg#0',
         'LSemitendinosusEmg#0',

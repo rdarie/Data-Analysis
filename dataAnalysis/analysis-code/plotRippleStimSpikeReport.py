@@ -152,7 +152,7 @@ mapsDict = {
 # alignedAsigsKWargs.update(dict(
 #     windowSize=(-350e-3, 350e-3)))
 alignedAsigsKWargs.update(dict(
-    windowSize=(-100e-3, 400e-3)))
+    windowSize=(0, 2.5e-3)))
 alignedAsigsKWargs.update(dict(decimate=1))
 flipInfo = {
     'ripple': {'lr': True, 'ud': True},

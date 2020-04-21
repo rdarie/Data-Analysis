@@ -208,7 +208,7 @@ outlierTrials = ash.applyFunGrouped(
     mahalDist,
     groupBy, testVar,
     fun=findOutliers, funArgs=[],
-    funKWargs=dict(multiplier=10, nDim=len(dataDF.columns)),
+    funKWargs=dict(multiplier=12, nDim=len(dataDF.columns)),
     # funKWargs=dict(sdThresh=300),
     resultNames=resultNames,
     plotting=False)
@@ -265,10 +265,10 @@ if arguments['plotting']:
     nRowCol = int(np.ceil(np.sqrt(theseOutliers.size)))
     emgFig, emgAx = plt.subplots(
         nRowCol, nRowCol, sharex=True)
-    emgFig.set_size_inches(3 * nRowCol, 2 * nRowCol)
+    emgFig.set_size_inches(5 * nRowCol, 3 * nRowCol)
     mhFig, mhAx = plt.subplots(
         nRowCol, nRowCol, sharex=True)
-    mhFig.set_size_inches(3 * nRowCol, 2 * nRowCol)
+    mhFig.set_size_inches(5 * nRowCol, 3 * nRowCol)
     # for idx, (name, group) in enumerate(dataDF.loc[fullOutMask, :].groupby(theseOutliers.index.names)):
     for idx, (name, row) in enumerate(theseOutliers.items()):
         outlierDataMasks = []
@@ -278,7 +278,7 @@ if arguments['plotting']:
         for cN in dataDF.columns:
             emgAx.flat[idx].plot(
                 dataDF.loc[fullOutMask, :].index.get_level_values('bin'),
-                dataDF.loc[fullOutMask, cN], label=cN[0])
+                dataDF.loc[fullOutMask, cN], alpha=0.8, label=cN[0])
             emgAx.flat[idx].text(
                 1, 1, 'dev = {:.2f}'.format(row),
                 va='top', ha='right',

@@ -102,22 +102,28 @@ nspTimes = (
 listDiscontinuities = np.flatnonzero(np.abs(np.diff(oeTimes)) > 0.018)
 # pdb.set_trace()
 if len(listDiscontinuities):
-    print('Found discontinuities!')
+    print('Found discontinuities! On Delsys clock:')
+    for dIdx in listDiscontinuities:
+        print(oeTimes[dIdx])
     oeDiscRound = np.zeros_like(oeTimes.magnitude)
     nspDiscRound = np.zeros_like(nspTimes.magnitude)
     for discIdx in listDiscontinuities:
         oeDiscRound[discIdx+1:] += 1
         nspDiscRound[discIdx+1] = 999  # use 999 as a discard marker
         nspDiscRound[discIdx+2:] += 1
+    # pdb.set_trace()
     if np.sum(nspDiscRound < 999) > np.sum(oeDiscRound < 999):
         # if there are more nsp triggers at the end, discard
-        nspDiscRound[oeDiscRound.size+1:] = 999
+        nspDiscRound[np.sum(oeDiscRound < 999):] = 999
     if np.sum(oeDiscRound < 999) > np.sum(nspDiscRound < 999):
         # if there are more nsp triggers at the end, discard
-        oeDiscRound[nspDiscRound.size+1:] = 999
+        oeDiscRound[np.sum(nspDiscRound < 999):] = 999
     pwSyncDict = {}  # piecewise sync parameters
     uniqueOeRounds = np.unique(oeDiscRound)
     for roundIdx in uniqueOeRounds:
+        if roundIdx == 999:
+            continue
+        # pdb.set_trace()
         thesePolyCoeffs = np.polyfit(
             x=oeTimes[oeDiscRound == roundIdx],
             y=nspTimes[nspDiscRound == roundIdx], deg=1)
@@ -165,6 +171,12 @@ else:
     # nspSynchDur = nspTimes[-1] - nspTimes[0]
     # oeSynchDur = oeTimes[-1] - oeTimes[0]
     ###########
+    if oeTimes.size > nspTimes.size:
+        # if there are more nsp triggers at the end, discard
+        oeTimes = oeTimes[:nspTimes.size]
+    if nspTimes.size > oeTimes.size:
+        # if there are more nsp triggers at the end, discard
+        nspTimes = nspTimes[:oeTimes.size]
     synchPolyCoeffs = np.polyfit(x=oeTimes, y=nspTimes, deg=1)
     # synchPolyCoeffs = np.array([1, np.mean(nspTimes - oeTimes)])
     # synchPolyCoeffs = np.array([1, np.mean(nspTimes[0] - oeTimes[0])])

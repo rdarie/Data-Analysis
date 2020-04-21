@@ -20,26 +20,30 @@
 #SBATCH --account=bibs-dborton-condo
 
 # EXP="exp202003091200"
+# EXP="exp202003191400"
 EXP="exp202003201200"
 
 LAZINESS="--lazy"
 # LAZINESS=""
-WINDOW="--window=miniRC"
+# WINDOW="--window=miniRC"
 # WINDOW="--window=short"
 # WINDOW="--window=extraShort"
-# TRIALSELECTOR="--blockIdx=2"
+WINDOW="--window=extraExtraShort"
+# TRIALSELECTOR="--blockIdx=1"
 TRIALSELECTOR="--processAll"
 # ANALYSISSELECTOR="--analysisName=emg"
 # ANALYSISSELECTOR="--analysisName=default"
 # ANALYSISSELECTOR="--analysisName=emgStretchTime"
 # ANALYSISSELECTOR="--analysisName=emgHiRes"
 # ANALYSISSELECTOR="--analysisName=emg1msec"
-ANALYSISSELECTOR="--analysisName=emg1msecSmooth"
+# ANALYSISSELECTOR="--analysisName=emg1msecSmooth"
+# ANALYSISSELECTOR="--analysisName=emg1msecNoLFPFilterSmoothEMG"
+ANALYSISSELECTOR="--analysisName=lfpFullRes"
 #
 # UNITSELECTOR="--unitQuery=all"
-UNITSELECTOR="--unitQuery=isiemgraw"
+# UNITSELECTOR="--unitQuery=isiemgraw"
 # UNITSELECTOR="--unitQuery=isispinal"
-# UNITSELECTOR="--unitQuery=isispinaloremg"
+UNITSELECTOR="--unitQuery=isispinaloremg"
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
@@ -48,9 +52,9 @@ source activate nda
 python --version
 
 # python3 ./assembleExperimentData.py --exp=$EXP --processAsigs --processRasters $ANALYSISSELECTOR 
-# python3 ./calcAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ANALYSISSELECTOR --eventName=stimAlignTimes --chanQuery="all" --blockName="lfp"  --alignFolderName=stim
+python3 ./calcAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ANALYSISSELECTOR --eventName=stimAlignTimes --chanQuery="all" --blockName="lfp"  --alignFolderName=stim
 
-python3 ./calcTrialOutliers.py --exp=$EXP --alignFolderName=stim --inputBlockName="lfp" $TRIALSELECTOR $ANALYSISSELECTOR $UNITSELECTOR $WINDOW --alignQuery="stimOn" --saveResults --verbose --plotting
+# python3 ./calcTrialOutliers.py --exp=$EXP --alignFolderName=stim --inputBlockName="lfp" $TRIALSELECTOR $ANALYSISSELECTOR $UNITSELECTOR $WINDOW --alignQuery="stimOn" --saveResults --verbose --plotting
 
 # python3 ./calcUnitCorrelation.py --exp=$EXP $TRIALSELECTOR $UNITSELECTOR $ANALYSISSELECTOR $WINDOW --resultName="corr" --alignQuery="stimOn" --alignFolderName=stim --inputBlockName="lfp" --verbose --plotting
 

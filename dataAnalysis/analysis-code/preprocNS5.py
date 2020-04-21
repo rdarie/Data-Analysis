@@ -100,7 +100,9 @@ if arguments['ISI']:
         calcRigEvents=trialFilesFrom['utah']['calcRigEvents'],
         normalizeByImpedance=False, removeMeanAcross=False,
         asigNameList=asigNameList, ainpNameList=ainpNameList,
-        LFPFilterOpts=LFPFilterOpts, calcAverageLFP=True)
+        # LFPFilterOpts=LFPFilterOpts,
+        LFPFilterOpts=None,
+        calcAverageLFP=True)
     if arguments['transferISIStimLog']:
         try:
             jsonSrcPath = os.path.join(nspFolder, ns5FileName + '_autoStimLog.json')
