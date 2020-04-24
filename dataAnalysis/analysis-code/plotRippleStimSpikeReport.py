@@ -124,26 +124,16 @@ rippleMapDF = prb_meta.mapToDF(rippleMapFile)
 rippleMapDF.loc[
     rippleMapDF['label'].str.contains('caudal'),
     'ycoords'] += 800
-delsysMapDF = pd.DataFrame({
-    'label': [
-        'LBicepsBrachiiEmgEnv',   'RBicepsBrachiiEmgEnv',
-        'LSemitendinosusEmgEnv',  'RSemitendinosusEmgEnv',
-        'LVastusLateralisEmgEnv', 'RVastusLateralisEmgEnv',
-        'LPeroneusLongusEmgEnv',  'RPeroneusLongusEmgEnv',
-        'LBicepsBrachiiEmg',   'RBicepsBrachiiEmg',
-        'LSemitendinosusEmg',  'RSemitendinosusEmg',
-        'LVastusLateralisEmg', 'RVastusLateralisEmg',
-        'LPeroneusLongusEmg',  'RPeroneusLongusEmg'],
-    'ycoords': [
-        3, 4, 3, 4, 3, 4, 3, 4,
-        0, 1, 0, 1, 0, 1, 0, 1],
-    'xcoords': [
-        0, 0, 2, 2, 3, 3, 5, 5,
-        0, 0, 2, 2, 3, 3, 5, 5]
-    })
-mapsDict = {
-    'ripple': rippleMapDF,
-    'delsys': delsysMapDF}
+
+if 'delsysMapDict' in locals():
+    delsysMapDF = pd.DataFrame(delsysMapDict)
+    mapsDict = {
+        'ripple': rippleMapDF,
+        'delsys': delsysMapDF}
+else:
+    mapsDict = {
+        'ripple': rippleMapDF}
+
 #############################
 # for stim spike report
 # alignedAsigsKWargs.update(dict(
@@ -152,7 +142,7 @@ mapsDict = {
 # alignedAsigsKWargs.update(dict(
 #     windowSize=(-350e-3, 350e-3)))
 alignedAsigsKWargs.update(dict(
-    windowSize=(0, 2.5e-3)))
+    windowSize=(-20e-3, 40e-3)))
 alignedAsigsKWargs.update(dict(decimate=1))
 flipInfo = {
     'ripple': {'lr': True, 'ud': True},
@@ -181,8 +171,9 @@ mapSpecificRelplotKWArgs = {
 relplotKWArgs.update({
     'legend': 'brief',
     # 'legend': False,
+    'palette': "ch:0.6,.3,dark=.1,light=0.7,reverse=1",
     'height': 4,
-    'aspect': 1.5,
+    'aspect': 2,
     'facet_kws': {
         'sharey': False,
         'legend_out': False,
@@ -208,13 +199,14 @@ plotProcFuns = [
             'horizontalalignment': 'right'
         }, shared=False),
     # for evoked lfp report, add stim times
-    asp.genBlockVertShader([
-            max(0e-3, alignedAsigsKWargs['windowSize'][0]),
-            min(300e-3, alignedAsigsKWargs['windowSize'][1])],
-        asigPlotShadingOpts),
-    # asp.genVLineAdder(
-    #     np.arange(0, min(300e-3, alignedAsigsKWargs['windowSize'][1]), 10e-3),
-    #     vLineOpts)
+    # asp.genBlockVertShader([
+    #         max(0e-3, alignedAsigsKWargs['windowSize'][0]),
+    #         min(300e-3, alignedAsigsKWargs['windowSize'][1])],
+    #     asigPlotShadingOpts),
+    asp.genVLineAdder(
+        # np.arange(0, min(300e-3, alignedAsigsKWargs['windowSize'][1]), 10e-3),
+        [0],
+        vLineOpts)
         ]
 mapSpecificPlotProcFuns = {
     'ripple': [

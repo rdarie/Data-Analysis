@@ -21,7 +21,7 @@ sns.set()
 sns.set_color_codes("dark")
 sns.set_context("notebook")
 sns.set_style("white")
-
+from tqdm import tqdm
 from neo.io import NixIO, nixio_fr, BlackrockIO
 import pandas as pd
 import numpy as np
@@ -72,7 +72,6 @@ def preprocDelsysWrapper(
     samplingRate = np.round(headerData['fs'].max())
     #
     rawData = pd.read_csv(delsysPath, skiprows=delimIdx, low_memory=False)
-    
     # for idx, cName in enumerate(rawData.columns): print('{}: {}'.format(idx, cName))
     if arguments['plotting']:
         ainp = rawData['Analog Input adapter 7: Analog 7']
@@ -87,51 +86,60 @@ def preprocDelsysWrapper(
     domainCols = [cName for cName in rawData.columns if 'X[' in cName]
     featureCols = [cName for cName in rawData.columns if 'X[' not in cName]
     collatedDataList = []
-    for idx, (dom, feat) in enumerate(zip(domainCols, featureCols)):
-        newIndex = rawData[dom].to_numpy()
+    print('Assembling list of vectors...')
+    for idx, (dom, feat) in enumerate(tqdm(iter(zip(domainCols, featureCols)))):
+        # keepDataMask = (
+        #     rawData[dom].notna() & rawData[feat].notna())
+        # newIndex = rawData[dom].to_numpy()
+        # pdb.set_trace()
+        # print('{}: {}\r'.format(idx, feat))
         newFeat = rawData[feat].to_numpy()
-        keepDataMask = (
-            rawData[dom].notna() & rawData[feat].notna())
+        keepDataMask = rawData[feat].notna()
+        newIndex = rawData[dom].interpolate(method='linear')[keepDataMask]
+        duplIndex = newIndex.duplicated()
         thisFeat = pd.DataFrame(
-            newFeat[keepDataMask],
-            index=newIndex[keepDataMask],
-            columns=[feat]
-            )
-        thisFeat.drop(
-            index=thisFeat.index[thisFeat.index.duplicated()],
-            inplace=True)
+            newFeat[keepDataMask][~duplIndex],
+            index=newIndex[~duplIndex],
+            columns=[feat])
+        # thisFeat.drop(
+        #     index=thisFeat.index[thisFeat.index.duplicated()],
+        #     inplace=True)
         if idx == 0:
-            runningT = thisFeat.index.to_numpy()
+            runningT = [thisFeat.index[0], thisFeat.index[-1]]
         else:
-            runningT = np.concatenate([runningT, thisFeat.index.to_numpy()])
-        if rawData[dom].isna().any():
-            print('{} NaNs detected: '.format(rawData[dom].isna().sum()))
-            print(feat)
-            print(np.flatnonzero(rawData[dom].isna()))
+            runningT[0] = min(runningT[0], thisFeat.index[0])
+            runningT[-1] = max(runningT[-1], thisFeat.index[-1])
+            # runningT = np.concatenate([runningT, thisFeat.index.to_numpy()])
+        # if rawData[dom].isna().any():
+        #     print('{} NaNs detected: '.format(rawData[dom].isna().sum()))
+        #     print(feat)
+        #     print(np.flatnonzero(rawData[dom].isna()))
         collatedDataList.append(thisFeat)
     #
-    finalT = np.unique(runningT)
-    resampledT = np.arange(finalT[0], finalT[-1], samplingRate ** (-1))
-    for idx, thisFeat in enumerate(collatedDataList):
+    # finalT = np.unique(runningT)
+    resampledT = np.arange(runningT[0], runningT[-1], samplingRate ** (-1))
+    print('interpolating')
+    for idx, thisFeat in enumerate(tqdm(collatedDataList)):
         tempT = np.unique(np.concatenate([resampledT, thisFeat.index.to_numpy()]))
         collatedDataList[idx] = (
             thisFeat.reindex(tempT)
-            .interpolate(method='cubic')
+            .interpolate(method='pchip')
             .fillna(method='ffill').fillna(method='bfill'))
         absentInNew = ~collatedDataList[idx].index.isin(resampledT)
         collatedDataList[idx].drop(
             index=collatedDataList[idx].index[absentInNew],
             inplace=True)
+    print('Concatenating...')
     collatedData = pd.concat(collatedDataList, axis=1)
     collatedData.columns = [
         re.sub('[\s+]', '', re.sub(r'[^a-zA-Z]', ' ', colName).title())
         for colName in collatedData.columns
         ]
-    #
+    collatedData.rename(columns={'TrignoAnalogInputAdapterAnalogA': 'AnalogInputAdapterAnalog'}, inplace=True)
+    # pdb.set_trace()
     collatedData.fillna(method='bfill', inplace=True)
     collatedData.index.name = 't'
     collatedData.reset_index(inplace=True)
-    # pdb.set_trace()
     if arguments['plotting']:
         fig, ax = plt.subplots()
         pNames = [
@@ -141,14 +149,14 @@ def preprocDelsysWrapper(
         for cName in pNames:
             plt.plot(
                 collatedData['t'],
-                collatedData[cName] / collatedData[cName].abs().max(), '.-')
+                collatedData[cName] / collatedData[cName].abs().max(),
+                '.-')
         plt.show()
     dataBlock = ns5.dataFrameToAnalogSignals(
         collatedData,
         idxT='t', useColNames=True, probeName='',
         dataCol=collatedData.drop(columns='t').columns,
         samplingRate=samplingRate * pq.Hz)
-    # pdb.set_trace()
     dataBlock.name = 'delsys'
     outPathName = os.path.join(
         scratchFolder, ns5FileName + '_delsys.nix')

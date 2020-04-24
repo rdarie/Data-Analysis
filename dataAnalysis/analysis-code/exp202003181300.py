@@ -1,25 +1,16 @@
 def getExpOpts():
     #
     miniRCBlockLookup = {
-        1: False,
-        2: False,
         3: False,
-        4: False,
         }
     RCBlockLookup = {
-        1: True,
-        2: True,
         3: True,
-        4: True,
         }
     RippleBlockLookup = {
-        1: True,
-        2: True,
         3: True,
-        4: True,
         }
     
-    experimentName = '202003191400-Peep'
+    experimentName = '202003181300-Peep'
     deviceName = None
     rippleMapFile = 'isi_nano1caudal_xAyBzC_ortho_nano2rostral_xAyBzC_ortho.map'
     # exclude dummy electrodes 8 and 16
@@ -34,27 +25,13 @@ def getExpOpts():
     ainpNameList = ['analog 1']
     jsonSessionNames = {
         #  per block
-        1: [],
-        2: [],
         3: [],
-        4: [],
         }
 
     synchInfo = {'delsys': {}, 'nsp': {}, 'ins': {}}
-    synchInfo['delsys'][1] = {'timeRanges': [0, 400], 'chooseCrossings': slice(None)}
-    synchInfo['delsys'][2] = {'timeRanges': [0, 240], 'chooseCrossings': slice(None)}
-    synchInfo['delsys'][3] = {'timeRanges': [0, 390], 'chooseCrossings': slice(None)}
-    # synchInfo['delsys'][3] = {'timeRanges': [0, 3924], 'chooseCrossings': slice(None, 59000)}
-    synchInfo['delsys'][4] = {'timeRanges': [0, 645], 'chooseCrossings': slice(None)}
-    # synchInfo['delsys'][4] = {'timeRanges': [0, 822], 'chooseCrossings': [i for i in range(1000)] + [i for i in range(-1000, -1)]}
-    #
-    synchInfo['nsp'][1] = {'timeRanges': [0, 545], 'chooseCrossings': slice(None)}
-    synchInfo['nsp'][2] = {'timeRanges': [0, 222], 'chooseCrossings': slice(None)}
-    synchInfo['nsp'][3] = {'timeRanges': [0, 375], 'chooseCrossings': slice(None)}
-    # synchInfo['nsp'][3] = {'timeRanges': [0, 3924], 'chooseCrossings': slice(None, 59000)}
-    synchInfo['nsp'][4] = {'timeRanges': [0, 640], 'chooseCrossings': slice(None)}
-    # synchInfo['nsp'][4] = {'timeRanges': [0, 802], 'chooseCrossings': [i for i in range(1000)] + [i for i in range(-1000, -1)]}
-
+    synchInfo['delsys'][3] = {'timeRanges': [4, 2048], 'chooseCrossings': slice(None)}
+    synchInfo['nsp'][3] = {'timeRanges': [2, 2060], 'chooseCrossings': slice(None)}
+    
     #  if not possible to use taps, override with good taps from another segment
     #  not ideal, because segments are only synchronized to the nearest **second**
     overrideSegmentsForTapSync = {
@@ -78,7 +55,7 @@ def getExpOpts():
     triDestinations = []
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        '202003191400-Peep': [1, 2, 3, 4],
+        '202003181300-Peep': [3],
         }
 
     movementSizeBins = [0, 0.25, 0.5, 1, 1.25, 1.5]
@@ -99,18 +76,9 @@ def getExpOpts():
     #      }
     # For emg analysis - emg missing for some time ranges
     alignTimeBoundsLookup = {
-        1: [
-            [0, 545]
-            ],
-        2: [
-            [0, 222]
-            ],
         3: [
-            [0, 375]
-            ],
-        4: [
-            [0, 640]
-            ],
+            [2, 2060]
+            ]
         }
     # rowColOverrides = {
     #     'electrode': [
@@ -133,26 +101,4 @@ def getExpOpts():
         # 'RSemitendinosusEmg#0',
         # 'RVastusLateralisEmg#0'
         ]
-    
-    delsysMapDict = ({
-        'label': [
-            # 'LBicepsBrachiiEmgEnv',   'RBicepsBrachiiEmgEnv',
-            'LSemitendinosusEmgEnv',  'RSemitendinosusEmgEnv',
-            'LVastusLateralisEmgEnv', 'RVastusLateralisEmgEnv',
-            'LPeroneusLongusEmgEnv',  'RPeroneusLongusEmgEnv',
-            # 'LBicepsBrachiiEmg',   'RBicepsBrachiiEmg',
-            'LSemitendinosusEmg',  'RSemitendinosusEmg',
-            'LVastusLateralisEmg', 'RVastusLateralisEmg',
-            'LPeroneusLongusEmg',  'RPeroneusLongusEmg'],
-        'ycoords': [
-            # 3, 4,
-            3, 4, 3, 4, 3, 4,
-            # 0, 1,
-            0, 1, 0, 1, 0, 1],
-        'xcoords': [
-            # 0, 0,
-            2, 2, 3, 3, 5, 5,
-            # 0, 0,
-            2, 2, 3, 3, 5, 5]
-        })
     return locals()

@@ -65,13 +65,12 @@ resultPath = os.path.join(
 print('loading {}'.format(resultPath))
 #  Overrides
 limitPages = None
-# amplitudeFieldName = 'nominalCurrent'
-amplitudeFieldName = 'amplitudeCat'
+amplitudeFieldName = 'nominalCurrent'
+# amplitudeFieldName = 'amplitudeCat'
 #  End Overrides
 recCurve = pd.read_hdf(resultPath, 'meanRAUC')
 plotRC = recCurve.reset_index()
-#
-# 
+
 figureStatsFolder = os.path.join(
     alignSubFolder, 'figureStats'
     )
@@ -83,8 +82,11 @@ statsTestPath = os.path.join(figureStatsFolder, 'backup', alignedPdfName + '_sta
 if os.path.exists(statsTestPath):
     sigValsWide = pd.read_hdf(statsTestPath, 'sig')
     sigValsWide.columns.name = 'bin'
-#
-def masterPlot(emgRC, targetFeature, plotElectrode, plotFeature, keepElectrodeList):
+
+pdb.set_trace()
+def masterPlot(
+        emgRC, targetFeature, plotElectrode,
+        plotFeature, keepElectrodeList):
     meanSelectivity = pd.DataFrame(
         np.nan,
         index=emgRC['electrode'].unique(),
@@ -160,8 +162,20 @@ def masterPlot(emgRC, targetFeature, plotElectrode, plotFeature, keepElectrodeLi
     plt.savefig(pdfPath)
     plt.show()
 
-mapDF = prb_meta.mapToDF(expOpts['rippleMapFile'])
-mapDF.loc[mapDF['elecName'].str.contains('rostral'), 'ycoords'] += 60000
+rippleMapDF = prb_meta.mapToDF(expOpts['rippleMapFile'])
+rippleMapDF.loc[
+    rippleMapDF['label'].str.contains('caudal'),
+    'ycoords'] += 800
+#
+if 'delsysMapDict' in locals():
+    delsysMapDF = pd.DataFrame(delsysMapDict)
+    mapsDict = {
+        'ripple': rippleMapDF,
+        'delsys': delsysMapDF}
+else:
+    mapsDict = {
+        'ripple': rippleMapDF}
+
 lfpRC = (
     plotRC.loc[plotRC['feature'].str.contains('caudal') |
     plotRC['feature'].str.contains('rostral'), :].copy())
@@ -184,12 +198,12 @@ for name, group in lfpRC.groupby('feature'):
     lfpRC.loc[group.index, 'normalizedRAUC'] = (
         thisScaler.transform(group['rauc'].to_numpy().reshape(-1, 1)))
     lfpRC.loc[group.index, 'featureName'] = name[:-2]
-    lfpRC.loc[group.index, 'xcoords'] = mapDF.loc[mapDF['label'] == name[:-2], 'xcoords'].iloc[0]
-    lfpRC.loc[group.index, 'ycoords'] = mapDF.loc[mapDF['label'] == name[:-2], 'ycoords'].iloc[0]
+    lfpRC.loc[group.index, 'xcoords'] = rippleMapDF.loc[rippleMapDF['label'] == name[:-2], 'xcoords'].iloc[0]
+    lfpRC.loc[group.index, 'ycoords'] = rippleMapDF.loc[rippleMapDF['label'] == name[:-2], 'ycoords'].iloc[0]
 
-uniqueX = np.unique(mapDF['xcoords'].to_list() + [3400, 8500])
+uniqueX = np.unique(rippleMapDF['xcoords'].to_list() + [3400, 8500])
 # xIdx = [3, 4, 6, 7]
-uniqueY = np.unique(mapDF['ycoords'].to_list() + [6200, 31000, 40000, 50000, 66200, 91000])
+uniqueY = np.unique(rippleMapDF['ycoords'].to_list() + [6200, 31000, 40000, 50000, 66200, 91000])
 # yIdx = [0, 2, 3, 4, 6, 8, 10, 11, 12, 14, 16]
 # xLookup = {k: v for k, v in zip(uniqueX, xIdx)}
 # yLookup = {k: v for k, v in zip(uniqueY, yIdx)}
@@ -205,8 +219,8 @@ for elecName, elecGroup in lfpRC.groupby('electrode'):
         lfpRAUCDistr[elecName].loc[posName[1], posName[0]] = posGroup['normalizedRAUC'].mean()
 
 for elecName in lfpRAUCDistr.keys():
-    for xPos in mapDF['xcoords'].unique():
-        for yPos in mapDF['ycoords'].unique():
+    for xPos in rippleMapDF['xcoords'].unique():
+        for yPos in rippleMapDF['ycoords'].unique():
             if np.isnan(lfpRAUCDistr[elecName].loc[yPos, xPos]):
                 lfpRAUCDistr[elecName].loc[yPos, xPos] = 0
 
@@ -230,7 +244,6 @@ sns.heatmap(
     ax=ax, cbar_ax=cb_ax, cbar_kws={"orientation": "horizontal"})
 plt.savefig(pdfPath)
 plt.show()
-pdb.set_trace()
 
 masterPlot(lfpRC, targetFeature, plotElectrode, plotFeature, keepElectrodeList)
 lfpPalette = sns.color_palette('Set2', lfpRC[targetFeature].unique().size)
@@ -263,7 +276,7 @@ sideLookup = {'R': 'Right', 'L': 'Left'}
 nSig = {}
 for name, group in emgRC.groupby('feature'):
     emgRC.loc[group.index, 'standardizedRAUC'] = (
-        RobustScaler(quantile_range=(5., 95.))
+        RobustScaler(quantile_range=(1, 99.))
         .fit_transform(
             group['rauc'].to_numpy().reshape(-1, 1)))
     outlierMask = emgRC.loc[group.index, 'standardizedRAUC'].abs() > 6
@@ -276,12 +289,13 @@ for name, group in emgRC.groupby('feature'):
     emgRC.loc[group.index, 'featureName'] = name[:-8]
     emgRC.loc[group.index, 'EMGSite'] = name[1:-8]
     emgRC.loc[group.index, 'EMGSide'] = sideLookup[name[0]]
-    theseSig = sigValsWide.xs(name, level='unit')
-    nSig.update({name[:-8]: theseSig.sum().sum()})
+    if os.path.exists(statsTestPath):
+        theseSig = sigValsWide.xs(name, level='unit')
+        nSig.update({name[:-8]: theseSig.sum().sum()})
+#
 emgRC.loc[:, 'EMG Location'] = (
     emgRC['EMGSide'] + ' ' + emgRC['EMGSite'])
 
-pdb.set_trace()
 # keepElectrodeList = meanSelectivity.max(axis=1).index[meanSelectivity.max(axis=1) > 0.3]
 # keepElectrodeList = meanSelectivity.index.to_list()
 # targetFeature = 'featureName'
@@ -291,7 +305,9 @@ pdb.set_trace()
 # plotFeature = 'RPeroneusLongus'
 # plotFeature = 'PeroneusLongus'
 # plotFeature = 'Right'
-masterPlot(emgRC, targetFeature, plotElectrode, plotFeature, keepElectrodeList)
+masterPlot(
+    emgRC, targetFeature, plotElectrode,
+    plotFeature, keepElectrodeList)
 significantOnly = True
 if significantOnly:
     emgRC = emgRC.query("(kruskalP < 1e-3)")

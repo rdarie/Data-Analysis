@@ -503,11 +503,17 @@ def interpolateDF(
                 useFill = fill_value
         else:
             useFill = fill_value
-
-        interpFun = interpolate.interp1d(
-            oldX, df[columnName], kind=kind,
-            fill_value=useFill, bounds_error=False)
-        outputDF[columnName] = interpFun(newX)
+        if kind in [
+                'linear', 'nearest', 'zero', 'slinear',
+                'quadratic', 'cubic', 'previous', 'next']:
+            interpFun = interpolate.interp1d(
+                oldX, df[columnName], kind=kind,
+                fill_value=useFill, bounds_error=False)
+            outputDF[columnName] = interpFun(newX)
+        elif kind in ['pchip']:
+            outputDF[columnName] = interpolate.pchip_interpolate(
+                oldX, df[columnName].to_numpy(), newX
+            )
     return outputDF
 
 

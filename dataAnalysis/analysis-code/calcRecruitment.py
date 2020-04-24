@@ -62,7 +62,6 @@ alignedAsigsKWargs.update(dict(
     metaDataToCategories=False,
     removeFuzzyName=False,
     decimate=1,
-    windowSize=(2e-3, 12e-3),
     transposeToColumns='bin', concatOn='index',))
 if arguments['processAll']:
     prefix = assembledName
@@ -78,8 +77,10 @@ resultPath = os.path.join(
     prefix + '_{}_{}_calc.h5'.format(
         arguments['inputBlockName'], arguments['window']))
 print('loading {}'.format(triggeredPath))
-dataReader, dataBlock = ns5.blockFromPath(triggeredPath, lazy=arguments['lazy'])
+dataReader, dataBlock = ns5.blockFromPath(
+    triggeredPath, lazy=arguments['lazy'])
 #  Overrides
+alignedAsigsKWargs.update(dict(windowSize=(5e-3, 25e-3)))
 limitPages = None
 resultName = 'meanRAUC'
 funKWargs = dict(
@@ -94,7 +95,7 @@ rAUCDF = ash.rAUC(
 rAUCDF['kruskalStat'] = np.nan
 rAUCDF['kruskalP'] = np.nan
 for name, group in rAUCDF.groupby(['electrode', 'feature']):
-    subGroups = [i['rauc'].to_numpy() for n, i in group.groupby('amplitude')]
+    subGroups = [i['rauc'].to_numpy() for n, i in group.groupby('nominalCurrent')]
     try:
         stat, pval = stats.kruskal(*subGroups, nan_policy='omit')
         rAUCDF.loc[group.index, 'kruskalStat'] = stat

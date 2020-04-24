@@ -44,6 +44,6 @@ python --version
 # UNITSELECTOR="--unitQuery=isispinaloremg"
 # python "./exportForDeepSpine.py" --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR --alignFolderName=stim --inputBlockName="lfp" $UNITSELECTOR --maskOutlierBlocks --alignQuery="stimOn"
 UNITSELECTOR="--unitQuery=isiemgenv"
-python "./calcTargetNoiseCeiling.py" --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR --alignFolderName=stim --inputBlockName="lfp" $UNITSELECTOR --maskOutlierBlocks --alignQuery="stimOn" --plotting
+# python "./calcTargetNoiseCeiling.py" --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR --alignFolderName=stim --inputBlockName="lfp" $UNITSELECTOR --maskOutlierBlocks --alignQuery="stimOn" --plotting
 # python "./calcEpochEffect.py" --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR --alignFolderName=stim --inputBlockName="lfp" $UNITSELECTOR --maskOutlierBlocks --alignQuery="stimOn" --plotting
-# python "loadSheepDeepSpine.py"
+python "loadSheepDeepSpine.py"

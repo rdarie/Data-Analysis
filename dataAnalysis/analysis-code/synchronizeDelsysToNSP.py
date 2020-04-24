@@ -57,13 +57,17 @@ oeSeg = oeBlock.segments[segIdx]
 oeSyncAsig = oeSeg.filter(name='seg0_AnalogInputAdapterAnalog')[0]
 tStart, tStop = synchInfo['delsys'][blockIdx]['timeRanges']
 #
-oeThresh = 1.5
 oeTimeMask = hf.getTimeMaskFromRanges(
     oeSyncAsig.times, [(tStart, tStop)])
 oeSrs = pd.Series(oeSyncAsig.magnitude[oeTimeMask].flatten())
 print(
     'On block {}, detecting Delsys threshold crossings.'
     .format(blockIdx))
+
+oeLims = oeSrs.quantile([1e-6, 1-1e-6]).to_list()
+oeDiffUncertainty = oeSrs.diff().abs().quantile(1-1e-6) / 4
+oeThresh = (oeLims[-1] - oeLims[0]) / 2
+
 # oePeakIdx, oeCrossMask = hf.getThresholdCrossings(
 #     oeSrs, thresh=oeThresh,
 #     iti=60 ** (-1), fs=float(oeSyncAsig.sampling_rate),
@@ -71,47 +75,53 @@ print(
 #     absVal=False, plotting=arguments['plotting'], keep_max=False)
 oePeakIdx = hf.getTriggers(
     oeSrs, iti=60 ** (-1), fs=float(oeSyncAsig.sampling_rate),
-    thres=2.58, edgeType='falling')
+    thres=1.5, edgeType='falling', plotting=arguments['plotting'])
 oeCrossMask = oeSrs.index.isin(oePeakIdx)
 print('Found {} triggers'.format(oePeakIdx.size))
 #
 nspSyncAsig = nspSeg.filter(name='seg0_analog 1')[0]
 tStart, tStop = synchInfo['nsp'][blockIdx]['timeRanges']
-nspThresh = 1500
+
 nspTimeMask = hf.getTimeMaskFromRanges(
     nspSyncAsig.times, [(tStart, tStop)])
 nspSrs = pd.Series(nspSyncAsig.magnitude[nspTimeMask].flatten())
+
+nspLims = nspSrs.quantile([1e-3, 1-1e-3]).to_list()
+nspDiffUncertainty = nspSrs.diff().abs().quantile(1-1e-3) / 4
+nspThresh = (nspLims[-1] - nspLims[0]) / 2
+pdb.set_trace()
 print(
     'On trial {}, detecting NSP threshold crossings.'
     .format(blockIdx))
-# nspPeakIdx, nspCrossMask = hf.getThresholdCrossings(
-#     nspSrs, thresh=nspThresh,
-#     iti=60 ** (-1), fs=float(nspSyncAsig.sampling_rate),
-#     edgeType='falling', itiWiggle=0.1,
-#     absVal=False, plotting=arguments['plotting'], keep_max=False)
-nspPeakIdx = hf.getTriggers(
-    nspSrs, iti=60 ** (-1), fs=float(oeSyncAsig.sampling_rate),
-    thres=2.58, edgeType='falling')
-nspCrossMask = nspSrs.index.isin(nspPeakIdx)
+nspPeakIdx, nspCrossMask = hf.getThresholdCrossings(
+    nspSrs, thresh=nspThresh,
+    iti=60 ** (-1), fs=float(nspSyncAsig.sampling_rate),
+    edgeType='falling', itiWiggle=0.1,
+    absVal=False, plotting=arguments['plotting'], keep_max=False)
+# nspPeakIdx = hf.getTriggers(
+#     nspSrs, iti=60 ** (-1), fs=float(oeSyncAsig.sampling_rate),
+#     thres=2.58, edgeType='falling')
+# nspCrossMask = nspSrs.index.isin(nspPeakIdx)
 print('Found {} triggers'.format(nspPeakIdx.size))
 oeTimes = (
     oeSyncAsig.times[oeTimeMask][oeCrossMask][synchInfo['delsys'][blockIdx]['chooseCrossings']])
 nspTimes = (
     nspSyncAsig.times[nspTimeMask][nspCrossMask][synchInfo['nsp'][blockIdx]['chooseCrossings']])
 ###########
+
 listDiscontinuities = np.flatnonzero(np.abs(np.diff(oeTimes)) > 0.018)
-# pdb.set_trace()
 if len(listDiscontinuities):
     print('Found discontinuities! On Delsys clock:')
     for dIdx in listDiscontinuities:
         print(oeTimes[dIdx])
     oeDiscRound = np.zeros_like(oeTimes.magnitude)
     nspDiscRound = np.zeros_like(nspTimes.magnitude)
-    for discIdx in listDiscontinuities:
+    for j, discIdx in enumerate(listDiscontinuities):
         oeDiscRound[discIdx+1:] += 1
-        nspDiscRound[discIdx+1] = 999  # use 999 as a discard marker
-        nspDiscRound[discIdx+2:] += 1
-    # pdb.set_trace()
+        nspDiscRound[discIdx+1+j] = 999  # use 999 as a discard marker
+        print('Skipping NSP pulse at t={:.3f}'.format(nspTimes[discIdx+1+j]))
+        nspDiscRound[discIdx+2+j:] += 1
+    
     if np.sum(nspDiscRound < 999) > np.sum(oeDiscRound < 999):
         # if there are more nsp triggers at the end, discard
         nspDiscRound[np.sum(oeDiscRound < 999):] = 999
@@ -119,11 +129,8 @@ if len(listDiscontinuities):
         # if there are more nsp triggers at the end, discard
         oeDiscRound[np.sum(nspDiscRound < 999):] = 999
     pwSyncDict = {}  # piecewise sync parameters
-    uniqueOeRounds = np.unique(oeDiscRound)
+    uniqueOeRounds = np.unique(oeDiscRound[oeDiscRound < 999])
     for roundIdx in uniqueOeRounds:
-        if roundIdx == 999:
-            continue
-        # pdb.set_trace()
         thesePolyCoeffs = np.polyfit(
             x=oeTimes[oeDiscRound == roundIdx],
             y=nspTimes[nspDiscRound == roundIdx], deg=1)
@@ -134,7 +141,6 @@ if len(listDiscontinuities):
                 'inStop': np.max(oeTimes[oeDiscRound == roundIdx].magnitude),
                 'tInterpFun': thisInterpFun}
         elif roundIdx == uniqueOeRounds[-1]:
-            # pdb.set_trace()
             pwSyncDict[roundIdx] = {
                 'inStart': np.max(oeTimes[oeDiscRound == roundIdx-1].magnitude),
                 'inStop': 1e6,
@@ -144,7 +150,7 @@ if len(listDiscontinuities):
                 'inStart': np.max(oeTimes[oeDiscRound == roundIdx-1].magnitude),
                 'inStop': np.max(oeTimes[oeDiscRound == roundIdx].magnitude),
                 'tInterpFun': thisInterpFun}
-    # pdb.set_trace()
+    
     def timeInterpFun(inputT):
         outputT = np.zeros_like(inputT)
         for k in sorted(pwSyncDict.keys()):
@@ -153,7 +159,7 @@ if len(listDiscontinuities):
                 (inputT < pwSyncDict[k]['inStop']))
             outputT[inTimeMask] = pwSyncDict[k]['tInterpFun'](
                 inputT[inTimeMask])
-        # pdb.set_trace()
+        
         plotting = False
         if plotting:
             import matplotlib.pyplot as plt
@@ -181,41 +187,40 @@ else:
     # synchPolyCoeffs = np.array([1, np.mean(nspTimes - oeTimes)])
     # synchPolyCoeffs = np.array([1, np.mean(nspTimes[0] - oeTimes[0])])
     timeInterpFun = np.poly1d(synchPolyCoeffs)
-for event in oeBlock.filter(objects=Event):
-    event.magnitude[:] = (
-        timeInterpFun(event.times.magnitude))
-for asig in oeBlock.filter(objects=AnalogSignal):
-    asig.times.magnitude[:] = (
-        timeInterpFun(asig.times.magnitude))
-for st in oeBlock.filter(objects=SpikeTrain):
-    st.times.magnitude[:] = (
-        timeInterpFun(st.times.magnitude))
+
+# account for delay because of
+# analog filters on one or both recording devices (units of pq.s)
+# filterDelay = 2.3 * 1e-3  # Trigno analog input, filtered DC-100Hz
+filterDelay = 2.3 * 1e-4  # Trigno analog input, filtered DC-1000Hz
+# TODO: figure out why the block below doesn't work
+# for event in oeBlock.filter(objects=Event):
+#     event.magnitude[:] = (
+#         timeInterpFun(event.times.magnitude) + filterDelay)
+# for asig in oeBlock.filter(objects=AnalogSignal):
+#     asig.times.magnitude[:] = (
+#         timeInterpFun(asig.times.magnitude) + filterDelay)
+# for st in oeBlock.filter(objects=SpikeTrain):
+#     st.times.magnitude[:] = (
+#         timeInterpFun(st.times.magnitude) + filterDelay)
+pdb.set_trace()
 oeDF = ns5.analogSignalsToDataFrame(
     oeBlock.filter(objects=AnalogSignal),
     idxT='oeT', useChanNames=True)
-oeDF['nspT'] = timeInterpFun(oeDF['oeT'])
+oeDF['nspT'] = timeInterpFun(oeDF['oeT']) + filterDelay
 dummyAsig = nspSeg.filter(objects=AnalogSignal)[0]
 newT = pd.Series(dummyAsig.times.magnitude)
 interpCols = oeDF.columns.drop(['oeT', 'nspT'])
 #
 oeInterp = hf.interpolateDF(
     oeDF, newT,
-    kind='linear', fill_value=(0, 0),
+    kind='pchip', fill_value=(0, 0),
     x='nspT', columns=interpCols)
 oeInterpBlock = ns5.dataFrameToAnalogSignals(
     oeInterp,
     idxT='nspT',
     probeName='openEphys', samplingRate=dummyAsig.sampling_rate,
     dataCol=interpCols, forceColNames=interpCols)
-# oeBlockJustEvents = hf.extractSignalsFromBlock(oeBlock)
-# ns5.addBlockToNIX(
-#     oeBlockJustEvents, neoSegIdx=[0],
-#     writeAsigs=False, writeSpikes=False, writeEvents=True,
-#     purgeNixNames=True,
-#     fileName=ns5FileName,
-#     folderPath=scratchFolder,
-#     nixBlockIdx=0, nixSegIdx=[0],
-#     )
+#
 ns5.addBlockToNIX(
     oeInterpBlock, neoSegIdx=[0],
     writeAsigs=True, writeSpikes=False, writeEvents=False,

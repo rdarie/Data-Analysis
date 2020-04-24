@@ -75,6 +75,7 @@ def calcISIBlockAnalysisNix():
     tdChanNames = ns5.listChanNames(
         nspBlock, arguments['chanQuery'],
         objType=AnalogSignalProxy)
+        
     allSpikeTrains = [
         i
         for i in spikesBlock.filter(objects=SpikeTrain)
@@ -89,6 +90,42 @@ def calcISIBlockAnalysisNix():
         for i in spikesBlock.filter(objects=SpikeTrain)
         if '_stim' in i.name]
 
+    tdBlock = hf.extractSignalsFromBlock(
+        nspBlock, keepSpikes=False, keepSignals=tdChanNames)
+    tdBlock = hf.loadBlockProxyObjects(tdBlock)
+
+    # pdb.set_trace()
+    # if len(allStimTrains):
+    #     for segIdx, dataSeg in enumerate(spikesBlock.segments):
+    #         spikeList = [
+    #             st
+    #             for st in dataSeg.filter(objects=SpikeTrain)
+    #             if '_stim' in st.name]
+    #         for stIdx, st in enumerate(spikeList):
+    #             chanName = st.unit.channel_index.name
+    #             matchingAsig = tdBlock.filter(objects=AnalogSignal, name='seg0_' + chanName)
+    #             if len(matchingAsig):
+    #                 stitchStimArtifact = True
+    #                 if stitchStimArtifact:
+    #                     tIdx = 10
+    #                     winSize = st.sampling_period * st.waveforms.shape[-1]
+    #                     wvfT = np.arange(
+    #                         st.times[tIdx],
+    #                         st.times[tIdx] + winSize,
+    #                         st.sampling_period) * st.sampling_period.units
+    #                     wvfT = wvfT[:st.waveforms.shape[-1]]
+    #                     asigTMask = (
+    #                         (matchingAsig[0].times >= wvfT[0]) &
+    #                         (matchingAsig[0].times < wvfT[0] + winSize))
+    #                     plotAsig = np.squeeze(matchingAsig[0])[asigTMask]
+    #                     plotAsigT = matchingAsig[0].times[asigTMask]
+    #                     plotWvf = np.squeeze(st.waveforms[tIdx, :, :]) * 1e-3
+    #                     fig, ax = plt.subplots()
+    #                     ax.plot(wvfT, plotWvf, 'c.-')
+    #                     twAx = ax.twinx()
+    #                     twAx.plot(plotAsigT, plotAsig, 'm.-')
+    #                     # ax.plot(plotAsigT, plotAsig - plotWvf, '.-')
+    #                     plt.show()
     if len(allStimTrains):
         mustDoubleSpikeWvfLen = True
 
@@ -231,6 +268,7 @@ def calcISIBlockAnalysisNix():
     if os.path.exists(jsonPath):
         with open(jsonPath, 'r') as f:
             stimLog = json.load(f)
+        ampQuanta = 20 * pq.uA  # TODO: read from settings
         stimDict = {
             't': [],
             'elec': [],
@@ -253,36 +291,58 @@ def calcISIBlockAnalysisNix():
         allNominalWaveforms = []
         for idx, entry in enumerate(stimLog):
             t = entry['t']
-            allStimCmd = entry['stimCmd']
-            ampQuanta = 20 * pq.uA  # TODO: read from settings
-            for stimCmd in allStimCmd:
-                # each stimCmd represents one electrode
-                nominalWaveform = []
-                lastAmplitude = 0
-                totalLen = 0
-                for phase in stimCmd['seq']:
-                    if phase['enable']:
-                        phAmp = ampQuanta * phase['ampl'] * (-1) * ((-1) ** phase['pol'])
-                        phaseWaveform = [phAmp for i in range(31 * phase['length'])]
-                    else:
-                        phaseWaveform = [0 for i in range(31 * phase['length'])]
-                    phaseWaveform[:phase['delay']] = [lastAmplitude for i in range(phase['delay'])]
-                    lastAmplitude = phaseWaveform[-1]
-                    nominalWaveform += phaseWaveform
-                    totalLen += phase['length']
-                stimDict['t'].append(t)
-                stimDict['firstPW'].append(
-                    stimCmd['seq'][0]['length'] / (30000) * pq.s)
-                stimDict['secondPW'].append(
-                    stimCmd['seq'][2]['length'] / (30000) * pq.s)
-                stimDict['totalPW'].append(totalLen / (30000) * pq.s)
-                stimDict['elec'].append(stimCmd['elec'] * pq.dimensionless)
-                allNominalWaveforms.append(np.asarray(nominalWaveform))
-                nominalIdxMax = np.argmax(np.abs(np.asarray(nominalWaveform)))
-                stimDict['nominalCurrent'].append(nominalWaveform[nominalIdxMax])
-                thisStimPeriod = (stimCmd['period'] / (30000) * pq.s)
-                stimDict['RateInHz'].append(thisStimPeriod ** (-1))
-                stimDict['trainDur'].append((stimCmd['repeats']) * thisStimPeriod)
+            if 'stimCmd' in entry:
+                allStimCmd = entry['stimCmd']
+                for stimCmd in allStimCmd:
+                    # each stimCmd represents one electrode
+                    nominalWaveform = []
+                    lastAmplitude = 0
+                    totalLen = 0
+                    for phase in stimCmd['seq']:
+                        if phase['enable']:
+                            phAmp = ampQuanta * phase['ampl'] * (-1) * ((-1) ** phase['pol'])
+                            phaseWaveform = [phAmp for i in range(31 * phase['length'])]
+                        else:
+                            phaseWaveform = [0 for i in range(31 * phase['length'])]
+                        phaseWaveform[:phase['delay']] = [lastAmplitude for i in range(phase['delay'])]
+                        lastAmplitude = phaseWaveform[-1]
+                        nominalWaveform += phaseWaveform
+                        totalLen += phase['length']
+                    stimDict['t'].append(t)
+                    stimDict['firstPW'].append(
+                        stimCmd['seq'][0]['length'] / (30000) * pq.s)
+                    stimDict['secondPW'].append(
+                        stimCmd['seq'][2]['length'] / (30000) * pq.s)
+                    stimDict['totalPW'].append(totalLen / (30000) * pq.s)
+                    stimDict['elec'].append(stimCmd['elec'] * pq.dimensionless)
+                    allNominalWaveforms.append(np.asarray(nominalWaveform))
+                    nominalIdxMax = np.argmax(np.abs(np.asarray(nominalWaveform)))
+                    stimDict['nominalCurrent'].append(nominalWaveform[nominalIdxMax])
+                    thisStimPeriod = (stimCmd['period'] / (30000) * pq.s)
+                    stimDict['RateInHz'].append(thisStimPeriod ** (-1))
+                    stimDict['trainDur'].append((stimCmd['repeats']) * thisStimPeriod)
+            else:
+                stimStr = entry['stimString']
+                stimStrDictRaw = {}
+                for stimSubStr in stimStr.split(';'):
+                    if len(stimSubStr):
+                        splitStr = stimSubStr.split('=')
+                        stimStrDictRaw[splitStr[0]] = splitStr[1]
+                stimStrDict = {}
+                for key, val in stimStrDictRaw.items():
+                    stimStrDict[key] = [float(st) for st in val.split(',') if len(st)]
+                stimStrDF = pd.DataFrame(stimStrDict)
+                stimStrDF['Elect'] = stimStrDF['Elect'].astype(np.int)
+                stimStrDF.loc[stimStrDF['PL'] == 1, 'Amp'] = stimStrDF.loc[stimStrDF['PL'] == 1, 'Amp'] * (-1)
+                for rIdx, row in stimStrDF.iterrows():
+                    stimDict['t'].append(t)
+                    stimDict['firstPW'].append(row['Dur'] * 1e-3 * pq.s)
+                    stimDict['secondPW'].append(row['Dur'] * 1e-3 * pq.s)
+                    stimDict['totalPW'].append(2 * row['Dur'] * 1e-3 * pq.s)
+                    stimDict['nominalCurrent'].append(row['Amp'] * ampQuanta)
+                    stimDict['RateInHz'].append(row['Freq'] * pq.Hz)
+                    stimDict['trainDur'].append(row['TL'] * 1e-3 * pq.s)
+                    stimDict['elec'].append(row['Elect'] * pq.dimensionless)
         stimDict['labels'] = np.asarray([
             'stim update {}'.format(i)
             for i in range(len(stimDict['elec']))])
@@ -646,30 +706,6 @@ def calcISIBlockAnalysisNix():
     #                 chIdx.units.remove(stUn)
     #     del allStimUnits
     #
-    tdBlock = hf.extractSignalsFromBlock(
-        nspBlock, keepSpikes=False, keepSignals=tdChanNames)
-    tdBlock = hf.loadBlockProxyObjects(tdBlock)
-    
-    pdb.set_trace()
-    if len(allStimTrains):
-        for segIdx, dataSeg in enumerate(spikesBlock.segments):
-            spikeList = [
-                st
-                for st in dataSeg.filter(objects=SpikeTrain)
-                if '_stim' in st.name]
-            for stIdx, st in enumerate(spikeList):
-                chanName = st.unit.channel_index.name
-                matchingAsig = tdBlock.filter(objects=AnalogSignalProxy, name='seg0_' + chanName)
-                if len(matchingAsig):
-                    stitchStimArtifact = True
-                    if stitchStimArtifact:
-                        tIdx = 0
-                        wvfT = np.arange(st.times[tIdx], st.times[tIdx] + st.sampling_period * st.waveforms.shape[-1], st.sampling_period)
-                        wvfT = wvfT[:st.waveforms.shape[-1]]
-                        fig, ax = plt.subplots()
-                        ax.plot(wvfT, np.squeeze(st.waveforms[tIdx, :, :]))
-                        asigTMask = matchingAsig[0].times > wvfT[0]
-                        plt.show()
     tdDF = ns5.analogSignalsToDataFrame(
         tdBlock.filter(objects=AnalogSignal))
     #

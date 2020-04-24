@@ -146,7 +146,7 @@ resultNames = [
     'covariance', 'covarianceStd',
     'mse', 'mseStd']
 
-recalc = True
+recalc = False
 if recalc:
     print('loading {}'.format(triggeredPath))
     dataReader, dataBlock = preproc.blockFromPath(
@@ -212,6 +212,14 @@ for cN in ['covariance', 'mse']:
         mmScaler.fit(resDF[cN].loc[scaledMask[fN], fN].to_numpy().reshape(-1, 1))
         resDF[cN + '_scaled'].loc[:, fN] = mmScaler.transform(resDF[cN][fN].to_numpy().reshape(-1, 1))
 
+exportToDeepSpine = True
+if exportToDeepSpine:
+    deepSpineExportPath = os.path.join(
+        alignSubFolder,
+        prefix + '_{}_{}_export.h5'.format(
+            arguments['inputBlockName'], arguments['window']))
+    for cN in ['noiseCeil', 'covariance', 'covariance_q_scale']:
+        resDF[cN].to_hdf(deepSpineExportPath, cN)
 if arguments['plotting']:
     figureOutputFolder = os.path.join(
         figureFolder, arguments['analysisName'])

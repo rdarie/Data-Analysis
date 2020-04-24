@@ -136,4 +136,21 @@ def getExpOpts():
         # 'RSemitendinosusEmg#0',
         # 'RVastusLateralisEmg#0'
         ]
+    delsysMapDict = ({
+        'label': [
+            'LBicepsBrachiiEmgEnv',   'RBicepsBrachiiEmgEnv',
+            'LSemitendinosusEmgEnv',  'RSemitendinosusEmgEnv',
+            'LVastusLateralisEmgEnv', 'RVastusLateralisEmgEnv',
+            'LPeroneusLongusEmgEnv',  'RPeroneusLongusEmgEnv',
+            'LBicepsBrachiiEmg',   'RBicepsBrachiiEmg',
+            'LSemitendinosusEmg',  'RSemitendinosusEmg',
+            'LVastusLateralisEmg', 'RVastusLateralisEmg',
+            'LPeroneusLongusEmg',  'RPeroneusLongusEmg'],
+        'ycoords': [
+            3, 4, 3, 4, 3, 4, 3, 4,
+            0, 1, 0, 1, 0, 1, 0, 1],
+        'xcoords': [
+            0, 0, 2, 2, 3, 3, 5, 5,
+            0, 0, 2, 2, 3, 3, 5, 5]
+        })
     return locals()

@@ -393,7 +393,7 @@ def unitSpikeTrainWaveformsToDF(
                 (wfDF.columns <= windowSize[1]))
             wfDF = wfDF.loc[:, winMask]
         if procFun is not None:
-            wfDF = procFun(wfDF)
+            wfDF = procFun(wfDF, st)
         idxLabels = ['segment', 'originalIndex', 't']
         wfDF.loc[:, 't'] = np.asarray(st.times.magnitude)
         if (getMetaData) or (dataQuery is not None):
@@ -1120,10 +1120,14 @@ def alignedAsigDFtoSpikeTrain(
             colsAre = 'feature'
         for featName, featGroup in grouper:
             print('Saving {}...'.format(featName))
+            if featName[-2:] == '#0':
+                cleanFeatName = featName
+            else:
+                cleanFeatName = featName + '#0'
             if segIdx == 0:
                 #  allocate units
                 chanIdx = ChannelIndex(
-                    name=featName + '#0', index=[0])
+                    name=cleanFeatName, index=[0])
                 chanIdx.annotate(nix_name=chanIdx.name)
                 thisUnit = Unit(name=chanIdx.name)
                 thisUnit.annotate(nix_name=chanIdx.name)
@@ -1132,7 +1136,7 @@ def alignedAsigDFtoSpikeTrain(
                 masterBlock.channel_indexes.append(chanIdx)
             else:
                 thisUnit = masterBlock.filter(
-                    objects=Unit, name=featName + '#0')[0]
+                    objects=Unit, name=cleanFeatName)[0]
             if colsAre == 'bin':
                 spikeWaveformsDF = featGroup
             elif colsAre == 'feature':
@@ -1152,7 +1156,7 @@ def alignedAsigDFtoSpikeTrain(
             spikeTimes = arrAnnDF['t']
             arrAnnDF.drop(columns='t', inplace=True)
             arrAnn = {}
-            colsToKeep = arrAnnDF.columns.drop(['originalIndex', 'feature', 'segment'])
+            colsToKeep = arrAnnDF.columns.drop(['originalIndex', 'feature', 'segment', 'lag'])
             for cName in colsToKeep:
                 values = arrAnnDF[cName].to_numpy()
                 if isinstance(values[0], str):

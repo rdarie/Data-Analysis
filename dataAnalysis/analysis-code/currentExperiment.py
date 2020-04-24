@@ -353,8 +353,8 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
     rasterOpts = {
         # 'binInterval': 1e-3, 'binWidth': 10e-3, 'smoothKernelWidth': 10e-3,
         # 'binInterval': 1e-3, 'binWidth': 30e-3, 'smoothKernelWidth': 50e-3,
-        # 'binInterval': 0.2e-3, 'binWidth': 5e-3, 'smoothKernelWidth': 10e-3,
-        'binInterval': 30e3 ** (-1), 'binWidth': 5e-3, 'smoothKernelWidth': 10e-3,
+        'binInterval': 0.2e-3, 'binWidth': 5e-3, 'smoothKernelWidth': 10e-3,
+        # 'binInterval': 30e3 ** (-1), 'binWidth': 5e-3, 'smoothKernelWidth': 10e-3,
         # 'binInterval': 10e3 ** (-1), 'binWidth': 5e-3, 'smoothKernelWidth': 10e-3,
         'windowSizes': {
             'extraShort': (-0.25, 0.25),

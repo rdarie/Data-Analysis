@@ -449,7 +449,7 @@ def calcUnitRegressionToAsig():
                     print('Calculating history term {}'.format(colIdx + 1))
                 thisBasis = ihbasis[:, colIdx]
                 # thisBasis = orthobas[:, colIdx]
-                def pFun(x):
+                def pFun(x, st=None):
                     x.iloc[:, :] = np.apply_along_axis(
                         np.convolve, 1, x.to_numpy(),
                         thisBasis, mode='same')
