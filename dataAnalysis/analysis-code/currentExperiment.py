@@ -349,15 +349,16 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
     overrideUnitNames = None
     # overrideUnitNames = [
     #     'elec75#0', 'elec75#1', 'elec83#0', 'elec78#0', 'elec78#1']
-    alignedAsigsChunkSize = 15000
+    alignedAsigsChunkSize = 150000
     rasterOpts = {
+        # 'binInterval': .5e-3, 'binWidth': 10e-3, 'smoothKernelWidth': 10e-3,
         # 'binInterval': 1e-3, 'binWidth': 10e-3, 'smoothKernelWidth': 10e-3,
         # 'binInterval': 1e-3, 'binWidth': 30e-3, 'smoothKernelWidth': 50e-3,
-        'binInterval': 0.2e-3, 'binWidth': 5e-3, 'smoothKernelWidth': 10e-3,
-        # 'binInterval': 30e3 ** (-1), 'binWidth': 5e-3, 'smoothKernelWidth': 10e-3,
+        # 'binInterval': 0.2e-3, 'binWidth': 5e-3, 'smoothKernelWidth': 10e-3,
+        'binInterval': 30e3 ** (-1), 'binWidth': 5e-3, 'smoothKernelWidth': 10e-3,
         # 'binInterval': 10e3 ** (-1), 'binWidth': 5e-3, 'smoothKernelWidth': 10e-3,
         'windowSizes': {
-            'extraShort': (-0.25, 0.25),
+            'extraShort': (-0.1, 0.4),
             'extraExtraShort': (-0.125, 0.125),
             'short': (-0.5, 0.5),
             'long': (-2.25, 2.25),

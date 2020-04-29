@@ -21,26 +21,28 @@
 
 # EXP="exp202003091200"
 # EXP="exp202003181300"
-EXP="exp202003191400"
+# EXP="exp202003191400"
+EXP="exp202004271200"
 # EXP="exp202003201200"
 
 LAZINESS="--lazy"
 # LAZINESS=""
 # WINDOW="--window=miniRC"
-WINDOW="--window=short"
-# WINDOW="--window=extraShort"
+# WINDOW="--window=short"
+WINDOW="--window=extraShort"
 # WINDOW="--window=extraExtraShort"
-# TRIALSELECTOR="--blockIdx=1"
+# TRIALSELECTOR="--blockIdx=2"
 # TRIALSELECTOR="--blockIdx=3"
 TRIALSELECTOR="--processAll"
 # ANALYSISSELECTOR="--analysisName=emg"
 # ANALYSISSELECTOR="--analysisName=default"
 # ANALYSISSELECTOR="--analysisName=emgStretchTime"
-ANALYSISSELECTOR="--analysisName=emgHiRes"
+# ANALYSISSELECTOR="--analysisName=emgHiRes"
+# ANALYSISSELECTOR="--analysisName=emgLoRes"
 # ANALYSISSELECTOR="--analysisName=emg1msec"
 # ANALYSISSELECTOR="--analysisName=emg1msecSmooth"
 # ANALYSISSELECTOR="--analysisName=emg1msecNoLFPFilterSmoothEMG"
-# ANALYSISSELECTOR="--analysisName=lfpFullRes"
+ANALYSISSELECTOR="--analysisName=lfpFullRes"
 #
 # UNITSELECTOR="--unitQuery=all"
 # UNITSELECTOR="--unitQuery=isiemgraw"
@@ -54,7 +56,8 @@ source activate nda
 python --version
 
 python3 ./assembleExperimentData.py --exp=$EXP --processAsigs --processRasters $ANALYSISSELECTOR 
-python3 ./calcAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ANALYSISSELECTOR --eventName=stimAlignTimes --chanQuery="all" --blockName="lfp"  --alignFolderName=stim
+python3 ./calcAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ANALYSISSELECTOR --eventName=stimAlignTimes --chanQuery="isiemg" --blockName="emg" --verbose  --alignFolderName=stim
+python3 ./calcAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ANALYSISSELECTOR --eventName=stimAlignTimes --chanQuery="isispinal" --blockName="spinal" --verbose  --alignFolderName=stim
 
 # python3 ./calcTrialOutliers.py --exp=$EXP --alignFolderName=stim --inputBlockName="lfp" $TRIALSELECTOR $ANALYSISSELECTOR $UNITSELECTOR $WINDOW --alignQuery="stimOn" --saveResults --verbose --plotting
 # python3 ./calcISIStimArtifact.py --exp=$EXP --alignFolderName=stim --inputBlockName="lfp" --outputBlockName="lfp_clean" $TRIALSELECTOR $ANALYSISSELECTOR $UNITSELECTOR $WINDOW --alignQuery="stimOn" --saveResults --verbose --plotting

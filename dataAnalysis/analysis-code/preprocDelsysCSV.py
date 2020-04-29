@@ -136,7 +136,7 @@ def preprocDelsysWrapper(
         for colName in collatedData.columns
         ]
     collatedData.rename(columns={'TrignoAnalogInputAdapterAnalogA': 'AnalogInputAdapterAnalog'}, inplace=True)
-    # pdb.set_trace()
+    collatedData.rename(columns={'AnalogInputAdapterAnalogA': 'AnalogInputAdapterAnalog'}, inplace=True)
     collatedData.fillna(method='bfill', inplace=True)
     collatedData.index.name = 't'
     collatedData.reset_index(inplace=True)

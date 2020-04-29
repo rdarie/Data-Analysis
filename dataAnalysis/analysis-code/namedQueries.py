@@ -44,7 +44,12 @@ namedQueries = {
         'oechorsense': "((chanName.str.contains('CH'))or(chanName.str.contains('Sense')))",
         'oechorins': "((chanName.str.contains('CH'))or(chanName.str.contains('ins')))",
         'notoeaux': "not((chanName.str.contains('AUX')))",
-        'rig': "not((chanName.str.contains('elec'))or(chanName.str.contains('pca')))"
+        'rig': "not((chanName.str.contains('elec'))or(chanName.str.contains('pca')))",
+        'isispinaloremg': "((chanName.str.contains('caudal'))or(chanName.str.contains('rostral'))or(chanName.str.contains('Emg')))",
+        'isispinal': "( (chanName.str.contains('caudal'))or(chanName.str.contains('rostral')) )",
+        'isiemg': "(chanName.str.contains('Emg'))",
+        'isiemgenv': "(chanName.str.contains('EmgEnv'))",
+        'isiemgraw': "((chanName.str.contains('Emg')) and not (chanName.str.contains('EmgEnv')))",
     }
 }
 namedQueries['align'].update({

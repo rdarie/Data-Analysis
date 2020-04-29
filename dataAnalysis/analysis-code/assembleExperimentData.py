@@ -10,7 +10,7 @@ Options:
     --processRasters                whether to process the rasters [default: False]
 """
 import dataAnalysis.ephyviewer.scripts as vis_scripts
-import os, pdb
+import os, pdb, traceback
 from importlib import reload
 import neo
 from neo import (
@@ -80,9 +80,12 @@ for idx, trialBasePath in enumerate(trialsToAssemble):
         if not chAlreadyThere.any():
             # masterChanDF.loc[chIdx.name, 'hasUnits'] = len(chIdx.units) > 0
             # masterChanDF.loc[chIdx.name, 'hasAsigs'] = len(chIdx.analogsignals) > 0
-            masterChanDF.loc[chIdx.name, 'index'] = chIdx.index
-            masterChanDF.loc[chIdx.name, 'channel_names'] = chIdx.channel_names
-            masterChanDF.loc[chIdx.name, 'channel_ids'] = chIdx.channel_ids
+            try:
+                masterChanDF.loc[chIdx.name, 'index'] = chIdx.index
+                masterChanDF.loc[chIdx.name, 'channel_names'] = chIdx.channel_names
+                masterChanDF.loc[chIdx.name, 'channel_ids'] = chIdx.channel_ids
+            except Exception:
+                traceback.print_exc()
             for annName,  annVal in chIdx.annotations.items():
                 masterChanDF.loc[chIdx.name, annName] = annVal
         # else:
@@ -113,7 +116,8 @@ for suffix in suffixList:
             )
         if idx == 0:
             masterBlock = preproc.loadWithArrayAnn(
-                trialDataPath, fromRaw=False)
+                trialDataPath, fromRaw=False, reduceChannelIndexes=True)
+            # pdb.set_trace()
             masterBlock.name = experimentName + suffix
             if suffix == '_binarized':
                 for seg in masterBlock.segments:
@@ -128,12 +132,25 @@ for suffix in suffixList:
                         # create it
                         print('ch {} not found; creating now'.format(rowIdx))
                         # [ch.index for ch in masterBlock.filter(objects=ChannelIndex)]
+                        # if row['index'] is None:
+                        #     pdb.set_trace()
+                        #     chIdx = ChannelIndex(
+                        #         name=rowIdx,
+                        #         index=np.asarray([0]),
+                        #         channel_ids=np.asarray([0]),
+                        #         channel_names=np.asarray([rowIdx]),
+                        #         file_origin=masterBlock.channel_indexes[-1].file_origin
+                        #         )
+                        # else:
                         chIdx = ChannelIndex(
-                            index=row['index'],
-                            channel_ids=row['channel_ids'],
-                            channel_names=row['channel_names'],
-                            file_origin=dataBlock.channel_indexes[-1].file_origin
+                            name=rowIdx,
+                            index=np.asarray([row['index']]),
+                            channel_ids=np.asarray([row['channel_ids']]),
+                            channel_names=np.asarray([row['channel_names']]),
+                            file_origin=masterBlock.channel_indexes[-1].file_origin
                             )
+                        for aN in row.drop(['index', 'channel_names', 'channel_ids']).index:
+                            chIdx.annotations[aN] = row[aN]
                         masterBlock.channel_indexes.append(chIdx)
                         chIdx.block = masterBlock
                         # TODO: create blank asigs
@@ -153,7 +170,21 @@ for suffix in suffixList:
                             .replace('#0', ''))
                         matchingCh = masterBlock.filter(
                             objects=ChannelIndex, name=parentChanName)
+                        # if not len(matchingCh):
+                        #     masterListEntry = masterChanDF.loc[parentChanName, :]
+                        #     parentChIdx = ChannelIndex(
+                        #         name=parentChanName,
+                        #         index=masterListEntry['index'],
+                        #         channel_ids=masterListEntry['channel_ids'],
+                        #         channel_names=masterListEntry['channel_names'],
+                        #         file_origin=masterBlock.channel_indexes[-1].file_origin
+                        #         )
+                        #     masterBlock.channel_indexes.append(parentChIdx)
+                        #     parentChIdx.block = masterBlock
+                        # else:
+                        #     parentChIdx = matchingCh[0]
                         parentChIdx = matchingCh[0]
+                        print('unit {} not found; creating now'.format(rowIdx))
                         newUnit = Unit(name=rowIdx)
                         for annName in row.index:
                             newUnit.annotations[annName] = row[annName]
@@ -177,7 +208,7 @@ for suffix in suffixList:
                     child.name = 'seg{}_{}'.format(idx, childBaseName)
         else:
             dataBlock = preproc.loadWithArrayAnn(
-                trialDataPath, fromRaw=False)
+                trialDataPath, fromRaw=False, reduceChannelIndexes=True)
             dataBlock.name = masterBlock.name
             if suffix == '_binarized':
                 for seg in dataBlock.segments:
@@ -196,12 +227,24 @@ for suffix in suffixList:
                         # create it
                         print('ch {} not found; creating now'.format(rowIdx))
                         # [ch.index for ch in dataBlock.filter(objects=ChannelIndex)]
+                        # if row['index'] is None:
+                        #     chIdx = ChannelIndex(
+                        #         name=rowIdx,
+                        #         index=np.asarray([0]),
+                        #         channel_ids=np.asarray([0]),
+                        #         channel_names=np.asarray([rowIdx]),
+                        #         file_origin=dataBlock.channel_indexes[-1].file_origin
+                        #         )
+                        # else:
                         chIdx = ChannelIndex(
-                            index=row['index'],
-                            channel_ids=row['channel_ids'],
-                            channel_names=row['channel_names'],
+                            name=rowIdx,
+                            index=np.asarray([row['index']]),
+                            channel_ids=np.asarray([row['channel_ids']]),
+                            channel_names=np.asarray([row['channel_names']]),
                             file_origin=dataBlock.channel_indexes[-1].file_origin
                             )
+                        for aN in row.drop(['index', 'channel_names', 'channel_ids']).index:
+                            chIdx.annotations[aN] = row[aN]
                         dataBlock.channel_indexes.append(chIdx)
                         chIdx.block = dataBlock
                         # TODO: create blank asigs
@@ -221,7 +264,21 @@ for suffix in suffixList:
                             .replace('#0', ''))
                         matchingCh = dataBlock.filter(
                             objects=ChannelIndex, name=parentChanName)
+                        # if not len(matchingCh):
+                        #     masterListEntry = masterChanDF.loc[parentChanName, :]
+                        #     parentChIdx = ChannelIndex(
+                        #         name=parentChanName,
+                        #         index=masterListEntry['index'],
+                        #         channel_ids=masterListEntry['channel_ids'],
+                        #         channel_names=masterListEntry['channel_names'],
+                        #         file_origin=dataBlock.channel_indexes[-1].file_origin
+                        #         )
+                        #     dataBlock.channel_indexes.append(parentChIdx)
+                        #     parentChIdx.block = dataBlock
+                        # else:
+                        #     
                         parentChIdx = matchingCh[0]
+                        print('unit {} not found; creating now'.format(rowIdx))
                         newUnit = Unit(name=rowIdx)
                         for annName in row.index:
                             newUnit.annotations[annName] = row[annName]
@@ -246,7 +303,7 @@ for suffix in suffixList:
             # print([st.name for st in dataBlock.filter(objects=SpikeTrain)])
             # print([ev.name for ev in dataBlock.filter(objects=Event)])
             # print([chIdx.name for chIdx in dataBlock.filter(objects=ChannelIndex)])
-            # #)
+            
             masterBlock.merge(dataBlock)
             if applyTimeOffset:
                 oldTStop = tStop
@@ -256,7 +313,14 @@ for suffix in suffixList:
     # print([st.name for st in masterBlock.filter(objects=SpikeTrain)])
     # print([ev.name for ev in masterBlock.filter(objects=Event)])
     # print([chIdx.name for chIdx in masterBlock.filter(objects=ChannelIndex)])
+    # print([un.name for un in masterBlock.filter(objects=Unit)])
+    
+    masterBlock.create_relationship()
+    for idx, chIdx in enumerate(dataBlock.channel_indexes):
+        print('{}: {}'.format(chIdx.name, chIdx.index))
     masterBlock = preproc.purgeNixAnn(masterBlock)
+    if os.path.exists(experimentDataPath):
+        os.remove(experimentDataPath)
     writer = neo.io.NixIO(filename=experimentDataPath)
     writer.write_block(masterBlock, use_obj_names=True)
     writer.close()

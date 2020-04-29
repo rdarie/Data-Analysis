@@ -62,7 +62,7 @@ def calcISIBlockAnalysisNix():
         samplingRate = float(1 / rasterOpts['binInterval']) * pq.Hz
     #
     nspReader = neo.io.nixio_fr.NixIO(filename=trialBasePath)
-    mapDF = prb_meta.mapToDF(rippleMapFile)
+    mapDF = prb_meta.mapToDF(rippleMapFile[int(arguments['blockIdx'])])
     nspBlock = ns5.readBlockFixNames(
         nspReader, block_index=0,
         reduceChannelIndexes=True
@@ -293,6 +293,9 @@ def calcISIBlockAnalysisNix():
             t = entry['t']
             if 'stimCmd' in entry:
                 allStimCmd = entry['stimCmd']
+                if isinstance(allStimCmd, dict):
+                    # if only one electrode
+                    allStimCmd = [allStimCmd]
                 for stimCmd in allStimCmd:
                     # each stimCmd represents one electrode
                     nominalWaveform = []
@@ -333,7 +336,7 @@ def calcISIBlockAnalysisNix():
                     stimStrDict[key] = [float(st) for st in val.split(',') if len(st)]
                 stimStrDF = pd.DataFrame(stimStrDict)
                 stimStrDF['Elect'] = stimStrDF['Elect'].astype(np.int)
-                stimStrDF.loc[stimStrDF['PL'] == 1, 'Amp'] = stimStrDF.loc[stimStrDF['PL'] == 1, 'Amp'] * (-1)
+                stimStrDF.loc[stimStrDF['PL'] == 0, 'Amp'] = stimStrDF.loc[stimStrDF['PL'] == 0, 'Amp'] * (-1)
                 for rIdx, row in stimStrDF.iterrows():
                     stimDict['t'].append(t)
                     stimDict['firstPW'].append(row['Dur'] * 1e-3 * pq.s)
@@ -346,6 +349,7 @@ def calcISIBlockAnalysisNix():
         stimDict['labels'] = np.asarray([
             'stim update {}'.format(i)
             for i in range(len(stimDict['elec']))])
+        # (np.asarray(stimDict['t'])/3e4 <= 1).any()
         rawStimEventTimes = np.asarray(stimDict.pop('t')) / (30000) * pq.s
         # rawStimEventTimes = rawStimEventTimes - rawStimEventTimes[0] + activeTimes.min() * pq.s
         # rawStimEventTimes = rawStimEventTimes.magnitude * rawStimEventTimes.units.simplified
@@ -412,7 +416,12 @@ def calcISIBlockAnalysisNix():
                     newIndex = np.unique(np.concatenate([
                         stimEvents[thisStEventsMask].times.magnitude,
                         st.times.magnitude]))
-                    allUpdates = theseUpdates.reindex(newIndex, method='ffill')
+                    # pdb.set_trace()
+                    try:
+                        allUpdates = theseUpdates.reindex(newIndex, method='ffill')
+                    except Exception:
+                        traceback.print_exc()
+                        pdb.set_trace()
                     stAnnotations = allUpdates.loc[
                         allUpdates.index.isin(st.times.magnitude), :]
                 #
@@ -518,7 +527,8 @@ def calcISIBlockAnalysisNix():
                             stAnnotations[annName].to_numpy() *
                             eventUnits[annName])
             peakIdx, _, trainStartIdx, trainEndIdx = hf.findTrains(
-                peakTimes=activeTimes, iti=10e-3)
+                peakTimes=activeTimes, minDistance=5e-3, maxDistance=200e-3)
+            # pdb.set_trace()
             trainDurations = trainEndIdx - trainStartIdx
             #
             if len(trainStartIdx):

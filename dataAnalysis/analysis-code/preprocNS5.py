@@ -86,7 +86,7 @@ if arguments['makeFull']:
         calcRigEvents=trialFilesFrom['utah']['calcRigEvents'])
 ##################################################################################
 if arguments['ISI']:
-    mapDF = prb_meta.mapToDF(rippleMapFile)
+    mapDF = prb_meta.mapToDF(rippleMapFile[int(arguments['blockIdx'])])
     reader = ns5.preproc(
         fileName=ns5FileName,
         rawFolderPath=nspFolder,
@@ -112,7 +112,7 @@ if arguments['ISI']:
             traceback.print_exc()
 ##################################################################################
 if arguments['ISIRaw']:
-    mapDF = prb_meta.mapToDF(rippleMapFile)
+    mapDF = prb_meta.mapToDF(rippleMapFile[int(arguments['blockIdx'])])
     reader = ns5.preproc(
         fileName=ns5FileName,
         rawFolderPath=nspFolder,

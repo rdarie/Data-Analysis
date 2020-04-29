@@ -123,7 +123,7 @@ pdfPath = os.path.join(
     figureOutputFolder,
     prefix + '_{}_{}_prepoststim.pdf'.format(
         arguments['inputBlockName'], arguments['window']))
-rippleMapDF = prb_meta.mapToDF(rippleMapFile)
+rippleMapDF = prb_meta.mapToDF(rippleMapFile[int(arguments['blockIdx'])])
 
 dataStackDict = {
     'corrPreStim': getPairResult(resultPath, rippleMapDF, 'corrPreStim'),

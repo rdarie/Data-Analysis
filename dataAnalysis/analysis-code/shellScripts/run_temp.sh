@@ -10,36 +10,43 @@
 #SBATCH --mem=96G
 
 # Specify a job name:
-#SBATCH -J isiProc_20200309
+#SBATCH -J alignStim_20200318
 
 # Specify an output file
-#SBATCH -o ../batch_logs/%j-isiProc_20200309.stdout
-#SBATCH -e ../batch_logs/%j-isiProc_20200309.errout
+#SBATCH -o ../batch_logs/%j-alignStim_20200318.stdout
+#SBATCH -e ../batch_logs/%j-alignStim_20200318.errout
 
 # Specify account details
 #SBATCH --account=bibs-dborton-condo
 
-# Request custom resources
-#SBATCH --array=1,2
-
-# EXP="exp201901070700"
-# EXP="exp201901201200"
-# EXP="exp201901211000"
-# EXP="expRippleSaline"
-# EXP="exp201901221000"
-# EXP="exp201901231000"
-# EXP="exp201901271000"
-# EXP="exp202001231400"
-#
 # EXP="exp202003091200"
-# EXP="exp202003131100"
-EXP="exp202003201200"
+# EXP="exp202003181300"
+# EXP="exp202003191400"
+EXP="exp202004271200"
+# EXP="exp202003201200"
 
 LAZINESS="--lazy"
-WINDOW="--window=extraShort"
+# LAZINESS=""
+# WINDOW="--window=miniRC"
+WINDOW="--window=short"
+# WINDOW="--window=extraShort"
+# WINDOW="--window=extraExtraShort"
 # TRIALSELECTOR="--blockIdx=2"
-# TRIALSELECTOR="--processAll"
-UNITSELECTOR="--selector=_minfrmaxcorrminamp"
+# TRIALSELECTOR="--blockIdx=3"
+TRIALSELECTOR="--processAll"
+# ANALYSISSELECTOR="--analysisName=emg"
+# ANALYSISSELECTOR="--analysisName=default"
+# ANALYSISSELECTOR="--analysisName=emgStretchTime"
+ANALYSISSELECTOR="--analysisName=emgHiRes"
+# ANALYSISSELECTOR="--analysisName=emg1msec"
+# ANALYSISSELECTOR="--analysisName=emg1msecSmooth"
+# ANALYSISSELECTOR="--analysisName=emg1msecNoLFPFilterSmoothEMG"
+# ANALYSISSELECTOR="--analysisName=lfpFullRes"
+#
+# UNITSELECTOR="--unitQuery=all"
+# UNITSELECTOR="--unitQuery=isiemgraw"
+# UNITSELECTOR="--unitQuery=isispinal"
+UNITSELECTOR="--unitQuery=isispinaloremg"
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
@@ -47,13 +54,4 @@ conda activate
 source activate nda
 python --version
 
-SLURM_ARRAY_TASK_ID="1"
-python launchVis.py
-# python ./quickPlotRipple.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID
-# python ./saveImpedances.py --exp=$EXP --processAll --ripple --plotting
-#
-# python ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --ISI
-#
-# python ./calcISIAnalysisNix.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --chanQuery="all"
-# python3 ./calcAlignedAsigs.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $WINDOW $LAZINESS --eventName=stimAlignTimes --chanQuery="all" --blockName="lfp"  --alignFolderName=stim
-# python3 ./plotAlignedAsigs.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $WINDOW --inputBlockName="lfp" --unitQuery="all" --alignQuery="stimOn" --rowName= --rowControl= --colControl= --hueName="amplitudeCat" --alignFolderName=stim --enableOverrides
+python3 ./launchVis.py

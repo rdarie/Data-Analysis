@@ -838,7 +838,6 @@ def getAsigsAlignedToEvents(
                     print(
                         'getAsigsAlignedToEvents on channel {}'
                         .format(chanName))
-                
                 assert len(signalSeg.filter(name=asigName)) == 1
                 asig = signalSeg.filter(name=asigName)[0]
                 nominalWinLen = int(
@@ -1696,6 +1695,7 @@ def readBlockFixNames(
         signal_group_mode=signal_group_mode)
     headerSignalChan = pd.DataFrame(
         rawioReader.header['signal_channels']).set_index('id')
+    headerUnitChan = pd.DataFrame(rawioReader.header['unit_channels']).set_index('id')
     #  
     if dataBlock.name is None:
         if 'neo_name' in dataBlock.annotations:
@@ -1732,6 +1732,8 @@ def readBlockFixNames(
         seg0.filter(objects=SpikeTrainProxy) +
         seg0.filter(objects=SpikeTrain)
         )
+    # add channels for channelIndex that has no asigs but has spikes
+    nExtraChans = 0
     for stp in spikeTrainLikeList:
         stpBaseName = childBaseName(stp.name, 'seg')
         nameParser = re.search(r'ch(\d*)#(\d*)', stpBaseName)
@@ -1782,6 +1784,19 @@ def readBlockFixNames(
                     dataBlock.channel_indexes.remove(oldChIdx)
                 del oldChIdx
                 targetChIdx.create_relationship()
+            elif reduceChannelIndexes:
+                if newChanName not in headerSignalChan['name']:
+                    stp.unit.channel_index.index = np.asarray(
+                        [headerSignalChan['name'].size + nExtraChans])
+                    stp.unit.channel_index.channel_ids = np.asarray(
+                        [headerSignalChan['name'].size + nExtraChans])
+                    stp.unit.channel_index.channel_names = np.asarray(
+                        [newChanName])
+                    nExtraChans += 1
+                if 'neo_name' not in allMatchingChIdx[0].annotations:
+                    allMatchingChIdx[0].annotations['neo_name'] = allMatchingChIdx[0].name
+                if 'nix_name' not in allMatchingChIdx[0].annotations:
+                    allMatchingChIdx[0].annotations['nix_name'] = allMatchingChIdx[0].name
     #  rename the children
     typesNeedRenaming = [
         SpikeTrainProxy, AnalogSignalProxy, EventProxy,
@@ -2732,10 +2747,14 @@ def loadObjArrayAnn(st):
 
 
 def loadWithArrayAnn(
-        dataPath, fromRaw=False):
+        dataPath, fromRaw=False,
+        mapDF=None, reduceChannelIndexes=False):
     if fromRaw:
         reader = nixio_fr.NixIO(filename=dataPath)
-        block = readBlockFixNames(reader, lazy=False)
+        block = readBlockFixNames(
+            reader, lazy=False,
+            mapDF=mapDF,
+            reduceChannelIndexes=reduceChannelIndexes)
     else:
         reader = NixIO(filename=dataPath)
         block = reader.read_block()
@@ -2754,7 +2773,8 @@ def blockFromPath(dataPath, lazy=False, reduceChannelIndexes=False):
         dataReader = nixio_fr.NixIO(
             filename=dataPath)
         dataBlock = readBlockFixNames(
-            dataReader, lazy=True, reduceChannelIndexes=reduceChannelIndexes)
+            dataReader, lazy=True,
+            reduceChannelIndexes=reduceChannelIndexes)
         #  dataBlock = dataReader.read_block(
         #      block_index=0, lazy=True,
         #      signal_group_mode='split-all')

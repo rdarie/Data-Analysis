@@ -396,7 +396,7 @@ def plotAsigsAligned(
                         for hn in hueOrder
                         if hn in sorted(np.unique(indexInfo[hueName]))]
                 asig = asigWide.stack().reset_index(name='signal')
-                #
+                # pdb.set_trace()
                 g = sns.relplot(
                     x='bin', y='signal',
                     col=colName, row=rowName, hue=hueName,

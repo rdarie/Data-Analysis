@@ -973,7 +973,7 @@ def fillInJumps(channelData, samp_per_s, smoothing_ms = 1, badThresh = 1e-3,
     return channelData, badMask
 
 
-def confirmTriggersPlot(peakIdx, dataSeries, fs, whichPeak=0, nSec=2):
+def confirmTriggersPlot(peakIdx, dataSeries, fs, whichPeak=0, nSec=10):
 
     indent = peakIdx[whichPeak]
 
@@ -981,15 +981,16 @@ def confirmTriggersPlot(peakIdx, dataSeries, fs, whichPeak=0, nSec=2):
     peakSlice = np.where(np.logical_and(peakIdx > indent - .25*fs, peakIdx < indent + nSec*fs))
 
     fig, ax = plt.subplots()
-    plt.plot(dataSeries.index[dataSlice] - indent, dataSeries.iloc[dataSlice])
-    plt.plot(peakIdx[peakSlice] - indent, dataSeries.iloc[peakIdx[peakSlice]], 'r*')
+    plt.plot((dataSeries.index[dataSlice] - indent) * fs ** (-1), dataSeries.iloc[dataSlice])
+    plt.plot((peakIdx[peakSlice] - indent) * fs ** (-1), dataSeries.iloc[peakIdx[peakSlice]], 'r*')
     plt.title('dataSeries and found triggers')
+    plt.xlabel('distance between triggers (sec)')
 
     figDist, axDist = plt.subplots()
     if len(peakIdx) > 5:
-        sns.distplot(np.diff(peakIdx), kde=False)
-    plt.title('distance between triggers (# samples)')
-    plt.xlabel('distance between triggers (# samples)')
+        sns.distplot(np.diff(peakIdx) * fs ** (-1), kde=False)
+    plt.title('distance between triggers (sec)')
+    plt.xlabel('distance between triggers (sec)')
     return fig, ax, figDist, axDist
 
 
@@ -1023,10 +1024,18 @@ def getThresholdCrossings(
         crossMask = (
             (dsToSearch >= thresh) & (nextDS < thresh) |
             (dsToSearch > thresh) & (nextDS <= thresh))
-    else:
+    elif edgeType == 'falling':
         crossMask = (
             (dsToSearch <= thresh) & (nextDS > thresh) |
             (dsToSearch < thresh) & (nextDS >= thresh))
+    elif edgeType == 'both':
+        risingMask = (
+            (dsToSearch >= thresh) & (nextDS < thresh) |
+            (dsToSearch > thresh) & (nextDS <= thresh))
+        fallingMask = (
+            (dsToSearch <= thresh) & (nextDS > thresh) |
+            (dsToSearch < thresh) & (nextDS >= thresh))
+        crossMask = risingMask | fallingMask
     crossIdx = dataSrs.index[crossMask]
     if iti is not None:
         min_dist = int(fs * iti * (1 - itiWiggle))
@@ -1056,8 +1065,8 @@ def getThresholdCrossings(
 
 def findTrains(
         peakTimes=None,
-        peakIdx=None, fs=None, iti=None,
-        minTrainLength=0, maxDistance=1.5, maxTrain=False, plotting=False):
+        peakIdx=None, fs=None, minDistance=None,
+        minTrainLength=0, maxDistance=None, maxTrain=False, plotting=False):
     #peakMask = dataSrs.index.isin(peakIdx)
     #foundTime = pd.Series((dataSrs.index[peakIdx] - dataSrs.index[peakIdx[0]]) / fs)
     if peakTimes is not None:
@@ -1069,18 +1078,16 @@ def findTrains(
         foundTime = pd.Series(peakIdx / fs, index=peakIdx)
     # identify trains of peaks
     #
-    itiWiggle = 0.05
-    assert iti is not None
-    minPeriod = iti * (1 - itiWiggle)
+    assert minDistance is not None
     #
     peakDiff = foundTime.diff()
-    peakDiff.iloc[0] = iti * 2e3 #fudge it so that the first one is taken
-    trainStartIdx = foundTime.index[peakDiff > (iti * maxDistance)]
+    peakDiff.iloc[0] = minDistance * 2e3 #fudge it so that the first one is taken
+    trainStartIdx = foundTime.index[peakDiff > (maxDistance)]
     trainStarts = foundTime[trainStartIdx]
     #
     peakFwdDiff = foundTime.diff(periods = -1) * (-1)
-    peakFwdDiff.iloc[-1] = iti * 2e3 #fudge it so that the last one is taken
-    trainEndIdx = foundTime.index[peakFwdDiff > (iti * maxDistance)]
+    peakFwdDiff.iloc[-1] = minDistance * 2e3 #fudge it so that the last one is taken
+    trainEndIdx = foundTime.index[peakFwdDiff > (maxDistance)]
     trainEnds = foundTime[trainEndIdx]
 
     #
@@ -1094,7 +1101,7 @@ def findTrains(
         theseDiffs = peakDiff.loc[idxIntoPeaks:trainEndIdx[idx]]
         thisMeanPeriod = theseDiffs.iloc[1:].mean()
         thisOneValid = (
-            (validTrains[idx] and thisMeanPeriod > minPeriod) or
+            (validTrains[idx] and thisMeanPeriod > minDistance) or
             ((minTrainLength == 0) and theseDiffs.size == 1) # accept single pulses
             )
         if thisOneValid:
@@ -1116,14 +1123,13 @@ def findTrains(
 
 def getTriggers(
         dataSeries, iti = .01, fs = 3e4, thres = 2.58,
-        edgeType = 'rising',
+        edgeType = 'rising', itiWiggle = 0.05,
         minAmp = None,
         minTrainLength = None,
         expectedTime = None, keep_max = True, plotting = False):
     # iti: expected inter trigger interval
 
     # minimum distance between triggers (units of samples), 5% wiggle room
-    itiWiggle = 0.05
     width = int(fs * iti * (1 - itiWiggle))
     # first difference of triggers
     triggersPrime = dataSeries.diff()

@@ -162,7 +162,7 @@ def masterPlot(
     plt.savefig(pdfPath)
     plt.show()
 
-rippleMapDF = prb_meta.mapToDF(expOpts['rippleMapFile'])
+rippleMapDF = prb_meta.mapToDF(expOpts['rippleMapFile'][int(arguments['blockIdx'])])
 rippleMapDF.loc[
     rippleMapDF['label'].str.contains('caudal'),
     'ycoords'] += 800

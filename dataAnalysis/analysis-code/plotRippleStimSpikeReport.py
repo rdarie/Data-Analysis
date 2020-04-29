@@ -20,6 +20,8 @@ Options:
     --alignQuery=alignQuery                what will the plot be aligned to? [default: all]
     --hueName=hueName                      break down by hue  [default: nominalCurrent]
     --hueControl=hueControl                hues to exclude from stats test
+    --sizeName=sizeName                    break down by style [default: RateInHz]
+    --sizeControl=sizeControl              styles to exclude from stats test
     --styleName=styleName                  break down by style [default: RateInHz]
     --styleControl=styleControl            styles to exclude from stats test
     --groupPagesBy=groupPagesBy            break down each page
@@ -36,6 +38,7 @@ import dataAnalysis.plotting.aligned_signal_plots as asp
 import dataAnalysis.helperFunctions.kilosort_analysis as ksa
 import dataAnalysis.helperFunctions.probe_metadata as prb_meta
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
+import dataAnalysis.helperFunctions.profiling as prf
 #
 from namedQueries import namedQueries
 import neo
@@ -118,9 +121,12 @@ alignedAsigsKWargs.update(dict(
     duplicateControlsByProgram=False,
     makeControlProgram=False,
     metaDataToCategories=False,
-    removeFuzzyName=False, decimate=1,
+    removeFuzzyName=False, decimate=5,
+    getMetaData=[
+        'RateInHz', 'bin', 'electrode', 'nominalCurrent',
+        'stimCat', 'originalIndex', 'segment', 't'],
     transposeToColumns='feature', concatOn='columns',))
-rippleMapDF = prb_meta.mapToDF(rippleMapFile)
+rippleMapDF = prb_meta.mapToDF(rippleMapFile[int(arguments['blockIdx'])])
 rippleMapDF.loc[
     rippleMapDF['label'].str.contains('caudal'),
     'ycoords'] += 800
@@ -142,7 +148,7 @@ else:
 # alignedAsigsKWargs.update(dict(
 #     windowSize=(-350e-3, 350e-3)))
 alignedAsigsKWargs.update(dict(
-    windowSize=(-20e-3, 40e-3)))
+    windowSize=(-25e-3, 125e-3)))
 alignedAsigsKWargs.update(dict(decimate=1))
 flipInfo = {
     'ripple': {'lr': True, 'ud': True},
@@ -166,7 +172,7 @@ mapSpecificRelplotKWArgs = {
                 'width_ratios': [
                     1, 1, 1, 1, 1],
                 'height_ratios': [
-                    1, 0.5, 1, 1, 0.5, 1]}}}
+                    1, 1, 0.5, 1, 0.5, 1, 0.5, 1, 0.5, 1, 1, 0.5, 1]}}}
     }
 relplotKWArgs.update({
     'legend': 'brief',
@@ -199,14 +205,14 @@ plotProcFuns = [
             'horizontalalignment': 'right'
         }, shared=False),
     # for evoked lfp report, add stim times
-    # asp.genBlockVertShader([
-    #         max(0e-3, alignedAsigsKWargs['windowSize'][0]),
-    #         min(300e-3, alignedAsigsKWargs['windowSize'][1])],
-    #     asigPlotShadingOpts),
-    asp.genVLineAdder(
-        # np.arange(0, min(300e-3, alignedAsigsKWargs['windowSize'][1]), 10e-3),
-        [0],
-        vLineOpts)
+    asp.genBlockVertShader([
+            max(0e-3, alignedAsigsKWargs['windowSize'][0]),
+            min(300e-3, alignedAsigsKWargs['windowSize'][1])],
+        asigPlotShadingOpts),
+    # asp.genVLineAdder(
+    #     np.arange(0, min(300e-3, alignedAsigsKWargs['windowSize'][1]), 10e-3),
+    #     # [0],
+    #     vLineOpts)
         ]
 mapSpecificPlotProcFuns = {
     'ripple': [
@@ -233,7 +239,7 @@ extraSpaces = {
         (34, 364), (34, 852),
         (85, 1060)],
     'delsys': [
-        (1, 2), (4, 2)
+        (2, 2), (4, 2), (6, 2), (8, 2), (11, 2)
         ]}
 # pdb.set_trace()
 limitPages = None
@@ -251,16 +257,22 @@ dataReader, dataBlock = preproc.blockFromPath(
     dataPath, lazy=arguments['lazy'])
 asigWide = preproc.alignedAsigsToDF(
     dataBlock, **alignedAsigsKWargs)
+prf.print_memory_usage('loaded asig wide')
 #
+pdb.set_trace()
 asigStack = (
     asigWide
     .stack(level=['feature', 'lag'])
     .reset_index(name='signal')
     .dropna())
+prf.print_memory_usage('created asig stack')
+del asigWide
+prf.print_memory_usage('deleted asig wide')
 asigStack['parentChanName'] = (
     asigStack['feature']
     .apply(lambda x: x.replace('_stim#0', '').replace('#0', '')))
 dummyDict = {}
+
 for probeName, mapDF in mapsDict.items():
     probeMask = asigStack['parentChanName'].isin(mapDF['label'])
     for cName in ['xcoords', 'ycoords']:
@@ -333,9 +345,11 @@ with PdfPages(pdfName) as pdf:
                     updateHeight = np.sum(absHeights)
                     relplotKWArgs['facet_kws']['gridspec_kws']['hspace'] = (
                         relplotKWArgs['height'] * 0.1 / np.mean(absHeights))
+            # pdb.set_trace()
             g = sns.relplot(
                 data=thisAsigStack,
                 x='bin', y='signal', hue=arguments['hueName'],
+                size=arguments['sizeName'], style=arguments['styleName'],
                 row='xcoords', col='ycoords', **relplotKWArgs)
             for (ro, co, hu), dataSubset in g.facet_data():
                 # if sigTestResults is not None:

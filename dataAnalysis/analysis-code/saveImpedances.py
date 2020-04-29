@@ -113,7 +113,7 @@ if arguments['ripple']:
         experimentShorthand = 'exp{}'.format(recDateStr[0])
         optsModule = importlib.import_module(experimentShorthand, package=None)
         expOpts = optsModule.getExpOpts()
-        mapDF = prb_meta.mapToDF(expOpts['rippleMapFile'])
+        mapDF = prb_meta.mapToDF(expOpts['rippleMapFile'][int(arguments['blockIdx'])])
         folderPath = os.path.dirname(filename)
         newImpedances = pd.read_csv(
             filename, sep='\s+', skiprows=10,

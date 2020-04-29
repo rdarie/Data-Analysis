@@ -22,7 +22,9 @@
 #SBATCH --array=3,4
 
 # EXP="exp202003201200"
-EXP="exp202003191400"
+# EXP="exp202003191400"
+# EXP="exp202004251400"
+EXP="exp202004271200"
 # EXP="exp202003181300"
 
 LAZINESS="--lazy"
@@ -34,4 +36,4 @@ source activate nda
 python --version
 
 SLURM_ARRAY_TASK_ID=4
-python3 -u './synchronizeDelsysToNSP.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --plotting
+python3 -u './synchronizeDelsysToNSP.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --trigRate=1

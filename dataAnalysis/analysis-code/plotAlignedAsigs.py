@@ -21,6 +21,8 @@ Options:
     --rowControl=rowControl                rows to exclude from stats test
     --hueName=hueName                      break down by hue  [default: amplitude]
     --hueControl=hueControl                hues to exclude from stats test
+    --sizeName=sizeName                    break down by hue  [default: RateInHz]
+    --sizeControl=sizeControl              hues to exclude from stats test
     --styleName=styleName                  break down by style [default: RateInHz]
     --styleControl=styleControl            styles to exclude from stats test
     --colName=colName                      break down by col  [default: electrode]
@@ -109,7 +111,7 @@ pdfName = '{}_{}_{}_{}'.format(
 statsTestPath = os.path.join(figureStatsFolder, pdfName + '_stats.h5')
 #############################################
 #  Overrides
-alignedAsigsKWargs.update({'decimate': 1})
+alignedAsigsKWargs.update({'decimate': 10})
 alignedAsigsKWargs.update({'amplitudeColumn': arguments['hueName']})
 limitPages = None
 if arguments['individualTraces']:
@@ -125,7 +127,7 @@ if arguments['enableOverrides']:
     if 'rowColOverrides' in locals():
         if rowColOpts['colName'] in rowColOverrides:
             rowColOpts['colOrder'] = rowColOverrides[rowColOpts['colName']]
-    alignedAsigsKWargs.update({'windowSize': (-100e-3, 400e-3)})
+    alignedAsigsKWargs.update({'windowSize': (-50e-3, 350e-3)})
     currWindow = rasterOpts['windowSizes'][arguments['window']]
     fullWinSize = currWindow[1] - currWindow[0]
     redWinSize = (

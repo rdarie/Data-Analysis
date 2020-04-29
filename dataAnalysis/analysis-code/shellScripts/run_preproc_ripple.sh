@@ -33,7 +33,9 @@
 # EXP="exp202003091200"
 # EXP="exp202003131100"
 # EXP="exp202003201200"
-EXP="exp202003191400"
+# EXP="exp202003191400"
+# EXP="exp202004251400"
+EXP="exp202004271200"
 # EXP="exp202003181300"
 
 module load anaconda/3-5.2.0
@@ -42,6 +44,6 @@ conda activate
 source activate nda
 python --version
 
-# SLURM_ARRAY_TASK_ID=3
+# SLURM_ARRAY_TASK_ID=4
 python3 ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --ISI --transferISIStimLog
 # python3 ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --previewEncoder

@@ -6,6 +6,7 @@ Options:
     --blockIdx=blockIdx             which trial to analyze
     --exp=exp                       which experimental day to analyze
     --lazy                          load from raw, or regular? [default: False]
+    --trigRate=trigRate             inter trigger interval [default: 60]
     --plotting                      whether to show diagnostic plots (must have display) [default: False]
 """
 
@@ -50,6 +51,7 @@ oePath = os.path.join(
 oeReader, oeBlock = ns5.blockFromPath(
     oePath, lazy=arguments['lazy'])
 
+interTriggerInterval = float(arguments['trigRate']) ** (-1)
 segIdx = 0
 nspSeg = nspBlock.segments[segIdx]
 oeSeg = oeBlock.segments[segIdx]
@@ -68,15 +70,15 @@ oeLims = oeSrs.quantile([1e-6, 1-1e-6]).to_list()
 oeDiffUncertainty = oeSrs.diff().abs().quantile(1-1e-6) / 4
 oeThresh = (oeLims[-1] - oeLims[0]) / 2
 
-# oePeakIdx, oeCrossMask = hf.getThresholdCrossings(
-#     oeSrs, thresh=oeThresh,
-#     iti=60 ** (-1), fs=float(oeSyncAsig.sampling_rate),
-#     edgeType='falling', itiWiggle=0.1,
-#     absVal=False, plotting=arguments['plotting'], keep_max=False)
-oePeakIdx = hf.getTriggers(
-    oeSrs, iti=60 ** (-1), fs=float(oeSyncAsig.sampling_rate),
-    thres=1.5, edgeType='falling', plotting=arguments['plotting'])
-oeCrossMask = oeSrs.index.isin(oePeakIdx)
+oePeakIdx, oeCrossMask = hf.getThresholdCrossings(
+    oeSrs, thresh=oeThresh,
+    iti=interTriggerInterval, fs=float(oeSyncAsig.sampling_rate),
+    edgeType='both', itiWiggle=1,
+    absVal=False, plotting=arguments['plotting'], keep_max=False)
+# oePeakIdx = hf.getTriggers(
+#     oeSrs, iti=interTriggerInterval, fs=float(oeSyncAsig.sampling_rate),
+#     thres=1.5, edgeType='falling', plotting=arguments['plotting'])
+# oeCrossMask = oeSrs.index.isin(oePeakIdx)
 print('Found {} triggers'.format(oePeakIdx.size))
 #
 nspSyncAsig = nspSeg.filter(name='seg0_analog 1')[0]
@@ -89,18 +91,18 @@ nspSrs = pd.Series(nspSyncAsig.magnitude[nspTimeMask].flatten())
 nspLims = nspSrs.quantile([1e-3, 1-1e-3]).to_list()
 nspDiffUncertainty = nspSrs.diff().abs().quantile(1-1e-3) / 4
 nspThresh = (nspLims[-1] - nspLims[0]) / 2
-pdb.set_trace()
 print(
     'On trial {}, detecting NSP threshold crossings.'
     .format(blockIdx))
 nspPeakIdx, nspCrossMask = hf.getThresholdCrossings(
     nspSrs, thresh=nspThresh,
-    iti=60 ** (-1), fs=float(nspSyncAsig.sampling_rate),
-    edgeType='falling', itiWiggle=0.1,
+    iti=interTriggerInterval, fs=float(nspSyncAsig.sampling_rate),
+    edgeType='both', itiWiggle=.2,
     absVal=False, plotting=arguments['plotting'], keep_max=False)
 # nspPeakIdx = hf.getTriggers(
-#     nspSrs, iti=60 ** (-1), fs=float(oeSyncAsig.sampling_rate),
-#     thres=2.58, edgeType='falling')
+#     nspSrs, iti=interTriggerInterval, itiWiggle=1,
+#     fs=float(oeSyncAsig.sampling_rate), plotting=arguments['plotting'],
+#     thres=2.58, edgeType='both')
 # nspCrossMask = nspSrs.index.isin(nspPeakIdx)
 print('Found {} triggers'.format(nspPeakIdx.size))
 oeTimes = (
@@ -108,20 +110,38 @@ oeTimes = (
 nspTimes = (
     nspSyncAsig.times[nspTimeMask][nspCrossMask][synchInfo['nsp'][blockIdx]['chooseCrossings']])
 ###########
-
-listDiscontinuities = np.flatnonzero(np.abs(np.diff(oeTimes)) > 0.018)
+nMissingTriggers = nspTimes.size - oeTimes.size
+sampleWiggle = 5 * oeSyncAsig.sampling_rate.magnitude ** (-1)
+prelimOEMismatch = np.abs(np.diff(oeTimes) - interTriggerInterval * pq.s)
+prelimNSPMismatch = np.abs(np.diff(nspTimes) - interTriggerInterval * pq.s)
+if nMissingTriggers > 0:
+    listDiscontinuitiesNSP = np.flatnonzero(prelimNSPMismatch > sampleWiggle)
+    listDiscontinuitiesOE = np.flatnonzero(prelimOEMismatch > sampleWiggle)
+    # np.diff(oeTimes)[listDiscontinuitiesOE]
+    # np.diff(nspTimes)[listDiscontinuitiesNSP]
+    # nspTimes[listDiscontinuitiesNSP]
+    # oeTimes[listDiscontinuitiesOE]
+    listDiscontinuities = listDiscontinuitiesOE
+    nMissingTriggers = nspTimes.size - oeTimes.size
+    print('Found {} discontinuities!'.format(len(listDiscontinuities)))
+else:
+    # pdb.set_trace()
+    listDiscontinuities = np.flatnonzero(np.abs(prelimNSPMismatch - prelimOEMismatch) > sampleWiggle)
 if len(listDiscontinuities):
-    print('Found discontinuities! On Delsys clock:')
+    print(' On Delsys clock, discontinuities at:')
     for dIdx in listDiscontinuities:
         print(oeTimes[dIdx])
     oeDiscRound = np.zeros_like(oeTimes.magnitude)
     nspDiscRound = np.zeros_like(nspTimes.magnitude)
     for j, discIdx in enumerate(listDiscontinuities):
         oeDiscRound[discIdx+1:] += 1
-        nspDiscRound[discIdx+1+j] = 999  # use 999 as a discard marker
-        print('Skipping NSP pulse at t={:.3f}'.format(nspTimes[discIdx+1+j]))
-        nspDiscRound[discIdx+2+j:] += 1
-    
+        if nMissingTriggers > 0:
+            nspDiscRound[discIdx+1+j] = 999  # use 999 as a discard marker
+            nMissingTriggers -= 1
+            print('Skipping NSP pulse at t={:.3f}'.format(nspTimes[discIdx+1+j]))
+            nspDiscRound[discIdx+2+j:] += 1
+        else:
+            nspDiscRound[discIdx+1:] += 1
     if np.sum(nspDiscRound < 999) > np.sum(oeDiscRound < 999):
         # if there are more nsp triggers at the end, discard
         nspDiscRound[np.sum(oeDiscRound < 999):] = 999
@@ -190,8 +210,8 @@ else:
 
 # account for delay because of
 # analog filters on one or both recording devices (units of pq.s)
-# filterDelay = 2.3 * 1e-3  # Trigno analog input, filtered DC-100Hz
-filterDelay = 2.3 * 1e-4  # Trigno analog input, filtered DC-1000Hz
+filterDelay = 2.3 * 1e-3  # Trigno analog input, filtered DC-100Hz
+# filterDelay = 2.3 * 1e-4  # Trigno analog input, filtered DC-1000Hz
 # TODO: figure out why the block below doesn't work
 # for event in oeBlock.filter(objects=Event):
 #     event.magnitude[:] = (
@@ -202,7 +222,7 @@ filterDelay = 2.3 * 1e-4  # Trigno analog input, filtered DC-1000Hz
 # for st in oeBlock.filter(objects=SpikeTrain):
 #     st.times.magnitude[:] = (
 #         timeInterpFun(st.times.magnitude) + filterDelay)
-pdb.set_trace()
+
 oeDF = ns5.analogSignalsToDataFrame(
     oeBlock.filter(objects=AnalogSignal),
     idxT='oeT', useChanNames=True)

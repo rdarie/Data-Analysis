@@ -124,7 +124,7 @@ pdfPath = os.path.join(
         arguments['inputBlockName'], arguments['window'],
         arguments['resultName']))
 
-rippleMapDF = prb_meta.mapToDF(rippleMapFile)
+rippleMapDF = prb_meta.mapToDF(rippleMapFile[int(arguments['blockIdx'])])
 
 rippleMapDF.loc[
     rippleMapDF['label'].str.contains('caudal'),
