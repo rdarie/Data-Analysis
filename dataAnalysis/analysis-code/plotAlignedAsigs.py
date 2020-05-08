@@ -17,6 +17,7 @@ Options:
     --invertOutlierBlocks                  delete outlier trials? [default: False]
     --enableOverrides                      delete outlier trials? [default: False]
     --individualTraces                     mean+sem or individual traces? [default: False]
+    --overlayStats                         overlay ANOVA significance stars? [default: False]
     --rowName=rowName                      break down by row  [default: pedalDirection]
     --rowControl=rowControl                rows to exclude from stats test
     --hueName=hueName                      break down by hue  [default: amplitude]
@@ -111,7 +112,6 @@ pdfName = '{}_{}_{}_{}'.format(
 statsTestPath = os.path.join(figureStatsFolder, pdfName + '_stats.h5')
 #############################################
 #  Overrides
-alignedAsigsKWargs.update({'decimate': 10})
 alignedAsigsKWargs.update({'amplitudeColumn': arguments['hueName']})
 limitPages = None
 if arguments['individualTraces']:
@@ -123,18 +123,28 @@ if arguments['individualTraces']:
 if arguments['invertOutlierBlocks']:
     pdfName += '_outliers'
 if arguments['enableOverrides']:
-    relplotKWArgs['legend'] = 'brief'
+    relplotKWArgs.update({
+        'legend': 'brief',
+        'height': 4,
+        'aspect': 2,
+        'facet_kws': {
+            'sharey': False,
+            # 'legend_out': False,
+            'gridspec_kws': {
+                'wspace': 0.01,
+                'hspace': 0.01
+            }}
+    })
     if 'rowColOverrides' in locals():
         if rowColOpts['colName'] in rowColOverrides:
             rowColOpts['colOrder'] = rowColOverrides[rowColOpts['colName']]
-    alignedAsigsKWargs.update({'windowSize': (-50e-3, 350e-3)})
+    # alignedAsigsKWargs.update({'windowSize': (-25e-3, 125e-3)})
+    # alignedAsigsKWargs.update({'windowSize': (-2e-3, 23e-3)})
     currWindow = rasterOpts['windowSizes'][arguments['window']]
     fullWinSize = currWindow[1] - currWindow[0]
     redWinSize = (
         alignedAsigsKWargs['windowSize'][1] -
         alignedAsigsKWargs['windowSize'][0])
-    # relplotKWArgs['facet_kws'] = {'sharey': False}
-    relplotKWArgs['aspect'] = 2
     # relplotKWArgs['aspect'] = (
     #     relplotKWArgs['aspect'] * redWinSize / fullWinSize)
     statsTestOpts.update({
@@ -145,18 +155,21 @@ if arguments['enableOverrides']:
 #  End Overrides
 
 #  Get stats results
-if os.path.exists(statsTestPath):
-    sigValsWide = pd.read_hdf(statsTestPath, 'sig')
-    sigValsWide.columns.name = 'bin'
+if arguments['overlayStats']:
+    if os.path.exists(statsTestPath):
+        sigValsWide = pd.read_hdf(statsTestPath, 'sig')
+        sigValsWide.columns.name = 'bin'
+    else:
+        (
+            pValsWide, statValsWide,
+            sigValsWide) = ash.facetGridCompareMeans(
+            dataBlock, statsTestPath,
+            loadArgs=alignedAsigsKWargs,
+            rowColOpts=rowColOpts,
+            limitPages=limitPages,
+            statsTestOpts=statsTestOpts)
 else:
-    (
-        pValsWide, statValsWide,
-        sigValsWide) = ash.facetGridCompareMeans(
-        dataBlock, statsTestPath,
-        loadArgs=alignedAsigsKWargs,
-        rowColOpts=rowColOpts,
-        limitPages=limitPages,
-        statsTestOpts=statsTestOpts)
+    sigValsWide = None
 #
 # import warnings
 # warnings.filterwarnings("error")
@@ -168,13 +181,16 @@ asp.plotAsigsAligned(
     sigTestResults=sigValsWide,
     figureFolder=alignedFeaturesFolder,
     enablePlots=True,
-    minNObservations=10,
+    minNObservations=5,
     plotProcFuns=[
         asp.genTicksToScale(
             lineOpts={'lw': 2}, shared=False,
             # for evoked lfp report
-            xUnitFactor=1e3, yUnitFactor=1,
-            xUnits='msec', yUnits='uV'
+            # xUnitFactor=1e3, yUnitFactor=1,
+            # xUnits='msec', yUnits='uV',
+            # for evoked emg report
+            xUnitFactor=1e3, yUnitFactor=1e6,
+            xUnits='msec', yUnits='mV',
             ),
         asp.genYLabelChanger(
             lookupDict={}, removeMatch='#0'),
@@ -184,20 +200,20 @@ asp.plotAsigsAligned(
                 max(0e-3, alignedAsigsKWargs['windowSize'][0]),
                 min(300e-3, alignedAsigsKWargs['windowSize'][1])],
             asigPlotShadingOpts),
-        # asp.genVLineAdder(
-        #     np.arange(0, min(300e-3, alignedAsigsKWargs['windowSize'][1]), 10e-3),
-        #     vLineOpts),
+        asp.genStimVLineAdder(
+            'RateInHz', vLineOpts, tOnset=0, tOffset=.3, includeRight=False),
         asp.genLegendRounder(decimals=2),
         ],
     pdfName=pdfName,
     **rowColOpts,
     relplotKWArgs=relplotKWArgs, sigStarOpts=asigSigStarOpts)
-asp.plotSignificance(
-    sigValsWide,
-    pdfName=pdfName + '_pCount',
-    figureFolder=alignedFeaturesFolder,
-    **rowColOpts,
-    **statsTestOpts)
+if arguments['overlayStats']:
+    asp.plotSignificance(
+        sigValsWide,
+        pdfName=pdfName + '_pCount',
+        figureFolder=alignedFeaturesFolder,
+        **rowColOpts,
+        **statsTestOpts)
 #
 if arguments['lazy']:
     dataReader.file.close()

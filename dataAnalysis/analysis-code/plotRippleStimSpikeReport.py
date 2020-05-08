@@ -13,16 +13,16 @@ Options:
     --alignFolderName=alignFolderName      append a name to the resulting blocks? [default: motion]
     --analysisName=analysisName            append a name to the resulting blocks? [default: default]
     --inputBlockName=inputBlockName        which trig_ block to pull
-    --unitQuery=unitQuery                  how to restrict channels if not supplying a list? [default: isichoremg]
+    --unitQuery=unitQuery                  how to restrict channels if not supplying a list? [default: isispinaloremg]
     --maskOutlierBlocks                    delete outlier trials? [default: False]
     --invertOutlierBlocks                  delete outlier trials? [default: False]
     --individualTraces                     mean+sem or individual traces? [default: False]
     --alignQuery=alignQuery                what will the plot be aligned to? [default: all]
     --hueName=hueName                      break down by hue  [default: nominalCurrent]
     --hueControl=hueControl                hues to exclude from stats test
-    --sizeName=sizeName                    break down by style [default: RateInHz]
-    --sizeControl=sizeControl              styles to exclude from stats test
-    --styleName=styleName                  break down by style [default: RateInHz]
+    --sizeName=sizeName                    break down by size
+    --sizeControl=sizeControl              sizes to exclude from stats test
+    --styleName=styleName                  break down by style
     --styleControl=styleControl            styles to exclude from stats test
     --groupPagesBy=groupPagesBy            break down each page
 """
@@ -75,6 +75,11 @@ analysisSubFolder = os.path.join(
     )
 if not os.path.exists(analysisSubFolder):
     os.makedirs(analysisSubFolder, exist_ok=True)
+
+if arguments['groupPagesBy'] is not None:
+    groupPagesBy = arguments['groupPagesBy'].split(', ')
+else:
+    groupPagesBy = None
 if arguments['inputBlockName'] is not None:
     # plotting aligned features
     alignSubFolder = os.path.join(analysisSubFolder, arguments['alignFolderName'])
@@ -95,6 +100,8 @@ if arguments['inputBlockName'] is not None:
         figureFolder, arguments['analysisName'], 'alignedFeatures')
     if not os.path.exists(figureOutputFolder):
         os.makedirs(figureOutputFolder, exist_ok=True)
+    alignedAsigsKWargs['outlierTrials'] = ash.processOutlierTrials(
+        alignSubFolder, prefix, **arguments)
 else:
     # plotting aligned spike waveforms
     if arguments['processAll']:
@@ -103,10 +110,7 @@ else:
     else:
         dataPath = analysisDataPath
         reportName = ns5FileName + '_isi_spike_report' + nameSuffix
-    figureOutputFolder = os.path.join(
-        figureFolder, arguments['analysisName'])
-    if not os.path.exists(figureOutputFolder):
-        os.makedirs(figureOutputFolder, exist_ok=True)
+    figureOutputFolder = figureFolder
 dataPath = dataPath.format(arguments['analysisName'])
 pdfName = os.path.join(figureOutputFolder, reportName + '.pdf')
 #
@@ -115,17 +119,27 @@ alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(
 alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = (
     ash.processUnitQueryArgs(
         namedQueries, analysisSubFolder, **arguments))
-alignedAsigsKWargs['outlierTrials'] = ash.processOutlierTrials(
-    alignSubFolder, prefix, **arguments)
 alignedAsigsKWargs.update(dict(
     duplicateControlsByProgram=False,
     makeControlProgram=False,
     metaDataToCategories=False,
-    removeFuzzyName=False, decimate=5,
+    removeFuzzyName=False,
     getMetaData=[
-        'RateInHz', 'bin', 'electrode', 'nominalCurrent',
+        'RateInHz', 'feature', 'electrode', 'nominalCurrent',
         'stimCat', 'originalIndex', 'segment', 't'],
-    transposeToColumns='feature', concatOn='columns',))
+    transposeToColumns='bin', concatOn='index'))
+
+#############################
+# for stim spike report
+# alignedAsigsKWargs.update(dict(
+#     windowSize=(6e-5, 1.2e-3)))
+# for evoked lfp report
+# alignedAsigsKWargs.update(dict(
+#     windowSize=(-2e-3, 23e-3)))
+# alignedAsigsKWargs.update(dict(
+#     windowSize=(-25e-3, 125e-3)))
+alignedAsigsKWargs.update({'amplitudeColumn': arguments['hueName']})
+
 rippleMapDF = prb_meta.mapToDF(rippleMapFile[int(arguments['blockIdx'])])
 rippleMapDF.loc[
     rippleMapDF['label'].str.contains('caudal'),
@@ -140,16 +154,6 @@ else:
     mapsDict = {
         'ripple': rippleMapDF}
 
-#############################
-# for stim spike report
-# alignedAsigsKWargs.update(dict(
-#     windowSize=(6e-5, 1.2e-3)))
-# for evoked lfp report
-# alignedAsigsKWargs.update(dict(
-#     windowSize=(-350e-3, 350e-3)))
-alignedAsigsKWargs.update(dict(
-    windowSize=(-25e-3, 125e-3)))
-alignedAsigsKWargs.update(dict(decimate=1))
 flipInfo = {
     'ripple': {'lr': True, 'ud': True},
     'delsys': {'lr': False, 'ud': False}
@@ -209,21 +213,19 @@ plotProcFuns = [
             max(0e-3, alignedAsigsKWargs['windowSize'][0]),
             min(300e-3, alignedAsigsKWargs['windowSize'][1])],
         asigPlotShadingOpts),
-    # asp.genVLineAdder(
-    #     np.arange(0, min(300e-3, alignedAsigsKWargs['windowSize'][1]), 10e-3),
-    #     # [0],
-    #     vLineOpts)
+    asp.genStimVLineAdder(
+        'RateInHz', vLineOpts, tOnset=0, tOffset=.3, includeRight=False)
         ]
 mapSpecificPlotProcFuns = {
     'ripple': [
         asp.genTicksToScale(
             lineOpts={'lw': 2}, shared=False,
             # for evoked lfp report
-            xUnitFactor=1e3, yUnitFactor=1,
-            xUnits='msec', yUnits='uV',
+            # xUnitFactor=1e3, yUnitFactor=1,
+            # xUnits='msec', yUnits='uV',
             # for stim spike
-            # xUnitFactor=1e3, yUnitFactor=1e-6,
-            # xUnits='msec', yUnits='V',
+            xUnitFactor=1e3, yUnitFactor=1e-6,
+            xUnits='msec', yUnits='V',
             )
         ],
     'delsys': [
@@ -241,8 +243,9 @@ extraSpaces = {
     'delsys': [
         (2, 2), (4, 2), (6, 2), (8, 2), (11, 2)
         ]}
-# pdb.set_trace()
+#
 limitPages = None
+minNObservations = 5
 if arguments['individualTraces']:
     relplotKWArgs['alpha'] = 0.3
     relplotKWArgs['estimator'] = None
@@ -259,70 +262,97 @@ asigWide = preproc.alignedAsigsToDF(
     dataBlock, **alignedAsigsKWargs)
 prf.print_memory_usage('loaded asig wide')
 #
-pdb.set_trace()
-asigStack = (
-    asigWide
-    .stack(level=['feature', 'lag'])
-    .reset_index(name='signal')
-    .dropna())
-prf.print_memory_usage('created asig stack')
-del asigWide
-prf.print_memory_usage('deleted asig wide')
-asigStack['parentChanName'] = (
-    asigStack['feature']
+
+# asigStack = (
+#     asigWide
+#     .stack(level=['feature', 'lag'])
+#     .reset_index(name='signal')
+#     .dropna())
+trialInfo = asigWide.index.to_frame().reset_index(drop=True)
+#
+if minNObservations is not None:
+    nObsCountedFeatures = ['feature']
+    for extraName in groupPagesBy + [arguments['hueName'], arguments['sizeName'], arguments['styleName']]:
+        if extraName is not None:
+            if extraName not in nObsCountedFeatures:
+                nObsCountedFeatures.append(extraName)
+    nObs = trialInfo.groupby(nObsCountedFeatures).count().iloc[:, 0].to_frame(name='obsCount')
+    nObs['keepMask'] = nObs['obsCount'] > minNObservations
+    #
+    def lookupKeep(x):
+        keepVal = nObs.loc[tuple(x.loc[nObsCountedFeatures]), 'keepMask']
+        # print(keepVal)
+        return(keepVal)
+    #
+    keepMask = trialInfo.apply(lookupKeep, axis=1).to_numpy()
+    asigWide = asigWide.loc[keepMask, :]
+    trialInfo = asigWide.index.to_frame().reset_index(drop=True)
+
+trialInfo['parentChanName'] = (
+    trialInfo['feature']
     .apply(lambda x: x.replace('_stim#0', '').replace('#0', '')))
 dummyDict = {}
 
 for probeName, mapDF in mapsDict.items():
-    probeMask = asigStack['parentChanName'].isin(mapDF['label'])
+    probeMask = trialInfo['parentChanName'].isin(mapDF['label'])
     for cName in ['xcoords', 'ycoords']:
         mapSer = pd.Series(
             mapDF[cName].to_numpy(),
             index=mapDF['label'])
-        asigStack.loc[probeMask, cName] = (
-            asigStack
+        trialInfo.loc[probeMask, cName] = (
+            trialInfo
             .loc[probeMask, 'parentChanName']
             .map(mapSer))
-    asigStack.loc[probeMask, 'mapGroup'] = probeName
+    trialInfo.loc[probeMask, 'mapGroup'] = probeName
     dummyList = []
     if addSpacesFromMap:
         for name, group in mapDF.groupby(['xcoords', 'ycoords']):
-            dummySer = pd.Series(np.nan, index=asigStack.columns)
+            dummySer = pd.Series(np.nan, index=trialInfo.columns)
             dummySer['xcoords'] = name[0]
             dummySer['ycoords'] = name[1]
             dummySer['mapGroup'] = probeName
             dummyList.append(dummySer)
     if extraSpaces[probeName] is not None:
         for name in extraSpaces[probeName]:
-            dummySer = pd.Series(np.nan, index=asigStack.columns)
+            dummySer = pd.Series(np.nan, index=trialInfo.columns)
             dummySer['xcoords'] = name[0]
             dummySer['ycoords'] = name[1]
             dummySer['mapGroup'] = probeName
             dummyList.append(dummySer)
     if len(dummyList):
-        dummyDict[probeName] = (
+        dummyDF = (
             pd.concat(dummyList, axis='columns', ignore_index=True)
             .transpose())
+        dummyDF['bin'] = np.nan
+        dummyDF['signal'] = np.nan
+        # dummySeries = pd.Series(np.nan, index=pd.MultiIndex.from_frame(dummyDF))
+        dummyDict[probeName] = dummyDF
 
-if arguments['groupPagesBy'] is None:
-    pageGrouper = [('all', asigStack)]
+asigWide.index = pd.MultiIndex.from_frame(trialInfo)
+if groupPagesBy is None:
+    pageGrouper = [('all', asigWide)]
 else:
-    pageGrouper = asigStack.groupby(arguments['groupPagesBy'])
+    pageGrouper = asigWide.groupby(groupPagesBy)
 #
+pageCount = 0
 with PdfPages(pdfName) as pdf:
     for pageIdx, (pageName, pageGroup) in enumerate(tqdm(pageGrouper)):
+        #
         if limitPages is not None:
-            if pageIdx >= limitPages:
+            if pageCount < limitPages:
                 break
         for probeName, probeGroup in pageGroup.groupby('mapGroup'):
             if pd.isnull(probeName):
                 continue
+            thisAsigStack = (
+                probeGroup.stack()
+                .reset_index(name='signal')
+                .dropna())
             if probeName in dummyDict:
                 thisAsigStack = pd.concat(
-                    [probeGroup, dummyDict[probeName]],
-                    ignore_index=True)
-            else:
-                thisAsigStack = probeGroup
+                    [thisAsigStack, dummyDict[probeName]],
+                    ignore_index=True
+                    )
             if flipInfo[probeName]['ud']:
                 thisAsigStack['xcoords'] *= -1
             if flipInfo[probeName]['lr']:
@@ -345,7 +375,7 @@ with PdfPages(pdfName) as pdf:
                     updateHeight = np.sum(absHeights)
                     relplotKWArgs['facet_kws']['gridspec_kws']['hspace'] = (
                         relplotKWArgs['height'] * 0.1 / np.mean(absHeights))
-            # pdb.set_trace()
+            #
             g = sns.relplot(
                 data=thisAsigStack,
                 x='bin', y='signal', hue=arguments['hueName'],
@@ -385,4 +415,5 @@ with PdfPages(pdfName) as pdf:
             pdf.savefig(bbox_inches='tight', pad_inches=0, **saveLegendOpts)
             # plt.show()
             plt.close()
-# pdb.set_trace()
+            pageCount += 1
+#

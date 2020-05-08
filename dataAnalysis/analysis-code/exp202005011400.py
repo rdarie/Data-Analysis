@@ -5,27 +5,45 @@ def getExpOpts():
         2: False,
         3: False,
         4: False,
+        5: False,
+        6: False,
         }
     RCBlockLookup = {
         1: True,
         2: True,
         3: True,
         4: True,
+        5: True,
+        6: True,
         }
     RippleBlockLookup = {
         1: True,
         2: True,
         3: True,
         4: True,
+        5: True,
+        6: True,
         }
     
-    experimentName = '202004271200-Peep'
+    experimentName = '202005011400-Peep'
     deviceName = None
     rippleMapFile = {
+        1: 'isi_nano1caudal_xAzByC_ortho_nano2rostral_xAyBzC_ortho.map',
+        2: 'isi_nano1caudal_xAzByC_ortho_nano2rostral_xAyBzC_ortho.map',
+        3: 'isi_nano1caudal_xAzByC_ortho_nano2rostral_xAyBzC_ortho.map',
+        4: 'isi_nano1caudal_xAzByC_ortho_nano2rostral_xAyBzC_ortho.map',
+        5: 'isi_nano1caudal_xAyBzC_ortho_nano2rostral_xAyBzC_ortho.map',
+        6: 'isi_nano1caudal_xAyBzC_ortho_nano2rostral_xAyBzC_ortho.map',
+        }
+    # use "original" file in edge cases where the ns5 file was saved incorrectly
+    # with the wrong map
+    rippleOriginalMapFile = {
         1: 'isi_nano1caudal_xAyBzC_ortho_nano2rostral_xAyBzC_ortho.map',
         2: 'isi_nano1caudal_xAyBzC_ortho_nano2rostral_xAyBzC_ortho.map',
         3: 'isi_nano1caudal_xAyBzC_ortho_nano2rostral_xAyBzC_ortho.map',
-        4: 'isi_nano1rostral_xAyBzC_ortho_nano2caudal_xAyBzC_ortho.map',
+        4: 'isi_nano1caudal_xAyBzC_ortho_nano2rostral_xAyBzC_ortho.map',
+        5: None,
+        6: None,
         }
     # exclude dummy electrodes 8 and 16
     asigNameList = [
@@ -43,39 +61,56 @@ def getExpOpts():
         2: [],
         3: [],
         4: [],
+        5: [],
+        6: [],
         }
 
     synchInfo = {'delsys': {}, 'nsp': {}, 'ins': {}}
-    synchInfo['delsys'][1] = {'timeRanges': [320, 1278], 'chooseCrossings': slice(None)}
-    synchInfo['delsys'][2] = {'timeRanges': [300, 754], 'chooseCrossings': slice(None)}
-    synchInfo['delsys'][3] = {'timeRanges': [14, 713], 'chooseCrossings': slice(None)}
-    synchInfo['delsys'][4] = {'timeRanges': [7, 3154], 'chooseCrossings': slice(None)}
+    synchInfo['delsys'][1] = {'timeRanges': [303.6, 1589], 'chooseCrossings': slice(None)}  #########
+    synchInfo['delsys'][2] = {'timeRanges': [15, 1373.5], 'chooseCrossings': slice(None)}
+    synchInfo['delsys'][3] = {'timeRanges': [30, 1722], 'chooseCrossings': slice(None)}
+    synchInfo['delsys'][4] = {'timeRanges': [8, 580.3], 'chooseCrossings': slice(None)}
+    synchInfo['delsys'][5] = {'timeRanges': [236, 1676], 'chooseCrossings': slice(None)}
+    synchInfo['delsys'][6] = {'timeRanges': [7, 1693], 'chooseCrossings': slice(None)}
     #
-    synchInfo['nsp'][1] = {'timeRanges': [9, 967], 'chooseCrossings': slice(None)}
-    synchInfo['nsp'][2] = {'timeRanges': [186, 640], 'chooseCrossings': slice(None)}
-    synchInfo['nsp'][3] = {'timeRanges': [3, 704], 'chooseCrossings': slice(None)}
-    synchInfo['nsp'][4] = {'timeRanges': [34, 3181.5], 'chooseCrossings': slice(None)}
+    synchInfo['nsp'][1] = {'timeRanges': [176.6, 1525.2], 'chooseCrossings': slice(None, 2570)}
+    synchInfo['nsp'][2] = {'timeRanges': [3, 1361.1], 'chooseCrossings': slice(None)}
+    synchInfo['nsp'][3] = {'timeRanges': [3, 1695], 'chooseCrossings': slice(None)}
+    synchInfo['nsp'][4] = {'timeRanges': [7, 579.9], 'chooseCrossings': slice(None)}
+    synchInfo['nsp'][5] = {'timeRanges': [240, 1680], 'chooseCrossings': slice(None)}
+    synchInfo['nsp'][6] = {'timeRanges': [6, 1692], 'chooseCrossings': slice(None)}
     
     # For emg analysis - emg missing for some time ranges
     alignTimeBoundsLookup = {
         1: [
-            [1, 972]
+            [175, 1461.8]
             ],
         2: [
-            [180, 644]
+            [3, 1361.1]
             ],
         3: [
-            [3, 703]
+            [3, 1695]
             ],
         4: [
-            [34, 3181.5]
+            [7, 579.9]
+            ],
+        5: [
+            [240, 1680]
+            ],
+        6: [
+            [6, 1692]
             ],
         }
     #  if not possible to use taps, override with good taps from another segment
     #  not ideal, because segments are only synchronized to the nearest **second**
     overrideSegmentsForTapSync = {
-        #  each key is a trial
+        #  each key is a block
         1: {},
+        2: {},
+        3: {},
+        4: {},
+        5: {},
+        6: {},
         }
     # options for stim artifact detection
     detectStim = False
@@ -95,7 +130,7 @@ def getExpOpts():
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
         # For emg analysis - emg missing from block 2
-        '202004271200-Peep': [1, 2, 3, 4],
+        '202005011400-Peep': [1, 2, 3, 4, 5, 6],
         }
 
     movementSizeBins = [0, 0.25, 0.5, 1, 1.25, 1.5]
@@ -119,18 +154,18 @@ def getExpOpts():
             # 'LPeroneusLongusEmg#0',
             # 'LBicepsFemorisEmg#0',
             # 'LGastrocnemiusEmg#0',
-            'RThoracolumbarFasciaEmg#0',
-            'RGracilisEmg#0',
-            'RTensorFasciaeLataeEmg#0',
-            'RPeroneusLongusEmg#0',
-            'RBicepsFemorisEmg#0',
-            'RGastrocnemiusEmg#0'
-            # 'RThoracolumbarFasciaEmgEnv#0',
-            # 'RGracilisEmgEnv#0',
-            # 'RTensorFasciaeLataeEmgEnv#0',
-            # 'RPeroneusLongusEmgEnv#0',
-            # 'RBicepsFemorisEmgEnv#0',
-            # 'RGastrocnemiusEmgEnv#0'
+            # 'RThoracolumbarFasciaEmg#0',
+            # 'RGracilisEmg#0',
+            # 'RTensorFasciaeLataeEmg#0',
+            # 'RPeroneusLongusEmg#0',
+            # 'RBicepsFemorisEmg#0',
+            # 'RGastrocnemiusEmg#0'
+            'RThoracolumbarFasciaEmgEnv#0',
+            'RGracilisEmgEnv#0',
+            'RTensorFasciaeLataeEmgEnv#0',
+            'RPeroneusLongusEmgEnv#0',
+            'RBicepsFemorisEmgEnv#0',
+            'RGastrocnemiusEmgEnv#0'
         ]
     # based on vanderhorst and hostege distanges along lumbar enlargement
     delsysMapDict = ({

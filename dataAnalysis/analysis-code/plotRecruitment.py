@@ -14,6 +14,8 @@ Options:
     --inputBlockName=inputBlockName        which trig_ block to pull [default: pca]
     --unitQuery=unitQuery                  how to restrict channels if not supplying a list? [default: pca]
     --alignQuery=alignQuery                what will the plot be aligned to? [default: outboundWithStim]
+    --maskOutlierBlocks                    delete outlier trials? [default: False]
+    --invertOutlierMask                    delete outlier trials? [default: False]
 """
 import matplotlib
 matplotlib.rcParams['pdf.fonttype'] = 42
@@ -63,12 +65,49 @@ resultPath = os.path.join(
     prefix + '_{}_{}_calc.h5'.format(
         arguments['inputBlockName'], arguments['window']))
 print('loading {}'.format(resultPath))
+outlierTrials = ash.processOutlierTrials(
+    alignSubFolder, prefix, **arguments)
 #  Overrides
 limitPages = None
 amplitudeFieldName = 'nominalCurrent'
 # amplitudeFieldName = 'amplitudeCat'
 #  End Overrides
 recCurve = pd.read_hdf(resultPath, 'meanRAUC')
+if outlierTrials is not None:
+    def rejectionLookup(entry):
+        key = []
+        for subKey in outlierTrials.index.names:
+            keyIdx = recCurve.index.names.index(subKey)
+            key.append(entry[keyIdx])
+        # print(key)
+        return outlierTrials.loc[tuple(key), :][0]
+    #
+    outlierMask = np.asarray(
+        recCurve.index.map(rejectionLookup),
+        dtype=np.bool)
+    if arguments['invertOutlierMask']:
+        outlierMask = ~outlierMask
+    recCurve = recCurve.loc[~outlierMask, :]
+minNObservations = 5
+trialInfo = recCurve.index.to_frame().reset_index(drop=True)
+if minNObservations is not None:
+    nObsCountedFeatures = ['feature']
+    for extraName in ['electrode', amplitudeFieldName, 'RateInHz']:
+        if extraName is not None:
+            if extraName not in nObsCountedFeatures:
+                nObsCountedFeatures.append(extraName)
+    nObs = trialInfo.groupby(nObsCountedFeatures).count().iloc[:, 0].to_frame(name='obsCount')
+    nObs['keepMask'] = nObs['obsCount'] > minNObservations
+    #
+    def lookupKeep(x):
+        keepVal = nObs.loc[tuple(x.loc[nObsCountedFeatures]), 'keepMask']
+        # print(keepVal)
+        return(keepVal)
+    #
+    keepMask = trialInfo.apply(lookupKeep, axis=1).to_numpy()
+    recCurve = recCurve.loc[keepMask, :]
+    trialInfo = recCurve.index.to_frame().reset_index(drop=True)
+
 plotRC = recCurve.reset_index()
 
 figureStatsFolder = os.path.join(
@@ -78,12 +117,12 @@ alignedPdfName = '{}_{}_{}_{}'.format(
     prefix, arguments['inputBlockName'],
     arguments['window'],
     arguments['alignQuery'])
-statsTestPath = os.path.join(figureStatsFolder, 'backup', alignedPdfName + '_stats.h5')
+statsTestPath = os.path.join(figureStatsFolder, alignedPdfName + '_stats.h5')
 if os.path.exists(statsTestPath):
     sigValsWide = pd.read_hdf(statsTestPath, 'sig')
     sigValsWide.columns.name = 'bin'
 
-pdb.set_trace()
+'''
 def masterPlot(
         emgRC, targetFeature, plotElectrode,
         plotFeature, keepElectrodeList):
@@ -265,18 +304,20 @@ g = sns.relplot(
 # for (ro, co, hu), dataSubset in g.facet_data():
 #     break
 plt.savefig(pdfPath)
+'''
 emgRC = plotRC.loc[plotRC['feature'].str.contains('EmgEnv'), :].copy()
 emgRC['normalizedRAUC'] = np.nan
 emgRC['standardizedRAUC'] = np.nan
 emgRC['featureName'] = np.nan
 emgRC['EMGSide'] = np.nan
 emgRC['EMGSite'] = np.nan
-emgRC[amplitudeFieldName] *= -1
+# emgRC[amplitudeFieldName] *= (-1)
+emgRC[amplitudeFieldName] = emgRC[amplitudeFieldName].abs()
 sideLookup = {'R': 'Right', 'L': 'Left'}
 nSig = {}
 for name, group in emgRC.groupby('feature'):
     emgRC.loc[group.index, 'standardizedRAUC'] = (
-        RobustScaler(quantile_range=(1, 99.))
+        RobustScaler(quantile_range=(10, 90.))
         .fit_transform(
             group['rauc'].to_numpy().reshape(-1, 1)))
     outlierMask = emgRC.loc[group.index, 'standardizedRAUC'].abs() > 6
@@ -295,6 +336,10 @@ for name, group in emgRC.groupby('feature'):
 #
 emgRC.loc[:, 'EMG Location'] = (
     emgRC['EMGSide'] + ' ' + emgRC['EMGSite'])
+for name, group in emgRC.groupby('electrode'):
+    emgRC.loc[group.index, 'normalizedAmplitude'] = pd.cut(
+        group[amplitudeFieldName], bins=10, labels=False)
+keepElectrodeList = None
 
 # keepElectrodeList = meanSelectivity.max(axis=1).index[meanSelectivity.max(axis=1) > 0.3]
 # keepElectrodeList = meanSelectivity.index.to_list()
@@ -305,9 +350,9 @@ emgRC.loc[:, 'EMG Location'] = (
 # plotFeature = 'RPeroneusLongus'
 # plotFeature = 'PeroneusLongus'
 # plotFeature = 'Right'
-masterPlot(
-    emgRC, targetFeature, plotElectrode,
-    plotFeature, keepElectrodeList)
+# masterPlot(
+#     emgRC, targetFeature, plotElectrode,
+#     plotFeature, keepElectrodeList)
 significantOnly = True
 if significantOnly:
     emgRC = emgRC.query("(kruskalP < 1e-3)")
@@ -318,18 +363,29 @@ pdfPath = os.path.join(
     prefix + '_{}_{}_{}.pdf'.format(
         arguments['inputBlockName'], arguments['window'],
         'meanRAUC'))
-keepDataMask = emgRC['electrode'].isin(keepElectrodeList)
-plotEmgRC = emgRC.loc[keepDataMask, :]
+if keepElectrodeList is not None:
+    keepDataMask = emgRC['electrode'].isin(keepElectrodeList)
+    plotEmgRC = emgRC.loc[keepDataMask, :]
+else:
+    plotEmgRC = emgRC
+
 g = sns.relplot(
-    col='electrode', col_wrap=5, col_order=np.unique(plotEmgRC['electrode']),
-    x=amplitudeFieldName, y='normalizedRAUC',
+    col='electrode',
+    # col_order=np.unique(plotEmgRC['electrode']),
+    # col_wrap=5,
+    row='RateInHz',
+    x='normalizedAmplitude',
+    # x=amplitudeFieldName,
+    y='normalizedRAUC',
     style='EMGSide', style_order=['Right', 'Left'],
     hue='EMGSite', hue_order=np.unique(plotEmgRC['EMGSite']),
     kind='line', data=plotEmgRC,
     palette=emgPalette,
     height=5, aspect=1.5, ci='sem', estimator='mean',
+    facet_kws=dict(sharey=False)
     )
 # for (ro, co, hu), dataSubset in g.facet_data():
 #     break
 plt.savefig(pdfPath)
-plt.show()
+plt.close()
+# pdb.set_trace()

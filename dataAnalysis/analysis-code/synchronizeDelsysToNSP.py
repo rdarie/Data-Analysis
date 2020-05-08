@@ -70,17 +70,6 @@ oeLims = oeSrs.quantile([1e-6, 1-1e-6]).to_list()
 oeDiffUncertainty = oeSrs.diff().abs().quantile(1-1e-6) / 4
 oeThresh = (oeLims[-1] - oeLims[0]) / 2
 
-oePeakIdx, oeCrossMask = hf.getThresholdCrossings(
-    oeSrs, thresh=oeThresh,
-    iti=interTriggerInterval, fs=float(oeSyncAsig.sampling_rate),
-    edgeType='both', itiWiggle=1,
-    absVal=False, plotting=arguments['plotting'], keep_max=False)
-# oePeakIdx = hf.getTriggers(
-#     oeSrs, iti=interTriggerInterval, fs=float(oeSyncAsig.sampling_rate),
-#     thres=1.5, edgeType='falling', plotting=arguments['plotting'])
-# oeCrossMask = oeSrs.index.isin(oePeakIdx)
-print('Found {} triggers'.format(oePeakIdx.size))
-#
 nspSyncAsig = nspSeg.filter(name='seg0_analog 1')[0]
 tStart, tStop = synchInfo['nsp'][blockIdx]['timeRanges']
 
@@ -91,13 +80,25 @@ nspSrs = pd.Series(nspSyncAsig.magnitude[nspTimeMask].flatten())
 nspLims = nspSrs.quantile([1e-3, 1-1e-3]).to_list()
 nspDiffUncertainty = nspSrs.diff().abs().quantile(1-1e-3) / 4
 nspThresh = (nspLims[-1] - nspLims[0]) / 2
+
+oePeakIdx, oeCrossMask = hf.getThresholdCrossings(
+    oeSrs, thresh=oeThresh,
+    iti=interTriggerInterval, fs=float(oeSyncAsig.sampling_rate),
+    edgeType='both', itiWiggle=.1,
+    absVal=False, plotting=arguments['plotting'], keep_max=False)
+# oePeakIdx = hf.getTriggers(
+#     oeSrs, iti=interTriggerInterval, fs=float(oeSyncAsig.sampling_rate),
+#     thres=1.5, edgeType='falling', plotting=arguments['plotting'])
+# oeCrossMask = oeSrs.index.isin(oePeakIdx)
+print('Found {} triggers'.format(oePeakIdx.size))
+#
 print(
     'On trial {}, detecting NSP threshold crossings.'
     .format(blockIdx))
 nspPeakIdx, nspCrossMask = hf.getThresholdCrossings(
     nspSrs, thresh=nspThresh,
     iti=interTriggerInterval, fs=float(nspSyncAsig.sampling_rate),
-    edgeType='both', itiWiggle=.2,
+    edgeType='both', itiWiggle=.1,
     absVal=False, plotting=arguments['plotting'], keep_max=False)
 # nspPeakIdx = hf.getTriggers(
 #     nspSrs, iti=interTriggerInterval, itiWiggle=1,
@@ -114,13 +115,16 @@ nMissingTriggers = nspTimes.size - oeTimes.size
 sampleWiggle = 5 * oeSyncAsig.sampling_rate.magnitude ** (-1)
 prelimOEMismatch = np.abs(np.diff(oeTimes) - interTriggerInterval * pq.s)
 prelimNSPMismatch = np.abs(np.diff(nspTimes) - interTriggerInterval * pq.s)
+listDiscontinuitiesNSP = np.flatnonzero(prelimNSPMismatch > sampleWiggle)
+listDiscontinuitiesOE = np.flatnonzero(prelimOEMismatch > sampleWiggle)
+pdb.set_trace()
 if nMissingTriggers > 0:
-    listDiscontinuitiesNSP = np.flatnonzero(prelimNSPMismatch > sampleWiggle)
-    listDiscontinuitiesOE = np.flatnonzero(prelimOEMismatch > sampleWiggle)
     # np.diff(oeTimes)[listDiscontinuitiesOE]
     # np.diff(nspTimes)[listDiscontinuitiesNSP]
     # nspTimes[listDiscontinuitiesNSP]
     # oeTimes[listDiscontinuitiesOE]
+    # nspTimes[listDiscontinuitiesNSP] - nspTimes[0]
+    # oeTimes[listDiscontinuitiesOE] - oeTimes[0]
     listDiscontinuities = listDiscontinuitiesOE
     nMissingTriggers = nspTimes.size - oeTimes.size
     print('Found {} discontinuities!'.format(len(listDiscontinuities)))

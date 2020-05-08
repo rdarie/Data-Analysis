@@ -25,6 +25,8 @@
 # EXP="exp202003191400"
 # EXP="exp202004251400"
 EXP="exp202004271200"
+# EXP="exp202004301200"
+# EXP="exp202005011400"
 # EXP="exp202003181300"
 
 LAZINESS="--lazy"
@@ -35,5 +37,5 @@ conda activate
 source activate nda
 python --version
 
-SLURM_ARRAY_TASK_ID=4
-python3 -u './synchronizeDelsysToNSP.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --trigRate=1
+SLURM_ARRAY_TASK_ID=2
+python3 -u './synchronizeDelsysToNSP.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --trigRate=1 --plotting

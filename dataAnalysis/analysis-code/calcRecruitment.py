@@ -80,7 +80,7 @@ print('loading {}'.format(triggeredPath))
 dataReader, dataBlock = ns5.blockFromPath(
     triggeredPath, lazy=arguments['lazy'])
 #  Overrides
-alignedAsigsKWargs.update(dict(windowSize=(5e-3, 25e-3)))
+alignedAsigsKWargs.update(dict(windowSize=(5e-3, 300e-3)))
 limitPages = None
 resultName = 'meanRAUC'
 funKWargs = dict(

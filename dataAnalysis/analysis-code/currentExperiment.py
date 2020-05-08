@@ -330,6 +330,9 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
         programColumn='program',
         electrodeColumn='electrode',
         removeFuzzyName=False)
+    alignedAsigsKWargs.update(dict(
+        windowSize=(-100e-3, 400e-3),
+        decimate=2))
     # if (miniRCBlock or RCBlock):
     #     alignedAsigsKWargs.update(dict(
     #         amplitudeColumn='amplitude',
@@ -342,7 +345,6 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
     #         programColumn='programFuzzy',
     #         electrodeColumn='electrodeFuzzy',
     #         removeFuzzyName=True))
-    #
     overrideChanNames = None
     # overrideChanNames = [
     #     'elec75#0', 'elec75#1', 'elec83#0', 'elec78#0', 'elec78#1']
@@ -351,12 +353,12 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
     #     'elec75#0', 'elec75#1', 'elec83#0', 'elec78#0', 'elec78#1']
     alignedAsigsChunkSize = 150000
     rasterOpts = {
-        # 'binInterval': .5e-3, 'binWidth': 10e-3, 'smoothKernelWidth': 10e-3,
+        'binInterval': 2e-4, 'binWidth': 10e-3, 'smoothKernelWidth': 10e-3,  # 5 kHz, EMG Lo-Res
         # 'binInterval': 1e-3, 'binWidth': 10e-3, 'smoothKernelWidth': 10e-3,
         # 'binInterval': 1e-3, 'binWidth': 30e-3, 'smoothKernelWidth': 50e-3,
         # 'binInterval': 0.2e-3, 'binWidth': 5e-3, 'smoothKernelWidth': 10e-3,
-        'binInterval': 30e3 ** (-1), 'binWidth': 5e-3, 'smoothKernelWidth': 10e-3,
-        # 'binInterval': 10e3 ** (-1), 'binWidth': 5e-3, 'smoothKernelWidth': 10e-3,
+        # 'binInterval': 3e-4, 'binWidth': 5e-3, 'smoothKernelWidth': 10e-3,  # 30 kHz, Full-Res
+        # 'binInterval': 1e-4, 'binWidth': 5e-3, 'smoothKernelWidth': 10e-3,  # 10 kHz, EMG Hi-Res
         'windowSizes': {
             'extraShort': (-0.1, 0.4),
             'extraExtraShort': (-0.125, 0.125),
@@ -384,7 +386,7 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
         # estimator=None, units='t',
         palette="ch:0.6,-.3,dark=.1,light=0.7,reverse=1",
         height=6, aspect=30, kind='line')
-    vLineOpts = {'color': 'm'}
+    vLineOpts = {'color': 'm', 'alpha': 0.5}
     asigPlotShadingOpts = {
         'facecolor': vLineOpts['color'],
         'alpha': 0.1, 'zorder': -100}

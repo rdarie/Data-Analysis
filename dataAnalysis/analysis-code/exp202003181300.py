@@ -12,7 +12,8 @@ def getExpOpts():
     
     experimentName = '202003181300-Peep'
     deviceName = None
-    rippleMapFile = 'isi_nano1caudal_xAyBzC_ortho_nano2rostral_xAyBzC_ortho.map'
+    rippleMapFile = {
+        3: 'isi_nano1caudal_xAyBzC_ortho_nano2rostral_xAyBzC_ortho.map'}
     # exclude dummy electrodes 8 and 16
     asigNameList = [
         ['caudalX_e{:02d}_a'.format(i) for i in range(1, 8)] +

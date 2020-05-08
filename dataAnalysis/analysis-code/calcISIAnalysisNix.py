@@ -94,7 +94,7 @@ def calcISIBlockAnalysisNix():
         nspBlock, keepSpikes=False, keepSignals=tdChanNames)
     tdBlock = hf.loadBlockProxyObjects(tdBlock)
 
-    # pdb.set_trace()
+    #  
     # if len(allStimTrains):
     #     for segIdx, dataSeg in enumerate(spikesBlock.segments):
     #         spikeList = [
@@ -268,13 +268,15 @@ def calcISIBlockAnalysisNix():
     if os.path.exists(jsonPath):
         with open(jsonPath, 'r') as f:
             stimLog = json.load(f)
-        ampQuanta = 20 * pq.uA  # TODO: read from settings
+        stimResLookup = {4: 10 * pq.uA, 5: 20 * pq.uA}
+        # ampQuanta = 20 * pq.uA  # TODO: read from settings
         stimDict = {
             't': [],
             'elec': [],
             # 'nominalWaveform': [],
             'nominalCurrent': [],
             'RateInHz': [],
+            'stimPeriod': [],
             'trainDur': [],
             'firstPW': [],
             'secondPW': [],
@@ -283,6 +285,7 @@ def calcISIBlockAnalysisNix():
         eventUnits = {
             'nominalCurrent': pq.uA,
             'RateInHz': pq.Hz,
+            'stimPeriod': pq.Hz,
             'trainDur': pq.s,
             'firstPW': pq.s,
             'secondPW': pq.s,
@@ -301,6 +304,10 @@ def calcISIBlockAnalysisNix():
                     nominalWaveform = []
                     lastAmplitude = 0
                     totalLen = 0
+                    if 'stimRes' in stimCmd:
+                        ampQuanta = stimResLookup[stimCmd['stimRes']]
+                    else:
+                        ampQuanta = 20 * pq.uA
                     for phase in stimCmd['seq']:
                         if phase['enable']:
                             phAmp = ampQuanta * phase['ampl'] * (-1) * ((-1) ** phase['pol'])
@@ -322,6 +329,9 @@ def calcISIBlockAnalysisNix():
                     nominalIdxMax = np.argmax(np.abs(np.asarray(nominalWaveform)))
                     stimDict['nominalCurrent'].append(nominalWaveform[nominalIdxMax])
                     thisStimPeriod = (stimCmd['period'] / (30000) * pq.s)
+                    stimDict['stimPeriod'].append(thisStimPeriod)
+                    #  
+                    # stimDict['RateInHz'].append(np.round(thisStimPeriod ** (-1), decimals=1))
                     stimDict['RateInHz'].append(thisStimPeriod ** (-1))
                     stimDict['trainDur'].append((stimCmd['repeats']) * thisStimPeriod)
             else:
@@ -336,7 +346,7 @@ def calcISIBlockAnalysisNix():
                     stimStrDict[key] = [float(st) for st in val.split(',') if len(st)]
                 stimStrDF = pd.DataFrame(stimStrDict)
                 stimStrDF['Elect'] = stimStrDF['Elect'].astype(np.int)
-                stimStrDF.loc[stimStrDF['PL'] == 0, 'Amp'] = stimStrDF.loc[stimStrDF['PL'] == 0, 'Amp'] * (-1)
+                stimStrDF.loc[stimStrDF['PL'] == 1, 'Amp'] = stimStrDF.loc[stimStrDF['PL'] == 1, 'Amp'] * (-1)
                 for rIdx, row in stimStrDF.iterrows():
                     stimDict['t'].append(t)
                     stimDict['firstPW'].append(row['Dur'] * 1e-3 * pq.s)
@@ -344,6 +354,7 @@ def calcISIBlockAnalysisNix():
                     stimDict['totalPW'].append(2 * row['Dur'] * 1e-3 * pq.s)
                     stimDict['nominalCurrent'].append(row['Amp'] * ampQuanta)
                     stimDict['RateInHz'].append(row['Freq'] * pq.Hz)
+                    stimDict['stimPeriod'].append(row['Freq'] ** -1)
                     stimDict['trainDur'].append(row['TL'] * 1e-3 * pq.s)
                     stimDict['elec'].append(row['Elect'] * pq.dimensionless)
         stimDict['labels'] = np.asarray([
@@ -412,16 +423,23 @@ def calcISIBlockAnalysisNix():
                         })
                     theseUpdates.index = stimEvents[thisStEventsMask].times
                     theseUpdates.index.name = 't'
+                    # NOTE: the line below is a workaround for an edge case where the same electrode is
+                    # requested twice in the same command, it should not be needed normally
+                    theseUpdates = theseUpdates.loc[~theseUpdates.index.duplicated(), :]
                     # create entries for each pulse of the spiketrain
                     newIndex = np.unique(np.concatenate([
                         stimEvents[thisStEventsMask].times.magnitude,
                         st.times.magnitude]))
-                    # pdb.set_trace()
+                    #  
+                    # updateTimes = pd.Series(theseUpdates.index)
+                    # nonMonotonicTimes = updateTimes.diff().fillna(1) <= 0
+                    # updateTimes[nonMonotonicTimes][0]
+                    # theseUpdate.loc[theseUpdates.index > updateTimes[nonMonotonicTimes][0], :]
                     try:
                         allUpdates = theseUpdates.reindex(newIndex, method='ffill')
                     except Exception:
                         traceback.print_exc()
-                        pdb.set_trace()
+                         
                     stAnnotations = allUpdates.loc[
                         allUpdates.index.isin(st.times.magnitude), :]
                 #
@@ -528,7 +546,7 @@ def calcISIBlockAnalysisNix():
                             eventUnits[annName])
             peakIdx, _, trainStartIdx, trainEndIdx = hf.findTrains(
                 peakTimes=activeTimes, minDistance=5e-3, maxDistance=200e-3)
-            # pdb.set_trace()
+            #  
             trainDurations = trainEndIdx - trainStartIdx
             #
             if len(trainStartIdx):
@@ -540,7 +558,7 @@ def calcISIBlockAnalysisNix():
                     # 'amplitude',
                     'nominalCurrent', 'program',
                     'activeGroup', 'firstPW', 'secondPW', 'electrode',
-                    'RateInHz', 'trainDur', 't'])
+                    'RateInHz', 'stimPeriod', 'trainDur', 't'])
                 #
                 for idx, (idxStart, idxEnd) in enumerate(
                         zip(trainStartIdx, trainEndIdx)):
@@ -580,17 +598,21 @@ def calcISIBlockAnalysisNix():
                                             idx, 'trainDur'] = 0
                                         startCategories.loc[
                                             idx, 'RateInHz'] = 0
+                                        startCategories.loc[
+                                            idx, 'stimPeriod'] = 1000
                                     else:
                                         startCategories.loc[
                                             idx, 'trainDur'] = (
                                                 theseTimes[-1] -
                                                 theseTimes[0])
+                                        stimPeriod = np.round(np.diff(theseTimes).median(), decimals=6)
                                         startCategories.loc[
-                                            idx, 'RateInHz'] = (
-                                                np.diff(theseTimes).mean() ** (-1))
+                                            idx, 'stimPeriod'] = stimPeriod
+                                        startCategories.loc[
+                                            idx, 'RateInHz'] = stimPeriod ** -1
                                 else:
-                                    nominalRate = np.mean(st.annotations['RateInHz'][theseTimesMask])
-                                    observedRate = np.diff(theseTimes).mean() ** (-1)
+                                    nominalRate = np.median(st.annotations['RateInHz'][theseTimesMask])
+                                    observedRate = np.median(np.diff(theseTimes)) ** (-1)
                                     if not np.abs(nominalRate - observedRate) < 1e-6:
                                         print('Rate Warning on {} at time {}'.format(st.name, theseTimes[0]))
                                     nominalTrainDur = np.mean(st.annotations['trainDur'][theseTimesMask])
@@ -600,6 +622,7 @@ def calcISIBlockAnalysisNix():
                                     # assert np.diff(theseTimes).mean()
                                     startCategories.loc[idx, 'trainDur'] = nominalTrainDur
                                     startCategories.loc[idx, 'RateInHz'] = nominalRate
+                                    startCategories.loc[idx, 'stimPeriod'] = nominalRate ** -1
                                 startCategories.loc[
                                     idx, 'secondPW'] = np.round(np.mean(
                                         st.annotations['secondPW'][theseTimesMask]) * 1e6)
@@ -638,6 +661,7 @@ def calcISIBlockAnalysisNix():
                     startCategories['nominalCurrent'],
                     np.arange(-2, 2, 0.2))
                 startCategories['nominalCurrentCat'] = currCats.astype('str')
+                startCategories['RateInHz'] = np.round(startCategories['RateInHz'], decimals=1)
                 stopCategories = startCategories.copy()
                 #
                 stopCategories['t'] = (
@@ -716,14 +740,24 @@ def calcISIBlockAnalysisNix():
     #                 chIdx.units.remove(stUn)
     #     del allStimUnits
     #
-    tdDF = ns5.analogSignalsToDataFrame(
-        tdBlock.filter(objects=AnalogSignal))
+    #  
+    aSigList = tdBlock.filter(objects=AnalogSignal)
+    tdDF = ns5.analogSignalsToDataFrame(aSigList)
     #
     currentSamplingRate = tdBlock.filter(
         objects=AnalogSignal)[0].sampling_rate
     #
     emgCols = [cn for cn in tdDF.columns if 'Emg' in cn]
+     
     if len(emgCols):
+        # fix for bug affecting the mean of the channel
+        keepMaskAsig = pd.Series(False, index=tdDF.index)
+        for atb in alignTimeBounds:
+            keepMaskAsig = (
+                keepMaskAsig |
+                (
+                    (tdDF['t'] >= atb[0]) &
+                    (tdDF['t'] <= atb[1])))
         sosHP = signal.butter(
             2, 40, 'high',
             fs=float(currentSamplingRate), output='sos')
@@ -739,12 +773,19 @@ def calcISIBlockAnalysisNix():
             plt.plot(t, y); plt.show()
         for cName in emgCols:
             procName = cName.replace('Emg', 'EmgEnv')
+            # weird units hack, TODO check
+            tdDF.loc[:, cName] = tdDF.loc[:, cName] * 1e6
             preprocEmg = signal.sosfiltfilt(
                 sosHP,
-                (tdDF[cName] - tdDF[cName].mean()).to_numpy())
+                (tdDF[cName] - tdDF.loc[keepMaskAsig, cName].median()).to_numpy())
             # 
             tdDF[procName] = signal.sosfiltfilt(
                 sosLP, np.abs(preprocEmg))
+            # break
+            # if True:
+            #     plt.plot(tdDF.loc[keepMaskAsig, cName])
+            #     plt.plot(tdDF.loc[keepMaskAsig, procName])
+            #     plt.show()
             tdChanNames.append(procName)
             #
     if len(allStimTrains):

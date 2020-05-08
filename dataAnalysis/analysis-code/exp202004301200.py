@@ -5,28 +5,31 @@ def getExpOpts():
         2: False,
         3: False,
         4: False,
+        5: False,
         }
     RCBlockLookup = {
         1: True,
         2: True,
         3: True,
         4: True,
+        5: True,
         }
     RippleBlockLookup = {
         1: True,
         2: True,
         3: True,
         4: True,
+        5: True,
         }
     
-    experimentName = '202003191400-Peep'
+    experimentName = '202004301200-Peep'
     deviceName = None
-    # rippleMapFile = 'isi_nano1caudal_xAyBzC_ortho_nano2rostral_xAyBzC_ortho.map'
     rippleMapFile = {
         1: 'isi_nano1caudal_xAyBzC_ortho_nano2rostral_xAyBzC_ortho.map',
         2: 'isi_nano1caudal_xAyBzC_ortho_nano2rostral_xAyBzC_ortho.map',
         3: 'isi_nano1caudal_xAyBzC_ortho_nano2rostral_xAyBzC_ortho.map',
         4: 'isi_nano1caudal_xAyBzC_ortho_nano2rostral_xAyBzC_ortho.map',
+        5: 'isi_nano1caudal_xAyBzC_ortho_nano2rostral_xAyBzC_ortho.map',
         }
     # exclude dummy electrodes 8 and 16
     asigNameList = [
@@ -44,28 +47,31 @@ def getExpOpts():
         2: [],
         3: [],
         4: [],
+        5: [],
         }
 
     synchInfo = {'delsys': {}, 'nsp': {}, 'ins': {}}
-    synchInfo['delsys'][1] = {'timeRanges': [0, 400], 'chooseCrossings': slice(None)}
-    synchInfo['delsys'][2] = {'timeRanges': [0, 240], 'chooseCrossings': slice(None)}
-    synchInfo['delsys'][3] = {'timeRanges': [0, 390], 'chooseCrossings': slice(None)}
-    # synchInfo['delsys'][3] = {'timeRanges': [0, 3924], 'chooseCrossings': slice(None, 59000)}
-    synchInfo['delsys'][4] = {'timeRanges': [0, 645], 'chooseCrossings': slice(None)}
-    # synchInfo['delsys'][4] = {'timeRanges': [0, 822], 'chooseCrossings': [i for i in range(1000)] + [i for i in range(-1000, -1)]}
+    synchInfo['delsys'][4] = {'timeRanges': [3.5, 1325.5], 'chooseCrossings': slice(None)}
+    synchInfo['delsys'][5] = {'timeRanges': [2, 3343], 'chooseCrossings': slice(None)}
     #
-    synchInfo['nsp'][1] = {'timeRanges': [0, 545], 'chooseCrossings': slice(None)}
-    synchInfo['nsp'][2] = {'timeRanges': [0, 222], 'chooseCrossings': slice(None)}
-    synchInfo['nsp'][3] = {'timeRanges': [0, 375], 'chooseCrossings': slice(None)}
-    # synchInfo['nsp'][3] = {'timeRanges': [0, 3924], 'chooseCrossings': slice(None, 59000)}
-    synchInfo['nsp'][4] = {'timeRanges': [0, 640], 'chooseCrossings': slice(None)}
-    # synchInfo['nsp'][4] = {'timeRanges': [0, 802], 'chooseCrossings': [i for i in range(1000)] + [i for i in range(-1000, -1)]}
-
+    synchInfo['nsp'][4] = {'timeRanges': [19.5, 1341.5], 'chooseCrossings': slice(None)}
+    synchInfo['nsp'][5] = {'timeRanges': [2, 3363], 'chooseCrossings': slice(None)}
+    
+    # For emg analysis - emg missing for some time ranges
+    alignTimeBoundsLookup = {
+        4: [
+            [19.5, 1341.5]
+            ],
+        5: [
+            [2, 3340]
+            ],
+        }
     #  if not possible to use taps, override with good taps from another segment
     #  not ideal, because segments are only synchronized to the nearest **second**
     overrideSegmentsForTapSync = {
-        #  each key is a trial
-        1: {},
+        #  each key is a block
+        4: {},
+        5: {},
         }
     # options for stim artifact detection
     detectStim = False
@@ -84,40 +90,11 @@ def getExpOpts():
     triDestinations = []
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        '202003191400-Peep': [1, 2, 3, 4],
+        # For emg analysis - emg missing from block 2
+        '202004301200-Peep': [4, 5],
         }
 
     movementSizeBins = [0, 0.25, 0.5, 1, 1.25, 1.5]
-    # For lfp analysis - all time ranges are valid
-    #  alignTimeBoundsLookup = {
-    #      1: [
-    #          [1, 2000]
-    #          ],
-    #      2: [
-    #          [1, 675]
-    #          ],
-    #      3: [
-    #          [1, 1623]
-    #          ],
-    #      4: [
-    #          [1, 800]
-    #          ],
-    #      }
-    # For emg analysis - emg missing for some time ranges
-    alignTimeBoundsLookup = {
-        1: [
-            [0, 545]
-            ],
-        2: [
-            [0, 222]
-            ],
-        3: [
-            [0, 375]
-            ],
-        4: [
-            [0, 640]
-            ],
-        }
     # rowColOverrides = {
     #     'electrode': [
     #         '-caudalY_e12+caudalX_e05',
@@ -132,33 +109,44 @@ def getExpOpts():
     #         ]
     # }
     outlierDetectColumns = [
-        'LPeroneusLongusEmg#0',
-        'LSemitendinosusEmg#0',
-        'LVastusLateralisEmg#0',
-        # 'RPeroneusLongusEmg#0',
-        # 'RSemitendinosusEmg#0',
-        # 'RVastusLateralisEmg#0'
+            # 'LThoracolumbarFasciaEmg#0',
+            # 'LGracilisEmg#0',
+            # 'LTensorFasciaeLataeEmg#0',
+            # 'LPeroneusLongusEmg#0',
+            # 'LBicepsFemorisEmg#0',
+            # 'LGastrocnemiusEmg#0',
+            'RThoracolumbarFasciaEmg#0',
+            'RGracilisEmg#0',
+            'RTensorFasciaeLataeEmg#0',
+            'RPeroneusLongusEmg#0',
+            'RBicepsFemorisEmg#0',
+            'RGastrocnemiusEmg#0'
         ]
-    
+    # based on vanderhorst and hostege distanges along lumbar enlargement
     delsysMapDict = ({
         'label': [
-            # 'LBicepsBrachiiEmgEnv',   'RBicepsBrachiiEmgEnv',
-            'LSemitendinosusEmgEnv',  'RSemitendinosusEmgEnv',
-            'LVastusLateralisEmgEnv', 'RVastusLateralisEmgEnv',
-            'LPeroneusLongusEmgEnv',  'RPeroneusLongusEmgEnv',
-            # 'LBicepsBrachiiEmg',   'RBicepsBrachiiEmg',
-            'LSemitendinosusEmg',  'RSemitendinosusEmg',
-            'LVastusLateralisEmg', 'RVastusLateralisEmg',
-            'LPeroneusLongusEmg',  'RPeroneusLongusEmg'],
+            'RExtensorDigitorumEmg',
+            'LThoracolumbarFasciaEmg',    'RThoracolumbarFasciaEmg',
+            'LGracilisEmg',               'RGracilisEmg',  # ~40
+            'LTensorFasciaeLataeEmg',     'RTensorFasciaeLataeEmg',  # ~60
+            'LPeroneusLongusEmg',         'RPeroneusLongusEmg',  # ~75
+            'LSemitendinosusEmg',         'RSemitendinosusEmg',  # ~80
+            'LBicepsFemorisEmg',          'RBicepsFemorisEmg',  # ~90
+            'LGastrocnemiusEmg',          'RGastrocnemiusEmg',  # ~90
+            'RExtensorDigitorumEmgEnv',
+            'LThoracolumbarFasciaEmgEnv', 'RThoracolumbarFasciaEmgEnv',
+            'LGracilisEmgEnv',            'RGracilisEmgEnv',
+            'LTensorFasciaeLataeEmgEnv',  'RTensorFasciaeLataeEmgEnv',
+            'LPeroneusLongusEmgEnv',      'RPeroneusLongusEmgEnv',
+            'LSemitendinosusEmgEnv',      'RSemitendinosusEmgEnv',
+            'LBicepsFemorisEmgEnv',       'RBicepsFemorisEmgEnv',
+            'LGastrocnemiusEmgEnv',       'RGastrocnemiusEmgEnv',
+],
         'ycoords': [
-            # 3, 4,
-            3, 4, 3, 4, 3, 4,
-            # 0, 1,
-            0, 1, 0, 1, 0, 1],
+            0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1,
+            3, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4],
         'xcoords': [
-            # 0, 0,
-            2, 2, 3, 3, 5, 5,
-            # 0, 0,
-            2, 2, 3, 3, 5, 5]
+            0, 1, 1, 3, 3, 5, 5, 7, 7, 9, 9, 10, 10, 12, 12,
+            0, 1, 1, 3, 3, 5, 5, 7, 7, 9, 9, 10, 10, 12, 12]
         })
     return locals()

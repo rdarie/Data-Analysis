@@ -1688,14 +1688,15 @@ def childBaseName(
 def readBlockFixNames(
         rawioReader,
         block_index=0, signal_group_mode='split-all',
-        lazy=True, mapDF=None, reduceChannelIndexes=False):
+        lazy=True, mapDF=None, reduceChannelIndexes=False, swapMaps=None):
     
     dataBlock = rawioReader.read_block(
         block_index=block_index, lazy=lazy,
         signal_group_mode=signal_group_mode)
     headerSignalChan = pd.DataFrame(
         rawioReader.header['signal_channels']).set_index('id')
-    headerUnitChan = pd.DataFrame(rawioReader.header['unit_channels']).set_index('id')
+    headerUnitChan = pd.DataFrame(
+        rawioReader.header['unit_channels']).set_index('id')
     #  
     if dataBlock.name is None:
         if 'neo_name' in dataBlock.annotations:
@@ -1704,12 +1705,16 @@ def readBlockFixNames(
     seg0 = dataBlock.segments[0]
     asigLikeList = (
         seg0.filter(objects=AnalogSignalProxy) +
-        seg0.filter(objects=AnalogSignal)
-        )
+        seg0.filter(objects=AnalogSignal))
     if mapDF is not None:
         # [len(a.name) for a in asigLikeList]
-        asigOrigNames = [headerSignalChan.loc[int(i+1), 'name'] for i in mapDF['nevID']]
-        asigNameChanger = dict(zip(asigOrigNames, mapDF['label']))
+        # pdb.set_trace()
+        if swapMaps is not None:
+            asigOrigNames = [headerSignalChan.loc[int(i+1), 'name'] for i in swapMaps['from']['nevID']]
+            asigNameChanger = dict(zip(asigOrigNames, swapMaps['to']['label']))
+        else:
+            asigOrigNames = [headerSignalChan.loc[int(i+1), 'name'] for i in mapDF['nevID']]
+            asigNameChanger = dict(zip(asigOrigNames, mapDF['label']))
     else:
         asigNameChanger = dict()
     for asig in asigLikeList:
@@ -1730,8 +1735,7 @@ def readBlockFixNames(
                 asig.channel_index.annotations['nix_name'] = newChanName
     spikeTrainLikeList = (
         seg0.filter(objects=SpikeTrainProxy) +
-        seg0.filter(objects=SpikeTrain)
-        )
+        seg0.filter(objects=SpikeTrain))
     # add channels for channelIndex that has no asigs but has spikes
     nExtraChans = 0
     for stp in spikeTrainLikeList:
@@ -2594,7 +2598,7 @@ def preprocBlockToNix(
 def preproc(
         fileName='Trial001',
         rawFolderPath='./',
-        outputFolderPath='./', mapDF=None,
+        outputFolderPath='./', mapDF=None, swapMaps=None,
         fillOverflow=True, removeJumps=True,
         motorEncoderMask=None,
         calcAverageLFP=False,
@@ -2605,7 +2609,8 @@ def preproc(
         writeMode='rw',
         signal_group_mode='split-all', trialInfo=None,
         asigNameList=None, ainpNameList=None, nameSuffix='',
-        calcRigEvents=True, normalizeByImpedance=False, removeMeanAcross=False,
+        calcRigEvents=True, normalizeByImpedance=False,
+        removeMeanAcross=False,
         LFPFilterOpts=None
         ):
     #  base file name
@@ -2637,7 +2642,8 @@ def preproc(
         block = readBlockFixNames(
             reader,
             block_index=blkIdx, lazy=True,
-            signal_group_mode=signal_group_mode, mapDF=mapDF)
+            signal_group_mode=signal_group_mode,
+            mapDF=mapDF, swapMaps=swapMaps)
         # ripple debugging
         # allSptProx = block.filter(objects=SpikeTrainProxy)
         # allSpt = [i.load() for i in allSptProx]

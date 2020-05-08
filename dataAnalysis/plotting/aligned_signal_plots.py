@@ -22,6 +22,7 @@ from seaborn.relational import _ScatterPlotter, _LinePlotter
 import os
 import traceback
 from copy import deepcopy
+from tqdm import tqdm
 
 def processRowColArguments(arguments):
     outDict = {}
@@ -124,7 +125,7 @@ def plotNeuronsAligned(
                 sigTestResults.sum(axis=1).groupby('unit')
                 .sum().sort_values(ascending=False).index)
             unitNames = [i.replace('_raster#0', '') for i in unitRanks]
-        for idx, unitName in enumerate(unitNames):
+        for idx, unitName in enumerate(tqdm(unitNames)):
             rasterName = unitName + '_raster#0'
             continuousName = unitName + '_fr#0'
             rasterWide = ns5.alignedAsigsToDF(
@@ -327,7 +328,7 @@ def plotAsigsAligned(
     unitNames = loadArgs.pop('unitNames')
     loadArgs.pop('unitQuery')
     with PdfPages(os.path.join(figureFolder, pdfName + '.pdf')) as pdf:
-        for idx, unitName in enumerate(unitNames):
+        for idx, unitName in enumerate(tqdm(unitNames)):
             asigWide = ns5.alignedAsigsToDF(
                 dataBlock, [unitName],
                 **loadArgs)
@@ -620,6 +621,33 @@ def genVLineAdder(posList, patchOpts, dropNaNCol='segment'):
             (dataSubset.empty) or
             (dataSubset[dropNaNCol].isna().all()))
         if not emptySubset:
+            for pos in posList:
+                g.axes[ro, co].axvline(pos, **patchOpts)
+        return
+    return addVline
+
+
+def genStimVLineAdder(
+        rateFieldName, patchOpts,
+        tOnset=0, tOffset=1, includeRight=True,
+        dropNaNCol='segment'):
+    def addVline(g, ro, co, hu, dataSubset):
+        emptySubset = (
+            (dataSubset.empty) or
+            (dataSubset[dropNaNCol].isna().all()))
+        if not emptySubset:
+            pulseRates = dataSubset[rateFieldName]
+            pulseRate = pulseRates[pulseRates.notna()].unique()
+            assert pulseRate.size == 1
+            axLims = g.axes[ro, co].get_xlim()
+            pulsePeriod = pulseRate[0] ** (-1)
+            pulseLims = [
+                max(axLims[0], tOnset),
+                min(axLims[1], tOffset),
+            ]
+            if includeRight:
+                pulseLims[1] = pulseLims[1] + pulsePeriod
+            posList = np.arange(*pulseLims, pulsePeriod)
             for pos in posList:
                 g.axes[ro, co].axvline(pos, **patchOpts)
         return

@@ -87,10 +87,20 @@ if arguments['makeFull']:
 ##################################################################################
 if arguments['ISI']:
     mapDF = prb_meta.mapToDF(rippleMapFile[int(arguments['blockIdx'])])
+    if 'rippleOriginalMapFile' in locals():
+        if rippleOriginalMapFile[int(arguments['blockIdx'])] is not None:
+            swapMaps = {
+                'from': prb_meta.mapToDF(rippleOriginalMapFile[int(arguments['blockIdx'])]),
+                'to': mapDF
+            }
+        else:
+            swapMaps = None
+    else:
+        swapMaps = None
     reader = ns5.preproc(
         fileName=ns5FileName,
         rawFolderPath=nspFolder,
-        outputFolderPath=scratchFolder, mapDF=mapDF,
+        outputFolderPath=scratchFolder, mapDF=mapDF, swapMaps=swapMaps,
         fillOverflow=False, removeJumps=False,
         motorEncoderMask=motorEncoderMask,
         eventInfo=trialFilesFrom['utah']['eventInfo'],
