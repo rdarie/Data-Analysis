@@ -170,4 +170,6 @@ dataAnalysis/paths.py
 #local environment definitions
 
 dataAnalysis/\.ftpconfig
-.vscode/
+.vscode/ftp-sync.json
+dataAnalysis/analysis-code/\.vscode/ftp-sync.json
+dataAnalysis/simulation/\.vscode/ftp-sync.json
