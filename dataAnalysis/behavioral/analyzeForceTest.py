@@ -136,9 +136,9 @@ def readForceData(nevDataName, calibrationFiles):
             lowByteStr = format(lowByte, '02x')
             highByteStr = format(highByte, '02x')
             #if readingIdx == 0:
-            #    pdb.set_trace()
+            #    
             if addressIdx == 1:
-                #pdb.set_trace()
+                #
                 currTimeStamp = nevData['dig_events']['TimeStamps'][blockIdx + addressIdx - 1 + startIdx]
                 if type(currTimeStamp) == np.ndarray:
                     currTimeStamp = currTimeStamp[0]
@@ -169,7 +169,7 @@ def readForceData(nevDataName, calibrationFiles):
                     giveUp = True
 
                 while not isValidAddressSequence( forwardPeek ) and not giveUp:
-                    #pdb.set_trace()
+                    #
                     newAddressByte = int ( '0x' + format( expectedSensorIdxOrder[byteIdx], '01x') + '0', 0)
                     nevData['dig_events']['Data'] = np.array([np.insert(nevData['dig_events']['Data'][0], currIndexIntoNevData, newAddressByte )])
                     nevData['dig_events']['TimeStamps'] = np.array(np.insert(nevData['dig_events']['TimeStamps'], currIndexIntoNevData, 0 ))
@@ -191,7 +191,7 @@ def readForceData(nevDataName, calibrationFiles):
 
         #print('Sensor ids were: ' + sensorIds)
         #if sensorIds not in matchStr:
-        #    pdb.set_trace()
+        #    
     """
     Zero the measurements
     """
@@ -252,7 +252,7 @@ def readPythonForceData(pythonDataName, calibrationFiles):
             #print(lowByteStr + highByteStr)
             procPythonData[channelLookup[addressIdx]][readingIdx] = int(highByteStr[1] + lowByteStr[0] + lowByteStr[1], 16)
             if addressIdx == 1:
-                #pdb.set_trace()
+                #
                 procPythonData['Sync'][readingIdx] = 0 if highByteStr[0] == 'f' else 1
 
     for key in procPythonData:

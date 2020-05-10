@@ -14,7 +14,7 @@ import pdb
 import matplotlib.pyplot as plt
 from lmfit import Minimizer, Parameters, report_fit
 
-def doubleLayerCapacitancePerArea(V, c_H = 45, k_1 = 31, k_2 = 1.2):
+def doubleLayerCapacitancePerArea(V, c_H=45, k_1=31, k_2=1.2):
     #c_H uF/cm^2
     #k_1 uF/cm^2
     #k_2 V^-1
@@ -28,7 +28,7 @@ def doubleLayerCapacitancePerArea(V, c_H = 45, k_1 = 31, k_2 = 1.2):
     # c_dl in uF / cm ^ 2
     return c_dl
 
-def faradaicResistancePerArea(V, J_0 = 1e-4, r_min = 1e-1):
+def faradaicResistancePerArea(V, J_0=1e-4, r_min=1e-1):
      #J_0 A/cm^2
     alpha = 1/2
     beta = 37.44 # V^-1
@@ -46,12 +46,12 @@ def faradaicResistancePerArea(V, J_0 = 1e-4, r_min = 1e-1):
 S in units of mm^2
 V in units of volts
 """
-def doubleLayerCapacitance(S, V = 1, c_dl = None, c_H = 45, k_1 = 31, k_2 = 1.2):
+def doubleLayerCapacitance(S, V=1, c_dl=None, c_H=45, k_1=31, k_2=1.2):
     if c_dl is None:
         c_dl = doubleLayerCapacitancePerArea(V, c_H = c_H, k_1 = k_1, k_2 = k_2)
     return c_dl * (S / 100)
 
-def faradaicResistance(S, V = 1, r_f = None, J_0 = 1e-4, r_min = 1e-1):
+def faradaicResistance(S, V=1, r_f=None, J_0=1e-4, r_min=1e-1):
     if r_f is None:
         r_f = faradaicResistancePerArea(V, J_0 = J_0, r_min = r_min)
     return r_f / (S / 100)
@@ -90,7 +90,7 @@ def ETITransient(S, I, PW, R_s, openCircuitV = 0, r_f = None, c_dl = None,
     C_dl = pd.Series(0, index = I.index)
 
     for curT, curI in I.items():
-        #pdb.set_trace()
+        #
         curR_f = faradaicResistance(S, curV, r_f = r_f, J_0 = J_0, r_min = r_min) # ohms
 
 

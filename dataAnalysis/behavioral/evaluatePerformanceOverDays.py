@@ -1,10 +1,17 @@
 from dataAnalysis.helperFunctions.helper_functions import *
-from proprioBehavioralControl.helperFunctions import *
-import plotly.plotly as py
-import plotly.tools as tls
-import plotly.figure_factory as ff
-import plotly.graph_objs as go
-import plotly.dashboard_objs as dashboard
+import traceback
+try:
+    from proprioBehavioralControl.helperFunctions import *
+except Exception:
+    traceback.print_exc()
+try:
+    import plotly.plotly as py
+    import plotly.tools as tls
+    import plotly.figure_factory as ff
+    import plotly.graph_objs as go
+    import plotly.dashboard_objs as dashboard
+except Exception:
+    traceback.print_exc()
 import argparse, pdb
 import copy
 import pandas as pd

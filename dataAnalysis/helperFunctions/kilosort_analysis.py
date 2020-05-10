@@ -1,9 +1,14 @@
 import os, sys, pdb
+import quantities as pq
+from neo import (
+    Unit, ChannelIndex, Block,
+    Segment, SpikeTrain, Event, AnalogSignal)
 from tempfile import mkdtemp
 import numpy as np
 from scipy.ndimage.filters import gaussian_filter1d
-from scipy import stats, ndimage
+from scipy import stats, ndimage, signal
 import scipy.io
+from statsmodels.stats.multitest import multipletests as mt
 import pandas as pd
 import matplotlib
 from matplotlib.backends.backend_pdf import PdfPages
@@ -13,6 +18,7 @@ import seaborn as sns
 from importlib import reload
 import dataAnalysis.helperFunctions.motor_encoder as mea
 import dataAnalysis.helperFunctions.helper_functions as hf
+import dataAnalysis.preproc.ns5 as preproc
 import line_profiler
 import pickle
 import h5py
@@ -24,12 +30,13 @@ import math as m
 import copy
 LABELFONTSIZE = 10
 import peakutils
+import rcsanalysis.packet_func as rcsa_helpers
 
 
 def loadParamsPy(filePath):
     """
     # Old implementation, treats params.py as a package and cannot be overriden when processing a new folder.
-    pdb.set_trace()
+    
 
     sys.path.insert(0, filePath)
 
@@ -61,6 +68,7 @@ def coordsToIndices(xcoords, ycoords):
 
     return xIdx, yIdx
 
+
 def getSpikeMetaData(filePath, ns5FileName, KSDir):
 
     coords = np.load(filePath + '/'+ KSDir + '/channel_positions.npy', mmap_mode = mMapMode)
@@ -74,8 +82,8 @@ def getSpikeMetaData(filePath, ns5FileName, KSDir):
     }
     return spikeStruct
 
-#@profile
-def loadKSDir(filePath, excludeNoise = True, loadPCs = False):
+
+def loadKSDir(filePath, excludeNoise=True, loadPCs=False):
     mMapMode = 'r'
     params = loadParamsPy(filePath)
 
@@ -113,7 +121,7 @@ def loadKSDir(filePath, excludeNoise = True, loadPCs = False):
             hasClusterInfo = False
 
         if excludeNoise and hasClusterInfo:
-            #pdb.set_trace()
+            #
             noiseClusters = clusterInfo[clusterInfo.loc[:,'group'] == 'noise'].loc[:, 'cluster_id'].values
             # identify which spikes are in noise clusters
             spikeMask = np.array([not x in noiseClusters for x in spikeCluster], dtype = np.bool)
@@ -171,7 +179,7 @@ def loadKSDir(filePath, excludeNoise = True, loadPCs = False):
         }
     return spikeStruct
 
-#@profile
+
 def getWaveForms(filePath, spikeStruct, nevIDs = None, dataType = np.int16, wfWin = (-40, 81), nWf = None, plotting = False, tempFolder = None):
     if tempFolder is None:
         tempFolder = mkdtemp()
@@ -205,14 +213,14 @@ def getWaveForms(filePath, spikeStruct, nevIDs = None, dataType = np.int16, wfWi
         'extended_headers' : []
         }
 
-    #pdb.set_trace()
+    #
     if nevIDs:
         rootFolder = filePath.split('KiloSort')[0]
         rootName = spikeStruct['dat_path'].split('.dat')[0]
         if '_' in rootName:
             rootName = rootName.split('_')[0]
         nevFileName = rootFolder + rootName + '.nev'
-        #pdb.set_trace()
+        #
         nevFile = NevFile(nevFileName)
 
         spikes['basic_headers'] = nevFile.basic_header
@@ -227,7 +235,7 @@ def getWaveForms(filePath, spikeStruct, nevIDs = None, dataType = np.int16, wfWi
         waveForms[idx] = np.memmap(waveFormTempFileNames[idx], dtype='int16', mode='w+', shape=(curUnitNSpikes, wfNSamples, nCh))
 
         for spikeIdx, curSpikeTime in enumerate(curSpikeTimes):
-            #pdb.set_trace()
+            #
             tmpWf = rawData[int(curSpikeTime + wfWin[0]) : int(curSpikeTime + wfWin [1]), :]
             waveForms[idx][spikeIdx, :tmpWf.shape[0], :] = tmpWf
 
@@ -261,17 +269,17 @@ def getWaveForms(filePath, spikeStruct, nevIDs = None, dataType = np.int16, wfWi
             spikes['Waveforms'][idx] = np.memmap(waveFormTempFileNames[idx], dtype='int16', mode='w+', shape=(nSpikesOnChan,wfNSamples,nCh))
             #spikes['Waveforms'][idx] = np.zeros((nSpikesOnChan,wfNSamples,nCh))
             for spikeIdx, spikeClass in enumerate(spikes['Classification'][idx]):
-                #pdb.set_trace()
+                #
                 classIdx = np.where(unitIDs==spikeClass)[0][0]
                 spikes['Waveforms'][idx][spikeIdx,:,:] = waveForms[classIdx][waveFormIndices[spikeClass],:,:]
                 waveFormIndices[spikeClass] = waveFormIndices[spikeClass] + 1
             spikes['Waveforms'][idx].flush()
-    #pdb.set_trace()
+    #
     del waveForms
     #spikes['Waveforms'].flush()
     return spikes
 
-#@profile
+
 def numFromWaveClusSpikeFile(spikeFileName):
     return int(spikeFileName.split('times_NSX')[-1].split('.mat')[0])
 
@@ -309,7 +317,7 @@ def getNevMatSpikes(filePath, nevIDs = None, plotting = False, excludeClus = [0]
     lastMaxUnitID = 0
     with h5py.File(filePath, 'r') as f:
         for idx, chanID in enumerate(nevIDs):
-            #pdb.set_trace()
+            #
             print('getNevMatSpikes() on channel {} of {}'.format(idx + 1, len(nevIDs)))
             spikes['ChannelID'][idx] = chanID
             chanMask = np.array(f['NEV']['Data']['Spikes']['Electrode']) == chanID
@@ -322,7 +330,7 @@ def getNevMatSpikes(filePath, nevIDs = None, plotting = False, excludeClus = [0]
                     notMUAMask = np.logical_not(np.isin(f['NEV']['Data']['Spikes']['Unit'][chanMask], excludeClus))
                 else:
                     notMUAMask = np.full(len(f['NEV']['Data']['Spikes']['Unit'][chanMask]), True, dtype = np.bool)
-                #pdb.set_trace()
+                #
                 spikes['Classification'][idx] = f['NEV']['Data']['Spikes']['Unit'][chanMask] + 1 + lastMaxUnitID
                 spikes['Classification'][idx] = spikes['Classification'][idx][notMUAMask]
 
@@ -336,7 +344,7 @@ def getNevMatSpikes(filePath, nevIDs = None, plotting = False, excludeClus = [0]
                 unitIDs+=unitsInFile.tolist()
                 lastMaxUnitID = max(unitIDs)
 
-    #  pdb.set_trace()
+    #  
     spikes['ChannelID'] = list(filter(lambda it: not markForDeletion[it], spikes['ChannelID']))
     spikes['Classification'] = list(filter(lambda it: not it == [], spikes['Classification']))
     spikes['TimeStamps'] = list(filter(lambda it:not it == [], spikes['TimeStamps']))
@@ -379,12 +387,12 @@ def getWaveClusSpikes(filePath, nevIDs = None, plotting = False, excludeClus = [
         spikes['ChannelID'][idx] = nevIDs[idx]
         unitsInFile = np.unique(waveClusData['cluster_class'][:,0]) + 1 + lastMaxUnitID
 
-        #pdb.set_trace()
+        #
         if excludeClus:
             notMUAMask = np.logical_not(np.isin(waveClusData['cluster_class'][:,0], excludeClus))
         else:
             notMUAMask = np.full(len(waveClusData['cluster_class'][:,0]), True, dtype = np.bool)
-        #pdb.set_trace()
+        #
         spikes['Classification'][idx] = waveClusData['cluster_class'][notMUAMask,0] + 1 + lastMaxUnitID
         spikes['TimeStamps'][idx] = waveClusData['cluster_class'][notMUAMask,1] / 1e3
         spikes['Waveforms'][idx] = waveClusData['spikes'][notMUAMask, :]
@@ -413,7 +421,7 @@ def getSpikeStats(spikes, channel, whichStats = ['mean', 'std'], bounds = None, 
         for unitIdx, unitName in enumerate(unitsOnThisChan):
             unitMask = spikes['Classification'][ChanIdx] == unitName
 
-            #pdb.set_trace()
+            #
             if bounds is not None:
                 startIdx = int((bounds[0] - windowSize[0]) * spikes['basic_headers']['TimeStampResolution'])
                 endIdx = int((bounds[1] - windowSize[0]) * spikes['basic_headers']['TimeStampResolution'])
@@ -433,7 +441,7 @@ def getSpikeStats(spikes, channel, whichStats = ['mean', 'std'], bounds = None, 
                 waveFormsDF = pd.DataFrame(waveForms).fillna(method = 'ffill', axis = 1, limit = 30).fillna(method = 'bfill', axis = 1, limit =  30)
                 statsDict[unitName].update({'rms':np.linalg.norm(waveFormsDF, ord=None, axis=1)})
             if 'abs max' in whichStats:
-                #pdb.set_trace()
+                #
                 statsDict[unitName].update({'abs max':np.abs(waveForms).max().max()})
             if 'max' in whichStats:
                 statsDict[unitName].update({'max':waveForms.max().max()})
@@ -441,286 +449,11 @@ def getSpikeStats(spikes, channel, whichStats = ['mean', 'std'], bounds = None, 
                 statsDict[unitName].update({'min':waveForms.min().min()})
     return statsDict
 
-def getINSStimOnset(
-    folderPath, sessionName, 
-    td = None, stimStatus = None, accel = None, deviceName='DeviceNPC700373H',
-    fs = 500, stimIti = 0, minDist = 0, minDur = 0, thres = .5,
-    timeInterpFunINStoNSP=None,
-    maxSpikesPerGroup=None,
-    stimFreq = None,
-    stimDetectOpts = None,
-    plotting = []):
-    
-    if stimDetectOpts is None:
-        defaultOptsDict = {
-            'channels': ['channel_0', 'channel_1'],
-            'thres': thres,
-            'keep_max': False}
-        stimDetectOpts = {i: defaultOptsDict for i in range(4)}
-
-    elecStatus, elecType, elecConfiguration = hf.getINSDeviceConfig(
-        folderPath, sessionName, deviceName)
-
-    progAmpNames = [
-        'program{}_amplitude'.format(progIdx) for progIdx in range(4)]
-    
-    columnsToBeAdded = [
-        'amplitudeChange', 'amplitudeRound', 'activeGroup',
-        'frequency', 'therapyStatus', 'activeProgram', 'maxAmp'] + progAmpNames
-    infoFromStimStatus = hf.interpolateDF(
-        stimStatus, td['INSTime'],
-        x='INSTime', columns=columnsToBeAdded, kind='previous')
-    
-    for columnName in columnsToBeAdded:
-        td['data'][columnName] = infoFromStimStatus.loc[:,columnName]
-    allGroups = pd.unique(stimStatus['activeGroup'])
-    uniqueElectrodeCombos = list(range(4*len(allGroups)))
-    nCh = len(uniqueElectrodeCombos)
-
-    stimSpikes = {
-        'ChannelID' : uniqueElectrodeCombos,
-        'Classification' : [np.array([]) for i in range(nCh)],
-        'NEUEVWAV_HeaderIndices' : [None for i in range(nCh)],
-        'TimeStamps' : [np.array([]) for i in range(nCh)],
-        'Units' : 'uV',
-        'Waveforms' : [None for i in range(nCh)],
-        #'meanWaveforms' : [None for i in range(nCh)],
-        #'stdWaveforms' : [None for i in range(nCh)],
-        'basic_headers' : {'TimeStampResolution': 3e4},
-        'extended_headers' : []
-        }
-
-    for name, group in td['data'].groupby('amplitudeRound'):
-        electrodeCombo = int(4 * pd.unique(group['activeGroup'])[0] + (
-            pd.unique(group['activeProgram'])[0]))
-        #  print('electrode combo: {}'.format(electrodeCombo))
-        thisAmplitude = group['maxAmp'].max()
-        thisTrialSegment = group['trialSegment'].value_counts().idxmax()
-        
-        #  pad with 100 msec to capture first pulse
-        tStart = max(0, group['INSTime'].iloc[0] - 0.1)
-        tStop = min(group['INSTime'].iloc[-1], td['INSTime'].iloc[-1])
-        
-        #  pad with 100 msec to *avoid* first pulse
-        #  tStart = min(tStop, group['INSTime'].iloc[0] + 0.1)
-        
-        if (tStop - tStart) < minDur:
-            print('tStart ={}'.format(tStart))
-            print('tStop ={}'.format(tStop))
-            print('(tStop - tStart) < minDur')
-            continue
-
-        plotMaskTD = (td['INSTime'] > tStart) & (td['INSTime'] < tStop)
-        
-        activeState = td['data'].loc[plotMaskTD,'therapyStatus'].value_counts().idxmax()
-        activeProgram = td['data'].loc[plotMaskTD,'activeProgram'].value_counts().idxmax()
-
-        if not activeState:
-            print('Therapy not active!')
-            continue
-        '''
-        tdPow = pd.Series(0, index = td['data'].loc[plotMaskTD, chanNames].index)
-        for chanName in chanNames:
-            tdPow = tdPow + stats.zscore(td['data'].loc[plotMaskTD, chanName]) ** 2
-        '''
-        #  print('Active program is {}'.format(activeProgram))
-        
-        theseDetectOpts = stimDetectOpts[activeProgram]
-        
-        tdPow = (td['data'].loc[plotMaskTD, theseDetectOpts['channels']] ** 2).sum(axis = 1)
-        
-        # convolve with a rectangular kernel
-        # then shift forward and backward to get forward and backward sum
-        kernDur = 0.2
-        kernNSamp = int(kernDur * fs)
-        if kernNSamp > len(tdPow):
-            kernNSamp = round(len(tdPow) - 2)
-        kern = np.concatenate((
-            np.linspace(0, 1, round(kernNSamp/2)),
-            np.array([0]),
-            np.linspace(-1, 0, round(kernNSamp/2))
-            ))
-        #  pdb.set_trace()
-        correctionFactor = pd.Series(
-            np.convolve(kern, tdPow, mode = 'same'),
-            index = tdPow.index)
-        correctionFactor.loc[correctionFactor < 1] = 1
-
-        sobelFiltered = pd.Series(
-            ndimage.sobel(tdPow, mode='reflect'),
-            index=tdPow.index)
-
-        sobelFiltered.iloc[:] = stats.zscore(sobelFiltered)
-        stimDetectSignal = sobelFiltered.abs() * correctionFactor
-        stimDetectSignal = stimDetectSignal.fillna(0)
-        stimDetectSignal = stimDetectSignal - stimDetectSignal.min()
-
-        if thisAmplitude == 0:
-            #  pdb.set_trace()
-            #  peakIdx = hf.getTriggers(
-            #      td['data'].loc[plotMaskTD, 'amplitudeChange'].astype(np.float), thres=5,
-            #      iti=minDist, keep_max = theseDetectOpts['keep_max'])
-            peakIdx = np.array([])
-        else:
-            peakIdx = peakutils.indexes(
-                stimDetectSignal.values, thres=theseDetectOpts['thres'],
-                min_dist=int(minDist * fs), thres_abs=True, keep_max = theseDetectOpts['keep_max'])
-            peakIdx = tdPow.index[peakIdx]
-            if name in plotting:
-                print('After peakutils.indexes, before check for amplitude')
-                print('{}'.format(peakIdx))
-            # check for amplitude
-            keepMask = (td['data'].loc[peakIdx, 'maxAmp'] == thisAmplitude).values
-            peakIdx = peakIdx[keepMask]
-            # use the HUT derived stim onset if no artifact visible
-            if len(peakIdx) == 0:
-                #  pdb.set_trace()
-                peakIdx = hf.getTriggers(
-                    td['data'].loc[plotMaskTD, 'maxAmp'], thres=5,
-                    iti=minDist, keep_max = theseDetectOpts['keep_max'])
-        
-        if name in plotting:
-            print('Before if maxSpikesPerGroup is not None')
-            print('{}'.format(peakIdx))
-
-        if maxSpikesPerGroup is not None:
-            peakIdx = peakIdx[:maxSpikesPerGroup]
-
-        theseTimestamps = pd.Series(
-            td['INSTime'].loc[peakIdx].values,
-            index = td['INSTime'].loc[peakIdx].index)
-
-        if name in plotting:
-            print('Before if stimIti > 0')
-            print('{}'.format(peakIdx))
-        if stimIti > 0:
-            stimBackDiff = theseTimestamps.diff().fillna(method = 'bfill')
-            stimFwdDiff = (-1) * theseTimestamps.diff(-1).fillna(method = 'ffill')
-            stimDiff = (stimBackDiff + stimFwdDiff) / 2
-            offBy = (stimDiff - stimIti).abs()
-            if name in plotting:
-                print('off by:')
-                print('{}'.format(offBy))
-            keepMask = offBy < 0.3
-            theseTimestamps = theseTimestamps.loc[keepMask]
-            peakIdx = peakIdx[keepMask]
-        
-        if timeInterpFunINStoNSP is not None:
-            # synchronize stim timestamps with INS timestamps
-            theseTimestamps.iloc[:] = timeInterpFunINStoNSP[thisTrialSegment](
-                theseTimestamps.values)
-        
-        theseTimestamps = theseTimestamps.values
-        stimSpikes['TimeStamps'][electrodeCombo] = np.append(
-            stimSpikes['TimeStamps'][electrodeCombo],
-            theseTimestamps)
-
-        ampList = theseTimestamps ** 0 * thisAmplitude * 1e3
-        #  print('The amplitude was {}'.format(thisAmplitude))
-        stimSpikes['Classification'][electrodeCombo] = np.append(
-            stimSpikes['Classification'][electrodeCombo],
-            ampList)
-        if stimSpikes['Waveforms'][electrodeCombo] is not None:
-            stimSpikes['Waveforms'][electrodeCombo] = np.concatenate(
-                [stimSpikes['Waveforms'][electrodeCombo],
-                np.zeros((theseTimestamps.shape[0], 3))], axis = 0)
-        else:
-            stimSpikes['Waveforms'][electrodeCombo] = np.zeros((theseTimestamps.shape[0], 3))
-        #pdb.set_trace()
-        
-        if name in plotting:
-            #  pdb.set_trace()
-            print('About to Plot')
-            print('{}'.format(peakIdx))
-
-            fig, ax = plt.subplots(3, 1, sharex=True)
-            if accel is not None:
-                plotMaskAccel = (accel['INSTime'] > tStart) & (
-                    accel['INSTime'] < tStop)
-                ax[0].plot(
-                    accel['INSTime'].loc[plotMaskAccel],
-                    stats.zscore(accel['data'].loc[plotMaskAccel, 'inertia']),
-                    '-', label='inertia')
-            for channelName in theseDetectOpts['channels']:
-                ax[0].plot(
-                    td['INSTime'].loc[plotMaskTD],
-                    stats.zscore(td['data'].loc[plotMaskTD, channelName]),
-                    '-', label=channelName)
-            ax[0].legend()
-            ax[0].set_title('INS Accel and TD')
-            
-            ax[1].plot(
-                td['INSTime'].loc[plotMaskTD],
-                stats.zscore(correctionFactor),
-                '-', label='correctionFactor')
-                
-            ax[1].plot(
-                td['INSTime'].loc[plotMaskTD],
-                sobelFiltered,
-                '-', label='sobelFiltered')
-            ax[1].plot(
-                td['INSTime'].loc[plotMaskTD],
-                stimDetectSignal,
-                '-', label='stimDetectSignal')
-            ax[1].plot(
-                td['INSTime'].loc[peakIdx],
-                stimDetectSignal.loc[peakIdx],
-                'o', label='stimOnset')
-                                  
-            ax[1].plot(
-                td['INSTime'].loc[plotMaskTD],
-                stimDetectSignal ** 0 * theseDetectOpts['thres'],
-                'r-', label='detection Threshold')
-            ax[1].legend()
-            ax[1].set_title('INS TD Measurements')
-            
-            for columnName in progAmpNames:
-                ax[2].plot(
-                    td['data'].loc[plotMaskTD, 'INSTime'],
-                    td['data'].loc[plotMaskTD, columnName],
-                    '-', label=columnName, lw = 2.5)
-
-            statusAx = ax[2].twinx()
-            statusAx.plot(
-                td['data'].loc[plotMaskTD, 'INSTime'],
-                td['data'].loc[plotMaskTD, 'therapyStatus'],
-                '--', label='therapyStatus', lw = 1.5)
-            statusAx.plot(
-                td['data'].loc[plotMaskTD, 'INSTime'],
-                td['data'].loc[plotMaskTD, 'amplitudeChange'],
-                'c--', label='amplitudeChange', lw = 1.5)
-            ax[2].legend(loc = 'upper left')    
-            statusAx.legend(loc = 'upper right')
-            ax[2].set_ylabel('Stim Amplitude (mA)')
-            ax[2].set_xlabel('NSP Time (sec)')
-            plt.suptitle('Stim State')
-            plt.show()
-
-    markForDeletion = {i: False for i in stimSpikes['ChannelID']}
-    for idx, chanID in enumerate(stimSpikes['ChannelID']):
-        markForDeletion[chanID] = len(stimSpikes['TimeStamps'][idx]) == 0
-
-    #  pdb.set_trace()
-    fil = [not markForDeletion[it] for it in stimSpikes['ChannelID']]
-
-    stimSpikes['ChannelID'] = [
-        i for i in itertools.compress(stimSpikes['ChannelID'], fil)]
-    #pdb.set_trace()
-    stimSpikes['Classification'] = [
-        i for i in itertools.compress(stimSpikes['Classification'], fil)]
-    stimSpikes['TimeStamps'] = [
-        i for i in itertools.compress(stimSpikes['TimeStamps'], fil)]
-    stimSpikes['Waveforms'] = [
-        i for i in itertools.compress(stimSpikes['Waveforms'], fil)]
-    stimSpikes['NEUEVWAV_HeaderIndices'] = [
-        i for i in itertools.compress(stimSpikes['NEUEVWAV_HeaderIndices'], fil)]
-
-    return stimSpikes
-
-def plotSpike(spikes, channel, showNow = False, ax = None,
-    acrossArray = False, xcoords = None, ycoords = None,
-    axesLabel = False, errorMultiplier = 2, ignoreUnits = [],
-    channelPlottingName = None, chanNameInLegend = True):
+def plotSpike(
+        spikes, channel, showNow = False, ax = None,
+        acrossArray = False, xcoords = None, ycoords = None,
+        axesLabel = False, errorMultiplier = 1, ignoreUnits = [],
+        channelPlottingName=None, chanNameInLegend=False, legendTags=[]):
 
     if channelPlottingName is None:
         channelPlottingName = str(channel)
@@ -733,12 +466,6 @@ def plotSpike(spikes, channel, showNow = False, ax = None,
         unitsLabelsOnThisChan = None
 
     if acrossArray:
-        sns.set_style("dark", {"axes.facecolor": ".9"})
-        matplotlib.rc('xtick', labelsize=5)
-        matplotlib.rc('ytick', labelsize=5)
-        matplotlib.rc('legend', fontsize=5)
-        matplotlib.rc('axes', xmargin=.01)
-        matplotlib.rc('axes', ymargin=.01)
         # Check that we didn't ask to plot the spikes across channels into a single axis
         assert ax is None
         # Check that we have waveform data everywhere
@@ -768,9 +495,22 @@ def plotSpike(spikes, channel, showNow = False, ax = None,
                 unitPlottingName = unitName
 
             if chanNameInLegend:
-                labelName = 'chan %s, unit %s (%d SDs)' % (channelPlottingName, unitPlottingName, errorMultiplier)
+                #  labelName = 'chan %s: unit %s (%d SDs)' % (channelPlottingName, unitPlottingName, errorMultiplier)
+                labelName = '{}#{}'.format(channelPlottingName, unitPlottingName)
             else:
-                labelName = 'unit %s (%d SDs)' % (unitPlottingName, errorMultiplier)
+                labelName = '#{}'.format(unitPlottingName)
+
+            for legendTag in legendTags:
+                if legendTag in spikes['basic_headers']:
+                    if unitName in spikes['basic_headers'][legendTag]:
+                        labelName += ' {}: {}'.format(
+                            legendTag,
+                            spikes['basic_headers'][legendTag][unitName]
+                        )
+                    else:
+                        print('{} not found in header!'.format(unitName))
+                else:
+                    print('{} not found! in legendTags'.format(legendTag))
 
             if acrossArray:
                 for idx, channel in enumerate(spikes['ChannelID']):
@@ -778,6 +518,7 @@ def plotSpike(spikes, channel, showNow = False, ax = None,
                     waveForms = spikes['Waveforms'][ChanIdx][unitMask, :, idx]
                     thisSpike = np.nanmean(waveForms, axis = 0)
                     thisError = np.nanstd(waveForms, axis = 0)
+                    #  thisError = stats.sem(waveForms, nan_policy='omit')
                     timeRange = np.arange(len(thisSpike)) / spikes['basic_headers']['TimeStampResolution'] * 1e3
                     curAx.fill_between(timeRange, thisSpike - errorMultiplier*thisError,
                         thisSpike + errorMultiplier*thisError, alpha=0.4,
@@ -798,7 +539,9 @@ def plotSpike(spikes, channel, showNow = False, ax = None,
                 else:
                     waveForms = spikes['Waveforms'][ChanIdx][unitMask, :]
                 thisSpike = np.nanmean(waveForms, axis = 0)
+                #  
                 thisError = np.nanstd(waveForms, axis = 0)
+                #  thisError = stats.sem(waveForms, nan_policy='omit')
                 timeRange = np.arange(len(thisSpike)) / spikes['basic_headers']['TimeStampResolution'] * 1e3
                 colorPalette = sns.color_palette(n_colors = 40)
 
@@ -818,13 +561,70 @@ def plotSpike(spikes, channel, showNow = False, ax = None,
     return fig,ax
 
 #@profile
-def plotISIHistogram(spikes, channel, showNow = False, ax = None,
-    bins = None, kde = False, kde_kws = None):
+def plotISIHistogram(
+        spikes, channel, showNow = False, ax = None,
+        bins = None, kde = True, kde_kws = None, labelType='median'):
+
     if ax is None:
         fig, ax = plt.subplots()
     else:
         fig = ax.figure
 
+    fig.set_tight_layout({'pad': 0.01})
+    idx = spikes['ChannelID'].index(channel)
+    unitsOnThisChan = np.unique(spikes['Classification'][idx])
+
+    if unitsOnThisChan is not None:
+        colorPalette = sns.color_palette(n_colors = 40)
+        if labelType:
+            legendLines = []
+            legendEntries = []
+            cmap = sns.color_palette()
+        for unitIdx, unitName in enumerate(unitsOnThisChan):
+            unitMask = spikes['Classification'][idx] == unitName
+            theseTimes = spikes['TimeStamps'][idx][unitMask]
+            theseISI = np.diff(theseTimes) * 1e3 # units of msec
+            if labelType:
+                legendLines.append(
+                    sns.mpl.lines.Line2D(
+                        [0], [0], color=cmap[unitIdx], lw=4))
+                if labelType == 'count':
+                    labelText = '{} spikes'.format(len(theseTimes))
+                if labelType == 'average':
+                    aveSpS = (np.nanmean(theseISI) / 1e3) ** (-1)
+                    labelText = 'mean {} sp/s'.format(aveSpS)
+                if labelType == 'median':
+                    aveSpS = (np.nanmedian(theseISI) / 1e3) ** (-1)
+                    extremeSpS = (np.nanquantile(theseISI, 0.1) / 1e3) ** (-1)
+                    labelText = 'median {:.2f} sp/s, 0.1 quantile {:.2f} sp/s'.format(aveSpS, extremeSpS)
+                legendEntries.append(labelText)
+            #  
+            ax = sns.distplot(
+                theseISI, bins=bins, ax=ax, norm_hist=True,
+                color=colorPalette[unitIdx], kde=kde, kde_kws=kde_kws)
+            ax.set_xlabel('ISI (msec)')
+            yAxLabel = 'Probability density (per bin)' if kde else 'Count'
+            ax.set_ylabel(yAxLabel)
+            if bins is not None:
+                if not isinstance(bins, np.str):
+                    ax.set_title('Bin size: {} msec'.format(bins[1] - bins[0]))
+                    ax.set_xlim(min(bins), max(bins))
+        if labelText:
+            ax.legend(legendLines, legendEntries)
+        if showNow:
+            plt.show()
+
+
+def plotSpikePropertyHistogram(
+        spikes, channel, whichProp, showNow=False, ax=None,
+        bins=None, kde=True, kde_kws=None):
+    
+    if ax is None:
+        fig, ax = plt.subplots()
+    else:
+        fig = ax.figure
+
+    fig.set_tight_layout({'pad': 0.01})
     idx = spikes['ChannelID'].index(channel)
     unitsOnThisChan = np.unique(spikes['Classification'][idx])
 
@@ -832,90 +632,73 @@ def plotISIHistogram(spikes, channel, showNow = False, ax = None,
         colorPalette = sns.color_palette(n_colors = 40)
         for unitIdx, unitName in enumerate(unitsOnThisChan):
             unitMask = spikes['Classification'][idx] == unitName
-            theseTimes = spikes['TimeStamps'][idx][unitMask]
-            theseISI = np.diff(theseTimes) * 1e3 # units of msec
-            #pdb.set_trace()
-            sns.distplot(theseISI, bins = bins, ax = ax,
-                color = colorPalette[unitIdx], kde = kde, kde_kws = kde_kws)
-            """
-            fit_alpha, fit_loc, fit_beta = stats.gamma.fit(np.histogram(theseISI, bins = bins))
-            rv = stats.gamma(fit_alpha, loc = fit_loc, scale = fit_beta)
-            ax.plot(bins, rv.pdf(bins), 'k-', lw=2)
-            #pdb.set_trace()
-
-            plt.hist(theseISI, bins = bins, color = colorPalette[unitIdx], density = False)
-            """
-            plt.xlabel('ISI (msec)')
+            thisProp = spikes[whichProp][idx][unitMask]
+            sns.distplot(thisProp, bins=bins, ax=ax, norm_hist=True,
+                color = colorPalette[unitIdx], kde=kde, kde_kws=kde_kws)
+            ax.set_xlabel(whichProp)
             yAxLabel = 'Count (normalized)' if kde else 'Count'
-            plt.ylabel(yAxLabel)
+            ax.set_ylabel(yAxLabel)
             if bins is not None:
+                ax.set_title('Bin size: {} msec'.format(bins[1] - bins[0]))
                 ax.set_xlim(min(bins), max(bins))
         if showNow:
             plt.show()
 
+
 #@profile
-def plotSpikePanel(spikeStruct, spikes):
+def plotSpikePanel(
+        spikeStruct, spikes, labelFontSize=LABELFONTSIZE,
+        padOverride=5e-3, figSize=(12, 8),
+        colorPal="ch:2,-.1,dark=.2,light=0.8,reverse=1"):
+    
     sns.set_style("dark", {"axes.facecolor": ".9"})
-    matplotlib.rc('xtick', labelsize=5)
-    matplotlib.rc('ytick', labelsize=5)
-    matplotlib.rc('legend', fontsize=5)
-    matplotlib.rc('axes', xmargin=.01)
-    matplotlib.rc('axes', ymargin=.01)
-
-    """
-    xIdx, yIdx = coordsToIndices(spikeStruct['xcoords'], spikeStruct['ycoords'])
-    fig, ax = plt.subplots(nrows = max(np.unique(xIdx)) + 1,
-        ncols = max(np.unique(yIdx)) + 1)
-    """
-
-    #spikeStruct.dropna(inplace = True)
     xIdx = np.array(spikeStruct['xcoords'].values - spikeStruct['xcoords'].min(), dtype = np.int)
     yIdx = np.array(spikeStruct['ycoords'].values - spikeStruct['ycoords'].min(), dtype = np.int)
-    #pdb.set_trace()
+    # 
 
     fig, ax = plt.subplots(nrows = int(max(np.unique(xIdx)) + 1),
         ncols = int(max(np.unique(yIdx)) + 1))
+    fig.set_size_inches(figSize)
     axHighLims = np.empty(ax.shape)
     axHighLims[:] = np.nan
     axLowLims = np.empty(ax.shape)
     axLowLims[:] = np.nan
+    with sns.color_palette(colorPal, 5):
+        for idx, channel in enumerate(spikes['ChannelID']):
+            curAx = ax[xIdx[idx], yIdx[idx]]
+            plotSpike(spikes, channel, ax=curAx)
+            curAxLim = curAx.get_ylim()
+            axHighLims[xIdx[idx], yIdx[idx]] = curAxLim[1]
+            axLowLims[xIdx[idx], yIdx[idx]] = curAxLim[0]
+        # get xLim from last axis that has spikes, in order to make the label
+        xLim = ax[xIdx[idx], yIdx[idx]].get_xlim()
+        sns.despine()
 
-    for idx, channel in enumerate(spikes['ChannelID']):
-        curAx = ax[xIdx[idx], yIdx[idx]]
-        plotSpike(spikes, channel, ax = curAx)
-        curAxLim = curAx.get_ylim()
-        axHighLims[xIdx[idx], yIdx[idx]] = curAxLim[1]
-        axLowLims[xIdx[idx], yIdx[idx]] = curAxLim[0]
-    # get xLim from last axis that has spikes, in order to make the label
-    xLim = ax[xIdx[idx], yIdx[idx]].get_xlim()
-    sns.despine()
+        newAxMin = np.nanmean(axLowLims) - .5 * np.nanstd(axLowLims)
+        newAxMax = np.nanmean(axHighLims) + .5 * np.nanstd(axHighLims)
 
-    newAxMin = np.nanmean(axLowLims) - .5 * np.nanstd(axLowLims)
-    newAxMax = np.nanmean(axHighLims) + .5 * np.nanstd(axHighLims)
-
-    for idx, channel in enumerate(spikes['ChannelID']):
-        curAx = ax[xIdx[idx], yIdx[idx]]
-        curAx.set_ylim(newAxMin, newAxMax)
-
-    for idx, curAx in enumerate(ax.flatten()):
-        if idx != 0:
-            curAx.tick_params(left=False, top=False, right=False, bottom=False,
-                labelleft=False, labeltop=False, labelright=False,
-                labelbottom=False)
-        else:
-            curAx.tick_params(left=True, top=False, right=False, bottom=True,
-                labelleft=True, labeltop=False, labelright=False,
-                labelbottom=True, direction = 'in')
-
+        for idx, channel in enumerate(spikes['ChannelID']):
+            curAx = ax[xIdx[idx], yIdx[idx]]
             curAx.set_ylim(newAxMin, newAxMax)
-            curAx.set_xlim(*xLim)
-            labelFontSize = LABELFONTSIZE
-            curAx.set_xlabel('msec', fontsize = labelFontSize,
-                labelpad = - 3 * labelFontSize)
-            curAx.set_ylabel('uV', fontsize = labelFontSize,
-                labelpad = - 3 * labelFontSize)
 
-    plt.tight_layout(0.005)
+        for idx, curAx in enumerate(ax.flatten()):
+            if idx != 0:
+                curAx.tick_params(left=False, top=False, right=False, bottom=False,
+                    labelleft=False, labeltop=False, labelright=False,
+                    labelbottom=False, labelsize=labelFontSize, length=labelFontSize)
+            else:
+                curAx.tick_params(left=True, top=False, right=False, bottom=True,
+                    labelleft=True, labeltop=False, labelright=False,
+                    labelbottom=True, direction = 'in', labelsize=labelFontSize, length=labelFontSize)
+
+                curAx.set_ylim(newAxMin, newAxMax)
+                curAx.set_xlim(*xLim)
+                curAx.set_xlabel('msec', fontsize = labelFontSize,
+                    labelpad = - 2 * labelFontSize)
+                curAx.set_ylabel(spikes['Units'], fontsize = labelFontSize,
+                    labelpad = - 2 * labelFontSize)
+
+        plt.tight_layout(pad=padOverride)
     return newAxMin, newAxMax
 
 def getTrialAxes(trialStats, alignTo, channel, separateBy = None, ax = None):
@@ -1335,7 +1118,7 @@ def plotSpikeTriggeredFR(spikesFrom = None, spikesTo = None,
             if idx > 0:
                 spikeMats[idx] = thisSpikeMat.loc[selectedIndices, :]
         if categories is not None:
-            #pdb.set_trace()
+            #
             categories = categories.loc[selectedIndices]
 
     if categories is not None:
@@ -1388,11 +1171,68 @@ def plotSpikeTriggeredFR(spikesFrom = None, spikesTo = None,
     plt.tight_layout(pad = 0.01)
     return spikeMats, fig, ax
 
+
+def triggeredAsigCompareMeans(
+        asigWide, groupBy, testVar,
+        tStart=None, tStop=None,
+        testWidth=100e-3, testStride=20e-3,
+        correctMultiple=True):
+    
+    if tStart is None:
+        tStart = asigWide.columns[0]
+    if tStop is None:
+        tStop = asigWide.columns[-1]
+    testBins = np.arange(
+        tStart, tStop, testStride)
+
+    if (isinstance(groupBy, list)) and (len(groupBy) == 1):
+        groupBy = groupBy[0]
+    
+    if isinstance(groupBy, str):
+        pValIndex = pd.Index(
+            asigWide.groupby(groupBy).groups.keys())
+        pValIndex.name = groupBy
+    else:
+        pValIndex = pd.MultiIndex.from_tuples(
+            asigWide.groupby(groupBy).groups.keys(),
+            names=groupBy)
+
+    pVals = pd.DataFrame(
+        np.nan,
+        index=pValIndex,
+        columns=testBins)
+    pVals.columns.name = 'bin'
+    for testBin in testBins:
+        tMask = (
+            (asigWide.columns > testBin - testWidth / 2) &
+            (asigWide.columns < testBin + testWidth / 2)
+            )
+        testAsig = asigWide.loc[:, tMask]
+        for name, group in testAsig.groupby(groupBy):
+            testGroups = [
+                np.ravel(i)
+                for _, i in group.groupby(testVar)]
+            if len(testGroups) > 1:
+                try:
+                    stat, p = scipy.stats.kruskal(*testGroups)
+                    pVals.loc[name, testBin] = p
+                except Exception:
+                    traceback.print_exc()
+                    pVals.loc[name, testBin] = 1
+    if correctMultiple:
+        flatPvals = pVals.stack()
+        _, fixedPvals, _, _ = mt(flatPvals.values, method='holm')
+        flatPvals.loc[:] = fixedPvals
+        flatPvals = flatPvals.unstack('bin')
+        pVals.loc[flatPvals.index, flatPvals.columns] = flatPvals
+
+    return pVals
+
 def modOnset(spikeMat):
     preWindow = 0
     dt  = spikeMat.columns[1] - spikeMat.columns[0]
 
-    #pdb.set_trace()
+    #
     preStimMask = spikeMat.columns < preWindow
     postStimMask = spikeMat.columns > preWindow
     thresh = spikeMat.loc[:,preStimMask].mean(axis = 1) + 2.576 * spikeMat.loc[:,preStimMask].std(axis = 1)
@@ -1415,29 +1255,31 @@ def modOnset(spikeMat):
     nCheck = postStimMask.sum() - sustainCriterion
     bla1 = (pValHolder * nCheck) < 1e-6
     bla2 = magDiffHolder.abs() > 50
-    #pdb.set_trace()
+    #
     #thisModOnset = ((pValHolder * nCheck) < 0.01).idxmax(axis = 1) * 1e3
     thisModOnset = (bla1 & bla2).idxmax(axis = 1) * 1e3
-    #pdb.set_trace()
+    #
     thisModOnset[thisModOnset < 3] = np.nan
     thisModOnset[thisModOnset > lastValid] = np.nan
     return thisModOnset, pValHolder, magDiffHolder
-"""
-tempDF = pd.DataFrame(False, index = spikeMat.loc[:,postStimMask].index, columns = spikeMat.loc[:,postStimMask].columns)
-for rowIdx, row in spikeMat.loc[:,postStimMask].iterrows():
-    tempDF.loc[rowIdx, :] = row > thresh[rowIdx]
 
-# add future samples to each sample to check if it continues to be modulated
-tempDF = tempDF.astype(float)
-for i in range(1,sustainCriterion+1):
-    tempDF = tempDF + tempDF.shift(-i, axis = 1).fillna(method = 'ffill',axis = 1)
+    """
+    notes for modOnset
+    tempDF = pd.DataFrame(False, index = spikeMat.loc[:,postStimMask].index, columns = spikeMat.loc[:,postStimMask].columns)
+    for rowIdx, row in spikeMat.loc[:,postStimMask].iterrows():
+        tempDF.loc[rowIdx, :] = row > thresh[rowIdx]
 
-tempDF = (tempDF > sustainCriterion).astype(float)
-thisModOnset = tempDF.idxmax(axis = 1)
+    # add future samples to each sample to check if it continues to be modulated
+    tempDF = tempDF.astype(float)
+    for i in range(1,sustainCriterion+1):
+        tempDF = tempDF + tempDF.shift(-i, axis = 1).fillna(method = 'ffill',axis = 1)
 
-thisModOnset = (thisModOnset - preWindow) * 1e3
-thisModOnset[thisModOnset < 1] = np.nan
-"""
+    tempDF = (tempDF > sustainCriterion).astype(float)
+    thisModOnset = tempDF.idxmax(axis = 1)
+
+    thisModOnset = (thisModOnset - preWindow) * 1e3
+    thisModOnset[thisModOnset < 1] = np.nan
+    """
 
 def saveModOnset(arrayName, spikeMatDict):
     for key, value in spikeMatDict.items():
@@ -1449,20 +1291,16 @@ def saveModOnset(arrayName, spikeMatDict):
         magDiffHolder.to_hdf('./modOnset.h5', 'magDiffHolder_{}_{}'.format(arrayName, key))
 
 def sortBinnedArray(spikeMat, orderSpikesBy):
-
     if orderSpikesBy == 'idxmax':
         spikeOrder = spikeMat.idxmax(axis = 1).sort_values().index
-
     elif orderSpikesBy == 'meanFR':
         spikeOrder = spikeMat.mean(axis = 1).sort_values().index
-
     elif orderSpikesBy == 'modOnset':
-        #pdb.set_trace()
+        #
         thisModOnset, pValHolder, magDiffHolder = modOnset(spikeMat)
         spikeOrder = thisModOnset.sort_values(ascending=False).index
-
+    
     spikeMat = spikeMat.loc[spikeOrder,:]
-
     return spikeMat, spikeOrder
 
 def plotSingleTrial(
@@ -1624,19 +1462,19 @@ def addLagsCentered(X, nBins = 1, binStride = 1, binOffset = 0, setPath = None, 
     # todo make this accept arbitrarily shuffled data
     # print('Loading {} from {}'.format(recordName, setPath))
 
-    #pdb.set_trace()
+    #
     spikeMats = pd.read_hdf(setPath, 'spikeMats')
     stackedByBin = spikeMats.unstack(level = ['alignLabel', 'trial'])
     origX = pd.read_hdf(setPath, recordName + '/X')
     shuffledIdx = origX.index
     allDFs = {}
     for i in range(binOffset-nBins, binOffset+nBins+1, binStride):
-        #pdb.set_trace()
+        #
         #thisStackedBin = stackedByBin.shift(i).dropna(how = 'all')
         thisStackedBin = stackedByBin.shift(i).fillna(method = 'ffill', axis = 0).fillna(method = 'bfill', axis = 0)
         thisUnstackedBin = thisStackedBin.stack(level = ['alignLabel', 'trial']).reorder_levels(['alignLabel', 'trial', 'bin']).loc[shuffledIdx, :]
         allDFs.update({i:thisUnstackedBin})
-    #pdb.set_trace()
+    #
     outputDF = pd.concat(allDFs, axis = 1, names = ['lag'])
     #print('outputDF.isna().sum() = {}'.format(outputDF.isna().sum().sum()))
     #print('X.shape = {}'.format(X.shape))
@@ -1666,7 +1504,7 @@ def addHistory(X, nHistBins = 0, binStride = 1, setPath = None, recordName = Non
     # todo make this accept arbitrarily shuffled data
     spikeMats = pd.read_hdf(setPath, 'spikeMats')
     origX = pd.read_hdf(setPath, recordName + '/X')
-    pdb.set_trace()
+    
     shuffledIdx = []
     origIndex = spikeMats.index
     for i in range(X.shape[0]):
@@ -1685,7 +1523,9 @@ def addHistory(X, nHistBins = 0, binStride = 1, setPath = None, recordName = Non
     return outputDF.values
 """
 
-def featureUnstackerGenerator(spikeMats, whichLevel = None, nCol = None):
+
+def featureUnstackerGenerator(
+        spikeMats, whichLevel = None, nCol = None):
     if nCol is None:
         nCol = len(spikeMats.columns)
     # make a custom function that only works on spikeMats to unstack it
@@ -1696,22 +1536,25 @@ def featureUnstackerGenerator(spikeMats, whichLevel = None, nCol = None):
         return tempDF #maybe add .values here
     return unstacker
 
-def getSpikeMatsForIdx(spikeMats, whichTrials, startBin = 0):
+
+def getSpikeMatsForIdx(
+        spikeMats, whichTrials, startBin = 0):
 
     exampleSpikeMat = next(iter(spikeMats.values()))
     spikeMatIdx = exampleSpikeMat.index
     spikeMatCols = exampleSpikeMat.columns - exampleSpikeMat.columns[0] + startBin
-    theseSpikeMats =  np.full((exampleSpikeMat.shape[0],
+    spikeMat3D =  np.full((exampleSpikeMat.shape[0],
         exampleSpikeMat.shape[1], len(whichTrials)), np.nan)
     for idx, trialIdx in enumerate(whichTrials):
         try:
-            theseSpikeMats[:,:,idx] = spikeMats[trialIdx]
+            spikeMat3D[:,:,idx] = spikeMats[trialIdx]
         except Exception:
             traceback.print_exc()
-            pdb.set_trace()
-    return theseSpikeMats, spikeMatIdx, spikeMatCols
+            
+    return spikeMat3D, spikeMatIdx, spikeMatCols
 
-def getSpikeMatsForCategories(categories, uniqueCategories, validTrials, spikeMats, startBin = 0):
+def getSpikeMatsForCategories(
+        categories, uniqueCategories, validTrials, spikeMats, startBin = 0):
 
     spikeMatsCategorized = {category:None for category in uniqueCategories.values}
 
@@ -1729,7 +1572,8 @@ def getSpikeMatsForCategories(categories, uniqueCategories, validTrials, spikeMa
 
     return spikeMatsCategorized, spikeMatIdx, spikeMatCols
 
-def getAverageSpikeMatsForIdx(spikeMats, whichTrials):
+def getAverageSpikeMatsForIdx(
+        spikeMats, whichTrials):
     theseSpikeMats = getSpikeMatsForIdx(spikeMats, whichTrials)
 
     exampleSpikeMat = next(iter(spikeMats.values()))
@@ -1743,7 +1587,8 @@ def getAverageSpikeMatsForIdx(spikeMats, whichTrials):
 
     return averageSpikeMats, stdSpikeMats
 
-def getAverageSpikeMatsForCategories(categories, uniqueCategories, validTrials, spikeMats, startBin = 0):
+def getAverageSpikeMatsForCategories(
+        categories, uniqueCategories, validTrials, spikeMats, startBin = 0):
 
     spikeMatsCategorized, spikeMatIdx, spikeMatCols = getSpikeMatsForCategories(categories,
         uniqueCategories, validTrials, spikeMats, startBin = startBin)
@@ -1752,7 +1597,7 @@ def getAverageSpikeMatsForCategories(categories, uniqueCategories, validTrials, 
     stdSpikeMats = {category:None for category in uniqueCategories.values}
 
     for category, theseSpikeMats in spikeMatsCategorized.items():
-        #pdb.set_trace()
+        #
         averageSpikeMats[category] = pd.DataFrame(np.nanmean(theseSpikeMats, axis = 2),
             columns = spikeMatCols, index = spikeMatIdx)
         stdSpikeMats[category] = pd.DataFrame(np.nanstd(theseSpikeMats, axis = 2),
@@ -1760,7 +1605,8 @@ def getAverageSpikeMatsForCategories(categories, uniqueCategories, validTrials, 
 
     return averageSpikeMats, stdSpikeMats
 
-def getAverageSpikeMatsFromList(categories, uniqueCategories, validTrials, spikeMatList, arrayNames, startBin = 0):
+def getAverageSpikeMatsFromList(
+        categories, uniqueCategories, validTrials, spikeMatList, arrayNames, startBin = 0):
     averageSpikeMats = {arrayName: None for arrayName in arrayNames}
     stdSpikeMats = {arrayName: None for arrayName in arrayNames}
     for arrayName in arrayNames:
@@ -1769,12 +1615,14 @@ def getAverageSpikeMatsFromList(categories, uniqueCategories, validTrials, spike
         saveModOnset(arrayName, averageSpikeMats[arrayName])
     return averageSpikeMats, stdSpikeMats
 
-def getPairedSpikeMatTTest(spikeMatCubeCatA, spikeMatCubeCatB):
-    #pdb.set_trace()
+def getPairedSpikeMatTTest(
+        spikeMatCubeCatA, spikeMatCubeCatB):
+    #
     tTestStatistic, tTestPVal = scipy.stats.ttest_ind(spikeMatCubeCatA, spikeMatCubeCatB, axis=2, nan_policy = 'omit')
     return tTestPVal * spikeMatCubeCatA.shape[0] * spikeMatCubeCatA.shape[1]
 
-def getAllPairedSpikeMatTTestForCategories(categories, uniqueCategories, validTrials, spikeMats):
+def getAllPairedSpikeMatTTestForCategories(
+        categories, uniqueCategories, validTrials, spikeMats):
 
     spikeMatsCategorized, spikeMatIdx, spikeMatCols = getSpikeMatsForCategories(categories,
         uniqueCategories, validTrials, spikeMats)
@@ -1791,10 +1639,11 @@ def getAllPairedSpikeMatTTestForCategories(categories, uniqueCategories, validTr
 
     return tTestSpikeMats
 
-def getTrialCategoriesAsFeatures(folderPath,
-    trialStats = None, eventInfo = None,
-    targetCategory = None,
-    alignToList = None, overrideLabel = None):
+def getTrialCategoriesAsFeatures(
+        folderPath,
+        trialStats = None, eventInfo = None,
+        targetCategory = None,
+        alignToList = None, overrideLabel = None):
 
     targetsDict = {}
 
@@ -1822,7 +1671,7 @@ def getTrialCategoriesAsFeatures(folderPath,
         targetsDict.update({alignTo:theseTargets})
 
     targets = pd.concat(targetsDict, names = ['alignLabel'])
-    #pdb.set_trace()
+    #
     if type(targetCategory) == list:
         targets = pd.Series(targets.apply(tuple, axis=1),index = targets.index)
     if overrideLabel is not None:
@@ -1832,7 +1681,8 @@ def getTrialCategoriesAsFeatures(folderPath,
 
     return targets
 
-def getTrialTriggeredTimeSeriesAsFeatures(folderPath, binCenters,
+def getTrialTriggeredTimeSeriesAsFeatures(
+    folderPath, binCenters,
     trialStats = None, eventInfo = None,
     tsInfo = None,
     trialFiles = None,
@@ -1872,17 +1722,18 @@ def getTrialTriggeredTimeSeriesAsFeatures(folderPath, binCenters,
         targets.columns.name = 'bin'
         targets = targets.stack()
         timeSeriesFeatures.update({targetVariable:targets})
-    #pdb.set_trace()
+    #
     return pd.concat(timeSeriesFeatures, names = ['joint'], axis = 1)
 
-def getSpikeMatsAsFeatures(folderPath,
-    trialStats = None, eventInfo = None,
-    trialFiles = None,
-    binCenters = None,
-    rasterOpts = None,
-    targetCategory = None,
-    alignToList = None
-    ):
+def getSpikeMatsAsFeatures(
+        folderPath,
+        trialStats = None, eventInfo = None,
+        trialFiles = None,
+        binCenters = None,
+        rasterOpts = None,
+        targetCategory = None,
+        alignToList = None
+        ):
     arrayNames = []
 
     if trialStats is None:
@@ -1953,11 +1804,11 @@ def getSpikeMatsAsFeatures(folderPath,
     return spikeMats, theBins
 
 def loadCategorizationData(
-    folderPath = None,
-    trialFiles = None, eventInfo = None,
-    rasterOpts = None,
-    targetCategory = None, alignToList = None,
-    addOverrideLabels = None):
+        folderPath = None,
+        trialFiles = None, eventInfo = None,
+        rasterOpts = None,
+        targetCategory = None, alignToList = None,
+        addOverrideLabels = None):
 
     setName = categorizationRunNameGenerator(trialFiles, alignToList, targetCategory)
     setPath = os.path.join(folderPath, setName + '.h5')
@@ -2096,7 +1947,7 @@ def plotAverageTrialPDFReport(
             arrayNames.append(key)
 
     nArrays = len(spikeMatList)
-    #pdb.set_trace()
+    #
     categories, uniqueCategories, catIndices, validTrials = getTrialCategories(trialStats,
         eventTsInfo['separateBy'])
 
@@ -2253,92 +2104,12 @@ def plotAverageTrialPDFReport(
 
                 nameStr = 'p < {}'.format(pThres)
                 significantBins = significantBins.sum()
-                #pdb.set_trace()
+                #
                 ax[2 + 3*idx+2].bar(significantBins.index, significantBins, width = rasterOpts['binInterval'])
                 ax[2 + 3*idx+2].set_ylabel('Count', fontsize = labelFontSize)
                 ax[2 + 3*idx+2].set_title('{}: count of {}'.format(arrayName, nameStr), fontsize = labelFontSize)
             pdf.savefig()
             plt.close()
-#@profile
-def spikePDFReport(folderPath, spikes, spikeStruct,
-    arrayName = None, arrayInfo = None,
-    correctAlignmentSpikes = 0,
-    plotOpts = {'type' : 'ticks', 'errorBar' : 'sem'},
-    rasterOpts = {
-    'kernelWidth' : 50e-3,
-    'binInterval' : 2.5* 1e-3, 'binWidth' : 5* 1e-3,
-    'windowSize' : (-0.25, 1),
-    'alignTo' : 'FirstOnset',
-    'separateBy' : 'Direction',
-    'discardEmpty': None, 'maxTrial' : None, 'timeRange' : None},
-    trialStats = None, enableFR = False, newName = None):
-
-    if correctAlignmentSpikes: #correctAlignmentSpikes units in samples
-        spikes = hf.correctSpikeAlignment(spikes, correctAlignmentSpikes)
-
-    if newName is None:
-        pdfName = os.path.join(folderPath, 'spikePDFReport.pdf')
-    else:
-        pdfName = os.path.join(folderPath , newName + '.pdf')
-
-    if any((arrayName is None, arrayInfo is None)):
-        arrayName, arrayInfo, partialRasterOpts = trialBinnedSpikesNameRetrieve(newName)
-        arrayInfo['nevIDs'] = spikes['ChannelID']
-
-    with PdfPages(pdfName) as pdf:
-        plotSpikePanel(spikeStruct, spikes)
-        pdf.savefig()
-        plt.close()
-
-        for idx, channel in enumerate(spikes['ChannelID']):
-            if os.fstat(0) == os.fstat(1):
-                endChar = '\r'
-                print("Running spikePDFReport: %d%%" % int((idx + 1) * 100 / len(spikes['ChannelID'])), end = endChar)
-            else:
-                print("Running spikePDFReport: %d%%" % int((idx + 1) * 100 / len(spikes['ChannelID'])))
-
-            unitsOnThisChan = np.unique(spikes['Classification'][idx])
-            if unitsOnThisChan is not None:
-                if len(unitsOnThisChan) > 0:
-                    fig, ax = plt.subplots(nrows = 1, ncols = 2)
-                    plotSpike(spikes, channel = channel, ax = ax[0],
-                        axesLabel = True)
-                    isiBins = np.linspace(0, 80, 40)
-                    kde_kws = {'clip' : (isiBins[0] * 0.8, isiBins[-1] * 1.2),
-                        'bw' : 'silverman', 'gridsize' : 500}
-                    plotISIHistogram(spikes, channel = channel, bins = isiBins,
-                        ax = ax[1], kde_kws = kde_kws)
-                    pdf.savefig()
-                    plt.close()
-
-                    if len(spikes['Waveforms'][idx].shape) == 3:
-                        plotSpike(spikes, channel = channel, acrossArray = True,
-                         xcoords = spikeStruct['xcoords'], ycoords = spikeStruct['ycoords'])
-                        pdf.savefig()
-                        plt.close()
-
-                    if rasterOpts['alignTo'] is not None and trialStats is not None:
-                        spikeMats, categories, selectedIndices = loadTrialBinnedSpike(folderPath,
-                            arrayName, arrayInfo,
-                            channel,
-                            rasterOpts,
-                            trialStats = trialStats, spikes = spikes,
-                            correctAlignmentSpikes = 0,
-                            forceRecalc = False)
-
-                        spikeMats, categories, plotFig, plotAx, uniqueCategories, curLine = plotTrialRaster(
-                            trialStats = trialStats, channel = channel,
-                            spikeMats = spikeMats, categories = categories,
-                            plotOpts = plotOpts, rasterOpts = rasterOpts)
-
-                        #plotAx = plotRaster(spikes, trialStats, alignTo = plotRastersAlignedTo, windowSize = (-0.5, 2), channel = channel, separateBy = plotRastersSeparatedBy)
-                        if enableFR:
-                            plotTrialFR(spikeMats = spikeMats, categories = categories,
-                                fig = plotFig, ax = plotAx, uniqueCategories = uniqueCategories, twin = True,
-                                plotOpts = plotOpts, rasterOpts = rasterOpts)
-                            #plotFR(spikes, trialStats, alignTo = plotRastersAlignedTo, windowSize = (-0.5, 2), channel = channel, separateBy = plotRastersSeparatedBy, ax = plotAx, twin = True)
-                        pdf.savefig()
-                        plt.close()
 
 def trialPDFReport(folderPath,
     eventInfo,
@@ -2492,7 +2263,7 @@ def spikeTriggeredAveragePDFReport(folderPath,
             except Exception:
                 traceback.print_exc()
                 plt.close()
-                #  pdb.set_trace()
+                #  
 
             try:
                 fig, ax = plt.subplots(nrows = 1, ncols = 2)
@@ -2506,7 +2277,7 @@ def spikeTriggeredAveragePDFReport(folderPath,
             except Exception:
                 traceback.print_exc()
                 plt.close()
-                #  pdb.set_trace()
+                #  
 
 def generateSpikeTriggeredAverageReport(folderPath, trialFileFrom, trialFileTo,
     correctAlignmentSpikesFrom = 0, correctAlignmentSpikesTo = 0,
@@ -2524,7 +2295,7 @@ def generateSpikeTriggeredAverageReport(folderPath, trialFileFrom, trialFileTo,
     newName = spikeBinnedSpikesNameGenerator(arrayNameFrom, arrayInfoFrom, arrayNameTo, arrayInfoTo)
     
     spikesFromList = []
-    #pdb.set_trace()
+    #
     for idx, channel in enumerate(spikesFrom['ChannelID']):
         unitsOnThisChan = np.unique(spikesFrom['Classification'][idx])
         if unitsOnThisChan.any():
@@ -2535,7 +2306,7 @@ def generateSpikeTriggeredAverageReport(folderPath, trialFileFrom, trialFileTo,
         unitsOnThisChan = np.unique(spikesTo['Classification'][idx])
         if unitsOnThisChan.any():
             spikesToList.append({'chan':channel})
-    #pdb.set_trace()
+    #
     spikeTriggeredAveragePDFReport(folderPath, spikesFrom, spikesTo, spikesFromList,
         spikesToList,
         arrayNameFrom = arrayNameFrom, arrayInfoFrom = arrayInfoFrom,
@@ -2582,7 +2353,7 @@ def generateStimTriggeredAverageReport(folderPath, trialFileFrom, trialFileStim,
             dtype = np.float32) * 8.5 * 1e3) / (2**15 * impedances.loc[channel, 'Mag(kOhms)'])
 
         spikesStim['Classification'][idx] = catSpikeFun(spikesStim, idx)
-    #pdb.set_trace()
+    #
     spikeTriggeredAveragePDFReport(folderPath, spikesFrom, spikesStim, spikesFromList,
         spikesStimList,
         arrayNameFrom = arrayNameFrom, arrayInfoFrom = arrayInfoFrom,
@@ -2792,15 +2563,20 @@ def loadSpikeInfo(arrayName, arrayInfo, forceRecalc = False):
                 spikeStruct.loc[elecLabel, 'nevID'] = int(row['elec']) + bankLookup[row['bank']] * 32
                 spikeStruct.loc[elecLabel, 'bank'] = row['bank']
                 spikeStruct.loc[elecLabel, 'bankID'] = int(row['elec'])
-        #  pdb.set_trace()
+        #  
         spikeStruct.dropna(inplace = True)
         spikeStruct.to_hdf(structSetPath, 'spikeStruct')
         print(
             'Recalculated spike Metadata from {} data and saved to pickle.'.format(
                 arrayInfo['origin']))
     
-    #  pdb.set_trace()
-    nevIDs = spikeStruct.loc[arrayInfo['elecIDs'], 'nevID'].astype(int).tolist()
+    elecCorrespondence = spikeStruct.loc[arrayInfo['elecIDs'], 'nevID']
+    if elecCorrespondence.isna().any():
+        print('Caution!\n{}'.format(
+            elecCorrespondence.loc[elecCorrespondence.isna()]))
+        print('Removing nonexistent...')
+        elecCorrespondence.dropna(inplace = True)
+    nevIDs = elecCorrespondence.astype(int).tolist()
     if not forceRecalc:
     # if not requiring a recalculation, load from pickle
         try:
@@ -2839,7 +2615,7 @@ def loadSpikeInfo(arrayName, arrayInfo, forceRecalc = False):
                 folderPath, arrayInfo['jsonSessionNames'][0],
                 **arrayInfo['getINSkwargs'])
             
-        #pdb.set_trace()
+        #
         pickle.dump(spikes,
             open(setPath, 'wb')
             )
@@ -2993,7 +2769,7 @@ def loadSpikeBinnedSpike(folderPath,
                             discardEmpty = rasterOpts['discardEmpty'])
                     except Exception:
                         traceback.print_exc()
-                        pdb.set_trace()
+                        
 
                     spikeMatSetName = str(spikesFromIdx['chan']) + '_to_' + str(spikesToIdx['chan'])
                     grp = f.create_group(spikeMatSetName)
@@ -3089,7 +2865,7 @@ def triggeredTimeSeries(alignTimes, dataDF, categories,
                     spikesTriggered['Waveforms'][idx][rowIdxWave,idxIntoStart:idxIntoEnd] = chanSlice.values[idxIntoStart:idxIntoEnd]
 
             except Exception:
-                pdb.set_trace()
+                
                 traceback.print_exc()
 
     return spikesTriggered
@@ -3157,7 +2933,7 @@ def getTrialCategories(trialStats, separateBy, validTrials = None):
 
         uniqueCategories.dropna(inplace = True)
         #sort unique categories
-        #pdb.set_trace()
+        #
         if not isinstance(uniqueCategories[0], tuple):
             uniqueCategories.sort_values(inplace = True)
         elif isinstance(uniqueCategories[0], tuple):
@@ -3443,7 +3219,7 @@ def loadSpikeBinnedArray(folderPath,
                                 columns = f[requestedRecord + requestedSpikeMat + '/columns'])
                     except Exception:
                         traceback.print_exc()
-                        pdb.set_trace()
+                        
 
                 selectedIndices = np.array(f[requestedRecord + '/selectedIndices'])
 
@@ -3520,7 +3296,7 @@ def loadSpikeBinnedArray(folderPath,
                     spikeMats.update(hf.binnedArray(spikesFrom, rasterOpts, alignTimes))
                 except Exception:
                     traceback.print_exc()
-                    pdb.set_trace()
+                    
 
                 for idx, spikeMat in spikeMats.items():
                     spikeMatSetName = str(idx)
@@ -3599,7 +3375,7 @@ def loadTrialBinnedArray(folderPath,
                                 columns = f[requestedSpikeMat + '/columns'])
                     except Exception:
                         traceback.print_exc()
-                        pdb.set_trace()
+                        
 
         except Exception:
             traceback.print_exc()
@@ -3630,13 +3406,13 @@ def loadTrialBinnedArray(folderPath,
                 else:
                     if value is not None and key not in ['separateBy']:
                         try: grp.attrs[key] = value
-                        except Exception: traceback.print_exc(); pdb.set_trace()
+                        except Exception: traceback.print_exc(); 
                     else:
                         grp.attrs[key] = np.nan
 
             spikeMats = {i:None for i in trialStats.index}
             spikeMats.update(hf.trialBinnedArray(spikes, rasterOpts, trialStats, chans = None))
-            #pdb.set_trace()
+            #
             saveSpikeMats = {i:None for i in whichTrial}
             for idx, spikeMat in spikeMats.items():
                 spikeMatSetName = str(idx)

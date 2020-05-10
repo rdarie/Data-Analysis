@@ -15,7 +15,7 @@ parentDir = os.path.abspath(
 #print(parentDir)
 
 import pdb, re, warnings, string, os
-#pdb.set_trace()
+#
 from enum import Enum
 from tkinter import *
 from tkinter import filedialog
@@ -49,7 +49,7 @@ def get_spikes(raw, chanLabels, filter_function, spike_dur, trig_sr,
     current_spike = 0
 
     for idx in np.squeeze(trig_idx):
-        #pdb.set_trace()
+        #
         spike = np.array(raw[chanLabels[0]]['data'][idx:idx+spike_num_samp]) #collect spike from raw data trace
         spike = filter_function(spike)
         spike_mat[current_spike,:] = spike
@@ -89,7 +89,7 @@ def plot_sta(whichChan, chanLabels, spike_dur, filter_function = lambda x: x,
         title = 'Choose file(s)',
         initialdir = serverHome + '/Reversible lesions/Rodent Spinal Virus Transfection')
         # open window to get file name
-    #pdb.set_trace()
+    #
 
     if not TDMS_filename_all: # if file not selected, select a default
         TDMS_filename_all = (serverHome +
@@ -160,7 +160,7 @@ def plot_sta(whichChan, chanLabels, spike_dur, filter_function = lambda x: x,
             spike_mat = spike_mat / norm_factor
             mean_spike = mean_spike / norm_factor
             std_spike = std_spike / norm_factor
-        #pdb.set_trace()
+        #
 
         if debugging:
             plt.xlabel('Time (msec)')
@@ -194,7 +194,7 @@ def plot_sta(whichChan, chanLabels, spike_dur, filter_function = lambda x: x,
         box = fig_axes.get_position()
         fig_axes.set_position([box.x0, box.y0, box.width, box.height * 0.8])
 
-        #pdb.set_trace()
+        #
 
         if not os.path.exists(filename_path + chanLabels[0] +'_figs/'):
             os.makedirs(filename_path + chanLabels[0] +'_figs/')
@@ -209,7 +209,7 @@ def compare_sta(whichChan, chanLabels, spike_dur, filter_function = lambda x: x,
 
     # get color map
     use_color = plt.get_cmap('viridis')
-    #pdb.set_trace()
+    #
 
     # get filename
     root = Tk()
@@ -217,7 +217,7 @@ def compare_sta(whichChan, chanLabels, spike_dur, filter_function = lambda x: x,
     TDMS_filename_all = filedialog.askopenfilenames(title = 'Choose file(s)',
         initialdir = serverHome + '/Reversible lesions/Rodent Spinal Virus Transfection') # open window to get file name
     numFiles = len(TDMS_filename_all)
-    #pdb.set_trace()
+    #
 
     if not TDMS_filename_all: # if file not selected, select a default
         TDMS_filename_all = (serverHome + '/Reversible lesions/Rodent Spinal Virus Transfection/Survivor - 20160727/10_Survivor_HReflex_I1000_PW100us_A055.tdms',)
@@ -244,7 +244,7 @@ def compare_sta(whichChan, chanLabels, spike_dur, filter_function = lambda x: x,
             plt.figure(1)
 
         spike_mat, mean_spike, std_spike, spike_time = get_spikes(raw, chanLabels, filter_function, spike_dur, trig_sr, trig_idx, debugging)
-        #pdb.set_trace()
+        #
         if normalize == NORM.TOMAX:
             norm_factor = mean_spike.max()
             spike_mat = spike_mat / norm_factor
@@ -259,7 +259,7 @@ def compare_sta(whichChan, chanLabels, spike_dur, filter_function = lambda x: x,
 
         plt.figure(2)
         current_color = use_color(float(counter)/float(numFiles))[:3]
-        #pdb.set_trace()
+        #
         plt.plot(spike_time,mean_spike, label = 'Mean ' + chanLabels[0] +', ' + conditions[counter], color = current_color, linewidth = 2)
         plt.fill_between(spike_time, mean_spike+std_spike, mean_spike-std_spike,facecolor=current_color, alpha = 0.3, label = 'Standard Deviation, ' + conditions[counter])
         plt.xlabel('Time (msec)')

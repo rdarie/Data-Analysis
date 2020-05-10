@@ -83,7 +83,6 @@ class StandAloneViewer(MainViewer):
         #TODO clear all
         sources = get_sources_from_neo_rawio(self.neorawio)
         
-        
         compose_mainviewer_from_sources(sources, mainviewer=self)
         
         #~ for i, sig_source in enumerate(sources['signal']):

@@ -55,7 +55,7 @@ spikes = getNEVData(datafile, chans)
 binInterval = float(argBinInterval)
 binWidth = float(argBinWidth)
 timeStart = 0
-#pdb.set_trace()
+#
 #timeDur = max([max(sp) for sp in spikes['TimeStamps']]) / spikes['basic_headers']['TimeStampResolution'] - timeStart
 timeDur = 90
 

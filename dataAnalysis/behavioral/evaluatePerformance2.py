@@ -1,7 +1,11 @@
 # Started November 2018; does not use plotly
 
 import dataAnalysis.helperFunctions.helper_functions as hf
-import proprioBehavioralControl.helperFunctions as bhf
+import traceback
+try:
+    import proprioBehavioralControl.helperFunctions as bhf
+except Exception:
+    traceback.print_exc()
 import dataAnalysis.helperFunctions.motor_encoder as mea
 import argparse, pdb
 import os

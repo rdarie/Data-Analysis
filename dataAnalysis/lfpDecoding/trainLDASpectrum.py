@@ -7,7 +7,7 @@ import numpy as np
 import argparse
 
 parser = argparse.ArgumentParser()
-#pdb.set_trace()
+#
 parser.add_argument('--file', nargs='*', default = ['201612201054-Starbuck_Treadmill-Array1480_Right-Trial00001.ns5','201612201054-Starbuck_Treadmill-Array1480_Right-Trial00002.ns5'])
 args = parser.parse_args()
 argFile = args.file

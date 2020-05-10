@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 #~ from __future__ import (unicode_literals, print_function, division, absolute_import)
-
+#  RD
+import numpy as np
+#  
 from collections import OrderedDict
 import time
 import sys
@@ -212,10 +214,16 @@ def compose_mainviewer_from_sources(sources, mainviewer=None):
         mainviewer = MainViewer(show_auto_scale=True)
     
     for i, sig_source in enumerate(sources['signal']):
+        #  import pdb; 
+        #  RD 02-23-2019
         view = TraceViewer(source=sig_source, name='signal {}'.format(i))
         view.params['scale_mode'] = 'same_for_all'
         view.params['display_labels'] = True
-        view.auto_scale()
+        view.params['xsize'] = 12
+        try:
+            view.auto_scale()
+        except Exception:
+            view.params['scale_mode'] = 'real_scale'
         if i==0:
             mainviewer.add_view(view)
         else:

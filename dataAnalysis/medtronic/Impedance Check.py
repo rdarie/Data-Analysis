@@ -229,7 +229,7 @@ for i in range(20):
     # Write some Text
     #singleTile = cv2.putText(singleTile,'250 um',(x0_s + 200, 300), font, fontScale, whiteTuple, thickness, cv2.LINE_AA)
     #blankImage = cv2.putText(blankImage,'250 um',(x0_s + 200,y0 + 300), font, fontScale, whiteTuple, thickness, cv2.LINE_AA)
-    #pdb.set_trace()
+    #
     cv2.imwrite(baseFolder + 'tiled_{:02d}.png'.format(int(i)), singleTile)
 
 cv2.imwrite(baseFolder + 'tiled.png', blankImage)
