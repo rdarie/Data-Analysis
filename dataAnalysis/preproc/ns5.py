@@ -672,6 +672,7 @@ def alignedAsigsToDF(
             dtype=np.bool)
         if invertOutlierMask:
             outlierMask = ~outlierMask
+        # pdb.set_trace()
         allWaveforms = allWaveforms.loc[~outlierMask, :]
     if manipulateIndex and getMetaData:
         idxLabels = allWaveforms.index.names

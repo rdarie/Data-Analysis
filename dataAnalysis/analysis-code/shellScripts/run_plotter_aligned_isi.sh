@@ -7,7 +7,7 @@
 
 # Request memory:
 #SBATCH --nodes=1
-#SBATCH --mem=24G
+#SBATCH --mem=32G
 
 # Specify a job name:
 #SBATCH -J plotsStim

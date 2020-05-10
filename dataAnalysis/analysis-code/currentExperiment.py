@@ -332,7 +332,7 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
         removeFuzzyName=False)
     alignedAsigsKWargs.update(dict(
         windowSize=(-100e-3, 400e-3),
-        decimate=2))
+        decimate=20))
     # if (miniRCBlock or RCBlock):
     #     alignedAsigsKWargs.update(dict(
     #         amplitudeColumn='amplitude',
