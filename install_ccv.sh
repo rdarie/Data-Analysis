@@ -10,8 +10,6 @@ RepoList=(\
 "rcsanalysis" \
 "peakutils" \
 "seaborn" \
-"spykesML" \
-"Data-Analysis"\
 )
 
 module load leveldb openblas hdf5 protobuf ffmpeg
@@ -19,6 +17,7 @@ module load opengl
 module load anaconda/3-5.2.0
 module load mpi
 module load qt/5.10.1
+
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
 conda activate
 
