@@ -189,8 +189,8 @@ asp.plotAsigsAligned(
             # xUnitFactor=1e3, yUnitFactor=1,
             # xUnits='msec', yUnits='uV',
             # for evoked emg report
-            xUnitFactor=1e3, yUnitFactor=1e6,
-            xUnits='msec', yUnits='mV',
+            xUnitFactor=1e3, yUnitFactor=1,
+            xUnits='msec', yUnits='uV',
             ),
         asp.genYLabelChanger(
             lookupDict={}, removeMatch='#0'),

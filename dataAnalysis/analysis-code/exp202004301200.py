@@ -115,12 +115,18 @@ def getExpOpts():
             # 'LPeroneusLongusEmg#0',
             # 'LBicepsFemorisEmg#0',
             # 'LGastrocnemiusEmg#0',
-            'RThoracolumbarFasciaEmg#0',
-            'RGracilisEmg#0',
-            'RTensorFasciaeLataeEmg#0',
-            'RPeroneusLongusEmg#0',
-            'RBicepsFemorisEmg#0',
-            'RGastrocnemiusEmg#0'
+            # 'RThoracolumbarFasciaEmg#0',
+            # 'RGracilisEmg#0',
+            # 'RTensorFasciaeLataeEmg#0',
+            # 'RPeroneusLongusEmg#0',
+            # 'RBicepsFemorisEmg#0',
+            # 'RGastrocnemiusEmg#0'
+            'RThoracolumbarFasciaEmgEnv#0',
+            'RGracilisEmgEnv#0',
+            'RTensorFasciaeLataeEmgEnv#0',
+            'RPeroneusLongusEmgEnv#0',
+            'RBicepsFemorisEmgEnv#0',
+            'RGastrocnemiusEmgEnv#0'
         ]
     # based on vanderhorst and hostege distanges along lumbar enlargement
     delsysMapDict = ({

@@ -10,11 +10,11 @@
 #SBATCH --mem=96G
 
 # Specify a job name:
-#SBATCH -J alignStim_20200318
+#SBATCH -J alignStim_20200427
 
 # Specify an output file
-#SBATCH -o ../batch_logs/%j-alignStim_20200318.stdout
-#SBATCH -e ../batch_logs/%j-alignStim_20200318.errout
+#SBATCH -o ../batch_logs/%j-alignStim_20200427.stdout
+#SBATCH -e ../batch_logs/%j-alignStim_20200427.errout
 
 # Specify account details
 #SBATCH --account=bibs-dborton-condo
@@ -22,9 +22,9 @@
 # EXP="exp202003091200"
 # EXP="exp202003181300"
 # EXP="exp202003191400"
-# EXP="exp202004271200"
+EXP="exp202004271200"
 # EXP="exp202004301200"
-EXP="exp202005011400"
+# EXP="exp202005011400"
 # EXP="exp202003201200"
 
 LAZINESS="--lazy"

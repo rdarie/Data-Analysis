@@ -231,8 +231,8 @@ mapSpecificPlotProcFuns = {
     'delsys': [
         asp.genTicksToScale(
             lineOpts={'lw': 2}, shared=False,
-            xUnitFactor=1e3, yUnitFactor=1e6,
-            xUnits='msec', yUnits='mV',
+            xUnitFactor=1e3, yUnitFactor=1,
+            xUnits='msec', yUnits='uV',
             )]}
 addSpacesFromMap = True
 extraSpaces = {
