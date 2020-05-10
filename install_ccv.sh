@@ -40,5 +40,6 @@ for i in ${RepoList[*]}; do
     cd ..
 done
 #
-cd ..
+cd Data-analysis
+python setup.py develop --user
 echo $(pwd)
