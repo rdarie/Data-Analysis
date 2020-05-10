@@ -12,6 +12,8 @@ RepoList=(\
 "seaborn" \
 )
 
+module load git/2.10.2
+module load gcc/4.9.4
 module load leveldb openblas hdf5 protobuf ffmpeg
 module load opengl
 module load anaconda/3-5.2.0
@@ -43,4 +45,7 @@ done
 #
 cd Data-Analysis
 python setup.py develop --user
+cd ~/anaconda/nda2/bin
+chmod u+x *
+cd ~
 echo $(pwd)
