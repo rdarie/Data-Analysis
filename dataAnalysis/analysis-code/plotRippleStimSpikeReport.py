@@ -221,11 +221,11 @@ mapSpecificPlotProcFuns = {
         asp.genTicksToScale(
             lineOpts={'lw': 2}, shared=False,
             # for evoked lfp report
-            # xUnitFactor=1e3, yUnitFactor=1,
-            # xUnits='msec', yUnits='uV',
+            xUnitFactor=1e3, yUnitFactor=1,
+            xUnits='msec', yUnits='uV',
             # for stim spike
-            xUnitFactor=1e3, yUnitFactor=1e-6,
-            xUnits='msec', yUnits='V',
+            # xUnitFactor=1e3, yUnitFactor=1e-6,
+            # xUnits='msec', yUnits='V',
             )
         ],
     'delsys': [

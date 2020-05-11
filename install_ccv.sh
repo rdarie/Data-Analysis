@@ -2,6 +2,7 @@
 GitRepoRoot="git://github.com/rdarie/"
 #GitRepoRoot="git://github.com/neuromotion/"
 RepoList=(\
+"seaborn" \
 "python-neo" \
 "tridesclous" \
 "ephyviewer" \
@@ -10,7 +11,6 @@ RepoList=(\
 "analysis-tools" \
 "rcsanalysis" \
 "peakutils" \
-"seaborn" \
 )
 
 module load git/2.10.2

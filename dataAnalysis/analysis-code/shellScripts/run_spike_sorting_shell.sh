@@ -15,8 +15,8 @@
 #SBATCH --array=2
 
 # Specify an output file
-#SBATCH -o ../batch_logs/%j-%a-spike_sort_peeler.stdout
-#SBATCH -e ../batch_logs/%j-%a-spike_sort_peeler.errout
+#SBATCH -o ../../batch_logs/%j-%a-spike_sort_peeler.stdout
+#SBATCH -e ../../batch_logs/%j-%a-spike_sort_peeler.errout
 
 # Specify account details
 #SBATCH --account=bibs-dborton-condo
@@ -27,9 +27,9 @@
 # EXP="exp201901211000"
 # EXP="exp201901221000"
 # EXP="exp201901231000"
-# EXP="exp201901271000"
-EXP="exp201901261000"
-TRIALIDX="4"
+EXP="exp201901271000"
+# EXP="exp201901261000"
+TRIALIDX="1"
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
@@ -37,15 +37,15 @@ conda activate
 source activate nda2
 python --version
 
-# Constructor
-# python3 ./tridesclousCCV.py --blockIdx=$TRIALIDX --exp=$EXP  --batchPreprocess
+# Step 1: Constructor
+python3 ./tridesclousCCV.py --blockIdx=$TRIALIDX --exp=$EXP  --batchPreprocess
 # python3 ./tridesclousVisualize.py --blockIdx=$TRIALIDX --exp=$EXP  --constructor
-# Transfer
-python3 ./transferTDCTemplates.py --blockIdx=$TRIALIDX --exp=$EXP
-# Peeler
+# Step 2: Transfer
+# python3 ./transferTDCTemplates.py --blockIdx=$TRIALIDX --exp=$EXP
+# Step 3: Peeler
 # python3 ./tridesclousCCV.py --blockIdx=$TRIALIDX --exp=$EXP --purgePeeler --batchPeel
 # python3 ./tridesclousVisualize.py --blockIdx=$TRIALIDX --exp=$EXP  --peeler
-#
+# Step 4: 
 # python3 ./tridesclousCCV.py --blockIdx=$TRIALIDX --exp=$EXP --exportSpikesCSV
 # python3 ./tridesclousCCV.py --blockIdx=$TRIALIDX --exp=$EXP --purgePeelerDiagnostics
 # python3 './tridesclousCCV.py' --blockIdx=$TRIALIDX --makeStrictNeoBlock --exp=$EXP

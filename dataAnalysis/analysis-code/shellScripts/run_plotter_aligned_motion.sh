@@ -13,8 +13,8 @@
 #SBATCH -J plotsMotionStim
 
 # Specify an output file
-#SBATCH -o ../batch_logs/%j-plotsMotionStim.stdout
-#SBATCH -e ../batch_logs/%j-plotsMotionStim.errout
+#SBATCH -o ../../batch_logs/%j-plotsMotionStim.stdout
+#SBATCH -e ../../batch_logs/%j-plotsMotionStim.errout
 
 # Specify account details
 #SBATCH --account=bibs-dborton-condo

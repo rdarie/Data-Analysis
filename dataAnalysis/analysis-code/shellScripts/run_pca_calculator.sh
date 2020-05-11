@@ -13,8 +13,8 @@
 #SBATCH -J calc_pca
 
 # Specify an output file
-#SBATCH -o ../batch_logs/%j-calc_pca.stdout
-#SBATCH -e ../batch_logs/%j-calc_pca.errout
+#SBATCH -o ../../batch_logs/%j-calc_pca.stdout
+#SBATCH -e ../../batch_logs/%j-calc_pca.errout
 
 # Specify account details
 #SBATCH --account=bibs-dborton-condo

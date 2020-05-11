@@ -14,8 +14,8 @@
 #SBATCH -J analysis_mini_20190127
 
 # Specify an output file
-#SBATCH -o ../batch_logs/%j-%a-analysis_mini_20190127.stdout
-#SBATCH -e ../batch_logs/%j-%a-analysis_mini_20190127.errout
+#SBATCH -o ../../batch_logs/%j-%a-analysis_mini_20190127.stdout
+#SBATCH -e ../../batch_logs/%j-%a-analysis_mini_20190127.errout
 
 # Specify account details
 #SBATCH --account=bibs-dborton-condo

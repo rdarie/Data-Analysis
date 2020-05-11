@@ -23,6 +23,7 @@ from docopt import docopt
 import tridesclous as tdc
 import dataAnalysis.helperFunctions.tridesclous_helpers as tdch
 import os, gc, traceback
+import pdb
 
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 chan_start = int(arguments['chan_start'])
@@ -50,6 +51,7 @@ if RANK == 0:
     globals().update(expOpts)
     globals().update(allOpts)
     try:
+        # pdb.set_trace()
         tdch.initialize_catalogueconstructor(
             nspFolder,
             ns5FileName,

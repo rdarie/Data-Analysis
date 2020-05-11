@@ -13,8 +13,8 @@
 #SBATCH -J tdrFull
 
 # Specify an output file
-#SBATCH -o ../batch_logs/%j-tdrFull.stdout
-#SBATCH -e ../batch_logs/%j-tdrFull.errout
+#SBATCH -o ../../batch_logs/%j-tdrFull.stdout
+#SBATCH -e ../../batch_logs/%j-tdrFull.errout
 
 # Specify account details
 #SBATCH --account=bibs-dborton-condo

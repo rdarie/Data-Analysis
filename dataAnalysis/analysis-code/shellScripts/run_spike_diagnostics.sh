@@ -13,8 +13,8 @@
 #SBATCH -J sorting_diagnostics
 
 # Specify an output file
-#SBATCH -o ../batch_logs/%j-%a-sorting-diagnostics.stdout
-#SBATCH -e ../batch_logs/%j-%a-sorting-diagnostics.errout
+#SBATCH -o ../../batch_logs/%j-%a-sorting-diagnostics.stdout
+#SBATCH -e ../../batch_logs/%j-%a-sorting-diagnostics.errout
 
 # Specify account details
 #SBATCH --account=bibs-dborton-condo

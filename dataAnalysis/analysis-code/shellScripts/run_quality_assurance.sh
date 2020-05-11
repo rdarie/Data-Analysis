@@ -13,8 +13,8 @@
 #SBATCH -J calc_qa
 
 # Specify an output file
-#SBATCH -o ../batch_logs/%j-calc_qa.stdout
-#SBATCH -e ../batch_logs/%j-calc_qa.errout
+#SBATCH -o ../../batch_logs/%j-calc_qa.stdout
+#SBATCH -e ../../batch_logs/%j-calc_qa.errout
 
 # Specify account details
 #SBATCH --account=bibs-dborton-condo

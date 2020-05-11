@@ -14,8 +14,8 @@
 #SBATCH -J all_preproc_20190123
 
 # Specify an output file
-#SBATCH -o ../batch_logs/%j-%a-all_preproc_20190123.stdout
-#SBATCH -e ../batch_logs/%j-%a-all_preproc_20190123.errout
+#SBATCH -o ../../batch_logs/%j-%a-all_preproc_20190123.stdout
+#SBATCH -e ../../batch_logs/%j-%a-all_preproc_20190123.errout
 
 # Specify account details
 #SBATCH --account=bibs-dborton-condo

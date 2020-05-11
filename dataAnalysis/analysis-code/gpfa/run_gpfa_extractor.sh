@@ -13,8 +13,8 @@
 #SBATCH -J extract_GPFA
 
 # Specify an output file
-#SBATCH -o ../batch_logs/%j-extract_GPFA.stdout
-#SBATCH -e ../batch_logs/%j-extract_GPFA.errout
+#SBATCH -o ../../batch_logs/%j-extract_GPFA.stdout
+#SBATCH -e ../../batch_logs/%j-extract_GPFA.errout
 
 # Specify account details
 #SBATCH --account=bibs-dborton-condo

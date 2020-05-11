@@ -1,13 +1,12 @@
 def getExpOpts():
     #
-    miniRCBlockLookup = {
-        1: False,
-        2: False,
-        3: False,
-        4: False,
-        5: True
+    blockExperimentTypeLookup = {
+        1: 'proprio',
+        2: 'proprio',
+        3: 'proprio',
+        4: 'proprio',
+        5: 'proprio-miniRC'
         }
-    RCBlockLookup = {i: False for i in miniRCBlockLookup.keys()} 
     
     experimentName = '201901271000-Proprio'
     deviceName = 'DeviceNPC700373H'

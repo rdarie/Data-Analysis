@@ -13,8 +13,8 @@
 #SBATCH -J alignMiniRC
 
 # Specify an output file
-#SBATCH -o ../batch_logs/%j-alignMiniRC.stdout
-#SBATCH -e ../batch_logs/%j-alignMiniRC.errout
+#SBATCH -o ../../batch_logs/%j-alignMiniRC.stdout
+#SBATCH -e ../../batch_logs/%j-alignMiniRC.errout
 
 # Specify account details
 #SBATCH --account=bibs-dborton-condo

@@ -14,8 +14,8 @@
 #SBATCH --array=1
 
 # Specify an output file
-#SBATCH -o ../batch_logs/%j-%a-spike_sort_constructor.stdout
-#SBATCH -e ../batch_logs/%j-%a-spike_sort_constructor.errout
+#SBATCH -o ../../../batch_logs/%j-%a-spike_sort_constructor.stdout
+#SBATCH -e ../../../batch_logs/%j-%a-spike_sort_constructor.errout
 
 # Specify account details
 #SBATCH --account=bibs-dborton-condo

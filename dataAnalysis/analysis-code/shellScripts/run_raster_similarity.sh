@@ -13,8 +13,8 @@
 #SBATCH -J alignTemp
 
 # Specify an output file
-#SBATCH -o ../batch_logs/%j-alignTemp.stdout
-#SBATCH -e ../batch_logs/%j-alignTemp.errout
+#SBATCH -o ../../batch_logs/%j-alignTemp.stdout
+#SBATCH -e ../../batch_logs/%j-alignTemp.errout
 
 # Specify account details
 #SBATCH --account=bibs-dborton-condo

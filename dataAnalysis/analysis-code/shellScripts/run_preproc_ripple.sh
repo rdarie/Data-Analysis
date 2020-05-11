@@ -14,8 +14,8 @@
 #SBATCH -J nsp_preproc_20200319_raw
 
 # Specify an output file
-#SBATCH -o ../batch_logs/%j-%a-nsp_preproc_20200319_raw.stdout
-#SBATCH -e ../batch_logs/%j-%a-nsp_preproc_20200319_raw.errout
+#SBATCH -o ../../batch_logs/%j-%a-nsp_preproc_20200319_raw.stdout
+#SBATCH -e ../../batch_logs/%j-%a-nsp_preproc_20200319_raw.errout
 
 # Specify account details
 #SBATCH --account=bibs-dborton-condo

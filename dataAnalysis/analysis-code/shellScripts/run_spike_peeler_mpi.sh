@@ -14,8 +14,8 @@
 #SBATCH -J spike_sort_peeler
 
 # Specify an output file
-#SBATCH -o ../batch_logs/%j-%a-spike_sort_peeler.stdout
-#SBATCH -e ../batch_logs/%j-%a-spike_sort_peeler.errout
+#SBATCH -o ../../batch_logs/%j-%a-spike_sort_peeler.stdout
+#SBATCH -e ../../batch_logs/%j-%a-spike_sort_peeler.errout
 
 # Specify account details
 #SBATCH --account=bibs-dborton-condo

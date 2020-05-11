@@ -14,8 +14,8 @@
 #SBATCH -J delsys_preproc_20200309_raw
 
 # Specify an output file
-#SBATCH -o ../batch_logs/%j-%a-delsys_preproc_20200309_raw.stdout
-#SBATCH -e ../batch_logs/%j-%a-delsys_preproc_20200309_raw.errout
+#SBATCH -o ../../batch_logs/%j-%a-delsys_preproc_20200309_raw.stdout
+#SBATCH -e ../../batch_logs/%j-%a-delsys_preproc_20200309_raw.errout
 
 # Specify account details
 #SBATCH --account=bibs-dborton-condo

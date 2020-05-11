@@ -1,28 +1,13 @@
 def getExpOpts():
     #
-    miniRCBlockLookup = {
-        1: False,
-        2: False,
-        3: False,
-        4: False,
-        5: False,
-        6: False,
-        }
-    RCBlockLookup = {
-        1: True,
-        2: True,
-        3: True,
-        4: True,
-        5: True,
-        6: True,
-        }
-    RippleBlockLookup = {
-        1: True,
-        2: True,
-        3: True,
-        4: True,
-        5: True,
-        6: True,
+    
+    blockExperimentTypeLookup = {
+        1: 'isi',
+        2: 'isi',
+        3: 'isi',
+        4: 'isi',
+        5: 'isi',
+        6: 'isi',
         }
     
     experimentName = '202005011400-Peep'

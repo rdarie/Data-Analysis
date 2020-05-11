@@ -13,8 +13,8 @@
 #SBATCH -J plotsStim
 
 # Specify an output file
-#SBATCH -o ../batch_logs/%j-plotsStim.stdout
-#SBATCH -e ../batch_logs/%j-plotsStim.errout
+#SBATCH -o ../../batch_logs/%j-plotsStim.stdout
+#SBATCH -e ../../batch_logs/%j-plotsStim.errout
 
 # Specify account details
 #SBATCH --account=bibs-dborton-condo
@@ -67,8 +67,17 @@ python --version
 # --maskOutlierBlocks --invertOutlierBlocks --individualTraces
 
 #  --maskOutlierBlocks
-python3 './plotRippleStimSpikeReport.py' --exp=$EXP $TRIALSELECTOR $WINDOW $UNITSELECTOR $ANALYSISSELECTOR --alignQuery="stimOn" --alignFolderName=stim $BLOCKSELECTOR --groupPagesBy="electrode, RateInHz" --maskOutlierBlocks
-python3 './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR $BLOCKSELECTOR $UNITSELECTOR --alignQuery="stimOn" --rowName="RateInHz" --rowControl= --colControl= --hueName="nominalCurrent" --alignFolderName=stim --enableOverrides --maskOutlierBlocks --overlayStats
+# python3 './plotRippleStimSpikeReport.py' --exp=$EXP $TRIALSELECTOR $WINDOW $UNITSELECTOR $ANALYSISSELECTOR --alignQuery="stimOn" --alignFolderName=stim $BLOCKSELECTOR --groupPagesBy="electrode, RateInHz" --maskOutlierBlocks
+# python3 './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR $BLOCKSELECTOR $UNITSELECTOR --alignQuery="stimOn" --rowName="RateInHz" --rowControl= --colControl= --hueName="nominalCurrent" --alignFolderName=stim --enableOverrides --maskOutlierBlocks --overlayStats
 
 # stim spikes
 # python3 './plotRippleStimSpikeReport.py' --exp=$EXP $TRIALSELECTOR $ANALYSISSELECTOR $UNITSELECTOR
+
+#  --maskOutlierBlocks
+ANALYSISSELECTOR="--analysisName=lfpFullRes"
+UNITSELECTOR="--unitQuery=isispinal"
+BLOCKSELECTOR="--inputBlockName=lfp"
+WINDOW="--window=extraExtraShort"
+#
+python3 './plotRippleStimSpikeReport.py' --exp=$EXP $TRIALSELECTOR $WINDOW $UNITSELECTOR $ANALYSISSELECTOR --alignQuery="stimOff" --alignFolderName=stim $BLOCKSELECTOR --groupPagesBy="electrode, RateInHz"
+python3 './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR $BLOCKSELECTOR $UNITSELECTOR --alignQuery="stimOff" --rowName="RateInHz" --rowControl= --colControl= --hueName="nominalCurrent" --alignFolderName=stim --enableOverrides --overlayStats

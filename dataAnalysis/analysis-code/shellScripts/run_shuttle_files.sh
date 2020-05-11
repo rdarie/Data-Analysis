@@ -13,8 +13,8 @@
 #SBATCH -J ins_preproc
 
 # Specify an output file
-#SBATCH -o ../batch_logs/%j-%a-ins_preproc.stdout
-#SBATCH -e ../batch_logs/%j-%a-ins_preproc.errout
+#SBATCH -o ../../batch_logs/%j-%a-ins_preproc.stdout
+#SBATCH -e ../../batch_logs/%j-%a-ins_preproc.errout
 
 # Specify account details
 #SBATCH --account=bibs-dborton-condo

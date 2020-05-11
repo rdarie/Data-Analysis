@@ -59,6 +59,7 @@ if arguments['previewMotorEncoder']:
 if arguments['makeTruncated']:
     analogInputNames = sorted(
         trialFilesFrom['utah']['eventInfo']['inputIDs'].values())
+    pdb.set_trace()
     reader =ns5.preproc(
         fileName=ns5FileName,
         rawFolderPath=nspFolder,

@@ -13,8 +13,8 @@
 #SBATCH -J alignStim_20200427
 
 # Specify an output file
-#SBATCH -o ../batch_logs/%j-alignStim_20200427.stdout
-#SBATCH -e ../batch_logs/%j-alignStim_20200427.errout
+#SBATCH -o ../../batch_logs/%j-alignStim_20200427.stdout
+#SBATCH -e ../../batch_logs/%j-alignStim_20200427.errout
 
 # Specify account details
 #SBATCH --account=bibs-dborton-condo
@@ -22,17 +22,17 @@
 # EXP="exp202003091200"
 # EXP="exp202003181300"
 # EXP="exp202003191400"
-EXP="exp202004271200"
+# EXP="exp202004271200"
 # EXP="exp202004301200"
-# EXP="exp202005011400"
+EXP="exp202005011400"
 # EXP="exp202003201200"
 
 LAZINESS="--lazy"
 # LAZINESS=""
 # WINDOW="--window=miniRC"
 # WINDOW="--window=short"
-WINDOW="--window=extraShort"
-# WINDOW="--window=extraExtraShort"
+# WINDOW="--window=extraShort"
+WINDOW="--window=extraExtraShort"
 # TRIALSELECTOR="--blockIdx=1"
 # TRIALSELECTOR="--blockIdx=3"
 TRIALSELECTOR="--processAll"
@@ -40,16 +40,16 @@ TRIALSELECTOR="--processAll"
 # ANALYSISSELECTOR="--analysisName=default"
 # ANALYSISSELECTOR="--analysisName=emgStretchTime"
 # ANALYSISSELECTOR="--analysisName=emgHiRes"
-ANALYSISSELECTOR="--analysisName=emgLoRes"
+# ANALYSISSELECTOR="--analysisName=emgLoRes"
 # ANALYSISSELECTOR="--analysisName=emg1msec"
 # ANALYSISSELECTOR="--analysisName=emg1msecSmooth"
 # ANALYSISSELECTOR="--analysisName=emg1msecNoLFPFilterSmoothEMG"
-# ANALYSISSELECTOR="--analysisName=lfpFullRes"
+ANALYSISSELECTOR="--analysisName=lfpFullRes"
 #
 # UNITSELECTOR="--unitQuery=all"
 # UNITSELECTOR="--unitQuery=isiemgraw"
-UNITSELECTOR="--unitQuery=isiemgenv"
-# UNITSELECTOR="--unitQuery=isispinal"
+# UNITSELECTOR="--unitQuery=isiemgenv"
+UNITSELECTOR="--unitQuery=isispinal"
 # UNITSELECTOR="--unitQuery=isispinaloremg"
 
 module load anaconda/3-5.2.0
@@ -58,9 +58,9 @@ conda activate
 source activate nda2
 python --version
 
-# python3 ./assembleExperimentData.py --exp=$EXP --blockIdx=4 --processAsigs --processRasters $ANALYSISSELECTOR 
+python3 ./assembleExperimentData.py --exp=$EXP --blockIdx=4 --processAsigs --processRasters $ANALYSISSELECTOR 
 # python3 ./calcAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ANALYSISSELECTOR --eventName=stimAlignTimes --chanQuery="isiemg" --blockName="emg" --verbose  --alignFolderName=stim
-# python3 ./calcAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ANALYSISSELECTOR --eventName=stimAlignTimes --chanQuery="isispinal" --blockName="spinal" --verbose  --alignFolderName=stim
+python3 ./calcAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ANALYSISSELECTOR --eventName=stimAlignTimes --chanQuery="isispinal" --blockName="lfp" --verbose  --alignFolderName=stim
 
 python3 ./calcTrialOutliers.py --exp=$EXP --alignFolderName=stim --inputBlockName="emg" $TRIALSELECTOR $ANALYSISSELECTOR $UNITSELECTOR $WINDOW --alignQuery="stimOn" --verbose --plotting --saveResults
 # python3 ./calcISIStimArtifact.py --exp=$EXP --alignFolderName=stim --inputBlockName="lfp" --outputBlockName="lfp_clean" $TRIALSELECTOR $ANALYSISSELECTOR $UNITSELECTOR $WINDOW --alignQuery="stimOn" --saveResults --verbose --plotting

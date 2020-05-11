@@ -13,8 +13,8 @@
 #SBATCH -J alignStim_20190121
 
 # Specify an output file
-#SBATCH -o ../batch_logs/%j-alignStim_20190127.stdout
-#SBATCH -e ../batch_logs/%j-alignStim_20190127.errout
+#SBATCH -o ../../batch_logs/%j-alignStim_20190127.stdout
+#SBATCH -e ../../batch_logs/%j-alignStim_20190127.errout
 
 # Specify account details
 #SBATCH --account=bibs-dborton-condo

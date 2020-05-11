@@ -15,7 +15,9 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
         ccvUsername = d['ccvUsername']
         scratchPath = d['scratchPath']
         remoteBasePath = d['remoteBasePath']
-    optsModule = importlib.import_module(experimentShorthand, package=None)
+    #
+    optsModule = importlib.import_module(
+        'experimentOptions.' + experimentShorthand, package=None)
     expOpts = optsModule.getExpOpts()
     #  globals().update(expOpts)
     #  remote paths
@@ -36,9 +38,10 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
     oeFolder = os.path.join(remoteBasePath, 'raw', experimentName, 'open_ephys')
     sipFolder = os.path.join(remoteBasePath, 'raw', experimentName, 'ins_sip')
     ns5FileName = 'Block{:0>3}'.format(blockIdx)
-    miniRCBlockLookup = expOpts['miniRCBlockLookup']
-    RCBlockLookup = expOpts['RCBlockLookup']
-    RippleBlockLookup = expOpts['RippleBlockLookup']
+    # miniRCBlockLookup = expOpts['miniRCBlockLookup']
+    # RCBlockLookup = expOpts['RCBlockLookup']
+    # RippleBlockLookup = expOpts['RippleBlockLookup']
+    blockExperimentType = expOpts['blockExperimentTypeLookup'][blockIdx]
     try:
         openEphysChanNames = expOpts['openEphysChanNames']
     except Exception:
@@ -97,9 +100,7 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
             'ftype': 'butter'
         }
     }
-    miniRCBlock = miniRCBlockLookup[blockIdx]
-    RCBlock = RCBlockLookup[blockIdx]
-    RippleBlock = RippleBlockLookup[blockIdx]
+    
     gpfaOpts = {
         'xDim': 3,
         'segLength': 20,
@@ -124,7 +125,7 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
         'keepIndex': slice(None)
         }
     sessionTapRangesNSP = expOpts['synchInfo']['nsp']
-    if not RippleBlock:
+    if not blockExperimentType == 'isi':
         for trialKey in sessionTapRangesNSP.keys():
             for trialSegmentKey in sessionTapRangesNSP[trialKey].keys():
                 for key in defaultSessionTapRangesNSP.keys():
@@ -232,16 +233,16 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
         }
     #
     trialFilesStim['ins']['getINSkwargs'].update(commonStimDetectionOpts)
-    if miniRCBlock:
+    if blockExperimentType == 'proprio-miniRC':
         #  override with settings for detecting cycling stim trains
         trialFilesStim['ins']['getINSkwargs'].update(miniRCStimDetectionOpts)
         #  only parse sync lines
         eventInfo = {'inputIDs': miniRCRigInputs}
-    elif RCBlock:
+    elif blockExperimentType == 'proprio-RC':
         trialFilesStim['ins']['getINSkwargs'].update(RCStimDetectionOpts)
         #  should rename eventInfo to something more intuitive
         eventInfo = {'inputIDs': RCRigInputs}
-    elif RippleBlock:
+    elif blockExperimentType == 'isi':
         #  should rename eventInfo to something more intuitive
         eventInfo = {'inputIDs': dict()}
     else:
@@ -249,7 +250,7 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
         #  should rename eventInfo to something more intuitive
         eventInfo = {'inputIDs': fullRigInputs}
     #
-    trialFilesFrom['utah']['calcRigEvents'] = not (miniRCBlock or RCBlock)
+    trialFilesFrom['utah']['calcRigEvents'] = not ((blockExperimentType == 'proprio-miniRC') or (blockExperimentType == 'proprio-RC'))
     trialFilesFrom['utah'].update({'eventInfo': eventInfo})
     
     nspCmpPath = os.path.join('.', 'nsp_map.cmp')
@@ -343,8 +344,8 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
         electrodeColumn='electrode',
         removeFuzzyName=False)
     alignedAsigsKWargs.update(dict(
-        windowSize=(-100e-3, 400e-3),
-        decimate=20))
+        windowSize=(-1e-3, 5e-3),
+        decimate=1))
     # if (miniRCBlock or RCBlock):
     #     alignedAsigsKWargs.update(dict(
     #         amplitudeColumn='amplitude',
@@ -373,7 +374,7 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
         # 'binInterval': 1e-4, 'binWidth': 5e-3, 'smoothKernelWidth': 10e-3,  # 10 kHz, EMG Hi-Res
         'windowSizes': {
             'extraShort': (-0.1, 0.4),
-            'extraExtraShort': (-0.125, 0.125),
+            'extraExtraShort': (-0.025, 0.075),
             'short': (-0.5, 0.5),
             'long': (-2.25, 2.25),
             'RC': (-0.33, 0.33),

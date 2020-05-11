@@ -13,8 +13,8 @@
 #SBATCH -J mpi_test
 
 # Specify an output file
-#SBATCH -o ../batch_logs/%j-%a-mpi_test-o.out
-#SBATCH -e ../batch_logs/%j-%a-mpi_test-e.out
+#SBATCH -o ../../batch_logs/%j-%a-mpi_test-o.out
+#SBATCH -e ../../batch_logs/%j-%a-mpi_test-e.out
 
 # Specify account details
 #SBATCH --account=bibs-dborton-condo

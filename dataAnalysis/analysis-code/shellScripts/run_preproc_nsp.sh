@@ -14,8 +14,8 @@
 #SBATCH -J nsp_preproc_20200309_raw
 
 # Specify an output file
-#SBATCH -o ../batch_logs/%j-%a-nsp_preproc_20200309_raw.stdout
-#SBATCH -e ../batch_logs/%j-%a-nsp_preproc_20200309_raw.errout
+#SBATCH -o ../../batch_logs/%j-%a-nsp_preproc_20200309_raw.stdout
+#SBATCH -e ../../batch_logs/%j-%a-nsp_preproc_20200309_raw.errout
 
 # Specify account details
 #SBATCH --account=bibs-dborton-condo
@@ -41,12 +41,8 @@ python --version
 # SLURM_ARRAY_TASK_ID=2
 # python3 ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --makeTruncated
 # python3 ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --makeTruncated --maskMotorEncoder
-# python3 ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --makeFull
-# python3 ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --ISI
-python3 ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --ISI
-# python3 ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --previewEncoder
 
 # once the synchronization has happened once
-# SLURM_ARRAY_TASK_ID=5
-# python3 ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --makeTruncated --maskMotorEncoder
-# python3 ./synchronizeINStoNSP.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP
+SLURM_ARRAY_TASK_ID=1
+python3 ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --makeTruncated --maskMotorEncoder
+python3 ./synchronizeINStoNSP.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP
