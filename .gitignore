@@ -173,3 +173,4 @@ dataAnalysis/\.ftpconfig
 .vscode/ftp-sync.json
 dataAnalysis/analysis-code/\.vscode/ftp-sync.json
 dataAnalysis/simulation/\.vscode/ftp-sync.json
+paths.py

@@ -61,7 +61,8 @@ expOpts, allOpts = parseAnalysisOptions(
 globals().update(expOpts)
 globals().update(allOpts)
 
-oldImpedances = pd.read_hdf('./impedances.h5', 'impedance')
+impedanceFilePath = os.path.join(remoteBasePath, 'impedances.h5')
+oldImpedances = pd.read_hdf(impedanceFilePath, 'impedance')
 impList = [oldImpedances]
 if arguments['blackrock']:
     def stripImpedance(x):
@@ -91,7 +92,7 @@ if arguments['blackrock']:
         newImpedances['date'] = recDate
         impList.append(newImpedances)
     allImpedances = pd.concat(impList)
-    allImpedances.to_hdf('./impedances.h5', 'impedance')
+    allImpedances.to_hdf(impedanceFilePath, 'impedance')
 
 if arguments['ripple']:
     headerNames = [
@@ -152,4 +153,4 @@ if arguments['ripple']:
             :, ['impedance', 'elec', 'elecType', 'date']]
         impList.append(saveImpedances)
     allImpedances = pd.concat(impList, sort=True)
-    allImpedances.to_hdf('./impedances.h5', 'impedance')
+    allImpedances.to_hdf(impedanceFilePath, 'impedance')

@@ -33,7 +33,7 @@ EXP="exp201901261000"
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
 conda activate
-source activate nda
+source activate nda2
 python --version
 
 #  python3 './synchronizeINStoNSP.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP 

@@ -9,16 +9,24 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
     plotBlocking = True
     remakePrb = False
     #
+    with open("../../paths.py") as fp:
+        d = {}
+        exec(fp.read(), d)
+        ccvUsername = d['ccvUsername']
+        scratchPath = d['scratchPath']
+        remoteBasePath = d['remoteBasePath']
     optsModule = importlib.import_module(experimentShorthand, package=None)
     expOpts = optsModule.getExpOpts()
     #  globals().update(expOpts)
     #  remote paths
-    if platform.system() == 'Linux':
-        remoteBasePath = '..'
-        scratchPath = '/gpfs/scratch/rdarie/rdarie/Murdoc Neural Recordings'
-    else:
-        remoteBasePath = os.path.join('E:', 'Murdoc Neural Recordings')
-        scratchPath = os.path.join('E:', 'Murdoc Neural Recordings', 'scratch')
+    # if platform.system() == 'Linux':
+    #     remoteBasePath = '..'
+    #     scratchPath = '/gpfs/scratch/{}/{}/Neural Recordings'.format(
+    #         ccvUsername, ccvUsername)
+    # else:
+    #     remoteBasePath = os.path.join('E:', 'Neural Recordings')
+    #     scratchPath = os.path.join('E:', 'Neural Recordings', 'scratch')
+
     nspPrbPath = os.path.join('.', 'nsp_map.prb')
     insFolder = os.path.join(remoteBasePath, 'ORCA Logs')
     experimentName = expOpts['experimentName']
@@ -31,7 +39,6 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
     miniRCBlockLookup = expOpts['miniRCBlockLookup']
     RCBlockLookup = expOpts['RCBlockLookup']
     RippleBlockLookup = expOpts['RippleBlockLookup']
-    
     try:
         openEphysChanNames = expOpts['openEphysChanNames']
     except Exception:
@@ -98,7 +105,7 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
         'segLength': 20,
         'binWidth': 30,
         'kernSD': 50,
-        'installFolder': '/gpfs_home/rdarie/Github/NeuralTraj'
+        'installFolder': '/gpfs_home/{}/Github/NeuralTraj'
     }
 
     defaultTapDetectOpts = {
@@ -247,11 +254,16 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
     
     nspCmpPath = os.path.join('.', 'nsp_map.cmp')
     cmpDF = prb_meta.cmpToDF(nspCmpPath)
-    experimentDateStr = re.search('(\d*)', experimentName).groups()[0]
-    impedances = prb_meta.getLatestImpedance(recordingDateStr=experimentDateStr, elecType='utah')
+    experimentDateStr = re.search(r'(\d*)', experimentName).groups()[0]
+    # pdb.set_trace()
+    impedances = prb_meta.getLatestImpedance(
+        impedanceFilePath=os.path.join(remoteBasePath, 'impedances.h5'),
+        recordingDateStr=experimentDateStr, elecType='utah')
     impedances['elec'] = cmpDF['label'].iloc[:impedances.shape[0]].to_numpy()
     impedances.set_index('elec', inplace=True)
-    impedancesRipple = prb_meta.getLatestImpedance(recordingDateStr=experimentDateStr, elecType='isi_paddle')
+    impedancesRipple = prb_meta.getLatestImpedance(
+        impedanceFilePath=os.path.join(remoteBasePath, 'impedances.h5'),
+        recordingDateStr=experimentDateStr, elecType='isi_paddle')
     #
     if remakePrb:
         nspCsvPath = os.path.join('.', 'nsp_map.csv')

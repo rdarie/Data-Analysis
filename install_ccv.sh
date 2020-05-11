@@ -5,6 +5,7 @@ RepoList=(\
 "python-neo" \
 "tridesclous" \
 "ephyviewer" \
+"elephant" \
 "pyglmnet" \
 "analysis-tools" \
 "rcsanalysis" \

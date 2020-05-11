@@ -5,9 +5,10 @@ from datetime import datetime as dt
 
 
 def getLatestImpedance(
-        recordingDate=None, recordingDateStr=None,
+        recordingDate=None, impedanceFilePath='./impedances.h5',
+        recordingDateStr=None,
         block=None, elecType=None):
-    impedances = pd.read_hdf('./impedances.h5', 'impedance')
+    impedances = pd.read_hdf(impedanceFilePath, 'impedance')
     if elecType is not None:
         impedances = impedances.query('elecType == "{}"'.format(elecType))
     if recordingDate is None:

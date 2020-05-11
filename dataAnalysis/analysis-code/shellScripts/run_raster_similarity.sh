@@ -40,7 +40,7 @@ SELECTOR="Block001_minfrmaxcorr"
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
 conda activate
-source activate nda
+source activate nda2
 # python3 ./calcBlockAnalysisNix.py --exp=$EXP --blockIdx=$TRIALIDX --chanQuery="all"
 # python3 ./calcMotionStimAlignTimes.py --exp=$EXP --blockIdx=$TRIALIDX --plotParamHistograms
 # python3 ./calcFR.py --exp=$EXP --blockIdx=$TRIALIDX

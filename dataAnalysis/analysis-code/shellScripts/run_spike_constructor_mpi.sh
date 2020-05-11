@@ -30,7 +30,7 @@ EXP="exp201901271000"
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
 conda activate
-source activate nda
+source activate nda2
 python --version
 
 module load mpi

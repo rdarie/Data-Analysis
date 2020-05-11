@@ -33,7 +33,7 @@ module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
 conda activate
 
-source activate nda
+source activate nda2
 python --version
 # python3 ./calcUnitLeastSquaresToAsig.py --exp=$EXP --processAll --inputBlockName="fr_sqrt" --secondaryBlockName="rig" --alignQuery="midPeak" --unitQuery="fr_sqrt" --estimatorName=$BLOCKNAME --verbose --plotting
 # python3 ./calcUnitGLMToAsig.py --exp=$EXP --processAll --inputBlockName="fr" --secondaryBlockName="rig" --alignQuery="midPeak" --unitQuery="fr" --estimatorName=$BLOCKNAME --verbose --plotting
