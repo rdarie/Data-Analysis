@@ -24,7 +24,7 @@ module load qt/5.10.1
 conda activate
 
 conda env create -f environment.yml
-chmod +x ~/anaconda/nda2/bin/*
+chmod a+x ~/anaconda/nda2/bin/*
 source activate nda2
 cd ..
 #
