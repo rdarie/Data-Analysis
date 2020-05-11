@@ -24,6 +24,7 @@ module load qt/5.10.1
 conda activate
 
 conda env create -f environment.yml
+chmod +x ~/anaconda/nda2/bin/*
 source activate nda2
 cd ..
 #
@@ -45,7 +46,3 @@ done
 #
 cd Data-Analysis
 python setup.py develop --user
-cd ~/anaconda/nda2/bin
-chmod u+x *
-cd ~
-echo $(pwd)
