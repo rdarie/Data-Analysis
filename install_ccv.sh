@@ -23,7 +23,7 @@ module load qt/5.10.1
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
 conda activate
 
-conda env create -f environment.yml
+conda env create -f environment-linux.yml
 chmod +x $HOME/anaconda/nda2/bin/*
 source activate nda2
 cd ..
