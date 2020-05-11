@@ -1,6 +1,6 @@
 name: nda2
 channels:
-- anaconda
+- defaults
 - conda-forge
 dependencies:
 - python=3.7.6
