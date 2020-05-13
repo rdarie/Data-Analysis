@@ -667,7 +667,8 @@ def alignedAsigsToDF(
             # print(key)
             # outlierTrials.iloc[1, :]
             # allWaveforms.iloc[1, :]
-            return key.loc[tuple(key), :][0]
+            # pdb.set_trace()
+            return outlierTrials[tuple(key)]
         #
         outlierMask = np.asarray(
             allWaveforms.index.map(rejectionLookup),

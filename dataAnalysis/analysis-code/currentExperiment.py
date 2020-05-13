@@ -344,8 +344,8 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
         electrodeColumn='electrode',
         removeFuzzyName=False)
     alignedAsigsKWargs.update(dict(
-        windowSize=(-50e-3, 350e-3),
-        decimate=5))
+        windowSize=(-100e-3, 400e-3),
+        decimate=1))
     # alignedAsigsKWargs.update(dict(
     #     windowSize=None, decimate=1))
     # if (miniRCBlock or RCBlock):

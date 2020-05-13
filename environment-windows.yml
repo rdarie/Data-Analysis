@@ -5,6 +5,8 @@ channels:
 dependencies:
 - python=3.7.6
 - pip
+- jupyter
+- mpi4py=3.0.3
 - line_profiler=2.1.2
 - tzlocal=1.5.1
 - brian2=2.3.0.2
@@ -30,3 +32,7 @@ dependencies:
 - tabulate=0.8.3
 - tqdm=4.36.1
 - openpyxl=2.6.3
+- dask=2.16.0
+- fastparquet=0.4.0
+- pyarrow=0.16.0
+- python-snappy=0.5.4

@@ -76,6 +76,7 @@ analysisSubFolder = os.path.join(
 if not os.path.exists(analysisSubFolder):
     os.makedirs(analysisSubFolder, exist_ok=True)
 
+
 if arguments['groupPagesBy'] is not None:
     groupPagesBy = arguments['groupPagesBy'].split(', ')
 else:
@@ -85,6 +86,9 @@ if arguments['inputBlockName'] is not None:
     alignSubFolder = os.path.join(analysisSubFolder, arguments['alignFolderName'])
     if not os.path.exists(alignSubFolder):
         os.makedirs(alignSubFolder, exist_ok=True)
+    calcSubFolder = os.path.join(alignSubFolder, 'dataframes')
+    if not os.path.exists(calcSubFolder):
+        os.makedirs(calcSubFolder, exist_ok=True)
     if arguments['processAll']:
         prefix = assembledName
     else:
@@ -101,7 +105,7 @@ if arguments['inputBlockName'] is not None:
     if not os.path.exists(figureOutputFolder):
         os.makedirs(figureOutputFolder, exist_ok=True)
     alignedAsigsKWargs['outlierTrials'] = ash.processOutlierTrials(
-        alignSubFolder, prefix, **arguments)
+        calcSubFolder, prefix, **arguments)
 else:
     # plotting aligned spike waveforms
     if arguments['processAll']:

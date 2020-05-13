@@ -28,6 +28,8 @@ from scipy.stats import zscore, chi2
 import pingouin as pg
 import pandas as pd
 import numpy as np
+from dask import dataframe as dd
+from dask.diagnostics import ProgressBar
 from copy import deepcopy
 from docopt import docopt
 from tqdm import tqdm
@@ -60,6 +62,10 @@ if not os.path.exists(analysisSubFolder):
 alignSubFolder = os.path.join(analysisSubFolder, arguments['alignFolderName'])
 if not os.path.exists(alignSubFolder):
     os.makedirs(alignSubFolder, exist_ok=True)
+
+calcSubFolder = os.path.join(alignSubFolder, 'dataframes')
+if not os.path.exists(calcSubFolder):
+    os.makedirs(calcSubFolder, exist_ok=True)
 #
 if arguments['processAll']:
     prefix = assembledName
@@ -74,7 +80,7 @@ print('loading {}'.format(triggeredPath))
 dataReader, dataBlock = ns5.blockFromPath(
     triggeredPath, lazy=arguments['lazy'])
 resultPath = os.path.join(
-    alignSubFolder,
+    calcSubFolder,
     prefix + '_{}_outliers.h5'.format(
         arguments['window']))
 #
@@ -113,7 +119,7 @@ if ordMag < 0:
 #     dataDF.index.get_level_values('bin'),
 #     bins=50)
 trialInfo = dataDF.index.to_frame().reset_index(drop=True)
-epochs = pd.Series(index=trialInfo.index)
+trialInfo['epoch'] = np.nan
 # nominal epoch size
 targetEpochSize = 2e-3
 #  delay to account for transmission between event
@@ -133,14 +139,16 @@ for stimPeriod, group in trialInfo.groupby('stimPeriod'):
     # align epoch bins to window
     epochOffset = np.max(epochBins[epochBins <= 0])
     epochBins = epochBins - epochOffset + transmissionDelay
+    validBins = (epochBins > theseTBins.min()) & (epochBins < theseTBins.max())
+    epochBins = epochBins[validBins]
     # stretch first and last epoch bin to cover entire window
     epochBins[0] = theseTBins.min() - 1
     epochBins[-1] = theseTBins.max() + 1
     theseEpochs = pd.cut(theseTBins, bins=epochBins, labels=False)
-    epochs.loc[group.index] = theseEpochs
-# pdb.set_trace()
+    trialInfo.loc[group.index, 'epoch'] = theseEpochs
+# 
 dataDF.set_index(
-    pd.Index(epochs, name='epoch'),
+    pd.Index(trialInfo['epoch'], name='epoch'),
     append=True, inplace=True)
 
 outlierLogPath = os.path.join(
@@ -150,45 +158,23 @@ if os.path.exists(outlierLogPath):
     os.remove(outlierLogPath)
 
 def findOutliers(
-        mahalDistDF, qThresh=None, sdThresh=None,
-        devQuantile=None,
-        nDim=1, multiplier=1):
+        mahalDistDF, groupBy=None,
+        qThresh=None, sdThresh=None,
+        devQuantile=None, nDim=1, multiplier=1):
     if sdThresh is None:
         if qThresh is None:
             qThresh = 1 - 1e-6
         sdThresh = multiplier * chi2.interval(qThresh, nDim)[1]
-    seg = (
-        mahalDistDF
-        .index
-        .get_level_values('segment')
-        .unique())
-    t = (
-        mahalDistDF
-        .index
-        .get_level_values('t')
-        .unique())
-    # print('Outlier thresh is {}'.format(sdThresh))
     if devQuantile is not None:
-        deviation = (mahalDistDF).quantile(q=devQuantile)[0]
+        deviation = mahalDistDF.groupby(groupBy).quantile(q=devQuantile).iloc[:, -1]
     else:
-        deviation = (mahalDistDF).max()[0]
-    tooMuch = (deviation >= sdThresh)
-    if tooMuch:
-        try:
-            summaryMessage = [
-                'segment {} time {:.2f}\n'.format(seg[0], t[0]),
-                ' deviation {:.2f} > {:.2f}\n'.format(
-                    deviation, sdThresh)]
-            print(summaryMessage)
-            with open(outlierLogPath, 'a') as f:
-                f.writelines(summaryMessage)
-        except Exception:
-            pass
-    # else:
-    #     print(
-    #         'segment {} time {} average deviation {} < {}'.format(
-    #             seg[0], t[0], deviation, sdThresh))
-    return deviation, tooMuch, seg[0], t[0]
+        deviation = mahalDistDF.groupby(groupBy).max().iloc[:, -1]
+    if isinstance(deviation, pd.Series):
+        deviationDF = deviation.to_frame(name='deviation')
+    else:
+        deviationDF = deviation
+    deviationDF['rejectBlock'] = (deviationDF['deviation'] >= sdThresh)
+    return deviationDF
 
 def applyMad(ser):
     if np.median(ser) == 0:
@@ -199,7 +185,7 @@ def applyMad(ser):
 testVar = None
 groupBy = ['segment', 't']
 resultNames = [
-    'deviation', 'rejectBlock', 'seg', 't']
+    'deviation', 'rejectBlock']
 
 print('working with {} samples'.format(dataDF.shape[0]))
 randSample = slice(None, None, None)
@@ -207,10 +193,6 @@ randSample = slice(None, None, None)
 #
 groupNames = ['electrode', 'nominalCurrent', 'RateInHz', 'epoch']
 # groupNames = None
-if groupNames is not None:
-    grouper = dataDF.groupby(groupNames)
-else:
-    grouper = [('all', dataDF)]
 
 useCachedMahalDist = True
 if useCachedMahalDist and os.path.exists(resultPath):
@@ -221,58 +203,107 @@ else:
     mahalDistLoaded = False
 
 useEmpiricalCovariance = True
-# def calcCovMat(partition):
-# 
+
+def calcCovMat(
+        partition, nameColumn='groupLabels',
+        useEmpiricalCovariance=True,
+        supportFraction=None, verbose=False):
+    dataMask = ~(partition.columns == nameColumn)
+    # print('partition shape = {}'.format(partition.loc[:, dataMask].shape))
+    if not useEmpiricalCovariance:
+        try:
+            est = MinCovDet(support_fraction=supportFraction)
+            est.fit(partition.loc[:, dataMask].values)
+        except Exception:
+            traceback.print_exc()
+            est = EmpiricalCovariance()
+            est.fit(partition.loc[:, dataMask].values)
+    else:
+        est = EmpiricalCovariance()
+        est.fit(partition.loc[:, dataMask].values)
+    result = pd.DataFrame(
+        est.mahalanobis(partition.loc[:, dataMask].values),
+        index=partition.index, columns=['mahalDist'])
+    # print('result shape is {}'.format(result.shape))
+    result.name = 'mahalanobisDistance'
+    # print('result type is {}'.format(type(result)))
+    return result
+
+covOpts = dict(
+    useEmpiricalCovariance=True,
+    supportFraction=None)
+
 if not mahalDistLoaded:
-    mahalDist = pd.DataFrame(
-        np.nan,
-        index=dataDF.index, columns=['mahalDist'])
     if arguments['verbose']:
         print('Calculating covariance matrix...')
-    
-    for name, group in tqdm(grouper):
-        # tBins = group.index.get_level_values('bin')
-        # tMask = (tBins >= tBoundsCovCalc[0]) & (tBins <=tBoundsCovCalc[1])
-        # subData = group.to_numpy()[tMask, :]
-        subData = group.to_numpy()[randSample, :]
-        defaultSupport = (
-            (subData.shape[0] + subData.shape[1] + 1) /
-            (2 * subData.shape[0])
-            )
-        if not useEmpiricalCovariance:
-            # supportFraction = None
-            supportFraction = .9
-            try:
-                covMat = MinCovDet(support_fraction=supportFraction).fit(subData)
-            except Exception:
-                traceback.print_exc()
-                pdb.set_trace()
-                covMat = EmpiricalCovariance().fit(subData)
-        else:
-            covMat = EmpiricalCovariance().fit(subData)
-        mahalDist.loc[group.index, 'mahalDist'] = covMat.mahalanobis(
-            group.to_numpy())
-#
+    mahalDist = ash.splitApplyCombine(
+        dataDF, fun=calcCovMat, resultPath=resultPath,
+        funKWArgs=covOpts,
+        rowKeys=groupNames, colKeys=['lag'],
+        useDask=True
+        )
+    mahalDist.columns = ['mahalDist']
+    # if groupNames is not None:
+    #     # grouper = dataDF.groupby(groupNames)
+    #     groupLabels = dataDF.groupby(groupNames).ngroup().to_numpy()
+    #     columnLabels = ['{}'.format(cN) for cN in dataDF.columns]
+    #     # tempDF = pd.DataFrame(
+    #     #     dataDF.to_numpy(),
+    #     #     index=groupLabels, columns=columnLabels)
+    #     tempDF = pd.DataFrame(
+    #         dataDF.to_numpy(),
+    #         columns=columnLabels)
+    #     tempDF['groupLabels'] = groupLabels
+    #     tempSavePath = os.path.join(calcSubFolder, 'temp.parquet')
+    #     if os.path.exists(tempSavePath):
+    #         os.remove(tempSavePath)
+    #     tempDF.to_parquet(tempSavePath)
+    #     del tempDF
+    #     tempDaskDF = dd.read_parquet(tempSavePath)
+    #     # 
+    #     covEst = (
+    #             tempDaskDF
+    #             .groupby(by='groupLabels', group_keys=False)
+    #             .apply(
+    #                 calcCovMat, meta={'mahalDist': 'f8'},
+    #                 **covOpts))
+    #     with ProgressBar():
+    #         covEst = covEst.compute()
+    #     # for grpIdx, (name, group) in enumerate(tqdm(dataDF.groupby(groupNames))):
+    #     #     bla = covEst.iloc[0].mahalanobis(group)
+    #     #     mahalDist.loc[group.index, 'mahalDist'] = covEst.iloc[grpIdx].mahalanobis(
+    #     #         group.to_numpy())
+    #     mahalDist = pd.DataFrame(
+    #         covEst.to_numpy(),
+    #         index=dataDF.index, columns=['mahalDist'])
+    #     if os.path.exists(tempSavePath):
+    #         os.remove(tempSavePath)
+    # else:
+    #     grouper = [('all', dataDF)]
+
 print('#######################################################')
 refInterval = chi2.interval(1 - 1e-2, len(dataDF.columns))
 print('Data is {} dimensional'.format(len(dataDF.columns)))
 print('The mahalanobis distance should lie within {}'.format(refInterval))
 print('#######################################################')
+# 
+outlierTrials = findOutliers(
+    mahalDist, groupBy=groupBy, multiplier=1, qThresh=1-1e-2,
+    nDim=len(dataDF.columns), devQuantile=0.95)
+# outlierTrials = ash.applyFunGrouped(
+#     mahalDist,
+#     groupBy, testVar,
+#     fun=findOutliers, funArgs=[],
+#     funKWargs=dict(
+#         multiplier=1, qThresh=1-1e-2,
+#         nDim=len(dataDF.columns), devQuantile=0.95),
+#     # funKWargs=dict(sdThresh=100),
+#     resultNames=resultNames,
+#     plotting=False)
 
-outlierTrials = ash.applyFunGrouped(
-    mahalDist,
-    groupBy, testVar,
-    fun=findOutliers, funArgs=[],
-    funKWargs=dict(
-        multiplier=1, qThresh=1-1e-2,
-        nDim=len(dataDF.columns), devQuantile=0.95),
-    # funKWargs=dict(sdThresh=100),
-    resultNames=resultNames,
-    plotting=False)
-
-print(outlierTrials['deviation'].sort_values('all').tail())
+print(outlierTrials['deviation'].sort_values().tail())
 print('Outlier proportion was:')
-print(outlierTrials['rejectBlock']['all'].sum() / outlierTrials['rejectBlock']['all'].size)
+print(outlierTrials['rejectBlock'].sum() / outlierTrials['rejectBlock'].size)
 
 # if arguments['plotting']:
 #     import matplotlib.pyplot as plt
@@ -285,7 +316,7 @@ if arguments['plotting']:
         outlierTrials['deviation'],
         bins=np.arange(
             0,
-            outlierTrials['deviation']['all'].max() + binSize,
+            outlierTrials['deviation'].max() + binSize,
             binSize)
         )
     cumFrac = np.cumsum(hist) / hist.sum()
@@ -328,10 +359,9 @@ if arguments['plotting']:
 #     plt.show(block=False)
 # #
 theseOutliers = (
-    outlierTrials['deviation']
-    .loc[
-        outlierTrials['rejectBlock']['all'].astype(np.bool),
-        'all']).sort_values()
+    outlierTrials
+    .loc[outlierTrials['rejectBlock'].astype(np.bool), 'deviation'].sort_values()
+    )
 maxDroppedTrials = pd.Series(
     index=np.concatenate(
         [
@@ -436,7 +466,7 @@ if arguments['saveResults']:
     mahalDist.to_hdf(
         resultPath, 'mahalDist', format='fixed')
 
-# pdb.set_trace()
+# 
 minNObservations = 5
 firstBinTrialInfo = trialInfo.loc[firstBinMask, :]
 goodTrialInfo = firstBinTrialInfo.loc[~outlierTrials['rejectBlock'].to_numpy().flatten().astype(np.bool), :]
@@ -446,7 +476,7 @@ goodTrialCount.to_csv(os.path.join(figureOutputFolder, 'good_trial_breakdown.csv
 goodTrialCount.groupby(['electrode', 'RateInHz', 'nominalCurrent']).ngroups
 badTrialInfo = firstBinTrialInfo.loc[outlierTrials['rejectBlock'].to_numpy().flatten().astype(np.bool), :]
 badTrialCount = badTrialInfo.groupby(['electrode', 'nominalCurrent'])['RateInHz'].value_counts().sort_values().to_frame(name='count').reset_index()
-outlierTrials['deviation'].reset_index().sort_values(['segment', 'all']).to_csv(os.path.join(figureOutputFolder, 'trial_deviation_breakdown.csv'))
+outlierTrials['deviation'].reset_index().sort_values(['segment', 'deviation']).to_csv(os.path.join(figureOutputFolder, 'trial_deviation_breakdown.csv'))
 print('Bad trial count:\n{}'.format(badTrialCount))
 
 # .to_csv(os.path.join(figureOutputFolder, 'bad_trial_breakdown.csv'))

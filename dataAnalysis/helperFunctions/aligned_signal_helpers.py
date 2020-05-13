@@ -5,6 +5,8 @@ import dataAnalysis.helperFunctions.profiling as prf
 import dataAnalysis.helperFunctions.helper_functions_new as hf
 import pandas as pd
 import numpy as np
+from dask import dataframe as dd
+from dask.diagnostics import ProgressBar
 from scipy import stats
 from statsmodels.stats.multitest import multipletests as mt
 from copy import copy
@@ -227,6 +229,63 @@ def applyFun(
     return result
 
 
+def splitApplyCombine(
+        asigWide, fun=None, resultPath=None,
+        funArgs=[], funKWArgs={},
+        rowKeys=None, colKeys=None, useDask=False):
+    if isinstance(rowKeys, str):
+        rowKeys = [rowKeys, ]
+    if isinstance(colKeys, str):
+        colKeys = [colKeys, ]
+    # TODO: test column iteration
+    # TODO: handle transformation / aggregation / filtration
+    # look to https://pandas.pydata.org/pandas-docs/stable/user_guide/groupby.html
+    if colKeys is not None:
+        asigStack = asigWide.stack(level=colKeys)
+    else:
+        asigStack = asigWide
+    # TODO: edge case for series?
+    if useDask:
+        tempDF = pd.DataFrame(
+            asigStack.to_numpy(), columns=asigStack.columns)
+        dataColNames = tempDF.columns.to_list()
+        tempDF['groupLabels'] = (
+            asigStack.groupby(rowKeys).ngroup().to_numpy())
+        tempSavePath = os.path.join(
+            os.path.dirname(resultPath), 'temp.parquet')
+        if os.path.exists(tempSavePath):
+            os.remove(tempSavePath)
+        tempDF.to_parquet(tempSavePath)
+        del tempDF
+        tempDaskDF = dd.read_parquet(tempSavePath)
+        # pdb.set_trace()
+        result = (
+                tempDaskDF
+                .groupby(by='groupLabels', group_keys=False)[dataColNames]
+                .apply(
+                    fun,
+                    # meta={'mahalDist': 'f8'},
+                    *funArgs, **funKWArgs))
+        with ProgressBar():
+            result = result.compute()
+        if os.path.exists(tempSavePath):
+            os.remove(tempSavePath)
+        # TODO, below is a transformation, handle other index types
+        resultDF = pd.DataFrame(
+            result.to_numpy(),
+            index=asigStack.index, columns=result.columns)
+    else:
+        resultDF = (
+            asigStack
+            .groupby(by=rowKeys, group_keys=False)
+            .apply(
+                fun,
+                *funArgs, **funKWArgs))
+    if colKeys is not None:
+        resultDF = resultDF.unstack(level=colKeys)
+    return resultDF
+
+
 def applyFunGrouped(
         asigWide, groupBy, testVar,
         fun=None, funArgs=[], funKWargs={},
@@ -389,6 +448,7 @@ def compareMeansGrouped(
     significanceVals = pVals < pThresh
     return pVals, statVals, significanceVals
 
+
 def compareISIsGrouped(
         asigWide, groupBy, testVar,
         tStart=None, tStop=None,
@@ -498,6 +558,7 @@ def compareISIsGrouped(
         pVals.loc[flatPvals.index, flatPvals.columns] = flatPvals
     significanceVals = pVals < pThresh
     return pVals, statVals, significanceVals
+
 
 def facetGridApplyFunGrouped(
         dataBlock, resultPath,

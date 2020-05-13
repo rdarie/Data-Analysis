@@ -79,7 +79,10 @@ alignedFeaturesFolder = os.path.join(
     'alignedFeatures')
 if not os.path.exists(alignedFeaturesFolder):
     os.makedirs(alignedFeaturesFolder, exist_ok=True)
-#
+
+calcSubFolder = os.path.join(alignSubFolder, 'dataframes')
+if not os.path.exists(calcSubFolder):
+    os.makedirs(calcSubFolder, exist_ok=True)
 rowColOpts = asp.processRowColArguments(arguments)
 if arguments['processAll']:
     prefix = assembledName
@@ -92,7 +95,7 @@ alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = (
     ash.processUnitQueryArgs(
         namedQueries, analysisSubFolder, **arguments))
 alignedAsigsKWargs['outlierTrials'] = ash.processOutlierTrials(
-    alignSubFolder, prefix, **arguments)
+    calcSubFolder, prefix, **arguments)
 alignedAsigsKWargs.update(dict(
     duplicateControlsByProgram=True,
     makeControlProgram=True,
