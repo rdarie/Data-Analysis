@@ -56,7 +56,7 @@ ANALYSISSELECTOR="--analysisName=emgLoRes"
 # UNITSELECTOR="--unitQuery=isispinal"
 UNITSELECTOR="--unitQuery=isiemg"
 
-BLOCKSELECTOR="--inputBlockName=emg"
+BLOCKSELECTOR="--inputBlockName=emg_clean"
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
@@ -67,17 +67,17 @@ python --version
 # --maskOutlierBlocks --invertOutlierBlocks --individualTraces
 
 #  --maskOutlierBlocks
-# python3 './plotRippleStimSpikeReport.py' --exp=$EXP $TRIALSELECTOR $WINDOW $UNITSELECTOR $ANALYSISSELECTOR --alignQuery="stimOn" --alignFolderName=stim $BLOCKSELECTOR --groupPagesBy="electrode, RateInHz" --maskOutlierBlocks
-# python3 './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR $BLOCKSELECTOR $UNITSELECTOR --alignQuery="stimOn" --rowName="RateInHz" --rowControl= --colControl= --hueName="nominalCurrent" --alignFolderName=stim --enableOverrides --maskOutlierBlocks --overlayStats
-
+python3 './plotRippleStimSpikeReport.py' --exp=$EXP $TRIALSELECTOR $WINDOW $UNITSELECTOR $ANALYSISSELECTOR --alignQuery="stimOn" --alignFolderName=stim $BLOCKSELECTOR --groupPagesBy="electrode, RateInHz"
+python3 './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR $BLOCKSELECTOR $UNITSELECTOR --alignQuery="stimOn" --rowName="RateInHz" --rowControl= --colControl= --hueName="nominalCurrent" --alignFolderName=stim --enableOverrides --overlayStats
 # stim spikes
 # python3 './plotRippleStimSpikeReport.py' --exp=$EXP $TRIALSELECTOR $ANALYSISSELECTOR $UNITSELECTOR
 
-#  --maskOutlierBlocks
-ANALYSISSELECTOR="--analysisName=lfpFullRes"
-UNITSELECTOR="--unitQuery=isispinal"
-BLOCKSELECTOR="--inputBlockName=lfp"
-WINDOW="--window=extraExtraShort"
-#
-python3 './plotRippleStimSpikeReport.py' --exp=$EXP $TRIALSELECTOR $WINDOW $UNITSELECTOR $ANALYSISSELECTOR --alignQuery="stimOff" --alignFolderName=stim $BLOCKSELECTOR --groupPagesBy="electrode, RateInHz"
-python3 './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR $BLOCKSELECTOR $UNITSELECTOR --alignQuery="stimOff" --rowName="RateInHz" --rowControl= --colControl= --hueName="nominalCurrent" --alignFolderName=stim --enableOverrides --overlayStats
+# #  --maskOutlierBlocks
+# ANALYSISSELECTOR="--analysisName=lfpFullRes"
+# UNITSELECTOR="--unitQuery=isispinal"
+# BLOCKSELECTOR="--inputBlockName=lfp_clean"
+# WINDOW="--window=extraExtraShort"
+# #
+# python3 './plotRippleStimSpikeReport.py' --exp=$EXP $TRIALSELECTOR $WINDOW $UNITSELECTOR $ANALYSISSELECTOR --alignQuery="stimOn" --alignFolderName=stim $BLOCKSELECTOR --groupPagesBy="electrode, RateInHz"
+# python3 './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR $BLOCKSELECTOR $UNITSELECTOR --alignQuery="stimOn" --rowName="RateInHz" --rowControl= --colControl= --hueName="nominalCurrent" --alignFolderName=stim --enableOverrides --overlayStats
+# 

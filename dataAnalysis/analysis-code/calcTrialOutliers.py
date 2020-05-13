@@ -197,7 +197,7 @@ def applyMad(ser):
         return np.abs(ser - np.median(ser)) / pg.mad(ser)
 
 testVar = None
-groupBy = ['segment', 'originalIndex', 't']
+groupBy = ['segment', 't']
 resultNames = [
     'deviation', 'rejectBlock', 'seg', 't']
 
@@ -220,13 +220,16 @@ if useCachedMahalDist and os.path.exists(resultPath):
 else:
     mahalDistLoaded = False
 
+useEmpiricalCovariance = True
+# def calcCovMat(partition):
+# 
 if not mahalDistLoaded:
     mahalDist = pd.DataFrame(
         np.nan,
         index=dataDF.index, columns=['mahalDist'])
     if arguments['verbose']:
         print('Calculating covariance matrix...')
-    useEmpiricalCovariance = True
+    
     for name, group in tqdm(grouper):
         # tBins = group.index.get_level_values('bin')
         # tMask = (tBins >= tBoundsCovCalc[0]) & (tBins <=tBoundsCovCalc[1])

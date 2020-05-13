@@ -30,6 +30,14 @@ def getExpOpts():
         5: None,
         6: None,
         }
+    rippleFastSettleTriggers = {
+        1: {'stim': 'same'},
+        2: {'stim': 'same'},
+        3: {'stim': 'same'},
+        4: {'stim': 'same'},
+        5: {'stim': 'same'},
+        6: {'stim': 'same'}
+    }
     # exclude dummy electrodes 8 and 16
     asigNameList = [
         ['caudalX_e{:02d}_a'.format(i) for i in range(1, 8)] +
@@ -117,7 +125,9 @@ def getExpOpts():
         # For emg analysis - emg missing from block 2
         '202005011400-Peep': [1, 2, 3, 4, 5, 6],
         }
-
+    assembledSegmentToBlockLookup = {
+        i - 1: i for i in [1, 2, 3, 4, 5, 6]
+        }
     movementSizeBins = [0, 0.25, 0.5, 1, 1.25, 1.5]
     # rowColOverrides = {
     #     'electrode': [
@@ -171,7 +181,7 @@ def getExpOpts():
             'LSemitendinosusEmgEnv',      'RSemitendinosusEmgEnv',
             'LBicepsFemorisEmgEnv',       'RBicepsFemorisEmgEnv',
             'LGastrocnemiusEmgEnv',       'RGastrocnemiusEmgEnv',
-],
+            ],
         'ycoords': [
             0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1,
             3, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4],
