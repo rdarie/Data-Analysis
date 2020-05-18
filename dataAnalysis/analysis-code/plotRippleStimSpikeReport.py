@@ -57,10 +57,10 @@ from currentExperiment import parseAnalysisOptions
 from docopt import docopt
 import seaborn as sns
 #
-sns.set()
-sns.set_color_codes("dark")
-sns.set_context("notebook")
-sns.set_style("dark")
+sns.set(
+    context='talk', style='dark',
+    palette='dark', font='sans-serif',
+    font_scale=1.5, color_codes=True)
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(int(arguments['blockIdx']), arguments['exp'])
 globals().update(expOpts)
@@ -96,6 +96,10 @@ if arguments['inputBlockName'] is not None:
     dataPath = os.path.join(
         alignSubFolder,
         prefix + '_{}_{}.nix'.format(
+            arguments['inputBlockName'], arguments['window']))
+    cachedH5Path = os.path.join(
+        calcSubFolder,
+        prefix + '_{}_{}.h5'.format(
             arguments['inputBlockName'], arguments['window']))
     reportName = prefix + '_{}_{}_{}_topo'.format(
             arguments['inputBlockName'], arguments['window'],
@@ -159,7 +163,7 @@ else:
         'ripple': rippleMapDF}
 
 flipInfo = {
-    'ripple': {'lr': True, 'ud': True},
+    'ripple': {'lr': True, 'ud': False},
     'delsys': {'lr': False, 'ud': False}
     }
 mapSpecificRelplotKWArgs = {
@@ -195,6 +199,7 @@ relplotKWArgs.update({
             'wspace': 0.01,
             'hspace': 0.01
         }}})
+sharedYAxes = relplotKWArgs['facet_kws']['sharey']
 plotProcFuns = [
     # asp.genYLimSetter(quantileLims=0.99, forceLims=True),
     # asp.genYLabelChanger(
@@ -215,7 +220,7 @@ plotProcFuns = [
     # for evoked lfp report, add stim times
     asp.genBlockVertShader([
             max(0e-3, alignedAsigsKWargs['windowSize'][0]),
-            min(300e-3, alignedAsigsKWargs['windowSize'][1])],
+            min(.6e-3, alignedAsigsKWargs['windowSize'][1])],
         asigPlotShadingOpts),
     asp.genStimVLineAdder(
         'RateInHz', vLineOpts, tOnset=0, tOffset=.3, includeRight=False)
@@ -223,8 +228,8 @@ plotProcFuns = [
 mapSpecificPlotProcFuns = {
     'ripple': [
         asp.genTicksToScale(
-            lineOpts={'lw': 2}, shared=False,
-            # for evoked lfp report
+            lineOpts={'lw': 2}, shared=sharedYAxes,
+            # for evoked lfp/emg report
             xUnitFactor=1e3, yUnitFactor=1,
             xUnits='msec', yUnits='uV',
             # for stim spike
@@ -234,7 +239,7 @@ mapSpecificPlotProcFuns = {
         ],
     'delsys': [
         asp.genTicksToScale(
-            lineOpts={'lw': 2}, shared=False,
+            lineOpts={'lw': 2}, shared=sharedYAxes,
             xUnitFactor=1e3, yUnitFactor=1,
             xUnits='msec', yUnits='uV',
             )]}
@@ -249,6 +254,7 @@ extraSpaces = {
         ]}
 #
 limitPages = None
+
 minNObservations = 5
 if arguments['individualTraces']:
     relplotKWArgs['alpha'] = 0.3
@@ -259,14 +265,25 @@ if arguments['invertOutlierBlocks']:
     pdfName = pdfName.replace('.pdf', '_outliers.pdf')
 ################
 # from here on we can start defining a function
-print('loading {}'.format(dataPath))
-dataReader, dataBlock = preproc.blockFromPath(
-    dataPath, lazy=arguments['lazy'])
-asigWide = preproc.alignedAsigsToDF(
-    dataBlock, **alignedAsigsKWargs)
-prf.print_memory_usage('loaded asig wide')
+# TODO delete this and rework, right now it is very hacky
+useCached = False
+if useCached:
+    print('loading {}'.format(cachedH5Path))
+    asigWide = pd.read_hdf(cachedH5Path, 'clean')
+    tMask = (asigWide.columns > alignedAsigsKWargs['windowSize'][0]) & (asigWide.columns < alignedAsigsKWargs['windowSize'][-1])
+    asigWide = asigWide.loc[:, tMask]
+    # pdb.set_trace()
+else:
+    print('loading {}'.format(dataPath))
+    dataReader, dataBlock = preproc.blockFromPath(
+        dataPath, lazy=arguments['lazy'])
+    asigWide = preproc.alignedAsigsToDF(
+        dataBlock, **alignedAsigsKWargs)
 #
-
+prf.print_memory_usage('loaded asig wide')
+# TODO check that these actually should be here
+if 'nominalCurrentCat' in asigWide.index.names:
+    asigWide.index = asigWide.index.droplevel('nominalCurrentCat')
 # asigStack = (
 #     asigWide
 #     .stack(level=['feature', 'lag'])
@@ -343,7 +360,7 @@ with PdfPages(pdfName) as pdf:
     for pageIdx, (pageName, pageGroup) in enumerate(tqdm(pageGrouper)):
         #
         if limitPages is not None:
-            if pageCount < limitPages:
+            if pageCount > limitPages:
                 break
         for probeName, probeGroup in pageGroup.groupby('mapGroup'):
             if pd.isnull(probeName):
@@ -379,7 +396,7 @@ with PdfPages(pdfName) as pdf:
                     updateHeight = np.sum(absHeights)
                     relplotKWArgs['facet_kws']['gridspec_kws']['hspace'] = (
                         relplotKWArgs['height'] * 0.1 / np.mean(absHeights))
-            #
+            # pdb.set_trace()
             g = sns.relplot(
                 data=thisAsigStack,
                 x='bin', y='signal', hue=arguments['hueName'],

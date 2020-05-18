@@ -9,6 +9,7 @@ Options:
     --chanQuery=chanQuery             how to restrict channels if not providing a list? [default: fr]
     --samplingRate=samplingRate       subsample the result??
     --plotting                        run diagnostic plots? [default: False]
+    --commitResults                   save results to data partition? [default: False]
 """
 import matplotlib
 import matplotlib.pyplot as plt
@@ -36,6 +37,7 @@ import os, pdb
 import traceback
 from importlib import reload
 import json
+import shutil
 from copy import deepcopy
 #  load options
 from currentExperiment import parseAnalysisOptions
@@ -60,6 +62,12 @@ def calcISIBlockAnalysisNix():
         samplingRate = float(arguments['samplingRate']) * pq.Hz
     else:
         samplingRate = float(1 / rasterOpts['binInterval']) * pq.Hz
+    #
+    if not os.path.exists(trialBasePath):
+        trialProcessedPath = os.path.join(
+            processedFolder, ns5FileName + '.nix')
+        # will throw an error if file was never processed
+        shutil.copyfile(trialProcessedPath, trialBasePath)
     #
     nspReader = neo.io.nixio_fr.NixIO(filename=trialBasePath)
     mapDF = prb_meta.mapToDF(rippleMapFile[int(arguments['blockIdx'])])
@@ -279,6 +287,7 @@ def calcISIBlockAnalysisNix():
             'stimPeriod': [],
             'trainDur': [],
             'firstPW': [],
+            'interPhase': [],
             'secondPW': [],
             'totalPW': []
             }
@@ -288,6 +297,7 @@ def calcISIBlockAnalysisNix():
             'stimPeriod': pq.Hz,
             'trainDur': pq.s,
             'firstPW': pq.s,
+            'interPhase': pq.s,
             'secondPW': pq.s,
             'totalPW': pq.s
             }
@@ -320,20 +330,22 @@ def calcISIBlockAnalysisNix():
                         totalLen += phase['length']
                     stimDict['t'].append(t)
                     stimDict['firstPW'].append(
-                        stimCmd['seq'][0]['length'] / (30000) * pq.s)
+                        (stimCmd['seq'][0]['length'] / (3e4)) * pq.s)
+                    stimDict['interPhase'].append(
+                        (stimCmd['seq'][1]['length'] / (3e4)) * pq.s)
                     stimDict['secondPW'].append(
-                        stimCmd['seq'][2]['length'] / (30000) * pq.s)
-                    stimDict['totalPW'].append(totalLen / (30000) * pq.s)
+                        (stimCmd['seq'][2]['length'] / (3e4)) * pq.s)
+                    stimDict['totalPW'].append((totalLen / (3e4)) * pq.s)
                     stimDict['elec'].append(stimCmd['elec'] * pq.dimensionless)
                     allNominalWaveforms.append(np.asarray(nominalWaveform))
                     nominalIdxMax = np.argmax(np.abs(np.asarray(nominalWaveform)))
                     stimDict['nominalCurrent'].append(nominalWaveform[nominalIdxMax])
-                    thisStimPeriod = (stimCmd['period'] / (30000) * pq.s)
+                    thisStimPeriod = ((stimCmd['period'] / (3e4)) * pq.s)
                     stimDict['stimPeriod'].append(thisStimPeriod)
                     #  
                     # stimDict['RateInHz'].append(np.round(thisStimPeriod ** (-1), decimals=1))
                     stimDict['RateInHz'].append(thisStimPeriod ** (-1))
-                    stimDict['trainDur'].append((stimCmd['repeats']) * thisStimPeriod)
+                    stimDict['trainDur'].append((stimCmd['repeats'] - 1) * thisStimPeriod)
             else:
                 stimStr = entry['stimString']
                 stimStrDictRaw = {}
@@ -351,7 +363,8 @@ def calcISIBlockAnalysisNix():
                     stimDict['t'].append(t)
                     stimDict['firstPW'].append(row['Dur'] * 1e-3 * pq.s)
                     stimDict['secondPW'].append(row['Dur'] * 1e-3 * pq.s)
-                    stimDict['totalPW'].append(2 * row['Dur'] * 1e-3 * pq.s)
+                    stimDict['interPhase'].append(2 * ((3e4) ** -1) * pq.s)  # per page 16 of xippmex manual
+                    stimDict['totalPW'].append(2 * (row['Dur'] * 1e-3 + ((3e4) ** -1)) * pq.s)
                     stimDict['nominalCurrent'].append(row['Amp'] * ampQuanta)
                     stimDict['RateInHz'].append(row['Freq'] * pq.Hz)
                     stimDict['stimPeriod'].append(row['Freq'] ** -1)
@@ -409,8 +422,15 @@ def calcISIBlockAnalysisNix():
                     stimEvents.times[0] -
                     10e-3 * pq.s +  # Fudge factor to account for delay between execution and matlab save
                     activeTimes.min() * pq.s)
+                # pdb.set_trace()
+                stimEventsDF = pd.DataFrame(stimEvents.array_annotations)
+                stimEventsDF['t'] = stimEvents.times
+                stimEventsDF.to_csv(os.path.join(
+                    analysisSubFolder, ns5FileName + '_exported_stim_updates.csv'
+                    ))
             #
             for stIdx, st in enumerate(spikeList):
+                # annotate ripple stim spikes with info from json log
                 chanName = st.unit.channel_index.name
                 # matchingChIdx = nspBlock.filter(objects=ChannelIndex, name=chanName)
                 rippleChanNum = int(mapDF.loc[mapDF['label'] == chanName, 'nevID'] + 1)
@@ -447,8 +467,8 @@ def calcISIBlockAnalysisNix():
                 wvfDiff = wvf.diff(-1, axis=1).fillna(0)
                 wvfDiffAbs = wvfDiff.abs()
                 if stimEvents is not None:
-                    lastValidIdx = int(stAnnotations['totalPW'].min() * 30000) - 1
-                    idxPeak = int(stAnnotations['firstPW'].min() * 30000)
+                    lastValidIdx = int(stAnnotations['totalPW'].min() * 3e4) - 1
+                    idxPeak = int(stAnnotations['firstPW'].min() * 3e4)
                     wvf.iloc[:, lastValidIdx:] = np.nan
                     wvf.fillna(method='ffill', axis=1, inplace=True)
                     wvfDiff = wvf.diff(-1, axis=1).fillna(0)
@@ -517,10 +537,21 @@ def calcISIBlockAnalysisNix():
                     st.annotations['firstPW'] = pws
                     st.array_annotations['firstPW'] = pws
                     st.annotations['arrayAnnNames'].append('firstPW')
+                    #
                     secPws = amplitudes ** 0 * (lastValidIdx - idxPeak) * st.sampling_period
                     st.annotations['secondPW'] = secPws
                     st.array_annotations['secondPW'] = secPws
                     st.annotations['arrayAnnNames'].append('secondPW')
+                    #
+                    interPhases = 2 * amplitudes ** 0 * st.sampling_period
+                    st.annotations['interPhase'] = interPhases
+                    st.array_annotations['interPhase'] = interPhases
+                    st.annotations['arrayAnnNames'].append('interPhase')
+                    #
+                    totalPws = pws + secPws
+                    st.annotations['totalPW'] = totalPws
+                    st.array_annotations['totalPW'] = totalPws
+                    st.annotations['arrayAnnNames'].append('totalPW')
                     # try to estimate current
                     matchingAsig = nspBlock.filter(objects=AnalogSignalProxy, name='seg0_' + chanName)
                     if len(matchingAsig):
@@ -544,6 +575,7 @@ def calcISIBlockAnalysisNix():
                         st.array_annotations[annName] = (
                             stAnnotations[annName].to_numpy() *
                             eventUnits[annName])
+            # detect stimulation trains
             peakIdx, _, trainStartIdx, trainEndIdx = hf.findTrains(
                 peakTimes=activeTimes, minDistance=5e-3, maxDistance=200e-3)
             #  
@@ -557,7 +589,8 @@ def calcISIBlockAnalysisNix():
                 startCategories = startCategories.reindex(columns=[
                     # 'amplitude',
                     'nominalCurrent', 'program',
-                    'activeGroup', 'firstPW', 'secondPW', 'electrode',
+                    'activeGroup', 'firstPW', 'secondPW', 'interPhase',
+                    'totalPW', 'electrode',
                     'RateInHz', 'stimPeriod', 'trainDur', 't'])
                 #
                 for idx, (idxStart, idxEnd) in enumerate(
@@ -614,9 +647,10 @@ def calcISIBlockAnalysisNix():
                                     nominalRate = np.median(st.annotations['RateInHz'][theseTimesMask])
                                     observedRate = np.median(np.diff(theseTimes)) ** (-1)
                                     if not np.abs(nominalRate - observedRate) < 1e-6:
+                                        # pdb.set_trace()
                                         print('Rate Warning on {} at time {}'.format(st.name, theseTimes[0]))
                                     nominalTrainDur = np.mean(st.annotations['trainDur'][theseTimesMask])
-                                    observedTrainDur = (theseTimes[-1] - theseTimes[0]) + observedRate ** (-1)
+                                    observedTrainDur = (theseTimes[-1] - theseTimes[0])
                                     if not np.abs(nominalTrainDur - observedTrainDur) < 1e-6:
                                         print('train Dur Warning on {} at time {}'.format(st.name, theseTimes[0]))
                                     # assert np.diff(theseTimes).mean()
@@ -625,10 +659,16 @@ def calcISIBlockAnalysisNix():
                                     startCategories.loc[idx, 'stimPeriod'] = nominalRate ** -1
                                 startCategories.loc[
                                     idx, 'secondPW'] = np.round(np.mean(
-                                        st.annotations['secondPW'][theseTimesMask]) * 1e6)
+                                        st.annotations['secondPW'][theseTimesMask]), decimals=9)
                                 startCategories.loc[
                                     idx, 'firstPW'] = np.round(np.mean(
-                                        st.annotations['firstPW'][theseTimesMask]) * 1e6)
+                                        st.annotations['firstPW'][theseTimesMask]), decimals=9)
+                                startCategories.loc[
+                                    idx, 'interPhase'] = np.round(np.mean(
+                                        st.annotations['interPhase'][theseTimesMask]), decimals=9)
+                                startCategories.loc[
+                                    idx, 'totalPW'] = np.round(np.mean(
+                                        st.annotations['totalPW'][theseTimesMask]), decimals=9)
                         startCategories.loc[idx, 'activeGroup'] = 1
                         electrodeShortHand = ''
                         negativeAmps = stimRasterCurrent < 0
@@ -668,6 +708,7 @@ def calcISIBlockAnalysisNix():
                     activeTimes[trainEndIdx].to_numpy() +
                     (
                         stopCategories['firstPW'] +
+                        stopCategories['interPhase'] +
                         stopCategories['secondPW']
                     ).to_numpy() * 1e-6)
                 # maxAmp = startCategories['amplitude'].max()
@@ -831,8 +872,9 @@ def calcISIBlockAnalysisNix():
                 tdDF['t'].iloc[plotIdx],
                 blankMask[plotIdx], 'r')
             plt.show()
-
+    
     if samplingRate != currentSamplingRate:
+        print("Reinterpolating...")
         tdInterp = hf.interpolateDF(
             tdDF, newT,
             kind='linear', fill_value=(0, 0),
@@ -885,6 +927,15 @@ def calcISIBlockAnalysisNix():
     writer = neo.io.NixIO(filename=outPathName)
     writer.write_block(spikesBlock, use_obj_names=True)
     writer.close()
+    if arguments['commitResults']:
+        analysisProcessedSubFolder = os.path.join(
+            processedFolder, arguments['analysisName']
+            )
+        if not os.path.exists(processedFolder):
+            os.makedirs(processedFolder, exist_ok=True)
+        processedOutPath = os.path.join(
+            processedFolder, ns5FileName + '_analyze.nix')
+        shutil.copyfile(outPathName, processedOutPath)
     # ns5.addBlockToNIX(
     #     tdBlockInterp, neoSegIdx=[0],
     #     writeSpikes=False, writeEvents=False,

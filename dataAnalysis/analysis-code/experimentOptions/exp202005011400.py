@@ -1,6 +1,5 @@
 def getExpOpts():
     #
-    
     blockExperimentTypeLookup = {
         1: 'isi',
         2: 'isi',
@@ -9,7 +8,6 @@ def getExpOpts():
         5: 'isi',
         6: 'isi',
         }
-    
     experimentName = '202005011400-Peep'
     deviceName = None
     rippleMapFile = {
@@ -129,19 +127,29 @@ def getExpOpts():
         i - 1: i for i in [1, 2, 3, 4, 5, 6]
         }
     movementSizeBins = [0, 0.25, 0.5, 1, 1.25, 1.5]
-    # rowColOverrides = {
-    #     'electrode': [
-    #         '-caudalY_e12+caudalX_e05',
-    #         '-caudalY_e13+caudalZ_e20',
-    #         '-caudalX_e06+caudalX_e02',
-    #         '-caudalZ_e17+caudalZ_e21',
-    #         '-rostralY_e12+rostralZ_e24',
-    #         '-rostralZ_e19+rostralZ_e24',
-    #         '-rostralY_e14+rostralZ_e21',
-    #         '-rostralZ_e17+rostralZ_e21',
-    #         '-rostralY_e12+rostralX_e05',
-    #         ]
-    # }
+    rowColOverrides = {
+        'electrode': [
+            # Block001
+            '-rostralZ_e20',
+            '-caudalY_e12',
+            # Block002
+            '-rostralZ_e24',
+            '-caudalY_e15',
+            # Block 003
+            '-rostralY_e15',
+            '-caudalZ_e21',
+            '-caudalZ_e12+caudalZ_e17caudalZ_e21',
+            # Block 004
+            '-rostralZ_e20+rostralY_e09rostralY_e13'
+            # Block 005
+            '-caudalZ_e20',
+            '-caudalZ_e21',
+            # Block 006
+            '-caudalZ_e23',
+            '-caudalZ_e21+caudalZ_e17',
+            '-rostralZ_e24+rostralZ_e19',
+            ]
+    }
     outlierDetectColumns = [
             # 'LThoracolumbarFasciaEmg#0',
             # 'LGracilisEmg#0',
@@ -162,6 +170,19 @@ def getExpOpts():
             'RBicepsFemorisEmgEnv#0',
             'RGastrocnemiusEmgEnv#0'
         ]
+    RCPlotOpts = {
+        'keepFeatures': [
+            'LBicepsFemoris', 'LGastrocnemius', 'LGracilis',
+            'LPeroneusLongus', 'LTensorFasciaeLatae',
+            'LThoracolumbarFascia', 'RBicepsFemoris',
+            'RGastrocnemius', 'RGracilis', 'RPeroneusLongus',
+            'RTensorFasciaeLatae', 'RThoracolumbarFascia',
+            # 'RExtensorDigitorum',
+            # 'LSemitendinosus', 'RSemitendinosus',
+            ],
+        'keepElectrodes': None,
+        'significantOnly': False,
+        }
     # based on vanderhorst and hostege distanges along lumbar enlargement
     delsysMapDict = ({
         'label': [

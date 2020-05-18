@@ -26,10 +26,6 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import dataAnalysis.helperFunctions.probe_metadata as prb_meta
 import seaborn as sns
-sns.set()
-sns.set_color_codes("dark")
-sns.set_context("talk")
-sns.set_style("whitegrid")
 from namedQueries import namedQueries
 import pdb
 import dataAnalysis.plotting.aligned_signal_plots as asp
@@ -47,6 +43,10 @@ expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']), arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
+sns.set(
+    context='notebook', style='whitegrid',
+    palette='dark', font='sans-serif',
+    font_scale=1.5, color_codes=True)
 #
 analysisSubFolder = os.path.join(
     scratchFolder, arguments['analysisName']
@@ -54,19 +54,23 @@ analysisSubFolder = os.path.join(
 alignSubFolder = os.path.join(
     analysisSubFolder, arguments['alignFolderName']
     )
-#
+calcSubFolder = os.path.join(alignSubFolder, 'dataframes')
+figureOutputFolder = os.path.join(
+    figureFolder, arguments['analysisName'])
+if not os.path.exists(figureOutputFolder):
+    os.makedirs(figureOutputFolder, exist_ok=True)
 if arguments['processAll']:
     prefix = assembledName
 else:
     prefix = ns5FileName
 #
 resultPath = os.path.join(
-    alignSubFolder,
-    prefix + '_{}_{}_calc.h5'.format(
+    calcSubFolder,
+    prefix + '_{}_{}_rauc.h5'.format(
         arguments['inputBlockName'], arguments['window']))
 print('loading {}'.format(resultPath))
 outlierTrials = ash.processOutlierTrials(
-    alignSubFolder, prefix, **arguments)
+    calcSubFolder, prefix, **arguments)
 #  Overrides
 limitPages = None
 amplitudeFieldName = 'nominalCurrent'
@@ -80,7 +84,7 @@ if outlierTrials is not None:
             keyIdx = recCurve.index.names.index(subKey)
             key.append(entry[keyIdx])
         # print(key)
-        return outlierTrials.loc[tuple(key), :][0]
+        return outlierTrials[tuple(key)]
     #
     outlierMask = np.asarray(
         recCurve.index.map(rejectionLookup),
@@ -315,65 +319,62 @@ emgRC['EMGSite'] = np.nan
 emgRC[amplitudeFieldName] = emgRC[amplitudeFieldName].abs()
 sideLookup = {'R': 'Right', 'L': 'Left'}
 nSig = {}
-for name, group in emgRC.groupby('feature'):
+
+qLims = (0.025, 0.975)
+for name, group in emgRC.groupby(['feature', 'electrode']):
     emgRC.loc[group.index, 'standardizedRAUC'] = (
-        RobustScaler(quantile_range=(10, 90.))
+        RobustScaler(quantile_range=[i * 100 for i in qLims])
         .fit_transform(
             group['rauc'].to_numpy().reshape(-1, 1)))
-    outlierMask = emgRC.loc[group.index, 'standardizedRAUC'].abs() > 6
+    groupQuantiles = group['rauc'].quantile(qLims)
+    rauc = group['rauc'].copy()
+    rauc[rauc > groupQuantiles[qLims[-1]]] = groupQuantiles[qLims[-1]]
+    rauc[rauc < groupQuantiles[qLims[0]]] = groupQuantiles[qLims[0]]
+    # outlierMask = emgRC.loc[group.index, 'standardizedRAUC'].abs() > 6
     thisScaler = MinMaxScaler()
     thisScaler.fit(
-        group.loc[~outlierMask, 'rauc'].to_numpy().reshape(-1, 1))
+        rauc.to_numpy().reshape(-1, 1))
     emgRC.loc[group.index, 'normalizedRAUC'] = (
-        thisScaler.transform(group['rauc'].to_numpy().reshape(-1, 1)))
-    featName = name[1:-8]
-    emgRC.loc[group.index, 'featureName'] = name[:-8]
-    emgRC.loc[group.index, 'EMGSite'] = name[1:-8]
-    emgRC.loc[group.index, 'EMGSide'] = sideLookup[name[0]]
+        thisScaler.transform(rauc.to_numpy().reshape(-1, 1)))
+    featName = name[0][1:-8]
+    emgRC.loc[group.index, 'featureName'] = name[0][:-8]
+    emgRC.loc[group.index, 'EMGSite'] = name[0][1:-8]
+    emgRC.loc[group.index, 'EMGSide'] = sideLookup[name[0][0]]
     if os.path.exists(statsTestPath):
-        theseSig = sigValsWide.xs(name, level='unit')
-        nSig.update({name[:-8]: theseSig.sum().sum()})
-#
+        theseSig = sigValsWide.xs(name[0], level='unit')
+        nSig.update({name[0][:-8]: theseSig.sum().sum()})
+
 emgRC.loc[:, 'EMG Location'] = (
     emgRC['EMGSide'] + ' ' + emgRC['EMGSite'])
 for name, group in emgRC.groupby('electrode'):
     emgRC.loc[group.index, 'normalizedAmplitude'] = pd.cut(
         group[amplitudeFieldName], bins=10, labels=False)
-keepElectrodeList = None
-
-# keepElectrodeList = meanSelectivity.max(axis=1).index[meanSelectivity.max(axis=1) > 0.3]
-# keepElectrodeList = meanSelectivity.index.to_list()
-# targetFeature = 'featureName'
-#targetFeature = 'EMGSite'
-# plotElectrode = '-caudalY_e12+caudalX_e05'
-# plotFeature = 'RVastusLateralis'
-# plotFeature = 'RPeroneusLongus'
-# plotFeature = 'PeroneusLongus'
-# plotFeature = 'Right'
-# masterPlot(
-#     emgRC, targetFeature, plotElectrode,
-#     plotFeature, keepElectrodeList)
-significantOnly = True
-if significantOnly:
-    emgRC = emgRC.query("(kruskalP < 1e-3)")
-emgPalette = sns.color_palette('Set2', emgRC['EMGSite'].unique().size)
 
 pdfPath = os.path.join(
-    figureFolder,
+    figureOutputFolder,
     prefix + '_{}_{}_{}.pdf'.format(
         arguments['inputBlockName'], arguments['window'],
         'meanRAUC'))
-if keepElectrodeList is not None:
-    keepDataMask = emgRC['electrode'].isin(keepElectrodeList)
-    plotEmgRC = emgRC.loc[keepDataMask, :]
-else:
-    plotEmgRC = emgRC
+
+plotEmgRC = emgRC
+if RCPlotOpts['significantOnly']:
+    plotEmgRC = plotEmgRC.query("(kruskalP < 1e-3)")
+
+if RCPlotOpts['keepElectrodes'] is not None:
+    keepDataMask = emgRC['electrode'].isin(RCPlotOpts['keepElectrodes'])
+    plotEmgRC = plotEmgRC.loc[keepDataMask, :]
+
+if RCPlotOpts['keepFeatures'] is not None:
+    keepDataMask = plotEmgRC['featureName'].isin(RCPlotOpts['keepFeatures'])
+    plotEmgRC = plotEmgRC.loc[keepDataMask, :]
+
+emgPalette = sns.color_palette('Set2', plotEmgRC['EMGSite'].unique().size)
 
 g = sns.relplot(
     col='electrode',
-    # col_order=np.unique(plotEmgRC['electrode']),
-    # col_wrap=5,
-    row='RateInHz',
+    col_order=np.unique(plotEmgRC['electrode']),
+    col_wrap=5,
+    # row='RateInHz',
     x='normalizedAmplitude',
     # x=amplitudeFieldName,
     y='normalizedRAUC',
@@ -382,10 +383,11 @@ g = sns.relplot(
     kind='line', data=plotEmgRC,
     palette=emgPalette,
     height=5, aspect=1.5, ci='sem', estimator='mean',
-    facet_kws=dict(sharey=False)
+    facet_kws=dict(sharey=True), lw=2,
     )
 # for (ro, co, hu), dataSubset in g.facet_data():
 #     break
 plt.savefig(pdfPath)
 plt.close()
+pdb.set_trace()
 # pdb.set_trace()

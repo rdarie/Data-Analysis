@@ -18,7 +18,7 @@
 #SBATCH -e ../../batch_logs/%j-%a-analysis_mini_20200430.errout
 
 # Specify account details
-#SBATCH --account=bibs-dborton-condo
+#SBATCH --account=carney-dborton-condo
 
 # Request custom resources
 #SBATCH --array=4,5
@@ -52,15 +52,15 @@ WINDOW="--window=extraShort"
 # ANALYSISSELECTOR="--analysisName=emg1msec"
 # ANALYSISSELECTOR="--analysisName=emg1msecSmooth"
 # ANALYSISSELECTOR="--analysisName=emg1msecNoLFPFilterSmoothEMG"
-# ANALYSISSELECTOR="--analysisName=lfpFullRes"
+ANALYSISSELECTOR="--analysisName=lfpFullRes"
 # ANALYSISSELECTOR="--analysisName=emgStretchTime"
 # ANALYSISSELECTOR="--analysisName=emgHiRes"
-ANALYSISSELECTOR="--analysisName=emgLoRes"
+# ANALYSISSELECTOR="--analysisName=emgLoRes"
 
 # CHANSELECTOR="--chanQuery=all"
 # CHANSELECTOR="--chanQuery=isiemgraw"
-CHANSELECTOR="--chanQuery=isiemg"
-# CHANSELECTOR="--chanQuery=isispinal"
+# CHANSELECTOR="--chanQuery=isiemg"
+CHANSELECTOR="--chanQuery=isispinal"
 # CHANSELECTOR="--chanQuery=isispinaloremg"
 
 module load anaconda/3-5.2.0
@@ -70,4 +70,4 @@ source activate nda2
 python --version
 
 SLURM_ARRAY_TASK_ID=4
-python -u './calcISIAnalysisNix.py' --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $CHANSELECTOR $ANALYSISSELECTOR
+python -u './calcISIAnalysisNix.py' --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $CHANSELECTOR $ANALYSISSELECTOR --commitResults

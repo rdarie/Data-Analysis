@@ -62,7 +62,10 @@ alignSubFolder = os.path.join(
     analysisSubFolder, arguments['alignFolderName'])
 if not os.path.exists(alignSubFolder):
     os.makedirs(alignSubFolder, exist_ok=True)
-#
+calcSubFolder = os.path.join(alignSubFolder, 'dataframes')
+if not os.path.exists(calcSubFolder):
+    os.makedirs(calcSubFolder, exist_ok=True)
+
 if arguments['processAll']:
     prefix = assembledName
 else:
@@ -72,7 +75,7 @@ triggeredPath = os.path.join(
     prefix + '_{}_{}.nix'.format(
         arguments['inputBlockName'], arguments['window']))
 resultPath = os.path.join(
-    alignSubFolder,
+    calcSubFolder,
     prefix + '_{}_{}_calc.h5'.format(
         arguments['inputBlockName'], arguments['window']))
 #
@@ -88,7 +91,7 @@ alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **argu
 alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
     namedQueries, scratchFolder, **arguments)
 alignedAsigsKWargs['outlierTrials'] = ash.processOutlierTrials(
-    alignSubFolder, prefix, **arguments)
+    calcSubFolder, prefix, **arguments)
 from sklearn.preprocessing import scale, robust_scale
 
 def noiseCeil(
@@ -140,13 +143,13 @@ def noiseCeil(
     return allCorr.mean(), allCorr.std(), allCov.mean(), allCov.std(), allMSE.mean(), allMSE.std()
 
 testVar = 'feature'
-groupBy = ['electrode', 'nominalCurrent']
+groupBy = ['electrode', 'RateInHz', 'nominalCurrent']
 resultNames = [
     'noiseCeil', 'noiseCeilStd',
     'covariance', 'covarianceStd',
     'mse', 'mseStd']
 
-recalc = False
+recalc = True
 if recalc:
     print('loading {}'.format(triggeredPath))
     dataReader, dataBlock = preproc.blockFromPath(
@@ -175,6 +178,7 @@ else:
         'covariance': covar,
         'mse': mse,
     }
+pdb.set_trace()
 mask = pd.DataFrame(
     0,
     index=noiseCeil.index,

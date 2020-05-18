@@ -50,6 +50,9 @@ analysisSubFolder = os.path.join(
 alignSubFolder = os.path.join(
     analysisSubFolder, arguments['alignFolderName']
     )
+calcSubFolder = os.path.join(alignSubFolder, 'dataframes')
+if not os.path.exists(calcSubFolder):
+    os.makedirs(calcSubFolder, exist_ok=True)
 #
 alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(
     namedQueries, **arguments)
@@ -61,7 +64,7 @@ alignedAsigsKWargs.update(dict(
     makeControlProgram=False,
     metaDataToCategories=False,
     removeFuzzyName=False,
-    decimate=1,
+    decimate=1, windowSize=(0, 300e-3),
     transposeToColumns='bin', concatOn='index',))
 if arguments['processAll']:
     prefix = assembledName
@@ -73,14 +76,13 @@ triggeredPath = os.path.join(
     prefix + '_{}_{}.nix'.format(
         arguments['inputBlockName'], arguments['window']))
 resultPath = os.path.join(
-    alignSubFolder,
-    prefix + '_{}_{}_calc.h5'.format(
+    calcSubFolder,
+    prefix + '_{}_{}_rauc.h5'.format(
         arguments['inputBlockName'], arguments['window']))
 print('loading {}'.format(triggeredPath))
 dataReader, dataBlock = ns5.blockFromPath(
     triggeredPath, lazy=arguments['lazy'])
 #  Overrides
-alignedAsigsKWargs.update(dict(windowSize=(5e-3, 300e-3)))
 limitPages = None
 resultName = 'meanRAUC'
 funKWargs = dict(

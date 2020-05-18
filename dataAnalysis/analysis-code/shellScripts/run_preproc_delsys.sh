@@ -18,10 +18,10 @@
 #SBATCH -e ../../batch_logs/%j-%a-delsys_preproc_20200309_raw.errout
 
 # Specify account details
-#SBATCH --account=bibs-dborton-condo
+#SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=1,2,3,4,5,6
+#SBATCH --array=4,5
 
 # EXP="exp201901070700"
 # EXP="exp201901201200"
@@ -36,8 +36,8 @@
 # EXP="exp202003191400"
 # EXP="exp202004251400"
 # EXP="exp202004271200"
-# EXP="exp202004301200"
- EXP="exp202005011400"
+EXP="exp202004301200"
+# EXP="exp202005011400"
 # EXP="exp202003181300"
 
 module load anaconda/3-5.2.0

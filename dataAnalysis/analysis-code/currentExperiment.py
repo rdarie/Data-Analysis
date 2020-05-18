@@ -250,7 +250,7 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
         #  should rename eventInfo to something more intuitive
         eventInfo = {'inputIDs': fullRigInputs}
     #
-    trialFilesFrom['utah']['calcRigEvents'] = not ((blockExperimentType == 'proprio-miniRC') or (blockExperimentType == 'proprio-RC'))
+    trialFilesFrom['utah']['calcRigEvents'] = ((blockExperimentType == 'proprio-miniRC') or (blockExperimentType == 'proprio-RC'))
     trialFilesFrom['utah'].update({'eventInfo': eventInfo})
     
     nspCmpPath = os.path.join('.', 'nsp_map.cmp')
@@ -343,8 +343,11 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
         programColumn='program',
         electrodeColumn='electrode',
         removeFuzzyName=False)
+    # alignedAsigsKWargs.update(dict(
+    #     windowSize=(-50e-3, 350e-3),
+    #     decimate=3))
     alignedAsigsKWargs.update(dict(
-        windowSize=(-100e-3, 400e-3),
+        windowSize=(-1e-3, 4e-3),
         decimate=1))
     # alignedAsigsKWargs.update(dict(
     #     windowSize=None, decimate=1))
@@ -368,14 +371,14 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
     #     'elec75#0', 'elec75#1', 'elec83#0', 'elec78#0', 'elec78#1']
     alignedAsigsChunkSize = 150000
     rasterOpts = {
-        'binInterval': 2e-4, 'binWidth': 10e-3, 'smoothKernelWidth': 10e-3,  # 5 kHz, EMG Lo-Res
+        # 'binInterval': 2e-4, 'binWidth': 10e-3, 'smoothKernelWidth': 10e-3,  # 5 kHz, EMG Lo-Res
         # 'binInterval': 1e-3, 'binWidth': 10e-3, 'smoothKernelWidth': 10e-3,
         # 'binInterval': 1e-3, 'binWidth': 30e-3, 'smoothKernelWidth': 50e-3,
         # 'binInterval': 0.2e-3, 'binWidth': 5e-3, 'smoothKernelWidth': 10e-3,
-        # 'binInterval': 3e-4, 'binWidth': 5e-3, 'smoothKernelWidth': 10e-3,  # 30 kHz, Full-Res
+        'binInterval': (3e4) ** (-1), 'binWidth': 5e-3, 'smoothKernelWidth': 10e-3,  # 30 kHz, Full-Res
         # 'binInterval': 1e-4, 'binWidth': 5e-3, 'smoothKernelWidth': 10e-3,  # 10 kHz, EMG Hi-Res
         'windowSizes': {
-            'extraShort': (-0.1, 0.4),
+            'extraShort': (-0.15, 0.4),
             'extraExtraShort': (-0.025, 0.075),
             'short': (-0.5, 0.5),
             'long': (-2.25, 2.25),

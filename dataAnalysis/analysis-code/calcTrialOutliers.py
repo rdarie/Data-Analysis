@@ -121,7 +121,7 @@ if ordMag < 0:
 trialInfo = dataDF.index.to_frame().reset_index(drop=True)
 trialInfo['epoch'] = np.nan
 # nominal epoch size
-targetEpochSize = 2e-3
+targetEpochSize = 1e-3
 #  delay to account for transmission between event
 #  at t=0 and the signal being recorded
 transmissionDelay = 0
@@ -205,26 +205,28 @@ else:
 useEmpiricalCovariance = True
 
 def calcCovMat(
-        partition, nameColumn='groupLabels',
+        partition, dataColNames=None,
         useEmpiricalCovariance=True,
         supportFraction=None, verbose=False):
-    dataMask = ~(partition.columns == nameColumn)
-    # print('partition shape = {}'.format(partition.loc[:, dataMask].shape))
+    dataColMask = partition.columns.isin(dataColNames)
+    partitionData = partition.loc[:, dataColMask]
+    # print('partition shape = {}'.format(partitionData.shape))
     if not useEmpiricalCovariance:
         try:
             est = MinCovDet(support_fraction=supportFraction)
-            est.fit(partition.loc[:, dataMask].values)
+            est.fit(partitionData.values)
         except Exception:
             traceback.print_exc()
             est = EmpiricalCovariance()
-            est.fit(partition.loc[:, dataMask].values)
+            est.fit(partitionData.values)
     else:
         est = EmpiricalCovariance()
-        est.fit(partition.loc[:, dataMask].values)
+        est.fit(partitionData.values)
     result = pd.DataFrame(
-        est.mahalanobis(partition.loc[:, dataMask].values),
+        est.mahalanobis(partitionData.values),
         index=partition.index, columns=['mahalDist'])
     # print('result shape is {}'.format(result.shape))
+    result = pd.concat([result, partition.loc[:, ~dataColMask]], axis=1)
     result.name = 'mahalanobisDistance'
     # print('result type is {}'.format(type(result)))
     return result
@@ -240,46 +242,9 @@ if not mahalDistLoaded:
         dataDF, fun=calcCovMat, resultPath=resultPath,
         funKWArgs=covOpts,
         rowKeys=groupNames, colKeys=['lag'],
-        useDask=True
+        useDask=True, reindexFromInput=False
         )
     mahalDist.columns = ['mahalDist']
-    # if groupNames is not None:
-    #     # grouper = dataDF.groupby(groupNames)
-    #     groupLabels = dataDF.groupby(groupNames).ngroup().to_numpy()
-    #     columnLabels = ['{}'.format(cN) for cN in dataDF.columns]
-    #     # tempDF = pd.DataFrame(
-    #     #     dataDF.to_numpy(),
-    #     #     index=groupLabels, columns=columnLabels)
-    #     tempDF = pd.DataFrame(
-    #         dataDF.to_numpy(),
-    #         columns=columnLabels)
-    #     tempDF['groupLabels'] = groupLabels
-    #     tempSavePath = os.path.join(calcSubFolder, 'temp.parquet')
-    #     if os.path.exists(tempSavePath):
-    #         os.remove(tempSavePath)
-    #     tempDF.to_parquet(tempSavePath)
-    #     del tempDF
-    #     tempDaskDF = dd.read_parquet(tempSavePath)
-    #     # 
-    #     covEst = (
-    #             tempDaskDF
-    #             .groupby(by='groupLabels', group_keys=False)
-    #             .apply(
-    #                 calcCovMat, meta={'mahalDist': 'f8'},
-    #                 **covOpts))
-    #     with ProgressBar():
-    #         covEst = covEst.compute()
-    #     # for grpIdx, (name, group) in enumerate(tqdm(dataDF.groupby(groupNames))):
-    #     #     bla = covEst.iloc[0].mahalanobis(group)
-    #     #     mahalDist.loc[group.index, 'mahalDist'] = covEst.iloc[grpIdx].mahalanobis(
-    #     #         group.to_numpy())
-    #     mahalDist = pd.DataFrame(
-    #         covEst.to_numpy(),
-    #         index=dataDF.index, columns=['mahalDist'])
-    #     if os.path.exists(tempSavePath):
-    #         os.remove(tempSavePath)
-    # else:
-    #     grouper = [('all', dataDF)]
 
 print('#######################################################')
 refInterval = chi2.interval(1 - 1e-2, len(dataDF.columns))

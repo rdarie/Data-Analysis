@@ -36,27 +36,30 @@ SELECTOR="_minfrmaxcorr"
 # WINDOW="--window=extraExtraShort"
 WINDOW="--window=extraShort"
 #
-TRIALSELECTOR="--processAll"
-# TRIALSELECTOR="--blockIdx=3"
+# TRIALSELECTOR="--processAll"
+TRIALSELECTOR="--blockIdx=4"
 # TRIALSELECTOR="--blockIdx=1"
 #
 # ANALYSISSELECTOR="--analysisName=emg"
 # ANALYSISSELECTOR="--analysisName=default"
 # ANALYSISSELECTOR="--analysisName=emgStretchTime"
 # ANALYSISSELECTOR="--analysisName=emgHiRes"
-ANALYSISSELECTOR="--analysisName=emgLoRes"
+# ANALYSISSELECTOR="--analysisName=emgLoRes"
 # ANALYSISSELECTOR="--analysisName=emg1msec"
 # ANALYSISSELECTOR="--analysisName=emg1msecSmooth"
 # ANALYSISSELECTOR="--analysisName=emg1msecNoLFPFilterSmoothEMG"
-# ANALYSISSELECTOR="--analysisName=lfpFullRes"
+ANALYSISSELECTOR="--analysisName=lfpFullRes"
 #
 # UNITSELECTOR="--unitQuery=all"
 # UNITSELECTOR="--unitQuery=isiemgenv"
 # UNITSELECTOR="--unitQuery=isiemgraw"
-# UNITSELECTOR="--unitQuery=isispinal"
-UNITSELECTOR="--unitQuery=isiemg"
+UNITSELECTOR="--unitQuery=isispinal"
+# UNITSELECTOR="--unitQuery=isiemg"
 
-BLOCKSELECTOR="--inputBlockName=emg_clean"
+# BLOCKSELECTOR="--inputBlockName=emg"
+BLOCKSELECTOR="--inputBlockName=lfp"
+# BLOCKSELECTOR="--inputBlockName=emg_clean"
+# BLOCKSELECTOR="--inputBlockName=lfp_clean"
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
@@ -67,17 +70,19 @@ python --version
 # --maskOutlierBlocks --invertOutlierBlocks --individualTraces
 
 #  --maskOutlierBlocks
-python3 './plotRippleStimSpikeReport.py' --exp=$EXP $TRIALSELECTOR $WINDOW $UNITSELECTOR $ANALYSISSELECTOR --alignQuery="stimOn" --alignFolderName=stim $BLOCKSELECTOR --groupPagesBy="electrode, RateInHz" --maskOutlierBlocks
-python3 './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR $BLOCKSELECTOR $UNITSELECTOR --alignQuery="stimOn" --rowName="RateInHz" --rowControl= --colControl= --hueName="nominalCurrent" --alignFolderName=stim --maskOutlierBlocks --enableOverrides --overlayStats
+python3 './plotRippleStimSpikeReport.py' --exp=$EXP $TRIALSELECTOR $WINDOW $UNITSELECTOR $ANALYSISSELECTOR --alignQuery="stimOn" --alignFolderName=stim $BLOCKSELECTOR --groupPagesBy="electrode, RateInHz"
+# python3 './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR $BLOCKSELECTOR $UNITSELECTOR --alignQuery="stimOn" --rowName="electrode" --rowControl= --colName="RateInHz" --colControl= --hueName="nominalCurrent" --alignFolderName=stim --enableOverrides
 # stim spikes
 # python3 './plotRippleStimSpikeReport.py' --exp=$EXP $TRIALSELECTOR $ANALYSISSELECTOR $UNITSELECTOR
 
 # #  --maskOutlierBlocks
 # ANALYSISSELECTOR="--analysisName=lfpFullRes"
 # UNITSELECTOR="--unitQuery=isispinal"
-# BLOCKSELECTOR="--inputBlockName=lfp_clean"
-# WINDOW="--window=extraExtraShort"
+# WINDOW="--window=extraShort"
 # #
+BLOCKSELECTOR="--inputBlockName=lfp_clean"
+python3 './plotRippleStimSpikeReport.py' --exp=$EXP $TRIALSELECTOR $WINDOW $UNITSELECTOR $ANALYSISSELECTOR --alignQuery="stimOn" --alignFolderName=stim $BLOCKSELECTOR --groupPagesBy="electrode, RateInHz"
+# BLOCKSELECTOR="--inputBlockName=lfp"
 # python3 './plotRippleStimSpikeReport.py' --exp=$EXP $TRIALSELECTOR $WINDOW $UNITSELECTOR $ANALYSISSELECTOR --alignQuery="stimOn" --alignFolderName=stim $BLOCKSELECTOR --groupPagesBy="electrode, RateInHz"
 # python3 './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR $BLOCKSELECTOR $UNITSELECTOR --alignQuery="stimOn" --rowName="RateInHz" --rowControl= --colControl= --hueName="nominalCurrent" --alignFolderName=stim --enableOverrides --overlayStats
 # 

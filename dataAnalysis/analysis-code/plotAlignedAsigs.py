@@ -34,8 +34,8 @@ Options:
 import matplotlib
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
-matplotlib.use('Agg')   # generate postscript output
-# matplotlib.use('QT5Agg')   # generate postscript output
+# matplotlib.use('Agg')   # generate postscript output
+matplotlib.use('QT5Agg')   # generate postscript output
 
 
 from namedQueries import namedQueries
@@ -50,10 +50,10 @@ import dill as pickle
 import pandas as pd
 import numpy as np
 import seaborn as sns
-sns.set()
-sns.set_color_codes("dark")
-sns.set_context("notebook")
-sns.set_style("white")
+sns.set(
+    context='talk', style='dark',
+    palette='dark', font='sans-serif',
+    font_scale=1.5, color_codes=True)
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']), arguments['exp'])
@@ -131,7 +131,7 @@ if arguments['enableOverrides']:
         'height': 4,
         'aspect': 2,
         'facet_kws': {
-            'sharey': False,
+            'sharey': True,
             # 'legend_out': False,
             'gridspec_kws': {
                 'wspace': 0.01,
@@ -187,7 +187,7 @@ asp.plotAsigsAligned(
     minNObservations=5,
     plotProcFuns=[
         asp.genTicksToScale(
-            lineOpts={'lw': 2}, shared=False,
+            lineOpts={'lw': 2}, shared=True,
             # for evoked lfp report
             # xUnitFactor=1e3, yUnitFactor=1,
             # xUnits='msec', yUnits='uV',
@@ -201,7 +201,7 @@ asp.plotAsigsAligned(
         asp.xLabelsTime,
         asp.genBlockVertShader([
                 max(0e-3, alignedAsigsKWargs['windowSize'][0]),
-                min(300e-3, alignedAsigsKWargs['windowSize'][1])],
+                min(.9e-3, alignedAsigsKWargs['windowSize'][1])],
             asigPlotShadingOpts),
         asp.genStimVLineAdder(
             'RateInHz', vLineOpts, tOnset=0, tOffset=.3, includeRight=False),

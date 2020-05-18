@@ -220,11 +220,13 @@ def calcBlockAnalysisNix():
                 ]
     #
     if samplingRate != tdBlock.filter(objects=AnalogSignal)[0].sampling_rate:
+        print('Interpolating input!')
         tdInterp = hf.interpolateDF(
             tdDF, newT,
             kind='linear', fill_value=(0, 0),
             x='t', columns=tdChanNames)
     else:
+        print('Using input as is!')
         tdInterp = tdDF
     #
     infoFromStimStatus = hf.interpolateDF(

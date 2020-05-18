@@ -1,23 +1,23 @@
 #!/bin/bash
 #  10: Calculate align Times
 # Request runtime:
-#SBATCH --time=72:00:00
+#SBATCH --time=24:00:00
 
 # Default resources are 1 core with 2.8GB of memory.
 
 # Request memory:
-#SBATCH --nodes=1
-#SBATCH --mem=96G
+#SBATCH --nodes=12
+#SBATCH --mem=127G
 
 # Specify a job name:
-#SBATCH -J alignStim_20200427
+#SBATCH -J alignStim_20200501
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-alignStim_20200427.stdout
-#SBATCH -e ../../batch_logs/%j-alignStim_20200427.errout
+#SBATCH -o ../../batch_logs/%j-alignStim_20200501.stdout
+#SBATCH -e ../../batch_logs/%j-alignStim_20200501.errout
 
 # Specify account details
-#SBATCH --account=bibs-dborton-condo
+#SBATCH --account=carney-dborton-condo
 
 # EXP="exp202003091200"
 # EXP="exp202003181300"
@@ -34,31 +34,34 @@ LAZINESS="--lazy"
 WINDOW="--window=extraShort"
 # WINDOW="--window=extraExtraShort"
 # TRIALSELECTOR="--blockIdx=1"
-# TRIALSELECTOR="--blockIdx=3"
+# TRIALSELECTOR="--blockIdx=4"
 TRIALSELECTOR="--processAll"
+
 # ANALYSISSELECTOR="--analysisName=emg"
 # ANALYSISSELECTOR="--analysisName=default"
 # ANALYSISSELECTOR="--analysisName=emgStretchTime"
 # ANALYSISSELECTOR="--analysisName=emgHiRes"
-ANALYSISSELECTOR="--analysisName=emgLoRes"
+# ANALYSISSELECTOR="--analysisName=emgLoRes"
 # ANALYSISSELECTOR="--analysisName=emg1msec"
 # ANALYSISSELECTOR="--analysisName=emg1msecSmooth"
 # ANALYSISSELECTOR="--analysisName=emg1msecNoLFPFilterSmoothEMG"
-# ANALYSISSELECTOR="--analysisName=lfpFullRes"
+ANALYSISSELECTOR="--analysisName=lfpFullRes"
 #
 # UNITSELECTOR="--unitQuery=all"
 # UNITSELECTOR="--unitQuery=isiemgraw"
-UNITSELECTOR="--unitQuery=isiemgenv"
-# UNITSELECTOR="--unitQuery=isispinal"
+# UNITSELECTOR="--unitQuery=isiemgenv"
+UNITSELECTOR="--unitQuery=isispinal"
 # UNITSELECTOR="--unitQuery=isiemg"
 # UNITSELECTOR="--unitQuery=isispinaloremg"
 
 # OUTPUTBLOCKNAME="--outputBlockName=emg_clean"
 # INPUTBLOCKNAME="--inputBlockName=emg"
-INPUTBLOCKNAME="--inputBlockName=emg_clean"
-# OUTPUTBLOCKNAME="--outputBlockName=lfp_clean"
-# INPUTBLOCKNAME="--inputBlockName=lfp"
+OUTPUTBLOCKNAME="--outputBlockName=lfp_clean"
+INPUTBLOCKNAME="--inputBlockName=lfp"
 ALIGNQUERY="--alignQuery=stimOn"
+
+# CHANSELECTOR="--chanQuery=isiemg"
+# CHANSELECTOR="--chanQuery=isispinal"
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
@@ -67,16 +70,14 @@ source activate nda2
 python --version
 
 # python3 ./assembleExperimentData.py --exp=$EXP --blockIdx=4 --processAsigs --processRasters $ANALYSISSELECTOR 
-# python3 ./calcAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ANALYSISSELECTOR --eventName=stimAlignTimes --chanQuery="isiemg" --blockName="emg" --verbose  --alignFolderName=stim
-# python3 ./calcAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ANALYSISSELECTOR --eventName=stimAlignTimes --chanQuery="isispinal" --blockName="lfp" --verbose  --alignFolderName=stim
 
-# python3 ./cleanISIData.py --exp=$EXP --alignFolderName=stim $OUTPUTBLOCKNAME $INPUTBLOCKNAME $TRIALSELECTOR $ANALYSISSELECTOR $UNITSELECTOR $WINDOW --alignQuery="stimOn" --saveResults --verbose --plotting
-python3 ./calcTrialOutliers.py --exp=$EXP --alignFolderName=stim $INPUTBLOCKNAME $TRIALSELECTOR $ANALYSISSELECTOR $UNITSELECTOR $WINDOW $ALIGNQUERY --verbose --plotting --saveResults
+# CHANSELECTOR="--chanQuery=isispinal"
+# OUTPUTBLOCKNAME="--outputBlockName=lfp"
+# python3 ./calcAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ANALYSISSELECTOR --eventName=stimAlignTimes $CHANSELECTOR $OUTPUTBLOCKNAME --verbose  --alignFolderName=stim
 
-# python3 ./calcUnitCorrelation.py --exp=$EXP $TRIALSELECTOR $UNITSELECTOR $ANALYSISSELECTOR $WINDOW --resultName="corr" --alignQuery="stimOn" --alignFolderName=stim --inputBlockName="lfp" --verbose --plotting
+OUTPUTBLOCKNAME="--outputBlockName=lfp_clean"
+INPUTBLOCKNAME="--inputBlockName=lfp"
+python3 ./cleanISIData.py --exp=$EXP --alignFolderName=stim $OUTPUTBLOCKNAME $INPUTBLOCKNAME $TRIALSELECTOR $ANALYSISSELECTOR $UNITSELECTOR $WINDOW $ALIGNQUERY --saveResults --verbose --plotting
 
-# python3 ./plotMatrixOfScalars.py --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR --resultName="corr" --alignFolderName=stim --inputBlockName="lfp" --verbose
-# python3 ./plotMatrixOfScalars.py --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR --resultName="corrPreStim" --alignFolderName=stim --inputBlockName="lfp" --verbose
-# python3 ./plotMatrixOfScalarsTopo.py --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR --resultName="corr" --alignFolderName=stim --inputBlockName="lfp" --verbose
-# python3 ./plotMatrixOfScalarsTopo.py --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR --resultName="corrPreStim" --alignFolderName=stim --inputBlockName="lfp" --verbose
-# python3 ./adhoc_plotMatrixOfScalarsTopoDarpaMAC7.py --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR --alignFolderName=stim --inputBlockName="lfp" --verbose
+# INPUTBLOCKNAME="--inputBlockName=emg_clean"
+# python3 ./calcTrialOutliers.py --exp=$EXP --alignFolderName=stim $INPUTBLOCKNAME $TRIALSELECTOR $ANALYSISSELECTOR $UNITSELECTOR $WINDOW $ALIGNQUERY --verbose --plotting --saveResults

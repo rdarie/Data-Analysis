@@ -1,27 +1,12 @@
 def getExpOpts():
     #
-    miniRCBlockLookup = {
-        1: False,
-        2: False,
-        3: False,
-        4: False,
-        5: False,
+    blockExperimentTypeLookup = {
+        1: 'isi',
+        2: 'isi',
+        3: 'isi',
+        4: 'isi',
+        5: 'isi',
         }
-    RCBlockLookup = {
-        1: True,
-        2: True,
-        3: True,
-        4: True,
-        5: True,
-        }
-    RippleBlockLookup = {
-        1: True,
-        2: True,
-        3: True,
-        4: True,
-        5: True,
-        }
-    
     experimentName = '202004301200-Peep'
     deviceName = None
     rippleMapFile = {
@@ -41,6 +26,14 @@ def getExpOpts():
         ['rostralZ_e{:02d}_a'.format(i) for i in range(17, 25)]
         ]
     ainpNameList = ['analog 1']
+    rippleFastSettleTriggers = {
+        1: {'stim': 'same'},
+        2: {'stim': 'same'},
+        3: {'stim': 'same'},
+        4: {'stim': 'same'},
+        5: {'stim': 'same'},
+        6: {'stim': 'same'}
+    }
     jsonSessionNames = {
         #  per block
         1: [],
@@ -92,6 +85,9 @@ def getExpOpts():
     experimentsToAssemble = {
         # For emg analysis - emg missing from block 2
         '202004301200-Peep': [4, 5],
+        }
+    assembledSegmentToBlockLookup = {
+        i - 1: i for i in [4, 5]
         }
 
     movementSizeBins = [0, 0.25, 0.5, 1, 1.25, 1.5]

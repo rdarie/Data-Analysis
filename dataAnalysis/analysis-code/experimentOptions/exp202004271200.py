@@ -1,24 +1,11 @@
 def getExpOpts():
     #
-    miniRCBlockLookup = {
-        1: False,
-        2: False,
-        3: False,
-        4: False,
+    blockExperimentTypeLookup = {
+        1: 'isi',
+        2: 'isi',
+        3: 'isi',
+        4: 'isi',
         }
-    RCBlockLookup = {
-        1: True,
-        2: True,
-        3: True,
-        4: True,
-        }
-    RippleBlockLookup = {
-        1: True,
-        2: True,
-        3: True,
-        4: True,
-        }
-    
     experimentName = '202004271200-Peep'
     deviceName = None
     rippleMapFile = {
@@ -96,6 +83,9 @@ def getExpOpts():
     experimentsToAssemble = {
         # For emg analysis - emg missing from block 2
         '202004271200-Peep': [1, 2, 3, 4],
+        }
+    assembledSegmentToBlockLookup = {
+        i - 1: i for i in [1, 2, 3, 4]
         }
 
     movementSizeBins = [0, 0.25, 0.5, 1, 1.25, 1.5]

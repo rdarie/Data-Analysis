@@ -11,17 +11,17 @@
 #SBATCH --mem=96G
 
 # Specify a job name:
-#SBATCH -J nsp_preproc_20200319_raw
+#SBATCH -J nsp_preproc_20200430_raw
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-nsp_preproc_20200319_raw.stdout
-#SBATCH -e ../../batch_logs/%j-%a-nsp_preproc_20200319_raw.errout
+#SBATCH -o ../../batch_logs/%j-%a-nsp_preproc_20200430_raw.stdout
+#SBATCH -e ../../batch_logs/%j-%a-nsp_preproc_20200430_raw.errout
 
 # Specify account details
-#SBATCH --account=bibs-dborton-condo
+#SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=2,3,4,5,6
+#SBATCH --array=4,5
 
 # EXP="exp201901070700"
 # EXP="exp201901201200"
@@ -35,8 +35,8 @@
 # EXP="exp202003201200"
 # EXP="exp202003191400"
 # EXP="exp202004251400"
-EXP="exp202004271200"
-# EXP="exp202004301200"
+# EXP="exp202004271200"
+EXP="exp202004301200"
 # EXP="exp202005011400"
 # EXP="exp202003181300"
 
@@ -45,7 +45,7 @@ module load anaconda/3-5.2.0
 conda activate
 source activate nda2
 python --version
-#
-SLURM_ARRAY_TASK_ID=2
+## 
+SLURM_ARRAY_TASK_ID=5
 python3 ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --ISI --transferISIStimLog
 # python3 ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --previewEncoder

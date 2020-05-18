@@ -54,6 +54,10 @@ analysisSubFolder = os.path.join(
 alignSubFolder = os.path.join(
     analysisSubFolder, arguments['alignFolderName']
     )
+calcSubFolder = os.path.join(alignSubFolder, 'dataframes')
+if not os.path.exists(calcSubFolder):
+    os.makedirs(calcSubFolder, exist_ok=True)
+
 if arguments['processAll']:
     prefix = assembledName
 else:
@@ -64,15 +68,15 @@ alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = (
     ash.processUnitQueryArgs(
         namedQueries, analysisSubFolder, **arguments))
 outlierTrialNames = ash.processOutlierTrials(
-    alignSubFolder, prefix, **arguments)
+    calcSubFolder, prefix, **arguments)
 
 alignedAsigsKWargs.update(dict(
     duplicateControlsByProgram=False,
     makeControlProgram=False,
     metaDataToCategories=False,
     removeFuzzyName=False,
-    decimate=1,
-    windowSize=(-250e-3, 750e-3),
+    decimate=5,
+    windowSize=(-100e-3, 400e-3),
     transposeToColumns='feature', concatOn='columns',))
 #
 triggeredPath = os.path.join(
@@ -90,17 +94,29 @@ asigWide = ns5.alignedAsigsToDF(
     dataBlock, **alignedAsigsKWargs)
 metaData = asigWide.index.to_frame()
 elecNames = metaData['electrode'].unique()
-elecRegex = r'\-([\S\s]*)\+([\S\s]*)'
+elecRegex = r'([\-]*[\S\s]*)([\+]*[\S\s]*)'
+chanRegex = r'((?:rostral|caudal)\S_\S\S\S)'
 elecChanNames = []
+stimConfigLookup = {}
 for comboName in elecNames:
     matches = re.search(elecRegex, comboName)
     if matches:
-        cathodeName = matches.groups()[0]
-        if cathodeName not in elecChanNames:
-            elecChanNames.append(cathodeName)
-        anodeName = matches.groups()[1]
-        if anodeName not in elecChanNames:
-            elecChanNames.append(anodeName)
+        thisLookup = {'cathodes': [], 'anodes': []}
+        for matchGroup in matches.groups():
+            if len(matchGroup):
+                theseChanNames = re.search(chanRegex, matchGroup)
+                if theseChanNames:
+                    for chanName in theseChanNames.groups():
+                        if chanName not in elecChanNames:
+                            elecChanNames.append(chanName)
+                    if '-' in matchGroup:
+                        for chanName in theseChanNames.groups():
+                            thisLookup['cathodes'].append(chanName)
+                    if '+' in matchGroup:
+                        for chanName in theseChanNames.groups():
+                            thisLookup['anodes'].append(chanName)
+                    stimConfigLookup[comboName] = thisLookup
+# pdb.set_trace()
 eesColumns = pd.MultiIndex.from_tuples(
     [(eCN, 'amplitude') for eCN in sorted(elecChanNames)],
     names=['object', 'property']
@@ -113,9 +129,9 @@ trialColumns = pd.MultiIndex.from_tuples(
         ('hip_flexion_l', 'angle'), ('knee_angle_l', 'angle'),
     ], names=['object', 'property'])
 #
-manualPeriod = 0.01
-manualStimTimes = np.arange(0, 0.3 + manualPeriod, manualPeriod)
-manualEESWaveform = trialIndex.isin(manualStimTimes)
+# manualPeriod = 0.01
+# manualStimTimes = np.arange(0, 0.3 + manualPeriod, manualPeriod)
+# manualEESWaveform = trialIndex.isin(manualStimTimes)
 # print(metaData.reset_index(drop=True))
 # print(metaData['electrode'])
 nullKinematics = pd.DataFrame(
@@ -126,19 +142,20 @@ with pd.HDFStore(outputPath) as store:
 eesIdx = 0
 
 for stimName, stimGroup in asigWide.groupby(['electrode', 'RateInHz', 'nominalCurrent']):
-    if stimGroup.groupby(['segment', 't']).ngroups < 10:
+    if stimGroup.groupby(['segment', 't']).ngroups < 5:
         continue
     print(stimName)
-    matches = re.search(elecRegex, stimName[0])
-    cathodeName = matches.groups()[0]
-    anodeName = matches.groups()[1]
-    for trialIdx, (trialName, trialGroup) in enumerate(stimGroup.groupby(['segment', 'originalIndex', 't'])):
+    for trialIdx, (trialName, trialGroup) in enumerate(stimGroup.groupby(['segment', 't'])):
         stimKey = '/sling/sheep/spindle_0/biophysical/ees_{:0>3}/stim'.format(eesIdx)
-        #
+        eesPeriod = stimName[1] ** -1
+        stimTimes = np.arange(0, 0.3 + eesPeriod, eesPeriod)
+        EESWaveform = trialIndex.isin(stimTimes)
         eesIdx += 1
         theseResults = pd.DataFrame(0, index=trialIndex, columns=eesColumns)
-        theseResults.loc[:, (cathodeName, 'amplitude')] = manualEESWaveform * stimName[2]
-        theseResults.loc[:, (anodeName, 'amplitude')] = manualEESWaveform * stimName[2] * (-1)
+        for cathodeName in stimConfigLookup[stimName[0]]['cathodes']:
+            theseResults.loc[:, (cathodeName, 'amplitude')] = EESWaveform * stimName[2]
+        for anodeName in stimConfigLookup[stimName[0]]['anodes']:
+            theseResults.loc[:, (anodeName, 'amplitude')] = EESWaveform * stimName[2] * (-1)
         for cName, lag in trialGroup.columns:
             if 'EmgEnv' in cName:
                 mName = cName.split('EmgEnv')[0]
@@ -154,8 +171,7 @@ for stimName, stimGroup in asigWide.groupby(['electrode', 'RateInHz', 'nominalCu
                 'electrode': stimName[0], 'RateInHz': stimName[1],
                 'amplitude': stimName[2]}
             if arguments['maskOutlierBlocks']:
-                thisMetadata['outlierTrial'] = outlierTrialNames.loc[
-                    trialName, 'all']
+                thisMetadata['outlierTrial'] = outlierTrialNames.loc[trialName]
             store.get_storer(stimKey).attrs.metadata = thisMetadata
 
 if arguments['lazy']:

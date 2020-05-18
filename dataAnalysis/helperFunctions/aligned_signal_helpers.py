@@ -7,6 +7,7 @@ import pandas as pd
 import numpy as np
 from dask import dataframe as dd
 from dask.diagnostics import ProgressBar
+import multiprocessing
 from scipy import stats
 from statsmodels.stats.multitest import multipletests as mt
 from copy import copy
@@ -232,7 +233,10 @@ def applyFun(
 def splitApplyCombine(
         asigWide, fun=None, resultPath=None,
         funArgs=[], funKWArgs={},
-        rowKeys=None, colKeys=None, useDask=False):
+        rowKeys=None, colKeys=None, useDask=False,
+        daskPersist=True, daskProgBar=True,
+        daskComputeOpts={},
+        reindexFromInput=False):
     if isinstance(rowKeys, str):
         rowKeys = [rowKeys, ]
     if isinstance(colKeys, str):
@@ -245,44 +249,65 @@ def splitApplyCombine(
     else:
         asigStack = asigWide
     # TODO: edge case for series?
+    dataColNames = asigStack.columns.to_list()
+    funKWArgs['dataColNames'] = dataColNames
     if useDask:
-        tempDF = pd.DataFrame(
-            asigStack.to_numpy(), columns=asigStack.columns)
-        dataColNames = tempDF.columns.to_list()
-        tempDF['groupLabels'] = (
-            asigStack.groupby(rowKeys).ngroup().to_numpy())
-        tempSavePath = os.path.join(
-            os.path.dirname(resultPath), 'temp.parquet')
-        if os.path.exists(tempSavePath):
-            os.remove(tempSavePath)
-        tempDF.to_parquet(tempSavePath)
-        del tempDF
-        tempDaskDF = dd.read_parquet(tempSavePath)
-        # pdb.set_trace()
-        result = (
-                tempDaskDF
-                .groupby(by='groupLabels', group_keys=False)[dataColNames]
-                .apply(
-                    fun,
-                    # meta={'mahalDist': 'f8'},
-                    *funArgs, **funKWArgs))
-        with ProgressBar():
-            result = result.compute()
-        if os.path.exists(tempSavePath):
-            os.remove(tempSavePath)
-        # TODO, below is a transformation, handle other index types
-        resultDF = pd.DataFrame(
-            result.to_numpy(),
-            index=asigStack.index, columns=result.columns)
-    else:
-        resultDF = (
-            asigStack
+        '''
+            tempDF = pd.DataFrame(
+                asigStack.to_numpy(), columns=asigStack.columns)
+            tempDF['groupLabels'] = (
+                asigStack.groupby(rowKeys).ngroup().to_numpy())
+            tempSavePath = os.path.join(
+                os.path.dirname(resultPath), 'temp.parquet')
+            if os.path.exists(tempSavePath):
+                os.remove(tempSavePath)
+            # trick to stash data in parquet compatible form (string columns)
+            tempDF = asigStack.reset_index()
+            stashColDtypes = [type(i) for i in tempDF.columns]
+            tempDF.columns = [str(i) for i in tempDF.columns]
+            tempDF.to_parquet(tempSavePath)
+            del tempDF
+            tempDaskDF = dd.read_parquet(tempSavePath)
+            newColumns = []
+            for oldType, value in zip(stashColDtypes, tempDaskDF.columns):
+                newColumns.append(np.array(value).astype(oldType).item())
+            tempDaskDF.columns = newColumns
+            '''
+        tempDaskDF = dd.from_pandas(
+            asigStack.reset_index(),
+            npartitions=2*multiprocessing.cpu_count())
+        resultCollection = (
+            tempDaskDF
             .groupby(by=rowKeys, group_keys=False)
             .apply(
                 fun,
+                # meta={'mahalDist': 'f8'},
                 *funArgs, **funKWArgs))
-    if colKeys is not None:
-        resultDF = resultDF.unstack(level=colKeys)
+        if daskPersist:
+            resultCollection.persist()
+        if daskProgBar:
+            with ProgressBar():
+                result = resultCollection.compute(**daskComputeOpts)
+        else:
+            result = resultCollection.compute(**daskComputeOpts)
+        # if os.path.exists(tempSavePath):
+        #     os.remove(tempSavePath)
+    else:
+        result = (
+            asigStack
+            .reset_index()
+            .groupby(by=rowKeys, group_keys=False)
+            .apply(fun, *funArgs, **funKWArgs))
+    # TODO, below is a transformation, handle other index types
+    # pdb.set_trace()
+    if reindexFromInput:
+        resultDF = pd.DataFrame(
+            result.sort_index().loc[:, dataColNames].to_numpy(),
+            index=asigStack.index, columns=asigStack.columns)
+        if colKeys is not None:
+            resultDF = resultDF.unstack(level=colKeys)
+    else:
+        resultDF = result.sort_index().set_index(asigStack.index.names)
     return resultDF
 
 

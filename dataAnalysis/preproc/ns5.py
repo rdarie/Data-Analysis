@@ -879,6 +879,11 @@ def getAsigsAlignedToEvents(
                         asig.load(
                             time_slice=(t + windowSize[0], t + windowSize[1]))
                         for t in alignEvents]
+                    if any([rW.shape[0] < nominalWinLen for rW in rawWaveforms]):
+                        rawWaveforms = [
+                            asig.load(
+                                time_slice=(t + windowSize[0], t + windowSize[1] + asig.sampling_period))
+                            for t in alignEvents]
                 elif isinstance(asig, AnalogSignal):
                     rawWaveforms = []
                     for t in alignEvents:
@@ -891,6 +896,7 @@ def getAsigsAlignedToEvents(
                 waveformUnits = rawWaveforms[0].units
                 #  fix length if roundoff error
                 #  minLen = min([rW.shape[0] for rW in rawWaveforms])
+                #  pdb.set_trace()
                 rawWaveforms = [rW[:nominalWinLen] for rW in rawWaveforms]
                 #
                 spikeWaveforms = (
