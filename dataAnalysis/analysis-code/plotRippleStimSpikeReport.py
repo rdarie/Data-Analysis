@@ -220,7 +220,7 @@ plotProcFuns = [
     # for evoked lfp report, add stim times
     asp.genBlockVertShader([
             max(0e-3, alignedAsigsKWargs['windowSize'][0]),
-            min(.6e-3, alignedAsigsKWargs['windowSize'][1])],
+            min(.7e-3, alignedAsigsKWargs['windowSize'][1])],
         asigPlotShadingOpts),
     asp.genStimVLineAdder(
         'RateInHz', vLineOpts, tOnset=0, tOffset=.3, includeRight=False)

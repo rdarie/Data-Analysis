@@ -77,6 +77,7 @@ python --version
 
 OUTPUTBLOCKNAME="--outputBlockName=lfp_clean"
 INPUTBLOCKNAME="--inputBlockName=lfp"
+EXP="exp202005011400"
 python3 ./cleanISIData.py --exp=$EXP --alignFolderName=stim $OUTPUTBLOCKNAME $INPUTBLOCKNAME $TRIALSELECTOR $ANALYSISSELECTOR $UNITSELECTOR $WINDOW $ALIGNQUERY --saveResults --verbose --plotting
 
 # INPUTBLOCKNAME="--inputBlockName=emg_clean"

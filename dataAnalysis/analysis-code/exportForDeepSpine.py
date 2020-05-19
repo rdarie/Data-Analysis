@@ -149,13 +149,18 @@ for stimName, stimGroup in asigWide.groupby(['electrode', 'RateInHz', 'nominalCu
         stimKey = '/sling/sheep/spindle_0/biophysical/ees_{:0>3}/stim'.format(eesIdx)
         eesPeriod = stimName[1] ** -1
         stimTimes = np.arange(0, 0.3 + eesPeriod, eesPeriod)
-        EESWaveform = trialIndex.isin(stimTimes)
+        EESWaveform = np.zeros_like(trialIndex)
+        # TODO replace this with the hf.findClosestTimes implementation
+        for stimTime in stimTimes:
+            closestIndexTime = np.argmin(np.abs((trialIndex - stimTime)))
+            EESWaveform[closestIndexTime] = 1
         eesIdx += 1
         theseResults = pd.DataFrame(0, index=trialIndex, columns=eesColumns)
         for cathodeName in stimConfigLookup[stimName[0]]['cathodes']:
-            theseResults.loc[:, (cathodeName, 'amplitude')] = EESWaveform * stimName[2]
+            # pdb.set_trace()
+            theseResults.loc[:, (cathodeName, 'amplitude')] = EESWaveform * stimName[2] / len(stimConfigLookup[stimName[0]]['cathodes'])
         for anodeName in stimConfigLookup[stimName[0]]['anodes']:
-            theseResults.loc[:, (anodeName, 'amplitude')] = EESWaveform * stimName[2] * (-1)
+            theseResults.loc[:, (anodeName, 'amplitude')] = EESWaveform * stimName[2] * (-1) / len(stimConfigLookup[stimName[0]]['anodes'])
         for cName, lag in trialGroup.columns:
             if 'EmgEnv' in cName:
                 mName = cName.split('EmgEnv')[0]

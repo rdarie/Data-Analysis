@@ -36,8 +36,8 @@ SELECTOR="_minfrmaxcorr"
 # WINDOW="--window=extraExtraShort"
 WINDOW="--window=extraShort"
 #
-# TRIALSELECTOR="--processAll"
-TRIALSELECTOR="--blockIdx=4"
+TRIALSELECTOR="--processAll"
+# TRIALSELECTOR="--blockIdx=4"
 # TRIALSELECTOR="--blockIdx=1"
 #
 # ANALYSISSELECTOR="--analysisName=emg"
@@ -70,7 +70,7 @@ python --version
 # --maskOutlierBlocks --invertOutlierBlocks --individualTraces
 
 #  --maskOutlierBlocks
-python3 './plotRippleStimSpikeReport.py' --exp=$EXP $TRIALSELECTOR $WINDOW $UNITSELECTOR $ANALYSISSELECTOR --alignQuery="stimOn" --alignFolderName=stim $BLOCKSELECTOR --groupPagesBy="electrode, RateInHz"
+# python3 './plotRippleStimSpikeReport.py' --exp=$EXP $TRIALSELECTOR $WINDOW $UNITSELECTOR $ANALYSISSELECTOR --alignQuery="stimOn" --alignFolderName=stim $BLOCKSELECTOR --groupPagesBy="electrode, RateInHz"
 # python3 './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR $BLOCKSELECTOR $UNITSELECTOR --alignQuery="stimOn" --rowName="electrode" --rowControl= --colName="RateInHz" --colControl= --hueName="nominalCurrent" --alignFolderName=stim --enableOverrides
 # stim spikes
 # python3 './plotRippleStimSpikeReport.py' --exp=$EXP $TRIALSELECTOR $ANALYSISSELECTOR $UNITSELECTOR

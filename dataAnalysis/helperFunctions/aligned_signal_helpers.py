@@ -234,7 +234,7 @@ def splitApplyCombine(
         asigWide, fun=None, resultPath=None,
         funArgs=[], funKWArgs={},
         rowKeys=None, colKeys=None, useDask=False,
-        daskPersist=True, daskProgBar=True,
+        daskPersist=True, daskProgBar=True, daskResultMeta=None,
         daskComputeOpts={},
         reindexFromInput=False):
     if isinstance(rowKeys, str):
@@ -276,12 +276,13 @@ def splitApplyCombine(
         tempDaskDF = dd.from_pandas(
             asigStack.reset_index(),
             npartitions=2*multiprocessing.cpu_count())
+        if daskResultMeta is not None:
+            funKWArgs.update({'meta': daskResultMeta})
         resultCollection = (
             tempDaskDF
             .groupby(by=rowKeys, group_keys=False)
             .apply(
                 fun,
-                # meta={'mahalDist': 'f8'},
                 *funArgs, **funKWArgs))
         if daskPersist:
             resultCollection.persist()
@@ -290,8 +291,6 @@ def splitApplyCombine(
                 result = resultCollection.compute(**daskComputeOpts)
         else:
             result = resultCollection.compute(**daskComputeOpts)
-        # if os.path.exists(tempSavePath):
-        #     os.remove(tempSavePath)
     else:
         result = (
             asigStack
@@ -307,7 +306,11 @@ def splitApplyCombine(
         if colKeys is not None:
             resultDF = resultDF.unstack(level=colKeys)
     else:
-        resultDF = result.sort_index().set_index(asigStack.index.names)
+        presentIndices = [
+            idx
+            for idx in asigStack.index.names
+            if (idx in result.columns)]
+        resultDF = result.sort_index().set_index(presentIndices)
     return resultDF
 
 

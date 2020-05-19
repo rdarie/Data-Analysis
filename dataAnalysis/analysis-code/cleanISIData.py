@@ -202,7 +202,7 @@ def cleanISIData(
             fastSettleMode = fastSettleModeList[0]
             correctSwitch = False
             timeStep = (3e4 ** (-1))
-            blankingDur = firstPW + secondPW - 6 * timeStep
+            blankingDur = totalPW
             if fastSettleMode == 'same':
                 if (
                         (
@@ -212,10 +212,10 @@ def cleanISIData(
                             ('rostral' in featureName) &
                             ('rostral' in electrodeName))):
                     correctSwitch = False
-                    blankingDur += 9 * timeStep
+                    blankingDur += 3 * timeStep
             if fastSettleMode == 'any':
                 correctSwitch = False
-                blankingDur += 9 * timeStep
+                blankingDur += 3 * timeStep
             #
             # print('{} during stim on {}; Cleaning {:.2f} usec'.format(
             #     featureName, electrodeName, blankingDur * 1e6))
