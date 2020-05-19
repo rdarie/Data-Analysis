@@ -140,7 +140,8 @@ def noiseCeil(
         for idx in range(maxIter):
             testX = shuffle(groupData, n_samples=nChoose)
             refX = groupData.loc[~groupData.index.isin(testX.index), :]
-            # pdb.set_trace()
+            if refX.mean().isna().any():
+                pdb.set_trace()
             allCorr.iloc[idx] = refX.mean().corr(
                 testX.mean(), method=corrMethod)
             allCov.iloc[idx] = refX.mean().cov(testX.mean())
@@ -190,8 +191,8 @@ if __name__ == "__main__":
         # daskClient = Client()
         # daskComputeOpts = {}
         daskComputeOpts = dict(
-            scheduler='processes'
-            # scheduler='single-threaded'
+            # scheduler='processes'
+            scheduler='single-threaded'
             )
         resDF = ash.splitApplyCombine(
             dataDF, fun=noiseCeil, resultPath=resultPath,
@@ -225,26 +226,21 @@ if __name__ == "__main__":
             }
     
     for cN in ['covariance', 'mse']:
-        pdb.set_trace()
+        # pdb.set_trace()
+        #
         preScaled = (
             RobustScaler(quantile_range=(5, 95))
             .fit_transform(resDF[cN]))
-        resDF[cN + '_q_scale'] = pd.DataFrame(
+        resDF[cN + '_q_scale'] = pd.Series(
             preScaled,
-            index=resDF[cN].index,
-            columns=resDF[cN].columns)
-        scaledMask = pd.DataFrame(
+            index=resDF[cN].index)
+        scaledMask = pd.Series(
             np.abs(preScaled) < 2,
-            index=resDF[cN].index,
-            columns=resDF[cN].columns)
-        resDF[cN + '_scaled'] = pd.DataFrame(
-            np.nan,
-            index=resDF[cN].index,
-            columns=resDF[cN].columns)
-        for fN in resDF[cN].columns:
-            mmScaler = MinMaxScaler()
-            mmScaler.fit(resDF[cN].loc[scaledMask[fN], fN].to_numpy().reshape(-1, 1))
-            resDF[cN + '_scaled'].loc[:, fN] = mmScaler.transform(resDF[cN][fN].to_numpy().reshape(-1, 1))
+            index=resDF[cN].index)
+        mmScaler = MinMaxScaler()
+        mmScaler.fit(resDF.loc[scaledMask, cN].to_numpy().reshape(-1, 1))
+        resDF[cN + '_scaled'] = mmScaler.transform(resDF[cN].to_numpy().reshape(-1, 1))
+        break
 
     exportToDeepSpine = True
     if exportToDeepSpine:

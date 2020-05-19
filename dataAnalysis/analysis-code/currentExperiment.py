@@ -347,7 +347,7 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
     #     windowSize=(-50e-3, 350e-3),
     #     decimate=3))
     alignedAsigsKWargs.update(dict(
-        windowSize=(-1e-3, 4e-3),
+        windowSize=(-1e-3, 9e-3),
         decimate=1))
     # alignedAsigsKWargs.update(dict(
     #     windowSize=None, decimate=1))
