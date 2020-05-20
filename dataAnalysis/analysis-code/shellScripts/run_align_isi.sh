@@ -1,4 +1,4 @@
-233214421#!/bin/bash
+#!/bin/bash
 #  10: Calculate align Times
 # Request runtime:
 #SBATCH --time=24:00:00
@@ -31,10 +31,10 @@ LAZINESS="--lazy"
 # LAZINESS=""
 # WINDOW="--window=miniRC"
 # WINDOW="--window=short"
-WINDOW="--window=extraShort"
-# WINDOW="--window=extraExtraShort"
+# WINDOW="--window=extraShort"
+WINDOW="--window=extraExtraShort"
 # TRIALSELECTOR="--blockIdx=1"
-# TRIALSELECTOR="--blockIdx=4"
+# TRIALSELECTOR="--blockIdx=3"
 TRIALSELECTOR="--processAll"
 
 # ANALYSISSELECTOR="--analysisName=emg"
@@ -77,7 +77,6 @@ python --version
 
 OUTPUTBLOCKNAME="--outputBlockName=lfp_clean"
 INPUTBLOCKNAME="--inputBlockName=lfp"
-EXP="exp202005011400"
 python3 ./cleanISIData.py --exp=$EXP --alignFolderName=stim $OUTPUTBLOCKNAME $INPUTBLOCKNAME $TRIALSELECTOR $ANALYSISSELECTOR $UNITSELECTOR $WINDOW $ALIGNQUERY --saveResults --verbose --plotting
 
 # INPUTBLOCKNAME="--inputBlockName=emg_clean"

@@ -50,17 +50,18 @@ metadataNP = metaDataDF.to_numpy()
 # combinationIdx is the index of the particular combination
 # of rate, active electrodes and amplitude
 with pd.HDFStore(inputPath, 'r') as store:
-    noiseCeilDF = pd.read_hdf(store, 'noiseCeil')
+    noiseCeilDF = pd.read_hdf(store, 'noiseCeil').unstack(level='feature')
     columnLabels = noiseCeilDF.columns.to_list()
     electrodeLabels = noiseCeilDF.index.get_level_values('electrode').to_list()
     amplitudeLabels = noiseCeilDF.index.get_level_values('nominalCurrent').to_list()
-    covariances = pd.read_hdf(store, 'covariance').to_numpy()
+    covariances = pd.read_hdf(store, 'covariance').unstack(level='feature').to_numpy()
     noiseCeil = noiseCeilDF.to_numpy()
 print('finished loading.')
-pdb.set_trace()
-# plt.plot(eesNP[0, :, 0])
-# plt.plot(emgNP[0, :, 0])
-# plt.show()
-# print(metaDataDF.loc[~metaDataDF['outlierTrial'].astype(np.bool), :].groupby(['electrode', 'amplitude'])['RateInHz'].value_counts())
-# print(emgList[0].index)
-# 
+# pdb.set_trace()
+checkPlots = True
+if checkPlots:
+    plt.plot(eesNP[0, :, 0])
+    plt.plot(emgNP[0, :, 0])
+    plt.show()
+    print(metaDataDF.loc[~metaDataDF['outlierTrial'].astype(np.bool), :].groupby(['electrode', 'amplitude'])['RateInHz'].value_counts())
+    print(emgList[0].index)

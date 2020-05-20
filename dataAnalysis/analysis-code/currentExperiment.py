@@ -346,8 +346,11 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
     # alignedAsigsKWargs.update(dict(
     #     windowSize=(-50e-3, 350e-3),
     #     decimate=3))
+    # alignedAsigsKWargs.update(dict(
+    #     windowSize=(-1e-3, 9e-3),
+    #     decimate=1))
     alignedAsigsKWargs.update(dict(
-        windowSize=(-1e-3, 9e-3),
+        windowSize=(-250e-6, 2250e-6),
         decimate=1))
     # alignedAsigsKWargs.update(dict(
     #     windowSize=None, decimate=1))
@@ -379,7 +382,7 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
         # 'binInterval': 1e-4, 'binWidth': 5e-3, 'smoothKernelWidth': 10e-3,  # 10 kHz, EMG Hi-Res
         'windowSizes': {
             'extraShort': (-0.15, 0.4),
-            'extraExtraShort': (-0.025, 0.075),
+            'extraExtraShort': (-0.15, 0.01),
             'short': (-0.5, 0.5),
             'long': (-2.25, 2.25),
             'RC': (-0.33, 0.33),

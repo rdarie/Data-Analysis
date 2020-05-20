@@ -112,6 +112,7 @@ def noiseCeil(
     else:
         maskX = np.ones_like(groupData.columns).astype(np.bool)
     #
+    nSamp = groupData.shape[0]
     if iterMethod == 'loo':
         loo = LeaveOneOut()
         allCorr = pd.Series(index=groupData.index)
@@ -127,7 +128,6 @@ def noiseCeil(
                 break
         allCorr.dropna(inplace=True)
     elif iterMethod == 'half':
-        nSamp = groupData.shape[0]
         nChoose = int(groupData.shape[0] / 2)
         if maxIter is None:
             maxIter = int(factorial(nSamp) / (factorial(nChoose) ** 2))
@@ -140,8 +140,8 @@ def noiseCeil(
         for idx in range(maxIter):
             testX = shuffle(groupData, n_samples=nChoose)
             refX = groupData.loc[~groupData.index.isin(testX.index), :]
-            if refX.mean().isna().any():
-                pdb.set_trace()
+            # if refX.mean().isna().any() or testX.mean().isna().any():
+            #     pdb.set_trace()
             allCorr.iloc[idx] = refX.mean().corr(
                 testX.mean(), method=corrMethod)
             allCov.iloc[idx] = refX.mean().cov(testX.mean())
@@ -187,12 +187,12 @@ if __name__ == "__main__":
                 tBounds=None,
                 plotting=False, iterMethod='half',
                 corrMethod='pearson',
-                maxIter=1e1)
+                maxIter=5)
         # daskClient = Client()
         # daskComputeOpts = {}
         daskComputeOpts = dict(
-            # scheduler='processes'
-            scheduler='single-threaded'
+            scheduler='processes'
+            # scheduler='single-threaded'
             )
         resDF = ash.splitApplyCombine(
             dataDF, fun=noiseCeil, resultPath=resultPath,
@@ -202,6 +202,7 @@ if __name__ == "__main__":
             daskComputeOpts=daskComputeOpts,
             reindexFromInput=False)
         # pdb.set_trace()
+        # nObs = dataDF.reset_index().groupby(groupBy)['feature'].value_counts()
         # resDF = ash.applyFunGrouped(
         #     dataDF,
         #     groupBy, testVar,
@@ -226,21 +227,19 @@ if __name__ == "__main__":
             }
     
     for cN in ['covariance', 'mse']:
-        # pdb.set_trace()
-        #
-        preScaled = (
-            RobustScaler(quantile_range=(5, 95))
-            .fit_transform(resDF[cN]))
+        robScaler = RobustScaler(quantile_range=(5, 95))
+        robScaler.fit(resDF.loc[resDF[cN].notna(), cN].to_numpy().reshape(-1, 1))
+        preScaled = (robScaler.transform(resDF[cN].to_numpy().reshape(-1, 1)))
         resDF[cN + '_q_scale'] = pd.Series(
-            preScaled,
+            preScaled.squeeze(),
             index=resDF[cN].index)
-        scaledMask = pd.Series(
-            np.abs(preScaled) < 2,
-            index=resDF[cN].index)
+        scaledMask = np.abs(preScaled.squeeze()) < 2
+        # scaledMask = pd.Series(
+        #     np.abs(preScaled.squeeze()) < 2,
+        #     index=resDF[cN].index)
         mmScaler = MinMaxScaler()
         mmScaler.fit(resDF.loc[scaledMask, cN].to_numpy().reshape(-1, 1))
         resDF[cN + '_scaled'] = mmScaler.transform(resDF[cN].to_numpy().reshape(-1, 1))
-        break
 
     exportToDeepSpine = True
     if exportToDeepSpine:
@@ -250,19 +249,17 @@ if __name__ == "__main__":
                 arguments['inputBlockName'], arguments['window']))
         for cN in ['noiseCeil', 'covariance', 'covariance_q_scale']:
             resDF[cN].to_hdf(deepSpineExportPath, cN)
-    pdb.set_trace()
-    # 
+    #
     mask = pd.DataFrame(
-        0,
-        index=resDF['noiseCeil'].index,
-        columns=resDF['noiseCeil'].columns)
+        False,
+        index=resDF['noiseCeil'].index)
     trialInfo = resDF['noiseCeil'].index.to_frame().reset_index(drop=True)
     dropColumns = []
     for cN in dropColumns:
-        mask.loc[:, cN] = True
+        mask.loc[trialInfo['feature'] == cN] = True
     dropElectrodes = []
-    dropIndex = mask.index.get_level_values('electrode').isin(dropElectrodes)
-    mask.loc[dropIndex, :] = True
+    dropIndex = trialInfo['electrode'].isin(dropElectrodes)
+    mask.loc[dropIndex] = True
     if arguments['plotting']:
         figureOutputFolder = os.path.join(
             figureFolder, arguments['analysisName'])

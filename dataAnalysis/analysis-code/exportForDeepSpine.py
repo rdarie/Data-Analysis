@@ -148,11 +148,12 @@ for stimName, stimGroup in asigWide.groupby(['electrode', 'RateInHz', 'nominalCu
     for trialIdx, (trialName, trialGroup) in enumerate(stimGroup.groupby(['segment', 't'])):
         stimKey = '/sling/sheep/spindle_0/biophysical/ees_{:0>3}/stim'.format(eesIdx)
         eesPeriod = stimName[1] ** -1
-        stimTimes = np.arange(0, 0.3 + eesPeriod, eesPeriod)
+        stimTimes = np.arange(0, 0.3, eesPeriod)
         EESWaveform = np.zeros_like(trialIndex)
         # TODO replace this with the hf.findClosestTimes implementation
         for stimTime in stimTimes:
             closestIndexTime = np.argmin(np.abs((trialIndex - stimTime)))
+            # pdb.set_trace()
             EESWaveform[closestIndexTime] = 1
         eesIdx += 1
         theseResults = pd.DataFrame(0, index=trialIndex, columns=eesColumns)
