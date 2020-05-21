@@ -347,11 +347,17 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
     #     windowSize=(-50e-3, 350e-3),
     #     decimate=3))
     # alignedAsigsKWargs.update(dict(
-    #     windowSize=(-1e-3, 9e-3),
+    #     windowSize=(-250e-6, 9e-3),
+    #     decimate=1))
+    # alignedAsigsKWargs.update(dict(
+    #     windowSize=(-250e-6, 19e-3),
     #     decimate=1))
     alignedAsigsKWargs.update(dict(
-        windowSize=(-250e-6, 2250e-6),
-        decimate=1))
+        windowSize=(-250e-6, 49e-3),
+        decimate=2))
+    # alignedAsigsKWargs.update(dict(
+    #     windowSize=(-250e-6, 2750e-6),
+    #     decimate=1))
     # alignedAsigsKWargs.update(dict(
     #     windowSize=None, decimate=1))
     # if (miniRCBlock or RCBlock):
@@ -381,8 +387,8 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
         'binInterval': (3e4) ** (-1), 'binWidth': 5e-3, 'smoothKernelWidth': 10e-3,  # 30 kHz, Full-Res
         # 'binInterval': 1e-4, 'binWidth': 5e-3, 'smoothKernelWidth': 10e-3,  # 10 kHz, EMG Hi-Res
         'windowSizes': {
-            'extraShort': (-0.15, 0.4),
-            'extraExtraShort': (-0.15, 0.01),
+            'XS': (-0.15, 0.4),
+            'XXS': (-0.2, 0.05),
             'short': (-0.5, 0.5),
             'long': (-2.25, 2.25),
             'RC': (-0.33, 0.33),

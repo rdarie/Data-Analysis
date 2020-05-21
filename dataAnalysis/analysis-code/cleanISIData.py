@@ -96,7 +96,7 @@ outputH5Path = os.path.join(
 alignedAsigsKWargs.update(dict(
     duplicateControlsByProgram=False,
     makeControlProgram=False, removeFuzzyName=False,
-    decimate=1, windowSize=(-150e-3, 400e-3),
+    decimate=1, windowSize=(-200e-3, 400e-3),
     procFun=None,
     metaDataToCategories=False,
     transposeToColumns='bin', concatOn='index',
@@ -113,22 +113,48 @@ def cleanISIData(
         refWinMask=None, tau=None,
         plottingLineNoiseMatch=False,
         artifactDiagnosticPlots=False,
-        removeReferenceBaseline=True,
+        removeReferenceBaseline=False, removeResponseBaseline=False,
+        correctSwitch=True,
         nExtraSteps=1, interpMethod='pchip',
         remove60Hz=True, verbose=False):
     try:
-        featureName = group['feature'].unique()[0]
-        electrodeName = group['electrode'].unique()[0]
-        firstPW = group['firstPW'].unique()[0]
-        secondPW = group['secondPW'].unique()[0]
-        totalPW = group['totalPW'].unique()[0]
-        stimCat = group['stimCat'].unique()[0]
-        #
-        dataColMask = group.columns.isin(dataColNames)
+        timeStep = (3e4 ** (-1))
         procDF = group.copy()
+        dataColMask = procDF.columns.isin(dataColNames)
         groupData = procDF.loc[:, dataColMask]
+        t = np.asarray(groupData.columns).astype(np.float)
+        nDataCols = groupData.shape[1]
+        #
+        featureName = procDF['feature'].unique()[0]
+        electrodeName = procDF['electrode'].unique()[0]
+        firstPW = procDF['firstPW'].unique()[0]
+        secondPW = procDF['secondPW'].unique()[0]
+        totalPW = procDF['totalPW'].unique()[0]
+        stimCat = procDF['stimCat'].unique()[0]
+        stimPeriod = procDF['stimPeriod'].unique()[0]
+        fastSettleModeList = group['fastSettleTriggers'].unique()
+        # if not (fastSettleModeList.size == 1):
+        #     pdb.set_trace()
+        assert fastSettleModeList.size == 1
+        fastSettleMode = fastSettleModeList[0]
+        blankingDur = totalPW
+        if fastSettleMode == 'same':
+            if (
+                    (
+                        ('caudal' in featureName) &
+                        ('caudal' in electrodeName)) |
+                    (
+                        ('rostral' in featureName) &
+                        ('rostral' in electrodeName))):
+                pass
+                # correctSwitch = False
+                blankingDur += nExtraSteps * timeStep
+        if fastSettleMode == 'any':
+            pass
+            # correctSwitch = False
+            blankingDur += nExtraSteps * timeStep
         if plottingLineNoiseMatch or artifactDiagnosticPlots:
-            plotTrialIdx = 1
+            plotTrialIdx = 0
             groupMean = groupData.iloc[plotTrialIdx, :].mean()
             saveOriginalForPlotting = groupData.iloc[plotTrialIdx, :].copy()
         if remove60Hz and ('EmgEnv' not in featureName):
@@ -201,67 +227,30 @@ def cleanISIData(
                     axM.set_xlabel('Time (sec)')
             if plottingLineNoiseMatch and not (artifactDiagnosticPlots):
                 plt.show()
-        if removeReferenceBaseline:
-            procDF.loc[:, dataColMask] = (
-                procDF.loc[:, dataColMask].apply(
-                    lambda x: x - np.median(x[refWinMask]),
-                    axis=1, raw=True,
-                    ))
         if (
                 fillInFastSettle and
                 (
                     ('caudal' in featureName) or
                     ('rostral' in featureName))):
-            fastSettleModeList = group['fastSettleTriggers'].unique()
-            # if not (fastSettleModeList.size == 1):
-            #     pdb.set_trace()
-            assert fastSettleModeList.size == 1
-            fastSettleMode = fastSettleModeList[0]
-            correctSwitch = True
-            timeStep = (3e4 ** (-1))
-            blankingDur = totalPW
-            if fastSettleMode == 'same':
-                if (
-                        (
-                            ('caudal' in featureName) &
-                            ('caudal' in electrodeName)) |
-                        (
-                            ('rostral' in featureName) &
-                            ('rostral' in electrodeName))):
-                    pass
-                    # correctSwitch = False
-                    blankingDur += nExtraSteps * timeStep
-            if fastSettleMode == 'any':
-                pass
-                # correctSwitch = False
-                blankingDur += nExtraSteps * timeStep
-            #
             # print('{} during stim on {}; Cleaning {:.2f} usec'.format(
             #     featureName, electrodeName, blankingDur * 1e6))
-            t = groupData.columns
             if stimCat == 'stimOn':
                 blankMask = (t >= 0) & (t <= 0 + blankingDur)
             elif stimCat == 'stimOff':
                 blankMask = (t >= - blankingDur) & (t <= 0)
+            else:
+                blankMask = (t >= 0) & (t <= 0 + blankingDur)
             # remove saturated readings
             # satLimit = 6e3
             #
             lastBlankIdx = np.flatnonzero(blankMask)[-1]
-            # nextIdx = min(lastBlankIdx+1, blankMask.size)
-            # while (groupData.iloc[:, nextIdx].abs() > satLimit).any():
-            #     lastBlankIdx += 1
-            #     nextIdx = min(lastBlankIdx+1, blankMask.size)
-            #     if nextIdx == blankMask.size:
-            #         break
-            # blankMask[np.flatnonzero(blankMask)[-1]:lastBlankIdx+1] = True
-            # # firstBlankIdx = np.flatnonzero(blankMask)[0]
-            # lastBlankIdx = np.flatnonzero(blankMask)[-1]
             if correctSwitch:
                 deltaV = (groupData.iloc[:, lastBlankIdx+1])
                 artifactDF = calcStimArtifact(
                     groupData, t, t[lastBlankIdx+1],
                     deltaV, tau)
                 blankMask[lastBlankIdx+1] = True
+                blankingDur += timeStep
             if artifactDiagnosticPlots:
                 fig, ax = plt.subplots(2, 1, sharex=True, sharey=True)
                 ax[0].plot(
@@ -281,6 +270,50 @@ def cleanISIData(
             maskToNan = dataColMask.copy()
             maskToNan[dataColMask] = blankMask
             procDF.loc[:, maskToNan] = np.nan
+        if removeReferenceBaseline:
+            fullDFReferenceMask = dataColMask.copy()
+            fullDFReferenceMask[dataColMask] = refWinMask
+            if fullDFReferenceMask.any():
+                theseMedians = np.median(
+                    procDF.loc[:, fullDFReferenceMask].to_numpy(),
+                    axis=1)
+                mediansDF = pd.DataFrame(
+                    np.tile(np.atleast_2d(theseMedians), (nDataCols, 1)).transpose(),
+                    index=groupData.index, columns=groupData.columns
+                    )
+                procDF.loc[:, dataColMask] = (
+                    procDF.loc[:, dataColMask] - mediansDF)
+        if removeResponseBaseline:
+            if stimCat == 'stimOn':
+                responseMask = (t > 0 + blankingDur) & (t <= stimPeriod)
+            elif stimCat == 'stimOff':
+                responseMask = (t > 0) & (t <= stimPeriod - blankingDur)
+            else:
+                # dummy mask, to deal with dask internal checking
+                # of dtypes
+                responseMask = (t > 0 + blankingDur) & (t <= stimPeriod)
+            fullDFResponseMask = dataColMask.copy()
+            fullDFResponseMask[dataColMask] = responseMask
+            if fullDFResponseMask.any():
+                theseMedians = np.median(
+                    procDF.loc[:, fullDFResponseMask].to_numpy(),
+                    axis=1)
+                nSamplesInResponse = procDF.loc[:, fullDFResponseMask].shape[1]
+                mediansDF = pd.DataFrame(
+                    np.tile(
+                        np.atleast_2d(theseMedians),
+                        (nSamplesInResponse, 1)).transpose(),
+                    index=groupData.index,
+                    columns=procDF.loc[:, fullDFResponseMask].columns
+                    )
+                procDF.loc[:, fullDFResponseMask] = (
+                    procDF.loc[:, fullDFResponseMask] -
+                    mediansDF)
+        if (
+                fillInFastSettle and
+                (
+                    ('caudal' in featureName) or
+                    ('rostral' in featureName))):
             if interpMethod in ['ffill', 'bfill']:
                 procDF.loc[:, dataColMask] = (
                     procDF.loc[:, dataColMask]
@@ -307,8 +340,8 @@ def cleanISIData(
 if __name__ == "__main__":
     dataReader, dataBlock = ns5.blockFromPath(
         triggeredPath, lazy=arguments['lazy'])
-    useCachedInput = False
-    if useCachedInput:
+    useCachedInput = True
+    if useCachedInput and (os.path.exists(triggeredH5Path)):
         dataDF = pd.read_hdf(triggeredH5Path, arguments['inputBlockName'])
         samplingRate = float((dataDF.columns[1] - dataDF.columns[0]) ** -1)
     else:
@@ -334,13 +367,6 @@ if __name__ == "__main__":
                 append=True, inplace=True)
     # procDF = dataDF.copy()
 
-    groupBy = [
-        'electrode', 'nominalCurrent',
-        'stimCat', 'feature',
-        'totalPW',
-        'firstPW', 'secondPW'
-        ]
-
     def calcStimArtifact(DF, t, tOffset, vMag, tau):
         artDF = pd.DataFrame(0., index=DF.index, columns=DF.columns)
         tMask = (t - tOffset) >= 0
@@ -349,16 +375,44 @@ if __name__ == "__main__":
                 vMag[rowIdx] * np.exp(-(t[tMask] - tOffset) / tau))
         return artDF
 
+    groupBy = [
+        'electrode', 'nominalCurrent',
+        'feature',
+        'totalPW',
+        'stimCat',
+        'stimPeriod',
+        'firstPW', 'secondPW'
+        ]
     # line noise match filter
     lineNoiseFilterOpts = {
         'type': 'sin',
         'Wn': 60,
-        'nHarmonics': 2,
-        'timeWindow': [-150e-3, -1e-3]  # split the epoch into a reference window (pre-stimulus) and the rest
+        'nHarmonics': 3,
+        'timeWindow': [-200e-3, -1e-3]  # split the epoch into a reference window (pre-stimulus) and the rest
         }
-    refWinMask = (dataDF.columns >= lineNoiseFilterOpts['timeWindow'][0]) & (dataDF.columns < lineNoiseFilterOpts['timeWindow'][-1])
+
+    refWinMask = np.asarray(
+        (dataDF.columns >= lineNoiseFilterOpts['timeWindow'][0]) &
+        (dataDF.columns < lineNoiseFilterOpts['timeWindow'][-1])
+    )
     matchType = lineNoiseFilterOpts['type']
     matchFreq = lineNoiseFilterOpts['Wn']
+    #
+    # daskClient = Client()
+    # daskComputeOpts = {}
+    daskComputeOpts = dict(
+        scheduler='processes'
+        # scheduler='single-threaded'
+        )
+    cleanOpts = dict(
+        refWinMask=refWinMask,
+        fillInFastSettle=True,
+        tau=33.3e-6, nExtraSteps=4,
+        remove60Hz=True,
+        removeReferenceBaseline=True, removeResponseBaseline=True,
+        interpMethod='ffill',
+        plottingLineNoiseMatch=False,
+        artifactDiagnosticPlots=False)
     # how many 60Hz cycles fill the reference window
     nCycles = np.floor(
         matchFreq * (
@@ -367,11 +421,8 @@ if __name__ == "__main__":
     nMatchSamples = np.ceil(nCycles * samplingRate / matchFreq).astype(np.int)
     noiseKernels = []
     referenceSines = []
-    plottingLineNoiseMatch = False
-    artifactDiagnosticPlots = False
-    if plottingLineNoiseMatch:
+    if cleanOpts['plottingLineNoiseMatch']:
         fig, axK = plt.subplots()
-
     if matchType == 'sin':
         nMatchHarmonics = lineNoiseFilterOpts['nHarmonics']
         for harmonicOrder in range(1, nMatchHarmonics + 1):
@@ -382,10 +433,9 @@ if __name__ == "__main__":
             referenceWaveform = referenceWaveform / referenceWaveform.max()
             referenceSines.append(referenceWaveform)
             kernel = referenceWaveform[:nMatchSamples]
-            # 
             kernel = kernel / np.sum(kernel ** 2)
             noiseKernels.append(kernel)
-            if plottingLineNoiseMatch:
+            if cleanOpts['plottingLineNoiseMatch']:
                 tK = dataDF.columns[:nMatchSamples]
                 axK.plot(
                     tK, kernel,
@@ -394,25 +444,12 @@ if __name__ == "__main__":
     else:
         numKernels = 1
 
-    if plottingLineNoiseMatch:
+    if cleanOpts['plottingLineNoiseMatch']:
         axK.set_title('matched filter kernels')
         axK.set_xlabel('Time (sec)')
         plt.show()
-
-    cleanOpts = dict(
-        refWinMask=refWinMask,
-        fillInFastSettle=True,
-        tau=30e-6, nExtraSteps=4,
-        remove60Hz=True, removeReferenceBaseline=False,
-        interpMethod='ffill',
-        plottingLineNoiseMatch=plottingLineNoiseMatch,
-        artifactDiagnosticPlots=artifactDiagnosticPlots,)
-    # daskClient = Client()
-    # daskComputeOpts = {}
-    daskComputeOpts = dict(
-        scheduler='processes'
-        # scheduler='single-threaded'
-        )
+    # pdb.set_trace()
+    # dataDF.groupby(groupBy).nunique
     procDF = ash.splitApplyCombine(
         dataDF, fun=cleanISIData, resultPath=outputPath,
         funArgs=[], funKWArgs=cleanOpts,
