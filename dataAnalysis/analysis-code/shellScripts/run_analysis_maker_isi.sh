@@ -11,11 +11,11 @@
 #SBATCH --mem=200G
 
 # Specify a job name:
-#SBATCH -J analysis_mini_20200430
+#SBATCH -J analysis_mini_20200427
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-analysis_mini_20200430.stdout
-#SBATCH -e ../../batch_logs/%j-%a-analysis_mini_20200430.errout
+#SBATCH -o ../../batch_logs/%j-%a-analysis_mini_20200427.stdout
+#SBATCH -e ../../batch_logs/%j-%a-analysis_mini_20200427.errout
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -29,13 +29,13 @@
 # EXP="exp202003201200"
 # EXP="exp202004251400"
 
-# EXP="exp202004271200"
+EXP="exp202004271200"
 # has blocks 1,2,3,4
 
 # EXP="exp202004301200"
 # has blocks 4,5
 
-EXP="exp202005011400"
+# EXP="exp202005011400"
 # has blocks 1,2,3,4,5,6
 
 # SELECTOR="Block005_minfrmaxcorr"
@@ -43,7 +43,7 @@ SELECTOR="_minfrmaxcorr"
 
 # WINDOW="--window=short"
 # WINDOW="--window=miniRC"
-WINDOW="--window=extraShort"
+WINDOW="--window=XXS"
 # WINDOW="--window=extraExtraShort"
 
 # TRIALSELECTOR="--processAll"
@@ -69,5 +69,5 @@ conda activate
 source activate nda2
 python --version
 
-# SLURM_ARRAY_TASK_ID=3
+SLURM_ARRAY_TASK_ID=4
 python -u './calcISIAnalysisNix.py' --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $CHANSELECTOR $ANALYSISSELECTOR --commitResults

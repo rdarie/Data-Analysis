@@ -146,12 +146,9 @@ def cleanISIData(
                     (
                         ('rostral' in featureName) &
                         ('rostral' in electrodeName))):
-                pass
-                # correctSwitch = False
+                #
                 blankingDur += nExtraSteps * timeStep
         if fastSettleMode == 'any':
-            pass
-            # correctSwitch = False
             blankingDur += nExtraSteps * timeStep
         if plottingLineNoiseMatch or artifactDiagnosticPlots:
             plotTrialIdx = 0
@@ -227,6 +224,7 @@ def cleanISIData(
                     axM.set_xlabel('Time (sec)')
             if plottingLineNoiseMatch and not (artifactDiagnosticPlots):
                 plt.show()
+        #
         if (
                 fillInFastSettle and
                 (
@@ -235,13 +233,11 @@ def cleanISIData(
             # print('{} during stim on {}; Cleaning {:.2f} usec'.format(
             #     featureName, electrodeName, blankingDur * 1e6))
             if stimCat == 'stimOn':
-                blankMask = (t >= 0) & (t <= 0 + blankingDur)
+                blankMask = (t >= 0) & (t <= blankingDur)
             elif stimCat == 'stimOff':
-                blankMask = (t >= - blankingDur) & (t <= 0)
+                blankMask = (t >= - timeStep) & (t <= blankingDur)
             else:
-                blankMask = (t >= 0) & (t <= 0 + blankingDur)
-            # remove saturated readings
-            # satLimit = 6e3
+                blankMask = (t >= 0) & (t <= blankingDur)
             #
             lastBlankIdx = np.flatnonzero(blankMask)[-1]
             if correctSwitch:
@@ -267,9 +263,6 @@ def cleanISIData(
             if correctSwitch:
                 procDF.loc[:, dataColMask] = (
                     procDF.loc[:, dataColMask] - artifactDF)
-            maskToNan = dataColMask.copy()
-            maskToNan[dataColMask] = blankMask
-            procDF.loc[:, maskToNan] = np.nan
         if removeReferenceBaseline:
             fullDFReferenceMask = dataColMask.copy()
             fullDFReferenceMask[dataColMask] = refWinMask
@@ -285,13 +278,13 @@ def cleanISIData(
                     procDF.loc[:, dataColMask] - mediansDF)
         if removeResponseBaseline:
             if stimCat == 'stimOn':
-                responseMask = (t > 0 + blankingDur) & (t <= stimPeriod)
+                responseMask = (t > blankingDur) & (t <= stimPeriod)
             elif stimCat == 'stimOff':
-                responseMask = (t > 0) & (t <= stimPeriod - blankingDur)
+                responseMask = (t > blankingDur - timeStep) & (t <= stimPeriod)
             else:
                 # dummy mask, to deal with dask internal checking
                 # of dtypes
-                responseMask = (t > 0 + blankingDur) & (t <= stimPeriod)
+                responseMask = (t > blankingDur) & (t <= stimPeriod - blankingDur)
             fullDFResponseMask = dataColMask.copy()
             fullDFResponseMask[dataColMask] = responseMask
             if fullDFResponseMask.any():
@@ -314,6 +307,9 @@ def cleanISIData(
                 (
                     ('caudal' in featureName) or
                     ('rostral' in featureName))):
+            maskToNan = dataColMask.copy()
+            maskToNan[dataColMask] = blankMask
+            procDF.loc[:, maskToNan] = np.nan
             if interpMethod in ['ffill', 'bfill']:
                 procDF.loc[:, dataColMask] = (
                     procDF.loc[:, dataColMask]
@@ -408,7 +404,7 @@ if __name__ == "__main__":
         refWinMask=refWinMask,
         fillInFastSettle=True,
         tau=33.3e-6, nExtraSteps=4,
-        remove60Hz=True,
+        remove60Hz=True, correctSwitch=True,
         removeReferenceBaseline=True, removeResponseBaseline=True,
         interpMethod='ffill',
         plottingLineNoiseMatch=False,
@@ -458,143 +454,6 @@ if __name__ == "__main__":
         daskComputeOpts=daskComputeOpts,
         reindexFromInput=True)
 
-    # procDF.columns.name = 'bin'
-    '''
-        for name, group in tqdm(dataDF.groupby(groupBy)):
-        try:
-            if remove60Hz and ('EmgEnv' not in name[2]):
-                if plottingLineNoiseMatch:
-                    plotTrialIdx = 1
-                    # group.iloc[plotTrialIdx, :] = 13.64 * referenceSines[0][17: 17 + group.shape[1]]
-                    fig, (axBA, axM) = plt.subplots(2, 1, sharex=True)
-                    fig2, axXCorr = plt.subplots(2, 1)
-                    cPalette = sns.color_palette(n_colors=numKernels)
-                    groupMean = group.iloc[plotTrialIdx, :].mean()
-                    axBA.plot(
-                        group.columns, group.iloc[plotTrialIdx, :] - groupMean,
-                        label='Original')
-                for hOrder, kernel in enumerate(noiseKernels):
-                    hPeriod = ((hOrder + 1) * lineNoiseFilterOpts['Wn']) ** -1 # seconds
-                    hPeriodSamples = int(samplingRate * hPeriod)
-                    #
-                    def corrWithKern(x, ker):
-                        y = signal.correlate(
-                            x, kernel, mode='valid')
-                        return y
-                    #
-                    # cross corelate the ref window with the kernel
-                    signalXCorr = np.apply_along_axis(
-                        corrWithKern, 1,
-                        group.loc[:, refWinMask], kernel)
-                    # find the max lag in the xcorr, corresponding to the phase of the noise
-                    maxLagSamples = np.apply_along_axis(np.argmax, 1, (signalXCorr[:, :hPeriodSamples]))
-                    noiseModel = pd.DataFrame(np.nan, index=group.index, columns=group.columns)
-                    if plottingLineNoiseMatch:
-                        axXCorr[0].plot(
-                            signalXCorr[plotTrialIdx, :],
-                            label='cross correlogram')
-                        axXCorr[1].plot(
-                            (group.iloc[plotTrialIdx, refWinMask] - groupMean).to_numpy(),
-                            label='Original')
-                        axXCorr[1].plot(
-                            referenceSines[hOrder],
-                            label='lookup waveform')
-                        axXCorr[1].plot(
-                            kernel,
-                            label='kernel')
-                        axXCorr[0].set_title('maxLag == {}'.format(maxLagSamples[plotTrialIdx]))
-                        axXCorr[1].legend()
-                    for rowIdx, maxLag in enumerate(maxLagSamples):
-                        tweakLag = maxLag
-                        noiseAmp = signalXCorr[rowIdx, maxLag]
-                        noiseModel.iloc[rowIdx, :] = (noiseAmp * referenceSines[hOrder][hPeriodSamples - tweakLag: hPeriodSamples - tweakLag + group.shape[1]])
-                    # print('Noise Amp Max {}'.format(noiseModel.iloc[plotTrialIdx, :].max()))
-                    # print('orig max / noise max {}'.format(group.iloc[plotTrialIdx, :].max() / noiseModel.iloc[plotTrialIdx, :].max()))
-                    if plottingLineNoiseMatch:
-                        axM.plot(
-                            noiseModel.columns, noiseModel.iloc[plotTrialIdx, :], '--',
-                            label='noise model order {}'.format(hOrder + 1),
-                            c=cPalette[hOrder])
-                        axM.plot(
-                            group.columns, group.iloc[plotTrialIdx, :] - groupMean, '-',
-                            label='before match order {}'.format(hOrder + 1), lw=2,
-                            c=cPalette[hOrder])
-                    procDF.loc[group.index, :] = group - noiseModel
-                    if plottingLineNoiseMatch:
-                        axBA.plot(
-                            procDF.loc[group.index, :].columns,
-                            procDF.loc[group.index, :].iloc[plotTrialIdx, :] - groupMean,
-                            label='after match order {}'.format(hOrder + 1))
-                        axBA.legend()
-                        axBA.set_title('{} during stim on {}'.format(name[2], name[0]))
-                        axBA.set_xlabel('Time (sec)')
-                        axM.legend()
-                        axM.set_xlabel('Time (sec)')
-                if plottingLineNoiseMatch:
-                    plt.show()
-                    # electrodeName_trace()
-            if fillInFastSettle and (('caudal' in name[2]) or ('rostral' in name[2])):
-                blankingDur = (name[3] + name[4]) * 1e-6 + 6 * 33.3 * 1e-6
-                t = group.columns
-                if name[5] == 'stimOn':
-                    blankMask = (t >= 0) & (t <= 0 + blankingDur)
-                # remove saturated readings
-                satLimit = 6e3
-                #
-                lastBlankIdx = np.flatnonzero(blankMask)[-1]
-                nextIdx = min(lastBlankIdx+1, blankMask.size)
-                while (group.iloc[:, nextIdx].abs() > satLimit).any():
-                    lastBlankIdx += 1
-                    nextIdx = min(lastBlankIdx+1, blankMask.size)
-                    if nextIdx == blankMask.size:
-                        break
-                blankMask[np.flatnonzero(blankMask)[-1]:lastBlankIdx+1] = True
-                firstBlankIdx = np.flatnonzero(blankMask)[0]
-                lastBlankIdx = np.flatnonzero(blankMask)[-1]
-                fastSettleModeList = (
-                    trialInfo
-                    .loc[group.index, 'fastSettleTriggers']
-                    .unique())
-                assert fastSettleModeList.size == 1
-                fastSettleMode = fastSettleModeList[0]
-                correctSwitch = False
-                if fastSettleMode == 'same':
-                    if (
-                            (
-                                ('caudal' in name[2]) &
-                                ('caudal' in name[0])) |
-                            (
-                                ('rostral' in name[2]) &
-                                ('rostral' in name[0]))):
-                        correctSwitch = True
-                if fastSettleMode == 'any':
-                    correctSwitch = True
-                if correctSwitch:
-                    deltaV = (group.iloc[:, lastBlankIdx+1])
-                    artifactDF = calcStimArtifact(group, t, t[lastBlankIdx+1], deltaV, tau)
-                    blankMask[lastBlankIdx+1] = True
-                artifactDiagnosticPlots = False
-                if artifactDiagnosticPlots:
-                    plotTrialIdx = 1
-                    fig, ax = plt.subplots(2, 1, sharex=True, sharey=True)
-                    ax[0].plot(t, group.iloc[plotTrialIdx, :], '.-')
-                    ax[0].plot(t[blankMask], group.iloc[plotTrialIdx, :][blankMask])
-                    if correctSwitch:
-                        ax[0].plot(t, artifactDF.iloc[plotTrialIdx, :])
-                #
-                if correctSwitch:
-                    procDF.loc[group.index, :] = procDF.loc[group.index, :] - artifactDF
-                procDF.loc[group.index, blankMask] = np.nan
-                #
-                if artifactDiagnosticPlots:
-                    plotFixed = procDF.loc[group.index, :].iloc[plotTrialIdx, :]
-                    ax[1].plot(t, plotFixed)
-                    ax[0].set_title('{} during stim on {}'.format(name[2], name[0]))
-                    plt.show()
-        except Exception:
-            traceback.print_exc()
-        electrodeName_trace()
-    '''
     del dataDF
     #
     masterBlock = ns5.alignedAsigDFtoSpikeTrain(procDF, dataBlock)

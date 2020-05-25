@@ -24,6 +24,14 @@ def getExpOpts():
         ['rostralZ_e{:02d}_a'.format(i) for i in range(17, 25)]
         ]
     ainpNameList = ['analog 1']
+    rippleFastSettleTriggers = {
+        1: {'stim': 'same'},
+        2: {'stim': 'same'},
+        3: {'stim': 'same'},
+        4: {'stim': 'same'},
+        5: {'stim': 'same'},
+        6: {'stim': 'same'}
+    }
     jsonSessionNames = {
         #  per block
         1: [],
@@ -42,8 +50,7 @@ def getExpOpts():
     synchInfo['nsp'][2] = {'timeRanges': [186, 640], 'chooseCrossings': slice(None)}
     synchInfo['nsp'][3] = {'timeRanges': [3, 704], 'chooseCrossings': slice(None)}
     synchInfo['nsp'][4] = {'timeRanges': [34, 3181.5], 'chooseCrossings': slice(None)}
-    
-    # For emg analysis - emg missing for some time ranges
+    #
     alignTimeBoundsLookup = {
         1: [
             [1, 972]

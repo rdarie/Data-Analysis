@@ -23,8 +23,8 @@
 # EXP="exp202003181300"
 # EXP="exp202003191400"
 # EXP="exp202004271200"
-# EXP="exp202004301200"
-EXP="exp202005011400"
+EXP="exp202004301200"
+# EXP="exp202005011400"
 # EXP="exp202003201200"
 #
 # SELECTOR="Block005_minfrmaxcorr"
@@ -37,7 +37,7 @@ WINDOW="--window=XXS"
 # WINDOW="--window=extraShort"
 #
 TRIALSELECTOR="--processAll"
-# TRIALSELECTOR="--blockIdx=4"
+# TRIALSELECTOR="--blockIdx=3"
 # TRIALSELECTOR="--blockIdx=1"
 #
 # ANALYSISSELECTOR="--analysisName=emg"
@@ -82,6 +82,8 @@ python --version
 # #
 # BLOCKSELECTOR="--inputBlockName=lfp"
 BLOCKSELECTOR="--inputBlockName=lfp_clean"
+python3 './plotRippleStimSpikeReport.py' --exp=$EXP $TRIALSELECTOR $WINDOW $UNITSELECTOR $ANALYSISSELECTOR --alignQuery="stimOn" --alignFolderName=stim $BLOCKSELECTOR --groupPagesBy="electrode, RateInHz" --nameSuffix="_zoom_out_x3"
+BLOCKSELECTOR="--inputBlockName=lfp"
 python3 './plotRippleStimSpikeReport.py' --exp=$EXP $TRIALSELECTOR $WINDOW $UNITSELECTOR $ANALYSISSELECTOR --alignQuery="stimOn" --alignFolderName=stim $BLOCKSELECTOR --groupPagesBy="electrode, RateInHz" --nameSuffix="_zoom_out_x3"
 # BLOCKSELECTOR="--inputBlockName=lfp"
 # python3 './plotRippleStimSpikeReport.py' --exp=$EXP $TRIALSELECTOR $WINDOW $UNITSELECTOR $ANALYSISSELECTOR --alignQuery="stimOn" --alignFolderName=stim $BLOCKSELECTOR --groupPagesBy="electrode, RateInHz"

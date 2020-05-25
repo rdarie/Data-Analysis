@@ -23,9 +23,7 @@ import pdb, traceback, shutil, os
 from currentExperiment import parseAnalysisOptions
 from docopt import docopt
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
-expOpts, allOpts = parseAnalysisOptions(
-    int(arguments['blockIdx']),
-    arguments['exp'])
+expOpts, allOpts = parseAnalysisOptions(int(arguments['blockIdx']),arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
 
@@ -59,14 +57,14 @@ if arguments['previewMotorEncoder']:
 if arguments['makeTruncated']:
     analogInputNames = sorted(
         trialFilesFrom['utah']['eventInfo']['inputIDs'].values())
-    pdb.set_trace()
+    # pdb.set_trace()
     reader =ns5.preproc(
         fileName=ns5FileName,
         rawFolderPath=nspFolder,
         outputFolderPath=scratchFolder,
         fillOverflow=False, removeJumps=False,
         motorEncoderMask=motorEncoderMask,
-        calcAverageLFP=True,
+        calcAverageLFP=False,
         eventInfo=trialFilesFrom['utah']['eventInfo'],
         asigNameList=analogInputNames,
         spikeSourceType='tdc', writeMode='ow',

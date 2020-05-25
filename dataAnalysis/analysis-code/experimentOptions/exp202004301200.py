@@ -49,11 +49,19 @@ def getExpOpts():
     #
     synchInfo['nsp'][4] = {'timeRanges': [19.5, 1341.5], 'chooseCrossings': slice(None)}
     synchInfo['nsp'][5] = {'timeRanges': [2, 3363], 'chooseCrossings': slice(None)}
-    
-    # For emg analysis - emg missing for some time ranges
+    ### For emg analysis - emg missing for some time ranges
+    #  alignTimeBoundsLookup = {
+    #      4: [
+    #          [19.5, 1341.5]
+    #          ],
+    #      5: [
+    #          [2, 3340]
+    #          ],
+    #      }
+    # For lfp analysis
     alignTimeBoundsLookup = {
         4: [
-            [19.5, 1341.5]
+            [19.5, 2405]
             ],
         5: [
             [2, 3340]

@@ -646,9 +646,12 @@ def calcISIBlockAnalysisNix():
                                 else:
                                     nominalRate = np.median(st.annotations['RateInHz'][theseTimesMask])
                                     observedRate = np.median(np.diff(theseTimes)) ** (-1)
-                                    if not np.abs(nominalRate - observedRate) < 1e-6:
-                                        # pdb.set_trace()
-                                        print('Rate Warning on {} at time {}'.format(st.name, theseTimes[0]))
+                                    rateMismatch = np.abs(nominalRate - observedRate)
+                                    if not rateMismatch < 1e-6:
+                                        print(
+                                            'Rate mismatch warning on {} at time {}: off by {} Hz'
+                                            .format(st.name, theseTimes[0], rateMismatch))
+                                        pdb.set_trace()
                                     nominalTrainDur = np.mean(st.annotations['trainDur'][theseTimesMask])
                                     observedTrainDur = (theseTimes[-1] - theseTimes[0])
                                     if not np.abs(nominalTrainDur - observedTrainDur) < 1e-6:

@@ -347,17 +347,17 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
     #     windowSize=(-50e-3, 350e-3),
     #     decimate=3))
     # alignedAsigsKWargs.update(dict(
+    #     windowSize=(-250e-6, 2750e-6),
+    #     decimate=1))
+    # alignedAsigsKWargs.update(dict(
     #     windowSize=(-250e-6, 9e-3),
     #     decimate=1))
     # alignedAsigsKWargs.update(dict(
     #     windowSize=(-250e-6, 19e-3),
-    #     decimate=1))
+    #     decimate=2))
     alignedAsigsKWargs.update(dict(
         windowSize=(-250e-6, 49e-3),
-        decimate=2))
-    # alignedAsigsKWargs.update(dict(
-    #     windowSize=(-250e-6, 2750e-6),
-    #     decimate=1))
+        decimate=3))
     # alignedAsigsKWargs.update(dict(
     #     windowSize=None, decimate=1))
     # if (miniRCBlock or RCBlock):

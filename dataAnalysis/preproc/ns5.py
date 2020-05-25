@@ -2131,6 +2131,7 @@ def preprocBlockToNix(
                 ainpNameListSeg = [a.name for a in aSigList]
             #  
             nAsigs = len(aSigList)
+            # pdb.set_trace()
             if asigNameList is not None:
                 lfpAsigList = aSigList
             else:
