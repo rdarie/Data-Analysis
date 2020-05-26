@@ -14,7 +14,7 @@ RepoList=(\
 )
 
 conda env create -f environment-windows.yml
-conda activate nda2
+conda.bat activate nda2
 cd ..
 
 pip install pyqt5==5.10.1 --user
