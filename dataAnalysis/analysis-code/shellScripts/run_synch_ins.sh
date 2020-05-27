@@ -26,8 +26,8 @@
 # EXP="exp201901211000"
 # EXP="exp201901221000"
 # EXP="exp201901231000"
-EXP="exp201901261000"
-# EXP="exp201901271000"
+# EXP="exp201901261000"
+EXP="exp201901271000"
 
 
 module load anaconda/3-5.2.0
@@ -36,5 +36,6 @@ conda activate
 source activate nda2
 python --version
 
-#  python3 './synchronizeINStoNSP.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP 
-python3 './synchronizeINStoNSP.py' --blockIdx=4 --exp=$EXP --curateManually
+SLURM_ARRAY_TASK_ID=1
+# python3 './synchronizeINStoNSP.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP 
+python3 './synchronizeINStoNSP.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --curateManually

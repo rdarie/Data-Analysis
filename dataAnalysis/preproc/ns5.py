@@ -2629,6 +2629,8 @@ def preproc(
     outputFilePath = os.path.join(
         outputFolderPath,
         fileName + nameSuffix + '.nix')
+    if os.path.exists(outputFilePath):
+        os.remove(outputFilePath)
     #  instantiate reader, get metadata
     reader = BlackrockIO(
         filename=rawBasePath, nsx_to_load=5)

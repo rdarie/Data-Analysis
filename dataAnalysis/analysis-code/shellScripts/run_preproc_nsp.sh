@@ -38,11 +38,11 @@ conda activate
 source activate nda2
 python --version
 
-# SLURM_ARRAY_TASK_ID=2
-# python3 ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --makeTruncated
+SLURM_ARRAY_TASK_ID=1
+python3 ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --makeTruncated
 # python3 ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --makeTruncated --maskMotorEncoder
 
 # once the synchronization has happened once
-SLURM_ARRAY_TASK_ID=1
-python3 ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --makeTruncated --maskMotorEncoder
-python3 ./synchronizeINStoNSP.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP
+# SLURM_ARRAY_TASK_ID=1
+# python3 ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --makeTruncated --maskMotorEncoder
+# python3 ./synchronizeINStoNSP.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP

@@ -17,7 +17,7 @@
 #SBATCH -e ../../batch_logs/%j-%a-ins_preproc.errout
 
 # Specify account details
-#SBATCH --account=bibs-dborton-condo
+#SBATCH --account=carney-dborton-condo
 
 # Request custom resources
 #SBATCH --array=1,2,3,4

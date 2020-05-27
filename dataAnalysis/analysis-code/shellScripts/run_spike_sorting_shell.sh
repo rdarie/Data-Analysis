@@ -38,15 +38,14 @@ source activate nda2
 python --version
 
 # Step 1: Constructor
-python3 ./tridesclousCCV.py --blockIdx=$TRIALIDX --exp=$EXP  --batchPreprocess
-# python3 ./tridesclousVisualize.py --blockIdx=$TRIALIDX --exp=$EXP  --constructor
-# Step 2: Transfer
+# python3 ./tridesclousCCV.py --blockIdx=$TRIALIDX --exp=$EXP  --batchPreprocess
+# Step 2: Validate the constructor
+python3 ./tridesclousVisualize.py --blockIdx=$TRIALIDX --exp=$EXP  --constructor
+# Step 3: Transfer
 # python3 ./transferTDCTemplates.py --blockIdx=$TRIALIDX --exp=$EXP
-# Step 3: Peeler
+# Step 4: Peeler
 # python3 ./tridesclousCCV.py --blockIdx=$TRIALIDX --exp=$EXP --purgePeeler --batchPeel
 # python3 ./tridesclousVisualize.py --blockIdx=$TRIALIDX --exp=$EXP  --peeler
-# Step 4: 
-# python3 ./tridesclousCCV.py --blockIdx=$TRIALIDX --exp=$EXP --exportSpikesCSV
-# python3 ./tridesclousCCV.py --blockIdx=$TRIALIDX --exp=$EXP --purgePeelerDiagnostics
-# python3 './tridesclousCCV.py' --blockIdx=$TRIALIDX --makeStrictNeoBlock --exp=$EXP
+# Step 5:
+# python3 './tridesclousCCV.py' --blockIdx=$TRIALIDX --purgePeelerDiagnostics --makeStrictNeoBlock --exp=$EXP
 # python3 './plotSpikeReport.py' --blockIdx=$TRIALIDX --nameSuffix=_final --exp=$EXP

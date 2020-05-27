@@ -3,15 +3,16 @@ Usage:
     calcBlockAnalysisNix.py [options]
 
 Options:
-    --blockIdx=blockIdx               which trial to analyze
-    --exp=exp                         which experimental day to analyze
-    --analysisName=analysisName       append a name to the resulting blocks? [default: default]
-    --processAll                      process entire experimental day? [default: False]
-    --dataToScratch                   process entire experimental day? [default: False]
-    --scratchToData                   process entire experimental day? [default: False]
-    --removeSource                    process entire experimental day? [default: False]
-    --removeDate                      process entire experimental day? [default: False]
-    --removePNGs                      process entire experimental day? [default: False]
+    --blockIdx=blockIdx                    which trial to analyze
+    --exp=exp                              which experimental day to analyze
+    --analysisName=analysisName            append a name to the resulting blocks? [default: default]
+    --processAll                           process entire experimental day? [default: False]
+    --dataToScratch                        process entire experimental day? [default: False]
+    --scratchToData                        process entire experimental day? [default: False]
+    --removeSource                         process entire experimental day? [default: False]
+    --removeDate                           process entire experimental day? [default: False]
+    --removePNGs                           process entire experimental day? [default: False]
+    --tdcNIXFromProcessedToScratch         process entire experimental day? [default: False]
 """
 
 #  load options
@@ -82,3 +83,19 @@ if arguments['removePNGs']:
         except Exception:
             traceback.print_exc()
             print("Error while deleting file : ", filePath)
+
+if arguments['tdcNIXFromProcessedToScratch']:
+    tdcFolderName = 'tdc_{}'.format(ns5FileName)
+    originPath = os.path.join(
+        processedFolder,
+        tdcFolderName,
+        'tdc_' + ns5FileName + '.nix')
+    destinFolder = os.path.join(
+        scratchFolder,
+        tdcFolderName)
+    if not os.path.exists(destinFolder):
+        os.makedirs(destinationFolder, exist_ok=True)
+    destinPath = os.path.join(
+        destinFolder, 'tdc_' + ns5FileName + '.nix'
+        )
+    shutil.copyfile(originPath, destinPath)

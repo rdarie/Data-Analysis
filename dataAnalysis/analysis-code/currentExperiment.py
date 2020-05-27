@@ -149,7 +149,7 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
             'experimentName': experimentName,
             'folderPath': nspFolder,
             'ns5FileName': ns5FileName,
-            'calcRigEvents': True,
+            'calcRigEvents': (blockExperimentType == 'proprio'),
             'spikeWindow': [-25, 50]
             }
         }
@@ -250,7 +250,6 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
         #  should rename eventInfo to something more intuitive
         eventInfo = {'inputIDs': fullRigInputs}
     #
-    trialFilesFrom['utah']['calcRigEvents'] = ((blockExperimentType == 'proprio-miniRC') or (blockExperimentType == 'proprio-RC'))
     trialFilesFrom['utah'].update({'eventInfo': eventInfo})
     
     nspCmpPath = os.path.join('.', 'nsp_map.cmp')
