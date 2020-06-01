@@ -58,7 +58,7 @@ if arguments['makeTruncated']:
     analogInputNames = sorted(
         trialFilesFrom['utah']['eventInfo']['inputIDs'].values())
     # pdb.set_trace()
-    reader =ns5.preproc(
+    reader = ns5.preproc(
         fileName=ns5FileName,
         rawFolderPath=nspFolder,
         outputFolderPath=scratchFolder,
@@ -66,7 +66,8 @@ if arguments['makeTruncated']:
         motorEncoderMask=motorEncoderMask,
         calcAverageLFP=False,
         eventInfo=trialFilesFrom['utah']['eventInfo'],
-        asigNameList=analogInputNames,
+        asigNameList=[],
+        ainpNameList=analogInputNames,
         spikeSourceType='tdc', writeMode='ow',
         chunkSize=chunkSize, equalChunks=equalChunks,
         chunkList=chunkList, calcRigEvents=trialFilesFrom['utah']['calcRigEvents'])

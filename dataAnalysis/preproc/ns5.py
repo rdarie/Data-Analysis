@@ -2113,7 +2113,7 @@ def preprocBlockToNix(
                 aSigList = [
                     a
                     for a in seg.analogsignals
-                    if ~(('ainp' in a.name) or ('analog' in a.name))]
+                    if not (('ainp' in a.name) or ('analog' in a.name))]
                 asigNameListSeg = [a.name for a in aSigList]
             if ainpNameList is not None:
                 ainpNameListSeg = [
@@ -2131,7 +2131,6 @@ def preprocBlockToNix(
                 ainpNameListSeg = [a.name for a in aSigList]
             #  
             nAsigs = len(aSigList)
-            # pdb.set_trace()
             if asigNameList is not None:
                 lfpAsigList = aSigList
             else:

@@ -61,7 +61,9 @@ def getMotorData(
 '''
 
 
-def processMotorData(motorData, fs, invertLookup=False):
+def processMotorData(
+        motorData, fs,
+        encoderCountPerDegree=180e2, invertLookup=False):
     #
     motorData['A'] = motorData['A+'] - motorData['A-']
     motorData['B'] = motorData['B+'] - motorData['B-']
@@ -136,7 +138,7 @@ def processMotorData(motorData, fs, invertLookup=False):
     #  pad with a zero to make up for the fact that the first one doesn't have a pair
     motorData.loc[transitionIdx, 'count'] = [0] + count
     #
-    rawVelocity = motorData['count'] / 180e2
+    rawVelocity = motorData['count'] / encoderCountPerDegree
     motorData['position'] = rawVelocity.cumsum()
     #
     detectSignal = hf.filterDF(

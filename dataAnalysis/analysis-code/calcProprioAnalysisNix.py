@@ -8,7 +8,7 @@ Options:
     --analysisName=analysisName       append a name to the resulting blocks? [default: default]
     --chanQuery=chanQuery             how to restrict channels if not providing a list? [default: fr]
     --samplingRate=samplingRate       subsample the result??
-    --mergeINSandNSPEvents            if there's an INS block, merge with NSP block? [default: False]
+    --rigOnly                         is there no INS block? [default: False]
 """
 
 from neo.io.proxyobjects import (
@@ -75,47 +75,53 @@ def calcBlockAnalysisNix():
     forceData = hf.parseFSE103Events(
         spikesBlock, delay=9e-3, clipLimit=1e9, formatForce='f')
     #  merge events
-    if arguments['mergeINSandNSPEvents']:
-        evList = []
-        for key in ['property', 'value']:
-            #  key = 'property'
-            insProp = spikesBlock.filter(
-                objects=Event,
-                name='seg0_ins_' + key
-                )[0]
-            rigProp = spikesBlock.filter(
-                objects=Event,
-                name='seg0_rig_' + key
-                )
-            if len(rigProp):
-                rigProp = rigProp[0]
+    # pdb.set_trace()
+    evList = []
+    for key in ['property', 'value']:
+        #  key = 'property'
+        insPropList = spikesBlock.filter(
+            objects=Event,
+            name='seg0_ins_' + key
+            )
+        rigPropList = spikesBlock.filter(
+            objects=Event,
+            name='seg0_rig_' + key
+            )
+        if len(insPropList):
+            insProp = insPropList[0]
+        if len(rigPropList):
+            rigProp = rigPropList[0]
+            if arguments['rigOnly']:
+                allProp = rigProp
+                allProp.name = 'seg0_' + key
+                evList.append(allProp)
+            else:
                 allProp = insProp.merge(rigProp)
                 allProp.name = 'seg0_' + key
-
                 evSortIdx = np.argsort(allProp.times, kind='mergesort')
                 allProp = allProp[evSortIdx]
                 evList.append(allProp)
-            else:
-                #  RC's don't have rig_events
-                allProp = insProp
-                allProp.name = 'seg0_' + key
-                evList.append(insProp)
-        #  make concatenated event, for viewing
-        concatLabels = np.array([
-            (elphpdb._convert_value_safe(evList[0].labels[i]) + ': ' +
-                elphpdb._convert_value_safe(evList[1].labels[i])) for
-            i in range(len(evList[0]))
-            ])
-        concatEvent = Event(
-            name='seg0_' + 'concatenated_updates',
-            times=allProp.times,
-            labels=concatLabels
-            )
-        concatEvent.merge_annotations(allProp)
-        evList.append(concatEvent)
-        spikesBlock.segments[0].events = evList
-        for ev in evList:
-            ev.segment = spikesBlock.segments[0]
+        else:
+            #  RC's don't have rig_events
+            allProp = insProp
+            allProp.name = 'seg0_' + key
+            evList.append(allProp)
+    #  make concatenated event, for viewing
+    concatLabels = np.array([
+        (elphpdb._convert_value_safe(evList[0].labels[i]) + ': ' +
+            elphpdb._convert_value_safe(evList[1].labels[i])) for
+        i in range(len(evList[0]))
+        ])
+    concatEvent = Event(
+        name='seg0_' + 'concatenated_updates',
+        times=allProp.times,
+        labels=concatLabels
+        )
+    concatEvent.merge_annotations(allProp)
+    evList.append(concatEvent)
+    spikesBlock.segments[0].events = evList
+    for ev in evList:
+        ev.segment = spikesBlock.segments[0]
     # print([asig.name for asig in spikesBlock.filter(objects=AnalogSignal)])
     # print([st.name for st in spikesBlock.filter(objects=SpikeTrain)])
     # print([ev.name for ev in spikesBlock.filter(objects=Event)])
@@ -128,26 +134,26 @@ def calcBlockAnalysisNix():
     tdBlock = hf.extractSignalsFromBlock(
         nspBlock, keepSpikes=False, keepSignals=tdChanNames)
     tdBlock = hf.loadBlockProxyObjects(tdBlock)
-    #
-    ins_events = [
-        i for i in tdBlock.filter(objects=Event)
-        if 'ins_' in i.name]
     tdDF = ns5.analogSignalsToDataFrame(
         tdBlock.filter(objects=AnalogSignal))
     #
-    expandCols = [
-            'RateInHz', 'therapyStatus',
-            'activeGroup', 'program', 'trialSegment']
-    deriveCols = ['amplitudeRound', 'amplitude']
-    progAmpNames = rcsa_helpers.progAmpNames
-    #
-    stimStSer = ns5.eventsToDataFrame(
-        ins_events, idxT='t')
-    stimStatus = mdt.stimStatusSerialtoLong(
-        stimStSer, idxT='t',  namePrefix='seg0_ins_',
-        expandCols=expandCols,
-        deriveCols=deriveCols, progAmpNames=progAmpNames)
-    columnsToBeAdded = ['amplitude', 'program', 'RateInHz'] + progAmpNames
+    if not arguments['rigOnly']:
+        ins_events = [
+            i for i in tdBlock.filter(objects=Event)
+            if 'ins_' in i.name]
+        expandCols = [
+                'RateInHz', 'therapyStatus',
+                'activeGroup', 'program', 'trialSegment']
+        deriveCols = ['amplitudeRound', 'amplitude']
+        progAmpNames = rcsa_helpers.progAmpNames
+        #
+        stimStSer = ns5.eventsToDataFrame(
+            ins_events, idxT='t')
+        stimStatus = mdt.stimStatusSerialtoLong(
+            stimStSer, idxT='t',  namePrefix='seg0_ins_',
+            expandCols=expandCols,
+            deriveCols=deriveCols, progAmpNames=progAmpNames)
+        columnsToBeAdded = ['amplitude', 'program', 'RateInHz'] + progAmpNames
     # calc binarized and get new time axis
     if len(allSpikeTrains):
         spikeMatBlock = ns5.calcBinarizedArray(
@@ -194,6 +200,7 @@ def calcBlockAnalysisNix():
     debugVelCalc = False
     if debugVelCalc:
         import matplotlib.pyplot as plt
+    #
     for cName in tdDF.columns:
         if '_angle' in cName:
             if debugVelCalc:
@@ -229,38 +236,37 @@ def calcBlockAnalysisNix():
         print('Using input as is!')
         tdInterp = tdDF
     #
-    infoFromStimStatus = hf.interpolateDF(
-        stimStatus, tdInterp['t'],
-        x='t', columns=columnsToBeAdded, kind='previous')
+    concatList = [tdInterp]
+    if not arguments['rigOnly']:
+        infoFromStimStatus = hf.interpolateDF(
+            stimStatus, tdInterp['t'],
+            x='t', columns=columnsToBeAdded, kind='previous')
+        concatList.append(infoFromStimStatus.drop(columns='t'))
     if forceData is not None:
         forceDataInterp = hf.interpolateDF(
             forceData, newT,
             kind='linear', fill_value=(0, 0),
             x='NSP Timestamp', columns=['forceX', 'forceY', 'forceZ'])
-        tdInterp = pd.concat((
-            tdInterp,
-            infoFromStimStatus.drop(columns='t'),
-            forceDataInterp.drop(columns='NSP Timestamp')),
-            axis=1)
-    else:
-        tdInterp = pd.concat((
-            tdInterp,
-            infoFromStimStatus.drop(columns='t')),
+        concatList.append(forceDataInterp.drop(columns='NSP Timestamp'))
+    if len(concatList) > 1:
+        tdInterp = pd.concat(
+            concatList,
             axis=1)
     #
     tdInterp.columns = [i.replace('seg0_', '') for i in tdInterp.columns]
-    tdInterp.loc[:, 'RateInHz'] = (
-        tdInterp.loc[:, 'RateInHz'] *
-        (tdInterp.loc[:, 'amplitude'].abs() > 0))
-    for pName in progAmpNames:
-        if pName in tdInterp.columns:
-            tdInterp.loc[:, pName.replace('amplitude', 'ACR')] = (
-                tdInterp.loc[:, pName] *
-                tdInterp.loc[:, 'RateInHz'])
-            tdInterp.loc[:, pName.replace('amplitude', 'dAmpDt')] = (
-                tdInterp.loc[:, pName].diff()
-                .rolling(6 * smoothWindowStd, center=True, win_type='gaussian')
-                .mean(std=smoothWindowStd).fillna(0) / origTimeStep)
+    if not arguments['rigOnly']:
+        tdInterp.loc[:, 'RateInHz'] = (
+            tdInterp.loc[:, 'RateInHz'] *
+            (tdInterp.loc[:, 'amplitude'].abs() > 0))
+        for pName in progAmpNames:
+            if pName in tdInterp.columns:
+                tdInterp.loc[:, pName.replace('amplitude', 'ACR')] = (
+                    tdInterp.loc[:, pName] *
+                    tdInterp.loc[:, 'RateInHz'])
+                tdInterp.loc[:, pName.replace('amplitude', 'dAmpDt')] = (
+                    tdInterp.loc[:, pName].diff()
+                    .rolling(6 * smoothWindowStd, center=True, win_type='gaussian')
+                    .mean(std=smoothWindowStd).fillna(0) / origTimeStep)
     tdInterp.sort_index(axis='columns', inplace=True)
     
     # tdInterp.columns = ['seg0_{}'.format(i) for i in tdInterp.columns]
