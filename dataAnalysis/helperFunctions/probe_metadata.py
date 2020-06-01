@@ -2,7 +2,8 @@ import pandas as pd
 import numpy as np
 import re
 from datetime import datetime as dt
-
+import os
+import pdb
 
 def getLatestImpedance(
         recordingDate=None, impedanceFilePath='./impedances.h5',
@@ -109,20 +110,19 @@ def cmpDFToPrb(
     #  
     cmpDF.reset_index(inplace=True, drop=True)
     prbDict = {}
-    
     if groupIn is not None:
         groupingCols = []
-        for key, spacing in groupIn.items():
-            uniqueValues = np.unique(cmpDF[key])
-            bins = int(round(
-                (uniqueValues.max() - uniqueValues.min() + 1) / spacing))
+        for key, bins in groupIn.items():
+            # uniqueValues = np.unique(cmpDF[key])
+            # bins = int(round(
+            #     (uniqueValues.max() - uniqueValues.min() + 1) / spacing))
             cmpDF[key + '_group'] = np.nan
             cmpDF.loc[:, key + '_group'] = pd.cut(
-                cmpDF[key], bins, include_lowest=True, labels=False)
+                cmpDF[key], bins, labels=False)
             groupingCols.append(key + '_group')
     else:
         groupingCols = ['elecName']
-    #  
+    # pdb.set_trace()
     for idx, (name, group) in enumerate(cmpDF.groupby(groupingCols)):
         theseChannels = []
         theseGeoms = {}
@@ -145,6 +145,8 @@ def cmpDFToPrb(
     import pdb; 
     """
     if filePath is not None:
+        if os.path.exists(filePath):
+            os.remove(filePath)
         with open(filePath, 'w') as f:
             f.write('channel_groups = ' + str(prbDict))
     return prbDict

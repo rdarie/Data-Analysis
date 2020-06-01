@@ -7,7 +7,6 @@ import importlib
 def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
     plottingFigures = False
     plotBlocking = True
-    remakePrb = False
     #
     with open("../../paths.py") as fp:
         d = {}
@@ -210,49 +209,28 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
         'gaussWid': 100e-3,
         'treatAsSinglePulses': False
         }
-    miniRCRigInputs = {
-        'tapSync': 'ainp7',
-        'simiTrigs': 'ainp8'
-        }
-    RCRigInputs = {
-        'kinectSync': 'ainp16',
-        }
-    fullRigInputs = {
-        'A+': 'ainp1',
-        'B+': 'ainp2',
-        'Z+': 'ainp3',
-        'A-': 'ainp5',
-        'B-': 'ainp4',
-        'Z-': 'ainp6',
-        'rightBut': 'ainp11',
-        'leftBut': 'ainp12',
-        'rightLED': 'ainp9',
-        'leftLED': 'ainp10',
-        'simiTrigs': 'ainp8',
-        'tapSync': 'ainp7',
-        }
-    #
+    # pdb.set_trace()
     trialFilesStim['ins']['getINSkwargs'].update(commonStimDetectionOpts)
     if blockExperimentType == 'proprio-miniRC':
         #  override with settings for detecting cycling stim trains
         trialFilesStim['ins']['getINSkwargs'].update(miniRCStimDetectionOpts)
         #  only parse sync lines
-        eventInfo = {'inputIDs': miniRCRigInputs}
+        eventInfo = {'inputIDs': expOpts['miniRCRigInputs']}
     elif blockExperimentType == 'proprio-RC':
         trialFilesStim['ins']['getINSkwargs'].update(RCStimDetectionOpts)
         #  should rename eventInfo to something more intuitive
-        eventInfo = {'inputIDs': RCRigInputs}
+        eventInfo = {'inputIDs': expOpts['RCRigInputs']}
     elif blockExperimentType == 'isi':
         #  should rename eventInfo to something more intuitive
         eventInfo = {'inputIDs': dict()}
     else:
         trialFilesStim['ins']['getINSkwargs'].update(fullStimDetectionOpts)
         #  should rename eventInfo to something more intuitive
-        eventInfo = {'inputIDs': fullRigInputs}
+        eventInfo = {'inputIDs': expOpts['fullRigInputs']}
     #
     trialFilesFrom['utah'].update({'eventInfo': eventInfo})
     
-    nspCmpPath = os.path.join('.', 'nsp_map.cmp')
+    nspCmpPath = os.path.join('.', 'murdoc_map.cmp')
     cmpDF = prb_meta.cmpToDF(nspCmpPath)
     experimentDateStr = re.search(r'(\d*)', experimentName).groups()[0]
     # pdb.set_trace()
@@ -265,14 +243,22 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
         impedanceFilePath=os.path.join(remoteBasePath, 'impedances.h5'),
         recordingDateStr=experimentDateStr, elecType='isi_paddle')
     #
+    remakePrb = False
     if remakePrb:
+        import numpy as np
         nspCsvPath = os.path.join('.', 'nsp_map.csv')
         cmpDF.to_csv(nspCsvPath)
         prb_meta.cmpDFToPrb(
             cmpDF, filePath=nspPrbPath,
-            names=['elec', 'ainp'],
-            #names=['elec'],
-            groupIn={'xcoords': 2, 'ycoords': 2})
+            contactSpacing=100,
+            names=['elec', 'nform', 'ainp'],
+            banks=['A', 'B', 'C', 'E'],
+            # names=['elec', 'ainp'],
+            # groupIn={'xcoords': 4, 'ycoords': 4}
+            groupIn={
+                'ycoords': np.arange(-1.1, 64, 4),
+                'xcoords': np.arange(-0.1, 44, 8)},
+            )
     #  should rename these to something more intuitive
     #  paths relevant to individual trials
     processedFolder = os.path.join(

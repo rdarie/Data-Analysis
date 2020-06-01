@@ -6,7 +6,7 @@ Options:
     --blockIdx=blockIdx        which trial to analyze [default: 1]
     --exp=exp                  which experimental day to analyze
     --chan_start=chan_start    which chan_grp to start on [default: 0]
-    --chan_stop=chan_stop      which chan_grp to stop on [default: 25]
+    --chan_stop=chan_stop      which chan_grp to stop on [default: 80]
     --peeler                   visualize Peeler results
     --constructor              visualize Catalogue Constructor Results
 """
@@ -18,6 +18,12 @@ import dataAnalysis.helperFunctions.helper_functions as hf
 from currentExperiment import parseAnalysisOptions
 #from exp201901211000 import *
 import os, gc, traceback
+from numba.errors import NumbaPerformanceWarning, NumbaDeprecationWarning, NumbaPendingDeprecationWarning
+import warnings
+#
+warnings.simplefilter('ignore', category=NumbaPerformanceWarning)
+#
+
 
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
@@ -52,6 +58,7 @@ chansToAnalyze = [
     90, 91, 92, 93, 94, 95]
 '''
 
+# chansToAnalyze = [66, 71]
 #  chansToAnalyze = chansToAnalyze[80:]
 #  chansToAnalyze = [11, 14, 16, 18, 20, 22, 29, 36, 37, 39, 41, 48, 51, 52, 59, 60, 64, 66, 73, 75, 77, 80, 81, 88, 95]
 #  chansToAnalyze = [2, 3, 7, 10, 19, 20, 26, 27, 52, 53, 54, 59, 66, 80, 81, 91, 92, 93]

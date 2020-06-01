@@ -45,7 +45,11 @@ dataBlock = preproc.loadWithArrayAnn(spikePath, fromRaw=False)
 spChanIdx = [
     i
     for i in dataBlock.filter(objects=ChannelIndex)
-    if ((len(i.units) > 0) & ('elec' in i.name))]
+    if (
+        (len(i.units) > 0) &
+        ('elec' in i.name) |
+        ('nform' in i.name)
+        )]
 #  [i.name for i in spChanIdx]
 #  [len(i.units) for i in dataBlock.filter(objects=ChannelIndex)]
 #  ['elec' in i.name for i in dataBlock.filter(objects=ChannelIndex)]
@@ -54,7 +58,8 @@ spikes = preproc.channelIndexesToSpikeDict(spChanIdx)
 
 spikes['Units'] = 'a.u. (z-score)'
 reportName = 'tdc_' + ns5FileName + '_spike_report' + nameSuffix
-spikeStruct = cmpDF[cmpDF['elecName'] == 'elec']
+# pdb.set_trace()
+spikeStruct = cmpDF[cmpDF['elecName'] != 'ainp']
 
 ssplt.spikePDFReport(
     spikeSortingFiguresFolder,

@@ -16,7 +16,7 @@ Options:
     --makeStrictNeoBlock           save peeler results to a neo block [default: False]
     --exportSpikesCSV              save peeler results to a csv file [default: False]
     --chan_start=chan_start        which chan_grp to start on [default: 0]
-    --chan_stop=chan_stop          which chan_grp to stop on [default: 25]
+    --chan_stop=chan_stop          which chan_grp to stop on [default: 47]
 """
 
 from docopt import docopt
@@ -24,6 +24,12 @@ import tridesclous as tdc
 import dataAnalysis.helperFunctions.tridesclous_helpers as tdch
 import os, gc, traceback
 import pdb
+from numba.core.errors import NumbaPerformanceWarning, NumbaDeprecationWarning, NumbaPendingDeprecationWarning
+import warnings
+#
+warnings.simplefilter('ignore', category=NumbaPerformanceWarning)
+warnings.simplefilter('ignore', category=NumbaDeprecationWarning)
+#
 
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 chan_start = int(arguments['chan_start'])
@@ -106,13 +112,16 @@ chansToAnalyze = [
     90, 91, 92, 93, 94, 95]
 '''
 
+# chansToAnalyze = [66, 71]
+
 if arguments['batchPreprocess']:
     tdch.batchPreprocess(
         triFolder, chansToAnalyze,
-        relative_threshold=5.5,
+        relative_threshold=3.5,
+        fill_overflow=True,
         highpass_freq=300.,
         lowpass_freq=3000.,
-        filter_order=8,
+        filter_order=4,
         featureOpts={
             'method': 'global_umap',
             'n_components': 5,
@@ -126,13 +135,13 @@ if arguments['batchPreprocess']:
             'allow_single_cluster': True},
         noise_estimate_duration='all',
         sample_snippet_duration='all',
-        common_ref_removal=True,
-        chunksize=2**20,
+        common_ref_removal=False,
+        chunksize=2**18,
         extractOpts=dict(
             mode='rand',
             n_left=spikeWindow[0] - 2,
             n_right=spikeWindow[1] + 2,
-            nb_max=10000, align_waveform=False),
+            nb_max=32000, align_waveform=False),
         autoMerge=False, auto_merge_threshold=0.99,
         attemptMPI=HAS_MPI)
 

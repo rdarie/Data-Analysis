@@ -4,6 +4,27 @@ def getExpOpts():
         1: 'proprio',
         2: 'proprio',
         }
+    fullRigInputs = {
+        'A+': 'ainp11',
+        'B+': 'ainp13',
+        'Z+': 'ainp15',
+        'A-': 'ainp12',
+        'B-': 'ainp14',
+        'Z-': 'ainp16',
+        'rightBut': 'ainp1',
+        'leftBut': 'ainp2',
+        'rightLED': 'ainp3',
+        'leftLED': 'ainp2',
+        'simiTrigs': 'ainp8',
+        'tapSync': 'ainp7',
+        }
+    miniRCRigInputs = {
+        'tapSync': 'ainp7',
+        'simiTrigs': 'ainp8'
+        }
+    RCRigInputs = {
+        'kinectSync': 'ainp16',
+        }
     
     experimentName = '201804271016-Proprio'
     deviceName = ''
@@ -73,12 +94,10 @@ def getExpOpts():
             2: {'detectChannels': stimDetectChansDefault, 'thres': stimDetectThresDefault},
             3: {'detectChannels': stimDetectChansDefault, 'thres': stimDetectThresDefault}
         }}
-        
-    triFolderSourceBase = 1
+    triFolderSourceBase = 2
     triDestinations = [
         'Block00{}'.format(blockIdx)
-        for blockIdx in [2]]
-    
+        for blockIdx in [1]]
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
         '201804271016-Proprio': [1, 2],

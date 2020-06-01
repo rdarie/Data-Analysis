@@ -7,7 +7,7 @@ Options:
     --exp=exp                       which experimental day to analyze
     --processAll                    process entire experimental day? [default: False]
     --chan_start=chan_start         which chan_grp to start on [default: 0]
-    --chan_stop=chan_stop           which chan_grp to stop on [default: 25]
+    --chan_stop=chan_stop           which chan_grp to stop on [default: 47]
 """
 
 import tridesclous as tdc

@@ -22,16 +22,26 @@ sns.set(rc={
 def plotSpikePanel(
         spikeStruct, spikes, labelFontSize=5,
         padOverride=5e-3, figSize=(12, 8),
+        hideUnused=True,
         colorPal="ch:2,-.1,dark=.2,light=0.8,reverse=1"):
-    
     sns.set_style("dark", {"axes.facecolor": ".9"})
+    if hideUnused:
+        spikeStruct = spikeStruct.loc[
+            spikeStruct['label'].isin(spikes['ChannelID']), :]
     xIdx = np.array(
         spikeStruct['xcoords'].values - spikeStruct['xcoords'].min(),
         dtype=np.int)
     yIdx = np.array(
         spikeStruct['ycoords'].values - spikeStruct['ycoords'].min(),
         dtype=np.int)
-
+    uniqueXLookup = {i: idx for idx, i in enumerate(np.unique(xIdx))}
+    uniqueYLookup = {i: idx for idx, i in enumerate(np.unique(yIdx))}
+    xIdx = np.array([uniqueXLookup[i] for i in xIdx])
+    yIdx = np.array([uniqueYLookup[i] for i in yIdx])
+    # pdb.set_trace()
+    panelX = {spikeStruct.iloc[i, :].loc['label']: x for i, x in enumerate(xIdx)}
+    panelY = {spikeStruct.iloc[i, :].loc['label']: y for i, y in enumerate(yIdx)}
+    #
     fig, ax = plt.subplots(
         nrows=int(max(np.unique(xIdx)) + 1),
         ncols=int(max(np.unique(yIdx)) + 1))
@@ -42,20 +52,20 @@ def plotSpikePanel(
     axLowLims[:] = np.nan
     with sns.color_palette(colorPal, 5):
         for idx, channel in enumerate(spikes['ChannelID']):
-            curAx = ax[xIdx[idx], yIdx[idx]]
+            curAx = ax[panelX[channel], panelY[channel]]
             plotSpike(spikes, channel, ax=curAx)
             curAxLim = curAx.get_ylim()
-            axHighLims[xIdx[idx], yIdx[idx]] = curAxLim[1]
-            axLowLims[xIdx[idx], yIdx[idx]] = curAxLim[0]
+            axHighLims[panelX[channel], panelY[channel]] = curAxLim[1]
+            axLowLims[panelX[channel], panelY[channel]] = curAxLim[0]
         # get xLim from last axis that has spikes, in order to make the label
-        xLim = ax[xIdx[idx], yIdx[idx]].get_xlim()
+        xLim = ax[panelX[channel], panelY[channel]].get_xlim()
         sns.despine()
 
         newAxMin = np.nanmean(axLowLims) - .5 * np.nanstd(axLowLims)
         newAxMax = np.nanmean(axHighLims) + .5 * np.nanstd(axHighLims)
 
         for idx, channel in enumerate(spikes['ChannelID']):
-            curAx = ax[xIdx[idx], yIdx[idx]]
+            curAx = ax[panelX[channel], panelY[channel]]
             curAx.set_ylim(newAxMin, newAxMax)
 
         for idx, curAx in enumerate(ax.flatten()):
@@ -71,7 +81,6 @@ def plotSpikePanel(
                     labelleft=True, labeltop=False, labelright=False,
                     labelbottom=True, direction='in',
                     labelsize=labelFontSize, length=labelFontSize)
-
                 curAx.set_ylim(newAxMin, newAxMax)
                 curAx.set_xlim(*xLim)
                 curAx.set_xlabel(
@@ -368,8 +377,6 @@ def spikePDFReport(
                     try:
                         spikeAx = fig.add_subplot(gs[1, 0])
                         spikesBadAx = fig.add_subplot(gs[1, 1])
-                        #  spikesBadAx.get_shared_y_axes().join(
-                        #      spikesBadAx, spikeAx)
                         plotSpike(
                             spikes, channel=channel, ax=spikeAx,
                             axesLabel=True,
@@ -392,10 +399,8 @@ def spikePDFReport(
                             spikes, channel=channel, ax=spikesBadAx,
                             axesLabel=True, maxSpikes=500, lineAlpha=0.025)
                         spikesBadAx.set_ylim(spikeAx.get_ylim())
-                        #  spikeAx.set_ylim([-12, 5])
                     except Exception:
                         traceback.print_exc()
-
                     try:
                         isiAx = fig.add_subplot(gs[0, :2])
                         templateAx = fig.add_subplot(gs[0, 2])
@@ -423,7 +428,6 @@ def spikePDFReport(
                         for stimHarmonic in stimHarmonics:
                             isiAx.axvline(
                                 stimHarmonic, color='r', linestyle='--', zorder=0)
-                        #  
                         ksa.plotSpikePropertyHistogram(
                             spikes, channel=channel, whichProp='templateDist',
                             bins=distBins,
@@ -433,7 +437,6 @@ def spikePDFReport(
                                 'shape distance',
                                 templateAx.get_title()
                             ))
-                        #  import pdb; 
                         pdf.savefig()
                         plt.close()
                     except Exception:
