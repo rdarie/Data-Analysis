@@ -303,7 +303,7 @@ for suffix in suffixList:
             # print([st.name for st in dataBlock.filter(objects=SpikeTrain)])
             # print([ev.name for ev in dataBlock.filter(objects=Event)])
             # print([chIdx.name for chIdx in dataBlock.filter(objects=ChannelIndex)])
-            
+            pdb.set_trace()
             masterBlock.merge(dataBlock)
             if applyTimeOffset:
                 oldTStop = tStop

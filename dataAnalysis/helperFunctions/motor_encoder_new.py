@@ -143,7 +143,7 @@ def processMotorData(
     #
     detectSignal = hf.filterDF(
             rawVelocity, fs, filtFun='butter',
-            lowPass=500, lowOrder=4)
+            lowPass=500, lowOrder=6)
     motorData['velocity'] = detectSignal.to_numpy()
     #
     detectSignal.iloc[:] = stats.zscore(detectSignal)

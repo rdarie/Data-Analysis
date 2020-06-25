@@ -24,18 +24,14 @@ Options:
     --colControl=colControl                cols to exclude from comparison [default: control]
     --analysisName=analysisName            append a name to the resulting blocks? [default: default]
     --alignFolderName=alignFolderName      append a name to the resulting blocks? [default: motion]
+    --overlayStats                         overlay ANOVA significance stars? [default: False]
 """
 import matplotlib
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
-matplotlib.use('Agg')   # generate postscript output
-# matplotlib.use('QT5Agg')   # generate postscript output
+# matplotlib.use('Agg')   # generate postscript output
+matplotlib.use('QT5Agg')   # generate postscript output
 
-import seaborn as sns
-sns.set()
-sns.set_color_codes("dark")
-sns.set_context("notebook")
-sns.set_style("white")
 
 import os
 import dataAnalysis.plotting.aligned_signal_plots as asp
@@ -49,6 +45,11 @@ from copy import deepcopy
 from currentExperiment import parseAnalysisOptions
 from docopt import docopt
 from namedQueries import namedQueries
+import seaborn as sns
+sns.set(
+    context='talk', style='dark',
+    palette='dark', font='sans-serif',
+    font_scale=1.5, color_codes=True)
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']), arguments['exp'])
@@ -70,6 +71,12 @@ figureStatsFolder = os.path.join(
     )
 if not os.path.exists(figureStatsFolder):
     os.makedirs(figureStatsFolder, exist_ok=True)
+alignedRastersFolder = os.path.join(
+    figureFolder, arguments['analysisName'],
+    'alignedRasters')
+if not os.path.exists(alignedRastersFolder):
+    os.makedirs(alignedRastersFolder, exist_ok=True)
+
 rowColOpts = asp.processRowColArguments(arguments)
 #
 if arguments['processAll']:
@@ -113,43 +120,66 @@ statsTestOpts.update({
 ################################################################
 limitPages = None
 if arguments['enableOverrides']:
-    alignedAsigsKWargs.update({'windowSize': (-1000e-3, 1000e-3)})
-    currWindow = rasterOpts['windowSizes'][arguments['window']]
-    fullWinSize = currWindow[1] - currWindow[0]
-    redWinSize = (
-        alignedAsigsKWargs['windowSize'][1] -
-        alignedAsigsKWargs['windowSize'][0])
-    nrnRelplotKWArgs['aspect'] = (
-        nrnRelplotKWArgs['aspect'] * redWinSize / fullWinSize)
-    # alignedAsigsKWargs.update({'decimate': 10})
-    # statsTestOpts.update({
-    #     'plotting': True,
-    #     'testStride': 500e-3,
-    #     'testWidth': 500e-3,
-    #     'tStart': -2000e-3,
-    #     'tStop': 2250e-3})
-#  End Overrides
-################################################################
-if os.path.exists(statsTestPath):
-    sigValsWide = pd.read_hdf(statsTestPath, 'sig')
-    sigValsWide.columns.name = 'bin'
+    nrnRelplotKWArgs.update({
+        'legend': 'brief',
+        'height': 4,
+        'aspect': 2,
+        'facet1_kws': {
+            'sharey': False,
+            # 'legend_out': False,
+            'gridspec_kws': {
+                'wspace': 0.01,
+                'hspace': 0.01
+            }},
+        'facet2_kws': {
+            'sharey': True,
+            # 'legend_out': False,
+            'gridspec_kws': {
+                'wspace': 0.01,
+                'hspace': 0.01
+            }}
+        })
+#     # alignedAsigsKWargs.update({'windowSize': (-1000e-3, 1000e-3)})
+#     # currWindow = rasterOpts['windowSizes'][arguments['window']]
+#     # fullWinSize = currWindow[1] - currWindow[0]
+#     # redWinSize = (
+#     #     alignedAsigsKWargs['windowSize'][1] -
+#     #     alignedAsigsKWargs['windowSize'][0])
+#     # nrnRelplotKWArgs['aspect'] = (
+#     #     nrnRelplotKWArgs['aspect'] * redWinSize / fullWinSize)
+#     # alignedAsigsKWargs.update({'decimate': 10})
+#     # statsTestOpts.update({
+#     #     'plotting': True,
+#     #     'testStride': 500e-3,
+#     #     'testWidth': 500e-3,
+#     #     'tStart': -2000e-3,
+#     #     'tStop': 2250e-3})
+# #  End Overrides
+# ################################################################
+
+if arguments['overlayStats']:
+    if os.path.exists(statsTestPath):
+        sigValsWide = pd.read_hdf(statsTestPath, 'sig')
+        sigValsWide.columns.name = 'bin'
+    else:
+        print('Recalculating t test results')
+        alignedAsigsKWargsStats = deepcopy(alignedAsigsKWargs)
+        if alignedAsigsKWargsStats['unitNames'] is not None:
+            alignedAsigsKWargsStats['unitNames'] = [
+                i.replace('_#0', '_raster#0')
+                for i in alignedAsigsKWargsStats['unitNames']
+            ]
+        (
+            pValsWide, statValsWide,
+            sigValsWide) = ash.facetGridCompareMeans(
+            rasterBlock, statsTestPath,
+            limitPages=limitPages,
+            compareISIs=True,
+            loadArgs=alignedAsigsKWargsStats,
+            rowColOpts=rowColOpts,
+            statsTestOpts=statsTestOpts)
 else:
-    print('Recalculating t test results')
-    alignedAsigsKWargsStats = deepcopy(alignedAsigsKWargs)
-    if alignedAsigsKWargsStats['unitNames'] is not None:
-        alignedAsigsKWargsStats['unitNames'] = [
-            i.replace('_#0', '_raster#0')
-            for i in alignedAsigsKWargsStats['unitNames']
-        ]
-    (
-        pValsWide, statValsWide,
-        sigValsWide) = ash.facetGridCompareMeans(
-        rasterBlock, statsTestPath,
-        limitPages=limitPages,
-        compareISIs=True,
-        loadArgs=alignedAsigsKWargsStats,
-        rowColOpts=rowColOpts,
-        statsTestOpts=statsTestOpts)
+    sigValsWide = None
 
 asp.plotNeuronsAligned(
     rasterBlock,
@@ -161,20 +191,31 @@ asp.plotNeuronsAligned(
     figureFolder=alignedRastersFolder,
     enablePlots=True,
     plotProcFuns=[
+        # asp.genYLimSetterTwin((0, 150)),
+        asp.genTicksToScaleTwin(
+            lineOpts={'lw': 2}, shared=True,
+            # for evoked lfp report
+            # xUnitFactor=1e3, yUnitFactor=1,
+            # xUnits='msec', yUnits='uV',
+            # for evoked emg report
+            xUnitFactor=1e3, yUnitFactor=1,
+            xUnits='msec', yUnits='spk/s',
+            ),
         asp.xLabelsTime, asp.genLegendRounder(decimals=2),
-        asp.genDespiner(right=False, left=True, trim=True),
-        asp.genYLimSetterTwin((0, 150)),
+        asp.genDespiner(right=True, left=True, trim=True),
         asp.genVLineAdder([0], nrnVLineOpts),
-        asp.genBlockShader(nrnBlockShadingOpts)],
+        # asp.genBlockShader(nrnBlockShadingOpts)
+        ],
     pdfName=pdfName,
     **rowColOpts,
     twinRelplotKWArgs=nrnRelplotKWArgs, sigStarOpts=nrnSigStarOpts)
-asp.plotSignificance(
-    sigValsWide,
-    pdfName=pdfName + '_pCount',
-    figureFolder=alignedRastersFolder,
-    **rowColOpts,
-    **statsTestOpts)
+if arguments['overlayStats']:
+    asp.plotSignificance(
+        sigValsWide,
+        pdfName=pdfName + '_pCount',
+        figureFolder=alignedRastersFolder,
+        **rowColOpts,
+        **statsTestOpts)
 
 if arguments['lazy']:
     frReader.close()

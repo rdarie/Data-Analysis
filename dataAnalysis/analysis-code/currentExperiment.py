@@ -328,9 +328,9 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
         programColumn='program',
         electrodeColumn='electrode',
         removeFuzzyName=False)
-    # alignedAsigsKWargs.update(dict(
-    #     windowSize=(-50e-3, 350e-3),
-    #     decimate=3))
+    alignedAsigsKWargs.update(dict(
+        windowSize=(-750e-3, 750e-3),
+        decimate=5))
     # alignedAsigsKWargs.update(dict(
     #     windowSize=(-250e-6, 2750e-6),
     #     decimate=1))
@@ -340,9 +340,9 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
     # alignedAsigsKWargs.update(dict(
     #     windowSize=(-250e-6, 19e-3),
     #     decimate=2))
-    alignedAsigsKWargs.update(dict(
-        windowSize=(-250e-6, 49e-3),
-        decimate=3))
+    # alignedAsigsKWargs.update(dict(
+    #     windowSize=(-250e-6, 49e-3),
+    #     decimate=3))
     # alignedAsigsKWargs.update(dict(
     #     windowSize=None, decimate=1))
     # if (miniRCBlock or RCBlock):
@@ -410,12 +410,12 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
     nrnRelplotKWArgs = dict(
         palette="ch:1.6,-.3,dark=.1,light=0.7,reverse=1",
         func1_kws={
-            'marker': 'd', 's': 15, 'edgecolors': 'face',
+            'marker': 'd', 's': 25, 'edgecolors': 'face',
             'alpha': 0.2, 'rasterized': True},
         func2_kws={'ci': 'sem'},
         facet1_kws={'sharey': False},
         facet2_kws={'sharey': True},
-        height=5, aspect=3,
+        height=4, aspect=2,
         kind1='scatter', kind2='line')
     nrnVLineOpts = {'color': 'y'}
     nrnBlockShadingOpts = {

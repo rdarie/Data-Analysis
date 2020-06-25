@@ -9,7 +9,7 @@ Options:
     --window=window                        process with short window? [default: short]
     --lazy                                 load from raw, or regular? [default: False]
     --chanQuery=chanQuery                  how to restrict channels? [default: raster]
-    --blockName=blockName                  name for new block [default: raster]
+    --outputBlockName=outputBlockName      name for new block [default: raster]
     --eventName=eventName                  name of events object to align to [default: motionStimAlignTimes]
     --analysisName=analysisName            append a name to the resulting blocks? [default: default]
     --alignFolderName=alignFolderName      append a name to the resulting blocks? [default: motion]
@@ -103,5 +103,5 @@ ns5.getAsigsAlignedToEvents(
     checkReferences=False,
     verbose=arguments['verbose'],
     fileName=prefix + '_{}_{}'.format(
-        arguments['blockName'], arguments['window']),
+        arguments['outputBlockName'], arguments['window']),
     folderPath=alignSubFolder, chunkSize=alignedAsigsChunkSize)

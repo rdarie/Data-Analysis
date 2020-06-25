@@ -1962,7 +1962,7 @@ def preprocBlockToNix(
         spikeSourceType='', spikeBlock=None,
         calcRigEvents=True,
         normalizeByImpedance=True, removeMeanAcross=False,
-        LFPFilterOpts=None
+        LFPFilterOpts=None, encoderCountPerDegree=180e2
         ):
     idx = segInitIdx
     #  prune out nev spike placeholders
@@ -2507,7 +2507,9 @@ def preprocBlockToNix(
                     del ainpData, ainpTime
                     gc.collect()
                 motorData = mea.processMotorData(
-                    motorData, ainpAsig.sampling_rate.magnitude)
+                    motorData, ainpAsig.sampling_rate.magnitude,
+                    encoderCountPerDegree=encoderCountPerDegree
+                    )
                 keepCols = [
                     'position', 'velocity', 'velocityCat',
                     'rightBut_int', 'leftBut_int',
@@ -2621,7 +2623,7 @@ def preproc(
         asigNameList=None, ainpNameList=None, nameSuffix='',
         calcRigEvents=True, normalizeByImpedance=False,
         removeMeanAcross=False,
-        LFPFilterOpts=None
+        LFPFilterOpts=None, encoderCountPerDegree=180e2
         ):
     #  base file name
     rawBasePath = os.path.join(rawFolderPath, fileName)
@@ -2684,7 +2686,8 @@ def preproc(
             calcRigEvents=calcRigEvents,
             normalizeByImpedance=normalizeByImpedance,
             removeMeanAcross=removeMeanAcross,
-            LFPFilterOpts=LFPFilterOpts
+            LFPFilterOpts=LFPFilterOpts,
+            encoderCountPerDegree=encoderCountPerDegree
             )
     writer.close()
     #

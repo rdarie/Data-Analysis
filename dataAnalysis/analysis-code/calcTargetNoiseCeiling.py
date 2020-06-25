@@ -82,7 +82,7 @@ alignedAsigsKWargs.update(dict(
     duplicateControlsByProgram=False,
     makeControlProgram=False,
     removeFuzzyName=False,
-    decimate=1, windowSize=(0, 300e-3),
+    decimate=5, windowSize=(0, 300e-3),
     metaDataToCategories=False,
     transposeToColumns='bin', concatOn='index',
     verbose=False, procFun=None))
@@ -133,22 +133,28 @@ def noiseCeil(
             maxIter = int(factorial(nSamp) / (factorial(nChoose) ** 2))
         else:
             maxIter = int(maxIter)
-        # pdb.set_trace()
+        #
         allCorr = pd.Series(index=range(maxIter))
         allCov = pd.Series(index=range(maxIter))
         allMSE = pd.Series(index=range(maxIter))
         for idx in range(maxIter):
             testX = shuffle(groupData, n_samples=nChoose)
+            testXBar = testX.mean()
             refX = groupData.loc[~groupData.index.isin(testX.index), :]
+            refXBar = refX.mean()
             # if refX.mean().isna().any() or testX.mean().isna().any():
-            #     pdb.set_trace()
+            #
             allCorr.iloc[idx] = refX.mean().corr(
-                testX.mean(), method=corrMethod)
-            allCov.iloc[idx] = refX.mean().cov(testX.mean())
+                testXBar, method=corrMethod)
+            allCov.iloc[idx] = refXBar.cov(testXBar)
             allMSE.iloc[idx] = (
-                ((refX.mean() - testX.mean()) ** 2)
+                ((refXBar - testXBar) ** 2)
                 .mean())
-    # pdb.set_trace()
+    #
+    # if allCorr.mean() < 0:
+    #     pdb.set_trace()
+    #     plt.plot(testXBar); plt.plot(refXBar); plt.show()
+    #     plt.plot(testX.transpose(), 'b'); plt.plot(refX.transpose(), 'r'); plt.show()
     resultDF = pd.DataFrame(
         {
             'noiseCeil': allCorr.mean(),
@@ -186,8 +192,7 @@ if __name__ == "__main__":
         funKWArgs = dict(
                 tBounds=None,
                 plotting=False, iterMethod='half',
-                corrMethod='pearson',
-                maxIter=5)
+                corrMethod='pearson', maxIter=500)
         # daskClient = Client()
         # daskComputeOpts = {}
         daskComputeOpts = dict(
@@ -201,7 +206,7 @@ if __name__ == "__main__":
             daskPersist=True, daskProgBar=True, daskResultMeta=resultMeta,
             daskComputeOpts=daskComputeOpts,
             reindexFromInput=False)
-        # pdb.set_trace()
+        #
         # nObs = dataDF.reset_index().groupby(groupBy)['feature'].value_counts()
         # resDF = ash.applyFunGrouped(
         #     dataDF,
@@ -220,14 +225,15 @@ if __name__ == "__main__":
         noiseCeil = pd.read_hdf(resultPath, 'noiseCeil')
         covar = pd.read_hdf(resultPath, 'covariance')
         mse = pd.read_hdf(resultPath, 'mse')
-        resDF = {
-            'noiseCeil': noiseCeil.unstack(level='feature'),
-            'covariance': covar.unstack(level='feature'),
-            'mse': mse.unstack(level='feature'),
-            }
-    
+        resDF = pd.concat({
+            'noiseCeil': noiseCeil,
+            'covariance': covar,
+            'mse': mse,
+            }, axis='columns')
     for cN in ['covariance', 'mse']:
         robScaler = RobustScaler(quantile_range=(5, 95))
+        # inputDF = resDF[cN].unstack(level='feature')
+        #
         robScaler.fit(resDF.loc[resDF[cN].notna(), cN].to_numpy().reshape(-1, 1))
         preScaled = (robScaler.transform(resDF[cN].to_numpy().reshape(-1, 1)))
         resDF[cN + '_q_scale'] = pd.Series(
@@ -240,7 +246,6 @@ if __name__ == "__main__":
         mmScaler = MinMaxScaler()
         mmScaler.fit(resDF.loc[scaledMask, cN].to_numpy().reshape(-1, 1))
         resDF[cN + '_scaled'] = mmScaler.transform(resDF[cN].to_numpy().reshape(-1, 1))
-
     exportToDeepSpine = True
     if exportToDeepSpine:
         deepSpineExportPath = os.path.join(
@@ -249,7 +254,7 @@ if __name__ == "__main__":
                 arguments['inputBlockName'], arguments['window']))
         for cN in ['noiseCeil', 'covariance', 'covariance_q_scale']:
             resDF[cN].to_hdf(deepSpineExportPath, cN)
-    #
+    pdb.set_trace()
     mask = pd.DataFrame(
         False,
         index=resDF['noiseCeil'].index)
@@ -272,7 +277,9 @@ if __name__ == "__main__":
                         'RateInHz', 'nominalCurrent']])
                 plotDF = resDF[cN].reset_index(drop=True).set_index(plotIndex)
                 fig, ax = plt.subplots(figsize=(12, 12))
-                sns.heatmap(plotDF, mask=mask.to_numpy(), ax=ax, center=0, vmin=-1, vmax=1)
+                sns.heatmap(
+                    plotDF, mask=mask.to_numpy(),
+                    ax=ax, center=0, vmin=-1, vmax=1)
                 ax.set_xticklabels(ax.get_xticklabels(), rotation=-45)
                 ax.set_yticklabels(ax.get_yticklabels(), rotation=45)
                 ax.set_title(cN)
@@ -314,6 +321,5 @@ if __name__ == "__main__":
         # ax.set_ylim([-1, 1])
         fig.savefig(os.path.join(figureOutputFolder, 'noise_ceil_scatterplot.pdf'))
         plt.show()
-    # pdb.set_trace()
     keepMask = ((plotNoiseCeil > 0.4) & (plotCovar > 0.1))
     keepFeats = plotNoiseCeil[keepMask].index.to_frame().reset_index(drop=True)

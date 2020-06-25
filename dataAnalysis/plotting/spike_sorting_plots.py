@@ -12,7 +12,7 @@ import random
 import traceback
 from fractions import gcd
 sns.set(rc={
-    'figure.figsize': (12, 8),
+    'figure.figsize': (14, 18),
     'legend.fontsize': 10,
     'legend.handlelength': 2
     })
@@ -21,7 +21,7 @@ sns.set(rc={
 #@profile
 def plotSpikePanel(
         spikeStruct, spikes, labelFontSize=5,
-        padOverride=5e-3, figSize=(12, 8),
+        padOverride=1e-3, figSize=(18, 14),
         hideUnused=True,
         colorPal="ch:2,-.1,dark=.2,light=0.8,reverse=1"):
     sns.set_style("dark", {"axes.facecolor": ".9"})
@@ -50,9 +50,10 @@ def plotSpikePanel(
     axHighLims[:] = np.nan
     axLowLims = np.empty(ax.shape)
     axLowLims[:] = np.nan
-    with sns.color_palette(colorPal, 5):
+    with sns.color_palette(colorPal, 8):
         for idx, channel in enumerate(spikes['ChannelID']):
             curAx = ax[panelX[channel], panelY[channel]]
+            # curAx.set_aspect('equal', adjustable='datalim')
             plotSpike(spikes, channel, ax=curAx)
             curAxLim = curAx.get_ylim()
             axHighLims[panelX[channel], panelY[channel]] = curAxLim[1]
@@ -67,30 +68,42 @@ def plotSpikePanel(
         for idx, channel in enumerate(spikes['ChannelID']):
             curAx = ax[panelX[channel], panelY[channel]]
             curAx.set_ylim(newAxMin, newAxMax)
+            trnsf = curAx.transAxes
+            textOpts = {
+                'verticalalignment': 'top',
+                'horizontalalignment': 'right',
+                'fontsize': labelFontSize
+                }
+            curAx.text(
+                1, 1, channel,
+                transform=trnsf, **textOpts)
+            # pdb.set_trace()
 
         for idx, curAx in enumerate(ax.flatten()):
             if idx != 0:
                 curAx.tick_params(
                     left=False, top=False, right=False, bottom=False,
                     labelleft=False, labeltop=False, labelright=False,
+                    pad=-3 * labelFontSize,
                     labelbottom=False, labelsize=labelFontSize,
+                    direction='in',
                     length=labelFontSize)
             else:
                 curAx.tick_params(
                     left=True, top=False, right=False, bottom=True,
                     labelleft=True, labeltop=False, labelright=False,
+                    pad=-3 * labelFontSize,
                     labelbottom=True, direction='in',
                     labelsize=labelFontSize, length=labelFontSize)
                 curAx.set_ylim(newAxMin, newAxMax)
                 curAx.set_xlim(*xLim)
                 curAx.set_xlabel(
                     'msec', fontsize=labelFontSize,
-                    labelpad=-2 * labelFontSize)
+                    labelpad=-3 * labelFontSize)
                 curAx.set_ylabel(
                     spikes['Units'], fontsize=labelFontSize,
-                    labelpad=-2 * labelFontSize)
-
-        plt.tight_layout(pad=padOverride)
+                    labelpad=-3 * labelFontSize)
+        plt.tight_layout(pad=padOverride, w_pad=padOverride, h_pad=padOverride)
     return newAxMin, newAxMax
 
 
@@ -352,11 +365,12 @@ def spikePDFReport(
         plotSpikePanel(
             spikeStruct, spikes,
             colorPal=None,
-            labelFontSize=1, padOverride=5e-2)
+            labelFontSize=2, padOverride=1e-3)
         #  make spikepanel square
-        figWidth, _ = plt.gcf().get_size_inches()
-        plt.gcf().set_size_inches(figWidth, figWidth)
-        pdf.savefig()
+        # figWidth, figHeight = plt.gcf().get_size_inches()
+        # aspectRatio = (spikeStruct['xcoords'].max() - spikeStruct['xcoords'].min()) / (spikeStruct['ycoords'].max() - spikeStruct['ycoords'].min())
+        # plt.gcf().set_size_inches(figWidth, figWidth)
+        pdf.savefig(bbox_inches='tight', pad_inches=0, dpi=300)
         plt.close()
 
         for idx, channel in enumerate(spikes['ChannelID']):

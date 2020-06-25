@@ -121,15 +121,31 @@ def getExpOpts():
         '201805231100-Proprio': [1, 2, 3],
         }
 
-    movementSizeBins = [0, 0.25, 0.5, 1, 1.25, 1.5]
+    movementSizeBins = [
+        i / 180e2
+        for i in [
+            0, 2500, 5000,
+            7500, 10000, 12500,
+            15000, 17500, 20000, 22500]
+        ]
+    movementSizeBinLabels = [
+        'XXXS', 'XXS', 'XS',
+        'S', 'M', 'L', 'XL',
+        'XXL', 'XXXL'
+        ]
     alignTimeBoundsLookup = {
         1: [
-            [999, 999],
+            [8, 1822],
             ],
         #  per trial
         2: [
             #  per trialSegment
-            [999, 999],
+            [5, 460],
+            ],
+        #  per trial
+        3: [
+            #  per trialSegment
+            [5, 1048],
             ]
         }
     return locals()

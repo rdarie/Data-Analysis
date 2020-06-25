@@ -136,7 +136,8 @@ def plotNeuronsAligned(
                 **loadArgs)
             oneSpikePerBinHz = int(
                 np.round(
-                    np.diff(rasterWide.columns)[0] ** (-1)))
+                    np.diff(rasterWide.columns)[0] ** (-1) *
+                    loadArgs['decimate']))
             if enablePlots:
                 indexInfo = asigWide.index.to_frame()
                 if idx == 0:
@@ -185,6 +186,7 @@ def plotNeuronsAligned(
                 raster = getRasterFacetIdx(
                     raster, 't',
                     col=colName, row=rowName, hue=hueName)
+                # 
                 g = twin_relplot(
                     x='bin',
                     y2='fr', y1='t_facetIdx',
@@ -397,7 +399,7 @@ def plotAsigsAligned(
                         for hn in hueOrder
                         if hn in sorted(np.unique(indexInfo[hueName]))]
                 asig = asigWide.stack().reset_index(name='signal')
-                # pdb.set_trace()
+                # 
                 g = sns.relplot(
                     x='bin', y='signal',
                     col=colName, row=rowName, hue=hueName,
@@ -538,6 +540,64 @@ def genTicksToScale(
         g.axes[ro, co].set_xticks([])
         return
     return ticksToScale
+
+def genTicksToScaleTwin(
+        lineOpts={}, textOpts={}, shared=True,
+        xUnitFactor=1, yUnitFactor=1,
+        xUnits='', yUnits='', dropNaNCol='segment'):
+    limFrac = 0.2
+
+    def ticksToScaleTwin(g, ro, co, hu, dataSubset):
+        if hasattr(g, 'twin_axes'):
+            topLeftCol = ((ro == 0) and (co == 0))
+            emptySubset = (
+                (dataSubset.empty) or
+                (dataSubset[dropNaNCol].isna().all()))
+            if ((topLeftCol) or (not shared)) and not emptySubset:
+                # 
+                xLim = g.twin_axes[ro, co].get_xlim()
+                yLim = g.twin_axes[ro, co].get_ylim()
+                odX = limFrac * (xLim[1] - xLim[0])
+                odY = limFrac * (yLim[1] - yLim[0])
+                # round to nearest order of magnitude
+                if odX > 1:
+                    xOrdMag = -np.floor(np.log10(odX)) + 3
+                else:
+                    xOrdMag = -np.floor(np.log10(odX)) + 2
+                dX = np.round(odX, decimals=int(xOrdMag))
+                if odY > 1:
+                    yOrdMag = -np.floor(np.log10(odY)) + 3
+                else:
+                    yOrdMag = -np.floor(np.log10(odY)) + 2
+                dY = np.round(odY, decimals=int(yOrdMag))
+                if odX > 0 and odY > 0:
+                    # positions of scale-bar
+                    scaleX = xLim[0] + np.asarray([odX,    odX, dX+odX])
+                    scaleY = yLim[0] + np.asarray([dY+odY, odY, odY])
+                    #
+                    # g.twin_axes[ro, co].autoscale(enable=False)
+                    g.twin_axes[ro, co].plot(scaleX, scaleY, 'k-', **lineOpts)
+                    #
+                    xText = '{:.1f}'.format(dX * xUnitFactor)
+                    if xUnits:
+                        xText += ' {}'.format(xUnits)
+                    g.twin_axes[ro, co].text(
+                        scaleX[0], scaleY[1], xText,
+                        horizontalalignment='left',
+                        verticalalignment='top', **textOpts)
+                    #
+                    yText = '{:.1f}'.format(dY * yUnitFactor)
+                    if yUnits:
+                        yText += ' {}'.format(yUnits)
+                    g.twin_axes[ro, co].text(
+                        scaleX[0], scaleY[1], yText,
+                        horizontalalignment='right',
+                        verticalalignment='bottom',
+                        rotation='vertical', **textOpts)
+            g.twin_axes[ro, co].set_yticks([])
+            g.twin_axes[ro, co].set_xticks([])
+            return
+    return ticksToScaleTwin
 
 
 def genDespiner(

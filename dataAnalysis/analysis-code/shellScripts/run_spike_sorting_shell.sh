@@ -33,7 +33,7 @@ EXP="exp201805231100"
 # EXP="exp201901231000"
 # EXP="exp201901271000"
 # EXP="exp201901261000"
-TRIALIDX="3"
+TRIALIDX="1"
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
@@ -51,5 +51,5 @@ python --version
 # python3 ./tridesclousCCV.py --blockIdx=$TRIALIDX --exp=$EXP --purgePeeler --batchPeel
 # python3 ./tridesclousVisualize.py --blockIdx=$TRIALIDX --exp=$EXP  --peeler
 # Step 5:
-python3 './tridesclousCCV.py' --blockIdx=$TRIALIDX --purgePeelerDiagnostics --makeStrictNeoBlock --exp=$EXP
+# python3 './tridesclousCCV.py' --blockIdx=$TRIALIDX --purgePeelerDiagnostics --makeStrictNeoBlock --exp=$EXP
 python3 './plotSpikeReport.py' --blockIdx=$TRIALIDX --nameSuffix=_final --exp=$EXP

@@ -17,8 +17,10 @@ with pd.HDFStore(inputPath, 'r') as store:
     eesList = []
     emgList = []
     for idx, eesKey in enumerate(sorted(allEESKeys)):
+        print(eesKey)
         # data for this trial is stored in a pd.dataframe
         stimData = pd.read_hdf(store, eesKey)
+        print((stimData.abs() > 0).any())
         # metadata is stored in a dictionary
         eesMetadata = store.get_storer(eesKey).attrs.metadata
         # extract column names from first trial
@@ -38,6 +40,7 @@ with pd.HDFStore(inputPath, 'r') as store:
             (stimData.index <= cropEdgesTimes[1]))
         eesList.append(stimData.loc[cropEdgesMask, eesColIdx])
         emgList.append(stimData.loc[cropEdgesMask, emgColIdx])
+
 # ees information saved in the ees file
 eesNP = np.stack(eesList)
 # eesNP.shape = trials x time x channel
@@ -51,13 +54,27 @@ metadataNP = metaDataDF.to_numpy()
 # of rate, active electrodes and amplitude
 with pd.HDFStore(inputPath, 'r') as store:
     noiseCeilDF = pd.read_hdf(store, 'noiseCeil').unstack(level='feature')
+    noiseCeilDF.index.set_names('amplitude', level='nominalCurrent', inplace=True)
     columnLabels = noiseCeilDF.columns.to_list()
     electrodeLabels = noiseCeilDF.index.get_level_values('electrode').to_list()
-    amplitudeLabels = noiseCeilDF.index.get_level_values('nominalCurrent').to_list()
+    amplitudeLabels = noiseCeilDF.index.get_level_values('amplitude').to_list()
     covariances = pd.read_hdf(store, 'covariance').unstack(level='feature').to_numpy()
     noiseCeil = noiseCeilDF.to_numpy()
+
+noiseCeilMeta = noiseCeilDF.index.to_frame(index=False)
+def getEESIdx(metaRow):
+    # pdb.set_trace()
+    findMask = (noiseCeilMeta['electrode'] == metaRow['electrode']) & (noiseCeilMeta['RateInHz'] == metaRow['RateInHz']) & (noiseCeilMeta['amplitude'] == metaRow['amplitude'])
+    if not noiseCeilMeta.index[findMask].empty:
+        return noiseCeilMeta.index[findMask][0]
+    else:
+        return np.nan
+
+
+metaDataDF['eesIdx'] = metaDataDF.apply(getEESIdx, axis=1)
+(metaDataDF.loc[~metaDataDF['outlierTrial'], :].groupby(['electrode', 'amplitude', 'RateInHz']).ngroups)
 print('finished loading.')
-# pdb.set_trace()
+pdb.set_trace()
 checkPlots = True
 if checkPlots:
     plt.plot(eesNP[0, :, 0])

@@ -8,7 +8,7 @@
 
 # Use more memory (32GB):
 #SBATCH --nodes=1
-#SBATCH --mem=96G
+#SBATCH --mem=127G
 
 # Specify a job name:
 #SBATCH -J analysis_calc_20190127
@@ -18,10 +18,10 @@
 #SBATCH -e ../../batch_logs/%j-%a-analysis_calc_20190127.errout
 
 # Specify account details
-#SBATCH --account=bibs-dborton-condo
+#SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=1,2,3,4
+#SBATCH --array=1,2,3
 
 # EXP="exp201901070700"
 # EXP="exp201901201200"
@@ -38,8 +38,8 @@ conda activate
 source activate nda2
 python --version
 
-SLURM_ARRAY_TASK_ID=2
+# SLURM_ARRAY_TASK_ID=3
 # python ./synchronizeSIMItoNSP.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP
-python ./calcProprioAnalysisNix.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --chanQuery="all" --rigOnly
-# python ./calcMotionAlignTimes.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --plotParamHistograms $LAZINESS
-# python ./calcFR.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID
+python ./calcProprioAnalysisNix.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --chanQuery="notainp" --rigOnly
+python ./calcMotionAlignTimes.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --plotParamHistograms $LAZINESS
+python ./calcFR.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID

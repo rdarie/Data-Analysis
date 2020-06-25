@@ -151,8 +151,8 @@ if arguments['enableOverrides']:
     # relplotKWArgs['aspect'] = (
     #     relplotKWArgs['aspect'] * redWinSize / fullWinSize)
     statsTestOpts.update({
-        'testStride': 10e-3,
-        'testWidth': 10e-3,
+        'testStride': 50e-3,
+        'testWidth': 50e-3,
         'tStart': 0e-3,
         'tStop': alignedAsigsKWargs['windowSize'][1]})
 #  End Overrides
@@ -199,12 +199,13 @@ asp.plotAsigsAligned(
             lookupDict={}, removeMatch='#0'),
         # asp.genYLimSetter(newLims=[-75, 100], forceLims=True),
         asp.xLabelsTime,
-        asp.genBlockVertShader([
-                max(0e-3, alignedAsigsKWargs['windowSize'][0]),
-                min(.9e-3, alignedAsigsKWargs['windowSize'][1])],
-            asigPlotShadingOpts),
-        asp.genStimVLineAdder(
-            'RateInHz', vLineOpts, tOnset=0, tOffset=.3, includeRight=False),
+        # asp.genBlockVertShader([
+        #         max(0e-3, alignedAsigsKWargs['windowSize'][0]),
+        #         min(.9e-3, alignedAsigsKWargs['windowSize'][1])],
+        #     asigPlotShadingOpts),
+        # asp.genStimVLineAdder(
+        #     'RateInHz', vLineOpts, tOnset=0, tOffset=.3, includeRight=False),
+        asp.genVLineAdder([0], nrnVLineOpts),
         asp.genLegendRounder(decimals=2),
         ],
     pdfName=pdfName,

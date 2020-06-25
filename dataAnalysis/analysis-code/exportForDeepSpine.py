@@ -94,28 +94,32 @@ asigWide = ns5.alignedAsigsToDF(
     dataBlock, **alignedAsigsKWargs)
 metaData = asigWide.index.to_frame()
 elecNames = metaData['electrode'].unique()
-elecRegex = r'([\-]*[\S\s]*)([\+]*[\S\s]*)'
+# elecRegex = r'([\-]?[\S\s]*\d)([\+]?[\S\s]*\d)'
+# elecRegex = r'((?:\-|\+)(?:(?:rostral|caudal)\S_\S\S\S)*)*'
+elecRegex = r'((?:\-|\+)(?:(?:rostral|caudal)\S_\S\S\S)*)'
 chanRegex = r'((?:rostral|caudal)\S_\S\S\S)'
 elecChanNames = []
 stimConfigLookup = {}
 for comboName in elecNames:
-    matches = re.search(elecRegex, comboName)
+    matches = re.findall(elecRegex, comboName)
     if matches:
+        print(comboName)
         thisLookup = {'cathodes': [], 'anodes': []}
-        for matchGroup in matches.groups():
+        for matchGroup in matches:
+            print('\t' + matchGroup)
             if len(matchGroup):
-                theseChanNames = re.search(chanRegex, matchGroup)
+                theseChanNames = re.findall(chanRegex, matchGroup)
                 if theseChanNames:
-                    for chanName in theseChanNames.groups():
+                    for chanName in theseChanNames:
                         if chanName not in elecChanNames:
                             elecChanNames.append(chanName)
                     if '-' in matchGroup:
-                        for chanName in theseChanNames.groups():
+                        for chanName in theseChanNames:
                             thisLookup['cathodes'].append(chanName)
                     if '+' in matchGroup:
-                        for chanName in theseChanNames.groups():
+                        for chanName in theseChanNames:
                             thisLookup['anodes'].append(chanName)
-                    stimConfigLookup[comboName] = thisLookup
+        stimConfigLookup[comboName] = thisLookup
 # pdb.set_trace()
 eesColumns = pd.MultiIndex.from_tuples(
     [(eCN, 'amplitude') for eCN in sorted(elecChanNames)],

@@ -33,7 +33,7 @@ namedQueries = {
         'oechorsense': "((chanName.str.contains('CH'))or(chanName.str.contains('Sense')))",
         'oechorins': "((chanName.str.contains('CH'))or(chanName.str.contains('ins')))",
         'neural': "((chanName.str.contains('elec'))or(chanName.str.contains('nform')))or(chanName.str.contains('utah'))",
-        'rig': "not((chanName.str.contains('elec'))or(chanName.str.contains('pca'))or(chanName.str.contains('ainp')))"
+        'rig': "not((chanName.str.contains('elec'))or(chanName.str.contains('pca'))or(chanName.str.contains('nform'))or(chanName.str.contains('ainp')))"
     },
     'chan': {
         'all': "(chanName.notna())",
@@ -44,7 +44,8 @@ namedQueries = {
         'oechorsense': "((chanName.str.contains('CH'))or(chanName.str.contains('Sense')))",
         'oechorins': "((chanName.str.contains('CH'))or(chanName.str.contains('ins')))",
         'notoeaux': "not((chanName.str.contains('AUX')))",
-        'rig': "not((chanName.str.contains('elec'))or(chanName.str.contains('pca')))",
+        'rig': "not((chanName.str.contains('elec'))or(chanName.str.contains('pca'))or(chanName.str.contains('nform')))",
+        'notainp': "not((chanName.str.contains('ainp'))or(chanName.str.contains('analog')))",
         'isispinaloremg': "((chanName.str.contains('caudal'))or(chanName.str.contains('rostral'))or(chanName.str.contains('Emg')))",
         'isispinal': "( (chanName.str.contains('caudal'))or(chanName.str.contains('rostral')) )",
         'isiemg': "(chanName.str.contains('Emg'))",
