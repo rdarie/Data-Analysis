@@ -21,7 +21,7 @@
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=4,5
+#SBATCH --array=1,2,3
 
 # EXP="exp201901070700"
 # EXP="exp201901201200"
@@ -36,9 +36,10 @@
 # EXP="exp202003191400"
 # EXP="exp202004251400"
 # EXP="exp202004271200"
-EXP="exp202004301200"
+# EXP="exp202004301200"
 # EXP="exp202005011400"
 # EXP="exp202003181300"
+EXP="exp202006171300"
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
@@ -46,6 +47,6 @@ conda activate
 source activate nda2
 python --version
 ## 
-SLURM_ARRAY_TASK_ID=5
+# SLURM_ARRAY_TASK_ID=5
 python3 ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --ISI --transferISIStimLog
 # python3 ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --previewEncoder

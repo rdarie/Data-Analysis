@@ -42,6 +42,7 @@ globals().update(allOpts)
 nspPath = os.path.join(
     scratchFolder,
     ns5FileName + '.nix')
+# pdb.set_trace()
 nspReader, nspBlock = ns5.blockFromPath(
     nspPath, lazy=arguments['lazy'])
 #
@@ -117,7 +118,7 @@ prelimOEMismatch = np.abs(np.diff(oeTimes) - interTriggerInterval * pq.s)
 prelimNSPMismatch = np.abs(np.diff(nspTimes) - interTriggerInterval * pq.s)
 listDiscontinuitiesNSP = np.flatnonzero(prelimNSPMismatch > sampleWiggle)
 listDiscontinuitiesOE = np.flatnonzero(prelimOEMismatch > sampleWiggle)
-pdb.set_trace()
+# pdb.set_trace()
 if nMissingTriggers > 0:
     # np.diff(oeTimes)[listDiscontinuitiesOE]
     # np.diff(nspTimes)[listDiscontinuitiesNSP]

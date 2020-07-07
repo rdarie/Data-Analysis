@@ -21,7 +21,7 @@
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=4,5
+#SBATCH --array=1,2,3
 
 # EXP="exp202003091200"
 # EXP="exp202003181300"
@@ -29,7 +29,7 @@
 # EXP="exp202003201200"
 # EXP="exp202004251400"
 
-EXP="exp202004271200"
+# EXP="exp202004271200"
 # has blocks 1,2,3,4
 
 # EXP="exp202004301200"
@@ -38,12 +38,14 @@ EXP="exp202004271200"
 # EXP="exp202005011400"
 # has blocks 1,2,3,4,5,6
 
+EXP="exp202006171300"
+
 # SELECTOR="Block005_minfrmaxcorr"
 SELECTOR="_minfrmaxcorr"
 
 # WINDOW="--window=short"
 # WINDOW="--window=miniRC"
-WINDOW="--window=XXS"
+WINDOW="--window=XS"
 # WINDOW="--window=extraExtraShort"
 
 # TRIALSELECTOR="--processAll"
@@ -52,15 +54,15 @@ WINDOW="--window=XXS"
 # ANALYSISSELECTOR="--analysisName=emg1msec"
 # ANALYSISSELECTOR="--analysisName=emg1msecSmooth"
 # ANALYSISSELECTOR="--analysisName=emg1msecNoLFPFilterSmoothEMG"
-ANALYSISSELECTOR="--analysisName=lfpFullRes"
+# ANALYSISSELECTOR="--analysisName=lfpFullRes"
 # ANALYSISSELECTOR="--analysisName=emgStretchTime"
 # ANALYSISSELECTOR="--analysisName=emgHiRes"
-# ANALYSISSELECTOR="--analysisName=emgLoRes"
+ANALYSISSELECTOR="--analysisName=emgLoRes"
 
 # CHANSELECTOR="--chanQuery=all"
 # CHANSELECTOR="--chanQuery=isiemgraw"
-# CHANSELECTOR="--chanQuery=isiemg"
-CHANSELECTOR="--chanQuery=isispinal"
+CHANSELECTOR="--chanQuery=isiemg"
+# CHANSELECTOR="--chanQuery=isispinal"
 # CHANSELECTOR="--chanQuery=isispinaloremg"
 
 module load anaconda/3-5.2.0
@@ -69,5 +71,5 @@ conda activate
 source activate nda2
 python --version
 
-SLURM_ARRAY_TASK_ID=4
+SLURM_ARRAY_TASK_ID=3
 python -u './calcISIAnalysisNix.py' --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $CHANSELECTOR $ANALYSISSELECTOR --commitResults

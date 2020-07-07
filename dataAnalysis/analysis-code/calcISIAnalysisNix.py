@@ -277,7 +277,6 @@ def calcISIBlockAnalysisNix():
         with open(jsonPath, 'r') as f:
             stimLog = json.load(f)
         stimResLookup = {4: 10 * pq.uA, 5: 20 * pq.uA}
-        # ampQuanta = 20 * pq.uA  # TODO: read from settings
         stimDict = {
             't': [],
             'elec': [],
