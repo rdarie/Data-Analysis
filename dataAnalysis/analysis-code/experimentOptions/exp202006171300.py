@@ -8,17 +8,18 @@ def getExpOpts():
     experimentName = '202006171300-Peep'
     deviceName = None
     rippleMapFile = {
-        1: 'isi_nano1caudal_xAzByC_ortho_nano2rostral_xAyBzC_ortho.map',
-        2: 'isi_nano1caudal_xAzByC_ortho_nano2rostral_xAyBzC_ortho.map',
-        3: 'isi_nano1caudal_xAzByC_ortho_nano2rostral_xAyBzC_ortho.map',
-        }
-    # use "original" file in edge cases where the ns5 file was saved incorrectly
-    # with the wrong map
-    rippleOriginalMapFile = {
         1: 'isi_nano1caudal_xAyBzC_ortho_nano2rostral_xAyBzC_ortho.map',
         2: 'isi_nano1caudal_xAyBzC_ortho_nano2rostral_xAyBzC_ortho.map',
         3: 'isi_nano1caudal_xAyBzC_ortho_nano2rostral_xAyBzC_ortho.map',
         }
+    # use "original" file in edge cases where the ns5 file was saved incorrectly
+    # with the wrong map. Original is the incorrect, old one, above is the corrected one.
+    rippleOriginalMapFile = {
+        1: None,
+        2: None,
+        3: None,
+        }
+    #
     rippleFastSettleTriggers = {
         1: {'stim': 'same'},
         2: {'stim': 'same'},
@@ -40,7 +41,6 @@ def getExpOpts():
         2: [],
         3: [],
         }
-
     synchInfo = {'delsys': {}, 'nsp': {}, 'ins': {}}
     synchInfo['delsys'][1] = {'timeRanges': [56, 2756], 'chooseCrossings': slice(None)}  #########
     synchInfo['delsys'][2] = {'timeRanges': [4, 3599.7], 'chooseCrossings': slice(None)}
@@ -49,7 +49,6 @@ def getExpOpts():
     synchInfo['nsp'][1] = {'timeRanges': [53, 2752], 'chooseCrossings': slice(None)}
     synchInfo['nsp'][2] = {'timeRanges': [11, 3606.7], 'chooseCrossings': slice(None)}
     synchInfo['nsp'][3] = {'timeRanges': [14, 600], 'chooseCrossings': slice(None)}
-    
     # For emg analysis - emg missing for some time ranges
     alignTimeBoundsLookup = {
         1: [
@@ -87,7 +86,6 @@ def getExpOpts():
     triDestinations = []
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        # For emg analysis - emg missing from block 2
         '202006171300-Peep': [1, 2, 3],
         }
     assembledSegmentToBlockLookup = {

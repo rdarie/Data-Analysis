@@ -11,11 +11,11 @@
 #SBATCH --mem=96G
 
 # Specify a job name:
-#SBATCH -J nsp_preproc_20200430_raw
+#SBATCH -J ripple_preproc_20200708_raw
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-nsp_preproc_20200430_raw.stdout
-#SBATCH -e ../../batch_logs/%j-%a-nsp_preproc_20200430_raw.errout
+#SBATCH -o ../../batch_logs/%j-%a-ripple_preproc_20200708_raw.stdout
+#SBATCH -e ../../batch_logs/%j-%a-ripple_preproc_20200708_raw.errout
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -40,13 +40,14 @@
 # EXP="exp202005011400"
 # EXP="exp202003181300"
 EXP="exp202006171300"
+# EXP="exp202007071300"
+# EXP="exp202007081300"
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
 conda activate
 source activate nda2
 python --version
-## 
-# SLURM_ARRAY_TASK_ID=5
+#
 python3 ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --ISI --transferISIStimLog
 # python3 ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --previewEncoder

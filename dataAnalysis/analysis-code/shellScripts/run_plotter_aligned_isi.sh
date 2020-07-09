@@ -23,42 +23,33 @@
 # EXP="exp202003181300"
 # EXP="exp202003191400"
 # EXP="exp202004271200"
-EXP="exp202004301200"
+# EXP="exp202004301200"
 # EXP="exp202005011400"
 # EXP="exp202003201200"
+EXP="exp202006171300"
 #
 # SELECTOR="Block005_minfrmaxcorr"
 SELECTOR="_minfrmaxcorr"
 #
-# WINDOW="--window=miniRC"
-# WINDOW="--window=miniRC"
-# WINDOW="--window=short"
-WINDOW="--window=XXS"
-# WINDOW="--window=extraShort"
+WINDOW="--window=XS"
+# WINDOW="--window=XXS"
 #
 TRIALSELECTOR="--processAll"
 # TRIALSELECTOR="--blockIdx=3"
 # TRIALSELECTOR="--blockIdx=1"
 #
-# ANALYSISSELECTOR="--analysisName=emg"
-# ANALYSISSELECTOR="--analysisName=default"
-# ANALYSISSELECTOR="--analysisName=emgStretchTime"
-# ANALYSISSELECTOR="--analysisName=emgHiRes"
-# ANALYSISSELECTOR="--analysisName=emgLoRes"
-# ANALYSISSELECTOR="--analysisName=emg1msec"
-# ANALYSISSELECTOR="--analysisName=emg1msecSmooth"
-# ANALYSISSELECTOR="--analysisName=emg1msecNoLFPFilterSmoothEMG"
-ANALYSISSELECTOR="--analysisName=lfpFullRes"
+ANALYSISSELECTOR="--analysisName=emgLoRes"
+# ANALYSISSELECTOR="--analysisName=lfpFullRes"
 #
 # UNITSELECTOR="--unitQuery=all"
 # UNITSELECTOR="--unitQuery=isiemgenv"
 # UNITSELECTOR="--unitQuery=isiemgraw"
-UNITSELECTOR="--unitQuery=isispinal"
-# UNITSELECTOR="--unitQuery=isiemg"
+# UNITSELECTOR="--unitQuery=isispinal"
+UNITSELECTOR="--unitQuery=isiemg"
 
 # BLOCKSELECTOR="--inputBlockName=emg"
-BLOCKSELECTOR="--inputBlockName=lfp"
-# BLOCKSELECTOR="--inputBlockName=emg_clean"
+# BLOCKSELECTOR="--inputBlockName=lfp"
+BLOCKSELECTOR="--inputBlockName=emg_clean"
 # BLOCKSELECTOR="--inputBlockName=lfp_clean"
 
 module load anaconda/3-5.2.0
@@ -69,23 +60,7 @@ source activate nda2
 python --version
 # --maskOutlierBlocks --invertOutlierBlocks --individualTraces
 
-#  --maskOutlierBlocks
-# python3 './plotRippleStimSpikeReport.py' --exp=$EXP $TRIALSELECTOR $WINDOW $UNITSELECTOR $ANALYSISSELECTOR --alignQuery="stimOn" --alignFolderName=stim $BLOCKSELECTOR --groupPagesBy="electrode, RateInHz" --nameSuffix="_zoom_in"
+python3 './plotRippleStimSpikeReport.py' --exp=$EXP $TRIALSELECTOR $WINDOW $UNITSELECTOR $ANALYSISSELECTOR --alignQuery="stimOn" --alignFolderName=stim $BLOCKSELECTOR --groupPagesBy="electrode, RateInHz"
 # python3 './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR $BLOCKSELECTOR $UNITSELECTOR --alignQuery="stimOn" --rowName="electrode" --rowControl= --colName="RateInHz" --colControl= --hueName="nominalCurrent" --alignFolderName=stim --enableOverrides
 # stim spikes
 # python3 './plotRippleStimSpikeReport.py' --exp=$EXP $TRIALSELECTOR $ANALYSISSELECTOR $UNITSELECTOR
-
-# #  --maskOutlierBlocks
-# ANALYSISSELECTOR="--analysisName=lfpFullRes"
-# UNITSELECTOR="--unitQuery=isispinal"
-# WINDOW="--window=extraShort"
-# #
-# BLOCKSELECTOR="--inputBlockName=lfp"
-BLOCKSELECTOR="--inputBlockName=lfp_clean"
-python3 './plotRippleStimSpikeReport.py' --exp=$EXP $TRIALSELECTOR $WINDOW $UNITSELECTOR $ANALYSISSELECTOR --alignQuery="stimOn" --alignFolderName=stim $BLOCKSELECTOR --groupPagesBy="electrode, RateInHz" --nameSuffix="_zoom_out_x3"
-BLOCKSELECTOR="--inputBlockName=lfp"
-python3 './plotRippleStimSpikeReport.py' --exp=$EXP $TRIALSELECTOR $WINDOW $UNITSELECTOR $ANALYSISSELECTOR --alignQuery="stimOn" --alignFolderName=stim $BLOCKSELECTOR --groupPagesBy="electrode, RateInHz" --nameSuffix="_zoom_out_x3"
-# BLOCKSELECTOR="--inputBlockName=lfp"
-# python3 './plotRippleStimSpikeReport.py' --exp=$EXP $TRIALSELECTOR $WINDOW $UNITSELECTOR $ANALYSISSELECTOR --alignQuery="stimOn" --alignFolderName=stim $BLOCKSELECTOR --groupPagesBy="electrode, RateInHz"
-# python3 './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR $BLOCKSELECTOR $UNITSELECTOR --alignQuery="stimOn" --rowName="RateInHz" --rowControl= --colControl= --hueName="nominalCurrent" --alignFolderName=stim --enableOverrides --overlayStats
-# 

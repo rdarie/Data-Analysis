@@ -8,7 +8,7 @@
 
 # Use more memory (32GB):
 #SBATCH --nodes=1
-#SBATCH --mem=96G
+#SBATCH --mem=200G
 
 # Specify a job name:
 #SBATCH -J delsys_preproc_20200309_raw

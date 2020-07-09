@@ -39,6 +39,7 @@
 # has blocks 1,2,3,4,5,6
 
 EXP="exp202006171300"
+# has blocks 1,2,3
 
 # SELECTOR="Block005_minfrmaxcorr"
 SELECTOR="_minfrmaxcorr"
@@ -71,5 +72,5 @@ conda activate
 source activate nda2
 python --version
 
-SLURM_ARRAY_TASK_ID=3
+# SLURM_ARRAY_TASK_ID=3
 python -u './calcISIAnalysisNix.py' --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $CHANSELECTOR $ANALYSISSELECTOR --commitResults

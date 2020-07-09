@@ -96,7 +96,7 @@ outputH5Path = os.path.join(
 alignedAsigsKWargs.update(dict(
     duplicateControlsByProgram=False,
     makeControlProgram=False, removeFuzzyName=False,
-    decimate=1, windowSize=(-200e-3, 400e-3),
+    decimate=1, windowSize=(-150e-3, 400e-3),
     procFun=None,
     metaDataToCategories=False,
     transposeToColumns='bin', concatOn='index',

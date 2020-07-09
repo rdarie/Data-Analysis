@@ -83,7 +83,7 @@ def calcISIBlockAnalysisNix():
     tdChanNames = ns5.listChanNames(
         nspBlock, arguments['chanQuery'],
         objType=AnalogSignalProxy)
-        
+    #
     allSpikeTrains = [
         i
         for i in spikesBlock.filter(objects=SpikeTrain)

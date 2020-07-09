@@ -22,46 +22,41 @@
 # EXP="exp202003091200"
 # EXP="exp202003181300"
 # EXP="exp202003191400"
-EXP="exp202004271200"
+# EXP="exp202004271200"
 # EXP="exp202004301200"
 # EXP="exp202005011400"
 # EXP="exp202003201200"
+EXP="exp202006171300"
 
 LAZINESS="--lazy"
 # LAZINESS=""
-# WINDOW="--window=miniRC"
-# WINDOW="--window=short"
-# WINDOW="--window=extraShort"
-WINDOW="--window=XXS"
+
+# WINDOW="--window=XXS"
+WINDOW="--window=XS"
+
 # TRIALSELECTOR="--blockIdx=1"
 # TRIALSELECTOR="--blockIdx=3"
 TRIALSELECTOR="--processAll"
 
-# ANALYSISSELECTOR="--analysisName=emg"
-# ANALYSISSELECTOR="--analysisName=default"
-# ANALYSISSELECTOR="--analysisName=emgStretchTime"
 # ANALYSISSELECTOR="--analysisName=emgHiRes"
-# ANALYSISSELECTOR="--analysisName=emgLoRes"
-# ANALYSISSELECTOR="--analysisName=emg1msec"
-# ANALYSISSELECTOR="--analysisName=emg1msecSmooth"
-# ANALYSISSELECTOR="--analysisName=emg1msecNoLFPFilterSmoothEMG"
-ANALYSISSELECTOR="--analysisName=lfpFullRes"
+ANALYSISSELECTOR="--analysisName=emgLoRes"
+# ANALYSISSELECTOR="--analysisName=lfpFullRes"
 #
 # UNITSELECTOR="--unitQuery=all"
 # UNITSELECTOR="--unitQuery=isiemgraw"
 # UNITSELECTOR="--unitQuery=isiemgenv"
-UNITSELECTOR="--unitQuery=isispinal"
-# UNITSELECTOR="--unitQuery=isiemg"
+# UNITSELECTOR="--unitQuery=isispinal"
+UNITSELECTOR="--unitQuery=isiemg"
 # UNITSELECTOR="--unitQuery=isispinaloremg"
 
-# OUTPUTBLOCKNAME="--outputBlockName=emg_clean"
-# INPUTBLOCKNAME="--inputBlockName=emg"
-OUTPUTBLOCKNAME="--outputBlockName=lfp_clean"
-INPUTBLOCKNAME="--inputBlockName=lfp"
-ALIGNQUERY="--alignQuery=stimOn"
+OUTPUTBLOCKNAME="--outputBlockName=emg_clean"
+INPUTBLOCKNAME="--inputBlockName=emg"
+# OUTPUTBLOCKNAME="--outputBlockName=lfp_clean"
+# INPUTBLOCKNAME="--inputBlockName=lfp"
+# ALIGNQUERY="--alignQuery=stimOn"
 # ALIGNQUERY="--alignQuery=all"
 
-# CHANSELECTOR="--chanQuery=isiemg"
+CHANSELECTOR="--chanQuery=isiemg"
 # CHANSELECTOR="--chanQuery=isispinal"
 
 module load anaconda/3-5.2.0
@@ -70,15 +65,15 @@ conda activate
 source activate nda2
 python --version
 
-# python3 ./assembleExperimentData.py --exp=$EXP --blockIdx=4 --processAsigs --processRasters $ANALYSISSELECTOR 
+# python3 ./assembleExperimentData.py --exp=$EXP --blockIdx=3 --processAsigs --processRasters $ANALYSISSELECTOR 
 
-# CHANSELECTOR="--chanQuery=isispinal"
-# OUTPUTBLOCKNAME="--outputBlockName=lfp"
+# CHANSELECTOR="--chanQuery=isiemg"
+# OUTPUTBLOCKNAME="--outputBlockName=emg"
 # python3 ./calcAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ANALYSISSELECTOR --eventName=stimAlignTimes $CHANSELECTOR $OUTPUTBLOCKNAME --verbose  --alignFolderName=stim
 
-OUTPUTBLOCKNAME="--outputBlockName=lfp_clean"
-INPUTBLOCKNAME="--inputBlockName=lfp"
-python3 ./cleanISIData.py --exp=$EXP --alignFolderName=stim $OUTPUTBLOCKNAME $INPUTBLOCKNAME $TRIALSELECTOR $ANALYSISSELECTOR $UNITSELECTOR $WINDOW $ALIGNQUERY --saveResults --verbose --plotting
+# INPUTBLOCKNAME="--inputBlockName=emg"
+# OUTPUTBLOCKNAME="--outputBlockName=emg_clean"
+# python3 ./cleanISIData.py --exp=$EXP --alignFolderName=stim $OUTPUTBLOCKNAME $INPUTBLOCKNAME $TRIALSELECTOR $ANALYSISSELECTOR $UNITSELECTOR $WINDOW $ALIGNQUERY --saveResults --verbose --plotting
 
-# INPUTBLOCKNAME="--inputBlockName=emg_clean"
-# python3 ./calcTrialOutliers.py --exp=$EXP --alignFolderName=stim $INPUTBLOCKNAME $TRIALSELECTOR $ANALYSISSELECTOR $UNITSELECTOR $WINDOW $ALIGNQUERY --verbose --plotting --saveResults
+INPUTBLOCKNAME="--inputBlockName=emg_clean"
+python3 ./calcTrialOutliers.py --exp=$EXP --alignFolderName=stim $INPUTBLOCKNAME $TRIALSELECTOR $ANALYSISSELECTOR $UNITSELECTOR $WINDOW $ALIGNQUERY --verbose --plotting --saveResults
