@@ -21,10 +21,10 @@
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=1,2,3
+#SBATCH --array=1,2,3,4
 
 # EXP="exp201804271016"
-EXP="exp201805231100"
+# EXP="exp201805231100"
 # EXP="exp201805071032"
 # EXP="exp201901070700"
 # EXP="exp201901201200"
@@ -32,7 +32,7 @@ EXP="exp201805231100"
 # EXP="exp201901221000"
 # EXP="exp201901231000"
 # EXP="exp201901261000"
-# EXP="exp201901271000"
+EXP="exp201901271000"
 
 
 module load anaconda/3-5.2.0
@@ -41,12 +41,12 @@ conda activate
 source activate nda2
 python --version
 
-SLURM_ARRAY_TASK_ID=2
-python3 ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --makeTruncated
-# python3 ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --makeFull
-# python3 ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --makeTruncated --maskMotorEncoder
+# SLURM_ARRAY_TASK_ID=2
+# python3 -u ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --makeTruncated
+# python3 -u ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --makeFull
+# python3 -u ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --makeTruncated --maskMotorEncoder
 
 # once the synchronization has happened once
 # SLURM_ARRAY_TASK_ID=1
-# python3 ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --makeTruncated --maskMotorEncoder
-# python3 ./synchronizeINStoNSP.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP
+python3 -u ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --makeTruncated --maskMotorEncoder
+python3 -u ./synchronizeINStoNSP.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP

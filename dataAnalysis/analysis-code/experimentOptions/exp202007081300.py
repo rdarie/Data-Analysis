@@ -141,6 +141,12 @@ def getExpOpts():
             # 'RPeroneusLongusEmg#0',
             # 'RBicepsFemorisEmg#0',
             # 'RGastrocnemiusEmg#0'
+            'LThoracolumbarFasciaEmgEnv#0',
+            'LGracilisEmgEnv#0',
+            'LTensorFasciaeLataeEmgEnv#0',
+            'LPeroneusLongusEmgEnv#0',
+            'LBicepsFemorisEmgEnv#0',
+            'LGastrocnemiusEmgEnv#0'
             'RThoracolumbarFasciaEmgEnv#0',
             'RGracilisEmgEnv#0',
             'RTensorFasciaeLataeEmgEnv#0',

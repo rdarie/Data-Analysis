@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 # data is aligned to stim onset
 # cropEdgesTimes controls the size of the window that is loaded
 cropEdgesTimes = [-100e-3, 400e-3]
-inputPath = '/gpfs/scratch/rdarie/rdarie/Neural Recordings/202005011400-Peep/emgLoRes/stim/_emg_extraShort_export.h5'
+inputPath = '/gpfs/scratch/rdarie/rdarie/Neural Recordings/202006171300-Peep/emgLoRes/stim/_emg_XS_export.h5'
 with pd.HDFStore(inputPath, 'r') as store:
     # each trial has its own eesKey, get list of all
     allEESKeys = [

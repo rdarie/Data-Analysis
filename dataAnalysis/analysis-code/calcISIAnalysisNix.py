@@ -50,6 +50,16 @@ globals().update(expOpts)
 globals().update(allOpts)
 alignTimeBounds = alignTimeBoundsLookup[int(arguments['blockIdx'])]
 
+eventUnits = {
+    'nominalCurrent': pq.uA,
+    'RateInHz': pq.Hz,
+    'stimPeriod': pq.Hz,
+    'trainDur': pq.s,
+    'firstPW': pq.s,
+    # 'interPhase': pq.s,
+    'secondPW': pq.s,
+    'totalPW': pq.s
+    }
 def calcISIBlockAnalysisNix():
     arguments['chanNames'], arguments['chanQuery'] = ash.processChannelQueryArgs(
         namedQueries, scratchFolder, **arguments)
@@ -63,6 +73,150 @@ def calcISIBlockAnalysisNix():
     else:
         samplingRate = float(1 / rasterOpts['binInterval']) * pq.Hz
     #
+    # Start parsing autologger info
+    thisJsonPath = trialBasePath.replace('.nix', '_autoStimLog.json')
+    if os.path.exists(thisJsonPath):
+        #
+        def parseAutoStimLog(jsonPath):
+            with open(jsonPath, 'r') as f:
+                stimLog = json.load(f)
+            stimResLookup = {4: 10 * pq.uA, 5: 20 * pq.uA}
+            stimDict = {
+                't': [],
+                'elec': [],
+                # 'nominalWaveform': [],
+                'nominalCurrent': [],
+                'RateInHz': [],
+                'stimPeriod': [],
+                'trainDur': [],
+                'firstPW': [],
+                # 'interPhase': [],
+                'secondPW': [],
+                'totalPW': []
+                }
+            allNominalWaveforms = []
+            for idx, entry in enumerate(stimLog):
+                t = entry['t']
+                if 'stimCmd' in entry:
+                    allStimCmd = entry['stimCmd']
+                    if isinstance(allStimCmd, dict):
+                        # if only one electrode
+                        allStimCmd = [allStimCmd]
+                    for stimCmd in allStimCmd:
+                        # each stimCmd represents one electrode
+                        nominalWaveform = []
+                        lastAmplitude = 0
+                        totalLen = 0
+                        if 'stimRes' in stimCmd:
+                            ampQuanta = stimResLookup[stimCmd['stimRes']]
+                        else:
+                            ampQuanta = 20 * pq.uA
+                        for seqIdx, phase in enumerate(stimCmd['seq']):
+                            if phase['enable']:
+                                phAmp = (
+                                    ampQuanta * phase['ampl'] *
+                                    (-1) * ((-1) ** phase['pol'])
+                                    )
+                                phaseWaveform = [
+                                    phAmp
+                                    for i in range(31 * phase['length'])]
+                            else:
+                                phaseWaveform = [
+                                    0
+                                    for i in range(31 * phase['length'])]
+                            phaseWaveform[:phase['delay']] = [
+                                lastAmplitude for i in range(phase['delay'])]
+                            lastAmplitude = phaseWaveform[-1]
+                            nominalWaveform += phaseWaveform
+                            totalLen += phase['length']
+                            if seqIdx == 0:
+                                stimDict['firstPW'].append(
+                                    (phase['length'] / (3e4)) * pq.s)
+                            if seqIdx == 1:
+                                stimDict['secondPW'].append(
+                                    (phase['length'] / (3e4)) * pq.s)
+                        stimDict['t'].append(t)
+                        stimDict['totalPW'].append(
+                            (totalLen / (3e4)) * pq.s)
+                        stimDict['elec'].append(
+                            stimCmd['elec'] * pq.dimensionless)
+                        allNominalWaveforms.append(
+                            np.asarray(nominalWaveform))
+                        nominalIdxMax = np.argmax(
+                            np.abs(np.asarray(nominalWaveform)))
+                        stimDict['nominalCurrent'].append(
+                            nominalWaveform[nominalIdxMax])
+                        thisStimPeriod = (stimCmd['period'] / (3e4)) * pq.s
+                        stimDict['stimPeriod'].append(thisStimPeriod)
+                        stimDict['RateInHz'].append(
+                            thisStimPeriod ** (-1))
+                        stimDict['trainDur'].append(
+                            (stimCmd['repeats'] - 1) * thisStimPeriod)
+                else:
+                    stimStr = entry['stimString']
+                    stimStrDictRaw = {}
+                    for stimSubStr in stimStr.split(';'):
+                        if len(stimSubStr):
+                            splitStr = stimSubStr.split('=')
+                            stimStrDictRaw[splitStr[0]] = splitStr[1]
+                    stimStrDict = {}
+                    for key, val in stimStrDictRaw.items():
+                        stimStrDict[key] = [
+                            float(st)
+                            for st in val.split(',')
+                            if len(st)]
+                    stimStrDF = pd.DataFrame(stimStrDict)
+                    stimStrDF['Elect'] = stimStrDF['Elect'].astype(np.int)
+                    stimStrDF.loc[stimStrDF['PL'] == 1, 'Amp'] = (
+                        stimStrDF.loc[stimStrDF['PL'] == 1, 'Amp'] * (-1))
+                    for rIdx, row in stimStrDF.iterrows():
+                        stimDict['t'].append(t)
+                        stimDict['firstPW'].append(
+                            row['Dur'] * 1e-3 * pq.s)
+                        stimDict['secondPW'].append(
+                            row['Dur'] * 1e-3 * pq.s)
+                        # stimDict['interPhase'].append(
+                        #     2 * ((3e4) ** -1) * pq.s)  # per page 16 of xippmex manual
+                        stimDict['totalPW'].append(
+                            2 * (row['Dur'] * 1e-3 + ((3e4) ** -1)) * pq.s)
+                        stimDict['nominalCurrent'].append(
+                            row['Amp'] * ampQuanta)
+                        stimDict['RateInHz'].append(row['Freq'] * pq.Hz)
+                        stimDict['stimPeriod'].append(row['Freq'] ** -1)
+                        stimDict['trainDur'].append(row['TL'] * 1e-3 * pq.s)
+                        stimDict['elec'].append(
+                            row['Elect'] * pq.dimensionless)
+            stimDict['labels'] = np.asarray([
+                'stim update {}'.format(i)
+                for i in range(len(stimDict['elec']))])
+            # (np.asarray(stimDict['t'])/3e4 <= 1).any()
+            rawStimEventTimes = np.asarray(stimDict.pop('t')) / (30000) * pq.s
+            # rawStimEventTimes = rawStimEventTimes - rawStimEventTimes[0] + activeTimes.min() * pq.s
+            # rawStimEventTimes = rawStimEventTimes.magnitude * rawStimEventTimes.units.simplified
+            stimEvents = Event(
+                name='seg0_stimEvents',
+                times=rawStimEventTimes,
+                labels=stimDict.pop('labels'))
+            stimEvents.annotations['arrayAnnNames'] = [
+                k
+                for k in stimDict.keys()]
+            stimEvents.annotations['nix_name'] = stimEvents.name
+            #
+            for k in stimEvents.annotations['arrayAnnNames']:
+                stimEvents.array_annotations[k] = stimDict[k]
+                stimEvents.annotations[k] = stimDict.pop(k)
+            return stimEvents
+        #
+        stimEvents = parseAutoStimLog(thisJsonPath)
+        rawStimEventsDF = pd.DataFrame(stimEvents.array_annotations)
+        rawStimEventsDF['t'] = stimEvents.times
+        rawStimEventsDF.to_csv(os.path.join(
+            analysisSubFolder, ns5FileName + '_unsynched_stim_updates.csv'
+            ))
+        # pdb.set_trace()
+    else:
+        stimEvents = None
+
     if not os.path.exists(trialBasePath):
         trialProcessedPath = os.path.join(
             processedFolder, ns5FileName + '.nix')
@@ -247,6 +401,7 @@ def calcISIBlockAnalysisNix():
                         [
                             st.waveforms, np.zeros_like(st.waveforms)],
                         axis=-1) * st.waveforms.units
+    #
     if len(allSpikeTrains):
         spikeMatBlock = ns5.calcBinarizedArray(
             deepcopy(spikesBlock), samplingRate,
@@ -271,125 +426,9 @@ def calcISIBlockAnalysisNix():
     else:
         electrodeToProgramLookup = {}
         latestProgram = 0
-    # Start parsing autologger info
-    jsonPath = trialBasePath.replace('.nix', '_autoStimLog.json')
-    if os.path.exists(jsonPath):
-        with open(jsonPath, 'r') as f:
-            stimLog = json.load(f)
-        stimResLookup = {4: 10 * pq.uA, 5: 20 * pq.uA}
-        stimDict = {
-            't': [],
-            'elec': [],
-            # 'nominalWaveform': [],
-            'nominalCurrent': [],
-            'RateInHz': [],
-            'stimPeriod': [],
-            'trainDur': [],
-            'firstPW': [],
-            'interPhase': [],
-            'secondPW': [],
-            'totalPW': []
-            }
-        eventUnits = {
-            'nominalCurrent': pq.uA,
-            'RateInHz': pq.Hz,
-            'stimPeriod': pq.Hz,
-            'trainDur': pq.s,
-            'firstPW': pq.s,
-            'interPhase': pq.s,
-            'secondPW': pq.s,
-            'totalPW': pq.s
-            }
-        allNominalWaveforms = []
-        for idx, entry in enumerate(stimLog):
-            t = entry['t']
-            if 'stimCmd' in entry:
-                allStimCmd = entry['stimCmd']
-                if isinstance(allStimCmd, dict):
-                    # if only one electrode
-                    allStimCmd = [allStimCmd]
-                for stimCmd in allStimCmd:
-                    # each stimCmd represents one electrode
-                    nominalWaveform = []
-                    lastAmplitude = 0
-                    totalLen = 0
-                    if 'stimRes' in stimCmd:
-                        ampQuanta = stimResLookup[stimCmd['stimRes']]
-                    else:
-                        ampQuanta = 20 * pq.uA
-                    for phase in stimCmd['seq']:
-                        if phase['enable']:
-                            phAmp = ampQuanta * phase['ampl'] * (-1) * ((-1) ** phase['pol'])
-                            phaseWaveform = [phAmp for i in range(31 * phase['length'])]
-                        else:
-                            phaseWaveform = [0 for i in range(31 * phase['length'])]
-                        phaseWaveform[:phase['delay']] = [lastAmplitude for i in range(phase['delay'])]
-                        lastAmplitude = phaseWaveform[-1]
-                        nominalWaveform += phaseWaveform
-                        totalLen += phase['length']
-                    stimDict['t'].append(t)
-                    stimDict['firstPW'].append(
-                        (stimCmd['seq'][0]['length'] / (3e4)) * pq.s)
-                    stimDict['interPhase'].append(
-                        (stimCmd['seq'][1]['length'] / (3e4)) * pq.s)
-                    stimDict['secondPW'].append(
-                        (stimCmd['seq'][2]['length'] / (3e4)) * pq.s)
-                    stimDict['totalPW'].append((totalLen / (3e4)) * pq.s)
-                    stimDict['elec'].append(stimCmd['elec'] * pq.dimensionless)
-                    allNominalWaveforms.append(np.asarray(nominalWaveform))
-                    nominalIdxMax = np.argmax(np.abs(np.asarray(nominalWaveform)))
-                    stimDict['nominalCurrent'].append(nominalWaveform[nominalIdxMax])
-                    thisStimPeriod = ((stimCmd['period'] / (3e4)) * pq.s)
-                    stimDict['stimPeriod'].append(thisStimPeriod)
-                    #  
-                    # stimDict['RateInHz'].append(np.round(thisStimPeriod ** (-1), decimals=1))
-                    stimDict['RateInHz'].append(thisStimPeriod ** (-1))
-                    stimDict['trainDur'].append((stimCmd['repeats'] - 1) * thisStimPeriod)
-            else:
-                stimStr = entry['stimString']
-                stimStrDictRaw = {}
-                for stimSubStr in stimStr.split(';'):
-                    if len(stimSubStr):
-                        splitStr = stimSubStr.split('=')
-                        stimStrDictRaw[splitStr[0]] = splitStr[1]
-                stimStrDict = {}
-                for key, val in stimStrDictRaw.items():
-                    stimStrDict[key] = [float(st) for st in val.split(',') if len(st)]
-                stimStrDF = pd.DataFrame(stimStrDict)
-                stimStrDF['Elect'] = stimStrDF['Elect'].astype(np.int)
-                stimStrDF.loc[stimStrDF['PL'] == 1, 'Amp'] = stimStrDF.loc[stimStrDF['PL'] == 1, 'Amp'] * (-1)
-                for rIdx, row in stimStrDF.iterrows():
-                    stimDict['t'].append(t)
-                    stimDict['firstPW'].append(row['Dur'] * 1e-3 * pq.s)
-                    stimDict['secondPW'].append(row['Dur'] * 1e-3 * pq.s)
-                    stimDict['interPhase'].append(2 * ((3e4) ** -1) * pq.s)  # per page 16 of xippmex manual
-                    stimDict['totalPW'].append(2 * (row['Dur'] * 1e-3 + ((3e4) ** -1)) * pq.s)
-                    stimDict['nominalCurrent'].append(row['Amp'] * ampQuanta)
-                    stimDict['RateInHz'].append(row['Freq'] * pq.Hz)
-                    stimDict['stimPeriod'].append(row['Freq'] ** -1)
-                    stimDict['trainDur'].append(row['TL'] * 1e-3 * pq.s)
-                    stimDict['elec'].append(row['Elect'] * pq.dimensionless)
-        stimDict['labels'] = np.asarray([
-            'stim update {}'.format(i)
-            for i in range(len(stimDict['elec']))])
-        # (np.asarray(stimDict['t'])/3e4 <= 1).any()
-        rawStimEventTimes = np.asarray(stimDict.pop('t')) / (30000) * pq.s
-        # rawStimEventTimes = rawStimEventTimes - rawStimEventTimes[0] + activeTimes.min() * pq.s
-        # rawStimEventTimes = rawStimEventTimes.magnitude * rawStimEventTimes.units.simplified
-        stimEvents = Event(
-            name='seg0_stimEvents',
-            times=rawStimEventTimes,
-            labels=stimDict.pop('labels'))
-        stimEvents.annotations['arrayAnnNames'] = [k for k in stimDict.keys()]
-        stimEvents.annotations['nix_name'] = stimEvents.name
-        spikesBlock.segments[0].events.append(stimEvents)
+    if stimEvents is not None:
         stimEvents.segment = spikesBlock.segments[0]
-        #
-        for k in stimEvents.annotations['arrayAnnNames']:
-            stimEvents.array_annotations[k] = stimDict[k]
-            stimEvents.annotations[k] = stimDict.pop(k)
-    else:
-        stimEvents = None
+        spikesBlock.segments[0].events.append(stimEvents)
     # stimEvents.annotations['nominalWaveforms'] = np.vstack(allNominalWaveforms)
     if len(allStimTrains):
         for segIdx, dataSeg in enumerate(spikesBlock.segments):
@@ -542,10 +581,10 @@ def calcISIBlockAnalysisNix():
                     st.array_annotations['secondPW'] = secPws
                     st.annotations['arrayAnnNames'].append('secondPW')
                     #
-                    interPhases = 2 * amplitudes ** 0 * st.sampling_period
-                    st.annotations['interPhase'] = interPhases
-                    st.array_annotations['interPhase'] = interPhases
-                    st.annotations['arrayAnnNames'].append('interPhase')
+                    # interPhases = 2 * amplitudes ** 0 * st.sampling_period
+                    # st.annotations['interPhase'] = interPhases
+                    # st.array_annotations['interPhase'] = interPhases
+                    # st.annotations['arrayAnnNames'].append('interPhase')
                     #
                     totalPws = pws + secPws
                     st.annotations['totalPW'] = totalPws
@@ -588,7 +627,8 @@ def calcISIBlockAnalysisNix():
                 startCategories = startCategories.reindex(columns=[
                     # 'amplitude',
                     'nominalCurrent', 'program',
-                    'activeGroup', 'firstPW', 'secondPW', 'interPhase',
+                    'activeGroup', 'firstPW', 'secondPW',
+                    # 'interPhase',
                     'totalPW', 'electrode',
                     'RateInHz', 'stimPeriod', 'trainDur', 't'])
                 #
@@ -665,9 +705,9 @@ def calcISIBlockAnalysisNix():
                                 startCategories.loc[
                                     idx, 'firstPW'] = np.round(np.mean(
                                         st.annotations['firstPW'][theseTimesMask]), decimals=9)
-                                startCategories.loc[
-                                    idx, 'interPhase'] = np.round(np.mean(
-                                        st.annotations['interPhase'][theseTimesMask]), decimals=9)
+                                # startCategories.loc[
+                                #     idx, 'interPhase'] = np.round(np.mean(
+                                #         st.annotations['interPhase'][theseTimesMask]), decimals=9)
                                 startCategories.loc[
                                     idx, 'totalPW'] = np.round(np.mean(
                                         st.annotations['totalPW'][theseTimesMask]), decimals=9)
@@ -710,7 +750,7 @@ def calcISIBlockAnalysisNix():
                     activeTimes[trainEndIdx].to_numpy() +
                     (
                         stopCategories['firstPW'] +
-                        stopCategories['interPhase'] +
+                        # stopCategories['interPhase'] +
                         stopCategories['secondPW']
                     ).to_numpy() * 1e-6)
                 # maxAmp = startCategories['amplitude'].max()
@@ -933,11 +973,15 @@ def calcISIBlockAnalysisNix():
         analysisProcessedSubFolder = os.path.join(
             processedFolder, arguments['analysisName']
             )
-        if not os.path.exists(processedFolder):
-            os.makedirs(processedFolder, exist_ok=True)
+        if not os.path.exists(analysisProcessedSubFolder):
+            os.makedirs(analysisProcessedSubFolder, exist_ok=True)
         processedOutPath = os.path.join(
-            processedFolder, ns5FileName + '_analyze.nix')
+            analysisProcessedSubFolder, ns5FileName + '_analyze.nix')
         shutil.copyfile(outPathName, processedOutPath)
+        outPathNameBin = outPathName.replace('_analyze.nix', '_binarize.nix')
+        processedOutPathBin = os.path.join(
+            analysisProcessedSubFolder, ns5FileName + '_binarize.nix')
+        shutil.copyfile(outPathNameBin, processedOutPathBin)
     # ns5.addBlockToNIX(
     #     tdBlockInterp, neoSegIdx=[0],
     #     writeSpikes=False, writeEvents=False,

@@ -6,15 +6,15 @@
 # Default resources are 1 core with 2.8GB of memory.
 
 # Request memory:
-#SBATCH --nodes=1
+#SBATCH --nodes=6
 #SBATCH --mem=127G
 
 # Specify a job name:
-#SBATCH -J alignStim_20200702
+#SBATCH -J alignStim_20200701
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-alignStim_20200702.stdout
-#SBATCH -e ../../batch_logs/%j-alignStim_20200702.errout
+#SBATCH -o ../../batch_logs/%j-alignStim_20200701.stdout
+#SBATCH -e ../../batch_logs/%j-alignStim_20200701.errout
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -69,8 +69,13 @@ conda activate
 source activate nda2
 python --version
 
-python3 -u ./assembleExperimentData.py --exp=$EXP --blockIdx=3 --processAsigs --processRasters $ANALYSISSELECTOR 
+INPUTBLOCKNAME="--inputBlockName=emg"
+OUTPUTBLOCKNAME="--outputBlockName=emg_clean"
+python3 -u ./cleanISIData.py --exp=$EXP --alignFolderName=stim $OUTPUTBLOCKNAME $INPUTBLOCKNAME $TRIALSELECTOR $ANALYSISSELECTOR $UNITSELECTOR $WINDOW $ALIGNQUERY --saveResults --verbose --plotting
 
-CHANSELECTOR="--chanQuery=isiemg"
-OUTPUTBLOCKNAME="--outputBlockName=emg"
-python3 -u ./calcAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ANALYSISSELECTOR --eventName=stimAlignTimes $CHANSELECTOR $OUTPUTBLOCKNAME --verbose  --alignFolderName=stim
+INPUTBLOCKNAME="--inputBlockName=emg_clean"
+python3 -u ./calcTrialOutliers.py --exp=$EXP --alignFolderName=stim $INPUTBLOCKNAME $TRIALSELECTOR $ANALYSISSELECTOR $UNITSELECTOR $WINDOW $ALIGNQUERY --verbose --plotting --saveResults
+
+INPUTBLOCKNAME="--inputBlockName=emg_clean"
+UNITSELECTOR="--unitQuery=isiemgenv"
+python -u "./calcTargetNoiseCeiling.py" --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR --alignFolderName=stim --inputBlockName=$INPUTBLOCKNAME $UNITSELECTOR --maskOutlierBlocks --alignQuery="stimOn" --plotting

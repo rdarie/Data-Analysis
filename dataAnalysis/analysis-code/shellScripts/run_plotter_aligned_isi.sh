@@ -26,7 +26,9 @@
 # EXP="exp202004301200"
 # EXP="exp202005011400"
 # EXP="exp202003201200"
-EXP="exp202006171300"
+# EXP="exp202006171300"
+# EXP="exp202007011300"
+EXP="exp202007021300"
 #
 # SELECTOR="Block005_minfrmaxcorr"
 SELECTOR="_minfrmaxcorr"
@@ -47,9 +49,9 @@ ANALYSISSELECTOR="--analysisName=emgLoRes"
 # UNITSELECTOR="--unitQuery=isispinal"
 UNITSELECTOR="--unitQuery=isiemg"
 
-# BLOCKSELECTOR="--inputBlockName=emg"
+BLOCKSELECTOR="--inputBlockName=emg"
 # BLOCKSELECTOR="--inputBlockName=lfp"
-BLOCKSELECTOR="--inputBlockName=emg_clean"
+# BLOCKSELECTOR="--inputBlockName=emg_clean"
 # BLOCKSELECTOR="--inputBlockName=lfp_clean"
 
 module load anaconda/3-5.2.0
@@ -60,7 +62,7 @@ source activate nda2
 python --version
 # --maskOutlierBlocks --invertOutlierBlocks --individualTraces
 
-python3 './plotRippleStimSpikeReport.py' --exp=$EXP $TRIALSELECTOR $WINDOW $UNITSELECTOR $ANALYSISSELECTOR --alignQuery="stimOn" --alignFolderName=stim $BLOCKSELECTOR --groupPagesBy="electrode, RateInHz"
-# python3 './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR $BLOCKSELECTOR $UNITSELECTOR --alignQuery="stimOn" --rowName="electrode" --rowControl= --colName="RateInHz" --colControl= --hueName="nominalCurrent" --alignFolderName=stim --enableOverrides
+python3 -u './plotRippleStimSpikeReport.py' --exp=$EXP $TRIALSELECTOR $WINDOW $UNITSELECTOR $ANALYSISSELECTOR --alignQuery="stimOn" --alignFolderName=stim $BLOCKSELECTOR --groupPagesBy="electrode, RateInHz"
+python3 -u './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR $BLOCKSELECTOR $UNITSELECTOR --alignQuery="stimOn" --rowName="electrode" --rowControl= --colName="RateInHz" --colControl= --hueName="nominalCurrent" --alignFolderName=stim --enableOverrides
 # stim spikes
-# python3 './plotRippleStimSpikeReport.py' --exp=$EXP $TRIALSELECTOR $ANALYSISSELECTOR $UNITSELECTOR
+python3 -u './plotRippleStimSpikeReport.py' --exp=$EXP $TRIALSELECTOR $ANALYSISSELECTOR $UNITSELECTOR

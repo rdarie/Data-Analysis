@@ -5,7 +5,7 @@ def getExpOpts():
         2: 'isi',
         3: 'isi',
         }
-    experimentName = '202006171300-Peep'
+    experimentName = '202007021300-Peep'
     deviceName = None
     rippleMapFile = {
         1: 'isi_nano1caudal_xAyBzC_ortho_nano2rostral_xAyBzC_ortho.map',
@@ -42,23 +42,23 @@ def getExpOpts():
         3: [],
         }
     synchInfo = {'delsys': {}, 'nsp': {}, 'ins': {}}
-    synchInfo['delsys'][1] = {'timeRanges': [56, 2756], 'chooseCrossings': slice(None)}  #########
-    synchInfo['delsys'][2] = {'timeRanges': [4, 3599.7], 'chooseCrossings': slice(None)}
-    synchInfo['delsys'][3] = {'timeRanges': [6, 592], 'chooseCrossings': slice(None)}
+    synchInfo['delsys'][1] = {'timeRanges': [11.2, 2508.7], 'chooseCrossings': slice(None)}  #########
+    synchInfo['delsys'][2] = {'timeRanges': [10.5, 2676], 'chooseCrossings': slice(None)}
+    synchInfo['delsys'][3] = {'timeRanges': [5, 2499], 'chooseCrossings': slice(None)}
     #
-    synchInfo['nsp'][1] = {'timeRanges': [53, 2752], 'chooseCrossings': slice(None)}
-    synchInfo['nsp'][2] = {'timeRanges': [11, 3606.7], 'chooseCrossings': slice(None)}
-    synchInfo['nsp'][3] = {'timeRanges': [14, 600], 'chooseCrossings': slice(None)}
+    synchInfo['nsp'][1] = {'timeRanges': [3.5, 2501], 'chooseCrossings': slice(None)}
+    synchInfo['nsp'][2] = {'timeRanges': [3, 2669], 'chooseCrossings': slice(None)}
+    synchInfo['nsp'][3] = {'timeRanges': [5, 2499], 'chooseCrossings': slice(None)}
     # For emg analysis - emg missing for some time ranges
     alignTimeBoundsLookup = {
         1: [
-            [53, 2752]
+            [3.5, 2501]
             ],
         2: [
-            [11, 3606.7]
+            [3, 2669]
             ],
         3: [
-            [14, 600]
+            [5, 2499]
             ]
         }
     #  if not possible to use taps, override with good taps from another segment
@@ -86,7 +86,7 @@ def getExpOpts():
     triDestinations = []
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        '202006171300-Peep': [1, 2, 3],
+        '202007021300-Peep': [1, 2, 3],
         }
     assembledSegmentToBlockLookup = {
         i - 1: i for i in [1, 2, 3]

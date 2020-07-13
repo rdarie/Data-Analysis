@@ -81,7 +81,7 @@ nspSrs = pd.Series(nspSyncAsig.magnitude[nspTimeMask].flatten())
 nspLims = nspSrs.quantile([1e-3, 1-1e-3]).to_list()
 nspDiffUncertainty = nspSrs.diff().abs().quantile(1-1e-3) / 4
 nspThresh = (nspLims[-1] - nspLims[0]) / 2
-
+# pdb.set_trace()
 oePeakIdx, oeCrossMask = hf.getThresholdCrossings(
     oeSrs, thresh=oeThresh,
     iti=interTriggerInterval, fs=float(oeSyncAsig.sampling_rate),
@@ -175,7 +175,7 @@ if len(listDiscontinuities):
                 'inStart': np.max(oeTimes[oeDiscRound == roundIdx-1].magnitude),
                 'inStop': np.max(oeTimes[oeDiscRound == roundIdx].magnitude),
                 'tInterpFun': thisInterpFun}
-    
+    #
     def timeInterpFun(inputT):
         outputT = np.zeros_like(inputT)
         for k in sorted(pwSyncDict.keys()):
@@ -184,7 +184,6 @@ if len(listDiscontinuities):
                 (inputT < pwSyncDict[k]['inStop']))
             outputT[inTimeMask] = pwSyncDict[k]['tInterpFun'](
                 inputT[inTimeMask])
-        
         plotting = False
         if plotting:
             import matplotlib.pyplot as plt

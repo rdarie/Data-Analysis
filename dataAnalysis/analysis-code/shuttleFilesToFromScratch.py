@@ -123,6 +123,8 @@ if arguments['alignFolderFromScratchToData']:
         destinationFolder = os.path.join(
             processedFolder, arguments['alignFolderName']
             )
+        if not os.path.exists(destinationFolder):
+            os.makedirs(destinationFolder, exist_ok=True)
         copy_tree(alignSubFolder, destinationFolder)
     else:
         print('{} does not exist!!'.format(analysisSubFolder))

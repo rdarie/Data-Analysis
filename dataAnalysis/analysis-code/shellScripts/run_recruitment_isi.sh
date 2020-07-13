@@ -17,19 +17,25 @@
 #SBATCH -e ../../batch_logs/%j-plotsStim.errout
 
 # Specify account details
-#SBATCH --account=bibs-dborton-condo
+#SBATCH --account=carney-dborton-condo
 
 # EXP="exp202003201200"
 # EXP="exp202003191400"
 # EXP="exp202004271200"
 # EXP="exp202004301200"
-EXP="exp202005011400"
+# EXP="exp202005011400"
 # EXP="exp202003181300"
+# EXP="exp202006171300"
+# EXP="exp202007011300"
+EXP="exp202007021300"
+
 # SELECTOR="Block005_minfrmaxcorr"
 SELECTOR="_minfrmaxcorr"
+
 # WINDOW="--window=miniRC"
-WINDOW="--window=extraShort"
+WINDOW="--window=XS"
 # WINDOW="--window=short"
+
 TRIALSELECTOR="--processAll"
 # TRIALSELECTOR="--blockIdx=2"
 # TRIALSELECTOR="--blockIdx=3"
@@ -43,6 +49,8 @@ UNITSELECTOR="--unitQuery=isiemgenv"
 # UNITSELECTOR="--unitQuery=isispinal"
 # UNITSELECTOR="--unitQuery=isispinaloremg"
 
+INPUTBLOCKNAME="--inputBlockName=emg"
+# INPUTBLOCKNAME="--inputBlockName=emg_clean"
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
 conda activate
@@ -50,5 +58,5 @@ conda activate
 source activate nda2
 python --version
 
-# python "./calcRecruitment.py" --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR --alignFolderName=stim --inputBlockName="emg" $UNITSELECTOR --alignQuery="stimOn"
-python "./plotRecruitment.py" --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR --alignFolderName=stim --inputBlockName="emg" $UNITSELECTOR --alignQuery="stimOn" --maskOutlierBlocks
+python -u "./calcRecruitment.py" --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --alignQuery="stimOn"
+python -u "./plotRecruitment.py" --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --alignQuery="stimOn"

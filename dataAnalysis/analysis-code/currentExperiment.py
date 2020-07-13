@@ -310,12 +310,12 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
     if not os.path.exists(figureFolder):
         os.makedirs(figureFolder, exist_ok=True)
     #
-    alignedRastersFolder = os.path.join(figureFolder, 'alignedRasters')
-    if not os.path.exists(alignedRastersFolder):
-        os.makedirs(alignedRastersFolder, exist_ok=True)
-    alignedFeaturesFolder = os.path.join(figureFolder, 'alignedFeatures')
-    if not os.path.exists(alignedFeaturesFolder):
-        os.makedirs(alignedFeaturesFolder, exist_ok=True)
+    # alignedRastersFolder = os.path.join(figureFolder, 'alignedRasters')
+    # if not os.path.exists(alignedRastersFolder):
+    #     os.makedirs(alignedRastersFolder, exist_ok=True)
+    # alignedFeaturesFolder = os.path.join(figureFolder, 'alignedFeatures')
+    # if not os.path.exists(alignedFeaturesFolder):
+    #     os.makedirs(alignedFeaturesFolder, exist_ok=True)
     spikeSortingFiguresFolder = os.path.join(figureFolder, 'spikeSorting')
     if not os.path.exists(spikeSortingFiguresFolder):
         os.makedirs(spikeSortingFiguresFolder, exist_ok=True)
@@ -329,8 +329,8 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
         electrodeColumn='electrode',
         removeFuzzyName=False)
     alignedAsigsKWargs.update(dict(
-        windowSize=(-750e-3, 750e-3),
-        decimate=5))
+        windowSize=(-100e-3, 400e-3),
+        decimate=2))
     # alignedAsigsKWargs.update(dict(
     #     windowSize=(-250e-6, 2750e-6),
     #     decimate=1))
@@ -365,8 +365,8 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
     #     'elec75#0', 'elec75#1', 'elec83#0', 'elec78#0', 'elec78#1']
     alignedAsigsChunkSize = 150000
     rasterOpts = {
-        'binInterval': 2e-4, 'binWidth': 10e-3, 'smoothKernelWidth': 10e-3,  # 5 kHz, EMG Lo-Res
-        # 'binInterval': 1e-3, 'binWidth': 10e-3, 'smoothKernelWidth': 10e-3,  # default, 1 kHz spikes
+        # 'binInterval': 2e-4, 'binWidth': 10e-3, 'smoothKernelWidth': 10e-3,  # 5 kHz, EMG Lo-Res
+        'binInterval': 1e-3, 'binWidth': 10e-3, 'smoothKernelWidth': 10e-3,  # default, 1 kHz spikes
         # 'binInterval': 0.2e-3, 'binWidth': 5e-3, 'smoothKernelWidth': 10e-3,
         # 'binInterval': (3e4) ** (-1), 'binWidth': 5e-3, 'smoothKernelWidth': 10e-3,  # 30 kHz, Full-Res
         # 'binInterval': 1e-4, 'binWidth': 5e-3, 'smoothKernelWidth': 10e-3,  # 10 kHz, EMG Hi-Res

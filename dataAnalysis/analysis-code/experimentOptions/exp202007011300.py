@@ -4,13 +4,15 @@ def getExpOpts():
         1: 'isi',
         2: 'isi',
         3: 'isi',
+        4: 'isi',
         }
-    experimentName = '202006171300-Peep'
+    experimentName = '202007011300-Peep'
     deviceName = None
     rippleMapFile = {
         1: 'isi_nano1caudal_xAyBzC_ortho_nano2rostral_xAyBzC_ortho.map',
         2: 'isi_nano1caudal_xAyBzC_ortho_nano2rostral_xAyBzC_ortho.map',
         3: 'isi_nano1caudal_xAyBzC_ortho_nano2rostral_xAyBzC_ortho.map',
+        4: 'isi_nano1caudal_xAyBzC_ortho_nano2rostral_xAyBzC_ortho.map',
         }
     # use "original" file in edge cases where the ns5 file was saved incorrectly
     # with the wrong map. Original is the incorrect, old one, above is the corrected one.
@@ -18,12 +20,14 @@ def getExpOpts():
         1: None,
         2: None,
         3: None,
+        4: None,
         }
     #
     rippleFastSettleTriggers = {
-        1: {'stim': 'same'},
-        2: {'stim': 'same'},
-        3: {'stim': 'same'},
+        1: {'stim': 'none'},
+        2: {'stim': 'none'},
+        3: {'stim': 'none'},
+        4: {'stim': 'none'},
     }
     # exclude dummy electrodes 8 and 16
     asigNameList = [
@@ -40,25 +44,31 @@ def getExpOpts():
         1: [],
         2: [],
         3: [],
+        4: [],
         }
     synchInfo = {'delsys': {}, 'nsp': {}, 'ins': {}}
-    synchInfo['delsys'][1] = {'timeRanges': [56, 2756], 'chooseCrossings': slice(None)}  #########
-    synchInfo['delsys'][2] = {'timeRanges': [4, 3599.7], 'chooseCrossings': slice(None)}
-    synchInfo['delsys'][3] = {'timeRanges': [6, 592], 'chooseCrossings': slice(None)}
+    synchInfo['delsys'][1] = {'timeRanges': [82, 2369.5], 'chooseCrossings': slice(None)}  #########
+    synchInfo['delsys'][2] = {'timeRanges': [18.7, 357.7], 'chooseCrossings': slice(None)}
+    synchInfo['delsys'][3] = {'timeRanges': [7, 538], 'chooseCrossings': slice(None)}
+    synchInfo['delsys'][4] = {'timeRanges': [45, 3567], 'chooseCrossings': slice(None)}
     #
-    synchInfo['nsp'][1] = {'timeRanges': [53, 2752], 'chooseCrossings': slice(None)}
-    synchInfo['nsp'][2] = {'timeRanges': [11, 3606.7], 'chooseCrossings': slice(None)}
-    synchInfo['nsp'][3] = {'timeRanges': [14, 600], 'chooseCrossings': slice(None)}
+    synchInfo['nsp'][1] = {'timeRanges': [4, 2291.5], 'chooseCrossings': slice(None)}
+    synchInfo['nsp'][2] = {'timeRanges': [2.1, 341.1], 'chooseCrossings': slice(None)}
+    synchInfo['nsp'][3] = {'timeRanges': [4, 540], 'chooseCrossings': slice(None)}
+    synchInfo['nsp'][4] = {'timeRanges': [44, 3573], 'chooseCrossings': slice(None)}
     # For emg analysis - emg missing for some time ranges
     alignTimeBoundsLookup = {
         1: [
-            [53, 2752]
+            [3, 2290.5]
             ],
         2: [
-            [11, 3606.7]
+            [2.1, 341.1]
             ],
         3: [
-            [14, 600]
+            [4, 540]
+            ],
+        4: [
+            [44, 3573]
             ]
         }
     #  if not possible to use taps, override with good taps from another segment
@@ -67,7 +77,8 @@ def getExpOpts():
         #  each key is a block
         1: {},
         2: {},
-        3: {}
+        3: {},
+        4: {}
         }
     # options for stim artifact detection
     detectStim = False
@@ -86,10 +97,10 @@ def getExpOpts():
     triDestinations = []
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        '202006171300-Peep': [1, 2, 3],
+        '202007011300-Peep': [1, 2, 3, 4],
         }
     assembledSegmentToBlockLookup = {
-        i - 1: i for i in [1, 2, 3]
+        i - 1: i for i in [1, 2, 3, 4]
         }
     movementSizeBins = [0, 0.25, 0.5, 1, 1.25, 1.5]
     rowColOverrides = {
@@ -152,7 +163,7 @@ def getExpOpts():
             # 'LSemitendinosus', 'RSemitendinosus',
             ],
         'keepElectrodes': None,
-        'significantOnly': False,
+        'significantOnly': True,
         }
     EMGStyleMarkers = {
         'LThoracolumbarFasciaEmgEnv#0': 'o',

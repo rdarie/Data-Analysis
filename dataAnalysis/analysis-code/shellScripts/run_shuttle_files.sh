@@ -29,7 +29,15 @@
 # EXP="exp201901231000"
 # EXP="exp201901261000"
 # EXP="exp201901271000"
-EXP="exp202006171300"
+# EXP="exp202006171300"
+# EXP="exp202007011300"
+# EXP="exp202007021300"
+# EXP="exp202007071300"
+EXP="exp202007081300"
+
+# ANALYSISSELECTOR="--analysisName=emgHiRes"
+ANALYSISSELECTOR="--analysisName=emgLoRes"
+# ANALYSISSELECTOR="--analysisName=lfpFullRes"
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
@@ -39,4 +47,4 @@ source activate nda2
 python --version
 
 SLURM_ARRAY_TASK_ID=1
-python './shuttleFilesToFromScratch.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --purgePreprocFolder
+python './shuttleFilesToFromScratch.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP $ANALYSISSELECTOR --analysisFolderFromScratchToData --preprocFolderFilesFromScratchToData

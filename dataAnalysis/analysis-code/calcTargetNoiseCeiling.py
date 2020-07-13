@@ -30,6 +30,7 @@ from tqdm import tqdm
 import pdb
 import os
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
+import dataAnalysis.plotting.aligned_signal_plots as asp
 import dataAnalysis.preproc.ns5 as preproc
 import numpy as np
 import pandas as pd
@@ -41,6 +42,8 @@ from currentExperiment import parseAnalysisOptions
 from namedQueries import namedQueries
 import seaborn as sns
 from math import factorial
+
+#
 sns.set()
 sns.set_color_codes("dark")
 sns.set_context("notebook")
@@ -77,7 +80,7 @@ resultPath = os.path.join(
     calcSubFolder,
     prefix + '_{}_{}_calc.h5'.format(
         arguments['inputBlockName'], arguments['window']))
-#
+# e.g. resultPath = '/gpfs/scratch/rdarie/rdarie/Neural Recordings/202006171300-Peep/emgLoRes/stim/_emg_XS.nix'
 alignedAsigsKWargs.update(dict(
     duplicateControlsByProgram=False,
     makeControlProgram=False,
@@ -170,9 +173,10 @@ def noiseCeil(
 
 if __name__ == "__main__":
     testVar = None
-    groupBy = [
-        'feature', 'electrode',
+    conditionNames = [
+        'electrode',
         'RateInHz', 'nominalCurrent']
+    groupBy = ['feature'] + conditionNames
     # resultMeta = {
     #     'noiseCeil': np.float,
     #     'noiseCeilStd': np.float,
@@ -182,13 +186,17 @@ if __name__ == "__main__":
     #     'mseStd': np.float
     #     }
     resultMeta = None
-    recalc = True
+    recalc = False
     if recalc:
         print('loading {}'.format(triggeredPath))
         dataReader, dataBlock = preproc.blockFromPath(
             triggeredPath, lazy=arguments['lazy'])
         dataDF = preproc.alignedAsigsToDF(
             dataBlock, **alignedAsigsKWargs)
+        egFeatName = dataDF.index.get_level_values('feature').unique()[0]
+        breakDownData, breakDownText, fig, ax = asp.printBreakdown(
+            dataDF.xs(egFeatName, level='feature', drop_level=False),
+            'RateInHz', 'electrode', 'nominalCurrent')
         funKWArgs = dict(
                 tBounds=None,
                 plotting=False, iterMethod='half',
@@ -207,7 +215,6 @@ if __name__ == "__main__":
             daskComputeOpts=daskComputeOpts,
             reindexFromInput=False)
         #
-        # nObs = dataDF.reset_index().groupby(groupBy)['feature'].value_counts()
         # resDF = ash.applyFunGrouped(
         #     dataDF,
         #     groupBy, testVar,
@@ -254,32 +261,35 @@ if __name__ == "__main__":
                 arguments['inputBlockName'], arguments['window']))
         for cN in ['noiseCeil', 'covariance', 'covariance_q_scale']:
             resDF[cN].to_hdf(deepSpineExportPath, cN)
-    pdb.set_trace()
-    mask = pd.DataFrame(
-        False,
-        index=resDF['noiseCeil'].index)
+    #
+    # pdb.set_trace()
     trialInfo = resDF['noiseCeil'].index.to_frame().reset_index(drop=True)
-    dropColumns = []
-    for cN in dropColumns:
-        mask.loc[trialInfo['feature'] == cN] = True
+    dropColumns = [
+        'RExtensorDigitorumEmgEnv#0']
     dropElectrodes = []
-    dropIndex = trialInfo['electrode'].isin(dropElectrodes)
-    mask.loc[dropIndex] = True
+    
     if arguments['plotting']:
         figureOutputFolder = os.path.join(
             figureFolder, arguments['analysisName'])
         pdfName = os.path.join(figureOutputFolder, 'noise_ceil_halves.pdf')
         with PdfPages(pdfName) as pdf:
+            plotIndex = pd.MultiIndex.from_frame(
+                trialInfo.loc[:, [
+                    'electrode',
+                    'RateInHz', 'nominalCurrent', 'feature']])
             for cN in ['noiseCeil', 'covariance_q_scale', 'mse_q_scale']:
-                plotIndex = pd.Index(
-                    trialInfo.loc[:, [
-                        'electrode',
-                        'RateInHz', 'nominalCurrent']])
-                plotDF = resDF[cN].reset_index(drop=True).set_index(plotIndex)
+                plotDF = (
+                    resDF[cN]
+                    .unstack(level='feature')
+                    .drop(dropElectrodes, axis='index', level='electrode')
+                    .drop(dropColumns, axis='columns'))
+                plotDF.index = pd.MultiIndex.from_frame(
+                    plotDF.index.to_frame(index=False).loc[
+                        :, ['electrode', 'RateInHz', 'nominalCurrent']])
                 fig, ax = plt.subplots(figsize=(12, 12))
                 sns.heatmap(
-                    plotDF, mask=mask.to_numpy(),
-                    ax=ax, center=0, vmin=-1, vmax=1)
+                    plotDF, ax=ax,
+                    center=0, vmin=-1, vmax=1)
                 ax.set_xticklabels(ax.get_xticklabels(), rotation=-45)
                 ax.set_yticklabels(ax.get_yticklabels(), rotation=45)
                 ax.set_title(cN)
@@ -287,39 +297,67 @@ if __name__ == "__main__":
                 pdf.savefig()
                 plt.show()
             # for pageIdx, (pageName, pageGroup) in enumerate(tqdm(noiseCeil.groupby('electrode'))):
-
+    # pdb.set_trace()
+    
+    keepMask = ((resDF['noiseCeil'] > 0.4) & (resDF['covariance_q_scale'] > 0.1))
+    keepFeats = (resDF.loc[keepMask, 'noiseCeil'].index.to_frame().reset_index(drop=True).groupby(['RateInHz', 'nominalCurrent', 'electrode'])['feature'])
+    keepFeats.name = 'numFeatures'
+    #
+    minReliabilityPerEMG = (
+        resDF['noiseCeil']
+        .unstack(level='feature')
+        .drop(dropElectrodes, axis='index', level='electrode')
+        .drop(dropColumns, axis='columns').quantile(0.75))
+    minReliabilityPerElectrode = (
+        resDF['noiseCeil']
+        .unstack(level='electrode')
+        .drop(dropColumns, axis='index', level='feature')
+        .drop(dropElectrodes, axis='columns').quantile(0.75))
     if arguments['plotting']:
-        plotNoiseCeil = (
-            resDF['noiseCeil']
+        plotCovar = (
+            resDF.loc[keepMask, 'covariance_q_scale']
             .drop(dropElectrodes, axis='index', level='electrode')
-            .drop(dropColumns, axis='columns')
-            .stack())
+            .drop(dropColumns, axis='index', level='feature'))
+        plotNoiseCeil = (
+            resDF.loc[keepMask, 'noiseCeil']
+            .drop(dropElectrodes, axis='index', level='electrode')
+            .drop(dropColumns, axis='index', level='feature')
+            )
         fig, ax = plt.subplots(figsize=(9, 6))
         sns.distplot(plotNoiseCeil, ax=ax, kde=False)
         ax.set_title('Noise ceiling histogram')
         ax.set_xlabel('Pearson Correlation')
         ax.set_ylabel('Count')
         fig.savefig(os.path.join(figureOutputFolder, 'noise_ceil_histogram.pdf'))
+        plt.show()
         # 
-        plotCovar = (
-            resDF['covariance_q_scale']
-            .drop(dropElectrodes, axis='index', level='electrode')
-            .drop(dropColumns, axis='columns')
-            .stack())
+    if arguments['plotting']:
         plotDF = pd.concat(
-            {'noiseCeil': plotNoiseCeil,
-            'covar': plotCovar}, axis='columns').reset_index()
+            {
+                'noiseCeil': plotNoiseCeil,
+                'covar': plotCovar}, axis='columns').reset_index()
         plotDF['nominalCurrent'] *= -1
         fig, ax = plt.subplots(figsize=(9, 6))
         sns.scatterplot(
             x='covar', y='noiseCeil',
             hue='electrode', size='nominalCurrent', style='feature',
-            data=plotDF, ax=ax, alpha=0.75, sizes=(50, 500))
+            markers=EMGStyleMarkers,
+            data=plotDF, ax=ax, alpha=0.75, sizes=(10, 100))
         ax.set_xlabel('Scaled Covariance')
         ax.set_ylabel('Reliability')
         ax.set_xlim([-.2, 1])
         # ax.set_ylim([-1, 1])
         fig.savefig(os.path.join(figureOutputFolder, 'noise_ceil_scatterplot.pdf'))
         plt.show()
-    keepMask = ((plotNoiseCeil > 0.4) & (plotCovar > 0.1))
-    keepFeats = plotNoiseCeil[keepMask].index.to_frame().reset_index(drop=True)
+    if arguments['plotting']:
+        plotDF = (
+            resDF.loc[keepMask, :]
+            .drop(dropElectrodes, axis='index', level='electrode')
+            .drop(dropColumns, axis='index', level='feature')
+            .reset_index()
+            )
+        fig, ax = plt.subplots(figsize=(9, 6))
+        sns.barplot(x='feature', y='noiseCeil', data=plotDF, ax=ax)
+        ax.set_xticklabels(ax.get_xticklabels(), rotation=-60)
+        fig.savefig(os.path.join(figureOutputFolder, 'noise_ceil_per_emg.pdf'))
+        plt.show()

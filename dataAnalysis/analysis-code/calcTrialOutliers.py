@@ -265,9 +265,9 @@ outlierTrials = findOutliers(
 #     # funKWargs=dict(sdThresh=100),
 #     resultNames=resultNames,
 #     plotting=False)
-
+print('\nHighest observed deviations were:')
 print(outlierTrials['deviation'].sort_values().tail())
-print('Outlier proportion was:')
+print('\nOutlier proportion was:')
 print(outlierTrials['rejectBlock'].sum() / outlierTrials['rejectBlock'].size)
 
 # if arguments['plotting']:
@@ -337,7 +337,7 @@ maxDroppedTrials = pd.Series(
         ))
 firstBinMask = trialInfo['bin'] == trialInfo['bin'].unique()[0]
 for ix, devThreshold in enumerate(maxDroppedTrials.index):
-    print(ix)
+    # print(ix)
     if (theseOutliers >= devThreshold).any():
         outlierDataMasks = []
         for lvlIdx, levelName in enumerate(theseOutliers.index.names):
@@ -352,8 +352,9 @@ for ix, devThreshold in enumerate(maxDroppedTrials.index):
             saveNOutliers = nOutliersPerCondition
         maxDroppedTrials[devThreshold] = nOutliersPerCondition.max()
 
+print('\nMaximum number of dropped trials, as a function of deviation threshold:')
 print(maxDroppedTrials)
-print(saveNOutliers.sort_values())
+# print(saveNOutliers.sort_values())
 
 if arguments['plotting']:
     nRowCol = int(np.ceil(np.sqrt(theseOutliers.size)))

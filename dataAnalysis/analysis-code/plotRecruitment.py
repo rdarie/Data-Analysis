@@ -375,15 +375,15 @@ g = sns.relplot(
     col_order=np.unique(plotEmgRC['electrode']),
     col_wrap=5,
     # row='RateInHz',
-    x='normalizedAmplitude',
-    # x=amplitudeFieldName,
+    # x='normalizedAmplitude',
+    x=amplitudeFieldName,
     y='normalizedRAUC',
     style='EMGSide', style_order=['Right', 'Left'],
     hue='EMGSite', hue_order=np.unique(plotEmgRC['EMGSite']),
     kind='line', data=plotEmgRC,
     palette=emgPalette,
     height=5, aspect=1.5, ci='sem', estimator='mean',
-    facet_kws=dict(sharey=True), lw=2,
+    facet_kws=dict(sharey=True, sharex=False), lw=2,
     )
 # for (ro, co, hu), dataSubset in g.facet_data():
 #     break
