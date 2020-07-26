@@ -58,11 +58,7 @@ WINDOW="--window=XS"
 # TRIALSELECTOR="--processAll"
 # TRIALSELECTOR="--blockIdx=2"
 
-# ANALYSISSELECTOR="--analysisName=emg1msec"
-# ANALYSISSELECTOR="--analysisName=emg1msecSmooth"
-# ANALYSISSELECTOR="--analysisName=emg1msecNoLFPFilterSmoothEMG"
 # ANALYSISSELECTOR="--analysisName=lfpFullRes"
-# ANALYSISSELECTOR="--analysisName=emgStretchTime"
 # ANALYSISSELECTOR="--analysisName=emgHiRes"
 ANALYSISSELECTOR="--analysisName=emgLoRes"
 

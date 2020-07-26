@@ -103,7 +103,7 @@ if arguments['tdcNIXFromProcessedToScratch']:
         scratchFolder,
         tdcFolderName)
     if not os.path.exists(destinFolder):
-        os.makedirs(destinationFolder, exist_ok=True)
+        os.makedirs(destinFolder, exist_ok=True)
     destinPath = os.path.join(
         destinFolder, 'tdc_' + ns5FileName + '.nix'
         )

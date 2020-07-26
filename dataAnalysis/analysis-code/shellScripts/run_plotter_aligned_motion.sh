@@ -19,14 +19,15 @@
 # Specify account details
 #SBATCH --account=bibs-dborton-condo
 
-EXP="exp201805231100"
 # EXP="exp201901211000"
-# EXP="exp201901271000"
+EXP="exp201901271000"
 # EXP="exp201901231000"
-# UNITSELECTOR="--selector=_minfrmaxcorr"
-UNITSELECTOR=""
-OUTLIERSWITCH=""
-# OUTLIERSWITCH="--maskOutlierBlocks"
+
+UNITSELECTOR="--selector=_minfrmaxcorr"
+# UNITSELECTOR=""
+
+# OUTLIERSWITCH=""
+OUTLIERSWITCH="--maskOutlierBlocks"
 WINDOW="--window=long"
 # TRIALSELECTOR="--blockIdx=2"
 TRIALSELECTOR="--processAll"
@@ -47,7 +48,7 @@ python --version
 #             done
 #         python3 './plotAlignedNeurons.py' --exp=$EXP $TRIALSELECTOR $WINDOW --alignQuery=$QUERY $UNITSELECTOR --hueName="amplitudeCat" --rowName="pedalDirection" $OUTLIERSWITCH --verbose
 #     done
-QUERY=midPeakM
-# python3 './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $WINDOW --inputBlockName=rig --unitQuery=rig --alignQuery=$QUERY --rowName="pedalSizeCat" --colControl= --colName="pedalDirection" --rowControl= $OUTLIERSWITCH --verbose --enableOverrides
-python3 './plotAlignedNeurons.py' --exp=$EXP $TRIALSELECTOR $WINDOW --alignQuery=$QUERY $UNITSELECTOR --rowName="pedalSizeCat" --colControl= --colName="pedalDirection" --rowControl= $OUTLIERSWITCH --verbose --enableOverrides
+QUERY="midPeakM"
+# python3 './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $WINDOW --inputBlockName="rig" --unitQuery=rig --alignQuery=$QUERY --rowName="pedalSizeCat" --colControl= --colName="pedalDirection" --rowControl= $OUTLIERSWITCH --verbose --enableOverrides
+python3 './plotAlignedNeurons.py' --exp=$EXP $TRIALSELECTOR $WINDOW --alignQuery=$QUERY $UNITSELECTOR --rowName="pedalDirection" --hueName="amplitudeCat" --rowControl= $OUTLIERSWITCH --verbose --enableOverrides
 

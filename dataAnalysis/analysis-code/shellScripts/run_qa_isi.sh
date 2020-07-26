@@ -10,11 +10,11 @@
 #SBATCH --mem=127G
 
 # Specify a job name:
-#SBATCH -J alignStim_20200701
+#SBATCH -J QA_Stim_20200702
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-alignStim_20200701.stdout
-#SBATCH -e ../../batch_logs/%j-alignStim_20200701.errout
+#SBATCH -o ../../batch_logs/%j-QA_Stim_20200702.stdout
+#SBATCH -e ../../batch_logs/%j-QA_Stim_20200702.errout
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -57,7 +57,7 @@ OUTPUTBLOCKNAME="--outputBlockName=emg_clean"
 INPUTBLOCKNAME="--inputBlockName=emg"
 # OUTPUTBLOCKNAME="--outputBlockName=lfp_clean"
 # INPUTBLOCKNAME="--inputBlockName=lfp"
-# ALIGNQUERY="--alignQuery=stimOn"
+ALIGNQUERY="--alignQuery=stimOn"
 # ALIGNQUERY="--alignQuery=all"
 
 CHANSELECTOR="--chanQuery=isiemg"
@@ -78,4 +78,4 @@ python3 -u ./calcTrialOutliers.py --exp=$EXP --alignFolderName=stim $INPUTBLOCKN
 
 INPUTBLOCKNAME="--inputBlockName=emg_clean"
 UNITSELECTOR="--unitQuery=isiemgenv"
-python -u "./calcTargetNoiseCeiling.py" --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR --alignFolderName=stim --inputBlockName=$INPUTBLOCKNAME $UNITSELECTOR --maskOutlierBlocks --alignQuery="stimOn" --plotting
+python -u ./calcTargetNoiseCeiling.py --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --maskOutlierBlocks $ALIGNQUERY --plotting

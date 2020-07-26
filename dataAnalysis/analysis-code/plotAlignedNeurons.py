@@ -65,6 +65,7 @@ if not os.path.exists(analysisSubFolder):
 alignSubFolder = os.path.join(analysisSubFolder, arguments['alignFolderName'])
 if not os.path.exists(alignSubFolder):
     os.makedirs(alignSubFolder, exist_ok=True)
+calcSubFolder = os.path.join(alignSubFolder, 'dataframes')
 #
 figureStatsFolder = os.path.join(
     alignSubFolder, 'figureStats'
@@ -88,7 +89,7 @@ alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **argu
 alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
     namedQueries, alignSubFolder, **arguments)
 alignedAsigsKWargs['outlierTrials'] = ash.processOutlierTrials(
-    alignSubFolder, prefix, **arguments)
+    calcSubFolder, prefix, **arguments)
 alignedAsigsKWargs.update(dict(
     duplicateControlsByProgram=True,
     makeControlProgram=True,

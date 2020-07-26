@@ -16,6 +16,7 @@ Options:
     --resultName=resultName                filename for result [default: meanFR]
     --analysisName=analysisName            append a name to the resulting blocks? [default: default]
     --alignFolderName=alignFolderName      append a name to the resulting blocks? [default: motion]
+    --maskOutlierBlocks                    delete outlier trials? [default: False]
 """
 
 import pdb
@@ -39,6 +40,9 @@ if not os.path.exists(analysisSubFolder):
 alignSubFolder = os.path.join(analysisSubFolder, arguments['alignFolderName'])
 if not os.path.exists(alignSubFolder):
     os.makedirs(alignSubFolder, exist_ok=True)
+calcSubFolder = os.path.join(alignSubFolder, 'dataframes')
+if not os.path.exists(calcSubFolder):
+    os.makedirs(calcSubFolder, exist_ok=True)
 #
 if arguments['processAll']:
     prefix = assembledName
@@ -49,7 +53,7 @@ triggeredPath = os.path.join(
     prefix + '_{}_{}.nix'.format(
         arguments['inputBlockName'], arguments['window']))
 resultPath = os.path.join(
-    alignSubFolder,
+    calcSubFolder,
     prefix + '_{}_{}_calc.h5'.format(
         arguments['inputBlockName'], arguments['window']))
 #
@@ -65,6 +69,8 @@ alignedAsigsKWargs.update(dict(
 alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **arguments)
 alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
     namedQueries, scratchFolder, **arguments)
+alignedAsigsKWargs['outlierTrials'] = ash.processOutlierTrials(
+    calcSubFolder, prefix, **arguments)
 
 meanFRDF = ash.applyFun(
     triggeredPath=triggeredPath, resultPath=resultPath,

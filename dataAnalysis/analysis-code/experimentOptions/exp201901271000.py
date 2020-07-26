@@ -190,4 +190,12 @@ def getExpOpts():
             [100, 2010]
         ]
         }
+    outlierDetectOptions = dict(
+        targetEpochSize=20e-3,
+        windowSize=(-2.1, 2.1),
+        conditionNames=[
+            'electrode', 'amplitude', 'RateInHz',
+            'pedalMovementCat', 'pedalSizeCat', 'pedalDirection'],
+        twoTailed=True,
+        )
     return locals()

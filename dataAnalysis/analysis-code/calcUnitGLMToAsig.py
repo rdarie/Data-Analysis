@@ -92,6 +92,7 @@ def calcUnitRegressionToAsig():
     alignSubFolder = os.path.join(
         analysisSubFolder, arguments['alignFolderName']
         )
+    calcSubFolder = os.path.join(alignSubFolder, 'dataframes')
     if arguments['processAll']:
         prefix = assembledName
     else:
@@ -157,7 +158,7 @@ def calcUnitRegressionToAsig():
     alignedAsigsKWargs['unitQuery'] = uQ
     #
     alignedAsigsKWargs['outlierTrials'] = ash.processOutlierTrials(
-        alignSubFolder, prefix, **arguments)
+        calcSubFolder, prefix, **arguments)
     #
     featuresMetaDataPath = os.path.join(
         estimatorSubFolder, 'features_meta.pickle')
@@ -365,20 +366,27 @@ def calcUnitRegressionToAsig():
                 if isinstance(v, pd.Series) or isinstance(v, pd.DataFrame):
                     if not all(featuresMetaData['featureLoadArgs'][k] == v):
                         sameFeatures = False
+                        print('features differ at {}'.format(k))
                 else:
                     if not (featuresMetaData['featureLoadArgs'][k] == v):
                         sameFeatures = False
+                        print('features differ at {}'.format(k))
+            print('sameFeatures is {}'.format(sameFeatures))
             sameTargets = True
             for k, v in targetLoadArgs.items():
                 if isinstance(v, pd.Series) or isinstance(v, pd.DataFrame):
                     if not all(featuresMetaData['targetLoadArgs'][k] == v):
                         sameTargets = False
+                        print('targets differ at {}'.format(k))
                 else:
                     if not (featuresMetaData['targetLoadArgs'][k] == v):
                         sameTargets = False
+                        print('targets differ at {}'.format(k))
+            print('sameTargets is {}'.format(sameTargets))
             # sameFeatures = (featuresMetaData['featureLoadArgs'] == featureLoadArgs)
             # sameTargets = (featuresMetaData['targetLoadArgs'] == targetLoadArgs)
             sameSources = (featuresMetaData['sourceOpts'] == sourceOpts)
+            print('sameSources is {}'.format(sameSources))
             if sameFeatures and sameTargets and sameSources:
                 reloadFeatures = False
             else:
@@ -395,11 +403,13 @@ def calcUnitRegressionToAsig():
     else:
         reloadFeatures = None
         featuresMetaData = None
+    # pdb.set_trace()
     if HAS_MPI:
         COMM.Barrier()  # sync MPI threads, wait for 0
         reloadFeatures = COMM.bcast(reloadFeatures, root=0)
         featuresMetaData = COMM.bcast(featuresMetaData, root=0)
     if reloadFeatures and (RANK == 0):
+        print('reloadFeatures is {}'.format(reloadFeatures))
         featuresDFList = []
         targetDFList = []
         for sourceOpt in sourceOpts:
@@ -409,14 +419,15 @@ def calcUnitRegressionToAsig():
                 sourceScratchFolder, sourceOpt['analysisName'])
             sourceAlignSubFolder = os.path.join(
                 sourceAnalysisSubFolder, sourceOpt['alignFolderName'])
+            sourceCalcSubFolder = os.path.join(sourceAlignSubFolder, 'dataframes')
             targetLoadArgs['dataQuery'] = ash.processAlignQueryArgs(
                 namedQueries, alignQuery=sourceOpt['alignQuery'])
             targetLoadArgs['outlierTrials'] = ash.processOutlierTrials(
-                sourceAlignSubFolder, sourceOpt['prefix'], **arguments)
+                sourceCalcSubFolder, sourceOpt['prefix'], **arguments)
             featureLoadArgs['dataQuery'] = ash.processAlignQueryArgs(
                 namedQueries, alignQuery=sourceOpt['alignQuery'])
             featureLoadArgs['outlierTrials'] = ash.processOutlierTrials(
-                sourceAlignSubFolder, sourceOpt['prefix'], **arguments)
+                sourceCalcSubFolder, sourceOpt['prefix'], **arguments)
             featureLoadArgs['windowSize'] = sourceOpt['windowSize']
             targetLoadArgs['windowSize'] = sourceOpt['windowSize']
             triggeredPath = os.path.join(
@@ -444,7 +455,6 @@ def calcUnitRegressionToAsig():
             partialTargetDF.columns = [
                 '{}'.format(i[0]).replace('_raster#0', '').replace('#', '_')
                 for i in partialTargetDF.columns]
-            # pdb.set_trace()
             # check for point process assumption
             # print((partialTargetDF * countPerBin).quantile(0.99).sort_values())
             # print(((partialTargetDF * countPerBin > 1).sum() / partialTargetDF.shape[0]).sort_values())
@@ -506,7 +516,6 @@ def calcUnitRegressionToAsig():
             partialTargetDF = partialTargetDF * countPerBin
             featuresDFList.append(partialFeaturesDF)
             targetDFList.append(partialTargetDF)
-        # pdb.set_trace()
         featuresDF = pd.concat(featuresDFList)
         targetDF = pd.concat(targetDFList)
         ############################################################

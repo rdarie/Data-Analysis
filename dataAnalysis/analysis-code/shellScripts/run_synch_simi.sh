@@ -10,16 +10,16 @@
 #SBATCH --mem=32G
 
 # Specify a job name:
-#SBATCH -J ins_synch
+#SBATCH -J simi_synch
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-ins_synch.stdout
-#SBATCH -e ../../batch_logs/%j-%a-ins_synch.errout
+#SBATCH -o ../../batch_logs/%j-%a-simi_synch.stdout
+#SBATCH -e ../../batch_logs/%j-%a-simi_synch.errout
 
 # Specify account details
-#SBATCH --account=bibs-dborton-condo
+#SBATCH --account=carney-dborton-condo
 # Request custom resources
-#SBATCH --array=1
+#SBATCH --array=1,2,3,4
 
 # EXP="exp201901070700"
 # EXP="exp201901201200"

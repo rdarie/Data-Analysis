@@ -1345,8 +1345,9 @@ def getTensTrigs(
     # 
     peakIdx, peakTimes, trainStartPeaks, trainEndPeaks = findTrains(
         #tensSrs,
-        peakTimes=peakTimes, iti=iti,
-        minTrainLength=minTrainLength, maxDistance=1.5,
+        peakTimes=peakTimes,
+        # iti=iti,
+        minTrainLength=minTrainLength, maxDistance=1.5 * iti,
         maxTrain=maxTrain, plotting=plotting)
     '''
     # identify trains of peaks
@@ -1543,9 +1544,12 @@ def getKinematics(
             absVal=False, plotting=plotting,
             keep_max=False)
         peakIdx, _, trainStartPeaks, trainEndPeaks = findTrains(
-            peakIdx=peakIdx, iti=fps**(-1),
+            peakIdx=peakIdx,
+            # iti=fps**(-1),
             fs=fs,
-            minTrainLength=10, maxDistance=1.5,
+            minTrainLength=10,
+            minDistance=0.5 * fps**(-1),
+            maxDistance=1.5 * fps**(-1),
             plotting=plotting)
     # get time of first simi frame in NSP time:
     trigTimes = nspTime[peakIdx[peakIdx >= trainStartPeaks[-1]]]

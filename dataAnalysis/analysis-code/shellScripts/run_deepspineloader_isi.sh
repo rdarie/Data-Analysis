@@ -17,13 +17,15 @@
 #SBATCH -e ../../batch_logs/%j-plotsStim.errout
 
 # Specify account details
-#SBATCH --account=bibs-dborton-condo
+#SBATCH --account=carney-dborton-condo
 
 # EXP="exp202003201200"
 # EXP="exp202004271200"
 # EXP="exp202004301200"
 # EXP="exp202005011400"
-EXP="exp202006171300"
+# EXP="exp202006171300"
+EXP="exp202007011300"
+# EXP="exp202007021300"
 
 # SELECTOR="Block005_minfrmaxcorr"
 SELECTOR="_minfrmaxcorr"
@@ -50,8 +52,8 @@ python --version
 
 # python3 './calcAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ANALYSISSELECTOR --eventName=stimAlignTimes --chanQuery="isispinaloremg" --blockName="lfp" --verbose  --alignFolderName=stim
 # UNITSELECTOR="--unitQuery=isispinaloremg"
-# python "./exportForDeepSpine.py" --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR --alignFolderName=stim --inputBlockName="emg" $UNITSELECTOR --maskOutlierBlocks --alignQuery="stimOn"
+# python "./exportForDeepSpine.py" --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR --alignFolderName=stim --inputBlockName="emg_clean" $UNITSELECTOR --maskOutlierBlocks --alignQuery="stimOn"
 # UNITSELECTOR="--unitQuery=isiemgenv"
-python "./calcTargetNoiseCeiling.py" --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR --alignFolderName=stim --inputBlockName="emg" $UNITSELECTOR --maskOutlierBlocks --alignQuery="stimOn" --plotting
+# python "./calcTargetNoiseCeiling.py" --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR --alignFolderName=stim --inputBlockName="emg_clean" $UNITSELECTOR --maskOutlierBlocks --alignQuery="stimOn" --plotting
 # python "./calcEpochEffect.py" --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR --alignFolderName=stim --inputBlockName="emg" $UNITSELECTOR --maskOutlierBlocks --alignQuery="stimOn" --plotting
 python "loadSheepDeepSpine.py"

@@ -11,7 +11,7 @@ Options:
     --analysisName=analysisName            append a name to the resulting blocks? [default: default]
     --alignFolderName=alignFolderName      append a name to the resulting blocks? [default: motion]
     --chanQuery=chanQuery                  how to restrict channels if not providing a list? [default: fr]
-    --outputBlockName=blockName            name for new block [default: fr]
+    --outputBlockName=outputBlockName      name for new block [default: fr]
     --eventName=eventName                  name of events object to align to [default: motionStimAlignTimes]
     --verbose                              print diagnostics? [default: False]
 """

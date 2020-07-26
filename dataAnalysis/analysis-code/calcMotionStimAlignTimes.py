@@ -64,7 +64,7 @@ if arguments['processAll']:
     print('calcMotionStimAlignTimes does not support aggregate files')
     sys.exit()
 # trick to allow joint processing of minirc and regular trials
-if (miniRCBlock or RCBlock):
+if ('RC' in blockExperimentTypeLookup[int(arguments['blockIdx'])]):
     print('skipping RC trial')
     sys.exit()
 alignTimeBounds = [
@@ -494,7 +494,7 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         if (('Fuzzy' in i) and (i.replace('Fuzzy', '') in alignEventsDF.columns))]
     alignEventsDF.drop(columns=stripColumnNames, inplace=True)
     alignEventsDF.columns = [i.replace('Fuzzy', '') for i in alignEventsDF.columns]
-    
+    # pdb.set_trace()
     alignEvents = preproc.eventDataFrameToEvents(
         alignEventsDF, idxT='t',
         annCol=None,

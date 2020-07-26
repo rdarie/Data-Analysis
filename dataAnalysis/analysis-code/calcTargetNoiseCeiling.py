@@ -186,8 +186,8 @@ if __name__ == "__main__":
     #     'mseStd': np.float
     #     }
     resultMeta = None
-    recalc = False
-    if recalc:
+    useCachedResult = True
+    if not (useCachedResult and os.path.exists(resultPath)):
         print('loading {}'.format(triggeredPath))
         dataReader, dataBlock = preproc.blockFromPath(
             triggeredPath, lazy=arguments['lazy'])

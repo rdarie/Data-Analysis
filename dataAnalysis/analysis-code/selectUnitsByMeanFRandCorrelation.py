@@ -45,13 +45,16 @@ if not os.path.exists(analysisSubFolder):
 alignSubFolder = os.path.join(analysisSubFolder, arguments['alignFolderName'])
 if not os.path.exists(alignSubFolder):
     os.makedirs(alignSubFolder, exist_ok=True)
+calcSubFolder = os.path.join(alignSubFolder, 'dataframes')
+if not os.path.exists(calcSubFolder):
+    os.makedirs(calcSubFolder, exist_ok=True)
 #
 if arguments['processAll']:
     prefix = assembledName
 else:
     prefix = ns5FileName
 resultPath = os.path.join(
-    alignSubFolder,
+    calcSubFolder,
     prefix + '_{}_{}_calc.h5'.format(
         arguments['inputBlockName'], arguments['window']))
 selectorPath = os.path.join(
@@ -90,7 +93,7 @@ def selFun(
 # import matplotlib.pyplot as plt
 # plt.hist(impedanceDF, bins='sqrt'); plt.show()
 thisCorrThresh = .85
-thisMeanThresh = 3
+thisMeanThresh = 5
 # import pdb; pdb.set_trace()
 outputFeatures = selFun(
     meanFRDF, corrDF, impedanceDF, meanThresh=thisMeanThresh,
@@ -114,6 +117,7 @@ selectorMetadata = {
     'selFunInputs': {'meanThresh': 5, 'corrThresh': thisCorrThresh}
     }
 #
+
 with open(selectorPath, 'wb') as f:
     pickle.dump(
         selectorMetadata, f)

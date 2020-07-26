@@ -26,8 +26,8 @@
 
 # EXP="exp201901211000"
 EXP="exp201901271000"
-# ESTIMATOR="glm_20msec"
-ESTIMATOR="glm_5msec"
+ESTIMATOR="glm_20msec"
+# ESTIMATOR="glm_50msec"
 
 # UNITSELECTOR=""
 UNITSELECTOR="--selector=_minfrmaxcorr"
@@ -40,12 +40,4 @@ conda activate
 source activate nda2
 python --version
 
-# module load mpi
-# srun --mpi=pmi2 python3 -u ./calcUnitGLMToAsig.py --exp=$EXP --processAll --inputBlockName="raster" --unitQuery="raster" $UNITSELECTOR --secondaryBlockName="rig" --alignQuery="midPeak" --maskOutlierBlocks --estimatorName=$ESTIMATOR --verbose --plotting --attemptMPI
-# python3 -u ./calcUnitGLMToAsig.py --exp=$EXP --processAll --inputBlockName="raster" --unitQuery="raster" $UNITSELECTOR --secondaryBlockName="rig" --alignQuery="midPeak" --maskOutlierBlocks --estimatorName=$ESTIMATOR --verbose --plotting --debugging --dryRun
-
-# debugging
-python3 -u ./evaluateUnitGLMToAsig.py --exp=$EXP --processAll --alignQuery="midPeak" --estimatorName=$ESTIMATOR --lazy --verbose --debugging --plottingOverall --plottingIndividual --plottingCovariateFilters --makePredictionPDF
-
-# full
-# python3 -u ./evaluateUnitGLMToAsig.py --exp=$EXP --processAll --alignQuery="midPeak" --estimatorName=$ESTIMATOR --lazy --verbose --plottingIndividual --plottingCovariateFilters --plottingOverall --makePredictionPDF --makeCovariatePDF
+python3 -u ./evaluateUnitGLMToAsig.py --exp=$EXP --processAll --alignQuery="midPeak" --estimatorName=$ESTIMATOR --lazy --verbose --debugging --makeCovariatePDF --plottingOverall --plottingIndividual --makePredictionPDF  --plottingCovariateFilters

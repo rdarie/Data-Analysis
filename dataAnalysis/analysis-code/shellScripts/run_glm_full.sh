@@ -1,13 +1,13 @@
 #!/bin/bash
 #  10: Calculate align Times
 # Request runtime:
-#SBATCH --time=150:00:00
+#SBATCH --time=24:00:00
 
 # Default resources are 1 core with 2.8GB of memory.
 
 # Request memory:
-#SBATCH --nodes=45
-#SBATCH --tasks=45
+#SBATCH --nodes=12
+#SBATCH --tasks=12
 #SBATCH --tasks-per-node=1
 #SBATCH --mem=72G
 
@@ -20,14 +20,14 @@
 
 # Specify account details
 #disableSBATCH -p bigmem
-#SBATCH --account=bibs-dborton-condo
+#SBATCH --account=carney-dborton-condo
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=radu_darie@brown.edu
 
 # EXP="exp201901211000"
 EXP="exp201901271000"
 # ESTIMATOR="glm_20msec"
-ESTIMATOR="glm_5msec"
+ESTIMATOR="glm_20msec"
 
 # UNITSELECTOR=""
 UNITSELECTOR="--selector=_minfrmaxcorr"
@@ -43,9 +43,4 @@ python --version
 module load mpi
 srun --mpi=pmi2 python3 -u ./calcUnitGLMToAsig.py --exp=$EXP --processAll --inputBlockName="raster" --unitQuery="raster" $UNITSELECTOR --secondaryBlockName="rig" --alignQuery="midPeak" --maskOutlierBlocks --estimatorName=$ESTIMATOR --verbose --plotting --attemptMPI
 # python3 -u ./calcUnitGLMToAsig.py --exp=$EXP --processAll --inputBlockName="raster" --unitQuery="raster" $UNITSELECTOR --secondaryBlockName="rig" --alignQuery="midPeak" --maskOutlierBlocks --estimatorName=$ESTIMATOR --verbose --plotting --debugging --dryRun
-
-# debugging
-# python3 ./evaluateUnitGLMToAsig.py --exp=$EXP --processAll --alignQuery="midPeak" --estimatorName=$ESTIMATOR --lazy --verbose --debugging --plottingOverall --plottingIndividual --plottingCovariateFilters --makePredictionPDF
-
-# full
-# python3 ./evaluateUnitGLMToAsig.py --exp=$EXP --processAll --alignQuery="midPeak" --estimatorName=$ESTIMATOR --lazy --verbose --plottingIndividual --plottingCovariateFilters --plottingOverall --makePredictionPDF --makeCovariatePDF
+# python3 -u ./calcUnitGLMToAsig.py --exp=$EXP --processAll --inputBlockName="raster" --unitQuery="raster" $UNITSELECTOR --secondaryBlockName="rig" --alignQuery="midPeak" --maskOutlierBlocks --estimatorName=$ESTIMATOR --plotting --verbose

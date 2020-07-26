@@ -192,11 +192,11 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
         'predictSlots': True, 'snapToGrid': True,
         'plotAnomalies': False,
         'overrideStartTimes': overrideStartTimes,
-        'plotting': []  # range(1, 1000, 5) [] range(1000)
+        'plotting':  range(0, 1000)  # [] range(1000)
         }
     miniRCStimDetectionOpts = {
         'minDist': 1.2,
-        'gaussWid': 100e-3,
+        'gaussWid': 300e-3,
         'treatAsSinglePulses': False
         }
     RCStimDetectionOpts = {
@@ -328,9 +328,12 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
         programColumn='program',
         electrodeColumn='electrode',
         removeFuzzyName=False)
+    # alignedAsigsKWargs.update(dict(
+    #     windowSize=(-2, 2),
+    #     decimate=5))
     alignedAsigsKWargs.update(dict(
         windowSize=(-100e-3, 400e-3),
-        decimate=2))
+        decimate=5))
     # alignedAsigsKWargs.update(dict(
     #     windowSize=(-250e-6, 2750e-6),
     #     decimate=1))
@@ -367,7 +370,6 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
     rasterOpts = {
         # 'binInterval': 2e-4, 'binWidth': 10e-3, 'smoothKernelWidth': 10e-3,  # 5 kHz, EMG Lo-Res
         'binInterval': 1e-3, 'binWidth': 10e-3, 'smoothKernelWidth': 10e-3,  # default, 1 kHz spikes
-        # 'binInterval': 0.2e-3, 'binWidth': 5e-3, 'smoothKernelWidth': 10e-3,
         # 'binInterval': (3e4) ** (-1), 'binWidth': 5e-3, 'smoothKernelWidth': 10e-3,  # 30 kHz, Full-Res
         # 'binInterval': 1e-4, 'binWidth': 5e-3, 'smoothKernelWidth': 10e-3,  # 10 kHz, EMG Hi-Res
         'windowSizes': {
@@ -396,7 +398,7 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
         estimator='mean',
         # estimator=None, units='t',
         palette="ch:0.6,-.3,dark=.1,light=0.7,reverse=1",
-        height=6, aspect=30, kind='line')
+        height=6, aspect=2, kind='line')
     vLineOpts = {'color': 'm', 'alpha': 0.5}
     asigPlotShadingOpts = {
         'facecolor': vLineOpts['color'],
@@ -450,25 +452,39 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
         'covariateHistoryLen': .30,
         'nHistoryBasisTerms': 5,
         'glm_50msec': dict(
-            subsampleOpts=dict(rollingWindow=50, decimate=50),
+            subsampleOpts=dict(
+                rollingWindow=50, decimate=50,
+                windowSize=(-1750e-3, 1750e-3)),
             covariateSpacing=25e-3),
         'glm_30msec': dict(
-            subsampleOpts=dict(rollingWindow=30, decimate=30),
+            subsampleOpts=dict(
+                rollingWindow=30, decimate=30,
+                windowSize=(-1750e-3, 1750e-3)),
             covariateSpacing=15e-3),
         'glm_20msec': dict(
-            subsampleOpts=dict(rollingWindow=20, decimate=20),
+            subsampleOpts=dict(
+                rollingWindow=20, decimate=20,
+                windowSize=(-1750e-3, 1750e-3)),
             covariateSpacing=10e-3),
         'glm_10msec': dict(
-            subsampleOpts=dict(rollingWindow=10, decimate=10),
+            subsampleOpts=dict(
+                rollingWindow=10, decimate=10,
+                windowSize=(-1750e-3, 1750e-3)),
             covariateSpacing=10e-3),
         'glm_5msec': dict(
-            subsampleOpts=dict(rollingWindow=5, decimate=5),
+            subsampleOpts=dict(
+                rollingWindow=5, decimate=5,
+                windowSize=(-1750e-3, 1750e-3)),
             covariateSpacing=10e-3),
         'glm_3msec': dict(
-            subsampleOpts=dict(rollingWindow=3, decimate=3),
+            subsampleOpts=dict(
+                rollingWindow=3, decimate=3,
+                windowSize=(-1750e-3, 1750e-3)),
             covariateSpacing=10e-3),
         'glm_1msec': dict(
-            subsampleOpts=dict(rollingWindow=None, decimate=1),
+            subsampleOpts=dict(
+                rollingWindow=None, decimate=1,
+                windowSize=(-1750e-3, 1750e-3)),
             covariateSpacing=10e-3),
     }
     return expOpts, locals()

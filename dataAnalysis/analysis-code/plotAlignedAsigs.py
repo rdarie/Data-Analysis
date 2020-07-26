@@ -81,8 +81,6 @@ if not os.path.exists(alignedFeaturesFolder):
     os.makedirs(alignedFeaturesFolder, exist_ok=True)
 
 calcSubFolder = os.path.join(alignSubFolder, 'dataframes')
-if not os.path.exists(calcSubFolder):
-    os.makedirs(calcSubFolder, exist_ok=True)
 rowColOpts = asp.processRowColArguments(arguments)
 if arguments['processAll']:
     prefix = assembledName

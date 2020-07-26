@@ -25,6 +25,7 @@ from scipy import stats, signal, ndimage
 import peakutils
 from scipy import interpolate
 from sklearn.preprocessing import MinMaxScaler
+from sklearn.covariance import EmpiricalCovariance, MinCovDet
 import datetime
 from datetime import datetime as dt
 import json
@@ -962,7 +963,8 @@ def getINSStimLogFromJson(
 def stimStatusSerialtoLong(
         stimStSer, idxT='t', namePrefix='ins_', expandCols=[],
         deriveCols=[], progAmpNames=[], dropDuplicates=True,
-        amplitudeCatBins=4):
+        amplitudeCatBins=4,
+        dummyTherapySwitches=False, elecConfiguration=None):
     fullExpandCols = copy(expandCols)
     #  fixes issue with 'program' and 'amplitude' showing up unrequested
     if 'program' not in expandCols:
@@ -998,14 +1000,32 @@ def stimStatusSerialtoLong(
         stimStLong.loc[pMask, pName] = stimStSer.loc[pMask, namePrefix + 'value']
         stimStLong[pName].fillna(method='ffill', inplace=True)
         stimStLong[pName].fillna(value=0, inplace=True)
-    
     if dropDuplicates:
         stimStLong.drop_duplicates(subset=idxT, keep='last', inplace=True)
     #
     if debugPlot:
         stimStLong.loc[:, ['program'] + progAmpNames].plot()
         plt.show()
-        #
+    stimStLong = stimStLong.reset_index(drop=True)
+    ###################
+    # scan for rate changes and add dummy therapy increments
+    if dummyTherapySwitches:
+        rateChange = (
+            (stimStLong['RateInHz'].diff().fillna(0) != 0) |
+            (stimStLong['trialSegment'].diff().fillna(0) != 0)
+            )
+        stimStLong['rateRound'] = rateChange.astype(np.float).cumsum()
+        groupComponents = [group.copy() for name, group in stimStLong.groupby('rateRound')]
+        for idx, (name, group) in enumerate(stimStLong.groupby('rateRound')):
+            if idx < len(groupComponents) - 1:
+                nextT = groupComponents[idx+1][idxT].iloc[0]
+                lastRate = groupComponents[idx]['RateInHz'].iloc[-1]
+                dummyEntry = group.iloc[-1, :].copy()
+                dummyEntry[idxT] = nextT - lastRate ** (-1)
+                dummyEntry['therapyStatus'] = 0
+                groupComponents[idx] = group.append(dummyEntry)
+        stimStLong = pd.concat(groupComponents).reset_index(drop=True)
+    ###################
     ampIncrease = pd.Series(False, index=stimStLong.index)
     ampChange = pd.Series(False, index=stimStLong.index)
     for idx, pName in enumerate(progAmpNames):
@@ -1013,7 +1033,71 @@ def stimStatusSerialtoLong(
         ampChange = ampChange | (stimStLong[pName].diff().fillna(0) != 0)
         if debugPlot:
             plt.plot(stimStLong[pName].diff().fillna(0), label=pName)
-    #
+    #####
+    ampChange = ampChange | (stimStLong['trialSegment'].diff().fillna(0) != 0)
+    ####
+    stimStLong['amplitudeRound'] = (
+        ampIncrease.astype(np.float).cumsum())
+    stimStLong['amplitude'] = (
+        stimStLong[progAmpNames].sum(axis=1))
+    ################
+    if elecConfiguration is not None:
+        groupComponents = [group.copy() for name, group in stimStLong.groupby('amplitudeRound')]
+        for idx, (name, group) in enumerate(stimStLong.groupby('amplitudeRound')):
+            thisProgram = int(group['program'].iloc[0])
+            thisAmplitude = group['program{}_amplitude'.format(thisProgram)].iloc[0]
+            if thisAmplitude == 0:
+                continue
+            thisElecConfig = elecConfiguration[0][thisProgram]
+            if thisElecConfig['cyclingEnabled']:
+                thisCycleOnTime = (
+                    thisElecConfig['cycleOnTime']['time'] *
+                    mdt_constants.cycleUnits[thisElecConfig['cycleOnTime']['units']] *
+                    pq.s).magnitude
+                thisCycleOffTime = (
+                    thisElecConfig['cycleOffTime']['time'] *
+                    mdt_constants.cycleUnits[thisElecConfig['cycleOffTime']['units']] *
+                    pq.s).magnitude
+                firstT = (group[idxT].iloc[0])
+                if idx < len(groupComponents) - 1:
+                    lastT = (groupComponents[idx+1][idxT].iloc[0])
+                else:
+                    lastT = (group[idxT].iloc[-1])
+                onTimes = [
+                    i
+                    for i in np.arange(firstT, lastT, (thisCycleOnTime + thisCycleOffTime))
+                    if i > firstT]
+                offTimes = [
+                    i
+                    for i in np.arange(firstT + thisCycleOffTime, lastT, (thisCycleOnTime + thisCycleOffTime))]
+                dummyEntriesOn = pd.DataFrame(
+                    np.nan, index=range(len(onTimes)), columns=group.columns)
+                dummyEntriesOff = pd.DataFrame(
+                    np.nan, index=range(len(offTimes)), columns=group.columns)
+                for pName in progAmpNames:
+                    dummyEntriesOn[pName] = 0
+                    dummyEntriesOff[pName] = 0
+                dummyEntriesOn[idxT] = onTimes
+                dummyEntriesOff[idxT] = offTimes
+                dummyEntriesOn['program{}_amplitude'.format(thisProgram)] = thisAmplitude
+                dummyEntriesOff['program{}_amplitude'.format(thisProgram)] = 0
+                substituteGroup = pd.concat(
+                    [group, dummyEntriesOn, dummyEntriesOff])
+                substituteGroup.sort_values(idxT, inplace=True)
+                substituteGroup.fillna(method='ffill', inplace=True)
+                groupComponents[idx] = substituteGroup
+        stimStLong = pd.concat(groupComponents).reset_index(drop=True)
+        # redo 
+        ampIncrease = pd.Series(False, index=stimStLong.index)
+        ampChange = pd.Series(False, index=stimStLong.index)
+        for idx, pName in enumerate(progAmpNames):
+            ampIncrease = ampIncrease | (stimStLong[pName].diff().fillna(0) > 0)
+            ampChange = ampChange | (stimStLong[pName].diff().fillna(0) != 0)
+            if debugPlot:
+                plt.plot(stimStLong[pName].diff().fillna(0), label=pName)
+        #####
+        ampChange = ampChange | (stimStLong['trialSegment'].diff().fillna(0) != 0)
+        ####
     if debugPlot:
         stimStLong.loc[:, ['program'] + progAmpNames].plot()
         ampIncrease.astype(float).plot(style='ro')
@@ -1021,15 +1105,15 @@ def stimStatusSerialtoLong(
         plt.legend()
         plt.show()
     #
-    if 'amplitudeRound' in deriveCols:
-        stimStLong['amplitudeRound'] = (
-            ampIncrease.astype(np.float).cumsum())
+    stimStLong['amplitudeRound'] = (
+        ampIncrease.astype(np.float).cumsum())
+    stimStLong['amplitude'] = (
+        stimStLong[progAmpNames].sum(axis=1))
+    ###############
     if 'movementRound' in deriveCols:
         stimStLong['movementRound'] = (
             stimStLong['movement'].abs().cumsum())
-    if 'amplitude' in deriveCols:
-        stimStLong['amplitude'] = (
-            stimStLong[progAmpNames].sum(axis=1))
+    # if 'amplitude' in deriveCols:
     if 'amplitudeCat' in deriveCols:
         ampsForSum = copy(stimStLong[progAmpNames])
         for colName in ampsForSum.columns:
@@ -1472,7 +1556,7 @@ def getINSStimOnset(
         timeInterpFunINStoNSP=None,
         offsetFromPeak=None,
         overrideStartTimes=None,
-        cyclePeriodCorrection=18e-3,
+        cyclePeriodCorrection=0, # 18e-3,
         stimDetectOptsByChannel=None,
         plotAnomalies=False,
         predictSlots=True, snapToGrid=False,
@@ -1486,8 +1570,8 @@ def getINSStimOnset(
     # 
     # WIP: treat as single at the stimStatus level
     tdDF, accelDF, stimStatus = unpackINSBlock(
-        block, convertStimToSinglePulses=False)
-    
+        block, convertStimToSinglePulses=False,
+        dummyTherapySwitches=False, elecConfiguration=elecConfiguration)
     #  assume a fixed delay between onset and stim
     #  fixedDelayIdx = int(fixedDelay * fs)
     #  print('Using a fixed delay of {} samples'.format(fixedDelayIdx))
@@ -1544,8 +1628,8 @@ def getINSStimOnset(
     for idx, row in therapyOnTimes.iterrows():
         print('Calculating therapy on times for segment {}'.format(idx))
         # figure out what the group rate is at therapy on
-        winStartT = tdDF.loc[row['nominalOnIdx'], 't'] - gaussWid / 2
-        winStopT = tdDF.loc[row['nominalOnIdx'], 't'] + gaussWid / 2
+        winStartT = tdDF.loc[row['nominalOnIdx'], 't'] - gaussWid
+        winStopT = tdDF.loc[row['nominalOnIdx'], 't'] + gaussWid
         tMask = hf.getTimeMaskFromRanges(tdDF['t'], [(winStartT, winStopT)])
         groupRate = tdDF.loc[tMask, 'RateInHz'].value_counts().idxmax()
         # expand search window by group rate
@@ -1554,7 +1638,7 @@ def getINSStimOnset(
         tdSeg = tdDF.loc[tMask, allDataCol + ['t']]
         tdSegDetect = tdSeg.set_index('t')
         try:
-            detectSignal, foundTimestamp, _ = extractArtifactTimestampsNew(
+            detectSignal, foundTimestamp, _ = extractArtifactTimestampsMahalanobis(
                 tdSegDetect, fs,
                 gaussWid=gaussWid,
                 thresh=2,
@@ -1586,8 +1670,8 @@ def getINSStimOnset(
         for idx, row in therapyOffTimes.iterrows():
             print('Calculating therapy off times for segment {}'.format(idx))
             # figure out what the group rate is at therapy on
-            winStartT = tdDF.loc[row['nominalOffIdx'], 't'] - gaussWid / 2
-            winStopT = tdDF.loc[row['nominalOffIdx'], 't'] + gaussWid / 2
+            winStartT = tdDF.loc[row['nominalOffIdx'], 't'] - gaussWid
+            winStopT = tdDF.loc[row['nominalOffIdx'], 't'] + gaussWid
             tMask = hf.getTimeMaskFromRanges(tdDF['t'], [(winStartT, winStopT)])
             groupRate = tdDF.loc[tMask, 'RateInHz'].value_counts().idxmax()
             # expand search window by group rate
@@ -1596,7 +1680,7 @@ def getINSStimOnset(
             tdSeg = tdDF.loc[tMask, allDataCol + ['t']]
             tdSegDetect = tdSeg.set_index('t')
             try:
-                detectSignal, foundTimestamp, _ = extractArtifactTimestampsNew(
+                detectSignal, foundTimestamp, _ = extractArtifactTimestampsMahalanobis(
                     tdSegDetect, fs,
                     gaussWid=gaussWid,
                     thresh=1,
@@ -1780,6 +1864,8 @@ def getINSStimOnset(
                 int(slotSize / 2) +
                 activeProgram * int(slotSize / 4)
                 )
+            if not expectedOnsetIdx in tdSeg.index:
+                expectedOnsetIdx = nominalStimOnIdx
             expectedTimestamp = tdSeg.loc[expectedOnsetIdx, 't']
             if overrideStartTimes is not None:
                 ovrTimes = pd.Series(overrideStartTimes)
@@ -1810,8 +1896,8 @@ def getINSStimOnset(
         ROIMaskOnset.iloc[-1] = True
         tdSegDetect = tdSeg.set_index('t')
         plottingEnabled = (name in plotting) # and (not resolvedSlots)
-        
-        detectSignal, foundTimestamp, usedExpectedT = extractArtifactTimestampsNew(
+        # detect stim onset
+        detectSignal, foundTimestamp, usedExpectedT = extractArtifactTimestampsMahalanobis(
             tdSegDetect,
             fs,
             gaussWid=gaussWid,
@@ -1833,7 +1919,6 @@ def getINSStimOnset(
         for i in foundTimestamp:
             localIdx.append(tdSegDetect.index.get_loc(i))
         foundIdx = tdSeg.index[localIdx]
-        
         if (not resolvedSlots) and predictSlots and (lastAmplitude == 0):
             # have not resolved phase between slots and recording for this segment
             therSegDF = tdDF.loc[tdDF['therapyRound'] == thisTherapyRound, :]
@@ -1841,7 +1926,6 @@ def getINSStimOnset(
             rateDiff = therSegDF['RateInHz'].diff().fillna(method='bfill')
             rateChangeTimes = therSegDF.loc[rateDiff != 0, 't']
             print('Calculating slots for segment {}'.format(thisTherapyRound))
-            
             groupRate = therSegDF.loc[foundIdx, 'RateInHz'].iloc[0]
             groupPeriod = np.float64(groupRate ** (-1))
             rateChangePeriods = (
@@ -1873,7 +1957,10 @@ def getINSStimOnset(
                 timeBase = therSegDF.loc[startIdx:endIdx, 't'].to_numpy()
                 timeBase = timeBase - timeBase[0]
                 calculatedSlots = (timeBase % groupPeriod) // (groupPeriod / 4)
-                tdDF.loc[startIdx:endIdx, 'slot'] = calculatedSlots.astype(np.int)
+                try:
+                    tdDF.loc[startIdx:endIdx, 'slot'] = calculatedSlots.astype(np.int)
+                except Exception:
+                    pdb.set_trace()
                 timeSeekIdx = min(
                     endIdx + 1,
                     therSegDF.index[-1])
@@ -1987,48 +2074,47 @@ def getINSStimOnset(
                 name=electrodeCombo
                 )[0]
             thisElecConfig = elecConfiguration[activeGroup][activeProgram]
-            # pdb.set_trace()
-            if thisElecConfig['cyclingEnabled']:
-                thisCycleOnTime = (
-                    thisElecConfig['cycleOnTime']['time'] *
-                    mdt_constants.cycleUnits[thisElecConfig['cycleOnTime']['units']] *
-                    pq.s
-                    )
-                thisCycleOffTime = (
-                    thisElecConfig['cycleOffTime']['time'] *
-                    mdt_constants.cycleUnits[thisElecConfig['cycleOffTime']['units']] *
-                    pq.s
-                    )
-                tempOnTimes = []
-                tempOffTimes = []
-                tempOnDiffsE = []
-                tempOnDiffsL = []
-                for idx, onTime in enumerate(theseOnsetTimestamps):
-                    offTime = theseOffsetTimestamps[idx]
-                    # 
-                    interCycleInterval = (
-                        thisCycleOffTime +
-                        cyclePeriodCorrection * pq.s +
-                        thisCycleOnTime)
-                    pulseOnTimes = np.arange(
-                        onTime, offTime,
-                        interCycleInterval) * onTime.units
-                    pulseOffTimes = pulseOnTimes + thisCycleOnTime
-                    # if cycle shuts down early because of new command
-                    if offTime < pulseOffTimes[-1]:
-                        print('Replaced {} with {}'.format(pulseOffTimes[-1], offTime))
-                        pulseOffTimes[-1] = offTime
-                    tempOnTimes.append(pulseOnTimes)
-                    tempOffTimes.append(pulseOffTimes)
-                    onDiffE = onsetDifferenceFromExpected[idx]
-                    tempOnDiffsE.append(pulseOnTimes ** 0 * onDiffE)
-                    onDiffL = onsetDifferenceFromLogged[idx]
-                    tempOnDiffsL.append(pulseOnTimes ** 0 * onDiffL)
-                #
-                theseOnsetTimestamps = np.concatenate(tempOnTimes) * onTime.units
-                theseOffsetTimestamps = np.concatenate(tempOffTimes) * offTime.units
-                onsetDifferenceFromExpected = np.concatenate(tempOnDiffsE) * onTime.units
-                onsetDifferenceFromLogged = np.concatenate(tempOnDiffsL) * offTime.units
+            # if thisElecConfig['cyclingEnabled']:
+            #     thisCycleOnTime = (
+            #         thisElecConfig['cycleOnTime']['time'] *
+            #         mdt_constants.cycleUnits[thisElecConfig['cycleOnTime']['units']] *
+            #         pq.s
+            #         )
+            #     thisCycleOffTime = (
+            #         thisElecConfig['cycleOffTime']['time'] *
+            #         mdt_constants.cycleUnits[thisElecConfig['cycleOffTime']['units']] *
+            #         pq.s
+            #         )
+            #     tempOnTimes = []
+            #     tempOffTimes = []
+            #     tempOnDiffsE = []
+            #     tempOnDiffsL = []
+            #     for idx, onTime in enumerate(theseOnsetTimestamps):
+            #         offTime = theseOffsetTimestamps[idx]
+            #         # 
+            #         interCycleInterval = (
+            #             thisCycleOffTime +
+            #             cyclePeriodCorrection * pq.s +
+            #             thisCycleOnTime)
+            #         pulseOnTimes = np.arange(
+            #             onTime, offTime,
+            #             interCycleInterval) * onTime.units
+            #         pulseOffTimes = pulseOnTimes + thisCycleOnTime
+            #         # if cycle shuts down early because of new command
+            #         if offTime < pulseOffTimes[-1]:
+            #             print('Replaced {} with {}'.format(pulseOffTimes[-1], offTime))
+            #             pulseOffTimes[-1] = offTime
+            #         tempOnTimes.append(pulseOnTimes)
+            #         tempOffTimes.append(pulseOffTimes)
+            #         onDiffE = onsetDifferenceFromExpected[idx]
+            #         tempOnDiffsE.append(pulseOnTimes ** 0 * onDiffE)
+            #         onDiffL = onsetDifferenceFromLogged[idx]
+            #         tempOnDiffsL.append(pulseOnTimes ** 0 * onDiffL)
+            #     #
+            #     theseOnsetTimestamps = np.concatenate(tempOnTimes) * onTime.units
+            #     theseOffsetTimestamps = np.concatenate(tempOffTimes) * offTime.units
+            #     onsetDifferenceFromExpected = np.concatenate(tempOnDiffsE) * onTime.units
+            #     onsetDifferenceFromLogged = np.concatenate(tempOnDiffsL) * offTime.units
             if treatAsSinglePulses:
                 tempOnTimes = []
                 tempOffTimes = []
@@ -2223,12 +2309,12 @@ def extractArtifactTimestampsNew(
                     applyScaler=None,
                     plotKernel=plotKernel))
             edgeEnhancer += thisEdgeEnhancer
-            if plotDetection and False:
-                ax.plot(
-                    tdSeg.index,
-                    thisEdgeEnhancer,
-                    '--', c=cLookup[colName],
-                    label='edge enhancer {}'.format(colName))
+            # if plotDetection and False:
+            #     ax.plot(
+            #         tdSeg.index,
+            #         thisEdgeEnhancer,
+            #         '--', c=cLookup[colName],
+            #         label='edge enhancer {}'.format(colName))
         edgeEnhancer.loc[:] = (
             MinMaxScaler(feature_range=(1e-2, 1))
             .fit_transform(edgeEnhancer.to_numpy().reshape(-1, 1))
@@ -2329,200 +2415,155 @@ def extractArtifactTimestampsNew(
             pass
     return detectSignal, np.atleast_1d(foundTimestamp[keepSlice]), usedExpectedTimestamp
 
-'''
-def extractArtifactTimestamps(
-        tdSeg, tdDF, ROIMask,
-        fs, gaussWid,
+def extractArtifactTimestampsMahalanobis(
+        tdSeg,
+        fs,
+        gaussWid=200e-3,
+        thresh=2,
+        offsetFromPeak=0,
         stimRate=100,
-        closeThres=200e-3,
+        keepWhat='first',
+        threshMethod='cross',
         enhanceEdges=True,
-        expectedIdx=None,
-        enhanceExpected=True,
-        expandExpectedByStimRate=False,
-        correctThresholdWithAmplitude=True,
-        thisAmplitude=None,
+        expectedTimestamp=None,
+        ROIBasis=None,
+        ROIMask=None, keepSlice=0,
         name=None, plotting=None,
         plotAnomalies=None, anomalyOccured=None,
-        minDist=None, theseDetectOpts=None,
-        maxSpikesPerGroup=None,
-        fixedDelayIdx=None, delayByFreqIdx=None,
-        keep_what=None, plotDetection=False, plotKernel=False
+        plotDetection=False, plotKernel=False
         ):
     if plotDetection:
+        sns.set()
+        sns.set_style("whitegrid")
+        sns.set_color_codes("dark")
+        cPal = sns.color_palette(n_colors=tdSeg.columns.size)
+        cLookup = {n: cPal[i] for i, n in enumerate(tdSeg.columns)}
         fig, ax = plt.subplots()
         for colName, tdCol in tdSeg.iteritems():
             ax.plot(
+                tdSeg.index,
                 tdCol.values,
-                'b-', label='original signal {}'.format(colName))
-    # convolve with a future facing kernel
+                '-', c=cLookup[colName],
+                label='original signal {}'.format(colName))
+        ax.set_xlabel('Time (sec)')
+    #
+    # fit on first part of tdSeg
+    firstPartMask = tdSeg.index < tdSeg.index[0] + gaussWid / 2
+    empCov = EmpiricalCovariance().fit(tdSeg.loc[firstPartMask, :].to_numpy())
+    mahalDist = pd.Series(
+        np.sqrt(empCov.mahalanobis(tdSeg)),
+        index=tdSeg.index)
     if enhanceEdges:
-        edgeEnhancer = pd.Series(0, index=tdSeg.index)
-        for colName, tdCol in tdSeg.iteritems():
-            thisEdgeEnhancer = (
-                hf.noisyTriggerCorrection(
-                    tdCol, fs, gaussWid, order=2, plotKernel=plotKernel))
-            edgeEnhancer += thisEdgeEnhancer
-            if plotDetection:
-                ax.plot(
-                    thisEdgeEnhancer,
-                    'k-', label='edge enhancer {}'.format(colName))
-        #
+        # convolve with a future facing kernel
         edgeEnhancer = pd.Series(
+            hf.noisyTriggerCorrection(
+                mahalDist, fs, gaussWid, order=2,
+                applyZScore=True, applyAbsVal=True,
+                applyScaler=None,
+                plotKernel=plotKernel), index=tdSeg.index)
+        if plotDetection and False:
+            ax.plot(
+                tdSeg.index,
+                thisEdgeEnhancer,
+                '--', c=cLookup[colName],
+                label='edge enhancer {}'.format(colName))
+        edgeEnhancer.loc[:] = (
             MinMaxScaler(feature_range=(1e-2, 1))
-            .fit_transform(edgeEnhancer.values.reshape(-1, 1))
-            .squeeze(),
-            index=tdSeg.index)
+            .fit_transform(edgeEnhancer.to_numpy().reshape(-1, 1))
+            .squeeze()
+            )
+        if plotDetection:
+            ax.plot(
+                tdSeg.index,
+                edgeEnhancer,
+                'k--', label='final edge enhancer')
     else:
         edgeEnhancer = pd.Series(
             1, index=tdSeg.index)
-    if plotDetection:
-        ax.plot(
-            edgeEnhancer.values,
-            'k-', label='final edge enhancer')
-    if enhanceExpected:
-        assert expectedIdx is not None
-        if expandExpectedByStimRate:
-            print(' ')
-            
+    if ROIBasis is not None:
         expectedEnhancer = hf.gaussianSupport(
-            tdSeg, expectedIdx, gaussWid, fs)
-        #
+            tdSeg=tdSeg, gaussWid=6 * gaussWid, fs=fs, support=ROIBasis)
+        if plotDetection:
+            ax.plot(
+                tdSeg.index,
+                expectedEnhancer.values, 'c--', label='expected enhancer')
+            #ax.axvline(expectedTimestamp, label='expected timestamp')
         correctionFactor = edgeEnhancer * expectedEnhancer
         correctionFactor = pd.Series(
             MinMaxScaler(feature_range=(1e-2, 1))
-            .fit_transform(correctionFactor.values.reshape(-1, 1))
+            .fit_transform(correctionFactor.to_numpy().reshape(-1, 1))
             .squeeze(),
             index=tdSeg.index)
-        if plotDetection:
-            ax.plot(expectedEnhancer.values, 'k--', label='expected enhancer')
-    #
-    tdPow = tdSeg.abs().sum(axis=1)
-    detectSignalFull = hf.enhanceNoisyTriggers(
-        tdPow, correctionFactor)
-    if plotDetection:
-        ax.plot(detectSignalFull.values, 'g-', label='detect signal')
-    #  threshold proportional to amplitude
-    if correctThresholdWithAmplitude:
-        amplitudeCorrection = thisAmplitude / 20
-        if (name in plotting) or anomalyOccured:
-            print(
-                'amplitude threshold correction = {}'
-                .format(amplitudeCorrection))
-        currentThresh = theseDetectOpts['thres'] + amplitudeCorrection
     else:
-        currentThresh = theseDetectOpts['thres']
-
+        correctionFactor = edgeEnhancer
+    #
+    detectSignal = pd.Series(hf.enhanceNoisyTriggers(
+        mahalDist, correctionFactor=correctionFactor,
+        applyZScore=True, applyAbsVal=True,
+        applyScaler=None), index=tdSeg.index)
+    if plotDetection and False:
+        ax.plot(
+            tdSeg.index,
+            detectSignal,
+            '-.', c=cLookup[colName],
+            label='detect signal {}'.format(colName))
+    #
+    if ROIMask is not None:
+        detectSignal.loc[~ROIMask] = np.nan
+        detectSignal.interpolate(inplace=True)
+        if plotDetection:
+            ax.axvspan(
+                detectSignal.index[ROIMask][1],
+                detectSignal.index[ROIMask][-2],
+                facecolor='g', alpha=0.5, zorder=-100)
     if plotDetection:
-        ax.axhline(currentThresh, color='r')
-        ax.legend()
-        plt.show()
-    
-    detectSignal = detectSignalFull.loc[ROIMask]
-    idxLocal = peakutils.indexes(
-        detectSignal.values,
-        thres=currentThresh,
-        min_dist=int(minDist * fs), thres_abs=True,
-        keep_what=keep_what)
-
-    if not len(idxLocal):
-        if plotAnomalies:
-            anomalyOccured = True
+        ax.plot(
+            detectSignal.index,
+            detectSignal.values, 'y-', label='detect signal')
+        ax.axhline(thresh, color='r')
+    if threshMethod == 'peaks':
+        idxLocal = peakutils.indexes(
+            detectSignal.to_numpy(),
+            thres=thresh,
+            min_dist=int(1.05 * fs / stimRate), thres_abs=True,
+            keep_what=keepWhat)
+        idxLocal = np.atleast_1d(idxLocal)
+    elif threshMethod == 'cross':
+        keepMax = (keepWhat == 'max')
+        crossIdx, crossMask = hf.getThresholdCrossings(
+            detectSignal, thresh=thresh,
+            iti=1.05 / stimRate, fs=fs,
+            absVal=False, keep_max=keepMax)
+        if crossMask.any():
+            idxLocal = np.atleast_1d(np.flatnonzero(crossMask))
+        else:
+            idxLocal = []
+    if len(idxLocal):
+        idxLocal = idxLocal - int(fs * offsetFromPeak)
+        idxLocal[idxLocal < 0] = 0
+        usedExpectedTimestamp = False
+        foundTimestamp = tdSeg.index[idxLocal]
+        if plotDetection:
+            ax.plot(
+                foundTimestamp, foundTimestamp ** 0 - 1,
+                'r*', markersize=10)
+    else:
         print(
             'After peakutils.indexes, no peaks found! ' +
             'Using JSON times...')
-        peakIdx = expectedIdx
-    else:
-        peakIdx = detectSignal.index[idxLocal]
+        usedExpectedTimestamp = True
+        foundTimestamp = np.atleast_1d(expectedTimestamp)
+    if plotDetection:
+        ax.legend()
+        try:
+            ax.set_xlim([
+                max(detectSignal.index[0], foundTimestamp[0] - 5 * stimRate ** (-1)),
+                min(detectSignal.index[-1], foundTimestamp[0] + 15 * stimRate ** (-1))
+            ])
+        except:
+            pass
+    return detectSignal, np.atleast_1d(foundTimestamp[keepSlice]), usedExpectedTimestamp
 
-    expectedTimestamps = pd.Series(
-        tdDF['t'].loc[expectedIdx])
-    if maxSpikesPerGroup > 0:
-        peakIdx = peakIdx[:maxSpikesPerGroup]
-        expectedIdx = expectedIdx[:maxSpikesPerGroup]
-        expectedTimestamps = pd.Series(
-            tdDF['t'].loc[expectedIdx])
-
-    theseTimestamps = pd.Series(
-        tdDF['t'].loc[peakIdx])
-
-    if (name in plotting) or anomalyOccured:
-        print('Before checking against expectation')
-        print('{}'.format(theseTimestamps))
-    
-    # check whether the found spikes are off from expected
-    assert len(theseTimestamps) > 0, 'nothing found!'
-    
-    if theseTimestamps.shape[0] >= expectedTimestamps.shape[0]:
-        if theseTimestamps.shape[0] > expectedTimestamps.shape[0]:
-            if plotAnomalies:
-                anomalyOccured = True
-                print('More timestamps than expected!')
-        closestExpected, _ = hf.closestSeries(
-            theseTimestamps,
-            expectedTimestamps)
-        offsetFromExpected = (
-            theseTimestamps.values -
-            closestExpected.values)
-        offsetTooFarMask = (
-            np.abs(offsetFromExpected) > closeThres)
-        if offsetTooFarMask.any():
-            if plotAnomalies:
-                anomalyOccured = True
-            #  just use the expected locations
-            #  if we failed to find anything better
-            newTimestamps = theseTimestamps.copy()
-            newTimestamps.loc[offsetTooFarMask] = (
-                closestExpected.loc[offsetTooFarMask])
-    elif theseTimestamps.shape[0] < expectedTimestamps.shape[0]:
-        if plotAnomalies:
-            anomalyOccured = True
-            print('fewer timestamps than expected!')
-        #  fewer detections than expected
-        closestFound, _ = hf.closestSeries(
-            expectedTimestamps,
-            theseTimestamps
-            )
-        offsetFromExpected = (
-            expectedTimestamps.values -
-            closestFound.values)
-        offsetTooFarMask = (
-            np.abs(offsetFromExpected) > closeThres)
-        #  start with expected and fill in with
-        #  timestamps that were fine
-        newTimestamps = expectedTimestamps.copy()
-        newTimestamps.loc[~offsetTooFarMask] = (
-            closestFound.loc[~offsetTooFarMask])
-    
-    if offsetTooFarMask.any():
-        closestTimes, _ = hf.closestSeries(
-            newTimestamps,
-            tdDF['t'],
-            )
-        originalPeakIdx = theseTimestamps.index
-        peakIdx = tdDF['t'].index[tdDF['t'].isin(closestTimes)]
-        theseTimestamps = pd.Series(
-            tdDF['t'].loc[peakIdx])
-    else:
-        originalPeakIdx = None
-        
-    # save closest for diagnostics
-    closestExpected, _ = hf.closestSeries(
-        theseTimestamps,
-        expectedTimestamps)
-    offsetFromExpected = (theseTimestamps - closestExpected).values * pq.s
-
-    deadjustedIndices = expectedIdx - fixedDelayIdx - delayByFreqIdx
-    loggedTimestamps = pd.Series(
-        tdDF['t'].loc[deadjustedIndices])
-    closestToLogged, _ = hf.closestSeries(
-        theseTimestamps,
-        loggedTimestamps)
-    offsetFromLogged = (theseTimestamps - closestToLogged).values * pq.s
-    return (
-        peakIdx, theseTimestamps, offsetFromExpected, offsetFromLogged,
-        anomalyOccured, originalPeakIdx, correctionFactor, detectSignalFull,
-        currentThresh)
-'''
 
 def insDataToBlock(
         td, accel, stimStatusSerial,
@@ -2620,7 +2661,10 @@ def insDataToBlock(
     return block
 
 
-def unpackINSBlock(block, unpackAccel=True, convertStimToSinglePulses=False):
+def unpackINSBlock(
+    block, unpackAccel=True,
+    dummyTherapySwitches=False, elecConfiguration=None,
+    convertStimToSinglePulses=False):
     tdAsig = block.filter(
         objects=AnalogSignal,
         td=True
@@ -2649,7 +2693,9 @@ def unpackINSBlock(block, unpackAccel=True, convertStimToSinglePulses=False):
     progAmpNames = rcsa_helpers.progAmpNames
     stimStatus = stimStatusSerialtoLong(
         stimStSer, idxT='t', expandCols=expandCols,
-        deriveCols=deriveCols, progAmpNames=progAmpNames)
+        deriveCols=deriveCols, progAmpNames=progAmpNames,
+        dummyTherapySwitches=dummyTherapySwitches,
+        elecConfiguration=elecConfiguration)
     #  add stim info to traces
     columnsToBeAdded = (
         expandCols + deriveCols + progAmpNames)

@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 # data is aligned to stim onset
 # cropEdgesTimes controls the size of the window that is loaded
 cropEdgesTimes = [-100e-3, 400e-3]
-inputPath = '/gpfs/scratch/rdarie/rdarie/Neural Recordings/202006171300-Peep/emgLoRes/stim/_emg_XS_export.h5'
+inputPath = '/gpfs/scratch/rdarie/rdarie/Neural Recordings/202007011300-Peep/emgLoRes/stim/_emg_XS_export.h5'
 with pd.HDFStore(inputPath, 'r') as store:
     # each trial has its own eesKey, get list of all
     allEESKeys = [
@@ -17,10 +17,10 @@ with pd.HDFStore(inputPath, 'r') as store:
     eesList = []
     emgList = []
     for idx, eesKey in enumerate(sorted(allEESKeys)):
-        print(eesKey)
+        # print(eesKey)
         # data for this trial is stored in a pd.dataframe
         stimData = pd.read_hdf(store, eesKey)
-        print((stimData.abs() > 0).any())
+        # print((stimData.abs() > 0).any())
         # metadata is stored in a dictionary
         eesMetadata = store.get_storer(eesKey).attrs.metadata
         # extract column names from first trial
@@ -72,13 +72,20 @@ def getEESIdx(metaRow):
 
 
 metaDataDF['eesIdx'] = metaDataDF.apply(getEESIdx, axis=1)
-(metaDataDF.loc[~metaDataDF['outlierTrial'], :].groupby(['electrode', 'amplitude', 'RateInHz']).ngroups)
+print('Number of groups that are not exclusively outliers: ')
+print(metaDataDF.loc[~metaDataDF['outlierTrial'], :].groupby(['electrode', 'amplitude', 'RateInHz']).ngroups)
 print('finished loading.')
 pdb.set_trace()
+print('Nans in noiseCeil: ')
+nansInNoiseCeilMask = noiseCeilDF.drop(columns=['RExtensorDigitorumEmgEnv#0']).isna().any(axis=1)
+noiseCeilDF.loc[nansInNoiseCeilMask, :]
+trialCountGood = metaDataDF.loc[~metaDataDF['outlierTrial'].astype(np.bool), :].groupby(['electrode', 'amplitude'])['RateInHz'].value_counts()
+trialCount = metaDataDF.groupby(['electrode', 'amplitude'])['RateInHz'].value_counts()
 checkPlots = True
 if checkPlots:
     plt.plot(eesNP[0, :, 0])
     plt.plot(emgNP[0, :, 0])
     plt.show()
-    print(metaDataDF.loc[~metaDataDF['outlierTrial'].astype(np.bool), :].groupby(['electrode', 'amplitude'])['RateInHz'].value_counts())
+    print('Number of trials per ees condition: ')
+    print(trialCount)
     print(emgList[0].index)

@@ -3,13 +3,33 @@ import os
 
 def getExpOpts():
     #
-    miniRCBlockLookup = {
-        1: False,
-        2: False,
-        3: False,
-        4: True,
+    blockExperimentTypeLookup = {
+        1: 'proprio',
+        2: 'proprio',
+        3: 'proprio',
+        4: 'proprio-miniRC'
         }
-    RCBlockLookup = {i: False for i in miniRCBlockLookup.keys()} 
+    fullRigInputs = {
+        'A+': 'ainp1',
+        'B+': 'ainp2',
+        'Z+': 'ainp3',
+        'A-': 'ainp5',
+        'B-': 'ainp4',
+        'Z-': 'ainp6',
+        'rightBut': 'ainp11',
+        'leftBut': 'ainp12',
+        'rightLED': 'ainp9',
+        'leftLED': 'ainp10',
+        'simiTrigs': 'ainp8',
+        'tapSync': 'ainp7',
+        }
+    miniRCRigInputs = {
+        'tapSync': 'ainp7',
+        'simiTrigs': 'ainp8'
+        }
+    RCRigInputs = {
+        'kinectSync': 'ainp16',
+        }
     
     experimentName = '201901261000-Proprio'
     deviceName = 'DeviceNPC700373H'
@@ -107,8 +127,14 @@ def getExpOpts():
         }
     # options for stim artifact detection
     detectStim = True
-    stimDetectThresDefault = 4
+    stimDetectThresDefault = 3
     stimDetectChansDefault = ['ins_td2', 'ins_td3']
+    stimDetectOverrideStartTimes = {
+        1: None,
+        2: None,
+        3: None,
+        4: None,
+    }
     stimDetectOptsByChannelSpecific = {
         #group
         0: {
