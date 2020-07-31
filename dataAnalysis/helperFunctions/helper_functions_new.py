@@ -30,6 +30,7 @@ from neo import (
 from neo.io.proxyobjects import (
     AnalogSignalProxy, SpikeTrainProxy, EventProxy)
 from sklearn.preprocessing import MinMaxScaler
+from sklearn.covariance import EmpiricalCovariance
 import datetime
 from datetime import datetime as dt
 import json
@@ -514,6 +515,11 @@ def interpolateDF(
             outputDF[columnName] = interpolate.pchip_interpolate(
                 oldX, df[columnName].to_numpy(), newX
             )
+        elif kind in ['akima']:
+            interpFun = interpolate.Akima1DInterpolator(
+                oldX, df[columnName], axis=-1
+            )
+            outputDF[columnName] = interpFun(newX, extrapolate=True)
     return outputDF
 
 
@@ -2517,154 +2523,37 @@ def plotBinnedSpikes(spikeMat, show=True, normalizationType='linear',
     return fi, im
 '''
 
-
-'''
-def plot_events_raster(eventDf, names, collapse = False, usePlotly = True):
+def plot_events_raster(eventDf, names, plotOpts, collapse=False):
     # Initialize plots
-    (viridis_cmap, norm,colorsRgb, plotColPlotly,
-    plotColMPL, names2int, line_styles) = getPlotOpts(names)
-
-    if not usePlotly:
-        fig, ax = plt.subplots()
-    else:
-        data = []
-        layout = {
-
-            'title' : 'Event Raster Plot',
-
-            'xaxis' : dict(
-                title='Time (sec)',
-                titlefont=dict(
-                    family='Courier New, monospace',
-                    size=18,
-                    color='#7f7f7f'
-                )
-            ),
-
-            'yaxis' : dict(
-                title='',
-                titlefont=dict(
-                    family='Courier New, monospace',
-                    size=18,
-                    color='#7f7f7f'
-                )
-            ),
-            'shapes' : []}
-
+    fig, ax = plt.subplots()
+    #
     for idx, name in enumerate(names):
-
-        color_idx = (names2int[idx] % len(plotColPlotly))
-        ln_sty_idx = 0
         event_times = eventDf['Time'][eventDf['Label'] == name]
-
         if collapse:
             idx = 0
-
-        if not usePlotly:
-
-            ax.vlines(event_times, idx, idx + 1, colors = plotColMPL[color_idx],
-                linestyles = line_styles[ln_sty_idx], label = name)
-
-        else:
-
-            data.append( go.Scatter(
-                    x = event_times,
-                    y = [idx + 0.5 for i in event_times],
-                    mode = 'markers',
-                    name = name,
-                    marker = dict(
-                        color = plotColPlotly[color_idx][1],
-                        symbol = "line-ns-open",
-                        line = dict(
-                            width = 4,
-                            color = plotColPlotly[color_idx][1]
-                        )
-                    )
-                )
-            )
-
-            layout['shapes'] = layout['shapes'] + [
-                {
-                    'type' : 'line',
-                    'x0' :  t,
-                    'y0' :  idx,
-                    'x1' :  t,
-                    'y1' :  idx + 1,
-                    'line' :  dict(
-                        color = plotColPlotly[color_idx][1],
-                        width = 5
-                    )
-                } for t in event_times
-            ]
-
-    if not usePlotly:
-        plt.legend()
-        plt.xlabel('Times (sec)')
-        ax.get_yaxis().set_visible(False)
-        rasterFig = fig
-
-    else:
-        rasterFig = go.Figure(data=data,layout=layout)
-        #py.iplot(fig, filename='eventRaster')
+        ax.vlines(event_times, idx, idx + 1, colors = plotOpts[name]['color'],
+            linestyles = plotOpts[name]['linestyle'], label = name)
+    #
+    plt.legend()
+    plt.xlabel('Times (sec)')
+    ax.get_yaxis().set_visible(False)
+    rasterFig = fig
     return rasterFig
-'''
 
-'''
-def plotPeristimulusTimeHistogram(eventDf, stimulus, names,
+
+def plotPeristimulusTimeHistogram(
+    eventDf, stimulus, names,
     preInterval = 5, postInterval = 5, deltaInterval = 100e-3,
-    collapse = False, usePlotly = True):
+    collapse = False):
     """
     https://en.wikipedia.org/wiki/Peristimulus_time_histogram
     """
     nBins = int((preInterval + postInterval)/deltaInterval + 1)
-    (viridis_cmap, norm,colorsRgb, plotColPlotly,
-        plotColMPL, names2int, line_styles) = getPlotOpts(names)
-
-    if not usePlotly:
-        fig, ax = plt.subplots()
-        listHistograms = []
-    else:
-        data = []
-        layout = go.Layout(barmode='overlay')
-        layout['title'] = 'Peristimulus Time Histogram'
-        layout['titlefont'] =dict(
-                family='Arial',
-                size=25,
-                color='#7f7f7f'
-            )
-        layout['xaxis'] = dict(
-                title='Time (sec)',
-                titlefont=dict(
-                    family='Arial',
-                    size=25,
-                    color='#7f7f7f'
-                ),
-                tickfont = dict(
-                    size = 20
-                )
-            )
-        layout['yaxis'] = dict(
-                title='Count',
-                titlefont=dict(
-                    family='Arial',
-                    size=25,
-                    color='#7f7f7f'
-                ),
-                tickfont = dict(
-                    size = 20
-                )
-            )
-        layout['legend'] = dict(
-            font = dict(
-                size = 20
-            )
-        )
-
+    fig, ax = plt.subplots()
+    listHistograms = []
+    
     maxTime = max(eventDf['Time'])
     for idx, name in enumerate(names):
-
-        color_idx = (names2int[idx] % len(plotColPlotly))
-        ln_sty_idx = 0
         event_times = eventDf['Time'][eventDf['Label'] == name]
 
         eventTimes = pd.Series(index = ['Time'])
@@ -2681,50 +2570,15 @@ def plotPeristimulusTimeHistogram(eventDf, stimulus, names,
             eventTimes = eventTimes.append(theseEventTimes, ignore_index = True)
 
         eventTimes.dropna(inplace = True)
-        if not usePlotly:
-            #store list of these values
-            listHistograms.append(eventTimes.values)
-        else:
-            data.append( go.Histogram(
-                    x = eventTimes,
-                    name = name,
-                    opacity = 0.75,
-                    nbinsx = nBins,
-                    marker = dict(
-                        color = plotColPlotly[color_idx][1],
-                        line = dict(
-                            width = 4,
-                            color = plotColPlotly[color_idx][1]
-                        )
-                    )
-                )
-            )
+        listHistograms.append(eventTimes.values)
 
-    if not usePlotly:
-        ax.hist(listHistograms, nBins, histtype='bar')
-        plt.legend(names)
-        plt.xlabel('Times (sec)')
-        ax.get_yaxis().set_visible(False)
-        psthFig = fig
-    else:
-        layout['shapes'] = [
-            {
-                'type' : 'line',
-                'x0' :  0,
-                'y0' :  0,
-                'x1' :  0,
-                'y1' :  np.max([np.max(np.histogram(datum['x'], bins = nBins)[0]) for datum in data]),
-                'line' :  dict(
-                    color = 'rgb(0,0,0)',
-                    width = 5
-                )
-            }
-        ]
-
-        psthFig = go.Figure(data=data,layout=layout)
-
+    ax.hist(listHistograms, nBins, histtype='bar')
+    plt.legend(names)
+    plt.xlabel('Times (sec)')
+    ax.get_yaxis().set_visible(False)
+    psthFig = fig
     return psthFig
-'''
+
 
 '''
 def plot_trial_stats(trialStatsDf, usePlotly = True, separate = None, debugging = False, title = 'Global outcomes'):
@@ -2997,7 +2851,6 @@ def readPiLog(filePaths, names = None, zeroTime = False, fixMovedToError = [Fals
     return logs, trialStatsAll
 '''
 
-'''
 def readPiJsonLog(filePaths, zeroTime = False):
     logs = pd.DataFrame()
     trialStatsAll = pd.DataFrame()
@@ -3088,7 +2941,7 @@ def readPiJsonLog(filePaths, zeroTime = False):
         trialStatsAll = pd.concat([trialStatsAll, trialStats], ignore_index = True)
         #print(trialStatsAll.shape)
     return logs, trialStatsAll
-'''
+
 
 def plotConfusionMatrix(
         cm, classes,

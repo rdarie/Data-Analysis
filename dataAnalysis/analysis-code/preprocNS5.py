@@ -97,6 +97,7 @@ if arguments['ISI']:
             swapMaps = None
     else:
         swapMaps = None
+    # pdb.set_trace()
     reader = ns5.preproc(
         fileName=ns5FileName,
         rawFolderPath=nspFolder,

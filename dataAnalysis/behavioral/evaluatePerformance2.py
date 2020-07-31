@@ -1,6 +1,6 @@
 # Started November 2018; does not use plotly
 
-import dataAnalysis.helperFunctions.helper_functions as hf
+import dataAnalysis.helperFunctions.helper_functions_new as hf
 import traceback
 try:
     import proprioBehavioralControl.helperFunctions as bhf
@@ -10,11 +10,20 @@ import dataAnalysis.helperFunctions.motor_encoder as mea
 import argparse, pdb
 import os
 import re
-import seaborn as sns
 import numpy as np
 import matplotlib
+matplotlib.rcParams['pdf.fonttype'] = 42
+matplotlib.rcParams['ps.fonttype'] = 42
+# matplotlib.use('Agg')   # generate postscript output
+matplotlib.use('QT5Agg')   # generate postscript output
+
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib import pyplot as plt
+import seaborn as sns
+sns.set(
+    context='talk', style='dark',
+    palette='dark', font='sans-serif',
+    font_scale=1.5, color_codes=True)
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--file', default = 'Murdoc_29_09_2017_10_48_48',  nargs='*')
@@ -60,6 +69,29 @@ typeLongName = {
     1 : 'Long First'
     }
 
+deepPalette = sns.color_palette('deep')
+plotOpts = {
+    'goEasy': {
+        'color': deepPalette[0],
+        'linestyle': '-',
+        'linewidth': 2
+    },
+    'goHard': {
+        'color': deepPalette[1],
+        'linestyle': '-',
+        'linewidth': 2
+    },
+    'correct button': {
+        'color': deepPalette[2],
+        'linestyle': '-',
+        'linewidth': 2
+    },
+    'incorrect button': {
+        'color': deepPalette[3],
+        'linestyle': '-',
+        'linewidth': 2
+    },
+}
 log, trialStats = hf.readPiJsonLog(filePaths, zeroTime = False)
 
 # In[ ]: Count total # of events
@@ -82,7 +114,7 @@ with PdfPages(os.path.join(fileDir, outputFileName + '_piReport.pdf')) as pdf:
     # In[ ]:
 
     plotNames = ['goEasy', 'goHard', 'correct button', 'incorrect button']
-    fi = hf.plot_events_raster(log, plotNames, collapse = True, usePlotly = False)
+    fi = hf.plot_events_raster(log, plotNames, plotOpts, collapse=True)
     plt.title('Events Raster')
     pdf.savefig()
     plt.close()
@@ -109,28 +141,30 @@ with PdfPages(os.path.join(fileDir, outputFileName + '_piReport.pdf')) as pdf:
     postInterval = 5
     deltaInterval = 500e-3
 
-    fi = hf.plotPeristimulusTimeHistogram(log, stimulus, plotNames,
-        preInterval = preInterval, postInterval = postInterval,
-        deltaInterval = deltaInterval, usePlotly = False)
+    fi = hf.plotPeristimulusTimeHistogram(
+        log, stimulus, plotNames,
+        preInterval=preInterval, postInterval=postInterval,
+        deltaInterval=deltaInterval)
     plt.title('Timing of button presses (PSTH)')
     pdf.savefig()
     pdf.savefig()
     plt.close()
     # In[ ]: Plot Trial Statistics
-    trialStats['Condition'].replace(conditionLongName, inplace = True)
-    trialStats['Outcome'].replace(outcomeLongName, inplace = True)
-    trialStats['Type'].replace(typeLongName, inplace = True)
+    trialStats['Condition'].replace(conditionLongName, inplace=True)
+    trialStats['Outcome'].replace(outcomeLongName, inplace=True)
+    trialStats['Type'].replace(typeLongName, inplace=True)
 
-    nBins = 7
-    stimIDs, stimIDsAbs, firstStimID, secondStimID = mea.getStimID(trialStats, nBins = nBins)
+    nBins = 9
+    stimIDs, stimIDsAbs, firstStimID, secondStimID = mea.getStimID(
+        trialStats, nBins=nBins)
 
-    trialStats["Stimulus ID Pair"]= stimIDs
-    trialStats["Stimulus ID Pair (Abs)"]= stimIDsAbs
+    trialStats["Stimulus ID Pair"] = stimIDs
+    trialStats["Stimulus ID Pair (Abs)"] = stimIDsAbs
 
-    trialStats["firstStimID"]= firstStimID.astype(float)
-    trialStats["firstStimID (Abs)"]= firstStimID.astype(float).abs()
-    trialStats["secondStimID"]= secondStimID.astype(float)
-    trialStats["secondStimID (Abs)"]= secondStimID.astype(float).abs()
+    trialStats["firstStimID"] = firstStimID.astype(float)
+    trialStats["firstStimID (Abs)"] = firstStimID.astype(float).abs()
+    trialStats["secondStimID"] = secondStimID.astype(float)
+    trialStats["secondStimID (Abs)"] = secondStimID.astype(float).abs()
 
     trialStats.to_csv(fileDir + '/' + outputFileName + '_trialStats.csv')
 
@@ -147,7 +181,7 @@ with PdfPages(os.path.join(fileDir, outputFileName + '_piReport.pdf')) as pdf:
         'Incorrect button' :0,
         'No press':np.nan
         }
-    uncuedTrialStats['Outcome Score'].replace(scoringDict, inplace = True)
+    uncuedTrialStats['Outcome Score'].replace(scoringDict, inplace=True)
 
     ax = sns.barplot(x="secondStimID (Abs)", y = 'Outcome Score', data=uncuedTrialStats)
     ax.set_title('Attempted trials broken down by difficulty (Uncued)')

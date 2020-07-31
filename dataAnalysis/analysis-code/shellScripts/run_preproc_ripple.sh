@@ -51,5 +51,6 @@ conda activate
 source activate nda2
 python --version
 #
+SLURM_ARRAY_TASK_ID=1
 python3 ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --ISI --transferISIStimLog
 # python3 ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --previewEncoder

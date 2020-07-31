@@ -163,8 +163,10 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
             'jsonSessionNames': jsonSessionNames[blockIdx],
             'elecIDs': range(17),
             'excludeClus': [],
-            'upsampleRate': 4,
-            'interpKind': 'linear',
+            # 'upsampleRate': 4,
+            # 'interpKind': 'linear',
+            'upsampleRate': 10,
+            'interpKind': 'akima',
             'forceRecalc': True,
             'detectStim': expOpts['detectStim'],
             'getINSkwargs': {}
@@ -187,26 +189,35 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
     commonStimDetectionOpts = {
         'stimDetectOptsByChannel': stimDetectOptsByChannelDefault,
         'spikeWindow': spikeWindow,
-        'offsetFromPeak': 4e-3,
         'cyclePeriodCorrection': 20e-3,
-        'predictSlots': True, 'snapToGrid': True,
         'plotAnomalies': False,
         'overrideStartTimes': overrideStartTimes,
-        'plotting':  range(0, 1000)  # [] range(1000)
+        'plotting':  range(0, 1000),  # [] range(1000)
+        'showPlots': True, 'figureOutputFolder': None
         }
     miniRCStimDetectionOpts = {
         'minDist': 1.2,
-        'gaussWid': 300e-3,
+        'gaussWid': 250e-3,
+        'offsetFromPeak': 2e-3,
+        'artifactKeepWhat': 'first',
+        'predictSlots': False, 'snapToGrid': False,
         'treatAsSinglePulses': False
         }
     RCStimDetectionOpts = {
         'minDist': 0.25,
         'gaussWid': 120e-3,
+        'offsetFromPeak': 2e-3,
+        'artifactKeepWhat': 'first',
+        'predictSlots': True, 'snapToGrid': True,
         'treatAsSinglePulses': True
         }
     fullStimDetectionOpts = {
         'minDist': 0.2,
-        'gaussWid': 100e-3,
+        'gaussWid': 50e-3,
+        'offsetFromPeak': 2e-3,
+        'artifactKeepWhat': 'max',
+        # 'predictSlots': False, 'snapToGrid': False,
+        'predictSlots': True, 'snapToGrid': True,
         'treatAsSinglePulses': False
         }
     # pdb.set_trace()
@@ -331,9 +342,9 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
     # alignedAsigsKWargs.update(dict(
     #     windowSize=(-2, 2),
     #     decimate=5))
-    alignedAsigsKWargs.update(dict(
-        windowSize=(-100e-3, 400e-3),
-        decimate=5))
+    # alignedAsigsKWargs.update(dict(
+    #     windowSize=(-100e-3, 400e-3),
+    #     decimate=5))
     # alignedAsigsKWargs.update(dict(
     #     windowSize=(-250e-6, 2750e-6),
     #     decimate=1))

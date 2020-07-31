@@ -27,8 +27,8 @@
 # EXP="exp201901211000"
 # EXP="exp201901221000"
 # EXP="exp201901231000"
-EXP="exp201901261000"
-# EXP="exp201901271000"
+# EXP="exp201901261000"
+EXP="exp201901271000"
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
@@ -37,8 +37,8 @@ conda activate
 source activate nda2
 python --version
 
-SLURM_ARRAY_TASK_ID=4
+SLURM_ARRAY_TASK_ID=2
 
 # --showPlots to enable quality check plots
-python3 './preprocINS.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP
-# python3 './preprocINS.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --disableStimDetection
+# --disableStimDetection to use HUT derived stim start times
+python3 './preprocINS.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --makePlots
