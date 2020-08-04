@@ -1,11 +1,22 @@
 from enum import Enum
 
-sampleRate = {
+TdSampleRates = {
+    # Hz
     0: 250,
     1: 500,
     2: 1000,
     240: None
     }
+
+AccelSampleRate = {
+    # Hz
+    0: 64,
+    1: 32,
+    2: 16,
+    3: 8,
+    4: 4,
+    255: None
+}
 
 cycleUnits = {
     # ushort, convert to seconds

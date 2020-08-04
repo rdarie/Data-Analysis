@@ -80,6 +80,521 @@ def fixMalformedJson(jsonString, jsonType=''):
     return jsonStringOut
 
 
+def processMetaMatrix(
+        metaMatrix,
+        sampleRateLookupDict=None, tossPackets=True, fixTimeShifts=False,
+        verbose=False, makePlots=False):
+    # count frame sizes
+    metaDF = pd.DataFrame(
+        metaMatrix, columns=[
+            'dataSize', 'dataTypeSequence',
+            'systemTick', 'timestamp', 'microloss', 'macroloss', 'bothloss',
+            'packetIdx', 'chanSamplesLen', 'dataSizePerChannel', 'SampleRate',
+            'overlapsFuture', 'PacketRxUnixTime', 'sortedIndices'])
+    metaDF['microloss'] = metaDF['microloss'].astype(np.bool)
+    metaDF['macroloss'] = metaDF['macroloss'].astype(np.bool)
+    metaDF['bothloss'] = metaDF['bothloss'].astype(np.bool)
+    # assume n channels is constant for all assembled sessions
+    mostCommonSampleRateCode = metaDF['SampleRate'].value_counts().idxmax()
+    fs = float(sampleRateLookupDict[mostCommonSampleRateCode])
+    nominalFrameSize = metaDF['dataSizePerChannel'].value_counts().idxmax()
+    nominalFrameDur = nominalFrameSize * (fs ** -1)
+    intersampleTickCount = int((fs ** -1) / (100e-6))
+    nChan = int(metaDF['chanSamplesLen'].iloc[0])
+    if fixTimeShifts:
+        metaMatrix, packetsNeededFixing =\
+            rcsa_helpers.correct_meta_matrix_time_displacement(
+                metaMatrix, intersampleTickCount)
+        metaMatrix = rcsa_helpers.code_micro_and_macro_packet_loss(
+            metaMatrix)
+        metaDF.loc[:, :] = metaMatrix
+        metaDF['microloss'] = metaDF['microloss'].astype(np.bool)
+        metaDF['macroloss'] = metaDF['macroloss'].astype(np.bool)
+        metaDF['bothloss'] = metaDF['bothloss'].astype(np.bool)
+    else:
+        packetsNeededFixing = pd.Index([])
+    if verbose:
+        print('{} microlosses'.format(metaMatrix[:, 4].sum()))
+        print('{} macrolosses'.format(metaMatrix[:, 5].sum()))
+        print('{} coincident losses'.format(metaMatrix[:, 6].sum()))
+    #
+    metaDF['anyloss'] = (metaDF['microloss'] | metaDF['macroloss'])
+    metaDF['payloadDurIsQuestionable'] = (
+        metaDF['anyloss'] |
+        metaDF['anyloss'].shift(-1).fillna(False) |
+        metaDF['anyloss'].shift(1).fillna(False))
+    #
+    metaDF['dataPayloadDur'] = metaDF['dataSizePerChannel'] * (fs ** -1)
+    # will hold duration corrections based on sysTick
+    metaDF['frameLenMissingPacketCorrection'] = 0
+    # how many whole data packets was that supposed to represent?
+    metaDF['dataPayloadDurWhole'] = (
+        nominalFrameDur *
+        np.round(
+            metaDF['dataPayloadDur'] / nominalFrameDur))
+    ####
+    metaDF['firstSampleTick'], metaDF['lastSampleTick'] = (
+        rcsa_helpers
+        .unpack_meta_matrix_time(
+            metaMatrix, intersampleTickCount))
+    metaDF['firstSampleTick'] *= 1e-4
+    metaDF['lastSampleTick'] *= 1e-4
+    #
+    metaDF['dataPayloadDurSysTick'] = metaDF['lastSampleTick'].diff()
+    metaDF['dataPayloadDurWholeSysTick'] = (
+        nominalFrameDur *
+        np.round(metaDF['dataPayloadDurSysTick'] / nominalFrameDur))
+    # there are never empty packets;
+    # nearly empty packets are wrongly labeled as too long
+    zeroWholePayloadMask = (metaDF['dataPayloadDurWholeSysTick'] == 0)
+    metaDF.loc[zeroWholePayloadMask, 'dataPayloadDurWholeSysTick'] += nominalFrameDur
+    metaDF['frameLenMismatchSysTick'] = (
+        metaDF['dataPayloadDurSysTick'] -
+        metaDF['dataPayloadDurWholeSysTick']
+        )
+    metaDF.loc[metaDF.index[0:2], 'frameLenMismatchSysTick'] = 0
+    # if the payload duration is close to nominal * (n + 0.5), we might have rounding
+    # problems
+    metaDF['wholeNumFramesIsQuestionable'] = (
+        metaDF['frameLenMismatchSysTick'].abs() > (nominalFrameDur / 2 - nominalFrameDur / 10))
+    metaDF['cumFrameLenMismatchSysTick'] = metaDF['frameLenMismatchSysTick'].cumsum()
+    rollingWindowForUnresolved = 20
+    metaDF['unresolvedFrameLenMismatchSysTick'] = (
+        metaDF['cumFrameLenMismatchSysTick']
+        .iloc[::-1]
+        .rolling(rollingWindowForUnresolved)
+        .min().iloc[::-1])
+    metaDF['unresolvedFrameLenMismatchWholeSysTick'] = (
+        nominalFrameDur *
+        np.round(
+            metaDF['unresolvedFrameLenMismatchSysTick'] / nominalFrameDur))
+    for rowIdx in metaDF.loc[metaDF['wholeNumFramesIsQuestionable'], :].index:
+        wholeDurCorrection = metaDF.loc[rowIdx, 'unresolvedFrameLenMismatchWholeSysTick']
+        # print('Applying whole correction: {:.3f}'.format(wholeDurCorrection))
+        metaDF.loc[
+            rowIdx, 'dataPayloadDurWholeSysTick'] += wholeDurCorrection
+        metaDF['frameLenMismatchSysTick'] = (
+            metaDF['dataPayloadDurSysTick'] -
+            metaDF['dataPayloadDurWholeSysTick']
+            )
+        metaDF.loc[metaDF.index[0:2], 'frameLenMismatchSysTick'] = 0
+        metaDF['cumFrameLenMismatchSysTick'] = metaDF['frameLenMismatchSysTick'].cumsum()
+        metaDF['unresolvedFrameLenMismatchSysTick'] = (
+            metaDF['cumFrameLenMismatchSysTick']
+            .iloc[::-1]
+            .rolling(rollingWindowForUnresolved)
+            .min().iloc[::-1])
+        metaDF['unresolvedFrameLenMismatchWholeSysTick'] = (
+            nominalFrameDur *
+            np.round(
+                metaDF['unresolvedFrameLenMismatchSysTick'] / nominalFrameDur))
+    metaDF['packetLossSysTick'] = (
+        metaDF['cumFrameLenMismatchSysTick'].diff().abs()
+        > nominalFrameDur)
+    metaDF.loc[~metaDF['microloss'], 'dataPayloadDurWhole'] = (
+        metaDF.loc[~metaDF['microloss'], 'dataPayloadDurWholeSysTick']
+        )
+    apparentFS = metaDF['dataPayloadDurSysTick'] / nominalFrameSize
+    print(
+        'Apparent sample period = {:.3e} msec (SEM = {:.2e} msec) (based on sysTick)'
+        .format(
+            1e3 * apparentFS.median(),
+            1e3 * stats.sem(apparentFS, nan_policy='omit')))
+    metaDF['frameLenMismatch'] = (
+        metaDF['dataPayloadDur'] -
+        metaDF['dataPayloadDurWhole'])
+    metaDF.loc[metaDF.index[0:2], 'frameLenMismatch'] = 0
+    metaDF['cumFrameLenMismatch'] = metaDF['frameLenMismatch'].cumsum()
+    metaDF['unresolvedFrameLenMismatch'] = (
+        metaDF['cumFrameLenMismatch']
+        .iloc[::-1]
+        .rolling(rollingWindowForUnresolved)
+        .min().iloc[::-1])
+    # print(metaDF.loc[25502:25506, ['dataTypeSequence', 'dataSizePerChannel', 'dataPayloadDur', 'dataPayloadDurWhole', 'frameLenMismatch']])
+    # check packet sizes
+    if makePlots:
+        fig, ax = plt.subplots(3, 1, sharex=True, figsize=(15, 15))
+        # xAxisVariable = 'PacketRxUnixTime'
+        # xAxisLabel = 'Packet Unix RX time (msec)'
+        # plotExtent = 250000
+        xAxisVariable = 'packetIdx'
+        xAxisLabel = 'Packet number'
+        plotExtent = 150
+        zoomAxes = True
+        if zoomAxes:
+            if metaDF['microloss'].any():
+                newXMin = max(
+                    metaDF.loc[
+                        metaDF['microloss'],
+                        xAxisVariable].iloc[0] - int(plotExtent/4),
+                    metaDF[xAxisVariable].iloc[0])
+                newXMax = min(
+                    newXMin + plotExtent,
+                    metaDF[xAxisVariable].iloc[-1])
+            else:
+                newXMin = metaDF[xAxisVariable].iloc[0]
+                newXMax = min(
+                    metaDF[xAxisVariable].iloc[0] + plotExtent,
+                    metaDF[xAxisVariable].iloc[-1])
+            plotMask = (
+                (metaDF[xAxisVariable] > newXMin) &
+                (metaDF[xAxisVariable] < newXMax)
+                ).to_numpy()
+            # ax[0].set_xlim([newXMin, newXMax])
+        else:
+            plotMask = np.ones(metaDF.index.shape)
+        ax[0].plot(
+            metaDF.loc[plotMask, xAxisVariable],
+            1e3 * metaDF.loc[plotMask, 'dataSizePerChannel'] * (fs ** -1),
+            label='frame length per packet'
+            )
+        ax[0].plot(
+            metaDF.loc[plotMask, xAxisVariable],
+            1e3 * metaDF.loc[plotMask, 'dataPayloadDurSysTick'],
+            label='frame length per packet (systick)'
+            )
+        ax[0].plot(
+            metaDF.loc[plotMask, xAxisVariable],
+            1e3 * metaDF.loc[plotMask, 'dataPayloadDurWholeSysTick'],
+            label='nominal frame length per packet (systick)'
+            )
+        ax[0].plot(
+            metaDF.loc[metaDF['wholeNumFramesIsQuestionable'] & plotMask, xAxisVariable],
+            1e3 * metaDF.loc[
+                metaDF['wholeNumFramesIsQuestionable'] & plotMask,
+                'dataSizePerChannel'] * (fs ** -1),
+            'yo', label='possible rounding problems'
+            )
+        ax[0].plot(
+            metaDF.loc[metaDF['microloss'] & plotMask, xAxisVariable],
+            1e3 * metaDF.loc[
+                metaDF['microloss'] & plotMask,
+                'dataSizePerChannel'] * (fs ** -1),
+            'm*', label='microloss packets'
+            )
+        ax[0].legend(loc='upper right')
+        ax[0].set_ylabel('time interval (msec)')
+        ax[1].plot(
+            metaDF.loc[plotMask, xAxisVariable],
+            1e3 * metaDF.loc[plotMask, 'frameLenMismatch'],
+            '.-',
+            label='difference from nominal length per packet',
+            )
+        ax[1].plot(
+            metaDF.loc[plotMask, xAxisVariable],
+            1e3 * metaDF.loc[plotMask, 'frameLenMismatchSysTick'],
+            label='difference from nominal length per packet (systick)',
+            )
+        ax[1].plot(
+            metaDF.loc[metaDF['microloss'] & plotMask, xAxisVariable],
+            1e3 * metaDF.loc[metaDF['microloss'] & plotMask, 'frameLenMismatch'],
+            'm*', label='microloss packets'
+            )
+        ax[1].legend(loc='upper right')
+        ax[1].set_ylabel('time interval (msec)')
+        ax[2].plot(
+            metaDF.loc[plotMask, xAxisVariable],
+            1e3 * metaDF.loc[plotMask, 'cumFrameLenMismatch'],
+            '--',
+            label='cumulative deviation from nominal frame lengths',
+            )
+        ax[2].plot(
+            metaDF.loc[plotMask, xAxisVariable],
+            1e3 * metaDF.loc[plotMask, 'cumFrameLenMismatchSysTick'],
+            label='cumulative deviation from nominal frame lengths (systick)',
+            )
+        ax[2].plot(
+            metaDF.loc[plotMask, xAxisVariable],
+            1e3 * metaDF.loc[plotMask, 'unresolvedFrameLenMismatch'], '--',
+            label='cumulative unresolved deviation from nominal frame lengths',
+            lw=3, zorder=2
+            )
+        ax[2].plot(
+            metaDF.loc[plotMask, xAxisVariable],
+            1e3 * metaDF.loc[plotMask, 'unresolvedFrameLenMismatchWholeSysTick'], '--',
+            label='cumulative unresolved deviation from nominal frame lengths (systick)',
+            lw=3, zorder=2
+            )
+        ax[2].plot(
+            metaDF.loc[
+                metaDF['microloss'] & plotMask, xAxisVariable],
+            1e3 * metaDF.loc[
+                metaDF['microloss'] & plotMask, 'cumFrameLenMismatch'],
+            'm*', label='microloss packets', zorder=3)
+    else:
+        fig, ax = None, None
+    for rowIdx in metaDF.loc[metaDF['microloss'], :].index:
+        metaDF.loc[
+            rowIdx, 'frameLenMissingPacketCorrection'] = metaDF.loc[
+                rowIdx, 'unresolvedFrameLenMismatch'] * (-1)
+        metaDF['cumFrameLenMismatch'] = ((
+            metaDF['frameLenMismatch'] +
+            metaDF['frameLenMissingPacketCorrection']).cumsum() -
+            (
+                metaDF['frameLenMismatch'].iloc[0] +
+                metaDF['frameLenMismatch'].iloc[1]))
+        metaDF['unresolvedFrameLenMismatch'] = (
+            metaDF['cumFrameLenMismatch']
+            .iloc[::-1]
+            .rolling(rollingWindowForUnresolved).min()
+            .iloc[::-1])
+    frameLenMismatchCompare = (
+        metaDF['cumFrameLenMismatchSysTick'] -
+        metaDF['cumFrameLenMismatch'])
+    frameLenCheckMessage = '''
+        after corrections, sysTick frame length tally
+        and frame size tally differ by at most {:.1f} msec'''.format(
+            1e3 * frameLenMismatchCompare.abs().max())
+    print(frameLenCheckMessage)
+    if makePlots:
+        ax[2].plot(
+            metaDF.loc[plotMask, xAxisVariable],
+            1e3 * metaDF.loc[plotMask, 'cumFrameLenMismatch'],
+            label='''
+                cumulative unresolved deviation
+                from nominal frame lengths (after fix)''',
+            zorder=1)
+        ax[2].set_ylabel('time interval (msec)')
+        ax[2].set_xlabel(xAxisLabel)
+        ax[2].set_title(frameLenCheckMessage)
+        ax[2].legend(loc='upper right')
+    if tossPackets:
+        tossMask = np.zeros((metaMatrix.shape[0])).astype(np.bool)
+        dataTypeSeqIndex = np.flatnonzero(
+            np.diff(metaMatrix[:, 1]) == 0)
+        tossMask[dataTypeSeqIndex] = True
+        sysTickIndex = np.flatnonzero(
+            np.diff(metaMatrix[:, 2]) == 0)
+        tossMask[sysTickIndex] = True
+    else:
+        tossMask = None
+    return (
+        metaDF, nChan, fs, intersampleTickCount,
+        nominalFrameDur, packetsNeededFixing,
+        tossMask, fig, ax)
+
+
+def processMetaMatrixV2(
+        metaMatrix,
+        sampleRateLookupDict=None, tossPackets=True, fixTimeShifts=False,
+        verbose=False, makePlots=False):
+    # count frame sizes
+    metaDF = pd.DataFrame(
+        metaMatrix, columns=[
+            'dataSize', 'dataTypeSequence',
+            'systemTick', 'timestamp', 'microloss', 'macroloss', 'bothloss',
+            'packetIdx', 'chanSamplesLen', 'dataSizePerChannel', 'SampleRate',
+            'overlapsFuture', 'PacketRxUnixTime', 'sortedIndices'])
+    metaDF['microloss'] = metaDF['microloss'].astype(np.bool)
+    metaDF['macroloss'] = metaDF['macroloss'].astype(np.bool)
+    metaDF['bothloss'] = metaDF['bothloss'].astype(np.bool)
+    # assume n channels is constant for all assembled sessions
+    mostCommonSampleRateCode = metaDF['SampleRate'].value_counts().idxmax()
+    fs = float(sampleRateLookupDict[mostCommonSampleRateCode])
+    nominalFrameSize = metaDF['dataSizePerChannel'].value_counts().idxmax()
+    nominalFrameDur = nominalFrameSize * (fs ** -1)
+    intersampleTickCount = int((fs ** -1) / (100e-6))
+    nChan = int(metaDF['chanSamplesLen'].iloc[0])
+    if fixTimeShifts:
+        metaMatrix, packetsNeededFixing =\
+            rcsa_helpers.correct_meta_matrix_time_displacement(
+                metaMatrix, intersampleTickCount)
+        metaMatrix = rcsa_helpers.code_micro_and_macro_packet_loss(
+            metaMatrix)
+        metaDF.loc[:, :] = metaMatrix
+        metaDF['microloss'] = metaDF['microloss'].astype(np.bool)
+        metaDF['macroloss'] = metaDF['macroloss'].astype(np.bool)
+        metaDF['bothloss'] = metaDF['bothloss'].astype(np.bool)
+    else:
+        packetsNeededFixing = pd.Index([])
+    if verbose:
+        print('{} microlosses'.format(metaMatrix[:, 4].sum()))
+        print('{} macrolosses'.format(metaMatrix[:, 5].sum()))
+        print('{} coincident losses'.format(metaMatrix[:, 6].sum()))
+    #
+    metaDF['anyloss'] = (metaDF['microloss'] | metaDF['macroloss'])
+    #
+    metaDF['dataPayloadDur'] = metaDF['dataSizePerChannel'] * (fs ** -1)
+    # will hold duration corrections based on sysTick
+    metaDF['frameLenMissingPacketCorrection'] = 0
+    ####
+    metaDF['firstSampleTick'], metaDF['lastSampleTick'] = (
+        rcsa_helpers
+        .unpack_meta_matrix_time(
+            metaMatrix, intersampleTickCount))
+    metaDF['firstSampleTick'] *= 1e-4
+    metaDF['lastSampleTick'] *= 1e-4
+    #
+    metaDF['dataPayloadDurSysTick'] = metaDF['lastSampleTick'].diff()
+    metaDF['dataPayloadDurSysTick'].iloc[0] = 0
+    metaDF['recordDurSysTick'] = metaDF['dataPayloadDurSysTick'].cumsum()
+    metaDF['recordDurWholeSysTick'] = (
+        nominalFrameDur *
+        np.round(
+            metaDF['recordDurSysTick'] / nominalFrameDur))
+
+    if makePlots:
+        fig, ax = plt.subplots(3, 1, sharex=True, figsize=(15, 15))
+        # xAxisVariable = 'PacketRxUnixTime'
+        # xAxisLabel = 'Packet Unix RX time (msec)'
+        # plotExtent = 250000
+        xAxisVariable = 'packetIdx'
+        xAxisLabel = 'Packet number'
+        plotExtent = 150
+        zoomAxes = True
+        if zoomAxes:
+            if metaDF['microloss'].any():
+                newXMin = max(
+                    metaDF.loc[
+                        metaDF['microloss'],
+                        xAxisVariable].iloc[0] - int(plotExtent/4),
+                    metaDF[xAxisVariable].iloc[0])
+                newXMax = min(
+                    newXMin + plotExtent,
+                    metaDF[xAxisVariable].iloc[-1])
+            else:
+                newXMin = metaDF[xAxisVariable].iloc[0]
+                newXMax = min(
+                    metaDF[xAxisVariable].iloc[0] + plotExtent,
+                    metaDF[xAxisVariable].iloc[-1])
+            plotMask = (
+                (metaDF[xAxisVariable] > newXMin) &
+                (metaDF[xAxisVariable] < newXMax)
+                ).to_numpy()
+            # ax[0].set_xlim([newXMin, newXMax])
+        else:
+            plotMask = np.ones(metaDF.index.shape)
+        ax[0].plot(
+            metaDF.loc[plotMask, xAxisVariable],
+            1e3 * metaDF.loc[plotMask, 'dataSizePerChannel'] * (fs ** -1),
+            label='frame length per packet'
+            )
+        ax[0].plot(
+            metaDF.loc[plotMask, xAxisVariable],
+            1e3 * metaDF.loc[plotMask, 'dataPayloadDurSysTick'],
+            label='frame length per packet (systick)'
+            )
+        ax[0].plot(
+            metaDF.loc[plotMask, xAxisVariable],
+            1e3 * metaDF.loc[plotMask, 'dataPayloadDurWholeSysTick'],
+            label='nominal frame length per packet (systick)'
+            )
+        ax[0].plot(
+            metaDF.loc[metaDF['wholeNumFramesIsQuestionable'] & plotMask, xAxisVariable],
+            1e3 * metaDF.loc[
+                metaDF['wholeNumFramesIsQuestionable'] & plotMask,
+                'dataSizePerChannel'] * (fs ** -1),
+            'yo', label='possible rounding problems'
+            )
+        ax[0].plot(
+            metaDF.loc[metaDF['microloss'] & plotMask, xAxisVariable],
+            1e3 * metaDF.loc[
+                metaDF['microloss'] & plotMask,
+                'dataSizePerChannel'] * (fs ** -1),
+            'm*', label='microloss packets'
+            )
+        ax[0].legend(loc='upper right')
+        ax[0].set_ylabel('time interval (msec)')
+        ax[1].plot(
+            metaDF.loc[plotMask, xAxisVariable],
+            1e3 * metaDF.loc[plotMask, 'frameLenMismatch'],
+            '.-',
+            label='difference from nominal length per packet',
+            )
+        ax[1].plot(
+            metaDF.loc[plotMask, xAxisVariable],
+            1e3 * metaDF.loc[plotMask, 'frameLenMismatchSysTick'],
+            label='difference from nominal length per packet (systick)',
+            )
+        ax[1].plot(
+            metaDF.loc[metaDF['microloss'] & plotMask, xAxisVariable],
+            1e3 * metaDF.loc[metaDF['microloss'] & plotMask, 'frameLenMismatch'],
+            'm*', label='microloss packets'
+            )
+        ax[1].legend(loc='upper right')
+        ax[1].set_ylabel('time interval (msec)')
+        ax[2].plot(
+            metaDF.loc[plotMask, xAxisVariable],
+            1e3 * metaDF.loc[plotMask, 'cumFrameLenMismatch'],
+            '--',
+            label='cumulative deviation from nominal frame lengths',
+            )
+        ax[2].plot(
+            metaDF.loc[plotMask, xAxisVariable],
+            1e3 * metaDF.loc[plotMask, 'cumFrameLenMismatchSysTick'],
+            label='cumulative deviation from nominal frame lengths (systick)',
+            )
+        ax[2].plot(
+            metaDF.loc[plotMask, xAxisVariable],
+            1e3 * metaDF.loc[plotMask, 'unresolvedFrameLenMismatch'], '--',
+            label='cumulative unresolved deviation from nominal frame lengths',
+            lw=3, zorder=2
+            )
+        ax[2].plot(
+            metaDF.loc[plotMask, xAxisVariable],
+            1e3 * metaDF.loc[plotMask, 'unresolvedFrameLenMismatchWholeSysTick'], '--',
+            label='cumulative unresolved deviation from nominal frame lengths (systick)',
+            lw=3, zorder=2
+            )
+        ax[2].plot(
+            metaDF.loc[
+                metaDF['microloss'] & plotMask, xAxisVariable],
+            1e3 * metaDF.loc[
+                metaDF['microloss'] & plotMask, 'cumFrameLenMismatch'],
+            'm*', label='microloss packets', zorder=3)
+    else:
+        fig, ax = None, None
+    for rowIdx in metaDF.loc[metaDF['microloss'], :].index:
+        metaDF.loc[
+            rowIdx, 'frameLenMissingPacketCorrection'] = metaDF.loc[
+                rowIdx, 'unresolvedFrameLenMismatch'] * (-1)
+        metaDF['cumFrameLenMismatch'] = ((
+            metaDF['frameLenMismatch'] +
+            metaDF['frameLenMissingPacketCorrection']).cumsum() -
+            (
+                metaDF['frameLenMismatch'].iloc[0] +
+                metaDF['frameLenMismatch'].iloc[1]))
+        metaDF['unresolvedFrameLenMismatch'] = (
+            metaDF['cumFrameLenMismatch']
+            .iloc[::-1]
+            .rolling(rollingWindowForUnresolved).min()
+            .iloc[::-1])
+    frameLenMismatchCompare = (
+        metaDF['cumFrameLenMismatchSysTick'] -
+        metaDF['cumFrameLenMismatch'])
+    frameLenCheckMessage = '''
+        after corrections, sysTick frame length tally
+        and frame size tally differ by at most {:.1f} msec'''.format(
+            1e3 * frameLenMismatchCompare.abs().max())
+    print(frameLenCheckMessage)
+    if makePlots:
+        ax[2].plot(
+            metaDF.loc[plotMask, xAxisVariable],
+            1e3 * metaDF.loc[plotMask, 'cumFrameLenMismatch'],
+            label='''
+                cumulative unresolved deviation
+                from nominal frame lengths (after fix)''',
+            zorder=1)
+        ax[2].set_ylabel('time interval (msec)')
+        ax[2].set_xlabel(xAxisLabel)
+        ax[2].set_title(frameLenCheckMessage)
+        ax[2].legend(loc='upper right')
+    if tossPackets:
+        tossMask = np.zeros((metaMatrix.shape[0])).astype(np.bool)
+        dataTypeSeqIndex = np.flatnonzero(
+            np.diff(metaMatrix[:, 1]) == 0)
+        tossMask[dataTypeSeqIndex] = True
+        sysTickIndex = np.flatnonzero(
+            np.diff(metaMatrix[:, 2]) == 0)
+        tossMask[sysTickIndex] = True
+    else:
+        tossMask = None
+    return (
+        metaDF, nChan, fs, intersampleTickCount,
+        nominalFrameDur, packetsNeededFixing,
+        tossMask, fig, ax)
+
+
 def getINSTDFromJson(
         folderPath, sessionNames,
         deviceName='DeviceNPC700373H',
@@ -89,9 +604,8 @@ def getINSTDFromJson(
         upsampleRate=None, interpKind='linear',
         fixTimeShifts=False, tossPackets=True,
         assumeConsistentPacketSizes=True,
-        makePlots=False,
-        showPlots=False,
-        figureOutputFolder=None,
+        makePlots=False, showPlots=False,
+        figureOutputFolder=None, blockIdx=None
         ):
 
     if not isinstance(sessionNames, Iterable):
@@ -124,55 +638,19 @@ def getINSTDFromJson(
                     timeDomainJsonText = f.read()
                     timeDomainJsonText = fixMalformedJson(timeDomainJsonText)
                     timeDomainJson = json.loads(timeDomainJsonText)
-            timeDomainMeta = rcsa_helpers.extract_td_meta_data(timeDomainJson)
             #
+            timeDomainMeta = rcsa_helpers.extract_td_meta_data(timeDomainJson)
             timeDomainMeta = rcsa_helpers.code_micro_and_macro_packet_loss(
                 timeDomainMeta)
-            # def process metaMatrix(metaMatrix):
-            # count frame sizes
-            tdMetaDF = pd.DataFrame(
-                timeDomainMeta, columns=[
-                    'dataSize', 'dataTypeSequence',
-                    'systemTick', 'timestamp', 'microloss', 'macroloss', 'bothloss',
-                    'packetIdx', 'chanSamplesLen', 'dataSizePerChannel', 'SampleRate',
-                    'overlapsFuture', 'PacketRxUnixTime', 'sortedIndices'])
-            # assume n channels is constant for all assembled sessions
-            fs = float(mdt_constants.sampleRate[tdMetaDF['SampleRate'].value_counts().idxmax()])
-            nominalFrameSize = tdMetaDF['dataSizePerChannel'].value_counts().idxmax()
-            nominalFrameDur = nominalFrameSize * (fs ** -1)
-            intersampleTickCount = int((fs ** -1) / (100e-6))
-            nChan = int(tdMetaDF['chanSamplesLen'].iloc[0])
-            #
-            tdMetaDF['frameLenMismatch'] = (
-                tdMetaDF['dataSizePerChannel'] * (fs ** -1) -
-                nominalFrameDur *
-                np.round(
-                    tdMetaDF['dataSizePerChannel'] *
-                    fs ** -1 / nominalFrameDur))
-            tdMetaDF['frameLenMissingPacketCorrection'] = 0
-            tdMetaDF['cumFrameLenMismatch'] = tdMetaDF['frameLenMismatch'].cumsum()
-            rollingWindowForUnresolved = 20
-            # TODO!!!!! turn unresolved into absolute value; the idea is that the mismatch should hit 0 at some point, the signed min is irellevant
-            tdMetaDF['unresolvedFrameLenMismatch'] = (
-                tdMetaDF['cumFrameLenMismatch']
-                .iloc[::-1]
-                .rolling(rollingWindowForUnresolved)
-                .min().iloc[::-1])
-            tdMetaDF['firstSampleTick'], tdMetaDF['lastSampleTick'] = (
-                rcsa_helpers
-                .unpack_meta_matrix_time(
-                    timeDomainMeta, intersampleTickCount))
-            tdMetaDF['firstSampleTick'] *= 1e-4
-            tdMetaDF['lastSampleTick'] *= 1e-4
-            tdMetaDF['frameLenMismatchSysTick'] = (
-                tdMetaDF['lastSampleTick'].diff() -
-                nominalFrameDur *
-                np.round(
-                    tdMetaDF['lastSampleTick'].diff() / nominalFrameDur))
-            tdMetaDF['cumFrameLenMismatchSysTick'] = (
-                tdMetaDF['frameLenMismatchSysTick']
-                .cumsum())
-            # check packet sizes
+            (
+                tdMetaDF, nChan, fs,
+                intersampleTickCount, nominalFrameDur,
+                packetsNeededFixing, tossMask,
+                fig, ax) = processMetaMatrixV2(
+                    timeDomainMeta, verbose=verbose,
+                    sampleRateLookupDict=mdt_constants.TdSampleRates,
+                    tossPackets=tossPackets, fixTimeShifts=fixTimeShifts,
+                    makePlots=makePlots)
             if makePlots:
                 (
                     (tdMetaDF['dataSizePerChannel'] * (fs ** -1))
@@ -180,132 +658,21 @@ def getINSTDFromJson(
                     .to_csv(
                         os.path.join(
                             figureOutputFolder,
-                            'frame_size_counts.csv')))
-                fig, ax = plt.subplots(3, 1, sharex=True, figsize=(15, 15))
-                ax[0].plot(
-                    tdMetaDF['PacketRxUnixTime'],
-                    1e3 * tdMetaDF['dataSizePerChannel'] * (fs ** -1),
-                    label='frame length per packet'
-                    )
-                ax[0].plot(
-                    tdMetaDF['PacketRxUnixTime'],
-                    1e3 * tdMetaDF['lastSampleTick'].diff(),
-                    label='frame length per packet (systick)'
-                    )
-                ax[0].plot(
-                    tdMetaDF.loc[
-                        tdMetaDF['microloss'].astype(bool),
-                        'PacketRxUnixTime'],
-                    1e3 * tdMetaDF.loc[
-                        tdMetaDF['microloss'].astype(bool),
-                        'dataSizePerChannel'] * (fs ** -1),
-                    'm*', label='microloss packets'
-                    )
-                ax[0].legend()
-                ax[0].set_ylabel('time interval (msec)')
-                ax[1].plot(
-                    tdMetaDF['PacketRxUnixTime'],
-                    1e3 * tdMetaDF['frameLenMismatch'],
-                    label='difference from nominal length per packet',
-                    )
-                ax[1].plot(
-                    tdMetaDF['PacketRxUnixTime'],
-                    1e3 * tdMetaDF['frameLenMismatchSysTick'],
-                    label='difference from nominal length per packet (systick)',
-                    )
-                ax[1].plot(
-                    tdMetaDF.loc[tdMetaDF[
-                        'microloss'].astype(bool),
-                        'PacketRxUnixTime'],
-                    1e3 * tdMetaDF.loc[
-                        tdMetaDF['microloss'].astype(bool),
-                        'frameLenMismatch'],
-                    'm*', label='microloss packets'
-                    )
-                ax[1].legend()
-                ax[1].set_ylabel('time interval (msec)')
-                ax[2].plot(
-                    tdMetaDF['PacketRxUnixTime'],
-                    1e3 * tdMetaDF['cumFrameLenMismatch'],
-                    label='cumulative deviation from nominal frame lengths',
-                    )
-                ax[2].plot(
-                    tdMetaDF['PacketRxUnixTime'],
-                    1e3 * tdMetaDF['cumFrameLenMismatchSysTick'],
-                    label='cumulative deviation from nominal frame lengths (systick)',
-                    )
-                ax[2].plot(
-                    tdMetaDF['PacketRxUnixTime'],
-                    1e3 * tdMetaDF['unresolvedFrameLenMismatch'],
-                    label='cumulative unresolved deviation from nominal frame lengths',
-                    lw=3, zorder=2
-                    )
-                ax[2].plot(
-                    tdMetaDF.loc[
-                        tdMetaDF['microloss'].astype(bool),
-                        'PacketRxUnixTime'],
-                    1e3 * tdMetaDF.loc[
-                        tdMetaDF['microloss'].astype(bool),
-                        'cumFrameLenMismatch'],
-                    'm*', label='microloss packets', zorder=3)
-            for rowIdx in tdMetaDF.loc[tdMetaDF['microloss'].astype(bool), :].index:
-                tdMetaDF.loc[rowIdx, 'frameLenMissingPacketCorrection'] = tdMetaDF.loc[rowIdx, 'unresolvedFrameLenMismatch'] * (-1)
-                tdMetaDF['cumFrameLenMismatch'] = (tdMetaDF['frameLenMismatch'] + tdMetaDF['frameLenMissingPacketCorrection']).cumsum()
-                tdMetaDF['unresolvedFrameLenMismatch'] = tdMetaDF['cumFrameLenMismatch'].iloc[::-1].rolling(rollingWindowForUnresolved).min().iloc[::-1]
-            # pdb.set_trace()
-            frameLenMismatchCompare = (
-                tdMetaDF['cumFrameLenMismatchSysTick'] -
-                tdMetaDF['cumFrameLenMismatch'])
-            frameLenCheckMessage = 'after corrections, sysTick frame length tally and frame size tally differ by at most {:.1f} msec'.format(1e3 * frameLenMismatchCompare.abs().max())
-            print(frameLenCheckMessage)
-            if makePlots:
-                ax[2].plot(
-                    tdMetaDF['PacketRxUnixTime'],
-                    1e3 * tdMetaDF['cumFrameLenMismatch'],
-                    label='cumulative unresolved deviation from nominal frame lengths (after fix)',
-                    zorder=1)
-                ax[2].set_ylabel('time interval (msec)')
-                ax[2].set_xlabel('Packet Unix RX time (msec)')
-                ax[2].set_title(frameLenCheckMessage)
-                ax[2].legend()
-                # pdb.set_trace()
-                if tdMetaDF['microloss'].astype(bool).any():
-                    newXLims = [
-                        tdMetaDF.loc[tdMetaDF['microloss'].astype(bool), 'PacketRxUnixTime'].iloc[0] - 2000,
-                        tdMetaDF.loc[tdMetaDF['microloss'].astype(bool), 'PacketRxUnixTime'].iloc[0] + 8000,
-                        ]
-                else:
-                    newXLims = [
-                        tdMetaDF['PacketRxUnixTime'].iloc[0],
-                        tdMetaDF['PacketRxUnixTime'].iloc[0] + 10000]
-                ax[0].set_xlim(newXLims)
+                            'frame_size_counts_Block{:0>3}_td.csv'.format(blockIdx)),
+                        header=True))
                 figSaveOpts = dict(
                     bbox_extra_artists=(thisAx.get_legend() for thisAx in ax),
                     bbox_inches='tight')
-                pdfPath = os.path.join(figureOutputFolder, 'packet_jitter.pdf')
+                pdfPath = os.path.join(
+                    figureOutputFolder,
+                    'packet_jitter_Block{:0>3}_td.pdf'.format(
+                        blockIdx))
                 plt.savefig(pdfPath, **figSaveOpts)
                 if showPlots:
                     plt.show()
                 else:
                     plt.close()
-            if verbose:
-                print('{} microlosses'.format(timeDomainMeta[:, 4].sum()))
-                print('{} macrolosses'.format(timeDomainMeta[:, 5].sum()))
-            if fixTimeShifts:
-                timeDomainMeta, packetsNeededFixing =\
-                    rcsa_helpers.correct_meta_matrix_time_displacement(
-                        timeDomainMeta, intersampleTickCount)
-                timeDomainMeta = rcsa_helpers.code_micro_and_macro_packet_loss(
-                    timeDomainMeta)
-                if verbose:
-                    print('after fixing time traveling packets')
-                    print('{} microlosses'.format(timeDomainMeta[:, 4].sum()))
-                    print('{} macrolosses'.format(timeDomainMeta[:, 5].sum()))
-            else:
-                packetsNeededFixing = pd.Index([])
-            #  num_real_points, num_macro_rollovers, loss_as_scalar =\
-            #      rcsa_helpers.calculate_statistics(
-            #          timeDomainMeta, intersampleTickCount)
+            #
             timeDomainValues = rcsa_helpers.unpacker_td(
                 timeDomainMeta, timeDomainJson, intersampleTickCount)
             #  save the noninterpolated files to disk
@@ -314,13 +681,6 @@ def getINSTDFromJson(
                     jsonPath, 'RawDataTD.csv'),
                 time_format='full', data_type='td', num_cols=nChan)
             if tossPackets:
-                tossMask = np.zeros((timeDomainMeta.shape[0])).astype(np.bool)
-                dataTypeSeqIndex = np.flatnonzero(
-                    np.diff(timeDomainMeta[:, 1]) == 0)
-                tossMask[dataTypeSeqIndex] = True
-                sysTickIndex = np.flatnonzero(
-                    np.diff(timeDomainMeta[:, 2]) == 0)
-                tossMask[sysTickIndex] = True
                 tossMaskFinal = tdData['packetIdx'].isin(
                     np.flatnonzero(tossMask))
                 tdData = tdData.loc[~tossMaskFinal, :]
@@ -340,35 +700,50 @@ def getINSTDFromJson(
                 lastPacketT = lastPacketStartTime - fs ** (-1)
                 # lastPacketStartCoarseTime = tdData['coarseClock'].iloc[0]
                 for name, group in tdData.groupby('packetIdx'):
+                    # get time difference from sysTick
                     misalignTimeDiff = group['t'].iloc[0] - lastPacketT
-                    startTimeOver = tdMetaDF.loc[name, 'microloss'].astype(bool)
+                    startTimeOver = tdMetaDF.loc[name, 'microloss']
                     if verbose and (int(name) in packetsNeededFixing):
                         print('    fixed packet: t = {:+.4f}'.format(
                             group['t'].iloc[0] - tZero))
                     if startTimeOver:
                         if verbose:
-                            print('    starting over; t = {:+.4f}; time skip = {:+.4f}'.format(
-                                group['t'].iloc[0] - tZero, misalignTimeDiff))
+                            print(
+                                '    starting over; t = {:+.4f}; time skip = {:+.4f}'
+                                .format(
+                                    group['t'].iloc[0] - tZero,
+                                    misalignTimeDiff))
                         if assumeConsistentPacketSizes:
-                            # TODO: check that the sign of the missing frame len is correct
+                            # TODO: check that
+                            # the sign of the missing frame len is correct
                             packetTimeCorrection = (
-                                tdMetaDF.loc[name, 'frameLenMissingPacketCorrection'] +
+                                tdMetaDF.loc[
+                                    name,
+                                    'frameLenMissingPacketCorrection'] +
                                 nominalFrameDur *
                                 np.round(misalignTimeDiff / nominalFrameDur))
                             if verbose:
-                                print('    applying {:+.4f} corection'.format(packetTimeCorrection))
-                            lastPacketStartTime = lastPacketStartTime + packetTimeCorrection
+                                print(
+                                    '    applying {:+.4f} corection'
+                                    .format(packetTimeCorrection))
+                            lastPacketStartTime = (
+                                lastPacketStartTime +
+                                packetTimeCorrection)
                         else:
                             lastPacketStartTime = group['t'].iloc[0]
                     else:
                         if verbose and False:
-                            print('not starting over; t = {:+.4f}; time skip = {:+.4f}'.format(
-                                group['t'].iloc[0] - tZero, misalignTimeDiff))
+                            print(
+                                'not starting over; t = {:+.4f}; time skip = {:+.4f}'
+                                .format(
+                                    group['t'].iloc[0] - tZero,
+                                    misalignTimeDiff))
                     tdData.loc[group.index, 'equidistantT'] = (
                         lastPacketStartTime +
                         fs ** (-1) * np.arange(0, group.shape[0]))
                     lastPacketStartTime = (
-                        tdData.loc[group.index, 'equidistantT'].iloc[-1] + fs ** (-1))
+                        tdData.loc[group.index, 'equidistantT'].iloc[-1] +
+                        fs ** (-1))
                     lastPacketT = group['t'].iloc[-1] + fs ** (-1)
                     # lastPacketStartCoarseTime = (
                     #     tdData.loc[group.index, 'coarseClock'].iloc[-1])
@@ -480,7 +855,7 @@ def getINSAccelFromJson(
         assumeConsistentPacketSizes=True,
         makePlots=False,
         showPlots=False,
-        figureOutputFolder=None,
+        figureOutputFolder=None, blockIdx=None
         ):
 
     if not isinstance(sessionNames, Iterable):
@@ -507,7 +882,6 @@ def getINSAccelFromJson(
 
         except Exception:
             traceback.print_exc()
-
             try:
                 with open(os.path.join(jsonPath, 'RawDataAccel.json'), 'r') as f:
                     accelJson = json.load(f)
@@ -516,19 +890,40 @@ def getINSAccelFromJson(
                     accelJsonText = f.read()
                     accelJsonText = fixMalformedJson(accelJsonText)
                     accelJson = json.loads(accelJsonText)
-
-            intersampleTickCount = int((1/fs) / (100e-6))
+            # intersampleTickCount = int((1/fs) / (100e-6))
             accelMeta = rcsa_helpers.extract_accel_meta_data(accelJson)
             accelMeta = rcsa_helpers.code_micro_and_macro_packet_loss(
                 accelMeta)
-            if fixTimeShifts:
-                accelMeta, packetsNeededFixing =\
-                    rcsa_helpers.correct_meta_matrix_time_displacement(
-                        accelMeta, intersampleTickCount)
-                accelMeta = rcsa_helpers.code_micro_and_macro_packet_loss(
-                    accelMeta)
-            else:
-                packetsNeededFixing = pd.Index([])
+            (
+                accelMetaDF, nChan, fs,
+                intersampleTickCount, nominalFrameDur,
+                packetsNeededFixing, tossMask,
+                fig, ax) = processMetaMatrixV2(
+                    accelMeta, verbose=verbose,
+                    sampleRateLookupDict=mdt_constants.AccelSampleRate,
+                    tossPackets=tossPackets, fixTimeShifts=fixTimeShifts,
+                    makePlots=makePlots)
+            if makePlots:
+                (
+                    (accelMetaDF['dataSizePerChannel'] * (fs ** -1))
+                    .value_counts()
+                    .to_csv(
+                        os.path.join(
+                            figureOutputFolder,
+                            'frame_size_counts_Block{:0>3}_accel.csv'.format(blockIdx)),
+                        header=True))
+                figSaveOpts = dict(
+                    bbox_extra_artists=(thisAx.get_legend() for thisAx in ax),
+                    bbox_inches='tight')
+                pdfPath = os.path.join(
+                    figureOutputFolder,
+                    'packet_jitter_Block{:0>3}_accel.pdf'.format(
+                        blockIdx))
+                plt.savefig(pdfPath, **figSaveOpts)
+                if showPlots:
+                    plt.show()
+                else:
+                    plt.close()
             accelDataValues = rcsa_helpers.unpacker_accel(
                 accelMeta, accelJson, intersampleTickCount)
             #  save the noninterpolated files to disk
@@ -537,13 +932,6 @@ def getINSAccelFromJson(
                     jsonPath, 'RawDataAccel.csv'),
                 time_format='full', data_type='accel')
             if tossPackets:
-                tossMask = np.zeros((accelMeta.shape[0])).astype(np.bool)
-                dataTypeSeqIndex = np.flatnonzero(
-                    np.diff(accelMeta[:, 1]) == 0)
-                tossMask[dataTypeSeqIndex] = True
-                sysTickIndex = np.flatnonzero(
-                    np.diff(accelMeta[:, 2]) == 0)
-                tossMask[sysTickIndex] = True
                 tossMaskFinal = accelData['packetIdx'].isin(
                     np.flatnonzero(tossMask))
                 accelData = accelData.loc[~tossMaskFinal, :]
@@ -551,6 +939,8 @@ def getINSAccelFromJson(
             accelData['t'] = (
                 accelData['actual_time'] - INSReferenceTime) / (
                     datetime.timedelta(seconds=1))
+            if idx == 0:
+                tZero = accelData['t'].iloc[0]
             if not assumeNoSamplesLost:
                 accelData = accelData.drop_duplicates(
                     ['t']
@@ -558,23 +948,45 @@ def getINSAccelFromJson(
             else:
                 accelData['equidistantT'] = np.nan
                 lastPacketStartTime = accelData['t'].iloc[0]
+                lastPacketT = lastPacketStartTime - fs ** (-1)
                 # lastPacketStartCoarseTime = accelData['coarseClock'].iloc[0]
                 for name, group in accelData.groupby('packetIdx'):
-                    startTimeOver = (
-                        (accelMeta[int(name), 5] == 1) |
-                        (accelMeta[int(name), 4] == 1)
-                        )
+                    misalignTimeDiff = group['t'].iloc[0] - lastPacketT
+                    startTimeOver = accelMetaDF.loc[name, 'microloss']
+                    if verbose and (int(name) in packetsNeededFixing):
+                        print('    fixed packet: t = {:+.4f}'.format(
+                            group['t'].iloc[0] - tZero))
                     if startTimeOver:
-                        accelData.loc[group.index, 'equidistantT'] = (
-                            group['t'].iloc[0] +
-                            fs ** (-1) * np.arange(0, group.shape[0]))
+                        if verbose:
+                            print('    starting over; t = {:+.4f}; time skip = {:+.4f}'.format(
+                                group['t'].iloc[0] - tZero, misalignTimeDiff))
+                        if assumeConsistentPacketSizes:
+                            # TODO: check that the sign of the missing frame len is correct
+                            packetTimeCorrection = (
+                                accelMetaDF.loc[
+                                    name,
+                                    'frameLenMissingPacketCorrection'] +
+                                nominalFrameDur *
+                                np.round(misalignTimeDiff / nominalFrameDur))
+                            if verbose:
+                                print(
+                                    '    applying {:+.4f} corection'
+                                    .format(packetTimeCorrection))
+                            lastPacketStartTime = (
+                                lastPacketStartTime + packetTimeCorrection)
+                        else:
+                            lastPacketStartTime = group['t'].iloc[0]
                     else:
-                        accelData.loc[group.index, 'equidistantT'] = (
-                            lastPacketStartTime +
-                            fs ** (-1) * np.arange(0, group.shape[0]))
+                        if verbose and False:
+                            print('not starting over; t = {:+.4f}; time skip = {:+.4f}'.format(
+                                group['t'].iloc[0] - tZero, misalignTimeDiff))
+                    accelData.loc[group.index, 'equidistantT'] = (
+                        lastPacketStartTime +
+                        fs ** (-1) * np.arange(0, group.shape[0]))
                     lastPacketStartTime = (
                         accelData.loc[group.index, 'equidistantT'].iloc[-1] +
                         fs ** (-1))
+                    lastPacketT = group['t'].iloc[-1] + fs ** (-1)
                     # lastPacketStartCoarseTime = (
                     #     accelData.loc[group.index, 'coarseClock'].iloc[-1])
                 accelData['t'] = accelData['equidistantT'].to_numpy()
@@ -588,7 +1000,6 @@ def getINSAccelFromJson(
                     i for i in accelData.columns if 'accel_' in i]
                 channelsPresent += [
                     'time_master', 'microseconds']
-
                 #  convert to floats before interpolating
                 accelData['microseconds'] = accelData['microseconds'] / (
                     datetime.timedelta(microseconds=1))
@@ -604,7 +1015,6 @@ def getINSAccelFromJson(
                 accelData['time_master'] = pd.to_datetime(
                     accelData['time_master'], unit='s',
                     origin=pd.Timestamp('2000-03-01'))
-
             inertia = accelData['accel_x']**2 +\
                 accelData['accel_y']**2 +\
                 accelData['accel_z']**2
@@ -1439,7 +1849,7 @@ def getINSDeviceConfig(
     senseInfo = pd.DataFrame(
         deviceSettings[0]['SensingConfig']['timeDomainChannels'])
     senseInfo['sampleRate'] = senseInfo['sampleRate'].apply(
-        lambda x: mdt_constants.sampleRate[x])
+        lambda x: mdt_constants.TdSampleRates[x])
     senseInfo['minusInput'] = senseInfo['minusInput'].apply(
         lambda x: mdt_constants.muxIdx[x])
     senseInfo['plusInput'] = senseInfo['plusInput'].apply(
@@ -1455,10 +1865,9 @@ def getINSDeviceConfig(
 def preprocINS(
         trialFilesStim,
         insDataFilename,
-        makePlots=False,
-        showPlots=False,
-        figureOutputFolder=None,
-        plotBlocking=True):
+        verbose=False, blockIdx=None,
+        makePlots=False, showPlots=False,
+        figureOutputFolder=None, plotBlocking=True):
     print('Preprocessing')
     jsonBaseFolder = trialFilesStim['folderPath']
     jsonSessionNames = trialFilesStim['jsonSessionNames']
@@ -1481,9 +1890,11 @@ def preprocINS(
         interpKind = trialFilesStim['interpKind']
     else:
         interpKind = 'linear'
+    #
     td = getINSTDFromJson(
         jsonBaseFolder, jsonSessionNames, getInterpolated=True,
-        # fs=fs,
+        verbose=verbose, blockIdx=blockIdx,
+        fixTimeShifts=True,
         upsampleRate=upsampleRate, interpKind=interpKind,
         forceRecalc=trialFilesStim['forceRecalc'],
         makePlots=makePlots, showPlots=showPlots,
@@ -1497,13 +1908,15 @@ def preprocINS(
             tdDataCols.append(updatedName)
             renamer.update({colName: updatedName})
     td['data'].rename(columns=renamer, inplace=True)
-
+    #
     accel = getINSAccelFromJson(
         jsonBaseFolder, jsonSessionNames, getInterpolated=True,
         forceRecalc=trialFilesStim['forceRecalc'],
+        fixTimeShifts=True,
+        verbose=verbose, blockIdx=blockIdx,
         makePlots=makePlots, showPlots=showPlots,
         figureOutputFolder=figureOutputFolder)
-
+    #
     timeSync = getINSTimeSyncFromJson(
         jsonBaseFolder, jsonSessionNames,
         forceRecalc=True)
@@ -1707,9 +2120,8 @@ def preprocINS(
     #  stim detection
     if trialFilesStim['detectStim']:
         block = getINSStimOnset(
-            block, elecConfiguration,
-            makePlots=makePlots, showPlots=showPlots,
-            figureOutputFolder=figureOutputFolder,
+            block, elecConfiguration, blockIdx=blockIdx,
+            showPlots=showPlots, figureOutputFolder=figureOutputFolder,
             **trialFilesStim['getINSkwargs'])
         #  if we did stim detection, recalculate stimStatusSerial
         stimSpikes = block.filter(objects=SpikeTrain)
@@ -1727,7 +2139,9 @@ def preprocINS(
         onsetEvents = pd.melt(
             stimSpikesDF,
             id_vars=['t'],
-            value_vars=['group', 'program', 'RateInHz', 'pulseWidth', 'amplitude'],
+            value_vars=[
+                'group', 'program', 'RateInHz',
+                'pulseWidth', 'amplitude'],
             var_name='ins_property', value_name='ins_value')
         onsetEvents.rename(columns={'t': 'INSTime'}, inplace=True)
         onsetEvents.loc[onsetEvents['ins_property'] == 'group', 'ins_property'] = 'activeGroup'
@@ -1834,7 +2248,7 @@ def preprocINS(
 
 
 def getINSStimOnset(
-        block, elecConfiguration,
+        block, elecConfiguration,  blockIdx=None,
         cyclePeriod=0, minDist=0, minDur=0,
         gaussWid=600e-3,
         timeInterpFunINStoNSP=None,
@@ -1849,8 +2263,14 @@ def getINSStimOnset(
         spikeWindow=[-32, 64],
         plotting=[], showPlots=False, figureOutputFolder=None):
     if figureOutputFolder is not None:
-        therapyDetectionPDF = pdPages(os.path.join(figureOutputFolder, 'therapy_detection.pdf'))
-        pulsesDetectionPDF = pdPages(os.path.join(figureOutputFolder, 'pulses_detection.pdf'))
+        therapyDetectionPDF = PdfPages(
+            os.path.join(
+                figureOutputFolder,
+                'therapy_detection_Block{:0>3}.pdf'.format(blockIdx)))
+        pulseDetectionPDF = PdfPages(
+            os.path.join(
+                figureOutputFolder,
+                'pulses_detection_Block{:0>3}.pdf'.format(blockIdx)))
     segIdx = 0
     seg = block.segments[segIdx]
     fs = seg.analogsignals[0].sampling_rate
@@ -1925,9 +2345,9 @@ def getINSStimOnset(
         winStopT += groupRate ** (-1)
         tMask = hf.getTimeMaskFromRanges(tdDF['t'], [(winStartT, winStopT)])
         tdSeg = tdDF.loc[tMask, allDataCol + ['t']]
-        tdSegDetect = tdSeg.set_index('t')
+        tdSegDetect = tdSeg.loc[:, allDataCol + ['t']].set_index('t')
         try:
-            detectSignal, foundTimestamp, _, fig, ax = extractArtifactTimestampsMahalanobis(
+            detectSignal, foundTimestamp, _, fig, ax, twinAx = extractArtifactTimestampsMahalanobis(
                 tdSegDetect, fs,
                 gaussWid=gaussWid,
                 thresh=200,
@@ -1939,9 +2359,10 @@ def getINSStimOnset(
             foundTimestamp = [None]
         if len(plotting) > 0:
             # ax = plt.gca()
-            ax.legend()
+            ax.legend(loc='upper left')
+            twinAx.legend(loc='upper right')
             figSaveOpts = dict(
-                bbox_extra_artists=(ax.get_legend()),
+                bbox_extra_artists=(ax.get_legend(), twinAx.get_legend()),
                 bbox_inches='tight')
             therapyDetectionPDF.savefig(**figSaveOpts)
             if showPlots:
@@ -1978,9 +2399,9 @@ def getINSStimOnset(
             winStopT += 1/groupRate
             tMask = hf.getTimeMaskFromRanges(tdDF['t'], [(winStartT, winStopT)])
             tdSeg = tdDF.loc[tMask, allDataCol + ['t']]
-            tdSegDetect = tdSeg.set_index('t')
+            tdSegDetect = tdSeg.loc[:, allDataCol + ['t']].set_index('t')
             try:
-                detectSignal, foundTimestamp, _, fig, ax = extractArtifactTimestampsMahalanobis(
+                detectSignal, foundTimestamp, _, fig, ax, twinAx = extractArtifactTimestampsMahalanobis(
                     tdSegDetect, fs,
                     gaussWid=gaussWid,
                     thresh=100,
@@ -1994,9 +2415,10 @@ def getINSStimOnset(
                 foundTimestamp = [None]
             if len(plotting) > 0:
                 # ax = plt.gca()
-                ax.legend()
+                ax.legend(loc='upper left')
+                twinAx.legend(loc='upper right')
                 figSaveOpts = dict(
-                    bbox_extra_artists=(ax.get_legend()),
+                    bbox_extra_artists=(ax.get_legend(), twinAx.get_legend()),
                     bbox_inches='tight')
                 therapyDetectionPDF.savefig(**figSaveOpts)
                 if showPlots:
@@ -2233,7 +2655,7 @@ def getINSStimOnset(
         # TODO: document why it's necessary to make the edges true (interpolation?)
         ROIMaskOnset.iloc[0] = True
         ROIMaskOnset.iloc[-1] = True
-        tdSegDetect = tdSeg.set_index('t')
+        tdSegDetect = tdSeg.loc[:, theseDetectOpts['detectChannels'] + ['t']].set_index('t')
         if plotting is not None:
             if isinstance(plotting, str):
                 if (plotting == 'first_slot') and not resolvedSlots:
@@ -2243,7 +2665,7 @@ def getINSStimOnset(
             elif isinstance(plotting, Iterable):
                 plottingEnabled = (name in plotting) # and (not resolvedSlots)
         # detect stim onset
-        detectSignal, foundTimestamp, usedExpectedT = extractArtifactTimestampsMahalanobis(
+        detectSignal, foundTimestamp, usedExpectedT, fig, ax, twinAx = extractArtifactTimestampsMahalanobis(
             tdSegDetect,
             fs,
             gaussWid=gaussWid,
@@ -2323,41 +2745,39 @@ def getINSStimOnset(
             slotDiff = tdSeg['slot'].diff()
             resolvedSlots = True
             if plottingEnabled and plottingSlots:
+                pass
                 # plot all the slots for this therapy round
-                sns.set()
-                sns.set_style("whitegrid")
-                sns.set_color_codes("dark")
-                cPal = sns.color_palette('pastel', n_colors=len(allDataCol))
-                cLookup = {n: cPal[i] for i, n in enumerate(allDataCol)}
-                fig, slotAx = plt.subplots()
-                for colName in allDataCol:
-                    tdCol = therSegDF[colName]
-                    slotAx.plot(
-                        therSegDF['t'],
-                        tdCol.values,
-                        '-', c=cLookup[colName],
-                        label='original signal {}'.format(colName))
-                slotAx.set_xlabel('Time (sec)')
-                slotAx.set_title('Slots for therapy round {}'.format(thisTherapyRound))
-                therSegSlotDiff = therSegDF['slot'].diff()
-                slotEdges = (
-                    therSegDF
-                    .loc[therSegSlotDiff.fillna(1) != 0, 't']
-                    .reset_index(drop=True))
-                theseSlots = (
-                    therSegDF
-                    .loc[therSegSlotDiff.fillna(1) != 0, 'slot']
-                    .reset_index(drop=True))
-                for idx, slEdge in slotEdges.iloc[1:].iteritems():
-                    try:
-                        slotAx.axvspan(
-                            slotEdges[idx-1], slEdge,
-                            alpha=0.4, facecolor=cPal[int(theseSlots[idx-1])])
-                    except Exception:
-                        continue
-                for t in rateChangeTimes:
-                    slotAx.axvline(t)
-                slotAx.legend()
+                # cPal = sns.color_palette('pastel', n_colors=len(allDataCol))
+                # cLookup = {n: cPal[i] for i, n in enumerate(allDataCol)}
+                # fig, slotAx = plt.subplots()
+                # for colName in allDataCol:
+                #     tdCol = therSegDF[colName]
+                #     slotAx.plot(
+                #         therSegDF['t'],
+                #         tdCol.values,
+                #         '-', c=cLookup[colName],
+                #         label='original signal {}'.format(colName))
+                # slotAx.set_xlabel('Time (sec)')
+                # slotAx.set_title('Slots for therapy round {}'.format(thisTherapyRound))
+                # therSegSlotDiff = therSegDF['slot'].diff()
+                # slotEdges = (
+                #     therSegDF
+                #     .loc[therSegSlotDiff.fillna(1) != 0, 't']
+                #     .reset_index(drop=True))
+                # theseSlots = (
+                #     therSegDF
+                #     .loc[therSegSlotDiff.fillna(1) != 0, 'slot']
+                #     .reset_index(drop=True))
+                # for idx, slEdge in slotEdges.iloc[1:].iteritems():
+                #     try:
+                #         slotAx.axvspan(
+                #             slotEdges[idx-1], slEdge,
+                #             alpha=0.4, facecolor=cPal[int(theseSlots[idx-1])])
+                #     except Exception:
+                #         continue
+                # for t in rateChangeTimes:
+                #     slotAx.axvline(t)
+                # slotAx.legend()
         # done resolving slots
         if plottingEnabled:
             # tdSegSlotDiff = tdDF.loc[plotMaskTD, 'slot'].diff()
@@ -2374,7 +2794,7 @@ def getINSStimOnset(
                 tdSeg
                 .loc[slotDiff.fillna(1) != 0, 'slot']
                 .reset_index(drop=True))
-            ax = plt.gca()
+            # ax = plt.gca()
             ax.axvline(expectedTimestamp, color='b', linestyle='--', label='expected time')
             ax.axvline(group['t'].iloc[0], color='r', label='stimLog time')
             ax.set_title(
@@ -2400,13 +2820,14 @@ def getINSStimOnset(
         else:
             theseOnsetTimestamps = np.atleast_1d(foundTimestamp[0]) * pq.s
         if plottingEnabled:
-            ax.plot(
+            twinAx.plot(
                 theseOnsetTimestamps,
                 theseOnsetTimestamps ** 0 - 1,
                 'g*', label='final timestamps: {:.4f}'.format(theseOnsetTimestamps[0]))
-            ax.legend()
+            ax.legend(loc='upper left')
+            twinAx.legend(loc='upper right')
             figSaveOpts = dict(
-                bbox_extra_artists=(ax.get_legend()),
+                bbox_extra_artists=(ax.get_legend(), twinAx.get_legend()),
                 bbox_inches='tight')
             pulseDetectionPDF.savefig(**figSaveOpts)
             if showPlots:
@@ -2789,20 +3210,16 @@ def extractArtifactTimestampsNew(
 
 
 def extractArtifactTimestampsMahalanobis(
-        tdSeg,
-        fs,
-        gaussWid=200e-3,
-        mahalTrainingTMax = 150e-3,
-        thresh=2,
-        offsetFromPeak=0,
+        tdSeg, fs,
+        gaussWid=200e-3, mahalTrainingTMax=150e-3,
+        thresh=2, offsetFromPeak=0,
         stimRate=100,
         keepWhat='first',
         threshMethod='cross',
         enhanceEdges=True,
         expectedTimestamp=None,
         ROIBasis=None,
-        ROIMask=None, keepSlice=0,
-        name=None, plotting=None,
+        ROIMask=None, keepSlice=0, name=None, 
         plotAnomalies=None, anomalyOccured=None,
         plotDetection=False, plotKernel=False
         ):
@@ -2812,7 +3229,7 @@ def extractArtifactTimestampsMahalanobis(
         # sns.set_color_codes("dark")
         cPal = sns.color_palette(n_colors=tdSeg.columns.size)
         cLookup = {n: cPal[i] for i, n in enumerate(tdSeg.columns)}
-        fig, ax = plt.subplots(figsize=(15, 12))
+        fig, ax = plt.subplots(figsize=(16, 8))
         for colName, tdCol in tdSeg.iteritems():
             ax.plot(
                 tdSeg.index,
@@ -2820,8 +3237,9 @@ def extractArtifactTimestampsMahalanobis(
                 '-', c=cLookup[colName],
                 label='original signal {}'.format(colName))
         ax.set_xlabel('Time (sec)')
+        twinAx = ax.twinx()
     else:
-        fig, ax = None, None
+        fig, ax, twinAx = None, None, None
     #
     # fit on first part of tdSeg
     firstPartMask = tdSeg.index < tdSeg.index[0] + gaussWid
@@ -2887,10 +3305,10 @@ def extractArtifactTimestampsMahalanobis(
         index=tdSeg.index)
     #
     if plotDetection:
-        ax.plot(
+        twinAx.plot(
             detectSignal.index,
             detectSignal.values, 'm--', label='detect signal before slot mask')
-        ax.axhline(thresh, color='r')
+        twinAx.axhline(thresh, color='r')
     #
     if ROIMask is not None:
         detectSignal.loc[~ROIMask] = np.nan
@@ -2901,10 +3319,10 @@ def extractArtifactTimestampsMahalanobis(
                 detectSignal.index[ROIMask][-2],
                 facecolor='g', alpha=0.5, zorder=-100)
     if plotDetection:
-        ax.plot(
+        twinAx.plot(
             detectSignal.index,
             detectSignal.values, 'y-', label='detect signal')
-        ax.axhline(thresh, color='r')
+        twinAx.axhline(thresh, color='r')
     #
     if threshMethod == 'peaks':
         idxLocal = peakutils.indexes(
@@ -2930,9 +3348,9 @@ def extractArtifactTimestampsMahalanobis(
         usedExpectedTimestamp = False
         foundTimestamp = tdSeg.index[idxLocal]
         if plotDetection:
-            ax.plot(
+            twinAx.plot(
                 foundTimestamp, foundTimestamp ** 0 - 1,
-                'r*', markersize=10, label='t = {}'.format(foundTimestamp[0]))
+                'r*', markersize=12, label='t = {}'.format(foundTimestamp[0]))
     else:
         print(
             'After peakutils.indexes, no peaks found! ' +
@@ -2940,15 +3358,16 @@ def extractArtifactTimestampsMahalanobis(
         usedExpectedTimestamp = True
         foundTimestamp = np.atleast_1d(expectedTimestamp)
     if plotDetection:
-        ax.legend()
         try:
             ax.set_xlim([
-                max(detectSignal.index[0], foundTimestamp[0] - 5 * stimRate ** (-1)),
-                min(detectSignal.index[-1], foundTimestamp[0] + 15 * stimRate ** (-1))
+                max(detectSignal.index[0], foundTimestamp[0] - 100e-3),
+                min(detectSignal.index[-1], foundTimestamp[0] + 150e-3)
             ])
         except:
             pass
-    return detectSignal, np.atleast_1d(foundTimestamp[keepSlice]), usedExpectedTimestamp, fig, ax
+    return (
+        detectSignal, np.atleast_1d(foundTimestamp[keepSlice]),
+        usedExpectedTimestamp, fig, ax, twinAx)
 
 
 def insDataToBlock(

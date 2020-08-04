@@ -163,9 +163,9 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
             'jsonSessionNames': jsonSessionNames[blockIdx],
             'elecIDs': range(17),
             'excludeClus': [],
-            # 'upsampleRate': 4,
+            'upsampleRate': 4,
             # 'interpKind': 'linear',
-            'upsampleRate': 10,
+            # 'upsampleRate': 10,
             'interpKind': 'akima',
             'forceRecalc': True,
             'detectStim': expOpts['detectStim'],
@@ -193,14 +193,14 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
         'plotAnomalies': False,
         'overrideStartTimes': overrideStartTimes,
         'plotting':  range(0, 1000),  # [] range(1000)
-        'showPlots': True, 'figureOutputFolder': None
         }
     miniRCStimDetectionOpts = {
         'minDist': 1.2,
         'gaussWid': 250e-3,
         'offsetFromPeak': 2e-3,
         'artifactKeepWhat': 'first',
-        'predictSlots': False, 'snapToGrid': False,
+        # 'predictSlots': False, 'snapToGrid': False,
+        'predictSlots': True, 'snapToGrid': True,
         'treatAsSinglePulses': False
         }
     RCStimDetectionOpts = {

@@ -6,6 +6,7 @@ Usage:
 Options:
     --blockIdx=blockIdx              which trial to analyze
     --exp=exp                        which experimental day to analyze
+    --verbose                        print statements? [default: False]
     --makePlots                      make diagnostic plots? [default: False]
     --showPlots                      show diagnostic plots? [default: False]
     --disableStimDetection           disable stimulation time detection? [default: False]
@@ -18,9 +19,9 @@ matplotlib.use('Qt5Agg')   # generate interactive qt output
 # matplotlib.use('PS')   # generate offline postscript
 import seaborn as sns
 sns.set(
-    context='talk', style='dark',
+    context='talk', style='darkgrid',
     palette='dark', font='sans-serif',
-    font_scale=1.5, color_codes=True)
+    font_scale=0.75, color_codes=True)
 import dataAnalysis.preproc.mdt as preprocINS
 import os
 from importlib import reload
@@ -38,6 +39,7 @@ import line_profiler
 import atexit
 # profile = line_profiler.LineProfiler()
 # atexit.register(profile.print_stats)
+
 figureOutputFolder = os.path.join(
     figureFolder, 'insDiagnostics')
 if not os.path.exists(figureOutputFolder):
@@ -45,10 +47,6 @@ if not os.path.exists(figureOutputFolder):
 #
 if not arguments['makePlots']:
     trialFilesStim['ins']['getINSkwargs']['plotting'] = []
-    trialFilesStim['ins']['getINSkwargs']['showPlots'] = False
-
-if not arguments['showPlots']:
-    trialFilesStim['ins']['getINSkwargs']['showPlots'] = False
 
 def preprocINSWrapper(
         trialFilesStim=None,
@@ -60,8 +58,9 @@ def preprocINSWrapper(
         trialFilesStim['ins']['detectStim'] = False
     insBlock = preprocINS.preprocINS(
         trialFilesStim['ins'],
-        insDataPath,
+        insDataPath, blockIdx=int(arguments['blockIdx']),
         figureOutputFolder=figureOutputFolder,
+        verbose=arguments['verbose'],
         showPlots=arguments['showPlots'],
         makePlots=arguments['makePlots'])
     return
