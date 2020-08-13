@@ -3,9 +3,10 @@ Usage:
     synchronizeINStoNSP [options]
 
 Options:
-    --blockIdx=blockIdx             which trial to analyze
-    --exp=exp                       which experimental day to analyze
-    --curateManually                whether to manually confirm synch [default: False]
+    --blockIdx=blockIdx                    which trial to analyze
+    --exp=exp                              which experimental day to analyze
+    --inputBlockSuffix=inputBlockSuffix    append a name to the resulting blocks?
+    --curateManually                       whether to manually confirm synch [default: False]
 """
 import matplotlib, pdb, traceback
 matplotlib.use('Qt5Agg')   # generate interactive output by default
@@ -55,6 +56,8 @@ expOpts, allOpts = parseAnalysisOptions(
     arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
+if arguments['inputBlockSuffix'] is None:
+    arguments['inputBlockSuffix'] = ''
 #  load INS Data
 ############################################################
 synchFunPath = os.path.join(
@@ -85,7 +88,7 @@ dataLength_s = None
 print('Loading NSP Block...')
 try:
     channelData, _ = ns5.getNIXData(
-        fileName=ns5FileName,
+        fileName=ns5FileName + arguments['inputBlockSuffix'],
         folderPath=scratchFolder,
         elecIds=['ainp7'], startTime_s=startTime_s,
         dataLength_s=dataLength_s,
@@ -255,7 +258,7 @@ if addingToNix:
     ns5.addBlockToNIX(
         insBlockJustSpikes, neoSegIdx=[0],
         writeAsigs=False, writeSpikes=True,
-        fileName=ns5FileName,
+        fileName=ns5FileName + arguments['inputBlockSuffix'],
         folderPath=scratchFolder,
         purgeNixNames=True,
         nixBlockIdx=0, nixSegIdx=[0],
@@ -275,7 +278,7 @@ if addingToNix:
         forceColNames=tdColumns)
     ns5.addBlockToNIX(
         tdBlock, neoSegIdx=[0],
-        fileName=ns5FileName,
+        fileName=ns5FileName + arguments['inputBlockSuffix'],
         folderPath=scratchFolder,
         purgeNixNames=True,
         nixBlockIdx=0, nixSegIdx=[0],
@@ -295,7 +298,7 @@ if addingToNix:
         forceColNames=accelColumns)
     ns5.addBlockToNIX(
         accelBlock, neoSegIdx=[0],
-        fileName=ns5FileName,
+        fileName=ns5FileName + arguments['inputBlockSuffix'],
         folderPath=scratchFolder,
         purgeNixNames=True,
         nixBlockIdx=0, nixSegIdx=[0],

@@ -25,6 +25,7 @@ sns.set(
 import dataAnalysis.preproc.mdt as preprocINS
 import os
 from importlib import reload
+import warnings
 #  load options
 from currentExperiment import parseAnalysisOptions
 from docopt import docopt
@@ -39,7 +40,7 @@ import line_profiler
 import atexit
 # profile = line_profiler.LineProfiler()
 # atexit.register(profile.print_stats)
-
+# warnings.filterwarnings("error")
 figureOutputFolder = os.path.join(
     figureFolder, 'insDiagnostics')
 if not os.path.exists(figureOutputFolder):

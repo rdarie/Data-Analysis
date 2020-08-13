@@ -3,12 +3,14 @@ Usage:
     calcBlockAnalysisNix.py [options]
 
 Options:
-    --blockIdx=blockIdx               which trial to analyze
-    --exp=exp                         which experimental day to analyze
-    --analysisName=analysisName       append a name to the resulting blocks? [default: default]
-    --chanQuery=chanQuery             how to restrict channels if not providing a list? [default: fr]
-    --samplingRate=samplingRate       subsample the result??
-    --rigOnly                         is there no INS block? [default: False]
+    --blockIdx=blockIdx                    which trial to analyze
+    --exp=exp                              which experimental day to analyze
+    --verbose                              print out messages? [default: False]
+    --analysisName=analysisName            append a name to the resulting blocks? [default: default]
+    --inputBlockSuffix=inputBlockSuffix    append a name to the resulting blocks?
+    --chanQuery=chanQuery                  how to restrict channels if not providing a list? [default: fr]
+    --samplingRate=samplingRate            resample the result??
+    --rigOnly                              is there no INS block? [default: False]
 """
 
 from neo.io.proxyobjects import (
@@ -40,6 +42,8 @@ expOpts, allOpts = parseAnalysisOptions(
 globals().update(expOpts)
 globals().update(allOpts)
 
+if arguments['inputBlockSuffix'] is None:
+    arguments['inputBlockSuffix'] = ''
 
 def calcBlockAnalysisNix():
     arguments['chanNames'], arguments['chanQuery'] = ash.processChannelQueryArgs(
@@ -54,7 +58,10 @@ def calcBlockAnalysisNix():
     else:
         samplingRate = float(1 / rasterOpts['binInterval']) * pq.Hz
     #
-    nspReader = neo.io.nixio_fr.NixIO(filename=trialBasePath)
+    nspReader = neo.io.nixio_fr.NixIO(
+        filename=os.path.join(
+            scratchFolder,
+            ns5FileName + arguments['inputBlockSuffix'] + '.nix'))
     nspBlock = ns5.readBlockFixNames(nspReader, block_index=0)
     #
     spikesBlock = hf.extractSignalsFromBlock(
@@ -231,7 +238,7 @@ def calcBlockAnalysisNix():
         tdInterp = hf.interpolateDF(
             tdDF, newT,
             kind='linear', fill_value=(0, 0),
-            x='t', columns=tdChanNames)
+            x='t', columns=tdChanNames, verbose=arguments['verbose'])
     else:
         print('Using input as is!')
         tdInterp = tdDF
@@ -268,7 +275,6 @@ def calcBlockAnalysisNix():
                     .rolling(6 * smoothWindowStd, center=True, win_type='gaussian')
                     .mean(std=smoothWindowStd).fillna(0) / origTimeStep)
     tdInterp.sort_index(axis='columns', inplace=True)
-    
     # tdInterp.columns = ['seg0_{}'.format(i) for i in tdInterp.columns]
     tdBlockInterp = ns5.dataFrameToAnalogSignals(
         tdInterp,

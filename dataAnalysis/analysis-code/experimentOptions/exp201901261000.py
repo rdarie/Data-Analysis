@@ -93,7 +93,7 @@ def getExpOpts():
             'tdChan': 'ins_td3',
             'tdThres': 2.5,
             'iti': 0.2,
-            'keepIndex': slice(None)
+            'keepIndex': slice(1, None)
             }
         }
 
@@ -148,7 +148,6 @@ def getExpOpts():
             2: {'detectChannels': ['ins_td2', 'ins_td3'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True},
             3: {'detectChannels': stimDetectChansDefault, 'thres': stimDetectThresDefault, 'useForSlotDetection': True}
         }}
-        
     triFolderSourceBase = os.path.join(
         '201901271000-Proprio', 'tdc_Block001')
     triDestinations = [
@@ -157,7 +156,7 @@ def getExpOpts():
     
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        '201901261000-Proprio': [4],
+        # '201901261000-Proprio': [4],
         '201901271000-Proprio': [1, 2, 3, 4],
         }
 
@@ -181,5 +180,19 @@ def getExpOpts():
         4: [
             [939, 2252],
             ]
+        }
+    outlierDetectOptions = dict(
+        targetEpochSize=5e-3,
+        windowSize=(-1, 1),
+        conditionNames=[
+            'electrode', 'amplitude', 'RateInHz',
+            # 'pedalMovementCat', 'pedalSizeCat', 'pedalDirection'
+            ],
+        twoTailed=True,
+        )
+    #
+    minNConditionRepetitions = {
+        'n': 3,
+        'categories': ['amplitude', 'electrode', 'RateInHz']
         }
     return locals()

@@ -64,7 +64,7 @@ def getExpOpts():
         0: {
             'timeRanges': [(18, 20)],
             'tdChan': 'ins_td0',
-            'tdThres': 2.5,
+            'tdThres': 5,
             'iti': 0.2,
             'keepIndex': slice(None)
             }
@@ -74,7 +74,7 @@ def getExpOpts():
         0: {
             'timeRanges': [(20, 22)],
             'tdChan': 'ins_td0',
-            'tdThres': 2.5,
+            'tdThres': 5,
             'iti': 0.2,
             'keepIndex': slice(None)
             }
@@ -82,11 +82,11 @@ def getExpOpts():
     synchInfo['ins'][4] = {
         #  per trialSegment
         0: {
-            'timeRanges': [(21, 24)],
+            'timeRanges': [(21.5, 23.5)],
             'tdChan': 'ins_td0',
-            'tdThres': 2.5,
+            'tdThres': 5,
             'iti': 0.2,
-            'keepIndex': slice(None)
+            'keepIndex': slice(1, None)
             }
         }
     synchInfo['ins'][5] = {
@@ -94,21 +94,21 @@ def getExpOpts():
         0: {
             'timeRanges': [(22, 24)],
             'tdChan': 'ins_td0',
-            'tdThres': 2.5,
+            'tdThres': 5,
             'iti': 0.2,
             'keepIndex': slice(None)
             },
         1: {
             'timeRanges': [(1047, 1049)],
-            'accChan': 'ins_accinertia',
-            'accThres': 2.5,
+            'tdChan': 'ins_td0',
+            'tdThres': 5,
             'iti': 0.2,
             'keepIndex': slice(None)
             },
         2: {
             'timeRanges': [(1301, 1304)],
             'accChan': 'ins_accz',
-            'accThres': 2.5,
+            'accThres': 5,
             'iti': 0.2,
             'keepIndex': slice(None)
             }
@@ -127,7 +127,7 @@ def getExpOpts():
             0: {'timeRanges': [105, 107], 'keepIndex': slice(None)}
             },
         4: {
-            0: {'timeRanges': [140, 144], 'keepIndex': slice(None)}
+            0: {'timeRanges': [141, 143], 'keepIndex': slice(None)}
             },
         5: {
             0: {'timeRanges': [145, 147], 'keepIndex': slice(None)},
@@ -148,9 +148,11 @@ def getExpOpts():
     # options for stim artifact detection
     stimDetectOverrideStartTimes = {
         1: None,
-        2: [96.43, 191.689],
+        # 2: [96.43, 191.689],
+        2: None,
         3: None,
         4: None,
+        5: None,
     }
     detectStim = True
     stimDetectThresDefault = 100
@@ -197,11 +199,18 @@ def getExpOpts():
         ]
         }
     outlierDetectOptions = dict(
-        targetEpochSize=20e-3,
-        windowSize=(-2.1, 2.1),
+        targetEpochSize=10e-3,
+        windowSize=(-1, 1),
+        # conditionNames=[
+        #     'electrode', 'amplitude', 'RateInHz',
+        #     'pedalMovementCat', 'pedalSizeCat', 'pedalDirection'],
         conditionNames=[
-            'electrode', 'amplitude', 'RateInHz',
-            'pedalMovementCat', 'pedalSizeCat', 'pedalDirection'],
+            'electrode', 'amplitude', 'RateInHz'],
         twoTailed=True,
         )
+    #
+    minNConditionRepetitions = {
+        'n': 1,
+        'categories': ['amplitude', 'electrode', 'RateInHz']
+        }
     return locals()

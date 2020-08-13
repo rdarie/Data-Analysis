@@ -3,13 +3,14 @@ from matplotlib.collections import PatchCollection
 from matplotlib.patches import FancyBboxPatch, Rectangle
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
+import matplotlib.path as mpath
 import pandas as pd
 import numpy as np
 import pdb
 import math
 import seaborn as sns
-from tabulate import tabulate
 import dataAnalysis.helperFunctions.kilosort_analysis_new as ksa
+import dataAnalysis.helperFunctions.helper_functions_new as hf
 import dataAnalysis.preproc.ns5 as ns5
 from neo import (
     Block, Segment, ChannelIndex,
@@ -62,7 +63,7 @@ def processRowColArguments(arguments):
 
 
 def getRasterFacetIdx(
-        plotDF, y, row=None, col=None, hue=None):
+        plotDF, y, row=None, col=None, hue=None, verbose=False):
     plotDF.loc[:, y + '_facetIdx'] = np.nan
     breakDownBy = [
         i
@@ -80,6 +81,10 @@ def getRasterFacetIdx(
             subGroupBy = hue
         idxOffset = 0
         for subName, subGroup in group.groupby(subGroupBy):
+            if verbose:
+                print(
+                    'get indices for hue group {}'
+                    .format(subName))
             uniqueIdx = np.unique(subGroup[y])
             idxLookup = {
                 uIdx: idx + idxOffset
@@ -98,12 +103,12 @@ def plotNeuronsAligned(
         verbose=False,
         figureFolder=None, pdfName='alignedNeurons.pdf',
         limitPages=None, enablePlots=True,
-        rowName=None, rowControl=None,
-        colName=None, colControl=None,
-        hueName=None, hueControl=None,
-        styleName=None, styleControl=None,
+        rowName=None, rowControl=None, rowOrder=None,
+        colName=None, colControl=None, colOrder=None,
+        hueName=None, hueControl=None, hueOrder=None,
+        styleName=None, styleControl=None, styleOrder=None,
         twinRelplotKWArgs={}, sigStarOpts={},
-        plotProcFuns=[], minNObservations=0,
+        plotProcFuns=[], minNObservations=0, showNow=False
         ):
     #
     if loadArgs['unitNames'] is None:
@@ -114,11 +119,14 @@ def plotNeuronsAligned(
             for i in allChanNames
             if '_raster' in i]
     else:
-        loadArgs['unitNames'] = [i.replace('_#0', '') for i in loadArgs['unitNames']]
-    unitNames = loadArgs.pop('unitNames')
+        loadArgs['unitNames'] = [
+            i.replace('_#0', '') for
+            i in loadArgs['unitNames']]
+    unitNames = sorted(loadArgs.pop('unitNames'))
     loadArgs.pop('unitQuery')
     rasterLoadArgs = deepcopy(loadArgs)
-    # rasterLoadArgs.pop('decimate')
+    if 'decimate' in rasterLoadArgs:
+        rasterLoadArgs.pop('decimate')
     with PdfPages(os.path.join(figureFolder, pdfName + '.pdf')) as pdf:
         if sigTestResults is not None:
             unitRanks = (
@@ -134,10 +142,13 @@ def plotNeuronsAligned(
             asigWide = ns5.alignedAsigsToDF(
                 frBlock, [continuousName],
                 **loadArgs)
+            # oneSpikePerBinHz = int(
+            #     np.round(
+            #         np.diff(rasterWide.columns)[0] ** (-1) *
+            #         loadArgs['decimate']))
             oneSpikePerBinHz = int(
                 np.round(
-                    np.diff(rasterWide.columns)[0] ** (-1) *
-                    loadArgs['decimate']))
+                    np.diff(rasterWide.columns)[0] ** (-1)))
             if enablePlots:
                 indexInfo = asigWide.index.to_frame()
                 if idx == 0:
@@ -168,25 +179,54 @@ def plotNeuronsAligned(
                     asigWide = asigWide.loc[minObsKeepMask, :]
                     rasterWide = rasterWide.loc[minObsKeepMask, :]
                 indexInfo = rasterWide.index.to_frame()
-                if colName is not None:
-                    colOrder = sorted(np.unique(indexInfo[colName]))
+                if colOrder is None:
+                    if colName is not None:
+                        colOrder = sorted(np.unique(indexInfo[colName]))
+                    else:
+                        colOrder = None
                 else:
-                    colOrder = None
-                if rowName is not None:
-                    rowOrder = sorted(np.unique(indexInfo[rowName]))
+                    # ensure we didn't drop any of the col_names
+                    colOrder = [
+                        cn
+                        for cn in colOrder
+                        if cn in sorted(np.unique(indexInfo[colName]))]
+                if rowOrder is None:
+                    if rowName is not None:
+                        rowOrder = sorted(np.unique(indexInfo[rowName]))
+                    else:
+                        rowOrder = None
                 else:
-                    rowOrder = None
-                if hueName is not None:
-                    hueOrder = sorted(np.unique(indexInfo[hueName]))
+                    # ensure we didn't drop any of the row_names
+                    rowOrder = [
+                        rn
+                        for rn in rowOrder
+                        if rn in sorted(np.unique(indexInfo[rowName]))]
+                if hueOrder is None:
+                    if hueName is not None:
+                        hueOrder = sorted(np.unique(indexInfo[hueName]))
+                    else:
+                        hueOrder = None
                 else:
-                    hueOrder = None
+                    # ensure we didn't drop any of the hue_names
+                    hueOrder = [
+                        hn
+                        for hn in hueOrder
+                        if hn in sorted(np.unique(indexInfo[hueName]))]
                 raster = rasterWide.stack().reset_index(name='raster')
                 asig = asigWide.stack().reset_index(name='fr')
                 raster.loc[:, 'fr'] = asig.loc[:, 'fr']
                 raster = getRasterFacetIdx(
                     raster, 't',
                     col=colName, row=rowName, hue=hueName)
-                # 
+                #
+                if 'height' in twinRelplotKWArgs:
+                    figHeight = twinRelplotKWArgs['height'] * 72
+                else:
+                    figHeight = 3 * 72
+                # figHeight in **points**
+                nRasterRows = raster['t_facetIdx'].max()
+                twinRelplotKWArgs['func1_kws']['s'] = (2 * figHeight / nRasterRows) ** 2
+                # pdb.set_trace()
                 g = twin_relplot(
                     x='bin',
                     y2='fr', y1='t_facetIdx',
@@ -200,7 +240,7 @@ def plotNeuronsAligned(
                     if len(plotProcFuns):
                         for procFun in plotProcFuns:
                             procFun(g, ro, co, hu, dataSubset)
-                    g.twin_axes[ro, co].set_ylabel('Firing Rate (spk/s)')
+                    # g.twin_axes[ro, co].set_ylabel('Firing Rate (spk/s)')
                     g.axes[ro, co].set_ylabel('')
                     if sigTestResults is not None:
                         addSignificanceStars(
@@ -208,106 +248,14 @@ def plotNeuronsAligned(
                             ro, co, hu, dataSubset, sigStarOpts=sigStarOpts)
                 plt.suptitle(unitName)
                 pdf.savefig()
-                plt.close()
+                if showNow:
+                    plt.show()
+                else:
+                    plt.close()
             if limitPages is not None:
                 if idx >= (limitPages - 1):
                     break
     return
-
-
-def addSignificanceStars(
-        g, sigTestResults, ro, co, hu, dataSubset, sigStarOpts):
-    pQueryList = []
-    if len(g.row_names):
-        rowFacetName = g.row_names[ro]
-        rowName = g._row_var
-        if rowName is not None:
-            if isinstance(rowFacetName, str):
-                compareName = '\'' + rowFacetName + '\''
-            else:
-                compareName = rowFacetName
-            pQueryList.append(
-                '({} == {})'.format(rowName, compareName))
-    if len(g.col_names):
-        colFacetName = g.col_names[co]
-        colName = g._col_var
-        if colName is not None:
-            if isinstance(colFacetName, str):
-                compareName = '\'' + colFacetName + '\''
-            else:
-                compareName = colFacetName
-            pQueryList.append(
-                '({} == {})'.format(colName, compareName))
-    pQuery = '&'.join(pQueryList)
-    if len(pQuery):
-        significantBins = sigTestResults.query(pQuery)
-    else:
-        significantBins = sigTestResults
-    #  plot stars
-    if not significantBins.empty:
-        assert significantBins.shape[0] == 1
-        significantTimes = significantBins.columns[significantBins.to_numpy().flatten()].to_numpy()
-        if len(significantTimes):
-            ymin, ymax = g.axes[ro, co].get_ylim()
-            # g.axes[ro, co].autoscale(False)
-            g.axes[ro, co].plot(
-                significantTimes,
-                significantTimes ** 0 * ymax * 0.95,
-                **sigStarOpts)
-            # g.axes[ro, co].autoscale(True)
-
-
-def calcBreakDown(asigWide, rowName, colName, hueName):
-    breakDownBy = [
-        i
-        for i in [rowName, colName, hueName]
-        if i is not None]
-    if len(breakDownBy) == 1:
-        breakDownBy = breakDownBy[0]
-    breakDownData = (
-        asigWide
-        .groupby(breakDownBy)
-        .agg('count')
-        .iloc[:, 0]
-    )
-    # 
-    indexNames = breakDownData.index.names + ['count']
-    breakDownData = breakDownData.reset_index()
-    breakDownData.columns = indexNames
-    unitName = asigWide.reset_index()['feature'].unique()[0]
-    breakDownText = (
-        '{}\n'.format(unitName) +
-        '# of observations:\n' +
-        tabulate(
-            breakDownData, showindex=False,
-            headers='keys', tablefmt='github',
-            numalign='left', stralign='left')
-        )
-    return breakDownData, breakDownText
-
-
-def printBreakdown(asigWide, rowName, colName, hueName):
-    #  print a table
-    fig, ax = plt.subplots()
-    # print out description of how many observations there are
-    # for each condition
-    breakDownData, breakDownText = calcBreakDown(asigWide, rowName, colName, hueName)
-    #  
-    textHandle = fig.text(
-        0.5, 0.5, breakDownText,
-        fontsize=sns.plotting_context()['font.size'],
-        fontfamily='monospace',
-        va='center', ha='center',
-        # bbox={'boxstyle': 'round'},
-        wrap=True, transform=ax.transAxes)  # add text
-    # fig.canvas.draw()
-    # bb = textHandle.get_bbox_patch().get_extents()
-    # bbFigCoords = bb.transformed(fig.transFigure.inverted())
-    # 
-    fig.set_size_inches(12, 24)
-    # fig.set_size_inches(bbFigCoords.width, bbFigCoords.height)
-    # bb.transformed(fig.transFigure.inverted()).width
-    return breakDownData, breakDownText, fig, ax
 
 
 def plotAsigsAligned(
@@ -320,7 +268,7 @@ def plotAsigsAligned(
         rowName=None, rowControl=None, rowOrder=None,
         colName=None, colControl=None, colOrder=None,
         hueName=None, hueControl=None, hueOrder=None,
-        styleName=None, styleControl=None,
+        styleName=None, styleControl=None, styleOrder=None,
         relplotKWArgs={}, sigStarOpts={},
         plotProcFuns=[], minNObservations=0,
         ):
@@ -422,6 +370,73 @@ def plotAsigsAligned(
                 if idx >= (limitPages - 1):
                     break
     return
+
+
+def addSignificanceStars(
+        g, sigTestResults, ro, co, hu, dataSubset, sigStarOpts):
+    pQueryList = []
+    if len(g.row_names):
+        rowFacetName = g.row_names[ro]
+        rowName = g._row_var
+        if rowName is not None:
+            if isinstance(rowFacetName, str):
+                compareName = '\'' + rowFacetName + '\''
+            else:
+                compareName = rowFacetName
+            pQueryList.append(
+                '({} == {})'.format(rowName, compareName))
+    if len(g.col_names):
+        colFacetName = g.col_names[co]
+        colName = g._col_var
+        if colName is not None:
+            if isinstance(colFacetName, str):
+                compareName = '\'' + colFacetName + '\''
+            else:
+                compareName = colFacetName
+            pQueryList.append(
+                '({} == {})'.format(colName, compareName))
+    pQuery = '&'.join(pQueryList)
+    if len(pQuery):
+        significantBins = sigTestResults.query(pQuery)
+    else:
+        significantBins = sigTestResults
+    #  plot stars
+    if not significantBins.empty:
+        assert significantBins.shape[0] == 1
+        significantTimes = significantBins.columns[significantBins.to_numpy().flatten()].to_numpy()
+        if len(significantTimes):
+            ymin, ymax = g.axes[ro, co].get_ylim()
+            # g.axes[ro, co].autoscale(False)
+            g.axes[ro, co].plot(
+                significantTimes,
+                significantTimes ** 0 * ymax * 0.95,
+                **sigStarOpts)
+            # g.axes[ro, co].autoscale(True)
+
+
+def printBreakdown(asigWide, rowName, colName, hueName):
+    #  print a table
+    fig, ax = plt.subplots()
+    # print out description of how many observations there are
+    # for each condition
+    breakDownData, breakDownText = hf.calcBreakDown(
+        asigWide, rowName, colName, hueName)
+    #  
+    textHandle = fig.text(
+        0.5, 0.5, breakDownText,
+        fontsize=sns.plotting_context()['font.size'],
+        fontfamily='monospace',
+        va='center', ha='center',
+        # bbox={'boxstyle': 'round'},
+        wrap=True, transform=ax.transAxes)  # add text
+    # fig.canvas.draw()
+    # bb = textHandle.get_bbox_patch().get_extents()
+    # bbFigCoords = bb.transformed(fig.transFigure.inverted())
+    # 
+    fig.set_size_inches(12, 24)
+    # fig.set_size_inches(bbFigCoords.width, bbFigCoords.height)
+    # bb.transformed(fig.transFigure.inverted()).width
+    return breakDownData, breakDownText, fig, ax
 
 
 def genYLabelChanger(lookupDict={}, removeMatch=''):
@@ -943,12 +958,32 @@ def twin_relplot(
     # Set up the FacetGrid object
     facet1_kws = {} if facet1_kws is None else facet1_kws
     data1 = data.query(query1) if query1 is not None else data
+
+    if 'sharey' in facet1_kws.keys():
+        facet1_sharey = facet1_kws.pop('sharey')
+    else:
+        facet1_sharey = True
+    facet1_kws['sharey'] = False
+    if 'sharey' in facet2_kws.keys():
+        facet2_sharey = facet2_kws.pop('sharey')
+    else:
+        facet2_sharey = True
+    facet2_kws['sharey'] = False
+    if 'sharex' in facet1_kws.keys():
+        facet1_sharex = facet1_kws.pop('sharex')
+    else:
+        facet1_sharex = True
+    facet1_kws['sharex'] = False
+    if 'sharex' in facet2_kws.keys():
+        facet2_sharex = facet2_kws.pop('sharex')
+    else:
+        facet2_sharex = True
+    facet2_kws['sharex'] = False
+
     g1 = FacetGrid(
         data=data1, row=row, col=col, col_wrap=col_wrap,
         row_order=row_order, col_order=col_order,
-        # 12/30/19
         hue=hue, hue_order=hue_order,
-        #
         height=height, aspect=aspect, dropna=False,
         **facet1_kws
     )
@@ -958,11 +993,15 @@ def twin_relplot(
         for j, ax in enumerate(axList):
             twin_axes[i, j] = ax.twinx()
 
-    if 'sharey' in facet2_kws.keys():
-        if facet2_kws['sharey']:
-            flatAx = twin_axes.flat
-            for ax in flatAx[1:]:
-                flatAx[0].get_shared_y_axes().join(flatAx[0], ax)
+    if facet1_sharey:
+        flatAx = g1.axes.flat
+        for ax in flatAx[1:]:
+            flatAx[0].get_shared_y_axes().join(flatAx[0], ax)
+
+    if facet1_sharex:
+        flatAx = g1.axes.flat
+        for ax in flatAx[1:]:
+            flatAx[0].get_shared_x_axes().join(flatAx[0], ax)
 
     facet2_kws = {} if facet2_kws is None else facet2_kws
     data2 = data.query(query2) if query2 is not None else data
@@ -970,12 +1009,18 @@ def twin_relplot(
         data=data2, fig=g1.fig, axes=twin_axes,
         row=row, col=col, col_wrap=col_wrap,
         row_order=row_order, col_order=col_order,
-        # 12/30/19
         hue=hue, hue_order=hue_order,
-        #
         height=height, aspect=aspect, dropna=False,
         **facet2_kws
     )
+    if facet2_sharey:
+        flatAx = twin_axes.flat
+        for ax in flatAx[1:]:
+            flatAx[0].get_shared_y_axes().join(flatAx[0], ax)
+    if facet2_sharex:
+        flatAx = twin_axes.flat
+        for ax in flatAx[1:]:
+            flatAx[0].get_shared_x_axes().join(flatAx[0], ax)
     
     # Draw the plot
     try:
@@ -1009,12 +1054,13 @@ def twin_relplot(
 
 class FacetGridShadow(Grid):
     """Multi-plot grid for plotting conditional relationships."""
-    def __init__(self, data, fig, axes, row=None, col=None, hue=None, col_wrap=None,
-                 sharex=True, sharey=True, height=3, aspect=1, palette=None,
-                 row_order=None, col_order=None, hue_order=None, hue_kws=None,
-                 dropna=True, legend_out=True, despine=True,
-                 margin_titles=False, xlim=None, ylim=None, subplot_kws=None,
-                 gridspec_kws=None, size=None):
+    def __init__(
+            self, data, fig, axes, row=None, col=None, hue=None, col_wrap=None,
+            sharex=True, sharey=True, height=3, aspect=1, palette=None,
+            row_order=None, col_order=None, hue_order=None, hue_kws=None,
+            dropna=True, legend_out=True, despine=True,
+            margin_titles=False, xlim=None, ylim=None, subplot_kws=None,
+            gridspec_kws=None, size=None):
 
         MPL_GRIDSPEC_VERSION = LooseVersion('1.4')
         OLD_MPL = LooseVersion(mpl.__version__) < MPL_GRIDSPEC_VERSION

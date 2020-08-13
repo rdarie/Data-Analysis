@@ -1,4 +1,6 @@
 """
+Creates a list of units to include in future analyses
+
 Usage:
     temp.py [options]
 
@@ -59,7 +61,7 @@ resultPath = os.path.join(
         arguments['inputBlockName'], arguments['window']))
 selectorPath = os.path.join(
     alignSubFolder,
-    prefix + '_{}.pickle'.format(
+    'unitSelector_{}.pickle'.format(
         arguments['selectorName']))
 #
 meanFRDF = pd.read_hdf(resultPath, 'meanFR')

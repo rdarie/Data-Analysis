@@ -6,6 +6,7 @@ import sys, os, itertools
 import peakutils
 import random
 import vg
+from tabulate import tabulate
 from tqdm import tqdm
 from collections.abc import Iterable
 import matplotlib.pyplot as plt
@@ -480,7 +481,7 @@ def closestSeries(takeFrom=None, compareTo=None, strictly='neither'):
 
 def interpolateDF(
         df, newX, kind='linear', fill_value='extrapolate',
-        x=None, columns=None):
+        x=None, columns=None, verbose=False):
     if x is None:
         oldX = np.array(df.index)
         if columns is None:
@@ -495,6 +496,8 @@ def interpolateDF(
         outputDF[x] = newX
     
     for columnName in columns:
+        if verbose:
+            print('Interpolating {}'.format(columnName))
         if isinstance(columnName, Iterable):
             if ('time' in columnName) or ('microseconds' in columnName):
                 #  fix for issue where you can't interpolate time with zeros meaningfully.
@@ -516,9 +519,13 @@ def interpolateDF(
                 oldX, df[columnName].to_numpy(), newX
             )
         elif kind in ['akima']:
-            interpFun = interpolate.Akima1DInterpolator(
-                oldX, df[columnName], axis=-1
-            )
+            try:
+                interpFun = interpolate.Akima1DInterpolator(
+                    oldX, df[columnName], axis=-1
+                )
+            except Exception:
+                traceback.print_exc()
+                pdb.set_trace()
             outputDF[columnName] = interpFun(newX, extrapolate=True)
     return outputDF
 
@@ -3625,3 +3632,32 @@ def parseFSE103Events(spikesBlock, delay=0, clipLimit=100, formatForce='f'):
         data.loc[:, ('forceX', 'forceY', 'forceZ')]
         .clip(lower=-1*clipLimit, upper=1*clipLimit))
     return data
+
+    
+def calcBreakDown(asigWide, rowName, colName, hueName):
+    breakDownBy = [
+        i
+        for i in [rowName, colName, hueName]
+        if i is not None]
+    if len(breakDownBy) == 1:
+        breakDownBy = breakDownBy[0]
+    breakDownData = (
+        asigWide
+        .groupby(breakDownBy)
+        .agg('count')
+        .iloc[:, 0]
+    )
+    # 
+    indexNames = breakDownData.index.names + ['count']
+    breakDownData = breakDownData.reset_index()
+    breakDownData.columns = indexNames
+    unitName = asigWide.reset_index()['feature'].unique()[0]
+    breakDownText = (
+        '{}\n'.format(unitName) +
+        '# of observations:\n' +
+        tabulate(
+            breakDownData, showindex=False,
+            headers='keys', tablefmt='github',
+            numalign='left', stralign='left')
+        )
+    return breakDownData, breakDownText

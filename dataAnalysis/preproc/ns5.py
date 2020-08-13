@@ -763,8 +763,9 @@ def alignedAsigsToDF(
 def getAsigsAlignedToEvents(
         eventBlock=None, signalBlock=None,
         chansToTrigger=None, chanQuery=None,
-        eventName=None,
-        windowSize=None, appendToExisting=False,
+        eventName=None, windowSize=None, 
+        minNReps=None,
+        appendToExisting=False,
         checkReferences=True, verbose=False,
         fileName=None, folderPath=None, chunkSize=None
         ):
@@ -790,28 +791,52 @@ def getAsigsAlignedToEvents(
         masterBlock.channel_indexes.append(chanIdx)
     totalNSegs = 0
     #  print([evSeg.events[3].name for evSeg in eventBlock.segments])
+    allAlignEventsList = []
     for segIdx, eventSeg in enumerate(eventBlock.segments):
-        if verbose:
-            print(
-                'getAsigsAlignedToEvents on segment {}'
-                .format(segIdx))
-        #
-        signalSeg = signalBlock.segments[segIdx]
         thisEventName = 'seg{}_{}'.format(segIdx, eventName)
-        #
         try:
             assert len(eventSeg.filter(name=thisEventName)) == 1
         except Exception:
             traceback.print_exc()
-            
         allEvIn = eventSeg.filter(name=thisEventName)[0]
         if isinstance(allEvIn, EventProxy):
             allAlignEvents = loadObjArrayAnn(allEvIn.load())
         elif isinstance(allEvIn, Event):
             allAlignEvents = allEvIn
         else:
-            raise(Exception('{} must be an Event or EventProxy!'.format(eventName)))
-        #
+            raise(Exception(
+                '{} must be an Event or EventProxy!'
+                .format(eventName)))
+        allAlignEventsList.append(allAlignEvents)
+    allAlignEventsDF = unitSpikeTrainArrayAnnToDF(allAlignEventsList)
+    #
+    breakDownData = (
+        allAlignEventsDF
+        .groupby(minNReps['categories'])
+        .agg('count')
+        .iloc[:, 0]
+        )
+    try:
+        breakDownData[breakDownData > minNReps['n']].to_csv(
+            os.path.join(
+                folderPath, 'numRepetitionsEachCondition.csv'
+            ), header=True
+        )
+    except Exception:
+        traceback.print_exc()
+    allAlignEventsDF.loc[:, 'keepMask'] = False
+    for name, group in allAlignEventsDF.groupby(minNReps['categories']):
+        allAlignEventsDF.loc[group.index, 'keepMask'] = (
+            breakDownData[name] > minNReps['n'])
+    for segIdx, group in allAlignEventsDF.groupby('segment'):
+        allAlignEventsList[segIdx].array_annotations['keepMask'] = group['keepMask'].to_numpy()
+    #
+    for segIdx, eventSeg in enumerate(eventBlock.segments):
+        if verbose:
+            print(
+                'getAsigsAlignedToEvents on segment {}'
+                .format(segIdx))
+        allAlignEvents = allAlignEventsList[segIdx]
         if chunkSize is None:
             alignEventGroups = [allAlignEvents]
         else:
@@ -827,6 +852,7 @@ def getAsigsAlignedToEvents(
                 else:
                     alignEventGroups.append(
                         allAlignEvents[i * chunkSize:])
+        signalSeg = signalBlock.segments[segIdx]
         for subSegIdx, alignEvents in enumerate(alignEventGroups):
             # seg to contain triggered time series
             if verbose:
@@ -855,8 +881,13 @@ def getAsigsAlignedToEvents(
                         alignEvents + windowSize[0] -
                         asig.sampling_rate ** (-1)) > asig.t_start)
                     )
-                #
-                alignEvents = alignEvents[validMask]
+                thisKeepMask = alignEvents.array_annotations['keepMask']
+                fullMask = (validMask & thisKeepMask)
+                alignEvents = alignEvents[fullMask]
+                # array_annotations get sliced with the event, but regular anns do not
+                for annName in alignEvents.annotations['arrayAnnNames']:
+                    alignEvents.annotations[annName] = (
+                        alignEvents.annotations[annName][fullMask])
                 if isinstance(asig, AnalogSignalProxy):
                     if checkReferences:
                         da = (
@@ -966,7 +997,6 @@ def getAsigsAlignedToEvents(
         writer = NixIO(filename=triggeredPath)
         writer.write_block(masterBlock, use_obj_names=True)
         writer.close()
-
     return masterBlock
 
 '''
@@ -1525,8 +1555,10 @@ def synchronizeINStoNSP(
                     st.t_start = tStart
                     st.t_stop = tStop
         #
-        allEvents = insBlock.filter(objects=Event)
-        allEvents = [ev for ev in allEvents if 'concatenate' not in ev.name]
+        allEvents = [
+            ev
+            for ev in insBlock.filter(objects=Event)
+            if ('ins' in ev.name) and ('concatenate' not in ev.name)]
         eventsDF = eventsToDataFrame(allEvents, idxT='t')
         newNames = {i: childBaseName(i, 'seg') for i in eventsDF.columns}
         eventsDF.rename(columns=newNames, inplace=True)
@@ -1534,6 +1566,13 @@ def synchronizeINStoNSP(
         for event in allEvents:
             event.magnitude[segMask] = (
                 timeInterpFunINStoNSP(event.times[segMask].magnitude))
+        concatEvents = [
+            ev
+            for ev in insBlock.filter(objects=Event)
+            if ('ins' in ev.name) and ('concatenate' in ev.name)]
+        if len(concatEvents) > trialSegment:
+            concatEvents[trialSegment].magnitude[:] = timeInterpFunINStoNSP(
+                concatEvents[trialSegment].times[:].magnitude)
     return td, accel, insBlock, timeInterpFunINStoNSP
 
 
@@ -2757,6 +2796,7 @@ def loadObjArrayAnn(st):
                     st.annotations[key] = [st.annotations[key]]
                 st.array_annotations.update(
                     {key: np.asarray(st.annotations[key])})
+                st.annotations[key] = np.asarray(st.annotations[key])
             except Exception:
                 traceback.print_exc()
     if hasattr(st, 'waveforms'):
@@ -2903,11 +2943,9 @@ def calcBinarizedArray(
 
 def calcFR(
         binnedPath, dataPath,
-        suffix='fr',
-        aggregateFun=None,
-        chanNames=None,
-        rasterOpts=None):
-    #
+        suffix='fr', aggregateFun=None,
+        chanNames=None, rasterOpts=None, verbose=False
+        ):
     print('Loading rasters...')
     masterSpikeMats, _ = loadSpikeMats(
         binnedPath, rasterOpts,

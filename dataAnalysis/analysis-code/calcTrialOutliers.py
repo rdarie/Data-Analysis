@@ -116,7 +116,6 @@ else:
         'electrode', arguments['amplitudeFieldName'], 'RateInHz']
     twoTailed = False
     alignedAsigsKWargs['windowSize'] = (-100e-3, 400e-3)
-    
 
 def takeSqrt(waveDF, spkTrain):
     return np.sqrt(waveDF)
@@ -182,6 +181,7 @@ dataDF.set_index(
     pd.Index(trialInfo['epoch'], name='epoch'),
     append=True, inplace=True)
 
+
 def findOutliers(
         mahalDistDF, groupBy=None,
         qThresh=None, sdThresh=None, sdThreshInner=None,
@@ -229,7 +229,7 @@ randSample = slice(None, None, None)
 # tBoundsCovCalc = [0, 150e-3]
 #
 
-useCachedMahalDist = False
+useCachedMahalDist = True
 if useCachedMahalDist and os.path.exists(resultPath):
     mahalDist = pd.read_hdf(
         resultPath, 'mahalDist')
@@ -309,14 +309,7 @@ print(outlierTrials['deviation'].sort_values().tail())
 print('\nOutlier proportion was:')
 print(outlierTrials['rejectBlock'].sum() / outlierTrials['rejectBlock'].size)
 
-pdb.set_trace()
-# if arguments['plotting']:
-#     import matplotlib.pyplot as plt
-#     import seaborn as sns
-#     plt.plot(mahalDist.to_numpy())
-#     plt.show()
-
-if arguments['plotting']:
+if arguments['plotting'] and outlierTrials['rejectBlock'].astype(np.bool).any():
     binSize = 1
     hist, binEdges = np.histogram(
         outlierTrials['deviation'],
@@ -396,8 +389,7 @@ theseOutliers = (
 # print('\nMaximum number of dropped trials, as a function of deviation threshold:')
 # print(maxDroppedTrials)
 # print(saveNOutliers.sort_values())
-
-if arguments['plotting']:
+if arguments['plotting'] and outlierTrials['rejectBlock'].astype(np.bool).any():
     nRowCol = int(np.ceil(np.sqrt(theseOutliers.size)))
     emgFig, emgAx = plt.subplots(
         nRowCol, nRowCol, sharex=True)

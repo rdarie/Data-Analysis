@@ -17,15 +17,18 @@
 #SBATCH -e ../../batch_logs/%j-alignMiniRC.errout
 
 # Specify account details
-#SBATCH --account=bibs-dborton-condo
+#SBATCH --account=carney-dborton-condo
 
-EXP="exp201901201200"
+# EXP="exp201901201200"
 # EXP="exp201901221000"
-# EXP="exp201901271000"
+EXP="exp201901271000"
+# EXP="exp201901261000"
 # EXP="exp201901070700"
-TRIALSELECTOR="--blockIdx=1"
+TRIALSELECTOR="--blockIdx=4"
+ALIGNSELECTOR="--analysisName=loRes"
 # TRIALSELECTOR="--processAll"
-UNITSELECTOR="--selector=_minfrmaxcorr"
+# UNITSELECTOR="--selector=unitSelector_minfrmaxcorr"
+UNITSELECTOR=""
 LAZINESS="--lazy"
 WINDOW="--window=miniRC"
 
@@ -35,9 +38,8 @@ conda activate
 source activate nda2
 python --version
 
-python3 ./calcAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS --eventName=stimAlignTimes --chanQuery="fr" --blockName="fr"  --alignFolderName=stim
-python3 ./calcAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS --eventName=stimAlignTimes --chanQuery="rig" --blockName="rig"  --alignFolderName=stim
-#  python3 ./calcAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS --eventName=stimAlignTimes --chanQuery="fr_sqrt" --blockName="fr_sqrt"  --alignFolderName=stim
-python3 ./calcAlignedRasters.py --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS --eventName=stimAlignTimes --chanQuery="raster" --blockName="raster"  --alignFolderName=stim
-#  
-python3 ./calcBlockOutliers.py --exp=$EXP $TRIALSELECTOR $UNITSELECTOR --inputBlockName="fr" --alignQuery="stimOn" --unitQuery="fr" --verbose --plotting  --alignFolderName=stim
+python3 ./calcAlignedAsigs.py --chanQuery="utahlfp" --outputBlockName="utahlfp"     --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ALIGNSELECTOR --eventName=stimAlignTimes  --alignFolderName=stim
+python3 ./calcAlignedAsigs.py --chanQuery="fr" --outputBlockName="fr"             --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ALIGNSELECTOR --eventName=stimAlignTimes  --alignFolderName=stim
+python3 ./calcAlignedAsigs.py --chanQuery="rig" --outputBlockName="rig"           --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ALIGNSELECTOR --eventName=stimAlignTimes  --alignFolderName=stim
+# python3 ./calcAlignedAsigs.py --chanQuery="fr_sqrt" --outputBlockName="fr_sqrt"   --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ALIGNSELECTOR --eventName=stimAlignTimes  --alignFolderName=stim
+python3 ./calcAlignedRasters.py --chanQuery="raster" --outputBlockName="raster"   --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ALIGNSELECTOR --eventName=stimAlignTimes  --alignFolderName=stim

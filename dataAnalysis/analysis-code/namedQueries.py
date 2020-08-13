@@ -20,6 +20,7 @@ namedQueries = {
     },
     'unit': {
         'fr': "(chanName.str.endswith('fr#0'))",
+        'utahlfp': "(chanName.str.contains('elec')and(not(chanName.str.endswith('fr#0'))))",
         'fr_sqrt': "(chanName.str.endswith('fr_sqrt#0'))",
         'raster': "(chanName.str.endswith('raster#0'))",
         'all': "(chanName.str.endswith('#0'))",
@@ -37,6 +38,7 @@ namedQueries = {
     },
     'chan': {
         'all': "(chanName.notna())",
+        'utahlfp': "(chanName.str.contains('elec')and(not(chanName.str.endswith('fr'))))",
         'fr': "(chanName.str.endswith('fr'))",
         'fr_sqrt': "(chanName.str.endswith('fr_sqrt'))",
         'raster': "(chanName.str.endswith('raster'))",

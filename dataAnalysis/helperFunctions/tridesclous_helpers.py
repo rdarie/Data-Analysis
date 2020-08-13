@@ -465,7 +465,8 @@ def neo_block_after_peeler(
                     timesDF['templateDist'] = spike[unitMask]['feature_distance']
                     timesDF['maxDeviation'] = np.nan
                     timesDF['energyReduction'] = np.nan
-                    meanWaveform = np.mean(spikeWaveforms[:, idxOfChanLabel, :], axis=0)
+                    meanWaveform = np.mean(
+                        spikeWaveforms[:, idxOfChanLabel, :], axis=0)
                     #  TODO: compare mean waveforms; if sufficiently, similar, collapse the two units
                     #  pdb.set_trace()
                     #  mirror naming convention from tdc
@@ -484,7 +485,7 @@ def neo_block_after_peeler(
                             wf / norm_factor,
                             pred_wf / norm_factor,
                             p=1, w=distance_window)
-                        #timesDF.loc[idx, 'templateDist'] = pred_distance
+                        # timesDF.loc[idx, 'templateDist'] = pred_distance
                         energy_reduction = (
                             (np.sum(wf**2) - np.sum(wf_resid**2)) /
                             wf.shape[0])

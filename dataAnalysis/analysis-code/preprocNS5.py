@@ -69,9 +69,9 @@ if arguments['makeTruncated']:
         asigNameList=[],
         ainpNameList=analogInputNames,
         spikeSourceType='tdc', writeMode='ow',
-        chunkSize=chunkSize, equalChunks=equalChunks,
-        chunkList=chunkList, calcRigEvents=trialFilesFrom['utah']['calcRigEvents'])
-###################################################################################
+        chunkSize=chunkSize, equalChunks=equalChunks, chunkList=chunkList,
+        calcRigEvents=trialFilesFrom['utah']['calcRigEvents'])
+###############################################################################
 if arguments['makeFull']:
     reader = ns5.preproc(
         fileName=ns5FileName,
@@ -81,10 +81,10 @@ if arguments['makeFull']:
         motorEncoderMask=motorEncoderMask,
         eventInfo=trialFilesFrom['utah']['eventInfo'],
         spikeSourceType='tdc', writeMode='ow',
-        chunkSize=chunkSize, equalChunks=equalChunks,
-        chunkList=chunkList, nameSuffix='_full',
+        chunkSize=chunkSize, equalChunks=equalChunks, chunkList=chunkList,
+        nameSuffix='_full',
         calcRigEvents=trialFilesFrom['utah']['calcRigEvents'])
-##################################################################################
+###############################################################################
 if arguments['ISI']:
     mapDF = prb_meta.mapToDF(rippleMapFile[int(arguments['blockIdx'])])
     if 'rippleOriginalMapFile' in locals():

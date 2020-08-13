@@ -78,12 +78,7 @@ signalBlock = eventBlock
 windowSize = [
     i * pq.s
     for i in rasterOpts['windowSizes'][arguments['window']]]
-#  arguments['chanNames'] = [
-#      'elec85#0_fr', 'elec85#1_fr',
-#      'elec71#1_fr', 'elec71#2_fr',
-#      'elec75#0_fr', 'elec75#1_fr',
-#      'elec77#0_fr', 'elec77#1_fr', 'elec77#2_fr',
-#      ]
+
 if arguments['processAll']:
     prefix = assembledName
 else:
@@ -95,11 +90,10 @@ ns5.getAsigsAlignedToEvents(
     chanQuery=arguments['chanQuery'],
     eventName=arguments['eventName'],
     windowSize=windowSize,
+    minNReps=minNConditionRepetitions,
     appendToExisting=False,
     checkReferences=False,
     verbose=arguments['verbose'],
     fileName='{}_{}_{}'.format(
         prefix, arguments['outputBlockName'], arguments['window']),
-    folderPath=alignSubFolder,
-    chunkSize=alignedAsigsChunkSize
-    )
+    folderPath=alignSubFolder, chunkSize=alignedAsigsChunkSize)

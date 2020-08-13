@@ -27,8 +27,8 @@
 # EXP="exp201901201200"
 # EXP="exp201901221000"
 # EXP="exp201901231000"
-# EXP="exp201901261000"
-EXP="exp201901271000"
+EXP="exp201901261000"
+# EXP="exp201901271000"
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
@@ -36,7 +36,7 @@ conda activate
 source activate nda2
 python --version
 
-#SLURM_ARRAY_TASK_ID="2"
+SLURM_ARRAY_TASK_ID="4"
 #python3 './tridesclousCCV.py' --blockIdx=$SLURM_ARRAY_TASK_ID --makeCoarseNeoBlock --exp=$EXP
 #python3 './plotSpikeReport.py' --blockIdx=$SLURM_ARRAY_TASK_ID --nameSuffix=_coarse --exp=$EXP
 #python3 './tridesclousCCV.py' --blockIdx=$SLURM_ARRAY_TASK_ID --makeStrictNeoBlock --exp=$EXP

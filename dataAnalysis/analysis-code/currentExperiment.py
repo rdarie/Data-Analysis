@@ -163,7 +163,7 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
             'jsonSessionNames': jsonSessionNames[blockIdx],
             'elecIDs': range(17),
             'excludeClus': [],
-            'upsampleRate': 4,
+            'upsampleRate': 8,
             # 'interpKind': 'linear',
             # 'upsampleRate': 10,
             'interpKind': 'akima',
@@ -197,7 +197,7 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
     miniRCStimDetectionOpts = {
         'minDist': 1.2,
         'gaussWid': 250e-3,
-        'offsetFromPeak': 2e-3,
+        'offsetFromPeak': 1e-3,
         'artifactKeepWhat': 'first',
         # 'predictSlots': False, 'snapToGrid': False,
         'predictSlots': True, 'snapToGrid': True,
@@ -214,7 +214,7 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
     fullStimDetectionOpts = {
         'minDist': 0.2,
         'gaussWid': 50e-3,
-        'offsetFromPeak': 2e-3,
+        'offsetFromPeak': 1e-3,
         'artifactKeepWhat': 'max',
         # 'predictSlots': False, 'snapToGrid': False,
         'predictSlots': True, 'snapToGrid': True,
@@ -227,10 +227,16 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
         trialFilesStim['ins']['getINSkwargs'].update(miniRCStimDetectionOpts)
         #  only parse sync lines
         eventInfo = {'inputIDs': expOpts['miniRCRigInputs']}
+        if 'outlierDetectOptions' in locals():
+            outlierDetectOptions['conditionNames'] = [
+                'electrode', 'amplitude', 'RateInHz']
     elif blockExperimentType == 'proprio-RC':
         trialFilesStim['ins']['getINSkwargs'].update(RCStimDetectionOpts)
         #  should rename eventInfo to something more intuitive
         eventInfo = {'inputIDs': expOpts['RCRigInputs']}
+        if 'outlierDetectOptions' in locals():
+            outlierDetectOptions['conditionNames'] = [
+                'electrode', 'amplitude', 'RateInHz']
     elif blockExperimentType == 'isi':
         #  should rename eventInfo to something more intuitive
         eventInfo = {'inputIDs': dict()}
@@ -338,39 +344,8 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
         amplitudeColumn='amplitude',
         programColumn='program',
         electrodeColumn='electrode',
-        removeFuzzyName=False)
-    # alignedAsigsKWargs.update(dict(
-    #     windowSize=(-2, 2),
-    #     decimate=5))
-    # alignedAsigsKWargs.update(dict(
-    #     windowSize=(-100e-3, 400e-3),
-    #     decimate=5))
-    # alignedAsigsKWargs.update(dict(
-    #     windowSize=(-250e-6, 2750e-6),
-    #     decimate=1))
-    # alignedAsigsKWargs.update(dict(
-    #     windowSize=(-250e-6, 9e-3),
-    #     decimate=1))
-    # alignedAsigsKWargs.update(dict(
-    #     windowSize=(-250e-6, 19e-3),
-    #     decimate=2))
-    # alignedAsigsKWargs.update(dict(
-    #     windowSize=(-250e-6, 49e-3),
-    #     decimate=3))
-    # alignedAsigsKWargs.update(dict(
-    #     windowSize=None, decimate=1))
-    # if (miniRCBlock or RCBlock):
-    #     alignedAsigsKWargs.update(dict(
-    #         amplitudeColumn='amplitude',
-    #         programColumn='program',
-    #         electrodeColumn='electrode',
-    #         removeFuzzyName=False))
-    # else:
-    #     alignedAsigsKWargs.update(dict(
-    #         amplitudeColumn='amplitudeFuzzy',
-    #         programColumn='programFuzzy',
-    #         electrodeColumn='electrodeFuzzy',
-    #         removeFuzzyName=True))
+        removeFuzzyName=False,
+        decimate=1)
     overrideChanNames = None
     # overrideChanNames = [
     #     'elec75#0', 'elec75#1', 'elec83#0', 'elec78#0', 'elec78#1']
@@ -379,13 +354,14 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
     #     'elec75#0', 'elec75#1', 'elec83#0', 'elec78#0', 'elec78#1']
     alignedAsigsChunkSize = 150000
     rasterOpts = {
-        # 'binInterval': 2e-4, 'binWidth': 10e-3, 'smoothKernelWidth': 10e-3,  # 5 kHz, EMG Lo-Res
+        # 'binInterval': 2e-4, 'binWidth': 5e-3, 'smoothKernelWidth': 5e-3,  # 5 kHz, EMG Lo-Res
         'binInterval': 1e-3, 'binWidth': 10e-3, 'smoothKernelWidth': 10e-3,  # default, 1 kHz spikes
-        # 'binInterval': (3e4) ** (-1), 'binWidth': 5e-3, 'smoothKernelWidth': 10e-3,  # 30 kHz, Full-Res
-        # 'binInterval': 1e-4, 'binWidth': 5e-3, 'smoothKernelWidth': 10e-3,  # 10 kHz, EMG Hi-Res
+        # 'binInterval': (3e4) ** (-1), 'binWidth': 5e-3, 'smoothKernelWidth': 5e-3,  # 30 kHz, Full-Res
+        # 'binInterval': 1e-4, 'binWidth': 5e-3, 'smoothKernelWidth': 5e-3,  # 10 kHz, EMG Hi-Res
         'windowSizes': {
             'XS': (-0.15, 0.4),
             'XXS': (-0.2, 0.05),
+            'XXXS': (-0.005, 0.025),
             'short': (-0.5, 0.5),
             'long': (-2.25, 2.25),
             'RC': (-0.33, 0.33),
@@ -423,8 +399,10 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
     nrnRelplotKWArgs = dict(
         palette="ch:1.6,-.3,dark=.1,light=0.7,reverse=1",
         func1_kws={
-            'marker': 'd', 's': 25, 'edgecolors': 'face',
-            'alpha': 0.2, 'rasterized': True},
+            'marker': 'd',
+            'edgecolor': None,
+            'edgecolors': 'face',
+            'alpha': .8, 'rasterized': True},
         func2_kws={'ci': 'sem'},
         facet1_kws={'sharey': False},
         facet2_kws={'sharey': True},
@@ -433,10 +411,11 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
     nrnVLineOpts = {'color': 'y'}
     nrnBlockShadingOpts = {
         'facecolor': nrnVLineOpts['color'],
-        'alpha': 0.1, 'zorder': -100}
+        'alpha': 0.3, 'zorder': -100}
     nrnSigStarOpts = {
         'color': 'y',
-        # 'edgecolors': 'face',
+        'edgecolor': None,
+        'edgecolors': 'face',
         'linestyle': 'None',
         'markersize': 20,
         'marker': '*'}

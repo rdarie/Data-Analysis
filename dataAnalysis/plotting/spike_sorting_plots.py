@@ -11,6 +11,7 @@ import seaborn as sns
 import random
 import traceback
 from fractions import gcd
+from tqdm import tqdm
 sns.set(rc={
     'figure.figsize': (14, 18),
     'legend.fontsize': 10,
@@ -372,16 +373,8 @@ def spikePDFReport(
         # plt.gcf().set_size_inches(figWidth, figWidth)
         pdf.savefig(bbox_inches='tight', pad_inches=0, dpi=300)
         plt.close()
-
-        for idx, channel in enumerate(spikes['ChannelID']):
-            if os.fstat(0) == os.fstat(1):
-                endChar = '\r'
-            else:
-                endChar = ''
-            print(
-                "Running spikePDFReport: %d%%" % int(
-                    (idx + 1) * 100 / len(spikes['ChannelID'])),
-                end=endChar)
+        for channel in tqdm(sorted(spikes['ChannelID'])):
+            idx = spikes['ChannelID'].index(channel)
             unitsOnThisChan = np.unique(spikes['Classification'][idx])
             if unitsOnThisChan is not None:
                 if len(unitsOnThisChan) > 0:
@@ -434,16 +427,19 @@ def spikePDFReport(
                             ))
                         noiseHarmonics = [
                             i * 1e3 * (60) ** (-1)
-                            for i in range(1,10)]
+                            for i in range(1, 10)]
                         for noiseHarmonic in noiseHarmonics:
                             isiAx.axvline(
-                                noiseHarmonic, color='b', linestyle='--', zorder=0)
+                                noiseHarmonic, color='b',
+                                linestyle='--', zorder=0)
                         stimHarmonics = [100]
                         for stimHarmonic in stimHarmonics:
                             isiAx.axvline(
-                                stimHarmonic, color='r', linestyle='--', zorder=0)
+                                stimHarmonic, color='r',
+                                linestyle='--', zorder=0)
                         ksa.plotSpikePropertyHistogram(
-                            spikes, channel=channel, whichProp='templateDist',
+                            spikes, channel=channel,
+                            whichProp='templateDist',
                             bins=distBins,
                             ax=templateAx, kde_kws=kde_kws)
                         templateAx.set_title(

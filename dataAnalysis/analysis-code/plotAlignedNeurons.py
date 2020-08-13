@@ -47,9 +47,9 @@ from docopt import docopt
 from namedQueries import namedQueries
 import seaborn as sns
 sns.set(
-    context='talk', style='dark',
+    context='talk', style='white',
     palette='dark', font='sans-serif',
-    font_scale=1.5, color_codes=True)
+    font_scale=1, color_codes=True)
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']), arguments['exp'])
@@ -120,27 +120,28 @@ statsTestOpts.update({
 #  Overrides
 ################################################################
 limitPages = None
+showNow = False
 if arguments['enableOverrides']:
     nrnRelplotKWArgs.update({
         'legend': 'brief',
         'height': 4,
         'aspect': 2,
-        'facet1_kws': {
+        'facet1_kws': {  # raster axes
             'sharey': False,
             # 'legend_out': False,
             'gridspec_kws': {
                 'wspace': 0.01,
                 'hspace': 0.01
             }},
-        'facet2_kws': {
-            'sharey': True,
+        'facet2_kws': {  # firing rate axes
+            'sharey': False,
             # 'legend_out': False,
             'gridspec_kws': {
                 'wspace': 0.01,
                 'hspace': 0.01
             }}
         })
-#     # alignedAsigsKWargs.update({'windowSize': (-1000e-3, 1000e-3)})
+    alignedAsigsKWargs['windowSize'] = (-50e-3, 200e-3)
 #     # currWindow = rasterOpts['windowSizes'][arguments['window']]
 #     # fullWinSize = currWindow[1] - currWindow[0]
 #     # redWinSize = (
@@ -186,6 +187,7 @@ asp.plotNeuronsAligned(
     rasterBlock,
     frBlock,
     limitPages=limitPages,
+    showNow=showNow,
     verbose=arguments['verbose'],
     loadArgs=alignedAsigsKWargs,
     sigTestResults=sigValsWide,
@@ -194,7 +196,7 @@ asp.plotNeuronsAligned(
     plotProcFuns=[
         # asp.genYLimSetterTwin((0, 150)),
         asp.genTicksToScaleTwin(
-            lineOpts={'lw': 2}, shared=True,
+            lineOpts={'lw': 2}, shared=False,
             # for evoked lfp report
             # xUnitFactor=1e3, yUnitFactor=1,
             # xUnits='msec', yUnits='uV',
@@ -205,7 +207,7 @@ asp.plotNeuronsAligned(
         asp.xLabelsTime, asp.genLegendRounder(decimals=2),
         asp.genDespiner(right=True, left=True, trim=True),
         asp.genVLineAdder([0], nrnVLineOpts),
-        # asp.genBlockShader(nrnBlockShadingOpts)
+        asp.genBlockShader(nrnBlockShadingOpts)
         ],
     pdfName=pdfName,
     **rowColOpts,

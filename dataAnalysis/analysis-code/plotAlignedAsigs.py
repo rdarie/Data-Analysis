@@ -14,8 +14,8 @@ Options:
     --alignQuery=alignQuery                what will the plot be aligned to? [default: outboundWithStim]
     --selector=selector                    filename if using a unit selector
     --maskOutlierBlocks                    delete outlier trials? [default: False]
-    --invertOutlierBlocks                  delete outlier trials? [default: False]
-    --enableOverrides                      delete outlier trials? [default: False]
+    --invertOutlierBlocks                  delete everything *except* outlier trials? [default: False]
+    --enableOverrides                      modify default plot opts? [default: False]
     --individualTraces                     mean+sem or individual traces? [default: False]
     --overlayStats                         overlay ANOVA significance stars? [default: False]
     --rowName=rowName                      break down by row  [default: pedalDirection]
@@ -53,7 +53,7 @@ import seaborn as sns
 sns.set(
     context='talk', style='dark',
     palette='dark', font='sans-serif',
-    font_scale=1.5, color_codes=True)
+    font_scale=1, color_codes=True)
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']), arguments['exp'])
@@ -129,7 +129,7 @@ if arguments['enableOverrides']:
         'height': 4,
         'aspect': 2,
         'facet_kws': {
-            'sharey': True,
+            'sharey': False,
             # 'legend_out': False,
             'gridspec_kws': {
                 'wspace': 0.01,
@@ -139,10 +139,11 @@ if arguments['enableOverrides']:
     if 'rowColOverrides' in locals():
         if rowColOpts['colName'] in rowColOverrides:
             rowColOpts['colOrder'] = rowColOverrides[rowColOpts['colName']]
-    # alignedAsigsKWargs.update({'windowSize': (-25e-3, 125e-3)})
-    # alignedAsigsKWargs.update({'windowSize': (-2e-3, 23e-3)})
+    alignedAsigsKWargs.update({'windowSize': (-25e-3, 100e-3)})
     currWindow = rasterOpts['windowSizes'][arguments['window']]
     fullWinSize = currWindow[1] - currWindow[0]
+    if 'windowSize' not in alignedAsigsKWargs:
+        alignedAsigsKWargs['windowSize'] = rasterOpts['windowSizes'][arguments['window']]
     redWinSize = (
         alignedAsigsKWargs['windowSize'][1] -
         alignedAsigsKWargs['windowSize'][0])
@@ -185,7 +186,7 @@ asp.plotAsigsAligned(
     minNObservations=5,
     plotProcFuns=[
         asp.genTicksToScale(
-            lineOpts={'lw': 2}, shared=True,
+            lineOpts={'lw': 2}, shared=False,
             # for evoked lfp report
             # xUnitFactor=1e3, yUnitFactor=1,
             # xUnits='msec', yUnits='uV',

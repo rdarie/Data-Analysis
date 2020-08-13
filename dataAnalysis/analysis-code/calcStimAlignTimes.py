@@ -103,6 +103,7 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
             except Exception:
                 traceback.print_exc()
     dataSegEvents = [evP.load() for evP in eventProxysList]
+    # pdb.set_trace()
     eventDF = ns5.eventsToDataFrame(
         dataSegEvents, idxT='t',
         names=['property', 'value']

@@ -100,6 +100,7 @@ ns5.getAsigsAlignedToEvents(
     eventName=arguments['eventName'],
     windowSize=windowSize,
     appendToExisting=False,
+    minNReps=minNConditionRepetitions,
     checkReferences=False,
     verbose=arguments['verbose'],
     fileName=prefix + '_{}_{}'.format(

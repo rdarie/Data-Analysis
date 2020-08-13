@@ -18,7 +18,7 @@
 #SBATCH -e ../../batch_logs/%j-%a-analysis_mini_20190127.errout
 
 # Specify account details
-#SBATCH --account=bibs-dborton-condo
+#SBATCH --account=carney-dborton-condo
 
 # Request custom resources
 #SBATCH --array=5
@@ -32,10 +32,16 @@
 # EXP="exp201901231000"
 #
 # EXP="exp201901261000"
-# EXP="exp201901271000"
+EXP="exp201901271000"
 #
-EXP="exp202003091200"
+# EXP="exp202003091200"
 
+LAZINESS="--lazy"
+ANALYSISNAME="--analysisName=loRes"
+# ANALYSISNAME="--analysisName=default"
+
+BLOCKSUFFIX="--inputBlockSuffix=_full"
+# BLOCKSUFFIX=""
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
@@ -43,7 +49,7 @@ conda activate
 source activate nda2
 python --version
 
-SLURM_ARRAY_TASK_ID=1
-python ./calcTrialAnalysisNix.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --chanQuery="all"
-# python ./calcStimAlignTimes.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --plotParamHistograms
-# python ./calcFR.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID
+SLURM_ARRAY_TASK_ID=5
+python ./calcProprioAnalysisNix.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISNAME $BLOCKSUFFIX --chanQuery="all" --verbose
+python ./calcStimAlignTimes.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISNAME --plotParamHistograms $LAZINESS
+python ./calcFR.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISNAME
