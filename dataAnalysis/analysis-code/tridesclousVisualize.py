@@ -32,6 +32,15 @@ expOpts, allOpts = parseAnalysisOptions(
 globals().update(expOpts)
 globals().update(allOpts)
 
+sortingConfigName = 'nform'
+electrodeMapPath = spikeSortingOpts[sortingConfigName]['electrodeMapPath']
+mapExt = electrodeMapPath.split('.')[-1]
+nspCsvPath = electrodeMapPath.replace(mapExt, 'csv')
+nspPrbPath = electrodeMapPath.replace(mapExt, 'prb')
+ns5FileName = ns5FileName.replace('Block', sortingConfigName)
+triFolder = os.path.join(
+    scratchFolder, 'tdc_{}{:0>3}'.format(sortingConfigName, blockIdx))
+
 viewPeeler = False
 if arguments['peeler']:
     viewPeeler = arguments['peeler']

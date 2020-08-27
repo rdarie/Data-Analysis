@@ -11,6 +11,7 @@ import dataAnalysis.helperFunctions.kilosort_analysis_new as ksa
 import rcsanalysis.packet_func as rcsa_helpers
 import dataAnalysis.preproc.ns5 as ns5
 import matplotlib.pyplot as plt
+import warnings
 from matplotlib.backends.backend_pdf import PdfPages
 import seaborn as sns
 import numpy as np
@@ -31,6 +32,7 @@ import datetime
 from datetime import datetime as dt
 import json
 from copy import copy
+
 # INSReferenceTime = pd.Timestamp('2018-03-01')
 INSReferenceTime = pd.Timestamp('2019-01-01')
 
@@ -375,17 +377,21 @@ def processMetaMatrix(
 
 
 def processMetaMatrixV2(
-        metaMatrix,
+        inputJson, streamType,
         sampleRateLookupDict=None,
         tossPackets=True, fixTimeShifts=False,
         useApparentFS=True,
         verbose=False, makePlots=False):
     # count frame sizes
-    originalMetaDFColumns = [
-        'dataSize', 'dataTypeSequence',
-        'systemTick', 'timestamp', 'microloss', 'macroloss', 'bothloss',
-        'packetIdx', 'chanSamplesLen', 'dataSizePerChannel', 'SampleRate',
-        'overlapsFuture', 'PacketRxUnixTime', 'sortedIndices']
+    if streamType == 'accel':
+        metaMatrix, metaFig, metaAx, metaTwinAx = rcsa_helpers.extract_accel_meta_data(
+            inputJson, sampleRateLookupDict=sampleRateLookupDict,
+            plotting=makePlots)
+    elif streamType == 'td':
+        metaMatrix, metaFig, metaAx, metaTwinAx = rcsa_helpers.extract_td_meta_data(
+            inputJson, sampleRateLookupDict=sampleRateLookupDict,
+            plotting=makePlots)
+    originalMetaDFColumns = rcsa_helpers.metaMatrixColumns
     metaDF = pd.DataFrame(
         metaMatrix, columns=originalMetaDFColumns)
     metaDF['microloss'] = metaDF['microloss'].astype(np.bool)
@@ -398,10 +404,6 @@ def processMetaMatrixV2(
     intersampleTickCount = (fs ** -1) / (100e-6)
     nominalFrameSize = metaDF['dataSizePerChannel'].value_counts().idxmax()
     if useApparentFS:
-        metaDF['firstSampleTick'], metaDF['lastSampleTick'] = (
-            rcsa_helpers
-            .unpack_meta_matrix_time(
-                metaMatrix, intersampleTickCount))
         apparentPayloadDur = (
             (metaDF['lastSampleTick'].diff().fillna(method='bfill') * 1e-4) /
             nominalFrameSize)
@@ -428,6 +430,21 @@ def processMetaMatrixV2(
             .format(apparentSamplingPeriod, apparentSamplingPeriodSEM))
         print(
             'Apparent sampling freq is {}'.format(fs))
+        if streamType == 'accel':
+            metaMatrix, metaFig, metaAx, metaTwinAx = rcsa_helpers.extract_accel_meta_data(
+                inputJson, sampleRateLookupDict=sampleRateLookupDict,
+                intersampleTickCount=intersampleTickCount,
+                plotting=makePlots)
+        elif streamType == 'td':
+            metaMatrix, metaFig, metaAx, metaTwinAx = rcsa_helpers.extract_td_meta_data(
+                inputJson, sampleRateLookupDict=sampleRateLookupDict,
+                intersampleTickCount=intersampleTickCount,
+                plotting=makePlots)
+        metaDF = pd.DataFrame(
+            metaMatrix, columns=originalMetaDFColumns)
+        metaDF['microloss'] = metaDF['microloss'].astype(np.bool)
+        metaDF['macroloss'] = metaDF['macroloss'].astype(np.bool)
+        metaDF['bothloss'] = metaDF['bothloss'].astype(np.bool)
     nominalFrameDur = nominalFrameSize * (fs ** -1)
     nChan = int(metaDF['chanSamplesLen'].iloc[0])
     if fixTimeShifts:
@@ -459,15 +476,26 @@ def processMetaMatrixV2(
     metaDF['frameLenMismatch'] = metaDF['recordDurWhole'] - metaDF['recordDur']
     # will hold duration corrections based on sysTick
     metaDF['packetTimeCorrection'] = 0
-    ####
-    metaDF['firstSampleTick'], metaDF['lastSampleTick'] = (
-        rcsa_helpers
-        .unpack_meta_matrix_time(
-            metaMatrix, intersampleTickCount))
-    metaDF['firstSampleTick'] *= 1e-4
-    metaDF['lastSampleTick'] *= 1e-4
     #
-    metaDF['dataPayloadDurSysTick'] = metaDF['lastSampleTick'].diff()
+    # validLatencyMask = (metaDF['PacketGenTime'] > 0).to_numpy() & (metaDF['PacketGenTime'].shift(1) > 0).to_numpy()
+    # dataPayloadDurPGT = metaDF['PacketGenTime'].diff() * 1e-3
+    # dataPayloadDurPRT = metaDF['PacketRxUnixTime'].diff() * 1e-3
+    # dataPayloadDurPGT.loc[~validLatencyMask] = dataPayloadDurPRT.loc[~validLatencyMask]
+    # metaDF['dataPayloadDurPGT'] = dataPayloadDurPGT
+    metaDF['dataPayloadDurPGT'] = metaDF['PacketGenTime'].diff() * 1e-3
+    metaDF.loc[metaDF.index[0], 'dataPayloadDurPGT'] = 0
+    metaDF['recordDurPGT'] = metaDF['dataPayloadDurPGT'].cumsum()
+    metaDF['recordDurWholePGT'] = (
+        nominalFrameDur *
+        np.round(
+            metaDF['recordDurPGT'] / nominalFrameDur))
+    metaDF['frameLenMismatchPGT'] = (
+        metaDF['recordDurWholePGT'] -
+        metaDF['recordDurPGT'])
+    metaDF['recordDurMismatchPGT'] = (
+        metaDF['recordDurPGT'] - metaDF['recordDur'])
+    #
+    metaDF['dataPayloadDurSysTick'] = metaDF['lastSampleTick'].diff() * 1e-4
     metaDF.loc[metaDF.index[0], 'dataPayloadDurSysTick'] = 0
     metaDF['recordDurSysTick'] = metaDF['dataPayloadDurSysTick'].cumsum()
     metaDF['recordDurWholeSysTick'] = (
@@ -488,10 +516,10 @@ def processMetaMatrixV2(
         plotExtent = 400
         zoomAxes = False
         if zoomAxes:
-            if metaDF['microloss'].any():
+            if metaDF['anyloss'].any():
                 newXMin = max(
                     metaDF.loc[
-                        metaDF['microloss'],
+                        metaDF['anyloss'],
                         xAxisVariable].iloc[0] - int(plotExtent/4),
                     metaDF[xAxisVariable].iloc[0])
                 newXMax = min(
@@ -511,6 +539,11 @@ def processMetaMatrixV2(
             plotMask = np.ones(metaDF.index.shape).astype(np.bool)
         ax[0].plot(
             metaDF.loc[plotMask, xAxisVariable],
+            1e3 * metaDF.loc[plotMask, 'dataPayloadDurPGT'],
+            label='frame length per packet (packet gen time)'
+            )
+        ax[0].plot(
+            metaDF.loc[plotMask, xAxisVariable],
             1e3 * metaDF.loc[plotMask, 'dataPayloadDur'],
             label='frame length per packet'
             )
@@ -519,14 +552,10 @@ def processMetaMatrixV2(
             1e3 * metaDF.loc[plotMask, 'dataPayloadDurSysTick'],
             label='frame length per packet (systick)'
             )
-        ax[0].plot(
-            metaDF.loc[
-                metaDF['microloss'] & plotMask,
-                xAxisVariable],
-            1e3 * metaDF.loc[
-                metaDF['microloss'] & plotMask,
-                'dataPayloadDur'],
-            'm*', label='microloss packets'
+        ax[1].plot(
+            metaDF.loc[plotMask, xAxisVariable],
+            1e3 * metaDF.loc[plotMask, 'frameLenMismatchPGT'],
+            label='difference from nominal length per packet (packet gen time)',
             )
         ax[1].plot(
             metaDF.loc[plotMask, xAxisVariable],
@@ -540,20 +569,25 @@ def processMetaMatrixV2(
             label='difference from nominal length per packet (systick)',
             )
         ax[1].plot(
-            metaDF.loc[metaDF['microloss'] & plotMask, xAxisVariable],
-            1e3 * metaDF.loc[metaDF['microloss'] & plotMask, 'frameLenMismatch'],
-            'm*', label='microloss packets'
+            metaDF.loc[metaDF['anyloss'] & plotMask, xAxisVariable],
+            1e3 * metaDF.loc[metaDF['anyloss'] & plotMask, 'frameLenMismatch'],
+            'y*', label='lost packet(s)'
             )
         ax[1].legend(loc='upper right')
         ax[1].set_ylabel('time interval (msec)')
         ax[2].plot(
             metaDF.loc[plotMask, xAxisVariable],
+            1e3 * metaDF.loc[plotMask, 'recordDurMismatchPGT'],
+            label='cumulative unresolved deviation from packetGen time            ',
+            zorder=1)
+        ax[2].plot(
+            metaDF.loc[plotMask, xAxisVariable],
             1e3 * metaDF.loc[plotMask, 'recordDurMismatch'],
-            label='cumulative unresolved deviation from systick time',
+            label='cumulative unresolved deviation from systick time            ',
             zorder=1)
     else:
         fig, ax = None, None
-    for rowIdx in metaDF.loc[metaDF['microloss'], :].index:
+    for rowIdx in metaDF.loc[metaDF['anyloss'], :].index:
         thisMismatch = metaDF.loc[
             rowIdx, 'recordDurMismatch']
         thisCorrection = (
@@ -566,18 +600,43 @@ def processMetaMatrixV2(
                 rowIdx, 'packetTimeCorrection'] = thisCorrection
         metaDF['recordDur'] = (metaDF['dataPayloadDur'] + metaDF['packetTimeCorrection']).cumsum()
         metaDF['recordDurMismatch'] = metaDF['recordDurSysTick'] - metaDF['recordDur']
-    metaDF['recordDurMismatch'] = metaDF['recordDurSysTick'] - metaDF['recordDur']
+    metaDF['recordDurMismatch'] = (
+        metaDF['recordDurSysTick'] - metaDF['recordDur'])
+    metaDF['recordDurMismatchPGT'] = (
+        metaDF['recordDurPGT'] - metaDF['recordDur'])
     if makePlots:
-        ax[2].plot(
-            metaDF.loc[plotMask, xAxisVariable],
-            1e3 * metaDF.loc[plotMask, 'recordDurMismatch'],
-            label='cumulative unresolved deviation from systick time',
-            zorder=1)
         ax[0].plot(
             metaDF.loc[plotMask, xAxisVariable],
             1e3 * metaDF.loc[plotMask, 'packetTimeCorrection'],
             label='length correction applied to each packet'
             )
+        ax[0].plot(
+            metaDF.loc[
+                metaDF['anyloss'] & plotMask,
+                xAxisVariable],
+            1e3 * metaDF.loc[
+                metaDF['anyloss'] & plotMask,
+                'dataPayloadDur'],
+            'y*', label='lost packet(s)'
+            )
+        ax[2].plot(
+            metaDF.loc[plotMask, xAxisVariable],
+            1e3 * metaDF.loc[plotMask, 'recordDurMismatchPGT'],
+            label='cumulative unresolved deviation from packetGen time (after fix)',
+            zorder=1)
+        ax[2].plot(
+            metaDF.loc[plotMask, xAxisVariable],
+            1e3 * metaDF.loc[plotMask, 'recordDurMismatch'],
+            label='cumulative unresolved deviation from systick time (after fix)',
+            zorder=1)
+        ax[2].text(
+            0.1, 0.1,
+            'min: {:.1f} max: {:.1f}'.format(
+                1e3 * metaDF['recordDurMismatch'].min(),
+                1e3 * metaDF['recordDurMismatch'].max()
+            ),
+            horizontalalignment='left', verticalalignment='baseline',
+            transform=ax[2].transAxes)
         ax[0].legend(loc='upper right')
         ax[0].set_ylabel('time interval (msec)')
         ax[2].set_ylabel('time interval (msec)')
@@ -596,7 +655,7 @@ def processMetaMatrixV2(
     return (
         metaDF, nChan, fs, intersampleTickCount,
         nominalFrameDur, packetsNeededFixing,
-        tossMask, fig, ax)
+        tossMask, fig, ax, metaFig, metaAx, metaTwinAx)
 
 
 def getINSTDFromJson(
@@ -643,15 +702,14 @@ def getINSTDFromJson(
                     timeDomainJsonText = fixMalformedJson(timeDomainJsonText)
                     timeDomainJson = json.loads(timeDomainJsonText)
             #
-            timeDomainMeta = rcsa_helpers.extract_td_meta_data(timeDomainJson)
-            timeDomainMeta = rcsa_helpers.code_micro_and_macro_packet_loss(
-                timeDomainMeta)
+            # warnings.filterwarnings("error")
             (
                 tdMetaDF, nChan, fs,
                 intersampleTickCount, nominalFrameDur,
                 packetsNeededFixing, tossMask,
-                fig, ax) = processMetaMatrixV2(
-                    timeDomainMeta, verbose=verbose,
+                fig, ax,
+                metaFig, metaAx, metaTwinAx) = processMetaMatrixV2(
+                    timeDomainJson, streamType='td', verbose=verbose,
                     sampleRateLookupDict=mdt_constants.TdSampleRates,
                     tossPackets=tossPackets, fixTimeShifts=fixTimeShifts,
                     makePlots=makePlots)
@@ -668,18 +726,29 @@ def getINSTDFromJson(
                 figSaveOpts = dict(
                     bbox_extra_artists=(thisAx.get_legend() for thisAx in ax),
                     bbox_inches='tight')
+                ax[0].set_title(
+                    'Block{:0>3}_TrialSeg{:0>1}_td'.format(
+                        blockIdx, idx)
+                    )
+                #
                 pdfPath = os.path.join(
                     figureOutputFolder,
                     'packet_jitter_Block{:0>3}_TrialSeg{:0>1}_td.pdf'.format(
                         blockIdx, idx))
-                plt.savefig(pdfPath, **figSaveOpts)
+                fig.savefig(pdfPath, **figSaveOpts)
+                #
+                pdfPath = os.path.join(
+                    figureOutputFolder,
+                    'meta_info_Block{:0>3}_TrialSeg{:0>1}_td.pdf'.format(
+                        blockIdx, idx))
+                metaFig.savefig(pdfPath, **figSaveOpts)
                 if showPlots:
                     plt.show()
                 else:
                     plt.close()
             #
             timeDomainValues = rcsa_helpers.unpacker_td(
-                timeDomainMeta, timeDomainJson, intersampleTickCount)
+                tdMetaDF.to_numpy(), timeDomainJson, intersampleTickCount)
             #  save the noninterpolated files to disk
             tdData = rcsa_helpers.save_to_disk(
                 timeDomainValues, os.path.join(
@@ -703,13 +772,12 @@ def getINSTDFromJson(
                 tdData['equidistantT'] = np.nan
                 lastPacketStartTime = tdData['t'].iloc[0]
                 lastPacketT = lastPacketStartTime - fs ** (-1)
-                # lastPacketStartCoarseTime = tdData['coarseClock'].iloc[0]
                 for name, group in tdData.groupby('packetIdx'):
                     # get time difference from sysTick
                     misalignTimeDiff = group['t'].iloc[0] - lastPacketT
-                    startTimeOver = tdMetaDF.loc[name, 'microloss']
+                    startTimeOver = tdMetaDF.loc[name, 'anyloss']
                     if verbose and (int(name) in packetsNeededFixing):
-                        print('    fixed packet: t = {:+.4f}'.format(
+                        print('    fixed packet time shifted: t = {:+.4f}'.format(
                             group['t'].iloc[0] - tZero))
                     if startTimeOver:
                         if verbose:
@@ -808,7 +876,9 @@ def getINSTDFromJson(
 def getINSTimeSyncFromJson(
         folderPath, sessionNames,
         deviceName='DeviceNPC700373H',
-        forceRecalc=True
+        makePlots=False, showPlots=False,
+        figureOutputFolder=None, 
+        blockIdx=None, forceRecalc=True
         ):
 
     if not isinstance(sessionNames, Iterable):
@@ -819,7 +889,7 @@ def getINSTimeSyncFromJson(
         try:
             if forceRecalc:
                 raise(Exception('Debugging, always extract fresh'))
-
+            #
             timeSyncData = pd.read_csv(os.path.join(jsonPath, 'TimeSync.csv'))
             #  loading from csv removes datetime formatting, recover it:
             timeSyncData['microseconds'] = pd.to_timedelta(
@@ -828,7 +898,6 @@ def getINSTimeSyncFromJson(
                 timeSyncData['time_master'])
             timeSyncData['actual_time'] = pd.to_datetime(
                 timeSyncData['actual_time'])
-
         except Exception:
             traceback.print_exc()
             try:
@@ -839,9 +908,56 @@ def getINSTimeSyncFromJson(
                     timeSyncText = f.read()
                     timeSyncText = fixMalformedJson(timeSyncText)
                     timeSync = json.loads(timeSyncText)[0]
-                    
+            #
             timeSyncData = rcsa_helpers.extract_time_sync_meta_data(timeSync)
-
+            #
+            if makePlots:
+                fig, ax = plt.subplots(2, 1, figsize=(15, 15))
+                # ax[0] refers to the latency
+                actualLatency = (
+                    timeSyncData['PacketRxUnixTime'] - timeSyncData['PacketGenTime'])
+                #
+                ax[0].plot(
+                    timeSyncData.index, timeSyncData['LatencyMilliseconds'],
+                    '-o', label='LatencyMilliseconds')
+                ax[0].plot(
+                    timeSyncData.index, actualLatency,
+                    '-o', label='PacketRxUnixTime - PacketGenTime')
+                ax[0].set_ylabel('latency (msec)')
+                ax[0].legend(loc='upper right')
+                # ax[1] refers to the seconds counter "timestamps"
+                p, = ax[1].plot(
+                    timeSyncData.index, timeSyncData['timestamp'],
+                    'r-o', label='timestamp')
+                ax[1].legend(loc='upper right')
+                ax[1].set_ylabel('timestamp (sec)')
+                ax[1].set_xlabel('(Packet #)')
+                ax[1].yaxis.get_label().set_color(p.get_color())
+                tsDiffAx = ax[1].twinx()
+                tsDiff = timeSyncData['timestamp'].diff()
+                twinP, = tsDiffAx.plot(
+                    tsDiff.index, tsDiff,
+                    'm-o', label='timestamp diff')
+                tsDiffAx.legend(loc='lower right')
+                tsDiffAx.set_ylabel('timestamp diff (sec)')
+                tsDiffAx.yaxis.get_label().set_color(twinP.get_color())
+                figSaveOpts = dict(
+                    bbox_extra_artists=(thisAx.get_legend() for thisAx in ax),
+                    bbox_inches='tight')
+                ax[0].set_title(
+                    'Block{:0>3}_TrialSeg{:0>1}_time_sync'.format(
+                        blockIdx, idx)
+                    )
+                pdfPath = os.path.join(
+                    figureOutputFolder,
+                    'time_sync_Block{:0>3}_TrialSeg{:0>1}.pdf'.format(
+                        blockIdx, idx))
+                plt.savefig(pdfPath, **figSaveOpts)
+                if showPlots:
+                    plt.show()
+                else:
+                    plt.close()
+                
             timeSyncData['trialSegment'] = idx
             timeSyncData.to_csv(os.path.join(jsonPath, 'TimeSync.csv'))
 
@@ -900,15 +1016,12 @@ def getINSAccelFromJson(
                     accelJsonText = fixMalformedJson(accelJsonText)
                     accelJson = json.loads(accelJsonText)
             # intersampleTickCount = int((1/fs) / (100e-6))
-            accelMeta = rcsa_helpers.extract_accel_meta_data(accelJson)
-            accelMeta = rcsa_helpers.code_micro_and_macro_packet_loss(
-                accelMeta)
             (
                 accelMetaDF, nChan, fs,
                 intersampleTickCount, nominalFrameDur,
                 packetsNeededFixing, tossMask,
-                fig, ax) = processMetaMatrixV2(
-                    accelMeta, verbose=verbose,
+                fig, ax, metaFig, metaAx, metaTwinAx) = processMetaMatrixV2(
+                    accelJson, streamType='accel', verbose=verbose,
                     sampleRateLookupDict=mdt_constants.AccelSampleRate,
                     tossPackets=tossPackets, fixTimeShifts=fixTimeShifts,
                     makePlots=makePlots)
@@ -925,17 +1038,30 @@ def getINSAccelFromJson(
                 figSaveOpts = dict(
                     bbox_extra_artists=(thisAx.get_legend() for thisAx in ax),
                     bbox_inches='tight')
+                ax[0].set_title(
+                    'Block{:0>3}_TrialSeg{:0>1}_accel'.format(
+                        blockIdx, idx)
+                    )
                 pdfPath = os.path.join(
                     figureOutputFolder,
                     'packet_jitter_Block{:0>3}_TrialSeg{:0>1}_accel.pdf'.format(
                         blockIdx, idx))
                 plt.savefig(pdfPath, **figSaveOpts)
+                pdfPath = os.path.join(
+                    figureOutputFolder,
+                    'meta_info_Block{:0>3}_TrialSeg{:0>1}_accel.pdf'.format(
+                        blockIdx, idx))
+                metaFig.savefig(pdfPath, **figSaveOpts)
+                if showPlots:
+                    plt.show()
+                else:
+                    plt.close()
                 if showPlots:
                     plt.show()
                 else:
                     plt.close()
             accelDataValues = rcsa_helpers.unpacker_accel(
-                accelMeta, accelJson, intersampleTickCount)
+                accelMetaDF.to_numpy(), accelJson, intersampleTickCount)
             #  save the noninterpolated files to disk
             accelData = rcsa_helpers.save_to_disk(
                 accelDataValues, os.path.join(
@@ -962,7 +1088,7 @@ def getINSAccelFromJson(
                 # lastPacketStartCoarseTime = accelData['coarseClock'].iloc[0]
                 for name, group in accelData.groupby('packetIdx'):
                     misalignTimeDiff = group['t'].iloc[0] - lastPacketT
-                    startTimeOver = accelMetaDF.loc[name, 'microloss']
+                    startTimeOver = accelMetaDF.loc[name, 'anyloss']
                     if verbose and (int(name) in packetsNeededFixing):
                         print('    fixed packet: t = {:+.4f}'.format(
                             group['t'].iloc[0] - tZero))
@@ -1204,306 +1330,240 @@ def line_picker(line, mouseevent):
 
 
 def peekAtTaps(
-        td, accel,
-        channelData, trialIdx,
+        td, accel, tapDetectSignal,
+        channelData, trialIdx, trialSegment,
         tapDetectOpts, sessionTapRangesNSP,
         onlyPlotDetectChan=True,
         insX='t', plotBlocking=True,
         allTapTimestampsINS=None,
-        allTapTimestampsNSP=None,
-        segmentsToPlot=None):
+        allTapTimestampsNSP=None):
     sns.set_style('darkgrid')
-    if segmentsToPlot is None:
-        segmentsToPlot = pd.unique(td['data']['trialSegment'])
-
     tempClick = {
         'ins': [],
         'nsp': []
         }
-    clickDict = {
-        i: tempClick
-        for i in segmentsToPlot}
-    
+
     def onpick(event):
-        
         if 'INS' in event.artist.axes.get_title():
             tempClick['ins'].append(event.pickx[0])
-            print('Clicked on ins {}'.format(event.pickx[0]))
+            print('Clicked on ins {:.3f}'.format(event.pickx[0]))
         elif 'NSP' in event.artist.axes.get_title():
             tempClick['nsp'].append(event.pickx[0])
-            print('Clicked on nsp {}'.format(event.pickx[0]))
+            print('Clicked on nsp {:.3f}'.format(event.pickx[0]))
+        event.artist.axes.text(
+            event.pickx[0], event.picky[0],
+            '{:.3f}'.format(event.pickx[0]),
+            ha='left', va='baseline')
+        event.artist.get_figure().canvas.draw_idle()
 
-    for trialSegment in segmentsToPlot:
-        #  NSP plotting Bounds
-        trialSegment = int(trialSegment)
-        tStartNSP = (
-            sessionTapRangesNSP[trialIdx][trialSegment]['timeRanges'][0])
-        tStopNSP = (
-            sessionTapRangesNSP[trialIdx][trialSegment]['timeRanges'][1])
-        tDiffNSP = tStopNSP - tStartNSP
-        #  Set up figures
-        fig = plt.figure(tight_layout=True)
-        ax = [None for i in range(3)]
-        ax[0] = fig.add_subplot(311)
-        ax[1] = fig.add_subplot(312, sharex=ax[0])
-        if insX == 't':
-            # INS plotting bounds
-            tStartINS = td['t'].iloc[0]
-            tStopINS = td['t'].iloc[-1]
-            for thisRange in tapDetectOpts[
-                    trialIdx][trialSegment]['timeRanges']:
-                tStartINS = max(tStartINS, thisRange[0])
-                tStopINS = min(tStopINS, thisRange[1])
-            #  make it so that the total extent always matches, for easy comparison
-            tDiffINS = max(tStopINS - tStartINS, tDiffNSP)
-            tStopINS = tStartINS + tDiffINS
-            ax[2] = fig.add_subplot(313)
-        else:
-            ax[2] = fig.add_subplot(313, sharex=ax[0])
-            tStartINS = tStartNSP
-            tStopINS = tStopNSP
-        
-        insTapsAx = ax[1]
-        twinAx = ax[2].twiny()
-        dataColMask = np.array(['ins_td' in i for i in td['data'].columns])
-        if 'accChan' in tapDetectOpts[trialIdx][trialSegment].keys():
-            detectOn = 'acc'
-            accAx = ax[1]
-            tdAx = ax[0]
-            accAx.get_shared_x_axes().join(accAx, twinAx)
-            accAx.get_shared_y_axes().join(accAx, twinAx)
-            accAxLineStyle = '.-'
-            tdAxLineStyle = '-'
-            if onlyPlotDetectChan:
-                accColumnNames = [tapDetectOpts[trialIdx][trialSegment]['accChan']]
-            else:
-                accColumnNames = [
-                    'ins_accx', 'ins_accy',
-                    'ins_accz', 'ins_accinertia']
-            tdColumnNames = td['data'].columns[dataColMask]
-        else:
-            detectOn = 'td'
-            accAx = ax[0]
-            tdAx = ax[1]
-            tdAx.get_shared_x_axes().join(tdAx, twinAx)
-            tdAx.get_shared_y_axes().join(tdAx, twinAx)
-            accAxLineStyle = '-'
-            tdAxLineStyle = '.-'
-            if onlyPlotDetectChan:
-                tdColumnNames = [tapDetectOpts[trialIdx][trialSegment]['tdChan']]
-            else:
-                tdColumnNames = td['data'].columns[dataColMask]
-            accColumnNames = [
-                'ins_accx', 'ins_accy',
-                'ins_accz', 'ins_accinertia']
+    #  NSP plotting Bounds
+    tStartNSP = (
+        sessionTapRangesNSP[trialIdx][trialSegment]['timeRanges'][0])
+    tStopNSP = (
+        sessionTapRangesNSP[trialIdx][trialSegment]['timeRanges'][1])
+    tDiffNSP = tStopNSP - tStartNSP
+    #  Set up figures
+    fig = plt.figure(tight_layout=True)
+    ax = [None for i in range(3)]
+    ax[0] = fig.add_subplot(311)
+    ax[1] = fig.add_subplot(312, sharex=ax[0])
+    if insX == 't':
+        # INS plotting bounds
+        tStartINS = td['t'].iloc[0]
+        tStopINS = td['t'].iloc[-1]
+        for thisRange in tapDetectOpts[
+                trialIdx][trialSegment]['timeRanges']:
+            tStartINS = max(tStartINS, thisRange[0])
+            tStopINS = min(tStopINS, thisRange[1])
+        #  make it so that the total extent always matches, for easy comparison
+        tDiffINS = max(tStopINS - tStartINS, tDiffNSP)
+        tStopINS = tStartINS + tDiffINS
+        ax[2] = fig.add_subplot(313)
+    else:
+        ax[2] = fig.add_subplot(313, sharex=ax[0])
+        tStartINS = tStartNSP
+        tStopINS = tStopNSP
+    insDataAx = ax[0]
+    insTapsAx = ax[1]
+    twinAx = ax[2].twiny()
+    # dataColMask = np.array(['ins_td' in i for i in td['data'].columns])
+    # pdb.set_trace()
+    # if 'accChan' in tapDetectOpts[trialIdx][trialSegment].keys():
+    #     detectOn = 'acc'
+    #     accAx = ax[1]
+    #     tdAx = ax[0]
+    #     accAx.get_shared_x_axes().join(accAx, twinAx)
+    #     accAx.get_shared_y_axes().join(accAx, twinAx)
+    #     accAxLineStyle = '.-'
+    #     tdAxLineStyle = '-'
+    #     if onlyPlotDetectChan:
+    #         accColumnNames = [tapDetectOpts[trialIdx][trialSegment]['accChan']]
+    #     else:
+    #         accColumnNames = [
+    #             'ins_accx', 'ins_accy',
+    #             'ins_accz', 'ins_accinertia']
+    #     tdColumnNames = td['data'].columns[dataColMask]
+    # else:
+    #     detectOn = 'td'
+    #     accAx = ax[0]
+    #     tdAx = ax[1]
+    #     tdAx.get_shared_x_axes().join(tdAx, twinAx)
+    #     tdAx.get_shared_y_axes().join(tdAx, twinAx)
+    #     accAxLineStyle = '-'
+    #     tdAxLineStyle = '.-'
+    #     if onlyPlotDetectChan:
+    #         tdColumnNames = [tapDetectOpts[trialIdx][trialSegment]['tdChan']]
+    #     else:
+    #         tdColumnNames = td['data'].columns[dataColMask]
+    #     accColumnNames = [
+    #         'ins_accx', 'ins_accy',
+    #         'ins_accz', 'ins_accinertia']
+    # pdb.set_trace()
+    # 
+    insTapsAx.get_shared_x_axes().join(insTapsAx, twinAx)
+    insTapsAx.get_shared_y_axes().join(insTapsAx, twinAx)
+    plotMask = td.index.isin(tapDetectSignal.index)
+    # pdb.set_trace()
+    for columnName in accel.columns:
+        if 'acc' in columnName:
+            insDataAx.plot(
+                accel.loc[plotMask, insX],
+                stats.zscore(accel.loc[plotMask, columnName]),
+                label=columnName)
+    for columnName in td.columns:
+        if 'td' in columnName:
+            insDataAx.plot(
+                td.loc[plotMask, insX],
+                stats.zscore(td.loc[plotMask, columnName]),
+                label=columnName)
+    insDataAx.set_title('INS Segment {}'.format(trialSegment))
+    insDataAx.set_ylabel('Z Score (a.u.)')
+    insTapsAx.plot(
+        td.loc[plotMask, insX],
+        stats.zscore(tapDetectSignal),
+        '.-', label='tap detect signal',
+        picker=line_picker)
+    insTapsAx.set_title('INS Segment {}'.format(trialSegment))
+    insTapsAx.set_ylabel('Z Score (a.u.)')
+    twinAx.plot(
+        td.loc[plotMask, insX],
+        stats.zscore(tapDetectSignal),
+        label='tap detect signal')
 
-        plotMask = (accel[insX] > tStartINS) & (accel[insX] < tStopINS)
-        plotMaskTD = (td[insX] > tStartINS) & (td[insX] < tStopINS)
+    if allTapTimestampsINS is not None:
+        insTapsAx.plot(
+            allTapTimestampsINS[trialSegment],
+            allTapTimestampsINS[trialSegment] ** 0 - 1,
+            'c*', label='tap peaks', picker=line_picker)
+    
+    xmin, xmax = ax[1].get_xlim()
+    xTicks = np.arange(xmin, xmax, 0.05)
+    ax[0].set_xticks(xTicks)
+    ax[0].set_yticks([])
+    ax[0].set_xticklabels([])
+    ax[0].grid(which='major', color='b', alpha=0.75)
+    ax[1].set_xticks(xTicks)
+    ax[1].set_yticks([])
+    ax[1].set_xticklabels([])
+    ax[1].grid(which='major', color='b', alpha=0.75)
+    twinAx.set_xticks(xTicks)
+    twinAx.set_yticks([])
+    twinAx.set_xticklabels([])
+    twinAx.grid(which='major', color='b', alpha=0.75)
+    insDataAx.legend()
 
-        for columnName in accColumnNames:
-            accAx.plot(
-                accel[insX].loc[plotMask],
-                stats.zscore(accel['data'].loc[plotMask, columnName]),
-                accAxLineStyle,
-                label=columnName, picker=line_picker)
-            if detectOn == 'acc':
-                twinAx.plot(
-                    accel[insX].loc[plotMask],
-                    stats.zscore(accel['data'].loc[plotMask, columnName])
-                    )
-        accAx.set_title('INS Acc Segment {}'.format(trialSegment))
-        accAx.set_ylabel('Z Score (a.u.)')
-
-        for columnName in tdColumnNames:
-            tdAx.plot(
-                td[insX].loc[plotMaskTD],
-                stats.zscore(td['data'].loc[plotMaskTD, columnName]),
-                tdAxLineStyle,
-                label=columnName, picker=line_picker)
-            if detectOn == 'td':
-                twinAx.plot(
-                    td[insX].loc[plotMaskTD],
-                    stats.zscore(td['data'].loc[plotMaskTD, columnName])
-                    )
-        tdAx.set_ylabel('Z Score (a.u.)')
-        tdAx.set_title('INS TD Segment {}'.format(trialSegment))
-
-        if allTapTimestampsINS is not None:
-            insTapsAx.plot(
-                allTapTimestampsINS[trialSegment],
-                allTapTimestampsINS[trialSegment] ** 0 - 1,
-                'c*', label='tap peaks')
-        
-        xmin, xmax = ax[1].get_xlim()
-        xTicks = np.arange(xmin, xmax, 0.05)
-        ax[0].set_xticks(xTicks)
-        ax[0].set_yticks([])
-        ax[0].set_xticklabels([])
-        ax[0].grid(which='major', color='b', alpha=0.75)
-        ax[1].set_xticks(xTicks)
-        ax[1].set_yticks([])
-        ax[1].set_xticklabels([])
-        ax[1].grid(which='major', color='b', alpha=0.75)
-        twinAx.set_xticks(xTicks)
-        twinAx.set_yticks([])
-        twinAx.set_xticklabels([])
-        twinAx.grid(which='major', color='b', alpha=0.75)
-        tdAx.legend()
-        accAx.legend()
-
-        tNSPMask = (channelData['t'] > tStartNSP) & (channelData['t'] < tStopNSP)
-        triggerTrace = channelData['data'].loc[tNSPMask, 'ainp7']
-        
+    tNSPMask = (channelData['t'] > tStartNSP) & (channelData['t'] < tStopNSP)
+    triggerTrace = channelData['data'].loc[tNSPMask, 'ainp7']
+    decimateFactor = 1
+    ax[2].plot(
+        channelData['t'].loc[tNSPMask].iloc[::decimateFactor],
+        stats.zscore(triggerTrace.iloc[::decimateFactor]),
+        'c', label='Analog Sync', picker=line_picker)
+    xmin, xmax = ax[2].get_xlim()
+    xTicks2 = np.arange(xmin, xmax, 0.05)
+    ax[2].set_xticks(xTicks2)
+    ax[2].set_yticks([])
+    ax[2].set_xticklabels([])
+    ax[2].grid(which='major', color='c', alpha=0.75)
+    if allTapTimestampsNSP is not None:
         ax[2].plot(
-            channelData['t'].loc[tNSPMask].iloc[::30],
-            stats.zscore(triggerTrace.iloc[::30]),
-            'c', label='Analog Sync', picker=line_picker)
-        xmin, xmax = ax[2].get_xlim()
-        xTicks2 = np.arange(xmin, xmax, 0.05)
-        ax[2].set_xticks(xTicks2)
-        ax[2].set_yticks([])
-        ax[2].set_xticklabels([])
-        ax[2].grid(which='major', color='c', alpha=0.75)
-        if allTapTimestampsNSP is not None:
-            ax[2].plot(
-                allTapTimestampsNSP[trialSegment],
-                allTapTimestampsNSP[trialSegment] ** 0 - 1,
-                'm*', label='tap peaks', picker=line_picker)
+            allTapTimestampsNSP[trialSegment],
+            allTapTimestampsNSP[trialSegment] ** 0 - 1,
+            'm*', label='tap peaks', picker=line_picker)
+    ax[2].legend()
+    ax[2].set_title('NSP Data')
+    fig.canvas.mpl_connect('pick_event', onpick)
+    plt.show(block=plotBlocking)
 
-        ax[2].legend()
-        ax[2].set_title('NSP Data')
-        fig.canvas.mpl_connect('pick_event', onpick)
-        plt.show(block=plotBlocking)
-
-        for key, value in tempClick.items():
-            tempVal = pd.Series(value)
-            tempClick[key] = tempVal.loc[tempVal.diff().fillna(1) > 100e-3]
-            
-        clickDict[trialSegment] = tempClick
-
-        tempClick = {
-            'ins': [],
-            'nsp': []
-            }
-    return clickDict
+    for key, value in tempClick.items():
+        tempVal = pd.Series(value)
+        tempClick[key] = tempVal.loc[tempVal.diff().fillna(1) > 100e-3]
+    return tempClick
 
 
 def getINSTapTimestamp(
         td=None, accel=None,
         tapDetectOpts={}, plotting=False
         ):
-
+    #
     if 'timeRanges' in tapDetectOpts.keys():
         timeRanges = tapDetectOpts['timeRanges']
     else:
         timeRanges = None
-
+    #
     if 'keepIndex' in tapDetectOpts.keys():
         keepIndex = tapDetectOpts['keepIndex']
     else:
         keepIndex = slice(None)
-
+    #
     if 'iti' in tapDetectOpts.keys():
         iti = tapDetectOpts['iti']
     else:
         iti = 0.25
+    #
+    if timeRanges is None:
+        tdMask = td['t'] > 0
+    else:
+        for idx, timeSegment in enumerate(timeRanges):
+            if idx == 0:
+                tdMask = (td['t'] > timeSegment[0]) & (
+                    td['t'] < timeSegment[1])
+            else:
+                tdMask = tdMask | (
+                    (td['t'] > timeSegment[0]) & (
+                        td['t'] < timeSegment[1]))
+    #
+    signalsToConcat = []
+    if td is not None:
+        tdChans = [cn for cn in tapDetectOpts['chan'] if 'td' in cn]
+        signalsToConcat.append(td.loc[tdMask, tdChans])
+    if accel is not None:
+        accChans = [cn for cn in tapDetectOpts['chan'] if 'acc' in cn]
+        signalsToConcat.append(accel.loc[tdMask, accChans])
+    tapDetectSignal = pd.concat(signalsToConcat, axis='columns')
+    # TODO: WIP, use covariance matrix for novelty detector
+    try:
+        cov = (
+            MinCovDet(support_fraction=0.75)
+            .fit(tapDetectSignal.to_numpy()))
+    except Exception:
+        traceback.print_exc()
+        cov = (
+            EmpiricalCovariance()
+            .fit(tapDetectSignal.to_numpy()))
+    tapDetectSignal = pd.Series(
+        np.sqrt(cov.mahalanobis(tapDetectSignal.to_numpy())),
+        index=tapDetectSignal.index)
+    tdPeakIdx = hf.getTriggers(
+        tapDetectSignal, iti=iti, fs=500, thres=tapDetectOpts['thres'],
+        edgeType='both', minAmp=None,
+        expectedTime=None, keep_max=False, plotting=plotting)
+    tdPeakIdx = tdPeakIdx[keepIndex]
+    print('TD Timestamps \n{}'.format(td['t'].loc[tdPeakIdx]))
+    tapTimestamps = td['t'].loc[tdPeakIdx]
+    peakIdx = tdPeakIdx
 
-    if 'accChan' in tapDetectOpts.keys():
-        assert accel is not None
-
-        if not isinstance(accel, dict):
-            accel = {
-                'data': accel,
-                't': accel['t']
-                }
-        if timeRanges is None:
-            tdMask = td['t'] > 0
-        else:
-            for idx, timeSegment in enumerate(timeRanges):
-                if idx == 0:
-                    accelMask = (accel['t'] > timeSegment[0]) & (
-                        accel['t'] < timeSegment[1])
-                else:
-                    accelMask = accelMask | (
-                        (accel['t'] > timeSegment[0]) & (
-                            accel['t'] < timeSegment[1]))
-        tapDetectSignal = accel['data'].loc[
-            accelMask, tapDetectOpts['accChan']]
-        # check that we've interpolated accel at this point?
-        accelPeakIdx = hf.getTriggers(
-            tapDetectSignal, iti=iti, fs=500, thres=tapDetectOpts['accThres'],
-            edgeType='both', minAmp=None,
-            expectedTime=None, keep_max=False, plotting=plotting)
-        '''
-
-        # minimum distance between triggers (units of samples), 5% wiggle room
-        width = int(64 * iti * (1 - itiWiggle))
-        ilocPeakIdx = peakutils.indexes(
-            accel['data']['inertia_z'].loc[accelMask].values, thres=accThres,
-            min_dist=width, thres_abs=True, keep_max=True)
-        accelPeakIdx = accel['data']['inertia_z'].loc[accelMask].index[ilocPeakIdx]
-        '''
-        accelPeakIdx = accelPeakIdx[keepIndex]
-        print('Accel Timestamps \n{}'.format(accel['t'].loc[accelPeakIdx]))
-
-        tapTimestamps = accel['t'].loc[accelPeakIdx]
-        peakIdx = accelPeakIdx
-
-    if 'tdChan' in tapDetectOpts.keys():
-        assert td is not None
-        if not isinstance(td, dict):
-            td = {
-                'data': td,
-                't': td['t']
-                }
-
-        if timeRanges is None:
-            tdMask = td['t'] > 0
-        else:
-            for idx, timeSegment in enumerate(timeRanges):
-                if idx == 0:
-                    tdMask = (td['t'] > timeSegment[0]) & (
-                        td['t'] < timeSegment[1])
-                else:
-                    tdMask = tdMask | (
-                        (td['t'] > timeSegment[0]) & (
-                            td['t'] < timeSegment[1]))
-
-        tapDetectSignal = td['data'].loc[tdMask, tapDetectOpts['tdChan']]
-        # TODO: WIP, use covariance matrix for novelty detector
-        '''
-        try:
-            cov = (
-                MinCovDet(support_fraction=0.75)
-                .fit(tapDetectSignal.to_numpy()))
-        except Exception:
-            cov = (
-                empiricalCovariacne()
-                .fit(tapDetectSignal.to_numpy()))
-        tapDetectSignal = pd.Series(
-            np.sqrt(cov.mahalanobis(tapDetectSignal.to_numpy())),
-            index=tapDetectSignal.index)
-        '''
-        tdPeakIdx = hf.getTriggers(
-            tapDetectSignal, iti=iti, fs=500, thres=tapDetectOpts['tdThres'],
-            edgeType='both', minAmp=None,
-            expectedTime=None, keep_max=False, plotting=plotting)
-        '''
-
-        # minimum distance between triggers (units of samples), 5% wiggle room
-        width = int(500 * iti * (1 - itiWiggle))
-        ilocPeakIdx = peakutils.indexes(
-            tapDetectSignal.loc[tdMask].values, thres=tdThres,
-            min_dist=width, thres_abs=True, keep_max=True)
-        tdPeakIdx = tapDetectSignal.loc[tdMask].index[ilocPeakIdx]
-        '''
-        tdPeakIdx = tdPeakIdx[keepIndex]
-        print('TD Timestamps \n{}'.format(td['t'].loc[tdPeakIdx]))
-
-        tapTimestamps = td['t'].loc[tdPeakIdx]
-        peakIdx = tdPeakIdx
-
-    return tapTimestamps, peakIdx
+    return tapTimestamps, peakIdx, tapDetectSignal
 
 
 def getHUTtoINSSyncFun(
@@ -1753,13 +1813,13 @@ def stimStatusSerialtoLong(
                 if idx < len(groupComponents) - 1:
                     lastT = (groupComponents[idx+1][idxT].iloc[0])
                 else:
-                    lastT = (group[idxT].iloc[-1])
+                    lastT = (group[idxT].iloc[-1]) - thisCycleOnTime
                 onTimes = [
                     i
                     for i in np.arange(
                         firstT, lastT,
-                        (thisCycleOnTime + thisCycleOffTime)
-                        # (thisCycleOnTime + thisCycleOffTime + 15e-3)
+                        # (thisCycleOnTime + thisCycleOffTime)
+                        (thisCycleOnTime + thisCycleOffTime) + 10e-3
                         )
                     if i > firstT]
                 offTimes = [
@@ -1767,8 +1827,8 @@ def stimStatusSerialtoLong(
                     for i in np.arange(
                         firstT + thisCycleOffTime,
                         lastT,
-                        (thisCycleOnTime + thisCycleOffTime)
-                        # (thisCycleOnTime + thisCycleOffTime + 15e-3)
+                        # (thisCycleOnTime + thisCycleOffTime)
+                        (thisCycleOnTime + thisCycleOffTime) + 10e-3
                         )]
                 dummyEntriesOn = pd.DataFrame(
                     np.nan, index=range(len(onTimes)), columns=group.columns)
@@ -1923,15 +1983,14 @@ def preprocINS(
         interpKind = trialFilesStim['interpKind']
     else:
         interpKind = 'linear'
-    #
-    accel = getINSAccelFromJson(
-        jsonBaseFolder, jsonSessionNames, getInterpolated=True,
-        forceRecalc=trialFilesStim['forceRecalc'],
-        fixTimeShifts=True,
-        verbose=verbose, blockIdx=blockIdx,
+    ###########################################################
+    # warnings.filterwarnings("error")
+    timeSync = getINSTimeSyncFromJson(
+        jsonBaseFolder, jsonSessionNames,
         makePlots=makePlots, showPlots=showPlots,
-        figureOutputFolder=figureOutputFolder)
-    #
+        figureOutputFolder=figureOutputFolder,
+        blockIdx=blockIdx, forceRecalc=True)
+    #############################################################
     td = getINSTDFromJson(
         jsonBaseFolder, jsonSessionNames, getInterpolated=True,
         verbose=verbose, blockIdx=blockIdx,
@@ -1949,10 +2008,15 @@ def preprocINS(
             tdDataCols.append(updatedName)
             renamer.update({colName: updatedName})
     td['data'].rename(columns=renamer, inplace=True)
-    #
-    timeSync = getINSTimeSyncFromJson(
-        jsonBaseFolder, jsonSessionNames,
-        forceRecalc=True)
+    #############################################################
+    accel = getINSAccelFromJson(
+        jsonBaseFolder, jsonSessionNames, getInterpolated=True,
+        forceRecalc=trialFilesStim['forceRecalc'],
+        fixTimeShifts=True,
+        verbose=verbose, blockIdx=blockIdx,
+        makePlots=makePlots, showPlots=showPlots,
+        figureOutputFolder=figureOutputFolder)
+    ##############################################################
     #  packets are aligned to INSReferenceTime, for convenience
     #  (otherwise the values in ['t'] would be huge)
     #  align them to the more reasonable minimum first timestamp across packets
@@ -1961,7 +2025,6 @@ def preprocINS(
     rolloverSeconds = pd.to_timedelta(6.5535, unit='s')
 
     for trialSegment in pd.unique(td['data']['trialSegment']):
-
         accelSegmentMask = accel['data']['trialSegment'] == trialSegment
         accelGroup = accel['data'].loc[accelSegmentMask, :]
         tdSegmentMask = td['data']['trialSegment'] == trialSegment
@@ -2097,7 +2160,9 @@ def preprocINS(
     deriveCols = ['amplitudeRound']
     stimStatus = stimStatusSerialtoLong(
         stimStatusSerial, idxT='HostUnixTime', expandCols=expandCols,
-        deriveCols=deriveCols, progAmpNames=progAmpNames)
+        deriveCols=deriveCols, progAmpNames=progAmpNames,
+        dummyTherapySwitches=False, elecConfiguration=elecConfiguration
+        )
     HUTChunkSize = 50
     interpFunHUTtoINS = getHUTtoINSSyncFun(
         timeSync, degree=1,
@@ -2183,8 +2248,8 @@ def preprocINS(
             var_name='ins_property', value_name='ins_value')
         onsetEvents.rename(columns={'t': 'INSTime'}, inplace=True)
         onsetEvents.loc[onsetEvents['ins_property'] == 'group', 'ins_property'] = 'activeGroup'
-        #ampOnsets = onsetEvents.loc[onsetEvents['ins_property'] == 'amplitude', :]
-        #stimSpikesDF.loc[:, ['t', 'endTime']]
+        # ampOnsets = onsetEvents.loc[onsetEvents['ins_property'] == 'amplitude', :]
+        # stimSpikesDF.loc[:, ['t', 'endTime']]
         offsetEvents = pd.melt(
             stimSpikesDF,
             id_vars=['endTime'],
@@ -2362,9 +2427,6 @@ def getINSStimOnset(
     # calculate therapy status starts and ends
     therapyDiff = tdDF['therapyStatus'].diff().fillna(0)
     therapyOnsetIdx = tdDF.index[therapyDiff == 1]
-    # if tdDF['therapyStatus'].iloc[0] == 1:
-    #     therapyOnsetIdx = pd.Index(
-    #         [tdDF.index[0]] + therapyOnsetIdx.to_list())
     therapyOnTimes = pd.DataFrame({
         'nominalOnIdx': therapyOnsetIdx})
     therapyOnTimes.loc[:, 'on'] = np.nan
@@ -2397,7 +2459,6 @@ def getINSStimOnset(
         except Exception:
             foundTimestamp = [None]
         if len(plotting) > 0:
-            # ax = plt.gca()
             ax.legend(loc='upper left')
             twinAx.legend(loc='upper right')
             figSaveOpts = dict(
@@ -2412,8 +2473,12 @@ def getINSStimOnset(
             therapyOnTimes.loc[idx, 'on'] = foundTimestamp
             localIdx = [tdSegDetect.index.get_loc(i) for i in foundTimestamp]
             therapyOnTimes.loc[idx, 'onIdx'] = tMask.index[tMask][localIdx]
-    therapyOnTimes.dropna(inplace=True)
-    trueTherapyDiff = pd.Series(0, index=tdDF.index)
+        else:
+            therapyOnTimes.loc[idx, 'on'] = tdDF.loc[row['nominalOnIdx'], 't']
+            therapyOnTimes.loc[idx, 'onIdx'] = row['nominalOnIdx']
+    # trueTherapyDiff = pd.Series(0, index=tdDF.index)
+    trueTherapyDiff = tdDF['trialSegment'].diff().fillna(0)
+    # 
     trueTherapyDiff.loc[therapyOnTimes['onIdx']] = 1
     tdDF.loc[:, 'therapyRound'] = trueTherapyDiff.cumsum()
     # find offsets
@@ -2468,7 +2533,11 @@ def getINSStimOnset(
                 therapyOffTimes.loc[idx, 'off'] = foundTimestamp
                 localIdx = [tdSegDetect.index.get_loc(i) for i in foundTimestamp]
                 therapyOffTimes.loc[idx, 'offIdx'] = tMask.index[tMask][localIdx]
-        therapyOffTimes.dropna(inplace=True)
+            else:
+                therapyOffTimes.loc[idx, 'off'] = tdDF.loc[row['nominalOffIdx'], 't']
+                therapyOffTimes.loc[idx, 'offIdx'] = row['nominalOffIdx']   
+        trueTherapyDiff.loc[therapyOffTimes['offIdx']] = -1
+    tdDF.loc[:, 'therapyStatus'] = trueTherapyDiff.cumsum()
     if figureOutputFolder is not None:
         therapyDetectionPDF.close()
     lastTherapyRound = 0
@@ -2478,6 +2547,7 @@ def getINSStimOnset(
     plottingSlots = False
     resolvedSlots = False
     lastRate = np.nan
+    # warnings.filterwarnings("error")
     for name, group in tdDF.groupby('amplitudeRound'):
         anomalyOccured = False
         # check that this round is worth analyzing
@@ -2556,22 +2626,27 @@ def getINSStimOnset(
             [(
                 nominalStimOnT - paddingDuration / 2,
                 nominalStimOnT + paddingDuration / 2
-            )])
+            )]).to_numpy()
         #  load the appropriate detection options
         theseDetectOpts = stimDetectOptsByChannel[activeGroup][activeProgram]
         #  calculate signal used for stim artifact detection
+        therapyOnMaskTD = (tdDF['therapyRound'] == thisTherapyRound).to_numpy()
+        therSegDF = tdDF.loc[therapyOnMaskTD, :]
         tdSeg = (tdDF.loc[
-            plotMaskTD,
+            plotMaskTD & therapyOnMaskTD,
             theseDetectOpts['detectChannels'] + ['t']
             ])
+        lastAmplitude = tdDF.loc[
+            plotMaskTD & therapyOnMaskTD,
+            ampColName].iloc[0]
         # 
-        lastAmplitude = tdDF.loc[max(nominalStimOnIdx - 1, 0), ampColName]
         if (lastRate != stimRate):
             # recalculate every time we increment amplitude from zero
             # (these should usually be very visible)
+            # also recalculate on rate changes
             # in order to mitigate uncertainty about when Rate changes
             # are implemented
-            # TODO!!! Only do this when rate changed.
+            print('resetting slots!')
             resolvedSlots = False
         lastRate = stimRate
         useThresh = theseDetectOpts['thres']
@@ -2730,14 +2805,16 @@ def getINSStimOnset(
         if 'useForSlotDetection' not in theseDetectOpts:
             theseDetectOpts['useForSlotDetection'] = True
         if (not resolvedSlots) and predictSlots and (theseDetectOpts['useForSlotDetection']) and (stimRate <= maxSlotsStimRate):
-            #  and (lastAmplitude == 0)
-            # have not resolved phase between slots and recording for this segment
-            therSegDF = tdDF.loc[tdDF['therapyRound'] == thisTherapyRound, :]
-            # therSegDF = tdDF.loc[tdDF['trialSegment'] == thisTrialSegment, :]
+            # have not resolved phase between slots and recording for this therapy segment
+            # resolving now:
             rateDiff = therSegDF['RateInHz'].diff().fillna(method='bfill')
             rateChangeTimes = therSegDF.loc[rateDiff != 0, 't']
             print('Calculating slots for segment {}'.format(thisTherapyRound))
-            groupRate = therSegDF.loc[foundIdx, 'RateInHz'].iloc[0]
+            try:
+                groupRate = therSegDF.loc[foundIdx, 'RateInHz'].iloc[0]
+            except:
+                traceback.print_exc()
+                pdb.set_trace()
             groupPeriod = np.float64(groupRate ** (-1))
             rateChangePeriods = (
                 therSegDF
@@ -2770,6 +2847,7 @@ def getINSStimOnset(
                 try:
                     tdDF.loc[startIdx:endIdx, 'slot'] = calculatedSlots.astype(np.int)
                 except Exception:
+                    traceback.print_exc()
                     pdb.set_trace()
                 timeSeekIdx = min(
                     endIdx + 1,
@@ -2839,8 +2917,9 @@ def getINSStimOnset(
             ax.axvline(expectedTimestamp, color='b', linestyle='--', label='expected time')
             ax.axvline(group['t'].iloc[0], color='r', label='stimLog time')
             ax.set_title(
-                'Grp {} Prog {} slots: {} (Rate {})'.format(
-                    activeGroup, activeProgram, usedSlotToDetect, stimRate))
+                'Grp {} Prog {} slots: {} (Rate {:.1f} Hz, Amp {:.1f} uA)'.format(
+                    activeGroup, activeProgram,
+                    usedSlotToDetect, stimRate, 100 * thisAmplitude))
             cPal = sns.color_palette(n_colors=4)
             for idx, slEdge in slotEdges.iloc[1:].iteritems():
                 try:
@@ -2902,7 +2981,9 @@ def getINSStimOnset(
                 name=electrodeCombo
                 )[0]
             thisElecConfig = elecConfiguration[activeGroup][activeProgram]
+            ##############################################################################
             repeatCycles = False
+            #############################
             if repeatCycles:
                 if thisElecConfig['cyclingEnabled']:
                     thisCycleOnTime = (
@@ -2945,6 +3026,7 @@ def getINSStimOnset(
                     theseOffsetTimestamps = np.concatenate(tempOffTimes) * offTime.units
                     onsetDifferenceFromExpected = np.concatenate(tempOnDiffsE) * onTime.units
                     onsetDifferenceFromLogged = np.concatenate(tempOnDiffsL) * offTime.units
+            ##############################################################################
             if treatAsSinglePulses:
                 tempOnTimes = []
                 tempOffTimes = []
@@ -3044,6 +3126,11 @@ def getINSStimOnset(
             consolidatedTimes, timesIndex = hf.closestSeries(
                 takeFrom=pd.Series(consolidatedTimes),
                 compareTo=tdDF['t'])
+            # check cycling interval
+            print('median inter pulse interval: {}'.format(
+                consolidatedTimes.diff().median()
+                ))
+            #
             timesIndex = np.array(timesIndex.values, dtype=np.int)
             left_sweep_samples = spikeWindow[0] * (-1)
             left_sweep = left_sweep_samples / fs
@@ -3401,8 +3488,8 @@ def extractArtifactTimestampsMahalanobis(
     if plotDetection:
         try:
             ax.set_xlim([
-                max(detectSignal.index[0], foundTimestamp[0] - 75e-3),
-                min(detectSignal.index[-1], foundTimestamp[0] + 225e-3)
+                max(detectSignal.index[0], foundTimestamp[0] - 50e-3),
+                min(detectSignal.index[-1], foundTimestamp[0] + 100e-3)
             ])
         except:
             pass

@@ -19,29 +19,42 @@
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 
-# EXP="exp201901070700"
-# EXP="exp201901201200"
-# EXP="exp201901211000"
-# EXP="exp201901221000"
-# EXP="exp201901231000"
-EXP="exp201901271000"
-LAZINESS="--lazy"
-WINDOW="--window=long"
-TRIALSELECTOR="--blockIdx=2"
-# TRIALSELECTOR="--processAll"
-UNITSELECTOR="--selector=_minfrmaxcorr"
-
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
 conda activate
 source activate nda2
 python --version
 
-# python3 -u ./assembleExperimentData.py --exp=$EXP --processAsigs --processRasters
-#   python3 -u ./calcAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $LAZINESS $WINDOW --chanQuery="fr_sqrt" --outputBlockName="fr_sqrt"
-# python3 -u ./calcAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $LAZINESS $WINDOW --chanQuery="rig" --outputBlockName="rig" --verbose
-python3 -u ./calcAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $LAZINESS $WINDOW --chanQuery="fr" --outputBlockName="fr" --verbose
-python3 -u ./calcAlignedRasters.py --exp=$EXP $TRIALSELECTOR $LAZINESS $WINDOW --chanQuery="raster" --outputBlockName="raster" --verbose
+# EXP="exp201901070700"
+# EXP="exp201901201200"
+# EXP="exp201901211000"
+# EXP="exp201901221000"
+# EXP="exp201901231000"
+EXP="exp201901271000"
+
+LAZINESS="--lazy"
+
+# WINDOW="--window=long"
+WINDOW="--window=XS"
+
+ANALYSISFOLDER="--analysisName=loRes"
+# ANALYSISFOLDER="--analysisName=default"
+
+SLURM_ARRAY_TASK_ID=4
+
+# TRIALSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
+TRIALSELECTOR="--processAll"
+UNITSELECTOR="--selector=_minfrmaxcorr"
+
+EVENTSELECTOR="--eventName=stimAlignTimes"
+ALIGNFOLDER="--alignFolderName=stim"
+
+# python3 -u ./assembleExperimentData.py --exp=$EXP $ANALYSISFOLDER --processAsigs --processRasters
+
+python3 -u ./calcAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $LAZINESS $WINDOW $EVENTSELECTOR $ALIGNFOLDER $ANALYSISFOLDER --chanQuery="rig" --outputBlockName="rig" --verbose
+python3 -u ./calcAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $LAZINESS $WINDOW $EVENTSELECTOR $ALIGNFOLDER $ANALYSISFOLDER --chanQuery="fr" --outputBlockName="fr" --verbose
+python3 -u ./calcAlignedRasters.py --exp=$EXP $TRIALSELECTOR $LAZINESS $WINDOW $EVENTSELECTOR $ALIGNFOLDER $ANALYSISFOLDER --chanQuery="raster" --outputBlockName="raster" --verbose
+
 # qa
 # python3 -u ./calcUnitMeanFR.py --exp=$EXP $TRIALSELECTOR --inputBlockName="fr" --alignQuery="midPeak" --unitQuery="fr" --verbose
 # python3 -u ./calcUnitCorrelation.py --exp=$EXP $TRIALSELECTOR --inputBlockName="fr" --alignQuery="midPeak" --unitQuery="fr" --verbose --plotting

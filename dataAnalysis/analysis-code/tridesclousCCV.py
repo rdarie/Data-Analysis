@@ -22,7 +22,8 @@ Options:
 from docopt import docopt
 import tridesclous as tdc
 import dataAnalysis.helperFunctions.tridesclous_helpers as tdch
-import os, gc, traceback
+import dataAnalysis.helperFunctions.probe_metadata as prb_meta
+import os, gc, traceback, re
 import pdb
 from numba.core.errors import NumbaPerformanceWarning, NumbaDeprecationWarning, NumbaPendingDeprecationWarning
 import warnings
@@ -49,6 +50,7 @@ except Exception:
     SIZE = 1
     HAS_MPI = False
 
+sortingConfigName = 'nform'
 if RANK == 0:
     from currentExperiment import parseAnalysisOptions
     expOpts, allOpts = parseAnalysisOptions(
@@ -57,16 +59,42 @@ if RANK == 0:
     globals().update(expOpts)
     globals().update(allOpts)
     try:
-        # pdb.set_trace()
+        electrodeMapPath = spikeSortingOpts[sortingConfigName]['electrodeMapPath']
+        mapExt = electrodeMapPath.split('.')[-1]
+        if mapExt == 'cmp':
+            cmpDF = prb_meta.cmpToDF(electrodeMapPath)
+        elif mapExt == 'map':
+            cmpDF = prb_meta.mapToDF(electrodeMapPath)
+        nspCsvPath = electrodeMapPath.replace(mapExt, 'csv')
+        nspPrbPath = electrodeMapPath.replace(mapExt, 'prb')
+        cmpDF.to_csv(nspCsvPath)
+        #
+        remakePrb = True
+        if remakePrb:
+            import numpy as np
+            excludeChans = spikeSortingOpts[sortingConfigName]['excludeChans']
+            prb_meta.cmpDFToPrb(
+                cmpDF, filePath=nspPrbPath,
+                contactSpacing=1,
+                labels=cmpDF.loc[~cmpDF['label'].isin(excludeChans), 'label'].to_list(),
+                groupIn={
+                    'xcoords': np.arange(-1, 4001, 500),
+                    'ycoords': np.arange(-1, 2501, 1000)},
+                )
+        ns5FileName = ns5FileName.replace('Block', sortingConfigName)
+        triFolder = os.path.join(
+            scratchFolder, 'tdc_{}{:0>3}'.format(sortingConfigName, blockIdx))
         tdch.initialize_catalogueconstructor(
             nspFolder,
             ns5FileName,
             triFolder,
             nspPrbPath,
-            removeExisting=False, fileFormat='Blackrock')
+            removeExisting=True, fileFormat='Blackrock')
     except Exception:
+        traceback.print_exc()
         pass
 else:
+    ns5FileName = None
     nspFolder = None
     nspPrbPath = None
     triFolder = None
@@ -74,6 +102,7 @@ else:
 
 if HAS_MPI:
     COMM.Barrier()  # sync MPI threads, waith for 0
+    ns5FileName = COMM.bcast(ns5FileName, root=0)
     nspFolder = COMM.bcast(nspFolder, root=0)
     nspPrbPath = COMM.bcast(nspPrbPath, root=0)
     triFolder = COMM.bcast(triFolder, root=0)

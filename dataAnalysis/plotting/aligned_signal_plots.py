@@ -225,8 +225,9 @@ def plotNeuronsAligned(
                     figHeight = 3 * 72
                 # figHeight in **points**
                 nRasterRows = raster['t_facetIdx'].max()
-                twinRelplotKWArgs['func1_kws']['s'] = (2 * figHeight / nRasterRows) ** 2
-                # pdb.set_trace()
+                twinRelplotKWArgs['func1_kws']['s'] = (4 * figHeight / nRasterRows) ** 2
+                raster.loc[raster['bin'] == raster['bin'].min(), 'raster'] = oneSpikePerBinHz
+                raster.loc[raster['bin'] == raster['bin'].max(), 'raster'] = oneSpikePerBinHz
                 g = twin_relplot(
                     x='bin',
                     y2='fr', y1='t_facetIdx',

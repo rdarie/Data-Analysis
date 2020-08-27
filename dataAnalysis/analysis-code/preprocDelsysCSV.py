@@ -85,6 +85,7 @@ def preprocDelsysWrapper(
         plt.show(block=False)
     domainCols = [cName for cName in rawData.columns if 'X[' in cName]
     featureCols = [cName for cName in rawData.columns if 'X[' not in cName]
+    # pdb.set_trace()
     collatedDataList = []
     print('Assembling list of vectors...')
     for idx, (dom, feat) in enumerate(tqdm(iter(zip(domainCols, featureCols)))):

@@ -1,13 +1,10 @@
-import os
-
-
 def getExpOpts():
     #
     blockExperimentTypeLookup = {
         1: 'proprio',
         2: 'proprio',
         3: 'proprio',
-        4: 'proprio-miniRC'
+        4: 'proprio',
         }
     fullRigInputs = {
         'A+': 'ainp1',
@@ -31,57 +28,54 @@ def getExpOpts():
         'kinectSync': 'ainp16',
         }
     
-    experimentName = '201901261000-Proprio'
+    experimentName = '202008201100-Rupert'
     deviceName = 'DeviceNPC700373H'
     
     jsonSessionNames = {
         #  per trial
-        1: [
-            'Session1548517963713', 'Session1548518261171',
-            'Session1548518496294', 'Session1548518727243',
-            'Session1548518982240'],
-        2: ['Session1548520562275'],
-        3: ['Session1548521956580'],
-        4: ['Session1548524126669'],
+        1: [],
+        2: [],
+        3: [],
+        4: [],
+        5: []
         }
 
     synchInfo = {'ins': {}, 'nsp': {}}
     synchInfo['ins'][1] = {
-        #  TODO
         #  per trialSegment
         0: {
             'timeRanges': [(14, 16)],
-            'tdChan': 'ins_td0',
-            'tdThres': 2,
+            'chan': ['ins_td0', 'ins_td2'],
+            'thres': 5,
             'iti': 0.2,
             'keepIndex': slice(None)
             },
         1: {
             'timeRanges': [(448, 450)],
-            'tdChan': 'ins_td0',
-            'tdThres': 2,
+            'chan': ['ins_td0', 'ins_td2'],
+            # 'chan': ['ins_accx', 'ins_accy', 'ins_accz'],
+            'thres': 5,
             'iti': 0.2,
             'keepIndex': slice(None)
             }
         }
     synchInfo['ins'][2] = {
-        #  TODO
         #  per trialSegment
         0: {
             'timeRanges': [(18, 20)],
-            'tdChan': 'ins_td0',
-            'tdThres': 2.5,
+            # 'chan': ['ins_td0', 'ins_td2'],
+            'chan': ['ins_accx', 'ins_accy', 'ins_accz'],
+            'thres': 5,
             'iti': 0.2,
             'keepIndex': slice(None)
             }
         }
     synchInfo['ins'][3] = {
-        #  TODO
         #  per trialSegment
         0: {
             'timeRanges': [(20, 22)],
-            'tdChan': 'ins_td0',
-            'tdThres': 2.5,
+            'chan': ['ins_td0', 'ins_td2'],
+            'thres': 5,
             'iti': 0.2,
             'keepIndex': slice(None)
             }
@@ -89,32 +83,58 @@ def getExpOpts():
     synchInfo['ins'][4] = {
         #  per trialSegment
         0: {
-            'timeRanges': [(15.5, 17.5)],
-            'chan': ['ins_td2', 'ins_td3'],
+            'timeRanges': [(21.5, 23.5)],
+            'chan': ['ins_td0', 'ins_td2'],
+            'thres': 5,
+            'iti': 0.2,
+            'keepIndex': slice(1, None)
+            }
+        }
+    synchInfo['ins'][5] = {
+        #  per trialSegment
+        0: {
+            'timeRanges': [(22, 24)],
+            'chan': ['ins_td0', 'ins_td2'],
             'thres': 5,
             'iti': 0.2,
             'keepIndex': slice(None)
+            },
+        1: {
+            'timeRanges': [(1047, 1049)],
+            'chan': ['ins_td0', 'ins_td2'],
+            'thres': 5,
+            'iti': 0.2,
+            'keepIndex': slice(None)
+            },
+        2: {
+            'timeRanges': [(1301, 1304)],
+            'chan': ['ins_td0', 'ins_td2'],
+            'thres': 5,
+            'iti': 0.2,
+            'keepIndex': slice(None, 3)
             }
         }
 
     synchInfo['nsp'] = {
         #  per trialSegment
-        #  TODO
         1: {
             0: {'timeRanges': [212, 214], 'keepIndex': slice(None)},
             1: {'timeRanges': [647, 649], 'keepIndex': slice(None)}
             },
-        #  TODO
         2: {
             0: {'timeRanges': [203, 205], 'keepIndex': slice(None)}
             },
-        #  TODO
         3: {
             0: {'timeRanges': [105, 107], 'keepIndex': slice(None)}
             },
         4: {
-            0: {'timeRanges': [939, 941], 'keepIndex': slice(None)}
+            0: {'timeRanges': [141, 143], 'keepIndex': slice(None)}
             },
+        5: {
+            0: {'timeRanges': [145, 147], 'keepIndex': slice(None)},
+            1: {'timeRanges': [1169, 1171], 'keepIndex': slice(None)},
+            2: {'timeRanges': [1423, 1426], 'keepIndex': slice(None)}
+            }
         }
     #  if not possible to use taps, override with good taps from another segment
     #  not ideal, because segments are only synchronized to the nearest **second**
@@ -123,83 +143,78 @@ def getExpOpts():
         1: {},
         2: {},
         3: {},
-        4: {}
+        4: {},
+        5: {}
         }
     # options for stim artifact detection
-    detectStim = True
-    stimDetectThresDefault = 500
-    stimDetectChansDefault = ['ins_td2', 'ins_td3']
     stimDetectOverrideStartTimes = {
         1: None,
+        # 2: [96.43, 191.689],
         2: None,
         3: None,
         4: None,
-        # 4: [
-        #     402.074, 404.084, 406.084, 408.094, 410.114, 412.124,
-        #     414.144, 416.164, 418.194, 420.204, 422.224, 424.244,
-        #     426.264, 428.284, 430.304],
+        5: None,
     }
+    detectStim = True
+    stimDetectThresDefault = 500
+    stimDetectChansDefault = ['ins_td0', 'ins_td2']
     stimDetectOptsByChannelSpecific = {
         # group
         0: {
             # program
-            0: {'detectChannels': ['ins_td2'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True},
-            1: {'detectChannels': ['ins_td3'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True},
-            2: {'detectChannels': ['ins_td2', 'ins_td3'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True},
-            3: {'detectChannels': stimDetectChansDefault, 'thres': stimDetectThresDefault, 'useForSlotDetection': True}
-        },
-        1: {
-            # program
-            0: {'detectChannels': stimDetectChansDefault, 'thres': stimDetectThresDefault, 'useForSlotDetection': True},
-            1: {'detectChannels': ['ins_td2'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True},
-            2: {'detectChannels': stimDetectChansDefault, 'thres': stimDetectThresDefault, 'useForSlotDetection': True},
-            3: {'detectChannels': ['ins_td2', 'ins_td3'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True}
+            0: {'detectChannels': ['ins_td0', 'ins_td2'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True},
+            1: {'detectChannels': ['ins_td0', 'ins_td2'], 'thres': 250, 'useForSlotDetection': True},
+            2: {'detectChannels': ['ins_td0', 'ins_td2'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True},
+            3: {'detectChannels': ['ins_td0', 'ins_td2'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True}
         }}
-    triFolderSourceBase = os.path.join(
-        '201901271000-Proprio', 'tdc_Block001')
+        
+    triFolderSourceBase = 1
     triDestinations = [
         'Block00{}'.format(blockIdx)
-        for blockIdx in [4]]
+        for blockIdx in [2, 3, 4]]
     
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        # '201901261000-Proprio': [4],
-        '201901271000-Proprio': [1, 2, 3, 4],
+        '202008201100-Rupert': [1, 2, 3, 4],
         }
 
     movementSizeBins = [0, 0.25, 0.5, 1, 1.25, 1.5]
     alignTimeBoundsLookup = {
-        #  TODO
         1: [
             [257, 552],
             [670, 1343],
             ],
         #  per trial
-        #  TODO
         2: [
             #  per trialSegment
             [238, 1198],
             ],
-        #  TODO
         3: [
             [171, 1050]
             ],
         4: [
-            [939, 2252],
-            ]
+            [185, 1501],
+            ],
+        5: [
+            [100, 2010]
+        ]
         }
     outlierDetectOptions = dict(
-        targetEpochSize=5e-3,
+        targetEpochSize=10e-3,
         windowSize=(-1, 1),
+        # conditionNames=[
+        #     'electrode', 'amplitude', 'RateInHz',
+        #     'pedalMovementCat', 'pedalSizeCat', 'pedalDirection'],
         conditionNames=[
-            'electrode', 'amplitude', 'RateInHz',
-            # 'pedalMovementCat', 'pedalSizeCat', 'pedalDirection'
-            ],
+            'electrode', 'amplitude', 'RateInHz'],
         twoTailed=True,
         )
     #
     minNConditionRepetitions = {
-        'n': 3,
+        'n': 1,
         'categories': ['amplitude', 'electrode', 'RateInHz']
         }
+    # electrodeMapPath = './Utah_SN6251_002374_Rupert.cmp'
+    electrodeMapPath = './NForm_Rupert_flat.map'
+    
     return locals()

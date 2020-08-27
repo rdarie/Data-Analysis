@@ -23,6 +23,12 @@
 # Request custom resources
 #SBATCH --array=1,2,3,4
 
+module load anaconda/3-5.2.0
+. /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
+conda activate
+source activate nda2
+python --version
+
 # EXP="exp202003091200"
 # EXP="exp202003181300"
 # EXP="exp202003191400"
@@ -55,24 +61,20 @@ SELECTOR="_minfrmaxcorr"
 WINDOW="--window=XS"
 # WINDOW="--window=extraExtraShort"
 
+# SLURM_ARRAY_TASK_ID=1
 # TRIALSELECTOR="--processAll"
-# TRIALSELECTOR="--blockIdx=2"
+TRIALSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
 
-# ANALYSISSELECTOR="--analysisName=lfpFullRes"
-# ANALYSISSELECTOR="--analysisName=emgHiRes"
-ANALYSISSELECTOR="--analysisName=emgLoRes"
+# ANALYSISSELECTOR="--analysisName=fullRes"
+# ANALYSISSELECTOR="--analysisName=hiRes"
+# ANALYSISSELECTOR="--analysisName=loRes"
+ANALYSISSELECTOR="--analysisName=default"
 
 # CHANSELECTOR="--chanQuery=all"
 # CHANSELECTOR="--chanQuery=isiemgraw"
-CHANSELECTOR="--chanQuery=isiemg"
+# CHANSELECTOR="--chanQuery=isiemg"
+CHANSELECTOR="--chanQuery=isiemgoracc"
 # CHANSELECTOR="--chanQuery=isispinal"
 # CHANSELECTOR="--chanQuery=isispinaloremg"
 
-module load anaconda/3-5.2.0
-. /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
-conda activate
-source activate nda2
-python --version
-
-# SLURM_ARRAY_TASK_ID=2
-python -u './calcISIAnalysisNix.py' --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $CHANSELECTOR $ANALYSISSELECTOR --commitResults
+python -u ./calcISIAnalysisNix.py --exp=$EXP $TRIALSELECTOR $CHANSELECTOR $ANALYSISSELECTOR --commitResults

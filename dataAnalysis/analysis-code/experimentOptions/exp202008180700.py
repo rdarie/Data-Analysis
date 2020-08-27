@@ -6,7 +6,7 @@ def getExpOpts():
         3: 'isi',
         4: 'isi',
         }
-    experimentName = '202007011300-Peep'
+    experimentName = '202008180700-Billy'
     deviceName = None
     rippleMapFile = {
         1: 'isi_nano1caudal_xAyBzC_ortho_nano2rostral_xAyBzC_ortho.map',
@@ -33,10 +33,7 @@ def getExpOpts():
     asigNameList = [
         ['caudalX_e{:02d}_a'.format(i) for i in range(1, 8)] +
         ['caudalY_e{:02d}_a'.format(i) for i in range(9, 16)] +
-        ['caudalZ_e{:02d}_a'.format(i) for i in range(17, 25)] +
-        ['rostralX_e{:02d}_a'.format(i) for i in range(1, 8)] +
-        ['rostralY_e{:02d}_a'.format(i) for i in range(9, 16)] +
-        ['rostralZ_e{:02d}_a'.format(i) for i in range(17, 25)]
+        ['caudalZ_e{:02d}_a'.format(i) for i in range(17, 25)]
         ]
     ainpNameList = ['analog 1']
     jsonSessionNames = {
@@ -47,28 +44,28 @@ def getExpOpts():
         4: [],
         }
     synchInfo = {'delsys': {}, 'nsp': {}, 'ins': {}}
-    synchInfo['delsys'][1] = {'timeRanges': [82, 2369.5], 'chooseCrossings': slice(None)}  #########
-    synchInfo['delsys'][2] = {'timeRanges': [18.7, 357.7], 'chooseCrossings': slice(None)}
-    synchInfo['delsys'][3] = {'timeRanges': [7, 538], 'chooseCrossings': slice(None)}
-    synchInfo['delsys'][4] = {'timeRanges': [45, 3567], 'chooseCrossings': slice(None)}
+    synchInfo['delsys'][1] = {'timeRanges': [9.1, 2404.9], 'chooseCrossings': slice(None)}  #########
+    synchInfo['delsys'][2] = {'timeRanges': [8.8, 2238.8], 'chooseCrossings': slice(None)}
+    synchInfo['delsys'][3] = {'timeRanges': [9, 59], 'chooseCrossings': slice(None)}
+    synchInfo['delsys'][4] = {'timeRanges': [8, 2888], 'chooseCrossings': slice(None)}
     #
-    synchInfo['nsp'][1] = {'timeRanges': [4, 2291.5], 'chooseCrossings': slice(None)}
-    synchInfo['nsp'][2] = {'timeRanges': [2.1, 341.1], 'chooseCrossings': slice(None)}
-    synchInfo['nsp'][3] = {'timeRanges': [4, 540], 'chooseCrossings': slice(None)}
-    synchInfo['nsp'][4] = {'timeRanges': [44, 3573], 'chooseCrossings': slice(None)}
+    synchInfo['nsp'][1] = {'timeRanges': [28.4, 2424.2], 'chooseCrossings': slice(None)}
+    synchInfo['nsp'][2] = {'timeRanges': [0.4, 2230.4], 'chooseCrossings': slice(None)}
+    synchInfo['nsp'][3] = {'timeRanges': [3.6, 53.6], 'chooseCrossings': slice(None)}
+    synchInfo['nsp'][4] = {'timeRanges': [3.6, 2883.6], 'chooseCrossings': slice(None)}
     # For emg analysis - emg missing for some time ranges
     alignTimeBoundsLookup = {
         1: [
-            [3, 2290.5]
+            []
             ],
         2: [
-            [2.1, 341.1]
+            []
             ],
         3: [
-            [4, 540]
+            []
             ],
         4: [
-            [44, 3573]
+            []
             ]
         }
     #  if not possible to use taps, override with good taps from another segment
@@ -97,7 +94,7 @@ def getExpOpts():
     triDestinations = []
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        '202007011300-Peep': [1, 2, 3, 4],
+        '202008180700-Billy': [1, 2, 3, 4],
         }
     assembledSegmentToBlockLookup = {
         i - 1: i for i in [1, 2, 3, 4]

@@ -43,6 +43,7 @@ expOpts, allOpts = parseAnalysisOptions(
     arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
+binOpts = rasterOpts['binOpts'][arguments['analysisName']]
 
 analysisSubFolder = os.path.join(
     scratchFolder, arguments['analysisName']
@@ -67,7 +68,7 @@ if arguments['processAll']:
         suffix='fr',
         aggregateFun=None,
         chanNames=chanNames,
-        rasterOpts=rasterOpts)
+        rasterOpts=binOpts)
 else:
     masterBlock = preproc.calcFR(
         binnedSpikePath,
@@ -75,7 +76,7 @@ else:
         suffix='fr',
         aggregateFun=None,
         chanNames=chanNames,
-        rasterOpts=rasterOpts)
+        rasterOpts=binOpts)
 
 allSegs = list(range(len(masterBlock.segments)))
 if arguments['processAll']:

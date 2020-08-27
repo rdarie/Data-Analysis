@@ -141,7 +141,9 @@ if arguments['enableOverrides']:
                 'hspace': 0.01
             }}
         })
-    alignedAsigsKWargs['windowSize'] = (-50e-3, 200e-3)
+    ##########################################################################
+    alignedAsigsKWargs.update({'windowSize': (-50e-3, 200e-3)})
+    ##########################################################################
 #     # currWindow = rasterOpts['windowSizes'][arguments['window']]
 #     # fullWinSize = currWindow[1] - currWindow[0]
 #     # redWinSize = (

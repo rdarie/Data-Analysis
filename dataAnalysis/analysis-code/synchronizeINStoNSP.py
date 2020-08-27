@@ -85,7 +85,9 @@ accel = {'data': accelDF, 't': accelDF['t']}
 ############################################################
 startTime_s = None
 dataLength_s = None
-print('Loading NSP Block...')
+print(
+    'Loading NSP Block {}'
+    .format(ns5FileName + arguments['inputBlockSuffix']))
 try:
     channelData, _ = ns5.getNIXData(
         fileName=ns5FileName + arguments['inputBlockSuffix'],
@@ -128,13 +130,19 @@ allTapTimestampsINS = []
 if not os.path.exists(synchFunPath):
     print('Detecting INS Timestamps...')
     overrideSegments = overrideSegmentsForTapSync[blockIdx]
+    clickDict = {
+        i: {
+            'ins': [],
+            'nsp': []
+            }
+        for i in pd.unique(td['data']['trialSegment'])}
     for trialSegment in pd.unique(td['data']['trialSegment']).astype(int):
         print('detecting INS taps on trial segment {}\n'.format(trialSegment))
         accelGroupMask = accel['data']['trialSegment'] == trialSegment
         accelGroup = accel['data'].loc[accelGroupMask, :]
         tdGroupMask = td['data']['trialSegment'] == trialSegment
         tdGroup = td['data'].loc[tdGroupMask, :]
-        tapTimestampsINS, peakIdx = mdt.getINSTapTimestamp(
+        tapTimestampsINS, peakIdx, tapDetectSignal = mdt.getINSTapTimestamp(
             tdGroup, accelGroup,
             tapDetectOpts[blockIdx][trialSegment]
             )
@@ -143,25 +151,18 @@ if not os.path.exists(synchFunPath):
         print('diff:\n{}'.format(
             tapTimestampsINS.diff() * 1e3))
         allTapTimestampsINS.append(tapTimestampsINS)
-    if arguments['curateManually']:
-        try:
-            clickDict = mdt.peekAtTaps(
-                td, accel,
-                channelData, blockIdx,
-                tapDetectOpts, sessionTapRangesNSP,
-                insX='t', plotBlocking=plotBlocking,
-                allTapTimestampsINS=allTapTimestampsINS,
-                allTapTimestampsNSP=allTapTimestampsNSP,
-                )
-        except Exception:
-            traceback.print_exc()
-    else:
-        clickDict = {
-            i: {
-                'ins': [],
-                'nsp': []
-                }
-            for i in pd.unique(td['data']['trialSegment'])}
+        if arguments['curateManually']:
+            try:
+                clickDict[trialSegment] = mdt.peekAtTaps(
+                    tdGroup, accelGroup, tapDetectSignal,
+                    channelData, blockIdx, trialSegment,
+                    tapDetectOpts, sessionTapRangesNSP,
+                    insX='t', plotBlocking=plotBlocking,
+                    allTapTimestampsINS=allTapTimestampsINS,
+                    allTapTimestampsNSP=allTapTimestampsNSP,
+                    )
+            except Exception:
+                traceback.print_exc()
     # perform the sync
     ############################################################
     for trialSegment in pd.unique(td['data']['trialSegment']).astype(int):

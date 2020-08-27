@@ -183,7 +183,9 @@ def cleanISIData(
                 if plottingLineNoiseMatch:
                     axXCorr[0].plot(
                         signalXCorr[plotTrialIdx, :],
-                        label='cross correlogram')
+                        label='cross correlogram (max lag = {})'.format(
+                            maxLagSamples[plotTrialIdx]
+                        ))
                     # axXCorr[1].plot(
                     #     (saveOriginalForPlotting.iloc[refWinMask]).to_numpy(),
                     #     label='Original')
@@ -198,7 +200,8 @@ def cleanISIData(
                 for rowIdx, maxLag in enumerate(maxLagSamples):
                     tweakLag = maxLag
                     noiseAmp = signalXCorr[rowIdx, maxLag]
-                    noiseModel.iloc[rowIdx, :] = (noiseAmp * referenceSines[hOrder][hPeriodSamples - tweakLag: hPeriodSamples - tweakLag + groupData.shape[1]])
+                    noiseModel.iloc[rowIdx, :] = (
+                        noiseAmp * referenceSines[hOrder][hPeriodSamples - tweakLag: hPeriodSamples - tweakLag + groupData.shape[1]])
                 # print('Noise Amp Max {}'.format(noiseModel.iloc[plotTrialIdx, :].max()))
                 # print('orig max / noise max {}'.format(groupData.iloc[plotTrialIdx, :].max() / noiseModel.iloc[plotTrialIdx, :].max()))
                 if plottingLineNoiseMatch:
@@ -222,6 +225,7 @@ def cleanISIData(
                     axBA.set_xlabel('Time (sec)')
                     axM.legend()
                     axM.set_xlabel('Time (sec)')
+                    axXCorr[0].legend()
             if plottingLineNoiseMatch and not (artifactDiagnosticPlots):
                 plt.show()
         #
@@ -276,7 +280,11 @@ def cleanISIData(
                     )
                 procDF.loc[:, dataColMask] = (
                     procDF.loc[:, dataColMask] - mediansDF)
-        if removeResponseBaseline:
+        if (
+                removeResponseBaseline and
+                (
+                    ('caudal' in featureName) or
+                    ('rostral' in featureName))):
             if stimCat == 'stimOn':
                 responseMask = (t > blankingDur) & (t <= stimPeriod)
             elif stimCat == 'stimOff':
@@ -334,6 +342,7 @@ def cleanISIData(
 
 
 if __name__ == "__main__":
+    print('loading {}'.format(triggeredPath))
     dataReader, dataBlock = ns5.blockFromPath(
         triggeredPath, lazy=arguments['lazy'])
     useCachedInput = True
@@ -397,8 +406,8 @@ if __name__ == "__main__":
     # daskClient = Client()
     # daskComputeOpts = {}
     daskComputeOpts = dict(
-        scheduler='processes'
-        # scheduler='single-threaded'
+        # scheduler='processes'
+        scheduler='single-threaded'
         )
     cleanOpts = dict(
         refWinMask=refWinMask,
@@ -407,7 +416,7 @@ if __name__ == "__main__":
         remove60Hz=True, correctSwitch=True,
         removeReferenceBaseline=True, removeResponseBaseline=True,
         interpMethod='ffill',
-        plottingLineNoiseMatch=False,
+        plottingLineNoiseMatch=True,
         artifactDiagnosticPlots=False)
     # how many 60Hz cycles fill the reference window
     nCycles = np.floor(

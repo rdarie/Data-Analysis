@@ -64,7 +64,7 @@ if arguments['makeTruncated']:
         outputFolderPath=scratchFolder,
         fillOverflow=False, removeJumps=False,
         motorEncoderMask=motorEncoderMask,
-        calcAverageLFP=False,
+        calcAverageLFP=True,
         eventInfo=trialFilesFrom['utah']['eventInfo'],
         asigNameList=[],
         ainpNameList=analogInputNames,
@@ -73,6 +73,8 @@ if arguments['makeTruncated']:
         calcRigEvents=trialFilesFrom['utah']['calcRigEvents'])
 ###############################################################################
 if arguments['makeFull']:
+    analogInputNames = sorted(
+        trialFilesFrom['utah']['eventInfo']['inputIDs'].values())
     reader = ns5.preproc(
         fileName=ns5FileName,
         rawFolderPath=nspFolder,
@@ -80,6 +82,7 @@ if arguments['makeFull']:
         fillOverflow=False, removeJumps=False,
         motorEncoderMask=motorEncoderMask,
         eventInfo=trialFilesFrom['utah']['eventInfo'],
+        asigNameList=None, ainpNameList=analogInputNames,
         spikeSourceType='tdc', writeMode='ow',
         chunkSize=chunkSize, equalChunks=equalChunks, chunkList=chunkList,
         nameSuffix='_full',

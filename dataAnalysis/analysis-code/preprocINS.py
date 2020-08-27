@@ -22,7 +22,7 @@ sns.set(
     context='talk', style='darkgrid',
     palette='dark', font='sans-serif',
     font_scale=0.75, color_codes=True)
-import dataAnalysis.preproc.mdt as preprocINS
+import dataAnalysis.preproc.mdt as mdt
 import os
 from importlib import reload
 import warnings
@@ -57,7 +57,7 @@ def preprocINSWrapper(
         ):
     if arguments['disableStimDetection']:
         trialFilesStim['ins']['detectStim'] = False
-    insBlock = preprocINS.preprocINS(
+    insBlock = mdt.preprocINS(
         trialFilesStim['ins'],
         insDataPath, blockIdx=int(arguments['blockIdx']),
         figureOutputFolder=figureOutputFolder,

@@ -987,12 +987,14 @@ def fillInJumps(channelData, samp_per_s, smoothing_ms = 1, badThresh = 1e-3,
 
 
 def confirmTriggersPlot(peakIdx, dataSeries, fs, whichPeak=0, nSec=10):
-
+    #
     indent = peakIdx[whichPeak]
-
-    dataSlice = slice(int(indent-.25*fs),int(indent+nSec*fs)) # 5 sec after first peak
+    #
+    dataSlice = slice(
+        max(0, int(indent-.25*fs)),
+        min(int(indent+nSec*fs), dataSeries.shape[0])) # 5 sec after first peak
     peakSlice = np.where(np.logical_and(peakIdx > indent - .25*fs, peakIdx < indent + nSec*fs))
-
+    #
     fig, ax = plt.subplots()
     plt.plot((dataSeries.index[dataSlice] - indent) * fs ** (-1), dataSeries.iloc[dataSlice])
     plt.plot((peakIdx[peakSlice] - indent) * fs ** (-1), dataSeries.iloc[peakIdx[peakSlice]], 'r*')
@@ -1031,8 +1033,8 @@ def getThresholdCrossings(
         dsToSearch = dataSrs.abs()
     else:
         dsToSearch = dataSrs
+    # dsToSearch: data series to search
     nextDS = dsToSearch.shift(1).fillna(method='bfill')
-    # pdb.set_trace()
     if edgeType == 'rising':
         crossMask = (
             (dsToSearch >= thresh) & (nextDS < thresh) |
@@ -1105,7 +1107,6 @@ def findTrains(
 
     #
     trainLengths = (trainEnds.values - trainStarts.values)
-    # pdb.set_trace()
     validTrains = trainLengths >= minTrainLength
     keepPeaks = pd.Series(False, index = foundTime.index)
     nTrains = 0

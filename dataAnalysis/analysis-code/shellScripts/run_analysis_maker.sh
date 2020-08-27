@@ -21,7 +21,7 @@
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=4
+#SBATCH --array=1,2,3,4
 
 # EXP="exp201901070700"
 # EXP="exp201901201200"
@@ -30,6 +30,7 @@
 # EXP="exp201901231000"
 EXP="exp201901271000"
 LAZINESS="--lazy"
+
 # ANALYSISNAME="--analysisName=loRes"
 ANALYSISNAME="--analysisName=default"
 
@@ -42,8 +43,8 @@ conda activate
 source activate nda2
 python --version
 
-SLURM_ARRAY_TASK_ID=4
-python ./synchronizeSIMItoNSP.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP
+SLURM_ARRAY_TASK_ID=5
+python -u ./synchronizeSIMItoNSP.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP
 python -u ./calcProprioAnalysisNix.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISNAME $BLOCKSUFFIX --chanQuery="all" --verbose
 python -u ./calcMotionStimAlignTimes.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISNAME --plotParamHistograms $LAZINESS
 python -u ./calcStimAlignTimes.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISNAME --plotParamHistograms $LAZINESS

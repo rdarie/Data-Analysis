@@ -1,0 +1,142 @@
+// Auto generated mapfile									
+//									
+//   legend									
+//   col - 0 based column from left to right									
+//   row - 0 based row from bottom to top									
+//   bank - bank name - values can be A B C or D									
+//   elec - 1 based electrode number within the bank - values can be 1-32									
+//   label - label used to rename channels in Central (optional)									
+//									
+// Comments begin with //									
+// First non-comment line is the Mapfile description									
+//									
+Cerebus mapping for array 1046-2    SN: 6251-002374									
+//col	row	bank	elec	label					
+0	8	C	1	utah96					
+0	7	C	3	utah95					
+0	6	C	5	utah94					
+0	5	C	7	utah93					
+0	4	C	9	utah92					
+0	3	C	11	utah91					
+0	2	C	13	utah90					
+0	1	C	15	utah89					
+1	9	A	2	utah88					
+1	8	C	2	utah87					
+1	7	C	4	utah86					
+1	6	C	6	utah85					
+1	5	C	8	utah84					
+1	4	C	10	utah83					
+1	3	C	12	utah82					
+1	2	C	14	utah81					
+1	1	C	16	utah80					
+1	0	C	17	utah79					
+2	9	A	1	utah78					
+2	8	B	1	utah77					
+2	7	B	3	utah76					
+2	6	B	5	utah75					
+2	5	B	7	utah74					
+2	4	B	9	utah73					
+2	3	B	13	utah72					
+2	2	C	18	utah71					
+2	1	C	20	utah70					
+2	0	C	19	utah69					
+3	9	A	3	utah68					
+3	8	B	2	utah67					
+3	7	B	4	utah66					
+3	6	B	6	utah65					
+3	5	B	8	utah64					
+3	4	B	11	utah63					
+3	3	B	15	utah62					
+3	2	B	17	utah61					
+3	1	C	22	utah60					
+3	0	C	21	utah59					
+4	9	A	4	utah58					
+4	8	A	7	utah57					
+4	7	A	5	utah56					
+4	6	B	16	utah55					
+4	5	B	10	utah54					
+4	4	B	12	utah53					
+4	3	B	19	utah52					
+4	2	B	21	utah51					
+4	1	C	23	utah50					
+4	0	C	24	utah49					
+5	9	A	6	utah48					
+5	8	A	9	utah47					
+5	7	A	17	utah46					
+5	6	A	15	utah45					
+5	5	B	18	utah44					
+5	4	B	14	utah43					
+5	3	B	24	utah42					
+5	2	B	23	utah41					
+5	1	C	25	utah40					
+5	0	C	26	utah39					
+6	9	A	8	utah38					
+6	8	A	11	utah37					
+6	7	A	13	utah36					
+6	6	A	19	utah35					
+6	5	B	22	utah34					
+6	4	B	20	utah33					
+6	3	B	26	utah32					
+6	2	B	25	utah31					
+6	1	C	27	utah30					
+6	0	C	28	utah29					
+7	9	A	10	utah28					
+7	8	A	12	utah27					
+7	7	A	23	utah26					
+7	6	A	25	utah25					
+7	5	A	21	utah24					
+7	4	B	30	utah23					
+7	3	B	28	utah22					
+7	2	B	27	utah21					
+7	1	C	30	utah20					
+7	0	C	29	utah19					
+8	9	A	14	utah18					
+8	8	A	16	utah17					
+8	7	A	20	utah16					
+8	6	A	27	utah15					
+8	5	A	29	utah14					
+8	4	A	31	utah13					
+8	3	B	32	utah12					
+8	2	B	29	utah11					
+8	1	B	31	utah10					
+8	0	C	32	utah9					
+9	8	A	18	utah8					
+9	7	A	22	utah7					
+9	6	A	24	utah6					
+9	5	A	26	utah5					
+9	4	A	28	utah4					
+9	3	A	30	utah3					
+9	2	A	32	utah2					
+9	1	C	31	utah1					
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									
+									

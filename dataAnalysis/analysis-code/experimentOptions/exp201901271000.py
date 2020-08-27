@@ -46,15 +46,16 @@ def getExpOpts():
         #  per trialSegment
         0: {
             'timeRanges': [(14, 16)],
-            'tdChan': 'ins_td0',
-            'tdThres': 2,
+            'chan': ['ins_td0', 'ins_td2'],
+            'thres': 5,
             'iti': 0.2,
             'keepIndex': slice(None)
             },
         1: {
             'timeRanges': [(448, 450)],
-            'tdChan': 'ins_td0',
-            'tdThres': 2,
+            'chan': ['ins_td0', 'ins_td2'],
+            # 'chan': ['ins_accx', 'ins_accy', 'ins_accz'],
+            'thres': 5,
             'iti': 0.2,
             'keepIndex': slice(None)
             }
@@ -63,8 +64,9 @@ def getExpOpts():
         #  per trialSegment
         0: {
             'timeRanges': [(18, 20)],
-            'tdChan': 'ins_td0',
-            'tdThres': 5,
+            # 'chan': ['ins_td0', 'ins_td2'],
+            'chan': ['ins_accx', 'ins_accy', 'ins_accz'],
+            'thres': 5,
             'iti': 0.2,
             'keepIndex': slice(None)
             }
@@ -73,8 +75,8 @@ def getExpOpts():
         #  per trialSegment
         0: {
             'timeRanges': [(20, 22)],
-            'tdChan': 'ins_td0',
-            'tdThres': 5,
+            'chan': ['ins_td0', 'ins_td2'],
+            'thres': 5,
             'iti': 0.2,
             'keepIndex': slice(None)
             }
@@ -83,8 +85,8 @@ def getExpOpts():
         #  per trialSegment
         0: {
             'timeRanges': [(21.5, 23.5)],
-            'tdChan': 'ins_td0',
-            'tdThres': 5,
+            'chan': ['ins_td0', 'ins_td2'],
+            'thres': 5,
             'iti': 0.2,
             'keepIndex': slice(1, None)
             }
@@ -93,24 +95,24 @@ def getExpOpts():
         #  per trialSegment
         0: {
             'timeRanges': [(22, 24)],
-            'tdChan': 'ins_td0',
-            'tdThres': 5,
+            'chan': ['ins_td0', 'ins_td2'],
+            'thres': 5,
             'iti': 0.2,
             'keepIndex': slice(None)
             },
         1: {
             'timeRanges': [(1047, 1049)],
-            'tdChan': 'ins_td0',
-            'tdThres': 5,
+            'chan': ['ins_td0', 'ins_td2'],
+            'thres': 5,
             'iti': 0.2,
             'keepIndex': slice(None)
             },
         2: {
             'timeRanges': [(1301, 1304)],
-            'accChan': 'ins_accz',
-            'accThres': 5,
+            'chan': ['ins_td0', 'ins_td2'],
+            'thres': 5,
             'iti': 0.2,
-            'keepIndex': slice(None)
+            'keepIndex': slice(None, 3)
             }
         }
 
@@ -155,16 +157,16 @@ def getExpOpts():
         5: None,
     }
     detectStim = True
-    stimDetectThresDefault = 100
+    stimDetectThresDefault = 500
     stimDetectChansDefault = ['ins_td0', 'ins_td2']
     stimDetectOptsByChannelSpecific = {
         # group
         0: {
             # program
-            0: {'detectChannels': ['ins_td0'], 'thres': 250, 'useForSlotDetection': True},
-            1: {'detectChannels': ['ins_td0'], 'thres': 70, 'useForSlotDetection': False},
-            2: {'detectChannels': ['ins_td0', 'ins_td2'], 'thres': 250, 'useForSlotDetection': True},
-            3: {'detectChannels': stimDetectChansDefault, 'thres': stimDetectThresDefault, 'useForSlotDetection': False}
+            0: {'detectChannels': ['ins_td0', 'ins_td2'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True},
+            1: {'detectChannels': ['ins_td0', 'ins_td2'], 'thres': 125, 'useForSlotDetection': True},
+            2: {'detectChannels': ['ins_td0', 'ins_td2'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True},
+            3: {'detectChannels': ['ins_td0', 'ins_td2'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True}
         }}
         
     triFolderSourceBase = 1

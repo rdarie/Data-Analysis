@@ -139,7 +139,9 @@ if arguments['enableOverrides']:
     if 'rowColOverrides' in locals():
         if rowColOpts['colName'] in rowColOverrides:
             rowColOpts['colOrder'] = rowColOverrides[rowColOpts['colName']]
-    alignedAsigsKWargs.update({'windowSize': (-25e-3, 100e-3)})
+    ##########################################################################
+    alignedAsigsKWargs.update({'windowSize': (-50e-3, 200e-3)})
+    ##########################################################################
     currWindow = rasterOpts['windowSizes'][arguments['window']]
     fullWinSize = currWindow[1] - currWindow[0]
     if 'windowSize' not in alignedAsigsKWargs:

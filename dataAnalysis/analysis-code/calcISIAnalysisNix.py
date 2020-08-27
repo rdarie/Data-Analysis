@@ -50,6 +50,7 @@ globals().update(expOpts)
 globals().update(allOpts)
 alignTimeBounds = alignTimeBoundsLookup[int(arguments['blockIdx'])]
 
+binOpts = rasterOpts['binOpts'][arguments['analysisName']]
 eventUnits = {
     'nominalCurrent': pq.uA,
     'RateInHz': pq.Hz,
@@ -71,7 +72,7 @@ def calcISIBlockAnalysisNix():
     if arguments['samplingRate'] is not None:
         samplingRate = float(arguments['samplingRate']) * pq.Hz
     else:
-        samplingRate = float(1 / rasterOpts['binInterval']) * pq.Hz
+        samplingRate = float(1 / binOpts['binInterval']) * pq.Hz
     #
     # Start parsing autologger info
     thisJsonPath = trialBasePath.replace('.nix', '_autoStimLog.json')
@@ -213,7 +214,6 @@ def calcISIBlockAnalysisNix():
         rawStimEventsDF.to_csv(os.path.join(
             analysisSubFolder, ns5FileName + '_unsynched_stim_updates.csv'
             ))
-        # pdb.set_trace()
     else:
         stimEvents = None
 
@@ -460,7 +460,6 @@ def calcISIBlockAnalysisNix():
                     stimEvents.times[0] -
                     10e-3 * pq.s +  # Fudge factor to account for delay between execution and matlab save
                     activeTimes.min() * pq.s)
-                # pdb.set_trace()
                 stimEventsDF = pd.DataFrame(stimEvents.array_annotations)
                 stimEventsDF['t'] = stimEvents.times
                 stimEventsDF.to_csv(os.path.join(
@@ -677,7 +676,8 @@ def calcISIBlockAnalysisNix():
                                             idx, 'trainDur'] = (
                                                 theseTimes[-1] -
                                                 theseTimes[0])
-                                        stimPeriod = np.round(np.diff(theseTimes).median(), decimals=6)
+                                        # stimPeriod = np.round(np.diff(theseTimes).median(), decimals=6)
+                                        stimPeriod = np.round(np.median(np.diff(theseTimes)), decimals=6)
                                         startCategories.loc[
                                             idx, 'stimPeriod'] = stimPeriod
                                         startCategories.loc[
@@ -914,7 +914,7 @@ def calcISIBlockAnalysisNix():
                 tdDF['t'].iloc[plotIdx],
                 blankMask[plotIdx], 'r')
             plt.show()
-    
+    #
     if samplingRate != currentSamplingRate:
         print("Reinterpolating...")
         tdInterp = hf.interpolateDF(

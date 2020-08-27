@@ -23,14 +23,7 @@
 # EXP="exp201901201200"
 # EXP="exp201901261000"
 EXP="exp201901271000"
-# UNITSELECTOR="--selector=unitSelector_minfrmaxcorr"
-UNITSELECTOR=""
-# SELECTOR="_minfrmaxcorr"
-TRIALSELECTOR="--blockIdx=4"
-# TRIALSELECTOR="--processAll"
-WINDOW="--window=miniRC"
-ANALYSISNAME="--analysisName=loRes"
-# ANALYSISNAME="--analysisName=default"
+
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
 conda activate
@@ -38,7 +31,21 @@ conda activate
 source activate nda2
 python --version
 
+SLURM_ARRAY_TASK_ID=5
+
+UNITSELECTOR="--selector=unitSelector_minfrmaxcorr"
+# UNITSELECTOR=""
+
+TRIALSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
+# TRIALSELECTOR="--processAll"
+
+# WINDOW="--window=miniRC"
+WINDOW="--window=XS"
+
+# ANALYSISFOLDER="--analysisName=loRes"
+ANALYSISFOLDER="--analysisName=default"
+
 #  --maskOutlierBlocks
-python3 './plotAlignedNeurons.py' --exp=$EXP $TRIALSELECTOR $ANALYSISNAME $UNITSELECTOR $WINDOW --unitQuery="all" --alignQuery="stimOn" --rowName="RateInHz" --hueName="amplitude" --alignFolderName=stim --enableOverrides
-# python3 './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $ANALYSISNAME $WINDOW --inputBlockName="rig" --unitQuery="all" --alignQuery="stimOn" --rowName="RateInHz" --hueName="amplitude" --alignFolderName=stim --enableOverrides
-# python3 './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $ANALYSISNAME $WINDOW --inputBlockName="utahlfp" --unitQuery="utahlfp" --alignQuery="stimOn" --rowName="RateInHz" --hueName="amplitude" --alignFolderName=stim --enableOverrides
+python3 -u './plotAlignedNeurons.py' --exp=$EXP $TRIALSELECTOR $ANALYSISFOLDER $UNITSELECTOR $WINDOW --unitQuery="all" --alignQuery="stimOn" --rowName="RateInHz" --hueName="amplitude" --alignFolderName=stim --enableOverrides
+python3 -u './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $ANALYSISFOLDER $WINDOW --inputBlockName="rig" --unitQuery="all" --alignQuery="stimOn" --rowName="RateInHz" --hueName="amplitude" --alignFolderName=stim --enableOverrides
+python3 -u './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $ANALYSISFOLDER $WINDOW --inputBlockName="utahlfp" --unitQuery="utahlfp" --alignQuery="stimOn" --rowName="RateInHz" --hueName="amplitude" --alignFolderName=stim --enableOverrides

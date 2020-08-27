@@ -17,9 +17,15 @@
 #SBATCH -e ../../batch_logs/%j-%a-ins_synch.errout
 
 # Specify account details
-#SBATCH --account=bibs-dborton-condo
+#SBATCH --account=carney-dborton-condo
 # Request custom resources
-#SBATCH --array=1,2,3
+#SBATCH --array=1,2,3,4
+
+module load anaconda/3-5.2.0
+. /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
+conda activate
+source activate nda2
+python --version
 
 # EXP="exp201901070700"
 # EXP="exp201901201200"
@@ -29,16 +35,10 @@
 # EXP="exp201901261000"
 EXP="exp201901271000"
 
-
-module load anaconda/3-5.2.0
-. /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
-conda activate
-source activate nda2
-python --version
-
-# BLOCKSELECTOR="--inputBlockSuffix='_full'"
+# BLOCKSELECTOR="--inputBlockSuffix=_full"
 BLOCKSELECTOR=""
 
-SLURM_ARRAY_TASK_ID=4
-python3 './synchronizeINStoNSP.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP $BLOCKSELECTOR
-# python3 './synchronizeINStoNSP.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP $BLOCKSELECTOR --curateManually
+# SLURM_ARRAY_TASK_ID=4
+
+# python3 -u './synchronizeINStoNSP.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP $BLOCKSELECTOR --curateManually
+python3 -u './synchronizeINStoNSP.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP $BLOCKSELECTOR --curateManually |& tee "../../batch_logs/${EXP}_Block_${SLURM_ARRAY_TASK_ID}_synch_ins"

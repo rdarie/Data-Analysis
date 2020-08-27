@@ -21,16 +21,22 @@
 
 # EXP="exp201901201200"
 # EXP="exp201901221000"
-EXP="exp201901271000"
-# EXP="exp201901261000"
+# EXP="exp201901271000"
+EXP="exp201901261000"
 # EXP="exp201901070700"
-TRIALSELECTOR="--blockIdx=4"
-ALIGNSELECTOR="--analysisName=loRes"
+
+# ALIGNSELECTOR="--analysisName=loRes"
+ALIGNSELECTOR="--analysisName=default"
+
+SLURM_ARRAY_TASK_ID=4
+TRIALSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
 # TRIALSELECTOR="--processAll"
 # UNITSELECTOR="--selector=unitSelector_minfrmaxcorr"
 UNITSELECTOR=""
+
 LAZINESS="--lazy"
-WINDOW="--window=miniRC"
+# WINDOW="--window=miniRC"
+WINDOW="--window=XS"
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh

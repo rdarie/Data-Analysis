@@ -12,7 +12,8 @@
 
 # Specify a job name:
 #SBATCH -J spike_sort_vis_parallel
-#SBATCH --array=0,4,8,12,16,20
+#############SBATCH --array=0,4,8,12,16,20
+#SBATCH --array=0,4,8,12
 
 # Specify an output file
 #SBATCH -o ../../batch_logs/%j-%a-spike_sort_vis_parallel.stdout
@@ -25,7 +26,7 @@
 # EXP="exp201804271016"
 # EXP="exp201805071032"
 # EXP="exp201804240927"
-EXP="exp201805231100"
+# EXP="exp201805231100"
 # EXP="exp201901070700"
 # EXP="exp201901201200"
 # EXP="exp201901211000"
@@ -33,7 +34,8 @@ EXP="exp201805231100"
 # EXP="exp201901231000"
 # EXP="exp201901271000"
 # EXP="exp201901261000"
-TRIALIDX="1"
+EXP="exp202008261100"
+TRIALIDX="2"
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh

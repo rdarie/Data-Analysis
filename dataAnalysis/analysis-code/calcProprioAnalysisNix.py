@@ -41,6 +41,7 @@ expOpts, allOpts = parseAnalysisOptions(
     arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
+binOpts = rasterOpts['binOpts'][arguments['analysisName']]
 
 if arguments['inputBlockSuffix'] is None:
     arguments['inputBlockSuffix'] = ''
@@ -56,7 +57,7 @@ def calcBlockAnalysisNix():
     if arguments['samplingRate'] is not None:
         samplingRate = float(arguments['samplingRate']) * pq.Hz
     else:
-        samplingRate = float(1 / rasterOpts['binInterval']) * pq.Hz
+        samplingRate = float(1 / binOpts['binInterval']) * pq.Hz
     #
     nspReader = neo.io.nixio_fr.NixIO(
         filename=os.path.join(

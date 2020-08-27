@@ -10,43 +10,35 @@
 #SBATCH --mem=96G
 
 # Specify a job name:
-#SBATCH -J alignStim_20200318
+#SBATCH -J alignMiniRC
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-alignStim_20200318.stdout
-#SBATCH -e ../../batch_logs/%j-alignStim_20200318.errout
+#SBATCH -o ../../batch_logs/%j-alignMiniRC.stdout
+#SBATCH -e ../../batch_logs/%j-alignMiniRC.errout
 
 # Specify account details
-#SBATCH --account=bibs-dborton-condo
+#SBATCH --account=carney-dborton-condo
 
-# EXP="exp202003091200"
-# EXP="exp202003181300"
-# EXP="exp202003191400"
-EXP="exp202004271200"
-# EXP="exp202003201200"
+# EXP="exp201901201200"
+# EXP="exp201901221000"
+# EXP="exp201901271000"
+EXP="exp201901261000"
+# EXP="exp201901070700"
+
+# ALIGNFOLDER="--analysisName=loRes"
+ALIGNFOLDER="--analysisName=default"
+
+SLURM_ARRAY_TASK_ID=4
+TRIALSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
+# TRIALSELECTOR="--processAll"
+
+# UNITSELECTOR="--selector=unitSelector_minfrmaxcorr"
+UNITSELECTOR=""
 
 LAZINESS="--lazy"
-# LAZINESS=""
+
 # WINDOW="--window=miniRC"
-WINDOW="--window=short"
-# WINDOW="--window=extraShort"
-# WINDOW="--window=extraExtraShort"
-# TRIALSELECTOR="--blockIdx=2"
-# TRIALSELECTOR="--blockIdx=3"
-TRIALSELECTOR="--processAll"
-# ANALYSISSELECTOR="--analysisName=emg"
-# ANALYSISSELECTOR="--analysisName=default"
-# ANALYSISSELECTOR="--analysisName=emgStretchTime"
-ANALYSISSELECTOR="--analysisName=emgHiRes"
-# ANALYSISSELECTOR="--analysisName=emg1msec"
-# ANALYSISSELECTOR="--analysisName=emg1msecSmooth"
-# ANALYSISSELECTOR="--analysisName=emg1msecNoLFPFilterSmoothEMG"
-# ANALYSISSELECTOR="--analysisName=lfpFullRes"
-#
-# UNITSELECTOR="--unitQuery=all"
-# UNITSELECTOR="--unitQuery=isiemgraw"
-# UNITSELECTOR="--unitQuery=isispinal"
-UNITSELECTOR="--unitQuery=isispinaloremg"
+WINDOW="--window=XS"
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
@@ -54,4 +46,17 @@ conda activate
 source activate nda2
 python --version
 
-python3 ./launchVis.py
+python3 ./calcAlignedAsigs.py --chanQuery="utahlfp" --outputBlockName="utahlfp"     --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ALIGNFOLDER --eventName=stimAlignTimes  --alignFolderName=stim
+python3 ./calcAlignedAsigs.py --chanQuery="fr" --outputBlockName="fr"             --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ALIGNFOLDER --eventName=stimAlignTimes  --alignFolderName=stim
+python3 ./calcAlignedAsigs.py --chanQuery="rig" --outputBlockName="rig"           --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ALIGNFOLDER --eventName=stimAlignTimes  --alignFolderName=stim
+# python3 ./calcAlignedAsigs.py --chanQuery="fr_sqrt" --outputBlockName="fr_sqrt"   --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ALIGNFOLDER --eventName=stimAlignTimes  --alignFolderName=stim
+python3 ./calcAlignedRasters.py --chanQuery="raster" --outputBlockName="raster"   --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ALIGNFOLDER --eventName=stimAlignTimes  --alignFolderName=stim
+#
+python3 -u ./calcUnitMeanFR.py --exp=$EXP $TRIALSELECTOR $WINDOW $ALIGNFOLDER $ALIGNQUERY --inputBlockName="fr" --unitQuery="fr" --verbose
+python3 -u ./calcUnitCorrelation.py --exp=$EXP $TRIALSELECTOR $WINDOW $ALIGNFOLDER $ALIGNQUERY --inputBlockName="fr" --unitQuery="fr" --verbose --plotting
+python3 -u ./selectUnitsByMeanFRandCorrelation.py --exp=$EXP $TRIALSELECTOW $ALIGNFOLDER $WINDOW $LAZINESS --verbose
+
+UNITSELECTOR="--selector=unitSelector_minfrmaxcorr"
+python3 -u ./plotAlignedNeurons.py --exp=$EXP $TRIALSELECTOR $ALIGNFOLDER $UNITSELECTOR $WINDOW --unitQuery="all" --alignQuery="stimOn" --rowName="RateInHz" --hueName="amplitude" --alignFolderName=stim --enableOverrides
+python3 -u ./plotAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $ALIGNFOLDER $WINDOW --inputBlockName="rig" --unitQuery="all" --alignQuery="stimOn" --rowName="RateInHz" --hueName="amplitude" --alignFolderName=stim --enableOverrides
+python3 -u ./plotAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $ALIGNFOLDER $WINDOW --inputBlockName="utahlfp" --unitQuery="utahlfp" --alignQuery="stimOn" --rowName="RateInHz" --hueName="amplitude" --alignFolderName=stim --enableOverrides

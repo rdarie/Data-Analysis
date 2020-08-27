@@ -11,17 +11,17 @@
 #SBATCH --mem=127G
 
 # Specify a job name:
-#SBATCH -J nsp_preproc_20190127_full
+#SBATCH -J nsp_preproc_20190126_full
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-nsp_preproc_20190127_full.stdout
-#SBATCH -e ../../batch_logs/%j-%a-nsp_preproc_20190127_full.errout
+#SBATCH -o ../../batch_logs/%j-%a-nsp_preproc_20190126_full.stdout
+#SBATCH -e ../../batch_logs/%j-%a-nsp_preproc_20190126_full.errout
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=1,2,3,4,5
+#SBATCH --array=4
 
 # EXP="exp201804271016"
 # EXP="exp201805231100"
@@ -31,8 +31,8 @@
 # EXP="exp201901211000"
 # EXP="exp201901221000"
 # EXP="exp201901231000"
-# EXP="exp201901261000"
-EXP="exp201901271000"
+EXP="exp201901261000"
+# EXP="exp201901271000"
 
 
 module load anaconda/3-5.2.0
@@ -41,7 +41,7 @@ conda activate
 source activate nda2
 python --version
 
-SLURM_ARRAY_TASK_ID=4
+# SLURM_ARRAY_TASK_ID=5
 # python3 -u ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --makeTruncated
 # python3 -u ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --makeFull
 # !! maskMotorEncoder ignores all motor events outside alignTimeBounds

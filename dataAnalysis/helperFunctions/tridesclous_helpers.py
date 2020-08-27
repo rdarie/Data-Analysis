@@ -45,13 +45,15 @@ def initialize_catalogueconstructor(
     dataio = tdc.DataIO(dirname=triFolder)
     dataio.set_data_source(
         type=fileFormat, filenames=[filePath])
+    #
+    print('initialize_catalogueconstructor DataIO is: ')
     print(dataio)  # check
-
     #  set up probe file
     dataio.set_probe_file(prbPath)
     for chan_grp in dataio.channel_groups.keys():
         cc = tdc.CatalogueConstructor(
             dataio=dataio, name=name, chan_grp=chan_grp)
+        print('initialize_catalogueconstructor cat constructor is: ')
         print(cc)
     return
 

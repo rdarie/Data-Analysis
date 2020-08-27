@@ -70,8 +70,11 @@ def mapToDF(arrayFilePath):
         processor, port, FEslot, channel = row['FE'].split('.')
         bankName = '{}.{}'.format(port, FEslot)
         array, electrodeFull = row['electrode'].split('.')
-        electrode, electrodeRep = electrodeFull.split('_')
-        x, y , z = row['position'].split('.')
+        if '_' in electrodeFull:
+            electrode, electrodeRep = electrodeFull.split('_')
+        else:
+            electrode = electrodeFull
+        x, y, z = row['position'].split('.')
         nevIdx = int(channel) - 1 + bankLookup[bankName] * 32
         cmpDF.loc[nevIdx, 'elecID'] = int(electrode[1:])
         cmpDF.loc[nevIdx, 'nevID'] = nevIdx
@@ -97,18 +100,20 @@ def mapToDF(arrayFilePath):
 
 def cmpDFToPrb(
         cmpDF, filePath=None,
-        names=None, banks=None,
+        names=None, banks=None, labels=None,
         contactSpacing=400,  # units of um
         groupIn=None):
-
     if names is not None:
         keepMask = cmpDF['elecName'].isin(names)
         cmpDF = cmpDF.loc[keepMask, :]
     if banks is not None:
         keepMask = cmpDF['bank'].isin(banks)
         cmpDF = cmpDF.loc[keepMask, :]
+    if labels is not None:
+        keepMask = cmpDF['label'].isin(labels)
+        cmpDF = cmpDF.loc[keepMask, :]
     #  
-    cmpDF.reset_index(inplace=True, drop=True)
+    # cmpDF.reset_index(inplace=True, drop=True)
     prbDict = {}
     if groupIn is not None:
         groupingCols = []
@@ -116,14 +121,14 @@ def cmpDFToPrb(
             # uniqueValues = np.unique(cmpDF[key])
             # bins = int(round(
             #     (uniqueValues.max() - uniqueValues.min() + 1) / spacing))
-            cmpDF[key + '_group'] = np.nan
+            cmpDF.loc[:, key + '_group'] = np.nan
             cmpDF.loc[:, key + '_group'] = pd.cut(
                 cmpDF[key], bins, labels=False)
             groupingCols.append(key + '_group')
     else:
         groupingCols = ['elecName']
-    # pdb.set_trace()
     for idx, (name, group) in enumerate(cmpDF.groupby(groupingCols)):
+        print('idx: {} name: {}'.format(idx, name))
         theseChannels = []
         theseGeoms = {}
         for rName, row in group.iterrows():

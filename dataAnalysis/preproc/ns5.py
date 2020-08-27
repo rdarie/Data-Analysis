@@ -810,6 +810,7 @@ def getAsigsAlignedToEvents(
         allAlignEventsList.append(allAlignEvents)
     allAlignEventsDF = unitSpikeTrainArrayAnnToDF(allAlignEventsList)
     #
+    # pdb.set_trace()
     breakDownData = (
         allAlignEventsDF
         .groupby(minNReps['categories'])
@@ -834,8 +835,8 @@ def getAsigsAlignedToEvents(
     for segIdx, eventSeg in enumerate(eventBlock.segments):
         if verbose:
             print(
-                'getAsigsAlignedToEvents on segment {}'
-                .format(segIdx))
+                'getAsigsAlignedToEvents on segment {} of {}'
+                .format(segIdx + 1, len(eventBlock.segments)))
         allAlignEvents = allAlignEventsList[segIdx]
         if chunkSize is None:
             alignEventGroups = [allAlignEvents]
@@ -858,7 +859,7 @@ def getAsigsAlignedToEvents(
             if verbose:
                 print(
                     'getAsigsAlignedToEvents on subSegment {} of {}'
-                    .format(subSegIdx, len(alignEventGroups)))
+                    .format(subSegIdx + 1, len(alignEventGroups)))
             newSeg = Segment(name='seg{}_'.format(int(totalNSegs)))
             newSeg.annotate(nix_name=newSeg.name)
             masterBlock.segments.append(newSeg)
@@ -2140,7 +2141,9 @@ def preprocBlockToNix(
                 if removeMeanAcross:
                     meanGroups = {}
                 for subListIdx, subList in enumerate(asigNameList):
-                    subListSeg = ['seg{}_{}'.format(segIdx, a) for a in subList]
+                    subListSeg = [
+                        'seg{}_{}'.format(segIdx, a)
+                        for a in subList]
                     asigNameListSeg += subListSeg
                     if removeMeanAcross:
                         meanGroups[subListIdx] = subListSeg
@@ -2168,18 +2171,19 @@ def preprocBlockToNix(
                     for a in seg.analogsignals
                     if (('ainp' in a.name) or ('analog' in a.name))]
                 ainpNameListSeg = [a.name for a in aSigList]
-            #  
             nAsigs = len(aSigList)
+            # if we want the mean but aren't keeping the LFP chans  
+            lfpAsigList = None
             if asigNameList is not None:
-                lfpAsigList = aSigList
-            else:
+                if len(asigNameList):
+                    lfpAsigList = aSigList
+            if lfpAsigList is None:
                 lfpAsigList = [
                     a
                     for a in seg.analogsignals
                     if ~(('ainp' in a.name) or ('analog' in a.name))
                     ]
             nLfpAsigs = len(lfpAsigList)
-            # second pass through asigs, to save
             if LFPFilterOpts is not None:
                 def filterFun(sig, filterCoeffs=None):
                     sig[:] = signal.sosfiltfilt(
@@ -2349,6 +2353,7 @@ def preprocBlockToNix(
                     axFr.set_ylim([59, 61])
                     axFr.legend()
                     plt.show()
+            # second pass through asigs, to save
             for aSigIdx, aSigProxy in enumerate(seg.analogsignals):
                 if aSigIdx == 0:
                     # check bounds

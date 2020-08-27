@@ -354,12 +354,26 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
     #     'elec75#0', 'elec75#1', 'elec83#0', 'elec78#0', 'elec78#1']
     alignedAsigsChunkSize = 150000
     rasterOpts = {
-        # 'binInterval': 2e-4, 'binWidth': 5e-3, 'smoothKernelWidth': 5e-3,  # 5 kHz, EMG Lo-Res
-        'binInterval': 1e-3, 'binWidth': 10e-3, 'smoothKernelWidth': 10e-3,  # default, 1 kHz spikes
-        # 'binInterval': (3e4) ** (-1), 'binWidth': 5e-3, 'smoothKernelWidth': 5e-3,  # 30 kHz, Full-Res
-        # 'binInterval': 1e-4, 'binWidth': 5e-3, 'smoothKernelWidth': 5e-3,  # 10 kHz, EMG Hi-Res
+        'binOpts': {
+            'loRes': {
+                'binInterval': 2e-4,
+                'binWidth': 5e-3,
+                'smoothKernelWidth': 5e-3},  # 5 kHz,
+            'default': {
+                'binInterval': 1e-3,
+                'binWidth': 10e-3,
+                'smoothKernelWidth': 10e-3},  # default
+            'fullRes': {
+                'binInterval': (3e4) ** (-1),
+                'binWidth': 5e-3,
+                'smoothKernelWidth': 5e-3},  # 30 kHz
+            'hiRes': {
+                'binInterval': 1e-4,
+                'binWidth': 5e-3,
+                'smoothKernelWidth': 5e-3},  # 10 kHz
+            },
         'windowSizes': {
-            'XS': (-0.15, 0.4),
+            'XS': (-0.2, 0.4),
             'XXS': (-0.2, 0.05),
             'XXXS': (-0.005, 0.025),
             'short': (-0.5, 0.5),
