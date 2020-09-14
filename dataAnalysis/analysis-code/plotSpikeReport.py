@@ -7,6 +7,7 @@ Options:
     --blockIdx=blockIdx            which trial to analyze [default: 1]
     --exp=exp                      which experimental day to analyze
     --nameSuffix=nameSuffix        add anything to the output name?
+    --arrayName=arrayName          which electrode array to analyze [default: utah]
 """
 import matplotlib
 matplotlib.use('PS')
@@ -19,6 +20,7 @@ from neo.io.proxyobjects import (
     AnalogSignalProxy, SpikeTrainProxy, EventProxy) 
 import dataAnalysis.helperFunctions.kilosort_analysis as ksa
 import dataAnalysis.plotting.spike_sorting_plots as ssplt
+import dataAnalysis.helperFunctions.probe_metadata as prb_meta
 import dataAnalysis.preproc.ns5 as preproc
 import dataAnalysis.preproc.mdt as preprocINS
 from importlib import reload
@@ -30,6 +32,19 @@ arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(int(arguments['blockIdx']), arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
+
+arrayName = arguments['arrayName']
+electrodeMapPath = spikeSortingOpts[arrayName]['electrodeMapPath']
+mapExt = electrodeMapPath.split('.')[-1]
+
+if mapExt == 'cmp':
+    cmpDF = prb_meta.cmpToDF(electrodeMapPath)
+elif mapExt == 'map':
+    cmpDF = prb_meta.mapToDF(electrodeMapPath)
+
+ns5FileName = ns5FileName.replace('Block', arrayName)
+triFolder = os.path.join(
+    scratchFolder, 'tdc_{}{:0>3}'.format(arrayName, blockIdx))
 
 if arguments['nameSuffix']:
     nameSuffix = arguments['nameSuffix']
@@ -48,6 +63,7 @@ spChanIdx = [
     if (
         (len(i.units) > 0) &
         ('elec' in i.name) |
+        ('utah' in i.name) |
         ('nform' in i.name)
         )]
 #  [i.name for i in spChanIdx]
@@ -58,9 +74,11 @@ spikes = preproc.channelIndexesToSpikeDict(spChanIdx)
 
 spikes['Units'] = 'a.u. (z-score)'
 reportName = 'tdc_' + ns5FileName + '_spike_report' + nameSuffix
-# pdb.set_trace()
-spikeStruct = cmpDF[cmpDF['elecName'] != 'ainp']
-
+spikeStruct = cmpDF.loc[cmpDF['elecName'] != 'ainp', :]
+spikeStruct.loc[:, 'label'] = [
+    i.replace('_', '.') + ' raw'
+    for i in spikeStruct['label']
+    ]
 ssplt.spikePDFReport(
     spikeSortingFiguresFolder,
     spikes, spikeStruct,

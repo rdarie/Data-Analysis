@@ -8,6 +8,7 @@ Options:
     --analysisName=analysisName            append a name to the resulting blocks? [default: default]
     --alignFolderName=alignFolderName      append a name to the resulting blocks? [default: motion]
     --processAll                           process entire experimental day? [default: False]
+    --noStim                               remove stim pulses? [default: False]
     --maskOutlierBlocks                    delete outlier trials? [default: False]
     --verbose                              print diagnostics? [default: True]
     --lazy                                 load from raw, or regular? [default: False]
@@ -70,13 +71,17 @@ alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = (
 outlierTrialNames = ash.processOutlierTrials(
     calcSubFolder, prefix, **arguments)
 
+if arguments['window'] == 'XS':
+    cropWindow = (-100e-3, 400e-3)
+elif arguments['window'] == 'XSPre':
+    cropWindow = (-600e-3, -100e-3)
 alignedAsigsKWargs.update(dict(
     duplicateControlsByProgram=False,
     makeControlProgram=False,
     metaDataToCategories=False,
     removeFuzzyName=False,
     decimate=5,
-    windowSize=(-100e-3, 400e-3),
+    windowSize=cropWindow,
     transposeToColumns='feature', concatOn='columns',))
 #
 triggeredPath = os.path.join(
@@ -88,6 +93,7 @@ outputPath = os.path.join(
     prefix + '_{}_{}_export.h5'.format(
         arguments['inputBlockName'], arguments['window']))
 print('loading {}'.format(triggeredPath))
+
 dataReader, dataBlock = ns5.blockFromPath(
     triggeredPath, lazy=arguments['lazy'])
 asigWide = ns5.alignedAsigsToDF(
@@ -156,25 +162,31 @@ for stimName, stimGroup in asigWide.groupby(['electrode', 'RateInHz', 'nominalCu
         stimTimes = np.arange(0, 0.3, eesPeriod)
         EESWaveform = np.zeros_like(trialIndex)
         # TODO replace this with the hf.findClosestTimes implementation
-        for stimTime in stimTimes:
-            closestIndexTime = np.argmin(np.abs((trialIndex - stimTime)))
-            # pdb.set_trace()
-            EESWaveform[closestIndexTime] = 1
+        if not arguments['noStim']:
+            for stimTime in stimTimes:
+                closestIndexTime = np.argmin(np.abs((trialIndex - stimTime)))
+                # pdb.set_trace()
+                EESWaveform[closestIndexTime] = 1
         eesIdx += 1
         theseResults = pd.DataFrame(0, index=trialIndex, columns=eesColumns)
         for cathodeName in stimConfigLookup[stimName[0]]['cathodes']:
-            # pdb.set_trace()
             theseResults.loc[:, (cathodeName, 'amplitude')] = EESWaveform * stimName[2] / len(stimConfigLookup[stimName[0]]['cathodes'])
         for anodeName in stimConfigLookup[stimName[0]]['anodes']:
             theseResults.loc[:, (anodeName, 'amplitude')] = EESWaveform * stimName[2] * (-1) / len(stimConfigLookup[stimName[0]]['anodes'])
         for cName, lag in trialGroup.columns:
             if 'EmgEnv' in cName:
                 mName = cName.split('EmgEnv')[0]
-                theseResults.loc[:, (mName, 'EMG')] = trialGroup[cName].to_numpy()
-            if ('caudal' in cName) or ('rostral' in cName):
+                theseResults.loc[:, (mName, 'emg_env')] = trialGroup[cName].to_numpy()
+            elif 'Emg' in cName:
+                mName = cName.split('Emg')[0]
+                theseResults.loc[:, (mName, 'emg')] = trialGroup[cName].to_numpy()
+            elif ('caudal' in cName) or ('rostral' in cName):
                 lfpName = cName[:-4]
                 theseResults.loc[:, (lfpName, 'lfp')] = trialGroup[cName].to_numpy()
-        # pdb.set_trace()
+            elif ('Acc' in cName):
+                nameParts = cName.split('Acc')
+                mName = nameParts[0]
+                theseResults.loc[:, (mName, 'acc_{}'.format(nameParts[1][0].lower()))] = trialGroup[cName].to_numpy()
         with pd.HDFStore(outputPath) as store:
             theseResults.to_hdf(store, stimKey)
             thisMetadata = {

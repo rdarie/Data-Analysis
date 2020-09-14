@@ -10,11 +10,11 @@
 #SBATCH --mem=127G
 
 # Specify a job name:
-#SBATCH -J alignStim_20200702
+#SBATCH -J alignStim_20200701
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-alignStim_20200702.stdout
-#SBATCH -e ../../batch_logs/%j-alignStim_20200702.errout
+#SBATCH -o ../../batch_logs/%j-alignStim_20200701.stdout
+#SBATCH -e ../../batch_logs/%j-alignStim_20200701.errout
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -37,29 +37,31 @@ EXP="exp202007011300"
 # EXP="exp202007021300"
 # EXP="exp202007071300"
 # EXP="exp202007081300"
+# EXP="exp202009031500"
 
 LAZINESS="--lazy"
 # LAZINESS=""
 
 # WINDOW="--window=XXS"
 WINDOW="--window=XS"
+# WINDOW="--window=XSPre"
 
 SLURM_ARRAY_TASK_ID=1
 # TRIALSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
 # TRIALSELECTOR="--blockIdx=3"
 TRIALSELECTOR="--processAll"
 
-ANALYSISSELECTOR="--analysisName=default"
+# ANALYSISSELECTOR="--analysisName=default"
 # ANALYSISSELECTOR="--analysisName=hiRes"
-# ANALYSISSELECTOR="--analysisName=loRes"
+ANALYSISSELECTOR="--analysisName=loRes"
 # ANALYSISSELECTOR="--analysisName=fullRes"
 #
-# UNITSELECTOR="--unitQuery=all"
+UNITSELECTOR="--unitQuery=all"
 # UNITSELECTOR="--unitQuery=isiemgraw"
 # UNITSELECTOR="--unitQuery=isiemgenv"
 # UNITSELECTOR="--unitQuery=isispinal"
 # UNITSELECTOR="--unitQuery=isiemg"
-UNITSELECTOR="--unitQuery=isiemgoracc"
+# UNITSELECTOR="--unitQuery=isiemgoracc"
 # UNITSELECTOR="--unitQuery=isispinaloremg"
 
 OUTPUTBLOCKNAME="--outputBlockName=emg_clean"
@@ -74,6 +76,8 @@ INPUTBLOCKNAME="--inputBlockName=emg"
 
 python3 -u ./assembleExperimentData.py --exp=$EXP --blockIdx=3 --processAsigs --processRasters $ANALYSISSELECTOR 
 
-CHANSELECTOR="--chanQuery=isiemgoracc"
-OUTPUTBLOCKNAME="--outputBlockName=emg"
+CHANSELECTOR="--chanQuery=all"
+OUTPUTBLOCKNAME="--outputBlockName=all"
+python3 -u ./calcAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ANALYSISSELECTOR --eventName=stimAlignTimes $CHANSELECTOR $OUTPUTBLOCKNAME --verbose --alignFolderName=stim
+WINDOW="--window=XSPre"
 python3 -u ./calcAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ANALYSISSELECTOR --eventName=stimAlignTimes $CHANSELECTOR $OUTPUTBLOCKNAME --verbose --alignFolderName=stim

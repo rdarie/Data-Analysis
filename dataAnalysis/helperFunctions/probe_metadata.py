@@ -34,7 +34,6 @@ def cmpToDF(arrayFilePath):
             'elecID', 'label', 'bank', 'bankID', 'nevID']
         )
     bankLookup = {'A': 0, 'B': 1, 'C': 2, 'D': 3, 'E': 4, 'F': 5}
-    
     for rowIdx, row in arrayMap.iterrows():
         #  label matches non-digits index matches digit
         elecSplit = re.match(r'(\D*)(\d*)', row['label']).groups()
@@ -88,6 +87,7 @@ def mapToDF(arrayFilePath):
         cmpDF.loc[nevIdx, 'FE'] = row['FE']
     #
     cmpDF.dropna(inplace=True)
+    cmpDF.reset_index(inplace=True, drop=True)
     # import pdb; pdb.set_trace()
     # xIdx = np.array(
     #     cmpDF['xcoords'].values - cmpDF['xcoords'].min(),
@@ -113,7 +113,6 @@ def cmpDFToPrb(
         keepMask = cmpDF['label'].isin(labels)
         cmpDF = cmpDF.loc[keepMask, :]
     #  
-    # cmpDF.reset_index(inplace=True, drop=True)
     prbDict = {}
     if groupIn is not None:
         groupingCols = []

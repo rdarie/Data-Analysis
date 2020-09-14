@@ -2,12 +2,12 @@
 
 # 06b: Preprocess the INS Recording
 # Request 24 hours of runtime:
-#SBATCH --time=24:00:00
+#SBATCH --time=100:00:00
 
 # Default resources are 1 core with 2.8GB of memory.
 # Request custom resources
 #SBATCH --nodes=1
-#SBATCH --mem=96G
+#SBATCH --mem=127G
 
 # Specify a job name:
 #SBATCH -J ins_preproc_20190127
@@ -20,7 +20,7 @@
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=1,2,3,4
+#SBATCH --array=1
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
@@ -36,11 +36,16 @@ python --version
 # EXP="exp201901231000"
 # EXP="exp201901261000"
 EXP="exp201901271000"
-
 # SLURM_ARRAY_TASK_ID=5
+BLOCK_ID=5
 
 # --makePlots to make quality check plots
 # --showPlots to interactively display quality check plots
 # --disableStimDetection to use HUT derived stim start times
-# python3 -u './preprocINS.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --makePlots --verbose
-python3 -u './preprocINS.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --makePlots --verbose |& tee "../../batch_logs/${EXP}_Block_${SLURM_ARRAY_TASK_ID}_preproc_ins"
+python3 -u './preprocINS.py' --blockIdx=$BLOCK_ID --exp=$EXP --makePlots --verbose
+# python3 -u './preprocINS.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --makePlots --verbose |& tee "../../batch_logs/${EXP}_Block_${SLURM_ARRAY_TASK_ID}_preproc_ins"
+
+BLOCK_ID=1
+EXP="expRCSLongStim"
+python3 -u './preprocINS.py' --blockIdx=$BLOCK_ID --exp=$EXP --makePlots --disableStimDetection --verbose |& tee "../../batch_logs/${EXP}_Block_${SLURM_ARRAY_TASK_ID}_preproc_ins"
+#

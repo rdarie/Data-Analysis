@@ -60,6 +60,7 @@ def preprocINSWrapper(
     insBlock = mdt.preprocINS(
         trialFilesStim['ins'],
         insDataPath, blockIdx=int(arguments['blockIdx']),
+        deviceName=deviceName,
         figureOutputFolder=figureOutputFolder,
         verbose=arguments['verbose'],
         showPlots=arguments['showPlots'],

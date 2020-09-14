@@ -33,6 +33,7 @@ namedQueries = {
         'isiemgoracc': "(chanName.str.contains('Acc'))or(chanName.str.contains('Emg'))",
         'isiemgenv': "(chanName.str.contains('EmgEnv'))",
         'isiemgraw': "((chanName.str.contains('Emg')) and not (chanName.str.contains('EmgEnv')))",
+        'isiemgenvoraccorspinal': "(chanName.str.contains('Acc'))or(chanName.str.contains('EmgEnv'))or(chanName.str.contains('caudal'))or(chanName.str.contains('rostral'))",
         'oechorsense': "((chanName.str.contains('CH'))or(chanName.str.contains('Sense')))",
         'oechorins': "((chanName.str.contains('CH'))or(chanName.str.contains('ins')))",
         'neural': "((chanName.str.contains('elec'))or(chanName.str.contains('nform')))or(chanName.str.contains('utah'))",
@@ -55,6 +56,7 @@ namedQueries = {
         'isiemg': "(chanName.str.contains('Emg'))",
         'isiacc': "(chanName.str.contains('Acc'))",
         'isiemgoracc': "(chanName.str.contains('Acc'))or(chanName.str.contains('Emg'))",
+        'isiemgenvoraccorspinal': "(chanName.str.contains('Acc'))or(chanName.str.contains('EmgEnv'))or(chanName.str.contains('caudal'))or(chanName.str.contains('rostral'))",
         'isiemgenv': "(chanName.str.contains('EmgEnv'))",
         'isiemgraw': "((chanName.str.contains('Emg')) and not (chanName.str.contains('EmgEnv')))",
     }

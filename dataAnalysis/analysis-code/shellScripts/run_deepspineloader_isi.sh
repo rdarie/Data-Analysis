@@ -26,22 +26,28 @@
 # EXP="exp202006171300"
 EXP="exp202007011300"
 # EXP="exp202007021300"
+# EXP="exp202009031500"
 
 # SELECTOR="Block005_minfrmaxcorr"
 SELECTOR="_minfrmaxcorr"
 # WINDOW="--window=miniRC"
 WINDOW="--window=XS"
+# WINDOW="--window=XSPre"
 # WINDOW="--window=short"
+
 TRIALSELECTOR="--processAll"
 # TRIALSELECTOR="--blockIdx=2"
-# ANALYSISSELECTOR="--analysisName=emgStretchTime"
-# ANALYSISSELECTOR="--analysisName=emgHiRes"
-# ANALYSISSELECTOR="--analysisName=emg1msec"
-ANALYSISSELECTOR="--analysisName=emgLoRes"
-# ANALYSISSELECTOR="--analysisName=emg1msecSmooth"
+
+# ANALYSISSELECTOR="--analysisName=hiRes"
+# ANALYSISSELECTOR="--analysisName=default"
+ANALYSISSELECTOR="--analysisName=loRes"
+
 # UNITSELECTOR="--unitQuery=all"
-UNITSELECTOR="--unitQuery=isiemgenv"
+# UNITSELECTOR="--unitQuery=isiemgenv"
 # UNITSELECTOR="--unitQuery=isispinaloremg"
+UNITSELECTOR="--unitQuery=isiemgenvoraccorspinal"
+
+BLOCKSELECTOR="--inputBlockName=all"
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
@@ -52,8 +58,14 @@ python --version
 
 # python3 './calcAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ANALYSISSELECTOR --eventName=stimAlignTimes --chanQuery="isispinaloremg" --blockName="lfp" --verbose  --alignFolderName=stim
 # UNITSELECTOR="--unitQuery=isispinaloremg"
-# python "./exportForDeepSpine.py" --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR --alignFolderName=stim --inputBlockName="emg_clean" $UNITSELECTOR --maskOutlierBlocks --alignQuery="stimOn"
+
+# python "./exportForDeepSpine.py" --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR --alignFolderName=stim $BLOCKSELECTOR $UNITSELECTOR --alignQuery="stimOn"
+
+WINDOW="--window=XSPre"
+python "./exportForDeepSpine.py" --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR --alignFolderName=stim $BLOCKSELECTOR $UNITSELECTOR --alignQuery="stimOn" --noStim
+
 # UNITSELECTOR="--unitQuery=isiemgenv"
 # python "./calcTargetNoiseCeiling.py" --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR --alignFolderName=stim --inputBlockName="emg_clean" $UNITSELECTOR --maskOutlierBlocks --alignQuery="stimOn" --plotting
 # python "./calcEpochEffect.py" --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR --alignFolderName=stim --inputBlockName="emg" $UNITSELECTOR --maskOutlierBlocks --alignQuery="stimOn" --plotting
+
 python "loadSheepDeepSpine.py"

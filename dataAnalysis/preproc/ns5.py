@@ -200,7 +200,10 @@ def channelIndexesToSpikeDict(
         'extended_headers': []
         }
     #  allocate fields for annotations
-    dummyUnit = channel_indexes[0].units[0]
+    for dummyCh in channel_indexes:
+        if len(dummyCh.units):
+            dummyUnit = dummyCh.units[0]
+            break
     dummySt = [
         st
         for st in dummyUnit.spiketrains
@@ -799,6 +802,7 @@ def getAsigsAlignedToEvents(
         except Exception:
             traceback.print_exc()
         allEvIn = eventSeg.filter(name=thisEventName)[0]
+        #pdb.set_trace()
         if isinstance(allEvIn, EventProxy):
             allAlignEvents = loadObjArrayAnn(allEvIn.load())
         elif isinstance(allEvIn, Event):
@@ -1758,13 +1762,21 @@ def readBlockFixNames(
         seg0.filter(objects=AnalogSignal))
     if mapDF is not None:
         # [len(a.name) for a in asigLikeList]
-        # pdb.set_trace()
         if swapMaps is not None:
             asigOrigNames = [headerSignalChan.loc[int(i+1), 'name'] for i in swapMaps['from']['nevID']]
             asigNameChanger = dict(zip(asigOrigNames, swapMaps['to']['label']))
         else:
-            asigOrigNames = [headerSignalChan.loc[int(i+1), 'name'] for i in mapDF['nevID']]
-            asigNameChanger = dict(zip(asigOrigNames, mapDF['label']))
+            if headerSignalChan.size > 0:
+                asigOrigNames = [headerSignalChan.loc[int(i+1), 'name'] for i in mapDF['nevID']]
+                asigNameChanger = dict(zip(asigOrigNames, mapDF['label']))
+            else:
+                asigOrigNames = np.unique([i.split('#')[0] for i in headerUnitChan['name']])
+                asigNameChanger = {}
+                for origName in asigOrigNames:
+                    # ripple specific
+                    formattedName = origName.replace('.', '_').replace(' raw', '')
+                    if mapDF['label'].str.contains(formattedName).any():
+                        asigNameChanger[origName] = formattedName
     else:
         asigNameChanger = dict()
     for asig in asigLikeList:
@@ -1800,7 +1812,6 @@ def readBlockFixNames(
                 chanId = chanId - 5120
             else:
                 isRippleStimChan = False
-            # pdb.set_trace()
             asigBaseName = headerSignalChan.loc[chanId, 'name']
             if mapDF is not None:
                 if asigBaseName in asigNameChanger:
@@ -1816,9 +1827,15 @@ def readBlockFixNames(
                 stp.name = '{}_stim#{}'.format(chanIdLabel, unitId)
             else:
                 stp.name = '{}#{}'.format(chanIdLabel, unitId)
+            stp.unit.name = stp.name
+        ########################################
+        # sanitize ripple names ####
+        stp.name = stp.name.replace('.', '_').replace(' raw', '')
+        stp.unit.name = stp.unit.name.replace('.', '_').replace(' raw', '')
+        ###########################################
         if 'ChannelIndex for ' in stp.unit.channel_index.name:
             newChanName = stp.name.replace('_stim#0', '').replace('#0', '')
-            stp.unit.name = stp.name
+            # pdb.set_trace()
             stp.unit.channel_index.name = newChanName
             # units and analogsignals have different channel_indexes when loaded by nix
             # add them to each other's parent list
@@ -1851,6 +1868,7 @@ def readBlockFixNames(
                     allMatchingChIdx[0].annotations['neo_name'] = allMatchingChIdx[0].name
                 if 'nix_name' not in allMatchingChIdx[0].annotations:
                     allMatchingChIdx[0].annotations['nix_name'] = allMatchingChIdx[0].name
+        stp.unit.channel_index.name = stp.unit.channel_index.name.replace('.', '_').replace(' raw', '')
     #  rename the children
     typesNeedRenaming = [
         SpikeTrainProxy, AnalogSignalProxy, EventProxy,
@@ -1876,6 +1894,10 @@ def readBlockFixNames(
                 #  elif 'seg' in child.name:
                 #      childBaseName = '_'.join(child.name.split('_')[1:])
                 #      child.name = 'seg{}_{}'.format(segIdx, childBaseName)
+    # [i.name for i in dataBlock.filter(objects=Unit)]
+    # [i.name for i in dataBlock.filter(objects=ChannelIndex)]
+    # [i.name for i in dataBlock.filter(objects=SpikeTrain)]
+    # [i.name for i in dataBlock.filter(objects=SpikeTrainProxy)]
     return dataBlock
 
 
@@ -2478,6 +2500,8 @@ def preprocBlockToNix(
                     #
                     chIdxName = unit.name.replace('_stim', '').split('#')[0]
                     chanIdx = block.filter(objects=ChannelIndex, name=chIdxName)[0]
+                    # [i.name for i in block.filter(objects=ChannelIndex)]
+                    # [i.name for i in spikeBlock.filter(objects=Unit)]
                     #  print(unit.name)
                     if not (unit in chanIdx.units):
                         # first time at this unit, add to its chanIdx
@@ -2709,7 +2733,8 @@ def preproc(
         if spikeReader is not None:
             spikeBlock = readBlockFixNames(
                 spikeReader, block_index=blkIdx, lazy=True,
-                signal_group_mode=signal_group_mode)
+                signal_group_mode=signal_group_mode,
+                mapDF=mapDF, swapMaps=swapMaps)
             spikeBlock = purgeNixAnn(spikeBlock)
         else:
             spikeBlock = None

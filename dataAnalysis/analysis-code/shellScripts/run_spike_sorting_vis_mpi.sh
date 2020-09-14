@@ -11,13 +11,14 @@
 #SBATCH --mem=64G
 
 # Specify a job name:
-#SBATCH -J spike_sort_vis_parallel
-#############SBATCH --array=0,4,8,12,16,20
-#SBATCH --array=0,4,8,12
+#SBATCH -J sort_vis
+#SBATCH --array=0,4,8,12,16,20
+#############SBATCH --array=0,4,8,12
+############# SBATCH --array=0,2,4,6
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-spike_sort_vis_parallel.stdout
-#SBATCH -e ../../batch_logs/%j-%a-spike_sort_vis_parallel.errout
+#SBATCH -o ../../batch_logs/%j-%a-sort_vis.stdout
+#SBATCH -e ../../batch_logs/%j-%a-sort_vis.errout
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -34,8 +35,15 @@
 # EXP="exp201901231000"
 # EXP="exp201901271000"
 # EXP="exp201901261000"
-EXP="exp202008261100"
-TRIALIDX="2"
+# EXP="exp202008261100"
+# EXP="exp202008271200"
+# EXP="exp202008281100"
+# EXP="exp202008311100"
+# EXP="exp202009021100"
+# EXP="exp202009071200"
+# EXP="exp202009101200"
+EXP="exp202009111100"
+TRIALIDX="1"
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
@@ -46,4 +54,5 @@ python --version
 # Step 2: Validate the constructor
 let CHAN_START=SLURM_ARRAY_TASK_ID
 let CHAN_STOP=SLURM_ARRAY_TASK_ID+4
-python3 -u ./tridesclousVisualize.py --blockIdx=$TRIALIDX --exp=$EXP  --constructor --chan_start=$CHAN_START --chan_stop=$CHAN_STOP
+python3 -u ./tridesclousVisualize.py --blockIdx=$TRIALIDX --exp=$EXP  --constructor --arrayName=utah --chan_start=$CHAN_START --chan_stop=$CHAN_STOP
+# python3 -u ./tridesclousVisualize.py --blockIdx=$TRIALIDX --exp=$EXP  --peeler --chan_start=$CHAN_START --chan_stop=$CHAN_STOP

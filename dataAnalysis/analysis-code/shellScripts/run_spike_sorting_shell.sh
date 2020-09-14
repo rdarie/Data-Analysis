@@ -34,8 +34,13 @@
 # EXP="exp201901271000"
 # EXP="exp201901261000"
 # EXP="exp202008201100"
-EXP="exp202008261100"
-TRIALIDX="3"
+# EXP="exp202008261100"
+# EXP="exp202008271200"
+# EXP="exp202008281100"
+# EXP="exp202008311100"
+# EXP="exp202009021100"
+EXP="exp202009071200"
+TRIALIDX="1"
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
@@ -44,7 +49,8 @@ source activate nda2
 python --version
 
 # Step 1: Constructor
-python3 ./tridesclousCCV.py --blockIdx=$TRIALIDX --exp=$EXP  --batchPreprocess
+# python3 ./tridesclousCCV.py --blockIdx=$TRIALIDX --exp=$EXP  --batchPreprocess --chan_start=0 --chan_stop=25 --arrayName=utah --remakePrb --removeExistingCatalog
+python3 ./tridesclousCCV.py --blockIdx=$TRIALIDX --exp=$EXP --batchPreprocess --chan_start=0 --chan_stop=16 --arrayName=nform --remakePrb --removeExistingCatalog
 # Step 2: Validate the constructor
 # python3 ./tridesclousVisualize.py --blockIdx=$TRIALIDX --exp=$EXP  --constructor --chan_start=51 --chan_stop=64
 # Step 3: Transfer

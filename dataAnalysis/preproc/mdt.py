@@ -81,7 +81,7 @@ def fixMalformedJson(jsonString, jsonType=''):
         jsonStringOut = jsonString
     return jsonStringOut
 
-
+"""
 def processMetaMatrix(
         metaMatrix,
         sampleRateLookupDict=None, tossPackets=True, fixTimeShifts=False,
@@ -374,11 +374,12 @@ def processMetaMatrix(
         metaDF, nChan, fs, intersampleTickCount,
         nominalFrameDur, packetsNeededFixing,
         tossMask, fig, ax)
+"""
 
 
 def processMetaMatrixV2(
         inputJson, streamType,
-        sampleRateLookupDict=None,
+        sampleRateLookupDict=None, frameSize=50,
         tossPackets=True, fixTimeShifts=False,
         useApparentFS=True,
         verbose=False, makePlots=False):
@@ -402,26 +403,31 @@ def processMetaMatrixV2(
     fs = float(sampleRateLookupDict[mostCommonSampleRateCode])
     # intersampleTickCount = int((fs ** -1) / (100e-6))
     intersampleTickCount = (fs ** -1) / (100e-6)
-    nominalFrameSize = metaDF['dataSizePerChannel'].value_counts().idxmax()
+    # nominalFrameSize = frameSize / ((fs ** -1) * 1e3)
+    metaDF['dataPayloadDurSysTick'] = metaDF['lastSampleTick'].diff() * 1e-4
+    #
     if useApparentFS:
-        apparentPayloadDur = (
-            (metaDF['lastSampleTick'].diff().fillna(method='bfill') * 1e-4) /
-            nominalFrameSize)
-        # sns.distplot(apparentPayloadDur); plt.show()
-        # by default, supportFraction = (apparentPayloadDur.shape[0] + 2) / (2 * apparentPayloadDur.shape[0])
+        samplePeriodsSysTick = (
+            metaDF['dataPayloadDurSysTick'].fillna(method='bfill') /
+            metaDF['dataSizePerChannel'])
+        # sns.distplot(samplePeriodsSysTick); plt.show()
+        # by default, supportFraction = (samplePeriodsSysTick.shape[0] + 2) / (2 * samplePeriodsSysTick.shape[0])
         noDropMask = ~(metaDF['microloss'] | metaDF['macroloss']).to_numpy()
         try:
             cov = (
                 MinCovDet(support_fraction=0.75)
-                .fit(apparentPayloadDur.to_numpy()[noDropMask].reshape(-1, 1)))
-            apparentSamplingPeriod = np.round(cov.location_[0], decimals=5)
+                .fit(
+                    samplePeriodsSysTick
+                    .to_numpy()[noDropMask]
+                    .reshape(-1, 1)))
+            apparentSamplingPeriod = np.round(cov.location_[0], decimals=4)
         except Exception:
             traceback.print_exc()
-            # apparentSamplingPeriod = apparentPayloadDur.median()
+            # apparentSamplingPeriod = samplePeriodsSysTick.median()
             apparentSamplingPeriod = np.round(
-                apparentPayloadDur.loc[noDropMask].median(), decimals=5)
+                samplePeriodsSysTick.loc[noDropMask].median(), decimals=4)
         apparentSamplingPeriodSEM = stats.sem(
-            apparentPayloadDur.loc[noDropMask], nan_policy='omit')
+            samplePeriodsSysTick.loc[noDropMask], nan_policy='omit')
         fs = apparentSamplingPeriod ** (-1)
         # intersampleTickCount = int(apparentSamplingPeriod / (100e-6))
         intersampleTickCount = apparentSamplingPeriod / (100e-6)
@@ -430,6 +436,7 @@ def processMetaMatrixV2(
             .format(apparentSamplingPeriod, apparentSamplingPeriodSEM))
         print(
             'Apparent sampling freq is {}'.format(fs))
+        # pdb.set_trace()
         if streamType == 'accel':
             metaMatrix, metaFig, metaAx, metaTwinAx = rcsa_helpers.extract_accel_meta_data(
                 inputJson, sampleRateLookupDict=sampleRateLookupDict,
@@ -445,7 +452,9 @@ def processMetaMatrixV2(
         metaDF['microloss'] = metaDF['microloss'].astype(np.bool)
         metaDF['macroloss'] = metaDF['macroloss'].astype(np.bool)
         metaDF['bothloss'] = metaDF['bothloss'].astype(np.bool)
-    nominalFrameDur = nominalFrameSize * (fs ** -1)
+        metaDF['dataPayloadDurSysTick'] = metaDF['lastSampleTick'].diff() * 1e-4
+    # nominalFrameDur = nominalFrameSize * (fs ** -1)
+    nominalFrameDur = frameSize * 1e-3
     nChan = int(metaDF['chanSamplesLen'].iloc[0])
     if fixTimeShifts:
         metaMatrix, packetsNeededFixing =\
@@ -468,6 +477,7 @@ def processMetaMatrixV2(
     #
     metaDF['dataPayloadDur'] = metaDF['dataSizePerChannel'] * (fs ** -1)
     metaDF.loc[metaDF.index[0], 'dataPayloadDur'] = 0
+    #
     metaDF['recordDur'] = metaDF['dataPayloadDur'].cumsum()
     metaDF['recordDurWhole'] = (
         nominalFrameDur *
@@ -477,11 +487,6 @@ def processMetaMatrixV2(
     # will hold duration corrections based on sysTick
     metaDF['packetTimeCorrection'] = 0
     #
-    # validLatencyMask = (metaDF['PacketGenTime'] > 0).to_numpy() & (metaDF['PacketGenTime'].shift(1) > 0).to_numpy()
-    # dataPayloadDurPGT = metaDF['PacketGenTime'].diff() * 1e-3
-    # dataPayloadDurPRT = metaDF['PacketRxUnixTime'].diff() * 1e-3
-    # dataPayloadDurPGT.loc[~validLatencyMask] = dataPayloadDurPRT.loc[~validLatencyMask]
-    # metaDF['dataPayloadDurPGT'] = dataPayloadDurPGT
     metaDF['dataPayloadDurPGT'] = metaDF['PacketGenTime'].diff() * 1e-3
     metaDF.loc[metaDF.index[0], 'dataPayloadDurPGT'] = 0
     metaDF['recordDurPGT'] = metaDF['dataPayloadDurPGT'].cumsum()
@@ -495,13 +500,13 @@ def processMetaMatrixV2(
     metaDF['recordDurMismatchPGT'] = (
         metaDF['recordDurPGT'] - metaDF['recordDur'])
     #
-    metaDF['dataPayloadDurSysTick'] = metaDF['lastSampleTick'].diff() * 1e-4
-    metaDF.loc[metaDF.index[0], 'dataPayloadDurSysTick'] = 0
     metaDF['recordDurSysTick'] = metaDF['dataPayloadDurSysTick'].cumsum()
+    metaDF.loc[metaDF.index[0], 'dataPayloadDurSysTick'] = 0
+    # pdb.set_trace()
     metaDF['recordDurWholeSysTick'] = (
         nominalFrameDur *
-        np.round(
-            metaDF['recordDurSysTick'] / nominalFrameDur))
+        np.round(metaDF['recordDurSysTick'].fillna(1) / nominalFrameDur))
+    metaDF.loc[metaDF.index[0], 'recordDurWholeSysTick'] = 0
     metaDF['frameLenMismatchSysTick'] = (
         metaDF['recordDurWholeSysTick'] -
         metaDF['recordDurSysTick'])
@@ -587,6 +592,7 @@ def processMetaMatrixV2(
             zorder=1)
     else:
         fig, ax = None, None
+    ###########################################################################
     for rowIdx in metaDF.loc[metaDF['anyloss'], :].index:
         thisMismatch = metaDF.loc[
             rowIdx, 'recordDurMismatch']
@@ -598,7 +604,8 @@ def processMetaMatrixV2(
         if thisCorrection > 0:
             metaDF.loc[
                 rowIdx, 'packetTimeCorrection'] = thisCorrection
-        metaDF['recordDur'] = (metaDF['dataPayloadDur'] + metaDF['packetTimeCorrection']).cumsum()
+        metaDF['recordDur'] = (
+            metaDF['dataPayloadDur'] + metaDF['packetTimeCorrection']).cumsum()
         metaDF['recordDurMismatch'] = metaDF['recordDurSysTick'] - metaDF['recordDur']
     metaDF['recordDurMismatch'] = (
         metaDF['recordDurSysTick'] - metaDF['recordDur'])
@@ -661,7 +668,7 @@ def processMetaMatrixV2(
 def getINSTDFromJson(
         folderPath, sessionNames,
         deviceName='DeviceNPC700373H',
-        # fs=500,
+        frameSize=50,
         assumeNoSamplesLost=True, verbose=True,
         forceRecalc=True, getInterpolated=True,
         upsampleRate=None, interpKind='linear',
@@ -710,6 +717,7 @@ def getINSTDFromJson(
                 fig, ax,
                 metaFig, metaAx, metaTwinAx) = processMetaMatrixV2(
                     timeDomainJson, streamType='td', verbose=verbose,
+                    frameSize=frameSize,
                     sampleRateLookupDict=mdt_constants.TdSampleRates,
                     tossPackets=tossPackets, fixTimeShifts=fixTimeShifts,
                     makePlots=makePlots)
@@ -973,8 +981,8 @@ def getINSTimeSyncFromJson(
 
 def getINSAccelFromJson(
         folderPath, sessionNames,
-        deviceName='DeviceNPC700373H', fs=64,
-        forceRecalc=True, getInterpolated=True,
+        deviceName='DeviceNPC700373H', frameSize=50,
+        fs=64, forceRecalc=True, getInterpolated=True,
         assumeNoSamplesLost=True, verbose=False,
         fixTimeShifts=False, tossPackets=True,
         assumeConsistentPacketSizes=True,
@@ -1022,6 +1030,7 @@ def getINSAccelFromJson(
                 packetsNeededFixing, tossMask,
                 fig, ax, metaFig, metaAx, metaTwinAx) = processMetaMatrixV2(
                     accelJson, streamType='accel', verbose=verbose,
+                    frameSize=frameSize,
                     sampleRateLookupDict=mdt_constants.AccelSampleRate,
                     tossPackets=tossPackets, fixTimeShifts=fixTimeShifts,
                     makePlots=makePlots)
@@ -1701,8 +1710,15 @@ def getINSStimLogFromJson(
     allStimStatus = []
     for idx, sessionName in enumerate(sessionNames):
         jsonPath = os.path.join(folderPath, sessionName, deviceName)
-        with open(os.path.join(jsonPath, 'StimLog.json'), 'r') as f:
-            stimLog = json.load(f)
+        try:
+            with open(os.path.join(jsonPath, 'StimLog.json'), 'r') as f:
+                stimLog = json.load(f)
+        except Exception:
+            with open(os.path.join(jsonPath, 'StimLog.json'), 'r') as f:
+                stimLogText = f.read()
+                stimLogText = fixMalformedJson(stimLogText)
+                pdb.set_trace()
+                stimLog = json.loads(stimLogText)
         if logForm == 'serial':
             stimStatus = rcsa_helpers.extract_stim_meta_data_events(
                 stimLog, trialSegment=idx)
@@ -1898,10 +1914,22 @@ def getINSDeviceConfig(
         folderPath, sessionName, deviceName='DeviceNPC700373H'):
     jsonPath = os.path.join(folderPath, sessionName, deviceName)
 
-    with open(os.path.join(jsonPath, 'DeviceSettings.json'), 'r') as f:
-        deviceSettings = json.load(f)
-    with open(os.path.join(jsonPath, 'StimLog.json'), 'r') as f:
-        stimLog = json.load(f)
+    try:
+        with open(os.path.join(jsonPath, 'DeviceSettings.json'), 'r') as f:
+            deviceSettings = json.load(f)
+    except Exception:
+        with open(os.path.join(jsonPath, 'DeviceSettings.json'), 'r') as f:
+            deviceSettingsText = f.read()
+            deviceSettingsText = fixMalformedJson(deviceSettingsText)
+            deviceSettings = json.loads(deviceSettingsText)
+    try:
+        with open(os.path.join(jsonPath, 'StimLog.json'), 'r') as f:
+            stimLog = json.load(f)
+    except Exception:
+        with open(os.path.join(jsonPath, 'DeviceSettings.json'), 'r') as f:
+            stimLogText = f.read()
+            stimLogText = fixMalformedJson(stimLogText)
+            stimLog = json.loads(stimLogText)
 
     progIndices = list(range(4))
     groupIndices = list(range(4))
@@ -1951,12 +1979,14 @@ def getINSDeviceConfig(
     senseInfo = senseInfo.loc[senseInfo['sampleRate'].notnull(), :]
     senseInfo.reset_index(inplace=True)
     senseInfo.rename(columns={'index': 'senseChan'}, inplace=True)
+    senseInfo.streamingFrameRate = deviceSettings[0]['SensingConfig']['miscSensing']['streamingRate'] * 10 # in msec
     return electrodeConfiguration, senseInfo
 
 
 def preprocINS(
         trialFilesStim,
         insDataFilename,
+        deviceName='DeviceNPC700373H',
         verbose=False, blockIdx=None,
         makePlots=False, showPlots=False,
         figureOutputFolder=None, plotBlocking=True):
@@ -1966,10 +1996,13 @@ def preprocINS(
     jsonSessionNames = trialFilesStim['jsonSessionNames']
     #
     stimStatusSerial = getINSStimLogFromJson(
-        jsonBaseFolder, jsonSessionNames)
+        jsonBaseFolder, jsonSessionNames,
+        deviceName=deviceName)
     #
     elecConfiguration, senseInfo = (
-        getINSDeviceConfig(jsonBaseFolder, jsonSessionNames[0])
+        getINSDeviceConfig(
+            jsonBaseFolder, jsonSessionNames[0],
+            deviceName=deviceName)
         )
     #
     fsList = senseInfo['sampleRate'].unique()
@@ -1987,12 +2020,16 @@ def preprocINS(
     # warnings.filterwarnings("error")
     timeSync = getINSTimeSyncFromJson(
         jsonBaseFolder, jsonSessionNames,
+        deviceName=deviceName,
         makePlots=makePlots, showPlots=showPlots,
         figureOutputFolder=figureOutputFolder,
         blockIdx=blockIdx, forceRecalc=True)
     #############################################################
     td = getINSTDFromJson(
-        jsonBaseFolder, jsonSessionNames, getInterpolated=True,
+        jsonBaseFolder, jsonSessionNames,
+        deviceName=deviceName,
+        frameSize=senseInfo.streamingFrameRate,
+        getInterpolated=True,
         verbose=verbose, blockIdx=blockIdx,
         fixTimeShifts=True,
         upsampleRate=upsampleRate, interpKind=interpKind,
@@ -2010,7 +2047,10 @@ def preprocINS(
     td['data'].rename(columns=renamer, inplace=True)
     #############################################################
     accel = getINSAccelFromJson(
-        jsonBaseFolder, jsonSessionNames, getInterpolated=True,
+        jsonBaseFolder, jsonSessionNames,
+        deviceName=deviceName,
+        frameSize=senseInfo.streamingFrameRate,
+        getInterpolated=True,
         forceRecalc=trialFilesStim['forceRecalc'],
         fixTimeShifts=True,
         verbose=verbose, blockIdx=blockIdx,

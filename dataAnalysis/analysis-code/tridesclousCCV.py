@@ -7,7 +7,10 @@ Usage:
 Options:
     --exp=exp                      which experimental day to analyze
     --blockIdx=blockIdx            which trial to analyze [default: 1]
+    --arrayName=arrayName          which electrode array to analyze [default: utah]
     --attemptMPI                   whether to try to load MPI [default: False]
+    --remakePrb                    whether to try to load MPI [default: False]
+    --removeExistingCatalog        delete previous sort results [default: False]
     --purgePeeler                  delete previous sort results [default: False]
     --purgePeelerDiagnostics       delete previous sort results [default: False]
     --batchPreprocess              extract snippets and features, run clustering [default: False]
@@ -50,7 +53,7 @@ except Exception:
     SIZE = 1
     HAS_MPI = False
 
-sortingConfigName = 'nform'
+arrayName = arguments['arrayName']
 if RANK == 0:
     from currentExperiment import parseAnalysisOptions
     expOpts, allOpts = parseAnalysisOptions(
@@ -59,7 +62,7 @@ if RANK == 0:
     globals().update(expOpts)
     globals().update(allOpts)
     try:
-        electrodeMapPath = spikeSortingOpts[sortingConfigName]['electrodeMapPath']
+        electrodeMapPath = spikeSortingOpts[arrayName]['electrodeMapPath']
         mapExt = electrodeMapPath.split('.')[-1]
         if mapExt == 'cmp':
             cmpDF = prb_meta.cmpToDF(electrodeMapPath)
@@ -69,27 +72,23 @@ if RANK == 0:
         nspPrbPath = electrodeMapPath.replace(mapExt, 'prb')
         cmpDF.to_csv(nspCsvPath)
         #
-        remakePrb = True
-        if remakePrb:
+        if arguments['remakePrb']:
             import numpy as np
-            excludeChans = spikeSortingOpts[sortingConfigName]['excludeChans']
+            excludeChans = spikeSortingOpts[arrayName]['excludeChans']
             prb_meta.cmpDFToPrb(
                 cmpDF, filePath=nspPrbPath,
-                contactSpacing=1,
                 labels=cmpDF.loc[~cmpDF['label'].isin(excludeChans), 'label'].to_list(),
-                groupIn={
-                    'xcoords': np.arange(-1, 4001, 500),
-                    'ycoords': np.arange(-1, 2501, 1000)},
+                **spikeSortingOpts[arrayName]['prbOpts']
                 )
-        ns5FileName = ns5FileName.replace('Block', sortingConfigName)
+        ns5FileName = ns5FileName.replace('Block', arrayName)
         triFolder = os.path.join(
-            scratchFolder, 'tdc_{}{:0>3}'.format(sortingConfigName, blockIdx))
+            scratchFolder, 'tdc_{}{:0>3}'.format(arrayName, blockIdx))
         tdch.initialize_catalogueconstructor(
             nspFolder,
             ns5FileName,
             triFolder,
             nspPrbPath,
-            removeExisting=True, fileFormat='Blackrock')
+            removeExisting=arguments['removeExistingCatalog'], fileFormat='Blackrock')
     except Exception:
         traceback.print_exc()
         pass
@@ -147,24 +146,33 @@ if arguments['batchPreprocess']:
     tdch.batchPreprocess(
         triFolder, chansToAnalyze,
         relative_threshold=3.5,
-        fill_overflow=True,
+        fill_overflow=False,
         highpass_freq=300.,
-        lowpass_freq=3000.,
-        filter_order=4,
+        lowpass_freq=6000.,
+        common_ref_freq=300.,
+        common_ref_removal=False,
+        notch_freq=None,
+        filter_order=3,
+        # featureOpts={
+        #     'method': 'global_pca',
+        #     'n_components': 5
+        # },
         featureOpts={
             'method': 'global_umap',
             'n_components': 5,
             'n_neighbors': 50,
             'min_dist': 0,
+            'set_op_mix_ratio': 0.75,
+            'init': 'random',
+            'n_epochs': 1000,
         },
         clusterOpts={
             'method': 'hdbscan',
             'min_cluster_size': 50,
             'min_samples': 20,
             'allow_single_cluster': True},
-        noise_estimate_duration='all',
-        sample_snippet_duration='all',
-        common_ref_removal=False,
+        noise_estimate_duration=300,
+        sample_snippet_duration=300,
         chunksize=2**18,
         extractOpts=dict(
             mode='rand',
@@ -177,9 +185,9 @@ if arguments['batchPreprocess']:
 if arguments['batchPeel']:
     tdch.batchPeel(
         triFolder, chansToAnalyze,
-        shape_boundary_threshold=3,
-        confidence_threshold=0.6,
-        shape_distance_threshold=2, attemptMPI=HAS_MPI)
+        shape_boundary_threshold=2.5,
+        confidence_threshold=0.75,
+        shape_distance_threshold=1.5, attemptMPI=HAS_MPI)
 
 if HAS_MPI:
     COMM.Barrier()  # wait until all threads finish sorting

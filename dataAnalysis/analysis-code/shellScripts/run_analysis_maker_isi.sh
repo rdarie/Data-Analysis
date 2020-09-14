@@ -11,17 +11,17 @@
 #SBATCH --mem=200G
 
 # Specify a job name:
-#SBATCH -J analysis_mini_20200427
+#SBATCH -J analysis_mini_20200701
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-analysis_mini_20200427.stdout
-#SBATCH -e ../../batch_logs/%j-%a-analysis_mini_20200427.errout
+#SBATCH -o ../../batch_logs/%j-%a-analysis_mini_20200701.stdout
+#SBATCH -e ../../batch_logs/%j-%a-analysis_mini_20200701.errout
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=1,2,3,4
+#SBATCH --array=4
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
@@ -53,6 +53,9 @@ EXP="exp202007011300"
 # EXP="exp202007021300"
 # has blocks 1,2,3
 
+# EXP="exp202009031500"
+# has blocks 1,2,3
+
 # SELECTOR="Block005_minfrmaxcorr"
 SELECTOR="_minfrmaxcorr"
 
@@ -61,19 +64,19 @@ SELECTOR="_minfrmaxcorr"
 WINDOW="--window=XS"
 # WINDOW="--window=extraExtraShort"
 
-# SLURM_ARRAY_TASK_ID=1
+# SLURM_ARRAY_TASK_ID=3
 # TRIALSELECTOR="--processAll"
 TRIALSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
 
 # ANALYSISSELECTOR="--analysisName=fullRes"
 # ANALYSISSELECTOR="--analysisName=hiRes"
-# ANALYSISSELECTOR="--analysisName=loRes"
-ANALYSISSELECTOR="--analysisName=default"
+ANALYSISSELECTOR="--analysisName=loRes"
+# ANALYSISSELECTOR="--analysisName=default"
 
-# CHANSELECTOR="--chanQuery=all"
+CHANSELECTOR="--chanQuery=all"
 # CHANSELECTOR="--chanQuery=isiemgraw"
 # CHANSELECTOR="--chanQuery=isiemg"
-CHANSELECTOR="--chanQuery=isiemgoracc"
+# CHANSELECTOR="--chanQuery=isiemgoracc"
 # CHANSELECTOR="--chanQuery=isispinal"
 # CHANSELECTOR="--chanQuery=isispinaloremg"
 

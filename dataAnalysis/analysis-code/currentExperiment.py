@@ -149,7 +149,7 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
             'folderPath': nspFolder,
             'ns5FileName': ns5FileName,
             'calcRigEvents': (blockExperimentType == 'proprio'),
-            'spikeWindow': [-25, 50]
+            'spikeWindow': [-12, 32]
             }
         }
     spikeWindow = trialFilesFrom['utah']['spikeWindow']
@@ -251,15 +251,18 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
     cmpDF = prb_meta.cmpToDF(nspCmpPath)
     experimentDateStr = re.search(r'(\d*)', experimentName).groups()[0]
     # pdb.set_trace()
-    impedances = prb_meta.getLatestImpedance(
-        impedanceFilePath=os.path.join(remoteBasePath, 'impedances.h5'),
-        recordingDateStr=experimentDateStr, elecType='utah')
-    impedances['elec'] = cmpDF['label'].iloc[:impedances.shape[0]].to_numpy()
-    impedances.set_index('elec', inplace=True)
-    impedancesRipple = prb_meta.getLatestImpedance(
-        impedanceFilePath=os.path.join(remoteBasePath, 'impedances.h5'),
-        recordingDateStr=experimentDateStr, elecType='isi_paddle')
-    #
+    try:
+        impedances = prb_meta.getLatestImpedance(
+            impedanceFilePath=os.path.join(remoteBasePath, 'impedances.h5'),
+            recordingDateStr=experimentDateStr, elecType='utah')
+        impedances['elec'] = cmpDF['label'].iloc[:impedances.shape[0]].to_numpy()
+        impedances.set_index('elec', inplace=True)
+        impedancesRipple = prb_meta.getLatestImpedance(
+            impedanceFilePath=os.path.join(remoteBasePath, 'impedances.h5'),
+            recordingDateStr=experimentDateStr, elecType='isi_paddle')
+    except Exception:
+        impedances = None
+        impedancesRipple = None
     remakePrb = False
     if remakePrb:
         import numpy as np
@@ -374,6 +377,7 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
             },
         'windowSizes': {
             'XS': (-0.2, 0.4),
+            'XSPre': (-0.65, -0.05),
             'XXS': (-0.2, 0.05),
             'XXXS': (-0.005, 0.025),
             'short': (-0.5, 0.5),

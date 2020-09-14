@@ -978,9 +978,9 @@ def calcISIBlockAnalysisNix():
         processedOutPath = os.path.join(
             analysisProcessedSubFolder, ns5FileName + '_analyze.nix')
         shutil.copyfile(outPathName, processedOutPath)
-        outPathNameBin = outPathName.replace('_analyze.nix', '_binarize.nix')
+        outPathNameBin = outPathName.replace('_analyze.nix', '_binarized.nix')
         processedOutPathBin = os.path.join(
-            analysisProcessedSubFolder, ns5FileName + '_binarize.nix')
+            analysisProcessedSubFolder, ns5FileName + '_binarized.nix')
         shutil.copyfile(outPathNameBin, processedOutPathBin)
     # ns5.addBlockToNIX(
     #     tdBlockInterp, neoSegIdx=[0],

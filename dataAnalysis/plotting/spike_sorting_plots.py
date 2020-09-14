@@ -22,7 +22,7 @@ sns.set(rc={
 #@profile
 def plotSpikePanel(
         spikeStruct, spikes, labelFontSize=5,
-        padOverride=1e-3, figSize=(18, 14),
+        padOverride=1e-3, figSize=(6, 18),
         hideUnused=True,
         colorPal="ch:2,-.1,dark=.2,light=0.8,reverse=1"):
     sns.set_style("dark", {"axes.facecolor": ".9"})
@@ -39,7 +39,7 @@ def plotSpikePanel(
     uniqueYLookup = {i: idx for idx, i in enumerate(np.unique(yIdx))}
     xIdx = np.array([uniqueXLookup[i] for i in xIdx])
     yIdx = np.array([uniqueYLookup[i] for i in yIdx])
-    # pdb.set_trace()
+    #
     panelX = {spikeStruct.iloc[i, :].loc['label']: x for i, x in enumerate(xIdx)}
     panelY = {spikeStruct.iloc[i, :].loc['label']: y for i, y in enumerate(yIdx)}
     #

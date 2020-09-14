@@ -6,6 +6,8 @@ Usage:
 Options:
     --blockIdx=blockIdx             which trial to analyze
     --exp=exp                       which experimental day to analyze
+    --arrayName=arrayName           use a named array?
+    --dualImplantTest               whether to make a .nix file that has all raw traces [default: False]
     --makeFull                      whether to make a .nix file that has all raw traces [default: False]
     --previewMotorEncoder           whether to make a .nix file to preview the motor encoder analysis [default: False]
     --makeTruncated                 whether to make a .nix file that only has analog inputs [default: False]
@@ -26,6 +28,18 @@ arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(int(arguments['blockIdx']),arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
+
+if arguments['arrayName'] is not None:
+    arrayName = arguments['arrayName']
+    electrodeMapPath = spikeSortingOpts[arrayName]['electrodeMapPath']
+    mapExt = electrodeMapPath.split('.')[-1]
+    if mapExt == 'cmp':
+        mapDF = prb_meta.cmpToDF(electrodeMapPath)
+    elif mapExt == 'map':
+        mapDF = prb_meta.mapToDF(electrodeMapPath)
+    ns5FileName = ns5FileName.replace('Block', arrayName)
+    triFolder = os.path.join(
+        scratchFolder, 'tdc_{}{:0>3}'.format(arrayName, blockIdx))
 
 chunkSize = 4000
 chunkList = [0]
@@ -71,6 +85,24 @@ if arguments['makeTruncated']:
         spikeSourceType='tdc', writeMode='ow',
         chunkSize=chunkSize, equalChunks=equalChunks, chunkList=chunkList,
         calcRigEvents=trialFilesFrom['utah']['calcRigEvents'])
+#
+if arguments['dualImplantTest']:
+    analogInputNames = sorted(
+        trialFilesFrom['utah']['eventInfo']['inputIDs'].values())
+    # pdb.set_trace()
+    reader = ns5.preproc(
+        fileName=ns5FileName,
+        rawFolderPath=nspFolder,
+        outputFolderPath=scratchFolder, mapDF=mapDF, swapMaps=None,
+        fillOverflow=False, removeJumps=False,
+        motorEncoderMask=motorEncoderMask,
+        calcAverageLFP=True,
+        eventInfo=trialFilesFrom['utah']['eventInfo'],
+        asigNameList=None,
+        ainpNameList=None,
+        spikeSourceType='tdc', writeMode='ow',
+        chunkSize=chunkSize, equalChunks=equalChunks, chunkList=chunkList,
+        calcRigEvents=False)
 ###############################################################################
 if arguments['makeFull']:
     analogInputNames = sorted(

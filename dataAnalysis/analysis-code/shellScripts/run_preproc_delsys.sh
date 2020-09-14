@@ -11,17 +11,17 @@
 #SBATCH --mem=200G
 
 # Specify a job name:
-#SBATCH -J delsys_preproc_20200818_raw
+#SBATCH -J delsys_preproc_20200903_raw
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-delsys_preproc_20200818_raw.stdout
-#SBATCH -e ../../batch_logs/%j-%a-delsys_preproc_20200818_raw.errout
+#SBATCH -o ../../batch_logs/%j-%a-delsys_preproc_20200903_raw.stdout
+#SBATCH -e ../../batch_logs/%j-%a-delsys_preproc_20200903_raw.errout
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=2,3,4
+#SBATCH --array=1,2,3
 
 # EXP="exp201901070700"
 # EXP="exp201901201200"
@@ -42,7 +42,8 @@
 # EXP="exp202006171300"
 # EXP="exp202007011300"
 # EXP="exp202007021300"
-EXP="exp202008180700"
+# EXP="exp202008180700"
+EXP="exp202009031500"
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
