@@ -57,78 +57,91 @@ def preprocDelsysWrapper():
     assert len(delsysPathCandidates) == 1
     delsysPath = delsysPathCandidates[0]
     delsysPathShort = os.path.join(nspFolder, ns5FileName + '.hpf')
-    shutil.move(delsysPath, delsysPathShort)
-    delsysPath = delsysPathShort
-    pdb.set_trace()
-    reader = btk.btkAcquisitionFileReader() # build a btk reader object
-    reader.SetFilename(delsysPath) # set a filename to the reader
+    if delsysPathShort != delsysPath:
+        shutil.move(delsysPath, delsysPathShort)
+        delsysPath = delsysPathShort
+    reader = btk.btkAcquisitionFileReader()  # build a btk reader object
+    reader.SetFilename(delsysPath)  # set a filename to the reader
     reader.Update()
-    acq = reader.GetOutput() # acq is the btk aquisition object
-    bla = acq.GetAnalog(0)
-    resampledT = np.arange(runningT[0], runningT[-1], samplingRate ** (-1))
-    # 
-    featureNames = pd.concat([
-        df.columns.to_series()
-        for df in collatedDataList])
-    if arguments['chanQuery'] is not None:
-        if arguments['chanQuery'] in namedQueries['chan']:
-            chanQuery = namedQueries['chan'][arguments['chanQuery']]
-        else:
-            chanQuery = arguments['chanQuery']
-        chanQuery = chanQuery.replace('chanName', 'featureNames').replace('Emg', 'EMG')
-        # pdb.set_trace()
-        featureNames = featureNames[eval(chanQuery)]
-        collatedDataList = [
-            df
-            for df in collatedDataList
-            if featureNames.str.contains(df.columns[0]).any()]
-    print('interpolating...')
-    for idx, thisFeat in enumerate(tqdm(collatedDataList)):
-        tempT = np.unique(np.concatenate([resampledT, thisFeat.index.to_numpy()]))
-        collatedDataList[idx] = (
-            thisFeat.reindex(tempT)
-            .interpolate(method='pchip')
-            .fillna(method='ffill').fillna(method='bfill'))
-        absentInNew = ~collatedDataList[idx].index.isin(resampledT)
-        collatedDataList[idx].drop(
-            index=collatedDataList[idx].index[absentInNew],
-            inplace=True)
-    print('Concatenating...')
-    collatedData = pd.concat(collatedDataList, axis=1)
-    collatedData.columns = [
-        re.sub('[\s+]', '', re.sub(r'[^a-zA-Z]', ' ', colName).title())
-        for colName in collatedData.columns
-        ]
-    collatedData.rename(columns={'TrignoAnalogInputAdapterAnalogA': 'AnalogInputAdapterAnalog'}, inplace=True)
-    collatedData.rename(columns={'AnalogInputAdapterAnalogA': 'AnalogInputAdapterAnalog'}, inplace=True)
-    collatedData.fillna(method='bfill', inplace=True)
-    collatedData.index.name = 't'
-    collatedData.reset_index(inplace=True)
-    if arguments['plotting']:
-        fig, ax = plt.subplots()
-        pNames = [
-            'AnalogInputAdapterAnalog',
-            'RVastusLateralisEmg',
-            'RSemitendinosusEmg', 'RPeroneusLongusEmg']
-        for cName in pNames:
-            plt.plot(
-                collatedData['t'],
-                collatedData[cName] / collatedData[cName].abs().max(),
-                '.-')
-        plt.show()
-    dataBlock = ns5.dataFrameToAnalogSignals(
-        collatedData,
-        idxT='t', useColNames=True, probeName='',
-        dataCol=collatedData.drop(columns='t').columns,
-        samplingRate=samplingRate * pq.Hz)
-    dataBlock.name = 'delsys'
-    outPathName = os.path.join(
-        scratchFolder, ns5FileName + '_delsys.nix')
-    if os.path.exists(outPathName):
-        os.remove(outPathName)
-    writer = NixIO(filename=outPathName)
-    writer.write_block(dataBlock, use_obj_names=True)
-    writer.close()
+    acq = reader.GetOutput()  # acq is the btk aquisition object
+    data = {}
+    metaData = {}
+    for idx in range(acq.GetAnalogNumber()):
+        analog = acq.GetAnalog(idx)
+        data[analog.GetLabel()] = analog.GetValues()
+        metaData[analog.GetLabel()] = {
+            'gain': analog.GetGain(),
+            'offset': analog.GetOffset(),
+            'scale': analog.GetScale(),
+            'timestamp': analog.GetTimestamp(),
+            'unit': analog.GetUnit()
+            }
+    pdb.set_trace()
+    # plt.plot(data['L THORACOLUMBAR FASCIA 12: Acc 14.Y'])
+    #  resampledT = np.arange(runningT[0], runningT[-1], samplingRate ** (-1))
+    #  # 
+    #  featureNames = pd.concat([
+    #      df.columns.to_series()
+    #      for df in collatedDataList])
+    #  if arguments['chanQuery'] is not None:
+    #      if arguments['chanQuery'] in namedQueries['chan']:
+    #          chanQuery = namedQueries['chan'][arguments['chanQuery']]
+    #      else:
+    #          chanQuery = arguments['chanQuery']
+    #      chanQuery = chanQuery.replace('chanName', 'featureNames').replace('Emg', 'EMG')
+    #      # pdb.set_trace()
+    #      featureNames = featureNames[eval(chanQuery)]
+    #      collatedDataList = [
+    #          df
+    #          for df in collatedDataList
+    #          if featureNames.str.contains(df.columns[0]).any()]
+    #  print('interpolating...')
+    #  for idx, thisFeat in enumerate(tqdm(collatedDataList)):
+    #      tempT = np.unique(np.concatenate([resampledT, thisFeat.index.to_numpy()]))
+    #      collatedDataList[idx] = (
+    #          thisFeat.reindex(tempT)
+    #          .interpolate(method='pchip')
+    #          .fillna(method='ffill').fillna(method='bfill'))
+    #      absentInNew = ~collatedDataList[idx].index.isin(resampledT)
+    #      collatedDataList[idx].drop(
+    #          index=collatedDataList[idx].index[absentInNew],
+    #          inplace=True)
+    #  print('Concatenating...')
+    #  collatedData = pd.concat(collatedDataList, axis=1)
+    #  collatedData.columns = [
+    #      re.sub('[\s+]', '', re.sub(r'[^a-zA-Z]', ' ', colName).title())
+    #      for colName in collatedData.columns
+    #      ]
+    #  collatedData.rename(columns={'TrignoAnalogInputAdapterAnalogA': 'AnalogInputAdapterAnalog'}, inplace=True)
+    #  collatedData.rename(columns={'AnalogInputAdapterAnalogA': 'AnalogInputAdapterAnalog'}, inplace=True)
+    #  collatedData.fillna(method='bfill', inplace=True)
+    #  collatedData.index.name = 't'
+    #  collatedData.reset_index(inplace=True)
+    #  if arguments['plotting']:
+    #      fig, ax = plt.subplots()
+    #      pNames = [
+    #          'AnalogInputAdapterAnalog',
+    #          'RVastusLateralisEmg',
+    #          'RSemitendinosusEmg', 'RPeroneusLongusEmg']
+    #      for cName in pNames:
+    #          plt.plot(
+    #              collatedData['t'],
+    #              collatedData[cName] / collatedData[cName].abs().max(),
+    #              '.-')
+    #      plt.show()
+    #  dataBlock = ns5.dataFrameToAnalogSignals(
+    #      collatedData,
+    #      idxT='t', useColNames=True, probeName='',
+    #      dataCol=collatedData.drop(columns='t').columns,
+    #      samplingRate=samplingRate * pq.Hz)
+    #  dataBlock.name = 'delsys'
+    #  outPathName = os.path.join(
+    #      scratchFolder, ns5FileName + '_delsys.nix')
+    #  if os.path.exists(outPathName):
+    #      os.remove(outPathName)
+    #  writer = NixIO(filename=outPathName)
+    #  writer.write_block(dataBlock, use_obj_names=True)
+    #  writer.close()
     return
 
 
