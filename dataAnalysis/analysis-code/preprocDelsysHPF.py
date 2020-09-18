@@ -31,7 +31,7 @@ import pandas as pd
 import numpy as np
 import quantities as pq
 import dataAnalysis.preproc.ns5 as ns5
-import os
+import os, glob, shutil
 import pdb, traceback
 import re
 from importlib import reload
@@ -39,8 +39,7 @@ from importlib import reload
 from currentExperiment import parseAnalysisOptions
 from namedQueries import namedQueries
 expOpts, allOpts = parseAnalysisOptions(
-    int(arguments['blockIdx']),
-    arguments['exp'])
+    int(arguments['blockIdx']), arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
 
@@ -48,66 +47,24 @@ import line_profiler
 import atexit
 #profile = line_profiler.LineProfiler()
 #atexit.register(profile.print_stats)
-pdb.set_trace()
 
-delsysPath = os.path.join(
-    nspFolder, ns5FileName + '.csv')
-
+import btk
 
 def preprocDelsysWrapper():
-    headerDataList = []
-    with open(delsysPath, 'r') as f:
-        expr = r'Label: ([\S\s]+) Sampling frequency: ([\S\s]+) Number of points: ([\S\s]+) start: ([\S\s]+) Unit: ([\S\s]+) Domain Unit: ([\S\s]+)\n'
-        delimIdx = 0
-        for line in f:
-            matches = re.search(expr, line)
-            if matches:
-                headerDataList.append({
-                    'label': str(matches.groups()[0]),
-                    'fs': float(matches.groups()[1]),
-                    'nSamp': int(matches.groups()[2]),
-                    'start': float(matches.groups()[3]),
-                    'units': str(matches.groups()[4]),
-                    'domainUnits': str(matches.groups()[5])
-                })
-            elif line == ' \n':
-                break
-            delimIdx += 1
-    headerData = pd.DataFrame(headerDataList)
-    samplingRate = np.round(headerData['fs'].max())
-    #
-    rawData = pd.read_csv(delsysPath, skiprows=delimIdx, low_memory=False)
-    # for idx, cName in enumerate(rawData.columns): print('{}: {}'.format(idx, cName))
-    if arguments['plotting']:
-        ainp = rawData['Analog Input adapter 7: Analog 7']
-        plt.plot(rawData['X[s].42'], ainp / ainp.abs().max(), '.-')
-        trace = rawData.iloc[:, 1]
-        plt.plot(rawData.iloc[:, 0], trace / trace.abs().max(), '.-')
-        trace = rawData.iloc[:, 15]
-        plt.plot(rawData.iloc[:, 14], trace / trace.abs().max(), '.-')
-        trace = rawData.iloc[:, 29]
-        plt.plot(rawData.iloc[:, 28], trace / trace.abs().max(), '.-')
-        plt.show(block=False)
-    domainCols = [cName for cName in rawData.columns if 'X[' in cName]
-    featureCols = [cName for cName in rawData.columns if 'X[' not in cName]
-    collatedDataList = []
-    print('Assembling list of vectors...')
-    for idx, (dom, feat) in enumerate(tqdm(iter(zip(domainCols, featureCols)))):
-        newFeat = rawData[feat].to_numpy()
-        keepDataMask = rawData[feat].notna()
-        newIndex = rawData[dom].interpolate(method='linear')[keepDataMask]
-        duplIndex = newIndex.duplicated()
-        thisFeat = pd.DataFrame(
-            newFeat[keepDataMask][~duplIndex],
-            index=newIndex[~duplIndex],
-            columns=[feat])
-        if idx == 0:
-            runningT = [thisFeat.index[0], thisFeat.index[-1]]
-        else:
-            runningT[0] = min(runningT[0], thisFeat.index[0])
-            runningT[-1] = max(runningT[-1], thisFeat.index[-1])
-        collatedDataList.append(thisFeat)
-    #
+    searchStr = os.path.join(nspFolder, '*' + ns5FileName + '*.hpf')
+
+    delsysPathCandidates = glob.glob(searchStr)
+    assert len(delsysPathCandidates) == 1
+    delsysPath = delsysPathCandidates[0]
+    delsysPathShort = os.path.join(nspFolder, ns5FileName + '.hpf')
+    shutil.move(delsysPath, delsysPathShort)
+    delsysPath = delsysPathShort
+    pdb.set_trace()
+    reader = btk.btkAcquisitionFileReader() # build a btk reader object
+    reader.SetFilename(delsysPath) # set a filename to the reader
+    reader.Update()
+    acq = reader.GetOutput() # acq is the btk aquisition object
+    bla = acq.GetAnalog(0)
     resampledT = np.arange(runningT[0], runningT[-1], samplingRate ** (-1))
     # 
     featureNames = pd.concat([
