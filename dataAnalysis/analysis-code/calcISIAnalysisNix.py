@@ -11,8 +11,7 @@ Options:
     --plotting                        run diagnostic plots? [default: False]
     --commitResults                   save results to data partition? [default: False]
 """
-import matplotlib
-import matplotlib.pyplot as plt
+
 from copy import copy, deepcopy
 from neo.io.proxyobjects import (
     AnalogSignalProxy, SpikeTrainProxy, EventProxy)
@@ -20,6 +19,8 @@ from neo import (
     Block, Segment, ChannelIndex, Unit,
     Event, Epoch, AnalogSignal, SpikeTrain)
 import neo
+# import dataAnalysis.preproc.mdt as mdt
+import dataAnalysis.preproc.ns5 as ns5
 import dataAnalysis.helperFunctions.helper_functions_new as hf
 import dataAnalysis.helperFunctions.probe_metadata as prb_meta
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
@@ -28,17 +29,14 @@ import numpy as np
 import pandas as pd
 from scipy import stats, signal
 from sklearn.preprocessing import StandardScaler
-import elephant.pandas_bridge as elphpdb
-import dataAnalysis.preproc.mdt as mdt
-import dataAnalysis.preproc.ns5 as ns5
+# import elephant.pandas_bridge as elphpdb
 import quantities as pq
-import rcsanalysis.packet_func as rcsa_helpers
+# import rcsanalysis.packet_func as rcsa_helpers
 import os, pdb
 import traceback
-from importlib import reload
+# from importlib import reload
 import json
 import shutil
-from copy import deepcopy
 #  load options
 from currentExperiment import parseAnalysisOptions
 from docopt import docopt
@@ -48,7 +46,9 @@ expOpts, allOpts = parseAnalysisOptions(
     arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
-alignTimeBounds = alignTimeBoundsLookup[int(arguments['blockIdx'])]
+if arguments['plotting']:
+    import matplotlib.pyplot as plt
+
 
 binOpts = rasterOpts['binOpts'][arguments['analysisName']]
 eventUnits = {
@@ -61,6 +61,8 @@ eventUnits = {
     'secondPW': pq.s,
     'totalPW': pq.s
     }
+
+
 def calcISIBlockAnalysisNix():
     arguments['chanNames'], arguments['chanQuery'] = ash.processChannelQueryArgs(
         namedQueries, scratchFolder, **arguments)
@@ -237,6 +239,11 @@ def calcISIBlockAnalysisNix():
     tdChanNames = ns5.listChanNames(
         nspBlock, arguments['chanQuery'],
         objType=AnalogSignalProxy)
+    try:
+        alignTimeBounds = alignTimeBoundsLookup[int(arguments['blockIdx'])]
+    except Exception:
+        traceback.print_exc()
+        alignTimeBounds = None
     #
     allSpikeTrains = [
         i
@@ -255,7 +262,6 @@ def calcISIBlockAnalysisNix():
     tdBlock = hf.extractSignalsFromBlock(
         nspBlock, keepSpikes=False, keepSignals=tdChanNames)
     tdBlock = hf.loadBlockProxyObjects(tdBlock)
-
     #  
     # if len(allStimTrains):
     #     for segIdx, dataSeg in enumerate(spikesBlock.segments):
@@ -776,13 +782,16 @@ def calcISIBlockAnalysisNix():
             startCategories, stopCategories),
             axis=0, ignore_index=True, sort=True)
         # remove events outside manually identified time bounds
-        keepMask = pd.Series(False, index=alignEventsDF.index)
-        for atb in alignTimeBounds:
-            keepMask = (
-                keepMask |
-                (
-                    (alignEventsDF['t'] >= atb[0]) &
-                    (alignEventsDF['t'] <= atb[1])))
+        if alignTimeBounds is not None:
+            keepMask = pd.Series(False, index=alignEventsDF.index)
+            for atb in alignTimeBounds:
+                keepMask = (
+                    keepMask |
+                    (
+                        (alignEventsDF['t'] >= atb[0]) &
+                        (alignEventsDF['t'] <= atb[1])))
+        else:
+            keepMask = pd.Series(True, index=alignEventsDF.index)
         alignEventsDF.drop(
             index=alignEventsDF.index[~keepMask], inplace=True)
         #
@@ -834,13 +843,16 @@ def calcISIBlockAnalysisNix():
      
     if len(emgCols):
         # fix for bug affecting the mean of the channel
-        keepMaskAsig = pd.Series(False, index=tdDF.index)
-        for atb in alignTimeBounds:
-            keepMaskAsig = (
-                keepMaskAsig |
-                (
-                    (tdDF['t'] >= atb[0]) &
-                    (tdDF['t'] <= atb[1])))
+        if alignTimeBounds is not None:
+            keepMaskAsig = pd.Series(False, index=tdDF.index)
+            for atb in alignTimeBounds:
+                keepMaskAsig = (
+                    keepMaskAsig |
+                    (
+                        (tdDF['t'] >= atb[0]) &
+                        (tdDF['t'] <= atb[1])))
+        else:
+            keepMaskAsig = pd.Series(True, index=tdDF.index)
         sosHP = signal.butter(
             2, 40, 'high',
             fs=float(currentSamplingRate), output='sos')
@@ -994,16 +1006,13 @@ def calcISIBlockAnalysisNix():
 
 
 if __name__ == "__main__":
-    runProfiler = False
+    runProfiler = True
     if runProfiler:
         import dataAnalysis.helperFunctions.profiling as prf
-        if arguments['lazy']:
-            nameSuffix = 'lazy'
-        else:
-            nameSuffix = 'not_lazy'
+        nameSuffix = os.environ.get('SLURM_ARRAY_TASK_ID')
         prf.profileFunction(
             topFun=calcISIBlockAnalysisNix,
-            modulesToProfile=[ash, ns5, hf],
+            modulesToProfile=[ash, ns5, prb_meta, hf],
             outputBaseFolder=os.path.join(remoteBasePath, 'batch_logs'),
             nameSuffix=nameSuffix)
     else:

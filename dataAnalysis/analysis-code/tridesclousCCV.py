@@ -8,6 +8,7 @@ Options:
     --exp=exp                      which experimental day to analyze
     --blockIdx=blockIdx            which trial to analyze [default: 1]
     --arrayName=arrayName          which electrode array to analyze [default: utah]
+    --sourceFile=sourceFile        which source file to analyze [default: raw]
     --attemptMPI                   whether to try to load MPI [default: False]
     --remakePrb                    whether to try to load MPI [default: False]
     --removeExistingCatalog        delete previous sort results [default: False]
@@ -62,33 +63,24 @@ if RANK == 0:
     globals().update(expOpts)
     globals().update(allOpts)
     try:
-        electrodeMapPath = spikeSortingOpts[arrayName]['electrodeMapPath']
-        mapExt = electrodeMapPath.split('.')[-1]
-        if mapExt == 'cmp':
-            cmpDF = prb_meta.cmpToDF(electrodeMapPath)
-        elif mapExt == 'map':
-            cmpDF = prb_meta.mapToDF(electrodeMapPath)
-        nspCsvPath = electrodeMapPath.replace(mapExt, 'csv')
-        nspPrbPath = electrodeMapPath.replace(mapExt, 'prb')
-        cmpDF.to_csv(nspCsvPath)
-        #
-        if arguments['remakePrb']:
-            import numpy as np
-            excludeChans = spikeSortingOpts[arrayName]['excludeChans']
-            prb_meta.cmpDFToPrb(
-                cmpDF, filePath=nspPrbPath,
-                labels=cmpDF.loc[~cmpDF['label'].isin(excludeChans), 'label'].to_list(),
-                **spikeSortingOpts[arrayName]['prbOpts']
-                )
         ns5FileName = ns5FileName.replace('Block', arrayName)
         triFolder = os.path.join(
             scratchFolder, 'tdc_{}{:0>3}'.format(arrayName, blockIdx))
-        tdch.initialize_catalogueconstructor(
-            nspFolder,
-            ns5FileName,
-            triFolder,
-            nspPrbPath,
-            removeExisting=arguments['removeExistingCatalog'], fileFormat='Blackrock')
+        spikeSortingOpts[arrayName]['remakePrb'] = arguments['remakePrb']
+        if arguments['sourceFile'] == 'raw':
+            tdch.initialize_catalogueconstructor(
+                nspFolder,
+                ns5FileName,
+                triFolder,
+                prbPath=nspPrbPath,
+                removeExisting=arguments['removeExistingCatalog'], fileFormat='Blackrock')
+        else:
+            tdch.initialize_catalogueconstructor(
+                scratchFolder,
+                ns5FileName,
+                triFolder,
+                spikeSortingOpts=spikeSortingOpts[arrayName],
+                removeExisting=arguments['removeExistingCatalog'], fileFormat='NIX')
     except Exception:
         traceback.print_exc()
         pass
@@ -164,7 +156,7 @@ if arguments['batchPreprocess']:
             'min_dist': 0,
             'set_op_mix_ratio': 0.75,
             'init': 'random',
-            'n_epochs': 1000,
+            'n_epochs': 2000,
         },
         clusterOpts={
             'method': 'hdbscan',

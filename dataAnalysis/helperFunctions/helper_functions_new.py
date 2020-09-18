@@ -510,9 +510,13 @@ def interpolateDF(
         if kind in [
                 'linear', 'nearest', 'zero', 'slinear',
                 'quadratic', 'cubic', 'previous', 'next']:
-            interpFun = interpolate.interp1d(
-                oldX, df[columnName], kind=kind,
-                fill_value=useFill, bounds_error=False)
+            try:
+                interpFun = interpolate.interp1d(
+                    oldX, df[columnName], kind=kind,
+                    fill_value=useFill, bounds_error=False)
+            except:
+                traceback.print_exc()
+                pdb.set_trace()
             outputDF[columnName] = interpFun(newX)
         elif kind in ['pchip']:
             outputDF[columnName] = interpolate.pchip_interpolate(

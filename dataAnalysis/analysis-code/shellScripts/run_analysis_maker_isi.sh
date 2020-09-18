@@ -68,10 +68,10 @@ WINDOW="--window=XS"
 # TRIALSELECTOR="--processAll"
 TRIALSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
 
-# ANALYSISSELECTOR="--analysisName=fullRes"
-# ANALYSISSELECTOR="--analysisName=hiRes"
-ANALYSISSELECTOR="--analysisName=loRes"
-# ANALYSISSELECTOR="--analysisName=default"
+# ANALYSISFOLDER="--analysisName=fullRes"
+# ANALYSISFOLDER="--analysisName=hiRes"
+ANALYSISFOLDER="--analysisName=loRes"
+# ANALYSISFOLDER="--analysisName=default"
 
 CHANSELECTOR="--chanQuery=all"
 # CHANSELECTOR="--chanQuery=isiemgraw"
@@ -80,4 +80,4 @@ CHANSELECTOR="--chanQuery=all"
 # CHANSELECTOR="--chanQuery=isispinal"
 # CHANSELECTOR="--chanQuery=isispinaloremg"
 
-python -u ./calcISIAnalysisNix.py --exp=$EXP $TRIALSELECTOR $CHANSELECTOR $ANALYSISSELECTOR --commitResults
+python -u ./calcISIAnalysisNix.py --exp=$EXP $TRIALSELECTOR $CHANSELECTOR $ANALYSISFOLDER --commitResults

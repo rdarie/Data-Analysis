@@ -5,27 +5,26 @@ def getExpOpts():
     blockExperimentTypeLookup = {
         1: 'proprio',
         2: 'proprio',
-        3: 'proprio',
-        4: 'proprio',
-        5: 'proprio',
         }
     fullRigInputs = {
-        'A+': 'ainp1',
-        'B+': 'ainp2',
+        'A+': 'ainp9',
+        'B+': 'ainp11',
         'Z+': 'ainp3',
-        'A-': 'ainp5',
-        'B-': 'ainp4',
-        'Z-': 'ainp6',
-        'rightBut': 'ainp11',
-        'leftBut': 'ainp12',
-        'rightLED': 'ainp9',
-        'leftLED': 'ainp10',
-        'simiTrigs': 'ainp8',
-        'tapSync': 'ainp7',
+        'A-': 'ainp10',
+        'B-': 'ainp12',
+        'Z-': 'ainp4',
+        'rightBut': 'ainp5',
+        'leftBut': 'ainp6',
+        'rightLED': 'ainp7',
+        'leftLED': 'ainp8',
+        'simiTrigs': 'ainp16',
+        'forceX': 'ainp14',
+        'forceY': 'ainp15',
+        'tapSync': 'ainp13',
         }
     miniRCRigInputs = {
-        'tapSync': 'ainp7',
-        'simiTrigs': 'ainp8'
+        'tapSync': 'ainp13',
+        'simiTrigs': 'ainp16'
         }
     RCRigInputs = {
         'kinectSync': 'ainp16',
@@ -33,7 +32,6 @@ def getExpOpts():
     
     experimentName = '202009101200-Rupert'
     deviceName = 'DeviceNPC700373H'
-    
     jsonSessionNames = {
         #  per trial
         1: [],
@@ -42,103 +40,9 @@ def getExpOpts():
         4: [],
         5: []
         }
-
-    synchInfo = {'ins': {}, 'nsp': {}}
-    synchInfo['ins'][1] = {
-        #  per trialSegment
-        0: {
-            'timeRanges': [(14, 16)],
-            'chan': ['ins_td0', 'ins_td2'],
-            'thres': 5,
-            'iti': 0.2,
-            'keepIndex': slice(None)
-            },
-        1: {
-            'timeRanges': [(448, 450)],
-            'chan': ['ins_td0', 'ins_td2'],
-            # 'chan': ['ins_accx', 'ins_accy', 'ins_accz'],
-            'thres': 5,
-            'iti': 0.2,
-            'keepIndex': slice(None)
-            }
-        }
-    synchInfo['ins'][2] = {
-        #  per trialSegment
-        0: {
-            'timeRanges': [(18, 20)],
-            # 'chan': ['ins_td0', 'ins_td2'],
-            'chan': ['ins_accx', 'ins_accy', 'ins_accz'],
-            'thres': 5,
-            'iti': 0.2,
-            'keepIndex': slice(None)
-            }
-        }
-    synchInfo['ins'][3] = {
-        #  per trialSegment
-        0: {
-            'timeRanges': [(20, 22)],
-            'chan': ['ins_td0', 'ins_td2'],
-            'thres': 5,
-            'iti': 0.2,
-            'keepIndex': slice(None)
-            }
-        }
-    synchInfo['ins'][4] = {
-        #  per trialSegment
-        0: {
-            'timeRanges': [(21.5, 23.5)],
-            'chan': ['ins_td0', 'ins_td2'],
-            'thres': 5,
-            'iti': 0.2,
-            'keepIndex': slice(1, None)
-            }
-        }
-    synchInfo['ins'][5] = {
-        #  per trialSegment
-        0: {
-            'timeRanges': [(22, 24)],
-            'chan': ['ins_td0', 'ins_td2'],
-            'thres': 5,
-            'iti': 0.2,
-            'keepIndex': slice(None)
-            },
-        1: {
-            'timeRanges': [(1047, 1049)],
-            'chan': ['ins_td0', 'ins_td2'],
-            'thres': 5,
-            'iti': 0.2,
-            'keepIndex': slice(None)
-            },
-        2: {
-            'timeRanges': [(1301, 1304)],
-            'chan': ['ins_td0', 'ins_td2'],
-            'thres': 5,
-            'iti': 0.2,
-            'keepIndex': slice(None, 3)
-            }
-        }
-
-    synchInfo['nsp'] = {
-        #  per trialSegment
-        1: {
-            0: {'timeRanges': [212, 214], 'keepIndex': slice(None)},
-            1: {'timeRanges': [647, 649], 'keepIndex': slice(None)}
-            },
-        2: {
-            0: {'timeRanges': [203, 205], 'keepIndex': slice(None)}
-            },
-        3: {
-            0: {'timeRanges': [105, 107], 'keepIndex': slice(None)}
-            },
-        4: {
-            0: {'timeRanges': [141, 143], 'keepIndex': slice(None)}
-            },
-        5: {
-            0: {'timeRanges': [145, 147], 'keepIndex': slice(None)},
-            1: {'timeRanges': [1169, 1171], 'keepIndex': slice(None)},
-            2: {'timeRanges': [1423, 1426], 'keepIndex': slice(None)}
-            }
-        }
+    synchInfo = {'nform': {}, 'nsp': {}, 'ins': {}}
+    synchInfo['nsp'][2] = {'timeRanges': [1, 986], 'chooseCrossings': slice(None)}
+    synchInfo['nform'][2] = {'timeRanges': [2, 987], 'chooseCrossings': slice(None)}
     #  if not possible to use taps, override with good taps from another segment
     #  not ideal, because segments are only synchronized to the nearest **second**
     overrideSegmentsForTapSync = {
@@ -183,24 +87,9 @@ def getExpOpts():
 
     movementSizeBins = [0, 0.25, 0.5, 1, 1.25, 1.5]
     alignTimeBoundsLookup = {
-        1: [
-            [257, 552],
-            [670, 1343],
-            ],
-        #  per trial
         2: [
-            #  per trialSegment
-            [238, 1198],
-            ],
-        3: [
-            [171, 1050]
-            ],
-        4: [
-            [185, 1501],
-            ],
-        5: [
-            [100, 2010]
-        ]
+            [2, 987],
+            ]
         }
     outlierDetectOptions = dict(
         targetEpochSize=10e-3,
@@ -219,6 +108,15 @@ def getExpOpts():
         }
     spikeSortingOpts = {
         'utah': {
+            'asigNameList': [
+                [
+                    'utah{:d}'.format(i)
+                    for i in range(1, 97)]
+                ],
+            'ainpNameList': [
+                'ainp{:d}'.format(i)
+                for i in range(1, 17)
+            ],
             'electrodeMapPath': './Utah_SN6251_002374_Rupert.cmp',
             'excludeChans': [],
             'prbOpts': dict(
@@ -229,8 +127,19 @@ def getExpOpts():
 
         },
         'nform': {
+            'asigNameList': [
+                [
+                    'nform_{:02d}'.format(i)
+                    for i in range(1, 33)
+                    if i not in [20, 27]],
+                [
+                    'nform_{:02d}'.format(i)
+                    for i in range(33, 65)
+                    if i not in [44]]
+                ],
+            'ainpNameList': ['analog 1'],
             'electrodeMapPath': './NForm_Rupert_flat_v2.map',
-            'excludeChans': ['nform_20', 'nform_27', 'nform_12', 'nform_60'],
+            'excludeChans': ['nform_20', 'nform_27', 'nform_44'],
             'prbOpts': dict(
                 contactSpacing=500,
                 groupIn={

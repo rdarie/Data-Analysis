@@ -47,20 +47,21 @@ def getExpOpts():
         4: [],
         }
     synchInfo = {'delsys': {}, 'nsp': {}, 'ins': {}}
-    synchInfo['delsys'][1] = {'timeRanges': [82, 2369.5], 'chooseCrossings': slice(None)}  #########
+    # synchInfo['delsys'][1] = {'timeRanges': [82, 2369.5], 'chooseCrossings': slice(None)}
     synchInfo['delsys'][2] = {'timeRanges': [18.7, 357.7], 'chooseCrossings': slice(None)}
     synchInfo['delsys'][3] = {'timeRanges': [7, 538], 'chooseCrossings': slice(None)}
     synchInfo['delsys'][4] = {'timeRanges': [45, 3567], 'chooseCrossings': slice(None)}
     #
-    synchInfo['nsp'][1] = {'timeRanges': [4, 2291.5], 'chooseCrossings': slice(None)}
+    # synchInfo['nsp'][1] = {'timeRanges': [4, 2291.5], 'chooseCrossings': slice(None)}
     synchInfo['nsp'][2] = {'timeRanges': [2.1, 341.1], 'chooseCrossings': slice(None)}
     synchInfo['nsp'][3] = {'timeRanges': [4, 540], 'chooseCrossings': slice(None)}
     synchInfo['nsp'][4] = {'timeRanges': [44, 3573], 'chooseCrossings': slice(None)}
     # For emg analysis - emg missing for some time ranges
     alignTimeBoundsLookup = {
-        1: [
-            [3, 2290.5]
-            ],
+        # 1: [
+        #     [3, 2290.5]
+        #     ],
+        1: None,
         2: [
             [2.1, 341.1]
             ],

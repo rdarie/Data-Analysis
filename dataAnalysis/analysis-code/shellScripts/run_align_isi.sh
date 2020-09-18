@@ -51,10 +51,10 @@ SLURM_ARRAY_TASK_ID=1
 # TRIALSELECTOR="--blockIdx=3"
 TRIALSELECTOR="--processAll"
 
-# ANALYSISSELECTOR="--analysisName=default"
-# ANALYSISSELECTOR="--analysisName=hiRes"
-ANALYSISSELECTOR="--analysisName=loRes"
-# ANALYSISSELECTOR="--analysisName=fullRes"
+# ANALYSISFOLDER="--analysisName=default"
+# ANALYSISFOLDER="--analysisName=hiRes"
+ANALYSISFOLDER="--analysisName=loRes"
+# ANALYSISFOLDER="--analysisName=fullRes"
 #
 UNITSELECTOR="--unitQuery=all"
 # UNITSELECTOR="--unitQuery=isiemgraw"
@@ -74,10 +74,10 @@ INPUTBLOCKNAME="--inputBlockName=emg"
 # CHANSELECTOR="--chanQuery=isiemg"
 # CHANSELECTOR="--chanQuery=isispinal"
 
-python3 -u ./assembleExperimentData.py --exp=$EXP --blockIdx=3 --processAsigs --processRasters $ANALYSISSELECTOR 
+python3 -u ./assembleExperimentData.py --exp=$EXP --blockIdx=3 --processAsigs --processRasters $ANALYSISFOLDER 
 
 CHANSELECTOR="--chanQuery=all"
 OUTPUTBLOCKNAME="--outputBlockName=all"
-python3 -u ./calcAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ANALYSISSELECTOR --eventName=stimAlignTimes $CHANSELECTOR $OUTPUTBLOCKNAME --verbose --alignFolderName=stim
+python3 -u ./calcAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ANALYSISFOLDER --eventName=stimAlignTimes $CHANSELECTOR $OUTPUTBLOCKNAME --verbose --alignFolderName=stim
 WINDOW="--window=XSPre"
-python3 -u ./calcAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ANALYSISSELECTOR --eventName=stimAlignTimes $CHANSELECTOR $OUTPUTBLOCKNAME --verbose --alignFolderName=stim
+python3 -u ./calcAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ANALYSISFOLDER --eventName=stimAlignTimes $CHANSELECTOR $OUTPUTBLOCKNAME --verbose --alignFolderName=stim

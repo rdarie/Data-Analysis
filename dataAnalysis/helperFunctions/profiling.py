@@ -119,10 +119,12 @@ def profileFunction(
     #
     profile.runcall(topFun)
     #
-    if nameSuffix is not None:
-        fileName = os.path.basename(__file__) + '_' + nameSuffix
+    if topFun is not None:
+        fileName = topFun.__name__
     else:
-        fileName = os.path.basename(__file__)
+        fileName = ''
+    if nameSuffix is not None:
+        fileName = fileName + '_' + nameSuffix
     outfile = os.path.join(
         outputBaseFolder,
         '{}.{}'.format(fileName, 'lprof'))

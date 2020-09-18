@@ -142,7 +142,7 @@ if arguments['enableOverrides']:
             }}
         })
     ##########################################################################
-    alignedAsigsKWargs.update({'windowSize': (-50e-3, 200e-3)})
+    alignedAsigsKWargs.update({'windowSize': (-.2, .5)})
     ##########################################################################
 #     # currWindow = rasterOpts['windowSizes'][arguments['window']]
 #     # fullWinSize = currWindow[1] - currWindow[0]

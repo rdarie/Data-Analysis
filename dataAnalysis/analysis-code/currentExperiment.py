@@ -4,7 +4,8 @@ import dataAnalysis.helperFunctions.probe_metadata as prb_meta
 import importlib
 
 
-def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
+def parseAnalysisOptions(
+        blockIdx=1, experimentShorthand=None):
     plottingFigures = False
     plotBlocking = True
     #
@@ -124,14 +125,17 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
         'keepIndex': slice(None)
         }
     sessionTapRangesNSP = expOpts['synchInfo']['nsp']
-    if not blockExperimentType == 'isi':
-        for trialKey in sessionTapRangesNSP.keys():
-            for trialSegmentKey in sessionTapRangesNSP[trialKey].keys():
-                for key in defaultSessionTapRangesNSP.keys():
-                    if key not in sessionTapRangesNSP[trialKey][trialSegmentKey].keys():
-                        sessionTapRangesNSP[trialKey][trialSegmentKey].update(
-                            {key: defaultSessionTapRangesNSP[key]}
-                            )
+    try:
+        if not blockExperimentType == 'isi':
+            for trialKey in sessionTapRangesNSP.keys():
+                for trialSegmentKey in sessionTapRangesNSP[trialKey].keys():
+                    for key in defaultSessionTapRangesNSP.keys():
+                        if key not in sessionTapRangesNSP[trialKey][trialSegmentKey].keys():
+                            sessionTapRangesNSP[trialKey][trialSegmentKey].update(
+                                {key: defaultSessionTapRangesNSP[key]}
+                                )
+    except Exception:
+        pass
     #  make placeholders for interpolation functions
     interpFunINStoNSP = {
         key: [None for i in value.keys()]
@@ -420,7 +424,7 @@ def parseAnalysisOptions(blockIdx=1, experimentShorthand=None):
             'marker': 'd',
             'edgecolor': None,
             'edgecolors': 'face',
-            'alpha': .8, 'rasterized': True},
+            'alpha': .3, 'rasterized': True},
         func2_kws={'ci': 'sem'},
         facet1_kws={'sharey': False},
         facet2_kws={'sharey': True},

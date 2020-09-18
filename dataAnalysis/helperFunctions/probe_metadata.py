@@ -50,6 +50,7 @@ def cmpToDF(arrayFilePath):
         cmpDF.loc[nevIdx, 'bank'] = row['bank']
         cmpDF.loc[nevIdx, 'bankID'] = int(row['elec'])
     cmpDF.dropna(inplace=True)
+    cmpDF.reset_index(drop=True, inplace=True)
     return cmpDF
 
 
@@ -103,6 +104,7 @@ def cmpDFToPrb(
         names=None, banks=None, labels=None,
         contactSpacing=400,  # units of um
         groupIn=None):
+    # pdb.set_trace()
     if names is not None:
         keepMask = cmpDF['elecName'].isin(names)
         cmpDF = cmpDF.loc[keepMask, :]

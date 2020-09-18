@@ -22,6 +22,7 @@ import seaborn as sns
 sns.set()
 import gc
 import dataAnalysis.helperFunctions.profiling as prf
+import dataAnalysis.helperFunctions.probe_metadata as prb_meta
 #  import dataAnalysis.helperFunctions.helper_functions_new as hf
 from scipy.spatial.distance import minkowski
 import scipy.signal
@@ -29,16 +30,17 @@ import dill as pickle
 
 def initialize_catalogueconstructor(
         folderPath, fileName,
-        triFolder, prbPath,
+        triFolder, prbPath=None,
+        spikeSortingOpts=None,
         name='catalogue_constructor',
         removeExisting=False, fileFormat='NIX'):
     #  set up file source
     if os.path.exists(triFolder) and removeExisting:
-        #  remove is already exists
+        #  remove if already exists
         import shutil
         shutil.rmtree(triFolder)
     if fileFormat == 'NIX':
-        filePath = os.path.join(folderPath, fileName + '.nix')
+        filePath = os.path.join(folderPath, fileName + '_raw.nix')
     if fileFormat == 'Blackrock':
         filePath = os.path.join(folderPath, fileName + '.ns5')
     print(filePath)  # check
@@ -49,7 +51,38 @@ def initialize_catalogueconstructor(
     print('initialize_catalogueconstructor DataIO is: ')
     print(dataio)  # check
     #  set up probe file
+    if prbPath is None:
+        electrodeMapPath = spikeSortingOpts['electrodeMapPath']
+        mapExt = electrodeMapPath.split('.')[-1]
+        if mapExt == 'cmp':
+            cmpDF = prb_meta.cmpToDF(electrodeMapPath)
+        elif mapExt == 'map':
+            cmpDF = prb_meta.mapToDF(electrodeMapPath)
+        csvPath = electrodeMapPath.replace(mapExt, 'csv')
+        prbPath = electrodeMapPath.replace(mapExt, 'prb')
+        cmpDF.to_csv(csvPath)
+        #
+        labelsInFile = dataio.datasource.sig_channels['name']
+        labelsInMap = cmpDF['label'].unique().tolist()
+        #
+        cmpDF = cmpDF.set_index('label').reindex(labelsInFile).reset_index()
+        cmpDF.loc[:, ['xcoords', 'ycoords', 'zcoords']] = (
+            cmpDF.loc[:, ['xcoords', 'ycoords', 'zcoords']]
+            .fillna(-1))
+        if spikeSortingOpts['remakePrb']:
+            excludeChans = spikeSortingOpts['excludeChans']
+            for label in labelsInFile:
+                if (label not in labelsInMap) and (label not in excludeChans):
+                    excludeChans.append(label)
+            #
+            prb_meta.cmpDFToPrb(
+                cmpDF, filePath=prbPath,
+                labels=cmpDF.loc[~cmpDF['label'].isin(excludeChans), 'label'].to_list(),
+                **spikeSortingOpts['prbOpts']
+                )
+    #
     dataio.set_probe_file(prbPath)
+    #
     for chan_grp in dataio.channel_groups.keys():
         cc = tdc.CatalogueConstructor(
             dataio=dataio, name=name, chan_grp=chan_grp)

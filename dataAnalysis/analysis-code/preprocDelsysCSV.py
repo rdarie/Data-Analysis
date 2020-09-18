@@ -7,20 +7,24 @@ Options:
     --blockIdx=blockIdx              which trial to analyze
     --exp=exp                        which experimental day to analyze
     --plotting                       show plots? [default: False]
-    --disableStimDetection           disable stimulation time detection? [default: False]
+    --chanQuery=chanQuery            how to restrict channels if not providing a list? [default: fr]
 """
 
-import matplotlib
-matplotlib.rcParams['pdf.fonttype'] = 42
-matplotlib.rcParams['ps.fonttype'] = 42
-matplotlib.use('Qt5Agg')   # generate interactive qt output
-# matplotlib.use('PS')   # generate offline postscript
-import matplotlib.pyplot as plt
-import seaborn as sns
-sns.set()
-sns.set_color_codes("dark")
-sns.set_context("notebook")
-sns.set_style("white")
+from docopt import docopt
+arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
+#
+if arguments['plotting']:
+    import matplotlib
+    matplotlib.rcParams['pdf.fonttype'] = 42
+    matplotlib.rcParams['ps.fonttype'] = 42
+    matplotlib.use('Qt5Agg')   # generate interactive qt output
+    # matplotlib.use('PS')   # generate offline postscript
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    sns.set()
+    sns.set_color_codes("dark")
+    sns.set_context("notebook")
+    sns.set_style("white")
 from tqdm import tqdm
 from neo.io import NixIO, nixio_fr, BlackrockIO
 import pandas as pd
@@ -33,8 +37,7 @@ import re
 from importlib import reload
 #  load options
 from currentExperiment import parseAnalysisOptions
-from docopt import docopt
-arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
+from namedQueries import namedQueries
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']),
     arguments['exp'])
@@ -46,10 +49,11 @@ import atexit
 #profile = line_profiler.LineProfiler()
 #atexit.register(profile.print_stats)
 
-def preprocDelsysWrapper(
-        delsysPath=None,
-        arguments=None
-        ):
+delsysPath = os.path.join(
+    nspFolder, ns5FileName + '.csv')
+
+
+def preprocDelsysWrapper():
     headerDataList = []
     with open(delsysPath, 'r') as f:
         expr = r'Label: ([\S\s]+) Sampling frequency: ([\S\s]+) Number of points: ([\S\s]+) start: ([\S\s]+) Unit: ([\S\s]+) Domain Unit: ([\S\s]+)\n'
@@ -85,15 +89,9 @@ def preprocDelsysWrapper(
         plt.show(block=False)
     domainCols = [cName for cName in rawData.columns if 'X[' in cName]
     featureCols = [cName for cName in rawData.columns if 'X[' not in cName]
-    # pdb.set_trace()
     collatedDataList = []
     print('Assembling list of vectors...')
     for idx, (dom, feat) in enumerate(tqdm(iter(zip(domainCols, featureCols)))):
-        # keepDataMask = (
-        #     rawData[dom].notna() & rawData[feat].notna())
-        # newIndex = rawData[dom].to_numpy()
-        # pdb.set_trace()
-        # print('{}: {}\r'.format(idx, feat))
         newFeat = rawData[feat].to_numpy()
         keepDataMask = rawData[feat].notna()
         newIndex = rawData[dom].interpolate(method='linear')[keepDataMask]
@@ -102,24 +100,30 @@ def preprocDelsysWrapper(
             newFeat[keepDataMask][~duplIndex],
             index=newIndex[~duplIndex],
             columns=[feat])
-        # thisFeat.drop(
-        #     index=thisFeat.index[thisFeat.index.duplicated()],
-        #     inplace=True)
         if idx == 0:
             runningT = [thisFeat.index[0], thisFeat.index[-1]]
         else:
             runningT[0] = min(runningT[0], thisFeat.index[0])
             runningT[-1] = max(runningT[-1], thisFeat.index[-1])
-            # runningT = np.concatenate([runningT, thisFeat.index.to_numpy()])
-        # if rawData[dom].isna().any():
-        #     print('{} NaNs detected: '.format(rawData[dom].isna().sum()))
-        #     print(feat)
-        #     print(np.flatnonzero(rawData[dom].isna()))
         collatedDataList.append(thisFeat)
     #
-    # finalT = np.unique(runningT)
-    # pdb.set_trace()
     resampledT = np.arange(runningT[0], runningT[-1], samplingRate ** (-1))
+    # 
+    featureNames = pd.concat([
+        df.columns.to_series()
+        for df in collatedDataList])
+    if arguments['chanQuery'] is not None:
+        if arguments['chanQuery'] in namedQueries['chan']:
+            chanQuery = namedQueries['chan'][arguments['chanQuery']]
+        else:
+            chanQuery = arguments['chanQuery']
+        chanQuery = chanQuery.replace('chanName', 'featureNames').replace('Emg', 'EMG')
+        # pdb.set_trace()
+        featureNames = featureNames[eval(chanQuery)]
+        collatedDataList = [
+            df
+            for df in collatedDataList
+            if featureNames.str.contains(df.columns[0]).any()]
     print('interpolating...')
     for idx, thisFeat in enumerate(tqdm(collatedDataList)):
         tempT = np.unique(np.concatenate([resampledT, thisFeat.index.to_numpy()]))
@@ -171,8 +175,14 @@ def preprocDelsysWrapper(
 
 
 if __name__ == "__main__":
-    delsysPath = os.path.join(
-        nspFolder, ns5FileName + '.csv')
-    preprocDelsysWrapper(
-        delsysPath=delsysPath,
-        arguments=arguments)
+    runProfiler = True
+    if runProfiler:
+        import dataAnalysis.helperFunctions.profiling as prf
+        nameSuffix = os.environ.get('SLURM_ARRAY_TASK_ID')
+        prf.profileFunction(
+            topFun=preprocDelsysWrapper,
+            modulesToProfile=[ns5],
+            outputBaseFolder=os.path.join(remoteBasePath, 'batch_logs'),
+            nameSuffix=nameSuffix)
+    else:
+        preprocDelsysWrapper()

@@ -12,9 +12,12 @@
 
 # Specify a job name:
 #SBATCH -J sort_vis
-#SBATCH --array=0,4,8,12,16,20
-#############SBATCH --array=0,4,8,12
-############# SBATCH --array=0,2,4,6
+
+######## For Utah array
+#############SBATCH --array=0,5,10,15,20
+
+######## For N-Form
+#SBATCH --array=0,4,8,12
 
 # Specify an output file
 #SBATCH -o ../../batch_logs/%j-%a-sort_vis.stdout
@@ -54,5 +57,9 @@ python --version
 # Step 2: Validate the constructor
 let CHAN_START=SLURM_ARRAY_TASK_ID
 let CHAN_STOP=SLURM_ARRAY_TASK_ID+4
-python3 -u ./tridesclousVisualize.py --blockIdx=$TRIALIDX --exp=$EXP  --constructor --arrayName=utah --chan_start=$CHAN_START --chan_stop=$CHAN_STOP
+#      let CHAN_STOP=SLURM_ARRAY_TASK_ID+5
+
+# python3 -u ./tridesclousVisualize.py --blockIdx=$TRIALIDX --exp=$EXP  --constructor --arrayName=utah --chan_start=$CHAN_START --chan_stop=$CHAN_STOP
+# python3 -u ./tridesclousVisualize.py --blockIdx=$TRIALIDX --exp=$EXP  --constructor --arrayName=nform --chan_start=$CHAN_START --chan_stop=$CHAN_STOP
+
 # python3 -u ./tridesclousVisualize.py --blockIdx=$TRIALIDX --exp=$EXP  --peeler --chan_start=$CHAN_START --chan_stop=$CHAN_STOP

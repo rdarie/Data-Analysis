@@ -161,25 +161,60 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
     #  get alignment times
     moveMask = pd.Series(False, index=tdDF.index)
     stopMask = pd.Series(False, index=tdDF.index)
-    movingAtAll = tdDF['pedalVelocityCat'].abs()
-    movementOnOff = movingAtAll.diff().fillna(0)
-    # guard against blips in the velocity rating
-    moveStartIndices = movementOnOff.index[movementOnOff.abs() > 0]
-    blipMask = tdDF.loc[moveStartIndices, 't'].diff() < 5e-3
-    movementOnOff.loc[blipMask.index[blipMask]] = 0
-    #
-    checkMoveOnOff = False
-    if checkMoveOnOff:
-        plt.plot(tdDF['t'], tdDF['pedalPosition'].values)
-        plt.plot(tdDF['t'], tdDF['pedalVelocityCat'].values)
-        plt.plot(tdDF['t'], movementOnOff); plt.show()
-    #
+
     taskMask = (
         (tdDF['t'] > alignTimeBounds[segIdx][0][0]) &
         (tdDF['t'] < alignTimeBounds[segIdx][0][1])
         )
-    moveMaskForSeg = (movementOnOff == 1) & taskMask
-    stopMaskForSeg = (movementOnOff == -1) & taskMask
+    ###################################################
+    fs = asigsList[0].sampling_rate.magnitude
+    lowPassVelocity = hf.filterDF(
+        tdDF.loc[:, 'pedalVelocityCat'], 
+        fs,
+        lowPass=30, lowOrder=3)
+    minDist = 25e-3
+    _, startLowMask = hf.getThresholdCrossings(
+        lowPassVelocity, thresh=-0.5, absVal=False,
+        edgeType='falling', fs=fs, iti=minDist,
+        plotting=False, keep_max=False, itiWiggle=0.05)
+    _, startHighMask = hf.getThresholdCrossings(
+        lowPassVelocity, thresh=0.5, absVal=False,
+        edgeType='rising', fs=fs, iti=minDist,
+        plotting=False, keep_max=False, itiWiggle=0.05)
+    _, stopLowMask = hf.getThresholdCrossings(
+        lowPassVelocity, thresh=-0.5, absVal=False,
+        edgeType='rising', fs=fs, iti=minDist,
+        plotting=False, keep_max=False, itiWiggle=0.05)
+    _, stopHighMask = hf.getThresholdCrossings(
+        lowPassVelocity, thresh=0.5, absVal=False,
+        edgeType='falling', fs=fs, iti=minDist,
+        plotting=False, keep_max=False, itiWiggle=0.05)
+    moveMaskForSeg = (startLowMask | startHighMask) & taskMask
+    stopMaskForSeg = (stopLowMask | stopHighMask) & taskMask
+    ################
+    # movingAtAll = tdDF['pedalVelocityCat'].abs()
+    # movementOnOff = movingAtAll.diff().fillna(0)
+    # # guard against blips in the velocity rating
+    # moveStartIndices = movementOnOff.index[movementOnOff.abs() > 0]
+    # blipMask = tdDF.loc[moveStartIndices, 't'].diff() < 30e-3
+    # movementOnOff.loc[blipMask.index[blipMask]] = 0
+    # #
+    checkMoveOnOff = False
+    if checkMoveOnOff:
+        plt.plot(tdDF['t'], tdDF['pedalPosition'].values, label='position')
+        plt.plot(tdDF['t'], tdDF['pedalVelocityCat'].values, label='velocity (int)')
+        plt.plot(tdDF['t'], lowPassVelocity, label='filtered velocity')
+        plt.plot(tdDF['t'], startHighMask, label='start high')
+        plt.plot(tdDF['t'], stopHighMask, label='stop high')
+        plt.plot(tdDF['t'], startLowMask, label='start low')
+        plt.plot(tdDF['t'], stopLowMask, label='stop low')
+        plt.legend(); plt.show()
+    # #
+    # moveMaskForSeg = (movementOnOff == 1) & taskMask
+    # stopMaskForSeg = (movementOnOff == -1) & taskMask
+    ################
+    print('Found {} movement starts'.format(moveMaskForSeg.sum()))
+    print('Found {} movement stops'.format(stopMaskForSeg.sum()))
     # pdb.set_trace()
     assert stopMaskForSeg.sum() == moveMaskForSeg.sum(), 'unequal start and stop lengths'
     assert stopMaskForSeg.sum() % 2 == 0, 'number of movements not divisible by 2'

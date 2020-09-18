@@ -75,10 +75,11 @@ spikes = preproc.channelIndexesToSpikeDict(spChanIdx)
 spikes['Units'] = 'a.u. (z-score)'
 reportName = 'tdc_' + ns5FileName + '_spike_report' + nameSuffix
 spikeStruct = cmpDF.loc[cmpDF['elecName'] != 'ainp', :]
-spikeStruct.loc[:, 'label'] = [
-    i.replace('_', '.') + ' raw'
-    for i in spikeStruct['label']
-    ]
+# pdb.set_trace()
+# spikeStruct.loc[:, 'label'] = [
+#     i.replace('_', '.') + ' raw'
+#     for i in spikeStruct['label']
+#     ]
 ssplt.spikePDFReport(
     spikeSortingFiguresFolder,
     spikes, spikeStruct,

@@ -17,20 +17,24 @@
 #SBATCH -e ../../batch_logs/%j-plotsMotionStim.errout
 
 # Specify account details
-#SBATCH --account=bibs-dborton-condo
+#SBATCH --account=carney-dborton-condo
 
 # EXP="exp201901211000"
 EXP="exp201901271000"
 # EXP="exp201901231000"
+EXP="exp202009111100"
 
-UNITSELECTOR="--selector=_minfrmaxcorr"
-# UNITSELECTOR=""
+# UNITSELECTOR="--selector=_minfrmaxcorr"
+UNITSELECTOR=""
 
-# OUTLIERSWITCH=""
-OUTLIERSWITCH="--maskOutlierBlocks"
-WINDOW="--window=long"
-# TRIALSELECTOR="--blockIdx=2"
-TRIALSELECTOR="--processAll"
+OUTLIERSWITCH=""
+# OUTLIERSWITCH="--maskOutlierBlocks"
+WINDOW="--window=short"
+# WINDOW="--window=miniRC"
+
+SLURM_ARRAY_TASK_ID=1
+TRIALSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
+# TRIALSELECTOR="--processAll"
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
@@ -48,7 +52,14 @@ python --version
 #             done
 #         python3 './plotAlignedNeurons.py' --exp=$EXP $TRIALSELECTOR $WINDOW --alignQuery=$QUERY $UNITSELECTOR --hueName="amplitudeCat" --rowName="pedalDirection" $OUTLIERSWITCH --verbose
 #     done
-QUERY="midPeakM"
-# python3 './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $WINDOW --inputBlockName="rig" --unitQuery=rig --alignQuery=$QUERY --rowName="pedalSizeCat" --colControl= --colName="pedalDirection" --rowControl= $OUTLIERSWITCH --verbose --enableOverrides
-python3 './plotAlignedNeurons.py' --exp=$EXP $TRIALSELECTOR $WINDOW --alignQuery=$QUERY $UNITSELECTOR --rowName="pedalDirection" --hueName="amplitudeCat" --rowControl= $OUTLIERSWITCH --verbose --enableOverrides
+ALIGNQUERY="--alignQuery=outbound"
+python3 './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $WINDOW --inputBlockName="rig" --unitQuery="rig" $ALIGNQUERY --rowName="pedalSizeCat" --colControl= --colName="pedalDirection" --rowControl= $OUTLIERSWITCH --verbose --enableOverrides
+
+ALIGNQUERY="--alignQuery=outbound"
+# python3 './plotAlignedNeurons.py' --exp=$EXP $TRIALSELECTOR $WINDOW $ALIGNQUERY $UNITSELECTOR --rowName= --colName="pedalDirection" --hueName="amplitudeCat" $OUTLIERSWITCH --verbose --enableOverrides
+
+ALIGNQUERY="--alignQuery=return"
+# python3 './plotAlignedNeurons.py' --exp=$EXP $TRIALSELECTOR $WINDOW $ALIGNQUERY $UNITSELECTOR --rowName= --colName="pedalDirection" --hueName="amplitudeCat" $OUTLIERSWITCH --verbose --enableOverrides
+
+# python3 './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $WINDOW --inputBlockName="lfp" --unitQuery="lfp" $ALIGNQUERY --rowName="pedalSizeCat" --colControl= --colName="pedalDirection" --rowControl= $OUTLIERSWITCH --verbose --enableOverrides
 

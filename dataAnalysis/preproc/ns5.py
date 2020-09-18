@@ -40,9 +40,9 @@ def analogSignalsToDataFrame(
     for asig in analogsignals:
         if asig.shape[1] == 1:
             if useChanNames:
-                colNames = [asig.channel_index.name]
+                colNames = [str(asig.channel_index.name)]
             else:
-                colNames = [asig.name]
+                colNames = [str(asig.name)]
         else:
             colNames = [
                 asig.name +
@@ -1232,13 +1232,17 @@ def dataFrameToAnalogSignals(
         timeUnits=pq.s, measureUnits=pq.mV,
         dataCol=['channel_0', 'channel_1'],
         useColNames=False, forceColNames=None,
-        namePrefix='', nameSuffix=''):
+        namePrefix='', nameSuffix='', verbose=False):
     if block is None:
         assert seg is None
         block = Block(name=probeName)
         seg = Segment(name='seg0_' + probeName)
         block.segments.append(seg)
+    if verbose:
+        print('in dataFrameToAnalogSignals...')
     for idx, colName in enumerate(dataCol):
+        if verbose:
+            print('    {}'.format(colName))
         if forceColNames is not None:
             chanName = forceColNames[idx]
         elif useColNames:
@@ -1763,11 +1767,11 @@ def readBlockFixNames(
     if mapDF is not None:
         # [len(a.name) for a in asigLikeList]
         if swapMaps is not None:
-            asigOrigNames = [headerSignalChan.loc[int(i+1), 'name'] for i in swapMaps['from']['nevID']]
+            asigOrigNames = [headerSignalChan.loc[int(i), 'name'] for i in swapMaps['from']['nevID']]
             asigNameChanger = dict(zip(asigOrigNames, swapMaps['to']['label']))
         else:
             if headerSignalChan.size > 0:
-                asigOrigNames = [headerSignalChan.loc[int(i+1), 'name'] for i in mapDF['nevID']]
+                asigOrigNames = [headerSignalChan.loc[int(i), 'name'] for i in mapDF['nevID']]
                 asigNameChanger = dict(zip(asigOrigNames, mapDF['label']))
             else:
                 asigOrigNames = np.unique([i.split('#')[0] for i in headerUnitChan['name']])
@@ -2019,6 +2023,7 @@ def preprocBlockToNix(
         eventInfo=None,
         fillOverflow=False, calcAverageLFP=False,
         motorEncoderMask=None,
+        electrodeArrayName='utah',
         removeJumps=False, trackMemory=True,
         asigNameList=None, ainpNameList=None,
         spikeSourceType='', spikeBlock=None,
@@ -2059,9 +2064,9 @@ def preprocBlockToNix(
         lastID = block.channel_indexes[-1].channel_ids[0] + 1
         aveLFPChIdx = ChannelIndex(
             index=[lastIndex],
-            channel_names=['zScoredAverage'],
+            channel_names=['{}_zScoredAverage'.format(electrodeArrayName)],
             channel_ids=[lastID],
-            name='zScoredAverage',
+            name='{}_zScoredAverage'.format(electrodeArrayName),
             file_origin=block.channel_indexes[-1].file_origin
             )
         aveLFPChIdx.merge_annotations(block.channel_indexes[-1])
@@ -2075,9 +2080,9 @@ def preprocBlockToNix(
             for meanChIdx in range(nMeanChans):
                 tempChIdx = ChannelIndex(
                     index=[lastIndex + meanChIdx],
-                    channel_names=['rawAverage{}'.format(meanChIdx)],
+                    channel_names=['{}_rawAverage{}'.format(electrodeArrayName, meanChIdx)],
                     channel_ids=[lastID + meanChIdx],
-                    name='rawAverage{}'.format(meanChIdx),
+                    name='{}_rawAverage{}'.format(electrodeArrayName, meanChIdx),
                     file_origin=block.channel_indexes[-1].file_origin
                     )
                 tempChIdx.merge_annotations(block.channel_indexes[-1])
@@ -2170,6 +2175,7 @@ def preprocBlockToNix(
                     if removeMeanAcross:
                         meanGroups[subListIdx] = subListSeg
                 aSigList = []
+                # [asig.name for asig in seg.analogsignals]
                 for a in seg.analogsignals:
                     if np.any([n in a.name for n in asigNameListSeg]):
                         aSigList.append(a)
@@ -2283,18 +2289,27 @@ def preprocBlockToNix(
                     meanLFP = np.zeros(
                         (tempLFPStore.shape[0], len(asigNameList)),
                         dtype=np.float32)
+                    useMean = True
                     for subListIdx, subList in enumerate(asigNameList):
-                        meanLFP[:, subListIdx] = (
-                            tempLFPStore
-                            .loc[:, meanGroups[subListIdx]]
-                            .median(axis=1))
+                        if useMean:
+                            meanLFP[:, subListIdx] = (
+                                tempLFPStore
+                                .loc[:, meanGroups[subListIdx]]
+                                .mean(axis=1)
+                                )
+                        else:
+                            meanLFP[:, subListIdx] = (
+                                tempLFPStore
+                                .loc[:, meanGroups[subListIdx]]
+                                .median(axis=1)
+                                )
                     del tempLFPStore
                 gc.collect()
             if calcAverageLFP:
-                averageLFP.name = 'seg{}_zScoredAverage'.format(segIdx)
+                averageLFP.name = 'seg{}_{}_zScoredAverage'.format(segIdx, electrodeArrayName)
                 chanIdx = block.filter(
                     objects=ChannelIndex,
-                    name='zScoredAverage')[0]
+                    name='{}_zScoredAverage'.format(electrodeArrayName))[0]
                 # assign ownership to containers
                 chanIdx.analogsignals.append(averageLFP)
                 newSeg.analogsignals.append(averageLFP)
@@ -2679,6 +2694,7 @@ def preproc(
         fileName='Trial001',
         rawFolderPath='./',
         outputFolderPath='./', mapDF=None, swapMaps=None,
+        electrodeArrayName='utah',
         fillOverflow=True, removeJumps=True,
         motorEncoderMask=None,
         calcAverageLFP=False,
@@ -2711,6 +2727,7 @@ def preproc(
             spikePath = os.path.join(
                 outputFolderPath, 'tdc_' + fileName,
                 'tdc_' + fileName + '.nix')
+        print('loading {}'.format(spikePath))
         spikeReader = nixio_fr.NixIO(filename=spikePath)
     else:
         spikeReader = None
@@ -2747,6 +2764,7 @@ def preproc(
             fillOverflow=fillOverflow,
             removeJumps=removeJumps,
             motorEncoderMask=motorEncoderMask,
+            electrodeArrayName=electrodeArrayName,
             calcAverageLFP=calcAverageLFP,
             eventInfo=eventInfo,
             asigNameList=asigNameList, ainpNameList=ainpNameList,

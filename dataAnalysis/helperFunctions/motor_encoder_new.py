@@ -63,11 +63,23 @@ def getMotorData(
 
 def processMotorData(
         motorData, fs,
-        encoderCountPerDegree=180e2, invertLookup=False):
+        encoderCountPerDegree=180e2, invertLookup=False, plotting=False):
     #
     motorData['A'] = motorData['A+'] - motorData['A-']
     motorData['B'] = motorData['B+'] - motorData['B-']
     motorData['Z'] = motorData['Z+'] - motorData['Z-']
+    if plotting:
+        from matplotlib import pyplot as plt
+        i = motorData.index
+        firstIndex = int(1e6)
+        lastIndex = int(2e6)
+        plt.plot(motorData.loc[i[firstIndex:lastIndex], 'A+'], label='A+')
+        plt.plot(motorData.loc[i[firstIndex:lastIndex], 'A-'], label='A-')
+        plt.plot(motorData.loc[i[firstIndex:lastIndex], 'B+'], label='B+')
+        plt.plot(motorData.loc[i[firstIndex:lastIndex], 'B-'], label='B-')
+        plt.plot(motorData.loc[i[firstIndex:lastIndex], 'Z+'], label='Z+')
+        plt.plot(motorData.loc[i[firstIndex:lastIndex], 'Z-'], label='Z-')
+        plt.legend(); plt.show()
     motorData.drop(
         ['A+', 'A-', 'B+', 'B-', 'Z+', 'Z-'],
         axis=1, inplace=True)
@@ -78,13 +90,15 @@ def processMotorData(
         maxQ = motorData[column].quantile(q=0.95)
         #  print('min quantile = {}'.format(minQ))
         #  print('max quantile = {}'.format(maxQ))
-        #  plt.plot(motorData[column]); plt.show()
+        if plotting:
+            plt.plot(motorData.loc[i[firstIndex:lastIndex], column], label=column)
         motorData[column] = (motorData[column] - minQ) / (maxQ - minQ)
         #  threshold = (motorData[column].max() - motorData[column].min() ) / 2
         threshold = 0.5
         motorData.loc[:, column + '_int'] = (
             motorData[column] > threshold).astype(int)
-    #
+    if plotting:
+        plt.legend(); plt.show()
     transitionMask, transitionIdx = getTransitionIdx(
         motorData, edgeType='both')
     motorData['encoderState'] = 0
@@ -383,7 +397,6 @@ def getTrials(motorData, fs, tStart, trialType='2AFC'):
             correctionFactor = pd.Series(
                 tdSeries**0,
                 index=tdSeries.index)
-
         detectSignal = hf.filterDF(
             tdSeries, fs,
             highPass=1000, highOrder=3)
@@ -403,20 +416,29 @@ def getTrials(motorData, fs, tStart, trialType='2AFC'):
         #  plt.plot(tdSeries.index / fs, tdSeries)
         #  plt.plot(peakIdx / fs, tdSeries.loc[peakIdx]**0, 'ro'); plt.show()
         #  plt.plot(tdSeries.index / fs, detectSignal)
-        #  plt.plot(peakIdx / fs, detectSignal.loc[peakIdx]**0, 'ro'); plt.show()
+        #  plt.plot(peakIdx / fs, detectSignal.loc[peakIdx]**0, 'ro'); plt.show(
+        # 
     vCat = motorData.loc[:, 'velocityCat'].astype(float) - 1
-    detectSignal = vCat.diff().fillna(0)
-    minDist = 50e-3  # msec debounce
-    peakIdx = peakutils.indexes(
-        detectSignal.abs().values, thres=0.5,
-        min_dist=int(fs*minDist),
-        thres_abs=True, keep_what='max')
+    detectSignal = (
+        (
+            hf.filterDF(
+                vCat, fs,
+                lowPass=250, lowOrder=3))
+        .abs().fillna(0))
+    minDist = 150e-3  # msec debounce
+    #  peakIdx = peakutils.indexes(
+    #      detectSignal.abs().values, thres=0.5,
+    #      min_dist=int(fs*minDist),
+    #      thres_abs=True, keep_what='first')
     #  prior to using alignTime bounds, first pedal movement just gets it into position, discard,
     #  then return to indexes into the dataframe
     #  peakIdx = detectSignal.index[peakIdx[2:]]
-    
     #  when using alignTime bounds, use all
-    peakIdx = detectSignal.index[peakIdx[:]]
+    # peakIdx = detectSignal.index[peakIdx[:]]
+    peakIdx, crossMask = hf.getThresholdCrossings(
+        detectSignal, thresh=0.5, absVal=True,
+        edgeType='rising', fs=fs, iti=minDist,
+        plotting=False, keep_max=False, itiWiggle=0.05)
     #  avoid bounce by looking into the future of vCat
     futureOffset = int(minDist * fs)
     for thisIdx in peakIdx:
@@ -427,22 +449,17 @@ def getTrials(motorData, fs, tStart, trialType='2AFC'):
             trialEvents['Details'].append(vCat[futureIdx])
         except Exception:
             traceback.print_exc()
-    #  plt.plot(vCat[peakIdx + futureOffset].values, '-o'); plt.show()
-    #  thisT = vCat.index / fs
-    #  tMask = (thisT > 100) & (thisT < 300)
-    #  plt.plot(thisT[tMask], mPos.loc[tMask])
-    #  plt.plot(peakIdx / fs, mPos.loc[peakIdx], 'bo')
-    #  plt.plot(onPeakIdx / fs, mPos.loc[onPeakIdx], 'go')
-    #  plt.plot(offPeakIdx / fs, mPos.loc[offPeakIdx], 'ro'); plt.show()
-    #  plt.plot(thisT[tMask], vCat[tMask])
-    #  plt.plot(onPeakIdx / fs, vCat.loc[onPeakIdx], 'ro'); plt.show()
-    #  plt.plot(vCat.index / fs, detectSignal)
-    #  plt.plot(onPeakIdx / fs, detectSignal.loc[onPeakIdx], 'go')
-    #  plt.plot(offPeakIdx / fs, detectSignal.loc[offPeakIdx]**0-1, 'ro'); plt.show()
-    
     trialEvents = pd.DataFrame(trialEvents)
     trialEvents.sort_values('Time', inplace=True)
     trialEvents.reset_index(drop=True, inplace=True)
+    if False:
+        mPos = motorData.loc[:, 'position']
+        thisT = detectSignal.index / fs
+        tMask = (thisT > 100) & (thisT < 300)
+        plt.plot(vCat)
+        plt.plot(detectSignal)
+        plt.plot(detectSignal[peakIdx], 'go')
+        plt.plot(detectSignal[peakIdx + futureOffset], 'ro'); plt.show()
     if trialType == '2AFC':
         #  !!!! TODO: changes to how we calculate movement break this, because we now track
         #  move on and move off 4 times a trial (to and back)
@@ -451,8 +468,7 @@ def getTrials(motorData, fs, tStart, trialType='2AFC'):
             #above expression is not true if the first 5 events do not make up a complete sequence
             #
             trialEvents.drop(0, inplace=True)
-            trialEvents.reset_index(drop=True, inplace = True)
-
+            trialEvents.reset_index(drop=True, inplace=True)
         #
         trialStartIdx = trialEvents.index[trialEvents['Label'] == 'Movement Onset']
         trialStartIdx = trialStartIdx[range(0,len(trialStartIdx),2)]

@@ -2,13 +2,13 @@
 
 # 04: Run peeler
 # Request an hour of runtime:
-#SBATCH --time=24:00:00
+#SBATCH --time=12:00:00
 
 # Use 2 nodes with 8 tasks each, for 16 MPI tasks:
-#SBATCH --nodes=4
-#SBATCH --tasks=4
+#SBATCH --nodes=25
+#SBATCH --tasks=25
 #SBATCH --tasks-per-node=1
-#SBATCH --mem=48G
+#SBATCH --mem=56G
 
 # Specify a job name:
 #SBATCH -J peeler
@@ -21,7 +21,7 @@
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=2
+#SBATCH --array=1
 
 # Run a command
 # EXP="exp201804271016"
@@ -39,7 +39,8 @@
 # EXP="exp202008311100"
 # EXP="exp202009021100"
 # EXP="exp202009071200"
-EXP="exp202009101200"
+# EXP="exp202009101200"
+EXP="exp202009111100"
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
@@ -48,5 +49,5 @@ source activate nda2
 python --version
 
 module load mpi
-# srun --mpi=pmi2 python3 -u ./tridesclousCCV.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --attemptMPI --purgePeeler --batchPeel --chan_start=0 --chan_stop=16
-srun --mpi=pmi2 python3 -u ./tridesclousCCV.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --attemptMPI --purgePeeler --batchPeel --chan_start=0 --chan_stop=16 --arrayName=nform
+srun --mpi=pmi2 python3 -u ./tridesclousCCV.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --attemptMPI --purgePeeler --batchPeel --chan_start=0 --chan_stop=25 --arrayName=utah
+# srun --mpi=pmi2 python3 -u ./tridesclousCCV.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --attemptMPI --purgePeeler --batchPeel --chan_start=0 --chan_stop=16 --sourceFile=processed --arrayName=nform

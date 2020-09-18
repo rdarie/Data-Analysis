@@ -53,4 +53,3 @@ python --version
 
 # SLURM_ARRAY_TASK_ID=1
 python3 ./preprocDelsysCSV.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID
-# python3 ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --previewEncoder

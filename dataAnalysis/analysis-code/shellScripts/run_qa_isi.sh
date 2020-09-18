@@ -59,6 +59,7 @@ OUTPUTBLOCKNAME="--outputBlockName=emg_clean"
 INPUTBLOCKNAME="--inputBlockName=emg"
 # OUTPUTBLOCKNAME="--outputBlockName=lfp_clean"
 # INPUTBLOCKNAME="--inputBlockName=lfp"
+
 ALIGNQUERY="--alignQuery=stimOn"
 # ALIGNQUERY="--alignQuery=all"
 
