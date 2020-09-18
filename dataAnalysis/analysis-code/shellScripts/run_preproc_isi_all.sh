@@ -52,11 +52,11 @@ EXP="exp202007011300"
 # EXP="exp202008180700"
 # EXP="exp202009031500"
 
-module load anaconda/3-5.2.0
-. /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
-conda activate
-source activate nda2
-python --version
+# module load anaconda/3-5.2.0
+# . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
+# conda activate
+# source activate nda2
+# python --version
 #
 
 LAZINESS="--lazy"
