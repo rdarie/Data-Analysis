@@ -52,14 +52,15 @@ import btk
 
 def preprocDelsysWrapper():
     searchStr = os.path.join(nspFolder, '*' + ns5FileName + '*.hpf')
-
     delsysPathCandidates = glob.glob(searchStr)
     assert len(delsysPathCandidates) == 1
     delsysPath = delsysPathCandidates[0]
+    #
     delsysPathShort = os.path.join(nspFolder, ns5FileName + '.hpf')
     if delsysPathShort != delsysPath:
         shutil.move(delsysPath, delsysPathShort)
         delsysPath = delsysPathShort
+    #
     reader = btk.btkAcquisitionFileReader()  # build a btk reader object
     reader.SetFilename(delsysPath)  # set a filename to the reader
     reader.Update()
