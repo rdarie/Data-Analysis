@@ -91,6 +91,7 @@ def preprocDelsysWrapper():
     delsysPathCandidates = glob.glob(searchStr)
     assert len(delsysPathCandidates) == 1
     delsysPath = delsysPathCandidates[0]
+    #
     delsysPathShort = os.path.join(nspFolder, ns5FileName + '.hpf')
     if delsysPathShort != delsysPath:
         shutil.move(delsysPath, delsysPathShort)
