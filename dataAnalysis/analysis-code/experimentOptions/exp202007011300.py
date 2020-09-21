@@ -14,6 +14,7 @@ def getExpOpts():
         3: 'isi_nano1caudal_xAyBzC_ortho_nano2rostral_xAyBzC_ortho.map',
         4: 'isi_nano1caudal_xAyBzC_ortho_nano2rostral_xAyBzC_ortho.map',
         }
+    delsysExampleHeaderPath = './delsys_example_header_20200701.csv'
     # use "original" file in edge cases where the ns5 file was saved incorrectly
     # with the wrong map. Original is the incorrect, old one, above is the corrected one.
     rippleOriginalMapFile = {

@@ -69,7 +69,6 @@ WINDOW="--window=XS"
 # ANALYSISFOLDER="--analysisName=hiRes"
 # ANALYSISFOLDER="--analysisName=loRes"
 ANALYSISFOLDER="--analysisName=default"
-# SLURM_ARRAY_TASK_ID=1
 
 # CHANSELECTOR="--chanQuery=all"
 # CHANSELECTOR="--chanQuery=isiemgraw"
@@ -86,7 +85,7 @@ UNITSELECTOR="--unitQuery=isiemgenv"
 # UNITSELECTOR="--unitQuery=isiacc"
 # UNITSELECTOR="--unitQuery=isispinaloremg"
 
-SLURM_ARRAY_TASK_ID=1
+SLURM_ARRAY_TASK_ID=2
 # BLOCKSELECTOR="--processAll"
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
 
