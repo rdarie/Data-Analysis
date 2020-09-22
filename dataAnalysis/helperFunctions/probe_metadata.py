@@ -96,6 +96,7 @@ def mapToDF(arrayFilePath):
     # yIdx = np.array(
     #     cmpDF['ycoords'].values - cmpDF['ycoords'].min(),
     #     dtype=np.int)
+    cmpDF.loc[:, 'nevID'] += 1
     return cmpDF
 
 
@@ -157,7 +158,7 @@ def cmpDFToPrb(
             f.write('channel_groups = ' + str(prbDict))
     return prbDict
 
-
+'''
 def cmpDFToPrbAddDummies(
         cmpDF, filePath=None,
         names=None, banks=None,
@@ -227,3 +228,4 @@ def cmpDFToPrbAddDummies(
         with open(filePath, 'w') as f:
             f.write('channel_groups = ' + str(prbDict))
     return prbDict
+'''

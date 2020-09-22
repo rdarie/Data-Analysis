@@ -4,10 +4,10 @@
 #SBATCH --time=2:00:00
 
 # Use 2 nodes with 8 tasks each, for 16 MPI tasks:
-#SBATCH --nodes=16
-#SBATCH --tasks=16
+#SBATCH --nodes=25
+#SBATCH --tasks=25
 #SBATCH --tasks-per-node=1
-#SBATCH --mem=56G
+#SBATCH --mem=48G
 
 # Specify a job name:
 #SBATCH -J constructor
@@ -38,7 +38,8 @@
 # EXP="exp202009021100"
 # EXP="exp202009071200"
 # EXP="exp202009101200"
-EXP="exp202009111100"
+# EXP="exp202009111100"
+EXP="exp202009211200"
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
@@ -47,5 +48,5 @@ source activate nda2
 python --version
 
 module load mpi
-# srun --mpi=pmi2 python3 -u ./tridesclousCCV.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --attemptMPI --batchPreprocess --chan_start=0 --chan_stop=25 --arrayName=utah --sourceFile=processed --remakePrb --removeExistingCatalog
-srun --mpi=pmi2 python3 -u ./tridesclousCCV.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --attemptMPI --batchPreprocess --chan_start=0 --chan_stop=16 --arrayName=nform --sourceFile=processed --remakePrb --removeExistingCatalog
+srun --mpi=pmi2 python -u ./tridesclousCCV.py --arrayName=utah --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --attemptMPI --batchPreprocess --chan_start=0 --chan_stop=25 --sourceFile=processed --remakePrb --removeExistingCatalog
+# srun --mpi=pmi2 python -u ./tridesclousCCV.py --arrayName=nform --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --attemptMPI --batchPreprocess --chan_start=0 --chan_stop=16 --sourceFile=processed --remakePrb --removeExistingCatalog

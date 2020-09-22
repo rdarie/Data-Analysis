@@ -26,4 +26,4 @@ conda activate
 source activate nda2
 python --version
 
-python3 ./launchVis.py
+python ./launchVis.py

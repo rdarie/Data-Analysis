@@ -9,6 +9,7 @@ Options:
     --chanQuery=chanQuery             how to restrict channels if not providing a list? [default: fr]
     --samplingRate=samplingRate       subsample the result??
     --plotting                        run diagnostic plots? [default: False]
+    --verbose                         run diagnostic plots? [default: False]
     --commitResults                   save results to data partition? [default: False]
 """
 
@@ -19,7 +20,7 @@ from neo import (
     Block, Segment, ChannelIndex, Unit,
     Event, Epoch, AnalogSignal, SpikeTrain)
 import neo
-# import dataAnalysis.preproc.mdt as mdt
+import dataAnalysis.preproc.mdt as mdt
 import dataAnalysis.preproc.ns5 as ns5
 import dataAnalysis.helperFunctions.helper_functions_new as hf
 import dataAnalysis.helperFunctions.probe_metadata as prb_meta
@@ -81,8 +82,14 @@ def calcISIBlockAnalysisNix():
     if os.path.exists(thisJsonPath):
         #
         def parseAutoStimLog(jsonPath):
-            with open(jsonPath, 'r') as f:
-                stimLog = json.load(f)
+            try:
+                with open(jsonPath, 'r') as f:
+                    stimLog = json.load(f)
+            except Exception:
+                with open(jsonPath, 'r') as f:
+                    stimLogText = f.read()
+                    stimLogText = mdt.fixMalformedJson(stimLogText, jsonType='Log')
+                    stimLog = json.loads(stimLogText)
             stimResLookup = {4: 10 * pq.uA, 5: 20 * pq.uA}
             stimDict = {
                 't': [],
@@ -451,11 +458,14 @@ def calcISIBlockAnalysisNix():
             stimRastersDF.columns = [
                 cn.replace('_stim#0_raster', '')
                 for cn in stimRastersDF.columns]
+            # trick to avoid double counting channels that are plugged into the same electrode
             keepStimRasterList = []
             for stIdx, st in enumerate(spikeList):
                 chanName = st.unit.channel_index.name
-                matchingAsig = nspBlock.filter(objects=AnalogSignalProxy, name='seg0_' + chanName)
-                if len(matchingAsig):
+                # matchingAsig = nspBlock.filter(objects=AnalogSignalProxy, name='seg0_' + chanName)
+                # if len(matchingAsig):
+                #     keepStimRasterList.append(chanName)
+                if '_b' not in chanName:
                     keepStimRasterList.append(chanName)
             stimActive = stimRastersDF[keepStimRasterList].sum(axis=1) > 0
             activeTimes = stimRastersDF.loc[stimActive, 't']
@@ -502,7 +512,6 @@ def calcISIBlockAnalysisNix():
                         allUpdates = theseUpdates.reindex(newIndex, method='ffill')
                     except Exception:
                         traceback.print_exc()
-                         
                     stAnnotations = allUpdates.loc[
                         allUpdates.index.isin(st.times.magnitude), :]
                 #
@@ -598,7 +607,6 @@ def calcISIBlockAnalysisNix():
                     # try to estimate current
                     matchingAsig = nspBlock.filter(objects=AnalogSignalProxy, name='seg0_' + chanName)
                     if len(matchingAsig):
-                        # keepStimRasterList.append(chanName)
                         elecImpedance = (
                             impedancesRipple
                             .loc[impedancesRipple['elec'] == chanName, 'impedance'])
@@ -835,54 +843,81 @@ def calcISIBlockAnalysisNix():
     #  
     aSigList = tdBlock.filter(objects=AnalogSignal)
     tdDF = ns5.analogSignalsToDataFrame(aSigList)
+    currentSamplingRate = aSigList[0].sampling_rate
     #
-    currentSamplingRate = tdBlock.filter(
-        objects=AnalogSignal)[0].sampling_rate
+    if samplingRate != currentSamplingRate:
+        print("Reinterpolating...")
+        tdInterp = hf.interpolateDF(
+            tdDF, newT,
+            kind='linear', fill_value=(0, 0),
+            x='t', columns=tdChanNames, verbose=arguments['verbose'])
+    else:
+        tdInterp = tdDF
     #
-    emgCols = [cn for cn in tdDF.columns if 'Emg' in cn]
-     
+    emgCols = [cn for cn in tdInterp.columns if 'Emg' in cn]
     if len(emgCols):
         # fix for bug affecting the mean of the channel
         if alignTimeBounds is not None:
-            keepMaskAsig = pd.Series(False, index=tdDF.index)
+            keepMaskAsig = pd.Series(False, index=tdInterp.index)
             for atb in alignTimeBounds:
                 keepMaskAsig = (
                     keepMaskAsig |
                     (
-                        (tdDF['t'] >= atb[0]) &
-                        (tdDF['t'] <= atb[1])))
+                        (tdInterp['t'] >= atb[0]) &
+                        (tdInterp['t'] <= atb[1])))
         else:
-            keepMaskAsig = pd.Series(True, index=tdDF.index)
+            keepMaskAsig = pd.Series(True, index=tdInterp.index)
         sosHP = signal.butter(
             2, 40, 'high',
-            fs=float(currentSamplingRate), output='sos')
+            fs=float(samplingRate), output='sos')
         cornerFrequencyLP = 40
         sosLP = signal.butter(
             2, cornerFrequencyLP, 'low',
-            fs=float(currentSamplingRate), output='sos')
+            fs=float(samplingRate), output='sos')
         if False:
-            t = np.arange(0, .1, currentSamplingRate.magnitude ** (-1))
+            t = np.arange(0, .1, samplingRate.magnitude ** (-1))
             x = np.zeros_like(t)
             x[int(x.size/2)] = 1
             y = signal.sosfiltfilt(sosLP, x)
             plt.plot(t, y); plt.show()
-        for cName in emgCols:
-            procName = cName.replace('Emg', 'EmgEnv')
-            # weird units hack, TODO check
-            tdDF.loc[:, cName] = tdDF.loc[:, cName] * 1e6
-            preprocEmg = signal.sosfiltfilt(
-                sosHP,
-                (tdDF[cName] - tdDF.loc[keepMaskAsig, cName].median()).to_numpy())
-            # 
-            tdDF[procName] = signal.sosfiltfilt(
-                sosLP, np.abs(preprocEmg))
-            # break
-            # if True:
-            #     plt.plot(tdDF.loc[keepMaskAsig, cName])
-            #     plt.plot(tdDF.loc[keepMaskAsig, procName])
-            #     plt.show()
-            tdChanNames.append(procName)
-            #
+        # weird units hack, TODO check
+        tdInterp.loc[:, emgCols] = tdInterp.loc[:, emgCols] * 1e6
+        preprocEmg = signal.sosfiltfilt(
+            sosHP,
+            (
+                tdInterp.loc[:, emgCols] -
+                tdInterp
+                .loc[keepMaskAsig, emgCols]
+                .median(axis=0)).to_numpy(), axis=0
+            )
+        # 
+        procNames = [eN.replace('Emg', 'EmgEnv') for eN in emgCols]
+        emgEnvDF = pd.DataFrame(
+            signal.sosfiltfilt(
+                sosLP, np.abs(preprocEmg), axis=0),
+            columns=procNames
+            )
+        # pdb.set_trace()
+        tdInterp = pd.concat([tdInterp, emgEnvDF], axis=1)
+        # for cName in emgCols:
+        #     procName = cName.replace('Emg', 'EmgEnv')
+        #     # weird units hack, TODO check
+        #     tdInterp.loc[:, cName] = tdInterp.loc[:, cName] * 1e6
+        #     preprocEmg = signal.sosfiltfilt(
+        #         sosHP,
+        #         (tdInterp[cName] - tdInterp.loc[keepMaskAsig, cName].median()).to_numpy())
+        #     # 
+        #     tdInterp[procName] = signal.sosfiltfilt(
+        #         sosLP, np.abs(preprocEmg))
+        #     # break
+        #     # if True:
+        #     #     plt.plot(tdInterp.loc[keepMaskAsig, cName])
+        #     #     plt.plot(tdInterp.loc[keepMaskAsig, procName])
+        #     #     plt.show()
+        #     tdChanNames.append(procName)
+        #     #
+    ## moved to cleaning scripts
+    '''
     if len(allStimTrains):
         # fill in blank period
         stimMask = (stimRastersDF.drop(columns='t') > 0).any(axis='columns')
@@ -900,41 +935,34 @@ def calcISIBlockAnalysisNix():
         kernel = np.zeros_like(kernelT)
         kernel[kernelT > 0] = 1
         blankMask = (
-            np.convolve(kernel, stimMask, 'same') > 0)[:tdDF.shape[0]]
+            np.convolve(kernel, stimMask, 'same') > 0)[:tdInterp.shape[0]]
         checkBlankMask = False
         if checkBlankMask:
             plotIdx = slice(2000000, 2020000)
             fig, ax = plt.subplots()
             twAx = ax.twinx()
             ax.plot(
-                tdDF['t'].iloc[plotIdx],
-                tdDF.iloc[plotIdx, 1], 'b.-', lw=2)
+                tdInterp['t'].iloc[plotIdx],
+                tdInterp.iloc[plotIdx, 1], 'b.-', lw=2)
         spinalLfpChans = [
             cN
-            for cN in tdDF.columns
+            for cN in tdInterp.columns
             if 'rostral' in cN or 'caudal' in cN]
-        # tdDF.loc[
+        # tdInterp.loc[
         #     blankMask, spinalLfpChans] = np.nan
-        # tdDF.interpolate(axis=0, method='cubic', inplace=True)
-        # tdDF.loc[
+        # tdInterp.interpolate(axis=0, method='cubic', inplace=True)
+        # tdInterp.loc[
         #     blankMask, spinalLfpChans] = 0
         if checkBlankMask:
             ax.plot(
-                tdDF['t'].iloc[plotIdx],
-                tdDF.iloc[plotIdx, 1].interpolate(axis=0, method='cubic'), 'g--', lw=2)
+                tdInterp['t'].iloc[plotIdx],
+                tdInterp.iloc[plotIdx, 1].interpolate(axis=0, method='cubic'), 'g--', lw=2)
             twAx.plot(
-                tdDF['t'].iloc[plotIdx],
+                tdInterp['t'].iloc[plotIdx],
                 blankMask[plotIdx], 'r')
             plt.show()
+    '''
     #
-    if samplingRate != currentSamplingRate:
-        print("Reinterpolating...")
-        tdInterp = hf.interpolateDF(
-            tdDF, newT,
-            kind='linear', fill_value=(0, 0),
-            x='t', columns=tdChanNames)
-    else:
-        tdInterp = tdDF
     #
     tdInterp.columns = [i.replace('seg0_', '') for i in tdInterp.columns]
     tdInterp.sort_index(axis='columns', inplace=True)
@@ -942,7 +970,7 @@ def calcISIBlockAnalysisNix():
         tdInterp,
         idxT='t', useColNames=True, probeName='',
         dataCol=tdInterp.drop(columns='t').columns,
-        samplingRate=samplingRate)
+        samplingRate=samplingRate, verbose=arguments['verbose'])
     #
     for aSig in tdBlockInterp.filter(objects=AnalogSignal):
         chName = aSig.channel_index.name
@@ -1014,6 +1042,6 @@ if __name__ == "__main__":
             topFun=calcISIBlockAnalysisNix,
             modulesToProfile=[ash, ns5, prb_meta, hf],
             outputBaseFolder=os.path.join(remoteBasePath, 'batch_logs'),
-            nameSuffix=nameSuffix)
+            nameSuffix=nameSuffix, outputUnits=1e-3)
     else:
         calcISIBlockAnalysisNix()

@@ -68,7 +68,9 @@ def register_list_with_profiler(functionList, profile):
 
 
 #  hack original line_profiler.show_text to override dict order
-def show_profiler_text(stats, unit, output_unit=None, stream=None, stripzeros=False):
+def show_profiler_text(
+        stats, unit, output_unit=None,
+        stream=None, stripzeros=False):
     """ Show text for the given timings.
     """
     if stream is None:
@@ -108,7 +110,7 @@ def orderLStatsByTime(scriptName):
 def profileFunction(
         topFun=None, modulesToProfile=None,
         registerTopFun=True,
-        outputBaseFolder='.', nameSuffix=''):
+        outputBaseFolder='.', nameSuffix='', outputUnits=None):
     if not os.path.exists(outputBaseFolder):
         os.makedirs(outputBaseFolder, exist_ok=True)
     profile = line_profiler.LineProfiler()
@@ -130,9 +132,12 @@ def profileFunction(
         '{}.{}'.format(fileName, 'lprof'))
     profile.dump_stats(outfile)
     orderedStats, unit = orderLStatsByTime(outfile)
+    #
     outfiletext = os.path.join(
         outputBaseFolder,
         '{}.{}'.format(fileName, 'lprof.txt'))
     with open(outfiletext, 'w') as f:
-        show_profiler_text(orderedStats, unit, stream=f)
+        show_profiler_text(
+            orderedStats, unit,
+            output_unit=outputUnits, stream=f)
     return

@@ -54,7 +54,7 @@ except Exception:
     SIZE = 1
     HAS_MPI = False
 
-arrayName = arguments['arrayName']
+
 if RANK == 0:
     from currentExperiment import parseAnalysisOptions
     expOpts, allOpts = parseAnalysisOptions(
@@ -62,6 +62,7 @@ if RANK == 0:
         arguments['exp'])
     globals().update(expOpts)
     globals().update(allOpts)
+    arrayName = arguments['arrayName']
     try:
         ns5FileName = ns5FileName.replace('Block', arrayName)
         triFolder = os.path.join(
@@ -83,7 +84,7 @@ if RANK == 0:
                 removeExisting=arguments['removeExistingCatalog'], fileFormat='NIX')
     except Exception:
         traceback.print_exc()
-        pass
+        print('Ignoring Exception')
 else:
     ns5FileName = None
     nspFolder = None
@@ -137,7 +138,7 @@ chansToAnalyze = [
 if arguments['batchPreprocess']:
     tdch.batchPreprocess(
         triFolder, chansToAnalyze,
-        relative_threshold=3.5,
+        relative_threshold=3.25,
         fill_overflow=False,
         highpass_freq=300.,
         lowpass_freq=6000.,
@@ -151,17 +152,18 @@ if arguments['batchPreprocess']:
         # },
         featureOpts={
             'method': 'global_umap',
-            'n_components': 5,
-            'n_neighbors': 50,
+            'n_components': 8,
+            'n_neighbors': 100,
             'min_dist': 0,
-            'set_op_mix_ratio': 0.75,
-            'init': 'random',
-            'n_epochs': 2000,
+            'metric': 'mahalanobis',
+            'set_op_mix_ratio': 0.9,
+            'init': 'spectral',
+            'n_epochs': 1000,
         },
         clusterOpts={
             'method': 'hdbscan',
-            'min_cluster_size': 50,
-            'min_samples': 20,
+            'min_cluster_size': 100,
+            'min_samples': 100,
             'allow_single_cluster': True},
         noise_estimate_duration=300,
         sample_snippet_duration=300,

@@ -40,9 +40,10 @@
 # EXP="exp202008311100"
 # EXP="exp202009021100"
 # EXP="exp202009071200"
-EXP="exp202009101200"
+# EXP="exp202009101200"
 # EXP="exp202009111100"
-TRIALIDX="2"
+EXP="exp202009211200"
+BLOCKIDX="1"
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
@@ -51,16 +52,18 @@ source activate nda2
 python --version
 
 # Step 1: Constructor
-# python3 ./tridesclousCCV.py --blockIdx=$TRIALIDX --exp=$EXP  --batchPreprocess --chan_start=0 --chan_stop=25 --arrayName=utah --remakePrb --removeExistingCatalog
-# python3 ./tridesclousCCV.py --blockIdx=$TRIALIDX --exp=$EXP --batchPreprocess --chan_start=0 --chan_stop=16 --arrayName=nform --remakePrb --removeExistingCatalog
-python3 ./tridesclousCCV.py --blockIdx=$TRIALIDX --exp=$EXP --batchPreprocess --chan_start=0 --chan_stop=16 --arrayName=nform --sourceFile=processed --remakePrb --removeExistingCatalog
+# python3 ./tridesclousCCV.py --blockIdx=$BLOCKIDX --exp=$EXP --batchPreprocess --chan_start=0 --chan_stop=16 --arrayName=nform --sourceFile=processed --remakePrb --removeExistingCatalog
+# python3 ./tridesclousCCV.py --blockIdx=$BLOCKIDX --exp=$EXP --batchPreprocess --chan_start=0 --chan_stop=25 --arrayName=utah --sourceFile=processed --remakePrb --removeExistingCatalog
+
 # Step 2: Validate the constructor
-# python3 ./tridesclousVisualize.py --blockIdx=$TRIALIDX --exp=$EXP  --constructor --chan_start=51 --chan_stop=64
-# Step 3: Transfer
-# python3 ./transferTDCTemplates.py --blockIdx=$TRIALIDX --exp=$EXP
+# python3 ./tridesclousVisualize.py --blockIdx=$BLOCKIDX --exp=$EXP  --constructor --chan_start=51 --chan_stop=64
+
+# Step 3: Transfer the templates
+# python3 ./transferTDCTemplates.py --arrayName=utah --exp=$EXP --chan_start=0 --chan_stop=25 --sourceFile=processed
+python3 ./transferTDCTemplates.py --arrayName=nform --exp=$EXP --chan_start=0 --chan_stop=16 --sourceFile=processed
 # Step 4: Peeler
-# python3 ./tridesclousCCV.py --blockIdx=$TRIALIDX --exp=$EXP --purgePeeler --batchPeel
-# python3 ./tridesclousVisualize.py --blockIdx=$TRIALIDX --exp=$EXP  --peeler
+# python3 ./tridesclousCCV.py --blockIdx=$BLOCKIDX --exp=$EXP --purgePeeler --batchPeel
+# python3 ./tridesclousVisualize.py --blockIdx=$BLOCKIDX --exp=$EXP  --peeler
 # Step 5:
-# python3 './tridesclousCCV.py' --blockIdx=$TRIALIDX --purgePeelerDiagnostics --makeStrictNeoBlock --exp=$EXP
-# python3 './plotSpikeReport.py' --blockIdx=$TRIALIDX --nameSuffix=_final --exp=$EXP
+# python3 './tridesclousCCV.py' --blockIdx=$BLOCKIDX --purgePeelerDiagnostics --makeStrictNeoBlock --exp=$EXP
+# python3 './plotSpikeReport.py' --blockIdx=$BLOCKIDX --nameSuffix=_final --exp=$EXP

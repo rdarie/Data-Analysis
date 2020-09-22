@@ -2954,10 +2954,10 @@ def calcBinarizedArray(
             else:
                 print('{} has no spikes'.format(st.name))
                 stBin = dummyBin
-            skipStAnnNames = (
-                list(st.annotations['arrayAnnNames']) +
-                ['nix_name', 'neo_name', 'arrayAnnNames']
-                )
+            skipStAnnNames = [
+                'nix_name', 'neo_name', 'arrayAnnNames']
+            if 'arrayAnnNames' in st.annotations:
+                skipStAnnNames += list(st.annotations['arrayAnnNames'])
             asigAnn = {
                 k: v
                 for k, v in st.annotations.items()

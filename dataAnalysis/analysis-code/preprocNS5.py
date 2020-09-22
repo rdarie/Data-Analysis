@@ -16,6 +16,7 @@ Options:
     --maskMotorEncoder              whether to ignore motor encoder activity outside the alignTimeBounds window [default: False]
     --ISI                           special options for parsing Ripple files from ISI [default: False]
     --transferISIStimLog            special options for parsing Ripple files from ISI [default: False]
+    --ISIMinimal                    special options for parsing Ripple files from ISI [default: False]
     --ISIRaw                        special options for parsing Ripple files from ISI [default: False]
 """
 
@@ -110,6 +111,22 @@ def preprocNS5():
             calcRigEvents=False)
     #
     if arguments['forSpikeSorting']:
+        idealDataPath = os.path.join(nspFolder, ns5FileName + '.ns5')
+        if not os.path.exists(idealDataPath):
+            fallBackPath = os.path.join(
+                nspFolder,
+                '{}{:0>4}'.format(arrayName, blockIdx) + '.ns5')
+            if os.path.exists(fallBackPath):
+                shutil.move(
+                    fallBackPath,
+                    idealDataPath)
+                try:
+                    shutil.move(
+                        fallBackPath.replace('.ns5', '.nev'),
+                        idealDataPath.replace('.ns5', '.nev'))
+                except Exception:
+                    traceback.print_exc()
+                    print('Ignoring exception...')
         reader = ns5.preproc(
             fileName=ns5FileName,
             rawFolderPath=nspFolder,
@@ -206,6 +223,43 @@ def preprocNS5():
                 shutil.copyfile(jsonSrcPath, jsonDestPath)
             except Exception:
                 traceback.print_exc()
+    if arguments['ISIMinimal']:
+        mapDF = prb_meta.mapToDF(rippleMapFile[int(arguments['blockIdx'])])
+        mapDF.loc[:, 'nevID'] += 1 # ?????
+        if 'rippleOriginalMapFile' in locals():
+            if rippleOriginalMapFile[int(arguments['blockIdx'])] is not None:
+                swapMaps = {
+                    'from': prb_meta.mapToDF(rippleOriginalMapFile[int(arguments['blockIdx'])]),
+                    'to': mapDF
+                }
+            else:
+                swapMaps = None
+        else:
+            swapMaps = None
+        # pdb.set_trace()
+        reader = ns5.preproc(
+            fileName=ns5FileName,
+            rawFolderPath=nspFolder,
+            outputFolderPath=scratchFolder,
+            mapDF=mapDF, swapMaps=swapMaps,
+            fillOverflow=False, removeJumps=False,
+            motorEncoderMask=motorEncoderMask,
+            eventInfo=trialFilesFrom['utah']['eventInfo'],
+            spikeSourceType='nev', writeMode='ow',
+            chunkSize=chunkSize, equalChunks=equalChunks,
+            chunkList=chunkList,
+            calcRigEvents=trialFilesFrom['utah']['calcRigEvents'],
+            normalizeByImpedance=False, removeMeanAcross=False,
+            asigNameList=[], ainpNameList=ainpNameList,
+            # LFPFilterOpts=LFPFilterOpts,
+            LFPFilterOpts=None, calcAverageLFP=False)
+        if arguments['transferISIStimLog']:
+            try:
+                jsonSrcPath = os.path.join(nspFolder, ns5FileName + '_autoStimLog.json')
+                jsonDestPath = trialBasePath.replace('.nix', '_autoStimLog.json')
+                shutil.copyfile(jsonSrcPath, jsonDestPath)
+            except Exception:
+                traceback.print_exc()
     ##################################################################################
     if arguments['ISIRaw']:
         mapDF = prb_meta.mapToDF(rippleMapFile[int(arguments['blockIdx'])])
@@ -235,6 +289,6 @@ if __name__ == "__main__":
             topFun=preprocNS5,
             modulesToProfile=[ns5],
             outputBaseFolder=os.path.join(remoteBasePath, 'batch_logs'),
-            nameSuffix=nameSuffix)
+            nameSuffix=nameSuffix, outputUnits=1e-3)
     else:
         preprocNS5()

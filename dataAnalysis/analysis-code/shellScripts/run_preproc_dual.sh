@@ -21,7 +21,7 @@
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=1
+#SBATCH --array=3
 
 # EXP="exp201804271016"
 # EXP="exp201805231100"
@@ -38,7 +38,8 @@
 # EXP="exp202009021100"
 # EXP="exp202009071200"
 # EXP="exp202009101200"
-EXP="exp202009111100"
+# EXP="exp202009111100"
+EXP="exp202009211200"
 
 
 module load anaconda/3-5.2.0
@@ -47,12 +48,13 @@ conda activate
 source activate nda2
 python --version
 
-SLURM_ARRAY_TASK_ID=1
-# python3 -u ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --arrayName=nform --forSpikeSorting
-# python3 -u ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --arrayName=utah --forSpikeSorting
+# SLURM_ARRAY_TASK_ID=1
+
+python -u ./preprocNS5.py --arrayName=nform --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --forSpikeSorting
+python -u ./preprocNS5.py --arrayName=utah --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --forSpikeSorting
 
 # !! maskMotorEncoder ignores all motor events outside alignTimeBounds
-python3 -u ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --arrayName=utah --fullSubtractMean --maskMotorEncoder
-python3 -u ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --arrayName=nform --rippleNForm
-#
-python3 -u ./synchronizeNFormToNSP.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --trigRate=100
+# python3 -u ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --arrayName=utah --fullSubtractMean --maskMotorEncoder
+# python3 -u ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --arrayName=nform --rippleNForm
+
+# python3 -u ./synchronizeNFormToNSP.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --trigRate=100

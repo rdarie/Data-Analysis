@@ -183,6 +183,6 @@ if __name__ == "__main__":
             topFun=preprocDelsysWrapper,
             modulesToProfile=[ns5],
             outputBaseFolder=os.path.join(remoteBasePath, 'batch_logs'),
-            nameSuffix=nameSuffix)
+            nameSuffix=nameSuffix, outputUnits=1e-3)
     else:
         preprocDelsysWrapper()

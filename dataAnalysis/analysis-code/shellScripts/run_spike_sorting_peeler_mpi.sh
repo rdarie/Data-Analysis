@@ -21,7 +21,7 @@
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=1
+#SBATCH --array=2,3
 
 # Run a command
 # EXP="exp201804271016"
@@ -40,7 +40,8 @@
 # EXP="exp202009021100"
 # EXP="exp202009071200"
 # EXP="exp202009101200"
-EXP="exp202009111100"
+# EXP="exp202009111100"
+EXP="exp202009211200"
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
@@ -49,5 +50,5 @@ source activate nda2
 python --version
 
 module load mpi
-srun --mpi=pmi2 python3 -u ./tridesclousCCV.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --attemptMPI --purgePeeler --batchPeel --chan_start=0 --chan_stop=25 --arrayName=utah
-# srun --mpi=pmi2 python3 -u ./tridesclousCCV.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --attemptMPI --purgePeeler --batchPeel --chan_start=0 --chan_stop=16 --sourceFile=processed --arrayName=nform
+srun --mpi=pmi2 python3 -u ./tridesclousCCV.py --arrayName=utah --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --attemptMPI --purgePeeler --batchPeel --chan_start=0 --chan_stop=25 --sourceFile=processed
+# srun --mpi=pmi2 python3 -u ./tridesclousCCV.py --arrayName=nform --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --attemptMPI --purgePeeler --batchPeel --chan_start=0 --chan_stop=16 --sourceFile=processed

@@ -21,7 +21,7 @@
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=1,2,3,4
+#SBATCH --array=4
 
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=radu_darie@brown.edu
@@ -52,11 +52,12 @@ EXP="exp202007011300"
 # EXP="exp202008180700"
 # EXP="exp202009031500"
 
-# module load anaconda/3-5.2.0
-# . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
-# conda activate
-# source activate nda2
-# python --version
+# 
+module load anaconda/3-5.2.0
+. /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
+conda activate
+source activate nda2
+python --version
 #
 
 LAZINESS="--lazy"
@@ -85,7 +86,7 @@ UNITSELECTOR="--unitQuery=isiemgenv"
 # UNITSELECTOR="--unitQuery=isiacc"
 # UNITSELECTOR="--unitQuery=isispinaloremg"
 
-SLURM_ARRAY_TASK_ID=2
+# SLURM_ARRAY_TASK_ID=2
 # BLOCKSELECTOR="--processAll"
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
 
@@ -94,24 +95,13 @@ ALIGNQUERY="--alignQuery=stimOn"
 
 
 # preprocess
-# python -u ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --ISI --transferISIStimLog
-# python -u ./preprocDelsysCSV.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $CHANSELECTOR
-python -u ./preprocDelsysHPF.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $CHANSELECTOR
+python -u ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --ISIMinimal --transferISIStimLog
+python -u ./preprocDelsysCSV.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $CHANSELECTOR
+# python -u ./preprocDelsysHPF.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $CHANSELECTOR --verbose
 
 # synchronize
-# python -u ./synchronizeDelsysToNSP.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP $CHANSELECTOR --trigRate=2
+python -u ./synchronizeDelsysToNSP.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP $CHANSELECTOR --trigRate=2
 
 # downsample
 CHANSELECTOR="--chanQuery=isiemg"
-# python -u ./calcISIAnalysisNix.py --exp=$EXP $BLOCKSELECTOR $CHANSELECTOR $ANALYSISFOLDER --commitResults
-
-# if [$SLURM_ARRAY_TASK_ID = 1]
-# then
-#     python -u ./assembleExperimentData.py --exp=$EXP --blockIdx=3 --processAsigs --processRasters $ANALYSISFOLDER
-#     OUTPUTBLOCKNAME="--outputBlockName=all"
-#     python -u ./calcAlignedAsigs.py --exp=$EXP $BLOCKSELECTOR $WINDOW $LAZINESS $ANALYSISFOLDER --eventName=stimAlignTimes $CHANSELECTOR $OUTPUTBLOCKNAME --verbose --alignFolderName=stim
-#     python -u ./calcAlignedAsigs.py --exp=$EXP $BLOCKSELECTOR $WINDOW $LAZINESS $ANALYSISFOLDER --eventName=stimAlignTimes $CHANSELECTOR $OUTPUTBLOCKNAME --verbose --alignFolderName=stim
-#     INPUTBLOCKNAME="--inputBlockName=all"
-#     python -u ./calcTrialOutliers.py --exp=$EXP --alignFolderName=stim $INPUTBLOCKNAME $BLOCKSELECTOR $ANALYSISSELECTOR $UNITSELECTOR $WINDOW $ALIGNQUERY --verbose --plotting --saveResults
-#     python -u ./exportForDeepSpine.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISSELECTOR --alignFolderName=stim $UNITSELECTOR --alignQuery="stimOn" $INPUTBLOCKNAME
-# fi
+python -u ./calcISIAnalysisNix.py --exp=$EXP $BLOCKSELECTOR $CHANSELECTOR $ANALYSISFOLDER

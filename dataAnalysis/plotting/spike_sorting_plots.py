@@ -26,7 +26,6 @@ def plotSpikePanel(
         hideUnused=True,
         colorPal="ch:2,-.1,dark=.2,light=0.8,reverse=1"):
     sns.set_style("dark", {"axes.facecolor": ".9"})
-    pdb.set_trace()
     if hideUnused:
         spikeStruct = spikeStruct.loc[
             spikeStruct['label'].isin(spikes['ChannelID']), :]

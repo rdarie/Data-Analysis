@@ -295,13 +295,7 @@ def parseAnalysisOptions(
     #  paths relevant to single trial files
     triFolder = os.path.join(
         scratchFolder, 'tdc_Block{:0>3}'.format(blockIdx))
-    
-    if isinstance(expOpts['triFolderSourceBase'], int):
-        triFolderSource = os.path.join(
-            scratchFolder, 'tdc_Block{:0>3}'.format(expOpts['triFolderSourceBase']))
-    else:
-        triFolderSource = os.path.join(
-            scratchPath, expOpts['triFolderSourceBase'])
+    #
     analysisDataPath = os.path.join(
         scratchFolder, '{}',
         ns5FileName + '_analyze.nix')

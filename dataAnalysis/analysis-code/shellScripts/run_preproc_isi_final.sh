@@ -93,11 +93,11 @@ BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
 ALIGNQUERY="--alignQuery=stimOn"
 # ALIGNQUERY="--alignQuery=all"
 
-python3 -u ./assembleExperimentData.py --exp=$EXP --blockIdx=3 --processAsigs --processRasters $ANALYSISFOLDER
+python -u ./assembleExperimentData.py --exp=$EXP --blockIdx=3 --processAsigs --processRasters $ANALYSISFOLDER
 OUTPUTBLOCKNAME="--outputBlockName=emg"
 INPUTBLOCKNAME="--inputBlockName=emg"
 CHANSELECTOR="--chanQuery=isiemgenv"
-python3 -u ./calcAlignedAsigs.py --exp=$EXP $BLOCKSELECTOR $WINDOW $LAZINESS $ANALYSISFOLDER --eventName=stimAlignTimes $CHANSELECTOR $OUTPUTBLOCKNAME --verbose --alignFolderName=stim
+python -u ./calcAlignedAsigs.py --exp=$EXP $BLOCKSELECTOR $WINDOW $LAZINESS $ANALYSISFOLDER --eventName=stimAlignTimes $CHANSELECTOR $OUTPUTBLOCKNAME --verbose --alignFolderName=stim
 #
-python3 -u ./calcTrialOutliers.py --exp=$EXP --alignFolderName=stim $INPUTBLOCKNAME $BLOCKSELECTOR $ANALYSISSELECTOR $UNITSELECTOR $WINDOW $ALIGNQUERY --verbose --plotting --saveResults
-python3 -u ./exportForDeepSpine.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISSELECTOR --alignFolderName=stim $UNITSELECTOR --alignQuery="stimOn" $INPUTBLOCKNAME
+python -u ./calcTrialOutliers.py --exp=$EXP --alignFolderName=stim $INPUTBLOCKNAME $BLOCKSELECTOR $ANALYSISSELECTOR $UNITSELECTOR $WINDOW $ALIGNQUERY --verbose --plotting --saveResults
+python -u ./exportForDeepSpine.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISSELECTOR --alignFolderName=stim $UNITSELECTOR --alignQuery="stimOn" $INPUTBLOCKNAME
