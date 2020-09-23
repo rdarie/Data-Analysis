@@ -138,10 +138,10 @@ chansToAnalyze = [
 if arguments['batchPreprocess']:
     tdch.batchPreprocess(
         triFolder, chansToAnalyze,
-        relative_threshold=3.25,
+        relative_threshold=3.5,
         fill_overflow=False,
         highpass_freq=300.,
-        lowpass_freq=6000.,
+        lowpass_freq=5000.,
         common_ref_freq=300.,
         common_ref_removal=False,
         notch_freq=None,
@@ -152,10 +152,10 @@ if arguments['batchPreprocess']:
         # },
         featureOpts={
             'method': 'global_umap',
-            'n_components': 8,
-            'n_neighbors': 100,
+            'n_components': 4,
+            'n_neighbors': 75,
             'min_dist': 0,
-            'metric': 'mahalanobis',
+            'metric': 'euclidean',
             'set_op_mix_ratio': 0.9,
             'init': 'spectral',
             'n_epochs': 1000,
@@ -163,7 +163,7 @@ if arguments['batchPreprocess']:
         clusterOpts={
             'method': 'hdbscan',
             'min_cluster_size': 100,
-            'min_samples': 100,
+            'min_samples': 75,
             'allow_single_cluster': True},
         noise_estimate_duration=300,
         sample_snippet_duration=300,
@@ -179,9 +179,9 @@ if arguments['batchPreprocess']:
 if arguments['batchPeel']:
     tdch.batchPeel(
         triFolder, chansToAnalyze,
-        shape_boundary_threshold=2.5,
-        confidence_threshold=0.75,
-        shape_distance_threshold=1.5, attemptMPI=HAS_MPI)
+        shape_boundary_threshold=3,
+        confidence_threshold=0.65,
+        shape_distance_threshold=2, attemptMPI=HAS_MPI)
 
 if HAS_MPI:
     COMM.Barrier()  # wait until all threads finish sorting

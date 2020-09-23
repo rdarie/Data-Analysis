@@ -65,8 +65,8 @@ def synchronizeDelsysToNSP():
         tStart, tStop = synchInfo['delsys'][blockIdx]['timeRanges']
     except Exception:
         traceback.print_exc()
-        tStart = float(oeSyncAsig.times[0] + 2 * pq.s)
-        tStop = float(oeSyncAsig.times[-1])
+        tStart = float(oeSyncAsig.times[0] + 1 * pq.s)
+        tStop = float(oeSyncAsig.times[-1] - 1 * pq.s)
 
     oeTimeMask = hf.getTimeMaskFromRanges(
         oeSyncAsig.times, [(tStart, tStop)])
@@ -84,8 +84,8 @@ def synchronizeDelsysToNSP():
         tStart, tStop = synchInfo['nsp'][blockIdx]['timeRanges']
     except Exception:
         traceback.print_exc()
-        tStart = float(nspSyncAsig.times[0] + 2 * pq.s)
-        tStop = float(nspSyncAsig.times[-1].magnitude)
+        tStart = float(nspSyncAsig.times[0] + 1 * pq.s)
+        tStop = float(nspSyncAsig.times[-1] - 1 * pq.s)
 
     nspTimeMask = hf.getTimeMaskFromRanges(
         nspSyncAsig.times, [(tStart, tStop)])

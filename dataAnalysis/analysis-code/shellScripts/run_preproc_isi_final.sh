@@ -44,13 +44,14 @@
 # EXP="exp202003181300"
 # EXP="exp202006171300"
 
-EXP="exp202007011300"
+# EXP="exp202007011300"
 # has blocks 1,2,3,4
 # EXP="exp202007021300"
 # EXP="exp202007071300"
 # EXP="exp202007081300"
 # EXP="exp202008180700"
 # EXP="exp202009031500"
+EXP="exp202009221300"
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh

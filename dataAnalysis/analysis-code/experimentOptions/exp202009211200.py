@@ -125,7 +125,7 @@ def getExpOpts():
                 contactSpacing=400,
                 groupIn={
                     'xcoords': np.arange(-.1, 10.1, 2),
-                    'ycoords': np.arange(-.1, 10.1, 2)}),
+                    'ycoords': np.arange(-.1, 10.1, 1)}),
             'triFolderSource': {'exp': experimentName, 'block': 1},
             'triFolderDest': [{'exp': experimentName, 'block': i} for i in [2, 3]]
 
@@ -147,7 +147,7 @@ def getExpOpts():
             'prbOpts': dict(
                 contactSpacing=500,
                 groupIn={
-                    'xcoords': np.arange(-.1, 18.1, 2),
+                    'xcoords': np.arange(-.1, 18.1, 1),
                     'ycoords': np.arange(-.1, 5.1, 2)}),
             'triFolderSource': {'exp': experimentName, 'block': 2},
             'triFolderDest': [{'exp': experimentName, 'block': i} for i in [1, 3]]

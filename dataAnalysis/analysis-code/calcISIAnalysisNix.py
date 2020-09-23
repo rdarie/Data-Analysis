@@ -840,7 +840,8 @@ def calcISIBlockAnalysisNix():
     #                 chIdx.units.remove(stUn)
     #     del allStimUnits
     #
-    #  
+    #
+    pdb.set_trace()
     aSigList = tdBlock.filter(objects=AnalogSignal)
     tdDF = ns5.analogSignalsToDataFrame(aSigList)
     currentSamplingRate = aSigList[0].sampling_rate

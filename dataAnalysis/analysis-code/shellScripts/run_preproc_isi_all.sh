@@ -44,20 +44,21 @@
 # EXP="exp202003181300"
 # EXP="exp202006171300"
 
-EXP="exp202007011300"
+# EXP="exp202007011300"
 # has blocks 1,2,3,4
 # EXP="exp202007021300"
 # EXP="exp202007071300"
 # EXP="exp202007081300"
 # EXP="exp202008180700"
 # EXP="exp202009031500"
+EXP="exp202009221300"
 
 # 
-module load anaconda/3-5.2.0
-. /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
-conda activate
-source activate nda2
-python --version
+# module load anaconda/3-5.2.0
+# . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
+# conda activate
+# source activate nda2
+# python --version
 #
 
 LAZINESS="--lazy"
@@ -86,7 +87,7 @@ UNITSELECTOR="--unitQuery=isiemgenv"
 # UNITSELECTOR="--unitQuery=isiacc"
 # UNITSELECTOR="--unitQuery=isispinaloremg"
 
-# SLURM_ARRAY_TASK_ID=2
+SLURM_ARRAY_TASK_ID=1
 # BLOCKSELECTOR="--processAll"
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
 
@@ -96,8 +97,8 @@ ALIGNQUERY="--alignQuery=stimOn"
 
 # preprocess
 python -u ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --ISIMinimal --transferISIStimLog
-python -u ./preprocDelsysCSV.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $CHANSELECTOR
-# python -u ./preprocDelsysHPF.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $CHANSELECTOR --verbose
+# python -u ./preprocDelsysCSV.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $CHANSELECTOR
+python -u ./preprocDelsysHPF.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $CHANSELECTOR --verbose
 
 # synchronize
 python -u ./synchronizeDelsysToNSP.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP $CHANSELECTOR --trigRate=2

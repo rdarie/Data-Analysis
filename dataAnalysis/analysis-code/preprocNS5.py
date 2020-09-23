@@ -6,7 +6,7 @@ Usage:
 Options:
     --blockIdx=blockIdx             which trial to analyze
     --exp=exp                       which experimental day to analyze
-    --arrayName=arrayName           use a named array?
+    --arrayName=arrayName           use a named array? [default: Block]
     --forSpikeSorting               whether to make a .nix file that has all raw traces [default: False]
     --fullSubtractMean              whether to make a .nix file that has all raw traces [default: False]
     --rippleNForm                   whether to make a .nix file that has all raw traces [default: False]
@@ -37,8 +37,8 @@ globals().update(allOpts)
 def preprocNS5():
     # weird scope issue with ns5FileName in particular
     ns5FileName = allOpts['ns5FileName']
-    if arguments['arrayName'] is not None:
-        arrayName = arguments['arrayName']
+    arrayName = arguments['arrayName']
+    if arguments['arrayName'] != 'Block':
         electrodeMapPath = spikeSortingOpts[arrayName]['electrodeMapPath']
         mapExt = electrodeMapPath.split('.')[-1]
         if mapExt == 'cmp':
@@ -46,6 +46,22 @@ def preprocNS5():
         elif mapExt == 'map':
             mapDF = prb_meta.mapToDF(electrodeMapPath)
         ns5FileName = ns5FileName.replace('Block', arrayName)
+    idealDataPath = os.path.join(nspFolder, ns5FileName + '.ns5')
+    if not os.path.exists(idealDataPath):
+        fallBackPath = os.path.join(
+            nspFolder,
+            '{}{:0>4}'.format(arrayName, blockIdx) + '.ns5')
+        if os.path.exists(fallBackPath):
+            shutil.move(
+                fallBackPath,
+                idealDataPath)
+            try:
+                shutil.move(
+                    fallBackPath.replace('.ns5', '.nev'),
+                    idealDataPath.replace('.ns5', '.nev'))
+            except Exception:
+                traceback.print_exc()
+                print('Ignoring exception...')
 
     chunkSize = 4000
     chunkList = [0]
@@ -111,22 +127,6 @@ def preprocNS5():
             calcRigEvents=False)
     #
     if arguments['forSpikeSorting']:
-        idealDataPath = os.path.join(nspFolder, ns5FileName + '.ns5')
-        if not os.path.exists(idealDataPath):
-            fallBackPath = os.path.join(
-                nspFolder,
-                '{}{:0>4}'.format(arrayName, blockIdx) + '.ns5')
-            if os.path.exists(fallBackPath):
-                shutil.move(
-                    fallBackPath,
-                    idealDataPath)
-                try:
-                    shutil.move(
-                        fallBackPath.replace('.ns5', '.nev'),
-                        idealDataPath.replace('.ns5', '.nev'))
-                except Exception:
-                    traceback.print_exc()
-                    print('Ignoring exception...')
         reader = ns5.preproc(
             fileName=ns5FileName,
             rawFolderPath=nspFolder,

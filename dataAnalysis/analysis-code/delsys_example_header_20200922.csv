@@ -1,0 +1,13 @@
+Label: R PERONEUS LONGUS: EMG 1 Sampling frequency: 1.925926e+003 Number of points: 1988454 start: 0.000000e+000 Unit: Volts Domain Unit: s
+Label: R GASTROCNEMIUS: EMG 2 Sampling frequency: 1.925926e+003 Number of points: 1988454 start: 0.000000e+000 Unit: Volts Domain Unit: s
+Label: R BICEPS FEMORIS: EMG 3 Sampling frequency: 1.925926e+003 Number of points: 1988454 start: 0.000000e+000 Unit: Volts Domain Unit: s
+Label: R GRACILIS: EMG 4 Sampling frequency: 1.925926e+003 Number of points: 1988454 start: 0.000000e+000 Unit: Volts Domain Unit: s
+Label: R TENSOR FASCIAE LATAE: EMG 5 Sampling frequency: 1.925926e+003 Number of points: 1988454 start: 0.000000e+000 Unit: Volts Domain Unit: s
+Label: R THORACOLUMBAR FASCIA: EMG 6 Sampling frequency: 1.925926e+003 Number of points: 1988454 start: 0.000000e+000 Unit: Volts Domain Unit: s
+Label: L PERONEUS LONGUS: EMG 7 Sampling frequency: 1.925926e+003 Number of points: 1988454 start: 0.000000e+000 Unit: Volts Domain Unit: s
+Label: L GASTROCNEMIUS: EMG 8 Sampling frequency: 1.925926e+003 Number of points: 1988454 start: 0.000000e+000 Unit: Volts Domain Unit: s
+Label: L GRACILIS: EMG 10 Sampling frequency: 1.925926e+003 Number of points: 1988454 start: 0.000000e+000 Unit: Volts Domain Unit: s
+Label: L THORACOLUMBAR FASCIA: EMG 11 Sampling frequency: 1.925926e+003 Number of points: 1988454 start: 0.000000e+000 Unit: Volts Domain Unit: s
+Label: L BICEPS FEMORIS: EMG 12 Sampling frequency: 1.925926e+003 Number of points: 1988454 start: 0.000000e+000 Unit: Volts Domain Unit: s
+Label: L TENSOR FASCIAE LATAE: EMG 13 Sampling frequency: 1.925926e+003 Number of points: 1988454 start: 0.000000e+000 Unit: Volts Domain Unit: s
+Label: Trigno Analog Input Adapter 16: Analog 16.A Sampling frequency: 1.925926e+003 Number of points: 1988454 start: 0.000000e+000 Unit: Volts Domain Unit: s

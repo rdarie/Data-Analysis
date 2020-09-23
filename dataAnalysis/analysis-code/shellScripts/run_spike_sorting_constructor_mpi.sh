@@ -48,5 +48,5 @@ source activate nda2
 python --version
 
 module load mpi
-srun --mpi=pmi2 python -u ./tridesclousCCV.py --arrayName=utah --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --attemptMPI --batchPreprocess --chan_start=0 --chan_stop=25 --sourceFile=processed --remakePrb --removeExistingCatalog
+srun --mpi=pmi2 python -u ./tridesclousCCV.py --arrayName=utah --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --attemptMPI --batchPreprocess --chan_start=0 --chan_stop=50 --sourceFile=processed --remakePrb --removeExistingCatalog
 # srun --mpi=pmi2 python -u ./tridesclousCCV.py --arrayName=nform --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --attemptMPI --batchPreprocess --chan_start=0 --chan_stop=16 --sourceFile=processed --remakePrb --removeExistingCatalog

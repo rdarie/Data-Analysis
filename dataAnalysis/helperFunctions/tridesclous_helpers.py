@@ -159,7 +159,7 @@ def preprocess_signals_and_peaks(
 def extract_waveforms_pca(
         triFolder, chan_grp=0,
         name='catalogue_constructor',
-        nb_noise_snippet=2000,
+        nb_noise_snippet=5000,
         minWaveforms=100,
         extractOpts=dict(
             mode='rand',

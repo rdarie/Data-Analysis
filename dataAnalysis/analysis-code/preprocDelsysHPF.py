@@ -75,8 +75,8 @@ def preprocDelsysWrapper():
             elif line == ' \n':
                 break
             delimIdx += 1
-    # pdb.set_trace()
     headerData = pd.DataFrame(headerDataList).set_index('label')
+    # pdb.set_trace()
     samplingRate = np.round(headerData['fs'].max())
     #
     searchStr = os.path.join(nspFolder, '*' + ns5FileName + '*.hpf')

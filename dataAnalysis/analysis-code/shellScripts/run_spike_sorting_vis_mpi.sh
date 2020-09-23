@@ -15,9 +15,10 @@
 
 ######## For Utah array
 ############# SBATCH --array=0,5,10,15,20
+#SBATCH --array=0,5,10,15,20,25,30,35,40,45
 
 ######## For N-Form
-#SBATCH --array=0,4,8,12
+############# SBATCH --array=0,4,8,12
 
 # Specify an output file
 #SBATCH -o ../../batch_logs/%j-%a-sort_vis.stdout
@@ -47,7 +48,7 @@
 # EXP="exp202009101200"
 # EXP="exp202009111100"
 EXP="exp202009211200"
-TRIALIDX="2"
+TRIALIDX="1"
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
@@ -58,11 +59,11 @@ python --version
 # Step 2: Validate the constructor
 let CHAN_START=SLURM_ARRAY_TASK_ID
 # for nform, groups of 4
-let CHAN_STOP=SLURM_ARRAY_TASK_ID+4
+# let CHAN_STOP=SLURM_ARRAY_TASK_ID+4
 # for utah, groups of 5
-#      let CHAN_STOP=SLURM_ARRAY_TASK_ID+5
+let CHAN_STOP=SLURM_ARRAY_TASK_ID+5
 
-# python -u ./tridesclousVisualize.py --arrayName=utah --blockIdx=$TRIALIDX --exp=$EXP  --constructor --chan_start=$CHAN_START --chan_stop=$CHAN_STOP
-python -u ./tridesclousVisualize.py --arrayName=nform --blockIdx=$TRIALIDX --exp=$EXP  --constructor --chan_start=$CHAN_START --chan_stop=$CHAN_STOP
+python -u ./tridesclousVisualize.py --arrayName=utah --blockIdx=$TRIALIDX --exp=$EXP  --constructor --chan_start=$CHAN_START --chan_stop=$CHAN_STOP
+# python -u ./tridesclousVisualize.py --arrayName=nform --blockIdx=$TRIALIDX --exp=$EXP  --constructor --chan_start=$CHAN_START --chan_stop=$CHAN_STOP
 
 # python -u ./tridesclousVisualize.py --blockIdx=$TRIALIDX --exp=$EXP  --peeler --chan_start=$CHAN_START --chan_stop=$CHAN_STOP
