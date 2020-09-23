@@ -5,8 +5,8 @@
 #SBATCH --time=12:00:00
 
 # Use 2 nodes with 8 tasks each, for 16 MPI tasks:
-#SBATCH --nodes=25
-#SBATCH --tasks=25
+#SBATCH --nodes=16
+#SBATCH --tasks=16
 #SBATCH --tasks-per-node=1
 #SBATCH --mem=56G
 
@@ -50,5 +50,5 @@ source activate nda2
 python --version
 
 module load mpi
-srun --mpi=pmi2 python3 -u ./tridesclousCCV.py --arrayName=utah --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --attemptMPI --purgePeeler --batchPeel --chan_start=0 --chan_stop=25 --sourceFile=processed
-# srun --mpi=pmi2 python3 -u ./tridesclousCCV.py --arrayName=nform --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --attemptMPI --purgePeeler --batchPeel --chan_start=0 --chan_stop=16 --sourceFile=processed
+# srun --mpi=pmi2 python3 -u ./tridesclousCCV.py --arrayName=utah --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --attemptMPI --purgePeeler --batchPeel --chan_start=0 --chan_stop=25 --sourceFile=processed
+srun --mpi=pmi2 python3 -u ./tridesclousCCV.py --arrayName=nform --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --attemptMPI --purgePeeler --batchPeel --chan_start=0 --chan_stop=16 --sourceFile=processed
