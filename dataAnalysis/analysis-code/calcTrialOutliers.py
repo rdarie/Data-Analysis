@@ -274,7 +274,7 @@ if __name__ == "__main__":
         mahalDistLoaded = False
 
     covOpts = dict(
-        useEmpiricalCovariance=False,
+        useEmpiricalCovariance=True,
         supportFraction=None)
     daskComputeOpts = dict(
         scheduler='processes'
@@ -288,7 +288,7 @@ if __name__ == "__main__":
             dataDF, fun=calcCovMat, resultPath=resultPath,
             funKWArgs=covOpts,
             rowKeys=groupNames, colKeys=['lag'],
-            useDask=True, reindexFromInput=False,
+            daskPersist=True, useDask=True, reindexFromInput=False,
             daskComputeOpts=daskComputeOpts
             )
         mahalDist.columns = ['mahalDist']
