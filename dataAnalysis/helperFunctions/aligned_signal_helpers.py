@@ -5,7 +5,9 @@ import dataAnalysis.helperFunctions.profiling as prf
 import dataAnalysis.helperFunctions.helper_functions_new as hf
 import pandas as pd
 import numpy as np
+import dask
 from dask import dataframe as dd
+from dask.distributed import Client
 from dask.diagnostics import ProgressBar
 import multiprocessing
 from scipy import stats
@@ -277,6 +279,7 @@ def splitApplyCombine(
                 newColumns.append(np.array(value).astype(oldType).item())
             tempDaskDF.columns = newColumns
             '''
+        daskClient = Client()
         tempDaskDF = dd.from_pandas(
             asigStack.reset_index(),
             npartitions=nPartitionMultiplier*multiprocessing.cpu_count())

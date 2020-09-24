@@ -102,13 +102,14 @@ def noiseCeil(
         tBounds=None,
         plotting=False, iterMethod='loo',
         corrMethod='pearson', maxIter=1e6):
+    # print('os.getpid() = {}'.format(os.getpid()))
     # print('Group shape is {}'.format(group.shape))
     dataColMask = group.columns.isin(dataColNames)
     groupData = group.loc[:, dataColMask]
     indexColMask = ~group.columns.isin(dataColNames)
     indexCols = group.columns[indexColMask]
     keepIndexCols = indexCols[~indexCols.isin(['segment', 'originalIndex', 't'])]
-    # 
+    #
     if tBounds is not None:
         maskX = (groupData.columns > tBounds[0]) & (groupData.columns < tBounds[1])
     else:
@@ -135,7 +136,6 @@ def noiseCeil(
             maxIter = int(factorial(nSamp) / (factorial(nChoose) ** 2))
         else:
             maxIter = int(maxIter)
-        #
         allCorr = pd.Series(index=range(maxIter))
         allCov = pd.Series(index=range(maxIter))
         allMSE = pd.Series(index=range(maxIter))
@@ -144,15 +144,12 @@ def noiseCeil(
             testXBar = testX.mean()
             refX = groupData.loc[~groupData.index.isin(testX.index), :]
             refXBar = refX.mean()
-            # if refX.mean().isna().any() or testX.mean().isna().any():
-            #
             allCorr.iloc[idx] = refX.mean().corr(
                 testXBar, method=corrMethod)
             allCov.iloc[idx] = refXBar.cov(testXBar)
             allMSE.iloc[idx] = (
                 ((refXBar - testXBar) ** 2)
                 .mean())
-    #
     # if allCorr.mean() < 0:
     #     pdb.set_trace()
     #     plt.plot(testXBar); plt.plot(refXBar); plt.show()
@@ -184,7 +181,6 @@ if __name__ == "__main__":
     #     'mse': np.float,
     #     'mseStd': np.float
     #     }
-    resultMeta = None
     useCachedResult = True
     if not (useCachedResult and os.path.exists(resultPath)):
         print('loading {}'.format(triggeredPath))
@@ -200,19 +196,26 @@ if __name__ == "__main__":
                 tBounds=None,
                 plotting=False, iterMethod='half',
                 corrMethod='pearson', maxIter=500)
-        # daskClient = Client()
         # daskComputeOpts = {}
         daskComputeOpts = dict(
             # scheduler='threads'
             scheduler='processes'
             # scheduler='single-threaded'
             )
+        exampleOutput = pd.DataFrame(
+        {
+            'noiseCeil': float(1),
+            'noiseCeilStd': float(1),
+            'covariance': float(1),
+            'covarianceStd': float(1),
+            'mse': float(1),
+            'mseStd': float(1)}, index=[0])
         resDF = ash.splitApplyCombine(
             dataDF, fun=noiseCeil, resultPath=resultPath,
             funArgs=[], funKWArgs=funKWArgs,
             rowKeys=groupBy, colKeys=testVar, useDask=True,
-            daskPersist=True, daskProgBar=True, daskResultMeta=resultMeta,
-            daskComputeOpts=daskComputeOpts, nPartitionMultiplier=2,
+            daskPersist=True, daskProgBar=True, daskResultMeta=exampleOutput,
+            daskComputeOpts=daskComputeOpts, nPartitionMultiplier=4,
             reindexFromInput=False)
         #
         # resDF = ash.applyFunGrouped(
