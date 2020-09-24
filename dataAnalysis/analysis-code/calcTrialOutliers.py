@@ -82,8 +82,6 @@ triggeredPath = os.path.join(
     prefix + '_{}_{}.nix'.format(
         arguments['inputBlockName'], arguments['window']))
 print('loading {}'.format(triggeredPath))
-dataReader, dataBlock = ns5.blockFromPath(
-    triggeredPath, lazy=arguments['lazy'])
 resultPath = os.path.join(
     calcSubFolder,
     prefix + '_{}_outliers.h5'.format(
@@ -203,6 +201,8 @@ def calcCovMat(
 
 
 if __name__ == "__main__":
+    dataReader, dataBlock = ns5.blockFromPath(
+        triggeredPath, lazy=arguments['lazy'])
     dataDF = ns5.alignedAsigsToDF(
         dataBlock, **alignedAsigsKWargs)
 

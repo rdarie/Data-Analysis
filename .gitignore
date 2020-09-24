@@ -174,3 +174,4 @@ dataAnalysis/\.ftpconfig
 dataAnalysis/analysis-code/\.vscode/ftp-sync.json
 dataAnalysis/simulation/\.vscode/ftp-sync.json
 paths.py
+dataAnalysis\analysis-code\dask-worker-space

@@ -117,7 +117,7 @@ OUTPUTBLOCKNAME="--outputBlockName=emg"
 CHANSELECTOR="--chanQuery=isiemgenv"
 BLOCKSELECTOR="--processAll"
 
-python -u ./calcAlignedAsigs.py --exp=$EXP $BLOCKSELECTOR $WINDOW $LAZINESS $ANALYSISFOLDER --eventName=stimAlignTimes $CHANSELECTOR $OUTPUTBLOCKNAME --verbose --alignFolderName=stim
+# python -u ./calcAlignedAsigs.py --exp=$EXP $BLOCKSELECTOR $WINDOW $LAZINESS $ANALYSISFOLDER --eventName=stimAlignTimes $CHANSELECTOR $OUTPUTBLOCKNAME --verbose --alignFolderName=stim
 
 INPUTBLOCKNAME="--inputBlockName=emg"
 
