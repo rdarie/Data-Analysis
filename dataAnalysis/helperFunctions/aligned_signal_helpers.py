@@ -237,7 +237,7 @@ def applyFun(
 def splitApplyCombine(
         asigWide, fun=None, resultPath=None,
         funArgs=[], funKWArgs={},
-        rowKeys=None, colKeys=None, useDask=False,
+        rowKeys=None, colKeys=None, useDask=False, nPartitionMultiplier=2,
         daskPersist=True, daskProgBar=True, daskResultMeta=None,
         daskComputeOpts={},
         reindexFromInput=False):
@@ -279,7 +279,7 @@ def splitApplyCombine(
             '''
         tempDaskDF = dd.from_pandas(
             asigStack.reset_index(),
-            npartitions=2*multiprocessing.cpu_count())
+            npartitions=nPartitionMultiplier*multiprocessing.cpu_count())
         if daskResultMeta is not None:
             funKWArgs.update({'meta': daskResultMeta})
         resultCollection = (
