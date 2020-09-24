@@ -309,9 +309,10 @@ if __name__ == "__main__":
                 ax.set_title(cN)
                 plt.tight_layout()
                 pdf.savefig()
-                plt.show()
-            # for pageIdx, (pageName, pageGroup) in enumerate(tqdm(noiseCeil.groupby('electrode'))):
-    # pdb.set_trace()
+                if arguments['showPlots']:
+                    plt.show()
+                else:
+                    plt.close()
     
     keepMask = ((resDF['noiseCeil'] > 0.4) & (resDF['covariance_q_scale'] > 0.1))
     keepFeats = (resDF.loc[keepMask, 'noiseCeil'].index.to_frame().reset_index(drop=True).groupby(['RateInHz', 'nominalCurrent', 'electrode'])['feature'])
@@ -343,7 +344,10 @@ if __name__ == "__main__":
         ax.set_xlabel('Pearson Correlation')
         ax.set_ylabel('Count')
         fig.savefig(os.path.join(figureOutputFolder, 'noise_ceil_histogram.pdf'))
-        plt.show()
+        if arguments['showPlots']:
+            plt.show()
+        else:
+            plt.close()
         # 
     if arguments['plotting']:
         plotDF = pd.concat(
@@ -362,7 +366,10 @@ if __name__ == "__main__":
         ax.set_xlim([-.2, 1])
         # ax.set_ylim([-1, 1])
         fig.savefig(os.path.join(figureOutputFolder, 'noise_ceil_scatterplot.pdf'))
-        plt.show()
+        if arguments['showPlots']:
+            plt.show()
+        else:
+            plt.close()
     if arguments['plotting']:
         plotDF = (
             resDF.loc[keepMask, :]
@@ -374,4 +381,7 @@ if __name__ == "__main__":
         sns.barplot(x='feature', y='noiseCeil', data=plotDF, ax=ax)
         ax.set_xticklabels(ax.get_xticklabels(), rotation=-60)
         fig.savefig(os.path.join(figureOutputFolder, 'noise_ceil_per_emg.pdf'))
-        plt.show()
+        if arguments['showPlots']:
+            plt.show()
+        else:
+            plt.close()

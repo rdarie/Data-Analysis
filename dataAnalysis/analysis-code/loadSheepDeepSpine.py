@@ -7,7 +7,9 @@ import matplotlib.pyplot as plt
 # cropEdgesTimes controls the size of the window that is loaded
 cropEdgesTimes = [-100e-3, 400e-3]
 # cropEdgesTimes = [-600e-3, -100e-3]
-inputPath = '/gpfs/scratch/rdarie/rdarie/Neural Recordings/202009231400-Peep/default/stim/_emg_XS_export.h5'
+inputPath = 'G:\\Delsys\\scratch\\202009231400-Peep\\default\\stim\\_emg_XS_export.h5'
+# inputPath = '/gpfs/scratch/rdarie/rdarie/Neural Recordings/202009231400-Peep/default/stim/_emg_XS_export.h5'
+
 with pd.HDFStore(inputPath, 'r') as store:
     # each trial has its own eesKey, get list of all
     allEESKeys = [
@@ -111,7 +113,7 @@ print(metaDataDF.loc[~metaDataDF['outlierTrial'], :].groupby(['electrode', 'ampl
 
 if noiseCeilDF is not None:
     print('Nans in noiseCeil: ')
-    nansInNoiseCeilMask = noiseCeilDF.drop(columns=['RExtensorDigitorumEmgEnv#0']).isna().any(axis=1)
+    nansInNoiseCeilMask = noiseCeilDF.isna().any(axis=1)
     noiseCeilDF.loc[nansInNoiseCeilMask, :]
 
 trialCountGood = metaDataDF.loc[~metaDataDF['outlierTrial'].astype(np.bool), :].groupby(['electrode', 'amplitude'])['RateInHz'].value_counts()
@@ -123,10 +125,16 @@ if checkPlots:
     ax[0].legend()
     ax[1].plot(emgNP[0, :, 0], label='emg')
     ax[1].legend()
-    ax[2].plot(accNP[0, :, 0], label='acc')
-    ax[2].legend()
-    ax[3].plot(lfpNP[0, :, 0], label='lfp')
-    ax[3].legend()
+    try:
+        ax[2].plot(accNP[0, :, 0], label='acc')
+        ax[2].legend()
+    except:
+        pass
+    try:
+        ax[3].plot(lfpNP[0, :, 0], label='lfp')
+        ax[3].legend()
+    except:
+        pass
     plt.show()
     print('Number of trials per ees condition: ')
     print(trialCount)
