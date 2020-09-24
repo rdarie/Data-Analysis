@@ -212,7 +212,7 @@ if __name__ == "__main__":
             funArgs=[], funKWArgs=funKWArgs,
             rowKeys=groupBy, colKeys=testVar, useDask=True,
             daskPersist=True, daskProgBar=True, daskResultMeta=resultMeta,
-            daskComputeOpts=daskComputeOpts, nPartitionMultiplier=10,
+            daskComputeOpts=daskComputeOpts, nPartitionMultiplier=2,
             reindexFromInput=False)
         #
         # resDF = ash.applyFunGrouped(
