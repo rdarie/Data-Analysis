@@ -39,3 +39,4 @@ dependencies:
 - python-snappy=0.5.4
 - xlrd=1.2.0
 - jupyter-server-proxy
+- requests=2.23.0
