@@ -21,6 +21,15 @@ Options:
     --sqrtTransform                              for firing rates, whether to take the sqrt to stabilize variance [default: False]
 """
 
+from docopt import docopt
+arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
+if arguments['plotting']:
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    sns.set()
+    sns.set_color_codes("dark")
+    sns.set_context("notebook")
+    sns.set_style("darkgrid")
 import pdb, traceback
 import os
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
@@ -32,26 +41,19 @@ import pandas as pd
 import numpy as np
 from dask import dataframe as dd
 from dask.diagnostics import ProgressBar
+from dask.distributed import Client
 from copy import deepcopy
-from docopt import docopt
 from tqdm import tqdm
 from currentExperiment import parseAnalysisOptions
 from namedQueries import namedQueries
 from sklearn.covariance import EmpiricalCovariance, MinCovDet, EllipticEnvelope
 from sklearn.utils.random import sample_without_replacement as swr
-arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']), arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
 
 if arguments['plotting']:
-    import matplotlib.pyplot as plt
-    import seaborn as sns
-    sns.set()
-    sns.set_color_codes("dark")
-    sns.set_context("notebook")
-    sns.set_style("darkgrid")
     figureOutputFolder = os.path.join(
         figureFolder, arguments['analysisName'])
     if not os.path.exists(figureOutputFolder):
@@ -199,6 +201,7 @@ def calcCovMat(
     # print('partition shape = {}'.format(partitionData.shape))
     return result
 
+
 if __name__ == "__main__":
     dataDF = ns5.alignedAsigsToDF(
         dataBlock, **alignedAsigsKWargs)
@@ -280,6 +283,7 @@ if __name__ == "__main__":
     if not mahalDistLoaded:
         if arguments['verbose']:
             print('Calculating covariance matrix...')
+        daskClient = Client()
         mahalDist = ash.splitApplyCombine(
             dataDF, fun=calcCovMat, resultPath=resultPath,
             funKWArgs=covOpts,

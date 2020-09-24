@@ -38,3 +38,4 @@ dependencies:
 - pyarrow=0.16.0
 - python-snappy=0.5.4
 - xlrd=1.2.0
+- jupyter-server-proxy

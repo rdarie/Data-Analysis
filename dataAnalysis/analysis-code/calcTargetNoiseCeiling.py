@@ -3,30 +3,33 @@ Usage:
     temp.py [options]
 
 Options:
-    --exp=exp                                 which experimental day to analyze
-    --blockIdx=blockIdx                       which trial to analyze [default: 1]
-    --processAll                              process entire experimental day? [default: False]
-    --lazy                                    load from raw, or regular? [default: False]
-    --verbose                                 print diagnostics? [default: False]
-    --plotting                                plot out the correlation matrix? [default: True]
-    --analysisName=analysisName               append a name to the resulting blocks? [default: default]
-    --inputBlockName=inputBlockName           filename for inputs [default: fr]
-    --maskOutlierBlocks                       delete outlier trials? [default: False]
-    --window=window                           process with short window? [default: long]
-    --unitQuery=unitQuery                     how to restrict channels if not supplying a list? [default: fr]
-    --alignQuery=alignQuery                   query what the units will be aligned to? [default: midPeak]
-    --alignFolderName=alignFolderName         append a name to the resulting blocks? [default: motion]
-    --selector=selector                       filename if using a unit selector
+    --exp=exp                                   which experimental day to analyze
+    --blockIdx=blockIdx                         which trial to analyze [default: 1]
+    --processAll                                process entire experimental day? [default: False]
+    --lazy                                      load from raw, or regular? [default: False]
+    --verbose                                   print diagnostics? [default: False]
+    --plotting                                  plot out the correlation matrix? [default: True]
+    --analysisName=analysisName                 append a name to the resulting blocks? [default: default]
+    --inputBlockName=inputBlockName             filename for inputs [default: fr]
+    --maskOutlierBlocks                         delete outlier trials? [default: False]
+    --window=window                             process with short window? [default: long]
+    --unitQuery=unitQuery                       how to restrict channels if not supplying a list? [default: fr]
+    --alignQuery=alignQuery                     query what the units will be aligned to? [default: midPeak]
+    --alignFolderName=alignFolderName           append a name to the resulting blocks? [default: motion]
+    --selector=selector                         filename if using a unit selector
+    --amplitudeFieldName=amplitudeFieldName     what is the amplitude named? [default: nominalCurrent]
 """
-
-import matplotlib
-matplotlib.rcParams['pdf.fonttype'] = 42
-matplotlib.rcParams['ps.fonttype'] = 42
-matplotlib.use('QT5Agg')   # generate postscript output
-# matplotlib.use('Agg')   # generate postscript output
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_pdf import PdfPages
-from tqdm import tqdm
+from docopt import docopt
+arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
+if arguments['plotting']:
+    import matplotlib
+    matplotlib.rcParams['pdf.fonttype'] = 42
+    matplotlib.rcParams['ps.fonttype'] = 42
+    matplotlib.use('QT5Agg')   # generate postscript output
+    # matplotlib.use('Agg')   # generate postscript output
+    import matplotlib.pyplot as plt
+    from matplotlib.backends.backend_pdf import PdfPages
+# from tqdm import tqdm
 import pdb
 import os
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
@@ -37,18 +40,19 @@ import pandas as pd
 from sklearn.model_selection import LeaveOneOut, PredefinedSplit
 from sklearn.utils import shuffle
 from sklearn.preprocessing import QuantileTransformer, RobustScaler, MinMaxScaler, StandardScaler
-from docopt import docopt
+
 from currentExperiment import parseAnalysisOptions
 from namedQueries import namedQueries
 import seaborn as sns
 from math import factorial
+from sklearn.preprocessing import scale, robust_scale
+from dask.distributed import Client
 
 #
 sns.set()
 sns.set_color_codes("dark")
 sns.set_context("notebook")
 sns.set_style("dark")
-arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']), arguments['exp'])
 globals().update(expOpts)
@@ -87,6 +91,11 @@ alignedAsigsKWargs.update(dict(
     removeFuzzyName=False,
     decimate=1, windowSize=(0, 300e-3),
     metaDataToCategories=False,
+    getMetaData=[
+        'RateInHz', 'feature', 'electrode',
+        arguments['amplitudeFieldName'], 'stimPeriod',
+        'pedalMovementCat', 'pedalSizeCat', 'pedalDirection',
+        'stimCat', 'originalIndex', 'segment', 't']
     transposeToColumns='bin', concatOn='index',
     verbose=False, procFun=None))
 #
@@ -95,7 +104,7 @@ alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUn
     namedQueries, scratchFolder, **arguments)
 alignedAsigsKWargs['outlierTrials'] = ash.processOutlierTrials(
     calcSubFolder, prefix, **arguments)
-from sklearn.preprocessing import scale, robust_scale
+
 
 def noiseCeil(
         group, dataColNames=None,
@@ -195,7 +204,7 @@ if __name__ == "__main__":
         funKWArgs = dict(
                 tBounds=None,
                 plotting=False, iterMethod='half',
-                corrMethod='pearson', maxIter=500)
+                corrMethod='pearson', maxIter=100)
         # daskComputeOpts = {}
         daskComputeOpts = dict(
             # scheduler='threads'
@@ -210,12 +219,13 @@ if __name__ == "__main__":
             'covarianceStd': float(1),
             'mse': float(1),
             'mseStd': float(1)}, index=[0])
+        daskClient = Client()
         resDF = ash.splitApplyCombine(
             dataDF, fun=noiseCeil, resultPath=resultPath,
             funArgs=[], funKWArgs=funKWArgs,
             rowKeys=groupBy, colKeys=testVar, useDask=True,
-            daskPersist=True, daskProgBar=True, daskResultMeta=exampleOutput,
-            daskComputeOpts=daskComputeOpts, nPartitionMultiplier=4,
+            daskPersist=True, daskProgBar=True, daskResultMeta=None,
+            daskComputeOpts=daskComputeOpts, nPartitionMultiplier=2,
             reindexFromInput=False)
         #
         # resDF = ash.applyFunGrouped(
@@ -267,13 +277,14 @@ if __name__ == "__main__":
     #
     # pdb.set_trace()
     trialInfo = resDF['noiseCeil'].index.to_frame().reset_index(drop=True)
-    dropColumns = [
-        'RExtensorDigitorumEmgEnv#0']
+    dropColumns = []
     dropElectrodes = []
     
     if arguments['plotting']:
         figureOutputFolder = os.path.join(
             figureFolder, arguments['analysisName'])
+        if not os.path.exists(figureOutputFolder):
+            os.makedirs(figureOutputFolder)
         pdfName = os.path.join(figureOutputFolder, 'noise_ceil_halves.pdf')
         with PdfPages(pdfName) as pdf:
             plotIndex = pd.MultiIndex.from_frame(
