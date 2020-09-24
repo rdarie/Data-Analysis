@@ -102,7 +102,7 @@ def noiseCeil(
         tBounds=None,
         plotting=False, iterMethod='loo',
         corrMethod='pearson', maxIter=1e6):
-    print('Group shape is {}'.format(group.shape))
+    # print('Group shape is {}'.format(group.shape))
     dataColMask = group.columns.isin(dataColNames)
     groupData = group.loc[:, dataColMask]
     indexColMask = ~group.columns.isin(dataColNames)
