@@ -75,12 +75,13 @@ if arguments['window'] == 'XS':
     cropWindow = (-100e-3, 400e-3)
 elif arguments['window'] == 'XSPre':
     cropWindow = (-600e-3, -100e-3)
+
 alignedAsigsKWargs.update(dict(
     duplicateControlsByProgram=False,
     makeControlProgram=False,
     metaDataToCategories=False,
     removeFuzzyName=False,
-    decimate=5,
+    decimate=1,
     windowSize=cropWindow,
     transposeToColumns='feature', concatOn='columns',))
 #
@@ -100,8 +101,10 @@ asigWide = ns5.alignedAsigsToDF(
     dataBlock, **alignedAsigsKWargs)
 metaData = asigWide.index.to_frame()
 elecNames = metaData['electrode'].unique()
+
 # elecRegex = r'([\-]?[\S\s]*\d)([\+]?[\S\s]*\d)'
 # elecRegex = r'((?:\-|\+)(?:(?:rostral|caudal)\S_\S\S\S)*)*'
+
 elecRegex = r'((?:\-|\+)(?:(?:rostral|caudal)\S_\S\S\S)*)'
 chanRegex = r'((?:rostral|caudal)\S_\S\S\S)'
 elecChanNames = []
@@ -126,7 +129,7 @@ for comboName in elecNames:
                         for chanName in theseChanNames:
                             thisLookup['anodes'].append(chanName)
         stimConfigLookup[comboName] = thisLookup
-# pdb.set_trace()
+
 eesColumns = pd.MultiIndex.from_tuples(
     [(eCN, 'amplitude') for eCN in sorted(elecChanNames)],
     names=['object', 'property']
@@ -151,7 +154,6 @@ with pd.HDFStore(outputPath) as store:
     nullKinematics.to_hdf(store, kinKey)
 eesIdx = 0
 
-# pdb.set_trace()
 for stimName, stimGroup in asigWide.groupby(['electrode', 'RateInHz', 'nominalCurrent']):
     if stimGroup.groupby(['segment', 't']).ngroups < 5:
         continue
@@ -165,7 +167,6 @@ for stimName, stimGroup in asigWide.groupby(['electrode', 'RateInHz', 'nominalCu
         if not arguments['noStim']:
             for stimTime in stimTimes:
                 closestIndexTime = np.argmin(np.abs((trialIndex - stimTime)))
-                # pdb.set_trace()
                 EESWaveform[closestIndexTime] = 1
         eesIdx += 1
         theseResults = pd.DataFrame(0, index=trialIndex, columns=eesColumns)

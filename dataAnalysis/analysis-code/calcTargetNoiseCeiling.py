@@ -101,9 +101,8 @@ def noiseCeil(
         group, dataColNames=None,
         tBounds=None,
         plotting=False, iterMethod='loo',
-        corrMethod='pearson',
-        maxIter=1e6):
-    # print('Group shape is {}'.format(group.shape))
+        corrMethod='pearson', maxIter=1e6):
+    print('Group shape is {}'.format(group.shape))
     dataColMask = group.columns.isin(dataColNames)
     groupData = group.loc[:, dataColMask]
     indexColMask = ~group.columns.isin(dataColNames)
@@ -204,6 +203,7 @@ if __name__ == "__main__":
         # daskClient = Client()
         # daskComputeOpts = {}
         daskComputeOpts = dict(
+            # scheduler='threads'
             scheduler='processes'
             # scheduler='single-threaded'
             )
@@ -212,7 +212,7 @@ if __name__ == "__main__":
             funArgs=[], funKWArgs=funKWArgs,
             rowKeys=groupBy, colKeys=testVar, useDask=True,
             daskPersist=True, daskProgBar=True, daskResultMeta=resultMeta,
-            daskComputeOpts=daskComputeOpts,
+            daskComputeOpts=daskComputeOpts, nPartitionMultiplier=10,
             reindexFromInput=False)
         #
         # resDF = ash.applyFunGrouped(

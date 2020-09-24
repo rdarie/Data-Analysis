@@ -97,3 +97,5 @@ ns5.getAsigsAlignedToEvents(
     fileName='{}_{}_{}'.format(
         prefix, arguments['outputBlockName'], arguments['window']),
     folderPath=alignSubFolder, chunkSize=alignedAsigsChunkSize)
+
+print('Finished CalcAlignedAsigs')

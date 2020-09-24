@@ -92,31 +92,35 @@ SLURM_ARRAY_TASK_ID=3
 # BLOCKSELECTOR="--processAll"
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
 
+
+#    
+#     preprocess
+#    ython -u ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --ISIMinimal --transferISIStimLog
+#     python -u ./preprocDelsysCSV.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $CHANSELECTOR
+#    ython -u ./preprocDelsysHPF.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $CHANSELECTOR --verbose
+#    
+#     synchronize
+#    ython -u ./synchronizeDelsysToNSP.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP $CHANSELECTOR --trigRate=2
+#    
+#     downsample
+#    HANSELECTOR="--chanQuery=isiemg"
+#    ython -u ./calcISIAnalysisNix.py --exp=$EXP $BLOCKSELECTOR $CHANSELECTOR $ANALYSISFOLDER --verbose
+#    
+
+################################################################################################################
 ALIGNQUERY="--alignQuery=stimOn"
 # ALIGNQUERY="--alignQuery=all"
 
+# python -u ./assembleExperimentData.py --exp=$EXP --blockIdx=3 --processAsigs --processRasters $ANALYSISFOLDER
 
-# preprocess
-python -u ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --ISIMinimal --transferISIStimLog
-# python -u ./preprocDelsysCSV.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $CHANSELECTOR
-python -u ./preprocDelsysHPF.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $CHANSELECTOR --verbose
+OUTPUTBLOCKNAME="--outputBlockName=emg"
+CHANSELECTOR="--chanQuery=isiemgenv"
+BLOCKSELECTOR="--processAll"
 
-# synchronize
-python -u ./synchronizeDelsysToNSP.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP $CHANSELECTOR --trigRate=2
+# python -u ./calcAlignedAsigs.py --exp=$EXP $BLOCKSELECTOR $WINDOW $LAZINESS $ANALYSISFOLDER --eventName=stimAlignTimes $CHANSELECTOR $OUTPUTBLOCKNAME --verbose --alignFolderName=stim
 
-# downsample
-CHANSELECTOR="--chanQuery=isiemg"
-python -u ./calcISIAnalysisNix.py --exp=$EXP $BLOCKSELECTOR $CHANSELECTOR $ANALYSISFOLDER --verbose
+INPUTBLOCKNAME="--inputBlockName=emg"
 
-# ALIGNQUERY="--alignQuery=stimOn"
-# # ALIGNQUERY="--alignQuery=all"
-# 
-python -u ./assembleExperimentData.py --exp=$EXP --blockIdx=3 --processAsigs --processRasters $ANALYSISFOLDER
-# OUTPUTBLOCKNAME="--outputBlockName=emg"
-# INPUTBLOCKNAME="--inputBlockName=emg"
-# CHANSELECTOR="--chanQuery=isiemgenv"
-python -u ./calcAlignedAsigs.py --exp=$EXP $BLOCKSELECTOR $WINDOW $LAZINESS $ANALYSISFOLDER --eventName=stimAlignTimes $CHANSELECTOR $OUTPUTBLOCKNAME --verbose --alignFolderName=stim
-# #
-python -u ./calcTrialOutliers.py --exp=$EXP --alignFolderName=stim $INPUTBLOCKNAME $BLOCKSELECTOR $ANALYSISSELECTOR $UNITSELECTOR $WINDOW $ALIGNQUERY --verbose --plotting --saveResults
-python -u ./calcTargetNoiseCeiling.py --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --maskOutlierBlocks $ALIGNQUERY --plotting
-python -u ./exportForDeepSpine.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISSELECTOR --alignFolderName=stim $UNITSELECTOR --alignQuery="stimOn" $INPUTBLOCKNAME
+# python -u ./calcTrialOutliers.py --exp=$EXP --alignFolderName=stim $INPUTBLOCKNAME $BLOCKSELECTOR $ANALYSISSELECTOR $UNITSELECTOR $WINDOW $ALIGNQUERY --verbose --plotting --saveResults
+python -u ./exportForDeepSpine.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISSELECTOR --alignFolderName=stim $UNITSELECTOR --alignQuery="stimOn" $INPUTBLOCKNAME --maskOutlierBlocks
+python -u ./calcTargetNoiseCeiling.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISSELECTOR --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --maskOutlierBlocks $ALIGNQUERY --plotting
