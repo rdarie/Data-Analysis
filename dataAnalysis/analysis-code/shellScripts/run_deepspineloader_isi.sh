@@ -40,8 +40,8 @@ TRIALSELECTOR="--processAll"
 # TRIALSELECTOR="--blockIdx=2"
 
 # ANALYSISFOLDER="--analysisName=hiRes"
-# ANALYSISFOLDER="--analysisName=default"
-ANALYSISFOLDER="--analysisName=loRes"
+ANALYSISFOLDER="--analysisName=default"
+# ANALYSISFOLDER="--analysisName=loRes"
 
 # UNITSELECTOR="--unitQuery=all"
 UNITSELECTOR="--unitQuery=isiemgenv"

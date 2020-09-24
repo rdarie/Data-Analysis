@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 # cropEdgesTimes controls the size of the window that is loaded
 cropEdgesTimes = [-100e-3, 400e-3]
 # cropEdgesTimes = [-600e-3, -100e-3]
-inputPath = '/gpfs/scratch/rdarie/rdarie/Neural Recordings/202009031500-Peep/loRes/stim/_emg_XS_export.h5'
+inputPath = '/gpfs/scratch/rdarie/rdarie/Neural Recordings/202009231400-Peep/default/stim/_emg_XS_export.h5'
 with pd.HDFStore(inputPath, 'r') as store:
     # each trial has its own eesKey, get list of all
     allEESKeys = [
@@ -92,7 +92,7 @@ with pd.HDFStore(inputPath, 'r') as store:
                 return noiseCeilMeta.index[findMask][0]
             else:
                 return np.nan
-    
+
         metaDataDF['eesIdx'] = metaDataDF.apply(getEESIdx, axis=1)
     else:
         noiseCeilDF = None
