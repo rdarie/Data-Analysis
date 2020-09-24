@@ -80,13 +80,15 @@ def preprocDelsysWrapper():
     samplingRate = np.round(headerData['fs'].max())
     #
     searchStr = os.path.join(nspFolder, '*' + ns5FileName + '*.hpf')
-    delsysPathCandidates = glob.glob(searchStr)
+    altSearchStr = os.path.join(nspFolder, '*' + 'Block{:0>4}'.format(blockIdx) + '*.hpf')
+    delsysPathCandidates = glob.glob(searchStr) + glob.glob(altSearchStr)
     assert len(delsysPathCandidates) == 1
     delsysPath = delsysPathCandidates[0]
     #
     delsysPathShort = os.path.join(nspFolder, ns5FileName + '.hpf')
     if delsysPathShort != delsysPath:
-        shutil.move(delsysPath, delsysPathShort)
+        # shutil.move(delsysPath, delsysPathShort)
+        shutil.copyfile(delsysPath, delsysPathShort)
         delsysPath = delsysPathShort
     #
     if arguments['chanQuery'] is not None:
@@ -94,7 +96,6 @@ def preprocDelsysWrapper():
             chanQuery = namedQueries['chan'][arguments['chanQuery']]
         else:
             chanQuery = arguments['chanQuery']
-    #   chanQuery = chanQuery.replace('.str', '').replace('contains', 'find')
     reader = btk.btkAcquisitionFileReader()  # build a btk reader object
     reader.SetFilename(delsysPath)  # set a filename to the reader
     reader.Update()

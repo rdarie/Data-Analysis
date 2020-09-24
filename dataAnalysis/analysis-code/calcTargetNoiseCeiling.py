@@ -85,7 +85,7 @@ alignedAsigsKWargs.update(dict(
     duplicateControlsByProgram=False,
     makeControlProgram=False,
     removeFuzzyName=False,
-    decimate=5, windowSize=(0, 300e-3),
+    decimate=1, windowSize=(0, 300e-3),
     metaDataToCategories=False,
     transposeToColumns='bin', concatOn='index',
     verbose=False, procFun=None))

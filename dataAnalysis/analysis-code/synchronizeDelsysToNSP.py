@@ -65,12 +65,15 @@ def synchronizeDelsysToNSP():
         tStart, tStop = synchInfo['delsys'][blockIdx]['timeRanges']
     except Exception:
         traceback.print_exc()
-        tStart = float(oeSyncAsig.times[0] + 1 * pq.s)
-        tStop = float(oeSyncAsig.times[-1] - 1 * pq.s)
+        tStart = float(oeSyncAsig.times[0] + 2 * pq.s)
+        tStop = float(oeSyncAsig.times[-1] - 2 * pq.s)
 
     oeTimeMask = hf.getTimeMaskFromRanges(
         oeSyncAsig.times, [(tStart, tStop)])
     oeSrs = pd.Series(oeSyncAsig.magnitude[oeTimeMask].flatten())
+    oeSrs.loc[oeSrs == 0] = np.nan
+    oeSrs.interpolate(method='linear', inplace=True)
+    oeSrs.fillna(method='bfill', inplace=True)
     print(
         'On block {}, detecting Delsys threshold crossings.'
         .format(blockIdx))
@@ -84,8 +87,8 @@ def synchronizeDelsysToNSP():
         tStart, tStop = synchInfo['nsp'][blockIdx]['timeRanges']
     except Exception:
         traceback.print_exc()
-        tStart = float(nspSyncAsig.times[0] + 1 * pq.s)
-        tStop = float(nspSyncAsig.times[-1] - 1 * pq.s)
+        tStart = float(nspSyncAsig.times[0] + 2 * pq.s)
+        tStop = float(nspSyncAsig.times[-1] - 2 * pq.s)
 
     nspTimeMask = hf.getTimeMaskFromRanges(
         nspSyncAsig.times, [(tStart, tStop)])
@@ -97,7 +100,7 @@ def synchronizeDelsysToNSP():
     oePeakIdx, oeCrossMask = hf.getThresholdCrossings(
         oeSrs, thresh=oeThresh,
         iti=interTriggerInterval, fs=float(oeSyncAsig.sampling_rate),
-        edgeType='both', itiWiggle=.1,
+        edgeType='both', itiWiggle=.2,
         absVal=False, plotting=arguments['plotting'], keep_max=False)
     # oePeakIdx = hf.getTriggers(
     #     oeSrs, iti=interTriggerInterval, fs=float(oeSyncAsig.sampling_rate),
@@ -111,7 +114,7 @@ def synchronizeDelsysToNSP():
     nspPeakIdx, nspCrossMask = hf.getThresholdCrossings(
         nspSrs, thresh=nspThresh,
         iti=interTriggerInterval, fs=float(nspSyncAsig.sampling_rate),
-        edgeType='both', itiWiggle=.1,
+        edgeType='both', itiWiggle=.2,
         absVal=False, plotting=arguments['plotting'], keep_max=False)
     # nspPeakIdx = hf.getTriggers(
     #     nspSrs, iti=interTriggerInterval, itiWiggle=1,
@@ -180,9 +183,13 @@ def synchronizeDelsysToNSP():
         pwSyncDict = {}  # piecewise sync parameters
         uniqueOeRounds = np.unique(oeDiscRound[oeDiscRound < 999])
         for roundIdx in uniqueOeRounds:
-            thesePolyCoeffs = np.polyfit(
-                x=oeTimes[oeDiscRound == roundIdx],
-                y=nspTimes[nspDiscRound == roundIdx], deg=1)
+            try:
+                thesePolyCoeffs = np.polyfit(
+                    x=oeTimes[oeDiscRound == roundIdx],
+                    y=nspTimes[nspDiscRound == roundIdx], deg=1)
+            except Exception:
+                traceback.print_exc()
+                pdb.set_trace()
             thisInterpFun = np.poly1d(thesePolyCoeffs)
             if roundIdx == 0:
                 pwSyncDict[roundIdx] = {

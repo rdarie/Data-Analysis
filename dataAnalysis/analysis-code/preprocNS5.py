@@ -33,6 +33,9 @@ expOpts, allOpts = parseAnalysisOptions(int(arguments['blockIdx']),arguments['ex
 globals().update(expOpts)
 globals().update(allOpts)
 
+enablePathOverrides = True
+if enablePathOverrides:
+    nspFolder = nspFolder.replace('G:\\Delsys', 'F:\\Trellis')
 
 def preprocNS5():
     # weird scope issue with ns5FileName in particular

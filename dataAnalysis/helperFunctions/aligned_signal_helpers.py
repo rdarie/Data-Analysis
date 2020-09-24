@@ -12,7 +12,11 @@ from scipy import stats
 from statsmodels.stats.multitest import multipletests as mt
 from copy import copy
 import pdb, traceback
-import pingouin as pg
+try:
+    import pingouin as pg
+except:
+    traceback.print_exc()
+    pass
 
 
 def processAlignQueryArgs(
