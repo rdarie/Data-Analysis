@@ -274,7 +274,7 @@ if __name__ == "__main__":
         mahalDistLoaded = False
 
     covOpts = dict(
-        useEmpiricalCovariance=True,
+        useEmpiricalCovariance=False,
         supportFraction=None)
     daskComputeOpts = dict(
         scheduler='processes'
