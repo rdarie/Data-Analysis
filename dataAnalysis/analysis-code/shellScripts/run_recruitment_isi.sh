@@ -27,7 +27,9 @@
 # EXP="exp202003181300"
 # EXP="exp202006171300"
 # EXP="exp202007011300"
-EXP="exp202007021300"
+# EXP="exp202007021300"
+EXP="exp202010071400"
+
 
 # SELECTOR="Block005_minfrmaxcorr"
 SELECTOR="_minfrmaxcorr"
@@ -40,9 +42,9 @@ TRIALSELECTOR="--processAll"
 # TRIALSELECTOR="--blockIdx=2"
 # TRIALSELECTOR="--blockIdx=3"
 # ANALYSISSELECTOR="--analysisName=emg"
-# ANALYSISSELECTOR="--analysisName=default"
+ANALYSISSELECTOR="--analysisName=default"
 # ANALYSISSELECTOR="--analysisName=emgHiRes"
-ANALYSISSELECTOR="--analysisName=emgLoRes"
+# ANALYSISSELECTOR="--analysisName=emgLoRes"
 #
 # UNITSELECTOR="--unitQuery=all"
 UNITSELECTOR="--unitQuery=isiemgenv"

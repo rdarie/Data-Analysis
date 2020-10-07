@@ -90,7 +90,7 @@ def calcISIBlockAnalysisNix():
                     stimLogText = f.read()
                     stimLogText = mdt.fixMalformedJson(stimLogText, jsonType='Log')
                     stimLog = json.loads(stimLogText)
-            stimResLookup = {4: 10 * pq.uA, 5: 20 * pq.uA}
+            stimResLookup = {3: 5 * pq.uA, 4: 10 * pq.uA, 5: 20 * pq.uA}
             stimDict = {
                 't': [],
                 'elec': [],
@@ -107,6 +107,11 @@ def calcISIBlockAnalysisNix():
             allNominalWaveforms = []
             for idx, entry in enumerate(stimLog):
                 t = entry['t']
+                if 'stimRes' in entry:
+                    ampQuanta = stimResLookup[entry['stimRes']]
+                else:
+                    ampQuanta = 20 * pq.uA
+                # print('ampQuanta = {}'.format(ampQuanta))
                 if 'stimCmd' in entry:
                     allStimCmd = entry['stimCmd']
                     if isinstance(allStimCmd, dict):
@@ -117,10 +122,6 @@ def calcISIBlockAnalysisNix():
                         nominalWaveform = []
                         lastAmplitude = 0
                         totalLen = 0
-                        if 'stimRes' in stimCmd:
-                            ampQuanta = stimResLookup[stimCmd['stimRes']]
-                        else:
-                            ampQuanta = 20 * pq.uA
                         for seqIdx, phase in enumerate(stimCmd['seq']):
                             if phase['enable']:
                                 phAmp = (
@@ -458,6 +459,7 @@ def calcISIBlockAnalysisNix():
             stimRastersDF.columns = [
                 cn.replace('_stim#0_raster', '')
                 for cn in stimRastersDF.columns]
+            ##############################
             # trick to avoid double counting channels that are plugged into the same electrode
             keepStimRasterList = []
             for stIdx, st in enumerate(spikeList):
@@ -729,6 +731,7 @@ def calcISIBlockAnalysisNix():
                         electrodeShortHand = ''
                         negativeAmps = stimRasterCurrent < 0
                         #
+                        pdb.set_trace()
                         if (negativeAmps).any():
                             electrodeShortHand += '-'
                             totalCathode = stimRasterCurrent[negativeAmps].sum()

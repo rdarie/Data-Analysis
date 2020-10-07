@@ -285,6 +285,7 @@ if __name__ == "__main__":
         if arguments['verbose']:
             print('Calculating covariance matrix...')
         daskClient = Client()
+        print(daskClient.scheduler_info()['services'])
         mahalDist = ash.splitApplyCombine(
             dataDF, fun=calcCovMat, resultPath=resultPath,
             funKWArgs=covOpts,
