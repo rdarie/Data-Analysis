@@ -1,24 +1,25 @@
 #!/bin/bash
 # 01: Preprocess spikes
 # Request an hour of runtime:
-#SBATCH --time=1:00:00
+#SBATCH --time=4:00:00
 
 # Use 2 nodes with 8 tasks each, for 16 MPI tasks:
-#SBATCH --nodes=10
-#SBATCH --tasks=10
+#SBATCH --nodes=1
+#SBATCH --tasks=1
 #SBATCH --tasks-per-node=1
 #SBATCH --mem=24G
 
 # Specify a job name:
-#SBATCH -J constructor
-#SBATCH --array=1
+#SBATCH -J ss_wave_extract
+###########SBATCH --array=0-28:4
+#SBATCH --array=0-45:5
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-constructor.stdout
-#SBATCH -e ../../batch_logs/%j-%a-constructor.errout
+#SBATCH -o ../../batch_logs/%j-%a-ss_wave_extract.stdout
+#SBATCH -e ../../batch_logs/%j-%a-ss_wave_extract.errout
 
 # Specify account details
-#SBATCH --account=carney-dborton-condo
+#############SBATCH --account=carney-dborton-condo
 
 # Run a command
 # EXP="exp201805071032"
@@ -49,5 +50,10 @@ conda activate
 source activate nda2
 python --version
 
-module load mpi
-srun --mpi=pmi2 python -u ./tridesclousCCV.py --arrayName=utah --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --attemptMPI --batchPreprocWaveforms --chan_start=0 --chan_stop=50 --sourceFile=processed --remakePrb --removeExistingCatalog
+BLOCK_ID=1
+# SLURM_ARRAY_TASK_ID=0
+let CHAN_START=SLURM_ARRAY_TASK_ID
+# for nform, groups of 4 for utah, groups of 5
+let CHAN_STOP=SLURM_ARRAY_TASK_ID+5
+
+python -u ./tridesclousCCV_jobArray.py --arrayName=utah --exp=$EXP --blockIdx=$BLOCK_ID --attemptMPI --batchPrepWaveforms --chan_start=$CHAN_START --chan_stop=$CHAN_STOP --sourceFile=processed

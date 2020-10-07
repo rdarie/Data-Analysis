@@ -5,10 +5,10 @@
 #SBATCH --time=12:00:00
 
 # Use 2 nodes with 8 tasks each, for 16 MPI tasks:
-#SBATCH --nodes=16
-#SBATCH --tasks=16
+#SBATCH --nodes=1
+#SBATCH --tasks=1
 #SBATCH --tasks-per-node=1
-#SBATCH --mem=56G
+#SBATCH --mem=24G
 
 # Specify a job name:
 #SBATCH -J peeler
@@ -21,7 +21,7 @@
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=1
+#SBATCH --array=0-49:1
 
 # Run a command
 # EXP="exp201804271016"
@@ -52,6 +52,11 @@ conda activate
 source activate nda2
 python --version
 
-module load mpi
-# srun --mpi=pmi2 python3 -u ./tridesclousCCV.py --arrayName=utah --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --attemptMPI --purgePeeler --batchPeel --chan_start=0 --chan_stop=50 --sourceFile=processed
-srun --mpi=pmi2 python3 -u ./tridesclousCCV.py --arrayName=nform --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --attemptMPI --purgePeeler --batchPeel --chan_start=0 --chan_stop=32 --sourceFile=processed
+BLOCKIDX=1
+# SLURM_ARRAY_TASK_ID=0
+let CHAN_START=SLURM_ARRAY_TASK_ID
+# for nform, groups of 4 for utah, groups of 5
+let CHAN_STOP=SLURM_ARRAY_TASK_ID+1
+
+python3 -u ./tridesclousCCV_jobArray.py --arrayName=utah --blockIdx=$BLOCKIDX --exp=$EXP --attemptMPI --purgePeeler --batchPeel --chan_start=$CHAN_START --chan_stop=$CHAN_STOP --sourceFile=processed
+# python3 -u ./tridesclousCCV_jobArray.py --arrayName=nform --blockIdx=$BLOCKIDX --exp=$EXP --attemptMPI --purgePeeler --batchPeel --chan_start=$CHAN_START --chan_stop=$CHAN_STOP --sourceFile=processed

@@ -313,7 +313,6 @@ if __name__ == "__main__":
                     plt.show()
                 else:
                     plt.close()
-    
     keepMask = ((resDF['noiseCeil'] > 0.4) & (resDF['covariance_q_scale'] > 0.1))
     keepFeats = (resDF.loc[keepMask, 'noiseCeil'].index.to_frame().reset_index(drop=True).groupby(['RateInHz', 'nominalCurrent', 'electrode'])['feature'])
     keepFeats.name = 'numFeatures'

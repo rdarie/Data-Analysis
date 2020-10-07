@@ -2271,12 +2271,14 @@ def preprocBlockToNix(
                             '''
                             pass
                         if calcAverageLFP:
-                            normalAsig = stats.zscore(asig)
+                            normalAsig = stats.zscore(asig.magnitude) * asig.units
                             if 'averageLFP' not in locals():
-                                averageLFP = normalAsig / nLfpAsigs
+                                averageLFP = asig.copy()
+                                # pdb.set_trace()
+                                averageLFP.magnitude[:] = normalAsig / nLfpAsigs
                                 averageLFP.array_annotations = {}
                             else:
-                                averageLFP += normalAsig / nLfpAsigs
+                                averageLFP.magnitude[:] += normalAsig / nLfpAsigs
                         if removeMeanAcross:
                             tempLFPStore.loc[:, aSigProxy.name] = asig.magnitude.flatten()
                         del asig

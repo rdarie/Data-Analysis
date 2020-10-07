@@ -15,6 +15,8 @@ Options:
     --purgePeeler                  delete previous sort results [default: False]
     --purgePeelerDiagnostics       delete previous sort results [default: False]
     --batchPreprocess              extract snippets and features, run clustering [default: False]
+    --batchPrepWaveforms           extract snippets [default: False]
+    --batchRunClustering           extract features, run clustering [default: False]
     --batchPeel                    run peeler [default: False]
     --makeCoarseNeoBlock           save peeler results to a neo block [default: False]
     --makeStrictNeoBlock           save peeler results to a neo block [default: False]
@@ -150,8 +152,18 @@ if arguments['batchPreprocess']:
         #     'method': 'global_pca',
         #     'n_components': 5
         # },
+        # featureOpts={
+        #     'method': 'global_umap',
+        #     'n_components': 4,
+        #     'n_neighbors': 75,
+        #     'min_dist': 0,
+        #     'metric': 'euclidean',
+        #     'set_op_mix_ratio': 0.9,
+        #     'init': 'spectral',
+        #     'n_epochs': 1000,
+        # },
         featureOpts={
-            'method': 'global_umap',
+            'method': 'global_pumap',
             'n_components': 4,
             'n_neighbors': 75,
             'min_dist': 0,
@@ -159,6 +171,9 @@ if arguments['batchPreprocess']:
             'set_op_mix_ratio': 0.9,
             'init': 'spectral',
             'n_epochs': 1000,
+            'parametric_reconstruction': True,
+            'autoencoder_loss': True,
+            'verbose': False
         },
         clusterOpts={
             'method': 'hdbscan',
@@ -175,6 +190,49 @@ if arguments['batchPreprocess']:
             nb_max=32000, align_waveform=False),
         autoMerge=False, auto_merge_threshold=0.99,
         attemptMPI=HAS_MPI)
+
+if arguments['batchPrepWaveforms']:
+    tdch.batchPrepWaveforms(
+        triFolder, chansToAnalyze,
+        relative_threshold=3.5,
+        fill_overflow=False,
+        highpass_freq=300.,
+        lowpass_freq=5000.,
+        common_ref_freq=300.,
+        common_ref_removal=False,
+        notch_freq=None,
+        filter_order=3,
+        noise_estimate_duration=300,
+        sample_snippet_duration=300,
+        chunksize=2**18,
+        extractOpts=dict(
+            mode='rand',
+            n_left=spikeWindow[0] - 2,
+            n_right=spikeWindow[1] + 2,
+            nb_max=32000, align_waveform=False),
+        attemptMPI=HAS_MPI)
+
+if arguments['batchRunClustering']:
+    tdch.batchRunClustering(
+        triFolder, chansToAnalyze,
+        featureOpts={
+            'method': 'global_pumap',
+            'n_components': 4,
+            'n_neighbors': 75,
+            'min_dist': 1e-3,
+            'metric': 'euclidean',
+            'set_op_mix_ratio': 0.9,
+            'parametric_reconstruction': False,
+            'autoencoder_loss': False,
+            'verbose': False,
+            'keras_fit_kwargs': {}
+        },
+        clusterOpts={
+            'method': 'hdbscan',
+            'min_cluster_size': 100,
+            'min_samples': 50,
+            'allow_single_cluster': True},
+        autoMerge=False, auto_merge_threshold=0.99)
 
 if arguments['batchPeel']:
     tdch.batchPeel(

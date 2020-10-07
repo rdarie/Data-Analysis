@@ -159,7 +159,7 @@ def preprocess_signals_and_peaks(
 def extract_waveforms_pca(
         triFolder, chan_grp=0,
         name='catalogue_constructor',
-        nb_noise_snippet=5000,
+        nb_noise_snippet=2000,
         minWaveforms=100,
         extractOpts=dict(
             mode='rand',
@@ -205,8 +205,87 @@ def extract_waveforms_pca(
     if cc.projector is not None:
         ccFolderName = os.path.dirname(cc.info_filename)
         projectorPath = os.path.join(ccFolderName, 'projector.pickle')
+        if 'GlobalPUMAP' in cc.projector.__repr__():
+            saveSubfolderPath = os.path.join(ccFolderName, 'umap')
+            if not os.path.exists(saveSubfolderPath):
+                os.makedirs(saveSubfolderPath)
+                cc.projector.umap.save(saveSubfolderPath, useH5=False)
+                # cc.projector.umap = None
         with open(projectorPath, 'wb') as f:
             pickle.dump({'projector': cc.projector}, f)
+    print(cc)
+    return
+
+
+def extract_pca(
+        triFolder, chan_grp=0,
+        name='catalogue_constructor',
+        featureOpts={
+            'method': 'neighborhood_pca',
+            'n_components_by_neighborhood': 10,
+            'radius_um': 600}
+        ):
+    dataio = tdc.DataIO(dirname=triFolder)
+    cc = tdc.CatalogueConstructor(
+        dataio=dataio, name=name, chan_grp=chan_grp)
+    t1 = time.perf_counter()
+    cc.extract_some_features(**featureOpts)
+    t2 = time.perf_counter()
+    print('project took {} seconds'.format(t2-t1))
+    if cc.projector is not None:
+        ccFolderName = os.path.dirname(cc.info_filename)
+        projectorPath = os.path.join(ccFolderName, 'projector.pickle')
+        if 'GlobalPUMAP' in cc.projector.__repr__():
+            saveSubfolderPath = os.path.join(ccFolderName, 'umap')
+            if not os.path.exists(saveSubfolderPath):
+                os.makedirs(saveSubfolderPath)
+                cc.projector.umap.save(saveSubfolderPath, useH5=False)
+                # cc.projector.umap = None
+        with open(projectorPath, 'wb') as f:
+            pickle.dump({'projector': cc.projector}, f)
+    print(cc)
+    return
+
+
+
+def extract_waveforms(
+        triFolder, chan_grp=0,
+        name='catalogue_constructor',
+        nb_noise_snippet=2000,
+        minWaveforms=100,
+        extractOpts=dict(
+            mode='rand',
+            n_left=-34, n_right=66, nb_max=500000,
+            align_waveform=False,
+            subsample_ratio=20)
+        ):
+    dataio = tdc.DataIO(dirname=triFolder)
+    cc = tdc.CatalogueConstructor(
+        dataio=dataio, name=name, chan_grp=chan_grp)
+    if extractOpts['mode'] == 'all':
+        extractOpts['nb_max'] = None
+    t1 = time.perf_counter()
+    cc.extract_some_waveforms(**extractOpts)
+    t2 = time.perf_counter()
+    print('extract_some_waveforms took {} seconds'.format(t2-t1))
+    t1 = time.perf_counter()
+    cc.clean_waveforms(
+        alien_value_threshold=100.)
+    t2 = time.perf_counter()
+    print('clean_waveforms took {} seconds'.format(t2-t1))
+    if cc.some_waveforms is not None:
+        if (cc.some_waveforms.shape[0] < minWaveforms):
+            print('No waveforms found!')
+            return
+    else:
+        print('No waveforms found!')
+        return
+    #  extract_some_noise
+    t1 = time.perf_counter()
+    cc.extract_some_noise(
+        nb_snippet=nb_noise_snippet)
+    t2 = time.perf_counter()
+    print('extract_some_noise took {} seconds'.format(t2-t1))
     print(cc)
     return
 
@@ -269,6 +348,8 @@ def open_cataloguewindow(
     win.show()
     #
     app.exec_()
+    #  re order by rms
+    cc.order_clusters(by='waveforms_rms')
     #  save catalogue before peeler
     cc.make_catalogue_for_peeler()
     return
@@ -857,6 +938,114 @@ def batchPreprocess(
                 clusterOpts=clusterOpts,
                 chan_grp=chan_grp, auto_make_catalog=False,
                 autoMerge=autoMerge, auto_merge_threshold=auto_merge_threshold)
+    return
+
+
+def batchRunClustering(
+        triFolder, chansToAnalyze,
+        featureOpts={
+            'method': 'pca_by_channel',
+            'n_components_by_channel': 15},
+        clusterOpts={
+            'method': 'kmeans',
+            'n_clusters': 4,
+            },
+        autoMerge=False, auto_merge_threshold=0.8,
+        attemptMPI=False
+        ):
+    print('Batch preprocessing...')
+    try:
+        if attemptMPI:
+            from mpi4py import MPI
+            COMM = MPI.COMM_WORLD
+            SIZE = COMM.Get_size()
+            RANK = COMM.Get_rank()
+        else:
+            raise(Exception('MPI aborted by cmd line argument'))
+    except Exception:
+        RANK = 0
+        SIZE = 1
+    print('RANK={}, SIZE={}'.format(RANK, SIZE))
+    for idx, chan_grp in enumerate(chansToAnalyze):
+        if idx % SIZE == RANK:
+            print('memory usage: {}'.format(
+                prf.memory_usage_psutil()))
+            extract_pca(
+                triFolder,
+                chan_grp=chan_grp,
+                featureOpts=featureOpts
+                )
+            cluster(
+                triFolder,
+                clusterOpts=clusterOpts,
+                chan_grp=chan_grp, auto_make_catalog=False,
+                autoMerge=autoMerge, auto_merge_threshold=auto_merge_threshold)
+    return
+
+
+def batchPrepWaveforms(
+        triFolder, chansToAnalyze,
+        relative_threshold=5.5,
+        fill_overflow=False,
+        highpass_freq=300.,
+        lowpass_freq=6000.,
+        notch_freq=60.,
+        common_ref_freq=1000.,
+        filter_order=4,
+        smooth_size=0,
+        output_dtype='float32',
+        peak_span=1e-3,
+        common_ref_removal=False,
+        noise_estimate_duration=120.,
+        sample_snippet_duration=240.,
+        chunksize=4096,
+        extractOpts=dict(
+            mode='rand',
+            n_left=-34, n_right=66, nb_max=500000,
+            align_waveform=False,
+            subsample_ratio=20),
+        attemptMPI=False
+        ):
+    print('Batch preprocessing...')
+    try:
+        if attemptMPI:
+            from mpi4py import MPI
+            COMM = MPI.COMM_WORLD
+            SIZE = COMM.Get_size()
+            RANK = COMM.Get_rank()
+        else:
+            raise(Exception('MPI aborted by cmd line argument'))
+    except Exception:
+        RANK = 0
+        SIZE = 1
+    print('RANK={}, SIZE={}'.format(RANK, SIZE))
+    for idx, chan_grp in enumerate(chansToAnalyze):
+        if idx % SIZE == RANK:
+            print('memory usage: {}'.format(
+                prf.memory_usage_psutil()))
+            preprocess_signals_and_peaks(
+                triFolder, chan_grp=chan_grp,
+                chunksize=chunksize,
+                signalpreprocessor_engine='numpy',
+                peakdetector_engine='numpy',
+                fill_overflow=fill_overflow,
+                highpass_freq=highpass_freq,
+                lowpass_freq=lowpass_freq,
+                notch_freq=notch_freq,
+                common_ref_freq=common_ref_freq,
+                filter_order=filter_order,
+                smooth_size=smooth_size,
+                output_dtype=output_dtype,
+                relative_threshold=relative_threshold,
+                peak_span=peak_span,
+                common_ref_removal=common_ref_removal,
+                noise_estimate_duration=noise_estimate_duration,
+                sample_snippet_duration=sample_snippet_duration)
+            extract_waveforms(
+                triFolder,
+                chan_grp=chan_grp,
+                extractOpts=extractOpts
+                )
     return
 
 

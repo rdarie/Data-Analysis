@@ -96,7 +96,7 @@ def mapToDF(arrayFilePath):
     # yIdx = np.array(
     #     cmpDF['ycoords'].values - cmpDF['ycoords'].min(),
     #     dtype=np.int)
-    # cmpDF.loc[:, 'nevID'] += 1
+    cmpDF.loc[:, 'nevID'] += 1
     return cmpDF
 
 

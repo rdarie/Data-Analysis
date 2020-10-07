@@ -34,6 +34,7 @@ pip install vg==1.6.1 --user
 pip install git+git://github.com/G-Node/nixpy@v1.5.0b3 --user
 pip install git+git://github.com/hector-sab/ttictoc@v0.4.1 --user
 pip install git+git://github.com/raphaelvallat/pingouin@v0.3.3 --user
+pip install git+git://github.com/lmcinnes/umap.git@0.5dev --user
 #
 
 for i in ${RepoList[*]}; do

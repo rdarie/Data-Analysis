@@ -33,7 +33,7 @@ expOpts, allOpts = parseAnalysisOptions(int(arguments['blockIdx']),arguments['ex
 globals().update(expOpts)
 globals().update(allOpts)
 
-enablePathOverrides = True
+enablePathOverrides = False
 if enablePathOverrides:
     nspFolder = nspFolder.replace('G:\\Delsys', 'F:\\Trellis')
 
@@ -114,7 +114,6 @@ def preprocNS5():
         analogInputNames = sorted(
             trialFilesFrom['utah']['eventInfo']['inputIDs'].values())
         # pdb.set_trace()
-        mapDF.loc[:, 'nevID'] += 1 # ?????
         reader = ns5.preproc(
             fileName=ns5FileName,
             rawFolderPath=nspFolder,
@@ -191,7 +190,7 @@ def preprocNS5():
     ###############################################################################
     if arguments['ISI']:
         mapDF = prb_meta.mapToDF(rippleMapFile[int(arguments['blockIdx'])])
-        mapDF.loc[:, 'nevID'] += 1 # ?????
+        # mapDF.loc[:, 'nevID'] += 1 # ?????
         if 'rippleOriginalMapFile' in locals():
             if rippleOriginalMapFile[int(arguments['blockIdx'])] is not None:
                 swapMaps = {

@@ -27,7 +27,7 @@ import elephant.pandas_bridge as elphpdb
 import dataAnalysis.preproc.mdt as preprocINS
 import quantities as pq
 import rcsanalysis.packet_func as rcsa_helpers
-import os, pdb
+import os, pdb, traceback
 from importlib import reload
 
 #  load options
@@ -60,7 +60,12 @@ nspSeg = nspBlock.segments[segIdx]
 oeSeg = oeBlock.segments[segIdx]
 #
 oeSyncAsig = oeSeg.filter(name='seg0_analog 1')[0]
-tStart, tStop = synchInfo['nform'][blockIdx]['timeRanges']
+try:
+    tStart, tStop = synchInfo['nform'][blockIdx]['timeRanges']
+except Exception:
+    traceback.print_exc()
+    tStart = float(oeSyncAsig.times[0] + 2 * pq.s)
+    tStop = float(oeSyncAsig.times[-1] - 2 * pq.s)
 #
 oeTimeMask = hf.getTimeMaskFromRanges(
     oeSyncAsig.times, [(tStart, tStop)])
@@ -74,13 +79,19 @@ oeDiffUncertainty = oeSrs.diff().abs().quantile(1-1e-6) / 4
 oeThresh = (oeLims[-1] - oeLims[0]) / 2
 
 nspSyncAsig = nspSeg.filter(name='seg0_ainp16')[0]
-tStart, tStop = synchInfo['nsp'][blockIdx]['timeRanges']
-
+try:
+    tStart, tStop = synchInfo['nsp'][blockIdx]['timeRanges']
+except Exception:
+    traceback.print_exc()
+    tStart = float(nspSyncAsig.times[0] + 2 * pq.s)
+    tStop = float(nspSyncAsig.times[-1] - 2 * pq.s)
 nspTimeMask = hf.getTimeMaskFromRanges(
     nspSyncAsig.times, [(tStart, tStop)])
 nspSrs = pd.Series(nspSyncAsig.magnitude[nspTimeMask].flatten())
 
-nspThresh = 0
+nspLims = nspSrs.quantile([1e-3, 1-1e-3]).to_list()
+nspDiffUncertainty = nspSrs.diff().abs().quantile(1-1e-3) / 4
+nspThresh = (nspLims[-1] - nspLims[0]) / 2
 #
 oePeakIdx, oeCrossMask = hf.getThresholdCrossings(
     oeSrs, thresh=oeThresh,
@@ -107,10 +118,22 @@ nspPeakIdx, nspCrossMask = hf.getThresholdCrossings(
 #     thres=2.58, edgeType='both')
 # nspCrossMask = nspSrs.index.isin(nspPeakIdx)
 print('Found {} triggers'.format(nspPeakIdx.size))
-oeTimes = (
-    oeSyncAsig.times[oeTimeMask][oeCrossMask][synchInfo['nform'][blockIdx]['chooseCrossings']])
-nspTimes = (
-    nspSyncAsig.times[nspTimeMask][nspCrossMask][synchInfo['nsp'][blockIdx]['chooseCrossings']])
+try:
+    chooseCrossings = synchInfo['nform'][blockIdx]['chooseCrossings']
+    oeTimes = (
+        oeSyncAsig.times[oeTimeMask][oeCrossMask][chooseCrossings])
+except Exception:
+    traceback.print_exc()
+    oeTimes = (
+        oeSyncAsig.times[oeTimeMask][oeCrossMask])
+try:
+    chooseCrossings = synchInfo['nsp'][blockIdx]['chooseCrossings']
+    nspTimes = (
+        nspSyncAsig.times[nspTimeMask][nspCrossMask][chooseCrossings])
+except Exception:
+    traceback.print_exc()
+    nspTimes = (
+        nspSyncAsig.times[nspTimeMask][nspCrossMask])
 ###########
 nMissingTriggers = nspTimes.size - oeTimes.size
 sampleWiggle = 5 * oeSyncAsig.sampling_rate.magnitude ** (-1)

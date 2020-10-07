@@ -29,7 +29,8 @@
 # EXP="exp201901221000"
 # EXP="exp201901231000"
 # EXP="exp201901271000"
-EXP="exp202009111100"
+# EXP="exp202009111100"
+EXP="exp202010011100"
 # EXP="exp201805231100"
 LAZINESS="--lazy"
 
@@ -41,6 +42,6 @@ python --version
 
 SLURM_ARRAY_TASK_ID=1
 # python3 -u ./synchronizeSIMItoNSP.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP
-python3 -u ./calcProprioAnalysisNix.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --chanQuery="notainp" --verbose --rigOnly
+python3 -u ./calcProprioAnalysisNix.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --chanQuery="rig" --verbose --rigOnly
 python3 -u ./calcMotionAlignTimes.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --plotParamHistograms $LAZINESS
 python3 -u ./calcFR.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID

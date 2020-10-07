@@ -39,7 +39,10 @@
 # EXP="exp202009071200"
 # EXP="exp202009101200"
 # EXP="exp202009111100"
-EXP="exp202009211200"
+# EXP="exp202009211200"
+# EXP="exp202009291300"
+# EXP="exp202009301100"
+EXP="exp202010011100"
 
 
 module load anaconda/3-5.2.0
@@ -48,13 +51,13 @@ conda activate
 source activate nda2
 python --version
 
-# SLURM_ARRAY_TASK_ID=1
+SLURM_ARRAY_TASK_ID=1
 
-# python -u ./preprocNS5.py --arrayName=nform --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --forSpikeSorting
 # python -u ./preprocNS5.py --arrayName=utah --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --forSpikeSorting
+# python -u ./preprocNS5.py --arrayName=nform --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --forSpikeSorting
 
 # !! maskMotorEncoder ignores all motor events outside alignTimeBounds
-python3 -u ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --arrayName=utah --fullSubtractMean --maskMotorEncoder
+# python3 -u ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --arrayName=utah --fullSubtractMean
 python3 -u ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --arrayName=nform --rippleNForm
 
 # python3 -u ./synchronizeNFormToNSP.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --trigRate=100

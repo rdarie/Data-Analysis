@@ -19,11 +19,9 @@ import dataAnalysis.helperFunctions.helper_functions as hf
 from currentExperiment import parseAnalysisOptions
 #from exp201901211000 import *
 import os, gc, traceback
-from numba.errors import NumbaPerformanceWarning, NumbaDeprecationWarning, NumbaPendingDeprecationWarning
+from numba.core.errors import NumbaPerformanceWarning, NumbaDeprecationWarning, NumbaPendingDeprecationWarning
 import warnings
-#
 warnings.simplefilter('ignore', category=NumbaPerformanceWarning)
-#
 
 
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}

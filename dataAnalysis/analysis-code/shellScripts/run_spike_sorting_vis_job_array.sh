@@ -8,18 +8,12 @@
 #SBATCH --nodes=1
 #SBATCH --tasks=1
 #SBATCH --tasks-per-node=1
-#SBATCH --mem=48G
+#SBATCH --mem=24G
 
 # Specify a job name:
 #SBATCH -J sort_vis
 
-######## For Utah array
-############# SBATCH --array=0,5,10,15,20
-############# SBATCH --array=0,5,10,15,20,25,30,35,40,45
-
-######## For N-Form
-############# SBATCH --array=0,4,8,12
-#SBATCH --array=0-28:4
+#SBATCH --array=0-49:1
 
 # Specify an output file
 #SBATCH -o ../../batch_logs/%j-%a-sort_vis.stdout
@@ -50,7 +44,8 @@
 # EXP="exp202009111100"
 # EXP="exp202009211200"
 # EXP="exp202009291300"
-EXP="exp202009301100"
+# EXP="exp202009301100"
+EXP="exp202010011100"
 TRIALIDX="1"
 
 module load anaconda/3-5.2.0
@@ -64,10 +59,10 @@ let CHAN_START=SLURM_ARRAY_TASK_ID
 
 # for nform, groups of 4
 # for utah, groups of 5
-let CHAN_STOP=SLURM_ARRAY_TASK_ID+4
+let CHAN_STOP=SLURM_ARRAY_TASK_ID+1
 
-# python -u ./tridesclousVisualize.py --arrayName=utah --blockIdx=$TRIALIDX --exp=$EXP  --constructor --chan_start=$CHAN_START --chan_stop=$CHAN_STOP
+python -u ./tridesclousVisualize.py --arrayName=utah --blockIdx=$TRIALIDX --exp=$EXP  --constructor --chan_start=$CHAN_START --chan_stop=$CHAN_STOP
 # python -u ./tridesclousVisualize.py --arrayName=nform --blockIdx=$TRIALIDX --exp=$EXP  --constructor --chan_start=$CHAN_START --chan_stop=$CHAN_STOP
 
 # python -u ./tridesclousVisualize.py --arrayName=utah --blockIdx=$TRIALIDX --exp=$EXP --peeler --chan_start=$CHAN_START --chan_stop=$CHAN_STOP
-python -u ./tridesclousVisualize.py --arrayName=nform --blockIdx=$TRIALIDX --exp=$EXP  --peeler --chan_start=$CHAN_START --chan_stop=$CHAN_STOP
+# python -u ./tridesclousVisualize.py --arrayName=nform --blockIdx=$TRIALIDX --exp=$EXP  --peeler --chan_start=$CHAN_START --chan_stop=$CHAN_STOP

@@ -97,6 +97,7 @@ def synchronizeDelsysToNSP():
     nspLims = nspSrs.quantile([1e-3, 1-1e-3]).to_list()
     nspDiffUncertainty = nspSrs.diff().abs().quantile(1-1e-3) / 4
     nspThresh = (nspLims[-1] - nspLims[0]) / 2
+    
     oePeakIdx, oeCrossMask = hf.getThresholdCrossings(
         oeSrs, thresh=oeThresh,
         iti=interTriggerInterval, fs=float(oeSyncAsig.sampling_rate),
