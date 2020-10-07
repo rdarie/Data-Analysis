@@ -9,6 +9,7 @@ Options:
     --lazy                                      load from raw, or regular? [default: False]
     --verbose                                   print diagnostics? [default: False]
     --plotting                                  plot out the correlation matrix? [default: True]
+    --showPlots                                 show the plots? [default: False]
     --analysisName=analysisName                 append a name to the resulting blocks? [default: default]
     --inputBlockName=inputBlockName             filename for inputs [default: fr]
     --maskOutlierBlocks                         delete outlier trials? [default: False]
@@ -29,6 +30,11 @@ if arguments['plotting']:
     # matplotlib.use('Agg')   # generate postscript output
     import matplotlib.pyplot as plt
     from matplotlib.backends.backend_pdf import PdfPages
+    import seaborn as sns
+    sns.set()
+    sns.set_color_codes("dark")
+    sns.set_context("notebook")
+    sns.set_style("dark")
 # from tqdm import tqdm
 import pdb
 import os
@@ -43,16 +49,11 @@ from sklearn.preprocessing import QuantileTransformer, RobustScaler, MinMaxScale
 
 from currentExperiment import parseAnalysisOptions
 from namedQueries import namedQueries
-import seaborn as sns
 from math import factorial
 from sklearn.preprocessing import scale, robust_scale
 from dask.distributed import Client
 
 #
-sns.set()
-sns.set_color_codes("dark")
-sns.set_context("notebook")
-sns.set_style("dark")
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']), arguments['exp'])
 globals().update(expOpts)
@@ -173,6 +174,7 @@ def noiseCeil(
             'mseStd': allMSE.std()}, index=[group.index[0]])
     for cN in keepIndexCols:
         resultDF.loc[group.index[0], cN] = group.loc[group.index[0], cN]
+    # print(os.getpid())
     return resultDF
 
 

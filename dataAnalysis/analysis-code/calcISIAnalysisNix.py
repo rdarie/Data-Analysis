@@ -90,7 +90,7 @@ def calcISIBlockAnalysisNix():
                     stimLogText = f.read()
                     stimLogText = mdt.fixMalformedJson(stimLogText, jsonType='Log')
                     stimLog = json.loads(stimLogText)
-            stimResLookup = {4: 10 * pq.uA, 5: 20 * pq.uA}
+            stimResLookup = {3: 5 * pq.uA, 4: 10 * pq.uA, 5: 20 * pq.uA}
             stimDict = {
                 't': [],
                 'elec': [],
@@ -107,6 +107,11 @@ def calcISIBlockAnalysisNix():
             allNominalWaveforms = []
             for idx, entry in enumerate(stimLog):
                 t = entry['t']
+                if 'stimRes' in entry:
+                    ampQuanta = stimResLookup[entry['stimRes']]
+                else:
+                    ampQuanta = 20 * pq.uA
+                # print('ampQuanta = {}'.format(ampQuanta))
                 if 'stimCmd' in entry:
                     allStimCmd = entry['stimCmd']
                     if isinstance(allStimCmd, dict):
@@ -117,10 +122,6 @@ def calcISIBlockAnalysisNix():
                         nominalWaveform = []
                         lastAmplitude = 0
                         totalLen = 0
-                        if 'stimRes' in stimCmd:
-                            ampQuanta = stimResLookup[stimCmd['stimRes']]
-                        else:
-                            ampQuanta = 20 * pq.uA
                         for seqIdx, phase in enumerate(stimCmd['seq']):
                             if phase['enable']:
                                 phAmp = (
@@ -465,8 +466,7 @@ def calcISIBlockAnalysisNix():
                 # matchingAsig = nspBlock.filter(objects=AnalogSignalProxy, name='seg0_' + chanName)
                 # if len(matchingAsig):
                 #     keepStimRasterList.append(chanName)
-                if '_b' not in chanName:
-                    keepStimRasterList.append(chanName)
+                keepStimRasterList.append(chanName)
             stimActive = stimRastersDF[keepStimRasterList].sum(axis=1) > 0
             activeTimes = stimRastersDF.loc[stimActive, 't']
             #
