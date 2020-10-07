@@ -459,7 +459,6 @@ def calcISIBlockAnalysisNix():
             stimRastersDF.columns = [
                 cn.replace('_stim#0_raster', '')
                 for cn in stimRastersDF.columns]
-            ##############################
             # trick to avoid double counting channels that are plugged into the same electrode
             keepStimRasterList = []
             for stIdx, st in enumerate(spikeList):
@@ -467,8 +466,7 @@ def calcISIBlockAnalysisNix():
                 # matchingAsig = nspBlock.filter(objects=AnalogSignalProxy, name='seg0_' + chanName)
                 # if len(matchingAsig):
                 #     keepStimRasterList.append(chanName)
-                if '_b' not in chanName:
-                    keepStimRasterList.append(chanName)
+                keepStimRasterList.append(chanName)
             stimActive = stimRastersDF[keepStimRasterList].sum(axis=1) > 0
             activeTimes = stimRastersDF.loc[stimActive, 't']
             #
@@ -731,7 +729,6 @@ def calcISIBlockAnalysisNix():
                         electrodeShortHand = ''
                         negativeAmps = stimRasterCurrent < 0
                         #
-                        pdb.set_trace()
                         if (negativeAmps).any():
                             electrodeShortHand += '-'
                             totalCathode = stimRasterCurrent[negativeAmps].sum()
