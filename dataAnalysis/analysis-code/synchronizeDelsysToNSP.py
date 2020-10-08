@@ -8,7 +8,7 @@ Options:
     --lazy                          load from raw, or regular? [default: False]
     --trigRate=trigRate             inter trigger interval [default: 60]
     --plotting                      whether to show diagnostic plots (must have display) [default: False]
-    --chanQuery=chanQuery           how to restrict channels if not providing a list? [default: fr]
+    --chanQuery=chanQuery           how to restrict channels if not providing a list?
 """
 
 from neo.io.proxyobjects import (

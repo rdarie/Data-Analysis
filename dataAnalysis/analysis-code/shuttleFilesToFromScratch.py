@@ -17,6 +17,7 @@ Options:
     --removePNGs                                 process entire experimental day? [default: False]
     --tdcNIXFromProcessedToScratch               process entire experimental day? [default: False]
     --preprocFolderFilesFromScratchToData        process entire experimental day? [default: False]
+    --preprocFolderFilesFromDataToScratch        process entire experimental day? [default: False]
     --purgePreprocFolder                         process entire experimental day? [default: False]
     --purgeAnalysisFolder                        process entire experimental day? [default: False]
     --purgeAlignFolder                           process entire experimental day? [default: False]
@@ -135,6 +136,15 @@ if arguments['preprocFolderFilesFromScratchToData']:
         if os.path.isfile(originPath):
             destinPath = os.path.join(processedFolder, itemName)
             shutil.copyfile(originPath, destinPath)
+            print('Copying from\n{}\ninto{}'.format(originPath, destinPath))
+
+if arguments['preprocFolderFilesFromDataToScratch']:
+    for itemName in os.listdir(processedFolder):
+        originPath = os.path.join(processedFolder, itemName)
+        if os.path.isfile(originPath):
+            destinPath = os.path.join(scratchFolder, itemName)
+            shutil.copyfile(originPath, destinPath)
+            print('Copying from\n{}\ninto{}'.format(originPath, destinPath))
 
 if arguments['purgePreprocFolder']:
     # Get a list of all the file paths that ends with .txt from in specified directory
@@ -148,7 +158,7 @@ if arguments['purgePreprocFolder']:
             destinPath = os.path.join(processedFolder, itemName)
             if not os.path.exists(destinPath):
                 safeToPurge = False
-                print('{} is missing!'.format(destinPath))
+                print('{} is missing from processed!'.format(destinPath))
     if safeToPurge or arguments['forcePurge']:
         print('purging {}'.format(scratchFolder))
         shutil.rmtree(scratchFolder)

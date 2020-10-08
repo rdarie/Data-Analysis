@@ -7,7 +7,7 @@ Options:
     --blockIdx=blockIdx              which trial to analyze
     --exp=exp                        which experimental day to analyze
     --plotting                       show plots? [default: False]
-    --chanQuery=chanQuery            how to restrict channels if not providing a list? [default: fr]
+    --chanQuery=chanQuery            how to restrict channels if not providing a list?
 """
 
 from docopt import docopt
@@ -77,16 +77,6 @@ def preprocDelsysWrapper():
     #
     rawData = pd.read_csv(delsysPath, skiprows=delimIdx, low_memory=False)
     # for idx, cName in enumerate(rawData.columns): print('{}: {}'.format(idx, cName))
-    if arguments['plotting']:
-        ainp = rawData['Analog Input adapter 7: Analog 7']
-        plt.plot(rawData['X[s].42'], ainp / ainp.abs().max(), '.-')
-        trace = rawData.iloc[:, 1]
-        plt.plot(rawData.iloc[:, 0], trace / trace.abs().max(), '.-')
-        trace = rawData.iloc[:, 15]
-        plt.plot(rawData.iloc[:, 14], trace / trace.abs().max(), '.-')
-        trace = rawData.iloc[:, 29]
-        plt.plot(rawData.iloc[:, 28], trace / trace.abs().max(), '.-')
-        plt.show(block=False)
     domainCols = [cName for cName in rawData.columns if 'X[' in cName]
     featureCols = [cName for cName in rawData.columns if 'X[' not in cName]
     collatedDataList = []
@@ -106,7 +96,6 @@ def preprocDelsysWrapper():
             runningT[0] = min(runningT[0], thisFeat.index[0])
             runningT[-1] = max(runningT[-1], thisFeat.index[-1])
         collatedDataList.append(thisFeat)
-    #
     resampledT = np.arange(runningT[0], runningT[-1], samplingRate ** (-1))
     # 
     featureNames = pd.concat([

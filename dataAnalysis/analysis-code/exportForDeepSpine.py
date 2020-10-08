@@ -124,10 +124,12 @@ for comboName in elecNames:
                             elecChanNames.append(chanName)
                     if '-' in matchGroup:
                         for chanName in theseChanNames:
-                            thisLookup['cathodes'].append(chanName)
+                            if chanName not in thisLookup['cathodes']:
+                                thisLookup['cathodes'].append(chanName)
                     if '+' in matchGroup:
                         for chanName in theseChanNames:
-                            thisLookup['anodes'].append(chanName)
+                            if chanName not in thisLookup['anodes']:
+                                thisLookup['anodes'].append(chanName)
         stimConfigLookup[comboName] = thisLookup
 
 eesColumns = pd.MultiIndex.from_tuples(

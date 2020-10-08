@@ -27,10 +27,10 @@
 # EXP="exp201901211000"
 # EXP="exp201901221000"
 # EXP="exp201901231000"
-EXP="exp201901261000"
+# EXP="exp201901261000"
 # EXP="exp201901271000"
 # EXP="exp202006171300"
-# EXP="exp202007011300"
+EXP="exp202007011300"
 # EXP="exp202007021300"
 # EXP="exp202007071300"
 # EXP="exp202007081300"
@@ -46,6 +46,9 @@ conda activate
 source activate nda2
 python --version
 
+# global operations
+python './shuttleFilesToFromScratch.py' --exp=$EXP --preprocFolderFilesFromScratchToData
+
+# per block operations
 SLURM_ARRAY_TASK_ID=4
-# python './shuttleFilesToFromScratch.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP $ANALYSISSELECTOR --analysisFolderFromScratchToData --preprocFolderFilesFromScratchToData
-python './shuttleFilesToFromScratch.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --tdcNIXFromProcessedToScratch
+# python './shuttleFilesToFromScratch.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --preprocFolderFilesFromScratchToData

@@ -486,7 +486,7 @@ def calcISIBlockAnalysisNix():
                 # annotate ripple stim spikes with info from json log
                 chanName = st.unit.channel_index.name
                 # matchingChIdx = nspBlock.filter(objects=ChannelIndex, name=chanName)
-                rippleChanNum = int(mapDF.loc[mapDF['label'] == chanName, 'nevID'] + 1)
+                rippleChanNum = int(mapDF.loc[mapDF['label'] == chanName, 'nevID'])
                 if stimEvents is not None:
                     # find which events in the stim log reference this spiketrain
                     thisStEventsMask = stimEvents.array_annotations['elec'] == rippleChanNum
@@ -519,6 +519,7 @@ def calcISIBlockAnalysisNix():
                 wvfDiff = wvf.diff(-1, axis=1).fillna(0)
                 wvfDiffAbs = wvfDiff.abs()
                 if stimEvents is not None:
+                    # pdb.set_trace()
                     lastValidIdx = int(stAnnotations['totalPW'].min() * 3e4) - 1
                     idxPeak = int(stAnnotations['firstPW'].min() * 3e4)
                     wvf.iloc[:, lastValidIdx:] = np.nan

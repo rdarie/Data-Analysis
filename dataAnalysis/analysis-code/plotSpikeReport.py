@@ -46,6 +46,9 @@ ns5FileName = ns5FileName.replace('Block', arrayName)
 triFolder = os.path.join(
     scratchFolder, 'tdc_{}{:0>3}'.format(arrayName, blockIdx))
 
+if not os.path.exists(spikeSortingFiguresFolder):
+    os.makedirs(spikeSortingFiguresFolder, exist_ok=True)
+
 if arguments['nameSuffix']:
     nameSuffix = arguments['nameSuffix']
 else:

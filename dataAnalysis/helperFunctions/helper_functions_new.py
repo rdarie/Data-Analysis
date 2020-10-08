@@ -536,7 +536,6 @@ def interpolateDF(
 
 def timeOffsetBlock(block, timeOffset, masterTStart):
     for st in block.filter(objects=SpikeTrain):
-        #  
         if len(st.times):
             st.magnitude[:] = st.times.magnitude + timeOffset.magnitude
             st.t_start = min(masterTStart, st.times[0] * 0.999)

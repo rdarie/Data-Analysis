@@ -19,10 +19,10 @@
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 # Request custom resources
-#SBATCH --array=2
+#SBATCH --array=2,3
 
 # EXP="exp202009101200"
-EXP="exp202009111100"
+# EXP="exp202009111100"
 EXP="exp202010011100"
 
 LAZINESS="--lazy"
@@ -33,5 +33,5 @@ conda activate
 source activate nda2
 python --version
 
-SLURM_ARRAY_TASK_ID=1
+# SLURM_ARRAY_TASK_ID=1
 python3 -u ./synchronizeNFormToNSP.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --trigRate=100 --plotting

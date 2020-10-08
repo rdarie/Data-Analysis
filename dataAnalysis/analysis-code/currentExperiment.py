@@ -335,11 +335,11 @@ def parseAnalysisOptions(
     # if not os.path.exists(alignedFeaturesFolder):
     #     os.makedirs(alignedFeaturesFolder, exist_ok=True)
     spikeSortingFiguresFolder = os.path.join(figureFolder, 'spikeSorting')
-    if not os.path.exists(spikeSortingFiguresFolder):
-        os.makedirs(spikeSortingFiguresFolder, exist_ok=True)
-    GLMFiguresFolder = os.path.join(figureFolder, 'GLM')
-    if not os.path.exists(GLMFiguresFolder):
-        os.makedirs(GLMFiguresFolder, exist_ok=True)
+    # if not os.path.exists(spikeSortingFiguresFolder):
+    #     os.makedirs(spikeSortingFiguresFolder, exist_ok=True)
+    # GLMFiguresFolder = os.path.join(figureFolder, 'GLM')
+    # if not os.path.exists(GLMFiguresFolder):
+    #     os.makedirs(GLMFiguresFolder, exist_ok=True)
     #
     alignedAsigsKWargs = dict(
         amplitudeColumn='amplitude',

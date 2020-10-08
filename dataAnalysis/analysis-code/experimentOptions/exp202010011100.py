@@ -83,7 +83,7 @@ def getExpOpts():
     
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        '202010011100-Rupert': [1, 2],
+        '202010011100-Rupert': [1, 2, 3],
         }
     # Options relevant to the classifcation of proprio trials
     movementSizeBins = [0, 0.4, 0.8]
@@ -125,7 +125,7 @@ def getExpOpts():
                     'xcoords': np.arange(-.1, 10.1, 2),
                     'ycoords': np.arange(-.1, 10.1, 1)}),
             'triFolderSource': {'exp': experimentName, 'block': 1},
-            'triFolderDest': [{'exp': experimentName, 'block': i} for i in [2]]
+            'triFolderDest': [{'exp': experimentName, 'block': i} for i in [2, 3]]
 
         },
         'nform': {
@@ -148,7 +148,7 @@ def getExpOpts():
                     'xcoords': np.arange(-.1, 18.1, 1),
                     'ycoords': np.arange(-.1, 5.1, 2)}),
             'triFolderSource': {'exp': experimentName, 'block': 1},
-            'triFolderDest': [{'exp': experimentName, 'block': i} for i in [2]]
+            'triFolderDest': [{'exp': experimentName, 'block': i} for i in [2, 3]]
         }
     }
     return locals()

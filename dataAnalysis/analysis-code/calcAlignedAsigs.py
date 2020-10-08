@@ -64,6 +64,7 @@ if arguments['processAll']:
 else:
     eventPath = analysisDataPath
 
+print('Loading events from {}'.format(eventPath))
 eventReader, eventBlock = ns5.blockFromPath(
     eventPath, lazy=arguments['lazy'])
 #  eventBlock = eventReader.read_block(

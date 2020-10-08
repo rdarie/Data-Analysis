@@ -1747,15 +1747,14 @@ def readBlockFixNames(
         rawioReader,
         block_index=0, signal_group_mode='split-all',
         lazy=True, mapDF=None, reduceChannelIndexes=False, swapMaps=None):
-    
-    dataBlock = rawioReader.read_block(
-        block_index=block_index, lazy=lazy,
-        signal_group_mode=signal_group_mode)
     headerSignalChan = pd.DataFrame(
         rawioReader.header['signal_channels']).set_index('id')
     headerUnitChan = pd.DataFrame(
         rawioReader.header['unit_channels']).set_index('id')
-    #  
+    dataBlock = rawioReader.read_block(
+        block_index=block_index, lazy=lazy,
+        signal_group_mode=signal_group_mode)
+    #
     if dataBlock.name is None:
         if 'neo_name' in dataBlock.annotations:
             dataBlock.name = dataBlock.annotations['neo_name']
@@ -2879,7 +2878,9 @@ def loadWithArrayAnn(
     return block
 
 
-def blockFromPath(dataPath, lazy=False, reduceChannelIndexes=False):
+def blockFromPath(
+        dataPath, lazy=False,
+        reduceChannelIndexes=False):
     if lazy:
         dataReader = nixio_fr.NixIO(
             filename=dataPath)

@@ -8,38 +8,26 @@ Options:
     --analysisName=analysisName     append a name to the resulting blocks? [default: default]
     --processAsigs                  whether to process the analog signals [default: False]
     --processRasters                whether to process the rasters [default: False]
+    --commitResults                whether to additionally save to the processed data folder [default: False]
 """
 import dataAnalysis.ephyviewer.scripts as vis_scripts
-import os, pdb, traceback
-from importlib import reload
+import os, pdb, traceback, shutil
+# from importlib import reload
 import neo
-from neo import (
-    Block, Segment, ChannelIndex,
-    Event, Epoch, AnalogSignal, SpikeTrain)
-from copy import copy
-import dataAnalysis.helperFunctions.kilosort_analysis as ksa
-import dataAnalysis.helperFunctions.helper_functions as hf
-import rcsanalysis.packet_func as rcsa_helpers
-import dataAnalysis.preproc.ns5 as preproc
-import dataAnalysis.preproc.mdt as preprocINS
-import numpy as np
-import pandas as pd
-import quantities as pq
-from matplotlib import pyplot as plt
-import seaborn as sns
-from sklearn.decomposition import PCA, FactorAnalysis
-from sklearn.preprocessing import StandardScaler
-from sklearn import linear_model
-from sklearn.model_selection import cross_val_predict, cross_val_score, train_test_split
-from sklearn.preprocessing import FunctionTransformer
-from sklearn.pipeline import make_pipeline, Pipeline
-from sklearn.model_selection import ParameterGrid
-from sklearn.model_selection import KFold
-from sklearn.model_selection import fit_grid_point
-from sklearn.metrics import mean_squared_error, r2_score
 from neo import (
     Unit, AnalogSignal, Event, Epoch,
     Block, Segment, ChannelIndex, SpikeTrain)
+from copy import copy
+# import dataAnalysis.helperFunctions.kilosort_analysis as ksa
+import dataAnalysis.helperFunctions.helper_functions_new as hf
+# import rcsanalysis.packet_func as rcsa_helpers
+import dataAnalysis.preproc.ns5 as preproc
+# import dataAnalysis.preproc.mdt as preprocINS
+import numpy as np
+import pandas as pd
+import quantities as pq
+# from matplotlib import pyplot as plt
+# import seaborn as sns
 
 #  load options
 from currentExperiment import parseAnalysisOptions
@@ -324,3 +312,20 @@ for suffix in suffixList:
     writer = neo.io.NixIO(filename=experimentDataPath)
     writer.write_block(masterBlock, use_obj_names=True)
     writer.close()
+    if arguments['commitResults']:
+        analysisProcessedSubFolder = os.path.join(
+            processedFolder, arguments['analysisName']
+            )
+        if not os.path.exists(analysisProcessedSubFolder):
+            os.makedirs(analysisProcessedSubFolder, exist_ok=True)
+        for suffix in suffixList:
+            experimentDataPath = os.path.join(
+                scratchFolder, arguments['analysisName'],
+                assembledName +
+                suffix + '.nix')
+            processedOutPath = os.path.join(
+                analysisProcessedSubFolder, arguments['analysisName'],
+                assembledName +
+                suffix + '.nix')
+            print('copying from:\n{}\ninto\n{}'.format(experimentDataPath, processedOutPath))
+            shutil.copyfile(experimentDataPath, processedOutPath)

@@ -51,9 +51,9 @@ SLURM_ARRAY_TASK_ID=1
 # TRIALSELECTOR="--blockIdx=3"
 TRIALSELECTOR="--processAll"
 
-# ANALYSISFOLDER="--analysisName=default"
+ANALYSISFOLDER="--analysisName=default"
 # ANALYSISFOLDER="--analysisName=hiRes"
-ANALYSISFOLDER="--analysisName=loRes"
+# ANALYSISFOLDER="--analysisName=loRes"
 # ANALYSISFOLDER="--analysisName=fullRes"
 #
 UNITSELECTOR="--unitQuery=all"

@@ -840,6 +840,13 @@ def transferTemplates(
                 shutil.copy(
                     os.path.join(ccFolderSource, skObjName + '.pickle'),
                     os.path.join(ccFolderDest, skObjName + '.pickle'))
+        umapNNFolders = ['umap', 'supervised-umap']
+        for umapFolder in umapNNFolders:
+            if os.path.exists(os.path.join(ccFolderSource, umapFolder)):
+                shutil.copytree(
+                    os.path.join(ccFolderSource, umapFolder),
+                    os.path.join(ccFolderDest, umapFolder)
+                )
         catDoesntExist = not os.path.exists(catFolderDest)
         catExistsButOverride = os.path.exists(catFolderDest) and removeExisting
         if catDoesntExist or catExistsButOverride:

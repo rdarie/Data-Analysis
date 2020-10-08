@@ -37,6 +37,7 @@ enablePathOverrides = False
 if enablePathOverrides:
     nspFolder = nspFolder.replace('G:\\Delsys', 'F:\\Trellis')
 
+
 def preprocNS5():
     # weird scope issue with ns5FileName in particular
     ns5FileName = allOpts['ns5FileName']
