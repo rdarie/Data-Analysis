@@ -28,8 +28,8 @@
 # EXP="exp202006171300"
 # EXP="exp202007011300"
 # EXP="exp202007021300"
-EXP="exp202010071400"
-
+# EXP="exp202010071400"
+EXP="exp202010081400"
 
 # SELECTOR="Block005_minfrmaxcorr"
 SELECTOR="_minfrmaxcorr"
@@ -60,5 +60,5 @@ conda activate
 source activate nda2
 python --version
 
-# python -u "./calcRecruitment.py" --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --alignQuery="stimOn"
+python -u "./calcRecruitment.py" --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --alignQuery="stimOn"
 python -u "./plotRecruitment.py" --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --alignQuery="stimOn"

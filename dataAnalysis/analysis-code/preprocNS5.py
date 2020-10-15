@@ -33,7 +33,7 @@ expOpts, allOpts = parseAnalysisOptions(int(arguments['blockIdx']),arguments['ex
 globals().update(expOpts)
 globals().update(allOpts)
 
-enablePathOverrides = False
+enablePathOverrides = True
 if enablePathOverrides:
     nspFolder = nspFolder.replace('G:\\Delsys', 'F:\\Trellis')
 
@@ -55,6 +55,9 @@ def preprocNS5():
         fallBackPath = os.path.join(
             nspFolder,
             '{}{:0>4}'.format(arrayName, blockIdx) + '.ns5')
+        print('{} not found;\nFalling back to {}'.format(
+            idealDataPath, fallBackPath
+        ))
         if os.path.exists(fallBackPath):
             shutil.move(
                 fallBackPath,
@@ -228,7 +231,7 @@ def preprocNS5():
                 traceback.print_exc()
     if arguments['ISIMinimal']:
         mapDF = prb_meta.mapToDF(rippleMapFile[int(arguments['blockIdx'])])
-        mapDF.loc[:, 'nevID'] += 1 # ?????
+        # mapDF.loc[:, 'nevID'] += 1 # ?????
         if 'rippleOriginalMapFile' in locals():
             if rippleOriginalMapFile[int(arguments['blockIdx'])] is not None:
                 swapMaps = {
