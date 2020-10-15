@@ -30,10 +30,12 @@
 # EXP="exp201901261000"
 # EXP="exp201901271000"
 # EXP="exp202006171300"
-EXP="exp202007011300"
+# EXP="exp202007011300"
 # EXP="exp202007021300"
 # EXP="exp202007071300"
 # EXP="exp202007081300"
+EXP="exp202010011100"
+# EXP="exp202009231400"
 
 # ANALYSISSELECTOR="--analysisName=emgHiRes"
 # ANALYSISSELECTOR="--analysisName=emgLoRes"
@@ -47,8 +49,6 @@ source activate nda2
 python --version
 
 # global operations
-python './shuttleFilesToFromScratch.py' --exp=$EXP --preprocFolderFilesFromScratchToData
+python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm=tdc_ --preprocFolderFiles --fromScratchToData --moveItems
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm=default
 
-# per block operations
-SLURM_ARRAY_TASK_ID=4
-# python './shuttleFilesToFromScratch.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --preprocFolderFilesFromScratchToData

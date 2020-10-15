@@ -320,8 +320,9 @@ emgRC[amplitudeFieldName] = emgRC[amplitudeFieldName].abs()
 sideLookup = {'R': 'Right', 'L': 'Left'}
 nSig = {}
 
-qLims = (0.025, 0.975)
-for name, group in emgRC.groupby(['feature', 'electrode']):
+qLims = (0.05, 0.95)
+# for name, group in emgRC.groupby(['feature', 'electrode']):
+for name, group in emgRC.groupby(['feature']):
     emgRC.loc[group.index, 'standardizedRAUC'] = (
         RobustScaler(quantile_range=[i * 100 for i in qLims])
         .fit_transform(
@@ -336,13 +337,13 @@ for name, group in emgRC.groupby(['feature', 'electrode']):
         rauc.to_numpy().reshape(-1, 1))
     emgRC.loc[group.index, 'normalizedRAUC'] = (
         thisScaler.transform(rauc.to_numpy().reshape(-1, 1)))
-    featName = name[0][1:-8]
-    emgRC.loc[group.index, 'featureName'] = name[0][:-8]
-    emgRC.loc[group.index, 'EMGSite'] = name[0][1:-8]
-    emgRC.loc[group.index, 'EMGSide'] = sideLookup[name[0][0]]
+    featName = name
+    emgRC.loc[group.index, 'featureName'] = featName[:-8]
+    emgRC.loc[group.index, 'EMGSite'] = featName[1:-8]
+    emgRC.loc[group.index, 'EMGSide'] = sideLookup[featName[0]]
     if os.path.exists(statsTestPath):
-        theseSig = sigValsWide.xs(name[0], level='unit')
-        nSig.update({name[0][:-8]: theseSig.sum().sum()})
+        theseSig = sigValsWide.xs(featName, level='unit')
+        nSig.update({featName[:-8]: theseSig.sum().sum()})
 
 emgRC.loc[:, 'EMG Location'] = (
     emgRC['EMGSide'] + ' ' + emgRC['EMGSite'])
@@ -367,9 +368,8 @@ if RCPlotOpts['keepElectrodes'] is not None:
 if RCPlotOpts['keepFeatures'] is not None:
     keepDataMask = plotEmgRC['featureName'].isin(RCPlotOpts['keepFeatures'])
     plotEmgRC = plotEmgRC.loc[keepDataMask, :]
-
+#
 emgPalette = sns.color_palette('Set2', plotEmgRC['EMGSite'].unique().size)
-
 g = sns.relplot(
     col='electrode',
     col_order=np.unique(plotEmgRC['electrode']),
@@ -380,14 +380,11 @@ g = sns.relplot(
     y='normalizedRAUC',
     style='EMGSide', style_order=['Right', 'Left'],
     hue='EMGSite', hue_order=np.unique(plotEmgRC['EMGSite']),
-    kind='line', data=plotEmgRC,
+    kind='line', data=plotEmgRC.query('RateInHz > 50'),
     palette=emgPalette,
     height=5, aspect=1.5, ci='sem', estimator='mean',
     facet_kws=dict(sharey=True, sharex=False), lw=2,
     )
-# for (ro, co, hu), dataSubset in g.facet_data():
-#     break
+#
 plt.savefig(pdfPath)
 plt.close()
-pdb.set_trace()
-# pdb.set_trace()

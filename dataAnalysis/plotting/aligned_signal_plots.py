@@ -558,6 +558,7 @@ def genTicksToScale(
         return
     return ticksToScale
 
+
 def genTicksToScaleTwin(
         lineOpts={}, textOpts={}, shared=True,
         xUnitFactor=1, yUnitFactor=1,
@@ -1051,6 +1052,11 @@ def twin_relplot(
                 legend_data=p2.legend_data,
                 label_order=p2.legend_order)
     g1.twin_axes = twin_axes
+    # reset the dictionary for any future visits to this function
+    facet1_kws['sharex'] = facet1_sharex
+    facet1_kws['sharey'] = facet1_sharey
+    facet2_kws['sharex'] = facet2_sharex
+    facet2_kws['sharey'] = facet2_sharey
     return g1
 
 

@@ -30,15 +30,16 @@ python --version
 # EXP="exp201901211000"
 # EXP="exp201901221000"
 # EXP="exp201901231000"
-EXP="exp201901271000"
+# EXP="exp201901271000"
+EXP="exp202010011100"
 
 LAZINESS="--lazy"
 
 # WINDOW="--window=long"
 WINDOW="--window=XS"
 
-ANALYSISFOLDER="--analysisName=loRes"
-# ANALYSISFOLDER="--analysisName=default"
+# ANALYSISFOLDER="--analysisName=loRes"
+ANALYSISFOLDER="--analysisName=default"
 
 SLURM_ARRAY_TASK_ID=4
 
@@ -49,7 +50,7 @@ UNITSELECTOR="--selector=_minfrmaxcorr"
 EVENTSELECTOR="--eventName=stimAlignTimes"
 ALIGNFOLDER="--alignFolderName=stim"
 
-# python3 -u ./assembleExperimentData.py --exp=$EXP $ANALYSISFOLDER --processAsigs --processRasters
+python3 -u ./assembleExperimentData.py --exp=$EXP $ANALYSISFOLDER --processAsigs --processRasters
 
 python3 -u ./calcAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $LAZINESS $WINDOW $EVENTSELECTOR $ALIGNFOLDER $ANALYSISFOLDER --chanQuery="rig" --outputBlockName="rig" --verbose
 python3 -u ./calcAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $LAZINESS $WINDOW $EVENTSELECTOR $ALIGNFOLDER $ANALYSISFOLDER --chanQuery="fr" --outputBlockName="fr" --verbose

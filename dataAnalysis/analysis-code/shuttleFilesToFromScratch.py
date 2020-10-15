@@ -3,25 +3,27 @@ Usage:
     calcBlockAnalysisNix.py [options]
 
 Options:
-    --blockIdx=blockIdx                          which trial to analyze
-    --exp=exp                                    which experimental day to analyze
-    --analysisName=analysisName                  append a name to the resulting blocks? [default: default]
-    --alignFolderName=alignFolderName            append a name to the resulting blocks? [default: motion]
-    --processAll                                 process entire experimental day? [default: False]
-    --analysisFolderFromScratchToData            process entire experimental day? [default: False]
-    --alignFolderFromScratchToData               process entire experimental day? [default: False]
-    --dataToScratch                              process entire experimental day? [default: False]
-    --scratchToData                              process entire experimental day? [default: False]
-    --removeSource                               process entire experimental day? [default: False]
-    --removeDate                                 process entire experimental day? [default: False]
-    --removePNGs                                 process entire experimental day? [default: False]
-    --tdcNIXFromProcessedToScratch               process entire experimental day? [default: False]
-    --preprocFolderFilesFromScratchToData        process entire experimental day? [default: False]
-    --preprocFolderFilesFromDataToScratch        process entire experimental day? [default: False]
-    --purgePreprocFolder                         process entire experimental day? [default: False]
-    --purgeAnalysisFolder                        process entire experimental day? [default: False]
-    --purgeAlignFolder                           process entire experimental day? [default: False]
-    --forcePurge                                 process entire experimental day? [default: False]
+    --blockIdx=blockIdx                              which trial to analyze [default: 1]
+    --exp=exp                                        which experimental day to analyze
+    --analysisName=analysisName                      append a name to the resulting blocks? [default: default]
+    --processAll                                     process entire experimental day? [default: False]
+    --alignFolderName=alignFolderName                append a name to the resulting blocks? [default: motion]
+    --searchTerm=searchTerm                          shuttle all files and folders that include this term
+    --moveItems                                      move items, as opposed to copy them
+    --fromScratchToData                              process entire experimental day? [default: False]
+    --fromDataToScratch                              process entire experimental day? [default: False]
+    --preprocFolderFiles                             process entire experimental day? [default: False]
+    --analysisFolderFromScratchToData                process entire experimental day? [default: False]
+    --alignFolderFromScratchToData                   process entire experimental day? [default: False]
+    --removeSource                                   process entire experimental day? [default: False]
+    --removeDate                                     process entire experimental day? [default: False]
+    --removePNGs                                     process entire experimental day? [default: False]
+    --tdcNIXFromProcessedToScratch                   process entire experimental day? [default: False]
+    --purgePreprocFolder                             process entire experimental day? [default: False]
+    --purgeAnalysisFolder                            process entire experimental day? [default: False]
+    --purgeAlignFolder                               process entire experimental day? [default: False]
+    --forcePurge                                     process entire experimental day? [default: False]
+    
 """
 
 #  load options
@@ -54,15 +56,6 @@ analysisSubFolder = os.path.join(
     )
 alignSubFolder = os.path.join(
     analysisSubFolder, arguments['alignFolderName'])
-if arguments['dataToScratch']:
-    originPath = dataPath
-    destinPath = scratchPath
-    shutil.copyfile(originPath, destinPath)
-
-if arguments['scratchToData']:
-    originPath = scratchPath
-    destinPath = dataPath
-    shutil.copyfile(originPath, destinPath)
 
 #  Try to delete the file ##
 if arguments['removeSource']:
@@ -130,22 +123,59 @@ if arguments['alignFolderFromScratchToData']:
     else:
         print('{} does not exist!!'.format(analysisSubFolder))
 
-if arguments['preprocFolderFilesFromScratchToData']:
-    for itemName in os.listdir(scratchFolder):
-        originPath = os.path.join(scratchFolder, itemName)
-        if os.path.isfile(originPath):
+#######################
+#  Global moves
+#######################
+
+if arguments['fromScratchToData']:
+    if arguments['preprocFolderFiles']:
+        for itemName in os.listdir(scratchFolder):
+            originPath = os.path.join(scratchFolder, itemName)
             destinPath = os.path.join(processedFolder, itemName)
-            shutil.copyfile(originPath, destinPath)
-            print('Copying from\n{}\ninto{}'.format(originPath, destinPath))
+            if os.path.isfile(originPath):
+                if arguments['moveItems']:
+                    shutil.move(originPath, destinPath)
+                else:
+                    shutil.copyfile(originPath, destinPath)
+                print('Copying from\n{}\ninto\n{}'.format(originPath, destinPath))
+    if arguments['searchTerm'] is not None:
+        for itemName in os.listdir(scratchFolder):
+            originPath = os.path.join(scratchFolder, itemName)
+            destinPath = os.path.join(processedFolder, itemName)
+            if os.path.isdir(originPath) and arguments['searchTerm'] in originPath:
+                if os.path.exists(destinPath):
+                    shutil.rmtree(destinPath)
+                if arguments['moveItems']:
+                    shutil.move(originPath, destinPath)
+                else:
+                    shutil.copytree(originPath, destinPath)
+                print('Copying from\n{}\ninto\n{}'.format(originPath, destinPath))
+            if os.path.isfile(originPath) and arguments['searchTerm'] in originPath:
+                shutil.copyfile(originPath, destinPath)
+                print('Copying from\n{}\ninto\n{}'.format(originPath, destinPath))
 
-if arguments['preprocFolderFilesFromDataToScratch']:
-    for itemName in os.listdir(processedFolder):
-        originPath = os.path.join(processedFolder, itemName)
-        if os.path.isfile(originPath):
+if arguments['fromDataToScratch']:
+    if arguments['preprocFolderFiles']:
+        for itemName in os.listdir(processedFolder):
+            originPath = os.path.join(processedFolder, itemName)
             destinPath = os.path.join(scratchFolder, itemName)
-            shutil.copyfile(originPath, destinPath)
-            print('Copying from\n{}\ninto{}'.format(originPath, destinPath))
+            if os.path.isfile(originPath):
+                shutil.copyfile(originPath, destinPath)
+                print('Copying from\n{}\ninto\n{}'.format(originPath, destinPath))
+    if arguments['searchTerm'] is not None:
+        for itemName in os.listdir(processedFolder):
+            originPath = os.path.join(processedFolder, itemName)
+            destinPath = os.path.join(scratchFolder, itemName)
+            if os.path.isdir(originPath) and arguments['searchTerm'] in originPath:
+                if os.path.exists(destinPath):
+                    shutil.rmtree(destinPath)
+                shutil.copytree(originPath, destinPath)
+                print('Copying from\n{}\ninto\n{}'.format(originPath, destinPath))
+            if os.path.isfile(originPath) and arguments['searchTerm'] in originPath:
+                shutil.copyfile(originPath, destinPath)
+                print('Copying from\n{}\ninto\n{}'.format(originPath, destinPath))
 
+'''
 if arguments['purgePreprocFolder']:
     # Get a list of all the file paths that ends with .txt from in specified directory
     fileList = glob.glob('{}/*'.format(scratchFolder), recursive=True)
@@ -162,3 +192,4 @@ if arguments['purgePreprocFolder']:
     if safeToPurge or arguments['forcePurge']:
         print('purging {}'.format(scratchFolder))
         shutil.rmtree(scratchFolder)
+'''
