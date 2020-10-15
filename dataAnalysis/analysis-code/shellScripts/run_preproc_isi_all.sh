@@ -94,15 +94,17 @@ UNITSELECTOR="--unitQuery=isiemgenv"
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
 
 #  #  preprocess
-# python -u ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --ISIMinimal --transferISIStimLog
-# python -u ./preprocDelsysHPF.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $CHANSELECTOR --verbose
+python -u ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --ISIMinimal --transferISIStimLog
+#  #  python -u ./preprocDelsysCSV.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $CHANSELECTOR
+python -u ./preprocDelsysHPF.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $CHANSELECTOR --verbose
 #  
 #  #  synchronize
-# python -u ./synchronizeDelsysToNSP.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP $CHANSELECTOR --trigRate=2
+python -u ./synchronizeDelsysToNSP.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP $CHANSELECTOR --trigRate=2
 #  
 #  #  downsample
-# CHANSELECTOR="--chanQuery=isiemg"
-# python -u ./calcISIAnalysisNix.py --exp=$EXP $BLOCKSELECTOR $CHANSELECTOR $ANALYSISFOLDER --verbose
+#  CHANSELECTOR="--chanQuery=isiemg"
+python -u ./calcISIAnalysisNix.py --exp=$EXP $BLOCKSELECTOR $CHANSELECTOR $ANALYSISFOLDER --verbose
+#  #    
 
 ################################################################################################################
 ALIGNQUERY="--alignQuery=stimOn"
