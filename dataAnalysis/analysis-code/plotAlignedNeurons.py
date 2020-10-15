@@ -127,14 +127,14 @@ if arguments['enableOverrides']:
         'height': 4,
         'aspect': 2,
         'facet1_kws': {  # raster axes
-            'sharey': False,
+            'sharey': True,
             # 'legend_out': False,
             'gridspec_kws': {
                 'wspace': 0.01,
                 'hspace': 0.01
             }},
         'facet2_kws': {  # firing rate axes
-            'sharey': False,
+            'sharey': True,
             # 'legend_out': False,
             'gridspec_kws': {
                 'wspace': 0.01,
@@ -142,7 +142,7 @@ if arguments['enableOverrides']:
             }}
         })
     ##########################################################################
-    alignedAsigsKWargs.update({'windowSize': (-.2, .5)})
+    alignedAsigsKWargs.update({'windowSize': (-.5, 1)})
     ##########################################################################
 #     # currWindow = rasterOpts['windowSizes'][arguments['window']]
 #     # fullWinSize = currWindow[1] - currWindow[0]
@@ -198,7 +198,7 @@ asp.plotNeuronsAligned(
     plotProcFuns=[
         # asp.genYLimSetterTwin((0, 150)),
         asp.genTicksToScaleTwin(
-            lineOpts={'lw': 2}, shared=False,
+            lineOpts={'lw': 2}, shared=True,
             # for evoked lfp report
             # xUnitFactor=1e3, yUnitFactor=1,
             # xUnits='msec', yUnits='uV',

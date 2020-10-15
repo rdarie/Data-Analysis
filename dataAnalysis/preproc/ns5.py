@@ -418,7 +418,8 @@ def unitSpikeTrainWaveformsToDF(
                 st.annotations['arrayAnnNames'] +
                 [
                     'arrayAnnNames', 'arrayAnnDTypes',
-                    'nix_name', 'neo_name', 'id']
+                    'nix_name', 'neo_name', 'id',
+                    'cell_label', 'cluster_label', 'max_on_channel', 'binWidth']
                 )
             annDF = pd.DataFrame(annDict)
             for k, value in st.annotations.items():
@@ -618,12 +619,15 @@ def concatenateUnitSpikeTrainWaveformsDF(
         print(
             'finished concatenating, memory usage: {:.1f} MB'
             .format(prf.memory_usage_psutil()))
-    allWaveforms.set_index(idxLabels, inplace=True)
-    allWaveforms.sort_index(
-        level=['segment', 'originalIndex', 't'],
-        axis='index', inplace=True, kind='mergesort')
-    allWaveforms.sort_index(
-        axis='columns', inplace=True, kind='mergesort')
+    try:
+        allWaveforms.set_index(idxLabels, inplace=True)
+        allWaveforms.sort_index(
+            level=['segment', 'originalIndex', 't'],
+            axis='index', inplace=True, kind='mergesort')
+        allWaveforms.sort_index(
+            axis='columns', inplace=True, kind='mergesort')
+    except:
+        pdb.set_trace()
     return allWaveforms
 
 
@@ -2885,11 +2889,8 @@ def blockFromPath(
         dataReader = nixio_fr.NixIO(
             filename=dataPath)
         dataBlock = readBlockFixNames(
-            dataReader, lazy=True,
+            dataReader, lazy=lazy,
             reduceChannelIndexes=reduceChannelIndexes)
-        #  dataBlock = dataReader.read_block(
-        #      block_index=0, lazy=True,
-        #      signal_group_mode='split-all')
     else:
         dataReader = None
         dataBlock = loadWithArrayAnn(dataPath)

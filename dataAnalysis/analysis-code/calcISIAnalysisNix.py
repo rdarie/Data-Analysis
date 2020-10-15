@@ -738,14 +738,17 @@ def calcISIBlockAnalysisNix():
                                 impedancesRipple.loc[impedancesRipple['elec'].isin(
                                     stimRasterCurrent[negativeAmps].index), 'impedance'])
                             # startCategories.loc[idx, 'amplitude'] = totalCathode * averageImpedance
+                            # pdb.set_trace()
                             for cName in stimRasterCurrent[negativeAmps].index:
-                                electrodeShortHand += cName[:-2]
+                                if cName[:-2] not in electrodeShortHand:
+                                    electrodeShortHand += cName[:-2]
                         positiveAmps = stimRasterCurrent > 0
                         if (positiveAmps).any():
                             electrodeShortHand += '+'
                             totalAnode = stimRasterCurrent[positiveAmps].sum()
                             for cName in stimRasterCurrent[positiveAmps].index:
-                                electrodeShortHand += cName[:-2]
+                                if cName[:-2] not in electrodeShortHand:
+                                    electrodeShortHand += cName[:-2]
                             if np.isnan(startCategories.loc[idx, 'nominalCurrent']):
                                 startCategories.loc[idx, 'nominalCurrent'] = totalAnode
                         startCategories.loc[idx, 'electrode'] = electrodeShortHand

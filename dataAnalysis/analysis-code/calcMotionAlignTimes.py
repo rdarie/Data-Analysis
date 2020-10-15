@@ -65,9 +65,11 @@ if not (blockExperimentType == 'proprio'):
     print('skipping RC trial')
     sys.exit()
 #
-alignTimeBounds = [
-    alignTimeBoundsLookup[int(arguments['blockIdx'])]
-    ]
+try:
+    alignTimeBounds = alignTimeBoundsLookup[int(arguments['blockIdx'])]
+except Exception:
+    traceback.print_exc()
+    alignTimeBounds = None
 #
 prefix = ns5FileName
 dataBlockPath = os.path.join(
@@ -162,17 +164,29 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
     moveMask = pd.Series(False, index=tdDF.index)
     stopMask = pd.Series(False, index=tdDF.index)
 
-    taskMask = (
-        (tdDF['t'] > alignTimeBounds[segIdx][0][0]) &
-        (tdDF['t'] < alignTimeBounds[segIdx][0][1])
-        )
+    if alignTimeBounds is not None:
+        taskMask = pd.Series(False, index=tdDF.index)
+        for idx, atb in enumerate(alignTimeBounds):
+            taskMask = (
+                (taskMask) | (
+                    (tdDF['t'] > atb[0]) &
+                    (tdDF['t'] < atb[1])
+                    )
+                )
+    else:
+        taskMask = (tdDF['t'] >= 0)
     ###################################################
     fs = asigsList[0].sampling_rate.magnitude
-    lowPassVelocity = hf.filterDF(
-        tdDF.loc[:, 'pedalVelocityCat'], 
-        fs,
-        lowPass=30, lowOrder=3)
+    pedalNeutralPoint = tdDF.loc[taskMask, 'pedalPosition'].iloc[0]
+    centeredPedalPosition = tdDF['pedalPosition'] - pedalNeutralPoint
+    pedalPosAbs = centeredPedalPosition.abs()
+    pedalPosThresh = pedalPosAbs.max() / 1000
     minDist = 25e-3
+    lowPassVelocity = hf.filterDF(
+        tdDF.loc[:, 'pedalVelocityCat'],
+        fs,
+        lowPass=25, lowOrder=6)
+    #
     _, startLowMask = hf.getThresholdCrossings(
         lowPassVelocity, thresh=-0.5, absVal=False,
         edgeType='falling', fs=fs, iti=minDist,
@@ -189,6 +203,7 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         lowPassVelocity, thresh=0.5, absVal=False,
         edgeType='falling', fs=fs, iti=minDist,
         plotting=False, keep_max=False, itiWiggle=0.05)
+    #
     moveMaskForSeg = (startLowMask | startHighMask) & taskMask
     stopMaskForSeg = (stopLowMask | stopHighMask) & taskMask
     ################
@@ -258,7 +273,6 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
     tdDF['pedalSize'].fillna(method='ffill', inplace=True)
     tdDF['pedalSize'].fillna(method='bfill', inplace=True)
     #
-    pedalNeutralPoint = tdDF.loc[taskMask, 'pedalPosition'].iloc[0]
     tdDF.loc[:, 'pedalSize'] = tdDF['pedalSize'] - pedalNeutralPoint
     #  plt.plot(tdDF['t'], tdDF['pedalSize'])
     #  plt.plot(tdDF['t'], tdDF['pedalPosition']); plt.show()

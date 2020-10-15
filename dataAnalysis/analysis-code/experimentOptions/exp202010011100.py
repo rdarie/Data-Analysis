@@ -1,7 +1,6 @@
 import numpy as np
 
 def getExpOpts():
-    #
     blockExperimentTypeLookup = {
         1: 'proprio',
         2: 'proprio',
@@ -79,8 +78,6 @@ def getExpOpts():
             2: {'detectChannels': ['ins_td0', 'ins_td2'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True},
             3: {'detectChannels': ['ins_td0', 'ins_td2'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True}
         }}
-        
-    
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
         '202010011100-Rupert': [1, 2, 3],
@@ -89,7 +86,9 @@ def getExpOpts():
     movementSizeBins = [0, 0.4, 0.8]
     movementSizeBinLabels = ['S', 'L']
     alignTimeBoundsLookup = {
-        1: None,
+        2: [
+            [66, 400]
+            ],
         }
     outlierDetectOptions = dict(
         targetEpochSize=10e-3,
@@ -125,8 +124,9 @@ def getExpOpts():
                     'xcoords': np.arange(-.1, 10.1, 2),
                     'ycoords': np.arange(-.1, 10.1, 1)}),
             'triFolderSource': {'exp': experimentName, 'block': 1},
-            'triFolderDest': [{'exp': experimentName, 'block': i} for i in [2, 3]]
-
+            'triFolderDest': [
+                {'exp': experimentName, 'block': i}
+                for i in [2, 3]]
         },
         'nform': {
             'asigNameList': [
@@ -148,7 +148,9 @@ def getExpOpts():
                     'xcoords': np.arange(-.1, 18.1, 1),
                     'ycoords': np.arange(-.1, 5.1, 2)}),
             'triFolderSource': {'exp': experimentName, 'block': 1},
-            'triFolderDest': [{'exp': experimentName, 'block': i} for i in [2, 3]]
+            'triFolderDest': [
+                {'exp': experimentName, 'block': i}
+                for i in [2, 3]]
         }
     }
     return locals()

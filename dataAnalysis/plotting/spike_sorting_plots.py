@@ -22,7 +22,7 @@ sns.set(rc={
 #@profile
 def plotSpikePanel(
         spikeStruct, spikes, labelFontSize=5,
-        padOverride=1e-3, figSize=(6, 18),
+        padOverride=1e-3, figSize=(12, 18),
         hideUnused=True,
         colorPal="ch:2,-.1,dark=.2,light=0.8,reverse=1"):
     sns.set_style("dark", {"axes.facecolor": ".9"})
