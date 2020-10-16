@@ -5,6 +5,11 @@ def getExpOpts():
         2: 'isi',
         3: 'isi',
         4: 'isi',
+        5: 'isi',
+        6: 'isi',
+        7: 'isi',
+        8: 'isi',
+        9: 'isi',
         }
     experimentName = '202010151400-Peep'
     deviceName = None
@@ -13,6 +18,11 @@ def getExpOpts():
         2: 'isi_nano1caudal_xAyBzC_ortho_nano2rostral_xAyBzC_ortho.map',
         3: 'isi_nano1caudal_xAyBzC_ortho_nano2rostral_xAyBzC_ortho.map',
         4: 'isi_nano1caudal_xAyBzC_ortho_nano2rostral_xAyBzC_ortho.map',
+        5: 'isi_nano1caudal_xAyBzC_ortho_nano2rostral_xAyBzC_ortho.map',
+        6: 'isi_nano1caudal_xAyBzC_ortho_nano2rostral_xAyBzC_ortho.map',
+        7: 'isi_nano1caudal_xAyBzC_ortho_nano2rostral_xAyBzC_ortho.map',
+        8: 'isi_nano1caudal_xAyBzC_ortho_nano2rostral_xAyBzC_ortho.map',
+        9: 'isi_nano1caudal_xAyBzC_ortho_nano2rostral_xAyBzC_ortho.map',
         }
     delsysExampleHeaderPath = './delsys_example_header_20200922.csv'
     # use "original" file in edge cases where the ns5 file was saved incorrectly
@@ -22,6 +32,11 @@ def getExpOpts():
         2: None,
         3: None,
         4: None,
+        5: None,
+        6: None,
+        7: None,
+        8: None,
+        9: None,
         }
     #
     rippleFastSettleTriggers = {
@@ -29,6 +44,11 @@ def getExpOpts():
         2: {'stim': 'none'},
         3: {'stim': 'none'},
         4: {'stim': 'none'},
+        5: {'stim': 'none'},
+        6: {'stim': 'none'},
+        7: {'stim': 'none'},
+        8: {'stim': 'none'},
+        9: {'stim': 'none'},
     }
     # exclude dummy electrodes 8 and 16
     asigNameList = [
@@ -46,6 +66,11 @@ def getExpOpts():
         2: [],
         3: [],
         4: [],
+        5: [],
+        6: [],
+        7: [],
+        8: [],
+        9: [],
         }
     synchInfo = {'delsys': {}, 'nsp': {}, 'ins': {}}
     # For emg analysis - emg missing for some time ranges
@@ -60,6 +85,11 @@ def getExpOpts():
         2: None,
         3: None,
         4: None,
+        5: None,
+        6: None,
+        7: None,
+        8: None,
+        9: None,
         }
     #  if not possible to use taps, override with good taps from another segment
     #  not ideal, because segments are only synchronized to the nearest **second**
@@ -68,7 +98,12 @@ def getExpOpts():
         1: {},
         2: {},
         3: {},
-        4: {}
+        4: {},
+        5: {},
+        6: {},
+        7: {},
+        8: {},
+        9: {}
         }
     # options for stim artifact detection
     detectStim = False

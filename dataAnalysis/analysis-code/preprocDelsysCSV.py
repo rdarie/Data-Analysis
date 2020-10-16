@@ -7,6 +7,7 @@ Options:
     --blockIdx=blockIdx              which trial to analyze
     --exp=exp                        which experimental day to analyze
     --plotting                       show plots? [default: False]
+    --verbose                        show plots? [default: False]
     --chanQuery=chanQuery            how to restrict channels if not providing a list?
 """
 
@@ -118,7 +119,7 @@ def preprocDelsysWrapper():
         tempT = np.unique(np.concatenate([resampledT, thisFeat.index.to_numpy()]))
         collatedDataList[idx] = (
             thisFeat.reindex(tempT)
-            .interpolate(method='pchip')
+            .interpolate(method='linear')
             .fillna(method='ffill').fillna(method='bfill'))
         absentInNew = ~collatedDataList[idx].index.isin(resampledT)
         collatedDataList[idx].drop(
@@ -151,7 +152,7 @@ def preprocDelsysWrapper():
         collatedData,
         idxT='t', useColNames=True, probeName='',
         dataCol=collatedData.drop(columns='t').columns,
-        samplingRate=samplingRate * pq.Hz)
+        samplingRate=samplingRate * pq.Hz, verbose=arguments['verbose'])
     dataBlock.name = 'delsys'
     outPathName = os.path.join(
         scratchFolder, ns5FileName + '_delsys.nix')
