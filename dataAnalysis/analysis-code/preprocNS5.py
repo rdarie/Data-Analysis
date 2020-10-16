@@ -33,7 +33,7 @@ expOpts, allOpts = parseAnalysisOptions(int(arguments['blockIdx']),arguments['ex
 globals().update(expOpts)
 globals().update(allOpts)
 
-enablePathOverrides = True
+enablePathOverrides = False
 if enablePathOverrides:
     nspFolder = nspFolder.replace('G:\\Delsys', 'F:\\Trellis')
 

@@ -92,7 +92,7 @@ UNITSELECTOR="--unitQuery=isiemgenv"
 # UNITSELECTOR="--unitQuery=isiacc"
 # UNITSELECTOR="--unitQuery=isispinaloremg"
 
-SLURM_ARRAY_TASK_ID=4
+SLURM_ARRAY_TASK_ID=5
 # BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
 
 #  #  preprocess
