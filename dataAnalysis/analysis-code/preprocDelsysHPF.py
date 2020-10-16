@@ -76,12 +76,12 @@ def preprocDelsysWrapper():
                 break
             delimIdx += 1
     headerData = pd.DataFrame(headerDataList).set_index('label')
-    # pdb.set_trace()
     samplingRate = np.round(headerData['fs'].max())
     #
     searchStr = os.path.join(nspFolder, '*' + ns5FileName + '*.hpf')
     altSearchStr = os.path.join(nspFolder, '*' + 'Block{:0>4}'.format(blockIdx) + '*.hpf')
     delsysPathCandidates = glob.glob(searchStr) + glob.glob(altSearchStr)
+    # pdb.set_trace()
     assert len(delsysPathCandidates) == 1
     delsysPath = delsysPathCandidates[0]
     #

@@ -6,7 +6,7 @@ def getExpOpts():
         3: 'isi',
         4: 'isi',
         }
-    experimentName = '202009231400-Peep'
+    experimentName = '202010151400-Peep'
     deviceName = None
     rippleMapFile = {
         1: 'isi_nano1caudal_xAyBzC_ortho_nano2rostral_xAyBzC_ortho.map',
@@ -49,6 +49,9 @@ def getExpOpts():
         }
     synchInfo = {'delsys': {}, 'nsp': {}, 'ins': {}}
     # For emg analysis - emg missing for some time ranges
+    synchInfo['delsys'][3] = {'timeRanges': [8, 1313], 'chooseCrossings': slice(None)}
+    #
+    synchInfo['nsp'][3] = {'timeRanges': [4, 1313], 'chooseCrossings': slice(None)}
     alignTimeBoundsLookup = {
         # 1: [
         #     [3, 2290.5]
@@ -84,10 +87,10 @@ def getExpOpts():
     triDestinations = []
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        '202009231400-Peep': [1, 2, 3],
+        '202010151400-Peep': [1, 2, 3, 4],
         }
     assembledSegmentToBlockLookup = {
-        i - 1: i for i in [1, 2, 3]
+        i - 1: i for i in [1, 2, 3, 4]
         }
     movementSizeBins = [0, 0.25, 0.5, 1, 1.25, 1.5]
     rowColOverrides = {
