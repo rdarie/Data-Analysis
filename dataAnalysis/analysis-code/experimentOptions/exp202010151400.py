@@ -20,9 +20,9 @@ def getExpOpts():
         4: 'isi_nano1caudal_xAyBzC_ortho_nano2rostral_xAyBzC_ortho.map',
         5: 'isi_nano1caudal_xAyBzC_ortho_nano2rostral_xAyBzC_ortho.map',
         6: 'isi_nano1caudal_xAyBzC_ortho_nano2rostral_xAyBzC_ortho.map',
-        7: 'isi_nano1caudal_xAyBzC_ortho_nano2rostral_xAyBzC_ortho.map',
-        8: 'isi_nano1caudal_xAyBzC_ortho_nano2rostral_xAyBzC_ortho.map',
-        9: 'isi_nano1caudal_xAyBzC_ortho_nano2rostral_xAyBzC_ortho.map',
+        7: 'isi_nano1rostral_xAyBzC_ortho.map',
+        8: 'isi_nano1rostral_xAyBzC_ortho.map',
+        9: 'isi_nano1rostral_xAyBzC_ortho.map',
         }
     delsysExampleHeaderPath = './delsys_example_header_20200922.csv'
     # use "original" file in edge cases where the ns5 file was saved incorrectly
