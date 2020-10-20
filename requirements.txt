@@ -9,7 +9,7 @@ pandas==0.24.2
 h5py==2.8.0
 lmfit==1.0.1
 matplotlib==3.3.1
-psutil==5.7.2
+psutil==5.6.6
 scipy==1.5.2
 patsy==0.5.1
 statsmodels==0.12.0
