@@ -21,7 +21,7 @@ dependencies:
 - matplotlib=3.0.3
 - psutil=5.6.3
 - opencv=4.1.1
-- umap-learn=0.3.9
+- umap-learn=0.4.6
 - hdbscan=0.8.26
 - scipy=1.4.1
 - patsy=0.5.1
@@ -40,4 +40,3 @@ dependencies:
 - python-snappy=0.5.4
 - datashader=0.11.1
 - holoviews=1.13.4
-- pynndescent=0.5.0

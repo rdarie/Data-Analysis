@@ -14,7 +14,7 @@ RepoList=(\
 )
 
 module load git/2.10.2
-module load gcc/4.9.4
+module load gcc/8.3
 module load leveldb openblas hdf5 protobuf ffmpeg
 module load opengl
 module load anaconda/3-5.2.0
