@@ -19,8 +19,8 @@ Options:
     --selector=selector                    filename if using a unit selector
 """
 import matplotlib
-matplotlib.rcParams['pdf.fonttype'] = 42
-matplotlib.rcParams['ps.fonttype'] = 42
+# matplotlib.rcParams['pdf.fonttype'] = 42
+# matplotlib.rcParams['ps.fonttype'] = 42
 matplotlib.use('PS')   # generate postscript output by default
 import seaborn as sns
 

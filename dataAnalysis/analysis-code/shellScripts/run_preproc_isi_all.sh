@@ -56,7 +56,8 @@
 # EXP="exp202009231400"
 # EXP="exp202010071400"
 # EXP="exp202010081400"
-EXP="exp202010151400"
+# EXP="exp202010151400"
+EXP="exp202010191100"
 
 # 
 module load anaconda/3-5.2.0
@@ -92,19 +93,18 @@ UNITSELECTOR="--unitQuery=isiemgenv"
 # UNITSELECTOR="--unitQuery=isiacc"
 # UNITSELECTOR="--unitQuery=isispinaloremg"
 
-SLURM_ARRAY_TASK_ID=9
-# BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
+SLURM_ARRAY_TASK_ID=3
+BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
 
 #  #  preprocess
-# python -u ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --ISIMinimal --transferISIStimLog
-python -u ./preprocDelsysHPF.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $CHANSELECTOR --verbose
+python -u ./preprocNS5.py --exp=$EXP $BLOCKSELECTOR --ISIMinimal --transferISIStimLog
+python -u ./preprocDelsysHPF.py --exp=$EXP $BLOCKSELECTOR $CHANSELECTOR --verbose
 
 #  #  synchronize
-# python -u ./synchronizeDelsysToNSP.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP $CHANSELECTOR --trigRate=2
+python -u ./synchronizeDelsysToNSP.py $BLOCKSELECTOR --exp=$EXP $CHANSELECTOR --trigRate=2
  
 #  #  downsample
-# python -u ./calcISIAnalysisNix.py --exp=$EXP $BLOCKSELECTOR $CHANSELECTOR $ANALYSISFOLDER --verbose
-#  #    
+python -u ./calcISIAnalysisNix.py --exp=$EXP $BLOCKSELECTOR $CHANSELECTOR $ANALYSISFOLDER --verbose
 
 ################################################################################################################
 ALIGNQUERY="--alignQuery=stimOn"
@@ -122,6 +122,10 @@ INPUTBLOCKNAME="--inputBlockName=emg"
 # python -u ./calcTrialOutliers.py --exp=$EXP --alignFolderName=stim $INPUTBLOCKNAME $BLOCKSELECTOR $ANALYSISSELECTOR $UNITSELECTOR $WINDOW $ALIGNQUERY --verbose --plotting --saveResults
 # python -u ./exportForDeepSpine.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISSELECTOR --alignFolderName=stim $UNITSELECTOR --alignQuery="stimOn" $INPUTBLOCKNAME --maskOutlierBlocks
 # python -u ./calcTargetNoiseCeiling.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISSELECTOR --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --maskOutlierBlocks $ALIGNQUERY --plotting
-# 
+
 # python -u ./calcRecruitment.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISSELECTOR --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --alignQuery="stimOn"
 # python -u ./plotRecruitment.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISSELECTOR --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --alignQuery="stimOn"
+
+UNITSELECTOR="--unitQuery=isiemg"
+# python -u ./plotAlignedAsigs.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISSELECTOR $INPUTBLOCKNAME $UNITSELECTOR --alignQuery="stimOn" --rowName="electrode" --rowControl= --colName="RateInHz" --colControl= --hueName="nominalCurrent" --alignFolderName=stim --enableOverrides
+# python -u ./plotRippleStimSpikeReport.py --exp=$EXP $BLOCKSELECTOR $WINDOW $UNITSELECTOR $ANALYSISSELECTOR --alignQuery="stimOn" --alignFolderName=stim $INPUTBLOCKNAME --groupPagesBy="electrode, RateInHz" --maskOutlierBlocks

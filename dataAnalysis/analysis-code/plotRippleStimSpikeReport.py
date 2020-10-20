@@ -142,8 +142,8 @@ alignedAsigsKWargs.update(dict(
 # alignedAsigsKWargs.update(dict(
 #     windowSize=(6e-5, 1.2e-3)))
 # for evoked lfp report
-# alignedAsigsKWargs.update(dict(
-#     windowSize=(-2e-3, 23e-3)))
+alignedAsigsKWargs.update(dict(
+    windowSize=(-100e-3, 400e-3)))
 # alignedAsigsKWargs.update(dict(
 #     windowSize=(-25e-3, 125e-3)))
 alignedAsigsKWargs.update({'amplitudeColumn': arguments['hueName']})

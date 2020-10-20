@@ -33,7 +33,7 @@ expOpts, allOpts = parseAnalysisOptions(int(arguments['blockIdx']),arguments['ex
 globals().update(expOpts)
 globals().update(allOpts)
 
-enablePathOverrides = False
+enablePathOverrides = True
 if enablePathOverrides:
     nspFolder = nspFolder.replace('G:\\Delsys', 'F:\\Trellis')
 
@@ -209,7 +209,8 @@ def preprocNS5():
         reader = ns5.preproc(
             fileName=ns5FileName,
             rawFolderPath=nspFolder,
-            outputFolderPath=scratchFolder, mapDF=mapDF, swapMaps=swapMaps,
+            outputFolderPath=scratchFolder, mapDF=mapDF,
+            # swapMaps=swapMaps,
             fillOverflow=False, removeJumps=False,
             motorEncoderMask=motorEncoderMask,
             eventInfo=trialFilesFrom['utah']['eventInfo'],
@@ -247,7 +248,8 @@ def preprocNS5():
             fileName=ns5FileName,
             rawFolderPath=nspFolder,
             outputFolderPath=scratchFolder,
-            mapDF=mapDF, swapMaps=swapMaps,
+            mapDF=mapDF,
+            #swapMaps=swapMaps,
             fillOverflow=False, removeJumps=False,
             motorEncoderMask=motorEncoderMask,
             eventInfo=trialFilesFrom['utah']['eventInfo'],
