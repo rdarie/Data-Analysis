@@ -35,11 +35,13 @@ python --version
 # EXP="exp202003201200"
 # EXP="exp202006171300"
 # EXP="exp202007011300"
-EXP="exp202009031500"
+# EXP="exp202009031500"
 # EXP="exp202007021300"
+EXP="exp202010151400"
 #
 # SELECTOR="Block005_minfrmaxcorr"
-SELECTOR="_minfrmaxcorr"
+# SELECTOR="_minfrmaxcorr"
+SELECTOR=""
 #
 WINDOW="--window=XS"
 # WINDOW="--window=XXS"
@@ -48,8 +50,9 @@ TRIALSELECTOR="--processAll"
 # TRIALSELECTOR="--blockIdx=3"
 # TRIALSELECTOR="--blockIdx=1"
 #
-ANALYSISSELECTOR="--analysisName=loRes"
-# ANALYSISSELECTOR="--analysisName=default"
+# ANALYSISSELECTOR="--analysisName=loRes"
+# ANALYSISSELECTOR="--analysisName=parameter_recovery"
+ANALYSISSELECTOR="--analysisName=default"
 # ANALYSISSELECTOR="--analysisName=lfpFullRes"
 #
 # UNITSELECTOR="--unitQuery=all"
@@ -58,11 +61,11 @@ ANALYSISSELECTOR="--analysisName=loRes"
 # UNITSELECTOR="--unitQuery=isispinal"
 # UNITSELECTOR="--unitQuery=isiemg"
 # UNITSELECTOR="--unitQuery=isiemgoracc"
-UNITSELECTOR="--unitQuery=isiemgenvoraccorspinal"
+# UNITSELECTOR="--unitQuery=isiemgenvoraccorspinal"
+CHANSELECTOR="--chanQuery=isiemgoranalog"
 
 
-BLOCKSELECTOR="--inputBlockName=all"
-# BLOCKSELECTOR="--inputBlockName=emg"
+BLOCKSELECTOR="--inputBlockName=emg"
 # BLOCKSELECTOR="--inputBlockName=emg_clean"
 # BLOCKSELECTOR="--inputBlockName=lfp"
 # BLOCKSELECTOR="--inputBlockName=emg_clean"
@@ -72,6 +75,6 @@ BLOCKSELECTOR="--inputBlockName=all"
 
 # python3 -u './plotRippleStimSpikeReport.py' --exp=$EXP $TRIALSELECTOR $WINDOW $UNITSELECTOR $ANALYSISSELECTOR --alignQuery="stimOn" --alignFolderName=stim $BLOCKSELECTOR --groupPagesBy="electrode, RateInHz" --maskOutlierBlocks
 #  --maskOutlierBlocks
-python3 -u './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR $BLOCKSELECTOR $UNITSELECTOR --alignQuery="stimOn" --rowName="electrode" --rowControl= --colName="RateInHz" --colControl= --hueName="nominalCurrent" --alignFolderName=stim --enableOverrides
+python3 -u './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR $BLOCKSELECTOR $UNITSELECTOR --alignQuery="stimOn" --rowName="electrode" --rowControl= --colName="RateInHz" --colControl= --hueName="nominalCurrent" --alignFolderName=stim --enableOverrides --maskOutlierBlocks
 # stim spikes
 # python3 -u './plotRippleStimSpikeReport.py' --exp=$EXP $TRIALSELECTOR $ANALYSISSELECTOR $UNITSELECTOR

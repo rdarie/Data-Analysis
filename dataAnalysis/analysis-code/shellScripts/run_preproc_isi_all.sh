@@ -21,7 +21,7 @@
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=1,2,3,4
+#SBATCH --array=6-9
 
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=radu_darie@brown.edu
@@ -76,7 +76,8 @@ WINDOW="--window=XS"
 # ANALYSISFOLDER="--analysisName=fullRes"
 # ANALYSISFOLDER="--analysisName=hiRes"
 # ANALYSISFOLDER="--analysisName=loRes"
-ANALYSISFOLDER="--analysisName=default"
+# ANALYSISFOLDER="--analysisName=default"
+ANALYSISFOLDER="--analysisName=parameter_recovery"
 
 # CHANSELECTOR="--chanQuery=all"
 # CHANSELECTOR="--chanQuery=isiemgraw"
@@ -93,15 +94,16 @@ UNITSELECTOR="--unitQuery=isiemgenv"
 # UNITSELECTOR="--unitQuery=isiacc"
 # UNITSELECTOR="--unitQuery=isispinaloremg"
 
-SLURM_ARRAY_TASK_ID=3
+# SLURM_ARRAY_TASK_ID=6
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
 
 #  #  preprocess
-python -u ./preprocNS5.py --exp=$EXP $BLOCKSELECTOR --ISIMinimal --transferISIStimLog
-python -u ./preprocDelsysHPF.py --exp=$EXP $BLOCKSELECTOR $CHANSELECTOR --verbose
+# python -u ./preprocNS5.py --exp=$EXP $BLOCKSELECTOR --ISIMinimal --transferISIStimLog
+# python -u ./preprocDelsysHPF.py --exp=$EXP $BLOCKSELECTOR $CHANSELECTOR --verbose
+# python -u ./preprocDelsysCSV.py --exp=$EXP $BLOCKSELECTOR $CHANSELECTOR --verbose
 
 #  #  synchronize
-python -u ./synchronizeDelsysToNSP.py $BLOCKSELECTOR --exp=$EXP $CHANSELECTOR --trigRate=2
+# python -u ./synchronizeDelsysToNSP.py $BLOCKSELECTOR --exp=$EXP $CHANSELECTOR --trigRate=2
  
 #  #  downsample
 python -u ./calcISIAnalysisNix.py --exp=$EXP $BLOCKSELECTOR $CHANSELECTOR $ANALYSISFOLDER --verbose
@@ -109,13 +111,13 @@ python -u ./calcISIAnalysisNix.py --exp=$EXP $BLOCKSELECTOR $CHANSELECTOR $ANALY
 ################################################################################################################
 ALIGNQUERY="--alignQuery=stimOn"
 
-# python -u ./assembleExperimentData.py --exp=$EXP --blockIdx=1 --processAsigs --processRasters $ANALYSISFOLDER
+python -u ./assembleExperimentData.py --exp=$EXP --blockIdx=1 --processAsigs --processRasters $ANALYSISFOLDER
 
 OUTPUTBLOCKNAME="--outputBlockName=emg"
 CHANSELECTOR="--chanQuery=isiemgenv"
 BLOCKSELECTOR="--processAll"
 
-# python -u ./calcAlignedAsigs.py --exp=$EXP $BLOCKSELECTOR $WINDOW $LAZINESS $ANALYSISFOLDER --eventName=stimAlignTimes $CHANSELECTOR $OUTPUTBLOCKNAME --verbose --alignFolderName=stim
+python -u ./calcAlignedAsigs.py --exp=$EXP $BLOCKSELECTOR $WINDOW $LAZINESS $ANALYSISFOLDER --eventName=stimAlignTimes $CHANSELECTOR $OUTPUTBLOCKNAME --verbose --alignFolderName=stim
 
 INPUTBLOCKNAME="--inputBlockName=emg"
 

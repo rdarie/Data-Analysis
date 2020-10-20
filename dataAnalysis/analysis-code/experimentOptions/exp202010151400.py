@@ -19,7 +19,7 @@ def getExpOpts():
         3: 'isi_nano1caudal_xAyBzC_ortho_nano2rostral_xAyBzC_ortho.map',
         4: 'isi_nano1caudal_xAyBzC_ortho_nano2rostral_xAyBzC_ortho.map',
         5: 'isi_nano1caudal_xAyBzC_ortho_nano2rostral_xAyBzC_ortho.map',
-        6: 'isi_nano1caudal_xAyBzC_ortho_nano2rostral_xAyBzC_ortho.map',
+        6: 'isi_nano1caudal_xAyBzC_ortho.map',
         7: 'isi_nano1rostral_xAyBzC_ortho.map',
         8: 'isi_nano1rostral_xAyBzC_ortho.map',
         9: 'isi_nano1rostral_xAyBzC_ortho.map',
@@ -27,17 +27,17 @@ def getExpOpts():
     delsysExampleHeaderPath = './delsys_example_header_20200922.csv'
     # use "original" file in edge cases where the ns5 file was saved incorrectly
     # with the wrong map. Original is the incorrect, old one, above is the corrected one.
-    rippleOriginalMapFile = {
-        1: None,
-        2: None,
-        3: None,
-        4: None,
-        5: None,
-        6: None,
-        7: None,
-        8: None,
-        9: None,
-        }
+    # rippleOriginalMapFile = {
+    #     1: None,
+    #     2: None,
+    #     3: None,
+    #     4: None,
+    #     5: None,
+    #     6: 'nano1rostral_xAyBzC_ortho.map',
+    #     7: None,
+    #     8: None,
+    #     9: None,
+    #     }
     #
     rippleFastSettleTriggers = {
         1: {'stim': 'none'},
@@ -122,10 +122,10 @@ def getExpOpts():
     triDestinations = []
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        '202010151400-Peep': [1, 2, 3, 4],
+        '202010151400-Peep': [6, 7, 8, 9],
         }
     assembledSegmentToBlockLookup = {
-        i - 1: i for i in [1, 2, 3, 4]
+        i - 1: i for i in [6, 7, 8, 9]
         }
     movementSizeBins = [0, 0.25, 0.5, 1, 1.25, 1.5]
     rowColOverrides = {
@@ -176,7 +176,7 @@ def getExpOpts():
             # 'RGastrocnemiusEmg#0',
             # 'LThoracolumbarFasciaEmgEnv#0',
             'LGracilisEmgEnv#0',
-            'LTensorFasciaeLataeEmgEnv#0',
+            # 'LTensorFasciaeLataeEmgEnv#0',
             'LPeroneusLongusEmgEnv#0',
             'LBicepsFemorisEmgEnv#0',
             'LGastrocnemiusEmgEnv#0',
@@ -184,19 +184,22 @@ def getExpOpts():
             'RGracilisEmgEnv#0',
             'RTensorFasciaeLataeEmgEnv#0',
             'RPeroneusLongusEmgEnv#0',
-            'RBicepsFemorisEmgEnv#0',
-            'RGastrocnemiusEmgEnv#0'
+            # 'RBicepsFemorisEmgEnv#0',
+            # 'RGastrocnemiusEmgEnv#0'
         ]
     RCPlotOpts = {
         'keepFeatures': [
             'LBicepsFemoris', 'LGastrocnemius', 'LGracilis',
-            'LPeroneusLongus', 'LTensorFasciaeLatae',
-            'RBicepsFemoris',
-            'RGastrocnemius', 'RGracilis', 'RPeroneusLongus',
+            'LPeroneusLongus',
+            # 'LTensorFasciaeLatae',
+            # 'RBicepsFemoris',
+            'RGastrocnemius',
+            # 'RGracilis',
+            'RPeroneusLongus',
             'RTensorFasciaeLatae',
             # 'LThoracolumbarFascia', 'RThoracolumbarFascia',
-            'RExtensorDigitorum',
-            'LSemitendinosus', 'RSemitendinosus',
+            # 'RExtensorDigitorum',
+            # 'LSemitendinosus', 'RSemitendinosus',
             ],
         'keepElectrodes': None,
         'significantOnly': False,
