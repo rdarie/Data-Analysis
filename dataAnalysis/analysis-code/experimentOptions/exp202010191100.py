@@ -115,10 +115,10 @@ def getExpOpts():
     triDestinations = []
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        '202010191100-Peep': [1, 2, 3],
+        '202010191100-Peep': [4, 5, 6, 7, 8],
         }
     assembledSegmentToBlockLookup = {
-        i - 1: i for i in [1, 2, 3]
+        i - 1: i for i in [4, 5, 6, 7, 8]
         }
     movementSizeBins = [0, 0.25, 0.5, 1, 1.25, 1.5]
     rowColOverrides = {

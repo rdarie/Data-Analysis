@@ -107,7 +107,8 @@ def calcISIBlockAnalysisNix():
                 'firstPW': [],
                 # 'interPhase': [],
                 'secondPW': [],
-                'totalPW': []
+                'totalPW': [],
+                'stimRes': []
                 }
             allNominalWaveforms = []
             for idx, entry in enumerate(stimLog):
@@ -157,6 +158,7 @@ def calcISIBlockAnalysisNix():
                                 stimDict['secondPW'].append(
                                     (phase['length'] / (3e4)) * pq.s)
                         stimDict['t'].append(t)
+                        stimDict['stimRes'].append(ampQuanta)
                         stimDict['totalPW'].append(
                             (totalLen / (3e4)) * pq.s)
                         stimDict['elec'].append(
@@ -709,7 +711,10 @@ def calcISIBlockAnalysisNix():
                                             idx, 'RateInHz'] = stimPeriod ** -1
                                 else:
                                     nominalRate = np.median(st.annotations['RateInHz'][theseTimesMask])
-                                    observedRate = np.median(np.diff(theseTimes)) ** (-1)
+                                    if len(theseTimes) > 1:
+                                        observedRate = np.median(np.diff(theseTimes)) ** (-1)
+                                    else:
+                                        observedRate = 3 / pq.s
                                     try:
                                         rateMismatch = np.abs(nominalRate - observedRate)
                                     except:

@@ -94,7 +94,7 @@ UNITSELECTOR="--unitQuery=isiemgenv"
 # UNITSELECTOR="--unitQuery=isiacc"
 # UNITSELECTOR="--unitQuery=isispinaloremg"
 
-# SLURM_ARRAY_TASK_ID=6
+SLURM_ARRAY_TASK_ID=4
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
 
 #  #  preprocess
@@ -111,23 +111,23 @@ python -u ./calcISIAnalysisNix.py --exp=$EXP $BLOCKSELECTOR $CHANSELECTOR $ANALY
 ################################################################################################################
 ALIGNQUERY="--alignQuery=stimOn"
 
-python -u ./assembleExperimentData.py --exp=$EXP --blockIdx=1 --processAsigs --processRasters $ANALYSISFOLDER
+# python -u ./assembleExperimentData.py --exp=$EXP --blockIdx=1 --processAsigs --processRasters $ANALYSISFOLDER
 
 OUTPUTBLOCKNAME="--outputBlockName=emg"
 CHANSELECTOR="--chanQuery=isiemgenv"
 BLOCKSELECTOR="--processAll"
 
-python -u ./calcAlignedAsigs.py --exp=$EXP $BLOCKSELECTOR $WINDOW $LAZINESS $ANALYSISFOLDER --eventName=stimAlignTimes $CHANSELECTOR $OUTPUTBLOCKNAME --verbose --alignFolderName=stim
+# python -u ./calcAlignedAsigs.py --exp=$EXP $BLOCKSELECTOR $WINDOW $LAZINESS $ANALYSISFOLDER --eventName=stimAlignTimes $CHANSELECTOR $OUTPUTBLOCKNAME --verbose --alignFolderName=stim
 
 INPUTBLOCKNAME="--inputBlockName=emg"
 
-# python -u ./calcTrialOutliers.py --exp=$EXP --alignFolderName=stim $INPUTBLOCKNAME $BLOCKSELECTOR $ANALYSISSELECTOR $UNITSELECTOR $WINDOW $ALIGNQUERY --verbose --plotting --saveResults
-# python -u ./exportForDeepSpine.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISSELECTOR --alignFolderName=stim $UNITSELECTOR --alignQuery="stimOn" $INPUTBLOCKNAME --maskOutlierBlocks
-# python -u ./calcTargetNoiseCeiling.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISSELECTOR --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --maskOutlierBlocks $ALIGNQUERY --plotting
+# python -u ./calcTrialOutliers.py --exp=$EXP --alignFolderName=stim $INPUTBLOCKNAME $BLOCKSELECTOR $ANALYSISFOLDER $UNITSELECTOR $WINDOW $ALIGNQUERY --verbose --plotting --saveResults
+# python -u ./exportForDeepSpine.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $UNITSELECTOR --alignQuery="stimOn" $INPUTBLOCKNAME --maskOutlierBlocks
+# python -u ./calcTargetNoiseCeiling.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --maskOutlierBlocks $ALIGNQUERY --plotting
 
-# python -u ./calcRecruitment.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISSELECTOR --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --alignQuery="stimOn"
-# python -u ./plotRecruitment.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISSELECTOR --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --alignQuery="stimOn"
+# python -u ./calcRecruitment.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --alignQuery="stimOn"
+# python -u ./plotRecruitment.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --alignQuery="stimOn"
 
 UNITSELECTOR="--unitQuery=isiemg"
-# python -u ./plotAlignedAsigs.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISSELECTOR $INPUTBLOCKNAME $UNITSELECTOR --alignQuery="stimOn" --rowName="electrode" --rowControl= --colName="RateInHz" --colControl= --hueName="nominalCurrent" --alignFolderName=stim --enableOverrides
-# python -u ./plotRippleStimSpikeReport.py --exp=$EXP $BLOCKSELECTOR $WINDOW $UNITSELECTOR $ANALYSISSELECTOR --alignQuery="stimOn" --alignFolderName=stim $INPUTBLOCKNAME --groupPagesBy="electrode, RateInHz" --maskOutlierBlocks
+# python -u ./plotAlignedAsigs.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER $INPUTBLOCKNAME $UNITSELECTOR --alignQuery="stimOn" --rowName="electrode" --rowControl= --colName="RateInHz" --colControl= --hueName="nominalCurrent" --alignFolderName=stim --enableOverrides
+# python -u ./plotRippleStimSpikeReport.py --exp=$EXP $BLOCKSELECTOR $WINDOW $UNITSELECTOR $ANALYSISFOLDER --alignQuery="stimOn" --alignFolderName=stim $INPUTBLOCKNAME --groupPagesBy="electrode, RateInHz" --maskOutlierBlocks
