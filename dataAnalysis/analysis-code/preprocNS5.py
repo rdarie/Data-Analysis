@@ -192,24 +192,26 @@ def preprocNS5():
             chunkSize=chunkSize, equalChunks=equalChunks, chunkList=chunkList,
             calcRigEvents=trialFilesFrom['utah']['calcRigEvents'])
     ###############################################################################
-    if arguments['ISI']:
+    if arguments['ISI'] or arguments['ISIRaw'] or arguments['ISIMinimal']:
         mapDF = prb_meta.mapToDF(rippleMapFile[int(arguments['blockIdx'])])
-        # mapDF.loc[:, 'nevID'] += 1 # ?????
-        if 'rippleOriginalMapFile' in locals():
-            if rippleOriginalMapFile[int(arguments['blockIdx'])] is not None:
-                swapMaps = {
-                    'from': prb_meta.mapToDF(rippleOriginalMapFile[int(arguments['blockIdx'])]),
-                    'to': mapDF
-                }
-            else:
-                swapMaps = None
-        else:
-            swapMaps = None
-        # pdb.set_trace()
+        # if 'rippleOriginalMapFile' in expOpts:
+        #     rippleOriginalMapFile = expOpts['rippleOriginalMapFile']
+        #     if rippleOriginalMapFile[int(arguments['blockIdx'])] is not None:
+        #         swapMaps = {
+        #             'from': prb_meta.mapToDF(rippleOriginalMapFile[int(arguments['blockIdx'])]),
+        #             'to': mapDF
+        #         }
+        #     else:
+        #         swapMaps = None
+        # else:
+        #     swapMaps = None
+    if arguments['ISI']:
         reader = ns5.preproc(
             fileName=ns5FileName,
             rawFolderPath=nspFolder,
-            outputFolderPath=scratchFolder, mapDF=mapDF, swapMaps=swapMaps,
+            outputFolderPath=scratchFolder,
+            mapDF=mapDF,
+            # swapMaps=swapMaps,
             fillOverflow=False, removeJumps=False,
             motorEncoderMask=motorEncoderMask,
             eventInfo=trialFilesFrom['utah']['eventInfo'],
@@ -230,24 +232,12 @@ def preprocNS5():
             except Exception:
                 traceback.print_exc()
     if arguments['ISIMinimal']:
-        mapDF = prb_meta.mapToDF(rippleMapFile[int(arguments['blockIdx'])])
-        # mapDF.loc[:, 'nevID'] += 1 # ?????
-        if 'rippleOriginalMapFile' in locals():
-            if rippleOriginalMapFile[int(arguments['blockIdx'])] is not None:
-                swapMaps = {
-                    'from': prb_meta.mapToDF(rippleOriginalMapFile[int(arguments['blockIdx'])]),
-                    'to': mapDF
-                }
-            else:
-                swapMaps = None
-        else:
-            swapMaps = None
-        # pdb.set_trace()
         reader = ns5.preproc(
             fileName=ns5FileName,
             rawFolderPath=nspFolder,
             outputFolderPath=scratchFolder,
-            mapDF=mapDF, swapMaps=swapMaps,
+            mapDF=mapDF,
+            # swapMaps=swapMaps,
             fillOverflow=False, removeJumps=False,
             motorEncoderMask=motorEncoderMask,
             eventInfo=trialFilesFrom['utah']['eventInfo'],
@@ -268,7 +258,6 @@ def preprocNS5():
                 traceback.print_exc()
     ##################################################################################
     if arguments['ISIRaw']:
-        mapDF = prb_meta.mapToDF(rippleMapFile[int(arguments['blockIdx'])])
         reader = ns5.preproc(
             fileName=ns5FileName,
             rawFolderPath=nspFolder,

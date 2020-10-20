@@ -609,7 +609,6 @@ def concatenateUnitSpikeTrainWaveformsDF(
             .format(prf.memory_usage_psutil()))
     #  if concatenating indexes, reset the index of the result
     #  ignoreIndex = (concatOn == 'index')
-    #  pdb.set_trace()
     allWaveforms = pd.concat(
         waveformsList, axis=concatOn,
         # ignore_index=ignoreIndex
@@ -674,7 +673,6 @@ def alignedAsigsToDF(
             # print(key)
             # outlierTrials.iloc[1, :]
             # allWaveforms.iloc[1, :]
-            # pdb.set_trace()
             return outlierTrials[tuple(key)]
         #
         outlierMask = np.asarray(
@@ -682,7 +680,6 @@ def alignedAsigsToDF(
             dtype=np.bool)
         if invertOutlierMask:
             outlierMask = ~outlierMask
-        # pdb.set_trace()
         allWaveforms = allWaveforms.loc[~outlierMask, :]
     if manipulateIndex and getMetaData:
         idxLabels = allWaveforms.index.names
@@ -806,7 +803,6 @@ def getAsigsAlignedToEvents(
         except Exception:
             traceback.print_exc()
         allEvIn = eventSeg.filter(name=thisEventName)[0]
-        #pdb.set_trace()
         if isinstance(allEvIn, EventProxy):
             allAlignEvents = loadObjArrayAnn(allEvIn.load())
         elif isinstance(allEvIn, Event):
@@ -818,7 +814,6 @@ def getAsigsAlignedToEvents(
         allAlignEventsList.append(allAlignEvents)
     allAlignEventsDF = unitSpikeTrainArrayAnnToDF(allAlignEventsList)
     #
-    # pdb.set_trace()
     breakDownData = (
         allAlignEventsDF
         .groupby(minNReps['categories'])
@@ -936,7 +931,6 @@ def getAsigsAlignedToEvents(
                 waveformUnits = rawWaveforms[0].units
                 #  fix length if roundoff error
                 #  minLen = min([rW.shape[0] for rW in rawWaveforms])
-                #  pdb.set_trace()
                 rawWaveforms = [rW[:nominalWinLen] for rW in rawWaveforms]
                 #
                 spikeWaveforms = (
@@ -1311,7 +1305,6 @@ def eventDataFrameToEvents(
                 'arrayAnnNames': [],
                 'arrayAnnDTypes': []
                 })
-        # pdb.set_trace()
         for colName in annCol:
             originalDType = type(eventDF[colName].to_numpy()[0]).__name__
             arrayAnn = eventDF[colName].astype(originalDType).to_numpy()
@@ -1750,7 +1743,9 @@ def childBaseName(
 def readBlockFixNames(
         rawioReader,
         block_index=0, signal_group_mode='split-all',
-        lazy=True, mapDF=None, reduceChannelIndexes=False, swapMaps=None):
+        lazy=True, mapDF=None, reduceChannelIndexes=False,
+        # swapMaps=None
+        ):
     headerSignalChan = pd.DataFrame(
         rawioReader.header['signal_channels']).set_index('id')
     headerUnitChan = pd.DataFrame(
@@ -1767,23 +1762,60 @@ def readBlockFixNames(
     asigLikeList = (
         seg0.filter(objects=AnalogSignalProxy) +
         seg0.filter(objects=AnalogSignal))
+    # if mapDF is not None:
+    #     # [len(a.name) for a in asigLikeList]
+    #     if swapMaps is not None:
+    #         # asigOrigNames = [headerSignalChan.loc[int(i), 'name'] for i in swapMaps['from']['nevID']]
+    #         asigNameChanger = {}
+    #         for nevID in swapMaps['from']['nevID']:
+    #             if int(nevID) in headerSignalChan.index:
+    #                 labelFromNewMap = (
+    #                     swapMaps['to']
+    #                     .loc[swapMaps['to']['nevID'] == nevID, 'label']
+    #                     .iloc[0])
+    #                 asigNameChanger[headerSignalChan.loc[int(nevID), 'name']] = labelFromNewMap
+    #         # asigNameChanger = dict(zip(asigOrigNames, swapMaps['to']['label']))
+    #     else:
+    #         if headerSignalChan.size > 0:
+    #             # asigOrigNames = [headerSignalChan.loc[int(i), 'name'] for i in mapDF['nevID']]
+    #             # asigNameChanger = dict(zip(asigOrigNames, mapDF['label']))
+    #             asigNameChanger = {}
+    #             for nevID in mapDF['nevID']:
+    #                 if int(nevID) in headerSignalChan.index:
+    #                     labelFromMap = (
+    #                         mapDF
+    #                         .loc[mapDF['nevID'] == nevID, 'label']
+    #                         .iloc[0])
+    #                     asigNameChanger[
+    #                         headerSignalChan.loc[int(nevID), 'name']] = labelFromMap
+    #         else:
+    #             asigOrigNames = np.unique([i.split('#')[0] for i in headerUnitChan['name']])
+    #             asigNameChanger = {}
+    #             for origName in asigOrigNames:
+    #                 # ripple specific
+    #                 formattedName = origName.replace('.', '_').replace(' raw', '')
+    #                 if mapDF['label'].str.contains(formattedName).any():
+    #                     asigNameChanger[origName] = formattedName
     if mapDF is not None:
-        # [len(a.name) for a in asigLikeList]
-        if swapMaps is not None:
-            asigOrigNames = [headerSignalChan.loc[int(i), 'name'] for i in swapMaps['from']['nevID']]
-            asigNameChanger = dict(zip(asigOrigNames, swapMaps['to']['label']))
+        if headerSignalChan.size > 0:
+            asigNameChanger = {}
+            for nevID in mapDF['nevID']:
+                if int(nevID) in headerSignalChan.index:
+                    labelFromMap = (
+                        mapDF
+                        .loc[mapDF['nevID'] == nevID, 'label']
+                        .iloc[0])
+                    asigNameChanger[
+                        headerSignalChan.loc[int(nevID), 'name']] = labelFromMap
         else:
-            if headerSignalChan.size > 0:
-                asigOrigNames = [headerSignalChan.loc[int(i), 'name'] for i in mapDF['nevID']]
-                asigNameChanger = dict(zip(asigOrigNames, mapDF['label']))
-            else:
-                asigOrigNames = np.unique([i.split('#')[0] for i in headerUnitChan['name']])
-                asigNameChanger = {}
-                for origName in asigOrigNames:
-                    # ripple specific
-                    formattedName = origName.replace('.', '_').replace(' raw', '')
-                    if mapDF['label'].str.contains(formattedName).any():
-                        asigNameChanger[origName] = formattedName
+            asigOrigNames = np.unique(
+                [i.split('#')[0] for i in headerUnitChan['name']])
+            asigNameChanger = {}
+            for origName in asigOrigNames:
+                # ripple specific
+                formattedName = origName.replace('.', '_').replace(' raw', '')
+                if mapDF['label'].str.contains(formattedName).any():
+                    asigNameChanger[origName] = formattedName
     else:
         asigNameChanger = dict()
     for asig in asigLikeList:
@@ -1819,17 +1851,40 @@ def readBlockFixNames(
                 chanId = chanId - 5120
             else:
                 isRippleStimChan = False
-            asigBaseName = headerSignalChan.loc[chanId, 'name']
+            ####################
+            # asigBaseName = headerSignalChan.loc[chanId, 'name']
+            # if mapDF is not None:
+            #     if asigBaseName in asigNameChanger:
+            #         chanIdLabel = (
+            #             asigNameChanger[asigBaseName]
+            #             if asigBaseName in asigNameChanger
+            #             else asigBaseName)
+            #     else:
+            #         chanIdLabel = asigBaseName
+            # else:
+            #     chanIdLabel = asigBaseName
+            ###################
+            # if swapMaps is not None:
+            #     nameCandidates = (swapMaps['to'].loc[swapMaps['to']['nevID'] == chanId, 'label']).to_list()
+            # elif mapDF is not None:
+            #     nameCandidates = (mapDF.loc[mapDF['nevID'] == chanId, 'label']).to_list()
+            # else:
+            #     nameCandidates = []
+            ##############################
             if mapDF is not None:
-                if asigBaseName in asigNameChanger:
-                    chanIdLabel = (
-                        asigNameChanger[asigBaseName]
-                        if asigBaseName in asigNameChanger
-                        else asigBaseName)
-                else:
-                    chanIdLabel = asigBaseName
+                nameCandidates = (
+                    mapDF
+                    .loc[mapDF['nevID'] == chanId, 'label']
+                    .to_list())
             else:
-                chanIdLabel = asigBaseName
+                nameCandidates = []
+            if len(nameCandidates) == 1:
+                chanIdLabel = nameCandidates[0]
+            elif chanId in headerSignalChan:
+                chanIdLabel = headerSignalChan.loc[chanId, 'name']
+            else:
+                chanIdLabel = 'ch{}'.format(chanId)
+            #
             if isRippleStimChan:
                 stp.name = '{}_stim#{}'.format(chanIdLabel, unitId)
             else:
@@ -1842,7 +1897,6 @@ def readBlockFixNames(
         ###########################################
         if 'ChannelIndex for ' in stp.unit.channel_index.name:
             newChanName = stp.name.replace('_stim#0', '').replace('#0', '')
-            # pdb.set_trace()
             stp.unit.channel_index.name = newChanName
             # units and analogsignals have different channel_indexes when loaded by nix
             # add them to each other's parent list
@@ -2042,7 +2096,7 @@ def preprocBlockToNix(
         pruneOutUnits = False
     else:
         pruneOutUnits = True
-
+    #
     for chanIdx in block.channel_indexes:
         if chanIdx.units:
             for unit in chanIdx.units:
@@ -2050,7 +2104,7 @@ def preprocBlockToNix(
                     unit.spiketrains = []
             if pruneOutUnits:
                 chanIdx.units = []
-
+    #
     if spikeBlock is not None:
         for chanIdx in spikeBlock.channel_indexes:
             if chanIdx.units:
@@ -2059,9 +2113,9 @@ def preprocBlockToNix(
                         unit.spiketrains = []
     #  remove chanIndexes assigned to units; makes more sense to
     #  only use chanIdx for asigs and spikes on that asig
-    block.channel_indexes = (
-        [chanIdx for chanIdx in block.channel_indexes if (
-            chanIdx.analogsignals)])
+    #  block.channel_indexes = (
+    #      [chanIdx for chanIdx in block.channel_indexes if (
+    #          chanIdx.analogsignals)])
     if calcAverageLFP:
         lastIndex = len(block.channel_indexes)
         lastID = block.channel_indexes[-1].channel_ids[0] + 1
@@ -2277,7 +2331,6 @@ def preprocBlockToNix(
                             normalAsig = stats.zscore(asig.magnitude) * asig.units
                             if 'averageLFP' not in locals():
                                 averageLFP = asig.copy()
-                                # pdb.set_trace()
                                 averageLFP.magnitude[:] = normalAsig / nLfpAsigs
                                 averageLFP.array_annotations = {}
                             else:
@@ -2698,7 +2751,8 @@ def preprocBlockToNix(
 def preproc(
         fileName='Trial001',
         rawFolderPath='./',
-        outputFolderPath='./', mapDF=None, swapMaps=None,
+        outputFolderPath='./', mapDF=None,
+        # swapMaps=None,
         electrodeArrayName='utah',
         fillOverflow=True, removeJumps=True,
         motorEncoderMask=None,
@@ -2722,6 +2776,7 @@ def preproc(
     if os.path.exists(outputFilePath):
         os.remove(outputFilePath)
     #  instantiate reader, get metadata
+    print('Loading\n{}\n'.format(rawBasePath))
     reader = BlackrockIO(
         filename=rawBasePath, nsx_to_load=5)
     reader.parse_header()
@@ -2747,7 +2802,9 @@ def preproc(
             reader,
             block_index=blkIdx, lazy=True,
             signal_group_mode=signal_group_mode,
-            mapDF=mapDF, swapMaps=swapMaps)
+            mapDF=mapDF,
+            # swapMaps=swapMaps
+            )
         # ripple debugging
         # allSptProx = block.filter(objects=SpikeTrainProxy)
         # allSpt = [i.load() for i in allSptProx]
@@ -2756,7 +2813,9 @@ def preproc(
             spikeBlock = readBlockFixNames(
                 spikeReader, block_index=blkIdx, lazy=True,
                 signal_group_mode=signal_group_mode,
-                mapDF=mapDF, swapMaps=swapMaps)
+                mapDF=mapDF,
+                # swapMaps=swapMaps
+                )
             spikeBlock = purgeNixAnn(spikeBlock)
         else:
             spikeBlock = None

@@ -90,7 +90,12 @@ def calcISIBlockAnalysisNix():
                     stimLogText = f.read()
                     stimLogText = mdt.fixMalformedJson(stimLogText, jsonType='Log')
                     stimLog = json.loads(stimLogText)
-            stimResLookup = {3: 5 * pq.uA, 4: 10 * pq.uA, 5: 20 * pq.uA}
+            stimResLookup = {
+                1: 1 * pq.uA,
+                2: 2 * pq.uA,
+                3: 5 * pq.uA,
+                4: 10 * pq.uA,
+                5: 20 * pq.uA}
             stimDict = {
                 't': [],
                 'elec': [],
@@ -107,6 +112,11 @@ def calcISIBlockAnalysisNix():
             allNominalWaveforms = []
             for idx, entry in enumerate(stimLog):
                 t = entry['t']
+                if idx == 0:
+                    firstT = t
+                else:
+                    if t < firstT:
+                        continue
                 if 'stimRes' in entry:
                     ampQuanta = stimResLookup[entry['stimRes']]
                 else:
@@ -474,7 +484,7 @@ def calcISIBlockAnalysisNix():
                 stimEvents[:] = (
                     stimEvents.times -
                     stimEvents.times[0] -
-                    10e-3 * pq.s +  # Fudge factor to account for delay between execution and matlab save
+                    20e-3 * pq.s +  # Fudge factor to account for delay between execution and matlab save
                     activeTimes.min() * pq.s)
                 stimEventsDF = pd.DataFrame(stimEvents.array_annotations)
                 stimEventsDF['t'] = stimEvents.times
@@ -510,16 +520,16 @@ def calcISIBlockAnalysisNix():
                     # theseUpdate.loc[theseUpdates.index > updateTimes[nonMonotonicTimes][0], :]
                     try:
                         allUpdates = theseUpdates.reindex(newIndex, method='ffill')
+                        stAnnotations = allUpdates.loc[
+                            allUpdates.index.isin(st.times.magnitude), :]
                     except Exception:
+                        pdb.set_trace()
                         traceback.print_exc()
-                    stAnnotations = allUpdates.loc[
-                        allUpdates.index.isin(st.times.magnitude), :]
                 #
                 wvf = pd.DataFrame(np.atleast_2d(np.squeeze(st.waveforms)))
                 wvfDiff = wvf.diff(-1, axis=1).fillna(0)
                 wvfDiffAbs = wvfDiff.abs()
                 if stimEvents is not None:
-                    # pdb.set_trace()
                     lastValidIdx = int(stAnnotations['totalPW'].min() * 3e4) - 1
                     idxPeak = int(stAnnotations['firstPW'].min() * 3e4)
                     wvf.iloc[:, lastValidIdx:] = np.nan
@@ -700,12 +710,14 @@ def calcISIBlockAnalysisNix():
                                 else:
                                     nominalRate = np.median(st.annotations['RateInHz'][theseTimesMask])
                                     observedRate = np.median(np.diff(theseTimes)) ** (-1)
-                                    rateMismatch = np.abs(nominalRate - observedRate)
+                                    try:
+                                        rateMismatch = np.abs(nominalRate - observedRate)
+                                    except:
+                                        pdb.set_trace()
                                     if not rateMismatch < 1e-6:
                                         print(
                                             'Rate mismatch warning on {} at time {}: off by {} Hz'
                                             .format(st.name, theseTimes[0], rateMismatch))
-                                        pdb.set_trace()
                                     nominalTrainDur = np.mean(st.annotations['trainDur'][theseTimesMask])
                                     observedTrainDur = (theseTimes[-1] - theseTimes[0])
                                     if not np.abs(nominalTrainDur - observedTrainDur) < 1e-6:
