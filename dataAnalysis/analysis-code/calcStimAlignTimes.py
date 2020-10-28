@@ -58,9 +58,7 @@ insBlock = insReader.read_block(0)
 #          filename=experimentDataPath)
 #  else:
 #      # alignTimeBounds = alignTimeBoundsLookup[experimentName][int(arguments['blockIdx'])]
-alignTimeBounds = [
-    alignTimeBoundsLookup[int(arguments['blockIdx'])]
-    ]
+
 dataReader = neo.io.nixio_fr.NixIO(
     filename=analysisDataPath)
 
@@ -69,7 +67,17 @@ dataBlock = dataReader.read_block(
     signal_group_mode='split-all')
 for ev in dataBlock.filter(objects=EventProxy):
     ev.name = '_'.join(ev.name.split('_')[1:])
-
+try:
+    alignTimeBounds = [
+    alignTimeBoundsLookup[int(arguments['blockIdx'])]
+    ]
+except Exception:
+    alignTimeBounds = [[
+        [
+            float(dataBlock.segments[0].filter(objects=AnalogSignalProxy)[0].t_start),
+            float(dataBlock.segments[-1].filter(objects=AnalogSignalProxy)[0].t_stop)
+        ]
+    ]]
 availableCateg = [
     'amplitude', 'program', 'activeGroup', 'RateInHz']
 progAmpNames = rcsa_helpers.progAmpNames

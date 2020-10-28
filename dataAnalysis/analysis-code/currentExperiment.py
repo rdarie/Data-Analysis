@@ -30,7 +30,7 @@ def parseAnalysisOptions(
     #     scratchPath = os.path.join('E:', 'Neural Recordings', 'scratch')
 
     nspPrbPath = os.path.join('.', 'nsp_map.prb')
-    insFolder = os.path.join(remoteBasePath, 'ORCA Logs')
+    insFolder = os.path.join(remoteBasePath, 'ORCA Logs', expOpts['subjectName'])
     experimentName = expOpts['experimentName']
     assembledName = ''
     nspFolder = os.path.join(remoteBasePath, 'raw', experimentName)
@@ -208,10 +208,10 @@ def parseAnalysisOptions(
         'treatAsSinglePulses': False
         }
     RCStimDetectionOpts = {
-        'minDist': 0.25,
-        'gaussWid': 120e-3,
-        'offsetFromPeak': 2e-3,
-        'artifactKeepWhat': 'first',
+        'minDist': 0.2,
+        'gaussWid': 50e-3,
+        'offsetFromPeak': 1e-3,
+        'artifactKeepWhat': 'max',
         'predictSlots': True, 'snapToGrid': True,
         'treatAsSinglePulses': True
         }

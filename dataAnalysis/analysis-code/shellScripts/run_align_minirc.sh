@@ -22,13 +22,14 @@
 # EXP="exp201901201200"
 # EXP="exp201901221000"
 # EXP="exp201901271000"
-EXP="exp201901261000"
+# EXP="exp201901261000"
+EXP="exp202010201200"
 # EXP="exp201901070700"
 
 # ALIGNSELECTOR="--analysisName=loRes"
 ALIGNSELECTOR="--analysisName=default"
 
-SLURM_ARRAY_TASK_ID=4
+SLURM_ARRAY_TASK_ID=1
 TRIALSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
 # TRIALSELECTOR="--processAll"
 # UNITSELECTOR="--selector=unitSelector_minfrmaxcorr"
@@ -44,8 +45,8 @@ conda activate
 source activate nda2
 python --version
 
-python3 ./calcAlignedAsigs.py --chanQuery="utahlfp" --outputBlockName="utahlfp"     --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ALIGNSELECTOR --eventName=stimAlignTimes  --alignFolderName=stim
-python3 ./calcAlignedAsigs.py --chanQuery="fr" --outputBlockName="fr"             --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ALIGNSELECTOR --eventName=stimAlignTimes  --alignFolderName=stim
+# python3 ./calcAlignedAsigs.py --chanQuery="utahlfp" --outputBlockName="utahlfp"     --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ALIGNSELECTOR --eventName=stimAlignTimes  --alignFolderName=stim
+# python3 ./calcAlignedAsigs.py --chanQuery="fr" --outputBlockName="fr"             --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ALIGNSELECTOR --eventName=stimAlignTimes  --alignFolderName=stim
 python3 ./calcAlignedAsigs.py --chanQuery="rig" --outputBlockName="rig"           --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ALIGNSELECTOR --eventName=stimAlignTimes  --alignFolderName=stim
 # python3 ./calcAlignedAsigs.py --chanQuery="fr_sqrt" --outputBlockName="fr_sqrt"   --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ALIGNSELECTOR --eventName=stimAlignTimes  --alignFolderName=stim
-python3 ./calcAlignedRasters.py --chanQuery="raster" --outputBlockName="raster"   --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ALIGNSELECTOR --eventName=stimAlignTimes  --alignFolderName=stim
+# python3 ./calcAlignedRasters.py --chanQuery="raster" --outputBlockName="raster"   --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ALIGNSELECTOR --eventName=stimAlignTimes  --alignFolderName=stim

@@ -19,44 +19,7 @@
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 
-# EXP="exp201901201200"
-# EXP="exp201901221000"
-# EXP="exp201901271000"
-EXP="exp201901261000"
-# EXP="exp201901070700"
-
-# ALIGNFOLDER="--analysisName=loRes"
-ALIGNFOLDER="--analysisName=default"
-
-SLURM_ARRAY_TASK_ID=4
-TRIALSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
-# TRIALSELECTOR="--processAll"
-
-# UNITSELECTOR="--selector=unitSelector_minfrmaxcorr"
-UNITSELECTOR=""
-
-LAZINESS="--lazy"
-
-# WINDOW="--window=miniRC"
-WINDOW="--window=XS"
-
-module load anaconda/3-5.2.0
-. /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
-conda activate
-source activate nda2
-python --version
-
-python3 ./calcAlignedAsigs.py --chanQuery="utahlfp" --outputBlockName="utahlfp"     --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ALIGNFOLDER --eventName=stimAlignTimes  --alignFolderName=stim
-python3 ./calcAlignedAsigs.py --chanQuery="fr" --outputBlockName="fr"             --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ALIGNFOLDER --eventName=stimAlignTimes  --alignFolderName=stim
-python3 ./calcAlignedAsigs.py --chanQuery="rig" --outputBlockName="rig"           --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ALIGNFOLDER --eventName=stimAlignTimes  --alignFolderName=stim
-# python3 ./calcAlignedAsigs.py --chanQuery="fr_sqrt" --outputBlockName="fr_sqrt"   --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ALIGNFOLDER --eventName=stimAlignTimes  --alignFolderName=stim
-python3 ./calcAlignedRasters.py --chanQuery="raster" --outputBlockName="raster"   --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ALIGNFOLDER --eventName=stimAlignTimes  --alignFolderName=stim
-#
-python3 -u ./calcUnitMeanFR.py --exp=$EXP $TRIALSELECTOR $WINDOW $ALIGNFOLDER $ALIGNQUERY --inputBlockName="fr" --unitQuery="fr" --verbose
-python3 -u ./calcUnitCorrelation.py --exp=$EXP $TRIALSELECTOR $WINDOW $ALIGNFOLDER $ALIGNQUERY --inputBlockName="fr" --unitQuery="fr" --verbose --plotting
-python3 -u ./selectUnitsByMeanFRandCorrelation.py --exp=$EXP $TRIALSELECTOW $ALIGNFOLDER $WINDOW $LAZINESS --verbose
-
-UNITSELECTOR="--selector=unitSelector_minfrmaxcorr"
-python3 -u ./plotAlignedNeurons.py --exp=$EXP $TRIALSELECTOR $ALIGNFOLDER $UNITSELECTOR $WINDOW --unitQuery="all" --alignQuery="stimOn" --rowName="RateInHz" --hueName="amplitude" --alignFolderName=stim --enableOverrides
-python3 -u ./plotAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $ALIGNFOLDER $WINDOW --inputBlockName="rig" --unitQuery="all" --alignQuery="stimOn" --rowName="RateInHz" --hueName="amplitude" --alignFolderName=stim --enableOverrides
-python3 -u ./plotAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $ALIGNFOLDER $WINDOW --inputBlockName="utahlfp" --unitQuery="utahlfp" --alignQuery="stimOn" --rowName="RateInHz" --hueName="amplitude" --alignFolderName=stim --enableOverrides
+./shellScripts/run_preproc_ins.sh
+./shellScripts/run_analysis_maker_ins_only.sh
+./shellScripts/run_align_minirc.sh
+./shellScripts/run_plotter_aligned_stim.sh
