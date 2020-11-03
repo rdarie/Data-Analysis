@@ -559,17 +559,19 @@ def getINSTDFromJson(
                     tdData['t'].iloc[0],
                     tdData['t'].iloc[-1] + float(fs) ** (-1),
                     float(fs) ** (-1))
-                channelsPresent = [
-                    i for i in tdData.columns if 'channel_' in i]
-                channelsPresent += [
-                    'time_master', 'microseconds']
                 #  convert to floats before interpolating
                 tdData['microseconds'] = tdData['microseconds'] / (
                     datetime.timedelta(microseconds=1))
                 tdData['time_master'] = (
                     tdData['time_master'] - pd.Timestamp('2000-03-01')) / (
                     datetime.timedelta(seconds=1))
-                # 
+                HUTMapping = tdMetaDF['PacketGenTime']
+                tdData['PacketGenTime'] = tdData['packetIdx'].map(HUTMapping)
+                channelsPresent = [
+                    i for i in tdData.columns if 'channel_' in i]
+                channelsPresent += [
+                    'time_master', 'microseconds', 'PacketGenTime']
+                #
                 tdData = hf.interpolateDF(
                     tdData, uniformT, x='t', kind=interpKind,
                     columns=channelsPresent, fill_value=(0, 0))
@@ -864,16 +866,18 @@ def getINSAccelFromJson(
                     accelData['t'].iloc[0],
                     accelData['t'].iloc[-1] + 1/fs,
                     1/fs)
-                channelsPresent = [
-                    i for i in accelData.columns if 'accel_' in i]
-                channelsPresent += [
-                    'time_master', 'microseconds']
                 #  convert to floats before interpolating
                 accelData['microseconds'] = accelData['microseconds'] / (
                     datetime.timedelta(microseconds=1))
                 accelData['time_master'] = (
                     accelData['time_master'] - pd.Timestamp('2000-03-01')) / (
                     datetime.timedelta(seconds=1))
+                HUTMapping = accelMetaDF['PacketGenTime']
+                accelData['PacketGenTime'] = accelData['packetIdx'].map(HUTMapping)
+                channelsPresent = [
+                    i for i in accelData.columns if 'accel_' in i]
+                channelsPresent += [
+                    'time_master', 'microseconds', 'PacketGenTime']
                 accelData = hf.interpolateDF(
                     accelData, uniformT, x='t',
                     columns=channelsPresent, fill_value=(0, 0))
@@ -1058,8 +1062,9 @@ def line_picker(line, mouseevent):
 
 def peekAtTaps(
         td, accel, tapDetectSignal,
-        channelData, trialIdx, trialSegment,
+        channelData, trialSegment,
         tapDetectOpts, sessionTapRangesNSP,
+        nspChannelName='ainp7',
         onlyPlotDetectChan=True,
         insX='t', plotBlocking=True,
         allTapTimestampsINS=None,
@@ -1085,9 +1090,9 @@ def peekAtTaps(
 
     #  NSP plotting Bounds
     tStartNSP = (
-        sessionTapRangesNSP[trialIdx][trialSegment]['timeRanges'][0])
+        sessionTapRangesNSP[trialSegment]['timeRanges'][0])
     tStopNSP = (
-        sessionTapRangesNSP[trialIdx][trialSegment]['timeRanges'][1])
+        sessionTapRangesNSP[trialSegment]['timeRanges'][1])
     tDiffNSP = tStopNSP - tStartNSP
     #  Set up figures
     fig = plt.figure(tight_layout=True)
@@ -1099,7 +1104,7 @@ def peekAtTaps(
         tStartINS = td['t'].iloc[0]
         tStopINS = td['t'].iloc[-1]
         for thisRange in tapDetectOpts[
-                trialIdx][trialSegment]['timeRanges']:
+                trialSegment]['timeRanges']:
             tStartINS = max(tStartINS, thisRange[0])
             tStopINS = min(tStopINS, thisRange[1])
         #  make it so that the total extent always matches, for easy comparison
@@ -1197,7 +1202,7 @@ def peekAtTaps(
     insDataAx.legend()
 
     tNSPMask = (channelData['t'] > tStartNSP) & (channelData['t'] < tStopNSP)
-    triggerTrace = channelData['data'].loc[tNSPMask, 'ainp7']
+    triggerTrace = channelData['data'].loc[tNSPMask, nspChannelName]
     decimateFactor = 1
     ax[2].plot(
         channelData['t'].loc[tNSPMask].iloc[::decimateFactor],
@@ -1801,6 +1806,9 @@ def preprocINS(
         tdGroup = td['data'].loc[tdSegmentMask, :]
         timeSyncSegmentMask = timeSync['trialSegment'] == trialSegment
         timeSyncGroup = timeSync.loc[timeSyncSegmentMask, :]
+        sessionStartTime = int(jsonSessionNames[trialSegment].split('Session')[-1])
+        sessionMasterTime = datetime.datetime.utcfromtimestamp(sessionStartTime / 1000)
+        # pdb.set_trace()
         streamInitTimestampsDict = {
             'td': tdGroup['time_master'].iloc[0],
             'timeSync': timeSyncGroup['time_master'].iloc[0],
@@ -1809,6 +1817,14 @@ def preprocINS(
             streamInitTimestampsDict['accel'] = accelGroup['time_master'].iloc[0]
         streamInitTimestamps = pd.Series(streamInitTimestampsDict)
         print('streamInitTimestamps\n{}'.format(streamInitTimestamps))
+        streamInitHUTDict = {
+            'td': datetime.datetime.utcfromtimestamp(tdGroup['PacketGenTime'].iloc[0] / 1e3),
+            'timeSync': datetime.datetime.utcfromtimestamp(timeSyncGroup['PacketGenTime'].iloc[0] / 1e3),
+            }
+        if accel is not None:
+            streamInitHUTDict['accel'] = datetime.datetime.utcfromtimestamp(accelGroup['PacketGenTime'].iloc[0] / 1e3)
+        streamInitHUT = pd.Series(streamInitHUTDict) - sessionMasterTime
+        print('streamInitHUT\n{}'.format(streamInitHUT))
         streamInitSysTicksDict = {
             'td': tdGroup['microseconds'].iloc[0],
             'timeSync': timeSyncGroup['microseconds'].iloc[0],
@@ -1816,11 +1832,22 @@ def preprocINS(
         if accel is not None:
             streamInitSysTicksDict['accel'] = accelGroup['microseconds'].iloc[0]
         streamInitSysTicks = pd.Series(streamInitSysTicksDict)
-        print('streamInitTimestamps\n{}'.format(streamInitSysTicks))
+        print('streamInitSysTicks\n{}'.format(streamInitSysTicks))
+        rolloverCorrection = pd.Series(pd.Timedelta(seconds=0), index=streamInitSysTicks.index)
         # get first timestamp in session for each source
-        sessionMasterTime = min(streamInitTimestamps)
-        sessionTimeRef = streamInitTimestamps - sessionMasterTime
-
+        # sessionMasterTime = min(streamInitTimestamps)
+        # ordersMatch = (streamInitHUT.sort_values().index == streamInitSysTicks.sort_values().index).all()
+        # pdb.set_trace()
+        # while not ordersMatch:
+        #     rolloverCorrection.loc[streamInitSysTicks.index != streamInitSysTicks.idxmax()] += rolloverSeconds
+        #     correctedSysTicks = streamInitSysTicks + rolloverCorrection
+        #     ordersMatch = (streamInitHUT.sort_values().index == correctedSysTicks.sort_values().index).all()
+        containsRollover = (streamInitSysTicks > 2 * rolloverSeconds / 3).any() & (streamInitSysTicks < rolloverSeconds / 3).any()
+        if containsRollover:
+            rolloverCorrection.loc[(streamInitSysTicks < rolloverSeconds / 3)] = rolloverSeconds
+        print('rolloverCorrection\n{}'.format(rolloverCorrection))
+        # print([tS.total_seconds() for tS in streamInitSysTicks])
+        '''
         #  get first systemTick in session for each source
         #  Note: only look within the master timestamp
         happenedBeforeSecondTimestamp = (
@@ -1846,25 +1873,24 @@ def preprocINS(
                 # no rollover in first second
                 sessionMasterTick = min(ticksInFirstSecond)
                 #  refTo = ticksInFirstSecond.idxmin()
-
         #  now check for rollover between first systick and anything else
         #  look for other streams that should be within rollover of start
         rolloverCandidates = ~(sessionTimeRef > rolloverSeconds)
         #  are there any streams that appear to start before the first stream?
         rolledOver = (streamInitSysTicks < sessionMasterTick) & (
             rolloverCandidates)
-
+        '''
+        firstStream = streamInitHUT.idxmin()
         if trialSegment == 0:
             absoluteRef = sessionMasterTime
-            alignmentFactor = pd.Series(
-                - sessionMasterTick, index=streamInitSysTicks.index)
+            alignmentFactor = streamInitHUT[firstStream] - streamInitSysTicks[firstStream] + rolloverCorrection
         else:
-            alignmentFactor = pd.Series(
-                sessionMasterTime-absoluteRef-sessionMasterTick,
-                index=streamInitSysTicks.index)
+            alignmentFactor = sessionMasterTime - absoluteRef + streamInitHUT[firstStream] - streamInitSysTicks[firstStream] + rolloverCorrection
         #  correct any roll-over        
-        alignmentFactor[rolledOver] += rolloverSeconds
+        ## alignmentFactor[rolledOver] += rolloverSeconds
         print('alignmentFactor\n{}'.format(alignmentFactor))
+        print([tS.total_seconds() for tS in alignmentFactor])
+        # pdb.set_trace()
         if accel is not None:
             accel = realignINSTimestamps(
                 accel, trialSegment, alignmentFactor.loc['accel'])
@@ -1872,6 +1898,7 @@ def preprocINS(
             td, trialSegment, alignmentFactor.loc['td'])
         timeSync = realignINSTimestamps(
             timeSync, trialSegment, alignmentFactor.loc['timeSync'])
+    #  pdb.set_trace()
     #  Check timeSync
     checkTimeSync = False
     if checkTimeSync and makePlots:
@@ -1988,6 +2015,16 @@ def preprocINS(
         else:
             plt.close()
     #
+    # coarsely align the time so that the session start time maps to t = 0
+    # sessionStartTime = int(jsonSessionNames[0].split('Session')[-1])
+    # datetime.datetime.utcfromtimestamp(sessionStartTime / 1000)
+    # minHUTidx = stimStatusSerial['HostUnixTime'].idxmin()
+    # coarseAdjust = (stimStatusSerial.loc[minHUTidx, 'HostUnixTime'] - sessionStartTime) / 1000 - stimStatusSerial.loc[minHUTidx, 'INSTime']
+    # td['t'] += coarseAdjust
+    # td['data']['t'] += coarseAdjust
+    # accel['t'] += coarseAdjust
+    # accel['data']['t'] += coarseAdjust
+    # stimStatusSerial['INSTime'] += coarseAdjust
     block = insDataToBlock(
         td, accel, stimStatusSerial,
         senseInfo, trialFilesStim,

@@ -109,43 +109,6 @@ def parseAnalysisOptions(
         'installFolder': '/gpfs_home/{}/Github/NeuralTraj'
     }
 
-    defaultTapDetectOpts = {
-        'iti': 0.2,
-        'keepIndex': slice(None)
-        }
-    tapDetectOpts = expOpts['synchInfo']['ins']
-    for trialKey in tapDetectOpts.keys():
-        for trialSegmentKey in tapDetectOpts[trialKey].keys():
-            for key in defaultTapDetectOpts.keys():
-                if key not in tapDetectOpts[trialKey][trialSegmentKey].keys():
-                    tapDetectOpts[trialKey][trialSegmentKey].update(
-                        {key: defaultTapDetectOpts[key]}
-                        )
-    defaultSessionTapRangesNSP = {
-        'keepIndex': slice(None)
-        }
-    sessionTapRangesNSP = expOpts['synchInfo']['nsp']
-    try:
-        if not blockExperimentType == 'isi':
-            for trialKey in sessionTapRangesNSP.keys():
-                for trialSegmentKey in sessionTapRangesNSP[trialKey].keys():
-                    for key in defaultSessionTapRangesNSP.keys():
-                        if key not in sessionTapRangesNSP[trialKey][trialSegmentKey].keys():
-                            sessionTapRangesNSP[trialKey][trialSegmentKey].update(
-                                {key: defaultSessionTapRangesNSP[key]}
-                                )
-    except Exception:
-        pass
-    #  make placeholders for interpolation functions
-    interpFunINStoNSP = {
-        key: [None for i in value.keys()]
-        for key, value in sessionTapRangesNSP.items()
-        }
-    interpFunHUTtoINS = {
-        key: [None for i in value.keys()]
-        for key, value in sessionTapRangesNSP.items()
-        }
-
     trialFilesFrom = {
         'utah': {
             'origin': 'mat',

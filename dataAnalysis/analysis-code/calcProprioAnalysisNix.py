@@ -59,12 +59,18 @@ def calcBlockAnalysisNix():
     else:
         samplingRate = float(1 / binOpts['binInterval']) * pq.Hz
     #
+    nspPath = os.path.join(
+        scratchFolder,
+        ns5FileName + arguments['inputBlockSuffix'] + '.nix')
     nspReader = neo.io.nixio_fr.NixIO(
-        filename=os.path.join(
-            scratchFolder,
-            ns5FileName + arguments['inputBlockSuffix'] + '.nix'))
-    nspBlock = ns5.readBlockFixNames(nspReader, block_index=0)
-    #
+        filename=nspPath)
+    nspBlock = ns5.readBlockFixNames(
+        nspReader, reduceChannelIndexes=True, block_index=0)
+    print('Loading {}'.format(nspPath))
+    # print([asig.name for asig in spikesBlock.filter(objects=AnalogSignal)])
+    # print([st.name for st in nspBlock.filter(objects=SpikeTrain)])
+    # print([st.name for st in nspBlock.filter(objects=ChannelIndex)]) len(nspBlock.filter(objects=ChannelIndex))
+    # print([ev.name for ev in nspBlock.filter(objects=Event)])
     spikesBlock = hf.extractSignalsFromBlock(
         nspBlock, keepSpikes=True)
     spikesBlock = hf.loadBlockProxyObjects(spikesBlock)
@@ -132,10 +138,14 @@ def calcBlockAnalysisNix():
         ev.segment = spikesBlock.segments[0]
     # print([asig.name for asig in spikesBlock.filter(objects=AnalogSignal)])
     # print([st.name for st in spikesBlock.filter(objects=SpikeTrain)])
+    # print([st.name for st in spikesBlock.filter(objects=ChannelIndex)]) len(spikesBlock.filter(objects=ChannelIndex))
     # print([ev.name for ev in spikesBlock.filter(objects=Event)])
     spikesBlock = ns5.purgeNixAnn(spikesBlock)
-    writer = neo.io.NixIO(
-        filename=analysisDataPath.format(arguments['analysisName']))
+    # pdb.set_trace()
+    analysisBlockPath = analysisDataPath.format(arguments['analysisName'])
+    if os.path.exists(analysisBlockPath):
+        os.remove(analysisBlockPath)
+    writer = neo.io.NixIO(filename=analysisBlockPath)
     writer.write_block(spikesBlock, use_obj_names=True)
     writer.close()
     #

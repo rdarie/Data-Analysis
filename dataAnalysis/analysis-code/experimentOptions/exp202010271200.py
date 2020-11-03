@@ -20,14 +20,19 @@ def getExpOpts():
         'simiTrigs': 'ainp16',
         'forceX': 'ainp14',
         'forceY': 'ainp15',
-        'tapSync': 'ainp13',
+        'tapSync': 'ainp1',
         }
     miniRCRigInputs = {
-        'tapSync': 'ainp7',
-        'simiTrigs': 'ainp8'
+        'tapSync': 'ainp1',
+        'simiTrigs': 'ainp16',
+        'forceX': 'ainp14',
+        'forceY': 'ainp15',
         }
     RCRigInputs = {
+        'tapSync': 'ainp1',
         'kinectSync': 'ainp16',
+        'forceX': 'ainp14',
+        'forceY': 'ainp15',
         }
     
     experimentName = '202010271200-Rupert'
@@ -41,9 +46,84 @@ def getExpOpts():
         3: ['Session1603816446027', 'Session1603816775688', ]
         }
     synchInfo = {'nform': {}, 'nsp': {}, 'ins': {}}
-    # synchInfo['nsp'][1] = {'timeRanges': [25, 1050], 'chooseCrossings': slice(None)}
-    # synchInfo['nform'][1] = {'timeRanges': [26, 1051], 'chooseCrossings': slice(None)}
-    
+    synchInfo['ins'][1] = {
+        #  per trialSegment
+        0: {
+            'timeRanges': [(14, 16)],
+            'chan': ['ins_td0', 'ins_td2'],
+            'thres': 5,
+            'iti': 0.2,
+            'keepIndex': slice(None)
+            },
+        1: {
+            'timeRanges': [(448, 450)],
+            'chan': ['ins_td0', 'ins_td2'],
+            # 'chan': ['ins_accx', 'ins_accy', 'ins_accz'],
+            'thres': 5,
+            'iti': 0.2,
+            'keepIndex': slice(None)
+            }
+        }
+    synchInfo['ins'][2] = {
+        #  per trialSegment
+        0: {
+            'timeRanges': None,
+            'chan': ['ins_td0'],
+            'thres': 5,
+            'iti': 0.2,
+            'keepIndex': slice(None)
+            },
+        1: {
+            'timeRanges': None,
+            'chan': ['ins_td0'],
+            # 'chan': ['ins_accx', 'ins_accy', 'ins_accz'],
+            'thres': 5,
+            'iti': 0.2,
+            'keepIndex': slice(None)
+            },
+        2: {
+            'timeRanges': None,
+            'chan': ['ins_td0'],
+            # 'chan': ['ins_accx', 'ins_accy', 'ins_accz'],
+            'thres': 5,
+            'iti': 0.2,
+            'keepIndex': slice(None)
+            }
+        }
+    synchInfo['ins'][3] = {
+        #  per trialSegment
+        0: {
+            'timeRanges': None,
+            'chan': ['ins_td0', 'ins_td2'],
+            'thres': 5,
+            'iti': 0.2,
+            'keepIndex': slice(None)
+            },
+        1: {
+            'timeRanges': None,
+            'chan': ['ins_td0', 'ins_td2'],
+            # 'chan': ['ins_accx', 'ins_accy', 'ins_accz'],
+            'thres': 5,
+            'iti': 0.2,
+            'keepIndex': slice(None)
+            }
+        }
+    synchInfo['nsp'] = {
+        #  per trialSegment
+        1: {
+            0: {'timeRanges': None, 'keepIndex': slice(None)},
+            1: {'timeRanges': None, 'keepIndex': slice(None)}
+            },
+        2: {
+            0: {'timeRanges': None, 'keepIndex': slice(None)},
+            1: {'timeRanges': None, 'keepIndex': slice(None)},
+            2: {'timeRanges': None, 'keepIndex': slice(None, 3)}
+            },
+        3: {
+            0: {'timeRanges': None, 'keepIndex': slice(None)},
+            1: {'timeRanges': None, 'keepIndex': slice(None)}
+            }
+        }
     #  if not possible to use taps, override with good taps from another segment
     #  not ideal, because segments are only synchronized to the nearest **second**
     overrideSegmentsForTapSync = {
@@ -67,13 +147,13 @@ def getExpOpts():
         0: {
             # program
             0: {'detectChannels': ['ins_td0'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True},
-            1: {'detectChannels': ['ins_td0'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True},
+            1: {'detectChannels': ['ins_td2'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True},
             2: {'detectChannels': ['ins_td0'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True},
             3: {'detectChannels': ['ins_td0'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True}
         }}
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        '202010271200-Rupert': [1],
+        '202010271200-Rupert': [2,31],
         }
     # Options relevant to the classifcation of proprio trials
     movementSizeBins = [0, 0.4, 0.8]
@@ -116,10 +196,10 @@ def getExpOpts():
                 groupIn={
                     'xcoords': np.arange(-.1, 10.1, 2),
                     'ycoords': np.arange(-.1, 10.1, 1)}),
-            'triFolderSource': {'exp': experimentName, 'block': 1},
+            'triFolderSource': {'exp': experimentName, 'block': 2},
             'triFolderDest': [
                 {'exp': experimentName, 'block': i}
-                for i in [2, 3]]
+                for i in [3]]
         },
         'nform': {
             'asigNameList': [

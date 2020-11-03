@@ -29,7 +29,7 @@ from currentExperiment import parseAnalysisOptions
 from docopt import docopt
 #
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
-expOpts, allOpts = parseAnalysisOptions(int(arguments['blockIdx']),arguments['exp'])
+expOpts, allOpts = parseAnalysisOptions(int(arguments['blockIdx']), arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
 
@@ -121,7 +121,7 @@ def preprocNS5():
         reader = ns5.preproc(
             fileName=ns5FileName,
             rawFolderPath=nspFolder,
-            outputFolderPath=scratchFolder, mapDF=mapDF, swapMaps=None,
+            outputFolderPath=scratchFolder, mapDF=mapDF,
             fillOverflow=False, removeJumps=False, electrodeArrayName=arrayName,
             motorEncoderMask=motorEncoderMask,
             calcAverageLFP=True, removeMeanAcross=True,
@@ -136,7 +136,7 @@ def preprocNS5():
         reader = ns5.preproc(
             fileName=ns5FileName,
             rawFolderPath=nspFolder,
-            outputFolderPath=scratchFolder, mapDF=mapDF, swapMaps=None,
+            outputFolderPath=scratchFolder, mapDF=mapDF,
             fillOverflow=False, removeJumps=False,
             motorEncoderMask=motorEncoderMask,
             calcAverageLFP=True,
@@ -159,7 +159,8 @@ def preprocNS5():
         reader = ns5.preproc(
             fileName=ns5FileName,
             rawFolderPath=nspFolder,
-            outputFolderPath=scratchFolder, mapDF=mapDF, swapMaps=None,
+            outputFolderPath=scratchFolder, mapDF=mapDF,
+            # swapMaps=None,
             fillOverflow=False, removeJumps=False,
             motorEncoderMask=motorEncoderMask,
             calcAverageLFP=True,

@@ -11,11 +11,11 @@
 #SBATCH --mem=24G
 
 # Specify a job name:
-#SBATCH -J peeler
+#SBATCH -J peeler_block003
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-peeler.stdout
-#SBATCH -e ../../batch_logs/%j-%a-peeler.errout
+#SBATCH -o ../../batch_logs/%j-%a-peeler_block003.stdout
+#SBATCH -e ../../batch_logs/%j-%a-peeler_block003.errout
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -44,7 +44,8 @@
 # EXP="exp202009211200"
 # EXP="exp202009291300"
 # EXP="exp202009301100"
-EXP="exp202010011100"
+# EXP="exp202010011100"
+EXP="exp202010271200"
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
@@ -59,4 +60,4 @@ let CHAN_START=SLURM_ARRAY_TASK_ID
 let CHAN_STOP=SLURM_ARRAY_TASK_ID+1
 
 python3 -u ./tridesclousCCV_jobArray.py --arrayName=utah --blockIdx=$BLOCKIDX --exp=$EXP --attemptMPI --purgePeeler --batchPeel --chan_start=$CHAN_START --chan_stop=$CHAN_STOP --sourceFile=processed
-python3 -u ./tridesclousCCV_jobArray.py --arrayName=nform --blockIdx=$BLOCKIDX --exp=$EXP --attemptMPI --purgePeeler --batchPeel --chan_start=$CHAN_START --chan_stop=$CHAN_STOP --sourceFile=processed
+# python3 -u ./tridesclousCCV_jobArray.py --arrayName=nform --blockIdx=$BLOCKIDX --exp=$EXP --attemptMPI --purgePeeler --batchPeel --chan_start=$CHAN_START --chan_stop=$CHAN_STOP --sourceFile=processed

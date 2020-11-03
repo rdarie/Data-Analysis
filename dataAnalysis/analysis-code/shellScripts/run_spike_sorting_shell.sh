@@ -46,6 +46,7 @@
 # EXP="exp202009291300"
 # EXP="exp202009301100"
 EXP="exp202010011100"
+EXP="exp202010271200"
 BLOCKIDX="1"
 
 module load anaconda/3-5.2.0
@@ -63,7 +64,7 @@ python --version
 
 # Step 3: Transfer the templates
 python3 ./transferTDCTemplates.py --arrayName=utah --exp=$EXP --chan_start=0 --chan_stop=50 --sourceFile=processed
-python3 ./transferTDCTemplates.py --arrayName=nform --exp=$EXP --chan_start=0 --chan_stop=32 --sourceFile=processed
+# python3 ./transferTDCTemplates.py --arrayName=nform --exp=$EXP --chan_start=0 --chan_stop=32 --sourceFile=processed
 
 # Step 4: Peeler
 # python3 ./tridesclousCCV.py --blockIdx=$BLOCKIDX --exp=$EXP --purgePeeler --batchPeel

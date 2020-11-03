@@ -3,10 +3,14 @@ Usage:
     synchronizeINStoNSP [options]
 
 Options:
-    --blockIdx=blockIdx                    which trial to analyze
-    --exp=exp                              which experimental day to analyze
-    --inputBlockSuffix=inputBlockSuffix    append a name to the resulting blocks?
-    --curateManually                       whether to manually confirm synch [default: False]
+    --blockIdx=blockIdx                             which trial to analyze
+    --exp=exp                                       which experimental day to analyze
+    --inputBlockSuffix=inputBlockSuffix             append a name to the resulting blocks?
+    --inputInsBlockSuffix=inputInsBlockSuffix       append a name to the resulting blocks?
+    --lazy                                          whether to fully load data from blocks [default: True]
+    --curateManually                                whether to manually confirm synch [default: False]
+    --preparationStage                              get aproximate timings and print to shell, to help identify time ranges? [default: False]
+    --plotting                                      whether to display confirmation plots [default: False]
 """
 import matplotlib, pdb, traceback
 matplotlib.use('Qt5Agg')   # generate interactive output by default
@@ -58,31 +62,21 @@ globals().update(expOpts)
 globals().update(allOpts)
 if arguments['inputBlockSuffix'] is None:
     arguments['inputBlockSuffix'] = ''
-#  load INS Data
-############################################################
+if arguments['inputInsBlockSuffix'] is None:
+    arguments['inputInsBlockSuffix'] = ''
 synchFunPath = os.path.join(
     scratchFolder,
     '{}_{}_synchFun.pickle'.format(experimentName, ns5FileName))
-print('Loading INS Block...')
-'''
-    reader = neo.io.NixIO(filename=insDataPath, mode='ro')
-    insBlock = reader.read_block()
-    insBlock.create_relationship()  # need this!
-    reader.close()
-    for st in insBlock.filter(objects=SpikeTrain):
-        #  print('unit is {}'.format(st.unit.name))
-        #  print('spiketrain is {}'.format(st.name))
-        if 'arrayAnnNames' in st.annotations.keys():
-            #  print(st.annotations['arrayAnnNames'])
-            for key in st.annotations['arrayAnnNames']:
-                st.array_annotations.update({key: st.annotations[key]})
-    '''
-insBlock = ns5.loadWithArrayAnn(insDataPath)
-tdDF, accelDF, stimStatus = mdt.unpackINSBlock(insBlock)
-td = {'data': tdDF, 't': tdDF['t']}
-accel = {'data': accelDF, 't': accelDF['t']}
+
 #  Load NSP Data
 ############################################################
+nspPath = os.path.join(
+    scratchFolder,
+    ns5FileName + arguments['inputBlockSuffix'] +
+    '.nix')
+nspReader, nspBlock = ns5.blockFromPath(
+    nspPath, lazy=arguments['lazy'])
+'''
 startTime_s = None
 dataLength_s = None
 print(
@@ -92,16 +86,49 @@ try:
     channelData, _ = ns5.getNIXData(
         fileName=ns5FileName + arguments['inputBlockSuffix'],
         folderPath=scratchFolder,
-        elecIds=['ainp7'], startTime_s=startTime_s,
+        elecIds=['ainp1'], startTime_s=startTime_s,
         dataLength_s=dataLength_s,
         signal_group_mode='split-all', closeReader=True)
 except Exception:
     traceback.print_exc()
-
-allTapTimestampsNSP = []
+'''
 print('Detecting NSP Timestamps...')
-#  TODO: detect all in one, should be easy enough
-#  #)
+interTriggerInterval = .2
+nspChannelName = 'ainp1'
+segIdx = 0
+nspSeg = nspBlock.segments[segIdx]
+nspSyncAsig = nspSeg.filter(name='seg0_{}'.format(nspChannelName))[0]
+# try:
+#     tStart, tStop = synchInfo['nsp'][blockIdx]['timeRanges']
+# except Exception:
+#     traceback.print_exc()
+#     tStart = float(nspSyncAsig.times[0] + 2 * pq.s)
+#     tStop = float(nspSyncAsig.times[-1] - 2 * pq.s)
+# nspTimeMask = hf.getTimeMaskFromRanges(
+#     nspSyncAsig.times, [(tStart, tStop)])
+nspSrs = pd.Series(nspSyncAsig.magnitude.flatten())
+nspDF = nspSrs.to_frame(name=nspChannelName)
+nspDF['t'] = nspSyncAsig.times.magnitude
+channelData = {
+    'data': nspDF,
+    't': nspDF['t']
+    }
+#
+# nspLims = nspSrs.quantile([1e-6, 1-1e-6]).to_list()
+nspLims = [min(nspSrs), max(nspSrs)]
+nspDiffUncertainty = nspSrs.diff().abs().quantile(1-1e-3) / 4
+nspThresh = nspLims[0] + (nspLims[-1] - nspLims[0]) / 2
+print(
+    'On trial {}, detecting NSP threshold crossings.'
+    .format(blockIdx))
+nspPeakIdx, nspCrossMask = hf.getThresholdCrossings(
+    nspSrs, thresh=nspThresh,
+    iti=interTriggerInterval, fs=float(nspSyncAsig.sampling_rate),
+    edgeType='both', itiWiggle=.2,
+    absVal=False, plotting=arguments['plotting'], keep_max=False)
+allNSPTapTimes = nspDF.loc[nspPeakIdx, 't'].to_numpy()
+allTapTimestampsNSP = []
+'''
 for trialSegment in pd.unique(td['data']['trialSegment']):
     #  Where in NSP to look
     #  #)
@@ -120,7 +147,103 @@ for trialSegment in pd.unique(td['data']['trialSegment']):
     print('diff:\n{}'.format(
         tapTimestampsNSP.diff() * 1e3))
     allTapTimestampsNSP.append(tapTimestampsNSP)
+'''
+#  load INS Data
+############################################################
+print('Loading INS Block...')
+insPath = os.path.join(
+    scratchFolder,
+    ns5FileName + '_ins' +
+    arguments['inputInsBlockSuffix'] +
+    '.nix')
+insReader, insBlock = ns5.blockFromPath(
+    insPath, lazy=arguments['lazy'])
+sessionStartTimes = [
+    datetime.datetime.utcfromtimestamp(int(sN.split('Session')[-1]) / 1000)
+    for sN in insBlock.annotations['jsonSessionNames']]
+approxDeltaRecTime = (nspBlock.rec_datetime - sessionStartTimes[0]).total_seconds()
+approxInsTapTimes = allNSPTapTimes + approxDeltaRecTime
+approxTapTimes = pd.DataFrame([allNSPTapTimes, approxInsTapTimes]).T
+approxTapTimes.columns = ['NSP', 'INS']
+tapIntervals = approxTapTimes['NSP'].diff()
+approxTapTimes['tapGroup'] = (tapIntervals > 60).cumsum()
+autoTimeRanges = {
+    'NSP': [],
+    'INS': []
+}
+for trialSegment, group in approxTapTimes.groupby('tapGroup'):
+    tapTrainDur = np.ceil(group['NSP'].max() - group['NSP'].min())
+    firstNSPTap = group['NSP'].min()
+    firstINSTap = group['INS'].min()
+    approxTapTimes.loc[group.index, 'tStart_NSP'] = firstNSPTap - 1
+    approxTapTimes.loc[group.index, 'tStop_NSP'] = firstNSPTap + tapTrainDur + 1
+    approxTapTimes.loc[group.index, 'tStart_INS'] = firstINSTap - 1
+    approxTapTimes.loc[group.index, 'tStop_INS'] = firstINSTap + tapTrainDur + 1
+    autoTimeRanges['NSP'].append((firstNSPTap - 1, firstNSPTap + tapTrainDur + 1))
+    autoTimeRanges['INS'].append((firstINSTap - 1, firstINSTap + tapTrainDur + 1))
+    tapTimestampsNSP = group['NSP'].astype(np.float)
+    allTapTimestampsNSP.append(tapTimestampsNSP)
+    print('tSeg {}: NSP Taps:\n{}'.format(
+        trialSegment, tapTimestampsNSP))
+    print('diff:\n{}'.format(
+        np.diff(tapTimestampsNSP) * 1e3))
+approxTimesPath = os.path.join(
+    scratchFolder,
+    '{}_{}_approximateTimes.html'.format(experimentName, ns5FileName))
+approxTapTimes.to_html(approxTimesPath)
 
+defaultTapDetectOpts = {
+    'iti': 0.2,
+    'keepIndex': slice(None)
+    }
+tapDetectOpts = expOpts['synchInfo']['ins'][blockIdx]
+
+for trialSegmentKey in tapDetectOpts.keys():
+    if tapDetectOpts[trialSegmentKey]['timeRanges'] is None:
+        tapDetectOpts[trialSegmentKey]['timeRanges'] = [autoTimeRanges['INS'][trialSegmentKey]]
+    for key in defaultTapDetectOpts.keys():
+        if key not in tapDetectOpts[trialSegmentKey].keys():
+            tapDetectOpts[trialSegmentKey].update(
+                {key: defaultTapDetectOpts[key]}
+                )
+defaultSessionTapRangesNSP = {
+    'keepIndex': slice(None)
+    }
+sessionTapRangesNSP = expOpts['synchInfo']['nsp'][blockIdx]
+for trialSegmentKey in sessionTapRangesNSP.keys():
+    if sessionTapRangesNSP[trialSegmentKey]['timeRanges'] is None:
+        sessionTapRangesNSP[trialSegmentKey]['timeRanges'] = autoTimeRanges['NSP'][trialSegmentKey]
+    for key in defaultSessionTapRangesNSP.keys():
+        if key not in sessionTapRangesNSP[trialSegmentKey].keys():
+            sessionTapRangesNSP[trialSegmentKey].update(
+                {key: defaultSessionTapRangesNSP[key]}
+                )
+#  make placeholders for interpolation functions
+interpFunINStoNSP = {
+    key: [None for i in value.keys()]
+    for key, value in sessionTapRangesNSP.items()
+    }
+interpFunHUTtoINS = {
+    key: [None for i in value.keys()]
+    for key, value in sessionTapRangesNSP.items()
+    }
+'''
+    reader = neo.io.NixIO(filename=insDataPath, mode='ro')
+    insBlock = reader.read_block()
+    insBlock.create_relationship()  # need this!
+    reader.close()
+    for st in insBlock.filter(objects=SpikeTrain):
+        #  print('unit is {}'.format(st.unit.name))
+        #  print('spiketrain is {}'.format(st.name))
+        if 'arrayAnnNames' in st.annotations.keys():
+            #  print(st.annotations['arrayAnnNames'])
+            for key in st.annotations['arrayAnnNames']:
+                st.array_annotations.update({key: st.annotations[key]})
+    '''
+#  insBlock = ns5.loadWithArrayAnn(insDataPath)
+tdDF, accelDF, stimStatus = mdt.unpackINSBlock(insBlock)
+td = {'data': tdDF, 't': tdDF['t']}
+accel = {'data': accelDF, 't': accelDF['t']}
 #  Detect INS taps
 ############################################################
 td['data']['NSPTime'] = np.nan
@@ -144,20 +267,25 @@ if not os.path.exists(synchFunPath):
         tdGroup = td['data'].loc[tdGroupMask, :]
         tapTimestampsINS, peakIdx, tapDetectSignal = mdt.getINSTapTimestamp(
             tdGroup, accelGroup,
-            tapDetectOpts[blockIdx][trialSegment]
+            tapDetectOpts[trialSegment]
             )
         print('tSeg {}, INS Taps:\n{}'.format(
             trialSegment, tapTimestampsINS))
         print('diff:\n{}'.format(
             tapTimestampsINS.diff() * 1e3))
         allTapTimestampsINS.append(tapTimestampsINS)
+        
+        keepIdx = sessionTapRangesNSP[trialSegment]['keepIndex']
+        allTapTimestampsNSP[trialSegment] = allTapTimestampsNSP[trialSegment].iloc[keepIdx]
+        #
         if arguments['curateManually']:
             try:
                 clickDict[trialSegment] = mdt.peekAtTaps(
                     tdGroup, accelGroup, tapDetectSignal,
-                    channelData, blockIdx, trialSegment,
+                    channelData, trialSegment,
                     tapDetectOpts, sessionTapRangesNSP,
                     insX='t', plotBlocking=plotBlocking,
+                    nspChannelName=nspChannelName,
                     allTapTimestampsINS=allTapTimestampsINS,
                     allTapTimestampsNSP=allTapTimestampsNSP,
                     )
@@ -195,7 +323,7 @@ if not os.path.exists(synchFunPath):
         td['data'].loc[tdGroupMask, 'NSPTime'] = tdGroup['NSPTime']
         accel['data'].loc[accelGroupMask, 'NSPTime'] = accelGroup['NSPTime']
         #
-        interpFunINStoNSP[blockIdx][trialSegment] = thisINStoNSP
+        interpFunINStoNSP[trialSegment] = thisINStoNSP
         allTapTimestampsINSAligned.append(thisINStoNSP(
             theseTapTimestampsINS))
     with open(synchFunPath, 'wb') as f:
@@ -203,7 +331,7 @@ if not os.path.exists(synchFunPath):
 else:
     with open(synchFunPath, 'rb') as f:
         interpFunINStoNSP = pickle.load(f)
-    theseInterpFun = interpFunINStoNSP[blockIdx]
+    theseInterpFun = interpFunINStoNSP
     td['data']['NSPTime'] = np.nan
     accel['data']['NSPTime'] = np.nan
     for trialSegment in pd.unique(td['data']['trialSegment']).astype(int):
@@ -224,7 +352,7 @@ else:
 #
 print(
     'Interpolation between INS and NSP: {}'
-    .format(interpFunINStoNSP[blockIdx]))
+    .format(interpFunINStoNSP))
 td['NSPTime'] = td['data']['NSPTime']
 accel['NSPTime'] = accel['data']['NSPTime']
 #
@@ -232,7 +360,7 @@ if plottingFigures:
     try:
         hf.peekAtTaps(
             td, accel,
-            channelData, blockIdx,
+            channelData,
             tapDetectOpts, sessionTapRangesNSP,
             insX='NSPTime',
             allTapTimestampsINS=allTapTimestampsINSAligned,

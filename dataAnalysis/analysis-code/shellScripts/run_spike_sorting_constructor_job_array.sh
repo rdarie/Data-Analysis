@@ -43,7 +43,8 @@
 # EXP="exp202009291300"
 # EXP="exp202009301100"
 # EXP="exp202010011100"
-EXP="exp202010251400"
+# EXP="exp202010251400"
+EXP="exp202010271200"
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
@@ -51,7 +52,7 @@ conda activate
 source activate nda2
 python --version
 
-BLOCKIDX=1
+BLOCKIDX=2
 # SLURM_ARRAY_TASK_ID=0
 let CHAN_START=SLURM_ARRAY_TASK_ID
 # for nform, groups of 4 for utah, groups of 5

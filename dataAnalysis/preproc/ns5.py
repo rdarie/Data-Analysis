@@ -1753,7 +1753,6 @@ def readBlockFixNames(
     dataBlock = rawioReader.read_block(
         block_index=block_index, lazy=lazy,
         signal_group_mode=signal_group_mode)
-    #
     if dataBlock.name is None:
         if 'neo_name' in dataBlock.annotations:
             dataBlock.name = dataBlock.annotations['neo_name']
@@ -1896,7 +1895,9 @@ def readBlockFixNames(
         stp.unit.name = stp.unit.name.replace('.', '_').replace(' raw', '')
         ###########################################
         if 'ChannelIndex for ' in stp.unit.channel_index.name:
-            newChanName = stp.name.replace('_stim#0', '').replace('#0', '')
+            newChanName = stp.name.replace('_stim#0', '')
+            # remove unit #
+            newChanName = re.sub(r'#\d', '', newChanName)
             stp.unit.channel_index.name = newChanName
             # units and analogsignals have different channel_indexes when loaded by nix
             # add them to each other's parent list
@@ -2802,7 +2803,7 @@ def preproc(
             reader,
             block_index=blkIdx, lazy=True,
             signal_group_mode=signal_group_mode,
-            mapDF=mapDF,
+            mapDF=mapDF, reduceChannelIndexes=True,
             # swapMaps=swapMaps
             )
         # ripple debugging
@@ -2813,7 +2814,7 @@ def preproc(
             spikeBlock = readBlockFixNames(
                 spikeReader, block_index=blkIdx, lazy=True,
                 signal_group_mode=signal_group_mode,
-                mapDF=mapDF,
+                mapDF=mapDF, reduceChannelIndexes=True,
                 # swapMaps=swapMaps
                 )
             spikeBlock = purgeNixAnn(spikeBlock)

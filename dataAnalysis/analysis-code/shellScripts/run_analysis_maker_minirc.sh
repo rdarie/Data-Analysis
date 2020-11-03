@@ -31,10 +31,11 @@
 # EXP="exp201901221000"
 # EXP="exp201901231000"
 #
-EXP="exp201901261000"
+# EXP="exp201901261000"
 # EXP="exp201901271000"
 #
 # EXP="exp202003091200"
+EXP="exp202010271200"
 
 LAZINESS="--lazy"
 # ANALYSISNAME="--analysisName=loRes"
@@ -43,14 +44,14 @@ ANALYSISNAME="--analysisName=default"
 # BLOCKSUFFIX="--inputBlockSuffix=_full"
 BLOCKSUFFIX=""
 
-module load anaconda/3-5.2.0
-. /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
+module load anaconda/2020.02
+. /gpfs/runtime/opt/anaconda/2020.02/etc/profile.d/conda.sh
 conda activate
 source activate nda2
 python --version
 
-SLURM_ARRAY_TASK_ID=4
+SLURM_ARRAY_TASK_ID=3
 # python -u ./synchronizeSIMItoNSP.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP
 python -u ./calcProprioAnalysisNix.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISNAME $BLOCKSUFFIX --chanQuery="all" --verbose
-python -u ./calcStimAlignTimes.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISNAME --plotParamHistograms $LAZINESS
-python -u ./calcFR.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISNAME
+# python -u ./calcStimAlignTimes.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISNAME --plotParamHistograms $LAZINESS
+# python -u ./calcFR.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISNAME
