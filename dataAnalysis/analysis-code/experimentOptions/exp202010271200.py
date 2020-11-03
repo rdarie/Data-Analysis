@@ -153,7 +153,7 @@ def getExpOpts():
         }}
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        '202010271200-Rupert': [2,31],
+        '202010271200-Rupert': [2, 3],
         }
     # Options relevant to the classifcation of proprio trials
     movementSizeBins = [0, 0.4, 0.8]

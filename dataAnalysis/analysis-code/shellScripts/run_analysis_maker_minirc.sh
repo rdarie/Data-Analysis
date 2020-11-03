@@ -21,7 +21,7 @@
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=5
+#SBATCH --array=2,3
 
 # EXP="exp201901070700"
 #
@@ -50,8 +50,8 @@ conda activate
 source activate nda2
 python --version
 
-SLURM_ARRAY_TASK_ID=3
+# SLURM_ARRAY_TASK_ID=3
 # python -u ./synchronizeSIMItoNSP.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP
 python -u ./calcProprioAnalysisNix.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISNAME $BLOCKSUFFIX --chanQuery="all" --verbose
-# python -u ./calcStimAlignTimes.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISNAME --plotParamHistograms $LAZINESS
-# python -u ./calcFR.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISNAME
+python -u ./calcStimAlignTimes.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISNAME --plotParamHistograms $LAZINESS
+python -u ./calcFR.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISNAME
