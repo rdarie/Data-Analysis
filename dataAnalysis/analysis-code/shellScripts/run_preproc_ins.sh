@@ -41,7 +41,7 @@ python --version
 # EXP="exp202010261100"
 EXP="exp202010271200"
 
-SLURM_ARRAY_TASK_ID=3
+# SLURM_ARRAY_TASK_ID=3
 
 # python -u ./viewINSSessionSummary.py
 

@@ -70,6 +70,8 @@ for suffix in suffixList:
         #     trialDataPath, lazy=True, reduceChannelIndexes=True)
         dataBlock = preproc.loadWithArrayAnn(
             trialDataPath, fromRaw=False, reduceChannelIndexes=True)
+        # [cI.name for cI in dataBlock.channel_indexes]
+        # pdb.set_trace()
         blocksCache[trialDataPath] = dataBlock
         if idx == 0:
             masterDataPath = trialDataPath
@@ -107,7 +109,7 @@ for suffix in suffixList:
                 masterUnitDF.loc[unit.name, 'parentChanName'] = unitParentChanName
                 # chAlreadyThere = masterChanDF.index == unitParentChanName
         # dataReader.file.close()
-    # masterChanDF[masterChanDF['hasUnits']]
+    # now merge the blocks
     for idx, trialBasePath in enumerate(trialsToAssemble):
         trialDataPath = (
             trialBasePath

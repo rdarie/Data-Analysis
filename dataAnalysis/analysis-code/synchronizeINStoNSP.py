@@ -31,7 +31,7 @@ import dataAnalysis.helperFunctions.estimateElectrodeImpedances as eti
 import dataAnalysis.preproc.ns5 as ns5
 import dataAnalysis.preproc.mdt as mdt
 import dataAnalysis.preproc.mdt_constants as mdt_constants
-
+import warnings
 import h5py
 import os
 import math as m
@@ -47,7 +47,7 @@ from neo.io.proxyobjects import (
     AnalogSignalProxy, SpikeTrainProxy, EventProxy)
 from neo import (
     Block, Segment, ChannelIndex,
-    Event, AnalogSignal, SpikeTrain)
+    Event, AnalogSignal, SpikeTrain, Unit)
 import neo
 import elephant.pandas_bridge as elphpdb
 
@@ -68,6 +68,20 @@ synchFunPath = os.path.join(
     scratchFolder,
     '{}_{}_synchFun.pickle'.format(experimentName, ns5FileName))
 
+#  load INS Data
+############################################################
+insPath = os.path.join(
+    scratchFolder,
+    ns5FileName + '_ins' +
+    arguments['inputInsBlockSuffix'] +
+    '.nix')
+print('Loading INS Block: {}'.format(insPath))
+insReader, insBlock = ns5.blockFromPath(
+    insPath, lazy=arguments['lazy'],
+    reduceChannelIndexes=True)
+# [un.name for un in insBlock.filter(objects=Unit)]
+# [len(un.spiketrains) for un in insBlock.filter(objects=Unit)]
+# [id(st) for st in insBlock.filter(objects=Unit)[0].spiketrains]
 #  Load NSP Data
 ############################################################
 nspPath = os.path.join(
@@ -75,7 +89,7 @@ nspPath = os.path.join(
     ns5FileName + arguments['inputBlockSuffix'] +
     '.nix')
 nspReader, nspBlock = ns5.blockFromPath(
-    nspPath, lazy=arguments['lazy'])
+    nspPath, lazy=arguments['lazy'], reduceChannelIndexes=True)
 '''
 startTime_s = None
 dataLength_s = None
@@ -148,16 +162,8 @@ for trialSegment in pd.unique(td['data']['trialSegment']):
         tapTimestampsNSP.diff() * 1e3))
     allTapTimestampsNSP.append(tapTimestampsNSP)
 '''
-#  load INS Data
+#  Detect INS taps
 ############################################################
-print('Loading INS Block...')
-insPath = os.path.join(
-    scratchFolder,
-    ns5FileName + '_ins' +
-    arguments['inputInsBlockSuffix'] +
-    '.nix')
-insReader, insBlock = ns5.blockFromPath(
-    insPath, lazy=arguments['lazy'])
 sessionStartTimes = [
     datetime.datetime.utcfromtimestamp(int(sN.split('Session')[-1]) / 1000)
     for sN in insBlock.annotations['jsonSessionNames']]
@@ -246,8 +252,10 @@ td = {'data': tdDF, 't': tdDF['t']}
 accel = {'data': accelDF, 't': accelDF['t']}
 #  Detect INS taps
 ############################################################
-td['data']['NSPTime'] = np.nan
-accel['data']['NSPTime'] = np.nan
+# warnings.filterwarnings('error')
+################################################################
+td['data'].loc[:, 'NSPTime'] = np.nan
+accel['data'].loc[:, 'NSPTime'] = np.nan
 allTapTimestampsINSAligned = []
 allTapTimestampsINS = []
 if not os.path.exists(synchFunPath):
@@ -295,9 +303,9 @@ if not os.path.exists(synchFunPath):
     ############################################################
     for trialSegment in pd.unique(td['data']['trialSegment']).astype(int):
         accelGroupMask = accel['data']['trialSegment'] == trialSegment
-        accelGroup = accel['data'].loc[accelGroupMask, :]
+        accelGroup = accel['data'].loc[accelGroupMask, :].copy()
         tdGroupMask = td['data']['trialSegment'] == trialSegment
-        tdGroup = td['data'].loc[tdGroupMask, :]
+        tdGroup = td['data'].loc[tdGroupMask, :].copy()
         # if overriding with manually identified points
         if not (trialSegment in overrideSegments.keys()):
             if len(clickDict[trialSegment]['ins']):
@@ -312,14 +320,15 @@ if not os.path.exists(synchFunPath):
             print('\t Overriding trialSegment {}'.format(trialSegment))
             theseTapTimestampsINS = allTapTimestampsINS[overrideSegments[trialSegment]]
             theseTapTimestampsNSP = allTapTimestampsNSP[overrideSegments[trialSegment]]
-        #
+        # trim spikes that happened after end of NSP recording (last trial segment only)
+        trimSpiketrains = trialSegment == pd.unique(td['data']['trialSegment']).astype(int).max()
         tdGroup, accelGroup, insBlock, thisINStoNSP = ns5.synchronizeINStoNSP(
             tapTimestampsNSP=theseTapTimestampsNSP,
             tapTimestampsINS=theseTapTimestampsINS,
             NSPTimeRanges=(
                 channelData['t'].iloc[0], channelData['t'].iloc[-1]),
             td=tdGroup, accel=accelGroup, insBlock=insBlock,
-            trialSegment=trialSegment, degree=0)
+            trialSegment=trialSegment, degree=0, trimSpiketrains=trimSpiketrains)
         td['data'].loc[tdGroupMask, 'NSPTime'] = tdGroup['NSPTime']
         accel['data'].loc[accelGroupMask, 'NSPTime'] = accelGroup['NSPTime']
         #
@@ -332,20 +341,21 @@ else:
     with open(synchFunPath, 'rb') as f:
         interpFunINStoNSP = pickle.load(f)
     theseInterpFun = interpFunINStoNSP
-    td['data']['NSPTime'] = np.nan
-    accel['data']['NSPTime'] = np.nan
+    td['data'].loc[:, 'NSPTime'] = np.nan
+    accel['data'].loc[:, 'NSPTime'] = np.nan
     for trialSegment in pd.unique(td['data']['trialSegment']).astype(int):
         accelGroupMask = accel['data']['trialSegment'] == trialSegment
-        accelGroup = accel['data'].loc[accelGroupMask, :]
+        accelGroup = accel['data'].loc[accelGroupMask, :].copy()
         tdGroupMask = td['data']['trialSegment'] == trialSegment
-        tdGroup = td['data'].loc[tdGroupMask, :]
-        #
+        tdGroup = td['data'].loc[tdGroupMask, :].copy()
+        # trim spikes that happened after end of NSP recording (last trial segment only)
+        trimSpiketrains = trialSegment == pd.unique(td['data']['trialSegment']).astype(int).max()
         tdGroup, accelGroup, insBlock, thisINStoNSP = ns5.synchronizeINStoNSP(
             precalculatedFun=theseInterpFun[trialSegment],
             NSPTimeRanges=(
                 channelData['t'].iloc[0], channelData['t'].iloc[-1]),
             td=tdGroup, accel=accelGroup, insBlock=insBlock,
-            trialSegment=trialSegment, degree=0)
+            trialSegment=trialSegment, degree=0, trimSpiketrains=trimSpiketrains)
         #
         td['data'].loc[tdGroupMask, 'NSPTime'] = tdGroup['NSPTime']
         accel['data'].loc[accelGroupMask, 'NSPTime'] = accelGroup['NSPTime']

@@ -50,8 +50,8 @@ conda activate
 source activate nda2
 python --version
 
-# SLURM_ARRAY_TASK_ID=3
+SLURM_ARRAY_TASK_ID=2
 # python -u ./synchronizeSIMItoNSP.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP
 python -u ./calcProprioAnalysisNix.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISNAME $BLOCKSUFFIX --chanQuery="all" --verbose
-python -u ./calcStimAlignTimes.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISNAME --plotParamHistograms $LAZINESS
-python -u ./calcFR.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISNAME
+# python -u ./calcStimAlignTimes.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISNAME --plotParamHistograms $LAZINESS
+# python -u ./calcFR.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISNAME

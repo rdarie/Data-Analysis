@@ -67,6 +67,7 @@ def calcBlockAnalysisNix():
     nspBlock = ns5.readBlockFixNames(
         nspReader, reduceChannelIndexes=True, block_index=0)
     print('Loading {}'.format(nspPath))
+    # print([cI.name for cI in nspBlock.channel_indexes])
     # print([asig.name for asig in spikesBlock.filter(objects=AnalogSignal)])
     # print([st.name for st in nspBlock.filter(objects=SpikeTrain)])
     # print([st.name for st in nspBlock.filter(objects=ChannelIndex)]) len(nspBlock.filter(objects=ChannelIndex))
@@ -74,6 +75,7 @@ def calcBlockAnalysisNix():
     spikesBlock = hf.extractSignalsFromBlock(
         nspBlock, keepSpikes=True)
     spikesBlock = hf.loadBlockProxyObjects(spikesBlock)
+    # print([cI.name for cI in spikesBlock.channel_indexes])
     #  save ins time series
     tdChanNames = ns5.listChanNames(
         nspBlock, arguments['chanQuery'], objType=AnalogSignalProxy)
@@ -142,12 +144,6 @@ def calcBlockAnalysisNix():
     # print([ev.name for ev in spikesBlock.filter(objects=Event)])
     spikesBlock = ns5.purgeNixAnn(spikesBlock)
     # pdb.set_trace()
-    analysisBlockPath = analysisDataPath.format(arguments['analysisName'])
-    if os.path.exists(analysisBlockPath):
-        os.remove(analysisBlockPath)
-    writer = neo.io.NixIO(filename=analysisBlockPath)
-    writer.write_block(spikesBlock, use_obj_names=True)
-    writer.close()
     #
     tdBlock = hf.extractSignalsFromBlock(
         nspBlock, keepSpikes=False, keepSignals=tdChanNames)
@@ -293,22 +289,36 @@ def calcBlockAnalysisNix():
         idxT='t', useColNames=True,
         dataCol=tdInterp.drop(columns='t').columns,
         samplingRate=samplingRate)
-    # print([asig.name for asig in tdBlockInterp.filter(objects=AnalogSignal)])
-    # print([st.name for st in tdBlockInterp.filter(objects=SpikeTrain)])
-    # print([ev.name for ev in tdBlockInterp.filter(objects=Event)])
-    # print([chIdx.name for chIdx in tdBlockInterp.filter(objects=ChannelIndex)])
-    #  typesNeedRenaming = [ChannelIndex]
-    #  for objType in typesNeedRenaming:
-    #      for child in tdBlockInterp.filter(objects=objType):
-    #          child.name = ns5.childBaseName(child.name, 'seg')
-    ns5.addBlockToNIX(
-        tdBlockInterp, neoSegIdx=[0],
-        writeSpikes=False, writeEvents=False,
-        purgeNixNames=False,
-        fileName=ns5FileName + '_analyze',
-        folderPath=analysisSubFolder,
-        nixBlockIdx=0, nixSegIdx=[0],
-        )
+    spikesBlock.merge(tdBlockInterp)
+    #
+    del spikesBlock.segments[-1]
+    #
+    for cI in spikesBlock.channel_indexes:
+        # e.g. cI = spikesBlock.channel_indexes[0]
+        for asig in cI.analogsignals:
+            # e.g. asig = cI.analogsignals[0]
+            # print('Assigning {}'.format(asig.name))
+            asig.channel_index = cI
+            asig.segment = spikesBlock.segments[0]
+            spikesBlock.segments[0].analogsignals.append(asig)
+    spikesBlock.create_relationship(force=True)
+    # spikesBlock.channel_indexes[0].analogsignals[0]
+    # pd.unique([id(asi) for asi in spikesBlock.filter(objects=AnalogSignal)])
+    analysisBlockPath = analysisDataPath.format(arguments['analysisName'])
+    if os.path.exists(analysisBlockPath):
+        os.remove(analysisBlockPath)
+    pdb.set_trace()
+    writer = neo.io.NixIO(filename=analysisBlockPath)
+    writer.write_block(spikesBlock, use_obj_names=True)
+    writer.close()
+    # ns5.addBlockToNIX(
+    #     tdBlockInterp, neoSegIdx=[0],
+    #     writeSpikes=False, writeEvents=False,
+    #     purgeNixNames=False,
+    #     fileName=ns5FileName + '_analyze',
+    #     folderPath=analysisSubFolder,
+    #     nixBlockIdx=0, nixSegIdx=[0],
+    #     )
     return
 
 

@@ -1499,14 +1499,15 @@ def synchronizeINStoNSP(
         tapTimestampsNSP=None, tapTimestampsINS=None,
         precalculatedFun=None,
         NSPTimeRanges=(None, None),
-        td=None, accel=None, insBlock=None, trialSegment=None, degree=1
+        td=None, accel=None, insBlock=None, trialSegment=None, degree=1,
+        trimSpiketrains=False
         ):
+    print('Trial Segment {}'.format(trialSegment))
     if precalculatedFun is None:
         assert ((tapTimestampsNSP is not None) & (tapTimestampsINS is not None))
         # sanity check that the intervals match
         insDiff = tapTimestampsINS.diff().dropna().values
         nspDiff = tapTimestampsNSP.diff().dropna().values
-        print('Trial Segment {}'.format(trialSegment))
         print('On the INS, the diff() between taps was\n{}'.format(insDiff))
         print('On the NSP, the diff() between taps was\n{}'.format(nspDiff))
         print('This amounts to a msec difference of\n{}'.format(
@@ -1526,11 +1527,13 @@ def synchronizeINStoNSP(
     if td is not None:
         td.loc[:, 'NSPTime'] = pd.Series(
             timeInterpFunINStoNSP(td['t']), index=td['t'].index)
+        td.loc[:, 'NSPTime'] = timeInterpFunINStoNSP(td['t'].to_numpy())
     if accel is not None:
         accel.loc[:, 'NSPTime'] = pd.Series(
             timeInterpFunINStoNSP(accel['t']), index=accel['t'].index)
     if insBlock is not None:
         # allUnits = [st.unit for st in insBlock.segments[0].spiketrains]
+        # [un.name for un in insBlock.filter(objects=Unit)]
         for unit in insBlock.filter(objects=Unit):
             tStart = NSPTimeRanges[0]
             tStop = NSPTimeRanges[1]
@@ -1540,26 +1543,36 @@ def synchronizeINStoNSP(
                     uniqueSt.append(st)
                 else:
                     continue
+                print('Synchronizing {}'.format(st.name))
                 if len(st.times):
                     segMask = np.array(
                         st.array_annotations['trialSegment'],
                         dtype=np.int) == trialSegment
                     st.magnitude[segMask] = (
                         timeInterpFunINStoNSP(st.times[segMask].magnitude))
-                    #  kludgey fix for weirdness concerning t_start
-                    st.t_start = min(tStart, st.times[0] * 0.999)
-                    st.t_stop = min(tStop, st.times[-1] * 1.001)
-                    validMask = st < st.t_stop
-                    if ~validMask.all():
-                        print('Deleted some spikes')
-                        st = st[validMask]
-                        # delete invalid spikes
-                        if 'arrayAnnNames' in st.annotations.keys():
-                            for key in st.annotations['arrayAnnNames']:
-                                st.annotations[key] = np.array(st.array_annotations[key])
+                    if trimSpiketrains:
+                        print('Trimming spiketrain')
+                        #  kludgey fix for weirdness concerning t_start
+                        st.t_start = min(tStart, st.times[0] * 0.999)
+                        st.t_stop = min(tStop, st.times[-1] * 1.001)
+                        validMask = st < st.t_stop
+                        if ~validMask.all():
+                            print('Deleted some spikes')
+                            # pdb.set_trace()
+                            st = st[validMask]
+                            # delete invalid spikes
+                            if 'arrayAnnNames' in st.annotations.keys():
+                                for key in st.annotations['arrayAnnNames']:
+                                    try:
+                                        # st.annotations[key] = np.array(st.array_annotations[key])
+                                        st.annotations[key] = np.delete(st.annotations[key], ~validMask)
+                                    except Exception:
+                                        traceback.print_exc()
+                                        pdb.set_trace()
                 else:
-                    st.t_start = tStart
-                    st.t_stop = tStop
+                    if trimSpiketrains:
+                        st.t_start = tStart
+                        st.t_stop = tStop
         #
         allEvents = [
             ev
@@ -1753,6 +1766,7 @@ def readBlockFixNames(
     dataBlock = rawioReader.read_block(
         block_index=block_index, lazy=lazy,
         signal_group_mode=signal_group_mode)
+    # pdb.set_trace()
     if dataBlock.name is None:
         if 'neo_name' in dataBlock.annotations:
             dataBlock.name = dataBlock.annotations['neo_name']
@@ -2911,7 +2925,9 @@ def loadObjArrayAnn(st):
                     {key: np.asarray(st.annotations[key])})
                 st.annotations[key] = np.asarray(st.annotations[key])
             except Exception:
+                print('Error with {}'.format(st.name))
                 traceback.print_exc()
+                pdb.set_trace()
     if hasattr(st, 'waveforms'):
         if st.waveforms is None:
             st.waveforms = np.asarray([]).reshape((0, 0, 0))*pq.mV
@@ -2932,6 +2948,9 @@ def loadWithArrayAnn(
     else:
         reader = NixIO(filename=dataPath)
         block = reader.read_block()
+        # pdb.set_trace()
+        # [un.name for un in block.filter(objects=Unit)]
+        # [len(un.spiketrains) for un in block.filter(objects=Unit)]
     
     block = loadContainerArrayAnn(container=block)
     

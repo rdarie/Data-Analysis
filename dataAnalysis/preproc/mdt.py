@@ -2151,7 +2151,11 @@ def preprocINS(
         )
     block.segments[0].events.append(concatEvents)
     concatEvents.segment = block.segments[0]
-    block.create_relationship()
+    # [un.name for un in block.filter(objects=Unit)]
+    # [len(un.spiketrains) for un in block.filter(objects=Unit)]
+    createRelationship = False
+    if createRelationship:
+        block.create_relationship()
     #
     writer = neo.io.NixIO(filename=insDataFilename, mode='ow')
     writer.write_block(block, use_obj_names=True)
@@ -2215,7 +2219,7 @@ def getINSStimOnset(
 
             thisElecConfig = elecConfiguration[
                 groupIdx][progIdx]
-            thisUnit = Unit(name=electrodeCombo)
+            thisUnit = Unit(name=electrodeCombo + '#0')
             thisUnit.annotate(group=groupIdx)
             thisUnit.annotate(program=progIdx)
             thisUnit.annotate(cathodes=thisElecConfig['cathodes'])
@@ -2788,7 +2792,7 @@ def getINSStimOnset(
         if len(theseOnsetTimestamps):
             thisUnit = block.filter(
                 objects=Unit,
-                name=electrodeCombo
+                name=electrodeCombo + '#0'
                 )[0]
             thisElecConfig = elecConfiguration[activeGroup][activeProgram]
             ##############################################################################
@@ -2894,7 +2898,7 @@ def getINSStimOnset(
     if figureOutputFolder is not None:
         pulseDetectionPDF.close()
     for thisUnit in block.filter(objects=Unit):
-        # print('getINSStimOnset packaging unit {}'.format(thisUnit.name))
+        print('getINSStimOnset packaging unit {}'.format(thisUnit.name))
         if len(tempSpiketrainStorage[thisUnit.name]) == 0:
             st = SpikeTrain(
                 name='seg{}_{}'.format(int(segIdx), thisUnit.name),
@@ -2982,17 +2986,20 @@ def getINSStimOnset(
                 t_start=spikeTStart, **consolidatedAnn, **arrayAnnNames)
             assert (consolidatedTimes.shape[0] == spikeWaveforms.shape[0])
             thisUnit.spiketrains.append(newSt)
-            print('thisUnit.st len = {}'.format(len(thisUnit.spiketrains)))
             newSt.unit = thisUnit
             if createRelationship:
                 thisUnit.create_relationship()
             seg.spiketrains.append(newSt)
             newSt.segment = seg
+            print('thisUnit.st len = {}'.format(len(thisUnit.spiketrains)))
     if createRelationship:
         for chanIdx in block.channel_indexes:
             chanIdx.create_relationship()
         seg.create_relationship()
         block.create_relationship()
+    # pdb.set_trace()
+    # [un.name for un in block.filter(objects=Unit)]
+    # [len(un.spiketrains) for un in block.filter(objects=Unit)]
     return block
 
 
