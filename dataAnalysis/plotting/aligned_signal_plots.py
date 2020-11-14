@@ -135,131 +135,136 @@ def plotNeuronsAligned(
                 .sum().sort_values(ascending=False).index)
             unitNames = [i.replace('_raster#0', '') for i in unitRanks]
         for idx, unitName in enumerate(tqdm(unitNames)):
-            rasterName = unitName + '_raster#0'
-            continuousName = unitName + '_fr#0'
-            rasterWide = ns5.alignedAsigsToDF(
-                rasterBlock, [rasterName],
-                **rasterLoadArgs)
-            asigWide = ns5.alignedAsigsToDF(
-                frBlock, [continuousName],
-                **loadArgs)
-            # oneSpikePerBinHz = int(
-            #     np.round(
-            #         np.diff(rasterWide.columns)[0] ** (-1) *
-            #         loadArgs['decimate']))
-            oneSpikePerBinHz = int(
-                np.round(
-                    np.diff(rasterWide.columns)[0] ** (-1)))
-            if enablePlots:
-                indexInfo = asigWide.index.to_frame()
-                if idx == 0:
-                    breakDownData, breakDownText, fig, ax = printBreakdown(
-                        asigWide, rowName, colName, hueName)
-                    breakDownData.to_csv(
-                        os.path.join(
-                            figureFolder,
-                            pdfName + '_trialsBreakDown.txt'),
-                        sep='\t')
-                    pdf.savefig()
-                    plt.close()
+            try:
+                rasterName = unitName + '_raster#0'
+                continuousName = unitName + '_fr#0'
+                rasterWide = ns5.alignedAsigsToDF(
+                    rasterBlock, [rasterName],
+                    **rasterLoadArgs)
+                asigWide = ns5.alignedAsigsToDF(
+                    frBlock, [continuousName],
+                    **loadArgs)
+                # oneSpikePerBinHz = int(
+                #     np.round(
+                #         np.diff(rasterWide.columns)[0] ** (-1) *
+                #         loadArgs['decimate']))
+                oneSpikePerBinHz = int(
+                    np.round(
+                        np.diff(rasterWide.columns)[0] ** (-1)))
+                if enablePlots:
+                    indexInfo = asigWide.index.to_frame()
+                    if idx == 0:
+                        breakDownData, breakDownText, fig, ax = printBreakdown(
+                            asigWide, rowName, colName, hueName)
+                        breakDownData.to_csv(
+                            os.path.join(
+                                figureFolder,
+                                pdfName + '_trialsBreakDown.txt'),
+                            sep='\t')
+                        pdf.savefig()
+                        plt.close()
+                        if minNObservations > 0:
+                            underMinLabels = (
+                                breakDownData
+                                .loc[breakDownData['count'] < minNObservations, :]
+                                .drop(columns=['count']))
+                            dropLabels = pd.Series(
+                                False,
+                                index=asigWide.index)
+                            for rIdx, row in underMinLabels.iterrows():
+                                theseBad = pd.Series(True, index=asigWide.index)
+                                for cName in row.index:
+                                    theseBad = theseBad & (indexInfo[cName] == row[cName])
+                                dropLabels = dropLabels | (theseBad)
+                            minObsKeepMask = ~dropLabels.to_numpy()
                     if minNObservations > 0:
-                        underMinLabels = (
-                            breakDownData
-                            .loc[breakDownData['count'] < minNObservations, :]
-                            .drop(columns=['count']))
-                        dropLabels = pd.Series(
-                            False,
-                            index=asigWide.index)
-                        for rIdx, row in underMinLabels.iterrows():
-                            theseBad = pd.Series(True, index=asigWide.index)
-                            for cName in row.index:
-                                theseBad = theseBad & (indexInfo[cName] == row[cName])
-                            dropLabels = dropLabels | (theseBad)
-                        minObsKeepMask = ~dropLabels.to_numpy()
-                if minNObservations > 0:
-                    asigWide = asigWide.loc[minObsKeepMask, :]
-                    rasterWide = rasterWide.loc[minObsKeepMask, :]
-                indexInfo = rasterWide.index.to_frame()
-                if colOrder is None:
-                    if colName is not None:
-                        colOrder = sorted(np.unique(indexInfo[colName]))
+                        asigWide = asigWide.loc[minObsKeepMask, :]
+                        rasterWide = rasterWide.loc[minObsKeepMask, :]
+                    indexInfo = rasterWide.index.to_frame()
+                    if colOrder is None:
+                        if colName is not None:
+                            colOrder = sorted(np.unique(indexInfo[colName]))
+                        else:
+                            colOrder = None
                     else:
-                        colOrder = None
-                else:
-                    # ensure we didn't drop any of the col_names
-                    colOrder = [
-                        cn
-                        for cn in colOrder
-                        if cn in sorted(np.unique(indexInfo[colName]))]
-                if rowOrder is None:
-                    if rowName is not None:
-                        rowOrder = sorted(np.unique(indexInfo[rowName]))
+                        # ensure we didn't drop any of the col_names
+                        colOrder = [
+                            cn
+                            for cn in colOrder
+                            if cn in sorted(np.unique(indexInfo[colName]))]
+                    if rowOrder is None:
+                        if rowName is not None:
+                            rowOrder = sorted(np.unique(indexInfo[rowName]))
+                        else:
+                            rowOrder = None
                     else:
-                        rowOrder = None
-                else:
-                    # ensure we didn't drop any of the row_names
-                    rowOrder = [
-                        rn
-                        for rn in rowOrder
-                        if rn in sorted(np.unique(indexInfo[rowName]))]
-                if hueOrder is None:
-                    if hueName is not None:
-                        hueOrder = sorted(np.unique(indexInfo[hueName]))
+                        # ensure we didn't drop any of the row_names
+                        rowOrder = [
+                            rn
+                            for rn in rowOrder
+                            if rn in sorted(np.unique(indexInfo[rowName]))]
+                    if hueOrder is None:
+                        if hueName is not None:
+                            hueOrder = sorted(np.unique(indexInfo[hueName]))
+                        else:
+                            hueOrder = None
                     else:
-                        hueOrder = None
-                else:
-                    # ensure we didn't drop any of the hue_names
-                    hueOrder = [
-                        hn
-                        for hn in hueOrder
-                        if hn in sorted(np.unique(indexInfo[hueName]))]
-                raster = rasterWide.stack().reset_index(name='raster')
-                asig = asigWide.stack().reset_index(name='fr')
-                raster.loc[:, 'fr'] = asig.loc[:, 'fr']
-                raster = getRasterFacetIdx(
-                    raster, 't',
-                    col=colName, row=rowName, hue=hueName)
-                #
-                if 'height' in twinRelplotKWArgs:
-                    figHeight = twinRelplotKWArgs['height'] * 72
-                else:
-                    figHeight = 3 * 72
-                # figHeight in **points**
-                nRasterRows = raster['t_facetIdx'].max()
-                twinRelplotKWArgs['func1_kws']['s'] = min(
-                    (3 * figHeight / nRasterRows) ** 2,
-                    4)
-                # pdb.set_trace()
-                raster.loc[raster['bin'] == raster['bin'].min(), 'raster'] = oneSpikePerBinHz
-                raster.loc[raster['bin'] == raster['bin'].max(), 'raster'] = oneSpikePerBinHz
-                g = twin_relplot(
-                    x='bin',
-                    y2='fr', y1='t_facetIdx',
-                    query2=None, query1='(raster == {})'.format(oneSpikePerBinHz),
-                    col=colName, row=rowName, hue=hueName,
-                    col_order=colOrder, row_order=rowOrder, hue_order=hueOrder,
-                    **twinRelplotKWArgs,
-                    data=raster)
-                #  iterate through plot and add significance stars
-                for (ro, co, hu), dataSubset in g.facet_data():
-                    if len(plotProcFuns):
-                        for procFun in plotProcFuns:
-                            procFun(g, ro, co, hu, dataSubset)
-                    # g.twin_axes[ro, co].set_ylabel('Firing Rate (spk/s)')
-                    g.axes[ro, co].set_ylabel('')
-                    if sigTestResults is not None:
-                        addSignificanceStars(
-                            g, sigTestResults.query("unit == '{}'".format(rasterName)),
-                            ro, co, hu, dataSubset, sigStarOpts=sigStarOpts)
-                plt.suptitle(unitName)
-                pdf.savefig()
-                if showNow:
-                    plt.show()
-                else:
-                    plt.close()
-            if limitPages is not None:
-                if idx >= (limitPages - 1):
-                    break
+                        # ensure we didn't drop any of the hue_names
+                        hueOrder = [
+                            hn
+                            for hn in hueOrder
+                            if hn in sorted(np.unique(indexInfo[hueName]))]
+                    raster = rasterWide.stack().reset_index(name='raster')
+                    asig = asigWide.stack().reset_index(name='fr')
+                    raster.loc[:, 'fr'] = asig.loc[:, 'fr']
+                    raster = getRasterFacetIdx(
+                        raster, 't',
+                        col=colName, row=rowName, hue=hueName)
+                    #
+                    if 'height' in twinRelplotKWArgs:
+                        figHeight = twinRelplotKWArgs['height'] * 72
+                    else:
+                        figHeight = 3 * 72
+                    # figHeight in **points**
+                    nRasterRows = raster['t_facetIdx'].max()
+                    twinRelplotKWArgs['func1_kws']['s'] = min(
+                        (3 * figHeight / nRasterRows) ** 2,
+                        4)
+                    # pdb.set_trace()
+                    raster.loc[raster['bin'] == raster['bin'].min(), 'raster'] = oneSpikePerBinHz
+                    raster.loc[raster['bin'] == raster['bin'].max(), 'raster'] = oneSpikePerBinHz
+                    g = twin_relplot(
+                        x='bin',
+                        y2='fr', y1='t_facetIdx',
+                        query2=None, query1='(raster == {})'.format(oneSpikePerBinHz),
+                        col=colName, row=rowName, hue=hueName,
+                        col_order=colOrder, row_order=rowOrder, hue_order=hueOrder,
+                        **twinRelplotKWArgs,
+                        data=raster)
+                    #  iterate through plot and add significance stars
+                    for (ro, co, hu), dataSubset in g.facet_data():
+                        if len(plotProcFuns):
+                            for procFun in plotProcFuns:
+                                procFun(g, ro, co, hu, dataSubset)
+                        # g.twin_axes[ro, co].set_ylabel('Firing Rate (spk/s)')
+                        g.axes[ro, co].set_ylabel('')
+                        if sigTestResults is not None:
+                            addSignificanceStars(
+                                g, sigTestResults.query("unit == '{}'".format(rasterName)),
+                                ro, co, hu, dataSubset, sigStarOpts=sigStarOpts)
+                    plt.suptitle(unitName)
+                    pdf.savefig()
+                    if showNow:
+                        plt.show()
+                    else:
+                        plt.close()
+                if limitPages is not None:
+                    if idx >= (limitPages - 1):
+                        break
+            except Exception:
+                traceback.print_exc()
+                plt.close()
+                pass
     return
 
 
@@ -737,12 +742,16 @@ def genStimVLineAdder(
 
 def genBlockShader(patchOpts):
     def shadeBlocks(g, ro, co, hu, dataSubset):
-        pdb.set_trace()
-        if (hu % 2) == 0:
+        # pdb.set_trace()
+        if not hasattr(g, 'addShading'):
+            g.addShading = True
+            print('creating shading attr')
+        if g.addShading:
             g.axes[ro, co].axhspan(
                 dataSubset[g._y_var].min(), dataSubset[g._y_var].max(),
                 **patchOpts
             )
+            print('g.addShading = {}'.format(g.addShading))
             # Create list for all the patches
             # y = (dataSubset[g._y_var].max() + dataSubset[g._y_var].min()) / 2
             # height = (dataSubset[g._y_var].max() - dataSubset[g._y_var].min())
@@ -752,7 +761,8 @@ def genBlockShader(patchOpts):
             # rect = Rectangle((x, y), width, height, **patchOpts)
             # # Add collection to axes
             # g.axes[ro, co].add_patch(rect)
-            return
+        g.addShading = not (g.addShading)
+        return
     return shadeBlocks
 
 
