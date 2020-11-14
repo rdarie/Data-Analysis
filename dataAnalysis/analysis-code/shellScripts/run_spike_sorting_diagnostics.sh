@@ -22,28 +22,11 @@
 # Request custom resources
 #SBATCH --array=2,3
 
-# EXP="exp201901070700"
-# EXP="exp201901211000"
-# EXP="exp201901201200"
-# EXP="exp201901221000"
-# EXP="exp201901231000"
 # EXP="exp201901261000"
-# EXP="exp201901271000"
-# EXP="exp202008261100"
-# EXP="exp202008271200"
-# EXP="exp202008281100"
-# EXP="exp202008311100"
-# EXP="exp202009021100"
-# EXP="exp202009071200"
-# EXP="exp202009101200"
-# EXP="exp202009111100"
-# EXP="exp202009211200"
-# EXP="exp202009301100"
-# EXP="exp202010011100"
 EXP="exp202010271200"
 
-module load anaconda/3-5.2.0
-. /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
+module load anaconda/2020.02
+. /gpfs/runtime/opt/anaconda/2020.02/etc/profile.d/conda.sh
 conda activate
 source activate nda2
 python --version
@@ -51,6 +34,9 @@ python --version
 # SLURM_ARRAY_TASK_ID=3
 # python -u ./tridesclousCCV.py --arrayName=nform --blockIdx=$SLURM_ARRAY_TASK_ID --makeStrictNeoBlock --purgePeelerDiagnostics --exp=$EXP --chan_start=0 --chan_stop=32 --sourceFile=processed
 # python -u ./plotSpikeReport.py --blockIdx=$SLURM_ARRAY_TASK_ID --nameSuffix=_final --exp=$EXP --arrayName=nform
-# SLURM_ARRAY_TASK_ID=1
-python -u ./tridesclousCCV.py --arrayName=utah --blockIdx=$SLURM_ARRAY_TASK_ID --makeStrictNeoBlock --purgePeelerDiagnostics --exp=$EXP --chan_start=0 --chan_stop=50 --sourceFile=processed
-python -u ./plotSpikeReport.py --blockIdx=$SLURM_ARRAY_TASK_ID --nameSuffix=_final --exp=$EXP --arrayName=utah
+SLURM_ARRAY_TASK_ID=2
+python -u ./tridesclousCCV.py --arrayName=utah --blockIdx=$SLURM_ARRAY_TASK_ID --makeStrictNeoBlock --purgePeelerDiagnostics --exp=$EXP --chan_start=0 --chan_stop=96  --sourceFileSuffix='spike_preview'
+python -u ./plotSpikeReport.py --blockIdx=$SLURM_ARRAY_TASK_ID --nameSuffix=_final --exp=$EXP --arrayName=utah  --sourceFileSuffix='spike_preview'
+#
+# python -u ./tridesclousCCV.py --arrayName=utah --blockIdx=$SLURM_ARRAY_TASK_ID --makeStrictNeoBlock --purgePeelerDiagnostics --exp=$EXP --chan_start=0 --chan_stop=96  --sourceFileSuffix='mean_subtracted'
+# python -u ./plotSpikeReport.py --blockIdx=$SLURM_ARRAY_TASK_ID --nameSuffix=_final --exp=$EXP --arrayName=utah  --sourceFileSuffix='mean_subtracted'

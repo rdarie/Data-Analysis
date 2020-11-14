@@ -21,10 +21,10 @@ from ephyviewer.datasource import get_sources_from_neo_rawio
 from neo.rawio import rawiolist
 rawio_gui_params = {}
 rawio_gui_params['RawBinarySignal'] = [
-        {'name': 'dtype', 'type': 'list', 'values':['int16', 'uint16', 'float32', 'float64']},
-        {'name': 'nb_channel', 'type': 'int', 'value':1},
-        {'name': 'sampling_rate', 'type': 'float', 'value':10000., 'step': 1000., 'suffix': 'Hz', 'siPrefix': True},
-        {'name': 'bytesoffset', 'type': 'int', 'value':0},
+        {'name': 'dtype', 'type': 'list', 'values': ['int16', 'uint16', 'float32', 'float64']},
+        {'name': 'nb_channel', 'type': 'int', 'value': 1},
+        {'name': 'sampling_rate', 'type': 'float', 'value': 10000., 'step': 1000., 'suffix': 'Hz', 'siPrefix': True},
+        {'name': 'bytesoffset', 'type': 'int', 'value': 0},
     ]
 
 all_neo_rawio_dict = OrderedDict()
@@ -70,7 +70,7 @@ class StandAloneViewer(MainViewer):
         kargs = dict()
         if neo_rawio_class.rawmode.endswith('-file'):
             kargs['filename'] = file_or_dir_names[0]
-        elif neo_rawio_class.rawmode.endswith('-dir'):        
+        elif neo_rawio_class.rawmode.endswith('-dir'):
             kargs['dirname'] = file_or_dir_names[0]
         kargs.update(io_params)
         

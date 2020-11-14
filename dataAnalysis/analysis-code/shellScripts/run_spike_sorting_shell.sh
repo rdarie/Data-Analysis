@@ -45,9 +45,9 @@
 # EXP="exp202009211200"
 # EXP="exp202009291300"
 # EXP="exp202009301100"
-EXP="exp202010011100"
+# EXP="exp202010011100"
 EXP="exp202010271200"
-BLOCKIDX="1"
+BLOCKIDX="2"
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
@@ -56,19 +56,21 @@ source activate nda2
 python --version
 
 # Step 1: Constructor
-# python3 ./tridesclousCCV.py --blockIdx=$BLOCKIDX --exp=$EXP --chan_start=0 --chan_stop=32 --arrayName=utah --sourceFile=processed --remakePrb --removeExistingCatalog
-# python3 ./tridesclousCCV.py --blockIdx=$BLOCKIDX --exp=$EXP --batchPreprocess --chan_start=0 --chan_stop=50 --arrayName=utah --sourceFile=processed --remakePrb --removeExistingCatalog
+# python ./tridesclousCCV_jobArray.py --blockIdx=$BLOCKIDX --exp=$EXP --batchPreprocess --chan_start=45 --chan_stop=46 --arrayName=utah --sourceFileSuffix='spike_preview'
+# python ./tridesclousCCV_jobArray.py --blockIdx=$BLOCKIDX --exp=$EXP --batchPreprocess --chan_start=0 --chan_stop=50 --arrayName=utah --sourceFileSuffix='spike_preview' --remakePrb
 
 # Step 2: Validate the constructor
-# python3 ./tridesclousVisualize.py --arrayName=utah --blockIdx=$BLOCKIDX --exp=$EXP  --constructor --chan_start=1 --chan_stop=2
+# python -u ./tridesclousVisualize.py --arrayName=utah --blockIdx=$BLOCKIDX --exp=$EXP  --constructor --chan_start=95 --chan_stop=96 --sourceFileSuffix='spike_preview'
 
 # Step 3: Transfer the templates
-python3 ./transferTDCTemplates.py --arrayName=utah --exp=$EXP --chan_start=0 --chan_stop=50 --sourceFile=processed
-# python3 ./transferTDCTemplates.py --arrayName=nform --exp=$EXP --chan_start=0 --chan_stop=32 --sourceFile=processed
+# python ./transferTDCTemplates.py --arrayName=utah --exp=$EXP --chan_start=0 --chan_stop=96
+# python ./transferTDCTemplates.py --arrayName=nform --exp=$EXP --chan_start=0 --chan_stop=65
 
 # Step 4: Peeler
-# python3 ./tridesclousCCV.py --blockIdx=$BLOCKIDX --exp=$EXP --purgePeeler --batchPeel
-# python3 ./tridesclousVisualize.py --blockIdx=$BLOCKIDX --exp=$EXP  --peeler
+# python -u ./tridesclousCCV_jobArray.py --arrayName=utah --blockIdx=$BLOCKIDX --exp=$EXP --purgePeeler --batchPeel --chan_start=45 --chan_stop=46 --sourceFileSuffix='spike_preview'
+# optional: visualize the peeler
+python -u ./tridesclousVisualize.py --blockIdx=$BLOCKIDX --exp=$EXP --peeler --chan_start=45 --chan_stop=46 --sourceFileSuffix='spike_preview'
+
 # Step 5:
-# python3 './tridesclousCCV.py' --blockIdx=$BLOCKIDX --purgePeelerDiagnostics --makeStrictNeoBlock --exp=$EXP
-# python3 './plotSpikeReport.py' --blockIdx=$BLOCKIDX --nameSuffix=_final --exp=$EXP
+# python './tridesclousCCV.py' --blockIdx=$BLOCKIDX --purgePeelerDiagnostics --makeStrictNeoBlock --exp=$EXP --sourceFileSuffix='spike_preview'
+# python './plotSpikeReport.py' --blockIdx=$BLOCKIDX --nameSuffix=_final --exp=$EXP --sourceFileSuffix='spike_preview'

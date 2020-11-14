@@ -1766,7 +1766,6 @@ def readBlockFixNames(
     dataBlock = rawioReader.read_block(
         block_index=block_index, lazy=lazy,
         signal_group_mode=signal_group_mode)
-    # pdb.set_trace()
     if dataBlock.name is None:
         if 'neo_name' in dataBlock.annotations:
             dataBlock.name = dataBlock.annotations['neo_name']
@@ -2379,7 +2378,9 @@ def preprocBlockToNix(
                     del tempLFPStore
                 gc.collect()
             if calcAverageLFP:
-                averageLFP.name = 'seg{}_{}_zScoredAverage'.format(segIdx, electrodeArrayName)
+                averageLFP.name = 'seg{}_{}_zScoredAverage'.format(
+                    idx, electrodeArrayName)
+                    # segIdx, electrodeArrayName)
                 chanIdx = block.filter(
                     objects=ChannelIndex,
                     name='{}_zScoredAverage'.format(electrodeArrayName))[0]
@@ -2398,7 +2399,8 @@ def preprocBlockToNix(
                             meanLFP[:, mIdx],
                             units=averageLFP.units,
                             sampling_rate=averageLFP.sampling_rate,
-                            name='seg{}_{}'.format(segIdx, meanChIdx.name)
+                            name='seg{}_{}'.format(idx, meanChIdx.name)
+                            # name='seg{}_{}'.format(segIdx, meanChIdx.name)
                         )
                         # assign ownership to containers
                         meanChIdx.analogsignals.append(meanAsig)
@@ -2425,7 +2427,7 @@ def preprocBlockToNix(
                 nextLen = fftpack.helper.next_fast_len(averageLFP.shape[0])
                 deficit = int(nextLen - averageLFP.shape[0])
                 lDef = int(np.floor(deficit / 2))
-                rDef = int(np.ceil(deficit / 2))
+                rDef = int(np.ceil(deficit / 2)) + 1
                 temp = np.pad(
                     averageLFP.magnitude.flatten(),
                     (lDef, rDef), mode='constant')
@@ -2476,8 +2478,8 @@ def preprocBlockToNix(
                 )
                 if loadThisOne:
                     if trackMemory:
-                        print('writing asigs memory usage: {:.1f} MB'.format(
-                            prf.memory_usage_psutil()))
+                        print('writing asig {} ({}) memory usage: {:.1f} MB'.format(
+                            aSigIdx, aSigProxy.name, prf.memory_usage_psutil()))
                     chanIdx = aSigProxy.channel_index
                     asig = aSigProxy.load(
                         time_slice=(tStart, tStop),
@@ -2597,7 +2599,8 @@ def preprocBlockToNix(
                         chanIdx.units.append(unit)
                     #  except Exception:
                     #      traceback.print_exc()
-                    st.name = 'seg{}_{}'.format(segIdx, unit.name)
+                    # st.name = 'seg{}_{}'.format(segIdx, unit.name)
+                    st.name = 'seg{}_{}'.format(idx, unit.name)
                     #  link SpikeTrain and ID providing unit
                     if calcAverageLFP:
                         if 'arrayAnnNames' in st.annotations:
@@ -3132,7 +3135,11 @@ def calcFR(
                 chanIdx.name = chanIdx.name.replace('_raster', '_' + suffix)
             chanIdx.annotate(nix_name=chanIdx.name)
 
-        masterBlock.merge(spikeMatBlockInterp)
+        # masterBlock.merge(spikeMatBlockInterp)
+        frBlockPath = dataPath.replace('_analyze.nix', '_fr.nix')
+        writer = NixIO(filename=frBlockPath)
+        writer.write_block(spikeMatBlockInterp, use_obj_names=True)
+        writer.close()
     #
     dataReader.file.close()
     return masterBlock

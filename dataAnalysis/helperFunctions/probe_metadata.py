@@ -104,7 +104,7 @@ def cmpDFToPrb(
         cmpDF, filePath=None,
         names=None, banks=None, labels=None,
         contactSpacing=400,  # units of um
-        groupIn=None):
+        groupIn=None, verbose=True):
     # pdb.set_trace()
     if names is not None:
         keepMask = cmpDF['elecName'].isin(names)
@@ -129,8 +129,11 @@ def cmpDFToPrb(
             groupingCols.append(key + '_group')
     else:
         groupingCols = ['elecName']
+    if verbose:
+        print('Writing prb file (in cmpDFToPrb)....')
     for idx, (name, group) in enumerate(cmpDF.groupby(groupingCols)):
-        print('idx: {} name: {}'.format(idx, name))
+        if verbose:
+            print('channel group idx: {} name: {}'.format(idx, name))
         theseChannels = []
         theseGeoms = {}
         for rName, row in group.iterrows():
@@ -143,6 +146,7 @@ def cmpDFToPrb(
             'channels': theseChannels,
             'geometry': theseGeoms
             }})
+    # pdb.set_trace()
     """
     tallyChans = []
     tallyGeoms = {}

@@ -119,7 +119,7 @@ statsTestOpts.update({
     'tStop': rasterOpts['windowSizes'][arguments['window']][1]})
 #  Overrides
 ################################################################
-limitPages = None
+limitPages = 20
 showNow = False
 if arguments['enableOverrides']:
     nrnRelplotKWArgs.update({
@@ -142,7 +142,7 @@ if arguments['enableOverrides']:
             }}
         })
     ##########################################################################
-    alignedAsigsKWargs.update({'windowSize': (-.5, 1)})
+    alignedAsigsKWargs.update({'windowSize': (-.2, .4)})
     ##########################################################################
 #     # currWindow = rasterOpts['windowSizes'][arguments['window']]
 #     # fullWinSize = currWindow[1] - currWindow[0]
@@ -199,10 +199,6 @@ asp.plotNeuronsAligned(
         # asp.genYLimSetterTwin((0, 150)),
         asp.genTicksToScaleTwin(
             lineOpts={'lw': 2}, shared=True,
-            # for evoked lfp report
-            # xUnitFactor=1e3, yUnitFactor=1,
-            # xUnits='msec', yUnits='uV',
-            # for evoked emg report
             xUnitFactor=1e3, yUnitFactor=1,
             xUnits='msec', yUnits='spk/s',
             ),

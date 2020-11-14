@@ -40,7 +40,6 @@ def launch_standalone_ephyviewer():
         
         win.load_dataset(neo_rawio_class=neo_rawio_class, file_or_dir_names=[file_or_dir_name])
         
-        
     app.exec_()
 
 if __name__=='__main__':

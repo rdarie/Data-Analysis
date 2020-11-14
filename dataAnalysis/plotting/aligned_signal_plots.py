@@ -226,7 +226,10 @@ def plotNeuronsAligned(
                     figHeight = 3 * 72
                 # figHeight in **points**
                 nRasterRows = raster['t_facetIdx'].max()
-                twinRelplotKWArgs['func1_kws']['s'] = (2 * figHeight / nRasterRows) ** 2
+                twinRelplotKWArgs['func1_kws']['s'] = min(
+                    (3 * figHeight / nRasterRows) ** 2,
+                    4)
+                # pdb.set_trace()
                 raster.loc[raster['bin'] == raster['bin'].min(), 'raster'] = oneSpikePerBinHz
                 raster.loc[raster['bin'] == raster['bin'].max(), 'raster'] = oneSpikePerBinHz
                 g = twin_relplot(
@@ -734,6 +737,7 @@ def genStimVLineAdder(
 
 def genBlockShader(patchOpts):
     def shadeBlocks(g, ro, co, hu, dataSubset):
+        pdb.set_trace()
         if (hu % 2) == 0:
             g.axes[ro, co].axhspan(
                 dataSubset[g._y_var].min(), dataSubset[g._y_var].max(),

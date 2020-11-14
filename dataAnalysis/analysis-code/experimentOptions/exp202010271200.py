@@ -190,16 +190,21 @@ def getExpOpts():
                 for i in range(1, 17)
             ],
             'electrodeMapPath': './Utah_SN6251_002374_Rupert.cmp',
+            'rawBlockName': 'utah',
             'excludeChans': [],
             'prbOpts': dict(
                 contactSpacing=400,
                 groupIn={
-                    'xcoords': np.arange(-.1, 10.1, 2),
+                    'xcoords': np.arange(-.1, 10.1, 1),
                     'ycoords': np.arange(-.1, 10.1, 1)}),
-            'triFolderSource': {'exp': experimentName, 'block': 2},
+            'triFolderSource': {
+                'exp': experimentName, 'block': 2,
+                'nameSuffix': 'spike_preview'},
             'triFolderDest': [
-                {'exp': experimentName, 'block': i}
-                for i in [3]]
+                {
+                    'exp': experimentName, 'block': i,
+                    'nameSuffix': 'mean_subtracted'}
+                for i in [2, 3]]
         },
         'nform': {
             'asigNameList': [
@@ -214,15 +219,20 @@ def getExpOpts():
                 ],
             'ainpNameList': ['analog 1'],
             'electrodeMapPath': './NForm_Rupert_flat_v2.map',
+            'rawBlockName': 'nform',
             'excludeChans': ['nform_20', 'nform_27'],
             'prbOpts': dict(
                 contactSpacing=500,
                 groupIn={
                     'xcoords': np.arange(-.1, 18.1, 1),
                     'ycoords': np.arange(-.1, 5.1, 2)}),
-            'triFolderSource': {'exp': experimentName, 'block': 1},
+            'triFolderSource': {
+                'exp': experimentName, 'block': 2,
+                'nameSuffix': 'spike_preview'},
             'triFolderDest': [
-                {'exp': experimentName, 'block': i}
+                {
+                    'exp': experimentName, 'block': i,
+                    'nameSuffix': 'mean_subtracted'}
                 for i in [2, 3]]
         }
     }

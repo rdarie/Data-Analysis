@@ -40,7 +40,7 @@ def initialize_catalogueconstructor(
         import shutil
         shutil.rmtree(triFolder)
     if fileFormat == 'NIX':
-        filePath = os.path.join(folderPath, fileName + '_raw.nix')
+        filePath = os.path.join(folderPath, fileName + '.nix')
     if fileFormat == 'Blackrock':
         filePath = os.path.join(folderPath, fileName + '.ns5')
     print(filePath)  # check
@@ -380,10 +380,12 @@ def clean_catalogue(
 
 def run_peeler(
         triFolder, chan_grp=0,
-        shape_distance_threshold=2,
-        shape_boundary_threshold=3,
+        shape_distance_threshold=3,
+        shape_boundary_threshold=4,
         confidence_threshold=0.6,
+        energy_reduction_threshold=0,
         debugging=False, progressbar=False,
+        chunksize=2**12,
         duration=None, useOpenCL=False, trackTiming=False):
 
     dataio = tdc.DataIO(dirname=triFolder)
@@ -396,14 +398,16 @@ def run_peeler(
         peeler.change_params(
             catalogue=initial_catalogue,
             shape_distance_threshold=shape_distance_threshold,
-            debugging=debugging)
+            energy_reduction_threshold=energy_reduction_threshold,
+            debugging=debugging, chunksize=chunksize)
     else:
         peeler.change_params(
             catalogue=initial_catalogue,
             shape_distance_threshold=shape_distance_threshold,
             shape_boundary_threshold=shape_boundary_threshold,
             confidence_threshold=confidence_threshold,
-            debugging=debugging)
+            energy_reduction_threshold=energy_reduction_threshold,
+            debugging=debugging, chunksize=chunksize)
 
     if trackTiming:
         t1 = time.perf_counter()
@@ -435,8 +439,8 @@ def export_spikes_after_peeler(triFolder):
 
 def neo_block_after_peeler(
         triFolder, chan_grps=None,
-        shape_distance_threshold=None,
-        shape_boundary_threshold=None,
+        shape_distance_threshold=3,
+        shape_boundary_threshold=4,
         refractory_period=None, ignoreTags=['so_bad'],
         plotting=False,
         FRThresh=1):
@@ -467,8 +471,10 @@ def neo_block_after_peeler(
                 window1[:int(-n_left)],
                 window2[int(n_right) + 1:]),
             axis=-1)
-        #  discount edges a lot
-        window[window < 0.5] = 0.1
+        discountEdges = False
+        if discountEdges:
+            #  discount edges a lot
+            window[window < 0.5] = 0.1
         #  normalize to sum 1, so that the distance is an average
         #  deviation
         distance_window = (window) / np.sum(window)
@@ -795,8 +801,8 @@ def purgePeelerResults(
             f
             for f in os.listdir(triFolder)
             if os.path.isdir(os.path.join(triFolder, f))]
-        for fl in glob.glob(os.path.join(triFolder, 'templateHist*.png')):
-            os.remove(fl)
+        # for fl in glob.glob(os.path.join(triFolder, 'templateHist*.png')):
+        #     os.remove(fl)
         for fl in glob.glob(os.path.join(triFolder, 'feature_distances*.png')):
             os.remove(fl)
         for grpFolder in grpFolders:
@@ -1058,9 +1064,11 @@ def batchPrepWaveforms(
 
 def batchPeel(
         triFolder, chansToAnalyze,
-        shape_distance_threshold=2,
-        shape_boundary_threshold=3,
+        shape_distance_threshold=3,
+        shape_boundary_threshold=4,
         confidence_threshold=0.6,
+        energy_reduction_threshold=0,
+        chunksize=2**12,
         attemptMPI=False
         ):
     print('Batch peeling...')
@@ -1085,10 +1093,12 @@ def batchPeel(
                 prf.memory_usage_psutil()))
             try:
                 run_peeler(
-                    triFolder, shape_distance_threshold=shape_distance_threshold,
+                    triFolder,
+                    shape_distance_threshold=shape_distance_threshold,
                     shape_boundary_threshold=shape_boundary_threshold,
                     confidence_threshold=confidence_threshold,
-                    debugging=True,
+                    energy_reduction_threshold=energy_reduction_threshold,
+                    debugging=True, chunksize=chunksize,
                     chan_grp=chan_grp, progressbar=False)
                 gc.collect()
             except Exception:

@@ -44,9 +44,9 @@ namedQueries = {
     'chan': {
         'all': "(chanName.notna())",
         'lfp': "((chanName.str.contains('elec')or(chanName.str.contains('utah'))or(chanName.str.contains('nform')))and(not(chanName.str.endswith('fr'))))",
-        'fr': "(chanName.str.endswith('fr'))",
+        'fr': "((chanName.str.contains('elec')or(chanName.str.contains('utah'))or(chanName.str.contains('nform')))and((chanName.str.endswith('fr'))))",
         'fr_sqrt': "(chanName.str.endswith('fr_sqrt'))",
-        'raster': "(chanName.str.endswith('raster'))",
+        'raster': "((chanName.str.contains('elec')or(chanName.str.contains('utah'))or(chanName.str.contains('nform')))and((chanName.str.endswith('raster'))))",
         'oech': "(chanName.str.contains('CH'))",
         'oechorsense': "((chanName.str.contains('CH'))or(chanName.str.contains('Sense')))",
         'oechorins': "((chanName.str.contains('CH'))or(chanName.str.contains('ins')))",

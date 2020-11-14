@@ -31,6 +31,7 @@ def getExpOpts():
     
     experimentName = '201901271000-Proprio'
     deviceName = 'DeviceNPC700373H'
+    subjectName = 'Murdoc'
     
     jsonSessionNames = {
         #  per trial

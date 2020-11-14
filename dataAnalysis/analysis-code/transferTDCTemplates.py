@@ -3,13 +3,13 @@ Usage:
     temp.py [options]
 
 Options:
-    --blockIdx=blockIdx             which trial to analyze [default: 1]
-    --exp=exp                       which experimental day to analyze
-    --processAll                    process entire experimental day? [default: False]
-    --sourceFile=sourceFile         which source file to analyze [default: raw]
-    --chan_start=chan_start         which chan_grp to start on [default: 0]
-    --chan_stop=chan_stop           which chan_grp to stop on [default: 47]
-    --arrayName=arrayName           which electrode array to analyze [default: utah]
+    --blockIdx=blockIdx                         which trial to analyze [default: 1]
+    --exp=exp                                   which experimental day to analyze
+    --processAll                                process entire experimental day? [default: False]
+    --fromNS5                                   make from raw ns5 file? [default: False]
+    --chan_start=chan_start                     which chan_grp to start on [default: 0]
+    --chan_stop=chan_stop                       which chan_grp to stop on [default: 47]
+    --arrayName=arrayName                       which electrode array to analyze [default: utah]
 """
 
 import os, pdb, glob
@@ -26,13 +26,17 @@ globals().update(expOpts)
 globals().update(allOpts)
 
 arrayName = arguments['arrayName']
-spikeSortingOpts = spikeSortingOpts[arrayName]
-triFolderSourceMeta = spikeSortingOpts['triFolderSource']
+if 'rawBlockName' in spikeSortingOpts[arrayName]:
+   rawBlockName = spikeSortingOpts[arrayName]['rawBlockName']
+else:
+    rawBlockName = 'Block'
+triFolderSourceMeta = spikeSortingOpts[arrayName]['triFolderSource']
 triFolderSource = os.path.join(
     scratchPath, triFolderSourceMeta['exp'],
-    'tdc_{}{:0>3}'.format(arrayName, triFolderSourceMeta['block']))
+    'tdc_{}{:0>3}'.format(rawBlockName, triFolderSourceMeta['block']))
+if triFolderSourceMeta['nameSuffix'] is not None:
+    triFolderSource += '_{}'.format(triFolderSourceMeta['nameSuffix'])
 #
-ns5FileName = ns5FileName.replace('Block', arrayName)
 prbPathCandidates = glob.glob(os.path.join(triFolderSource, '*.prb'))
 assert len(prbPathCandidates) == 1
 prbPath = prbPathCandidates[0]
@@ -42,12 +46,30 @@ chan_start = int(arguments['chan_start'])
 chan_stop = int(arguments['chan_stop'])
 chansToAnalyze = sorted(list(dataio.channel_groups.keys()))[chan_start:chan_stop]
 
-for triFolderDestMeta in spikeSortingOpts['triFolderDest']:
+for triFolderDestMeta in spikeSortingOpts[arrayName]['triFolderDest']:
     triFolderDest = os.path.join(
         scratchPath, triFolderDestMeta['exp'],
-        'tdc_{}{:0>3}'.format(arrayName, triFolderDestMeta['block']))
+        'tdc_{}{:0>3}'.format(rawBlockName, triFolderDestMeta['block']))
+    if 'rawBlockName' in spikeSortingOpts[arrayName]:
+        ns5FileName = '{}{:0>3}'.format(spikeSortingOpts[arrayName]['rawBlockName'], triFolderDestMeta['block'])
+    else:
+        ns5FileName = 'Block{:0>3}'.format(triFolderDestMeta['block'])
+    if triFolderDestMeta['nameSuffix'] is not None:
+        triFolderDest += '_{}'.format(triFolderDestMeta['nameSuffix'])
+        ns5FileName += '_{}'.format(triFolderDestMeta['nameSuffix'])
+    ##### hack to restore broken templates
+    # pdb.set_trace()
+    # if True:
+    #     # reverse the order
+    #     hackSrc = triFolderDest
+    #     hackDest = triFolderSource
+    #     # tdch.purgeNeoBlock(hackDest)
+    #     # tdch.purgePeelerResults(hackDest, purgeAll=True)
+    #     tdch.transferTemplates(hackSrc, hackDest, chansToAnalyze)
+    #     break
+    ##################
     try:
-        if arguments['sourceFile'] == 'raw':
+        if arguments['fromNS5']:
             tdch.initialize_catalogueconstructor(
                 nspFolder,
                 ns5FileName,
@@ -59,7 +81,7 @@ for triFolderDestMeta in spikeSortingOpts['triFolderDest']:
                 scratchFolder,
                 ns5FileName,
                 triFolderDest, prbPath=prbPath,
-                spikeSortingOpts=spikeSortingOpts,
+                spikeSortingOpts=spikeSortingOpts[arrayName],
                 fileFormat='NIX')
     except Exception:
         traceback.print_exc()

@@ -5,24 +5,25 @@ Usage:
     tridesclousCCV.py [options]
 
 Options:
-    --exp=exp                      which experimental day to analyze
-    --blockIdx=blockIdx            which trial to analyze [default: 1]
-    --arrayName=arrayName          which electrode array to analyze [default: utah]
-    --sourceFile=sourceFile        which source file to analyze [default: raw]
-    --attemptMPI                   whether to try to load MPI [default: False]
-    --remakePrb                    whether to try to load MPI [default: False]
-    --removeExistingCatalog        delete previous sort results [default: False]
-    --purgePeeler                  delete previous sort results [default: False]
-    --purgePeelerDiagnostics       delete previous sort results [default: False]
-    --batchPreprocess              extract snippets and features, run clustering [default: False]
-    --batchPrepWaveforms           extract snippets [default: False]
-    --batchRunClustering           extract features, run clustering [default: False]
-    --batchPeel                    run peeler [default: False]
-    --makeCoarseNeoBlock           save peeler results to a neo block [default: False]
-    --makeStrictNeoBlock           save peeler results to a neo block [default: False]
-    --exportSpikesCSV              save peeler results to a csv file [default: False]
-    --chan_start=chan_start        which chan_grp to start on [default: 0]
-    --chan_stop=chan_stop          which chan_grp to stop on [default: 47]
+    --exp=exp                                   which experimental day to analyze
+    --blockIdx=blockIdx                         which trial to analyze [default: 1]
+    --arrayName=arrayName                       which electrode array to analyze [default: utah]
+    --sourceFileSuffix=sourceFileSuffix         which source file to analyze
+    --fromNS5                                   make from raw ns5 file? [default: False]
+    --attemptMPI                                whether to try to load MPI [default: False]
+    --remakePrb                                 whether to try to load MPI [default: False]
+    --removeExistingCatalog                     delete previous sort results [default: False]
+    --purgePeeler                               delete previous sort results [default: False]
+    --purgePeelerDiagnostics                    delete previous sort results [default: False]
+    --batchPreprocess                           extract snippets and features, run clustering [default: False]
+    --batchPrepWaveforms                        extract snippets [default: False]
+    --batchRunClustering                        extract features, run clustering [default: False]
+    --batchPeel                                 run peeler [default: False]
+    --makeCoarseNeoBlock                        save peeler results to a neo block [default: False]
+    --makeStrictNeoBlock                        save peeler results to a neo block [default: False]
+    --exportSpikesCSV                           save peeler results to a csv file [default: False]
+    --chan_start=chan_start                     which chan_grp to start on [default: 0]
+    --chan_stop=chan_stop                       which chan_grp to stop on [default: 47]
 """
 
 from docopt import docopt
@@ -66,24 +67,37 @@ if RANK == 0:
     globals().update(allOpts)
     arrayName = arguments['arrayName']
     try:
-        ns5FileName = ns5FileName.replace('Block', arrayName)
-        triFolder = os.path.join(
-            scratchFolder, 'tdc_{}{:0>3}'.format(arrayName, blockIdx))
+        if 'rawBlockName' in spikeSortingOpts[arrayName]:
+            ns5FileName = ns5FileName.replace(
+                'Block', spikeSortingOpts[arrayName]['rawBlockName'])
+            triFolder = os.path.join(
+                scratchFolder, 'tdc_{}{:0>3}'.format(
+                    spikeSortingOpts[arrayName]['rawBlockName'], blockIdx))
+        else:
+            triFolder = os.path.join(
+                scratchFolder, 'tdc_Block{:0>3}'.format(blockIdx))
+        if arguments['sourceFileSuffix'] is not None:
+            triFolder = triFolder + '_{}'.format(arguments['sourceFileSuffix'])
+        #
         spikeSortingOpts[arrayName]['remakePrb'] = arguments['remakePrb']
-        if arguments['sourceFile'] == 'raw':
+        if arguments['fromNS5']:
             tdch.initialize_catalogueconstructor(
                 nspFolder,
                 ns5FileName,
                 triFolder,
                 prbPath=nspPrbPath,
-                removeExisting=arguments['removeExistingCatalog'], fileFormat='Blackrock')
+                removeExisting=arguments['removeExistingCatalog'],
+                fileFormat='Blackrock')
         else:
+            if arguments['sourceFileSuffix'] is not None:
+                ns5FileName = ns5FileName + '_{}'.format(arguments['sourceFileSuffix'])
             tdch.initialize_catalogueconstructor(
                 scratchFolder,
                 ns5FileName,
                 triFolder,
                 spikeSortingOpts=spikeSortingOpts[arrayName],
-                removeExisting=arguments['removeExistingCatalog'], fileFormat='NIX')
+                removeExisting=arguments['removeExistingCatalog'],
+                fileFormat='NIX')
     except Exception:
         traceback.print_exc()
         print('Ignoring Exception')

@@ -78,22 +78,22 @@ else:
         chanNames=chanNames,
         rasterOpts=binOpts)
 
-allSegs = list(range(len(masterBlock.segments)))
-if arguments['processAll']:
-    preproc.addBlockToNIX(
-        masterBlock, neoSegIdx=allSegs,
-        writeSpikes=False, writeEvents=False,
-        fileName=experimentName + '_analyze',
-        folderPath=analysisSubFolder,
-        purgeNixNames=False,
-        nixBlockIdx=0, nixSegIdx=allSegs,
-        )
-else:
-    preproc.addBlockToNIX(
-        masterBlock, neoSegIdx=allSegs,
-        writeSpikes=False, writeEvents=False,
-        fileName=ns5FileName + '_analyze',
-        folderPath=analysisSubFolder,
-        purgeNixNames=False,
-        nixBlockIdx=0, nixSegIdx=allSegs,
-        )
+# allSegs = list(range(len(masterBlock.segments)))
+# if arguments['processAll']:
+#     preproc.addBlockToNIX(
+#         masterBlock, neoSegIdx=allSegs,
+#         writeSpikes=False, writeEvents=False,
+#         fileName=experimentName + '_analyze',
+#         folderPath=analysisSubFolder,
+#         purgeNixNames=False,
+#         nixBlockIdx=0, nixSegIdx=allSegs,
+#         )
+# else:
+#     preproc.addBlockToNIX(
+#         masterBlock, neoSegIdx=allSegs,
+#         writeSpikes=False, writeEvents=False,
+#         fileName=ns5FileName + '_analyze',
+#         folderPath=analysisSubFolder,
+#         purgeNixNames=False,
+#         nixBlockIdx=0, nixSegIdx=allSegs,
+#         )

@@ -84,12 +84,18 @@ insReader, insBlock = ns5.blockFromPath(
 # [id(st) for st in insBlock.filter(objects=Unit)[0].spiketrains]
 #  Load NSP Data
 ############################################################
+if 'rawBlockName' in spikeSortingOpts['utah']:
+    BlackrockFileName = ns5FileName.replace(
+        'Block', spikeSortingOpts['utah']['rawBlockName'])
+else:
+    BlackrockFileName = ns5FileName
 nspPath = os.path.join(
     scratchFolder,
-    ns5FileName + arguments['inputBlockSuffix'] +
+    BlackrockFileName + arguments['inputBlockSuffix'] +
     '.nix')
 nspReader, nspBlock = ns5.blockFromPath(
-    nspPath, lazy=arguments['lazy'], reduceChannelIndexes=True)
+    nspPath, lazy=arguments['lazy'],
+    reduceChannelIndexes=True)
 '''
 startTime_s = None
 dataLength_s = None
@@ -397,7 +403,7 @@ if addingToNix:
     ns5.addBlockToNIX(
         insBlockJustSpikes, neoSegIdx=[0],
         writeAsigs=False, writeSpikes=True,
-        fileName=ns5FileName + arguments['inputBlockSuffix'],
+        fileName=BlackrockFileName + arguments['inputBlockSuffix'],
         folderPath=scratchFolder,
         purgeNixNames=True,
         nixBlockIdx=0, nixSegIdx=[0],
@@ -417,7 +423,7 @@ if addingToNix:
         forceColNames=tdColumns)
     ns5.addBlockToNIX(
         tdBlock, neoSegIdx=[0],
-        fileName=ns5FileName + arguments['inputBlockSuffix'],
+        fileName=BlackrockFileName + arguments['inputBlockSuffix'],
         folderPath=scratchFolder,
         purgeNixNames=True,
         nixBlockIdx=0, nixSegIdx=[0],
@@ -437,7 +443,7 @@ if addingToNix:
         forceColNames=accelColumns)
     ns5.addBlockToNIX(
         accelBlock, neoSegIdx=[0],
-        fileName=ns5FileName + arguments['inputBlockSuffix'],
+        fileName=BlackrockFileName + arguments['inputBlockSuffix'],
         folderPath=scratchFolder,
         purgeNixNames=True,
         nixBlockIdx=0, nixSegIdx=[0],

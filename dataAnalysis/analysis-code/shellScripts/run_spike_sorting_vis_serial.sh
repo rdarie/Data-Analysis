@@ -32,7 +32,7 @@
 # EXP="exp201901221000"
 # EXP="exp201901231000"
 # EXP="exp201901271000"
-# EXP="exp201901261000"
+EXP="exp201901261000"
 # EXP="exp202008201100"
 # EXP="exp202008261100"
 # EXP="exp202008271200"
@@ -45,14 +45,14 @@
 # EXP="exp202009211200"
 # EXP="exp202009291300"
 # EXP="exp202009301100"
-EXP="exp202010011100"
-BLOCKIDX="1"
+# EXP="exp202010011100"
+BLOCKIDX="3"
 
-module load anaconda/3-5.2.0
-. /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
+module load anaconda/2020.02
+. /gpfs/runtime/opt/anaconda/2020.02/etc/profile.d/conda.sh
 conda activate
 source activate nda2
 python --version
 
 # Step 2: Validate the constructor
-python3 ./tridesclousVisualize.py --arrayName=utah --blockIdx=$BLOCKIDX --exp=$EXP  --constructor --chan_start=0 --chan_stop=1
+python3 ./tridesclousVisualize.py --arrayName=utah --blockIdx=$BLOCKIDX --exp=$EXP  --constructor --chan_start=13 --chan_stop=14

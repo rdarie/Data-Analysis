@@ -45,6 +45,7 @@ if arguments['processAsigs']:
     suffixList.append('_analyze')
 if arguments['processRasters']:
     suffixList.append('_binarized')
+suffixList.append('_fr')
 
 for suffix in suffixList:
     print('assembling {}'.format(suffix))

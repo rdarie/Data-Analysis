@@ -174,7 +174,7 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         if pName == 999:
             alignEventsDF.loc[group.index, 'electrode'] = 'control'
         else:
-            unitName = 'g{}p{}'.format(gName, pName)
+            unitName = 'g{}p{}#0'.format(gName, pName)
             thisUnit = insBlock.filter(objects=Unit, name=unitName)[0]
             cathodes = thisUnit.annotations['cathodes']
             anodes = thisUnit.annotations['anodes']

@@ -7,7 +7,7 @@ from collections import OrderedDict
 import time
 import sys
 import pickle
-
+import dataAnalysis.helperFunctions.profiling as prf
 from ephyviewer.myqt import QT, QT_MODE
 from ephyviewer.navigation import NavigationToolBar
 
@@ -68,8 +68,9 @@ class MainViewer(QT.QMainWindow):
         self.load_one_setting('navigation_toolbar', self.navigation_toolbar)
         
 
-    def add_view(self, widget, location='bottom', orientation='vertical',
-                        tabify_with=None, split_with=None):
+    def add_view(
+        self, widget, location='bottom', orientation='vertical',
+        tabify_with=None, split_with=None):
         name = widget.name
         
         assert name not in self.viewers, 'Viewer already in MainViewer'
@@ -200,7 +201,9 @@ class MainViewer(QT.QMainWindow):
 
 
 
-def compose_mainviewer_from_sources(sources, mainviewer=None):
+def compose_mainviewer_from_sources(
+        sources, mainviewer=None,
+        addSpikesToEventList=True):
     """
     Helper that compose a windows from several source with basic rules.
     
@@ -214,12 +217,10 @@ def compose_mainviewer_from_sources(sources, mainviewer=None):
         mainviewer = MainViewer(show_auto_scale=True)
     
     for i, sig_source in enumerate(sources['signal']):
-        #  import pdb; 
-        #  RD 02-23-2019
         view = TraceViewer(source=sig_source, name='signal {}'.format(i))
         view.params['scale_mode'] = 'same_for_all'
         view.params['display_labels'] = True
-        view.params['xsize'] = 12
+        view.params['xsize'] = 3
         try:
             view.auto_scale()
         except Exception:
@@ -254,7 +255,10 @@ def compose_mainviewer_from_sources(sources, mainviewer=None):
     for i, ev_source in enumerate(ev_source_list):
         view = EventList(source=ev_source, name='Event list')
         mainviewer.add_view(view, location='bottom',  orientation='horizontal')
-    
-    
+    #
+    if addSpikesToEventList and ('spike' in sources):
+        for i, ev_source in enumerate(sources['spike']):
+            view = EventList(source=ev_source, name='Spike list')
+            mainviewer.add_view(view, tabify_with='Event list')
     return mainviewer
 

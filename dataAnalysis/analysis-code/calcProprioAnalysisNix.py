@@ -62,6 +62,19 @@ def calcBlockAnalysisNix():
     nspPath = os.path.join(
         scratchFolder,
         ns5FileName + arguments['inputBlockSuffix'] + '.nix')
+    # pdb.set_trace()
+    if not os.path.exists(nspPath):
+        fallBackPath = os.path.join(
+            scratchFolder,
+            (
+                ns5FileName.replace('Block', 'utah') +
+                arguments['inputBlockSuffix'] +
+                '.nix'))
+        print('{} not found;\nFalling back to {}'.format(
+            nspPath, fallBackPath
+        ))
+        if os.path.exists(fallBackPath):
+            nspPath = fallBackPath
     nspReader = neo.io.nixio_fr.NixIO(
         filename=nspPath)
     nspBlock = ns5.readBlockFixNames(
@@ -289,25 +302,27 @@ def calcBlockAnalysisNix():
         idxT='t', useColNames=True,
         dataCol=tdInterp.drop(columns='t').columns,
         samplingRate=samplingRate)
+    tdBlockInterp.name = spikesBlock.name
+    tdBlockInterp.segments[0].name = spikesBlock.segments[0].name
     spikesBlock.merge(tdBlockInterp)
+    # len(spikesBlock.segments)
+    # del spikesBlock.segments[-1]
     #
-    del spikesBlock.segments[-1]
-    #
-    for cI in spikesBlock.channel_indexes:
-        # e.g. cI = spikesBlock.channel_indexes[0]
-        for asig in cI.analogsignals:
-            # e.g. asig = cI.analogsignals[0]
-            # print('Assigning {}'.format(asig.name))
-            asig.channel_index = cI
-            asig.segment = spikesBlock.segments[0]
-            spikesBlock.segments[0].analogsignals.append(asig)
+    # for cI in spikesBlock.channel_indexes:
+    #     # e.g. cI = spikesBlock.channel_indexes[0]
+    #     for asig in cI.analogsignals:
+    #         # e.g. asig = cI.analogsignals[0]
+    #         # print('Assigning {}'.format(asig.name))
+    #         asig.channel_index = cI
+    #         asig.segment = spikesBlock.segments[0]
+    #         spikesBlock.segments[0].analogsignals.append(asig)
     spikesBlock.create_relationship(force=True)
     # spikesBlock.channel_indexes[0].analogsignals[0]
     # pd.unique([id(asi) for asi in spikesBlock.filter(objects=AnalogSignal)])
     analysisBlockPath = analysisDataPath.format(arguments['analysisName'])
     if os.path.exists(analysisBlockPath):
         os.remove(analysisBlockPath)
-    pdb.set_trace()
+    # pdb.set_trace()
     writer = neo.io.NixIO(filename=analysisBlockPath)
     writer.write_block(spikesBlock, use_obj_names=True)
     writer.close()

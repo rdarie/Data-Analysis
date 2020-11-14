@@ -5,24 +5,22 @@ Usage:
     tridesclousCCV.py [options]
 
 Options:
-    --exp=exp                      which experimental day to analyze
-    --blockIdx=blockIdx            which trial to analyze [default: 1]
-    --arrayName=arrayName          which electrode array to analyze [default: utah]
-    --sourceFile=sourceFile        which source file to analyze [default: raw]
-    --attemptMPI                   whether to try to load MPI [default: False]
-    --remakePrb                    whether to try to load MPI [default: False]
-    --removeExistingCatalog        delete previous sort results [default: False]
-    --purgePeeler                  delete previous sort results [default: False]
-    --purgePeelerDiagnostics       delete previous sort results [default: False]
-    --batchPrepWaveforms           extract snippets [default: False]
-    --batchRunClustering           extract features, run clustering [default: False]
-    --batchPreprocess              extract snippets and features, run clustering [default: False]
-    --batchPeel                    run peeler [default: False]
-    --makeCoarseNeoBlock           save peeler results to a neo block [default: False]
-    --makeStrictNeoBlock           save peeler results to a neo block [default: False]
-    --exportSpikesCSV              save peeler results to a csv file [default: False]
-    --chan_start=chan_start        which chan_grp to start on [default: 0]
-    --chan_stop=chan_stop          which chan_grp to stop on [default: 47]
+    --exp=exp                                   which experimental day to analyze
+    --blockIdx=blockIdx                         which trial to analyze [default: 1]
+    --arrayName=arrayName                       which electrode array to analyze [default: utah]
+    --sourceFileSuffix=sourceFileSuffix         which source file to analyze
+    --remakePrb                                 whether to try to load MPI [default: False]
+    --purgePeeler                               delete previous sort results [default: False]
+    --purgePeelerDiagnostics                    delete previous sort results [default: False]
+    --batchPrepWaveforms                        extract snippets [default: False]
+    --batchRunClustering                        extract features, run clustering [default: False]
+    --batchPreprocess                           extract snippets and features, run clustering [default: False]
+    --batchPeel                                 run peeler [default: False]
+    --makeCoarseNeoBlock                        save peeler results to a neo block [default: False]
+    --makeStrictNeoBlock                        save peeler results to a neo block [default: False]
+    --exportSpikesCSV                           save peeler results to a csv file [default: False]
+    --chan_start=chan_start                     which chan_grp to start on [default: 0]
+    --chan_stop=chan_stop                       which chan_grp to stop on [default: 96]
 """
 
 from docopt import docopt
@@ -34,9 +32,11 @@ import dataAnalysis.helperFunctions.tridesclous_helpers as tdch
 import dataAnalysis.helperFunctions.probe_metadata as prb_meta
 import os, gc, traceback, re
 import pdb
+import matplotlib
 from numba.core.errors import NumbaPerformanceWarning, NumbaDeprecationWarning, NumbaPendingDeprecationWarning
 import warnings
 #
+matplotlib.use('PS')   # generate postscript output
 warnings.simplefilter('ignore', category=NumbaPerformanceWarning)
 warnings.simplefilter('ignore', category=NumbaDeprecationWarning)
 #
@@ -49,11 +49,19 @@ expOpts, allOpts = parseAnalysisOptions(
     arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
-arrayName = arguments['arrayName']
 
-ns5FileName = ns5FileName.replace('Block', arrayName)
-triFolder = os.path.join(
-    scratchFolder, 'tdc_{}{:0>3}'.format(arrayName, blockIdx))
+arrayName = arguments['arrayName']
+if 'rawBlockName' in spikeSortingOpts[arrayName]:
+    ns5FileName = ns5FileName.replace(
+        'Block', spikeSortingOpts[arrayName]['rawBlockName'])
+    triFolder = os.path.join(
+        scratchFolder, 'tdc_{}{:0>3}'.format(
+            spikeSortingOpts[arrayName]['rawBlockName'], blockIdx))
+else:
+    triFolder = os.path.join(
+        scratchFolder, 'tdc_Block{:0>3}'.format(blockIdx))
+if arguments['sourceFileSuffix'] is not None:
+    triFolder = triFolder + '_{}'.format(arguments['sourceFileSuffix'])
 
 chan_start = int(arguments['chan_start'])
 chan_stop = int(arguments['chan_stop'])
@@ -65,7 +73,7 @@ theseExtractOpts = dict(
     mode='rand',
     n_left=spikeWindow[0] - 2,
     n_right=spikeWindow[1] + 2,
-    nb_max=16000, align_waveform=False)
+    nb_max=12000, align_waveform=False)
 callbacks = [
     tf.keras.callbacks.EarlyStopping(
         # Stop training when `loss` is no longer improving
@@ -73,7 +81,7 @@ callbacks = [
         # "no longer improving" being defined as "no better than 1e-2 less"
         min_delta=1e-2,
         # "no longer improving" being further defined as "for at least 2 epochs"
-        patience=2,
+        patience=1,
         verbose=1,
     )
 ]
@@ -106,11 +114,15 @@ theseFeatureOpts = {
 #     'init': 'spectral',
 #     'n_epochs': 1000,
 # },
+#  theseClusterOpts = {
+#      'method': 'hdbscan',
+#      'min_cluster_size': 100,
+#      'min_samples': 50,
+#      'allow_single_cluster': False}
 theseClusterOpts = {
-    'method': 'hdbscan',
-    'min_cluster_size': 100,
-    'min_samples': 50,
-    'allow_single_cluster': False}
+    'method': 'agglomerative',
+    'n_clusters': 7
+    }
 
 if RANK == 0:
     if arguments['purgePeeler']:
@@ -134,9 +146,9 @@ if arguments['batchPreprocess']:
         filter_order=3,
         featureOpts=theseFeatureOpts,
         clusterOpts=theseClusterOpts,
-        noise_estimate_duration=240,
-        sample_snippet_duration=240,
-        chunksize=2**18,
+        noise_estimate_duration=300,
+        sample_snippet_duration=300,
+        chunksize=2**19,
         extractOpts=theseExtractOpts,
         autoMerge=False, auto_merge_threshold=0.99)
 
@@ -144,11 +156,7 @@ if arguments['batchRunClustering']:
     tdch.batchRunClustering(
         triFolder, chansToAnalyze,
         featureOpts=theseFeatureOpts,
-        clusterOpts={
-            'method': 'hdbscan',
-            'min_cluster_size': 100,
-            'min_samples': 50,
-            'allow_single_cluster': True},
+        clusterOpts=theseClusterOpts,
         autoMerge=False, auto_merge_threshold=0.99)
 
 if arguments['batchPrepWaveforms']:
@@ -175,9 +183,12 @@ if arguments['batchPrepWaveforms']:
 if arguments['batchPeel']:
     tdch.batchPeel(
         triFolder, chansToAnalyze,
-        shape_boundary_threshold=3,
-        confidence_threshold=0.65,
-        shape_distance_threshold=2)
+        chunksize=2**22,
+        shape_distance_threshold=3,
+        shape_boundary_threshold=4,
+        confidence_threshold=0.5,
+        energy_reduction_threshold=1,
+        )
 
 if arguments['exportSpikesCSV'] and RANK == 0:
     tdch.export_spikes_after_peeler(triFolder)

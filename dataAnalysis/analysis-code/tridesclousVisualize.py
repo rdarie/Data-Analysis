@@ -3,13 +3,14 @@ Usage:
     tridesclousVisualize [options]
 
 Options:
-    --blockIdx=blockIdx            which trial to analyze [default: 1]
-    --exp=exp                      which experimental day to analyze
-    --arrayName=arrayName          which electrode array to analyze [default: utah]
-    --chan_start=chan_start        which chan_grp to start on [default: 0]
-    --chan_stop=chan_stop          which chan_grp to stop on [default: 80]
-    --peeler                       visualize Peeler results
-    --constructor                  visualize Catalogue Constructor Results
+    --blockIdx=blockIdx                         which trial to analyze [default: 1]
+    --exp=exp                                   which experimental day to analyze
+    --arrayName=arrayName                       which electrode array to analyze [default: utah]
+    --chan_start=chan_start                     which chan_grp to start on [default: 0]
+    --chan_stop=chan_stop                       which chan_grp to stop on [default: 80]
+    --peeler                                    visualize Peeler results
+    --constructor                               visualize Catalogue Constructor Results
+    --sourceFileSuffix=sourceFileSuffix         which source file to analyze
 """
 
 from docopt import docopt
@@ -31,13 +32,23 @@ expOpts, allOpts = parseAnalysisOptions(
 globals().update(expOpts)
 globals().update(allOpts)
 
-electrodeMapPath = spikeSortingOpts[arguments['arrayName']]['electrodeMapPath']
+arrayName = arguments['arrayName']
+electrodeMapPath = spikeSortingOpts[arrayName]['electrodeMapPath']
 mapExt = electrodeMapPath.split('.')[-1]
 nspCsvPath = electrodeMapPath.replace(mapExt, 'csv')
 nspPrbPath = electrodeMapPath.replace(mapExt, 'prb')
-ns5FileName = ns5FileName.replace('Block', arguments['arrayName'])
-triFolder = os.path.join(
-    scratchFolder, 'tdc_{}{:0>3}'.format(arguments['arrayName'], blockIdx))
+
+if 'rawBlockName' in spikeSortingOpts[arrayName]:
+    ns5FileName = ns5FileName.replace(
+        'Block', spikeSortingOpts[arrayName]['rawBlockName'])
+    triFolder = os.path.join(
+        scratchFolder, 'tdc_{}{:0>3}'.format(
+            spikeSortingOpts[arrayName]['rawBlockName'], blockIdx))
+else:
+    triFolder = os.path.join(
+        scratchFolder, 'tdc_Block{:0>3}'.format(blockIdx))
+if arguments['sourceFileSuffix'] is not None:
+    triFolder = triFolder + '_{}'.format(arguments['sourceFileSuffix'])
 
 viewPeeler = False
 if arguments['peeler']:

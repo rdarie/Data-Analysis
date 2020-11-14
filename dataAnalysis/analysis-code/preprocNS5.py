@@ -4,20 +4,21 @@ Usage:
     preprocNS5.py [options]
 
 Options:
-    --blockIdx=blockIdx             which trial to analyze
-    --exp=exp                       which experimental day to analyze
-    --arrayName=arrayName           use a named array? [default: Block]
-    --forSpikeSorting               whether to make a .nix file that has all raw traces [default: False]
-    --fullSubtractMean              whether to make a .nix file that has all raw traces [default: False]
-    --rippleNForm                   whether to make a .nix file that has all raw traces [default: False]
-    --makeFull                      whether to make a .nix file that has all raw traces [default: False]
-    --previewMotorEncoder           whether to make a .nix file to preview the motor encoder analysis [default: False]
-    --makeTruncated                 whether to make a .nix file that only has analog inputs [default: False]
-    --maskMotorEncoder              whether to ignore motor encoder activity outside the alignTimeBounds window [default: False]
-    --ISI                           special options for parsing Ripple files from ISI [default: False]
-    --transferISIStimLog            special options for parsing Ripple files from ISI [default: False]
-    --ISIMinimal                    special options for parsing Ripple files from ISI [default: False]
-    --ISIRaw                        special options for parsing Ripple files from ISI [default: False]
+    --blockIdx=blockIdx                which trial to analyze
+    --exp=exp                          which experimental day to analyze
+    --arrayName=arrayName              use a named array? [default: Block]
+    --forSpikeSorting                  whether to make a .nix file that has all raw traces [default: False]
+    --fullSubtractMean                 whether to make a .nix file that has all raw traces [default: False]
+    --fullSubtractMeanWithSpikes       whether to make a .nix file that has all raw traces [default: False]
+    --rippleNForm                      whether to make a .nix file that has all raw traces [default: False]
+    --makeFull                         whether to make a .nix file that has all raw traces [default: False]
+    --previewMotorEncoder              whether to make a .nix file to preview the motor encoder analysis [default: False]
+    --makeTruncated                    whether to make a .nix file that only has analog inputs [default: False]
+    --maskMotorEncoder                 whether to ignore motor encoder activity outside the alignTimeBounds window [default: False]
+    --ISI                              special options for parsing Ripple files from ISI [default: False]
+    --transferISIStimLog               special options for parsing Ripple files from ISI [default: False]
+    --ISIMinimal                       special options for parsing Ripple files from ISI [default: False]
+    --ISIRaw                           special options for parsing Ripple files from ISI [default: False]
 """
 
 import dataAnalysis.preproc.ns5 as ns5
@@ -49,7 +50,9 @@ def preprocNS5():
             mapDF = prb_meta.cmpToDF(electrodeMapPath)
         elif mapExt == 'map':
             mapDF = prb_meta.mapToDF(electrodeMapPath)
-        ns5FileName = ns5FileName.replace('Block', arrayName)
+        if 'rawBlockName' in spikeSortingOpts[arrayName]:
+            ns5FileName = ns5FileName.replace(
+                'Block', spikeSortingOpts[arrayName]['rawBlockName'])
     idealDataPath = os.path.join(nspFolder, ns5FileName + '.ns5')
     if not os.path.exists(idealDataPath):
         fallBackPath = os.path.join(
@@ -77,6 +80,7 @@ def preprocNS5():
         motorEncoderMask = alignTimeBoundsLookup[int(arguments['blockIdx'])]
     else:
         motorEncoderMask = None
+    #
     if arguments['previewMotorEncoder']:
         analogInputNames = sorted(
             trialFilesFrom['utah']['eventInfo']['inputIDs'].values())
@@ -141,20 +145,16 @@ def preprocNS5():
             motorEncoderMask=motorEncoderMask,
             calcAverageLFP=True,
             eventInfo=trialFilesFrom['utah']['eventInfo'],
-            # asigNameList=None,
-            # ainpNameList=None,
-            # spikeSourceType='nev',
-            # spikeSourceType='tdc',
             asigNameList=spikeSortingOpts[arrayName]['asigNameList'],
             ainpNameList=spikeSortingOpts[arrayName]['ainpNameList'],
             spikeSourceType='',
             removeMeanAcross=True,
-            nameSuffix='_raw',
+            nameSuffix='_spike_preview',
             #
             writeMode='ow',
-            chunkSize=chunkSize, equalChunks=equalChunks, chunkList=chunkList,
+            chunkSize=300, equalChunks=False, chunkList=[1],
             calcRigEvents=False)
-    
+    #
     if arguments['fullSubtractMean']:
         reader = ns5.preproc(
             fileName=ns5FileName,
@@ -165,14 +165,34 @@ def preprocNS5():
             motorEncoderMask=motorEncoderMask,
             calcAverageLFP=True,
             eventInfo=trialFilesFrom['utah']['eventInfo'],
-            # asigNameList=None,
-            # ainpNameList=None,
-            # spikeSourceType='nev',
-            # spikeSourceType='tdc',
             asigNameList=spikeSortingOpts[arrayName]['asigNameList'],
             ainpNameList=spikeSortingOpts[arrayName]['ainpNameList'],
-            spikeSourceType='tdc',
             removeMeanAcross=True,
+            nameSuffix='_mean_subtracted',
+            #
+            writeMode='ow',
+            chunkSize=chunkSize, equalChunks=equalChunks, chunkList=chunkList,
+            calcRigEvents=trialFilesFrom['utah']['calcRigEvents'])
+    #
+    if arguments['fullSubtractMeanWithSpikes']:
+        spikePath = os.path.join(
+            scratchFolder, 'tdc_' + ns5FileName + '_mean_subtracted',
+            'tdc_' + ns5FileName + '_mean_subtracted' + '.nix'
+            )
+        reader = ns5.preproc(
+            fileName=ns5FileName,
+            rawFolderPath=nspFolder,
+            outputFolderPath=scratchFolder, mapDF=mapDF,
+            # swapMaps=None,
+            fillOverflow=False, removeJumps=False,
+            motorEncoderMask=motorEncoderMask,
+            calcAverageLFP=True,
+            eventInfo=trialFilesFrom['utah']['eventInfo'],
+            asigNameList=spikeSortingOpts[arrayName]['asigNameList'],
+            ainpNameList=spikeSortingOpts[arrayName]['ainpNameList'],
+            removeMeanAcross=True,
+            nameSuffix='',
+            spikeSourceType='tdc', spikePath=spikePath,
             #
             writeMode='ow',
             chunkSize=chunkSize, equalChunks=equalChunks, chunkList=chunkList,
@@ -287,3 +307,4 @@ if __name__ == "__main__":
             nameSuffix=nameSuffix, outputUnits=1e-3)
     else:
         preprocNS5()
+    print('Done running preprocNS5.py')

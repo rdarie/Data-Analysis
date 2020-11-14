@@ -19,7 +19,6 @@ sns.set(rc={
     })
 
 
-#@profile
 def plotSpikePanel(
         spikeStruct, spikes, labelFontSize=5,
         padOverride=1e-3, figSize=(12, 18),
@@ -217,7 +216,8 @@ def plotSpike(
                 timeRange = np.arange(len(thisSpike)) / spikes['basic_headers']['TimeStampResolution'] * 1e3
                 colorPalette = sns.color_palette(n_colors=40)
 
-                ax.fill_between(timeRange, thisSpike - errorMultiplier*thisError,
+                ax.fill_between(
+                    timeRange, thisSpike - errorMultiplier * thisError,
                     thisSpike + errorMultiplier*thisError, alpha=0.4,
                     facecolor=colorPalette[unitIdx],
                     label=labelName)
@@ -226,7 +226,7 @@ def plotSpike(
                     ax.set_ylabel(spikes['Units'])
                     ax.set_xlabel('Time (msec)')
                     ax.set_title('Units on channel {}'.format(channelPlottingName))
-                    ax.legend()
+                    ax.legend(loc='lower right')
         if showNow:
             plt.show()
     return fig, ax
@@ -236,7 +236,7 @@ def plot_spikes(
         spikes, channel, ignoreUnits=[], showNow=False, ax=None,
         acrossArray=False, xcoords=None, ycoords=None,
         axesLabel=False, channelPlottingName=None, chanNameInLegend=True,
-        legendTags=[],
+        legendTags=[], lineWidth=1, lineRasterized=False,
         maskSpikes=None, maxSpikes=200, lineAlpha=0.025):
         
     if channelPlottingName is None:
@@ -305,7 +305,8 @@ def plot_spikes(
                         thisLabel = labelName if idx == 0 else None
                         curAx.plot(
                             timeRange, thisSpike, label=thisLabel,
-                            linewidth=1, color=colorPalette[unitIdx], alpha=lineAlpha)
+                            linewidth=lineWidth, color=colorPalette[unitIdx],
+                            alpha=lineAlpha, rasterized=lineRasterized)
                 sns.despine()
                 for curAx in ax.flatten():
                     curAx.tick_params(
@@ -329,13 +330,14 @@ def plot_spikes(
                     thisLabel = labelName if spIdx == 0 else None
                     ax.plot(
                         timeRange, thisSpike,
-                        linewidth=1, color=colorPalette[unitIdx], alpha=lineAlpha, label=thisLabel)
+                        linewidth=lineWidth, color=colorPalette[unitIdx],
+                        alpha=lineAlpha, label=thisLabel, rasterized=lineRasterized)
                 ax.set_xlim(timeRange[0], timeRange[-1])
                 if axesLabel:
                     ax.set_ylabel(spikes['Units'])
                     ax.set_xlabel('Time (msec)')
                     ax.set_title('Units on channel {}'.format(channelPlottingName))
-                    ax.legend()
+                    ax.legend(loc='lower right')
         if showNow:
             plt.show()
     return fig, ax
@@ -404,7 +406,8 @@ def spikePDFReport(
                             traceback.print_exc()
                         plot_spikes(
                             spikes, channel=channel, ax=spikesBadAx,
-                            axesLabel=True, maxSpikes=500, lineAlpha=0.025)
+                            axesLabel=True, maxSpikes=1000,
+                            lineWidth=2, lineAlpha=0.025, lineRasterized=False)
                         spikesBadAx.set_ylim(spikeAx.get_ylim())
                     except Exception:
                         traceback.print_exc()
