@@ -345,6 +345,7 @@ def parseAnalysisOptions(
             'XSPre': (-0.65, -0.05),
             'XXS': (-0.2, 0.05),
             'XXXS': (-0.005, 0.025),
+            'M': (-0.2, 0.8),
             'short': (-0.5, 0.5),
             'long': (-2.25, 2.25),
             'RC': (-0.33, 0.33),
@@ -374,7 +375,7 @@ def parseAnalysisOptions(
         'facecolor': vLineOpts['color'],
         'alpha': 0.1, 'zorder': -100}
     asigSigStarOpts = {
-        'color': 'm',
+        'color': vLineOpts['color'],
         'linestyle': 'None',
         'markersize': 20,
         'marker': '*'
@@ -396,7 +397,7 @@ def parseAnalysisOptions(
         'facecolor': nrnVLineOpts['color'],
         'alpha': 0.3, 'zorder': -100}
     nrnSigStarOpts = {
-        'color': 'y',
+        'color': nrnVLineOpts['color'],
         'edgecolor': None,
         'edgecolors': 'face',
         'linestyle': 'None',

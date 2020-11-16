@@ -23,7 +23,7 @@
 #SBATCH --array=2,3
 
 # EXP="exp201901261000"
-EXP="exp202010271200"
+# EXP="exp202010271200"
 
 module load anaconda/2020.02
 . /gpfs/runtime/opt/anaconda/2020.02/etc/profile.d/conda.sh
@@ -31,12 +31,14 @@ conda activate
 source activate nda2
 python --version
 
-# SLURM_ARRAY_TASK_ID=3
-# python -u ./tridesclousCCV.py --arrayName=nform --blockIdx=$SLURM_ARRAY_TASK_ID --makeStrictNeoBlock --purgePeelerDiagnostics --exp=$EXP --chan_start=0 --chan_stop=32 --sourceFile=processed
-# python -u ./plotSpikeReport.py --blockIdx=$SLURM_ARRAY_TASK_ID --nameSuffix=_final --exp=$EXP --arrayName=nform
-SLURM_ARRAY_TASK_ID=2
-python -u ./tridesclousCCV.py --arrayName=utah --blockIdx=$SLURM_ARRAY_TASK_ID --makeStrictNeoBlock --purgePeelerDiagnostics --exp=$EXP --chan_start=0 --chan_stop=96  --sourceFileSuffix='spike_preview'
-python -u ./plotSpikeReport.py --blockIdx=$SLURM_ARRAY_TASK_ID --nameSuffix=_final --exp=$EXP --arrayName=utah  --sourceFileSuffix='spike_preview'
+# SLURM_ARRAY_TASK_ID=2
+
+# --sourceFileSuffix='spike_preview', --sourceFileSuffix='mean_subtracted'
+# python -u ./tridesclousCCV.py --arrayName=utah --blockIdx=$SLURM_ARRAY_TASK_ID --makeStrictNeoBlock --purgePeelerDiagnostics --exp=$EXP --chan_start=0 --chan_stop=96  --sourceFileSuffix='spike_preview'
+# python -u ./plotSpikeReport.py --blockIdx=$SLURM_ARRAY_TASK_ID --nameSuffix=_final --exp=$EXP --arrayName=utah  --sourceFileSuffix='spike_preview'
 #
 # python -u ./tridesclousCCV.py --arrayName=utah --blockIdx=$SLURM_ARRAY_TASK_ID --makeStrictNeoBlock --purgePeelerDiagnostics --exp=$EXP --chan_start=0 --chan_stop=96  --sourceFileSuffix='mean_subtracted'
 # python -u ./plotSpikeReport.py --blockIdx=$SLURM_ARRAY_TASK_ID --nameSuffix=_final --exp=$EXP --arrayName=utah  --sourceFileSuffix='mean_subtracted'
+
+
+########################################################################################################################################################################################################################

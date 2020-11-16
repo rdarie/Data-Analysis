@@ -32,14 +32,14 @@ python --version
 # EXP="exp201901211000"
 # EXP="exp201901221000"
 # EXP="exp201901231000"
-# EXP="exp201901261000"
+EXP="exp201901261000"
 # EXP="exp201901271000"
-EXP="exp202010271200"
+# EXP="exp202010271200"
 
 # BLOCKSELECTOR="--inputBlockSuffix=_full"
 BLOCKSELECTOR=""
 
-# SLURM_ARRAY_TASK_ID=2
+SLURM_ARRAY_TASK_ID=4
 
 python3 -u './synchronizeINStoNSP.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP $BLOCKSELECTOR --curateManually
 # python3 -u './synchronizeINStoNSP.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP $BLOCKSELECTOR --curateManually |& tee "../../batch_logs/${EXP}_Block_${SLURM_ARRAY_TASK_ID}_synch_ins"

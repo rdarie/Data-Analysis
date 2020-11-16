@@ -43,7 +43,7 @@ def getExpOpts():
             'Session1548518982240'],
         2: ['Session1548520562275'],
         3: ['Session1548521956580'],
-        4: ['Session1548524126669'],
+        4: ['Session1548524126669', ],
         }
 
     synchInfo = {'ins': {}, 'nsp': {}}
@@ -90,7 +90,8 @@ def getExpOpts():
     synchInfo['ins'][4] = {
         #  per trialSegment
         0: {
-            'timeRanges': [(15.5, 17.5)],
+            # 'timeRanges': [(15.5, 17.5)],
+            'timeRanges': None,
             'chan': ['ins_td2', 'ins_td3'],
             'thres': 5,
             'iti': 0.2,
@@ -114,7 +115,8 @@ def getExpOpts():
             0: {'timeRanges': [105, 107], 'keepIndex': slice(None)}
             },
         4: {
-            0: {'timeRanges': [939, 941], 'keepIndex': slice(None)}
+            # 0: {'timeRanges': [939, 941], 'keepIndex': slice(None)}
+            0: {'timeRanges': None, 'keepIndex': slice(None)}
             },
         }
     #  if not possible to use taps, override with good taps from another segment

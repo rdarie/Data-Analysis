@@ -24,11 +24,13 @@
 # EXP="exp201901211000"
 # EXP="exp201901221000"
 # EXP="exp201901231000"
-# EXP="exp201901261000"
-EXP="exp201901271000"
+EXP="exp201901261000"
+# EXP="exp201901271000"
+# EXP="exp202010271200"
 
 LAZINESS="--lazy"
-TRIALSELECTOR="--blockIdx=5"
+
+TRIALSELECTOR="--blockIdx=4"
 # TRIALSELECTOR="--processAll"
 
 # ALIGNQUERY="--alignQuery=midPeak"
@@ -43,23 +45,23 @@ BLOCKSELECTOR="--inputBlockName=fr"
 # ANALYSISNAME="--analysisName=loRes"
 # ANALYSISNAME="--analysisName=default"
 
-module load anaconda/3-5.2.0
-. /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
+module load anaconda/2020.02
+. /gpfs/runtime/opt/anaconda/2020.02/etc/profile.d/conda.sh
 conda activate
 source activate nda2
 python --version
 
 # first pass
 UNITSELECTOR=""
-python3 -u ./calcUnitMeanFR.py --exp=$EXP $TRIALSELECTOR $WINDOW $ALIGNFOLDER $ANALYSISNAME $ALIGNQUERY --inputBlockName="fr" --unitQuery="fr" --verbose
-python3 -u ./calcUnitCorrelation.py --exp=$EXP $TRIALSELECTOR $WINDOW $ALIGNFOLDER $ANALYSISNAME $ALIGNQUERY --inputBlockName="fr" --unitQuery="fr" --verbose --plotting
-python3 -u ./selectUnitsByMeanFRandCorrelation.py --exp=$EXP $TRIALSELECTOR $ALIGNFOLDER $ANALYSISNAME $WINDOW $LAZINESS --verbose
+python -u ./calcUnitMeanFR.py --exp=$EXP $TRIALSELECTOR $WINDOW $ALIGNFOLDER $ANALYSISNAME $ALIGNQUERY --inputBlockName="fr" --unitQuery="fr" --verbose
+python -u ./calcUnitCorrelation.py --exp=$EXP $TRIALSELECTOR $WINDOW $ALIGNFOLDER $ANALYSISNAME $ALIGNQUERY --inputBlockName="fr" --unitQuery="fr" --verbose --plotting
+python -u ./selectUnitsByMeanFRandCorrelation.py --exp=$EXP $TRIALSELECTOR $ALIGNFOLDER $ANALYSISNAME $WINDOW $LAZINESS --verbose
 
 # remove outlier trials
-# UNITSELECTOR="--selector=unitSelector_minfrmaxcorr"
-# python3 -u ./calcTrialOutliers.py --exp=$EXP $TRIALSELECTOR $UNITSELECTOR $WINDOW $ALIGNFOLDER $ANALYSISNAME $ALIGNQUERY $LAZINESS $BLOCKSELECTOR --saveResults --plotting --verbose --unitQuery="fr" --amplitudeFieldName="amplitude" --sqrtTransform
+UNITSELECTOR="--selector=unitSelector_minfrmaxcorr"
+python -u ./calcTrialOutliers.py --exp=$EXP $TRIALSELECTOR $UNITSELECTOR $WINDOW $ALIGNFOLDER $ANALYSISNAME $ALIGNQUERY $LAZINESS $BLOCKSELECTOR --saveResults --plotting --verbose --unitQuery="fr" --amplitudeFieldName="amplitude" --sqrtTransform
 
 # recalculate, once outliers do not affect the calculation
-# python3 -u ./calcUnitMeanFR.py --exp=$EXP $TRIALSELECTOR $WINDOW $ALIGNFOLDER $ANALYSISNAME $ALIGNQUERY --inputBlockName="fr" --unitQuery="fr" --verbose --maskOutlierBlocks
-# python3 -u ./calcUnitCorrelation.py --exp=$EXP $TRIALSELECTOR $WINDOW $ALIGNFOLDER $ANALYSISNAME $ALIGNQUERY --inputBlockName="fr" --unitQuery="fr" --verbose --plotting --maskOutlierBlocks
-# python3 -u ./selectUnitsByMeanFRandCorrelation.py --exp=$EXP $TRIALSELECTOR $ALIGNFOLDER $ANALYSISNAME $WINDOW $LAZINESS --verbose
+python -u ./calcUnitMeanFR.py --exp=$EXP $TRIALSELECTOR $WINDOW $ALIGNFOLDER $ANALYSISNAME $ALIGNQUERY --inputBlockName="fr" --unitQuery="fr" --verbose --maskOutlierBlocks
+python -u ./calcUnitCorrelation.py --exp=$EXP $TRIALSELECTOR $WINDOW $ALIGNFOLDER $ANALYSISNAME $ALIGNQUERY --inputBlockName="fr" --unitQuery="fr" --verbose --plotting --maskOutlierBlocks
+python -u ./selectUnitsByMeanFRandCorrelation.py --exp=$EXP $TRIALSELECTOR $ALIGNFOLDER $ANALYSISNAME $WINDOW $LAZINESS --verbose

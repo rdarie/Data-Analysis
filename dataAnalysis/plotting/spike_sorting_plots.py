@@ -454,7 +454,6 @@ def spikePDFReport(
                         plt.close()
                     except Exception:
                         traceback.print_exc()
-
                     if len(spikes['Waveforms'][idx].shape) == 3:
                         plotSpike(
                             spikes, channel=channel, acrossArray=True,

@@ -114,7 +114,8 @@ except Exception:
 '''
 print('Detecting NSP Timestamps...')
 interTriggerInterval = .2
-nspChannelName = 'ainp1'
+nspChannelName = eventInfo['inputIDs']['tapSync']
+
 segIdx = 0
 nspSeg = nspBlock.segments[segIdx]
 nspSyncAsig = nspSeg.filter(name='seg0_{}'.format(nspChannelName))[0]
@@ -170,6 +171,9 @@ for trialSegment in pd.unique(td['data']['trialSegment']):
 '''
 #  Detect INS taps
 ############################################################
+# pdb.set_trace()
+if isinstance(insBlock.annotations['jsonSessionNames'], str):
+    insBlock.annotations['jsonSessionNames'] = [insBlock.annotations['jsonSessionNames']]
 sessionStartTimes = [
     datetime.datetime.utcfromtimestamp(int(sN.split('Session')[-1]) / 1000)
     for sN in insBlock.annotations['jsonSessionNames']]
@@ -187,12 +191,12 @@ for trialSegment, group in approxTapTimes.groupby('tapGroup'):
     tapTrainDur = np.ceil(group['NSP'].max() - group['NSP'].min())
     firstNSPTap = group['NSP'].min()
     firstINSTap = group['INS'].min()
-    approxTapTimes.loc[group.index, 'tStart_NSP'] = firstNSPTap - 1
-    approxTapTimes.loc[group.index, 'tStop_NSP'] = firstNSPTap + tapTrainDur + 1
-    approxTapTimes.loc[group.index, 'tStart_INS'] = firstINSTap - 1
-    approxTapTimes.loc[group.index, 'tStop_INS'] = firstINSTap + tapTrainDur + 1
-    autoTimeRanges['NSP'].append((firstNSPTap - 1, firstNSPTap + tapTrainDur + 1))
-    autoTimeRanges['INS'].append((firstINSTap - 1, firstINSTap + tapTrainDur + 1))
+    approxTapTimes.loc[group.index, 'tStart_NSP'] = firstNSPTap - 2
+    approxTapTimes.loc[group.index, 'tStop_NSP'] = firstNSPTap + tapTrainDur + 2
+    approxTapTimes.loc[group.index, 'tStart_INS'] = firstINSTap - 2
+    approxTapTimes.loc[group.index, 'tStop_INS'] = firstINSTap + tapTrainDur + 2
+    autoTimeRanges['NSP'].append((firstNSPTap - 2, firstNSPTap + tapTrainDur + 2))
+    autoTimeRanges['INS'].append((firstINSTap - 2, firstINSTap + tapTrainDur + 2))
     tapTimestampsNSP = group['NSP'].astype(np.float)
     allTapTimestampsNSP.append(tapTimestampsNSP)
     print('tSeg {}: NSP Taps:\n{}'.format(

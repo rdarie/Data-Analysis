@@ -119,7 +119,7 @@ statsTestOpts.update({
     'tStop': rasterOpts['windowSizes'][arguments['window']][1]})
 #  Overrides
 ################################################################
-limitPages = 10
+limitPages = None
 showNow = False
 if arguments['enableOverrides']:
     nrnRelplotKWArgs.update({

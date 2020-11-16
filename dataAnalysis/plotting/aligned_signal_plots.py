@@ -229,7 +229,7 @@ def plotNeuronsAligned(
                     nRasterRows = raster['t_facetIdx'].max()
                     twinRelplotKWArgs['func1_kws']['s'] = min(
                         (3 * figHeight / nRasterRows) ** 2,
-                        4)
+                        10)
                     # pdb.set_trace()
                     raster.loc[raster['bin'] == raster['bin'].min(), 'raster'] = oneSpikePerBinHz
                     raster.loc[raster['bin'] == raster['bin'].max(), 'raster'] = oneSpikePerBinHz
@@ -263,6 +263,7 @@ def plotNeuronsAligned(
                         break
             except Exception:
                 traceback.print_exc()
+                pdb.set_trace()
                 plt.close()
                 pass
     return
@@ -740,18 +741,23 @@ def genStimVLineAdder(
     return addVline
 
 
-def genBlockShader(patchOpts):
+def genBlockShader(patchOpts, dropNaNCol='segment'):
     def shadeBlocks(g, ro, co, hu, dataSubset):
         # pdb.set_trace()
-        if not hasattr(g, 'addShading'):
-            g.addShading = True
+        emptySubset = (
+            (dataSubset.empty) or
+            (dataSubset[dropNaNCol].isna().all()))
+        if emptySubset:
+            return
+        if not hasattr(g.axes[ro, co], 'addShading'):
+            g.axes[ro, co].addShading = True
             print('creating shading attr')
-        if g.addShading:
+        if g.axes[ro, co].addShading:
             g.axes[ro, co].axhspan(
                 dataSubset[g._y_var].min(), dataSubset[g._y_var].max(),
                 **patchOpts
             )
-            print('g.addShading = {}'.format(g.addShading))
+            print('g.addShading = {}'.format(g.axes[ro, co].addShading))
             # Create list for all the patches
             # y = (dataSubset[g._y_var].max() + dataSubset[g._y_var].min()) / 2
             # height = (dataSubset[g._y_var].max() - dataSubset[g._y_var].min())
@@ -761,7 +767,7 @@ def genBlockShader(patchOpts):
             # rect = Rectangle((x, y), width, height, **patchOpts)
             # # Add collection to axes
             # g.axes[ro, co].add_patch(rect)
-        g.addShading = not (g.addShading)
+        g.axes[ro, co].addShading = not (g.axes[ro, co].addShading)
         return
     return shadeBlocks
 
