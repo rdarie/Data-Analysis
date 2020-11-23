@@ -43,11 +43,4 @@ conda activate
 source activate nda2
 python --version
 
-python -u ./assembleExperimentData.py --exp=$EXP $ANALYSISFOLDER --processAsigs --processRasters
-
-python -u ./calcAlignedAsigs.py --chanQuery="fr" --outputBlockName="fr" --eventBlockName='analyze' --signalBlockName='fr' --verbose --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS --eventName=stimAlignTimes --alignFolderName=stim
 python -u ./calcAlignedAsigs.py --chanQuery="raster" --outputBlockName="raster" --eventBlockName='analyze' --signalBlockName='binarized' --verbose --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS --eventName=stimAlignTimes --alignFolderName=stim
-python -u ./calcAlignedAsigs.py --chanQuery="lfp" --outputBlockName="lfp" --eventBlockName='analyze' --signalBlockName='analyze' --verbose --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ALIGNSELECTOR --eventName=stimAlignTimes --alignFolderName=stim
-python -u ./calcAlignedAsigs.py --chanQuery="rig" --outputBlockName="rig" --eventBlockName='analyze' --signalBlockName='analyze' --verbose --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS --eventName=stimAlignTimes --alignFolderName=stim
-# qa
-# python ./calcBlockOutliers.py --exp=$EXP $TRIALSELECTOR --inputBlockName="fr" --alignQuery="stimOn" --unitQuery="fr" --verbose --plotting --alignFolderName=stim

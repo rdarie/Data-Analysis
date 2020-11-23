@@ -24,8 +24,11 @@
 #SBATCH --array=0-95:1
 
 # Run a command
-EXP="exp201901261000"
+# EXP="exp201901261000"
 # EXP="exp202010271200"
+# EXP="exp202011161100"
+# EXP="exp202011201100"
+EXP="exp202011231200"
 
 module load anaconda/2020.02
 . /gpfs/runtime/opt/anaconda/2020.02/etc/profile.d/conda.sh
@@ -33,7 +36,7 @@ conda activate
 source activate nda2
 python --version
 
-BLOCKIDX=4
+BLOCKIDX=1
 # SLURM_ARRAY_TASK_ID=0
 let CHAN_START=SLURM_ARRAY_TASK_ID
 # for nform, groups of 4 for utah, groups of 5
@@ -42,6 +45,6 @@ let CHAN_STOP=SLURM_ARRAY_TASK_ID+1
 # python3 -u ./tridesclousCCV_jobArray.py --arrayName=utah --blockIdx=$BLOCKIDX --exp=$EXP --purgePeeler --batchPeel --chan_start=$CHAN_START --chan_stop=$CHAN_STOP --sourceFileSuffix='mean_subtracted'
 # python3 -u ./tridesclousCCV_jobArray.py --arrayName=nform --blockIdx=$BLOCKIDX --exp=$EXP --purgePeeler --batchPeel --chan_start=$CHAN_START --chan_stop=$CHAN_STOP --sourceFileSuffix=
 
-python3 -u ./tridesclousCCV_jobArray.py --arrayName=utah --exp=exp201901261000 --blockIdx=4 --purgePeeler --batchPeel --chan_start=$CHAN_START --chan_stop=$CHAN_STOP --sourceFileSuffix='mean_subtracted'
-python3 -u ./tridesclousCCV_jobArray.py --arrayName=utah --exp=exp202010271200 --blockIdx=2 --purgePeeler --batchPeel --chan_start=$CHAN_START --chan_stop=$CHAN_STOP --sourceFileSuffix='mean_subtracted'
-python3 -u ./tridesclousCCV_jobArray.py --arrayName=utah --exp=exp202010271200 --blockIdx=3 --purgePeeler --batchPeel --chan_start=$CHAN_START --chan_stop=$CHAN_STOP --sourceFileSuffix='mean_subtracted'
+python3 -u ./tridesclousCCV_jobArray.py --arrayName=utah --blockIdx=1 --exp=$EXP --purgePeeler --batchPeel --chan_start=$CHAN_START --chan_stop=$CHAN_STOP --sourceFileSuffix='mean_subtracted'
+python3 -u ./tridesclousCCV_jobArray.py --arrayName=utah --blockIdx=2 --exp=$EXP --purgePeeler --batchPeel --chan_start=$CHAN_START --chan_stop=$CHAN_STOP --sourceFileSuffix='mean_subtracted'
+python3 -u ./tridesclousCCV_jobArray.py --arrayName=utah --blockIdx=3 --exp=$EXP --purgePeeler --batchPeel --chan_start=$CHAN_START --chan_stop=$CHAN_STOP --sourceFileSuffix='mean_subtracted'

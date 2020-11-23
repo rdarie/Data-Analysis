@@ -34,15 +34,16 @@
 # EXP="exp202007021300"
 # EXP="exp202007071300"
 # EXP="exp202007081300"
-EXP="exp202010011100"
+# EXP="exp202010011100"
 # EXP="exp202009231400"
+EXP="exp202011201100"
 
 # ANALYSISSELECTOR="--analysisName=emgHiRes"
 # ANALYSISSELECTOR="--analysisName=emgLoRes"
 # ANALYSISSELECTOR="--analysisName=lfpFullRes"
 
-module load anaconda/3-5.2.0
-. /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
+module load anaconda/2020.02
+. /gpfs/runtime/opt/anaconda/2020.02/etc/profile.d/conda.sh
 conda activate
 
 source activate nda2

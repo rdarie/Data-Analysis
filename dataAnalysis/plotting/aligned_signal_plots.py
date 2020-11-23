@@ -418,7 +418,11 @@ def addSignificanceStars(
         if len(significantTimes):
             ymin, ymax = g.axes[ro, co].get_ylim()
             # g.axes[ro, co].autoscale(False)
-            g.axes[ro, co].plot(
+            # g.axes[ro, co].plot(
+            #     significantTimes,
+            #     significantTimes ** 0 * ymax * 0.95,
+            #     **sigStarOpts)
+            g.axes[ro, co].scatter(
                 significantTimes,
                 significantTimes ** 0 * ymax * 0.95,
                 **sigStarOpts)
@@ -867,7 +871,10 @@ def plotSignificance(
             for i, l in enumerate(labels):
                 if (i % skipEvery != 0): labels[i] = ''  # skip every nth labe
             ax.set_xticklabels(labels, rotation=30)
-            newwidth = (ax.get_xticks()[1] - ax.get_xticks()[0])
+            try:
+                newwidth = (ax.get_xticks()[1] - ax.get_xticks()[0])
+            except:
+                newwidth = 0.1
             for bar in ax.patches:
                 x = bar.get_x()
                 width = bar.get_width()

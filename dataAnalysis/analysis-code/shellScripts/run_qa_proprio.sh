@@ -24,14 +24,15 @@
 # EXP="exp201901211000"
 # EXP="exp201901221000"
 # EXP="exp201901231000"
-EXP="exp201901261000"
+# EXP="exp201901261000"
 # EXP="exp201901271000"
 # EXP="exp202010271200"
+EXP="exp202011201100"
 
 LAZINESS="--lazy"
 
-TRIALSELECTOR="--blockIdx=4"
-# TRIALSELECTOR="--processAll"
+# TRIALSELECTOR="--blockIdx=4"
+TRIALSELECTOR="--processAll"
 
 # ALIGNQUERY="--alignQuery=midPeak"
 ALIGNQUERY="--alignQuery=stimOn"
@@ -39,11 +40,12 @@ ALIGNFOLDER="--alignFolderName=stim"
 
 # WINDOW="--window=long"
 # WINDOW="--window=miniRC"
-WINDOW="--window=XS"
+# WINDOW="--window=XS"
+WINDOW="--window=M"
 
-BLOCKSELECTOR="--inputBlockName=fr"
 # ANALYSISNAME="--analysisName=loRes"
-# ANALYSISNAME="--analysisName=default"
+ANALYSISNAME="--analysisName=default"
+
 
 module load anaconda/2020.02
 . /gpfs/runtime/opt/anaconda/2020.02/etc/profile.d/conda.sh
@@ -52,14 +54,17 @@ source activate nda2
 python --version
 
 # first pass
-UNITSELECTOR=""
+# UNITSELECTOR=""
 python -u ./calcUnitMeanFR.py --exp=$EXP $TRIALSELECTOR $WINDOW $ALIGNFOLDER $ANALYSISNAME $ALIGNQUERY --inputBlockName="fr" --unitQuery="fr" --verbose
 python -u ./calcUnitCorrelation.py --exp=$EXP $TRIALSELECTOR $WINDOW $ALIGNFOLDER $ANALYSISNAME $ALIGNQUERY --inputBlockName="fr" --unitQuery="fr" --verbose --plotting
 python -u ./selectUnitsByMeanFRandCorrelation.py --exp=$EXP $TRIALSELECTOR $ALIGNFOLDER $ANALYSISNAME $WINDOW $LAZINESS --verbose
 
 # remove outlier trials
-UNITSELECTOR="--selector=unitSelector_minfrmaxcorr"
-python -u ./calcTrialOutliers.py --exp=$EXP $TRIALSELECTOR $UNITSELECTOR $WINDOW $ALIGNFOLDER $ANALYSISNAME $ALIGNQUERY $LAZINESS $BLOCKSELECTOR --saveResults --plotting --verbose --unitQuery="fr" --amplitudeFieldName="amplitude" --sqrtTransform
+# UNITSELECTOR="--selector=unitSelector_minfrmaxcorr"
+UNITSELECTOR=""
+UNITQUERY="--unitQuery=lfp"
+BLOCKSELECTOR="--inputBlockName=lfp"
+python -u ./calcTrialOutliers.py --exp=$EXP $TRIALSELECTOR $UNITSELECTOR $WINDOW $ALIGNFOLDER $ANALYSISNAME $ALIGNQUERY $LAZINESS $BLOCKSELECTOR $UNITQUERY --saveResults --plotting --verbose --amplitudeFieldName="amplitude"
 
 # recalculate, once outliers do not affect the calculation
 python -u ./calcUnitMeanFR.py --exp=$EXP $TRIALSELECTOR $WINDOW $ALIGNFOLDER $ANALYSISNAME $ALIGNQUERY --inputBlockName="fr" --unitQuery="fr" --verbose --maskOutlierBlocks

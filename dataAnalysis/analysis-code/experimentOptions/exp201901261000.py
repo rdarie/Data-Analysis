@@ -168,8 +168,8 @@ def getExpOpts():
     alignTimeBoundsLookup = {
         }
     outlierDetectOptions = dict(
-        targetEpochSize=10e-3,
-        windowSize=(-1, 1),
+        targetEpochSize=100e-3,
+        windowSize=(-.2, .4),
         # conditionNames=[
         #     'electrode', 'amplitude', 'RateInHz',
         #     'pedalMovementCat', 'pedalSizeCat', 'pedalDirection'],
@@ -213,10 +213,5 @@ def getExpOpts():
                 ]
         }
     }
-    triFolderSourceBase = os.path.join(
-        '201901271000-Proprio', 'tdc_Block001')
-    triDestinations = [
-        'Block00{}'.format(blockIdx)
-        for blockIdx in [4]]
     
     return locals()

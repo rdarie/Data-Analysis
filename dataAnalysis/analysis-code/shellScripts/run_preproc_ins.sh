@@ -20,7 +20,7 @@
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=2,3
+#SBATCH --array=1,2
 
 module load anaconda/2020.02
 . /gpfs/runtime/opt/anaconda/2020.02/etc/profile.d/conda.sh
@@ -34,14 +34,17 @@ python --version
 # EXP="exp201901211000"
 # EXP="exp201901221000"
 # EXP="exp201901231000"
-EXP="exp201901261000"
+# EXP="exp201901261000"
 # EXP="exp201901271000"
 # EXP="exp202010201200"
 # EXP="exp202010251400"
 # EXP="exp202010261100"
 # EXP="exp202010271200"
+# EXP="exp202011161100"
+# EXP="exp202011201100"
+EXP="exp202011231200"
 
-SLURM_ARRAY_TASK_ID=4
+SLURM_ARRAY_TASK_ID=2
 
 # python -u ./viewINSSessionSummary.py
 

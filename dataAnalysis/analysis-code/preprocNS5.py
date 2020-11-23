@@ -152,7 +152,7 @@ def preprocNS5():
             nameSuffix='_spike_preview',
             #
             writeMode='ow',
-            chunkSize=300, equalChunks=False, chunkList=[1],
+            chunkSize=300, equalChunks=False, chunkList=[0], chunkOffset=0,
             calcRigEvents=False)
     #
     if arguments['fullSubtractMean']:

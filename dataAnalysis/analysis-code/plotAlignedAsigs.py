@@ -30,6 +30,9 @@ Options:
     --colControl=colControl                cols to exclude from stats test [default: control]
     --analysisName=analysisName            append a name to the resulting blocks? [default: default]
     --alignFolderName=alignFolderName      append a name to the resulting blocks? [default: motion]
+    --winStart=winStart                    start of window [default: 200]
+    --winStop=winStop                      end of window [default: 400]
+    --limitPages=limitPages                how many pages to print, max?
 """
 import matplotlib
 matplotlib.rcParams['pdf.fonttype'] = 42
@@ -114,7 +117,10 @@ statsTestPath = os.path.join(figureStatsFolder, pdfName + '_stats.h5')
 #############################################
 #  Overrides
 alignedAsigsKWargs.update({'amplitudeColumn': arguments['hueName']})
-limitPages = None
+if arguments['limitPages'] is not None:
+    limitPages = int(arguments['limitPages'])
+else:
+    limitPages = None
 if arguments['individualTraces']:
     relplotKWArgs['estimator'] = None
     relplotKWArgs['units'] = 't'
@@ -140,7 +146,13 @@ if arguments['enableOverrides']:
         if rowColOpts['colName'] in rowColOverrides:
             rowColOpts['colOrder'] = rowColOverrides[rowColOpts['colName']]
     ##########################################################################
-    alignedAsigsKWargs.update({'windowSize': (-.2, .4)})
+
+    # alignedAsigsKWargs.update({'windowSize': (-.2, .4)})
+    alignedAsigsKWargs.update({
+        'windowSize': (
+            float(arguments['winStart']) * (-1e-3),
+            float(arguments['winStop']) * 1e-3
+            )})
     ##########################################################################
     currWindow = rasterOpts['windowSizes'][arguments['window']]
     fullWinSize = currWindow[1] - currWindow[0]

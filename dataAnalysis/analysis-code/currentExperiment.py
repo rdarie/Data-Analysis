@@ -116,7 +116,7 @@ def parseAnalysisOptions(
             'folderPath': nspFolder,
             'ns5FileName': ns5FileName,
             'calcRigEvents': (blockExperimentType == 'proprio'),
-            'spikeWindow': [-12, 32]
+            'spikeWindow': [-16, 48]
             }
         }
     spikeWindow = trialFilesFrom['utah']['spikeWindow']
@@ -149,9 +149,9 @@ def parseAnalysisOptions(
         } for grpIdx in range(4)}
     stimDetectOptsByChannel = stimDetectOptsByChannelDefault
     stimDetectOptsByChannel.update(expOpts['stimDetectOptsByChannelSpecific'])
-    if 'stimDetectOverrideStartTimes' in expOpts:
+    try:
         overrideStartTimes = expOpts['stimDetectOverrideStartTimes'][blockIdx]
-    else:
+    except Exception:
         overrideStartTimes = None
     commonStimDetectionOpts = {
         'stimDetectOptsByChannel': stimDetectOptsByChannelDefault,
@@ -356,9 +356,9 @@ def parseAnalysisOptions(
         'separateByFunKWArgs': {'type': 'Classification'}
         }
     statsTestOpts = dict(
-        testStride=500e-3,
-        testWidth=500e-3,
-        tStart=None,
+        testStride=50e-3,
+        testWidth=50e-3,
+        tStart=0,
         tStop=None,
         pThresh=1e-2,
         correctMultiple=True
@@ -375,9 +375,9 @@ def parseAnalysisOptions(
         'facecolor': vLineOpts['color'],
         'alpha': 0.1, 'zorder': -100}
     asigSigStarOpts = {
-        'color': vLineOpts['color'],
-        'linestyle': 'None',
-        'markersize': 20,
+        'c': vLineOpts['color'],
+        # 'linestyle': 'None',
+        's': 20,
         'marker': '*'
         }
     nrnRelplotKWArgs = dict(
@@ -397,11 +397,11 @@ def parseAnalysisOptions(
         'facecolor': nrnVLineOpts['color'],
         'alpha': 0.3, 'zorder': -100}
     nrnSigStarOpts = {
-        'color': nrnVLineOpts['color'],
-        'edgecolor': None,
+        'c': nrnVLineOpts['color'],
+        # 'edgecolor': None,
         'edgecolors': 'face',
-        'linestyle': 'None',
-        'markersize': 20,
+        # 'linestyle': 'None',
+        's': 20,
         'marker': '*'}
     plotOpts = {
         'type': 'ticks', 'errorBar': 'sem',

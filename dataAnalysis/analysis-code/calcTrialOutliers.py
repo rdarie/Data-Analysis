@@ -8,6 +8,7 @@ Options:
     --processAll                                 process entire experimental day? [default: False]
     --lazy                                       load from raw, or regular? [default: False]
     --saveResults                                load from raw, or regular? [default: False]
+    --useCachedMahalanobis                       load previous covariance matrix? [default: False]
     --inputBlockName=inputBlockName              which trig_ block to pull [default: pca]
     --verbose                                    print diagnostics? [default: False]
     --plotting                                   plot results?
@@ -106,6 +107,8 @@ alignedAsigsKWargs.update(dict(
     transposeToColumns='feature', concatOn='columns',
     verbose=False, procFun=None))
 #
+print("'outlierDetectOptions' in locals(): {}".format('outlierDetectOptions' in locals()))
+
 if 'outlierDetectOptions' in locals():
     targetEpochSize = outlierDetectOptions['targetEpochSize']
     stimulusConditionNames = outlierDetectOptions['conditionNames']
@@ -118,8 +121,10 @@ else:
     twoTailed = False
     alignedAsigsKWargs['windowSize'] = (-100e-3, 400e-3)
 
+
 def takeSqrt(waveDF, spkTrain):
     return np.sqrt(waveDF)
+
 
 if arguments['sqrtTransform']:
     alignedAsigsKWargs['procFun'] = takeSqrt
@@ -140,40 +145,38 @@ def findOutliers(
         chi2Bounds = chi2.interval(qThresh, nDim)
         sdThresh = multiplier * chi2Bounds[1]
     #
-    chiProba = pd.Series(
-        -np.log(np.squeeze(chi2.pdf(mahalDistDF, nDim))),
-        index=mahalDistDF.index)
-    chiProbaLim = -np.log(chi2.pdf(sdThresh, nDim))
-    if devQuantile is not None:
-        deviation = chiProba.groupby(groupBy).quantile(q=devQuantile)
-        # maxMhDist = mahalDistDF.groupby(groupBy).quantile(q=devQuantile).iloc[:, -1] - sdThresh
-        # minMhDist = sdThreshInner - mahalDistDF.groupby(groupBy).quantile(q=1-devQuantile).iloc[:, -1]
+    if twoTailed:
+        chiProba = pd.Series(
+            -np.log(np.squeeze(chi2.pdf(mahalDistDF, nDim))),
+            index=mahalDistDF.index)
+        chiProbaLim = -np.log(chi2.pdf(sdThresh, nDim))
+        if devQuantile is not None:
+            deviation = chiProba.groupby(groupBy).quantile(q=devQuantile)
+        else:
+            deviation = chiProba.groupby(groupBy).max()
     else:
-        deviation = chiProba.groupby(groupBy).max()
-        # maxMhDist = mahalDistDF.groupby(groupBy).max().iloc[:, -1] - sdThresh
-        # minMhDist = sdThreshInner - mahalDistDF.groupby(groupBy).min().iloc[:, -1]
+        if devQuantile is not None:
+            deviation = mahalDistDF['mahalDist'].groupby(groupBy).quantile(q=devQuantile)
+        else:
+            deviation = mahalDistDF['mahalDist'].groupby(groupBy).max()
+    deviationDF = deviation.to_frame(name='deviation')
     #
-    # if twoTailed:
-    #     deviation = pd.concat([maxMhDist, minMhDist], axis='columns').max(axis='columns')
-    #     pdb.set_trace()
-    # else:
-    #     deviation = maxMhDist
-    if isinstance(deviation, pd.Series):
-        deviationDF = deviation.to_frame(name='deviation')
+    if twoTailed:
+        deviationDF['rejectBlock'] = (deviationDF['deviation'] > chiProbaLim)
     else:
-        deviationDF = deviation
-    deviationDF['rejectBlock'] = (deviationDF['deviation'] > chiProbaLim)
+        deviationDF['rejectBlock'] = (deviationDF['deviation'] > sdThresh)
+    #
     return deviationDF
 
 
 def calcCovMat(
         partition, dataColNames=None,
-        useEmpiricalCovariance=True,
+        useMinCovDet=True,
         supportFraction=None, verbose=False):
     dataColMask = partition.columns.isin(dataColNames)
     partitionData = partition.loc[:, dataColMask]
     # print('partition shape = {}'.format(partitionData.shape))
-    if not useEmpiricalCovariance:
+    if useMinCovDet:
         try:
             est = MinCovDet(support_fraction=supportFraction)
             est.fit(partitionData.values)
@@ -191,7 +194,7 @@ def calcCovMat(
     # print('result shape is {}'.format(result.shape))
     result = pd.concat([result, partition.loc[:, ~dataColMask]], axis=1)
     result.name = 'mahalanobisDistance'
-    # pdb.set_trace()
+    #
     # if result['electrode'].iloc[0] == 'foo':
     #     pdb.set_trace()
     # print('result type is {}'.format(type(result)))
@@ -256,7 +259,10 @@ if __name__ == "__main__":
     dataDF.set_index(
         pd.Index(trialInfo['epoch'], name='epoch'),
         append=True, inplace=True)
-
+    #  ########################### Debugging
+    # if True:
+    #     dataDF = dataDF.drop(columns=[('utah25#0', 0)])
+    #  ###########################
     testVar = None
     groupBy = ['segment', 't']
     resultNames = [
@@ -265,8 +271,7 @@ if __name__ == "__main__":
     print('working with {} samples'.format(dataDF.shape[0]))
     randSample = slice(None, None, None)
 
-    useCachedMahalDist = True
-    if useCachedMahalDist and os.path.exists(resultPath):
+    if arguments['useCachedMahalanobis'] and os.path.exists(resultPath):
         with pd.HDFStore(resultPath,  mode='r') as store:
             mahalDist = pd.read_hdf(
                 store, 'mahalDist')
@@ -275,11 +280,11 @@ if __name__ == "__main__":
         mahalDistLoaded = False
 
     covOpts = dict(
-        useEmpiricalCovariance=True,
+        useMinCovDet=False,
         supportFraction=None)
     daskComputeOpts = dict(
-        scheduler='processes'
-        # scheduler='single-threaded'
+        # scheduler='processes'
+        scheduler='single-threaded'
         )
     if not mahalDistLoaded:
         if arguments['verbose']:
@@ -375,7 +380,8 @@ if __name__ == "__main__":
     theseOutliers = (
         outlierTrials
         .loc[outlierTrials['rejectBlock'].astype(np.bool), 'deviation'].sort_values()
-        )
+        ).iloc[-100:]
+    # pdb.set_trace()
     # maxDroppedTrials = pd.Series(
     #     index=np.concatenate(
     #         [

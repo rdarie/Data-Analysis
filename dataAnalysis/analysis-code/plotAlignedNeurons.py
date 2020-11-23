@@ -25,6 +25,9 @@ Options:
     --analysisName=analysisName            append a name to the resulting blocks? [default: default]
     --alignFolderName=alignFolderName      append a name to the resulting blocks? [default: motion]
     --overlayStats                         overlay ANOVA significance stars? [default: False]
+    --winStart=winStart                    start of window [default: 200]
+    --winStop=winStop                      end of window [default: 400]
+    --limitPages=limitPages                how many pages to print, max?
 """
 import matplotlib
 matplotlib.rcParams['pdf.fonttype'] = 42
@@ -119,7 +122,11 @@ statsTestOpts.update({
     'tStop': rasterOpts['windowSizes'][arguments['window']][1]})
 #  Overrides
 ################################################################
-limitPages = None
+if arguments['limitPages'] is not None:
+    limitPages = int(arguments['limitPages'])
+else:
+    limitPages = None
+
 showNow = False
 if arguments['enableOverrides']:
     nrnRelplotKWArgs.update({
@@ -127,7 +134,7 @@ if arguments['enableOverrides']:
         'height': 4,
         'aspect': 2,
         'facet1_kws': {  # raster axes
-            'sharey': True,
+            'sharey': False,
             # 'legend_out': False,
             'gridspec_kws': {
                 'wspace': 0.01,
@@ -142,7 +149,11 @@ if arguments['enableOverrides']:
             }}
         })
     ##########################################################################
-    alignedAsigsKWargs.update({'windowSize': (-.2, .4)})
+    alignedAsigsKWargs.update({
+        'windowSize': (
+            float(arguments['winStart']) * (-1e-3),
+            float(arguments['winStop']) * 1e-3
+            )})
     ##########################################################################
 #     # currWindow = rasterOpts['windowSizes'][arguments['window']]
 #     # fullWinSize = currWindow[1] - currWindow[0]

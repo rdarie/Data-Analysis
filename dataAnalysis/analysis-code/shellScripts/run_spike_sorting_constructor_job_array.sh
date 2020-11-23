@@ -1,7 +1,7 @@
 #!/bin/bash
 # 01: Preprocess spikes
 # Request an hour of runtime:
-#SBATCH --time=4:00:00
+#SBATCH --time=12:00:00
 
 # Use 2 nodes with 8 tasks each, for 16 MPI tasks:
 #SBATCH --nodes=1
@@ -22,8 +22,11 @@
 
 # Run a command
 
-EXP="exp201901261000"
+# EXP="exp201901261000"
 # EXP="exp202010271200"
+# EXP="exp202011161100"
+# EXP="exp202011201100"
+EXP="exp202011231200"
 
 module load anaconda/2020.02
 . /gpfs/runtime/opt/anaconda/2020.02/etc/profile.d/conda.sh
@@ -31,11 +34,12 @@ conda activate
 source activate nda2
 python --version
 
-BLOCKIDX=4
+BLOCKIDX=1
 # SLURM_ARRAY_TASK_ID=0
 let CHAN_START=SLURM_ARRAY_TASK_ID
 # for nform, groups of 4 for utah, groups of 5
 let CHAN_STOP=SLURM_ARRAY_TASK_ID+1
 
-python -u ./tridesclousCCV_jobArray.py --arrayName=utah --exp=$EXP --blockIdx=$BLOCKIDX --batchPreprocess --chan_start=$CHAN_START --chan_stop=$CHAN_STOP --sourceFileSuffix=spike_preview
-# python -u ./tridesclousCCV_jobArray.py --arrayName=nform --exp=$EXP --blockIdx=$BLOCKIDX --batchPreprocess --chan_start=$CHAN_START --chan_stop=$CHAN_STOP --sourceFileSuffix=spike_preview
+python -u ./tridesclousCCV_jobArray.py --arrayName=utah --exp=$EXP --blockIdx=$BLOCKIDX --batchPreprocess --chan_start=$CHAN_START --chan_stop=$CHAN_STOP --sourceFileSuffix='spike_preview'
+python -u ./tridesclousVisualize.py --arrayName=utah --blockIdx=$BLOCKIDX --exp=$EXP  --constructor --chan_start=$CHAN_START --chan_stop=$CHAN_STOP --sourceFileSuffix='spike_preview'
+python -u ./tridesclousCCV_jobArray.py --arrayName=utah --blockIdx=$BLOCKIDX --exp=$EXP --purgePeeler --batchPeel --chan_start=$CHAN_START --chan_stop=$CHAN_STOP --sourceFileSuffix='spike_preview'

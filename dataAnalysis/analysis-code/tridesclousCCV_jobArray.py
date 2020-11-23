@@ -73,7 +73,7 @@ theseExtractOpts = dict(
     mode='rand',
     n_left=spikeWindow[0] - 2,
     n_right=spikeWindow[1] + 2,
-    nb_max=12000, align_waveform=False)
+    nb_max=16000, align_waveform=False)
 callbacks = [
     tf.keras.callbacks.EarlyStopping(
         # Stop training when `loss` is no longer improving
@@ -87,7 +87,7 @@ callbacks = [
 ]
 theseFeatureOpts = {
     'method': 'global_pumap',
-    'n_components': 6,
+    'n_components': 5,
     'n_neighbors': 50,
     'min_dist': 0,
     'metric': 'euclidean',
@@ -136,19 +136,19 @@ if RANK == 0:
 if arguments['batchPreprocess']:
     tdch.batchPreprocess(
         triFolder, chansToAnalyze,
-        relative_threshold=3.5,
+        relative_threshold=4,
         fill_overflow=False,
         highpass_freq=300.,
         lowpass_freq=5000.,
         common_ref_freq=300.,
         common_ref_removal=False,
         notch_freq=None,
-        filter_order=3,
+        filter_order=4,
         featureOpts=theseFeatureOpts,
         clusterOpts=theseClusterOpts,
         noise_estimate_duration=300,
         sample_snippet_duration=300,
-        chunksize=2**19,
+        chunksize=2**20,
         extractOpts=theseExtractOpts,
         autoMerge=False, auto_merge_threshold=0.99)
 
@@ -169,15 +169,11 @@ if arguments['batchPrepWaveforms']:
         common_ref_freq=300.,
         common_ref_removal=False,
         notch_freq=None,
-        filter_order=3,
+        filter_order=4,
         noise_estimate_duration=300,
         sample_snippet_duration=300,
         chunksize=2**18,
-        extractOpts=dict(
-            mode='rand',
-            n_left=spikeWindow[0] - 2,
-            n_right=spikeWindow[1] + 2,
-            nb_max=32000, align_waveform=False)
+        extractOpts=theseExtractOpts
         )
 
 if arguments['batchPeel']:

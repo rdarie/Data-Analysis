@@ -717,6 +717,7 @@ def getINSAccelFromJson(
     accelSessions = []
     for idx, sessionName in enumerate(sessionNames):
         jsonPath = os.path.join(folderPath, sessionName, deviceName)
+        print('getINSAccelFromJson( Loading {}'.format(jsonPath))
         try:
             if forceRecalc:
                 raise(Exception('Debugging, always extract fresh'))
@@ -1223,10 +1224,10 @@ def peekAtTaps(
     ax[2].set_title('NSP Data')
     fig.canvas.mpl_connect('pick_event', onpick)
     plt.show(block=plotBlocking)
-
+    # remove double clicks
     for key, value in tempClick.items():
         tempVal = pd.Series(value)
-        tempClick[key] = tempVal.loc[tempVal.diff().fillna(1) > 100e-3]
+        tempClick[key] = tempVal.loc[tempVal.diff().fillna(1) > 10e-3]
     return tempClick
 
 
@@ -1266,11 +1267,12 @@ def getINSTapTimestamp(
     if td is not None:
         tdChans = [cn for cn in tapDetectOpts['chan'] if 'td' in cn]
         signalsToConcat.append(td.loc[tdMask, tdChans])
+        fs = (td['t'].iloc[1] - td['t'].iloc[0]) ** -1
     if accel is not None:
         accChans = [cn for cn in tapDetectOpts['chan'] if 'acc' in cn]
         signalsToConcat.append(accel.loc[tdMask, accChans])
+        fs = (accel['t'].iloc[1] - accel['t'].iloc[0]) ** -1
     tapDetectSignal = pd.concat(signalsToConcat, axis='columns')
-    # TODO: WIP, use covariance matrix for novelty detector
     try:
         cov = (
             MinCovDet(support_fraction=0.75)
@@ -1284,7 +1286,7 @@ def getINSTapTimestamp(
         np.sqrt(cov.mahalanobis(tapDetectSignal.to_numpy())),
         index=tapDetectSignal.index)
     tdPeakIdx = hf.getTriggers(
-        tapDetectSignal, iti=iti, fs=500, thres=tapDetectOpts['thres'],
+        tapDetectSignal, iti=iti, fs=fs, thres=tapDetectOpts['thres'],
         edgeType='both', minAmp=None,
         expectedTime=None, keep_max=False, plotting=plotting)
     tdPeakIdx = tdPeakIdx[keepIndex]
@@ -1441,14 +1443,21 @@ def getINSStimLogFromJson(
     allStimStatus = []
     for idx, sessionName in enumerate(sessionNames):
         jsonPath = os.path.join(folderPath, sessionName, deviceName)
+        print('getINSStimLogFromJson(: Loading {}\n...'.format(jsonPath))
         try:
             with open(os.path.join(jsonPath, 'StimLog.json'), 'r') as f:
                 stimLog = json.load(f)
         except Exception:
-            with open(os.path.join(jsonPath, 'StimLog.json'), 'r') as f:
-                stimLogText = f.read()
-                stimLogText = fixMalformedJson(stimLogText)
-                stimLog = json.loads(stimLogText)
+            try:
+                with open(os.path.join(jsonPath, 'StimLog.json'), 'r') as f:
+                    stimLogText = f.read()
+                    stimLogText = fixMalformedJson(stimLogText)
+                    stimLog = json.loads(stimLogText)
+            except Exception:
+                with open(os.path.join(jsonPath, 'StimLog.json'), 'r') as f:
+                    stimLogText = f.read()
+                    stimLogText = fixMalformedJson(stimLogText)
+                    stimLog = json.loads(stimLogText)
         if logForm == 'serial':
             stimStatus = rcsa_helpers.extract_stim_meta_data_events(
                 stimLog, trialSegment=idx)
@@ -1649,18 +1658,24 @@ def getINSDeviceConfig(
         with open(os.path.join(jsonPath, 'DeviceSettings.json'), 'r') as f:
             deviceSettings = json.load(f)
     except Exception:
-        with open(os.path.join(jsonPath, 'DeviceSettings.json'), 'r') as f:
-            deviceSettingsText = f.read()
-            deviceSettingsText = fixMalformedJson(deviceSettingsText)
-            deviceSettings = json.loads(deviceSettingsText)
-    try:
-        with open(os.path.join(jsonPath, 'StimLog.json'), 'r') as f:
-            stimLog = json.load(f)
-    except Exception:
-        with open(os.path.join(jsonPath, 'DeviceSettings.json'), 'r') as f:
-            stimLogText = f.read()
-            stimLogText = fixMalformedJson(stimLogText)
-            stimLog = json.loads(stimLogText)
+        try:
+            with open(os.path.join(jsonPath, 'DeviceSettings.json'), 'r') as f:
+                deviceSettingsText = f.read()
+                deviceSettingsText += ']'
+                deviceSettings = json.loads(deviceSettingsText)
+        except Exception:
+            with open(os.path.join(jsonPath, 'DeviceSettings.json'), 'r') as f:
+                deviceSettingsText = f.read()
+                deviceSettingsText = fixMalformedJson(deviceSettingsText)
+                deviceSettings = json.loads(deviceSettingsText)
+    # try:
+    #     with open(os.path.join(jsonPath, 'StimLog.json'), 'r') as f:
+    #         stimLog = json.load(f)
+    # except Exception:
+    #     with open(os.path.join(jsonPath, 'DeviceSettings.json'), 'r') as f:
+    #         stimLogText = f.read()
+    #         stimLogText = fixMalformedJson(stimLogText)
+    #         stimLog = json.loads(stimLogText)
 
     progIndices = list(range(4))
     groupIndices = list(range(4))

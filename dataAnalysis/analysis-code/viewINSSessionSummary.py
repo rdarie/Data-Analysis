@@ -30,7 +30,7 @@ arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 import line_profiler
 import atexit
 import traceback
-
+import json
 
 def summarizeINSSession(
         sessionUnixTime=None,
@@ -39,6 +39,7 @@ def summarizeINSSession(
         orcaFolderPath=None
         ):
     summaryText = '<h1>Session{}</h1>\n'.format(sessionUnixTime)
+    print(summaryText)
     #
     sessionTime = datetime.fromtimestamp(sessionUnixTime / 1e3)
     summaryText += '<h3>Started: ' + sessionTime.isoformat() + '</h3>\n'
@@ -57,7 +58,9 @@ def summarizeINSSession(
                 )
             firstPacketT = datetime.fromtimestamp(timeSyncDF['HostUnixTime'].min() / 1e3)
             lastPacketT = datetime.fromtimestamp(timeSyncDF['HostUnixTime'].max() / 1e3)
-            summaryText += '<h3>Duration: {}</h3>\n'.format(lastPacketT - firstPacketT)
+            sessionDuration = lastPacketT - firstPacketT
+            summaryText += '<h3>Duration: {}</h3>\n'.format(sessionDuration)
+            summaryText += '<h3>Ended: {}</h3>\n'.format((sessionTime + sessionDuration).isoformat())
         except Exception:
             traceback.print_exc()
             summaryText += '<h3>Duration: TimeSync.json exists but not read</h3>\n'
@@ -106,6 +109,7 @@ def summarizeINSSession(
     else:
         commentsLog = None
         summaryText += '<h2>Comments not found</h2>\n'
+    print('#################################\n\n\n')
     return elecConfigDF, senseInfoDF, commentsLog, summaryText
 
 
@@ -123,18 +127,28 @@ def summarizeINSSessionWrapper():
     summaryPath = os.path.join(
         orcaFolderPath, subjectName,
         'summary.html')
-    if os.path.exists(summaryPath):
-        os.remove(summaryPath)
+    listOfSummarizedPath = os.path.join(
+        orcaFolderPath, subjectName, 'list_of_summarized.json'
+        )
+    if not os.path.exists(listOfSummarizedPath):
+        listOfSummarized = {'sessions': []}
+    else:
+        with open(listOfSummarizedPath, 'r') as f:
+            listOfSummarized = json.load(f)
     for sessionUnixTime in sessionUnixTimeList:
-        elecConfigDF, senseInfoDF, commentsLog, summaryText = summarizeINSSession(
-            sessionUnixTime=sessionUnixTime,
-            subjectName=subjectName,
-            deviceName=deviceName,
-            orcaFolderPath=orcaFolderPath
-            )
-        with open(summaryPath, 'a+') as _file:
-            _file.write(summaryText)
-            _file.write('\n<hr>\n')
+        if sessionUnixTime not in listOfSummarized['sessions']:
+            elecConfigDF, senseInfoDF, commentsLog, summaryText = summarizeINSSession(
+                sessionUnixTime=sessionUnixTime,
+                subjectName=subjectName,
+                deviceName=deviceName,
+                orcaFolderPath=orcaFolderPath
+                )
+            with open(summaryPath, 'a+') as _file:
+                _file.write(summaryText)
+                _file.write('\n<hr>\n')
+            listOfSummarized['sessions'].append(sessionUnixTime)
+    with open(listOfSummarizedPath, 'w') as f:
+        json.dump(listOfSummarized, f)
     return
 
 

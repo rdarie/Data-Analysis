@@ -7,6 +7,7 @@ import pdb
 from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
+import matplotlib.colors as mplcolors
 import seaborn as sns
 import random
 import traceback
@@ -39,8 +40,14 @@ def plotSpikePanel(
     xIdx = np.array([uniqueXLookup[i] for i in xIdx])
     yIdx = np.array([uniqueYLookup[i] for i in yIdx])
     #
-    panelX = {spikeStruct.iloc[i, :].loc['label']: x for i, x in enumerate(xIdx)}
-    panelY = {spikeStruct.iloc[i, :].loc['label']: y for i, y in enumerate(yIdx)}
+    panelX = {
+        spikeStruct.iloc[i, :].loc['label']: x
+        for i, x in enumerate(xIdx)
+        }
+    panelY = {
+        spikeStruct.iloc[i, :].loc['label']: y
+        for i, y in enumerate(yIdx)
+        }
     #
     fig, ax = plt.subplots(
         nrows=int(max(np.unique(xIdx)) + 1),
@@ -61,10 +68,10 @@ def plotSpikePanel(
         # get xLim from last axis that has spikes, in order to make the label
         xLim = ax[panelX[channel], panelY[channel]].get_xlim()
         sns.despine()
-
+        #
         newAxMin = np.nanmean(axLowLims) - .5 * np.nanstd(axLowLims)
         newAxMax = np.nanmean(axHighLims) + .5 * np.nanstd(axHighLims)
-
+        #
         for idx, channel in enumerate(spikes['ChannelID']):
             curAx = ax[panelX[channel], panelY[channel]]
             curAx.set_ylim(newAxMin, newAxMax)
@@ -77,8 +84,8 @@ def plotSpikePanel(
             curAx.text(
                 1, 1, channel,
                 transform=trnsf, **textOpts)
-            # pdb.set_trace()
-
+            ax[panelX[channel], panelY[channel]].channelName = channel
+        #
         for idx, curAx in enumerate(ax.flatten()):
             if idx != 0:
                 curAx.tick_params(
@@ -103,8 +110,10 @@ def plotSpikePanel(
                 curAx.set_ylabel(
                     spikes['Units'], fontsize=labelFontSize,
                     labelpad=-3 * labelFontSize)
-        plt.tight_layout(pad=padOverride, w_pad=padOverride, h_pad=padOverride)
-    return newAxMin, newAxMax
+        plt.tight_layout(
+            pad=padOverride, w_pad=padOverride,
+            h_pad=padOverride)
+    return fig, ax
 
 
 def coordsToIndices(xcoords, ycoords):
@@ -349,7 +358,8 @@ def spikePDFReport(
         correctAlignmentSpikes=0,
         plotOpts={'type': 'ticks', 'errorBar': 'sem'},
         trialStats=None, enableFR=False, rasterOpts={'alignTo': None},
-        newReportName=None):
+        newReportName=None, colorByAmpBank=False
+        ):
 
     if correctAlignmentSpikes:  # correctAlignmentSpikes units in samples
         spikes = hf.correctSpikeAlignment(spikes, correctAlignmentSpikes)
@@ -365,10 +375,27 @@ def spikePDFReport(
     #      arrayInfo['nevIDs'] = spikes['ChannelID']
 
     with PdfPages(pdfName) as pdf:
-        plotSpikePanel(
-            spikeStruct, spikes,
-            colorPal=None,
+        spPanelFig, spPanelAx = plotSpikePanel(
+            spikeStruct, spikes, colorPal=None,
             labelFontSize=2, padOverride=1e-3)
+        ######################################################
+        #  color axes by amplifier bank
+        #######################################################
+        if colorByAmpBank:
+            bankColorLookup = {
+                'A': list(mplcolors.to_rgba('tab:brown')),
+                'B': list(mplcolors.to_rgba('tab:pink')),
+                'C': list(mplcolors.to_rgba('tab:olive')),
+                'D': list(mplcolors.to_rgba('tab:cyan')),
+                }
+            for curAx in spPanelAx.flatten():
+                if hasattr(curAx, 'channelName'):
+                    chMapInfo = spikeStruct.loc[spikeStruct['label'] == curAx.channelName, :]
+                    chBank = chMapInfo['bank'].iloc[0]
+                    chColor = bankColorLookup[chBank]
+                    chColor[-1] = 0.3
+                    curAx.set_facecolor(chColor)
+        ###########################################################
         #  make spikepanel square
         # figWidth, figHeight = plt.gcf().get_size_inches()
         # aspectRatio = (spikeStruct['xcoords'].max() - spikeStruct['xcoords'].min()) / (spikeStruct['ycoords'].max() - spikeStruct['ycoords'].min())

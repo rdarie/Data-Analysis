@@ -35,125 +35,65 @@ def getExpOpts():
         'forceY': 'ainp15',
         }
     
-    experimentName = '202010271200-Rupert'
+    experimentName = '202011161100-Rupert'
     deviceName = 'DeviceNPC700246H'
     subjectName = 'Rupert'
 
     jsonSessionNames = {
         #  per trial
-        1: [],
-        2: ['Session1603815232182', 'Session1603815636014', 'Session1603816009303'],
-        3: ['Session1603816446027', 'Session1603816775688', ]
+        1: [
+            'Session1605545213441',
+            'Session1605545475068', 'Session1605545632724',
+            'Session1605546058247'],
+        2: [],
+        3: []
         }
     synchInfo = {'nform': {}, 'nsp': {}, 'ins': {}}
     synchInfo['ins'][1] = {
         #  per trialSegment
-        0: {
-            'timeRanges': [(14, 16)],
-            'chan': ['ins_td0', 'ins_td2'],
+        i: {
+            'timeRanges': None,
+            'chan': ['ins_td0', 'ins_td1'],
             'thres': 5,
-            'iti': 0.2,
-            'keepIndex': slice(None)
-            },
-        1: {
-            'timeRanges': [(448, 450)],
-            'chan': ['ins_td0', 'ins_td2'],
-            # 'chan': ['ins_accx', 'ins_accy', 'ins_accz'],
-            'thres': 5,
-            'iti': 0.2,
+            'iti': 50e-3,
             'keepIndex': slice(None)
             }
-        }
-    synchInfo['ins'][2] = {
-        #  per trialSegment
-        0: {
-            'timeRanges': None,
-            'chan': ['ins_td0'],
-            'thres': 5,
-            'iti': 0.2,
-            'keepIndex': slice(None)
-            },
-        1: {
-            'timeRanges': None,
-            'chan': ['ins_td0'],
-            # 'chan': ['ins_accx', 'ins_accy', 'ins_accz'],
-            'thres': 5,
-            'iti': 0.2,
-            'keepIndex': slice(None)
-            },
-        2: {
-            'timeRanges': None,
-            'chan': ['ins_td0'],
-            # 'chan': ['ins_accx', 'ins_accy', 'ins_accz'],
-            'thres': 5,
-            'iti': 0.2,
-            'keepIndex': slice(None)
-            }
-        }
-    synchInfo['ins'][3] = {
-        #  per trialSegment
-        0: {
-            'timeRanges': None,
-            'chan': ['ins_td0', 'ins_td2'],
-            'thres': 5,
-            'iti': 0.2,
-            'keepIndex': slice(None)
-            },
-        1: {
-            'timeRanges': None,
-            'chan': ['ins_td0', 'ins_td2'],
-            # 'chan': ['ins_accx', 'ins_accy', 'ins_accz'],
-            'thres': 5,
-            'iti': 0.2,
-            'keepIndex': slice(None)
-            }
+        for i in range(4)
         }
     synchInfo['nsp'] = {
         #  per trialSegment
         1: {
-            0: {'timeRanges': None, 'keepIndex': slice(None)},
-            1: {'timeRanges': None, 'keepIndex': slice(None)}
-            },
-        2: {
-            0: {'timeRanges': None, 'keepIndex': slice(None)},
-            1: {'timeRanges': None, 'keepIndex': slice(None)},
-            2: {'timeRanges': None, 'keepIndex': slice(None, 3)}
-            },
-        3: {
-            0: {'timeRanges': None, 'keepIndex': slice(None)},
-            1: {'timeRanges': None, 'keepIndex': slice(None)}
+            i: {'timeRanges': None, 'keepIndex': slice(None)}
+            for i in range(4)
             }
         }
     #  if not possible to use taps, override with good taps from another segment
     #  not ideal, because segments are only synchronized to the nearest **second**
     overrideSegmentsForTapSync = {
-        #  each key is a trial
+        #  each key is a Block
         1: {},
-        2: {},
-        3: {},
         }
     # options for stim artifact detection
     stimDetectOverrideStartTimes = {
+        #  each key is a Block
         1: None,
-        2: None,
-        3: None,
         # 2: [96.43, 191.689],
     }
     detectStim = True
     stimDetectThresDefault = 100
-    stimDetectChansDefault = ['ins_td0']
+    stimDetectChansDefault = ['ins_td0', 'ins_td1']
     stimDetectOptsByChannelSpecific = {
         # group
         0: {
             # program
-            0: {'detectChannels': ['ins_td0'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True},
-            1: {'detectChannels': ['ins_td2'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True},
-            2: {'detectChannels': ['ins_td0'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True},
-            3: {'detectChannels': ['ins_td0'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True}
+            0: {'detectChannels': ['ins_td0', 'ins_td1'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True},
+            1: {'detectChannels': ['ins_td0', 'ins_td1'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True},
+            2: {'detectChannels': ['ins_td0', 'ins_td1'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True},
+            3: {'detectChannels': ['ins_td0', 'ins_td1'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True}
         }}
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        '202010271200-Rupert': [2, 3],
+        '202011161100-Rupert': [2, 3],
         }
     # Options relevant to the classifcation of proprio trials
     movementSizeBins = [0, 0.4, 0.8]
@@ -164,14 +104,14 @@ def getExpOpts():
         #     ],
         }
     outlierDetectOptions = dict(
-        targetEpochSize=50e-3,
+        targetEpochSize=100e-3,
         windowSize=(-.2, .4),
         # conditionNames=[
         #     'electrode', 'amplitude', 'RateInHz',
         #     'pedalMovementCat', 'pedalSizeCat', 'pedalDirection'],
         conditionNames=[
             'electrode', 'amplitude', 'RateInHz'],
-        twoTailed=False,
+        twoTailed=True,
         )
     #
     minNConditionRepetitions = {
@@ -191,20 +131,20 @@ def getExpOpts():
             ],
             'electrodeMapPath': './Utah_SN6251_002374_Rupert.cmp',
             'rawBlockName': 'utah',
-            'excludeChans': ['utah25'],
+            'excludeChans': [],
             'prbOpts': dict(
                 contactSpacing=400,
                 groupIn={
                     'xcoords': np.arange(-.1, 10.1, 1),
                     'ycoords': np.arange(-.1, 10.1, 1)}),
             'triFolderSource': {
-                'exp': experimentName, 'block': 2,
+                'exp': experimentName, 'block': 1,
                 'nameSuffix': 'spike_preview'},
             'triFolderDest': [
                 {
                     'exp': experimentName, 'block': i,
                     'nameSuffix': 'mean_subtracted'}
-                for i in [2, 3]]
+                for i in [1]]
         },
         'nform': {
             'asigNameList': [

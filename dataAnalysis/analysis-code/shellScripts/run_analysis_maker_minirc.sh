@@ -21,7 +21,7 @@
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=4
+#SBATCH --array=1,2
 
 # EXP="exp201901070700"
 #
@@ -31,11 +31,12 @@
 # EXP="exp201901221000"
 # EXP="exp201901231000"
 #
-EXP="exp201901261000"
+ #EXP="exp201901261000"
 # EXP="exp201901271000"
 #
 # EXP="exp202003091200"
 # EXP="exp202010271200"
+EXP="exp202011201100"
 
 LAZINESS="--lazy"
 # ANALYSISNAME="--analysisName=loRes"

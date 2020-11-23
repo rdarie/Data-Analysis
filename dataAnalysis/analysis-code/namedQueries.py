@@ -22,7 +22,7 @@ namedQueries = {
     'unit': {
         'fr': "(chanName.str.endswith('fr#0'))",
         'utahlfp': "(chanName.str.contains('elec')and(not(chanName.str.endswith('fr#0'))))",
-        'lfp': "((chanName.str.contains('elec')or(chanName.str.contains('utah'))or(chanName.str.contains('nform')))and(not(chanName.str.endswith('fr#0'))))",
+        'lfp': "((chanName.str.contains('elec')or(chanName.str.contains('utah'))or(chanName.str.contains('nform')))and(not((chanName.str.endswith('fr#0')or(chanName.str.contains('rawAverage'))or(chanName.str.contains('zScoredAverage'))))))",
         'fr_sqrt': "(chanName.str.endswith('fr_sqrt#0'))",
         'raster': "(chanName.str.endswith('raster#0'))",
         'all': "(chanName.str.endswith('#0'))",

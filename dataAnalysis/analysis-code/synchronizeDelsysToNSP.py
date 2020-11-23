@@ -119,7 +119,7 @@ def synchronizeDelsysToNSP():
         absVal=False, plotting=arguments['plotting'], keep_max=False)
     # nspPeakIdx = hf.getTriggers(
     #     nspSrs, iti=interTriggerInterval, itiWiggle=1,
-    #     fs=float(oeSyncAsig.sampling_rate), plotting=arguments['plotting'],
+    #     fs=float(nspSyncAsig.sampling_rate), plotting=arguments['plotting'],
     #     thres=2.58, edgeType='both')
     # nspCrossMask = nspSrs.index.isin(nspPeakIdx)
     print('Found {} triggers'.format(nspPeakIdx.size))

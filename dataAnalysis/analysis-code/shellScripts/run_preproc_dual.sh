@@ -21,10 +21,13 @@
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=4
+#SBATCH --array=3
 
-EXP="exp201901261000"
+# EXP="exp201901261000"
 # EXP="exp202010271200"
+# EXP="exp202011161100"
+# EXP="exp202011201100"
+EXP="exp202011231200"
 
 
 module load anaconda/2020.02
@@ -33,22 +36,22 @@ conda activate
 source activate nda2
 python --version
 
-# SLURM_ARRAY_TASK_ID=2
+# SLURM_ARRAY_TASK_ID=1
 
 # init spike sorting
 # python -u ./preprocNS5.py --arrayName=utah --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --forSpikeSorting
-# python3 ./tridesclousCCV.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --arrayName=utah --sourceFileSuffix=spike_preview --removeExistingCatalog
+# python -u ./tridesclousCCV.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --arrayName=utah --sourceFileSuffix=spike_preview --remakePrb --removeExistingCatalog
 #
 # python -u ./preprocNS5.py --arrayName=nform --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --forSpikeSorting
 # python3 ./tridesclousCCV.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --arrayName=nform --sourceFileSuffix=spike_preview --remakePrb --removeExistingCatalog
 
 # get dataset to run spike extraction on
-# python -u ./preprocNS5.py --arrayName=utah --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --fullSubtractMean
+python -u ./preprocNS5.py --arrayName=utah --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --fullSubtractMean
 # python -u ./preprocNS5.py --arrayName=nform --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --fullSubtractMean
 
 # finalize dataset
 # !! maskMotorEncoder ignores all motor events outside alignTimeBounds
-python3 -u ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --arrayName=utah --fullSubtractMeanWithSpikes
+# python3 -u ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --arrayName=utah --fullSubtractMeanWithSpikes
 # python3 -u ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --arrayName=nform --fullSubtractMeanWithSpikes
 
 # python3 -u ./synchronizeNFormToNSP.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --trigRate=100

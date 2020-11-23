@@ -2090,7 +2090,7 @@ def preprocBlockToNix(
         block, writer, chunkSize,
         segInitIdx,
         equalChunks=True,
-        chunkList=None,
+        chunkList=None, chunkOffset=0,
         eventInfo=None,
         fillOverflow=False, calcAverageLFP=False,
         motorEncoderMask=None,
@@ -2184,8 +2184,8 @@ def preprocBlockToNix(
 
         segParents.update({segIdx: {}})
         for chunkIdx in chunkList:
-            tStart = chunkIdx * actualChunkSize
-            tStop = (chunkIdx + 1) * actualChunkSize
+            tStart = chunkIdx * actualChunkSize + chunkOffset
+            tStop = (chunkIdx + 1) * actualChunkSize + chunkOffset
 
             newSeg = Segment(
                     index=idx, name=seg.name,
@@ -2223,8 +2223,8 @@ def preprocBlockToNix(
             spikeSeg = seg
         #
         for chunkIdx in chunkList:
-            tStart = chunkIdx * actualChunkSize * pq.s
-            tStop = (chunkIdx + 1) * actualChunkSize * pq.s
+            tStart = chunkIdx * actualChunkSize * pq.s + chunkOffset * pq.s
+            tStop = (chunkIdx + 1) * actualChunkSize * pq.s + chunkOffset * pq.s
             print(
                 'PreprocNs5: starting chunk %d of %d' % (
                     chunkIdx + 1, nChunks))
@@ -2778,7 +2778,7 @@ def preproc(
         eventInfo=None,
         spikeSourceType='', spikePath=None,
         chunkSize=1800, equalChunks=True,
-        chunkList=None,
+        chunkList=None, chunkOffset=0,
         writeMode='rw',
         signal_group_mode='split-all', trialInfo=None,
         asigNameList=None, ainpNameList=None, nameSuffix='',
@@ -2842,7 +2842,7 @@ def preproc(
             block, writer, chunkSize,
             segInitIdx=idx,
             equalChunks=equalChunks,
-            chunkList=chunkList,
+            chunkList=chunkList, chunkOffset=chunkOffset,
             fillOverflow=fillOverflow,
             removeJumps=removeJumps,
             motorEncoderMask=motorEncoderMask,
