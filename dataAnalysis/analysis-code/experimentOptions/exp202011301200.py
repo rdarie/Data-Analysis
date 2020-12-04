@@ -35,15 +35,13 @@ def getExpOpts():
         'forceY': 'ainp15',
         }
     
-    experimentName = '202011231200-Rupert'
+    experimentName = '202011301200-Rupert'
     deviceName = 'DeviceNPC700246H'
     subjectName = 'Rupert'
 
     jsonSessionNames = {
         #  per trial
-        1: [],
-        2: ['Session1606152902407'],
-        3: ['Session1606154197535']
+        1: ['Session1606757108275', 'Session1606757559226']
         }
     synchInfo = {'nform': {}, 'nsp': {}, 'ins': {}}
     synchInfo['ins'][1] = {
@@ -118,7 +116,7 @@ def getExpOpts():
         }}
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        '202011231200-Rupert': [2],
+        '202011301200-Rupert': [2],
         }
     # Options relevant to the classifcation of proprio trials
     movementSizeBins = [0, 0.4, 0.8]

@@ -121,6 +121,8 @@ if arguments['limitPages'] is not None:
     limitPages = int(arguments['limitPages'])
 else:
     limitPages = None
+
+minNObservations = 6
 if arguments['individualTraces']:
     relplotKWArgs['estimator'] = None
     relplotKWArgs['units'] = 't'
@@ -197,7 +199,7 @@ asp.plotAsigsAligned(
     sigTestResults=sigValsWide,
     figureFolder=alignedFeaturesFolder,
     enablePlots=True,
-    minNObservations=5,
+    minNObservations = minNObservations,
     plotProcFuns=[
         asp.genTicksToScale(
             lineOpts={'lw': 2}, shared=False,

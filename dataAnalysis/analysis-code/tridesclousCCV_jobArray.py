@@ -121,7 +121,7 @@ theseFeatureOpts = {
 #      'allow_single_cluster': False}
 theseClusterOpts = {
     'method': 'agglomerative',
-    'n_clusters': 7
+    'n_clusters': 5
     }
 
 if RANK == 0:
@@ -139,11 +139,11 @@ if arguments['batchPreprocess']:
         relative_threshold=4,
         fill_overflow=False,
         highpass_freq=300.,
-        lowpass_freq=5000.,
+        lowpass_freq=3000.,
         common_ref_freq=300.,
         common_ref_removal=False,
-        notch_freq=None,
-        filter_order=4,
+        notch_freq=5700,
+        filter_order=8,
         featureOpts=theseFeatureOpts,
         clusterOpts=theseClusterOpts,
         noise_estimate_duration=300,
@@ -165,7 +165,7 @@ if arguments['batchPrepWaveforms']:
         relative_threshold=4,
         fill_overflow=False,
         highpass_freq=300.,
-        lowpass_freq=5000.,
+        lowpass_freq=3000.,
         common_ref_freq=300.,
         common_ref_removal=False,
         notch_freq=None,

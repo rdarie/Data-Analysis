@@ -26,7 +26,7 @@
 # EXP="exp202010271200"
 # EXP="exp202011161100"
 # EXP="exp202011201100"
-EXP="exp202011231200"
+EXP="exp202011271100"
 
 module load anaconda/2020.02
 . /gpfs/runtime/opt/anaconda/2020.02/etc/profile.d/conda.sh
@@ -40,6 +40,6 @@ let CHAN_START=SLURM_ARRAY_TASK_ID
 # for nform, groups of 4 for utah, groups of 5
 let CHAN_STOP=SLURM_ARRAY_TASK_ID+1
 
-python -u ./tridesclousCCV_jobArray.py --arrayName=utah --exp=$EXP --blockIdx=$BLOCKIDX --batchPreprocess --chan_start=$CHAN_START --chan_stop=$CHAN_STOP --sourceFileSuffix='spike_preview'
+python -u ./tridesclousCCV_jobArray.py --arrayName=utah --blockIdx=$BLOCKIDX --exp=$EXP --batchPreprocess --chan_start=$CHAN_START --chan_stop=$CHAN_STOP --sourceFileSuffix='spike_preview'
 python -u ./tridesclousVisualize.py --arrayName=utah --blockIdx=$BLOCKIDX --exp=$EXP  --constructor --chan_start=$CHAN_START --chan_stop=$CHAN_STOP --sourceFileSuffix='spike_preview'
 python -u ./tridesclousCCV_jobArray.py --arrayName=utah --blockIdx=$BLOCKIDX --exp=$EXP --purgePeeler --batchPeel --chan_start=$CHAN_START --chan_stop=$CHAN_STOP --sourceFileSuffix='spike_preview'

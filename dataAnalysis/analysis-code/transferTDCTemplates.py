@@ -12,7 +12,7 @@ Options:
     --arrayName=arrayName                       which electrode array to analyze [default: utah]
 """
 
-import os, pdb, glob
+import os, pdb, glob, shutil
 import tridesclous as tdc
 import dataAnalysis.helperFunctions.tridesclous_helpers as tdch
 import traceback
@@ -38,7 +38,10 @@ if triFolderSourceMeta['nameSuffix'] is not None:
     triFolderSource += '_{}'.format(triFolderSourceMeta['nameSuffix'])
 #
 prbPathCandidates = glob.glob(os.path.join(triFolderSource, '*.prb'))
-assert len(prbPathCandidates) == 1
+try:
+    assert len(prbPathCandidates) == 1
+except:
+    pdb.set_trace()
 prbPath = prbPathCandidates[0]
 #
 dataio = tdc.DataIO(dirname=triFolderSource)
@@ -68,6 +71,8 @@ for triFolderDestMeta in spikeSortingOpts[arrayName]['triFolderDest']:
     #     tdch.transferTemplates(hackSrc, hackDest, chansToAnalyze)
     #     break
     ##################
+    if os.path.exists(triFolderDest):
+        shutil.rmtree(triFolderDest)
     try:
         if arguments['fromNS5']:
             tdch.initialize_catalogueconstructor(
@@ -86,6 +91,9 @@ for triFolderDestMeta in spikeSortingOpts[arrayName]['triFolderDest']:
     except Exception:
         traceback.print_exc()
         print('Ignoring Exception')
+    allCatPaths = glob.glob(os.path.join(triFolderSource, '*', 'catalogues'))
+    for pa in sorted(allCatPaths):
+        print('{}'.format(pa))
     tdch.transferTemplates(
         triFolderSource, triFolderDest,
         chansToAnalyze)

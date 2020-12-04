@@ -160,7 +160,7 @@ def extract_waveforms_pca(
         triFolder, chan_grp=0,
         name='catalogue_constructor',
         nb_noise_snippet=2000,
-        minWaveforms=100,
+        minWaveforms=10,
         extractOpts=dict(
             mode='rand',
             n_left=-34, n_right=66, nb_max=500000,
@@ -252,7 +252,7 @@ def extract_waveforms(
         triFolder, chan_grp=0,
         name='catalogue_constructor',
         nb_noise_snippet=2000,
-        minWaveforms=100,
+        minWaveforms=10,
         extractOpts=dict(
             mode='rand',
             n_left=-34, n_right=66, nb_max=500000,
@@ -293,7 +293,7 @@ def extract_waveforms(
 def cluster(
         triFolder, chan_grp=0,
         name='catalogue_constructor',
-        minFeatures=100,
+        minFeatures=10,
         clusterOpts={
             'method': 'kmeans',
             'n_clusters': 10
@@ -308,10 +308,10 @@ def cluster(
         dataio=dataio, name=name, chan_grp=chan_grp)
     if cc.some_features is not None:
         if cc.some_features.shape[0] < minFeatures:
-            print('Not enough threshold crossings!')
+            print('Not enough threshold crossings to cluster!')
             return
     else:
-        print('Not enough threshold crossings!')
+        print('Not enough threshold crossings to cluster!')
         return
     t1 = time.perf_counter()
     cc.find_clusters(**clusterOpts)
@@ -834,7 +834,12 @@ def transferTemplates(
             triFolderDest, 'channel_group_{}'.format(chan_grp))
         catFolderDest = os.path.join(
             grpFolderDest, 'catalogues', 'initial')
-        assert os.path.exists(catFolderSource), 'source catalogue does not exist!'
+        try:
+            assert os.path.exists(catFolderSource), 'source catalogue does not exist!'
+        except Exception:
+            traceback.print_exc()
+            print('{}'.format(catFolderSource))
+            pdb.set_trace()
         assert os.path.exists(grpFolderDest), 'destination folder does not exist!'
         ccFolderSource = os.path.join(
             grpFolderSource, 'catalogue_constructor')

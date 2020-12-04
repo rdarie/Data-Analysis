@@ -26,6 +26,7 @@ if arguments['plotting']:
     sns.set_color_codes("dark")
     sns.set_context("notebook")
     sns.set_style("white")
+
 from tqdm import tqdm
 from neo.io import NixIO, nixio_fr, BlackrockIO
 import pandas as pd
@@ -47,8 +48,9 @@ globals().update(allOpts)
 
 import line_profiler
 import atexit
-#profile = line_profiler.LineProfiler()
-#atexit.register(profile.print_stats)
+
+#  profile = line_profiler.LineProfiler()
+#  atexit.register(profile.print_stats)
 
 delsysPath = os.path.join(
     nspFolder, ns5FileName + '.csv')

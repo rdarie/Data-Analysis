@@ -126,7 +126,7 @@ if arguments['limitPages'] is not None:
     limitPages = int(arguments['limitPages'])
 else:
     limitPages = None
-
+minNObservations = 6
 showNow = False
 if arguments['enableOverrides']:
     nrnRelplotKWArgs.update({
@@ -201,6 +201,7 @@ asp.plotNeuronsAligned(
     frBlock,
     limitPages=limitPages,
     showNow=showNow,
+    minNObservations=minNObservations,
     verbose=arguments['verbose'],
     loadArgs=alignedAsigsKWargs,
     sigTestResults=sigValsWide,

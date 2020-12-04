@@ -35,7 +35,7 @@ def getExpOpts():
         'forceY': 'ainp15',
         }
     
-    experimentName = '202011231200-Rupert'
+    experimentName = '202011271100-Rupert'
     deviceName = 'DeviceNPC700246H'
     subjectName = 'Rupert'
 
@@ -118,7 +118,7 @@ def getExpOpts():
         }}
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        '202011231200-Rupert': [2],
+        '202011271100-Rupert': [2],
         }
     # Options relevant to the classifcation of proprio trials
     movementSizeBins = [0, 0.4, 0.8]

@@ -37,14 +37,15 @@ python --version
 # EXP="exp202010271200"
 # EXP="exp202011161100"
 # EXP="exp202011201100"
-EXP="exp202011231200"
+# EXP="exp202011231200"
+# EXP="exp202011271100"
+EXP="exp202011301200"
 
 BLOCKSELECTOR=""
-
-SLURM_ARRAY_TASK_ID=2
+SLURM_ARRAY_TASK_ID=1
 
 python3 -u './previewNSPTapTimes.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --usedTENSPulses
-
+#
 # python3 -u './synchronizeINStoNSP.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP $BLOCKSELECTOR --curateManually --usedTENSPulses --plotting
 # python3 -u './synchronizeINStoNSP.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP $BLOCKSELECTOR --curateManually --usedTENSPulses --plotting
 # python3 -u './synchronizeINStoNSP.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP $BLOCKSELECTOR --curateManually |& tee "../../batch_logs/${EXP}_Block_${SLURM_ARRAY_TASK_ID}_synch_ins"
