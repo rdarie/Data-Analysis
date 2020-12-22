@@ -2299,7 +2299,8 @@ def preprocBlockToNix(
             nLfpAsigs = len(lfpAsigList)
             if LFPFilterOpts is not None:
                 def filterFun(sig, filterCoeffs=None):
-                    sig[:] = signal.sosfiltfilt(
+                    # sig[:] = signal.sosfiltfilt(
+                    sig[:] = signal.sosfilt(
                         filterCoeffs, sig.magnitude.flatten())[:, np.newaxis] * sig.units
                     return sig
                 filterCoeffs = hf.makeFilterCoeffsSOS(
@@ -2483,7 +2484,8 @@ def preprocBlockToNix(
                             '''
                         # filter the traces, if needed
                         if LFPFilterOpts is not None:
-                            tempLFPStore.loc[:, columnsForThisGroup] = signal.sosfiltfilt(
+                            # tempLFPStore.loc[:, columnsForThisGroup] = signal.sosfiltfilt(
+                            tempLFPStore.loc[:, columnsForThisGroup] = signal.sosfilt(
                                 filterCoeffs, tempLFPStore.loc[:, columnsForThisGroup], axis=0)
                             if plotDevFilterDebug:
                                 ddfAx3[subListIdx].plot(
@@ -2502,7 +2504,8 @@ def preprocBlockToNix(
                             .loc[:, columnsForThisGroup]
                             .sum(axis=1)
                             )
-                        smoothedDeviation = signal.sosfiltfilt(
+                        # smoothedDeviation = signal.sosfiltfilt(
+                        smoothedDeviation = signal.sosfilt(
                             filterCoeffsOutlierMask, lfpDeviation[:, subListIdx])
                         ##
                         if plotDevFilterDebug:
@@ -2585,7 +2588,8 @@ def preprocBlockToNix(
                 temp = np.pad(
                     dummyAsig.magnitude.flatten(),
                     (lDef, rDef), mode='constant')
-                lineNoise = signal.sosfiltfilt(
+                # lineNoise = signal.sosfiltfilt(
+                lineNoise = signal.sosfilt(
                     noiseSos, temp, axis=0)
                 lineNoiseH = signal.hilbert(lineNoise)
                 lineNoise = lineNoise[lDef:-rDef]

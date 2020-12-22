@@ -151,7 +151,8 @@ def preprocNS5():
             ainpNameList=spikeSortingOpts[arrayName]['ainpNameList'],
             spikeSourceType='tdc', writeMode='ow',
             chunkSize=chunkSize, equalChunks=equalChunks, chunkList=chunkList,
-            calcRigEvents=False)    #
+            calcRigEvents=False)
+    #
     if arguments['forSpikeSorting']:
         reader = ns5.preproc(
             fileName=ns5FileName,
@@ -210,7 +211,6 @@ def preprocNS5():
             fileName=ns5FileName,
             rawFolderPath=nspFolder,
             outputFolderPath=scratchFolder, mapDF=mapDF,
-            # swapMaps=None,
             fillOverflow=False, removeJumps=False,
             interpolateOutliers=spikeSortingOpts[arrayName]['interpolateOutliers'],
             outlierThreshold=spikeSortingOpts[arrayName]['outlierThreshold'],
@@ -220,9 +220,10 @@ def preprocNS5():
             eventInfo=trialFilesFrom['utah']['eventInfo'],
             asigNameList=spikeSortingOpts[arrayName]['asigNameList'],
             ainpNameList=spikeSortingOpts[arrayName]['ainpNameList'],
-            LFPFilterOpts=spikeSortingFilterOpts,
+            spikeSourceType='',
             removeMeanAcross=True,
             nameSuffix='_mean_subtracted',
+            LFPFilterOpts=spikeSortingFilterOpts,
             #
             writeMode='ow',
             chunkSize=chunkSize, equalChunks=equalChunks, chunkList=chunkList,

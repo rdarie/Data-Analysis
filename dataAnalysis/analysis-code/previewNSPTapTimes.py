@@ -159,17 +159,21 @@ for asigP in nspBlock.segments[segIdx].analogsignals:
     chName = asigP.channel_index.name
     if 'ainp' not in chName:
         print('    Loading {}'.format(chName))
-        tempAsig = asigP.load(time_slice=[0 * pq.s, 600 * pq.s])
+        lastT = min((spikeSortingOpts['utah']['previewOffset'] + spikeSortingOpts['utah']['previewDuration']) * pq.s,  asigP.t_stop)
+        firstT = max(spikeSortingOpts['utah']['previewOffset'] * pq.s,  asigP.t_start)
+        tempAsig = asigP.load(time_slice=[firstT, lastT])
         sigLims = np.quantile(
             tempAsig, [
                 (1 - targetQuantile) / 2,
                 (1 + targetQuantile) / 2
                 ])
-        summaryText += (
-            '{}: {:.1f} uV to {:.1f} uV <br />\n'
+        thisTextRow = (
+            '{}: {:.1f} uV to {:.1f} uV <br>\n'
             .format(chName, sigLims[0], sigLims[1]))
         if (sigLims[0] < -1 * problemThreshold) and (sigLims[1] > problemThreshold):
             problemChannelsList.append(chName)
+            thisTextRow = '<b>' + thisTextRow.replace('<br>', '</b><br>')
+        summaryText += thisTextRow
 summaryText += ('</p>\n<h3>List view: </h3>\n')
 summaryText += '{}\n'.format(problemChannelsList)
 approxTimesPath = os.path.join(

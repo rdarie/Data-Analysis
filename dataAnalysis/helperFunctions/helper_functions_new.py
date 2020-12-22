@@ -383,7 +383,8 @@ def filterDF(
     filteredDF = pd.DataFrame(df[columns])
     for column in filteredDF.columns:
         filteredDF.loc[:, column] = (
-            signal.sosfiltfilt(sos, filteredDF[column].to_numpy()))
+            # signal.sosfiltfilt(sos, filteredDF[column].to_numpy()))
+            signal.sosfilt(sos, filteredDF[column].to_numpy()))
     if passedSeries:
         filteredDF = filteredDF['temp']
     return filteredDF

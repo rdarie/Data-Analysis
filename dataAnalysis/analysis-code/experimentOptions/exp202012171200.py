@@ -4,6 +4,7 @@ def getExpOpts():
     blockExperimentTypeLookup = {
         1: 'proprio',
         2: 'proprio',
+        3: 'proprio',
         }
     fullRigInputs = {
         'A+': 'ainp12',
@@ -64,6 +65,8 @@ def getExpOpts():
     jsonSessionNames = {
         #  per trial
         1: [],
+        2: [],
+        3: [],
         }
     synchInfo = {'nform': {}, 'nsp': {}, 'ins': {}}
     # populate with defaults
@@ -173,36 +176,12 @@ def getExpOpts():
             'previewDuration': 400,
             'previewOffset': 0,
             'interpolateOutliers': True,
-            'outlierThreshold': .999,
-            'triFolderSource': {
-                'exp': experimentName, 'block': 2,
-                'nameSuffix': 'spike_preview'},
-            'triFolderDest': [
-                {
-                    'exp': experimentName, 'block': i,
-                    'nameSuffix': 'mean_subtracted'}
-                for i in [1, 2, 3]]
-        },
-        'nform': {
-            'asigNameList': [
-                [
-                    'nform_{:02d}'.format(i)
-                    for i in range(33, 65)
-                    if i not in [52, 59]]
-                ],
-            'ainpNameList': ['analog 1'],
-            'electrodeMapPath': './NForm_Rupert_flat_1port_secondHalf.map',
-            'rawBlockName': 'nform',
-            'excludeChans': ['nform_52', 'nform_59'],
-            'prbOpts': dict(
-                contactSpacing=500,
-                groupIn={
-                    'xcoords': np.arange(-.1, 18.1, 1),
-                    'ycoords': np.arange(-.1, 5.1, 1)}),
-            'previewDuration': 600,
-            'previewOffset': 0,
-            'interpolateOutliers': True,
-            'outlierThreshold': 1,
+            'outlierThreshold': 1 - 1e-6,
+            'shape_distance_threshold': None,
+            'shape_boundary_threshold': None,
+            'energy_reduction_threshold': 0.5,
+            'confidence_threshold': 0.5,
+            'refractory_period': None,
             'triFolderSource': {
                 'exp': experimentName, 'block': 2,
                 'nameSuffix': 'spike_preview'},

@@ -31,8 +31,8 @@
 # EXP="exp202012101100"
 # EXP="exp202012111100"
 # EXP="exp202012121100"
-# EXP="exp202012171200"
-EXP="exp202012181200"
+EXP="exp202012171200"
+# EXP="exp202012181200"
 
 module load anaconda/2020.02
 . /gpfs/runtime/opt/anaconda/2020.02/etc/profile.d/conda.sh
@@ -40,7 +40,7 @@ conda activate
 source activate nda2
 python --version
 
-SLURM_ARRAY_TASK_ID=1
+SLURM_ARRAY_TASK_ID=2
 
 ########################################################################################################################################################################################################################
 

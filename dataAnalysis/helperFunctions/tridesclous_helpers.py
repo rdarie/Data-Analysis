@@ -350,17 +350,20 @@ def open_cataloguewindow(
     #
     openWindow = True
     if minTotalWaveforms is not None:
-        if cc.all_peaks.shape[0] < minTotalWaveforms:
+        # negative labels are reserved for "special" use, such as trash or alien
+        mask = cc.all_peaks['cluster_label'] >= 0
+        if mask.sum() < minTotalWaveforms:
             openWindow = False
-            cc.move_cluster_to_trash(list(cc.cluster_labels))
+            cc.all_peaks['cluster_label'][mask] = -1
+            cc.on_new_cluster()
     if openWindow:
         app = pg.mkQApp()
         win = tdc.CatalogueWindow(cc)
         win.show()
         #
         app.exec_()
-        #  re order by rms
-        cc.order_clusters(by='waveforms_rms')
+    #  re order by rms
+    cc.order_clusters(by='waveforms_rms')
     #  save catalogue before peeler
     cc.make_catalogue_for_peeler()
     return
@@ -368,7 +371,8 @@ def open_cataloguewindow(
 
 def clean_catalogue(
         triFolder,
-        name='catalogue_constructor', min_nb_peak=10, chan_grp=0):
+        name='catalogue_constructor',
+        min_nb_peak=10, chan_grp=0):
     #  the catalogue need strong attention with teh catalogue windows.
     #  here a dirty way a cleaning is to take on the first 20 bigger cells
     #  the peeler will only detect them

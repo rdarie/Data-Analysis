@@ -49,7 +49,9 @@
 # EXP="exp202010271200"
 # EXP="exp202011231200"
 EXP="exp202012181200"
-BLOCKIDX="1"
+EXP="exp202012171200"
+
+BLOCKIDX=2
 
 module load anaconda/2020.02
 . /gpfs/runtime/opt/anaconda/2020.02/etc/profile.d/conda.sh
@@ -62,7 +64,7 @@ python --version
 # python ./tridesclousCCV_jobArray.py --blockIdx=$BLOCKIDX --exp=$EXP --batchPreprocess --chan_start=0 --chan_stop=50 --arrayName=utah --sourceFileSuffix='spike_preview' --remakePrb
 
 # Step 2: Validate the constructor
-python -u ./tridesclousVisualize.py --arrayName=utah --blockIdx=$BLOCKIDX --exp=$EXP --constructor --chan_start=66 --chan_stop=67 --sourceFileSuffix='spike_preview'
+python -u ./tridesclousVisualize.py --arrayName=utah --blockIdx=$BLOCKIDX --exp=$EXP --constructor --chan_start=2 --chan_stop=3 --sourceFileSuffix='spike_preview'
 
 # Step 3: Transfer the templates
 # python ./transferTDCTemplates.py --arrayName=utah --exp=$EXP --chan_start=0 --chan_stop=96

@@ -9,95 +9,71 @@ Options:
     --blockIdx=blockIdx                         which trial to analyze [default: 1]
     --arrayName=arrayName                       which electrode array to analyze [default: utah]
     --sourceFileSuffix=sourceFileSuffix         which source file to analyze
-    --fromNS5                                   make from raw ns5 file? [default: False]
-    --attemptMPI                                whether to try to load MPI [default: False]
     --remakePrb                                 whether to try to load MPI [default: False]
-    --removeExistingCatalog                     delete previous sort results [default: False]
     --purgePeeler                               delete previous sort results [default: False]
     --purgePeelerDiagnostics                    delete previous sort results [default: False]
-    --batchPreprocess                           extract snippets and features, run clustering [default: False]
     --batchPrepWaveforms                        extract snippets [default: False]
     --batchRunClustering                        extract features, run clustering [default: False]
+    --batchPreprocess                           extract snippets and features, run clustering [default: False]
     --batchPeel                                 run peeler [default: False]
+    --removeExistingCatalog                     delete previous sort results [default: False]
+    --initCatalogConstructor                    whether to init a catalogue constructor [default: False]
+    --fromNS5                                   save peeler results to a neo block [default: False]
     --makeCoarseNeoBlock                        save peeler results to a neo block [default: False]
     --makeStrictNeoBlock                        save peeler results to a neo block [default: False]
+    --overrideSpikeSource                       save peeler results to a neo block [default: False]
     --exportSpikesCSV                           save peeler results to a csv file [default: False]
     --chan_start=chan_start                     which chan_grp to start on [default: 0]
-    --chan_stop=chan_stop                       which chan_grp to stop on [default: 47]
+    --chan_stop=chan_stop                       which chan_grp to stop on [default: 96]
 """
 
 from docopt import docopt
+arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
+
+import tensorflow as tf
 import tridesclous as tdc
 import dataAnalysis.helperFunctions.tridesclous_helpers as tdch
 import dataAnalysis.helperFunctions.probe_metadata as prb_meta
 import os, gc, traceback, re
 import pdb
+import matplotlib
 from numba.core.errors import NumbaPerformanceWarning, NumbaDeprecationWarning, NumbaPendingDeprecationWarning
 import warnings
 #
+matplotlib.use('PS')   # generate postscript output
 warnings.simplefilter('ignore', category=NumbaPerformanceWarning)
 warnings.simplefilter('ignore', category=NumbaDeprecationWarning)
 #
+from currentExperiment import parseAnalysisOptions
+expOpts, allOpts = parseAnalysisOptions(
+    int(arguments['blockIdx']),
+    arguments['exp'])
+globals().update(expOpts)
+globals().update(allOpts)
 
-arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
-chan_start = int(arguments['chan_start'])
-chan_stop = int(arguments['chan_stop'])
 
-try:
-    if not arguments['attemptMPI']:
-        raise(Exception('MPI aborted by cmd line argument'))
-    from mpi4py import MPI
-    COMM = MPI.COMM_WORLD
-    SIZE = COMM.Get_size()
-    RANK = COMM.Get_rank()
-    HAS_MPI = True
-except Exception:
-    traceback.print_exc()
+SLURM_ARRAY_TASK_ID = os.environ.get('SLURM_ARRAY_TASK_ID')
+if SLURM_ARRAY_TASK_ID is not None:
+    RANK = int(SLURM_ARRAY_TASK_ID)
+else:
     RANK = 0
-    SIZE = 1
-    HAS_MPI = False
 
+arrayName = arguments['arrayName']
+if 'rawBlockName' in spikeSortingOpts[arrayName]:
+    ns5FileName = ns5FileName.replace(
+        'Block', spikeSortingOpts[arrayName]['rawBlockName'])
+    triFolder = os.path.join(
+        scratchFolder, 'tdc_{}{:0>3}'.format(
+            spikeSortingOpts[arrayName]['rawBlockName'], blockIdx))
+else:
+    triFolder = os.path.join(
+        scratchFolder, 'tdc_Block{:0>3}'.format(blockIdx))
+if arguments['sourceFileSuffix'] is not None:
+    triFolder = triFolder + '_{}'.format(arguments['sourceFileSuffix'])
+spikeSortingOpts[arrayName]['remakePrb'] = arguments['remakePrb']
 
-if RANK == 0:
-    from currentExperiment import parseAnalysisOptions
-    expOpts, allOpts = parseAnalysisOptions(
-        int(arguments['blockIdx']),
-        arguments['exp'])
-    globals().update(expOpts)
-    globals().update(allOpts)
-    arrayName = arguments['arrayName']
+if arguments['initCatalogConstructor'] and RANK == 0:
     try:
-        if 'rawBlockName' in spikeSortingOpts[arrayName]:
-            ns5FileName = ns5FileName.replace(
-                'Block', spikeSortingOpts[arrayName]['rawBlockName'])
-            triFolder = os.path.join(
-                scratchFolder, 'tdc_{}{:0>3}'.format(
-                    spikeSortingOpts[arrayName]['rawBlockName'], blockIdx))
-        else:
-            triFolder = os.path.join(
-                scratchFolder, 'tdc_Block{:0>3}'.format(blockIdx))
-        if arguments['sourceFileSuffix'] is not None:
-            triFolder = triFolder + '_{}'.format(arguments['sourceFileSuffix'])
-        #
-        spikeSortingOpts[arrayName]['remakePrb'] = arguments['remakePrb']
-        #####
-        overrideSpikeSource = True
-        if overrideSpikeSource:
-            altDataIOInfo = {
-                'datasource_type': 'NIX',
-                'datasource_kargs': {
-                    'filenames': [
-                        os.path.join(
-                            scratchFolder,
-                            ns5FileName + '_spike_preview_unfiltered.nix')
-                    ]
-                }}
-            waveformSignalType = 'initial'
-        else:
-            altDataIOInfo = None
-            waveformSignalType = 'processed'
-        ##
-        ###
         if arguments['fromNS5']:
             tdch.initialize_catalogueconstructor(
                 nspFolder,
@@ -108,7 +84,9 @@ if RANK == 0:
                 fileFormat='Blackrock')
         else:
             if arguments['sourceFileSuffix'] is not None:
-                ns5FileName = ns5FileName + '_{}'.format(arguments['sourceFileSuffix'])
+                ns5FileName = (
+                    ns5FileName +
+                    '_{}'.format(arguments['sourceFileSuffix']))
             tdch.initialize_catalogueconstructor(
                 scratchFolder,
                 ns5FileName,
@@ -119,20 +97,65 @@ if RANK == 0:
     except Exception:
         traceback.print_exc()
         print('Ignoring Exception')
-else:
-    ns5FileName = None
-    nspFolder = None
-    nspPrbPath = None
-    triFolder = None
-    spikeWindow = None
+chan_start = int(arguments['chan_start'])
+chan_stop = int(arguments['chan_stop'])
+#
+dataio = tdc.DataIO(dirname=triFolder)
+chansToAnalyze = sorted(list(dataio.channel_groups.keys()))[chan_start:chan_stop]
+print('Analyzing channels:\n{}'.format(chansToAnalyze))
 
-if HAS_MPI:
-    COMM.Barrier()  # sync MPI threads, waith for 0
-    ns5FileName = COMM.bcast(ns5FileName, root=0)
-    nspFolder = COMM.bcast(nspFolder, root=0)
-    nspPrbPath = COMM.bcast(nspPrbPath, root=0)
-    triFolder = COMM.bcast(triFolder, root=0)
-    spikeWindow = COMM.bcast(spikeWindow, root=0)
+theseExtractOpts = dict(
+    mode='rand',
+    n_left=spikeWindow[0] - 2,
+    n_right=spikeWindow[1] + 2,
+    nb_max=9000,
+    align_waveform=False)
+#
+callbacks = [
+    tf.keras.callbacks.EarlyStopping(
+        # Stop training when `loss` is no longer improving
+        monitor="loss",
+        # "no longer improving" being defined as "no better than 1e-2 less"
+        min_delta=5e-3,
+        # "no longer improving" being further defined as "for at least 2 epochs"
+        patience=2,
+        verbose=1,
+    )
+]
+#
+theseFeatureOpts = {
+    'method': 'global_pumap',
+    'n_components': 5,
+    'n_neighbors': 50,
+    'min_dist': 0,
+    'metric': 'euclidean',
+    'set_op_mix_ratio': 0.9,
+    'parametric_reconstruction': False,
+    'autoencoder_loss': False,
+    'verbose': False,
+    'batch_size': 10000,
+    'n_training_epochs': 15,
+    'keras_fit_kwargs': {'verbose': 2, 'callbacks': callbacks}
+}
+#
+theseClusterOpts = {
+    'method': 'agglomerative',
+    'n_clusters': 2
+    }
+#
+thesePreprocOpts = dict(
+    relative_threshold=3.5,
+    fill_overflow=False,
+    highpass_freq=200.,
+    lowpass_freq=6000.,
+    common_ref_freq=None,
+    common_ref_removal=False,
+    notch_freq=None,
+    filter_order=2,
+    noise_estimate_duration=spikeSortingOpts[arrayName]['previewDuration'],
+    sample_snippet_duration=spikeSortingOpts[arrayName]['previewDuration'],
+    chunksize=2**22
+    )
 
 if RANK == 0:
     if arguments['purgePeeler']:
@@ -142,142 +165,62 @@ if RANK == 0:
     if arguments['purgePeelerDiagnostics']:
         tdch.purgePeelerResults(
             triFolder, diagnosticsOnly=True, purgeAll=True)
-    dataio = tdc.DataIO(dirname=triFolder, altInfo=altDataIOInfo)
-    # TODO: automatically find ephys channels based on name
-    chansToAnalyze = sorted(list(dataio.channel_groups.keys()))[chan_start:chan_stop]
-    print('Analyzing channels:\n{}'.format(chansToAnalyze))
-else:
-    chansToAnalyze = None
-
-if HAS_MPI:
-    COMM.Barrier()  # sync MPI threads, waith for 0 to gather chansToAnalyze
-    chansToAnalyze = COMM.bcast(chansToAnalyze, root=0)
-
-'''
-chansToAnalyze = [
-    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
-    11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
-    21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
-    31, 32, 33, 34, 35, 36, 37, 38, 39, 40,
-    41, 42, 43, 44, 45, 46, 47, 48, 49, 50,
-    51, 52, 53, 54, 55, 56, 57, 58, 59, 60,
-    61, 62, 63, 64, 65, 66, 67, 68, 69, 70,
-    71, 72, 73, 74, 75, 76, 77, 78, 79, 80,
-    81, 82, 83, 84, 85, 86, 87, 88, 89,
-    90, 91, 92, 93, 94, 95]
-'''
-
-# chansToAnalyze = [66, 71]
 
 if arguments['batchPreprocess']:
     tdch.batchPreprocess(
         triFolder, chansToAnalyze,
-        relative_threshold=3.5,
-        fill_overflow=False,
-        highpass_freq=300.,
-        lowpass_freq=5000.,
-        common_ref_freq=300.,
-        common_ref_removal=False,
-        notch_freq=None,
-        filter_order=3,
-        # featureOpts={
-        #     'method': 'global_pca',
-        #     'n_components': 5
-        # },
-        # featureOpts={
-        #     'method': 'global_umap',
-        #     'n_components': 4,
-        #     'n_neighbors': 75,
-        #     'min_dist': 0,
-        #     'metric': 'euclidean',
-        #     'set_op_mix_ratio': 0.9,
-        #     'init': 'spectral',
-        #     'n_epochs': 1000,
-        # },
-        featureOpts={
-            'method': 'global_pumap',
-            'n_components': 4,
-            'n_neighbors': 75,
-            'min_dist': 0,
-            'metric': 'euclidean',
-            'set_op_mix_ratio': 0.9,
-            'init': 'spectral',
-            'n_epochs': 1000,
-            'parametric_reconstruction': True,
-            'autoencoder_loss': True,
-            'verbose': False
-        },
-        clusterOpts={
-            'method': 'hdbscan',
-            'min_cluster_size': 100,
-            'min_samples': 75,
-            'allow_single_cluster': True},
-        noise_estimate_duration=300,
-        sample_snippet_duration=300,
-        chunksize=2**18,
-        extractOpts=dict(
-            mode='rand',
-            n_left=spikeWindow[0] - 2,
-            n_right=spikeWindow[1] + 2,
-            nb_max=32000, align_waveform=False),
+        nb_noise_snippet=1000,
+        minWaveformRate=None,
+        minWaveforms=10,
+        alien_value_threshold=100.,
+        extractOpts=theseExtractOpts,
+        featureOpts=theseFeatureOpts,
+        clusterOpts=theseClusterOpts,
         autoMerge=False, auto_merge_threshold=0.99,
-        attemptMPI=HAS_MPI)
-
-if arguments['batchPrepWaveforms']:
-    tdch.batchPrepWaveforms(
-        triFolder, chansToAnalyze,
-        relative_threshold=3.5,
-        fill_overflow=False,
-        highpass_freq=300.,
-        lowpass_freq=5000.,
-        common_ref_freq=300.,
-        common_ref_removal=False,
-        notch_freq=None,
-        filter_order=3,
-        noise_estimate_duration=300,
-        sample_snippet_duration=300,
-        chunksize=2**18,
-        extractOpts=dict(
-            mode='rand',
-            n_left=spikeWindow[0] - 2,
-            n_right=spikeWindow[1] + 2,
-            nb_max=32000, align_waveform=False),
-        attemptMPI=HAS_MPI)
+        **thesePreprocOpts)
 
 if arguments['batchRunClustering']:
     tdch.batchRunClustering(
         triFolder, chansToAnalyze,
-        featureOpts={
-            'method': 'global_pumap',
-            'n_components': 4,
-            'n_neighbors': 75,
-            'min_dist': 1e-3,
-            'metric': 'euclidean',
-            'set_op_mix_ratio': 0.9,
-            'parametric_reconstruction': False,
-            'autoencoder_loss': False,
-            'verbose': False,
-            'keras_fit_kwargs': {}
-        },
-        clusterOpts={
-            'method': 'hdbscan',
-            'min_cluster_size': 100,
-            'min_samples': 50,
-            'allow_single_cluster': True},
+        featureOpts=theseFeatureOpts,
+        clusterOpts=theseClusterOpts,
         autoMerge=False, auto_merge_threshold=0.99)
+
+if arguments['batchPrepWaveforms']:
+    tdch.batchPrepWaveforms(
+        triFolder, chansToAnalyze,
+        featureOpts=theseFeatureOpts,
+        clusterOpts=theseClusterOpts,
+        extractOpts=theseExtractOpts,
+        **thesePreprocOpts
+        )
 
 if arguments['batchPeel']:
     tdch.batchPeel(
         triFolder, chansToAnalyze,
-        shape_boundary_threshold=3,
-        confidence_threshold=0.65,
-        shape_distance_threshold=2, attemptMPI=HAS_MPI)
+        chunksize=2**22,
+        shape_distance_threshold=spikeSortingOpts[arrayName]['shape_distance_threshold'],
+        shape_boundary_threshold=spikeSortingOpts[arrayName]['shape_boundary_threshold'],
+        confidence_threshold=spikeSortingOpts[arrayName]['confidence_threshold'],
+        energy_reduction_threshold=spikeSortingOpts[arrayName]['energy_reduction_threshold'],
+        )
 
-if HAS_MPI:
-    COMM.Barrier()  # wait until all threads finish sorting
 
-if arguments['exportSpikesCSV'] and RANK == 0:
-    tdch.export_spikes_after_peeler(triFolder)
+if arguments['overrideSpikeSource']:
+    altDataIOInfo = {
+        'datasource_type': 'NIX',
+        'datasource_kargs': {
+            'filenames': [
+                os.path.join(
+                    scratchFolder,
+                    ns5FileName + '_spike_preview_unfiltered.nix')
+            ]
+        }}
+    waveformSignalType = 'initial'
+else:
+    altDataIOInfo = None
+    waveformSignalType = 'processed'
+
 
 if arguments['makeCoarseNeoBlock'] and RANK == 0:
     tdch.purgeNeoBlock(triFolder)
@@ -297,3 +240,23 @@ if arguments['makeStrictNeoBlock'] and RANK == 0:
         ignoreTags=['so_bad'], altDataIOInfo=altDataIOInfo,
         waveformSignalType=waveformSignalType,
         )
+
+# featureOpts={
+#     'method': 'global_pca',
+#     'n_components': 5
+# },
+# featureOpts={
+#     'method': 'global_umap',
+#     'n_components': 4,
+#     'n_neighbors': 75,
+#     'min_dist': 0,
+#     'metric': 'euclidean',
+#     'set_op_mix_ratio': 0.9,
+#     'init': 'spectral',
+#     'n_epochs': 1000,
+# },
+#  theseClusterOpts = {
+#      'method': 'hdbscan',
+#      'min_cluster_size': 100,
+#      'min_samples': 50,
+#      'allow_single_cluster': False}
