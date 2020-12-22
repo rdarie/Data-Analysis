@@ -23,7 +23,7 @@ def getLatestImpedance(
     return impedances
 
 
-def cmpToDF(arrayFilePath):
+def cmpToDF(arrayFilePath, lgaMapFilePath=None):
     arrayMap = pd.read_csv(
         arrayFilePath, sep='\t',
         skiprows=13)
@@ -43,14 +43,29 @@ def cmpToDF(arrayFilePath):
         cmpDF.loc[nevIdx, 'elecID'] = elecIdx
         cmpDF.loc[nevIdx, 'nevID'] = nevIdx
         cmpDF.loc[nevIdx, 'elecName'] = elecName
-        cmpDF.loc[nevIdx, 'xcoords'] = row['row']
-        cmpDF.loc[nevIdx, 'ycoords'] = row['//col']
+        cmpDF.loc[nevIdx, 'ycoords'] = int(row['row'])
+        cmpDF.loc[nevIdx, 'xcoords'] = int(row['//col'])
         cmpDF.loc[nevIdx, 'zcoords'] = 0
         cmpDF.loc[nevIdx, 'label'] = row['label']
         cmpDF.loc[nevIdx, 'bank'] = row['bank']
         cmpDF.loc[nevIdx, 'bankID'] = int(row['elec'])
     cmpDF.dropna(inplace=True)
     cmpDF.reset_index(drop=True, inplace=True)
+    if lgaMapFilePath is not None:
+        cmpDF['lgaXCoords'] = np.nan
+        cmpDF['lgaYCoords'] = np.nan
+        lgaMapDF = pd.read_csv(lgaMapFilePath, header=None)
+        for lgaX in lgaMapDF.columns:
+            for lgaY in lgaMapDF.index:
+                if isinstance(lgaMapDF.loc[lgaY, lgaX], str):
+                    lgaBank = lgaMapDF.loc[lgaY, lgaX][0]
+                    lgaChan = float(lgaMapDF.loc[lgaY, lgaX][1:])
+                    matchMask = (cmpDF['bank'] == lgaBank) & (cmpDF['bankID'] == lgaChan)
+                    if matchMask.any():
+                        assert matchMask.sum() == 1
+                        cmpDF.loc[matchMask, 'lgaXCoords'] = lgaX
+                        cmpDF.loc[matchMask, 'lgaYCoords'] = lgaY
+    # pdb.set_trace()
     return cmpDF
 
 

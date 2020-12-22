@@ -39,7 +39,7 @@ electrodeMapPath = spikeSortingOpts[arrayName]['electrodeMapPath']
 mapExt = electrodeMapPath.split('.')[-1]
 
 if mapExt == 'cmp':
-    cmpDF = prb_meta.cmpToDF(electrodeMapPath)
+    cmpDF = prb_meta.cmpToDF(electrodeMapPath, lgaMapFilePath='./lga_to_banks_lookup.csv')
 elif mapExt == 'map':
     cmpDF = prb_meta.mapToDF(electrodeMapPath)
 
@@ -97,4 +97,11 @@ ssplt.spikePDFReport(
     spikes, spikeStruct,
     arrayName='utah', arrayInfo=trialFilesFrom['utah'],
     rasterOpts=rasterOpts, plotOpts=plotOpts,
+    plotSpikePanelOpts={
+        'hideUnused': False,
+        # 'useLGACoords': True,
+        # 'coordsToIndicesOpts': {},
+        'useLGACoords': False,
+        'coordsToIndicesOpts': {'reverseY': True},
+        },
     trialStats=None, newReportName=reportName, colorByAmpBank=True)

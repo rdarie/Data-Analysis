@@ -47,7 +47,8 @@
 # EXP="exp202009301100"
 # EXP="exp202010011100"
 # EXP="exp202010271200"
-EXP="exp202011231200"
+# EXP="exp202011231200"
+EXP="exp202012181200"
 BLOCKIDX="1"
 
 module load anaconda/2020.02
@@ -57,11 +58,11 @@ source activate nda2
 python --version
 
 # Step 1: Constructor
-python ./tridesclousCCV_jobArray.py --blockIdx=$BLOCKIDX --exp=$EXP --batchPreprocess --chan_start=66 --chan_stop=67 --arrayName=utah --sourceFileSuffix='spike_preview'
+# python ./tridesclousCCV_jobArray.py --blockIdx=$BLOCKIDX --exp=$EXP --batchPreprocess --chan_start=66 --chan_stop=67 --arrayName=utah --sourceFileSuffix='spike_preview'
 # python ./tridesclousCCV_jobArray.py --blockIdx=$BLOCKIDX --exp=$EXP --batchPreprocess --chan_start=0 --chan_stop=50 --arrayName=utah --sourceFileSuffix='spike_preview' --remakePrb
 
 # Step 2: Validate the constructor
-python -u ./tridesclousVisualize.py --arrayName=utah --blockIdx=$BLOCKIDX --exp=$EXP  --constructor --chan_start=66 --chan_stop=67 --sourceFileSuffix='spike_preview'
+python -u ./tridesclousVisualize.py --arrayName=utah --blockIdx=$BLOCKIDX --exp=$EXP --constructor --chan_start=66 --chan_stop=67 --sourceFileSuffix='spike_preview'
 
 # Step 3: Transfer the templates
 # python ./transferTDCTemplates.py --arrayName=utah --exp=$EXP --chan_start=0 --chan_stop=96

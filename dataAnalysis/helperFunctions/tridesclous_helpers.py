@@ -161,6 +161,7 @@ def extract_waveforms_pca(
         name='catalogue_constructor',
         nb_noise_snippet=2000,
         minWaveforms=10,
+        alien_value_threshold=150.,
         extractOpts=dict(
             mode='rand',
             n_left=-34, n_right=66, nb_max=500000,
@@ -182,7 +183,7 @@ def extract_waveforms_pca(
     print('extract_some_waveforms took {} seconds'.format(t2-t1))
     t1 = time.perf_counter()
     cc.clean_waveforms(
-        alien_value_threshold=100.)
+        alien_value_threshold=alien_value_threshold)
     t2 = time.perf_counter()
     print('clean_waveforms took {} seconds'.format(t2-t1))
     if cc.some_waveforms is not None:
@@ -301,7 +302,7 @@ def cluster(
         autoMerge=False,
         auto_merge_threshold=0.9,
         minClusterSize=5,
-        auto_make_catalog=True):
+        auto_make_catalog=False):
 
     dataio = tdc.DataIO(dirname=triFolder)
     cc = tdc.CatalogueConstructor(
@@ -328,8 +329,11 @@ def cluster(
             print('auto_merge took {} seconds'.format(t2-t1))
         except Exception:
             traceback.print_exc()
+    #
+    # TODO Fix moving small clusters to trash
+    # cc.move_small_cluster_to_trash(n=minClusterSize)
+    #
     cc.order_clusters(by='waveforms_rms')
-    cc.trash_small_cluster(n=minClusterSize)
     print(cc)
     if auto_make_catalog:
         cc.make_catalogue_for_peeler()
@@ -338,18 +342,25 @@ def cluster(
 
 def open_cataloguewindow(
         triFolder, chan_grp=0,
-        name='catalogue_constructor'):
+        name='catalogue_constructor',
+        minTotalWaveforms=None):
     dataio = tdc.DataIO(dirname=triFolder)
     cc = tdc.CatalogueConstructor(
         dataio=dataio, name=name, chan_grp=chan_grp)
     #
-    app = pg.mkQApp()
-    win = tdc.CatalogueWindow(cc)
-    win.show()
-    #
-    app.exec_()
-    #  re order by rms
-    cc.order_clusters(by='waveforms_rms')
+    openWindow = True
+    if minTotalWaveforms is not None:
+        if cc.all_peaks.shape[0] < minTotalWaveforms:
+            openWindow = False
+            cc.move_cluster_to_trash(list(cc.cluster_labels))
+    if openWindow:
+        app = pg.mkQApp()
+        win = tdc.CatalogueWindow(cc)
+        win.show()
+        #
+        app.exec_()
+        #  re order by rms
+        cc.order_clusters(by='waveforms_rms')
     #  save catalogue before peeler
     cc.make_catalogue_for_peeler()
     return
@@ -441,10 +452,15 @@ def neo_block_after_peeler(
         triFolder, chan_grps=None,
         shape_distance_threshold=3,
         shape_boundary_threshold=4,
+        energy_reduction_threshold=1,
         refractory_period=None, ignoreTags=['so_bad'],
-        plotting=False,
+        plotting=False, altDataIOInfo=None,
+        waveformSignalType='processed',
+        # catConstructorName='catalogue_constructor',
         FRThresh=1):
-    dataio = tdc.DataIO(dirname=triFolder)
+    dataio = tdc.DataIO(
+        dirname=triFolder,
+        altInfo=altDataIOInfo)
     #
     chanNames = np.array(
         dataio.datasource.get_channel_names())
@@ -484,6 +500,8 @@ def neo_block_after_peeler(
             channelIds = np.array(
                 dataio.channel_groups[chan_grp]['channels'])
             #
+            # cc = tdc.CatalogueConstructor(
+            #     dataio=dataio, name=catConstructorName, chan_grp=chan_grp)
             catalogue = dataio.load_catalogue(chan_grp=chan_grp)
             if catalogue is None:
                 continue
@@ -551,20 +569,21 @@ def neo_block_after_peeler(
                 try:
                     spike = dataio.get_spikes(
                         seg_num=segIdx, chan_grp=chan_grp)
-                except Exception:
-                    continue
-                unitMask = np.isin(
-                    spike['cluster_label'],
-                    group['cluster_label'])
-                #  discard edges
-                edgeMask = (
-                    (spike['index'] + n_left > 0) &
-                    (
-                        spike['index'] + n_right <
-                        dataio.get_segment_length(segIdx))
-                )
-                unitMask = unitMask & edgeMask
-                try:
+                    # except Exception:
+                    #     traceback.print_exc()
+                    #     pdb.set_trace()
+                    unitMask = np.isin(
+                        spike['cluster_label'],
+                        group['cluster_label'])
+                    #  discard edges
+                    edgeMask = (
+                        (spike['index'] + n_left > 0) &
+                        (
+                            spike['index'] + n_right <
+                            dataio.get_segment_length(segIdx))
+                        )
+                    unitMask = unitMask & edgeMask
+                    # try:
                     if not unitMask.any():
                         # no events for this unit
                         raise Exception(
@@ -580,10 +599,14 @@ def neo_block_after_peeler(
                             seg_num=segIdx, chan_grp=chan_grp,
                             spike_indexes=thisUnitIndices,
                             n_left=n_left,
-                            n_right=n_right
+                            n_right=n_right,
+                            signal_type=waveformSignalType
                             )
+                        wvfBaseline = spikeWaveforms.mean(axis=1)
+                        spikeWaveforms = spikeWaveforms - wvfBaseline[:, np.newaxis, :]
                     except Exception:
                         traceback.print_exc()
+                        pdb.set_trace()
                     spikeWaveforms = np.swapaxes(
                         spikeWaveforms,
                         1, 2)
@@ -594,13 +617,16 @@ def neo_block_after_peeler(
                     meanWaveform = np.mean(
                         spikeWaveforms[:, idxOfChanLabel, :], axis=0)
                     #  TODO: compare mean waveforms; if sufficiently, similar, collapse the two units
-                    #  pdb.set_trace()
                     #  mirror naming convention from tdc
                     pred_wf = meanWaveform
+                    if waveformSignalType == 'initial':
+                        pred_wf = (pred_wf) / catalogue['signals_mads'][idxOfChanLabel]
                     norm_factor = 1
                     for idx in timesDF.index:
-                        # pdb.set_trace()
-                        wf = spikeWaveforms[idx, idxOfChanLabel, :]
+                        if waveformSignalType == 'processed':
+                            wf = spikeWaveforms[idx, idxOfChanLabel, :]
+                        else:
+                            wf = (spikeWaveforms[idx, idxOfChanLabel, :]) / catalogue['signals_mads'][idxOfChanLabel]
                         wf_resid = (wf-pred_wf)
                         normalized_deviation = (
                             np.abs(wf_resid) *
@@ -611,15 +637,14 @@ def neo_block_after_peeler(
                             wf / norm_factor,
                             pred_wf / norm_factor,
                             p=1, w=distance_window)
-                        # timesDF.loc[idx, 'templateDist'] = pred_distance
-                        energy_reduction = (
-                            (np.sum(wf**2) - np.sum(wf_resid**2)) /
-                            wf.shape[0])
+                        timesDF.loc[idx, 'templateDist'] = pred_distance
+                        resid_energy = np.sqrt(np.sum(wf_resid**2) / wf_resid.shape[0])
+                        wf_energy = np.sqrt(np.sum(wf**2) / wf.shape[0])
+                        energy_reduction = wf_energy - resid_energy
                         timesDF.loc[idx, 'energyReduction'] = energy_reduction
                     if shape_boundary_threshold is not None:
                         tooFar = timesDF.index[
                             timesDF['maxDeviation'] > shape_boundary_threshold]
-                        #  
                         timesDF.drop(index=tooFar, inplace=True)
                         spikeTimes = spikeTimes[timesDF.index]
                         spikeWaveforms = spikeWaveforms[timesDF.index, :, :]
@@ -627,7 +652,13 @@ def neo_block_after_peeler(
                     if shape_distance_threshold is not None:
                         tooFar = timesDF.index[
                             timesDF['templateDist'] > shape_distance_threshold]
-                        #  
+                        timesDF.drop(index=tooFar, inplace=True)
+                        spikeTimes = spikeTimes[timesDF.index]
+                        spikeWaveforms = spikeWaveforms[timesDF.index, :, :]
+                        timesDF.reset_index(drop=True, inplace=True)
+                    if energy_reduction_threshold is not None:
+                        tooFar = timesDF.index[
+                            timesDF['energyReduction'] < energy_reduction_threshold]
                         timesDF.drop(index=tooFar, inplace=True)
                         spikeTimes = spikeTimes[timesDF.index]
                         spikeWaveforms = spikeWaveforms[timesDF.index, :, :]
@@ -693,6 +724,8 @@ def neo_block_after_peeler(
                             ax[uIdx][pltIdx].set_title('{}'.format(cat))
                         # 
                     # pdb.set_trace()
+                    if waveformSignalType == 'processed':
+                        spikeWaveforms = spikeWaveforms * catalogue['signals_mads'][idxOfChanLabel]
                     st = SpikeTrain(
                         name='seg{}_{}'.format(int(segIdx), thisUnit.name),
                         times=spikeTimes, units='sec',
@@ -766,7 +799,7 @@ def purgeNeoBlock(triFolder):
 
 
 def purgePeelerResults(
-        triFolder, chan_grps=None, purgeAll=False, diagnosticsOnly=False):
+        triFolder, chan_grps=None, purgeAll=False, diagnosticsOnly=False, altDataIOInfo=None):
     if not purgeAll:
         assert chan_grps is not None, 'Need to specify chan_grps!'
 
@@ -902,6 +935,9 @@ def batchPreprocess(
         noise_estimate_duration=120.,
         sample_snippet_duration=240.,
         chunksize=4096,
+        nb_noise_snippet=2000,
+        minWaveforms=10, minWaveformRate=None,
+        alien_value_threshold=150.,
         extractOpts=dict(
             mode='rand',
             n_left=-34, n_right=66, nb_max=500000,
@@ -923,6 +959,8 @@ def batchPreprocess(
         RANK = 0
         SIZE = 1
     print('RANK={}, SIZE={}'.format(RANK, SIZE))
+    if minWaveformRate is not None:
+        minWaveforms = int(sample_snippet_duration / minWaveformRate)
     for idx, chan_grp in enumerate(chansToAnalyze):
         if idx % SIZE == RANK:
             print('memory usage: {}'.format(
@@ -948,6 +986,9 @@ def batchPreprocess(
             extract_waveforms_pca(
                 triFolder,
                 chan_grp=chan_grp,
+                nb_noise_snippet=nb_noise_snippet,
+                minWaveforms=minWaveforms,
+                alien_value_threshold=alien_value_threshold,
                 extractOpts=extractOpts,
                 featureOpts=featureOpts
                 )

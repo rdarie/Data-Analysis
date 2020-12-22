@@ -1,65 +1,67 @@
 #!/bin/bash
 
 # Request runtime:
-#SBATCH --time=24:00:00
+#SBATCH --time=12:00:00
 
 # Default resources are 1 core with 2.8GB of memory.
 
 # Request memory:
 #SBATCH --nodes=1
-#SBATCH --mem=48G
+#SBATCH --mem=24G
 
 # Specify a job name:
-#SBATCH -J plotsMotionStim
+#SBATCH -J plotsStim
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-plotsMotionStim.stdout
-#SBATCH -e ../../batch_logs/%j-plotsMotionStim.errout
+#SBATCH -o ../../batch_logs/%j-plotsStim.stdout
+#SBATCH -e ../../batch_logs/%j-plotsStim.errout
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 
-# EXP="exp201901211000"
-EXP="exp201901271000"
-# EXP="exp201901231000"
-EXP="exp202009111100"
-
-# UNITSELECTOR="--selector=_minfrmaxcorr"
-UNITSELECTOR=""
-
-OUTLIERSWITCH=""
-# OUTLIERSWITCH="--maskOutlierBlocks"
-WINDOW="--window=short"
-# WINDOW="--window=miniRC"
-
-SLURM_ARRAY_TASK_ID=1
-TRIALSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
-# TRIALSELECTOR="--processAll"
+# EXP="exp201901221000"
+# EXP="exp201901201200"
+# EXP="exp201901261000"
+# EXP="exp201901271000"
+# EXP="exp202010201200"
+# EXP="exp202010271200"
+EXP="exp202011201100"
+EXP="exp202012111100"
+EXP="exp202012121100"
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
 conda activate
+
 source activate nda2
 python --version
 
-#python3 ./calcBlockOutliers.py --exp=$EXP $TRIALSELECTOR $UNITSELECTOR --saveResults --plotting --alignQuery="all" --verbose
-#
-# for QUERY in midPeakM midPeakXS midPeakS midPeakL midPeakXL
-#     do
-#         for BLOCKNAME in rig
-#             do
-#                 python3 './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $WINDOW --inputBlockName=$BLOCKNAME --unitQuery=$BLOCKNAME --alignQuery=$QUERY --hueName="amplitudeCat" --rowName="pedalDirection" $OUTLIERSWITCH --verbose
-#             done
-#         python3 './plotAlignedNeurons.py' --exp=$EXP $TRIALSELECTOR $WINDOW --alignQuery=$QUERY $UNITSELECTOR --hueName="amplitudeCat" --rowName="pedalDirection" $OUTLIERSWITCH --verbose
-#     done
+SLURM_ARRAY_TASK_ID=1
+
+# UNITSELECTOR="--selector=unitSelector_minfrmaxcorr"
+
+TRIALSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
+# TRIALSELECTOR="--processAll"
+
+# WINDOW="--window=miniRC"
+WINDOW="--window=M"
+# WINDOW="--window=XS"
+
+# ANALYSISFOLDER="--analysisName=loRes"
+ANALYSISFOLDER="--analysisName=default"
+
+# OUTLIERMASK="--maskOutlierBlocks"
+OUTLIERMASK=""
+
+#STATSOVERLAY="--overlayStats"
+TIMEWINDOWOPTS="--winStart=200 --winStop=800"
+
+# ALIGNQUERY="--alignQuery=stimOn"
 ALIGNQUERY="--alignQuery=outbound"
-python3 './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $WINDOW --inputBlockName="rig" --unitQuery="rig" $ALIGNQUERY --rowName="pedalSizeCat" --colControl= --colName="pedalDirection" --rowControl= $OUTLIERSWITCH --verbose --enableOverrides
 
-ALIGNQUERY="--alignQuery=outbound"
-# python3 './plotAlignedNeurons.py' --exp=$EXP $TRIALSELECTOR $WINDOW $ALIGNQUERY $UNITSELECTOR --rowName= --colName="pedalDirection" --hueName="amplitudeCat" $OUTLIERSWITCH --verbose --enableOverrides
+# ALIGNFOLDER="--alignFolderName=stim"
+ALIGNFOLDER="--alignFolderName=motion"
 
-ALIGNQUERY="--alignQuery=return"
-# python3 './plotAlignedNeurons.py' --exp=$EXP $TRIALSELECTOR $WINDOW $ALIGNQUERY $UNITSELECTOR --rowName= --colName="pedalDirection" --hueName="amplitudeCat" $OUTLIERSWITCH --verbose --enableOverrides
-
-# python3 './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $WINDOW --inputBlockName="lfp" --unitQuery="lfp" $ALIGNQUERY --rowName="pedalSizeCat" --colControl= --colName="pedalDirection" --rowControl= $OUTLIERSWITCH --verbose --enableOverrides
-
+python3 -u './plotAlignedNeurons.py' --exp=$EXP $TRIALSELECTOR $ANALYSISFOLDER $UNITSELECTOR $WINDOW --unitQuery="all" $ALIGNQUERY $ALIGNFOLDER --enableOverrides $TIMEWINDOWOPTS $STATSOVERLAY $OUTLIERMASK
+python3 -u './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $ANALYSISFOLDER $WINDOW --inputBlockName="rig" --unitQuery="all" $ALIGNQUERY $ALIGNFOLDER --enableOverrides $TIMEWINDOWOPTS $STATSOVERLAY $OUTLIERMASK
+python3 -u './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $ANALYSISFOLDER $WINDOW --inputBlockName="lfp" --unitQuery="lfp" $ALIGNQUERY $ALIGNFOLDER --enableOverrides $TIMEWINDOWOPTS $STATSOVERLAY $OUTLIERMASK

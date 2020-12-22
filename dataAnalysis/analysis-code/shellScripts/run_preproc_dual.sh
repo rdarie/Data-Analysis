@@ -29,7 +29,16 @@
 # EXP="exp202011201100"
 # EXP="exp202011231200"
 # EXP="exp202011271100"
-EXP="exp202011301200"
+# EXP="exp202011301200"
+# EXP="exp202012071100"
+# EXP="exp202012081200"
+# EXP="exp202012091200"
+# EXP="exp202012101100"
+# EXP="exp202012121100"
+# EXP="exp202012151200"
+# EXP="exp202012161200"
+# EXP="exp202012171200"
+EXP="exp202012181200"
 
 
 module load anaconda/2020.02
@@ -40,18 +49,20 @@ python --version
 
 SLURM_ARRAY_TASK_ID=1
 
-# init spike sorting
+# python3 -u './previewNSPTapTimes.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --usedTENSPulses
+
+############## init spike sorting
 python -u ./preprocNS5.py --arrayName=utah --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --forSpikeSorting
 python -u ./tridesclousCCV.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --arrayName=utah --sourceFileSuffix=spike_preview --remakePrb --removeExistingCatalog
-#
-# python -u ./preprocNS5.py --arrayName=nform --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --forSpikeSorting
-# python3 ./tridesclousCCV.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --arrayName=nform --sourceFileSuffix=spike_preview --remakePrb --removeExistingCatalog
 
-# get dataset to run spike extraction on
+# python -u ./preprocNS5.py --arrayName=nform --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --forSpikeSorting
+# python -u ./tridesclousCCV.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --arrayName=nform --sourceFileSuffix=spike_preview --remakePrb --removeExistingCatalog
+
+########### get dataset to run spike extraction on
 # python -u ./preprocNS5.py --arrayName=utah --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --fullSubtractMean
 # python -u ./preprocNS5.py --arrayName=nform --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --fullSubtractMean
 
-# finalize dataset
+######### finalize dataset
 # !! maskMotorEncoder ignores all motor events outside alignTimeBounds
 # python3 -u ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --arrayName=utah --fullSubtractMeanWithSpikes
 # python3 -u ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --arrayName=nform --fullSubtractMeanWithSpikes

@@ -43,17 +43,20 @@ python --version
 # EXP="exp202011161100"
 # EXP="exp202011201100"
 # EXP="exp202011231200"
-EXP="exp202011271100"
-EXP="exp202011301200"
+# EXP="exp202011271100"
+# EXP="exp202011301200"
+# EXP="exp202012111100"
+# EXP="exp202012121100"
+EXP="exp202012151200"
 
-SLURM_ARRAY_TASK_ID=1
+SLURM_ARRAY_TASK_ID=2
 
-python -u ./viewINSSessionSummary.py
+# python -u ./viewINSSessionSummary.py
 
 # --makePlots to make quality check plots
 # --showPlots to interactively display quality check plots
 # --disableStimDetection to use HUT derived stim start times
-python -u './preprocINS.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --makePlots --verbose --disableStimDetection
+python -u './preprocINS.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --makePlots --verbose
 # python -u './preprocINS.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --makePlots --verbose |& tee "../../batch_logs/${EXP}_Block_${SLURM_ARRAY_TASK_ID}_preproc_ins"
 
 # EXP="expRCSLongStim"

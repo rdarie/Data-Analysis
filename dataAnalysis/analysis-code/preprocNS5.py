@@ -8,6 +8,7 @@ Options:
     --exp=exp                          which experimental day to analyze
     --arrayName=arrayName              use a named array? [default: Block]
     --forSpikeSorting                  whether to make a .nix file that has all raw traces [default: False]
+    --forSpikeSortingUnfiltered        whether to make a .nix file that has all raw traces [default: False]
     --fullSubtractMean                 whether to make a .nix file that has all raw traces [default: False]
     --fullSubtractMeanWithSpikes       whether to make a .nix file that has all raw traces [default: False]
     --rippleNForm                      whether to make a .nix file that has all raw traces [default: False]
@@ -19,6 +20,7 @@ Options:
     --transferISIStimLog               special options for parsing Ripple files from ISI [default: False]
     --ISIMinimal                       special options for parsing Ripple files from ISI [default: False]
     --ISIRaw                           special options for parsing Ripple files from ISI [default: False]
+    
 """
 
 import dataAnalysis.preproc.ns5 as ns5
@@ -76,6 +78,21 @@ def preprocNS5():
     chunkSize = 4000
     chunkList = [0]
     equalChunks = False
+    ###############################################################
+    groupAsigsByBank = True
+    if groupAsigsByBank:
+        print('Rewriting list of asigs that will be processed')
+        spikeSortingOpts[arrayName]['asigNameList'] = []
+        for name, group in mapDF.groupby('bank'):
+            allAsigsInBank = sorted(group['label'].to_list())
+            theseAsigNames = [
+                aName
+                for aName in allAsigsInBank
+                if aName not in spikeSortingOpts[arrayName]['excludeChans']
+                ]
+            spikeSortingOpts[arrayName]['asigNameList'].append(theseAsigNames)
+            print(theseAsigNames)
+    ###############################################################
     if arguments['maskMotorEncoder']:
         motorEncoderMask = alignTimeBoundsLookup[int(arguments['blockIdx'])]
     else:
@@ -134,14 +151,16 @@ def preprocNS5():
             ainpNameList=spikeSortingOpts[arrayName]['ainpNameList'],
             spikeSourceType='tdc', writeMode='ow',
             chunkSize=chunkSize, equalChunks=equalChunks, chunkList=chunkList,
-            calcRigEvents=False)
-    #
+            calcRigEvents=False)    #
     if arguments['forSpikeSorting']:
         reader = ns5.preproc(
             fileName=ns5FileName,
             rawFolderPath=nspFolder,
             outputFolderPath=scratchFolder, mapDF=mapDF,
             fillOverflow=False, removeJumps=False,
+            interpolateOutliers=spikeSortingOpts[arrayName]['interpolateOutliers'],
+            outlierThreshold=spikeSortingOpts[arrayName]['outlierThreshold'],
+            outlierMaskFilterOpts=outlierMaskFilterOpts,
             motorEncoderMask=motorEncoderMask,
             calcAverageLFP=True,
             eventInfo=trialFilesFrom['utah']['eventInfo'],
@@ -150,10 +169,41 @@ def preprocNS5():
             spikeSourceType='',
             removeMeanAcross=True,
             nameSuffix='_spike_preview',
-            #
+            LFPFilterOpts=spikeSortingFilterOpts,
+            # LFPFilterOpts=None,
             writeMode='ow',
-            chunkSize=300, equalChunks=False, chunkList=[0], chunkOffset=0,
+            chunkSize=spikeSortingOpts[arrayName]['previewDuration'],
+            chunkOffset=spikeSortingOpts[arrayName]['previewOffset'],
+            equalChunks=False, chunkList=[0],
             calcRigEvents=False)
+    #
+    #
+    if arguments['forSpikeSortingUnfiltered']:
+        reader = ns5.preproc(
+            fileName=ns5FileName,
+            rawFolderPath=nspFolder,
+            outputFolderPath=scratchFolder, mapDF=mapDF,
+            fillOverflow=False, removeJumps=False,
+            # interpolateOutliers=spikeSortingOpts[arrayName]['interpolateOutliers'],
+            interpolateOutliers=False,
+            outlierThreshold=spikeSortingOpts[arrayName]['outlierThreshold'],
+            outlierMaskFilterOpts=outlierMaskFilterOpts,
+            motorEncoderMask=motorEncoderMask,
+            calcAverageLFP=True,
+            eventInfo=trialFilesFrom['utah']['eventInfo'],
+            asigNameList=spikeSortingOpts[arrayName]['asigNameList'],
+            ainpNameList=spikeSortingOpts[arrayName]['ainpNameList'],
+            spikeSourceType='',
+            removeMeanAcross=False,
+            nameSuffix='_spike_preview_unfiltered',
+            # LFPFilterOpts=spikeSortingFilterOpts,
+            LFPFilterOpts=None,
+            writeMode='ow',
+            chunkSize=spikeSortingOpts[arrayName]['previewDuration'],
+            chunkOffset=spikeSortingOpts[arrayName]['previewOffset'],
+            equalChunks=False, chunkList=[0],
+            calcRigEvents=False)
+    #
     #
     if arguments['fullSubtractMean']:
         reader = ns5.preproc(
@@ -162,11 +212,15 @@ def preprocNS5():
             outputFolderPath=scratchFolder, mapDF=mapDF,
             # swapMaps=None,
             fillOverflow=False, removeJumps=False,
+            interpolateOutliers=spikeSortingOpts[arrayName]['interpolateOutliers'],
+            outlierThreshold=spikeSortingOpts[arrayName]['outlierThreshold'],
+            outlierMaskFilterOpts=outlierMaskFilterOpts,
             motorEncoderMask=motorEncoderMask,
             calcAverageLFP=True,
             eventInfo=trialFilesFrom['utah']['eventInfo'],
             asigNameList=spikeSortingOpts[arrayName]['asigNameList'],
             ainpNameList=spikeSortingOpts[arrayName]['ainpNameList'],
+            LFPFilterOpts=spikeSortingFilterOpts,
             removeMeanAcross=True,
             nameSuffix='_mean_subtracted',
             #
@@ -191,6 +245,7 @@ def preprocNS5():
             asigNameList=spikeSortingOpts[arrayName]['asigNameList'],
             ainpNameList=spikeSortingOpts[arrayName]['ainpNameList'],
             removeMeanAcross=True,
+            LFPFilterOpts=None,
             nameSuffix='',
             spikeSourceType='tdc', spikePath=spikePath,
             #

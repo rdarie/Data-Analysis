@@ -26,6 +26,8 @@
 # EXP="exp202010201200"
 # EXP="exp202010271200"
 EXP="exp202011201100"
+EXP="exp202012111100"
+EXP="exp202012121100"
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
@@ -34,7 +36,7 @@ conda activate
 source activate nda2
 python --version
 
-# SLURM_ARRAY_TASK_ID=4
+SLURM_ARRAY_TASK_ID=1
 
 # UNITSELECTOR="--selector=unitSelector_minfrmaxcorr"
 
@@ -54,5 +56,5 @@ OUTLIERMASK="--maskOutlierBlocks"
 TIMEWINDOWOPTS="--winStart=200 --winStop=800"
 
 python3 -u './plotAlignedNeurons.py' --exp=$EXP $TRIALSELECTOR $ANALYSISFOLDER $UNITSELECTOR $WINDOW --unitQuery="all" --alignQuery="stimOn" --rowName="RateInHz" --hueName="amplitude" --alignFolderName=stim --enableOverrides $TIMEWINDOWOPTS $STATSOVERLAY $OUTLIERMASK
-python3 -u './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $ANALYSISFOLDER $WINDOW --inputBlockName="rig" --unitQuery="all" --alignQuery="stimOn" --rowName="RateInHz" --hueName="amplitude" --alignFolderName=stim --enableOverrides $TIMEWINDOWOPTS $STATSOVERLAY $OUTLIERMASK
-python3 -u './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $ANALYSISFOLDER $WINDOW --inputBlockName="lfp" --unitQuery="lfp" --alignQuery="stimOn" --rowName="RateInHz" --hueName="amplitude" --alignFolderName=stim --enableOverrides $TIMEWINDOWOPTS $STATSOVERLAY $OUTLIERMASK
+# python3 -u './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $ANALYSISFOLDER $WINDOW --inputBlockName="rig" --unitQuery="all" --alignQuery="stimOn" --rowName="RateInHz" --hueName="amplitude" --alignFolderName=stim --enableOverrides $TIMEWINDOWOPTS $STATSOVERLAY $OUTLIERMASK
+# python3 -u './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $ANALYSISFOLDER $WINDOW --inputBlockName="lfp" --unitQuery="lfp" --alignQuery="stimOn" --rowName="RateInHz" --hueName="amplitude" --alignFolderName=stim --enableOverrides $TIMEWINDOWOPTS $STATSOVERLAY $OUTLIERMASK

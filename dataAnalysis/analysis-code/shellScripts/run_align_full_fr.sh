@@ -46,12 +46,7 @@ SLURM_ARRAY_TASK_ID=1
 TRIALSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
 # TRIALSELECTOR="--processAll"
 
-EVENTSELECTOR="--eventName=motionStimAlignTimes"
+EVENTSELECTOR="--eventName=motionAlignTimes"
 ALIGNFOLDER="--alignFolderName=motion"
 
-# python -u ./assembleExperimentData.py --exp=$EXP $ANALYSISFOLDER --processAsigs --processRasters
-
-# python -u ./calcAlignedAsigs.py --chanQuery="fr" --outputBlockName="fr" --eventBlockName='analyze' --signalBlockName='fr' --verbose --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $EVENTSELECTOR $ALIGNFOLDER
-# python -u ./calcAlignedAsigs.py --chanQuery="raster" --outputBlockName="raster" --eventBlockName='analyze' --signalBlockName='binarized' --verbose --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $EVENTSELECTOR $ALIGNFOLDER
-# python -u ./calcAlignedAsigs.py --chanQuery="lfp" --outputBlockName="lfp" --eventBlockName='analyze' --signalBlockName='analyze' --verbose --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ALIGNSELECTOR $EVENTSELECTOR $ALIGNFOLDER
-# python -u ./calcAlignedAsigs.py --chanQuery="rig" --outputBlockName="rig" --eventBlockName='analyze' --signalBlockName='analyze' --verbose --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $EVENTSELECTOR $ALIGNFOLDER
+python -u ./calcAlignedAsigs.py --chanQuery="fr" --outputBlockName="fr" --eventBlockName='analyze' --signalBlockName='fr' --verbose --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $EVENTSELECTOR $ALIGNFOLDER

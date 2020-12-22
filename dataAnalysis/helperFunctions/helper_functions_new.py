@@ -988,6 +988,49 @@ def fillInJumps(channelData, samp_per_s, smoothing_ms = 1, badThresh = 1e-3,
 
     return channelData, badMask
 
+def fillInOverflow2(
+        data,
+        overFlowFillType='8mV',
+        overFlowThreshold=8000,
+        debuggingPlots=False,
+        ):
+    if debuggingPlots:
+        i1 = 30000
+        i2 = 90000
+        fig, ax = plt.subplots()
+        ax.plot(data[i1:i2, 0], '.-', label='original')
+    else:
+        fig, ax = None, None
+    dataDiff = np.diff(data, axis=0)
+    for colIdx in range(data.shape[1]):
+        diffExceeds = np.abs(dataDiff[:, colIdx]) > overFlowThreshold
+        idxOverflow = np.flatnonzero(diffExceeds)
+        if idxOverflow.size > 0:
+            if dataDiff[idxOverflow[0], colIdx] < 0:
+                fixDir = 'negative'
+            else:
+                fixDir = 'positive'
+            for oIdx in idxOverflow:
+                if oIdx + 1 < data.shape[0]:
+                    if overFlowFillType == '8mV':
+                        if (dataDiff[oIdx, colIdx] < 0) and (fixDir == 'negative'):
+                            data[oIdx+1:, colIdx] = data[oIdx+1:, colIdx] + 8.191e3
+                            fixDir = 'positive'
+                        elif (dataDiff[oIdx, colIdx] > 0) and (fixDir == 'positive'):
+                            data[oIdx+1:, colIdx] = data[oIdx+1:, colIdx] - 8.191e3
+                            fixDir = 'negative'
+                    else:
+                        if (dataDiff[oIdx, colIdx] < 0) and (fixDir == 'negative'):
+                            data[oIdx+1:, colIdx] = data[oIdx+1:, colIdx] - dataDiff[oIdx, colIdx]
+                            fixDir = 'positive'
+                        elif (dataDiff[oIdx, colIdx] > 0) and (fixDir == 'positive'):
+                            data[oIdx+1:, colIdx] = data[oIdx+1:, colIdx] - dataDiff[oIdx, colIdx]
+                            fixDir = 'negative'
+    if debuggingPlots:
+        ax.plot(data[i1:i2, 0], '.--', label='filled')
+    if debuggingPlots:
+        ax.legend()
+    return data, {'fig': fig, 'ax': ax}
 
 def confirmTriggersPlot(peakIdx, dataSeries, fs, whichPeak=0, nSec=10):
     #

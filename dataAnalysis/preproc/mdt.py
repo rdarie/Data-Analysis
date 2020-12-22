@@ -492,6 +492,7 @@ def getINSTDFromJson(
                     ['t']
                     ).sort_values('t').reset_index(drop=True)
             else:
+                # main workflow as of 12-15-2020
                 tdData['equidistantT'] = np.nan
                 lastPacketStartTime = tdData['t'].iloc[0]
                 lastPacketT = lastPacketStartTime - fs ** (-1)
@@ -584,6 +585,7 @@ def getINSTDFromJson(
                 #  tdData['actual_time'] = tdData['time_master'] + (
                 #      tdData['microseconds'])
             tdData['trialSegment'] = idx
+            print('Wrote trialSegment {}'.format(idx))
             if getInterpolated:
                 tdData.to_csv(
                     os.path.join(jsonPath, 'RawDataTD_interpolated.csv'))
@@ -1047,12 +1049,13 @@ def line_picker(line, mouseevent):
     xdata = line.get_xdata()
     ydata = line.get_ydata()
     maxd = 0.1
-    d = np.sqrt(
-        (xdata - mouseevent.xdata)**2 + (ydata - mouseevent.ydata)**2)
+    # d = np.sqrt(
+    #     (xdata - mouseevent.xdata)**2 + (ydata - mouseevent.ydata)**2)
+    d = np.abs(xdata - mouseevent.xdata)
     dmask = (d < maxd) & (d == min(d))
     ind, = np.nonzero(dmask)
-    
     if len(ind):
+        # print('ind = {}'.format(ind))
         pickx = xdata[ind]
         picky = ydata[ind]
         props = dict(ind=ind, pickx=pickx, picky=picky)
@@ -1069,7 +1072,8 @@ def peekAtTaps(
         onlyPlotDetectChan=True,
         insX='t', plotBlocking=True,
         allTapTimestampsINS=None,
-        allTapTimestampsNSP=None):
+        allTapTimestampsNSP=None,
+        interTrigInterval=40e-3):
     sns.set_style('darkgrid')
     tempClick = {
         'ins': [],
@@ -1085,7 +1089,7 @@ def peekAtTaps(
             print('Clicked on nsp {:.3f}'.format(event.pickx[0]))
         event.artist.axes.text(
             event.pickx[0], event.picky[0],
-            '{:.3f}'.format(event.pickx[0]),
+            '. {:.3f}'.format(event.pickx[0]),
             ha='left', va='baseline')
         event.artist.get_figure().canvas.draw_idle()
 
@@ -1184,10 +1188,12 @@ def peekAtTaps(
         insTapsAx.plot(
             allTapTimestampsINS[trialSegment],
             allTapTimestampsINS[trialSegment] ** 0 - 1,
-            'c*', label='tap peaks', picker=line_picker)
+            'c*', label='tap peaks',
+            # picker=line_picker
+            )
     
     xmin, xmax = ax[1].get_xlim()
-    xTicks = np.arange(xmin, xmax, 0.05)
+    xTicks = np.arange(xmin, xmax, interTrigInterval)
     ax[0].set_xticks(xTicks)
     ax[0].set_yticks([])
     ax[0].set_xticklabels([])
@@ -1208,9 +1214,11 @@ def peekAtTaps(
     ax[2].plot(
         channelData['t'].loc[tNSPMask].iloc[::decimateFactor],
         stats.zscore(triggerTrace.iloc[::decimateFactor]),
-        'c', label='Analog Sync', picker=line_picker)
+        'c', label='Analog Sync',
+        # picker=line_picker
+        )
     xmin, xmax = ax[2].get_xlim()
-    xTicks2 = np.arange(xmin, xmax, 0.05)
+    xTicks2 = np.arange(xmin, xmax, interTrigInterval)
     ax[2].set_xticks(xTicks2)
     ax[2].set_yticks([])
     ax[2].set_xticklabels([])
@@ -1219,7 +1227,9 @@ def peekAtTaps(
         ax[2].plot(
             allTapTimestampsNSP[trialSegment],
             allTapTimestampsNSP[trialSegment] ** 0 - 1,
-            'm*', label='tap peaks', picker=line_picker)
+            'm*', label='tap peaks',
+            # picker=line_picker
+            )
     ax[2].legend()
     ax[2].set_title('NSP Data')
     fig.canvas.mpl_connect('pick_event', onpick)
@@ -1334,14 +1344,19 @@ def getHUTtoINSSyncFun(
                     tsTimeChunk[syncTo].values * 1e-3)
                 synchPolyCoeffsHUTtoINS = np.array([1e-3, np.mean(timeOffset)])
             thisFun = np.poly1d(synchPolyCoeffsHUTtoINS)
-            if (timeChunk == 0):
-                tStart = 0
-                tStartHUT = 0
-                tStop = tsDataSegment.loc[tsDataSegment['timeChunks'] == (timeChunk + 1), 't'].min()
-                tStopHUT = tsDataSegment.loc[tsDataSegment['timeChunks'] == (timeChunk + 1), syncTo].min()
-            elif (timeChunk < lastTimeChunk):
+            if (timeChunk < lastTimeChunk):
                 tStart = tsTimeChunk['t'].min()
                 tStartHUT = tsTimeChunk[syncTo].min()
+                tStop = tsDataSegment.loc[tsDataSegment['timeChunks'] == (timeChunk + 1), 't'].min()
+                tStopHUT = tsDataSegment.loc[tsDataSegment['timeChunks'] == (timeChunk + 1), syncTo].min()
+            elif (timeChunk == 0) and (lastTimeChunk == 0):
+                tStart = 0
+                tStartHUT = 0
+                tStop = tsTimeChunk['t'].max()
+                tStopHUT = tsTimeChunk[syncTo].max()
+            elif (timeChunk == 0):
+                tStart = 0
+                tStartHUT = 0
                 tStop = tsDataSegment.loc[tsDataSegment['timeChunks'] == (timeChunk + 1), 't'].min()
                 tStopHUT = tsDataSegment.loc[tsDataSegment['timeChunks'] == (timeChunk + 1), syncTo].min()
             else:
@@ -1359,6 +1374,8 @@ def getHUTtoINSSyncFun(
             print('timeChunk = {}'.format(timeChunk))
             print('tStartHUT = {}'.format(tStartHUT))
             print('tStopHUT = {}'.format(tStopHUT))
+            # if np.isnan(tStopHUT):
+            #     pdb.set_trace()
             print('tStart = {}'.format(tStart))
             print('tStop = {}'.format(tStop))
             timeInterpFunHUTtoINS[trialSegment].append(thisInterpDict)
@@ -1433,6 +1450,9 @@ def synchronizeHUTtoINS(
         if timeChunkIdx.any():
             insDF.loc[timeChunkIdx, 'INSTime'] = interpFun(
                 insDF.loc[timeChunkIdx, syncTo])
+    #if trialSegment == 1:
+    #    # insDF.loc[insDF['trialSegment'] == 1, :]
+    #    pdb.set_trace()
     return insDF
 
 
@@ -1823,7 +1843,6 @@ def preprocINS(
         timeSyncGroup = timeSync.loc[timeSyncSegmentMask, :]
         sessionStartTime = int(jsonSessionNames[trialSegment].split('Session')[-1])
         sessionMasterTime = datetime.datetime.utcfromtimestamp(sessionStartTime / 1000)
-        # pdb.set_trace()
         streamInitTimestampsDict = {
             'td': tdGroup['time_master'].iloc[0],
             'timeSync': timeSyncGroup['time_master'].iloc[0],
@@ -1852,7 +1871,7 @@ def preprocINS(
         # get first timestamp in session for each source
         # sessionMasterTime = min(streamInitTimestamps)
         # ordersMatch = (streamInitHUT.sort_values().index == streamInitSysTicks.sort_values().index).all()
-        # pdb.set_trace()
+        #
         # while not ordersMatch:
         #     rolloverCorrection.loc[streamInitSysTicks.index != streamInitSysTicks.idxmax()] += rolloverSeconds
         #     correctedSysTicks = streamInitSysTicks + rolloverCorrection
@@ -1905,7 +1924,7 @@ def preprocINS(
         ## alignmentFactor[rolledOver] += rolloverSeconds
         print('alignmentFactor\n{}'.format(alignmentFactor))
         print([tS.total_seconds() for tS in alignmentFactor])
-        # pdb.set_trace()
+        #
         if accel is not None:
             accel = realignINSTimestamps(
                 accel, trialSegment, alignmentFactor.loc['accel'])
@@ -1913,7 +1932,6 @@ def preprocINS(
             td, trialSegment, alignmentFactor.loc['td'])
         timeSync = realignINSTimestamps(
             timeSync, trialSegment, alignmentFactor.loc['timeSync'])
-    #  pdb.set_trace()
     #  Check timeSync
     checkTimeSync = False
     if checkTimeSync and makePlots:
@@ -2040,6 +2058,7 @@ def preprocINS(
     # accel['t'] += coarseAdjust
     # accel['data']['t'] += coarseAdjust
     # stimStatusSerial['INSTime'] += coarseAdjust
+    
     block = insDataToBlock(
         td, accel, stimStatusSerial,
         senseInfo, trialFilesStim,
@@ -2172,6 +2191,7 @@ def preprocINS(
     if createRelationship:
         block.create_relationship()
     #
+    # stimStatusSerial.loc[stimStatusSerial['ins_property'] == 'trialSegment', :]
     writer = neo.io.NixIO(filename=insDataFilename, mode='ow')
     writer.write_block(block, use_obj_names=True)
     writer.close()
@@ -3012,7 +3032,6 @@ def getINSStimOnset(
             chanIdx.create_relationship()
         seg.create_relationship()
         block.create_relationship()
-    # pdb.set_trace()
     # [un.name for un in block.filter(objects=Unit)]
     # [len(un.spiketrains) for un in block.filter(objects=Unit)]
     return block
@@ -3354,6 +3373,11 @@ def insDataToBlock(
         td['data'], fullX,
         kind='linear', fill_value=(0, 0),
         x='t', columns=tdDataCols)
+    # pdb.set_trace()
+    tdInterp.loc[:, 'validTD'] = False
+    for name, group in td['data'].groupby('trialSegment'):
+        validMask = (tdInterp['t'] >= group['t'].min()) & (tdInterp['t'] <= group['t'].max())
+        tdInterp.loc[:, 'validTD'] = tdInterp.loc[:, 'validTD'] | validMask
     if accel is not None:
         accelInterp = hf.interpolateDF(
             accel['data'], fullX,
@@ -3370,7 +3394,7 @@ def insDataToBlock(
     for idx, colName in enumerate(tdDataCols):
         sigName = 'ins_td{}'.format(senseInfo.loc[idx, 'senseChan'])
         asig = AnalogSignal(
-            tdInterp[colName].values*pq.mV,
+            tdInterp[colName].to_numpy()*pq.mV,
             name='seg0_' + sigName,
             sampling_rate=sampleRate,
             dtype=np.float32,
@@ -3391,6 +3415,27 @@ def insDataToBlock(
         block.channel_indexes.append(chanIdx)
         chanIdx.analogsignals.append(asig)
         asig.channel_index = chanIdx
+
+    # non td data
+    for idx, colName in enumerate(['validTD']):
+        asig = AnalogSignal(
+            tdInterp[colName].to_numpy()*pq.mV,
+            name='seg0_' + colName,
+            sampling_rate=sampleRate,
+            dtype=np.float32)
+        #
+        asig.t_start = tStart*pq.s
+        seg.analogsignals.append(asig)
+        chanIdx = ChannelIndex(
+            name=colName,
+            index=np.array([0]),
+            channel_names=np.array([colName]),
+            channel_ids=np.array([0])
+            )
+        block.channel_indexes.append(chanIdx)
+        chanIdx.analogsignals.append(asig)
+        asig.channel_index = chanIdx
+    
     if accel is not None:
         for idx, colName in enumerate(accelColumns):
             if colName == 'inertia':

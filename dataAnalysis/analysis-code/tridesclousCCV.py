@@ -80,6 +80,24 @@ if RANK == 0:
             triFolder = triFolder + '_{}'.format(arguments['sourceFileSuffix'])
         #
         spikeSortingOpts[arrayName]['remakePrb'] = arguments['remakePrb']
+        #####
+        overrideSpikeSource = True
+        if overrideSpikeSource:
+            altDataIOInfo = {
+                'datasource_type': 'NIX',
+                'datasource_kargs': {
+                    'filenames': [
+                        os.path.join(
+                            scratchFolder,
+                            ns5FileName + '_spike_preview_unfiltered.nix')
+                    ]
+                }}
+            waveformSignalType = 'initial'
+        else:
+            altDataIOInfo = None
+            waveformSignalType = 'processed'
+        ##
+        ###
         if arguments['fromNS5']:
             tdch.initialize_catalogueconstructor(
                 nspFolder,
@@ -124,7 +142,7 @@ if RANK == 0:
     if arguments['purgePeelerDiagnostics']:
         tdch.purgePeelerResults(
             triFolder, diagnosticsOnly=True, purgeAll=True)
-    dataio = tdc.DataIO(dirname=triFolder)
+    dataio = tdc.DataIO(dirname=triFolder, altInfo=altDataIOInfo)
     # TODO: automatically find ephys channels based on name
     chansToAnalyze = sorted(list(dataio.channel_groups.keys()))[chan_start:chan_stop]
     print('Analyzing channels:\n{}'.format(chansToAnalyze))
@@ -272,5 +290,10 @@ if arguments['makeStrictNeoBlock'] and RANK == 0:
     tdch.purgeNeoBlock(triFolder)
     tdch.neo_block_after_peeler(
         triFolder, chan_grps=chansToAnalyze,
-        shape_distance_threshold=None, refractory_period=2.5e-3,
-        ignoreTags=['so_bad'])
+        shape_distance_threshold=spikeSortingOpts[arrayName]['shape_distance_threshold'],
+        refractory_period=spikeSortingOpts[arrayName]['refractory_period'],
+        shape_boundary_threshold=spikeSortingOpts[arrayName]['shape_boundary_threshold'],
+        energy_reduction_threshold=spikeSortingOpts[arrayName]['energy_reduction_threshold'],
+        ignoreTags=['so_bad'], altDataIOInfo=altDataIOInfo,
+        waveformSignalType=waveformSignalType,
+        )

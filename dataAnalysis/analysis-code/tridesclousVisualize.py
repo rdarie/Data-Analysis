@@ -62,6 +62,10 @@ chan_stop = int(arguments['chan_stop'])
 dataio = tdc.DataIO(dirname=triFolder)
 chansToAnalyze = sorted(list(dataio.channel_groups.keys()))[chan_start:chan_stop]
 
+#
+minWaveformRate = 2
+minTotalWaveforms = int(spikeSortingOpts[arrayName]['previewDuration'] * minWaveformRate)
+#
 '''
 chansToAnalyze = [
     0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
@@ -83,7 +87,9 @@ chansToAnalyze = [
 if viewConstructor:
     for chan_grp in chansToAnalyze:
         print('\n\n\n\nOn channel group {}\n\n\n\n'.format(chan_grp))
-        tdch.open_cataloguewindow(triFolder, chan_grp=chan_grp)
+        tdch.open_cataloguewindow(
+            triFolder, chan_grp=chan_grp,
+            minTotalWaveforms=minTotalWaveforms)
         gc.collect()
         #  try:
         #      tdch.clean_catalogue(

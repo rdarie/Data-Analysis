@@ -18,6 +18,7 @@ Options:
     --batchPeel                                 run peeler [default: False]
     --makeCoarseNeoBlock                        save peeler results to a neo block [default: False]
     --makeStrictNeoBlock                        save peeler results to a neo block [default: False]
+    --overrideSpikeSource                       save peeler results to a neo block [default: False]
     --exportSpikesCSV                           save peeler results to a csv file [default: False]
     --chan_start=chan_start                     which chan_grp to start on [default: 0]
     --chan_stop=chan_stop                       which chan_grp to stop on [default: 96]
@@ -40,9 +41,6 @@ matplotlib.use('PS')   # generate postscript output
 warnings.simplefilter('ignore', category=NumbaPerformanceWarning)
 warnings.simplefilter('ignore', category=NumbaDeprecationWarning)
 #
-
-RANK = os.getenv('SLURM_ARRAY_TASK_ID')
-
 from currentExperiment import parseAnalysisOptions
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']),
@@ -50,6 +48,11 @@ expOpts, allOpts = parseAnalysisOptions(
 globals().update(expOpts)
 globals().update(allOpts)
 
+SLURM_ARRAY_TASK_ID = os.environ.get('SLURM_ARRAY_TASK_ID')
+if SLURM_ARRAY_TASK_ID is not None:
+    RANK = int(SLURM_ARRAY_TASK_ID)
+else:
+    RANK = 0
 arrayName = arguments['arrayName']
 if 'rawBlockName' in spikeSortingOpts[arrayName]:
     ns5FileName = ns5FileName.replace(
@@ -73,7 +76,7 @@ theseExtractOpts = dict(
     mode='rand',
     n_left=spikeWindow[0] - 2,
     n_right=spikeWindow[1] + 2,
-    nb_max=16000, align_waveform=False)
+    nb_max=9000, align_waveform=False)
 callbacks = [
     tf.keras.callbacks.EarlyStopping(
         # Stop training when `loss` is no longer improving
@@ -121,8 +124,21 @@ theseFeatureOpts = {
 #      'allow_single_cluster': False}
 theseClusterOpts = {
     'method': 'agglomerative',
-    'n_clusters': 5
+    'n_clusters': 2
     }
+thesePreprocOpts = dict(
+    relative_threshold=4.5,
+    fill_overflow=False,
+    highpass_freq=200.,
+    lowpass_freq=6000.,
+    common_ref_freq=None,
+    common_ref_removal=False,
+    notch_freq=None,
+    filter_order=2,
+    noise_estimate_duration=spikeSortingOpts[arrayName]['previewDuration'],
+    sample_snippet_duration=spikeSortingOpts[arrayName]['previewDuration'],
+    chunksize=2**20
+    )
 
 if RANK == 0:
     if arguments['purgePeeler']:
@@ -136,21 +152,15 @@ if RANK == 0:
 if arguments['batchPreprocess']:
     tdch.batchPreprocess(
         triFolder, chansToAnalyze,
-        relative_threshold=4,
-        fill_overflow=False,
-        highpass_freq=300.,
-        lowpass_freq=3000.,
-        common_ref_freq=300.,
-        common_ref_removal=False,
-        notch_freq=5700,
-        filter_order=8,
+        nb_noise_snippet=1000,
+        minWaveformRate=None,
+        minWaveforms=10,
+        alien_value_threshold=50.,
+        extractOpts=theseExtractOpts,
         featureOpts=theseFeatureOpts,
         clusterOpts=theseClusterOpts,
-        noise_estimate_duration=300,
-        sample_snippet_duration=300,
-        chunksize=2**20,
-        extractOpts=theseExtractOpts,
-        autoMerge=False, auto_merge_threshold=0.99)
+        autoMerge=False, auto_merge_threshold=0.99,
+        **thesePreprocOpts)
 
 if arguments['batchRunClustering']:
     tdch.batchRunClustering(
@@ -162,32 +172,38 @@ if arguments['batchRunClustering']:
 if arguments['batchPrepWaveforms']:
     tdch.batchPrepWaveforms(
         triFolder, chansToAnalyze,
-        relative_threshold=4,
-        fill_overflow=False,
-        highpass_freq=300.,
-        lowpass_freq=3000.,
-        common_ref_freq=300.,
-        common_ref_removal=False,
-        notch_freq=None,
-        filter_order=4,
-        noise_estimate_duration=300,
-        sample_snippet_duration=300,
-        chunksize=2**18,
-        extractOpts=theseExtractOpts
+        featureOpts=theseFeatureOpts,
+        clusterOpts=theseClusterOpts,
+        extractOpts=theseExtractOpts,
+        **thesePreprocOpts
         )
 
 if arguments['batchPeel']:
     tdch.batchPeel(
         triFolder, chansToAnalyze,
         chunksize=2**22,
-        shape_distance_threshold=3,
-        shape_boundary_threshold=4,
-        confidence_threshold=0.5,
-        energy_reduction_threshold=1,
+        shape_distance_threshold=spikeSortingOpts[arrayName]['shape_distance_threshold'],
+        shape_boundary_threshold=spikeSortingOpts[arrayName]['shape_boundary_threshold'],
+        confidence_threshold=spikeSortingOpts[arrayName]['confidence_threshold'],
+        energy_reduction_threshold=spikeSortingOpts[arrayName]['energy_reduction_threshold'],
         )
 
-if arguments['exportSpikesCSV'] and RANK == 0:
-    tdch.export_spikes_after_peeler(triFolder)
+
+if arguments['overrideSpikeSource']:
+    altDataIOInfo = {
+        'datasource_type': 'NIX',
+        'datasource_kargs': {
+            'filenames': [
+                os.path.join(
+                    scratchFolder,
+                    ns5FileName + '_spike_preview_unfiltered.nix')
+            ]
+        }}
+    waveformSignalType = 'initial'
+else:
+    altDataIOInfo = None
+    waveformSignalType = 'processed'
+
 
 if arguments['makeCoarseNeoBlock'] and RANK == 0:
     tdch.purgeNeoBlock(triFolder)
@@ -200,5 +216,10 @@ if arguments['makeStrictNeoBlock'] and RANK == 0:
     tdch.purgeNeoBlock(triFolder)
     tdch.neo_block_after_peeler(
         triFolder, chan_grps=chansToAnalyze,
-        shape_distance_threshold=None, refractory_period=2.5e-3,
-        ignoreTags=['so_bad'])
+        shape_distance_threshold=spikeSortingOpts[arrayName]['shape_distance_threshold'],
+        refractory_period=spikeSortingOpts[arrayName]['refractory_period'],
+        shape_boundary_threshold=spikeSortingOpts[arrayName]['shape_boundary_threshold'],
+        energy_reduction_threshold=spikeSortingOpts[arrayName]['energy_reduction_threshold'],
+        ignoreTags=['so_bad'], altDataIOInfo=altDataIOInfo,
+        waveformSignalType=waveformSignalType,
+        )

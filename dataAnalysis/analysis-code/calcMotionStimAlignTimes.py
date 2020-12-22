@@ -67,9 +67,7 @@ if arguments['processAll']:
 if ('RC' in blockExperimentTypeLookup[int(arguments['blockIdx'])]):
     print('skipping RC trial')
     sys.exit()
-alignTimeBounds = [
-    alignTimeBoundsLookup[int(arguments['blockIdx'])]
-]
+
 prefix = ns5FileName
 dataBlockPath = os.path.join(
     analysisSubFolder,
@@ -77,6 +75,15 @@ dataBlockPath = os.path.join(
 print('loading {}'.format(dataBlockPath))
 dataReader, dataBlock = preproc.blockFromPath(
     dataBlockPath, lazy=arguments['lazy'])
+try:
+    alignTimeBounds = alignTimeBoundsLookup[int(arguments['blockIdx'])]
+except Exception:
+    alignTimeBounds = [[
+        [
+            float(dataBlock.segments[0].filter(objects=AnalogSignalProxy)[0].t_start),
+            float(dataBlock.segments[-1].filter(objects=AnalogSignalProxy)[0].t_stop)
+        ]
+    ]]
 # print([asig.name for asig in dataBlock.filter(objects=EventProxy)])
 # print([asig.name for asig in dataBlock.filter(objects=Event)])
 #  some categories need to be calculated,
@@ -179,6 +186,12 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
     stopMask = pd.Series(False, index=tdDF.index)
     for idx, group in tdDF.groupby('trialSegment'):
         idx = int(idx)
+        print('On trial segment {} ({} sec to {} sec)'.format(
+            idx,
+            alignTimeBounds[segIdx][idx][0],
+            alignTimeBounds[segIdx][idx][1]
+            ))
+        print('Group t min = {} t max = {}'.format(group['t'].min(), group['t'].max()))
         movingAtAll = group['pedalVelocityCat'].fillna(0).abs()
         movementOnOff = movingAtAll.diff()
         taskMask = (
@@ -188,8 +201,8 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         moveMaskForSeg = (movementOnOff == 1) & taskMask
         stopMaskForSeg = (movementOnOff == -1) & taskMask
 
-        assert stopMaskForSeg.sum() == moveMaskForSeg.sum(), 'unequal start and stop lengths' 
-        assert stopMaskForSeg.sum() % 2 == 0, 'number of movements not divisible by 2'
+        assert stopMaskForSeg.sum() == moveMaskForSeg.sum(), 'unequal start and stop lengths\n\n' 
+        assert stopMaskForSeg.sum() % 2 == 0, 'number of movements ({}) not divisible by 2\n\n'.format(stopMaskForSeg.sum())
 
         moveMask.loc[moveMaskForSeg.index[moveMaskForSeg]] = True
         stopMask.loc[stopMaskForSeg.index[stopMaskForSeg]] = True
@@ -259,7 +272,7 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
     #  determine size category
     tdDF['pedalSizeCat'] = pd.cut(
         tdDF['pedalSize'].abs(), movementSizeBins,
-        labels=['XS', 'S', 'M', 'L', 'XL'])
+        labels=movementSizeBinLabels)
     #  determine CW or CCW
     tdDF['pedalDirection'] = np.nan
     tdDF.loc[tdDF['pedalSize'] > 0, 'pedalDirection'] = 'CW'

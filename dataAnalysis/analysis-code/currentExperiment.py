@@ -1,4 +1,4 @@
-import os, pdb, re, platform
+import os, pdb, re, platform, traceback
 #  import dataAnalysis.helperFunctions.kilosort_analysis as ksa
 import dataAnalysis.helperFunctions.probe_metadata as prb_meta
 import importlib
@@ -100,6 +100,33 @@ def parseAnalysisOptions(
             'ftype': 'butter'
         }
     }
+    if 'spikeSortingFilterOpts' not in expOpts:
+        spikeSortingFilterOpts = {
+            'low': {
+                'Wn': 6000,
+                'N': 2,
+                'btype': 'low',
+                'ftype': 'bessel'
+            },
+            'high': {
+                'Wn': 200,
+                'N': 2,
+                'btype': 'high',
+                'ftype': 'bessel'
+            }
+        }
+    else:
+        spikeSortingFilterOpts = expOpts['spikeSortingFilterOpts']
+    if 'outlierMaskFilterOpts' not in expOpts:
+        outlierMaskFilterOpts = {
+            'low': {
+                'Wn': 20,
+                'N': 2,
+                'btype': 'low',
+                'ftype': 'bessel'
+            }}
+    else:
+        outlierMaskFilterOpts = expOpts['outlierMaskFilterOpts']
     
     gpfaOpts = {
         'xDim': 3,
@@ -116,11 +143,17 @@ def parseAnalysisOptions(
             'folderPath': nspFolder,
             'ns5FileName': ns5FileName,
             'calcRigEvents': (blockExperimentType == 'proprio'),
-            'spikeWindow': [-16, 48]
+            'spikeWindow': [-24, 40]
             }
         }
     spikeWindow = trialFilesFrom['utah']['spikeWindow']
-    jsonSessionNames = expOpts['jsonSessionNames']
+    try:
+        jsonSessionNames = expOpts['jsonSessionNames']
+    except Exception:
+        traceback.print_exc()
+        jsonSessionNames = {blockIdx: []}
+    if blockIdx not in jsonSessionNames:
+        jsonSessionNames[blockIdx] = []
     trialFilesStim = {
         'ins': {
             'origin': 'ins',

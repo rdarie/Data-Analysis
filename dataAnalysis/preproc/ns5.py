@@ -203,7 +203,9 @@ def channelIndexesToSpikeDict(
     for dummyCh in channel_indexes:
         if len(dummyCh.units):
             dummyUnit = dummyCh.units[0]
-            break
+            if len(dummyUnit.spiketrains):
+                if len(dummyUnit.spiketrains[0].times):
+                    break
     dummySt = [
         st
         for st in dummyUnit.spiketrains
@@ -2092,7 +2094,9 @@ def preprocBlockToNix(
         equalChunks=True,
         chunkList=None, chunkOffset=0,
         eventInfo=None,
-        fillOverflow=False, calcAverageLFP=False,
+        fillOverflow=False, calcAverageLFP=False, interpolateOutliers=False,
+        outlierMaskFilterOpts=None,
+        outlierThreshold=1,
         motorEncoderMask=None,
         electrodeArrayName='utah',
         removeJumps=False, trackMemory=True,
@@ -2133,32 +2137,41 @@ def preprocBlockToNix(
     if calcAverageLFP:
         lastIndex = len(block.channel_indexes)
         lastID = block.channel_indexes[-1].channel_ids[0] + 1
-        aveLFPChIdx = ChannelIndex(
-            index=[lastIndex],
-            channel_names=['{}_zScoredAverage'.format(electrodeArrayName)],
-            channel_ids=[lastID],
-            name='{}_zScoredAverage'.format(electrodeArrayName),
-            file_origin=block.channel_indexes[-1].file_origin
-            )
-        aveLFPChIdx.merge_annotations(block.channel_indexes[-1])
-        block.channel_indexes.append(aveLFPChIdx)
-        if removeMeanAcross:
-            if asigNameList is None:
-                nMeanChans = 1
-            else:
-                nMeanChans = len(asigNameList)
-            meanChIdxList = []
-            for meanChIdx in range(nMeanChans):
-                tempChIdx = ChannelIndex(
-                    index=[lastIndex + meanChIdx],
-                    channel_names=['{}_rawAverage{}'.format(electrodeArrayName, meanChIdx)],
-                    channel_ids=[lastID + meanChIdx],
-                    name='{}_rawAverage{}'.format(electrodeArrayName, meanChIdx),
-                    file_origin=block.channel_indexes[-1].file_origin
-                    )
-                tempChIdx.merge_annotations(block.channel_indexes[-1])
-                block.channel_indexes.append(tempChIdx)
-                meanChIdxList.append(tempChIdx)
+        if asigNameList is None:
+            nMeanChans = 1
+        else:
+            nMeanChans = len(asigNameList)
+        meanChIdxList = []
+        for meanChIdx in range(nMeanChans):
+            tempChIdx = ChannelIndex(
+                index=[lastIndex + meanChIdx],
+                channel_names=['{}_rawAverage_{}'.format(electrodeArrayName, meanChIdx)],
+                channel_ids=[lastID + meanChIdx],
+                name='{}_rawAverage_{}'.format(electrodeArrayName, meanChIdx),
+                file_origin=block.channel_indexes[-1].file_origin
+                )
+            tempChIdx.merge_annotations(block.channel_indexes[-1])
+            block.channel_indexes.append(tempChIdx)
+            meanChIdxList.append(tempChIdx)
+        lastIndex = len(block.channel_indexes)
+        lastID = block.channel_indexes[-1].channel_ids[0] + 1
+        # if interpolateOutliers:
+        if asigNameList is None:
+            nMeanChans = 1
+        else:
+            nMeanChans = len(asigNameList)
+        devChIdxList = []
+        for devChIdx in range(nMeanChans):
+            tempChIdx = ChannelIndex(
+                index=[lastIndex + devChIdx],
+                channel_names=['{}_deviation_{}'.format(electrodeArrayName, devChIdx)],
+                channel_ids=[lastID + devChIdx],
+                name='{}_deviation_{}'.format(electrodeArrayName, devChIdx),
+                file_origin=block.channel_indexes[-1].file_origin
+                )
+            tempChIdx.merge_annotations(block.channel_indexes[-1])
+            block.channel_indexes.append(tempChIdx)
+            devChIdxList.append(tempChIdx)
     #  delete asig and irsig proxies from channel index list
     for metaIdx, chanIdx in enumerate(block.channel_indexes):
         if chanIdx.analogsignals:
@@ -2236,19 +2249,20 @@ def preprocBlockToNix(
             #  trim down list of analog signals if necessary
             if asigNameList is not None:
                 asigNameListSeg = []
-                if removeMeanAcross:
+                if (removeMeanAcross or calcAverageLFP):
                     meanGroups = {}
                 for subListIdx, subList in enumerate(asigNameList):
                     subListSeg = [
                         'seg{}_{}'.format(segIdx, a)
                         for a in subList]
                     asigNameListSeg += subListSeg
-                    if removeMeanAcross:
+                    if (removeMeanAcross or calcAverageLFP):
                         meanGroups[subListIdx] = subListSeg
                 aSigList = []
                 # [asig.name for asig in seg.analogsignals]
                 for a in seg.analogsignals:
-                    if np.any([n in a.name for n in asigNameListSeg]):
+                    # if np.any([n in a.name for n in asigNameListSeg]):
+                    if a.name in asigNameListSeg:
                         aSigList.append(a)
             else:
                 aSigList = [
@@ -2316,7 +2330,12 @@ def preprocBlockToNix(
                                     (asig.shape[0], nAsigs),
                                     dtype=np.float32),
                                 columns=asigNameListSeg)
+                        if 'dummyAsig' not in locals():
+                            dummyAsig = asig.copy()
                         #  perform requested preproc operations
+                        #  if LFPFilterOpts is not None:
+                        #      asig[:] = filterFun(
+                        #          asig, filterCoeffs=filterCoeffs)
                         if normalizeByImpedance:
                             elNmMatchMsk = impedances['elec'] == chanIdx.name
                             asig.magnitude[:] = (
@@ -2341,79 +2360,214 @@ def preprocBlockToNix(
                             badData.update(newBadData)
                             '''
                             pass
-                        if calcAverageLFP:
-                            normalAsig = stats.zscore(asig.magnitude) * asig.units
-                            if 'averageLFP' not in locals():
-                                averageLFP = asig.copy()
-                                averageLFP.magnitude[:] = normalAsig / nLfpAsigs
-                                averageLFP.array_annotations = {}
-                            else:
-                                averageLFP.magnitude[:] += normalAsig / nLfpAsigs
-                        if removeMeanAcross:
-                            tempLFPStore.loc[:, aSigProxy.name] = asig.magnitude.flatten()
+                        tempLFPStore.loc[:, aSigProxy.name] = asig.magnitude.flatten()
                         del asig
                         gc.collect()
-                if removeMeanAcross:
-                    if trackMemory:
-                        print(
-                            'Calculating asig mean, memory usage: {:.1f} MB'.format(
-                                prf.memory_usage_psutil()))
-                    meanLFP = np.zeros(
+                # end of first pass
+                if (removeMeanAcross or calcAverageLFP):
+                    centerLFP = np.zeros(
                         (tempLFPStore.shape[0], len(asigNameList)),
                         dtype=np.float32)
-                    useMean = True
+                    spreadLFP = np.zeros(
+                        (tempLFPStore.shape[0], len(asigNameList)),
+                        dtype=np.float32)
+                    # if interpolateOutliers
+                    if outlierMaskFilterOpts is None:
+                        outlierMaskFilterOpts = {
+                         'low': {
+                            'Wn': 10,
+                            'N': 2,
+                            'btype': 'low',
+                            'ftype': 'bessel'
+                            }
+                        }
+                    filterCoeffsOutlierMask = hf.makeFilterCoeffsSOS(
+                        outlierMaskFilterOpts, float(dummyAsig.sampling_rate))
+                    lfpDeviation = np.zeros(
+                        (tempLFPStore.shape[0], len(asigNameList)),
+                        dtype=np.float32)
+                    outlierMask = np.zeros(
+                        (tempLFPStore.shape[0], len(asigNameList)),
+                        dtype=np.bool)
+                    ###############
+                    # tempLFPStore.iloc[:, 0] = np.nan  # for debugging axes
+                    #############
+                    plotDevFilterDebug = False
+                    if plotDevFilterDebug:
+                        import matplotlib.pyplot as plt
+                        i1 = 30000
+                        i2 = 90000
+                        plotColIdx = 1
+                        ddfFig, ddfAx = plt.subplots(len(asigNameList), 1)
+                        ddfFig2, ddfAx2 = plt.subplots()
+                        ddfFig3, ddfAx3 = plt.subplots(
+                            1, len(asigNameList),
+                            sharey=True)
+                    useMean = False
                     for subListIdx, subList in enumerate(asigNameList):
+                        if trackMemory:
+                            print(
+                                'asig group {}: calculating mean, memory usage: {:.1f} MB'.format(
+                                    subListIdx, prf.memory_usage_psutil()))
+                        columnsForThisGroup = meanGroups[subListIdx]
+                        print('on group\n{}'.format(columnsForThisGroup))
+                        if plotDevFilterDebug:
+                            ddfAx3[subListIdx].plot(
+                                dummyAsig.times[i1:i2],
+                                tempLFPStore.loc[:, columnsForThisGroup].iloc[i1:i2, plotColIdx],
+                                label='original ch'
+                                )
+                        if fillOverflow:
+                            # fill in overflow:
+                            tempLFPStore.loc[:, columnsForThisGroup], pltHandles = hf.fillInOverflow2(
+                                tempLFPStore.loc[:, columnsForThisGroup].to_numpy(),
+                                overFlowFillType='average',
+                                overFlowThreshold=8000,
+                                debuggingPlots=plotDevFilterDebug
+                                )
+                            if plotDevFilterDebug:
+                                pltHandles['ax'].set_title('ch grp {}'.format(subListIdx))
+                                ddfAx3[subListIdx].plot(
+                                    dummyAsig.times[i1:i2],
+                                    tempLFPStore.loc[:, columnsForThisGroup].iloc[i1:i2, plotColIdx],
+                                    label='filled ch'
+                                    )
+                        # zscore of each trace
+                        columnZScore = pd.DataFrame(
+                            stats.zscore(
+                                tempLFPStore.loc[:, columnsForThisGroup],
+                                axis=1),
+                            index=tempLFPStore.index,
+                            columns=columnsForThisGroup
+                            )
+                        excludeFromMeanMask = columnZScore.abs() > 3
                         if useMean:
-                            meanLFP[:, subListIdx] = (
+                            centerLFP[:, subListIdx] = (
                                 tempLFPStore
-                                .loc[:, meanGroups[subListIdx]]
+                                .loc[:, columnsForThisGroup]
+                                .mask(excludeFromMeanMask)
                                 .mean(axis=1)
                                 )
                         else:
-                            meanLFP[:, subListIdx] = (
+                            centerLFP[:, subListIdx] = (
                                 tempLFPStore
-                                .loc[:, meanGroups[subListIdx]]
+                                .loc[:, columnsForThisGroup]
+                                .mask(excludeFromMeanMask)
                                 .median(axis=1)
                                 )
-                    del tempLFPStore
-                gc.collect()
-            if calcAverageLFP:
-                averageLFP.name = 'seg{}_{}_zScoredAverage'.format(
-                    idx, electrodeArrayName)
-                    # segIdx, electrodeArrayName)
-                chanIdx = block.filter(
-                    objects=ChannelIndex,
-                    name='{}_zScoredAverage'.format(electrodeArrayName))[0]
-                # assign ownership to containers
-                chanIdx.analogsignals.append(averageLFP)
-                newSeg.analogsignals.append(averageLFP)
-                # assign parent to children
-                chanIdx.create_relationship()
-                newSeg.create_relationship()
-                # write out to file
-                averageLFP = writer._write_analogsignal(
-                    averageLFP, nixblock, nixgroup)
-                if removeMeanAcross:
-                    for mIdx, meanChIdx in enumerate(meanChIdxList):
-                        meanAsig = AnalogSignal(
-                            meanLFP[:, mIdx],
-                            units=averageLFP.units,
-                            sampling_rate=averageLFP.sampling_rate,
-                            name='seg{}_{}'.format(idx, meanChIdx.name)
-                            # name='seg{}_{}'.format(segIdx, meanChIdx.name)
-                        )
-                        # assign ownership to containers
-                        meanChIdx.analogsignals.append(meanAsig)
-                        newSeg.analogsignals.append(meanAsig)
-                        # assign parent to children
-                        meanChIdx.create_relationship()
-                        newSeg.create_relationship()
-                        # write out to file
+                        # if interpolateOutliers:
+                        if removeMeanAcross:
+                            # mean center the LFP store, for outlier detection
+                            # TODO: trivially true, need to rework if-statement tree here
+                            '''
+                            for cName in columnsForThisGroup:
+                                noiseModel = np.polyfit(
+                                    centerLFP[:, subListIdx],
+                                    tempLFPStore[cName],
+                                    1)
+                                noiseTerm = np.polyval(noiseModel, centerLFP[:, subListIdx])
+                                tempLFPStore.loc[:, cName] = (
+                                    tempLFPStore[cName] - noiseTerm)
+                                if plotDevFilterDebug and cName == columnsForThisGroup[plotColIdx]:
+                                    ddfAx3[subListIdx].plot(
+                                        dummyAsig.times[i1:i2],
+                                        noiseTerm[i1:i2],
+                                        label='mean term'
+                                        )
+                            if plotDevFilterDebug:
+                                ddfAx3[subListIdx].plot(
+                                    dummyAsig.times[i1:i2],
+                                    tempLFPStore.loc[:, columnsForThisGroup].iloc[i1:i2, plotColIdx],
+                                    label='mean subtracted ch'
+                                    )
+                            '''
+                        # filter the traces, if needed
                         if LFPFilterOpts is not None:
-                            meanAsig[:] = filterFun(
-                                meanAsig, filterCoeffs=filterCoeffs)
-                        meanAsig = writer._write_analogsignal(
-                            meanAsig, nixblock, nixgroup)
+                            tempLFPStore.loc[:, columnsForThisGroup] = signal.sosfiltfilt(
+                                filterCoeffs, tempLFPStore.loc[:, columnsForThisGroup], axis=0)
+                            if plotDevFilterDebug:
+                                ddfAx3[subListIdx].plot(
+                                    dummyAsig.times[i1:i2],
+                                    tempLFPStore.loc[:, columnsForThisGroup].iloc[i1:i2, plotColIdx],
+                                    label='filtered ch'
+                                    )
+                        # zscore of each trace
+                        tempLFPStore.loc[:, columnsForThisGroup] = (
+                                stats.zscore(
+                                    tempLFPStore.loc[:, columnsForThisGroup])
+                                ** 2)
+                        # calculate the sum of squared z-scored traces
+                        lfpDeviation[:, subListIdx] = (
+                            tempLFPStore
+                            .loc[:, columnsForThisGroup]
+                            .sum(axis=1)
+                            )
+                        smoothedDeviation = signal.sosfiltfilt(
+                            filterCoeffsOutlierMask, lfpDeviation[:, subListIdx])
+                        ##
+                        if plotDevFilterDebug:
+                            ddfAx[subListIdx].plot(
+                                dummyAsig.times[i1:i2], lfpDeviation[i1:i2, subListIdx],
+                                label='original (ch grp {})'.format(subListIdx))
+                            ddfAx[subListIdx].plot(
+                                dummyAsig.times[i1:i2], smoothedDeviation[i1:i2],
+                                label='filtered (ch grp {})'.format(subListIdx))
+                        ##
+                        lfpDeviation[:, subListIdx] = smoothedDeviation
+                        nDim = tempLFPStore.loc[:, columnsForThisGroup].shape[1]
+                        chi2Bounds = stats.chi2.interval(outlierThreshold, nDim)
+                        print('nDim = {}, chi2Lim = {}'.format(nDim, chi2Bounds))
+                        outlierMask[:, subListIdx] = lfpDeviation[:, subListIdx] > chi2Bounds[1]
+                        if plotDevFilterDebug:
+                            ddfAx[subListIdx].axhline(chi2Bounds[1], c='r')
+                    if plotDevFilterDebug:
+                        for subListIdx, subList in enumerate(asigNameList):
+                            ddfAx[subListIdx].legend(loc='upper right')
+                            ddfAx3[subListIdx].legend(loc='upper right')
+                            ddfAx2.plot(dummyAsig.times[i1:i2], lfpDeviation[i1:i2, subListIdx],
+                            label='ch grp {}'.format(subListIdx))
+                        ddfAx2.legend(loc='upper right')
+                        plt.show()
+                    #############
+                    del tempLFPStore
+                    gc.collect()
+            if (removeMeanAcross or calcAverageLFP):
+                for mIdx, meanChIdx in enumerate(meanChIdxList):
+                    meanAsig = AnalogSignal(
+                        centerLFP[:, mIdx],
+                        units=dummyAsig.units,
+                        sampling_rate=dummyAsig.sampling_rate,
+                        name='seg{}_{}'.format(idx, meanChIdx.name)
+                        # name='seg{}_{}'.format(segIdx, meanChIdx.name)
+                    )
+                    # assign ownership to containers
+                    meanChIdx.analogsignals.append(meanAsig)
+                    newSeg.analogsignals.append(meanAsig)
+                    # assign parent to children
+                    meanChIdx.create_relationship()
+                    newSeg.create_relationship()
+                    # write out to file
+                    if LFPFilterOpts is not None:
+                        meanAsig[:] = filterFun(
+                            meanAsig, filterCoeffs=filterCoeffs)
+                    meanAsig = writer._write_analogsignal(
+                        meanAsig, nixblock, nixgroup)
+                for mIdx, devChIdx in enumerate(devChIdxList):
+                    devAsig = AnalogSignal(
+                        lfpDeviation[:, mIdx],
+                        units=dummyAsig.units,
+                        sampling_rate=dummyAsig.sampling_rate,
+                        name='seg{}_{}'.format(idx, devChIdx.name)
+                    )
+                    # assign ownership to containers
+                    devChIdx.analogsignals.append(devAsig)
+                    newSeg.analogsignals.append(devAsig)
+                    # assign parent to children
+                    devChIdx.create_relationship()
+                    newSeg.create_relationship()
+                    # write out to file
+                    devAsig = writer._write_analogsignal(
+                        devAsig, nixblock, nixgroup)
                 #
                 w0 = 60
                 bandQ = 20
@@ -2421,15 +2575,15 @@ def preprocBlockToNix(
                 noiseSos = signal.iirfilter(
                     N=8, Wn=[w0 - bw/2, w0 + bw/2],
                     btype='band', ftype='butter',
-                    analog=False, fs=float(averageLFP.sampling_rate),
+                    analog=False, fs=float(dummyAsig.sampling_rate),
                     output='sos')
                 # signal.hilbert does not have an option to zero pad
-                nextLen = fftpack.helper.next_fast_len(averageLFP.shape[0])
-                deficit = int(nextLen - averageLFP.shape[0])
+                nextLen = fftpack.helper.next_fast_len(dummyAsig.shape[0])
+                deficit = int(nextLen - dummyAsig.shape[0])
                 lDef = int(np.floor(deficit / 2))
                 rDef = int(np.ceil(deficit / 2)) + 1
                 temp = np.pad(
-                    averageLFP.magnitude.flatten(),
+                    dummyAsig.magnitude.flatten(),
                     (lDef, rDef), mode='constant')
                 lineNoise = signal.sosfiltfilt(
                     noiseSos, temp, axis=0)
@@ -2439,28 +2593,28 @@ def preprocBlockToNix(
                 lineNoisePhase = np.angle(lineNoiseH)
                 lineNoisePhaseDF = pd.DataFrame(
                     lineNoisePhase,
-                    index=averageLFP.times,
+                    index=dummyAsig.times,
                     columns=['phase']
                     )
                 plotHilbert = False
                 if plotHilbert:
                     lineNoiseFreq = (
                         np.diff(np.unwrap(lineNoisePhase)) /
-                        (2.0*np.pi) * float(averageLFP.sampling_rate))
+                        (2.0*np.pi) * float(dummyAsig.sampling_rate))
                     lineNoiseEnvelope = np.abs(lineNoiseH)
                     import matplotlib.pyplot as plt
                     i1 = 300000; i2 = 330000
                     fig, ax = plt.subplots(2, 1, sharex=True)
-                    ax[0].plot(averageLFP.times[i1:i2], averageLFP.magnitude[i1:i2, :])
-                    ax[0].plot(averageLFP.times[i1:i2], lineNoise[i1:i2])
-                    ax[0].plot(averageLFP.times[i1:i2], lineNoiseEnvelope[i1:i2])
+                    ax[0].plot(dummyAsig.times[i1:i2], dummyAsig.magnitude[i1:i2, :])
+                    ax[0].plot(dummyAsig.times[i1:i2], lineNoise[i1:i2])
+                    ax[0].plot(dummyAsig.times[i1:i2], lineNoiseEnvelope[i1:i2])
                     axFr = ax[1].twinx()
                     ax[1].plot(
-                        averageLFP.times[i1:i2], lineNoisePhase[i1:i2],
+                        dummyAsig.times[i1:i2], lineNoisePhase[i1:i2],
                         c='r', label='phase')
                     ax[1].legend()
                     axFr.plot(
-                        averageLFP.times[i1:i2], lineNoiseFreq[i1:i2],
+                        dummyAsig.times[i1:i2], lineNoiseFreq[i1:i2],
                         label='freq')
                     axFr.set_ylim([59, 61])
                     axFr.legend()
@@ -2497,12 +2651,12 @@ def preprocBlockToNix(
                             )
                     if fillOverflow:
                         # fill in overflow:
-                        '''
-                        timeSection['data'], overflowMask = hf.fillInOverflow(
-                            timeSection['data'], fillMethod = 'average')
-                        badData.update({'overflow': overflowMask})
-                        '''
-                        pass
+                        asig.magnitude[:], _ = hf.fillInOverflow2(
+                            asig.magnitude[:],
+                            overFlowFillType='average',
+                            overFlowThreshold=8000,
+                            debuggingPlots=False
+                            )
                     if removeJumps:
                         # find unusual jumps in derivative or amplitude
                         '''
@@ -2516,14 +2670,39 @@ def preprocBlockToNix(
                         for k, cols in meanGroups.items():
                             if asig.name in cols:
                                 whichColumnToSubtract = k
+                        noiseModel = np.polyfit(centerLFP[:, whichColumnToSubtract], asig.magnitude.flatten(), 1)
+                        noiseTerm = np.polyval(noiseModel,centerLFP[:, whichColumnToSubtract] )
+                        ###
+                        plotMeanSubtraction = False
+                        if plotMeanSubtraction:
+                            import matplotlib.pyplot as plt
+                            i1 = 300000; i2 = 330000
+                            fig, ax = plt.subplots(1, 1)
+                            ax.plot(asig.times[i1:i2], asig.magnitude[i1:i2, :], label='channel')
+                            ax.plot(asig.times[i1:i2], centerLFP[i1:i2, whichColumnToSubtract], label='mean')
+                            ax.plot(asig.times[i1:i2], noiseTerm[i1:i2], label='adjusted mean')
+                            ax.legend()
+                            plt.show()
+                        ###
                         asig.magnitude[:] = np.atleast_2d(
-                            asig.magnitude.flatten() -
-                            meanLFP[:, whichColumnToSubtract]).transpose()
+                            asig.magnitude.flatten() - noiseTerm).transpose()
                         asig.magnitude[:] = (
-                            asig.magnitude -
-                            np.median(asig.magnitude))
+                            asig.magnitude - np.median(asig.magnitude))
                     if (LFPFilterOpts is not None) and (aSigProxy not in ainpList):
-                        asig[:] = filterFun(asig, filterCoeffs=filterCoeffs)
+                        asig.magnitude[:] = filterFun(asig, filterCoeffs=filterCoeffs)
+                    if (interpolateOutliers) and (aSigProxy not in ainpList):
+                        for k, cols in meanGroups.items():
+                            if asig.name in cols:
+                                whichColumnToSubtract = k
+                        tempSer = pd.Series(asig.magnitude.flatten())
+                        tempSer.loc[outlierMask[:, whichColumnToSubtract]] = np.nan
+                        tempSer = (
+                            tempSer
+                            .interpolate(method='linear', limit_area='inside')
+                            .fillna(method='ffill')
+                            .fillna(method='bfill')
+                            )
+                        asig.magnitude[:, 0] = tempSer.to_numpy()
                     if (aSigProxy in aSigList) or (aSigProxy in ainpList):
                         # assign ownership to containers
                         chanIdx.analogsignals.append(asig)
@@ -2773,6 +2952,9 @@ def preproc(
         # swapMaps=None,
         electrodeArrayName='utah',
         fillOverflow=True, removeJumps=True,
+        interpolateOutliers=False,
+        outlierMaskFilterOpts=None,
+        outlierThreshold=1,
         motorEncoderMask=None,
         calcAverageLFP=False,
         eventInfo=None,
@@ -2845,6 +3027,9 @@ def preproc(
             chunkList=chunkList, chunkOffset=chunkOffset,
             fillOverflow=fillOverflow,
             removeJumps=removeJumps,
+            interpolateOutliers=interpolateOutliers,
+            outlierThreshold=outlierThreshold,
+            outlierMaskFilterOpts=outlierMaskFilterOpts,
             motorEncoderMask=motorEncoderMask,
             electrodeArrayName=electrodeArrayName,
             calcAverageLFP=calcAverageLFP,
@@ -2923,7 +3108,7 @@ def loadObjArrayAnn(st):
             #  fromRaw, the ann come back as tuple, need to recast
             try:
                 if len(st.times) == 1:
-                    st.annotations[key] = [st.annotations[key]]
+                    st.annotations[key] = np.atleast_1d(st.annotations[key]).flatten()
                 st.array_annotations.update(
                     {key: np.asarray(st.annotations[key])})
                 st.annotations[key] = np.asarray(st.annotations[key])

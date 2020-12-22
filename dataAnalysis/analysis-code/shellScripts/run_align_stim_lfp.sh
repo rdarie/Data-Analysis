@@ -10,11 +10,11 @@
 #SBATCH --mem=16G
 
 # Specify a job name:
-#SBATCH -J raster_alignStim_20201027
+#SBATCH -J lfp_alignStim_20201027
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-raster_alignStim_20201027.stdout
-#SBATCH -e ../../batch_logs/%j-raster_alignStim_20201027.errout
+#SBATCH -o ../../batch_logs/%j-lfp_alignStim_20201027.stdout
+#SBATCH -e ../../batch_logs/%j-lfp_alignStim_20201027.errout
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -45,4 +45,4 @@ conda activate
 source activate nda2
 python --version
 
-python -u ./calcAlignedAsigs.py --chanQuery="raster" --outputBlockName="raster" --eventBlockName='analyze' --signalBlockName='binarized' --verbose --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS --eventName=stimAlignTimes --alignFolderName=stim
+python -u ./calcAlignedAsigs.py --chanQuery="lfp" --outputBlockName="lfp" --eventBlockName='analyze' --signalBlockName='analyze' --verbose --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS --eventName=stimAlignTimes --alignFolderName=stim

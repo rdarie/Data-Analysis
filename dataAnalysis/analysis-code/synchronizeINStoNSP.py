@@ -126,8 +126,8 @@ print(
     'On trial {}, detecting NSP threshold crossings.'
     .format(blockIdx))
 if arguments['usedTENSPulses']:
-    interTriggerInterval = 50e-3  # 20 Hz
-    minAnalogValue = 200  # mV (determined empirically)
+    interTriggerInterval = 40e-3  # 20 Hz
+    minAnalogValue = 100  # mV (determined empirically)
     nspSrs.loc[nspSrs <= minAnalogValue] = 0
     nspPeakIdx = hf.getTriggers(
         nspSrs, iti=interTriggerInterval, itiWiggle=.5,
@@ -186,13 +186,14 @@ for trialSegment, group in approxTapTimes.groupby('tapGroup'):
     tapTrainDur = np.ceil(group['NSP'].max() - group['NSP'].min())
     firstNSPTap = group['NSP'].min()
     firstINSTap = group['INS'].min()
-    lookAround = 3
-    approxTapTimes.loc[group.index, 'tStart_NSP'] = firstNSPTap - lookAround
-    approxTapTimes.loc[group.index, 'tStop_NSP'] = firstNSPTap + tapTrainDur + lookAround
-    approxTapTimes.loc[group.index, 'tStart_INS'] = firstINSTap - lookAround
-    approxTapTimes.loc[group.index, 'tStop_INS'] = firstINSTap + tapTrainDur + lookAround
-    autoTimeRanges['NSP'].append((firstNSPTap - lookAround, firstNSPTap + tapTrainDur + lookAround))
-    autoTimeRanges['INS'].append((firstINSTap - lookAround, firstINSTap + tapTrainDur + lookAround))
+    lookAroundBack = 1
+    lookAroundFwd = 3.5
+    approxTapTimes.loc[group.index, 'tStart_NSP'] = firstNSPTap - lookAroundBack
+    approxTapTimes.loc[group.index, 'tStop_NSP'] = firstNSPTap + tapTrainDur + lookAroundFwd
+    approxTapTimes.loc[group.index, 'tStart_INS'] = firstINSTap - lookAroundBack
+    approxTapTimes.loc[group.index, 'tStop_INS'] = firstINSTap + tapTrainDur + lookAroundFwd
+    autoTimeRanges['NSP'].append((firstNSPTap - lookAroundBack, firstNSPTap + tapTrainDur + lookAroundFwd))
+    autoTimeRanges['INS'].append((firstINSTap - lookAroundBack, firstINSTap + tapTrainDur + lookAroundFwd))
     tapTimestampsNSP = group['NSP'].astype(np.float)
     allTapTimestampsNSP.append(tapTimestampsNSP)
     print('tSeg {}: NSP Taps:\n{}'.format(
@@ -259,6 +260,7 @@ if not os.path.exists(synchFunPath):
             'nsp': []
             }
         for i in pd.unique(td['data']['trialSegment'])}
+    # pdb.set_trace()
     for trialSegment in pd.unique(td['data']['trialSegment']).astype(int):
         print('detecting INS taps on trial segment {}\n'.format(trialSegment))
         accelGroupMask = accel['data']['trialSegment'] == trialSegment

@@ -102,7 +102,7 @@ channelData = {
 #
 # nspLims = nspSrs.quantile([1e-6, 1-1e-6]).to_list()
 if arguments['usedTENSPulses']:
-    interTriggerInterval = 50e-3  # 20 Hz
+    interTriggerInterval = 39.7e-3  # 20 Hz
     minAnalogValue = 200  # mV (determined empirically)
     nspSrs.loc[nspSrs <= minAnalogValue] = 0
     nspPeakIdx = hf.getTriggers(
@@ -135,6 +135,9 @@ for trialSegment, group in approxTapTimes.groupby('tapGroup'):
         '<h3>Segment {} started: '.format(trialSegment) +
         firstNSPTap.isoformat() +
         '</h3>\n')
+    summaryText += (
+        '<h3>t = {:.3f} sec'.format(group['NSP'].min()) +
+        '</h3>\n')
     if trialSegment == approxTapTimes['tapGroup'].max():
         lastNSPTime = recDateTime + pd.Timedelta(int(nspDF['t'].max() * 1e3), unit='milli')
     else:
@@ -144,10 +147,34 @@ for trialSegment, group in approxTapTimes.groupby('tapGroup'):
         '<h3>             ended: '.format(trialSegment) +
         lastNSPTime.isoformat() +
         '</h3>\n')
+
+segIdx = 0
+problemChannelsList = []
+problemThreshold = 4e3
+targetQuantile = 0.99
+summaryText += (
+    '<h3>.95 voltage intervals:</h3>\n<p>\n'
+    .format(2 * problemThreshold))
+for asigP in nspBlock.segments[segIdx].analogsignals:
+    chName = asigP.channel_index.name
+    if 'ainp' not in chName:
+        print('    Loading {}'.format(chName))
+        tempAsig = asigP.load(time_slice=[0 * pq.s, 600 * pq.s])
+        sigLims = np.quantile(
+            tempAsig, [
+                (1 - targetQuantile) / 2,
+                (1 + targetQuantile) / 2
+                ])
+        summaryText += (
+            '{}: {:.1f} uV to {:.1f} uV <br />\n'
+            .format(chName, sigLims[0], sigLims[1]))
+        if (sigLims[0] < -1 * problemThreshold) and (sigLims[1] > problemThreshold):
+            problemChannelsList.append(chName)
+summaryText += ('</p>\n<h3>List view: </h3>\n')
+summaryText += '{}\n'.format(problemChannelsList)
 approxTimesPath = os.path.join(
     scratchFolder,
-    '{}_{}_approximateTimesPreview.html'.format(
+    '{}_{}_NS5_Preview.html'.format(
         experimentName, ns5FileName))
-
 with open(approxTimesPath, 'w') as _file:
     _file.write(summaryText)

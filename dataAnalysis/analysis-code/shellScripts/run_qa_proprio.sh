@@ -28,15 +28,19 @@
 # EXP="exp201901271000"
 # EXP="exp202010271200"
 EXP="exp202011201100"
+EXP="exp202012111100"
+EXP="exp202012121100"
 
 LAZINESS="--lazy"
 
-# TRIALSELECTOR="--blockIdx=4"
-TRIALSELECTOR="--processAll"
+TRIALSELECTOR="--blockIdx=1"
+# TRIALSELECTOR="--processAll"
 
 # ALIGNQUERY="--alignQuery=midPeak"
-ALIGNQUERY="--alignQuery=stimOn"
-ALIGNFOLDER="--alignFolderName=stim"
+# ALIGNQUERY="--alignQuery=stimOn"
+# ALIGNFOLDER="--alignFolderName=stim"
+ALIGNQUERY="--alignQuery=outbound"
+ALIGNFOLDER="--alignFolderName=motion"
 
 # WINDOW="--window=long"
 # WINDOW="--window=miniRC"
