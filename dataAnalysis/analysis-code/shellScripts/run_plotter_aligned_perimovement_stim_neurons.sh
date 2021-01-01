@@ -10,18 +10,16 @@
 #SBATCH --mem=24G
 
 # Specify a job name:
-#SBATCH -J plotsStim
+#SBATCH -J plotsStim_rasters
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-plotsStim.stdout
-#SBATCH -e ../../batch_logs/%j-plotsStim.errout
+#SBATCH -o ../../batch_logs/%j-plotsStim_rasters.stdout
+#SBATCH -e ../../batch_logs/%j-plotsStim_rasters.errout
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 
-SLURM_ARRAY_TASK_ID=2
-source ./shellScripts/run_plotter_aligned_motion_preamble.sh
+SLURM_ARRAY_TASK_ID=3
+source ./shellScripts/run_plotter_aligned_perimovement_stim_preamble.sh
 
-python3 -u './plotAlignedNeurons.py' --exp=$EXP $BLOCKSELECTOR $ANALYSISFOLDER $UNITSELECTOR $WINDOW --unitQuery="all" $ALIGNQUERY $ALIGNFOLDER --enableOverrides $TIMEWINDOWOPTS $STATSOVERLAY $OUTLIERMASK
-# python3 -u './plotAlignedAsigs.py' --exp=$EXP $BLOCKSELECTOR $ANALYSISFOLDER $WINDOW --inputBlockName="rig" --unitQuery="all" $ALIGNQUERY $ALIGNFOLDER --enableOverrides $TIMEWINDOWOPTS $STATSOVERLAY $OUTLIERMASK
-# python3 -u './plotAlignedAsigs.py' --exp=$EXP $BLOCKSELECTOR $ANALYSISFOLDER $WINDOW --inputBlockName="lfp" --unitQuery="lfp" $ALIGNQUERY $ALIGNFOLDER --enableOverrides $TIMEWINDOWOPTS $STATSOVERLAY $OUTLIERMASK
+python3 -u './plotAlignedNeurons.py' --exp=$EXP --unitQuery="all" --enableOverrides $BLOCKSELECTOR $ANALYSISFOLDER $UNITSELECTOR $WINDOW $ALIGNQUERY $ALIGNFOLDER $TIMEWINDOWOPTS $STATSOVERLAY $OUTLIERMASK $PAGELIMITS

@@ -137,7 +137,7 @@ if arguments['enableOverrides']:
         'height': 4,
         'aspect': 2,
         'facet_kws': {
-            'sharey': False,
+            'sharey': True,
             # 'legend_out': False,
             'gridspec_kws': {
                 'wspace': 0.01,

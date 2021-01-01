@@ -402,6 +402,7 @@ def parseAnalysisOptions(
         estimator='mean',
         # estimator=None, units='t',
         palette="ch:0.6,-.3,dark=.1,light=0.7,reverse=1",
+        # facet_kws={'sharey': True},
         height=6, aspect=2, kind='line')
     vLineOpts = {'color': 'm', 'alpha': 0.5}
     asigPlotShadingOpts = {
