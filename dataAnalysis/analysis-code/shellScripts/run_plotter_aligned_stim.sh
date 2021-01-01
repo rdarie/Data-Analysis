@@ -40,8 +40,8 @@ SLURM_ARRAY_TASK_ID=1
 
 # UNITSELECTOR="--selector=unitSelector_minfrmaxcorr"
 
-# TRIALSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
-TRIALSELECTOR="--processAll"
+# BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
+BLOCKSELECTOR="--processAll"
 
 # WINDOW="--window=miniRC"
 WINDOW="--window=M"
@@ -55,6 +55,6 @@ OUTLIERMASK="--maskOutlierBlocks"
 #STATSOVERLAY="--overlayStats"
 TIMEWINDOWOPTS="--winStart=200 --winStop=800"
 
-python3 -u './plotAlignedNeurons.py' --exp=$EXP $TRIALSELECTOR $ANALYSISFOLDER $UNITSELECTOR $WINDOW --unitQuery="all" --alignQuery="stimOn" --rowName="RateInHz" --hueName="amplitude" --alignFolderName=stim --enableOverrides $TIMEWINDOWOPTS $STATSOVERLAY $OUTLIERMASK
-# python3 -u './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $ANALYSISFOLDER $WINDOW --inputBlockName="rig" --unitQuery="all" --alignQuery="stimOn" --rowName="RateInHz" --hueName="amplitude" --alignFolderName=stim --enableOverrides $TIMEWINDOWOPTS $STATSOVERLAY $OUTLIERMASK
-# python3 -u './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $ANALYSISFOLDER $WINDOW --inputBlockName="lfp" --unitQuery="lfp" --alignQuery="stimOn" --rowName="RateInHz" --hueName="amplitude" --alignFolderName=stim --enableOverrides $TIMEWINDOWOPTS $STATSOVERLAY $OUTLIERMASK
+python3 -u './plotAlignedNeurons.py' --exp=$EXP $BLOCKSELECTOR $ANALYSISFOLDER $UNITSELECTOR $WINDOW --unitQuery="all" --alignQuery="stimOn" --rowName="RateInHz" --hueName="amplitude" --alignFolderName=stim --enableOverrides $TIMEWINDOWOPTS $STATSOVERLAY $OUTLIERMASK
+# python3 -u './plotAlignedAsigs.py' --exp=$EXP $BLOCKSELECTOR $ANALYSISFOLDER $WINDOW --inputBlockName="rig" --unitQuery="all" --alignQuery="stimOn" --rowName="RateInHz" --hueName="amplitude" --alignFolderName=stim --enableOverrides $TIMEWINDOWOPTS $STATSOVERLAY $OUTLIERMASK
+# python3 -u './plotAlignedAsigs.py' --exp=$EXP $BLOCKSELECTOR $ANALYSISFOLDER $WINDOW --inputBlockName="lfp" --unitQuery="lfp" --alignQuery="stimOn" --rowName="RateInHz" --hueName="amplitude" --alignFolderName=stim --enableOverrides $TIMEWINDOWOPTS $STATSOVERLAY $OUTLIERMASK

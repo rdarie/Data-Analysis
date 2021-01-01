@@ -57,19 +57,13 @@ if not os.path.exists(analysisSubFolder):
 # 
 if arguments['processAll']:
     prefix = assembledName
-    alignTimeBounds = [] # not working as of 12/31/19
+    alignTimeBounds = []  # not working as of 12/31/19
     print('calcMotionStimAlignTimes does not support aggregate files')
     sys.exit()
 # trick to allow joint processing of minirc and regular trials
 if not (blockExperimentType == 'proprio'):
     print('skipping RC trial')
     sys.exit()
-#
-try:
-    alignTimeBounds = alignTimeBoundsLookup[int(arguments['blockIdx'])]
-except Exception:
-    traceback.print_exc()
-    alignTimeBounds = None
 #
 prefix = ns5FileName
 dataBlockPath = os.path.join(
@@ -78,7 +72,24 @@ dataBlockPath = os.path.join(
 print('loading {}'.format(dataBlockPath))
 dataReader, dataBlock = preproc.blockFromPath(
     dataBlockPath, lazy=arguments['lazy'])
-#
+####
+try:
+    alignTimeBounds = alignTimeBoundsLookup[int(arguments['blockIdx'])]
+except Exception:
+    traceback.print_exc()
+    fallbackTStart = float(
+        dataBlock.segments[0]
+        .filter(objects=AnalogSignalProxy)[0].t_start)
+    fallbackTStop = float(
+        dataBlock.segments[-1]
+        .filter(objects=AnalogSignalProxy)[0].t_stop)
+    alignTimeBounds = [
+        [fallbackTStart, fallbackTStop]
+    ]
+    print(
+        '\n Setting alignTimeBounds to {} -> {}'
+        .format(fallbackTStart, fallbackTStop))
+###
 dummyCateg = [
     'amplitude', 'amplitudeCat', 'program',
     'RateInHz', 'electrode', 'activeGroup',

@@ -247,6 +247,7 @@ def preprocNS5():
             ainpNameList=spikeSortingOpts[arrayName]['ainpNameList'],
             removeMeanAcross=True,
             LFPFilterOpts=None,
+            outlierMaskFilterOpts=outlierMaskFilterOpts,
             nameSuffix='',
             spikeSourceType='tdc', spikePath=spikePath,
             #

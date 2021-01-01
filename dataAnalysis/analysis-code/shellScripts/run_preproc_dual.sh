@@ -2,7 +2,7 @@
 
 # 06a: Preprocess the NS5 File
 # Request 24 hours of runtime:
-#SBATCH --time=1:00:00
+#SBATCH --time=6:00:00
 
 # Default resources are 1 core with 2.8GB of memory.
 
@@ -47,13 +47,13 @@ conda activate
 source activate nda2
 python --version
 
-SLURM_ARRAY_TASK_ID=2
+# SLURM_ARRAY_TASK_ID=3
 
 # python3 -u './previewNSPTapTimes.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --usedTENSPulses
 
 ############## init spike sorting
 # python -u ./preprocNS5.py --arrayName=utah --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --forSpikeSorting
-python -u ./tridesclousCCV.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --arrayName=utah --sourceFileSuffix=spike_preview --remakePrb --removeExistingCatalog --initCatalogConstructor
+# python -u ./tridesclousCCV.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --arrayName=utah --sourceFileSuffix=spike_preview --removeExistingCatalog --initCatalogConstructor
 ##
 # python -u ./preprocNS5.py --arrayName=nform --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --forSpikeSorting
 # python -u ./tridesclousCCV.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --arrayName=nform --sourceFileSuffix=spike_preview --remakePrb --removeExistingCatalog --initCatalogConstructor
@@ -64,7 +64,7 @@ python -u ./tridesclousCCV.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --array
 
 ######### finalize dataset
 # !! maskMotorEncoder ignores all motor events outside alignTimeBounds
-# python3 -u ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --arrayName=utah --fullSubtractMeanWithSpikes
+python -u ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --arrayName=utah --fullSubtractMeanWithSpikes
 # python3 -u ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --arrayName=nform --fullSubtractMeanWithSpikes
 
 # python3 -u ./synchronizeNFormToNSP.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --trigRate=100

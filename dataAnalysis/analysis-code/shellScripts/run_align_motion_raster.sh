@@ -10,19 +10,19 @@
 #SBATCH --mem=32G
 
 # Specify a job name:
-#SBATCH -J alignStim_20201217_raster
+#SBATCH -J alignMotion_20201217_raster
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j_%a_alignStim_20201217_raster.stdout
-#SBATCH -e ../../batch_logs/%j_%a_alignStim_20201217_raster.errout
+#SBATCH -o ../../batch_logs/%j_%a_alignMotion_20201217_raster.stdout
+#SBATCH -e ../../batch_logs/%j_%a_alignMotion_20201217_raster.errout
 
 # Request custom resources
-#SBATCH --array=3
+#SBATCH --array=2
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 
-####  SLURM_ARRAY_TASK_ID=3
-source shellScripts/run_align_stim_preamble.sh
-
+####  SLURM_ARRAY_TASK_ID=2
+source shellScripts/run_align_motion_preamble.sh
+#
 python -u ./calcAlignedAsigs.py --chanQuery="raster" --outputBlockName="raster" --eventBlockName='analyze' --signalBlockName='binarized' --verbose --exp=$EXP $BLOCKSELECTOR $WINDOW $LAZINESS $EVENTSELECTOR $ALIGNFOLDER

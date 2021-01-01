@@ -32,8 +32,8 @@ EXP="exp201901271000"
 EXP="exp202010201200"
 LAZINESS="--lazy"
 
-# ANALYSISNAME="--analysisName=loRes"
-ANALYSISNAME="--analysisName=default"
+# ANALYSISFOLDER="--analysisName=loRes"
+ANALYSISFOLDER="--analysisName=default"
 
 # BLOCKSUFFIX="--inputBlockSuffix=_full"
 BLOCKSUFFIX="--inputBlockSuffix=_ins"
@@ -45,5 +45,5 @@ source activate nda2
 python --version
 
 SLURM_ARRAY_TASK_ID=1
-# python -u ./calcProprioAnalysisNix.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISNAME $BLOCKSUFFIX --chanQuery="all" --verbose
-python -u ./calcStimAlignTimes.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISNAME --plotParamHistograms
+# python -u ./calcProprioAnalysisNix.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER $BLOCKSUFFIX --chanQuery="all" --verbose
+python -u ./calcStimAlignTimes.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER --plotParamHistograms

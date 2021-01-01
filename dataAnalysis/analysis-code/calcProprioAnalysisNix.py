@@ -118,6 +118,10 @@ def calcBlockAnalysisNix():
             )
         if len(insPropList):
             insProp = insPropList[0]
+        else:
+            print(
+                'INS properties not found! analyzing rig events only.')
+            arguments['rigOnly'] = True
         if len(rigPropList):
             rigProp = rigPropList[0]
             if arguments['rigOnly']:

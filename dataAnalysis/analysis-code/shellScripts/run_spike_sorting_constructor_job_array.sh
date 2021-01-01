@@ -21,28 +21,7 @@
 #SBATCH --account=carney-dborton-condo
 
 # Run a command
-
-# EXP="exp201901261000"
-# EXP="exp202010271200"
-# EXP="exp202011161100"
-# EXP="exp202011201100"
-# EXP="exp202011271100"
-# EXP="exp202012071100"
-# EXP="exp202012081200"
-# EXP="exp202012091200"
-# EXP="exp202012101100"
-# EXP="exp202012111100"
-# EXP="exp202012121100"
-# EXP="exp202012151200"
-# EXP="exp202012161200"
-EXP="exp202012171200"
-# EXP="exp202012181200"
-
-module load anaconda/2020.02
-. /gpfs/runtime/opt/anaconda/2020.02/etc/profile.d/conda.sh
-conda activate
-source activate nda2
-python --version
+source ./shellScripts/run_spike_sorting_preamble.sh
 
 BLOCKIDX=2
 # SLURM_ARRAY_TASK_ID=0
@@ -51,6 +30,7 @@ let CHAN_START=SLURM_ARRAY_TASK_ID
 let CHAN_STOP=SLURM_ARRAY_TASK_ID+1
 
 SOURCESELECTOR="--sourceFileSuffix=spike_preview"
+# SOURCESELECTOR="--sourceFileSuffix=mean_subtracted"
 python -u ./tridesclousCCV.py --arrayName=utah --blockIdx=$BLOCKIDX --exp=$EXP --batchPreprocess --chan_start=$CHAN_START --chan_stop=$CHAN_STOP $SOURCESELECTOR
 python -u ./tridesclousVisualize.py --arrayName=utah --blockIdx=$BLOCKIDX --exp=$EXP  --constructor --chan_start=$CHAN_START --chan_stop=$CHAN_STOP $SOURCESELECTOR
-python -u ./tridesclousCCV.py --arrayName=utah --blockIdx=$BLOCKIDX --exp=$EXP --purgePeeler --batchPeel --chan_start=$CHAN_START --chan_stop=$CHAN_STOP $SOURCESELECTOR
+python -u ./tridesclousCCV.py --arrayName=utah --blockIdx=$BLOCKIDX --exp=$EXP --batchPeel --chan_start=$CHAN_START --chan_stop=$CHAN_STOP $SOURCESELECTOR

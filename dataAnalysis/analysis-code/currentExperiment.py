@@ -103,13 +103,13 @@ def parseAnalysisOptions(
     if 'spikeSortingFilterOpts' not in expOpts:
         spikeSortingFilterOpts = {
             'low': {
-                'Wn': 6000,
-                'N': 2,
+                'Wn': 5000,
+                'N': 8,
                 'btype': 'low',
                 'ftype': 'bessel'
             },
             'high': {
-                'Wn': 200,
+                'Wn': 100,
                 'N': 2,
                 'btype': 'high',
                 'ftype': 'bessel'
@@ -121,7 +121,7 @@ def parseAnalysisOptions(
         outlierMaskFilterOpts = {
             'low': {
                 'Wn': 20,
-                'N': 2,
+                'N': 8,
                 'btype': 'low',
                 'ftype': 'bessel'
             }}

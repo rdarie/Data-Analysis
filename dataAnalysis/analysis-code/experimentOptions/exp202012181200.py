@@ -173,10 +173,10 @@ def getExpOpts():
             'previewDuration': 600,
             'previewOffset': 0,
             'interpolateOutliers': True,
-            'outlierThreshold': .999,
+            'outlierThreshold': 1 - 1e-6,
             'shape_distance_threshold': None,
             'shape_boundary_threshold': None,
-            'energy_reduction_threshold': 0.5,
+            'energy_reduction_threshold': 0.1,
             'confidence_threshold': 0.5,
             'refractory_period': None,
             'triFolderSource': {

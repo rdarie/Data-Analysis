@@ -66,7 +66,9 @@ def getExpOpts():
         #  per trial
         1: [],
         2: [],
-        3: [],
+        3: [
+            'Session1608230097867', 'Session1608230660036',
+            'Session1608231134065'],
         }
     synchInfo = {'nform': {}, 'nsp': {}, 'ins': {}}
     # populate with defaults
@@ -75,7 +77,7 @@ def getExpOpts():
         for idx, sessionName in enumerate(jsonSessionNames[blockIdx]):
             synchInfo['ins'][blockIdx][idx] = {
                 'timeRanges': None,
-                'chan': ['ins_td2'],
+                'chan': ['ins_td0', 'ins_td2'],
                 'thres': 5,
                 'iti': 50e-3,
                 'keepIndex': slice(None)
@@ -104,6 +106,7 @@ def getExpOpts():
         #  each key is a Block
         1: {},
         2: {},
+        3: {},
         }
     # options for stim artifact detection
     stimDetectOverrideStartTimes = {
@@ -125,29 +128,28 @@ def getExpOpts():
         }}
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        '202012171200-Rupert': [1],
+        '202012171200-Rupert': [2, 3],
         }
     # Options relevant to the classifcation of proprio trials
     movementSizeBins = [0, 0.4, 0.8]
     movementSizeBinLabels = ['S', 'L']
-    alignTimeBoundsLookup = None
-    # alignTimeBoundsLookup = {
-    #     1: [
-    #             [42, 1241]
-    #         ],
-    #     2: [
-    #         [25, 430]
-    #         ],
-    #     }
+    # alignTimeBoundsLookup = None
+    alignTimeBoundsLookup = {
+        3: [
+            [275, 1732]
+            ],
+        }
     outlierDetectOptions = dict(
         targetEpochSize=100e-3,
         windowSize=(-.2, .8),
+        conditionNames=[
+            'pedalDirection'],
         # conditionNames=[
         #     'electrode', 'amplitude', 'RateInHz',
         #     'pedalMovementCat', 'pedalSizeCat', 'pedalDirection'],
-        conditionNames=[
-            'electrode', 'amplitude', 'RateInHz'],
-        twoTailed=False,
+        # conditionNames=[
+        #     'electrode', 'amplitude', 'RateInHz'],
+        twoTailed=True,
         )
     #
     minNConditionRepetitions = {
@@ -179,7 +181,7 @@ def getExpOpts():
             'outlierThreshold': 1 - 1e-6,
             'shape_distance_threshold': None,
             'shape_boundary_threshold': None,
-            'energy_reduction_threshold': 0.5,
+            'energy_reduction_threshold': 0.25,
             'confidence_threshold': 0.5,
             'refractory_period': None,
             'triFolderSource': {

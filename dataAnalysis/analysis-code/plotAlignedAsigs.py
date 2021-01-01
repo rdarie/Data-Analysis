@@ -199,10 +199,10 @@ asp.plotAsigsAligned(
     sigTestResults=sigValsWide,
     figureFolder=alignedFeaturesFolder,
     enablePlots=True,
-    minNObservations = minNObservations,
+    minNObservations=minNObservations,
     plotProcFuns=[
         asp.genTicksToScale(
-            lineOpts={'lw': 2}, shared=False,
+            lineOpts={'lw': 2}, shared=True,
             # for evoked lfp report
             # xUnitFactor=1e3, yUnitFactor=1,
             # xUnits='msec', yUnits='uV',

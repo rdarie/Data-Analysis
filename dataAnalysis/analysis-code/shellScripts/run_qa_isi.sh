@@ -38,9 +38,9 @@ LAZINESS="--lazy"
 # WINDOW="--window=XXS"
 WINDOW="--window=XS"
 
-# TRIALSELECTOR="--blockIdx=1"
-# TRIALSELECTOR="--blockIdx=3"
-TRIALSELECTOR="--processAll"
+# BLOCKSELECTOR="--blockIdx=1"
+# BLOCKSELECTOR="--blockIdx=3"
+BLOCKSELECTOR="--processAll"
 
 # ANALYSISSELECTOR="--analysisName=emgHiRes"
 # ANALYSISSELECTOR="--analysisName=loRes"
@@ -75,11 +75,11 @@ python --version
 
 INPUTBLOCKNAME="--inputBlockName=emg"
 OUTPUTBLOCKNAME="--outputBlockName=emg_clean"
-python3 -u ./cleanISIData.py --exp=$EXP --alignFolderName=stim $OUTPUTBLOCKNAME $INPUTBLOCKNAME $TRIALSELECTOR $ANALYSISSELECTOR $UNITSELECTOR $WINDOW $ALIGNQUERY --saveResults --verbose --plotting
+python3 -u ./cleanISIData.py --exp=$EXP --alignFolderName=stim $OUTPUTBLOCKNAME $INPUTBLOCKNAME $BLOCKSELECTOR $ANALYSISSELECTOR $UNITSELECTOR $WINDOW $ALIGNQUERY --saveResults --verbose --plotting
 
 # INPUTBLOCKNAME="--inputBlockName=emg_clean"
-# python3 -u ./calcTrialOutliers.py --exp=$EXP --alignFolderName=stim $INPUTBLOCKNAME $TRIALSELECTOR $ANALYSISSELECTOR $UNITSELECTOR $WINDOW $ALIGNQUERY --verbose --plotting --saveResults
+# python3 -u ./calcTrialOutliers.py --exp=$EXP --alignFolderName=stim $INPUTBLOCKNAME $BLOCKSELECTOR $ANALYSISSELECTOR $UNITSELECTOR $WINDOW $ALIGNQUERY --verbose --plotting --saveResults
 # 
 # INPUTBLOCKNAME="--inputBlockName=emg_clean"
 # UNITSELECTOR="--unitQuery=isiemgenv"
-# python -u ./calcTargetNoiseCeiling.py --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --maskOutlierBlocks $ALIGNQUERY --plotting
+# python -u ./calcTargetNoiseCeiling.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISSELECTOR --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --maskOutlierBlocks $ALIGNQUERY --plotting

@@ -192,7 +192,9 @@ def calcCovMat(
         est.mahalanobis(partitionData.values),
         index=partition.index, columns=['mahalDist'])
     # print('result shape is {}'.format(result.shape))
-    result = pd.concat([result, partition.loc[:, ~dataColMask]], axis=1)
+    result = pd.concat(
+        [result, partition.loc[:, ~dataColMask]],
+        axis=1)
     result.name = 'mahalanobisDistance'
     #
     # if result['electrode'].iloc[0] == 'foo':
@@ -230,31 +232,35 @@ if __name__ == "__main__":
     #  delay to account for transmission between event
     #  at t=0 and the signal being recorded
     transmissionDelay = 0
-    if 'stimPeriod' not in trialInfo.columns:
-        trialInfo['stimPeriod'] = trialInfo['RateInHz'] ** (-1)
-        trialInfo.loc[np.isinf(trialInfo['stimPeriod']), 'stimPeriod'] = 10
-    #
-    for stimPeriod, group in trialInfo.groupby('stimPeriod'):
-        # adjust epoch size down from nominal, to capture
-        # integer number of stim periods
-        if stimPeriod > targetEpochSize:
-            epochSize = stimPeriod / np.floor(stimPeriod / targetEpochSize)
-        else:
-            epochSize = stimPeriod * np.ceil(targetEpochSize / stimPeriod)
-        print('stimPeriod = {}, epochSize = {}'.format(stimPeriod, epochSize))
-        theseTBins = group['bin'].to_numpy()
-        epochBins = np.arange(
-            theseTBins.min(), theseTBins.max(), epochSize)
-        # align epoch bins to window
-        epochOffset = np.max(epochBins[epochBins <= 0])
-        epochBins = epochBins - epochOffset + transmissionDelay
-        validBins = (epochBins > theseTBins.min()) & (epochBins < theseTBins.max())
-        epochBins = epochBins[validBins]
-        # stretch first and last epoch bin to cover entire window
-        epochBins[0] = theseTBins.min() - 1
-        epochBins[-1] = theseTBins.max() + 1
-        theseEpochs = pd.cut(theseTBins, bins=epochBins, labels=False)
-        trialInfo.loc[group.index, 'epoch'] = theseEpochs
+    if 'RateInHz' in trialInfo.columns:
+        trialInfo.loc[trialInfo['RateInHz'] <= 0, 'RateInHz'] = 1e-1
+        if 'stimPeriod' not in trialInfo.columns:
+            trialInfo['stimPeriod'] = trialInfo['RateInHz'] ** (-1)
+            trialInfo.loc[np.isinf(trialInfo['stimPeriod']), 'stimPeriod'] = 10
+        #
+        for stimPeriod, group in trialInfo.groupby('stimPeriod'):
+            # adjust epoch size down from nominal, to capture
+            # integer number of stim periods
+            if stimPeriod > targetEpochSize:
+                epochSize = stimPeriod / np.floor(stimPeriod / targetEpochSize)
+            else:
+                epochSize = stimPeriod * np.ceil(targetEpochSize / stimPeriod)
+            print('stimPeriod = {}, epochSize = {}'.format(stimPeriod, epochSize))
+            theseTBins = group['bin'].to_numpy()
+            epochBins = np.arange(
+                theseTBins.min(), theseTBins.max(), epochSize)
+            # align epoch bins to window
+            epochOffset = np.max(epochBins[epochBins <= 0])
+            epochBins = epochBins - epochOffset + transmissionDelay
+            validBins = (epochBins > theseTBins.min()) & (epochBins < theseTBins.max())
+            epochBins = epochBins[validBins]
+            # stretch first and last epoch bin to cover entire window
+            epochBins[0] = theseTBins.min() - 1
+            epochBins[-1] = theseTBins.max() + 1
+            theseEpochs = pd.cut(theseTBins, bins=epochBins, labels=False)
+            trialInfo.loc[group.index, 'epoch'] = theseEpochs
+    else:
+        trialInfo.loc[:, 'epoch'] = 0
     #
     dataDF.set_index(
         pd.Index(trialInfo['epoch'], name='epoch'),
@@ -381,7 +387,6 @@ if __name__ == "__main__":
         outlierTrials
         .loc[outlierTrials['rejectBlock'].astype(np.bool), 'deviation'].sort_values()
         ).iloc[-100:]
-    # pdb.set_trace()
     # maxDroppedTrials = pd.Series(
     #     index=np.concatenate(
     #         [
@@ -411,7 +416,8 @@ if __name__ == "__main__":
     # print(maxDroppedTrials)
     # print(saveNOutliers.sort_values())
     if arguments['plotting'] and outlierTrials['rejectBlock'].astype(np.bool).any():
-        nRowCol = int(np.ceil(np.sqrt(theseOutliers.size)))
+        # nRowCol = int(np.ceil(np.sqrt(theseOutliers.size)))
+        nRowCol = max(int(np.ceil(np.sqrt(theseOutliers.size))), 2)
         emgFig, emgAx = plt.subplots(
             nRowCol, nRowCol, sharex=True)
         emgFig.set_size_inches(5 * nRowCol, 3 * nRowCol)

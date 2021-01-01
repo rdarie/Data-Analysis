@@ -48,8 +48,8 @@
 # EXP="exp202010011100"
 # EXP="exp202010271200"
 # EXP="exp202011231200"
-EXP="exp202012181200"
 EXP="exp202012171200"
+# EXP="exp202012181200"
 
 BLOCKIDX=2
 
@@ -59,21 +59,25 @@ conda activate
 source activate nda2
 python --version
 
+# SOURCESELECTOR="--sourceFileSuffix=spike_preview"
+SOURCESELECTOR="--sourceFileSuffix=mean_subtracted"
+
+CHAN_START=88
+CHAN_STOP=89
 # Step 1: Constructor
-# python ./tridesclousCCV_jobArray.py --blockIdx=$BLOCKIDX --exp=$EXP --batchPreprocess --chan_start=66 --chan_stop=67 --arrayName=utah --sourceFileSuffix='spike_preview'
-# python ./tridesclousCCV_jobArray.py --blockIdx=$BLOCKIDX --exp=$EXP --batchPreprocess --chan_start=0 --chan_stop=50 --arrayName=utah --sourceFileSuffix='spike_preview' --remakePrb
+# python -u ./tridesclousCCV.py --arrayName=utah --blockIdx=$BLOCKIDX --exp=$EXP --batchPreprocess --chan_start=$CHAN_START --chan_stop=$CHAN_STOP $SOURCESELECTOR
 
 # Step 2: Validate the constructor
-python -u ./tridesclousVisualize.py --arrayName=utah --blockIdx=$BLOCKIDX --exp=$EXP --constructor --chan_start=2 --chan_stop=3 --sourceFileSuffix='spike_preview'
+# python -u ./tridesclousVisualize.py --arrayName=utah --blockIdx=$BLOCKIDX --exp=$EXP --constructor --chan_start=$CHAN_START --chan_stop=$CHAN_STOP $SOURCESELECTOR
 
 # Step 3: Transfer the templates
 # python ./transferTDCTemplates.py --arrayName=utah --exp=$EXP --chan_start=0 --chan_stop=96
 # python ./transferTDCTemplates.py --arrayName=nform --exp=$EXP --chan_start=0 --chan_stop=65
 
 # Step 4: Peeler
-# python -u ./tridesclousCCV_jobArray.py --arrayName=utah --blockIdx=$BLOCKIDX --exp=$EXP --purgePeeler --batchPeel --chan_start=45 --chan_stop=46 --sourceFileSuffix='spike_preview'
+# python -u ./tridesclousCCV.py --arrayName=utah --blockIdx=$BLOCKIDX --exp=$EXP --purgePeeler --batchPeel --chan_start=45 --chan_stop=46 --sourceFileSuffix='spike_preview'
 # optional: visualize the peeler
-# python -u ./tridesclousVisualize.py --blockIdx=$BLOCKIDX --exp=$EXP --peeler --chan_start=45 --chan_stop=46 --sourceFileSuffix='spike_preview'
+python -u ./tridesclousVisualize.py --blockIdx=$BLOCKIDX --exp=$EXP --peeler --chan_start=$CHAN_START --chan_stop=$CHAN_STOP $SOURCESELECTOR
 
 # Step 5:
 # python './tridesclousCCV.py' --blockIdx=$BLOCKIDX --purgePeelerDiagnostics --makeStrictNeoBlock --exp=$EXP --sourceFileSuffix='spike_preview'

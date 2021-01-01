@@ -65,8 +65,8 @@ WINDOW="--window=XS"
 # WINDOW="--window=extraExtraShort"
 
 SLURM_ARRAY_TASK_ID=4
-# TRIALSELECTOR="--processAll"
-TRIALSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
+# BLOCKSELECTOR="--processAll"
+BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
 
 # ANALYSISFOLDER="--analysisName=fullRes"
 # ANALYSISFOLDER="--analysisName=hiRes"
@@ -80,4 +80,4 @@ CHANSELECTOR="--chanQuery=all"
 # CHANSELECTOR="--chanQuery=isispinal"
 # CHANSELECTOR="--chanQuery=isispinaloremg"
 
-python -u ./calcISIAnalysisNix.py --exp=$EXP $TRIALSELECTOR $CHANSELECTOR $ANALYSISFOLDER --commitResults
+python -u ./calcISIAnalysisNix.py --exp=$EXP $BLOCKSELECTOR $CHANSELECTOR $ANALYSISFOLDER --commitResults

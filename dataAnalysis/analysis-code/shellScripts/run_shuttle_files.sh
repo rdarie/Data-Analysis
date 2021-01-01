@@ -36,8 +36,9 @@
 # EXP="exp202007081300"
 # EXP="exp202010011100"
 # EXP="exp202009231400"
-EXP="exp202011201100"
+# EXP="exp202011201100"
 # EXP="exp202011231200"
+EXP="exp202012171200"
 
 # ANALYSISSELECTOR="--analysisName=emgHiRes"
 # ANALYSISSELECTOR="--analysisName=emgLoRes"
@@ -53,5 +54,7 @@ python --version
 # global operations
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --preprocFolderFiles --fromDataToScratch
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm=tdc_ --preprocFolderFiles --fromScratchToData --moveItems
-python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm=default --fromDataToScratch
-
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm=default --fromScratchToData --moveItems
+python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm=20201217 --fromDataToScratch
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --preprocFolderFiles --fromDataToScratch
+# 

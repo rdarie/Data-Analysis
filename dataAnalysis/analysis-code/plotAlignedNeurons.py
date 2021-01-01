@@ -16,10 +16,10 @@ Options:
     --rowName=rowName                      break down by row  [default: pedalDirection]
     --rowControl=rowControl                rows to exclude from comparison
     --hueName=hueName                      break down by hue  [default: amplitude]
-    --enableOverrides                      delete outlier trials? [default: False]
     --hueControl=hueControl                hues to exclude from comparison
+    --enableOverrides                      delete outlier trials? [default: False]
     --styleName=styleName                  break down by style [default: RateInHz]
-    --styleControl=hueControl              styles to exclude from stats test
+    --styleControl=styleControl            styles to exclude from stats test
     --colName=colName                      break down by col  [default: electrode]
     --colControl=colControl                cols to exclude from comparison [default: control]
     --analysisName=analysisName            append a name to the resulting blocks? [default: default]

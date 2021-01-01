@@ -8,6 +8,7 @@ Options:
     --inputBlockSuffix=inputBlockSuffix             append a name to the resulting blocks?
     --inputInsBlockSuffix=inputInsBlockSuffix       append a name to the resulting blocks?
     --lazy                                          whether to fully load data from blocks [default: True]
+    --addToBlockSuffix=addToBlockSuffix             whether to also add stim info to the high pass filtered NSP blocks
     --curateManually                                whether to manually confirm synch [default: False]
     --preparationStage                              get aproximate timings and print to shell, to help identify time ranges? [default: False]
     --plotting                                      whether to display confirmation plots [default: False]
@@ -277,7 +278,9 @@ if not os.path.exists(synchFunPath):
             tapTimestampsINS.diff() * 1e3))
         allTapTimestampsINS.append(tapTimestampsINS)
         keepIdx = sessionTapRangesNSP[trialSegment]['keepIndex']
-        allTapTimestampsNSP[trialSegment] = allTapTimestampsNSP[trialSegment].iloc[keepIdx]
+        allTapTimestampsNSP[trialSegment] = (
+            allTapTimestampsNSP[trialSegment]
+            .iloc[keepIdx])
         #
         if arguments['curateManually']:
             try:
@@ -371,10 +374,18 @@ if plottingFigures:
     except Exception:
         traceback.print_exc()
 ############################################################
-addingToNix = True
+insBlockJustSpikes = hf.extractSignalsFromBlock(insBlock)
+insSpikeTrains = insBlockJustSpikes.filter(objects=SpikeTrain)
+# pdb.set_trace()
+# check in case the nsp block already has INS blocks added
+nspEvList = nspBlock.filter(objects=Event)
+nspEvNames = [ev.name for ev in nspEvList]
+if 'ins_property' in nspEvNames:
+    raise Warning('INS events already in NSP block!\n\t\tWill not overwrite.')
+    addingToNix = False
+else:
+    addingToNix = True
 if addingToNix:
-    insBlockJustSpikes = hf.extractSignalsFromBlock(insBlock)
-    insSpikeTrains = insBlockJustSpikes.filter(objects=SpikeTrain)
     #  reader = neo.io.nixio_fr.NixIO(filename=trialBasePath)
     #  nspBlock = reader.read_block(lazy=True)
     #  nspStP = nspBlock.filter(objects=SpikeTrainProxy)
@@ -431,6 +442,16 @@ if addingToNix:
     ns5.addBlockToNIX(
         accelBlock, neoSegIdx=[0],
         fileName=BlackrockFileName + arguments['inputBlockSuffix'],
+        folderPath=scratchFolder,
+        purgeNixNames=True,
+        nixBlockIdx=0, nixSegIdx=[0],
+        )
+
+if arguments['addToBlockSuffix'] is not None:
+    ns5.addBlockToNIX(
+        insBlockJustSpikes, neoSegIdx=[0],
+        writeAsigs=False, writeSpikes=True,
+        fileName=BlackrockFileName + '_' + arguments['addToBlockSuffix'],
         folderPath=scratchFolder,
         purgeNixNames=True,
         nixBlockIdx=0, nixSegIdx=[0],

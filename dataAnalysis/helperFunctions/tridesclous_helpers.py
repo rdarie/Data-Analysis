@@ -248,7 +248,6 @@ def extract_pca(
     return
 
 
-
 def extract_waveforms(
         triFolder, chan_grp=0,
         name='catalogue_constructor',
@@ -353,17 +352,22 @@ def open_cataloguewindow(
         # negative labels are reserved for "special" use, such as trash or alien
         mask = cc.all_peaks['cluster_label'] >= 0
         if mask.sum() < minTotalWaveforms:
+            print('Skipping chan grp {} because it has {} spikes'.format(
+                chan_grp, mask.sum()
+            ))
             openWindow = False
-            cc.all_peaks['cluster_label'][mask] = -1
-            cc.on_new_cluster()
+            cc.change_spike_label(mask, -1)
+            # cc.all_peaks['cluster_label'][mask] = -1
+            # cc.on_new_cluster()
+    print(cc)
     if openWindow:
         app = pg.mkQApp()
         win = tdc.CatalogueWindow(cc)
         win.show()
         #
         app.exec_()
-    #  re order by rms
-    cc.order_clusters(by='waveforms_rms')
+        #  re order by rms
+        cc.order_clusters(by='waveforms_rms')
     #  save catalogue before peeler
     cc.make_catalogue_for_peeler()
     return
@@ -644,7 +648,7 @@ def neo_block_after_peeler(
                         timesDF.loc[idx, 'templateDist'] = pred_distance
                         resid_energy = np.sqrt(np.sum(wf_resid**2) / wf_resid.shape[0])
                         wf_energy = np.sqrt(np.sum(wf**2) / wf.shape[0])
-                        energy_reduction = wf_energy - resid_energy
+                        energy_reduction = (wf_energy - resid_energy) / resid_energy
                         timesDF.loc[idx, 'energyReduction'] = energy_reduction
                     if shape_boundary_threshold is not None:
                         tooFar = timesDF.index[

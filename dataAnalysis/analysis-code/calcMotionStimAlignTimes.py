@@ -78,12 +78,19 @@ dataReader, dataBlock = preproc.blockFromPath(
 try:
     alignTimeBounds = alignTimeBoundsLookup[int(arguments['blockIdx'])]
 except Exception:
-    alignTimeBounds = [[
-        [
-            float(dataBlock.segments[0].filter(objects=AnalogSignalProxy)[0].t_start),
-            float(dataBlock.segments[-1].filter(objects=AnalogSignalProxy)[0].t_stop)
-        ]
-    ]]
+    traceback.print_exc()
+    fallbackTStart = float(
+        dataBlock.segments[0]
+        .filter(objects=AnalogSignalProxy)[0].t_start)
+    fallbackTStop = float(
+        dataBlock.segments[-1]
+        .filter(objects=AnalogSignalProxy)[0].t_stop)
+    alignTimeBounds = [
+        [fallbackTStart, fallbackTStop]
+    ]
+    print(
+        '\n Setting alignTimeBounds to {} -> {}'
+        .format(fallbackTStart, fallbackTStop))
 # print([asig.name for asig in dataBlock.filter(objects=EventProxy)])
 # print([asig.name for asig in dataBlock.filter(objects=Event)])
 #  some categories need to be calculated,
@@ -184,20 +191,20 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
     #  get alignment times
     moveMask = pd.Series(False, index=tdDF.index)
     stopMask = pd.Series(False, index=tdDF.index)
-    for idx, group in tdDF.groupby('trialSegment'):
-        idx = int(idx)
-        print('On trial segment {} ({} sec to {} sec)'.format(
-            idx,
-            alignTimeBounds[segIdx][idx][0],
-            alignTimeBounds[segIdx][idx][1]
-            ))
+    for sessIdx, group in tdDF.groupby('trialSegment'):
+        sessIdx = int(sessIdx)
         print('Group t min = {} t max = {}'.format(group['t'].min(), group['t'].max()))
+        print('On trial segment {} ({} sec to {} sec)'.format(
+            sessIdx,
+            alignTimeBounds[segIdx][0],
+            alignTimeBounds[segIdx][1]
+            ))
+        taskMask = (
+            (group['t'] > alignTimeBounds[segIdx][0]) &
+            (group['t'] < alignTimeBounds[segIdx][1])
+            )
         movingAtAll = group['pedalVelocityCat'].fillna(0).abs()
         movementOnOff = movingAtAll.diff()
-        taskMask = (
-            (group['t'] > alignTimeBounds[segIdx][idx][0]) &
-            (group['t'] < alignTimeBounds[segIdx][idx][1])
-            )
         moveMaskForSeg = (movementOnOff == 1) & taskMask
         stopMaskForSeg = (movementOnOff == -1) & taskMask
 
@@ -250,11 +257,11 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
     tdDF['pedalSize'].interpolate(method='nearest', inplace=True)
     tdDF['pedalSize'].fillna(method='ffill', inplace=True)
     tdDF['pedalSize'].fillna(method='bfill', inplace=True)
-    for idx, group in tdDF.groupby('trialSegment'):
-        idx = int(idx)
+    for sessIdx, group in tdDF.groupby('trialSegment'):
+        sessIdx = int(sessIdx)
         taskMask = (
-            (group['t'] > alignTimeBounds[segIdx][idx][0]) &
-            (group['t'] < alignTimeBounds[segIdx][idx][1])
+            (group['t'] > alignTimeBounds[segIdx][0]) &
+            (group['t'] < alignTimeBounds[segIdx][1])
             )
         # get pedal start point
         pedalNeutralPoint = group.loc[taskMask, 'pedalPosition'].iloc[0]
@@ -484,7 +491,7 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         if pName == 999:
             categories.loc[pMask, 'electrodeFuzzy'] = 'control'
         else:
-            unitName = 'g{}p{}'.format(gName, pName)
+            unitName = 'g{}p{}#0'.format(gName, pName)
             thisUnit = insBlock.filter(objects=Unit, name=unitName)[0]
             cathodes = thisUnit.annotations['cathodes']
             anodes = thisUnit.annotations['anodes']

@@ -10,19 +10,18 @@
 #SBATCH --mem=32G
 
 # Specify a job name:
-#SBATCH -J alignStim_20201217_fr
+#SBATCH -J alignMotion_20201217_fr
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j_%a_alignStim_20201217_fr.stdout
-#SBATCH -e ../../batch_logs/%j_%a_alignStim_20201217_fr.errout
+#SBATCH -o ../../batch_logs/%j_%a_alignMotion_20201217_fr.stdout
+#SBATCH -e ../../batch_logs/%j_%a_alignMotion_20201217_fr.errout
 
 # Request custom resources
-#SBATCH --array=3
+#SBATCH --array=2
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 
-####  SLURM_ARRAY_TASK_ID=3
-source shellScripts/run_align_stim_preamble.sh
-
+####  SLURM_ARRAY_TASK_ID=2
+source shellScripts/run_align_motion_preamble.sh
 python -u ./calcAlignedAsigs.py --chanQuery="fr" --outputBlockName="fr" --eventBlockName='analyze' --signalBlockName='fr' --verbose --exp=$EXP $BLOCKSELECTOR $WINDOW $LAZINESS $EVENTSELECTOR $ALIGNFOLDER

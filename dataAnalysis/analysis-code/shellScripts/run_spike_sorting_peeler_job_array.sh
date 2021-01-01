@@ -31,6 +31,8 @@
 # EXP="exp202011231200"
 EXP="exp202012111100"
 EXP="exp202012121100"
+EXP="exp202012171200"
+# EXP="exp202012181200"
 
 module load anaconda/2020.02
 . /gpfs/runtime/opt/anaconda/2020.02/etc/profile.d/conda.sh
@@ -38,11 +40,16 @@ conda activate
 source activate nda2
 python --version
 
-BLOCKIDX=1
+# BLOCKIDX=2
 # SLURM_ARRAY_TASK_ID=0
 let CHAN_START=SLURM_ARRAY_TASK_ID
 # for nform, groups of 4 for utah, groups of 5
 let CHAN_STOP=SLURM_ARRAY_TASK_ID+1
 
-python3 -u ./tridesclousCCV_jobArray.py --arrayName=utah --blockIdx=$BLOCKIDX --exp=$EXP --purgePeeler --batchPeel --chan_start=$CHAN_START --chan_stop=$CHAN_STOP --sourceFileSuffix='mean_subtracted'
-# python3 -u ./tridesclousCCV_jobArray.py --arrayName=nform --blockIdx=$BLOCKIDX --exp=$EXP --purgePeeler --batchPeel --chan_start=$CHAN_START --chan_stop=$CHAN_STOP --sourceFileSuffix=
+# SOURCESELECTOR="--sourceFileSuffix=spike_preview"
+SOURCESELECTOR="--sourceFileSuffix=mean_subtracted"
+# python3 -u ./tridesclousCCV.py --arrayName=utah --blockIdx=$BLOCKIDX --exp=$EXP --batchPeel --chan_start=$CHAN_START --chan_stop=$CHAN_STOP $SOURCESELECTOR
+# python3 -u ./tridesclousCCV.py --arrayName=nform --blockIdx=$BLOCKIDX --exp=$EXP --batchPeel --chan_start=$CHAN_START --chan_stop=$CHAN_STOP $SOURCESELECTOR
+
+python3 -u ./tridesclousCCV.py --arrayName=utah --blockIdx=2 --exp=$EXP --batchPeel --chan_start=$CHAN_START --chan_stop=$CHAN_STOP $SOURCESELECTOR
+python3 -u ./tridesclousCCV.py --arrayName=utah --blockIdx=3 --exp=$EXP --batchPeel --chan_start=$CHAN_START --chan_stop=$CHAN_STOP $SOURCESELECTOR

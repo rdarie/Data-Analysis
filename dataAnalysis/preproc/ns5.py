@@ -2305,6 +2305,16 @@ def preprocBlockToNix(
                     return sig
                 filterCoeffs = hf.makeFilterCoeffsSOS(
                     LFPFilterOpts, float(seg.analogsignals[0].sampling_rate))
+                # pdb.set_trace()
+                if False:
+                    import matplotlib.pyplot as plt
+                    fig, ax1, ax2 = hf.plotFilterResponse(
+                        filterCoeffs,
+                        float(seg.analogsignals[0].sampling_rate))
+                    fig2, ax3, ax4 = hf.plotFilterImpulseResponse(
+                        LFPFilterOpts,
+                        float(seg.analogsignals[0].sampling_rate))
+                    plt.show()
             # first pass through asigs, if removing mean across channels
             if (removeMeanAcross or calcAverageLFP):
                 for aSigIdx, aSigProxy in enumerate(seg.analogsignals):
@@ -2373,15 +2383,17 @@ def preprocBlockToNix(
                         (tempLFPStore.shape[0], len(asigNameList)),
                         dtype=np.float32)
                     # if interpolateOutliers
+                    '''
                     if outlierMaskFilterOpts is None:
                         outlierMaskFilterOpts = {
                          'low': {
                             'Wn': 10,
-                            'N': 2,
+                            'N': 8,
                             'btype': 'low',
                             'ftype': 'bessel'
                             }
                         }
+                    '''
                     filterCoeffsOutlierMask = hf.makeFilterCoeffsSOS(
                         outlierMaskFilterOpts, float(dummyAsig.sampling_rate))
                     lfpDeviation = np.zeros(
@@ -2504,8 +2516,8 @@ def preprocBlockToNix(
                             .loc[:, columnsForThisGroup]
                             .sum(axis=1)
                             )
-                        # smoothedDeviation = signal.sosfiltfilt(
-                        smoothedDeviation = signal.sosfilt(
+                        # smoothedDeviation = signal.sosfilt(
+                        smoothedDeviation = signal.sosfiltfilt(
                             filterCoeffsOutlierMask, lfpDeviation[:, subListIdx])
                         ##
                         if plotDevFilterDebug:

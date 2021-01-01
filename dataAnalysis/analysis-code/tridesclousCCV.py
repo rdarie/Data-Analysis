@@ -51,7 +51,6 @@ expOpts, allOpts = parseAnalysisOptions(
 globals().update(expOpts)
 globals().update(allOpts)
 
-
 SLURM_ARRAY_TASK_ID = os.environ.get('SLURM_ARRAY_TASK_ID')
 if SLURM_ARRAY_TASK_ID is not None:
     RANK = int(SLURM_ARRAY_TASK_ID)
@@ -97,18 +96,20 @@ if arguments['initCatalogConstructor'] and RANK == 0:
     except Exception:
         traceback.print_exc()
         print('Ignoring Exception')
+
 chan_start = int(arguments['chan_start'])
 chan_stop = int(arguments['chan_stop'])
-#
 dataio = tdc.DataIO(dirname=triFolder)
-chansToAnalyze = sorted(list(dataio.channel_groups.keys()))[chan_start:chan_stop]
+print(dataio)
+# chansToAnalyze = sorted(list(dataio.channel_groups.keys()))[chan_start:chan_stop]
+chansToAnalyze = list(range(chan_start, chan_stop))
 print('Analyzing channels:\n{}'.format(chansToAnalyze))
 
 theseExtractOpts = dict(
     mode='rand',
     n_left=spikeWindow[0] - 2,
     n_right=spikeWindow[1] + 2,
-    nb_max=9000,
+    nb_max=10000,
     align_waveform=False)
 #
 callbacks = [
@@ -125,7 +126,7 @@ callbacks = [
 #
 theseFeatureOpts = {
     'method': 'global_pumap',
-    'n_components': 5,
+    'n_components': 3,
     'n_neighbors': 50,
     'min_dist': 0,
     'metric': 'euclidean',
@@ -144,27 +145,26 @@ theseClusterOpts = {
     }
 #
 thesePreprocOpts = dict(
-    relative_threshold=3.5,
+    relative_threshold=4,
     fill_overflow=False,
-    highpass_freq=200.,
-    lowpass_freq=6000.,
+    highpass_freq=100.,
+    lowpass_freq=5000.,
     common_ref_freq=None,
     common_ref_removal=False,
     notch_freq=None,
     filter_order=2,
     noise_estimate_duration=spikeSortingOpts[arrayName]['previewDuration'],
     sample_snippet_duration=spikeSortingOpts[arrayName]['previewDuration'],
-    chunksize=2**22
+    chunksize=2**18
     )
 
-if RANK == 0:
-    if arguments['purgePeeler']:
-        tdch.purgeNeoBlock(triFolder)
-        tdch.purgePeelerResults(
-            triFolder, purgeAll=True)
-    if arguments['purgePeelerDiagnostics']:
-        tdch.purgePeelerResults(
-            triFolder, diagnosticsOnly=True, purgeAll=True)
+if arguments['purgePeeler']:
+    tdch.purgeNeoBlock(triFolder)
+    tdch.purgePeelerResults(
+        triFolder, purgeAll=True)
+if arguments['purgePeelerDiagnostics']:
+    tdch.purgePeelerResults(
+        triFolder, diagnosticsOnly=True, purgeAll=True)
 
 if arguments['batchPreprocess']:
     tdch.batchPreprocess(
@@ -196,11 +196,21 @@ if arguments['batchPrepWaveforms']:
         )
 
 if arguments['batchPeel']:
+    if spikeSortingOpts[arrayName]['shape_distance_threshold'] is not None:
+        shape_distance_threshold = spikeSortingOpts[arrayName]['shape_distance_threshold']
+    else:
+        shape_distance_threshold = 3
+    #
+    if spikeSortingOpts[arrayName]['shape_boundary_threshold'] is not None:
+        shape_boundary_threshold = spikeSortingOpts[arrayName]['shape_boundary_threshold']
+    else:
+        shape_boundary_threshold = 4
+    #
     tdch.batchPeel(
         triFolder, chansToAnalyze,
-        chunksize=2**22,
-        shape_distance_threshold=spikeSortingOpts[arrayName]['shape_distance_threshold'],
-        shape_boundary_threshold=spikeSortingOpts[arrayName]['shape_boundary_threshold'],
+        chunksize=thesePreprocOpts['chunksize'],
+        shape_distance_threshold=shape_distance_threshold,
+        shape_boundary_threshold=shape_boundary_threshold,
         confidence_threshold=spikeSortingOpts[arrayName]['confidence_threshold'],
         energy_reduction_threshold=spikeSortingOpts[arrayName]['energy_reduction_threshold'],
         )
@@ -222,14 +232,14 @@ else:
     waveformSignalType = 'processed'
 
 
-if arguments['makeCoarseNeoBlock'] and RANK == 0:
+if arguments['makeCoarseNeoBlock']:
     tdch.purgeNeoBlock(triFolder)
     tdch.neo_block_after_peeler(
         triFolder, chan_grps=chansToAnalyze,
         shape_distance_threshold=None, refractory_period=None,
         ignoreTags=[])
 
-if arguments['makeStrictNeoBlock'] and RANK == 0:
+if arguments['makeStrictNeoBlock']:
     tdch.purgeNeoBlock(triFolder)
     tdch.neo_block_after_peeler(
         triFolder, chan_grps=chansToAnalyze,

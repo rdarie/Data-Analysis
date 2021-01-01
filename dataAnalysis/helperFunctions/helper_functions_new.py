@@ -458,6 +458,33 @@ def plotFilterResponse(sos, fs):
     return fig, ax1, ax2
 
 
+def plotFilterImpulseResponse(
+        fOpts, fs, useAcausal=True):
+    fig2, ax3 = plt.subplots()
+    ax4 = ax3.twinx()
+    fCoeffs = makeFilterCoeffsSOS(
+        fOpts, fs)
+    nMult = 3
+    if 'high' in fOpts:
+        ti = np.arange(
+            -nMult * fOpts['high']['Wn'] ** (-1),
+            nMult * fOpts['high']['Wn'] ** (-1),
+            fs ** (-1))
+    else:
+        ti = np.arange(-.2, .2, fs ** (-1))
+    impulse = np.zeros(ti.shape)
+    impulse[int(ti.shape[0]/2)] = 1
+    if useAcausal:
+        filtered = signal.sosfiltfilt(fCoeffs, impulse)
+    else:
+        filtered = signal.sosfilt(fCoeffs, impulse)
+    ax3.plot(ti, impulse, c='tab:blue', label='impulse')
+    ax3.legend(loc='upper right')
+    ax4.plot(ti, filtered, c='tab:orange', label='filtered')
+    ax4.legend(loc='lower right')
+    return fig2, ax3, ax4
+
+
 def closestSeries(takeFrom=None, compareTo=None, strictly='neither'):
     closest = pd.Series(
         np.nan, index=takeFrom.index)

@@ -20,7 +20,7 @@
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=1,2,3
+#SBATCH --array=2,3
 
 # EXP="exp201901261000"
 # EXP="exp202010271200"
@@ -40,14 +40,14 @@ conda activate
 source activate nda2
 python --version
 
-SLURM_ARRAY_TASK_ID=2
+# SLURM_ARRAY_TASK_ID=2
 
 ########################################################################################################################################################################################################################
 
-SOURCESELECTOR="--sourceFileSuffix=spike_preview"
-# SOURCESELECTOR="--sourceFileSuffix=mean_subtracted"
+# SOURCESELECTOR="--sourceFileSuffix=spike_preview"
+SOURCESELECTOR="--sourceFileSuffix=mean_subtracted"
 # --sourceFileSuffix='spike_preview', --sourceFileSuffix='mean_subtracted'
-python -u ./tridesclousCCV_jobArray.py --arrayName=utah --blockIdx=$SLURM_ARRAY_TASK_ID --makeStrictNeoBlock --purgePeelerDiagnostics --exp=$EXP --chan_start=0 --chan_stop=96 $SOURCESELECTOR
+python -u ./tridesclousCCV.py --arrayName=utah --blockIdx=$SLURM_ARRAY_TASK_ID --makeStrictNeoBlock --exp=$EXP --chan_start=0 --chan_stop=96 $SOURCESELECTOR
 python -u ./plotSpikeReport.py --blockIdx=$SLURM_ARRAY_TASK_ID --nameSuffix=_final --exp=$EXP --arrayName=utah $SOURCESELECTOR
 #
 # python -u ./tridesclousCCV.py --arrayName=utah --blockIdx=$SLURM_ARRAY_TASK_ID --makeStrictNeoBlock --purgePeelerDiagnostics --exp=$EXP --chan_start=0 --chan_stop=96  --sourceFileSuffix='mean_subtracted'
