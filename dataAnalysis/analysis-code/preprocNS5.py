@@ -7,6 +7,7 @@ Options:
     --blockIdx=blockIdx                which trial to analyze
     --exp=exp                          which experimental day to analyze
     --arrayName=arrayName              use a named array? [default: Block]
+    --chunkSize=chunkSize              split into blocks of this size
     --forSpikeSorting                  whether to make a .nix file that has all raw traces [default: False]
     --forSpikeSortingUnfiltered        whether to make a .nix file that has all raw traces [default: False]
     --fullSubtractMean                 whether to make a .nix file that has all raw traces [default: False]
@@ -75,7 +76,10 @@ def preprocNS5():
                 traceback.print_exc()
                 print('Ignoring exception...')
 
-    chunkSize = 4000
+    if arguments['chunkSize'] is not None:
+        chunkSize = int(chunkSize)
+    else:
+        chunkSize = 4000
     chunkList = [0]
     equalChunks = False
     ###############################################################
