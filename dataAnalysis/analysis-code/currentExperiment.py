@@ -164,9 +164,9 @@ def parseAnalysisOptions(
             'elecIDs': range(17),
             'excludeClus': [],
             'upsampleRate': 8,
-            # 'interpKind': 'linear',
+            'interpKind': 'linear',
             # 'upsampleRate': 10,
-            'interpKind': 'akima',
+            # 'interpKind': 'akima',
             'forceRecalc': True,
             'detectStim': expOpts['detectStim'],
             'getINSkwargs': {}
@@ -196,9 +196,10 @@ def parseAnalysisOptions(
         }
     miniRCStimDetectionOpts = {
         'minDist': 1.2,
-        'gaussWid': 250e-3,
+        'gaussWid': 100e-3,
         'offsetFromPeak': 1e-3,
-        'artifactKeepWhat': 'first',
+        # 'artifactKeepWhat': 'first',
+        'artifactKeepWhat': 'max',
         # 'predictSlots': False, 'snapToGrid': False,
         'predictSlots': True, 'snapToGrid': True,
         'treatAsSinglePulses': False

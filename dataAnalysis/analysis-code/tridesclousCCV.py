@@ -30,7 +30,10 @@ Options:
 from docopt import docopt
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 
-import tensorflow as tf
+try:
+    import tensorflow as tf
+except Exception:
+    pass
 import tridesclous as tdc
 import dataAnalysis.helperFunctions.tridesclous_helpers as tdch
 import dataAnalysis.helperFunctions.probe_metadata as prb_meta
@@ -112,36 +115,49 @@ theseExtractOpts = dict(
     nb_max=10000,
     align_waveform=False)
 #
-callbacks = [
-    tf.keras.callbacks.EarlyStopping(
-        # Stop training when `loss` is no longer improving
-        monitor="loss",
-        # "no longer improving" being defined as "no better than 1e-2 less"
-        min_delta=5e-3,
-        # "no longer improving" being further defined as "for at least 2 epochs"
-        patience=2,
-        verbose=1,
-    )
-]
-#
+# ########## decomposition options
+
+#  ### parametric umap (with tensorflow) projection options
+#  callbacks = [
+#      tf.keras.callbacks.EarlyStopping(
+#          # Stop training when `loss` is no longer improving
+#          monitor="loss",
+#          # "no longer improving" being defined as "no better than 1e-2 less"
+#          min_delta=5e-3,
+#          # "no longer improving" being further defined as "for at least 2 epochs"
+#          patience=2,
+#          verbose=1,
+#      )
+#  ]
+#  #
+#  theseFeatureOpts = {
+#      'method': 'global_pumap',
+#      'n_components': 3,
+#      'n_neighbors': 50,
+#      'min_dist': 0,
+#      'metric': 'euclidean',
+#      'set_op_mix_ratio': 0.9,
+#      'parametric_reconstruction': False,
+#      'autoencoder_loss': False,
+#      'verbose': False,
+#      'batch_size': 10000,
+#      'n_training_epochs': 15,
+#      'keras_fit_kwargs': {'verbose': 2, 'callbacks': callbacks}
+#  }
+
+#  ### PCA opts
 theseFeatureOpts = {
-    'method': 'global_pumap',
-    'n_components': 3,
-    'n_neighbors': 50,
-    'min_dist': 0,
-    'metric': 'euclidean',
-    'set_op_mix_ratio': 0.9,
-    'parametric_reconstruction': False,
-    'autoencoder_loss': False,
-    'verbose': False,
-    'batch_size': 10000,
-    'n_training_epochs': 15,
-    'keras_fit_kwargs': {'verbose': 2, 'callbacks': callbacks}
+    'method': 'global_pca',
+    'n_components': 5
 }
+# ########## clustering options
 #
+# theseClusterOpts = {
+#     'method': 'agglomerative',
+#     'n_clusters': 2
+#     }
 theseClusterOpts = {
-    'method': 'agglomerative',
-    'n_clusters': 2
+    'method': 'onecluster',
     }
 #
 thesePreprocOpts = dict(

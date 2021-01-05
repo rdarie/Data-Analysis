@@ -48,10 +48,11 @@
 # EXP="exp202010011100"
 # EXP="exp202010271200"
 # EXP="exp202011231200"
-EXP="exp202012171200"
+# EXP="exp202012171200"
 # EXP="exp202012181200"
+EXP="exp202101051100"
 
-BLOCKIDX=2
+BLOCKIDX=1
 
 module load anaconda/2020.02
 . /gpfs/runtime/opt/anaconda/2020.02/etc/profile.d/conda.sh
@@ -59,11 +60,11 @@ conda activate
 source activate nda2
 python --version
 
-# SOURCESELECTOR="--sourceFileSuffix=spike_preview"
-SOURCESELECTOR="--sourceFileSuffix=mean_subtracted"
+SOURCESELECTOR="--sourceFileSuffix=spike_preview"
+# SOURCESELECTOR="--sourceFileSuffix=mean_subtracted"
 
-CHAN_START=88
-CHAN_STOP=89
+CHAN_START=0
+CHAN_STOP=1
 # Step 1: Constructor
 # python -u ./tridesclousCCV.py --arrayName=utah --blockIdx=$BLOCKIDX --exp=$EXP --batchPreprocess --chan_start=$CHAN_START --chan_stop=$CHAN_STOP $SOURCESELECTOR
 
@@ -75,9 +76,9 @@ CHAN_STOP=89
 # python ./transferTDCTemplates.py --arrayName=nform --exp=$EXP --chan_start=0 --chan_stop=65
 
 # Step 4: Peeler
-# python -u ./tridesclousCCV.py --arrayName=utah --blockIdx=$BLOCKIDX --exp=$EXP --purgePeeler --batchPeel --chan_start=45 --chan_stop=46 --sourceFileSuffix='spike_preview'
+# python -u ./tridesclousCCV.py --arrayName=utah --blockIdx=$BLOCKIDX --exp=$EXP --batchPeel --chan_start=$CHAN_START --chan_stop=$CHAN_STOP $SOURCESELECTOR
 # optional: visualize the peeler
-python -u ./tridesclousVisualize.py --blockIdx=$BLOCKIDX --exp=$EXP --peeler --chan_start=$CHAN_START --chan_stop=$CHAN_STOP $SOURCESELECTOR
+# python -u ./tridesclousVisualize.py --blockIdx=$BLOCKIDX --exp=$EXP --peeler --chan_start=$CHAN_START --chan_stop=$CHAN_STOP $SOURCESELECTOR
 
 # Step 5:
 # python './tridesclousCCV.py' --blockIdx=$BLOCKIDX --purgePeelerDiagnostics --makeStrictNeoBlock --exp=$EXP --sourceFileSuffix='spike_preview'

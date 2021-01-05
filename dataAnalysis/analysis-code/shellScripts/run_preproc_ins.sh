@@ -47,12 +47,13 @@ python --version
 # EXP="exp202011301200"
 # EXP="exp202012111100"
 # EXP="exp202012121100"
-EXP="exp202012151200"
-EXP="exp202012171200"
+# EXP="exp202012151200"
+# EXP="exp202012171200"
+EXP="exp202101051100"
 
-SLURM_ARRAY_TASK_ID=3
+SLURM_ARRAY_TASK_ID=1
 
-# python -u ./viewINSSessionSummary.py
+# python -u ./previewINSSessionSummary.py --exp=$EXP
 
 # --makePlots to make quality check plots
 # --showPlots to interactively display quality check plots

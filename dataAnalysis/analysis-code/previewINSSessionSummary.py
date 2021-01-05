@@ -5,6 +5,8 @@ Usage:
 
 Options:
     --sessionName=sessionName          which session to view
+    --blockIdx=blockIdx                which trial to analyze [default: 1]
+    --exp=exp                          which experimental day to analyze
 """
 
 import matplotlib
@@ -12,6 +14,7 @@ matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
 matplotlib.use('Qt5Agg')   # generate interactive qt output
 # matplotlib.use('PS')   # generate offline postscript
+from currentExperiment import parseAnalysisOptions
 import seaborn as sns
 import pandas as pd
 import quantities as pq
@@ -26,11 +29,16 @@ import dataAnalysis.preproc.mdt_constants as mdt_constants
 import os
 from docopt import docopt
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
+expOpts, allOpts = parseAnalysisOptions(
+    int(arguments['blockIdx']), arguments['exp'])
+globals().update(expOpts)
+globals().update(allOpts)
 
 import line_profiler
 import atexit
 import traceback
 import json
+
 
 def summarizeINSSession(
         sessionUnixTime=None,
@@ -114,10 +122,11 @@ def summarizeINSSession(
 
 
 def summarizeINSSessionWrapper():
-    subjectName = 'Rupert'
-    deviceName = 'DeviceNPC700246H'
-    orcaFolderPath = '/gpfs/data/dborton/rdarie/Neural Recordings/ORCA Logs'
     # pdb.set_trace()
+    # subjectName = 'Rupert'
+    # deviceName = 'DeviceNPC700246H'
+    # orcaFolderPath = '/gpfs/data/dborton/rdarie/Neural Recordings/ORCA Logs'
+    orcaFolderPath = os.path.join(remoteBasePath, 'ORCA Logs')
     sessionFolders = sorted(
         glob.glob(os.path.join(orcaFolderPath, subjectName, 'Session*')))
     sessionUnixTimeList = [
@@ -132,6 +141,8 @@ def summarizeINSSessionWrapper():
         )
     if not os.path.exists(listOfSummarizedPath):
         listOfSummarized = {'sessions': []}
+        with open(listOfSummarizedPath, 'w') as f:
+            json.dump(listOfSummarized, f)
     else:
         with open(listOfSummarizedPath, 'r') as f:
             listOfSummarized = json.load(f)
