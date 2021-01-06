@@ -22,6 +22,7 @@ import pandas as pd
 from datetime import datetime as dt
 import os, gc
 import traceback
+import json
 from functools import reduce
 #  import h5py
 import re
@@ -2264,7 +2265,7 @@ def preprocBlockToNix(
             for a in ainpNameList]
         ainpList = []
         for a in seg.analogsignals:
-            if np.any([n in a.name for n in ainpNameListSeg]):
+            if np.any([n == a.name for n in ainpNameListSeg]):
                 ainpList.append(a)
     else:
         ainpList = [
@@ -2957,6 +2958,7 @@ def preproc(
         # swapMaps=None,
         electrodeArrayName='utah',
         fillOverflow=True, removeJumps=True,
+        removeMeanAcross=False,
         interpolateOutliers=False,
         outlierMaskFilterOpts=None,
         outlierThreshold=1,
@@ -2964,13 +2966,11 @@ def preproc(
         calcAverageLFP=False,
         eventInfo=None,
         spikeSourceType='', spikePath=None,
-        chunkSize=1800, equalChunks=True,
-        chunkList=None, chunkOffset=0,
+        chunkSize=1800, equalChunks=True, chunkList=None, chunkOffset=0,
         writeMode='rw',
         signal_group_mode='split-all', trialInfo=None,
         asigNameList=None, ainpNameList=None, nameSuffix='',
         calcRigEvents=True, normalizeByImpedance=False,
-        removeMeanAcross=False,
         LFPFilterOpts=None, encoderCountPerDegree=180e2
         ):
     #  base file name
@@ -3004,6 +3004,7 @@ def preproc(
         actualChunkSize = chunkSize
     if chunkList is None:
         chunkList = range(nChunks)
+    chunkingMetadata = {}
     for chunkIdx in chunkList:
         print('preproc on chunk {}'.format(chunkIdx))
         #  instantiate spike reader if requested
@@ -3036,25 +3037,31 @@ def preproc(
             spikeBlock = None
         #
         #  instantiate writer
-        thisChunkOutFilePath = (
-            outputFilePath
-            .replace('.nix', '_pt{:0>3}.nix'.format(chunkIdx)))
+        if nChunks > 1:
+            partNameSuffix = '_pt{:0>3}'.format(chunkIdx)
+            thisChunkOutFilePath = (
+                outputFilePath
+                .replace('.nix', partNameSuffix + '.nix'))
+        else:
+            partNameSuffix = ""
+            thisChunkOutFilePath = outputFilePath
+        #
         if os.path.exists(thisChunkOutFilePath):
             os.remove(thisChunkOutFilePath)
         writer = NixIO(
             filename=thisChunkOutFilePath, mode=writeMode)
         chunkTStart = chunkIdx * actualChunkSize + chunkOffset
         chunkTStop = (chunkIdx + 1) * actualChunkSize + chunkOffset
+        chunkingMetadata[chunkIdx] = {
+            'filename': thisChunkOutFilePath,
+            'partNameSuffix': partNameSuffix,
+            'chunkTStart': chunkTStart,
+            'chunkTStop': chunkTStop}
+        block.annotate(chunkTStart=chunkTStart)
+        block.annotate(chunkTStop=chunkTStop)
         #
-        # newBlock = deepcopy(block)
-        # if spikeBlock is not None:
-        #     newSpikeBlock = deepcopy(spikeBlock)
-        # else:
-        #     newSpikeBlock = None
-        newBlock = block
-        newSpikeBlock = spikeBlock
         preprocBlockToNix(
-            newBlock, writer,
+            block, writer,
             chunkTStart=chunkTStart,
             chunkTStop=chunkTStop,
             fillOverflow=fillOverflow,
@@ -3068,7 +3075,7 @@ def preproc(
             eventInfo=eventInfo,
             asigNameList=asigNameList, ainpNameList=ainpNameList,
             spikeSourceType=spikeSourceType,
-            spikeBlock=newSpikeBlock,
+            spikeBlock=spikeBlock,
             calcRigEvents=calcRigEvents,
             normalizeByImpedance=normalizeByImpedance,
             removeMeanAcross=removeMeanAcross,
@@ -3076,7 +3083,15 @@ def preproc(
             encoderCountPerDegree=encoderCountPerDegree
             )
         writer.close()
-    #
+    chunkingInfoPath = os.path.join(
+        outputFolderPath,
+        fileName + nameSuffix +
+        '_chunkingInfo.json'
+        )
+    if os.path.exists(chunkingInfoPath):
+        os.remove(chunkingInfoPath)
+    with open(chunkingInfoPath, 'w') as f:
+        json.dump(chunkingMetadata, f)
     return
 
 

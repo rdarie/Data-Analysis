@@ -28,6 +28,7 @@ from scipy.spatial.distance import minkowski
 import scipy.signal
 import dill as pickle
 
+
 def initialize_catalogueconstructor(
         folderPath, fileName,
         triFolder, prbPath=None,
@@ -43,8 +44,9 @@ def initialize_catalogueconstructor(
         filePath = os.path.join(folderPath, fileName + '.nix')
     if fileFormat == 'Blackrock':
         filePath = os.path.join(folderPath, fileName + '.ns5')
-    print(filePath)  # check
+    print('dataIO: ')
     dataio = tdc.DataIO(dirname=triFolder)
+    print('using file: {}'.format(filePath))  # check
     dataio.set_data_source(
         type=fileFormat, filenames=[filePath])
     #
@@ -939,19 +941,20 @@ def batchPreprocess(
             'method': 'kmeans',
             'n_clusters': 4,
             },
-        common_ref_removal=False,
-        noise_estimate_duration=120.,
-        sample_snippet_duration=240.,
-        chunksize=4096,
-        nb_noise_snippet=2000,
-        minWaveforms=10, minWaveformRate=None,
-        alien_value_threshold=150.,
         extractOpts=dict(
             mode='rand',
             n_left=-34, n_right=66, nb_max=500000,
             align_waveform=False,
             subsample_ratio=20),
         autoMerge=False, auto_merge_threshold=0.8,
+        auto_make_catalog=False,
+        common_ref_removal=False,
+        noise_estimate_duration=120.,
+        sample_snippet_duration=240.,
+        chunksize=int(2**12),
+        nb_noise_snippet=2000,
+        minWaveforms=10, minWaveformRate=None,
+        alien_value_threshold=150.,
         attemptMPI=False
         ):
     print('Batch preprocessing...')
@@ -973,6 +976,7 @@ def batchPreprocess(
         if idx % SIZE == RANK:
             print('memory usage: {}'.format(
                 prf.memory_usage_psutil()))
+            print('About to run preprocess_signals_and_peaks()...')
             preprocess_signals_and_peaks(
                 triFolder, chan_grp=chan_grp,
                 chunksize=chunksize,
@@ -991,6 +995,7 @@ def batchPreprocess(
                 common_ref_removal=common_ref_removal,
                 noise_estimate_duration=noise_estimate_duration,
                 sample_snippet_duration=sample_snippet_duration)
+            print('About to run extract_waveforms_pca()...')
             extract_waveforms_pca(
                 triFolder,
                 chan_grp=chan_grp,
@@ -1000,10 +1005,11 @@ def batchPreprocess(
                 extractOpts=extractOpts,
                 featureOpts=featureOpts
                 )
+            print('About to run cluster()...')
             cluster(
                 triFolder,
                 clusterOpts=clusterOpts,
-                chan_grp=chan_grp, auto_make_catalog=False,
+                chan_grp=chan_grp, auto_make_catalog=auto_make_catalog,
                 autoMerge=autoMerge, auto_merge_threshold=auto_merge_threshold)
     return
 
@@ -1141,7 +1147,6 @@ def batchPeel(
     print('RANK={}, SIZE={}'.format(RANK, SIZE))
     for idx, chan_grp in enumerate(chansToAnalyze):
         if idx % SIZE == RANK:
-        # if idx == 24:
             print('chan_grp {}, memory usage: {}'.format(
                 chan_grp,
                 prf.memory_usage_psutil()))

@@ -8,14 +8,13 @@ Options:
     --exp=exp                          which experimental day to analyze
     --arrayName=arrayName              use a named array? [default: Block]
     --chunkSize=chunkSize              split into blocks of this size
+    --analogOnly                       whether to make a .nix file that has all raw traces [default: False]
     --forSpikeSorting                  whether to make a .nix file that has all raw traces [default: False]
     --forSpikeSortingUnfiltered        whether to make a .nix file that has all raw traces [default: False]
     --fullSubtractMean                 whether to make a .nix file that has all raw traces [default: False]
     --fullSubtractMeanWithSpikes       whether to make a .nix file that has all raw traces [default: False]
     --rippleNForm                      whether to make a .nix file that has all raw traces [default: False]
     --makeFull                         whether to make a .nix file that has all raw traces [default: False]
-    --previewMotorEncoder              whether to make a .nix file to preview the motor encoder analysis [default: False]
-    --makeTruncated                    whether to make a .nix file that only has analog inputs [default: False]
     --maskMotorEncoder                 whether to ignore motor encoder activity outside the alignTimeBounds window [default: False]
     --ISI                              special options for parsing Ripple files from ISI [default: False]
     --transferISIStimLog               special options for parsing Ripple files from ISI [default: False]
@@ -36,10 +35,6 @@ arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(int(arguments['blockIdx']), arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
-
-enablePathOverrides = True
-if enablePathOverrides:
-    nspFolder = nspFolder.replace('G:\\Delsys', 'F:\\Trellis')
 
 
 def preprocNS5():
@@ -80,7 +75,7 @@ def preprocNS5():
         chunkSize = int(arguments['chunkSize'])
     else:
         chunkSize = 4000
-    chunkList = None
+    chunkList = [0, 1, 2]
     equalChunks = False
     ###############################################################
     groupAsigsByBank = True
@@ -101,43 +96,7 @@ def preprocNS5():
         motorEncoderMask = alignTimeBoundsLookup[int(arguments['blockIdx'])]
     else:
         motorEncoderMask = None
-    #
-    if arguments['previewMotorEncoder']:
-        analogInputNames = sorted(
-            trialFilesFrom['utah']['eventInfo']['inputIDs'].values())
-        assert trialFilesFrom['utah']['calcRigEvents']
-        reader =ns5.preproc(
-            fileName=ns5FileName,
-            rawFolderPath=nspFolder,
-            outputFolderPath=scratchFolder,
-            fillOverflow=False, removeJumps=False,
-            motorEncoderMask=None,
-            calcAverageLFP=False,
-            eventInfo=trialFilesFrom['utah']['eventInfo'],
-            asigNameList=analogInputNames,
-            spikeSourceType='nev', writeMode='ow',
-            chunkSize=chunkSize, equalChunks=equalChunks,
-            chunkList=chunkList,
-            nameSuffix='_motorPreview',
-            calcRigEvents=trialFilesFrom['utah']['calcRigEvents'])
-    #
-    if arguments['makeTruncated']:
-        analogInputNames = sorted(
-            trialFilesFrom['utah']['eventInfo']['inputIDs'].values())
-        # pdb.set_trace()
-        ns5.preproc(
-            fileName=ns5FileName,
-            rawFolderPath=nspFolder,
-            outputFolderPath=scratchFolder,
-            fillOverflow=False, removeJumps=False,
-            motorEncoderMask=motorEncoderMask,
-            calcAverageLFP=True,
-            eventInfo=trialFilesFrom['utah']['eventInfo'],
-            asigNameList=[],
-            ainpNameList=analogInputNames,
-            spikeSourceType='tdc', writeMode='ow',
-            chunkSize=chunkSize, equalChunks=equalChunks, chunkList=chunkList,
-            calcRigEvents=trialFilesFrom['utah']['calcRigEvents'])
+    ###############################################################
     #
     if arguments['rippleNForm']:
         analogInputNames = sorted(
@@ -181,7 +140,6 @@ def preprocNS5():
             chunkOffset=spikeSortingOpts[arrayName]['previewOffset'],
             equalChunks=False, chunkList=[0],
             calcRigEvents=False)
-    #
     #
     if arguments['forSpikeSortingUnfiltered']:
         ns5.preproc(
@@ -233,6 +191,23 @@ def preprocNS5():
             chunkSize=chunkSize, equalChunks=equalChunks, chunkList=chunkList,
             calcRigEvents=trialFilesFrom['utah']['calcRigEvents'])
     #
+    if arguments['analogOnly']:
+        analogInputNames = sorted(
+            trialFilesFrom['utah']['eventInfo']['inputIDs'].values())
+        ns5.preproc(
+            fileName=ns5FileName,
+            rawFolderPath=nspFolder,
+            outputFolderPath=scratchFolder, mapDF=mapDF,
+            fillOverflow=False, removeJumps=False,
+            motorEncoderMask=motorEncoderMask,
+            eventInfo=trialFilesFrom['utah']['eventInfo'],
+            asigNameList=[],
+            ainpNameList=analogInputNames,
+            spikeSourceType='',
+            nameSuffix='_analog_inputs', writeMode='ow',
+            chunkSize=4000,
+            calcRigEvents=trialFilesFrom['utah']['calcRigEvents'])
+    #
     if arguments['fullSubtractMeanWithSpikes']:
         spikePath = os.path.join(
             scratchFolder, 'tdc_' + ns5FileName + '_mean_subtracted',
@@ -256,21 +231,6 @@ def preprocNS5():
             spikeSourceType='tdc', spikePath=spikePath,
             #
             writeMode='ow',
-            chunkSize=chunkSize, equalChunks=equalChunks, chunkList=chunkList,
-            calcRigEvents=trialFilesFrom['utah']['calcRigEvents'])
-    ###############################################################################
-    if arguments['makeFull']:
-        analogInputNames = sorted(
-            trialFilesFrom['utah']['eventInfo']['inputIDs'].values())
-        ns5.preproc(
-            fileName=ns5FileName,
-            rawFolderPath=nspFolder,
-            outputFolderPath=scratchFolder,
-            fillOverflow=False, removeJumps=False,
-            motorEncoderMask=motorEncoderMask,
-            eventInfo=trialFilesFrom['utah']['eventInfo'],
-            asigNameList=None, ainpNameList=analogInputNames,
-            spikeSourceType='tdc', writeMode='ow',
             chunkSize=chunkSize, equalChunks=equalChunks, chunkList=chunkList,
             calcRigEvents=trialFilesFrom['utah']['calcRigEvents'])
     ###############################################################################

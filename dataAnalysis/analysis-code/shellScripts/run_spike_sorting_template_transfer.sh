@@ -28,9 +28,10 @@
 # EXP="exp202011161100"
 # EXP="exp202011201100"
 # EXP="exp202011231200"
-EXP="exp202012111100"
-EXP="exp202012121100"
-EXP="exp202012171200"
+# EXP="exp202012111100"
+# EXP="exp202012121100"
+# EXP="exp202012171200"
+EXP="exp202101051100"
 
 module load anaconda/2020.02
 . /gpfs/runtime/opt/anaconda/2020.02/etc/profile.d/conda.sh
@@ -39,4 +40,4 @@ source activate nda2
 python --version
 
 # Step 3: Transfer the templates
-python3 ./transferTDCTemplates.py --arrayName=utah --exp=$EXP --chan_start=0 --chan_stop=96
+python ./transferTDCTemplates.py --arrayName=utah --exp=$EXP --chan_start=0 --chan_stop=96

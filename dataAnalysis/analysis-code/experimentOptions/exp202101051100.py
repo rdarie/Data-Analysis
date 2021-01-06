@@ -177,7 +177,7 @@ def getExpOpts():
             'confidence_threshold': 0.5,
             'refractory_period': None,
             'triFolderSource': {
-                'exp': experimentName, 'block': 2,
+                'exp': experimentName, 'block': 1,
                 'nameSuffix': 'spike_preview'},
             'triFolderDest': [
                 {
