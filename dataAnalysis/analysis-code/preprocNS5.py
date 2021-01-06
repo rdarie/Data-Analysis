@@ -77,10 +77,10 @@ def preprocNS5():
                 print('Ignoring exception...')
 
     if arguments['chunkSize'] is not None:
-        chunkSize = int(chunkSize)
+        chunkSize = int(arguments['chunkSize'])
     else:
         chunkSize = 4000
-    chunkList = [0]
+    chunkList = None
     equalChunks = False
     ###############################################################
     groupAsigsByBank = True
@@ -125,7 +125,7 @@ def preprocNS5():
         analogInputNames = sorted(
             trialFilesFrom['utah']['eventInfo']['inputIDs'].values())
         # pdb.set_trace()
-        reader = ns5.preproc(
+        ns5.preproc(
             fileName=ns5FileName,
             rawFolderPath=nspFolder,
             outputFolderPath=scratchFolder,
@@ -143,7 +143,7 @@ def preprocNS5():
         analogInputNames = sorted(
             trialFilesFrom['utah']['eventInfo']['inputIDs'].values())
         # pdb.set_trace()
-        reader = ns5.preproc(
+        ns5.preproc(
             fileName=ns5FileName,
             rawFolderPath=nspFolder,
             outputFolderPath=scratchFolder, mapDF=mapDF,
@@ -158,7 +158,7 @@ def preprocNS5():
             calcRigEvents=False)
     #
     if arguments['forSpikeSorting']:
-        reader = ns5.preproc(
+        ns5.preproc(
             fileName=ns5FileName,
             rawFolderPath=nspFolder,
             outputFolderPath=scratchFolder, mapDF=mapDF,
@@ -184,7 +184,7 @@ def preprocNS5():
     #
     #
     if arguments['forSpikeSortingUnfiltered']:
-        reader = ns5.preproc(
+        ns5.preproc(
             fileName=ns5FileName,
             rawFolderPath=nspFolder,
             outputFolderPath=scratchFolder, mapDF=mapDF,
@@ -211,7 +211,7 @@ def preprocNS5():
     #
     #
     if arguments['fullSubtractMean']:
-        reader = ns5.preproc(
+        ns5.preproc(
             fileName=ns5FileName,
             rawFolderPath=nspFolder,
             outputFolderPath=scratchFolder, mapDF=mapDF,
@@ -238,7 +238,7 @@ def preprocNS5():
             scratchFolder, 'tdc_' + ns5FileName + '_mean_subtracted',
             'tdc_' + ns5FileName + '_mean_subtracted' + '.nix'
             )
-        reader = ns5.preproc(
+        ns5.preproc(
             fileName=ns5FileName,
             rawFolderPath=nspFolder,
             outputFolderPath=scratchFolder, mapDF=mapDF,
@@ -262,7 +262,7 @@ def preprocNS5():
     if arguments['makeFull']:
         analogInputNames = sorted(
             trialFilesFrom['utah']['eventInfo']['inputIDs'].values())
-        reader = ns5.preproc(
+        ns5.preproc(
             fileName=ns5FileName,
             rawFolderPath=nspFolder,
             outputFolderPath=scratchFolder,
@@ -288,7 +288,7 @@ def preprocNS5():
         # else:
         #     swapMaps = None
     if arguments['ISI']:
-        reader = ns5.preproc(
+        ns5.preproc(
             fileName=ns5FileName,
             rawFolderPath=nspFolder,
             outputFolderPath=scratchFolder, mapDF=mapDF,
@@ -313,7 +313,7 @@ def preprocNS5():
             except Exception:
                 traceback.print_exc()
     if arguments['ISIMinimal']:
-        reader = ns5.preproc(
+        ns5.preproc(
             fileName=ns5FileName,
             rawFolderPath=nspFolder,
             outputFolderPath=scratchFolder,
@@ -339,7 +339,7 @@ def preprocNS5():
                 traceback.print_exc()
     ##################################################################################
     if arguments['ISIRaw']:
-        reader = ns5.preproc(
+        ns5.preproc(
             fileName=ns5FileName,
             rawFolderPath=nspFolder,
             outputFolderPath=scratchFolder, mapDF=None,
