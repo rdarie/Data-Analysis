@@ -111,13 +111,14 @@ def preprocess_signals_and_peaks(
         noise_estimate_duration=60.,
         sample_snippet_duration=240.,
         signalpreprocessor_engine='numpy',
-        peakdetector_engine='numpy'):
-
+        peakdetector_engine='numpy',
+        verboseTiming=False):
+    #
     dataio = tdc.DataIO(dirname=triFolder)
     cc = tdc.CatalogueConstructor(
         dataio=dataio, name=name, chan_grp=chan_grp)
     print(dataio)
-
+    #
     cc.set_preprocessor_params(
         chunksize=chunksize,
         signalpreprocessor_engine=signalpreprocessor_engine,
@@ -140,20 +141,24 @@ def preprocess_signals_and_peaks(
     #
     total_duration = np.floor(
         cc.dataio.get_segment_shape(0)[0] / cc.dataio.sample_rate)
-    t1 = time.perf_counter()
+    if verboseTiming:
+        t1 = time.perf_counter()
     if noise_estimate_duration == 'all':
         noise_estimate_duration = total_duration
     cc.estimate_signals_noise(
         seg_num=0, duration=noise_estimate_duration)
-    t2 = time.perf_counter()
-    print('estimate_signals_noise took {} seconds'.format(t2-t1))
+    if verboseTiming:
+        t2 = time.perf_counter()
+        print('estimate_signals_noise took {} seconds'.format(t2-t1))
     if sample_snippet_duration == 'all':
         sample_snippet_duration = total_duration
-    t1 = time.perf_counter()
+    if verboseTiming:
+        t1 = time.perf_counter()
     cc.run_signalprocessor(
         duration=sample_snippet_duration)
-    t2 = time.perf_counter()
-    print('run_signalprocessor took {} seconds'.format(t2-t1))
+    if verboseTiming:
+        t2 = time.perf_counter()
+        print('run_signalprocessor took {} seconds'.format(t2-t1))
     print(cc)
     return
 
@@ -172,22 +177,26 @@ def extract_waveforms_pca(
         featureOpts={
             'method': 'neighborhood_pca',
             'n_components_by_neighborhood': 10,
-            'radius_um': 600}
+            'radius_um': 600},
+        verboseTiming=False
         ):
     dataio = tdc.DataIO(dirname=triFolder)
     cc = tdc.CatalogueConstructor(
         dataio=dataio, name=name, chan_grp=chan_grp)
     if extractOpts['mode'] == 'all':
         extractOpts['nb_max'] = None
-    t1 = time.perf_counter()
+    if verboseTiming:
+        t1 = time.perf_counter()
     cc.extract_some_waveforms(**extractOpts)
-    t2 = time.perf_counter()
-    print('extract_some_waveforms took {} seconds'.format(t2-t1))
-    t1 = time.perf_counter()
+    if verboseTiming:
+        t2 = time.perf_counter()
+        print('extract_some_waveforms took {} seconds'.format(t2-t1))
+        t1 = time.perf_counter()
     cc.clean_waveforms(
         alien_value_threshold=alien_value_threshold)
-    t2 = time.perf_counter()
-    print('clean_waveforms took {} seconds'.format(t2-t1))
+    if verboseTiming:
+        t2 = time.perf_counter()
+        print('clean_waveforms took {} seconds'.format(t2-t1))
     if cc.some_waveforms is not None:
         if (cc.some_waveforms.shape[0] < minWaveforms):
             print('No waveforms found!')
@@ -196,15 +205,18 @@ def extract_waveforms_pca(
         print('No waveforms found!')
         return
     #  extract_some_noise
-    t1 = time.perf_counter()
+    if verboseTiming:
+        t1 = time.perf_counter()
     cc.extract_some_noise(
         nb_snippet=nb_noise_snippet)
-    t2 = time.perf_counter()
-    print('extract_some_noise took {} seconds'.format(t2-t1))
-    t1 = time.perf_counter()
+    if verboseTiming:
+        t2 = time.perf_counter()
+        print('extract_some_noise took {} seconds'.format(t2-t1))
+        t1 = time.perf_counter()
     cc.extract_some_features(**featureOpts)
-    t2 = time.perf_counter()
-    print('project took {} seconds'.format(t2-t1))
+    if verboseTiming:
+        t2 = time.perf_counter()
+        print('project took {} seconds'.format(t2-t1))
     if cc.projector is not None:
         ccFolderName = os.path.dirname(cc.info_filename)
         projectorPath = os.path.join(ccFolderName, 'projector.pickle')
@@ -303,7 +315,8 @@ def cluster(
         autoMerge=False,
         auto_merge_threshold=0.9,
         minClusterSize=5,
-        auto_make_catalog=False):
+        auto_make_catalog=False,
+        verboseTiming=False):
 
     dataio = tdc.DataIO(dirname=triFolder)
     cc = tdc.CatalogueConstructor(
@@ -315,19 +328,23 @@ def cluster(
     else:
         print('Not enough threshold crossings to cluster!')
         return
-    t1 = time.perf_counter()
+    if verboseTiming:
+        t1 = time.perf_counter()
     cc.find_clusters(**clusterOpts)
-    t2 = time.perf_counter()
-    print('find_clusters took {} seconds'.format(t2-t1))
+    if verboseTiming:
+        t2 = time.perf_counter()
+        print('find_clusters took {} seconds'.format(t2-t1))
     if autoMerge:
         try:
             print(cc)
-            t1 = time.perf_counter()
+            if verboseTiming:
+                t1 = time.perf_counter()
             #  cc.compute_spike_waveforms_similarity()
             cc.auto_merge_high_similarity(
                 threshold=auto_merge_threshold)
-            t2 = time.perf_counter()
-            print('auto_merge took {} seconds'.format(t2-t1))
+            if verboseTiming:
+                t2 = time.perf_counter()
+                print('auto_merge took {} seconds'.format(t2-t1))
         except Exception:
             traceback.print_exc()
     #
@@ -407,7 +424,7 @@ def run_peeler(
         energy_reduction_threshold=0,
         debugging=False, progressbar=False,
         chunksize=2**12,
-        duration=None, useOpenCL=False, trackTiming=False):
+        duration=None, useOpenCL=False, verboseTiming=False):
 
     dataio = tdc.DataIO(dirname=triFolder)
     initial_catalogue = dataio.load_catalogue(chan_grp=chan_grp)
@@ -430,12 +447,12 @@ def run_peeler(
             energy_reduction_threshold=energy_reduction_threshold,
             debugging=debugging, chunksize=chunksize)
 
-    if trackTiming:
+    if verboseTiming:
         t1 = time.perf_counter()
 
     peeler.run(duration=duration, progressbar=progressbar)
 
-    if trackTiming:
+    if verboseTiming:
         t2 = time.perf_counter()
         print('peeler.run_loop', t2-t1)
     return
@@ -466,7 +483,6 @@ def neo_block_after_peeler(
         refractory_period=None, ignoreTags=['so_bad'],
         plotting=False, altDataIOInfo=None,
         waveformSignalType='processed',
-        # catConstructorName='catalogue_constructor',
         FRThresh=1):
     dataio = tdc.DataIO(
         dirname=triFolder,
@@ -673,7 +689,10 @@ def neo_block_after_peeler(
                         spikeTimes = spikeTimes[timesDF.index]
                         spikeWaveforms = spikeWaveforms[timesDF.index, :, :]
                         timesDF.reset_index(drop=True, inplace=True)
-                    timesDF['isi'] = timesDF['times'].diff().fillna(method='bfill')
+                    timesDF['isi'] = (
+                        timesDF['times']
+                        .diff()
+                        .fillna(method='bfill'))
                     aveSpS = np.nanmedian(timesDF['isi']) ** (-1)
                     #
                     if refractory_period is not None:
@@ -1164,13 +1183,3 @@ def batchPeel(
                 traceback.print_exc()
                 pass
     return
-
-
-if __name__ == '__main__':
-    #  initialize_catalogueconstructor(dataPath, chan_grp=0)
-    #  preprocess_signals_and_peaks(chan_grp=0)
-    #  extract_waveforms_pca_cluster(chan_grp=0)
-    #  open_cataloguewindow(chan_grp=0)
-    #  run_peeler(chan_grp=0)
-    #  open_PeelerWindow(chan_grp=0)
-    pass
