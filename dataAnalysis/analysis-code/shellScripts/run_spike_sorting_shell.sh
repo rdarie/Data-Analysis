@@ -51,8 +51,9 @@
 # EXP="exp202012171200"
 # EXP="exp202012181200"
 EXP="exp202101051100"
+EXP="exp202101061100"
 
-BLOCKIDX=1
+BLOCKIDX=3
 
 module load anaconda/2020.02
 . /gpfs/runtime/opt/anaconda/2020.02/etc/profile.d/conda.sh
@@ -66,7 +67,7 @@ SOURCESELECTOR="--sourceFileSuffix=spike_preview"
 CHAN_START=0
 CHAN_STOP=96
 # Step 1: Init catalog
-# python -u ./tridesclousCCV.py --arrayName=utah --blockIdx=$BLOCKIDX --exp=$EXP --removeExistingCatalog --initCatalogConstructor $SOURCESELECTOR
+python -u ./tridesclousCCV.py --arrayName=utah --blockIdx=$BLOCKIDX --exp=$EXP --removeExistingCatalog --initCatalogConstructor $SOURCESELECTOR
 
 # Step 2: Constructor
 python -u ./tridesclousCCV.py --arrayName=utah --blockIdx=$BLOCKIDX --exp=$EXP --batchPreprocess --chan_start=$CHAN_START --chan_stop=$CHAN_STOP $SOURCESELECTOR
@@ -78,11 +79,11 @@ python -u ./tridesclousCCV.py --arrayName=utah --blockIdx=$BLOCKIDX --exp=$EXP -
 # python ./transferTDCTemplates.py --arrayName=utah --exp=$EXP --chan_start=0 --chan_stop=96
 # python ./transferTDCTemplates.py --arrayName=nform --exp=$EXP --chan_start=0 --chan_stop=65
 
-# Step 5: Peeler
-# python -u ./tridesclousCCV.py --arrayName=utah --blockIdx=$BLOCKIDX --exp=$EXP --batchPeel --chan_start=$CHAN_START --chan_stop=$CHAN_STOP $SOURCESELECTOR
+# Step 5: Peeler (optional --purgePeeler)
+python -u ./tridesclousCCV.py --arrayName=utah --blockIdx=$BLOCKIDX --exp=$EXP --batchPeel --chan_start=$CHAN_START --chan_stop=$CHAN_STOP $SOURCESELECTOR
 # optional: visualize the peeler
 # python -u ./tridesclousVisualize.py --blockIdx=$BLOCKIDX --exp=$EXP --peeler --chan_start=$CHAN_START --chan_stop=$CHAN_STOP $SOURCESELECTOR
 
 # Step 6: Export to NIX
-# python './tridesclousCCV.py' --blockIdx=$BLOCKIDX --purgePeelerDiagnostics --makeStrictNeoBlock --exp=$EXP --sourceFileSuffix='spike_preview'
-# python './plotSpikeReport.py' --blockIdx=$BLOCKIDX --nameSuffix=_final --exp=$EXP --sourceFileSuffix='spike_preview'
+# python -u ./tridesclousCCV.py --arrayName=utah --blockIdx=$SLURM_ARRAY_TASK_ID --makeStrictNeoBlock --exp=$EXP --chan_start=0 --chan_stop=96 $SOURCESELECTOR
+# python -u ./plotSpikeReport.py --blockIdx=$SLURM_ARRAY_TASK_ID --nameSuffix=_final --exp=$EXP --arrayName=utah $SOURCESELECTOR

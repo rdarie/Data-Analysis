@@ -522,7 +522,6 @@ def interpolateDF(
                 df.columns[~df.columns.isin([x])])
         outputDF = pd.DataFrame(columns=columns+[x])
         outputDF[x] = newX
-    
     for columnName in columns:
         if verbose:
             print('Interpolating {}'.format(columnName))
@@ -542,7 +541,7 @@ def interpolateDF(
                 interpFun = interpolate.interp1d(
                     oldX, df[columnName], kind=kind,
                     fill_value=useFill, bounds_error=False)
-            except:
+            except Exception:
                 traceback.print_exc()
                 pdb.set_trace()
             outputDF[columnName] = interpFun(newX)

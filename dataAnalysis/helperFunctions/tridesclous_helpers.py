@@ -402,15 +402,12 @@ def clean_catalogue(
     dataio = tdc.DataIO(dirname=triFolder)
     cc = tdc.CatalogueConstructor(
         dataio=dataio, name=name, chan_grp=chan_grp)
-    
     #  re order by rms
     cc.order_clusters(by='waveforms_rms')
-
     #  re label >20 to trash (-1)
     mask = cc.all_peaks['nb_peak'] < min_nb_peak
     cc.all_peaks['cluster_label'][mask] = -1
     cc.on_new_cluster()
-    
     #  save catalogue before peeler
     cc.make_catalogue_for_peeler()
     return
@@ -421,6 +418,7 @@ def run_peeler(
         shape_distance_threshold=3,
         shape_boundary_threshold=4,
         confidence_threshold=0.6,
+        n_max_passes=3,
         energy_reduction_threshold=0,
         debugging=False, progressbar=False,
         chunksize=2**12,
@@ -437,6 +435,7 @@ def run_peeler(
             catalogue=initial_catalogue,
             shape_distance_threshold=shape_distance_threshold,
             energy_reduction_threshold=energy_reduction_threshold,
+            n_max_passes=n_max_passes,
             debugging=debugging, chunksize=chunksize)
     else:
         peeler.change_params(
@@ -445,6 +444,7 @@ def run_peeler(
             shape_boundary_threshold=shape_boundary_threshold,
             confidence_threshold=confidence_threshold,
             energy_reduction_threshold=energy_reduction_threshold,
+            n_max_passes=n_max_passes,
             debugging=debugging, chunksize=chunksize)
 
     if verboseTiming:
@@ -1147,6 +1147,7 @@ def batchPeel(
         shape_boundary_threshold=4,
         confidence_threshold=0.6,
         energy_reduction_threshold=0,
+        n_max_passes=3,
         chunksize=2**12,
         attemptMPI=False
         ):
@@ -1176,6 +1177,7 @@ def batchPeel(
                     shape_boundary_threshold=shape_boundary_threshold,
                     confidence_threshold=confidence_threshold,
                     energy_reduction_threshold=energy_reduction_threshold,
+                    n_max_passes=n_max_passes,
                     debugging=True, chunksize=chunksize,
                     chan_grp=chan_grp, progressbar=False)
                 gc.collect()

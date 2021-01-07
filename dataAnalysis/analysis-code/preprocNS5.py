@@ -75,7 +75,7 @@ def preprocNS5():
         chunkSize = int(arguments['chunkSize'])
     else:
         chunkSize = 4000
-    chunkList = [0, 1, 2]
+    chunkList = None
     equalChunks = False
     ###############################################################
     groupAsigsByBank = True

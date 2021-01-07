@@ -167,12 +167,12 @@ def tridesclousCCV(
         if spikeSortingOpts['shape_distance_threshold'] is not None:
             shape_distance_threshold = spikeSortingOpts['shape_distance_threshold']
         else:
-            shape_distance_threshold = 3
+            shape_distance_threshold = 6
         #
         if spikeSortingOpts['shape_boundary_threshold'] is not None:
             shape_boundary_threshold = spikeSortingOpts['shape_boundary_threshold']
         else:
-            shape_boundary_threshold = 4
+            shape_boundary_threshold = 8
         #
         tdch.batchPeel(
             triFolder, chansToAnalyze,
@@ -181,6 +181,7 @@ def tridesclousCCV(
             shape_boundary_threshold=shape_boundary_threshold,
             confidence_threshold=spikeSortingOpts['confidence_threshold'],
             energy_reduction_threshold=spikeSortingOpts['energy_reduction_threshold'],
+            n_max_passes=1,  # TODO: check that n_max_passes has the desired effect
             )
     ######################################################################
     #

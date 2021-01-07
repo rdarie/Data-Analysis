@@ -2309,8 +2309,8 @@ def preprocBlockToNix(
         for aSigIdx, aSigProxy in enumerate(seg.analogsignals):
             if aSigIdx == 0:
                 # check bounds
-                tStart = max(chunkTStart, aSigProxy.t_start)
-                tStop = min(chunkTStop, aSigProxy.t_stop)
+                tStart = max(chunkTStart * pq.s, aSigProxy.t_start)
+                tStop = min(chunkTStop * pq.s, aSigProxy.t_stop)
             loadThisOne = (
                 (aSigProxy in aSigList) or
                 (calcAverageLFP and (aSigProxy in lfpAsigList))
@@ -2629,8 +2629,8 @@ def preprocBlockToNix(
     for aSigIdx, aSigProxy in enumerate(seg.analogsignals):
         if aSigIdx == 0:
             # check bounds
-            tStart = max(chunkTStart, aSigProxy.t_start)
-            tStop = min(chunkTStop, aSigProxy.t_stop)
+            tStart = max(chunkTStart * pq.s, aSigProxy.t_start)
+            tStop = min(chunkTStop * pq.s, aSigProxy.t_stop)
         loadThisOne = (
             (aSigProxy in aSigList) or
             (calcAverageLFP and (aSigProxy in lfpAsigList)) or
@@ -3037,14 +3037,14 @@ def preproc(
             spikeBlock = None
         #
         #  instantiate writer
-        if nChunks > 1:
+        if (nChunks == 1) or (len(chunkList) == 1):
+            partNameSuffix = ""
+            thisChunkOutFilePath = outputFilePath
+        else:
             partNameSuffix = '_pt{:0>3}'.format(chunkIdx)
             thisChunkOutFilePath = (
                 outputFilePath
                 .replace('.nix', partNameSuffix + '.nix'))
-        else:
-            partNameSuffix = ""
-            thisChunkOutFilePath = outputFilePath
         #
         if os.path.exists(thisChunkOutFilePath):
             os.remove(thisChunkOutFilePath)
@@ -3197,13 +3197,13 @@ def loadWithArrayAnn(
 
 
 def blockFromPath(
-        dataPath, lazy=False,
+        dataPath, lazy=False, mapDF=None,
         reduceChannelIndexes=False):
     if lazy:
         dataReader = nixio_fr.NixIO(
             filename=dataPath)
         dataBlock = readBlockFixNames(
-            dataReader, lazy=lazy,
+            dataReader, lazy=lazy, mapDF=mapDF,
             reduceChannelIndexes=reduceChannelIndexes)
     else:
         dataReader = None

@@ -72,7 +72,6 @@ def transferTDCTemplates():
             scratchPath, triFolderDestMeta['exp'],
             blockBaseName + destNameSuffix + '_chunkingInfo.json'
             )
-        pdb.set_trace()
         #
         if os.path.exists(chunkingInfoPath):
             with open(chunkingInfoPath, 'r') as f:
@@ -91,10 +90,10 @@ def transferTDCTemplates():
                 }}
         for chunkIdxStr, chunkMeta in chunkingMetadata.items():
             # chunkIdx = int(chunkIdxStr)
-            destNameSuffix = destNameSuffix + chunkMeta['partNameSuffix']
+            thisNameSuffix = destNameSuffix + chunkMeta['partNameSuffix']
             triFolderDest = os.path.join(
                 scratchPath, triFolderDestMeta['exp'],
-                'tdc_{}'.format(blockBaseName + destNameSuffix))
+                'tdc_{}'.format(blockBaseName + thisNameSuffix))
             #  #### hack to restore broken templates
             # pdb.set_trace()
             # if True:
@@ -111,15 +110,15 @@ def transferTDCTemplates():
             try:
                 if arguments['fromNS5']:
                     tdch.initialize_catalogueconstructor(
-                        remoteBasePath, 'raw', triFolderDestMeta['exp'],
+                        os.path.join(remoteBasePath, 'raw', triFolderDestMeta['exp']),
                         blockBaseName,
                         triFolderDest,
                         prbPath=prbPath,
                         fileFormat='Blackrock')
                 else:
                     tdch.initialize_catalogueconstructor(
-                        scratchPath, triFolderDestMeta['exp'],
-                        blockBaseName,
+                        os.path.join(scratchPath, triFolderDestMeta['exp']),
+                        blockBaseName + thisNameSuffix,
                         triFolderDest, prbPath=prbPath,
                         spikeSortingOpts=spikeSortingOpts[arrayName],
                         fileFormat='NIX')

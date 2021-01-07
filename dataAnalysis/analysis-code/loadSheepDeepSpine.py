@@ -2,16 +2,17 @@ import pandas as pd
 import numpy as np
 import pdb
 import matplotlib.pyplot as plt
-
+import os
 # data is aligned to stim onset
 # cropEdgesTimes controls the size of the window that is loaded
 cropEdgesTimes = [-100e-3, 400e-3]
 # cropEdgesTimes = [-600e-3, -100e-3]
 # inputPath = 'G:\\Delsys\\scratch\\202009231400-Peep\\default\\stim\\_emg_XS_export.h5'
 
+inputFolder = 'E:\\Neural Recordings\\scratch\\202012171300-Goat\\parameter_recovery\\stim'
 inputPath = 'G:\\Delsys\\scratch\\202010191100-Peep\\default\\stim\\_emg_XS_export.h5'
 inputPath = 'G:\\Delsys\\scratch\\202007011300-Peep\\_emg_XS_export_0701.h5'
-
+inputPath = 'E:\\Neural Recordings\\scratch\\202012171300-Goat\\parameter_recovery\\stim\\_emg_XS_export.h5'
 # inputPath = '/gpfs/scratch/rdarie/rdarie/Neural Recordings/202009231400-Peep/default/stim/_emg_XS_export.h5'
 
 with pd.HDFStore(inputPath, 'r') as store:
@@ -20,6 +21,7 @@ with pd.HDFStore(inputPath, 'r') as store:
         i
         for i in store.keys()
         if ('stim' in i)]
+    # pdb.set_trace()
     # allocate lists to hold data from each trial
     eesList = []
     emgList = []
@@ -91,14 +93,14 @@ with pd.HDFStore(inputPath, 'r') as store:
         amplitudeLabels = noiseCeilDF.index.get_level_values('amplitude').to_list()
         noiseCeil = noiseCeilDF.to_numpy()
         noiseCeilMeta = noiseCeilDF.index.to_frame(index=False)
-
+        #
         def getEESIdx(metaRow):
             findMask = (noiseCeilMeta['electrode'] == metaRow['electrode']) & (noiseCeilMeta['RateInHz'] == metaRow['RateInHz']) & (noiseCeilMeta['amplitude'] == metaRow['amplitude'])
             if not noiseCeilMeta.index[findMask].empty:
                 return noiseCeilMeta.index[findMask][0]
             else:
                 return np.nan
-
+        #
         metaDataDF['eesIdx'] = metaDataDF.apply(getEESIdx, axis=1)
     else:
         noiseCeilDF = None
@@ -120,8 +122,19 @@ if noiseCeilDF is not None:
     nansInNoiseCeilMask = noiseCeilDF.isna().any(axis=1)
     noiseCeilDF.loc[nansInNoiseCeilMask, :]
 
-trialCountGood = metaDataDF.loc[~metaDataDF['outlierTrial'].astype(np.bool), :].groupby(['electrode', 'amplitude'])['RateInHz'].value_counts()
+trialCountGood = (
+    metaDataDF
+    .loc[~metaDataDF['outlierTrial']
+    .astype(np.bool), :]
+    .groupby(['electrode', 'amplitude'])['RateInHz']
+    .value_counts())
 trialCount = metaDataDF.groupby(['electrode', 'amplitude'])['RateInHz'].value_counts()
+
+# pdb.set_trace()
+saveMetaPath = os.path.join(inputFolder, 'metaDataByTrial.csv')
+metaDataDF.to_csv(saveMetaPath)
+saveUniqueMetaPath = os.path.join(inputFolder, 'metaDataByTrial_unique.csv')
+trialCountGood.to_csv(saveUniqueMetaPath)
 checkPlots = True
 if checkPlots:
     fig, ax = plt.subplots(4, 1, sharex=True)
@@ -145,4 +158,3 @@ if checkPlots:
     print(emgList[0].index)
 
 print('finished loading.')
-pdb.set_trace()

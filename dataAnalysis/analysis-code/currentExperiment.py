@@ -117,6 +117,14 @@ def parseAnalysisOptions(
         }
     else:
         spikeSortingFilterOpts = expOpts['spikeSortingFilterOpts']
+    tapDetectFilterOpts = {
+        'high': {
+            'Wn': 20,
+            'N': 2,
+            'btype': 'high',
+            'ftype': 'bessel'
+        }
+    }
     if 'outlierMaskFilterOpts' not in expOpts:
         outlierMaskFilterOpts = {
             'low': {

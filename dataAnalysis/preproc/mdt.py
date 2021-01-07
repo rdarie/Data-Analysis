@@ -397,7 +397,7 @@ def getINSTDFromJson(
         sessionNames = [sessionNames]
 
     tdSessions = []
-    for idx, sessionName in enumerate(sessionNames):
+    for sessionIdx, sessionName in enumerate(sessionNames):
         jsonPath = os.path.join(folderPath, sessionName, deviceName)
         try:
             if forceRecalc:
@@ -444,26 +444,26 @@ def getINSTDFromJson(
                         os.path.join(
                             figureOutputFolder,
                             'frame_size_counts_Block{:0>3}_TrialSeg{:0>1}_td.csv'.format(
-                                blockIdx, idx)),
+                                blockIdx, sessionIdx)),
                         header=True))
                 figSaveOpts = dict(
                     bbox_extra_artists=(thisAx.get_legend() for thisAx in ax),
                     bbox_inches='tight')
                 ax[0].set_title(
                     'Block{:0>3}_TrialSeg{:0>1}_td'.format(
-                        blockIdx, idx)
+                        blockIdx, sessionIdx)
                     )
                 #
                 pdfPath = os.path.join(
                     figureOutputFolder,
                     'packet_jitter_Block{:0>3}_TrialSeg{:0>1}_td.pdf'.format(
-                        blockIdx, idx))
+                        blockIdx, sessionIdx))
                 fig.savefig(pdfPath, **figSaveOpts)
                 #
                 pdfPath = os.path.join(
                     figureOutputFolder,
                     'meta_info_Block{:0>3}_TrialSeg{:0>1}_td.pdf'.format(
-                        blockIdx, idx))
+                        blockIdx, sessionIdx))
                 metaFig.savefig(pdfPath, **figSaveOpts)
                 if showPlots:
                     plt.show()
@@ -485,7 +485,7 @@ def getINSTDFromJson(
             tdData['t'] = (
                 tdData['actual_time'] - INSReferenceTime) / (
                     datetime.timedelta(seconds=1))
-            if idx == 0:
+            if sessionIdx == 0:
                 tZero = tdData['t'].iloc[0]
             if not assumeNoSamplesLost:
                 tdData = tdData.drop_duplicates(
@@ -584,8 +584,8 @@ def getINSTDFromJson(
                     origin=pd.Timestamp('2000-03-01'))
                 #  tdData['actual_time'] = tdData['time_master'] + (
                 #      tdData['microseconds'])
-            tdData['trialSegment'] = idx
-            print('Wrote trialSegment {}'.format(idx))
+            tdData['trialSegment'] = sessionIdx
+            print('Wrote insSession {}'.format(sessionIdx))
             if getInterpolated:
                 tdData.to_csv(
                     os.path.join(jsonPath, 'RawDataTD_interpolated.csv'))
@@ -610,11 +610,10 @@ def getINSTimeSyncFromJson(
         figureOutputFolder=None, 
         blockIdx=None, forceRecalc=True
         ):
-
     if not isinstance(sessionNames, Iterable):
         sessionNames = [sessionNames]
     tsSessions = []
-    for idx, sessionName in enumerate(sessionNames):
+    for sessionIdx, sessionName in enumerate(sessionNames):
         jsonPath = os.path.join(folderPath, sessionName, deviceName)
         try:
             if forceRecalc:
@@ -638,7 +637,6 @@ def getINSTimeSyncFromJson(
                     timeSyncText = f.read()
                     timeSyncText = fixMalformedJson(timeSyncText)
                     timeSync = json.loads(timeSyncText)[0]
-            #
             timeSyncData = rcsa_helpers.extract_time_sync_meta_data(timeSync)
             #
             if makePlots:
@@ -676,27 +674,26 @@ def getINSTimeSyncFromJson(
                     bbox_inches='tight')
                 ax[0].set_title(
                     'Block{:0>3}_TrialSeg{:0>1}_time_sync'.format(
-                        blockIdx, idx)
+                        blockIdx, sessionIdx)
                     )
                 pdfPath = os.path.join(
                     figureOutputFolder,
                     'time_sync_Block{:0>3}_TrialSeg{:0>1}.pdf'.format(
-                        blockIdx, idx))
+                        blockIdx, sessionIdx))
                 plt.savefig(pdfPath, **figSaveOpts)
                 if showPlots:
                     plt.show()
                 else:
                     plt.close()
-                
-            timeSyncData['trialSegment'] = idx
+            #
+            timeSyncData['trialSegment'] = sessionIdx
             timeSyncData.to_csv(os.path.join(jsonPath, 'TimeSync.csv'))
-
         timeSyncData['t'] = (
             timeSyncData['actual_time'] - INSReferenceTime) / (
                 datetime.timedelta(seconds=1))
         timeSyncData.to_csv(os.path.join(jsonPath, 'TimeSync.csv'))
         tsSessions.append(timeSyncData)
-
+    #
     allTimeSync = pd.concat(tsSessions, ignore_index=True)
     return allTimeSync
 
@@ -717,7 +714,7 @@ def getINSAccelFromJson(
         sessionNames = [sessionNames]
 
     accelSessions = []
-    for idx, sessionName in enumerate(sessionNames):
+    for sessionIdx, sessionName in enumerate(sessionNames):
         jsonPath = os.path.join(folderPath, sessionName, deviceName)
         print('getINSAccelFromJson( Loading {}'.format(jsonPath))
         try:
@@ -762,24 +759,24 @@ def getINSAccelFromJson(
                         os.path.join(
                             figureOutputFolder,
                             'frame_size_counts_Block{:0>3}_TrialSeg{:0>1}_accel.csv'.format(
-                                blockIdx, idx)),
+                                blockIdx, sessionIdx)),
                         header=True))
                 figSaveOpts = dict(
                     bbox_extra_artists=(thisAx.get_legend() for thisAx in ax),
                     bbox_inches='tight')
                 ax[0].set_title(
                     'Block{:0>3}_TrialSeg{:0>1}_accel'.format(
-                        blockIdx, idx)
+                        blockIdx, sessionIdx)
                     )
                 pdfPath = os.path.join(
                     figureOutputFolder,
                     'packet_jitter_Block{:0>3}_TrialSeg{:0>1}_accel.pdf'.format(
-                        blockIdx, idx))
+                        blockIdx, sessionIdx))
                 plt.savefig(pdfPath, **figSaveOpts)
                 pdfPath = os.path.join(
                     figureOutputFolder,
                     'meta_info_Block{:0>3}_TrialSeg{:0>1}_accel.pdf'.format(
-                        blockIdx, idx))
+                        blockIdx, sessionIdx))
                 metaFig.savefig(pdfPath, **figSaveOpts)
                 if showPlots:
                     plt.show()
@@ -804,7 +801,7 @@ def getINSAccelFromJson(
             accelData['t'] = (
                 accelData['actual_time'] - INSReferenceTime) / (
                     datetime.timedelta(seconds=1))
-            if idx == 0:
+            if sessionIdx == 0:
                 tZero = accelData['t'].iloc[0]
             if not assumeNoSamplesLost:
                 accelData = accelData.drop_duplicates(
@@ -896,7 +893,7 @@ def getINSAccelFromJson(
             inertia = inertia.apply(np.sqrt)
             accelData['inertia'] = inertia
 
-            accelData['trialSegment'] = idx
+            accelData['trialSegment'] = sessionIdx
 
             if getInterpolated:
                 accelData.to_csv(
@@ -921,29 +918,24 @@ def getINSAccelFromJson(
 def realignINSTimestamps(
         dataStruct, trialSegment, alignmentFactor
         ):
-
     if isinstance(dataStruct, pd.DataFrame):
         segmentMask = dataStruct['trialSegment'] == trialSegment
         dataStruct.loc[segmentMask, 't'] = (
             dataStruct.loc[segmentMask, 'microseconds'] + alignmentFactor) / (
                 pd.Timedelta(1, unit='s'))
-
         if 'INSTime' in dataStruct.columns:
             dataStruct.loc[
                 segmentMask, 'INSTime'] = dataStruct.loc[segmentMask, 't']
-
     elif isinstance(dataStruct, dict):
         segmentMask = dataStruct['data']['trialSegment'] == trialSegment
         dataStruct['data'].loc[segmentMask, 't'] = (
             dataStruct['data'].loc[
                 segmentMask, 'microseconds'] + alignmentFactor) / (
                     pd.Timedelta(1, unit='s'))
-
         if 'INSTime' in dataStruct['data'].columns:
             dataStruct['data'].loc[
                 segmentMask, 'INSTime'] = dataStruct[
                     'data'].loc[segmentMask, 't']
-
         #  ['INSTime'] is a reference to ['t']  for the dict
         dataStruct['t'].loc[segmentMask] = dataStruct['data'].loc[segmentMask, 't']
         if 'INSTime' in dataStruct.keys():
@@ -1243,7 +1235,8 @@ def peekAtTaps(
 
 def getINSTapTimestamp(
         td=None, accel=None,
-        tapDetectOpts={}, plotting=False
+        tapDetectOpts={}, filterOpts=None,
+        plotting=False
         ):
     #
     if 'timeRanges' in tapDetectOpts.keys():
@@ -1295,6 +1288,13 @@ def getINSTapTimestamp(
     tapDetectSignal = pd.Series(
         np.sqrt(cov.mahalanobis(tapDetectSignal.to_numpy())),
         index=tapDetectSignal.index)
+    # pdb.set_trace()
+    if filterOpts is not None:
+        filterCoeffs = hf.makeFilterCoeffsSOS(
+            filterOpts, fs)
+        tapDetectSignal.loc[:] = signal.sosfiltfilt(
+            filterCoeffs,
+            tapDetectSignal.to_numpy())
     tdPeakIdx = hf.getTriggers(
         tapDetectSignal, iti=iti, fs=fs, thres=tapDetectOpts['thres'],
         edgeType='both', minAmp=None,
@@ -1308,17 +1308,19 @@ def getINSTapTimestamp(
 
 
 def getHUTtoINSSyncFun(
-        timeSyncData,
+        timeSyncDF,
         degree=1, plotting=False,
         trialSegments=None,
         syncTo='HostUnixTime',
         chunkSize=None,
         ):
-    if trialSegments is None:
-        trialSegments = pd.unique(timeSyncData['trialSegment'])
-    timeInterpFunHUTtoINS = [[] for i in trialSegments]
-    timeSyncData['timeChunks'] = 0
-    for trialSegment, tsDataSegment in timeSyncData.groupby('trialSegment'):
+    # if trialSegments is None:
+    #     trialSegments = pd.unique(timeSyncDF['trialSegment'])
+    # timeInterpFunHUTtoINS = [[] for i in trialSegments]
+    timeInterpFunHUTtoINS = {}  # will be indexed by timeChunkIdx
+    timeSyncDF['timeChunksHUTSynch'] = 0
+    currChunkIdx = 0
+    for trialSegment, tsDataSegment in timeSyncDF.groupby('trialSegment'):
         if chunkSize is not None:
             nChunks = int(np.ceil(tsDataSegment.shape[0] / chunkSize))
             thisT = tsDataSegment['t'] - tsDataSegment['t'].min()
@@ -1327,132 +1329,113 @@ def getHUTtoINSSyncFun(
                     tMask = (thisT >= i * chunkSize) & (thisT < (i + 1) * chunkSize)
                 else:
                     tMask = (thisT >= i * chunkSize)
-                tsDataSegment.loc[tMask, 'timeChunks'] = i
+                tsDataSegment.loc[tMask, 'timeChunksHUTSynch'] = currChunkIdx
+                idxIntoFullTsData = tsDataSegment.loc[tMask, :].index
+                timeSyncDF.loc[idxIntoFullTsData, 'timeChunksHUTSynch'] = currChunkIdx
+                currChunkIdx += 1
         else:
-            tsDataSegment.loc[:, 'timeChunks'] = 0
-        lastTimeChunk = tsDataSegment['timeChunks'].max()
-        for timeChunk, tsTimeChunk in tsDataSegment.groupby('timeChunks'):
-            if degree > 0:
-                synchPolyCoeffsHUTtoINS = np.polyfit(
-                    x=tsTimeChunk[syncTo].values,
-                    y=tsTimeChunk['t'].values,
-                    deg=degree)
-            else:
-                # assume no clock drift
-                timeOffset = (
-                    tsTimeChunk['t'].values -
-                    tsTimeChunk[syncTo].values * 1e-3)
-                synchPolyCoeffsHUTtoINS = np.array([1e-3, np.mean(timeOffset)])
-            thisFun = np.poly1d(synchPolyCoeffsHUTtoINS)
-            if (timeChunk < lastTimeChunk):
-                tStart = tsTimeChunk['t'].min()
-                tStartHUT = tsTimeChunk[syncTo].min()
-                tStop = tsDataSegment.loc[tsDataSegment['timeChunks'] == (timeChunk + 1), 't'].min()
-                tStopHUT = tsDataSegment.loc[tsDataSegment['timeChunks'] == (timeChunk + 1), syncTo].min()
-            elif (timeChunk == 0) and (lastTimeChunk == 0):
-                tStart = 0
-                tStartHUT = 0
-                tStop = tsTimeChunk['t'].max()
-                tStopHUT = tsTimeChunk[syncTo].max()
-            elif (timeChunk == 0):
-                tStart = 0
-                tStartHUT = 0
-                tStop = tsDataSegment.loc[tsDataSegment['timeChunks'] == (timeChunk + 1), 't'].min()
-                tStopHUT = tsDataSegment.loc[tsDataSegment['timeChunks'] == (timeChunk + 1), syncTo].min()
-            else:
-                tStart = tsTimeChunk['t'].min()
-                tStartHUT = tsTimeChunk[syncTo].min()
-                tStop = tsTimeChunk['t'].max()
-                tStopHUT = tsTimeChunk[syncTo].max()
-            thisInterpDict = {
-                'fun': thisFun,
-                'tStart': tStart,
-                'tStop': tStop,
-                'tStartHUT': tStartHUT,
-                'tStopHUT': tStopHUT
+            tsDataSegment.loc[:, 'timeChunksHUTSynch'] = 0
+    # lastTimeChunk = tsDataSegment['timeChunksHUTSynch'].max()
+    for timeChunkIdx, tsTimeChunk in timeSyncDF.groupby('timeChunksHUTSynch'):
+        if degree > 0:
+            synchPolyCoeffsHUTtoINS = np.polyfit(
+                x=tsTimeChunk[syncTo].values,
+                y=tsTimeChunk['t'].values,
+                deg=degree)
+        else:
+            # assume no clock drift
+            timeOffset = (
+                tsTimeChunk['t'].values -
+                tsTimeChunk[syncTo].values * 1e-3)
+            synchPolyCoeffsHUTtoINS = np.array([1e-3, np.mean(timeOffset)])
+        thisFun = np.poly1d(synchPolyCoeffsHUTtoINS)
+        # if (timeChunk < lastTimeChunk):
+        #     tStart = tsTimeChunk['t'].min()
+        #     tStartHUT = tsTimeChunk[syncTo].min()
+        #     tStop = tsDataSegment.loc[tsDataSegment['timeChunksHUTSynch'] == (timeChunk + 1), 't'].min()
+        #     tStopHUT = tsDataSegment.loc[tsDataSegment['timeChunksHUTSynch'] == (timeChunk + 1), syncTo].min()
+        # elif (timeChunk == 0) and (lastTimeChunk == 0):
+        #     tStart = 0
+        #     tStartHUT = 0
+        #     tStop = tsTimeChunk['t'].max()
+        #     tStopHUT = tsTimeChunk[syncTo].max()
+        # elif (timeChunk == 0):
+        #     tStart = 0
+        #     tStartHUT = 0
+        #     tStop = tsDataSegment.loc[tsDataSegment['timeChunksHUTSynch'] == (timeChunk + 1), 't'].min()
+        #     tStopHUT = tsDataSegment.loc[tsDataSegment['timeChunksHUTSynch'] == (timeChunk + 1), syncTo].min()
+        # else:
+        #     tStart = tsTimeChunk['t'].min()
+        #     tStartHUT = tsTimeChunk[syncTo].min()
+        #     tStop = tsTimeChunk['t'].max()
+        #     tStopHUT = tsTimeChunk[syncTo].max()
+        thisInterpDict = {
+            'fun': thisFun,
+            # 'tStart': tStart,
+            # 'tStop': tStop,
+            # 'tStartHUT': tStartHUT,
+            # 'tStopHUT': tStopHUT
             }
-            print('timeChunk = {}'.format(timeChunk))
-            print('tStartHUT = {}'.format(tStartHUT))
-            print('tStopHUT = {}'.format(tStopHUT))
-            # if np.isnan(tStopHUT):
-            #     pdb.set_trace()
-            print('tStart = {}'.format(tStart))
-            print('tStop = {}'.format(tStop))
-            timeInterpFunHUTtoINS[trialSegment].append(thisInterpDict)
-            if plotting:
-                plt.plot(
-                    tsTimeChunk[syncTo].values * 1e-3,
-                    tsTimeChunk['t'].values, 'bo',
-                    label='original')
-                plt.plot(
-                    tsTimeChunk[syncTo].values * 1e-3,
-                    thisFun(tsTimeChunk[syncTo].values), 'r-',
-                    label='first degree polynomial fit')
-                plt.xlabel('Host Unix Time (msec)')
-                plt.ylabel('INS Time (sec)')
-                plt.title('HUT Synchronization')
-                plt.legend()
-                plt.show()
-                resid = (
-                    thisFun(tsTimeChunk[syncTo].values) -
-                    tsTimeChunk['t'].values)
-                ax = sns.distplot(resid)
-                ax.set_title('Residuals from HUT Regression')
-                ax.set_xlabel('Time (sec)')
-                plt.show()
-                plt.plot(
-                    tsTimeChunk['t'].values,
-                    resid, label='Residuals from HUT Regression')
-                plt.title('Residuals from HUT Regression')
-                plt.xlabel('Time (sec)')
-                plt.ylabel('Time (sec)')
-                plt.show()
+        # print('timeChunk = {}'.format(timeChunk))
+        # print('tStartHUT = {}'.format(tStartHUT))
+        # print('tStopHUT = {}'.format(tStopHUT))
+        # if np.isnan(tStopHUT):
+        #     pdb.set_trace()
+        # print('tStart = {}'.format(tStart))
+        # print('tStop = {}'.format(tStop))
+        ###########################################################
+        timeInterpFunHUTtoINS[timeChunkIdx] = thisInterpDict
+        ###########################################################
+        #
+        if plotting:
+            plt.plot(
+                tsTimeChunk[syncTo].values * 1e-3,
+                tsTimeChunk['t'].values, 'bo',
+                label='original')
+            plt.plot(
+                tsTimeChunk[syncTo].values * 1e-3,
+                thisFun(tsTimeChunk[syncTo].values), 'r-',
+                label='first degree polynomial fit')
+            plt.xlabel('Host Unix Time (msec)')
+            plt.ylabel('INS Time (sec)')
+            plt.title('HUT Synchronization')
+            plt.legend()
+            plt.show()
+            resid = (
+                thisFun(tsTimeChunk[syncTo].values) -
+                tsTimeChunk['t'].values)
+            ax = sns.distplot(resid)
+            ax.set_title('Residuals from HUT Regression')
+            ax.set_xlabel('Time (sec)')
+            plt.show()
+            plt.plot(
+                tsTimeChunk['t'].values,
+                resid, label='Residuals from HUT Regression')
+            plt.title('Residuals from HUT Regression')
+            plt.xlabel('Time (sec)')
+            plt.ylabel('Time (sec)')
+            plt.show()
     return timeInterpFunHUTtoINS
 
 
 def synchronizeHUTtoINS(
-        insDF, trialSegment, interpFunDictList,
+        insDF, timeSyncDF, interpFunDict,
         syncTo='HostUnixTime'
         ):
+    #
+    HUTChunks = hf.interpolateDF(
+        timeSyncDF, insDF['HostUnixTime'],
+        kind='previous', x='HostUnixTime',
+        columns=['timeChunksHUTSynch']
+        )
+    insDF.loc[:, 'timeChunksHUTSynch'] = HUTChunks['timeChunksHUTSynch']
     if 'INSTime' not in insDF.columns:
-        insDF['INSTime'] = np.nan
-    if 'trialSegment' in insDF.columns:
-        segmentMask = insDF['trialSegment'] == trialSegment
-    else:
-        #  event dataframes don't have an explicit trialSegment
-        segmentMask = hf.getStimSerialTrialSegMask(insDF, trialSegment)
-    for idx, interpFunDict in enumerate(interpFunDictList):
-        interpFun = interpFunDict['fun']
-        if idx == 0:
-            timeChunkIdx = insDF.loc[segmentMask, :].index[
-                (insDF.loc[segmentMask, syncTo] <= interpFunDict['tStopHUT'])
-                ]
-        elif idx == (len(interpFunDictList) - 1):
-            timeChunkIdx = insDF.loc[segmentMask, :].index[
-                (insDF.loc[segmentMask, syncTo] >= interpFunDict['tStartHUT'])
-                ]
-        else:
-            timeChunkIdx = insDF.loc[segmentMask, :].index[
-                (insDF.loc[segmentMask, syncTo] >= interpFunDict['tStartHUT']) &
-                (insDF.loc[segmentMask, syncTo] <= interpFunDict['tStopHUT'])
-                ]
-        #  if not timeChunkIdx.any():
-        #      lookAhead = 1 
-        #      
-        #      while not timeChunkIdx.any():
-        #          nextInterpFunDict = interpFunDictList[idx + lookAhead]
-        #          interpFun = nextInterpFunDict['fun']
-        #          
-        #          timeChunkIdx = insDF.loc[segmentMask, :].index[
-        #              (insDF.loc[segmentMask, syncTo] <= nextInterpFunDict['tStartHUT'])
-        #              ]
-        #          lookAhead += 1
-        if timeChunkIdx.any():
-            insDF.loc[timeChunkIdx, 'INSTime'] = interpFun(
-                insDF.loc[timeChunkIdx, syncTo])
-    #if trialSegment == 1:
-    #    # insDF.loc[insDF['trialSegment'] == 1, :]
-    #    pdb.set_trace()
+        insDF.loc[:, 'INSTime'] = np.nan
+    for timeChunkIdx, group in insDF.groupby('timeChunksHUTSynch'):
+        interpFun = interpFunDict[timeChunkIdx]['fun']
+        insDF.loc[group.index, 'INSTime'] = interpFun(
+            insDF.loc[group.index, syncTo])
+    insDF.drop(columns=['timeChunksHUTSynch'], inplace=True)
     return insDF
 
 
@@ -1461,7 +1444,7 @@ def getINSStimLogFromJson(
         deviceName='DeviceNPC700373H',
         absoluteStartTime=None, logForm='serial'):
     allStimStatus = []
-    for idx, sessionName in enumerate(sessionNames):
+    for sessionIdx, sessionName in enumerate(sessionNames):
         jsonPath = os.path.join(folderPath, sessionName, deviceName)
         print('getINSStimLogFromJson(: Loading {}\n...'.format(jsonPath))
         try:
@@ -1480,7 +1463,7 @@ def getINSStimLogFromJson(
                     stimLog = json.loads(stimLogText)
         if logForm == 'serial':
             stimStatus = rcsa_helpers.extract_stim_meta_data_events(
-                stimLog, trialSegment=idx)
+                stimLog, trialSegment=sessionIdx)
         allStimStatus.append(stimStatus)
     allStimStatusDF = pd.concat(allStimStatus, ignore_index=True)
     
@@ -1771,9 +1754,6 @@ def preprocINS(
             deviceName=deviceName)
         )
     #
-    fsList = senseInfo['sampleRate'].unique()
-    assert fsList.size == 1
-    fs = fsList[0]
     if 'upsampleRate' in trialFilesStim:
         upsampleRate = trialFilesStim['upsampleRate']
     else:
@@ -1829,7 +1809,6 @@ def preprocINS(
     #  packets are aligned to INSReferenceTime, for convenience
     #  (otherwise the values in ['t'] would be huge)
     #  align them to the more reasonable minimum first timestamp across packets
-
     #  System Tick seconds before roll over
     rolloverSeconds = pd.to_timedelta(6.5535, unit='s')
 
@@ -1868,52 +1847,10 @@ def preprocINS(
         streamInitSysTicks = pd.Series(streamInitSysTicksDict)
         print('streamInitSysTicks\n{}'.format(streamInitSysTicks))
         rolloverCorrection = pd.Series(pd.Timedelta(seconds=0), index=streamInitSysTicks.index)
-        # get first timestamp in session for each source
-        # sessionMasterTime = min(streamInitTimestamps)
-        # ordersMatch = (streamInitHUT.sort_values().index == streamInitSysTicks.sort_values().index).all()
-        #
-        # while not ordersMatch:
-        #     rolloverCorrection.loc[streamInitSysTicks.index != streamInitSysTicks.idxmax()] += rolloverSeconds
-        #     correctedSysTicks = streamInitSysTicks + rolloverCorrection
-        #     ordersMatch = (streamInitHUT.sort_values().index == correctedSysTicks.sort_values().index).all()
         containsRollover = (streamInitSysTicks > 2 * rolloverSeconds / 3).any() & (streamInitSysTicks < rolloverSeconds / 3).any()
         if containsRollover:
             rolloverCorrection.loc[(streamInitSysTicks < rolloverSeconds / 3)] = rolloverSeconds
         print('rolloverCorrection\n{}'.format(rolloverCorrection))
-        # print([tS.total_seconds() for tS in streamInitSysTicks])
-        '''
-        #  get first systemTick in session for each source
-        #  Note: only look within the master timestamp
-        happenedBeforeSecondTimestamp = (
-            sessionTimeRef == pd.Timedelta(0)
-            )
-        ticksInFirstSecond = streamInitSysTicks.loc[
-            happenedBeforeSecondTimestamp]
-        if len(ticksInFirstSecond) == 1:
-            sessionMasterTick = ticksInFirstSecond.iloc[0]
-        else:
-            #  if there are multiple candidates for first systick, need to
-            #  make sure there was no rollover
-            lowestTick = min(ticksInFirstSecond)
-            highestTick = max(ticksInFirstSecond)
-            if (highestTick - lowestTick) > pd.Timedelta(1, unit='s'):
-                #  the counter rolled over in the first second
-                rolloverMask = ticksInFirstSecond > pd.Timedelta(1, unit='s')
-                underRollover = ticksInFirstSecond.index[rolloverMask]
-
-                sessionMasterTick = min(ticksInFirstSecond[underRollover])
-                #  refTo = ticksInFirstSecond[underRollover].idxmin()
-            else:
-                # no rollover in first second
-                sessionMasterTick = min(ticksInFirstSecond)
-                #  refTo = ticksInFirstSecond.idxmin()
-        #  now check for rollover between first systick and anything else
-        #  look for other streams that should be within rollover of start
-        rolloverCandidates = ~(sessionTimeRef > rolloverSeconds)
-        #  are there any streams that appear to start before the first stream?
-        rolledOver = (streamInitSysTicks < sessionMasterTick) & (
-            rolloverCandidates)
-        '''
         firstStream = streamInitHUT.idxmin()
         if trialSegment == 0:
             absoluteRef = sessionMasterTime
@@ -1984,28 +1921,33 @@ def preprocINS(
             plt.show()
         else:
             plt.close()
-
     progAmpNames = rcsa_helpers.progAmpNames
     expandCols = (
         ['RateInHz', 'therapyStatus', 'trialSegment'] +
         progAmpNames)
     deriveCols = ['amplitudeRound']
-    stimStatus = stimStatusSerialtoLong(
-        stimStatusSerial, idxT='HostUnixTime', expandCols=expandCols,
-        deriveCols=deriveCols, progAmpNames=progAmpNames,
-        dummyTherapySwitches=False, elecConfiguration=elecConfiguration
-        )
     HUTChunkSize = 100
     interpFunHUTtoINS = getHUTtoINSSyncFun(
         timeSync, degree=1,
-        # syncTo='HostUnixTime',
         syncTo='PacketGenTime',
         chunkSize=HUTChunkSize)
-    for trialSegment in pd.unique(td['data']['trialSegment']):
-        stimStatus = synchronizeHUTtoINS(
-            stimStatus, trialSegment, interpFunHUTtoINS[trialSegment])
-        stimStatusSerial = synchronizeHUTtoINS(
-            stimStatusSerial, trialSegment, interpFunHUTtoINS[trialSegment])
+    # # # #
+    stimStatusSerial = synchronizeHUTtoINS(
+        stimStatusSerial, timeSync, interpFunHUTtoINS,
+        syncTo='HostUnixTime')
+    # # # #
+    stimStatus = stimStatusSerialtoLong(
+        stimStatusSerial, idxT='INSTime', expandCols=expandCols,
+        deriveCols=deriveCols, progAmpNames=progAmpNames,
+        dummyTherapySwitches=False, elecConfiguration=elecConfiguration
+        )
+    # for trialSegment in pd.unique(td['data']['trialSegment']):
+    #     stimStatus = synchronizeHUTtoINS(
+    #         stimStatus, trialSegment, interpFunHUTtoINS[trialSegment],
+    #         syncTo='HostUnixTime')
+    #     stimStatusSerial = synchronizeHUTtoINS(
+    #         stimStatusSerial, trialSegment, interpFunHUTtoINS[trialSegment],
+    #         syncTo='HostUnixTime')
     #  sync Host PC Unix time to NSP
     HUTtoINSPlotting = False
     if HUTtoINSPlotting and makePlots:
@@ -2047,18 +1989,6 @@ def preprocINS(
             plt.show(block=plotBlocking)
         else:
             plt.close()
-    #
-    # coarsely align the time so that the session start time maps to t = 0
-    # sessionStartTime = int(jsonSessionNames[0].split('Session')[-1])
-    # datetime.datetime.utcfromtimestamp(sessionStartTime / 1000)
-    # minHUTidx = stimStatusSerial['HostUnixTime'].idxmin()
-    # coarseAdjust = (stimStatusSerial.loc[minHUTidx, 'HostUnixTime'] - sessionStartTime) / 1000 - stimStatusSerial.loc[minHUTidx, 'INSTime']
-    # td['t'] += coarseAdjust
-    # td['data']['t'] += coarseAdjust
-    # accel['t'] += coarseAdjust
-    # accel['data']['t'] += coarseAdjust
-    # stimStatusSerial['INSTime'] += coarseAdjust
-    
     block = insDataToBlock(
         td, accel, stimStatusSerial,
         senseInfo, trialFilesStim,
@@ -3375,22 +3305,29 @@ def insDataToBlock(
         x='t', columns=tdDataCols)
     # pdb.set_trace()
     tdInterp.loc[:, 'validTD'] = False
-    for name, group in td['data'].groupby('trialSegment'):
+    tdInterp.loc[:, 'trialSegment'] = np.nan
+    for sessionIdx, group in td['data'].groupby('trialSegment'):
         validMask = (tdInterp['t'] >= group['t'].min()) & (tdInterp['t'] <= group['t'].max())
         tdInterp.loc[:, 'validTD'] = tdInterp.loc[:, 'validTD'] | validMask
+        tdInterp.loc[validMask, 'trialSegment'] = sessionIdx
+    tdInterp.loc[:, 'trialSegment'] = (
+        tdInterp['trialSegment']
+        .fillna(method='ffill')
+        .fillna(method='bfill')
+        )
     if accel is not None:
         accelInterp = hf.interpolateDF(
             accel['data'], fullX,
             kind='linear', fill_value=(0, 0),
             x='t', columns=accelColumns)
     tStart = fullX[0]
-
+    #
     blockName = trialFilesStim['experimentName'] + '_ins'
     block = Block(name=blockName)
     block.annotate(jsonSessionNames=trialFilesStim['jsonSessionNames'])
     seg = Segment(name='seg0_' + blockName)
     block.segments.append(seg)
-
+    #
     for idx, colName in enumerate(tdDataCols):
         sigName = 'ins_td{}'.format(senseInfo.loc[idx, 'senseChan'])
         asig = AnalogSignal(
@@ -3415,9 +3352,8 @@ def insDataToBlock(
         block.channel_indexes.append(chanIdx)
         chanIdx.analogsignals.append(asig)
         asig.channel_index = chanIdx
-
     # non td data
-    for idx, colName in enumerate(['validTD']):
+    for idx, colName in enumerate(['validTD', 'trialSegment']):
         asig = AnalogSignal(
             tdInterp[colName].to_numpy()*pq.mV,
             name='seg0_' + colName,
@@ -3435,7 +3371,6 @@ def insDataToBlock(
         block.channel_indexes.append(chanIdx)
         chanIdx.analogsignals.append(asig)
         asig.channel_index = chanIdx
-    
     if accel is not None:
         for idx, colName in enumerate(accelColumns):
             if colName == 'inertia':

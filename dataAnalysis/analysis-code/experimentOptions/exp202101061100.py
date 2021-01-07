@@ -1,8 +1,11 @@
 import numpy as np
 
+
 def getExpOpts():
     blockExperimentTypeLookup = {
         1: 'proprio-miniRC',
+        2: 'proprio',
+        3: 'proprio',
         }
     fullRigInputs = {
         'A+': 'ainp12',
@@ -33,7 +36,7 @@ def getExpOpts():
         'forceY': 'ainp15',
         }
     
-    experimentName = '202101051100-Rupert'
+    experimentName = '202101061100-Rupert'
     deviceName = 'DeviceNPC700246H'
     subjectName = 'Rupert'
 
@@ -62,7 +65,9 @@ def getExpOpts():
     # }
     jsonSessionNames = {
         #  per trial
-        1: ['Session1609866139448', 'Session1609866874163'],
+        1: ['Session1609950588323', 'Session1609951132662'],
+        2: ['Session1609951940258', 'Session1609952078942', 'Session1609952463973'],
+        3: ['Session1609952950984'],
         }
     synchInfo = {'nform': {}, 'nsp': {}, 'ins': {}}
     # populate with defaults
@@ -98,7 +103,7 @@ def getExpOpts():
     #  not ideal, because segments are only synchronized to the nearest **second**
     overrideSegmentsForTapSync = {
         #  each key is a Block
-        1: {1: 0},
+        #  1: {1: 0},
         }
     # options for stim artifact detection
     stimDetectOverrideStartTimes = {
@@ -113,14 +118,14 @@ def getExpOpts():
         # group
         0: {
             # program
-            0: {'detectChannels': ['ins_td0'], 'thres': 250, 'useForSlotDetection': True},
-            1: {'detectChannels': ['ins_td0', 'ins_td2'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True},
+            0: {'detectChannels': ['ins_td2'], 'thres': 250, 'useForSlotDetection': True},
+            1: {'detectChannels': ['ins_td2'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True},
             2: {'detectChannels': ['ins_td0', 'ins_td2'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True},
             3: {'detectChannels': ['ins_td0', 'ins_td2'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True}
         }}
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        '202101051100-Rupert': [1],
+        '202101061100-Rupert': [1],
         }
     # Options relevant to the classifcation of proprio trials
     movementSizeBins = [0, 0.4, 0.8]
@@ -175,15 +180,15 @@ def getExpOpts():
             'shape_boundary_threshold': None,
             'energy_reduction_threshold': 0.25,
             'confidence_threshold': 0.5,
-            'refractory_period': None,
+            'refractory_period': 1e-3,
             'triFolderSource': {
-                'exp': experimentName, 'block': 1,
+                'exp': experimentName, 'block': 3,
                 'nameSuffix': 'spike_preview'},
             'triFolderDest': [
                 {
                     'exp': experimentName, 'block': i,
                     'nameSuffix': 'mean_subtracted'}
-                for i in [1]]
+                for i in [1, 2, 3]]
         }
     }
     return locals()
