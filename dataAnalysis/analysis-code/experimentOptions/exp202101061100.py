@@ -178,9 +178,10 @@ def getExpOpts():
             'outlierThreshold': 1 - 1e-6,
             'shape_distance_threshold': None,
             'shape_boundary_threshold': None,
-            'energy_reduction_threshold': 0.25,
-            'confidence_threshold': 0.5,
-            'refractory_period': 1e-3,
+            'energy_reduction_threshold': None,
+            'make_classifier': False,
+            'confidence_threshold': None,
+            'refractory_period': None,
             'triFolderSource': {
                 'exp': experimentName, 'block': 3,
                 'nameSuffix': 'spike_preview'},

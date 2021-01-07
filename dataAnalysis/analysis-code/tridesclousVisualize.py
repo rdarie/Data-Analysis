@@ -61,7 +61,7 @@ chan_start = int(arguments['chan_start'])
 chan_stop = int(arguments['chan_stop'])
 dataio = tdc.DataIO(dirname=triFolder)
 # chansToAnalyze = sorted(list(dataio.channel_groups.keys()))[chan_start:chan_stop]
-chansToAnalyze = list(range(chan_start,chan_stop))
+chansToAnalyze = list(range(chan_start, chan_stop))
 
 #
 minWaveformRate = 5
@@ -90,7 +90,9 @@ if viewConstructor:
         print('\n\n\n\nTDC visualize on channel group {}\n\n\n\n'.format(chan_grp))
         tdch.open_cataloguewindow(
             triFolder, chan_grp=chan_grp,
-            minTotalWaveforms=minTotalWaveforms)
+            minTotalWaveforms=minTotalWaveforms,
+            make_classifier=spikeSortingOpts[arrayName]['make_classifier'],
+            classifier_opts=None)
         gc.collect()
         #  try:
         #      tdch.clean_catalogue(
@@ -101,7 +103,7 @@ if viewConstructor:
 
 if viewPeeler:
     for chan_grp in chansToAnalyze:
-        print('\n\n\n\nOn channel group {}\n\n\n\n'.format(chan_grp))
+        print('\n\n\n\nTDC visualize on channel group {}\n\n\n\n'.format(chan_grp))
         try:
             tdch.open_PeelerWindow(triFolder, chan_grp=chan_grp)
         except Exception:

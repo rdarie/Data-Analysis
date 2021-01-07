@@ -142,6 +142,8 @@ def tridesclousCCV(
             minWaveformRate=None,
             minWaveforms=10,
             alien_value_threshold=100.,
+            make_classifier=spikeSortingOpts['make_classifier'],
+            classifier_opts=None,
             extractOpts=extractOpts,
             featureOpts=featureOpts,
             clusterOpts=clusterOpts,
@@ -164,24 +166,14 @@ def tridesclousCCV(
             )
     ######################################################################
     if arguments['batchPeel']:
-        if spikeSortingOpts['shape_distance_threshold'] is not None:
-            shape_distance_threshold = spikeSortingOpts['shape_distance_threshold']
-        else:
-            shape_distance_threshold = 6
-        #
-        if spikeSortingOpts['shape_boundary_threshold'] is not None:
-            shape_boundary_threshold = spikeSortingOpts['shape_boundary_threshold']
-        else:
-            shape_boundary_threshold = 8
-        #
         tdch.batchPeel(
             triFolder, chansToAnalyze,
             chunksize=preprocOpts['chunksize'],
-            shape_distance_threshold=shape_distance_threshold,
-            shape_boundary_threshold=shape_boundary_threshold,
+            shape_distance_threshold=spikeSortingOpts['shape_distance_threshold'],
+            shape_boundary_threshold=spikeSortingOpts['shape_boundary_threshold'],
             confidence_threshold=spikeSortingOpts['confidence_threshold'],
             energy_reduction_threshold=spikeSortingOpts['energy_reduction_threshold'],
-            n_max_passes=1,  # TODO: check that n_max_passes has the desired effect
+            n_max_passes=1,  #
             )
     ######################################################################
     #

@@ -316,11 +316,13 @@ def cluster(
         auto_merge_threshold=0.9,
         minClusterSize=5,
         auto_make_catalog=False,
+        make_classifier=False, classifier_opts=None,
         verboseTiming=False):
 
     dataio = tdc.DataIO(dirname=triFolder)
     cc = tdc.CatalogueConstructor(
-        dataio=dataio, name=name, chan_grp=chan_grp)
+        dataio=dataio, name=name, chan_grp=chan_grp,
+        make_classifier=make_classifier, classifier_opts=classifier_opts)
     if cc.some_features is not None:
         if cc.some_features.shape[0] < minFeatures:
             print('Not enough threshold crossings to cluster!')
@@ -361,12 +363,13 @@ def cluster(
 def open_cataloguewindow(
         triFolder, chan_grp=0,
         name='catalogue_constructor',
+        make_classifier=False, classifier_opts=None,
         minTotalWaveforms=None):
     dataio = tdc.DataIO(dirname=triFolder)
     cc = tdc.CatalogueConstructor(
-        dataio=dataio, name=name, chan_grp=chan_grp)
+        dataio=dataio, name=name, chan_grp=chan_grp,
+        make_classifier=make_classifier, classifier_opts=classifier_opts)
     #
-    openWindow = True
     if minTotalWaveforms is not None:
         # negative labels are reserved for "special" use, such as trash or alien
         mask = cc.all_peaks['cluster_label'] >= 0
@@ -378,6 +381,8 @@ def open_cataloguewindow(
             cc.change_spike_label(mask, -1)
             # cc.all_peaks['cluster_label'][mask] = -1
             # cc.on_new_cluster()
+        else:
+            openWindow = True
     print(cc)
     if openWindow:
         app = pg.mkQApp()
@@ -395,13 +400,15 @@ def open_cataloguewindow(
 def clean_catalogue(
         triFolder,
         name='catalogue_constructor',
-        min_nb_peak=10, chan_grp=0):
+        min_nb_peak=10, chan_grp=0,
+        make_classifier=False, classifier_opts=False):
     #  the catalogue need strong attention with teh catalogue windows.
     #  here a dirty way a cleaning is to take on the first 20 bigger cells
     #  the peeler will only detect them
     dataio = tdc.DataIO(dirname=triFolder)
     cc = tdc.CatalogueConstructor(
-        dataio=dataio, name=name, chan_grp=chan_grp)
+        dataio=dataio, name=name, chan_grp=chan_grp,
+        make_classifier=make_classifier, classifier_opts=classifier_opts)
     #  re order by rms
     cc.order_clusters(by='waveforms_rms')
     #  re label >20 to trash (-1)
@@ -967,6 +974,7 @@ def batchPreprocess(
             subsample_ratio=20),
         autoMerge=False, auto_merge_threshold=0.8,
         auto_make_catalog=False,
+        make_classifier=False, classifier_opts=None,
         common_ref_removal=False,
         noise_estimate_duration=120.,
         sample_snippet_duration=240.,
@@ -1029,6 +1037,8 @@ def batchPreprocess(
                 triFolder,
                 clusterOpts=clusterOpts,
                 chan_grp=chan_grp, auto_make_catalog=auto_make_catalog,
+                make_classifier=make_classifier,
+                classifier_opts=classifier_opts,
                 autoMerge=autoMerge, auto_merge_threshold=auto_merge_threshold)
     return
 
