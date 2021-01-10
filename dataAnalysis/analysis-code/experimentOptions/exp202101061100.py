@@ -76,10 +76,10 @@ def getExpOpts():
         for idx, sessionName in enumerate(jsonSessionNames[blockIdx]):
             synchInfo['ins'][blockIdx][idx] = {
                 'timeRanges': None,
-                'chan': ['ins_td0', 'ins_td2'],
+                'chan': ['ins_td0'],
                 'thres': 5,
                 'iti': 50e-3,
-                'keepIndex': slice(None)
+                'keepIndex': slice(-5, None)
                 }
     # manually add special instructions
     # #synchInfo['ins'][1][1] = {
@@ -103,7 +103,7 @@ def getExpOpts():
     #  not ideal, because segments are only synchronized to the nearest **second**
     overrideSegmentsForTapSync = {
         #  each key is a Block
-        #  1: {1: 0},
+        2: {2: 1},
         }
     # options for stim artifact detection
     stimDetectOverrideStartTimes = {
@@ -166,21 +166,23 @@ def getExpOpts():
             ],
             'electrodeMapPath': './Utah_SN6251_002374_Rupert.cmp',
             'rawBlockName': 'utah',
-            'excludeChans': [],
+            'excludeChans': ['utah8'],
             'prbOpts': dict(
                 contactSpacing=400,
                 groupIn={
                     'xcoords': np.arange(-.1, 10.1, 1),
                     'ycoords': np.arange(-.1, 10.1, 1)}),
-            'previewDuration': 400,
+            'previewDuration': 600,
             'previewOffset': 0,
             'interpolateOutliers': True,
             'outlierThreshold': 1 - 1e-6,
             'shape_distance_threshold': None,
             'shape_boundary_threshold': None,
-            'energy_reduction_threshold': None,
-            'make_classifier': False,
-            'confidence_threshold': None,
+            'energy_reduction_threshold': .25,
+            'make_classifier': True,
+            'refit_projector': False,
+            'n_max_peeler_passes': 2,
+            'confidence_threshold': .5,
             'refractory_period': None,
             'triFolderSource': {
                 'exp': experimentName, 'block': 3,

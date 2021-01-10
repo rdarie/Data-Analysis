@@ -128,8 +128,8 @@ def parseAnalysisOptions(
     if 'outlierMaskFilterOpts' not in expOpts:
         outlierMaskFilterOpts = {
             'low': {
-                'Wn': 20,
-                'N': 8,
+                'Wn': 100,
+                'N': 4,
                 'btype': 'low',
                 'ftype': 'bessel'
             }}

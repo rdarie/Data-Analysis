@@ -8,8 +8,8 @@ Options:
     --arrayName=arrayName                       which electrode array to analyze [default: utah]
     --chan_start=chan_start                     which chan_grp to start on [default: 0]
     --chan_stop=chan_stop                       which chan_grp to stop on [default: 80]
-    --peeler                                    visualize Peeler results
-    --constructor                               visualize Catalogue Constructor Results
+    --peeler                                    visualize Peeler results [default: False]
+    --constructor                               visualize Catalogue Constructor Results [default: False]
     --sourceFileSuffix=sourceFileSuffix         which source file to analyze
 """
 
@@ -49,20 +49,13 @@ else:
         scratchFolder, 'tdc_Block{:0>3}'.format(blockIdx))
 if arguments['sourceFileSuffix'] is not None:
     triFolder = triFolder + '_{}'.format(arguments['sourceFileSuffix'])
-
-viewPeeler = False
-if arguments['peeler']:
-    viewPeeler = arguments['peeler']
-viewConstructor = False
-if arguments['constructor']:
-    viewConstructor = arguments['constructor']
-
+#
 chan_start = int(arguments['chan_start'])
 chan_stop = int(arguments['chan_stop'])
 dataio = tdc.DataIO(dirname=triFolder)
-# chansToAnalyze = sorted(list(dataio.channel_groups.keys()))[chan_start:chan_stop]
-chansToAnalyze = list(range(chan_start, chan_stop))
-
+chansToAnalyze = [
+    chNum for chNum in list(range(chan_start, chan_stop))
+    if chNum in dataio.channel_groups.keys()]
 #
 minWaveformRate = 5
 minTotalWaveforms = int(spikeSortingOpts[arrayName]['previewDuration'] * minWaveformRate)
@@ -85,13 +78,14 @@ chansToAnalyze = [
 #  chansToAnalyze = chansToAnalyze[80:]
 #  chansToAnalyze = [11, 14, 16, 18, 20, 22, 29, 36, 37, 39, 41, 48, 51, 52, 59, 60, 64, 66, 73, 75, 77, 80, 81, 88, 95]
 #  chansToAnalyze = [2, 3, 7, 10, 19, 20, 26, 27, 52, 53, 54, 59, 66, 80, 81, 91, 92, 93]
-if viewConstructor:
+if arguments['constructor']:
     for chan_grp in chansToAnalyze:
         print('\n\n\n\nTDC visualize on channel group {}\n\n\n\n'.format(chan_grp))
         tdch.open_cataloguewindow(
             triFolder, chan_grp=chan_grp,
             minTotalWaveforms=minTotalWaveforms,
             make_classifier=spikeSortingOpts[arrayName]['make_classifier'],
+            refit_projector=spikeSortingOpts[arrayName]['refit_projector'],
             classifier_opts=None)
         gc.collect()
         #  try:
@@ -101,7 +95,7 @@ if viewConstructor:
         #  except Exception:
         #      traceback.print_exc()
 
-if viewPeeler:
+if arguments['peeler']:
     for chan_grp in chansToAnalyze:
         print('\n\n\n\nTDC visualize on channel group {}\n\n\n\n'.format(chan_grp))
         try:

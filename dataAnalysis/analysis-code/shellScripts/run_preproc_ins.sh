@@ -52,14 +52,14 @@ python --version
 # EXP="exp202101051100"
 EXP="exp202101061100"
 
-SLURM_ARRAY_TASK_ID=1
+SLURM_ARRAY_TASK_ID=3
 
 # python -u ./previewINSSessionSummary.py --exp=$EXP
 
 # --makePlots to make quality check plots
 # --showPlots to interactively display quality check plots
 # --disableStimDetection to use HUT derived stim start times
-python -u './preprocINS.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --makePlots --verbose
+python -u './preprocINS.py' --blockIdx=$SLURM_ARRAY_TASK_ID --disableStimDetection --exp=$EXP --makePlots --verbose
 # python -u './preprocINS.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --makePlots --verbose |& tee "../../batch_logs/${EXP}_Block_${SLURM_ARRAY_TASK_ID}_preproc_ins"
 
 # EXP="expRCSLongStim"

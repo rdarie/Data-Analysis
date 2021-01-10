@@ -2420,6 +2420,7 @@ def preprocBlockToNix(
                         label='original ch'
                         )
                 if fillOverflow:
+                    print('Filling overflow...')
                     # fill in overflow:
                     tempLFPStore.loc[:, columnsForThisGroup], pltHandles = hf.fillInOverflow2(
                         tempLFPStore.loc[:, columnsForThisGroup].to_numpy(),
@@ -2435,6 +2436,7 @@ def preprocBlockToNix(
                             label='filled ch'
                             )
                 # zscore of each trace
+                print('About to calculate z-score for outlier detection')
                 columnZScore = pd.DataFrame(
                     stats.zscore(
                         tempLFPStore.loc[:, columnsForThisGroup],
@@ -2484,6 +2486,7 @@ def preprocBlockToNix(
                             )
                     '''
                 # filter the traces, if needed
+                print('Removing outliers: filtering...')
                 if LFPFilterOpts is not None:
                     # tempLFPStore.loc[:, columnsForThisGroup] = signal.sosfiltfilt(
                     tempLFPStore.loc[:, columnsForThisGroup] = signal.sosfilt(
@@ -2495,6 +2498,7 @@ def preprocBlockToNix(
                             label='filtered ch'
                             )
                 # zscore of each trace
+                print('Zscore tempLFPStore')
                 tempLFPStore.loc[:, columnsForThisGroup] = (
                         stats.zscore(
                             tempLFPStore.loc[:, columnsForThisGroup])
@@ -2506,6 +2510,7 @@ def preprocBlockToNix(
                     .sum(axis=1)
                     )
                 # smoothedDeviation = signal.sosfilt(
+                print('Filtering deviation')
                 smoothedDeviation = signal.sosfiltfilt(
                     filterCoeffsOutlierMask, lfpDeviation[:, subListIdx])
                 ##
@@ -2627,6 +2632,7 @@ def preprocBlockToNix(
             plt.show()
     # second pass through asigs, to save
     for aSigIdx, aSigProxy in enumerate(seg.analogsignals):
+        print('Second pass: {}'.format(aSigIdx))
         if aSigIdx == 0:
             # check bounds
             tStart = max(chunkTStart * pq.s, aSigProxy.t_start)

@@ -23,7 +23,7 @@
 # Run a command
 source ./shellScripts/run_spike_sorting_preamble.sh
 
-BLOCKIDX=2
+BLOCKIDX=3
 # SLURM_ARRAY_TASK_ID=0
 let CHAN_START=SLURM_ARRAY_TASK_ID
 # for nform, groups of 4 for utah, groups of 5
@@ -31,6 +31,7 @@ let CHAN_STOP=SLURM_ARRAY_TASK_ID+1
 
 SOURCESELECTOR="--sourceFileSuffix=spike_preview"
 # SOURCESELECTOR="--sourceFileSuffix=mean_subtracted"
-python -u ./tridesclousCCV.py --arrayName=utah --blockIdx=$BLOCKIDX --exp=$EXP --batchPreprocess --chan_start=$CHAN_START --chan_stop=$CHAN_STOP $SOURCESELECTOR
-python -u ./tridesclousVisualize.py --arrayName=utah --blockIdx=$BLOCKIDX --exp=$EXP  --constructor --chan_start=$CHAN_START --chan_stop=$CHAN_STOP $SOURCESELECTOR
+# python -u ./tridesclousCCV.py --arrayName=utah --blockIdx=$BLOCKIDX --exp=$EXP --batchPreprocess --chan_start=$CHAN_START --chan_stop=$CHAN_STOP $SOURCESELECTOR
+# python -u ./tridesclousVisualize.py --arrayName=utah --blockIdx=$BLOCKIDX --exp=$EXP  --constructor --chan_start=$CHAN_START --chan_stop=$CHAN_STOP $SOURCESELECTOR
+python -u ./tridesclousCCV.py --arrayName=utah --blockIdx=$BLOCKIDX --exp=$EXP --batchCleanConstructor --chan_start=$CHAN_START --chan_stop=$CHAN_STOP $SOURCESELECTOR
 python -u ./tridesclousCCV.py --arrayName=utah --blockIdx=$BLOCKIDX --exp=$EXP --batchPeel --chan_start=$CHAN_START --chan_stop=$CHAN_STOP $SOURCESELECTOR

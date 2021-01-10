@@ -1276,6 +1276,13 @@ def getINSTapTimestamp(
         signalsToConcat.append(accel.loc[tdMask, accChans])
         fs = (accel['t'].iloc[1] - accel['t'].iloc[0]) ** -1
     tapDetectSignal = pd.concat(signalsToConcat, axis='columns')
+    if filterOpts is not None:
+        # pdb.set_trace()
+        filterCoeffs = hf.makeFilterCoeffsSOS(
+            filterOpts, fs)
+        tapDetectSignal.loc[:, :] = signal.sosfiltfilt(
+            filterCoeffs,
+            tapDetectSignal.to_numpy(), axis=0)
     try:
         cov = (
             MinCovDet(support_fraction=0.75)
@@ -1289,12 +1296,6 @@ def getINSTapTimestamp(
         np.sqrt(cov.mahalanobis(tapDetectSignal.to_numpy())),
         index=tapDetectSignal.index)
     # pdb.set_trace()
-    if filterOpts is not None:
-        filterCoeffs = hf.makeFilterCoeffsSOS(
-            filterOpts, fs)
-        tapDetectSignal.loc[:] = signal.sosfiltfilt(
-            filterCoeffs,
-            tapDetectSignal.to_numpy())
     tdPeakIdx = hf.getTriggers(
         tapDetectSignal, iti=iti, fs=fs, thres=tapDetectOpts['thres'],
         edgeType='both', minAmp=None,

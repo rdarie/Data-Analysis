@@ -12,6 +12,7 @@ def getExpOpts():
         }
     experimentName = '202012171300-Goat'
     deviceName = None
+    subjectName = 'Rupert'
     rippleMapFile = {
         1: 'isi_port1nano1caudal_xAyBzC_ortho_port2nano1rostral_xAyBzC_ortho.map',
         2: 'isi_port1nano1caudal_xAyBzC_ortho_port2nano1rostral_xAyBzC_ortho.map',

@@ -14,6 +14,7 @@ Options:
     --purgePeelerDiagnostics                    delete previous sort results [default: False]
     --batchPrepWaveforms                        extract snippets [default: False]
     --batchRunClustering                        extract features, run clustering [default: False]
+    --batchCleanConstructor                     extract features, run clustering [default: False]
     --batchPreprocess                           extract snippets and features, run clustering [default: False]
     --batchPeel                                 run peeler [default: False]
     --removeExistingCatalog                     delete previous sort results [default: False]
@@ -55,12 +56,6 @@ expOpts, allOpts = parseAnalysisOptions(
     arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
-
-# SLURM_ARRAY_TASK_ID = os.environ.get('SLURM_ARRAY_TASK_ID')
-# if SLURM_ARRAY_TASK_ID is not None:
-#     RANK = int(SLURM_ARRAY_TASK_ID)
-# else:
-#     RANK = 0
 
 
 def tridesclousCCV(
@@ -120,9 +115,12 @@ def tridesclousCCV(
     #
     chan_start = int(arguments['chan_start'])
     chan_stop = int(arguments['chan_stop'])
-    dataio = tdc.DataIO(dirname=triFolder)
-    print(dataio)
-    # chansToAnalyze = sorted(list(dataio.channel_groups.keys()))[chan_start:chan_stop]
+    # dataio = tdc.DataIO(dirname=triFolder)
+    # print(dataio)
+    # chansToAnalyze = [
+    #     chNum
+    #     for chNum in list(range(chan_start, chan_stop))
+    #     if chNum in list(dataio.channel_groups.keys())]
     chansToAnalyze = list(range(chan_start, chan_stop))
     print('Analyzing channels:\n{}'.format(chansToAnalyze))
     ######################################################################
@@ -141,7 +139,7 @@ def tridesclousCCV(
             nb_noise_snippet=1000,
             minWaveformRate=None,
             minWaveforms=10,
-            alien_value_threshold=100.,
+            alien_value_threshold=50.,
             make_classifier=spikeSortingOpts['make_classifier'],
             classifier_opts=None,
             extractOpts=extractOpts,
@@ -164,8 +162,18 @@ def tridesclousCCV(
             extractOpts=extractOpts,
             **preprocOpts
             )
+    #
+    if arguments['batchCleanConstructor']:
+        tdch.batchCleanConstructor(
+            triFolder, chansToAnalyze,
+            make_classifier=spikeSortingOpts['make_classifier'],
+            classifier_opts=None,
+            refit_projector=spikeSortingOpts['refit_projector'],
+            )
     ######################################################################
     if arguments['batchPeel']:
+        tdch.purgePeelerResults(
+            triFolder, chan_grps=chansToAnalyze)
         tdch.batchPeel(
             triFolder, chansToAnalyze,
             chunksize=preprocOpts['chunksize'],
@@ -173,7 +181,7 @@ def tridesclousCCV(
             shape_boundary_threshold=spikeSortingOpts['shape_boundary_threshold'],
             confidence_threshold=spikeSortingOpts['confidence_threshold'],
             energy_reduction_threshold=spikeSortingOpts['energy_reduction_threshold'],
-            n_max_passes=1,  #
+            n_max_passes=spikeSortingOpts['n_max_peeler_passes'],  #
             )
     ######################################################################
     #
@@ -182,7 +190,8 @@ def tridesclousCCV(
         tdch.neo_block_after_peeler(
             triFolder, chan_grps=chansToAnalyze,
             shape_distance_threshold=None, refractory_period=None,
-            ignoreTags=[])
+            ignoreTags=[]
+            )
     #
     if arguments['makeStrictNeoBlock']:
         tdch.purgeNeoBlock(triFolder)
@@ -243,47 +252,46 @@ def tdcCCVWrapper():
     # ########## decomposition options
     #
     #  ### parametric umap (with tensorflow) projection options
-    #  callbacks = [
-    #      tf.keras.callbacks.EarlyStopping(
-    #          # Stop training when `loss` is no longer improving
-    #          monitor="loss",
-    #          # "no longer improving" being defined as "no better than 1e-2 less"
-    #          min_delta=5e-3,
-    #          # "no longer improving" being further defined as "for at least 2 epochs"
-    #          patience=2,
-    #          verbose=1,
-    #      )
-    #  ]
-    #  #
-    #  theseFeatureOpts = {
-    #      'method': 'global_pumap',
-    #      'n_components': 3,
-    #      'n_neighbors': 50,
-    #      'min_dist': 0,
-    #      'metric': 'euclidean',
-    #      'set_op_mix_ratio': 0.9,
-    #      'parametric_reconstruction': False,
-    #      'autoencoder_loss': False,
-    #      'verbose': False,
-    #      'batch_size': 10000,
-    #      'n_training_epochs': 15,
-    #      'keras_fit_kwargs': {'verbose': 2, 'callbacks': callbacks}
-    #  }
-
-    #  ### PCA opts
-    theseFeatureOpts = {
-        'method': 'global_pca',
-        'n_components': 5
-    }
-    # ########## clustering options
+    callbacks = [
+        tf.keras.callbacks.EarlyStopping(
+            # Stop training when `loss` is no longer improving
+            monitor="loss",
+            # "no longer improving" being defined as "no better than 1e-2 less"
+            min_delta=5e-3,
+            # "no longer improving" being further defined as "for at least 2 epochs"
+            patience=2,
+            verbose=1,
+            )
+        ]
     #
-    # theseClusterOpts = {
-    #     'method': 'agglomerative',
-    #     'n_clusters': 2
-    #     }
-    theseClusterOpts = {
-        'method': 'onecluster',
+    theseFeatureOpts = {
+        'method': 'global_pumap',
+        'n_components': 3,
+        'n_neighbors': 50,
+        'min_dist': 0,
+        'metric': 'euclidean',
+        'set_op_mix_ratio': 0.9,
+        'parametric_reconstruction': False,
+        'autoencoder_loss': False,
+        'verbose': False,
+        'batch_size': 10000,
+        'n_training_epochs': 15,
+        'keras_fit_kwargs': {'verbose': 2, 'callbacks': callbacks}
         }
+    #  ### PCA opts
+    # theseFeatureOpts = {
+    #     'method': 'global_pca',
+    #     'n_components': 5
+    #     }
+    #  ########## clustering options
+    #
+    theseClusterOpts = {
+        'method': 'agglomerative',
+        'n_clusters': 2
+        }
+    #  theseClusterOpts = {
+    #      'method': 'onecluster',
+    #      }
     #
     thesePreprocOpts = dict(
         relative_threshold=4,
@@ -296,9 +304,9 @@ def tdcCCVWrapper():
         filter_order=2,
         noise_estimate_duration=spikeSortingOpts[arrayName]['previewDuration'],
         sample_snippet_duration=spikeSortingOpts[arrayName]['previewDuration'],
-        chunksize=2**18,
+        chunksize=2**19,
         autoMerge=False, auto_merge_threshold=0.99,
-        auto_make_catalog=True,
+        auto_make_catalog=False,
         )
     for chunkIdxStr, chunkMeta in chunkingMetadata.items():
         # chunkIdx = int(chunkIdxStr)
@@ -315,7 +323,6 @@ def tdcCCVWrapper():
             nspFolder=nspFolder, prbPath=nspPrbPath,
             )
     return
-
 
 
 if __name__ == "__main__":

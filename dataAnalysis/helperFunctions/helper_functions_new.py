@@ -829,106 +829,14 @@ def getStimSerialTrialSegMask(insDF, trialSegment):
     return segmentMask
 
 
-def fillInOverflow(
-        channelData, plotting=False, fillMethod='constant'):
-    # TODO merge this into getBadContinuousMask
-    overflowMask = pd.DataFrame(
-        False, index=channelData.index,
-        columns=channelData.columns,
-        dtype=np.bool).to_sparse(fill_value=False)
-    #
-    columnList = list(channelData.columns)
-    nChan = len(columnList)
-    for idx, row in channelData.iteritems():
-        ch_idx = columnList.index(idx)
-        col_idx = channelData.columns.get_loc(idx)
-
-        if os.fstat(0) == os.fstat(1):
-            endChar = '\r'
-            print("Running fillInOverflow: %d%%" % int((ch_idx + 1) * 100 / nChan), end = endChar)
-        else:
-            print("Running fillInOverflow: %d%%" % int((ch_idx + 1) * 100 / nChan))
-
-        # get the first difference of the row
-        rowDiff = row.diff()
-        rowDiff.fillna(0, inplace = True)
-        # negative dips are the start of the dip
-
-        dipCutoff = 3e3 # 3000 uV jumps are probably caused by artifact
-        #
-        # peakutils works on a percentage of the range of values
-        dipThresh = (dipCutoff - rowDiff.min()) / (rowDiff.max() - rowDiff.min())
-        dipStarts = peakutils.indexes(-rowDiff, thres=dipThresh)
-        dipEnds = []
-
-        if dipStarts.any() and plotting:
-            #
-            plt.figure()
-            plt.plot(row)
-            plt.plot(rowDiff)
-            plt.plot(dipStarts, row.iloc[dipStarts], '*')
-            plt.plot(dipEnds, row.iloc[dipEnds], '*')
-            plt.show()
-
-        if dipStarts.any():
-            nDips = len(dipStarts)
-            fixedRow = row.copy()
-            maskRow = np.full(len(overflowMask.index), False, dtype = np.bool)
-            for dipIdx, dipStartIdx in enumerate(dipStarts):
-                try:
-                    assert row.iloc[dipStartIdx - 1] > 8e3 # 8191 mV is equivalent to 32768
-                    nextIdx = dipStarts[dipIdx + 1] if dipIdx < nDips - 1 else len(row)
-                    thisSection = rowDiff.iloc[dipStartIdx:nextIdx].values
-                    dipEndIdx = peakutils.indexes(thisSection, thres=dipThresh)
-                    if not dipEndIdx and thisSection[-1] > dipCutoff:
-                        # if the end is the peak, peakutils won't catch it; add it in manually
-                        dipEndIdx = [len(thisSection)]
-                    dipEndIdx = dipEndIdx[0] + dipStartIdx
-                    dipEnds.append(dipEndIdx)
-                    if dipEndIdx == nextIdx:
-                        # avoid double counting the last point
-                        dipEndIdx -= 1
-                    assert dipEndIdx > dipStartIdx
-                except:
-                    continue
-
-                maskRow[dipStartIdx:dipEndIdx] = True
-                if fillMethod == 'average':
-                    fixValue = (-rowDiff.iloc[dipStartIdx] + rowDiff.iloc[dipEndIdx]) / 2
-                elif fillMethod == 'constant':
-                    fixValue = 8191
-
-                try:
-                    #assert fixedRow.iloc[dipStartIdx:dipEndIdx].mean() < 5e3
-                    fixedRow.iloc[dipStartIdx:dipEndIdx] = \
-                        row.iloc[dipStartIdx:dipEndIdx].values + \
-                        fixValue
-                except Exception as e:
-                    print(e)
-                    continue
-
-            if dipStarts.any() and plotting:
-                plt.figure()
-                plt.plot(row, label = 'Original')
-                plt.plot(fixedRow, label = 'Fixed')
-                plt.plot(dipStarts, row.iloc[dipStarts], '*')
-                plt.plot(dipEnds, row.iloc[dipEnds], '*')
-                plt.legend()
-                plt.show()
-
-            channelData.loc[:, idx] = fixedRow
-            overflowMask.loc[:, idx] = maskRow
-
-    print('\nFinished finding boolean overflow')
-    return channelData, overflowMask
-
-
-def fillInJumps(channelData, samp_per_s, smoothing_ms = 1, badThresh = 1e-3,
-    consecLen = 30, nStdDiff = 20, nStdAmp = 20):
-    #Allocate bad data mask as dict
+def fillInJumps(
+    channelData, samp_per_s, smoothing_ms=1, badThresh=1e-3,
+    consecLen=30, nStdDiff=20, nStdAmp=20
+    ):
+    #  Allocate bad data mask as dict
     badMask = {'general':None,
-        'perChannelAmp' : pd.DataFrame(False, index = channelData.index, columns = channelData.columns, dtype = np.bool).to_sparse(fill_value=False),
-        'perChannelDer' : pd.DataFrame(False, index = channelData.index, columns = channelData.columns, dtype = np.bool).to_sparse(fill_value=False)
+        'perChannelAmp': pd.DataFrame(False, index = channelData.index, columns = channelData.columns, dtype = np.bool).to_sparse(fill_value=False),
+        'perChannelDer': pd.DataFrame(False, index = channelData.index, columns = channelData.columns, dtype = np.bool).to_sparse(fill_value=False)
         }
 
     #per channel, only smooth a couple of samples
@@ -1015,6 +923,7 @@ def fillInJumps(channelData, samp_per_s, smoothing_ms = 1, badThresh = 1e-3,
 
     return channelData, badMask
 
+
 def fillInOverflow2(
         data,
         overFlowFillType='8mV',
@@ -1058,6 +967,7 @@ def fillInOverflow2(
     if debuggingPlots:
         ax.legend()
     return data, {'fig': fig, 'ax': ax}
+
 
 def confirmTriggersPlot(peakIdx, dataSeries, fs, whichPeak=0, nSec=10):
     #

@@ -5,6 +5,7 @@ from datetime import datetime as dt
 import os
 import pdb
 
+
 def getLatestImpedance(
         recordingDate=None, impedanceFilePath='./impedances.h5',
         recordingDateStr=None,
@@ -80,7 +81,9 @@ def mapToDF(arrayFilePath):
             'xcoords', 'ycoords', 'zcoords', 'elecName',
             'elecID', 'label', 'bank', 'bankID', 'nevID']
         )
-    bankLookup = {'A.1': 0, 'A.2': 1, 'A.3': 2}
+    bankLookup = {
+        'A.1': 0, 'A.2': 1, 'A.3': 2,
+        'B.1': 3, 'B.2': 4, 'B.3': 5}
     for rowIdx, row in arrayMap.iterrows():
         processor, port, FEslot, channel = row['FE'].split('.')
         bankName = '{}.{}'.format(port, FEslot)

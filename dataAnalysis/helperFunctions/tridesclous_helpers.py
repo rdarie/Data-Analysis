@@ -364,18 +364,20 @@ def open_cataloguewindow(
         triFolder, chan_grp=0,
         name='catalogue_constructor',
         make_classifier=False, classifier_opts=None,
+        refit_projector=False,
         minTotalWaveforms=None):
     dataio = tdc.DataIO(dirname=triFolder)
     cc = tdc.CatalogueConstructor(
         dataio=dataio, name=name, chan_grp=chan_grp,
-        make_classifier=make_classifier, classifier_opts=classifier_opts)
+        make_classifier=make_classifier, classifier_opts=classifier_opts,
+        refit_projector=refit_projector)
     #
     if minTotalWaveforms is not None:
         # negative labels are reserved for "special" use, such as trash or alien
         mask = cc.all_peaks['cluster_label'] >= 0
         if mask.sum() < minTotalWaveforms:
-            print('Skipping chan grp {} because it has {} spikes'.format(
-                chan_grp, mask.sum()
+            print('Skipping chan grp {} because it has {} < {} spikes'.format(
+                chan_grp, mask.sum(), minTotalWaveforms
             ))
             openWindow = False
             cc.change_spike_label(mask, -1)
@@ -401,20 +403,22 @@ def clean_catalogue(
         triFolder,
         name='catalogue_constructor',
         min_nb_peak=10, chan_grp=0,
-        make_classifier=False, classifier_opts=False):
+        make_classifier=False, classifier_opts=None,
+        refit_projector=False):
     #  the catalogue need strong attention with teh catalogue windows.
     #  here a dirty way a cleaning is to take on the first 20 bigger cells
     #  the peeler will only detect them
     dataio = tdc.DataIO(dirname=triFolder)
     cc = tdc.CatalogueConstructor(
         dataio=dataio, name=name, chan_grp=chan_grp,
-        make_classifier=make_classifier, classifier_opts=classifier_opts)
+        make_classifier=make_classifier, classifier_opts=classifier_opts,
+        refit_projector=refit_projector)
     #  re order by rms
     cc.order_clusters(by='waveforms_rms')
     #  re label >20 to trash (-1)
-    mask = cc.all_peaks['nb_peak'] < min_nb_peak
-    cc.all_peaks['cluster_label'][mask] = -1
-    cc.on_new_cluster()
+    #  mask = cc.all_peaks['nb_peak'] < min_nb_peak
+    #  cc.all_peaks['cluster_label'][mask] = -1
+    #  cc.on_new_cluster()
     #  save catalogue before peeler
     cc.make_catalogue_for_peeler()
     return
@@ -737,11 +741,11 @@ def neo_block_after_peeler(
                         'isi': timesDF['isi'].values}
                     arrayAnnNames = {'arrayAnnNames': list(arrayAnn.keys())}
                     #  
-                    if group['tag'].iloc[0] == '':
-                        if group['max_peak_amplitude'].iloc[0] < -7:
-                            group.loc[:, 'tag'] = 'so_good'
-                        else:
-                            group.loc[:, 'tag'] = 'good'
+                    # if group['tag'].iloc[0] == '':
+                    #     if group['max_peak_amplitude'].iloc[0] < -7:
+                    #         group.loc[:, 'tag'] = 'so_good'
+                    #     else:
+                    #         group.loc[:, 'tag'] = 'good'
                     if plotting:
                         fitBreakDown = pd.cut(timesDF['templateDist'], nCats)
                         # 
@@ -835,10 +839,11 @@ def purgeNeoBlock(triFolder):
 
 
 def purgePeelerResults(
-        triFolder, chan_grps=None, purgeAll=False, diagnosticsOnly=False, altDataIOInfo=None):
+        triFolder, chan_grps=None,
+        purgeAll=False, diagnosticsOnly=False,
+        altDataIOInfo=None):
     if not purgeAll:
         assert chan_grps is not None, 'Need to specify chan_grps!'
-
         for chan_grp in chan_grps:
             #  chan_grp = 0
             grpFolder = 'channel_group_{}'.format(chan_grp)
@@ -850,7 +855,7 @@ def purgePeelerResults(
                 os.remove(fl)
             for fl in glob.glob(os.path.join(triFolder, 'templateHist_{}.png'.format(chan_grp))):
                 os.remove(fl)
-            #  TODO implement selective removal of spikes or processed signs
+            #  TODO implement selective removal of spikes or processed signals
             """
             arrayInfoPath = os.path.join(segFolder, "arrays.json")
             with open(arrayInfoPath, "r") as f:
@@ -947,6 +952,39 @@ def transferTemplates(
                 """
     return
 
+
+def batchCleanConstructor(
+        triFolder, chansToAnalyze,
+        min_nb_peak=10,
+        make_classifier=False, classifier_opts=None,
+        refit_projector=False,
+        attemptMPI=False):
+    print('Batch preprocessing...')
+    try:
+        if attemptMPI:
+            from mpi4py import MPI
+            COMM = MPI.COMM_WORLD
+            SIZE = COMM.Get_size()
+            RANK = COMM.Get_rank()
+        else:
+            raise(Exception('MPI aborted by cmd line argument'))
+    except Exception:
+        RANK = 0
+        SIZE = 1
+    print('RANK={}, SIZE={}'.format(RANK, SIZE))
+    for idx, chan_grp in enumerate(chansToAnalyze):
+        if idx % SIZE == RANK:
+            print('memory usage: {}'.format(
+                prf.memory_usage_psutil()))
+            print('About to run clean_catalog()...')
+            clean_catalogue(
+                triFolder,
+                name='catalogue_constructor',
+                min_nb_peak=min_nb_peak, chan_grp=chan_grp,
+                make_classifier=make_classifier,
+                classifier_opts=classifier_opts,
+                refit_projector=refit_projector)
+    return
 
 def batchPreprocess(
         triFolder, chansToAnalyze,
