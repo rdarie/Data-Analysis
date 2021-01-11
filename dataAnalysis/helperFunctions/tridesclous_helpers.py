@@ -7,6 +7,7 @@ import time
 import os
 import glob
 import re
+import ast
 import pdb
 import traceback
 from collections import Iterable, OrderedDict
@@ -494,7 +495,17 @@ def neo_block_after_peeler(
         refractory_period=None, ignoreTags=['so_bad'],
         plotting=False, altDataIOInfo=None,
         waveformSignalType='processed',
-        FRThresh=1):
+        FRThresh=1, prbPath=None):
+    prbPath = glob.glob(os.path.join(triFolder, '*.prb'))[0]
+    with open(prbPath, "r") as f:
+        channelsInfoTxt = f.read()
+    channelsInfo = ast.literal_eval(
+        channelsInfoTxt.replace('channel_groups = ', ''))
+    chan_grps = [
+            chGrp
+            for chGrp in chan_grps
+            if chGrp in channelsInfo.keys()
+        ]
     dataio = tdc.DataIO(
         dirname=triFolder,
         altInfo=altDataIOInfo)
@@ -893,7 +904,8 @@ def purgePeelerResults(
 
 
 def transferTemplates(
-        triFolderSource, triFolderDest, chan_grps, removeExisting=True):
+        triFolderSource, triFolderDest,
+        chan_grps, removeExisting=True):
     #  triFolderSource = triFolder
     #  triFolderDest = triFolder.replace('3', '1')
     #  chan_grps = chansToAnalyze[:-1]
@@ -913,7 +925,7 @@ def transferTemplates(
         except Exception:
             traceback.print_exc()
             print('{}'.format(catFolderSource))
-            pdb.set_trace()
+            continue
         assert os.path.exists(grpFolderDest), 'destination folder does not exist!'
         ccFolderSource = os.path.join(
             grpFolderSource, 'catalogue_constructor')

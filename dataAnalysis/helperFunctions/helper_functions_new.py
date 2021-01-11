@@ -596,7 +596,6 @@ def loadBlockProxyObjects(block):
             chanIdx.analogsignals = []
         if chanIdx.irregularlysampledsignals:
             chanIdx.irregularlysampledsignals = []
-
     for segIdx, seg in enumerate(block.segments):
         stProxyList = seg.spiketrains
         seg.spiketrains = []
@@ -632,7 +631,6 @@ def loadBlockProxyObjects(block):
             # assign ownership to containers
             chanIdx.analogsignals.append(asig)
             seg.analogsignals.append(asig)
-        
         seg.events = [i.load() for i in seg.events]
         seg.epochs = [i.load() for i in seg.epochs]
     block.create_relationship()

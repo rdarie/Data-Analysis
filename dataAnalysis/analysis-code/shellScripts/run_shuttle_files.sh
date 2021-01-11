@@ -57,6 +57,6 @@ python --version
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm=tdc_ --preprocFolderFiles --fromScratchToData
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm=default --fromScratchToData --moveItems
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --fileSearchTerm=*spikes.raw --fromDataToScratch
-python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm=tdc_ --fromDataToScratch
+python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm=tdc_ --fromScratchToData
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --preprocFolderFiles --fromDataToScratch
 # 

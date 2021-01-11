@@ -42,15 +42,15 @@ conda activate
 source activate nda2
 python --version
 
-SLURM_ARRAY_TASK_ID=3
+SLURM_ARRAY_TASK_ID=1
 
 ########################################################################################################################################################################################################################
 
-SOURCESELECTOR="--sourceFileSuffix=spike_preview"
-# SOURCESELECTOR="--sourceFileSuffix=mean_subtracted"
+# SOURCESELECTOR="--sourceFileSuffix=spike_preview"
+SOURCESELECTOR="--sourceFileSuffix=mean_subtracted"
 # --sourceFileSuffix='spike_preview', --sourceFileSuffix='mean_subtracted'
 python -u ./tridesclousCCV.py --arrayName=utah --blockIdx=$SLURM_ARRAY_TASK_ID --makeStrictNeoBlock --exp=$EXP --chan_start=0 --chan_stop=96 $SOURCESELECTOR
-python -u ./plotSpikeReport.py --blockIdx=$SLURM_ARRAY_TASK_ID --nameSuffix=_final --exp=$EXP --arrayName=utah $SOURCESELECTOR
+# python -u ./plotSpikeReport.py --blockIdx=$SLURM_ARRAY_TASK_ID --nameSuffix=_final --exp=$EXP --arrayName=utah $SOURCESELECTOR
 #
 # python -u ./tridesclousCCV.py --arrayName=utah --blockIdx=$SLURM_ARRAY_TASK_ID --makeStrictNeoBlock --purgePeelerDiagnostics --exp=$EXP --chan_start=0 --chan_stop=96  --sourceFileSuffix='mean_subtracted'
 # python -u ./plotSpikeReport.py --blockIdx=$SLURM_ARRAY_TASK_ID --nameSuffix=_final --exp=$EXP --arrayName=utah  --sourceFileSuffix='mean_subtracted'

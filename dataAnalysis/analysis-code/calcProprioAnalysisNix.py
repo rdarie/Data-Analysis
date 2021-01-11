@@ -6,8 +6,9 @@ Options:
     --blockIdx=blockIdx                    which trial to analyze
     --exp=exp                              which experimental day to analyze
     --verbose                              print out messages? [default: False]
+    --lazy                                 load as neo proxy objects or no? [default: False]
     --analysisName=analysisName            append a name to the resulting blocks? [default: default]
-    --inputBlockSuffix=inputBlockSuffix    append a name to the resulting blocks?
+    --sourceFileSuffix=sourceFileSuffix    append a name to the resulting blocks?
     --chanQuery=chanQuery                  how to restrict channels if not providing a list? [default: fr]
     --samplingRate=samplingRate            resample the result??
     --rigOnly                              is there no INS block? [default: False]
@@ -32,6 +33,7 @@ import rcsanalysis.packet_func as rcsa_helpers
 import os, pdb
 import traceback
 from importlib import reload
+import json
 #  load options
 from currentExperiment import parseAnalysisOptions
 from docopt import docopt
@@ -43,10 +45,8 @@ globals().update(expOpts)
 globals().update(allOpts)
 binOpts = rasterOpts['binOpts'][arguments['analysisName']]
 
-if arguments['inputBlockSuffix'] is None:
-    arguments['inputBlockSuffix'] = ''
 
-def calcBlockAnalysisNix():
+def calcBlockAnalysisWrapper():
     arguments['chanNames'], arguments['chanQuery'] = ash.processChannelQueryArgs(
         namedQueries, scratchFolder, **arguments)
     analysisSubFolder = os.path.join(
@@ -59,36 +59,64 @@ def calcBlockAnalysisNix():
     else:
         samplingRate = float(1 / binOpts['binInterval']) * pq.Hz
     #
+    if arguments['sourceFileSuffix'] is not None:
+        sourceFileSuffix = '_' + arguments['sourceFileSuffix']
+    else:
+        sourceFileSuffix = ''
+    #  electrode array name (changes the prefix of the file)
+    arrayName = arguments['arrayName']
+    if arguments['arrayName'] is not None:
+        blockBaseName = ns5FileName.replace(
+            'Block', arguments['arrayName'])
+    else:
+        blockBaseName = copy(ns5FileName)
+    #
+    chunkingInfoPath = os.path.join(
+        scratchFolder,
+        blockBaseName + sourceFileSuffix + '_chunkingInfo.json'
+        )
+    #
+    if os.path.exists(chunkingInfoPath):
+        with open(chunkingInfoPath, 'r') as f:
+            chunkingMetadata = json.load(f)
+    else:
+        chunkingMetadata = {
+            '0': {
+                'filename': os.path.join(
+                    scratchFolder, blockBaseName + sourceFileSuffix + '.nix'
+                    ),
+                'partNameSuffix': '',
+                'chunkTStart': 0,
+                'chunkTStop': 'NaN'
+            }}
+    for chunkIdxStr, chunkMeta in chunkingMetadata.items():
+        # chunkIdx = int(chunkIdxStr)
+        nameSuffix = sourceFileSuffix + chunkMeta['partNameSuffix']
+        calcBlockAnalysisNix(
+            blockBaseName,
+            nameSuffix=nameSuffix,
+            scratchFolder=scratchFolder, partNameSuffix=None,
+            nspFolder=nspFolder,
+            )
+    return
+
+
+def calcBlockAnalysisNix(
+        blockBaseName, nameSuffix
+        ):
     nspPath = os.path.join(
         scratchFolder,
-        ns5FileName + arguments['inputBlockSuffix'] + '.nix')
+        ns5FileName + sourceFileSuffix + '.nix')
     # pdb.set_trace()
-    if not os.path.exists(nspPath):
-        fallBackPath = os.path.join(
-            scratchFolder,
-            (
-                ns5FileName.replace('Block', 'utah') +
-                arguments['inputBlockSuffix'] +
-                '.nix'))
-        print('{} not found;\nFalling back to {}'.format(
-            nspPath, fallBackPath
-        ))
-        if os.path.exists(fallBackPath):
-            nspPath = fallBackPath
-    nspReader = neo.io.nixio_fr.NixIO(
-        filename=nspPath)
-    nspBlock = ns5.readBlockFixNames(
-        nspReader, reduceChannelIndexes=True, block_index=0)
+    #####
+    nspReader, nspBlock = ns5.blockFromPath(
+        nspPath, lazy=arguments['lazy'],
+        reduceChannelIndexes=True)
     print('Loading {}'.format(nspPath))
-    # print([cI.name for cI in nspBlock.channel_indexes])
-    # print([asig.name for asig in spikesBlock.filter(objects=AnalogSignal)])
-    # print([st.name for st in nspBlock.filter(objects=SpikeTrain)])
-    # print([st.name for st in nspBlock.filter(objects=ChannelIndex)]) len(nspBlock.filter(objects=ChannelIndex))
-    # print([ev.name for ev in nspBlock.filter(objects=Event)])
+    #
     spikesBlock = hf.extractSignalsFromBlock(
         nspBlock, keepSpikes=True)
     spikesBlock = hf.loadBlockProxyObjects(spikesBlock)
-    # print([cI.name for cI in spikesBlock.channel_indexes])
     #  save ins time series
     tdChanNames = ns5.listChanNames(
         nspBlock, arguments['chanQuery'], objType=AnalogSignalProxy)

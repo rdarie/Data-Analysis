@@ -1005,134 +1005,6 @@ def getAsigsAlignedToEvents(
         writer.close()
     return masterBlock
 
-'''
-def getAsigsAlignedToEventsOneUnit(
-        eventBlock=None, eventName=None, chansToAlign=None,
-        windowSize=None, chunkSize=None,
-        checkReferences=False, verbose=False, 
-        ):
-    #  make channels and units for triggered time series
-    thisUnit = Unit(name=eventName)
-    
-    allAlignEvents = []
-    for segIdx, eventSeg in enumerate(eventBlock.segments):
-        evPs = eventSeg.filter(
-            objects=EventProxy, name=eventName)
-        if len(evPs):
-            event = evPs[0].load()
-            event = loadObjArrayAnn(event)
-        else:
-            evs = eventSeg.filter(objects=Event, name=eventName)
-            event = evs[0]
-        if segIdx == 0:
-            skipAnnNames = (
-                list(event.annotations['arrayAnnNames']) +
-                ['nix_name', 'neo_name']
-                )
-        if chunkSize is None:
-            alignEventGroups = [event]
-        else:
-            nChunks = max(
-                int(np.floor(event.shape[0] / chunkSize)),
-                1)
-            alignEventGroups = []
-            for i in range(nChunks):
-                if i < (nChunks - 1):
-                    alignEventGroups.append(
-                        event[i * chunkSize: (i + 1) * chunkSize])
-                else:
-                    alignEventGroups.append(
-                        event[i * chunkSize:])
-        allAlignEvents.append(alignEventGroups)
-    
-    samplingRate = chansToAlign[0].analogsignals[0].sampling_rate
-    nominalWinLen = int(
-        (windowSize[1] - windowSize[0]) *
-        samplingRate - 1)
-    signalBlock = chansToAlign[0].block
-    
-    totalNSegs = 0
-    for segIdx, signalSeg in enumerate(signalBlock.segments):
-        for subSegIdx, alignEvents in enumerate(allAlignEvents[segIdx]):
-            spikeWaveforms = np.zeros((alignEvents.shape[0], len(chansToAlign), nominalWinLen))
-            asigTStart = chansToAlign[0].analogsignals[segIdx].t_start
-            asigTStop = chansToAlign[0].analogsignals[segIdx].t_stop
-            validMask = (
-                ((
-                    alignEvents + windowSize[1] +
-                    samplingRate ** (-1)) < asigTStart) &
-                ((
-                    alignEvents + windowSize[0] -
-                    samplingRate ** (-1)) > asigTStop)
-                )
-            alignEvents = alignEvents[validMask]
-            for chanIdx in chansToAlign:
-                asigP = chanIdx.filter(objects=AnalogSignalProxy)[segIdx]
-                if checkReferences:
-                    da = (
-                        asigP
-                        ._rawio
-                        .da_list['blocks'][0]['segments'][segIdx]['data'])
-                    print('segIdx {}, asigP.name {}'.format(
-                        segIdx, asigP.name))
-                    print('asigP._global_channel_indexes = {}'.format(
-                        asigP._global_channel_indexes))
-                    print('asigP references {}'.format(
-                        da[asigP._global_channel_indexes[0]]))
-                    try:
-                        assert (
-                            asigP.name
-                            in da[asigP._global_channel_indexes[0]].name)
-                    except Exception:
-                        traceback.print_exc()
-                rawWaveforms = [
-                    asigP.load(
-                        time_slice=(t + windowSize[0], t + windowSize[1]))
-                    for t in alignEvents]
-                waveformUnits = rawWaveforms[0].units
-                #  fix length if roundoff error
-                #  minLen = min([rW.shape[0] for rW in rawWaveforms])
-                rawWaveforms = [rW[:nominalWinLen] for rW in rawWaveforms]
-                theseSpikeWaveforms = (
-                    np.hstack([rW.magnitude for rW in rawWaveforms])
-                    .transpose()[:, np.newaxis, :] * waveformUnits
-                    )
-                metaIndex = np.nan  # TODO: Figure out how to stack these
-                spikeWaveforms[:, metaIndex, :] = theseSpikeWaveforms
-            stAnn = {
-                k: v
-                for k, v in alignEvents.annotations.items()
-                if k not in skipAnnNames
-                }
-            stArrayAnn = {
-                k: alignEvents.array_annotations[k]
-                for k in alignEvents.annotations['arrayAnnNames']
-            }
-            st = SpikeTrain(
-                name='seg{}_{}'.format(int(totalNSegs), thisUnit.name),
-                times=alignEvents.times,
-                waveforms=spikeWaveforms,
-                t_start=asigP.t_start, t_stop=asigP.t_stop,
-                left_sweep=windowSize[0] * (-1),
-                sampling_rate=samplingRate,
-                **stArrayAnn,
-                **stAnn
-                )
-            st.annotate(nix_name=st.name)
-            thisUnit.spiketrains.append(st)
-            st.unit = thisUnit
-            totalNSegs += 1
-    try:
-        eventBlock.filter(
-            objects=EventProxy)[0]._rawio.file.close()
-    except Exception:
-        traceback.print_exc()
-    if signalBlock is not eventBlock:
-        signalBlock.filter(
-            objects=AnalogSignalProxy)[0]._rawio.file.close()
-    
-    return thisUnit
-'''
 
 def alignedAsigDFtoSpikeTrain(
         allWaveforms, dataBlock=None, matchSamplingRate=True):
@@ -1736,10 +1608,6 @@ def getNIXData(
         'data': data,
         't': data['t']
         }
-    
-    #  for stp in block.filter(objects=SpikeTrainProxy):
-    #      print('original tstart: '.format(stp.t_start))
-    #      print('original tstop: '.format(stp.t_stop))
     if closeReader:
         reader.file.close()
         block = None
@@ -1777,40 +1645,6 @@ def readBlockFixNames(
     asigLikeList = (
         seg0.filter(objects=AnalogSignalProxy) +
         seg0.filter(objects=AnalogSignal))
-    # if mapDF is not None:
-    #     # [len(a.name) for a in asigLikeList]
-    #     if swapMaps is not None:
-    #         # asigOrigNames = [headerSignalChan.loc[int(i), 'name'] for i in swapMaps['from']['nevID']]
-    #         asigNameChanger = {}
-    #         for nevID in swapMaps['from']['nevID']:
-    #             if int(nevID) in headerSignalChan.index:
-    #                 labelFromNewMap = (
-    #                     swapMaps['to']
-    #                     .loc[swapMaps['to']['nevID'] == nevID, 'label']
-    #                     .iloc[0])
-    #                 asigNameChanger[headerSignalChan.loc[int(nevID), 'name']] = labelFromNewMap
-    #         # asigNameChanger = dict(zip(asigOrigNames, swapMaps['to']['label']))
-    #     else:
-    #         if headerSignalChan.size > 0:
-    #             # asigOrigNames = [headerSignalChan.loc[int(i), 'name'] for i in mapDF['nevID']]
-    #             # asigNameChanger = dict(zip(asigOrigNames, mapDF['label']))
-    #             asigNameChanger = {}
-    #             for nevID in mapDF['nevID']:
-    #                 if int(nevID) in headerSignalChan.index:
-    #                     labelFromMap = (
-    #                         mapDF
-    #                         .loc[mapDF['nevID'] == nevID, 'label']
-    #                         .iloc[0])
-    #                     asigNameChanger[
-    #                         headerSignalChan.loc[int(nevID), 'name']] = labelFromMap
-    #         else:
-    #             asigOrigNames = np.unique([i.split('#')[0] for i in headerUnitChan['name']])
-    #             asigNameChanger = {}
-    #             for origName in asigOrigNames:
-    #                 # ripple specific
-    #                 formattedName = origName.replace('.', '_').replace(' raw', '')
-    #                 if mapDF['label'].str.contains(formattedName).any():
-    #                     asigNameChanger[origName] = formattedName
     if mapDF is not None:
         if headerSignalChan.size > 0:
             asigNameChanger = {}
@@ -3218,7 +3052,8 @@ def blockFromPath(
 
 
 def calcBinarizedArray(
-        dataBlock, samplingRate, binnedSpikePath, saveToFile=True):
+        dataBlock, samplingRate,
+        binnedSpikePath, saveToFile=True):
     #
     spikeMatBlock = Block(name=dataBlock.name + '_binarized')
     spikeMatBlock.merge_annotations(dataBlock)
