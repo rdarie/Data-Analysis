@@ -544,9 +544,9 @@ def interpolateDF(
             except Exception:
                 traceback.print_exc()
                 pdb.set_trace()
-            outputDF[columnName] = interpFun(newX)
+            outputDF.loc[:, columnName] = interpFun(newX)
         elif kind in ['pchip']:
-            outputDF[columnName] = interpolate.pchip_interpolate(
+            outputDF.loc[:, columnName] = interpolate.pchip_interpolate(
                 oldX, df[columnName].to_numpy(), newX
             )
         elif kind in ['akima']:
@@ -557,7 +557,7 @@ def interpolateDF(
             except Exception:
                 traceback.print_exc()
                 pdb.set_trace()
-            outputDF[columnName] = interpFun(newX, extrapolate=True)
+            outputDF.loc[:, columnName] = interpFun(newX, extrapolate=True)
     return outputDF
 
 

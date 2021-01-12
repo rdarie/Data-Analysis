@@ -189,7 +189,7 @@ def preprocNS5():
             #
             writeMode='ow',
             chunkSize=chunkSize, equalChunks=equalChunks, chunkList=chunkList,
-            calcRigEvents=trialFilesFrom['utah']['calcRigEvents'])
+            calcRigEvents=False)
     #
     if arguments['analogOnly']:
         analogInputNames = sorted(

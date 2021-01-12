@@ -1137,7 +1137,10 @@ def dataFrameToAnalogSignals(
             dtype=np.float32,
             # **ann
             )
-        asig.t_start = df[idxT].iloc[0] * timeUnits
+        if idxT is not None:
+            asig.t_start = df[idxT].iloc[0] * timeUnits
+        else:
+            asig.t_start = df.index[0] * timeUnits
         asig.channel_index = chanIdx
         # assign ownership to containers
         chanIdx.analogsignals.append(asig)
@@ -1196,7 +1199,6 @@ def eventsToDataFrame(
         events, idxT='t', names=None
         ):
     eventDict = {}
-    
     calculatedT = False
     for event in events:
         if names is not None:
@@ -1830,7 +1832,6 @@ def addBlockToNIX(
         tempBlock = reader.read_block(
             block_index=nixBlockIdx,
             lazy=True, signal_group_mode='split-all')
-
         checkCompatible = {i: False for i in nixSegIdx}
         forceShape = {i: None for i in nixSegIdx}
         forceType = {i: None for i in nixSegIdx}
@@ -2381,7 +2382,8 @@ def preprocBlockToNix(
                 units=dummyAsig.units,
                 sampling_rate=dummyAsig.sampling_rate,
                 # name='seg{}_{}'.format(idx, meanChIdx.name)
-                name='seg{}_{}'.format(0, meanChIdx.name)
+                name='seg{}_{}'.format(0, meanChIdx.name),
+                t_start=tStart
             )
             # assign ownership to containers
             meanChIdx.analogsignals.append(meanAsig)
@@ -2401,7 +2403,8 @@ def preprocBlockToNix(
                 units=dummyAsig.units,
                 sampling_rate=dummyAsig.sampling_rate,
                 # name='seg{}_{}'.format(idx, devChIdx.name)
-                name='seg{}_{}'.format(0, devChIdx.name)
+                name='seg{}_{}'.format(0, devChIdx.name),
+                t_start=tStart
             )
             # assign ownership to containers
             devChIdx.analogsignals.append(devAsig)
@@ -2466,7 +2469,6 @@ def preprocBlockToNix(
             plt.show()
     # second pass through asigs, to save
     for aSigIdx, aSigProxy in enumerate(seg.analogsignals):
-        print('Second pass: {}'.format(aSigIdx))
         if aSigIdx == 0:
             # check bounds
             tStart = max(chunkTStart * pq.s, aSigProxy.t_start)
@@ -2594,7 +2596,7 @@ def preprocBlockToNix(
             #  array annotations are not saved natively in the nix file
             #  (we're getting them as plain annotations)
             timeMask = np.asarray(
-                (st.times > tStart) & (st.times <= tStop),
+                (st.times >= tStart) & (st.times < tStop),
                 dtype=np.bool)
             try:
                 if 'arrayAnnNames' in st.annotations:
@@ -2756,6 +2758,8 @@ def preprocBlockToNix(
     for eventProxy in seg.events:
         event = eventProxy.load(
             time_slice=(tStart, tStop))
+        event.t_start = tStart
+        event.t_stop = tStop
         event.segment = newSeg
         newSeg.events.append(event)
         newSeg.create_relationship()
@@ -2767,6 +2771,8 @@ def preprocBlockToNix(
     for epochProxy in seg.epochs:
         epoch = epochProxy.load(
             time_slice=(tStart, tStop))
+        epoch.t_start = tStart
+        epoch.t_stop = tStop
         epoch.segment = newSeg
         newSeg.events.append(epoch)
         newSeg.create_relationship()
@@ -3053,7 +3059,7 @@ def blockFromPath(
 
 def calcBinarizedArray(
         dataBlock, samplingRate,
-        binnedSpikePath, saveToFile=True):
+        binnedSpikePath, saveToFile=True, matchT=None):
     #
     spikeMatBlock = Block(name=dataBlock.name + '_binarized')
     spikeMatBlock.merge_annotations(dataBlock)
@@ -3088,7 +3094,7 @@ def calcBinarizedArray(
             segSpikeTrains[0],
             sampling_rate=samplingRate,
             t_start=tStart,
-            t_stop=tStop) * 0
+            t_stop=tStop + samplingRate ** -1) * 0
         for chanIdx in spikeMatBlock.channel_indexes:
             #  print(chanIdx.name)
             stList = seg.filter(
@@ -3102,7 +3108,7 @@ def calcBinarizedArray(
                     st,
                     sampling_rate=samplingRate,
                     t_start=tStart,
-                    t_stop=tStop)
+                    t_stop=tStop + samplingRate ** -1)
                 spikeMatBlock.segments[segIdx].spiketrains.append(st)
                 #  to do: link st to spikematblock's chidx and units
                 assert len(chanIdx.filter(objects=Unit)) == 1
@@ -3128,6 +3134,8 @@ def calcBinarizedArray(
                 sampling_rate=samplingRate,
                 dtype=np.int,
                 **asigAnn)
+            if matchT is not None:
+                asig = asig[:matchT.shape[0], :]
             asig.t_start = tStart
             asig.annotate(binWidth=1 / samplingRate.magnitude)
             chanIdx.analogsignals.append(asig)

@@ -67,13 +67,13 @@ def parseAnalysisOptions(
             'Wn': 1000,
             'N': 8,
             'btype': 'low',
-            'ftype': 'butter'
+            'ftype': 'bessel'
         },
         'high': {
             'Wn': 15,
             'N': 10,
             'btype': 'high',
-            'ftype': 'butter'
+            'ftype': 'bessel'
         }
     }
     #
@@ -85,19 +85,19 @@ def parseAnalysisOptions(
             'N': 1,
             'rp': 1,
             'btype': 'bandstop',
-            'ftype': 'butter'
+            'ftype': 'bessel'
         },
         'low': {
             'Wn': 1000,
             'N': 2,
             'btype': 'low',
-            'ftype': 'butter'
+            'ftype': 'bessel'
         },
         'high': {
             'Wn': 5,
             'N': 2,
             'btype': 'high',
-            'ftype': 'butter'
+            'ftype': 'bessel'
         }
     }
     if 'spikeSortingFilterOpts' not in expOpts:
