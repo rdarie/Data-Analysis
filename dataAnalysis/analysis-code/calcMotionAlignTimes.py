@@ -117,7 +117,8 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
     asigProxysList = [
         asigP
         for asigP in dataSeg.filter(objects=AnalogSignalProxy)
-        if asigP.annotations['neo_name'] in signalsInSegment]
+        if asigP.name in signalsInSegment]
+    # pdb.set_trace()
     eventProxysList = dataSeg.events
     if checkReferences:
         for asigP in asigProxysList:

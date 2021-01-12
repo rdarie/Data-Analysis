@@ -19,7 +19,7 @@
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 
-SLURM_ARRAY_TASK_ID=2
+SLURM_ARRAY_TASK_ID=3
 source ./shellScripts/run_plotter_aligned_motion_preamble.sh
 
 python3 -u './plotAlignedNeurons.py' --exp=$EXP $BLOCKSELECTOR $ANALYSISFOLDER $UNITSELECTOR $WINDOW --unitQuery="all" $ALIGNQUERY $ALIGNFOLDER --enableOverrides $TIMEWINDOWOPTS $STATSOVERLAY $OUTLIERMASK

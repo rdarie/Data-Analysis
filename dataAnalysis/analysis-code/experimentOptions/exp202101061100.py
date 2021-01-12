@@ -140,10 +140,8 @@ def getExpOpts():
         targetEpochSize=100e-3,
         windowSize=(-.2, .8),
         conditionNames=[
-            'pedalDirection'],
-        # conditionNames=[
-        #     'electrode', 'amplitude', 'RateInHz',
-        #     'pedalMovementCat', 'pedalSizeCat', 'pedalDirection'],
+            'electrode', 'amplitude', 'RateInHz',
+            'pedalMovementCat', 'pedalSizeCat', 'pedalDirection'],
         # conditionNames=[
         #     'electrode', 'amplitude', 'RateInHz'],
         twoTailed=True,

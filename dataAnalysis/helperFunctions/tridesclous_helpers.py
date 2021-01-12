@@ -921,12 +921,12 @@ def transferTemplates(
         catFolderDest = os.path.join(
             grpFolderDest, 'catalogues', 'initial')
         try:
-            assert os.path.exists(catFolderSource), 'source catalogue does not exist!'
+            assert os.path.exists(catFolderSource), 'source catalogue ({}) does not exist!'.format(catFolderSource)
         except Exception:
             traceback.print_exc()
             print('{}'.format(catFolderSource))
             continue
-        assert os.path.exists(grpFolderDest), 'destination folder does not exist!'
+        assert os.path.exists(grpFolderDest), 'destination folder ({}) does not exist!'.format((grpFolderDest))
         ccFolderSource = os.path.join(
             grpFolderSource, 'catalogue_constructor')
         ccFolderDest = os.path.join(

@@ -13,6 +13,7 @@ Options:
     --forSpikeSortingUnfiltered        whether to make a .nix file that has all raw traces [default: False]
     --fullSubtractMean                 whether to make a .nix file that has all raw traces [default: False]
     --fullSubtractMeanWithSpikes       whether to make a .nix file that has all raw traces [default: False]
+    --fullSubtractMeanUnfiltered       whether to make a .nix file that has all raw traces [default: False]
     --rippleNForm                      whether to make a .nix file that has all raw traces [default: False]
     --makeFull                         whether to make a .nix file that has all raw traces [default: False]
     --maskMotorEncoder                 whether to ignore motor encoder activity outside the alignTimeBounds window [default: False]
@@ -186,6 +187,28 @@ def preprocNS5():
             removeMeanAcross=True,
             nameSuffix='_mean_subtracted',
             LFPFilterOpts=spikeSortingFilterOpts,
+            #
+            writeMode='ow',
+            chunkSize=chunkSize, equalChunks=equalChunks, chunkList=chunkList,
+            calcRigEvents=False)
+    if arguments['fullSubtractMeanUnfiltered']:
+        ns5.preproc(
+            fileName=ns5FileName,
+            rawFolderPath=nspFolder,
+            outputFolderPath=scratchFolder, mapDF=mapDF,
+            fillOverflow=False, removeJumps=False,
+            interpolateOutliers=spikeSortingOpts[arrayName]['interpolateOutliers'],
+            outlierThreshold=spikeSortingOpts[arrayName]['outlierThreshold'],
+            outlierMaskFilterOpts=outlierMaskFilterOpts,
+            motorEncoderMask=motorEncoderMask,
+            calcAverageLFP=True,
+            eventInfo=trialFilesFrom['utah']['eventInfo'],
+            asigNameList=spikeSortingOpts[arrayName]['asigNameList'],
+            ainpNameList=[],
+            spikeSourceType='',
+            removeMeanAcross=True,
+            nameSuffix='',
+            LFPFilterOpts=None,
             #
             writeMode='ow',
             chunkSize=chunkSize, equalChunks=equalChunks, chunkList=chunkList,

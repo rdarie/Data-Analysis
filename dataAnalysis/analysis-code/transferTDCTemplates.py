@@ -18,7 +18,7 @@ import dataAnalysis.helperFunctions.tridesclous_helpers as tdch
 import traceback
 from currentExperiment import parseAnalysisOptions
 from docopt import docopt
-import json
+import json, ast
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']),
@@ -48,12 +48,22 @@ def transferTDCTemplates():
         pdb.set_trace()
     prbPath = prbPathCandidates[0]
     #
-    dataio = tdc.DataIO(dirname=triFolderSource)
+    #  dataio = tdc.DataIO(dirname=triFolderSource)
     chan_start = int(arguments['chan_start'])
     chan_stop = int(arguments['chan_stop'])
-    chansToAnalyze = sorted(list(dataio.channel_groups.keys()))[chan_start:chan_stop]
+    with open(prbPath, "r") as f:
+        channelsInfoTxt = f.read()
+    channelsInfo = ast.literal_eval(
+        channelsInfoTxt.replace('channel_groups = ', ''))
+    # chansToAnalyze = sorted(list(dataio.channel_groups.keys()))[chan_start:chan_stop]
+    chansToAnalyze = [
+        cNum
+        for cNum in list(range(chan_start, chan_stop))
+        if cNum in channelsInfo.keys()
+        ]
     print('Source TDC catalogue')
-    print(dataio)
+    print('Analyzing channels:\n{}'.format(chansToAnalyze))
+    # print(dataio)
     #
     for triFolderDestMeta in spikeSortingOpts[arrayName]['triFolderDest']:
         if 'rawBlockName' in spikeSortingOpts[arrayName]:

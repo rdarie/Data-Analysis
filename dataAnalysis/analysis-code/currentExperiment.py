@@ -236,15 +236,15 @@ def parseAnalysisOptions(
         trialFilesStim['ins']['getINSkwargs'].update(miniRCStimDetectionOpts)
         #  only parse sync lines
         eventInfo = {'inputIDs': expOpts['miniRCRigInputs']}
-        if 'outlierDetectOptions' in locals():
-            outlierDetectOptions['conditionNames'] = [
+        if 'outlierDetectOptions' in expOpts:
+            expOpts['outlierDetectOptions']['conditionNames'] = [
                 'electrode', 'amplitude', 'RateInHz']
     elif blockExperimentType == 'proprio-RC':
         trialFilesStim['ins']['getINSkwargs'].update(RCStimDetectionOpts)
         #  should rename eventInfo to something more intuitive
         eventInfo = {'inputIDs': expOpts['RCRigInputs']}
-        if 'outlierDetectOptions' in locals():
-            outlierDetectOptions['conditionNames'] = [
+        if 'outlierDetectOptions' in expOpts:
+            expOpts['outlierDetectOptions']['conditionNames'] = [
                 'electrode', 'amplitude', 'RateInHz']
     elif blockExperimentType == 'isi':
         #  should rename eventInfo to something more intuitive

@@ -41,7 +41,7 @@ conda activate
 source activate nda2
 python --version
 
-BLOCKIDX=1
+# BLOCKIDX=1
 # SLURM_ARRAY_TASK_ID=0
 let CHAN_START=SLURM_ARRAY_TASK_ID
 # for nform, groups of 4 for utah, groups of 5

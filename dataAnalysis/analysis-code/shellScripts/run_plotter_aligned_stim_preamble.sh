@@ -1,6 +1,6 @@
 #!/bin/bash
 
-source ./shellScripts/run_align_motion_preamble.sh
+source ./shellScripts/run_align_stim_preamble.sh
 
 OUTLIERMASK="--maskOutlierBlocks"
 # OUTLIERMASK=""
@@ -8,10 +8,13 @@ OUTLIERMASK="--maskOutlierBlocks"
 #STATSOVERLAY="--overlayStats"
 TIMEWINDOWOPTS="--winStart=200 --winStop=800"
 
-# ALIGNQUERY="--alignQuery=stimOn"
-ALIGNQUERY="--alignQuery=outbound"
+ALIGNQUERY="--alignQuery=stimOn"
+# ALIGNQUERY="--alignQuery=outbound"
 
 HUEOPTS="--hueName=amplitude --hueControl="
-ROWOPTS="--rowName=RateInHz --rowControl="
+ROWOPTS="--rowName= --rowControl="
 COLOPTS="--colName=electrode --colControl=control"
 STYLEOPTS="--styleName=RateInHz"
+
+# PAGELIMITS="--limitPages=5"
+PAGELIMITS=""

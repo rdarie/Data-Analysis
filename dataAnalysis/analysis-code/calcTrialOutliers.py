@@ -108,7 +108,7 @@ alignedAsigsKWargs.update(dict(
     verbose=False, procFun=None))
 #
 print("'outlierDetectOptions' in locals(): {}".format('outlierDetectOptions' in locals()))
-
+#
 if 'outlierDetectOptions' in locals():
     targetEpochSize = outlierDetectOptions['targetEpochSize']
     stimulusConditionNames = outlierDetectOptions['conditionNames']

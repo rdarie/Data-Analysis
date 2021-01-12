@@ -12,6 +12,7 @@ Options:
     --insFilePrefix=insFilePrefix          Does the INS block have an unusual prefix
     --sourceFileSuffix=sourceFileSuffix    append a name to the resulting blocks?
     --rigFileSuffix=rigFileSuffix          append a name to the resulting blocks?
+    --spikeFileSuffix=spikeFileSuffix      append a name to the resulting blocks?
     --insFileSuffix=insFileSuffix          append a name to the resulting blocks? [default: ins]
     --chanQuery=chanQuery                  how to restrict channels if not providing a list? [default: fr]
     --samplingRate=samplingRate            resample the result??
@@ -363,6 +364,10 @@ def calcBlockAnalysisWrapper():
         sourceFileSuffix = '_' + arguments['sourceFileSuffix']
     else:
         sourceFileSuffix = ''
+    if arguments['spikeFileSuffix'] is not None:
+        spikeFileSuffix = '_' + arguments['spikeFileSuffix']
+    else:
+        spikeFileSuffix = ''
     if arguments['rigFileSuffix'] is not None:
         rigFileSuffix = '_' + arguments['rigFileSuffix']
     else:
@@ -432,8 +437,8 @@ def calcBlockAnalysisWrapper():
         if spikeSource == 'tdc':
             tdcPath = os.path.join(
                 scratchFolder,
-                'tdc_' + blockBaseName + nameSuffix,
-                'tdc_' + blockBaseName + nameSuffix + '.nix'
+                'tdc_' + blockBaseName + spikeFileSuffix + chunkMeta['partNameSuffix'],
+                'tdc_' + blockBaseName + spikeFileSuffix + chunkMeta['partNameSuffix'] + '.nix'
                 )
             print('Loading {}'.format(tdcPath))
             spikeReader, spikeBlock = ns5.blockFromPath(
@@ -471,7 +476,7 @@ def calcBlockAnalysisWrapper():
     del spikeBlocks, asigBlocks
     outputFilePath = os.path.join(
         analysisSubFolder,
-        blockBaseName + '_analyze.nix'
+        ns5FileName + '_analyze.nix'
         )
     writer = NixIO(
         filename=outputFilePath, mode='ow')
@@ -485,7 +490,7 @@ def calcBlockAnalysisWrapper():
     outputBlockT = pd.Series(dummyOutputAsig.times)
     binnedSpikePath = os.path.join(
         analysisSubFolder,
-        blockBaseName + '_binarized.nix'
+        ns5FileName + '_binarized.nix'
         )
     spikeMatBlock = ns5.calcBinarizedArray(
         outputBlock, samplingRate,
@@ -514,6 +519,69 @@ def calcBlockAnalysisWrapper():
     ######
     #  synchronize INS
     ######
+    
+    evList = []
+    for key in ['property', 'value']:
+        #  key = 'property'
+        if not arguments['lazy']:
+            evObjType = Event
+        else:
+            evObjType = EventProxy
+        if not arguments['rigOnly']:
+            insPropList = insBlock.filter(
+                objects=evObjType,
+                name='seg0_ins_' + key
+                )
+            if len(insPropList):
+                insProp = insPropList[0]
+                if arguments['lazy']:
+                    insProp = insProp.load()
+            else:
+                print(
+                    'INS properties not found! analyzing rig events only.')
+                arguments['rigOnly'] = True
+        else:
+            insPropList = []
+            insProp = None
+        rigPropList = nspBlock.filter(
+            objects=evObjType,
+            name='seg0_rig_' + key
+            )
+        if len(rigPropList):
+            rigProp = rigPropList[0]
+            if arguments['lazy']:
+                rigProp = rigProp.load()
+            if arguments['rigOnly']:
+                allProp = rigProp
+                allProp.name = 'seg0_' + key
+                evList.append(allProp)
+            else:
+                allProp = insProp.merge(rigProp)
+                allProp.name = 'seg0_' + key
+                evSortIdx = np.argsort(allProp.times, kind='mergesort')
+                allProp = allProp[evSortIdx]
+                evList.append(allProp)
+        else:
+            #  RC's don't have rig_events
+            if insProp is not None:
+                allProp = insProp
+                allProp.name = 'seg0_' + key
+                evList.append(allProp)
+    if len(evList):
+        #  make concatenated event, for viewing
+        concatLabels = np.array([
+            (elphpdb._convert_value_safe(evList[0].labels[i]) + ': ' +
+                elphpdb._convert_value_safe(evList[1].labels[i])) for
+            i in range(len(evList[0]))
+            ])
+        concatEvent = Event(
+            name='seg0_' + 'concatenated_updates',
+            times=allProp.times,
+            labels=concatLabels
+            )
+        concatEvent.merge_annotations(allProp)
+        evList.append(concatEvent)
+        
     rigChanQuery = '(chanName.notna())'
     if arguments['lazy']:
         rigChanNames = ns5.listChanNames(
@@ -580,30 +648,30 @@ def calcBlockAnalysisWrapper():
     else:
         tdInterp = tdDF
     # add analog traces derived from position
-    if 'seg0_position' in tdInterp.columns:
-        tdInterp.loc[:, 'seg0_position_x'] = ((
-            np.cos(
-                tdInterp.loc[:, 'seg0_position'] *
-                100 * 2 * np.pi / 360))
-            .to_numpy())
-        tdInterp.sort_index(axis='columns', inplace=True)
-        tdInterp.loc[:, 'seg0_position_y'] = ((
-            np.sin(
-                tdInterp.loc[:, 'seg0_position'] *
-                100 * 2 * np.pi / 360))
-            .to_numpy())
-        tdInterp.loc[:, 'seg0_velocity_x'] = ((
-            tdInterp.loc[:, 'seg0_position_y'] *
-            (-1) *
-            (tdInterp.loc[:, 'seg0_velocity'] * 3e2))
-            .to_numpy())
-        tdInterp.loc[:, 'seg0_velocity_y'] = ((
-            tdInterp.loc[:, 'seg0_position_x'] *
-            (tdInterp.loc[:, 'seg0_velocity'] * 3e2))
-            .to_numpy())
-        rigChanNames += [
-            'seg0_position_x', 'seg0_position_y',
-            'seg0_velocity_x', 'seg0_velocity_y']
+    # if 'seg0_position' in tdInterp.columns:
+    #     tdInterp.loc[:, 'seg0_position_x'] = ((
+    #         np.cos(
+    #             tdInterp.loc[:, 'seg0_position'] *
+    #             100 * 2 * np.pi / 360))
+    #         .to_numpy())
+    #     tdInterp.sort_index(axis='columns', inplace=True)
+    #     tdInterp.loc[:, 'seg0_position_y'] = ((
+    #         np.sin(
+    #             tdInterp.loc[:, 'seg0_position'] *
+    #             100 * 2 * np.pi / 360))
+    #         .to_numpy())
+    #     tdInterp.loc[:, 'seg0_velocity_x'] = ((
+    #         tdInterp.loc[:, 'seg0_position_y'] *
+    #         (-1) *
+    #         (tdInterp.loc[:, 'seg0_velocity'] * 3e2))
+    #         .to_numpy())
+    #     tdInterp.loc[:, 'seg0_velocity_y'] = ((
+    #         tdInterp.loc[:, 'seg0_position_x'] *
+    #         (tdInterp.loc[:, 'seg0_velocity'] * 3e2))
+    #         .to_numpy())
+    #     rigChanNames += [
+    #         'seg0_position_x', 'seg0_position_y',
+    #         'seg0_velocity_x', 'seg0_velocity_y']
     #
     concatList = [tdInterp]
     # convert stim updates to time series
@@ -663,67 +731,6 @@ def calcBlockAnalysisWrapper():
         dataCol=tdInterp.columns,
         samplingRate=samplingRate)
     #
-    evList = []
-    for key in ['property', 'value']:
-        #  key = 'property'
-        if not arguments['lazy']:
-            evObjType = Event
-        else:
-            evObjType = EventProxy
-        if not arguments['rigOnly']:
-            insPropList = insBlock.filter(
-                objects=evObjType,
-                name='seg0_ins_' + key
-                )
-            if len(insPropList):
-                insProp = insPropList[0]
-                if arguments['lazy']:
-                    insProp = insProp.load()
-            else:
-                print(
-                    'INS properties not found! analyzing rig events only.')
-                arguments['rigOnly'] = True
-        else:
-            insPropList = []
-            insProp = None
-        rigPropList = nspBlock.filter(
-            objects=evObjType,
-            name='seg0_rig_' + key
-            )
-        if len(rigPropList):
-            rigProp = rigPropList[0]
-            if arguments['lazy']:
-                rigProp = rigProp.load()
-            if arguments['rigOnly']:
-                allProp = rigProp
-                allProp.name = 'seg0_' + key
-                evList.append(allProp)
-            else:
-                allProp = insProp.merge(rigProp)
-                allProp.name = 'seg0_' + key
-                evSortIdx = np.argsort(allProp.times, kind='mergesort')
-                allProp = allProp[evSortIdx]
-                evList.append(allProp)
-        else:
-            #  RC's don't have rig_events
-            if insProp is not None:
-                allProp = insProp
-                allProp.name = 'seg0_' + key
-                evList.append(allProp)
-    if len(evList):
-        #  make concatenated event, for viewing
-        concatLabels = np.array([
-            (elphpdb._convert_value_safe(evList[0].labels[i]) + ': ' +
-                elphpdb._convert_value_safe(evList[1].labels[i])) for
-            i in range(len(evList[0]))
-            ])
-        concatEvent = Event(
-            name='seg0_' + 'concatenated_updates',
-            times=allProp.times,
-            labels=concatLabels
-            )
-        concatEvent.merge_annotations(allProp)
-        evList.append(concatEvent)
     # pdb.set_trace()
     tdBlockInterp.segments[0].events = evList
     for ev in evList:
@@ -732,7 +739,7 @@ def calcBlockAnalysisWrapper():
     ns5.addBlockToNIX(
         tdBlockInterp, neoSegIdx=[0],
         writeSpikes=False, writeEvents=True,
-        fileName=blockBaseName + '_analyze',
+        fileName=ns5FileName + '_analyze',
         folderPath=analysisSubFolder,
         purgeNixNames=True,
         nixBlockIdx=0, nixSegIdx=[0],

@@ -21,10 +21,10 @@
 
 SLURM_ARRAY_TASK_ID=3
 source shellScripts/run_align_motion_preamble.sh
+# source shellScripts/run_align_stim_preamble.sh
 
 # ALIGNQUERY="--alignQuery=midPeak"
 # ALIGNQUERY="--alignQuery=stimOn"
-# ALIGNFOLDER="--alignFolderName=stim"
 ALIGNQUERY="--alignQuery=outbound"
 
 # first pass
