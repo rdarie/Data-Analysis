@@ -26,4 +26,4 @@ conda activate
 source activate nda2
 python --version
 
-python ./launchVis.py
+python ./launchVis.py --exp=exp202101111100 --blockIdx=1

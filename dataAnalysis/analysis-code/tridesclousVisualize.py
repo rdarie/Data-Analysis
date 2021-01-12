@@ -19,7 +19,7 @@ import dataAnalysis.helperFunctions.tridesclous_helpers as tdch
 import dataAnalysis.helperFunctions.helper_functions as hf
 from currentExperiment import parseAnalysisOptions
 #from exp201901211000 import *
-import os, gc, traceback
+import os, gc, traceback, ast, glob
 from numba.core.errors import NumbaPerformanceWarning, NumbaDeprecationWarning, NumbaPendingDeprecationWarning
 import warnings
 warnings.simplefilter('ignore', category=NumbaPerformanceWarning)
@@ -52,10 +52,26 @@ if arguments['sourceFileSuffix'] is not None:
 #
 chan_start = int(arguments['chan_start'])
 chan_stop = int(arguments['chan_stop'])
-dataio = tdc.DataIO(dirname=triFolder)
+prbPathCandidates = glob.glob(os.path.join(triFolder, '*.prb'))
+try:
+    assert len(prbPathCandidates) == 1
+except Exception:
+    pdb.set_trace()
+prbPath = prbPathCandidates[0]
+#
+#  dataio = tdc.DataIO(dirname=triFolderSource)
+chan_start = int(arguments['chan_start'])
+chan_stop = int(arguments['chan_stop'])
+with open(prbPath, "r") as f:
+    channelsInfoTxt = f.read()
+channelsInfo = ast.literal_eval(
+    channelsInfoTxt.replace('channel_groups = ', ''))
+# chansToAnalyze = sorted(list(dataio.channel_groups.keys()))[chan_start:chan_stop]
 chansToAnalyze = [
-    chNum for chNum in list(range(chan_start, chan_stop))
-    if chNum in dataio.channel_groups.keys()]
+    cNum
+    for cNum in list(range(chan_start, chan_stop))
+    if cNum in channelsInfo.keys()
+    ]
 #
 minWaveformRate = 5
 minTotalWaveforms = int(spikeSortingOpts[arrayName]['previewDuration'] * minWaveformRate)

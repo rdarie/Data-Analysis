@@ -39,7 +39,6 @@ def initialize_catalogueconstructor(
     #  set up file source
     if os.path.exists(triFolder) and removeExisting:
         #  remove if already exists
-        import shutil
         shutil.rmtree(triFolder)
     if fileFormat == 'NIX':
         filePath = os.path.join(folderPath, fileName + '.nix')
@@ -53,17 +52,36 @@ def initialize_catalogueconstructor(
     #
     print('initialize_catalogueconstructor DataIO is: ')
     print(dataio)  # check
+    # if we supplied a path...
+    if prbPath is not None:
+        # ...that path exists...
+        if os.path.exists(prbPath):
+            # ...but we want to remake it...
+            if spikeSortingOpts['remakePrb']:
+                os.remove(prbPath)
+        else:
+            spikeSortingOpts['remakePrb'] = True
     #  set up probe file
-    if prbPath is None:
+    if (prbPath is None) or spikeSortingOpts['remakePrb']:
         electrodeMapPath = spikeSortingOpts['electrodeMapPath']
         mapExt = electrodeMapPath.split('.')[-1]
         if mapExt == 'cmp':
             cmpDF = prb_meta.cmpToDF(electrodeMapPath)
         elif mapExt == 'map':
             cmpDF = prb_meta.mapToDF(electrodeMapPath)
-        csvPath = electrodeMapPath.replace(mapExt, 'csv')
-        prbPath = electrodeMapPath.replace(mapExt, 'prb')
+        pdb.set_trace()
+        mapFileName = os.path.basename(electrodeMapPath)
+        csvPath = os.path.join(
+            folderPath,
+            mapFileName, '_map.csv'
+            )
         cmpDF.to_csv(csvPath)
+        # csvPath = electrodeMapPath.replace(mapExt, 'csv')
+        prbPath = os.path.join(
+            folderPath,
+            mapFileName, '_map.prb'
+            )
+        # prbPath = electrodeMapPath.replace(mapExt, 'prb')
         #
         labelsInFile = dataio.datasource.sig_channels['name']
         labelsInMap = cmpDF['label'].unique().tolist()
@@ -722,14 +740,14 @@ def neo_block_after_peeler(
                         while breaksRefractory.any() and timesDF['times'].any():
                             dropIndices = []
                             for idx in timesDF.loc[breaksRefractory, :].index:
-                                thisSpikeDist = timesDF.loc[idx, 'templateDist']
-                                #  if the previous spike looks worse,
+                                thisSpikeER = timesDF.loc[idx, 'energyReduction']
+                                #  if the previous spike looks worse (leaves more energy behind),
                                 #  we delete that one
                                 DFidx = timesDF.index.get_loc(idx)
                                 prevIdx = timesDF.index[DFidx - 1]
-                                prevSpikeDist = (
-                                    timesDF.loc[prevIdx, 'templateDist'])
-                                if (thisSpikeDist > prevSpikeDist):
+                                prevSpikeER = (
+                                    timesDF.loc[prevIdx, 'energyReduction'])
+                                if (thisSpikeER < prevSpikeER):
                                     dropIndices.append(idx)
                                 else:
                                     dropIndices.append(prevIdx)
@@ -749,7 +767,8 @@ def neo_block_after_peeler(
                         'templateDist': timesDF['templateDist'].values,
                         #  'maxDeviation': timesDF['maxDeviation'].values,
                         #  'energyReduction': timesDF['energyReduction'].values,
-                        'isi': timesDF['isi'].values}
+                        'isi': timesDF['isi'].values
+                        }
                     arrayAnnNames = {'arrayAnnNames': list(arrayAnn.keys())}
                     #  
                     # if group['tag'].iloc[0] == '':

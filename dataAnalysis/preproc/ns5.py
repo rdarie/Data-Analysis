@@ -1941,7 +1941,6 @@ def preprocBlockToNix(
         normalizeByImpedance=True, removeMeanAcross=False,
         LFPFilterOpts=None, encoderCountPerDegree=180e2
         ):
-    #  idx = segInitIdx # RD 20210105: will be unused
     #  prune out nev spike placeholders
     #  (will get added back on a chunk by chunk basis,
     #  if not pruning units)
@@ -2014,38 +2013,6 @@ def preprocBlockToNix(
         if chanIdx.irregularlysampledsignals:
             chanIdx.irregularlysampledsignals = []
     #  precalculate new segment
-    #  newSegList = []  # RD 20210105: will be a list of one new block
-    #  oldSegList = block.segments  # RD 20210105: will be a list of one old block
-    #  segParents = {}  # RD 20210105: will be unused
-    #  for segIdx, seg in enumerate(block.segments):
-    #      segLen = seg.analogsignals[0].shape[0] / (
-    #          seg.analogsignals[0].sampling_rate)
-    #      nChunks = math.ceil(segLen / chunkSize)
-    #      #
-    #      if equalChunks:
-    #          actualChunkSize = (segLen / nChunks).magnitude
-    #      else:
-    #          actualChunkSize = chunkSize
-    #      if chunkList is None:
-    #          chunkList = range(nChunks)
-    #      segParents.update({segIdx: {}})
-    #      for chunkIdx in chunkList:
-    #          tStart = chunkIdx * actualChunkSize + chunkOffset
-    #          tStop = (chunkIdx + 1) * actualChunkSize + chunkOffset
-    #          newSeg = Segment(
-    #                  index=idx, name=seg.name,
-    #                  description=seg.description,
-    #                  file_origin=seg.file_origin,
-    #                  file_datetime=seg.file_datetime,
-    #                  rec_datetime=seg.rec_datetime,
-    #                  **seg.annotations
-    #              )
-    #              
-    #          newSegList.append(newSeg)
-    #          segParents[segIdx].update(
-    #              {chunkIdx: newSegList.index(newSeg)})
-    #          idx += 1
-    #  block.segments = newSegList
     seg = block.segments[0]
     newSeg = Segment(
             index=0, name=seg.name,
@@ -2178,23 +2145,23 @@ def preprocBlockToNix(
                         np.min(
                             impedances.loc[elNmMatchMsk, 'impedance']
                             ))
-                if fillOverflow:
-                    # fill in overflow:
-                    '''
-                    timeSection['data'], overflowMask = hf.fillInOverflow(
-                        timeSection['data'], fillMethod = 'average')
-                    badData.update({'overflow': overflowMask})
-                    '''
-                    pass
-                if removeJumps:
-                    # find unusual jumps in derivative or amplitude
-                    '''
-                    timeSection['data'], newBadData = hf.fillInJumps(timeSection['data'],
-                    timeSection['samp_per_s'], smoothing_ms = 0.5, nStdDiff = 50,
-                    nStdAmp = 100)
-                    badData.update(newBadData)
-                    '''
-                    pass
+                # if fillOverflow:
+                #     # fill in overflow:
+                #     '''
+                #     timeSection['data'], overflowMask = hf.fillInOverflow(
+                #         timeSection['data'], fillMethod = 'average')
+                #     badData.update({'overflow': overflowMask})
+                #     '''
+                #     pass
+                # if removeJumps:
+                #     # find unusual jumps in derivative or amplitude
+                #     '''
+                #     timeSection['data'], newBadData = hf.fillInJumps(timeSection['data'],
+                #     timeSection['samp_per_s'], smoothing_ms = 0.5, nStdDiff = 50,
+                #     nStdAmp = 100)
+                #     badData.update(newBadData)
+                #     '''
+                #     pass
                 tempLFPStore.loc[:, aSigProxy.name] = asig.magnitude.flatten()
                 del asig
                 gc.collect()
@@ -2240,7 +2207,7 @@ def preprocBlockToNix(
                 ddfFig3, ddfAx3 = plt.subplots(
                     1, len(asigNameList),
                     sharey=True)
-            useMean = False
+            useMean = False  # mean center? median center?
             for subListIdx, subList in enumerate(asigNameList):
                 if trackMemory:
                     print(

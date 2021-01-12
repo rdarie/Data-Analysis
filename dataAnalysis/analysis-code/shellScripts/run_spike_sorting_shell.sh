@@ -52,8 +52,9 @@
 # EXP="exp202012181200"
 EXP="exp202101051100"
 EXP="exp202101061100"
+EXP="exp202101111100"
 
-BLOCKIDX=3
+BLOCKIDX=1
 
 module load anaconda/2020.02
 . /gpfs/runtime/opt/anaconda/2020.02/etc/profile.d/conda.sh
@@ -67,7 +68,7 @@ SOURCESELECTOR="--sourceFileSuffix=spike_preview"
 CHAN_START=0
 CHAN_STOP=96
 # Step 1: Init catalog
-# python -u ./tridesclousCCV.py --arrayName=utah --blockIdx=$BLOCKIDX --exp=$EXP --removeExistingCatalog --initCatalogConstructor $SOURCESELECTOR
+python -u ./tridesclousCCV.py --arrayName=utah --blockIdx=$BLOCKIDX --exp=$EXP --removeExistingCatalog --initCatalogConstructor $SOURCESELECTOR
 
 # Step 2: Constructor
 # python -u ./tridesclousCCV.py --arrayName=utah --blockIdx=$BLOCKIDX --exp=$EXP --batchPreprocess --chan_start=$CHAN_START --chan_stop=$CHAN_STOP $SOURCESELECTOR
@@ -87,7 +88,9 @@ CHAN_STOP=96
 # optional: visualize the peeler
 # python -u ./tridesclousVisualize.py --blockIdx=$BLOCKIDX --exp=$EXP --peeler --chan_start=$CHAN_START --chan_stop=$CHAN_STOP $SOURCESELECTOR
 
-python -u ./tridesclousCCV.py --arrayName=utah --blockIdx=$BLOCKIDX --exp=$EXP --purgePeeler --chan_start=$CHAN_START --chan_stop=$CHAN_STOP $SOURCESELECTOR
+# If need to redo peeling
+# python -u ./tridesclousCCV.py --arrayName=utah --blockIdx=$BLOCKIDX --exp=$EXP --purgePeeler --chan_start=$CHAN_START --chan_stop=$CHAN_STOP $SOURCESELECTOR
+# python -u ./tridesclousCCV.py --arrayName=utah --blockIdx=$BLOCKIDX --exp=$EXP --purgePeelerDiagnostics --chan_start=$CHAN_START --chan_stop=$CHAN_STOP $SOURCESELECTOR
 
 # Step 6: Export to NIX
 # python -u ./tridesclousCCV.py --arrayName=utah --blockIdx=$SLURM_ARRAY_TASK_ID --makeStrictNeoBlock --exp=$EXP --chan_start=0 --chan_stop=96 $SOURCESELECTOR

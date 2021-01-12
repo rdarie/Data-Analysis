@@ -128,7 +128,7 @@ def parseAnalysisOptions(
     if 'outlierMaskFilterOpts' not in expOpts:
         outlierMaskFilterOpts = {
             'low': {
-                'Wn': 100,
+                'Wn': 1000,
                 'N': 4,
                 'btype': 'low',
                 'ftype': 'bessel'
@@ -272,22 +272,6 @@ def parseAnalysisOptions(
     except Exception:
         impedances = None
         impedancesRipple = None
-    remakePrb = False
-    if remakePrb:
-        import numpy as np
-        nspCsvPath = os.path.join('.', 'nsp_map.csv')
-        cmpDF.to_csv(nspCsvPath)
-        prb_meta.cmpDFToPrb(
-            cmpDF, filePath=nspPrbPath,
-            contactSpacing=100,
-            names=['elec', 'nform', 'ainp'],
-            banks=['A', 'B', 'C', 'E'],
-            # names=['elec', 'ainp'],
-            # groupIn={'xcoords': 4, 'ycoords': 4}
-            groupIn={
-                'ycoords': np.arange(-1.1, 64, 4),
-                'xcoords': np.arange(-0.1, 44, 8)},
-            )
     #  should rename these to something more intuitive
     #  paths relevant to individual trials
     processedFolder = os.path.join(

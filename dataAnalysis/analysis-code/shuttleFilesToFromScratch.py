@@ -24,6 +24,7 @@ Options:
     --purgeAnalysisFolder                            process entire experimental day? [default: False]
     --purgeAlignFolder                               process entire experimental day? [default: False]
     --forcePurge                                     process entire experimental day? [default: False]
+    --everything                                     process entire experimental day? [default: False]
     
 """
 
@@ -127,8 +128,17 @@ if arguments['alignFolderFromScratchToData']:
 #######################
 #  Global moves
 #######################
-
 if arguments['fromScratchToData']:
+    if arguments['everything']:
+        print('\nAbout to move the entire folder:\n')
+        print('{}'.format(scratchFolder))
+        x = input('\n********\nPress any key to continue.')
+        if os.path.exists(processedFolder):
+            shutil.rmtree(processedFolder)
+        if arguments['moveItems']:
+            shutil.move(scratchFolder, processedFolder)
+        else:
+            shutil.copytree(scratchFolder, processedFolder)
     if arguments['preprocFolderFiles']:
         itemsToMove = [
             itemName

@@ -42,6 +42,7 @@ def launch_standalone_ephyviewer():
         
     app.exec_()
 
+
 if __name__=='__main__':
     launch_standalone_ephyviewer()
 

@@ -9,7 +9,7 @@ Options:
     --blockIdx=blockIdx                         which trial to analyze [default: 1]
     --arrayName=arrayName                       which electrode array to analyze [default: utah]
     --sourceFileSuffix=sourceFileSuffix         which source file to analyze
-    --remakePrb                                 whether to try to load MPI [default: False]
+    --remakePrb                                 whether to rewrite the electrode map file [default: False]
     --purgePeeler                               delete previous sort results [default: False]
     --purgePeelerDiagnostics                    delete previous sort results [default: False]
     --batchPrepWaveforms                        extract snippets [default: False]
@@ -67,12 +67,16 @@ def tridesclousCCV(
         preprocOpts=None,
         spikeSortingOpts=None,
         scratchFolder=None,
-        nspFolder=None, prbPath=None,
+        nspFolder=None,
         partNameSuffix=None,
+        arrayName=None,
         ):
     triFolder = os.path.join(
         scratchFolder, 'tdc_{}'.format(
             blockBaseName + nameSuffix))
+    prbPath = os.path.join(
+        scratchFolder, arrayName + '_map.prb'
+        )
     if arguments['overrideSpikeSource']:
         altDataIOInfo = {
             'datasource_type': 'NIX',
@@ -91,6 +95,7 @@ def tridesclousCCV(
     else:
         altDataIOInfo = None
         waveformSignalType = 'processed'
+    #
     if arguments['initCatalogConstructor']:
         try:
             if arguments['fromNS5']:
@@ -131,7 +136,8 @@ def tridesclousCCV(
     #
     if arguments['purgePeelerDiagnostics']:
         tdch.purgePeelerResults(
-            triFolder, diagnosticsOnly=True, purgeAll=True)
+            triFolder, diagnosticsOnly=True,
+            purgeAll=True)
     ######################################################################
     if arguments['batchPreprocess']:
         tdch.batchPreprocess(
@@ -252,6 +258,7 @@ def tdcCCVWrapper():
     # ########## decomposition options
     #
     #  ### parametric umap (with tensorflow) projection options
+    '''
     callbacks = [
         tf.keras.callbacks.EarlyStopping(
             # Stop training when `loss` is no longer improving
@@ -278,21 +285,24 @@ def tdcCCVWrapper():
         'n_training_epochs': 15,
         'keras_fit_kwargs': {'verbose': 2, 'callbacks': callbacks}
         }
+    '''
     #  ### PCA opts
-    # theseFeatureOpts = {
-    #     'method': 'global_pca',
-    #     'n_components': 5
-    #     }
+    theseFeatureOpts = {
+        'method': 'global_pca',
+        'n_components': 5
+        }
     #  ########## clustering options
     #
+    '''
     theseClusterOpts = {
         'method': 'agglomerative',
         'n_clusters': 2
         }
-    #  theseClusterOpts = {
-    #      'method': 'onecluster',
-    #      }
-    #
+    '''
+    theseClusterOpts = {
+        'method': 'onecluster',
+        }
+    
     thesePreprocOpts = dict(
         relative_threshold=4,
         fill_overflow=False,
@@ -306,7 +316,7 @@ def tdcCCVWrapper():
         sample_snippet_duration=spikeSortingOpts[arrayName]['previewDuration'],
         chunksize=2**19,
         autoMerge=False, auto_merge_threshold=0.99,
-        auto_make_catalog=False,
+        auto_make_catalog=True,
         )
     for chunkIdxStr, chunkMeta in chunkingMetadata.items():
         # chunkIdx = int(chunkIdxStr)
@@ -320,7 +330,7 @@ def tdcCCVWrapper():
             preprocOpts=thesePreprocOpts,
             spikeSortingOpts=spikeSortingOpts[arrayName],
             scratchFolder=scratchFolder, partNameSuffix=None,
-            nspFolder=nspFolder, prbPath=nspPrbPath,
+            nspFolder=nspFolder, arrayName=arrayName
             )
     return
 
