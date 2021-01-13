@@ -47,9 +47,10 @@ python --version
 # EXP="exp202012171200"
 EXP="exp202101051100"
 EXP="exp202101061100"
+EXP="exp202101111100"
 
 BLOCKSELECTOR=""
-# SLURM_ARRAY_TASK_ID=3
+SLURM_ARRAY_TASK_ID=2
 
 # python -u './synchronizeINStoNSP.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP $BLOCKSELECTOR --curateManually --usedTENSPulses --plotting
 python -u './synchronizeINStoNSP.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP $BLOCKSELECTOR --inputNSPBlockSuffix=analog_inputs --curateManually --addToNIX --usedTENSPulses --plotting

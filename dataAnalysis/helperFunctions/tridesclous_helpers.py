@@ -52,37 +52,29 @@ def initialize_catalogueconstructor(
     #
     print('initialize_catalogueconstructor DataIO is: ')
     print(dataio)  # check
-    # if we supplied a path...
-    if prbPath is not None:
-        # ...that path exists...
-        if os.path.exists(prbPath):
-            # ...but we want to remake it...
-            if spikeSortingOpts['remakePrb']:
-                os.remove(prbPath)
-        else:
-            spikeSortingOpts['remakePrb'] = True
+    # if the prb path exists...
+    if os.path.exists(prbPath):
+        # ...but we want to remake it...
+        if spikeSortingOpts['remakePrb']:
+            os.remove(prbPath)
+    else:
+        spikeSortingOpts['remakePrb'] = True
     #  set up probe file
-    if (prbPath is None) or spikeSortingOpts['remakePrb']:
+    # pdb.set_trace()
+    if spikeSortingOpts['remakePrb']:
         electrodeMapPath = spikeSortingOpts['electrodeMapPath']
         mapExt = electrodeMapPath.split('.')[-1]
         if mapExt == 'cmp':
             cmpDF = prb_meta.cmpToDF(electrodeMapPath)
         elif mapExt == 'map':
             cmpDF = prb_meta.mapToDF(electrodeMapPath)
-        pdb.set_trace()
-        mapFileName = os.path.basename(electrodeMapPath)
+        #
+        mapFileName = os.path.basename(prbPath).split('.')[0]
         csvPath = os.path.join(
             folderPath,
-            mapFileName, '_map.csv'
+            mapFileName + '.csv'
             )
         cmpDF.to_csv(csvPath)
-        # csvPath = electrodeMapPath.replace(mapExt, 'csv')
-        prbPath = os.path.join(
-            folderPath,
-            mapFileName, '_map.prb'
-            )
-        # prbPath = electrodeMapPath.replace(mapExt, 'prb')
-        #
         labelsInFile = dataio.datasource.sig_channels['name']
         labelsInMap = cmpDF['label'].unique().tolist()
         #
@@ -90,17 +82,17 @@ def initialize_catalogueconstructor(
         cmpDF.loc[:, ['xcoords', 'ycoords', 'zcoords']] = (
             cmpDF.loc[:, ['xcoords', 'ycoords', 'zcoords']]
             .fillna(-1))
-        if spikeSortingOpts['remakePrb']:
-            excludeChans = spikeSortingOpts['excludeChans']
-            for label in labelsInFile:
-                if (label not in labelsInMap) and (label not in excludeChans):
-                    excludeChans.append(label)
-            #
-            prb_meta.cmpDFToPrb(
-                cmpDF, filePath=prbPath,
-                labels=cmpDF.loc[~cmpDF['label'].isin(excludeChans), 'label'].to_list(),
-                **spikeSortingOpts['prbOpts']
-                )
+        #
+        excludeChans = spikeSortingOpts['excludeChans']
+        for label in labelsInFile:
+            if (label not in labelsInMap) and (label not in excludeChans):
+                excludeChans.append(label)
+        #
+        prb_meta.cmpDFToPrb(
+            cmpDF, filePath=prbPath,
+            labels=cmpDF.loc[~cmpDF['label'].isin(excludeChans), 'label'].to_list(),
+            **spikeSortingOpts['prbOpts']
+            )
     #
     dataio.set_probe_file(prbPath)
     #
@@ -514,6 +506,7 @@ def neo_block_after_peeler(
         plotting=False, altDataIOInfo=None,
         waveformSignalType='processed',
         FRThresh=1, prbPath=None):
+    # pdb.set_trace()
     prbPath = glob.glob(os.path.join(triFolder, '*.prb'))[0]
     with open(prbPath, "r") as f:
         channelsInfoTxt = f.read()

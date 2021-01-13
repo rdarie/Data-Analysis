@@ -19,8 +19,9 @@
 # Specify account details
 #SBATCH --account=bibs-dborton-condo
 
-SLURM_ARRAY_TASK_ID=3
-source shellScripts/run_align_motion_preamble.sh
+SLURM_ARRAY_TASK_ID=2
+# source shellScripts/run_align_motion_preamble.sh
+source shellScripts/run_align_perimovement_stim_preamble.sh
 # source shellScripts/run_align_stim_preamble.sh
 
 # ALIGNQUERY="--alignQuery=midPeak"

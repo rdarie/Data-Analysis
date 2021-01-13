@@ -75,8 +75,13 @@ def tridesclousCCV(
         scratchFolder, 'tdc_{}'.format(
             blockBaseName + nameSuffix))
     prbPath = os.path.join(
-        scratchFolder, arrayName + '_map.prb'
+        triFolder, arrayName + '_map.prb'
         )
+    if not os.path.exists(prbPath):
+        prbPath = os.path.join(
+            scratchFolder, arrayName + '_map.prb'
+            )
+
     if arguments['overrideSpikeSource']:
         altDataIOInfo = {
             'datasource_type': 'NIX',
@@ -111,6 +116,7 @@ def tridesclousCCV(
                     scratchFolder,
                     blockBaseName + nameSuffix,
                     triFolder,
+                    prbPath=prbPath,
                     spikeSortingOpts=spikeSortingOpts,
                     removeExisting=arguments['removeExistingCatalog'],
                     fileFormat='NIX')

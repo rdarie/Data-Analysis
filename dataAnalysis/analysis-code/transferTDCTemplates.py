@@ -29,6 +29,7 @@ globals().update(allOpts)
 def transferTDCTemplates():
     # affects the prefix
     arrayName = arguments['arrayName']
+    spikeSortingOpts[arrayName]['remakePrb'] = False
     if 'rawBlockName' in spikeSortingOpts[arrayName]:
        rawBlockName = spikeSortingOpts[arrayName]['rawBlockName']
     else:

@@ -20,7 +20,7 @@
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=2,3
+#SBATCH --array=1,2
 
 # EXP="exp201901261000"
 # EXP="exp202010271200"
@@ -35,6 +35,7 @@
 # EXP="exp202012181200"
 EXP="exp202101051100"
 EXP="exp202101061100"
+EXP="exp202101111100"
 
 module load anaconda/2020.02
 . /gpfs/runtime/opt/anaconda/2020.02/etc/profile.d/conda.sh
@@ -42,7 +43,7 @@ conda activate
 source activate nda2
 python --version
 
-SLURM_ARRAY_TASK_ID=3
+# SLURM_ARRAY_TASK_ID=1
 
 ########################################################################################################################################################################################################################
 

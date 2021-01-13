@@ -24,22 +24,7 @@
 #SBATCH --array=0-95:1
 
 # Run a command
-# EXP="exp201901261000"
-# EXP="exp202010271200"
-# EXP="exp202011161100"
-# EXP="exp202011201100"
-# EXP="exp202011231200"
-EXP="exp202012111100"
-EXP="exp202012121100"
-EXP="exp202012171200"
-# EXP="exp202012181200"
-EXP="exp202101061100"
-
-module load anaconda/2020.02
-. /gpfs/runtime/opt/anaconda/2020.02/etc/profile.d/conda.sh
-conda activate
-source activate nda2
-python --version
+source ./shellScripts/run_spike_sorting_preamble.sh
 
 # BLOCKIDX=1
 # SLURM_ARRAY_TASK_ID=0
@@ -49,5 +34,7 @@ let CHAN_STOP=SLURM_ARRAY_TASK_ID+1
 
 # SOURCESELECTOR="--sourceFileSuffix=spike_preview"
 SOURCESELECTOR="--sourceFileSuffix=mean_subtracted"
-python -u ./tridesclousCCV.py --arrayName=utah --blockIdx=$BLOCKIDX --exp=$EXP --batchPeel --chan_start=$CHAN_START --chan_stop=$CHAN_STOP $SOURCESELECTOR
+# python -u ./tridesclousCCV.py --arrayName=utah --blockIdx=$BLOCKIDX --exp=$EXP --batchPeel --chan_start=$CHAN_START --chan_stop=$CHAN_STOP $SOURCESELECTOR
 # python -u ./tridesclousCCV.py --arrayName=nform --blockIdx=$BLOCKIDX --exp=$EXP --batchPeel --chan_start=$CHAN_START --chan_stop=$CHAN_STOP $SOURCESELECTOR
+python -u ./tridesclousCCV.py --arrayName=utah --blockIdx=1 --exp=$EXP --batchPeel --chan_start=$CHAN_START --chan_stop=$CHAN_STOP $SOURCESELECTOR
+python -u ./tridesclousCCV.py --arrayName=utah --blockIdx=2 --exp=$EXP --batchPeel --chan_start=$CHAN_START --chan_stop=$CHAN_STOP $SOURCESELECTOR
