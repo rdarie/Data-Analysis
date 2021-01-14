@@ -78,7 +78,7 @@ def getExpOpts():
         for idx, sessionName in enumerate(jsonSessionNames[blockIdx]):
             synchInfo['ins'][blockIdx][idx] = {
                 'timeRanges': None,
-                'chan': ['ins_td0'],
+                'chan': ['ins_td0', 'ins_td2'],
                 'thres': 5,
                 'iti': 50e-3,
                 'keepIndex': slice(-5, None)
@@ -120,8 +120,8 @@ def getExpOpts():
         # group
         0: {
             # program
-            0: {'detectChannels': ['ins_td2'], 'thres': 250, 'useForSlotDetection': True},
-            1: {'detectChannels': ['ins_td2'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True},
+            0: {'detectChannels': ['ins_td0'], 'thres': 250, 'useForSlotDetection': True},
+            1: {'detectChannels': ['ins_td0', 'ins_td2'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True},
             2: {'detectChannels': ['ins_td0', 'ins_td2'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True},
             3: {'detectChannels': ['ins_td0', 'ins_td2'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True}
         }}

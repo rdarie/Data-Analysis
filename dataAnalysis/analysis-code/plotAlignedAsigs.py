@@ -170,6 +170,7 @@ if arguments['enableOverrides']:
         'testWidth': 50e-3,
         'tStart': 0e-3,
         'tStop': alignedAsigsKWargs['windowSize'][1]})
+    alignedAsigsKWargs['procFun'] = ash.genDetrender(timeWindow=(-100e-3, 0))
 #  End Overrides
 
 #  Get stats results

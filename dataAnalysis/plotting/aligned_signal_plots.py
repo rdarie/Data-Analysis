@@ -24,7 +24,7 @@ import os
 import traceback
 from copy import deepcopy
 from tqdm import tqdm
-
+import json
 
 def processRowColArguments(arguments):
     outDict = {}
@@ -230,7 +230,6 @@ def plotNeuronsAligned(
                     twinRelplotKWArgs['func1_kws']['s'] = min(
                         (3 * figHeight / nRasterRows) ** 2,
                         10)
-                    # pdb.set_trace()
                     raster.loc[raster['bin'] == raster['bin'].min(), 'raster'] = oneSpikePerBinHz
                     raster.loc[raster['bin'] == raster['bin'].max(), 'raster'] = oneSpikePerBinHz
                     g = twin_relplot(
@@ -522,11 +521,14 @@ def genTicksToScale(
     limFrac = 0.2
 
     def ticksToScale(g, ro, co, hu, dataSubset):
-        topLeftCol = ((ro == 0) and (co == 0))
+        # topLeftCol = ((ro == 0) and (co == 0))
         emptySubset = (
             (dataSubset.empty) or
             (dataSubset[dropNaNCol].isna().all()))
-        if ((topLeftCol) or (not shared)) and not emptySubset:
+        if not hasattr(g, 'ticksToScaleDone'):
+            g.ticksToScaleDone = False
+        if ((not g.ticksToScaleDone) or (not shared)) and not emptySubset:
+            g.ticksToScaleDone = True
             xLim = g.axes[ro, co].get_xlim()
             yLim = g.axes[ro, co].get_ylim()
             odX = limFrac * (xLim[1] - xLim[0])
@@ -570,6 +572,44 @@ def genTicksToScale(
         g.axes[ro, co].set_xticks([])
         return
     return ticksToScale
+
+
+def genAxLimSaver(
+        filePath=None, keyColName=None,
+        dropNaNCol='segment'
+        ):
+    # TODO: needs to use the features that define row and col
+    # as the keys
+    def axLimSaver(g, ro, co, hu, dataSubset):
+        emptySubset = (
+            (dataSubset.empty) or
+            (dataSubset[dropNaNCol].isna().all()))
+        if not emptySubset:
+            keyNames = dataSubset[keyColName].dropna().unique()
+            assert isinstance(keyNames, np.ndarray)
+            assert keyNames.shape[0] == 1
+            keyName = keyNames[0]
+            if not os.path.exists(filePath):
+                axLimInfo = {
+                    keyName: {
+                        'xlim': g.axes[ro, co].get_xlim(),
+                        'ylim': g.axes[ro, co].get_ylim(),
+                    }}
+                with open(filePath, 'w') as _f:
+                    json.dump(axLimInfo, _f)
+            else:
+                with open(filePath, 'r') as _f:
+                    axLimInfo = json.load(_f)
+                if keyName not in axLimInfo:
+                    axLimInfo.update({
+                        keyName: {
+                            'xlim': g.axes[ro, co].get_xlim(),
+                            'ylim': g.axes[ro, co].get_ylim(),
+                        }})
+                    with open(filePath, 'w') as _f:
+                        json.dump(axLimInfo, _f)
+        return
+    return axLimSaver
 
 
 def genTicksToScaleTwin(

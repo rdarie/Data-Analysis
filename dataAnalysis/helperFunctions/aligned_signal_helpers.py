@@ -240,8 +240,7 @@ def splitApplyCombine(
         funArgs=[], funKWArgs={},
         rowKeys=None, colKeys=None, useDask=False, nPartitionMultiplier=2,
         daskPersist=True, daskProgBar=True, daskResultMeta=None,
-        daskComputeOpts={},
-        reindexFromInput=False):
+        daskComputeOpts={}, reindexFromInput=False):
     if isinstance(rowKeys, str):
         rowKeys = [rowKeys, ]
     if isinstance(colKeys, str):
@@ -303,7 +302,6 @@ def splitApplyCombine(
             .groupby(by=rowKeys, group_keys=False)
             .apply(fun, *funArgs, **funKWArgs))
     # TODO, below is a transformation, handle other index types
-    # pdb.set_trace()
     if reindexFromInput:
         resultDF = pd.DataFrame(
             result.sort_index().loc[:, dataColNames].to_numpy(),
@@ -316,6 +314,10 @@ def splitApplyCombine(
             for idx in asigStack.index.names
             if (idx in result.columns)]
         resultDF = result.sort_index().set_index(presentIndices)
+        if colKeys is not None:
+            presentColKeys = list(np.intersect1d(colKeys, presentIndices))
+            if len(presentColKeys):
+                resultDF = resultDF.unstack(level=presentColKeys)
     return resultDF
 
 
@@ -807,3 +809,20 @@ def rAUC(
         .subtract(bLine, axis='index')
         .abs().sum(axis=1) * dt)
     return rAUCDF
+
+
+def genDetrender(
+        timeWindow=None, useMean=False):
+    def detrend(waveDF, spkTrain):
+        if timeWindow is None:
+            trendMask = slice(None)
+        else:
+            trendMask = (
+                (waveDF.columns >= timeWindow[0]) &
+                (waveDF.columns < timeWindow[1]))
+        if useMean:
+            trend = waveDF.loc[:, trendMask].mean(axis='columns')
+        else:
+            trend = waveDF.loc[:, trendMask].median(axis='columns')
+        return waveDF.sub(trend, axis='rows')
+    return detrend

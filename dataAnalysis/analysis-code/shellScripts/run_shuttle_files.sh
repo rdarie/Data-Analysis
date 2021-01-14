@@ -40,6 +40,7 @@
 # EXP="exp202011231200"
 # EXP="exp202012171200"
 EXP="exp202101061100"
+EXP="exp202101111100"
 
 # ANALYSISSELECTOR="--analysisName=emgHiRes"
 # ANALYSISSELECTOR="--analysisName=emgLoRes"

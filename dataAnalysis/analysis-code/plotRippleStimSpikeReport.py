@@ -49,9 +49,11 @@ from neo.io.proxyobjects import (
 import dataAnalysis.preproc.ns5 as preproc
 import pandas as pd
 import numpy as np
+import json
 from importlib import reload
 import os, pdb
 from tqdm import tqdm
+import dill as pickle
 #
 from currentExperiment import parseAnalysisOptions
 from docopt import docopt
@@ -263,6 +265,23 @@ if arguments['individualTraces']:
     pdfName = pdfName.replace('.pdf', '_traces.pdf')
 if arguments['invertOutlierBlocks']:
     pdfName = pdfName.replace('.pdf', '_outliers.pdf')
+
+
+saveFigMetaToPath = pdfName.replace('.pdf', '_metadata.pickle')
+####################
+optsSourceFolder = os.path.join(
+    figureFolder, 'default', 'alignedFeatures')
+loadFigMetaPath = os.path.join(
+    optsSourceFolder,
+    '_emg_XS_stimOn_topo_metadata.pickle'
+    )
+with open(loadFigMetaPath, 'rb') as _f:
+    loadedFigMeta = pickle.load(_f)
+# plotProcFuns.append(
+
+#     asp.genAxLimSaver(
+#         filePath=saveAxLimsToPath, keyColName='feature')
+#     )
 ################
 # from here on we can start defining a function
 # TODO delete this and rework, right now it is very hacky
@@ -356,6 +375,8 @@ else:
     pageGrouper = asigWide.groupby(groupPagesBy)
 #
 pageCount = 0
+if saveFigMetaToPath is not None:
+    figMetaData = []
 with PdfPages(pdfName) as pdf:
     for pageIdx, (pageName, pageGroup) in enumerate(tqdm(pageGrouper)):
         #
@@ -403,6 +424,9 @@ with PdfPages(pdfName) as pdf:
                 size=arguments['sizeName'], style=arguments['styleName'],
                 row='xcoords', col='ycoords', **relplotKWArgs)
             for (ro, co, hu), dataSubset in g.facet_data():
+                emptySubset = (
+                    (dataSubset.empty) or
+                    (dataSubset['segment'].isna().all()))
                 # if sigTestResults is not None:
                 #     addSignificanceStars(
                 #         g, sigTestResults.query(
@@ -412,6 +436,28 @@ with PdfPages(pdfName) as pdf:
                 if len(allProbePlotFuns):
                     for procFun in allProbePlotFuns:
                         procFun(g, ro, co, hu, dataSubset)
+                if saveFigMetaToPath is not None:
+                    if 'facetMetaList' not in locals():
+                        facetMetaList = []
+                    if not emptySubset:
+                        facetMeta = {}
+                        for gVarName in [g._row_var, g._col_var, g._hue_var]:
+                            if gVarName is not None:
+                                gVarValue = dataSubset[gVarName].dropna().unique()
+                                assert isinstance(gVarValue, np.ndarray)
+                                assert gVarValue.shape == (1,)
+                                facetMeta.update({gVarName: gVarValue[0]})
+                        gFeatName = dataSubset['feature'].dropna().unique()
+                        if isinstance(gFeatName, np.ndarray):
+                            if gFeatName.shape == (1,):
+                                facetMeta.update({'feature': gFeatName[0]})
+                        facetMeta.update({
+                            'xlim_left': g.axes[ro, co].get_xlim()[0],
+                            'xlim_right': g.axes[ro, co].get_xlim()[1],
+                            'ylim_bottom': g.axes[ro, co].get_ylim()[0],
+                            'ylim_top': g.axes[ro, co].get_ylim()[1]
+                            })
+                        facetMetaList.append(pd.Series(facetMeta))
             g.set_titles("")
             g.set_axis_labels("", "")
             if 'facet_kws' in relplotKWArgs:
@@ -432,9 +478,21 @@ with PdfPages(pdfName) as pdf:
                 saveLegendOpts.update({
                     'bbox_extra_artists': [pageTitle] + allLegends})
             # if not plt.rcParams['figure.constrained_layout.use']:
+            if saveFigMetaToPath is not None:
+                pageFullIdx = {
+                    key: value
+                    for key, value in zip(
+                        groupPagesBy + ['probe'], list(pageName) + [probeName])
+                    }
+                facetMetaDF = pd.concat(facetMetaList, axis='columns')
+                facetMetaDF.pageFullIdx = pageFullIdx
+                figMetaData.append(facetMetaDF.T)
+                del facetMetaList
             #     g.fig.tight_layout(pad=0)
             pdf.savefig(bbox_inches='tight', pad_inches=0, **saveLegendOpts)
             # plt.show()
             plt.close()
             pageCount += 1
-#
+    if saveFigMetaToPath is not None:
+        with open(saveFigMetaToPath, 'wb') as _f:
+            pickle.dump(figMetaData, _f)
