@@ -56,6 +56,7 @@ if arguments['sourceFileSuffix'] is not None:
     triFolder = triFolder + '_{}'.format(arguments['sourceFileSuffix'])
     ns5FileName = ns5FileName + '_{}'.format(arguments['sourceFileSuffix'])
 
+spikeSortingFiguresFolder = os.path.join(figureFolder, 'spikeSorting')
 if not os.path.exists(spikeSortingFiguresFolder):
     os.makedirs(spikeSortingFiguresFolder, exist_ok=True)
 

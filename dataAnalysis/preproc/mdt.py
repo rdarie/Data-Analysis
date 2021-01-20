@@ -1277,7 +1277,6 @@ def getINSTapTimestamp(
         fs = (accel['t'].iloc[1] - accel['t'].iloc[0]) ** -1
     tapDetectSignal = pd.concat(signalsToConcat, axis='columns')
     if filterOpts is not None:
-        # pdb.set_trace()
         filterCoeffs = hf.makeFilterCoeffsSOS(
             filterOpts, fs)
         tapDetectSignal.loc[:, :] = signal.sosfiltfilt(
@@ -1295,7 +1294,6 @@ def getINSTapTimestamp(
     tapDetectSignal = pd.Series(
         np.sqrt(cov.mahalanobis(tapDetectSignal.to_numpy())),
         index=tapDetectSignal.index)
-    # pdb.set_trace()
     tdPeakIdx = hf.getTriggers(
         tapDetectSignal, iti=iti, fs=fs, thres=tapDetectOpts['thres'],
         edgeType='both', minAmp=None,
@@ -1377,17 +1375,9 @@ def getHUTtoINSSyncFun(
             # 'tStartHUT': tStartHUT,
             # 'tStopHUT': tStopHUT
             }
-        # print('timeChunk = {}'.format(timeChunk))
-        # print('tStartHUT = {}'.format(tStartHUT))
-        # print('tStopHUT = {}'.format(tStopHUT))
-        # if np.isnan(tStopHUT):
-        #     pdb.set_trace()
-        # print('tStart = {}'.format(tStart))
-        # print('tStop = {}'.format(tStop))
         ###########################################################
         timeInterpFunHUTtoINS[timeChunkIdx] = thisInterpDict
         ###########################################################
-        #
         if plotting:
             plt.plot(
                 tsTimeChunk[syncTo].values * 1e-3,
@@ -1812,7 +1802,7 @@ def preprocINS(
     #  align them to the more reasonable minimum first timestamp across packets
     #  System Tick seconds before roll over
     rolloverSeconds = pd.to_timedelta(6.5535, unit='s')
-
+    #
     for trialSegment in pd.unique(td['data']['trialSegment']):
         if accel is not None:
             accelSegmentMask = accel['data']['trialSegment'] == trialSegment
@@ -1878,7 +1868,6 @@ def preprocINS(
             print(group.loc[:, ('time_master', 'microseconds', 't')].head())
             print('Segment {} tail:'.format(name))
             print(group.loc[:, ('time_master', 'microseconds', 't')].tail())
-
         plt.plot(
             np.linspace(0, 1, len(timeSync['t'])),
             timeSync['t'], 'o', label='timeSync')
@@ -2004,6 +1993,9 @@ def preprocINS(
         stimSpikes = block.filter(objects=SpikeTrain)
         stimSpikes = ns5.loadContainerArrayAnn(trainList=stimSpikes)
         stimSpikesDF = ns5.unitSpikeTrainArrayAnnToDF(stimSpikes)
+        if trialFilesStim['eventsFromFirstInTrain']:
+            firstOfTrainMask = stimSpikesDF['firstOfTrain'].astype(np.bool).to_numpy()
+            stimSpikesDF = stimSpikesDF.loc[firstOfTrainMask, :].reset_index()
         stimSpikesDF['ratePeriod'] = stimSpikesDF['RateInHz'] ** (-1)
         stimSpikesDF.sort_values('t', kind='mergesort', inplace=True)
         stimSpikesDF.reset_index(drop=True, inplace=True)
@@ -2068,14 +2060,22 @@ def preprocINS(
             eventName='seg0_',
             annCol=['ins_property', 'ins_value']
             )
-        
+        closestTimes, closestIdx = hf.closestSeries(
+            takeFrom=newStimStatusSerial['INSTime'],
+            compareTo=stimSpikesDF['t'])
+        tSegAnnsDF = (
+            stimSpikesDF
+            .loc[closestIdx, 'trialSegment']
+            .to_numpy())
         block.segments[0].events = newStimEvents
         for ev in newStimEvents:
+            ev.array_annotations.update({
+                'trialSegment': tSegAnnsDF})
+            ev.annotations.update({
+                'trialSegment': tSegAnnsDF,
+                'arrayAnnNames': ['trialSegment']})
             ev.segment = block.segments[0]
         stimStatusSerial = newStimStatusSerial
-    else:
-        # if not detecting stim onsets, change the filename to reflect that
-        insDataFilename = insDataFilename.replace('.nix', '_orig_stim.nix')
     # make labels
     labelNames = [
         'RateInHz', 'program', 'therapyStatus',
@@ -2761,6 +2761,9 @@ def getINSStimOnset(
                 name=electrodeCombo + '#0'
                 )[0]
             thisElecConfig = elecConfiguration[activeGroup][activeProgram]
+            #
+            firstOfTrain = (theseOnsetTimestamps ** 0).magnitude * pq.dimensionless
+            theseTrialSegments = (theseOnsetTimestamps ** 0).magnitude * thisTrialSegment * pq.dimensionless
             ##############################################################################
             repeatCycles = False
             #############################
@@ -2809,6 +2812,8 @@ def getINSStimOnset(
             ##############################################################################
             if treatAsSinglePulses:
                 tempOnTimes = []
+                tempFirstOfTrain = []
+                tempTrialSegs = []
                 tempOffTimes = []
                 tempOnDiffsE = []
                 tempOnDiffsL = []
@@ -2818,6 +2823,13 @@ def getINSStimOnset(
                     pulseOnTimes = np.arange(
                         onTime, offTime,
                         interPulseInterval) * onTime.units
+                    #
+                    pulseFoT = pulseOnTimes ** 0 - 1
+                    pulseFoT[0] = 1.
+                    tempFirstOfTrain.append(pulseFoT)
+                    tempTrialSegs.append(
+                        pulseOnTimes ** 0 * theseTrialSegments[idx])
+                    #
                     pulseOffTimes = pulseOnTimes + 100 * stimPW * pq.us
                     tempOnTimes.append(pulseOnTimes)
                     tempOffTimes.append(pulseOffTimes)
@@ -2829,6 +2841,8 @@ def getINSStimOnset(
                 theseOffsetTimestamps = np.concatenate(tempOffTimes) * offTime.units
                 onsetDifferenceFromExpected = np.concatenate(tempOnDiffsE) * onTime.units
                 onsetDifferenceFromLogged = np.concatenate(tempOnDiffsL) * offTime.units
+                firstOfTrain = np.concatenate(tempFirstOfTrain) * pq.dimensionless
+                theseTrialSegments = np.concatenate(tempTrialSegs) * pq.dimensionless
             #
             ampList = theseOnsetTimestamps ** 0 * 100 * thisAmplitude * pq.uA
             rateList = theseOnsetTimestamps ** 0 * stimRate * pq.Hz
@@ -2848,8 +2862,12 @@ def getINSStimOnset(
                 'group': groupList,
                 'offsetFromExpected': onsetDifferenceFromExpected,
                 'offsetFromLogged': onsetDifferenceFromLogged,
+                'firstOfTrain': firstOfTrain,
+                'trialSegment': theseTrialSegments,
                 'usedExpectedT': usedExpTList,
                 'usedSlotToDetect': usedSlotList}
+            if 'arrayAnnListOfNames' not in locals():
+                arrayAnnListOfNames = sorted(list(arrayAnn.keys()))
             st = SpikeTrain(
                 times=theseOnsetTimestamps, t_stop=spikeTStop,
                 t_start=spikeTStart,
@@ -2888,7 +2906,9 @@ def getINSStimOnset(
                 'offsetFromExpected': np.array([]),
                 'offsetFromLogged': np.array([]),
                 'usedExpectedT': np.array([]),
-                'usedSlotToDetect': np.array([])
+                'usedSlotToDetect': np.array([]),
+                'firstOfTrain': np.array([]),
+                'trialSegment': np.array([])
                 }
             arrayAnnNames = {'arrayAnnNames': list(consolidatedAnn.keys())}
             for idx, st in enumerate(tempSpiketrainStorage[thisUnit.name]):
@@ -2898,10 +2918,8 @@ def getINSStimOnset(
                 ))
                 for key, value in consolidatedAnn.items():
                     consolidatedAnn[key] = np.concatenate((
-                        consolidatedAnn[key],
-                        st.annotations[key]
+                        consolidatedAnn[key], st.annotations[key]
                         ))
-            #
             unitDetectedOn = thisUnit.annotations['detectChannels']
             consolidatedTimes, timesIndex = hf.closestSeries(
                 takeFrom=pd.Series(consolidatedTimes),
@@ -2948,8 +2966,9 @@ def getINSStimOnset(
                 name='seg{}_{}'.format(int(segIdx), thisUnit.name),
                 times=consolidatedTimes, units='sec', t_stop=spikeTStop,
                 waveforms=spikeWaveforms * pq.mV, left_sweep=left_sweep,
-                sampling_rate=fs,
-                t_start=spikeTStart, **consolidatedAnn, **arrayAnnNames)
+                sampling_rate=fs, t_start=spikeTStart,
+                **consolidatedAnn, **arrayAnnNames)
+            #
             assert (consolidatedTimes.shape[0] == spikeWaveforms.shape[0])
             thisUnit.spiketrains.append(newSt)
             newSt.unit = thisUnit
@@ -3304,7 +3323,6 @@ def insDataToBlock(
         td['data'], fullX,
         kind='linear', fill_value=(0, 0),
         x='t', columns=tdDataCols)
-    # pdb.set_trace()
     tdInterp.loc[:, 'validTD'] = False
     tdInterp.loc[:, 'trialSegment'] = np.nan
     for sessionIdx, group in td['data'].groupby('trialSegment'):
@@ -3360,7 +3378,6 @@ def insDataToBlock(
             name='seg0_' + colName,
             sampling_rate=sampleRate,
             dtype=np.float32)
-        #
         asig.t_start = tStart*pq.s
         seg.analogsignals.append(asig)
         chanIdx = ChannelIndex(
@@ -3379,7 +3396,6 @@ def insDataToBlock(
             else:
                 accUnits = (pq.m/pq.s**2)
             sigName = 'ins_acc{}'.format(accelNixColNames[idx])
-            #  print(sigName)
             asig = AnalogSignal(
                 accelInterp[colName].values*accUnits,
                 name='seg0_' + sigName,
@@ -3400,8 +3416,16 @@ def insDataToBlock(
     #
     stimEvents = ns5.eventDataFrameToEvents(
         stimStatusSerial, idxT='INSTime',
-        annCol=['ins_property', 'ins_value']
-        )
+        annCol=['ins_property', 'ins_value'])
+    evTimes = pd.Series(stimEvents[0].times.magnitude)
+    closestTimes, closestIdx = hf.closestSeries(
+        takeFrom=evTimes, compareTo=tdInterp['t'])
+    evTSegs = tdInterp.loc[closestIdx, 'trialSegment'].to_numpy()
+    for ev in stimEvents:
+        ev.array_annotations.update({'trialSegment': evTSegs})
+        ev.annotations.update({
+            'trialSegment': evTSegs,
+            'arrayAnnNames': ['trialSegment']})
     seg.events = stimEvents
     block.create_relationship()
     #

@@ -21,7 +21,7 @@
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=1,2
+#SBATCH --array=2
 
 # EXP="exp201901261000"
 # EXP="exp202010271200"
@@ -40,8 +40,10 @@
 # EXP="exp202012171200"
 # EXP="exp202012181200"
 # EXP="exp202101051100"
-EXP="exp202101061100"
-EXP="exp202101111100"
+# EXP="exp202101061100"
+# EXP="exp202101111100"
+# EXP="exp202101141100"
+EXP="exp202101191100"
 
 
 module load anaconda/2020.02
@@ -50,9 +52,7 @@ conda activate
 source activate nda2
 python --version
 
-# SLURM_ARRAY_TASK_ID=1
-
-# python -u './previewNSPTapTimes.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --usedTENSPulses
+SLURM_ARRAY_TASK_ID=3
 
 ############## init spike sorting
 # python -u ./preprocNS5.py --arrayName=utah --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --forSpikeSorting
@@ -62,7 +62,7 @@ python --version
 # python -u ./tridesclousCCV.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --arrayName=nform --sourceFileSuffix=spike_preview --removeExistingCatalog --initCatalogConstructor
 
 ########### get dataset to run spike extraction on
-python -u ./preprocNS5.py --arrayName=utah --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --fullSubtractMean --chunkSize=700
+# python -u ./preprocNS5.py --arrayName=utah --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --fullSubtractMean --chunkSize=700
 # python -u ./preprocNS5.py --arrayName=nform --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --fullSubtractMean
 
 ########### get analog inputs separately to run synchronization, etc
@@ -70,7 +70,7 @@ python -u ./preprocNS5.py --arrayName=utah --exp=$EXP --blockIdx=$SLURM_ARRAY_TA
 
 ######### finalize dataset
 # !! maskMotorEncoder ignores all motor events outside alignTimeBounds
-python -u ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --arrayName=utah --fullSubtractMeanUnfiltered --chunkSize=700
+# python -u ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --arrayName=utah --fullSubtractMeanUnfiltered --chunkSize=700
 # python -u ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --arrayName=nform --fullSubtractMeanUnfiltered
 
 # python -u ./synchronizeNFormToNSP.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --trigRate=100

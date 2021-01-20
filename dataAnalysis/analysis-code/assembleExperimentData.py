@@ -70,9 +70,11 @@ for suffix in suffixList:
         # dataReader, dataBlock = preproc.blockFromPath(
         #     trialDataPath, lazy=True, reduceChannelIndexes=True)
         dataBlock = preproc.loadWithArrayAnn(
-            trialDataPath, fromRaw=False, reduceChannelIndexes=True)
+            trialDataPath, fromRaw=False,
+            reduceChannelIndexes=True)
         # [cI.name for cI in dataBlock.channel_indexes]
-        # pdb.set_trace()
+        pdb.set_trace()
+        #
         blocksCache[trialDataPath] = dataBlock
         if idx == 0:
             masterDataPath = trialDataPath

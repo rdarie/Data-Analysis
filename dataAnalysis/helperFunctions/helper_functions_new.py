@@ -490,17 +490,17 @@ def closestSeries(takeFrom=None, compareTo=None, strictly='neither'):
         np.nan, index=takeFrom.index)
     closestIdx = pd.Series(
         np.nan, index=takeFrom.index)
-    for idx, value in enumerate(takeFrom.values):
+    for idx, value in enumerate(takeFrom.to_numpy()):
         if strictly == 'greater':
-            lookIn = compareTo[compareTo > value]
+            lookIn = compareTo.loc[compareTo > value]
         if strictly == 'less':
-            lookIn = compareTo[compareTo < value]
+            lookIn = compareTo.loc[compareTo < value]
         else:
             lookIn = compareTo
-        idxMin = np.abs(compareTo.values - value).argmin()
+        idxMin = np.abs(lookIn.to_numpy() - value).argmin()
         closeValue = (
             lookIn
-            .values
+            .to_numpy()
             .flat[idxMin])
         closest.iloc[idx] = closeValue
         closestIdx.iloc[idx] = lookIn.index[idxMin]
@@ -781,7 +781,7 @@ def getTimeMaskFromRanges(times, timeRanges):
     for tStart, tEnd in timeRanges:
         thisMask = (
             (times >= tStart * tUnits) &
-            (times <= tEnd * tUnits)
+            (times < tEnd * tUnits)
             )
         timeMask = timeMask | thisMask
     return timeMask
@@ -823,7 +823,8 @@ def getStimSerialTrialSegMask(insDF, trialSegment):
     tseg = pd.Series(np.nan, index=insDF.index)
     tseg.loc[tsegMask] = insDF.loc[tsegMask, 'ins_value']
     tseg.fillna(method='ffill', inplace=True)
-    segmentMask = tseg == trialSegment
+    tseg.fillna(method='bfill', inplace=True)
+    segmentMask = (tseg == trialSegment)
     return segmentMask
 
 

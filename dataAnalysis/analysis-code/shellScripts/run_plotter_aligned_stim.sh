@@ -19,42 +19,6 @@
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 
-# EXP="exp201901221000"
-# EXP="exp201901201200"
-# EXP="exp201901261000"
-# EXP="exp201901271000"
-# EXP="exp202010201200"
-# EXP="exp202010271200"
-EXP="exp202011201100"
-EXP="exp202012111100"
-EXP="exp202012121100"
-
-module load anaconda/3-5.2.0
-. /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
-conda activate
-
-source activate nda2
-python --version
-
-SLURM_ARRAY_TASK_ID=1
-
-# UNITSELECTOR="--selector=unitSelector_minfrmaxcorr"
-
-# BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
-BLOCKSELECTOR="--processAll"
-
-# WINDOW="--window=miniRC"
-WINDOW="--window=M"
-# WINDOW="--window=XS"
-
-# ANALYSISFOLDER="--analysisName=loRes"
-ANALYSISFOLDER="--analysisName=default"
-
-OUTLIERMASK="--maskOutlierBlocks"
-
-#STATSOVERLAY="--overlayStats"
-TIMEWINDOWOPTS="--winStart=200 --winStop=800"
-
-python3 -u './plotAlignedNeurons.py' --exp=$EXP $BLOCKSELECTOR $ANALYSISFOLDER $UNITSELECTOR $WINDOW --unitQuery="all" --alignQuery="stimOn" --rowName="RateInHz" --hueName="amplitude" --alignFolderName=stim --enableOverrides $TIMEWINDOWOPTS $STATSOVERLAY $OUTLIERMASK
-# python3 -u './plotAlignedAsigs.py' --exp=$EXP $BLOCKSELECTOR $ANALYSISFOLDER $WINDOW --inputBlockName="rig" --unitQuery="all" --alignQuery="stimOn" --rowName="RateInHz" --hueName="amplitude" --alignFolderName=stim --enableOverrides $TIMEWINDOWOPTS $STATSOVERLAY $OUTLIERMASK
-# python3 -u './plotAlignedAsigs.py' --exp=$EXP $BLOCKSELECTOR $ANALYSISFOLDER $WINDOW --inputBlockName="lfp" --unitQuery="lfp" --alignQuery="stimOn" --rowName="RateInHz" --hueName="amplitude" --alignFolderName=stim --enableOverrides $TIMEWINDOWOPTS $STATSOVERLAY $OUTLIERMASK
+./shellScripts/run_plotter_aligned_stim_neurons.sh
+./shellScripts/run_plotter_aligned_stim_lfp.sh
+./shellScripts/run_plotter_aligned_stim_rig.sh

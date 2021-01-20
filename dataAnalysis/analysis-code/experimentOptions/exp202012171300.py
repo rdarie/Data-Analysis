@@ -122,10 +122,10 @@ def getExpOpts():
     triDestinations = []
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        '202012171300-Goat': [7,8],
+        '202012171300-Goat': [3],
         }
     assembledSegmentToBlockLookup = {
-        i - 1: i for i in [7,8]
+        i - 1: i for i in [3]
         }
     movementSizeBins = [0, 0.25, 0.5, 1, 1.25, 1.5]
     rowColOverrides = {

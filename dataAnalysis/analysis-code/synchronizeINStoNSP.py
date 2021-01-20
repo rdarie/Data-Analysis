@@ -110,24 +110,41 @@ if not os.path.exists(synchFunFolder):
 synchFunPath = os.path.join(
     synchFunFolder,
     '{}_{}_synchFun.pickle'.format(experimentName, ns5FileName))
-#
+if os.path.exists(synchFunPath):
+    print('Synch already performed. Turning off plotting')
+    arguments['plotting'] = False
 print('Detecting NSP Timestamps...')
-nspChannelName = eventInfo['inputIDs']['tapSync']
 
+tapDetectOptsINS = expOpts['synchInfo']['ins'][blockIdx]
+defaultSessionTapRangesNSP = {
+    'keepIndex': slice(None)
+    }
+tapDetectOptsNSP = expOpts['synchInfo']['nsp'][blockIdx]
+####
+nspChannelName = tapDetectOptsNSP[0]['synchChanName']
+interTriggerInterval = tapDetectOptsNSP[0]['iti']
+nspThresh = tapDetectOptsNSP[0]['thres']
+minAnalogValue = tapDetectOptsNSP[0]['minAnalogValue']  # mV (determined empirically)
 segIdx = 0
 nspSeg = nspBlock.segments[segIdx]
 nspSyncAsig = nspSeg.filter(name='seg0_{}'.format(nspChannelName))[0]
 if isinstance(nspSyncAsig, AnalogSignalProxy):
     nspSyncAsig = nspSyncAsig.load()
-# try:
-#     tStart, tStop = synchInfo['nsp'][blockIdx]['timeRanges']
-# except Exception:
-#     traceback.print_exc()
-#     tStart = float(nspSyncAsig.times[0] + 2 * pq.s)
-#     tStop = float(nspSyncAsig.times[-1] - 2 * pq.s)
-# nspTimeMask = hf.getTimeMaskFromRanges(
-#     nspSyncAsig.times, [(tStart, tStop)])
 nspSrs = pd.Series(nspSyncAsig.magnitude.flatten())
+####
+nspTimeRestrictions = []
+for insSessionIdx, sessionTapOpts in tapDetectOptsNSP.items():
+    if sessionTapOpts['timeRanges'] is not None:
+        nspTimeRestrictions.append(sessionTapOpts['timeRanges'])
+if len(nspTimeRestrictions):
+    restrictMask = hf.getTimeMaskFromRanges(nspSyncAsig.times.magnitude, nspTimeRestrictions)
+    if restrictMask.any():
+        nspSrs.loc[~restrictMask] = np.nan
+        nspSrs = (
+            nspSrs
+            .interpolate(method='linear', limit_area='inside')
+            .fillna(method='bfill').fillna(method='ffill'))
+# pdb.set_trace()
 nspDF = nspSrs.to_frame(name=nspChannelName)
 nspDF['t'] = nspSyncAsig.times.magnitude
 channelData = {
@@ -140,13 +157,12 @@ print(
     'On trial {}, detecting NSP threshold crossings.'
     .format(blockIdx))
 if arguments['usedTENSPulses']:
-    interTriggerInterval = 40e-3  # 20 Hz
-    minAnalogValue = 100  # mV (determined empirically)
-    nspSrs.loc[nspSrs <= minAnalogValue] = 0
+    if minAnalogValue is not None:
+        nspSrs.loc[nspSrs <= minAnalogValue] = 0
     nspPeakIdx = hf.getTriggers(
         nspSrs, iti=interTriggerInterval, itiWiggle=.5,
         fs=float(nspSyncAsig.sampling_rate), plotting=arguments['plotting'],
-        thres=2.58, edgeType='rising')
+        thres=nspThresh, edgeType='rising')
 else:
     # older, used mechanical taps
     interTriggerInterval = .2
@@ -158,8 +174,13 @@ else:
         edgeType='both', itiWiggle=.2,
         absVal=False, plotting=arguments['plotting'], keep_max=False)
 #
+defaultTapDetectOpts = {
+    'iti': interTriggerInterval,
+    'keepIndex': slice(None)
+    }
 allNSPTapTimes = nspDF.loc[nspPeakIdx, 't'].to_numpy()
 allTapTimestampsNSP = []
+allTapTimestampsINS_coarse = []
 #  Detect INS taps
 ############################################################
 if isinstance(insBlock.annotations['jsonSessionNames'], str):
@@ -181,8 +202,8 @@ for insSession, group in approxTapTimes.groupby('tapGroup'):
     tapTrainDur = np.ceil(group['NSP'].max() - group['NSP'].min())
     firstNSPTap = group['NSP'].min()
     firstINSTap = group['INS'].min()
-    lookAroundBack = 1
-    lookAroundFwd = 3.5
+    lookAroundBack = 1.5
+    lookAroundFwd = 1.5
     approxTapTimes.loc[group.index, 'tStart_NSP'] = firstNSPTap - lookAroundBack
     approxTapTimes.loc[group.index, 'tStop_NSP'] = firstNSPTap + tapTrainDur + lookAroundFwd
     approxTapTimes.loc[group.index, 'tStart_INS'] = firstINSTap - lookAroundBack
@@ -190,7 +211,9 @@ for insSession, group in approxTapTimes.groupby('tapGroup'):
     autoTimeRanges['NSP'].append((firstNSPTap - lookAroundBack, firstNSPTap + tapTrainDur + lookAroundFwd))
     autoTimeRanges['INS'].append((firstINSTap - lookAroundBack, firstINSTap + tapTrainDur + lookAroundFwd))
     tapTimestampsNSP = group['NSP'].astype(np.float)
+    tapTimestampsINS_coarse = group['INS'].astype(np.float)
     allTapTimestampsNSP.append(tapTimestampsNSP)
+    allTapTimestampsINS_coarse.append(tapTimestampsINS_coarse)
     print('tSeg {}: NSP Taps:\n{}'.format(
         insSession, tapTimestampsNSP))
     print('diff:\n{}'.format(
@@ -200,11 +223,6 @@ approxTimesPath = os.path.join(
     '{}_{}_approximateTimes.html'.format(experimentName, ns5FileName))
 approxTapTimes.to_html(approxTimesPath)
 ###########
-defaultTapDetectOpts = {
-    'iti': 0.2,
-    'keepIndex': slice(None)
-    }
-tapDetectOptsINS = expOpts['synchInfo']['ins'][blockIdx]
 #
 for insSession in tapDetectOptsINS.keys():
     if tapDetectOptsINS[insSession]['timeRanges'] is None:
@@ -215,10 +233,6 @@ for insSession in tapDetectOptsINS.keys():
                 {key: defaultTapDetectOpts[key]}
                 )
 ###
-defaultSessionTapRangesNSP = {
-    'keepIndex': slice(None)
-    }
-tapDetectOptsNSP = expOpts['synchInfo']['nsp'][blockIdx]
 for insSession in tapDetectOptsNSP.keys():
     if tapDetectOptsNSP[insSession]['timeRanges'] is None:
         tapDetectOptsNSP[insSession]['timeRanges'] = autoTimeRanges['NSP'][insSession]
@@ -264,7 +278,7 @@ if not os.path.exists(synchFunPath):
         tapTimestampsINS, peakIdx, tapDetectSignal = mdt.getINSTapTimestamp(
             tdGroup, accelGroup, tapDetectOptsINS[insSession],
             filterOpts=tapDetectFilterOpts,
-            plotting=arguments['plotting']
+            plotting=False
             )
         print('tSeg {}, INS Taps:\n{}'.format(
             insSession, tapTimestampsINS))
@@ -286,9 +300,15 @@ if not os.path.exists(synchFunPath):
                     nspChannelName=nspChannelName,
                     allTapTimestampsINS=allTapTimestampsINS,
                     allTapTimestampsNSP=allTapTimestampsNSP,
+                    interTrigInterval=interTriggerInterval
                     )
             except Exception:
                 traceback.print_exc()
+        # if overriding with manually identified points
+        if len(clickDict[insSession]['ins']):
+            allTapTimestampsINS[insSession] = clickDict[insSession]['ins']
+        if len(clickDict[insSession]['nsp']):
+            allTapTimestampsNSP[insSession] = clickDict[insSession]['nsp']
     # calculate the time interpolating functions and apply them
     ############################################################
     for insSession in pd.unique(td['data']['trialSegment']).astype(int):
@@ -298,18 +318,16 @@ if not os.path.exists(synchFunPath):
         tdGroup = td['data'].loc[tdGroupMask, :].copy()
         # if overriding with manually identified points
         if not (insSession in overrideSegments.keys()):
-            if len(clickDict[insSession]['ins']):
-                allTapTimestampsINS[insSession] = clickDict[insSession]['ins']
             theseTapTimestampsINS = allTapTimestampsINS[insSession]
-            # if overriding with manually identified points
-            if len(clickDict[insSession]['nsp']):
-                allTapTimestampsNSP[insSession] = clickDict[insSession]['nsp']
             theseTapTimestampsNSP = allTapTimestampsNSP[insSession]
-            #
         else:
             print('\t Overriding insSession {}'.format(insSession))
-            theseTapTimestampsINS = allTapTimestampsINS[overrideSegments[insSession]]
-            theseTapTimestampsNSP = allTapTimestampsNSP[overrideSegments[insSession]]
+            if overrideSegments[insSession] == 'coarse':
+                theseTapTimestampsINS = allTapTimestampsINS_coarse[insSession]
+                theseTapTimestampsNSP = allTapTimestampsNSP[insSession]
+            else:
+                theseTapTimestampsINS = allTapTimestampsINS[overrideSegments[insSession]]
+                theseTapTimestampsNSP = allTapTimestampsNSP[overrideSegments[insSession]]
         # trim spikes that happened after end of NSP recording (last trial segment only)
         trimSpiketrains = (insSession == pd.unique(td['data']['trialSegment']).astype(int).max())
         tdGroup, accelGroup, insBlock, thisINStoNSP = ns5.synchronizeINStoNSP(
@@ -363,7 +381,6 @@ for st in insSpikeTrains:
     if st.waveforms is None:
         st.sampling_rate = 3e4*pq.Hz
         st.waveforms = np.array([]).reshape((0, 0, 0))*pq.mV
-# pdb.set_trace()
 # check in case the nsp block already has INS blocks added
 nspEvList = nspBlock.filter(objects=Event)
 nspEvNames = [ev.name for ev in nspEvList]
@@ -427,6 +444,7 @@ if arguments['addToNIX']:
         purgeNixNames=True,
         nixBlockIdx=0, nixSegIdx=[0],
         )
+### if adding to any other blocks
 if arguments['addToBlockSuffix'] is not None:
     ns5.addBlockToNIX(
         insBlockJustSpikes, neoSegIdx=[0],

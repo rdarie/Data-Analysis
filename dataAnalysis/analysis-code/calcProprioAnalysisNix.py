@@ -698,6 +698,8 @@ def calcBlockAnalysisWrapper():
             expandCols=expandCols,
             deriveCols=deriveCols, progAmpNames=progAmpNames)
         columnsToBeAdded = ['amplitude', 'program', 'RateInHz'] + progAmpNames
+        # pdb.set_trace()
+        # stimSt
         infoFromStimStatus = hf.interpolateDF(
             stimStatus, outputBlockT,
             x='t', columns=columnsToBeAdded, kind='previous')

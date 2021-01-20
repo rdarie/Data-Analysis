@@ -20,7 +20,7 @@
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=1,2
+#SBATCH --array=2
 
 module load anaconda/2020.02
 . /gpfs/runtime/opt/anaconda/2020.02/etc/profile.d/conda.sh
@@ -50,18 +50,18 @@ python --version
 # EXP="exp202012151200"
 # EXP="exp202012171200"
 # EXP="exp202101051100"
-EXP="exp202101061100"
-EXP="exp202101111100"
+# EXP="exp202101061100"
+# EXP="exp202101111100"
+# EXP="exp202101111100"
+# EXP="exp202101141100"
+EXP="exp202101191100"
 
-# SLURM_ARRAY_TASK_ID=1
-
-# python -u ./previewINSSessionSummary.py --exp=$EXP
+SLURM_ARRAY_TASK_ID=3
 
 # --makePlots to make quality check plots
 # --showPlots to interactively display quality check plots
 # --disableStimDetection to use HUT derived stim start times
-python -u './preprocINS.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --makePlots --verbose
-# python -u './preprocINS.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --makePlots --verbose |& tee "../../batch_logs/${EXP}_Block_${SLURM_ARRAY_TASK_ID}_preproc_ins"
 
-# EXP="expRCSLongStim"
-# python -u './preprocINS.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --makePlots --disableStimDetection --verbose |& tee "../../batch_logs/${EXP}_Block_${SLURM_ARRAY_TASK_ID}_preproc_ins"
+python -u './preprocINS.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --makePlots --verbose
+
+# python -u './preprocINS.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --makePlots --verbose |& tee "../../batch_logs/${EXP}_Block_${SLURM_ARRAY_TASK_ID}_preproc_ins"

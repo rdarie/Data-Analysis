@@ -256,7 +256,7 @@ if __name__ == "__main__":
     trialInfo = dataDF.index.to_frame().reset_index(drop=True)
     trialInfo['epoch'] = np.nan
     firstBinMask = trialInfo['bin'] == trialInfo['bin'].unique()[0]
-    groupNames = stimulusConditionNames + ['epoch']
+    groupNames = stimulusConditionNames
     #  delay to account for transmission between event
     #  at t=0 and the signal being recorded
     transmissionDelay = 0
@@ -341,7 +341,7 @@ if __name__ == "__main__":
         mahalDist = ash.splitApplyCombine(
             pcsDF, fun=calcCovMat, resultPath=resultPath,
             funKWArgs=covOpts,
-            rowKeys=groupNames, colKeys=['lag'],
+            rowKeys=groupNames + ['epoch'], colKeys=['lag'],
             daskProgBar=False,
             daskPersist=True, useDask=True, reindexFromInput=False,
             daskComputeOpts=daskComputeOpts
@@ -474,15 +474,16 @@ if __name__ == "__main__":
                 emgAx.flat[idx].plot(
                     pcsDF.loc[fullOutMask, :].index.get_level_values('bin'),
                     pcsDF.loc[fullOutMask, cN], alpha=0.8, label=cN[0])
+                # pdb.set_trace()
                 emgAx.flat[idx].text(
-                    1, 1, 'dev = {:.2f}'.format(row),
+                    1, 1, 'seg {}, t {:.3f}, dev = {:.2f}'.format(name[0], name[1], row),
                     va='top', ha='right',
                     transform=emgAx.flat[idx].transAxes)
             mhAx.flat[idx].plot(
                 mahalDist.loc[fullOutMask, :].index.get_level_values('bin'),
                 mahalDist.loc[fullOutMask, 'mahalDist'], label='mahalDist')
             mhAx.flat[idx].text(
-                1, 1, 'dev = {:.2f}'.format(row),
+                1, 1, 'seg {}, t {:.3f}, dev = {:.2f}'.format(name[0], name[1], row),
                 va='top', ha='right',
                 transform=mhAx.flat[idx].transAxes)
         emgLeg = emgAx.flat[0].legend(

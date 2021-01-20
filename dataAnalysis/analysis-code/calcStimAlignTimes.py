@@ -111,7 +111,6 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
             except Exception:
                 traceback.print_exc()
     dataSegEvents = [evP.load() for evP in eventProxysList]
-    # pdb.set_trace()
     eventDF = ns5.eventsToDataFrame(
         dataSegEvents, idxT='t',
         names=['property', 'value']
@@ -127,19 +126,20 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         )
     stimStatus = stimStatus.loc[tMask, :].reset_index(drop=True)
     #
-    ampMask = stimStatus['amplitude'] > 0
-    categories = stimStatus.loc[
-        ampMask,
-        availableCateg + ['t']]
-    categories['stimCat'] = 'stimOn'
+    ampUpdateMask = (
+        (eventDF['property'] == 'amplitude') &
+        (eventDF['value'] > 0)
+        )
+    ampUpdateMask = (eventDF['property'] == 'amplitude')
+    ampMask = stimStatus['t'].isin(eventDF.loc[ampUpdateMask, 't'])
     #
+    categories = stimStatus.loc[ampMask, availableCateg + ['t']]
+    categories.loc[categories['amplitude'] > 0, 'stimCat'] = 'stimOn'
+    categories.loc[categories['amplitude'] == 0, 'stimCat'] = 'stimOff'
+    # pdb.set_trace()
     if arguments['makeControl']:
-        offIdx = []
         midTimes = []
         for name, group in stimStatus.groupby('amplitudeRound'):
-            ampOff = group.query('amplitude==0')
-            if len(ampOff):
-                offIdx.append(ampOff.index[0])
             if name > 0:
                 ampOn = group.query('amplitude>0')
                 if len(ampOn):
@@ -147,10 +147,6 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
                     prevIdx = max(ampOn.index[0] - 1, stimStatus.index[0])
                     tPrev = stimStatus.loc[prevIdx, 't']
                     midTimes.append((tStart + tPrev) / 2)
-        offCategories = stimStatus.loc[
-            offIdx,
-            availableCateg + ['t']]
-        offCategories['stimCat'] = 'stimOff'
         #
         midCategories = pd.DataFrame(midTimes, columns=['t'])
         midCategories['stimCat'] = 'control'
@@ -159,7 +155,7 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         midCategories['RateInHz'] = 0
         #
         alignEventsDF = pd.concat((
-            categories, offCategories, midCategories),
+            categories, midCategories),
             axis=0, ignore_index=True, sort=True)
     else:
         alignEventsDF = categories

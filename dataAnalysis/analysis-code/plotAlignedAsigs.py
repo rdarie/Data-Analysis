@@ -127,6 +127,7 @@ if arguments['individualTraces']:
     relplotKWArgs['estimator'] = None
     relplotKWArgs['units'] = 't'
     pdfName += '_traces'
+    minNObservations = 0
     # rowColOpts['hueName'] = 't'
     # relplotKWArgs['palette'] = "ch:0,6,dark=.3,light=0.7,reverse=1"
 if arguments['invertOutlierBlocks']:

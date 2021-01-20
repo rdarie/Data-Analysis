@@ -18,3 +18,5 @@ STYLEOPTS="--styleName=RateInHz"
 
 # PAGELIMITS="--limitPages=5"
 PAGELIMITS=""
+
+OTHERASIGOPTS=""

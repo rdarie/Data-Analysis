@@ -117,6 +117,17 @@ def parseAnalysisOptions(
         }
     else:
         spikeSortingFilterOpts = expOpts['spikeSortingFilterOpts']
+    if 'stimArtifactFilterOpts' not in expOpts:
+        stimArtifactFilterOpts = {
+            'high': {
+                'Wn': 100,
+                'N': 4,
+                'btype': 'high',
+                'ftype': 'bessel'
+            }
+        }
+    else:
+        stimArtifactFilterOpts = expOpts['stimArtifactFilterOpts']
     tapDetectFilterOpts = {
         'high': {
             'Wn': 20,
@@ -172,6 +183,7 @@ def parseAnalysisOptions(
             'elecIDs': range(17),
             'excludeClus': [],
             'upsampleRate': 8,
+            'eventsFromFirstInTrain': True,
             'interpKind': 'linear',
             # 'upsampleRate': 10,
             # 'interpKind': 'akima',
@@ -210,7 +222,7 @@ def parseAnalysisOptions(
         'artifactKeepWhat': 'max',
         # 'predictSlots': False, 'snapToGrid': False,
         'predictSlots': True, 'snapToGrid': True,
-        'treatAsSinglePulses': False
+        'treatAsSinglePulses': True
         }
     RCStimDetectionOpts = {
         'minDist': 0.2,
@@ -227,7 +239,7 @@ def parseAnalysisOptions(
         'artifactKeepWhat': 'max',
         # 'predictSlots': False, 'snapToGrid': False,
         'predictSlots': True, 'snapToGrid': True,
-        'treatAsSinglePulses': False
+        'treatAsSinglePulses': True
         }
     # pdb.set_trace()
     trialFilesStim['ins']['getINSkwargs'].update(commonStimDetectionOpts)
@@ -312,7 +324,7 @@ def parseAnalysisOptions(
         assembledName + '_binarized.nix')
     #
     figureFolder = os.path.join(
-        remoteBasePath, 'figures', experimentName
+        remoteBasePath, 'processed', experimentName, 'figures'
         )
     if not os.path.exists(figureFolder):
         os.makedirs(figureFolder, exist_ok=True)
@@ -323,7 +335,7 @@ def parseAnalysisOptions(
     # alignedFeaturesFolder = os.path.join(figureFolder, 'alignedFeatures')
     # if not os.path.exists(alignedFeaturesFolder):
     #     os.makedirs(alignedFeaturesFolder, exist_ok=True)
-    spikeSortingFiguresFolder = os.path.join(figureFolder, 'spikeSorting')
+    # spikeSortingFiguresFolder = os.path.join(figureFolder, 'spikeSorting')
     # if not os.path.exists(spikeSortingFiguresFolder):
     #     os.makedirs(spikeSortingFiguresFolder, exist_ok=True)
     # GLMFiguresFolder = os.path.join(figureFolder, 'GLM')

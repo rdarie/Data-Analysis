@@ -5,7 +5,6 @@ def getExpOpts():
     blockExperimentTypeLookup = {
         1: 'proprio-miniRC',
         2: 'proprio',
-        3: 'proprio',
         }
     fullRigInputs = {
         'A+': 'ainp12',
@@ -36,7 +35,7 @@ def getExpOpts():
         'forceY': 'ainp15',
         }
     
-    experimentName = '202101061100-Rupert'
+    experimentName = '202101141100-Rupert'
     deviceName = 'DeviceNPC700246H'
     subjectName = 'Rupert'
 
@@ -64,10 +63,12 @@ def getExpOpts():
     #     }
     # }
     jsonSessionNames = {
-        #  per trial
-        1: ['Session1609950588323', 'Session1609951132662'],
-        2: ['Session1609951940258', 'Session1609952078942', 'Session1609952463973'],
-        3: ['Session1609952950984'],
+        #  per block
+        1: [
+            'Session1610641839881', 'Session1610642040064',
+            'Session1610642516780', 'Session1610642924085'],
+        2: [
+            'Session1610643294975', 'Session1610643999548'],
         }
     synchInfo = {'nform': {}, 'nsp': {}, 'ins': {}}
     # populate with defaults
@@ -78,10 +79,10 @@ def getExpOpts():
                 'timeRanges': None,
                 'chan': ['ins_td0'],
                 'thres': 5,
-                'iti': 50e-3,
+                'iti': 52.2e-3,
                 'keepIndex': slice(-5, None)
                 }
-    # manually add special instructions
+    # manually add special instructions, e.g.
     # #synchInfo['ins'][1][1] = {
     # #    'timeRanges': None,
     # #    'chan': ['ins_td2'],
@@ -89,22 +90,49 @@ def getExpOpts():
     # #    'iti': 50e-3,
     # #    'keepIndex': slice(None)
     # #    }
+    synchInfo['ins'][2][0].update({
+        'iti': 20e-3, 'keepIndex': slice(None, 3),
+    })
+    synchInfo['ins'][2][1].update({
+        'iti': 20e-3, 'keepIndex': slice(None, 3),
+    })
     synchInfo['nsp'] = {
-        #  per trialSegment
+        # per block
         i: {
-            j: {'timeRanges': None, 'keepIndex': slice(-5, None)}
+            #  per trialSegment
+            j: {
+                'timeRanges': None, 'keepIndex': slice(-5, None),
+                'synchChanName': miniRCRigInputs['tapSync'], 'iti': 52e-3,
+                'minAnalogValue': 100, 'thres': 3}
             for j, sessionName in enumerate(jsonSessionNames[i])
             }
         for i in jsonSessionNames.keys()
         }
-    # manually add special instructions
-    # synchInfo['nsp'][1][1] = {'timeRanges': None, 'keepIndex': slice(3, None)}
+    # manually add special instructions, e.g.
+    #  synchInfo['nsp'][1][1] = {'timeRanges': None, 'keepIndex': slice(3, None)}
+    synchInfo['nsp'][2][0].update({
+        'timeRanges': (136, 138),
+        'synchChanName': 'utah_rawAverage_0',
+        'iti': 20e-3, 'keepIndex': slice(None, 3),
+        'minAnalogValue': None, 'thres': 150,
+        })
+    synchInfo['nsp'][2][1].update({
+        'timeRanges': (956, 958),
+        'synchChanName': 'utah_rawAverage_0',
+        'iti': 20e-3, 'keepIndex': slice(None, 3),
+        'minAnalogValue': None, 'thres': 150
+        })
+    #  overrideSegmentsForTapSync
     #  if not possible to use taps, override with good taps from another segment
     #  not ideal, because segments are only synchronized to the nearest **second**
     overrideSegmentsForTapSync = {
         #  each key is a Block
-        2: {2: 1},
+        #  1: {0: 'coarse'},  # e.g. for ins session 0, use the coarse alignment based on system unix time
+        #  2: {2: 1},  # e.g. for ins session 2, use the alignment of ins session 1
+        #
         }
+    #
+    ###############################################################
     # options for stim artifact detection
     stimDetectOverrideStartTimes = {
         #  each key is a Block
@@ -118,14 +146,14 @@ def getExpOpts():
         # group
         0: {
             # program
-            0: {'detectChannels': ['ins_td2'], 'thres': 250, 'useForSlotDetection': True},
-            1: {'detectChannels': ['ins_td2'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True},
-            2: {'detectChannels': ['ins_td0', 'ins_td2'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True},
-            3: {'detectChannels': ['ins_td0', 'ins_td2'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True}
+            0: {'detectChannels': stimDetectChansDefault, 'thres': stimDetectThresDefault, 'useForSlotDetection': True},
+            1: {'detectChannels': stimDetectChansDefault, 'thres': stimDetectThresDefault, 'useForSlotDetection': True},
+            2: {'detectChannels': stimDetectChansDefault, 'thres': stimDetectThresDefault, 'useForSlotDetection': True},
+            3: {'detectChannels': stimDetectChansDefault, 'thres': stimDetectThresDefault, 'useForSlotDetection': True}
         }}
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        '202101061100-Rupert': [1],
+        '202101141100-Rupert': [1],
         }
     # Options relevant to the classifcation of proprio trials
     movementSizeBins = [0, 0.4, 0.8]
@@ -164,7 +192,7 @@ def getExpOpts():
             ],
             'electrodeMapPath': './Utah_SN6251_002374_Rupert.cmp',
             'rawBlockName': 'utah',
-            'excludeChans': [],
+            'excludeChans': ['utah69', 'utah44', 'utah54'],  # CHECK
             'prbOpts': dict(
                 contactSpacing=400,
                 groupIn={
@@ -176,20 +204,20 @@ def getExpOpts():
             'outlierThreshold': 1 - 1e-6,
             'shape_distance_threshold': None,
             'shape_boundary_threshold': None,
-            'energy_reduction_threshold': .25,
+            'energy_reduction_threshold': 0.25,
             'make_classifier': True,
             'refit_projector': True,
             'n_max_peeler_passes': 2,
             'confidence_threshold': .5,
             'refractory_period': 2e-3,
             'triFolderSource': {
-                'exp': experimentName, 'block': 3,
+                'exp': experimentName, 'block': 1,
                 'nameSuffix': 'spike_preview'},
             'triFolderDest': [
                 {
                     'exp': experimentName, 'block': i,
                     'nameSuffix': 'mean_subtracted'}
-                for i in [1, 2, 3]]
+                for i in [1,  2]]
         }
     }
     return locals()

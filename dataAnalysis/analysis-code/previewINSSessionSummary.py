@@ -50,7 +50,7 @@ def summarizeINSSession(
     print(summaryText)
     #
     sessionTime = datetime.fromtimestamp(sessionUnixTime / 1e3)
-    summaryText += '<h3>Started: ' + sessionTime.isoformat() + '</h3>\n'
+    summaryText += '<h3>Started: ' + sessionTime.strftime('%Y-%m-%d %H:%M:%S') + '</h3>\n'
     #
     timeSyncPath = os.path.join(
         orcaFolderPath, subjectName,
@@ -67,8 +67,8 @@ def summarizeINSSession(
             firstPacketT = datetime.fromtimestamp(timeSyncDF['HostUnixTime'].min() / 1e3)
             lastPacketT = datetime.fromtimestamp(timeSyncDF['HostUnixTime'].max() / 1e3)
             sessionDuration = lastPacketT - firstPacketT
-            summaryText += '<h3>Duration: {}</h3>\n'.format(sessionDuration)
-            summaryText += '<h3>Ended: {}</h3>\n'.format((sessionTime + sessionDuration).isoformat())
+            summaryText += '<h3>Duration: {} sec</h3>\n'.format(sessionDuration.total_seconds())
+            summaryText += '<h3>Ended: {}</h3>\n'.format((sessionTime + sessionDuration).strftime('%Y-%m-%d %H:%M:%S'))
         except Exception:
             traceback.print_exc()
             summaryText += '<h3>Duration: TimeSync.json exists but not read</h3>\n'
@@ -108,7 +108,7 @@ def summarizeINSSession(
     commentsJsonPath = os.path.join(
         orcaFolderPath, subjectName,
         'Session{}'.format(sessionUnixTime),
-        '.MDT_SummitTest','Session{}'.format(sessionUnixTime) + '.json')
+        '.MDT_SummitTest', 'Session{}'.format(sessionUnixTime) + '.json')
     if os.path.exists(commentsJsonPath):
         with open(commentsJsonPath, 'r') as f:
             commentsLog = json.load(f)
@@ -134,10 +134,11 @@ def summarizeINSSessionWrapper():
         for sessionName in sessionFolders
         ]
     summaryPath = os.path.join(
-        orcaFolderPath, subjectName,
-        'summary.html')
+        orcaFolderPath,
+        subjectName + '_summary.html')
     listOfSummarizedPath = os.path.join(
-        orcaFolderPath, subjectName, 'list_of_summarized.json'
+        orcaFolderPath,
+        subjectName + '_list_of_summarized.json'
         )
     if not os.path.exists(listOfSummarizedPath):
         listOfSummarized = {'sessions': []}

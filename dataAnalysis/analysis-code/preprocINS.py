@@ -10,6 +10,7 @@ Options:
     --makePlots                      make diagnostic plots? [default: False]
     --showPlots                      show diagnostic plots? [default: False]
     --disableStimDetection           disable stimulation time detection? [default: False]
+    -outputSuffix=outputSuffix       append a string to the resulting filename?
 """
 
 import matplotlib
@@ -23,7 +24,7 @@ sns.set(
     palette='dark', font='sans-serif',
     font_scale=0.75, color_codes=True)
 import dataAnalysis.preproc.mdt as mdt
-import os
+import os, pdb
 from importlib import reload
 import warnings
 #  load options
@@ -49,22 +50,37 @@ if not os.path.exists(figureOutputFolder):
 if not arguments['makePlots']:
     trialFilesStim['ins']['getINSkwargs']['plotting'] = []
 
+if arguments['outputSuffix'] is not None:
+    insDataPath = insDataPath.replace(
+        '.nix',
+        '_{}.nix'.format(arguments['outputSuffix'])
+        )
+
 def preprocINSWrapper(
         trialFilesStim=None,
         insDataPath=None,
         figureOutputFolder=None,
         arguments=None
         ):
+    # pdb.set_trace()
+    jsonSessionNames = trialFilesStim['ins'].pop('jsonSessionNames')
+    trialFilesStim = trialFilesStim['ins']
     if arguments['disableStimDetection']:
-        trialFilesStim['ins']['detectStim'] = False
-    insBlock = mdt.preprocINS(
-        trialFilesStim['ins'],
-        insDataPath, blockIdx=int(arguments['blockIdx']),
-        deviceName=deviceName,
-        figureOutputFolder=figureOutputFolder,
-        verbose=arguments['verbose'],
-        showPlots=arguments['showPlots'],
-        makePlots=arguments['makePlots'])
+        trialFilesStim['detectStim'] = False
+    for jsn in jsonSessionNames:
+        trialFilesStim['jsonSessionNames'] = [jsn]
+        insDataPath = os.path.join(
+            scratchFolder, '{}.nix'.format(jsn))
+        insBlock = mdt.preprocINS(
+            trialFilesStim,
+            insDataPath,
+            # blockIdx=int(arguments['blockIdx']),
+            blockIdx=jsn,
+            deviceName=deviceName,
+            figureOutputFolder=figureOutputFolder,
+            verbose=arguments['verbose'],
+            showPlots=arguments['showPlots'],
+            makePlots=arguments['makePlots'])
     return
 
 

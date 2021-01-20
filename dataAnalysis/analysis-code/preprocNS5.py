@@ -23,7 +23,12 @@ Options:
     --ISIRaw                           special options for parsing Ripple files from ISI [default: False]
     
 """
-
+import matplotlib
+matplotlib.rcParams['pdf.fonttype'] = 42
+matplotlib.rcParams['ps.fonttype'] = 42
+# matplotlib.use('PS')   # generate postscript output
+matplotlib.use('Qt5Agg')   # generate interactive output
+#
 import dataAnalysis.preproc.ns5 as ns5
 import dataAnalysis.helperFunctions.probe_metadata as prb_meta
 import pdb, traceback, shutil, os
@@ -133,6 +138,7 @@ def preprocNS5():
             ainpNameList=[],
             spikeSourceType='',
             removeMeanAcross=True,
+            linearDetrend=True,
             nameSuffix='_spike_preview',
             LFPFilterOpts=spikeSortingFilterOpts,
             # LFPFilterOpts=None,
@@ -140,42 +146,16 @@ def preprocNS5():
             chunkSize=spikeSortingOpts[arrayName]['previewDuration'],
             chunkOffset=spikeSortingOpts[arrayName]['previewOffset'],
             equalChunks=False, chunkList=[0],
-            calcRigEvents=False)
-    #
-    if arguments['forSpikeSortingUnfiltered']:
-        ns5.preproc(
-            fileName=ns5FileName,
-            rawFolderPath=nspFolder,
-            outputFolderPath=scratchFolder, mapDF=mapDF,
-            fillOverflow=False, removeJumps=False,
-            # interpolateOutliers=spikeSortingOpts[arrayName]['interpolateOutliers'],
-            interpolateOutliers=False,
-            outlierThreshold=spikeSortingOpts[arrayName]['outlierThreshold'],
-            outlierMaskFilterOpts=outlierMaskFilterOpts,
-            motorEncoderMask=motorEncoderMask,
-            calcAverageLFP=True,
-            eventInfo=trialFilesFrom['utah']['eventInfo'],
-            asigNameList=spikeSortingOpts[arrayName]['asigNameList'],
-            ainpNameList=spikeSortingOpts[arrayName]['ainpNameList'],
-            spikeSourceType='',
-            removeMeanAcross=False,
-            nameSuffix='_spike_preview_unfiltered',
-            # LFPFilterOpts=spikeSortingFilterOpts,
-            LFPFilterOpts=None,
-            writeMode='ow',
-            chunkSize=spikeSortingOpts[arrayName]['previewDuration'],
-            chunkOffset=spikeSortingOpts[arrayName]['previewOffset'],
-            equalChunks=False, chunkList=[0],
-            calcRigEvents=False)
-    #
-    #
+            calcRigEvents=False, outlierRemovalDebugFlag=False)
     if arguments['fullSubtractMean']:
         ns5.preproc(
             fileName=ns5FileName,
             rawFolderPath=nspFolder,
             outputFolderPath=scratchFolder, mapDF=mapDF,
             fillOverflow=False, removeJumps=False,
-            interpolateOutliers=spikeSortingOpts[arrayName]['interpolateOutliers'],
+            calcOutliers=spikeSortingOpts[arrayName]['interpolateOutliers'],
+            interpolateOutliers=False,
+            linearDetrend=True,
             outlierThreshold=spikeSortingOpts[arrayName]['outlierThreshold'],
             outlierMaskFilterOpts=outlierMaskFilterOpts,
             motorEncoderMask=motorEncoderMask,
@@ -197,7 +177,8 @@ def preprocNS5():
             rawFolderPath=nspFolder,
             outputFolderPath=scratchFolder, mapDF=mapDF,
             fillOverflow=False, removeJumps=False,
-            interpolateOutliers=spikeSortingOpts[arrayName]['interpolateOutliers'],
+            interpolateOutliers=False, calcOutliers=True,
+            linearDetrend=False,
             outlierThreshold=spikeSortingOpts[arrayName]['outlierThreshold'],
             outlierMaskFilterOpts=outlierMaskFilterOpts,
             motorEncoderMask=motorEncoderMask,
@@ -224,7 +205,10 @@ def preprocNS5():
             fillOverflow=False, removeJumps=False,
             motorEncoderMask=motorEncoderMask,
             eventInfo=trialFilesFrom['utah']['eventInfo'],
-            asigNameList=[],
+            asigNameList=[spikeSortingOpts[arrayName]['asigNameList'][0]],
+            saveFromAsigNameList=False,
+            calcAverageLFP=True,
+            LFPFilterOpts=stimArtifactFilterOpts,
             ainpNameList=analogInputNames,
             spikeSourceType='',
             nameSuffix='_analog_inputs', writeMode='ow',

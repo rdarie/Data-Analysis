@@ -133,20 +133,19 @@ for trialSegment, group in approxTapTimes.groupby('tapGroup'):
     firstNSPTap = recDateTime + pd.Timedelta(int(group['NSP'].min() * 1e3), unit='milli')
     summaryText += (
         '<h3>Segment {} started: '.format(trialSegment) +
-        firstNSPTap.isoformat() +
-        '</h3>\n')
-    summaryText += (
-        '<h3>t = {:.3f} sec'.format(group['NSP'].min()) +
-        '</h3>\n')
+        firstNSPTap.strftime('%Y-%m-%d %H:%M:%S') +
+        ' (t = {:.3f} sec)</h3>\n'.format(group['NSP'].min()))
     if trialSegment == approxTapTimes['tapGroup'].max():
         lastNSPTime = recDateTime + pd.Timedelta(int(nspDF['t'].max() * 1e3), unit='milli')
     else:
         nextGroup = approxTapTimes.loc[(approxTapTimes['tapGroup'] == trialSegment + 1), :]
         lastNSPTime = recDateTime + pd.Timedelta(int(nextGroup['NSP'].min() * 1e3), unit='milli')
+    segDur = lastNSPTime - firstNSPTap
     summaryText += (
         '<h3>             ended: '.format(trialSegment) +
-        lastNSPTime.isoformat() +
-        '</h3>\n')
+        lastNSPTime.strftime('%Y-%m-%d %H:%M:%S') +
+        ' (lasted up to {} sec)</h3>\n'.format(segDur.total_seconds()))
+
 
 segIdx = 0
 problemChannelsList = []

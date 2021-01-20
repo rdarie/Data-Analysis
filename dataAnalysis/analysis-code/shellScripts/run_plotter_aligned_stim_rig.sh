@@ -22,4 +22,5 @@
 SLURM_ARRAY_TASK_ID=1
 source ./shellScripts/run_plotter_aligned_stim_preamble.sh
 
-python3 -u './plotAlignedAsigs.py' --inputBlockName="rig" --unitQuery="rig" --enableOverrides --exp=$EXP $BLOCKSELECTOR $ANALYSISFOLDER $WINDOW $ALIGNQUERY $ALIGNFOLDER $TIMEWINDOWOPTS $STATSOVERLAY $OUTLIERMASK $HUEOPTS $ROWOPTS $COLOPTS $PAGELIMITS
+OTHERASIGOPTS="--individualTraces --invertOutlierBlocks"
+python3 -u './plotAlignedAsigs.py' --inputBlockName="rig" --unitQuery="rig" --enableOverrides --exp=$EXP $BLOCKSELECTOR $ANALYSISFOLDER $WINDOW $ALIGNQUERY $ALIGNFOLDER $TIMEWINDOWOPTS $STATSOVERLAY $OUTLIERMASK $HUEOPTS $ROWOPTS $COLOPTS $PAGELIMITS $OTHERASIGOPTS
