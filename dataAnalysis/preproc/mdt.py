@@ -1233,6 +1233,103 @@ def peekAtTaps(
     return tempClick
 
 
+def peekAtTapsV2(
+        nspDF, insDF, insAuxDataDF=None,
+        plotMaskNSP=None, plotMaskINS=None,
+        tapTimestampsINS=None, tapTimestampsNSP=None,
+        tapDetectOptsNSP=None, tapDetectOptsINS=None
+        ):
+    #
+    tempClick = {
+        'ins': [],
+        'nsp': []
+        }
+
+    def onpick(event):
+        if 'INS' in event.artist.axes.get_title():
+            tempClick['ins'].append(event.pickx[0])
+            print('Clicked on ins {:.3f}'.format(event.pickx[0]))
+        elif 'NSP' in event.artist.axes.get_title():
+            tempClick['nsp'].append(event.pickx[0])
+            print('Clicked on nsp {:.3f}'.format(event.pickx[0]))
+        event.artist.axes.text(
+            event.pickx[0], event.picky[0],
+            '. {:.3f}'.format(event.pickx[0]),
+            ha='left', va='baseline')
+        event.artist.get_figure().canvas.draw_idle()
+
+    #  Set up figures
+    fig, ax = plt.subplots(3, 1)
+    insDataAx = ax[0]
+    insTapsAx = ax[1]
+    nspTapsAx = ax[2]
+    twinAx = nspTapsAx.twiny()
+    insTapsAx.get_shared_x_axes().join(insTapsAx, insDataAx)
+    insTapsAx.get_shared_x_axes().join(insTapsAx, twinAx)
+    insTapsAx.get_shared_y_axes().join(insTapsAx, twinAx)
+    #
+    for cN in insAuxDataDF.columns:
+        insDataAx.plot(
+            insDF.loc[plotMaskINS, 't'],
+            stats.zscore(insAuxDataDF.loc[plotMaskINS, cN]),
+            label=cN)
+    insDataAx.set_title('INS data')
+    insDataAx.set_ylabel('Z Score (a.u.)')
+    insTapsAx.plot(
+        insDF.loc[plotMaskINS, 't'],
+        stats.zscore(insDF.loc[plotMaskINS, 'tapDetectSignal']),
+        '.-', label='tap detect signal',
+        picker=line_picker
+        )
+    insTapsAx.set_title('INS tap detect signal')
+    insTapsAx.set_ylabel('Z Score (a.u.)')
+    twinAx.plot(
+        insDF.loc[plotMaskINS, 't'],
+        stats.zscore(insDF.loc[plotMaskINS, 'tapDetectSignal']),
+        label='tap detect signal')
+    if tapTimestampsINS is not None:
+        if tapTimestampsINS.size > 0:
+            insTapsAx.plot(
+                tapTimestampsINS,
+                tapTimestampsINS ** 0 - 1,
+                'c*', label='tap peaks')
+    #
+    nspTapsAx.plot(
+        nspDF.loc[plotMaskNSP, 't'],
+        stats.zscore(nspDF.loc[plotMaskNSP, 'tapDetectSignal']),
+        'c', label='NSP tap detect signal',
+        # picker=line_picker
+        )
+    if tapTimestampsNSP is not None:
+        nspTapsAx.plot(
+            tapTimestampsNSP,
+            tapTimestampsNSP ** 0 - 1,
+            'm*', label='tap peaks')
+    #
+    xmin, xmax = insDF.loc[plotMaskINS, 't'].min(), insDF.loc[plotMaskINS, 't'].max()
+    insDataAx.set_xlim(xmin, xmax)
+    xTicks = np.arange(xmin, xmax, tapDetectOptsINS['iti'])
+    for linePos in xTicks:
+        insDataAx.axvline(x=linePos, alpha=0.75)
+        insTapsAx.axvline(x=linePos, alpha=0.75)
+        insTapsAx.axvline(x=linePos, alpha=0.75)
+    #
+    xmin, xmax = nspDF.loc[plotMaskNSP, 't'].min(), nspDF.loc[plotMaskNSP, 't'].max()
+    nspTapsAx.set_xlim(xmin, xmax)
+    xTicks2 = np.arange(xmin, xmax, tapDetectOptsINS['iti'])
+    for linePos in xTicks2:
+        nspTapsAx.axvline(x=linePos, alpha=0.75, c='c')
+    nspTapsAx.legend()
+    nspTapsAx.set_title('NSP Data')
+    #
+    fig.canvas.mpl_connect('pick_event', onpick)
+    # remove double detections
+    for key, value in tempClick.items():
+        tempVal = pd.Series(value)
+        tempClick[key] = tempVal.loc[tempVal.diff().fillna(1) > 10e-3]
+    return tempClick, fig, ax
+
+
 def getINSTapTimestamp(
         td=None, accel=None,
         tapDetectOpts={}, filterOpts=None,

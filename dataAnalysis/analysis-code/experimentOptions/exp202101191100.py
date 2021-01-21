@@ -69,6 +69,7 @@ def getExpOpts():
                 'synchChanName': ['ins_td0'],
                 'thres': 5,
                 'iti': 52.2e-3,
+                'minAnalogValue': None,
                 'keepIndex': slice(-5, None)
                 }
     # manually add special instructions, e.g.
@@ -85,7 +86,7 @@ def getExpOpts():
             #  per trialSegment
             j: {
                 'timeRanges': None, 'keepIndex': slice(-5, None),
-                'synchChanName': miniRCRigInputs['tapSync'], 'iti': 52e-3,
+                'synchChanName': [miniRCRigInputs['tapSync']], 'iti': 52e-3,
                 'minAnalogValue': 100, 'thres': 3}
             for j, sessionName in enumerate(jsonSessionNames[i])
             }
@@ -93,6 +94,8 @@ def getExpOpts():
         }
     # manually add special instructions, e.g.
     #  synchInfo['nsp'][1][1] = {'timeRanges': None, 'keepIndex': slice(3, None)}
+    synchInfo['nsp'][2][0].update({'synchChanName': ['utah_rawAverage_0'], 'keepIndex': slice(None)})
+    synchInfo['ins'][2][0].update({'keepIndex': slice(None)})
     #  overrideSegmentsForTapSync
     #  if not possible to use taps, override with good taps from another segment
     #  not ideal, because segments are only synchronized to the nearest **second**

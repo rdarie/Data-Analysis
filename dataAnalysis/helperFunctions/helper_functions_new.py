@@ -682,9 +682,13 @@ def extractSignalsFromBlock(
 
 
 def gaussianSupport(
-    tdSeg=None, peakIdx=None,
-    gaussWid=None, fs=None, support=None):
-    kernNSamp = min(int(gaussWid * fs), len(tdSeg.index) - 1)
+        tdSeg=None, peakIdx=None,
+        gaussWid=None, fs=None, support=None):
+
+    if tdSeg is not None:
+        kernNSamp = min(int(gaussWid * fs), len(tdSeg.index) - 1)
+    else:
+        kernNSamp = min(int(gaussWid * fs), len(support.index) - 1)
     
     gaussKern = signal.gaussian(
         kernNSamp, kernNSamp/6)

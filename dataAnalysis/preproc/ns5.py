@@ -3154,25 +3154,25 @@ def blockFromPath(
 
 def calcBinarizedArray(
         dataBlock, samplingRate,
-        binnedSpikePath, saveToFile=True, matchT=None):
+        binnedSpikePath=None,
+        saveToFile=True, matchT=None):
     #
     spikeMatBlock = Block(name=dataBlock.name + '_binarized')
     spikeMatBlock.merge_annotations(dataBlock)
     #
     allSpikeTrains = [
-        i for i in dataBlock.filter(objects=SpikeTrain) if '#' in i.name]
+        i for i in dataBlock.filter(objects=SpikeTrain)]
     #
     for st in allSpikeTrains:
-        if '#' in st.name:
-            chanList = spikeMatBlock.filter(
-                objects=ChannelIndex, name=st.unit.name)
-            if not len(chanList):
-                chanIdx = ChannelIndex(name=st.unit.name, index=np.asarray([0]))
-                #  print(chanIdx.name)
-                spikeMatBlock.channel_indexes.append(chanIdx)
-                thisUnit = Unit(name=st.unit.name)
-                chanIdx.units.append(thisUnit)
-                thisUnit.channel_index = chanIdx
+        chanList = spikeMatBlock.filter(
+            objects=ChannelIndex, name=st.unit.name)
+        if not len(chanList):
+            chanIdx = ChannelIndex(name=st.unit.name, index=np.asarray([0]))
+            #  print(chanIdx.name)
+            spikeMatBlock.channel_indexes.append(chanIdx)
+            thisUnit = Unit(name=st.unit.name)
+            chanIdx.units.append(thisUnit)
+            thisUnit.channel_index = chanIdx
     #
     for segIdx, seg in enumerate(dataBlock.segments):
         newSeg = Segment(name='seg{}_{}'.format(segIdx, spikeMatBlock.name))

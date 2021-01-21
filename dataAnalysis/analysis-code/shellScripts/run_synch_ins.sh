@@ -54,4 +54,4 @@ EXP="exp202101191100"
 BLOCKSELECTOR=""
 SLURM_ARRAY_TASK_ID=2
 
-python -u './synchronizeINStoNSP_stimBased.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP $BLOCKSELECTOR --inputNSPBlockSuffix=analog_inputs --curateManually --addToNIX --lazy --usedTENSPulses --plotting
+python -u './synchronizeINStoNSP_stimBased.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP $BLOCKSELECTOR --inputNSPBlockSuffix=analog_inputs --addToNIX --lazy --usedTENSPulses
