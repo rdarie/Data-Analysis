@@ -889,7 +889,7 @@ def calcISIBlockAnalysisNix():
         else:
             keepMaskAsig = pd.Series(True, index=tdInterp.index)
         sosHP = signal.butter(
-            2, 40, 'high',
+            2, 100, 'high',
             fs=float(samplingRate), output='sos')
         cornerFrequencyLP = 40
         sosLP = signal.butter(
