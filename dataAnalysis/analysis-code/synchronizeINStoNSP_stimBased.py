@@ -60,7 +60,7 @@ from elephant.conversion import binarize
 sns.set(
     context='talk', style='dark',
     palette='dark', font='sans-serif',
-    font_scale=1, color_codes=True)
+    font_scale=.7, color_codes=True)
 #  load options
 from currentExperiment import parseAnalysisOptions
 from docopt import docopt
@@ -112,6 +112,8 @@ if os.path.exists(synchFunPath):
 
 tapDetectOptsNSP = expOpts['synchInfo']['nsp'][blockIdx]
 tapDetectOptsINS = expOpts['synchInfo']['ins'][blockIdx]
+insSignalsToSave = ['td0']
+pdb.set_trace()
 #  ### INS Loading
 insChanNames = []
 for insSessIdx, tdo in tapDetectOptsINS.items():
@@ -264,7 +266,10 @@ for insSessIdx, insGroup in insDF.groupby('trialSegment'):
             thisInsDF['t'], sessTapOptsINS['timeRanges'])
     else:
         nspSearchUnixTimes = thisNspDF.loc[nspSearchMask, 'unixTime']
-        insSearchMask = (thisInsDF['unixTime'] >= nspSearchUnixTimes.min()) & (thisInsDF['unixTime'] < nspSearchUnixTimes.max())
+        insSearchMask = (
+            (thisInsDF['unixTime'] >= nspSearchUnixTimes.min()) &
+            (thisInsDF['unixTime'] < nspSearchUnixTimes.max())
+            )
     if insSearchMask.any():
         thisInsDF.loc[~insSearchMask, 'tapDetectSignal'] = np.nan
         thisInsDF.loc[:, 'tapDetectSignal'] = (
@@ -290,6 +295,7 @@ for insSessIdx, insGroup in insDF.groupby('trialSegment'):
             traceback.print_exc()
     alignByXCorr = True
     if alignByXCorr:
+        gaussWid = 5e-3
         trigRasterSamplingRate = min(nspSamplingRate, insSamplingRate)
         trigSampleInterval = trigRasterSamplingRate ** (-1)
         #
@@ -315,7 +321,7 @@ for insSessIdx, insGroup in insDF.groupby('trialSegment'):
             t_start=trigRaster['t'].min() * pq.s, t_stop=trigRaster['t'].max() * pq.s
             )
         trigRaster.loc[:, 'nspTrigs'] = hf.gaussianSupport(
-            support=trigRaster.set_index('t')['nspDiracDelta'], gaussWid=5e-3, fs=trigRasterSamplingRate).to_numpy()
+            support=trigRaster.set_index('t')['nspDiracDelta'], gaussWid=gaussWid, fs=trigRasterSamplingRate).to_numpy()
         if True:
             insBlockJustSpikes = hf.extractSignalsFromBlock(insBlockList[insSessIdx], keepEvents=False)
             insBlockJustSpikes = hf.loadBlockProxyObjects(insBlockJustSpikes)
@@ -325,12 +331,13 @@ for insSessIdx, insGroup in insDF.groupby('trialSegment'):
             spikeMatDF = ns5.analogSignalsToDataFrame(spikeMatBlock.filter(objects=AnalogSignal))
             spikeMatDF.loc[:, 'nspT'] = spikeMatDF['t'] + unixDerivedTimeDelta
             # spikeMatDF is in ins time
-            spikeMatMask = (spikeMatDF['nspT'] >= nspSearchLims[0]) & (spikeMatDF['nspT'] <= nspSearchLims[1])
+            spikeMatMask = (
+                (spikeMatDF['nspT'] >= nspSearchLims[0]) &
+                (spikeMatDF['nspT'] <= nspSearchLims[1]))
             trigRaster.loc[:, 'insDiracDelta'] = (
                 spikeMatDF.loc[spikeMatMask, :]
                 .drop(columns=['t', 'nspT'])
                 .any(axis='columns').to_numpy(dtype=np.float))
-            # trigRaster['insDiracDelta']
         else:
             approxInsTapTimes = insTapTimes + unixDerivedTimeDelta
             closestTimes, closestIdx = hf.closestSeries(
@@ -339,23 +346,39 @@ for insSessIdx, insGroup in insDF.groupby('trialSegment'):
             trigRaster.loc[closestIdx, 'insDiracDelta'] = 1
         trigRaster.loc[:, 'insTrigs'] = hf.gaussianSupport(
             support=trigRaster.set_index('t')['insDiracDelta'],
-            gaussWid=5e-3, fs=trigRasterSamplingRate).to_numpy()
-        xCorr = np.correlate(trigRaster['nspTrigs'], trigRaster['insTrigs'], mode='full')
-        posLags = np.arange(0, nspSearchDur, trigSampleInterval)
-        xCorrLags = np.concatenate([(-1) * np.flip(posLags[1:]), posLags])
-        xCorrSrs = pd.Series(xCorr, index=xCorrLags)
-        maxLag = xCorrSrs.idxmax()
+            gaussWid=gaussWid, fs=trigRasterSamplingRate).to_numpy()
+        #
+        def corrAtLag(targetLag, xSrs=None, ySrs=None):
+            return np.correlate(xSrs, ySrs.shift(targetLag).fillna(0))[0]
+        #
+        targetLags = np.arange(
+            -searchRadius / trigSampleInterval,
+            searchRadius / trigSampleInterval + 1,
+            dtype=np.int)
+        targetLagsSrs = pd.Series(
+            targetLags, index=targetLags * trigSampleInterval)
+        print('Calculating cross corr')
+        xCorrSrs = targetLagsSrs.apply(
+            corrAtLag, xSrs=trigRaster['nspTrigs'], ySrs=trigRaster['insTrigs'])
         if True:
             fig, ax = plt.subplots(2, 1)
             ax[0].plot(trigRaster['t'], trigRaster['nspTrigs'], label='NSP trigs.')
             ax[0].plot(trigRaster['t'], trigRaster['insTrigs'], label='INS trigs.')
+            ax[0].set_xlabel('time (sec)')
+            ax[0].legend(loc='upper right')
             #
             ax[1].plot(xCorrSrs, label='crossCorr')
-        ax[0].legend()
-        ax[1].legend()
-        plt.show()
-        pdb.set_trace()
-        corrLags = 0
+            ax[1].set_xlabel('cross-corr lag (sec)')
+            ax[1].legend(loc='upper right')
+            plt.show()
+        maxLag = xCorrSrs.idxmax()
+        funCoeffs = np.asarray([1, unixDerivedTimeDelta + maxLag])
+    else:
+        # align by regressing timestamps
+        # funCoeffs = np.poly1d()
+        pass
+    pdb.set_trace()
+        
 #
 #
 # get absolute timestamps of file extents (by INS session)

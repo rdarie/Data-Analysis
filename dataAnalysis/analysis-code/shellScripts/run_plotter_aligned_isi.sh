@@ -73,7 +73,7 @@ BLOCKSELECTOR="--inputBlockName=emg"
 
 # --maskOutlierBlocks --invertOutlierBlocks --individualTraces
 
-# python3 -u './plotRippleStimSpikeReport.py' --exp=$EXP $BLOCKSELECTOR $WINDOW $UNITSELECTOR $ANALYSISSELECTOR --alignQuery="stimOn" --alignFolderName=stim $BLOCKSELECTOR --groupPagesBy="electrode, RateInHz" --maskOutlierBlocks
+# python -u './plotRippleStimSpikeReport.py' --exp=$EXP $BLOCKSELECTOR $WINDOW $UNITSELECTOR $ANALYSISSELECTOR --alignQuery="stimOn" --alignFolderName=stim $BLOCKSELECTOR --groupPagesBy="electrode, RateInHz" --maskOutlierBlocks
 #  --maskOutlierBlocks
 python3 -u './plotAlignedAsigs.py' --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISSELECTOR $BLOCKSELECTOR $UNITSELECTOR --alignQuery="stimOn" --rowName="electrode" --rowControl= --colName="RateInHz" --colControl= --hueName="nominalCurrent" --alignFolderName=stim --enableOverrides --maskOutlierBlocks
 # stim spikes
