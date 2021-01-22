@@ -52,7 +52,7 @@ conda activate
 source activate nda2
 python --version
 
-SLURM_ARRAY_TASK_ID=3
+SLURM_ARRAY_TASK_ID=2
 
 ############## init spike sorting
 # python -u ./preprocNS5.py --arrayName=utah --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --forSpikeSorting
@@ -66,7 +66,7 @@ SLURM_ARRAY_TASK_ID=3
 # python -u ./preprocNS5.py --arrayName=nform --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --fullSubtractMean
 
 ########### get analog inputs separately to run synchronization, etc
-python -u ./preprocNS5.py --arrayName=utah --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --analogOnly
+# python -u ./preprocNS5.py --arrayName=utah --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --analogOnly
 
 ######### finalize dataset
 # !! maskMotorEncoder ignores all motor events outside alignTimeBounds

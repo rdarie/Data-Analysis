@@ -34,13 +34,14 @@ EXP="exp202012171200"
 EXP="exp202101061100"
 EXP="exp202101111100"
 EXP="exp202101141100"
+EXP="exp202101191100"
 
 LAZINESS="--lazy"
 
 # ANALYSISFOLDER="--analysisName=loRes"
 ANALYSISFOLDER="--analysisName=default"
 
-BLOCKSUFFIX="--spikeFileSuffix=mean_subtracted"
+SPIKEBLOCKSUFFIX="--spikeFileSuffix=mean_subtracted"
 
 RIGSUFFIX="--rigFileSuffix=analog_inputs"
 # BLOCKSUFFIX=""
@@ -54,11 +55,11 @@ python --version
 
 SLURM_ARRAY_TASK_ID=2
 # python -u ./synchronizeSIMItoNSP.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP
-python -u ./calcProprioAnalysisNix.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER $BLOCKSUFFIX $BLOCKPREFIX $RIGSUFFIX --chanQuery="all" --verbose --lazy
+python -u ./calcProprioAnalysisNix.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER $SPIKEBLOCKSUFFIX $BLOCKPREFIX $RIGSUFFIX --chanQuery="all" --verbose --lazy
 ##
-python -u ./calcMotionAlignTimesV2.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID  $ANALYSISFOLDER --plotParamHistograms $LAZINESS
-python -u ./calcStimAlignTimes.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER --plotParamHistograms $LAZINESS
-python -u ./calcMotionStimAlignTimesV2.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER $LAZINESS --plotParamHistograms
+# python -u ./calcMotionAlignTimesV2.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID  $ANALYSISFOLDER --plotParamHistograms $LAZINESS
+# python -u ./calcStimAlignTimes.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER --plotParamHistograms $LAZINESS
+# python -u ./calcMotionStimAlignTimesV2.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER $LAZINESS --plotParamHistograms
 ##
-python -u ./calcFR.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER
+# python -u ./calcFR.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER
 # python -u ./calcFRsqrt.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID

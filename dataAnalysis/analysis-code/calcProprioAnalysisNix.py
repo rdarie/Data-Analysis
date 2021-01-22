@@ -14,6 +14,7 @@ Options:
     --rigFileSuffix=rigFileSuffix          append a name to the resulting blocks?
     --spikeFileSuffix=spikeFileSuffix      append a name to the resulting blocks?
     --insFileSuffix=insFileSuffix          append a name to the resulting blocks? [default: ins]
+    --spikeSource=spikeSource              append a name to the resulting blocks?
     --chanQuery=chanQuery                  how to restrict channels if not providing a list? [default: fr]
     --samplingRate=samplingRate            resample the result??
     --rigOnly                              is there no INS block? [default: False]
@@ -54,297 +55,6 @@ globals().update(allOpts)
 binOpts = rasterOpts['binOpts'][arguments['analysisName']]
 
 trackMemory = True
-
-
-def concatenateBlocks(
-        asigBlocks, spikeBlocks, eventBlocks, chunkingMetadata,
-        samplingRate, chanQuery
-        ):
-    # Scan ahead through all files and ensure that
-    # spikeTrains and units are present across all assembled files
-    channelIndexCache = {}
-    unitCache = {}
-    asigCache = []
-    asigAnnCache = {}
-    spiketrainCache = {}
-    eventCache = {}
-    # get list of channels and units
-    for idx, (chunkIdxStr, chunkMeta) in enumerate(chunkingMetadata.items()):
-        gc.collect()
-        chunkIdx = int(chunkIdxStr)
-        asigBlock = asigBlocks[chunkIdx]
-        asigSeg = asigBlock.segments[0]
-        spikeBlock = spikeBlocks[chunkIdx]
-        eventBlock = eventBlocks[chunkIdx]
-        eventSeg = eventBlock.segments[0]
-        for chIdx in asigBlock.filter(objects=ChannelIndex):
-            chAlreadyThere = (chIdx.name in channelIndexCache.keys())
-            if not chAlreadyThere:
-                newChIdx = copy(chIdx)
-                newChIdx.analogsignals = []
-                newChIdx.units = []
-                channelIndexCache[chIdx.name] = newChIdx
-        for unit in (spikeBlock.filter(objects=Unit)):
-            if arguments['lazy']:
-                theseSpiketrains = []
-                for stP in unit.spiketrains:
-                    st = ns5.loadStProxy(stP)
-                    if len(st.times) > 0:
-                        theseSpiketrains.append(st)
-            else:
-                theseSpiketrains = [
-                    st
-                    for st in unit.spiketrains
-                    if len(st.times)
-                    ]
-            for st in theseSpiketrains:
-                st = ns5.loadObjArrayAnn(st)
-                if len(st.times):
-                    st.magnitude[:] = st.times.magnitude + spikeBlock.annotations['chunkTStart']
-                    st.t_start = min(0 * pq.s, st.times[0] * 0.999)
-                    st.t_stop = max(
-                        st.t_stop + spikeBlock.annotations['chunkTStart'] * pq.s,
-                        st.times[-1] * 1.001)
-                else:
-                    st.t_start += spikeBlock.annotations['chunkTStart'] * pq.s
-                    st.t_stop += spikeBlock.annotations['chunkTStart'] * pq.s
-            uAlreadyThere = (unit.name in unitCache.keys())
-            if not uAlreadyThere:
-                newUnit = copy(unit)
-                newUnit.spiketrains = []
-                newUnit.annotations['parentChanName'] = unit.channel_index.name
-                unitCache[unit.name] = newUnit
-                spiketrainCache[unit.name] = theseSpiketrains
-            else:
-                spiketrainCache[unit.name] = spiketrainCache[unit.name] + theseSpiketrains
-        #
-        if arguments['lazy']:
-            evList = [
-                evP.load()
-                for evP in eventSeg.events]
-        else:
-            evList = eventSeg.events
-        for event in evList:
-            event.magnitude[:] = event.magnitude + eventBlock.annotations['chunkTStart']
-            if event.name in eventCache.keys():
-                eventCache[event.name].append(event)
-            else:
-                eventCache[event.name] = [event]
-        # take the requested analog signal channels
-        if arguments['lazy']:
-            tdChanNames = ns5.listChanNames(
-                asigBlock, chanQuery, objType=AnalogSignalProxy)
-            #############
-            # tdChanNames = ['seg0_utah1', 'seg0_utah10']
-            ##############
-            asigList = []
-            for asigP in asigSeg.analogsignals:
-                if asigP.name in tdChanNames:
-                    asig = asigP.load()
-                    asig.channel_index = asigP.channel_index
-                    asigList.append(asig)
-                    if trackMemory:
-                        print('loading {} from proxy object. memory usage: {:.1f} MB'.format(
-                            asigP.name, prf.memory_usage_psutil()))
-        else:
-            tdChanNames = ns5.listChanNames(
-                asigBlock, chanQuery, objType=AnalogSignal)
-            asigList = [
-                asig
-                for asig in asigSeg.analogsignals
-                if asig.name in tdChanNames
-                ]
-        for asig in asigList:
-            if asig.size > 0:
-                dummyAsig = asig
-        if idx == 0:
-            outputBlock = Block(
-                name=asigBlock.name,
-                file_origin=asigBlock.file_origin,
-                file_datetime=asigBlock.file_datetime,
-                rec_datetime=asigBlock.rec_datetime,
-                **asigBlock.annotations
-            )
-            newSeg = Segment(
-                index=0, name=asigSeg.name,
-                description=asigSeg.description,
-                file_origin=asigSeg.file_origin,
-                file_datetime=asigSeg.file_datetime,
-                rec_datetime=asigSeg.rec_datetime,
-                **asigSeg.annotations
-            )
-            outputBlock.segments = [newSeg]
-            for asig in asigList:
-                asigAnnCache[asig.name] = asig.annotations
-                asigAnnCache[asig.name]['parentChanName'] = asig.channel_index.name
-            asigUnits = dummyAsig.units
-        tdDF = ns5.analogSignalsToDataFrame(asigList)
-        del asigList  # asigs saved to dataframe, no longer needed
-        tdDF.loc[:, 't'] += asigBlock.annotations['chunkTStart']
-        tdDF.set_index('t', inplace=True)
-        if samplingRate != dummyAsig.sampling_rate:
-            newT = pd.Series(
-                np.arange(
-                    dummyAsig.t_start + asigBlock.annotations['chunkTStart'] * pq.s,
-                    dummyAsig.t_stop + asigBlock.annotations['chunkTStart'] * pq.s,
-                    1/samplingRate))
-            if samplingRate < dummyAsig.sampling_rate:
-                lowPassOpts = {
-                    'low': {
-                        'Wn': float(samplingRate),
-                        'N': 2,
-                        'btype': 'low',
-                        'ftype': 'bessel'
-                    }
-                }
-                filterCoeffs = hf.makeFilterCoeffsSOS(
-                    lowPassOpts, float(dummyAsig.sampling_rate))
-                if trackMemory:
-                    print('Filtering analog data before downsampling. memory usage: {:.1f} MB'.format(
-                        prf.memory_usage_psutil()))
-                # tdDF.loc[:, tdChanNames] = signal.sosfiltfilt(
-                filteredAsigs = signal.sosfiltfilt(
-                    filterCoeffs, tdDF.to_numpy(),
-                    axis=0)
-                tdDF = pd.DataFrame(
-                    filteredAsigs,
-                    index=tdDF.index,
-                    columns=tdDF.columns)
-                if trackMemory:
-                    print('Just finished analog data filtering before downsampling. memory usage: {:.1f} MB'.format(
-                        prf.memory_usage_psutil()))
-            tdInterp = hf.interpolateDF(
-                tdDF, newT,
-                kind='linear', fill_value='extrapolate',
-                verbose=arguments['verbose'])
-            # free up memory used by full resolution asigs
-            del tdDF
-        else:
-            tdInterp = tdDF
-        #
-        asigCache.append(tdInterp)
-        #
-        print('Finished chunk {}'.format(chunkIdxStr))
-    allTdDF = pd.concat(asigCache)
-    # TODO: check for nans, if, for example a signal is partially missing
-    allTdDF.fillna(method='bfill', inplace=True)
-    allTdDF.fillna(method='ffill', inplace=True)
-    for asigName in allTdDF.columns:
-        newAsig = AnalogSignal(
-            allTdDF[asigName].to_numpy() * asigUnits,
-            name=asigName,
-            sampling_rate=samplingRate,
-            dtype=np.float32,
-            **asigAnnCache[asigName]
-        )
-        chIdxName = asigAnnCache[asigName]['parentChanName']
-        chIdx = channelIndexCache[chIdxName]
-        # cross-assign ownership to containers
-        chIdx.analogsignals.append(newAsig)
-        newSeg.analogsignals.append(newAsig)
-        newAsig.channel_index = chIdx
-        newAsig.segment = newSeg
-    #
-    for uName, unit in unitCache.items():
-        # concatenate spike times, waveforms, etc.
-        if len(spiketrainCache[unit.name]):
-            consolidatedTimes = np.concatenate([
-                    st.times.magnitude
-                    for st in spiketrainCache[unit.name]
-                ])
-            # TODO:   decide whether to include this step
-            #         which snaps the spike times to the nearest
-            #         *sampled* data point
-            #
-            # consolidatedTimes, timesIndex = hf.closestSeries(
-            #     takeFrom=pd.Series(consolidatedTimes),
-            #     compareTo=pd.Series(allTdDF.index))
-            #
-            # find an example spiketrain with array_annotations
-            for st in spiketrainCache[unit.name]:
-                if len(st.times):
-                    dummySt = st
-                    break
-            consolidatedAnn = {
-                key: np.array([])
-                for key, value in dummySt.array_annotations.items()
-                }
-            for key, value in consolidatedAnn.items():
-                consolidatedAnn[key] = np.concatenate([
-                    st.annotations[key]
-                    for st in spiketrainCache[unit.name]
-                ])
-            consolidatedWaveforms = np.concatenate([
-                st.waveforms
-                for st in spiketrainCache[unit.name]
-                ])
-            spikeTStop = max([
-                st.t_stop
-                for st in spiketrainCache[unit.name]
-                ])
-            spikeTStart = max([
-                st.t_start
-                for st in spiketrainCache[unit.name]
-                ])
-            spikeAnnotations = {
-                key: value
-                for key, value in dummySt.annotations.items()
-                if key not in dummySt.annotations['arrayAnnNames']
-            }
-            newSt = SpikeTrain(
-                name=dummySt.name,
-                times=consolidatedTimes, units='sec', t_stop=spikeTStop,
-                waveforms=consolidatedWaveforms * dummySt.waveforms.units,
-                left_sweep=dummySt.left_sweep,
-                sampling_rate=dummySt.sampling_rate,
-                t_start=spikeTStart, **spikeAnnotations,
-                array_annotations=consolidatedAnn)
-            # cross-assign ownership to containers
-            unit.spiketrains.append(newSt)
-            newSt.unit = unit
-            newSeg.spiketrains.append(newSt)
-            newSt.segment = newSeg
-            # link chIdxes and Units
-            if unit.annotations['parentChanName'] in channelIndexCache:
-                chIdx = channelIndexCache[unit.annotations['parentChanName']]
-                if unit not in chIdx.units:
-                    chIdx.units.append(unit)
-                    unit.channel_index = chIdx
-            else:
-                newChIdx = ChannelIndex(
-                    name=unit.annotations['parentChanName'], index=0)
-                channelIndexCache[unit.annotations['parentChanName']] = newChIdx
-                if unit not in newChIdx.units:
-                    newChIdx.units.append(unit)
-                    unit.channel_index = newChIdx
-    #
-    for evName, eventList in eventCache.items():
-        consolidatedTimes = np.concatenate([
-            ev.times.magnitude
-            for ev in eventList
-            ])
-        consolidatedLabels = np.concatenate([
-            ev.labels
-            for ev in eventList
-            ])
-        newEvent = Event(
-            name=evName,
-            times=consolidatedTimes * pq.s,
-            labels=consolidatedLabels
-            )
-        # if len(newEvent):
-        newEvent.segment = newSeg
-        newSeg.events.append(newEvent)
-    for chIdxName, chIdx in channelIndexCache.items():
-        if len(chIdx.analogsignals) or len(chIdx.units):
-            outputBlock.channel_indexes.append(chIdx)
-            chIdx.block = outputBlock
-    #
-    outputBlock = ns5.purgeNixAnn(outputBlock)
-    createRelationship = False
-    if createRelationship:
-        outputBlock.create_relationship()
-    return outputBlock
 
 
 def calcBlockAnalysisWrapper():
@@ -407,9 +117,6 @@ def calcBlockAnalysisWrapper():
                 'chunkTStart': 0,
                 'chunkTStop': 'NaN'
             }}
-    #  ########################################
-    spikeSource = 'tdc'
-    #  ########################################
     asigBlocks = {}
     spikeBlocks = {}
     eventBlocks = {}
@@ -434,7 +141,7 @@ def calcBlockAnalysisWrapper():
         asigBlocks[chunkIdx] = asigBlock
         asigReaders[chunkIdx] = asigReader
         #########################################
-        if spikeSource == 'tdc':
+        if arguments['spikeSource'] == 'tdc':
             tdcPath = os.path.join(
                 scratchFolder,
                 'tdc_' + blockBaseName + spikeFileSuffix + chunkMeta['partNameSuffix'],
@@ -457,18 +164,21 @@ def calcBlockAnalysisWrapper():
                 idx, prf.memory_usage_psutil()))
     chanQuery = arguments['chanQuery']
     ##############################################################################
-    outputBlock = concatenateBlocks(
+    outputBlock = ns5.concatenateBlocks(
         asigBlocks, spikeBlocks, eventBlocks,
-        chunkingMetadata, samplingRate, chanQuery
-        )
+        chunkingMetadata, samplingRate, chanQuery,
+        arguments['lazy'], trackMemory, arguments['verbose'])
     ##############################################################################
     # close open readers, etc
     for idx, (chunkIdxStr, chunkMeta) in enumerate(chunkingMetadata.items()):
         chunkIdx = int(chunkIdxStr)
         if arguments['lazy']:
             asigReaders[chunkIdx].file.close()
-            spikeReaders[chunkIdx].file.close()
-        del asigBlocks[chunkIdx], spikeBlocks[chunkIdx]
+            if arguments['spikeSource'] == 'tdc':
+                spikeReaders[chunkIdx].file.close()
+        del asigBlocks[chunkIdx]
+        if arguments['spikeSource'] == 'tdc':
+            spikeBlocks[chunkIdx]
         gc.collect()
         if trackMemory:
             print('Deleting blocks from chunk {} memory usage: {:.1f} MB'.format(
@@ -488,54 +198,65 @@ def calcBlockAnalysisWrapper():
             dummyOutputAsig = asig
             break
     outputBlockT = pd.Series(dummyOutputAsig.times)
-    binnedSpikePath = os.path.join(
-        analysisSubFolder,
-        ns5FileName + '_binarized.nix'
-        )
-    spikeMatBlock = ns5.calcBinarizedArray(
-        outputBlock, samplingRate,
-        binnedSpikePath,
-        saveToFile=True, matchT=outputBlockT)
+    if len(outputBlock.filter(objects=SpikeTrain)):
+        binnedSpikePath = os.path.join(
+            analysisSubFolder,
+            ns5FileName + '_binarized.nix'
+            )
+        _ = ns5.calcBinarizedArray(
+            outputBlock, samplingRate,
+            binnedSpikePath,
+            saveToFile=True, matchT=outputBlockT)
     #  ###### load analog inputs
+    print('Loading {}'.format(nspPath))
     nspPath = os.path.join(
         scratchFolder,
         blockBaseName + rigFileSuffix + '.nix')
+    nspLoadList = {'event': ['seg0_rig_property', 'seg0_rig_value']}
     nspReader, nspBlock = ns5.blockFromPath(
         nspPath, lazy=arguments['lazy'],
-        reduceChannelIndexes=True)
+        reduceChannelIndexes=True, loadList=nspLoadList)
     nspSeg = nspBlock.segments[0]
-    print('Loading {}'.format(nspPath))
-    '''
+    #
     insPath = os.path.join(
         scratchFolder,
         insBlockBaseName + insFileSuffix + '.nix')
+    print('Loading {}'.format(insPath))
+    insSignalsToLoad = ([
+        'seg0_ins_td{}'.format(tdIdx)
+        for tdIdx in range(4)] +
+        [
+        'seg0_ins_acc{}'.format(accIdx)
+        for accIdx in ['x', 'y', 'z', 'inertia']
+        ])
+    insEventsToLoad = [
+        'seg0_ins_property',
+        'seg0_ins_value'
+        ]
+    insSpikesToLoad = ['seg0_g0p0#0']
+    insLoadList = {
+        'asig': insSignalsToLoad,
+        'event': insEventsToLoad,
+        'spiketrain': insSpikesToLoad
+        }
     insReader, insBlock = ns5.blockFromPath(
         insPath, lazy=arguments['lazy'],
-        reduceChannelIndexes=True)
-    insSeg = nspBlock.segments[0]
-    print('Loading {}'.format(insPath))
-    '''
-    insBlock = nspBlock
+        reduceChannelIndexes=True,
+        loadList=insLoadList)
+    insSeg = insBlock.segments[0]
+    # insBlock = nspBlock
     ######
     #  synchronize INS
     ######
-    
     evList = []
     for key in ['property', 'value']:
-        #  key = 'property'
-        if not arguments['lazy']:
-            evObjType = Event
-        else:
-            evObjType = EventProxy
         if not arguments['rigOnly']:
             insPropList = insBlock.filter(
-                objects=evObjType,
+                objects=Event,
                 name='seg0_ins_' + key
                 )
             if len(insPropList):
                 insProp = insPropList[0]
-                if arguments['lazy']:
-                    insProp = insProp.load()
             else:
                 print(
                     'INS properties not found! analyzing rig events only.')
@@ -544,13 +265,11 @@ def calcBlockAnalysisWrapper():
             insPropList = []
             insProp = None
         rigPropList = nspBlock.filter(
-            objects=evObjType,
+            objects=Event,
             name='seg0_rig_' + key
             )
         if len(rigPropList):
             rigProp = rigPropList[0]
-            if arguments['lazy']:
-                rigProp = rigProp.load()
             if arguments['rigOnly']:
                 allProp = rigProp
                 allProp.name = 'seg0_' + key
@@ -581,7 +300,6 @@ def calcBlockAnalysisWrapper():
             )
         concatEvent.merge_annotations(allProp)
         evList.append(concatEvent)
-        
     rigChanQuery = '(chanName.notna())'
     if arguments['lazy']:
         rigChanNames = ns5.listChanNames(
@@ -647,6 +365,54 @@ def calcBlockAnalysisWrapper():
         del tdDF
     else:
         tdInterp = tdDF
+    # pdb.set_trace()
+    insAsigList = [
+        asig
+        for asig in insSeg.analogsignals
+        if asig.name in insLoadList['asig']
+        ]
+    for asig in insAsigList:
+        if asig.size > 0:
+            dummyInsAsig = asig
+            break
+    insDF = ns5.analogSignalsToDataFrame(insAsigList)
+    origInsTimeStep = insDF['t'].iloc[1] - insDF['t'].iloc[0]
+    insDF.set_index('t', inplace=True)
+    # interpolate rig analog signals
+    if samplingRate != dummyInsAsig.sampling_rate:
+        if samplingRate < dummyInsAsig.sampling_rate:
+            lowPassOpts = {
+                'low': {
+                    'Wn': float(samplingRate),
+                    'N': 2,
+                    'btype': 'low',
+                    'ftype': 'bessel'
+                }
+            }
+            filterCoeffs = hf.makeFilterCoeffsSOS(
+                lowPassOpts, float(dummyInsAsig.sampling_rate))
+            if trackMemory:
+                print('Filtering analog data before downsampling. memory usage: {:.1f} MB'.format(
+                    prf.memory_usage_psutil()))
+            # insDF.loc[:, tdChanNames] = signal.sosfiltfilt(
+            filteredAsigs = signal.sosfiltfilt(
+                filterCoeffs, insDF.to_numpy(),
+                axis=0)
+            insDF = pd.DataFrame(
+                filteredAsigs,
+                index=insDF.index,
+                columns=insDF.columns)
+            if trackMemory:
+                print('Just finished analog data filtering before downsampling. memory usage: {:.1f} MB'.format(
+                    prf.memory_usage_psutil()))
+        insInterp = hf.interpolateDF(
+            insDF, outputBlockT,
+            kind='linear', fill_value=(0, 0),
+            verbose=arguments['verbose'])
+        # free up memory used by full resolution asigs
+        del insDF
+    else:
+        insInterp = insDF
     # add analog traces derived from position
     # if 'seg0_position' in tdInterp.columns:
     #     tdInterp.loc[:, 'seg0_position_x'] = ((
@@ -673,24 +439,19 @@ def calcBlockAnalysisWrapper():
     #         'seg0_position_x', 'seg0_position_y',
     #         'seg0_velocity_x', 'seg0_velocity_y']
     #
-    concatList = [tdInterp]
+    concatList = [tdInterp, insInterp]
     # convert stim updates to time series
     if not arguments['rigOnly']:
-        if arguments['lazy']:
-            ins_events = [
-                evP.load()
-                for evP in insBlock.filter(objects=EventProxy)
-                if evP.name in ['seg0_ins_property', 'seg0_ins_value']]
-        else:
-            ins_events = [
-                ev for ev in insBlock.filter(objects=Event)
-                if ev.name in ['seg0_ins_property', 'seg0_ins_value']]
+        ins_events = [
+            ev for ev in insBlock.filter(objects=Event)
+            if ev.name in ['seg0_ins_property', 'seg0_ins_value']]
         expandCols = [
                 'RateInHz', 'therapyStatus',
                 'activeGroup', 'program', 'trialSegment']
         deriveCols = ['amplitudeRound', 'amplitude']
         progAmpNames = rcsa_helpers.progAmpNames
         #
+        pdb.set_trace()
         stimStSer = ns5.eventsToDataFrame(
             ins_events, idxT='t')
         stimStatus = mdt.stimStatusSerialtoLong(

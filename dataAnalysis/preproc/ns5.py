@@ -307,7 +307,6 @@ def getSpikeDFMetadata(spikeDF, metaDataCols):
 def transposeSpikeDF(
         spikeDF, transposeToColumns,
         fastTranspose=False):
-    
     newColumnNames = np.atleast_1d(transposeToColumns).tolist()
     originalColumnNames = np.atleast_1d(spikeDF.columns.names)
     metaDataCols = np.setdiff1d(spikeDF.index.names, newColumnNames).tolist()
@@ -335,6 +334,350 @@ def transposeSpikeDF(
             .drop(columns=['metaDataIdx'])
             .set_index(newIdxLabels))
         return newSpikeDF
+
+
+def concatenateBlocks(
+        asigBlocks, spikeBlocks, eventBlocks, chunkingMetadata,
+        samplingRate, chanQuery, lazy, trackMemory, verbose
+        ):
+    # Scan ahead through all files and ensure that
+    # spikeTrains and units are present across all assembled files
+    channelIndexCache = {}
+    unitCache = {}
+    asigCache = []
+    asigAnnCache = {}
+    spiketrainCache = {}
+    eventCache = {}
+    # get list of channels and units
+    for idx, (chunkIdxStr, chunkMeta) in enumerate(chunkingMetadata.items()):
+        gc.collect()
+        chunkIdx = int(chunkIdxStr)
+        asigBlock = asigBlocks[chunkIdx]
+        asigSeg = asigBlock.segments[0]
+        spikeBlock = spikeBlocks[chunkIdx]
+        eventBlock = eventBlocks[chunkIdx]
+        eventSeg = eventBlock.segments[0]
+        for chIdx in asigBlock.filter(objects=ChannelIndex):
+            chAlreadyThere = (chIdx.name in channelIndexCache.keys())
+            if not chAlreadyThere:
+                newChIdx = copy(chIdx)
+                newChIdx.analogsignals = []
+                newChIdx.units = []
+                channelIndexCache[chIdx.name] = newChIdx
+        for unit in (spikeBlock.filter(objects=Unit)):
+            if lazy:
+                theseSpiketrains = []
+                for stP in unit.spiketrains:
+                    st = loadStProxy(stP)
+                    if len(st.times) > 0:
+                        theseSpiketrains.append(st)
+            else:
+                theseSpiketrains = [
+                    st
+                    for st in unit.spiketrains
+                    if len(st.times)
+                    ]
+            for st in theseSpiketrains:
+                st = loadObjArrayAnn(st)
+                if len(st.times):
+                    st.magnitude[:] = st.times.magnitude + spikeBlock.annotations['chunkTStart']
+                    st.t_start = min(0 * pq.s, st.times[0] * 0.999)
+                    st.t_stop = max(
+                        st.t_stop + spikeBlock.annotations['chunkTStart'] * pq.s,
+                        st.times[-1] * 1.001)
+                else:
+                    st.t_start += spikeBlock.annotations['chunkTStart'] * pq.s
+                    st.t_stop += spikeBlock.annotations['chunkTStart'] * pq.s
+            uAlreadyThere = (unit.name in unitCache.keys())
+            if not uAlreadyThere:
+                newUnit = copy(unit)
+                newUnit.spiketrains = []
+                newUnit.annotations['parentChanName'] = unit.channel_index.name
+                unitCache[unit.name] = newUnit
+                spiketrainCache[unit.name] = theseSpiketrains
+            else:
+                spiketrainCache[unit.name] = spiketrainCache[unit.name] + theseSpiketrains
+        #
+        if lazy:
+            evList = [
+                evP.load()
+                for evP in eventSeg.events]
+        else:
+            evList = eventSeg.events
+        for event in evList:
+            event.magnitude[:] = event.magnitude + eventBlock.annotations['chunkTStart']
+            if event.name in eventCache.keys():
+                eventCache[event.name].append(event)
+            else:
+                eventCache[event.name] = [event]
+        # take the requested analog signal channels
+        if lazy:
+            tdChanNames = listChanNames(
+                asigBlock, chanQuery, objType=AnalogSignalProxy)
+            #############
+            # tdChanNames = ['seg0_utah1', 'seg0_utah10']
+            ##############
+            asigList = []
+            for asigP in asigSeg.analogsignals:
+                if asigP.name in tdChanNames:
+                    asig = asigP.load()
+                    asig.channel_index = asigP.channel_index
+                    asigList.append(asig)
+                    if trackMemory:
+                        print('loading {} from proxy object. memory usage: {:.1f} MB'.format(
+                            asigP.name, prf.memory_usage_psutil()))
+        else:
+            tdChanNames = listChanNames(
+                asigBlock, chanQuery, objType=AnalogSignal)
+            asigList = [
+                asig
+                for asig in asigSeg.analogsignals
+                if asig.name in tdChanNames
+                ]
+        for asig in asigList:
+            if asig.size > 0:
+                dummyAsig = asig
+        if idx == 0:
+            outputBlock = Block(
+                name=asigBlock.name,
+                file_origin=asigBlock.file_origin,
+                file_datetime=asigBlock.file_datetime,
+                rec_datetime=asigBlock.rec_datetime,
+                **asigBlock.annotations
+            )
+            newSeg = Segment(
+                index=0, name=asigSeg.name,
+                description=asigSeg.description,
+                file_origin=asigSeg.file_origin,
+                file_datetime=asigSeg.file_datetime,
+                rec_datetime=asigSeg.rec_datetime,
+                **asigSeg.annotations
+            )
+            outputBlock.segments = [newSeg]
+            for asig in asigList:
+                asigAnnCache[asig.name] = asig.annotations
+                asigAnnCache[asig.name]['parentChanName'] = asig.channel_index.name
+            asigUnits = dummyAsig.units
+        tdDF = analogSignalsToDataFrame(asigList)
+        del asigList  # asigs saved to dataframe, no longer needed
+        tdDF.loc[:, 't'] += asigBlock.annotations['chunkTStart']
+        tdDF.set_index('t', inplace=True)
+        if samplingRate != dummyAsig.sampling_rate:
+            newT = pd.Series(
+                np.arange(
+                    dummyAsig.t_start + asigBlock.annotations['chunkTStart'] * pq.s,
+                    dummyAsig.t_stop + asigBlock.annotations['chunkTStart'] * pq.s,
+                    1/samplingRate))
+            if samplingRate < dummyAsig.sampling_rate:
+                lowPassOpts = {
+                    'low': {
+                        'Wn': float(samplingRate),
+                        'N': 2,
+                        'btype': 'low',
+                        'ftype': 'bessel'
+                    }
+                }
+                filterCoeffs = hf.makeFilterCoeffsSOS(
+                    lowPassOpts, float(dummyAsig.sampling_rate))
+                if trackMemory:
+                    print('Filtering analog data before downsampling. memory usage: {:.1f} MB'.format(
+                        prf.memory_usage_psutil()))
+                # tdDF.loc[:, tdChanNames] = signal.sosfiltfilt(
+                filteredAsigs = signal.sosfiltfilt(
+                    filterCoeffs, tdDF.to_numpy(),
+                    axis=0)
+                tdDF = pd.DataFrame(
+                    filteredAsigs,
+                    index=tdDF.index,
+                    columns=tdDF.columns)
+                if trackMemory:
+                    print('Just finished analog data filtering before downsampling. memory usage: {:.1f} MB'.format(
+                        prf.memory_usage_psutil()))
+            tdInterp = hf.interpolateDF(
+                tdDF, newT,
+                kind='linear', fill_value='extrapolate',
+                verbose=verbose)
+            # free up memory used by full resolution asigs
+            del tdDF
+        else:
+            tdInterp = tdDF
+        #
+        asigCache.append(tdInterp)
+        #
+        print('Finished chunk {}'.format(chunkIdxStr))
+    allTdDF = pd.concat(asigCache)
+    # TODO: check for nans, if, for example a signal is partially missing
+    allTdDF.fillna(method='bfill', inplace=True)
+    allTdDF.fillna(method='ffill', inplace=True)
+    for asigName in allTdDF.columns:
+        newAsig = AnalogSignal(
+            allTdDF[asigName].to_numpy() * asigUnits,
+            name=asigName,
+            sampling_rate=samplingRate,
+            dtype=np.float32,
+            **asigAnnCache[asigName])
+        chIdxName = asigAnnCache[asigName]['parentChanName']
+        chIdx = channelIndexCache[chIdxName]
+        # cross-assign ownership to containers
+        chIdx.analogsignals.append(newAsig)
+        newSeg.analogsignals.append(newAsig)
+        newAsig.channel_index = chIdx
+        newAsig.segment = newSeg
+    #
+    for uName, unit in unitCache.items():
+        # concatenate spike times, waveforms, etc.
+        if len(spiketrainCache[unit.name]):
+            consolidatedTimes = np.concatenate([
+                    st.times.magnitude
+                    for st in spiketrainCache[unit.name]
+                ])
+            # TODO:   decide whether to include this step
+            #         which snaps the spike times to the nearest
+            #         *sampled* data point
+            #
+            # consolidatedTimes, timesIndex = hf.closestSeries(
+            #     takeFrom=pd.Series(consolidatedTimes),
+            #     compareTo=pd.Series(allTdDF.index))
+            #
+            # find an example spiketrain with array_annotations
+            for st in spiketrainCache[unit.name]:
+                if len(st.times):
+                    dummySt = st
+                    break
+            consolidatedAnn = {
+                key: np.array([])
+                for key, value in dummySt.array_annotations.items()
+                }
+            for key, value in consolidatedAnn.items():
+                consolidatedAnn[key] = np.concatenate([
+                    st.annotations[key]
+                    for st in spiketrainCache[unit.name]
+                ])
+            consolidatedWaveforms = np.concatenate([
+                st.waveforms
+                for st in spiketrainCache[unit.name]
+                ])
+            spikeTStop = max([
+                st.t_stop
+                for st in spiketrainCache[unit.name]
+                ])
+            spikeTStart = max([
+                st.t_start
+                for st in spiketrainCache[unit.name]
+                ])
+            spikeAnnotations = {
+                key: value
+                for key, value in dummySt.annotations.items()
+                if key not in dummySt.annotations['arrayAnnNames']
+            }
+            newSt = SpikeTrain(
+                name=dummySt.name,
+                times=consolidatedTimes, units='sec', t_stop=spikeTStop,
+                waveforms=consolidatedWaveforms * dummySt.waveforms.units,
+                left_sweep=dummySt.left_sweep,
+                sampling_rate=dummySt.sampling_rate,
+                t_start=spikeTStart, **spikeAnnotations,
+                array_annotations=consolidatedAnn)
+            # cross-assign ownership to containers
+            unit.spiketrains.append(newSt)
+            newSt.unit = unit
+            newSeg.spiketrains.append(newSt)
+            newSt.segment = newSeg
+            # link chIdxes and Units
+            if unit.annotations['parentChanName'] in channelIndexCache:
+                chIdx = channelIndexCache[unit.annotations['parentChanName']]
+                if unit not in chIdx.units:
+                    chIdx.units.append(unit)
+                    unit.channel_index = chIdx
+            else:
+                newChIdx = ChannelIndex(
+                    name=unit.annotations['parentChanName'], index=0)
+                channelIndexCache[unit.annotations['parentChanName']] = newChIdx
+                if unit not in newChIdx.units:
+                    newChIdx.units.append(unit)
+                    unit.channel_index = newChIdx
+    #
+    for evName, eventList in eventCache.items():
+        consolidatedTimes = np.concatenate([
+            ev.times.magnitude
+            for ev in eventList
+            ])
+        consolidatedLabels = np.concatenate([
+            ev.labels
+            for ev in eventList
+            ])
+        newEvent = Event(
+            name=evName,
+            times=consolidatedTimes * pq.s,
+            labels=consolidatedLabels
+            )
+        # if len(newEvent):
+        newEvent.segment = newSeg
+        newSeg.events.append(newEvent)
+    for chIdxName, chIdx in channelIndexCache.items():
+        if len(chIdx.analogsignals) or len(chIdx.units):
+            outputBlock.channel_indexes.append(chIdx)
+            chIdx.block = outputBlock
+    #
+    outputBlock = purgeNixAnn(outputBlock)
+    createRelationship = False
+    if createRelationship:
+        outputBlock.create_relationship()
+    return outputBlock
+
+
+def concatenateEventsContainer(eventContainer, newSegIdx=0):
+    if isinstance(eventContainer, dict):
+        listOfEvents = list(eventContainer.values())
+    else:
+        listOfEvents = eventContainer
+    listOfEvents = [ev for ev in listOfEvents if len(ev.times)]
+    for ev in listOfEvents:
+        dummyEvent = ev
+        if len(dummyEvent.times):
+            break
+    consolidatedTimes = np.concatenate([st.times for st in listOfEvents]) * dummyEvent.units
+    arrayAnnNames = list(dummyEvent.array_annotations.keys())
+    if len(arrayAnnNames):
+        consolidatedArrayAnn = {k: None for k in arrayAnnNames}
+        for annNm in arrayAnnNames:
+            consolidatedArrayAnn[annNm] = np.concatenate(
+                [st.array_annotations[annNm] for st in listOfEvents])
+    else:
+        consolidatedArrayAnn = None
+    if isinstance(dummyEvent, SpikeTrain):
+        consolidatedWaveforms = np.concatenate(
+            [st.waveforms for st in listOfEvents if hasattr(st, 'waveforms')],
+            axis=0) * dummyEvent.waveforms.units
+        tStop = max(st.t_stop for st in listOfEvents if hasattr(st, 't_stop'))
+        tStart = min(st.t_start for st in listOfEvents if hasattr(st, 't_start'))
+        if consolidatedWaveforms.size == 0:
+            consolidatedWaveforms = None
+            leftSweep = None
+        else:
+            dummyEvent.left_sweep
+        outObj = SpikeTrain(
+            name='seg{}_{}'.format(newSegIdx, dummyEvent.unit.name),
+            times=consolidatedTimes,
+            waveforms=consolidatedWaveforms,
+            t_start=tStart, t_stop=tStop,
+            left_sweep=leftSweep, **dummyEvent.annotations
+            )
+        outObj.unit = dummyEvent.unit
+    if isinstance(dummyEvent, Event):
+        consolidatedLabels = np.concatenate([st.labels for st in listOfEvents])
+        outObj = Event(
+            name='seg{}_{}'.format(
+                newSegIdx, childBaseName(dummyEvent.name, 'seg')),
+            labels=consolidatedLabels,
+            times=consolidatedTimes,
+            **dummyEvent.annotations
+            )
+    outObj.segment = dummyEvent.segment
+    if consolidatedArrayAnn is not None:
+        outObj.array_annotations = consolidatedArrayAnn
+        outObj.annotations['arrayAnnNames'] = arrayAnnNames
+    return outObj
 
 
 #  renamed spikeTrainWaveformsToDF to unitSpikeTrainWaveformsToDF
@@ -1643,7 +1986,7 @@ def readBlockFixNames(
         rawioReader,
         block_index=0, signal_group_mode='split-all',
         lazy=True, mapDF=None, reduceChannelIndexes=False,
-        # swapMaps=None
+        loadList=None
         ):
     headerSignalChan = pd.DataFrame(
         rawioReader.header['signal_channels']).set_index('id')
@@ -1825,6 +2168,47 @@ def readBlockFixNames(
     # [i.name for i in dataBlock.filter(objects=ChannelIndex)]
     # [i.name for i in dataBlock.filter(objects=SpikeTrain)]
     # [i.name for i in dataBlock.filter(objects=SpikeTrainProxy)]
+    if (loadList is not None) and lazy:
+        # pdb.set_trace()
+        if 'asig' in loadList:
+            for asigP in dataBlock.filter(objects=AnalogSignalProxy):
+                if asigP.name in loadList['asig']:
+                    asig = asigP.load()
+                    asig.annotations = asigP.annotations.copy()
+                    #
+                    seg = asigP.segment
+                    segAsigNames = [ag.name for ag in seg.analogsignals]
+                    asig.segment = seg
+                    idxInSeg = segAsigNames.index(asigP.name)
+                    seg.analogsignals[idxInSeg] = asig
+                    #
+                    chIdx = asigP.channel_index
+                    chIdxAsigNames = [ag.name for ag in chIdx.analogsignals]
+                    asig.channel_index = chIdx
+                    idxInChIdx = chIdxAsigNames.index(asigP.name)
+                    chIdx.analogsignals[idxInChIdx] = asig
+        if 'event' in loadList:
+            for evP in dataBlock.filter(objects=EventProxy):
+                if evP.name in loadList['event']:
+                    ev = loadObjArrayAnn(evP.load())
+                    seg = evP.segment
+                    segEvNames = [e.name for e in seg.events]
+                    idxInSeg = segEvNames.index(evP.name)
+                    seg.events[idxInSeg] = ev
+        if 'spikes' in loadList:
+            for stP in dataBlock.filter(objects=SpikeTrainProxy):
+                if stP.name in loadList['spikes']:
+                    st = loadObjArrayAnn(stP.load())
+                    seg = stP.segment
+                    segStNames = [s.name for s in seg.spiketrains]
+                    idxInSeg = segStNames.index(stP.name)
+                    seg.spiketrains[idxInSeg] = st
+                    #
+                    unit = stP.unit
+                    unitStNames = [s.name for s in unit.spiketrains]
+                    st.unit = unit
+                    idxInUnit = unitStNames.index(stP)
+                    unit.spiketrains[idxInUnit] = st
     return dataBlock
 
 
@@ -3139,13 +3523,14 @@ def loadWithArrayAnn(
 
 def blockFromPath(
         dataPath, lazy=False, mapDF=None,
-        reduceChannelIndexes=False):
+        reduceChannelIndexes=False, loadList=None):
     if lazy:
         dataReader = nixio_fr.NixIO(
             filename=dataPath)
         dataBlock = readBlockFixNames(
             dataReader, lazy=lazy, mapDF=mapDF,
-            reduceChannelIndexes=reduceChannelIndexes)
+            reduceChannelIndexes=reduceChannelIndexes, loadList=loadList)
+        
     else:
         dataReader = None
         dataBlock = loadWithArrayAnn(dataPath)
