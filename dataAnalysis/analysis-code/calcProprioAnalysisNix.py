@@ -244,6 +244,34 @@ def calcBlockAnalysisWrapper():
         reduceChannelIndexes=True,
         loadList=insLoadList)
     insSeg = insBlock.segments[0]
+    # convert stim updates to time series
+    if not arguments['rigOnly']:
+        ins_events = [
+            ev for ev in insBlock.filter(objects=Event)
+            if ev.name in ['seg0_ins_property', 'seg0_ins_value']]
+        if len(ins_events):
+            expandCols = [
+                    'RateInHz', 'therapyStatus',
+                    'activeGroup', 'program', 'trialSegment']
+            deriveCols = ['amplitudeRound', 'amplitude']
+            progAmpNames = rcsa_helpers.progAmpNames
+            #
+            pdb.set_trace()
+            stimStSer = ns5.eventsToDataFrame(
+                ins_events, idxT='t')
+            stimStatus = mdt.stimStatusSerialtoLong(
+                stimStSer, idxT='t',  namePrefix='seg0_ins_',
+                expandCols=expandCols,
+                deriveCols=deriveCols, progAmpNames=progAmpNames)
+            columnsToBeAdded = ['amplitude', 'program', 'RateInHz'] + progAmpNames
+            # pdb.set_trace()
+            # stimSt
+            infoFromStimStatus = hf.interpolateDF(
+                stimStatus, outputBlockT,
+                x='t', columns=columnsToBeAdded, kind='previous')
+            infoFromStimStatus.set_index('t', inplace=True)
+        else:
+            infoFromStimStatus = None
     # insBlock = nspBlock
     ######
     #  synchronize INS
@@ -294,7 +322,7 @@ def calcBlockAnalysisWrapper():
             i in range(len(evList[0]))
             ])
         concatEvent = Event(
-            name='seg0_' + 'concatenated_updates',
+            name='seg0_concatenated_updates',
             times=allProp.times,
             labels=concatLabels
             )
@@ -440,31 +468,7 @@ def calcBlockAnalysisWrapper():
     #         'seg0_velocity_x', 'seg0_velocity_y']
     #
     concatList = [tdInterp, insInterp]
-    # convert stim updates to time series
     if not arguments['rigOnly']:
-        ins_events = [
-            ev for ev in insBlock.filter(objects=Event)
-            if ev.name in ['seg0_ins_property', 'seg0_ins_value']]
-        expandCols = [
-                'RateInHz', 'therapyStatus',
-                'activeGroup', 'program', 'trialSegment']
-        deriveCols = ['amplitudeRound', 'amplitude']
-        progAmpNames = rcsa_helpers.progAmpNames
-        #
-        pdb.set_trace()
-        stimStSer = ns5.eventsToDataFrame(
-            ins_events, idxT='t')
-        stimStatus = mdt.stimStatusSerialtoLong(
-            stimStSer, idxT='t',  namePrefix='seg0_ins_',
-            expandCols=expandCols,
-            deriveCols=deriveCols, progAmpNames=progAmpNames)
-        columnsToBeAdded = ['amplitude', 'program', 'RateInHz'] + progAmpNames
-        # pdb.set_trace()
-        # stimSt
-        infoFromStimStatus = hf.interpolateDF(
-            stimStatus, outputBlockT,
-            x='t', columns=columnsToBeAdded, kind='previous')
-        infoFromStimStatus.set_index('t', inplace=True)
         concatList.append(infoFromStimStatus)
     if len(concatList) > 1:
         tdInterp = pd.concat(

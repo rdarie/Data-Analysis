@@ -20,7 +20,7 @@
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=2
+#SBATCH --array=1,2,3
 
 module load anaconda/2020.02
 . /gpfs/runtime/opt/anaconda/2020.02/etc/profile.d/conda.sh
@@ -56,7 +56,7 @@ python --version
 # EXP="exp202101141100"
 EXP="exp202101191100"
 
-SLURM_ARRAY_TASK_ID=3
+# SLURM_ARRAY_TASK_ID=3
 
 # --makePlots to make quality check plots
 # --showPlots to interactively display quality check plots

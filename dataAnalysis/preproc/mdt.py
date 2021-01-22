@@ -2928,6 +2928,7 @@ def getINSStimOnset(
                         pulseOnTimes ** 0 * theseTrialSegments[idx])
                     #
                     pulseOffTimes = pulseOnTimes + 100 * stimPW * pq.us
+                    pulseOffTimes[0] = offTime
                     tempOnTimes.append(pulseOnTimes)
                     tempOffTimes.append(pulseOffTimes)
                     onDiffE = onsetDifferenceFromExpected[idx]
