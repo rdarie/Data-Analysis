@@ -22,25 +22,7 @@
 #SBATCH --account=bibs-dborton-condo
 
 # Run a command
-
-# EXP="exp201901261000"
-# EXP="exp202010271200"
-# EXP="exp202011161100"
-# EXP="exp202011201100"
-# EXP="exp202011231200"
-# EXP="exp202012111100"
-# EXP="exp202012121100"
-# EXP="exp202012171200"
-EXP="exp202101051100"
-EXP="exp202101061100"
-EXP="exp202101111100"
-EXP="exp202101141100"
-
-module load anaconda/2020.02
-. /gpfs/runtime/opt/anaconda/2020.02/etc/profile.d/conda.sh
-conda activate
-source activate nda2
-python --version
+source ./shellScripts/run_spike_sorting_preamble.sh
 
 # Step 3: Transfer the templates
 python ./transferTDCTemplates.py --arrayName=utah --exp=$EXP --chan_start=0 --chan_stop=96

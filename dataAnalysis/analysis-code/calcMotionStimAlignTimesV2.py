@@ -182,14 +182,15 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
             theseStimAnn = stimEvDF.loc[int(closestIdx), :]
             try:
                 assert theseStimAnn['stimCat'] == 'stimOff'
-                for annName in stimAnnNames:
-                    motionEvDF.loc[outboundIdx, annName] = noStimFiller[annName]
-                    motionEvDF.loc[reachIdx, annName] = noStimFiller[annName]
-                motionEvDF.loc[outboundIdx, 'stimDelay'] = noStimFiller['stimDelay']
-                motionEvDF.loc[reachIdx, 'stimDelay'] = noStimFiller['stimDelay']
             except Exception:
+                print('\n\n{}\n Error at t= {} sec\n\n'.format(dataBlockPath, outboundT.iloc[0]))
                 traceback.print_exc()
-                pd.set_trace()
+                pdb.set_trace()
+            for annName in stimAnnNames:
+                motionEvDF.loc[outboundIdx, annName] = noStimFiller[annName]
+                motionEvDF.loc[reachIdx, annName] = noStimFiller[annName]
+            motionEvDF.loc[outboundIdx, 'stimDelay'] = noStimFiller['stimDelay']
+            motionEvDF.loc[reachIdx, 'stimDelay'] = noStimFiller['stimDelay']
         ####
         reachBaseT = group.loc[group['pedalMovementCat'] == 'reachedBase', 't']
         reachBaseIdx = reachBaseT.index
@@ -234,14 +235,15 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
             theseStimAnn = stimEvDF.loc[int(closestIdx), :]
             try:
                 assert theseStimAnn['stimCat'] == 'stimOff'
-                for annName in stimAnnNames:
-                    motionEvDF.loc[returnIdx, annName] = noStimFiller[annName]
-                    motionEvDF.loc[reachBaseIdx, annName] = noStimFiller[annName]
-                motionEvDF.loc[returnIdx, 'stimDelay'] = noStimFiller['stimDelay']
-                motionEvDF.loc[reachBaseIdx, 'stimDelay'] = noStimFiller['stimDelay']
             except Exception:
+                print('\n\n{}\nError at t= {} sec\n\n'.format(dataBlockPath, returnT.iloc[0]))
                 traceback.print_exc()
-                pd.set_trace()
+                pdb.set_trace()
+            for annName in stimAnnNames:
+                motionEvDF.loc[returnIdx, annName] = noStimFiller[annName]
+                motionEvDF.loc[reachBaseIdx, annName] = noStimFiller[annName]
+            motionEvDF.loc[returnIdx, 'stimDelay'] = noStimFiller['stimDelay']
+            motionEvDF.loc[reachBaseIdx, 'stimDelay'] = noStimFiller['stimDelay']
     motionEvDF.loc[:, stimAnnNames] = (
         motionEvDF
         .loc[:, stimAnnNames]

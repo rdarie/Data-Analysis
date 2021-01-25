@@ -17,6 +17,7 @@ python --version
 # EXP="exp202012171200"
 EXP="exp202101061100"
 EXP="exp202101141100"
+EXP="exp202101191100"
 
 LAZINESS="--lazy"
 

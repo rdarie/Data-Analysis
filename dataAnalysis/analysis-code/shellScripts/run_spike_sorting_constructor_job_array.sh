@@ -23,7 +23,7 @@
 # Run a command
 source ./shellScripts/run_spike_sorting_preamble.sh
 
-BLOCKIDX=1
+BLOCKIDX=3
 # SLURM_ARRAY_TASK_ID=0
 let CHAN_START=SLURM_ARRAY_TASK_ID
 # for nform, groups of 4 for utah, groups of 5

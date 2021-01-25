@@ -1038,6 +1038,7 @@ def getThresholdCrossings(
             (dsToSearch < thresh) & (nextDS >= thresh))
         crossMask = risingMask | fallingMask
     crossIdx = dataSrs.index[crossMask]
+    # pdb.set_trace()
     if iti is not None:
         min_dist = int(fs * iti * (1 - itiWiggle))
         y = dsToSearch.abs().to_numpy()

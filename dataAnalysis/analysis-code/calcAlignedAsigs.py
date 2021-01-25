@@ -78,6 +78,9 @@ else:
         scratchFolder, '{}',
         ns5FileName + '_{}.nix'.format(arguments['signalBlockName'])).format(arguments['analysisName'])
 
+print('Loading events from {}'.format(eventPath))
+print('Loading signal from {}'.format(signalPath))
+
 eventReader, eventBlock = ns5.blockFromPath(
     eventPath, lazy=arguments['lazy'])
 #

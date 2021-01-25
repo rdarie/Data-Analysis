@@ -626,6 +626,26 @@ def concatenateBlocks(
     return outputBlock
 
 
+def concatenateEventsContainerV2(eventContainer, newSegIdx=0):
+    if isinstance(eventContainer, dict):
+        listOfEvents = list(eventContainer.values())
+    else:
+        listOfEvents = eventContainer
+    listOfEvents = [ev for ev in listOfEvents if len(ev.times)]
+    for evIdx, ev in enumerate(listOfEvents):
+        masterEvent = ev
+        if len(masterEvent.times):
+            break
+    if evIdx > len(listOfEvents) - 1:
+        for ev in listOfEvents[evIdx+1:]:
+            masterEvent.merge(ev)
+    if masterEvent.array_annotations is not None:
+        arrayAnnNames = list(masterEvent.array_annotations.keys())
+        masterEvent.annotations.update(masterEvent.array_annotations)
+        masterEvent.annotations['arrayAnnNames'] = arrayAnnNames
+    return masterEvent
+
+
 def concatenateEventsContainer(eventContainer, newSegIdx=0):
     if isinstance(eventContainer, dict):
         listOfEvents = list(eventContainer.values())
@@ -676,6 +696,7 @@ def concatenateEventsContainer(eventContainer, newSegIdx=0):
     outObj.segment = dummyEvent.segment
     if consolidatedArrayAnn is not None:
         outObj.array_annotations = consolidatedArrayAnn
+        outObj.annotations.update(consolidatedArrayAnn)
         outObj.annotations['arrayAnnNames'] = arrayAnnNames
     return outObj
 
@@ -2168,11 +2189,15 @@ def readBlockFixNames(
     # [i.name for i in dataBlock.filter(objects=ChannelIndex)]
     # [i.name for i in dataBlock.filter(objects=SpikeTrain)]
     # [i.name for i in dataBlock.filter(objects=SpikeTrainProxy)]
+    if lazy:
+        for stP in dataBlock.filter(objects=SpikeTrainProxy):
+            if 'unitAnnotations' in stP.annotations:
+                unAnnStr = stP.annotations['unitAnnotations']
+                stP.unit.annotations.update(json.loads(unAnnStr))
     if (loadList is not None) and lazy:
-        # pdb.set_trace()
-        if 'asig' in loadList:
+        if 'asigs' in loadList:
             for asigP in dataBlock.filter(objects=AnalogSignalProxy):
-                if asigP.name in loadList['asig']:
+                if asigP.name in loadList['asigs']:
                     asig = asigP.load()
                     asig.annotations = asigP.annotations.copy()
                     #
@@ -2187,17 +2212,17 @@ def readBlockFixNames(
                     asig.channel_index = chIdx
                     idxInChIdx = chIdxAsigNames.index(asigP.name)
                     chIdx.analogsignals[idxInChIdx] = asig
-        if 'event' in loadList:
+        if 'events' in loadList:
             for evP in dataBlock.filter(objects=EventProxy):
-                if evP.name in loadList['event']:
+                if evP.name in loadList['events']:
                     ev = loadObjArrayAnn(evP.load())
                     seg = evP.segment
                     segEvNames = [e.name for e in seg.events]
                     idxInSeg = segEvNames.index(evP.name)
                     seg.events[idxInSeg] = ev
-        if 'spikes' in loadList:
+        if 'spiketrains' in loadList:
             for stP in dataBlock.filter(objects=SpikeTrainProxy):
-                if stP.name in loadList['spikes']:
+                if stP.name in loadList['spiketrains']:
                     st = loadObjArrayAnn(stP.load())
                     seg = stP.segment
                     segStNames = [s.name for s in seg.spiketrains]
@@ -2207,7 +2232,7 @@ def readBlockFixNames(
                     unit = stP.unit
                     unitStNames = [s.name for s in unit.spiketrains]
                     st.unit = unit
-                    idxInUnit = unitStNames.index(stP)
+                    idxInUnit = unitStNames.index(stP.name)
                     unit.spiketrains[idxInUnit] = st
     return dataBlock
 

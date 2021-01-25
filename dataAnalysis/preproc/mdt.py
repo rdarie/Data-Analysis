@@ -2090,89 +2090,90 @@ def preprocINS(
         stimSpikes = block.filter(objects=SpikeTrain)
         stimSpikes = ns5.loadContainerArrayAnn(trainList=stimSpikes)
         stimSpikesDF = ns5.unitSpikeTrainArrayAnnToDF(stimSpikes)
-        if trialFilesStim['eventsFromFirstInTrain']:
-            firstOfTrainMask = stimSpikesDF['firstOfTrain'].astype(np.bool).to_numpy()
-            stimSpikesDF = stimSpikesDF.loc[firstOfTrainMask, :].reset_index()
-        stimSpikesDF['ratePeriod'] = stimSpikesDF['RateInHz'] ** (-1)
-        stimSpikesDF.sort_values('t', kind='mergesort', inplace=True)
-        stimSpikesDF.reset_index(drop=True, inplace=True)
-        stimSpikesDF['nextT'] = stimSpikesDF['t'].shift(-1)
-        tDiff = (stimSpikesDF['nextT'] - stimSpikesDF['endTime']).fillna(1)
-        overShotEnd = tDiff <= 0
-        stimSpikesDF.loc[overShotEnd, 'endTime'] = (
-            stimSpikesDF.loc[overShotEnd, 'nextT'] -
-            stimSpikesDF.loc[overShotEnd, 'ratePeriod'])
-        onsetEvents = pd.melt(
-            stimSpikesDF,
-            id_vars=['t'],
-            value_vars=[
-                'group', 'program', 'RateInHz',
-                'pulseWidth', 'amplitude'],
-            var_name='ins_property', value_name='ins_value')
-        onsetEvents.rename(columns={'t': 'INSTime'}, inplace=True)
-        onsetEvents.loc[onsetEvents['ins_property'] == 'group', 'ins_property'] = 'activeGroup'
-        # ampOnsets = onsetEvents.loc[onsetEvents['ins_property'] == 'amplitude', :]
-        # stimSpikesDF.loc[:, ['t', 'endTime']]
-        offsetEvents = pd.melt(
-            stimSpikesDF,
-            id_vars=['endTime'],
-            value_vars=['amplitude'],
-            var_name='ins_property', value_name='ins_value')
-        offsetEvents.loc[
-            offsetEvents['ins_property'] == 'amplitude',
-            'ins_value'] = 0
-        offsetEvents.rename(columns={'endTime': 'INSTime'}, inplace=True)
-        newEvents = (
-            pd.concat([onsetEvents, offsetEvents], ignore_index=True)
-            .sort_values('INSTime', kind='mergesort')
-            .reset_index(drop=True)
+        if stimSpikesDF.size > 0:
+            if trialFilesStim['eventsFromFirstInTrain']:
+                firstOfTrainMask = stimSpikesDF['firstOfTrain'].astype(np.bool).to_numpy()
+                stimSpikesDF = stimSpikesDF.loc[firstOfTrainMask, :].reset_index()
+            stimSpikesDF['ratePeriod'] = stimSpikesDF['RateInHz'] ** (-1)
+            stimSpikesDF.sort_values('t', kind='mergesort', inplace=True)
+            stimSpikesDF.reset_index(drop=True, inplace=True)
+            stimSpikesDF['nextT'] = stimSpikesDF['t'].shift(-1)
+            tDiff = (stimSpikesDF['nextT'] - stimSpikesDF['endTime']).fillna(1)
+            overShotEnd = tDiff <= 0
+            stimSpikesDF.loc[overShotEnd, 'endTime'] = (
+                stimSpikesDF.loc[overShotEnd, 'nextT'] -
+                stimSpikesDF.loc[overShotEnd, 'ratePeriod'])
+            onsetEvents = pd.melt(
+                stimSpikesDF,
+                id_vars=['t'],
+                value_vars=[
+                    'group', 'program', 'RateInHz',
+                    'pulseWidth', 'amplitude'],
+                var_name='ins_property', value_name='ins_value')
+            onsetEvents.rename(columns={'t': 'INSTime'}, inplace=True)
+            onsetEvents.loc[onsetEvents['ins_property'] == 'group', 'ins_property'] = 'activeGroup'
+            # ampOnsets = onsetEvents.loc[onsetEvents['ins_property'] == 'amplitude', :]
+            # stimSpikesDF.loc[:, ['t', 'endTime']]
+            offsetEvents = pd.melt(
+                stimSpikesDF,
+                id_vars=['endTime'],
+                value_vars=['amplitude'],
+                var_name='ins_property', value_name='ins_value')
+            offsetEvents.loc[
+                offsetEvents['ins_property'] == 'amplitude',
+                'ins_value'] = 0
+            offsetEvents.rename(columns={'endTime': 'INSTime'}, inplace=True)
+            newEvents = (
+                pd.concat([onsetEvents, offsetEvents], ignore_index=True)
+                .sort_values('INSTime', kind='mergesort')
+                .reset_index(drop=True)
+                )
+            firstNonZeroAmplitudeMask = (
+                (stimStatusSerial['ins_property'] == 'amplitude') &
+                (stimStatusSerial['ins_value'] > 0)
             )
-        firstNonZeroAmplitudeMask = (
-            (stimStatusSerial['ins_property'] == 'amplitude') &
-            (stimStatusSerial['ins_value'] > 0)
-        )
-        firstNonZeroAmplitudeTime = stimStatusSerial.iloc[
-            firstNonZeroAmplitudeMask
-            .index[firstNonZeroAmplitudeMask][0]
-            ]['INSTime']
-        keepMask = (
-            (
-                stimStatusSerial['ins_property']
-                .isin(['trialSegment', 'therapyStatus', 'amplitude'])) |
-            (stimStatusSerial['INSTime'] < firstNonZeroAmplitudeTime)
-            )
-        newStimStatusSerial = stimStatusSerial.loc[
-            keepMask,
-            ['INSTime', 'ins_property', 'ins_value']]
-        newStimStatusSerial.loc[newStimStatusSerial['ins_property'] == 'amplitude', 'ins_property'] = 'amplitudeFromJSON'
-        newStimStatusSerial = pd.concat(
-            [newStimStatusSerial, newEvents])
-        newStimStatusSerial = (
-            newStimStatusSerial
-            .sort_values('INSTime', kind='mergesort')
-            .reset_index(drop=True)
-            )
-        newStimEvents = ns5.eventDataFrameToEvents(
-            newStimStatusSerial, idxT='INSTime',
-            eventName='seg0_',
-            annCol=['ins_property', 'ins_value']
-            )
-        closestTimes, closestIdx = hf.closestSeries(
-            takeFrom=newStimStatusSerial['INSTime'],
-            compareTo=stimSpikesDF['t'])
-        tSegAnnsDF = (
-            stimSpikesDF
-            .loc[closestIdx, 'trialSegment']
-            .to_numpy())
-        block.segments[0].events = newStimEvents
-        for ev in newStimEvents:
-            ev.array_annotations.update({
-                'trialSegment': tSegAnnsDF})
-            ev.annotations.update({
-                'trialSegment': tSegAnnsDF,
-                'arrayAnnNames': ['trialSegment']})
-            ev.segment = block.segments[0]
-        stimStatusSerial = newStimStatusSerial
+            firstNonZeroAmplitudeTime = stimStatusSerial.iloc[
+                firstNonZeroAmplitudeMask
+                .index[firstNonZeroAmplitudeMask][0]
+                ]['INSTime']
+            keepMask = (
+                (
+                    stimStatusSerial['ins_property']
+                    .isin(['trialSegment', 'therapyStatus', 'amplitude'])) |
+                (stimStatusSerial['INSTime'] < firstNonZeroAmplitudeTime)
+                )
+            newStimStatusSerial = stimStatusSerial.loc[
+                keepMask,
+                ['INSTime', 'ins_property', 'ins_value']]
+            newStimStatusSerial.loc[newStimStatusSerial['ins_property'] == 'amplitude', 'ins_property'] = 'amplitudeFromJSON'
+            newStimStatusSerial = pd.concat(
+                [newStimStatusSerial, newEvents])
+            newStimStatusSerial = (
+                newStimStatusSerial
+                .sort_values('INSTime', kind='mergesort')
+                .reset_index(drop=True)
+                )
+            newStimEvents = ns5.eventDataFrameToEvents(
+                newStimStatusSerial, idxT='INSTime',
+                eventName='seg0_',
+                annCol=['ins_property', 'ins_value']
+                )
+            closestTimes, closestIdx = hf.closestSeries(
+                takeFrom=newStimStatusSerial['INSTime'],
+                compareTo=stimSpikesDF['t'])
+            tSegAnnsDF = (
+                stimSpikesDF
+                .loc[closestIdx, 'trialSegment']
+                .to_numpy())
+            block.segments[0].events = newStimEvents
+            for ev in newStimEvents:
+                ev.array_annotations.update({
+                    'trialSegment': tSegAnnsDF})
+                ev.annotations.update({
+                    'trialSegment': tSegAnnsDF,
+                    'arrayAnnNames': ['trialSegment']})
+                ev.segment = block.segments[0]
+            stimStatusSerial = newStimStatusSerial
     # make labels
     labelNames = [
         'RateInHz', 'program', 'therapyStatus',
@@ -3070,6 +3071,7 @@ def getINSStimOnset(
             assert (consolidatedTimes.shape[0] == spikeWaveforms.shape[0])
             thisUnit.spiketrains.append(newSt)
             newSt.unit = thisUnit
+            newSt.annotations['unitAnnotations'] = json.dumps(thisUnit.annotations.copy())
             if createRelationship:
                 thisUnit.create_relationship()
             seg.spiketrains.append(newSt)

@@ -212,7 +212,7 @@ def calcBlockAnalysisWrapper():
     nspPath = os.path.join(
         scratchFolder,
         blockBaseName + rigFileSuffix + '.nix')
-    nspLoadList = {'event': ['seg0_rig_property', 'seg0_rig_value']}
+    nspLoadList = {'events': ['seg0_rig_property', 'seg0_rig_value']}
     nspReader, nspBlock = ns5.blockFromPath(
         nspPath, lazy=arguments['lazy'],
         reduceChannelIndexes=True, loadList=nspLoadList)
@@ -235,9 +235,9 @@ def calcBlockAnalysisWrapper():
         ]
     insSpikesToLoad = ['seg0_g0p0#0']
     insLoadList = {
-        'asig': insSignalsToLoad,
-        'event': insEventsToLoad,
-        'spiketrain': insSpikesToLoad
+        'asigs': insSignalsToLoad,
+        'events': insEventsToLoad,
+        'spiketrains': insSpikesToLoad
         }
     insReader, insBlock = ns5.blockFromPath(
         insPath, lazy=arguments['lazy'],
@@ -256,7 +256,6 @@ def calcBlockAnalysisWrapper():
             deriveCols = ['amplitudeRound', 'amplitude']
             progAmpNames = rcsa_helpers.progAmpNames
             #
-            pdb.set_trace()
             stimStSer = ns5.eventsToDataFrame(
                 ins_events, idxT='t')
             stimStatus = mdt.stimStatusSerialtoLong(
@@ -329,9 +328,12 @@ def calcBlockAnalysisWrapper():
         concatEvent.merge_annotations(allProp)
         evList.append(concatEvent)
     rigChanQuery = '(chanName.notna())'
+    alreadyThereNames = [asi.name for asi in outputBlock.filter(objects=AnalogSignal)]
     if arguments['lazy']:
         rigChanNames = ns5.listChanNames(
             nspBlock, rigChanQuery, objType=AnalogSignalProxy)
+        rigChanNames = [rcn for rcn in rigChanNames if rcn not in alreadyThereNames]
+        # pdb.set_trace()
         asigList = []
         for asigP in nspSeg.analogsignals:
             if asigP.name in rigChanNames:
@@ -344,6 +346,7 @@ def calcBlockAnalysisWrapper():
     else:
         rigChanNames = ns5.listChanNames(
             asigBlock, rigChanQuery, objType=AnalogSignal)
+        rigChanNames = [rcn for rcn in rigChanNames if rcn not in alreadyThereNames]
         asigList = [
             asig
             for asig in nspSeg.analogsignals
@@ -397,7 +400,7 @@ def calcBlockAnalysisWrapper():
     insAsigList = [
         asig
         for asig in insSeg.analogsignals
-        if asig.name in insLoadList['asig']
+        if asig.name in insLoadList['asigs']
         ]
     for asig in insAsigList:
         if asig.size > 0:

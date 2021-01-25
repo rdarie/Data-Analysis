@@ -26,6 +26,7 @@ expOpts, allOpts = parseAnalysisOptions(
 globals().update(expOpts)
 globals().update(allOpts)
 
+
 def transferTDCTemplates():
     # affects the prefix
     arrayName = arguments['arrayName']
@@ -46,6 +47,7 @@ def transferTDCTemplates():
     try:
         assert len(prbPathCandidates) == 1
     except Exception:
+        traceback.print_exc()
         pdb.set_trace()
     prbPath = prbPathCandidates[0]
     #

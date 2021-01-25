@@ -122,7 +122,7 @@ if arguments['limitPages'] is not None:
 else:
     limitPages = None
 
-minNObservations = 6
+minNObservations = 1
 if arguments['individualTraces']:
     relplotKWArgs['estimator'] = None
     relplotKWArgs['units'] = 't'

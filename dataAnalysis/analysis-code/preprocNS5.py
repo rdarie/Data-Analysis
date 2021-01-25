@@ -99,7 +99,10 @@ def preprocNS5():
             print(theseAsigNames)
     ###############################################################
     if arguments['maskMotorEncoder']:
-        motorEncoderMask = alignTimeBoundsLookup[int(arguments['blockIdx'])]
+        try:
+            motorEncoderMask = motorEncoderBoundsLookup[int(arguments['blockIdx'])]
+        except Exception:
+            motorEncoderMask = alignTimeBoundsLookup[int(arguments['blockIdx'])]
     else:
         motorEncoderMask = None
     ###############################################################
@@ -123,11 +126,13 @@ def preprocNS5():
             calcRigEvents=False)
     #
     if arguments['forSpikeSorting']:
+        print('\n\nPreprocNs5, generating spike preview...\n\n')
         ns5.preproc(
             fileName=ns5FileName,
             rawFolderPath=nspFolder,
             outputFolderPath=scratchFolder, mapDF=mapDF,
             fillOverflow=False, removeJumps=False,
+            calcOutliers=spikeSortingOpts[arrayName]['interpolateOutliers'],
             interpolateOutliers=spikeSortingOpts[arrayName]['interpolateOutliers'],
             outlierThreshold=spikeSortingOpts[arrayName]['outlierThreshold'],
             outlierMaskFilterOpts=outlierMaskFilterOpts,
@@ -148,6 +153,7 @@ def preprocNS5():
             equalChunks=False, chunkList=[0],
             calcRigEvents=False, outlierRemovalDebugFlag=False)
     if arguments['fullSubtractMean']:
+        print('\n\nPreprocNs5, generating spike extraction data...\n\n')
         ns5.preproc(
             fileName=ns5FileName,
             rawFolderPath=nspFolder,
@@ -172,6 +178,7 @@ def preprocNS5():
             chunkSize=chunkSize, equalChunks=equalChunks, chunkList=chunkList,
             calcRigEvents=False)
     if arguments['fullSubtractMeanUnfiltered']:
+        print('\n\nPreprocNs5, generating lfp data...\n\n')
         ns5.preproc(
             fileName=ns5FileName,
             rawFolderPath=nspFolder,
@@ -198,6 +205,7 @@ def preprocNS5():
     if arguments['analogOnly']:
         analogInputNames = sorted(
             trialFilesFrom['utah']['eventInfo']['inputIDs'].values())
+        print('\n\nPreprocNs5, generating rig inputs and other analog data...\n\n')
         ns5.preproc(
             fileName=ns5FileName,
             rawFolderPath=nspFolder,

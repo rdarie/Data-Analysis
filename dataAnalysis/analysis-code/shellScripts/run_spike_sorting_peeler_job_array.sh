@@ -38,3 +38,4 @@ SOURCESELECTOR="--sourceFileSuffix=mean_subtracted"
 # python -u ./tridesclousCCV.py --arrayName=nform --blockIdx=$BLOCKIDX --exp=$EXP --batchPeel --chan_start=$CHAN_START --chan_stop=$CHAN_STOP $SOURCESELECTOR
 python -u ./tridesclousCCV.py --arrayName=utah --blockIdx=1 --exp=$EXP --batchPeel --chan_start=$CHAN_START --chan_stop=$CHAN_STOP $SOURCESELECTOR
 python -u ./tridesclousCCV.py --arrayName=utah --blockIdx=2 --exp=$EXP --batchPeel --chan_start=$CHAN_START --chan_stop=$CHAN_STOP $SOURCESELECTOR
+python -u ./tridesclousCCV.py --arrayName=utah --blockIdx=3 --exp=$EXP --batchPeel --chan_start=$CHAN_START --chan_stop=$CHAN_STOP $SOURCESELECTOR

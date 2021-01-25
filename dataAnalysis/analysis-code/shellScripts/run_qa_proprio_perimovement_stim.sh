@@ -19,7 +19,7 @@
 # Specify account details
 #SBATCH --account=bibs-dborton-condo
 
-SLURM_ARRAY_TASK_ID=2
+SLURM_ARRAY_TASK_ID=3
 source shellScripts/run_align_perimovement_stim_preamble.sh
 
 ALIGNQUERY="--alignQuery=outbound"

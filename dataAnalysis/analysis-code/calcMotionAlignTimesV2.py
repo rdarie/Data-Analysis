@@ -188,16 +188,16 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
     pedalPosTolerance = (
         pedalPosQuantiles.iloc[1] -
         pedalPosQuantiles.iloc[0]) / 100
-    pedalVelQuantiles = tdDF.loc[taskMask, 'pedalVelocity'].quantile([0, 1])
+    tdDF.loc[:, 'pedalVelocityAbs'] = tdDF['pedalVelocity'].abs()
+    pedalVelQuantiles = tdDF.loc[taskMask, 'pedalVelocityAbs'].quantile([0, 1])
     pedalVelTolerance = (
         pedalVelQuantiles.iloc[1] -
         pedalVelQuantiles.iloc[0]) / 100
-    tdDF.loc[:, 'pedalVelocityAbs'] = tdDF['pedalVelocity'].abs()
-    #
-    pedalRestingMask = tdDF['pedalVelocityAbs'] < pedalVelTolerance
+    # pedalRestingMask = tdDF['pedalVelocityAbs'] < pedalVelTolerance
+    pedalRestingMask = tdDF['pedalVelocityAbs'] == 0
     pedalNeutralPoint = float(
-        tdDF.loc[taskMask & pedalRestingMask, 'pedalPosition']
-        .mode())
+        tdDF.loc[taskMask & pedalRestingMask, 'pedalPosition'].value_counts().idxmax())
+    #
     tdDF.loc[:, 'pedalPosition'] = tdDF['pedalPosition'] - pedalNeutralPoint
     tdDF.loc[:, 'pedalPositionAbs'] = tdDF['pedalPosition'].abs()
     crossIdx, crossMask = hf.getThresholdCrossings(
@@ -249,6 +249,9 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
             except Exception:
                 traceback.print_exc()
                 pdb.set_trace()
+                # plt.plot(group['t'], group['pedalPosition'])
+                # plt.show()
+                # sns.distplot(tdDF.loc[taskMask & pedalRestingMask, 'pedalPosition'])
             trialsDict['reachedPeak'].loc[mvRound, 'tdIndex'] = crossIdxReachPeak
             trialsDict['reachedPeak'].loc[mvRound, 't'] = group.loc[crossIdxReachPeak, 't']
             #  return

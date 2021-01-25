@@ -10,17 +10,17 @@
 #SBATCH --mem=127G
 
 # Specify a job name:
-#SBATCH -J ins_preproc_20190127
+#SBATCH -J preproc_previews_2021_01_20
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-ins_preproc_20190127.stdout
-#SBATCH -e ../../batch_logs/%j-%a-ins_preproc_20190127.errout
+#SBATCH -o ../../batch_logs/%j-%a-preproc_previews_2021_01_20.stdout
+#SBATCH -e ../../batch_logs/%j-%a-preproc_previews_2021_01_20.errout
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=1,2
+##############SBATCH --array=1,2
 
 module load anaconda/2020.02
 . /gpfs/runtime/opt/anaconda/2020.02/etc/profile.d/conda.sh
@@ -55,6 +55,8 @@ python --version
 # EXP="exp202101111100"
 # EXP="exp202101141100"
 EXP="exp202101191100"
+EXP="exp202101201100"
+EXP="exp202101211100"
 
 python -u ./previewINSSessionSummary.py --exp=$EXP
 SLURM_ARRAY_TASK_ID=1
@@ -62,4 +64,6 @@ python -u './previewNSPTapTimes.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP -
 SLURM_ARRAY_TASK_ID=2
 python -u './previewNSPTapTimes.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --usedTENSPulses
 SLURM_ARRAY_TASK_ID=3
+python -u './previewNSPTapTimes.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --usedTENSPulses
+SLURM_ARRAY_TASK_ID=4
 python -u './previewNSPTapTimes.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --usedTENSPulses

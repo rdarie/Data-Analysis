@@ -4,7 +4,7 @@ import numpy as np
 def getExpOpts():
     blockExperimentTypeLookup = {
         1: 'proprio-miniRC',
-        2: 'proprio-miniRC',
+        2: 'proprio',
         3: 'proprio',
         }
     fullRigInputs = {
@@ -35,30 +35,21 @@ def getExpOpts():
         'forceX': 'ainp14',
         'forceY': 'ainp15',
         }
-    
-    experimentName = '202101191100-Rupert'
+    experimentName = '202101201100-Rupert'
     deviceName = 'DeviceNPC700246H'
     subjectName = 'Rupert'
     #
     jsonSessionNames = {
         #  per block
         1: [
-            # all of these were bad, ignore entire block
-            'Session1611074244745',
-            'Session1611074444806',
-            'Session1611074613697',
-            'Session1611074817075',
-            'Session1611075027104'
+            'Session1611161648041'
             ],
-        2: ['Session1611075726468'],
+        2: [
+            'Session1611162632629',
+            'Session1611163616272'
+            ],
         3: [
-            'Session1611076817230',
-            'Session1611077380739',
-            'Session1611077938464',
-            'Session1611078419769',
-            'Session1611078746322',
-            # 'Session1611078891809' #  looks bad, taking out
-            ],
+            'Session1611164507435'],
         }
     synchInfo = {'nform': {}, 'nsp': {}, 'ins': {}}
     # populate with defaults
@@ -74,6 +65,8 @@ def getExpOpts():
                 'minAnalogValue': None,
                 'keepIndex': slice(None)
                 }
+    ############################################################
+    ############################################################
     # manually add special instructions, e.g.
     # synchInfo['ins'][3][0].update({'minStimAmp': 0})
     # #synchInfo['ins'][1][1] = {
@@ -83,6 +76,8 @@ def getExpOpts():
     # #    'iti': 50e-3,
     # #    'keepIndex': slice(None)
     # #    }
+    ############################################################
+    ############################################################
     synchInfo['nsp'] = {
         # per block
         i: {
@@ -95,14 +90,18 @@ def getExpOpts():
             }
         for i in jsonSessionNames.keys()
         }
+    ############################################################
+    ############################################################
     # manually add special instructions, e.g
-    synchInfo['nsp'][2][0].update({'timeRanges': [(40, 6000)]})
+    # synchInfo['nsp'][2][0].update({'timeRanges': [(40, 6000)]})
     #
-    synchInfo['nsp'][3][0].update({'timeRanges': [(110, 6000)]})
-    synchInfo['nsp'][3][1].update({'timeRanges': [(685, 6000)]})
-    synchInfo['nsp'][3][2].update({'timeRanges': [(1238, 6000)]})
-    synchInfo['nsp'][3][3].update({'timeRanges': [(1695, 6000)]})
-    synchInfo['nsp'][3][4].update({'timeRanges': [(2023, 6000)]})
+    # synchInfo['nsp'][3][0].update({'timeRanges': [(110, 6000)]})
+    # synchInfo['nsp'][3][1].update({'timeRanges': [(685, 6000)]})
+    # synchInfo['nsp'][3][2].update({'timeRanges': [(1238, 6000)]})
+    # synchInfo['nsp'][3][3].update({'timeRanges': [(1695, 6000)]})
+    # synchInfo['nsp'][3][4].update({'timeRanges': [(2023, 6000)]})
+    #
+    #
     #  overrideSegmentsForTapSync
     #  if not possible to use taps, override with good taps from another segment
     #  not ideal, because segments are only synchronized to the nearest **second**
@@ -113,7 +112,6 @@ def getExpOpts():
         #
         }
     #
-    ###############################################################
     # options for stim artifact detection
     stimDetectOverrideStartTimes = {
         #  each key is a Block
@@ -134,22 +132,29 @@ def getExpOpts():
         }}
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        '202101191100-Rupert': [1],
+        '202101201100-Rupert': [1],
         }
     # Options relevant to the classifcation of proprio trials
     movementSizeBins = [0, 0.4, 0.8]
     movementSizeBinLabels = ['S', 'L']
+
+    ############################################################
+    ############################################################
     alignTimeBoundsLookup = None
     # alignTimeBoundsLookup = {
     #     3: [
     #         [275, 1732]
     #         ],
     #     }
-    motorEncoderBoundsLookup = {
-        3: [
-            [100, 299], [730, 2290]
-        ]
-    }
+    #
+    # motorEncoderBoundsLookup = {
+    #     3: [
+    #         [100, 299], [730, 2290]
+    #     ]
+    # }
+
+    ############################################################
+    ############################################################
     outlierDetectOptions = dict(
         targetEpochSize=100e-3,
         windowSize=(-.2, .8),
@@ -178,13 +183,14 @@ def getExpOpts():
             ],
             'electrodeMapPath': './Utah_SN6251_002374_Rupert.cmp',
             'rawBlockName': 'utah',
-            'excludeChans': ['utah69', 'utah44', 'utah54'],  # CHECK
+            ############################################################
+            'excludeChans': [],  # CHECK
             'prbOpts': dict(
                 contactSpacing=400,
                 groupIn={
                     'xcoords': np.arange(-.1, 10.1, 1),
                     'ycoords': np.arange(-.1, 10.1, 1)}),
-            'previewDuration': 600,
+            'previewDuration': 480,
             'previewOffset': 0,
             'interpolateOutliers': True,
             'outlierThreshold': 1 - 1e-6,
@@ -197,13 +203,13 @@ def getExpOpts():
             'confidence_threshold': .5,
             'refractory_period': 2e-3,
             'triFolderSource': {
-                'exp': experimentName, 'block': 1,
+                'exp': experimentName, 'block': 3,
                 'nameSuffix': 'spike_preview'},
             'triFolderDest': [
                 {
                     'exp': experimentName, 'block': i,
                     'nameSuffix': 'mean_subtracted'}
-                for i in [1,  2]]
+                for i in [1, 2, 3]]
         }
     }
     return locals()
