@@ -62,7 +62,7 @@ if arguments['processAll']:
     print('calcMotionStimAlignTimes does not support aggregate files')
     sys.exit()
 # trick to allow joint processing of minirc and regular trials
-if not (blockExperimentType == 'proprio'):
+if not ((blockExperimentType == 'proprio') or (blockExperimentType == 'proprio-motionOnly')):
     print('skipping RC trial')
     sys.exit()
 #
@@ -233,6 +233,8 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
                 assert crossIdxFall.size == 1
                 crossIdxFall = crossIdxFall[0]
             except Exception:
+                print('\n\n{}\n Error at t = {} sec\n\n'.format(
+                    dataBlockPath, group.loc[crossIdxFall, 't']))
                 traceback.print_exc()
                 pdb.set_trace()
             trialsDict['reachedBase'].loc[mvRound, 'tdIndex'] = crossIdxFall
@@ -240,7 +242,8 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
             pedalSizeAbs = group['pedalPositionAbs'].quantile(1)
             #  reach peak
             crossIdxReachPeak, _ = hf.getThresholdCrossings(
-                group.loc[:crossIdxFall, 'pedalPositionAbs'], thresh=pedalSizeAbs - pedalPosTolerance,
+                group.loc[:crossIdxFall, 'pedalPositionAbs'],
+                thresh=pedalSizeAbs - pedalPosTolerance,
                 edgeType='rising', fs=samplingRate,
                 iti=1,  # at least 1 sec between triggers
                 )
@@ -248,6 +251,8 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
                 assert crossIdxReachPeak.size == 1
                 crossIdxReachPeak = crossIdxReachPeak[0]
             except Exception:
+                print('\n\n{}\n Error at t = {} sec\n\n'.format(
+                    dataBlockPath, group.loc[crossIdxReachPeak, 't']))
                 traceback.print_exc()
                 pdb.set_trace()
                 # plt.plot(group['t'], group['pedalPosition'])

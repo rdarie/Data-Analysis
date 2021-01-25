@@ -49,7 +49,7 @@ expOpts, allOpts = parseAnalysisOptions(
 globals().update(expOpts)
 globals().update(allOpts)
 
-print('\n' + '#' * 50 + '\n{}.py\n'.format(__file__) + '#' * 50 + '\n')
+print('\n' + '#' * 50 + '\n{}\n'.format(__file__) + '#' * 50 + '\n')
 analysisSubFolder = os.path.join(
     scratchFolder, arguments['analysisName']
     )

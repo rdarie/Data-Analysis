@@ -127,16 +127,23 @@ approxTapTimes['tapGroup'] = (tapIntervals > 60).cumsum()
 autoTimeRanges = {
     'NSP': [],
     }
+recDateTime = nspBlock.rec_datetime.replace(tzinfo=timezone.utc).astimezone(tz=None)
 summaryText = '<h2>{}</h2>\n'.format(nspPath)
+summaryText += '<h3>Block started {}</h3>\n'.format(recDateTime.strftime('%Y-%m-%d %H:%M:%S'))
+recEndTime = recDateTime + pd.Timedelta(int(nspDF['NSP'].max() * 1e3), unit='milli')
+summaryText += '<h3>Block ended {}</h3>\n<br>\n'.format(recEndTime.strftime('%Y-%m-%d %H:%M:%S'))
 for trialSegment, group in approxTapTimes.groupby('tapGroup'):
-    recDateTime = nspBlock.rec_datetime.replace(tzinfo=timezone.utc).astimezone(tz=None)
-    firstNSPTap = recDateTime + pd.Timedelta(int(group['NSP'].min() * 1e3), unit='milli')
+    firstNSPTap = (
+        recDateTime +
+        pd.Timedelta(int(group['NSP'].min() * 1e3), unit='milli'))
     summaryText += (
         '<h3>Segment {} started: '.format(trialSegment) +
         firstNSPTap.strftime('%Y-%m-%d %H:%M:%S') +
         ' (t = {:.3f} sec)</h3>\n'.format(group['NSP'].min()))
     if trialSegment == approxTapTimes['tapGroup'].max():
-        lastNSPTime = recDateTime + pd.Timedelta(int(nspDF['t'].max() * 1e3), unit='milli')
+        lastNSPTime = (
+            recDateTime +
+            pd.Timedelta(int(nspDF['t'].max() * 1e3), unit='milli'))
     else:
         nextGroup = approxTapTimes.loc[(approxTapTimes['tapGroup'] == trialSegment + 1), :]
         lastNSPTime = recDateTime + pd.Timedelta(int(nextGroup['NSP'].min() * 1e3), unit='milli')
