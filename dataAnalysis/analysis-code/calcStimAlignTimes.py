@@ -11,7 +11,7 @@ Options:
     --makeControl                        make control align times? [default: False]
     --lazy                               load from raw, or regular? [default: False]
 """
-import os, pdb, traceback
+import os, pdb, traceback, sys
 from importlib import reload
 import neo
 from neo import (
@@ -42,7 +42,10 @@ globals().update(expOpts)
 globals().update(allOpts)
 
 print('\n' + '#' * 50 + '\n{}.py\n'.format(__file__) + '#' * 50 + '\n')
-
+# trick to allow joint processing of minirc and regular trials
+if blockExperimentType == 'proprio-motionOnly':
+    print('skipping blocks without stim')
+    sys.exit()
 analysisSubFolder = os.path.join(
     scratchFolder, arguments['analysisName']
     )

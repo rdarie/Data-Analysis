@@ -102,7 +102,12 @@ def preprocNS5():
         try:
             motorEncoderMask = motorEncoderBoundsLookup[int(arguments['blockIdx'])]
         except Exception:
-            motorEncoderMask = alignTimeBoundsLookup[int(arguments['blockIdx'])]
+            traceback.print_exc()
+            try:
+                motorEncoderMask = alignTimeBoundsLookup[int(arguments['blockIdx'])]
+            except Exception:
+                traceback.print_exc()
+                motorEncoderMask = None
     else:
         motorEncoderMask = None
     ###############################################################

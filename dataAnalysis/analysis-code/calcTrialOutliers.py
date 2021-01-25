@@ -115,15 +115,21 @@ if (blockExperimentType == 'proprio-miniRC') or (blockExperimentType == 'proprio
     # has stim but no motion
     stimulusConditionNames = [
         'electrode', arguments['amplitudeFieldName'], 'RateInHz']
+    assert arguments['alignQuery'] in ['stimOn', 'stimOff']
 elif blockExperimentType == 'proprio-motionOnly':
     # has motion but no stim
     stimulusConditionNames = [
-        'electrode', arguments['amplitudeFieldName'], 'RateInHz',
         'pedalMovementCat', 'pedalSizeCat', 'pedalDirection']
+    assert arguments['alignQuery'] in ['outbound']
 else:
-    #
-    stimulusConditionNames = [
-        'pedalMovementCat', 'pedalSizeCat', 'pedalDirection']
+    if arguments['alignQuery'] in ['stimOn', 'stimOff']:
+        # stim events aren't motion aware
+        stimulusConditionNames = [
+            'electrode', arguments['amplitudeFieldName'], 'RateInHz']
+    else:
+        stimulusConditionNames = [
+            'electrode', arguments['amplitudeFieldName'], 'RateInHz',
+            'pedalMovementCat', 'pedalSizeCat', 'pedalDirection']
 
 if 'outlierDetectOptions' in locals():
     targetEpochSize = outlierDetectOptions['targetEpochSize']

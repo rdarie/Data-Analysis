@@ -14,22 +14,21 @@ python --version
 # EXP="exp201901271000"
 # EXP="exp202010011100"
 # EXP="exp202012121100"
-EXP="exp202012171200"
+# EXP="exp202012171200"
 EXP="exp202101061100"
+EXP="exp202101141100"
+EXP="exp202101191100"
+EXP="exp202101201100"
 
 LAZINESS="--lazy"
 
-# WINDOW="--window=long"
 WINDOW="--window=M"
 
-# ANALYSISFOLDER="--analysisName=loRes"
 ANALYSISFOLDER="--analysisName=default"
 
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
 # BLOCKSELECTOR="--processAll"
 
-# EVENTSELECTOR="--eventName=motionStimAlignTimes"
 EVENTSELECTOR="--eventName=motionAlignTimes"
 #
 ALIGNFOLDER="--alignFolderName=motion"
-# ALIGNFOLDER="--alignFolderName=stim"

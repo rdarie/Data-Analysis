@@ -22,17 +22,12 @@ EXP="exp202101201100"
 
 LAZINESS="--lazy"
 
-# WINDOW="--window=long"
 WINDOW="--window=M"
 
-# ANALYSISFOLDER="--analysisName=loRes"
 ANALYSISFOLDER="--analysisName=default"
 
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
-# BLOCKSELECTOR="--processAll"
 
 EVENTSELECTOR="--eventName=motionStimAlignTimes"
-# EVENTSELECTOR="--eventName=motionAlignTimes"
 #
 ALIGNFOLDER="--alignFolderName=motion"
-# ALIGNFOLDER="--alignFolderName=stim"

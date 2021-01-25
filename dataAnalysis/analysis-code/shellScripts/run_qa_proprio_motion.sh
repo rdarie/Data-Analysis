@@ -20,8 +20,8 @@
 #SBATCH --account=carney-dborton-condo
 # Request custom resources
 #SBATCH --array=2,3
-q
-# SLURM_ARRAY_TASK_ID=3
+
+# SLURM_ARRAY_TASK_ID=2,3
 source shellScripts/run_align_perimovement_stim_preamble.sh
 
 ALIGNQUERY="--alignQuery=outbound"

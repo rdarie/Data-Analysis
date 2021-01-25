@@ -53,9 +53,10 @@ expOpts, allOpts = parseAnalysisOptions(
     arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
-print('\n' + '#' * 50 + '\n{}.py\n'.format(__file__) + '#' * 50 + '\n')
-binOpts = rasterOpts['binOpts'][arguments['analysisName']]
 
+print('\n' + '#' * 50 + '\n{}\n'.format(__file__) + '#' * 50 + '\n')
+
+binOpts = rasterOpts['binOpts'][arguments['analysisName']]
 trackMemory = True
 
 
@@ -133,10 +134,13 @@ def calcBlockAnalysisWrapper():
             scratchFolder,
             blockBaseName + nameSuffix + '.nix')
         #####
-        print('Loading {}'.format(nspPath))
-        asigReader, asigBlock = ns5.blockFromPath(
-            nspPath, lazy=arguments['lazy'],
-            reduceChannelIndexes=True)
+        if os.path.exists(nspPath):
+            print('Loading {}'.format(nspPath))
+            asigReader, asigBlock = ns5.blockFromPath(
+                nspPath, lazy=arguments['lazy'],
+                reduceChannelIndexes=True)
+        else:
+            raise(Exception('\n{}\nDoes not exist!\n'.format(nspPath)))
         #################
         #  chunked asigBlocks have built-in timestamps
         asigBlock.annotations['chunkTStart'] = 0
@@ -194,7 +198,7 @@ def calcBlockAnalysisWrapper():
         filename=outputFilePath, mode='ow')
     writer.write_block(outputBlock, use_obj_names=True)
     writer.close()
-    # pdb.set_trace()
+    ###############################################
     for asig in outputBlock.filter(objects=AnalogSignal):
         if asig.size > 0:
             dummyOutputAsig = asig
@@ -224,6 +228,7 @@ def calcBlockAnalysisWrapper():
         scratchFolder,
         insBlockBaseName + insFileSuffix + '.nix')
     if not os.path.exists(insPath):
+        print('No INS data found. Analyzing motion only')
         arguments['rigOnly'] = True
     if not arguments['rigOnly']:
         print('Loading {}'.format(insPath))
@@ -267,14 +272,15 @@ def calcBlockAnalysisWrapper():
                 expandCols=expandCols,
                 deriveCols=deriveCols, progAmpNames=progAmpNames)
             columnsToBeAdded = ['amplitude', 'program', 'RateInHz'] + progAmpNames
-            # pdb.set_trace()
-            # stimSt
             infoFromStimStatus = hf.interpolateDF(
                 stimStatus, outputBlockT,
                 x='t', columns=columnsToBeAdded, kind='previous')
             infoFromStimStatus.set_index('t', inplace=True)
         else:
             infoFromStimStatus = None
+    else:
+        infoFromStimStatus = None
+        insBlock = None
     # insBlock = nspBlock
     ######
     #  synchronize INS
@@ -334,10 +340,10 @@ def calcBlockAnalysisWrapper():
     rigChanQuery = '(chanName.notna())'
     alreadyThereNames = [asi.name for asi in outputBlock.filter(objects=AnalogSignal)]
     if arguments['lazy']:
+        pdb.set_trace()
         rigChanNames = ns5.listChanNames(
             nspBlock, rigChanQuery, objType=AnalogSignalProxy)
         rigChanNames = [rcn for rcn in rigChanNames if rcn not in alreadyThereNames]
-        # pdb.set_trace()
         asigList = []
         for asigP in nspSeg.analogsignals:
             if asigP.name in rigChanNames:
@@ -401,7 +407,7 @@ def calcBlockAnalysisWrapper():
     else:
         tdInterp = tdDF
     concatList = [tdInterp]
-    # pdb.set_trace()
+    #
     if not arguments['rigOnly']:
         insAsigList = [
             asig
@@ -506,7 +512,6 @@ def calcBlockAnalysisWrapper():
         dataCol=tdInterp.columns,
         samplingRate=samplingRate)
     #
-    # pdb.set_trace()
     tdBlockInterp.segments[0].events = evList
     for ev in evList:
         ev.segment = tdBlockInterp.segments[0]

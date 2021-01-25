@@ -40,7 +40,7 @@ def getExpOpts():
     subjectName = 'Rupert'
     #
     jsonSessionNames = {
-        #  per block
+        #  per blo
         1: [
             'Session1611161648041'
             ],
@@ -140,12 +140,12 @@ def getExpOpts():
 
     ############################################################
     ############################################################
-    alignTimeBoundsLookup = None
-    # alignTimeBoundsLookup = {
-    #     3: [
-    #         [275, 1732]
-    #         ],
-    #     }
+    # alignTimeBoundsLookup = None
+    alignTimeBoundsLookup = {
+        3: [
+            [108, 99999]
+            ],
+        }
     #
     motorEncoderBoundsLookup = {
         2: [
