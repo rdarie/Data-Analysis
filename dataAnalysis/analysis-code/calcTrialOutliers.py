@@ -107,17 +107,30 @@ alignedAsigsKWargs.update(dict(
     transposeToColumns='feature', concatOn='columns',
     verbose=False, procFun=None))
 #
-print("'outlierDetectOptions' in locals(): {}".format('outlierDetectOptions' in locals()))
+print(
+    "'outlierDetectOptions' in locals(): {}"
+    .format('outlierDetectOptions' in locals()))
 #
+if (blockExperimentType == 'proprio-miniRC') or (blockExperimentType == 'proprio-RC'):
+    # has stim but no motion
+    stimulusConditionNames = [
+        'electrode', arguments['amplitudeFieldName'], 'RateInHz']
+elif blockExperimentType == 'proprio-motionOnly':
+    # has motion but no stim
+    stimulusConditionNames = [
+        'electrode', arguments['amplitudeFieldName'], 'RateInHz',
+        'pedalMovementCat', 'pedalSizeCat', 'pedalDirection']
+else:
+    #
+    stimulusConditionNames = [
+        'pedalMovementCat', 'pedalSizeCat', 'pedalDirection']
+
 if 'outlierDetectOptions' in locals():
     targetEpochSize = outlierDetectOptions['targetEpochSize']
-    stimulusConditionNames = outlierDetectOptions['conditionNames']
     twoTailed = outlierDetectOptions['twoTailed']
     alignedAsigsKWargs['windowSize'] = outlierDetectOptions['windowSize']
 else:
     targetEpochSize = 1e-3
-    stimulusConditionNames = [
-        'electrode', arguments['amplitudeFieldName'], 'RateInHz']
     twoTailed = False
     alignedAsigsKWargs['windowSize'] = (-100e-3, 400e-3)
 

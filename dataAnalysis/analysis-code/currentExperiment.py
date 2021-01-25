@@ -161,7 +161,7 @@ def parseAnalysisOptions(
             'experimentName': experimentName,
             'folderPath': nspFolder,
             'ns5FileName': ns5FileName,
-            'calcRigEvents': (blockExperimentType == 'proprio'),
+            'calcRigEvents': (blockExperimentType == 'proprio') or (blockExperimentType == 'proprio-motionOnly'),
             'spikeWindow': [-24, 40]
             }
         }
@@ -248,16 +248,10 @@ def parseAnalysisOptions(
         trialFilesStim['ins']['getINSkwargs'].update(miniRCStimDetectionOpts)
         #  only parse sync lines
         eventInfo = {'inputIDs': expOpts['miniRCRigInputs']}
-        if 'outlierDetectOptions' in expOpts:
-            expOpts['outlierDetectOptions']['conditionNames'] = [
-                'electrode', 'amplitude', 'RateInHz']
     elif blockExperimentType == 'proprio-RC':
         trialFilesStim['ins']['getINSkwargs'].update(RCStimDetectionOpts)
         #  should rename eventInfo to something more intuitive
         eventInfo = {'inputIDs': expOpts['RCRigInputs']}
-        if 'outlierDetectOptions' in expOpts:
-            expOpts['outlierDetectOptions']['conditionNames'] = [
-                'electrode', 'amplitude', 'RateInHz']
     elif blockExperimentType == 'isi':
         #  should rename eventInfo to something more intuitive
         eventInfo = {'inputIDs': dict()}

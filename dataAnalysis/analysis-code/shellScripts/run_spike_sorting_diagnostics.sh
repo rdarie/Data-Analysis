@@ -10,17 +10,17 @@
 #SBATCH --mem=48G
 
 # Specify a job name:
-#SBATCH -J sorting_diagnostics
+#SBATCH -J 2021_01_20_sorting_diagnostics
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-sorting-diagnostics.stdout
-#SBATCH -e ../../batch_logs/%j-%a-sorting-diagnostics.errout
+#SBATCH -o ../../batch_logs/%j-%a-2021_01_20_sorting-diagnostics.stdout
+#SBATCH -e ../../batch_logs/%j-%a-2021_01_20_sorting-diagnostics.errout
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=1,2
+#SBATCH --array=1,2,3
 
 source ./shellScripts/run_spike_sorting_preamble.sh
 

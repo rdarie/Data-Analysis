@@ -5,7 +5,7 @@ def getExpOpts():
     blockExperimentTypeLookup = {
         1: 'proprio-miniRC',
         2: 'proprio',
-        3: 'proprio',
+        3: 'proprio-motionOnly',
         }
     fullRigInputs = {
         'A+': 'ainp12',
@@ -158,11 +158,6 @@ def getExpOpts():
     outlierDetectOptions = dict(
         targetEpochSize=100e-3,
         windowSize=(-.2, .8),
-        conditionNames=[
-            'electrode', 'amplitude', 'RateInHz',
-            'pedalSizeCat', 'pedalDirection'],
-        # conditionNames=[
-        #     'electrode', 'amplitude', 'RateInHz'],
         twoTailed=True,
         )
     #

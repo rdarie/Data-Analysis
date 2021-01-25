@@ -19,6 +19,7 @@ Options:
     --samplingRate=samplingRate            resample the result??
     --rigOnly                              is there no INS block? [default: False]
 """
+
 from neo.io import NixIO
 from neo.io.proxyobjects import (
     AnalogSignalProxy, SpikeTrainProxy, EventProxy)
@@ -52,6 +53,7 @@ expOpts, allOpts = parseAnalysisOptions(
     arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
+print('\n' + '#' * 50 + '\n{}.py\n'.format(__file__) + '#' * 50 + '\n')
 binOpts = rasterOpts['binOpts'][arguments['analysisName']]
 
 trackMemory = True
@@ -221,31 +223,33 @@ def calcBlockAnalysisWrapper():
     insPath = os.path.join(
         scratchFolder,
         insBlockBaseName + insFileSuffix + '.nix')
-    print('Loading {}'.format(insPath))
-    insSignalsToLoad = ([
-        'seg0_ins_td{}'.format(tdIdx)
-        for tdIdx in range(4)] +
-        [
-        'seg0_ins_acc{}'.format(accIdx)
-        for accIdx in ['x', 'y', 'z', 'inertia']
-        ])
-    insEventsToLoad = [
-        'seg0_ins_property',
-        'seg0_ins_value'
-        ]
-    insSpikesToLoad = ['seg0_g0p0#0']
-    insLoadList = {
-        'asigs': insSignalsToLoad,
-        'events': insEventsToLoad,
-        'spiketrains': insSpikesToLoad
-        }
-    insReader, insBlock = ns5.blockFromPath(
-        insPath, lazy=arguments['lazy'],
-        reduceChannelIndexes=True,
-        loadList=insLoadList)
-    insSeg = insBlock.segments[0]
-    # convert stim updates to time series
+    if not os.path.exists(insPath):
+        arguments['rigOnly'] = True
     if not arguments['rigOnly']:
+        print('Loading {}'.format(insPath))
+        insSignalsToLoad = ([
+            'seg0_ins_td{}'.format(tdIdx)
+            for tdIdx in range(4)] +
+            [
+            'seg0_ins_acc{}'.format(accIdx)
+            for accIdx in ['x', 'y', 'z', 'inertia']
+            ])
+        insEventsToLoad = [
+            'seg0_ins_property',
+            'seg0_ins_value'
+            ]
+        insSpikesToLoad = ['seg0_g0p0#0']
+        insLoadList = {
+            'asigs': insSignalsToLoad,
+            'events': insEventsToLoad,
+            'spiketrains': insSpikesToLoad
+            }
+        insReader, insBlock = ns5.blockFromPath(
+            insPath, lazy=arguments['lazy'],
+            reduceChannelIndexes=True,
+            loadList=insLoadList)
+        insSeg = insBlock.segments[0]
+        # convert stim updates to time series
         ins_events = [
             ev for ev in insBlock.filter(objects=Event)
             if ev.name in ['seg0_ins_property', 'seg0_ins_value']]
@@ -307,7 +311,7 @@ def calcBlockAnalysisWrapper():
                 evSortIdx = np.argsort(allProp.times, kind='mergesort')
                 allProp = allProp[evSortIdx]
                 evList.append(allProp)
-        else:
+        elif not arguments['rigOnly']:
             #  RC's don't have rig_events
             if insProp is not None:
                 allProp = insProp
@@ -396,54 +400,58 @@ def calcBlockAnalysisWrapper():
         del tdDF
     else:
         tdInterp = tdDF
+    concatList = [tdInterp]
     # pdb.set_trace()
-    insAsigList = [
-        asig
-        for asig in insSeg.analogsignals
-        if asig.name in insLoadList['asigs']
-        ]
-    for asig in insAsigList:
-        if asig.size > 0:
-            dummyInsAsig = asig
-            break
-    insDF = ns5.analogSignalsToDataFrame(insAsigList)
-    origInsTimeStep = insDF['t'].iloc[1] - insDF['t'].iloc[0]
-    insDF.set_index('t', inplace=True)
-    # interpolate rig analog signals
-    if samplingRate != dummyInsAsig.sampling_rate:
-        if samplingRate < dummyInsAsig.sampling_rate:
-            lowPassOpts = {
-                'low': {
-                    'Wn': float(samplingRate),
-                    'N': 2,
-                    'btype': 'low',
-                    'ftype': 'bessel'
+    if not arguments['rigOnly']:
+        insAsigList = [
+            asig
+            for asig in insSeg.analogsignals
+            if asig.name in insLoadList['asigs']
+            ]
+        for asig in insAsigList:
+            if asig.size > 0:
+                dummyInsAsig = asig
+                break
+        insDF = ns5.analogSignalsToDataFrame(insAsigList)
+        origInsTimeStep = insDF['t'].iloc[1] - insDF['t'].iloc[0]
+        insDF.set_index('t', inplace=True)
+        # interpolate rig analog signals
+        if samplingRate != dummyInsAsig.sampling_rate:
+            if samplingRate < dummyInsAsig.sampling_rate:
+                lowPassOpts = {
+                    'low': {
+                        'Wn': float(samplingRate),
+                        'N': 2,
+                        'btype': 'low',
+                        'ftype': 'bessel'
+                    }
                 }
-            }
-            filterCoeffs = hf.makeFilterCoeffsSOS(
-                lowPassOpts, float(dummyInsAsig.sampling_rate))
-            if trackMemory:
-                print('Filtering analog data before downsampling. memory usage: {:.1f} MB'.format(
-                    prf.memory_usage_psutil()))
-            # insDF.loc[:, tdChanNames] = signal.sosfiltfilt(
-            filteredAsigs = signal.sosfiltfilt(
-                filterCoeffs, insDF.to_numpy(),
-                axis=0)
-            insDF = pd.DataFrame(
-                filteredAsigs,
-                index=insDF.index,
-                columns=insDF.columns)
-            if trackMemory:
-                print('Just finished analog data filtering before downsampling. memory usage: {:.1f} MB'.format(
-                    prf.memory_usage_psutil()))
-        insInterp = hf.interpolateDF(
-            insDF, outputBlockT,
-            kind='linear', fill_value=(0, 0),
-            verbose=arguments['verbose'])
-        # free up memory used by full resolution asigs
-        del insDF
-    else:
-        insInterp = insDF
+                filterCoeffs = hf.makeFilterCoeffsSOS(
+                    lowPassOpts, float(dummyInsAsig.sampling_rate))
+                if trackMemory:
+                    print('Filtering analog data before downsampling. memory usage: {:.1f} MB'.format(
+                        prf.memory_usage_psutil()))
+                # insDF.loc[:, tdChanNames] = signal.sosfiltfilt(
+                filteredAsigs = signal.sosfiltfilt(
+                    filterCoeffs, insDF.to_numpy(),
+                    axis=0)
+                insDF = pd.DataFrame(
+                    filteredAsigs,
+                    index=insDF.index,
+                    columns=insDF.columns)
+                if trackMemory:
+                    print('Just finished analog data filtering before downsampling. memory usage: {:.1f} MB'.format(
+                        prf.memory_usage_psutil()))
+            insInterp = hf.interpolateDF(
+                insDF, outputBlockT,
+                kind='linear', fill_value=(0, 0),
+                verbose=arguments['verbose'])
+            # free up memory used by full resolution asigs
+            del insDF
+        else:
+            insInterp = insDF
+        concatList.append(insInterp)
+        concatList.append(infoFromStimStatus)
     # add analog traces derived from position
     # if 'seg0_position' in tdInterp.columns:
     #     tdInterp.loc[:, 'seg0_position_x'] = ((
@@ -470,9 +478,6 @@ def calcBlockAnalysisWrapper():
     #         'seg0_position_x', 'seg0_position_y',
     #         'seg0_velocity_x', 'seg0_velocity_y']
     #
-    concatList = [tdInterp, insInterp]
-    if not arguments['rigOnly']:
-        concatList.append(infoFromStimStatus)
     if len(concatList) > 1:
         tdInterp = pd.concat(
             concatList,

@@ -10,16 +10,18 @@
 #SBATCH --mem=59G
 
 # Specify a job name:
-#SBATCH -J calc_qa
+#SBATCH -J qa_stim_20210120
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-calc_qa.stdout
-#SBATCH -e ../../batch_logs/%j-calc_qa.errout
+#SBATCH -o ../../batch_logs/%j-qa_stim_20210120.stdout
+#SBATCH -e ../../batch_logs/%j-qa_stim_20210120.errout
 
 # Specify account details
 #SBATCH --account=bibs-dborton-condo
+# Request custom resources
+#SBATCH --array=1,2
 
-SLURM_ARRAY_TASK_ID=3
+# SLURM_ARRAY_TASK_ID=1
 source shellScripts/run_align_stim_preamble.sh
 
 ALIGNQUERY="--alignQuery=stimOn"
