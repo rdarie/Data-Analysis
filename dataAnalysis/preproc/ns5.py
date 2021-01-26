@@ -2487,9 +2487,12 @@ def preproc(
         block.annotate(chunkTStart=chunkTStart)
         block.annotate(chunkTStop=chunkTStop)
         block.annotate(
-            recDatetimeStr=(block.rec_datetime.replace(tzinfo=timezone.utc)).isoformat()
+            recDatetimeStr=(
+                block
+                .rec_datetime
+                .replace(tzinfo=timezone.utc)
+                .isoformat())
             )
-        pdb.set_trace()
         #
         preprocBlockToNix(
             block, writer,
