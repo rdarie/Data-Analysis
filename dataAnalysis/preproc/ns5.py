@@ -660,6 +660,8 @@ def concatenateEventsContainer(eventContainer, newSegIdx=0):
     if not len(nonEmptyEvents) > 0:
         return listOfEvents[0]
     masterEvent = listOfEvents[0]
+    if isinstance(masterEvent, SpikeTrain):
+        pdb.set_trace()
     for evIdx, ev in enumerate(listOfEvents[1:]):
         try:
             masterEvent = masterEvent.merge(ev)

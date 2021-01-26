@@ -2953,7 +2953,8 @@ def getINSStimOnset(
             usedSlotList = theseOnsetTimestamps ** 0 * usedSlotToDetect
             #
             arrayAnn = {
-                'amplitude': ampList, 'RateInHz': rateList,
+                'amplitude': ampList,
+                'RateInHz': rateList,
                 'pulseWidth': pwList,
                 'trialSegment': tSegList,
                 'endTime': theseOffsetTimestamps,
@@ -2993,6 +2994,13 @@ def getINSStimOnset(
                 t_start=spikeTStart, sampling_rate=fs, left_sweep=left_sweep,
                 waveforms=np.asarray([]).reshape((0, 0, 0)) * pq.mV)
             placeHolderSt.annotations['unitAnnotations'] = json.dumps(thisUnit.annotations.copy())
+            placeHolderArrayAnn = {
+                annNm: np.array([])
+                for annNm in arrayAnnListOfNames
+                }
+            placeHolderSt.annotations['arrayAnnNames'] = arrayAnnListOfNames
+            placeHolderSt.annotations.update(placeHolderArrayAnn)
+            placeHolderSt.array_annotations = placeHolderArrayAnn
             thisUnit.spiketrains.append(placeHolderSt)
             seg.spiketrains.append(placeHolderSt)
             placeHolderSt.unit = thisUnit
@@ -3000,6 +3008,11 @@ def getINSStimOnset(
         else:
             #  consolidate spiketrains
             consolidatedTimes = np.array([])
+            consolidatedAnn = {
+                annNm: np.array([])
+                for annNm in arrayAnnListOfNames
+            }
+            '''
             consolidatedAnn = {
                 'amplitude': np.array([]),
                 'RateInHz': np.array([]),
@@ -3015,6 +3028,7 @@ def getINSStimOnset(
                 'firstOfTrain': np.array([]),
                 'trialSegment': np.array([])
                 }
+            '''
             arrayAnnNames = {'arrayAnnNames': list(consolidatedAnn.keys())}
             for idx, st in enumerate(tempSpiketrainStorage[thisUnit.name]):
                 consolidatedTimes = np.concatenate((
