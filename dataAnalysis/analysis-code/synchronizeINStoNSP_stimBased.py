@@ -116,11 +116,8 @@ synchFunPath = os.path.join(
 if os.path.exists(synchFunPath):
     print('Synch already performed. Turning off plotting')
     # arguments['plotting'] = False
-
 tapDetectOptsNSP = expOpts['synchInfo']['nsp'][blockIdx]
 tapDetectOptsINS = expOpts['synchInfo']['ins'][blockIdx]
-interpFunINStoNSP = {}
-interpFunNSPtoINS = {}
 #
 insSignalsToSave = ([
         'seg0_ins_td{}'.format(tdIdx)
@@ -134,7 +131,13 @@ insEventsToSave = [
     'seg0_ins_property',
     'seg0_ins_value'
     ]
-insSpikeTrainsToSave = ['seg0_g0p0#0']
+insSpikeTrainsToSave = []
+for grpIdx in range(4):
+    for prgIdx in range(4):
+        insSpikeTrainsToSave.append('seg0_g{}p{}#0'.format(grpIdx, prgIdx))
+
+interpFunINStoNSP = {}
+interpFunNSPtoINS = {}
 #  ### INS Loading
 insAsigNames = insSignalsToSave.copy()
 for insSessIdx, tdo in tapDetectOptsINS.items():
@@ -160,17 +163,6 @@ for insSessIdx, jsonSessName in enumerate(jsonSessionNames):
             'events': insEventsToSave,
             'spiketrains': insSpikeTrainsToSave
         })
-    '''
-    if arguments['lazy']:
-        asigList = [
-            asigP.load()
-            for asigP in insBlock.filter(objects=AnalogSignalProxy)
-            if asigP.name in insAsigNames
-            ]
-        evList = insBlock.filter(objects=EventProxy)
-        stList = insBlock.filter(objects=SpikeTrainProxy)
-    else:
-    '''
     asigList = [
         asig
         for asig in insBlock.filter(objects=AnalogSignal)
@@ -178,6 +170,7 @@ for insSessIdx, jsonSessName in enumerate(jsonSessionNames):
         ]
     evList = insBlock.filter(objects=Event)
     stList = insBlock.filter(objects=SpikeTrain)
+    #
     evNames = [ev.name for ev in evList]
     insEventsToSave = [
         evN for evN in insEventsToSave if evN in evNames]
@@ -196,15 +189,8 @@ insDF = (
     pd.concat(insDFList, names=['trialSegment', 'index'])
     .reset_index().drop(columns=['index']))
 insDF.loc[:, 'trialSegment'] = insDF['trialSegment'].astype(int)
-sessionUnixTimeList = [
-    int(sessionName.split('Session')[-1])
-    for sessionName in jsonSessionNames
-    ]
-homeTZ = pytz.timezone("America/New_York")
-sessionDatetimeList = [
-    pd.Timestamp(sut, unit='ms', tz='America/New_York').astimezone('utc')
-    for sut in sessionUnixTimeList
-]
+#
+
 #  ##### NSP Loading
 nspChanNames = []
 for insSessIdx, tdo in tapDetectOptsNSP.items():
@@ -225,284 +211,324 @@ else:
         ]
 nspDF = ns5.analogSignalsToDataFrame(asigList)
 nspSamplingRate = float(asigList[0].sampling_rate)
-nspAbsStart = pd.Timestamp(nspBlock.annotations['recDatetimeStr'])
-nspDF['unixTime'] = pd.TimedeltaIndex(nspDF['t'], unit='s') + nspAbsStart
-manualAlignTimes = {
-    insSessIdx: {
-        'ins': [],
-        'nsp': []
-        }
-    for insSessIdx, insGroup in insDF.groupby('trialSegment')}
 
-plotSynchReport = True
-if plotSynchReport:
-    synchReportPDF = PdfPages(
-        os.path.join(
-            figureFolder,
-            'ins_synch_report{:0>3}.pdf'.format(blockIdx)))
-
-for insSessIdx, insGroup in insDF.groupby('trialSegment'):
-    print('aligning session nb {}'.format(insSessIdx))
-    sessTapOptsNSP = tapDetectOptsNSP[insSessIdx]
-    sessTapOptsINS = tapDetectOptsINS[insSessIdx]
-    theseChanNamesNSP = [
-        'seg0_' + scn
-        for scn in sessTapOptsNSP['synchChanName']
+if os.path.exists(synchFunPath):
+    pdb.set_trace()
+    with open(synchFunPath, 'r') as _f:
+        interpFunLoaded = json.load(_f)
+    interpFunINStoNSP = {
+        int(key): np.poly1d(value)
+        for key, value in interpFunLoaded.items()
+    }
+else:
+    sessionUnixTimeList = [
+        int(sessionName.split('Session')[-1])
+        for sessionName in jsonSessionNames
         ]
-    #
-    sessStartUnix = sessionDatetimeList[insSessIdx]
-    insGroup.loc[:, 'unixTime'] = sessStartUnix + pd.TimedeltaIndex(insGroup['t'], unit='s')
-    sessStopUnix = sessStartUnix + pd.Timedelta(insGroup['t'].max(), unit='s')
-    nspSessMask = (nspDF['unixTime'] >= sessStartUnix) & (nspDF['unixTime'] < sessStopUnix)
-    #
-    thisNspDF = (
-        nspDF
-        .loc[nspSessMask, ['t', 'unixTime']]
-        .copy().reset_index(drop=True))
-    unixDeltaT = thisNspDF['t'].iloc[0] - insGroup['t'].iloc[0]
-    print('    delta T is approx {}'.format(unixDeltaT))
-    #
-    nspVals = nspDF.loc[nspSessMask, theseChanNamesNSP].to_numpy()
-    filterOpts = {
-        'high': {
-            'Wn': 1000,
-            'N': 4,
-            'btype': 'high',
-            'ftype': 'bessel'
-            }}
-    if filterOpts is not None:
-        print('Filtering')
-        filterCoeffs = hf.makeFilterCoeffsSOS(
-            filterOpts, nspSamplingRate)
-        nspVals = signal.sosfiltfilt(
-            filterCoeffs,
-            nspVals, axis=0)
-    if sessTapOptsNSP['minAnalogValue'] is not None:
-        nspVals[nspVals < sessTapOptsNSP['minAnalogValue']] = 0
-    if True:
-        empCov = EmpiricalCovariance().fit(nspVals)
-        thisNspDF.loc[:, 'tapDetectSignal'] = empCov.mahalanobis(nspVals)
-    else:
-        thisNspDF.loc[:, 'tapDetectSignal'] = np.mean(nspVals, axis=1)
-    #
-    if sessTapOptsNSP['timeRanges'] is not None:
-        restrictMask = hf.getTimeMaskFromRanges(
-            thisNspDF['t'], sessTapOptsNSP['timeRanges'])
-        if restrictMask.any():
-            thisNspDF.loc[~restrictMask, 'tapDetectSignal'] = np.nan
-            thisNspDF.loc[:, 'tapDetectSignal'] = (
-                thisNspDF.loc[:, 'tapDetectSignal']
+    homeTZ = pytz.timezone("America/New_York")
+    sessionDatetimeList = [
+        pd.Timestamp(sut, unit='ms', tz='America/New_York').astimezone('utc')
+        for sut in sessionUnixTimeList
+    ]
+    nspAbsStart = pd.Timestamp(nspBlock.annotations['recDatetimeStr'])
+    nspDF['unixTime'] = pd.TimedeltaIndex(nspDF['t'], unit='s') + nspAbsStart
+    manualAlignTimes = {
+        insSessIdx: {
+            'ins': [],
+            'nsp': []
+            }
+        for insSessIdx, insGroup in insDF.groupby('trialSegment')}
+    
+    plotSynchReport = True
+    if plotSynchReport:
+        synchReportPDF = PdfPages(
+            os.path.join(
+                figureFolder,
+                'ins_synch_report{:0>3}.pdf'.format(blockIdx)))
+    
+    for insSessIdx, insGroup in insDF.groupby('trialSegment'):
+        print('aligning session nb {}'.format(insSessIdx))
+        sessTapOptsNSP = tapDetectOptsNSP[insSessIdx]
+        sessTapOptsINS = tapDetectOptsINS[insSessIdx]
+        theseChanNamesNSP = [
+            'seg0_' + scn
+            for scn in sessTapOptsNSP['synchChanName']
+            ]
+        #
+        sessStartUnix = sessionDatetimeList[insSessIdx]
+        insGroup.loc[:, 'unixTime'] = sessStartUnix + pd.TimedeltaIndex(insGroup['t'], unit='s')
+        sessStopUnix = sessStartUnix + pd.Timedelta(insGroup['t'].max(), unit='s')
+        nspSessMask = (nspDF['unixTime'] >= sessStartUnix) & (nspDF['unixTime'] < sessStopUnix)
+        #
+        thisNspDF = (
+            nspDF
+            .loc[nspSessMask, ['t', 'unixTime']]
+            .copy().reset_index(drop=True))
+        unixDeltaT = thisNspDF['t'].iloc[0] - insGroup['t'].iloc[0]
+        print('    delta T is approx {}'.format(unixDeltaT))
+        #
+        nspVals = nspDF.loc[nspSessMask, theseChanNamesNSP].to_numpy()
+        filterOpts = {
+            'high': {
+                'Wn': 1000,
+                'N': 4,
+                'btype': 'high',
+                'ftype': 'bessel'
+                }}
+        if filterOpts is not None:
+            print('Filtering')
+            filterCoeffs = hf.makeFilterCoeffsSOS(
+                filterOpts, nspSamplingRate)
+            nspVals = signal.sosfiltfilt(
+                filterCoeffs,
+                nspVals, axis=0)
+        if sessTapOptsNSP['minAnalogValue'] is not None:
+            nspVals[nspVals < sessTapOptsNSP['minAnalogValue']] = 0
+        if True:
+            empCov = EmpiricalCovariance().fit(nspVals)
+            thisNspDF.loc[:, 'tapDetectSignal'] = empCov.mahalanobis(nspVals)
+        else:
+            thisNspDF.loc[:, 'tapDetectSignal'] = np.mean(nspVals, axis=1)
+        #
+        if sessTapOptsNSP['timeRanges'] is not None:
+            restrictMaskNSP = hf.getTimeMaskFromRanges(
+                thisNspDF['t'], sessTapOptsNSP['timeRanges'])
+            if restrictMaskNSP.any():
+                thisNspDF.loc[~restrictMaskNSP, 'tapDetectSignal'] = np.nan
+                thisNspDF.loc[:, 'tapDetectSignal'] = (
+                    thisNspDF.loc[:, 'tapDetectSignal']
+                    .interpolate(method='linear', limit_area='inside')
+                    .fillna(method='bfill').fillna(method='ffill'))
+        else:
+            restrictMaskNSP = pd.Series(True, index=thisNspDF.index)
+        #
+        if True:
+            nspPeakIdx = hf.getTriggers(
+                thisNspDF['tapDetectSignal'], iti=sessTapOptsNSP['iti'], itiWiggle=.5,
+                fs=nspSamplingRate, plotting=arguments['plotting'],
+                thres=sessTapOptsNSP['thres'], edgeType='rising')
+        else:
+            nspPeakIdx, _ = hf.getThresholdCrossings(
+                thisNspDF['tapDetectSignal'], thresh=sessTapOptsNSP['thres'],
+                iti=sessTapOptsNSP['iti'], fs=nspSamplingRate,
+                edgeType='both', itiWiggle=.2,
+                absVal=False, plotting=arguments['plotting'], keep_max=False)
+        nspPeakIdx = nspPeakIdx[sessTapOptsNSP['keepIndex']]
+        nspTapTimes = thisNspDF.loc[nspPeakIdx, 't'].to_numpy()
+        print('nspTapTimes: {}'.format(nspTapTimes))
+        nspTapTimesUnix = thisNspDF.loc[nspPeakIdx, 'unixTime'].to_numpy()
+        searchLimsUnix = {
+            0: max(nspTapTimesUnix[0] + searchRadiusUnix[0], sessStartUnix, thisNspDF.loc[restrictMaskNSP, 'unixTime'].min()),
+            1: min(nspTapTimesUnix[-1] + searchRadiusUnix[1], sessStopUnix, thisNspDF.loc[restrictMaskNSP, 'unixTime'].max())
+            }
+        nspSearchMask = (
+            (thisNspDF['unixTime'] >= searchLimsUnix[0]) &
+            (thisNspDF['unixTime'] < searchLimsUnix[1])
+            )
+        nspSearchLims = thisNspDF.loc[nspSearchMask, 't'].quantile([0, 1])
+        #
+        thisInsDF = insGroup.loc[:, ['t', 'unixTime']].copy().reset_index(drop=True)
+        #
+        theseChanNamesINS = [
+            'seg0_' + scn
+            for scn in sessTapOptsINS['synchChanName']
+            ]
+        insVals = insGroup.loc[:, theseChanNamesINS].to_numpy()
+        if sessTapOptsINS['minAnalogValue'] is not None:
+            insVals[insVals < sessTapOptsINS['minAnalogValue']] = 0
+        if True:
+            empCov = EmpiricalCovariance().fit(insVals)
+            thisInsDF.loc[:, 'tapDetectSignal'] = empCov.mahalanobis(insVals)
+        else:
+            thisInsDF.loc[:, 'tapDetectSignal'] = np.mean(insVals, axis=1)
+        #
+        if sessTapOptsINS['timeRanges'] is not None:
+            insSearchMask = hf.getTimeMaskFromRanges(
+                thisInsDF['t'], sessTapOptsINS['timeRanges'])
+        else:
+            nspSearchUnixTimes = thisNspDF.loc[nspSearchMask, 'unixTime']
+            insSearchMask = (
+                (thisInsDF['unixTime'] >= searchLimsUnix[0]) &
+                (thisInsDF['unixTime'] < searchLimsUnix[1])
+                )
+        if insSearchMask.any():
+            thisInsDF.loc[~insSearchMask, 'tapDetectSignal'] = np.nan
+            thisInsDF.loc[:, 'tapDetectSignal'] = (
+                thisInsDF.loc[:, 'tapDetectSignal']
                 .interpolate(method='linear', limit_area='inside')
                 .fillna(method='bfill').fillna(method='ffill'))
-    #
-    if True:
-        nspPeakIdx = hf.getTriggers(
-            thisNspDF['tapDetectSignal'], iti=sessTapOptsNSP['iti'], itiWiggle=.5,
-            fs=nspSamplingRate, plotting=arguments['plotting'],
-            thres=sessTapOptsNSP['thres'], edgeType='rising')
-    else:
-        nspPeakIdx, _ = hf.getThresholdCrossings(
-            thisNspDF['tapDetectSignal'], thresh=sessTapOptsNSP['thres'],
-            iti=sessTapOptsNSP['iti'], fs=nspSamplingRate,
-            edgeType='both', itiWiggle=.2,
-            absVal=False, plotting=arguments['plotting'], keep_max=False)
-    nspPeakIdx = nspPeakIdx[sessTapOptsNSP['keepIndex']]
-    nspTapTimes = thisNspDF.loc[nspPeakIdx, 't'].to_numpy()
-    print('nspTapTimes: {}'.format(nspTapTimes))
-    nspTapTimesUnix = thisNspDF.loc[nspPeakIdx, 'unixTime'].to_numpy()
-    nspSearchLimsUnix = {
-        0: max(nspTapTimesUnix[0] + searchRadiusUnix[0], sessStartUnix),
-        1: min(nspTapTimesUnix[-1] + searchRadiusUnix[1], sessStopUnix)
-        }
-    nspSearchMask = (
-        (thisNspDF['unixTime'] >= nspSearchLimsUnix[0]) &
-        (thisNspDF['unixTime'] < nspSearchLimsUnix[1])
-        )
-    nspSearchLims = thisNspDF.loc[nspSearchMask, 't'].quantile([0, 1])
-    #
-    thisInsDF = insGroup.loc[:, ['t', 'unixTime']].copy().reset_index(drop=True)
-    #
-    theseChanNamesINS = [
-        'seg0_' + scn
-        for scn in sessTapOptsINS['synchChanName']
-        ]
-    insVals = insGroup.loc[:, theseChanNamesINS].to_numpy()
-    if sessTapOptsINS['minAnalogValue'] is not None:
-        insVals[insVals < sessTapOptsINS['minAnalogValue']] = 0
-    if True:
-        empCov = EmpiricalCovariance().fit(insVals)
-        thisInsDF.loc[:, 'tapDetectSignal'] = empCov.mahalanobis(insVals)
-    else:
-        thisInsDF.loc[:, 'tapDetectSignal'] = np.mean(insVals, axis=1)
-    #
-    if sessTapOptsINS['timeRanges'] is not None:
-        insSearchMask = hf.getTimeMaskFromRanges(
-            thisInsDF['t'], sessTapOptsINS['timeRanges'])
-    else:
-        nspSearchUnixTimes = thisNspDF.loc[nspSearchMask, 'unixTime']
-        insSearchMask = (
-            (thisInsDF['unixTime'] >= nspSearchLimsUnix[0]) &
-            (thisInsDF['unixTime'] < nspSearchLimsUnix[1])
-            )
-    if insSearchMask.any():
-        thisInsDF.loc[~insSearchMask, 'tapDetectSignal'] = np.nan
-        thisInsDF.loc[:, 'tapDetectSignal'] = (
-            thisInsDF.loc[:, 'tapDetectSignal']
-            .interpolate(method='linear', limit_area='inside')
-            .fillna(method='bfill').fillna(method='ffill'))
-    insPeakIdx = hf.getTriggers(
-        thisInsDF['tapDetectSignal'], iti=sessTapOptsINS['iti'], itiWiggle=.5,
-        fs=insSamplingRate, plotting=arguments['plotting'], keep_max=True,
-        thres=sessTapOptsINS['thres'], edgeType='rising')
-    insTapTimes = thisInsDF.loc[insPeakIdx, 't'].to_numpy()[sessTapOptsINS['keepIndex']]
-    if arguments['curateManually']:
-        try:
-            manualAlignTimes[insSessIdx], fig, ax = mdt.peekAtTapsV2(
-                thisNspDF, thisInsDF,
-                insAuxDataDF=insGroup.drop(columns=['t', 'unixTime', 'trialSegment']),
-                plotMaskNSP=nspSearchMask, plotMaskINS=insSearchMask,
-                tapTimestampsINS=insTapTimes, tapTimestampsNSP=nspTapTimes,
-                tapDetectOptsNSP=sessTapOptsNSP, tapDetectOptsINS=sessTapOptsINS
-                )
-            plt.show()
-        except Exception:
-            traceback.print_exc()
-    '''
-    if True:
-        insBlockJustSpikes = hf.extractSignalsFromBlock(insBlockList[insSessIdx], keepEvents=False)
-        insBlockJustSpikes = hf.loadBlockProxyObjects(insBlockJustSpikes)
-        spikeMatBlock = ns5.calcBinarizedArray(
-            insBlockJustSpikes, trigRasterSamplingRate * pq.Hz,
-            saveToFile=False)
-        spikeMatDF = ns5.analogSignalsToDataFrame(spikeMatBlock.filter(objects=AnalogSignal))
-        spikeMatDF.loc[:, 'nspT'] = spikeMatDF['t'] + unixDeltaT
-        # spikeMatDF is in ins time
-    '''
-    alignByXCorr = True
-    if alignByXCorr:
-        trigRasterSamplingRate = min(nspSamplingRate, insSamplingRate)
-        trigSampleInterval = trigRasterSamplingRate ** (-1)
-        gaussWid = 5e-3
-        #
-        nspSearchDur = nspSearchLims[1] - nspSearchLims[0]
-        trigRasterT = nspSearchLims[0] + np.arange(0, nspSearchDur, trigSampleInterval)
-        trigRaster = pd.DataFrame({
-            't': trigRasterT,
-            'nspDiracDelta': np.zeros_like(trigRasterT),
-            'insDiracDelta': np.zeros_like(trigRasterT),
-            'nspTrigs': np.zeros_like(trigRasterT),
-            'insTrigs': np.zeros_like(trigRasterT),
-            })
-        if True:
-            coarseSpikeMats = []
-            for st in insBlockList[insSessIdx].filter(objects=SpikeTrain):
-                if len(st.times) > 0:
-                    coarseSt = st.copy()
-                    coarseSt.t_start = coarseSt.t_start + unixDeltaT * coarseSt.t_start.units
-                    coarseSt.t_stop = coarseSt.t_stop + unixDeltaT * coarseSt.t_stop.units
-                    newStT = coarseSt.times.magnitude + unixDeltaT
-                    coarseSt.magnitude[:] = newStT
-                    theseAmps = coarseSt.array_annotations['amplitude']
-                    thisSpikeMat = binarize(
-                        coarseSt.times[theseAmps > sessTapOptsINS['minStimAmp']],  # TODO, make amplitude thresh an option
-                        sampling_rate=trigRasterSamplingRate * pq.Hz,
-                        t_start=trigRaster['t'].min() * pq.s,
-                        t_stop=trigRaster['t'].max() * pq.s)
-                    coarseSpikeMats.append(thisSpikeMat[:, np.newaxis])
-                    print('coarseSt.times = {}'.format(coarseSt.times))
-                    # print('st.times = {}'.format(st.times))
-            # pdb.set_trace()
-            trigRaster.loc[:, 'insDiracDelta'] = np.concatenate(
-                coarseSpikeMats, axis=1).any(axis=1).astype(np.float)
-            # pdb.set_trace()
-        else:
-            approxInsTapTimes = insTapTimes + unixDeltaT
-            closestTimes, closestIdx = hf.closestSeries(
-                takeFrom=pd.Series(approxInsTapTimes), compareTo=trigRaster['t']
-                )
-            trigRaster.loc[closestIdx, 'insDiracDelta'] = 1.
-        trigRaster.loc[:, 'insTrigs'] = hf.gaussianSupport(
-            support=trigRaster.set_index('t')['insDiracDelta'],
-            gaussWid=gaussWid, fs=trigRasterSamplingRate).to_numpy()
-        nspDiracSt = SpikeTrain(
-            times=nspTapTimes, units='s',
-            t_start=trigRaster['t'].min() * pq.s,
-            t_stop=trigRaster['t'].max() * pq.s)
-        trigRaster.loc[:, 'nspDiracDelta'] = binarize(
-            nspDiracSt, sampling_rate=trigRasterSamplingRate * pq.Hz,
-            t_start=trigRaster['t'].min() * pq.s, t_stop=trigRaster['t'].max() * pq.s
-            )
-        trigRaster.loc[:, 'nspTrigs'] = hf.gaussianSupport(
-            support=trigRaster.set_index('t')['nspDiracDelta'], gaussWid=gaussWid, fs=trigRasterSamplingRate).to_numpy()
-        #
-        def corrAtLag(targetLag, xSrs=None, ySrs=None):
-            return np.correlate(xSrs, ySrs.shift(targetLag).fillna(0))[0]
-        #
-        targetLags = np.arange(
-            searchRadius[0] * trigRasterSamplingRate,
-            searchRadius[1] * trigRasterSamplingRate + 1,
-            # -0.8 * trigRasterSamplingRate,
-            # 0.1 * trigRasterSamplingRate + 1,
-            dtype=np.int)
-        targetLagsSrs = pd.Series(
-            targetLags, index=targetLags * trigSampleInterval)
-        print('Calculating cross corr')
-        xCorrSrs = targetLagsSrs.apply(
-            corrAtLag, xSrs=trigRaster['nspTrigs'],
-            ySrs=trigRaster['insTrigs'])
-        maxLag = xCorrSrs.idxmax()
-        if plotSynchReport:
-            fig, ax = plt.subplots(2, 1)
-            fig.set_size_inches(12, 8)
-            plotT0 = trigRaster.loc[(trigRaster['insTrigs'] > 0.5) & (trigRaster['nspTrigs'] > 0.5), 't']
-            if plotT0.size > 0:
-                plotT0 = plotT0.iloc[0]
-            else:
-                plotT0 = trigRaster.loc[(trigRaster['insTrigs'] > 0.5) | (trigRaster['nspTrigs'] > 0.5), 't'].iloc[0]
-            plotMask = (trigRaster['t'] >= plotT0 + searchRadius[0]) & (trigRaster['t'] < plotT0 + searchRadius[1])
-            ax[0].plot(
-                trigRaster.loc[plotMask, 't'], trigRaster.loc[plotMask, 'nspTrigs'],
-                label='NSP trigs.')
-            ax[0].plot(
-                trigRaster.loc[plotMask, 't'], trigRaster.loc[plotMask, 'insTrigs'],
-                label='INS trigs.')
-            ax[0].set_xlim(plotT0 + searchRadius[0], plotT0 + searchRadius[1])
-            ax[0].set_xlabel('time (sec)')
-            ax[0].set_ylabel('Triggers')
-            ax[0].legend(loc='upper right')
-            ax[0].set_title(jsonSessionNames[insSessIdx])
-            #
-            ax[1].plot(xCorrSrs, label='crossCorr')
-            ax[1].plot(maxLag, xCorrSrs.loc[maxLag], 'y*', label='optimal lag = {:.3f}'.format(maxLag))
-            ax[1].set_xlabel('cross-corr lag (sec)')
-            ax[1].legend(loc='upper right')
-            ax[1].set_ylabel('cross-corr')
-            ax[1].set_xlim(searchRadius[0], searchRadius[1])
-            figSaveOpts = dict(
-                bbox_extra_artists=(theAx.get_legend() for theAx in ax),
-                bbox_inches='tight')
-            synchReportPDF.savefig(**figSaveOpts)
-            if arguments['showFigures']:
+        insPeakIdx = hf.getTriggers(
+            thisInsDF['tapDetectSignal'], iti=sessTapOptsINS['iti'], itiWiggle=.5,
+            fs=insSamplingRate, plotting=arguments['plotting'], keep_max=True,
+            thres=sessTapOptsINS['thres'], edgeType='rising')
+        insTapTimes = thisInsDF.loc[insPeakIdx, 't'].to_numpy()[sessTapOptsINS['keepIndex']]
+        if arguments['curateManually']:
+            try:
+                manualAlignTimes[insSessIdx], fig, ax = mdt.peekAtTapsV2(
+                    thisNspDF, thisInsDF,
+                    insAuxDataDF=insGroup.drop(columns=['t', 'unixTime', 'trialSegment']),
+                    plotMaskNSP=nspSearchMask, plotMaskINS=insSearchMask,
+                    tapTimestampsINS=insTapTimes, tapTimestampsNSP=nspTapTimes,
+                    tapDetectOptsNSP=sessTapOptsNSP, tapDetectOptsINS=sessTapOptsINS
+                    )
                 plt.show()
+            except Exception:
+                traceback.print_exc()
+        alignByXCorr = True
+        if alignByXCorr:
+            trigRasterSamplingRate = min(nspSamplingRate, insSamplingRate)
+            trigSampleInterval = trigRasterSamplingRate ** (-1)
+            gaussWid = 5e-3
+            #
+            nspSearchDur = nspSearchLims[1] - nspSearchLims[0]
+            trigRasterT = nspSearchLims[0] + np.arange(0, nspSearchDur, trigSampleInterval)
+            trigRaster = pd.DataFrame({
+                't': trigRasterT,
+                'nspDiracDelta': np.zeros_like(trigRasterT),
+                'insDiracDelta': np.zeros_like(trigRasterT),
+                'nspTrigs': np.zeros_like(trigRasterT),
+                'insTrigs': np.zeros_like(trigRasterT),
+                })
+            if sessTapOptsINS['synchStimUnitName'] is not None:
+                # cross corr stim timestamps
+                coarseSpikeMats = []
+                for st in insBlockList[insSessIdx].filter(objects=SpikeTrain):
+                    if len(st.times) > 0:
+                        coarseSt = st.copy()
+                        coarseSt.t_start = coarseSt.t_start + unixDeltaT * coarseSt.t_start.units
+                        coarseSt.t_stop = coarseSt.t_stop + unixDeltaT * coarseSt.t_stop.units
+                        newStT = coarseSt.times.magnitude + unixDeltaT
+                        coarseSt.magnitude[:] = newStT
+                        theseAmps = coarseSt.array_annotations['amplitude']
+                        thisSpikeMat = binarize(
+                            coarseSt.times[theseAmps > sessTapOptsINS['minStimAmp']],  # TODO, make amplitude thresh an option
+                            sampling_rate=trigRasterSamplingRate * pq.Hz,
+                            t_start=trigRaster['t'].min() * pq.s,
+                            t_stop=trigRaster['t'].max() * pq.s)
+                        coarseSpikeMats.append(thisSpikeMat[:, np.newaxis])
+                        print('{}: coarseSt.times = {}'.format(coarseSt.name, coarseSt.times))
+                        # print('st.times = {}'.format(st.times))
+                if not len(coarseSpikeMats) > 0:
+                    print('\n\n INS {} has no stim spikes!'.format(jsonSessionNames[insSessIdx]))
+                    print('Defaulting to xcorr analog signals\n\n')
+                    sessTapOptsINS['synchByXCorrTapDetectSignal'] = True
+                    sessTapOptsNSP['synchByXCorrTapDetectSignal'] = True
+                else:
+                    trigRaster.loc[:, 'insDiracDelta'] = np.concatenate(
+                        coarseSpikeMats, axis=1).any(axis=1).astype(np.float)
+                    trigRaster.loc[:, 'insTrigs'] = hf.gaussianSupport(
+                        support=trigRaster.set_index('t')['insDiracDelta'],
+                        gaussWid=gaussWid, fs=trigRasterSamplingRate).to_numpy()
             else:
-                plt.close()
-        funCoeffs = np.asarray([1, unixDeltaT + maxLag])
-        invFunCoeffs = np.asarray([1, -1 * (unixDeltaT + maxLag)])
-    else:
-        # align by regressing timestamps
-        # funCoeffs = np.poly1d()
-        pass
-    interpFunINStoNSP[insSessIdx] = np.poly1d(funCoeffs)
-    interpFunNSPtoINS[insSessIdx] = np.poly1d(invFunCoeffs)
-    # end getting interp function
-interpFunExport = {
-    key: list(value)
-    for key, value in interpFunINStoNSP.items()}
-with open(synchFunPath, 'w') as f:
-    json.dump(interpFunExport, f)
-if plotSynchReport:
-    synchReportPDF.close()
-#
+                approxInsTapTimes = insTapTimes + unixDeltaT
+                closestTimes, closestIdx = hf.closestSeries(
+                    takeFrom=pd.Series(approxInsTapTimes), compareTo=trigRaster['t']
+                    )
+                trigRaster.loc[closestIdx, 'insDiracDelta'] = 1.
+                trigRaster.loc[:, 'insTrigs'] = hf.gaussianSupport(
+                    support=trigRaster.set_index('t')['insDiracDelta'],
+                    gaussWid=gaussWid, fs=trigRasterSamplingRate).to_numpy()
+            if sessTapOptsINS['synchByXCorrTapDetectSignal']:
+                maskedINS = thisInsDF.loc[insSearchMask, :].copy()
+                maskedINS.loc[:, 'coarseNspTime'] = maskedINS['t'] + unixDeltaT
+                trigRaster.loc[:, 'insTrigs'] = hf.interpolateDF(
+                    maskedINS, trigRaster['t'], x='coarseNspTime',
+                    columns=['tapDetectSignal'],
+                    kind='linear', fill_value=(0, 0))
+            if sessTapOptsNSP['synchByXCorrTapDetectSignal']:
+                trigRaster.loc[:, 'nspTrigs'] = hf.interpolateDF(
+                    thisNspDF, trigRaster['t'], x='t',
+                    columns=['tapDetectSignal'],
+                    kind='linear', fill_value=(0, 0))
+            else:
+                nspDiracSt = SpikeTrain(
+                    times=nspTapTimes, units='s',
+                    t_start=trigRaster['t'].min() * pq.s,
+                    t_stop=trigRaster['t'].max() * pq.s)
+                trigRaster.loc[:, 'nspDiracDelta'] = binarize(
+                    nspDiracSt, sampling_rate=trigRasterSamplingRate * pq.Hz,
+                    t_start=trigRaster['t'].min() * pq.s, t_stop=trigRaster['t'].max() * pq.s
+                    )
+                trigRaster.loc[:, 'nspTrigs'] = hf.gaussianSupport(
+                    support=trigRaster.set_index('t')['nspDiracDelta'], gaussWid=gaussWid,
+                    fs=trigRasterSamplingRate).to_numpy()
+            #
+            def corrAtLag(targetLag, xSrs=None, ySrs=None):
+                return np.correlate(xSrs, ySrs.shift(targetLag).fillna(0))[0]
+            #
+            targetLags = np.arange(
+                searchRadius[0] * trigRasterSamplingRate,
+                searchRadius[1] * trigRasterSamplingRate + 1,
+                # -0.8 * trigRasterSamplingRate,
+                # 0.1 * trigRasterSamplingRate + 1,
+                dtype=np.int)
+            targetLagsSrs = pd.Series(
+                targetLags, index=targetLags * trigSampleInterval)
+            print('Calculating cross corr')
+            xCorrSrs = targetLagsSrs.apply(
+                corrAtLag, xSrs=trigRaster['nspTrigs'],
+                ySrs=trigRaster['insTrigs'])
+            maxLag = xCorrSrs.idxmax()
+            if plotSynchReport:
+                fig, ax = plt.subplots(2, 1)
+                fig.set_size_inches(12, 8)
+                plotT0 = trigRaster.loc[(trigRaster['insTrigs'] > 0.5) & (trigRaster['nspTrigs'] > 0.5), 't']
+                if plotT0.size > 0:
+                    plotT0 = plotT0.iloc[0]
+                else:
+                    plotT0 = trigRaster.loc[(trigRaster['insTrigs'] > 0.5) | (trigRaster['nspTrigs'] > 0.5), 't'].iloc[0]
+                plotMask = (trigRaster['t'] >= plotT0 + searchRadius[0]) & (trigRaster['t'] < plotT0 + searchRadius[1])
+                ax[0].plot(
+                    trigRaster.loc[plotMask, 't'], trigRaster.loc[plotMask, 'nspTrigs'],
+                    label='NSP trigs.')
+                ax[0].plot(
+                    trigRaster.loc[plotMask, 't'], trigRaster.loc[plotMask, 'insTrigs'],
+                    label='INS trigs.')
+                ax[0].set_xlim(plotT0 + searchRadius[0], plotT0 + searchRadius[1])
+                ax[0].set_xlabel('time (sec)')
+                ax[0].set_ylabel('Triggers')
+                ax[0].legend(loc='upper right')
+                ax[0].set_title(jsonSessionNames[insSessIdx])
+                #
+                ax[1].plot(xCorrSrs, label='crossCorr')
+                ax[1].plot(maxLag, xCorrSrs.loc[maxLag], 'y*', label='optimal lag = {:.3f}'.format(maxLag))
+                ax[1].set_xlabel('cross-corr lag (sec)')
+                ax[1].legend(loc='upper right')
+                ax[1].set_ylabel('cross-corr')
+                ax[1].set_xlim(searchRadius[0], searchRadius[1])
+                figSaveOpts = dict(
+                    bbox_extra_artists=(theAx.get_legend() for theAx in ax),
+                    bbox_inches='tight')
+                synchReportPDF.savefig(**figSaveOpts)
+                if arguments['showFigures']:
+                    plt.show()
+                else:
+                    plt.close()
+            funCoeffs = np.asarray([1, unixDeltaT + maxLag])
+            invFunCoeffs = np.asarray([1, -1 * (unixDeltaT + maxLag)])
+        else:
+            # align by regressing timestamps
+            # funCoeffs = np.poly1d()
+            pass
+        interpFunINStoNSP[insSessIdx] = np.poly1d(funCoeffs)
+        interpFunNSPtoINS[insSessIdx] = np.poly1d(invFunCoeffs)
+        # end getting interp function
+    interpFunExport = {
+        'insToNsp': {
+            key: list(value)
+            for key, value in interpFunINStoNSP.items()
+            },
+        'nspToIns': {
+            key: list(value)
+            for key, value in interpFunNSPtoINS.items()
+            }
+        }
+    with open(synchFunPath, 'w') as f:
+        json.dump(interpFunExport, f)
+    if plotSynchReport:
+        synchReportPDF.close()
+
+# synch fun calculated, now apply
 allEvs = {}
 allSts = {}
 nspBoundaries = nspDF['t'].quantile([0, 1])
@@ -511,27 +537,6 @@ for insSessIdx, insGroup in insDF.groupby('trialSegment'):
     insBlock = insBlockList[insSessIdx]
     insBoundaries = np.polyval(interpFunNSPtoINS[insSessIdx], nspBoundaries)
     #
-    # if arguments['lazy']:
-    #     asigList = []
-    #     for asigP in insBlock.filter(objects=AnalogSignalProxy):
-    #         if asigP.name in insSignalsToSave:
-    #             asig = asigP.load()
-    #             asig.channel_index = asigP.channel_index
-    #             asigList.append(asig)
-    #     evList = []
-    #     for evP in insBlock.filter(objects=EventProxy):
-    #         if evP.name in insEventsToSave:
-    #             ev = ns5.loadObjArrayAnn(evP.load())
-    #             ev.segment = evP.segment
-    #             evList.append(ev)
-    #     stList = []
-    #     for stP in insBlock.filter(objects=SpikeTrainProxy):
-    #         if stP.name in insSpikeTrainsToSave:
-    #             st = ns5.loadObjArrayAnn(stP.load())
-    #             st.unit = stP.unit
-    #             st.segment = stP.segment
-    #             stList.append(st)
-    # else:
     asigList = [
         asig
         for asig in insBlock.filter(objects=AnalogSignal)
@@ -582,10 +587,11 @@ for insSessIdx, insGroup in insDF.groupby('trialSegment'):
 #
 eventsOut = {}
 for evName, evList in allEvs.items():
-    eventsOut[evName] = ns5.concatenateEventsContainerV2(evList)
+    eventsOut[evName] = ns5.concatenateEventsContainer(evList)
 spikesOut = {}
 for stName, stList in allSts.items():
-    spikesOut[stName] = ns5.concatenateEventsContainerV2(stList)
+    spikesOut[stName] = ns5.concatenateEventsContainer(stList)
+# pdb.set_trace()
 #
 insDFOut = (
     pd.concat(insDFListOut, names=['trialSegment', 'index'])

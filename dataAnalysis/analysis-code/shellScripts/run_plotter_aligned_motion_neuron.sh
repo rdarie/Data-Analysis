@@ -13,14 +13,14 @@
 #SBATCH -J plots_motion_neuron
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-plots_motion_neuron.stdout
-#SBATCH -e ../../batch_logs/%j-plots_motion_neuron.errout
+#SBATCH -o ../../batch_logs/%j-%a-plots_motion_neuron.stdout
+#SBATCH -e ../../batch_logs/%j-%a-plots_motion_neuron.errout
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=3
+#SBATCH --array=4
 
 # SLURM_ARRAY_TASK_ID=3
 source ./shellScripts/run_plotter_aligned_motion_preamble.sh

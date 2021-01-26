@@ -2980,17 +2980,23 @@ def getINSStimOnset(
     createRelationship = False
     if figureOutputFolder is not None:
         pulseDetectionPDF.close()
+    left_sweep_samples = spikeWindow[0] * (-1)
+    left_sweep = left_sweep_samples / fs
+    right_sweep_samples = spikeWindow[1] - 1
+    right_sweep = right_sweep_samples / fs
     for thisUnit in block.filter(objects=Unit):
         print('getINSStimOnset packaging unit {}'.format(thisUnit.name))
         if len(tempSpiketrainStorage[thisUnit.name]) == 0:
-            st = SpikeTrain(
+            placeHolderSt = SpikeTrain(
                 name='seg{}_{}'.format(int(segIdx), thisUnit.name),
                 times=[], units='sec', t_stop=spikeTStop,
-                t_start=spikeTStart)
-            thisUnit.spiketrains.append(st)
-            seg.spiketrains.append(st)
-            st.unit = thisUnit
-            st.segment = seg
+                t_start=spikeTStart, sampling_rate=fs, left_sweep=left_sweep,
+                waveforms=np.asarray([]).reshape((0, 0, 0)) * pq.mV)
+            placeHolderSt.annotations['unitAnnotations'] = json.dumps(thisUnit.annotations.copy())
+            thisUnit.spiketrains.append(placeHolderSt)
+            seg.spiketrains.append(placeHolderSt)
+            placeHolderSt.unit = thisUnit
+            placeHolderSt.segment = seg
         else:
             #  consolidate spiketrains
             consolidatedTimes = np.array([])
@@ -3029,10 +3035,6 @@ def getINSStimOnset(
                 ))
             #
             timesIndex = np.array(timesIndex.values, dtype=np.int)
-            left_sweep_samples = spikeWindow[0] * (-1)
-            left_sweep = left_sweep_samples / fs
-            right_sweep_samples = spikeWindow[1] - 1
-            right_sweep = right_sweep_samples / fs
             #  spike_duration = left_sweep + right_sweep
             spikeWaveforms = np.zeros(
                 (

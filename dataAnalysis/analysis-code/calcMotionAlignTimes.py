@@ -256,9 +256,6 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
                     dataBlockPath, group.loc[crossIdxReachPeak, 't']))
                 traceback.print_exc()
                 pdb.set_trace()
-                # plt.plot(group['t'], group['pedalPosition'])
-                # plt.show()
-                # sns.distplot(tdDF.loc[taskMask & pedalRestingMask, 'pedalPosition'])
             trialsDict['reachedPeak'].loc[mvRound, 'tdIndex'] = crossIdxReachPeak
             trialsDict['reachedPeak'].loc[mvRound, 't'] = group.loc[crossIdxReachPeak, 't']
             #  return
@@ -300,21 +297,26 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
     if (segIdx == 0) and arguments['plotParamHistograms']:
         ax = sns.distplot(
             trialsDict['midPeak'].loc[:, 'pedalSize'].abs(),
-            bins=200, kde=False)
+            bins=100, kde=False)
         plt.savefig(
             os.path.join(
                 figureFolder, 'pedalSizeDistribution.pdf'))
+        plt.close()
+        ax = sns.distplot(
+            trialsDict['midPeak'].loc[:, 'pedalMovementDuration'],
+            bins=100, kde=False)
+        plt.savefig(
+            os.path.join(
+                figureFolder, 'pedalMovementDurationDistribution.pdf'))
         # plt.show()
         plt.close()
     #  determine size category
     pedalSizeCat = pd.cut(
         trialsDict['outbound']['pedalSize'].abs(), movementSizeBins,
         labels=movementSizeBinLabels)
-    pdb.set_trace()
     assert not pedalSizeCat.isna().any()
     for mvCat in movementCatTypes:
         trialsDict[mvCat].loc[:, 'pedalSizeCat'] = pedalSizeCat
-    # pdb.set_trace()
     alignEventsDF = (
         pd.concat(
             trialsDict, axis=0,
@@ -322,7 +324,6 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         .reset_index())
     #  sort align times
     alignEventsDF.sort_values(by='t', inplace=True, kind='mergesort')
-    pdb.set_trace()
     alignEvents = preproc.eventDataFrameToEvents(
         alignEventsDF, idxT='t',
         annCol=None,

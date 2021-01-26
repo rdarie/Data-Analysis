@@ -340,7 +340,6 @@ def calcBlockAnalysisWrapper():
     rigChanQuery = '(chanName.notna())'
     alreadyThereNames = [asi.name for asi in outputBlock.filter(objects=AnalogSignal)]
     if arguments['lazy']:
-        pdb.set_trace()
         rigChanNames = ns5.listChanNames(
             nspBlock, rigChanQuery, objType=AnalogSignalProxy)
         rigChanNames = [rcn for rcn in rigChanNames if rcn not in alreadyThereNames]

@@ -99,6 +99,14 @@ channelData = {
     'data': nspDF,
     't': nspDF['t']
     }
+recDateTime = (
+    nspBlock.rec_datetime.replace(tzinfo=timezone.utc).astimezone(tz=None))
+summaryText = '<h2>{}</h2>\n'.format(nspPath)
+summaryText += '<h3>Block started {}</h3>\n'.format(
+    recDateTime.strftime('%Y-%m-%d %H:%M:%S'))
+recEndTime = recDateTime + pd.Timedelta(nspDF['t'].max(), unit='s')
+summaryText += '<h3>Block ended {}</h3>\n<br>\n'.format(
+    recEndTime.strftime('%Y-%m-%d %H:%M:%S'))
 #
 # nspLims = nspSrs.quantile([1e-6, 1-1e-6]).to_list()
 if arguments['usedTENSPulses']:
@@ -118,6 +126,7 @@ else:
         iti=interTriggerInterval, fs=float(nspSyncAsig.sampling_rate),
         edgeType='both', itiWiggle=.2,
         absVal=False, plotting=arguments['plotting'], keep_max=False)
+
 allNSPTapTimes = nspDF.loc[nspPeakIdx, 't'].to_numpy()
 
 approxTapTimes = pd.DataFrame([allNSPTapTimes]).T
@@ -127,11 +136,6 @@ approxTapTimes['tapGroup'] = (tapIntervals > 60).cumsum()
 autoTimeRanges = {
     'NSP': [],
     }
-recDateTime = nspBlock.rec_datetime.replace(tzinfo=timezone.utc).astimezone(tz=None)
-summaryText = '<h2>{}</h2>\n'.format(nspPath)
-summaryText += '<h3>Block started {}</h3>\n'.format(recDateTime.strftime('%Y-%m-%d %H:%M:%S'))
-recEndTime = recDateTime + pd.Timedelta(int(nspDF['NSP'].max() * 1e3), unit='milli')
-summaryText += '<h3>Block ended {}</h3>\n<br>\n'.format(recEndTime.strftime('%Y-%m-%d %H:%M:%S'))
 for trialSegment, group in approxTapTimes.groupby('tapGroup'):
     firstNSPTap = (
         recDateTime +
@@ -152,8 +156,6 @@ for trialSegment, group in approxTapTimes.groupby('tapGroup'):
         '<h3>             ended: '.format(trialSegment) +
         lastNSPTime.strftime('%Y-%m-%d %H:%M:%S') +
         ' (lasted up to {} sec)</h3>\n'.format(segDur.total_seconds()))
-
-
 segIdx = 0
 problemChannelsList = []
 problemThreshold = 4e3

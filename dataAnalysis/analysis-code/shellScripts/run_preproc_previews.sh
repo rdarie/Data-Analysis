@@ -54,16 +54,14 @@ python --version
 # EXP="exp202101111100"
 # EXP="exp202101111100"
 # EXP="exp202101141100"
-EXP="exp202101191100"
-EXP="exp202101201100"
+# EXP="exp202101191100"
+# EXP="exp202101201100"
 EXP="exp202101211100"
+# EXP="exp202101251100"
 
-python -u ./previewINSSessionSummary.py --exp=$EXP
-SLURM_ARRAY_TASK_ID=1
-python -u './previewNSPTapTimes.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --usedTENSPulses
-SLURM_ARRAY_TASK_ID=2
-python -u './previewNSPTapTimes.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --usedTENSPulses
-SLURM_ARRAY_TASK_ID=3
-python -u './previewNSPTapTimes.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --usedTENSPulses
-SLURM_ARRAY_TASK_ID=4
-python -u './previewNSPTapTimes.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --usedTENSPulses
+# python -u ./previewINSSessionSummary.py --exp=$EXP
+
+for BLOCKIDX in 1 2 3 4
+do
+    python -u './previewNSPTapTimes.py' --blockIdx=$BLOCKIDX --exp=$EXP --usedTENSPulses
+done

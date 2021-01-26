@@ -19,7 +19,7 @@
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 # Request custom resources
-#SBATCH --array=1,2,3,4
+#SBATCH --array=1,2,3
 
 # Request custom resources
 
@@ -58,6 +58,7 @@ python --version
 # EXP="exp202101191100"
 EXP="exp202101201100"
 EXP="exp202101211100"
+EXP="exp202101251100"
 
 # SLURM_ARRAY_TASK_ID=3
 

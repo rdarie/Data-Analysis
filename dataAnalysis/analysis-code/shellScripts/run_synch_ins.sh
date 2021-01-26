@@ -10,16 +10,16 @@
 #SBATCH --mem=32G
 
 # Specify a job name:
-#SBATCH -J ins_synch
+#SBATCH -J ins_synch_2021_01_25
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-ins_synch.stdout
-#SBATCH -e ../../batch_logs/%j-%a-ins_synch.errout
+#SBATCH -o ../../batch_logs/%j-%a-ins_synch_2021_01_25.stdout
+#SBATCH -e ../../batch_logs/%j-%a-ins_synch_2021_01_25.errout
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 # Request custom resources
-#SBATCH --array=3
+#SBATCH --array=2,3
 
 module load anaconda/2020.02
 . /gpfs/runtime/opt/anaconda/2020.02/etc/profile.d/conda.sh
@@ -51,8 +51,11 @@ EXP="exp202101111100"
 EXP="exp202101141100"
 EXP="exp202101191100"
 EXP="exp202101201100"
+EXP="exp202101211100"
+EXP="exp202101251100"
 
 BLOCKSELECTOR=""
-SLURM_ARRAY_TASK_ID=3
+SLURM_ARRAY_TASK_ID=2
 
-python -u './synchronizeINStoNSP_stimBased.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP $BLOCKSELECTOR --inputNSPBlockSuffix=analog_inputs --addToNIX --lazy --usedTENSPulses --showFigures
+## --showFigures
+python -u './synchronizeINStoNSP_stimBased.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP $BLOCKSELECTOR --inputNSPBlockSuffix=analog_inputs --addToNIX --lazy --usedTENSPulses

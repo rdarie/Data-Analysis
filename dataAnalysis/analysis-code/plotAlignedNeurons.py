@@ -133,7 +133,7 @@ if arguments['limitPages'] is not None:
     limitPages = int(arguments['limitPages'])
 else:
     limitPages = None
-minNObservations = 10
+minNObservations = 1
 showNow = False
 if arguments['enableOverrides']:
     nrnRelplotKWArgs.update({

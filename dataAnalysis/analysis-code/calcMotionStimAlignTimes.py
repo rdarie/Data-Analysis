@@ -163,7 +163,6 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
                 (~stimEvDF['alreadyAssigned']) &
                 stimInSearchRadius),
             't']
-        # pdb.set_trace()
         if stimOnTs.size > 0:
             closestTimes, closestIdx = hf.closestSeries(
                 takeFrom=outboundT, compareTo=stimOnTs,
@@ -186,7 +185,7 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
             except Exception:
                 print('\n\n{}\n Error at t= {} sec\n\n'.format(dataBlockPath, outboundT.iloc[0]))
                 traceback.print_exc()
-                pdb.set_trace()
+                # pdb.set_trace()
             for annName in stimAnnNames:
                 motionEvDF.loc[outboundIdx, annName] = noStimFiller[annName]
                 motionEvDF.loc[reachIdx, annName] = noStimFiller[annName]
@@ -239,7 +238,7 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
             except Exception:
                 print('\n\n{}\nError at t= {} sec\n\n'.format(dataBlockPath, returnT.iloc[0]))
                 traceback.print_exc()
-                pdb.set_trace()
+                # pdb.set_trace()
             for annName in stimAnnNames:
                 motionEvDF.loc[returnIdx, annName] = noStimFiller[annName]
                 motionEvDF.loc[reachBaseIdx, annName] = noStimFiller[annName]
@@ -256,8 +255,9 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
             theseEvents = (
                 motionEvDF
                 .loc[motionEvDF['pedalMovementCat'] == cN, :])
+            # pdb.set_trace()
             sns.distplot(
-                theseEvents.loc[:, 'stimDelay'],
+                theseEvents.loc[~theseEvents['stimDelay'].isna(), 'stimDelay'],
                 bins=200, kde=False, ax=ax)
             print(
                 theseEvents

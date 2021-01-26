@@ -41,7 +41,7 @@ expOpts, allOpts = parseAnalysisOptions(
 globals().update(expOpts)
 globals().update(allOpts)
 
-print('\n' + '#' * 50 + '\n{}.py\n'.format(__file__) + '#' * 50 + '\n')
+print('\n' + '#' * 50 + '\n{}\n'.format(__file__) + '#' * 50 + '\n')
 # trick to allow joint processing of minirc and regular trials
 if blockExperimentType == 'proprio-motionOnly':
     print('skipping blocks without stim')
@@ -102,7 +102,6 @@ masterBlock.annotate(
 blockIdx = 0
 checkReferences = False
 for segIdx, dataSeg in enumerate(dataBlock.segments):
-    print('Calculating stim align times for trial {}'.format(segIdx + 1))
     eventProxysList = dataSeg.events
     if checkReferences:
         for evP in eventProxysList:
@@ -177,21 +176,26 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
             alignEventsDF.loc[group.index, 'electrode'] = 'control'
         else:
             unitName = 'g{}p{}#0'.format(gName, pName)
-            thisUnit = insBlock.filter(objects=Unit, name=unitName)[0]
-            cathodes = thisUnit.annotations['cathodes']
-            anodes = thisUnit.annotations['anodes']
-            elecName = ''
-            if isinstance(anodes, Iterable):
-                elecName += '+ ' + ', '.join(['E{}'.format(i) for i in anodes])
-            else:
-                elecName += '+ E{}'.format(anodes)
-            elecName += ' '
-            if isinstance(cathodes, Iterable):
-                elecName += '- ' + ', '.join(['E{}'.format(i) for i in cathodes])
-            else:
-                elecName += '- E{}'.format(cathodes)
-            alignEventsDF.loc[group.index, 'electrode'] = elecName
+            unitCandidates = insBlock.filter(objects=Unit, name=unitName)
+            #
+            if len(unitCandidates) == 1:
+                thisUnit = unitCandidates[0]
+                cathodes = thisUnit.annotations['cathodes']
+                anodes = thisUnit.annotations['anodes']
+                elecName = ''
+                if isinstance(anodes, Iterable):
+                    elecName += '+ ' + ', '.join(['E{}'.format(i) for i in anodes])
+                else:
+                    elecName += '+ E{}'.format(anodes)
+                elecName += ' '
+                if isinstance(cathodes, Iterable):
+                    elecName += '- ' + ', '.join(['E{}'.format(i) for i in cathodes])
+                else:
+                    elecName += '- E{}'.format(cathodes)
+                alignEventsDF.loc[group.index, 'electrode'] = elecName
     #
+    # TODO: fix synch code so that all units are present, to avoid this hack:
+    alignEventsDF.loc[:, 'electrode'] = alignEventsDF['electrode'].fillna('NA')
     alignEvents = ns5.eventDataFrameToEvents(
         alignEventsDF, idxT='t',
         annCol=None,

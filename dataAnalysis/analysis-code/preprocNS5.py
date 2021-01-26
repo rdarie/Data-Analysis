@@ -225,7 +225,7 @@ def preprocNS5():
             ainpNameList=analogInputNames,
             spikeSourceType='',
             nameSuffix='_analog_inputs', writeMode='ow',
-            chunkSize=4000,
+            chunkSize=9999,
             calcRigEvents=trialFilesFrom['utah']['calcRigEvents'])
     #
     if arguments['fullSubtractMeanWithSpikes']:

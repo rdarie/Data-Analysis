@@ -626,26 +626,53 @@ def concatenateBlocks(
     return outputBlock
 
 
+'''
 def concatenateEventsContainerV2(eventContainer, newSegIdx=0):
     if isinstance(eventContainer, dict):
-        listOfEvents = list(eventContainer.values())
+        allListOfEvents = list(eventContainer.values())
     else:
-        listOfEvents = eventContainer
-    listOfEvents = [ev for ev in listOfEvents if len(ev.times)]
+        allListOfEvents = eventContainer
+    listOfEvents = [ev for ev in allListOfEvents if len(ev.times)]
+    if not len(listOfEvents) > 0:
+        return allListOfEvents[0]
+    masterEvent = None
     for evIdx, ev in enumerate(listOfEvents):
         masterEvent = ev
         if len(masterEvent.times):
             break
     if evIdx > len(listOfEvents) - 1:
         for ev in listOfEvents[evIdx+1:]:
-            masterEvent.merge(ev)
+            masterEvent = masterEvent.merge(ev)
+    if masterEvent.array_annotations is not None:
+        arrayAnnNames = list(masterEvent.array_annotations.keys())
+        masterEvent.annotations.update(masterEvent.array_annotations)
+        masterEvent.annotations['arrayAnnNames'] = arrayAnnNames
+    return masterEvent
+'''
+
+
+def concatenateEventsContainer(eventContainer, newSegIdx=0):
+    if isinstance(eventContainer, dict):
+        listOfEvents = list(eventContainer.values())
+    else:
+        listOfEvents = eventContainer
+    nonEmptyEvents = [ev for ev in listOfEvents if len(ev.times)]
+    if not len(nonEmptyEvents) > 0:
+        return listOfEvents[0]
+    masterEvent = listOfEvents[0]
+    for evIdx, ev in enumerate(listOfEvents[1:]):
+        try:
+            masterEvent = masterEvent.merge(ev)
+        except Exception:
+            traceback.print_exc()
+            pdb.set_trace()
     if masterEvent.array_annotations is not None:
         arrayAnnNames = list(masterEvent.array_annotations.keys())
         masterEvent.annotations.update(masterEvent.array_annotations)
         masterEvent.annotations['arrayAnnNames'] = arrayAnnNames
     return masterEvent
 
-
+'''
 def concatenateEventsContainer(eventContainer, newSegIdx=0):
     if isinstance(eventContainer, dict):
         listOfEvents = list(eventContainer.values())
@@ -699,7 +726,7 @@ def concatenateEventsContainer(eventContainer, newSegIdx=0):
         outObj.annotations.update(consolidatedArrayAnn)
         outObj.annotations['arrayAnnNames'] = arrayAnnNames
     return outObj
-
+'''
 
 #  renamed spikeTrainWaveformsToDF to unitSpikeTrainWaveformsToDF
 def unitSpikeTrainWaveformsToDF(
@@ -2652,7 +2679,7 @@ def preprocBlockToNix(
                     channel_names=['{}_outlierMask_{}'.format(
                         electrodeArrayName, outMaskChIdx)],
                     channel_ids=[lastID + outMaskChIdx],
-                    name='{}_outlierMark_{}'.format(
+                    name='{}_outlierMask_{}'.format(
                         electrodeArrayName, outMaskChIdx),
                     file_origin=block.channel_indexes[-1].file_origin
                     )
@@ -3516,9 +3543,9 @@ def loadObjArrayAnn(st):
                 pdb.set_trace()
     if hasattr(st, 'waveforms'):
         if st.waveforms is None:
-            st.waveforms = np.asarray([]).reshape((0, 0, 0))*pq.mV
+            st.waveforms = np.asarray([]).reshape((0, 0, 0)) * pq.mV
         elif not len(st.waveforms):
-            st.waveforms = np.asarray([]).reshape((0, 0, 0))*pq.mV
+            st.waveforms = np.asarray([]).reshape((0, 0, 0)) * pq.mV
     return st
 
 
@@ -3555,7 +3582,6 @@ def blockFromPath(
         dataBlock = readBlockFixNames(
             dataReader, lazy=lazy, mapDF=mapDF,
             reduceChannelIndexes=reduceChannelIndexes, loadList=loadList)
-        
     else:
         dataReader = None
         dataBlock = loadWithArrayAnn(dataPath)

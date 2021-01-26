@@ -5,8 +5,7 @@ def getExpOpts():
     blockExperimentTypeLookup = {
         1: 'proprio-miniRC',
         2: 'proprio',
-        3: 'proprio',
-        4: 'proprio-motionOnly',
+        3: 'proprio-motionOnly',
         }
     fullRigInputs = {
         'A+': 'ainp12',
@@ -36,21 +35,25 @@ def getExpOpts():
         'forceX': 'ainp14',
         'forceY': 'ainp15',
         }
-    
-    experimentName = '202101211100-Rupert'
+    experimentName = '202101251100-Rupert'
     deviceName = 'DeviceNPC700246H'
     subjectName = 'Rupert'
     #
     jsonSessionNames = {
         #  per block
-        1: ['Session1611246044886', 'Session1611246220465'],
-        2: ['Session1611247033380', 'Session1611247376867'],
-        3: [
-            'Session1611248043534', 'Session1611248599896',
-            'Session1611248732385', 'Session1611249056228',
-            'Session1611249262364', 'Session1611249767605'
+        1: [
+            'Session1611592926754', 'Session1611593104315',
+            'Session1611593338204', 'Session1611593481943'
             ],
-        4: ['Session1611250728338']
+        2: [
+            # 'Session1611594402265',
+            'Session1611594489092',
+            'Session1611594616190', 'Session1611594819553',
+            'Session1611595112906', 'Session1611595371302'
+        ],
+        3: [
+            'Session1611596364419', 'Session1611596422817'
+        ],
         }
     synchInfo = {'nform': {}, 'nsp': {}, 'ins': {}}
     # populate with defaults
@@ -79,9 +82,6 @@ def getExpOpts():
     # #    'iti': 50e-3,
     # #    'keepIndex': slice(None)
     # #    }
-    synchInfo['ins'][4][0].update({
-        'synchStimUnitName': None,
-        'synchByXCorrTapDetectSignal': True})
     ############################################################
     ############################################################
     synchInfo['nsp'] = {
@@ -100,22 +100,9 @@ def getExpOpts():
     ############################################################
     ############################################################
     # manually add special instructions, e.g
-    synchInfo['nsp'][1][0].update({'timeRanges': [(70, 9999)]})
-    synchInfo['nsp'][1][1].update({'timeRanges': [(220, 9999)]})
+    # synchInfo['nsp'][2][0].update({'timeRanges': [(40, 9999)]})
+    synchInfo['nsp'][2][0].update({'timeRanges': [(60, 9999)]})
     #
-    synchInfo['nsp'][2][0].update({'timeRanges': [(55, 9999)]})
-    synchInfo['nsp'][2][1].update({'timeRanges': [(415, 9999)]})
-    #
-    synchInfo['nsp'][3][0].update({'timeRanges': [(39, 9999)]})
-    synchInfo['nsp'][3][1].update({'timeRanges': [(600, 9999)]})
-    synchInfo['nsp'][3][2].update({'timeRanges': [(720, 9999)]})
-    synchInfo['nsp'][3][3].update({'timeRanges': [(1045, 9999)]})
-    synchInfo['nsp'][3][4].update({'timeRanges': [(1255, 9999)]})
-    synchInfo['nsp'][3][5].update({'timeRanges': [(1940, 9999)]})
-    #
-    synchInfo['nsp'][4][0].update({
-        'timeRanges': [(46, 9999)],
-        'synchByXCorrTapDetectSignal': True})
     #
     #
     #  overrideSegmentsForTapSync
@@ -148,7 +135,7 @@ def getExpOpts():
         }}
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        '202101211100-Rupert': [1],
+        '202101251100-Rupert': [2, 3],
         }
     # Options relevant to the classifcation of proprio trials
     movementSizeBins = [0, 0.6, 1]
@@ -159,26 +146,21 @@ def getExpOpts():
     alignTimeBoundsLookup = None
     # alignTimeBoundsLookup = {
     #     3: [
-    #         [275, 1732]
+    #         [108, 99999]
     #         ],
     #     }
     #
+    motorEncoderBoundsLookup = None
     # motorEncoderBoundsLookup = {
-    #     3: [
-    #         [100, 299], [730, 2290]
+    #     2: [
+    #         [100, 772], [1173, 1896]
     #     ]
     # }
-
     ############################################################
     ############################################################
     outlierDetectOptions = dict(
         targetEpochSize=100e-3,
         windowSize=(-.2, .8),
-        conditionNames=[
-            'electrode', 'amplitude', 'RateInHz',
-            'pedalSizeCat', 'pedalDirection'],
-        # conditionNames=[
-        #     'electrode', 'amplitude', 'RateInHz'],
         twoTailed=True,
         )
     #
@@ -219,13 +201,13 @@ def getExpOpts():
             'confidence_threshold': .5,
             'refractory_period': 2e-3,
             'triFolderSource': {
-                'exp': experimentName, 'block': 1,
+                'exp': experimentName, 'block': 3,
                 'nameSuffix': 'spike_preview'},
             'triFolderDest': [
                 {
                     'exp': experimentName, 'block': i,
                     'nameSuffix': 'mean_subtracted'}
-                for i in [1,  2]]
+                for i in [1, 2, 3]]
         }
     }
     return locals()

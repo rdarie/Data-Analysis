@@ -696,11 +696,12 @@ def gaussianSupport(
     if support is None:
         support = pd.Series(0, index=tdSeg.index)
         support.loc[peakIdx] = 1
-    # 
+    
     support.iloc[:] = np.convolve(
         support.values,
         gaussKern, mode='same'
         )
+    
     support = pd.Series(
         MinMaxScaler(feature_range=(1e-2, 1))
         .fit_transform(support.values.reshape(-1, 1))
