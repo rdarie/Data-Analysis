@@ -26,6 +26,7 @@ from copy import deepcopy
 from tqdm import tqdm
 import json
 
+
 def processRowColArguments(arguments):
     outDict = {}
     outDict['rowName'] = arguments['rowName'] if len(arguments['rowName']) else None
@@ -60,6 +61,7 @@ def processRowColArguments(arguments):
             outDict['styleControl'] = arguments['styleControl']
     else:
         outDict['styleControl'] = None
+    # pdb.set_trace()
     return outDict
 
 

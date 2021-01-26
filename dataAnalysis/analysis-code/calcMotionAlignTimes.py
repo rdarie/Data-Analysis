@@ -198,6 +198,7 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
     pedalRestingMask = tdDF['pedalVelocityAbs'] == 0
     pedalNeutralPoint = float(
         tdDF.loc[taskMask & pedalRestingMask, 'pedalPosition'].value_counts().idxmax())
+    assert np.abs(pedalNeutralPoint) < 0.1 # if the neutral point > 10 deg, there might be a problem
     #
     tdDF.loc[:, 'pedalPosition'] = tdDF['pedalPosition'] - pedalNeutralPoint
     tdDF.loc[:, 'pedalPositionAbs'] = tdDF['pedalPosition'].abs()
@@ -309,6 +310,8 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
     pedalSizeCat = pd.cut(
         trialsDict['outbound']['pedalSize'].abs(), movementSizeBins,
         labels=movementSizeBinLabels)
+    pdb.set_trace()
+    assert not pedalSizeCat.isna().any()
     for mvCat in movementCatTypes:
         trialsDict[mvCat].loc[:, 'pedalSizeCat'] = pedalSizeCat
     # pdb.set_trace()
@@ -319,6 +322,7 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         .reset_index())
     #  sort align times
     alignEventsDF.sort_values(by='t', inplace=True, kind='mergesort')
+    pdb.set_trace()
     alignEvents = preproc.eventDataFrameToEvents(
         alignEventsDF, idxT='t',
         annCol=None,

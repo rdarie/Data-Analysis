@@ -10,16 +10,19 @@
 #SBATCH --mem=24G
 
 # Specify a job name:
-#SBATCH -J plotsStim_lfp
+#SBATCH -J plotsStim_rig
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-plotsStim_lfp.stdout
-#SBATCH -e ../../batch_logs/%j-plotsStim_lfp.errout
+#SBATCH -o ../../batch_logs/%j-plotsStim_rig.stdout
+#SBATCH -e ../../batch_logs/%j-plotsStim_rig.errout
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 
-SLURM_ARRAY_TASK_ID=3
+# Request custom resources
+#SBATCH --array=1,2
+
+# SLURM_ARRAY_TASK_ID=2
 source ./shellScripts/run_plotter_aligned_stim_preamble.sh
 
 # OTHERASIGOPTS="--individualTraces --invertOutlierBlocks"

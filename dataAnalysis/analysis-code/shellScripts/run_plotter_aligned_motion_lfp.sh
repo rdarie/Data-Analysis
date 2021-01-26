@@ -10,16 +10,19 @@
 #SBATCH --mem=24G
 
 # Specify a job name:
-#SBATCH -J plotsStim
+#SBATCH -J plots_motion_lfp
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-plotsStim.stdout
-#SBATCH -e ../../batch_logs/%j-plotsStim.errout
+#SBATCH -o ../../batch_logs/%j_%a-plots_motion_lfp.stdout
+#SBATCH -e ../../batch_logs/%j_%a-plots_motion_lfp.errout
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 
-SLURM_ARRAY_TASK_ID=3
+# Request custom resources
+#SBATCH --array=3
+
+# SLURM_ARRAY_TASK_ID=3
 source ./shellScripts/run_plotter_aligned_motion_preamble.sh
 
-python3 -u './plotAlignedAsigs.py' --exp=$EXP $BLOCKSELECTOR $ANALYSISFOLDER $WINDOW --inputBlockName="lfp" --unitQuery="lfp" $ALIGNQUERY $ALIGNFOLDER --enableOverrides $TIMEWINDOWOPTS $STATSOVERLAY $OUTLIERMASK
+python3 -u './plotAlignedAsigs.py' --inputBlockName="lfp" --unitQuery="lfp" --enableOverrides --exp=$EXP $BLOCKSELECTOR $ANALYSISFOLDER $WINDOW $ALIGNQUERY $ALIGNFOLDER $TIMEWINDOWOPTS $STATSOVERLAY $OUTLIERMASK $HUEOPTS $ROWOPTS $COLOPTS $PAGELIMITS $OTHERASIGOPTS

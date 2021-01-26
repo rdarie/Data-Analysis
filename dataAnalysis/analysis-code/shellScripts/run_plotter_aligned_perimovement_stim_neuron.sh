@@ -10,11 +10,11 @@
 #SBATCH --mem=24G
 
 # Specify a job name:
-#SBATCH -J plots_peri_lfp
+#SBATCH -J plots_peri_neuron
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-plots_peri_lfp.stdout
-#SBATCH -e ../../batch_logs/%j-%a-plots_peri_lfp.errout
+#SBATCH -o ../../batch_logs/%j-%a-plots_peri_neuron.stdout
+#SBATCH -e ../../batch_logs/%j-%a-plots_peri_neuron.errout
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -25,4 +25,4 @@
 # SLURM_ARRAY_TASK_ID=2
 source ./shellScripts/run_plotter_aligned_perimovement_stim_preamble.sh
 
-python3 -u './plotAlignedAsigs.py' --inputBlockName="lfp" --unitQuery="lfp" --enableOverrides --exp=$EXP $BLOCKSELECTOR $ANALYSISFOLDER $WINDOW $ALIGNQUERY $ALIGNFOLDER $TIMEWINDOWOPTS $STATSOVERLAY $OUTLIERMASK $HUEOPTS $ROWOPTS $COLOPTS $PAGELIMITS $OTHERASIGOPTS
+python3 -u './plotAlignedNeurons.py' --exp=$EXP --unitQuery="all" --enableOverrides $BLOCKSELECTOR $ANALYSISFOLDER $UNITSELECTOR $WINDOW $ALIGNQUERY $ALIGNFOLDER $TIMEWINDOWOPTS $STATSOVERLAY $OUTLIERMASK $HUEOPTS $ROWOPTS $COLOPTS $PAGELIMITS $OTHERNEURONOPTS

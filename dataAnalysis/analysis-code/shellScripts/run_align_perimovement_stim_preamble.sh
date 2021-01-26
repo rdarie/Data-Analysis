@@ -23,6 +23,7 @@ EXP="exp202101201100"
 LAZINESS="--lazy"
 
 WINDOW="--window=M"
+AMPFIELDNAME="--amplitudeFieldName=amplitude"
 
 ANALYSISFOLDER="--analysisName=default"
 

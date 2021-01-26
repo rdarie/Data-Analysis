@@ -3,19 +3,20 @@ Usage:
     temp.py [options]
 
 Options:
-    --blockIdx=blockIdx                    which trial to analyze [default: 1]
-    --exp=exp                              which experimental day to analyze
-    --processAll                           process entire experimental day? [default: False]
-    --window=window                        process with short window? [default: short]
-    --lazy                                 load from raw, or regular? [default: False]
-    --chanQuery=chanQuery                  how to restrict channels? [default: raster]
-    --outputBlockName=outputBlockName      name for new block [default: raster]
-    --eventBlockName=eventBlockName        name of events object to align to [default: analyze]
-    --signalBlockName=signalBlockName      name of signal block [default: analyze]
-    --eventName=eventName                  name of events object to align to [default: motionStimAlignTimes]
-    --analysisName=analysisName            append a name to the resulting blocks? [default: default]
-    --alignFolderName=alignFolderName      append a name to the resulting blocks? [default: motion]
-    --verbose                              print diagnostics? [default: False]
+    --blockIdx=blockIdx                          which trial to analyze [default: 1]
+    --exp=exp                                    which experimental day to analyze
+    --processAll                                 process entire experimental day? [default: False]
+    --window=window                              process with short window? [default: short]
+    --lazy                                       load from raw, or regular? [default: False]
+    --chanQuery=chanQuery                        how to restrict channels? [default: raster]
+    --outputBlockName=outputBlockName            name for new block [default: raster]
+    --eventBlockName=eventBlockName              name of events object to align to [default: analyze]
+    --signalBlockName=signalBlockName            name of signal block [default: analyze]
+    --eventName=eventName                        name of events object to align to [default: motionStimAlignTimes]
+    --analysisName=analysisName                  append a name to the resulting blocks? [default: default]
+    --alignFolderName=alignFolderName            append a name to the resulting blocks? [default: motion]
+    --amplitudeFieldName=amplitudeFieldName      what is the amplitude named? [default: nominalCurrent]
+    --verbose                                    print diagnostics? [default: False]
 """
 
 import os, pdb, traceback
@@ -101,6 +102,23 @@ windowSize = [
 #       'elec77#0_raster', 'elec77#1_raster', 'elec77#2_raster',
 #       ]
 
+if (blockExperimentType == 'proprio-miniRC') or (blockExperimentType == 'proprio-RC'):
+    # has stim but no motion
+    minNConditionRepetitions['categories'] = [
+        'electrode', arguments['amplitudeFieldName'], 'RateInHz']
+elif blockExperimentType == 'proprio-motionOnly':
+    # has motion but no stim
+    minNConditionRepetitions['categories'] = [
+        'pedalMovementCat', 'pedalSizeCat', 'pedalDirection']
+else:
+    if arguments['eventName'] in ['stimAlignTimes']:
+        # stim events aren't motion aware
+        stimulusConditionNames = [
+            'electrode', arguments['amplitudeFieldName'], 'RateInHz']
+    else:
+        stimulusConditionNames = [
+            'electrode', arguments['amplitudeFieldName'], 'RateInHz',
+            'pedalMovementCat', 'pedalSizeCat', 'pedalDirection']
 ns5.getAsigsAlignedToEvents(
     eventBlock=eventBlock, signalBlock=signalBlock,
     chansToTrigger=arguments['chanNames'],

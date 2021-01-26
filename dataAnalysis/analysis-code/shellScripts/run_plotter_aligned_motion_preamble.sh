@@ -11,7 +11,13 @@ TIMEWINDOWOPTS="--winStart=200 --winStop=800"
 # ALIGNQUERY="--alignQuery=stimOn"
 ALIGNQUERY="--alignQuery=outbound"
 
-HUEOPTS="--hueName=amplitude --hueControl="
-ROWOPTS="--rowName=RateInHz --rowControl="
-COLOPTS="--colName=electrode --colControl=control"
-STYLEOPTS="--styleName=RateInHz"
+HUEOPTS="--hueName= --hueControl="
+ROWOPTS="--rowName=pedalDirection --rowControl="
+COLOPTS="--colName= --colControl="
+STYLEOPTS="--styleName= --styleControl="
+
+# PAGELIMITS="--limitPages=5"
+PAGELIMITS=""
+
+OTHERASIGOPTS="--noStim"
+OTHERNEURONOPTS="--noStim"

@@ -23,7 +23,6 @@ EXP="exp202101201100"
 LAZINESS="--lazy"
 
 WINDOW="--window=M"
-
 ANALYSISFOLDER="--analysisName=default"
 
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"

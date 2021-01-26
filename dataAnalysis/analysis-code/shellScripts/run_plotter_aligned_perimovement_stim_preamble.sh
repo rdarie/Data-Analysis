@@ -12,9 +12,11 @@ TIMEWINDOWOPTS="--winStart=200 --winStop=800"
 ALIGNQUERY="--alignQuery=outbound"
 
 HUEOPTS="--hueName=amplitude --hueControl="
-ROWOPTS="--rowName= --rowControl="
+ROWOPTS="--rowName=RateInHz --rowControl="
 COLOPTS="--colName=electrode --colControl=control"
 STYLEOPTS="--styleName=RateInHz"
 
 # PAGELIMITS="--limitPages=5"
 PAGELIMITS=""
+OTHERASIGOPTS=""
+OTHERNEURONOPTS=""

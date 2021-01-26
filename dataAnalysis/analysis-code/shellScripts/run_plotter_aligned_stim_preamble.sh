@@ -12,7 +12,7 @@ ALIGNQUERY="--alignQuery=stimOn"
 # ALIGNQUERY="--alignQuery=outbound"
 
 HUEOPTS="--hueName=amplitude --hueControl="
-ROWOPTS="--rowName= --rowControl="
+ROWOPTS="--rowName=RateInHz --rowControl="
 COLOPTS="--colName=electrode --colControl=control"
 STYLEOPTS="--styleName=RateInHz"
 
@@ -20,3 +20,4 @@ STYLEOPTS="--styleName=RateInHz"
 PAGELIMITS=""
 
 OTHERASIGOPTS=""
+OTHERNEURONOPTS=""

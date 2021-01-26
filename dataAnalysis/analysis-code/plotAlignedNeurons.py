@@ -28,6 +28,7 @@ Options:
     --winStart=winStart                    start of window [default: 200]
     --winStop=winStop                      end of window [default: 400]
     --limitPages=limitPages                how many pages to print, max?
+    --noStim                               disable references to "amplitude"
 """
 import matplotlib
 matplotlib.rcParams['pdf.fonttype'] = 42
@@ -93,10 +94,16 @@ alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUn
     namedQueries, alignSubFolder, **arguments)
 alignedAsigsKWargs['outlierTrials'] = ash.processOutlierTrials(
     calcSubFolder, prefix, **arguments)
-alignedAsigsKWargs.update(dict(
-    duplicateControlsByProgram=True,
-    makeControlProgram=True,
-    metaDataToCategories=False))
+if arguments['noStim']:
+    alignedAsigsKWargs.update(dict(
+        duplicateControlsByProgram=False,
+        makeControlProgram=False,
+        metaDataToCategories=False))
+else:
+    alignedAsigsKWargs.update(dict(
+        duplicateControlsByProgram=True,
+        makeControlProgram=True,
+        metaDataToCategories=False))
 #
 rasterBlockPath = os.path.join(
     alignSubFolder,

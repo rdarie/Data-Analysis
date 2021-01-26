@@ -19,7 +19,10 @@
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 
-SLURM_ARRAY_TASK_ID=2
-source ./shellScripts/run_plotter_aligned_perimovement_stim_preamble.sh
+# Request custom resources
+#SBATCH --array=1,2
 
-python3 -u './plotAlignedNeurons.py' --exp=$EXP --unitQuery="all" --enableOverrides $BLOCKSELECTOR $ANALYSISFOLDER $UNITSELECTOR $WINDOW $ALIGNQUERY $ALIGNFOLDER $TIMEWINDOWOPTS $STATSOVERLAY $OUTLIERMASK $HUEOPTS $ROWOPTS $COLOPTS $PAGELIMITS
+# SLURM_ARRAY_TASK_ID=2
+source ./shellScripts/run_plotter_aligned_stim_preamble.sh
+
+python3 -u './plotAlignedNeurons.py' --exp=$EXP --unitQuery="all" --enableOverrides $BLOCKSELECTOR $ANALYSISFOLDER $UNITSELECTOR $WINDOW $ALIGNQUERY $ALIGNFOLDER $TIMEWINDOWOPTS $STATSOVERLAY $OUTLIERMASK $HUEOPTS $ROWOPTS $COLOPTS $PAGELIMITS $OTHERNEURONOPTS
