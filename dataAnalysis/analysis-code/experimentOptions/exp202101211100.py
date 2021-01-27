@@ -100,18 +100,18 @@ def getExpOpts():
     ############################################################
     ############################################################
     # manually add special instructions, e.g
-    synchInfo['nsp'][1][0].update({'timeRanges': [(70, 9999)]})
-    synchInfo['nsp'][1][1].update({'timeRanges': [(220, 9999)]})
+    synchInfo['nsp'][1][0].update({'timeRanges': [(75, 9999)]})
+    synchInfo['nsp'][1][1].update({'timeRanges': [(225, 9999)]})
     #
-    synchInfo['nsp'][2][0].update({'timeRanges': [(55, 9999)]})
-    synchInfo['nsp'][2][1].update({'timeRanges': [(415, 9999)]})
+    synchInfo['nsp'][2][0].update({'timeRanges': [(60, 9999)]})
+    synchInfo['nsp'][2][1].update({'timeRanges': [(420, 9999)]})
     #
-    synchInfo['nsp'][3][0].update({'timeRanges': [(39, 9999)]})
-    synchInfo['nsp'][3][1].update({'timeRanges': [(600, 9999)]})
-    synchInfo['nsp'][3][2].update({'timeRanges': [(720, 9999)]})
-    synchInfo['nsp'][3][3].update({'timeRanges': [(1045, 9999)]})
-    synchInfo['nsp'][3][4].update({'timeRanges': [(1255, 9999)]})
-    synchInfo['nsp'][3][5].update({'timeRanges': [(1940, 9999)]})
+    synchInfo['nsp'][3][0].update({'timeRanges': [(45, 9999)]})
+    synchInfo['nsp'][3][1].update({'timeRanges': [(605, 9999)]})
+    synchInfo['nsp'][3][2].update({'timeRanges': [(725, 9999)]})
+    synchInfo['nsp'][3][3].update({'timeRanges': [(1050, 9999)]})
+    synchInfo['nsp'][3][4].update({'timeRanges': [(1260, 9999)]})
+    synchInfo['nsp'][3][5].update({'timeRanges': [(1945, 9999)]})
     #
     synchInfo['nsp'][4][0].update({
         'timeRanges': [(46, 9999)],
