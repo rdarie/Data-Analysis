@@ -509,7 +509,6 @@ else:
                     for custMess in customMessages
                     ]
                 phantomAx = ax[0].twinx()
-                phantomAx.set_xticks([])
                 phantomAx.set_yticks([])
                 phantomAx.legend(customLines, customMessages, loc='upper left')
                 #

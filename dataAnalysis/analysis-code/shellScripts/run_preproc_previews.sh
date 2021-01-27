@@ -57,11 +57,12 @@ python --version
 # EXP="exp202101191100"
 # EXP="exp202101201100"
 EXP="exp202101211100"
+EXP="exp202101221100"
 # EXP="exp202101251100"
 
-# python -u ./previewINSSessionSummary.py --exp=$EXP
+python -u ./previewINSSessionSummary.py --exp=$EXP
 
-for BLOCKIDX in 1 2 3 4
+for BLOCKIDX in 1 2 3
 do
     python -u './previewNSPTapTimes.py' --blockIdx=$BLOCKIDX --exp=$EXP --usedTENSPulses
 done

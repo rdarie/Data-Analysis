@@ -41,9 +41,15 @@ def getExpOpts():
     #
     jsonSessionNames = {
         #  per block
-        1: [],
-        2: [],
-        3: []
+        1: [
+            'Session1611332995649', 'Session1611333273122',
+            'Session1611333553519', 'Session1611334040372',
+            'Session1611334349859'],
+        2: [
+            'Session1611334604163', 'Session1611335022326',
+            'Session1611335197637', 'Session1611335825108'
+        ],
+        3: ['Session1611336429421']
         }
     synchInfo = {'nform': {}, 'nsp': {}, 'ins': {}}
     # populate with defaults
@@ -125,7 +131,7 @@ def getExpOpts():
         }}
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        '202101221100-Rupert': [2,
+        '202101221100-Rupert': [2],
         }
     # Options relevant to the classifcation of proprio trials
     movementSizeBins = [0, 0.6, 1]
