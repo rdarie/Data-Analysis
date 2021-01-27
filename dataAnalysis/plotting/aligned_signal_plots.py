@@ -31,37 +31,72 @@ def processRowColArguments(arguments):
     outDict = {}
     outDict['rowName'] = arguments['rowName'] if len(arguments['rowName']) else None
     if outDict['rowName'] is not None:
-        try:
-            outDict['rowControl'] = int(arguments['rowControl'])
-        except Exception:
-            outDict['rowControl'] = arguments['rowControl']
+        if arguments['rowControl'] is None:
+            outDict['rowControl'] = None
+        elif len(arguments['rowControl']):
+            try:
+                outDict['rowControl'] = int(arguments['rowControl'])
+            except Exception:
+                outDict['rowControl'] = arguments['rowControl']
+        else:
+            outDict['rowControl'] = None
     else:
         outDict['rowControl'] = None
     outDict['colName'] = arguments['colName'] if len(arguments['colName']) else None
     if outDict['colName'] is not None:
-        try:
-            outDict['colControl'] = int(arguments['colControl'])
-        except Exception:
-            outDict['colControl'] = arguments['colControl']
+        if arguments['colControl'] is None:
+            outDict['colControl'] = None
+        elif len(arguments['colControl']):
+            try:
+                outDict['colControl'] = int(arguments['colControl'])
+            except Exception:
+                outDict['colControl'] = arguments['colControl']
+        else:
+            outDict['colControl'] = None
     else:
         outDict['colControl'] = None
+    #
     outDict['hueName'] = arguments['hueName'] if len(arguments['hueName']) else None
     if outDict['hueName'] is not None:
-        try:
-            outDict['hueControl'] = int(arguments['hueControl'])
-        except Exception:
-            outDict['hueControl'] = arguments['hueControl']
+        if arguments['hueControl'] is None:
+            outDict['hueControl'] = None
+        elif len(arguments['hueControl']):
+            try:
+                outDict['hueControl'] = int(arguments['hueControl'])
+            except Exception:
+                outDict['hueControl'] = arguments['hueControl']
+        else:
+            outDict['hueControl'] = None
     else:
         outDict['hueControl'] = None
+    #
     outDict['styleName'] = arguments['styleName'] if len(arguments['styleName']) else None
     if outDict['styleName'] is not None:
-        try:
-            outDict['styleControl'] = int(arguments['styleControl'])
-        except Exception:
-            outDict['styleControl'] = arguments['styleControl']
+        if arguments['styleControl'] is None:
+            outDict['styleControl'] = None
+        elif len(arguments['styleControl']):
+            try:
+                outDict['styleControl'] = int(arguments['styleControl'])
+            except Exception:
+                outDict['styleControl'] = arguments['styleControl']
+        else:
+            outDict['styleControl'] = None
     else:
         outDict['styleControl'] = None
-    # pdb.set_trace()
+    #
+    outDict['sizeName'] = arguments['sizeName'] if len(arguments['sizeName']) else None
+    if outDict['sizeName'] is not None:
+        if arguments['sizeControl'] is None:
+            outDict['sizeControl'] = None
+        elif len(arguments['sizeControl']):
+            try:
+                outDict['sizeControl'] = int(arguments['sizeControl'])
+            except Exception:
+                outDict['sizeControl'] = arguments['sizeControl']
+        else:
+            outDict['sizeControl'] = None
+    else:
+        outDict['sizeControl'] = None
     return outDict
 
 
@@ -110,6 +145,7 @@ def plotNeuronsAligned(
         colName=None, colControl=None, colOrder=None,
         hueName=None, hueControl=None, hueOrder=None,
         styleName=None, styleControl=None, styleOrder=None,
+        sizeName=None, sizeControl=None, sizeOrder=None,
         twinRelplotKWArgs={}, sigStarOpts={},
         plotProcFuns=[], minNObservations=0, showNow=False
         ):
@@ -281,6 +317,7 @@ def plotAsigsAligned(
         colName=None, colControl=None, colOrder=None,
         hueName=None, hueControl=None, hueOrder=None,
         styleName=None, styleControl=None, styleOrder=None,
+        sizeName=None, sizeControl=None, sizeOrder=None,
         relplotKWArgs={}, sigStarOpts={},
         plotProcFuns=[], minNObservations=0,
         ):
@@ -897,6 +934,8 @@ def plotSignificance(
         pdfName='pCount',
         figureFolder=None,
         **kwargs):
+    if sigValsDF is None:
+        return
     sigValsDF = sigValsDF.stack().reset_index(name='significant')
     with PdfPages(os.path.join(figureFolder, pdfName + '.pdf')) as pdf:
         gPH = sns.catplot(
@@ -915,7 +954,7 @@ def plotSignificance(
             ax.set_xticklabels(labels, rotation=30)
             try:
                 newwidth = (ax.get_xticks()[1] - ax.get_xticks()[0])
-            except:
+            except Exception:
                 newwidth = 0.1
             for bar in ax.patches:
                 x = bar.get_x()
@@ -925,7 +964,6 @@ def plotSignificance(
                 bar.set_width(newwidth)
         pdf.savefig()
         plt.close()
-        
     return
 
 

@@ -25,6 +25,7 @@ Options:
     --analysisName=analysisName            append a name to the resulting blocks? [default: default]
     --alignFolderName=alignFolderName      append a name to the resulting blocks? [default: motion]
     --overlayStats                         overlay ANOVA significance stars? [default: False]
+    --recalcStats                          overlay ANOVA significance stars? [default: False]
     --winStart=winStart                    start of window [default: 200]
     --winStop=winStop                      end of window [default: 400]
     --limitPages=limitPages                how many pages to print, max?
@@ -180,7 +181,7 @@ if arguments['enableOverrides']:
 # ################################################################
 
 if arguments['overlayStats']:
-    if os.path.exists(statsTestPath):
+    if os.path.exists(statsTestPath) and not arguments['recalcStats']:
         sigValsWide = pd.read_hdf(statsTestPath, 'sig')
         sigValsWide.columns.name = 'bin'
     else:

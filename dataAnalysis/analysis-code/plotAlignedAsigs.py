@@ -18,6 +18,7 @@ Options:
     --enableOverrides                      modify default plot opts? [default: False]
     --individualTraces                     mean+sem or individual traces? [default: False]
     --overlayStats                         overlay ANOVA significance stars? [default: False]
+    --recalcStats                          overlay ANOVA significance stars? [default: False]
     --rowName=rowName                      break down by row  [default: pedalDirection]
     --rowControl=rowControl                rows to exclude from stats test
     --hueName=hueName                      break down by hue  [default: amplitude]
@@ -174,16 +175,13 @@ if arguments['enableOverrides']:
     # relplotKWArgs['aspect'] = (
     #     relplotKWArgs['aspect'] * redWinSize / fullWinSize)
     statsTestOpts.update({
-        'testStride': 50e-3,
-        'testWidth': 50e-3,
-        'tStart': 0e-3,
         'tStop': alignedAsigsKWargs['windowSize'][1]})
     alignedAsigsKWargs['procFun'] = ash.genDetrender(timeWindow=(-100e-3, 0))
 #  End Overrides
 
 #  Get stats results
 if arguments['overlayStats']:
-    if os.path.exists(statsTestPath):
+    if os.path.exists(statsTestPath) and not arguments['recalcStats']:
         sigValsWide = pd.read_hdf(statsTestPath, 'sig')
         sigValsWide.columns.name = 'bin'
     else:
@@ -231,6 +229,7 @@ asp.plotAsigsAligned(
         #     'RateInHz', vLineOpts, tOnset=0, tOffset=.3, includeRight=False),
         asp.genVLineAdder([0], nrnVLineOpts),
         asp.genLegendRounder(decimals=2),
+        asp.genXLimSetter(alignedAsigsKWargs['windowSize'])
         ],
     pdfName=pdfName,
     **rowColOpts,

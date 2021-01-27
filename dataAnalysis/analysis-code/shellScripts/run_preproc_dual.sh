@@ -11,17 +11,17 @@
 #SBATCH --mem=127G
 
 # Specify a job name:
-#SBATCH -J preproc_dual_20210125
+#SBATCH -J preproc_dual_2021_01_25
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-preproc_dual_20210125.stdout
-#SBATCH -e ../../batch_logs/%j-%a-preproc_dual_20210125.errout
+#SBATCH -o ../../batch_logs/%j-%a-preproc_dual_2021_01_25.stdout
+#SBATCH -e ../../batch_logs/%j-%a-preproc_dual_2021_01_25.errout
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=1,2,3
+#SBATCH --array=1,2,3,4
 
 # EXP="exp201901261000"
 # EXP="exp202010271200"
@@ -45,8 +45,8 @@
 # EXP="exp202101141100"
 # EXP="exp202101191100"
 # EXP="exp202101201100"
-# EXP="exp202101211100"
-EXP="exp202101251100"
+EXP="exp202101211100"
+# EXP="exp202101251100"
 
 
 module load anaconda/2020.02
@@ -55,7 +55,7 @@ conda activate
 source activate nda2
 python --version
 
-SLURM_ARRAY_TASK_ID=2
+# SLURM_ARRAY_TASK_ID=2
 
 ########### get dataset to run spike extraction on
 python -u ./preprocNS5.py --arrayName=utah --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --fullSubtractMean --chunkSize=700
@@ -63,10 +63,10 @@ python -u ./preprocNS5.py --arrayName=utah --exp=$EXP --blockIdx=$SLURM_ARRAY_TA
 
 ########### get analog inputs separately to run synchronization, etc
 # !! --maskMotorEncoder ignores all motor events outside alignTimeBounds
-# python -u ./preprocNS5.py --arrayName=utah --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --analogOnly --maskMotorEncoder
+python -u ./preprocNS5.py --arrayName=utah --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --analogOnly --maskMotorEncoder
 
 ######### finalize dataset
-# python -u ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --arrayName=utah --fullSubtractMeanUnfiltered --chunkSize=700
+python -u ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --arrayName=utah --fullSubtractMeanUnfiltered --chunkSize=700
 # python -u ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --arrayName=nform --fullSubtractMeanUnfiltered
 
 # python -u ./synchronizeNFormToNSP.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --trigRate=100

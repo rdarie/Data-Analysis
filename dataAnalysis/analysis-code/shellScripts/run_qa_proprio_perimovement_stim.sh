@@ -10,19 +10,19 @@
 #SBATCH --mem=59G
 
 # Specify a job name:
-#SBATCH -J qa_motion_2021_01_20
+#SBATCH -J qa_perims_2021_01_20
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-qa_motion_2021_01_20.stdout
-#SBATCH -e ../../batch_logs/%j-%a-qa_motion_2021_01_20.errout
+#SBATCH -o ../../batch_logs/%j-%a-qa_perims_2021_01_20.stdout
+#SBATCH -e ../../batch_logs/%j-%a-qa_perims_2021_01_20.errout
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 # Request custom resources
-#SBATCH --array=3
+#SBATCH --array=2
 
-# SLURM_ARRAY_TASK_ID=3
-source shellScripts/run_align_motion_preamble.sh
+# SLURM_ARRAY_TASK_ID=2
+source shellScripts/run_align_perimovement_stim_preamble.sh
 
 ALIGNQUERY="--alignQuery=outbound"
 

@@ -388,12 +388,12 @@ def parseAnalysisOptions(
         'separateByFunKWArgs': {'type': 'Classification'}
         }
     statsTestOpts = dict(
-        testStride=50e-3,
-        testWidth=50e-3,
+        testStride=25e-3,
+        testWidth=25e-3,
         tStart=0,
         tStop=None,
-        pThresh=1e-2,
-        correctMultiple=True
+        pThresh=5e-2,
+        correctMultiple=False
         )
     relplotKWArgs = dict(
         ci='sem',
@@ -410,7 +410,7 @@ def parseAnalysisOptions(
     asigSigStarOpts = {
         'c': vLineOpts['color'],
         # 'linestyle': 'None',
-        's': 20,
+        's': 50,
         'marker': '*'
         }
     nrnRelplotKWArgs = dict(

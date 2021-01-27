@@ -14,12 +14,14 @@ Options:
     --curateManually                                      whether to manually confirm synch [default: False]
     --preparationStage                                    get aproximate timings and print to shell, to help identify time ranges? [default: False]
     --plotting                                            whether to display confirmation plots [default: False]
+    --forceRecalc                                         whether to overwrite any previous calculated synch [default: False]
     --usedTENSPulses                                      whether the sync was done using TENS pulses (as opposed to mechanical taps) [default: False]
 """
 import matplotlib, pdb, traceback
 matplotlib.use('Qt5Agg')   # generate interactive output by default
 #  matplotlib.rcParams['agg.path.chunksize'] = 10000
 #  matplotlib.use('PS')   # noninteract output
+from matplotlib.lines import Line2D
 from matplotlib import pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import dill as pickle
@@ -60,7 +62,7 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.covariance import EmpiricalCovariance, MinCovDet
 from elephant.conversion import binarize
 sns.set(
-    context='talk', style='dark',
+    context='talk', style='darkgrid',
     palette='dark', font='sans-serif',
     font_scale=.7, color_codes=True)
 #  load options
@@ -82,7 +84,7 @@ if arguments['inputINSBlockSuffix'] is None:
 else:
     inputINSBlockSuffix = "_{}".format(arguments['inputINSBlockSuffix'])
 
-searchRadius = [-1.5, 0.5]
+searchRadius = [-1., 1.]
 searchRadiusUnix = [
     pd.Timedelta(searchRadius[0], unit='s'),
     pd.Timedelta(searchRadius[1], unit='s')]
@@ -113,9 +115,7 @@ if not os.path.exists(synchFunFolder):
 synchFunPath = os.path.join(
     synchFunFolder,
     '{}_{}_synchFun.json'.format(experimentName, ns5FileName))
-if os.path.exists(synchFunPath):
-    print('Synch already performed. Turning off plotting')
-    # arguments['plotting'] = False
+#
 tapDetectOptsNSP = expOpts['synchInfo']['nsp'][blockIdx]
 tapDetectOptsINS = expOpts['synchInfo']['ins'][blockIdx]
 #
@@ -212,13 +212,16 @@ else:
 nspDF = ns5.analogSignalsToDataFrame(asigList)
 nspSamplingRate = float(asigList[0].sampling_rate)
 
-if os.path.exists(synchFunPath):
-    pdb.set_trace()
+if os.path.exists(synchFunPath) and not arguments['forceRecalc']:
     with open(synchFunPath, 'r') as _f:
         interpFunLoaded = json.load(_f)
     interpFunINStoNSP = {
         int(key): np.poly1d(value)
-        for key, value in interpFunLoaded.items()
+        for key, value in interpFunLoaded['insToNsp'].items()
+    }
+    interpFunNSPtoINS = {
+        int(key): np.poly1d(value)
+        for key, value in interpFunLoaded['nspToIns'].items()
     }
 else:
     sessionUnixTimeList = [
@@ -415,7 +418,11 @@ else:
                     sessTapOptsNSP['synchByXCorrTapDetectSignal'] = True
                 else:
                     trigRaster.loc[:, 'insDiracDelta'] = np.concatenate(
-                        coarseSpikeMats, axis=1).any(axis=1).astype(np.float)
+                        coarseSpikeMats, axis=1).any(axis=1)
+                    debugDelta = trigRaster.loc[:, 'insDiracDelta'].unique()
+                    print("trigRaster.loc[:, 'insDiracDelta'].unique() = {}".format(debugDelta))
+                    #  if debugDelta.size > 2:
+                    #      pdb.set_trace()
                     trigRaster.loc[:, 'insTrigs'] = hf.gaussianSupport(
                         support=trigRaster.set_index('t')['insDiracDelta'],
                         gaussWid=gaussWid, fs=trigRasterSamplingRate).to_numpy()
@@ -424,7 +431,7 @@ else:
                 closestTimes, closestIdx = hf.closestSeries(
                     takeFrom=pd.Series(approxInsTapTimes), compareTo=trigRaster['t']
                     )
-                trigRaster.loc[closestIdx, 'insDiracDelta'] = 1.
+                trigRaster.loc[closestIdx, 'insDiracDelta'] = 1
                 trigRaster.loc[:, 'insTrigs'] = hf.gaussianSupport(
                     support=trigRaster.set_index('t')['insDiracDelta'],
                     gaussWid=gaussWid, fs=trigRasterSamplingRate).to_numpy()
@@ -469,6 +476,7 @@ else:
                 corrAtLag, xSrs=trigRaster['nspTrigs'],
                 ySrs=trigRaster['insTrigs'])
             maxLag = xCorrSrs.idxmax()
+            # pdb.set_trace()
             if plotSynchReport:
                 fig, ax = plt.subplots(2, 1)
                 fig.set_size_inches(12, 8)
@@ -488,7 +496,22 @@ else:
                 ax[0].set_xlabel('time (sec)')
                 ax[0].set_ylabel('Triggers')
                 ax[0].legend(loc='upper right')
-                ax[0].set_title(jsonSessionNames[insSessIdx])
+                ax[0].set_title('Block {}, insSession {}: {}'.format(blockIdx, insSessIdx, jsonSessionNames[insSessIdx]))
+                # fake legend with annotations
+                customMessages = [
+                    'INS session',
+                    '    lasted {:.1f} sec'.format((sessStopUnix - sessStartUnix).total_seconds()),
+                    '# of NSP trigs = {}'.format(trigRaster.loc[:, 'nspDiracDelta'].sum()),
+                    '# of INS trigs = {}'.format(trigRaster.loc[:, 'insDiracDelta'].sum())
+                ]
+                customLines = [
+                    Line2D([0], [0], color='k', alpha=0)
+                    for custMess in customMessages
+                    ]
+                phantomAx = ax[0].twinx()
+                phantomAx.set_xticks([])
+                phantomAx.set_yticks([])
+                phantomAx.legend(customLines, customMessages, loc='upper left')
                 #
                 ax[1].plot(xCorrSrs, label='crossCorr')
                 ax[1].plot(maxLag, xCorrSrs.loc[maxLag], 'y*', label='optimal lag = {:.3f}'.format(maxLag))
@@ -591,7 +614,6 @@ for evName, evList in allEvs.items():
 spikesOut = {}
 for stName, stList in allSts.items():
     spikesOut[stName] = ns5.concatenateEventsContainer(stList)
-# pdb.set_trace()
 #
 insDFOut = (
     pd.concat(insDFListOut, names=['trialSegment', 'index'])

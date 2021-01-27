@@ -20,10 +20,10 @@
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=1,2,3
+#SBATCH --array=1,2
 
 # SLURM_ARRAY_TASK_ID=2
 source ./shellScripts/run_plotter_aligned_stim_preamble.sh
 
 # OTHERASIGOPTS="--individualTraces --invertOutlierBlocks"
-python3 -u './plotAlignedAsigs.py' --inputBlockName="rig" --unitQuery="rig" --enableOverrides --exp=$EXP $BLOCKSELECTOR $ANALYSISFOLDER $WINDOW $ALIGNQUERY $ALIGNFOLDER $TIMEWINDOWOPTS $STATSOVERLAY $OUTLIERMASK $HUEOPTS $ROWOPTS $COLOPTS $PAGELIMITS $OTHERASIGOPTS
+python3 -u './plotAlignedAsigs.py' --inputBlockName="rig" --unitQuery="rig" --enableOverrides --exp=$EXP $BLOCKSELECTOR $ANALYSISFOLDER $WINDOW $ALIGNQUERY $ALIGNFOLDER $TIMEWINDOWOPTS $STATSOVERLAY $OUTLIERMASK $HUEOPTS $ROWOPTS $COLOPTS $STYLEOPTS $SIZEOPTS $PAGELIMITS $OTHERASIGOPTS

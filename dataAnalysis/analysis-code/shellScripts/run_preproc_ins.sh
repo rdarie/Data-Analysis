@@ -10,18 +10,18 @@
 #SBATCH --mem=127G
 
 # Specify a job name:
-#SBATCH -J ins_preproc_20210120
+#SBATCH -J ins_preproc_2021_01_25
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-ins_preproc_20210120.stdout
-#SBATCH -e ../../batch_logs/%j-%a-ins_preproc_20210120.errout
+#SBATCH -o ../../batch_logs/%j-%a-ins_preproc_2021_01_25.stdout
+#SBATCH -e ../../batch_logs/%j-%a-ins_preproc_2021_01_25.errout
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
-# Request custom resources
-#SBATCH --array=1,2,3
 
 # Request custom resources
+#SBATCH --array=1,2,3,4
+
 
 module load anaconda/2020.02
 . /gpfs/runtime/opt/anaconda/2020.02/etc/profile.d/conda.sh
@@ -58,7 +58,7 @@ python --version
 # EXP="exp202101191100"
 EXP="exp202101201100"
 EXP="exp202101211100"
-EXP="exp202101251100"
+# EXP="exp202101251100"
 
 # SLURM_ARRAY_TASK_ID=3
 

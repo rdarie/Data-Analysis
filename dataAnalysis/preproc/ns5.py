@@ -651,7 +651,7 @@ def concatenateEventsContainerV2(eventContainer, newSegIdx=0):
 '''
 
 
-def concatenateEventsContainer(eventContainer, newSegIdx=0):
+def concatenateEventsContainer(eventContainer, linkParents=True):
     if isinstance(eventContainer, dict):
         listOfEvents = list(eventContainer.values())
     else:
@@ -660,8 +660,6 @@ def concatenateEventsContainer(eventContainer, newSegIdx=0):
     if not len(nonEmptyEvents) > 0:
         return listOfEvents[0]
     masterEvent = listOfEvents[0]
-    if isinstance(masterEvent, SpikeTrain):
-        pdb.set_trace()
     for evIdx, ev in enumerate(listOfEvents[1:]):
         try:
             masterEvent = masterEvent.merge(ev)
@@ -672,6 +670,10 @@ def concatenateEventsContainer(eventContainer, newSegIdx=0):
         arrayAnnNames = list(masterEvent.array_annotations.keys())
         masterEvent.annotations.update(masterEvent.array_annotations)
         masterEvent.annotations['arrayAnnNames'] = arrayAnnNames
+    if linkParents:
+        masterEvent.segment = listOfEvents[0].segment
+        if isinstance(masterEvent, SpikeTrain):
+            masterEvent.unit = listOfEvents[0].unit
     return masterEvent
 
 '''
@@ -3583,6 +3585,7 @@ def loadWithArrayAnn(
 def blockFromPath(
         dataPath, lazy=False, mapDF=None,
         reduceChannelIndexes=False, loadList=None):
+    assert os.path.exists(dataPath)
     if lazy:
         dataReader = nixio_fr.NixIO(
             filename=dataPath)

@@ -2,11 +2,11 @@
 
 source ./shellScripts/run_align_motion_preamble.sh
 
-# OUTLIERMASK="--maskOutlierBlocks"
-OUTLIERMASK=""
+OUTLIERMASK="--maskOutlierBlocks"
+# OUTLIERMASK=""
 
-#STATSOVERLAY="--overlayStats"
-TIMEWINDOWOPTS="--winStart=200 --winStop=800"
+STATSOVERLAY="--overlayStats"
+TIMEWINDOWOPTS="--winStart=150 --winStop=450"
 
 # ALIGNQUERY="--alignQuery=stimOn"
 ALIGNQUERY="--alignQuery=outbound"
@@ -15,6 +15,7 @@ HUEOPTS="--hueName= --hueControl="
 ROWOPTS="--rowName=pedalDirection --rowControl="
 COLOPTS="--colName= --colControl="
 STYLEOPTS="--styleName= --styleControl="
+SIZEOPTS="--sizeName= --sizeControl="
 
 # PAGELIMITS="--limitPages=5"
 PAGELIMITS=""

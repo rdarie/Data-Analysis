@@ -2,11 +2,11 @@
 
 source ./shellScripts/run_align_stim_preamble.sh
 
-# OUTLIERMASK="--maskOutlierBlocks"
-OUTLIERMASK=""
+OUTLIERMASK="--maskOutlierBlocks"
+# OUTLIERMASK=""
 
-#STATSOVERLAY="--overlayStats"
-TIMEWINDOWOPTS="--winStart=200 --winStop=800"
+STATSOVERLAY="--overlayStats"
+TIMEWINDOWOPTS="--winStart=150 --winStop=450"
 
 ALIGNQUERY="--alignQuery=stimOn"
 # ALIGNQUERY="--alignQuery=outbound"
@@ -14,10 +14,11 @@ ALIGNQUERY="--alignQuery=stimOn"
 HUEOPTS="--hueName=amplitude --hueControl="
 ROWOPTS="--rowName=RateInHz --rowControl="
 COLOPTS="--colName=electrode --colControl=control"
-STYLEOPTS="--styleName=RateInHz"
+STYLEOPTS="--styleName= --styleControl="
+SIZEOPTS="--sizeName= --sizeControl="
 
 # PAGELIMITS="--limitPages=5"
 PAGELIMITS=""
 
-OTHERASIGOPTS=""
+OTHERASIGOPTS="--recalcStats"
 OTHERNEURONOPTS=""

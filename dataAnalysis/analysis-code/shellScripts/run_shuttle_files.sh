@@ -43,6 +43,8 @@ EXP="exp202101061100"
 EXP="exp202101111100"
 EXP="exp202101141100"
 EXP="exp202101201100"
+EXP="exp202101211100"
+EXP="exp202101251100"
 
 # ANALYSISSELECTOR="--analysisName=emgHiRes"
 # ANALYSISSELECTOR="--analysisName=emgLoRes"
@@ -56,5 +58,5 @@ source activate nda2
 python --version
 
 # global operations
-python './shuttleFilesToFromScratch.py' --exp=$EXP --everything --fromScratchToData
+python './shuttleFilesToFromScratch.py' --exp=$EXP --preprocFolderFiles --preprocFolderSubfolders --fromScratchToData
 # 

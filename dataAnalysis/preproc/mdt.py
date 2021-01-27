@@ -2424,6 +2424,13 @@ def getINSStimOnset(
     plottingSlots = False
     resolvedSlots = False
     lastRate = np.nan
+    arrayAnnListOfNames = [
+        'amplitude', 'RateInHz', 'program',
+        'group', 'pulseWidth', 'endTime',
+        'trialSegment', 'offsetFromExpected',
+        'offsetFromLogged','usedExpectedT',
+        'usedSlotToDetect',
+        'firstOfTrain', 'trialSegment']
     # warnings.filterwarnings("error")
     for name, group in tdDF.groupby('amplitudeRound'):
         anomalyOccured = False
@@ -2966,8 +2973,6 @@ def getINSStimOnset(
                 'trialSegment': theseTrialSegments,
                 'usedExpectedT': usedExpTList,
                 'usedSlotToDetect': usedSlotList}
-            if 'arrayAnnListOfNames' not in locals():
-                arrayAnnListOfNames = sorted(list(arrayAnn.keys()))
             st = SpikeTrain(
                 times=theseOnsetTimestamps, t_stop=spikeTStop,
                 t_start=spikeTStart,
@@ -3012,23 +3017,6 @@ def getINSStimOnset(
                 annNm: np.array([])
                 for annNm in arrayAnnListOfNames
             }
-            '''
-            consolidatedAnn = {
-                'amplitude': np.array([]),
-                'RateInHz': np.array([]),
-                'program': np.array([]),
-                'group': np.array([]),
-                'pulseWidth': np.array([]),
-                'endTime': np.array([]),
-                'trialSegment': np.array([]),
-                'offsetFromExpected': np.array([]),
-                'offsetFromLogged': np.array([]),
-                'usedExpectedT': np.array([]),
-                'usedSlotToDetect': np.array([]),
-                'firstOfTrain': np.array([]),
-                'trialSegment': np.array([])
-                }
-            '''
             arrayAnnNames = {'arrayAnnNames': list(consolidatedAnn.keys())}
             for idx, st in enumerate(tempSpiketrainStorage[thisUnit.name]):
                 consolidatedTimes = np.concatenate((

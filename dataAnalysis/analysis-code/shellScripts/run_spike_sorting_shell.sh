@@ -5,26 +5,26 @@
 #SBATCH --time=3:00:00
 
 # Use 2 nodes with 8 tasks each, for 16 MPI tasks:
-#SBATCH --nodes=32
-#SBATCH --tasks=32
+#SBATCH --nodes=1
+#SBATCH --tasks=1
 #SBATCH --tasks-per-node=1
 #SBATCH --mem=48G
 
 # Specify a job name:
-#SBATCH -J spike_sort_peeler
-#SBATCH --array=2
+#SBATCH -J spike_sort_shell
+#    SBATCH --array=2
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-spike_sort_peeler.stdout
-#SBATCH -e ../../batch_logs/%j-%a-spike_sort_peeler.errout
+#SBATCH -o ../../batch_logs/%j-%a-spike_sort_shell.stdout
+#SBATCH -e ../../batch_logs/%j-%a-spike_sort_shell.errout
 
 # Specify account details
-#SBATCH --account=bibs-dborton-condo
+#SBATCH --account=carney-dborton-condo
 
 # Run a command
 source ./shellScripts/run_spike_sorting_preamble.sh
 
-BLOCKIDX=3
+BLOCKIDX=4
 
 SOURCESELECTOR="--sourceFileSuffix=spike_preview"
 # SOURCESELECTOR="--sourceFileSuffix=mean_subtracted"
@@ -33,11 +33,11 @@ CHAN_START=0
 CHAN_STOP=96
 
 ############## init spike sorting
-# python -u ./preprocNS5.py --arrayName=utah --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --forSpikeSorting
-# python -u ./tridesclousCCV.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --arrayName=utah --sourceFileSuffix=spike_preview --removeExistingCatalog --initCatalogConstructor
+python -u ./preprocNS5.py --arrayName=utah --exp=$EXP --blockIdx=$BLOCKIDX --forSpikeSorting
+python -u ./tridesclousCCV.py --blockIdx=$BLOCKIDX --exp=$EXP --arrayName=utah --sourceFileSuffix=spike_preview --removeExistingCatalog --initCatalogConstructor
 ##
-# python -u ./preprocNS5.py --arrayName=nform --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --forSpikeSorting
-# python -u ./tridesclousCCV.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --arrayName=nform --sourceFileSuffix=spike_preview --removeExistingCatalog --initCatalogConstructor
+# python -u ./preprocNS5.py --arrayName=nform --exp=$EXP --blockIdx=$BLOCKIDX --forSpikeSorting
+# python -u ./tridesclousCCV.py --blockIdx=$BLOCKIDX --exp=$EXP --arrayName=nform --sourceFileSuffix=spike_preview --removeExistingCatalog --initCatalogConstructor
 
 # Step 1: Init catalog
 # python -u ./tridesclousCCV.py --arrayName=utah --blockIdx=$BLOCKIDX --exp=$EXP --removeExistingCatalog --initCatalogConstructor $SOURCESELECTOR
@@ -65,5 +65,5 @@ CHAN_STOP=96
 # python -u ./tridesclousCCV.py --arrayName=utah --blockIdx=$BLOCKIDX --exp=$EXP --purgePeelerDiagnostics --chan_start=$CHAN_START --chan_stop=$CHAN_STOP $SOURCESELECTOR
 
 # Step 6: Export to NIX
-python -u ./tridesclousCCV.py --arrayName=utah --blockIdx=$BLOCKIDX --makeStrictNeoBlock --exp=$EXP --chan_start=0 --chan_stop=96 $SOURCESELECTOR
-python -u ./plotSpikeReport.py --blockIdx=$BLOCKIDX --nameSuffix=_final --exp=$EXP --arrayName=utah $SOURCESELECTOR
+# python -u ./tridesclousCCV.py --arrayName=utah --blockIdx=$BLOCKIDX --makeStrictNeoBlock --exp=$EXP --chan_start=0 --chan_stop=96 $SOURCESELECTOR
+# python -u ./plotSpikeReport.py --blockIdx=$BLOCKIDX --nameSuffix=_final --exp=$EXP --arrayName=utah $SOURCESELECTOR
