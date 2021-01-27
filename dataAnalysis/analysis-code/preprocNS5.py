@@ -216,6 +216,8 @@ def preprocNS5():
             rawFolderPath=nspFolder,
             outputFolderPath=scratchFolder, mapDF=mapDF,
             fillOverflow=False, removeJumps=False,
+            interpolateOutliers=False, calcOutliers=True,
+            outlierMaskFilterOpts=outlierMaskFilterOpts,
             motorEncoderMask=motorEncoderMask,
             eventInfo=trialFilesFrom['utah']['eventInfo'],
             asigNameList=[spikeSortingOpts[arrayName]['asigNameList'][0]],

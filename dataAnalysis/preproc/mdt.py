@@ -2306,7 +2306,10 @@ def getINSStimOnset(
     therapyOnsetIdx = tdDF.index[therapyDiff == 1]
     therapyOnTimes = pd.DataFrame({
         'nominalOnIdx': therapyOnsetIdx})
-    therapyOnTimes.loc[:, 'on'] = np.nan
+    try:
+        therapyOnTimes.loc[:, 'on'] = np.nan
+    except Exception:
+        pdb.set_trace()
     therapyOnTimes.loc[:, 'onIdx'] = np.nan
     for idx, row in therapyOnTimes.iterrows():
         print('Calculating therapy on times for segment {}'.format(idx))

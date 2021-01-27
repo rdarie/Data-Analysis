@@ -46,6 +46,7 @@ import seaborn as sns
 import scipy.interpolate as intrp
 import quantities as pq
 import json
+from statsmodels import robust
 import rcsanalysis.packetizer as rcsa
 import rcsanalysis.packet_func as rcsa_helpers
 from datetime import datetime as dt
@@ -292,7 +293,6 @@ else:
             thisNspDF.loc[:, 'tapDetectSignal'] = empCov.mahalanobis(nspVals)
         else:
             thisNspDF.loc[:, 'tapDetectSignal'] = np.mean(nspVals, axis=1)
-        #
         if sessTapOptsNSP['timeRanges'] is not None:
             restrictMaskNSP = hf.getTimeMaskFromRanges(
                 thisNspDF['t'], sessTapOptsNSP['timeRanges'])
@@ -305,17 +305,17 @@ else:
         else:
             restrictMaskNSP = pd.Series(True, index=thisNspDF.index)
         #
-        if True:
+        if False:
             nspPeakIdx = hf.getTriggers(
-                thisNspDF['tapDetectSignal'], iti=sessTapOptsNSP['iti'], itiWiggle=.5,
+                thisNspDF['tapDetectSignal'], iti=sessTapOptsNSP['iti'], itiWiggle=.2,
                 fs=nspSamplingRate, plotting=arguments['plotting'],
-                thres=sessTapOptsNSP['thres'], edgeType='rising')
+                thres=sessTapOptsNSP['thres'], edgeType='rising', keep_max=True)
         else:
             nspPeakIdx, _ = hf.getThresholdCrossings(
                 thisNspDF['tapDetectSignal'], thresh=sessTapOptsNSP['thres'],
                 iti=sessTapOptsNSP['iti'], fs=nspSamplingRate,
-                edgeType='both', itiWiggle=.2,
-                absVal=False, plotting=arguments['plotting'], keep_max=False)
+                edgeType='rising', itiWiggle=.2,
+                absVal=False, plotting=arguments['plotting'], keep_max=True)
         nspPeakIdx = nspPeakIdx[sessTapOptsNSP['keepIndex']]
         nspTapTimes = thisNspDF.loc[nspPeakIdx, 't'].to_numpy()
         print('nspTapTimes: {}'.format(nspTapTimes))
@@ -354,29 +354,30 @@ else:
                 (thisInsDF['unixTime'] >= searchLimsUnix[0]) &
                 (thisInsDF['unixTime'] < searchLimsUnix[1])
                 )
-        if insSearchMask.any():
-            thisInsDF.loc[~insSearchMask, 'tapDetectSignal'] = np.nan
-            thisInsDF.loc[:, 'tapDetectSignal'] = (
-                thisInsDF.loc[:, 'tapDetectSignal']
-                .interpolate(method='linear', limit_area='inside')
-                .fillna(method='bfill').fillna(method='ffill'))
-        insPeakIdx = hf.getTriggers(
-            thisInsDF['tapDetectSignal'], iti=sessTapOptsINS['iti'], itiWiggle=.5,
-            fs=insSamplingRate, plotting=arguments['plotting'], keep_max=True,
-            thres=sessTapOptsINS['thres'], edgeType='rising')
-        insTapTimes = thisInsDF.loc[insPeakIdx, 't'].to_numpy()[sessTapOptsINS['keepIndex']]
-        if arguments['curateManually']:
-            try:
-                manualAlignTimes[insSessIdx], fig, ax = mdt.peekAtTapsV2(
-                    thisNspDF, thisInsDF,
-                    insAuxDataDF=insGroup.drop(columns=['t', 'unixTime', 'trialSegment']),
-                    plotMaskNSP=nspSearchMask, plotMaskINS=insSearchMask,
-                    tapTimestampsINS=insTapTimes, tapTimestampsNSP=nspTapTimes,
-                    tapDetectOptsNSP=sessTapOptsNSP, tapDetectOptsINS=sessTapOptsINS
-                    )
-                plt.show()
-            except Exception:
-                traceback.print_exc()
+        if False:
+            if insSearchMask.any():
+                thisInsDF.loc[~insSearchMask, 'tapDetectSignal'] = np.nan
+                thisInsDF.loc[:, 'tapDetectSignal'] = (
+                    thisInsDF.loc[:, 'tapDetectSignal']
+                    .interpolate(method='linear', limit_area='inside')
+                    .fillna(method='bfill').fillna(method='ffill'))
+            insPeakIdx = hf.getTriggers(
+                thisInsDF['tapDetectSignal'], iti=sessTapOptsINS['iti'], itiWiggle=.5,
+                fs=insSamplingRate, plotting=arguments['plotting'], keep_max=True,
+                thres=sessTapOptsINS['thres'], edgeType='rising')
+            insTapTimes = thisInsDF.loc[insPeakIdx, 't'].to_numpy()[sessTapOptsINS['keepIndex']]
+            if arguments['curateManually']:
+                try:
+                    manualAlignTimes[insSessIdx], fig, ax = mdt.peekAtTapsV2(
+                        thisNspDF, thisInsDF,
+                        insAuxDataDF=insGroup.drop(columns=['t', 'unixTime', 'trialSegment']),
+                        plotMaskNSP=nspSearchMask, plotMaskINS=insSearchMask,
+                        tapTimestampsINS=insTapTimes, tapTimestampsNSP=nspTapTimes,
+                        tapDetectOptsNSP=sessTapOptsNSP, tapDetectOptsINS=sessTapOptsINS
+                        )
+                    plt.show()
+                except Exception:
+                    traceback.print_exc()
         alignByXCorr = True
         if alignByXCorr:
             trigRasterSamplingRate = min(nspSamplingRate, insSamplingRate)
@@ -426,6 +427,13 @@ else:
                     trigRaster.loc[:, 'insTrigs'] = hf.gaussianSupport(
                         support=trigRaster.set_index('t')['insDiracDelta'],
                         gaussWid=gaussWid, fs=trigRasterSamplingRate).to_numpy()
+            elif sessTapOptsINS['synchByXCorrTapDetectSignal']:
+                maskedINS = thisInsDF.loc[insSearchMask, :].copy()
+                maskedINS.loc[:, 'coarseNspTime'] = maskedINS['t'] + unixDeltaT
+                trigRaster.loc[:, 'insTrigs'] = hf.interpolateDF(
+                    maskedINS, trigRaster['t'], x='coarseNspTime',
+                    columns=['tapDetectSignal'],
+                    kind='linear', fill_value=(0, 0))
             else:
                 approxInsTapTimes = insTapTimes + unixDeltaT
                 closestTimes, closestIdx = hf.closestSeries(
@@ -435,13 +443,6 @@ else:
                 trigRaster.loc[:, 'insTrigs'] = hf.gaussianSupport(
                     support=trigRaster.set_index('t')['insDiracDelta'],
                     gaussWid=gaussWid, fs=trigRasterSamplingRate).to_numpy()
-            if sessTapOptsINS['synchByXCorrTapDetectSignal']:
-                maskedINS = thisInsDF.loc[insSearchMask, :].copy()
-                maskedINS.loc[:, 'coarseNspTime'] = maskedINS['t'] + unixDeltaT
-                trigRaster.loc[:, 'insTrigs'] = hf.interpolateDF(
-                    maskedINS, trigRaster['t'], x='coarseNspTime',
-                    columns=['tapDetectSignal'],
-                    kind='linear', fill_value=(0, 0))
             if sessTapOptsNSP['synchByXCorrTapDetectSignal']:
                 trigRaster.loc[:, 'nspTrigs'] = hf.interpolateDF(
                     thisNspDF, trigRaster['t'], x='t',
@@ -484,7 +485,11 @@ else:
                 if plotT0.size > 0:
                     plotT0 = plotT0.iloc[0]
                 else:
-                    plotT0 = trigRaster.loc[(trigRaster['insTrigs'] > 0.5) | (trigRaster['nspTrigs'] > 0.5), 't'].iloc[0]
+                    plotT0 = trigRaster.loc[(trigRaster['insTrigs'] > 0.5), 't']
+                    if plotT0.size > 0:
+                        plotT0 = plotT0.iloc[0]
+                    else:
+                        plotT0 = trigRaster.loc[(trigRaster['insTrigs'] > 0.5) | (trigRaster['nspTrigs'] > 0.5), 't'].iloc[0]
                 plotMask = (trigRaster['t'] >= plotT0 + searchRadius[0]) & (trigRaster['t'] < plotT0 + searchRadius[1])
                 ax[0].plot(
                     trigRaster.loc[plotMask, 't'], trigRaster.loc[plotMask, 'nspTrigs'],
@@ -501,6 +506,7 @@ else:
                 customMessages = [
                     'INS session',
                     '    lasted {:.1f} sec'.format((sessStopUnix - sessStartUnix).total_seconds()),
+                    '    approx delay {:.1f} sec'.format(unixDeltaT),
                     '# of NSP trigs = {}'.format(trigRaster.loc[:, 'nspDiracDelta'].sum()),
                     '# of INS trigs = {}'.format(trigRaster.loc[:, 'insDiracDelta'].sum())
                 ]

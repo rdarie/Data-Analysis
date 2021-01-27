@@ -17,7 +17,7 @@
 #SBATCH -e ../../batch_logs/%j_%a_align_stim_2021_01_25_lfp.errout
 
 # Request custom resources
-#SBATCH --array=1,2
+#SBATCH --array=1,2,3
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo

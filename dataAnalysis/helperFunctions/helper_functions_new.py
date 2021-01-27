@@ -1128,7 +1128,7 @@ def getTriggers(
         edgeType = 'rising', itiWiggle = 0.05,
         minAmp = None,
         minTrainLength = None,
-        expectedTime = None, keep_max = True, plotting = False):
+        expectedTime = None, keep_max=True, plotting = False):
     # iti: expected inter trigger interval
 
     # minimum distance between triggers (units of samples), 5% wiggle room
@@ -1137,7 +1137,13 @@ def getTriggers(
     triggersPrime = dataSeries.diff()
     triggersPrime.fillna(0, inplace = True)
     # z-score the derivative
-    triggersPrime = pd.Series(stats.zscore(triggersPrime), index = triggersPrime.index)
+    useMAD = True
+    if useMAD:
+        tpMed = np.median(triggersPrime)
+        tpMAD = stats.median_abs_deviation(triggersPrime)
+        triggersPrime = pd.Series(((triggersPrime.to_numpy() - tpMed) / tpMAD), index=triggersPrime.index)
+    else:
+        triggersPrime = pd.Series(stats.zscore(triggersPrime), index=triggersPrime.index)
 
     if edgeType == 'falling':
         triggersPrime = - triggersPrime
@@ -1148,12 +1154,12 @@ def getTriggers(
         keep_what='max'
     else:
         keep_what='first'
-    
+    #
     triggersPrimeVals = triggersPrime.values.squeeze()
     peakIdx = peakutils.indexes(
         triggersPrimeVals, thres=thres,
         min_dist=width, thres_abs=True, keep_what=keep_what)
-    
+    #
     if minAmp is not None:
         if edgeType == 'falling':
             peekAhead = - 25
@@ -1165,7 +1171,6 @@ def getTriggers(
             whereToLook[-1] = int(triggersZScore.size - 1)
         triggersAtPeaks = triggersZScore[whereToLook]
         peakIdx = peakIdx[triggersAtPeaks > minAmp]
-
     # check that the # of triggers matches the number of frames
     if expectedTime is not None:
         foundTime = (dataSeries.index[peakIdx] - dataSeries.index[peakIdx[0]]) / fs

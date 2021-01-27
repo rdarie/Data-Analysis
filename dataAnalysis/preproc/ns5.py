@@ -2681,6 +2681,20 @@ def preprocBlockToNix(
                 devChIdxList.append(tempChIdx)
                 lastIndex += 1
                 lastID += 1
+            smDevChIdxList = []
+            for devChIdx in range(nMeanChans):
+                tempChIdx = ChannelIndex(
+                    index=[lastIndex + devChIdx],
+                    channel_names=['{}_smoothed_deviation_{}'.format(electrodeArrayName, devChIdx)],
+                    channel_ids=[lastID + devChIdx],
+                    name='{}_smoothed_deviation_{}'.format(electrodeArrayName, devChIdx),
+                    file_origin=block.channel_indexes[-1].file_origin
+                    )
+                tempChIdx.merge_annotations(block.channel_indexes[-1])
+                block.channel_indexes.append(tempChIdx)
+                smDevChIdxList.append(tempChIdx)
+                lastIndex += 1
+                lastID += 1
             outMaskChIdxList = []
             for outMaskChIdx in range(nMeanChans):
                 tempChIdx = ChannelIndex(
@@ -2854,6 +2868,9 @@ def preprocBlockToNix(
                 lfpDeviation = np.zeros(
                     (tempLFPStore.shape[0], len(asigNameList)),
                     dtype=np.float32)
+                smoothedDeviation = np.zeros(
+                    (tempLFPStore.shape[0], len(asigNameList)),
+                    dtype=np.float32)
                 outlierMask = np.zeros(
                     (tempLFPStore.shape[0], len(asigNameList)),
                     dtype=np.bool)
@@ -3000,21 +3017,20 @@ def preprocBlockToNix(
                     #      )
                     # smoothedDeviation = signal.sosfilt(
                     print('Smoothing deviation')
-                    smoothedDeviation = signal.sosfiltfilt(
+                    tempSmDev = signal.sosfiltfilt(
                         filterCoeffsOutlierMask, lfpDeviation[:, subListIdx])
-                    ##
+                    smoothedDeviation[:, subListIdx] = tempSmDev
                     if plotDevFilterDebug:
                         ddfAx[subListIdx].plot(
                             dummyAsig.times[i1:i2], lfpDeviation[i1:i2, subListIdx],
                             label='original (ch grp {})'.format(subListIdx))
                         ddfAx[subListIdx].plot(
-                            dummyAsig.times[i1:i2], smoothedDeviation[i1:i2],
+                            dummyAsig.times[i1:i2], smoothedDeviation[i1:i2, subListIdx],
                             label='filtered (ch grp {})'.format(subListIdx))
-                    lfpDeviation[:, subListIdx] = smoothedDeviation
                     ##
                     print('Calculating outlier mask')
                     outlierMask[:, subListIdx] = (
-                        lfpDeviation[:, subListIdx] > 1)
+                        smoothedDeviation[:, subListIdx] > 1)
                     if plotDevFilterDebug:
                         ddfAx[subListIdx].axhline(1, c='r')
             if plotDevFilterDebug and calcOutliers:
@@ -3022,7 +3038,7 @@ def preprocBlockToNix(
                     ddfAx[subListIdx].legend(loc='upper right')
                     ddfAx3[subListIdx].legend(loc='upper right')
                     ddfAx2.plot(
-                        dummyAsig.times[i1:i2], lfpDeviation[i1:i2, subListIdx],
+                        dummyAsig.times[i1:i2], smoothedDeviation[i1:i2, subListIdx],
                         label='ch grp {}'.format(subListIdx))
                 ddfAx2.legend(loc='upper right')
                 plt.show()
@@ -3070,6 +3086,25 @@ def preprocBlockToNix(
                 # write out to file
                 devAsig = writer._write_analogsignal(
                     devAsig, nixblock, nixgroup)
+                #########################################################
+            for mIdx, smDevChIdx in enumerate(smDevChIdxList):
+                smDevAsig = AnalogSignal(
+                    smoothedDeviation[:, mIdx],
+                    units=dummyAsig.units,
+                    sampling_rate=dummyAsig.sampling_rate,
+                    # name='seg{}_{}'.format(idx, devChIdx.name)
+                    name='seg{}_{}'.format(0, smDevChIdx.name),
+                    t_start=tStart
+                    )
+                # assign ownership to containers
+                smDevChIdx.analogsignals.append(smDevAsig)
+                newSeg.analogsignals.append(smDevAsig)
+                # assign parent to children
+                smDevChIdx.create_relationship()
+                newSeg.create_relationship()
+                # write out to file
+                smDevAsig = writer._write_analogsignal(
+                    smDevAsig, nixblock, nixgroup)
                 #########################################################
             for mIdx, outMaskChIdx in enumerate(outMaskChIdxList):
                 outMaskAsig = AnalogSignal(

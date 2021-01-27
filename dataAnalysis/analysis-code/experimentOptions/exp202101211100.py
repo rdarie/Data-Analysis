@@ -62,7 +62,7 @@ def getExpOpts():
                 'synchChanName': ['ins_td0', 'ins_td2'],
                 'synchStimUnitName': ['g0p0#0'],
                 'synchByXCorrTapDetectSignal': False,
-                'minStimAmp': 0,
+                'minStimAmp': 300,
                 'thres': 5,
                 'iti': 10e-3,
                 'minAnalogValue': None,
@@ -79,6 +79,8 @@ def getExpOpts():
     # #    'iti': 50e-3,
     # #    'keepIndex': slice(None)
     # #    }
+    synchInfo['ins'][1][0].update({
+        'minStimAmp': 700})
     synchInfo['ins'][4][0].update({
         'synchStimUnitName': None,
         'synchByXCorrTapDetectSignal': True})
@@ -92,7 +94,7 @@ def getExpOpts():
                 'timeRanges': None, 'keepIndex': slice(None),
                 'synchChanName': ['utah_rawAverage_0'], 'iti': 10e-3,
                 'synchByXCorrTapDetectSignal': False,
-                'minAnalogValue': None, 'thres': 3}
+                'minAnalogValue': None, 'thres': 8}
             for j, sessionName in enumerate(jsonSessionNames[i])
             }
         for i in jsonSessionNames.keys()
@@ -100,18 +102,23 @@ def getExpOpts():
     ############################################################
     ############################################################
     # manually add special instructions, e.g
-    synchInfo['nsp'][1][0].update({'timeRanges': [(75, 9999)]})
-    synchInfo['nsp'][1][1].update({'timeRanges': [(225, 9999)]})
+    synchInfo['nsp'][1][0].update({
+        'timeRanges': [(70, 9999)],
+        'thres': 100
+        })
+    synchInfo['nsp'][1][1].update({
+        'timeRanges': [(221, 9999)]
+        })
     #
-    synchInfo['nsp'][2][0].update({'timeRanges': [(60, 9999)]})
-    synchInfo['nsp'][2][1].update({'timeRanges': [(420, 9999)]})
+    synchInfo['nsp'][2][0].update({'timeRanges': [(57, 9999)]})
+    synchInfo['nsp'][2][1].update({'timeRanges': [(417, 9999)]})
     #
-    synchInfo['nsp'][3][0].update({'timeRanges': [(45, 9999)]})
-    synchInfo['nsp'][3][1].update({'timeRanges': [(605, 9999)]})
-    synchInfo['nsp'][3][2].update({'timeRanges': [(725, 9999)]})
-    synchInfo['nsp'][3][3].update({'timeRanges': [(1050, 9999)]})
-    synchInfo['nsp'][3][4].update({'timeRanges': [(1260, 9999)]})
-    synchInfo['nsp'][3][5].update({'timeRanges': [(1945, 9999)]})
+    synchInfo['nsp'][3][0].update({'timeRanges': [(38, 9999)]})
+    synchInfo['nsp'][3][1].update({'timeRanges': [(598, 9999)]})
+    synchInfo['nsp'][3][2].update({'timeRanges': [(721, 9999)]})
+    synchInfo['nsp'][3][3].update({'timeRanges': [(1045, 9999)]})
+    synchInfo['nsp'][3][4].update({'timeRanges': [(1257, 9999)]})
+    synchInfo['nsp'][3][5].update({'timeRanges': [(1941, 9999)]})
     #
     synchInfo['nsp'][4][0].update({
         'timeRanges': [(46, 9999)],

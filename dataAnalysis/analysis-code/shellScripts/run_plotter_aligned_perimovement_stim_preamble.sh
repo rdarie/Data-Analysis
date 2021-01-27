@@ -2,8 +2,8 @@
 
 source ./shellScripts/run_align_perimovement_stim_preamble.sh
 
-OUTLIERMASK="--maskOutlierBlocks"
-# OUTLIERMASK=""
+# OUTLIERMASK="--maskOutlierBlocks"
+OUTLIERMASK=""
 
 STATSOVERLAY="--overlayStats"
 TIMEWINDOWOPTS="--winStart=150 --winStop=450"
