@@ -885,7 +885,6 @@ def unitSpikeTrainWaveformsToDF(
                 halfRollingWin = 0
                 seekIdx = slice(None, None, decimate)
                 if False:
-                    import matplotlib.pyplot as plt
                     oldShiftedWaveform = zeroLagWaveformsDF.shift(
                         lag, axis='columns')
                     plt.plot(oldShiftedWaveform.iloc[0, :])
@@ -2389,6 +2388,7 @@ def preproc(
         interpolateOutliers=False, calcOutliers=False,
         outlierMaskFilterOpts=None,
         outlierThreshold=1,
+        calcArtifactTrace=False,
         motorEncoderMask=None,
         calcAverageLFP=False,
         eventInfo=None,
@@ -2506,6 +2506,7 @@ def preproc(
             calcOutliers=calcOutliers,
             outlierThreshold=outlierThreshold,
             outlierMaskFilterOpts=outlierMaskFilterOpts,
+            calcArtifactTrace=calcArtifactTrace,
             linearDetrend=linearDetrend,
             motorEncoderMask=motorEncoderMask,
             electrodeArrayName=electrodeArrayName,
@@ -2543,7 +2544,7 @@ def preproc(
                         annName: asig.annotations[annName]})
             annNames = [
                 'outlierProportion', 'nDim',
-                'chi2Bounds', 'outlierThreshold'
+                'noveltyThreshold', 'outlierThreshold'
                 ]
             for annName in annNames:
                 if annName in asig.annotations:
@@ -2596,6 +2597,7 @@ def preprocBlockToNix(
         eventInfo=None,
         fillOverflow=False, calcAverageLFP=False,
         interpolateOutliers=False, calcOutliers=False,
+        calcArtifactTrace=False,
         outlierMaskFilterOpts=None,
         useMeanToCenter=False,   # mean center? median center?
         linearDetrend=False,
@@ -2634,6 +2636,8 @@ def preprocBlockToNix(
                 for unit in chanIdx.units:
                     if unit.spiketrains:
                         unit.spiketrains = []
+    #  precalculate new segment
+    seg = block.segments[0]
     #  remove chanIndexes assigned to units; makes more sense to
     #  only use chanIdx for asigs and spikes on that asig
     #  block.channel_indexes = (
@@ -2643,9 +2647,14 @@ def preprocBlockToNix(
         lastIndex = len(block.channel_indexes)
         lastID = block.channel_indexes[-1].channel_ids[0] + 1
         if asigNameList is None:
-            nMeanChans = 1
-        else:
-            nMeanChans = len(asigNameList)
+            asigNameList = [
+                [
+                    childBaseName(a.name, 'seg')
+                    for a in seg.analogsignals
+                    if not (('ainp' in a.name) or ('analog' in a.name))]
+                ]
+        nMeanChans = len(asigNameList)
+        #
         meanChIdxList = []
         for meanChIdx in range(nMeanChans):
             tempChIdx = ChannelIndex(
@@ -2662,10 +2671,21 @@ def preprocBlockToNix(
             lastID += 1
         lastIndex = len(block.channel_indexes)
         lastID = block.channel_indexes[-1].channel_ids[0] + 1
-        if asigNameList is None:
-            nMeanChans = 1
-        else:
-            nMeanChans = len(asigNameList)
+        if calcArtifactTrace:
+            artChIdxList = []
+            for artChIdx in range(nMeanChans):
+                tempChIdx = ChannelIndex(
+                    index=[lastIndex + artChIdx],
+                    channel_names=['{}_artifact_{}'.format(electrodeArrayName, artChIdx)],
+                    channel_ids=[lastID + artChIdx],
+                    name='{}_artifact_{}'.format(electrodeArrayName, artChIdx),
+                    file_origin=block.channel_indexes[-1].file_origin
+                    )
+                tempChIdx.merge_annotations(block.channel_indexes[-1])
+                block.channel_indexes.append(tempChIdx)
+                artChIdxList.append(tempChIdx)
+                lastIndex += 1
+                lastID += 1
         if calcOutliers:
             devChIdxList = []
             for devChIdx in range(nMeanChans):
@@ -2717,8 +2737,6 @@ def preprocBlockToNix(
             chanIdx.analogsignals = []
         if chanIdx.irregularlysampledsignals:
             chanIdx.irregularlysampledsignals = []
-    #  precalculate new segment
-    seg = block.segments[0]
     newSeg = Segment(
             index=0, name=seg.name,
             description=seg.description,
@@ -2743,29 +2761,22 @@ def preprocBlockToNix(
             prf.memory_usage_psutil()))
     newSeg, nixgroup = writer._write_segment_meta(newSeg, nixblock)
     #  trim down list of analog signals if necessary
-    if asigNameList is not None:
-        asigNameListSeg = []
+    asigNameListSeg = []
+    if (removeMeanAcross or calcAverageLFP):
+        meanGroups = {}
+    for subListIdx, subList in enumerate(asigNameList):
+        subListSeg = [
+            'seg{}_{}'.format(0, a)
+            for a in subList]
+        asigNameListSeg += subListSeg
         if (removeMeanAcross or calcAverageLFP):
-            meanGroups = {}
-        for subListIdx, subList in enumerate(asigNameList):
-            subListSeg = [
-                'seg{}_{}'.format(0, a)
-                for a in subList]
-            asigNameListSeg += subListSeg
-            if (removeMeanAcross or calcAverageLFP):
-                meanGroups[subListIdx] = subListSeg
-        aSigList = []
-        # [asig.name for asig in seg.analogsignals]
-        for a in seg.analogsignals:
-            # if np.any([n in a.name for n in asigNameListSeg]):
-            if a.name in asigNameListSeg:
-                aSigList.append(a)
-    else:
-        aSigList = [
-            a
-            for a in seg.analogsignals
-            if not (('ainp' in a.name) or ('analog' in a.name))]
-        asigNameListSeg = [a.name for a in aSigList]
+            meanGroups[subListIdx] = subListSeg
+    aSigList = []
+    # [asig.name for asig in seg.analogsignals]
+    for a in seg.analogsignals:
+        # if np.any([n in a.name for n in asigNameListSeg]):
+        if a.name in asigNameListSeg:
+            aSigList.append(a)
     if ainpNameList is not None:
         ainpNameListSeg = [
             'seg{}_{}'.format(0, a)
@@ -2790,7 +2801,6 @@ def preprocBlockToNix(
         filterCoeffs = hf.makeFilterCoeffsSOS(
             LFPFilterOpts, float(seg.analogsignals[0].sampling_rate))
         if False:
-            import matplotlib.pyplot as plt
             fig, ax1, ax2 = hf.plotFilterResponse(
                 filterCoeffs,
                 float(seg.analogsignals[0].sampling_rate))
@@ -2875,20 +2885,28 @@ def preprocBlockToNix(
                     (tempLFPStore.shape[0], len(asigNameList)),
                     dtype=np.bool)
                 outlierMetadata = {}
+            if calcArtifactTrace:
+                artifactSignal = np.zeros(
+                    (tempLFPStore.shape[0], len(asigNameList)),
+                    dtype=np.float32)
             ###############
             # tempLFPStore.iloc[:, 0] = np.nan  # for debugging axes
             #############
             plotDevFilterDebug = False
             if plotDevFilterDebug:
-                import matplotlib.pyplot as plt
-                i1 = 30000
-                i2 = 90000
+                try:
+                    devFiltDebugMask = (dummyAsig.times > 90 * pq.s) & (dummyAsig.times < 92 * pq.s)
+                except Exception:
+                    pdb.set_trace()
                 plotColIdx = 1
                 ddfFig, ddfAx = plt.subplots(len(asigNameList), 1)
                 ddfFig2, ddfAx2 = plt.subplots()
                 ddfFig3, ddfAx3 = plt.subplots(
                     1, len(asigNameList),
                     sharey=True)
+                if len(asigNameList) == 1:
+                    ddfAx = np.asarray([ddfAx])
+                    ddfAx3 = np.asarray([ddfAx3])
             for subListIdx, subList in enumerate(asigNameList):
                 columnsForThisGroup = meanGroups[subListIdx]
                 if trackMemory:
@@ -2898,8 +2916,8 @@ def preprocBlockToNix(
                     print('this group contains\n{}'.format(columnsForThisGroup))
                 if plotDevFilterDebug:
                     ddfAx3[subListIdx].plot(
-                        dummyAsig.times[i1:i2],
-                        tempLFPStore.loc[:, columnsForThisGroup].iloc[i1:i2, plotColIdx],
+                        dummyAsig.times[devFiltDebugMask],
+                        tempLFPStore.loc[:, columnsForThisGroup].iloc[devFiltDebugMask, plotColIdx],
                         label='original ch'
                         )
                 if fillOverflow:
@@ -2914,8 +2932,8 @@ def preprocBlockToNix(
                     if plotDevFilterDebug:
                         pltHandles['ax'].set_title('ch grp {}'.format(subListIdx))
                         ddfAx3[subListIdx].plot(
-                            dummyAsig.times[i1:i2],
-                            tempLFPStore.loc[:, columnsForThisGroup].iloc[i1:i2, plotColIdx],
+                            dummyAsig.times[devFiltDebugMask],
+                            tempLFPStore.loc[:, columnsForThisGroup].iloc[devFiltDebugMask, plotColIdx],
                             label='filled ch'
                             )
                 # zscore of each trace
@@ -2956,12 +2974,32 @@ def preprocBlockToNix(
                             .loc[:, columnsForThisGroup]
                             .median(axis=1).to_numpy()
                             )
+                if calcArtifactTrace:
+                    if LFPFilterOpts is not None:
+                        print('applying LFPFilterOpts to mean asig for artifact ID')
+                        # tempLFPStore.loc[:, columnsForThisGroup] = signal.sosfilt(
+                        tempLFPStore.loc[:, columnsForThisGroup] = signal.sosfiltfilt(
+                            filterCoeffs, tempLFPStore.loc[:, columnsForThisGroup],
+                            axis=0)
+                        if useMeanToCenter:
+                            tempCenter = (
+                                tempLFPStore
+                                .loc[:, columnsForThisGroup]
+                                .mean(axis=1).diff().fillna(0)
+                                )
+                        else:
+                            tempCenter = (
+                                tempLFPStore
+                                .loc[:, columnsForThisGroup]
+                                .median(axis=1).diff().fillna(0)
+                                )
+                    artifactSignal[:, subListIdx] = np.abs(stats.zscore(tempCenter.to_numpy()))
                 if calcOutliers:
                     if plotDevFilterDebug:
-                        ddfAx3[subListIdx].plot(
-                            dummyAsig.times[i1:i2],
-                            tempLFPStore.loc[:, columnsForThisGroup].iloc[i1:i2, plotColIdx],
-                            label='mean subtracted ch'
+                        ddfAx[subListIdx].plot(
+                            dummyAsig.times[devFiltDebugMask],
+                            centerLFP[devFiltDebugMask, subListIdx],
+                            label='mean of ch group'
                             )
                     # filter the traces, if needed
                     if LFPFilterOpts is not None:
@@ -2972,49 +3010,57 @@ def preprocBlockToNix(
                             axis=0)
                         if plotDevFilterDebug:
                             ddfAx3[subListIdx].plot(
-                                dummyAsig.times[i1:i2],
-                                tempLFPStore.loc[:, columnsForThisGroup].iloc[i1:i2, plotColIdx],
+                                dummyAsig.times[devFiltDebugMask],
+                                tempLFPStore.loc[:, columnsForThisGroup].iloc[devFiltDebugMask, plotColIdx],
                                 label='filtered ch'
                                 )
                     ##################################
                     print('Whitening cached traces before outlier detection')
-                    projector = PCA(
-                        n_components=None, whiten=True)
-                    pcs = projector.fit_transform(
-                        tempLFPStore.loc[:, columnsForThisGroup])
-                    explVarMask = (
-                        np.cumsum(projector.explained_variance_ratio_) < 0.99)
-                    explVarMask[0] = True  # (keep at least 1)
-                    pcs = pcs[:, explVarMask]
-                    nDim = pcs.shape[1]
-                    lfpDeviation[:, subListIdx] = (pcs ** 2).sum(axis=1)
-                    chi2Bounds = stats.chi2.interval(outlierThreshold, nDim)
-                    lfpDeviation[:, subListIdx] = lfpDeviation[:, subListIdx] / chi2Bounds[1]
-                    print('nDim = {}, chi2Lim = {}'.format(nDim, chi2Bounds))
+                    whitenByPCA = True
+                    if whitenByPCA:
+                        projector = PCA(
+                            n_components=None, whiten=True)
+                        pcs = projector.fit_transform(
+                            tempLFPStore.loc[:, columnsForThisGroup])
+                        explVarMask = (
+                            np.cumsum(projector.explained_variance_ratio_) < 1 - 1e-2)
+                        explVarMask[0] = True  # (keep at least 1)
+                        pcs = pcs[:, explVarMask]
+                        nDim = pcs.shape[1]
+                        lfpDeviation[:, subListIdx] = (pcs ** 2).sum(axis=1)
+                    else:  # whiten by mahalanobis distance
+                        est = EmpiricalCovariance()
+                        est.fit(tempLFPStore.loc[:, columnsForThisGroup].to_numpy())
+                        lfpDeviation[:, subListIdx] = est.mahalanobis(
+                            tempLFPStore.loc[:, columnsForThisGroup].to_numpy())
+                        nDim = tempLFPStore.loc[:, columnsForThisGroup].shape[1]
+                    #
+                    transformedDeviation = stats.norm.isf(stats.chi2.sf(lfpDeviation[:, subListIdx], nDim))
+                    infMask = np.isinf(transformedDeviation)
+                    if infMask.any():
+                        transformedDeviation[infMask] = transformedDeviation[~infMask].max()
+                    debugProbaTrans = True
+                    if debugProbaTrans:
+                        fig, ax = plt.subplots()
+                        tAx = ax.twinx()
+                        plotMask = (dummyAsig.times >= 60 * pq.s) & (dummyAsig.times < 95 * pq.s)
+                        ax.plot(dummyAsig.times[plotMask], transformedDeviation[plotMask], c='b', label='transformed deviation')
+                        tAx.plot(dummyAsig.times[plotMask], lfpDeviation[plotMask, subListIdx], c='r', label='original deviation')
+                        ax.legend(loc='upper left')
+                        tAx.legend(loc='upper right')
+                        plt.show()
+                    lfpDeviation[:, subListIdx] = transformedDeviation
+                    noveltyThreshold = stats.norm.interval(outlierThreshold)[1]
+                    # chi2Bounds = stats.chi2.interval(outlierThreshold, nDim)
+                    # lfpDeviation[:, subListIdx] = lfpDeviation[:, subListIdx] / chi2Bounds[1]
+                    # print('nDim = {}, chi2Lim = {}'.format(nDim, chi2Bounds))
+                    # noveltyThreshold = 1
+                    #
                     outlierMetadata[subListIdx] = {
                         'nDim': nDim,
-                        'chi2Bounds': chi2Bounds,
+                        'noveltyThreshold': noveltyThreshold,
                         'outlierThreshold': outlierThreshold
-                    }
-                    '''
-                    explVarMask = np.cumsum(projector.explained_variance_ratio_) < 0.99
-                    nDim = explVarMask.sum()
-                    est = EmpiricalCovariance()
-                    est.fit(pcs[:, explVarMask])
-                    lfpDeviation[:, subListIdx] = est.mahalanobis(pcs[:, explVarMask])
-                    '''
-                    #  # zscore of each trace
-                    #  print('Zscoring cached traces before outlier detection')
-                    #  tempLFPStore.loc[:, columnsForThisGroup] = (
-                    #          stats.zscore(
-                    #              tempLFPStore.loc[:, columnsForThisGroup])
-                    #          ** 2)
-                    #  # calculate the sum of squared z-scored traces
-                    #  lfpDeviation[:, subListIdx] = (
-                    #      tempLFPStore
-                    #      .loc[:, columnsForThisGroup]
-                    #      .sum(axis=1)
-                    #      )
+                        }
                     # smoothedDeviation = signal.sosfilt(
                     print('Smoothing deviation')
                     tempSmDev = signal.sosfiltfilt(
@@ -3022,24 +3068,30 @@ def preprocBlockToNix(
                     smoothedDeviation[:, subListIdx] = tempSmDev
                     if plotDevFilterDebug:
                         ddfAx[subListIdx].plot(
-                            dummyAsig.times[i1:i2], lfpDeviation[i1:i2, subListIdx],
-                            label='original (ch grp {})'.format(subListIdx))
+                            dummyAsig.times[devFiltDebugMask],
+                            lfpDeviation[devFiltDebugMask, subListIdx],
+                            label='original deviation (ch grp {})'.format(subListIdx))
                         ddfAx[subListIdx].plot(
-                            dummyAsig.times[i1:i2], smoothedDeviation[i1:i2, subListIdx],
-                            label='filtered (ch grp {})'.format(subListIdx))
+                            dummyAsig.times[devFiltDebugMask],
+                            smoothedDeviation[devFiltDebugMask, subListIdx],
+                            label='filtered deviation (ch grp {})'.format(subListIdx))
                     ##
                     print('Calculating outlier mask')
                     outlierMask[:, subListIdx] = (
-                        smoothedDeviation[:, subListIdx] > 1)
+                        smoothedDeviation[:, subListIdx] > noveltyThreshold)
                     if plotDevFilterDebug:
-                        ddfAx[subListIdx].axhline(1, c='r')
+                        ddfAx[subListIdx].axhline(noveltyThreshold, c='r')
             if plotDevFilterDebug and calcOutliers:
                 for subListIdx, subList in enumerate(asigNameList):
                     ddfAx[subListIdx].legend(loc='upper right')
+                    ddfAx[subListIdx].set_title('Deviation')
                     ddfAx3[subListIdx].legend(loc='upper right')
+                    ddfAx3[subListIdx].set_title('Example channel')
                     ddfAx2.plot(
-                        dummyAsig.times[i1:i2], smoothedDeviation[i1:i2, subListIdx],
+                        dummyAsig.times[devFiltDebugMask],
+                        smoothedDeviation[devFiltDebugMask, subListIdx],
                         label='ch grp {}'.format(subListIdx))
+                    ddfAx2.set_title('Smoothed Deviation')
                 ddfAx2.legend(loc='upper right')
                 plt.show()
             #############
@@ -3067,6 +3119,26 @@ def preprocBlockToNix(
                     meanAsig, filterCoeffs=filterCoeffs)
             meanAsig = writer._write_analogsignal(
                 meanAsig, nixblock, nixgroup)
+        if calcArtifactTrace:
+            for mIdx, artChIdx in enumerate(artChIdxList):
+                artAsig = AnalogSignal(
+                    artifactSignal[:, mIdx],
+                    units=dummyAsig.units,
+                    sampling_rate=dummyAsig.sampling_rate,
+                    # name='seg{}_{}'.format(idx, devChIdx.name)
+                    name='seg{}_{}'.format(0, artChIdx.name),
+                    t_start=tStart
+                    )
+                # assign ownership to containers
+                artChIdx.analogsignals.append(artAsig)
+                newSeg.analogsignals.append(artAsig)
+                # assign parent to children
+                artChIdx.create_relationship()
+                newSeg.create_relationship()
+                # write out to file
+                artAsig = writer._write_analogsignal(
+                    artAsig, nixblock, nixgroup)
+                #########################################################
         if calcOutliers:
             for mIdx, devChIdx in enumerate(devChIdxList):
                 devAsig = AnalogSignal(
@@ -3161,19 +3233,18 @@ def preprocBlockToNix(
                 np.diff(np.unwrap(lineNoisePhase)) /
                 (2.0*np.pi) * float(dummyAsig.sampling_rate))
             lineNoiseEnvelope = np.abs(lineNoiseH)
-            import matplotlib.pyplot as plt
             i1 = 300000; i2 = 330000
             fig, ax = plt.subplots(2, 1, sharex=True)
-            ax[0].plot(dummyAsig.times[i1:i2], dummyAsig.magnitude[i1:i2, :])
-            ax[0].plot(dummyAsig.times[i1:i2], lineNoise[i1:i2])
-            ax[0].plot(dummyAsig.times[i1:i2], lineNoiseEnvelope[i1:i2])
+            ax[0].plot(dummyAsig.times[devFiltDebugMask], dummyAsig.magnitude[devFiltDebugMask, :])
+            ax[0].plot(dummyAsig.times[devFiltDebugMask], lineNoise[devFiltDebugMask])
+            ax[0].plot(dummyAsig.times[devFiltDebugMask], lineNoiseEnvelope[devFiltDebugMask])
             axFr = ax[1].twinx()
             ax[1].plot(
-                dummyAsig.times[i1:i2], lineNoisePhase[i1:i2],
+                dummyAsig.times[devFiltDebugMask], lineNoisePhase[devFiltDebugMask],
                 c='r', label='phase')
             ax[1].legend()
             axFr.plot(
-                dummyAsig.times[i1:i2], lineNoiseFreq[i1:i2],
+                dummyAsig.times[devFiltDebugMask], lineNoiseFreq[devFiltDebugMask],
                 label='freq')
             axFr.set_ylim([59, 61])
             axFr.legend()
@@ -3243,12 +3314,11 @@ def preprocBlockToNix(
                 ###
                 plotMeanSubtraction = False
                 if plotMeanSubtraction:
-                    import matplotlib.pyplot as plt
                     i1 = 300000; i2 = 330000
                     fig, ax = plt.subplots(1, 1)
-                    ax.plot(asig.times[i1:i2], asig.magnitude[i1:i2, :], label='channel')
-                    ax.plot(asig.times[i1:i2], centerLFP[i1:i2, whichColumnToSubtract], label='mean')
-                    ax.plot(asig.times[i1:i2], noiseTerm[i1:i2], label='adjusted mean')
+                    ax.plot(asig.times[devFiltDebugMask], asig.magnitude[devFiltDebugMask, :], label='channel')
+                    ax.plot(asig.times[devFiltDebugMask], centerLFP[devFiltDebugMask, whichColumnToSubtract], label='mean')
+                    ax.plot(asig.times[devFiltDebugMask], noiseTerm[devFiltDebugMask], label='adjusted mean')
                     ax.legend()
                     plt.show()
                 ###
@@ -3361,8 +3431,6 @@ def preprocBlockToNix(
                 st.annotations.update({'phase60hz': phase60hz})
                 plotPhaseDist = False
                 if plotPhaseDist:
-                    import matplotlib.pyplot as plt
-                    import seaborn as sns
                     sns.distplot(phase60hz)
                     plt.show()
             st.unit = unit
@@ -3377,6 +3445,7 @@ def preprocBlockToNix(
             del st
     #  process proprio trial related events
     if calcRigEvents:
+        print('Processing rig events...')
         analogData = []
         for key, value in eventInfo['inputIDs'].items():
             searchName = 'seg{}_'.format(0) + value

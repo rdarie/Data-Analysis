@@ -1137,7 +1137,7 @@ def getTriggers(
     triggersPrime = dataSeries.diff()
     triggersPrime.fillna(0, inplace = True)
     # z-score the derivative
-    useMAD = True
+    useMAD = False
     if useMAD:
         tpMed = np.median(triggersPrime)
         tpMAD = stats.median_abs_deviation(triggersPrime)

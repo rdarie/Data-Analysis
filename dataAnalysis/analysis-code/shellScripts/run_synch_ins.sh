@@ -19,7 +19,7 @@
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 # Request custom resources
-#SBATCH --array=2
+#SBATCH --array=1,2,3
 
 module load anaconda/2020.02
 . /gpfs/runtime/opt/anaconda/2020.02/etc/profile.d/conda.sh
@@ -56,7 +56,7 @@ EXP="exp202101221100"
 # EXP="exp202101251100"
 
 BLOCKSELECTOR=""
-# SLURM_ARRAY_TASK_ID=1
+SLURM_ARRAY_TASK_ID=1
 
 ## --showFigures --forceRecalc
 python -u './synchronizeINStoNSP_stimBased.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP $BLOCKSELECTOR --inputNSPBlockSuffix=analog_inputs --addToNIX --lazy --usedTENSPulses --forceRecalc

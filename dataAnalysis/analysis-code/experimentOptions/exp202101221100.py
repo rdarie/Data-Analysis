@@ -42,9 +42,11 @@ def getExpOpts():
     jsonSessionNames = {
         #  per block
         1: [
-            'Session1611332995649', 'Session1611333273122',
-            'Session1611333553519', 'Session1611334040372',
-            # 'Session1611334349859'
+            'Session1611332995649',
+            'Session1611333273122',
+            'Session1611333553519',
+            # 'Session1611334040372',
+            # 'Session1611334349859'  # ???
             ],
         2: [
             'Session1611334604163', 'Session1611335022326',
@@ -87,9 +89,9 @@ def getExpOpts():
             #  per trialSegment
             j: {
                 'timeRanges': None, 'keepIndex': slice(None),
-                'synchChanName': ['utah_rawAverage_0'], 'iti': 10e-3,
+                'synchChanName': ['utah_artifact_0'], 'iti': 10e-3,
                 'synchByXCorrTapDetectSignal': False,
-                'minAnalogValue': None, 'thres': 12}
+                'minAnalogValue': None, 'thres': 15}
             for j, sessionName in enumerate(jsonSessionNames[i])
             }
         for i in jsonSessionNames.keys()
@@ -98,7 +100,7 @@ def getExpOpts():
     ############################################################
     # manually add special instructions, e.g
     # synchInfo['nsp'][2][0].update({'timeRanges': [(40, 9999)]})
-    synchInfo['nsp'][3][0].update({'thres': 100, 'timeRanges': [(50, 70)]})
+    # synchInfo['nsp'][3][0].update({'thres': 100, 'timeRanges': [(50, 70)]})
     #
     #
     #

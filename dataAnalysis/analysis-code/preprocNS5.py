@@ -202,7 +202,6 @@ def preprocNS5():
             removeMeanAcross=True,
             nameSuffix='',
             LFPFilterOpts=None,
-            #
             writeMode='ow',
             chunkSize=chunkSize, equalChunks=equalChunks, chunkList=chunkList,
             calcRigEvents=False)
@@ -216,8 +215,10 @@ def preprocNS5():
             rawFolderPath=nspFolder,
             outputFolderPath=scratchFolder, mapDF=mapDF,
             fillOverflow=False, removeJumps=False,
-            interpolateOutliers=False, calcOutliers=True,
-            outlierMaskFilterOpts=outlierMaskFilterOpts,
+            interpolateOutliers=False, calcOutliers=False,
+            calcArtifactTrace=True,
+            # outlierThreshold=spikeSortingOpts[arrayName]['outlierThreshold'],
+            # outlierMaskFilterOpts=outlierMaskFilterOpts,
             motorEncoderMask=motorEncoderMask,
             eventInfo=trialFilesFrom['utah']['eventInfo'],
             asigNameList=[spikeSortingOpts[arrayName]['asigNameList'][0]],

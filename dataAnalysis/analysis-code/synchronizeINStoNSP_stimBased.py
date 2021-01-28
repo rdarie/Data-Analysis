@@ -27,7 +27,6 @@ from matplotlib.backends.backend_pdf import PdfPages
 import dill as pickle
 from scipy import signal
 from importlib import reload
-from datetime import datetime as dt
 import peakutils
 import numpy as np
 import pandas as pd
@@ -85,12 +84,11 @@ if arguments['inputINSBlockSuffix'] is None:
 else:
     inputINSBlockSuffix = "_{}".format(arguments['inputINSBlockSuffix'])
 
-searchRadius = [-1., 1.]
+searchRadius = [-5., 5.]
 searchRadiusUnix = [
     pd.Timedelta(searchRadius[0], unit='s'),
     pd.Timedelta(searchRadius[1], unit='s')]
-#  load INS Data
-############################################################
+#
 jsonSessionNames = jsonSessionNames[blockIdx]
 #  Load NSP Data
 ############################################################
@@ -139,7 +137,9 @@ for grpIdx in range(4):
 
 interpFunINStoNSP = {}
 interpFunNSPtoINS = {}
-#  ### INS Loading
+
+#  load INS Data
+############################################################
 insAsigNames = insSignalsToSave.copy()
 for insSessIdx, tdo in tapDetectOptsINS.items():
     for scn in tdo['synchChanName']:
@@ -272,6 +272,8 @@ else:
         print('    delta T is approx {}'.format(unixDeltaT))
         #
         nspVals = nspDF.loc[nspSessMask, theseChanNamesNSP].to_numpy()
+        filterOpts = None
+        '''
         filterOpts = {
             'high': {
                 'Wn': 1000,
@@ -279,8 +281,9 @@ else:
                 'btype': 'high',
                 'ftype': 'bessel'
                 }}
+        '''
         if filterOpts is not None:
-            print('Filtering')
+            print('Filtering NSP traces...')
             filterCoeffs = hf.makeFilterCoeffsSOS(
                 filterOpts, nspSamplingRate)
             nspVals = signal.sosfiltfilt(
@@ -288,7 +291,7 @@ else:
                 nspVals, axis=0)
         if sessTapOptsNSP['minAnalogValue'] is not None:
             nspVals[nspVals < sessTapOptsNSP['minAnalogValue']] = 0
-        if True:
+        if False:
             empCov = EmpiricalCovariance().fit(nspVals)
             thisNspDF.loc[:, 'tapDetectSignal'] = empCov.mahalanobis(nspVals)
         else:
@@ -308,14 +311,14 @@ else:
         if False:
             nspPeakIdx = hf.getTriggers(
                 thisNspDF['tapDetectSignal'], iti=sessTapOptsNSP['iti'], itiWiggle=.2,
-                fs=nspSamplingRate, plotting=arguments['plotting'],
+                fs=nspSamplingRate, plotting=arguments['plotting'], absVal=False,
                 thres=sessTapOptsNSP['thres'], edgeType='rising', keep_max=True)
         else:
             nspPeakIdx, _ = hf.getThresholdCrossings(
                 thisNspDF['tapDetectSignal'], thresh=sessTapOptsNSP['thres'],
                 iti=sessTapOptsNSP['iti'], fs=nspSamplingRate,
                 edgeType='rising', itiWiggle=.2,
-                absVal=False, plotting=arguments['plotting'], keep_max=True)
+                absVal=False, plotting=arguments['plotting'])
         nspPeakIdx = nspPeakIdx[sessTapOptsNSP['keepIndex']]
         nspTapTimes = thisNspDF.loc[nspPeakIdx, 't'].to_numpy()
         print('nspTapTimes: {}'.format(nspTapTimes))

@@ -99,15 +99,58 @@ channelData = {
     'data': nspDF,
     't': nspDF['t']
     }
-recDateTime = (
-    nspBlock.rec_datetime.replace(tzinfo=timezone.utc).astimezone(tz=None))
+recDateTime = pd.Timestamp(nspBlock.rec_datetime, tz='utc')
 summaryText = '<h2>{}</h2>\n'.format(nspPath)
 summaryText += '<h3>Block started {}</h3>\n'.format(
-    recDateTime.strftime('%Y-%m-%d %H:%M:%S'))
+    recDateTime.tz_convert("America/New_York").strftime('%Y-%m-%d %H:%M:%S'))
 recEndTime = recDateTime + pd.Timedelta(nspDF['t'].max(), unit='s')
 summaryText += '<h3>Block ended {}</h3>\n<br>\n'.format(
-    recEndTime.strftime('%Y-%m-%d %H:%M:%S'))
+    recEndTime.tz_convert("America/New_York").strftime('%Y-%m-%d %H:%M:%S'))
 #
+orcaFolderPath = os.path.join(remoteBasePath, 'ORCA Logs')
+listOfSummarizedPath = os.path.join(
+    orcaFolderPath,
+    subjectName + '_list_of_summarized.json'
+    )
+if os.path.exists(listOfSummarizedPath):
+    summaryDF = pd.read_json(
+        listOfSummarizedPath,
+        orient='records',
+        convert_dates=['tStart', 'tEnd'],
+        dtype={
+            'unixStartTime': int,
+            'tStart': pd.DatetimeIndex,
+            'tEnd': pd.DatetimeIndex,
+            'hasTD': bool,
+            'duration': float,
+            'maxAmp': int,
+            'minAmp': int,
+        })
+    sessionStarts = pd.DatetimeIndex(summaryDF['tStart']).tz_localize(tz="UTC")
+    sessionEnds = pd.DatetimeIndex(summaryDF['tEnd']).tz_localize(tz="UTC")
+    compatibleSessionsMask = (
+        (sessionStarts > (recDateTime - pd.Timedelta('1M'))) &
+        (sessionEnds < recEndTime) &
+        (summaryDF['hasTD']) &
+        (summaryDF['maxAmp'].notna()))
+    insSessions = summaryDF.loc[compatibleSessionsMask, :].copy()
+    insSessions.loc[:, 'tStart'] = sessionStarts[compatibleSessionsMask].tz_convert("America/New_York")
+    insSessions.loc[:, 'tEnd'] = sessionEnds[compatibleSessionsMask].tz_convert("America/New_York")
+    insSessions.loc[:, 'delayFromNSP'] = (sessionStarts[compatibleSessionsMask] - recDateTime).total_seconds()
+    summaryText += '<h3>Companion INS sessions: </h3>'
+    summaryText += insSessions.rename(
+        columns={
+            'tStart': 'Start Time', 'tEnd': 'End Time',
+            'duration': 'Duration (sec)', 'delayFromNSP': 'delay after NSP start (sec)'
+            }).to_html()
+    summaryText += '<br> insSessions = [{}]'.format(
+        ', '.join(
+            [
+                "'Session{}'".format(unT)
+                for unT in insSessions['unixStartTime']
+            ]
+        )
+    )
 # nspLims = nspSrs.quantile([1e-6, 1-1e-6]).to_list()
 if arguments['usedTENSPulses']:
     interTriggerInterval = 39.7e-3  # 20 Hz
@@ -156,6 +199,8 @@ for trialSegment, group in approxTapTimes.groupby('tapGroup'):
         '<h3>             ended: '.format(trialSegment) +
         lastNSPTime.strftime('%Y-%m-%d %H:%M:%S') +
         ' (lasted up to {} sec)</h3>\n'.format(segDur.total_seconds()))
+
+#### problem channel id
 segIdx = 0
 problemChannelsList = []
 problemThreshold = 4e3

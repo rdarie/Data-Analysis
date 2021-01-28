@@ -7,6 +7,7 @@ Options:
     --sessionName=sessionName          which session to view
     --blockIdx=blockIdx                which trial to analyze [default: 1]
     --exp=exp                          which experimental day to analyze
+    --reprocessAll                     Start analysis over [default: False]
 """
 
 import matplotlib
@@ -38,7 +39,7 @@ import line_profiler
 import atexit
 import traceback
 import json
-
+from tqdm import tqdm
 
 def summarizeINSSession(
         sessionUnixTime=None,
@@ -49,9 +50,19 @@ def summarizeINSSession(
     summaryText = '<h1>Session{}</h1>\n'.format(sessionUnixTime)
     print(summaryText)
     #
-    sessionTime = datetime.fromtimestamp(sessionUnixTime / 1e3)
-    summaryText += '<h3>Started: ' + sessionTime.strftime('%Y-%m-%d %H:%M:%S') + '</h3>\n'
+    sessionTime = pd.Timestamp(sessionUnixTime, unit='ms')
+    logEntry = {
+        'unixStartTime': sessionUnixTime,
+        'tStart': sessionTime.isoformat(),
+        'hasTD': False,
+        'tEnd': None,
+        'duration': None,
+        'maxAmp': None,
+        'minAmp': None
+        }
+    summaryText += '<h2>Started: ' + sessionTime.strftime('%Y-%m-%d %H:%M:%S') + '</h2>\n'
     #
+    HUTimestamps = []
     timeSyncPath = os.path.join(
         orcaFolderPath, subjectName,
         'Session{}'.format(sessionUnixTime),
@@ -64,16 +75,53 @@ def summarizeINSSession(
                 ['Session{}'.format(sessionUnixTime)],
                 deviceName=deviceName
                 )
-            firstPacketT = datetime.fromtimestamp(timeSyncDF['HostUnixTime'].min() / 1e3)
-            lastPacketT = datetime.fromtimestamp(timeSyncDF['HostUnixTime'].max() / 1e3)
-            sessionDuration = lastPacketT - firstPacketT
-            summaryText += '<h3>Duration: {} sec</h3>\n'.format(sessionDuration.total_seconds())
-            summaryText += '<h3>Ended: {}</h3>\n'.format((sessionTime + sessionDuration).strftime('%Y-%m-%d %H:%M:%S'))
+            HUTimestamps.append(timeSyncDF['HostUnixTime'])
+            logEntry['hasTD'] = True
         except Exception:
             traceback.print_exc()
-            summaryText += '<h3>Duration: TimeSync.json exists but not read</h3>\n'
+            summaryText += '<h3>TimeSync.json exists but not read</h3>\n'
     else:
-        summaryText += '<h3>Duration: NA</h3>\n'
+        summaryText += '<h3>TimeSync.json does not exist</h3>\n'
+    try:
+        stimStatusSerial = mdt.getINSStimLogFromJson(
+            os.path.join(
+            orcaFolderPath, subjectName),
+            ['Session{}'.format(sessionUnixTime)],
+            deviceName=deviceName)
+        HUTimestamps.append(stimStatusSerial['HostUnixTime'])
+        therapyOnMask = ((stimStatusSerial['ins_property'] == 'therapyStatus') & (stimStatusSerial['ins_value'] == 1))
+        if not therapyOnMask.any():
+            summaryText += '<h3>Therapy never turned on!</h3>\n'
+        ampOnMask = ((stimStatusSerial['ins_property'] == 'amplitude') & (stimStatusSerial['ins_value'] > 0))
+        if not ampOnMask.any():
+            summaryText += '<h3>No nonzero amplitude updates found!</h3>\n'
+        else:
+            ampsPresent = (
+                pd.Series(
+                    stimStatusSerial.loc[ampOnMask, 'ins_value']
+                    .unique())
+                .to_frame(name='amplitudesTested'))
+            summaryText += '<h3>Unique amplitudes: </h3>\n'
+            summaryText += ampsPresent.to_html()
+            logEntry['minAmp'] = int(ampsPresent['amplitudesTested'].min())
+            logEntry['maxAmp'] = int(ampsPresent['amplitudesTested'].max())
+    except Exception:
+        traceback.print_exc()
+        summaryText += '<h3>Unable to read Stim Log</h3>\n'
+    if len(HUTimestamps):
+        hutDF = pd.concat(HUTimestamps, ignore_index=True)
+        firstPacketT = pd.Timestamp(hutDF.min(), unit='ms')
+        lastPacketT = pd.Timestamp(hutDF.max(), unit='ms')
+        sessionDuration = lastPacketT - firstPacketT
+        #
+        logEntry['tEnd'] = lastPacketT.isoformat()
+        logEntry['duration'] = float(sessionDuration.total_seconds())
+        summaryText += '<h3>Duration: {} sec</h3>\n'.format(logEntry['duration'])
+        summaryText += '<h3>Ended: {}</h3>\n'.format((sessionTime + sessionDuration).strftime('%Y-%m-%d %H:%M:%S'))
+    else:
+        summaryText += '<h3>Duration could not be determined. </h3>\n'
+        summaryText += '<h3>End time could not be determined. </h3>\n'
+    #
     try:
         electrodeConfiguration, senseInfoDF = mdt.getINSDeviceConfig(
             os.path.join(
@@ -118,11 +166,10 @@ def summarizeINSSession(
         commentsLog = None
         summaryText += '<h2>Comments not found</h2>\n'
     print('#################################\n\n\n')
-    return elecConfigDF, senseInfoDF, commentsLog, summaryText
+    return elecConfigDF, senseInfoDF, commentsLog, summaryText, logEntry
 
 
 def summarizeINSSessionWrapper():
-    # pdb.set_trace()
     # subjectName = 'Rupert'
     # deviceName = 'DeviceNPC700246H'
     # orcaFolderPath = '/gpfs/data/dborton/rdarie/Neural Recordings/ORCA Logs'
@@ -140,16 +187,24 @@ def summarizeINSSessionWrapper():
         orcaFolderPath,
         subjectName + '_list_of_summarized.json'
         )
+    ###
+    if arguments['reprocessAll'] and os.path.exists(listOfSummarizedPath):
+        os.remove(listOfSummarizedPath)
+    if arguments['reprocessAll'] and os.path.exists(summaryPath):
+        os.remove(summaryPath)
+    ###
     if not os.path.exists(listOfSummarizedPath):
-        listOfSummarized = {'sessions': []}
-        with open(listOfSummarizedPath, 'w') as f:
-            json.dump(listOfSummarized, f)
+        listOfSummarized = []
+        summaryDF = pd.DataFrame([], columns=['unixStartTime'])
+        # with open(listOfSummarizedPath, 'w') as f:
+        #     json.dump(listOfSummarized, f)
     else:
         with open(listOfSummarizedPath, 'r') as f:
             listOfSummarized = json.load(f)
-    for sessionUnixTime in sessionUnixTimeList:
-        if sessionUnixTime not in listOfSummarized['sessions']:
-            elecConfigDF, senseInfoDF, commentsLog, summaryText = summarizeINSSession(
+            summaryDF = pd.DataFrame(listOfSummarized)
+    for sessionUnixTime in tqdm(sessionUnixTimeList):
+        if sessionUnixTime not in summaryDF['unixStartTime'].to_list():
+            elecConfigDF, senseInfoDF, commentsLog, summaryText, logEntry = summarizeINSSession(
                 sessionUnixTime=sessionUnixTime,
                 subjectName=subjectName,
                 deviceName=deviceName,
@@ -158,7 +213,7 @@ def summarizeINSSessionWrapper():
             with open(summaryPath, 'a+') as _file:
                 _file.write(summaryText)
                 _file.write('\n<hr>\n')
-            listOfSummarized['sessions'].append(sessionUnixTime)
+            listOfSummarized.append(logEntry)
     with open(listOfSummarizedPath, 'w') as f:
         json.dump(listOfSummarized, f)
     return

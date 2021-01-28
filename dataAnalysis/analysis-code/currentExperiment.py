@@ -120,7 +120,7 @@ def parseAnalysisOptions(
     if 'stimArtifactFilterOpts' not in expOpts:
         stimArtifactFilterOpts = {
             'high': {
-                'Wn': 100,
+                'Wn': 200,
                 'N': 4,
                 'btype': 'high',
                 'ftype': 'bessel'
