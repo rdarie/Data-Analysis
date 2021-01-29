@@ -14,7 +14,7 @@
 #SBATCH -J preproc_20200911
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-preproc_20200911.stdout
+#SBATCH -o ../../batch_logs/%j-%a-preproc_20200911.out
 #SBATCH -e ../../batch_logs/%j-%a-preproc_20200911.errout
 
 # Specify account details

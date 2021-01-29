@@ -13,8 +13,8 @@
 #SBATCH -J plots_motion_lfp
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j_%a-plots_motion_lfp.stdout
-#SBATCH -e ../../batch_logs/%j_%a-plots_motion_lfp.errout
+#SBATCH -o ../../batch_logs/%j_%a-plots_motion_lfp.out
+#SBATCH -e ../../batch_logs/%j_%a-plots_motion_lfp.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo

@@ -13,7 +13,7 @@
 #SBATCH -J align_motion_2021_01_25_raster
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j_%a_align_motion_2021_01_25_raster.stdout
+#SBATCH -o ../../batch_logs/%j_%a_align_motion_2021_01_25_raster.out
 #SBATCH -e ../../batch_logs/%j_%a_align_motion_2021_01_25_raster.errout
 
 # Request custom resources
@@ -25,4 +25,4 @@
 ####  SLURM_ARRAY_TASK_ID=2
 source shellScripts/run_align_motion_preamble.sh
 #
-python -u ./calcAlignedAsigs.py --chanQuery="raster" --outputBlockName="raster" --eventBlockName='analyze' --signalBlockName='binarized' --verbose --exp=$EXP $BLOCKSELECTOR $WINDOW $LAZINESS $EVENTSELECTOR $ALIGNFOLDER
+python -u ./calcAlignedAsigs.py --chanQuery="raster" --outputBlockName="raster" --eventBlockName='epochs' --signalBlockName='binarized' --verbose --exp=$EXP $BLOCKSELECTOR $WINDOW $LAZINESS $EVENTSELECTOR $ALIGNFOLDER

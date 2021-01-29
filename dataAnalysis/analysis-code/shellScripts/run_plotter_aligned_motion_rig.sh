@@ -13,8 +13,8 @@
 #SBATCH -J plots_motion_rig
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-plots_motion_rig.stdout
-#SBATCH -e ../../batch_logs/%j-%a-plots_motion_rig.errout
+#SBATCH -o ../../batch_logs/%j-%a-plots_motion_rig.out
+#SBATCH -e ../../batch_logs/%j-%a-plots_motion_rig.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo

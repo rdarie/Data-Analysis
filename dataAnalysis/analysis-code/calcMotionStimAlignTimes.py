@@ -70,9 +70,14 @@ prefix = ns5FileName
 dataBlockPath = os.path.join(
     analysisSubFolder,
     prefix + '_analyze.nix')
+eventBlockPath = os.path.join(
+    analysisSubFolder,
+    prefix + '_epochs.nix')
 print('loading {}'.format(dataBlockPath))
 dataReader, dataBlock = preproc.blockFromPath(
     dataBlockPath, lazy=arguments['lazy'])
+eventReader, eventBlock = preproc.blockFromPath(
+    eventBlockPath, lazy=arguments['lazy'])
 ####
 try:
     alignTimeBounds = alignTimeBoundsLookup[int(arguments['blockIdx'])]
@@ -104,18 +109,19 @@ extraAnnNames = ['stimDelay']
 blockIdx = 0
 checkReferences = False
 for segIdx, dataSeg in enumerate(dataBlock.segments):
+    eventSeg = eventBlock.segments[segIdx]
     print('Calculating motion stim align times for trial {}'.format(segIdx))
     #
     if arguments['lazy']:
-        eventProxysList = dataSeg.events
-        dataSegEvents = [evP.load() for evP in eventProxysList]
+        eventProxysList = eventSeg.events
+        eventSegEvents = [evP.load() for evP in eventProxysList]
     # samplingRate = dummyAsig.sampling_rate
-    motionEvent = preproc.loadObjArrayAnn([ev for ev in dataSegEvents if ev.name == 'seg0_motionAlignTimes'][0])
+    motionEvent = preproc.loadObjArrayAnn([ev for ev in eventSegEvents if ev.name == 'seg0_motionAlignTimes'][0])
     motionEvDict = motionEvent.array_annotations.copy()
     motionEvDict['t'] = motionEvent.times.magnitude
     motionEvDF = pd.DataFrame(motionEvDict)
     #
-    stimEvent = preproc.loadObjArrayAnn([ev for ev in dataSegEvents if ev.name == 'seg0_stimAlignTimes'][0])
+    stimEvent = preproc.loadObjArrayAnn([ev for ev in eventSegEvents if ev.name == 'seg0_stimAlignTimes'][0])
     stimEvDict = stimEvent.array_annotations.copy()
     stimAnnNames = [nm for nm in sorted(list(stimEvDict.keys())) if nm not in ['stimCat']]
     stimEvDict['t'] = stimEvent.times.magnitude
@@ -168,24 +174,24 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
                 takeFrom=outboundT, compareTo=stimOnTs,
                 strictly='neither')
             stimDelay = float(closestTimes - outboundT)
-            theseStimAnn = stimEvDF.loc[int(closestIdx), :]
+            theseStimAnn = stimEvDF.loc[closestIdx, :]
             for annName in stimAnnNames:
                 motionEvDF.loc[outboundIdx, annName] = theseStimAnn[annName]
                 motionEvDF.loc[reachIdx, annName] = theseStimAnn[annName]
-            stimEvDF.loc[int(closestIdx), 'alreadyAssigned'] = True
+            stimEvDF.loc[closestIdx, 'alreadyAssigned'] = True
             motionEvDF.loc[outboundIdx, 'stimDelay'] = stimDelay
             motionEvDF.loc[reachIdx, 'stimDelay'] = stimDelay
         else:
             closestTimes, closestIdx = hf.closestSeries(
                 takeFrom=outboundT, compareTo=stimEvDF['t'],
                 strictly='less')
-            theseStimAnn = stimEvDF.loc[int(closestIdx), :]
+            theseStimAnn = stimEvDF.loc[closestIdx, :]
             try:
-                assert theseStimAnn['stimCat'] == 'stimOff'
+                assert theseStimAnn['stimCat'].iloc[0] == 'stimOff'
             except Exception:
                 print('\n\n{}\n Error at t= {} sec\n\n'.format(dataBlockPath, outboundT.iloc[0]))
                 traceback.print_exc()
-                # pdb.set_trace()
+                pdb.set_trace()
             for annName in stimAnnNames:
                 motionEvDF.loc[outboundIdx, annName] = noStimFiller[annName]
                 motionEvDF.loc[reachIdx, annName] = noStimFiller[annName]
@@ -221,7 +227,7 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
             closestTimes, closestIdx = hf.closestSeries(
                 takeFrom=returnT, compareTo=stimOnTs,
                 strictly='neither')
-            theseStimAnn = stimEvDF.loc[int(closestIdx), :]
+            theseStimAnn = stimEvDF.loc[closestIdx, :]
             stimDelay = float(closestTimes - returnT)
             for annName in stimAnnNames:
                 motionEvDF.loc[returnIdx, annName] = theseStimAnn[annName]
@@ -232,9 +238,9 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
             closestTimes, closestIdx = hf.closestSeries(
                 takeFrom=returnT, compareTo=stimEvDF['t'],
                 strictly='less')
-            theseStimAnn = stimEvDF.loc[int(closestIdx), :]
+            theseStimAnn = stimEvDF.loc[closestIdx, :]
             try:
-                assert theseStimAnn['stimCat'] == 'stimOff'
+                assert theseStimAnn['stimCat'].iloc[0] == 'stimOff'
             except Exception:
                 print('\n\n{}\nError at t= {} sec\n\n'.format(dataBlockPath, returnT.iloc[0]))
                 traceback.print_exc()
@@ -296,13 +302,14 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
     masterBlock.segments.append(newSeg)
 
 dataReader.file.close()
+eventReader.file.close()
 masterBlock.create_relationship()
 allSegs = list(range(len(masterBlock.segments)))
 
 preproc.addBlockToNIX(
     masterBlock, neoSegIdx=allSegs,
     writeAsigs=False, writeSpikes=False, writeEvents=True,
-    fileName=ns5FileName + '_analyze',
+    fileName=ns5FileName + '_epochs',
     folderPath=analysisSubFolder,
     purgeNixNames=False,
     nixBlockIdx=0, nixSegIdx=allSegs,

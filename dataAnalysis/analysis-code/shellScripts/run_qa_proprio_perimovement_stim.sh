@@ -13,7 +13,7 @@
 #SBATCH -J qa_perims_2021_01_20
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-qa_perims_2021_01_20.stdout
+#SBATCH -o ../../batch_logs/%j-%a-qa_perims_2021_01_20.out
 #SBATCH -e ../../batch_logs/%j-%a-qa_perims_2021_01_20.errout
 
 # Specify account details

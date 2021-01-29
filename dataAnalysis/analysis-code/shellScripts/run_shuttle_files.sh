@@ -13,7 +13,7 @@
 #SBATCH -J ins_preproc
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-ins_preproc.stdout
+#SBATCH -o ../../batch_logs/%j-%a-ins_preproc.out
 #SBATCH -e ../../batch_logs/%j-%a-ins_preproc.errout
 
 # Specify account details

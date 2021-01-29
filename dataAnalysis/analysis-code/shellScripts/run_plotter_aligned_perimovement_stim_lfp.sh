@@ -13,14 +13,14 @@
 #SBATCH -J plots_peri_lfp
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-plots_peri_lfp.stdout
-#SBATCH -e ../../batch_logs/%j-%a-plots_peri_lfp.errout
+#SBATCH -o ../../batch_logs/%j-%a-plots_peri_lfp.out
+#SBATCH -e ../../batch_logs/%j-%a-plots_peri_lfp.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=2,3
+#SBATCH --array=2
 
 # SLURM_ARRAY_TASK_ID=2
 source ./shellScripts/run_plotter_aligned_perimovement_stim_preamble.sh

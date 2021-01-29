@@ -13,7 +13,7 @@
 #SBATCH -J calc_gpfa
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-calc_gpfa.stdout
+#SBATCH -o ../../batch_logs/%j-calc_gpfa.out
 #SBATCH -e ../../batch_logs/%j-calc_gpfa.errout
 
 # Specify account details

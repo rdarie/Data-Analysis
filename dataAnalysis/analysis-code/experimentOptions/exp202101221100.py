@@ -64,7 +64,7 @@ def getExpOpts():
                 'synchChanName': ['ins_td0', 'ins_td2'],
                 'synchStimUnitName': ['g0p0#0'],
                 'synchByXCorrTapDetectSignal': False,
-                'xCorrSamplingRate': 2000,
+                'xCorrSamplingRate': None,
                 'xCorrGaussWid': 10e-3,
                 'minStimAmp': 0,
                 'unixTimeAdjust': None,
@@ -157,12 +157,18 @@ def getExpOpts():
     #         ],
     #     }
     #
-    motorEncoderBoundsLookup = None
+    # motorEncoderBoundsLookup = None
     # motorEncoderBoundsLookup = {
     #     2: [
-    #         [100, 772], [1173, 1896]
+    #         [180, 400], [490, 605], [650, 1215], [1280, 1750]
     #     ]
     # }
+    pedalPositionZeroEpochs = {
+        2: [450, 620, 1250]
+    }
+    dropMotionRounds = {
+        2: [42, 43, 44]
+    }
     ############################################################
     ############################################################
     outlierDetectOptions = dict(

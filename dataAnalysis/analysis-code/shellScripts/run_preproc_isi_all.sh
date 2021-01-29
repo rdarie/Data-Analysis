@@ -14,7 +14,7 @@
 #SBATCH -J isi_preproc_one_shot
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-isi_preproc_one_shot.stdout
+#SBATCH -o ../../batch_logs/%j-%a-isi_preproc_one_shot.out
 #SBATCH -e ../../batch_logs/%j-%a-isi_preproc_one_shot.errout
 
 # Specify account details

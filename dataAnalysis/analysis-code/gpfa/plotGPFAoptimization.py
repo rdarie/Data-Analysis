@@ -93,5 +93,5 @@ plt.savefig(os.path.join(figureFolder, 'gpfa_reconstruction_error.pdf'))
 plt.close()
 ##)
 # stdout=subprocess.PIPE
-#print(result.stdout)
+#print(result.out)
 # plt.spy(alignedRasterList[2]); plt.show()

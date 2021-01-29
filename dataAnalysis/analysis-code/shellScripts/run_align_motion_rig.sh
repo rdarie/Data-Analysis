@@ -13,7 +13,7 @@
 #SBATCH -J align_motion_2021_01_25_rig
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j_%a_align_motion_2021_01_25_rig.stdout
+#SBATCH -o ../../batch_logs/%j_%a_align_motion_2021_01_25_rig.out
 #SBATCH -e ../../batch_logs/%j_%a_align_motion_2021_01_25_rig.errout
 
 # Request custom resources
@@ -25,4 +25,4 @@
 ####  SLURM_ARRAY_TASK_ID=2
 source shellScripts/run_align_motion_preamble.sh
 #
-python -u ./calcAlignedAsigs.py --chanQuery="rig" --outputBlockName="rig" --eventBlockName='analyze' --signalBlockName='analyze' --verbose --exp=$EXP $BLOCKSELECTOR $WINDOW $LAZINESS $EVENTSELECTOR $ALIGNFOLDER
+python -u ./calcAlignedAsigs.py --chanQuery="rig" --outputBlockName="rig" --eventBlockName='epochs' --signalBlockName='analyze' --verbose --exp=$EXP $BLOCKSELECTOR $WINDOW $LAZINESS $EVENTSELECTOR $ALIGNFOLDER

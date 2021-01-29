@@ -486,10 +486,8 @@ def plotFilterImpulseResponse(
 
 
 def closestSeries(takeFrom=None, compareTo=None, strictly='neither'):
-    closest = pd.Series(
-        np.nan, index=takeFrom.index)
-    closestIdx = pd.Series(
-        np.nan, index=takeFrom.index)
+    closest = pd.Series(np.nan, index=takeFrom.index)
+    closestIdx = []
     for idx, value in enumerate(takeFrom.to_numpy()):
         if strictly == 'greater':
             lookIn = compareTo.loc[compareTo > value]
@@ -503,8 +501,8 @@ def closestSeries(takeFrom=None, compareTo=None, strictly='neither'):
             .to_numpy()
             .flat[idxMin])
         closest.iloc[idx] = closeValue
-        closestIdx.iloc[idx] = lookIn.index[idxMin]
-    return closest, closestIdx
+        closestIdx.append(lookIn.index[idxMin])
+    return closest, pd.Index(closestIdx)
 
 
 def interpolateDF(
@@ -3640,11 +3638,13 @@ def calcBreakDown(asigWide, rowName, colName, hueName):
         .groupby(breakDownBy)
         .agg('count')
         .iloc[:, 0]
+        .to_frame(name='count')
     )
     # 
-    indexNames = breakDownData.index.names + ['count']
-    breakDownData = breakDownData.reset_index()
-    breakDownData.columns = indexNames
+    # indexNames = breakDownData.index.names + ['count']
+    # breakDownData = breakDownData.reset_index()
+    # pdb.set_trace()
+    # breakDownData.columns = indexNames
     unitName = asigWide.reset_index()['feature'].unique()[0]
     breakDownText = (
         '{}\n'.format(unitName) +
@@ -3654,4 +3654,33 @@ def calcBreakDown(asigWide, rowName, colName, hueName):
             headers='keys', tablefmt='github',
             numalign='left', stralign='left')
         )
-    return breakDownData, breakDownText
+    cssProps = {}
+    cssTableStyles = [
+        {
+            'selector': 'th',
+            'props': [
+                ('border-style', 'solid'),
+                ('border-color', 'black')]},
+        {
+            'selector': 'td',
+            'props': [
+                ('border-style', 'solid'),
+                ('border-color', 'black')]},
+        {
+            'selector': 'table',
+            'props': [
+                ('border-collapse', 'collapse')
+                ]}
+        ]
+    cm = sns.dark_palette("green", as_cmap=True)
+    dfStyler = (
+        breakDownData.style
+        .background_gradient(cmap=cm)
+        .set_precision(1)
+        )
+    if cssProps:
+        dfStyler.set_properties(**cssProps)
+    if cssTableStyles:
+        dfStyler.set_table_styles(cssTableStyles)
+    breakDownHtml = dfStyler.render()
+    return breakDownData, breakDownText, breakDownHtml

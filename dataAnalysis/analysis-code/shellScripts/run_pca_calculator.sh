@@ -13,7 +13,7 @@
 #SBATCH -J calc_pca
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-calc_pca.stdout
+#SBATCH -o ../../batch_logs/%j-calc_pca.out
 #SBATCH -e ../../batch_logs/%j-calc_pca.errout
 
 # Specify account details

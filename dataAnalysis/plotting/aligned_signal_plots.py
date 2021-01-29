@@ -25,7 +25,7 @@ import traceback
 from copy import deepcopy
 from tqdm import tqdm
 import json
-
+from IPython.display import HTML
 
 def processRowColArguments(arguments):
     outDict = {}
@@ -192,15 +192,18 @@ def plotNeuronsAligned(
                 if enablePlots:
                     indexInfo = asigWide.index.to_frame()
                     if idx == 0:
-                        breakDownData, breakDownText, fig, ax = printBreakdown(
+                        breakDownData, breakDownText, breakDownHtml = hf.calcBreakDown(
                             asigWide, rowName, colName, hueName)
                         breakDownData.to_csv(
                             os.path.join(
                                 figureFolder,
                                 pdfName + '_trialsBreakDown.txt'),
                             sep='\t')
-                        pdf.savefig()
-                        plt.close()
+                        breakDownInspectPath = os.path.join(
+                                figureFolder,
+                                pdfName + '_trialsBreakDown.html')
+                        with open(breakDownInspectPath, 'w') as _f:
+                            _f.write(breakDownHtml)
                         if minNObservations > 0:
                             underMinLabels = (
                                 breakDownData
@@ -334,15 +337,18 @@ def plotAsigsAligned(
             if enablePlots:
                 indexInfo = asigWide.index.to_frame()
                 if idx == 0:
-                    breakDownData, breakDownText, fig, ax = printBreakdown(
+                    breakDownData, breakDownText, breakDownHtml = hf.calcBreakDown(
                         asigWide, rowName, colName, hueName)
                     breakDownData.to_csv(
                         os.path.join(
                             figureFolder,
                             pdfName + '_trialsBreakDown.txt'),
                         sep='\t')
-                    pdf.savefig()
-                    plt.close()
+                    breakDownInspectPath = os.path.join(
+                            figureFolder,
+                            pdfName + '_trialsBreakDown.html')
+                    with open(breakDownInspectPath, 'w') as _f:
+                        _f.write(breakDownHtml)
                     if minNObservations > 0:
                         #
                         underMinLabels = (
@@ -472,7 +478,7 @@ def printBreakdown(asigWide, rowName, colName, hueName):
     fig, ax = plt.subplots()
     # print out description of how many observations there are
     # for each condition
-    breakDownData, breakDownText = hf.calcBreakDown(
+    breakDownData, breakDownText, breakDownHtml = hf.calcBreakDown(
         asigWide, rowName, colName, hueName)
     #  
     textHandle = fig.text(

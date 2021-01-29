@@ -107,7 +107,6 @@ masterBlock.name = dataBlock.annotations['neo_name']
 masterBlock.annotate(
     nix_name=dataBlock.annotations['neo_name'])
 
-blockIdx = 0
 checkReferences = False
 for segIdx, dataSeg in enumerate(dataBlock.segments):
     print('Calculating motion align times for trial {}'.format(segIdx))
@@ -123,7 +122,7 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         eventProxysList = dataSeg.events
         if checkReferences:
             for asigP in asigProxysList:
-                da = asigP._rawio.da_list['blocks'][blockIdx]['segments'][segIdx]['data']
+                da = asigP._rawio.da_list['blocks'][0]['segments'][segIdx]['data']
                 print('segIdx {}, asigP.name {}'.format(
                     segIdx, asigP.name))
                 print('asigP._global_channel_indexes = {}'.format(
@@ -140,7 +139,7 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
                 print('evP._event_channel_index = {}'.format(
                      evP._event_channel_index))
                 evP_ch = evP._event_channel_index
-                mts = evP._rawio.file.blocks[blockIdx].groups[segIdx].multi_tags
+                mts = evP._rawio.file.blocks[0].groups[segIdx].multi_tags
                 try:
                     assert evP.name in mts[evP_ch].name
                 except Exception:
@@ -185,23 +184,41 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
     else:
         taskMask = (tdDF['t'] >= 0)
     ###################################################
+    tdDF.loc[:, 'isInTask'] = taskMask
+    tdDF.loc[:, 'pedalVelocityAbs'] = tdDF['pedalVelocity'].abs()
+    try:
+        zeroEpochs = pd.Series(pedalPositionZeroEpochs[blockIdx])
+        closestTimes, closestIdx  = hf.closestSeries(takeFrom=zeroEpochs, compareTo=tdDF['t'])
+        epochChanges = pd.Series(0, index=tdDF.index)
+        epochChanges.loc[closestIdx] = 1
+        tdDF.loc[:, 'positionEpoch'] = epochChanges.cumsum()
+    except Exception:
+        tdDF.loc[:, 'positionEpoch'] = 0
+    #
+    for name, group in tdDF.groupby('positionEpoch'):
+        pedalRestingMask = group['pedalVelocityAbs'] == 0
+        thisTaskMask = group['isInTask']
+        thisNeutralPoint = float(group.loc[thisTaskMask & pedalRestingMask, 'pedalPosition'].mode())
+        assert np.abs(thisNeutralPoint) < 0.1 # if the neutral point > 10 deg, there might be a problem
+        tdDF.loc[group.index, 'pedalPosition'] = group['pedalPosition'] - thisNeutralPoint
+    #
+    tdDF.loc[:, 'pedalPositionAbs'] = tdDF['pedalPosition'].abs()
     pedalPosQuantiles = tdDF.loc[taskMask, 'pedalPosition'].quantile([0, 1])
     pedalPosTolerance = (
         pedalPosQuantiles.iloc[1] -
         pedalPosQuantiles.iloc[0]) / 100
-    tdDF.loc[:, 'pedalVelocityAbs'] = tdDF['pedalVelocity'].abs()
     pedalVelQuantiles = tdDF.loc[taskMask, 'pedalVelocityAbs'].quantile([0, 1])
     pedalVelTolerance = (
         pedalVelQuantiles.iloc[1] -
         pedalVelQuantiles.iloc[0]) / 100
     # pedalRestingMask = tdDF['pedalVelocityAbs'] < pedalVelTolerance
-    pedalRestingMask = tdDF['pedalVelocityAbs'] == 0
-    pedalNeutralPoint = float(
-        tdDF.loc[taskMask & pedalRestingMask, 'pedalPosition'].value_counts().idxmax())
-    assert np.abs(pedalNeutralPoint) < 0.1 # if the neutral point > 10 deg, there might be a problem
+    # pedalRestingMask = tdDF['pedalVelocityAbs'] == 0
+    # pedalNeutralPoint = float(
+    #     tdDF.loc[taskMask & pedalRestingMask, 'pedalPosition'].value_counts().idxmax())
+    # pedalNeutralPoint = float(tdDF.loc[taskMask & pedalRestingMask, 'pedalPosition'].mode())
+    # assert np.abs(pedalNeutralPoint) < 0.1 # if the neutral point > 10 deg, there might be a problem
     #
-    tdDF.loc[:, 'pedalPosition'] = tdDF['pedalPosition'] - pedalNeutralPoint
-    tdDF.loc[:, 'pedalPositionAbs'] = tdDF['pedalPosition'].abs()
+    # tdDF.loc[:, 'pedalPosition'] = tdDF['pedalPosition'] - pedalNeutralPoint
     crossIdx, crossMask = hf.getThresholdCrossings(
         tdDF.loc[taskMask, 'pedalPositionAbs'], thresh=pedalPosTolerance,
         edgeType='rising', fs=samplingRate,
@@ -219,7 +236,7 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
     for mvCat in movementCatTypes:
         trialsDict[mvCat].index.name = 'outboundTdIdx'
         trialsDict[mvCat].set_index('movementRound', inplace=True)
-        for catName in availableCateg + ['tdIndex']:
+        for catName in availableCateg + ['tdIndex', 'markForDeletion']:
             trialsDict[mvCat].loc[:, catName] = np.nan
     for idx, (mvRound, group) in enumerate(tdDF.groupby('movementRound')):
         if mvRound >= 0:
@@ -293,6 +310,8 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
                     trialsDict[mvCat].loc[mvRound, 'pedalDirection'] = 'CCW'
                 trialsDict[mvCat].loc[mvRound, 'pedalMovementDuration'] = (
                     movementDuration)
+                trialsDict[mvCat].loc[mvRound, 'markForDeletion'] = (movementDuration > 10.)
+            #
     #
     if (segIdx == 0) and arguments['plotParamHistograms']:
         ax = sns.distplot(
@@ -322,6 +341,36 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
             trialsDict, axis=0,
             names=['pedalMovementCat', 'movementRound'])
         .reset_index())
+    deleteTheseIdx = alignEventsDF.loc[alignEventsDF['markForDeletion'].astype(bool), :].index
+    if deleteTheseIdx.any():
+        print('calcMotionAlignTimes, dropping idx = {} (marked for deletion)'.format(deleteTheseIdx))
+        alignEventsDF.drop(index=deleteTheseIdx, inplace=True)
+    alignEventsDF.drop(columns=['markForDeletion'], inplace=True)
+    try:
+        manuallyRejectedRounds = dropMotionRounds[blockIdx]
+        rejectMask = alignEventsDF['movementRound'].isin(manuallyRejectedRounds)
+        print('calcMotionAlignTimes, dropping idx = {} (manually rejected)'.format(deleteTheseIdx))
+        alignEventsDF.drop(index=rejectMask.loc[rejectMask].index, inplace=True)
+    except Exception:
+        traceback.print_exc()
+    print('Found events at {}'.format(alignEventsDF['t'].tolist()))
+    if arguments['plotParamHistograms']:
+        # pdb.set_trace()
+        fig, ax = plt.subplots()
+        fig.set_size_inches(4 * (tdDF['t'].max() // 500), 4)
+        pPosDeg = 100 * tdDF['pedalPosition']
+        ax.plot(tdDF['t'], pPosDeg, label='pedal position')
+        ax.set_ylabel('deg.')
+        ax.plot(
+            trialsDict['outbound']['t'],
+            pPosDeg.loc[trialsDict['outbound']['tdIndex']],
+            'ro', label='trial outbound movement')
+        ax.legend()
+        plt.savefig(
+            os.path.join(
+                figureFolder, 'pedalMovementTrials.pdf'))
+        # plt.show()
+        plt.close()
     #  sort align times
     alignEventsDF.sort_values(by='t', inplace=True, kind='mergesort')
     alignEvents = preproc.eventDataFrameToEvents(
@@ -334,6 +383,7 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
     concatLabelColumns = [
         'pedalMovementCat',
         'pedalSizeCat', 'pedalDirection',
+        'movementRound',
         'pedalMovementDuration']
     concatLabelsDF = alignEventsDF[concatLabelColumns]
     concatLabels = np.array([
@@ -355,11 +405,21 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
 dataReader.file.close()
 masterBlock.create_relationship()
 allSegs = list(range(len(masterBlock.segments)))
-preproc.addBlockToNIX(
-    masterBlock, neoSegIdx=allSegs,
-    writeAsigs=False, writeSpikes=False, writeEvents=True,
-    fileName=ns5FileName + '_analyze',
-    folderPath=analysisSubFolder,
-    purgeNixNames=False,
-    nixBlockIdx=0, nixSegIdx=allSegs,
+
+outputPath = os.path.join(
+    analysisSubFolder,
+    ns5FileName + '_epochs'
     )
+if not os.path.exists(outputPath + '.nix'):
+    writer = preproc.NixIO(filename=outputPath + '.nix')
+    writer.write_block(masterBlock, use_obj_names=True)
+    writer.close()
+else:
+    preproc.addBlockToNIX(
+        masterBlock, neoSegIdx=allSegs,
+        writeAsigs=False, writeSpikes=False, writeEvents=True,
+        fileName=ns5FileName + '_epochs',
+        folderPath=analysisSubFolder,
+        purgeNixNames=False,
+        nixBlockIdx=0, nixSegIdx=allSegs,
+        )

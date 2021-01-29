@@ -15,7 +15,7 @@
 #SBATCH -J glmFull_20190127
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-glmFull_20190127.stdout
+#SBATCH -o ../../batch_logs/%j-glmFull_20190127.out
 #SBATCH -e ../../batch_logs/%j-glmFull_20190127.errout
 
 # Specify account details

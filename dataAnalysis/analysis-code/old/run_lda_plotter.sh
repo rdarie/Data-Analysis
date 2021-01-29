@@ -13,7 +13,7 @@
 #SBATCH -J plotsLDA
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-plotsLDA.stdout
+#SBATCH -o ../../batch_logs/%j-plotsLDA.out
 #SBATCH -e ../../batch_logs/%j-plotsLDA.errout
 
 # Specify account details

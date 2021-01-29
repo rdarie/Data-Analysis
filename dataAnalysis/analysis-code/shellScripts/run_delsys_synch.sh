@@ -13,7 +13,7 @@
 #SBATCH -J delsys_synch
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-delsys_synch.stdout
+#SBATCH -o ../../batch_logs/%j-%a-delsys_synch.out
 #SBATCH -e ../../batch_logs/%j-%a-delsys_synch.errout
 
 # Specify account details

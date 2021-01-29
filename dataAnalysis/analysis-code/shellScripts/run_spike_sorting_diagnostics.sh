@@ -13,7 +13,7 @@
 #SBATCH -J 2021_01_20_sorting_diagnostics
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-2021_01_20_sorting-diagnostics.stdout
+#SBATCH -o ../../batch_logs/%j-%a-2021_01_20_sorting-diagnostics.out
 #SBATCH -e ../../batch_logs/%j-%a-2021_01_20_sorting-diagnostics.errout
 
 # Specify account details

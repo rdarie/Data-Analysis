@@ -13,7 +13,7 @@
 #SBATCH -J qa_stim_2021_01_25
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-qa_stim_2021_01_25.stdout
+#SBATCH -o ../../batch_logs/%j-%a-qa_stim_2021_01_25.out
 #SBATCH -e ../../batch_logs/%j-%a-qa_stim_2021_01_25.errout
 
 # Specify account details

@@ -13,7 +13,7 @@
 #SBATCH -J optimize_gpfa
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-optimize_gpfa.stdout
+#SBATCH -o ../../batch_logs/%j-optimize_gpfa.out
 #SBATCH -e ../../batch_logs/%j-optimize_gpfa.errout
 
 # Specify account details

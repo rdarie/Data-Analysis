@@ -14,7 +14,7 @@
 #SBATCH --array=0-95:1
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-utah_constructor.stdout
+#SBATCH -o ../../batch_logs/%j-%a-utah_constructor.out
 #SBATCH -e ../../batch_logs/%j-%a-utah_constructor.errout
 
 # Specify account details

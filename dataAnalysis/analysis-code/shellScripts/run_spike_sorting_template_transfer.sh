@@ -15,7 +15,7 @@
 #SBATCH --array=2
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-spike_sort_peeler.stdout
+#SBATCH -o ../../batch_logs/%j-%a-spike_sort_peeler.out
 #SBATCH -e ../../batch_logs/%j-%a-spike_sort_peeler.errout
 
 # Specify account details

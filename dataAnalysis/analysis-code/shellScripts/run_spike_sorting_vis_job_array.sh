@@ -16,7 +16,7 @@
 #SBATCH --array=0-95:1
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-sort_vis.stdout
+#SBATCH -o ../../batch_logs/%j-%a-sort_vis.out
 #SBATCH -e ../../batch_logs/%j-%a-sort_vis.errout
 
 # Specify account details

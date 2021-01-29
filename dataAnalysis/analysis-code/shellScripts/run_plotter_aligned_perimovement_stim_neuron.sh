@@ -13,8 +13,8 @@
 #SBATCH -J plots_peri_neuron
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-plots_peri_neuron.stdout
-#SBATCH -e ../../batch_logs/%j-%a-plots_peri_neuron.errout
+#SBATCH -o ../../batch_logs/%j-%a-plots_peri_neuron.out
+#SBATCH -e ../../batch_logs/%j-%a-plots_peri_neuron.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo

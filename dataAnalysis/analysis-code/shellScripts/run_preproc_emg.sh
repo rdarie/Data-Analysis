@@ -14,7 +14,7 @@
 #SBATCH -J emg_preproc
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-emg_preproc.stdout
+#SBATCH -o ../../batch_logs/%j-%a-emg_preproc.out
 #SBATCH -e ../../batch_logs/%j-%a-emg_preproc.errout
 
 # Specify account details

@@ -49,6 +49,7 @@ from currentExperiment import parseAnalysisOptions
 from namedQueries import namedQueries
 from sklearn.covariance import EmpiricalCovariance, MinCovDet, EllipticEnvelope
 from sklearn.utils.random import sample_without_replacement as swr
+
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']), arguments['exp'])
 globals().update(expOpts)

@@ -13,8 +13,8 @@
 #SBATCH -J plots_motion_neuron
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-plots_motion_neuron.stdout
-#SBATCH -e ../../batch_logs/%j-%a-plots_motion_neuron.errout
+#SBATCH -o ../../batch_logs/%j-%a-plots_motion_neuron.out
+#SBATCH -e ../../batch_logs/%j-%a-plots_motion_neuron.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo

@@ -13,7 +13,7 @@
 #SBATCH -J simi_synch
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-simi_synch.stdout
+#SBATCH -o ../../batch_logs/%j-%a-simi_synch.out
 #SBATCH -e ../../batch_logs/%j-%a-simi_synch.errout
 
 # Specify account details

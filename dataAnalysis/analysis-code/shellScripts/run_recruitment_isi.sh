@@ -13,7 +13,7 @@
 #SBATCH -J plotsStim
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-plotsStim.stdout
+#SBATCH -o ../../batch_logs/%j-plotsStim.out
 #SBATCH -e ../../batch_logs/%j-plotsStim.errout
 
 # Specify account details

@@ -2976,7 +2976,7 @@ def preprocBlockToNix(
                             )
                 if calcArtifactTrace:
                     if LFPFilterOpts is not None:
-                        print('applying LFPFilterOpts to mean asig for artifact ID')
+                        print('applying LFPFilterOpts to cached asigs for artifact ID')
                         # tempLFPStore.loc[:, columnsForThisGroup] = signal.sosfilt(
                         tempLFPStore.loc[:, columnsForThisGroup] = signal.sosfiltfilt(
                             filterCoeffs, tempLFPStore.loc[:, columnsForThisGroup],
@@ -3039,7 +3039,7 @@ def preprocBlockToNix(
                     infMask = np.isinf(transformedDeviation)
                     if infMask.any():
                         transformedDeviation[infMask] = transformedDeviation[~infMask].max()
-                    debugProbaTrans = True
+                    debugProbaTrans = False
                     if debugProbaTrans:
                         fig, ax = plt.subplots()
                         tAx = ax.twinx()

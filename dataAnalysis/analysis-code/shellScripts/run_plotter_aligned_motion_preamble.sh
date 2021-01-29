@@ -5,7 +5,9 @@ source ./shellScripts/run_align_motion_preamble.sh
 OUTLIERMASK="--maskOutlierBlocks"
 # OUTLIERMASK=""
 
-STATSOVERLAY="--overlayStats"
+# STATSOVERLAY="--overlayStats"
+STATSOVERLAY=""
+
 TIMEWINDOWOPTS="--winStart=150 --winStop=450"
 
 # ALIGNQUERY="--alignQuery=stimOn"

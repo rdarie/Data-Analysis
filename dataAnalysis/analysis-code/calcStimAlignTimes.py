@@ -225,20 +225,20 @@ dataReader.file.close()
 
 masterBlock.create_relationship()
 allSegs = list(range(len(masterBlock.segments)))
-if arguments['processAll']:
-    ns5.addBlockToNIX(
-        masterBlock, neoSegIdx=allSegs,
-        writeAsigs=False, writeSpikes=False, writeEvents=True,
-        fileName=experimentName + '_analyze',
-        folderPath=analysisSubFolder,
-        purgeNixNames=False,
-        nixBlockIdx=0, nixSegIdx=allSegs,
-        )
+
+outputPath = os.path.join(
+    analysisSubFolder,
+    ns5FileName + '_epochs'
+    )
+if not os.path.exists(outputPath + '.nix'):
+    writer = ns5.NixIO(filename=outputPath + '.nix')
+    writer.write_block(masterBlock, use_obj_names=True)
+    writer.close()
 else:
     ns5.addBlockToNIX(
         masterBlock, neoSegIdx=allSegs,
         writeAsigs=False, writeSpikes=False, writeEvents=True,
-        fileName=ns5FileName + '_analyze',
+        fileName=ns5FileName + '_epochs',
         folderPath=analysisSubFolder,
         purgeNixNames=False,
         nixBlockIdx=0, nixSegIdx=allSegs,

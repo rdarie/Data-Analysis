@@ -14,7 +14,7 @@
 #SBATCH -J peeler_0126_4
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-peeler_0126_4.stdout
+#SBATCH -o ../../batch_logs/%j-%a-peeler_0126_4.out
 #SBATCH -e ../../batch_logs/%j-%a-peeler_0126_4.errout
 
 # Specify account details

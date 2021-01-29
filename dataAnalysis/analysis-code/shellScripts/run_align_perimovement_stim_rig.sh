@@ -13,15 +13,15 @@
 #SBATCH -J align_perims_2021_01_25_rig
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j_%a_align_perims_2021_01_25_rig.stdout
+#SBATCH -o ../../batch_logs/%j_%a_align_perims_2021_01_25_rig.out
 #SBATCH -e ../../batch_logs/%j_%a_align_perims_2021_01_25_rig.errout
 
 # Request custom resources
-#SBATCH --array=2,3
+#SBATCH --array=2
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 
 # SLURM_ARRAY_TASK_ID=3
 source shellScripts/run_align_perimovement_stim_preamble.sh
-python -u ./calcAlignedAsigs.py --chanQuery="rig" --outputBlockName="rig" --eventBlockName='analyze' --signalBlockName='analyze' --verbose --exp=$EXP $BLOCKSELECTOR $WINDOW $LAZINESS $EVENTSELECTOR $ALIGNFOLDER $AMPFIELDNAME
+python -u ./calcAlignedAsigs.py --chanQuery="rig" --outputBlockName="rig" --eventBlockName='epochs' --signalBlockName='analyze' --verbose --exp=$EXP $BLOCKSELECTOR $WINDOW $LAZINESS $EVENTSELECTOR $ALIGNFOLDER $AMPFIELDNAME

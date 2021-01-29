@@ -723,7 +723,7 @@ for insSessIdx, insGroup in insDF.groupby('trialSegment'):
         else:
             allEvs[ev.name] = [ev]
         newEvT = np.polyval(interpFunINStoNSP[insSessIdx], ev.magnitude)
-        ev.magnitude[:] = newEvT
+        ev.times.magnitude[:] = newEvT
     #
     for st in stList:
         if st.name in allSts:
@@ -796,7 +796,7 @@ if os.path.exists(outPathName):
 writer = neo.io.NixIO(filename=outPathName)
 writer.write_block(insBlockInterp, use_obj_names=True)
 writer.close()
-
+'''
 saveEventsToNSPBlock = True
 if saveEventsToNSPBlock:
     # if nsp block already has the spike stuff, revert from the copy; else, save a copy and add them
@@ -814,7 +814,7 @@ if saveEventsToNSPBlock:
         purgeNixNames=True,
         nixBlockIdx=0, nixSegIdx=[0],
         )
-
+'''
 #
 #
 # get absolute timestamps of file extents (by INS session)
