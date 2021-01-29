@@ -45,8 +45,8 @@ def getExpOpts():
             'Session1611332995649',
             'Session1611333273122',
             'Session1611333553519',
-            # 'Session1611334040372',
-            # 'Session1611334349859'  # ???
+            'Session1611334040372',
+            'Session1611334349859'  # ???
             ],
         2: [
             'Session1611334604163', 'Session1611335022326',
@@ -64,7 +64,10 @@ def getExpOpts():
                 'synchChanName': ['ins_td0', 'ins_td2'],
                 'synchStimUnitName': ['g0p0#0'],
                 'synchByXCorrTapDetectSignal': False,
-                'minStimAmp': 300,
+                'xCorrSamplingRate': 2000,
+                'xCorrGaussWid': 10e-3,
+                'minStimAmp': 0,
+                'unixTimeAdjust': None,
                 'thres': 5,
                 'iti': 10e-3,
                 'minAnalogValue': None,
@@ -74,6 +77,9 @@ def getExpOpts():
     ############################################################
     # manually add special instructions, e.g.
     # synchInfo['ins'][3][0].update({'minStimAmp': 0})
+    #
+    synchInfo['ins'][1][0].update({'unixTimeAdjust': -3})
+    synchInfo['ins'][1][1].update({'unixTimeAdjust': -3})
     # #synchInfo['ins'][1][1] = {
     # #    'timeRanges': None,
     # #    'chan': ['ins_td2'],
@@ -91,7 +97,8 @@ def getExpOpts():
                 'timeRanges': None, 'keepIndex': slice(None),
                 'synchChanName': ['utah_artifact_0'], 'iti': 10e-3,
                 'synchByXCorrTapDetectSignal': False,
-                'minAnalogValue': None, 'thres': 15}
+                'unixTimeAdjust': None,
+                'minAnalogValue': None, 'thres': 10}
             for j, sessionName in enumerate(jsonSessionNames[i])
             }
         for i in jsonSessionNames.keys()
@@ -100,7 +107,7 @@ def getExpOpts():
     ############################################################
     # manually add special instructions, e.g
     # synchInfo['nsp'][2][0].update({'timeRanges': [(40, 9999)]})
-    # synchInfo['nsp'][3][0].update({'thres': 100, 'timeRanges': [(50, 70)]})
+    #
     #
     #
     #
