@@ -14,7 +14,7 @@
 
 # Specify an output file
 #SBATCH -o ../../batch_logs/%j-tdrFull.out
-#SBATCH -e ../../batch_logs/%j-tdrFull.errout
+#SBATCH -e ../../batch_logs/%j-tdrFull.out
 
 # Specify account details
 #SBATCH --account=bibs-dborton-condo

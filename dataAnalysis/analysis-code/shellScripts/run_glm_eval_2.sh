@@ -16,7 +16,7 @@
 
 # Specify an output file
 #SBATCH -o ../../batch_logs/%j-glmCollation_20190127.out
-#SBATCH -e ../../batch_logs/%j-glmCollation_20190127.errout
+#SBATCH -e ../../batch_logs/%j-glmCollation_20190127.out
 
 # Specify account details
 #disableSBATCH -p bigmem

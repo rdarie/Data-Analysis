@@ -15,7 +15,7 @@
 
 # Specify an output file
 #SBATCH -o ../../batch_logs/%j-%a-preproc_20200911.out
-#SBATCH -e ../../batch_logs/%j-%a-preproc_20200911.errout
+#SBATCH -e ../../batch_logs/%j-%a-preproc_20200911.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo

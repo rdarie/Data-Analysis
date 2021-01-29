@@ -14,7 +14,7 @@
 
 # Specify an output file
 #SBATCH -o ../../batch_logs/%j-alignStim_20200701.out
-#SBATCH -e ../../batch_logs/%j-alignStim_20200701.errout
+#SBATCH -e ../../batch_logs/%j-alignStim_20200701.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo

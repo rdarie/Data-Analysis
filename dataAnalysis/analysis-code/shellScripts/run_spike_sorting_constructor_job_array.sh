@@ -15,7 +15,7 @@
 
 # Specify an output file
 #SBATCH -o ../../batch_logs/%j-%a-utah_constructor.out
-#SBATCH -e ../../batch_logs/%j-%a-utah_constructor.errout
+#SBATCH -e ../../batch_logs/%j-%a-utah_constructor.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo

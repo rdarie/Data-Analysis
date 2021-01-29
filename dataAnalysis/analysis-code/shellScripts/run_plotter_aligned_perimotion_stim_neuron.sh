@@ -23,6 +23,6 @@
 #SBATCH --array=2
 
 # SLURM_ARRAY_TASK_ID=2
-source ./shellScripts/run_plotter_aligned_perimovement_stim_preamble.sh
+source ./shellScripts/run_plotter_aligned_perimotion_stim_preamble.sh
 
 python3 -u './plotAlignedNeurons.py' --exp=$EXP --unitQuery="all" --enableOverrides $BLOCKSELECTOR $ANALYSISFOLDER $UNITSELECTOR $WINDOW $ALIGNQUERY $ALIGNFOLDER $TIMEWINDOWOPTS $STATSOVERLAY $OUTLIERMASK $HUEOPTS $ROWOPTS $COLOPTS $STYLEOPTS $SIZEOPTS $PAGELIMITS $OTHERNEURONOPTS

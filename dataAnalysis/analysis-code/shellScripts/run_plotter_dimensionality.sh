@@ -14,7 +14,7 @@
 
 # Specify an output file
 #SBATCH -o ../../batch_logs/%j-extract_pca.out
-#SBATCH -e ../../batch_logs/%j-extract_pca.errout
+#SBATCH -e ../../batch_logs/%j-extract_pca.out
 
 # Specify account details
 #SBATCH --account=bibs-dborton-condo

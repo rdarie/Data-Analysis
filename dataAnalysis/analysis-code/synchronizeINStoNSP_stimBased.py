@@ -723,7 +723,7 @@ for insSessIdx, insGroup in insDF.groupby('trialSegment'):
         else:
             allEvs[ev.name] = [ev]
         newEvT = np.polyval(interpFunINStoNSP[insSessIdx], ev.magnitude)
-        ev.times.magnitude[:] = newEvT
+        ev.magnitude[:] = newEvT
     #
     for st in stList:
         if st.name in allSts:

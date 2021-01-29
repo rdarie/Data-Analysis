@@ -14,7 +14,7 @@
 
 # Specify an output file
 #SBATCH -o ../../batch_logs/%j-plotsStim.out
-#SBATCH -e ../../batch_logs/%j-plotsStim.errout
+#SBATCH -e ../../batch_logs/%j-plotsStim.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo

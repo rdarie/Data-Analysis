@@ -14,7 +14,7 @@
 
 # Specify an output file
 #SBATCH -o ../../batch_logs/%j-plotsLDA.out
-#SBATCH -e ../../batch_logs/%j-plotsLDA.errout
+#SBATCH -e ../../batch_logs/%j-plotsLDA.out
 
 # Specify account details
 #SBATCH --account=bibs-dborton-condo

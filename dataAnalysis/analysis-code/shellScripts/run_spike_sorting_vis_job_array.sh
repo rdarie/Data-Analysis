@@ -17,7 +17,7 @@
 
 # Specify an output file
 #SBATCH -o ../../batch_logs/%j-%a-sort_vis.out
-#SBATCH -e ../../batch_logs/%j-%a-sort_vis.errout
+#SBATCH -e ../../batch_logs/%j-%a-sort_vis.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo

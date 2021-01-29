@@ -15,7 +15,7 @@
 
 # Specify an output file
 #SBATCH -o ../../batch_logs/%j-%a-analysis_calc_20190127.out
-#SBATCH -e ../../batch_logs/%j-%a-analysis_calc_20190127.errout
+#SBATCH -e ../../batch_logs/%j-%a-analysis_calc_20190127.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo

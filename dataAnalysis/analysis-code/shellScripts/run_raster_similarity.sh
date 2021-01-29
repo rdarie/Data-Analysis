@@ -14,7 +14,7 @@
 
 # Specify an output file
 #SBATCH -o ../../batch_logs/%j-alignTemp.out
-#SBATCH -e ../../batch_logs/%j-alignTemp.errout
+#SBATCH -e ../../batch_logs/%j-alignTemp.out
 
 # Specify account details
 #SBATCH --account=bibs-dborton-condo

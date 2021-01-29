@@ -14,7 +14,7 @@
 
 # Specify an output file
 #SBATCH -o ../../batch_logs/%j_%a_align_motion_2021_01_25_rig.out
-#SBATCH -e ../../batch_logs/%j_%a_align_motion_2021_01_25_rig.errout
+#SBATCH -e ../../batch_logs/%j_%a_align_motion_2021_01_25_rig.out
 
 # Request custom resources
 #SBATCH --array=3

@@ -174,7 +174,7 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
                 takeFrom=outboundT, compareTo=stimOnTs,
                 strictly='neither')
             stimDelay = float(closestTimes - outboundT)
-            theseStimAnn = stimEvDF.loc[closestIdx, :]
+            theseStimAnn = stimEvDF.loc[closestIdx, :].iloc[0]
             for annName in stimAnnNames:
                 motionEvDF.loc[outboundIdx, annName] = theseStimAnn[annName]
                 motionEvDF.loc[reachIdx, annName] = theseStimAnn[annName]
@@ -185,9 +185,9 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
             closestTimes, closestIdx = hf.closestSeries(
                 takeFrom=outboundT, compareTo=stimEvDF['t'],
                 strictly='less')
-            theseStimAnn = stimEvDF.loc[closestIdx, :]
+            theseStimAnn = stimEvDF.loc[closestIdx, :].iloc[0]
             try:
-                assert theseStimAnn['stimCat'].iloc[0] == 'stimOff'
+                assert theseStimAnn['stimCat'] == 'stimOff'
             except Exception:
                 print('\n\n{}\n Error at t= {} sec\n\n'.format(dataBlockPath, outboundT.iloc[0]))
                 traceback.print_exc()
@@ -227,7 +227,7 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
             closestTimes, closestIdx = hf.closestSeries(
                 takeFrom=returnT, compareTo=stimOnTs,
                 strictly='neither')
-            theseStimAnn = stimEvDF.loc[closestIdx, :]
+            theseStimAnn = stimEvDF.loc[closestIdx, :].iloc[0]
             stimDelay = float(closestTimes - returnT)
             for annName in stimAnnNames:
                 motionEvDF.loc[returnIdx, annName] = theseStimAnn[annName]
@@ -238,9 +238,9 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
             closestTimes, closestIdx = hf.closestSeries(
                 takeFrom=returnT, compareTo=stimEvDF['t'],
                 strictly='less')
-            theseStimAnn = stimEvDF.loc[closestIdx, :]
+            theseStimAnn = stimEvDF.loc[closestIdx, :].iloc[0]
             try:
-                assert theseStimAnn['stimCat'].iloc[0] == 'stimOff'
+                assert theseStimAnn['stimCat'] == 'stimOff'
             except Exception:
                 print('\n\n{}\nError at t= {} sec\n\n'.format(dataBlockPath, returnT.iloc[0]))
                 traceback.print_exc()

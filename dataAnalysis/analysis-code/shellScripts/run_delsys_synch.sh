@@ -14,7 +14,7 @@
 
 # Specify an output file
 #SBATCH -o ../../batch_logs/%j-%a-delsys_synch.out
-#SBATCH -e ../../batch_logs/%j-%a-delsys_synch.errout
+#SBATCH -e ../../batch_logs/%j-%a-delsys_synch.out
 
 # Specify account details
 #SBATCH --account=bibs-dborton-condo

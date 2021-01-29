@@ -99,7 +99,6 @@ masterBlock.name = dataBlock.annotations['neo_name']
 masterBlock.annotate(
     nix_name=dataBlock.annotations['neo_name'])
 
-blockIdx = 0
 checkReferences = False
 for segIdx, dataSeg in enumerate(dataBlock.segments):
     eventProxysList = dataSeg.events
@@ -110,7 +109,7 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
             print('evP._event_channel_index = {}'.format(
                  evP._event_channel_index))
             evP_ch = evP._event_channel_index
-            mts = evP._rawio.file.blocks[blockIdx].groups[segIdx].multi_tags
+            mts = evP._rawio.file.blocks[0].groups[segIdx].multi_tags
             try:
                 assert evP.name in mts[evP_ch].name
             except Exception:

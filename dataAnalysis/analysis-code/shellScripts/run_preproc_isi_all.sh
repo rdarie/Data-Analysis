@@ -15,7 +15,7 @@
 
 # Specify an output file
 #SBATCH -o ../../batch_logs/%j-%a-isi_preproc_one_shot.out
-#SBATCH -e ../../batch_logs/%j-%a-isi_preproc_one_shot.errout
+#SBATCH -e ../../batch_logs/%j-%a-isi_preproc_one_shot.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo

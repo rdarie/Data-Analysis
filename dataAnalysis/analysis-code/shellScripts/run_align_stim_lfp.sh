@@ -14,7 +14,7 @@
 
 # Specify an output file
 #SBATCH -o ../../batch_logs/%j_%a_align_stim_2021_01_25_lfp.out
-#SBATCH -e ../../batch_logs/%j_%a_align_stim_2021_01_25_lfp.errout
+#SBATCH -e ../../batch_logs/%j_%a_align_stim_2021_01_25_lfp.out
 
 # Request custom resources
 #SBATCH --array=1,2

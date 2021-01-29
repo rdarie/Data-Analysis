@@ -15,7 +15,7 @@
 
 # Specify an output file
 #SBATCH -o ../../batch_logs/%j-%a-emg_preproc.out
-#SBATCH -e ../../batch_logs/%j-%a-emg_preproc.errout
+#SBATCH -e ../../batch_logs/%j-%a-emg_preproc.out
 
 # Specify account details
 #SBATCH --account=bibs-dborton-condo

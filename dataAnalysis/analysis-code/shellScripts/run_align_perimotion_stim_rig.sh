@@ -14,7 +14,7 @@
 
 # Specify an output file
 #SBATCH -o ../../batch_logs/%j_%a_align_perims_2021_01_25_rig.out
-#SBATCH -e ../../batch_logs/%j_%a_align_perims_2021_01_25_rig.errout
+#SBATCH -e ../../batch_logs/%j_%a_align_perims_2021_01_25_rig.out
 
 # Request custom resources
 #SBATCH --array=2
@@ -23,5 +23,5 @@
 #SBATCH --account=carney-dborton-condo
 
 # SLURM_ARRAY_TASK_ID=3
-source shellScripts/run_align_perimovement_stim_preamble.sh
+source shellScripts/run_align_perimotion_stim_preamble.sh
 python -u ./calcAlignedAsigs.py --chanQuery="rig" --outputBlockName="rig" --eventBlockName='epochs' --signalBlockName='analyze' --verbose --exp=$EXP $BLOCKSELECTOR $WINDOW $LAZINESS $EVENTSELECTOR $ALIGNFOLDER $AMPFIELDNAME

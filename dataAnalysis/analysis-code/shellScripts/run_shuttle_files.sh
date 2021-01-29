@@ -14,7 +14,7 @@
 
 # Specify an output file
 #SBATCH -o ../../batch_logs/%j-%a-ins_preproc.out
-#SBATCH -e ../../batch_logs/%j-%a-ins_preproc.errout
+#SBATCH -e ../../batch_logs/%j-%a-ins_preproc.out
 
 # Specify account details
 #SBATCH --account=bibs-dborton-condo

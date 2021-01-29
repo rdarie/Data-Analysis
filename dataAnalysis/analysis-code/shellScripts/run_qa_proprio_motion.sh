@@ -14,7 +14,7 @@
 
 # Specify an output file
 #SBATCH -o ../../batch_logs/%j-%a-qa_motion_2021_01_20.out
-#SBATCH -e ../../batch_logs/%j-%a-qa_motion_2021_01_20.errout
+#SBATCH -e ../../batch_logs/%j-%a-qa_motion_2021_01_20.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo

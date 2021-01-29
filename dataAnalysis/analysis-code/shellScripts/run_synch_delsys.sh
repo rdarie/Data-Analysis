@@ -14,7 +14,7 @@
 
 # Specify an output file
 #SBATCH -o ../../batch_logs/%j-%a-delsys_synch_0903.out
-#SBATCH -e ../../batch_logs/%j-%a-delsys_synch_0903.errout
+#SBATCH -e ../../batch_logs/%j-%a-delsys_synch_0903.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo

@@ -15,7 +15,7 @@
 
 # Specify an output file
 #SBATCH -o ../../batch_logs/%j-%a-peeler_0126_4.out
-#SBATCH -e ../../batch_logs/%j-%a-peeler_0126_4.errout
+#SBATCH -e ../../batch_logs/%j-%a-peeler_0126_4.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo

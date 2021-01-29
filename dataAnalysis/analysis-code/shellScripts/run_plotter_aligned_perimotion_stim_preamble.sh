@@ -1,6 +1,6 @@
 #!/bin/bash
 
-source ./shellScripts/run_align_perimovement_stim_preamble.sh
+source ./shellScripts/run_align_perimotion_stim_preamble.sh
 
 # OUTLIERMASK="--maskOutlierBlocks"
 OUTLIERMASK=""
