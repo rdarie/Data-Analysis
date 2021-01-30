@@ -17,12 +17,13 @@ namedQueries = {
         'RateInHz==50or0Fuzzy': '((RateInHzFuzzy==50)|(RateInHzFuzzy==0))',
         'RateInHz==100or0Fuzzy': '((RateInHzFuzzy==100)|(RateInHzFuzzy==0))',
         'RateInHz==50or0': '((RateInHz==50)|(RateInHz==0))',
-        'RateInHz==100or0': '((RateInHz==100)|(RateInHz==0))'
+        'RateInHz==100or0': '((RateInHz==100)|(RateInHz==0))',
+        'RateInHz>10or0': '((RateInHz>10)|(RateInHz==0))',
     },
     'unit': {
         'fr': "(chanName.str.endswith('fr#0'))",
         'utahlfp': "(chanName.str.contains('elec')and(not(chanName.str.endswith('fr#0'))))",
-        'lfp': "((chanName.str.contains('elec') or chanName.str.contains('utah') or chanName.str.contains('nform')) and not(chanName.str.endswith('fr#0') or chanName.str.contains('rawAverage') or chanName.str.contains('deviation') or chanName.str.contains('outlierMark') or chanName.str.contains('outlierMask')))",
+        'lfp': "((chanName.str.contains('elec') or chanName.str.contains('utah') or chanName.str.contains('nform')) and not(chanName.str.endswith('fr#0') or chanName.str.contains('rawAverage') or chanName.str.contains('deviation') or chanName.str.contains('_artifact') or chanName.str.contains('outlierMask')))",
         'fr_sqrt': "(chanName.str.endswith('fr_sqrt#0'))",
         'raster': "(chanName.str.endswith('raster#0'))",
         'all': "(chanName.str.endswith('#0'))",
@@ -43,7 +44,7 @@ namedQueries = {
     },
     'chan': {
         'all': "(chanName.notna())",
-        'lfp': "((chanName.str.contains('elec')or(chanName.str.contains('utah'))or(chanName.str.contains('nform')))and(not(chanName.str.endswith('fr'))))",
+        'lfp': "((chanName.str.contains('elec') or chanName.str.contains('utah') or chanName.str.contains('nform')) and not(chanName.str.contains('rawAverage') or chanName.str.contains('deviation') or chanName.str.contains('_artifact') or chanName.str.contains('outlierMask')))",
         'fr': "((chanName.str.contains('elec')or(chanName.str.contains('utah'))or(chanName.str.contains('nform')))and((chanName.str.endswith('fr'))))",
         'fr_sqrt': "(chanName.str.endswith('fr_sqrt'))",
         'raster': "((chanName.str.contains('elec')or(chanName.str.contains('utah'))or(chanName.str.contains('nform')))and((chanName.str.endswith('raster'))))",
@@ -261,6 +262,13 @@ namedQueries['align'].update({
         ])
     })
 namedQueries['align'].update({
+    'outboundStim>10HzCW': '&'.join([
+        namedQueries['align']['RateInHz>10or0'],
+        namedQueries['align']['outbound'],
+        namedQueries['align']['CW']
+        ])
+    })
+namedQueries['align'].update({
     'midPeakNoStimCW': '&'.join([
         namedQueries['align']['noStim'],
         namedQueries['align']['midPeak'],
@@ -271,5 +279,11 @@ namedQueries['align'].update({
     'stimOnLowRate': '&'.join([
         namedQueries['align']['stimOn'],
         "(RateInHz < 5)"
+        ])
+    })
+namedQueries['align'].update({
+    'stimOnHighRate': '&'.join([
+        namedQueries['align']['stimOn'],
+        "(RateInHz > 11)"
         ])
     })

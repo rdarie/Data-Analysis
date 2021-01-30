@@ -503,8 +503,12 @@ def calcBlockAnalysisWrapper():
     #                 tdInterp.loc[:, pName].diff()
     #                 .rolling(6 * smoothWindowStd, center=True, win_type='gaussian')
     #                 .mean(std=smoothWindowStd).fillna(0) / origTimeStep)
-    tdInterp.sort_index(axis='columns', inplace=True)
     tdInterp.columns = [cN.replace('seg0_', '') for cN in tdInterp.columns]
+    descriptiveNames = pd.Series(eventInfo['inputIDs']).reset_index()
+    descriptiveNames.columns = ['newName', 'ainpName']
+    renamingDict = {row['ainpName']: row['newName'] for rowIdx, row in descriptiveNames.iterrows()}
+    tdInterp.rename(columns=renamingDict, inplace=True)
+    tdInterp.sort_index(axis='columns', inplace=True)
     tdBlockInterp = ns5.dataFrameToAnalogSignals(
         tdInterp,
         idxT=None, useColNames=True,

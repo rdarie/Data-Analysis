@@ -8,7 +8,8 @@ OUTLIERMASK=""
 STATSOVERLAY="--overlayStats"
 TIMEWINDOWOPTS="--winStart=150 --winStop=450"
 
-ALIGNQUERY="--alignQuery=stimOn"
+# ALIGNQUERY="--alignQuery=stimOn"
+ALIGNQUERY="--alignQuery=stimOnHighRate"
 # ALIGNQUERY="--alignQuery=outbound"
 
 HUEOPTS="--hueName=amplitude --hueControl="

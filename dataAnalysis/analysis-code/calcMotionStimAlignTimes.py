@@ -182,16 +182,18 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
             motionEvDF.loc[outboundIdx, 'stimDelay'] = stimDelay
             motionEvDF.loc[reachIdx, 'stimDelay'] = stimDelay
         else:
+            # if no onsets detected
             closestTimes, closestIdx = hf.closestSeries(
                 takeFrom=outboundT, compareTo=stimEvDF['t'],
                 strictly='less')
             theseStimAnn = stimEvDF.loc[closestIdx, :].iloc[0]
             try:
+                # todo: FIXME!!
                 assert theseStimAnn['stimCat'] == 'stimOff'
             except Exception:
                 print('\n\n{}\n Error at t= {} sec\n\n'.format(dataBlockPath, outboundT.iloc[0]))
                 traceback.print_exc()
-                pdb.set_trace()
+                # pdb.set_trace()
             for annName in stimAnnNames:
                 motionEvDF.loc[outboundIdx, annName] = noStimFiller[annName]
                 motionEvDF.loc[reachIdx, annName] = noStimFiller[annName]

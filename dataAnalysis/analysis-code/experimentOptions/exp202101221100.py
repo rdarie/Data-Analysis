@@ -157,7 +157,9 @@ def getExpOpts():
     #         ],
     #     }
     #
-    # motorEncoderBoundsLookup = None
+    motorEncoderBoundsLookup = None
+    #
+    # e.g.
     # motorEncoderBoundsLookup = {
     #     2: [
     #         [180, 400], [490, 605], [650, 1215], [1280, 1750]
