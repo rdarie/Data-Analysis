@@ -65,10 +65,13 @@ def getExpOpts():
     jsonSessionNames = {
         #  per block
         1: [
-            'Session1610641839881', 'Session1610642040064',
-            'Session1610642516780', 'Session1610642924085'],
+            'Session1610641839881',
+            'Session1610642040064',
+            'Session1610642516780',
+            'Session1610642924085'],
         2: [
-            'Session1610643294975', 'Session1610643999548'],
+            'Session1610643294975',
+            'Session1610643999548'],
         }
     synchInfo = {'nform': {}, 'nsp': {}, 'ins': {}}
     # populate with defaults
@@ -77,51 +80,47 @@ def getExpOpts():
         for idx, sessionName in enumerate(jsonSessionNames[blockIdx]):
             synchInfo['ins'][blockIdx][idx] = {
                 'timeRanges': None,
-                'chan': ['ins_td0'],
+                'synchChanName': ['ins_td0', 'ins_td2'],
+                'synchStimUnitName': ['g0p0#0'],
+                'synchByXCorrTapDetectSignal': False,
+                'xCorrSamplingRate': None,
+                'xCorrGaussWid': 10e-3,
+                'minStimAmp': 0,
+                'unixTimeAdjust': None,
                 'thres': 5,
-                'iti': 52.2e-3,
-                'keepIndex': slice(-5, None)
+                'iti': 10e-3,
+                'minAnalogValue': None,
+                'keepIndex': slice(None)
                 }
+    ############################################################
+    ############################################################
     # manually add special instructions, e.g.
-    # #synchInfo['ins'][1][1] = {
-    # #    'timeRanges': None,
-    # #    'chan': ['ins_td2'],
-    # #    'thres': 5,
-    # #    'iti': 50e-3,
-    # #    'keepIndex': slice(None)
-    # #    }
-    synchInfo['ins'][2][0].update({
-        'iti': 20e-3, 'keepIndex': slice(None, 3),
-    })
-    synchInfo['ins'][2][1].update({
-        'iti': 20e-3, 'keepIndex': slice(None, 3),
-    })
+    # synchInfo['ins'][3][0].update({'minStimAmp': 0})
+    #
+    #
+    ############################################################
+    ############################################################
     synchInfo['nsp'] = {
         # per block
         i: {
             #  per trialSegment
             j: {
-                'timeRanges': None, 'keepIndex': slice(-5, None),
-                'synchChanName': miniRCRigInputs['tapSync'], 'iti': 52e-3,
-                'minAnalogValue': 100, 'thres': 3}
+                'timeRanges': None, 'keepIndex': slice(None),
+                'synchChanName': ['utah_artifact_0'], 'iti': 10e-3,
+                'synchByXCorrTapDetectSignal': False,
+                'unixTimeAdjust': None,
+                'minAnalogValue': None, 'thres': 7}
             for j, sessionName in enumerate(jsonSessionNames[i])
             }
         for i in jsonSessionNames.keys()
         }
-    # manually add special instructions, e.g.
-    #  synchInfo['nsp'][1][1] = {'timeRanges': None, 'keepIndex': slice(3, None)}
-    synchInfo['nsp'][2][0].update({
-        'timeRanges': (136, 138),
-        'synchChanName': 'utah_rawAverage_0',
-        'iti': 20e-3, 'keepIndex': slice(None, 3),
-        'minAnalogValue': None, 'thres': 150,
-        })
-    synchInfo['nsp'][2][1].update({
-        'timeRanges': (956, 958),
-        'synchChanName': 'utah_rawAverage_0',
-        'iti': 20e-3, 'keepIndex': slice(None, 3),
-        'minAnalogValue': None, 'thres': 150
-        })
+    ############################################################
+    ############################################################
+    # manually add special instructions, e.g
+    # synchInfo['nsp'][2][0].update({'timeRanges': [(40, 9999)]})
+    #
+    #
+    ############################################################
     #  overrideSegmentsForTapSync
     #  if not possible to use taps, override with good taps from another segment
     #  not ideal, because segments are only synchronized to the nearest **second**
@@ -156,7 +155,7 @@ def getExpOpts():
         '202101141100-Rupert': [1],
         }
     # Options relevant to the classifcation of proprio trials
-    movementSizeBins = [0, 0.4, 0.8]
+    movementSizeBins = [0, 0.6, 1]
     movementSizeBinLabels = ['S', 'L']
     alignTimeBoundsLookup = None
     # alignTimeBoundsLookup = {

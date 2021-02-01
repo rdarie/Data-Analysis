@@ -10,11 +10,11 @@
 #SBATCH --mem=127G
 
 # Specify a job name:
-#SBATCH -J ins_preproc_2021_01_22
+#SBATCH -J ins_preproc_2021_01_14
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-ins_preproc_2021_01_22.out
-#SBATCH -e ../../batch_logs/%j-%a-ins_preproc_2021_01_22.out
+#SBATCH -o ../../batch_logs/%j-%a-ins_preproc_2021_01_14.out
+#SBATCH -e ../../batch_logs/%j-%a-ins_preproc_2021_01_14.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -30,36 +30,14 @@ conda activate
 source activate nda2
 python --version
 
-# EXP="exp201901070700"
-# EXP="exp201901201200"
-# EXP="exp201901211000"
-# EXP="exp201901221000"
-# EXP="exp201901231000"
-# EXP="exp201901261000"
-# EXP="exp201901271000"
-# EXP="exp202010201200"
-# EXP="exp202010251400"
-# EXP="exp202010261100"
-# EXP="exp202010271200"
-# EXP="exp202011161100"
-# EXP="exp202011201100"
-# EXP="exp202011231200"
-# EXP="exp202011271100"
-# EXP="exp202011301200"
-# EXP="exp202012111100"
-# EXP="exp202012121100"
-# EXP="exp202012151200"
-# EXP="exp202012171200"
-# EXP="exp202101051100"
-# EXP="exp202101061100"
-# EXP="exp202101111100"
-# EXP="exp202101111100"
-# EXP="exp202101141100"
+EXP="exp202101141100"
 # EXP="exp202101191100"
-EXP="exp202101201100"
-EXP="exp202101211100"
-EXP="exp202101221100"
+# EXP="exp202101201100"
+# EXP="exp202101211100"
+# EXP="exp202101221100"
 # EXP="exp202101251100"
+# EXP="exp202101271100"
+# EXP="exp202101281100"
 
 # SLURM_ARRAY_TASK_ID=1
 

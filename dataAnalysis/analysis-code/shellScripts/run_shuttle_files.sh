@@ -23,28 +23,12 @@
 #SBATCH --array=1,2,3
 
 # EXP="exp201901070700"
-# EXP="exp201901201200"
-# EXP="exp201901211000"
-# EXP="exp201901221000"
-# EXP="exp201901231000"
-# EXP="exp201901261000"
-# EXP="exp201901271000"
-# EXP="exp202006171300"
-# EXP="exp202007011300"
-# EXP="exp202007021300"
-# EXP="exp202007071300"
-# EXP="exp202007081300"
-# EXP="exp202010011100"
-# EXP="exp202009231400"
-# EXP="exp202011201100"
-# EXP="exp202011231200"
-# EXP="exp202012171200"
-EXP="exp202101061100"
-EXP="exp202101111100"
-EXP="exp202101141100"
-EXP="exp202101201100"
-EXP="exp202101211100"
-EXP="exp202101251100"
+# EXP="exp202101141100"
+# EXP="exp202101191100"
+# EXP="exp202101201100"
+# EXP="exp202101211100"
+# EXP="exp202101221100"
+# EXP="exp202101251100"
 
 # ANALYSISSELECTOR="--analysisName=emgHiRes"
 # ANALYSISSELECTOR="--analysisName=emgLoRes"
@@ -58,5 +42,6 @@ source activate nda2
 python --version
 
 # global operations
-python './shuttleFilesToFromScratch.py' --exp=$EXP --preprocFolderFiles --preprocFolderSubfolders --fromScratchToData
+python './shuttleFilesToFromScratch.py' --exp=$EXP --preprocFolderFiles --preprocFolderSubfolders --fromScratchToData --moveItems
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --preprocFolderFiles --preprocFolderSubfolders --fromDataToScratch
 # 

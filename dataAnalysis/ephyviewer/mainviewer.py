@@ -242,26 +242,44 @@ def compose_mainviewer_from_sources(
         else:
             mainviewer.add_view(view, tabify_with='spectrogram {}'.format(i-1))
 
+    epochViews = []
     for i, spike_source in enumerate(sources['spike']):
         view = SpikeTrainViewer(source=spike_source, name='spikes {}'.format(i))
-        mainviewer.add_view(view)
-
+        if len(epochViews) > 0:
+            mainviewer.add_view(view,  tabify_with=epochViews[0].name)
+        else:
+            mainviewer.add_view(view)
+        epochViews.append(view)
+    
     for i, ep_source in enumerate(sources['epoch']):
         view = EpochViewer(source=ep_source, name='epochs {}'.format(i))
-        mainviewer.add_view(view)
+        if len(epochViews) > 0:
+            mainviewer.add_view(view,  tabify_with=epochViews[0].name)
+        else:
+            mainviewer.add_view(view)
+        epochViews.append(view)
 
     if 'event' in sources and len(sources['event']) > 0:
         ev_source_list = sources['event']
     else:
         ev_source_list = sources['epoch']
     #
+    eventListViews = []
     for i, ev_source in enumerate(ev_source_list):
         view = EventList(source=ev_source, name='Event list {}'.format(i))
-        mainviewer.add_view(view, location='bottom',  orientation='horizontal')
-    #
+        if len(eventListViews) > 0:
+            mainviewer.add_view(view, tabify_with=eventListViews[0].name)
+        else:
+            mainviewer.add_view(view, location='bottom',  orientation='horizontal')
+        eventListViews.append(view)
+    #   
     if addSpikesToEventList and ('spike' in sources):
         for i, ev_source in enumerate(sources['spike']):
             view = EventList(source=ev_source, name='Spike list {}'.format(i))
-            mainviewer.add_view(view)
+            if len(eventListViews) > 0:
+                mainviewer.add_view(view, tabify_with=eventListViews[0].name)
+            else:
+                mainviewer.add_view(view, location='bottom',  orientation='horizontal')
+            eventListViews.append(view)
     return mainviewer
 

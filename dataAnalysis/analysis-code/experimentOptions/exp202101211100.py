@@ -62,7 +62,10 @@ def getExpOpts():
                 'synchChanName': ['ins_td0', 'ins_td2'],
                 'synchStimUnitName': ['g0p0#0'],
                 'synchByXCorrTapDetectSignal': False,
-                'minStimAmp': 300,
+                'xCorrSamplingRate': None,
+                'xCorrGaussWid': 10e-3,
+                'minStimAmp': 0,
+                'unixTimeAdjust': None,
                 'thres': 5,
                 'iti': 10e-3,
                 'minAnalogValue': None,
@@ -72,6 +75,7 @@ def getExpOpts():
     ############################################################
     # manually add special instructions, e.g.
     # synchInfo['ins'][3][0].update({'minStimAmp': 0})
+    synchInfo['ins'][2][0].update({'unixTimeAdjust': 5.})
     # #synchInfo['ins'][1][1] = {
     # #    'timeRanges': None,
     # #    'chan': ['ins_td2'],
@@ -79,11 +83,11 @@ def getExpOpts():
     # #    'iti': 50e-3,
     # #    'keepIndex': slice(None)
     # #    }
-    synchInfo['ins'][1][0].update({
-        'minStimAmp': 700})
-    synchInfo['ins'][4][0].update({
-        'synchStimUnitName': None,
-        'synchByXCorrTapDetectSignal': True})
+    # synchInfo['ins'][1][0].update({
+    #     'minStimAmp': 700})
+    # synchInfo['ins'][4][0].update({
+    #    'synchStimUnitName': None,
+    #     'synchByXCorrTapDetectSignal': True})
     ############################################################
     ############################################################
     synchInfo['nsp'] = {
@@ -92,9 +96,10 @@ def getExpOpts():
             #  per trialSegment
             j: {
                 'timeRanges': None, 'keepIndex': slice(None),
-                'synchChanName': ['utah_rawAverage_0'], 'iti': 10e-3,
+                'synchChanName': ['utah_artifact_0'], 'iti': 10e-3,
                 'synchByXCorrTapDetectSignal': False,
-                'minAnalogValue': None, 'thres': 8}
+                'unixTimeAdjust': None,
+                'minAnalogValue': None, 'thres': 4}
             for j, sessionName in enumerate(jsonSessionNames[i])
             }
         for i in jsonSessionNames.keys()
@@ -104,7 +109,7 @@ def getExpOpts():
     # manually add special instructions, e.g
     synchInfo['nsp'][1][0].update({
         'timeRanges': [(70, 9999)],
-        'thres': 100
+        # 'thres': 100
         })
     synchInfo['nsp'][1][1].update({
         'timeRanges': [(221, 9999)]
@@ -155,7 +160,7 @@ def getExpOpts():
         }}
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        '202101211100-Rupert': [1],
+        '202101211100-Rupert': [2, 3],
         }
     # Options relevant to the classifcation of proprio trials
     movementSizeBins = [0, 0.6, 1]
@@ -170,11 +175,14 @@ def getExpOpts():
     #         ],
     #     }
     #
+    motorEncoderBoundsLookup = None
     # motorEncoderBoundsLookup = {
     #     3: [
     #         [100, 299], [730, 2290]
     #     ]
     # }
+    pedalPositionZeroEpochs = None
+    dropMotionRounds = None
 
     ############################################################
     ############################################################

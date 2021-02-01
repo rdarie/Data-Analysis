@@ -10,14 +10,14 @@
 #SBATCH --mem=32G
 
 # Specify a job name:
-#SBATCH -J alignStim_20201217_rig
+#SBATCH -J align_stim_2021_01_20_rig
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j_%a_alignStim_20201217_rig.out
-#SBATCH -e ../../batch_logs/%j_%a_alignStim_20201217_rig.out
+#SBATCH -o ../../batch_logs/%j_%a_align_stim_2021_01_20_rig.out
+#SBATCH -e ../../batch_logs/%j_%a_align_stim_2021_01_20_rig.out
 
 # Request custom resources
-#SBATCH --array=1,2
+#SBATCH --array=1,2,3
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo

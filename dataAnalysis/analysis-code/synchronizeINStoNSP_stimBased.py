@@ -58,10 +58,11 @@ from neo import (
     Block, Segment, ChannelIndex,
     Event, AnalogSignal, SpikeTrain, Unit)
 import neo
+import elephant as elph
 import elephant.pandas_bridge as elphpdb
+from elephant.conversion import binarize
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.covariance import EmpiricalCovariance, MinCovDet
-from elephant.conversion import binarize
 sns.set(
     context='talk', style='darkgrid',
     palette='dark', font='sans-serif',
@@ -85,7 +86,8 @@ if arguments['inputINSBlockSuffix'] is None:
 else:
     inputINSBlockSuffix = "_{}".format(arguments['inputINSBlockSuffix'])
 
-searchRadius = [-5., 5.]
+# searchRadius = [-1.5, 1.5]
+searchRadius = [-.25, .25]
 searchRadiusUnix = [
     pd.Timedelta(searchRadius[0], unit='s'),
     pd.Timedelta(searchRadius[1], unit='s')]
@@ -214,6 +216,7 @@ else:
 nspDF = ns5.analogSignalsToDataFrame(asigList)
 nspSamplingRate = float(asigList[0].sampling_rate)
 
+
 if os.path.exists(synchFunPath) and not arguments['forceRecalc']:
     with open(synchFunPath, 'r') as _f:
         interpFunLoaded = json.load(_f)
@@ -248,7 +251,7 @@ else:
     #
     alignByXCorr = True
     alignByUnixTime = False
-    getINSTrigTimes = False
+    getINSTrigTimes = True
     #
     plotSynchReport = True
     if plotSynchReport and alignByXCorr:
@@ -289,21 +292,13 @@ else:
         if sessTapOptsNSP['timeRanges'] is not None:
             nspTimeRangesMask = hf.getTimeMaskFromRanges(
                 nspDF['t'], sessTapOptsNSP['timeRanges'])
-            maskedNspUnixTimes = insGroup.loc[insTimeRangesMask, 'unixTime']
+            maskedNspUnixTimes = insGroup.loc[nspTimeRangesMask, 'unixTime']
             searchLimsUnixStartList.append(maskedNspUnixTimes.min())
             searchLimsUnixStopList.append(maskedNspUnixTimes.max())
         searchLimsUnix = {
             0: max(searchLimsUnixStartList),
             1: min(searchLimsUnixStopList)
             }
-        '''
-        else:
-            nspSearchUnixTimes = thisNspDF.loc[nspSearchMask, 'unixTime']
-            insSearchMask = (
-                (thisInsDF['unixTime'] >= searchLimsUnix[0]) &
-                (thisInsDF['unixTime'] < searchLimsUnix[1])
-                )
-        '''
         insSearchMask = (insGroup['unixTime'] >= searchLimsUnix[0]) & (insGroup['unixTime'] < searchLimsUnix[1])
         assert insSearchMask.any()
         #
@@ -329,15 +324,6 @@ else:
         #
         nspVals = nspGroup.loc[:, theseChanNamesNSP].to_numpy()
         filterOpts = None
-        '''
-        filterOpts = {
-            'high': {
-                'Wn': 1000,
-                'N': 4,
-                'btype': 'high',
-                'ftype': 'bessel'
-                }}
-        '''
         if filterOpts is not None:
             print('Filtering NSP traces...')
             filterCoeffs = hf.makeFilterCoeffsSOS(
@@ -352,19 +338,6 @@ else:
             thisNspDF.loc[:, 'tapDetectSignal'] = empCov.mahalanobis(nspVals)
         else:
             thisNspDF.loc[:, 'tapDetectSignal'] = np.mean(nspVals, axis=1)
-        '''
-        if sessTapOptsNSP['timeRanges'] is not None:
-            restrictMaskNSP = hf.getTimeMaskFromRanges(
-                thisNspDF['t'], sessTapOptsNSP['timeRanges'])
-            if restrictMaskNSP.any():
-                thisNspDF.loc[~restrictMaskNSP, 'tapDetectSignal'] = np.nan
-                thisNspDF.loc[:, 'tapDetectSignal'] = (
-                    thisNspDF.loc[:, 'tapDetectSignal']
-                    .interpolate(method='linear', limit_area='inside')
-                    .fillna(method='bfill').fillna(method='ffill'))
-        else:
-            restrictMaskNSP = pd.Series(True, index=thisNspDF.index)
-        '''
         nspTrigFinder = 'getThresholdCrossings'
         if nspTrigFinder == 'getTriggers':
             nspPeakIdx = hf.getTriggers(
@@ -380,16 +353,6 @@ else:
         nspPeakIdx = nspPeakIdx[sessTapOptsNSP['keepIndex']]
         nspTapTimes = thisNspDF.loc[nspPeakIdx, 't'].to_numpy()
         print('nspTapTimes: {}'.format(nspTapTimes))
-        # nspTapTimesUnix = thisNspDF.loc[nspPeakIdx, 'unixTime'].to_numpy()
-        #
-        # nspSearchMask = (
-        #     (thisNspDF['unixTime'] >= searchLimsUnix[0]) &
-        #     (thisNspDF['unixTime'] < searchLimsUnix[1])
-        #     )
-        # nspSearchLims = thisNspDF.loc[nspSearchMask, 't'].quantile([0, 1])
-        #
-        # thisInsDF = insGroup.loc[:, ['t', 'unixTime']].copy().reset_index(drop=True)
-        #
         theseChanNamesINS = [
             'seg0_' + scn
             for scn in sessTapOptsINS['synchChanName']
@@ -404,14 +367,6 @@ else:
             thisInsDF.loc[:, 'tapDetectSignal'] = np.mean(insVals, axis=1)
         #
         if getINSTrigTimes:
-            '''
-            if insSearchMask.any():
-                thisInsDF.loc[~insSearchMask, 'tapDetectSignal'] = np.nan
-                thisInsDF.loc[:, 'tapDetectSignal'] = (
-                    thisInsDF.loc[:, 'tapDetectSignal']
-                    .interpolate(method='linear', limit_area='inside')
-                    .fillna(method='bfill').fillna(method='ffill'))
-            '''
             insPeakIdx = hf.getTriggers(
                 thisInsDF['tapDetectSignal'], iti=sessTapOptsINS['iti'], itiWiggle=.5,
                 fs=insSamplingRate, plotting=arguments['plotting'], keep_max=True,
@@ -433,7 +388,8 @@ else:
                 insTapTimes, t_start=thisInsDF['t'].min() * pq.s,
                 t_stop=thisInsDF['t'].max() * pq.s,
                 units=pq.s, name='tap times')
-        else:
+        #
+        if sessTapOptsINS['synchStimUnitName'] is not None:
             insTapTimes = None
             insTapTimesStList = [
                 st.copy()
@@ -499,14 +455,14 @@ else:
                     trigRaster.loc[:, 'insTrigs'] = hf.gaussianSupport(
                         support=trigRaster.set_index('t')['insDiracDelta'],
                         gaussWid=gaussWid, fs=trigRasterSamplingRate).to_numpy()
-            elif sessTapOptsINS['synchByXCorrTapDetectSignal']:
+            if sessTapOptsINS['synchByXCorrTapDetectSignal']:
                 xcorrINS = thisInsDF.copy()
-                xcorrINS.loc[:, 'coarseNspTime'] = maskedINS['t'] + unixDeltaT
+                xcorrINS.loc[:, 'coarseNspTime'] = xcorrINS['t'] + unixDeltaT
                 trigRaster.loc[:, 'insTrigs'] = hf.interpolateDF(
                     xcorrINS, trigRaster['t'], x='coarseNspTime',
                     columns=['tapDetectSignal'],
                     kind='linear', fill_value=(0, 0))
-            else:
+            if False:
                 approxInsTapTimes = insTapTimes + unixDeltaT
                 closestTimes, closestIdx = hf.closestSeries(
                     takeFrom=pd.Series(approxInsTapTimes), compareTo=trigRaster['t']
@@ -562,111 +518,24 @@ else:
                 unixDeltaT, maxLag, unixDeltaT + maxLag
                 ))
             if plotSynchReport:
-                def plotTheReport():
-                    fig, ax = plt.subplots(3, 1)
-                    fig.set_size_inches(12, 8)
-                    plotT0 = trigRaster.loc[
-                        (trigRaster['insTrigs'] > 0.5) & (trigRaster['nspTrigs'] > 0.5), 't']
-                    if plotT0.size > 0:
-                        plotT0 = plotT0.iloc[0]
-                    else:
-                        plotT0 = trigRaster.loc[(trigRaster['insTrigs'] > 0.5), 't']
-                        if plotT0.size > 0:
-                            plotT0 = plotT0.iloc[0]
-                        else:
-                            plotT0 = trigRaster.loc[(trigRaster['insTrigs'] > 0.5) | (trigRaster['nspTrigs'] > 0.5), 't'].iloc[0]
-                    plotMask = (trigRaster['t'] >= plotT0 + searchRadius[0]) & (trigRaster['t'] < plotT0 + searchRadius[1])
-                    ax[0].plot(
-                        trigRaster.loc[plotMask, 't'], trigRaster.loc[plotMask, 'nspTrigs'],
-                        label='NSP trigs.')
-                    ax[0].plot(
-                        trigRaster.loc[plotMask, 't'], trigRaster.loc[plotMask, 'insTrigs'],
-                        label='INS trigs.')
-                    ax[0].set_xlim(plotT0 + searchRadius[0], plotT0 + searchRadius[1])
-                    ax[0].set_xlabel('NSP time (sec)')
-                    ax[0].set_ylabel('Triggers')
-                    ax[0].legend(loc='upper right')
-                    ax[0].set_title('Block {}, insSession {}: {}'.format(blockIdx, insSessIdx, jsonSessionNames[insSessIdx]))
-                    # fake legend with annotations
-                    customMessages = [
-                        'INS session',
-                        '    lasted {:.1f} sec'.format((sessStopUnix - sessStartUnix).total_seconds()),
-                        '    approx delay {:.1f} sec'.format(unixDeltaT),
-                        '# of NSP trigs = {}'.format(trigRaster.loc[:, 'nspDiracDelta'].sum()),
-                        '# of INS trigs = {}'.format(trigRaster.loc[:, 'insDiracDelta'].sum())
-                    ]
-                    customLines = [
-                        Line2D([0], [0], color='k', alpha=0)
-                        for custMess in customMessages
-                        ]
-                    phantomAx = ax[0].twinx()
-                    phantomAx.set_yticks([])
-                    phantomAx.legend(customLines, customMessages, loc='upper left')
-                    #
-                    ax[1].plot(xCorrSrs, label='crossCorr')
-                    ax[1].plot(
-                        maxLag, xCorrSrs.loc[maxLag],
-                        'y*', label='optimal lag = {:.3f}'.format(maxLag))
-                    ax[1].set_xlabel('cross-corr lag (sec)')
-                    ax[1].legend(loc='upper right')
-                    ax[1].set_ylabel('cross-corr')
-                    ax[1].set_xlim(searchRadius[0], searchRadius[1])
-                    #
-                    maxShift = targetLagsSrs[maxLag]
-                    shiftedInsTrig = trigRaster['insTrigs'].shift(maxShift).fillna(0)
-                    shiftedInsImpulse = trigRaster['insDiracDelta'].shift(maxShift).fillna(0)
-                    shiftedProduct = (
-                        trigRaster['nspTrigs'] * shiftedInsTrig)
-                    lPFForSP = hf.makeFilterCoeffsSOS(
-                        {
-                            'low': {
-                                'Wn': 1,
-                                'N': 4,
-                                'btype': 'low',
-                                'ftype': 'bessel'
-                                }},
-                        trigRasterSamplingRate)
-                    lowPassShiftedProduct = signal.sosfiltfilt(
-                        lPFForSP, shiftedProduct.to_numpy())
-                    ax[2].plot(
-                        trigRaster['t'],
-                        trigRaster['nspTrigs'], c='tab:blue')
-                    nspTargetMask = trigRaster['nspDiracDelta'] > 0
-                    if nspTargetMask.any():
-                        ax[2].plot(
-                            trigRaster.loc[nspTargetMask, 't'],
-                            trigRaster.loc[nspTargetMask, 'nspTrigs'], 'o', c='tab:purple', label='NSP impulses')
-                    ax[2].plot(
-                        trigRaster['t'],
-                        shiftedInsTrig, c='tab:orange')
-                    insTargetMask = shiftedInsImpulse > 0
-                    if insTargetMask.any():
-                        defaultMarkerSize = matplotlib.rcParams['lines.markersize']
-                        ax[2].plot(
-                            trigRaster.loc[insTargetMask, 't'],
-                            shiftedInsTrig.loc[insTargetMask], 'd', c='tab:red', label='INS impulses (shifted)',
-                            markersize=defaultMarkerSize / 2)
-                    ax[2].plot(trigRaster['t'], shiftedProduct, c='tab:green', label='elementwise product of trigs')
-                    ax[2].set_xlabel('NSP time (sec)')
-                    ax[2].set_ylabel('A.U.')
-                    ax[2].legend(loc='upper right')
-                    prodAx = ax[2].twinx()
-                    prodAx.plot(trigRaster['t'], lowPassShiftedProduct, c='tab:olive', label='elementwise product of trigs (1 hz low pass)')
-                    prodAx.set_yticks([])
-                    prodAx.legend(loc='lower right')
-                    figSaveOpts = dict(
-                        bbox_extra_artists=(
-                            theAx.get_legend()
-                            for theAx in ax
-                            if theAx.get_legend() is not None),
-                        bbox_inches='tight')
-                    synchReportPDF.savefig(**figSaveOpts)
-                    if arguments['showFigures']:
-                        plt.show()
-                    else:
-                        plt.close()
-                    return
-                plotTheReport()
+                customTitle = 'Block {}, insSession {}: {}'.format(blockIdx, insSessIdx, jsonSessionNames[insSessIdx])
+                customMessages = [
+                    'INS session',
+                    '    lasted {:.1f} sec'.format((sessStopUnix - sessStartUnix).total_seconds()),
+                    '    approx delay {:.1f} sec'.format(unixDeltaT),
+                    '# of NSP trigs = {}'.format(trigRaster.loc[:, 'nspDiracDelta'].sum()),
+                    '# of INS trigs = {}'.format(trigRaster.loc[:, 'insDiracDelta'].sum())
+                ]
+                fig, ax, figSaveOpts = hf.plotCorrSynchReport(
+                    _trigRaster=trigRaster, _searchRadius=searchRadius,
+                    _targetLagsSrs=targetLagsSrs, _maxLag=maxLag, _xCorrSrs=xCorrSrs,
+                    customMessages=customMessages, customTitle=customTitle
+                    )
+                synchReportPDF.savefig(**figSaveOpts)
+                if arguments['showFigures']:
+                    plt.show()
+                else:
+                    plt.close()
             funCoeffs = np.asarray([1, unixDeltaT + maxLag])
             invFunCoeffs = np.asarray([1, -1 * (unixDeltaT + maxLag)])
         elif alignByUnixTime:

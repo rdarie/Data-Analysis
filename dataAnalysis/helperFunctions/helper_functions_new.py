@@ -9,12 +9,13 @@ import vg
 from tabulate import tabulate
 from tqdm import tqdm
 from collections.abc import Iterable
+import matplotlib
 import matplotlib.pyplot as plt
 #  import matplotlib.colors as colors
 #  import matplotlib.ticker as ticker
 #  from matplotlib import cm
 import mpl_toolkits.mplot3d.axes3d as p3
-#  from matplotlib.lines import Line2D
+from matplotlib.lines import Line2D
 import matplotlib.animation as animation
 from matplotlib.animation import FFMpegWriter
 #  import matplotlib.backends.backend_pdf
@@ -681,7 +682,7 @@ def extractSignalsFromBlock(
 
 def gaussianSupport(
         tdSeg=None, peakIdx=None,
-        gaussWid=None, fs=None, support=None):
+        gaussWid=None, fs=None, support=None, returnCopy=False):
 
     if tdSeg is not None:
         kernNSamp = min(int(gaussWid * fs), len(tdSeg.index) - 1)
@@ -695,17 +696,30 @@ def gaussianSupport(
         support = pd.Series(0, index=tdSeg.index)
         support.loc[peakIdx] = 1
     
-    support.iloc[:] = np.convolve(
-        support.values,
-        gaussKern, mode='same'
-        )
+    if not returnCopy:
+        support.iloc[:] = np.convolve(
+            support.values,
+            gaussKern, mode='same'
+            )
+        support = pd.Series(
+            MinMaxScaler(feature_range=(1e-2, 1))
+            .fit_transform(support.values.reshape(-1, 1))
+            .squeeze(),
+            index=support.index)
+        return support
+    else:
+        retSupport = pd.Series(np.convolve(
+            support.to_numpy(),
+            gaussKern, mode='same'
+            ), index=support.index)
+        retSupport = pd.Series(
+            MinMaxScaler(feature_range=(1e-2, 1))
+            .fit_transform(retSupport.to_numpy().reshape(-1, 1))
+            .squeeze(),
+            index=support.index)
+        return retSupport
+
     
-    support = pd.Series(
-        MinMaxScaler(feature_range=(1e-2, 1))
-        .fit_transform(support.values.reshape(-1, 1))
-        .squeeze(),
-        index=support.index)
-    return support
 
 
 def noisyTriggerCorrection(
@@ -3684,3 +3698,105 @@ def calcBreakDown(asigWide, rowName, colName, hueName):
         dfStyler.set_table_styles(cssTableStyles)
     breakDownHtml = dfStyler.render()
     return breakDownData, breakDownText, breakDownHtml
+
+
+def plotCorrSynchReport(
+        _trigRaster=None, _searchRadius=None,
+        _targetLagsSrs=None, _maxLag=None, _xCorrSrs=None,
+        customMessages=None, customTitle=None,
+        ):
+    fig, ax = plt.subplots(3, 1)
+    fig.set_size_inches(12, 8)
+    _trigRasterSamplingRate = (_trigRaster['t'].iloc[1] - _trigRaster['t'].iloc[0]) ** (-1)
+    listOfLegends = []
+    plotT0 = _trigRaster.loc[
+        (_trigRaster['insTrigs'] > 0.5) & (_trigRaster['nspTrigs'] > 0.5), 't']
+    if plotT0.size > 0:
+        plotT0 = plotT0.iloc[0]
+    else:
+        plotT0 = _trigRaster.loc[(_trigRaster['insTrigs'] > 0.5), 't']
+        if plotT0.size > 0:
+            plotT0 = plotT0.iloc[0]
+        else:
+            plotT0 = _trigRaster.loc[(_trigRaster['insTrigs'] > 0.5) | (_trigRaster['nspTrigs'] > 0.5), 't'].iloc[0]
+    plotLBound = plotT0 + _searchRadius[0]
+    plotRBound = max(plotT0 + _searchRadius[1], plotT0 + 3.)
+    plotMask = (_trigRaster['t'] >= plotLBound) & (_trigRaster['t'] < plotRBound)
+    defaultLineWidth = matplotlib.rcParams['lines.linewidth']
+    ax[0].plot(
+        _trigRaster.loc[plotMask, 't'], _trigRaster.loc[plotMask, 'nspTrigs'],
+        label='NSP trigs.', lw=2 * defaultLineWidth)
+    ax[0].plot(
+        _trigRaster.loc[plotMask, 't'], _trigRaster.loc[plotMask, 'insTrigs'],
+        label='INS trigs.', ls='--')
+    # ax[0].set_xlim(plotT0 + _searchRadius[0], plotT0 + _searchRadius[1])
+    ax[0].set_xlabel('NSP time (sec)')
+    ax[0].set_ylabel('Triggers')
+    listOfLegends.append(ax[0].legend(loc='upper right'))
+    ax[0].set_title(customTitle)
+    # fake legend with annotations
+    if customMessages is not None:
+        customLines = [
+            Line2D([0], [0], color='k', alpha=0)
+            for custMess in customMessages
+            ]
+        phantomAx = ax[0].twinx()
+        phantomAx.set_yticks([])
+        listOfLegends.append(phantomAx.legend(customLines, customMessages, loc='upper left'))
+    #
+    ax[1].plot(_xCorrSrs, label='crossCorr')
+    ax[1].plot(
+        _maxLag, _xCorrSrs.loc[_maxLag],
+        'y*', label='optimal lag = {:.3f}'.format(_maxLag))
+    ax[1].set_xlabel('cross-corr lag (sec)')
+    listOfLegends.append(ax[1].legend(loc='upper right'))
+    ax[1].set_ylabel('cross-corr')
+    ax[1].set_xlim(_searchRadius[0], _searchRadius[1])
+    #
+    maxShift = _targetLagsSrs[_maxLag]
+    shiftedInsTrig = _trigRaster['insTrigs'].shift(maxShift).fillna(0)
+    shiftedInsImpulse = _trigRaster['insDiracDelta'].shift(maxShift).fillna(0)
+    shiftedProduct = (
+        _trigRaster['nspTrigs'] * shiftedInsTrig)
+    lPFForSP = makeFilterCoeffsSOS(
+        {
+            'low': {
+                'Wn': 1,
+                'N': 4,
+                'btype': 'low',
+                'ftype': 'bessel'
+                }},
+        _trigRasterSamplingRate)
+    lowPassShiftedProduct = signal.sosfiltfilt(
+        lPFForSP, shiftedProduct.to_numpy())
+    ax[2].plot(
+        _trigRaster['t'],
+        _trigRaster['nspTrigs'], c='tab:blue')
+    nspTargetMask = _trigRaster['nspDiracDelta'] > 0
+    if nspTargetMask.any():
+        ax[2].plot(
+            _trigRaster.loc[nspTargetMask, 't'],
+            _trigRaster.loc[nspTargetMask, 'nspTrigs'], 'o', c='tab:purple', label='NSP impulses')
+    ax[2].plot(
+        _trigRaster['t'],
+        shiftedInsTrig, c='tab:orange')
+    insTargetMask = shiftedInsImpulse > 0
+    if insTargetMask.any():
+        defaultMarkerSize = matplotlib.rcParams['lines.markersize']
+        ax[2].plot(
+            _trigRaster.loc[insTargetMask, 't'],
+            shiftedInsTrig.loc[insTargetMask], 'd', c='tab:red', label='INS impulses (shifted)',
+            markersize=defaultMarkerSize / 2)
+    ax[2].plot(_trigRaster['t'], shiftedProduct, c='tab:green', label='elementwise product of trigs')
+    ax[2].set_xlabel('NSP time (sec)')
+    ax[2].set_ylabel('A.U.')
+    listOfLegends.append(ax[2].legend(loc='upper right'))
+    prodAx = ax[2].twinx()
+    prodAx.plot(_trigRaster['t'], lowPassShiftedProduct, c='tab:olive', label='elementwise product of trigs (1 hz low pass)')
+    prodAx.set_yticks([])
+    listOfLegends.append(prodAx.legend(loc='lower right'))
+    figSaveOpts = dict(
+        bbox_extra_artists=listOfLegends,
+        bbox_inches='tight')
+    return fig, ax, figSaveOpts
+

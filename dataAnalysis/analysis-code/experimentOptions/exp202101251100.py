@@ -66,7 +66,10 @@ def getExpOpts():
                 'synchChanName': ['ins_td0', 'ins_td2'],
                 'synchStimUnitName': ['g0p0#0'],
                 'synchByXCorrTapDetectSignal': False,
+                'xCorrSamplingRate': None,
+                'xCorrGaussWid': 10e-3,
                 'minStimAmp': 0,
+                'unixTimeAdjust': None,
                 'thres': 5,
                 'iti': 10e-3,
                 'minAnalogValue': None,
@@ -76,13 +79,8 @@ def getExpOpts():
     ############################################################
     # manually add special instructions, e.g.
     # synchInfo['ins'][3][0].update({'minStimAmp': 0})
-    # #synchInfo['ins'][1][1] = {
-    # #    'timeRanges': None,
-    # #    'chan': ['ins_td2'],
-    # #    'thres': 5,
-    # #    'iti': 50e-3,
-    # #    'keepIndex': slice(None)
-    # #    }
+    #
+    #
     ############################################################
     ############################################################
     synchInfo['nsp'] = {
@@ -91,8 +89,9 @@ def getExpOpts():
             #  per trialSegment
             j: {
                 'timeRanges': None, 'keepIndex': slice(None),
-                'synchChanName': ['utah_rawAverage_0'], 'iti': 10e-3,
+                'synchChanName': ['utah_artifact_0'], 'iti': 10e-3,
                 'synchByXCorrTapDetectSignal': False,
+                'unixTimeAdjust': None,
                 'minAnalogValue': None, 'thres': 5}
             for j, sessionName in enumerate(jsonSessionNames[i])
             }
@@ -103,10 +102,8 @@ def getExpOpts():
     # manually add special instructions, e.g
     # synchInfo['nsp'][2][0].update({'timeRanges': [(40, 9999)]})
     #
-    synchInfo['nsp'][3][0].update({'thres': 7})
     #
-    #
-    #
+    ############################################################
     #  overrideSegmentsForTapSync
     #  if not possible to use taps, override with good taps from another segment
     #  not ideal, because segments are only synchronized to the nearest **second**
@@ -158,6 +155,9 @@ def getExpOpts():
     #         [100, 772], [1173, 1896]
     #     ]
     # }
+    pedalPositionZeroEpochs = None
+    dropMotionRounds = None
+
     ############################################################
     ############################################################
     outlierDetectOptions = dict(

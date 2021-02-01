@@ -11,11 +11,11 @@
 #SBATCH --mem=127G
 
 # Specify a job name:
-#SBATCH -J preproc_dual_2021_01_22
+#SBATCH -J preproc_dual_2021_01_14
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-preproc_dual_2021_01_22.out
-#SBATCH -e ../../batch_logs/%j-%a-preproc_dual_2021_01_22.out
+#SBATCH -o ../../batch_logs/%j-%a-preproc_dual_2021_01_14.out
+#SBATCH -e ../../batch_logs/%j-%a-preproc_dual_2021_01_14.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -23,31 +23,14 @@
 # Request custom resources
 #SBATCH --array=1,2,3
 
-# EXP="exp201901261000"
-# EXP="exp202010271200"
-# EXP="exp202011161100"
-# EXP="exp202011201100"
-# EXP="exp202011231200"
-# EXP="exp202011271100"
-# EXP="exp202011301200"
-# EXP="exp202012071100"
-# EXP="exp202012081200"
-# EXP="exp202012091200"
-# EXP="exp202012101100"
-# EXP="exp202012121100"
-# EXP="exp202012151200"
-# EXP="exp202012161200"
-# EXP="exp202012171200"
-# EXP="exp202012181200"
-# EXP="exp202101051100"
-# EXP="exp202101061100"
-# EXP="exp202101111100"
-# EXP="exp202101141100"
+EXP="exp202101141100"
 # EXP="exp202101191100"
 # EXP="exp202101201100"
-EXP="exp202101211100"
-EXP="exp202101221100"
+# EXP="exp202101211100"
+# EXP="exp202101221100"
 # EXP="exp202101251100"
+# EXP="exp202101271100"
+# EXP="exp202101281100"
 
 
 module load anaconda/2020.02

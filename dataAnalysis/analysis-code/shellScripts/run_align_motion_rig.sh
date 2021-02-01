@@ -10,11 +10,11 @@
 #SBATCH --mem=32G
 
 # Specify a job name:
-#SBATCH -J align_motion_2021_01_25_rig
+#SBATCH -J align_motion_2021_01_20_rig
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j_%a_align_motion_2021_01_25_rig.out
-#SBATCH -e ../../batch_logs/%j_%a_align_motion_2021_01_25_rig.out
+#SBATCH -o ../../batch_logs/%j_%a_align_motion_2021_01_20_rig.out
+#SBATCH -e ../../batch_logs/%j_%a_align_motion_2021_01_20_rig.out
 
 # Request custom resources
 #SBATCH --array=3

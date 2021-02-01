@@ -1590,31 +1590,31 @@ def stimStatusSerialtoLong(
     stimStLong = pd.DataFrame(
         index=stimStSer.index, columns=fullExpandCols + [idxT])
     #  fill req columns
-    stimStLong[idxT] = stimStSer[idxT]
+    stimStLong.loc[:, idxT] = stimStSer[idxT]
     for pName in fullExpandCols:
         #  print(pName)
-        stimStLong[pName] = np.nan
+        stimStLong.loc[:, pName] = np.nan
         pMask = stimStSer[namePrefix + 'property'] == pName
         pValues = stimStSer.loc[pMask, namePrefix + 'value']
         stimStLong.loc[pMask, pName] = pValues
         if pName == 'movement':
-            stimStLong[pName].iloc[0] = 0
-        stimStLong[pName].fillna(
-            method='ffill', inplace=True)
-        stimStLong[pName].fillna(
-            method='bfill', inplace=True)
+            stimStLong.loc[:, pName].iloc[0] = 0
+        stimStLong.loc[:, pName] = stimStLong[pName].fillna(
+            method='ffill')
+        stimStLong.loc[:, pName] = stimStLong[pName].fillna(
+            method='bfill')
     #
     debugPlot = False
     if debugPlot:
         stimCat = pd.concat((stimStLong, stimStSer), axis=1)
     #
     for idx, pName in enumerate(progAmpNames):
-        stimStLong[pName] = np.nan
+        stimStLong.loc[:, pName] = np.nan
         pMask = (stimStSer[namePrefix + 'property'] == 'amplitude') & (
             stimStLong['program'] == idx)
         stimStLong.loc[pMask, pName] = stimStSer.loc[pMask, namePrefix + 'value']
-        stimStLong[pName].fillna(method='ffill', inplace=True)
-        stimStLong[pName].fillna(value=0, inplace=True)
+        stimStLong.loc[:, pName] = stimStLong[pName].fillna(method='ffill')
+        stimStLong.loc[:, pName] = stimStLong[pName].fillna(value=0)
     if dropDuplicates:
         stimStLong.drop_duplicates(subset=idxT, keep='last', inplace=True)
     #
@@ -1629,15 +1629,15 @@ def stimStatusSerialtoLong(
             (stimStLong['RateInHz'].diff().fillna(0) != 0) |
             (stimStLong['trialSegment'].diff().fillna(0) != 0)
             )
-        stimStLong['rateRound'] = rateChange.astype(np.float).cumsum()
+        stimStLong.loc[:, 'rateRound'] = rateChange.astype(np.float).cumsum()
         groupComponents = [group.copy() for name, group in stimStLong.groupby('rateRound')]
         for idx, (name, group) in enumerate(stimStLong.groupby('rateRound')):
             if idx < len(groupComponents) - 1:
                 nextT = groupComponents[idx+1][idxT].iloc[0]
                 lastRate = groupComponents[idx]['RateInHz'].iloc[-1]
                 dummyEntry = group.iloc[-1, :].copy()
-                dummyEntry[idxT] = nextT - lastRate ** (-1)
-                dummyEntry['therapyStatus'] = 0
+                dummyEntry.loc[:, idxT] = nextT - lastRate ** (-1)
+                dummyEntry.loc[:, 'therapyStatus'] = 0
                 groupComponents[idx] = group.append(dummyEntry)
         stimStLong = pd.concat(groupComponents).reset_index(drop=True)
     ###################
@@ -1651,9 +1651,9 @@ def stimStatusSerialtoLong(
     #####
     ampChange = ampChange | (stimStLong['trialSegment'].diff().fillna(0) != 0)
     ####
-    stimStLong['amplitudeRound'] = (
+    stimStLong.loc[:, 'amplitudeRound'] = (
         ampIncrease.astype(np.float).cumsum())
-    stimStLong['amplitude'] = (
+    stimStLong.loc[:, 'amplitude'] = (
         stimStLong[progAmpNames].sum(axis=1))
     ################
     if elecConfiguration is not None:
@@ -1731,25 +1731,25 @@ def stimStatusSerialtoLong(
         plt.legend()
         plt.show()
     #
-    stimStLong['amplitudeRound'] = (
+    stimStLong.loc[:, 'amplitudeRound'] = (
         ampIncrease.astype(np.float).cumsum())
-    stimStLong['amplitude'] = (
+    stimStLong.loc[:, 'amplitude'] = (
         stimStLong[progAmpNames].sum(axis=1))
     ###############
     if 'movementRound' in deriveCols:
-        stimStLong['movementRound'] = (
-            stimStLong['movement'].abs().cumsum())
+        stimStLong.loc[:, 'movementRound'] = (
+            stimStLong.loc[:, 'movement'].abs().cumsum())
     # if 'amplitude' in deriveCols:
     if 'amplitudeCat' in deriveCols:
         ampsForSum = copy(stimStLong[progAmpNames])
         for colName in ampsForSum.columns:
             if ampsForSum[colName].max() > 0:
-                ampsForSum[colName] = pd.cut(
+                ampsForSum.loc[:, colName] = pd.cut(
                     ampsForSum[colName], bins=amplitudeCatBins, labels=False)
             else:
-                ampsForSum[colName] = pd.cut(
+                ampsForSum.loc[:, colName] = pd.cut(
                     ampsForSum[colName], bins=1, labels=False)
-        stimStLong['amplitudeCat'] = (
+        stimStLong.loc[:, 'amplitudeCat'] = (
             ampsForSum.sum(axis=1))
     if debugPlot:
         stimStLong.loc[:, ['program'] + progAmpNames].plot()
