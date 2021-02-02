@@ -31,7 +31,7 @@ import dataAnalysis.preproc.ns5 as ns5
 import numpy as np
 import pandas as pd
 import quantities as pq
-
+#
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
 from namedQueries import namedQueries
 from currentExperiment import parseAnalysisOptions
@@ -50,7 +50,7 @@ if (overrideChanNames is not None) and (arguments['chanQuery'] in ['fr', 'fr_sqr
 else:
     arguments['chanNames'], arguments['chanQuery'] = ash.processChannelQueryArgs(
         namedQueries, scratchFolder, **arguments)
-# pdb.set_trace()
+
 analysisSubFolder = os.path.join(
     scratchFolder, arguments['analysisName']
     )

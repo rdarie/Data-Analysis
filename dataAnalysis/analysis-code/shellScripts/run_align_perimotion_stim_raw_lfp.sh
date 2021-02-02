@@ -22,6 +22,6 @@
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 
-# SLURM_ARRAY_TASK_ID=3
+SLURM_ARRAY_TASK_ID=2
 source shellScripts/run_align_perimotion_stim_preamble.sh
 python -u ./calcAlignedAsigs.py --chanQuery="lfp" --outputBlockName="lfp" --eventBlockName='epochs' --signalBlockName='analyze' --verbose --exp=$EXP $BLOCKSELECTOR $WINDOW $LAZINESS $EVENTSELECTOR $ALIGNFOLDER $AMPFIELDNAME $ANALYSISFOLDER

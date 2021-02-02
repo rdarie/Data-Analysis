@@ -226,7 +226,7 @@ masterBlock.create_relationship()
 allSegs = list(range(len(masterBlock.segments)))
 
 outputPath = os.path.join(
-    analysisSubFolder,
+    scratchFolder,
     ns5FileName + '_epochs'
     )
 if not os.path.exists(outputPath + '.nix'):
@@ -238,7 +238,7 @@ else:
         masterBlock, neoSegIdx=allSegs,
         writeAsigs=False, writeSpikes=False, writeEvents=True,
         fileName=ns5FileName + '_epochs',
-        folderPath=analysisSubFolder,
+        folderPath=scratchFolder,
         purgeNixNames=False,
         nixBlockIdx=0, nixSegIdx=allSegs,
         )

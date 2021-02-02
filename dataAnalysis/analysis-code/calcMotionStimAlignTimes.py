@@ -71,11 +71,13 @@ dataBlockPath = os.path.join(
     analysisSubFolder,
     prefix + '_analyze.nix')
 eventBlockPath = os.path.join(
-    analysisSubFolder,
+    # analysisSubFolder,
+    scratchFolder,
     prefix + '_epochs.nix')
 print('loading {}'.format(dataBlockPath))
 dataReader, dataBlock = preproc.blockFromPath(
     dataBlockPath, lazy=arguments['lazy'])
+print('loading {}'.format(eventBlockPath))
 eventReader, eventBlock = preproc.blockFromPath(
     eventBlockPath, lazy=arguments['lazy'])
 ####
@@ -99,6 +101,9 @@ except Exception:
 availableCateg = [
     'pedalDirection', 'pedalSizeCat', 'pedalMovementCat',
     'pedalSize', 'pedalMovementDuration']
+motionAnnNamesForStim = [
+    'pedalDirection', 'pedalSizeCat', 'pedalMovementCat',
+    'pedalSize', 'pedalMetaCat', 'pedalMovementDuration', 'movementRound']
 #  allocate block to contain events
 masterBlock = Block()
 masterBlock.name = dataBlock.annotations['neo_name']
@@ -108,6 +113,7 @@ masterBlock.annotate(
 extraAnnNames = ['stimDelay']
 blockIdx = 0
 checkReferences = False
+searchRadius = .7  # sec
 for segIdx, dataSeg in enumerate(dataBlock.segments):
     eventSeg = eventBlock.segments[segIdx]
     print('Calculating motion stim align times for trial {}'.format(segIdx))
@@ -128,25 +134,29 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
     stimEvDF = pd.DataFrame(stimEvDict)
     noStimFiller = pd.Series({
         'amplitude': 0,
+        'amplitudeRound': 999,
         'RateInHz': 0,
         'program': 999,
         'activeGroup': 0,
         'electrode': 'NA',
+        'detectionDelay': np.nan,
         'stimDelay': np.nan
     })
     for annName in stimAnnNames + extraAnnNames:
         motionEvDF.loc[:, annName] = np.nan
-    searchRadius = .7  # sec
-    stimEvDF.loc[:, 'alreadyAssigned'] = False
+    for annName in motionAnnNamesForStim + extraAnnNames:
+        stimEvDF.loc[:, annName] = np.nan
+    stimEvDF.loc[:, 'assignedTo'] = np.nan
     movementCatTypes = list(motionEvDF['pedalMovementCat'].unique())
     for mvRound, group in motionEvDF.groupby('movementRound'):
         outboundT = group.loc[group['pedalMovementCat'] == 'outbound', 't']
         outboundIdx = outboundT.index
-        reachT = group.loc[group['pedalMovementCat'] == 'reachedPeak', 't']
-        reachIdx = reachT.index
+        reachPeakT = group.loc[group['pedalMovementCat'] == 'reachedPeak', 't']
+        reachPeakIdx = reachPeakT.index
         returnT = group.loc[group['pedalMovementCat'] == 'return', 't']
         returnIdx = returnT.index
         ####
+        # find stim train corresponding to outbound movement
         if mvRound > 0:
             tSearchStart = max(
                 (float(outboundT) - searchRadius),
@@ -157,54 +167,59 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
                 (float(outboundT) - searchRadius),
                 stimEvDF['t'].min()
                 )
+        #
+        # tSearchStop = min(
+        #     (float(reachPeakT) + searchRadius),
+        #     float(returnT))
         tSearchStop = min(
-            (float(reachT) + searchRadius),
-            float(returnT))
+            (float(returnT) - searchRadius),
+            stimEvDF['t'].max()
+            )
         stimInSearchRadius = (
             (stimEvDF['t'] >= tSearchStart) &
             (stimEvDF['t'] < tSearchStop))
         stimOnTs = stimEvDF.loc[
             (
                 (stimEvDF['stimCat'] == 'stimOn') &
-                (~stimEvDF['alreadyAssigned']) &
+                (stimEvDF['assignedTo'].isna()) &
                 stimInSearchRadius),
             't']
         if stimOnTs.size > 0:
+            roundHasOutBStim = True
             closestTimes, closestIdx = hf.closestSeries(
                 takeFrom=outboundT, compareTo=stimOnTs,
                 strictly='neither')
             stimDelay = float(closestTimes - outboundT)
             theseStimAnn = stimEvDF.loc[closestIdx, :].iloc[0]
+            outBStimOn = theseStimAnn['t']
             for annName in stimAnnNames:
                 motionEvDF.loc[outboundIdx, annName] = theseStimAnn[annName]
-                motionEvDF.loc[reachIdx, annName] = theseStimAnn[annName]
-            stimEvDF.loc[closestIdx, 'alreadyAssigned'] = True
+                motionEvDF.loc[reachPeakIdx, annName] = theseStimAnn[annName]
             motionEvDF.loc[outboundIdx, 'stimDelay'] = stimDelay
-            motionEvDF.loc[reachIdx, 'stimDelay'] = stimDelay
+            # assign this stim event to the corresponding pedal movement
+            stimEvDF.loc[closestIdx, 'assignedTo'] = outboundIdx
+            theseMotAnn = motionEvDF.loc[outboundIdx, :].iloc[0]
+            stimEvDF.loc[closestIdx, 'stimDelay'] = stimDelay
+            for annName in motionAnnNamesForStim:
+                stimEvDF.loc[closestIdx, annName] = theseMotAnn[annName]
         else:
             # if no onsets detected
+            roundHasOutBStim = False
             closestTimes, closestIdx = hf.closestSeries(
                 takeFrom=outboundT, compareTo=stimEvDF['t'],
                 strictly='less')
             theseStimAnn = stimEvDF.loc[closestIdx, :].iloc[0]
-            try:
-                # todo: FIXME!!
-                assert theseStimAnn['stimCat'] == 'stimOff'
-            except Exception:
-                print('\n\n{}\n Error at t= {} sec\n\n'.format(dataBlockPath, outboundT.iloc[0]))
-                traceback.print_exc()
-                # pdb.set_trace()
             for annName in stimAnnNames:
                 motionEvDF.loc[outboundIdx, annName] = noStimFiller[annName]
-                motionEvDF.loc[reachIdx, annName] = noStimFiller[annName]
+                motionEvDF.loc[reachPeakIdx, annName] = noStimFiller[annName]
             motionEvDF.loc[outboundIdx, 'stimDelay'] = noStimFiller['stimDelay']
-            motionEvDF.loc[reachIdx, 'stimDelay'] = noStimFiller['stimDelay']
-        ####
+            motionEvDF.loc[reachPeakIdx, 'stimDelay'] = noStimFiller['stimDelay']
+        #### find stims associated with the return segment
         reachBaseT = group.loc[group['pedalMovementCat'] == 'reachedBase', 't']
         reachBaseIdx = reachBaseT.index
         tSearchStart = max(
             (float(returnT) - searchRadius),
-            float(reachT)
+            float(reachPeakT)
         )
         if mvRound == motionEvDF['movementRound'].max():
             tSearchStop = min(
@@ -222,68 +237,137 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         stimOnTs = stimEvDF.loc[
             (
                 (stimEvDF['stimCat'] == 'stimOn') &
-                (~stimEvDF['alreadyAssigned']) &
+                (stimEvDF['assignedTo'].isna()) &
                 stimInSearchRadius),
             't']
         if stimOnTs.size > 0:
+            roundHasRetStim = True
             closestTimes, closestIdx = hf.closestSeries(
                 takeFrom=returnT, compareTo=stimOnTs,
                 strictly='neither')
             theseStimAnn = stimEvDF.loc[closestIdx, :].iloc[0]
+            retStimOn = theseStimAnn['t']
             stimDelay = float(closestTimes - returnT)
             for annName in stimAnnNames:
                 motionEvDF.loc[returnIdx, annName] = theseStimAnn[annName]
                 motionEvDF.loc[reachBaseIdx, annName] = theseStimAnn[annName]
             motionEvDF.loc[returnIdx, 'stimDelay'] = stimDelay
-            motionEvDF.loc[reachBaseIdx, 'stimDelay'] = stimDelay
+            # assign this stim event to the corresponding pedal movement
+            stimEvDF.loc[closestIdx, 'assignedTo'] = returnIdx
+            theseMotAnn = motionEvDF.loc[returnIdx, :].iloc[0]
+            stimEvDF.loc[closestIdx, 'stimDelay'] = stimDelay
+            for annName in motionAnnNamesForStim:
+                stimEvDF.loc[closestIdx, annName] = theseMotAnn[annName]
         else:
+            roundHasRetStim = False
             closestTimes, closestIdx = hf.closestSeries(
                 takeFrom=returnT, compareTo=stimEvDF['t'],
                 strictly='less')
             theseStimAnn = stimEvDF.loc[closestIdx, :].iloc[0]
-            try:
-                assert theseStimAnn['stimCat'] == 'stimOff'
-            except Exception:
-                print('\n\n{}\nError at t= {} sec\n\n'.format(dataBlockPath, returnT.iloc[0]))
-                traceback.print_exc()
-                # pdb.set_trace()
             for annName in stimAnnNames:
                 motionEvDF.loc[returnIdx, annName] = noStimFiller[annName]
                 motionEvDF.loc[reachBaseIdx, annName] = noStimFiller[annName]
             motionEvDF.loc[returnIdx, 'stimDelay'] = noStimFiller['stimDelay']
             motionEvDF.loc[reachBaseIdx, 'stimDelay'] = noStimFiller['stimDelay']
+        #  annotate reachPeak and reachBase
+        if roundHasOutBStim:
+            if roundHasRetStim:
+                stimInSearchRadius = (
+                    (stimEvDF['t'] > outBStimOn) &
+                    (stimEvDF['t'] < retStimOn))
+            else:
+                stimInSearchRadius = (
+                    (stimEvDF['t'] > outBStimOn) &
+                    (stimEvDF['t'] < float(returnT) + searchRadius))
+            stimOffTs = stimEvDF.loc[
+                (
+                    (stimEvDF['stimCat'] == 'stimOff') &
+                    (stimEvDF['assignedTo'].isna()) &
+                    stimInSearchRadius),
+                't']
+            if stimOffTs.size > 0:
+                closestTimes, closestIdx = hf.closestSeries(
+                    takeFrom=reachPeakT, compareTo=stimOffTs,
+                    strictly='neither')
+                theseStimAnn = stimEvDF.loc[closestIdx, :].iloc[0]
+                stimDelay = float(closestTimes - reachPeakT)
+                motionEvDF.loc[reachPeakIdx, 'stimDelay'] = stimDelay
+                # assign this stim event to the corresponding pedal movement
+                stimEvDF.loc[closestIdx, 'assignedTo'] = reachPeakIdx
+                theseMotAnn = motionEvDF.loc[reachPeakIdx, :].iloc[0]
+                stimEvDF.loc[closestIdx, 'stimDelay'] = stimDelay
+                for annName in motionAnnNamesForStim:
+                    stimEvDF.loc[closestIdx, annName] = theseMotAnn[annName]
+            else:
+                raise(Exception('No off time corresponding to stim on for this move round (t = {:.3f})!'.format(reachPeakT)))
+        if roundHasRetStim:
+            stimInSearchRadius = (
+                (stimEvDF['t'] > retStimOn) &
+                (stimEvDF['t'] < float(reachBaseT) + searchRadius))
+            stimOffTs = stimEvDF.loc[
+                (
+                    (stimEvDF['stimCat'] == 'stimOff') &
+                    (stimEvDF['assignedTo'].isna()) &
+                    stimInSearchRadius),
+                't']
+            if stimOffTs.size > 0:
+                closestTimes, closestIdx = hf.closestSeries(
+                    takeFrom=reachBaseT, compareTo=stimOffTs,
+                    strictly='neither')
+                theseStimAnn = stimEvDF.loc[closestIdx, :].iloc[0]
+                stimDelay = float(closestTimes - reachBaseT)
+                motionEvDF.loc[reachBaseIdx, 'stimDelay'] = stimDelay
+                # assign this stim event to the corresponding pedal movement
+                stimEvDF.loc[closestIdx, 'assignedTo'] = reachBaseIdx
+                theseMotAnn = motionEvDF.loc[reachBaseIdx, :].iloc[0]
+                stimEvDF.loc[closestIdx, 'stimDelay'] = stimDelay
+                for annName in motionAnnNamesForStim:
+                    stimEvDF.loc[closestIdx, annName] = theseMotAnn[annName]
+            else:
+                raise(Exception('No off time corresponding to stim on for this move round (t = {:.3f})!'.format(reachBaseT)))
+    '''
     motionEvDF.loc[:, stimAnnNames] = (
         motionEvDF
         .loc[:, stimAnnNames]
         .fillna(method='ffill')
         .fillna(method='bfill'))
+    '''
     if (segIdx == 0) and arguments['plotParamHistograms']:
         fig, ax = plt.subplots()
-        for cN in ['outbound', 'return']:
+        for cN in movementCatTypes:
             theseEvents = (
                 motionEvDF
-                .loc[motionEvDF['pedalMovementCat'] == cN, :])
-            # pdb.set_trace()
-            sns.distplot(
-                theseEvents.loc[~theseEvents['stimDelay'].isna(), 'stimDelay'],
-                bins=200, kde=False, ax=ax)
-            print(
-                theseEvents
-                .sort_values('stimDelay', ascending=False)
-                .loc[:, ['t', 'stimDelay']]
-                .head(10)
-                )
+                .loc[(motionEvDF['pedalMovementCat'] == cN) & ~motionEvDF['stimDelay'].isna(), :])
+            if theseEvents.size > 0:
+                thisLabel = '\n'.join([
+                    'epoch: {}'.format(cN),
+                    'median: {:.1f} msec; std: {:.1f} msec'.format(
+                        1000 * theseEvents['stimDelay'].median(),
+                        1000 * theseEvents['stimDelay'].std())
+                    ])
+                sns.distplot(
+                    theseEvents['stimDelay'],
+                    # bins=200,
+                    kde=True, ax=ax, label=thisLabel)
+                ax.legend()
+                print(
+                    theseEvents
+                    .sort_values('stimDelay', ascending=False)
+                    .loc[:, ['t', 'stimDelay']]
+                    .head(10)
+                    )
         fig.savefig(
             os.path.join(
                 figureFolder, 'stimDelayDistribution.pdf'))
         # plt.show()
         plt.close()
-    alignEvents = preproc.eventDataFrameToEvents(
+    ###
+    alignEventsMotion = preproc.eventDataFrameToEvents(
         motionEvDF, idxT='t',
         annCol=None,
         eventName='seg{}_motionStimAlignTimes'.format(segIdx),
         tUnits=pq.s, makeList=False)
-    alignEvents.annotate(nix_name=alignEvents.name)
+    alignEventsMotion.annotate(nix_name=alignEventsMotion.name)
     #
     concatLabelColumns = availableCateg + stimAnnNames + extraAnnNames
     concatLabelsDF = motionEvDF[concatLabelColumns]
@@ -292,27 +376,63 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         for rowIdx, row in concatLabelsDF.iterrows()])
     concatEvents = Event(
         name='seg{}_motionStimAlignTimesConcatenated'.format(segIdx),
-        times=alignEvents.times,
+        times=alignEventsMotion.times,
         labels=concatLabels
         )
     newSeg = Segment(name=dataSeg.annotations['neo_name'])
     newSeg.annotate(nix_name=dataSeg.annotations['neo_name'])
-    newSeg.events.append(alignEvents)
+    newSeg.events.append(alignEventsMotion)
     newSeg.events.append(concatEvents)
-    alignEvents.segment = newSeg
+    alignEventsMotion.segment = newSeg
     concatEvents.segment = newSeg
+    ####
+    stimEvDF.dropna(inplace=True)
+    alignEventsStim = preproc.eventDataFrameToEvents(
+        stimEvDF, idxT='t',
+        annCol=None,
+        eventName='seg{}_stimPerimotionAlignTimes'.format(segIdx),
+        tUnits=pq.s, makeList=False)
+    alignEventsStim.annotate(nix_name=alignEventsStim.name)
+    #
+    concatLabelColumns = motionAnnNamesForStim + stimAnnNames + extraAnnNames
+    concatStimLabelsDF = stimEvDF[concatLabelColumns]
+    concatStimLabels = np.array([
+        '{}'.format(row)
+        for rowIdx, row in concatStimLabelsDF.iterrows()])
+    concatStimEvents = Event(
+        name='seg{}_stimPerimotionAlignTimesConcatenated'.format(segIdx),
+        times=alignEventsStim.times,
+        labels=concatStimLabels
+        )
+    newSeg.events.append(alignEventsStim)
+    newSeg.events.append(concatStimEvents)
+    alignEventsStim.segment = newSeg
+    concatStimEvents.segment = newSeg
+    #
     masterBlock.segments.append(newSeg)
-
+    newSeg.block = masterBlock
 dataReader.file.close()
 eventReader.file.close()
 masterBlock.create_relationship()
 allSegs = list(range(len(masterBlock.segments)))
-
+#
+outputPath = os.path.join(
+    scratchFolder,
+    ns5FileName + '_epochs'
+    )
+preReader, preBlock = preproc.blockFromPath(
+    outputPath + '.nix', lazy=arguments['lazy'])
+existingEvNames = [ev.name for ev in preBlock.filter(objects=[EventProxy, Event])]
+eventExists = (alignEventsStim.name in existingEvNames) or (alignEventsMotion.name in existingEvNames)
+# pdb.set_trace()
+preReader.file.close()
+if eventExists:
+    raise(Exception('CalcMotionStimAlignTimes: calculated events, but they already exist in the events block'))
 preproc.addBlockToNIX(
     masterBlock, neoSegIdx=allSegs,
     writeAsigs=False, writeSpikes=False, writeEvents=True,
     fileName=ns5FileName + '_epochs',
-    folderPath=analysisSubFolder,
+    folderPath=scratchFolder,
     purgeNixNames=False,
     nixBlockIdx=0, nixSegIdx=allSegs,
     )

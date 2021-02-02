@@ -451,7 +451,7 @@ masterBlock.create_relationship()
 allSegs = list(range(len(masterBlock.segments)))
 
 outputPath = os.path.join(
-    analysisSubFolder,
+    scratchFolder,
     ns5FileName + '_epochs'
     )
 if not os.path.exists(outputPath + '.nix'):
@@ -459,11 +459,23 @@ if not os.path.exists(outputPath + '.nix'):
     writer.write_block(masterBlock, use_obj_names=True)
     writer.close()
 else:
-    ns5.addBlockToNIX(
-        masterBlock, neoSegIdx=allSegs,
-        writeAsigs=False, writeSpikes=False, writeEvents=True,
-        fileName=ns5FileName + '_epochs',
-        folderPath=analysisSubFolder,
-        purgeNixNames=False,
-        nixBlockIdx=0, nixSegIdx=allSegs,
-        )
+    preReader, preBlock = ns5.blockFromPath(
+        outputPath + '.nix', lazy=arguments['lazy'])
+    eventExists = alignEvents.name in [ev.name for ev in preBlock.filter(objects=[EventProxy, Event])]
+    preReader.file.close()
+    # if events already exist...
+    if eventExists:
+        print('motion times already calculated! Deleting block and starting over')
+        os.remove(outputPath + '.nix')
+        writer = ns5.NixIO(filename=outputPath + '.nix')
+        writer.write_block(masterBlock, use_obj_names=True)
+        writer.close()
+    else:
+        ns5.addBlockToNIX(
+            masterBlock, neoSegIdx=allSegs,
+            writeAsigs=False, writeSpikes=False, writeEvents=True,
+            fileName=ns5FileName + '_epochs',
+            folderPath=scratchFolder,
+            purgeNixNames=False,
+            nixBlockIdx=0, nixSegIdx=allSegs,
+            )

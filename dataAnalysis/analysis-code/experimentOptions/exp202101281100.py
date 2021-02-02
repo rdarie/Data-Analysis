@@ -192,7 +192,7 @@ def getExpOpts():
                 groupIn={
                     'xcoords': np.arange(-.1, 10.1, 1),
                     'ycoords': np.arange(-.1, 10.1, 1)}),
-            'previewDuration': 480,
+            'previewDuration': 300,
             'previewOffset': 0,
             'interpolateOutliers': True,
             'outlierThreshold': 1 - 1e-6,

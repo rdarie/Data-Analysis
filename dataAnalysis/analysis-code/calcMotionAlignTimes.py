@@ -33,8 +33,8 @@ import quantities as pq
 import dataAnalysis.helperFunctions.kilosort_analysis_new as ksa
 import dataAnalysis.helperFunctions.helper_functions_new as hf
 import rcsanalysis.packet_func as rcsa_helpers
-import dataAnalysis.preproc.ns5 as preproc
-import dataAnalysis.preproc.mdt as preprocINS
+import dataAnalysis.preproc.ns5 as ns5
+# import dataAnalysis.preproc.mdt as preprocINS
 import numpy as np
 import pandas as pd
 from collections import Iterable
@@ -49,6 +49,10 @@ expOpts, allOpts = parseAnalysisOptions(
 globals().update(expOpts)
 globals().update(allOpts)
 print('\n' + '#' * 50 + '\n{}\n'.format(__file__) + '#' * 50 + '\n')
+###
+#!! applyDelay: Move align time by this factor, to account for build-up to the threshold crossing
+#               applyDelay should be positive, we'll resolve the sign later
+applyDelay = 10e-3
 
 analysisSubFolder = os.path.join(
     scratchFolder, arguments['analysisName']
@@ -71,13 +75,13 @@ dataBlockPath = os.path.join(
     analysisSubFolder,
     prefix + '_analyze.nix')
 print('loading {}'.format(dataBlockPath))
-dataReader, dataBlock = preproc.blockFromPath(
+dataReader, dataBlock = ns5.blockFromPath(
     dataBlockPath, lazy=arguments['lazy'])
 ####
 try:
     alignTimeBounds = alignTimeBoundsLookup[int(arguments['blockIdx'])]
 except Exception:
-    traceback.print_exc()
+    print('No alignTimeBounds read...')
     fallbackTStart = float(
         dataBlock.segments[0]
         .filter(objects=AnalogSignalProxy)[0].t_start)
@@ -107,7 +111,6 @@ masterBlock.name = dataBlock.annotations['neo_name']
 masterBlock.annotate(
     nix_name=dataBlock.annotations['neo_name'])
 
-checkReferences = False
 for segIdx, dataSeg in enumerate(dataBlock.segments):
     print('Calculating motion align times for trial {}'.format(segIdx))
     #
@@ -120,30 +123,6 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
             for asigP in dataSeg.filter(objects=AnalogSignalProxy)
             if asigP.name in signalsInSegment]
         eventProxysList = dataSeg.events
-        if checkReferences:
-            for asigP in asigProxysList:
-                da = asigP._rawio.da_list['blocks'][0]['segments'][segIdx]['data']
-                print('segIdx {}, asigP.name {}'.format(
-                    segIdx, asigP.name))
-                print('asigP._global_channel_indexes = {}'.format(
-                    asigP._global_channel_indexes))
-                print('asigP references {}'.format(
-                    da[asigP._global_channel_indexes[0]]))
-                try:
-                    assert asigP.name in da[asigP._global_channel_indexes[0]].name
-                except Exception:
-                    traceback.print_exc()
-            for evP in eventProxysList:
-                print('segIdx {}, evP.name {}'.format(
-                    segIdx, evP.name))
-                print('evP._event_channel_index = {}'.format(
-                     evP._event_channel_index))
-                evP_ch = evP._event_channel_index
-                mts = evP._rawio.file.blocks[0].groups[segIdx].multi_tags
-                try:
-                    assert evP.name in mts[evP_ch].name
-                except Exception:
-                    traceback.print_exc()
         asigsList = [
             asigP.load()
             for asigP in asigProxysList]
@@ -151,12 +130,12 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         dummyAsig = asigsList[0]
     samplingRate = dummyAsig.sampling_rate
     #
-    tdDF = preproc.analogSignalsToDataFrame(asigsList)
+    tdDF = ns5.analogSignalsToDataFrame(asigsList)
     tdDF.columns = [
         i.replace('seg{}_'.format(segIdx), '')
         for i in tdDF.columns
         ]
-    eventDF = preproc.eventsToDataFrame(
+    eventDF = ns5.eventsToDataFrame(
         dataSegEvents, idxT='t',
         names=[
             'seg{}_property'.format(segIdx),
@@ -343,7 +322,7 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         .reset_index())
     deleteTheseIdx = alignEventsDF.loc[alignEventsDF['markForDeletion'].astype(bool), :].index
     if deleteTheseIdx.any():
-        print('calcMotionAlignTimes, dropping idx = {} (marked for deletion)'.format(deleteTheseIdx))
+        print('calcMotionAlignTimes, dropping idx = {} (automatically marked for deletion)'.format(deleteTheseIdx))
         alignEventsDF.drop(index=deleteTheseIdx, inplace=True)
     alignEventsDF.drop(columns=['markForDeletion'], inplace=True)
     try:
@@ -353,7 +332,7 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         alignEventsDF.drop(index=rejectMask.loc[rejectMask].index, inplace=True)
     except Exception:
         traceback.print_exc()
-    print('Found events at {}'.format(alignEventsDF['t'].tolist()))
+    # print('Found events at {}'.format(alignEventsDF['t'].tolist()))
     if arguments['plotParamHistograms']:
         # pdb.set_trace()
         fig, ax = plt.subplots()
@@ -371,9 +350,19 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
                 figureFolder, 'pedalMovementTrials.pdf'))
         # plt.show()
         plt.close()
+    #  add metaCat
+    alignEventsDF.loc[:, 'pedalMetaCat'] = 'NA'
+    alignEventsDF.loc[(alignEventsDF['pedalMovementCat'] == 'outbound') | (alignEventsDF['pedalMovementCat'] == 'return'), 'pedalMetaCat'] = 'starting'
+    alignEventsDF.loc[(alignEventsDF['pedalMovementCat'] == 'reachedPeak') | (alignEventsDF['pedalMovementCat'] == 'reachedBase'), 'pedalMetaCat'] = 'stopping'
     #  sort align times
     alignEventsDF.sort_values(by='t', inplace=True, kind='mergesort')
-    alignEvents = preproc.eventDataFrameToEvents(
+    if applyDelay is not None:
+        # rising thresholds probably resolve earlier
+        alignEventsDF.loc[alignEventsDF['pedalMetaCat'] == 'starting', 't'] -= applyDelay
+        # falling thresholds probably resolve later
+        alignEventsDF.loc[alignEventsDF['pedalMetaCat'] == 'stopping', 't'] += applyDelay
+    # pdb.set_trace()
+    alignEvents = ns5.eventDataFrameToEvents(
         alignEventsDF, idxT='t',
         annCol=None,
         eventName='seg{}_motionAlignTimes'.format(segIdx),
@@ -407,19 +396,31 @@ masterBlock.create_relationship()
 allSegs = list(range(len(masterBlock.segments)))
 
 outputPath = os.path.join(
-    analysisSubFolder,
+    scratchFolder,
     ns5FileName + '_epochs'
     )
 if not os.path.exists(outputPath + '.nix'):
-    writer = preproc.NixIO(filename=outputPath + '.nix')
+    writer = ns5.NixIO(filename=outputPath + '.nix')
     writer.write_block(masterBlock, use_obj_names=True)
     writer.close()
 else:
-    preproc.addBlockToNIX(
-        masterBlock, neoSegIdx=allSegs,
-        writeAsigs=False, writeSpikes=False, writeEvents=True,
-        fileName=ns5FileName + '_epochs',
-        folderPath=analysisSubFolder,
-        purgeNixNames=False,
-        nixBlockIdx=0, nixSegIdx=allSegs,
-        )
+    preReader, preBlock = ns5.blockFromPath(
+        outputPath + '.nix', lazy=arguments['lazy'])
+    eventExists = alignEvents.name in [ev.name for ev in preBlock.filter(objects=[EventProxy, Event])]
+    preReader.file.close()
+    # if events already exist...
+    if eventExists:
+        print('motion times already calculated! Deleting block and starting over')
+        os.remove(outputPath + '.nix')
+        writer = ns5.NixIO(filename=outputPath + '.nix')
+        writer.write_block(masterBlock, use_obj_names=True)
+        writer.close()
+    else:
+        ns5.addBlockToNIX(
+            masterBlock, neoSegIdx=allSegs,
+            writeAsigs=False, writeSpikes=False, writeEvents=True,
+            fileName=ns5FileName + '_epochs',
+            folderPath=scratchFolder,
+            purgeNixNames=False,
+            nixBlockIdx=0, nixSegIdx=allSegs,
+            )

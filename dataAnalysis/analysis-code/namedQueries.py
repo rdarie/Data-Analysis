@@ -86,6 +86,12 @@ namedQueries['align'].update({
         ])
     })
 namedQueries['align'].update({
+    'starting': '|'.join([
+        namedQueries['align']['outbound'],
+        namedQueries['align']['return'],
+        ])
+    })
+namedQueries['align'].update({
     'midPeakWithStim100HzCCW': '&'.join([
         namedQueries['align']['RateInHz==100or0'],
         namedQueries['align']['midPeak'],
@@ -261,12 +267,21 @@ namedQueries['align'].update({
         namedQueries['align']['CW']
         ])
     })
+listOfSubQ = [
+    namedQueries['align']['RateInHz>20or0'],
+    namedQueries['align']['outbound'],
+    namedQueries['align']['CW']
+    ]
 namedQueries['align'].update({
-    'outboundStim>20HzCW': '&'.join([
-        namedQueries['align']['RateInHz>20or0'],
-        namedQueries['align']['outbound'],
-        namedQueries['align']['CW']
-        ])
+    'outboundStim>20HzCW': '&'.join(['({})'.format(subQ) for subQ in listOfSubQ])
+    })
+listOfSubQ = [
+    namedQueries['align']['RateInHz>20or0'],
+    namedQueries['align']['starting'],
+    namedQueries['align']['CW']
+    ]
+namedQueries['align'].update({
+    'startingStim>20HzCW': '&'.join(['({})'.format(subQ) for subQ in listOfSubQ])
     })
 namedQueries['align'].update({
     'midPeakNoStimCW': '&'.join([

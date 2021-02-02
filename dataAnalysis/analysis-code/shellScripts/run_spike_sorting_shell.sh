@@ -24,7 +24,7 @@
 # Run a command
 source ./shellScripts/run_spike_sorting_preamble.sh
 
-BLOCKIDX=4
+BLOCKIDX=3
 
 SOURCESELECTOR="--sourceFileSuffix=spike_preview"
 # SOURCESELECTOR="--sourceFileSuffix=mean_subtracted"
