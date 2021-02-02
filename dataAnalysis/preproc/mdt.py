@@ -2258,6 +2258,8 @@ def getINSStimOnset(
         stimDetectOptsByChannel=None,
         plotAnomalies=False, artifactKeepWhat='max',
         predictSlots=True, snapToGrid=False,
+        expectRateProportionalStimOnDelay=False,
+        expectRateProportionalStimOffDelay=False,
         redetectTherapyStatus=False,
         treatAsSinglePulses=False,
         spikeWindow=[-32, 64],
@@ -2645,11 +2647,14 @@ def getINSStimOnset(
             ROIWid = 3 * gaussWid + stimPeriod
             #  on average, the StimLog update will land in the middle of the previous group cycle
             #  adjust the ROIWid to account for this extra variability
-            expectedOnsetIdx = (
-                nominalStimOnIdx +
-                int(slotSize / 2) +
-                activeProgram * int(slotSize / 4)
-                )
+            if expectRateProportionalStimOnDelay:
+                expectedOnsetIdx = (
+                    nominalStimOnIdx +
+                    int(slotSize)
+                    # int(slotSize / 2) + activeProgram * int(slotSize / 4)
+                    )
+            else:
+                expectedOnsetIdx = nominalStimOnIdx
             if not expectedOnsetIdx in tdSeg.index:
                 expectedOnsetIdx = nominalStimOnIdx
             expectedTimestamp = tdSeg.loc[expectedOnsetIdx, 't']
@@ -2694,6 +2699,7 @@ def getINSStimOnset(
             elif isinstance(plotting, Iterable):
                 plottingEnabled = (name in plotting) # and (not resolvedSlots)
         # detect stim onset
+        print('Slot resolution status is: {}'.format(resolvedSlots))
         detectSignal, foundTimestamp, usedExpectedT, fig, ax, twinAx = extractArtifactTimestampsMahalanobis(
             tdSegDetect,
             fs,
@@ -2875,13 +2881,20 @@ def getINSStimOnset(
             np.atleast_1d(group['t'].iloc[0]) -
             np.atleast_1d(foundTimestamp)) * pq.s
         #
-        stimOffIdx = min(
-            group.index[-1],
-            (
-                group.index[groupAmpMask][-1] +
-                slotSize +
-                activeProgram * int(slotSize/4)
-            ))
+        if expectRateProportionalStimOffDelay:
+            stimOffIdx = min(
+                group.index[-1],
+                (
+                    group.index[groupAmpMask][-1] +
+                    int(slotSize)
+                    # int(slotSize/2) + activeProgram * int(slotSize/4)
+                ))
+        else:
+            stimOffIdx = min(
+                group.index[-1],
+                (
+                    group.index[groupAmpMask][-1]
+                ))
         theseOffsetTimestamps = np.atleast_1d(
             group
             .loc[stimOffIdx, 't']

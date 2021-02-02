@@ -3747,7 +3747,7 @@ def plotCorrSynchReport(
     ax[1].plot(_xCorrSrs, label='crossCorr')
     ax[1].plot(
         _maxLag, _xCorrSrs.loc[_maxLag],
-        'y*', label='optimal lag = {:.3f}'.format(_maxLag))
+        'y*', label='optimal lag = {:.3f}; xcorr = {:.3f}'.format(_maxLag, _xCorrSrs.loc[_maxLag]))
     ax[1].set_xlabel('cross-corr lag (sec)')
     listOfLegends.append(ax[1].legend(loc='upper right'))
     ax[1].set_ylabel('cross-corr')

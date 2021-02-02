@@ -10,11 +10,11 @@
 #SBATCH --mem=127G
 
 # Specify a job name:
-#SBATCH -J ins_preproc_2021_01_14
+#SBATCH -J ins_preproc_2021_01_28
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-ins_preproc_2021_01_14.out
-#SBATCH -e ../../batch_logs/%j-%a-ins_preproc_2021_01_14.out
+#SBATCH -o ../../batch_logs/%j-%a-ins_preproc_2021_01_28.out
+#SBATCH -e ../../batch_logs/%j-%a-ins_preproc_2021_01_28.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -30,16 +30,16 @@ conda activate
 source activate nda2
 python --version
 
-EXP="exp202101141100"
+# EXP="exp202101141100"
 # EXP="exp202101191100"
 # EXP="exp202101201100"
 # EXP="exp202101211100"
 # EXP="exp202101221100"
 # EXP="exp202101251100"
 # EXP="exp202101271100"
-# EXP="exp202101281100"
+EXP="exp202101281100"
 
-# SLURM_ARRAY_TASK_ID=1
+# SLURM_ARRAY_TASK_ID=2
 
 # --makePlots to make quality check plots
 # --showPlots to interactively display quality check plots

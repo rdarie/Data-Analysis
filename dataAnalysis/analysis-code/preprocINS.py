@@ -10,7 +10,7 @@ Options:
     --makePlots                      make diagnostic plots? [default: False]
     --showPlots                      show diagnostic plots? [default: False]
     --disableStimDetection           disable stimulation time detection? [default: False]
-    -outputSuffix=outputSuffix       append a string to the resulting filename?
+    --outputSuffix=outputSuffix      append a string to the resulting filename?
 """
 
 import matplotlib
@@ -55,6 +55,9 @@ if arguments['outputSuffix'] is not None:
         '.nix',
         '_{}.nix'.format(arguments['outputSuffix'])
         )
+    outputSuffix = '_{}'.format(arguments['outputSuffix'])
+else:
+    outputSuffix = ''
 
 def preprocINSWrapper(
         trialFilesStim=None,
@@ -70,12 +73,12 @@ def preprocINSWrapper(
     for jsn in jsonSessionNames:
         trialFilesStim['jsonSessionNames'] = [jsn]
         insDataPath = os.path.join(
-            scratchFolder, '{}.nix'.format(jsn))
+            scratchFolder, '{}{}.nix'.format(jsn, outputSuffix))
         insBlock = mdt.preprocINS(
             trialFilesStim,
             insDataPath,
             # blockIdx=int(arguments['blockIdx']),
-            blockIdx=jsn,
+            blockIdx='{}{}'.format(jsn, outputSuffix),
             deviceName=deviceName,
             figureOutputFolder=figureOutputFolder,
             verbose=arguments['verbose'],

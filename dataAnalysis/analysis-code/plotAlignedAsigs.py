@@ -130,7 +130,7 @@ if arguments['limitPages'] is not None:
 else:
     limitPages = None
 
-minNObservations = 1
+minNObservations = 3
 if arguments['individualTraces']:
     relplotKWArgs['estimator'] = None
     relplotKWArgs['units'] = 't'
@@ -176,7 +176,7 @@ if arguments['enableOverrides']:
     #     relplotKWArgs['aspect'] * redWinSize / fullWinSize)
     statsTestOpts.update({
         'tStop': alignedAsigsKWargs['windowSize'][1]})
-    alignedAsigsKWargs['procFun'] = ash.genDetrender(timeWindow=(-100e-3, 0))
+    alignedAsigsKWargs['procFun'] = ash.genDetrender(timeWindow=(-200e-3, 100e-3))
 #  End Overrides
 
 #  Get stats results

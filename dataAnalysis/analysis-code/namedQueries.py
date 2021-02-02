@@ -18,7 +18,7 @@ namedQueries = {
         'RateInHz==100or0Fuzzy': '((RateInHzFuzzy==100)|(RateInHzFuzzy==0))',
         'RateInHz==50or0': '((RateInHz==50)|(RateInHz==0))',
         'RateInHz==100or0': '((RateInHz==100)|(RateInHz==0))',
-        'RateInHz>10or0': '((RateInHz>10)|(RateInHz==0))',
+        'RateInHz>20or0': '((RateInHz>20)|(RateInHz==0))',
     },
     'unit': {
         'fr': "(chanName.str.endswith('fr#0'))",
@@ -262,8 +262,8 @@ namedQueries['align'].update({
         ])
     })
 namedQueries['align'].update({
-    'outboundStim>10HzCW': '&'.join([
-        namedQueries['align']['RateInHz>10or0'],
+    'outboundStim>20HzCW': '&'.join([
+        namedQueries['align']['RateInHz>20or0'],
         namedQueries['align']['outbound'],
         namedQueries['align']['CW']
         ])
@@ -284,6 +284,6 @@ namedQueries['align'].update({
 namedQueries['align'].update({
     'stimOnHighRate': '&'.join([
         namedQueries['align']['stimOn'],
-        "(RateInHz > 11)"
+        "(RateInHz > 20)"
         ])
     })

@@ -220,8 +220,9 @@ def parseAnalysisOptions(
         'offsetFromPeak': 1e-3,
         # 'artifactKeepWhat': 'first',
         'artifactKeepWhat': 'max',
-        # 'predictSlots': False, 'snapToGrid': False,
-        'predictSlots': True, 'snapToGrid': True,
+        'expectRateProportionalStimOnDelay': True,
+        'expectRateProportionalStimOffDelay': True,
+        'predictSlots': False, 'snapToGrid': False,
         'treatAsSinglePulses': True
         }
     RCStimDetectionOpts = {
@@ -229,7 +230,9 @@ def parseAnalysisOptions(
         'gaussWid': 50e-3,
         'offsetFromPeak': 1e-3,
         'artifactKeepWhat': 'max',
-        'predictSlots': True, 'snapToGrid': True,
+        'expectRateProportionalStimOnDelay': True,
+        'expectRateProportionalStimOffDelay': True,
+        'predictSlots': False, 'snapToGrid': False,
         'treatAsSinglePulses': True
         }
     fullStimDetectionOpts = {
@@ -237,8 +240,9 @@ def parseAnalysisOptions(
         'gaussWid': 50e-3,
         'offsetFromPeak': 1e-3,
         'artifactKeepWhat': 'max',
-        # 'predictSlots': False, 'snapToGrid': False,
-        'predictSlots': True, 'snapToGrid': True,
+        'expectRateProportionalStimOnDelay': True,
+        'expectRateProportionalStimOffDelay': True,
+        'predictSlots': False, 'snapToGrid': False,
         'treatAsSinglePulses': True
         }
     # pdb.set_trace()

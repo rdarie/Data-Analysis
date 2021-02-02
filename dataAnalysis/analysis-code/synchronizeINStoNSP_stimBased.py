@@ -7,6 +7,7 @@ Options:
     --exp=exp                                             which experimental day to analyze
     --inputNSPBlockSuffix=inputNSPBlockSuffix             append a name to the input block?
     --inputINSBlockSuffix=inputINSBlockSuffix             append a name to the input block?
+    --outputINSBlockSuffix=outputINSBlockSuffix           append a name to the output block? [default: ins]
     --lazy                                                whether to fully load data from blocks [default: True]
     --showFigures                                         whether to fully load data from blocks [default: False]
     --addToBlockSuffix=addToBlockSuffix                   whether to also add stim info to the high pass filtered NSP blocks
@@ -85,6 +86,10 @@ if arguments['inputINSBlockSuffix'] is None:
     inputINSBlockSuffix = ''
 else:
     inputINSBlockSuffix = "_{}".format(arguments['inputINSBlockSuffix'])
+if arguments['outputINSBlockSuffix'] is None:
+    outputINSBlockSuffix = ''
+else:
+    outputINSBlockSuffix = "_{}".format(arguments['outputINSBlockSuffix'])
 
 # searchRadius = [-1.5, 1.5]
 searchRadius = [-.25, .25]
@@ -261,7 +266,7 @@ else:
         synchReportPDF = PdfPages(
             os.path.join(
                 insDiagnosticsFolder,
-                'ins_synch_report_Block{:0>3}.pdf'.format(blockIdx)))
+                'ins_synch_report_Block{:0>3}{}.pdf'.format(blockIdx, inputINSBlockSuffix)))
     for insSessIdx, insGroup in insDF.groupby('trialSegment'):
         print('aligning session nb {}'.format(insSessIdx))
         sessTapOptsNSP = tapDetectOptsNSP[insSessIdx]
@@ -657,9 +662,10 @@ for stNameOut, stOut in spikesOut.items():
 insBlockInterp.name = 'ins_data'
 insBlockInterp = ns5.purgeNixAnn(insBlockInterp)
 insBlockInterp.create_relationship()
+
 outPathName = os.path.join(
     scratchFolder,
-    ns5FileName + '_ins.nix')
+    ns5FileName + '{}.nix'.format(outputINSBlockSuffix))
 if os.path.exists(outPathName):
     os.remove(outPathName)
 writer = neo.io.NixIO(filename=outPathName)

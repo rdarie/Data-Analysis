@@ -6,10 +6,11 @@ source ./shellScripts/run_align_perimotion_stim_preamble.sh
 OUTLIERMASK=""
 
 STATSOVERLAY="--overlayStats"
-TIMEWINDOWOPTS="--winStart=150 --winStop=450"
+TIMEWINDOWOPTS="--winStart=250 --winStop=750"
 
 # ALIGNQUERY="--alignQuery=stimOn"
-ALIGNQUERY="--alignQuery=outbound"
+ALIGNQUERY="--alignQuery=outboundStim>20HzCW"
+# ALIGNQUERY="--alignQuery=outbound"
 
 HUEOPTS="--hueName=amplitude --hueControl="
 ROWOPTS="--rowName=RateInHz --rowControl=0"

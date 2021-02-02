@@ -6,7 +6,7 @@ source ./shellScripts/run_align_stim_preamble.sh
 OUTLIERMASK=""
 
 STATSOVERLAY="--overlayStats"
-TIMEWINDOWOPTS="--winStart=150 --winStop=450"
+TIMEWINDOWOPTS="--winStart=250 --winStop=750"
 
 # ALIGNQUERY="--alignQuery=stimOn"
 ALIGNQUERY="--alignQuery=stimOnHighRate"

@@ -21,6 +21,7 @@ matplotlib.use('Qt5Agg')   # generate interactive output by default
 from matplotlib.backends.backend_pdf import PdfPages
 import os, pdb, traceback, sys
 from importlib import reload
+from matplotlib.lines import Line2D
 import neo
 from neo import (
     Block, Segment, ChannelIndex,
@@ -110,7 +111,7 @@ if not os.path.exists(insDiagnosticsFolder):
 synchReportPDF = PdfPages(
     os.path.join(
         insDiagnosticsFolder,
-        'ins_stim_refinement_Block{:0>3}.pdf'.format(blockIdx)))
+        'ins_stim_refinement_Block{:0>3}{}.pdf'.format(blockIdx, inputINSBlockSuffix)))
 sessTapOptsNSP = expOpts['synchInfo']['nsp'][blockIdx][0]
 sessTapOptsINS = expOpts['synchInfo']['ins'][blockIdx][0]
 print('Loading NSP Block from: {}'.format(nspPath))
@@ -243,8 +244,8 @@ for segIdx, nspSeg in enumerate(nspBlock.segments):
         prgIdx = int(group['program'].iloc[0])
         grpIdx = int(group['activeGroup'].iloc[0])
         stimRate = group['RateInHz'].iloc[0]
-        # searchRadius = [-1 * stimRate ** (-1), stimRate ** (-1)]
-        searchRadius = [-25e-3, 25e-3]
+        searchRadius = [-2 * stimRate ** (-1), 2 * stimRate ** (-1)]
+        # searchRadius = [-25e-3, 25e-3]
         targetLags = np.arange(
             searchRadius[0] * trigRasterSamplingRate,
             searchRadius[1] * trigRasterSamplingRate + 1,
@@ -260,11 +261,11 @@ for segIdx, nspSeg in enumerate(nspBlock.segments):
         groupStop = group['t'].max()
         # expand window to make sure we don't clip edges
         windowStart = max(
-            groupStart + searchRadius[0] - gaussWid,
+            groupStart + 5 * searchRadius[0],
             globalStart
             )
         windowStop = min(
-            groupStop + searchRadius[1] + gaussWid,
+            groupStop + 5 * searchRadius[1],
             globalStop
         )
         pulseMask = (pulsesSt[0] >= windowStart * pq.s) & (pulsesSt[0] <= windowStop * pq.s)
@@ -330,13 +331,31 @@ for segIdx, nspSeg in enumerate(nspBlock.segments):
             # pdb.set_trace()
     if (segIdx == 0) and arguments['plotParamHistograms']:
         fig, ax = plt.subplots()
+        # phantomAx = ax.twinx()
         theseEvents = (
             categories
             .loc[categories['detectionDelay'] < 999, :])
         # pdb.set_trace()
-        sns.distplot(
-            theseEvents.loc[~theseEvents['detectionDelay'].isna(), 'detectionDelay'],
-            bins=200, kde=False, ax=ax)
+        # customMessages = []
+        listOfLegends = []
+        for evN, evG in theseEvents.groupby('RateInHz'):
+            thisLegend = 'RateInHz = {} median = {:.3f} msec, std = {:.3f} msec'.format(evN, 1000 * evG['detectionDelay'].median(), 1000 * evG['detectionDelay'].std())
+            sns.distplot(
+                evG.loc[~evG['detectionDelay'].isna(), 'detectionDelay'],
+                # bins=200, kde=False,
+                ax=ax, label=thisLegend)
+            # customMessages.append('\n'.join([
+            #     
+            #     ]))
+        '''
+        customLines = [
+            Line2D([0], [0], color='k', alpha=0)
+            for custMess in customMessages
+            ]
+        phantomAx.set_yticks([])
+        listOfLegends.append(phantomAx.legend(customLines, customMessages, loc='upper left'))
+        '''
+        listOfLegends.append(ax.legend())
         print(
             theseEvents
             .sort_values('detectionDelay', ascending=False)
@@ -345,7 +364,7 @@ for segIdx, nspSeg in enumerate(nspBlock.segments):
             )
         fig.savefig(
             os.path.join(
-                figureFolder, 'stimDetectionDelayDistribution.pdf'))
+                figureFolder, 'stimDetectionDelayDistribution{}.pdf'.format(inputINSBlockSuffix)))
     if arguments['makeControl']:
         midTimes = []
         for name, group in stimStatus.groupby('amplitudeRound'):

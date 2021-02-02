@@ -11,11 +11,11 @@
 #SBATCH --mem=127G
 
 # Specify a job name:
-#SBATCH -J preproc_dual_2021_01_14
+#SBATCH -J preproc_dual_2021_01_28
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-preproc_dual_2021_01_14.out
-#SBATCH -e ../../batch_logs/%j-%a-preproc_dual_2021_01_14.out
+#SBATCH -o ../../batch_logs/%j-%a-preproc_dual_2021_01_28.out
+#SBATCH -e ../../batch_logs/%j-%a-preproc_dual_2021_01_28.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -23,14 +23,14 @@
 # Request custom resources
 #SBATCH --array=1,2,3
 
-EXP="exp202101141100"
+# EXP="exp202101141100"
 # EXP="exp202101191100"
 # EXP="exp202101201100"
 # EXP="exp202101211100"
 # EXP="exp202101221100"
 # EXP="exp202101251100"
 # EXP="exp202101271100"
-# EXP="exp202101281100"
+EXP="exp202101281100"
 
 
 module load anaconda/2020.02
