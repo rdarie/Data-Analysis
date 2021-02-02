@@ -19,7 +19,7 @@ Options:
     --verbose                                    print diagnostics? [default: False]
 """
 
-import os, pdb, traceback
+import os, pdb, traceback, sys
 from importlib import reload
 #import neo
 from neo import (
@@ -64,17 +64,27 @@ assembledName = ''
 if arguments['processAll']:
     prefix = assembledName
     #  paths relevant to the entire experimental day
+    '''
     eventPath = os.path.join(
         scratchFolder, '{}',
         assembledName + '_{}.nix'.format(arguments['eventBlockName'])).format(arguments['analysisName'])
+    '''
+    eventPath = os.path.join(
+        scratchFolder,
+        assembledName + '_{}.nix'.format(arguments['eventBlockName']))
     signalPath = os.path.join(
         scratchFolder, '{}',
         assembledName + '_{}.nix'.format(arguments['signalBlockName'])).format(arguments['analysisName'])
 else:
     prefix = ns5FileName
+    '''
     eventPath = os.path.join(
         scratchFolder, '{}',
         ns5FileName + '_{}.nix'.format(arguments['eventBlockName'])).format(arguments['analysisName'])
+    '''
+    eventPath = os.path.join(
+        scratchFolder,
+        ns5FileName + '_{}.nix'.format(arguments['eventBlockName']))
     signalPath = os.path.join(
         scratchFolder, '{}',
         ns5FileName + '_{}.nix'.format(arguments['signalBlockName'])).format(arguments['analysisName'])
@@ -101,29 +111,39 @@ windowSize = [
 #       'elec75#0_raster', 'elec75#1_raster',
 #       'elec77#0_raster', 'elec77#1_raster', 'elec77#2_raster',
 #       ]
-
+stimConditionNames = [
+    'electrode', arguments['amplitudeFieldName'], 'RateInHz']
+motionConditionNames = [
+    'pedalMovementCat', 'pedalSizeCat', 'pedalDirection']
+#
 if (blockExperimentType == 'proprio-miniRC') or (blockExperimentType == 'proprio-RC'):
     # has stim but no motion
-    minNConditionRepetitions['categories'] = [
-        'electrode', arguments['amplitudeFieldName'], 'RateInHz']
+    if arguments['eventName'] == 'motion':
+        print('Block does not have motion!')
+        sys.exit()
+    if arguments['eventName'] == 'stim':
+        eventName = 'stimAlignTimes'
+    minNConditionRepetitions['categories'] = stimConditionNames
 elif blockExperimentType == 'proprio-motionOnly':
     # has motion but no stim
-    minNConditionRepetitions['categories'] = [
-        'pedalMovementCat', 'pedalSizeCat', 'pedalDirection']
-else:
-    if arguments['eventName'] in ['stimAlignTimes']:
-        # stim events aren't motion aware
-        stimulusConditionNames = [
-            'electrode', arguments['amplitudeFieldName'], 'RateInHz']
-    else:
-        stimulusConditionNames = [
-            'electrode', arguments['amplitudeFieldName'], 'RateInHz',
-            'pedalMovementCat', 'pedalSizeCat', 'pedalDirection']
+    if arguments['eventName'] == 'motion':
+        eventName = 'motionAlignTimes'
+        sys.exit()
+    if arguments['eventName'] == 'stim':
+        print('Block does not have stim!')
+        sys.exit()
+    minNConditionRepetitions['categories'] = motionConditionNames
+elif blockExperimentType == 'proprio':
+    if arguments['eventName'] == 'stim':
+        eventName = 'stimPerimotionAlignTimes'
+    elif arguments['eventName'] == 'motion':
+        eventName = 'motionStimAlignTimes'
+    minNConditionRepetitions['categories'] = motionConditionNames + stimConditionNames
 ns5.getAsigsAlignedToEvents(
     eventBlock=eventBlock, signalBlock=signalBlock,
     chansToTrigger=arguments['chanNames'],
     chanQuery=arguments['chanQuery'],
-    eventName=arguments['eventName'],
+    eventName=eventName,
     windowSize=windowSize,
     appendToExisting=False,
     minNReps=minNConditionRepetitions,

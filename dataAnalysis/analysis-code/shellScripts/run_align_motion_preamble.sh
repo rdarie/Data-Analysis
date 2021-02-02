@@ -23,6 +23,8 @@ ANALYSISFOLDER="--analysisName=default"
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
 # BLOCKSELECTOR="--processAll"
 
-EVENTSELECTOR="--eventName=motionAlignTimes"
+EVENTSELECTOR="--eventName=motion"
 #
 ALIGNFOLDER="--alignFolderName=motion"
+AMPFIELDNAME="--amplitudeFieldName=amplitude"
+
