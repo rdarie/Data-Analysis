@@ -21,10 +21,8 @@
 # Request custom resources
 #SBATCH --array=3
 
-# SLURM_ARRAY_TASK_ID=3
-source shellScripts/run_align_motion_preamble.sh
-
-ALIGNQUERY="--alignQuery=outbound"
+SLURM_ARRAY_TASK_ID=2
+source shellScripts/run_plotter_aligned_motion_preamble.sh
 
 UNITQUERY="--unitQuery=lfp"
 INPUTBLOCKNAME="--inputBlockName=lfp"

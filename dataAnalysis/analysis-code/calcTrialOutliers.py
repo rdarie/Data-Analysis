@@ -112,26 +112,20 @@ print(
     "'outlierDetectOptions' in locals(): {}"
     .format('outlierDetectOptions' in locals()))
 #
+stimConditionNames = [
+    'electrode', arguments['amplitudeFieldName'], 'RateInHz']
+motionConditionNames = [
+    'pedalMovementCat', 'pedalSizeCat', 'pedalDirection']
 if (blockExperimentType == 'proprio-miniRC') or (blockExperimentType == 'proprio-RC'):
     # has stim but no motion
-    stimulusConditionNames = [
-        'electrode', arguments['amplitudeFieldName'], 'RateInHz']
-    assert arguments['alignQuery'] in ['stimOn', 'stimOff']
+    stimulusConditionNames = stimConditionNames
 elif blockExperimentType == 'proprio-motionOnly':
     # has motion but no stim
-    stimulusConditionNames = [
-        'pedalMovementCat', 'pedalSizeCat', 'pedalDirection']
-    assert arguments['alignQuery'] in ['outbound']
+    stimulusConditionNames = motionConditionNames
 else:
-    if arguments['alignQuery'] in ['stimOn', 'stimOff']:
-        # stim events aren't motion aware
-        stimulusConditionNames = [
-            'electrode', arguments['amplitudeFieldName'], 'RateInHz']
-    else:
-        stimulusConditionNames = [
-            'electrode', arguments['amplitudeFieldName'], 'RateInHz',
-            'pedalMovementCat', 'pedalSizeCat', 'pedalDirection']
-
+    stimulusConditionNames = stimConditionNames + motionConditionNames
+print('Block type {}; using the following stimulus condition breakdown:'.format(blockExperimentType))
+print('\n'.join(['    {}'.format(scn) for scn in stimulusConditionNames]))
 if 'outlierDetectOptions' in locals():
     targetEpochSize = outlierDetectOptions['targetEpochSize']
     twoTailed = outlierDetectOptions['twoTailed']
