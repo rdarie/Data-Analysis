@@ -95,6 +95,7 @@ alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUn
     namedQueries, alignSubFolder, **arguments)
 alignedAsigsKWargs['outlierTrials'] = ash.processOutlierTrials(
     calcSubFolder, prefix, **arguments)
+#
 if arguments['noStim']:
     alignedAsigsKWargs.update(dict(
         duplicateControlsByProgram=False,

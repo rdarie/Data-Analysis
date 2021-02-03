@@ -149,6 +149,7 @@ trialColumns = pd.MultiIndex.from_tuples(
 # manualEESWaveform = trialIndex.isin(manualStimTimes)
 # print(metaData.reset_index(drop=True))
 # print(metaData['electrode'])
+#
 nullKinematics = pd.DataFrame(
     0, index=trialIndex, columns=trialColumns)
 kinKey = '/sling/kinematics'
