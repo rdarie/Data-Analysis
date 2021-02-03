@@ -27,8 +27,7 @@ ANALYSISFOLDER="--analysisName=default"
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
 # BLOCKSELECTOR="--processAll"
 
-# EVENTSELECTOR="--eventName=motionStimAlignTimes"
-EVENTSELECTOR="--eventName=stimAlignTimes"
+EVENTSELECTOR="--eventName=stim"
 #
 # ALIGNFOLDER="--alignFolderName=motion"
 ALIGNFOLDER="--alignFolderName=stim"

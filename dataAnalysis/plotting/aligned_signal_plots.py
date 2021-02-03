@@ -191,6 +191,7 @@ def plotNeuronsAligned(
                         np.diff(rasterWide.columns)[0] ** (-1)))
                 if enablePlots:
                     indexInfo = asigWide.index.to_frame()
+                    ####pdb.set_trace()
                     if idx == 0:
                         breakDownData, breakDownText, breakDownHtml = hf.calcBreakDown(
                             asigWide, rowName, colName, hueName)
@@ -334,6 +335,11 @@ def plotAsigsAligned(
             asigWide = ns5.alignedAsigsToDF(
                 dataBlock, [unitName],
                 **loadArgs)
+            for indNm in [rowName, colName, hueName]:
+                if indNm is not None:
+                    if indNm not in asigWide.index.names:
+                        asigWide.loc[:, indNm] = 'NA'
+                        asigWide.set_index(indNm, append=True, inplace=True)
             if enablePlots:
                 indexInfo = asigWide.index.to_frame()
                 if idx == 0:
@@ -832,7 +838,6 @@ def genStimVLineAdder(
 
 def genBlockShader(patchOpts, dropNaNCol='segment'):
     def shadeBlocks(g, ro, co, hu, dataSubset):
-        # pdb.set_trace()
         emptySubset = (
             (dataSubset.empty) or
             (dataSubset[dropNaNCol].isna().all()))

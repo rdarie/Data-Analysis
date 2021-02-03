@@ -19,7 +19,7 @@
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 # Request custom resources
-#SBATCH --array=1,2
+#SBATCH --array=1,2,3
 
 # SLURM_ARRAY_TASK_ID=2
 source shellScripts/run_align_stim_preamble.sh

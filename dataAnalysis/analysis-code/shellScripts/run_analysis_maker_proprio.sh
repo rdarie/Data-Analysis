@@ -11,11 +11,11 @@
 #SBATCH --mem=96G
 
 # Specify a job name:
-#SBATCH -J analysis_calc_2021_01_19
+#SBATCH -J analysis_calc_2021_01_28
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-analysis_calc_2021_01_19.out
-#SBATCH -e ../../batch_logs/%j-%a-analysis_calc_2021_01_19.out
+#SBATCH -o ../../batch_logs/%j-%a-analysis_calc_2021_01_28.out
+#SBATCH -e ../../batch_logs/%j-%a-analysis_calc_2021_01_28.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -53,7 +53,7 @@ conda activate
 source activate nda2
 python --version
 
-SLURM_ARRAY_TASK_ID=2
+# SLURM_ARRAY_TASK_ID=2
 #
 # python -u ./synchronizeSIMItoNSP.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP
 # python -u ./calcProprioAnalysisNix.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER $SPIKESOURCE $SPIKEBLOCKSUFFIX $BLOCKPREFIX $RIGSUFFIX --chanQuery="all" --verbose --lazy

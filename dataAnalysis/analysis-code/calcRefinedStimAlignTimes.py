@@ -312,12 +312,12 @@ for segIdx, nspSeg in enumerate(nspBlock.segments):
                 maxTRI = trigRaster.index.max()
                 zeroMask = zeroMask | (trigRaster.index > maxTRI + targetLags.min())
             # trigRaster.loc[zeroMask, 'insTrigs'] = 0
-            print('Calculating cross corr')
+            # print('Calculating cross corr')
             xCorrSrs = targetLagsSrs.apply(
                 corrAtLag, xSrs=trigRaster['nspTrigs'],
                 ySrs=trigRaster['insTrigs'])
             maxLag = xCorrSrs.idxmax()
-            print('maxLag = {:.1f} millisec'.format(1000 * maxLag))
+            # print('maxLag = {:.1f} millisec'.format(1000 * maxLag))
             if True:
                 fig, ax, figSaveOpts = hf.plotCorrSynchReport(
                     _trigRaster=trigRaster, _searchRadius=searchRadius,

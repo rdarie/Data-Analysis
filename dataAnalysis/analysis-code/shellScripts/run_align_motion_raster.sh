@@ -17,7 +17,7 @@
 #SBATCH -e ../../batch_logs/%j_%a_align_motion_2021_01_25_raster.out
 
 # Request custom resources
-#SBATCH --array=3
+#SBATCH --array=1,2,3
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -25,4 +25,4 @@
 ####  SLURM_ARRAY_TASK_ID=2
 source shellScripts/run_align_motion_preamble.sh
 #
-python -u ./calcAlignedAsigs.py --chanQuery="raster" --outputBlockName="raster" --eventBlockName='epochs' --signalBlockName='binarized' --verbose --exp=$EXP $AMPFIELDNAME $BLOCKSELECTOR $WINDOW $LAZINESS $EVENTSELECTOR $ALIGNFOLDER $ANALYSISFOLDER
+python -u ./calcAlignedAsigs.py --chanQuery="raster" --outputBlockSuffix="raster" --eventBlockSuffix='epochs' --signalBlockSuffix='binarized' --verbose --exp=$EXP $AMPFIELDNAME $BLOCKSELECTOR $WINDOW $LAZINESS $EVENTSELECTOR $ALIGNFOLDER $ANALYSISFOLDER

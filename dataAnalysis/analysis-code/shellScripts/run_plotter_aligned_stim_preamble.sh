@@ -6,15 +6,21 @@ source ./shellScripts/run_align_stim_preamble.sh
 OUTLIERMASK=""
 
 STATSOVERLAY="--overlayStats"
-TIMEWINDOWOPTS="--winStart=250 --winStop=750"
+TIMEWINDOWOPTS="--winStart=200 --winStop=800"
 
 # ALIGNQUERY="--alignQuery=stimOn"
 ALIGNQUERY="--alignQuery=stimOnHighRate"
 # ALIGNQUERY="--alignQuery=outbound"
 
+# HUEOPTS="--hueName=amplitude --hueControl="
+# ROWOPTS="--rowName=RateInHz --rowControl="
+# COLOPTS="--colName=electrode --colControl=control"
+# STYLEOPTS="--styleName= --styleControl="
+# SIZEOPTS="--sizeName= --sizeControl="
+
 HUEOPTS="--hueName=amplitude --hueControl="
 ROWOPTS="--rowName=RateInHz --rowControl="
-COLOPTS="--colName=electrode --colControl=control"
+COLOPTS="--colName=pedalMovementCat --colControl="
 STYLEOPTS="--styleName= --styleControl="
 SIZEOPTS="--sizeName= --sizeControl="
 

@@ -176,7 +176,7 @@ if arguments['enableOverrides']:
     #     relplotKWArgs['aspect'] * redWinSize / fullWinSize)
     statsTestOpts.update({
         'tStop': alignedAsigsKWargs['windowSize'][1]})
-    alignedAsigsKWargs['procFun'] = ash.genDetrender(timeWindow=(-200e-3, 100e-3))
+    alignedAsigsKWargs['procFun'] = ash.genDetrender(timeWindow=(-200e-3, -100e-3))
 #  End Overrides
 
 #  Get stats results

@@ -19,9 +19,9 @@
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 # Request custom resources
-#SBATCH --array=3
+#SBATCH --array=1,2,3
 
-SLURM_ARRAY_TASK_ID=2
+# SLURM_ARRAY_TASK_ID=2
 source shellScripts/run_plotter_aligned_motion_preamble.sh
 
 UNITQUERY="--unitQuery=lfp"

@@ -1168,7 +1168,7 @@ def alignedAsigsToDF(
 def getAsigsAlignedToEvents(
         eventBlock=None, signalBlock=None,
         chansToTrigger=None, chanQuery=None,
-        eventName=None, windowSize=None, 
+        eventName=None, windowSize=None,
         minNReps=None,
         appendToExisting=False,
         checkReferences=True, verbose=False,
@@ -1183,8 +1183,13 @@ def getAsigsAlignedToEvents(
             signalBlock, chanQuery, objType=ChannelIndex, condition='hasAsigs')
     #  allocate block for spiketrains
     masterBlock = Block()
-    masterBlock.name = signalBlock.annotations['neo_name']
-    masterBlock.annotate(nix_name=signalBlock.annotations['neo_name'])
+    try:
+        masterBlock.name = signalBlock.annotations['neo_name']
+        masterBlock.annotate(nix_name=signalBlock.annotations['neo_name'])
+    except Exception:
+        masterBlock.name = signalBlock.name
+        masterBlock.annotate(neo_name=signalBlock.name)
+        masterBlock.annotate(nix_name=signalBlock.name)
     #  make channels and units for triggered time series
     for chanName in chansToTrigger:
         chanIdx = ChannelIndex(name=chanName + '#0', index=[0])
@@ -1264,6 +1269,8 @@ def getAsigsAlignedToEvents(
                 print(
                     'getAsigsAlignedToEvents on subSegment {} of {}'
                     .format(subSegIdx + 1, len(alignEventGroups)))
+            if not alignEvents.shape[0] > 0:
+                continue
             newSeg = Segment(name='seg{}_'.format(int(totalNSegs)))
             newSeg.annotate(nix_name=newSeg.name)
             masterBlock.segments.append(newSeg)
@@ -1292,7 +1299,7 @@ def getAsigsAlignedToEvents(
                 # array_annotations get sliced with the event, but regular anns do not
                 for annName in alignEvents.annotations['arrayAnnNames']:
                     alignEvents.annotations[annName] = (
-                        alignEvents.annotations[annName][fullMask])
+                        alignEvents.array_annotations[annName])
                 if isinstance(asig, AnalogSignalProxy):
                     if checkReferences:
                         da = (
@@ -2037,7 +2044,7 @@ def readBlockFixNames(
         rawioReader,
         block_index=0, signal_group_mode='split-all',
         lazy=True, mapDF=None, reduceChannelIndexes=False,
-        loadList=None
+        loadList=None, purgeNixNames=False
         ):
     headerSignalChan = pd.DataFrame(
         rawioReader.header['signal_channels']).set_index('id')
@@ -2264,6 +2271,8 @@ def readBlockFixNames(
                     st.unit = unit
                     idxInUnit = unitStNames.index(stP.name)
                     unit.spiketrains[idxInUnit] = st
+    if purgeNixNames:
+        dataBlock = purgeNixAnn(dataBlock)
     return dataBlock
 
 
@@ -2576,7 +2585,6 @@ def preproc(
             )
         with open(diagnosticTextPath, 'w') as _f:
             _f.write(diagnosticText)
-        # pdb.set_trace()
         writer.close()
     chunkingInfoPath = os.path.join(
         outputFolderPath,
@@ -3688,17 +3696,67 @@ def loadWithArrayAnn(
 
 def blockFromPath(
         dataPath, lazy=False, mapDF=None,
-        reduceChannelIndexes=False, loadList=None):
-    assert os.path.exists(dataPath)
-    if lazy:
-        dataReader = nixio_fr.NixIO(
-            filename=dataPath)
-        dataBlock = readBlockFixNames(
-            dataReader, lazy=lazy, mapDF=mapDF,
-            reduceChannelIndexes=reduceChannelIndexes, loadList=loadList)
-    else:
-        dataReader = None
-        dataBlock = loadWithArrayAnn(dataPath)
+        reduceChannelIndexes=False, loadList=None,
+        purgeNixNames=False, chunkingInfoPath=None):
+    chunkingMetadata = None
+    if chunkingInfoPath is not None:
+        if os.path.exists(chunkingInfoPath):
+            with open(chunkingInfoPath, 'r') as f:
+                chunkingMetadata = json.load(f)
+    if chunkingMetadata is None:
+        chunkingMetadata = {
+            '0': {
+                'filename': dataPath,
+                'partNameSuffix': '',
+                'chunkTStart': 0,
+                'chunkTStop': 'NaN'
+            }}
+    for idx, (chunkIdxStr, chunkMeta) in enumerate(chunkingMetadata.items()):   
+        thisDataPath = chunkMeta['filename']
+        assert os.path.exists(thisDataPath)
+        if idx == 0:
+            if lazy:
+                dataReader = nixio_fr.NixIO(
+                    filename=thisDataPath)
+                dataBlock = readBlockFixNames(
+                    dataReader, lazy=lazy, mapDF=mapDF,
+                    reduceChannelIndexes=reduceChannelIndexes,
+                    purgeNixNames=purgeNixNames, loadList=loadList)
+            else:
+                dataReader = None
+                dataBlock = loadWithArrayAnn(thisDataPath)
+        else:
+            if lazy:
+                dataReader2 = nixio_fr.NixIO(
+                    filename=thisDataPath)
+                dataBlock2 = readBlockFixNames(
+                    dataReader2, lazy=lazy, mapDF=mapDF,
+                    reduceChannelIndexes=reduceChannelIndexes, loadList=loadList)
+            else:
+                dataReader2 = None
+                dataBlock2 = loadWithArrayAnn(thisDataPath)
+            maxSegIdx = len(dataBlock.segments)
+            typesNeedRenaming = [
+                SpikeTrainProxy, AnalogSignalProxy, EventProxy,
+                SpikeTrain, AnalogSignal, Event]
+            for segIdx, seg in enumerate(dataBlock2.segments):
+                if seg.name is None:
+                    seg.name = 'seg{}_'.format(maxSegIdx + segIdx)
+                else:
+                    if 'seg{}_'.format(maxSegIdx + segIdx) not in seg.name:
+                        seg.name = (
+                            'seg{}_{}'
+                            .format(
+                                maxSegIdx + segIdx,
+                                childBaseName(seg.name, 'seg')))
+                for objType in typesNeedRenaming:
+                    for child in seg.filter(objects=objType):
+                        if 'seg{}_'.format(maxSegIdx + segIdx) not in child.name:
+                            child.name = (
+                                'seg{}_{}'
+                                .format(
+                                    maxSegIdx + segIdx, childBaseName(child.name, 'seg')))
+            dataBlock.merge(dataBlock2)
     return dataReader, dataBlock
 
 

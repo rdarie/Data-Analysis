@@ -1,6 +1,8 @@
 #!/bin/bash
 
 source ./shellScripts/run_align_motion_preamble.sh
+WINDOW="--window=XS"
+ANALYSISFOLDER="--analysisName=fullRes"
 
 # OUTLIERMASK="--maskOutlierBlocks"
 OUTLIERMASK=""
@@ -8,7 +10,7 @@ OUTLIERMASK=""
 # STATSOVERLAY="--overlayStats"
 STATSOVERLAY=""
 
-TIMEWINDOWOPTS="--winStart=200 --winStop=800"
+TIMEWINDOWOPTS="--winStart=200 --winStop=200"
 
 # ALIGNQUERY="--alignQuery=stimOn"
 # ALIGNQUERY="--alignQuery=outbound"
@@ -26,8 +28,8 @@ COLOPTS="--colName=pedalMovementCat --colControl="
 STYLEOPTS="--styleName= --styleControl="
 SIZEOPTS="--sizeName= --sizeControl="
 
-# PAGELIMITS="--limitPages=5"
-PAGELIMITS=""
+PAGELIMITS="--limitPages=10"
+# PAGELIMITS=""
 
 OTHERASIGOPTS="--noStim"
 OTHERNEURONOPTS="--noStim"

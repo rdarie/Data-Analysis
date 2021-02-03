@@ -22,7 +22,7 @@
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 
-# SLURM_ARRAY_TASK_ID=2
+SLURM_ARRAY_TASK_ID=2
 source shellScripts/run_align_motion_preamble.sh
 #
-python -u ./calcAlignedAsigs.py --chanQuery="lfp" --outputBlockSuffix="lfp" --eventBlockSuffix='epochs' --signalBlockSuffix='analyze' --verbose --exp=$EXP $AMPFIELDNAME $BLOCKSELECTOR $WINDOW $LAZINESS $EVENTSELECTOR $ALIGNFOLDER $ANALYSISFOLDER
+python -u ./calcAlignedAsigs.py --chanQuery="lfp" --outputBlockSuffix="lfp" --eventBlockSuffix='epochs' --signalBlockPrefix='utah' --verbose --exp=$EXP $AMPFIELDNAME $BLOCKSELECTOR --window=XS $LAZINESS $EVENTSELECTOR $ALIGNFOLDER --analysisName=fullRes --signalSubfolder=None

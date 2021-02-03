@@ -3647,17 +3647,18 @@ def calcBreakDown(asigWide, rowName, colName, hueName):
         if i is not None]
     if len(breakDownBy) == 1:
         breakDownBy = breakDownBy[0]
+        
     breakDownData = (
         asigWide
         .groupby(breakDownBy)
         .agg('count')
         .iloc[:, 0]
         .to_frame(name='count')
-    )
+        )
+    # breakDownData = (asigWide.groupby(breakDownBy).agg('count').iloc[:, 0].to_frame(name='count'))
     # 
     # indexNames = breakDownData.index.names + ['count']
     # breakDownData = breakDownData.reset_index()
-    # pdb.set_trace()
     # breakDownData.columns = indexNames
     unitName = asigWide.reset_index()['feature'].unique()[0]
     breakDownText = (

@@ -360,6 +360,7 @@ def parseAnalysisOptions(
                 'binWidth': 5e-3,
                 'smoothKernelWidth': 5e-3},  # 5 kHz,
             'default': {
+                'subfolder': 'default',
                 'binInterval': 1e-3,
                 'binWidth': 10e-3,
                 'smoothKernelWidth': 10e-3},  # default

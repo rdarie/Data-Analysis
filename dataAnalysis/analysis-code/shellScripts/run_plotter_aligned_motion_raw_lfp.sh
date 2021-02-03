@@ -22,7 +22,7 @@
 # Request custom resources
 #SBATCH --array=1,2,3
 
-# SLURM_ARRAY_TASK_ID=2
-source ./shellScripts/run_plotter_aligned_motion_preamble.sh
+SLURM_ARRAY_TASK_ID=2
+source ./shellScripts/run_plotter_aligned_motion_raw_preamble.sh
 
 python3 -u './plotAlignedAsigs.py' --inputBlockName="lfp" --unitQuery="lfp" --enableOverrides --exp=$EXP $BLOCKSELECTOR $ANALYSISFOLDER $WINDOW $ALIGNQUERY $ALIGNFOLDER $TIMEWINDOWOPTS $STATSOVERLAY $OUTLIERMASK $HUEOPTS $ROWOPTS $COLOPTS $STYLEOPTS $SIZEOPTS $PAGELIMITS $OTHERASIGOPTS

@@ -18,7 +18,9 @@ EXP="exp202101281100"
 LAZINESS="--lazy"
 
 WINDOW="--window=M"
+# WINDOW="--window=XS"
 ANALYSISFOLDER="--analysisName=default"
+# ANALYSISFOLDER="--analysisName=fullRes"
 
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
 # BLOCKSELECTOR="--processAll"
