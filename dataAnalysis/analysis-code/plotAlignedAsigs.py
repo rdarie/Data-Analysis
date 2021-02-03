@@ -64,15 +64,14 @@ expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']), arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
+#
 analysisSubFolder = os.path.join(
     scratchFolder, arguments['analysisName']
     )
-if not os.path.exists(analysisSubFolder):
-    os.makedirs(analysisSubFolder, exist_ok=True)
+assert os.path.exists(analysisSubFolder)
 #
 alignSubFolder = os.path.join(analysisSubFolder, arguments['alignFolderName'])
-if not os.path.exists(alignSubFolder):
-    os.makedirs(alignSubFolder, exist_ok=True)
+assert os.path.exists(alignSubFolder)
 figureStatsFolder = os.path.join(
     alignSubFolder, 'figureStats'
     )
@@ -99,6 +98,7 @@ alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = (
         namedQueries, analysisSubFolder, **arguments))
 alignedAsigsKWargs['outlierTrials'] = ash.processOutlierTrials(
     calcSubFolder, prefix, **arguments)
+
 if arguments['noStim']:
     alignedAsigsKWargs.update(dict(
         duplicateControlsByProgram=False,
@@ -241,6 +241,5 @@ if arguments['overlayStats']:
         figureFolder=alignedFeaturesFolder,
         **rowColOpts,
         **statsTestOpts)
-#
 if arguments['lazy']:
     dataReader.file.close()
