@@ -10,7 +10,7 @@ OUTLIERMASK=""
 # STATSOVERLAY="--overlayStats"
 STATSOVERLAY=""
 
-TIMEWINDOWOPTS="--winStart=200 --winStop=200"
+TIMEWINDOWOPTS="--winStart=25 --winStop=125"
 
 # ALIGNQUERY="--alignQuery=stimOn"
 # ALIGNQUERY="--alignQuery=outbound"
@@ -28,7 +28,7 @@ COLOPTS="--colName=pedalMovementCat --colControl="
 STYLEOPTS="--styleName= --styleControl="
 SIZEOPTS="--sizeName= --sizeControl="
 
-PAGELIMITS="--limitPages=10"
+# PAGELIMITS="--limitPages=10"
 # PAGELIMITS=""
 
 OTHERASIGOPTS="--noStim"

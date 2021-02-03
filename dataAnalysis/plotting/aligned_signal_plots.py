@@ -11,6 +11,7 @@ import math
 import seaborn as sns
 import dataAnalysis.helperFunctions.kilosort_analysis_new as ksa
 import dataAnalysis.helperFunctions.helper_functions_new as hf
+import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
 import dataAnalysis.preproc.ns5 as ns5
 from neo import (
     Block, Segment, ChannelIndex,
@@ -26,6 +27,7 @@ from copy import deepcopy
 from tqdm import tqdm
 import json
 from IPython.display import HTML
+
 
 def processRowColArguments(arguments):
     outDict = {}
@@ -97,7 +99,139 @@ def processRowColArguments(arguments):
             outDict['sizeControl'] = None
     else:
         outDict['sizeControl'] = None
+        
+    if 'rowColOverrides' in arguments:
+        for ident in ['col', 'row', 'hue']:
+            if outDict['{}Name'.format(ident)] in arguments['rowColOverrides']:
+                outDict['{}Order'.format(ident)] = arguments['rowColOverrides'][outDict['{}Name'.format(ident)]]
     return outDict
+
+
+def processFigureFolderTree(
+        _arguments, _scratchFolder, _figureFolder):
+    # folder structure processing
+    if _arguments['inputBlockSuffix'] is not None:
+        inputBlockSuffix = '_{}'.format(_arguments['inputBlockSuffix'])
+    else:
+        inputBlockSuffix = ''
+    if _arguments['processAll']:
+        blockBaseName = _arguments['inputBlockPrefix']
+    else:
+        blockBaseName = '{}{:0>3}'.format(
+            _arguments['inputBlockPrefix'], _arguments['blockIdx'])
+    if _arguments['analysisName'] is not None:
+        analysisSubFolder = os.path.join(
+            _scratchFolder, _arguments['analysisName']
+            )
+        assert os.path.exists(analysisSubFolder)
+    else:
+        analysisSubFolder = _scratchFolder
+    if _arguments['alignFolderName'] is not None:
+        alignSubFolder = os.path.join(analysisSubFolder, _arguments['alignFolderName'])
+        assert os.path.exists(alignSubFolder)
+    else:
+        alignSubFolder = analysisSubFolder
+    triggeredPath = os.path.join(
+        alignSubFolder,
+        blockBaseName + '{}_{}.nix'.format(
+            inputBlockSuffix, _arguments['window']))
+    #
+    figureStatsFolder = os.path.join(
+        alignSubFolder, 'figureStats'
+        )
+    if not os.path.exists(figureStatsFolder):
+        os.makedirs(figureStatsFolder, exist_ok=True)
+    alignedFeaturesFolder = os.path.join(
+        _figureFolder, _arguments['analysisName'],
+        'alignedFeatures')
+    if not os.path.exists(alignedFeaturesFolder):
+        os.makedirs(alignedFeaturesFolder, exist_ok=True)
+    #
+    pdfName = '{}{}_{}_{}'.format(
+        blockBaseName, inputBlockSuffix,
+        _arguments['window'],
+        _arguments['alignQuery'])
+    if _arguments['invertOutlierBlocks']:
+        pdfName += '_outliers'
+    if _arguments['individualTraces']:
+        pdfName += '_traces'
+    statsTestPath = os.path.join(figureStatsFolder, pdfName + '_stats.h5')
+    calcSubFolder = os.path.join(alignSubFolder, 'dataframes')
+    return (
+        blockBaseName, analysisSubFolder, alignSubFolder, figureStatsFolder,
+        alignedFeaturesFolder, calcSubFolder, triggeredPath, pdfName,
+        statsTestPath)
+
+
+def processFigureLoadArgs(
+        _arguments, _namedQueries, _analysisSubFolder,
+        _calcSubFolder, _blockBaseName, _rasterOpts, alignedAsigsKWargs, statsTestOpts
+        ):
+    rowColOpts = processRowColArguments(_arguments)
+    alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(
+        _namedQueries, **_arguments)
+    alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = (
+        ash.processUnitQueryArgs(
+            _namedQueries,
+            _analysisSubFolder, **_arguments))
+    alignedAsigsKWargs['outlierTrials'] = ash.processOutlierTrials(
+        _calcSubFolder, _blockBaseName, **_arguments)
+    if _arguments['noStim']:
+        alignedAsigsKWargs.update(dict(
+            duplicateControlsByProgram=False,
+            makeControlProgram=False,
+            metaDataToCategories=False))
+    else:
+        alignedAsigsKWargs.update(dict(
+            duplicateControlsByProgram=True,
+            makeControlProgram=True,
+            metaDataToCategories=False))
+    if 'windowSize' not in alignedAsigsKWargs:
+        alignedAsigsKWargs['windowSize'] = list(_rasterOpts['windowSizes'][_arguments['window']])
+    if 'winStart' in _arguments:
+        alignedAsigsKWargs['windowSize'][0] = float(_arguments['winStart']) * (-1e-3)
+    if 'winStop' in _arguments:
+        alignedAsigsKWargs['windowSize'][1] = float(_arguments['winStop']) * (1e-3)
+    #
+    if statsTestOpts['tStop'] is None:
+        statsTestOpts.update({
+            'tStop': alignedAsigsKWargs['windowSize'][1]})
+    elif statsTestOpts['tStop'] > alignedAsigsKWargs['windowSize'][1]:
+        statsTestOpts.update({
+            'tStop': alignedAsigsKWargs['windowSize'][1]})
+    if statsTestOpts['tStart'] is None:
+        statsTestOpts.update({
+            'tStart': alignedAsigsKWargs['windowSize'][0]})
+    elif statsTestOpts['tStart'] < alignedAsigsKWargs['windowSize'][0]:
+        statsTestOpts.update({
+            'tStart': alignedAsigsKWargs['windowSize'][0]})
+    #
+    if _arguments['hueName'] is not None:
+        alignedAsigsKWargs.update({'amplitudeColumn': _arguments['hueName']})
+    return rowColOpts, alignedAsigsKWargs, statsTestOpts
+
+
+def processRelplotKWArgs(
+        relplotKWArgs, minNObservations, _arguments, _alignedAsigsKWargs,
+        _rasterOpts=None, changeRelPlotAspectRatio=False
+        ):
+    if changeRelPlotAspectRatio:
+        currWindow = _rasterOpts['windowSizes'][_arguments['window']]
+        fullWinSize = currWindow[1] - currWindow[0]
+        redWinSize = (
+            _alignedAsigsKWargs['windowSize'][1] -
+            _alignedAsigsKWargs['windowSize'][0])
+        relplotKWArgs['aspect'] = (
+            relplotKWArgs['aspect'] * redWinSize / fullWinSize)
+    if _arguments['individualTraces']:
+        relplotKWArgs['estimator'] = None
+        relplotKWArgs['units'] = 't'
+        minNObservations = 0
+    if _arguments['limitPages'] is not None:
+        limitPages = int(_arguments['limitPages'])
+    else:
+        limitPages = None
+    return relplotKWArgs, minNObservations, limitPages
 
 
 def getRasterFacetIdx(
@@ -182,10 +316,14 @@ def plotNeuronsAligned(
                 asigWide = ns5.alignedAsigsToDF(
                     frBlock, [continuousName],
                     **loadArgs)
-                # oneSpikePerBinHz = int(
-                #     np.round(
-                #         np.diff(rasterWide.columns)[0] ** (-1) *
-                #         loadArgs['decimate']))
+                for indNm in [rowName, colName, hueName]:
+                    if indNm is not None:
+                        if indNm not in asigWide.index.names:
+                            asigWide.loc[:, indNm] = 'NA'
+                            asigWide.set_index(indNm, append=True, inplace=True)
+                        if indNm not in rasterWide.index.names:
+                            rasterWide.loc[:, indNm] = 'NA'
+                            rasterWide.set_index(indNm, append=True, inplace=True)
                 oneSpikePerBinHz = int(
                     np.round(
                         np.diff(rasterWide.columns)[0] ** (-1)))
@@ -198,7 +336,7 @@ def plotNeuronsAligned(
                         breakDownData.to_csv(
                             os.path.join(
                                 figureFolder,
-                                pdfName + '_trialsBreakDown.txt'),
+                                pdfName + '_trialsBreakDown.csv'),
                             sep='\t')
                         breakDownInspectPath = os.path.join(
                                 figureFolder,
@@ -348,7 +486,7 @@ def plotAsigsAligned(
                     breakDownData.to_csv(
                         os.path.join(
                             figureFolder,
-                            pdfName + '_trialsBreakDown.txt'),
+                            pdfName + '_trialsBreakDown.csv'),
                         sep='\t')
                     breakDownInspectPath = os.path.join(
                             figureFolder,
@@ -502,6 +640,56 @@ def printBreakdown(asigWide, rowName, colName, hueName):
     # fig.set_size_inches(bbFigCoords.width, bbFigCoords.height)
     # bb.transformed(fig.transFigure.inverted()).width
     return breakDownData, breakDownText, fig, ax
+
+
+def plotAsigsAlignedWrapper(
+        _arguments, _statsTestPath, _dataReader, _dataBlock,
+        _alignedAsigsKWargs, _rowColOpts, _limitPages, _statsTestOpts,
+        _alignedFeaturesFolder, _minNObservations, _plotProcFuns,
+        _pdfName, _relplotKWArgs, _asigSigStarOpts,
+        ):
+    #  Get stats results?
+    if _arguments['overlayStats']:
+        if os.path.exists(_statsTestPath) and not _arguments['recalcStats']:
+            sigValsWide = pd.read_hdf(_statsTestPath, 'sig')
+            sigValsWide.columns.name = 'bin'
+        else:
+            (
+                pValsWide, statValsWide,
+                sigValsWide) = ash.facetGridCompareMeans(
+                _dataBlock, _statsTestPath,
+                loadArgs=_alignedAsigsKWargs,
+                rowColOpts=_rowColOpts,
+                limitPages=_limitPages,
+                statsTestOpts=_statsTestOpts)
+    else:
+        sigValsWide = None
+    #
+    # import warnings
+    # warnings.filterwarnings("error")
+    plotAsigsAligned(
+        _dataBlock,
+        limitPages=_limitPages,
+        verbose=_arguments['verbose'],
+        loadArgs=_alignedAsigsKWargs,
+        sigTestResults=sigValsWide,
+        figureFolder=_alignedFeaturesFolder,
+        enablePlots=True,
+        minNObservations=_minNObservations,
+        plotProcFuns=_plotProcFuns,
+        pdfName=_pdfName,
+        **_rowColOpts,
+        relplotKWArgs=_relplotKWArgs, sigStarOpts=_asigSigStarOpts)
+
+    if _arguments['overlayStats']:
+        plotSignificance(
+            sigValsWide,
+            pdfName=_pdfName + '_pCount',
+            figureFolder=_alignedFeaturesFolder,
+            **_rowColOpts,
+            **_statsTestOpts)
+    if _arguments['lazy']:
+        _dataReader.file.close()
 
 
 def genYLabelChanger(lookupDict={}, removeMatch=''):

@@ -25,4 +25,4 @@
 SLURM_ARRAY_TASK_ID=2
 source shellScripts/run_align_stim_raw_preamble.sh
 #
-python -u ./calcAlignedAsigs.py --chanQuery="all" --outputBlockSuffix="lfp" --eventBlockSuffix='epochs' --signalBlockPrefix='utah' --verbose --exp=$EXP $AMPFIELDNAME $BLOCKSELECTOR $WINDOW $LAZINESS $EVENTSELECTOR $ALIGNFOLDER $ANALYSISFOLDER --signalSubfolder=None
+python -u ./calcAlignedAsigs.py --chanQuery="all" --outputBlockSuffix="rig" --eventBlockSuffix='epochs' --signalSubfolder='None' --signalBlockPrefix='utah' --signalBlockSuffix='analog_inputs' --verbose --exp=$EXP $AMPFIELDNAME $BLOCKSELECTOR $WINDOW $LAZINESS $EVENTSELECTOR $ALIGNFOLDER $ANALYSISFOLDER

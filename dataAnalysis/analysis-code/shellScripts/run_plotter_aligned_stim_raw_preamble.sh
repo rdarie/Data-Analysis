@@ -1,12 +1,16 @@
 #!/bin/bash
 
 source ./shellScripts/run_align_stim_preamble.sh
+WINDOW="--window=XS"
+ANALYSISFOLDER="--analysisName=fullRes"
 
 # OUTLIERMASK="--maskOutlierBlocks"
 OUTLIERMASK=""
 
-STATSOVERLAY="--overlayStats"
-TIMEWINDOWOPTS="--winStart=200 --winStop=800"
+# STATSOVERLAY="--overlayStats"
+
+STATSOVERLAY=""
+TIMEWINDOWOPTS="--winStart=22 --winStop=2"
 
 # ALIGNQUERY="--alignQuery=stimOn"
 ALIGNQUERY="--alignQuery=stimOnHighRate"
@@ -20,11 +24,11 @@ ALIGNQUERY="--alignQuery=stimOnHighRate"
 
 HUEOPTS="--hueName=amplitude --hueControl="
 ROWOPTS="--rowName=RateInHz --rowControl="
-COLOPTS="--colName=pedalMovementCat --colControl="
+COLOPTS="--colName= --colControl="
 STYLEOPTS="--styleName= --styleControl="
 SIZEOPTS="--sizeName= --sizeControl="
 
-# PAGELIMITS="--limitPages=5"
+# PAGELIMITS="--limitPages=10"
 PAGELIMITS=""
 
 OTHERASIGOPTS="--recalcStats"
