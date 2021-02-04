@@ -110,27 +110,10 @@ def processRowColArguments(arguments):
 def processFigureFolderTree(
         _arguments, _scratchFolder, _figureFolder):
     # folder structure processing
-    if _arguments['inputBlockSuffix'] is not None:
-        inputBlockSuffix = '_{}'.format(_arguments['inputBlockSuffix'])
-    else:
-        inputBlockSuffix = ''
-    if _arguments['processAll']:
-        blockBaseName = _arguments['inputBlockPrefix']
-    else:
-        blockBaseName = '{}{:0>3}'.format(
-            _arguments['inputBlockPrefix'], _arguments['blockIdx'])
-    if _arguments['analysisName'] is not None:
-        analysisSubFolder = os.path.join(
-            _scratchFolder, _arguments['analysisName']
-            )
-        assert os.path.exists(analysisSubFolder)
-    else:
-        analysisSubFolder = _scratchFolder
-    if _arguments['alignFolderName'] is not None:
-        alignSubFolder = os.path.join(analysisSubFolder, _arguments['alignFolderName'])
-        assert os.path.exists(alignSubFolder)
-    else:
-        alignSubFolder = analysisSubFolder
+    blockBaseName, inputBlockSuffix = hf.processBasicPaths(_arguments)
+    analysisSubFolder, alignSubFolder = hf.processSubfolderPaths(
+        _arguments, _scratchFolder, assertExists=True)
+    #
     triggeredPath = os.path.join(
         alignSubFolder,
         blockBaseName + '{}_{}.nix'.format(

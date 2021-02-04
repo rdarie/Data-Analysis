@@ -3801,3 +3801,41 @@ def plotCorrSynchReport(
         bbox_inches='tight')
     return fig, ax, figSaveOpts
 
+
+def processBasicPaths(_arguments):
+    if _arguments['inputBlockSuffix'] is not None:
+        inputBlockSuffix = '_{}'.format(_arguments['inputBlockSuffix'])
+    else:
+        inputBlockSuffix = ''
+    if _arguments['processAll']:
+        blockBaseName = _arguments['inputBlockPrefix']
+    else:
+        blockBaseName = '{}{:0>3}'.format(
+            _arguments['inputBlockPrefix'], _arguments['blockIdx'])
+    return blockBaseName, inputBlockSuffix
+
+
+def processSubfolderPaths(_arguments, _scratchFolder, assertExists=False):
+    if _arguments['analysisName'] is not None:
+        analysisSubFolder = os.path.join(
+            _scratchFolder, _arguments['analysisName']
+            )
+    else:
+        analysisSubFolder = _scratchFolder
+    if assertExists:
+        assert os.path.exists(analysisSubFolder)
+    else:
+        if not os.path.exists(analysisSubFolder):
+            os.makedirs(analysisSubFolder)
+    if _arguments['alignFolderName'] is not None:
+        alignSubFolder = os.path.join(
+            analysisSubFolder, _arguments['alignFolderName'])
+    else:
+        alignSubFolder = analysisSubFolder
+    if assertExists:
+        assert os.path.exists(alignSubFolder)
+    else:
+        if not os.path.exists(alignSubFolder):
+            os.makedirs(alignSubFolder)
+    return analysisSubFolder, alignSubFolder
+
