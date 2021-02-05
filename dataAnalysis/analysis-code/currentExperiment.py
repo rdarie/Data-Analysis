@@ -30,7 +30,10 @@ def parseAnalysisOptions(
     #     scratchPath = os.path.join('E:', 'Neural Recordings', 'scratch')
 
     nspPrbPath = os.path.join('.', 'nsp_map.prb')
-    insFolder = os.path.join(remoteBasePath, 'ORCA Logs', expOpts['subjectName'])
+    try:
+        insFolder = os.path.join(remoteBasePath, 'ORCA Logs', expOpts['subjectName'])
+    except:
+        insFolder = os.path.join(remoteBasePath, 'ORCA Logs')
     experimentName = expOpts['experimentName']
     assembledName = ''
     nspFolder = os.path.join(remoteBasePath, 'raw', experimentName)
