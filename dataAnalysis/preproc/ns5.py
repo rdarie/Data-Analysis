@@ -2233,47 +2233,96 @@ def readBlockFixNames(
                 stP.unit.annotations.update(json.loads(unAnnStr))
     if (loadList is not None) and lazy:
         if 'asigs' in loadList:
-            for asigP in dataBlock.filter(objects=AnalogSignalProxy):
-                if asigP.name in loadList['asigs']:
-                    asig = asigP.load()
-                    asig.annotations = asigP.annotations.copy()
-                    #
-                    seg = asigP.segment
-                    segAsigNames = [ag.name for ag in seg.analogsignals]
-                    asig.segment = seg
-                    idxInSeg = segAsigNames.index(asigP.name)
-                    seg.analogsignals[idxInSeg] = asig
-                    #
-                    chIdx = asigP.channel_index
-                    chIdxAsigNames = [ag.name for ag in chIdx.analogsignals]
-                    asig.channel_index = chIdx
-                    idxInChIdx = chIdxAsigNames.index(asigP.name)
-                    chIdx.analogsignals[idxInChIdx] = asig
+            loadAsigList(
+                dataBlock, listOfAsigProxyNames=loadList['asigs'],
+                replaceInParents=True)
         if 'events' in loadList:
-            for evP in dataBlock.filter(objects=EventProxy):
-                if evP.name in loadList['events']:
-                    ev = loadObjArrayAnn(evP.load())
-                    seg = evP.segment
-                    segEvNames = [e.name for e in seg.events]
-                    idxInSeg = segEvNames.index(evP.name)
-                    seg.events[idxInSeg] = ev
+            loadEventList(
+                dataBlock,
+                listOfEventNames=loadList['events'],
+                replaceInParents=True)
         if 'spiketrains' in loadList:
-            for stP in dataBlock.filter(objects=SpikeTrainProxy):
-                if stP.name in loadList['spiketrains']:
-                    st = loadObjArrayAnn(stP.load())
-                    seg = stP.segment
-                    segStNames = [s.name for s in seg.spiketrains]
-                    idxInSeg = segStNames.index(stP.name)
-                    seg.spiketrains[idxInSeg] = st
-                    #
-                    unit = stP.unit
-                    unitStNames = [s.name for s in unit.spiketrains]
-                    st.unit = unit
-                    idxInUnit = unitStNames.index(stP.name)
-                    unit.spiketrains[idxInUnit] = st
+            loadSpikeTrainList(
+                dataBlock,
+                listOfSpikeTrainNames=loadList['spiketrains'],
+                replaceInParents=True)
     if purgeNixNames:
         dataBlock = purgeNixAnn(dataBlock)
     return dataBlock
+
+
+def loadSpikeTrainList(
+        dataBlock, listOfSpikeTrainNames=None,
+        replaceInParents=True):
+    listOfSpikeTrains = None
+    if listOfSpikeTrainNames is None:
+        listOfSpikeTrainNames = [
+            stp.name
+            for stp in dataBlock.filter(objects=SpikeTrainProxy)]
+    for stP in dataBlock.filter(objects=SpikeTrainProxy):
+        if stP.name in listOfSpikeTrainNames:
+            st = loadObjArrayAnn(stP.load())
+            listOfSpikeTrains.append(st)
+            if replaceInParents:
+                seg = stP.segment
+                segStNames = [s.name for s in seg.spiketrains]
+                idxInSeg = segStNames.index(stP.name)
+                seg.spiketrains[idxInSeg] = st
+                #
+                unit = stP.unit
+                unitStNames = [s.name for s in unit.spiketrains]
+                st.unit = unit
+                idxInUnit = unitStNames.index(stP.name)
+                unit.spiketrains[idxInUnit] = st
+    return listOfSpikeTrains
+
+
+def loadEventList(
+        dataBlock,
+        listOfEventNames=None, replaceInParents=True):
+    listOfEvents = None
+    if listOfEventNames is None:
+        listOfEventNames = [
+            evp.name
+            for evp in dataBlock.filter(objects=EventProxy)]
+    for evP in dataBlock.filter(objects=EventProxy):
+        if evP.name in listOfEventNames:
+            ev = loadObjArrayAnn(evP.load())
+            listOfEvents.append(ev)
+            if replaceInParents:
+                seg = evP.segment
+                segEvNames = [e.name for e in seg.events]
+                idxInSeg = segEvNames.index(evP.name)
+                seg.events[idxInSeg] = ev
+    return listOfEvents
+
+
+def loadAsigList(
+        dataBlock, listOfAsigProxyNames=None, replaceInParents=True):
+    listOfAsigs = []
+    if listOfAsigProxyNames is None:
+        listOfAsigProxyNames = [
+            asigp.name
+            for asigp in dataBlock.filter(objects=AnalogSignalProxy)]
+    for asigP in dataBlock.filter(objects=AnalogSignalProxy):
+        if asigP.name in listOfAsigProxyNames:
+            asig = asigP.load()
+            asig.annotations = asigP.annotations.copy()
+            listOfAsigs.append(asig)
+            #
+            if replaceInParents:
+                seg = asigP.segment
+                segAsigNames = [ag.name for ag in seg.analogsignals]
+                asig.segment = seg
+                idxInSeg = segAsigNames.index(asigP.name)
+                seg.analogsignals[idxInSeg] = asig
+                #
+                chIdx = asigP.channel_index
+                chIdxAsigNames = [ag.name for ag in chIdx.analogsignals]
+                asig.channel_index = chIdx
+                idxInChIdx = chIdxAsigNames.index(asigP.name)
+                chIdx.analogsignals[idxInChIdx] = asig
+    return listOfAsigs
 
 
 def addBlockToNIX(
