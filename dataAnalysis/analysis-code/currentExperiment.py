@@ -32,7 +32,7 @@ def parseAnalysisOptions(
     nspPrbPath = os.path.join('.', 'nsp_map.prb')
     try:
         insFolder = os.path.join(remoteBasePath, 'ORCA Logs', expOpts['subjectName'])
-    except:
+    except Exception:
         insFolder = os.path.join(remoteBasePath, 'ORCA Logs')
     experimentName = expOpts['experimentName']
     assembledName = ''
