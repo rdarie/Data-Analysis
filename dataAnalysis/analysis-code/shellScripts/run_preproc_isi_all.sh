@@ -101,13 +101,13 @@ BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
 #  #  preprocess
 # python -u ./preprocNS5.py --exp=$EXP $BLOCKSELECTOR --ISIMinimal --transferISIStimLog
 # python -u ./preprocDelsysHPF.py --exp=$EXP $BLOCKSELECTOR $CHANSELECTOR --verbose
-python -u ./preprocDelsysCSV.py --exp=$EXP $BLOCKSELECTOR $CHANSELECTOR --verbose
+# python -u ./preprocDelsysCSV.py --exp=$EXP $BLOCKSELECTOR $CHANSELECTOR --verbose
 
 #  #  synchronize
 # python -u ./synchronizeDelsysToNSP.py $BLOCKSELECTOR --exp=$EXP $CHANSELECTOR --trigRate=2
  
 #  #  downsample
-# python -u ./calcISIAnalysisNix.py --exp=$EXP $BLOCKSELECTOR $CHANSELECTOR $ANALYSISFOLDER --verbose
+python -u ./calcISIAnalysisNix.py --exp=$EXP $BLOCKSELECTOR $CHANSELECTOR $ANALYSISFOLDER --verbose
 
 ################################################################################################################
 ALIGNQUERY="--alignQuery=stimOn"

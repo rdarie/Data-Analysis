@@ -274,6 +274,22 @@ def synchronizeDelsysToNSP():
             chanQuery = arguments['chanQuery']
         chanQuery = chanQuery.replace('chanName', 'interpCols')
         interpCols = interpCols[eval(chanQuery)]
+    dummyOeAsig = oeBlock.filter(objects=AnalogSignal)[0]
+    # pdb.set_trace()
+    listOfCols = list(interpCols)
+    oeBlock = ns5.dataFrameToAnalogSignals(
+        oeDF.loc[:, ['nspT'] + listOfCols],
+        idxT='nspT',
+        probeName='openEphys', samplingRate=dummyOeAsig.sampling_rate,
+        dataCol=listOfCols, forceColNames=listOfCols, verbose=True)
+    outputFilePath = os.path.join(
+        scratchFolder, ns5FileName + '_delsys_synchronized.nix'
+        )
+    writer = ns5.NixIO(
+        filename=outputFilePath, mode='ow')
+    writer.write_block(oeBlock, use_obj_names=True)
+    writer.close()
+    '''
     oeInterp = hf.interpolateDF(
         oeDF, newT,
         kind='pchip', fill_value=(0, 0),
@@ -292,6 +308,7 @@ def synchronizeDelsysToNSP():
         folderPath=scratchFolder,
         nixBlockIdx=0, nixSegIdx=[0],
         )
+    '''
     return
 
 
