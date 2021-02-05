@@ -85,7 +85,7 @@ def preprocNS5():
     equalChunks = False
     ###############################################################
     groupAsigsByBank = True
-    if groupAsigsByBank:
+    if groupAsigsByBank and ('spikeSortingOpts' in locals()):
         print('Rewriting list of asigs that will be processed')
         spikeSortingOpts[arrayName]['asigNameList'] = []
         for name, group in mapDF.groupby('bank'):

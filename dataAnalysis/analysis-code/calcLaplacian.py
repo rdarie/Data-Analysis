@@ -152,14 +152,14 @@ def compose2D(
         # asig is a 2D AnalogSignal
         lfpList = []
         if tqdmProgBar:
-            tIterator = tqdm(iter(range(asig.shape[0])))
-        else:
-            tIterator = iter(range(asig.shape[0]))
-        for tIdx in tIterator:
+            tIterator = tqdm(total=asig.shape[0], miniters=100)
+        for tIdx in range(asig.shape[0]):
             lfpDF = compose2D_single(
                 asig[tIdx, :], chanIndex, fullLongIndex,
                 procFun=procFun, fillerFun=fillerFun, unstacked=unstacked)
             lfpList.append(lfpDF)
+            if tqdmProgBar:
+                tIterator.update(1)
         return asig.times, lfpList
 
 

@@ -45,4 +45,4 @@ python --version
 
 # SLURM_ARRAY_TASK_ID=2
 #
-python -u ./calcLaplacian.py --chanQuery="lfp" --inputBlockSuffix='analyze' --verbose --useKCSD --outputBlockSuffix=kcsd --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER $LAZINESS
+python -u ./calcLaplacian.py --chanQuery="lfp" --inputBlockSuffix='analyze' --verbose --outputBlockSuffix=csd --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER $LAZINESS
