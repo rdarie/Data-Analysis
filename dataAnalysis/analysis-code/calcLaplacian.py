@@ -37,6 +37,7 @@ import dataAnalysis.helperFunctions.helper_functions_new as hf
 import dataAnalysis.plotting.spike_sorting_plots as ssplt
 import dataAnalysis.preproc.ns5 as ns5
 from scipy.stats import zscore, chi2
+from scipy import interpolate, ndimage
 # import pingouin as pg
 import pandas as pd
 import numpy as np
@@ -84,20 +85,76 @@ arguments['chanNames'], arguments['chanQuery'] = ash.processChannelQueryArgs(
     namedQueries, scratchFolder, **arguments)
 
 
-def plotLFP2D(asig, chanIndex=None, fig=None, ax=None):
+def compose2D_single(
+        quant, chanIndex, fullLongIndex,
+        procFun=None, fillerFun=None):
+    longData = pd.DataFrame(
+        {
+            'x': chanIndex.coordinates[:, 0],
+            'y': chanIndex.coordinates[:, 1],
+            'signal': quant}
+        ).set_index(['x', 'y'])
+    longData.dropna(inplace=True)
+    missingIndices = fullLongIndex[~fullLongIndex.isin(longData.index)]
+    if fillerFun is not None:
+        fillerDF = fillerFun(longData, missingIndices)
+    else:
+        fillerDF = pd.DataFrame(np.nan, index=missingIndices, columns=['signal'])
+    lfpLong = pd.concat([longData, fillerDF]).reset_index().sort_values(by=['x', 'y'])
+    lfpDF = lfpLong.pivot(index='y', columns='x', values='signal')
+    if procFun is not None:
+        lfpDF = procFun(lfpDF)
+    return lfpDF
+
+
+def compose2D(asig, chanIndex, procFun=None, fillerFun=None):
+    coordinateIndices = chanIndex.annotations['coordinateIndices']
+    # coordsToIndices is guaranteed to return indices between 0 and max
+    xMin = chanIndex.coordinates[:, 0].min()
+    xMax = chanIndex.coordinates[:, 0].max()
+    yMin = chanIndex.coordinates[:, 1].min()
+    yMax = chanIndex.coordinates[:, 1].max()
+    #
+    yIdxMax = coordinateIndices[:, 1].max()
+    yStepSize = (yMax - yMin) / yIdxMax
+    yIndex = (np.arange(yIdxMax + 1) * yStepSize)
+    xIdxMax = coordinateIndices[:, 0].max()
+    xStepSize = (xMax - xMin) / xIdxMax
+    xIndex = (np.arange(xIdxMax + 1) * xStepSize)
+    fullLongIndex = pd.MultiIndex.from_product([xIndex, yIndex], names=['x', 'y'])
+    # pdb.set_trace()
+    if asig.ndim == 1:
+        # asig is a 1D Quantity
+        lfpDF = compose2D_single(
+            asig, chanIndex, fullLongIndex,
+            procFun=procFun, fillerFun=fillerFun)
+        return lfpDF
+    else:
+        # asig is a 2D AnalogSignal
+        lfpList = []
+        for tIdx, t in asig.times:
+            lfpDF = compose2D_single(
+                asig, chanIndex, fullLongIndex,
+                procFun=procFun, fillerFun=fillerFun)
+            lfpList.append(lfpDF)
+        return asig.times, lfpList
+
+
+def plotLfp2D(
+        asig=None, chanIndex=None,
+        lfpDF=None, procFun=None, fillerFun=None,
+        fig=None, ax=None,
+        heatmapKWs={}):
     if (fig is None) and (ax is None):
         fig, ax = plt.subplots()
-    if chanIndex is None:
-        assert isinstance(asig, AnalogSignal)
-        chanIndex = asig.channel_index
-    coordinateIndices = chanIndex.annotations['coordinateIndices']
-    coordinates = chanIndex.coordinates
-    # coordsToIndices is guaranteed to return indices between 0 and max
-    xIdxMax = coordinateIndices[:, 0].max()
-    yIdxMax = coordinateIndices[:, 1].max()
-    pdb.set_trace()
-    # lfp = np.zeros((, ))
-    return
+    returnList = [fig, ax]
+    if lfpDF is None:
+        lfpDF = compose2D(
+            asig, chanIndex,
+            procFun=procFun, fillerFun=fillerFun)
+        returnList.append(lfpDF)
+    sns.heatmap(lfpDF, ax=ax, **heatmapKWs)
+    return returnList
 
 
 if __name__ == "__main__":
@@ -149,10 +206,6 @@ if __name__ == "__main__":
             coordinateIndices = np.concatenate(
                 [xcoords[:, np.newaxis], ycoords[:, np.newaxis]],
                 axis=1)
-            xMin = coordinates[:, 0].min()
-            xMax = coordinates[:, 0].max()
-            yMin = coordinates[:, 1].min()
-            yMax = coordinates[:, 1].max()
         #
         chanIndex = ChannelIndex(
             name=arguments['arrayName'],
@@ -160,8 +213,7 @@ if __name__ == "__main__":
             channel_ids=np.arange(len(chanNames)),
             channel_names=chanNames,
             coordinates=coordinates,
-            coordinateIndices=coordinateIndices,
-            xMin=xMin, xMax=xMax, yMin=yMin, yMax=yMax
+            coordinateIndices=coordinateIndices
             )
     asigs = AnalogSignal(
         np.concatenate(
@@ -175,5 +227,38 @@ if __name__ == "__main__":
         )
     asigs.channel_index = chanIndex
     chanIndex.analogsignals.append(asigs)
-    plotLFP2D(asigs[10, :], chanIndex=chanIndex)
-    pdb.set_trace()
+
+    def interpLfp(longData, missingIndices):
+        fillerVals = interpolate.griddata(
+            longData.index.to_frame(), longData['signal'],
+            missingIndices.to_frame())
+        fillerDF = pd.DataFrame(
+            fillerVals,
+            index=missingIndices, columns=['signal'])
+        if fillerDF['signal'].isna().any():
+            stillMissing = fillerDF.index[fillerDF['signal'].isna()]
+            fillerForFiller = interpolate.griddata(
+                longData.index.to_frame(), longData['signal'],
+                stillMissing.to_frame(), method='nearest')
+            fillerDF.loc[stillMissing, 'signal'] = fillerForFiller
+        # pdb.set_trace()
+        return fillerDF
+
+    fig, ax = plt.subplots(1, 3)
+    _, _, lfpDF = plotLfp2D(
+        asig=asigs[10, :], chanIndex=chanIndex,
+        fillerFun=interpLfp, fig=fig, ax=ax[0])
+    ax[0].set_title('Original')
+    smoothedDF = pd.DataFrame(
+        ndimage.gaussian_filter(lfpDF, 1), index=lfpDF.index,
+        columns=lfpDF.columns)
+    plotLfp2D(
+        lfpDF=smoothedDF, fig=fig, ax=ax[1])
+    ax[1].set_title('Smoothed')
+    laplDF = pd.DataFrame(
+        ndimage.laplace(smoothedDF), index=lfpDF.index,
+        columns=lfpDF.columns)
+    plotLfp2D(
+        lfpDF=laplDF, fig=fig, ax=ax[1])
+    ax[2].set_title('Laplacian')
+    plt.show()
