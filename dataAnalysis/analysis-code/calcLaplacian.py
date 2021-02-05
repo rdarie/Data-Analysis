@@ -245,20 +245,23 @@ if __name__ == "__main__":
         return fillerDF
 
     fig, ax = plt.subplots(1, 3)
+    fig.set_size_inches(12, 4)
     _, _, lfpDF = plotLfp2D(
         asig=asigs[10, :], chanIndex=chanIndex,
         fillerFun=interpLfp, fig=fig, ax=ax[0])
     ax[0].set_title('Original')
+    sigma = 1
     smoothedDF = pd.DataFrame(
-        ndimage.gaussian_filter(lfpDF, 1), index=lfpDF.index,
+        ndimage.gaussian_filter(lfpDF, sigma), index=lfpDF.index,
         columns=lfpDF.columns)
     plotLfp2D(
         lfpDF=smoothedDF, fig=fig, ax=ax[1])
-    ax[1].set_title('Smoothed')
+    ax[1].set_title('Smoothed (sigma = {})'.format(sigma))
     laplDF = pd.DataFrame(
         ndimage.laplace(smoothedDF), index=lfpDF.index,
         columns=lfpDF.columns)
     plotLfp2D(
-        lfpDF=laplDF, fig=fig, ax=ax[1])
-    ax[2].set_title('Laplacian')
+        lfpDF=laplDF, fig=fig, ax=ax[2], heatmapKWs={'cmap': 'mako'})
+    ax[2].set_title('Laplacian of smoothed')
     plt.show()
+    pdb.set_trace()
