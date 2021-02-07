@@ -2280,7 +2280,7 @@ def loadSpikeTrainList(
 def loadEventList(
         dataBlock,
         listOfEventNames=None, replaceInParents=True):
-    listOfEvents = None
+    listOfEvents = []
     if listOfEventNames is None:
         listOfEventNames = [
             evp.name
