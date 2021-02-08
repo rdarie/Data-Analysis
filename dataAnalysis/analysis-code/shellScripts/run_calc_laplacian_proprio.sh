@@ -8,20 +8,20 @@
 
 # Use more memory (32GB):
 #SBATCH --nodes=1
-#SBATCH --mem=96G
+#SBATCH --mem=127G
 
 # Specify a job name:
-#SBATCH -J laplacian_calc_2021_01_28_kcsd
+#SBATCH -J laplacian_calc_2021_01_28_lapl
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-laplacian_calc_2021_01_28_kcsd.out
-#SBATCH -e ../../batch_logs/%j-%a-laplacian_calc_2021_01_28_kcsd.out
+#SBATCH -o ../../batch_logs/%j-%a-laplacian_calc_2021_01_28_lapl.out
+#SBATCH -e ../../batch_logs/%j-%a-laplacian_calc_2021_01_28_lapl.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=2
+#SBATCH --array=1
 
 # EXP="exp202101141100"
 # EXP="exp202101191100"
@@ -45,4 +45,5 @@ python --version
 
 # SLURM_ARRAY_TASK_ID=2
 #
-python -u ./calcLaplacian.py --chanQuery="lfp" --inputBlockSuffix='analyze' --verbose --outputBlockSuffix=csd --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER $LAZINESS
+python -u ./calcLaplacian.py --useKCSD --outputBlockSuffix=kcsd --chanQuery="lfp" --inputBlockSuffix='analyze' --verbose --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER $LAZINESS
+# python -u ./calcLaplacian.py --outputBlockSuffix=laplacian --chanQuery="lfp" --inputBlockSuffix='analyze' --verbose --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER $LAZINESS

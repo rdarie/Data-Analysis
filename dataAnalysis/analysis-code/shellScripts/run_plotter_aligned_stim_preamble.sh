@@ -5,7 +5,9 @@ source ./shellScripts/run_align_stim_preamble.sh
 # OUTLIERMASK="--maskOutlierBlocks"
 OUTLIERMASK=""
 
-STATSOVERLAY="--overlayStats"
+# STATSOVERLAY="--overlayStats"
+STATSOVERLAY=""
+
 TIMEWINDOWOPTS="--winStart=200 --winStop=800"
 
 # ALIGNQUERY="--alignQuery=stimOn"

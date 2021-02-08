@@ -138,15 +138,25 @@ def plotSpikePanel(
 
 def coordsToIndices(
         xcoords, ycoords,
-        swapXY=False, reverseX=False, reverseY=False):
-    xSpacing = np.ufunc.reduce(np.frompyfunc(gcd, 2, 1), xcoords.astype(np.int))
-    ySpacing = np.ufunc.reduce(np.frompyfunc(gcd, 2, 1), ycoords.astype(np.int))
-    # 
-    xIdx = np.array(np.divide(xcoords, xSpacing), dtype=np.int)
-    yIdx = np.array(np.divide(ycoords, ySpacing), dtype=np.int)
-    # 
-    xIdx = xIdx - min(xIdx)
-    yIdx = yIdx - min(yIdx)
+        swapXY=False,
+        reverseX=False, reverseY=False):
+    # ordMag = np.floor(np.log10(xcoords.abs().mean().mean()))
+    xcoordsInt = (xcoords - xcoords.min()).astype(np.int)
+    ycoordsInt = (ycoords - ycoords.min()).astype(np.int)
+    #
+    # xcoordsInt = xcoords.astype(np.int) - xcoords.astype(np.int).min()
+    # ycoordsInt = ycoords.astype(np.int) - ycoords.astype(np.int).min()
+    #
+    xSpacing = np.ufunc.reduce(np.frompyfunc(gcd, 2, 1), xcoordsInt)
+    ySpacing = np.ufunc.reduce(np.frompyfunc(gcd, 2, 1), ycoordsInt)
+    #
+    xIdx = np.array(
+        np.divide(xcoords.astype(np.int), xSpacing),
+        dtype=np.int)
+    yIdx = np.array(
+        np.divide(ycoords.astype(np.int), ySpacing),
+        dtype=np.int)
+    #
     if reverseX:
         xIdx = np.max(xIdx) - xIdx
     if reverseY:

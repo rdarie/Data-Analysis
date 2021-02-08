@@ -45,11 +45,13 @@ from scipy import interpolate, ndimage
 import pandas as pd
 import numpy as np
 from elephant import current_source_density as csd
+from kcsd import KCSD2D
 from dask import dataframe as dd
 from dask.diagnostics import ProgressBar
 from dask.distributed import Client
 from copy import deepcopy
 from tqdm import tqdm
+from random import sample
 from currentExperiment import parseAnalysisOptions
 from namedQueries import namedQueries
 from sklearn.covariance import EmpiricalCovariance, MinCovDet, EllipticEnvelope
@@ -97,33 +99,6 @@ arguments['chanNames'], arguments['chanQuery'] = ash.processChannelQueryArgs(
     namedQueries, scratchFolder, **arguments)
 
 
-def compose2D_single(
-        quant, chanIndex, fullLongIndex,
-        procFun=None, fillerFun=None, unstacked=False):
-    longData = pd.DataFrame(
-        {
-            'x': chanIndex.coordinates[:, 0],
-            'y': chanIndex.coordinates[:, 1],
-            'signal': quant}
-        ).set_index(['x', 'y'])
-    longData.dropna(inplace=True)
-    missingIndices = fullLongIndex[~fullLongIndex.isin(longData.index)]
-    if fillerFun is not None:
-        fillerDF = fillerFun(longData, missingIndices)
-    else:
-        fillerDF = pd.DataFrame(
-            np.nan, index=missingIndices, columns=['signal'])
-    lfpLong = pd.concat(
-        [longData, fillerDF]).reset_index().sort_values(by=['x', 'y'])
-    lfpDF = lfpLong.pivot(index='y', columns='x', values='signal')
-    if procFun is not None:
-        lfpDF = procFun(lfpDF)
-    if unstacked:
-        return lfpDF.unstack()
-    else:
-        return lfpDF
-
-
 def compose2D(
         asig, chanIndex, procFun=None,
         fillerFun=None, unstacked=False,
@@ -137,30 +112,61 @@ def compose2D(
     #
     yIdxMax = coordinateIndices[:, 1].max()
     yStepSize = (yMax - yMin) / yIdxMax
-    yIndex = (np.arange(yIdxMax + 1) * yStepSize)
+    yIndex = yMin + (np.arange(yIdxMax + 1) * yStepSize)
     xIdxMax = coordinateIndices[:, 0].max()
     xStepSize = (xMax - xMin) / xIdxMax
-    xIndex = (np.arange(xIdxMax + 1) * xStepSize)
-    fullLongIndex = pd.MultiIndex.from_product([xIndex, yIndex], names=['x', 'y'])
+    xIndex = xMin + (np.arange(xIdxMax + 1) * xStepSize)
+    fullLongIndex = pd.MultiIndex.from_product(
+        [xIndex, yIndex], names=['x', 'y'])
+    fullLongCoords = fullLongIndex.to_frame().reset_index(drop=True)
+    fullLongCoords.loc[:, 'isPresent'] = False
+    presentCoords = pd.DataFrame(
+        chanIndex.coordinates[:, :2], columns=['x', 'y'])
+    for coordIdx, coord in fullLongCoords.iterrows():
+        deltaX = (presentCoords['x'] - coord['x']).abs()
+        deltaY = (presentCoords['y'] - coord['y']).abs()
+        fullLongCoords.loc[coordIdx, 'isPresent'] = (
+            (deltaX < 1e-3) &
+            (deltaY < 1e-3)
+            ).any()
     if asig.ndim == 1:
-        # asig is a 1D Quantity
-        lfpDF = compose2D_single(
-            asig, chanIndex, fullLongIndex,
-            procFun=procFun, fillerFun=fillerFun, unstacked=unstacked)
-        return lfpDF
+        allAsig = asig.magnitude[np.newaxis, :].copy()
+        asigTimes = np.asarray([0]) * pq.s
     else:
-        # asig is a 2D AnalogSignal
-        lfpList = []
-        if tqdmProgBar:
-            tIterator = tqdm(total=asig.shape[0], miniters=100)
-        for tIdx in range(asig.shape[0]):
-            lfpDF = compose2D_single(
-                asig[tIdx, :], chanIndex, fullLongIndex,
-                procFun=procFun, fillerFun=fillerFun, unstacked=unstacked)
+        allAsig = asig.magnitude.copy()
+        asigTimes = asig.times
+    if (~fullLongCoords['isPresent']).any():
+        missingCoords = fullLongCoords[~fullLongCoords['isPresent']]
+        allCoords = pd.concat(
+            [presentCoords, missingCoords.loc[:, ['x', 'y']]],
+            ignore_index=True, axis=0)
+        filler = np.empty((allAsig.shape[0], missingCoords.shape[0]))
+        filler[:] = np.nan
+        allAsig = np.concatenate([allAsig, filler], axis=1)
+    else:
+        allCoords = presentCoords
+    allAsigDF = pd.DataFrame(
+        allAsig, index=asigTimes,
+        columns=allCoords.set_index(['x', 'y']).index)
+    allAsigDF.index.name = 't'
+    if fillerFun is not None:
+        fillerFun(allAsigDF)
+    # asig is a 2D AnalogSignal
+    lfpList = []
+    if tqdmProgBar:
+        tIterator = tqdm(total=allAsig.shape[0], miniters=100)
+    for tIdx, asigSrs in allAsigDF.iterrows():
+        asigSrs.name = 'signal'
+        lfpDF = asigSrs.reset_index().pivot(index='y', columns='x', values='signal')
+        if procFun is not None:
+            lfpDF = procFun(lfpDF)
+        if unstacked:
+            lfpList.append(lfpDF.unstack())
+        else:
             lfpList.append(lfpDF)
-            if tqdmProgBar:
-                tIterator.update(1)
-        return asig.times, lfpList
+        if tqdmProgBar:
+            tIterator.update(1)
+    return asigTimes, lfpList
 
 
 def plotLfp2D(
@@ -172,43 +178,113 @@ def plotLfp2D(
         fig, ax = plt.subplots()
     returnList = [fig, ax]
     if lfpDF is None:
-        lfpDF = compose2D(
+        _, lfpList = compose2D(
             asig, chanIndex,
             procFun=procFun, fillerFun=fillerFun)
+        lfpDF = lfpList[0]
         returnList.append(lfpDF)
     sns.heatmap(lfpDF, ax=ax, **heatmapKWs)
     return returnList
 
 
-def interpLfp(longData, missingIndices):
+def do_kcsd(
+        lfp, coordinates,
+        kwargs={}, process_estimate=True):
+    scaled_coords = []
+    for coord in coordinates:
+        try:
+            scaled_coords.append(coord.rescale(pq.mm))
+        except AttributeError:
+            raise AttributeError('No units given for electrode spatial \
+            coordinates')
+    '''
+    input_array = np.zeros(
+        (len(lfp), lfp[0].magnitude.shape[0]))
+    print('do_kcsd(): rescaling inputs')
+    for ii, jj in enumerate(tqdm(lfp)):
+        input_array[ii, :] = jj.rescale(pq.mV).magnitude
+    '''
+    input_array = lfp.rescale(pq.mV).magnitude
+    lambdas = kwargs.pop('lambdas', None)
+    Rs = kwargs.pop('Rs', None)
+    k = KCSD2D(
+        np.array(scaled_coords),
+        input_array.T, **kwargs)
+    if process_estimate:
+        cv_R, cv_lambda = k.cross_validate(lambdas, Rs)
+    estm_csd = k.values()
+    estm_csd = np.rollaxis(estm_csd, -1, 0)
+    #
+    returnValues = []
+    if isinstance(lfp, AnalogSignal):
+        output = AnalogSignal(
+            estm_csd * pq.uA / pq.mm**3,
+            t_start=lfp.t_start,
+            sampling_rate=lfp.sampling_rate)
+        dim = len(scaled_coords[0])
+        if dim == 1:
+            output.annotate(
+                x_coords=np.round(k.estm_x, decimals=7))
+        elif dim == 2:
+            output.annotate(
+                x_coords=np.round(k.estm_x, decimals=7),
+                y_coords=np.round(k.estm_y, decimals=7))
+        elif dim == 3:
+            output.annotate(
+                x_coords=np.round(k.estm_x, decimals=7),
+                y_coords=np.round(k.estm_y, decimals=7),
+                z_coords=np.round(k.estm_z, decimals=7))
+        returnValues += [k, output]
+    else:
+        returnValues += [k, estm_csd * pq.uA / pq.mm**3]
+    if process_estimate:
+        returnValues += [cv_R, cv_lambda]
+    return returnValues
+
+
+def interpLfp(wideDF, coordCols=None):
+    longSrs = wideDF.unstack()
+    if coordCols is None:
+        coordCols = longSrs.index.names
+    validMask = longSrs.notna().to_numpy()
+    theseCoords = longSrs.index.to_frame().reset_index(drop=True)
+    validAxes = (theseCoords.max() - theseCoords.min()) != 0
+    coordCols = [cn for cn in coordCols if validAxes[cn]]
     fillerVals = interpolate.griddata(
-        longData.index.to_frame(), longData['signal'],
-        missingIndices.to_frame())
-    fillerDF = pd.DataFrame(
-        fillerVals,
-        index=missingIndices, columns=['signal'])
-    if fillerDF['signal'].isna().any():
-        stillMissing = fillerDF.index[fillerDF['signal'].isna()]
-        fillerForFiller = interpolate.griddata(
-            longData.index.to_frame(), longData['signal'],
-            stillMissing.to_frame(), method='nearest')
-        fillerDF.loc[stillMissing, 'signal'] = fillerForFiller
-    return fillerDF
+        theseCoords.loc[validMask, coordCols],
+        longSrs.loc[validMask],
+        theseCoords.loc[~validMask, coordCols])
+    nanFillers = np.isnan(fillerVals)
+    if nanFillers.any():
+        backupFillerVals = interpolate.griddata(
+            theseCoords.loc[validMask, coordCols],
+            longSrs.loc[validMask],
+            theseCoords.loc[~validMask, coordCols], method='nearest')
+        fillerVals[nanFillers] = backupFillerVals[nanFillers]
+    fillerDF = theseCoords.loc[~validMask, :].copy()
+    fillerDF.loc[:, 'signal'] = fillerVals
+    fillerDF.set_index(list(theseCoords.columns), inplace=True)
+    fillerDF = fillerDF.unstack(wideDF.columns.names)
+    fillerDF = fillerDF.droplevel(0, axis='columns')
+    wideDF.loc[fillerDF.index, fillerDF.columns] = fillerDF
+    return
 
 
 if __name__ == "__main__":
     print('loading {}'.format(dataPath))
-    #
     dataReader, dataBlock = ns5.blockFromPath(
         dataPath, lazy=arguments['lazy'])
     if arguments['chanNames'] is None:
         arguments['chanNames'] = ns5.listChanNames(
             dataBlock, arguments['chanQuery'], objType=ChannelIndex, condition='hasAsigs')
-    chanNames = arguments['chanNames']
+    reqChanNames = arguments['chanNames']
+    # DEBUGGING
+    reqChanNames = [cn for cn in reqChanNames if cn not in ['utah39']]
     channelIndexes = [
         chIdx
         for chIdx in dataBlock.filter(objects=ChannelIndex)
-        if chIdx.name in chanNames]
+        if chIdx.name in reqChanNames]
+    chanNames = [ci.name for ci in channelIndexes]
     #
     for segIdx, seg in enumerate(dataBlock.segments):
         if arguments['lazy']:
@@ -223,6 +299,7 @@ if __name__ == "__main__":
             asigList = [
                 chIdx.analogsignals[segIdx]
                 for chIdx in channelIndexes]
+        # pdb.set_trace()
         dummyAsig = asigList[0]
         if 'chanIndex' not in locals():
             if not (('xcoords' in dummyAsig.annotations) and ('ycoords' in dummyAsig.annotations)):
@@ -254,6 +331,12 @@ if __name__ == "__main__":
                 coordinates=coordinates,
                 coordinateIndices=coordinateIndices
                 )
+            annotationsLong = pd.DataFrame(chanIndex.coordinates, columns=['x', 'y', 'z'])
+            annotationsLong.loc[:, ['xIdx', 'yIdx']] = coordinateIndices
+            annotationsLong.loc[:, 'chanName'] = chanNames
+            annotations2D = {
+                key: annotationsLong.pivot(index='y', columns='x', values=key)
+                for key in ['chanName']}
         #
         asigs = AnalogSignal(
             np.concatenate(
@@ -268,62 +351,109 @@ if __name__ == "__main__":
         asigs.channel_index = chanIndex
         chanIndex.analogsignals.append(asigs)
         ##
-        decimateFactor = 10
+        decimateFactor = 4
         sigma = 1
-        # estimateAsigs = asigs[:30000, :]
+        NSamplesForCV = 1000
+        chunkSize = 1000
+        # estimateAsigs = asigs[:300, :]
         estimateAsigs = asigs
         if arguments['useKCSD']:
             print('estimating csd with kcsd...')
-            csdAsigs = csd.estimate_csd(
-                estimateAsigs,
-                coords=chanIndex.coordinates[:, :2],
-                method='KCSD2D')
+            kcsdKWArgs = {
+                'cv_iterator': True,
+                'verbose': True,
+                'Rs': np.asarray([0.2, 0.3, 0.4]),
+                # 'lambdas': np.logspace(-2, -10, 10, base=10.),
+                'n_lambda_suggestions': 10,
+                'gdx': 0.1, 'ext_x': 0.2, 'gdy': 0.1, 'ext_y': 0.2
+                }
+            nChunks = len(estimateAsigs) // chunkSize
+            adjChunkSize = int(np.ceil(len(estimateAsigs) / nChunks))
+            if True:
+                # run cross validator on a subset of the data
+                sampleIdx = sample(
+                    list(range(estimateAsigs.shape[0])),
+                    min(estimateAsigs.shape[0], NSamplesForCV))
+                sampleLFP = estimateAsigs.magnitude[sampleIdx, :] * estimateAsigs.units
+                kcsd, csdAsigs, cv_R, cv_lambda = do_kcsd(
+                    sampleLFP,
+                    chanIndex.coordinates[:, :2],
+                    kwargs=kcsdKWArgs.copy(),
+                    process_estimate=True)
+                print('After cross validation, setting R_init = {}, lambda = {}'.format(cv_R, cv_lambda))
+                kcsdKWArgs.update({'R_init': cv_R, 'lambd': cv_lambda})
+                # kcsd.errs_per_ele
+                csdErrPerElec = AnalogSignal(
+                    kcsd.errs_per_ele.mean(axis=0).mean(axis=0)[np.newaxis, :],
+                    units=pq.uV, t_start=0 * pq.s,
+                    sampling_rate=dummyAsig.sampling_rate
+                    )
             print('   Done running csd.estimate_csd')
             csdLongList = []
-            print('Smoothing and downsampling')
-            for tIdx in tqdm(range(csdAsigs.shape[0])):
-                csdDFFull = pd.DataFrame(
-                    csdAsigs[tIdx, :], index=csdAsigs.annotations['y_coords'][0, :],
-                    columns=csdAsigs.annotations['x_coords'][:, 0],
-                    )
-                win = decimateFactor
-                halfWin = int(np.ceil(win/2))
-                csdDF = (
-                    csdDFFull
-                    .rolling(window=win, center=True, axis=0).mean().iloc[halfWin:-halfWin:win, :]
-                    .rolling(window=win, center=True, axis=1).mean().iloc[:, halfWin:-halfWin:win])
-                csdDF.index.name = 'y'
-                csdDF.columns.name = 'x'
-                csdLong = csdDF.unstack()
-                csdLongList.append(csdLong.to_numpy()[np.newaxis, :])
-                if 'csdChanIndex' not in locals():
-                    csdCoordinates = csdLong.index.to_frame().to_numpy()
-                    csdX = csdCoordinates[:, 0] * 1000 * pq.um
-                    csdY = csdCoordinates[:, 1] * 1000 * pq.um
-                    csdXIdx, csdYIdx = ssplt.coordsToIndices(
-                        csdX, csdY)
-                    csdCoordinateIndices = np.concatenate(
-                        [csdXIdx[:, np.newaxis], csdYIdx[:, np.newaxis]],
-                        axis=1)
-                    csdChanNames = [
-                        arguments['arrayName'] + '_csd_{}'.format(idx)
-                        for idx, xy in enumerate(csdCoordinateIndices)
-                        ]
-                    csdChanIndex = ChannelIndex(
-                        name=arguments['arrayName'] + '_csd',
-                        index=np.arange(len(csdChanNames)),
-                        channel_ids=np.arange(len(csdChanNames)),
-                        channel_names=csdChanNames,
-                        coordinates=csdCoordinates,
-                        coordinateIndices=csdCoordinateIndices
-                        )
-            csdAsigsLong = AnalogSignal(
-                np.concatenate(csdLongList, axis=0),
-                units=csdAsigs.units, sampling_rate=csdAsigs.sampling_rate,
-                t_start=csdAsigs.t_start
+            for chunkIdx in range(nChunks):
+                seeker = slice(adjChunkSize * chunkIdx, adjChunkSize * (chunkIdx + 1))
+                kcsd, csdAsigs = do_kcsd(
+                    estimateAsigs[seeker],
+                    chanIndex.coordinates[:, :2],
+                    kwargs=kcsdKWArgs.copy(),
+                    process_estimate=False)
+                '''
+                csdAsigs = csd.estimate_csd(
+                    estimateAsigs, chanIndex.coordinates[:, :2],
+                    method='KCSD2D'
                 )
-            csdAsigsLong.channel_index = csdChanIndex
-            csdChanIndex.analogsignals.append(csdAsigsLong)
+                '''
+                print('Smoothing and downsampling')
+                for tIdx in tqdm(range(csdAsigs.shape[0])):
+                    csdDFFull = pd.DataFrame(
+                        csdAsigs[tIdx, :],
+                        index=csdAsigs.annotations['y_coords'][0, :],
+                        columns=csdAsigs.annotations['x_coords'][:, 0],
+                        )
+                    win = decimateFactor
+                    halfWin = int(np.ceil(win/2))
+                    csdDF = (
+                        csdDFFull
+                        .rolling(window=win, center=True, axis=0).mean()
+                        .iloc[halfWin:-halfWin:win, :]
+                        .rolling(window=win, center=True, axis=1).mean()
+                        .iloc[:, halfWin:-halfWin:win])
+                    csdDF.index.name = 'y'
+                    csdDF.columns.name = 'x'
+                    csdLong = csdDF.unstack()
+                    csdLongList.append(csdLong.to_numpy()[np.newaxis, :])
+                    if 'csdChanIndex' not in locals():
+                        csdCoordinates = (
+                            csdLong.index.to_frame().to_numpy() *
+                            1000 * pq.um)
+                        csdX = csdCoordinates[:, 0]
+                        csdY = csdCoordinates[:, 1]
+                        csdXIdx, csdYIdx = ssplt.coordsToIndices(
+                            np.floor(csdX), np.floor(csdY))
+                        csdCoordinateIndices = np.concatenate(
+                            [csdXIdx[:, np.newaxis], csdYIdx[:, np.newaxis]],
+                            axis=1)
+                        csdChanNames = [
+                            arguments['arrayName'] + '_csd_{}'.format(idx)
+                            for idx, xy in enumerate(csdCoordinateIndices)
+                            ]
+                        csdChanIndex = ChannelIndex(
+                            name=arguments['arrayName'] + '_csd',
+                            index=np.arange(len(csdChanNames)),
+                            channel_ids=np.arange(len(csdChanNames)),
+                            channel_names=csdChanNames,
+                            coordinates=csdCoordinates,
+                            coordinateIndices=csdCoordinateIndices
+                            )
+                        csdUnits = csdAsigs.units
+                csdAsigsLong = AnalogSignal(
+                    np.concatenate(csdLongList, axis=0),
+                    units=csdAsigs.units,
+                    sampling_rate=estimateAsigs.sampling_rate,
+                    t_start=estimateAsigs.t_start
+                    )
+                csdAsigsLong.channel_index = csdChanIndex
+                csdChanIndex.analogsignals.append(csdAsigsLong)
         else:
             # 2d laplacian
             print('reshaping data for laplacian')
@@ -363,11 +493,13 @@ if __name__ == "__main__":
             csdUnits = asigs.units / (csdX.units * csdY.units)
             csdAsigsLong = AnalogSignal(
                 np.concatenate(laplList, axis=0),
-                units=csdUnits, sampling_rate=estimateAsigs.sampling_rate,
+                units=csdUnits,
+                sampling_rate=estimateAsigs.sampling_rate,
                 t_start=estimateAsigs.t_start
                 )
             csdAsigsLong.channel_index = csdChanIndex
             csdChanIndex.analogsignals.append(csdAsigsLong)
+            # end laplacian option
     plotOneFrame = False
     if plotOneFrame:
         sns.set(font_scale=.8)
@@ -383,14 +515,23 @@ if __name__ == "__main__":
         plotLfp2D(
             lfpDF=smoothedDF, fig=fig, ax=ax[1])
         ax[1].set_title('Smoothed (sigma = {})'.format(sigma))
-        _, _, lfpDF = plotLfp2D(
+        _, _, csdDF = plotLfp2D(
             asig=csdAsigsLong[0, :], chanIndex=csdChanIndex,
-            fillerFun=interpLfp, fig=fig, ax=ax[2], heatmapKWs={'cmap': 'mako'})
+            fillerFun=interpLfp, fig=fig, ax=ax[2],
+            heatmapKWs={'cmap': 'mako'})
         ax[2].set_title('CSD estimate')
-        # plotLfp2D(
-        #     lfpDF=csdDF,
-        #     fig=fig, ax=ax[3], heatmapKWs={'cmap': 'mako'})
-        # ax[3].set_title('Elephand CSD function (default args)')
+        #
+        fig2, ax2 = plt.subplots()
+        ax2 = np.asarray([ax2])
+        fig2.set_size_inches(10, 10)
+        _, _, errDF = plotLfp2D(
+            asig=csdErrPerElec[0, :], chanIndex=chanIndex,
+            fillerFun=interpLfp, fig=fig2, ax=ax2[0],
+            heatmapKWs={
+                'cmap': 'viridis',
+                'annot': annotations2D['chanName'],
+                'fmt': '^5'})
+        ax2[0].set_title('Error from cross validation of kCSD')
         plt.show()
     outputBlock = Block(name='csd')
     for segIdx, seg in enumerate(dataBlock.segments):
@@ -399,7 +540,6 @@ if __name__ == "__main__":
         outputBlock.segments.append(newSeg)
         for cidx, csdName in enumerate(csdChanIndex.channel_names):
             if segIdx == 0:
-                # pdb.set_trace()
                 newChIdx = ChannelIndex(
                     name='{}'.format(csdName),
                     index=np.asarray([0]).flatten(),
