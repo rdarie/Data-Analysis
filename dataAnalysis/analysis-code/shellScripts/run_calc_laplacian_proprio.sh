@@ -8,14 +8,14 @@
 
 # Use more memory (32GB):
 #SBATCH --nodes=1
-#SBATCH --mem=127G
+#SBATCH --mem=250G
 
 # Specify a job name:
-#SBATCH -J laplacian_calc_2021_01_28_lapl
+#SBATCH -J laplacian_calc_2021_01_28_kcsd
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-laplacian_calc_2021_01_28_lapl.out
-#SBATCH -e ../../batch_logs/%j-%a-laplacian_calc_2021_01_28_lapl.out
+#SBATCH -o ../../batch_logs/%j-%a-laplacian_calc_2021_01_28_kcsd.out
+#SBATCH -e ../../batch_logs/%j-%a-laplacian_calc_2021_01_28_kcsd.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo

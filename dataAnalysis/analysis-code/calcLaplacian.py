@@ -556,8 +556,9 @@ if __name__ == "__main__":
                 csdAsigsLong[:, cidx],
                 name='seg{}_{}'.format(segIdx, csdName),
                 units=csdUnits, sampling_rate=estimateAsigs.sampling_rate,
-                t_start=estimateAsigs.t_start
+                t_start=estimateAsigs.t_start, t_stop=estimateAsigs.t_stop
                 )
+            print('asig {}, shape {}'.format(thisAsig.name, thisAsig.shape))
             newChIdx.analogsignals.append(thisAsig)
             newSeg.analogsignals.append(thisAsig)
             thisAsig.channel_index = newChIdx
@@ -567,3 +568,4 @@ if __name__ == "__main__":
         filename=outputPath, mode='ow')
     writer.write_block(outputBlock, use_obj_names=True)
     writer.close()
+    print('Done writing CSD matrix')
