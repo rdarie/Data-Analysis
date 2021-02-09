@@ -219,8 +219,9 @@ mapSpecificPlotProcFuns = {
     'utah': [
         asp.genTicksToScale(
             lineOpts={'lw': 1}, shared=sharedYAxes,
-            xUnitFactor=1e3, yUnitFactor=1e3,
-            xUnits='msec', yUnits='uA/mm^3',
+            xUnitFactor=1e3, xUnits='msec',
+            # yUnitFactor=1e3, yUnits='uA/mm^3',
+            yUnitFactor=1, yUnits='uV',
             )
         ]}
 addSpacesFromMap = True
@@ -337,7 +338,7 @@ if trialInfo['xcoords'].isna().any():
             index=mapDF['label'])
         trialInfo.loc[:, cName] = (
             trialInfo
-            .loc[:, 'feature']
+            .loc[:, 'parentChanName']
             .map(mapSer))
     trialInfo.loc[:, 'mapGroup'] = 'utah'
 # pdb.set_trace()
