@@ -3277,7 +3277,8 @@ def preprocBlockToNix(
                     t_start=tStart, dtype=np.float32
                     )
                 outMaskAsig.annotations['outlierProportion'] = np.mean(outlierMask[:, mIdx])
-                outMaskAsig.annotations.update(outlierMetadata[mIdx])
+                if calcOutliers:
+                    outMaskAsig.annotations.update(outlierMetadata[mIdx])
                 # assign ownership to containers
                 outMaskChIdx.analogsignals.append(outMaskAsig)
                 newSeg.analogsignals.append(outMaskAsig)

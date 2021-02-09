@@ -319,13 +319,14 @@ for cidx, chanIdx in enumerate(dataBlock.channel_indexes):
     listOfSpikeTrains = chanIdx.filter(objects=[SpikeTrain, SpikeTrainProxy])
     if len(listOfSpikeTrains):
         dummySt = listOfSpikeTrains[0]
-        if 'xcoords' in dummySt.annotations:
+        if 'xCoords' in dummySt.annotations:
             try:
                 trialInfo.loc[trialInfo['feature'] == chanIdx.name, 'xcoords'] = dummySt.annotations['xCoords']
                 trialInfo.loc[trialInfo['feature'] == chanIdx.name, 'ycoords'] = dummySt.annotations['yCoords']
                 trialInfo.loc[trialInfo['feature'] == chanIdx.name, 'mapGroup'] = 'utah'
             except Exception:
                 traceback.print_exc()
+
 if trialInfo['xcoords'].isna().any():
     if 'mapDF' not in locals():
         electrodeMapPath = spikeSortingOpts[arguments['arrayName']]['electrodeMapPath']

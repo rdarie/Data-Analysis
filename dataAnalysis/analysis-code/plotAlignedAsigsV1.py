@@ -82,8 +82,9 @@ plotProcFuns = [
         # xUnitFactor=1e3, yUnitFactor=1,
         # xUnits='msec', yUnits='uV',
         # for evoked emg report
-        xUnitFactor=1e3, yUnitFactor=1,
-        xUnits='msec', yUnits='uV',
+        xUnitFactor=1e3, xUnits='msec',
+        yUnitFactor=1, yUnits='uV',
+        # yUnitFactor=1e3, yUnits='uA/mm^3',
         ),
     asp.genYLabelChanger(
         lookupDict={}, removeMatch='#0'),
