@@ -8,6 +8,7 @@ import pdb
 
 def getLatestImpedance(
         recordingDate=None, impedanceFilePath='./impedances.h5',
+        subjectName=None,
         recordingDateStr=None,
         block=None, elecType=None):
     impedances = pd.read_hdf(impedanceFilePath, 'impedance')
@@ -21,7 +22,7 @@ def getLatestImpedance(
     pastDates = impedances.loc[impedances['date'] <= recordingDate, 'date']
     lastDate = np.max(pastDates)
     impedances = impedances.loc[impedances['date'] == lastDate, :]
-    return impedances
+    return impedances.dropna()
 
 
 def cmpToDF(arrayFilePath, lgaMapFilePath=None):

@@ -220,6 +220,10 @@ def preprocNS5():
             removeMeanAcross=False,
             linearDetrend=False,
             interpolateOutliers=False, calcOutliers=False,
+            normalizeByImpedance=True,
+            impedanceFilePath=os.path.join(
+                remoteBasePath,
+                '{}_blackrock_impedances.h5'.format(subjectName)),
             eventInfo=trialFilesFrom['utah']['eventInfo'],
             asigNameList=spikeSortingOpts[arrayName]['asigNameList'],
             ainpNameList=[],

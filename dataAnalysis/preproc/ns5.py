@@ -2483,7 +2483,7 @@ def preproc(
         saveFromAsigNameList=True,
         calcRigEvents=True, normalizeByImpedance=False,
         LFPFilterOpts=None, encoderCountPerDegree=180e2,
-        outlierRemovalDebugFlag=False
+        outlierRemovalDebugFlag=False, impedanceFilePath=None
         ):
     #  base file name
     rawBasePath = os.path.join(rawFolderPath, fileName)
@@ -2604,7 +2604,8 @@ def preproc(
             removeMeanAcross=removeMeanAcross,
             LFPFilterOpts=LFPFilterOpts,
             encoderCountPerDegree=encoderCountPerDegree,
-            outlierRemovalDebugFlag=outlierRemovalDebugFlag
+            outlierRemovalDebugFlag=outlierRemovalDebugFlag,
+            impedanceFilePath=impedanceFilePath,
             )
         #### diagnostics
         diagnosticFolder = os.path.join(
@@ -2692,9 +2693,11 @@ def preprocBlockToNix(
         saveFromAsigNameList=True,
         spikeSourceType='', spikeBlock=None,
         calcRigEvents=True,
-        normalizeByImpedance=True, removeMeanAcross=False,
+        normalizeByImpedance=True,
+        impedanceFilePath=None,
+        removeMeanAcross=False,
         LFPFilterOpts=None, encoderCountPerDegree=180e2,
-        outlierRemovalDebugFlag=False
+        outlierRemovalDebugFlag=False,
         ):
     #  prune out nev spike placeholders
     #  (will get added back on a chunk by chunk basis,
@@ -2833,7 +2836,9 @@ def preprocBlockToNix(
     block, nixblock = writer.write_block_meta(block)
     # descend into Segments
     if normalizeByImpedance:
-        impedances = prb_meta.getLatestImpedance(block)
+        impedances = prb_meta.getLatestImpedance(
+            block=block, impedanceFilePath=impedanceFilePath)
+        averageImpedance = impedances['impedance'].median()
     # for segIdx, seg in enumerate(oldSegList):
     if spikeBlock is not None:
         spikeSeg = spikeBlock.segments[0]
@@ -2923,8 +2928,15 @@ def preprocBlockToNix(
                 #          asig, filterCoeffs=filterCoeffs)
                 if normalizeByImpedance:
                     elNmMatchMsk = impedances['elec'] == chanIdx.name
+                    '''
                     asig.magnitude[:] = (
-                        (asig.magnitude - np.mean(asig.magnitude)) /
+                        (asig.magnitude - np.median(asig.magnitude)) /
+                        np.min(
+                            impedances.loc[elNmMatchMsk, 'impedance']
+                            ))
+                    '''
+                    asig.magnitude[:] = (
+                        (asig.magnitude) * averageImpedance /
                         np.min(
                             impedances.loc[elNmMatchMsk, 'impedance']
                             ))
@@ -3362,12 +3374,19 @@ def preprocBlockToNix(
             #  perform requested preproc operations
             if normalizeByImpedance and (aSigProxy not in ainpList):
                 elNmMatchMsk = impedances['elec'] == chanIdx.name
+                '''
                 asig.magnitude[:] = (
-                    (asig.magnitude - np.mean(asig.magnitude)) /
+                    (asig.magnitude - np.median(asig.magnitude)) /
                     np.min(
                         impedances.loc[elNmMatchMsk, 'impedance']
                         )
                     )
+                '''
+                asig.magnitude[:] = (
+                    (asig.magnitude) * averageImpedance /
+                    np.min(
+                        impedances.loc[elNmMatchMsk, 'impedance']
+                        ))
             if fillOverflow:
                 # fill in overflow:
                 asig.magnitude[:], _ = hf.fillInOverflow2(

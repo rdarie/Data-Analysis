@@ -7,8 +7,7 @@ Options:
     --processAll                        process all experimental days? [default: False]
     --verbose                           print diagnostics? [default: False]
     --plotting                          plot out the correlation matrix? [default: False]
-    --ripple                            impedances saved with Trellis? [default: False]
-    --blackrock                         impedances saved with Central? [default: False]
+    --reprocess                         restart processing from scratch [default: False]
 """
 #  The text block above is used by the docopt package to parse command line arguments
 #  e.g. you can call <python3 calcBlockSimilarityMatrix.py> to run with default arguments
@@ -61,29 +60,52 @@ expOpts, allOpts = parseAnalysisOptions(
 globals().update(expOpts)
 globals().update(allOpts)
 
-impedanceFilePath = os.path.join(remoteBasePath, 'impedances.h5')
-oldImpedances = pd.read_hdf(impedanceFilePath, 'impedance')
-impList = [oldImpedances]
-if arguments['blackrock']:
+electrodeMapLookup = {
+    'Rupert': './Utah_SN6251_002374_Rupert.cmp',
+    }
+electrodeMapPath = electrodeMapLookup[subjectName]
+mapExt = electrodeMapPath.split('.')[-1]
+if mapExt == 'cmp':
+    mapDF = prb_meta.cmpToDF(electrodeMapPath)
+    impedanceFileType = 'blackrock'
+elif mapExt == 'map':
+    mapDF = prb_meta.mapToDF(electrodeMapPath)
+    impedanceFileType = 'ripple'
+
+allTextPaths = glob.glob(os.path.join(remoteBasePath, 'raw', '*{}*'.format(subjectName), '*.txt'))
+print('\n'.join(allTextPaths))
+impedanceFileCandidatePaths = sorted(glob.glob(os.path.join(remoteBasePath, 'raw', '*{}*'.format(subjectName), 'impedances.txt')))
+print('\n'.join(impedanceFileCandidatePaths))
+#
+impedanceFilePath = os.path.join(remoteBasePath, '{}_{}_impedances.h5'.format(subjectName, impedanceFileType))
+if os.path.exists(impedanceFilePath) and not arguments['reprocess']:
+    oldImpedances = pd.read_hdf(impedanceFilePath, 'impedance')
+    impList = [oldImpedances]
+else:
+    impList = []
+    if os.path.exists(impedanceFilePath):
+        os.remove(impedanceFilePath)
+if impedanceFileType == 'blackrock':
     def stripImpedance(x):
         return int(x[:-5])
 
     def stripName(x):
         return re.split(r'\d*', x)[0]
 
-    cmpDF = prb_meta.cmpToDF(nspCmpPath)
-    utahLabels = cmpDF.loc[cmpDF['bank'].isin(['A', 'B', 'D']), 'label']
+    utahLabels = mapDF.loc[mapDF['bank'].isin(['A', 'B', 'C', 'D']), 'label']
     if arguments['processAll']:
-        fileList = glob.iglob('./**/impedances-blackrock.txt', recursive=True)
+        fileList = impedanceFileCandidatePaths
     else:
         fileList = []
     for filename in fileList:
-        folderPath = filename.split('\\')[-2]
+        folderPath = os.path.basename(os.path.dirname(filename))
         print(folderPath)
-        newImpedances = pd.read_csv(filename, sep='\t', skiprows=9, header=None, names=['elec', 'impedance'])
+        newImpedances = pd.read_csv(filename, sep='\t', skiprows=6, header=None, names=['elec', 'impedance'])
         newImpedances['impedance'] = newImpedances['impedance'].apply(stripImpedance)
         newImpedances['elec'] = newImpedances['elec'].apply(str.strip)
+        # newImpedances['elec'] = newImpedances['elec'].apply(stripName)
         newImpedances['elecType'] = np.nan
+        # pdb.set_trace()
         newImpedances.loc[newImpedances['elec'].isin(utahLabels.values), 'elecType'] = 'utah'
         recDateStr = [i for i in (re.findall('(\d*)', filename)) if len(i)]
         if not len(recDateStr):
@@ -94,7 +116,7 @@ if arguments['blackrock']:
     allImpedances = pd.concat(impList)
     allImpedances.to_hdf(impedanceFilePath, 'impedance')
 
-if arguments['ripple']:
+if impedanceFileType == 'ripple':
     headerNames = [
         'Array', 'Elec', 'Pin', 'Front End',
         'Freq(Hz)', 'Curr(nA)', 'Cycles', 'Mag(kOhms)', 'Phase']

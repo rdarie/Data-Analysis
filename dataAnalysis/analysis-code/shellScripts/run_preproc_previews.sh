@@ -38,9 +38,10 @@ EXP="exp202101141100"
 # EXP="exp202101271100"
 # EXP="exp202101281100"
 
-python -u ./previewINSSessionSummary.py --exp=$EXP
+# python -u ./previewINSSessionSummary.py --exp=$EXP
+python -u ./saveImpedances.py --exp=$EXP --processAll --reprocess
 
-for BLOCKIDX in 1 2 3
-do
-    python -u './previewNSPTapTimes.py' --blockIdx=$BLOCKIDX --exp=$EXP --usedTENSPulses
-done
+# for BLOCKIDX in 1 2 3
+# do
+#     python -u './previewNSPTapTimes.py' --blockIdx=$BLOCKIDX --exp=$EXP --usedTENSPulses
+# done
