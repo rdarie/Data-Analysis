@@ -103,7 +103,7 @@ statsTestOpts = dict(
     pThresh=5e-2,
     correctMultiple=False
     )
-# alignedAsigsKWargs['procFun'] = ash.genDetrender(timeWindow=(-25e-3, -5e-3))
+alignedAsigsKWargs['procFun'] = ash.genDetrender(timeWindow=(-200e-3, -100e-3))
 #
 #
 #############################################

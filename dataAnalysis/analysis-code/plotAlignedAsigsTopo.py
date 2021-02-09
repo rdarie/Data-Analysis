@@ -144,6 +144,7 @@ alignedAsigsKWargs.update(dict(
         arguments['amplitudeFieldName'],
         'stimCat', 'originalIndex', 'segment', 't'],
     transposeToColumns='bin', concatOn='index'))
+alignedAsigsKWargs['procFun'] = ash.genDetrender(timeWindow=(-200e-3, -100e-3))
 #
 #############################
 # for stim spike report
@@ -202,7 +203,8 @@ plotProcFuns = [
         left=True, bottom=True,
         offset=None, trim=False),
     asp.genGridAnnotator(
-        xpos=1, ypos=1, template='{}', colNames=['feature'],
+        xpos=1, ypos=1, template='{}',
+        colNames=['feature'],
         textOpts={
             'verticalalignment': 'top',
             'horizontalalignment': 'right'
