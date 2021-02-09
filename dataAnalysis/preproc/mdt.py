@@ -36,6 +36,7 @@ from copy import copy
 # INSReferenceTime = pd.Timestamp('2018-03-01')
 INSReferenceTime = pd.Timestamp('2019-01-01')
 
+
 def fixMalformedJson(jsonString, jsonType=''):
     '''
     Adapted from Medtronic RDK Matlab code

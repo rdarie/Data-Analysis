@@ -2,7 +2,7 @@
 
 # 08: Calculate binarized array and relevant analogsignals
 # Request 24 hours of runtime:
-#SBATCH --time=12:00:00
+#SBATCH --time=48:00:00
 
 # Default resources are 1 core with 2.8GB of memory.
 
@@ -11,17 +11,17 @@
 #SBATCH --mem=250G
 
 # Specify a job name:
-#SBATCH -J laplacian_calc_2021_01_28_kcsd
+#SBATCH -J laplacian_calc_2021_01_28_lapl
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-laplacian_calc_2021_01_28_kcsd.out
-#SBATCH -e ../../batch_logs/%j-%a-laplacian_calc_2021_01_28_kcsd.out
+#SBATCH -o ../../batch_logs/%j-%a-laplacian_calc_2021_01_28_lapl.out
+#SBATCH -e ../../batch_logs/%j-%a-laplacian_calc_2021_01_28_lapl.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=1
+#SBATCH --array=1,2,3
 
 # EXP="exp202101141100"
 # EXP="exp202101191100"
@@ -45,5 +45,5 @@ python --version
 
 # SLURM_ARRAY_TASK_ID=2
 #
-python -u ./calcLaplacian.py --useKCSD --outputBlockSuffix=kcsd --chanQuery="lfp" --inputBlockSuffix='analyze' --verbose --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER $LAZINESS
-# python -u ./calcLaplacian.py --outputBlockSuffix=laplacian --chanQuery="lfp" --inputBlockSuffix='analyze' --verbose --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER $LAZINESS
+# python -u ./calcLaplacian.py --useKCSD --inputBlockSuffix='analyze' --chanQuery="lfp" --outputBlockSuffix=kcsd --verbose --plotting --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER $LAZINESS
+python -u ./calcLaplacian.py --outputBlockSuffix=laplacian --chanQuery="lfp" --inputBlockSuffix='analyze' --verbose --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER $LAZINESS

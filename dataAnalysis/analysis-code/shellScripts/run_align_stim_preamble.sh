@@ -16,6 +16,7 @@ python --version
 EXP="exp202101281100"
 
 LAZINESS="--lazy"
+# LAZINESS=""
 
 # WINDOW="--window=long"
 WINDOW="--window=M"

@@ -145,14 +145,16 @@ print('Loading signal from {}'.format(signalPath))
 
 eventReader, eventBlock = ns5.blockFromPath(
     eventPath, lazy=arguments['lazy'],
-    loadList={'events': ['seg0_{}'.format(eventName)]}, purgeNixNames=True)
+    loadList={'events': ['seg0_{}'.format(eventName)]},
+    purgeNixNames=True)
 #
 if eventPath == signalPath:
     signalReader = eventReader
     signalBlock = eventBlock
 else:
     signalReader, signalBlock = ns5.blockFromPath(
-        signalPath, lazy=arguments['lazy'], chunkingInfoPath=chunkingInfoPath, purgeNixNames=True)
+        signalPath, lazy=arguments['lazy'],
+        chunkingInfoPath=chunkingInfoPath, purgeNixNames=True)
 #
 if len(signalBlock.segments) != len(eventBlock.segments):
     # assume eventBlock is not chunked, while signalBlock is chunked

@@ -302,7 +302,7 @@ if __name__ == "__main__":
         # pdb.set_trace()
         dummyAsig = asigList[0]
         if 'chanIndex' not in locals():
-            if not (('xcoords' in dummyAsig.annotations) and ('ycoords' in dummyAsig.annotations)):
+            if not (('xCoords' in dummyAsig.annotations) and ('yCoords' in dummyAsig.annotations)):
                 electrodeMapPath = spikeSortingOpts[arguments['arrayName']]['electrodeMapPath']
                 mapExt = electrodeMapPath.split('.')[-1]
                 if mapExt == 'cmp':
@@ -351,23 +351,27 @@ if __name__ == "__main__":
         asigs.channel_index = chanIndex
         chanIndex.analogsignals.append(asigs)
         ##
-        decimateFactor = 4
+        decimateFactor = None
         sigma = 1
+        #
         NSamplesForCV = 1000
-        chunkSize = 1000
-        # estimateAsigs = asigs[:300, :]
+        chunkSize = 10000
         estimateAsigs = asigs
+        # estimateAsigs = asigs[:900, :]
+        # NSamplesForCV = 100
+        # chunkSize = 100
+        #
         if arguments['useKCSD']:
             print('estimating csd with kcsd...')
             kcsdKWArgs = {
                 'cv_iterator': True,
                 'verbose': True,
-                'Rs': np.asarray([0.2, 0.3, 0.4]),
+                'Rs': np.asarray([0.2, 0.4]),
                 # 'lambdas': np.logspace(-2, -10, 10, base=10.),
-                'n_lambda_suggestions': 10,
-                'gdx': 0.1, 'ext_x': 0.2, 'gdy': 0.1, 'ext_y': 0.2
+                'n_lambda_suggestions': 3,
+                'gdx': 0.4, 'ext_x': 0.2, 'gdy': 0.4, 'ext_y': 0.2
                 }
-            nChunks = len(estimateAsigs) // chunkSize
+            nChunks = max(len(estimateAsigs) // chunkSize, 1)
             adjChunkSize = int(np.ceil(len(estimateAsigs) / nChunks))
             if True:
                 # run cross validator on a subset of the data
@@ -410,14 +414,17 @@ if __name__ == "__main__":
                         index=csdAsigs.annotations['y_coords'][0, :],
                         columns=csdAsigs.annotations['x_coords'][:, 0],
                         )
-                    win = decimateFactor
-                    halfWin = int(np.ceil(win/2))
-                    csdDF = (
-                        csdDFFull
-                        .rolling(window=win, center=True, axis=0).mean()
-                        .iloc[halfWin:-halfWin:win, :]
-                        .rolling(window=win, center=True, axis=1).mean()
-                        .iloc[:, halfWin:-halfWin:win])
+                    if decimateFactor is not None:
+                        win = decimateFactor
+                        halfWin = int(np.ceil(win/2))
+                        csdDF = (
+                            csdDFFull
+                            .rolling(window=win, center=True, axis=0).mean()
+                            .iloc[halfWin:-halfWin:win, :]
+                            .rolling(window=win, center=True, axis=1).mean()
+                            .iloc[:, halfWin:-halfWin:win])
+                    else:
+                        csdDF = csdDFFull
                     csdDF.index.name = 'y'
                     csdDF.columns.name = 'x'
                     csdLong = csdDF.unstack()
@@ -500,8 +507,7 @@ if __name__ == "__main__":
             csdAsigsLong.channel_index = csdChanIndex
             csdChanIndex.analogsignals.append(csdAsigsLong)
             # end laplacian option
-    plotOneFrame = False
-    if plotOneFrame:
+    if arguments['plotting']:
         sns.set(font_scale=.8)
         fig, ax = plt.subplots(1, 3)
         fig.set_size_inches(15, 5)
@@ -532,7 +538,16 @@ if __name__ == "__main__":
                 'annot': annotations2D['chanName'],
                 'fmt': '^5'})
         ax2[0].set_title('Error from cross validation of kCSD')
-        plt.show()
+        fig.savefig(
+            os.path.join(figureOutputFolder, 'laplacian_example.pdf'),
+            bbox_inches='tight', pad_inches=0
+        )
+        fig2.savefig(
+            os.path.join(figureOutputFolder, 'laplacian_error_by_electrode.pdf'),
+            bbox_inches='tight', pad_inches=0
+        )
+        # plt.show()
+        plt.close()
     outputBlock = Block(name='csd')
     for segIdx, seg in enumerate(dataBlock.segments):
         newSeg = Segment(name='seg{}_csd'.format(segIdx))
@@ -545,8 +560,8 @@ if __name__ == "__main__":
                     index=np.asarray([0]).flatten(),
                     channel_ids=np.asarray([cidx]).flatten(),
                     channel_names=np.asarray([csdName]).flatten(),
-                    coordinates=csdCoordinates[cidx, :][np.newaxis, :], # coordinates must be 2d
-                    coordinateIndices=csdCoordinateIndices[cidx, :], #any other annotation *cannot* be 2d...
+                    coordinates=csdCoordinates[cidx, :][np.newaxis, :],  # coordinates must be 2d
+                    coordinateIndices=csdCoordinateIndices[cidx, :],  #  any other annotation *cannot* be 2d...
                     )
                 newChIdx.block = outputBlock
                 outputBlock.channel_indexes.append(newChIdx)
@@ -556,8 +571,13 @@ if __name__ == "__main__":
                 csdAsigsLong[:, cidx],
                 name='seg{}_{}'.format(segIdx, csdName),
                 units=csdUnits, sampling_rate=estimateAsigs.sampling_rate,
-                t_start=estimateAsigs.t_start, t_stop=estimateAsigs.t_stop
+                t_start=estimateAsigs.t_start,
                 )
+            thisAsig.annotations['xCoords'] = float(newChIdx.coordinates[:, 0])
+            thisAsig.annotations['yCoords'] = float(newChIdx.coordinates[:, 1])
+            thisAsig.annotations['coordUnits'] = '{}'.format(
+                newChIdx.coordinates[:, 0].units)
+            #
             print('asig {}, shape {}'.format(thisAsig.name, thisAsig.shape))
             newChIdx.analogsignals.append(thisAsig)
             newSeg.analogsignals.append(thisAsig)

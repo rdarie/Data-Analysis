@@ -14,6 +14,7 @@ Options:
     --fullSubtractMean                 whether to make a .nix file that has all raw traces [default: False]
     --fullSubtractMeanWithSpikes       whether to make a .nix file that has all raw traces [default: False]
     --fullSubtractMeanUnfiltered       whether to make a .nix file that has all raw traces [default: False]
+    --fullUnfiltered                   whether to make a .nix file that has all raw traces [default: False]
     --rippleNForm                      whether to make a .nix file that has all raw traces [default: False]
     --makeFull                         whether to make a .nix file that has all raw traces [default: False]
     --maskMotorEncoder                 whether to ignore motor encoder activity outside the alignTimeBounds window [default: False]
@@ -166,16 +167,16 @@ def preprocNS5():
             fillOverflow=False, removeJumps=False,
             calcOutliers=spikeSortingOpts[arrayName]['interpolateOutliers'],
             interpolateOutliers=False,
-            linearDetrend=True,
             outlierThreshold=spikeSortingOpts[arrayName]['outlierThreshold'],
             outlierMaskFilterOpts=outlierMaskFilterOpts,
             motorEncoderMask=motorEncoderMask,
             calcAverageLFP=True,
+            removeMeanAcross=True,
+            linearDetrend=True,
             eventInfo=trialFilesFrom['utah']['eventInfo'],
             asigNameList=spikeSortingOpts[arrayName]['asigNameList'],
             ainpNameList=[],
             spikeSourceType='',
-            removeMeanAcross=True,
             nameSuffix='_mean_subtracted',
             LFPFilterOpts=spikeSortingFilterOpts,
             #
@@ -190,16 +191,39 @@ def preprocNS5():
             outputFolderPath=scratchFolder, mapDF=mapDF,
             fillOverflow=False, removeJumps=False,
             interpolateOutliers=False, calcOutliers=True,
-            linearDetrend=False,
             outlierThreshold=spikeSortingOpts[arrayName]['outlierThreshold'],
             outlierMaskFilterOpts=outlierMaskFilterOpts,
             motorEncoderMask=motorEncoderMask,
             calcAverageLFP=True,
+            removeMeanAcross=True,
+            linearDetrend=False,
             eventInfo=trialFilesFrom['utah']['eventInfo'],
             asigNameList=spikeSortingOpts[arrayName]['asigNameList'],
             ainpNameList=[],
             spikeSourceType='',
-            removeMeanAcross=True,
+            nameSuffix='',
+            LFPFilterOpts=None,
+            writeMode='ow',
+            chunkSize=chunkSize, equalChunks=equalChunks, chunkList=chunkList,
+            calcRigEvents=False)
+    if arguments['fullUnfiltered']:
+        print('\n\nPreprocNs5, generating lfp data...\n\n')
+        ns5.preproc(
+            fileName=ns5FileName,
+            rawFolderPath=nspFolder,
+            outputFolderPath=scratchFolder, mapDF=mapDF,
+            fillOverflow=False, removeJumps=False,
+            outlierThreshold=spikeSortingOpts[arrayName]['outlierThreshold'],
+            outlierMaskFilterOpts=outlierMaskFilterOpts,
+            motorEncoderMask=motorEncoderMask,
+            calcAverageLFP=True,
+            removeMeanAcross=False,
+            linearDetrend=False,
+            interpolateOutliers=False, calcOutliers=False,
+            eventInfo=trialFilesFrom['utah']['eventInfo'],
+            asigNameList=spikeSortingOpts[arrayName]['asigNameList'],
+            ainpNameList=[],
+            spikeSourceType='',
             nameSuffix='',
             LFPFilterOpts=None,
             writeMode='ow',

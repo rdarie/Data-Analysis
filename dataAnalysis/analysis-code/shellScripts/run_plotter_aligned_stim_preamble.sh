@@ -2,11 +2,11 @@
 
 source ./shellScripts/run_align_stim_preamble.sh
 
-# OUTLIERMASK="--maskOutlierBlocks"
-OUTLIERMASK=""
+OUTLIERMASK="--maskOutlierBlocks"
+# OUTLIERMASK=""
 
-# STATSOVERLAY="--overlayStats"
-STATSOVERLAY=""
+STATSOVERLAY="--overlayStats"
+# STATSOVERLAY=""
 
 TIMEWINDOWOPTS="--winStart=200 --winStop=800"
 

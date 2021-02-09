@@ -88,17 +88,20 @@ plotProcFuns = [
     asp.genYLabelChanger(
         lookupDict={}, removeMatch='#0'),
     # asp.genYLimSetter(newLims=[-75, 100], forceLims=True),
-    asp.genYLimSetter(quantileLims=0.95, forceLims=True),
     asp.xLabelsTime,
+    # asp.genBlockVertShader([
+    #         max(0e-3, alignedAsigsKWargs['windowSize'][0]),
+    #         min(.9e-3, alignedAsigsKWargs['windowSize'][1])],
+    #     asigPlotShadingOpts),
     # asp.genStimVLineAdder(
     #     'RateInHz', vLineOpts, tOnset=0, tOffset=.3, includeRight=False),
-    # asp.genVLineAdder([0], nrnVLineOpts),
+    asp.genVLineAdder([0], nrnVLineOpts),
     asp.genLegendRounder(decimals=2),
     ]
 statsTestOpts = dict(
-    testStride=25e-3,
-    testWidth=25e-3,
-    tStart=-100e-3,
+    testStride=5e-3,
+    testWidth=5e-3,
+    tStart=0,
     tStop=None,
     pThresh=5e-2,
     correctMultiple=False
@@ -123,11 +126,6 @@ rowColOpts, alignedAsigsKWargs, statsTestOpts = asp.processFigureLoadArgs(
 #
 #
 plotProcFuns.append(asp.genXLimSetter(alignedAsigsKWargs['windowSize']))
-plotProcFuns.append(
-    asp.genBlockVertShader([
-            max(0e-3, alignedAsigsKWargs['windowSize'][0]),
-            min(1000e-3, alignedAsigsKWargs['windowSize'][1])],
-        asigPlotShadingOpts),)
 #
 #
 #############################################
@@ -153,10 +151,6 @@ relplotUpdates = {
             'hspace': 0.01
         }}
     }
-if arguments['inputBlockSuffix'] == 'kcsd':
-    relplotUpdates.update({
-        'palette': "ch:0.6,.3,dark=.1,light=0.7,reverse=1"
-        })
 relplotKWArgs.update(relplotUpdates)
 #
 #

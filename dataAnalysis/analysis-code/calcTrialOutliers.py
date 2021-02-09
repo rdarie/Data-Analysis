@@ -333,7 +333,7 @@ if __name__ == "__main__":
 
     outlierTrials = findOutliers(
         mahalDist, groupBy=groupBy, multiplier=1, qThresh=1-1e-6,
-        nDim=len(dataDF.columns), devQuantile=0.95, twoTailed=twoTailed)
+        nDim=len(dataDF.columns), devQuantile=0.99, twoTailed=twoTailed)
     # outlierTrials = ash.applyFunGrouped(
     #     mahalDist,
     #     groupBy, testVar,

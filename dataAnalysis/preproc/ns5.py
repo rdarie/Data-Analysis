@@ -1199,6 +1199,17 @@ def getAsigsAlignedToEvents(
         chanIdx.units.append(thisUnit)
         thisUnit.channel_index = chanIdx
         masterBlock.channel_indexes.append(chanIdx)
+        sigChanIdxList = signalBlock.filter(
+            objects=ChannelIndex, name=chanName)
+        if len(sigChanIdxList):
+            sigChanIdx = sigChanIdxList[0]
+            if sigChanIdx.coordinates is not None:
+                coordUnits = sigChanIdx.coordinates[0][0].units
+                chanIdx.coordinates = np.asarray(sigChanIdx.coordinates) * coordUnits
+                thisUnit.annotations['parentChanXCoords'] = float(chanIdx.coordinates[:, 0].magnitude)
+                thisUnit.annotations['parentChanYCoords'] = float(chanIdx.coordinates[:, 1].magnitude)
+                thisUnit.annotations['parentChanCoordinateUnits'] = '{}'.format(coordUnits)
+    #
     totalNSegs = 0
     #  print([evSeg.events[3].name for evSeg in eventBlock.segments])
     allAlignEventsList = []
@@ -1374,6 +1385,8 @@ def getAsigsAlignedToEvents(
                     **stAnn
                     )
                 st.annotate(nix_name=st.name)
+                st.annotations['unitAnnotations'] = json.dumps(
+                    thisUnit.annotations.copy())
                 thisUnit.spiketrains.append(st)
                 newSeg.spiketrains.append(st)
                 st.unit = thisUnit
@@ -2089,6 +2102,11 @@ def readBlockFixNames(
             asigNameChanger[asigBaseName]
             if asigBaseName in asigNameChanger
             else asigBaseName)
+        if mapDF is not None:
+            if (mapDF['label'] == asig.name).any():
+                asig.annotations['xCoords'] = float(mapDF.loc[mapDF['label'] == asig.name, 'xcoords'].iloc[0])
+                asig.annotations['yCoords'] = float(mapDF.loc[mapDF['label'] == asig.name, 'ycoords'].iloc[0])
+                asig.annotations['zCoords'] = float(mapDF.loc[mapDF['label'] == asig.name, 'zcoords'].iloc[0])
         if 'Channel group ' in asig.channel_index.name:
             newChanName = (
                 asigNameChanger[asigBaseName]
@@ -2099,6 +2117,13 @@ def readBlockFixNames(
                 asig.channel_index.annotations['neo_name'] = newChanName
             if 'nix_name' in asig.channel_index.annotations:
                 asig.channel_index.annotations['nix_name'] = newChanName
+            if mapDF is not None:
+                try:
+                    asig.channel_index.coordinates = np.asarray([
+                        asig.annotations['xCoords'], asig.annotations['yCoords'], asig.annotations['zCoords']
+                    ])[np.newaxis, :] * pq.um
+                except Exception:
+                    pass
     spikeTrainLikeList = (
         seg0.filter(objects=SpikeTrainProxy) +
         seg0.filter(objects=SpikeTrain))
@@ -2728,7 +2753,8 @@ def preprocBlockToNix(
             lastID += 1
         lastIndex = len(block.channel_indexes)
         lastID = block.channel_indexes[-1].channel_ids[0] + 1
-        if calcArtifactTrace:
+        # if calcArtifactTrace:
+        if True:
             artChIdxList = []
             for artChIdx in range(nMeanChans):
                 tempChIdx = ChannelIndex(
@@ -2743,7 +2769,8 @@ def preprocBlockToNix(
                 artChIdxList.append(tempChIdx)
                 lastIndex += 1
                 lastID += 1
-        if calcOutliers:
+        # if calcOutliers:
+        if True:
             devChIdxList = []
             for devChIdx in range(nMeanChans):
                 tempChIdx = ChannelIndex(
@@ -2929,9 +2956,11 @@ def preprocBlockToNix(
             spreadLFP = np.zeros(
                 (tempLFPStore.shape[0], len(asigNameList)),
                 dtype=np.float32)
-            if calcOutliers:
-                filterCoeffsOutlierMask = hf.makeFilterCoeffsSOS(
-                    outlierMaskFilterOpts, float(dummyAsig.sampling_rate))
+            # if calcOutliers:
+            if True:
+                if outlierMaskFilterOpts is not None:
+                    filterCoeffsOutlierMask = hf.makeFilterCoeffsSOS(
+                        outlierMaskFilterOpts, float(dummyAsig.sampling_rate))
                 lfpDeviation = np.zeros(
                     (tempLFPStore.shape[0], len(asigNameList)),
                     dtype=np.float32)
@@ -2942,7 +2971,8 @@ def preprocBlockToNix(
                     (tempLFPStore.shape[0], len(asigNameList)),
                     dtype=np.bool)
                 outlierMetadata = {}
-            if calcArtifactTrace:
+            # if calcArtifactTrace:
+            if True:
                 artifactSignal = np.zeros(
                     (tempLFPStore.shape[0], len(asigNameList)),
                     dtype=np.float32)
@@ -3176,7 +3206,8 @@ def preprocBlockToNix(
                     meanAsig, filterCoeffs=filterCoeffs)
             meanAsig = writer._write_analogsignal(
                 meanAsig, nixblock, nixgroup)
-        if calcArtifactTrace:
+        # if calcArtifactTrace:
+        if True:
             for mIdx, artChIdx in enumerate(artChIdxList):
                 artAsig = AnalogSignal(
                     artifactSignal[:, mIdx],
@@ -3196,7 +3227,8 @@ def preprocBlockToNix(
                 artAsig = writer._write_analogsignal(
                     artAsig, nixblock, nixgroup)
                 #########################################################
-        if calcOutliers:
+        # if calcOutliers:
+        if True:
             for mIdx, devChIdx in enumerate(devChIdxList):
                 devAsig = AnalogSignal(
                     lfpDeviation[:, mIdx],
@@ -3398,6 +3430,7 @@ def preprocBlockToNix(
                     .fillna(method='bfill')
                     )
                 asig.magnitude[:, 0] = tempSer.to_numpy()
+            # pdb.set_trace()
             if (aSigProxy in aSigList) or (aSigProxy in ainpList):
                 # assign ownership to containers
                 chanIdx.analogsignals.append(asig)

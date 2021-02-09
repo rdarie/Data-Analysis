@@ -15,6 +15,7 @@ Options:
     --inputBlockSuffix=inputBlockSuffix                  which trig_ block to pull
     --inputBlockPrefix=inputBlockPrefix                  which trig_ block to pull
     --unitQuery=unitQuery                                how to restrict channels if not supplying a list? [default: isispinaloremg]
+    --arrayName=arrayName                                name of electrode array? (for map file) [default: utah]
     --maskOutlierBlocks                                  delete outlier trials? [default: False]
     --invertOutlierBlocks                                delete outlier trials? [default: False]
     --individualTraces                                   mean+sem or individual traces? [default: False]
@@ -42,6 +43,7 @@ import dataAnalysis.helperFunctions.kilosort_analysis as ksa
 import dataAnalysis.helperFunctions.probe_metadata as prb_meta
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
 import dataAnalysis.helperFunctions.profiling as prf
+import traceback
 #
 from namedQueries import namedQueries
 import neo
@@ -149,73 +151,47 @@ alignedAsigsKWargs.update(dict(
 #     windowSize=(6e-5, 1.2e-3)))
 # for evoked lfp report
 alignedAsigsKWargs.update(dict(
-    windowSize=(-100e-3, 400e-3)))
+    windowSize=(-200e-3, 800e-3)))
 # alignedAsigsKWargs.update(dict(
 #     windowSize=(-25e-3, 125e-3)))
 alignedAsigsKWargs.update({'amplitudeColumn': arguments['amplitudeFieldName']})
 #
-if 'proprio' in blockExperimentType:
-    electrodeMapPath = spikeSortingOpts[arguments['arrayName']]['electrodeMapPath']
-    mapExt = electrodeMapPath.split('.')[-1]
-    if mapExt == 'cmp':
-        mapDF = prb_meta.cmpToDF(electrodeMapPath)
-    elif mapExt == 'map':
-        mapDF = prb_meta.mapToDF(electrodeMapPath)
-else:
-    rippleMapDF = prb_meta.mapToDF(rippleMapFile[int(arguments['blockIdx'])])
-    rippleMapDF.loc[
-        rippleMapDF['label'].str.contains('caudal'),
-        'ycoords'] += 800
-    #
-    if 'delsysMapDict' in locals():
-        delsysMapDF = pd.DataFrame(delsysMapDict)
-        mapsDict = {
-            'ripple': rippleMapDF,
-            'delsys': delsysMapDF}
-    else:
-        mapsDict = {
-            'ripple': rippleMapDF}
-    
-    flipInfo = {
-        'ripple': {'lr': True, 'ud': False},
-        'delsys': {'lr': False, 'ud': False}
-        }
-mapSpecificRelplotKWArgs = {
-    'ripple': {
-        'facet_kws': {
-            'gridspec_kws': {
-                'width_ratios': [
-                    1, 0.2, 1, 1,
-                    1, 0.2, 1, 1,
-                    1, 0.2, 1, 1,
-                    1, 0.2, 1],
-                'height_ratios': [
-                    1, 1, 0.2, 1,
-                    1, 0.2, 1, 1]}}},
-    'delsys': {
-        'facet_kws': {
-            'gridspec_kws': {
-                'width_ratios': [
-                    1, 1, 1, 1, 1],
-                'height_ratios': [
-                    1, 1, 0.5, 1, 0.5, 1, 0.5, 1, 0.5, 1, 1, 0.5, 1]}}}
+flipInfo = {
+    'delsys': {'lr': False, 'ud': False}
     }
+mapSpecificRelplotKWArgs = {
+    # 'utah': {
+    #     'facet_kws': {
+    #         'gridspec_kws': {
+    #             'width_ratios': [
+    #                 1, 0.2, 1, 1,
+    #                 1, 0.2, 1, 1,
+    #                 1, 0.2, 1, 1,
+    #                 1, 0.2, 1],
+    #             'height_ratios': [
+    #                 1, 1, 0.2, 1,
+    #                 1, 0.2, 1, 1]}}}
+    }
+
 relplotKWArgs.update({
     'legend': 'brief',
     # 'legend': False,
-    'palette': "ch:0.6,.3,dark=.1,light=0.7,reverse=1",
-    'height': 4,
-    'aspect': 2,
+    'height': 6,
+    'aspect': 1,
     'facet_kws': {
-        'sharey': False,
+        'sharey': True,
         'legend_out': False,
         'gridspec_kws': {
             'wspace': 0.01,
             'hspace': 0.01
         }}})
+if arguments['inputBlockSuffix'] == 'kcsd':
+    relplotKWArgs.update({
+        'palette': "ch:0.6,.3,dark=.1,light=0.7,reverse=1"
+        })
 sharedYAxes = relplotKWArgs['facet_kws']['sharey']
 plotProcFuns = [
-    # asp.genYLimSetter(quantileLims=0.99, forceLims=True),
+    asp.genYLimSetter(quantileLims=0.95, forceLims=True),
     # asp.genYLabelChanger(
     #     lookupDict={}, removeMatch='#0'),
     # asp.genYLimSetter(newLims=[-75, 100], forceLims=True),
@@ -234,42 +210,31 @@ plotProcFuns = [
     # for evoked lfp report, add stim times
     asp.genBlockVertShader([
             max(0e-3, alignedAsigsKWargs['windowSize'][0]),
-            min(.733e-3, alignedAsigsKWargs['windowSize'][1])],
+            min(1000e-3, alignedAsigsKWargs['windowSize'][1])],
         asigPlotShadingOpts),
-    asp.genStimVLineAdder(
-        'RateInHz', vLineOpts, tOnset=0, tOffset=.3, includeRight=False)
+    # asp.genStimVLineAdder(
+    #     'RateInHz', vLineOpts, tOnset=0, tOffset=.3, includeRight=False)
         ]
 mapSpecificPlotProcFuns = {
-    'ripple': [
+    'utah': [
         asp.genTicksToScale(
-            lineOpts={'lw': 2}, shared=sharedYAxes,
-            # for evoked lfp/emg report
-            xUnitFactor=1e3, yUnitFactor=1,
-            xUnits='msec', yUnits='uV',
-            # for stim spike
-            # xUnitFactor=1e3, yUnitFactor=1e-6,
-            # xUnits='msec', yUnits='V',
+            lineOpts={'lw': 1}, shared=sharedYAxes,
+            xUnitFactor=1e3, yUnitFactor=1e3,
+            xUnits='msec', yUnits='uA/mm^3',
             )
-        ],
-    'delsys': [
-        asp.genTicksToScale(
-            lineOpts={'lw': 2}, shared=sharedYAxes,
-            xUnitFactor=1e3, yUnitFactor=1,
-            xUnits='msec', yUnits='uV',
-            )]}
+        ]}
 addSpacesFromMap = True
 extraSpaces = {
+    'utah': None,
+    # e.g. if we want to add blank spaces to the grid
     'ripple': [
         (34, 52), (85, 260),
         (34, 364), (34, 852),
-        (85, 1060)],
-    'delsys': [
-        (2, 2), (4, 2), (6, 2), (8, 2), (11, 2)
-        ]}
+        (85, 1060)]}
 #
 limitPages = None
-
 minNObservations = 5
+#
 if arguments['individualTraces']:
     relplotKWArgs['alpha'] = 0.3
     relplotKWArgs['estimator'] = None
@@ -280,6 +245,7 @@ if arguments['invertOutlierBlocks']:
 #
 saveFigMetaToPath = pdfName.replace('.pdf', '_metadata.pickle')
 ####################
+'''
 optsSourceFolder = os.path.join(
     figureFolder, 'default', 'alignedFeatures')
 loadFigMetaPath = os.path.join(
@@ -288,13 +254,14 @@ loadFigMetaPath = os.path.join(
     )
 with open(loadFigMetaPath, 'rb') as _f:
     loadedFigMeta = pickle.load(_f)
+'''
+#
 # plotProcFuns.append(
-
 #     asp.genAxLimSaver(
 #         filePath=saveAxLimsToPath, keyColName='feature')
 #     )
 ################
-# from here on we can start defining a function
+# from here on, we can start defining a function
 # TODO delete this and rework, right now it is very hacky
 useCached = False
 if useCached:
@@ -302,7 +269,6 @@ if useCached:
     asigWide = pd.read_hdf(cachedH5Path, 'clean')
     tMask = (asigWide.columns > alignedAsigsKWargs['windowSize'][0]) & (asigWide.columns < alignedAsigsKWargs['windowSize'][-1])
     asigWide = asigWide.loc[:, tMask]
-    # pdb.set_trace()
 else:
     print('loading {}'.format(dataPath))
     dataReader, dataBlock = preproc.blockFromPath(
@@ -312,8 +278,8 @@ else:
 #
 prf.print_memory_usage('loaded asig wide')
 # TODO check that these actually should be here
-if 'nominalCurrentCat' in asigWide.index.names:
-    asigWide.index = asigWide.index.droplevel('nominalCurrentCat')
+# if 'nominalCurrentCat' in asigWide.index.names:
+#     asigWide.index = asigWide.index.droplevel('nominalCurrentCat')
 # asigStack = (
 #     asigWide
 #     .stack(level=['feature', 'lag'])
@@ -342,29 +308,52 @@ if minNObservations is not None:
 trialInfo['parentChanName'] = (
     trialInfo['feature']
     .apply(lambda x: x.replace('_stim#0', '').replace('#0', '')))
-dummyDict = {}
+trialInfo.loc[:, 'xcoords'] = np.nan
+trialInfo.loc[:, 'ycoords'] = np.nan
+trialInfo.loc[:, 'mapGroup'] = np.nan
 
-for probeName, mapDF in mapsDict.items():
-    probeMask = trialInfo['parentChanName'].isin(mapDF['label'])
+for cidx, chanIdx in enumerate(dataBlock.channel_indexes):
+    listOfSpikeTrains = chanIdx.filter(objects=[SpikeTrain, SpikeTrainProxy])
+    if len(listOfSpikeTrains):
+        dummySt = listOfSpikeTrains[0]
+        if 'xcoords' in dummySt.annotations:
+            try:
+                trialInfo.loc[trialInfo['feature'] == chanIdx.name, 'xcoords'] = dummySt.annotations['xCoords']
+                trialInfo.loc[trialInfo['feature'] == chanIdx.name, 'ycoords'] = dummySt.annotations['yCoords']
+                trialInfo.loc[trialInfo['feature'] == chanIdx.name, 'mapGroup'] = 'utah'
+            except Exception:
+                traceback.print_exc()
+if trialInfo['xcoords'].isna().any():
+    if 'mapDF' not in locals():
+        electrodeMapPath = spikeSortingOpts[arguments['arrayName']]['electrodeMapPath']
+        mapExt = electrodeMapPath.split('.')[-1]
+        if mapExt == 'cmp':
+            mapDF = prb_meta.cmpToDF(electrodeMapPath)
+        elif mapExt == 'map':
+            mapDF = prb_meta.mapToDF(electrodeMapPath)
     for cName in ['xcoords', 'ycoords']:
         mapSer = pd.Series(
             mapDF[cName].to_numpy(),
             index=mapDF['label'])
-        trialInfo.loc[probeMask, cName] = (
+        trialInfo.loc[:, cName] = (
             trialInfo
-            .loc[probeMask, 'parentChanName']
+            .loc[:, 'feature']
             .map(mapSer))
-    trialInfo.loc[probeMask, 'mapGroup'] = probeName
+    trialInfo.loc[:, 'mapGroup'] = 'utah'
+# pdb.set_trace()
+dummyDict = {}
+for probeName, tInfoGrp in trialInfo.groupby('mapGroup'):
     dummyList = []
     if addSpacesFromMap:
-        for name, group in mapDF.groupby(['xcoords', 'ycoords']):
+        for name, subGrp in tInfoGrp.groupby(['xcoords', 'ycoords']):
             dummySer = pd.Series(np.nan, index=trialInfo.columns)
             dummySer['xcoords'] = name[0]
             dummySer['ycoords'] = name[1]
             dummySer['mapGroup'] = probeName
             dummyList.append(dummySer)
-    if extraSpaces[probeName] is not None:
-        for name in extraSpaces[probeName]:
+    xtrSpc = extraSpaces.pop(probeName, None)
+    if xtrSpc is not None:
+        for name in xtrSpc:
             dummySer = pd.Series(np.nan, index=trialInfo.columns)
             dummySer['xcoords'] = name[0]
             dummySer['ycoords'] = name[1]
@@ -406,28 +395,38 @@ with PdfPages(pdfName) as pdf:
                     [thisAsigStack, dummyDict[probeName]],
                     ignore_index=True
                     )
-            if flipInfo[probeName]['ud']:
-                thisAsigStack['xcoords'] *= -1
-            if flipInfo[probeName]['lr']:
-                thisAsigStack['ycoords'] *= -1
+            theseFlipInfo = flipInfo.pop(probeName, None)
+            if theseFlipInfo is not None:
+                ud = theseFlipInfo.pop('ud', False)
+                if ud:
+                    thisAsigStack['xcoords'] *= -1
+                lr = theseFlipInfo.pop('lr', False)
+                if lr:
+                    thisAsigStack['ycoords'] *= -1
             if 'facet_kws' in relplotKWArgs:
                 if 'gridspec_kws' in relplotKWArgs['facet_kws']:
-                    relplotKWArgs['facet_kws']['gridspec_kws'].update(
-                        mapSpecificRelplotKWArgs[probeName]['facet_kws']['gridspec_kws'])
-                    # workaround to get margins between axes to be spaced
-                    # as a fraction of the *absolute* axis size
-                    absWids = [
-                        ratio * relplotKWArgs['aspect'] * relplotKWArgs['height']
-                        for ratio in relplotKWArgs['facet_kws']['gridspec_kws']['width_ratios']]
-                    updateWid = np.sum(absWids)
-                    relplotKWArgs['facet_kws']['gridspec_kws']['wspace'] = (
-                        relplotKWArgs['height'] * 0.1 / np.mean(absWids))
-                    absHeights = [
-                        ratio * relplotKWArgs['height']
-                        for ratio in relplotKWArgs['facet_kws']['gridspec_kws']['height_ratios']]
-                    updateHeight = np.sum(absHeights)
-                    relplotKWArgs['facet_kws']['gridspec_kws']['hspace'] = (
-                        relplotKWArgs['height'] * 0.1 / np.mean(absHeights))
+                    msrpkwa = mapSpecificRelplotKWArgs.pop(probeName, None)
+                    if msrpkwa is not None:
+                        relplotKWArgs['facet_kws']['gridspec_kws'].update(
+                            msrpkwa['facet_kws']['gridspec_kws'])
+                    if 'width_ratios' in relplotKWArgs['facet_kws']['gridspec_kws']:
+                        # workaround to get margins between axes to be spaced
+                        # as a fraction of the *absolute* axis size
+                        updateFigSize = {}
+                        absWids = [
+                            ratio * relplotKWArgs['aspect'] * relplotKWArgs['height']
+                            for ratio in relplotKWArgs['facet_kws']['gridspec_kws']['width_ratios']]
+                        updateFigSize['width'] = np.sum(absWids)
+                        relplotKWArgs['facet_kws']['gridspec_kws']['wspace'] = (
+                            relplotKWArgs['height'] * 0.1 / np.mean(absWids))
+                        absHeights = [
+                            ratio * relplotKWArgs['height']
+                            for ratio in relplotKWArgs['facet_kws']['gridspec_kws']['height_ratios']]
+                        updateFigSize['heigth'] = np.sum(absHeights)
+                        relplotKWArgs['facet_kws']['gridspec_kws']['hspace'] = (
+                            relplotKWArgs['height'] * 0.1 / np.mean(absHeights))
+                    else:
+                        updateFigSize = None
             # pdb.set_trace()
             g = sns.relplot(
                 data=thisAsigStack,
@@ -471,9 +470,8 @@ with PdfPages(pdfName) as pdf:
                         facetMetaList.append(pd.Series(facetMeta))
             g.set_titles("")
             g.set_axis_labels("", "")
-            if 'facet_kws' in relplotKWArgs:
-                if 'gridspec_kws' in relplotKWArgs['facet_kws']:
-                    g.fig.set_size_inches(updateWid, updateHeight)
+            if updateFigSize is not None:
+                g.fig.set_size_inches(updateFigSize['width'], updateFigSize['height'])
             pageTitle = g.fig.suptitle(pageName)
             saveLegendOpts = {
                     'bbox_extra_artists': [pageTitle]}
