@@ -53,6 +53,7 @@ import atexit
 import btk
 interpKind = 'linear'
 
+@profile
 def preprocDelsysWrapper():
     featureRenameLookup = {
         'TrignoAnalogInputAdapterAnalogA': 'AnalogInputAdapterAnalog',
@@ -113,6 +114,7 @@ def preprocDelsysWrapper():
         if featName in featureRenameLookup:
             featName = featureRenameLookup[featName]
         chanName = pd.Series(featName)
+        pdb.set_trace()
         if not eval(chanQuery)[0]:
             print('Not loading {} bc. of query'.format(thisLabel))
             continue

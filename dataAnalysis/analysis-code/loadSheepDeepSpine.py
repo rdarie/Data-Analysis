@@ -8,10 +8,11 @@ import matplotlib.pyplot as plt
 cropEdgesTimes = [-100e-3, 400e-3]
 # cropEdgesTimes = [-600e-3, -100e-3]
 # inputPath = 'G:\\Delsys\\scratch\\202009231400-Peep\\default\\stim\\_emg_XS_export.h5'
-
+#
 inputPath = 'G:\\Delsys\\scratch\\202010191100-Peep\\default\\stim\\_emg_XS_export.h5'
 inputPath = 'G:\\Delsys\\scratch\\202007011300-Peep\\_emg_XS_export_0701.h5'
-
+inputPath = 'G:\\Delsys\\scratch\\202010191100-Peep\\parameter_recovery\\stim\\_emg_XS_export.h5'
+#
 # inputPath = '/gpfs/scratch/rdarie/rdarie/Neural Recordings/202009231400-Peep/default/stim/_emg_XS_export.h5'
 
 with pd.HDFStore(inputPath, 'r') as store:

@@ -60,10 +60,11 @@ eventUnits = {
     'firstPW': pq.s,
     # 'interPhase': pq.s,
     'secondPW': pq.s,
-    'totalPW': pq.s
+    'totalPW': pq.s,
+    'stimRes': pq.uA
     }
 
-
+@profile
 def calcISIBlockAnalysisNix():
     arguments['chanNames'], arguments['chanQuery'] = ash.processChannelQueryArgs(
         namedQueries, scratchFolder, **arguments)
@@ -81,6 +82,7 @@ def calcISIBlockAnalysisNix():
     thisJsonPath = trialBasePath.replace('.nix', '_autoStimLog.json')
     if os.path.exists(thisJsonPath):
         #
+        @profile
         def parseAutoStimLog(jsonPath):
             try:
                 with open(jsonPath, 'r') as f:
@@ -498,6 +500,7 @@ def calcISIBlockAnalysisNix():
                 # annotate ripple stim spikes with info from json log
                 chanName = st.unit.channel_index.name
                 # matchingChIdx = nspBlock.filter(objects=ChannelIndex, name=chanName)
+                # pdb.set_trace()
                 rippleChanNum = int(mapDF.loc[mapDF['label'] == chanName, 'nevID'])
                 if stimEvents is not None:
                     # find which events in the stim log reference this spiketrain
@@ -705,6 +708,8 @@ def calcISIBlockAnalysisNix():
                                                 theseTimes[0])
                                         # stimPeriod = np.round(np.diff(theseTimes).median(), decimals=6)
                                         stimPeriod = np.round(np.median(np.diff(theseTimes)), decimals=6)
+                                        # stimPeriod = np.median(np.diff(theseTimes))
+                                        # pdb.set_trace()
                                         startCategories.loc[
                                             idx, 'stimPeriod'] = stimPeriod
                                         startCategories.loc[
@@ -778,7 +783,7 @@ def calcISIBlockAnalysisNix():
                     startCategories['nominalCurrent'],
                     np.arange(-2, 2, 0.2))
                 startCategories['nominalCurrentCat'] = currCats.astype('str')
-                startCategories['RateInHz'] = np.round(startCategories['RateInHz'], decimals=1)
+                startCategories['RateInHz'] = np.round(startCategories['RateInHz'], decimals=6)
                 stopCategories = startCategories.copy()
                 #
                 stopCategories['t'] = (

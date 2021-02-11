@@ -128,7 +128,7 @@ alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **argu
 alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
     namedQueries, alignSubFolder, **arguments)
 
-
+@profile
 def findOutliers(
         mahalDistDF, groupBy=None,
         qThresh=None, sdThresh=None, sdThreshInner=None,
@@ -165,7 +165,7 @@ def findOutliers(
     deviationDF['rejectBlock'] = (deviationDF['deviation'] > chiProbaLim)
     return deviationDF
 
-
+@profile
 def calcCovMat(
         partition, dataColNames=None,
         useEmpiricalCovariance=True,
@@ -265,7 +265,7 @@ if __name__ == "__main__":
     print('working with {} samples'.format(dataDF.shape[0]))
     randSample = slice(None, None, None)
 
-    useCachedMahalDist = True
+    useCachedMahalDist = False
     if useCachedMahalDist and os.path.exists(resultPath):
         with pd.HDFStore(resultPath,  mode='r') as store:
             mahalDist = pd.read_hdf(

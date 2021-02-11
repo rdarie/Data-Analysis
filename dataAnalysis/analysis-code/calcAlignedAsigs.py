@@ -31,13 +31,14 @@ import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
 from namedQueries import namedQueries
 from currentExperiment import parseAnalysisOptions
 from docopt import docopt
+
+
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']),
     arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
-
 
 if (overrideChanNames is not None) and (arguments['chanQuery'] in ['fr', 'fr_sqrt', 'raster']):
     arguments['chanNames'] = [i + '_{}'.format(arguments['chanQuery']) for i in overrideChanNames]
@@ -54,49 +55,65 @@ if not os.path.exists(analysisSubFolder):
 alignSubFolder = os.path.join(analysisSubFolder, arguments['alignFolderName'])
 if not os.path.exists(alignSubFolder):
     os.makedirs(alignSubFolder, exist_ok=True)
-
+#pdb.set_trace()
 experimentDataPath = experimentDataPath.format(arguments['analysisName'])
 analysisDataPath = analysisDataPath.format(arguments['analysisName'])
 
-#  source of events
-if arguments['processAll']:
-    eventPath = experimentDataPath
-else:
-    eventPath = analysisDataPath
+@profile
+def calcAlignedAsigsWrapped():
+    #  source of events
+    if arguments['processAll']:
+        eventPath = experimentDataPath
+    else:
+        eventPath = analysisDataPath
 
-print('Loading events from {}'.format(eventPath))
-eventReader, eventBlock = ns5.blockFromPath(
-    eventPath, lazy=arguments['lazy'])
-#  eventBlock = eventReader.read_block(
-#      block_index=0, lazy=True,
-#      signal_group_mode='split-all')
-#  for ev in eventBlock.filter(objects=EventProxy):
-#      ev.name = '_'.join(ev.name.split('_')[1:])
+    print('Loading events from {}'.format(eventPath))
+    eventReader, eventBlock = ns5.blockFromPath(
+        eventPath, lazy=arguments['lazy'])
+    #  eventBlock = eventReader.read_block(
+    #      block_index=0, lazy=True,
+    #      signal_group_mode='split-all')
+    #  for ev in eventBlock.filter(objects=EventProxy):
+    #      ev.name = '_'.join(ev.name.split('_')[1:])
 
-#  source of analogsignals
-signalBlock = eventBlock
+    #  source of analogsignals
+    signalBlock = eventBlock
 
-windowSize = [
-    i * pq.s
-    for i in rasterOpts['windowSizes'][arguments['window']]]
+    windowSize = [
+        i * pq.s
+        for i in rasterOpts['windowSizes'][arguments['window']]]
 
-if arguments['processAll']:
-    prefix = assembledName
-else:
-    prefix = ns5FileName
+    if arguments['processAll']:
+        prefix = assembledName
+    else:
+        prefix = ns5FileName
 
-ns5.getAsigsAlignedToEvents(
-    eventBlock=eventBlock, signalBlock=signalBlock,
-    chansToTrigger=arguments['chanNames'],
-    chanQuery=arguments['chanQuery'],
-    eventName=arguments['eventName'],
-    windowSize=windowSize,
-    minNReps=minNConditionRepetitions,
-    appendToExisting=False,
-    checkReferences=False,
-    verbose=arguments['verbose'],
-    fileName='{}_{}_{}'.format(
-        prefix, arguments['outputBlockName'], arguments['window']),
-    folderPath=alignSubFolder, chunkSize=alignedAsigsChunkSize)
+    ns5.getAsigsAlignedToEvents(
+        eventBlock=eventBlock, signalBlock=signalBlock,
+        chansToTrigger=arguments['chanNames'],
+        chanQuery=arguments['chanQuery'],
+        eventName=arguments['eventName'],
+        windowSize=windowSize,
+        minNReps=minNConditionRepetitions,
+        appendToExisting=False,
+        checkReferences=False,
+        verbose=arguments['verbose'],
+        fileName='{}_{}_{}'.format(
+            prefix, arguments['outputBlockName'], arguments['window']),
+        folderPath=alignSubFolder, chunkSize=alignedAsigsChunkSize)
 
-print('Finished CalcAlignedAsigs')
+    print('Finished CalcAlignedAsigs')
+    return
+
+if __name__ == "__main__":
+    runProfiler = True
+    if runProfiler:
+        import dataAnalysis.helperFunctions.profiling as prf
+        nameSuffix = os.environ.get('SLURM_ARRAY_TASK_ID')
+        prf.profileFunction(
+            topFun=calcAlignedAsigsWrapped,
+            modulesToProfile=[ash, ns5],
+            #outputBaseFolder=os.path.join(remoteBasePath, 'batch_logs'),
+            nameSuffix=nameSuffix)
+    else:
+        calcAlignedAsigsWrapped()

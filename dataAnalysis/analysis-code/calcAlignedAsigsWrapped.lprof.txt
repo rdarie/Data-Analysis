@@ -1,0 +1,713 @@
+Timer unit: 1e-07 s
+
+Total time: 0.0002435 s
+File: c:\users\peep sheep\nda2\data-analysis\dataAnalysis\preproc\ns5.py
+Function: childBaseName at line 1739
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+  1739                                           def childBaseName(
+  1740                                                   childName, searchTerm):
+  1741       257        912.0      3.5     37.5      if searchTerm in childName:
+  1742        11        115.0     10.5      4.7          baseName = '_'.join(childName.split('_')[1:])
+  1743                                               else:
+  1744       246        740.0      3.0     30.4          baseName = childName
+  1745       257        668.0      2.6     27.4      return baseName
+
+Total time: 0.0076464 s
+File: C:\Users\Peep Sheep\.conda\envs\nda2\lib\copy.py
+Function: copy at line 66
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    66                                           def copy(x):
+    67                                               """Shallow copy operation on arbitrary Python objects.
+    68                                           
+    69                                               See the module's __doc__ string for more info.
+    70                                               """
+    71                                           
+    72      1820      27396.0     15.1     35.8      cls = type(x)
+    73                                           
+    74      1820      20540.0     11.3     26.9      copier = _copy_dispatch.get(cls)
+    75      1820      10102.0      5.6     13.2      if copier:
+    76      1820      18426.0     10.1     24.1          return copier(x)
+    77                                           
+    78                                               try:
+    79                                                   issc = issubclass(cls, type)
+    80                                               except TypeError: # cls is not a class
+    81                                                   issc = False
+    82                                               if issc:
+    83                                                   # treat it as a regular class:
+    84                                                   return _copy_immutable(x)
+    85                                           
+    86                                               copier = getattr(cls, "__copy__", None)
+    87                                               if copier:
+    88                                                   return copier(x)
+    89                                           
+    90                                               reductor = dispatch_table.get(cls)
+    91                                               if reductor:
+    92                                                   rv = reductor(x)
+    93                                               else:
+    94                                                   reductor = getattr(x, "__reduce_ex__", None)
+    95                                                   if reductor:
+    96                                                       rv = reductor(4)
+    97                                                   else:
+    98                                                       reductor = getattr(x, "__reduce__", None)
+    99                                                       if reductor:
+   100                                                           rv = reductor()
+   101                                                       else:
+   102                                                           raise Error("un(shallow)copyable object of type %s" % cls)
+   103                                           
+   104                                               if isinstance(rv, str):
+   105                                                   return x
+   106                                               return _reconstruct(x, None, *rv)
+
+Total time: 0.0114701 s
+File: c:\users\peep sheep\nda2\data-analysis\dataAnalysis\preproc\ns5.py
+Function: loadObjArrayAnn at line 2903
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+  2903                                           def loadObjArrayAnn(st):
+  2904         2         65.0     32.5      0.1      if 'arrayAnnNames' in st.annotations.keys():
+  2905         2         35.0     17.5      0.0          if isinstance(st.annotations['arrayAnnNames'], str):
+  2906                                                       st.annotations['arrayAnnNames'] = [st.annotations['arrayAnnNames']]
+  2907         2         15.0      7.5      0.0          elif isinstance(st.annotations['arrayAnnNames'], tuple):
+  2908         2         79.0     39.5      0.1              st.annotations['arrayAnnNames'] = [i for i in st.annotations['arrayAnnNames']]
+  2909                                                   #
+  2910        26        158.0      6.1      0.1          for key in st.annotations['arrayAnnNames']:
+  2911                                                       #  fromRaw, the ann come back as tuple, need to recast
+  2912        24        110.0      4.6      0.1              try:
+  2913        24      10280.0    428.3      9.0                  if len(st.times) == 1:
+  2914                                                               st.annotations[key] = [st.annotations[key]]
+  2915        24        173.0      7.2      0.2                  st.array_annotations.update(
+  2916        24      56446.0   2351.9     49.2                      {key: np.asarray(st.annotations[key])})
+  2917        24      47306.0   1971.1     41.2                  st.annotations[key] = np.asarray(st.annotations[key])
+  2918                                                       except Exception:
+  2919                                                           traceback.print_exc()
+  2920         2         24.0     12.0      0.0      if hasattr(st, 'waveforms'):
+  2921                                                   if st.waveforms is None:
+  2922                                                       st.waveforms = np.asarray([]).reshape((0, 0, 0))*pq.mV
+  2923                                                   elif not len(st.waveforms):
+  2924                                                       st.waveforms = np.asarray([]).reshape((0, 0, 0))*pq.mV
+  2925         2         10.0      5.0      0.0      return st
+
+Total time: 0.0124205 s
+File: c:\users\peep sheep\nda2\data-analysis\dataAnalysis\preproc\ns5.py
+Function: purgeNixAnn at line 2854
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+  2854                                           def purgeNixAnn(
+  2855                                                   block, annNames=['nix_name', 'neo_name']):
+  2856         3         27.0      9.0      0.0      for annName in annNames:
+  2857         2         39.0     19.5      0.0          block.annotations.pop(annName, None)
+  2858       283      54695.0    193.3     44.0      for child in block.children_recur:
+  2859       282       2218.0      7.9      1.8          if child.annotations:
+  2860       282       1856.0      6.6      1.5              child.annotations = {
+  2861                                                           k: v
+  2862       282      16030.0     56.8     12.9                  for k, v in child.annotations.items()
+  2863                                                           if k not in annNames}
+  2864       141      25050.0    177.7     20.2      for child in block.data_children_recur:
+  2865       140       2285.0     16.3      1.8          if child.annotations:
+  2866       140       2088.0     14.9      1.7              child.annotations = {
+  2867                                                           k: v
+  2868       140      19911.0    142.2     16.0                  for k, v in child.annotations.items()
+  2869                                                           if k not in annNames}
+  2870         1          6.0      6.0      0.0      return block
+
+Total time: 0.0269031 s
+File: c:\users\peep sheep\nda2\data-analysis\dataAnalysis\preproc\ns5.py
+Function: unitSpikeTrainArrayAnnToDF at line 272
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+   272                                           def unitSpikeTrainArrayAnnToDF(
+   273                                                   spikeTrainContainer):
+   274                                               #  list contains different segments
+   275         1         11.0     11.0      0.0      if isinstance(spikeTrainContainer, ChannelIndex):
+   276                                                   assert len(spikeTrainContainer.units) == 0
+   277                                                   spiketrains = spikeTrainContainer.units[0].spiketrains
+   278         1          7.0      7.0      0.0      elif isinstance(spikeTrainContainer, Unit):
+   279                                                   spiketrains = spikeTrainContainer.spiketrains
+   280         1          7.0      7.0      0.0      elif isinstance(spikeTrainContainer, list):
+   281         1          4.0      4.0      0.0          spiketrains = spikeTrainContainer
+   282         1          5.0      5.0      0.0      fullAnnotationsDict = {}
+   283         3         33.0     11.0      0.0      for segIdx, st in enumerate(spiketrains):
+   284         2      56298.0  28149.0     20.9          theseAnnDF = pd.DataFrame(st.array_annotations)
+   285         2      16310.0   8155.0      6.1          theseAnnDF['t'] = st.times.magnitude
+   286         2         34.0     17.0      0.0          fullAnnotationsDict.update({segIdx: theseAnnDF})
+   287         1         13.0     13.0      0.0      annotationsDF = pd.concat(
+   288         1     196282.0 196282.0     73.0          fullAnnotationsDict, names=['segment', 'index'], sort=True)
+   289         1         27.0     27.0      0.0      return annotationsDF
+
+Total time: 0.403081 s
+File: c:\users\peep sheep\nda2\data-analysis\dataAnalysis\preproc\ns5.py
+Function: listChanNames at line 64
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    64                                           def listChanNames(
+    65                                                   dataBlock, chanQuery,
+    66                                                   objType=AnalogSignalProxy, condition=None):
+    67                                               allChanList = [
+    68         1          8.0      8.0      0.0          i.name
+    69         1      27966.0  27966.0      0.7          for i in dataBlock.filter(objects=objType)]
+    70         1          9.0      9.0      0.0      if condition == 'hasAsigs':
+    71                                                   allChanList = [
+    72         1          8.0      8.0      0.0              i
+    73         1    3925883.0 3925883.0     97.4              for i in allChanList
+    74                                                       if len(dataBlock.filter(objects=objType, name=i)[0].analogsignals)
+    75                                                   ]
+    76         1         40.0     40.0      0.0      chansToTrigger = pd.DataFrame(
+    77         1       1072.0   1072.0      0.0          np.unique(allChanList),
+    78         1       8975.0   8975.0      0.2          columns=['chanName'])
+    79         1         14.0     14.0      0.0      if chanQuery is not None:
+    80         1         20.0     20.0      0.0          chansToTrigger = chansToTrigger.query(
+    81         1      66798.0  66798.0      1.7              chanQuery, engine='python')['chanName'].to_list()
+    82                                               else:
+    83                                                   chansToTrigger = chansToTrigger['chanName'].to_list()
+    84         1         12.0     12.0      0.0      return chansToTrigger
+
+Total time: 9.67291 s
+File: c:\users\peep sheep\nda2\data-analysis\dataAnalysis\preproc\ns5.py
+Function: readBlockFixNames at line 1748
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+  1748                                           def readBlockFixNames(
+  1749                                                   rawioReader,
+  1750                                                   block_index=0, signal_group_mode='split-all',
+  1751                                                   lazy=True, mapDF=None, reduceChannelIndexes=False,
+  1752                                                   # swapMaps=None
+  1753                                                   ):
+  1754         1         49.0     49.0      0.0      headerSignalChan = pd.DataFrame(
+  1755         1     115949.0 115949.0      0.1          rawioReader.header['signal_channels']).set_index('id')
+  1756         1         47.0     47.0      0.0      headerUnitChan = pd.DataFrame(
+  1757         1      67953.0  67953.0      0.1          rawioReader.header['unit_channels']).set_index('id')
+  1758         1         26.0     26.0      0.0      dataBlock = rawioReader.read_block(
+  1759         1         12.0     12.0      0.0          block_index=block_index, lazy=lazy,
+  1760         1   96129083.0 96129083.0     99.4          signal_group_mode=signal_group_mode)
+  1761                                               #
+  1762         1         23.0     23.0      0.0      if dataBlock.name is None:
+  1763         1         18.0     18.0      0.0          if 'neo_name' in dataBlock.annotations:
+  1764         1         14.0     14.0      0.0              dataBlock.name = dataBlock.annotations['neo_name']
+  1765                                               #  on first segment, rename the chan_indexes and units
+  1766         1         14.0     14.0      0.0      seg0 = dataBlock.segments[0]
+  1767                                               asigLikeList = (
+  1768         1        878.0    878.0      0.0          seg0.filter(objects=AnalogSignalProxy) +
+  1769         1        822.0    822.0      0.0          seg0.filter(objects=AnalogSignal))
+  1770                                               # if mapDF is not None:
+  1771                                               #     # [len(a.name) for a in asigLikeList]
+  1772                                               #     if swapMaps is not None:
+  1773                                               #         # asigOrigNames = [headerSignalChan.loc[int(i), 'name'] for i in swapMaps['from']['nevID']]
+  1774                                               #         asigNameChanger = {}
+  1775                                               #         for nevID in swapMaps['from']['nevID']:
+  1776                                               #             if int(nevID) in headerSignalChan.index:
+  1777                                               #                 labelFromNewMap = (
+  1778                                               #                     swapMaps['to']
+  1779                                               #                     .loc[swapMaps['to']['nevID'] == nevID, 'label']
+  1780                                               #                     .iloc[0])
+  1781                                               #                 asigNameChanger[headerSignalChan.loc[int(nevID), 'name']] = labelFromNewMap
+  1782                                               #         # asigNameChanger = dict(zip(asigOrigNames, swapMaps['to']['label']))
+  1783                                               #     else:
+  1784                                               #         if headerSignalChan.size > 0:
+  1785                                               #             # asigOrigNames = [headerSignalChan.loc[int(i), 'name'] for i in mapDF['nevID']]
+  1786                                               #             # asigNameChanger = dict(zip(asigOrigNames, mapDF['label']))
+  1787                                               #             asigNameChanger = {}
+  1788                                               #             for nevID in mapDF['nevID']:
+  1789                                               #                 if int(nevID) in headerSignalChan.index:
+  1790                                               #                     labelFromMap = (
+  1791                                               #                         mapDF
+  1792                                               #                         .loc[mapDF['nevID'] == nevID, 'label']
+  1793                                               #                         .iloc[0])
+  1794                                               #                     asigNameChanger[
+  1795                                               #                         headerSignalChan.loc[int(nevID), 'name']] = labelFromMap
+  1796                                               #         else:
+  1797                                               #             asigOrigNames = np.unique([i.split('#')[0] for i in headerUnitChan['name']])
+  1798                                               #             asigNameChanger = {}
+  1799                                               #             for origName in asigOrigNames:
+  1800                                               #                 # ripple specific
+  1801                                               #                 formattedName = origName.replace('.', '_').replace(' raw', '')
+  1802                                               #                 if mapDF['label'].str.contains(formattedName).any():
+  1803                                               #                     asigNameChanger[origName] = formattedName
+  1804         1         12.0     12.0      0.0      if mapDF is not None:
+  1805                                                   if headerSignalChan.size > 0:
+  1806                                                       asigNameChanger = {}
+  1807                                                       for nevID in mapDF['nevID']:
+  1808                                                           if int(nevID) in headerSignalChan.index:
+  1809                                                               labelFromMap = (
+  1810                                                                   mapDF
+  1811                                                                   .loc[mapDF['nevID'] == nevID, 'label']
+  1812                                                                   .iloc[0])
+  1813                                                               asigNameChanger[
+  1814                                                                   headerSignalChan.loc[int(nevID), 'name']] = labelFromMap
+  1815                                                   else:
+  1816                                                       asigOrigNames = np.unique(
+  1817                                                           [i.split('#')[0] for i in headerUnitChan['name']])
+  1818                                                       asigNameChanger = {}
+  1819                                                       for origName in asigOrigNames:
+  1820                                                           # ripple specific
+  1821                                                           formattedName = origName.replace('.', '_').replace(' raw', '')
+  1822                                                           if mapDF['label'].str.contains(formattedName).any():
+  1823                                                               asigNameChanger[origName] = formattedName
+  1824                                               else:
+  1825         1         17.0     17.0      0.0          asigNameChanger = dict()
+  1826        71        764.0     10.8      0.0      for asig in asigLikeList:
+  1827        70       2425.0     34.6      0.0          asigBaseName = childBaseName(asig.name, 'seg')
+  1828                                                   asig.name = (
+  1829                                                       asigNameChanger[asigBaseName]
+  1830        70        840.0     12.0      0.0              if asigBaseName in asigNameChanger
+  1831        70        799.0     11.4      0.0              else asigBaseName)
+  1832        70        910.0     13.0      0.0          if 'Channel group ' in asig.channel_index.name:
+  1833                                                       newChanName = (
+  1834                                                           asigNameChanger[asigBaseName]
+  1835        70        783.0     11.2      0.0                  if asigBaseName in asigNameChanger
+  1836        70        748.0     10.7      0.0                  else asigBaseName)
+  1837        70        825.0     11.8      0.0              asig.channel_index.name = newChanName
+  1838        70        965.0     13.8      0.0              if 'neo_name' in asig.channel_index.annotations:
+  1839        70        865.0     12.4      0.0                  asig.channel_index.annotations['neo_name'] = newChanName
+  1840        70        897.0     12.8      0.0              if 'nix_name' in asig.channel_index.annotations:
+  1841        70        868.0     12.4      0.0                  asig.channel_index.annotations['nix_name'] = newChanName
+  1842                                               spikeTrainLikeList = (
+  1843         1        788.0    788.0      0.0          seg0.filter(objects=SpikeTrainProxy) +
+  1844         1       1393.0   1393.0      0.0          seg0.filter(objects=SpikeTrain))
+  1845                                               # add channels for channelIndex that has no asigs but has spikes
+  1846         1         15.0     15.0      0.0      nExtraChans = 0
+  1847        13        153.0     11.8      0.0      for stp in spikeTrainLikeList:
+  1848        12        487.0     40.6      0.0          stpBaseName = childBaseName(stp.name, 'seg')
+  1849        12       5437.0    453.1      0.0          nameParser = re.search(r'ch(\d*)#(\d*)', stpBaseName)
+  1850        12        148.0     12.3      0.0          if nameParser is not None:
+  1851                                                       # first time at this unit, rename it
+  1852                                                       chanId = int(nameParser.group(1))
+  1853                                                       unitId = int(nameParser.group(2))
+  1854                                                       if chanId >= 5121:
+  1855                                                           isRippleStimChan = True
+  1856                                                           chanId = chanId - 5120
+  1857                                                       else:
+  1858                                                           isRippleStimChan = False
+  1859                                                       ####################
+  1860                                                       # asigBaseName = headerSignalChan.loc[chanId, 'name']
+  1861                                                       # if mapDF is not None:
+  1862                                                       #     if asigBaseName in asigNameChanger:
+  1863                                                       #         chanIdLabel = (
+  1864                                                       #             asigNameChanger[asigBaseName]
+  1865                                                       #             if asigBaseName in asigNameChanger
+  1866                                                       #             else asigBaseName)
+  1867                                                       #     else:
+  1868                                                       #         chanIdLabel = asigBaseName
+  1869                                                       # else:
+  1870                                                       #     chanIdLabel = asigBaseName
+  1871                                                       ###################
+  1872                                                       # if swapMaps is not None:
+  1873                                                       #     nameCandidates = (swapMaps['to'].loc[swapMaps['to']['nevID'] == chanId, 'label']).to_list()
+  1874                                                       # elif mapDF is not None:
+  1875                                                       #     nameCandidates = (mapDF.loc[mapDF['nevID'] == chanId, 'label']).to_list()
+  1876                                                       # else:
+  1877                                                       #     nameCandidates = []
+  1878                                                       ##############################
+  1879                                                       if mapDF is not None:
+  1880                                                           nameCandidates = (
+  1881                                                               mapDF
+  1882                                                               .loc[mapDF['nevID'] == chanId, 'label']
+  1883                                                               .to_list())
+  1884                                                       else:
+  1885                                                           nameCandidates = []
+  1886                                                       if len(nameCandidates) == 1:
+  1887                                                           chanIdLabel = nameCandidates[0]
+  1888                                                       elif chanId in headerSignalChan:
+  1889                                                           chanIdLabel = headerSignalChan.loc[chanId, 'name']
+  1890                                                       else:
+  1891                                                           chanIdLabel = 'ch{}'.format(chanId)
+  1892                                                       #
+  1893                                                       if isRippleStimChan:
+  1894                                                           stp.name = '{}_stim#{}'.format(chanIdLabel, unitId)
+  1895                                                       else:
+  1896                                                           stp.name = '{}#{}'.format(chanIdLabel, unitId)
+  1897                                                       stp.unit.name = stp.name
+  1898                                                   ########################################
+  1899                                                   # sanitize ripple names ####
+  1900        12        206.0     17.2      0.0          stp.name = stp.name.replace('.', '_').replace(' raw', '')
+  1901        12        206.0     17.2      0.0          stp.unit.name = stp.unit.name.replace('.', '_').replace(' raw', '')
+  1902                                                   ###########################################
+  1903        12        173.0     14.4      0.0          if 'ChannelIndex for ' in stp.unit.channel_index.name:
+  1904        12        204.0     17.0      0.0              newChanName = stp.name.replace('_stim#0', '').replace('#0', '')
+  1905        12        152.0     12.7      0.0              stp.unit.channel_index.name = newChanName
+  1906                                                       # units and analogsignals have different channel_indexes when loaded by nix
+  1907                                                       # add them to each other's parent list
+  1908        12        154.0     12.8      0.0              allMatchingChIdx = dataBlock.filter(
+  1909        12     369106.0  30758.8      0.4                  objects=ChannelIndex, name=newChanName)
+  1910        12        205.0     17.1      0.0              if (len(allMatchingChIdx) > 1) and reduceChannelIndexes:
+  1911                                                           assert len(allMatchingChIdx) == 2
+  1912                                                           targetChIdx = [
+  1913                                                               ch
+  1914                                                               for ch in allMatchingChIdx
+  1915                                                               if ch is not stp.unit.channel_index][0]
+  1916                                                           oldChIdx = stp.unit.channel_index
+  1917                                                           targetChIdx.units.append(stp.unit)
+  1918                                                           stp.unit.channel_index = targetChIdx
+  1919                                                           oldChIdx.units.remove(stp.unit)
+  1920                                                           if not (len(oldChIdx.units) or len(oldChIdx.analogsignals)):
+  1921                                                               dataBlock.channel_indexes.remove(oldChIdx)
+  1922                                                           del oldChIdx
+  1923                                                           targetChIdx.create_relationship()
+  1924        12        143.0     11.9      0.0              elif reduceChannelIndexes:
+  1925                                                           if newChanName not in headerSignalChan['name']:
+  1926                                                               stp.unit.channel_index.index = np.asarray(
+  1927                                                                   [headerSignalChan['name'].size + nExtraChans])
+  1928                                                               stp.unit.channel_index.channel_ids = np.asarray(
+  1929                                                                   [headerSignalChan['name'].size + nExtraChans])
+  1930                                                               stp.unit.channel_index.channel_names = np.asarray(
+  1931                                                                   [newChanName])
+  1932                                                               nExtraChans += 1
+  1933                                                           if 'neo_name' not in allMatchingChIdx[0].annotations:
+  1934                                                               allMatchingChIdx[0].annotations['neo_name'] = allMatchingChIdx[0].name
+  1935                                                           if 'nix_name' not in allMatchingChIdx[0].annotations:
+  1936                                                               allMatchingChIdx[0].annotations['nix_name'] = allMatchingChIdx[0].name
+  1937        12        263.0     21.9      0.0          stp.unit.channel_index.name = stp.unit.channel_index.name.replace('.', '_').replace(' raw', '')
+  1938                                               #  rename the children
+  1939                                               typesNeedRenaming = [
+  1940         1         15.0     15.0      0.0          SpikeTrainProxy, AnalogSignalProxy, EventProxy,
+  1941         1         15.0     15.0      0.0          SpikeTrain, AnalogSignal, Event]
+  1942         3         47.0     15.7      0.0      for segIdx, seg in enumerate(dataBlock.segments):
+  1943         2         26.0     13.0      0.0          if seg.name is None:
+  1944         2         52.0     26.0      0.0              seg.name = 'seg{}_'.format(segIdx)
+  1945                                                   else:
+  1946                                                       if 'seg{}_'.format(segIdx) not in seg.name:
+  1947                                                           seg.name = (
+  1948                                                               'seg{}_{}'
+  1949                                                               .format(
+  1950                                                                   segIdx,
+  1951                                                                   childBaseName(seg.name, 'seg')))
+  1952        14        167.0     11.9      0.0          for objType in typesNeedRenaming:
+  1953       198      11217.0     56.7      0.0              for child in seg.filter(objects=objType):
+  1954       186       2940.0     15.8      0.0                  if 'seg{}_'.format(segIdx) not in child.name:
+  1955                                                               child.name = (
+  1956       175       2147.0     12.3      0.0                          'seg{}_{}'
+  1957                                                                   .format(
+  1958       175       6636.0     37.9      0.0                              segIdx, childBaseName(child.name, 'seg')))
+  1959                                                           #  todo: decide if below is needed
+  1960                                                           #  elif 'seg' in child.name:
+  1961                                                           #      childBaseName = '_'.join(child.name.split('_')[1:])
+  1962                                                           #      child.name = 'seg{}_{}'.format(segIdx, childBaseName)
+  1963                                               # [i.name for i in dataBlock.filter(objects=Unit)]
+  1964                                               # [i.name for i in dataBlock.filter(objects=ChannelIndex)]
+  1965                                               # [i.name for i in dataBlock.filter(objects=SpikeTrain)]
+  1966                                               # [i.name for i in dataBlock.filter(objects=SpikeTrainProxy)]
+  1967         1         10.0     10.0      0.0      return dataBlock
+
+Total time: 11.7687 s
+File: c:\users\peep sheep\nda2\data-analysis\dataAnalysis\preproc\ns5.py
+Function: blockFromPath at line 2950
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+  2950                                           def blockFromPath(
+  2951                                                   dataPath, lazy=False,
+  2952                                                   reduceChannelIndexes=False):
+  2953         1         14.0     14.0      0.0      if lazy:
+  2954         1         19.0     19.0      0.0          dataReader = nixio_fr.NixIO(
+  2955         1   20931481.0 20931481.0     17.8              filename=dataPath)
+  2956         1         35.0     35.0      0.0          dataBlock = readBlockFixNames(
+  2957         1         13.0     13.0      0.0              dataReader, lazy=lazy,
+  2958         1   96755128.0 96755128.0     82.2              reduceChannelIndexes=reduceChannelIndexes)
+  2959                                               else:
+  2960                                                   dataReader = None
+  2961                                                   dataBlock = loadWithArrayAnn(dataPath)
+  2962         1          5.0      5.0      0.0      return dataReader, dataBlock
+
+Total time: 2032.53 s
+File: c:\users\peep sheep\nda2\data-analysis\dataAnalysis\preproc\ns5.py
+Function: getAsigsAlignedToEvents at line 772
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+   772                                           def getAsigsAlignedToEvents(
+   773                                                   eventBlock=None, signalBlock=None,
+   774                                                   chansToTrigger=None, chanQuery=None,
+   775                                                   eventName=None, windowSize=None, 
+   776                                                   minNReps=None,
+   777                                                   appendToExisting=False,
+   778                                                   checkReferences=True, verbose=False,
+   779                                                   fileName=None, folderPath=None, chunkSize=None
+   780                                                   ):
+   781                                               #  get signals from same block as events?
+   782         1         22.0     22.0      0.0      if signalBlock is None:
+   783                                                   signalBlock = eventBlock
+   784                                               #  channels to trigger
+   785         1         20.0     20.0      0.0      if chansToTrigger is None:
+   786         1         22.0     22.0      0.0          chansToTrigger = listChanNames(
+   787         1    4031132.0 4031132.0      0.0              signalBlock, chanQuery, objType=ChannelIndex, condition='hasAsigs')
+   788                                               #  allocate block for spiketrains
+   789         1        353.0    353.0      0.0      masterBlock = Block()
+   790         1         26.0     26.0      0.0      masterBlock.name = signalBlock.annotations['neo_name']
+   791         1         84.0     84.0      0.0      masterBlock.annotate(nix_name=signalBlock.annotations['neo_name'])
+   792                                               #  make channels and units for triggered time series
+   793        71       3238.0     45.6      0.0      for chanName in chansToTrigger:
+   794        70      34542.0    493.5      0.0          chanIdx = ChannelIndex(name=chanName + '#0', index=[0])
+   795        70       8383.0    119.8      0.0          chanIdx.annotate(nix_name=chanIdx.name)
+   796        70      24119.0    344.6      0.0          thisUnit = Unit(name=chanIdx.name)
+   797        70       8200.0    117.1      0.0          thisUnit.annotate(nix_name=chanIdx.name)
+   798        70       3349.0     47.8      0.0          chanIdx.units.append(thisUnit)
+   799        70       3259.0     46.6      0.0          thisUnit.channel_index = chanIdx
+   800        70       3382.0     48.3      0.0          masterBlock.channel_indexes.append(chanIdx)
+   801         1         62.0     62.0      0.0      totalNSegs = 0
+   802                                               #  print([evSeg.events[3].name for evSeg in eventBlock.segments])
+   803         1         64.0     64.0      0.0      allAlignEventsList = []
+   804         3        139.0     46.3      0.0      for segIdx, eventSeg in enumerate(eventBlock.segments):
+   805         2        129.0     64.5      0.0          thisEventName = 'seg{}_{}'.format(segIdx, eventName)
+   806         2         82.0     41.0      0.0          try:
+   807         2       6804.0   3402.0      0.0              assert len(eventSeg.filter(name=thisEventName)) == 1
+   808                                                   except Exception:
+   809                                                       traceback.print_exc()
+   810         2       5747.0   2873.5      0.0          allEvIn = eventSeg.filter(name=thisEventName)[0]
+   811         2         92.0     46.0      0.0          if isinstance(allEvIn, EventProxy):
+   812         2    1960366.0 980183.0      0.0              allAlignEvents = loadObjArrayAnn(allEvIn.load())
+   813                                                   elif isinstance(allEvIn, Event):
+   814                                                       allAlignEvents = allEvIn
+   815                                                   else:
+   816                                                       raise(Exception(
+   817                                                           '{} must be an Event or EventProxy!'
+   818                                                           .format(eventName)))
+   819         2         53.0     26.5      0.0          allAlignEventsList.append(allAlignEvents)
+   820         1     270588.0 270588.0      0.0      allAlignEventsDF = unitSpikeTrainArrayAnnToDF(allAlignEventsList)
+   821                                               #
+   822                                               breakDownData = (
+   823         1         74.0     74.0      0.0          allAlignEventsDF
+   824         1      41826.0  41826.0      0.0          .groupby(minNReps['categories'])
+   825         1     120253.0 120253.0      0.0          .agg('count')
+   826         1       3331.0   3331.0      0.0          .iloc[:, 0]
+   827                                                   )
+   828         1         46.0     46.0      0.0      try:
+   829         1      42036.0  42036.0      0.0          breakDownData[breakDownData > minNReps['n']].to_csv(
+   830         1         48.0     48.0      0.0              os.path.join(
+   831         1        240.0    240.0      0.0                  folderPath, 'numRepetitionsEachCondition.csv'
+   832         1     124367.0 124367.0      0.0              ), header=True
+   833                                                   )
+   834                                               except Exception:
+   835                                                   traceback.print_exc()
+   836         1      33442.0  33442.0      0.0      allAlignEventsDF.loc[:, 'keepMask'] = False
+   837       291    1333344.0   4581.9      0.0      for name, group in allAlignEventsDF.groupby(minNReps['categories']):
+   838                                                   allAlignEventsDF.loc[group.index, 'keepMask'] = (
+   839       290  222948961.0 768789.5      1.1              breakDownData[name] > minNReps['n'])
+   840         3      35624.0  11874.7      0.0      for segIdx, group in allAlignEventsDF.groupby('segment'):
+   841         2       2546.0   1273.0      0.0          allAlignEventsList[segIdx].array_annotations['keepMask'] = group['keepMask'].to_numpy()
+   842                                               #
+   843         3        106.0     35.3      0.0      for segIdx, eventSeg in enumerate(eventBlock.segments):
+   844         2         43.0     21.5      0.0          if verbose:
+   845         2         47.0     23.5      0.0              print(
+   846         2         42.0     21.0      0.0                  'getAsigsAlignedToEvents on segment {} of {}'
+   847         2       1138.0    569.0      0.0                  .format(segIdx + 1, len(eventBlock.segments)))
+   848         2         47.0     23.5      0.0          allAlignEvents = allAlignEventsList[segIdx]
+   849         2         44.0     22.0      0.0          if chunkSize is None:
+   850                                                       alignEventGroups = [allAlignEvents]
+   851                                                   else:
+   852         2         44.0     22.0      0.0              nChunks = max(
+   853         2        171.0     85.5      0.0                  int(np.floor(allAlignEvents.shape[0] / chunkSize)),
+   854         2         59.0     29.5      0.0                  1)
+   855         2        416.0    208.0      0.0              alignEventGroups = []
+   856         4        117.0     29.2      0.0              for i in range(nChunks):
+   857         2         46.0     23.0      0.0                  if not (i == (nChunks - 1)):
+   858                                                               # not last one
+   859                                                               alignEventGroups.append(
+   860                                                                   allAlignEvents[i * chunkSize: (i + 1) * chunkSize])
+   861                                                           else:
+   862         2         41.0     20.5      0.0                      alignEventGroups.append(
+   863         2      11012.0   5506.0      0.0                          allAlignEvents[i * chunkSize:])
+   864         2         58.0     29.0      0.0          signalSeg = signalBlock.segments[segIdx]
+   865         4        236.0     59.0      0.0          for subSegIdx, alignEvents in enumerate(alignEventGroups):
+   866                                                       # seg to contain triggered time series
+   867         2         43.0     21.5      0.0              if verbose:
+   868         2         43.0     21.5      0.0                  print(
+   869         2         45.0     22.5      0.0                      'getAsigsAlignedToEvents on subSegment {} of {}'
+   870         2        796.0    398.0      0.0                      .format(subSegIdx + 1, len(alignEventGroups)))
+   871         2       1008.0    504.0      0.0              newSeg = Segment(name='seg{}_'.format(int(totalNSegs)))
+   872         2        152.0     76.0      0.0              newSeg.annotate(nix_name=newSeg.name)
+   873         2         53.0     26.5      0.0              masterBlock.segments.append(newSeg)
+   874       142       4070.0     28.7      0.0              for chanName in chansToTrigger:
+   875       140       5623.0     40.2      0.0                  asigName = 'seg{}_{}'.format(segIdx, chanName)
+   876       140       3451.0     24.6      0.0                  if verbose:
+   877       140       4070.0     29.1      0.0                      print(
+   878       140       3377.0     24.1      0.0                          'getAsigsAlignedToEvents on channel {}'
+   879       140      84677.0    604.8      0.0                          .format(chanName))
+   880       140     334510.0   2389.4      0.0                  assert len(signalSeg.filter(name=asigName)) == 1
+   881       140     243074.0   1736.2      0.0                  asig = signalSeg.filter(name=asigName)[0]
+   882       140       3672.0     26.2      0.0                  nominalWinLen = int(
+   883       140     170786.0   1219.9      0.0                      (windowSize[1] - windowSize[0]) *
+   884       140     657527.0   4696.6      0.0                      asig.sampling_rate - 1)
+   885                                                           validMask = (
+   886                                                               ((
+   887       140    1277552.0   9125.4      0.0                          alignEvents + windowSize[1] +
+   888       140    2717044.0  19407.5      0.0                          asig.sampling_rate ** (-1)) < asig.t_stop) &
+   889                                                               ((
+   890       140    1144461.0   8174.7      0.0                          alignEvents + windowSize[0] -
+   891       140     819948.0   5856.8      0.0                          asig.sampling_rate ** (-1)) > asig.t_start)
+   892                                                               )
+   893       140       6761.0     48.3      0.0                  thisKeepMask = alignEvents.array_annotations['keepMask']
+   894       140       6426.0     45.9      0.0                  fullMask = (validMask & thisKeepMask)
+   895       140     786165.0   5615.5      0.0                  alignEvents = alignEvents[fullMask]
+   896                                                           # array_annotations get sliced with the event, but regular anns do not
+   897      1820      52189.0     28.7      0.0                  for annName in alignEvents.annotations['arrayAnnNames']:
+   898                                                               alignEvents.annotations[annName] = (
+   899      1680     208585.0    124.2      0.0                          alignEvents.annotations[annName][fullMask])
+   900       140       4541.0     32.4      0.0                  if isinstance(asig, AnalogSignalProxy):
+   901       140       3840.0     27.4      0.0                      if checkReferences:
+   902                                                                   da = (
+   903                                                                       asig
+   904                                                                       ._rawio
+   905                                                                       .da_list['blocks'][0]['segments'][segIdx]['data'])
+   906                                                                   print('segIdx {}, asig.name {}'.format(
+   907                                                                       segIdx, asig.name))
+   908                                                                   print('asig._global_channel_indexes = {}'.format(
+   909                                                                       asig._global_channel_indexes))
+   910                                                                   print('asig references {}'.format(
+   911                                                                       da[asig._global_channel_indexes[0]]))
+   912                                                                   try:
+   913                                                                       assert (
+   914                                                                           asig.name
+   915                                                                           in da[asig._global_channel_indexes[0]].name)
+   916                                                                   except Exception:
+   917                                                                       traceback.print_exc()
+   918                                                               rawWaveforms = [
+   919       140       4315.0     30.8      0.0                          asig.load(
+   920                                                                       time_slice=(t + windowSize[0], t + windowSize[1]))
+   921       140 11175772238.0 79826944.6     55.0                          for t in alignEvents]
+   922       140    1607160.0  11479.7      0.0                      if any([rW.shape[0] < nominalWinLen for rW in rawWaveforms]):
+   923                                                                   rawWaveforms = [
+   924        70       2999.0     42.8      0.0                              asig.load(
+   925                                                                           time_slice=(t + windowSize[0], t + windowSize[1] + asig.sampling_period))
+   926        70 7549649920.0 107852141.7     37.1                              for t in alignEvents]
+   927                                                           elif isinstance(asig, AnalogSignal):
+   928                                                               rawWaveforms = []
+   929                                                               for t in alignEvents:
+   930                                                                   asigMask = (asig.times > t + windowSize[0]) & (asig.times < t + windowSize[1])
+   931                                                                   rawWaveforms.append(asig[asigMask[:, np.newaxis]])
+   932                                                           else:
+   933                                                               raise(Exception('{} must be an AnalogSignal or AnalogSignalProxy!'.format(asigName)))
+   934                                                           #
+   935       140       6310.0     45.1      0.0                  samplingRate = asig.sampling_rate
+   936       140      31744.0    226.7      0.0                  waveformUnits = rawWaveforms[0].units
+   937                                                           #  fix length if roundoff error
+   938                                                           #  minLen = min([rW.shape[0] for rW in rawWaveforms])
+   939       140  462690219.0 3304930.1      2.3                  rawWaveforms = [rW[:nominalWinLen] for rW in rawWaveforms]
+   940                                                           #
+   941                                                           spikeWaveforms = (
+   942       140   21853258.0 156094.7      0.1                      np.hstack([rW.magnitude for rW in rawWaveforms])
+   943       140    3505938.0  25042.4      0.0                      .transpose()[:, np.newaxis, :] * waveformUnits
+   944                                                               )
+   945                                                           #
+   946       140       6310.0     45.1      0.0                  thisUnit = masterBlock.filter(
+   947       140   10729633.0  76640.2      0.1                      objects=Unit, name=chanName + '#0')[0]
+   948                                                           skipEventAnnNames = (
+   949       140       5021.0     35.9      0.0                      ['nix_name', 'neo_name']
+   950                                                               )
+   951       140       3972.0     28.4      0.0                  stAnn = {
+   952                                                               k: v
+   953       140      21765.0    155.5      0.0                      for k, v in alignEvents.annotations.items()
+   954                                                               if k not in skipEventAnnNames
+   955                                                               }
+   956                                                           skipAsigAnnNames = (
+   957       140       3992.0     28.5      0.0                      ['channel_id', 'nix_name', 'neo_name']
+   958                                                               )
+   959       140       3825.0     27.3      0.0                  stAnn.update({
+   960                                                               k: v
+   961       140       8793.0     62.8      0.0                      for k, v in asig.annotations.items()
+   962                                                               if k not in skipAsigAnnNames
+   963                                                           })
+   964       140       3697.0     26.4      0.0                  st = SpikeTrain(
+   965       140       7645.0     54.6      0.0                      name='seg{}_{}'.format(int(totalNSegs), thisUnit.name),
+   966       140     138370.0    988.4      0.0                      times=alignEvents.times,
+   967       140       3809.0     27.2      0.0                      waveforms=spikeWaveforms,
+   968       140     783833.0   5598.8      0.0                      t_start=asig.t_start, t_stop=asig.t_stop,
+   969       140      23754.0    169.7      0.0                      left_sweep=windowSize[0] * (-1),
+   970       140       4508.0     32.2      0.0                      sampling_rate=samplingRate,
+   971       140     402506.0   2875.0      0.0                      **stAnn
+   972                                                               )
+   973       140      12635.0     90.2      0.0                  st.annotate(nix_name=st.name)
+   974       140       5398.0     38.6      0.0                  thisUnit.spiketrains.append(st)
+   975       140       4930.0     35.2      0.0                  newSeg.spiketrains.append(st)
+   976       140       3756.0     26.8      0.0                  st.unit = thisUnit
+   977         2         49.0     24.5      0.0              totalNSegs += 1
+   978         1         21.0     21.0      0.0      try:
+   979         1         26.0     26.0      0.0          eventBlock.filter(
+   980         1    1004854.0 1004854.0      0.0              objects=EventProxy)[0]._rawio.file.close()
+   981                                               except Exception:
+   982                                                   traceback.print_exc()
+   983         1         55.0     55.0      0.0      if signalBlock is not eventBlock:
+   984                                                   try:
+   985                                                       signalBlock.filter(
+   986                                                           objects=AnalogSignalProxy)[0]._rawio.file.close()
+   987                                                   except Exception:
+   988                                                       traceback.print_exc()
+   989         1         52.0     52.0      0.0      triggeredPath = os.path.join(
+   990         1        360.0    360.0      0.0          folderPath, fileName + '.nix')
+   991         1       1050.0   1050.0      0.0      if not os.path.exists(triggeredPath):
+   992         1         35.0     35.0      0.0          appendToExisting = False
+   993                                           
+   994         1         34.0     34.0      0.0      if appendToExisting:
+   995                                                   allSegs = list(range(len(masterBlock.segments)))
+   996                                                   addBlockToNIX(
+   997                                                       masterBlock, neoSegIdx=allSegs,
+   998                                                       writeSpikes=True,
+   999                                                       fileName=fileName,
+  1000                                                       folderPath=folderPath,
+  1001                                                       purgeNixNames=False,
+  1002                                                       nixBlockIdx=0, nixSegIdx=allSegs)
+  1003                                               else:
+  1004         1     139267.0 139267.0      0.0          masterBlock = purgeNixAnn(masterBlock)
+  1005         1     151136.0 151136.0      0.0          writer = NixIO(filename=triggeredPath)
+  1006         1  856071614.0 856071614.0      4.2          writer.write_block(masterBlock, use_obj_names=True)
+  1007         1    1042534.0 1042534.0      0.0          writer.close()
+  1008         1         33.0     33.0      0.0      return masterBlock
+
+Total time: 2044.36 s
+File: ./calcAlignedAsigs.py
+Function: calcAlignedAsigsWrapped at line 63
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    63                                           def calcAlignedAsigsWrapped():
+    64                                               #  source of events
+    65         1         99.0     99.0      0.0      if arguments['processAll']:
+    66         1         29.0     29.0      0.0          eventPath = experimentDataPath
+    67                                               else:
+    68                                                   eventPath = analysisDataPath
+    69                                           
+    70         1       1220.0   1220.0      0.0      print('Loading events from {}'.format(eventPath))
+    71         1         25.0     25.0      0.0      eventReader, eventBlock = ns5.blockFromPath(
+    72         1  117686878.0 117686878.0      0.6          eventPath, lazy=arguments['lazy'])
+    73                                               #  eventBlock = eventReader.read_block(
+    74                                               #      block_index=0, lazy=True,
+    75                                               #      signal_group_mode='split-all')
+    76                                               #  for ev in eventBlock.filter(objects=EventProxy):
+    77                                               #      ev.name = '_'.join(ev.name.split('_')[1:])
+    78                                           
+    79                                               #  source of analogsignals
+    80         1          7.0      7.0      0.0      signalBlock = eventBlock
+    81                                           
+    82                                               windowSize = [
+    83         1         11.0     11.0      0.0          i * pq.s
+    84         1        522.0    522.0      0.0          for i in rasterOpts['windowSizes'][arguments['window']]]
+    85                                           
+    86         1          8.0      8.0      0.0      if arguments['processAll']:
+    87         1          7.0      7.0      0.0          prefix = assembledName
+    88                                               else:
+    89                                                   prefix = ns5FileName
+    90                                           
+    91         1         12.0     12.0      0.0      ns5.getAsigsAlignedToEvents(
+    92         1          6.0      6.0      0.0          eventBlock=eventBlock, signalBlock=signalBlock,
+    93         1          7.0      7.0      0.0          chansToTrigger=arguments['chanNames'],
+    94         1          8.0      8.0      0.0          chanQuery=arguments['chanQuery'],
+    95         1          7.0      7.0      0.0          eventName=arguments['eventName'],
+    96         1          6.0      6.0      0.0          windowSize=windowSize,
+    97         1          9.0      9.0      0.0          minNReps=minNConditionRepetitions,
+    98         1          6.0      6.0      0.0          appendToExisting=False,
+    99         1          5.0      5.0      0.0          checkReferences=False,
+   100         1          7.0      7.0      0.0          verbose=arguments['verbose'],
+   101         1          6.0      6.0      0.0          fileName='{}_{}_{}'.format(
+   102         1         15.0     15.0      0.0              prefix, arguments['outputBlockName'], arguments['window']),
+   103         1 20325914860.0 20325914860.0     99.4          folderPath=alignSubFolder, chunkSize=alignedAsigsChunkSize)
+   104                                           
+   105         1        659.0    659.0      0.0      print('Finished CalcAlignedAsigs')
+   106         1          7.0      7.0      0.0      return
+

@@ -41,6 +41,7 @@ expOpts, allOpts = parseAnalysisOptions(
 globals().update(expOpts)
 globals().update(allOpts)
 
+@profile
 def synchronizeDelsysToNSP():
     nspPath = os.path.join(
         scratchFolder,

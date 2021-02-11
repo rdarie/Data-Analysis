@@ -20,6 +20,7 @@ import dataAnalysis.helperFunctions.probe_metadata as prb_meta
 import numpy as np
 import pandas as pd
 from datetime import datetime as dt
+from datetime import timezone
 import os, gc
 import traceback
 from functools import reduce
@@ -338,6 +339,7 @@ def unitSpikeTrainWaveformsToDF(
         lags=None, decimate=1, rollingWindow=None,
         getMetaData=True, verbose=False,
         whichSegments=None, windowSize=None, procFun=None):
+    #pdb.set_trace()
     #  list contains different segments from *one* unit
     if isinstance(spikeTrainContainer, ChannelIndex):
         assert len(spikeTrainContainer.units) == 0
@@ -413,7 +415,6 @@ def unitSpikeTrainWaveformsToDF(
                 else:
                     v = np.asarray(values)
                 annDict.update({k: v})
-            #
             skipAnnNames = (
                 st.annotations['arrayAnnNames'] +
                 [
@@ -431,6 +432,7 @@ def unitSpikeTrainWaveformsToDF(
                 if k not in skipAnnNames:
                     annDF.loc[:, k] = value
             #
+            
             annColumns = annDF.columns.to_list()
             if getMetaData:
                 idxLabels += annColumns
@@ -447,12 +449,15 @@ def unitSpikeTrainWaveformsToDF(
             if not getMetaData:
                 spikeDF.drop(columns=annColumns, inplace=True)
         waveformsList.append(spikeDF)
+        #pdb.set_trace()
     #
+    #pdb.set_trace()
     zeroLagWaveformsDF = pd.concat(waveformsList, axis='index')
     if verbose:
         prf.print_memory_usage('before transposing waveforms')
     # TODO implement lags and rolling window addition here
     metaDF = zeroLagWaveformsDF.loc[:, idxLabels].copy()
+    #pdb.set_trace()
     zeroLagWaveformsDF.drop(columns=idxLabels, inplace=True)
     if lags is None:
         lags = [0]
@@ -507,12 +512,12 @@ def unitSpikeTrainWaveformsToDF(
             laggedWaveformsDict[
                 (spikeTrainContainer.name, lag)] = (
                     shiftedWaveform.iloc[:, seekIdx].copy())
-    #
     if transposeToColumns == 'feature':
         # stack the bin, name the feature column
         # 
         for idx, (key, value) in enumerate(laggedWaveformsDict.items()):
             if idx == 0:
+                #pdb.set_trace()
                 stackedIndexDF = pd.concat(
                     [metaDF, value], axis='columns')
                 stackedIndexDF.set_index(idxLabels, inplace=True)
@@ -2805,6 +2810,7 @@ def preproc(
             mapDF=mapDF,
             # swapMaps=swapMaps
             )
+        #pdb.set_trace()
         # ripple debugging
         # allSptProx = block.filter(objects=SpikeTrainProxy)
         # allSpt = [i.load() for i in allSptProx]

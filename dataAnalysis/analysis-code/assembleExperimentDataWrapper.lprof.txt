@@ -1,0 +1,382 @@
+Timer unit: 1e-07 s
+
+Total time: 0.0065709 s
+File: C:\Users\Peep Sheep\.conda\envs\nda2\lib\copy.py
+Function: copy at line 66
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    66                                           def copy(x):
+    67                                               """Shallow copy operation on arbitrary Python objects.
+    68                                           
+    69                                               See the module's __doc__ string for more info.
+    70                                               """
+    71                                           
+    72      1558      23122.0     14.8     35.2      cls = type(x)
+    73                                           
+    74      1558      17155.0     11.0     26.1      copier = _copy_dispatch.get(cls)
+    75      1558       9415.0      6.0     14.3      if copier:
+    76      1558      16017.0     10.3     24.4          return copier(x)
+    77                                           
+    78                                               try:
+    79                                                   issc = issubclass(cls, type)
+    80                                               except TypeError: # cls is not a class
+    81                                                   issc = False
+    82                                               if issc:
+    83                                                   # treat it as a regular class:
+    84                                                   return _copy_immutable(x)
+    85                                           
+    86                                               copier = getattr(cls, "__copy__", None)
+    87                                               if copier:
+    88                                                   return copier(x)
+    89                                           
+    90                                               reductor = dispatch_table.get(cls)
+    91                                               if reductor:
+    92                                                   rv = reductor(x)
+    93                                               else:
+    94                                                   reductor = getattr(x, "__reduce_ex__", None)
+    95                                                   if reductor:
+    96                                                       rv = reductor(4)
+    97                                                   else:
+    98                                                       reductor = getattr(x, "__reduce__", None)
+    99                                                       if reductor:
+   100                                                           rv = reductor()
+   101                                                       else:
+   102                                                           raise Error("un(shallow)copyable object of type %s" % cls)
+   103                                           
+   104                                               if isinstance(rv, str):
+   105                                                   return x
+   106                                               return _reconstruct(x, None, *rv)
+
+Total time: 0.0172696 s
+File: C:\Users\Peep Sheep\.conda\envs\nda2\lib\copy.py
+Function: deepcopy at line 132
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+   132                                           def deepcopy(x, memo=None, _nil=[]):
+   133                                               """Deep copy operation on arbitrary Python objects.
+   134                                           
+   135                                               See the module's __doc__ string for more info.
+   136                                               """
+   137                                           
+   138      1476      10651.0      7.2      6.2      if memo is None:
+   139       164       1366.0      8.3      0.8          memo = {}
+   140                                           
+   141      1476       9409.0      6.4      5.4      d = id(x)
+   142      1476      10727.0      7.3      6.2      y = memo.get(d, _nil)
+   143      1476       8039.0      5.4      4.7      if y is not _nil:
+   144                                                   return y
+   145                                           
+   146      1476       9607.0      6.5      5.6      cls = type(x)
+   147                                           
+   148      1476      11438.0      7.7      6.6      copier = _deepcopy_dispatch.get(cls)
+   149      1476       7931.0      5.4      4.6      if copier:
+   150      1312      19110.0     14.6     11.1          y = copier(x, memo)
+   151                                               else:
+   152       164        955.0      5.8      0.6          try:
+   153       164       1689.0     10.3      1.0              issc = issubclass(cls, type)
+   154                                                   except TypeError: # cls is not a class (old Boost; see SF #502085)
+   155                                                       issc = 0
+   156       164        926.0      5.6      0.5          if issc:
+   157                                                       y = _deepcopy_atomic(x, memo)
+   158                                                   else:
+   159       164       1532.0      9.3      0.9              copier = getattr(x, "__deepcopy__", None)
+   160       164        930.0      5.7      0.5              if copier:
+   161                                                           y = copier(memo)
+   162                                                       else:
+   163       164       1766.0     10.8      1.0                  reductor = dispatch_table.get(cls)
+   164       164        917.0      5.6      0.5                  if reductor:
+   165                                                               rv = reductor(x)
+   166                                                           else:
+   167       164       1943.0     11.8      1.1                      reductor = getattr(x, "__reduce_ex__", None)
+   168       164       1105.0      6.7      0.6                      if reductor:
+   169       164      28038.0    171.0     16.2                          rv = reductor(4)
+   170                                                               else:
+   171                                                                   reductor = getattr(x, "__reduce__", None)
+   172                                                                   if reductor:
+   173                                                                       rv = reductor()
+   174                                                                   else:
+   175                                                                       raise Error(
+   176                                                                           "un(deep)copyable object of type %s" % cls)
+   177       164       1662.0     10.1      1.0                  if isinstance(rv, str):
+   178                                                               y = x
+   179                                                           else:
+   180       164      11020.0     67.2      6.4                      y = _reconstruct(x, memo, *rv)
+   181                                           
+   182                                               # If is its own copy, don't memoize.
+   183      1476       9042.0      6.1      5.2      if y is not x:
+   184       492       3594.0      7.3      2.1          memo[d] = y
+   185       492      12066.0     24.5      7.0          _keep_alive(x, memo) # Make sure x lives at least as long as d
+   186      1476       7233.0      4.9      4.2      return y
+
+Total time: 48.6172 s
+File: ./assembleExperimentData.py
+Function: assembleExperimentDataWrapper at line 34
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    34                                           def assembleExperimentDataWrapper():
+    35         1       8736.0   8736.0      0.0      from currentExperiment import parseAnalysisOptions
+    36         1      96846.0  96846.0      0.0      from docopt import docopt
+    37         1      27897.0  27897.0      0.0      arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
+    38         1         21.0     21.0      0.0      expOpts, allOpts = parseAnalysisOptions(
+    39         1         23.0     23.0      0.0          int(arguments['blockIdx']),
+    40         1   15608225.0 15608225.0      3.2          arguments['exp'])
+    41         1        148.0    148.0      0.0      globals().update(expOpts)
+    42         1        179.0    179.0      0.0      globals().update(allOpts)
+    43                                           
+    44         1         46.0     46.0      0.0      applyTimeOffset = False
+    45         1         47.0     47.0      0.0      suffixList = []
+    46         1         56.0     56.0      0.0      if arguments['processAsigs']:
+    47         1         49.0     49.0      0.0          suffixList.append('_analyze')
+    48         1         49.0     49.0      0.0      if arguments['processRasters']:
+    49         1         46.0     46.0      0.0          suffixList.append('_binarized')
+    50                                           
+    51         3        119.0     39.7      0.0      for suffix in suffixList:
+    52         2       1779.0    889.5      0.0          print('assembling {}'.format(suffix))
+    53         2         92.0     46.0      0.0          experimentDataPath = os.path.join(
+    54         2         76.0     38.0      0.0              scratchFolder, arguments['analysisName'],
+    55                                                       assembledName +
+    56         2        894.0    447.0      0.0              suffix + '.nix')
+    57                                                   #print(experimentDataPath)
+    58                                                   #pdb.set_trace()
+    59                                                   # Scan ahead through all files and ensure that
+    60                                                   # spikeTrains and units are present across all assembled files
+    61         2         74.0     37.0      0.0          masterChanDF = pd.DataFrame([], columns=[
+    62         2         58.0     29.0      0.0              'index', 'channel_names', 'channel_ids',
+    63         2     163467.0  81733.5      0.0              'hasUnits', 'hasAsigs'
+    64                                                       ])
+    65         2     111825.0  55912.5      0.0          masterUnitDF = pd.DataFrame([], columns=['parentChanName'])
+    66         2         58.0     29.0      0.0          blocksCache = {}
+    67         6        191.0     31.8      0.0          for idx, trialBasePath in enumerate(trialsToAssemble):
+    68                                                       trialDataPath = (
+    69         4         72.0     18.0      0.0                  trialBasePath
+    70         4        143.0     35.8      0.0                  .format(arguments['analysisName'])
+    71         4        141.0     35.2      0.0                  .replace('.nix', '{}.nix'.format(suffix))
+    72                                                           )
+    73                                                       # dataReader, dataBlock = preproc.blockFromPath(
+    74                                                       #     trialDataPath, lazy=True, reduceChannelIndexes=True)
+    75         4        110.0     27.5      0.0              dataBlock = preproc.loadWithArrayAnn(
+    76         4  123464838.0 30866209.5     25.4                  trialDataPath, fromRaw=False, reduceChannelIndexes=True)
+    77         4        272.0     68.0      0.0              blocksCache[trialDataPath] = dataBlock
+    78                                                       #pdb.set_trace()
+    79         4        167.0     41.8      0.0              if idx == 0:
+    80         2         37.0     18.5      0.0                  masterDataPath = trialDataPath
+    81       168      90766.0    540.3      0.0              for chIdx in dataBlock.filter(objects=ChannelIndex):
+    82       164     162527.0    991.0      0.0                  chAlreadyThere = masterChanDF.index == chIdx.name
+    83       164      13088.0     79.8      0.0                  if not chAlreadyThere.any():
+    84        94    1484123.0  15788.5      0.3                      masterChanDF.loc[chIdx.name, 'hasUnits'] = len(chIdx.units) > 0
+    85        94     414587.0   4410.5      0.1                      masterChanDF.loc[chIdx.name, 'hasAsigs'] = len(chIdx.analogsignals) > 0
+    86        94       2550.0     27.1      0.0                      try:
+    87        94       2327.0     24.8      0.0                          chIdxNames = chIdx.channel_names
+    88        94       2107.0     22.4      0.0                          chIdxIDS = chIdx.channel_ids
+    89        94     197052.0   2096.3      0.0                          print('chIdx index = {}'.format(chIdx.index))
+    90        94       2723.0     29.0      0.0                          if not len(chIdxIDS):
+    91        24        874.0     36.4      0.0                              chIdxIDS = [int(chIdx.index)]
+    92        94       2060.0     21.9      0.0                          if not len(chIdxNames):
+    93        24        707.0     29.5      0.0                              chIdxNames = [chIdx.name]
+    94        94     436073.0   4639.1      0.1                          masterChanDF.loc[chIdx.name, 'index'] = int(chIdx.index)
+    95        94     412476.0   4388.0      0.1                          masterChanDF.loc[chIdx.name, 'channel_names'] = chIdxNames
+    96        94     418643.0   4453.6      0.1                          masterChanDF.loc[chIdx.name, 'channel_ids'] = chIdxIDS
+    97                                                               except Exception:
+    98                                                                   traceback.print_exc()
+    99       282       9165.0     32.5      0.0                      for annName,  annVal in chIdx.annotations.items():
+   100       188     881789.0   4690.4      0.2                          masterChanDF.loc[chIdx.name, annName] = annVal
+   101                                                           else:
+   102        70       1985.0     28.4      0.0                      if len(chIdx.units) > 0:
+   103                                                                   masterChanDF.loc[chAlreadyThere, 'hasUnits'] = True
+   104        70       1693.0     24.2      0.0                      if len(chIdx.analogsignals):
+   105        70     869507.0  12421.5      0.2                          masterChanDF.loc[chAlreadyThere, 'hasAsigs'] = True
+   106        28      76917.0   2747.0      0.0              for unit in (dataBlock.filter(objects=Unit)):
+   107        24      32427.0   1351.1      0.0                  uAlreadyThere = masterUnitDF.index == unit.name
+   108        24       2724.0    113.5      0.0                  if not uAlreadyThere.any():
+   109        84       4099.0     48.8      0.0                      for annName, annVal in unit.annotations.items():
+   110        60     933228.0  15553.8      0.2                          masterUnitDF.loc[unit.name, annName] = annVal
+   111        24       1042.0     43.4      0.0                      unitParentChanName = unit.channel_index.name
+   112        24     162269.0   6761.2      0.0                      masterUnitDF.loc[unit.name, 'parentChanName'] = unitParentChanName
+   113                                                               # chAlreadyThere = masterChanDF.index == unitParentChanName
+   114                                                       # dataReader.file.close()
+   115                                                   # masterChanDF[masterChanDF['hasUnits']]
+   116         6        215.0     35.8      0.0          for idx, trialBasePath in enumerate(trialsToAssemble):
+   117                                                       trialDataPath = (
+   118         4        112.0     28.0      0.0                  trialBasePath
+   119         4        186.0     46.5      0.0                  .format(arguments['analysisName'])
+   120         4        191.0     47.8      0.0                  .replace('.nix', '{}.nix'.format(suffix))
+   121                                                           )
+   122         4       2468.0    617.0      0.0              print('loading trial {}'.format(trialDataPath))
+   123         4        111.0     27.8      0.0              if idx == 0:
+   124         2        155.0     77.5      0.0                  blocksCache[trialDataPath].name = experimentName + suffix
+   125         2         68.0     34.0      0.0                  if applyTimeOffset:
+   126                                                               masterTStart = blocksCache[trialDataPath].filter(objects=AnalogSignal)[0].t_start
+   127                                                               oldTStop = blocksCache[trialDataPath].filter(objects=AnalogSignal)[0].t_stop
+   128                                                       else:
+   129         2         50.0     25.0      0.0                  blocksCache[trialDataPath].name = blocksCache[masterDataPath].name
+   130         2         36.0     18.0      0.0                  if applyTimeOffset:
+   131                                                               tStart = blocksCache[trialDataPath].filter(objects=AnalogSignal)[0].t_start
+   132                                                               timeOffset = oldTStop - tStart
+   133                                                               blocksCache[trialDataPath] = hf.timeOffsetBlock(
+   134                                                                   blocksCache[trialDataPath], timeOffset, masterTStart)
+   135                                                               #  [i.times for i in dataBlock.filter(objects=SpikeTrain)]
+   136                                                               #  [i.unit.channel_index.name for i in masterBlock.filter(objects=SpikeTrain)]
+   137                                                               tStop = dataBlock.filter(objects=AnalogSignal)[0].t_stop
+   138                                                       # if suffix == '_binarized':
+   139                                                       #     for seg in blocksCache[trialDataPath].segments:
+   140                                                       #         seg.spiketrains = []
+   141       192     492149.0   2563.3      0.1              for rowIdx, row in masterChanDF.iterrows():
+   142       188       5598.0     29.8      0.0                  matchingCh = blocksCache[trialDataPath].filter(
+   143       188    5936848.0  31579.0      1.2                      objects=ChannelIndex, name=rowIdx)
+   144       188       6237.0     33.2      0.0                  if not len(matchingCh):
+   145                                                               '''
+   146                                                                   # [ch.index for ch in blocksCache[trialDataPath].filter(objects=ChannelIndex)]
+   147                                                                   # if row['index'] is None:
+   148                                                                   #     pdb.set_trace()
+   149                                                                   #     chIdx = ChannelIndex(
+   150                                                                   #         name=rowIdx,
+   151                                                                   #         index=np.asarray([0]),
+   152                                                                   #         channel_ids=np.asarray([0]),
+   153                                                                   #         channel_names=np.asarray([rowIdx]),
+   154                                                                   #         file_origin=blocksCache[trialDataPath].channel_indexes[-1].file_origin
+   155                                                                   #         )
+   156                                                                   # else:
+   157                                                               '''
+   158                                                               # create it
+   159        24      20824.0    867.7      0.0                      print('ch {} not found; creating now'.format(rowIdx))
+   160        24        671.0     28.0      0.0                      chIdx = ChannelIndex(
+   161        24        631.0     26.3      0.0                          name=rowIdx,
+   162        24      16537.0    689.0      0.0                          index=np.asarray([row['index']]).flatten(),
+   163        24      16000.0    666.7      0.0                          channel_ids=np.asarray([row['channel_ids']]).flatten(),
+   164        24      12453.0    518.9      0.0                          channel_names=np.asarray([row['channel_names']]).flatten(),
+   165        24      13288.0    553.7      0.0                          file_origin=blocksCache[trialDataPath].channel_indexes[-1].file_origin
+   166                                                                   )
+   167       120     240604.0   2005.0      0.0                      for aN in row.drop(['index', 'channel_names', 'channel_ids']).index:
+   168        96      25497.0    265.6      0.0                          chIdx.annotations[aN] = row[aN]
+   169        24        866.0     36.1      0.0                      blocksCache[trialDataPath].channel_indexes.append(chIdx)
+   170        24        593.0     24.7      0.0                      chIdx.block = blocksCache[trialDataPath]
+   171                                                               # create blank asigs
+   172        24       5248.0    218.7      0.0                      if row['hasAsigs']:
+   173        12     345943.0  28828.6      0.1                          dummyAsig = blocksCache[trialDataPath].filter(objects=AnalogSignal)[0].copy()
+   174        12        767.0     63.9      0.0                          dummyAsig.name = 'seg0_' + chIdx.name
+   175        12        408.0     34.0      0.0                          dummyAsig.annotations['neo_name'] = dummyAsig.name
+   176        12      52287.0   4357.2      0.0                          dummyAsig.magnitude[:] = 0
+   177        12        347.0     28.9      0.0                          dummyAsig.channel_index = chIdx
+   178        12        536.0     44.7      0.0                          chIdx.analogsignals.append(dummyAsig)
+   179        12        749.0     62.4      0.0                          blocksCache[trialDataPath].segments[0].analogsignals.append(dummyAsig)
+   180        12        324.0     27.0      0.0                          dummyAsig.segment = blocksCache[trialDataPath].segments[0]
+   181                                                                   # pdb.set_trace()
+   182         4     121138.0  30284.5      0.0              anySpikeTrains = blocksCache[trialDataPath].filter(objects=SpikeTrain)
+   183         4        163.0     40.8      0.0              if len(anySpikeTrains):
+   184         4       1438.0    359.5      0.0                  wvfUnits = anySpikeTrains[0].waveforms.units
+   185         4        663.0    165.8      0.0                  stTimeUnits = anySpikeTrains[0].units
+   186                                                       else:
+   187                                                           stTimeUnits = pq.s
+   188                                                           wvfUnits = pq.uV
+   189        52     116355.0   2237.6      0.0              for rowIdx, row in masterUnitDF.iterrows():
+   190        48       1340.0     27.9      0.0                  matchingUnit = blocksCache[trialDataPath].filter(
+   191        48     992436.0  20675.8      0.2                      objects=Unit, name=rowIdx)
+   192        48       1564.0     32.6      0.0                  if not len(matchingUnit):
+   193        24      11978.0    499.1      0.0                      parentChanName = row['parentChanName']
+   194                                                               # parentChanName = rowIdx
+   195                                                               # if parentChanName.endswith('_stim#0'):
+   196                                                               #     parentChanName.replace('_stim#0', '')
+   197                                                               # if parentChanName.endswith('#0'):
+   198                                                               #     parentChanName.replace('#0', '')
+   199        24        700.0     29.2      0.0                      matchingCh = blocksCache[trialDataPath].filter(
+   200        24     442403.0  18433.5      0.1                          objects=ChannelIndex, name=parentChanName)
+   201                                                               '''
+   202                                                                   if not len(matchingCh):
+   203                                                                       masterListEntry = masterChanDF.loc[parentChanName, :]
+   204                                                                       parentChIdx = ChannelIndex(
+   205                                                                           name=parentChanName,
+   206                                                                           index=masterListEntry['index'],
+   207                                                                           channel_ids=masterListEntry['channel_ids'],
+   208                                                                           channel_names=masterListEntry['channel_names'],
+   209                                                                           file_origin=blocksCache[trialDataPath].channel_indexes[-1].file_origin
+   210                                                                           )
+   211                                                                       blocksCache[trialDataPath].channel_indexes.append(parentChIdx)
+   212                                                                       parentChIdx.block = blocksCache[trialDataPath]
+   213                                                                   else:
+   214                                                                       parentChIdx = matchingCh[0]
+   215                                                               '''
+   216        24        587.0     24.5      0.0                      parentChIdx = matchingCh[0]
+   217        24      13238.0    551.6      0.0                      print('unit {} not found; creating now'.format(rowIdx))
+   218        24       7387.0    307.8      0.0                      newUnit = Unit(name=rowIdx)
+   219       108      10881.0    100.8      0.0                      for annName in row.index:
+   220        84      17982.0    214.1      0.0                          newUnit.annotations[annName] = row[annName]
+   221        24        430.0     17.9      0.0                      newUnit.channel_index = parentChIdx
+   222        24        580.0     24.2      0.0                      parentChIdx.units.append(newUnit)
+   223        48       1096.0     22.8      0.0                      for seg in blocksCache[trialDataPath].segments:
+   224        24        440.0     18.3      0.0                          dummyST = SpikeTrain(
+   225        24        408.0     17.0      0.0                              times=[], units=stTimeUnits,
+   226        24     148353.0   6181.4      0.0                              t_stop=seg.filter(objects=AnalogSignal)[0].t_stop,
+   227        24       5247.0    218.6      0.0                              waveforms=np.array([]).reshape((0, 0, 0)) * wvfUnits,
+   228        24      34238.0   1426.6      0.0                              name=seg.name + newUnit.name)
+   229        24        554.0     23.1      0.0                          dummyST.unit = newUnit
+   230        24        479.0     20.0      0.0                          dummyST.segment = seg
+   231        24        542.0     22.6      0.0                          newUnit.spiketrains.append(dummyST)
+   232        24        642.0     26.8      0.0                          seg.spiketrains.append(dummyST)
+   233         4         99.0     24.8      0.0              typesNeedRenaming = [SpikeTrain, AnalogSignal, Event]
+   234         4         82.0     20.5      0.0              blocksCache[trialDataPath].segments[0].name = 'seg{}_{}'.format(
+   235         4        197.0     49.2      0.0                  idx, blocksCache[trialDataPath].name)
+   236        16        310.0     19.4      0.0              for objType in typesNeedRenaming:
+   237        12     219445.0  18287.1      0.0                  listOfChildren = blocksCache[trialDataPath].filter(objects=objType)
+   238        12        293.0     24.4      0.0                  print('{}\n{} objects of type {}'.format(
+   239        12       5819.0    484.9      0.0                      trialDataPath, len(listOfChildren), objType
+   240                                                           ))
+   241       246       4584.0     18.6      0.0                  for child in listOfChildren:
+   242       234       8233.0     35.2      0.0                      childBaseName = preproc.childBaseName(child.name, 'seg')
+   243       234       5413.0     23.1      0.0                      child.name = 'seg{}_{}'.format(idx, childBaseName)
+   244         4      60650.0  15162.5      0.0              blocksCache[trialDataPath].create_relationship()
+   245         4     118885.0  29721.2      0.0              blocksCache[trialDataPath] = preproc.purgeNixAnn(blocksCache[trialDataPath])
+   246                                                       ########
+   247         4         97.0     24.2      0.0              sanityCheck = False
+   248         4         80.0     20.0      0.0              if sanityCheck and idx == 2:
+   249                                                           doublePath = trialDataPath.replace(suffix, suffix + '_backup')
+   250                                                           if os.path.exists(doublePath):
+   251                                                               os.remove(doublePath)
+   252                                                           print('writing {} ...'.format(doublePath))
+   253                                                           for idx, chIdx in enumerate(blocksCache[trialDataPath].channel_indexes):
+   254                                                               print('{}: {}, chan_id = {}'.format(
+   255                                                                   chIdx.name, chIdx.index, chIdx.channel_ids))
+   256                                                           writer = neo.io.NixIO(filename=doublePath)
+   257                                                           writer.write_block(blocksCache[trialDataPath], use_obj_names=True)
+   258                                                           writer.close()
+   259                                                       ############
+   260         4         88.0     22.0      0.0              if idx > 0:
+   261         2      36629.0  18314.5      0.0                  blocksCache[masterDataPath].merge(blocksCache[trialDataPath])
+   262         2         37.0     18.5      0.0                  if applyTimeOffset:
+   263                                                               oldTStop = tStop
+   264                                                   '''
+   265                                                       print([evSeg.events[0].name for evSeg in masterBlock.segments])
+   266                                                       print([asig.name for asig in masterBlock.filter(objects=AnalogSignal)])
+   267                                                       print([st.name for st in masterBlock.filter(objects=SpikeTrain)])
+   268                                                       print([ev.name for ev in masterBlock.filter(objects=Event)])
+   269                                                       print([chIdx.name for chIdx in blocksCache[trialDataPath].filter(objects=ChannelIndex)])
+   270                                                       print([un.name for un in masterBlock.filter(objects=Unit)])
+   271                                                   '''
+   272                                                   # blocksCache[masterDataPath].create_relationship()
+   273         2       2121.0   1060.5      0.0          if os.path.exists(experimentDataPath):
+   274         2      38990.0  19495.0      0.0              os.remove(experimentDataPath)
+   275         2     190107.0  95053.5      0.0          writer = neo.io.NixIO(filename=experimentDataPath)
+   276         2       1546.0    773.0      0.0          print('writing {} ...'.format(experimentDataPath))
+   277         2  328536005.0 164268002.5     67.6          writer.write_block(blocksCache[masterDataPath], use_obj_names=True)
+   278         2    1703072.0 851536.0      0.4          writer.close()
+   279         2        124.0     62.0      0.0          if arguments['commitResults']:
+   280                                                       analysisProcessedSubFolder = os.path.join(
+   281                                                           processedFolder, arguments['analysisName']
+   282                                                           )
+   283                                                       if not os.path.exists(analysisProcessedSubFolder):
+   284                                                           os.makedirs(analysisProcessedSubFolder, exist_ok=True)
+   285                                                       for suffix in suffixList:
+   286                                                           experimentDataPath = os.path.join(
+   287                                                               scratchFolder, arguments['analysisName'],
+   288                                                               assembledName +
+   289                                                               suffix + '.nix')
+   290                                                           processedOutPath = os.path.join(
+   291                                                               analysisProcessedSubFolder, arguments['analysisName'],
+   292                                                               assembledName +
+   293                                                               suffix + '.nix')
+   294                                                           print('copying from:\n{}\ninto\n{}'.format(experimentDataPath, processedOutPath))
+   295                                                           shutil.copyfile(experimentDataPath, processedOutPath)
+   296         1         40.0     40.0      0.0      return
+

@@ -1,0 +1,583 @@
+Timer unit: 1e-07 s
+
+Total time: 21.8226 s
+File: C\../../analysis-code/assembleExperimentData.py
+Function: assembleExperimentDataWrapper at line 33
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    33                                           @profile
+    34                                           def assembleExperimentDataWrapper():
+    35         1       8852.0   8852.0      0.0      from currentExperiment import parseAnalysisOptions
+    36         1      93872.0  93872.0      0.0      from docopt import docopt
+    37         1      27865.0  27865.0      0.0      arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
+    38         1         19.0     19.0      0.0      expOpts, allOpts = parseAnalysisOptions(
+    39         1         27.0     27.0      0.0          int(arguments['blockIdx']),
+    40         1   12368467.0 12368467.0      5.7          arguments['exp'])
+    41         1         68.0     68.0      0.0      globals().update(expOpts)
+    42         1         61.0     61.0      0.0      globals().update(allOpts)
+    43                                           
+    44         1         16.0     16.0      0.0      applyTimeOffset = False
+    45         1         15.0     15.0      0.0      suffixList = []
+    46         1         24.0     24.0      0.0      if arguments['processAsigs']:
+    47         1         16.0     16.0      0.0          suffixList.append('_analyze')
+    48         1         18.0     18.0      0.0      if arguments['processRasters']:
+    49         1         15.0     15.0      0.0          suffixList.append('_binarized')
+    50                                           
+    51         3         57.0     19.0      0.0      for suffix in suffixList:
+    52         2       1143.0    571.5      0.0          print('assembling {}'.format(suffix))
+    53         2         55.0     27.5      0.0          experimentDataPath = os.path.join(
+    54         2         35.0     17.5      0.0              scratchFolder, arguments['analysisName'],
+    55                                                       assembledName +
+    56         2        481.0    240.5      0.0              suffix + '.nix')
+    57                                                   #print(experimentDataPath)
+    58                                                   #pdb.set_trace()
+    59                                                   # Scan ahead through all files and ensure that
+    60                                                   # spikeTrains and units are present across all assembled files
+    61         2         48.0     24.0      0.0          masterChanDF = pd.DataFrame([], columns=[
+    62         2         29.0     14.5      0.0              'index', 'channel_names', 'channel_ids',
+    63         2      97599.0  48799.5      0.0              'hasUnits', 'hasAsigs'
+    64                                                       ])
+    65         2      76514.0  38257.0      0.0          masterUnitDF = pd.DataFrame([], columns=['parentChanName'])
+    66         2         52.0     26.0      0.0          blocksCache = {}
+    67         6        194.0     32.3      0.0          for idx, trialBasePath in enumerate(trialsToAssemble):
+    68                                                       trialDataPath = (
+    69         4        119.0     29.8      0.0                  trialBasePath
+    70         4        192.0     48.0      0.0                  .format(arguments['analysisName'])
+    71         4        199.0     49.8      0.0                  .replace('.nix', '{}.nix'.format(suffix))
+    72                                                           )
+    73                                                       # dataReader, dataBlock = preproc.blockFromPath(
+    74                                                       #     trialDataPath, lazy=True, reduceChannelIndexes=True)
+    75         4        143.0     35.8      0.0              dataBlock = preproc.loadWithArrayAnn(
+    76         4   50810434.0 12702608.5     23.3                  trialDataPath, fromRaw=False, reduceChannelIndexes=True)
+    77         4        159.0     39.8      0.0              blocksCache[trialDataPath] = dataBlock
+    78                                                       #pdb.set_trace()
+    79         4         70.0     17.5      0.0              if idx == 0:
+    80         2         31.0     15.5      0.0                  masterDataPath = trialDataPath
+    81        98      41080.0    419.2      0.0              for chIdx in dataBlock.filter(objects=ChannelIndex):
+    82        94      67242.0    715.3      0.0                  chAlreadyThere = masterChanDF.index == chIdx.name
+    83        94       5590.0     59.5      0.0                  if not chAlreadyThere.any():
+    84        54     717705.0  13290.8      0.3                      masterChanDF.loc[chIdx.name, 'hasUnits'] = len(chIdx.units) > 0
+    85        54     200253.0   3708.4      0.1                      masterChanDF.loc[chIdx.name, 'hasAsigs'] = len(chIdx.analogsignals) > 0
+    86        54       1198.0     22.2      0.0                      try:
+    87        54       1060.0     19.6      0.0                          chIdxNames = chIdx.channel_names
+    88        54        973.0     18.0      0.0                          chIdxIDS = chIdx.channel_ids
+    89        54      90231.0   1670.9      0.0                          print('chIdx index = {}'.format(chIdx.index))
+    90        54       1284.0     23.8      0.0                          if not len(chIdxIDS):
+    91        24        528.0     22.0      0.0                              chIdxIDS = [int(chIdx.index)]
+    92        54       1060.0     19.6      0.0                          if not len(chIdxNames):
+    93        24        418.0     17.4      0.0                              chIdxNames = [chIdx.name]
+    94        54     208141.0   3854.5      0.1                          masterChanDF.loc[chIdx.name, 'index'] = int(chIdx.index)
+    95        54     198023.0   3667.1      0.1                          masterChanDF.loc[chIdx.name, 'channel_names'] = chIdxNames
+    96        54     191304.0   3542.7      0.1                          masterChanDF.loc[chIdx.name, 'channel_ids'] = chIdxIDS
+    97                                                               except Exception:
+    98                                                                   traceback.print_exc()
+    99       162       4583.0     28.3      0.0                      for annName,  annVal in chIdx.annotations.items():
+   100       108     444018.0   4111.3      0.2                          masterChanDF.loc[chIdx.name, annName] = annVal
+   101                                                           else:
+   102        40        875.0     21.9      0.0                      if len(chIdx.units) > 0:
+   103        10      70228.0   7022.8      0.0                          masterChanDF.loc[chAlreadyThere, 'hasUnits'] = True
+   104        40        836.0     20.9      0.0                      if len(chIdx.analogsignals):
+   105        35     234063.0   6687.5      0.1                          masterChanDF.loc[chAlreadyThere, 'hasAsigs'] = True
+   106        38      44606.0   1173.8      0.0              for unit in (dataBlock.filter(objects=Unit)):
+   107        34      37609.0   1106.1      0.0                  uAlreadyThere = masterUnitDF.index == unit.name
+   108        34       3130.0     92.1      0.0                  if not uAlreadyThere.any():
+   109        84       4678.0     55.7      0.0                      for annName, annVal in unit.annotations.items():
+   110        60     977725.0  16295.4      0.4                          masterUnitDF.loc[unit.name, annName] = annVal
+   111        24       1151.0     48.0      0.0                      unitParentChanName = unit.channel_index.name
+   112        24     177173.0   7382.2      0.1                      masterUnitDF.loc[unit.name, 'parentChanName'] = unitParentChanName
+   113                                                               # chAlreadyThere = masterChanDF.index == unitParentChanName
+   114                                                       # dataReader.file.close()
+   115                                                   # masterChanDF[masterChanDF['hasUnits']]
+   116         6        157.0     26.2      0.0          for idx, trialBasePath in enumerate(trialsToAssemble):
+   117                                                       trialDataPath = (
+   118         4         74.0     18.5      0.0                  trialBasePath
+   119         4        114.0     28.5      0.0                  .format(arguments['analysisName'])
+   120         4        126.0     31.5      0.0                  .replace('.nix', '{}.nix'.format(suffix))
+   121                                                           )
+   122         4       1815.0    453.8      0.0              print('loading trial {}'.format(trialDataPath))
+   123         4         71.0     17.8      0.0              if idx == 0:
+   124         2         56.0     28.0      0.0                  blocksCache[trialDataPath].name = experimentName + suffix
+   125         2         34.0     17.0      0.0                  if applyTimeOffset:
+   126                                                               masterTStart = blocksCache[trialDataPath].filter(objects=AnalogSignal)[0].t_start
+   127                                                               oldTStop = blocksCache[trialDataPath].filter(objects=AnalogSignal)[0].t_stop
+   128                                                       else:
+   129         2         44.0     22.0      0.0                  blocksCache[trialDataPath].name = blocksCache[masterDataPath].name
+   130         2         32.0     16.0      0.0                  if applyTimeOffset:
+   131                                                               tStart = blocksCache[trialDataPath].filter(objects=AnalogSignal)[0].t_start
+   132                                                               timeOffset = oldTStop - tStart
+   133                                                               blocksCache[trialDataPath] = hf.timeOffsetBlock(
+   134                                                                   blocksCache[trialDataPath], timeOffset, masterTStart)
+   135                                                               #  [i.times for i in dataBlock.filter(objects=SpikeTrain)]
+   136                                                               #  [i.unit.channel_index.name for i in masterBlock.filter(objects=SpikeTrain)]
+   137                                                               tStop = dataBlock.filter(objects=AnalogSignal)[0].t_stop
+   138                                                       # if suffix == '_binarized':
+   139                                                       #     for seg in blocksCache[trialDataPath].segments:
+   140                                                       #         seg.spiketrains = []
+   141       112     202297.0   1806.2      0.1              for rowIdx, row in masterChanDF.iterrows():
+   142       108       2481.0     23.0      0.0                  matchingCh = blocksCache[trialDataPath].filter(
+   143       108    1585977.0  14685.0      0.7                      objects=ChannelIndex, name=rowIdx)
+   144       108       2619.0     24.2      0.0                  if not len(matchingCh):
+   145                                                               '''
+   146                                                                   # [ch.index for ch in blocksCache[trialDataPath].filter(objects=ChannelIndex)]
+   147                                                                   # if row['index'] is None:
+   148                                                                   #     pdb.set_trace()
+   149                                                                   #     chIdx = ChannelIndex(
+   150                                                                   #         name=rowIdx,
+   151                                                                   #         index=np.asarray([0]),
+   152                                                                   #         channel_ids=np.asarray([0]),
+   153                                                                   #         channel_names=np.asarray([rowIdx]),
+   154                                                                   #         file_origin=blocksCache[trialDataPath].channel_indexes[-1].file_origin
+   155                                                                   #         )
+   156                                                                   # else:
+   157                                                               '''
+   158                                                               # create it
+   159        14       5816.0    415.4      0.0                      print('ch {} not found; creating now'.format(rowIdx))
+   160        14        252.0     18.0      0.0                      chIdx = ChannelIndex(
+   161        14        232.0     16.6      0.0                          name=rowIdx,
+   162        14       5576.0    398.3      0.0                          index=np.asarray([row['index']]).flatten(),
+   163        14       5800.0    414.3      0.0                          channel_ids=np.asarray([row['channel_ids']]).flatten(),
+   164        14       4484.0    320.3      0.0                          channel_names=np.asarray([row['channel_names']]).flatten(),
+   165        14       5306.0    379.0      0.0                          file_origin=blocksCache[trialDataPath].channel_indexes[-1].file_origin
+   166                                                                   )
+   167        70      97091.0   1387.0      0.0                      for aN in row.drop(['index', 'channel_names', 'channel_ids']).index:
+   168        56      11023.0    196.8      0.0                          chIdx.annotations[aN] = row[aN]
+   169        14        349.0     24.9      0.0                      blocksCache[trialDataPath].channel_indexes.append(chIdx)
+   170        14        272.0     19.4      0.0                      chIdx.block = blocksCache[trialDataPath]
+   171                                                               # create blank asigs
+   172        14       2356.0    168.3      0.0                      if row['hasAsigs']:
+   173         7      96693.0  13813.3      0.0                          dummyAsig = blocksCache[trialDataPath].filter(objects=AnalogSignal)[0].copy()
+   174         7        247.0     35.3      0.0                          dummyAsig.name = 'seg0_' + chIdx.name
+   175         7        167.0     23.9      0.0                          dummyAsig.annotations['neo_name'] = dummyAsig.name
+   176         7       8769.0   1252.7      0.0                          dummyAsig.magnitude[:] = 0
+   177         7        122.0     17.4      0.0                          dummyAsig.channel_index = chIdx
+   178         7        190.0     27.1      0.0                          chIdx.analogsignals.append(dummyAsig)
+   179         7        242.0     34.6      0.0                          blocksCache[trialDataPath].segments[0].analogsignals.append(dummyAsig)
+   180         7        147.0     21.0      0.0                          dummyAsig.segment = blocksCache[trialDataPath].segments[0]
+   181                                                                   # pdb.set_trace()
+   182         4      84467.0  21116.8      0.0              anySpikeTrains = blocksCache[trialDataPath].filter(objects=SpikeTrain)
+   183         4        156.0     39.0      0.0              if len(anySpikeTrains):
+   184         4       1396.0    349.0      0.0                  wvfUnits = anySpikeTrains[0].waveforms.units
+   185         4        705.0    176.2      0.0                  stTimeUnits = anySpikeTrains[0].units
+   186                                                       else:
+   187                                                           stTimeUnits = pq.s
+   188                                                           wvfUnits = pq.uV
+   189        52     111012.0   2134.8      0.1              for rowIdx, row in masterUnitDF.iterrows():
+   190        48       1368.0     28.5      0.0                  matchingUnit = blocksCache[trialDataPath].filter(
+   191        48     687779.0  14328.7      0.3                      objects=Unit, name=rowIdx)
+   192        48       1271.0     26.5      0.0                  if not len(matchingUnit):
+   193        14       6458.0    461.3      0.0                      parentChanName = row['parentChanName']
+   194                                                               # parentChanName = rowIdx
+   195                                                               # if parentChanName.endswith('_stim#0'):
+   196                                                               #     parentChanName.replace('_stim#0', '')
+   197                                                               # if parentChanName.endswith('#0'):
+   198                                                               #     parentChanName.replace('#0', '')
+   199        14        436.0     31.1      0.0                      matchingCh = blocksCache[trialDataPath].filter(
+   200        14     273052.0  19503.7      0.1                          objects=ChannelIndex, name=parentChanName)
+   201                                                               '''
+   202                                                                   if not len(matchingCh):
+   203                                                                       masterListEntry = masterChanDF.loc[parentChanName, :]
+   204                                                                       parentChIdx = ChannelIndex(
+   205                                                                           name=parentChanName,
+   206                                                                           index=masterListEntry['index'],
+   207                                                                           channel_ids=masterListEntry['channel_ids'],
+   208                                                                           channel_names=masterListEntry['channel_names'],
+   209                                                                           file_origin=blocksCache[trialDataPath].channel_indexes[-1].file_origin
+   210                                                                           )
+   211                                                                       blocksCache[trialDataPath].channel_indexes.append(parentChIdx)
+   212                                                                       parentChIdx.block = blocksCache[trialDataPath]
+   213                                                                   else:
+   214                                                                       parentChIdx = matchingCh[0]
+   215                                                               '''
+   216        14        524.0     37.4      0.0                      parentChIdx = matchingCh[0]
+   217        14       9143.0    653.1      0.0                      print('unit {} not found; creating now'.format(rowIdx))
+   218        14       5697.0    406.9      0.0                      newUnit = Unit(name=rowIdx)
+   219        63       8817.0    140.0      0.0                      for annName in row.index:
+   220        49      16335.0    333.4      0.0                          newUnit.annotations[annName] = row[annName]
+   221        14        407.0     29.1      0.0                      newUnit.channel_index = parentChIdx
+   222        14        529.0     37.8      0.0                      parentChIdx.units.append(newUnit)
+   223        28        937.0     33.5      0.0                      for seg in blocksCache[trialDataPath].segments:
+   224        14        404.0     28.9      0.0                          dummyST = SpikeTrain(
+   225        14        398.0     28.4      0.0                              times=[], units=stTimeUnits,
+   226        14     116541.0   8324.4      0.1                              t_stop=seg.filter(objects=AnalogSignal)[0].t_stop,
+   227        14       3994.0    285.3      0.0                              waveforms=np.array([]).reshape((0, 0, 0)) * wvfUnits,
+   228        14      26495.0   1892.5      0.0                              name=seg.name + newUnit.name)
+   229        14        453.0     32.4      0.0                          dummyST.unit = newUnit
+   230        14        388.0     27.7      0.0                          dummyST.segment = seg
+   231        14        435.0     31.1      0.0                          newUnit.spiketrains.append(dummyST)
+   232        14        482.0     34.4      0.0                          seg.spiketrains.append(dummyST)
+   233         4         93.0     23.2      0.0              typesNeedRenaming = [SpikeTrain, AnalogSignal, Event]
+   234         4         81.0     20.2      0.0              blocksCache[trialDataPath].segments[0].name = 'seg{}_{}'.format(
+   235         4        164.0     41.0      0.0                  idx, blocksCache[trialDataPath].name)
+   236        16        277.0     17.3      0.0              for objType in typesNeedRenaming:
+   237        12     133547.0  11128.9      0.1                  listOfChildren = blocksCache[trialDataPath].filter(objects=objType)
+   238        12        243.0     20.2      0.0                  print('{}\n{} objects of type {}'.format(
+   239        12       4756.0    396.3      0.0                      trialDataPath, len(listOfChildren), objType
+   240                                                           ))
+   241       166       2745.0     16.5      0.0                  for child in listOfChildren:
+   242       154       4872.0     31.6      0.0                      childBaseName = preproc.childBaseName(child.name, 'seg')
+   243       154       3219.0     20.9      0.0                      child.name = 'seg{}_{}'.format(idx, childBaseName)
+   244         4      40266.0  10066.5      0.0              blocksCache[trialDataPath].create_relationship()
+   245         4      84908.0  21227.0      0.0              blocksCache[trialDataPath] = preproc.purgeNixAnn(blocksCache[trialDataPath])
+   246                                                       ########
+   247         4         92.0     23.0      0.0              sanityCheck = False
+   248         4         84.0     21.0      0.0              if sanityCheck and idx == 2:
+   249                                                           doublePath = trialDataPath.replace(suffix, suffix + '_backup')
+   250                                                           if os.path.exists(doublePath):
+   251                                                               os.remove(doublePath)
+   252                                                           print('writing {} ...'.format(doublePath))
+   253                                                           for idx, chIdx in enumerate(blocksCache[trialDataPath].channel_indexes):
+   254                                                               print('{}: {}, chan_id = {}'.format(
+   255                                                                   chIdx.name, chIdx.index, chIdx.channel_ids))
+   256                                                           writer = neo.io.NixIO(filename=doublePath)
+   257                                                           writer.write_block(blocksCache[trialDataPath], use_obj_names=True)
+   258                                                           writer.close()
+   259                                                       ############
+   260         4         92.0     23.0      0.0              if idx > 0:
+   261         2      26976.0  13488.0      0.0                  blocksCache[masterDataPath].merge(blocksCache[trialDataPath])
+   262         2         48.0     24.0      0.0                  if applyTimeOffset:
+   263                                                               oldTStop = tStop
+   264                                                   '''
+   265                                                       print([evSeg.events[0].name for evSeg in masterBlock.segments])
+   266                                                       print([asig.name for asig in masterBlock.filter(objects=AnalogSignal)])
+   267                                                       print([st.name for st in masterBlock.filter(objects=SpikeTrain)])
+   268                                                       print([ev.name for ev in masterBlock.filter(objects=Event)])
+   269                                                       print([chIdx.name for chIdx in blocksCache[trialDataPath].filter(objects=ChannelIndex)])
+   270                                                       print([un.name for un in masterBlock.filter(objects=Unit)])
+   271                                                   '''
+   272                                                   # blocksCache[masterDataPath].create_relationship()
+   273         2      71520.0  35760.0      0.0          if os.path.exists(experimentDataPath):
+   274         2      10578.0   5289.0      0.0              os.remove(experimentDataPath)
+   275         2     172386.0  86193.0      0.1          writer = neo.io.NixIO(filename=experimentDataPath)
+   276         2       1636.0    818.0      0.0          print('writing {} ...'.format(experimentDataPath))
+   277         2  145571004.0 72785502.0     66.7          writer.write_block(blocksCache[masterDataPath], use_obj_names=True)
+   278         2    1481432.0 740716.0      0.7          writer.close()
+   279         2         85.0     42.5      0.0          if arguments['commitResults']:
+   280                                                       analysisProcessedSubFolder = os.path.join(
+   281                                                           processedFolder, arguments['analysisName']
+   282                                                           )
+   283                                                       if not os.path.exists(analysisProcessedSubFolder):
+   284                                                           os.makedirs(analysisProcessedSubFolder, exist_ok=True)
+   285                                                       for suffix in suffixList:
+   286                                                           experimentDataPath = os.path.join(
+   287                                                               scratchFolder, arguments['analysisName'],
+   288                                                               assembledName +
+   289                                                               suffix + '.nix')
+   290                                                           processedOutPath = os.path.join(
+   291                                                               analysisProcessedSubFolder, arguments['analysisName'],
+   292                                                               assembledName +
+   293                                                               suffix + '.nix')
+   294                                                           print('copying from:\n{}\ninto\n{}'.format(experimentDataPath, processedOutPath))
+   295                                                           shutil.copyfile(experimentDataPath, processedOutPath)
+   296         1         16.0     16.0      0.0      return
+
+Timer unit: 1e-07 s
+
+Total time: 166.789 s
+File: C\../../analysis-code/calcAlignedAsigs.py
+Function: calcAlignedAsigsWrapped at line 62
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    62                                           @profile
+    63                                           def calcAlignedAsigsWrapped():
+    64                                               #  source of events
+    65         1         12.0     12.0      0.0      if arguments['processAll']:
+    66         1          9.0      9.0      0.0          eventPath = experimentDataPath
+    67                                               else:
+    68                                                   eventPath = analysisDataPath
+    69                                           
+    70         1        551.0    551.0      0.0      print('Loading events from {}'.format(eventPath))
+    71         1          9.0      9.0      0.0      eventReader, eventBlock = ns5.blockFromPath(
+    72         1   57791916.0 57791916.0      3.5          eventPath, lazy=arguments['lazy'])
+    73                                               #  eventBlock = eventReader.read_block(
+    74                                               #      block_index=0, lazy=True,
+    75                                               #      signal_group_mode='split-all')
+    76                                               #  for ev in eventBlock.filter(objects=EventProxy):
+    77                                               #      ev.name = '_'.join(ev.name.split('_')[1:])
+    78                                           
+    79                                               #  source of analogsignals
+    80         1         16.0     16.0      0.0      signalBlock = eventBlock
+    81                                           
+    82                                               windowSize = [
+    83         1         11.0     11.0      0.0          i * pq.s
+    84         1        505.0    505.0      0.0          for i in rasterOpts['windowSizes'][arguments['window']]]
+    85                                           
+    86         1         10.0     10.0      0.0      if arguments['processAll']:
+    87         1          8.0      8.0      0.0          prefix = assembledName
+    88                                               else:
+    89                                                   prefix = ns5FileName
+    90                                           
+    91         1         14.0     14.0      0.0      ns5.getAsigsAlignedToEvents(
+    92         1          6.0      6.0      0.0          eventBlock=eventBlock, signalBlock=signalBlock,
+    93         1          7.0      7.0      0.0          chansToTrigger=arguments['chanNames'],
+    94         1          8.0      8.0      0.0          chanQuery=arguments['chanQuery'],
+    95         1          7.0      7.0      0.0          eventName=arguments['eventName'],
+    96         1          6.0      6.0      0.0          windowSize=windowSize,
+    97         1          8.0      8.0      0.0          minNReps=minNConditionRepetitions,
+    98         1          5.0      5.0      0.0          appendToExisting=False,
+    99         1          5.0      5.0      0.0          checkReferences=False,
+   100         1          7.0      7.0      0.0          verbose=arguments['verbose'],
+   101         1          6.0      6.0      0.0          fileName='{}_{}_{}'.format(
+   102         1         16.0     16.0      0.0              prefix, arguments['outputBlockName'], arguments['window']),
+   103         1 1610097841.0 1610097841.0     96.5          folderPath=alignSubFolder, chunkSize=alignedAsigsChunkSize)
+   104                                           
+   105         1        665.0    665.0      0.0      print('Finished CalcAlignedAsigs')
+   106         1          8.0      8.0      0.0      return
+
+Timer unit: 1e-07 s
+
+Total time: 3.76795 s
+File: C\../../analysis-code/calcTrialOutliers.py
+Function: findOutliers at line 131
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+   131                                           @profile
+   132                                           def findOutliers(
+   133                                                   mahalDistDF, groupBy=None,
+   134                                                   qThresh=None, sdThresh=None, sdThreshInner=None,
+   135                                                   devQuantile=None, nDim=1, multiplier=1, twoTailed=False):
+   136                                               #
+   137         1         27.0     27.0      0.0      if sdThresh is None:
+   138         1         10.0     10.0      0.0          if qThresh is None:
+   139                                                       qThresh = 1 - 1e-6
+   140         1       5907.0   5907.0      0.0          chi2Bounds = chi2.interval(qThresh, nDim)
+   141         1         20.0     20.0      0.0          sdThresh = multiplier * chi2Bounds[1]
+   142                                               #
+   143         1         11.0     11.0      0.0      chiProba = pd.Series(
+   144         1     731192.0 731192.0      1.9          -np.log(np.squeeze(chi2.pdf(mahalDistDF, nDim))),
+   145         1       3273.0   3273.0      0.0          index=mahalDistDF.index)
+   146         1       4150.0   4150.0      0.0      chiProbaLim = -np.log(chi2.pdf(sdThresh, nDim))
+   147         1         13.0     13.0      0.0      if devQuantile is not None:
+   148         1   36914645.0 36914645.0     98.0          deviation = chiProba.groupby(groupBy).quantile(q=devQuantile)
+   149                                                   # maxMhDist = mahalDistDF.groupby(groupBy).quantile(q=devQuantile).iloc[:, -1] - sdThresh
+   150                                                   # minMhDist = sdThreshInner - mahalDistDF.groupby(groupBy).quantile(q=1-devQuantile).iloc[:, -1]
+   151                                               else:
+   152                                                   deviation = chiProba.groupby(groupBy).max()
+   153                                                   # maxMhDist = mahalDistDF.groupby(groupBy).max().iloc[:, -1] - sdThresh
+   154                                                   # minMhDist = sdThreshInner - mahalDistDF.groupby(groupBy).min().iloc[:, -1]
+   155                                               #
+   156                                               # if twoTailed:
+   157                                               #     deviation = pd.concat([maxMhDist, minMhDist], axis='columns').max(axis='columns')
+   158                                               #     pdb.set_trace()
+   159                                               # else:
+   160                                               #     deviation = maxMhDist
+   161         1         28.0     28.0      0.0      if isinstance(deviation, pd.Series):
+   162         1       5367.0   5367.0      0.0          deviationDF = deviation.to_frame(name='deviation')
+   163                                               else:
+   164                                                   deviationDF = deviation
+   165         1      14861.0  14861.0      0.0      deviationDF['rejectBlock'] = (deviationDF['deviation'] > chiProbaLim)
+   166         1         11.0     11.0      0.0      return deviationDF
+
+Total time: 0.0723861 s
+File: C\../../analysis-code/calcTrialOutliers.py
+Function: calcCovMat at line 168
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+   168                                           @profile
+   169                                           def calcCovMat(
+   170                                                   partition, dataColNames=None,
+   171                                                   useEmpiricalCovariance=True,
+   172                                                   supportFraction=None, verbose=False):
+   173         2       7594.0   3797.0      1.0      dataColMask = partition.columns.isin(dataColNames)
+   174         2      27446.0  13723.0      3.8      partitionData = partition.loc[:, dataColMask]
+   175                                               # print('partition shape = {}'.format(partitionData.shape))
+   176         2         51.0     25.5      0.0      if not useEmpiricalCovariance:
+   177                                                   try:
+   178                                                       est = MinCovDet(support_fraction=supportFraction)
+   179                                                       est.fit(partitionData.values)
+   180                                                   except Exception:
+   181                                                       traceback.print_exc()
+   182                                                       print('\npartition shape = {}\n'.format(partitionData.shape))
+   183                                                       est = EmpiricalCovariance()
+   184                                                       est.fit(partitionData.values)
+   185                                               else:
+   186         2        603.0    301.5      0.1          est = EmpiricalCovariance()
+   187         2     370257.0 185128.5     51.2          est.fit(partitionData.values)
+   188         2        106.0     53.0      0.0      result = pd.DataFrame(
+   189         2     100031.0  50015.5     13.8          est.mahalanobis(partitionData.values),
+   190         2      31131.0  15565.5      4.3          index=partition.index, columns=['mahalDist'])
+   191                                               # print('result shape is {}'.format(result.shape))
+   192         2     184447.0  92223.5     25.5      result = pd.concat([result, partition.loc[:, ~dataColMask]], axis=1)
+   193         2       2158.0   1079.0      0.3      result.name = 'mahalanobisDistance'
+   194                                               # pdb.set_trace()
+   195                                               # if result['electrode'].iloc[0] == 'foo':
+   196                                               #     pdb.set_trace()
+   197                                               # print('result type is {}'.format(type(result)))
+   198                                               # print(result.T)
+   199                                               # print('partition shape = {}'.format(partitionData.shape))
+   200         2         37.0     18.5      0.0      return result
+
+Timer unit: 1e-07 s
+
+Total time: 121.111 s
+File: C\../../analysis-code/exportForDeepSpine.py
+Function: exportForDeepSpineWrapper at line 48
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    48                                           @profile
+    49                                           def exportForDeepSpineWrapper():
+    50         1      37535.0  37535.0      0.0      sns.set()
+    51         1       5346.0   5346.0      0.0      sns.set_color_codes("dark")
+    52         1       4121.0   4121.0      0.0      sns.set_context("talk")
+    53         1       9997.0   9997.0      0.0      sns.set_style("whitegrid")
+    54                                               #
+    55         1         76.0     76.0      0.0      analysisSubFolder = os.path.join(
+    56         1        566.0    566.0      0.0          scratchFolder, arguments['analysisName']
+    57                                                   )
+    58         1         62.0     62.0      0.0      alignSubFolder = os.path.join(
+    59         1        408.0    408.0      0.0          analysisSubFolder, arguments['alignFolderName']
+    60                                                   )
+    61         1        398.0    398.0      0.0      calcSubFolder = os.path.join(alignSubFolder, 'dataframes')
+    62         1       1628.0   1628.0      0.0      if not os.path.exists(calcSubFolder):
+    63                                                   os.makedirs(calcSubFolder, exist_ok=True)
+    64                                           
+    65         1         68.0     68.0      0.0      if arguments['processAll']:
+    66         1         58.0     58.0      0.0          prefix = assembledName
+    67                                               else:
+    68                                                   prefix = ns5FileName
+    69         1         67.0     67.0      0.0      alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(
+    70         1        220.0    220.0      0.0          namedQueries, **arguments)
+    71                                               alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = (
+    72         1         60.0     60.0      0.0          ash.processUnitQueryArgs(
+    73         1        231.0    231.0      0.0              namedQueries, analysisSubFolder, **arguments))
+    74         1         59.0     59.0      0.0      outlierTrialNames = ash.processOutlierTrials(
+    75         1     216194.0 216194.0      0.0          calcSubFolder, prefix, **arguments)
+    76                                           
+    77         1         40.0     40.0      0.0      if arguments['window'] == 'XS':
+    78         1         20.0     20.0      0.0          cropWindow = (-100e-3, 400e-3)
+    79                                               elif arguments['window'] == 'XSPre':
+    80                                                   cropWindow = (-600e-3, -100e-3)
+    81                                           
+    82         1         30.0     30.0      0.0      alignedAsigsKWargs.update(dict(
+    83         1         19.0     19.0      0.0          duplicateControlsByProgram=False,
+    84         1         18.0     18.0      0.0          makeControlProgram=False,
+    85         1         18.0     18.0      0.0          metaDataToCategories=False,
+    86         1         18.0     18.0      0.0          removeFuzzyName=False,
+    87         1         19.0     19.0      0.0          decimate=1,
+    88         1         19.0     19.0      0.0          windowSize=cropWindow,
+    89         1         46.0     46.0      0.0          transposeToColumns='feature', concatOn='columns',))
+    90                                               #
+    91         1         28.0     28.0      0.0      triggeredPath = os.path.join(
+    92         1         21.0     21.0      0.0          alignSubFolder,
+    93         1         20.0     20.0      0.0          prefix + '_{}_{}.nix'.format(
+    94         1        226.0    226.0      0.0              arguments['inputBlockName'], arguments['window']))
+    95         1         21.0     21.0      0.0      outputPath = os.path.join(
+    96         1         20.0     20.0      0.0          alignSubFolder,
+    97         1         20.0     20.0      0.0          prefix + '_{}_{}_export.h5'.format(
+    98         1        142.0    142.0      0.0              arguments['inputBlockName'], arguments['window']))
+    99         1        616.0    616.0      0.0      print('loading {}'.format(triggeredPath))
+   100                                           
+   101         1         27.0     27.0      0.0      dataReader, dataBlock = ns5.blockFromPath(
+   102         1   16139095.0 16139095.0      1.3          triggeredPath, lazy=arguments['lazy'])
+   103         1         42.0     42.0      0.0      asigWide = ns5.alignedAsigsToDF(
+   104         1   61549192.0 61549192.0      5.1          dataBlock, **alignedAsigsKWargs)
+   105                                               # asigWide is a dataframe
+   106         1     770926.0 770926.0      0.1      metaData = asigWide.index.to_frame()
+   107         1     262819.0 262819.0      0.0      elecNames = metaData['electrode'].unique()
+   108                                           
+   109                                               # elecRegex = r'([\-]?[\S\s]*\d)([\+]?[\S\s]*\d)'
+   110                                               # elecRegex = r'((?:\-|\+)(?:(?:rostral|caudal)\S_\S\S\S)*)*'
+   111                                           
+   112         1         80.0     80.0      0.0      elecRegex = r'((?:\-|\+)(?:(?:rostral|caudal)\S_\S\S\S)*)'
+   113         1         62.0     62.0      0.0      chanRegex = r'((?:rostral|caudal)\S_\S\S\S)'
+   114         1         60.0     60.0      0.0      elecChanNames = []
+   115         1         61.0     61.0      0.0      stimConfigLookup = {}
+   116        13        594.0     45.7      0.0      for comboName in elecNames:
+   117        12      28703.0   2391.9      0.0          matches = re.findall(elecRegex, comboName)
+   118        12        490.0     40.8      0.0          if matches:
+   119        12       5404.0    450.3      0.0              print(comboName)
+   120        12        548.0     45.7      0.0              thisLookup = {'cathodes': [], 'anodes': []}
+   121        24        923.0     38.5      0.0              for matchGroup in matches:
+   122        12       5143.0    428.6      0.0                  print('\t' + matchGroup)
+   123        12        494.0     41.2      0.0                  if len(matchGroup):
+   124        12      20518.0   1709.8      0.0                      theseChanNames = re.findall(chanRegex, matchGroup)
+   125        12        456.0     38.0      0.0                      if theseChanNames:
+   126        24        893.0     37.2      0.0                          for chanName in theseChanNames:
+   127        12        487.0     40.6      0.0                              if chanName not in elecChanNames:
+   128        12        514.0     42.8      0.0                                  elecChanNames.append(chanName)
+   129        12        453.0     37.8      0.0                          if '-' in matchGroup:
+   130        24        889.0     37.0      0.0                              for chanName in theseChanNames:
+   131        12        463.0     38.6      0.0                                  if chanName not in thisLookup['cathodes']:
+   132        12        465.0     38.8      0.0                                      thisLookup['cathodes'].append(chanName)
+   133        12        452.0     37.7      0.0                          if '+' in matchGroup:
+   134                                                                       for chanName in theseChanNames:
+   135                                                                           if chanName not in thisLookup['anodes']:
+   136                                                                               thisLookup['anodes'].append(chanName)
+   137        12        480.0     40.0      0.0              stimConfigLookup[comboName] = thisLookup
+   138                                           
+   139         1         41.0     41.0      0.0      eesColumns = pd.MultiIndex.from_tuples(
+   140         1         97.0     97.0      0.0          [(eCN, 'amplitude') for eCN in sorted(elecChanNames)],
+   141         1      17602.0  17602.0      0.0          names=['object', 'property']
+   142                                                   )
+   143                                               #
+   144         1     162864.0 162864.0      0.0      trialIndex = pd.Index(np.unique(metaData['bin']))
+   145         1         44.0     44.0      0.0      trialColumns = pd.MultiIndex.from_tuples(
+   146                                                   [
+   147         1         19.0     19.0      0.0              ('hip_flexion_r', 'angle'), ('knee_angle_r', 'angle'),
+   148         1         22.0     22.0      0.0              ('hip_flexion_l', 'angle'), ('knee_angle_l', 'angle'),
+   149         1      16012.0  16012.0      0.0          ], names=['object', 'property'])
+   150                                               #
+   151                                               # manualPeriod = 0.01
+   152                                               # manualStimTimes = np.arange(0, 0.3 + manualPeriod, manualPeriod)
+   153                                               # manualEESWaveform = trialIndex.isin(manualStimTimes)
+   154                                               # print(metaData.reset_index(drop=True))
+   155                                               # print(metaData['electrode'])
+   156         1         28.0     28.0      0.0      nullKinematics = pd.DataFrame(
+   157         1       2418.0   2418.0      0.0          0, index=trialIndex, columns=trialColumns)
+   158         1         23.0     23.0      0.0      kinKey = '/sling/kinematics'
+   159         1     143431.0 143431.0      0.0      with pd.HDFStore(outputPath) as store:
+   160         1     305298.0 305298.0      0.0          nullKinematics.to_hdf(store, kinKey)
+   161         1         59.0     59.0      0.0      eesIdx = 0
+   162                                           
+   163        90    1933532.0  21483.7      0.2      for stimName, stimGroup in asigWide.groupby(['electrode', 'RateInHz', 'nominalCurrent']):
+   164        89    2260029.0  25393.6      0.2          if stimGroup.groupby(['segment', 't']).ngroups < 5:
+   165                                                       continue
+   166        89      59530.0    668.9      0.0          print(stimName)
+   167      1029   17204572.0  16719.7      1.4          for trialIdx, (trialName, trialGroup) in enumerate(stimGroup.groupby(['segment', 't'])):
+   168       940      61805.0     65.8      0.0              stimKey = '/sling/sheep/spindle_0/biophysical/ees_{:0>3}/stim'.format(eesIdx)
+   169       940      53015.0     56.4      0.0              eesPeriod = stimName[1] ** -1
+   170       940      89279.0     95.0      0.0              stimTimes = np.arange(0, 0.3, eesPeriod)
+   171       940     326778.0    347.6      0.0              EESWaveform = np.zeros_like(trialIndex)
+   172                                                       # TODO replace this with the hf.findClosestTimes implementation
+   173       940      32503.0     34.6      0.0              if not arguments['noStim']:
+   174     20040     577493.0     28.8      0.0                  for stimTime in stimTimes:
+   175     19100   61075485.0   3197.7      5.0                      closestIndexTime = np.argmin(np.abs((trialIndex - stimTime)))
+   176     19100     664542.0     34.8      0.1                      EESWaveform[closestIndexTime] = 1
+   177       940      25830.0     27.5      0.0              eesIdx += 1
+   178       940    2699440.0   2871.7      0.2              theseResults = pd.DataFrame(0, index=trialIndex, columns=eesColumns)
+   179      1880      74603.0     39.7      0.0              for cathodeName in stimConfigLookup[stimName[0]]['cathodes']:
+   180       940   13679322.0  14552.5      1.1                  theseResults.loc[:, (cathodeName, 'amplitude')] = EESWaveform * stimName[2] / len(stimConfigLookup[stimName[0]]['cathodes'])
+   181       940      32719.0     34.8      0.0              for anodeName in stimConfigLookup[stimName[0]]['anodes']:
+   182                                                           theseResults.loc[:, (anodeName, 'amplitude')] = EESWaveform * stimName[2] * (-1) / len(stimConfigLookup[stimName[0]]['anodes'])
+   183     13160     910112.0     69.2      0.1              for cName, lag in trialGroup.columns:
+   184     12220     358505.0     29.3      0.0                  if 'EmgEnv' in cName:
+   185     12220     468830.0     38.4      0.0                      mName = cName.split('EmgEnv')[0]
+   186     12220  460313013.0  37668.8     38.0                      theseResults.loc[:, (mName, 'emg_env')] = trialGroup[cName].to_numpy()
+   187                                                           elif 'Emg' in cName:
+   188                                                               mName = cName.split('Emg')[0]
+   189                                                               theseResults.loc[:, (mName, 'emg')] = trialGroup[cName].to_numpy()
+   190                                                           elif ('caudal' in cName) or ('rostral' in cName):
+   191                                                               lfpName = cName[:-4]
+   192                                                               theseResults.loc[:, (lfpName, 'lfp')] = trialGroup[cName].to_numpy()
+   193                                                           elif ('Acc' in cName):
+   194                                                               nameParts = cName.split('Acc')
+   195                                                               mName = nameParts[0]
+   196                                                               theseResults.loc[:, (mName, 'acc_{}'.format(nameParts[1][0].lower()))] = trialGroup[cName].to_numpy()
+   197       940  114679371.0 121999.3      9.5              with pd.HDFStore(outputPath) as store:
+   198       940  435010078.0 462776.7     35.9                  theseResults.to_hdf(store, stimKey)
+   199                                                           thisMetadata = {
+   200       940      38486.0     40.9      0.0                      'globalIdx': eesIdx, 'combinationIdx': trialIdx,
+   201       940      27435.0     29.2      0.0                      'electrode': stimName[0], 'RateInHz': stimName[1],
+   202       940      31540.0     33.6      0.0                      'amplitude': stimName[2]}
+   203       940      33192.0     35.3      0.0                  if arguments['maskOutlierBlocks']:
+   204       940    2324831.0   2473.2      0.2                      thisMetadata['outlierTrial'] = outlierTrialNames.loc[trialName]
+   205       940   16341930.0  17385.0      1.3                  store.get_storer(stimKey).attrs.metadata = thisMetadata
+   206                                           
+   207         1         41.0     41.0      0.0      if arguments['lazy']:
+   208                                                   dataReader.file.close()
+   209         1         19.0     19.0      0.0      return
+

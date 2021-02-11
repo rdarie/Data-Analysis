@@ -10,6 +10,7 @@ def parseAnalysisOptions(
     plotBlocking = True
     #
     with open("../../paths.py") as fp:
+    #with open("C:/Users/Peep Sheep/nda2/Data-Analysis/paths.py") as fp:
         d = {}
         exec(fp.read(), d)
         ccvUsername = d['ccvUsername']
@@ -318,6 +319,7 @@ def parseAnalysisOptions(
     experimentDataPath = os.path.join(
         scratchFolder, '{}',
         assembledName + '_analyze.nix')
+    #pdb.set_trace()
     experimentBinnedSpikePath = os.path.join(
         scratchFolder, '{}',
         assembledName + '_binarized.nix')

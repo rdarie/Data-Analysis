@@ -10,19 +10,19 @@ def getExpOpts():
         7: 'isi',
         8: 'isi',
         }
-    experimentName = '202010191100-Peep'
+    experimentName = '202012091300-Goat'
     deviceName = None
     rippleMapFile = {
-        1: 'isi_nano1caudal_xAyBzC_ortho.map',
-        2: 'isi_nano1rostral_xAyBzC_ortho.map',
-        3: 'isi_nano1rostral_xAyBzC_ortho.map',
-        4: 'isi_nano1rostral_xByCzA_ortho.map',
-        5: 'isi_nano1rostral_xCyAzB_ortho.map',
-        6: 'isi_nano1rostral_xAyBzC_ortho.map',
-        7: 'isi_nano1caudal_xAyBzC_ortho.map',
-        8: 'isi_nano1rostral_xCyAzB_ortho.map',
+        1: 'isi_port1nano1caudal_xAyBzC_ortho_port2nano1rostral_xAyBzC_ortho.map',
+        2: 'isi_port1nano1caudal_xAyBzC_ortho_port2nano1rostral_xAyBzC_ortho.map',
+        3: 'isi_port1nano1caudal_xAyBzC_ortho_port2nano1rostral_xAyBzC_ortho.map',
+        4: 'isi_port1nano1caudal_xAyBzC_ortho_port2nano1rostral_xAyBzC_ortho.map',
+        5: 'isi_port1nano1caudal_xAyBzC_ortho_port2nano1rostral_xAyBzC_ortho.map',
+        6: 'isi_port1nano1caudal_xAyBzC_ortho_port2nano1rostral_xAyBzC_ortho.map',
+        7: 'isi_port1nano1caudal_xAyBzC_ortho_port2nano1rostral_xAyBzC_ortho.map',
+        8: 'isi_port1nano1caudal_xAyBzC_ortho_port2nano1rostral_xAyBzC_ortho.map',
         }
-    delsysExampleHeaderPath = './delsys_example_header_20200922.csv'
+    delsysExampleHeaderPath = './delsys_example_header_20200701.csv'
     # use "original" file in edge cases where the ns5 file was saved incorrectly
     # with the wrong map. Original is the incorrect, old one, above is the corrected one.
     rippleOriginalMapFile = {
@@ -69,9 +69,15 @@ def getExpOpts():
         }
     synchInfo = {'delsys': {}, 'nsp': {}, 'ins': {}}
     # For emg analysis - emg missing for some time ranges
-    synchInfo['delsys'][3] = {'timeRanges': [8, 1313], 'chooseCrossings': slice(None)}
+    synchInfo['delsys'][3] = {'timeRanges': [10, 3127], 'chooseCrossings': slice(None)}
+    synchInfo['delsys'][6] = {'timeRanges': [90, 2080], 'chooseCrossings': slice(None, 1000)}
+    synchInfo['delsys'][7] = {'timeRanges': [12, 1203], 'chooseCrossings': slice(None, 1200)}
+    synchInfo['delsys'][7] = {'timeRanges': [19, 674], 'chooseCrossings': slice(None, 1200)}
     #
-    synchInfo['nsp'][3] = {'timeRanges': [4, 1313], 'chooseCrossings': slice(None)}
+    synchInfo['nsp'][3] = {'timeRanges': [10, 3127], 'chooseCrossings': slice(None)}
+    synchInfo['nsp'][6] = {'timeRanges': [50, 2040], 'chooseCrossings': slice(None, 1000)}
+    synchInfo['nsp'][7] = {'timeRanges': [6, 1244], 'chooseCrossings': slice(None, 1200)}
+    synchInfo['nsp'][7] = {'timeRanges': [3, 659], 'chooseCrossings': slice(None, 1200)}
     alignTimeBoundsLookup = {
         # 1: [
         #     [3, 2290.5]
@@ -115,10 +121,12 @@ def getExpOpts():
     triDestinations = []
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        '202010191100-Peep': [4, 5, 6, 7, 8],
+        #'202012171300-Goat': [7,8],
+        '202012091300-Goat': [1, 2],
         }
     assembledSegmentToBlockLookup = {
-        i - 1: i for i in [4, 5, 6, 7, 8]
+        #i - 1: i for i in [7,8]
+        i - 1: i for i in [1, 2]
         }
     movementSizeBins = [0, 0.25, 0.5, 1, 1.25, 1.5]
     rowColOverrides = {

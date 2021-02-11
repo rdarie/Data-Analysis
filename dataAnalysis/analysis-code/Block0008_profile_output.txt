@@ -1,0 +1,1614 @@
+Timer unit: 1e-07 s
+
+Total time: 6.05358 s
+File: C\../../analysis-code/preprocNS5.py
+Function: preprocNS5 at line 40
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    40                                           @profile
+    41                                           def preprocNS5():
+    42                                               # weird scope issue with ns5FileName in particular
+    43         1         59.0     59.0      0.0      ns5FileName = allOpts['ns5FileName']
+    44         1         66.0     66.0      0.0      arrayName = arguments['arrayName']
+    45         1         54.0     54.0      0.0      if arguments['arrayName'] != 'Block':
+    46                                                   electrodeMapPath = spikeSortingOpts[arrayName]['electrodeMapPath']
+    47                                                   mapExt = electrodeMapPath.split('.')[-1]
+    48                                                   if mapExt == 'cmp':
+    49                                                       mapDF = prb_meta.cmpToDF(electrodeMapPath)
+    50                                                   elif mapExt == 'map':
+    51                                                       mapDF = prb_meta.mapToDF(electrodeMapPath)
+    52                                                   ns5FileName = ns5FileName.replace('Block', arrayName)
+    53         1        557.0    557.0      0.0      idealDataPath = os.path.join(nspFolder, ns5FileName + '.ns5')
+    54         1       1605.0   1605.0      0.0      if not os.path.exists(idealDataPath):
+    55                                                   fallBackPath = os.path.join(
+    56                                                       nspFolder,
+    57                                                       '{}{:0>4}'.format(arrayName, blockIdx) + '.ns5')
+    58                                                   print('{} not found;\nFalling back to {}'.format(
+    59                                                       idealDataPath, fallBackPath
+    60                                                   ))
+    61                                                   if os.path.exists(fallBackPath):
+    62                                                       shutil.move(
+    63                                                           fallBackPath,
+    64                                                           idealDataPath)
+    65                                                       try:
+    66                                                           shutil.move(
+    67                                                               fallBackPath.replace('.ns5', '.nev'),
+    68                                                               idealDataPath.replace('.ns5', '.nev'))
+    69                                                       except Exception:
+    70                                                           traceback.print_exc()
+    71                                                           print('Ignoring exception...')
+    72                                           
+    73         1         53.0     53.0      0.0      chunkSize = 4000
+    74         1         52.0     52.0      0.0      chunkList = [0]
+    75         1         49.0     49.0      0.0      equalChunks = False
+    76         1         58.0     58.0      0.0      if arguments['maskMotorEncoder']:
+    77                                                   motorEncoderMask = alignTimeBoundsLookup[int(arguments['blockIdx'])]
+    78                                               else:
+    79         1         48.0     48.0      0.0          motorEncoderMask = None
+    80         1         53.0     53.0      0.0      if arguments['previewMotorEncoder']:
+    81                                                   analogInputNames = sorted(
+    82                                                       trialFilesFrom['utah']['eventInfo']['inputIDs'].values())
+    83                                                   assert trialFilesFrom['utah']['calcRigEvents']
+    84                                                   reader =ns5.preproc(
+    85                                                       fileName=ns5FileName,
+    86                                                       rawFolderPath=nspFolder,
+    87                                                       outputFolderPath=scratchFolder,
+    88                                                       fillOverflow=False, removeJumps=False,
+    89                                                       motorEncoderMask=None,
+    90                                                       calcAverageLFP=False,
+    91                                                       eventInfo=trialFilesFrom['utah']['eventInfo'],
+    92                                                       asigNameList=analogInputNames,
+    93                                                       spikeSourceType='nev', writeMode='ow',
+    94                                                       chunkSize=chunkSize, equalChunks=equalChunks,
+    95                                                       chunkList=chunkList,
+    96                                                       nameSuffix='_motorPreview',
+    97                                                       calcRigEvents=trialFilesFrom['utah']['calcRigEvents'])
+    98                                               #
+    99         1         54.0     54.0      0.0      if arguments['makeTruncated']:
+   100                                                   analogInputNames = sorted(
+   101                                                       trialFilesFrom['utah']['eventInfo']['inputIDs'].values())
+   102                                                   # pdb.set_trace()
+   103                                                   reader = ns5.preproc(
+   104                                                       fileName=ns5FileName,
+   105                                                       rawFolderPath=nspFolder,
+   106                                                       outputFolderPath=scratchFolder,
+   107                                                       fillOverflow=False, removeJumps=False,
+   108                                                       motorEncoderMask=motorEncoderMask,
+   109                                                       calcAverageLFP=True,
+   110                                                       eventInfo=trialFilesFrom['utah']['eventInfo'],
+   111                                                       asigNameList=[],
+   112                                                       ainpNameList=analogInputNames,
+   113                                                       spikeSourceType='tdc', writeMode='ow',
+   114                                                       chunkSize=chunkSize, equalChunks=equalChunks, chunkList=chunkList,
+   115                                                       calcRigEvents=trialFilesFrom['utah']['calcRigEvents'])
+   116                                               #
+   117         1         52.0     52.0      0.0      if arguments['rippleNForm']:
+   118                                                   analogInputNames = sorted(
+   119                                                       trialFilesFrom['utah']['eventInfo']['inputIDs'].values())
+   120                                                   # pdb.set_trace()
+   121                                                   reader = ns5.preproc(
+   122                                                       fileName=ns5FileName,
+   123                                                       rawFolderPath=nspFolder,
+   124                                                       outputFolderPath=scratchFolder, mapDF=mapDF, swapMaps=None,
+   125                                                       fillOverflow=False, removeJumps=False, electrodeArrayName=arrayName,
+   126                                                       motorEncoderMask=motorEncoderMask,
+   127                                                       calcAverageLFP=True, removeMeanAcross=True,
+   128                                                       eventInfo=trialFilesFrom['utah']['eventInfo'],
+   129                                                       asigNameList=spikeSortingOpts[arrayName]['asigNameList'],
+   130                                                       ainpNameList=spikeSortingOpts[arrayName]['ainpNameList'],
+   131                                                       spikeSourceType='tdc', writeMode='ow',
+   132                                                       chunkSize=chunkSize, equalChunks=equalChunks, chunkList=chunkList,
+   133                                                       calcRigEvents=False)
+   134                                               #
+   135         1         53.0     53.0      0.0      if arguments['forSpikeSorting']:
+   136                                                   reader = ns5.preproc(
+   137                                                       fileName=ns5FileName,
+   138                                                       rawFolderPath=nspFolder,
+   139                                                       outputFolderPath=scratchFolder, mapDF=mapDF, swapMaps=None,
+   140                                                       fillOverflow=False, removeJumps=False,
+   141                                                       motorEncoderMask=motorEncoderMask,
+   142                                                       calcAverageLFP=True,
+   143                                                       eventInfo=trialFilesFrom['utah']['eventInfo'],
+   144                                                       # asigNameList=None,
+   145                                                       # ainpNameList=None,
+   146                                                       # spikeSourceType='nev',
+   147                                                       # spikeSourceType='tdc',
+   148                                                       asigNameList=spikeSortingOpts[arrayName]['asigNameList'],
+   149                                                       ainpNameList=spikeSortingOpts[arrayName]['ainpNameList'],
+   150                                                       spikeSourceType='',
+   151                                                       removeMeanAcross=True,
+   152                                                       nameSuffix='_raw',
+   153                                                       #
+   154                                                       writeMode='ow',
+   155                                                       chunkSize=chunkSize, equalChunks=equalChunks, chunkList=chunkList,
+   156                                                       calcRigEvents=False)
+   157                                               
+   158         1         53.0     53.0      0.0      if arguments['fullSubtractMean']:
+   159                                                   reader = ns5.preproc(
+   160                                                       fileName=ns5FileName,
+   161                                                       rawFolderPath=nspFolder,
+   162                                                       outputFolderPath=scratchFolder, mapDF=mapDF, swapMaps=None,
+   163                                                       fillOverflow=False, removeJumps=False,
+   164                                                       motorEncoderMask=motorEncoderMask,
+   165                                                       calcAverageLFP=True,
+   166                                                       eventInfo=trialFilesFrom['utah']['eventInfo'],
+   167                                                       # asigNameList=None,
+   168                                                       # ainpNameList=None,
+   169                                                       # spikeSourceType='nev',
+   170                                                       # spikeSourceType='tdc',
+   171                                                       asigNameList=spikeSortingOpts[arrayName]['asigNameList'],
+   172                                                       ainpNameList=spikeSortingOpts[arrayName]['ainpNameList'],
+   173                                                       spikeSourceType='tdc',
+   174                                                       removeMeanAcross=True,
+   175                                                       #
+   176                                                       writeMode='ow',
+   177                                                       chunkSize=chunkSize, equalChunks=equalChunks, chunkList=chunkList,
+   178                                                       calcRigEvents=trialFilesFrom['utah']['calcRigEvents'])
+   179                                               ###############################################################################
+   180         1         54.0     54.0      0.0      if arguments['makeFull']:
+   181                                                   analogInputNames = sorted(
+   182                                                       trialFilesFrom['utah']['eventInfo']['inputIDs'].values())
+   183                                                   reader = ns5.preproc(
+   184                                                       fileName=ns5FileName,
+   185                                                       rawFolderPath=nspFolder,
+   186                                                       outputFolderPath=scratchFolder,
+   187                                                       fillOverflow=False, removeJumps=False,
+   188                                                       motorEncoderMask=motorEncoderMask,
+   189                                                       eventInfo=trialFilesFrom['utah']['eventInfo'],
+   190                                                       asigNameList=None, ainpNameList=analogInputNames,
+   191                                                       spikeSourceType='tdc', writeMode='ow',
+   192                                                       chunkSize=chunkSize, equalChunks=equalChunks, chunkList=chunkList,
+   193                                                       calcRigEvents=trialFilesFrom['utah']['calcRigEvents'])
+   194                                               ###############################################################################
+   195         1         62.0     62.0      0.0      if arguments['ISI'] or arguments['ISIRaw'] or arguments['ISIMinimal']:
+   196         1    5633670.0 5633670.0      9.3          mapDF = prb_meta.mapToDF(rippleMapFile[int(arguments['blockIdx'])])
+   197                                                   # if 'rippleOriginalMapFile' in expOpts:
+   198                                                   #     rippleOriginalMapFile = expOpts['rippleOriginalMapFile']
+   199                                                   #     if rippleOriginalMapFile[int(arguments['blockIdx'])] is not None:
+   200                                                   #         swapMaps = {
+   201                                                   #             'from': prb_meta.mapToDF(rippleOriginalMapFile[int(arguments['blockIdx'])]),
+   202                                                   #             'to': mapDF
+   203                                                   #         }
+   204                                                   #     else:
+   205                                                   #         swapMaps = None
+   206                                                   # else:
+   207                                                   #     swapMaps = None
+   208         1         84.0     84.0      0.0      if arguments['ISI']:
+   209                                                   reader = ns5.preproc(
+   210                                                       fileName=ns5FileName,
+   211                                                       rawFolderPath=nspFolder,
+   212                                                       outputFolderPath=scratchFolder, mapDF=mapDF,
+   213                                                       # swapMaps=swapMaps,
+   214                                                       fillOverflow=False, removeJumps=False,
+   215                                                       motorEncoderMask=motorEncoderMask,
+   216                                                       eventInfo=trialFilesFrom['utah']['eventInfo'],
+   217                                                       spikeSourceType='nev', writeMode='ow',
+   218                                                       chunkSize=chunkSize, equalChunks=equalChunks,
+   219                                                       chunkList=chunkList,
+   220                                                       calcRigEvents=trialFilesFrom['utah']['calcRigEvents'],
+   221                                                       normalizeByImpedance=False, removeMeanAcross=False,
+   222                                                       asigNameList=asigNameList, ainpNameList=ainpNameList,
+   223                                                       # LFPFilterOpts=LFPFilterOpts,
+   224                                                       LFPFilterOpts=None,
+   225                                                       calcAverageLFP=True)
+   226                                                   if arguments['transferISIStimLog']:
+   227                                                       try:
+   228                                                           jsonSrcPath = os.path.join(nspFolder, ns5FileName + '_autoStimLog.json')
+   229                                                           jsonDestPath = trialBasePath.replace('.nix', '_autoStimLog.json')
+   230                                                           shutil.copyfile(jsonSrcPath, jsonDestPath)
+   231                                                       except Exception:
+   232                                                           traceback.print_exc()
+   233         1         59.0     59.0      0.0      if arguments['ISIMinimal']:
+   234         1         65.0     65.0      0.0          reader = ns5.preproc(
+   235         1         54.0     54.0      0.0              fileName=ns5FileName,
+   236         1         56.0     56.0      0.0              rawFolderPath=nspFolder,
+   237         1         53.0     53.0      0.0              outputFolderPath=scratchFolder,
+   238         1         52.0     52.0      0.0              mapDF=mapDF,
+   239                                                       #swapMaps=swapMaps,
+   240         1         53.0     53.0      0.0              fillOverflow=False, removeJumps=False,
+   241         1         51.0     51.0      0.0              motorEncoderMask=motorEncoderMask,
+   242         1         61.0     61.0      0.0              eventInfo=trialFilesFrom['utah']['eventInfo'],
+   243         1         54.0     54.0      0.0              spikeSourceType='nev', writeMode='ow',
+   244         1         52.0     52.0      0.0              chunkSize=chunkSize, equalChunks=equalChunks,
+   245         1         52.0     52.0      0.0              chunkList=chunkList,
+   246         1         56.0     56.0      0.0              calcRigEvents=trialFilesFrom['utah']['calcRigEvents'],
+   247         1         52.0     52.0      0.0              normalizeByImpedance=False, removeMeanAcross=False,
+   248         1         56.0     56.0      0.0              asigNameList=[], ainpNameList=ainpNameList,
+   249                                                       # LFPFilterOpts=LFPFilterOpts,
+   250         1   54783279.0 54783279.0     90.5              LFPFilterOpts=None, calcAverageLFP=False)
+   251         1         36.0     36.0      0.0          if arguments['transferISIStimLog']:
+   252         1         16.0     16.0      0.0              try:
+   253         1        204.0    204.0      0.0                  jsonSrcPath = os.path.join(nspFolder, ns5FileName + '_autoStimLog.json')
+   254         1         25.0     25.0      0.0                  jsonDestPath = trialBasePath.replace('.nix', '_autoStimLog.json')
+   255         1     114657.0 114657.0      0.2                  shutil.copyfile(jsonSrcPath, jsonDestPath)
+   256                                                       except Exception:
+   257                                                           traceback.print_exc()
+   258                                               ##################################################################################
+   259         1         44.0     44.0      0.0      if arguments['ISIRaw']:
+   260                                                   reader = ns5.preproc(
+   261                                                       fileName=ns5FileName,
+   262                                                       rawFolderPath=nspFolder,
+   263                                                       outputFolderPath=scratchFolder, mapDF=None,
+   264                                                       fillOverflow=False, removeJumps=False,
+   265                                                       motorEncoderMask=motorEncoderMask,
+   266                                                       eventInfo=trialFilesFrom['utah']['eventInfo'],
+   267                                                       spikeSourceType='nev', writeMode='ow',
+   268                                                       chunkSize=chunkSize, equalChunks=equalChunks,
+   269                                                       chunkList=chunkList,
+   270                                                       calcRigEvents=trialFilesFrom['utah']['calcRigEvents'],
+   271                                                       normalizeByImpedance=False, removeMeanAcross=False,
+   272                                                       asigNameList=None, ainpNameList=None, nameSuffix='_raw',
+   273                                                       LFPFilterOpts=LFPFilterOpts, calcAverageLFP=True)
+   274         1         16.0     16.0      0.0      return
+
+Timer unit: 1e-07 s
+
+Total time: 257.264 s
+File: C\../../analysis-code/preprocDelsysHPF.py
+Function: preprocDelsysWrapper at line 56
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    56                                           @profile
+    57                                           def preprocDelsysWrapper():
+    58                                               featureRenameLookup = {
+    59         1         38.0     38.0      0.0          'TrignoAnalogInputAdapterAnalogA': 'AnalogInputAdapterAnalog',
+    60         1         52.0     52.0      0.0          'AnalogInputAdapterAnalogA': 'AnalogInputAdapterAnalog'}
+    61         1       1233.0   1233.0      0.0      print('Loading {}'.format(delsysExampleHeaderPath))
+    62         1         39.0     39.0      0.0      headerDataList = []
+    63         1       1890.0   1890.0      0.0      with open(delsysExampleHeaderPath, 'r') as f:
+    64         1         39.0     39.0      0.0          expr = r'Label: ([\S\s]+) Sampling frequency: ([\S\s]+) Number of points: ([\S\s]+) start: ([\S\s]+) Unit: ([\S\s]+) Domain Unit: ([\S\s]+)\n'
+    65         1         33.0     33.0      0.0          delimIdx = 0
+    66        14       1905.0    136.1      0.0          for line in f:
+    67        13      71296.0   5484.3      0.0              matches = re.search(expr, line)
+    68        13        399.0     30.7      0.0              if matches:
+    69        13        726.0     55.8      0.0                  thisFs = float(matches.groups()[1])
+    70        13        414.0     31.8      0.0                  headerDataList.append({
+    71        13        594.0     45.7      0.0                      'label': str(matches.groups()[0]),
+    72        13        406.0     31.2      0.0                      'fs': thisFs,
+    73        13        594.0     45.7      0.0                      'units': str(matches.groups()[4]),
+    74        13        684.0     52.6      0.0                      'domainUnits': str(matches.groups()[5]),
+    75                                                           })
+    76                                                       elif line == ' \n':
+    77                                                           break
+    78        13        401.0     30.8      0.0              delimIdx += 1
+    79         1      59732.0  59732.0      0.0      headerData = pd.DataFrame(headerDataList).set_index('label')
+    80         1       6241.0   6241.0      0.0      samplingRate = np.round(headerData['fs'].max())
+    81                                               #
+    82         1        351.0    351.0      0.0      searchStr = os.path.join(nspFolder, '*' + ns5FileName + '*.hpf')
+    83         1        255.0    255.0      0.0      altSearchStr = os.path.join(nspFolder, '*' + 'Block{:0>4}'.format(blockIdx) + '*.hpf')
+    84         1      24670.0  24670.0      0.0      delsysPathCandidates = glob.glob(searchStr) + glob.glob(altSearchStr)
+    85                                               # pdb.set_trace()
+    86         1         30.0     30.0      0.0      assert len(delsysPathCandidates) == 1
+    87         1         21.0     21.0      0.0      delsysPath = delsysPathCandidates[0]
+    88                                               #
+    89         1        221.0    221.0      0.0      delsysPathShort = os.path.join(nspFolder, ns5FileName + '.hpf')
+    90         1         21.0     21.0      0.0      if delsysPathShort != delsysPath:
+    91                                                   # shutil.move(delsysPath, delsysPathShort)
+    92         1    8947106.0 8947106.0      0.3          shutil.copyfile(delsysPath, delsysPathShort)
+    93         1         26.0     26.0      0.0          delsysPath = delsysPathShort
+    94                                               #
+    95         1         33.0     33.0      0.0      if arguments['chanQuery'] is not None:
+    96         1         24.0     24.0      0.0          if arguments['chanQuery'] in namedQueries['chan']:
+    97         1         18.0     18.0      0.0              chanQuery = namedQueries['chan'][arguments['chanQuery']]
+    98                                                   else:
+    99                                                       chanQuery = arguments['chanQuery']
+   100         1        681.0    681.0      0.0      reader = btk.btkAcquisitionFileReader()  # build a btk reader object
+   101         1        134.0    134.0      0.0      reader.SetFilename(delsysPath)  # set a filename to the reader
+   102         1 2563329624.0 2563329624.0     99.6      reader.Update()
+   103         1        565.0    565.0      0.0      acq = reader.GetOutput()  # acq is the btk aquisition object
+   104         1         16.0     16.0      0.0      data = {}
+   105         1         11.0     11.0      0.0      metaData = {}
+   106                                               #
+   107         1        231.0    231.0      0.0      dummyAnalog = acq.GetAnalog(0)
+   108         1         87.0     87.0      0.0      nSampMax = dummyAnalog.GetFrameNumber()
+   109         1      43138.0  43138.0      0.0      referenceT = samplingRate ** -1 * np.arange(nSampMax)
+   110         1        162.0    162.0      0.0      for idx in range(acq.GetAnalogNumber()):
+   111         1        132.0    132.0      0.0          analog = acq.GetAnalog(idx)
+   112         1        104.0    104.0      0.0          thisLabel = analog.GetLabel()
+   113         1       6995.0   6995.0      0.0          featName = re.sub('[\s+]', '', re.sub(r'[^a-zA-Z]', ' ', thisLabel).title())
+   114         1         29.0     29.0      0.0          if featName in featureRenameLookup:
+   115                                                       featName = featureRenameLookup[featName]
+   116         1       6633.0   6633.0      0.0          chanName = pd.Series(featName)
+   117         1      22213.0  22213.0      0.0          if not eval(chanQuery)[0]:
+   118                                                       print('Not loading {} bc. of query'.format(thisLabel))
+   119                                                       continue
+   120                                                   else:
+   121         1        701.0    701.0      0.0              print('Loading {}'.format(thisLabel))
+   122         1     107432.0 107432.0      0.0          thisFeat = pd.Series(analog.GetValues().flatten()).to_frame(name=featName)
+   123         1       2484.0   2484.0      0.0          thisFs = headerData.loc[thisLabel, 'fs']
+   124                                                   if thisFs != samplingRate:
+   125                                                       thisNSamp = np.round(nSampMax * thisFs / samplingRate).astype(np.int)
+   126                                                       thisFeat = thisFeat.iloc[:thisNSamp]
+   127                                                       thisFeat.index = thisFs ** -1 * np.arange(thisNSamp)
+   128                                                       thisFeat = hf.interpolateDF(
+   129                                                           thisFeat, referenceT, kind=interpKind, verbose=arguments['verbose'])
+   130                                                   data[featName] = thisFeat.to_numpy().flatten()
+   131                                                   metaData[featName] = {
+   132                                                       'gain': analog.GetGain(),
+   133                                                       'offset': analog.GetOffset(),
+   134                                                       'scale': analog.GetScale(),
+   135                                                       'timestamp': analog.GetTimestamp(),
+   136                                                       'unit': analog.GetUnit()
+   137                                                       }
+   138                                               dataDF = pd.DataFrame(data)
+   139                                               dataDF['t'] = referenceT
+   140                                               dataBlock = ns5.dataFrameToAnalogSignals(
+   141                                                   dataDF,
+   142                                                   idxT='t', useColNames=True, probeName='',
+   143                                                   dataCol=dataDF.drop(columns='t').columns,
+   144                                                   samplingRate=samplingRate * pq.Hz, verbose=arguments['verbose'])
+   145                                               dataBlock.name = 'delsys'
+   146                                               outPathName = os.path.join(
+   147                                                   scratchFolder, ns5FileName + '_delsys.nix')
+   148                                               if os.path.exists(outPathName):
+   149                                                   os.remove(outPathName)
+   150                                               writer = NixIO(filename=outPathName)
+   151                                               writer.write_block(dataBlock, use_obj_names=True)
+   152                                               writer.close()
+   153                                               return
+
+Timer unit: 1e-07 s
+
+Total time: 25.7572 s
+File: C\../../analysis-code/synchronizeDelsysToNSP.py
+Function: synchronizeDelsysToNSP at line 44
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    44                                           @profile
+    45                                           def synchronizeDelsysToNSP():
+    46         1        124.0    124.0      0.0      nspPath = os.path.join(
+    47         1         69.0     69.0      0.0          scratchFolder,
+    48         1        608.0    608.0      0.0          ns5FileName + '.nix')
+    49                                               # 
+    50         1         68.0     68.0      0.0      nspReader, nspBlock = ns5.blockFromPath(
+    51         1    5201999.0 5201999.0      2.0          nspPath, lazy=arguments['lazy'])
+    52                                               #
+    53         1         50.0     50.0      0.0      oePath = os.path.join(
+    54         1         23.0     23.0      0.0          scratchFolder,
+    55         1        272.0    272.0      0.0          ns5FileName + '_delsys.nix')
+    56         1         28.0     28.0      0.0      oeReader, oeBlock = ns5.blockFromPath(
+    57         1    5383855.0 5383855.0      2.1          oePath, lazy=arguments['lazy'])
+    58                                           
+    59         1        197.0    197.0      0.0      interTriggerInterval = float(arguments['trigRate']) ** (-1)
+    60         1         64.0     64.0      0.0      segIdx = 0
+    61         1         85.0     85.0      0.0      nspSeg = nspBlock.segments[segIdx]
+    62         1         65.0     65.0      0.0      oeSeg = oeBlock.segments[segIdx]
+    63                                               #
+    64         1       2199.0   2199.0      0.0      oeSyncAsig = oeSeg.filter(name='seg0_AnalogInputAdapterAnalog')[0]
+    65         1         65.0     65.0      0.0      try:
+    66         1         92.0     92.0      0.0          tStart, tStop = synchInfo['delsys'][blockIdx]['timeRanges']
+    67         1         71.0     71.0      0.0      except Exception:
+    68         1      12732.0  12732.0      0.0          traceback.print_exc()
+    69         1     233577.0 233577.0      0.1          tStart = float(oeSyncAsig.times[0] + 2 * pq.s)
+    70         1     157727.0 157727.0      0.1          tStop = float(oeSyncAsig.times[-1] - 2 * pq.s)
+    71                                           
+    72         1         39.0     39.0      0.0      oeTimeMask = hf.getTimeMaskFromRanges(
+    73         1     298440.0 298440.0      0.1          oeSyncAsig.times, [(tStart, tStop)])
+    74         1     113362.0 113362.0      0.0      oeSrs = pd.Series(oeSyncAsig.magnitude[oeTimeMask].flatten())
+    75         1      46603.0  46603.0      0.0      oeSrs.loc[oeSrs == 0] = np.nan
+    76         1      52150.0  52150.0      0.0      oeSrs.interpolate(method='linear', inplace=True)
+    77         1      21815.0  21815.0      0.0      oeSrs.fillna(method='bfill', inplace=True)
+    78         1         32.0     32.0      0.0      print(
+    79         1         23.0     23.0      0.0          'On block {}, detecting Delsys threshold crossings.'
+    80         1        650.0    650.0      0.0          .format(blockIdx))
+    81                                           
+    82         1     113835.0 113835.0      0.0      oeLims = oeSrs.quantile([1e-6, 1-1e-6]).to_list()
+    83         1     234625.0 234625.0      0.1      oeDiffUncertainty = oeSrs.diff().abs().quantile(1-1e-6) / 4
+    84         1         42.0     42.0      0.0      oeThresh = (oeLims[-1] - oeLims[0]) / 2
+    85                                           
+    86         1        876.0    876.0      0.0      nspSyncAsig = nspSeg.filter(name='seg0_analog 1')[0]
+    87         1         21.0     21.0      0.0      try:
+    88         1         37.0     37.0      0.0          tStart, tStop = synchInfo['nsp'][blockIdx]['timeRanges']
+    89         1         26.0     26.0      0.0      except Exception:
+    90         1       2868.0   2868.0      0.0          traceback.print_exc()
+    91         1    2185234.0 2185234.0      0.8          tStart = float(nspSyncAsig.times[0] + 2 * pq.s)
+    92         1    2568362.0 2568362.0      1.0          tStop = float(nspSyncAsig.times[-1] - 2 * pq.s)
+    93                                           
+    94         1         40.0     40.0      0.0      nspTimeMask = hf.getTimeMaskFromRanges(
+    95         1    2767227.0 2767227.0      1.1          nspSyncAsig.times, [(tStart, tStop)])
+    96         1    1513340.0 1513340.0      0.6      nspSrs = pd.Series(nspSyncAsig.magnitude[nspTimeMask].flatten())
+    97                                           
+    98         1    2251202.0 2251202.0      0.9      nspLims = nspSrs.quantile([1e-3, 1-1e-3]).to_list()
+    99         1    3044496.0 3044496.0      1.2      nspDiffUncertainty = nspSrs.diff().abs().quantile(1-1e-3) / 4
+   100         1         53.0     53.0      0.0      nspThresh = (nspLims[-1] - nspLims[0]) / 2
+   101                                               
+   102         1         38.0     38.0      0.0      oePeakIdx, oeCrossMask = hf.getThresholdCrossings(
+   103         1         21.0     21.0      0.0          oeSrs, thresh=oeThresh,
+   104         1         80.0     80.0      0.0          iti=interTriggerInterval, fs=float(oeSyncAsig.sampling_rate),
+   105         1         21.0     21.0      0.0          edgeType='both', itiWiggle=.2,
+   106         1    1340885.0 1340885.0      0.5          absVal=False, plotting=arguments['plotting'], keep_max=False)
+   107                                               # oePeakIdx = hf.getTriggers(
+   108                                               #     oeSrs, iti=interTriggerInterval, fs=float(oeSyncAsig.sampling_rate),
+   109                                               #     thres=1.5, edgeType='falling', plotting=arguments['plotting'])
+   110                                               # oeCrossMask = oeSrs.index.isin(oePeakIdx)
+   111         1        814.0    814.0      0.0      print('Found {} triggers'.format(oePeakIdx.size))
+   112                                               #
+   113         1         23.0     23.0      0.0      print(
+   114         1         22.0     22.0      0.0          'On trial {}, detecting NSP threshold crossings.'
+   115         1        226.0    226.0      0.0          .format(blockIdx))
+   116         1         29.0     29.0      0.0      nspPeakIdx, nspCrossMask = hf.getThresholdCrossings(
+   117         1         21.0     21.0      0.0          nspSrs, thresh=nspThresh,
+   118         1         75.0     75.0      0.0          iti=interTriggerInterval, fs=float(nspSyncAsig.sampling_rate),
+   119         1         20.0     20.0      0.0          edgeType='both', itiWiggle=.2,
+   120         1   17711993.0 17711993.0      6.9          absVal=False, plotting=arguments['plotting'], keep_max=False)
+   121                                               # nspPeakIdx = hf.getTriggers(
+   122                                               #     nspSrs, iti=interTriggerInterval, itiWiggle=1,
+   123                                               #     fs=float(oeSyncAsig.sampling_rate), plotting=arguments['plotting'],
+   124                                               #     thres=2.58, edgeType='both')
+   125                                               # nspCrossMask = nspSrs.index.isin(nspPeakIdx)
+   126         1       1104.0   1104.0      0.0      print('Found {} triggers'.format(nspPeakIdx.size))
+   127         1         26.0     26.0      0.0      try:
+   128         1         58.0     58.0      0.0          chooseCrossings = synchInfo['delsys'][blockIdx]['chooseCrossings']
+   129                                                   oeTimes = (
+   130                                                       oeSyncAsig.times[oeTimeMask][oeCrossMask][chooseCrossings])
+   131         1         33.0     33.0      0.0      except Exception:
+   132         1       3649.0   3649.0      0.0          traceback.print_exc()
+   133                                                   oeTimes = (
+   134         1     191318.0 191318.0      0.1              oeSyncAsig.times[oeTimeMask][oeCrossMask])
+   135         1         32.0     32.0      0.0      try:
+   136         1         49.0     49.0      0.0          chooseCrossings = synchInfo['nsp'][blockIdx]['chooseCrossings']
+   137                                                   nspTimes = (
+   138                                                       nspSyncAsig.times[nspTimeMask][nspCrossMask][chooseCrossings])
+   139         1         28.0     28.0      0.0      except Exception:
+   140         1       3174.0   3174.0      0.0          traceback.print_exc()
+   141                                                   nspTimes = (
+   142         1    2711150.0 2711150.0      1.1              nspSyncAsig.times[nspTimeMask][nspCrossMask])
+   143                                               ###########
+   144         1         54.0     54.0      0.0      nMissingTriggers = nspTimes.size - oeTimes.size
+   145         1        377.0    377.0      0.0      sampleWiggle = 5 * oeSyncAsig.sampling_rate.magnitude ** (-1)
+   146         1       3285.0   3285.0      0.0      prelimOEMismatch = np.abs(np.diff(oeTimes) - interTriggerInterval * pq.s)
+   147         1       1966.0   1966.0      0.0      prelimNSPMismatch = np.abs(np.diff(nspTimes) - interTriggerInterval * pq.s)
+   148         1        471.0    471.0      0.0      listDiscontinuitiesNSP = np.flatnonzero(prelimNSPMismatch > sampleWiggle)
+   149         1        160.0    160.0      0.0      listDiscontinuitiesOE = np.flatnonzero(prelimOEMismatch > sampleWiggle)
+   150                                               # 
+   151         1         23.0     23.0      0.0      if nMissingTriggers > 0:
+   152                                                   # np.diff(oeTimes)[listDiscontinuitiesOE]
+   153                                                   # np.diff(nspTimes)[listDiscontinuitiesNSP]
+   154                                                   # nspTimes[listDiscontinuitiesNSP]
+   155                                                   # oeTimes[listDiscontinuitiesOE]
+   156                                                   # nspTimes[listDiscontinuitiesNSP] - nspTimes[0]
+   157                                                   # oeTimes[listDiscontinuitiesOE] - oeTimes[0]
+   158         1         21.0     21.0      0.0          listDiscontinuities = listDiscontinuitiesOE
+   159         1         25.0     25.0      0.0          nMissingTriggers = nspTimes.size - oeTimes.size
+   160         1        561.0    561.0      0.0          print('Found {} discontinuities!'.format(len(listDiscontinuities)))
+   161                                               else:
+   162                                                   # 
+   163                                                   listDiscontinuities = np.flatnonzero(np.abs(prelimNSPMismatch - prelimOEMismatch) > sampleWiggle)
+   164         1         27.0     27.0      0.0      if len(listDiscontinuities):
+   165                                                   print(' On Delsys clock, discontinuities at:')
+   166                                                   for dIdx in listDiscontinuities:
+   167                                                       print(oeTimes[dIdx])
+   168                                                   oeDiscRound = np.zeros_like(oeTimes.magnitude)
+   169                                                   nspDiscRound = np.zeros_like(nspTimes.magnitude)
+   170                                                   for j, discIdx in enumerate(listDiscontinuities):
+   171                                                       oeDiscRound[discIdx+1:] += 1
+   172                                                       if nMissingTriggers > 0:
+   173                                                           nspDiscRound[discIdx+1+j] = 999  # use 999 as a discard marker
+   174                                                           nMissingTriggers -= 1
+   175                                                           print('Skipping NSP pulse at t={:.3f}'.format(nspTimes[discIdx+1+j]))
+   176                                                           nspDiscRound[discIdx+2+j:] += 1
+   177                                                       else:
+   178                                                           nspDiscRound[discIdx+1:] += 1
+   179                                                   if np.sum(nspDiscRound < 999) > np.sum(oeDiscRound < 999):
+   180                                                       # if there are more nsp triggers at the end, discard
+   181                                                       nspDiscRound[np.sum(oeDiscRound < 999):] = 999
+   182                                                   if np.sum(oeDiscRound < 999) > np.sum(nspDiscRound < 999):
+   183                                                       # if there are more nsp triggers at the end, discard
+   184                                                       oeDiscRound[np.sum(nspDiscRound < 999):] = 999
+   185                                                   pwSyncDict = {}  # piecewise sync parameters
+   186                                                   uniqueOeRounds = np.unique(oeDiscRound[oeDiscRound < 999])
+   187                                                   for roundIdx in uniqueOeRounds:
+   188                                                       try:
+   189                                                           thesePolyCoeffs = np.polyfit(
+   190                                                               x=oeTimes[oeDiscRound == roundIdx],
+   191                                                               y=nspTimes[nspDiscRound == roundIdx], deg=1)
+   192                                                       except Exception:
+   193                                                           traceback.print_exc()
+   194                                                           pdb.set_trace()
+   195                                                       thisInterpFun = np.poly1d(thesePolyCoeffs)
+   196                                                       if roundIdx == 0:
+   197                                                           pwSyncDict[roundIdx] = {
+   198                                                               'inStart': 0,
+   199                                                               'inStop': np.max(oeTimes[oeDiscRound == roundIdx].magnitude),
+   200                                                               'tInterpFun': thisInterpFun}
+   201                                                       elif roundIdx == uniqueOeRounds[-1]:
+   202                                                           pwSyncDict[roundIdx] = {
+   203                                                               'inStart': np.max(oeTimes[oeDiscRound == roundIdx-1].magnitude),
+   204                                                               'inStop': 1e6,
+   205                                                               'tInterpFun': thisInterpFun}
+   206                                                       else:
+   207                                                           pwSyncDict[roundIdx] = {
+   208                                                               'inStart': np.max(oeTimes[oeDiscRound == roundIdx-1].magnitude),
+   209                                                               'inStop': np.max(oeTimes[oeDiscRound == roundIdx].magnitude),
+   210                                                               'tInterpFun': thisInterpFun}
+   211                                                   #
+   212                                                   def timeInterpFun(inputT):
+   213                                                       outputT = np.zeros_like(inputT)
+   214                                                       for k in sorted(pwSyncDict.keys()):
+   215                                                           inTimeMask = (
+   216                                                               (inputT >= pwSyncDict[k]['inStart']) &
+   217                                                               (inputT < pwSyncDict[k]['inStop']))
+   218                                                           outputT[inTimeMask] = pwSyncDict[k]['tInterpFun'](
+   219                                                               inputT[inTimeMask])
+   220                                                       plotting = False
+   221                                                       if plotting:
+   222                                                           import matplotlib.pyplot as plt
+   223                                                           for k in sorted(pwSyncDict.keys()):
+   224                                                               inTimeMask = (
+   225                                                                   (inputT >= pwSyncDict[k]['inStart']) &
+   226                                                                   (inputT < pwSyncDict[k]['inStop']))
+   227                                                               plt.plot(inputT[inTimeMask], outputT[inTimeMask])
+   228                                                           plt.show()
+   229                                                       return outputT
+   230                                               else:
+   231                                                   # assert np.max(np.abs((np.diff(oeTimes) - np.diff(nspTimes)))) < 1e-4
+   232                                                   # np.flatnonzero(np.abs(np.diff(oeTimes)) > 0.018)
+   233                                                   # np.sum(np.abs(np.diff(nspTimes)) < 0.017)
+   234                                                   # nspSynchDur = nspTimes[-1] - nspTimes[0]
+   235                                                   # oeSynchDur = oeTimes[-1] - oeTimes[0]
+   236                                                   ###########
+   237         1         24.0     24.0      0.0          if oeTimes.size > nspTimes.size:
+   238                                                       # if there are more nsp triggers at the end, discard
+   239                                                       oeTimes = oeTimes[:nspTimes.size]
+   240         1         23.0     23.0      0.0          if nspTimes.size > oeTimes.size:
+   241                                                       # if there are more nsp triggers at the end, discard
+   242         1         74.0     74.0      0.0              nspTimes = nspTimes[:oeTimes.size]
+   243         1       4836.0   4836.0      0.0          synchPolyCoeffs = np.polyfit(x=oeTimes, y=nspTimes, deg=1)
+   244                                                   # synchPolyCoeffs = np.array([1, np.mean(nspTimes - oeTimes)])
+   245                                                   # synchPolyCoeffs = np.array([1, np.mean(nspTimes[0] - oeTimes[0])])
+   246         1        435.0    435.0      0.0          timeInterpFun = np.poly1d(synchPolyCoeffs)
+   247                                           
+   248                                               # account for delay because of
+   249                                               # analog filters on one or both recording devices (units of pq.s)
+   250         1         25.0     25.0      0.0      filterDelay = 2.3 * 1e-3  # Trigno analog input, filtered DC-100Hz
+   251                                               # filterDelay = 2.3 * 1e-4  # Trigno analog input, filtered DC-1000Hz
+   252                                               # TODO: figure out why the block below doesn't work
+   253                                               # for event in oeBlock.filter(objects=Event):
+   254                                               #     event.magnitude[:] = (
+   255                                               #         timeInterpFun(event.times.magnitude) + filterDelay)
+   256                                               # for asig in oeBlock.filter(objects=AnalogSignal):
+   257                                               #     asig.times.magnitude[:] = (
+   258                                               #         timeInterpFun(asig.times.magnitude) + filterDelay)
+   259                                               # for st in oeBlock.filter(objects=SpikeTrain):
+   260                                               #     st.times.magnitude[:] = (
+   261                                               #         timeInterpFun(st.times.magnitude) + filterDelay)
+   262                                           
+   263         1         37.0     37.0      0.0      oeDF = ns5.analogSignalsToDataFrame(
+   264         1       6578.0   6578.0      0.0          oeBlock.filter(objects=AnalogSignal),
+   265         1     512956.0 512956.0      0.2          idxT='oeT', useChanNames=True)
+   266         1     221920.0 221920.0      0.1      oeDF['nspT'] = timeInterpFun(oeDF['oeT']) + filterDelay
+   267         1        815.0    815.0      0.0      dummyAsig = nspSeg.filter(objects=AnalogSignal)[0]
+   268         1    2308545.0 2308545.0      0.9      newT = pd.Series(dummyAsig.times.magnitude)
+   269         1       4965.0   4965.0      0.0      interpCols = oeDF.columns.drop(['oeT', 'nspT'])
+   270                                               #
+   271         1         40.0     40.0      0.0      if arguments['chanQuery'] is not None:
+   272         1         36.0     36.0      0.0          if arguments['chanQuery'] in namedQueries['chan']:
+   273         1         25.0     25.0      0.0              chanQuery = namedQueries['chan'][arguments['chanQuery']]
+   274                                                   else:
+   275                                                       chanQuery = arguments['chanQuery']
+   276         1         36.0     36.0      0.0          chanQuery = chanQuery.replace('chanName', 'interpCols')
+   277         1       9397.0   9397.0      0.0          interpCols = interpCols[eval(chanQuery)]
+   278         1         49.0     49.0      0.0      oeInterp = hf.interpolateDF(
+   279         1         35.0     35.0      0.0          oeDF, newT,
+   280         1         34.0     34.0      0.0          kind='pchip', fill_value=(0, 0),
+   281         1  165080025.0 165080025.0     64.1          x='nspT', columns=interpCols, verbose=True)
+   282         1         64.0     64.0      0.0      oeInterpBlock = ns5.dataFrameToAnalogSignals(
+   283         1         22.0     22.0      0.0          oeInterp,
+   284         1         22.0     22.0      0.0          idxT='nspT',
+   285         1         72.0     72.0      0.0          probeName='openEphys', samplingRate=dummyAsig.sampling_rate,
+   286         1   15655533.0 15655533.0      6.1          dataCol=interpCols, forceColNames=interpCols, verbose=True)
+   287                                               #
+   288         1         44.0     44.0      0.0      ns5.addBlockToNIX(
+   289         1         23.0     23.0      0.0          oeInterpBlock, neoSegIdx=[0],
+   290         1         22.0     22.0      0.0          writeAsigs=True, writeSpikes=False, writeEvents=False,
+   291         1         21.0     21.0      0.0          purgeNixNames=True,
+   292         1         28.0     28.0      0.0          fileName=ns5FileName,
+   293         1         23.0     23.0      0.0          folderPath=scratchFolder,
+   294         1   25584088.0 25584088.0      9.9          nixBlockIdx=0, nixSegIdx=[0],
+   295                                                   )
+   296         1         35.0     35.0      0.0      return
+
+Timer unit: 1e-07 s
+
+Total time: 33.673 s
+File: C\../../analysis-code/calcISIAnalysisNix.py
+Function: calcISIBlockAnalysisNix at line 67
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    67                                           @profile
+    68                                           def calcISIBlockAnalysisNix():
+    69         1        265.0    265.0      0.0      arguments['chanNames'], arguments['chanQuery'] = ash.processChannelQueryArgs(
+    70         1        419.0    419.0      0.0          namedQueries, scratchFolder, **arguments)
+    71         1        252.0    252.0      0.0      analysisSubFolder = os.path.join(
+    72         1        773.0    773.0      0.0          scratchFolder, arguments['analysisName']
+    73                                                   )
+    74         1       2081.0   2081.0      0.0      if not os.path.exists(analysisSubFolder):
+    75                                                   os.makedirs(analysisSubFolder, exist_ok=True)
+    76         1        244.0    244.0      0.0      if arguments['samplingRate'] is not None:
+    77                                                   samplingRate = float(arguments['samplingRate']) * pq.Hz
+    78                                               else:
+    79         1       1343.0   1343.0      0.0          samplingRate = float(1 / binOpts['binInterval']) * pq.Hz
+    80                                               #
+    81                                               # Start parsing autologger info
+    82         1        261.0    261.0      0.0      thisJsonPath = trialBasePath.replace('.nix', '_autoStimLog.json')
+    83         1       1227.0   1227.0      0.0      if os.path.exists(thisJsonPath):
+    84                                                   #
+    85         1        236.0    236.0      0.0          def parseAutoStimLog(jsonPath):
+    86                                                       try:
+    87                                                           with open(jsonPath, 'r') as f:
+    88                                                               stimLog = json.load(f)
+    89                                                       except Exception:
+    90                                                           with open(jsonPath, 'r') as f:
+    91                                                               stimLogText = f.read()
+    92                                                               stimLogText = mdt.fixMalformedJson(stimLogText, jsonType='Log')
+    93                                                               stimLog = json.loads(stimLogText)
+    94                                                       stimResLookup = {
+    95                                                           1: 1 * pq.uA,
+    96                                                           2: 2 * pq.uA,
+    97                                                           3: 5 * pq.uA,
+    98                                                           4: 10 * pq.uA,
+    99                                                           5: 20 * pq.uA}
+   100                                                       stimDict = {
+   101                                                           't': [],
+   102                                                           'elec': [],
+   103                                                           # 'nominalWaveform': [],
+   104                                                           'nominalCurrent': [],
+   105                                                           'RateInHz': [],
+   106                                                           'stimPeriod': [],
+   107                                                           'trainDur': [],
+   108                                                           'firstPW': [],
+   109                                                           # 'interPhase': [],
+   110                                                           'secondPW': [],
+   111                                                           'totalPW': [],
+   112                                                           'stimRes': []
+   113                                                           }
+   114                                                       allNominalWaveforms = []
+   115                                                       for idx, entry in enumerate(stimLog):
+   116                                                           t = entry['t']
+   117                                                           if idx == 0:
+   118                                                               firstT = t
+   119                                                           else:
+   120                                                               if t < firstT:
+   121                                                                   continue
+   122                                                           if 'stimRes' in entry:
+   123                                                               ampQuanta = stimResLookup[entry['stimRes']]
+   124                                                           else:
+   125                                                               ampQuanta = 20 * pq.uA
+   126                                                           # print('ampQuanta = {}'.format(ampQuanta))
+   127                                                           if 'stimCmd' in entry:
+   128                                                               allStimCmd = entry['stimCmd']
+   129                                                               if isinstance(allStimCmd, dict):
+   130                                                                   # if only one electrode
+   131                                                                   allStimCmd = [allStimCmd]
+   132                                                               for stimCmd in allStimCmd:
+   133                                                                   # each stimCmd represents one electrode
+   134                                                                   nominalWaveform = []
+   135                                                                   lastAmplitude = 0
+   136                                                                   totalLen = 0
+   137                                                                   for seqIdx, phase in enumerate(stimCmd['seq']):
+   138                                                                       if phase['enable']:
+   139                                                                           phAmp = (
+   140                                                                               ampQuanta * phase['ampl'] *
+   141                                                                               (-1) * ((-1) ** phase['pol'])
+   142                                                                               )
+   143                                                                           phaseWaveform = [
+   144                                                                               phAmp
+   145                                                                               for i in range(31 * phase['length'])]
+   146                                                                       else:
+   147                                                                           phaseWaveform = [
+   148                                                                               0
+   149                                                                               for i in range(31 * phase['length'])]
+   150                                                                       phaseWaveform[:phase['delay']] = [
+   151                                                                           lastAmplitude for i in range(phase['delay'])]
+   152                                                                       lastAmplitude = phaseWaveform[-1]
+   153                                                                       nominalWaveform += phaseWaveform
+   154                                                                       totalLen += phase['length']
+   155                                                                       if seqIdx == 0:
+   156                                                                           stimDict['firstPW'].append(
+   157                                                                               (phase['length'] / (3e4)) * pq.s)
+   158                                                                       if seqIdx == 1:
+   159                                                                           stimDict['secondPW'].append(
+   160                                                                               (phase['length'] / (3e4)) * pq.s)
+   161                                                                   stimDict['t'].append(t)
+   162                                                                   stimDict['stimRes'].append(ampQuanta)
+   163                                                                   stimDict['totalPW'].append(
+   164                                                                       (totalLen / (3e4)) * pq.s)
+   165                                                                   stimDict['elec'].append(
+   166                                                                       stimCmd['elec'] * pq.dimensionless)
+   167                                                                   allNominalWaveforms.append(
+   168                                                                       np.asarray(nominalWaveform))
+   169                                                                   nominalIdxMax = np.argmax(
+   170                                                                       np.abs(np.asarray(nominalWaveform)))
+   171                                                                   stimDict['nominalCurrent'].append(
+   172                                                                       nominalWaveform[nominalIdxMax])
+   173                                                                   thisStimPeriod = (stimCmd['period'] / (3e4)) * pq.s
+   174                                                                   stimDict['stimPeriod'].append(thisStimPeriod)
+   175                                                                   stimDict['RateInHz'].append(
+   176                                                                       thisStimPeriod ** (-1))
+   177                                                                   stimDict['trainDur'].append(
+   178                                                                       (stimCmd['repeats'] - 1) * thisStimPeriod)
+   179                                                           else:
+   180                                                               stimStr = entry['stimString']
+   181                                                               stimStrDictRaw = {}
+   182                                                               for stimSubStr in stimStr.split(';'):
+   183                                                                   if len(stimSubStr):
+   184                                                                       splitStr = stimSubStr.split('=')
+   185                                                                       stimStrDictRaw[splitStr[0]] = splitStr[1]
+   186                                                               stimStrDict = {}
+   187                                                               for key, val in stimStrDictRaw.items():
+   188                                                                   stimStrDict[key] = [
+   189                                                                       float(st)
+   190                                                                       for st in val.split(',')
+   191                                                                       if len(st)]
+   192                                                               stimStrDF = pd.DataFrame(stimStrDict)
+   193                                                               stimStrDF['Elect'] = stimStrDF['Elect'].astype(np.int)
+   194                                                               stimStrDF.loc[stimStrDF['PL'] == 1, 'Amp'] = (
+   195                                                                   stimStrDF.loc[stimStrDF['PL'] == 1, 'Amp'] * (-1))
+   196                                                               for rIdx, row in stimStrDF.iterrows():
+   197                                                                   stimDict['t'].append(t)
+   198                                                                   stimDict['firstPW'].append(
+   199                                                                       row['Dur'] * 1e-3 * pq.s)
+   200                                                                   stimDict['secondPW'].append(
+   201                                                                       row['Dur'] * 1e-3 * pq.s)
+   202                                                                   # stimDict['interPhase'].append(
+   203                                                                   #     2 * ((3e4) ** -1) * pq.s)  # per page 16 of xippmex manual
+   204                                                                   stimDict['totalPW'].append(
+   205                                                                       2 * (row['Dur'] * 1e-3 + ((3e4) ** -1)) * pq.s)
+   206                                                                   stimDict['nominalCurrent'].append(
+   207                                                                       row['Amp'] * ampQuanta)
+   208                                                                   stimDict['RateInHz'].append(row['Freq'] * pq.Hz)
+   209                                                                   stimDict['stimPeriod'].append(row['Freq'] ** -1)
+   210                                                                   stimDict['trainDur'].append(row['TL'] * 1e-3 * pq.s)
+   211                                                                   stimDict['elec'].append(
+   212                                                                       row['Elect'] * pq.dimensionless)
+   213                                                       stimDict['labels'] = np.asarray([
+   214                                                           'stim update {}'.format(i)
+   215                                                           for i in range(len(stimDict['elec']))])
+   216                                                       # (np.asarray(stimDict['t'])/3e4 <= 1).any()
+   217                                                       rawStimEventTimes = np.asarray(stimDict.pop('t')) / (30000) * pq.s
+   218                                                       # rawStimEventTimes = rawStimEventTimes - rawStimEventTimes[0] + activeTimes.min() * pq.s
+   219                                                       # rawStimEventTimes = rawStimEventTimes.magnitude * rawStimEventTimes.units.simplified
+   220                                                       stimEvents = Event(
+   221                                                           name='seg0_stimEvents',
+   222                                                           times=rawStimEventTimes,
+   223                                                           labels=stimDict.pop('labels'))
+   224                                                       stimEvents.annotations['arrayAnnNames'] = [
+   225                                                           k
+   226                                                           for k in stimDict.keys()]
+   227                                                       stimEvents.annotations['nix_name'] = stimEvents.name
+   228                                                       #
+   229                                                       for k in stimEvents.annotations['arrayAnnNames']:
+   230                                                           stimEvents.array_annotations[k] = stimDict[k]
+   231                                                           stimEvents.annotations[k] = stimDict.pop(k)
+   232                                                       return stimEvents
+   233                                                   #
+   234         1    2052611.0 2052611.0      0.6          stimEvents = parseAutoStimLog(thisJsonPath)
+   235         1      29094.0  29094.0      0.0          rawStimEventsDF = pd.DataFrame(stimEvents.array_annotations)
+   236         1      19802.0  19802.0      0.0          rawStimEventsDF['t'] = stimEvents.times
+   237         1        279.0    279.0      0.0          rawStimEventsDF.to_csv(os.path.join(
+   238         1     345543.0 345543.0      0.1              analysisSubFolder, ns5FileName + '_unsynched_stim_updates.csv'
+   239                                                       ))
+   240                                               else:
+   241                                                   stimEvents = None
+   242                                           
+   243         1       1424.0   1424.0      0.0      if not os.path.exists(trialBasePath):
+   244                                                   trialProcessedPath = os.path.join(
+   245                                                       processedFolder, ns5FileName + '.nix')
+   246                                                   # will throw an error if file was never processed
+   247                                                   shutil.copyfile(trialProcessedPath, trialBasePath)
+   248                                               #
+   249         1    3086070.0 3086070.0      0.9      nspReader = neo.io.nixio_fr.NixIO(filename=trialBasePath)
+   250         1    5096461.0 5096461.0      1.5      mapDF = prb_meta.mapToDF(rippleMapFile[int(arguments['blockIdx'])])
+   251         1        100.0    100.0      0.0      nspBlock = ns5.readBlockFixNames(
+   252         1         79.0     79.0      0.0          nspReader, block_index=0,
+   253         1    7520067.0 7520067.0      2.2          reduceChannelIndexes=True
+   254                                                   )
+   255                                               #
+   256         1        428.0    428.0      0.0      spikesBlock = hf.extractSignalsFromBlock(
+   257         1      48392.0  48392.0      0.0          nspBlock, keepSpikes=True)
+   258         1    2917195.0 2917195.0      0.9      spikesBlock = hf.loadBlockProxyObjects(spikesBlock)
+   259                                               #  save ins time series
+   260         1        123.0    123.0      0.0      tdChanNames = ns5.listChanNames(
+   261         1        105.0    105.0      0.0          nspBlock, arguments['chanQuery'],
+   262         1     100662.0 100662.0      0.0          objType=AnalogSignalProxy)
+   263         1         84.0     84.0      0.0      try:
+   264         1        100.0    100.0      0.0          alignTimeBounds = alignTimeBoundsLookup[int(arguments['blockIdx'])]
+   265                                               except Exception:
+   266                                                   traceback.print_exc()
+   267                                                   alignTimeBounds = None
+   268                                               #
+   269                                               allSpikeTrains = [
+   270         1         78.0     78.0      0.0          i
+   271         1       3977.0   3977.0      0.0          for i in spikesBlock.filter(objects=SpikeTrain)
+   272                                                   if '#' in i.name]
+   273         1         78.0     78.0      0.0      if len(allSpikeTrains):
+   274         2        159.0     79.5      0.0          for segIdx, dataSeg in enumerate(spikesBlock.segments):
+   275         1        479.0    479.0      0.0              spikeList = dataSeg.filter(objects=SpikeTrain)
+   276         1        289.0    289.0      0.0              spikeList = ns5.loadContainerArrayAnn(trainList=spikeList)
+   277                                               # calc binarized and get new time axis
+   278                                               allStimTrains = [
+   279         1         74.0     74.0      0.0          i
+   280         1       3668.0   3668.0      0.0          for i in spikesBlock.filter(objects=SpikeTrain)
+   281                                                   if '_stim' in i.name]
+   282                                           
+   283         1         86.0     86.0      0.0      tdBlock = hf.extractSignalsFromBlock(
+   284         1      14044.0  14044.0      0.0          nspBlock, keepSpikes=False, keepSignals=tdChanNames)
+   285         1   19277917.0 19277917.0      5.7      tdBlock = hf.loadBlockProxyObjects(tdBlock)
+   286                                               #  
+   287                                               # if len(allStimTrains):
+   288                                               #     for segIdx, dataSeg in enumerate(spikesBlock.segments):
+   289                                               #         spikeList = [
+   290                                               #             st
+   291                                               #             for st in dataSeg.filter(objects=SpikeTrain)
+   292                                               #             if '_stim' in st.name]
+   293                                               #         for stIdx, st in enumerate(spikeList):
+   294                                               #             chanName = st.unit.channel_index.name
+   295                                               #             matchingAsig = tdBlock.filter(objects=AnalogSignal, name='seg0_' + chanName)
+   296                                               #             if len(matchingAsig):
+   297                                               #                 stitchStimArtifact = True
+   298                                               #                 if stitchStimArtifact:
+   299                                               #                     tIdx = 10
+   300                                               #                     winSize = st.sampling_period * st.waveforms.shape[-1]
+   301                                               #                     wvfT = np.arange(
+   302                                               #                         st.times[tIdx],
+   303                                               #                         st.times[tIdx] + winSize,
+   304                                               #                         st.sampling_period) * st.sampling_period.units
+   305                                               #                     wvfT = wvfT[:st.waveforms.shape[-1]]
+   306                                               #                     asigTMask = (
+   307                                               #                         (matchingAsig[0].times >= wvfT[0]) &
+   308                                               #                         (matchingAsig[0].times < wvfT[0] + winSize))
+   309                                               #                     plotAsig = np.squeeze(matchingAsig[0])[asigTMask]
+   310                                               #                     plotAsigT = matchingAsig[0].times[asigTMask]
+   311                                               #                     plotWvf = np.squeeze(st.waveforms[tIdx, :, :]) * 1e-3
+   312                                               #                     fig, ax = plt.subplots()
+   313                                               #                     ax.plot(wvfT, plotWvf, 'c.-')
+   314                                               #                     twAx = ax.twinx()
+   315                                               #                     twAx.plot(plotAsigT, plotAsig, 'm.-')
+   316                                               #                     # ax.plot(plotAsigT, plotAsig - plotWvf, '.-')
+   317                                               #                     plt.show()
+   318         1         92.0     92.0      0.0      if len(allStimTrains):
+   319         1         75.0     75.0      0.0          mustDoubleSpikeWvfLen = True
+   320                                           
+   321         1         75.0     75.0      0.0          def fixRippleStimWvf(sourceArr, destArr, whichIdx, fixFirst=1):
+   322                                                       if fixFirst:
+   323                                                           for jj in range(fixFirst):
+   324                                                               destArr[:, :, jj] = destArr[:, :, fixFirst]
+   325                                                       for ii in range(destArr.shape[0]):
+   326                                                           destArr[ii, :, :] = destArr[ii, :, :] - sourceArr[ii, :, whichIdx]
+   327                                                       return destArr
+   328                                           
+   329         7        613.0     87.6      0.0          for stIdx, st in enumerate(allStimTrains):
+   330         6        467.0     77.8      0.0              if stIdx == 0:
+   331         1        116.0    116.0      0.0                  originalSpikeWvfLen = st.waveforms.shape[-1]
+   332         6      16737.0   2789.5      0.0              theseTimes = pd.Series(st.times)
+   333                                                       # if a stim train is longer than 1.7 msec
+   334                                                       # it gets split into two spikes
+   335         6      38700.0   6450.0      0.0              maskContinued = theseTimes.diff() < 1.8e-3
+   336                                                       #
+   337         6       9652.0   1608.7      0.0              if maskContinued.any():
+   338                                                           # mustDoubleSpikeWvfLen = True
+   339                                                           maskContinuedSources = maskContinued.shift(-1).fillna(False)
+   340                                                           assert maskContinued.sum() == maskContinuedSources.sum()
+   341                                                           secondVolIdx = maskContinued.index[maskContinued]
+   342                                                           notADuplicateMask = (~maskContinued).to_numpy()
+   343                                                           firstVolIdx = maskContinuedSources.index[maskContinuedSources]
+   344                                                           # fix inconsistency in first sample sourceArr, destArr, whichIdx
+   345                                                           wvf = pd.DataFrame(np.atleast_2d(
+   346                                                               np.squeeze(st.waveforms[notADuplicateMask, :, :])))
+   347                                                           wvfDiff = wvf.diff(-1, axis=1).fillna(0)
+   348                                                           wvfDiffAbs = wvfDiff.abs()
+   349                                                           #
+   350                                                           rawMaxIdx = wvfDiffAbs.iloc[:, :5].idxmax(axis=1)
+   351                                                           #
+   352                                                           firstValidIdx, _ = stats.mode(rawMaxIdx, axis=None)
+   353                                                           firstValidIdx = int(firstValidIdx[-1] + 1)
+   354                                                           #
+   355                                                           st.waveforms[notADuplicateMask, :, :] = fixRippleStimWvf(
+   356                                                               sourceArr=st.waveforms[notADuplicateMask, :, :],
+   357                                                               destArr=st.waveforms[notADuplicateMask, :, :],
+   358                                                               whichIdx=firstValidIdx, fixFirst=firstValidIdx)
+   359                                                           st.waveforms[secondVolIdx, :, :] = fixRippleStimWvf(
+   360                                                               sourceArr=st.waveforms[secondVolIdx, :, :],
+   361                                                               destArr=st.waveforms[secondVolIdx, :, :],
+   362                                                               whichIdx=firstValidIdx, fixFirst=firstValidIdx)
+   363                                                           st.waveforms[secondVolIdx, :, :] = fixRippleStimWvf(
+   364                                                               sourceArr=(-1) * st.waveforms[firstVolIdx, :, :],
+   365                                                               destArr=st.waveforms[secondVolIdx, :, :], whichIdx=-1, fixFirst=False)
+   366                                                           filledWaveforms = np.concatenate(
+   367                                                               [
+   368                                                                   st.waveforms[firstVolIdx, :, :],
+   369                                                                   st.waveforms[secondVolIdx, :, :]],
+   370                                                               axis=-1) * st.waveforms.units
+   371                                                           # expand all, to catch single size spikes
+   372                                                           #
+   373                                                           padding = np.concatenate([
+   374                                                               st.waveforms[:, :, -1]
+   375                                                               for i in range(st.waveforms.shape[-1])], axis=-1)
+   376                                                           newWaveforms = np.concatenate(
+   377                                                               [
+   378                                                                   st.waveforms, padding[:, np.newaxis, :]],
+   379                                                               axis=-1) * st.waveforms.units
+   380                                                           newWaveforms[firstVolIdx, :, :] = filledWaveforms
+   381                                                           newWaveforms = newWaveforms[notADuplicateMask, :, :]
+   382                                                           #
+   383                                                           unit = st.unit
+   384                                                           uIdx = np.flatnonzero([
+   385                                                               np.all(i == st)
+   386                                                               for i in unit.spiketrains])[0]
+   387                                                           seg = st.segment
+   388                                                           segIdx = np.flatnonzero([
+   389                                                               np.all(i == st)
+   390                                                               for i in seg.spiketrains])[0]
+   391                                                           #
+   392                                                           newSt = deepcopy(st[notADuplicateMask])
+   393                                                           newSt.waveforms = newWaveforms
+   394                                                           for k in newSt.array_annotations.keys():
+   395                                                               newSt.array_annotations[k] = st.array_annotations[k][notADuplicateMask]
+   396                                                               if k in st.annotations:
+   397                                                                   newSt.annotations[k] = st.array_annotations[k][notADuplicateMask]
+   398                                                           unit.spiketrains[uIdx] = newSt
+   399                                                           newSt.unit = unit
+   400                                                           seg.spiketrains[segIdx] = newSt
+   401                                                           newSt.segment = seg
+   402                                                           allStimTrains[stIdx] = newSt
+   403                                                           del st
+   404                                                           unit.create_relationship()
+   405                                                           seg.create_relationship()
+   406                                                       else:
+   407                                                           # fix inconsistency in first sample sourceArr, destArr, whichIdx
+   408         6        643.0    107.2      0.0                  wvf = pd.DataFrame(np.atleast_2d(
+   409         6      17859.0   2976.5      0.0                      np.squeeze(st.waveforms)))
+   410         6      54893.0   9148.8      0.0                  wvfDiff = wvf.diff(-1, axis=1).fillna(0)
+   411         6      18498.0   3083.0      0.0                  wvfDiffAbs = wvfDiff.abs()
+   412                                                           #
+   413         6     556741.0  92790.2      0.2                  rawMaxIdx = wvfDiffAbs.iloc[:, :5].idxmax(axis=1)
+   414         6      24547.0   4091.2      0.0                  firstValidIdx, _ = stats.mode(rawMaxIdx, axis=None)
+   415         6        770.0    128.3      0.0                  firstValidIdx = int(firstValidIdx[-1] + 1)
+   416                                                           #
+   417         6        552.0     92.0      0.0                  st.waveforms = fixRippleStimWvf(
+   418         6        596.0     99.3      0.0                      st.waveforms, st.waveforms,
+   419         6    9229926.0 1538321.0      2.7                      whichIdx=firstValidIdx, fixFirst=firstValidIdx)
+   420         6        671.0    111.8      0.0                  print(
+   421         6        577.0     96.2      0.0                      'on spiketrain {}, waveforms.shape = {}'
+   422         6       4062.0    677.0      0.0                      .format(st.name, st.waveforms.shape))
+   423                                                       #
+   424         1         77.0     77.0      0.0          if mustDoubleSpikeWvfLen:
+   425         7       4702.0    671.7      0.0              for stIdx, st in enumerate(spikesBlock.filter(objects=SpikeTrain)):
+   426         6        524.0     87.3      0.0                  if st.waveforms.shape[-1] == originalSpikeWvfLen:
+   427         6        488.0     81.3      0.0                      st.waveforms = np.concatenate(
+   428                                                                   [
+   429         6       2472.0    412.0      0.0                              st.waveforms, np.zeros_like(st.waveforms)],
+   430         6      18647.0   3107.8      0.0                          axis=-1) * st.waveforms.units
+   431                                               #
+   432         1         81.0     81.0      0.0      if len(allSpikeTrains):
+   433         1         87.0     87.0      0.0          spikeMatBlock = ns5.calcBinarizedArray(
+   434         1      99138.0  99138.0      0.0              deepcopy(spikesBlock), samplingRate,
+   435         1        108.0    108.0      0.0              binnedSpikePath.format(arguments['analysisName']),
+   436         1   10259962.0 10259962.0      3.0              saveToFile=True)
+   437         1        102.0    102.0      0.0          newT = pd.Series(
+   438         1         85.0     85.0      0.0              spikeMatBlock.filter(
+   439         1     103444.0 103444.0      0.0                  objects=AnalogSignal)[0].times.magnitude)
+   440                                               else:
+   441                                                   dummyT = nspBlock.filter(objects=AnalogSignalProxy)[0]
+   442                                                   newT = pd.Series(
+   443                                                       np.arange(
+   444                                                           dummyT.t_start,
+   445                                                           dummyT.t_stop + 1/samplingRate,
+   446                                                           1/samplingRate))
+   447                                               #
+   448         1        150.0    150.0      0.0      etpJsonPath = './isiElectrodeProgramLookup.json'
+   449         1       2963.0   2963.0      0.0      if os.path.exists(etpJsonPath):
+   450         1      65300.0  65300.0      0.0          with open(etpJsonPath, 'r') as f:
+   451         1       1366.0   1366.0      0.0              electrodeToProgramLookup = json.load(f)
+   452         1        368.0    368.0      0.0              latestProgram = len(electrodeToProgramLookup.keys())
+   453                                               else:
+   454                                                   electrodeToProgramLookup = {}
+   455                                                   latestProgram = 0
+   456         1        148.0    148.0      0.0      if stimEvents is not None:
+   457         1        185.0    185.0      0.0          stimEvents.segment = spikesBlock.segments[0]
+   458         1        166.0    166.0      0.0          spikesBlock.segments[0].events.append(stimEvents)
+   459                                               # stimEvents.annotations['nominalWaveforms'] = np.vstack(allNominalWaveforms)
+   460         1        147.0    147.0      0.0      if len(allStimTrains):
+   461         2        260.0    130.0      0.0          for segIdx, dataSeg in enumerate(spikesBlock.segments):
+   462                                                       spikeList = [
+   463         1        144.0    144.0      0.0                  st
+   464         1       1181.0   1181.0      0.0                  for st in dataSeg.filter(objects=SpikeTrain)
+   465                                                           if '_stim' in st.name]
+   466                                                       stimRasters = [
+   467         1        144.0    144.0      0.0                  sr
+   468         1        216.0    216.0      0.0                  for sr in spikeMatBlock.segments[segIdx].analogsignals
+   469                                                           if '_stim' in sr.name]
+   470         1        150.0    150.0      0.0              stimRastersDF = ns5.analogSignalsToDataFrame(
+   471         1     223309.0 223309.0      0.1                  stimRasters, idxT='t', useChanNames=True)
+   472                                                       stimRastersDF.columns = [
+   473         1        246.0    246.0      0.0                  cn.replace('_stim#0_raster', '')
+   474         1       7460.0   7460.0      0.0                  for cn in stimRastersDF.columns]
+   475                                                       # trick to avoid double counting channels that are plugged into the same electrode
+   476         1         92.0     92.0      0.0              keepStimRasterList = []
+   477         7        674.0     96.3      0.0              for stIdx, st in enumerate(spikeList):
+   478         6        578.0     96.3      0.0                  chanName = st.unit.channel_index.name
+   479                                                           # matchingAsig = nspBlock.filter(objects=AnalogSignalProxy, name='seg0_' + chanName)
+   480                                                           # if len(matchingAsig):
+   481                                                           #     keepStimRasterList.append(chanName)
+   482         6        574.0     95.7      0.0                  keepStimRasterList.append(chanName)
+   483         1     501352.0 501352.0      0.1              stimActive = stimRastersDF[keepStimRasterList].sum(axis=1) > 0
+   484         1      19746.0  19746.0      0.0              activeTimes = stimRastersDF.loc[stimActive, 't']
+   485                                                       #
+   486         1         89.0     89.0      0.0              if stimEvents is not None:
+   487                                                           stimEvents[:] = (
+   488                                                               stimEvents.times -
+   489                                                               stimEvents.times[0] -
+   490         1       3572.0   3572.0      0.0                      20e-3 * pq.s +  # Fudge factor to account for delay between execution and matlab save
+   491         1       4057.0   4057.0      0.0                      activeTimes.min() * pq.s)
+   492         1      11673.0  11673.0      0.0                  stimEventsDF = pd.DataFrame(stimEvents.array_annotations)
+   493         1       8170.0   8170.0      0.0                  stimEventsDF['t'] = stimEvents.times
+   494         1        103.0    103.0      0.0                  stimEventsDF.to_csv(os.path.join(
+   495         1     262264.0 262264.0      0.1                      analysisSubFolder, ns5FileName + '_exported_stim_updates.csv'
+   496                                                               ))
+   497                                                       #
+   498         7        606.0     86.6      0.0              for stIdx, st in enumerate(spikeList):
+   499                                                           # annotate ripple stim spikes with info from json log
+   500         6        651.0    108.5      0.0                  chanName = st.unit.channel_index.name
+   501                                                           # matchingChIdx = nspBlock.filter(objects=ChannelIndex, name=chanName)
+   502                                                           # pdb.set_trace()
+   503         6      56728.0   9454.7      0.0                  rippleChanNum = int(mapDF.loc[mapDF['label'] == chanName, 'nevID'])
+   504         6        572.0     95.3      0.0                  if stimEvents is not None:
+   505                                                               # find which events in the stim log reference this spiketrain
+   506         6       1093.0    182.2      0.0                      thisStEventsMask = stimEvents.array_annotations['elec'] == rippleChanNum
+   507         6        568.0     94.7      0.0                      theseUpdates = pd.DataFrame({
+   508                                                                   k: v[thisStEventsMask]
+   509         6      67302.0  11217.0      0.0                          for k, v in stimEvents.array_annotations.items()
+   510                                                                   })
+   511         6      26984.0   4497.3      0.0                      theseUpdates.index = stimEvents[thisStEventsMask].times
+   512         6        535.0     89.2      0.0                      theseUpdates.index.name = 't'
+   513                                                               # NOTE: the line below is a workaround for an edge case where the same electrode is
+   514                                                               # requested twice in the same command, it should not be needed normally
+   515         6      34918.0   5819.7      0.0                      theseUpdates = theseUpdates.loc[~theseUpdates.index.duplicated(), :]
+   516                                                               # create entries for each pulse of the spiketrain
+   517         6        567.0     94.5      0.0                      newIndex = np.unique(np.concatenate([
+   518         6      18289.0   3048.2      0.0                          stimEvents[thisStEventsMask].times.magnitude,
+   519         6       7176.0   1196.0      0.0                          st.times.magnitude]))
+   520                                                               #  
+   521                                                               # updateTimes = pd.Series(theseUpdates.index)
+   522                                                               # nonMonotonicTimes = updateTimes.diff().fillna(1) <= 0
+   523                                                               # updateTimes[nonMonotonicTimes][0]
+   524                                                               # theseUpdate.loc[theseUpdates.index > updateTimes[nonMonotonicTimes][0], :]
+   525         6        500.0     83.3      0.0                      try:
+   526         6      35961.0   5993.5      0.0                          allUpdates = theseUpdates.reindex(newIndex, method='ffill')
+   527         6        617.0    102.8      0.0                          stAnnotations = allUpdates.loc[
+   528         6      54066.0   9011.0      0.0                              allUpdates.index.isin(st.times.magnitude), :]
+   529                                                               except Exception:
+   530                                                                   pdb.set_trace()
+   531                                                                   traceback.print_exc()
+   532                                                           #
+   533         6      15245.0   2540.8      0.0                  wvf = pd.DataFrame(np.atleast_2d(np.squeeze(st.waveforms)))
+   534         6      79136.0  13189.3      0.0                  wvfDiff = wvf.diff(-1, axis=1).fillna(0)
+   535         6      24046.0   4007.7      0.0                  wvfDiffAbs = wvfDiff.abs()
+   536         6        528.0     88.0      0.0                  if stimEvents is not None:
+   537         6      18453.0   3075.5      0.0                      lastValidIdx = int(stAnnotations['totalPW'].min() * 3e4) - 1
+   538         6      13681.0   2280.2      0.0                      idxPeak = int(stAnnotations['firstPW'].min() * 3e4)
+   539         6      25531.0   4255.2      0.0                      wvf.iloc[:, lastValidIdx:] = np.nan
+   540         6      29959.0   4993.2      0.0                      wvf.fillna(method='ffill', axis=1, inplace=True)
+   541         6      71903.0  11983.8      0.0                      wvfDiff = wvf.diff(-1, axis=1).fillna(0)
+   542         6      21203.0   3533.8      0.0                      wvfDiffAbs = wvfDiff.abs()
+   543                                                           else:
+   544                                                               rawMaxIdx = wvfDiffAbs.idxmax(axis=1)
+   545                                                               #
+   546                                                               if (rawMaxIdx > 2).any():
+   547                                                                   lastValidIdx, _ = stats.mode(
+   548                                                                       rawMaxIdx[rawMaxIdx > 2], axis=None)
+   549                                                                   lastValidIdx = int(lastValidIdx[-1]) - 2
+   550                                                               else:
+   551                                                                   lastValidIdx = wvf.shape[-1] - 1
+   552                                                               #
+   553                                                               print(
+   554                                                                   'On spikeTrain {}, last valid index is {}'
+   555                                                                   .format(st.name, lastValidIdx))
+   556                                                               #
+   557                                                               wvf.iloc[:, lastValidIdx:] = np.nan
+   558                                                               wvf.fillna(method='ffill', axis=1, inplace=True)
+   559                                                               wvfDiff = wvf.diff(-1, axis=1).fillna(0)
+   560                                                               wvfDiffAbs = wvfDiff.abs()
+   561                                                               #
+   562                                                               scaler = StandardScaler()
+   563                                                               scaler.fit(wvfDiffAbs.iloc[:, 1:lastValidIdx].to_numpy().reshape(-1, 1))
+   564                                                               transformWvfDiff = lambda x: np.squeeze(scaler.transform(x.reshape(-1, 1)))
+   565                                                               wvfDiffStd = wvfDiffAbs.apply(transformWvfDiff, axis=1, raw=True)
+   566                                                               # if arguments['plotting']:
+   567                                                               #     plt.plot(wvfDiffStd.T, 'o-'); plt.title('{} standardized abs diff'.format(st.name)); plt.show()
+   568                                                               # TODO: check if it's necessary to exclude some samples from being centered
+   569                                                               # samplesNeedFix = wvfDiffStd.abs().iloc[:, 0] > 0
+   570                                                               # print('{} out of {} samples need fixing'.format(samplesNeedFix.sum(), samplesNeedFix.size))
+   571                                                               # wvf.loc[samplesNeedFix, 0] = np.nan
+   572                                                               # wvf.fillna(method='bfill', axis=1, inplace=True)
+   573                                                               # wvfDiff.loc[samplesNeedFix, 0] = np.nan
+   574                                                               # wvfDiff.fillna(method='bfill', axis=1, inplace=True)
+   575                                                               # wvfDiffStd.loc[samplesNeedFix, 0] = np.nan
+   576                                                               # wvfDiffStd.fillna(method='bfill', axis=1, inplace=True)
+   577                                                               # wvf = wvf.apply(lambda x: x - x[0], axis=1, raw=True)
+   578                                                               allPeakIdx = wvfDiffStd.iloc[:, :lastValidIdx - 5].idxmax(axis=1)
+   579                                                               if (allPeakIdx > 2).any():
+   580                                                                   idxPeak, _ = stats.mode(allPeakIdx[allPeakIdx > 2], axis=None)
+   581                                                                   idxPeak = int(idxPeak[0])
+   582                                                               else:
+   583                                                                   idxPeak = int(lastValidIdx/2)
+   584                                                           #
+   585         6        538.0     89.7      0.0                  amplitudes = wvf.apply(
+   586         6        499.0     83.2      0.0                      lambda x: (x[idxPeak] - x[0]) * 1e-6,
+   587         6     262544.0  43757.3      0.1                      axis=1, raw=True).to_numpy() * pq.V
+   588         6        575.0     95.8      0.0                  st.annotations['amplitude'] = amplitudes
+   589         6       2496.0    416.0      0.0                  st.array_annotations['amplitude'] = amplitudes
+   590         6        496.0     82.7      0.0                  if 'arrayAnnNames' in st.annotations:
+   591                                                               st.annotations['arrayAnnNames'].append('amplitude')
+   592                                                           else:
+   593         6        482.0     80.3      0.0                      st.annotations['arrayAnnNames'] = ['amplitude']
+   594                                                           #
+   595         6       1750.0    291.7      0.0                  ampWithinSpec = np.abs(amplitudes) < 4
+   596                                                           #
+   597         6       4591.0    765.2      0.0                  plotMask = st.times > 0 # < 1360
+   598         6        612.0    102.0      0.0                  if arguments['plotting']:
+   599                                                               plt.plot(st.sampling_period * np.arange(wvf.shape[1]), wvf.iloc[plotMask, :].T * 1e-6, 'o-'); plt.title('{} fixed wvf peak at {}'.format(st.name, idxPeak*st.sampling_period)); plt.show()
+   600                                                               plt.plot(st.sampling_period * np.arange(wvf.shape[1]), (wvfDiffAbs).iloc[:, :].T * 1e-6, 'o-');
+   601                                                               plt.plot(st.sampling_period * np.arange(wvf.shape[1]), (wvfDiffAbs).iloc[:, :].mean().T * 1e-6, 'o-', lw=3); plt.title('{} fixed diff peak at {}'.format(st.name, idxPeak*st.sampling_period)); plt.show()
+   602         6        488.0     81.3      0.0                  if stimEvents is None:
+   603                                                               pws = amplitudes ** 0 * idxPeak * st.sampling_period
+   604                                                               st.annotations['firstPW'] = pws
+   605                                                               st.array_annotations['firstPW'] = pws
+   606                                                               st.annotations['arrayAnnNames'].append('firstPW')
+   607                                                               #
+   608                                                               secPws = amplitudes ** 0 * (lastValidIdx - idxPeak) * st.sampling_period
+   609                                                               st.annotations['secondPW'] = secPws
+   610                                                               st.array_annotations['secondPW'] = secPws
+   611                                                               st.annotations['arrayAnnNames'].append('secondPW')
+   612                                                               #
+   613                                                               # interPhases = 2 * amplitudes ** 0 * st.sampling_period
+   614                                                               # st.annotations['interPhase'] = interPhases
+   615                                                               # st.array_annotations['interPhase'] = interPhases
+   616                                                               # st.annotations['arrayAnnNames'].append('interPhase')
+   617                                                               #
+   618                                                               totalPws = pws + secPws
+   619                                                               st.annotations['totalPW'] = totalPws
+   620                                                               st.array_annotations['totalPW'] = totalPws
+   621                                                               st.annotations['arrayAnnNames'].append('totalPW')
+   622                                                               # try to estimate current
+   623                                                               matchingAsig = nspBlock.filter(objects=AnalogSignalProxy, name='seg0_' + chanName)
+   624                                                               if len(matchingAsig):
+   625                                                                   elecImpedance = (
+   626                                                                       impedancesRipple
+   627                                                                       .loc[impedancesRipple['elec'] == chanName, 'impedance'])
+   628                                                                   currents = amplitudes / (elecImpedance.iloc[0] * pq.kOhm)
+   629                                                                   st.annotations['nominalCurrent'] = currents
+   630                                                                   st.array_annotations['nominalCurrent'] = currents
+   631                                                                   if 'arrayAnnNames' in st.annotations:
+   632                                                                       st.annotations['arrayAnnNames'].append('nominalCurrent')
+   633                                                                   else:
+   634                                                                       st.annotations['arrayAnnNames'] = ['nominalCurrent']
+   635                                                           else:
+   636        54      63969.0   1184.6      0.0                      for annName in stAnnotations.drop('elec', axis='columns'):
+   637        48       3996.0     83.2      0.0                          st.annotations['arrayAnnNames'].append(annName)
+   638                                                                   st.annotations[annName] = (
+   639        48      32741.0    682.1      0.0                              stAnnotations[annName].to_numpy() *
+   640        48      13650.0    284.4      0.0                              eventUnits[annName])
+   641                                                                   st.array_annotations[annName] = (
+   642        48      11120.0    231.7      0.0                              stAnnotations[annName].to_numpy() *
+   643        48      22484.0    468.4      0.0                              eventUnits[annName])
+   644                                                       # detect stimulation trains
+   645         1         88.0     88.0      0.0              peakIdx, _, trainStartIdx, trainEndIdx = hf.findTrains(
+   646         1    2938785.0 2938785.0      0.9                  peakTimes=activeTimes, minDistance=5e-3, maxDistance=200e-3)
+   647                                                       #  
+   648         1       1795.0   1795.0      0.0              trainDurations = trainEndIdx - trainStartIdx
+   649                                                       #
+   650         1         93.0     93.0      0.0              if len(trainStartIdx):
+   651         1         80.0     80.0      0.0                  startCategories = pd.DataFrame(
+   652         1      21276.0  21276.0      0.0                      activeTimes[trainStartIdx].to_numpy(),
+   653                                                               # index=range(activeTimes[trainStartIdx].size),
+   654         1       7021.0   7021.0      0.0                      columns=['t'])
+   655         1         97.0     97.0      0.0                  startCategories = startCategories.reindex(columns=[
+   656                                                               # 'amplitude',
+   657         1         81.0     81.0      0.0                      'nominalCurrent', 'program',
+   658         1         79.0     79.0      0.0                      'activeGroup', 'firstPW', 'secondPW',
+   659                                                               # 'interPhase',
+   660         1         78.0     78.0      0.0                      'totalPW', 'electrode',
+   661         1      10660.0  10660.0      0.0                      'RateInHz', 'stimPeriod', 'trainDur', 't'])
+   662                                                           #
+   663         1         93.0     93.0      0.0                  for idx, (idxStart, idxEnd) in enumerate(
+   664       291      35917.0    123.4      0.0                          zip(trainStartIdx, trainEndIdx)):
+   665                                                               stimRasterRow = (
+   666       290      30489.0    105.1      0.0                          stimRastersDF
+   667       290    4710748.0  16244.0      1.4                          .loc[idxStart, keepStimRasterList])
+   668       290    1512863.0   5216.8      0.4                      activeChans = stimRasterRow.index[stimRasterRow > 0]
+   669       290      36902.0    127.2      0.0                      if not activeChans.empty:
+   670       290      29095.0    100.3      0.0                          stimRasterAmplitude = pd.Series(
+   671       290     629152.0   2169.5      0.2                              np.nan, index=activeChans)
+   672       290      29453.0    101.6      0.0                          stimRasterCurrent = pd.Series(
+   673       290     572517.0   1974.2      0.2                              np.nan, index=activeChans)
+   674       580     140054.0    241.5      0.0                          for activeChanIdx, activeChan in enumerate(activeChans):
+   675                                                                       st = [
+   676       290      28922.0     99.7      0.0                                  i
+   677       290      50074.0    172.7      0.0                                  for i in spikeList
+   678       290      28658.0     98.8      0.0                                  if i.unit.channel_index.name == activeChan][0]
+   679                                                                       theseTimesMask = (
+   680       290     217593.0    750.3      0.1                                  (st.times >= (
+   681       290     207708.0    716.2      0.1                                      stimRastersDF.loc[idxStart, 't'] * pq.s -
+   682       290    1709969.0   5896.4      0.5                                      1.1 * samplingRate ** (-1) / 2)) &
+   683       290     142543.0    491.5      0.0                                  (st.times <= (
+   684       290     180288.0    621.7      0.1                                      stimRastersDF.loc[idxEnd, 't'] * pq.s +
+   685       290    1579337.0   5446.0      0.5                                      1.1 * samplingRate ** (-1) / 2))
+   686                                                                           )
+   687       290     162006.0    558.6      0.0                              theseTimes = st.times[theseTimesMask]
+   688       290      58827.0    202.9      0.0                              if not theseTimesMask.sum():
+   689                                                                           pdb.set_trace()
+   690       290      29245.0    100.8      0.0                              stimRasterAmplitude[activeChan] = np.mean(
+   691       290     287794.0    992.4      0.1                                  st.annotations['amplitude'][theseTimesMask])
+   692       290      29482.0    101.7      0.0                              stimRasterCurrent[activeChan] = np.mean(
+   693       290     192258.0    663.0      0.1                                  st.annotations['nominalCurrent'][theseTimesMask])
+   694       290      29135.0    100.5      0.0                              if activeChanIdx == 0:
+   695       290      28523.0     98.4      0.0                                  if stimEvents is None:
+   696                                                                               if theseTimes.size == 1:
+   697                                                                                   startCategories.loc[
+   698                                                                                       idx, 'trainDur'] = 0
+   699                                                                                   startCategories.loc[
+   700                                                                                       idx, 'RateInHz'] = 0
+   701                                                                                   startCategories.loc[
+   702                                                                                       idx, 'stimPeriod'] = 1000
+   703                                                                               else:
+   704                                                                                   startCategories.loc[
+   705                                                                                       idx, 'trainDur'] = (
+   706                                                                                           theseTimes[-1] -
+   707                                                                                           theseTimes[0])
+   708                                                                                   # stimPeriod = np.round(np.diff(theseTimes).median(), decimals=6)
+   709                                                                                   stimPeriod = np.round(np.median(np.diff(theseTimes)), decimals=6)
+   710                                                                                   # stimPeriod = np.median(np.diff(theseTimes))
+   711                                                                                   # pdb.set_trace()
+   712                                                                                   startCategories.loc[
+   713                                                                                       idx, 'stimPeriod'] = stimPeriod
+   714                                                                                   startCategories.loc[
+   715                                                                                       idx, 'RateInHz'] = stimPeriod ** -1
+   716                                                                           else:
+   717       290     471983.0   1627.5      0.1                                      nominalRate = np.median(st.annotations['RateInHz'][theseTimesMask])
+   718       290      30631.0    105.6      0.0                                      if len(theseTimes) > 1:
+   719       290     794954.0   2741.2      0.2                                          observedRate = np.median(np.diff(theseTimes)) ** (-1)
+   720                                                                               else:
+   721                                                                                   observedRate = 3 / pq.s
+   722       290      31247.0    107.7      0.0                                      try:
+   723       290    1353467.0   4667.1      0.4                                          rateMismatch = np.abs(nominalRate - observedRate)
+   724                                                                               except:
+   725                                                                                   pdb.set_trace()
+   726       290      46623.0    160.8      0.0                                      if not rateMismatch < 1e-6:
+   727                                                                                   print(
+   728                                                                                       'Rate mismatch warning on {} at time {}: off by {} Hz'
+   729                                                                                       .format(st.name, theseTimes[0], rateMismatch))
+   730       290     162439.0    560.1      0.0                                      nominalTrainDur = np.mean(st.annotations['trainDur'][theseTimesMask])
+   731       290     351487.0   1212.0      0.1                                      observedTrainDur = (theseTimes[-1] - theseTimes[0])
+   732       290     324473.0   1118.9      0.1                                      if not np.abs(nominalTrainDur - observedTrainDur) < 1e-6:
+   733                                                                                   print('train Dur Warning on {} at time {}'.format(st.name, theseTimes[0]))
+   734                                                                               # assert np.diff(theseTimes).mean()
+   735       290    2457492.0   8474.1      0.7                                      startCategories.loc[idx, 'trainDur'] = nominalTrainDur
+   736       290    2319392.0   7997.9      0.7                                      startCategories.loc[idx, 'RateInHz'] = nominalRate
+   737       290    2436018.0   8400.1      0.7                                      startCategories.loc[idx, 'stimPeriod'] = nominalRate ** -1
+   738                                                                           startCategories.loc[
+   739       290      32823.0    113.2      0.0                                      idx, 'secondPW'] = np.round(np.mean(
+   740       290    2548263.0   8787.1      0.8                                          st.annotations['secondPW'][theseTimesMask]), decimals=9)
+   741                                                                           startCategories.loc[
+   742       290      32899.0    113.4      0.0                                      idx, 'firstPW'] = np.round(np.mean(
+   743       290    2556159.0   8814.3      0.8                                          st.annotations['firstPW'][theseTimesMask]), decimals=9)
+   744                                                                           # startCategories.loc[
+   745                                                                           #     idx, 'interPhase'] = np.round(np.mean(
+   746                                                                           #         st.annotations['interPhase'][theseTimesMask]), decimals=9)
+   747                                                                           startCategories.loc[
+   748       290      32673.0    112.7      0.0                                      idx, 'totalPW'] = np.round(np.mean(
+   749       290    2555805.0   8813.1      0.8                                          st.annotations['totalPW'][theseTimesMask]), decimals=9)
+   750       290    2113309.0   7287.3      0.6                          startCategories.loc[idx, 'activeGroup'] = 1
+   751       290      31835.0    109.8      0.0                          electrodeShortHand = ''
+   752       290    1307225.0   4507.7      0.4                          negativeAmps = stimRasterCurrent < 0
+   753                                                                   #
+   754       290     433023.0   1493.2      0.1                          if (negativeAmps).any():
+   755       290      30914.0    106.6      0.0                              electrodeShortHand += '-'
+   756       290    1743702.0   6012.8      0.5                              totalCathode = stimRasterCurrent[negativeAmps].sum()
+   757       290    2184731.0   7533.6      0.6                              startCategories.loc[idx, 'nominalCurrent'] = totalCathode
+   758       290      31916.0    110.1      0.0                              averageImpedance = np.mean(
+   759       290      59763.0    206.1      0.0                                  impedancesRipple.loc[impedancesRipple['elec'].isin(
+   760       290    3880904.0  13382.4      1.2                                      stimRasterCurrent[negativeAmps].index), 'impedance'])
+   761                                                                       # startCategories.loc[idx, 'amplitude'] = totalCathode * averageImpedance
+   762                                                                       # pdb.set_trace()
+   763       580    1228151.0   2117.5      0.4                              for cName in stimRasterCurrent[negativeAmps].index:
+   764       290      32776.0    113.0      0.0                                  if cName[:-2] not in electrodeShortHand:
+   765       290      30665.0    105.7      0.0                                      electrodeShortHand += cName[:-2]
+   766       290    1267325.0   4370.1      0.4                          positiveAmps = stimRasterCurrent > 0
+   767       290     422405.0   1456.6      0.1                          if (positiveAmps).any():
+   768                                                                       electrodeShortHand += '+'
+   769                                                                       totalAnode = stimRasterCurrent[positiveAmps].sum()
+   770                                                                       for cName in stimRasterCurrent[positiveAmps].index:
+   771                                                                           if cName[:-2] not in electrodeShortHand:
+   772                                                                               electrodeShortHand += cName[:-2]
+   773                                                                       if np.isnan(startCategories.loc[idx, 'nominalCurrent']):
+   774                                                                           startCategories.loc[idx, 'nominalCurrent'] = totalAnode
+   775       290    2409339.0   8308.1      0.7                          startCategories.loc[idx, 'electrode'] = electrodeShortHand
+   776       290      32895.0    113.4      0.0                          if (electrodeShortHand not in electrodeToProgramLookup):
+   777         1        130.0    130.0      0.0                              electrodeToProgramLookup[electrodeShortHand] = latestProgram
+   778         1        131.0    131.0      0.0                              latestProgram += 1
+   779       290    2126978.0   7334.4      0.6                          startCategories.loc[idx, 'program'] = electrodeToProgramLookup[electrodeShortHand]
+   780                                                           #
+   781         1         89.0     89.0      0.0                  currCats = pd.cut(
+   782         1        738.0    738.0      0.0                      startCategories['nominalCurrent'],
+   783         1      59158.0  59158.0      0.0                      np.arange(-2, 2, 0.2))
+   784         1      17505.0  17505.0      0.0                  startCategories['nominalCurrentCat'] = currCats.astype('str')
+   785         1       4015.0   4015.0      0.0                  startCategories['RateInHz'] = np.round(startCategories['RateInHz'], decimals=6)
+   786         1       4811.0   4811.0      0.0                  stopCategories = startCategories.copy()
+   787                                                           #
+   788                                                           stopCategories['t'] = (
+   789         1      21167.0  21167.0      0.0                      activeTimes[trainEndIdx].to_numpy() +
+   790                                                               (
+   791         1        943.0    943.0      0.0                          stopCategories['firstPW'] +
+   792                                                                   # stopCategories['interPhase'] +
+   793         1       3233.0   3233.0      0.0                          stopCategories['secondPW']
+   794         1       3425.0   3425.0      0.0                      ).to_numpy() * 1e-6)
+   795                                                           # maxAmp = startCategories['amplitude'].max()
+   796                                                           # minAmp = startCategories['amplitude'].min()
+   797                                                           # ampBinRes = 0.2
+   798                                                           # ampBins = np.arange(
+   799                                                           #     (np.floor(minAmp / ampBinRes) - 1) * ampBinRes,
+   800                                                           #     (np.ceil(maxAmp / ampBinRes) + 1) * ampBinRes,
+   801                                                           #     ampBinRes)
+   802                                                           # ampBins[0] -= 0.01
+   803                                                           # ampBins[-1] += 0.01
+   804                                                           # ampCats = pd.cut(startCategories['amplitude'], ampBins)
+   805                                                           # startCategories['amplitudeCat'] = ampCats.astype(np.str)
+   806                                                           # stopCategories['amplitudeCat'] = ampCats.astype(np.str)
+   807         1       6936.0   6936.0      0.0                  startCategories['stimCat'] = 'stimOn'
+   808         1       6565.0   6565.0      0.0                  stopCategories['stimCat'] = 'stimOff'
+   809         1      26009.0  26009.0      0.0                  startCategories.dropna(inplace=True)
+   810         1      25379.0  25379.0      0.0                  stopCategories.dropna(inplace=True)
+   811                                                   #
+   812         1       3152.0   3152.0      0.0          with open(etpJsonPath, 'w') as f:
+   813         1       3503.0   3503.0      0.0              json.dump(electrodeToProgramLookup, f)
+   814         1         96.0     96.0      0.0          alignEventsDF = pd.concat((
+   815         1         84.0     84.0      0.0              startCategories, stopCategories),
+   816         1      46498.0  46498.0      0.0              axis=0, ignore_index=True, sort=True)
+   817                                                   # remove events outside manually identified time bounds
+   818         1         89.0     89.0      0.0          if alignTimeBounds is not None:
+   819                                                       keepMask = pd.Series(False, index=alignEventsDF.index)
+   820                                                       for atb in alignTimeBounds:
+   821                                                           keepMask = (
+   822                                                               keepMask |
+   823                                                               (
+   824                                                                   (alignEventsDF['t'] >= atb[0]) &
+   825                                                                   (alignEventsDF['t'] <= atb[1])))
+   826                                                   else:
+   827         1       1970.0   1970.0      0.0              keepMask = pd.Series(True, index=alignEventsDF.index)
+   828         1         85.0     85.0      0.0          alignEventsDF.drop(
+   829         1      22149.0  22149.0      0.0              index=alignEventsDF.index[~keepMask], inplace=True)
+   830                                                   #
+   831         1        206.0    206.0      0.0          if not alignEventsDF.empty:
+   832         1      16098.0  16098.0      0.0              alignEventsDF.sort_values('t', inplace=True, kind='mergesort')
+   833         1        102.0    102.0      0.0              alignEvents = ns5.eventDataFrameToEvents(
+   834         1         81.0     81.0      0.0                  alignEventsDF, idxT='t',
+   835         1         81.0     81.0      0.0                  annCol=None,
+   836         1         90.0     90.0      0.0                  eventName='seg{}_stimAlignTimes'.format(segIdx),
+   837         1      48044.0  48044.0      0.0                  tUnits=pq.s, makeList=False)
+   838         1        146.0    146.0      0.0              alignEvents.annotate(nix_name=alignEvents.name)
+   839                                                       #
+   840         1         81.0     81.0      0.0              concatLabelsDF = alignEventsDF
+   841         1         83.0     83.0      0.0              concatLabels = np.array([
+   842         1         83.0     83.0      0.0                  '{}'.format(row)
+   843         1    6182729.0 6182729.0      1.8                  for rowIdx, row in concatLabelsDF.iterrows()])
+   844         1         98.0     98.0      0.0              concatEvents = Event(
+   845         1        106.0    106.0      0.0                  name='seg{}_stimAlignTimesConcatenated'.format(segIdx),
+   846         1        977.0    977.0      0.0                  times=alignEvents.times,
+   847         1       4699.0   4699.0      0.0                  labels=concatLabels
+   848                                                           )
+   849         1        106.0    106.0      0.0              dataSeg.events.append(alignEvents)
+   850         1         83.0     83.0      0.0              dataSeg.events.append(concatEvents)
+   851         1         82.0     82.0      0.0              alignEvents.segment = dataSeg
+   852         1         81.0     81.0      0.0              concatEvents.segment = dataSeg
+   853                                               #  Delete stim trains, because they won't be consistent across assembled files
+   854                                               # if len(allStimTrains):
+   855                                               #     for seg in spikesBlock.segments:
+   856                                               #         for st in allStimTrains:
+   857                                               #             if st in seg.spiketrains:
+   858                                               #                 seg.spiketrains.remove(st)
+   859                                               #     allStimUnits = [un for un in spikesBlock.filter(objects=Unit) if '_stim' in un.name]
+   860                                               #     del allStimTrains
+   861                                               #     # delChanIndices = []
+   862                                               #     for chIdx in spikesBlock.channel_indexes:
+   863                                               #         for stUn in allStimUnits:
+   864                                               #             if stUn in chIdx.units:
+   865                                               #                 chIdx.units.remove(stUn)
+   866                                               #     del allStimUnits
+   867                                               #
+   868                                               #
+   869         1       6003.0   6003.0      0.0      aSigList = tdBlock.filter(objects=AnalogSignal)
+   870         1    6444748.0 6444748.0      1.9      tdDF = ns5.analogSignalsToDataFrame(aSigList)
+   871         1        151.0    151.0      0.0      currentSamplingRate = aSigList[0].sampling_rate
+   872                                               #
+   873         1       1510.0   1510.0      0.0      if samplingRate != currentSamplingRate:
+   874         1        879.0    879.0      0.0          print("Reinterpolating...")
+   875         1        103.0    103.0      0.0          tdInterp = hf.interpolateDF(
+   876         1         83.0     83.0      0.0              tdDF, newT,
+   877         1         80.0     80.0      0.0              kind='linear', fill_value=(0, 0),
+   878         1  144999109.0 144999109.0     43.1              x='t', columns=tdChanNames, verbose=arguments['verbose'])
+   879                                               else:
+   880                                                   tdInterp = tdDF
+   881                                               #
+   882         1        788.0    788.0      0.0      emgCols = [cn for cn in tdInterp.columns if 'Emg' in cn]
+   883         1         88.0     88.0      0.0      if len(emgCols):
+   884                                                   # fix for bug affecting the mean of the channel
+   885         1         81.0     81.0      0.0          if alignTimeBounds is not None:
+   886                                                       keepMaskAsig = pd.Series(False, index=tdInterp.index)
+   887                                                       for atb in alignTimeBounds:
+   888                                                           keepMaskAsig = (
+   889                                                               keepMaskAsig |
+   890                                                               (
+   891                                                                   (tdInterp['t'] >= atb[0]) &
+   892                                                                   (tdInterp['t'] <= atb[1])))
+   893                                                   else:
+   894         1       3058.0   3058.0      0.0              keepMaskAsig = pd.Series(True, index=tdInterp.index)
+   895         1         95.0     95.0      0.0          sosHP = signal.butter(
+   896         1         80.0     80.0      0.0              2, 40, 'high',
+   897         1      10928.0  10928.0      0.0              fs=float(samplingRate), output='sos')
+   898         1         96.0     96.0      0.0          cornerFrequencyLP = 40
+   899         1         96.0     96.0      0.0          sosLP = signal.butter(
+   900         1         90.0     90.0      0.0              2, cornerFrequencyLP, 'low',
+   901         1       7456.0   7456.0      0.0              fs=float(samplingRate), output='sos')
+   902                                                   if False:
+   903                                                       t = np.arange(0, .1, samplingRate.magnitude ** (-1))
+   904                                                       x = np.zeros_like(t)
+   905                                                       x[int(x.size/2)] = 1
+   906                                                       y = signal.sosfiltfilt(sosLP, x)
+   907                                                       plt.plot(t, y); plt.show()
+   908                                                   # weird units hack, TODO check
+   909         1    2129370.0 2129370.0      0.6          tdInterp.loc[:, emgCols] = tdInterp.loc[:, emgCols] * 1e6
+   910         1        132.0    132.0      0.0          preprocEmg = signal.sosfiltfilt(
+   911         1         90.0     90.0      0.0              sosHP,
+   912                                                       (
+   913         1     185116.0 185116.0      0.1                  tdInterp.loc[:, emgCols] -
+   914         1        113.0    113.0      0.0                  tdInterp
+   915         1     610049.0 610049.0      0.2                  .loc[keepMaskAsig, emgCols]
+   916         1    5920899.0 5920899.0      1.8                  .median(axis=0)).to_numpy(), axis=0
+   917                                                       )
+   918                                                   # 
+   919         1        258.0    258.0      0.0          procNames = [eN.replace('Emg', 'EmgEnv') for eN in emgCols]
+   920         1        102.0    102.0      0.0          emgEnvDF = pd.DataFrame(
+   921         1         95.0     95.0      0.0              signal.sosfiltfilt(
+   922         1    2732710.0 2732710.0      0.8                  sosLP, np.abs(preprocEmg), axis=0),
+   923         1      10137.0  10137.0      0.0              columns=procNames
+   924                                                       )
+   925                                                   # pdb.set_trace()
+   926         1     473466.0 473466.0      0.1          tdInterp = pd.concat([tdInterp, emgEnvDF], axis=1)
+   927                                                   # for cName in emgCols:
+   928                                                   #     procName = cName.replace('Emg', 'EmgEnv')
+   929                                                   #     # weird units hack, TODO check
+   930                                                   #     tdInterp.loc[:, cName] = tdInterp.loc[:, cName] * 1e6
+   931                                                   #     preprocEmg = signal.sosfiltfilt(
+   932                                                   #         sosHP,
+   933                                                   #         (tdInterp[cName] - tdInterp.loc[keepMaskAsig, cName].median()).to_numpy())
+   934                                                   #     # 
+   935                                                   #     tdInterp[procName] = signal.sosfiltfilt(
+   936                                                   #         sosLP, np.abs(preprocEmg))
+   937                                                   #     # break
+   938                                                   #     # if True:
+   939                                                   #     #     plt.plot(tdInterp.loc[keepMaskAsig, cName])
+   940                                                   #     #     plt.plot(tdInterp.loc[keepMaskAsig, procName])
+   941                                                   #     #     plt.show()
+   942                                                   #     tdChanNames.append(procName)
+   943                                                   #     #
+   944                                               ## moved to cleaning scripts
+   945                                               '''
+   946                                               if len(allStimTrains):
+   947                                                   # fill in blank period
+   948                                                   stimMask = (stimRastersDF.drop(columns='t') > 0).any(axis='columns')
+   949                                                   # blankingDur = 0.5e-3 + np.round(stAnnotations['totalPW'].max(), decimals=3) - 2 * currentSamplingRate.magnitude ** (-1)
+   950                                                   # blankingDur = stAnnotations['totalPW'].max() + 5 * currentSamplingRate.magnitude ** (-1)
+   951                                                   blankingDur = stAnnotations['totalPW'].max()
+   952                                                   #  TODO: get fixed part from metadata and make robust to
+   953                                                   #  different blanks per stim config stAnnotations['secondPW']
+   954                                                   kernelT = np.arange(
+   955                                                       # -blankingDur,
+   956                                                       -blankingDur + currentSamplingRate.magnitude ** (-1),
+   957                                                       # blankingDur,
+   958                                                       blankingDur + currentSamplingRate.magnitude ** (-1),
+   959                                                       currentSamplingRate.magnitude ** (-1))
+   960                                                   kernel = np.zeros_like(kernelT)
+   961                                                   kernel[kernelT > 0] = 1
+   962                                                   blankMask = (
+   963                                                       np.convolve(kernel, stimMask, 'same') > 0)[:tdInterp.shape[0]]
+   964                                                   checkBlankMask = False
+   965                                                   if checkBlankMask:
+   966                                                       plotIdx = slice(2000000, 2020000)
+   967                                                       fig, ax = plt.subplots()
+   968                                                       twAx = ax.twinx()
+   969                                                       ax.plot(
+   970                                                           tdInterp['t'].iloc[plotIdx],
+   971                                                           tdInterp.iloc[plotIdx, 1], 'b.-', lw=2)
+   972                                                   spinalLfpChans = [
+   973                                                       cN
+   974                                                       for cN in tdInterp.columns
+   975                                                       if 'rostral' in cN or 'caudal' in cN]
+   976                                                   # tdInterp.loc[
+   977                                                   #     blankMask, spinalLfpChans] = np.nan
+   978                                                   # tdInterp.interpolate(axis=0, method='cubic', inplace=True)
+   979                                                   # tdInterp.loc[
+   980                                                   #     blankMask, spinalLfpChans] = 0
+   981                                                   if checkBlankMask:
+   982                                                       ax.plot(
+   983                                                           tdInterp['t'].iloc[plotIdx],
+   984                                                           tdInterp.iloc[plotIdx, 1].interpolate(axis=0, method='cubic'), 'g--', lw=2)
+   985                                                       twAx.plot(
+   986                                                           tdInterp['t'].iloc[plotIdx],
+   987                                                           blankMask[plotIdx], 'r')
+   988                                                       plt.show()
+   989                                               '''
+   990                                               #
+   991                                               #
+   992         1       7436.0   7436.0      0.0      tdInterp.columns = [i.replace('seg0_', '') for i in tdInterp.columns]
+   993         1    1569149.0 1569149.0      0.5      tdInterp.sort_index(axis='columns', inplace=True)
+   994         1        117.0    117.0      0.0      tdBlockInterp = ns5.dataFrameToAnalogSignals(
+   995         1         91.0     91.0      0.0          tdInterp,
+   996         1         90.0     90.0      0.0          idxT='t', useColNames=True, probeName='',
+   997         1     624285.0 624285.0      0.2          dataCol=tdInterp.drop(columns='t').columns,
+   998         1    1458260.0 1458260.0      0.4          samplingRate=samplingRate, verbose=arguments['verbose'])
+   999                                               #
+  1000        31      21132.0    681.7      0.0      for aSig in tdBlockInterp.filter(objects=AnalogSignal):
+  1001        30       3779.0    126.0      0.0          chName = aSig.channel_index.name
+  1002        30     366486.0  12216.2      0.1          chIdxList = spikesBlock.filter(objects=ChannelIndex, name=chName)
+  1003        30       3759.0    125.3      0.0          if not len(chIdxList):
+  1004        30       3688.0    122.9      0.0              lastIndex = len(spikesBlock.channel_indexes)
+  1005        30       3658.0    121.9      0.0              if len(spikesBlock.channel_indexes[-1].channel_ids):
+  1006        29       3891.0    134.2      0.0                  lastID = spikesBlock.channel_indexes[-1].channel_ids[0] + 1
+  1007                                                       else:
+  1008         1        157.0    157.0      0.0                  lastID = 1
+  1009        30       3463.0    115.4      0.0              chIdx = ChannelIndex(
+  1010        30       3455.0    115.2      0.0                  index=[lastIndex],
+  1011        30       3600.0    120.0      0.0                  channel_names=[chName],
+  1012        30       3439.0    114.6      0.0                  channel_ids=[lastID],
+  1013        30       3436.0    114.5      0.0                  name=chName,
+  1014        30      16167.0    538.9      0.0                  file_origin=spikesBlock.channel_indexes[-1].file_origin
+  1015                                                           )
+  1016        30       6180.0    206.0      0.0              chIdx.merge_annotations(spikesBlock.channel_indexes[-1])
+  1017        30       3557.0    118.6      0.0              spikesBlock.channel_indexes.append(chIdx)
+  1018                                                   else:
+  1019                                                       chIdx = chIdxList[0]
+  1020        30       3542.0    118.1      0.0          chIdx.analogsignals.append(aSig)
+  1021        30       3513.0    117.1      0.0          aSig.channel_index = chIdx
+  1022        30       3496.0    116.5      0.0          segName = aSig.segment.name
+  1023        30     370566.0  12352.2      0.1          segList = spikesBlock.filter(objects=Segment, name=segName)
+  1024        30       3507.0    116.9      0.0          seg=segList[0]
+  1025        30       3533.0    117.8      0.0          seg.analogsignals.append(aSig)
+  1026        30       3431.0    114.4      0.0          aSig.segment = seg
+  1027                                               #
+  1028         1      22305.0  22305.0      0.0      spikesBlock = ns5.purgeNixAnn(spikesBlock)
+  1029                                               #
+  1030         1      11303.0  11303.0      0.0      spikesBlock.create_relationship()
+  1031         1        120.0    120.0      0.0      outPathName = analysisDataPath.format(arguments['analysisName'])
+  1032         1       1380.0   1380.0      0.0      if os.path.exists(outPathName):
+  1033         1      71872.0  71872.0      0.0          os.remove(outPathName)
+  1034         1      83383.0  83383.0      0.0      writer = neo.io.NixIO(filename=outPathName)
+  1035         1   44311511.0 44311511.0     13.2      writer.write_block(spikesBlock, use_obj_names=True)
+  1036         1     960839.0 960839.0      0.3      writer.close()
+  1037         1        150.0    150.0      0.0      if arguments['commitResults']:
+  1038                                                   analysisProcessedSubFolder = os.path.join(
+  1039                                                       processedFolder, arguments['analysisName']
+  1040                                                       )
+  1041                                                   if not os.path.exists(analysisProcessedSubFolder):
+  1042                                                       os.makedirs(analysisProcessedSubFolder, exist_ok=True)
+  1043                                                   processedOutPath = os.path.join(
+  1044                                                       analysisProcessedSubFolder, ns5FileName + '_analyze.nix')
+  1045                                                   shutil.copyfile(outPathName, processedOutPath)
+  1046                                                   outPathNameBin = outPathName.replace('_analyze.nix', '_binarized.nix')
+  1047                                                   processedOutPathBin = os.path.join(
+  1048                                                       analysisProcessedSubFolder, ns5FileName + '_binarized.nix')
+  1049                                                   shutil.copyfile(outPathNameBin, processedOutPathBin)
+  1050                                               # ns5.addBlockToNIX(
+  1051                                               #     tdBlockInterp, neoSegIdx=[0],
+  1052                                               #     writeSpikes=False, writeEvents=False,
+  1053                                               #     purgeNixNames=False,
+  1054                                               #     fileName=ns5FileName + '_analyze',
+  1055                                               #     folderPath=analysisSubFolder,
+  1056                                               #     nixBlockIdx=0, nixSegIdx=[0],
+  1057                                               #     )
+  1058         1        126.0    126.0      0.0      return
+

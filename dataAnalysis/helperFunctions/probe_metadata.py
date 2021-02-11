@@ -65,7 +65,9 @@ def mapToDF(arrayFilePath):
             'xcoords', 'ycoords', 'zcoords', 'elecName',
             'elecID', 'label', 'bank', 'bankID', 'nevID']
         )
-    bankLookup = {'A.1': 0, 'A.2': 1, 'A.3': 2}
+    bankLookup = {
+        'A.1': 0, 'A.2': 1, 'A.3': 2,
+        'B.1': 4, 'B.2': 5, 'B.3': 6}
     for rowIdx, row in arrayMap.iterrows():
         processor, port, FEslot, channel = row['FE'].split('.')
         bankName = '{}.{}'.format(port, FEslot)

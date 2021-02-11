@@ -53,9 +53,10 @@ import atexit
 delsysPath = os.path.join(
     nspFolder, ns5FileName + '.csv')
 
-
+@profile
 def preprocDelsysWrapper():
     headerDataList = []
+    print('Loading header from {} ...'.format(delsysPath))
     with open(delsysPath, 'r') as f:
         expr = r'Label: ([\S\s]+) Sampling frequency: ([\S\s]+) Number of points: ([\S\s]+) start: ([\S\s]+) Unit: ([\S\s]+) Domain Unit: ([\S\s]+)\n'
         delimIdx = 0
@@ -76,6 +77,7 @@ def preprocDelsysWrapper():
     headerData = pd.DataFrame(headerDataList)
     samplingRate = np.round(headerData['fs'].max())
     #
+    print('Loading raw data from {} ...'.format(delsysPath))
     rawData = pd.read_csv(delsysPath, skiprows=delimIdx, low_memory=False)
     # for idx, cName in enumerate(rawData.columns): print('{}: {}'.format(idx, cName))
     domainCols = [cName for cName in rawData.columns if 'X[' in cName]
