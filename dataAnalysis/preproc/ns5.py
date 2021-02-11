@@ -815,6 +815,7 @@ def unitSpikeTrainWaveformsToDF(
                 else:
                     v = np.asarray(values)
                 annDict.update({k: v})
+            pdb.set_trace()
             #
             skipAnnNames = (
                 st.annotations['arrayAnnNames'] +

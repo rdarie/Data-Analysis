@@ -146,11 +146,16 @@ else:
         makeControlProgram=True,
         metaDataToCategories=False))
 #
+requiredAnns = [
+    'RateInHz', 'feature', 'electrode', 'program',
+    arguments['amplitudeFieldName'],
+    'stimCat', 'originalIndex', 'segment', 't']
+if groupPagesBy is not None:
+    for annNm in groupPagesBy:
+        if annNm not in requiredAnns:
+            requiredAnns.append(annNm)
 alignedAsigsKWargs.update(dict(
-    getMetaData=[
-        'RateInHz', 'feature', 'electrode', 'program',
-        arguments['amplitudeFieldName'],
-        'stimCat', 'originalIndex', 'segment', 't'],
+    getMetaData=requiredAnns,
     transposeToColumns='bin', concatOn='index'))
 alignedAsigsKWargs['procFun'] = ash.genDetrender(timeWindow=(-200e-3, -100e-3))
 #
