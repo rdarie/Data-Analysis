@@ -13,8 +13,8 @@
 #SBATCH -J plotsStim
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-plotsStim.stdout
-#SBATCH -e ../../batch_logs/%j-plotsStim.errout
+#SBATCH -o ../../batch_logs/%j-plotsStim.out
+#SBATCH -e ../../batch_logs/%j-plotsStim.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -46,9 +46,9 @@ SELECTOR=""
 WINDOW="--window=XS"
 # WINDOW="--window=XXS"
 #
-TRIALSELECTOR="--processAll"
-# TRIALSELECTOR="--blockIdx=3"
-# TRIALSELECTOR="--blockIdx=1"
+BLOCKSELECTOR="--processAll"
+# BLOCKSELECTOR="--blockIdx=3"
+# BLOCKSELECTOR="--blockIdx=1"
 #
 # ANALYSISSELECTOR="--analysisName=loRes"
 # ANALYSISSELECTOR="--analysisName=parameter_recovery"
@@ -73,8 +73,8 @@ BLOCKSELECTOR="--inputBlockName=emg"
 
 # --maskOutlierBlocks --invertOutlierBlocks --individualTraces
 
-# python3 -u './plotRippleStimSpikeReport.py' --exp=$EXP $TRIALSELECTOR $WINDOW $UNITSELECTOR $ANALYSISSELECTOR --alignQuery="stimOn" --alignFolderName=stim $BLOCKSELECTOR --groupPagesBy="electrode, RateInHz" --maskOutlierBlocks
+# python -u './plotRippleStimSpikeReport.py' --exp=$EXP $BLOCKSELECTOR $WINDOW $UNITSELECTOR $ANALYSISSELECTOR --alignQuery="stimOn" --alignFolderName=stim $BLOCKSELECTOR --groupPagesBy="electrode, RateInHz" --maskOutlierBlocks
 #  --maskOutlierBlocks
-python3 -u './plotAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR $BLOCKSELECTOR $UNITSELECTOR --alignQuery="stimOn" --rowName="electrode" --rowControl= --colName="RateInHz" --colControl= --hueName="nominalCurrent" --alignFolderName=stim --enableOverrides --maskOutlierBlocks
+python3 -u './plotAlignedAsigs.py' --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISSELECTOR $BLOCKSELECTOR $UNITSELECTOR --alignQuery="stimOn" --rowName="electrode" --rowControl= --colName="RateInHz" --colControl= --hueName="nominalCurrent" --alignFolderName=stim --enableOverrides --maskOutlierBlocks
 # stim spikes
-# python3 -u './plotRippleStimSpikeReport.py' --exp=$EXP $TRIALSELECTOR $ANALYSISSELECTOR $UNITSELECTOR
+# python3 -u './plotRippleStimSpikeReport.py' --exp=$EXP $BLOCKSELECTOR $ANALYSISSELECTOR $UNITSELECTOR

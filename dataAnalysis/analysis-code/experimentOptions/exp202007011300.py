@@ -7,6 +7,7 @@ def getExpOpts():
         4: 'isi',
         }
     experimentName = '202007011300-Peep'
+    subjectName = 'Peep'
     deviceName = None
     rippleMapFile = {
         1: 'isi_nano1caudal_xAyBzC_ortho_nano2rostral_xAyBzC_ortho.map',

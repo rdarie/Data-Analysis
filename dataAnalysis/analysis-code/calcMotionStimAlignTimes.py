@@ -13,7 +13,8 @@ Options:
 import matplotlib
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
-matplotlib.use('PS')   # generate postscript output by default
+# matplotlib.use('PS')   # generate postscript output by default
+matplotlib.use('Qt5Agg')   # generate postscript output by default
 import matplotlib.pyplot as plt
 import seaborn as sns
 sns.set()
@@ -48,502 +49,390 @@ expOpts, allOpts = parseAnalysisOptions(
 globals().update(expOpts)
 globals().update(allOpts)
 
+print('\n' + '#' * 50 + '\n{}\n'.format(__file__) + '#' * 50 + '\n')
 analysisSubFolder = os.path.join(
     scratchFolder, arguments['analysisName']
     )
 if not os.path.exists(analysisSubFolder):
     os.makedirs(analysisSubFolder, exist_ok=True)
-#  fetch stim details
-insReader = neo.NixIO(
-    filename=insDataPath)
-insBlock = insReader.read_block(0)
 # 
 if arguments['processAll']:
     prefix = assembledName
-    alignTimeBounds = [] # not working as of 12/31/19
+    alignTimeBounds = []  # not working as of 12/31/19
     print('calcMotionStimAlignTimes does not support aggregate files')
     sys.exit()
 # trick to allow joint processing of minirc and regular trials
-if ('RC' in blockExperimentTypeLookup[int(arguments['blockIdx'])]):
-    print('skipping RC trial')
+if not (blockExperimentType == 'proprio'):
+    print('skipping blocks without movement *and* stim')
     sys.exit()
-alignTimeBounds = [
-    alignTimeBoundsLookup[int(arguments['blockIdx'])]
-]
+#
 prefix = ns5FileName
 dataBlockPath = os.path.join(
     analysisSubFolder,
     prefix + '_analyze.nix')
+eventBlockPath = os.path.join(
+    # analysisSubFolder,
+    scratchFolder,
+    prefix + '_epochs.nix')
 print('loading {}'.format(dataBlockPath))
 dataReader, dataBlock = preproc.blockFromPath(
     dataBlockPath, lazy=arguments['lazy'])
-# print([asig.name for asig in dataBlock.filter(objects=EventProxy)])
-# print([asig.name for asig in dataBlock.filter(objects=Event)])
-#  some categories need to be calculated,
-#  others are available; "fuzzy" ones need their
-#  alignment fixed
-fuzzyCateg = [
-    'amplitude', 'amplitudeCat', 'program', 'RateInHz']
+print('loading {}'.format(eventBlockPath))
+eventReader, eventBlock = preproc.blockFromPath(
+    eventBlockPath, lazy=arguments['lazy'])
+####
+try:
+    alignTimeBounds = alignTimeBoundsLookup[int(arguments['blockIdx'])]
+except Exception:
+    traceback.print_exc()
+    fallbackTStart = float(
+        dataBlock.segments[0]
+        .filter(objects=AnalogSignalProxy)[0].t_start)
+    fallbackTStop = float(
+        dataBlock.segments[-1]
+        .filter(objects=AnalogSignalProxy)[0].t_stop)
+    alignTimeBounds = [
+        [fallbackTStart, fallbackTStop]
+    ]
+    print(
+        '\n Setting alignTimeBounds to {} -> {}'
+        .format(fallbackTStart, fallbackTStop))
+###
 availableCateg = [
-    'pedalVelocityCat', 'pedalMovementCat', 'pedalDirection',
-    'pedalSizeCat', 'pedalSize', 'activeGroup', 'pedalMovementDuration']
-calcFromTD = [
-    'stimOffset']
-signalsInAsig = [
-    'position']
-
-progAmpNames = rcsa_helpers.progAmpNames
-expandCols = [
-    'RateInHz', 'movement', 'program', 'activeGroup', 'trialSegment']
-deriveCols = ['amplitude', 'amplitudeCat']
-columnsToBeAdded = (
-    expandCols + deriveCols + progAmpNames)
-
+    'pedalDirection', 'pedalSizeCat', 'pedalMovementCat',
+    'pedalSize', 'pedalMovementDuration']
+motionAnnNamesForStim = [
+    'pedalDirection', 'pedalSizeCat', 'pedalMovementCat',
+    'pedalSize', 'pedalMetaCat', 'pedalMovementDuration', 'movementRound']
 #  allocate block to contain events
 masterBlock = Block()
 masterBlock.name = dataBlock.annotations['neo_name']
 masterBlock.annotate(
     nix_name=dataBlock.annotations['neo_name'])
 
+extraAnnNames = ['stimDelay']
 blockIdx = 0
 checkReferences = False
+searchRadius = .7  # sec
 for segIdx, dataSeg in enumerate(dataBlock.segments):
-    print('Calculating motion+stim align times for trial {}'.format(segIdx))
-    # pdb.set_trace()
-    # print([asig.name for asig in dataSeg.filter(objects=AnalogSignalProxy)])
-    # print([asig.name for asig in dataSeg.filter(objects=AnalogSignal)])
-    signalsInSegment = [
-        'seg{}_'.format(segIdx) + i
-        for i in signalsInAsig]
-    asigProxysList = [
-        asigP
-        for asigP in dataSeg.filter(objects=AnalogSignalProxy)
-        if asigP.annotations['neo_name'] in signalsInSegment]
-    eventProxysList = dataSeg.events
-    if checkReferences:
-        for asigP in asigProxysList:
-            da = asigP._rawio.da_list['blocks'][blockIdx]['segments'][segIdx]['data']
-            print('segIdx {}, asigP.name {}'.format(
-                segIdx, asigP.name))
-            print('asigP._global_channel_indexes = {}'.format(
-                asigP._global_channel_indexes))
-            print('asigP references {}'.format(
-                da[asigP._global_channel_indexes[0]]))
-            try:
-                assert asigP.name in da[asigP._global_channel_indexes[0]].name
-            except Exception:
-                traceback.print_exc()
-        for evP in eventProxysList:
-            print('segIdx {}, evP.name {}'.format(
-                segIdx, evP.name))
-            print('evP._event_channel_index = {}'.format(
-                 evP._event_channel_index))
-            evP_ch = evP._event_channel_index
-            mts = evP._rawio.file.blocks[blockIdx].groups[segIdx].multi_tags
-            try:
-                assert evP.name in mts[evP_ch].name
-            except Exception:
-                traceback.print_exc()
-    asigsList = [
-        asigP.load()
-        for asigP in asigProxysList]
-    samplingRate = asigsList[0].sampling_rate
-    # asigsDF = preproc.analogSignalsToDataFrame(asigsList, useChanNames=True)
-    # pdb.set_trace()
-    asigsDF = preproc.analogSignalsToDataFrame(asigsList)
-    asigsDF.columns = [i.replace('seg{}_'.format(segIdx), '') for i in asigsDF.columns]
-
-    dataSegEvents = [evP.load() for evP in eventProxysList]
-    eventDF = preproc.eventsToDataFrame(
-        dataSegEvents, idxT='t',
-        names=['seg{}_property'.format(segIdx), 'seg{}_value'.format(segIdx)]
-        )
-    eventDF.columns = [i.replace('seg{}_'.format(segIdx), '') for i in eventDF.columns]
-    stimStatus = preprocINS.stimStatusSerialtoLong(
-        eventDF, idxT='t', namePrefix='', expandCols=expandCols,
-        deriveCols=deriveCols, progAmpNames=progAmpNames)
-    infoFromStimStatus = hf.interpolateDF(
-        stimStatus, asigsDF['t'],
-        x='t', columns=columnsToBeAdded, kind='previous')
-    tdDF = pd.concat((
-        asigsDF,
-        infoFromStimStatus.drop(columns='t')),
-        axis=1)
-    tdDF.rename(
-        columns={
-            'movement': 'pedalVelocityCat',
-            'position': 'pedalPosition'},
-        inplace=True)
-    #  get alignment times
-    moveMask = pd.Series(False, index=tdDF.index)
-    stopMask = pd.Series(False, index=tdDF.index)
-    for idx, group in tdDF.groupby('trialSegment'):
-        idx = int(idx)
-        movingAtAll = group['pedalVelocityCat'].fillna(0).abs()
-        movementOnOff = movingAtAll.diff()
-        taskMask = (
-            (group['t'] > alignTimeBounds[segIdx][idx][0]) &
-            (group['t'] < alignTimeBounds[segIdx][idx][1])
-            )
-        moveMaskForSeg = (movementOnOff == 1) & taskMask
-        stopMaskForSeg = (movementOnOff == -1) & taskMask
-
-        assert stopMaskForSeg.sum() == moveMaskForSeg.sum(), 'unequal start and stop lengths' 
-        assert stopMaskForSeg.sum() % 2 == 0, 'number of movements not divisible by 2'
-
-        moveMask.loc[moveMaskForSeg.index[moveMaskForSeg]] = True
-        stopMask.loc[stopMaskForSeg.index[stopMaskForSeg]] = True
-    
-    #  plt.plot(movementOnOff)
-    #  plt.plot(tdDF['trialSegment'].values)
-    #  plt.plot(tdDF['pedalVelocityCat'].values); plt.show()
-    #  plt.plot(tdDF['pedalPosition'].values); plt.show()
-    
-    moveTimes = tdDF.loc[
-        moveMask, 't']
-    stopTimes = tdDF.loc[
-        stopMask, 't']
-    
-    tdDF['pedalMovementCat'] = np.nan
-    for idx, dfMoveIdx in enumerate(moveMask.index[moveMask]):
-        dfStopIndex = stopMask.index[stopMask][idx]
-        assert dfStopIndex > dfMoveIdx
-        if (idx % 2) == 0:
-            tdDF.loc[dfMoveIdx, 'pedalMovementCat'] = 'outbound'
-            tdDF.loc[dfStopIndex, 'pedalMovementCat'] = 'reachedPeak'
+    eventSeg = eventBlock.segments[segIdx]
+    print('Calculating motion stim align times for trial {}'.format(segIdx))
+    #
+    if arguments['lazy']:
+        eventProxysList = eventSeg.events
+        eventSegEvents = [evP.load() for evP in eventProxysList]
+    # samplingRate = dummyAsig.sampling_rate
+    motionEvent = preproc.loadObjArrayAnn([ev for ev in eventSegEvents if ev.name == 'seg0_motionAlignTimes'][0])
+    motionEvDict = motionEvent.array_annotations.copy()
+    motionEvDict['t'] = motionEvent.times.magnitude
+    motionEvDF = pd.DataFrame(motionEvDict)
+    #
+    stimEvent = preproc.loadObjArrayAnn([ev for ev in eventSegEvents if ev.name == 'seg0_stimAlignTimes'][0])
+    stimEvDict = stimEvent.array_annotations.copy()
+    stimAnnNames = [nm for nm in sorted(list(stimEvDict.keys())) if nm not in ['stimCat']]
+    stimEvDict['t'] = stimEvent.times.magnitude
+    stimEvDF = pd.DataFrame(stimEvDict)
+    noStimFiller = pd.Series({
+        'amplitude': 0,
+        'amplitudeRound': 999,
+        'RateInHz': 0,
+        'program': 999,
+        'activeGroup': 0,
+        'electrode': 'NA',
+        'detectionDelay': np.nan,
+        'stimDelay': np.nan
+    })
+    for annName in stimAnnNames + extraAnnNames:
+        motionEvDF.loc[:, annName] = np.nan
+    for annName in motionAnnNamesForStim + extraAnnNames:
+        stimEvDF.loc[:, annName] = np.nan
+    stimEvDF.loc[:, 'assignedTo'] = np.nan
+    movementCatTypes = list(motionEvDF['pedalMovementCat'].unique())
+    for mvRound, group in motionEvDF.groupby('movementRound'):
+        outboundT = group.loc[group['pedalMovementCat'] == 'outbound', 't']
+        outboundIdx = outboundT.index
+        reachPeakT = group.loc[group['pedalMovementCat'] == 'reachedPeak', 't']
+        reachPeakIdx = reachPeakT.index
+        returnT = group.loc[group['pedalMovementCat'] == 'return', 't']
+        returnIdx = returnT.index
+        ####
+        # find stim train corresponding to outbound movement
+        if mvRound > 0:
+            tSearchStart = max(
+                (float(outboundT) - searchRadius),
+                float(reachBaseT)  # from prev trial
+                )
         else:
-            tdDF.loc[dfMoveIdx, 'pedalMovementCat'] = 'return'
-            tdDF.loc[dfStopIndex, 'pedalMovementCat'] = 'reachedBase'
-    outboundMask = tdDF['pedalMovementCat'] == 'outbound'
-    reachedPeakMask = tdDF['pedalMovementCat'] == 'reachedPeak'
-    returnMask = tdDF['pedalMovementCat'] == 'return'
-    reachedBaseMask = tdDF['pedalMovementCat'] == 'reachedBase'
-    #  check that the trials are intact
-    assert (
-        (tdDF['pedalMovementCat'] == 'outbound').sum() ==
-        (tdDF['pedalMovementCat'] == 'reachedBase').sum())
-    assert (
-        (tdDF['pedalMovementCat'] == 'outbound').sum() ==
-        (tdDF['pedalMovementCat'] == 'reachedPeak').sum())
-    assert (
-        (tdDF['pedalMovementCat'] == 'outbound').sum() ==
-        (tdDF['pedalMovementCat'] == 'return').sum())
-    #  calculate movement sizes (relative to starting point)
-    midPeakIdx = ((
-        returnMask[returnMask].index +
-        reachedPeakMask[reachedPeakMask].index) / 2).astype('int64')
-    tdDF['pedalSize'] = np.nan
-    tdDF.loc[midPeakIdx, 'pedalSize'] = tdDF.loc[midPeakIdx, 'pedalPosition']
-    tdDF['pedalSize'].interpolate(method='nearest', inplace=True)
-    tdDF['pedalSize'].fillna(method='ffill', inplace=True)
-    tdDF['pedalSize'].fillna(method='bfill', inplace=True)
-    for idx, group in tdDF.groupby('trialSegment'):
-        idx = int(idx)
-        taskMask = (
-            (group['t'] > alignTimeBounds[segIdx][idx][0]) &
-            (group['t'] < alignTimeBounds[segIdx][idx][1])
+            tSearchStart = max(
+                (float(outboundT) - searchRadius),
+                stimEvDF['t'].min()
+                )
+        #
+        # tSearchStop = min(
+        #     (float(reachPeakT) + searchRadius),
+        #     float(returnT))
+        tSearchStop = min(
+            (float(returnT) - searchRadius),
+            stimEvDF['t'].max()
             )
-        # get pedal start point
-        pedalNeutralPoint = group.loc[taskMask, 'pedalPosition'].iloc[0]
-        tdDF.loc[group.index, 'pedalSize'] = group['pedalSize'] - pedalNeutralPoint
-    #  plt.plot(tdDF['t'], tdDF['pedalSize'])
-    #  plt.plot(tdDF['t'], tdDF['pedalPosition']); plt.show()
+        stimInSearchRadius = (
+            (stimEvDF['t'] >= tSearchStart) &
+            (stimEvDF['t'] < tSearchStop))
+        stimOnTs = stimEvDF.loc[
+            (
+                (stimEvDF['stimCat'] == 'stimOn') &
+                (stimEvDF['assignedTo'].isna()) &
+                stimInSearchRadius),
+            't']
+        if stimOnTs.size > 0:
+            roundHasOutBStim = True
+            closestTimes, closestIdx = hf.closestSeries(
+                takeFrom=outboundT, compareTo=stimOnTs,
+                strictly='neither')
+            stimDelay = float(closestTimes - outboundT)
+            theseStimAnn = stimEvDF.loc[closestIdx, :].iloc[0]
+            outBStimOn = theseStimAnn['t']
+            for annName in stimAnnNames:
+                motionEvDF.loc[outboundIdx, annName] = theseStimAnn[annName]
+                motionEvDF.loc[reachPeakIdx, annName] = theseStimAnn[annName]
+            motionEvDF.loc[outboundIdx, 'stimDelay'] = stimDelay
+            # assign this stim event to the corresponding pedal movement
+            stimEvDF.loc[closestIdx, 'assignedTo'] = outboundIdx
+            theseMotAnn = motionEvDF.loc[outboundIdx, :].iloc[0]
+            stimEvDF.loc[closestIdx, 'stimDelay'] = stimDelay
+            for annName in motionAnnNamesForStim:
+                stimEvDF.loc[closestIdx, annName] = theseMotAnn[annName]
+        else:
+            # if no onsets detected
+            roundHasOutBStim = False
+            closestTimes, closestIdx = hf.closestSeries(
+                takeFrom=outboundT, compareTo=stimEvDF['t'],
+                strictly='less')
+            theseStimAnn = stimEvDF.loc[closestIdx, :].iloc[0]
+            for annName in stimAnnNames:
+                motionEvDF.loc[outboundIdx, annName] = noStimFiller[annName]
+                motionEvDF.loc[reachPeakIdx, annName] = noStimFiller[annName]
+            motionEvDF.loc[outboundIdx, 'stimDelay'] = noStimFiller['stimDelay']
+            motionEvDF.loc[reachPeakIdx, 'stimDelay'] = noStimFiller['stimDelay']
+        #### find stims associated with the return segment
+        reachBaseT = group.loc[group['pedalMovementCat'] == 'reachedBase', 't']
+        reachBaseIdx = reachBaseT.index
+        tSearchStart = max(
+            (float(returnT) - searchRadius),
+            float(reachPeakT)
+        )
+        if mvRound == motionEvDF['movementRound'].max():
+            tSearchStop = min(
+                (float(reachBaseT) + searchRadius),
+                motionEvDF['t'].max()
+            )
+        else:
+            tSearchStop = min(
+                (float(reachBaseT) + searchRadius),
+                motionEvDF.loc[motionEvDF['movementRound'] == mvRound + 1, 't'].max()
+            )
+        stimInSearchRadius = (
+            (stimEvDF['t'] >= tSearchStart) &
+            (stimEvDF['t'] < tSearchStop))
+        stimOnTs = stimEvDF.loc[
+            (
+                (stimEvDF['stimCat'] == 'stimOn') &
+                (stimEvDF['assignedTo'].isna()) &
+                stimInSearchRadius),
+            't']
+        if stimOnTs.size > 0:
+            roundHasRetStim = True
+            closestTimes, closestIdx = hf.closestSeries(
+                takeFrom=returnT, compareTo=stimOnTs,
+                strictly='neither')
+            theseStimAnn = stimEvDF.loc[closestIdx, :].iloc[0]
+            retStimOn = theseStimAnn['t']
+            stimDelay = float(closestTimes - returnT)
+            for annName in stimAnnNames:
+                motionEvDF.loc[returnIdx, annName] = theseStimAnn[annName]
+                motionEvDF.loc[reachBaseIdx, annName] = theseStimAnn[annName]
+            motionEvDF.loc[returnIdx, 'stimDelay'] = stimDelay
+            # assign this stim event to the corresponding pedal movement
+            stimEvDF.loc[closestIdx, 'assignedTo'] = returnIdx
+            theseMotAnn = motionEvDF.loc[returnIdx, :].iloc[0]
+            stimEvDF.loc[closestIdx, 'stimDelay'] = stimDelay
+            for annName in motionAnnNamesForStim:
+                stimEvDF.loc[closestIdx, annName] = theseMotAnn[annName]
+        else:
+            roundHasRetStim = False
+            closestTimes, closestIdx = hf.closestSeries(
+                takeFrom=returnT, compareTo=stimEvDF['t'],
+                strictly='less')
+            theseStimAnn = stimEvDF.loc[closestIdx, :].iloc[0]
+            for annName in stimAnnNames:
+                motionEvDF.loc[returnIdx, annName] = noStimFiller[annName]
+                motionEvDF.loc[reachBaseIdx, annName] = noStimFiller[annName]
+            motionEvDF.loc[returnIdx, 'stimDelay'] = noStimFiller['stimDelay']
+            motionEvDF.loc[reachBaseIdx, 'stimDelay'] = noStimFiller['stimDelay']
+        #  annotate reachPeak and reachBase
+        if roundHasOutBStim:
+            if roundHasRetStim:
+                stimInSearchRadius = (
+                    (stimEvDF['t'] > outBStimOn) &
+                    (stimEvDF['t'] < retStimOn))
+            else:
+                stimInSearchRadius = (
+                    (stimEvDF['t'] > outBStimOn) &
+                    (stimEvDF['t'] < float(returnT) + searchRadius))
+            stimOffTs = stimEvDF.loc[
+                (
+                    (stimEvDF['stimCat'] == 'stimOff') &
+                    (stimEvDF['assignedTo'].isna()) &
+                    stimInSearchRadius),
+                't']
+            if stimOffTs.size > 0:
+                closestTimes, closestIdx = hf.closestSeries(
+                    takeFrom=reachPeakT, compareTo=stimOffTs,
+                    strictly='neither')
+                theseStimAnn = stimEvDF.loc[closestIdx, :].iloc[0]
+                stimDelay = float(closestTimes - reachPeakT)
+                motionEvDF.loc[reachPeakIdx, 'stimDelay'] = stimDelay
+                # assign this stim event to the corresponding pedal movement
+                stimEvDF.loc[closestIdx, 'assignedTo'] = reachPeakIdx
+                theseMotAnn = motionEvDF.loc[reachPeakIdx, :].iloc[0]
+                stimEvDF.loc[closestIdx, 'stimDelay'] = stimDelay
+                for annName in motionAnnNamesForStim:
+                    stimEvDF.loc[closestIdx, annName] = theseMotAnn[annName]
+            else:
+                raise(Exception('No off time corresponding to stim on for this move round (t = {:.3f})!'.format(reachPeakT)))
+        if roundHasRetStim:
+            stimInSearchRadius = (
+                (stimEvDF['t'] > retStimOn) &
+                (stimEvDF['t'] < float(reachBaseT) + searchRadius))
+            stimOffTs = stimEvDF.loc[
+                (
+                    (stimEvDF['stimCat'] == 'stimOff') &
+                    (stimEvDF['assignedTo'].isna()) &
+                    stimInSearchRadius),
+                't']
+            if stimOffTs.size > 0:
+                closestTimes, closestIdx = hf.closestSeries(
+                    takeFrom=reachBaseT, compareTo=stimOffTs,
+                    strictly='neither')
+                theseStimAnn = stimEvDF.loc[closestIdx, :].iloc[0]
+                stimDelay = float(closestTimes - reachBaseT)
+                motionEvDF.loc[reachBaseIdx, 'stimDelay'] = stimDelay
+                # assign this stim event to the corresponding pedal movement
+                stimEvDF.loc[closestIdx, 'assignedTo'] = reachBaseIdx
+                theseMotAnn = motionEvDF.loc[reachBaseIdx, :].iloc[0]
+                stimEvDF.loc[closestIdx, 'stimDelay'] = stimDelay
+                for annName in motionAnnNamesForStim:
+                    stimEvDF.loc[closestIdx, annName] = theseMotAnn[annName]
+            else:
+                raise(Exception('No off time corresponding to stim on for this move round (t = {:.3f})!'.format(reachBaseT)))
+    '''
+    motionEvDF.loc[:, stimAnnNames] = (
+        motionEvDF
+        .loc[:, stimAnnNames]
+        .fillna(method='ffill')
+        .fillna(method='bfill'))
+    '''
     if (segIdx == 0) and arguments['plotParamHistograms']:
-        ax = sns.distplot(
-            tdDF.loc[midPeakIdx, 'pedalSize'],
-            bins=200, kde=False)
-        plt.savefig(
-            os.path.join(
-                figureFolder, 'pedalSizeDistribution.pdf'))
-        plt.close()
-    #  determine size category
-    tdDF['pedalSizeCat'] = pd.cut(
-        tdDF['pedalSize'].abs(), movementSizeBins,
-        labels=['XS', 'S', 'M', 'L', 'XL'])
-    #  determine CW or CCW
-    tdDF['pedalDirection'] = np.nan
-    tdDF.loc[tdDF['pedalSize'] > 0, 'pedalDirection'] = 'CW'
-    tdDF.loc[tdDF['pedalSize'] <= 0, 'pedalDirection'] = 'CCW'
-    #  calculate movement durations
-    tdDF['pedalMovementDuration'] = np.nan
-    outboundTimes = tdDF.loc[
-        outboundMask,
-        't']
-    reachedBaseTimes = tdDF.loc[
-        reachedBaseMask,
-        't']
-    pedalMovementDurations = (
-        reachedBaseTimes.values -
-        outboundTimes.values
-        )
-    tdDF.loc[outboundTimes.index, 'pedalMovementDuration'] = (
-        pedalMovementDurations
-        )
-    tdDF.loc[reachedBaseTimes.index, 'pedalMovementDuration'] = (
-        pedalMovementDurations
-        )
-    # import seaborn as sns
-    # sns.distplot(tdDF['pedalMovementDuration'].dropna())
-    tdDF['pedalMovementDuration'].interpolate(method='nearest', inplace=True)
-    tdDF['pedalMovementDuration'].fillna(method='ffill', inplace=True)
-    tdDF['pedalMovementDuration'].fillna(method='bfill', inplace=True)
-
-    peakTimes = tdDF.loc[midPeakIdx, 't']
-    #  get intervals halfway between move stop and move start
-    pauseLens = moveTimes.shift(-1).values - stopTimes
-    maskForLen = pauseLens > 1.5
-    halfOffsets = (
-        samplingRate.magnitude * (pauseLens / 2)).fillna(0).astype(int)
-    otherTimesIdx = (stopTimes.index + halfOffsets.values)[maskForLen]
-    otherTimes = tdDF.loc[otherTimesIdx, 't']
-
-    moveCategories = tdDF.loc[
-        tdDF['t'].isin(moveTimes), fuzzyCateg + availableCateg
-        ].reset_index(drop=True)
-    moveCategories['pedalMetaCat'] = 'onset'
-    
-    stopCategories = tdDF.loc[
-        tdDF['t'].isin(stopTimes), fuzzyCateg + availableCateg
-        ].reset_index(drop=True)
-    stopCategories['pedalMetaCat'] = 'offset'
-    
-    otherCategories = tdDF.loc[
-        tdDF['t'].isin(otherTimes), fuzzyCateg + availableCateg
-        ].reset_index(drop=True)
-    otherCategories['pedalMetaCat'] = 'control'
-
-    otherCategories['program'] = 999
-    otherCategories['RateInHz'] = 0
-    otherCategories['amplitude'] = 0
-    otherCategories['pedalSize'] = 0
-    otherCategories['pedalDirection'] = 'NA'
-    otherCategories['amplitudeCat'] = 0
-    otherCategories['pedalSizeCat'] = 'NA'
-    otherCategories['pedalMovementCat'] = 'NA'
-    otherCategories['pedalMovementDuration'] = 999
-    
-    peakCategories = tdDF.loc[
-        tdDF['t'].isin(peakTimes), fuzzyCateg + availableCateg
-        ].reset_index(drop=True)
-    peakCategories['pedalMetaCat'] = 'midPeak'
-    peakCategories['pedalMovementCat'] = 'midPeak'
-    
-    alignTimes = pd.concat((
-        moveTimes, stopTimes, otherTimes, peakTimes),
-        axis=0, ignore_index=True)
-    #  sort align times
-    alignTimes.sort_values(inplace=True, kind='mergesort')
-    categories = pd.concat((
-        moveCategories, stopCategories, otherCategories, peakCategories),
-        axis=0, ignore_index=True)
-    #  sort categories by align times
-    #  (needed to propagate values forward)
-    categories = categories.loc[alignTimes.index, :]
-    alignTimes.reset_index(drop=True, inplace=True)
-    categories.reset_index(drop=True, inplace=True)
-    for colName in calcFromTD:
-        categories[colName] = np.nan
-    for colName in fuzzyCateg:
-        categories[colName + 'Fuzzy'] = np.nan
-    #  scan through and calculate fuzzy values
-    motionStimAlignFudgeFactor = 500e-3  # seconds
-    '''
-    import seaborn as sns
-    for colName in progAmpNames:
-        sns.distplot(tdDF[colName], label=colName)
-    for colName in progAmpNames + ['amplitude']:
-        plt.plot(tdDF[colName], label=colName)
-    plt.plot(tdDF['amplitudeCat'], label=colName)
-    plt.show()
-    '''
-    for idx, tOnset in alignTimes.iteritems():
-        moveCat = categories.loc[idx, 'pedalMovementCat']
-        metaCat = categories.loc[idx, 'pedalMetaCat']
-        if moveCat == 'outbound':
-            tStart = max(0, tOnset - motionStimAlignFudgeFactor)
-            tStop = min(tdDF['t'].iloc[-1], tOnset + motionStimAlignFudgeFactor)
-            #  tdMaskPre = (tdDF['t'] > tStart) & (tdDF['t'] < tOnset)
-            #  tdMaskPost = (tdDF['t'] > tOnset) & (tdDF['t'] < tStop)
-            tdMask = (tdDF['t'] > tStart) & (tdDF['t'] < tStop)
-            theseAmps = tdDF.loc[tdMask, ['t', 'amplitude']]
-            theseAmps['diff'] = theseAmps['amplitude'].diff()
-            # ampOnset, ampOffset are times when the amplitude turned on and off
-            ampOnsetIdx = theseAmps[theseAmps['diff'] > 0].index
-            # pdb.set_trace()
-            if len(ampOnsetIdx):
-                tAmpOnset = theseAmps.loc[ampOnsetIdx, 't'].iloc[0]
-                # greater if movement after stim
-                categories.loc[idx, 'stimOffset'] = tOnset - tAmpOnset
-                ampOffsetMask = (
-                    (theseAmps['diff'] < 0) &
-                    (theseAmps['t'] > tAmpOnset)
+        fig, ax = plt.subplots()
+        for cN in movementCatTypes:
+            theseEvents = (
+                motionEvDF
+                .loc[(motionEvDF['pedalMovementCat'] == cN) & ~motionEvDF['stimDelay'].isna(), :])
+            if theseEvents.size > 0:
+                thisLabel = '\n'.join([
+                    'epoch: {}'.format(cN),
+                    'median: {:.1f} msec; std: {:.1f} msec'.format(
+                        1000 * theseEvents['stimDelay'].median(),
+                        1000 * theseEvents['stimDelay'].std())
+                    ])
+                sns.distplot(
+                    theseEvents['stimDelay'],
+                    # bins=200,
+                    kde=True, ax=ax, label=thisLabel)
+                ax.legend()
+                print(
+                    theseEvents
+                    .sort_values('stimDelay', ascending=False)
+                    .loc[:, ['t', 'stimDelay']]
+                    .head(10)
                     )
-                if ampOffsetMask.any():
-                    ampOffsetIdx = theseAmps.loc[ampOffsetMask, :].index
-                else:
-                    ampOffsetIdx = pd.Index([theseAmps.index[-1]])
-                fuzzyIdx = int((ampOnsetIdx[0] + ampOffsetIdx[0]) / 2)
-            else:
-                ampOnsetIdx = pd.Index([theseAmps.index[0]])
-                categories.loc[idx, 'stimOffset'] = 999
-                # ampOffsetMask = (theseAmps['diff'] < 0)
-                fuzzyIdx = theseAmps.index[-1]
-            #
-            # if len(ampOffsetIdx):
-            #     #  if the stim ever turns off
-            #     #  use the last value where amp was on
-            #     fuzzyIdx = theseAmps.loc[ampOffsetIdx].index[0] - 1
-            # else:
-            #     #  use the last value (amp stayed constant,
-            #     #  including the case where it was zero throughout)
-            #     fuzzyIdx = tdDF.loc[tdMask, :].index[-1]
-            for colName in fuzzyCateg:
-                nominalValue = categories.loc[idx, colName]
-                fuzzyValue = tdDF.loc[fuzzyIdx, colName]
-                if (nominalValue != fuzzyValue):
-                    categories.loc[idx, colName + 'Fuzzy'] = fuzzyValue
-                    print('nominally, {} is {}'.format(colName, nominalValue))
-                    print('changed it to {}'.format(fuzzyValue))
-                else:
-                    categories.loc[idx, colName + 'Fuzzy'] = nominalValue
-            if categories.loc[idx, 'amplitudeFuzzy'] == 0:
-                categories.loc[idx, 'programFuzzy'] = 999
-        elif metaCat == 'control':
-            for colName in fuzzyCateg:
-                if colName == 'program':
-                    categories.loc[idx, colName + 'Fuzzy'] = 999
-                else:
-                    categories.loc[idx, colName + 'Fuzzy'] = 0
-        else:
-            #  everyone else inherits the categories of the outbound leg
-            for colName in fuzzyCateg:
-                categories.loc[idx, colName + 'Fuzzy'] = np.nan
-    #  fill in the nans for the offset and midpeak times
-    categories.fillna(method='ffill', inplace=True)
-    categories.fillna(method='bfill', inplace=True)
-    #
-    for colName in ['RateInHz', 'RateInHzFuzzy']:
-        categories.loc[categories['amplitudeCatFuzzy'] == 0, colName] = 0
-    #
-    uniqProgs = pd.unique(categories['programFuzzy'])
-    #  plot these if we need to reset the amplitude category
-    if (segIdx == 0) and arguments['plotParamHistograms']:
-        fig, ax = plt.subplots(len(uniqProgs), 1, sharex=True)
-        for idx, pName in enumerate(uniqProgs):
-            ax[idx] = sns.distplot(
-                categories.loc[
-                    categories['programFuzzy'] == pName,
-                    'amplitudeFuzzy'],
-                bins=100, kde=False, ax=ax[idx]
-                )
-            ax[idx].set_title('prog {}'.format(pName))
-        plt.savefig(
+        fig.savefig(
             os.path.join(
-                figureFolder, 'amplitudeDistribution.pdf'))
+                figureFolder, 'stimDelayDistribution.pdf'))
+        # plt.show()
         plt.close()
-        uniqSizes = pd.unique(categories['pedalSizeCat'])
-        fig, ax = plt.subplots(len(uniqSizes), 1, sharex=True)
-        durationBins = np.linspace(
-            categories.query('pedalMovementDuration<999')['pedalMovementDuration'].min(),
-            categories.query('pedalMovementDuration<999')['pedalMovementDuration'].max(),
-            100
-        )
-        for idx, pName in enumerate(uniqSizes):
-            sizeCatQ = '&'.join([
-                '(pedalSizeCat==\'{}\')'.format(pName),
-                '(pedalMovementCat==\'outbound\')'
-            ])
-            ax[idx] = sns.distplot(
-                categories.query(sizeCatQ)['pedalMovementDuration'],
-                bins=durationBins, kde=False, ax=ax[idx]
-                )
-            ax[idx].set_title('size {}'.format(pName))
-        plt.savefig(
-            os.path.join(
-                figureFolder, 'movementDurationDistribution.pdf'))
-        plt.close()
-    #  pull actual electrode names
-    categories['electrodeFuzzy'] = np.nan
-    for name, group in categories.groupby(['activeGroup', 'programFuzzy']):
-        gName = int(name[0])
-        pName = int(name[1])
-        pMask = categories['programFuzzy'] == pName
-        if pName == 999:
-            categories.loc[pMask, 'electrodeFuzzy'] = 'control'
-        else:
-            unitName = 'g{}p{}'.format(gName, pName)
-            thisUnit = insBlock.filter(objects=Unit, name=unitName)[0]
-            cathodes = thisUnit.annotations['cathodes']
-            anodes = thisUnit.annotations['anodes']
-            elecName = ''
-            if isinstance(anodes, Iterable):
-                elecName += '+ ' + ', '.join(['E{}'.format(i) for i in anodes])
-            else:
-                elecName += '+ E{}'.format(anodes)
-            elecName += ' '
-            if isinstance(cathodes, Iterable):
-                elecName += '- ' + ', '.join(['E{}'.format(i) for i in cathodes])
-            else:
-                elecName += '- E{}'.format(cathodes)
-            categories.loc[pMask, 'electrodeFuzzy'] = elecName
-
-    alignEventsDF = pd.concat([alignTimes, categories], axis=1)
-    stripColumnNames = [
-        i.replace('Fuzzy', '')
-        for i in alignEventsDF.columns
-        if (('Fuzzy' in i) and (i.replace('Fuzzy', '') in alignEventsDF.columns))]
-    alignEventsDF.drop(columns=stripColumnNames, inplace=True)
-    alignEventsDF.columns = [i.replace('Fuzzy', '') for i in alignEventsDF.columns]
-    # pdb.set_trace()
-    alignEvents = preproc.eventDataFrameToEvents(
-        alignEventsDF, idxT='t',
+    ###
+    alignEventsMotion = preproc.eventDataFrameToEvents(
+        motionEvDF, idxT='t',
         annCol=None,
         eventName='seg{}_motionStimAlignTimes'.format(segIdx),
         tUnits=pq.s, makeList=False)
-    alignEvents.annotate(nix_name=alignEvents.name)
+    alignEventsMotion.annotate(nix_name=alignEventsMotion.name)
     #
-    concatLabelColumns = [
-        i
-        for i in fuzzyCateg + ['electrode']
-        ] + [
-            'pedalMovementCat', 'pedalMetaCat',
-            'pedalSizeCat', 'pedalDirection',
-            'pedalMovementDuration']
-    concatLabelsDF = alignEventsDF[concatLabelColumns]
+    concatLabelColumns = availableCateg + stimAnnNames + extraAnnNames
+    concatLabelsDF = motionEvDF[concatLabelColumns]
     concatLabels = np.array([
         '{}'.format(row)
         for rowIdx, row in concatLabelsDF.iterrows()])
     concatEvents = Event(
         name='seg{}_motionStimAlignTimesConcatenated'.format(segIdx),
-        times=alignEvents.times,
+        times=alignEventsMotion.times,
         labels=concatLabels
         )
     newSeg = Segment(name=dataSeg.annotations['neo_name'])
     newSeg.annotate(nix_name=dataSeg.annotations['neo_name'])
-    newSeg.events.append(alignEvents)
+    newSeg.events.append(alignEventsMotion)
     newSeg.events.append(concatEvents)
-    alignEvents.segment = newSeg
+    alignEventsMotion.segment = newSeg
     concatEvents.segment = newSeg
+    ####
+    stimEvDF.dropna(inplace=True)
+    alignEventsStim = preproc.eventDataFrameToEvents(
+        stimEvDF, idxT='t',
+        annCol=None,
+        eventName='seg{}_stimPerimotionAlignTimes'.format(segIdx),
+        tUnits=pq.s, makeList=False)
+    alignEventsStim.annotate(nix_name=alignEventsStim.name)
+    #
+    concatLabelColumns = motionAnnNamesForStim + stimAnnNames + extraAnnNames
+    concatStimLabelsDF = stimEvDF[concatLabelColumns]
+    concatStimLabels = np.array([
+        '{}'.format(row)
+        for rowIdx, row in concatStimLabelsDF.iterrows()])
+    concatStimEvents = Event(
+        name='seg{}_stimPerimotionAlignTimesConcatenated'.format(segIdx),
+        times=alignEventsStim.times,
+        labels=concatStimLabels
+        )
+    newSeg.events.append(alignEventsStim)
+    newSeg.events.append(concatStimEvents)
+    alignEventsStim.segment = newSeg
+    concatStimEvents.segment = newSeg
+    #
     masterBlock.segments.append(newSeg)
-
+    newSeg.block = masterBlock
 dataReader.file.close()
+eventReader.file.close()
 masterBlock.create_relationship()
 allSegs = list(range(len(masterBlock.segments)))
-if arguments['processAll']:
-    preproc.addBlockToNIX(
-        masterBlock, neoSegIdx=allSegs,
-        writeAsigs=False, writeSpikes=False, writeEvents=True,
-        fileName=experimentName + '_analyze',
-        folderPath=analysisSubFolder,
-        purgeNixNames=False,
-        nixBlockIdx=0, nixSegIdx=allSegs,
-        )
-else:
-    preproc.addBlockToNIX(
-        masterBlock, neoSegIdx=allSegs,
-        writeAsigs=False, writeSpikes=False, writeEvents=True,
-        fileName=ns5FileName + '_analyze',
-        folderPath=analysisSubFolder,
-        purgeNixNames=False,
-        nixBlockIdx=0, nixSegIdx=allSegs,
-        )
+#
+outputPath = os.path.join(
+    scratchFolder,
+    ns5FileName + '_epochs'
+    )
+preReader, preBlock = preproc.blockFromPath(
+    outputPath + '.nix', lazy=arguments['lazy'])
+existingEvNames = [ev.name for ev in preBlock.filter(objects=[EventProxy, Event])]
+eventExists = (alignEventsStim.name in existingEvNames) or (alignEventsMotion.name in existingEvNames)
+# pdb.set_trace()
+preReader.file.close()
+if eventExists:
+    raise(Exception('CalcMotionStimAlignTimes: calculated events, but they already exist in the events block'))
+preproc.addBlockToNIX(
+    masterBlock, neoSegIdx=allSegs,
+    writeAsigs=False, writeSpikes=False, writeEvents=True,
+    fileName=ns5FileName + '_epochs',
+    folderPath=scratchFolder,
+    purgeNixNames=False,
+    nixBlockIdx=0, nixSegIdx=allSegs,
+    )

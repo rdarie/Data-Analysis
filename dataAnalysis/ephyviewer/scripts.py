@@ -3,11 +3,11 @@ import sys
 import os
 import argparse
 from ephyviewer.datasource import HAVE_NEO
-from dataAnalysis.ephyviewer.standalone import all_neo_rawio_dict, rawio_gui_params
+from dataAnalysis.ephyviewer.standaloneV2 import all_neo_rawio_dict, rawio_gui_params
     
 
 def launch_standalone_ephyviewer():
-    from dataAnalysis.ephyviewer.standalone import StandAloneViewer
+    from dataAnalysis.ephyviewer.standaloneV2 import StandAloneViewer
     import pyqtgraph as pg
     assert HAVE_NEO, 'Must have neo 0.6.0'
     import neo
@@ -40,8 +40,8 @@ def launch_standalone_ephyviewer():
         
         win.load_dataset(neo_rawio_class=neo_rawio_class, file_or_dir_names=[file_or_dir_name])
         
-        
     app.exec_()
+
 
 if __name__=='__main__':
     launch_standalone_ephyviewer()

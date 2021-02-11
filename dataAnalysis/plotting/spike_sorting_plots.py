@@ -7,10 +7,11 @@ import pdb
 from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
+import matplotlib.colors as mplcolors
 import seaborn as sns
 import random
 import traceback
-from fractions import gcd
+from math import gcd
 from tqdm import tqdm
 sns.set(rc={
     'figure.figsize': (14, 18),
@@ -19,33 +20,53 @@ sns.set(rc={
     })
 
 
-#@profile
 def plotSpikePanel(
         spikeStruct, spikes, labelFontSize=5,
-        padOverride=1e-3, figSize=(12, 18),
-        hideUnused=True,
+        padOverride=1e-3, figSize=(18, 18),
+        hideUnused=True, useLGACoords=False,
+        coordsToIndicesOpts=None,
         colorPal="ch:2,-.1,dark=.2,light=0.8,reverse=1"):
     sns.set_style("dark", {"axes.facecolor": ".9"})
+    if coordsToIndicesOpts is None:
+        coordsToIndicesOpts = {
+            'reverseY': True
+        }
+    if useLGACoords:
+        spikeStruct.loc[:, 'xcoords'] = spikeStruct.loc[:, 'lgaXCoords']
+        spikeStruct.loc[:, 'ycoords'] = spikeStruct.loc[:, 'lgaYCoords']
     if hideUnused:
         spikeStruct = spikeStruct.loc[
             spikeStruct['label'].isin(spikes['ChannelID']), :]
-    xIdx = np.array(
-        spikeStruct['xcoords'].values - spikeStruct['xcoords'].min(),
-        dtype=np.int)
-    yIdx = np.array(
-        spikeStruct['ycoords'].values - spikeStruct['ycoords'].min(),
-        dtype=np.int)
-    uniqueXLookup = {i: idx for idx, i in enumerate(np.unique(xIdx))}
-    uniqueYLookup = {i: idx for idx, i in enumerate(np.unique(yIdx))}
-    xIdx = np.array([uniqueXLookup[i] for i in xIdx])
-    yIdx = np.array([uniqueYLookup[i] for i in yIdx])
+    spikeStruct.loc[:, 'panelX'], spikeStruct.loc[:, 'panelY'] = coordsToIndices(
+        spikeStruct['xcoords'], spikeStruct['ycoords'],
+        **coordsToIndicesOpts
+        )
     #
-    panelX = {spikeStruct.iloc[i, :].loc['label']: x for i, x in enumerate(xIdx)}
-    panelY = {spikeStruct.iloc[i, :].loc['label']: y for i, y in enumerate(yIdx)}
-    #
-    fig, ax = plt.subplots(
-        nrows=int(max(np.unique(xIdx)) + 1),
-        ncols=int(max(np.unique(yIdx)) + 1))
+    fig = plt.figure()
+    nCols = int(max(spikeStruct['panelX'].unique()) + 1)
+    nRows = int(max(spikeStruct['panelY'].unique()) + 1)
+    gs = fig.add_gridspec(
+        ncols=nCols, nrows=nRows)
+    axDF = pd.DataFrame(index=range(nRows), columns=range(nCols))
+    for axY in range(nRows):  # rows are y
+        for axX in range(nCols):  # cols are x
+            axDF.loc[axY, axX] = fig.add_subplot(gs[axY, axX])
+            axDF.loc[axY, axX].channelContainsSpikes = False
+            containsThisPosition = (
+                (spikeStruct['panelX'] == axX) &
+                (spikeStruct['panelY'] == axY))
+            axDF.loc[axY, axX].channelIsMapped = containsThisPosition.any()
+            if axDF.loc[axY, axX].channelIsMapped:
+                thisRow = spikeStruct.loc[containsThisPosition, :]
+                assert thisRow.shape[0] == 1
+                axDF.loc[axY, axX].bankInfo = '{}{:>02d}'.format(
+                    thisRow['bank'].iloc[0],
+                    int(thisRow['bankID'].iloc[0]),
+                    )
+            else:
+                axDF.loc[axY, axX].bankInfo = ''
+
+    ax = axDF.to_numpy()
     fig.set_size_inches(figSize)
     axHighLims = np.empty(ax.shape)
     axHighLims[:] = np.nan
@@ -53,21 +74,26 @@ def plotSpikePanel(
     axLowLims[:] = np.nan
     with sns.color_palette(colorPal, 8):
         for idx, channel in enumerate(spikes['ChannelID']):
-            curAx = ax[panelX[channel], panelY[channel]]
+            thisRow = spikeStruct.loc[spikeStruct['label'] == channel, :]
+            assert thisRow.shape[0] == 1
+            curAx = ax[thisRow['panelY'].iloc[0], thisRow['panelX'].iloc[0]]
             # curAx.set_aspect('equal', adjustable='datalim')
             plotSpike(spikes, channel, ax=curAx)
             curAxLim = curAx.get_ylim()
-            axHighLims[panelX[channel], panelY[channel]] = curAxLim[1]
-            axLowLims[panelX[channel], panelY[channel]] = curAxLim[0]
+            axHighLims[thisRow['panelY'].iloc[0], thisRow['panelX'].iloc[0]] = curAxLim[1]
+            axLowLims[thisRow['panelY'].iloc[0], thisRow['panelX'].iloc[0]] = curAxLim[0]
+            curAx.channelContainsSpikes = True
         # get xLim from last axis that has spikes, in order to make the label
-        xLim = ax[panelX[channel], panelY[channel]].get_xlim()
+        xLim = ax[thisRow['panelY'].iloc[0], thisRow['panelX'].iloc[0]].get_xlim()
         sns.despine()
-
+        #
         newAxMin = np.nanmean(axLowLims) - .5 * np.nanstd(axLowLims)
         newAxMax = np.nanmean(axHighLims) + .5 * np.nanstd(axHighLims)
-
+        #
         for idx, channel in enumerate(spikes['ChannelID']):
-            curAx = ax[panelX[channel], panelY[channel]]
+            thisRow = spikeStruct.loc[spikeStruct['label'] == channel, :]
+            assert thisRow.shape[0] == 1
+            curAx = ax[thisRow['panelY'].iloc[0], thisRow['panelX'].iloc[0]]
             curAx.set_ylim(newAxMin, newAxMax)
             trnsf = curAx.transAxes
             textOpts = {
@@ -78,8 +104,8 @@ def plotSpikePanel(
             curAx.text(
                 1, 1, channel,
                 transform=trnsf, **textOpts)
-            # pdb.set_trace()
-
+            ax[thisRow['panelY'].iloc[0], thisRow['panelX'].iloc[0]].channelName = channel
+        #
         for idx, curAx in enumerate(ax.flatten()):
             if idx != 0:
                 curAx.tick_params(
@@ -104,17 +130,39 @@ def plotSpikePanel(
                 curAx.set_ylabel(
                     spikes['Units'], fontsize=labelFontSize,
                     labelpad=-3 * labelFontSize)
-        plt.tight_layout(pad=padOverride, w_pad=padOverride, h_pad=padOverride)
-    return newAxMin, newAxMax
+        plt.tight_layout(
+            pad=padOverride, w_pad=padOverride,
+            h_pad=padOverride)
+    return fig, ax
 
 
-def coordsToIndices(xcoords, ycoords):
-    xSpacing = np.ufunc.reduce(np.frompyfunc(gcd, 2, 1), xcoords)
-    ySpacing = np.ufunc.reduce(np.frompyfunc(gcd, 2, 1), ycoords)
-    xIdx = np.array(np.divide(xcoords, xSpacing), dtype=np.int)
-    xIdx = xIdx - min(xIdx)
-    yIdx = np.array(np.divide(ycoords, ySpacing), dtype=np.int)
-    yIdx = yIdx - min(yIdx)
+def coordsToIndices(
+        xcoords, ycoords,
+        swapXY=False,
+        reverseX=False, reverseY=False):
+    # ordMag = np.floor(np.log10(xcoords.abs().mean().mean()))
+    xcoordsInt = (xcoords - xcoords.min()).astype(np.int)
+    ycoordsInt = (ycoords - ycoords.min()).astype(np.int)
+    #
+    # xcoordsInt = xcoords.astype(np.int) - xcoords.astype(np.int).min()
+    # ycoordsInt = ycoords.astype(np.int) - ycoords.astype(np.int).min()
+    #
+    xSpacing = np.ufunc.reduce(np.frompyfunc(gcd, 2, 1), xcoordsInt)
+    ySpacing = np.ufunc.reduce(np.frompyfunc(gcd, 2, 1), ycoordsInt)
+    #
+    xIdx = np.array(
+        np.divide(xcoords.astype(np.int), xSpacing),
+        dtype=np.int)
+    yIdx = np.array(
+        np.divide(ycoords.astype(np.int), ySpacing),
+        dtype=np.int)
+    #
+    if reverseX:
+        xIdx = np.max(xIdx) - xIdx
+    if reverseY:
+        yIdx = np.max(yIdx) - yIdx
+    if swapXY:
+        xIdx, yIdx = yIdx, xIdx
     return xIdx, yIdx
 
 
@@ -217,7 +265,8 @@ def plotSpike(
                 timeRange = np.arange(len(thisSpike)) / spikes['basic_headers']['TimeStampResolution'] * 1e3
                 colorPalette = sns.color_palette(n_colors=40)
 
-                ax.fill_between(timeRange, thisSpike - errorMultiplier*thisError,
+                ax.fill_between(
+                    timeRange, thisSpike - errorMultiplier * thisError,
                     thisSpike + errorMultiplier*thisError, alpha=0.4,
                     facecolor=colorPalette[unitIdx],
                     label=labelName)
@@ -226,7 +275,7 @@ def plotSpike(
                     ax.set_ylabel(spikes['Units'])
                     ax.set_xlabel('Time (msec)')
                     ax.set_title('Units on channel {}'.format(channelPlottingName))
-                    ax.legend()
+                    ax.legend(loc='lower right')
         if showNow:
             plt.show()
     return fig, ax
@@ -236,7 +285,7 @@ def plot_spikes(
         spikes, channel, ignoreUnits=[], showNow=False, ax=None,
         acrossArray=False, xcoords=None, ycoords=None,
         axesLabel=False, channelPlottingName=None, chanNameInLegend=True,
-        legendTags=[],
+        legendTags=[], lineWidth=1, lineRasterized=False,
         maskSpikes=None, maxSpikes=200, lineAlpha=0.025):
         
     if channelPlottingName is None:
@@ -305,7 +354,8 @@ def plot_spikes(
                         thisLabel = labelName if idx == 0 else None
                         curAx.plot(
                             timeRange, thisSpike, label=thisLabel,
-                            linewidth=1, color=colorPalette[unitIdx], alpha=lineAlpha)
+                            linewidth=lineWidth, color=colorPalette[unitIdx],
+                            alpha=lineAlpha, rasterized=lineRasterized)
                 sns.despine()
                 for curAx in ax.flatten():
                     curAx.tick_params(
@@ -329,13 +379,14 @@ def plot_spikes(
                     thisLabel = labelName if spIdx == 0 else None
                     ax.plot(
                         timeRange, thisSpike,
-                        linewidth=1, color=colorPalette[unitIdx], alpha=lineAlpha, label=thisLabel)
+                        linewidth=lineWidth, color=colorPalette[unitIdx],
+                        alpha=lineAlpha, label=thisLabel, rasterized=lineRasterized)
                 ax.set_xlim(timeRange[0], timeRange[-1])
                 if axesLabel:
                     ax.set_ylabel(spikes['Units'])
                     ax.set_xlabel('Time (msec)')
                     ax.set_title('Units on channel {}'.format(channelPlottingName))
-                    ax.legend()
+                    ax.legend(loc='lower right')
         if showNow:
             plt.show()
     return fig, ax
@@ -347,8 +398,15 @@ def spikePDFReport(
         correctAlignmentSpikes=0,
         plotOpts={'type': 'ticks', 'errorBar': 'sem'},
         trialStats=None, enableFR=False, rasterOpts={'alignTo': None},
-        newReportName=None):
-
+        plotSpikePanelOpts=None,
+        newReportName=None, colorByAmpBank=False, limitPages=None
+        ):
+    if plotSpikePanelOpts is None:
+        plotSpikePanelOpts = {
+            'hideUnused': True,
+            'useLGACoords': False,
+            'coordsToIndicesOpts': None,
+        }
     if correctAlignmentSpikes:  # correctAlignmentSpikes units in samples
         spikes = hf.correctSpikeAlignment(spikes, correctAlignmentSpikes)
 
@@ -363,23 +421,70 @@ def spikePDFReport(
     #      arrayInfo['nevIDs'] = spikes['ChannelID']
 
     with PdfPages(pdfName) as pdf:
-        plotSpikePanel(
-            spikeStruct, spikes,
-            colorPal=None,
-            labelFontSize=2, padOverride=1e-3)
+        spPanelFig, spPanelAx = plotSpikePanel(
+            spikeStruct, spikes, colorPal=None,
+            labelFontSize=14, padOverride=10e-3,
+            **plotSpikePanelOpts
+            )
+        ######################################################
+        #  color axes by amplifier bank
+        #######################################################
+        if colorByAmpBank:
+            bankColorLookup = {
+                'A': list(mplcolors.to_rgba('tab:brown')),
+                'B': list(mplcolors.to_rgba('tab:pink')),
+                'C': list(mplcolors.to_rgba('tab:olive')),
+                'D': list(mplcolors.to_rgba('tab:cyan')),
+                'noSpikes': list(mplcolors.to_rgba('tab:gray')),
+                }
+            for curAx in spPanelAx.flatten():
+                if hasattr(curAx, 'channelName'):
+                    chMapInfo = spikeStruct.loc[spikeStruct['label'] == curAx.channelName, :]
+                    chBank = chMapInfo['bank'].iloc[0]
+                    chColor = bankColorLookup[chBank]
+                    chColor[-1] = 0.3
+                    curAx.set_facecolor(chColor)
+                if hasattr(curAx, 'channelContainsSpikes'):
+                    if not curAx.channelContainsSpikes:
+                        chColor = bankColorLookup['noSpikes']
+                        chColor[-1] = 0.3
+                        curAx.set_facecolor(chColor)
+                    else:
+                        trnsf = curAx.transAxes
+                        textOpts = {
+                            'verticalalignment': 'bottom',
+                            'horizontalalignment': 'right',
+                            'fontsize': 12
+                            }
+                        curAx.text(
+                            1, 0,
+                            '{}'.format(curAx.bankInfo),
+                            transform=trnsf, **textOpts)
+                if hasattr(curAx, 'channelIsMapped'):
+                    if not curAx.channelIsMapped:
+                        chColor = bankColorLookup['noSpikes']
+                        chColor[-1] = 1
+                        curAx.set_facecolor(chColor)
+
+        ###########################################################
         #  make spikepanel square
         # figWidth, figHeight = plt.gcf().get_size_inches()
         # aspectRatio = (spikeStruct['xcoords'].max() - spikeStruct['xcoords'].min()) / (spikeStruct['ycoords'].max() - spikeStruct['ycoords'].min())
         # plt.gcf().set_size_inches(figWidth, figWidth)
         pdf.savefig(bbox_inches='tight', pad_inches=0, dpi=300)
         plt.close()
+        numChanPlotted = 0
         for channel in tqdm(sorted(spikes['ChannelID'])):
+            if limitPages is not None:
+                if numChanPlotted > limitPages:
+                    continue
             idx = spikes['ChannelID'].index(channel)
             unitsOnThisChan = np.unique(spikes['Classification'][idx])
             if unitsOnThisChan is not None:
                 if len(unitsOnThisChan) > 0:
                     #  allocate axes
                     fig = plt.figure(tight_layout={'pad': 0.01})
+                    numChanPlotted += 1
                     gs = gridspec.GridSpec(2, 3)
                     try:
                         spikeAx = fig.add_subplot(gs[1, 0])
@@ -404,7 +509,8 @@ def spikePDFReport(
                             traceback.print_exc()
                         plot_spikes(
                             spikes, channel=channel, ax=spikesBadAx,
-                            axesLabel=True, maxSpikes=500, lineAlpha=0.025)
+                            axesLabel=True, maxSpikes=1000,
+                            lineWidth=2, lineAlpha=0.025, lineRasterized=False)
                         spikesBadAx.set_ylim(spikeAx.get_ylim())
                     except Exception:
                         traceback.print_exc()
@@ -451,7 +557,6 @@ def spikePDFReport(
                         plt.close()
                     except Exception:
                         traceback.print_exc()
-
                     if len(spikes['Waveforms'][idx].shape) == 3:
                         plotSpike(
                             spikes, channel=channel, acrossArray=True,

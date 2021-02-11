@@ -14,8 +14,8 @@
 #SBATCH -J analysis_isi_20200701
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-analysis_isi_20200701.stdout
-#SBATCH -e ../../batch_logs/%j-%a-analysis_isi_20200701.errout
+#SBATCH -o ../../batch_logs/%j-%a-analysis_isi_20200701.out
+#SBATCH -e ../../batch_logs/%j-%a-analysis_isi_20200701.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -65,8 +65,8 @@ WINDOW="--window=XS"
 # WINDOW="--window=extraExtraShort"
 
 SLURM_ARRAY_TASK_ID=4
-# TRIALSELECTOR="--processAll"
-TRIALSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
+# BLOCKSELECTOR="--processAll"
+BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
 
 # ANALYSISFOLDER="--analysisName=fullRes"
 # ANALYSISFOLDER="--analysisName=hiRes"
@@ -80,4 +80,4 @@ CHANSELECTOR="--chanQuery=all"
 # CHANSELECTOR="--chanQuery=isispinal"
 # CHANSELECTOR="--chanQuery=isispinaloremg"
 
-python -u ./calcISIAnalysisNix.py --exp=$EXP $TRIALSELECTOR $CHANSELECTOR $ANALYSISFOLDER --commitResults
+python -u ./calcISIAnalysisNix.py --exp=$EXP $BLOCKSELECTOR $CHANSELECTOR $ANALYSISFOLDER --commitResults

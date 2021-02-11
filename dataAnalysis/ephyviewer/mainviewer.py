@@ -7,7 +7,7 @@ from collections import OrderedDict
 import time
 import sys
 import pickle
-
+import dataAnalysis.helperFunctions.profiling as prf
 from ephyviewer.myqt import QT, QT_MODE
 from ephyviewer.navigation import NavigationToolBar
 
@@ -33,7 +33,9 @@ orientation_to_qt={
     
 
 class MainViewer(QT.QMainWindow):
-    def __init__(self, debug=False, settings_name=None, parent=None, global_xsize_zoom=False, **navigation_params):
+    def __init__(
+        self, debug=False, settings_name=None,
+        parent=None, global_xsize_zoom=False, **navigation_params):
         QT.QMainWindow.__init__(self, parent)
 
         #TODO settings
@@ -68,11 +70,12 @@ class MainViewer(QT.QMainWindow):
         self.load_one_setting('navigation_toolbar', self.navigation_toolbar)
         
 
-    def add_view(self, widget, location='bottom', orientation='vertical',
-                        tabify_with=None, split_with=None):
+    def add_view(
+        self, widget, location='bottom', orientation='vertical',
+        tabify_with=None, split_with=None):
         name = widget.name
         
-        assert name not in self.viewers, 'Viewer already in MainViewer'
+        assert name not in self.viewers, 'Viewer {} already in MainViewer'.format(name)
         
         dock = QT.QDockWidget(name)
         dock.setObjectName(name)
@@ -200,7 +203,9 @@ class MainViewer(QT.QMainWindow):
 
 
 
-def compose_mainviewer_from_sources(sources, mainviewer=None):
+def compose_mainviewer_from_sources(
+        sources, mainviewer=None,
+        addSpikesToEventList=True):
     """
     Helper that compose a windows from several source with basic rules.
     
@@ -214,17 +219,15 @@ def compose_mainviewer_from_sources(sources, mainviewer=None):
         mainviewer = MainViewer(show_auto_scale=True)
     
     for i, sig_source in enumerate(sources['signal']):
-        #  import pdb; 
-        #  RD 02-23-2019
         view = TraceViewer(source=sig_source, name='signal {}'.format(i))
         view.params['scale_mode'] = 'same_for_all'
         view.params['display_labels'] = True
-        view.params['xsize'] = 12
+        view.params['xsize'] = 3
         try:
             view.auto_scale()
         except Exception:
             view.params['scale_mode'] = 'real_scale'
-        if i==0:
+        if i == 0:
             mainviewer.add_view(view)
         else:
             mainviewer.add_view(view, tabify_with='signal {}'.format(i-1))
@@ -239,22 +242,44 @@ def compose_mainviewer_from_sources(sources, mainviewer=None):
         else:
             mainviewer.add_view(view, tabify_with='spectrogram {}'.format(i-1))
 
+    epochViews = []
     for i, spike_source in enumerate(sources['spike']):
-        view = SpikeTrainViewer(source=spike_source, name='spikes')
-        mainviewer.add_view(view)
-
+        view = SpikeTrainViewer(source=spike_source, name='spikes {}'.format(i))
+        if len(epochViews) > 0:
+            mainviewer.add_view(view,  tabify_with=epochViews[0].name)
+        else:
+            mainviewer.add_view(view)
+        epochViews.append(view)
+    
     for i, ep_source in enumerate(sources['epoch']):
-        view = EpochViewer(source=ep_source, name='epochs')
-        mainviewer.add_view(view)
+        view = EpochViewer(source=ep_source, name='epochs {}'.format(i))
+        if len(epochViews) > 0:
+            mainviewer.add_view(view,  tabify_with=epochViews[0].name)
+        else:
+            mainviewer.add_view(view)
+        epochViews.append(view)
 
     if 'event' in sources and len(sources['event']) > 0:
         ev_source_list = sources['event']
     else:
         ev_source_list = sources['epoch']
+    #
+    eventListViews = []
     for i, ev_source in enumerate(ev_source_list):
-        view = EventList(source=ev_source, name='Event list')
-        mainviewer.add_view(view, location='bottom',  orientation='horizontal')
-    
-    
+        view = EventList(source=ev_source, name='Event list {}'.format(i))
+        if len(eventListViews) > 0:
+            mainviewer.add_view(view, tabify_with=eventListViews[0].name)
+        else:
+            mainviewer.add_view(view, location='bottom',  orientation='horizontal')
+        eventListViews.append(view)
+    #   
+    if addSpikesToEventList and ('spike' in sources):
+        for i, ev_source in enumerate(sources['spike']):
+            view = EventList(source=ev_source, name='Spike list {}'.format(i))
+            if len(eventListViews) > 0:
+                mainviewer.add_view(view, tabify_with=eventListViews[0].name)
+            else:
+                mainviewer.add_view(view, location='bottom',  orientation='horizontal')
+            eventListViews.append(view)
     return mainviewer
 

@@ -1,4 +1,4 @@
-import os, pdb, re, platform
+import os, pdb, re, platform, traceback
 #  import dataAnalysis.helperFunctions.kilosort_analysis as ksa
 import dataAnalysis.helperFunctions.probe_metadata as prb_meta
 import importlib
@@ -31,7 +31,10 @@ def parseAnalysisOptions(
     #     scratchPath = os.path.join('E:', 'Neural Recordings', 'scratch')
 
     nspPrbPath = os.path.join('.', 'nsp_map.prb')
-    insFolder = os.path.join(remoteBasePath, 'ORCA Logs')
+    try:
+        insFolder = os.path.join(remoteBasePath, 'ORCA Logs', expOpts['subjectName'])
+    except Exception:
+        insFolder = os.path.join(remoteBasePath, 'ORCA Logs')
     experimentName = expOpts['experimentName']
     assembledName = ''
     nspFolder = os.path.join(remoteBasePath, 'raw', experimentName)
@@ -68,13 +71,13 @@ def parseAnalysisOptions(
             'Wn': 1000,
             'N': 8,
             'btype': 'low',
-            'ftype': 'butter'
+            'ftype': 'bessel'
         },
         'high': {
             'Wn': 15,
             'N': 10,
             'btype': 'high',
-            'ftype': 'butter'
+            'ftype': 'bessel'
         }
     }
     #
@@ -86,21 +89,67 @@ def parseAnalysisOptions(
             'N': 1,
             'rp': 1,
             'btype': 'bandstop',
-            'ftype': 'butter'
+            'ftype': 'bessel'
         },
         'low': {
             'Wn': 1000,
             'N': 2,
             'btype': 'low',
-            'ftype': 'butter'
+            'ftype': 'bessel'
         },
         'high': {
             'Wn': 5,
             'N': 2,
             'btype': 'high',
-            'ftype': 'butter'
+            'ftype': 'bessel'
         }
     }
+    if 'spikeSortingFilterOpts' not in expOpts:
+        spikeSortingFilterOpts = {
+            'low': {
+                'Wn': 5000,
+                'N': 8,
+                'btype': 'low',
+                'ftype': 'bessel'
+            },
+            'high': {
+                'Wn': 100,
+                'N': 2,
+                'btype': 'high',
+                'ftype': 'bessel'
+            }
+        }
+    else:
+        spikeSortingFilterOpts = expOpts['spikeSortingFilterOpts']
+    if 'stimArtifactFilterOpts' not in expOpts:
+        stimArtifactFilterOpts = {
+            'high': {
+                'Wn': 200,
+                'N': 4,
+                'btype': 'high',
+                'ftype': 'bessel'
+            }
+        }
+    else:
+        stimArtifactFilterOpts = expOpts['stimArtifactFilterOpts']
+    tapDetectFilterOpts = {
+        'high': {
+            'Wn': 20,
+            'N': 2,
+            'btype': 'high',
+            'ftype': 'bessel'
+        }
+    }
+    if 'outlierMaskFilterOpts' not in expOpts:
+        outlierMaskFilterOpts = {
+            'low': {
+                'Wn': 1000,
+                'N': 4,
+                'btype': 'low',
+                'ftype': 'bessel'
+            }}
+    else:
+        outlierMaskFilterOpts = expOpts['outlierMaskFilterOpts']
     
     gpfaOpts = {
         'xDim': 3,
@@ -110,55 +159,24 @@ def parseAnalysisOptions(
         'installFolder': '/gpfs_home/{}/Github/NeuralTraj'
     }
 
-    defaultTapDetectOpts = {
-        'iti': 0.2,
-        'keepIndex': slice(None)
-        }
-    tapDetectOpts = expOpts['synchInfo']['ins']
-    for trialKey in tapDetectOpts.keys():
-        for trialSegmentKey in tapDetectOpts[trialKey].keys():
-            for key in defaultTapDetectOpts.keys():
-                if key not in tapDetectOpts[trialKey][trialSegmentKey].keys():
-                    tapDetectOpts[trialKey][trialSegmentKey].update(
-                        {key: defaultTapDetectOpts[key]}
-                        )
-    defaultSessionTapRangesNSP = {
-        'keepIndex': slice(None)
-        }
-    sessionTapRangesNSP = expOpts['synchInfo']['nsp']
-    try:
-        if not blockExperimentType == 'isi':
-            for trialKey in sessionTapRangesNSP.keys():
-                for trialSegmentKey in sessionTapRangesNSP[trialKey].keys():
-                    for key in defaultSessionTapRangesNSP.keys():
-                        if key not in sessionTapRangesNSP[trialKey][trialSegmentKey].keys():
-                            sessionTapRangesNSP[trialKey][trialSegmentKey].update(
-                                {key: defaultSessionTapRangesNSP[key]}
-                                )
-    except Exception:
-        pass
-    #  make placeholders for interpolation functions
-    interpFunINStoNSP = {
-        key: [None for i in value.keys()]
-        for key, value in sessionTapRangesNSP.items()
-        }
-    interpFunHUTtoINS = {
-        key: [None for i in value.keys()]
-        for key, value in sessionTapRangesNSP.items()
-        }
-
     trialFilesFrom = {
         'utah': {
             'origin': 'mat',
             'experimentName': experimentName,
             'folderPath': nspFolder,
             'ns5FileName': ns5FileName,
-            'calcRigEvents': (blockExperimentType == 'proprio'),
-            'spikeWindow': [-12, 32]
+            'calcRigEvents': (blockExperimentType == 'proprio') or (blockExperimentType == 'proprio-motionOnly'),
+            'spikeWindow': [-24, 40]
             }
         }
     spikeWindow = trialFilesFrom['utah']['spikeWindow']
-    jsonSessionNames = expOpts['jsonSessionNames']
+    try:
+        jsonSessionNames = expOpts['jsonSessionNames']
+    except Exception:
+        traceback.print_exc()
+        jsonSessionNames = {blockIdx: []}
+    if blockIdx not in jsonSessionNames:
+        jsonSessionNames[blockIdx] = []
     trialFilesStim = {
         'ins': {
             'origin': 'ins',
@@ -169,9 +187,10 @@ def parseAnalysisOptions(
             'elecIDs': range(17),
             'excludeClus': [],
             'upsampleRate': 8,
-            # 'interpKind': 'linear',
+            'eventsFromFirstInTrain': True,
+            'interpKind': 'linear',
             # 'upsampleRate': 10,
-            'interpKind': 'akima',
+            # 'interpKind': 'akima',
             'forceRecalc': True,
             'detectStim': expOpts['detectStim'],
             'getINSkwargs': {}
@@ -187,9 +206,9 @@ def parseAnalysisOptions(
         } for grpIdx in range(4)}
     stimDetectOptsByChannel = stimDetectOptsByChannelDefault
     stimDetectOptsByChannel.update(expOpts['stimDetectOptsByChannelSpecific'])
-    if 'stimDetectOverrideStartTimes' in expOpts:
+    try:
         overrideStartTimes = expOpts['stimDetectOverrideStartTimes'][blockIdx]
-    else:
+    except Exception:
         overrideStartTimes = None
     commonStimDetectionOpts = {
         'stimDetectOptsByChannel': stimDetectOptsByChannelDefault,
@@ -201,19 +220,23 @@ def parseAnalysisOptions(
         }
     miniRCStimDetectionOpts = {
         'minDist': 1.2,
-        'gaussWid': 250e-3,
+        'gaussWid': 100e-3,
         'offsetFromPeak': 1e-3,
-        'artifactKeepWhat': 'first',
-        # 'predictSlots': False, 'snapToGrid': False,
-        'predictSlots': True, 'snapToGrid': True,
-        'treatAsSinglePulses': False
+        # 'artifactKeepWhat': 'first',
+        'artifactKeepWhat': 'max',
+        'expectRateProportionalStimOnDelay': True,
+        'expectRateProportionalStimOffDelay': True,
+        'predictSlots': False, 'snapToGrid': False,
+        'treatAsSinglePulses': True
         }
     RCStimDetectionOpts = {
-        'minDist': 0.25,
-        'gaussWid': 120e-3,
-        'offsetFromPeak': 2e-3,
-        'artifactKeepWhat': 'first',
-        'predictSlots': True, 'snapToGrid': True,
+        'minDist': 0.2,
+        'gaussWid': 50e-3,
+        'offsetFromPeak': 1e-3,
+        'artifactKeepWhat': 'max',
+        'expectRateProportionalStimOnDelay': True,
+        'expectRateProportionalStimOffDelay': True,
+        'predictSlots': False, 'snapToGrid': False,
         'treatAsSinglePulses': True
         }
     fullStimDetectionOpts = {
@@ -221,9 +244,10 @@ def parseAnalysisOptions(
         'gaussWid': 50e-3,
         'offsetFromPeak': 1e-3,
         'artifactKeepWhat': 'max',
-        # 'predictSlots': False, 'snapToGrid': False,
-        'predictSlots': True, 'snapToGrid': True,
-        'treatAsSinglePulses': False
+        'expectRateProportionalStimOnDelay': True,
+        'expectRateProportionalStimOffDelay': True,
+        'predictSlots': False, 'snapToGrid': False,
+        'treatAsSinglePulses': True
         }
     # pdb.set_trace()
     trialFilesStim['ins']['getINSkwargs'].update(commonStimDetectionOpts)
@@ -232,16 +256,10 @@ def parseAnalysisOptions(
         trialFilesStim['ins']['getINSkwargs'].update(miniRCStimDetectionOpts)
         #  only parse sync lines
         eventInfo = {'inputIDs': expOpts['miniRCRigInputs']}
-        if 'outlierDetectOptions' in locals():
-            outlierDetectOptions['conditionNames'] = [
-                'electrode', 'amplitude', 'RateInHz']
     elif blockExperimentType == 'proprio-RC':
         trialFilesStim['ins']['getINSkwargs'].update(RCStimDetectionOpts)
         #  should rename eventInfo to something more intuitive
         eventInfo = {'inputIDs': expOpts['RCRigInputs']}
-        if 'outlierDetectOptions' in locals():
-            outlierDetectOptions['conditionNames'] = [
-                'electrode', 'amplitude', 'RateInHz']
     elif blockExperimentType == 'isi':
         #  should rename eventInfo to something more intuitive
         eventInfo = {'inputIDs': dict()}
@@ -268,22 +286,6 @@ def parseAnalysisOptions(
     except Exception:
         impedances = None
         impedancesRipple = None
-    remakePrb = False
-    if remakePrb:
-        import numpy as np
-        nspCsvPath = os.path.join('.', 'nsp_map.csv')
-        cmpDF.to_csv(nspCsvPath)
-        prb_meta.cmpDFToPrb(
-            cmpDF, filePath=nspPrbPath,
-            contactSpacing=100,
-            names=['elec', 'nform', 'ainp'],
-            banks=['A', 'B', 'C', 'E'],
-            # names=['elec', 'ainp'],
-            # groupIn={'xcoords': 4, 'ycoords': 4}
-            groupIn={
-                'ycoords': np.arange(-1.1, 64, 4),
-                'xcoords': np.arange(-0.1, 44, 8)},
-            )
     #  should rename these to something more intuitive
     #  paths relevant to individual trials
     processedFolder = os.path.join(
@@ -325,7 +327,7 @@ def parseAnalysisOptions(
         assembledName + '_binarized.nix')
     #
     figureFolder = os.path.join(
-        remoteBasePath, 'figures', experimentName
+        remoteBasePath, 'processed', experimentName, 'figures'
         )
     if not os.path.exists(figureFolder):
         os.makedirs(figureFolder, exist_ok=True)
@@ -336,7 +338,7 @@ def parseAnalysisOptions(
     # alignedFeaturesFolder = os.path.join(figureFolder, 'alignedFeatures')
     # if not os.path.exists(alignedFeaturesFolder):
     #     os.makedirs(alignedFeaturesFolder, exist_ok=True)
-    spikeSortingFiguresFolder = os.path.join(figureFolder, 'spikeSorting')
+    # spikeSortingFiguresFolder = os.path.join(figureFolder, 'spikeSorting')
     # if not os.path.exists(spikeSortingFiguresFolder):
     #     os.makedirs(spikeSortingFiguresFolder, exist_ok=True)
     # GLMFiguresFolder = os.path.join(figureFolder, 'GLM')
@@ -363,6 +365,12 @@ def parseAnalysisOptions(
                 'binWidth': 5e-3,
                 'smoothKernelWidth': 5e-3},  # 5 kHz,
             'default': {
+                'subfolder': 'default',
+                'binInterval': 1e-3,
+                'binWidth': 10e-3,
+                'smoothKernelWidth': 10e-3},  # default
+            'normalizedByImpedance': {
+                'subfolder': 'default',
                 'binInterval': 1e-3,
                 'binWidth': 10e-3,
                 'smoothKernelWidth': 10e-3},  # default
@@ -384,6 +392,7 @@ def parseAnalysisOptions(
             'XSPre': (-0.65, -0.05),
             'XXS': (-0.2, 0.05),
             'XXXS': (-0.005, 0.025),
+            'M': (-0.2, 0.8),
             'short': (-0.5, 0.5),
             'long': (-2.25, 2.25),
             'RC': (-0.33, 0.33),
@@ -394,12 +403,12 @@ def parseAnalysisOptions(
         'separateByFunKWArgs': {'type': 'Classification'}
         }
     statsTestOpts = dict(
-        testStride=500e-3,
-        testWidth=500e-3,
-        tStart=None,
+        testStride=25e-3,
+        testWidth=25e-3,
+        tStart=0,
         tStop=None,
-        pThresh=1e-2,
-        correctMultiple=True
+        pThresh=5e-2,
+        correctMultiple=False
         )
     relplotKWArgs = dict(
         ci='sem',
@@ -407,15 +416,16 @@ def parseAnalysisOptions(
         estimator='mean',
         # estimator=None, units='t',
         palette="ch:0.6,-.3,dark=.1,light=0.7,reverse=1",
+        # facet_kws={'sharey': True},
         height=6, aspect=2, kind='line')
     vLineOpts = {'color': 'm', 'alpha': 0.5}
     asigPlotShadingOpts = {
         'facecolor': vLineOpts['color'],
         'alpha': 0.1, 'zorder': -100}
     asigSigStarOpts = {
-        'color': 'm',
-        'linestyle': 'None',
-        'markersize': 20,
+        'c': vLineOpts['color'],
+        # 'linestyle': 'None',
+        's': 50,
         'marker': '*'
         }
     nrnRelplotKWArgs = dict(
@@ -435,11 +445,11 @@ def parseAnalysisOptions(
         'facecolor': nrnVLineOpts['color'],
         'alpha': 0.3, 'zorder': -100}
     nrnSigStarOpts = {
-        'color': 'y',
-        'edgecolor': None,
+        'c': nrnVLineOpts['color'],
+        # 'edgecolor': None,
         'edgecolors': 'face',
-        'linestyle': 'None',
-        'markersize': 20,
+        # 'linestyle': 'None',
+        's': 20,
         'marker': '*'}
     plotOpts = {
         'type': 'ticks', 'errorBar': 'sem',

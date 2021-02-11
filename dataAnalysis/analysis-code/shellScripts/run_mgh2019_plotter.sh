@@ -13,8 +13,8 @@
 #SBATCH -J plotsMGH
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-plotsMGH.stdout
-#SBATCH -e ../../batch_logs/%j-plotsMGH.errout
+#SBATCH -o ../../batch_logs/%j-plotsMGH.out
+#SBATCH -e ../../batch_logs/%j-plotsMGH.out
 
 # Specify account details
 #SBATCH --account=bibs-dborton-condo

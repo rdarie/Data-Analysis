@@ -14,8 +14,8 @@
 #SBATCH -J isi_preproc_one_shot
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-isi_preproc_one_shot.stdout
-#SBATCH -e ../../batch_logs/%j-%a-isi_preproc_one_shot.errout
+#SBATCH -o ../../batch_logs/%j-%a-isi_preproc_one_shot.out
+#SBATCH -e ../../batch_logs/%j-%a-isi_preproc_one_shot.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -44,7 +44,7 @@
 # EXP="exp202003181300"
 # EXP="exp202006171300"
 
-# EXP="exp202007011300"
+EXP="exp202007011300"
 # has blocks 1,2,3,4
 
 # EXP="exp202007021300"
@@ -83,7 +83,7 @@ WINDOW="--window=XS"
 
 #CHANSELECTOR="--chanQuery=all"
 # CHANSELECTOR="--chanQuery=isiemgraw"
-CHANSELECTOR="--chanQuery=isiemgoranalog"
+# CHANSELECTOR="--chanQuery=isiemgoranalog"
 # CHANSELECTOR="--chanQuery=isiemgoracc"
 # CHANSELECTOR="--chanQuery=isispinal"
 # CHANSELECTOR="--chanQuery=isispinaloremg"

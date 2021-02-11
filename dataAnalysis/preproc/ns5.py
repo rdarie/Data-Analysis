@@ -11,7 +11,7 @@ import quantities as pq
 #  from quantities import mV, kHz, s, uV
 import math, pdb
 from scipy import stats, signal, fftpack
-#  from copy import copy
+from copy import copy, deepcopy
 import dataAnalysis.helperFunctions.helper_functions_new as hf
 import dataAnalysis.helperFunctions.profiling as prf
 import dataAnalysis.helperFunctions.motor_encoder_new as mea
@@ -23,7 +23,12 @@ from datetime import datetime as dt
 from datetime import timezone
 import os, gc
 import traceback
+import json
 from functools import reduce
+from sklearn.covariance import EmpiricalCovariance
+from sklearn.decomposition import PCA
+from matplotlib import pyplot as plt
+import seaborn as sns
 #  import h5py
 import re
 #  from scipy import signal
@@ -204,7 +209,9 @@ def channelIndexesToSpikeDict(
     for dummyCh in channel_indexes:
         if len(dummyCh.units):
             dummyUnit = dummyCh.units[0]
-            break
+            if len(dummyUnit.spiketrains):
+                if len(dummyUnit.spiketrains[0].times):
+                    break
     dummySt = [
         st
         for st in dummyUnit.spiketrains
@@ -268,7 +275,6 @@ def channelIndexesToSpikeDict(
     return spikes
 
 
-#  renamed unitSpikeTrainArrayAnnToDF to unitSpikeTrainArrayAnnToDF
 def unitSpikeTrainArrayAnnToDF(
         spikeTrainContainer):
     #  list contains different segments
@@ -301,7 +307,6 @@ def getSpikeDFMetadata(spikeDF, metaDataCols):
 def transposeSpikeDF(
         spikeDF, transposeToColumns,
         fastTranspose=False):
-    
     newColumnNames = np.atleast_1d(transposeToColumns).tolist()
     originalColumnNames = np.atleast_1d(spikeDF.columns.names)
     metaDataCols = np.setdiff1d(spikeDF.index.names, newColumnNames).tolist()
@@ -330,6 +335,408 @@ def transposeSpikeDF(
             .set_index(newIdxLabels))
         return newSpikeDF
 
+
+def concatenateBlocks(
+        asigBlocks, spikeBlocks, eventBlocks, chunkingMetadata,
+        samplingRate, chanQuery, lazy, trackMemory, verbose
+        ):
+    # Scan ahead through all files and ensure that
+    # spikeTrains and units are present across all assembled files
+    channelIndexCache = {}
+    unitCache = {}
+    asigCache = []
+    asigAnnCache = {}
+    spiketrainCache = {}
+    eventCache = {}
+    # get list of channels and units
+    for idx, (chunkIdxStr, chunkMeta) in enumerate(chunkingMetadata.items()):
+        gc.collect()
+        chunkIdx = int(chunkIdxStr)
+        asigBlock = asigBlocks[chunkIdx]
+        asigSeg = asigBlock.segments[0]
+        spikeBlock = spikeBlocks[chunkIdx]
+        eventBlock = eventBlocks[chunkIdx]
+        eventSeg = eventBlock.segments[0]
+        for chIdx in asigBlock.filter(objects=ChannelIndex):
+            chAlreadyThere = (chIdx.name in channelIndexCache.keys())
+            if not chAlreadyThere:
+                newChIdx = copy(chIdx)
+                newChIdx.analogsignals = []
+                newChIdx.units = []
+                channelIndexCache[chIdx.name] = newChIdx
+        for unit in (spikeBlock.filter(objects=Unit)):
+            if lazy:
+                theseSpiketrains = []
+                for stP in unit.spiketrains:
+                    st = loadStProxy(stP)
+                    if len(st.times) > 0:
+                        theseSpiketrains.append(st)
+            else:
+                theseSpiketrains = [
+                    st
+                    for st in unit.spiketrains
+                    if len(st.times)
+                    ]
+            for st in theseSpiketrains:
+                st = loadObjArrayAnn(st)
+                if len(st.times):
+                    st.magnitude[:] = st.times.magnitude + spikeBlock.annotations['chunkTStart']
+                    st.t_start = min(0 * pq.s, st.times[0] * 0.999)
+                    st.t_stop = max(
+                        st.t_stop + spikeBlock.annotations['chunkTStart'] * pq.s,
+                        st.times[-1] * 1.001)
+                else:
+                    st.t_start += spikeBlock.annotations['chunkTStart'] * pq.s
+                    st.t_stop += spikeBlock.annotations['chunkTStart'] * pq.s
+            uAlreadyThere = (unit.name in unitCache.keys())
+            if not uAlreadyThere:
+                newUnit = copy(unit)
+                newUnit.spiketrains = []
+                newUnit.annotations['parentChanName'] = unit.channel_index.name
+                unitCache[unit.name] = newUnit
+                spiketrainCache[unit.name] = theseSpiketrains
+            else:
+                spiketrainCache[unit.name] = spiketrainCache[unit.name] + theseSpiketrains
+        #
+        if lazy:
+            evList = [
+                evP.load()
+                for evP in eventSeg.events]
+        else:
+            evList = eventSeg.events
+        for event in evList:
+            event.magnitude[:] = event.magnitude + eventBlock.annotations['chunkTStart']
+            if event.name in eventCache.keys():
+                eventCache[event.name].append(event)
+            else:
+                eventCache[event.name] = [event]
+        # take the requested analog signal channels
+        if lazy:
+            tdChanNames = listChanNames(
+                asigBlock, chanQuery, objType=AnalogSignalProxy)
+            #############
+            # tdChanNames = ['seg0_utah1', 'seg0_utah10']
+            ##############
+            asigList = []
+            for asigP in asigSeg.analogsignals:
+                if asigP.name in tdChanNames:
+                    asig = asigP.load()
+                    asig.channel_index = asigP.channel_index
+                    asigList.append(asig)
+                    if trackMemory:
+                        print('loading {} from proxy object. memory usage: {:.1f} MB'.format(
+                            asigP.name, prf.memory_usage_psutil()))
+        else:
+            tdChanNames = listChanNames(
+                asigBlock, chanQuery, objType=AnalogSignal)
+            asigList = [
+                asig
+                for asig in asigSeg.analogsignals
+                if asig.name in tdChanNames
+                ]
+        for asig in asigList:
+            if asig.size > 0:
+                dummyAsig = asig
+        if idx == 0:
+            outputBlock = Block(
+                name=asigBlock.name,
+                file_origin=asigBlock.file_origin,
+                file_datetime=asigBlock.file_datetime,
+                rec_datetime=asigBlock.rec_datetime,
+                **asigBlock.annotations
+            )
+            newSeg = Segment(
+                index=0, name=asigSeg.name,
+                description=asigSeg.description,
+                file_origin=asigSeg.file_origin,
+                file_datetime=asigSeg.file_datetime,
+                rec_datetime=asigSeg.rec_datetime,
+                **asigSeg.annotations
+            )
+            outputBlock.segments = [newSeg]
+            for asig in asigList:
+                asigAnnCache[asig.name] = asig.annotations
+                asigAnnCache[asig.name]['parentChanName'] = asig.channel_index.name
+            asigUnits = dummyAsig.units
+        tdDF = analogSignalsToDataFrame(asigList)
+        del asigList  # asigs saved to dataframe, no longer needed
+        tdDF.loc[:, 't'] += asigBlock.annotations['chunkTStart']
+        tdDF.set_index('t', inplace=True)
+        if samplingRate != dummyAsig.sampling_rate:
+            lowPassOpts = {
+                'low': {
+                    'Wn': float(samplingRate / 2),
+                    'N': 4,
+                    'btype': 'low',
+                    'ftype': 'bessel'
+                }
+            }
+            newT = pd.Series(
+                np.arange(
+                    dummyAsig.t_start + asigBlock.annotations['chunkTStart'] * pq.s,
+                    dummyAsig.t_stop + asigBlock.annotations['chunkTStart'] * pq.s,
+                    1/samplingRate))
+            if samplingRate < dummyAsig.sampling_rate:
+                filterCoeffs = hf.makeFilterCoeffsSOS(
+                    lowPassOpts, float(dummyAsig.sampling_rate))
+                if trackMemory:
+                    print('Filtering analog data before downsampling. memory usage: {:.1f} MB'.format(
+                        prf.memory_usage_psutil()))
+                '''
+                ### check that axis=0 is the correct option
+                dummyDF = tdDF.iloc[:, :4].copy()
+                filteredAsigs0 = signal.sosfiltfilt( filterCoeffs, dummyDF.to_numpy(), axis=0)
+                filteredAsigs1 = signal.sosfiltfilt( filterCoeffs, dummyDF.to_numpy(), axis=1)
+                ###
+                '''
+                filteredAsigs = signal.sosfiltfilt(
+                    filterCoeffs, tdDF.to_numpy(),
+                    axis=0)
+                tdDF = pd.DataFrame(
+                    filteredAsigs,
+                    index=tdDF.index,
+                    columns=tdDF.columns)
+                if trackMemory:
+                    print('Just finished analog data filtering before downsampling. memory usage: {:.1f} MB'.format(
+                        prf.memory_usage_psutil()))
+            tdInterp = hf.interpolateDF(
+                tdDF, newT,
+                kind='linear', fill_value='extrapolate',
+                verbose=verbose)
+            # free up memory used by full resolution asigs
+            del tdDF
+        else:
+            tdInterp = tdDF
+        #
+        asigCache.append(tdInterp)
+        #
+        print('Finished chunk {}'.format(chunkIdxStr))
+    allTdDF = pd.concat(asigCache)
+    # TODO: check for nans, if, for example a signal is partially missing
+    allTdDF.fillna(method='bfill', inplace=True)
+    allTdDF.fillna(method='ffill', inplace=True)
+    for asigName in allTdDF.columns:
+        newAsig = AnalogSignal(
+            allTdDF[asigName].to_numpy() * asigUnits,
+            name=asigName,
+            sampling_rate=samplingRate,
+            dtype=np.float32,
+            **asigAnnCache[asigName])
+        chIdxName = asigAnnCache[asigName]['parentChanName']
+        chIdx = channelIndexCache[chIdxName]
+        # cross-assign ownership to containers
+        chIdx.analogsignals.append(newAsig)
+        newSeg.analogsignals.append(newAsig)
+        newAsig.channel_index = chIdx
+        newAsig.segment = newSeg
+    #
+    for uName, unit in unitCache.items():
+        # concatenate spike times, waveforms, etc.
+        if len(spiketrainCache[unit.name]):
+            consolidatedTimes = np.concatenate([
+                    st.times.magnitude
+                    for st in spiketrainCache[unit.name]
+                ])
+            # TODO:   decide whether to include this step
+            #         which snaps the spike times to the nearest
+            #         *sampled* data point
+            #
+            # consolidatedTimes, timesIndex = hf.closestSeries(
+            #     takeFrom=pd.Series(consolidatedTimes),
+            #     compareTo=pd.Series(allTdDF.index))
+            #
+            # find an example spiketrain with array_annotations
+            for st in spiketrainCache[unit.name]:
+                if len(st.times):
+                    dummySt = st
+                    break
+            consolidatedAnn = {
+                key: np.array([])
+                for key, value in dummySt.array_annotations.items()
+                }
+            for key, value in consolidatedAnn.items():
+                consolidatedAnn[key] = np.concatenate([
+                    st.annotations[key]
+                    for st in spiketrainCache[unit.name]
+                ])
+            consolidatedWaveforms = np.concatenate([
+                st.waveforms
+                for st in spiketrainCache[unit.name]
+                ])
+            spikeTStop = max([
+                st.t_stop
+                for st in spiketrainCache[unit.name]
+                ])
+            spikeTStart = max([
+                st.t_start
+                for st in spiketrainCache[unit.name]
+                ])
+            spikeAnnotations = {
+                key: value
+                for key, value in dummySt.annotations.items()
+                if key not in dummySt.annotations['arrayAnnNames']
+            }
+            newSt = SpikeTrain(
+                name=dummySt.name,
+                times=consolidatedTimes, units='sec', t_stop=spikeTStop,
+                waveforms=consolidatedWaveforms * dummySt.waveforms.units,
+                left_sweep=dummySt.left_sweep,
+                sampling_rate=dummySt.sampling_rate,
+                t_start=spikeTStart, **spikeAnnotations,
+                array_annotations=consolidatedAnn)
+            # cross-assign ownership to containers
+            unit.spiketrains.append(newSt)
+            newSt.unit = unit
+            newSeg.spiketrains.append(newSt)
+            newSt.segment = newSeg
+            # link chIdxes and Units
+            if unit.annotations['parentChanName'] in channelIndexCache:
+                chIdx = channelIndexCache[unit.annotations['parentChanName']]
+                if unit not in chIdx.units:
+                    chIdx.units.append(unit)
+                    unit.channel_index = chIdx
+            else:
+                newChIdx = ChannelIndex(
+                    name=unit.annotations['parentChanName'], index=0)
+                channelIndexCache[unit.annotations['parentChanName']] = newChIdx
+                if unit not in newChIdx.units:
+                    newChIdx.units.append(unit)
+                    unit.channel_index = newChIdx
+    #
+    for evName, eventList in eventCache.items():
+        consolidatedTimes = np.concatenate([
+            ev.times.magnitude
+            for ev in eventList
+            ])
+        consolidatedLabels = np.concatenate([
+            ev.labels
+            for ev in eventList
+            ])
+        newEvent = Event(
+            name=evName,
+            times=consolidatedTimes * pq.s,
+            labels=consolidatedLabels
+            )
+        # if len(newEvent):
+        newEvent.segment = newSeg
+        newSeg.events.append(newEvent)
+    for chIdxName, chIdx in channelIndexCache.items():
+        if len(chIdx.analogsignals) or len(chIdx.units):
+            outputBlock.channel_indexes.append(chIdx)
+            chIdx.block = outputBlock
+    #
+    outputBlock = purgeNixAnn(outputBlock)
+    createRelationship = False
+    if createRelationship:
+        outputBlock.create_relationship()
+    return outputBlock
+
+
+'''
+def concatenateEventsContainerV2(eventContainer, newSegIdx=0):
+    if isinstance(eventContainer, dict):
+        allListOfEvents = list(eventContainer.values())
+    else:
+        allListOfEvents = eventContainer
+    listOfEvents = [ev for ev in allListOfEvents if len(ev.times)]
+    if not len(listOfEvents) > 0:
+        return allListOfEvents[0]
+    masterEvent = None
+    for evIdx, ev in enumerate(listOfEvents):
+        masterEvent = ev
+        if len(masterEvent.times):
+            break
+    if evIdx > len(listOfEvents) - 1:
+        for ev in listOfEvents[evIdx+1:]:
+            masterEvent = masterEvent.merge(ev)
+    if masterEvent.array_annotations is not None:
+        arrayAnnNames = list(masterEvent.array_annotations.keys())
+        masterEvent.annotations.update(masterEvent.array_annotations)
+        masterEvent.annotations['arrayAnnNames'] = arrayAnnNames
+    return masterEvent
+'''
+
+
+def concatenateEventsContainer(eventContainer, linkParents=True):
+    if isinstance(eventContainer, dict):
+        listOfEvents = list(eventContainer.values())
+    else:
+        listOfEvents = eventContainer
+    nonEmptyEvents = [ev for ev in listOfEvents if len(ev.times)]
+    if not len(nonEmptyEvents) > 0:
+        return listOfEvents[0]
+    masterEvent = listOfEvents[0]
+    for evIdx, ev in enumerate(listOfEvents[1:]):
+        try:
+            masterEvent = masterEvent.merge(ev)
+        except Exception:
+            traceback.print_exc()
+            pdb.set_trace()
+    if masterEvent.array_annotations is not None:
+        arrayAnnNames = list(masterEvent.array_annotations.keys())
+        masterEvent.annotations.update(masterEvent.array_annotations)
+        masterEvent.annotations['arrayAnnNames'] = arrayAnnNames
+    if linkParents:
+        masterEvent.segment = listOfEvents[0].segment
+        if isinstance(masterEvent, SpikeTrain):
+            masterEvent.unit = listOfEvents[0].unit
+    return masterEvent
+
+'''
+def concatenateEventsContainer(eventContainer, newSegIdx=0):
+    if isinstance(eventContainer, dict):
+        listOfEvents = list(eventContainer.values())
+    else:
+        listOfEvents = eventContainer
+    listOfEvents = [ev for ev in listOfEvents if len(ev.times)]
+    for ev in listOfEvents:
+        dummyEvent = ev
+        if len(dummyEvent.times):
+            break
+    consolidatedTimes = np.concatenate([st.times for st in listOfEvents]) * dummyEvent.units
+    arrayAnnNames = list(dummyEvent.array_annotations.keys())
+    if len(arrayAnnNames):
+        consolidatedArrayAnn = {k: None for k in arrayAnnNames}
+        for annNm in arrayAnnNames:
+            consolidatedArrayAnn[annNm] = np.concatenate(
+                [st.array_annotations[annNm] for st in listOfEvents])
+    else:
+        consolidatedArrayAnn = None
+    if isinstance(dummyEvent, SpikeTrain):
+        consolidatedWaveforms = np.concatenate(
+            [st.waveforms for st in listOfEvents if hasattr(st, 'waveforms')],
+            axis=0) * dummyEvent.waveforms.units
+        tStop = max(st.t_stop for st in listOfEvents if hasattr(st, 't_stop'))
+        tStart = min(st.t_start for st in listOfEvents if hasattr(st, 't_start'))
+        if consolidatedWaveforms.size == 0:
+            consolidatedWaveforms = None
+            leftSweep = None
+        else:
+            dummyEvent.left_sweep
+        outObj = SpikeTrain(
+            name='seg{}_{}'.format(newSegIdx, dummyEvent.unit.name),
+            times=consolidatedTimes,
+            waveforms=consolidatedWaveforms,
+            t_start=tStart, t_stop=tStop,
+            left_sweep=leftSweep, **dummyEvent.annotations
+            )
+        outObj.unit = dummyEvent.unit
+    if isinstance(dummyEvent, Event):
+        consolidatedLabels = np.concatenate([st.labels for st in listOfEvents])
+        outObj = Event(
+            name='seg{}_{}'.format(
+                newSegIdx, childBaseName(dummyEvent.name, 'seg')),
+            labels=consolidatedLabels,
+            times=consolidatedTimes,
+            **dummyEvent.annotations
+            )
+    outObj.segment = dummyEvent.segment
+    if consolidatedArrayAnn is not None:
+        outObj.array_annotations = consolidatedArrayAnn
+        outObj.annotations.update(consolidatedArrayAnn)
+        outObj.annotations['arrayAnnNames'] = arrayAnnNames
+    return outObj
+'''
 
 #  renamed spikeTrainWaveformsToDF to unitSpikeTrainWaveformsToDF
 def unitSpikeTrainWaveformsToDF(
@@ -432,10 +839,20 @@ def unitSpikeTrainWaveformsToDF(
                 if k not in skipAnnNames:
                     annDF.loc[:, k] = value
             #
-            
+            if isinstance(getMetaData, Iterable):
+                doNotFillList = idxLabels + ['feature', 'bin']
+                fieldsNeedFiller = [
+                    mdn
+                    for mdn in getMetaData
+                    if (mdn not in doNotFillList) and (mdn not in annDF.columns)]
+                for mdName in fieldsNeedFiller:
+                    annDF.loc[:, mdName] = 'NA'
             annColumns = annDF.columns.to_list()
             if getMetaData:
-                idxLabels += annColumns
+                for annNm in annColumns:
+                    if annNm not in idxLabels:
+                        idxLabels.append(annNm)
+                # idxLabels += annColumns
             spikeDF = annDF.join(wfDF)
         else:
             spikeDF = wfDF
@@ -488,7 +905,6 @@ def unitSpikeTrainWaveformsToDF(
                 halfRollingWin = 0
                 seekIdx = slice(None, None, decimate)
                 if False:
-                    import matplotlib.pyplot as plt
                     oldShiftedWaveform = zeroLagWaveformsDF.shift(
                         lag, axis='columns')
                     plt.plot(oldShiftedWaveform.iloc[0, :])
@@ -630,7 +1046,7 @@ def concatenateUnitSpikeTrainWaveformsDF(
             axis='index', inplace=True, kind='mergesort')
         allWaveforms.sort_index(
             axis='columns', inplace=True, kind='mergesort')
-    except:
+    except Exception:
         pdb.set_trace()
     return allWaveforms
 
@@ -715,6 +1131,7 @@ def alignedAsigsToDF(
                 )
             uniqProgs = stimWaveforms[programColumn].unique()
             progElecLookup = {}
+            # pdb.set_trace()
             for progIdx in uniqProgs:
                 theseStimDF = stimWaveforms.loc[
                     stimWaveforms[programColumn] == progIdx,
@@ -772,7 +1189,7 @@ def alignedAsigsToDF(
 def getAsigsAlignedToEvents(
         eventBlock=None, signalBlock=None,
         chansToTrigger=None, chanQuery=None,
-        eventName=None, windowSize=None, 
+        eventName=None, windowSize=None,
         minNReps=None,
         appendToExisting=False,
         checkReferences=True, verbose=False,
@@ -787,8 +1204,13 @@ def getAsigsAlignedToEvents(
             signalBlock, chanQuery, objType=ChannelIndex, condition='hasAsigs')
     #  allocate block for spiketrains
     masterBlock = Block()
-    masterBlock.name = signalBlock.annotations['neo_name']
-    masterBlock.annotate(nix_name=signalBlock.annotations['neo_name'])
+    try:
+        masterBlock.name = signalBlock.annotations['neo_name']
+        masterBlock.annotate(nix_name=signalBlock.annotations['neo_name'])
+    except Exception:
+        masterBlock.name = signalBlock.name
+        masterBlock.annotate(neo_name=signalBlock.name)
+        masterBlock.annotate(nix_name=signalBlock.name)
     #  make channels and units for triggered time series
     for chanName in chansToTrigger:
         chanIdx = ChannelIndex(name=chanName + '#0', index=[0])
@@ -798,6 +1220,17 @@ def getAsigsAlignedToEvents(
         chanIdx.units.append(thisUnit)
         thisUnit.channel_index = chanIdx
         masterBlock.channel_indexes.append(chanIdx)
+        sigChanIdxList = signalBlock.filter(
+            objects=ChannelIndex, name=chanName)
+        if len(sigChanIdxList):
+            sigChanIdx = sigChanIdxList[0]
+            if sigChanIdx.coordinates is not None:
+                coordUnits = sigChanIdx.coordinates[0][0].units
+                chanIdx.coordinates = np.asarray(sigChanIdx.coordinates) * coordUnits
+                thisUnit.annotations['parentChanXCoords'] = float(chanIdx.coordinates[:, 0].magnitude)
+                thisUnit.annotations['parentChanYCoords'] = float(chanIdx.coordinates[:, 1].magnitude)
+                thisUnit.annotations['parentChanCoordinateUnits'] = '{}'.format(coordUnits)
+    #
     totalNSegs = 0
     #  print([evSeg.events[3].name for evSeg in eventBlock.segments])
     allAlignEventsList = []
@@ -868,6 +1301,8 @@ def getAsigsAlignedToEvents(
                 print(
                     'getAsigsAlignedToEvents on subSegment {} of {}'
                     .format(subSegIdx + 1, len(alignEventGroups)))
+            if not alignEvents.shape[0] > 0:
+                continue
             newSeg = Segment(name='seg{}_'.format(int(totalNSegs)))
             newSeg.annotate(nix_name=newSeg.name)
             masterBlock.segments.append(newSeg)
@@ -896,7 +1331,7 @@ def getAsigsAlignedToEvents(
                 # array_annotations get sliced with the event, but regular anns do not
                 for annName in alignEvents.annotations['arrayAnnNames']:
                     alignEvents.annotations[annName] = (
-                        alignEvents.annotations[annName][fullMask])
+                        alignEvents.array_annotations[annName])
                 if isinstance(asig, AnalogSignalProxy):
                     if checkReferences:
                         da = (
@@ -971,6 +1406,8 @@ def getAsigsAlignedToEvents(
                     **stAnn
                     )
                 st.annotate(nix_name=st.name)
+                st.annotations['unitAnnotations'] = json.dumps(
+                    thisUnit.annotations.copy())
                 thisUnit.spiketrains.append(st)
                 newSeg.spiketrains.append(st)
                 st.unit = thisUnit
@@ -1001,140 +1438,14 @@ def getAsigsAlignedToEvents(
             purgeNixNames=False,
             nixBlockIdx=0, nixSegIdx=allSegs)
     else:
+        if os.path.exists(triggeredPath):
+            os.remove(triggeredPath)
         masterBlock = purgeNixAnn(masterBlock)
         writer = NixIO(filename=triggeredPath)
         writer.write_block(masterBlock, use_obj_names=True)
         writer.close()
     return masterBlock
 
-'''
-def getAsigsAlignedToEventsOneUnit(
-        eventBlock=None, eventName=None, chansToAlign=None,
-        windowSize=None, chunkSize=None,
-        checkReferences=False, verbose=False, 
-        ):
-    #  make channels and units for triggered time series
-    thisUnit = Unit(name=eventName)
-    
-    allAlignEvents = []
-    for segIdx, eventSeg in enumerate(eventBlock.segments):
-        evPs = eventSeg.filter(
-            objects=EventProxy, name=eventName)
-        if len(evPs):
-            event = evPs[0].load()
-            event = loadObjArrayAnn(event)
-        else:
-            evs = eventSeg.filter(objects=Event, name=eventName)
-            event = evs[0]
-        if segIdx == 0:
-            skipAnnNames = (
-                list(event.annotations['arrayAnnNames']) +
-                ['nix_name', 'neo_name']
-                )
-        if chunkSize is None:
-            alignEventGroups = [event]
-        else:
-            nChunks = max(
-                int(np.floor(event.shape[0] / chunkSize)),
-                1)
-            alignEventGroups = []
-            for i in range(nChunks):
-                if i < (nChunks - 1):
-                    alignEventGroups.append(
-                        event[i * chunkSize: (i + 1) * chunkSize])
-                else:
-                    alignEventGroups.append(
-                        event[i * chunkSize:])
-        allAlignEvents.append(alignEventGroups)
-    
-    samplingRate = chansToAlign[0].analogsignals[0].sampling_rate
-    nominalWinLen = int(
-        (windowSize[1] - windowSize[0]) *
-        samplingRate - 1)
-    signalBlock = chansToAlign[0].block
-    
-    totalNSegs = 0
-    for segIdx, signalSeg in enumerate(signalBlock.segments):
-        for subSegIdx, alignEvents in enumerate(allAlignEvents[segIdx]):
-            spikeWaveforms = np.zeros((alignEvents.shape[0], len(chansToAlign), nominalWinLen))
-            asigTStart = chansToAlign[0].analogsignals[segIdx].t_start
-            asigTStop = chansToAlign[0].analogsignals[segIdx].t_stop
-            validMask = (
-                ((
-                    alignEvents + windowSize[1] +
-                    samplingRate ** (-1)) < asigTStart) &
-                ((
-                    alignEvents + windowSize[0] -
-                    samplingRate ** (-1)) > asigTStop)
-                )
-            alignEvents = alignEvents[validMask]
-            for chanIdx in chansToAlign:
-                asigP = chanIdx.filter(objects=AnalogSignalProxy)[segIdx]
-                if checkReferences:
-                    da = (
-                        asigP
-                        ._rawio
-                        .da_list['blocks'][0]['segments'][segIdx]['data'])
-                    print('segIdx {}, asigP.name {}'.format(
-                        segIdx, asigP.name))
-                    print('asigP._global_channel_indexes = {}'.format(
-                        asigP._global_channel_indexes))
-                    print('asigP references {}'.format(
-                        da[asigP._global_channel_indexes[0]]))
-                    try:
-                        assert (
-                            asigP.name
-                            in da[asigP._global_channel_indexes[0]].name)
-                    except Exception:
-                        traceback.print_exc()
-                rawWaveforms = [
-                    asigP.load(
-                        time_slice=(t + windowSize[0], t + windowSize[1]))
-                    for t in alignEvents]
-                waveformUnits = rawWaveforms[0].units
-                #  fix length if roundoff error
-                #  minLen = min([rW.shape[0] for rW in rawWaveforms])
-                rawWaveforms = [rW[:nominalWinLen] for rW in rawWaveforms]
-                theseSpikeWaveforms = (
-                    np.hstack([rW.magnitude for rW in rawWaveforms])
-                    .transpose()[:, np.newaxis, :] * waveformUnits
-                    )
-                metaIndex = np.nan  # TODO: Figure out how to stack these
-                spikeWaveforms[:, metaIndex, :] = theseSpikeWaveforms
-            stAnn = {
-                k: v
-                for k, v in alignEvents.annotations.items()
-                if k not in skipAnnNames
-                }
-            stArrayAnn = {
-                k: alignEvents.array_annotations[k]
-                for k in alignEvents.annotations['arrayAnnNames']
-            }
-            st = SpikeTrain(
-                name='seg{}_{}'.format(int(totalNSegs), thisUnit.name),
-                times=alignEvents.times,
-                waveforms=spikeWaveforms,
-                t_start=asigP.t_start, t_stop=asigP.t_stop,
-                left_sweep=windowSize[0] * (-1),
-                sampling_rate=samplingRate,
-                **stArrayAnn,
-                **stAnn
-                )
-            st.annotate(nix_name=st.name)
-            thisUnit.spiketrains.append(st)
-            st.unit = thisUnit
-            totalNSegs += 1
-    try:
-        eventBlock.filter(
-            objects=EventProxy)[0]._rawio.file.close()
-    except Exception:
-        traceback.print_exc()
-    if signalBlock is not eventBlock:
-        signalBlock.filter(
-            objects=AnalogSignalProxy)[0]._rawio.file.close()
-    
-    return thisUnit
-'''
 
 def alignedAsigDFtoSpikeTrain(
         allWaveforms, dataBlock=None, matchSamplingRate=True):
@@ -1267,7 +1578,10 @@ def dataFrameToAnalogSignals(
             dtype=np.float32,
             # **ann
             )
-        asig.t_start = df[idxT].iloc[0] * timeUnits
+        if idxT is not None:
+            asig.t_start = df[idxT].iloc[0] * timeUnits
+        else:
+            asig.t_start = df.index[0] * timeUnits
         asig.channel_index = chanIdx
         # assign ownership to containers
         chanIdx.analogsignals.append(asig)
@@ -1326,7 +1640,6 @@ def eventsToDataFrame(
         events, idxT='t', names=None
         ):
     eventDict = {}
-    
     calculatedT = False
     for event in events:
         if names is not None:
@@ -1504,14 +1817,15 @@ def synchronizeINStoNSP(
         tapTimestampsNSP=None, tapTimestampsINS=None,
         precalculatedFun=None,
         NSPTimeRanges=(None, None),
-        td=None, accel=None, insBlock=None, trialSegment=None, degree=1
+        td=None, accel=None, insBlock=None, trialSegment=None, degree=1,
+        trimSpiketrains=False
         ):
+    print('Trial Segment {}'.format(trialSegment))
     if precalculatedFun is None:
         assert ((tapTimestampsNSP is not None) & (tapTimestampsINS is not None))
         # sanity check that the intervals match
         insDiff = tapTimestampsINS.diff().dropna().values
         nspDiff = tapTimestampsNSP.diff().dropna().values
-        print('Trial Segment {}'.format(trialSegment))
         print('On the INS, the diff() between taps was\n{}'.format(insDiff))
         print('On the NSP, the diff() between taps was\n{}'.format(nspDiff))
         print('This amounts to a msec difference of\n{}'.format(
@@ -1521,7 +1835,8 @@ def synchronizeINStoNSP(
         #
         if degree > 0:
             synchPolyCoeffsINStoNSP = np.polyfit(
-                x=tapTimestampsINS.values, y=tapTimestampsNSP.values, deg=degree)
+                x=tapTimestampsINS.values, y=tapTimestampsNSP.values,
+                deg=degree)
         else:
             timeOffset = tapTimestampsNSP.values - tapTimestampsINS.values
             synchPolyCoeffsINStoNSP = np.array([1, np.mean(timeOffset)])
@@ -1531,11 +1846,13 @@ def synchronizeINStoNSP(
     if td is not None:
         td.loc[:, 'NSPTime'] = pd.Series(
             timeInterpFunINStoNSP(td['t']), index=td['t'].index)
+        td.loc[:, 'NSPTime'] = timeInterpFunINStoNSP(td['t'].to_numpy())
     if accel is not None:
         accel.loc[:, 'NSPTime'] = pd.Series(
             timeInterpFunINStoNSP(accel['t']), index=accel['t'].index)
     if insBlock is not None:
         # allUnits = [st.unit for st in insBlock.segments[0].spiketrains]
+        # [un.name for un in insBlock.filter(objects=Unit)]
         for unit in insBlock.filter(objects=Unit):
             tStart = NSPTimeRanges[0]
             tStop = NSPTimeRanges[1]
@@ -1545,45 +1862,63 @@ def synchronizeINStoNSP(
                     uniqueSt.append(st)
                 else:
                     continue
+                print('Synchronizing {}'.format(st.name))
                 if len(st.times):
-                    segMask = np.array(
+                    segMaskSt = np.array(
                         st.array_annotations['trialSegment'],
                         dtype=np.int) == trialSegment
-                    st.magnitude[segMask] = (
-                        timeInterpFunINStoNSP(st.times[segMask].magnitude))
-                    #  kludgey fix for weirdness concerning t_start
-                    st.t_start = min(tStart, st.times[0] * 0.999)
-                    st.t_stop = min(tStop, st.times[-1] * 1.001)
-                    validMask = st < st.t_stop
-                    if ~validMask.all():
-                        print('Deleted some spikes')
-                        st = st[validMask]
-                        # delete invalid spikes
-                        if 'arrayAnnNames' in st.annotations.keys():
-                            for key in st.annotations['arrayAnnNames']:
-                                st.annotations[key] = np.array(st.array_annotations[key])
+                    st.magnitude[segMaskSt] = (
+                        timeInterpFunINStoNSP(st.times[segMaskSt].magnitude))
+                    if trimSpiketrains:
+                        print('Trimming spiketrain')
+                        #  kludgey fix for weirdness concerning t_start
+                        st.t_start = min(tStart, st.times[0] * 0.999)
+                        st.t_stop = min(tStop, st.times[-1] * 1.001)
+                        validMask = st < st.t_stop
+                        if ~validMask.all():
+                            print('Deleted some spikes')
+                            st = st[validMask]
+                            # delete invalid spikes
+                            if 'arrayAnnNames' in st.annotations.keys():
+                                for key in st.annotations['arrayAnnNames']:
+                                    try:
+                                        # st.annotations[key] = np.array(st.array_annotations[key])
+                                        st.annotations[key] = np.delete(st.annotations[key], ~validMask)
+                                    except Exception:
+                                        traceback.print_exc()
+                                        pdb.set_trace()
                 else:
-                    st.t_start = tStart
-                    st.t_stop = tStop
+                    if trimSpiketrains:
+                        st.t_start = tStart
+                        st.t_stop = tStop
         #
         allEvents = [
             ev
             for ev in insBlock.filter(objects=Event)
             if ('ins' in ev.name) and ('concatenate' not in ev.name)]
-        eventsDF = eventsToDataFrame(allEvents, idxT='t')
-        newNames = {i: childBaseName(i, 'seg') for i in eventsDF.columns}
-        eventsDF.rename(columns=newNames, inplace=True)
-        segMask = hf.getStimSerialTrialSegMask(eventsDF, trialSegment)
-        for event in allEvents:
-            event.magnitude[segMask] = (
-                timeInterpFunINStoNSP(event.times[segMask].magnitude))
         concatEvents = [
             ev
             for ev in insBlock.filter(objects=Event)
             if ('ins' in ev.name) and ('concatenate' in ev.name)]
-        if len(concatEvents) > trialSegment:
-            concatEvents[trialSegment].magnitude[:] = timeInterpFunINStoNSP(
-                concatEvents[trialSegment].times[:].magnitude)
+        eventsDF = eventsToDataFrame(allEvents, idxT='t')
+        newNames = {i: childBaseName(i, 'seg') for i in eventsDF.columns}
+        eventsDF.rename(columns=newNames, inplace=True)
+        segMask = hf.getStimSerialTrialSegMask(eventsDF, trialSegment)
+        evTStart = eventsDF.loc[segMask, 't'].min() * pq.s
+        evTStop = eventsDF.loc[segMask, 't'].max() * pq.s
+        # print('allEvents[0].shape = {}'.format(allEvents[0].shape))
+        # print('allEvents[0].magnitude[segMask][0] = {}'.format(allEvents[0].magnitude[segMask][0]))
+        for event in (allEvents + concatEvents):
+            if trimSpiketrains:
+                thisSegMask = (event.times >= evTStart) & (event.times <= evTStop)
+            else:
+                thisSegMask = (event.times >= evTStart) & (event.times < evTStop)
+            event.magnitude[thisSegMask] = (
+                timeInterpFunINStoNSP(event.times[thisSegMask].magnitude))
+        # print('allEvents[0].magnitude[segMask][0] = {}'.format(allEvents[0].magnitude[segMask][0]))
+        # if len(concatEvents) > trialSegment:
+        #     concatEvents[trialSegment].magnitude[:] = timeInterpFunINStoNSP(
+        #         concatEvents[trialSegment].times[:].magnitude)
     return td, accel, insBlock, timeInterpFunINStoNSP
 
 
@@ -1725,10 +2060,6 @@ def getNIXData(
         'data': data,
         't': data['t']
         }
-    
-    #  for stp in block.filter(objects=SpikeTrainProxy):
-    #      print('original tstart: '.format(stp.t_start))
-    #      print('original tstop: '.format(stp.t_stop))
     if closeReader:
         reader.file.close()
         block = None
@@ -1749,7 +2080,7 @@ def readBlockFixNames(
         rawioReader,
         block_index=0, signal_group_mode='split-all',
         lazy=True, mapDF=None, reduceChannelIndexes=False,
-        # swapMaps=None
+        loadList=None, purgeNixNames=False
         ):
     headerSignalChan = pd.DataFrame(
         rawioReader.header['signal_channels']).set_index('id')
@@ -1758,7 +2089,6 @@ def readBlockFixNames(
     dataBlock = rawioReader.read_block(
         block_index=block_index, lazy=lazy,
         signal_group_mode=signal_group_mode)
-    #
     if dataBlock.name is None:
         if 'neo_name' in dataBlock.annotations:
             dataBlock.name = dataBlock.annotations['neo_name']
@@ -1767,40 +2097,6 @@ def readBlockFixNames(
     asigLikeList = (
         seg0.filter(objects=AnalogSignalProxy) +
         seg0.filter(objects=AnalogSignal))
-    # if mapDF is not None:
-    #     # [len(a.name) for a in asigLikeList]
-    #     if swapMaps is not None:
-    #         # asigOrigNames = [headerSignalChan.loc[int(i), 'name'] for i in swapMaps['from']['nevID']]
-    #         asigNameChanger = {}
-    #         for nevID in swapMaps['from']['nevID']:
-    #             if int(nevID) in headerSignalChan.index:
-    #                 labelFromNewMap = (
-    #                     swapMaps['to']
-    #                     .loc[swapMaps['to']['nevID'] == nevID, 'label']
-    #                     .iloc[0])
-    #                 asigNameChanger[headerSignalChan.loc[int(nevID), 'name']] = labelFromNewMap
-    #         # asigNameChanger = dict(zip(asigOrigNames, swapMaps['to']['label']))
-    #     else:
-    #         if headerSignalChan.size > 0:
-    #             # asigOrigNames = [headerSignalChan.loc[int(i), 'name'] for i in mapDF['nevID']]
-    #             # asigNameChanger = dict(zip(asigOrigNames, mapDF['label']))
-    #             asigNameChanger = {}
-    #             for nevID in mapDF['nevID']:
-    #                 if int(nevID) in headerSignalChan.index:
-    #                     labelFromMap = (
-    #                         mapDF
-    #                         .loc[mapDF['nevID'] == nevID, 'label']
-    #                         .iloc[0])
-    #                     asigNameChanger[
-    #                         headerSignalChan.loc[int(nevID), 'name']] = labelFromMap
-    #         else:
-    #             asigOrigNames = np.unique([i.split('#')[0] for i in headerUnitChan['name']])
-    #             asigNameChanger = {}
-    #             for origName in asigOrigNames:
-    #                 # ripple specific
-    #                 formattedName = origName.replace('.', '_').replace(' raw', '')
-    #                 if mapDF['label'].str.contains(formattedName).any():
-    #                     asigNameChanger[origName] = formattedName
     if mapDF is not None:
         if headerSignalChan.size > 0:
             asigNameChanger = {}
@@ -1829,6 +2125,11 @@ def readBlockFixNames(
             asigNameChanger[asigBaseName]
             if asigBaseName in asigNameChanger
             else asigBaseName)
+        if mapDF is not None:
+            if (mapDF['label'] == asig.name).any():
+                asig.annotations['xCoords'] = float(mapDF.loc[mapDF['label'] == asig.name, 'xcoords'].iloc[0])
+                asig.annotations['yCoords'] = float(mapDF.loc[mapDF['label'] == asig.name, 'ycoords'].iloc[0])
+                asig.annotations['zCoords'] = float(mapDF.loc[mapDF['label'] == asig.name, 'zcoords'].iloc[0])
         if 'Channel group ' in asig.channel_index.name:
             newChanName = (
                 asigNameChanger[asigBaseName]
@@ -1839,6 +2140,13 @@ def readBlockFixNames(
                 asig.channel_index.annotations['neo_name'] = newChanName
             if 'nix_name' in asig.channel_index.annotations:
                 asig.channel_index.annotations['nix_name'] = newChanName
+            if mapDF is not None:
+                try:
+                    asig.channel_index.coordinates = np.asarray([
+                        asig.annotations['xCoords'], asig.annotations['yCoords'], asig.annotations['zCoords']
+                    ])[np.newaxis, :] * pq.um
+                except Exception:
+                    pass
     spikeTrainLikeList = (
         seg0.filter(objects=SpikeTrainProxy) +
         seg0.filter(objects=SpikeTrain))
@@ -1901,7 +2209,9 @@ def readBlockFixNames(
         stp.unit.name = stp.unit.name.replace('.', '_').replace(' raw', '')
         ###########################################
         if 'ChannelIndex for ' in stp.unit.channel_index.name:
-            newChanName = stp.name.replace('_stim#0', '').replace('#0', '')
+            newChanName = stp.name.replace('_stim#0', '')
+            # remove unit #
+            newChanName = re.sub(r'#\d', '', newChanName)
             stp.unit.channel_index.name = newChanName
             # units and analogsignals have different channel_indexes when loaded by nix
             # add them to each other's parent list
@@ -1964,7 +2274,103 @@ def readBlockFixNames(
     # [i.name for i in dataBlock.filter(objects=ChannelIndex)]
     # [i.name for i in dataBlock.filter(objects=SpikeTrain)]
     # [i.name for i in dataBlock.filter(objects=SpikeTrainProxy)]
+    if lazy:
+        for stP in dataBlock.filter(objects=SpikeTrainProxy):
+            if 'unitAnnotations' in stP.annotations:
+                unAnnStr = stP.annotations['unitAnnotations']
+                stP.unit.annotations.update(json.loads(unAnnStr))
+    if (loadList is not None) and lazy:
+        if 'asigs' in loadList:
+            loadAsigList(
+                dataBlock, listOfAsigProxyNames=loadList['asigs'],
+                replaceInParents=True)
+        if 'events' in loadList:
+            loadEventList(
+                dataBlock,
+                listOfEventNames=loadList['events'],
+                replaceInParents=True)
+        if 'spiketrains' in loadList:
+            loadSpikeTrainList(
+                dataBlock,
+                listOfSpikeTrainNames=loadList['spiketrains'],
+                replaceInParents=True)
+    if purgeNixNames:
+        dataBlock = purgeNixAnn(dataBlock)
     return dataBlock
+
+
+def loadSpikeTrainList(
+        dataBlock, listOfSpikeTrainNames=None,
+        replaceInParents=True):
+    listOfSpikeTrains = []
+    if listOfSpikeTrainNames is None:
+        listOfSpikeTrainNames = [
+            stp.name
+            for stp in dataBlock.filter(objects=SpikeTrainProxy)]
+    for stP in dataBlock.filter(objects=SpikeTrainProxy):
+        if stP.name in listOfSpikeTrainNames:
+            st = loadObjArrayAnn(stP.load())
+            listOfSpikeTrains.append(st)
+            if replaceInParents:
+                seg = stP.segment
+                segStNames = [s.name for s in seg.spiketrains]
+                idxInSeg = segStNames.index(stP.name)
+                seg.spiketrains[idxInSeg] = st
+                #
+                unit = stP.unit
+                unitStNames = [s.name for s in unit.spiketrains]
+                st.unit = unit
+                idxInUnit = unitStNames.index(stP.name)
+                unit.spiketrains[idxInUnit] = st
+    return listOfSpikeTrains
+
+
+def loadEventList(
+        dataBlock,
+        listOfEventNames=None, replaceInParents=True):
+    listOfEvents = []
+    if listOfEventNames is None:
+        listOfEventNames = [
+            evp.name
+            for evp in dataBlock.filter(objects=EventProxy)]
+    for evP in dataBlock.filter(objects=EventProxy):
+        if evP.name in listOfEventNames:
+            ev = loadObjArrayAnn(evP.load())
+            listOfEvents.append(ev)
+            if replaceInParents:
+                seg = evP.segment
+                segEvNames = [e.name for e in seg.events]
+                idxInSeg = segEvNames.index(evP.name)
+                seg.events[idxInSeg] = ev
+    return listOfEvents
+
+
+def loadAsigList(
+        dataBlock, listOfAsigProxyNames=None, replaceInParents=True):
+    listOfAsigs = []
+    if listOfAsigProxyNames is None:
+        listOfAsigProxyNames = [
+            asigp.name
+            for asigp in dataBlock.filter(objects=AnalogSignalProxy)]
+    for asigP in dataBlock.filter(objects=AnalogSignalProxy):
+        if asigP.name in listOfAsigProxyNames:
+            asig = asigP.load()
+            asig.annotations = asigP.annotations.copy()
+            listOfAsigs.append(asig)
+            #
+            if replaceInParents:
+                seg = asigP.segment
+                segAsigNames = [ag.name for ag in seg.analogsignals]
+                asig.segment = seg
+                idxInSeg = segAsigNames.index(asigP.name)
+                seg.analogsignals[idxInSeg] = asig
+                #
+                chIdx = asigP.channel_index
+                chIdxAsigNames = [ag.name for ag in chIdx.analogsignals]
+                asig.channel_index = chIdx
+                idxInChIdx = chIdxAsigNames.index(asigP.name)
+                chIdx.analogsignals[idxInChIdx] = asig
+    return listOfAsigs
 
 
 def addBlockToNIX(
@@ -1984,7 +2390,6 @@ def addBlockToNIX(
         tempBlock = reader.read_block(
             block_index=nixBlockIdx,
             lazy=True, signal_group_mode='split-all')
-
         checkCompatible = {i: False for i in nixSegIdx}
         forceShape = {i: None for i in nixSegIdx}
         forceType = {i: None for i in nixSegIdx}
@@ -2077,23 +2482,246 @@ def loadStProxy(stProxy):
     return st
 
 
+def preproc(
+        fileName='Trial001',
+        rawFolderPath='./',
+        outputFolderPath='./', mapDF=None,
+        # swapMaps=None,
+        electrodeArrayName='utah',
+        fillOverflow=True, removeJumps=True,
+        removeMeanAcross=False,
+        linearDetrend=False,
+        interpolateOutliers=False, calcOutliers=False,
+        outlierMaskFilterOpts=None,
+        outlierThreshold=1,
+        calcArtifactTrace=False,
+        motorEncoderMask=None,
+        calcAverageLFP=False,
+        eventInfo=None,
+        spikeSourceType='', spikePath=None,
+        chunkSize=1800, equalChunks=True, chunkList=None, chunkOffset=0,
+        writeMode='rw',
+        signal_group_mode='split-all', trialInfo=None,
+        asigNameList=None, ainpNameList=None, nameSuffix='',
+        saveFromAsigNameList=True,
+        calcRigEvents=True, normalizeByImpedance=False,
+        LFPFilterOpts=None, encoderCountPerDegree=180e2,
+        outlierRemovalDebugFlag=False, impedanceFilePath=None
+        ):
+    #  base file name
+    rawBasePath = os.path.join(rawFolderPath, fileName)
+    outputFilePath = os.path.join(
+        outputFolderPath,
+        fileName + nameSuffix + '.nix')
+    if os.path.exists(outputFilePath):
+        os.remove(outputFilePath)
+    #  instantiate reader, get metadata
+    print('Loading\n{}\n'.format(rawBasePath))
+    reader = BlackrockIO(
+        filename=rawBasePath, nsx_to_load=5)
+    reader.parse_header()
+    # metadata = reader.header
+    #  absolute section index
+    dummyBlock = readBlockFixNames(
+        reader,
+        block_index=0, lazy=True,
+        signal_group_mode=signal_group_mode,
+        mapDF=mapDF, reduceChannelIndexes=True,
+        # swapMaps=swapMaps
+        )
+    segLen = dummyBlock.segments[0].analogsignals[0].shape[0] / (
+        dummyBlock.segments[0].analogsignals[0].sampling_rate)
+    nChunks = math.ceil(segLen / chunkSize)
+    #
+    if equalChunks:
+        actualChunkSize = (segLen / nChunks).magnitude
+    else:
+        actualChunkSize = chunkSize
+    if chunkList is None:
+        chunkList = range(nChunks)
+    chunkingMetadata = {}
+    for chunkIdx in chunkList:
+        print('preproc on chunk {}'.format(chunkIdx))
+        #  instantiate spike reader if requested
+        if spikeSourceType == 'tdc':
+            if spikePath is None:
+                spikePath = os.path.join(
+                    outputFolderPath, 'tdc_' + fileName,
+                    'tdc_' + fileName + '.nix')
+            print('loading {}'.format(spikePath))
+            spikeReader = nixio_fr.NixIO(filename=spikePath)
+        else:
+            spikeReader = None
+        #  absolute section index
+        block = readBlockFixNames(
+            reader,
+            block_index=0, lazy=True,
+            signal_group_mode=signal_group_mode,
+            mapDF=mapDF, reduceChannelIndexes=True,
+            # swapMaps=swapMaps
+            )
+        if spikeReader is not None:
+            spikeBlock = readBlockFixNames(
+                spikeReader, block_index=0, lazy=True,
+                signal_group_mode=signal_group_mode,
+                mapDF=mapDF, reduceChannelIndexes=True,
+                # swapMaps=swapMaps
+                )
+            spikeBlock = purgeNixAnn(spikeBlock)
+        else:
+            spikeBlock = None
+        #
+        #  instantiate writer
+        if (nChunks == 1) or (len(chunkList) == 1):
+            partNameSuffix = ""
+            thisChunkOutFilePath = outputFilePath
+        else:
+            partNameSuffix = '_pt{:0>3}'.format(chunkIdx)
+            thisChunkOutFilePath = (
+                outputFilePath
+                .replace('.nix', partNameSuffix + '.nix'))
+        #
+        if os.path.exists(thisChunkOutFilePath):
+            os.remove(thisChunkOutFilePath)
+        writer = NixIO(
+            filename=thisChunkOutFilePath, mode=writeMode)
+        chunkTStart = chunkIdx * actualChunkSize + chunkOffset
+        chunkTStop = (chunkIdx + 1) * actualChunkSize + chunkOffset
+        chunkingMetadata[chunkIdx] = {
+            'filename': thisChunkOutFilePath,
+            'partNameSuffix': partNameSuffix,
+            'chunkTStart': chunkTStart,
+            'chunkTStop': chunkTStop}
+        block.annotate(chunkTStart=chunkTStart)
+        block.annotate(chunkTStop=chunkTStop)
+        block.annotate(
+            recDatetimeStr=(
+                block
+                .rec_datetime
+                .replace(tzinfo=timezone.utc)
+                .isoformat())
+            )
+        #
+        preprocBlockToNix(
+            block, writer,
+            chunkTStart=chunkTStart,
+            chunkTStop=chunkTStop,
+            fillOverflow=fillOverflow,
+            removeJumps=removeJumps,
+            interpolateOutliers=interpolateOutliers,
+            calcOutliers=calcOutliers,
+            outlierThreshold=outlierThreshold,
+            outlierMaskFilterOpts=outlierMaskFilterOpts,
+            calcArtifactTrace=calcArtifactTrace,
+            linearDetrend=linearDetrend,
+            motorEncoderMask=motorEncoderMask,
+            electrodeArrayName=electrodeArrayName,
+            calcAverageLFP=calcAverageLFP,
+            eventInfo=eventInfo,
+            asigNameList=asigNameList, ainpNameList=ainpNameList,
+            saveFromAsigNameList=saveFromAsigNameList,
+            spikeSourceType=spikeSourceType,
+            spikeBlock=spikeBlock,
+            calcRigEvents=calcRigEvents,
+            normalizeByImpedance=normalizeByImpedance,
+            removeMeanAcross=removeMeanAcross,
+            LFPFilterOpts=LFPFilterOpts,
+            encoderCountPerDegree=encoderCountPerDegree,
+            outlierRemovalDebugFlag=outlierRemovalDebugFlag,
+            impedanceFilePath=impedanceFilePath,
+            )
+        #### diagnostics
+        diagnosticFolder = os.path.join(
+            outputFolderPath,
+            'preprocDiagnostics',
+            # fileName + nameSuffix + partNameSuffix
+            )
+        if not os.path.exists(diagnosticFolder):
+            os.mkdir(diagnosticFolder)
+        asigDiagnostics = {}
+        outlierDiagnostics = {}
+        diagnosticText = ''
+        for asig in block.filter(objects=AnalogSignal):
+            annNames = ['mean_removal_r2', 'mean_removal_group']
+            for annName in annNames:
+                if annName in asig.annotations:
+                    if asig.name not in asigDiagnostics:
+                        asigDiagnostics[asig.name] = {}
+                    asigDiagnostics[asig.name].update({
+                        annName: asig.annotations[annName]})
+            annNames = [
+                'outlierProportion', 'nDim',
+                'noveltyThreshold', 'outlierThreshold'
+                ]
+            for annName in annNames:
+                if annName in asig.annotations:
+                    if asig.name not in outlierDiagnostics:
+                        outlierDiagnostics[asig.name] = {}
+                    outlierDiagnostics[asig.name].update({
+                        annName: '{}'.format(asig.annotations[annName])
+                    })
+        if removeMeanAcross:
+            asigDiagnosticsDF = pd.DataFrame(asigDiagnostics).T
+            asigDiagnosticsDF.sort_values(by='mean_removal_r2', inplace=True)
+            diagnosticText += '<h2>LFP Diagnostics</h2>\n'
+            diagnosticText += asigDiagnosticsDF.to_html()
+            fig, ax = plt.subplots()
+            sns.distplot(asigDiagnosticsDF['mean_removal_r2'], ax=ax)
+            ax.set_ylabel('Count of analog signals')
+            ax.set_xlabel('R^2 of regressing mean against signal')
+            fig.savefig(os.path.join(
+                    diagnosticFolder,
+                    fileName + nameSuffix + partNameSuffix + '_meanRemovalR2.png'
+                ))
+        if interpolateOutliers:
+            outlierDiagnosticsDF = pd.DataFrame(outlierDiagnostics).T
+            diagnosticText += '<h2>Outlier Diagnostics</h2>\n'
+            diagnosticText += outlierDiagnosticsDF.to_html()
+        diagnosticTextPath = os.path.join(
+            diagnosticFolder,
+            fileName + nameSuffix + partNameSuffix + '_asigDiagnostics.html'
+            )
+        with open(diagnosticTextPath, 'w') as _f:
+            _f.write(diagnosticText)
+        writer.close()
+    chunkingInfoPath = os.path.join(
+        outputFolderPath,
+        fileName + nameSuffix +
+        '_chunkingInfo.json'
+        )
+    if os.path.exists(chunkingInfoPath):
+        os.remove(chunkingInfoPath)
+    with open(chunkingInfoPath, 'w') as f:
+        json.dump(chunkingMetadata, f)
+    return
+
+
 def preprocBlockToNix(
-        block, writer, chunkSize,
-        segInitIdx,
-        equalChunks=True,
-        chunkList=None,
+        block, writer,
+        chunkTStart=None,
+        chunkTStop=None,
         eventInfo=None,
         fillOverflow=False, calcAverageLFP=False,
+        interpolateOutliers=False, calcOutliers=False,
+        calcArtifactTrace=False,
+        outlierMaskFilterOpts=None,
+        useMeanToCenter=False,   # mean center? median center?
+        linearDetrend=False,
+        zScoreEachTrace=False,
+        outlierThreshold=1,
         motorEncoderMask=None,
         electrodeArrayName='utah',
         removeJumps=False, trackMemory=True,
         asigNameList=None, ainpNameList=None,
+        saveFromAsigNameList=True,
         spikeSourceType='', spikeBlock=None,
         calcRigEvents=True,
-        normalizeByImpedance=True, removeMeanAcross=False,
-        LFPFilterOpts=None, encoderCountPerDegree=180e2
+        normalizeByImpedance=True,
+        impedanceFilePath=None,
+        removeMeanAcross=False,
+        LFPFilterOpts=None, encoderCountPerDegree=180e2,
+        outlierRemovalDebugFlag=False,
         ):
-    idx = segInitIdx
     #  prune out nev spike placeholders
     #  (will get added back on a chunk by chunk basis,
     #  if not pruning units)
@@ -2116,6 +2744,8 @@ def preprocBlockToNix(
                 for unit in chanIdx.units:
                     if unit.spiketrains:
                         unit.spiketrains = []
+    #  precalculate new segment
+    seg = block.segments[0]
     #  remove chanIndexes assigned to units; makes more sense to
     #  only use chanIdx for asigs and spikes on that asig
     #  block.channel_indexes = (
@@ -2124,618 +2754,963 @@ def preprocBlockToNix(
     if calcAverageLFP:
         lastIndex = len(block.channel_indexes)
         lastID = block.channel_indexes[-1].channel_ids[0] + 1
-        aveLFPChIdx = ChannelIndex(
-            index=[lastIndex],
-            channel_names=['{}_zScoredAverage'.format(electrodeArrayName)],
-            channel_ids=[lastID],
-            name='{}_zScoredAverage'.format(electrodeArrayName),
-            file_origin=block.channel_indexes[-1].file_origin
-            )
-        aveLFPChIdx.merge_annotations(block.channel_indexes[-1])
-        block.channel_indexes.append(aveLFPChIdx)
-        if removeMeanAcross:
-            if asigNameList is None:
-                nMeanChans = 1
-            else:
-                nMeanChans = len(asigNameList)
-            meanChIdxList = []
-            for meanChIdx in range(nMeanChans):
+        if asigNameList is None:
+            asigNameList = [
+                [
+                    childBaseName(a.name, 'seg')
+                    for a in seg.analogsignals
+                    if not (('ainp' in a.name) or ('analog' in a.name))]
+                ]
+        nMeanChans = len(asigNameList)
+        #
+        meanChIdxList = []
+        for meanChIdx in range(nMeanChans):
+            tempChIdx = ChannelIndex(
+                index=[lastIndex + meanChIdx],
+                channel_names=['{}_rawAverage_{}'.format(electrodeArrayName, meanChIdx)],
+                channel_ids=[lastID + meanChIdx],
+                name='{}_rawAverage_{}'.format(electrodeArrayName, meanChIdx),
+                file_origin=block.channel_indexes[-1].file_origin
+                )
+            tempChIdx.merge_annotations(block.channel_indexes[-1])
+            block.channel_indexes.append(tempChIdx)
+            meanChIdxList.append(tempChIdx)
+            lastIndex += 1
+            lastID += 1
+        lastIndex = len(block.channel_indexes)
+        lastID = block.channel_indexes[-1].channel_ids[0] + 1
+        # if calcArtifactTrace:
+        if True:
+            artChIdxList = []
+            for artChIdx in range(nMeanChans):
                 tempChIdx = ChannelIndex(
-                    index=[lastIndex + meanChIdx],
-                    channel_names=['{}_rawAverage{}'.format(electrodeArrayName, meanChIdx)],
-                    channel_ids=[lastID + meanChIdx],
-                    name='{}_rawAverage{}'.format(electrodeArrayName, meanChIdx),
+                    index=[lastIndex + artChIdx],
+                    channel_names=['{}_artifact_{}'.format(electrodeArrayName, artChIdx)],
+                    channel_ids=[lastID + artChIdx],
+                    name='{}_artifact_{}'.format(electrodeArrayName, artChIdx),
                     file_origin=block.channel_indexes[-1].file_origin
                     )
                 tempChIdx.merge_annotations(block.channel_indexes[-1])
                 block.channel_indexes.append(tempChIdx)
-                meanChIdxList.append(tempChIdx)
+                artChIdxList.append(tempChIdx)
+                lastIndex += 1
+                lastID += 1
+        # if calcOutliers:
+        if True:
+            devChIdxList = []
+            for devChIdx in range(nMeanChans):
+                tempChIdx = ChannelIndex(
+                    index=[lastIndex + devChIdx],
+                    channel_names=['{}_deviation_{}'.format(electrodeArrayName, devChIdx)],
+                    channel_ids=[lastID + devChIdx],
+                    name='{}_deviation_{}'.format(electrodeArrayName, devChIdx),
+                    file_origin=block.channel_indexes[-1].file_origin
+                    )
+                tempChIdx.merge_annotations(block.channel_indexes[-1])
+                block.channel_indexes.append(tempChIdx)
+                devChIdxList.append(tempChIdx)
+                lastIndex += 1
+                lastID += 1
+            smDevChIdxList = []
+            for devChIdx in range(nMeanChans):
+                tempChIdx = ChannelIndex(
+                    index=[lastIndex + devChIdx],
+                    channel_names=['{}_smoothed_deviation_{}'.format(electrodeArrayName, devChIdx)],
+                    channel_ids=[lastID + devChIdx],
+                    name='{}_smoothed_deviation_{}'.format(electrodeArrayName, devChIdx),
+                    file_origin=block.channel_indexes[-1].file_origin
+                    )
+                tempChIdx.merge_annotations(block.channel_indexes[-1])
+                block.channel_indexes.append(tempChIdx)
+                smDevChIdxList.append(tempChIdx)
+                lastIndex += 1
+                lastID += 1
+            outMaskChIdxList = []
+            for outMaskChIdx in range(nMeanChans):
+                tempChIdx = ChannelIndex(
+                    index=[lastIndex + outMaskChIdx],
+                    channel_names=['{}_outlierMask_{}'.format(
+                        electrodeArrayName, outMaskChIdx)],
+                    channel_ids=[lastID + outMaskChIdx],
+                    name='{}_outlierMask_{}'.format(
+                        electrodeArrayName, outMaskChIdx),
+                    file_origin=block.channel_indexes[-1].file_origin
+                    )
+                tempChIdx.merge_annotations(block.channel_indexes[-1])
+                block.channel_indexes.append(tempChIdx)
+                outMaskChIdxList.append(tempChIdx)
+                lastIndex += 1
+                lastID += 1
     #  delete asig and irsig proxies from channel index list
     for metaIdx, chanIdx in enumerate(block.channel_indexes):
         if chanIdx.analogsignals:
             chanIdx.analogsignals = []
         if chanIdx.irregularlysampledsignals:
             chanIdx.irregularlysampledsignals = []
-    #  precalculate new segments
-    newSegList = []
-    oldSegList = block.segments
-    #  keep track of which oldSeg newSegs spawn from
-    segParents = {}
-    for segIdx, seg in enumerate(block.segments):
-        segLen = seg.analogsignals[0].shape[0] / (
-            seg.analogsignals[0].sampling_rate)
-        nChunks = math.ceil(segLen / chunkSize)
-        #
-        if equalChunks:
-            actualChunkSize = (segLen / nChunks).magnitude
-        else:
-            actualChunkSize = chunkSize
-        if chunkList is None:
-            chunkList = range(nChunks)
-
-        segParents.update({segIdx: {}})
-        for chunkIdx in chunkList:
-            tStart = chunkIdx * actualChunkSize
-            tStop = (chunkIdx + 1) * actualChunkSize
-
-            newSeg = Segment(
-                    index=idx, name=seg.name,
-                    description=seg.description,
-                    file_origin=seg.file_origin,
-                    file_datetime=seg.file_datetime,
-                    rec_datetime=seg.rec_datetime,
-                    **seg.annotations
-                )
-                
-            newSegList.append(newSeg)
-            segParents[segIdx].update(
-                {chunkIdx: newSegList.index(newSeg)})
-            idx += 1
-    block.segments = newSegList
+    newSeg = Segment(
+            index=0, name=seg.name,
+            description=seg.description,
+            file_origin=seg.file_origin,
+            file_datetime=seg.file_datetime,
+            rec_datetime=seg.rec_datetime,
+            **seg.annotations
+        )
+    block.segments = [newSeg]
     block, nixblock = writer.write_block_meta(block)
     # descend into Segments
-    if normalizeByImpedance:
-        impedances = prb_meta.getLatestImpedance(block)
-    for segIdx, seg in enumerate(oldSegList):
-        segLen = seg.analogsignals[0].shape[0] / (
-            seg.analogsignals[0].sampling_rate)
-        nChunks = math.ceil(segLen / chunkSize)
-        #
-        if equalChunks:
-            actualChunkSize = (segLen / nChunks).magnitude
-        else:
-            actualChunkSize = chunkSize
-        if chunkList is None:
-            chunkList = range(nChunks)
-        #
-        if spikeBlock is not None:
-            spikeSeg = spikeBlock.segments[segIdx]
-        else:
-            spikeSeg = seg
-        #
-        for chunkIdx in chunkList:
-            tStart = chunkIdx * actualChunkSize * pq.s
-            tStop = (chunkIdx + 1) * actualChunkSize * pq.s
-            print(
-                'PreprocNs5: starting chunk %d of %d' % (
-                    chunkIdx + 1, nChunks))
-            if trackMemory:
-                print('memory usage: {:.1f} MB'.format(
-                    prf.memory_usage_psutil()))
-            newSeg = block.segments[segParents[segIdx][chunkIdx]]
-            newSeg, nixgroup = writer._write_segment_meta(newSeg, nixblock)
-            #  trim down list of analog signals if necessary
-            if asigNameList is not None:
-                asigNameListSeg = []
-                if removeMeanAcross:
-                    meanGroups = {}
-                for subListIdx, subList in enumerate(asigNameList):
-                    subListSeg = [
-                        'seg{}_{}'.format(segIdx, a)
-                        for a in subList]
-                    asigNameListSeg += subListSeg
-                    if removeMeanAcross:
-                        meanGroups[subListIdx] = subListSeg
-                aSigList = []
-                # [asig.name for asig in seg.analogsignals]
-                for a in seg.analogsignals:
-                    if np.any([n in a.name for n in asigNameListSeg]):
-                        aSigList.append(a)
-            else:
-                aSigList = [
-                    a
-                    for a in seg.analogsignals
-                    if not (('ainp' in a.name) or ('analog' in a.name))]
-                asigNameListSeg = [a.name for a in aSigList]
-            if ainpNameList is not None:
-                ainpNameListSeg = [
-                    'seg{}_{}'.format(segIdx, a)
-                    for a in ainpNameList]
-                ainpList = []
-                for a in seg.analogsignals:
-                    if np.any([n in a.name for n in ainpNameListSeg]):
-                        ainpList.append(a)
-            else:
-                ainpList = [
-                    a
-                    for a in seg.analogsignals
-                    if (('ainp' in a.name) or ('analog' in a.name))]
-                ainpNameListSeg = [a.name for a in aSigList]
-            nAsigs = len(aSigList)
-            # if we want the mean but aren't keeping the LFP chans  
-            lfpAsigList = None
-            if asigNameList is not None:
-                if len(asigNameList):
-                    lfpAsigList = aSigList
-            if lfpAsigList is None:
-                lfpAsigList = [
-                    a
-                    for a in seg.analogsignals
-                    if ~(('ainp' in a.name) or ('analog' in a.name))
-                    ]
-            nLfpAsigs = len(lfpAsigList)
-            if LFPFilterOpts is not None:
-                def filterFun(sig, filterCoeffs=None):
-                    sig[:] = signal.sosfiltfilt(
-                        filterCoeffs, sig.magnitude.flatten())[:, np.newaxis] * sig.units
-                    return sig
-                filterCoeffs = hf.makeFilterCoeffsSOS(
-                    LFPFilterOpts, float(seg.analogsignals[0].sampling_rate))
-            # first pass through asigs, if removing mean across channels
-            if (removeMeanAcross or calcAverageLFP):
-                for aSigIdx, aSigProxy in enumerate(seg.analogsignals):
-                    if aSigIdx == 0:
-                        # check bounds
-                        tStart = max(tStart, aSigProxy.t_start)
-                        tStop = min(tStop, aSigProxy.t_stop)
-                    loadThisOne = (
-                        (aSigProxy in aSigList) or
-                        (calcAverageLFP and (aSigProxy in lfpAsigList))
+    if impedanceFilePath is not None:
+        try:
+            impedances = prb_meta.getLatestImpedance(
+                block=block, impedanceFilePath=impedanceFilePath)
+            averageImpedance = impedances['impedance'].median()
+        except Exception:
+            traceback.print_exc()
+    # for segIdx, seg in enumerate(oldSegList):
+    if spikeBlock is not None:
+        spikeSeg = spikeBlock.segments[0]
+    else:
+        spikeSeg = seg
+    #
+    if trackMemory:
+        print('memory usage: {:.1f} MB'.format(
+            prf.memory_usage_psutil()))
+    newSeg, nixgroup = writer._write_segment_meta(newSeg, nixblock)
+    #  trim down list of analog signals if necessary
+    asigNameListSeg = []
+    if (removeMeanAcross or calcAverageLFP):
+        meanGroups = {}
+    for subListIdx, subList in enumerate(asigNameList):
+        subListSeg = [
+            'seg{}_{}'.format(0, a)
+            for a in subList]
+        asigNameListSeg += subListSeg
+        if (removeMeanAcross or calcAverageLFP):
+            meanGroups[subListIdx] = subListSeg
+    aSigList = []
+    # [asig.name for asig in seg.analogsignals]
+    for a in seg.analogsignals:
+        # if np.any([n in a.name for n in asigNameListSeg]):
+        if a.name in asigNameListSeg:
+            aSigList.append(a)
+    if ainpNameList is not None:
+        ainpNameListSeg = [
+            'seg{}_{}'.format(0, a)
+            for a in ainpNameList]
+        ainpList = []
+        for a in seg.analogsignals:
+            if np.any([n == a.name for n in ainpNameListSeg]):
+                ainpList.append(a)
+    else:
+        ainpList = [
+            a
+            for a in seg.analogsignals
+            if (('ainp' in a.name) or ('analog' in a.name))]
+        ainpNameListSeg = [a.name for a in aSigList]
+    nAsigs = len(aSigList)
+    if LFPFilterOpts is not None:
+        def filterFun(sig, filterCoeffs=None):
+            # sig[:] = signal.sosfiltfilt(
+            sig[:] = signal.sosfilt(
+                filterCoeffs, sig.magnitude.flatten())[:, np.newaxis] * sig.units
+            return sig
+        filterCoeffs = hf.makeFilterCoeffsSOS(
+            LFPFilterOpts, float(seg.analogsignals[0].sampling_rate))
+        if False:
+            fig, ax1, ax2 = hf.plotFilterResponse(
+                filterCoeffs,
+                float(seg.analogsignals[0].sampling_rate))
+            fig2, ax3, ax4 = hf.plotFilterImpulseResponse(
+                LFPFilterOpts,
+                float(seg.analogsignals[0].sampling_rate))
+            plt.show()
+    # first pass through asigs, if removing mean across channels
+    if (removeMeanAcross or calcAverageLFP):
+        for aSigIdx, aSigProxy in enumerate(seg.analogsignals):
+            if aSigIdx == 0:
+                # check bounds
+                tStart = max(chunkTStart * pq.s, aSigProxy.t_start)
+                tStop = min(chunkTStop * pq.s, aSigProxy.t_stop)
+            loadThisOne = (aSigProxy in aSigList)
+            if loadThisOne:
+                if trackMemory:
+                    print(
+                        'Extracting asig for mean, memory usage: {:.1f} MB'.format(
+                            prf.memory_usage_psutil()))
+                chanIdx = aSigProxy.channel_index
+                asig = aSigProxy.load(
+                    time_slice=(tStart, tStop),
+                    magnitude_mode='rescaled')
+                if 'tempLFPStore' not in locals():
+                    tempLFPStore = pd.DataFrame(
+                        np.zeros(
+                            (asig.shape[0], nAsigs),
+                            dtype=np.float32),
+                        columns=asigNameListSeg)
+                if 'dummyAsig' not in locals():
+                    dummyAsig = asig.copy()
+                #  perform requested preproc operations
+                #  if LFPFilterOpts is not None:
+                #      asig[:] = filterFun(
+                #          asig, filterCoeffs=filterCoeffs)
+                if normalizeByImpedance:
+                    elNmMatchMsk = impedances['elec'] == chanIdx.name
+                    '''
+                    asig.magnitude[:] = (
+                        (asig.magnitude - np.median(asig.magnitude)) /
+                        np.min(
+                            impedances.loc[elNmMatchMsk, 'impedance']
+                            ))
+                    '''
+                    asig.magnitude[:] = (
+                        (asig.magnitude) * averageImpedance /
+                        np.min(
+                            impedances.loc[elNmMatchMsk, 'impedance']
+                            ))
+                # if fillOverflow:
+                #     # fill in overflow:
+                #     '''
+                #     timeSection['data'], overflowMask = hf.fillInOverflow(
+                #         timeSection['data'], fillMethod = 'average')
+                #     badData.update({'overflow': overflowMask})
+                #     '''
+                #     pass
+                # if removeJumps:
+                #     # find unusual jumps in derivative or amplitude
+                #     '''
+                #     timeSection['data'], newBadData = hf.fillInJumps(timeSection['data'],
+                #     timeSection['samp_per_s'], smoothing_ms = 0.5, nStdDiff = 50,
+                #     nStdAmp = 100)
+                #     badData.update(newBadData)
+                #     '''
+                #     pass
+                tempLFPStore.loc[:, aSigProxy.name] = asig.magnitude.flatten()
+                del asig
+                gc.collect()
+        # end of first pass
+        if (removeMeanAcross or calcAverageLFP):
+            centerLFP = np.zeros(
+                (tempLFPStore.shape[0], len(asigNameList)),
+                dtype=np.float32)
+            spreadLFP = np.zeros(
+                (tempLFPStore.shape[0], len(asigNameList)),
+                dtype=np.float32)
+            # if calcOutliers:
+            if True:
+                if outlierMaskFilterOpts is not None:
+                    filterCoeffsOutlierMask = hf.makeFilterCoeffsSOS(
+                        outlierMaskFilterOpts, float(dummyAsig.sampling_rate))
+                lfpDeviation = np.zeros(
+                    (tempLFPStore.shape[0], len(asigNameList)),
+                    dtype=np.float32)
+                smoothedDeviation = np.zeros(
+                    (tempLFPStore.shape[0], len(asigNameList)),
+                    dtype=np.float32)
+                outlierMask = np.zeros(
+                    (tempLFPStore.shape[0], len(asigNameList)),
+                    dtype=np.bool)
+                outlierMetadata = {}
+            # if calcArtifactTrace:
+            if True:
+                artifactSignal = np.zeros(
+                    (tempLFPStore.shape[0], len(asigNameList)),
+                    dtype=np.float32)
+            ###############
+            # tempLFPStore.iloc[:, 0] = np.nan  # for debugging axes
+            #############
+            plotDevFilterDebug = False
+            if plotDevFilterDebug:
+                try:
+                    devFiltDebugMask = (dummyAsig.times > 90 * pq.s) & (dummyAsig.times < 92 * pq.s)
+                except Exception:
+                    pdb.set_trace()
+                plotColIdx = 1
+                ddfFig, ddfAx = plt.subplots(len(asigNameList), 1)
+                ddfFig2, ddfAx2 = plt.subplots()
+                ddfFig3, ddfAx3 = plt.subplots(
+                    1, len(asigNameList),
+                    sharey=True)
+                if len(asigNameList) == 1:
+                    ddfAx = np.asarray([ddfAx])
+                    ddfAx3 = np.asarray([ddfAx3])
+            for subListIdx, subList in enumerate(asigNameList):
+                columnsForThisGroup = meanGroups[subListIdx]
+                if trackMemory:
+                    print(
+                        'asig group {}: calculating mean, memory usage: {:.1f} MB'.format(
+                            subListIdx, prf.memory_usage_psutil()))
+                    print('this group contains\n{}'.format(columnsForThisGroup))
+                if plotDevFilterDebug:
+                    ddfAx3[subListIdx].plot(
+                        dummyAsig.times[devFiltDebugMask],
+                        tempLFPStore.loc[:, columnsForThisGroup].iloc[devFiltDebugMask, plotColIdx],
+                        label='original ch'
                         )
-                    if loadThisOne:
-                        if trackMemory:
-                            print(
-                                'Extracting asig for mean, memory usage: {:.1f} MB'.format(
-                                    prf.memory_usage_psutil()))
-                        chanIdx = aSigProxy.channel_index
-                        asig = aSigProxy.load(
-                            time_slice=(tStart, tStop),
-                            magnitude_mode='rescaled')
-                        if 'tempLFPStore' not in locals():
-                            tempLFPStore = pd.DataFrame(
-                                np.zeros(
-                                    (asig.shape[0], nAsigs),
-                                    dtype=np.float32),
-                                columns=asigNameListSeg)
-                        #  perform requested preproc operations
-                        if normalizeByImpedance:
-                            elNmMatchMsk = impedances['elec'] == chanIdx.name
-                            asig.magnitude[:] = (
-                                (asig.magnitude - np.mean(asig.magnitude)) /
-                                np.min(
-                                    impedances.loc[elNmMatchMsk, 'impedance']
-                                    ))
-                        if fillOverflow:
-                            # fill in overflow:
-                            '''
-                            timeSection['data'], overflowMask = hf.fillInOverflow(
-                                timeSection['data'], fillMethod = 'average')
-                            badData.update({'overflow': overflowMask})
-                            '''
-                            pass
-                        if removeJumps:
-                            # find unusual jumps in derivative or amplitude
-                            '''
-                            timeSection['data'], newBadData = hf.fillInJumps(timeSection['data'],
-                            timeSection['samp_per_s'], smoothing_ms = 0.5, nStdDiff = 50,
-                            nStdAmp = 100)
-                            badData.update(newBadData)
-                            '''
-                            pass
-                        if calcAverageLFP:
-                            normalAsig = stats.zscore(asig.magnitude) * asig.units
-                            if 'averageLFP' not in locals():
-                                averageLFP = asig.copy()
-                                averageLFP.magnitude[:] = normalAsig / nLfpAsigs
-                                averageLFP.array_annotations = {}
-                            else:
-                                averageLFP.magnitude[:] += normalAsig / nLfpAsigs
-                        if removeMeanAcross:
-                            tempLFPStore.loc[:, aSigProxy.name] = asig.magnitude.flatten()
-                        del asig
-                        gc.collect()
-                if removeMeanAcross:
-                    if trackMemory:
-                        print(
-                            'Calculating asig mean, memory usage: {:.1f} MB'.format(
-                                prf.memory_usage_psutil()))
-                    meanLFP = np.zeros(
-                        (tempLFPStore.shape[0], len(asigNameList)),
-                        dtype=np.float32)
-                    useMean = True
-                    for subListIdx, subList in enumerate(asigNameList):
-                        if useMean:
-                            meanLFP[:, subListIdx] = (
+                if fillOverflow:
+                    print('Filling overflow...')
+                    # fill in overflow:
+                    tempLFPStore.loc[:, columnsForThisGroup], pltHandles = hf.fillInOverflow2(
+                        tempLFPStore.loc[:, columnsForThisGroup].to_numpy(),
+                        overFlowFillType='average',
+                        overFlowThreshold=8000,
+                        debuggingPlots=plotDevFilterDebug
+                        )
+                    if plotDevFilterDebug:
+                        pltHandles['ax'].set_title('ch grp {}'.format(subListIdx))
+                        ddfAx3[subListIdx].plot(
+                            dummyAsig.times[devFiltDebugMask],
+                            tempLFPStore.loc[:, columnsForThisGroup].iloc[devFiltDebugMask, plotColIdx],
+                            label='filled ch'
+                            )
+                # zscore of each trace
+                if zScoreEachTrace:
+                    print('About to calculate zscore of each trace (along columns) for prelim outlier detection')
+                    columnZScore = pd.DataFrame(
+                        stats.zscore(
+                            tempLFPStore.loc[:, columnsForThisGroup],
+                            axis=1),
+                        index=tempLFPStore.index,
+                        columns=columnsForThisGroup
+                        )
+                    excludeFromMeanMask = columnZScore.abs() > 6
+                    if useMeanToCenter:
+                        centerLFP[:, subListIdx] = (
+                            tempLFPStore
+                            .loc[:, columnsForThisGroup]
+                            .mask(excludeFromMeanMask)
+                            .mean(axis=1).to_numpy()
+                            )
+                    else:
+                        centerLFP[:, subListIdx] = (
+                            tempLFPStore
+                            .loc[:, columnsForThisGroup]
+                            .mask(excludeFromMeanMask)
+                            .median(axis=1).to_numpy()
+                            )
+                else:
+                    if useMeanToCenter:
+                        centerLFP[:, subListIdx] = (
+                            tempLFPStore
+                            .loc[:, columnsForThisGroup]
+                            .mean(axis=1).to_numpy()
+                            )
+                    else:
+                        centerLFP[:, subListIdx] = (
+                            tempLFPStore
+                            .loc[:, columnsForThisGroup]
+                            .median(axis=1).to_numpy()
+                            )
+                if calcArtifactTrace:
+                    if LFPFilterOpts is not None:
+                        print('applying LFPFilterOpts to cached asigs for artifact ID')
+                        # tempLFPStore.loc[:, columnsForThisGroup] = signal.sosfilt(
+                        tempLFPStore.loc[:, columnsForThisGroup] = signal.sosfiltfilt(
+                            filterCoeffs, tempLFPStore.loc[:, columnsForThisGroup],
+                            axis=0)
+                        if useMeanToCenter:
+                            tempCenter = (
                                 tempLFPStore
-                                .loc[:, meanGroups[subListIdx]]
-                                .mean(axis=1)
+                                .loc[:, columnsForThisGroup]
+                                .mean(axis=1).diff().fillna(0)
                                 )
                         else:
-                            meanLFP[:, subListIdx] = (
+                            tempCenter = (
                                 tempLFPStore
-                                .loc[:, meanGroups[subListIdx]]
-                                .median(axis=1)
+                                .loc[:, columnsForThisGroup]
+                                .median(axis=1).diff().fillna(0)
                                 )
-                    del tempLFPStore
-                gc.collect()
-            if calcAverageLFP:
-                averageLFP.name = 'seg{}_{}_zScoredAverage'.format(segIdx, electrodeArrayName)
-                chanIdx = block.filter(
-                    objects=ChannelIndex,
-                    name='{}_zScoredAverage'.format(electrodeArrayName))[0]
+                    artifactSignal[:, subListIdx] = np.abs(stats.zscore(tempCenter.to_numpy()))
+                if calcOutliers:
+                    if plotDevFilterDebug:
+                        ddfAx[subListIdx].plot(
+                            dummyAsig.times[devFiltDebugMask],
+                            centerLFP[devFiltDebugMask, subListIdx],
+                            label='mean of ch group'
+                            )
+                    # filter the traces, if needed
+                    if LFPFilterOpts is not None:
+                        print('applying LFPFilterOpts to cached asigs before outlier detection')
+                        # tempLFPStore.loc[:, columnsForThisGroup] = signal.sosfiltfilt(
+                        tempLFPStore.loc[:, columnsForThisGroup] = signal.sosfilt(
+                            filterCoeffs, tempLFPStore.loc[:, columnsForThisGroup],
+                            axis=0)
+                        if plotDevFilterDebug:
+                            ddfAx3[subListIdx].plot(
+                                dummyAsig.times[devFiltDebugMask],
+                                tempLFPStore.loc[:, columnsForThisGroup].iloc[devFiltDebugMask, plotColIdx],
+                                label='filtered ch'
+                                )
+                    ##################################
+                    print('Whitening cached traces before outlier detection')
+                    whitenByPCA = True
+                    if whitenByPCA:
+                        projector = PCA(
+                            n_components=None, whiten=True)
+                        pcs = projector.fit_transform(
+                            tempLFPStore.loc[:, columnsForThisGroup])
+                        explVarMask = (
+                            np.cumsum(projector.explained_variance_ratio_) < 1 - 1e-2)
+                        explVarMask[0] = True  # (keep at least 1)
+                        pcs = pcs[:, explVarMask]
+                        nDim = pcs.shape[1]
+                        lfpDeviation[:, subListIdx] = (pcs ** 2).sum(axis=1)
+                    else:  # whiten by mahalanobis distance
+                        est = EmpiricalCovariance()
+                        est.fit(tempLFPStore.loc[:, columnsForThisGroup].to_numpy())
+                        lfpDeviation[:, subListIdx] = est.mahalanobis(
+                            tempLFPStore.loc[:, columnsForThisGroup].to_numpy())
+                        nDim = tempLFPStore.loc[:, columnsForThisGroup].shape[1]
+                    #
+                    transformedDeviation = stats.norm.isf(stats.chi2.sf(lfpDeviation[:, subListIdx], nDim))
+                    infMask = np.isinf(transformedDeviation)
+                    if infMask.any():
+                        transformedDeviation[infMask] = transformedDeviation[~infMask].max()
+                    debugProbaTrans = False
+                    if debugProbaTrans:
+                        fig, ax = plt.subplots()
+                        tAx = ax.twinx()
+                        plotMask = (dummyAsig.times >= 60 * pq.s) & (dummyAsig.times < 95 * pq.s)
+                        ax.plot(dummyAsig.times[plotMask], transformedDeviation[plotMask], c='b', label='transformed deviation')
+                        tAx.plot(dummyAsig.times[plotMask], lfpDeviation[plotMask, subListIdx], c='r', label='original deviation')
+                        ax.legend(loc='upper left')
+                        tAx.legend(loc='upper right')
+                        plt.show()
+                    lfpDeviation[:, subListIdx] = transformedDeviation
+                    noveltyThreshold = stats.norm.interval(outlierThreshold)[1]
+                    # chi2Bounds = stats.chi2.interval(outlierThreshold, nDim)
+                    # lfpDeviation[:, subListIdx] = lfpDeviation[:, subListIdx] / chi2Bounds[1]
+                    # print('nDim = {}, chi2Lim = {}'.format(nDim, chi2Bounds))
+                    # noveltyThreshold = 1
+                    #
+                    outlierMetadata[subListIdx] = {
+                        'nDim': nDim,
+                        'noveltyThreshold': noveltyThreshold,
+                        'outlierThreshold': outlierThreshold
+                        }
+                    # smoothedDeviation = signal.sosfilt(
+                    print('Smoothing deviation')
+                    tempSmDev = signal.sosfiltfilt(
+                        filterCoeffsOutlierMask, lfpDeviation[:, subListIdx])
+                    smoothedDeviation[:, subListIdx] = tempSmDev
+                    if plotDevFilterDebug:
+                        ddfAx[subListIdx].plot(
+                            dummyAsig.times[devFiltDebugMask],
+                            lfpDeviation[devFiltDebugMask, subListIdx],
+                            label='original deviation (ch grp {})'.format(subListIdx))
+                        ddfAx[subListIdx].plot(
+                            dummyAsig.times[devFiltDebugMask],
+                            smoothedDeviation[devFiltDebugMask, subListIdx],
+                            label='filtered deviation (ch grp {})'.format(subListIdx))
+                    ##
+                    print('Calculating outlier mask')
+                    outlierMask[:, subListIdx] = (
+                        smoothedDeviation[:, subListIdx] > noveltyThreshold)
+                    if plotDevFilterDebug:
+                        ddfAx[subListIdx].axhline(noveltyThreshold, c='r')
+            if plotDevFilterDebug and calcOutliers:
+                for subListIdx, subList in enumerate(asigNameList):
+                    ddfAx[subListIdx].legend(loc='upper right')
+                    ddfAx[subListIdx].set_title('Deviation')
+                    ddfAx3[subListIdx].legend(loc='upper right')
+                    ddfAx3[subListIdx].set_title('Example channel')
+                    ddfAx2.plot(
+                        dummyAsig.times[devFiltDebugMask],
+                        smoothedDeviation[devFiltDebugMask, subListIdx],
+                        label='ch grp {}'.format(subListIdx))
+                    ddfAx2.set_title('Smoothed Deviation')
+                ddfAx2.legend(loc='upper right')
+                plt.show()
+            #############
+            del tempLFPStore
+            gc.collect()
+    if (removeMeanAcross or calcAverageLFP):
+        for mIdx, meanChIdx in enumerate(meanChIdxList):
+            meanAsig = AnalogSignal(
+                centerLFP[:, mIdx],
+                units=dummyAsig.units,
+                sampling_rate=dummyAsig.sampling_rate,
+                # name='seg{}_{}'.format(idx, meanChIdx.name)
+                name='seg{}_{}'.format(0, meanChIdx.name),
+                t_start=tStart
+            )
+            # assign ownership to containers
+            meanChIdx.analogsignals.append(meanAsig)
+            newSeg.analogsignals.append(meanAsig)
+            # assign parent to children
+            meanChIdx.create_relationship()
+            newSeg.create_relationship()
+            # write out to file
+            if LFPFilterOpts is not None:
+                meanAsig[:] = filterFun(
+                    meanAsig, filterCoeffs=filterCoeffs)
+            meanAsig = writer._write_analogsignal(
+                meanAsig, nixblock, nixgroup)
+        # if calcArtifactTrace:
+        if True:
+            for mIdx, artChIdx in enumerate(artChIdxList):
+                artAsig = AnalogSignal(
+                    artifactSignal[:, mIdx],
+                    units=dummyAsig.units,
+                    sampling_rate=dummyAsig.sampling_rate,
+                    # name='seg{}_{}'.format(idx, devChIdx.name)
+                    name='seg{}_{}'.format(0, artChIdx.name),
+                    t_start=tStart
+                    )
                 # assign ownership to containers
-                chanIdx.analogsignals.append(averageLFP)
-                newSeg.analogsignals.append(averageLFP)
+                artChIdx.analogsignals.append(artAsig)
+                newSeg.analogsignals.append(artAsig)
                 # assign parent to children
-                chanIdx.create_relationship()
+                artChIdx.create_relationship()
                 newSeg.create_relationship()
                 # write out to file
-                averageLFP = writer._write_analogsignal(
-                    averageLFP, nixblock, nixgroup)
-                if removeMeanAcross:
-                    for mIdx, meanChIdx in enumerate(meanChIdxList):
-                        meanAsig = AnalogSignal(
-                            meanLFP[:, mIdx],
-                            units=averageLFP.units,
-                            sampling_rate=averageLFP.sampling_rate,
-                            name='seg{}_{}'.format(segIdx, meanChIdx.name)
-                        )
-                        # assign ownership to containers
-                        meanChIdx.analogsignals.append(meanAsig)
-                        newSeg.analogsignals.append(meanAsig)
-                        # assign parent to children
-                        meanChIdx.create_relationship()
-                        newSeg.create_relationship()
-                        # write out to file
-                        if LFPFilterOpts is not None:
-                            meanAsig[:] = filterFun(
-                                meanAsig, filterCoeffs=filterCoeffs)
-                        meanAsig = writer._write_analogsignal(
-                            meanAsig, nixblock, nixgroup)
-                #
-                w0 = 60
-                bandQ = 20
-                bw = w0/bandQ
-                noiseSos = signal.iirfilter(
-                    N=8, Wn=[w0 - bw/2, w0 + bw/2],
-                    btype='band', ftype='butter',
-                    analog=False, fs=float(averageLFP.sampling_rate),
-                    output='sos')
-                # signal.hilbert does not have an option to zero pad
-                nextLen = fftpack.helper.next_fast_len(averageLFP.shape[0])
-                deficit = int(nextLen - averageLFP.shape[0])
-                lDef = int(np.floor(deficit / 2))
-                rDef = int(np.ceil(deficit / 2))
-                temp = np.pad(
-                    averageLFP.magnitude.flatten(),
-                    (lDef, rDef), mode='constant')
-                lineNoise = signal.sosfiltfilt(
-                    noiseSos, temp, axis=0)
-                lineNoiseH = signal.hilbert(lineNoise)
-                lineNoise = lineNoise[lDef:-rDef]
-                lineNoiseH = lineNoiseH[lDef:-rDef]
-                lineNoisePhase = np.angle(lineNoiseH)
-                lineNoisePhaseDF = pd.DataFrame(
-                    lineNoisePhase,
-                    index=averageLFP.times,
-                    columns=['phase']
+                artAsig = writer._write_analogsignal(
+                    artAsig, nixblock, nixgroup)
+                #########################################################
+        # if calcOutliers:
+        if True:
+            for mIdx, devChIdx in enumerate(devChIdxList):
+                devAsig = AnalogSignal(
+                    lfpDeviation[:, mIdx],
+                    units=dummyAsig.units,
+                    sampling_rate=dummyAsig.sampling_rate,
+                    # name='seg{}_{}'.format(idx, devChIdx.name)
+                    name='seg{}_{}'.format(0, devChIdx.name),
+                    t_start=tStart
                     )
-                plotHilbert = False
-                if plotHilbert:
-                    lineNoiseFreq = (
-                        np.diff(np.unwrap(lineNoisePhase)) /
-                        (2.0*np.pi) * float(averageLFP.sampling_rate))
-                    lineNoiseEnvelope = np.abs(lineNoiseH)
-                    import matplotlib.pyplot as plt
-                    i1 = 300000; i2 = 330000
-                    fig, ax = plt.subplots(2, 1, sharex=True)
-                    ax[0].plot(averageLFP.times[i1:i2], averageLFP.magnitude[i1:i2, :])
-                    ax[0].plot(averageLFP.times[i1:i2], lineNoise[i1:i2])
-                    ax[0].plot(averageLFP.times[i1:i2], lineNoiseEnvelope[i1:i2])
-                    axFr = ax[1].twinx()
-                    ax[1].plot(
-                        averageLFP.times[i1:i2], lineNoisePhase[i1:i2],
-                        c='r', label='phase')
-                    ax[1].legend()
-                    axFr.plot(
-                        averageLFP.times[i1:i2], lineNoiseFreq[i1:i2],
-                        label='freq')
-                    axFr.set_ylim([59, 61])
-                    axFr.legend()
-                    plt.show()
-            # second pass through asigs, to save
-            for aSigIdx, aSigProxy in enumerate(seg.analogsignals):
-                if aSigIdx == 0:
-                    # check bounds
-                    tStart = max(tStart, aSigProxy.t_start)
-                    tStop = min(tStop, aSigProxy.t_stop)
-                loadThisOne = (
-                    (aSigProxy in aSigList) or
-                    (calcAverageLFP and (aSigProxy in lfpAsigList)) or
-                    (aSigProxy in ainpList)
-                )
-                if loadThisOne:
-                    if trackMemory:
-                        print('writing asigs memory usage: {:.1f} MB'.format(
-                            prf.memory_usage_psutil()))
-                    chanIdx = aSigProxy.channel_index
-                    asig = aSigProxy.load(
-                        time_slice=(tStart, tStop),
-                        magnitude_mode='rescaled')
-                    #  link AnalogSignal and ID providing channel_index
-                    asig.channel_index = chanIdx
-                    #  perform requested preproc operations
+                # assign ownership to containers
+                devChIdx.analogsignals.append(devAsig)
+                newSeg.analogsignals.append(devAsig)
+                # assign parent to children
+                devChIdx.create_relationship()
+                newSeg.create_relationship()
+                # write out to file
+                devAsig = writer._write_analogsignal(
+                    devAsig, nixblock, nixgroup)
+                #########################################################
+            for mIdx, smDevChIdx in enumerate(smDevChIdxList):
+                smDevAsig = AnalogSignal(
+                    smoothedDeviation[:, mIdx],
+                    units=dummyAsig.units,
+                    sampling_rate=dummyAsig.sampling_rate,
+                    # name='seg{}_{}'.format(idx, devChIdx.name)
+                    name='seg{}_{}'.format(0, smDevChIdx.name),
+                    t_start=tStart
+                    )
+                # assign ownership to containers
+                smDevChIdx.analogsignals.append(smDevAsig)
+                newSeg.analogsignals.append(smDevAsig)
+                # assign parent to children
+                smDevChIdx.create_relationship()
+                newSeg.create_relationship()
+                # write out to file
+                smDevAsig = writer._write_analogsignal(
+                    smDevAsig, nixblock, nixgroup)
+                #########################################################
+            for mIdx, outMaskChIdx in enumerate(outMaskChIdxList):
+                outMaskAsig = AnalogSignal(
+                    outlierMask[:, mIdx],
+                    units=dummyAsig.units,
+                    sampling_rate=dummyAsig.sampling_rate,
+                    # name='seg{}_{}'.format(idx, outMaskChIdx.name)
+                    name='seg{}_{}'.format(0, outMaskChIdx.name),
+                    t_start=tStart, dtype=np.float32
+                    )
+                outMaskAsig.annotations['outlierProportion'] = np.mean(outlierMask[:, mIdx])
+                if calcOutliers:
+                    outMaskAsig.annotations.update(outlierMetadata[mIdx])
+                # assign ownership to containers
+                outMaskChIdx.analogsignals.append(outMaskAsig)
+                newSeg.analogsignals.append(outMaskAsig)
+                # assign parent to children
+                outMaskChIdx.create_relationship()
+                newSeg.create_relationship()
+                # write out to file
+                outMaskAsig = writer._write_analogsignal(
+                    outMaskAsig, nixblock, nixgroup)
+        #
+        w0 = 60
+        bandQ = 20
+        bw = w0/bandQ
+        noiseSos = signal.iirfilter(
+            N=8, Wn=[w0 - bw/2, w0 + bw/2],
+            btype='band', ftype='butter',
+            analog=False, fs=float(dummyAsig.sampling_rate),
+            output='sos')
+        # signal.hilbert does not have an option to zero pad
+        nextLen = fftpack.helper.next_fast_len(dummyAsig.shape[0])
+        deficit = int(nextLen - dummyAsig.shape[0])
+        lDef = int(np.floor(deficit / 2))
+        rDef = int(np.ceil(deficit / 2)) + 1
+        temp = np.pad(
+            dummyAsig.magnitude.flatten(),
+            (lDef, rDef), mode='constant')
+        # lineNoise = signal.sosfiltfilt(
+        lineNoise = signal.sosfilt(
+            noiseSos, temp, axis=0)
+        lineNoiseH = signal.hilbert(lineNoise)
+        lineNoise = lineNoise[lDef:-rDef]
+        lineNoiseH = lineNoiseH[lDef:-rDef]
+        lineNoisePhase = np.angle(lineNoiseH)
+        lineNoisePhaseDF = pd.DataFrame(
+            lineNoisePhase,
+            index=dummyAsig.times,
+            columns=['phase']
+            )
+        plotHilbert = False
+        if plotHilbert:
+            lineNoiseFreq = (
+                np.diff(np.unwrap(lineNoisePhase)) /
+                (2.0*np.pi) * float(dummyAsig.sampling_rate))
+            lineNoiseEnvelope = np.abs(lineNoiseH)
+            i1 = 300000; i2 = 330000
+            fig, ax = plt.subplots(2, 1, sharex=True)
+            ax[0].plot(dummyAsig.times[devFiltDebugMask], dummyAsig.magnitude[devFiltDebugMask, :])
+            ax[0].plot(dummyAsig.times[devFiltDebugMask], lineNoise[devFiltDebugMask])
+            ax[0].plot(dummyAsig.times[devFiltDebugMask], lineNoiseEnvelope[devFiltDebugMask])
+            axFr = ax[1].twinx()
+            ax[1].plot(
+                dummyAsig.times[devFiltDebugMask], lineNoisePhase[devFiltDebugMask],
+                c='r', label='phase')
+            ax[1].legend()
+            axFr.plot(
+                dummyAsig.times[devFiltDebugMask], lineNoiseFreq[devFiltDebugMask],
+                label='freq')
+            axFr.set_ylim([59, 61])
+            axFr.legend()
+            plt.show()
+    # second pass through asigs, to save
+    for aSigIdx, aSigProxy in enumerate(seg.analogsignals):
+        if aSigIdx == 0:
+            # check bounds
+            tStart = max(chunkTStart * pq.s, aSigProxy.t_start)
+            tStop = min(chunkTStop * pq.s, aSigProxy.t_stop)
+        loadThisOne = (
+            (saveFromAsigNameList and (aSigProxy in aSigList)) or
+            (aSigProxy in ainpList)
+            )
+        if loadThisOne:
+            if trackMemory:
+                print('writing asig {} ({}) memory usage: {:.1f} MB'.format(
+                    aSigIdx, aSigProxy.name, prf.memory_usage_psutil()))
+            chanIdx = aSigProxy.channel_index
+            asig = aSigProxy.load(
+                time_slice=(tStart, tStop),
+                magnitude_mode='rescaled')
+            #  link AnalogSignal and ID providing channel_index
+            asig.channel_index = chanIdx
+            #  perform requested preproc operations
+            if 'impedances' in locals():
+                elNmMatchMsk = impedances['elec'] == chanIdx.name
+                if elNmMatchMsk.any():
+                    originalImpedance = np.min(
+                        impedances.loc[elNmMatchMsk, 'impedance']
+                        )
+                    asig.annotations['originalImpedance'] = originalImpedance
                     if normalizeByImpedance and (aSigProxy not in ainpList):
-                        elNmMatchMsk = impedances['elec'] == chanIdx.name
+                        '''
                         asig.magnitude[:] = (
-                            (asig.magnitude - np.mean(asig.magnitude)) /
+                            (asig.magnitude - np.median(asig.magnitude)) /
                             np.min(
                                 impedances.loc[elNmMatchMsk, 'impedance']
                                 )
                             )
-                    if fillOverflow:
-                        # fill in overflow:
                         '''
-                        timeSection['data'], overflowMask = hf.fillInOverflow(
-                            timeSection['data'], fillMethod = 'average')
-                        badData.update({'overflow': overflowMask})
-                        '''
-                        pass
-                    if removeJumps:
-                        # find unusual jumps in derivative or amplitude
-                        '''
-                        timeSection['data'], newBadData = hf.fillInJumps(timeSection['data'],
-                        timeSection['samp_per_s'], smoothing_ms = 0.5, nStdDiff = 50,
-                        nStdAmp = 100)
-                        badData.update(newBadData)
-                        '''
-                        pass
-                    if removeMeanAcross and (aSigProxy not in ainpList):
-                        for k, cols in meanGroups.items():
-                            if asig.name in cols:
-                                whichColumnToSubtract = k
-                        asig.magnitude[:] = np.atleast_2d(
-                            asig.magnitude.flatten() -
-                            meanLFP[:, whichColumnToSubtract]).transpose()
+                        print('Normalizing {} by {} kOhms'.format(asig.name, originalImpedance))
                         asig.magnitude[:] = (
-                            asig.magnitude -
-                            np.median(asig.magnitude))
-                    if (LFPFilterOpts is not None) and (aSigProxy not in ainpList):
-                        asig[:] = filterFun(asig, filterCoeffs=filterCoeffs)
-                    if (aSigProxy in aSigList) or (aSigProxy in ainpList):
-                        # assign ownership to containers
-                        chanIdx.analogsignals.append(asig)
-                        newSeg.analogsignals.append(asig)
-                        # assign parent to children
-                        chanIdx.create_relationship()
-                        newSeg.create_relationship()
-                        # write out to file
-                        asig = writer._write_analogsignal(
-                            asig, nixblock, nixgroup)
-                    del asig
-                    gc.collect()
-            for irSigIdx, irSigProxy in enumerate(
-                    seg.irregularlysampledsignals):
-                chanIdx = irSigProxy.channel_index
-                #
-                isig = irSigProxy.load(
-                    time_slice=(tStart, tStop),
-                    magnitude_mode='rescaled')
-                #  link irregularlysampledSignal
-                #  and ID providing channel_index
-                isig.channel_index = chanIdx
+                            (asig.magnitude * averageImpedance) / originalImpedance
+                            )
+            if fillOverflow:
+                # fill in overflow:
+                asig.magnitude[:], _ = hf.fillInOverflow2(
+                    asig.magnitude[:],
+                    overFlowFillType='average',
+                    overFlowThreshold=8000,
+                    debuggingPlots=False
+                    )
+            if removeJumps:
+                # find unusual jumps in derivative or amplitude
+                '''
+                timeSection['data'], newBadData = hf.fillInJumps(timeSection['data'],
+                timeSection['samp_per_s'], smoothing_ms = 0.5, nStdDiff = 50,
+                nStdAmp = 100)
+                badData.update(newBadData)
+                '''
+                pass
+            if calcAverageLFP and (aSigProxy not in ainpList):
+                for k, cols in meanGroups.items():
+                    if asig.name in cols:
+                        whichColumnToSubtract = k
+                noiseModel = np.polyfit(
+                    centerLFP[:, whichColumnToSubtract],
+                    asig.magnitude.flatten(), 1, full=True)
+                rSq = 1 - noiseModel[1][0] / np.sum(asig.magnitude.flatten() ** 2)
+                asig.annotations['mean_removal_r2'] = rSq
+                asig.annotations['mean_removal_group'] = whichColumnToSubtract
+                if linearDetrend:
+                    noiseTerm = np.polyval(
+                        noiseModel[0],
+                        centerLFP[:, whichColumnToSubtract])
+                else:
+                    noiseTerm = centerLFP[:, whichColumnToSubtract]
+                ###
+                plotMeanSubtraction = False
+                if plotMeanSubtraction:
+                    i1 = 300000; i2 = 330000
+                    fig, ax = plt.subplots(1, 1)
+                    ax.plot(asig.times[devFiltDebugMask], asig.magnitude[devFiltDebugMask, :], label='channel')
+                    ax.plot(asig.times[devFiltDebugMask], centerLFP[devFiltDebugMask, whichColumnToSubtract], label='mean')
+                    ax.plot(asig.times[devFiltDebugMask], noiseTerm[devFiltDebugMask], label='adjusted mean')
+                    ax.legend()
+                    plt.show()
+                ###
+                if removeMeanAcross:
+                    asig.magnitude[:] = np.atleast_2d(
+                        asig.magnitude.flatten() - noiseTerm).transpose()
+                    # asig.magnitude[:] = (
+                    #     asig.magnitude - np.median(asig.magnitude))
+            if (LFPFilterOpts is not None) and (aSigProxy not in ainpList):
+                asig.magnitude[:] = filterFun(asig, filterCoeffs=filterCoeffs)
+            if (interpolateOutliers) and (aSigProxy not in ainpList) and (not outlierRemovalDebugFlag):
+                for k, cols in meanGroups.items():
+                    if asig.name in cols:
+                        whichColumnToSubtract = k
+                tempSer = pd.Series(asig.magnitude.flatten())
+                tempSer.loc[outlierMask[:, whichColumnToSubtract]] = np.nan
+                tempSer = (
+                    tempSer
+                    .interpolate(method='linear', limit_area='inside')
+                    .fillna(method='ffill')
+                    .fillna(method='bfill')
+                    )
+                asig.magnitude[:, 0] = tempSer.to_numpy()
+            # pdb.set_trace()
+            if (aSigProxy in aSigList) or (aSigProxy in ainpList):
                 # assign ownership to containers
-                chanIdx.irregularlysampledsignals.append(isig)
-                newSeg.irregularlysampledsignals.append(isig)
+                chanIdx.analogsignals.append(asig)
+                newSeg.analogsignals.append(asig)
                 # assign parent to children
                 chanIdx.create_relationship()
                 newSeg.create_relationship()
                 # write out to file
-                isig = writer._write_irregularlysampledsignal(
-                    isig, nixblock, nixgroup)
-                del isig
-                gc.collect()
+                asig = writer._write_analogsignal(
+                    asig, nixblock, nixgroup)
+            del asig
+            gc.collect()
+    for irSigIdx, irSigProxy in enumerate(
+            seg.irregularlysampledsignals):
+        chanIdx = irSigProxy.channel_index
+        #
+        isig = irSigProxy.load(
+            time_slice=(tStart, tStop),
+            magnitude_mode='rescaled')
+        #  link irregularlysampledSignal
+        #  and ID providing channel_index
+        isig.channel_index = chanIdx
+        # assign ownership to containers
+        chanIdx.irregularlysampledsignals.append(isig)
+        newSeg.irregularlysampledsignals.append(isig)
+        # assign parent to children
+        chanIdx.create_relationship()
+        newSeg.create_relationship()
+        # write out to file
+        isig = writer._write_irregularlysampledsignal(
+            isig, nixblock, nixgroup)
+        del isig
+        gc.collect()
+    #
+    if len(spikeSourceType):
+        for stIdx, stProxy in enumerate(spikeSeg.spiketrains):
+            if trackMemory:
+                print('writing spiketrains mem usage: {}'.format(
+                    prf.memory_usage_psutil()))
+            unit = stProxy.unit
+            st = loadStProxy(stProxy)
+            #  have to manually slice tStop and tStart because
+            #  array annotations are not saved natively in the nix file
+            #  (we're getting them as plain annotations)
+            timeMask = np.asarray(
+                (st.times >= tStart) & (st.times < tStop),
+                dtype=np.bool)
+            try:
+                if 'arrayAnnNames' in st.annotations:
+                    for key in st.annotations['arrayAnnNames']:
+                        st.annotations[key] = np.asarray(
+                            st.annotations[key])[timeMask]
+                st = st[timeMask]
+                st.t_start = tStart
+                st.t_stop = tStop
+            except Exception:
+                traceback.print_exc()
+            #  tdc may or may not have the same channel ids, but
+            #  it will have consistent channel names
+            nameParser = re.search(
+                r'([a-zA-Z0-9]*)#(\d*)', unit.name)
+            chanLabel = nameParser.group(1)
+            unitId = nameParser.group(2)
             #
-            if len(spikeSourceType):
-                for stIdx, stProxy in enumerate(spikeSeg.spiketrains):
-                    if trackMemory:
-                        print('writing spiketrains mem usage: {}'.format(
-                            prf.memory_usage_psutil()))
-                    unit = stProxy.unit
-                    st = loadStProxy(stProxy)
-                    #  have to manually slice tStop and tStart because
-                    #  array annotations are not saved natively in the nix file
-                    #  (we're getting them as plain annotations)
-                    timeMask = np.asarray(
-                        (st.times > tStart) & (st.times <= tStop),
-                        dtype=np.bool)
-                    try:
-                        if 'arrayAnnNames' in st.annotations:
-                            for key in st.annotations['arrayAnnNames']:
-                                st.annotations[key] = np.asarray(
-                                    st.annotations[key])[timeMask]
-                        st = st[timeMask]
-                        st.t_start = tStart
-                        st.t_stop = tStop
-                    except Exception:
-                        traceback.print_exc()
-                    #  tdc may or may not have the same channel ids, but
-                    #  it will have consistent channel names
-                    nameParser = re.search(
-                        r'([a-zA-Z0-9]*)#(\d*)', unit.name)
-                    chanLabel = nameParser.group(1)
-                    unitId = nameParser.group(2)
-                    #
-                    chIdxName = unit.name.replace('_stim', '').split('#')[0]
-                    chanIdx = block.filter(objects=ChannelIndex, name=chIdxName)[0]
-                    # [i.name for i in block.filter(objects=ChannelIndex)]
-                    # [i.name for i in spikeBlock.filter(objects=Unit)]
-                    #  print(unit.name)
-                    if not (unit in chanIdx.units):
-                        # first time at this unit, add to its chanIdx
-                        unit.channel_index = chanIdx
-                        chanIdx.units.append(unit)
-                    #  except Exception:
-                    #      traceback.print_exc()
-                    st.name = 'seg{}_{}'.format(segIdx, unit.name)
-                    #  link SpikeTrain and ID providing unit
-                    if calcAverageLFP:
-                        if 'arrayAnnNames' in st.annotations:
-                            st.annotations['arrayAnnNames'] = list(st.annotations['arrayAnnNames'])
-                        else:
-                            st.annotations['arrayAnnNames'] = []
-                        st.annotations['arrayAnnNames'].append('phase60hz')
-                        phase60hz = hf.interpolateDF(
-                            lineNoisePhaseDF,
-                            newX=st.times, columns=['phase']).to_numpy().flatten()
-                        st.annotations.update({'phase60hz': phase60hz})
-                        plotPhaseDist = False
-                        if plotPhaseDist:
-                            import matplotlib.pyplot as plt
-                            import seaborn as sns
-                            sns.distplot(phase60hz)
-                            plt.show()
-                    st.unit = unit
-                    # assign ownership to containers
-                    unit.spiketrains.append(st)
-                    newSeg.spiketrains.append(st)
-                    # assign parent to children
-                    unit.create_relationship()
-                    newSeg.create_relationship()
-                    # write out to file
-                    st = writer._write_spiketrain(st, nixblock, nixgroup)
-                    del st
-            #  process proprio trial related events
-            if calcRigEvents:
-                analogData = []
-                for key, value in eventInfo['inputIDs'].items():
-                    searchName = 'seg{}_'.format(segIdx) + value
-                    ainpAsig = seg.filter(
-                        objects=AnalogSignalProxy,
-                        name=searchName)[0]
-                    ainpData = ainpAsig.load(
-                        time_slice=(tStart, tStop),
-                        magnitude_mode='rescaled')
-                    analogData.append(
-                        pd.DataFrame(ainpData.magnitude, columns=[key]))
-                    del ainpData
-                    gc.collect()
-                motorData = pd.concat(analogData, axis=1)
-                del analogData
-                gc.collect()
-                if motorEncoderMask is not None:
-                    ainpData = ainpAsig.load(
-                        time_slice=(tStart, tStop),
-                        magnitude_mode='rescaled')
-                    ainpTime = ainpData.times.magnitude
-                    meTimeMask = np.zeros_like(ainpTime, dtype=np.bool)
-                    for meTimeBounds in motorEncoderMask:
-                        meTimeMask = (
-                            meTimeMask |
-                            (
-                                (ainpTime > meTimeBounds[0]) &
-                                (ainpTime < meTimeBounds[1])
-                                )
-                            )
-                    columnsToOverride = ['A-', 'A+', 'B-', 'B+', 'Z-', 'Z+']
-                    for colName in columnsToOverride:
-                        motorData.loc[~meTimeMask, colName] = motorData.loc[:, colName].quantile(q=0.05)
-                    del ainpData, ainpTime
-                    gc.collect()
-                motorData = mea.processMotorData(
-                    motorData, ainpAsig.sampling_rate.magnitude,
-                    encoderCountPerDegree=encoderCountPerDegree
+            chIdxName = unit.name.replace('_stim', '').split('#')[0]
+            chanIdx = block.filter(objects=ChannelIndex, name=chIdxName)[0]
+            # [i.name for i in block.filter(objects=ChannelIndex)]
+            # [i.name for i in spikeBlock.filter(objects=Unit)]
+            #  print(unit.name)
+            if not (unit in chanIdx.units):
+                # first time at this unit, add to its chanIdx
+                unit.channel_index = chanIdx
+                chanIdx.units.append(unit)
+            #  except Exception:
+            #      traceback.print_exc()
+            st.name = 'seg{}_{}'.format(0, unit.name)
+            # st.name = 'seg{}_{}'.format(idx, unit.name)
+            #  link SpikeTrain and ID providing unit
+            if calcAverageLFP:
+                if 'arrayAnnNames' in st.annotations:
+                    st.annotations['arrayAnnNames'] = list(st.annotations['arrayAnnNames'])
+                else:
+                    st.annotations['arrayAnnNames'] = []
+                st.annotations['arrayAnnNames'].append('phase60hz')
+                phase60hz = hf.interpolateDF(
+                    lineNoisePhaseDF,
+                    newX=st.times, columns=['phase']).to_numpy().flatten()
+                st.annotations.update({'phase60hz': phase60hz})
+                plotPhaseDist = False
+                if plotPhaseDist:
+                    sns.distplot(phase60hz)
+                    plt.show()
+            st.unit = unit
+            # assign ownership to containers
+            unit.spiketrains.append(st)
+            newSeg.spiketrains.append(st)
+            # assign parent to children
+            unit.create_relationship()
+            newSeg.create_relationship()
+            # write out to file
+            st = writer._write_spiketrain(st, nixblock, nixgroup)
+            del st
+    #  process proprio trial related events
+    if calcRigEvents:
+        print('Processing rig events...')
+        analogData = []
+        for key, value in eventInfo['inputIDs'].items():
+            searchName = 'seg{}_'.format(0) + value
+            ainpAsig = seg.filter(
+                objects=AnalogSignalProxy,
+                name=searchName)[0]
+            ainpData = ainpAsig.load(
+                time_slice=(tStart, tStop),
+                magnitude_mode='rescaled')
+            analogData.append(
+                pd.DataFrame(ainpData.magnitude, columns=[key]))
+            del ainpData
+            gc.collect()
+        motorData = pd.concat(analogData, axis=1)
+        del analogData
+        gc.collect()
+        if motorEncoderMask is not None:
+            ainpData = ainpAsig.load(
+                time_slice=(tStart, tStop),
+                magnitude_mode='rescaled')
+            ainpTime = ainpData.times.magnitude
+            meTimeMask = np.zeros_like(ainpTime, dtype=np.bool)
+            for meTimeBounds in motorEncoderMask:
+                meTimeMask = (
+                    meTimeMask |
+                    (
+                        (ainpTime > meTimeBounds[0]) &
+                        (ainpTime < meTimeBounds[1])
+                        )
                     )
-                keepCols = [
-                    'position', 'velocity', 'velocityCat',
-                    'rightBut_int', 'leftBut_int',
-                    'rightLED_int', 'leftLED_int', 'simiTrigs_int']
-                for colName in keepCols:
-                    if trackMemory:
-                        print('writing motorData memory usage: {:.1f} MB'.format(
-                            prf.memory_usage_psutil()))
-                    chanIdx = ChannelIndex(
-                        name=colName,
-                        index=np.asarray([0]),
-                        channel_names=np.asarray([0]))
-                    block.channel_indexes.append(chanIdx)
-                    motorAsig = AnalogSignal(
-                        motorData[colName].to_numpy() * pq.mV,
-                        name=colName,
-                        sampling_rate=ainpAsig.sampling_rate,
-                        dtype=np.float32)
-                    motorAsig.t_start = ainpAsig.t_start
-                    motorAsig.channel_index = chanIdx
-                    # assign ownership to containers
-                    chanIdx.analogsignals.append(motorAsig)
-                    newSeg.analogsignals.append(motorAsig)
-                    chanIdx.create_relationship()
-                    newSeg.create_relationship()
-                    # write out to file
-                    motorAsig = writer._write_analogsignal(
-                        motorAsig, nixblock, nixgroup)
-                    del motorAsig
-                    gc.collect()
-                _, trialEvents = mea.getTrials(
-                    motorData, ainpAsig.sampling_rate.magnitude,
-                    float(tStart.magnitude), trialType=None)
-                trialEvents.fillna(0)
-                trialEvents.rename(
-                    columns={
-                        'Label': 'rig_property',
-                        'Details': 'rig_value'},
-                    inplace=True)
-                del motorData
-                gc.collect()
-                eventList = eventDataFrameToEvents(
-                    trialEvents,
-                    idxT='Time',
-                    annCol=['rig_property', 'rig_value'])
-                for event in eventList:
-                    if trackMemory:
-                        print(
-                            'writing motor events memory usage: {:.1f} MB'
-                            .format(prf.memory_usage_psutil()))
-                    event.segment = newSeg
-                    newSeg.events.append(event)
-                    newSeg.create_relationship()
-                    # write out to file
-                    event = writer._write_event(event, nixblock, nixgroup)
-                    del event
-                    gc.collect()
-                del trialEvents, eventList
-            #
-            for eventProxy in seg.events:
-                event = eventProxy.load(
-                    time_slice=(tStart, tStop))
-                event.segment = newSeg
-                newSeg.events.append(event)
-                newSeg.create_relationship()
-                # write out to file
-                event = writer._write_event(event, nixblock, nixgroup)
-                del event
-                gc.collect()
-            #
-            for epochProxy in seg.epochs:
-                epoch = epochProxy.load(
-                    time_slice=(tStart, tStop))
-                epoch.segment = newSeg
-                newSeg.events.append(epoch)
-                newSeg.create_relationship()
-                # write out to file
-                epoch = writer._write_epoch(epoch, nixblock, nixgroup)
-                del epoch
-                gc.collect()
+            columnsToOverride = ['A-', 'A+', 'B-', 'B+', 'Z-', 'Z+']
+            for colName in columnsToOverride:
+                motorData.loc[~meTimeMask, colName] = motorData.loc[:, colName].quantile(q=0.05)
+            del ainpData, ainpTime
+            gc.collect()
+        motorData = mea.processMotorData(
+            motorData, ainpAsig.sampling_rate.magnitude,
+            encoderCountPerDegree=encoderCountPerDegree
+            )
+        keepCols = [
+            'position', 'velocity', 'velocityCat',
+            'rightBut_int', 'leftBut_int',
+            'rightLED_int', 'leftLED_int', 'simiTrigs_int']
+        for colName in keepCols:
+            if trackMemory:
+                print('writing motorData memory usage: {:.1f} MB'.format(
+                    prf.memory_usage_psutil()))
+            chanIdx = ChannelIndex(
+                name=colName,
+                index=np.asarray([0]),
+                channel_names=np.asarray([0]))
+            block.channel_indexes.append(chanIdx)
+            motorAsig = AnalogSignal(
+                motorData[colName].to_numpy() * pq.mV,
+                name=colName,
+                sampling_rate=ainpAsig.sampling_rate,
+                dtype=np.float32)
+            motorAsig.t_start = ainpAsig.t_start
+            motorAsig.channel_index = chanIdx
+            # assign ownership to containers
+            chanIdx.analogsignals.append(motorAsig)
+            newSeg.analogsignals.append(motorAsig)
+            chanIdx.create_relationship()
+            newSeg.create_relationship()
+            # write out to file
+            motorAsig = writer._write_analogsignal(
+                motorAsig, nixblock, nixgroup)
+            del motorAsig
+            gc.collect()
+        _, trialEvents = mea.getTrials(
+            motorData, ainpAsig.sampling_rate.magnitude,
+            float(tStart.magnitude), trialType=None)
+        trialEvents.fillna(0)
+        trialEvents.rename(
+            columns={
+                'Label': 'rig_property',
+                'Details': 'rig_value'},
+            inplace=True)
+        del motorData
+        gc.collect()
+        eventList = eventDataFrameToEvents(
+            trialEvents,
+            idxT='Time',
+            annCol=['rig_property', 'rig_value'])
+        for event in eventList:
+            if trackMemory:
+                print(
+                    'writing motor events memory usage: {:.1f} MB'
+                    .format(prf.memory_usage_psutil()))
+            event.segment = newSeg
+            newSeg.events.append(event)
+            newSeg.create_relationship()
+            # write out to file
+            event = writer._write_event(event, nixblock, nixgroup)
+            del event
+            gc.collect()
+        del trialEvents, eventList
+    #
+    for eventProxy in seg.events:
+        event = eventProxy.load(
+            time_slice=(tStart, tStop))
+        event.t_start = tStart
+        event.t_stop = tStop
+        event.segment = newSeg
+        newSeg.events.append(event)
+        newSeg.create_relationship()
+        # write out to file
+        event = writer._write_event(event, nixblock, nixgroup)
+        del event
+        gc.collect()
+    #
+    for epochProxy in seg.epochs:
+        epoch = epochProxy.load(
+            time_slice=(tStart, tStop))
+        epoch.t_start = tStart
+        epoch.t_stop = tStop
+        epoch.segment = newSeg
+        newSeg.events.append(epoch)
+        newSeg.create_relationship()
+        # write out to file
+        epoch = writer._write_epoch(epoch, nixblock, nixgroup)
+        del epoch
+        gc.collect()
     #
     chanIdxDiscardNames = []
     # descend into ChannelIndexes
@@ -2911,17 +3886,19 @@ def loadObjArrayAnn(st):
             #  fromRaw, the ann come back as tuple, need to recast
             try:
                 if len(st.times) == 1:
-                    st.annotations[key] = [st.annotations[key]]
+                    st.annotations[key] = np.atleast_1d(st.annotations[key]).flatten()
                 st.array_annotations.update(
                     {key: np.asarray(st.annotations[key])})
                 st.annotations[key] = np.asarray(st.annotations[key])
             except Exception:
+                print('Error with {}'.format(st.name))
                 traceback.print_exc()
+                pdb.set_trace()
     if hasattr(st, 'waveforms'):
         if st.waveforms is None:
-            st.waveforms = np.asarray([]).reshape((0, 0, 0))*pq.mV
+            st.waveforms = np.asarray([]).reshape((0, 0, 0)) * pq.mV
         elif not len(st.waveforms):
-            st.waveforms = np.asarray([]).reshape((0, 0, 0))*pq.mV
+            st.waveforms = np.asarray([]).reshape((0, 0, 0)) * pq.mV
     return st
 
 
@@ -2937,6 +3914,8 @@ def loadWithArrayAnn(
     else:
         reader = NixIO(filename=dataPath)
         block = reader.read_block()
+        # [un.name for un in block.filter(objects=Unit)]
+        # [len(un.spiketrains) for un in block.filter(objects=Unit)]
     
     block = loadContainerArrayAnn(container=block)
     
@@ -2948,40 +3927,92 @@ def loadWithArrayAnn(
 
 
 def blockFromPath(
-        dataPath, lazy=False,
-        reduceChannelIndexes=False):
-    if lazy:
-        dataReader = nixio_fr.NixIO(
-            filename=dataPath)
-        dataBlock = readBlockFixNames(
-            dataReader, lazy=lazy,
-            reduceChannelIndexes=reduceChannelIndexes)
-    else:
-        dataReader = None
-        dataBlock = loadWithArrayAnn(dataPath)
+        dataPath, lazy=False, mapDF=None,
+        reduceChannelIndexes=False, loadList=None,
+        purgeNixNames=False, chunkingInfoPath=None):
+    chunkingMetadata = None
+    if chunkingInfoPath is not None:
+        if os.path.exists(chunkingInfoPath):
+            with open(chunkingInfoPath, 'r') as f:
+                chunkingMetadata = json.load(f)
+    if chunkingMetadata is None:
+        chunkingMetadata = {
+            '0': {
+                'filename': dataPath,
+                'partNameSuffix': '',
+                'chunkTStart': 0,
+                'chunkTStop': 'NaN'
+            }}
+    for idx, (chunkIdxStr, chunkMeta) in enumerate(chunkingMetadata.items()):   
+        thisDataPath = chunkMeta['filename']
+        assert os.path.exists(thisDataPath)
+        if idx == 0:
+            if lazy:
+                dataReader = nixio_fr.NixIO(
+                    filename=thisDataPath)
+                dataBlock = readBlockFixNames(
+                    dataReader, lazy=lazy, mapDF=mapDF,
+                    reduceChannelIndexes=reduceChannelIndexes,
+                    purgeNixNames=purgeNixNames, loadList=loadList)
+            else:
+                dataReader = None
+                dataBlock = loadWithArrayAnn(thisDataPath)
+        else:
+            if lazy:
+                dataReader2 = nixio_fr.NixIO(
+                    filename=thisDataPath)
+                dataBlock2 = readBlockFixNames(
+                    dataReader2, lazy=lazy, mapDF=mapDF,
+                    reduceChannelIndexes=reduceChannelIndexes, loadList=loadList)
+            else:
+                dataReader2 = None
+                dataBlock2 = loadWithArrayAnn(thisDataPath)
+            maxSegIdx = len(dataBlock.segments)
+            typesNeedRenaming = [
+                SpikeTrainProxy, AnalogSignalProxy, EventProxy,
+                SpikeTrain, AnalogSignal, Event]
+            for segIdx, seg in enumerate(dataBlock2.segments):
+                if seg.name is None:
+                    seg.name = 'seg{}_'.format(maxSegIdx + segIdx)
+                else:
+                    if 'seg{}_'.format(maxSegIdx + segIdx) not in seg.name:
+                        seg.name = (
+                            'seg{}_{}'
+                            .format(
+                                maxSegIdx + segIdx,
+                                childBaseName(seg.name, 'seg')))
+                for objType in typesNeedRenaming:
+                    for child in seg.filter(objects=objType):
+                        if 'seg{}_'.format(maxSegIdx + segIdx) not in child.name:
+                            child.name = (
+                                'seg{}_{}'
+                                .format(
+                                    maxSegIdx + segIdx, childBaseName(child.name, 'seg')))
+            dataBlock.merge(dataBlock2)
     return dataReader, dataBlock
 
 
 def calcBinarizedArray(
-        dataBlock, samplingRate, binnedSpikePath, saveToFile=True):
+        dataBlock, samplingRate,
+        binnedSpikePath=None,
+        saveToFile=True, matchT=None):
     #
     spikeMatBlock = Block(name=dataBlock.name + '_binarized')
     spikeMatBlock.merge_annotations(dataBlock)
     #
     allSpikeTrains = [
-        i for i in dataBlock.filter(objects=SpikeTrain) if '#' in i.name]
+        i for i in dataBlock.filter(objects=SpikeTrain)]
     #
     for st in allSpikeTrains:
-        if '#' in st.name:
-            chanList = spikeMatBlock.filter(
-                objects=ChannelIndex, name=st.unit.name)
-            if not len(chanList):
-                chanIdx = ChannelIndex(name=st.unit.name, index=np.asarray([0]))
-                #  print(chanIdx.name)
-                spikeMatBlock.channel_indexes.append(chanIdx)
-                thisUnit = Unit(name=st.unit.name)
-                chanIdx.units.append(thisUnit)
-                thisUnit.channel_index = chanIdx
+        chanList = spikeMatBlock.filter(
+            objects=ChannelIndex, name=st.unit.name)
+        if not len(chanList):
+            chanIdx = ChannelIndex(name=st.unit.name, index=np.asarray([0]))
+            #  print(chanIdx.name)
+            spikeMatBlock.channel_indexes.append(chanIdx)
+            thisUnit = Unit(name=st.unit.name)
+            chanIdx.units.append(thisUnit)
+            thisUnit.channel_index = chanIdx
     #
     for segIdx, seg in enumerate(dataBlock.segments):
         newSeg = Segment(name='seg{}_{}'.format(segIdx, spikeMatBlock.name))
@@ -2998,7 +4029,7 @@ def calcBinarizedArray(
             segSpikeTrains[0],
             sampling_rate=samplingRate,
             t_start=tStart,
-            t_stop=tStop) * 0
+            t_stop=tStop + samplingRate ** -1) * 0
         for chanIdx in spikeMatBlock.channel_indexes:
             #  print(chanIdx.name)
             stList = seg.filter(
@@ -3012,7 +4043,7 @@ def calcBinarizedArray(
                     st,
                     sampling_rate=samplingRate,
                     t_start=tStart,
-                    t_stop=tStop)
+                    t_stop=tStop + samplingRate ** -1)
                 spikeMatBlock.segments[segIdx].spiketrains.append(st)
                 #  to do: link st to spikematblock's chidx and units
                 assert len(chanIdx.filter(objects=Unit)) == 1
@@ -3038,6 +4069,8 @@ def calcBinarizedArray(
                 sampling_rate=samplingRate,
                 dtype=np.int,
                 **asigAnn)
+            if matchT is not None:
+                asig = asig[:matchT.shape[0], :]
             asig.t_start = tStart
             asig.annotate(binWidth=1 / samplingRate.magnitude)
             chanIdx.analogsignals.append(asig)
@@ -3118,7 +4151,11 @@ def calcFR(
                 chanIdx.name = chanIdx.name.replace('_raster', '_' + suffix)
             chanIdx.annotate(nix_name=chanIdx.name)
 
-        masterBlock.merge(spikeMatBlockInterp)
+        # masterBlock.merge(spikeMatBlockInterp)
+        frBlockPath = dataPath.replace('_analyze.nix', '_fr.nix')
+        writer = NixIO(filename=frBlockPath)
+        writer.write_block(spikeMatBlockInterp, use_obj_names=True)
+        writer.close()
     #
     dataReader.file.close()
     return masterBlock

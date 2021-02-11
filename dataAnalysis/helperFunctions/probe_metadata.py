@@ -5,8 +5,10 @@ from datetime import datetime as dt
 import os
 import pdb
 
+
 def getLatestImpedance(
         recordingDate=None, impedanceFilePath='./impedances.h5',
+        subjectName=None,
         recordingDateStr=None,
         block=None, elecType=None):
     impedances = pd.read_hdf(impedanceFilePath, 'impedance')
@@ -20,10 +22,10 @@ def getLatestImpedance(
     pastDates = impedances.loc[impedances['date'] <= recordingDate, 'date']
     lastDate = np.max(pastDates)
     impedances = impedances.loc[impedances['date'] == lastDate, :]
-    return impedances
+    return impedances.dropna()
 
 
-def cmpToDF(arrayFilePath):
+def cmpToDF(arrayFilePath, lgaMapFilePath=None):
     arrayMap = pd.read_csv(
         arrayFilePath, sep='\t',
         skiprows=13)
@@ -43,14 +45,29 @@ def cmpToDF(arrayFilePath):
         cmpDF.loc[nevIdx, 'elecID'] = elecIdx
         cmpDF.loc[nevIdx, 'nevID'] = nevIdx
         cmpDF.loc[nevIdx, 'elecName'] = elecName
-        cmpDF.loc[nevIdx, 'xcoords'] = row['row']
-        cmpDF.loc[nevIdx, 'ycoords'] = row['//col']
+        cmpDF.loc[nevIdx, 'ycoords'] = int(row['row'])
+        cmpDF.loc[nevIdx, 'xcoords'] = int(row['//col'])
         cmpDF.loc[nevIdx, 'zcoords'] = 0
         cmpDF.loc[nevIdx, 'label'] = row['label']
         cmpDF.loc[nevIdx, 'bank'] = row['bank']
         cmpDF.loc[nevIdx, 'bankID'] = int(row['elec'])
     cmpDF.dropna(inplace=True)
     cmpDF.reset_index(drop=True, inplace=True)
+    if lgaMapFilePath is not None:
+        cmpDF['lgaXCoords'] = np.nan
+        cmpDF['lgaYCoords'] = np.nan
+        lgaMapDF = pd.read_csv(lgaMapFilePath, header=None)
+        for lgaX in lgaMapDF.columns:
+            for lgaY in lgaMapDF.index:
+                if isinstance(lgaMapDF.loc[lgaY, lgaX], str):
+                    lgaBank = lgaMapDF.loc[lgaY, lgaX][0]
+                    lgaChan = float(lgaMapDF.loc[lgaY, lgaX][1:])
+                    matchMask = (cmpDF['bank'] == lgaBank) & (cmpDF['bankID'] == lgaChan)
+                    if matchMask.any():
+                        assert matchMask.sum() == 1
+                        cmpDF.loc[matchMask, 'lgaXCoords'] = lgaX
+                        cmpDF.loc[matchMask, 'lgaYCoords'] = lgaY
+    # pdb.set_trace()
     return cmpDF
 
 
@@ -106,7 +123,7 @@ def cmpDFToPrb(
         cmpDF, filePath=None,
         names=None, banks=None, labels=None,
         contactSpacing=400,  # units of um
-        groupIn=None):
+        groupIn=None, verbose=True):
     # pdb.set_trace()
     if names is not None:
         keepMask = cmpDF['elecName'].isin(names)
@@ -131,8 +148,11 @@ def cmpDFToPrb(
             groupingCols.append(key + '_group')
     else:
         groupingCols = ['elecName']
+    if verbose:
+        print('Writing prb file (in cmpDFToPrb)....')
     for idx, (name, group) in enumerate(cmpDF.groupby(groupingCols)):
-        print('idx: {} name: {}'.format(idx, name))
+        if verbose:
+            print('channel group idx: {} name: {}'.format(idx, name))
         theseChannels = []
         theseGeoms = {}
         for rName, row in group.iterrows():
@@ -145,6 +165,7 @@ def cmpDFToPrb(
             'channels': theseChannels,
             'geometry': theseGeoms
             }})
+    # pdb.set_trace()
     """
     tallyChans = []
     tallyGeoms = {}

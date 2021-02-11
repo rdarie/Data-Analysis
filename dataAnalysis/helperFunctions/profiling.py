@@ -5,6 +5,8 @@ import numpy as np
 import collections
 import line_profiler
 import pdb
+
+from PyQt5.QtCore import pyqtRemoveInputHook, pyqtRestoreInputHook
 from inspect import getmembers, isfunction
 
 psutil_process = psutil.Process(os.getpid())
@@ -141,3 +143,15 @@ def profileFunction(
             orderedStats, unit,
             output_unit=outputUnits, stream=f)
     return
+
+
+def debugTrace():
+    pyqtRemoveInputHook()
+    try:
+        debugger = pdb.Pdb()
+        debugger.reset()
+        debugger.do_next(None)
+        user_frame = sys._getframe().f_back
+        debugger.interaction(user_frame, None)
+    finally:
+        pyqtRestoreInputHook()

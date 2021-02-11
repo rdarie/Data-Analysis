@@ -9,6 +9,7 @@ Options:
     --processAll                                     process entire experimental day? [default: False]
     --alignFolderName=alignFolderName                append a name to the resulting blocks? [default: motion]
     --searchTerm=searchTerm                          shuttle all files and folders that include this term
+    --fileSearchTerm=fileSearchTerm                  shuttle all files and folders that include this term
     --moveItems                                      move items, as opposed to copy them
     --fromScratchToData                              process entire experimental day? [default: False]
     --fromDataToScratch                              process entire experimental day? [default: False]
@@ -23,6 +24,7 @@ Options:
     --purgeAnalysisFolder                            process entire experimental day? [default: False]
     --purgeAlignFolder                               process entire experimental day? [default: False]
     --forcePurge                                     process entire experimental day? [default: False]
+    --preprocFolderSubfolders                        process entire experimental day? [default: False]
     
 """
 
@@ -126,9 +128,16 @@ if arguments['alignFolderFromScratchToData']:
 #######################
 #  Global moves
 #######################
-
 if arguments['fromScratchToData']:
     if arguments['preprocFolderFiles']:
+        itemsToMove = [
+            itemName
+            for itemName in os.listdir(scratchFolder)
+            if os.path.isfile(os.path.join(scratchFolder, itemName))
+            ]
+        print('\nAbout to move:\n')
+        print('\n'.join(itemsToMove))
+        x = input('\n********\nPress any key to continue.')
         for itemName in os.listdir(scratchFolder):
             originPath = os.path.join(scratchFolder, itemName)
             destinPath = os.path.join(processedFolder, itemName)
@@ -138,7 +147,35 @@ if arguments['fromScratchToData']:
                 else:
                     shutil.copyfile(originPath, destinPath)
                 print('Copying from\n{}\ninto\n{}'.format(originPath, destinPath))
+    if arguments['preprocFolderSubfolders']:
+        itemsToMove = [
+            itemName
+            for itemName in os.listdir(scratchFolder)
+            if os.path.isdir(os.path.join(scratchFolder, itemName))
+            ]
+        print('\nAbout to move:\n')
+        print('\n'.join(itemsToMove))
+        x = input('\n********\nPress any key to continue.')
+        for itemName in os.listdir(scratchFolder):
+            originPath = os.path.join(scratchFolder, itemName)
+            destinPath = os.path.join(processedFolder, itemName)
+            if os.path.isdir(originPath):
+                if os.path.exists(destinPath):
+                    shutil.rmtree(destinPath)
+                if arguments['moveItems']:
+                    shutil.move(originPath, destinPath)
+                else:
+                    shutil.copytree(originPath, destinPath)
+                print('Copying from\n{}\ninto\n{}'.format(originPath, destinPath))
     if arguments['searchTerm'] is not None:
+        itemsToMove = [
+            itemName
+            for itemName in os.listdir(scratchFolder)
+            if arguments['searchTerm'] in os.path.join(scratchFolder, itemName)
+            ]
+        print('\nAbout to move:\n')
+        print('\n'.join(itemsToMove))
+        x = input('\n********\nPress any key to continue.')
         for itemName in os.listdir(scratchFolder):
             originPath = os.path.join(scratchFolder, itemName)
             destinPath = os.path.join(processedFolder, itemName)
@@ -156,13 +193,49 @@ if arguments['fromScratchToData']:
 
 if arguments['fromDataToScratch']:
     if arguments['preprocFolderFiles']:
+        itemsToMove = [
+            itemName
+            for itemName in os.listdir(processedFolder)
+            if os.path.isfile(os.path.join(processedFolder, itemName))
+            ]
+        print('\nAbout to move:\n')
+        print('\n'.join(itemsToMove))
+        x = input('\n********\nPress any key to continue.')
         for itemName in os.listdir(processedFolder):
             originPath = os.path.join(processedFolder, itemName)
             destinPath = os.path.join(scratchFolder, itemName)
             if os.path.isfile(originPath):
                 shutil.copyfile(originPath, destinPath)
                 print('Copying from\n{}\ninto\n{}'.format(originPath, destinPath))
+    if arguments['preprocFolderSubfolders']:
+        itemsToMove = [
+            itemName
+            for itemName in os.listdir(processedFolder)
+            if os.path.isdir(os.path.join(processedFolder, itemName))
+            ]
+        print('\nAbout to move:\n')
+        print('\n'.join(itemsToMove))
+        x = input('\n********\nPress any key to continue.')
+        for itemName in os.listdir(processedFolder):
+            originPath = os.path.join(processedFolder, itemName)
+            destinPath = os.path.join(scratchFolder, itemName)
+            if os.path.isdir(originPath):
+                if os.path.exists(destinPath):
+                    shutil.rmtree(destinPath)
+                if arguments['moveItems']:
+                    shutil.move(originPath, destinPath)
+                else:
+                    shutil.copytree(originPath, destinPath)
+                print('Copying from\n{}\ninto\n{}'.format(originPath, destinPath))
     if arguments['searchTerm'] is not None:
+        itemsToMove = [
+            itemName
+            for itemName in os.listdir(processedFolder)
+            if arguments['searchTerm'] in os.path.join(processedFolder, itemName)
+            ]
+        print('\nAbout to move:\n')
+        print('\n'.join(itemsToMove))
+        x = input('\n********\nPress any key to continue.')
         for itemName in os.listdir(processedFolder):
             originPath = os.path.join(processedFolder, itemName)
             destinPath = os.path.join(scratchFolder, itemName)
@@ -172,6 +245,27 @@ if arguments['fromDataToScratch']:
                 shutil.copytree(originPath, destinPath)
                 print('Copying from\n{}\ninto\n{}'.format(originPath, destinPath))
             if os.path.isfile(originPath) and arguments['searchTerm'] in originPath:
+                shutil.copyfile(originPath, destinPath)
+                print('Copying from\n{}\ninto\n{}'.format(originPath, destinPath))
+    if arguments['fileSearchTerm'] is not None:
+        itemsToMoveFullPath = glob.glob(os.path.join(processedFolder, '**', arguments['fileSearchTerm']), recursive=True)
+        itemsToMove = [
+            itemName.replace(processedFolder + '/', '')
+            for itemName in itemsToMoveFullPath
+            ]
+        # pdb.set_trace()
+        print('\nAbout to move:\n')
+        print('\n'.join(itemsToMove))
+        x = input('\n********\nPress any key to continue.')
+        for itemName in itemsToMove:
+            originPath = os.path.join(processedFolder, itemName)
+            destinPath = os.path.join(scratchFolder, itemName)
+            # if os.path.isdir(originPath) and arguments['searchTerm'] in originPath:
+            #     if os.path.exists(destinPath):
+            #         shutil.rmtree(destinPath)
+            #     shutil.copytree(originPath, destinPath)
+            #     print('Copying from\n{}\ninto\n{}'.format(originPath, destinPath))
+            if os.path.isfile(originPath):
                 shutil.copyfile(originPath, destinPath)
                 print('Copying from\n{}\ninto\n{}'.format(originPath, destinPath))
 

@@ -15,8 +15,8 @@
 #SBATCH -J glmFull_20190127
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-glmFull_20190127.stdout
-#SBATCH -e ../../batch_logs/%j-glmFull_20190127.errout
+#SBATCH -o ../../batch_logs/%j-glmFull_20190127.out
+#SBATCH -e ../../batch_logs/%j-glmFull_20190127.out
 
 # Specify account details
 #disableSBATCH -p bigmem

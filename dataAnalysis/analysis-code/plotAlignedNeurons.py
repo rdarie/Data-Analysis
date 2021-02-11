@@ -16,15 +16,20 @@ Options:
     --rowName=rowName                      break down by row  [default: pedalDirection]
     --rowControl=rowControl                rows to exclude from comparison
     --hueName=hueName                      break down by hue  [default: amplitude]
-    --enableOverrides                      delete outlier trials? [default: False]
     --hueControl=hueControl                hues to exclude from comparison
+    --enableOverrides                      delete outlier trials? [default: False]
     --styleName=styleName                  break down by style [default: RateInHz]
-    --styleControl=hueControl              styles to exclude from stats test
+    --styleControl=styleControl            styles to exclude from stats test
     --colName=colName                      break down by col  [default: electrode]
     --colControl=colControl                cols to exclude from comparison [default: control]
     --analysisName=analysisName            append a name to the resulting blocks? [default: default]
     --alignFolderName=alignFolderName      append a name to the resulting blocks? [default: motion]
     --overlayStats                         overlay ANOVA significance stars? [default: False]
+    --recalcStats                          overlay ANOVA significance stars? [default: False]
+    --winStart=winStart                    start of window [default: 200]
+    --winStop=winStop                      end of window [default: 400]
+    --limitPages=limitPages                how many pages to print, max?
+    --noStim                               disable references to "amplitude"
 """
 import matplotlib
 matplotlib.rcParams['pdf.fonttype'] = 42
@@ -90,10 +95,17 @@ alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUn
     namedQueries, alignSubFolder, **arguments)
 alignedAsigsKWargs['outlierTrials'] = ash.processOutlierTrials(
     calcSubFolder, prefix, **arguments)
-alignedAsigsKWargs.update(dict(
-    duplicateControlsByProgram=True,
-    makeControlProgram=True,
-    metaDataToCategories=False))
+#
+if arguments['noStim']:
+    alignedAsigsKWargs.update(dict(
+        duplicateControlsByProgram=False,
+        makeControlProgram=False,
+        metaDataToCategories=False))
+else:
+    alignedAsigsKWargs.update(dict(
+        duplicateControlsByProgram=True,
+        makeControlProgram=True,
+        metaDataToCategories=False))
 #
 rasterBlockPath = os.path.join(
     alignSubFolder,
@@ -119,7 +131,11 @@ statsTestOpts.update({
     'tStop': rasterOpts['windowSizes'][arguments['window']][1]})
 #  Overrides
 ################################################################
-limitPages = None
+if arguments['limitPages'] is not None:
+    limitPages = int(arguments['limitPages'])
+else:
+    limitPages = None
+minNObservations = 1
 showNow = False
 if arguments['enableOverrides']:
     nrnRelplotKWArgs.update({
@@ -127,7 +143,7 @@ if arguments['enableOverrides']:
         'height': 4,
         'aspect': 2,
         'facet1_kws': {  # raster axes
-            'sharey': True,
+            'sharey': False,
             # 'legend_out': False,
             'gridspec_kws': {
                 'wspace': 0.01,
@@ -142,7 +158,11 @@ if arguments['enableOverrides']:
             }}
         })
     ##########################################################################
-    alignedAsigsKWargs.update({'windowSize': (-.5, 1)})
+    alignedAsigsKWargs.update({
+        'windowSize': (
+            float(arguments['winStart']) * (-1e-3),
+            float(arguments['winStop']) * 1e-3
+            )})
     ##########################################################################
 #     # currWindow = rasterOpts['windowSizes'][arguments['window']]
 #     # fullWinSize = currWindow[1] - currWindow[0]
@@ -162,7 +182,7 @@ if arguments['enableOverrides']:
 # ################################################################
 
 if arguments['overlayStats']:
-    if os.path.exists(statsTestPath):
+    if os.path.exists(statsTestPath) and not arguments['recalcStats']:
         sigValsWide = pd.read_hdf(statsTestPath, 'sig')
         sigValsWide.columns.name = 'bin'
     else:
@@ -190,6 +210,7 @@ asp.plotNeuronsAligned(
     frBlock,
     limitPages=limitPages,
     showNow=showNow,
+    minNObservations=minNObservations,
     verbose=arguments['verbose'],
     loadArgs=alignedAsigsKWargs,
     sigTestResults=sigValsWide,
@@ -199,10 +220,6 @@ asp.plotNeuronsAligned(
         # asp.genYLimSetterTwin((0, 150)),
         asp.genTicksToScaleTwin(
             lineOpts={'lw': 2}, shared=True,
-            # for evoked lfp report
-            # xUnitFactor=1e3, yUnitFactor=1,
-            # xUnits='msec', yUnits='uV',
-            # for evoked emg report
             xUnitFactor=1e3, yUnitFactor=1,
             xUnits='msec', yUnits='spk/s',
             ),

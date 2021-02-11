@@ -2,7 +2,7 @@
 
 # 06a: Preprocess the NS5 File
 # Request 24 hours of runtime:
-#SBATCH --time=1:00:00
+#SBATCH --time=6:00:00
 
 # Default resources are 1 core with 2.8GB of memory.
 
@@ -11,53 +11,49 @@
 #SBATCH --mem=127G
 
 # Specify a job name:
-#SBATCH -J preproc_20200911
+#SBATCH -J preproc_dual_2021_02_08
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-preproc_20200911.stdout
-#SBATCH -e ../../batch_logs/%j-%a-preproc_20200911.errout
+#SBATCH -o ../../batch_logs/%j-%a-preproc_dual_2021_02_08.out
+#SBATCH -e ../../batch_logs/%j-%a-preproc_dual_2021_02_08.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=2,3
+#SBATCH --array=1
 
-# EXP="exp201804271016"
-# EXP="exp201805231100"
-# EXP="exp201805071032"
-# EXP="exp201901070700"
-# EXP="exp201901201200"
-# EXP="exp201901211000"
-# EXP="exp201901221000"
-# EXP="exp201901231000"
-# EXP="exp201901261000"
-# EXP="exp201901271000"
-# EXP="exp202008281100"
-# EXP="exp202008311100"
-# EXP="exp202009021100"
-# EXP="exp202009071200"
-# EXP="exp202009101200"
-# EXP="exp202009111100"
-# EXP="exp202009211200"
-# EXP="exp202009291300"
-# EXP="exp202009301100"
-EXP="exp202010011100"
+# EXP="exp202101141100"
+# EXP="exp202101191100"
+# EXP="exp202101201100"
+# EXP="exp202101211100"
+# EXP="exp202101221100"
+# EXP="exp202101251100"
+# EXP="exp202101271100"
+# EXP="exp202101281100"
+# EXP="exp202102041100"
+EXP="exp202102081100"
+# EXP="exp202102101100"
 
 
-module load anaconda/3-5.2.0
-. /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
+module load anaconda/2020.02
+. /gpfs/runtime/opt/anaconda/2020.02/etc/profile.d/conda.sh
 conda activate
 source activate nda2
 python --version
 
 # SLURM_ARRAY_TASK_ID=1
 
-# python -u ./preprocNS5.py --arrayName=utah --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --forSpikeSorting
-# python -u ./preprocNS5.py --arrayName=nform --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --forSpikeSorting
+########### get analog inputs separately to run synchronization, etc
+# !! --maskMotorEncoder ignores all motor events outside alignTimeBounds
+python -u ./preprocNS5.py --arrayName=utah --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --analogOnly --maskMotorEncoder
 
-# !! maskMotorEncoder ignores all motor events outside alignTimeBounds
-python3 -u ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --arrayName=utah --fullSubtractMean
-python3 -u ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --arrayName=nform --rippleNForm
+########### get dataset to run spike extraction on
+# python -u ./preprocNS5.py --arrayName=utah --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --fullSubtractMean --chunkSize=700
+# python -u ./preprocNS5.py --arrayName=nform --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --fullSubtractMean
 
-# python3 -u ./synchronizeNFormToNSP.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --trigRate=100
+######### finalize dataset
+# python -u ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --arrayName=utah --fullUnfiltered --chunkSize=700
+# python -u ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --arrayName=nform --fullSubtractMeanUnfiltered
+
+# python -u ./synchronizeNFormToNSP.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --trigRate=100

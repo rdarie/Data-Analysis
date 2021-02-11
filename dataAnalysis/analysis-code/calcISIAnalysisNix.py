@@ -78,6 +78,7 @@ def calcISIBlockAnalysisNix():
     else:
         samplingRate = float(1 / binOpts['binInterval']) * pq.Hz
     #
+    delsysBasePath = trialBasePath.replace('.nix', '_delsys_synchronized.nix')
     # Start parsing autologger info
     thisJsonPath = trialBasePath.replace('.nix', '_autoStimLog.json')
     if os.path.exists(thisJsonPath):
@@ -253,6 +254,12 @@ def calcISIBlockAnalysisNix():
         nspReader, block_index=0,
         reduceChannelIndexes=True
         )
+    delsysReader, delsysBlock = ns5.blockFromPath(
+        delsysBasePath, lazy=True
+        )
+    delsysChanNames = ns5.listChanNames(
+        delsysBlock, arguments['chanQuery'],
+        objType=AnalogSignalProxy)
     #
     spikesBlock = hf.extractSignalsFromBlock(
         nspBlock, keepSpikes=True)
@@ -284,6 +291,9 @@ def calcISIBlockAnalysisNix():
     tdBlock = hf.extractSignalsFromBlock(
         nspBlock, keepSpikes=False, keepSignals=tdChanNames)
     tdBlock = hf.loadBlockProxyObjects(tdBlock)
+    delsysLoadedBlock = hf.extractSignalsFromBlock(
+        delsysBlock, keepSpikes=False, keepSignals=delsysChanNames)
+    delsysLoadedBlock = hf.loadBlockProxyObjects(delsysLoadedBlock)
     #  
     # if len(allStimTrains):
     #     for segIdx, dataSeg in enumerate(spikesBlock.segments):
@@ -879,22 +889,55 @@ def calcISIBlockAnalysisNix():
             x='t', columns=tdChanNames, verbose=arguments['verbose'])
     else:
         tdInterp = tdDF
+    delsysASigList = delsysLoadedBlock.filter(objects=AnalogSignal)
+    delsysDF = ns5.analogSignalsToDataFrame(delsysASigList)
+    currentDelsysSamplingRate = delsysASigList[0].sampling_rate
     #
-    emgCols = [cn for cn in tdInterp.columns if 'Emg' in cn]
-    if len(emgCols):
+    if samplingRate != currentDelsysSamplingRate:
+        print("Reinterpolating...")
+        delsysInterp = hf.interpolateDF(
+            delsysDF, newT,
+            kind='linear', fill_value=(0, 0),
+            x='t', columns=delsysChanNames, verbose=arguments['verbose'])
+    else:
+        delsysInterp = delsysDF
+    #
+    accCols = [cn for cn in delsysInterp.columns if 'Acc' in cn]
+    if len(accCols):
         # fix for bug affecting the mean of the channel
         if alignTimeBounds is not None:
-            keepMaskAsig = pd.Series(False, index=tdInterp.index)
+            keepMaskAsig = pd.Series(False, index=delsysInterp.index)
             for atb in alignTimeBounds:
                 keepMaskAsig = (
                     keepMaskAsig |
                     (
-                        (tdInterp['t'] >= atb[0]) &
-                        (tdInterp['t'] <= atb[1])))
+                        (delsysInterp['t'] >= atb[0]) &
+                        (delsysInterp['t'] <= atb[1])))
         else:
-            keepMaskAsig = pd.Series(True, index=tdInterp.index)
+            keepMaskAsig = pd.Series(True, index=delsysInterp.index)
+        cornerFrequencyLP = 100
+        sosLP = signal.butter(
+            2, cornerFrequencyLP, 'low',
+            fs=float(samplingRate), output='sos')
+        preprocAcc = signal.sosfiltfilt(
+            sosLP, delsysInterp.loc[:, accCols].to_numpy(), axis=0
+            )
+        delsysInterp.loc[:, accCols] = preprocAcc
+    emgCols = [cn for cn in delsysInterp.columns if 'Emg' in cn]
+    if len(emgCols):
+        # fix for bug affecting the mean of the channel
+        if alignTimeBounds is not None:
+            keepMaskAsig = pd.Series(False, index=delsysInterp.index)
+            for atb in alignTimeBounds:
+                keepMaskAsig = (
+                    keepMaskAsig |
+                    (
+                        (delsysInterp['t'] >= atb[0]) &
+                        (delsysInterp['t'] <= atb[1])))
+        else:
+            keepMaskAsig = pd.Series(True, index=delsysInterp.index)
         sosHP = signal.butter(
-            2, 40, 'high',
+            2, 100, 'high',
             fs=float(samplingRate), output='sos')
         cornerFrequencyLP = 40
         sosLP = signal.butter(
@@ -907,12 +950,12 @@ def calcISIBlockAnalysisNix():
             y = signal.sosfiltfilt(sosLP, x)
             plt.plot(t, y); plt.show()
         # weird units hack, TODO check
-        tdInterp.loc[:, emgCols] = tdInterp.loc[:, emgCols] * 1e6
+        delsysInterp.loc[:, emgCols] = delsysInterp.loc[:, emgCols] * 1e6
         preprocEmg = signal.sosfiltfilt(
             sosHP,
             (
-                tdInterp.loc[:, emgCols] -
-                tdInterp
+                delsysInterp.loc[:, emgCols] -
+                delsysInterp
                 .loc[keepMaskAsig, emgCols]
                 .median(axis=0)).to_numpy(), axis=0
             )
@@ -924,7 +967,9 @@ def calcISIBlockAnalysisNix():
             columns=procNames
             )
         # pdb.set_trace()
-        tdInterp = pd.concat([tdInterp, emgEnvDF], axis=1)
+        delsysInterp = pd.concat([delsysInterp, emgEnvDF], axis=1)
+    tdInterp = pd.concat([delsysInterp.drop(columns='t'), tdInterp], axis=1)
+
         # for cName in emgCols:
         #     procName = cName.replace('Emg', 'EmgEnv')
         #     # weird units hack, TODO check
@@ -988,7 +1033,6 @@ def calcISIBlockAnalysisNix():
                 blankMask[plotIdx], 'r')
             plt.show()
     '''
-    #
     #
     tdInterp.columns = [i.replace('seg0_', '') for i in tdInterp.columns]
     tdInterp.sort_index(axis='columns', inplace=True)

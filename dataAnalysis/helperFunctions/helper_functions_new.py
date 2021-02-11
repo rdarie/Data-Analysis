@@ -9,12 +9,13 @@ import vg
 from tabulate import tabulate
 from tqdm import tqdm
 from collections.abc import Iterable
+import matplotlib
 import matplotlib.pyplot as plt
 #  import matplotlib.colors as colors
 #  import matplotlib.ticker as ticker
 #  from matplotlib import cm
 import mpl_toolkits.mplot3d.axes3d as p3
-#  from matplotlib.lines import Line2D
+from matplotlib.lines import Line2D
 import matplotlib.animation as animation
 from matplotlib.animation import FFMpegWriter
 #  import matplotlib.backends.backend_pdf
@@ -383,7 +384,8 @@ def filterDF(
     filteredDF = pd.DataFrame(df[columns])
     for column in filteredDF.columns:
         filteredDF.loc[:, column] = (
-            signal.sosfiltfilt(sos, filteredDF[column].to_numpy()))
+            # signal.sosfiltfilt(sos, filteredDF[column].to_numpy()))
+            signal.sosfilt(sos, filteredDF[column].to_numpy()))
     if passedSeries:
         filteredDF = filteredDF['temp']
     return filteredDF
@@ -457,26 +459,51 @@ def plotFilterResponse(sos, fs):
     return fig, ax1, ax2
 
 
+def plotFilterImpulseResponse(
+        fOpts, fs, useAcausal=True):
+    fig2, ax3 = plt.subplots()
+    ax4 = ax3.twinx()
+    fCoeffs = makeFilterCoeffsSOS(
+        fOpts, fs)
+    nMult = 3
+    if 'high' in fOpts:
+        ti = np.arange(
+            -nMult * fOpts['high']['Wn'] ** (-1),
+            nMult * fOpts['high']['Wn'] ** (-1),
+            fs ** (-1))
+    else:
+        ti = np.arange(-.2, .2, fs ** (-1))
+    impulse = np.zeros(ti.shape)
+    impulse[int(ti.shape[0]/2)] = 1
+    if useAcausal:
+        filtered = signal.sosfiltfilt(fCoeffs, impulse)
+    else:
+        filtered = signal.sosfilt(fCoeffs, impulse)
+    ax3.plot(ti, impulse, c='tab:blue', label='impulse')
+    ax3.legend(loc='upper right')
+    ax4.plot(ti, filtered, c='tab:orange', label='filtered')
+    ax4.legend(loc='lower right')
+    return fig2, ax3, ax4
+
+
 def closestSeries(takeFrom=None, compareTo=None, strictly='neither'):
-    closest = pd.Series(
-        np.nan, index=takeFrom.index)
-    closestIdx = pd.Series(
-        np.nan, index=takeFrom.index)
-    for idx, value in enumerate(takeFrom.values):
+    closest = pd.Series(np.nan, index=takeFrom.index)
+    closestIdx = []
+    for idx, value in enumerate(takeFrom.to_numpy()):
         if strictly == 'greater':
-            lookIn = compareTo[compareTo > value]
+            lookIn = compareTo.loc[compareTo > value]
         if strictly == 'less':
-            lookIn = compareTo[compareTo < value]
+            lookIn = compareTo.loc[compareTo < value]
         else:
             lookIn = compareTo
-        idxMin = np.abs(compareTo.values - value).argmin()
+        idxMin = np.abs(lookIn.to_numpy() - value).argmin()
         closeValue = (
             lookIn
-            .values
+            .to_numpy()
             .flat[idxMin])
         closest.iloc[idx] = closeValue
-        closestIdx.iloc[idx] = lookIn.index[idxMin]
-    return closest, closestIdx
+        closestIdx.append(lookIn.index[idxMin])
+    return closest, pd.Index(closestIdx)
 
 
 def interpolateDF(
@@ -494,7 +521,6 @@ def interpolateDF(
                 df.columns[~df.columns.isin([x])])
         outputDF = pd.DataFrame(columns=columns+[x])
         outputDF[x] = newX
-    
     for columnName in columns:
         if verbose:
             print('Interpolating {}'.format(columnName))
@@ -514,12 +540,12 @@ def interpolateDF(
                 interpFun = interpolate.interp1d(
                     oldX, df[columnName], kind=kind,
                     fill_value=useFill, bounds_error=False)
-            except:
+            except Exception:
                 traceback.print_exc()
                 pdb.set_trace()
-            outputDF[columnName] = interpFun(newX)
+            outputDF.loc[:, columnName] = interpFun(newX)
         elif kind in ['pchip']:
-            outputDF[columnName] = interpolate.pchip_interpolate(
+            outputDF.loc[:, columnName] = interpolate.pchip_interpolate(
                 oldX, df[columnName].to_numpy(), newX
             )
         elif kind in ['akima']:
@@ -530,7 +556,7 @@ def interpolateDF(
             except Exception:
                 traceback.print_exc()
                 pdb.set_trace()
-            outputDF[columnName] = interpFun(newX, extrapolate=True)
+            outputDF.loc[:, columnName] = interpFun(newX, extrapolate=True)
     return outputDF
 
 
@@ -569,7 +595,6 @@ def loadBlockProxyObjects(block):
             chanIdx.analogsignals = []
         if chanIdx.irregularlysampledsignals:
             chanIdx.irregularlysampledsignals = []
-
     for segIdx, seg in enumerate(block.segments):
         stProxyList = seg.spiketrains
         seg.spiketrains = []
@@ -605,7 +630,6 @@ def loadBlockProxyObjects(block):
             # assign ownership to containers
             chanIdx.analogsignals.append(asig)
             seg.analogsignals.append(asig)
-        
         seg.events = [i.load() for i in seg.events]
         seg.epochs = [i.load() for i in seg.epochs]
     block.create_relationship()
@@ -657,9 +681,15 @@ def extractSignalsFromBlock(
 
 
 def gaussianSupport(
-    tdSeg=None, peakIdx=None,
-    gaussWid=None, fs=None, support=None):
-    kernNSamp = min(int(gaussWid * fs), len(tdSeg.index) - 1)
+        tdSeg=None, peakIdx=None,
+        gaussWid=None, fs=None,
+        normalize=True,
+        support=None, returnCopy=False):
+
+    if tdSeg is not None:
+        kernNSamp = min(int(gaussWid * fs), len(tdSeg.index) - 1)
+    else:
+        kernNSamp = min(int(gaussWid * fs), len(support.index) - 1)
     
     gaussKern = signal.gaussian(
         kernNSamp, kernNSamp/6)
@@ -667,17 +697,35 @@ def gaussianSupport(
     if support is None:
         support = pd.Series(0, index=tdSeg.index)
         support.loc[peakIdx] = 1
-    # 
-    support.iloc[:] = np.convolve(
-        support.values,
-        gaussKern, mode='same'
-        )
-    support = pd.Series(
-        MinMaxScaler(feature_range=(1e-2, 1))
-        .fit_transform(support.values.reshape(-1, 1))
-        .squeeze(),
-        index=support.index)
-    return support
+    
+    if not returnCopy:
+        support.iloc[:] = np.convolve(
+            support.values,
+            gaussKern, mode='same'
+            )
+        if normalize:
+            support = pd.Series(
+                MinMaxScaler(feature_range=(1e-2, 1))
+                .fit_transform(support.values.reshape(-1, 1))
+                .squeeze(),
+                index=support.index)
+            return support
+        else:
+            return support
+    else:
+        retSupport = pd.Series(np.convolve(
+            support.to_numpy(),
+            gaussKern, mode='same'
+            ), index=support.index)
+        if normalize:
+            retSupport = pd.Series(
+                MinMaxScaler(feature_range=(1e-2, 1))
+                .fit_transform(retSupport.to_numpy().reshape(-1, 1))
+                .squeeze(),
+                index=support.index)
+        return retSupport
+
+    
 
 
 def noisyTriggerCorrection(
@@ -756,7 +804,7 @@ def getTimeMaskFromRanges(times, timeRanges):
     for tStart, tEnd in timeRanges:
         thisMask = (
             (times >= tStart * tUnits) &
-            (times <= tEnd * tUnits)
+            (times < tEnd * tUnits)
             )
         timeMask = timeMask | thisMask
     return timeMask
@@ -798,110 +846,19 @@ def getStimSerialTrialSegMask(insDF, trialSegment):
     tseg = pd.Series(np.nan, index=insDF.index)
     tseg.loc[tsegMask] = insDF.loc[tsegMask, 'ins_value']
     tseg.fillna(method='ffill', inplace=True)
-    segmentMask = tseg == trialSegment
+    tseg.fillna(method='bfill', inplace=True)
+    segmentMask = (tseg == trialSegment)
     return segmentMask
 
 
-def fillInOverflow(
-        channelData, plotting=False, fillMethod='constant'):
-    # TODO merge this into getBadContinuousMask
-    overflowMask = pd.DataFrame(
-        False, index=channelData.index,
-        columns=channelData.columns,
-        dtype=np.bool).to_sparse(fill_value=False)
-    #
-    columnList = list(channelData.columns)
-    nChan = len(columnList)
-    for idx, row in channelData.iteritems():
-        ch_idx = columnList.index(idx)
-        col_idx = channelData.columns.get_loc(idx)
-
-        if os.fstat(0) == os.fstat(1):
-            endChar = '\r'
-            print("Running fillInOverflow: %d%%" % int((ch_idx + 1) * 100 / nChan), end = endChar)
-        else:
-            print("Running fillInOverflow: %d%%" % int((ch_idx + 1) * 100 / nChan))
-
-        # get the first difference of the row
-        rowDiff = row.diff()
-        rowDiff.fillna(0, inplace = True)
-        # negative dips are the start of the dip
-
-        dipCutoff = 3e3 # 3000 uV jumps are probably caused by artifact
-        #
-        # peakutils works on a percentage of the range of values
-        dipThresh = (dipCutoff - rowDiff.min()) / (rowDiff.max() - rowDiff.min())
-        dipStarts = peakutils.indexes(-rowDiff, thres=dipThresh)
-        dipEnds = []
-
-        if dipStarts.any() and plotting:
-            #
-            plt.figure()
-            plt.plot(row)
-            plt.plot(rowDiff)
-            plt.plot(dipStarts, row.iloc[dipStarts], '*')
-            plt.plot(dipEnds, row.iloc[dipEnds], '*')
-            plt.show()
-
-        if dipStarts.any():
-            nDips = len(dipStarts)
-            fixedRow = row.copy()
-            maskRow = np.full(len(overflowMask.index), False, dtype = np.bool)
-            for dipIdx, dipStartIdx in enumerate(dipStarts):
-                try:
-                    assert row.iloc[dipStartIdx - 1] > 8e3 # 8191 mV is equivalent to 32768
-                    nextIdx = dipStarts[dipIdx + 1] if dipIdx < nDips - 1 else len(row)
-                    thisSection = rowDiff.iloc[dipStartIdx:nextIdx].values
-                    dipEndIdx = peakutils.indexes(thisSection, thres=dipThresh)
-                    if not dipEndIdx and thisSection[-1] > dipCutoff:
-                        # if the end is the peak, peakutils won't catch it; add it in manually
-                        dipEndIdx = [len(thisSection)]
-                    dipEndIdx = dipEndIdx[0] + dipStartIdx
-                    dipEnds.append(dipEndIdx)
-                    if dipEndIdx == nextIdx:
-                        # avoid double counting the last point
-                        dipEndIdx -= 1
-                    assert dipEndIdx > dipStartIdx
-                except:
-                    continue
-
-                maskRow[dipStartIdx:dipEndIdx] = True
-                if fillMethod == 'average':
-                    fixValue = (-rowDiff.iloc[dipStartIdx] + rowDiff.iloc[dipEndIdx]) / 2
-                elif fillMethod == 'constant':
-                    fixValue = 8191
-
-                try:
-                    #assert fixedRow.iloc[dipStartIdx:dipEndIdx].mean() < 5e3
-                    fixedRow.iloc[dipStartIdx:dipEndIdx] = \
-                        row.iloc[dipStartIdx:dipEndIdx].values + \
-                        fixValue
-                except Exception as e:
-                    print(e)
-                    continue
-
-            if dipStarts.any() and plotting:
-                plt.figure()
-                plt.plot(row, label = 'Original')
-                plt.plot(fixedRow, label = 'Fixed')
-                plt.plot(dipStarts, row.iloc[dipStarts], '*')
-                plt.plot(dipEnds, row.iloc[dipEnds], '*')
-                plt.legend()
-                plt.show()
-
-            channelData.loc[:, idx] = fixedRow
-            overflowMask.loc[:, idx] = maskRow
-
-    print('\nFinished finding boolean overflow')
-    return channelData, overflowMask
-
-
-def fillInJumps(channelData, samp_per_s, smoothing_ms = 1, badThresh = 1e-3,
-    consecLen = 30, nStdDiff = 20, nStdAmp = 20):
-    #Allocate bad data mask as dict
+def fillInJumps(
+    channelData, samp_per_s, smoothing_ms=1, badThresh=1e-3,
+    consecLen=30, nStdDiff=20, nStdAmp=20
+    ):
+    #  Allocate bad data mask as dict
     badMask = {'general':None,
-        'perChannelAmp' : pd.DataFrame(False, index = channelData.index, columns = channelData.columns, dtype = np.bool).to_sparse(fill_value=False),
-        'perChannelDer' : pd.DataFrame(False, index = channelData.index, columns = channelData.columns, dtype = np.bool).to_sparse(fill_value=False)
+        'perChannelAmp': pd.DataFrame(False, index = channelData.index, columns = channelData.columns, dtype = np.bool).to_sparse(fill_value=False),
+        'perChannelDer': pd.DataFrame(False, index = channelData.index, columns = channelData.columns, dtype = np.bool).to_sparse(fill_value=False)
         }
 
     #per channel, only smooth a couple of samples
@@ -989,6 +946,51 @@ def fillInJumps(channelData, samp_per_s, smoothing_ms = 1, badThresh = 1e-3,
     return channelData, badMask
 
 
+def fillInOverflow2(
+        data,
+        overFlowFillType='8mV',
+        overFlowThreshold=8000,
+        debuggingPlots=False,
+        ):
+    if debuggingPlots:
+        i1 = 30000
+        i2 = 90000
+        fig, ax = plt.subplots()
+        ax.plot(data[i1:i2, 0], '.-', label='original')
+    else:
+        fig, ax = None, None
+    dataDiff = np.diff(data, axis=0)
+    for colIdx in range(data.shape[1]):
+        diffExceeds = np.abs(dataDiff[:, colIdx]) > overFlowThreshold
+        idxOverflow = np.flatnonzero(diffExceeds)
+        if idxOverflow.size > 0:
+            if dataDiff[idxOverflow[0], colIdx] < 0:
+                fixDir = 'negative'
+            else:
+                fixDir = 'positive'
+            for oIdx in idxOverflow:
+                if oIdx + 1 < data.shape[0]:
+                    if overFlowFillType == '8mV':
+                        if (dataDiff[oIdx, colIdx] < 0) and (fixDir == 'negative'):
+                            data[oIdx+1:, colIdx] = data[oIdx+1:, colIdx] + 8.191e3
+                            fixDir = 'positive'
+                        elif (dataDiff[oIdx, colIdx] > 0) and (fixDir == 'positive'):
+                            data[oIdx+1:, colIdx] = data[oIdx+1:, colIdx] - 8.191e3
+                            fixDir = 'negative'
+                    else:
+                        if (dataDiff[oIdx, colIdx] < 0) and (fixDir == 'negative'):
+                            data[oIdx+1:, colIdx] = data[oIdx+1:, colIdx] - dataDiff[oIdx, colIdx]
+                            fixDir = 'positive'
+                        elif (dataDiff[oIdx, colIdx] > 0) and (fixDir == 'positive'):
+                            data[oIdx+1:, colIdx] = data[oIdx+1:, colIdx] - dataDiff[oIdx, colIdx]
+                            fixDir = 'negative'
+    if debuggingPlots:
+        ax.plot(data[i1:i2, 0], '.--', label='filled')
+    if debuggingPlots:
+        ax.legend()
+    return data, {'fig': fig, 'ax': ax}
+
+
 def confirmTriggersPlot(peakIdx, dataSeries, fs, whichPeak=0, nSec=10):
     #
     indent = peakIdx[whichPeak]
@@ -1055,6 +1057,7 @@ def getThresholdCrossings(
             (dsToSearch < thresh) & (nextDS >= thresh))
         crossMask = risingMask | fallingMask
     crossIdx = dataSrs.index[crossMask]
+    # pdb.set_trace()
     if iti is not None:
         min_dist = int(fs * iti * (1 - itiWiggle))
         y = dsToSearch.abs().to_numpy()
@@ -1143,7 +1146,7 @@ def getTriggers(
         edgeType = 'rising', itiWiggle = 0.05,
         minAmp = None,
         minTrainLength = None,
-        expectedTime = None, keep_max = True, plotting = False):
+        expectedTime = None, keep_max=True, plotting = False):
     # iti: expected inter trigger interval
 
     # minimum distance between triggers (units of samples), 5% wiggle room
@@ -1152,7 +1155,13 @@ def getTriggers(
     triggersPrime = dataSeries.diff()
     triggersPrime.fillna(0, inplace = True)
     # z-score the derivative
-    triggersPrime = pd.Series(stats.zscore(triggersPrime), index = triggersPrime.index)
+    useMAD = False
+    if useMAD:
+        tpMed = np.median(triggersPrime)
+        tpMAD = stats.median_abs_deviation(triggersPrime)
+        triggersPrime = pd.Series(((triggersPrime.to_numpy() - tpMed) / tpMAD), index=triggersPrime.index)
+    else:
+        triggersPrime = pd.Series(stats.zscore(triggersPrime), index=triggersPrime.index)
 
     if edgeType == 'falling':
         triggersPrime = - triggersPrime
@@ -1163,12 +1172,12 @@ def getTriggers(
         keep_what='max'
     else:
         keep_what='first'
-    
+    #
     triggersPrimeVals = triggersPrime.values.squeeze()
     peakIdx = peakutils.indexes(
         triggersPrimeVals, thres=thres,
         min_dist=width, thres_abs=True, keep_what=keep_what)
-    
+    #
     if minAmp is not None:
         if edgeType == 'falling':
             peekAhead = - 25
@@ -1180,7 +1189,6 @@ def getTriggers(
             whereToLook[-1] = int(triggersZScore.size - 1)
         triggersAtPeaks = triggersZScore[whereToLook]
         peakIdx = peakIdx[triggersAtPeaks > minAmp]
-
     # check that the # of triggers matches the number of frames
     if expectedTime is not None:
         foundTime = (dataSeries.index[peakIdx] - dataSeries.index[peakIdx[0]]) / fs
@@ -3645,16 +3653,19 @@ def calcBreakDown(asigWide, rowName, colName, hueName):
         if i is not None]
     if len(breakDownBy) == 1:
         breakDownBy = breakDownBy[0]
+        
     breakDownData = (
         asigWide
         .groupby(breakDownBy)
         .agg('count')
         .iloc[:, 0]
-    )
+        .to_frame(name='count')
+        )
+    # breakDownData = (asigWide.groupby(breakDownBy).agg('count').iloc[:, 0].to_frame(name='count'))
     # 
-    indexNames = breakDownData.index.names + ['count']
-    breakDownData = breakDownData.reset_index()
-    breakDownData.columns = indexNames
+    # indexNames = breakDownData.index.names + ['count']
+    # breakDownData = breakDownData.reset_index()
+    # breakDownData.columns = indexNames
     unitName = asigWide.reset_index()['feature'].unique()[0]
     breakDownText = (
         '{}\n'.format(unitName) +
@@ -3664,4 +3675,178 @@ def calcBreakDown(asigWide, rowName, colName, hueName):
             headers='keys', tablefmt='github',
             numalign='left', stralign='left')
         )
-    return breakDownData, breakDownText
+    cssProps = {}
+    cssTableStyles = [
+        {
+            'selector': 'th',
+            'props': [
+                ('border-style', 'solid'),
+                ('border-color', 'black')]},
+        {
+            'selector': 'td',
+            'props': [
+                ('border-style', 'solid'),
+                ('border-color', 'black')]},
+        {
+            'selector': 'table',
+            'props': [
+                ('border-collapse', 'collapse')
+                ]}
+        ]
+    cm = sns.dark_palette("green", as_cmap=True)
+    dfStyler = (
+        breakDownData.style
+        .background_gradient(cmap=cm)
+        .set_precision(1)
+        )
+    if cssProps:
+        dfStyler.set_properties(**cssProps)
+    if cssTableStyles:
+        dfStyler.set_table_styles(cssTableStyles)
+    breakDownHtml = dfStyler.render()
+    return breakDownData, breakDownText, breakDownHtml
+
+
+def plotCorrSynchReport(
+        _trigRaster=None, _searchRadius=None,
+        _targetLagsSrs=None, _maxLag=None, _xCorrSrs=None,
+        customMessages=None, customTitle=None,
+        ):
+    fig, ax = plt.subplots(3, 1)
+    fig.set_size_inches(12, 8)
+    _trigRasterSamplingRate = (_trigRaster['t'].iloc[1] - _trigRaster['t'].iloc[0]) ** (-1)
+    listOfLegends = []
+    plotT0 = _trigRaster.loc[
+        (_trigRaster['insTrigs'] > 0.5) & (_trigRaster['nspTrigs'] > 0.5), 't']
+    if plotT0.size > 0:
+        plotT0 = plotT0.iloc[0]
+    else:
+        plotT0 = _trigRaster.loc[(_trigRaster['insTrigs'] > 0.5), 't']
+        if plotT0.size > 0:
+            plotT0 = plotT0.iloc[0]
+        else:
+            plotT0 = _trigRaster.loc[(_trigRaster['insTrigs'] > 0.5) | (_trigRaster['nspTrigs'] > 0.5), 't'].iloc[0]
+    plotLBound = plotT0 + _searchRadius[0]
+    plotRBound = max(plotT0 + _searchRadius[1], plotT0 + 3.)
+    plotMask = (_trigRaster['t'] >= plotLBound) & (_trigRaster['t'] < plotRBound)
+    defaultLineWidth = matplotlib.rcParams['lines.linewidth']
+    ax[0].plot(
+        _trigRaster.loc[plotMask, 't'], _trigRaster.loc[plotMask, 'nspTrigs'],
+        label='NSP trigs.', lw=2 * defaultLineWidth)
+    ax[0].plot(
+        _trigRaster.loc[plotMask, 't'], _trigRaster.loc[plotMask, 'insTrigs'],
+        label='INS trigs.', ls='--')
+    # ax[0].set_xlim(plotT0 + _searchRadius[0], plotT0 + _searchRadius[1])
+    ax[0].set_xlabel('NSP time (sec)')
+    ax[0].set_ylabel('Triggers')
+    listOfLegends.append(ax[0].legend(loc='upper right'))
+    ax[0].set_title(customTitle)
+    # fake legend with annotations
+    if customMessages is not None:
+        customLines = [
+            Line2D([0], [0], color='k', alpha=0)
+            for custMess in customMessages
+            ]
+        phantomAx = ax[0].twinx()
+        phantomAx.set_yticks([])
+        listOfLegends.append(phantomAx.legend(customLines, customMessages, loc='upper left'))
+    #
+    ax[1].plot(_xCorrSrs, label='crossCorr')
+    ax[1].plot(
+        _maxLag, _xCorrSrs.loc[_maxLag],
+        'y*', label='optimal lag = {:.3f}; xcorr = {:.3f}'.format(_maxLag, _xCorrSrs.loc[_maxLag]))
+    ax[1].set_xlabel('cross-corr lag (sec)')
+    listOfLegends.append(ax[1].legend(loc='upper right'))
+    ax[1].set_ylabel('cross-corr')
+    ax[1].set_xlim(_searchRadius[0], _searchRadius[1])
+    #
+    maxShift = _targetLagsSrs[_maxLag]
+    shiftedInsTrig = _trigRaster['insTrigs'].shift(maxShift).fillna(0)
+    shiftedInsImpulse = _trigRaster['insDiracDelta'].shift(maxShift).fillna(0)
+    shiftedProduct = (
+        _trigRaster['nspTrigs'] * shiftedInsTrig)
+    lPFForSP = makeFilterCoeffsSOS(
+        {
+            'low': {
+                'Wn': 1,
+                'N': 4,
+                'btype': 'low',
+                'ftype': 'bessel'
+                }},
+        _trigRasterSamplingRate)
+    lowPassShiftedProduct = signal.sosfiltfilt(
+        lPFForSP, shiftedProduct.to_numpy())
+    ax[2].plot(
+        _trigRaster['t'],
+        _trigRaster['nspTrigs'], c='b')
+    nspTargetMask = _trigRaster['nspDiracDelta'] > 0
+    if nspTargetMask.any():
+        ax[2].plot(
+            _trigRaster.loc[nspTargetMask, 't'],
+            _trigRaster.loc[nspTargetMask, 'nspTrigs'], 'o', c='tab:blue', label='NSP impulses')
+    ax[2].plot(
+        _trigRaster['t'],
+        shiftedInsTrig, ls='--', c='r')
+    insTargetMask = shiftedInsImpulse > 0
+    if insTargetMask.any():
+        defaultMarkerSize = matplotlib.rcParams['lines.markersize']
+        ax[2].plot(
+            _trigRaster.loc[insTargetMask, 't'],
+            shiftedInsTrig.loc[insTargetMask], 'd', c='tab:red', label='INS impulses (shifted)',
+            markersize=defaultMarkerSize / 2)
+    ax[2].plot(
+        _trigRaster['t'], shiftedProduct, c='tab:green', label='elementwise product of trigs')
+    ax[2].set_xlabel('NSP time (sec)')
+    ax[2].set_ylabel('A.U.')
+    listOfLegends.append(ax[2].legend(loc='upper right'))
+    prodAx = ax[2].twinx()
+    prodAx.plot(_trigRaster['t'], lowPassShiftedProduct, c='tab:olive', label='elementwise product of trigs (1 hz low pass)')
+    prodAx.set_yticks([])
+    ax[2].set_ylim(
+        [
+            ax[2].get_ylim()[0],
+            ax[2].get_ylim()[1] * 1.1])
+    listOfLegends.append(prodAx.legend(loc='lower right'))
+    figSaveOpts = dict(
+        bbox_extra_artists=listOfLegends,
+        bbox_inches='tight')
+    return fig, ax, figSaveOpts
+
+
+def processBasicPaths(_arguments):
+    if _arguments['inputBlockSuffix'] is not None:
+        inputBlockSuffix = '_{}'.format(_arguments['inputBlockSuffix'])
+    else:
+        inputBlockSuffix = ''
+    if _arguments['processAll']:
+        blockBaseName = _arguments['inputBlockPrefix']
+    else:
+        blockBaseName = '{}{:0>3}'.format(
+            _arguments['inputBlockPrefix'], _arguments['blockIdx'])
+    return blockBaseName, inputBlockSuffix
+
+
+def processSubfolderPaths(_arguments, _scratchFolder, assertExists=False):
+    if _arguments['analysisName'] is not None:
+        analysisSubFolder = os.path.join(
+            _scratchFolder, _arguments['analysisName']
+            )
+    else:
+        analysisSubFolder = _scratchFolder
+    if assertExists:
+        assert os.path.exists(analysisSubFolder)
+    else:
+        if not os.path.exists(analysisSubFolder):
+            os.makedirs(analysisSubFolder)
+    if _arguments['alignFolderName'] is not None:
+        alignSubFolder = os.path.join(
+            analysisSubFolder, _arguments['alignFolderName'])
+    else:
+        alignSubFolder = analysisSubFolder
+    if assertExists:
+        assert os.path.exists(alignSubFolder)
+    else:
+        if not os.path.exists(alignSubFolder):
+            os.makedirs(alignSubFolder)
+    return analysisSubFolder, alignSubFolder
+

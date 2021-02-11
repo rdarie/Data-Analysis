@@ -15,8 +15,8 @@
 #SBATCH --array=0-45:5
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-ss_wave_extract.stdout
-#SBATCH -e ../../batch_logs/%j-%a-ss_wave_extract.errout
+#SBATCH -o ../../batch_logs/%j-%a-ss_wave_extract.out
+#SBATCH -e ../../batch_logs/%j-%a-ss_wave_extract.out
 
 # Specify account details
 #############SBATCH --account=carney-dborton-condo

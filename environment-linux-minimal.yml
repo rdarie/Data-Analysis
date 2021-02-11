@@ -1,0 +1,45 @@
+name: nda2
+channels:
+- conda-forge
+- defaults
+dependencies:
+- python=3.7.6
+- pip
+- jupyter
+- mpi4py=3.0.3
+- mpich=3.3.*=external_*
+- line_profiler=2.1.2
+- brian2
+- tzlocal
+- pytables
+- docopt
+- dill
+- numpy
+- imbalanced-learn
+- h5py
+- lmfit
+- matplotlib
+- opencv
+- hdbscan
+- statsmodels
+- joblib
+- pyqtgraph
+- quantities
+- scikit-learn
+- tabulate
+- tqdm
+- openpyxl
+- dask
+- distributed
+- fastparquet
+- pyarrow
+- python-snappy
+- tensorflow=2.2
+- pynndescent
+- datashader
+- pip-tools
+- holoviews
+- nose
+- pip:
+  - pyqt5==5.10.1
+  - vg==1.6.1

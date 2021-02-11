@@ -13,8 +13,8 @@
 #SBATCH -J alignStim_20200701
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-alignStim_20200701.stdout
-#SBATCH -e ../../batch_logs/%j-alignStim_20200701.errout
+#SBATCH -o ../../batch_logs/%j-alignStim_20200701.out
+#SBATCH -e ../../batch_logs/%j-alignStim_20200701.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -47,9 +47,9 @@ WINDOW="--window=XS"
 # WINDOW="--window=XSPre"
 
 SLURM_ARRAY_TASK_ID=1
-# TRIALSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
-# TRIALSELECTOR="--blockIdx=3"
-TRIALSELECTOR="--processAll"
+# BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
+# BLOCKSELECTOR="--blockIdx=3"
+BLOCKSELECTOR="--processAll"
 
 ANALYSISFOLDER="--analysisName=default"
 # ANALYSISFOLDER="--analysisName=hiRes"
@@ -78,6 +78,6 @@ python3 -u ./assembleExperimentData.py --exp=$EXP --blockIdx=3 --processAsigs --
 
 CHANSELECTOR="--chanQuery=all"
 OUTPUTBLOCKNAME="--outputBlockName=all"
-python3 -u ./calcAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ANALYSISFOLDER --eventName=stimAlignTimes $CHANSELECTOR $OUTPUTBLOCKNAME --verbose --alignFolderName=stim
+python3 -u ./calcAlignedAsigs.py --exp=$EXP $BLOCKSELECTOR $WINDOW $LAZINESS $ANALYSISFOLDER --eventName=stimAlignTimes $CHANSELECTOR $OUTPUTBLOCKNAME --verbose --alignFolderName=stim
 WINDOW="--window=XSPre"
-python3 -u ./calcAlignedAsigs.py --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ANALYSISFOLDER --eventName=stimAlignTimes $CHANSELECTOR $OUTPUTBLOCKNAME --verbose --alignFolderName=stim
+python3 -u ./calcAlignedAsigs.py --exp=$EXP $BLOCKSELECTOR $WINDOW $LAZINESS $ANALYSISFOLDER --eventName=stimAlignTimes $CHANSELECTOR $OUTPUTBLOCKNAME --verbose --alignFolderName=stim

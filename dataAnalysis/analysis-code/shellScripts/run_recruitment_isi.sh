@@ -13,8 +13,8 @@
 #SBATCH -J plotsStim
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-plotsStim.stdout
-#SBATCH -e ../../batch_logs/%j-plotsStim.errout
+#SBATCH -o ../../batch_logs/%j-plotsStim.out
+#SBATCH -e ../../batch_logs/%j-plotsStim.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -38,9 +38,9 @@ SELECTOR="_minfrmaxcorr"
 WINDOW="--window=XS"
 # WINDOW="--window=short"
 
-TRIALSELECTOR="--processAll"
-# TRIALSELECTOR="--blockIdx=2"
-# TRIALSELECTOR="--blockIdx=3"
+BLOCKSELECTOR="--processAll"
+# BLOCKSELECTOR="--blockIdx=2"
+# BLOCKSELECTOR="--blockIdx=3"
 # ANALYSISSELECTOR="--analysisName=emg"
 ANALYSISSELECTOR="--analysisName=default"
 # ANALYSISSELECTOR="--analysisName=emgHiRes"
@@ -60,5 +60,5 @@ conda activate
 source activate nda2
 python --version
 
-python -u "./calcRecruitment.py" --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --alignQuery="stimOn"
-python -u "./plotRecruitment.py" --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISSELECTOR --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --alignQuery="stimOn"
+python -u "./calcRecruitment.py" --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISSELECTOR --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --alignQuery="stimOn"
+python -u "./plotRecruitment.py" --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISSELECTOR --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --alignQuery="stimOn"

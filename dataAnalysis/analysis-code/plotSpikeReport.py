@@ -4,10 +4,11 @@ Usage:
     generateSpikeReport [options]
 
 Options:
-    --blockIdx=blockIdx            which trial to analyze [default: 1]
-    --exp=exp                      which experimental day to analyze
-    --nameSuffix=nameSuffix        add anything to the output name?
-    --arrayName=arrayName          which electrode array to analyze [default: utah]
+    --blockIdx=blockIdx                         which trial to analyze [default: 1]
+    --exp=exp                                   which experimental day to analyze
+    --nameSuffix=nameSuffix                     add anything to the output name?
+    --arrayName=arrayName                       which electrode array to analyze [default: utah]
+    --sourceFileSuffix=sourceFileSuffix         which source file to analyze
 """
 import matplotlib
 matplotlib.use('PS')
@@ -38,14 +39,24 @@ electrodeMapPath = spikeSortingOpts[arrayName]['electrodeMapPath']
 mapExt = electrodeMapPath.split('.')[-1]
 
 if mapExt == 'cmp':
-    cmpDF = prb_meta.cmpToDF(electrodeMapPath)
+    cmpDF = prb_meta.cmpToDF(electrodeMapPath, lgaMapFilePath='./lga_to_banks_lookup.csv')
 elif mapExt == 'map':
     cmpDF = prb_meta.mapToDF(electrodeMapPath)
 
-ns5FileName = ns5FileName.replace('Block', arrayName)
-triFolder = os.path.join(
-    scratchFolder, 'tdc_{}{:0>3}'.format(arrayName, blockIdx))
+if 'rawBlockName' in spikeSortingOpts[arrayName]:
+    ns5FileName = ns5FileName.replace(
+        'Block', spikeSortingOpts[arrayName]['rawBlockName'])
+    triFolder = os.path.join(
+        scratchFolder, 'tdc_{}{:0>3}'.format(
+            spikeSortingOpts[arrayName]['rawBlockName'], blockIdx))
+else:
+    triFolder = os.path.join(
+        scratchFolder, 'tdc_Block{:0>3}'.format(blockIdx))
+if arguments['sourceFileSuffix'] is not None:
+    triFolder = triFolder + '_{}'.format(arguments['sourceFileSuffix'])
+    ns5FileName = ns5FileName + '_{}'.format(arguments['sourceFileSuffix'])
 
+spikeSortingFiguresFolder = os.path.join(figureFolder, 'spikeSorting')
 if not os.path.exists(spikeSortingFiguresFolder):
     os.makedirs(spikeSortingFiguresFolder, exist_ok=True)
 
@@ -78,7 +89,6 @@ spikes = preproc.channelIndexesToSpikeDict(spChanIdx)
 spikes['Units'] = 'a.u. (z-score)'
 reportName = 'tdc_' + ns5FileName + '_spike_report' + nameSuffix
 spikeStruct = cmpDF.loc[cmpDF['elecName'] != 'ainp', :]
-# pdb.set_trace()
 # spikeStruct.loc[:, 'label'] = [
 #     i.replace('_', '.') + ' raw'
 #     for i in spikeStruct['label']
@@ -88,4 +98,11 @@ ssplt.spikePDFReport(
     spikes, spikeStruct,
     arrayName='utah', arrayInfo=trialFilesFrom['utah'],
     rasterOpts=rasterOpts, plotOpts=plotOpts,
-    trialStats=None, newReportName=reportName)
+    plotSpikePanelOpts={
+        'hideUnused': False,
+        # 'useLGACoords': True,
+        # 'coordsToIndicesOpts': {},
+        'useLGACoords': False,
+        'coordsToIndicesOpts': {'reverseY': True},
+        },
+    trialStats=None, newReportName=reportName, colorByAmpBank=True)

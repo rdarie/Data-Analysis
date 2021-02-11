@@ -12,6 +12,7 @@ def getExpOpts():
         }
     experimentName = '202012171300-Goat'
     deviceName = None
+    subjectName = 'Goat'
     rippleMapFile = {
         1: 'isi_port1nano1caudal_xAyBzC_ortho_port2nano1rostral_xAyBzC_ortho.map',
         2: 'isi_port1nano1caudal_xAyBzC_ortho_port2nano1rostral_xAyBzC_ortho.map',
@@ -121,12 +122,10 @@ def getExpOpts():
     triDestinations = []
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        #'202012171300-Goat': [7,8],
-        '202012171300-Goat': [3, 5, 6],
+        '202012171300-Goat': [3],
         }
     assembledSegmentToBlockLookup = {
-        #i - 1: i for i in [7,8]
-        i - 1: i for i in [3, 5, 6]
+        i - 1: i for i in [3]
         }
     movementSizeBins = [0, 0.25, 0.5, 1, 1.25, 1.5]
     rowColOverrides = {

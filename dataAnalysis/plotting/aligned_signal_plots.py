@@ -11,6 +11,7 @@ import math
 import seaborn as sns
 import dataAnalysis.helperFunctions.kilosort_analysis_new as ksa
 import dataAnalysis.helperFunctions.helper_functions_new as hf
+import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
 import dataAnalysis.preproc.ns5 as ns5
 from neo import (
     Block, Segment, ChannelIndex,
@@ -24,43 +25,196 @@ import os
 import traceback
 from copy import deepcopy
 from tqdm import tqdm
+import json
+from IPython.display import HTML
 
 
 def processRowColArguments(arguments):
     outDict = {}
     outDict['rowName'] = arguments['rowName'] if len(arguments['rowName']) else None
     if outDict['rowName'] is not None:
-        try:
-            outDict['rowControl'] = int(arguments['rowControl'])
-        except Exception:
-            outDict['rowControl'] = arguments['rowControl']
+        if arguments['rowControl'] is None:
+            outDict['rowControl'] = None
+        elif len(arguments['rowControl']):
+            try:
+                outDict['rowControl'] = int(arguments['rowControl'])
+            except Exception:
+                outDict['rowControl'] = arguments['rowControl']
+        else:
+            outDict['rowControl'] = None
     else:
         outDict['rowControl'] = None
     outDict['colName'] = arguments['colName'] if len(arguments['colName']) else None
     if outDict['colName'] is not None:
-        try:
-            outDict['colControl'] = int(arguments['colControl'])
-        except Exception:
-            outDict['colControl'] = arguments['colControl']
+        if arguments['colControl'] is None:
+            outDict['colControl'] = None
+        elif len(arguments['colControl']):
+            try:
+                outDict['colControl'] = int(arguments['colControl'])
+            except Exception:
+                outDict['colControl'] = arguments['colControl']
+        else:
+            outDict['colControl'] = None
     else:
         outDict['colControl'] = None
+    #
     outDict['hueName'] = arguments['hueName'] if len(arguments['hueName']) else None
     if outDict['hueName'] is not None:
-        try:
-            outDict['hueControl'] = int(arguments['hueControl'])
-        except Exception:
-            outDict['hueControl'] = arguments['hueControl']
+        if arguments['hueControl'] is None:
+            outDict['hueControl'] = None
+        elif len(arguments['hueControl']):
+            try:
+                outDict['hueControl'] = int(arguments['hueControl'])
+            except Exception:
+                outDict['hueControl'] = arguments['hueControl']
+        else:
+            outDict['hueControl'] = None
     else:
         outDict['hueControl'] = None
+    #
     outDict['styleName'] = arguments['styleName'] if len(arguments['styleName']) else None
     if outDict['styleName'] is not None:
-        try:
-            outDict['styleControl'] = int(arguments['styleControl'])
-        except Exception:
-            outDict['styleControl'] = arguments['styleControl']
+        if arguments['styleControl'] is None:
+            outDict['styleControl'] = None
+        elif len(arguments['styleControl']):
+            try:
+                outDict['styleControl'] = int(arguments['styleControl'])
+            except Exception:
+                outDict['styleControl'] = arguments['styleControl']
+        else:
+            outDict['styleControl'] = None
     else:
         outDict['styleControl'] = None
+    #
+    outDict['sizeName'] = arguments['sizeName'] if len(arguments['sizeName']) else None
+    if outDict['sizeName'] is not None:
+        if arguments['sizeControl'] is None:
+            outDict['sizeControl'] = None
+        elif len(arguments['sizeControl']):
+            try:
+                outDict['sizeControl'] = int(arguments['sizeControl'])
+            except Exception:
+                outDict['sizeControl'] = arguments['sizeControl']
+        else:
+            outDict['sizeControl'] = None
+    else:
+        outDict['sizeControl'] = None
+        
+    if 'rowColOverrides' in arguments:
+        for ident in ['col', 'row', 'hue']:
+            if outDict['{}Name'.format(ident)] in arguments['rowColOverrides']:
+                outDict['{}Order'.format(ident)] = arguments['rowColOverrides'][outDict['{}Name'.format(ident)]]
     return outDict
+
+
+def processFigureFolderTree(
+        _arguments, _scratchFolder, _figureFolder):
+    # folder structure processing
+    blockBaseName, inputBlockSuffix = hf.processBasicPaths(_arguments)
+    analysisSubFolder, alignSubFolder = hf.processSubfolderPaths(
+        _arguments, _scratchFolder, assertExists=True)
+    #
+    triggeredPath = os.path.join(
+        alignSubFolder,
+        blockBaseName + '{}_{}.nix'.format(
+            inputBlockSuffix, _arguments['window']))
+    #
+    figureStatsFolder = os.path.join(
+        alignSubFolder, 'figureStats'
+        )
+    if not os.path.exists(figureStatsFolder):
+        os.makedirs(figureStatsFolder, exist_ok=True)
+    alignedFeaturesFolder = os.path.join(
+        _figureFolder, _arguments['analysisName'],
+        'alignedFeatures')
+    if not os.path.exists(alignedFeaturesFolder):
+        os.makedirs(alignedFeaturesFolder, exist_ok=True)
+    #
+    pdfName = '{}{}_{}_{}'.format(
+        blockBaseName, inputBlockSuffix,
+        _arguments['window'],
+        _arguments['alignQuery'])
+    if _arguments['invertOutlierBlocks']:
+        pdfName += '_outliers'
+    if _arguments['individualTraces']:
+        pdfName += '_traces'
+    statsTestPath = os.path.join(figureStatsFolder, pdfName + '_stats.h5')
+    calcSubFolder = os.path.join(alignSubFolder, 'dataframes')
+    return (
+        blockBaseName, analysisSubFolder, alignSubFolder, figureStatsFolder,
+        alignedFeaturesFolder, calcSubFolder, triggeredPath, pdfName,
+        statsTestPath)
+
+
+def processFigureLoadArgs(
+        _arguments, _namedQueries, _analysisSubFolder,
+        _calcSubFolder, _blockBaseName, _rasterOpts, alignedAsigsKWargs, statsTestOpts
+        ):
+    rowColOpts = processRowColArguments(_arguments)
+    alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(
+        _namedQueries, **_arguments)
+    alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = (
+        ash.processUnitQueryArgs(
+            _namedQueries,
+            _analysisSubFolder, **_arguments))
+    alignedAsigsKWargs['outlierTrials'] = ash.processOutlierTrials(
+        _calcSubFolder, _blockBaseName, **_arguments)
+    if _arguments['noStim']:
+        alignedAsigsKWargs.update(dict(
+            duplicateControlsByProgram=False,
+            makeControlProgram=False,
+            metaDataToCategories=False))
+    else:
+        alignedAsigsKWargs.update(dict(
+            duplicateControlsByProgram=True,
+            makeControlProgram=True,
+            metaDataToCategories=False))
+    if 'windowSize' not in alignedAsigsKWargs:
+        alignedAsigsKWargs['windowSize'] = list(_rasterOpts['windowSizes'][_arguments['window']])
+    if 'winStart' in _arguments:
+        alignedAsigsKWargs['windowSize'][0] = float(_arguments['winStart']) * (-1e-3)
+    if 'winStop' in _arguments:
+        alignedAsigsKWargs['windowSize'][1] = float(_arguments['winStop']) * (1e-3)
+    #
+    if statsTestOpts['tStop'] is None:
+        statsTestOpts.update({
+            'tStop': alignedAsigsKWargs['windowSize'][1]})
+    elif statsTestOpts['tStop'] > alignedAsigsKWargs['windowSize'][1]:
+        statsTestOpts.update({
+            'tStop': alignedAsigsKWargs['windowSize'][1]})
+    if statsTestOpts['tStart'] is None:
+        statsTestOpts.update({
+            'tStart': alignedAsigsKWargs['windowSize'][0]})
+    elif statsTestOpts['tStart'] < alignedAsigsKWargs['windowSize'][0]:
+        statsTestOpts.update({
+            'tStart': alignedAsigsKWargs['windowSize'][0]})
+    #
+    if _arguments['hueName'] is not None:
+        alignedAsigsKWargs.update({'amplitudeColumn': _arguments['hueName']})
+    return rowColOpts, alignedAsigsKWargs, statsTestOpts
+
+
+def processRelplotKWArgs(
+        relplotKWArgs, minNObservations, _arguments, _alignedAsigsKWargs,
+        _rasterOpts=None, changeRelPlotAspectRatio=False
+        ):
+    if changeRelPlotAspectRatio:
+        currWindow = _rasterOpts['windowSizes'][_arguments['window']]
+        fullWinSize = currWindow[1] - currWindow[0]
+        redWinSize = (
+            _alignedAsigsKWargs['windowSize'][1] -
+            _alignedAsigsKWargs['windowSize'][0])
+        relplotKWArgs['aspect'] = (
+            relplotKWArgs['aspect'] * redWinSize / fullWinSize)
+    if _arguments['individualTraces']:
+        relplotKWArgs['estimator'] = None
+        relplotKWArgs['units'] = 't'
+        minNObservations = 0
+    if _arguments['limitPages'] is not None:
+        limitPages = int(_arguments['limitPages'])
+    else:
+        limitPages = None
+    return relplotKWArgs, minNObservations, limitPages
 
 
 def getRasterFacetIdx(
@@ -108,6 +262,7 @@ def plotNeuronsAligned(
         colName=None, colControl=None, colOrder=None,
         hueName=None, hueControl=None, hueOrder=None,
         styleName=None, styleControl=None, styleOrder=None,
+        sizeName=None, sizeControl=None, sizeOrder=None,
         twinRelplotKWArgs={}, sigStarOpts={},
         plotProcFuns=[], minNObservations=0, showNow=False
         ):
@@ -135,128 +290,144 @@ def plotNeuronsAligned(
                 .sum().sort_values(ascending=False).index)
             unitNames = [i.replace('_raster#0', '') for i in unitRanks]
         for idx, unitName in enumerate(tqdm(unitNames)):
-            rasterName = unitName + '_raster#0'
-            continuousName = unitName + '_fr#0'
-            rasterWide = ns5.alignedAsigsToDF(
-                rasterBlock, [rasterName],
-                **rasterLoadArgs)
-            asigWide = ns5.alignedAsigsToDF(
-                frBlock, [continuousName],
-                **loadArgs)
-            # oneSpikePerBinHz = int(
-            #     np.round(
-            #         np.diff(rasterWide.columns)[0] ** (-1) *
-            #         loadArgs['decimate']))
-            oneSpikePerBinHz = int(
-                np.round(
-                    np.diff(rasterWide.columns)[0] ** (-1)))
-            if enablePlots:
-                indexInfo = asigWide.index.to_frame()
-                if idx == 0:
-                    breakDownData, breakDownText, fig, ax = printBreakdown(
-                        asigWide, rowName, colName, hueName)
-                    breakDownData.to_csv(
-                        os.path.join(
-                            figureFolder,
-                            pdfName + '_trialsBreakDown.txt'),
-                        sep='\t')
-                    pdf.savefig()
-                    plt.close()
+            try:
+                rasterName = unitName + '_raster#0'
+                continuousName = unitName + '_fr#0'
+                rasterWide = ns5.alignedAsigsToDF(
+                    rasterBlock, [rasterName],
+                    **rasterLoadArgs)
+                asigWide = ns5.alignedAsigsToDF(
+                    frBlock, [continuousName],
+                    **loadArgs)
+                for indNm in [rowName, colName, hueName]:
+                    if indNm is not None:
+                        if indNm not in asigWide.index.names:
+                            asigWide.loc[:, indNm] = 'NA'
+                            asigWide.set_index(indNm, append=True, inplace=True)
+                        if indNm not in rasterWide.index.names:
+                            rasterWide.loc[:, indNm] = 'NA'
+                            rasterWide.set_index(indNm, append=True, inplace=True)
+                oneSpikePerBinHz = int(
+                    np.round(
+                        np.diff(rasterWide.columns)[0] ** (-1)))
+                if enablePlots:
+                    indexInfo = asigWide.index.to_frame()
+                    ####pdb.set_trace()
+                    if idx == 0:
+                        breakDownData, breakDownText, breakDownHtml = hf.calcBreakDown(
+                            asigWide, rowName, colName, hueName)
+                        breakDownData.to_csv(
+                            os.path.join(
+                                figureFolder,
+                                pdfName + '_trialsBreakDown.csv'),
+                            sep='\t')
+                        breakDownInspectPath = os.path.join(
+                                figureFolder,
+                                pdfName + '_trialsBreakDown.html')
+                        with open(breakDownInspectPath, 'w') as _f:
+                            _f.write(breakDownHtml)
+                        if minNObservations > 0:
+                            underMinLabels = (
+                                breakDownData
+                                .loc[breakDownData['count'] < minNObservations, :]
+                                .drop(columns=['count']))
+                            dropLabels = pd.Series(
+                                False,
+                                index=asigWide.index)
+                            for rIdx, row in underMinLabels.iterrows():
+                                theseBad = pd.Series(True, index=asigWide.index)
+                                for cName in row.index:
+                                    theseBad = theseBad & (indexInfo[cName] == row[cName])
+                                dropLabels = dropLabels | (theseBad)
+                            minObsKeepMask = ~dropLabels.to_numpy()
                     if minNObservations > 0:
-                        underMinLabels = (
-                            breakDownData
-                            .loc[breakDownData['count'] < minNObservations, :]
-                            .drop(columns=['count']))
-                        dropLabels = pd.Series(
-                            False,
-                            index=asigWide.index)
-                        for rIdx, row in underMinLabels.iterrows():
-                            theseBad = pd.Series(True, index=asigWide.index)
-                            for cName in row.index:
-                                theseBad = theseBad & (indexInfo[cName] == row[cName])
-                            dropLabels = dropLabels | (theseBad)
-                        minObsKeepMask = ~dropLabels.to_numpy()
-                if minNObservations > 0:
-                    asigWide = asigWide.loc[minObsKeepMask, :]
-                    rasterWide = rasterWide.loc[minObsKeepMask, :]
-                indexInfo = rasterWide.index.to_frame()
-                if colOrder is None:
-                    if colName is not None:
-                        colOrder = sorted(np.unique(indexInfo[colName]))
+                        asigWide = asigWide.loc[minObsKeepMask, :]
+                        rasterWide = rasterWide.loc[minObsKeepMask, :]
+                    indexInfo = rasterWide.index.to_frame()
+                    if colOrder is None:
+                        if colName is not None:
+                            colOrder = sorted(np.unique(indexInfo[colName]))
+                        else:
+                            colOrder = None
                     else:
-                        colOrder = None
-                else:
-                    # ensure we didn't drop any of the col_names
-                    colOrder = [
-                        cn
-                        for cn in colOrder
-                        if cn in sorted(np.unique(indexInfo[colName]))]
-                if rowOrder is None:
-                    if rowName is not None:
-                        rowOrder = sorted(np.unique(indexInfo[rowName]))
+                        # ensure we didn't drop any of the col_names
+                        colOrder = [
+                            cn
+                            for cn in colOrder
+                            if cn in sorted(np.unique(indexInfo[colName]))]
+                    if rowOrder is None:
+                        if rowName is not None:
+                            rowOrder = sorted(np.unique(indexInfo[rowName]))
+                        else:
+                            rowOrder = None
                     else:
-                        rowOrder = None
-                else:
-                    # ensure we didn't drop any of the row_names
-                    rowOrder = [
-                        rn
-                        for rn in rowOrder
-                        if rn in sorted(np.unique(indexInfo[rowName]))]
-                if hueOrder is None:
-                    if hueName is not None:
-                        hueOrder = sorted(np.unique(indexInfo[hueName]))
+                        # ensure we didn't drop any of the row_names
+                        rowOrder = [
+                            rn
+                            for rn in rowOrder
+                            if rn in sorted(np.unique(indexInfo[rowName]))]
+                    if hueOrder is None:
+                        if hueName is not None:
+                            hueOrder = sorted(np.unique(indexInfo[hueName]))
+                        else:
+                            hueOrder = None
                     else:
-                        hueOrder = None
-                else:
-                    # ensure we didn't drop any of the hue_names
-                    hueOrder = [
-                        hn
-                        for hn in hueOrder
-                        if hn in sorted(np.unique(indexInfo[hueName]))]
-                raster = rasterWide.stack().reset_index(name='raster')
-                asig = asigWide.stack().reset_index(name='fr')
-                raster.loc[:, 'fr'] = asig.loc[:, 'fr']
-                raster = getRasterFacetIdx(
-                    raster, 't',
-                    col=colName, row=rowName, hue=hueName)
-                #
-                if 'height' in twinRelplotKWArgs:
-                    figHeight = twinRelplotKWArgs['height'] * 72
-                else:
-                    figHeight = 3 * 72
-                # figHeight in **points**
-                nRasterRows = raster['t_facetIdx'].max()
-                twinRelplotKWArgs['func1_kws']['s'] = (2 * figHeight / nRasterRows) ** 2
-                raster.loc[raster['bin'] == raster['bin'].min(), 'raster'] = oneSpikePerBinHz
-                raster.loc[raster['bin'] == raster['bin'].max(), 'raster'] = oneSpikePerBinHz
-                g = twin_relplot(
-                    x='bin',
-                    y2='fr', y1='t_facetIdx',
-                    query2=None, query1='(raster == {})'.format(oneSpikePerBinHz),
-                    col=colName, row=rowName, hue=hueName,
-                    col_order=colOrder, row_order=rowOrder, hue_order=hueOrder,
-                    **twinRelplotKWArgs,
-                    data=raster)
-                #  iterate through plot and add significance stars
-                for (ro, co, hu), dataSubset in g.facet_data():
-                    if len(plotProcFuns):
-                        for procFun in plotProcFuns:
-                            procFun(g, ro, co, hu, dataSubset)
-                    # g.twin_axes[ro, co].set_ylabel('Firing Rate (spk/s)')
-                    g.axes[ro, co].set_ylabel('')
-                    if sigTestResults is not None:
-                        addSignificanceStars(
-                            g, sigTestResults.query("unit == '{}'".format(rasterName)),
-                            ro, co, hu, dataSubset, sigStarOpts=sigStarOpts)
-                plt.suptitle(unitName)
-                pdf.savefig()
-                if showNow:
-                    plt.show()
-                else:
-                    plt.close()
-            if limitPages is not None:
-                if idx >= (limitPages - 1):
-                    break
+                        # ensure we didn't drop any of the hue_names
+                        hueOrder = [
+                            hn
+                            for hn in hueOrder
+                            if hn in sorted(np.unique(indexInfo[hueName]))]
+                    raster = rasterWide.stack().reset_index(name='raster')
+                    asig = asigWide.stack().reset_index(name='fr')
+                    raster.loc[:, 'fr'] = asig.loc[:, 'fr']
+                    raster = getRasterFacetIdx(
+                        raster, 't',
+                        col=colName, row=rowName, hue=hueName)
+                    #
+                    if 'height' in twinRelplotKWArgs:
+                        figHeight = twinRelplotKWArgs['height'] * 72
+                    else:
+                        figHeight = 3 * 72
+                    # figHeight in **points**
+                    nRasterRows = raster['t_facetIdx'].max()
+                    twinRelplotKWArgs['func1_kws']['s'] = min(
+                        (3 * figHeight / nRasterRows) ** 2,
+                        10)
+                    raster.loc[raster['bin'] == raster['bin'].min(), 'raster'] = oneSpikePerBinHz
+                    raster.loc[raster['bin'] == raster['bin'].max(), 'raster'] = oneSpikePerBinHz
+                    g = twin_relplot(
+                        x='bin',
+                        y2='fr', y1='t_facetIdx',
+                        query2=None, query1='(raster == {})'.format(oneSpikePerBinHz),
+                        col=colName, row=rowName, hue=hueName,
+                        col_order=colOrder, row_order=rowOrder, hue_order=hueOrder,
+                        **twinRelplotKWArgs,
+                        data=raster)
+                    #  iterate through plot and add significance stars
+                    for (ro, co, hu), dataSubset in g.facet_data():
+                        if len(plotProcFuns):
+                            for procFun in plotProcFuns:
+                                procFun(g, ro, co, hu, dataSubset)
+                        # g.twin_axes[ro, co].set_ylabel('Firing Rate (spk/s)')
+                        g.axes[ro, co].set_ylabel('')
+                        if sigTestResults is not None:
+                            addSignificanceStars(
+                                g, sigTestResults.query("unit == '{}'".format(rasterName)),
+                                ro, co, hu, dataSubset, sigStarOpts=sigStarOpts)
+                    plt.suptitle(unitName)
+                    pdf.savefig()
+                    if showNow:
+                        plt.show()
+                    else:
+                        plt.close()
+                if limitPages is not None:
+                    if idx >= (limitPages - 1):
+                        break
+            except Exception:
+                traceback.print_exc()
+                pdb.set_trace()
+                plt.close()
+                pass
     return
 
 
@@ -271,6 +442,7 @@ def plotAsigsAligned(
         colName=None, colControl=None, colOrder=None,
         hueName=None, hueControl=None, hueOrder=None,
         styleName=None, styleControl=None, styleOrder=None,
+        sizeName=None, sizeControl=None, sizeOrder=None,
         relplotKWArgs={}, sigStarOpts={},
         plotProcFuns=[], minNObservations=0,
         ):
@@ -284,18 +456,26 @@ def plotAsigsAligned(
             asigWide = ns5.alignedAsigsToDF(
                 dataBlock, [unitName],
                 **loadArgs)
+            for indNm in [rowName, colName, hueName]:
+                if indNm is not None:
+                    if indNm not in asigWide.index.names:
+                        asigWide.loc[:, indNm] = 'NA'
+                        asigWide.set_index(indNm, append=True, inplace=True)
             if enablePlots:
                 indexInfo = asigWide.index.to_frame()
                 if idx == 0:
-                    breakDownData, breakDownText, fig, ax = printBreakdown(
+                    breakDownData, breakDownText, breakDownHtml = hf.calcBreakDown(
                         asigWide, rowName, colName, hueName)
                     breakDownData.to_csv(
                         os.path.join(
                             figureFolder,
-                            pdfName + '_trialsBreakDown.txt'),
+                            pdfName + '_trialsBreakDown.csv'),
                         sep='\t')
-                    pdf.savefig()
-                    plt.close()
+                    breakDownInspectPath = os.path.join(
+                            figureFolder,
+                            pdfName + '_trialsBreakDown.html')
+                    with open(breakDownInspectPath, 'w') as _f:
+                        _f.write(breakDownHtml)
                     if minNObservations > 0:
                         #
                         underMinLabels = (
@@ -409,7 +589,11 @@ def addSignificanceStars(
         if len(significantTimes):
             ymin, ymax = g.axes[ro, co].get_ylim()
             # g.axes[ro, co].autoscale(False)
-            g.axes[ro, co].plot(
+            # g.axes[ro, co].plot(
+            #     significantTimes,
+            #     significantTimes ** 0 * ymax * 0.95,
+            #     **sigStarOpts)
+            g.axes[ro, co].scatter(
                 significantTimes,
                 significantTimes ** 0 * ymax * 0.95,
                 **sigStarOpts)
@@ -421,7 +605,7 @@ def printBreakdown(asigWide, rowName, colName, hueName):
     fig, ax = plt.subplots()
     # print out description of how many observations there are
     # for each condition
-    breakDownData, breakDownText = hf.calcBreakDown(
+    breakDownData, breakDownText, breakDownHtml = hf.calcBreakDown(
         asigWide, rowName, colName, hueName)
     #  
     textHandle = fig.text(
@@ -439,6 +623,56 @@ def printBreakdown(asigWide, rowName, colName, hueName):
     # fig.set_size_inches(bbFigCoords.width, bbFigCoords.height)
     # bb.transformed(fig.transFigure.inverted()).width
     return breakDownData, breakDownText, fig, ax
+
+
+def plotAsigsAlignedWrapper(
+        _arguments, _statsTestPath, _dataReader, _dataBlock,
+        _alignedAsigsKWargs, _rowColOpts, _limitPages, _statsTestOpts,
+        _alignedFeaturesFolder, _minNObservations, _plotProcFuns,
+        _pdfName, _relplotKWArgs, _asigSigStarOpts,
+        ):
+    #  Get stats results?
+    if _arguments['overlayStats']:
+        if os.path.exists(_statsTestPath) and not _arguments['recalcStats']:
+            sigValsWide = pd.read_hdf(_statsTestPath, 'sig')
+            sigValsWide.columns.name = 'bin'
+        else:
+            (
+                pValsWide, statValsWide,
+                sigValsWide) = ash.facetGridCompareMeans(
+                _dataBlock, _statsTestPath,
+                loadArgs=_alignedAsigsKWargs,
+                rowColOpts=_rowColOpts,
+                limitPages=_limitPages,
+                statsTestOpts=_statsTestOpts)
+    else:
+        sigValsWide = None
+    #
+    # import warnings
+    # warnings.filterwarnings("error")
+    plotAsigsAligned(
+        _dataBlock,
+        limitPages=_limitPages,
+        verbose=_arguments['verbose'],
+        loadArgs=_alignedAsigsKWargs,
+        sigTestResults=sigValsWide,
+        figureFolder=_alignedFeaturesFolder,
+        enablePlots=True,
+        minNObservations=_minNObservations,
+        plotProcFuns=_plotProcFuns,
+        pdfName=_pdfName,
+        **_rowColOpts,
+        relplotKWArgs=_relplotKWArgs, sigStarOpts=_asigSigStarOpts)
+
+    if _arguments['overlayStats']:
+        plotSignificance(
+            sigValsWide,
+            pdfName=_pdfName + '_pCount',
+            figureFolder=_alignedFeaturesFolder,
+            **_rowColOpts,
+            **_statsTestOpts)
+    if _arguments['lazy']:
+        _dataReader.file.close()
 
 
 def genYLabelChanger(lookupDict={}, removeMatch=''):
@@ -509,11 +743,14 @@ def genTicksToScale(
     limFrac = 0.2
 
     def ticksToScale(g, ro, co, hu, dataSubset):
-        topLeftCol = ((ro == 0) and (co == 0))
+        # topLeftCol = ((ro == 0) and (co == 0))
         emptySubset = (
             (dataSubset.empty) or
             (dataSubset[dropNaNCol].isna().all()))
-        if ((topLeftCol) or (not shared)) and not emptySubset:
+        if not hasattr(g, 'ticksToScaleDone'):
+            g.ticksToScaleDone = False
+        if ((not g.ticksToScaleDone) or (not shared)) and not emptySubset:
+            g.ticksToScaleDone = True
             xLim = g.axes[ro, co].get_xlim()
             yLim = g.axes[ro, co].get_ylim()
             odX = limFrac * (xLim[1] - xLim[0])
@@ -557,6 +794,44 @@ def genTicksToScale(
         g.axes[ro, co].set_xticks([])
         return
     return ticksToScale
+
+
+def genAxLimSaver(
+        filePath=None, keyColName=None,
+        dropNaNCol='segment'
+        ):
+    # TODO: needs to use the features that define row and col
+    # as the keys
+    def axLimSaver(g, ro, co, hu, dataSubset):
+        emptySubset = (
+            (dataSubset.empty) or
+            (dataSubset[dropNaNCol].isna().all()))
+        if not emptySubset:
+            keyNames = dataSubset[keyColName].dropna().unique()
+            assert isinstance(keyNames, np.ndarray)
+            assert keyNames.shape[0] == 1
+            keyName = keyNames[0]
+            if not os.path.exists(filePath):
+                axLimInfo = {
+                    keyName: {
+                        'xlim': g.axes[ro, co].get_xlim(),
+                        'ylim': g.axes[ro, co].get_ylim(),
+                    }}
+                with open(filePath, 'w') as _f:
+                    json.dump(axLimInfo, _f)
+            else:
+                with open(filePath, 'r') as _f:
+                    axLimInfo = json.load(_f)
+                if keyName not in axLimInfo:
+                    axLimInfo.update({
+                        keyName: {
+                            'xlim': g.axes[ro, co].get_xlim(),
+                            'ylim': g.axes[ro, co].get_ylim(),
+                        }})
+                    with open(filePath, 'w') as _f:
+                        json.dump(axLimInfo, _f)
+        return
+    return axLimSaver
 
 
 def genTicksToScaleTwin(
@@ -732,13 +1007,22 @@ def genStimVLineAdder(
     return addVline
 
 
-def genBlockShader(patchOpts):
+def genBlockShader(patchOpts, dropNaNCol='segment'):
     def shadeBlocks(g, ro, co, hu, dataSubset):
-        if (hu % 2) == 0:
+        emptySubset = (
+            (dataSubset.empty) or
+            (dataSubset[dropNaNCol].isna().all()))
+        if emptySubset:
+            return
+        if not hasattr(g.axes[ro, co], 'addShading'):
+            g.axes[ro, co].addShading = True
+            print('creating shading attr')
+        if g.axes[ro, co].addShading:
             g.axes[ro, co].axhspan(
                 dataSubset[g._y_var].min(), dataSubset[g._y_var].max(),
                 **patchOpts
             )
+            print('g.addShading = {}'.format(g.axes[ro, co].addShading))
             # Create list for all the patches
             # y = (dataSubset[g._y_var].max() + dataSubset[g._y_var].min()) / 2
             # height = (dataSubset[g._y_var].max() - dataSubset[g._y_var].min())
@@ -748,7 +1032,8 @@ def genBlockShader(patchOpts):
             # rect = Rectangle((x, y), width, height, **patchOpts)
             # # Add collection to axes
             # g.axes[ro, co].add_patch(rect)
-            return
+        g.axes[ro, co].addShading = not (g.axes[ro, co].addShading)
+        return
     return shadeBlocks
 
 
@@ -831,6 +1116,8 @@ def plotSignificance(
         pdfName='pCount',
         figureFolder=None,
         **kwargs):
+    if sigValsDF is None:
+        return
     sigValsDF = sigValsDF.stack().reset_index(name='significant')
     with PdfPages(os.path.join(figureFolder, pdfName + '.pdf')) as pdf:
         gPH = sns.catplot(
@@ -847,7 +1134,10 @@ def plotSignificance(
             for i, l in enumerate(labels):
                 if (i % skipEvery != 0): labels[i] = ''  # skip every nth labe
             ax.set_xticklabels(labels, rotation=30)
-            newwidth = (ax.get_xticks()[1] - ax.get_xticks()[0])
+            try:
+                newwidth = (ax.get_xticks()[1] - ax.get_xticks()[0])
+            except Exception:
+                newwidth = 0.1
             for bar in ax.patches:
                 x = bar.get_x()
                 width = bar.get_width()
@@ -856,7 +1146,6 @@ def plotSignificance(
                 bar.set_width(newwidth)
         pdf.savefig()
         plt.close()
-        
     return
 
 

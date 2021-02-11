@@ -13,8 +13,8 @@
 #SBATCH -J plotsStim
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-plotsStim.stdout
-#SBATCH -e ../../batch_logs/%j-plotsStim.errout
+#SBATCH -o ../../batch_logs/%j-plotsStim.out
+#SBATCH -e ../../batch_logs/%j-plotsStim.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -36,8 +36,8 @@ WINDOW="--window=XS"
 # WINDOW="--window=XSPre"
 # WINDOW="--window=short"
 
-TRIALSELECTOR="--processAll"
-# TRIALSELECTOR="--blockIdx=2"
+BLOCKSELECTOR="--processAll"
+# BLOCKSELECTOR="--blockIdx=2"
 
 # ANALYSISFOLDER="--analysisName=hiRes"
 ANALYSISFOLDER="--analysisName=default"
@@ -57,16 +57,16 @@ conda activate
 source activate nda2
 python --version
 
-# python3 './calcAlignedAsigs.py' --exp=$EXP $TRIALSELECTOR $WINDOW $LAZINESS $ANALYSISFOLDER --eventName=stimAlignTimes --chanQuery="isispinaloremg" --blockName="lfp" --verbose  --alignFolderName=stim
+# python3 './calcAlignedAsigs.py' --exp=$EXP $BLOCKSELECTOR $WINDOW $LAZINESS $ANALYSISFOLDER --eventName=stimAlignTimes --chanQuery="isispinaloremg" --blockName="lfp" --verbose  --alignFolderName=stim
 # UNITSELECTOR="--unitQuery=isispinaloremg"
 
-# python "./exportForDeepSpine.py" --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $BLOCKSELECTOR $UNITSELECTOR --alignQuery="stimOn"
+# python "./exportForDeepSpine.py" --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $BLOCKSELECTOR $UNITSELECTOR --alignQuery="stimOn"
 
 # WINDOW="--window=XSPre"
-# python "./exportForDeepSpine.py" --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $BLOCKSELECTOR $UNITSELECTOR --alignQuery="stimOn" --noStim
+# python "./exportForDeepSpine.py" --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $BLOCKSELECTOR $UNITSELECTOR --alignQuery="stimOn" --noStim
 
 # UNITSELECTOR="--unitQuery=isiemgenv"
-# python "./calcTargetNoiseCeiling.py" --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim --inputBlockName="emg_clean" $UNITSELECTOR --maskOutlierBlocks --alignQuery="stimOn" --plotting
-# python "./calcEpochEffect.py" --exp=$EXP $TRIALSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim --inputBlockName="emg" $UNITSELECTOR --maskOutlierBlocks --alignQuery="stimOn" --plotting
+# python "./calcTargetNoiseCeiling.py" --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim --inputBlockName="emg_clean" $UNITSELECTOR --maskOutlierBlocks --alignQuery="stimOn" --plotting
+# python "./calcEpochEffect.py" --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim --inputBlockName="emg" $UNITSELECTOR --maskOutlierBlocks --alignQuery="stimOn" --plotting
 
 python "loadSheepDeepSpine.py"

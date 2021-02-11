@@ -9,6 +9,7 @@ Options:
     --plotting                       show plots? [default: False]
     --verbose                        show plots? [default: False]
     --chanQuery=chanQuery            how to restrict channels if not providing a list?
+    --notchAccChans                  apply notch filter to accel channels? [default: False]
 """
 
 from docopt import docopt
@@ -26,10 +27,13 @@ if arguments['plotting']:
     sns.set_color_codes("dark")
     sns.set_context("notebook")
     sns.set_style("white")
+
 from tqdm import tqdm
 from neo.io import NixIO, nixio_fr, BlackrockIO
+import dataAnalysis.helperFunctions.helper_functions_new as hf
 import pandas as pd
 import numpy as np
+from scipy import signal
 import quantities as pq
 import dataAnalysis.preproc.ns5 as ns5
 import os
@@ -44,14 +48,19 @@ expOpts, allOpts = parseAnalysisOptions(
     arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
-
+import glob
 import line_profiler
 import atexit
-#profile = line_profiler.LineProfiler()
-#atexit.register(profile.print_stats)
+
 
 delsysPath = os.path.join(
     nspFolder, ns5FileName + '.csv')
+if not os.path.exists(delsysPath):
+    searchStr = os.path.join(nspFolder, '*' + ns5FileName + '*.csv')
+    altSearchStr = os.path.join(nspFolder, '*' + 'Block{:0>4}'.format(blockIdx) + '*.csv')
+    delsysPathCandidates = glob.glob(searchStr) + glob.glob(altSearchStr)
+    assert len(delsysPathCandidates) == 1
+    delsysPath = delsysPathCandidates[0]
 
 @profile
 def preprocDelsysWrapper():
@@ -118,7 +127,58 @@ def preprocDelsysWrapper():
             if featureNames.str.contains(df.columns[0]).any()]
     print('interpolating...')
     for idx, thisFeat in enumerate(tqdm(collatedDataList)):
-        tempT = np.unique(np.concatenate([resampledT, thisFeat.index.to_numpy()]))
+        # tempT = np.unique(np.concatenate([resampledT, thisFeat.index.to_numpy()]))
+        # pdb.set_trace()
+        thisColName = thisFeat.columns[0]
+        print('    {}'.format(thisColName))
+        # Delsys pads zeros where the signal dropped, interpolate those here
+        zeroAndStaysZero = (
+            (thisFeat[thisColName] == 0) &
+            (thisFeat[thisColName].diff() == 0))
+        zeroAndWasZero = (
+            (thisFeat[thisColName] == 0) &
+            (thisFeat[thisColName].diff(periods=-1) == 0))
+        badMask = zeroAndStaysZero | zeroAndWasZero
+        thisFeat.loc[badMask, thisColName] = np.nan
+        # pdb.set_trace()
+        thisFeat = thisFeat.interpolate(method='linear', axis=0)
+        thisFeat = thisFeat.fillna(method='bfill').fillna(method='ffill')
+        outputFeat = hf.interpolateDF(
+            thisFeat, resampledT,
+            kind='linear', fill_value=(0, 0),
+            x=None, columns=None, verbose=arguments['verbose'])
+        if ('Acc' in thisColName) and arguments['notchAccChans']:
+            # acc channels present an unusual 75 Hz oscillation
+            # that is removed here
+            if 'filterCoeffs' not in locals():
+                filterOpts = {
+                    'bandstop': {
+                        'Wn': 75,
+                        'Q': 5,
+                        'nHarmonics': 1,
+                        'N': 4,
+                        'btype': 'bandstop',
+                        'ftype': 'bessel'
+                    }
+                }
+                filterCoeffs = hf.makeFilterCoeffsSOS(
+                    filterOpts.copy(), samplingRate)
+            print('        notch filtering at {} Hz (Q = {})'.format(
+                filterOpts['bandstop']['Wn'], filterOpts['bandstop']['Q']))
+            filteredFeat = signal.sosfiltfilt(
+                filterCoeffs, outputFeat[thisColName].to_numpy())
+            '''
+            # debug filtering
+            if arguments['plotting']:
+                fig, ax = plt.subplots()
+                ax.plot(resampledT, filteredFeat, label='filtered')
+                ax.plot(resampledT, outputFeat, label='original')
+                ax.legend()
+                plt.show()
+            '''
+            outputFeat.loc[:, thisColName] = filteredFeat
+        collatedDataList[idx] = outputFeat
+        '''
         collatedDataList[idx] = (
             thisFeat.reindex(tempT)
             .interpolate(method='linear')
@@ -127,17 +187,28 @@ def preprocDelsysWrapper():
         collatedDataList[idx].drop(
             index=collatedDataList[idx].index[absentInNew],
             inplace=True)
+        '''
     print('Concatenating...')
     collatedData = pd.concat(collatedDataList, axis=1)
     collatedData.columns = [
         re.sub('[\s+]', '', re.sub(r'[^a-zA-Z]', ' ', colName).title())
         for colName in collatedData.columns
         ]
-    collatedData.rename(columns={'TrignoAnalogInputAdapterAnalogA': 'AnalogInputAdapterAnalog'}, inplace=True)
-    collatedData.rename(columns={'AnalogInputAdapterAnalogA': 'AnalogInputAdapterAnalog'}, inplace=True)
+    collatedData.rename(
+        columns={
+            'TrignoAnalogInputAdapterAnalogA': 'AnalogInputAdapterAnalog',
+            'AnalogInputAdapterAnalogA': 'AnalogInputAdapterAnalog'},
+        inplace=True)
+    '''
+    collatedData.rename(
+        columns={
+            'AnalogInputAdapterAnalogA': 'AnalogInputAdapterAnalog'},
+        inplace=True)
+    '''
     collatedData.fillna(method='bfill', inplace=True)
     collatedData.index.name = 't'
     collatedData.reset_index(inplace=True)
+    '''
     if arguments['plotting']:
         fig, ax = plt.subplots()
         pNames = [
@@ -150,6 +221,7 @@ def preprocDelsysWrapper():
                 collatedData[cName] / collatedData[cName].abs().max(),
                 '.-')
         plt.show()
+    '''
     dataBlock = ns5.dataFrameToAnalogSignals(
         collatedData,
         idxT='t', useColNames=True, probeName='',

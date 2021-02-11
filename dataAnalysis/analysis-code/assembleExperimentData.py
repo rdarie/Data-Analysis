@@ -47,6 +47,7 @@ def assembleExperimentDataWrapper():
         suffixList.append('_analyze')
     if arguments['processRasters']:
         suffixList.append('_binarized')
+    suffixList.append('_fr')
 
     for suffix in suffixList:
         print('assembling {}'.format(suffix))
@@ -54,8 +55,6 @@ def assembleExperimentDataWrapper():
             scratchFolder, arguments['analysisName'],
             assembledName +
             suffix + '.nix')
-        #print(experimentDataPath)
-        #pdb.set_trace()
         # Scan ahead through all files and ensure that
         # spikeTrains and units are present across all assembled files
         masterChanDF = pd.DataFrame([], columns=[
@@ -73,9 +72,12 @@ def assembleExperimentDataWrapper():
             # dataReader, dataBlock = preproc.blockFromPath(
             #     trialDataPath, lazy=True, reduceChannelIndexes=True)
             dataBlock = preproc.loadWithArrayAnn(
-                trialDataPath, fromRaw=False, reduceChannelIndexes=True)
+                trialDataPath, fromRaw=False,
+                reduceChannelIndexes=True)
+            # [cI.name for cI in dataBlock.channel_indexes]
+            pdb.set_trace()
+            #
             blocksCache[trialDataPath] = dataBlock
-            #pdb.set_trace()
             if idx == 0:
                 masterDataPath = trialDataPath
             for chIdx in dataBlock.filter(objects=ChannelIndex):
@@ -112,7 +114,7 @@ def assembleExperimentDataWrapper():
                     masterUnitDF.loc[unit.name, 'parentChanName'] = unitParentChanName
                     # chAlreadyThere = masterChanDF.index == unitParentChanName
             # dataReader.file.close()
-        # masterChanDF[masterChanDF['hasUnits']]
+        # now merge the blocks
         for idx, trialBasePath in enumerate(trialsToAssemble):
             trialDataPath = (
                 trialBasePath
@@ -197,102 +199,159 @@ def assembleExperimentDataWrapper():
                     # if parentChanName.endswith('#0'):
                     #     parentChanName.replace('#0', '')
                     matchingCh = blocksCache[trialDataPath].filter(
-                        objects=ChannelIndex, name=parentChanName)
-                    '''
-                        if not len(matchingCh):
-                            masterListEntry = masterChanDF.loc[parentChanName, :]
-                            parentChIdx = ChannelIndex(
-                                name=parentChanName,
-                                index=masterListEntry['index'],
-                                channel_ids=masterListEntry['channel_ids'],
-                                channel_names=masterListEntry['channel_names'],
-                                file_origin=blocksCache[trialDataPath].channel_indexes[-1].file_origin
-                                )
-                            blocksCache[trialDataPath].channel_indexes.append(parentChIdx)
-                            parentChIdx.block = blocksCache[trialDataPath]
-                        else:
-                            parentChIdx = matchingCh[0]
-                    '''
-                    parentChIdx = matchingCh[0]
-                    print('unit {} not found; creating now'.format(rowIdx))
-                    newUnit = Unit(name=rowIdx)
-                    for annName in row.index:
-                        newUnit.annotations[annName] = row[annName]
-                    newUnit.channel_index = parentChIdx
-                    parentChIdx.units.append(newUnit)
-                    for seg in blocksCache[trialDataPath].segments:
-                        dummyST = SpikeTrain(
-                            times=[], units=stTimeUnits,
-                            t_stop=seg.filter(objects=AnalogSignal)[0].t_stop,
-                            waveforms=np.array([]).reshape((0, 0, 0)) * wvfUnits,
-                            name=seg.name + newUnit.name)
-                        dummyST.unit = newUnit
-                        dummyST.segment = seg
-                        newUnit.spiketrains.append(dummyST)
-                        seg.spiketrains.append(dummyST)
-            typesNeedRenaming = [SpikeTrain, AnalogSignal, Event]
-            blocksCache[trialDataPath].segments[0].name = 'seg{}_{}'.format(
-                idx, blocksCache[trialDataPath].name)
-            for objType in typesNeedRenaming:
-                listOfChildren = blocksCache[trialDataPath].filter(objects=objType)
-                print('{}\n{} objects of type {}'.format(
-                    trialDataPath, len(listOfChildren), objType
-                ))
-                for child in listOfChildren:
-                    childBaseName = preproc.childBaseName(child.name, 'seg')
-                    child.name = 'seg{}_{}'.format(idx, childBaseName)
-            blocksCache[trialDataPath].create_relationship()
-            blocksCache[trialDataPath] = preproc.purgeNixAnn(blocksCache[trialDataPath])
-            ########
-            sanityCheck = False
-            if sanityCheck and idx == 2:
-                doublePath = trialDataPath.replace(suffix, suffix + '_backup')
-                if os.path.exists(doublePath):
-                    os.remove(doublePath)
-                print('writing {} ...'.format(doublePath))
-                for idx, chIdx in enumerate(blocksCache[trialDataPath].channel_indexes):
-                    print('{}: {}, chan_id = {}'.format(
-                        chIdx.name, chIdx.index, chIdx.channel_ids))
-                writer = neo.io.NixIO(filename=doublePath)
-                writer.write_block(blocksCache[trialDataPath], use_obj_names=True)
-                writer.close()
-            ############
-            if idx > 0:
-                blocksCache[masterDataPath].merge(blocksCache[trialDataPath])
-                if applyTimeOffset:
-                    oldTStop = tStop
-        '''
-            print([evSeg.events[0].name for evSeg in masterBlock.segments])
-            print([asig.name for asig in masterBlock.filter(objects=AnalogSignal)])
-            print([st.name for st in masterBlock.filter(objects=SpikeTrain)])
-            print([ev.name for ev in masterBlock.filter(objects=Event)])
-            print([chIdx.name for chIdx in blocksCache[trialDataPath].filter(objects=ChannelIndex)])
-            print([un.name for un in masterBlock.filter(objects=Unit)])
-        '''
-        # blocksCache[masterDataPath].create_relationship()
-        if os.path.exists(experimentDataPath):
-            os.remove(experimentDataPath)
-        writer = neo.io.NixIO(filename=experimentDataPath)
-        print('writing {} ...'.format(experimentDataPath))
-        writer.write_block(blocksCache[masterDataPath], use_obj_names=True)
-        writer.close()
-        if arguments['commitResults']:
-            analysisProcessedSubFolder = os.path.join(
-                processedFolder, arguments['analysisName']
-                )
-            if not os.path.exists(analysisProcessedSubFolder):
-                os.makedirs(analysisProcessedSubFolder, exist_ok=True)
-            for suffix in suffixList:
-                experimentDataPath = os.path.join(
-                    scratchFolder, arguments['analysisName'],
-                    assembledName +
-                    suffix + '.nix')
-                processedOutPath = os.path.join(
-                    analysisProcessedSubFolder, arguments['analysisName'],
-                    assembledName +
-                    suffix + '.nix')
-                print('copying from:\n{}\ninto\n{}'.format(experimentDataPath, processedOutPath))
-                shutil.copyfile(experimentDataPath, processedOutPath)
+                        objects=ChannelIndex, name=rowIdx)
+                    if not len(matchingCh):
+                        '''
+                            # [ch.index for ch in blocksCache[trialDataPath].filter(objects=ChannelIndex)]
+                            # if row['index'] is None:
+                            #     pdb.set_trace()
+                            #     chIdx = ChannelIndex(
+                            #         name=rowIdx,
+                            #         index=np.asarray([0]),
+                            #         channel_ids=np.asarray([0]),
+                            #         channel_names=np.asarray([rowIdx]),
+                            #         file_origin=blocksCache[trialDataPath].channel_indexes[-1].file_origin
+                            #         )
+                            # else:
+                        '''
+                        # create it
+                        print('ch {} not found; creating now'.format(rowIdx))
+                        chIdx = ChannelIndex(
+                            name=rowIdx,
+                            index=np.asarray([row['index']]).flatten(),
+                            channel_ids=np.asarray([row['channel_ids']]).flatten(),
+                            channel_names=np.asarray([row['channel_names']]).flatten(),
+                            file_origin=blocksCache[trialDataPath].channel_indexes[-1].file_origin
+                            )
+                        for aN in row.drop(['index', 'channel_names', 'channel_ids']).index:
+                            chIdx.annotations[aN] = row[aN]
+                        blocksCache[trialDataPath].channel_indexes.append(chIdx)
+                        chIdx.block = blocksCache[trialDataPath]
+                        # create blank asigs
+                        if row['hasAsigs']:
+                            dummyAsig = blocksCache[trialDataPath].filter(objects=AnalogSignal)[0].copy()
+                            dummyAsig.name = 'seg0_' + chIdx.name
+                            dummyAsig.annotations['neo_name'] = dummyAsig.name
+                            dummyAsig.magnitude[:] = 0
+                            dummyAsig.channel_index = chIdx
+                            chIdx.analogsignals.append(dummyAsig)
+                            blocksCache[trialDataPath].segments[0].analogsignals.append(dummyAsig)
+                            dummyAsig.segment = blocksCache[trialDataPath].segments[0]
+                            # pdb.set_trace()
+                anySpikeTrains = blocksCache[trialDataPath].filter(objects=SpikeTrain)
+                if len(anySpikeTrains):
+                    wvfUnits = anySpikeTrains[0].waveforms.units
+                    stTimeUnits = anySpikeTrains[0].units
+                else:
+                    stTimeUnits = pq.s
+                    wvfUnits = pq.uV
+                for rowIdx, row in masterUnitDF.iterrows():
+                    matchingUnit = blocksCache[trialDataPath].filter(
+                        objects=Unit, name=rowIdx)
+                    if not len(matchingUnit):
+                        parentChanName = row['parentChanName']
+                        # parentChanName = rowIdx
+                        # if parentChanName.endswith('_stim#0'):
+                        #     parentChanName.replace('_stim#0', '')
+                        # if parentChanName.endswith('#0'):
+                        #     parentChanName.replace('#0', '')
+                        matchingCh = blocksCache[trialDataPath].filter(
+                            objects=ChannelIndex, name=parentChanName)
+                        '''
+                            if not len(matchingCh):
+                                masterListEntry = masterChanDF.loc[parentChanName, :]
+                                parentChIdx = ChannelIndex(
+                                    name=parentChanName,
+                                    index=masterListEntry['index'],
+                                    channel_ids=masterListEntry['channel_ids'],
+                                    channel_names=masterListEntry['channel_names'],
+                                    file_origin=blocksCache[trialDataPath].channel_indexes[-1].file_origin
+                                    )
+                                blocksCache[trialDataPath].channel_indexes.append(parentChIdx)
+                                parentChIdx.block = blocksCache[trialDataPath]
+                            else:
+                                parentChIdx = matchingCh[0]
+                        '''
+                        parentChIdx = matchingCh[0]
+                        print('unit {} not found; creating now'.format(rowIdx))
+                        newUnit = Unit(name=rowIdx)
+                        for annName in row.index:
+                            newUnit.annotations[annName] = row[annName]
+                        newUnit.channel_index = parentChIdx
+                        parentChIdx.units.append(newUnit)
+                        for seg in blocksCache[trialDataPath].segments:
+                            dummyST = SpikeTrain(
+                                times=[], units=stTimeUnits,
+                                t_stop=seg.filter(objects=AnalogSignal)[0].t_stop,
+                                waveforms=np.array([]).reshape((0, 0, 0)) * wvfUnits,
+                                name=seg.name + newUnit.name)
+                            dummyST.unit = newUnit
+                            dummyST.segment = seg
+                            newUnit.spiketrains.append(dummyST)
+                            seg.spiketrains.append(dummyST)
+                typesNeedRenaming = [SpikeTrain, AnalogSignal, Event]
+                blocksCache[trialDataPath].segments[0].name = 'seg{}_{}'.format(
+                    idx, blocksCache[trialDataPath].name)
+                for objType in typesNeedRenaming:
+                    listOfChildren = blocksCache[trialDataPath].filter(objects=objType)
+                    print('{}\n{} objects of type {}'.format(
+                        trialDataPath, len(listOfChildren), objType
+                    ))
+                    for child in listOfChildren:
+                        childBaseName = preproc.childBaseName(child.name, 'seg')
+                        child.name = 'seg{}_{}'.format(idx, childBaseName)
+                blocksCache[trialDataPath].create_relationship()
+                blocksCache[trialDataPath] = preproc.purgeNixAnn(blocksCache[trialDataPath])
+                ########
+                sanityCheck = False
+                if sanityCheck and idx == 2:
+                    doublePath = trialDataPath.replace(suffix, suffix + '_backup')
+                    if os.path.exists(doublePath):
+                        os.remove(doublePath)
+                    print('writing {} ...'.format(doublePath))
+                    for idx, chIdx in enumerate(blocksCache[trialDataPath].channel_indexes):
+                        print('{}: {}, chan_id = {}'.format(
+                            chIdx.name, chIdx.index, chIdx.channel_ids))
+                    writer = neo.io.NixIO(filename=doublePath)
+                    writer.write_block(blocksCache[trialDataPath], use_obj_names=True)
+                    writer.close()
+                ############
+                if idx > 0:
+                    blocksCache[masterDataPath].merge(blocksCache[trialDataPath])
+                    if applyTimeOffset:
+                        oldTStop = tStop
+            '''
+                print([evSeg.events[0].name for evSeg in masterBlock.segments])
+                print([asig.name for asig in masterBlock.filter(objects=AnalogSignal)])
+                print([st.name for st in masterBlock.filter(objects=SpikeTrain)])
+                print([ev.name for ev in masterBlock.filter(objects=Event)])
+                print([chIdx.name for chIdx in blocksCache[trialDataPath].filter(objects=ChannelIndex)])
+                print([un.name for un in masterBlock.filter(objects=Unit)])
+            '''
+            # blocksCache[masterDataPath].create_relationship()
+            if os.path.exists(experimentDataPath):
+                os.remove(experimentDataPath)
+            writer = neo.io.NixIO(filename=experimentDataPath)
+            print('writing {} ...'.format(experimentDataPath))
+            writer.write_block(blocksCache[masterDataPath], use_obj_names=True)
+            writer.close()
+            if arguments['commitResults']:
+                analysisProcessedSubFolder = os.path.join(
+                    processedFolder, arguments['analysisName']
+                    )
+                if not os.path.exists(analysisProcessedSubFolder):
+                    os.makedirs(analysisProcessedSubFolder, exist_ok=True)
+                for suffix in suffixList:
+                    experimentDataPath = os.path.join(
+                        scratchFolder, arguments['analysisName'],
+                        assembledName +
+                        suffix + '.nix')
+                    processedOutPath = os.path.join(
+                        analysisProcessedSubFolder, arguments['analysisName'],
+                        assembledName +
+                        suffix + '.nix')
+                    print('copying from:\n{}\ninto\n{}'.format(experimentDataPath, processedOutPath))
+                    shutil.copyfile(experimentDataPath, processedOutPath)
     return
 
 if __name__ == "__main__":

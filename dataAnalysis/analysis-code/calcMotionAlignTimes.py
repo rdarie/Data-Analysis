@@ -33,8 +33,8 @@ import quantities as pq
 import dataAnalysis.helperFunctions.kilosort_analysis_new as ksa
 import dataAnalysis.helperFunctions.helper_functions_new as hf
 import rcsanalysis.packet_func as rcsa_helpers
-import dataAnalysis.preproc.ns5 as preproc
-import dataAnalysis.preproc.mdt as preprocINS
+import dataAnalysis.preproc.ns5 as ns5
+# import dataAnalysis.preproc.mdt as preprocINS
 import numpy as np
 import pandas as pd
 from collections import Iterable
@@ -48,6 +48,11 @@ expOpts, allOpts = parseAnalysisOptions(
     arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
+print('\n' + '#' * 50 + '\n{}\n'.format(__file__) + '#' * 50 + '\n')
+###
+#!! applyDelay: Move align time by this factor, to account for build-up to the threshold crossing
+#               applyDelay should be positive, we'll resolve the sign later
+applyDelay = 10e-3
 
 analysisSubFolder = os.path.join(
     scratchFolder, arguments['analysisName']
@@ -57,37 +62,48 @@ if not os.path.exists(analysisSubFolder):
 # 
 if arguments['processAll']:
     prefix = assembledName
-    alignTimeBounds = [] # not working as of 12/31/19
+    alignTimeBounds = []  # not working as of 12/31/19
     print('calcMotionStimAlignTimes does not support aggregate files')
     sys.exit()
 # trick to allow joint processing of minirc and regular trials
-if not (blockExperimentType == 'proprio'):
-    print('skipping RC trial')
+if not ((blockExperimentType == 'proprio') or (blockExperimentType == 'proprio-motionOnly')):
+    print('skipping trial with no movement')
     sys.exit()
-#
-try:
-    alignTimeBounds = alignTimeBoundsLookup[int(arguments['blockIdx'])]
-except Exception:
-    traceback.print_exc()
-    alignTimeBounds = None
 #
 prefix = ns5FileName
 dataBlockPath = os.path.join(
     analysisSubFolder,
     prefix + '_analyze.nix')
 print('loading {}'.format(dataBlockPath))
-dataReader, dataBlock = preproc.blockFromPath(
+dataReader, dataBlock = ns5.blockFromPath(
     dataBlockPath, lazy=arguments['lazy'])
-#
+####
+try:
+    alignTimeBounds = alignTimeBoundsLookup[int(arguments['blockIdx'])]
+except Exception:
+    print('No alignTimeBounds read...')
+    fallbackTStart = float(
+        dataBlock.segments[0]
+        .filter(objects=AnalogSignalProxy)[0].t_start)
+    fallbackTStop = float(
+        dataBlock.segments[-1]
+        .filter(objects=AnalogSignalProxy)[0].t_stop)
+    alignTimeBounds = [
+        [fallbackTStart, fallbackTStop]
+    ]
+    print(
+        '\n Setting alignTimeBounds to {} -> {}'
+        .format(fallbackTStart, fallbackTStop))
+###
 dummyCateg = [
     'amplitude', 'amplitudeCat', 'program',
     'RateInHz', 'electrode', 'activeGroup',
     'program']
 availableCateg = [
-    'pedalVelocityCat', 'pedalMovementCat', 'pedalDirection',
-    'pedalSizeCat', 'pedalSize', 'pedalMovementDuration']
+    'pedalDirection', 'pedalSizeCat',
+    'pedalSize', 'pedalMovementDuration']
 signalsInAsig = [
-    'velocityCat', 'position']
+    'velocity', 'position']
 
 #  allocate block to contain events
 masterBlock = Block()
@@ -95,56 +111,31 @@ masterBlock.name = dataBlock.annotations['neo_name']
 masterBlock.annotate(
     nix_name=dataBlock.annotations['neo_name'])
 
-blockIdx = 0
-checkReferences = False
 for segIdx, dataSeg in enumerate(dataBlock.segments):
     print('Calculating motion align times for trial {}'.format(segIdx))
     #
     signalsInSegment = [
         'seg{}_'.format(segIdx) + i
         for i in signalsInAsig]
-    asigProxysList = [
-        asigP
-        for asigP in dataSeg.filter(objects=AnalogSignalProxy)
-        if asigP.annotations['neo_name'] in signalsInSegment]
-    eventProxysList = dataSeg.events
-    if checkReferences:
-        for asigP in asigProxysList:
-            da = asigP._rawio.da_list['blocks'][blockIdx]['segments'][segIdx]['data']
-            print('segIdx {}, asigP.name {}'.format(
-                segIdx, asigP.name))
-            print('asigP._global_channel_indexes = {}'.format(
-                asigP._global_channel_indexes))
-            print('asigP references {}'.format(
-                da[asigP._global_channel_indexes[0]]))
-            try:
-                assert asigP.name in da[asigP._global_channel_indexes[0]].name
-            except Exception:
-                traceback.print_exc()
-        for evP in eventProxysList:
-            print('segIdx {}, evP.name {}'.format(
-                segIdx, evP.name))
-            print('evP._event_channel_index = {}'.format(
-                 evP._event_channel_index))
-            evP_ch = evP._event_channel_index
-            mts = evP._rawio.file.blocks[blockIdx].groups[segIdx].multi_tags
-            try:
-                assert evP.name in mts[evP_ch].name
-            except Exception:
-                traceback.print_exc()
-    asigsList = [
-        asigP.load()
-        for asigP in asigProxysList]
-    samplingRate = asigsList[0].sampling_rate
-    # asigsDF = preproc.analogSignalsToDataFrame(asigsList, useChanNames=True)
-    tdDF = preproc.analogSignalsToDataFrame(asigsList)
+    if arguments['lazy']:
+        asigProxysList = [
+            asigP
+            for asigP in dataSeg.filter(objects=AnalogSignalProxy)
+            if asigP.name in signalsInSegment]
+        eventProxysList = dataSeg.events
+        asigsList = [
+            asigP.load()
+            for asigP in asigProxysList]
+        dataSegEvents = [evP.load() for evP in eventProxysList]
+        dummyAsig = asigsList[0]
+    samplingRate = dummyAsig.sampling_rate
+    #
+    tdDF = ns5.analogSignalsToDataFrame(asigsList)
     tdDF.columns = [
         i.replace('seg{}_'.format(segIdx), '')
         for i in tdDF.columns
         ]
-    #
-    dataSegEvents = [evP.load() for evP in eventProxysList]
-    eventDF = preproc.eventsToDataFrame(
+    eventDF = ns5.eventsToDataFrame(
         dataSegEvents, idxT='t',
         names=[
             'seg{}_property'.format(segIdx),
@@ -156,14 +147,10 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         ]
     tdDF.rename(
         columns={
-            'velocityCat': 'pedalVelocityCat',
+            'velocity': 'pedalVelocity',
             'position': 'pedalPosition'},
         inplace=True)
-    tdDF['pedalVelocityCat'] = tdDF['pedalVelocityCat'] - 1
-    #  get alignment times
-    moveMask = pd.Series(False, index=tdDF.index)
-    stopMask = pd.Series(False, index=tdDF.index)
-
+    #
     if alignTimeBounds is not None:
         taskMask = pd.Series(False, index=tdDF.index)
         for idx, atb in enumerate(alignTimeBounds):
@@ -176,201 +163,206 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
     else:
         taskMask = (tdDF['t'] >= 0)
     ###################################################
-    fs = asigsList[0].sampling_rate.magnitude
-    pedalNeutralPoint = tdDF.loc[taskMask, 'pedalPosition'].iloc[0]
-    centeredPedalPosition = tdDF['pedalPosition'] - pedalNeutralPoint
-    pedalPosAbs = centeredPedalPosition.abs()
-    pedalPosThresh = pedalPosAbs.max() / 1000
-    minDist = 25e-3
-    lowPassVelocity = hf.filterDF(
-        tdDF.loc[:, 'pedalVelocityCat'],
-        fs,
-        lowPass=25, lowOrder=6)
+    tdDF.loc[:, 'isInTask'] = taskMask
+    tdDF.loc[:, 'pedalVelocityAbs'] = tdDF['pedalVelocity'].abs()
+    try:
+        zeroEpochs = pd.Series(pedalPositionZeroEpochs[blockIdx])
+        closestTimes, closestIdx  = hf.closestSeries(takeFrom=zeroEpochs, compareTo=tdDF['t'])
+        epochChanges = pd.Series(0, index=tdDF.index)
+        epochChanges.loc[closestIdx] = 1
+        tdDF.loc[:, 'positionEpoch'] = epochChanges.cumsum()
+    except Exception:
+        tdDF.loc[:, 'positionEpoch'] = 0
     #
-    _, startLowMask = hf.getThresholdCrossings(
-        lowPassVelocity, thresh=-0.5, absVal=False,
-        edgeType='falling', fs=fs, iti=minDist,
-        plotting=False, keep_max=False, itiWiggle=0.05)
-    _, startHighMask = hf.getThresholdCrossings(
-        lowPassVelocity, thresh=0.5, absVal=False,
-        edgeType='rising', fs=fs, iti=minDist,
-        plotting=False, keep_max=False, itiWiggle=0.05)
-    _, stopLowMask = hf.getThresholdCrossings(
-        lowPassVelocity, thresh=-0.5, absVal=False,
-        edgeType='rising', fs=fs, iti=minDist,
-        plotting=False, keep_max=False, itiWiggle=0.05)
-    _, stopHighMask = hf.getThresholdCrossings(
-        lowPassVelocity, thresh=0.5, absVal=False,
-        edgeType='falling', fs=fs, iti=minDist,
-        plotting=False, keep_max=False, itiWiggle=0.05)
+    for name, group in tdDF.groupby('positionEpoch'):
+        pedalRestingMask = group['pedalVelocityAbs'] == 0
+        thisTaskMask = group['isInTask']
+        thisNeutralPoint = float(group.loc[thisTaskMask & pedalRestingMask, 'pedalPosition'].mode())
+        assert np.abs(thisNeutralPoint) < 0.1 # if the neutral point > 10 deg, there might be a problem
+        tdDF.loc[group.index, 'pedalPosition'] = group['pedalPosition'] - thisNeutralPoint
     #
-    moveMaskForSeg = (startLowMask | startHighMask) & taskMask
-    stopMaskForSeg = (stopLowMask | stopHighMask) & taskMask
-    ################
-    # movingAtAll = tdDF['pedalVelocityCat'].abs()
-    # movementOnOff = movingAtAll.diff().fillna(0)
-    # # guard against blips in the velocity rating
-    # moveStartIndices = movementOnOff.index[movementOnOff.abs() > 0]
-    # blipMask = tdDF.loc[moveStartIndices, 't'].diff() < 30e-3
-    # movementOnOff.loc[blipMask.index[blipMask]] = 0
-    # #
-    checkMoveOnOff = False
-    if checkMoveOnOff:
-        plt.plot(tdDF['t'], tdDF['pedalPosition'].values, label='position')
-        plt.plot(tdDF['t'], tdDF['pedalVelocityCat'].values, label='velocity (int)')
-        plt.plot(tdDF['t'], lowPassVelocity, label='filtered velocity')
-        plt.plot(tdDF['t'], startHighMask, label='start high')
-        plt.plot(tdDF['t'], stopHighMask, label='stop high')
-        plt.plot(tdDF['t'], startLowMask, label='start low')
-        plt.plot(tdDF['t'], stopLowMask, label='stop low')
-        plt.legend(); plt.show()
-    # #
-    # moveMaskForSeg = (movementOnOff == 1) & taskMask
-    # stopMaskForSeg = (movementOnOff == -1) & taskMask
-    ################
-    print('Found {} movement starts'.format(moveMaskForSeg.sum()))
-    print('Found {} movement stops'.format(stopMaskForSeg.sum()))
-    # pdb.set_trace()
-    assert stopMaskForSeg.sum() == moveMaskForSeg.sum(), 'unequal start and stop lengths'
-    assert stopMaskForSeg.sum() % 2 == 0, 'number of movements not divisible by 2'
-    moveMask.loc[moveMaskForSeg.index[moveMaskForSeg]] = True
-    stopMask.loc[stopMaskForSeg.index[stopMaskForSeg]] = True
-    moveTimes = tdDF.loc[
-        moveMask, 't']
-    stopTimes = tdDF.loc[
-        stopMask, 't']
-    tdDF['pedalMovementCat'] = np.nan
-    for idx, dfMoveIdx in enumerate(moveMask.index[moveMask]):
-        dfStopIndex = stopMask.index[stopMask][idx]
-        assert dfStopIndex > dfMoveIdx
-        if (idx % 2) == 0:
-            tdDF.loc[dfMoveIdx, 'pedalMovementCat'] = 'outbound'
-            tdDF.loc[dfStopIndex, 'pedalMovementCat'] = 'reachedPeak'
-        else:
-            tdDF.loc[dfMoveIdx, 'pedalMovementCat'] = 'return'
-            tdDF.loc[dfStopIndex, 'pedalMovementCat'] = 'reachedBase'
-    outboundMask = tdDF['pedalMovementCat'] == 'outbound'
-    reachedPeakMask = tdDF['pedalMovementCat'] == 'reachedPeak'
-    returnMask = tdDF['pedalMovementCat'] == 'return'
-    reachedBaseMask = tdDF['pedalMovementCat'] == 'reachedBase'
-    #  check that the trials are intact
-    assert (
-        (tdDF['pedalMovementCat'] == 'outbound').sum() ==
-        (tdDF['pedalMovementCat'] == 'reachedBase').sum())
-    assert (
-        (tdDF['pedalMovementCat'] == 'outbound').sum() ==
-        (tdDF['pedalMovementCat'] == 'reachedPeak').sum())
-    assert (
-        (tdDF['pedalMovementCat'] == 'outbound').sum() ==
-        (tdDF['pedalMovementCat'] == 'return').sum())
-    #  calculate movement sizes (relative to starting point)
-    midPeakIdx = ((
-        returnMask[returnMask].index +
-        reachedPeakMask[reachedPeakMask].index) / 2).astype('int64')
-    tdDF['pedalSize'] = np.nan
-    tdDF.loc[midPeakIdx, 'pedalSize'] = tdDF.loc[midPeakIdx, 'pedalPosition']
-    tdDF['pedalSize'].interpolate(method='nearest', inplace=True)
-    tdDF['pedalSize'].fillna(method='ffill', inplace=True)
-    tdDF['pedalSize'].fillna(method='bfill', inplace=True)
+    tdDF.loc[:, 'pedalPositionAbs'] = tdDF['pedalPosition'].abs()
+    pedalPosQuantiles = tdDF.loc[taskMask, 'pedalPosition'].quantile([0, 1])
+    pedalPosTolerance = (
+        pedalPosQuantiles.iloc[1] -
+        pedalPosQuantiles.iloc[0]) / 100
+    pedalVelQuantiles = tdDF.loc[taskMask, 'pedalVelocityAbs'].quantile([0, 1])
+    pedalVelTolerance = (
+        pedalVelQuantiles.iloc[1] -
+        pedalVelQuantiles.iloc[0]) / 100
+    # pedalRestingMask = tdDF['pedalVelocityAbs'] < pedalVelTolerance
+    # pedalRestingMask = tdDF['pedalVelocityAbs'] == 0
+    # pedalNeutralPoint = float(
+    #     tdDF.loc[taskMask & pedalRestingMask, 'pedalPosition'].value_counts().idxmax())
+    # pedalNeutralPoint = float(tdDF.loc[taskMask & pedalRestingMask, 'pedalPosition'].mode())
+    # assert np.abs(pedalNeutralPoint) < 0.1 # if the neutral point > 10 deg, there might be a problem
     #
-    tdDF.loc[:, 'pedalSize'] = tdDF['pedalSize'] - pedalNeutralPoint
-    #  plt.plot(tdDF['t'], tdDF['pedalSize'])
-    #  plt.plot(tdDF['t'], tdDF['pedalPosition']); plt.show()
+    # tdDF.loc[:, 'pedalPosition'] = tdDF['pedalPosition'] - pedalNeutralPoint
+    crossIdx, crossMask = hf.getThresholdCrossings(
+        tdDF.loc[taskMask, 'pedalPositionAbs'], thresh=pedalPosTolerance,
+        edgeType='rising', fs=samplingRate,
+        iti=1,  # at least 1 sec between triggers
+        )
+    movementOnOff = pd.Series(0, index=tdDF.index)
+    movementOnOff.loc[crossIdx] = 1
+    tdDF.loc[:, 'movementRound'] = movementOnOff.cumsum()
+    tdDF.loc[:, 'movementRound'] -= 1  # 0 is all the stuff before the first movement
+    movementCatTypes = ['outbound', 'reachedPeak', 'midPeak', 'return', 'reachedBase']
+    trialsDict = {
+        key: tdDF.loc[crossIdx, ['t', 'movementRound']].copy()
+        for key in movementCatTypes
+        }
+    for mvCat in movementCatTypes:
+        trialsDict[mvCat].index.name = 'outboundTdIdx'
+        trialsDict[mvCat].set_index('movementRound', inplace=True)
+        for catName in availableCateg + ['tdIndex', 'markForDeletion']:
+            trialsDict[mvCat].loc[:, catName] = np.nan
+    for idx, (mvRound, group) in enumerate(tdDF.groupby('movementRound')):
+        if mvRound >= 0:
+            trialsDict['outbound'].loc[mvRound, 'tdIndex'] = group.index[0]
+            #  back to start
+            crossIdxFall, crossMaskFall = hf.getThresholdCrossings(
+                group['pedalPositionAbs'], thresh=pedalPosTolerance,
+                edgeType='falling', fs=samplingRate,
+                iti=1,  # at least 1 sec between triggers
+                )
+            try:
+                assert crossIdxFall.size == 1
+                crossIdxFall = crossIdxFall[0]
+            except Exception:
+                print('\n\n{}\n Error at t = {} sec\n\n'.format(
+                    dataBlockPath, group.loc[crossIdxFall, 't']))
+                traceback.print_exc()
+                pdb.set_trace()
+            trialsDict['reachedBase'].loc[mvRound, 'tdIndex'] = crossIdxFall
+            trialsDict['reachedBase'].loc[mvRound, 't'] = group.loc[crossIdxFall, 't']
+            pedalSizeAbs = group['pedalPositionAbs'].quantile(1)
+            #  reach peak
+            crossIdxReachPeak, _ = hf.getThresholdCrossings(
+                group.loc[:crossIdxFall, 'pedalPositionAbs'],
+                thresh=pedalSizeAbs - pedalPosTolerance,
+                edgeType='rising', fs=samplingRate,
+                iti=1,  # at least 1 sec between triggers
+                )
+            try:
+                assert crossIdxReachPeak.size == 1
+                crossIdxReachPeak = crossIdxReachPeak[0]
+            except Exception:
+                print('\n\n{}\n Error at t = {} sec\n\n'.format(
+                    dataBlockPath, group.loc[crossIdxReachPeak, 't']))
+                traceback.print_exc()
+                pdb.set_trace()
+            trialsDict['reachedPeak'].loc[mvRound, 'tdIndex'] = crossIdxReachPeak
+            trialsDict['reachedPeak'].loc[mvRound, 't'] = group.loc[crossIdxReachPeak, 't']
+            #  return
+            crossIdxReturn, _ = hf.getThresholdCrossings(
+                group.loc[crossIdxReachPeak:crossIdxFall, 'pedalPositionAbs'],
+                thresh=pedalSizeAbs - pedalPosTolerance,
+                edgeType='falling', fs=samplingRate,
+                iti=1,  # at least 1 sec between triggers
+                )
+            try:
+                assert crossIdxReturn.size == 1
+                crossIdxReturn = crossIdxReturn[0]
+            except Exception:
+                traceback.print_exc()
+                pdb.set_trace()
+            trialsDict['return'].loc[mvRound, 'tdIndex'] = crossIdxReturn
+            trialsDict['return'].loc[mvRound, 't'] = (
+                group.loc[crossIdxReturn, 't'])
+            midPeakIdx = int(np.mean([crossIdxReachPeak, crossIdxReturn]))
+            #  mid peak
+            trialsDict['midPeak'].loc[mvRound, 'tdIndex'] = midPeakIdx
+            trialsDict['midPeak'].loc[mvRound, 't'] = (
+                group.loc[midPeakIdx, 't'])
+            #
+            movementDuration = float(
+                trialsDict['reachedBase'].loc[mvRound, 't'] -
+                trialsDict['outbound'].loc[mvRound, 't'])
+            #
+            for mvCat in movementCatTypes:
+                trialsDict[mvCat].loc[mvRound, 'pedalSize'] = (
+                    group.loc[midPeakIdx, 'pedalPosition'])
+                if group.loc[midPeakIdx, 'pedalPosition'] > 0:
+                    trialsDict[mvCat].loc[mvRound, 'pedalDirection'] = 'CW'
+                else:
+                    trialsDict[mvCat].loc[mvRound, 'pedalDirection'] = 'CCW'
+                trialsDict[mvCat].loc[mvRound, 'pedalMovementDuration'] = (
+                    movementDuration)
+                trialsDict[mvCat].loc[mvRound, 'markForDeletion'] = (movementDuration > 10.)
+            #
+    #
     if (segIdx == 0) and arguments['plotParamHistograms']:
         ax = sns.distplot(
-            tdDF.loc[midPeakIdx, 'pedalSize'].abs(),
-            bins=200, kde=False)
+            trialsDict['midPeak'].loc[:, 'pedalSize'].abs(),
+            bins=100, kde=False)
         plt.savefig(
             os.path.join(
                 figureFolder, 'pedalSizeDistribution.pdf'))
+        plt.close()
+        ax = sns.distplot(
+            trialsDict['midPeak'].loc[:, 'pedalMovementDuration'],
+            bins=100, kde=False)
+        plt.savefig(
+            os.path.join(
+                figureFolder, 'pedalMovementDurationDistribution.pdf'))
         # plt.show()
         plt.close()
     #  determine size category
-
-    tdDF['pedalSizeCat'] = pd.cut(
-        tdDF['pedalSize'].abs(), movementSizeBins,
+    pedalSizeCat = pd.cut(
+        trialsDict['outbound']['pedalSize'].abs(), movementSizeBins,
         labels=movementSizeBinLabels)
-    #  determine CW or CCW
-    tdDF['pedalDirection'] = np.nan
-    tdDF.loc[tdDF['pedalSize'] > 0, 'pedalDirection'] = 'CW'
-    tdDF.loc[tdDF['pedalSize'] <= 0, 'pedalDirection'] = 'CCW'
-    #  calculate movement durations
-    tdDF['pedalMovementDuration'] = np.nan
-    outboundTimes = tdDF.loc[
-        outboundMask,
-        't']
-    reachedBaseTimes = tdDF.loc[
-        reachedBaseMask,
-        't']
-    pedalMovementDurations = (
-        reachedBaseTimes.values -
-        outboundTimes.values
-        )
-    tdDF.loc[outboundTimes.index, 'pedalMovementDuration'] = (
-        pedalMovementDurations
-        )
-    tdDF.loc[reachedBaseTimes.index, 'pedalMovementDuration'] = (
-        pedalMovementDurations
-        )
-    # import seaborn as sns
-    # sns.distplot(tdDF['pedalMovementDuration'].dropna())
-    tdDF['pedalMovementDuration'].interpolate(method='nearest', inplace=True)
-    tdDF['pedalMovementDuration'].fillna(method='ffill', inplace=True)
-    tdDF['pedalMovementDuration'].fillna(method='bfill', inplace=True)
-
-if True:
-    peakTimes = tdDF.loc[midPeakIdx, 't']
-    #  get intervals halfway between move stop and move start
-    pauseLens = moveTimes.shift(-1).values - stopTimes
-    maskForLen = pauseLens > 1.5
-    halfOffsets = (
-        samplingRate.magnitude * (pauseLens / 2)).fillna(0).astype(int)
-    otherTimesIdx = (stopTimes.index + halfOffsets.values)[maskForLen]
-    otherTimes = tdDF.loc[otherTimesIdx, 't']
-
-    moveCategories = tdDF.loc[
-        tdDF['t'].isin(moveTimes), availableCateg
-        ].reset_index(drop=True)
-    moveCategories['pedalMetaCat'] = 'onset'
-    
-    stopCategories = tdDF.loc[
-        tdDF['t'].isin(stopTimes), availableCateg
-        ].reset_index(drop=True)
-    stopCategories['pedalMetaCat'] = 'offset'
-    
-    otherCategories = tdDF.loc[
-        tdDF['t'].isin(otherTimes), availableCateg
-        ].reset_index(drop=True)
-    otherCategories['pedalMetaCat'] = 'control'
-    
-    peakCategories = tdDF.loc[
-        tdDF['t'].isin(peakTimes), availableCateg
-        ].reset_index(drop=True)
-    peakCategories['pedalMetaCat'] = 'midPeak'
-    peakCategories['pedalMovementCat'] = 'midPeak'
-    # pdb.set_trace()
-    alignTimes = pd.concat((
-        moveTimes, stopTimes, otherTimes, peakTimes),
-        axis=0, ignore_index=True)
+    assert not pedalSizeCat.isna().any()
+    for mvCat in movementCatTypes:
+        trialsDict[mvCat].loc[:, 'pedalSizeCat'] = pedalSizeCat
+    alignEventsDF = (
+        pd.concat(
+            trialsDict, axis=0,
+            names=['pedalMovementCat', 'movementRound'])
+        .reset_index())
+    deleteTheseIdx = alignEventsDF.loc[alignEventsDF['markForDeletion'].astype(bool), :].index
+    if deleteTheseIdx.any():
+        print('calcMotionAlignTimes, dropping idx = {} (automatically marked for deletion)'.format(deleteTheseIdx))
+        alignEventsDF.drop(index=deleteTheseIdx, inplace=True)
+    alignEventsDF.drop(columns=['markForDeletion'], inplace=True)
+    try:
+        manuallyRejectedRounds = dropMotionRounds[blockIdx]
+        rejectMask = alignEventsDF['movementRound'].isin(manuallyRejectedRounds)
+        print('calcMotionAlignTimes, dropping idx = {} (manually rejected)'.format(deleteTheseIdx))
+        alignEventsDF.drop(index=rejectMask.loc[rejectMask].index, inplace=True)
+    except Exception:
+        traceback.print_exc()
+    # print('Found events at {}'.format(alignEventsDF['t'].tolist()))
+    if arguments['plotParamHistograms']:
+        # pdb.set_trace()
+        fig, ax = plt.subplots()
+        fig.set_size_inches(4 * (tdDF['t'].max() // 500), 4)
+        pPosDeg = 100 * tdDF['pedalPosition']
+        ax.plot(tdDF['t'], pPosDeg, label='pedal position')
+        ax.set_ylabel('deg.')
+        ax.plot(
+            trialsDict['outbound']['t'],
+            pPosDeg.loc[trialsDict['outbound']['tdIndex']],
+            'ro', label='trial outbound movement')
+        ax.legend()
+        plt.savefig(
+            os.path.join(
+                figureFolder, 'pedalMovementTrials.pdf'))
+        # plt.show()
+        plt.close()
+    #  add metaCat
+    alignEventsDF.loc[:, 'pedalMetaCat'] = 'NA'
+    alignEventsDF.loc[(alignEventsDF['pedalMovementCat'] == 'outbound') | (alignEventsDF['pedalMovementCat'] == 'return'), 'pedalMetaCat'] = 'starting'
+    alignEventsDF.loc[(alignEventsDF['pedalMovementCat'] == 'reachedPeak') | (alignEventsDF['pedalMovementCat'] == 'reachedBase'), 'pedalMetaCat'] = 'stopping'
     #  sort align times
-    alignTimes.sort_values(inplace=True, kind='mergesort')
-    categories = pd.concat((
-        moveCategories, stopCategories, otherCategories, peakCategories),
-        axis=0, ignore_index=True)
-    categories['program'] = 999
-    categories['RateInHz'] = 0
-    categories['amplitude'] = 0
-    categories['electrode'] = 'NA'
-    categories['amplitudeCat'] = 0
-    #  sort categories by align times
-    #  (needed to propagate values forward)
+    alignEventsDF.sort_values(by='t', inplace=True, kind='mergesort')
+    if applyDelay is not None:
+        # rising thresholds probably resolve earlier
+        alignEventsDF.loc[alignEventsDF['pedalMetaCat'] == 'starting', 't'] -= applyDelay
+        # falling thresholds probably resolve later
+        alignEventsDF.loc[alignEventsDF['pedalMetaCat'] == 'stopping', 't'] += applyDelay
     # pdb.set_trace()
-    categories = categories.loc[alignTimes.index, :]
-    alignTimes.reset_index(drop=True, inplace=True)
-    categories.reset_index(drop=True, inplace=True)
-    #
-    alignEventsDF = pd.concat([alignTimes, categories], axis=1)
-    alignEvents = preproc.eventDataFrameToEvents(
+    alignEvents = ns5.eventDataFrameToEvents(
         alignEventsDF, idxT='t',
         annCol=None,
         eventName='seg{}_motionAlignTimes'.format(segIdx),
@@ -378,8 +370,9 @@ if True:
     alignEvents.annotate(nix_name=alignEvents.name)
     #
     concatLabelColumns = [
-        'pedalMovementCat', 'pedalMetaCat',
+        'pedalMovementCat',
         'pedalSizeCat', 'pedalDirection',
+        'movementRound',
         'pedalMovementDuration']
     concatLabelsDF = alignEventsDF[concatLabelColumns]
     concatLabels = np.array([
@@ -401,21 +394,33 @@ if True:
 dataReader.file.close()
 masterBlock.create_relationship()
 allSegs = list(range(len(masterBlock.segments)))
-if arguments['processAll']:
-    preproc.addBlockToNIX(
-        masterBlock, neoSegIdx=allSegs,
-        writeAsigs=False, writeSpikes=False, writeEvents=True,
-        fileName=experimentName + '_analyze',
-        folderPath=analysisSubFolder,
-        purgeNixNames=False,
-        nixBlockIdx=0, nixSegIdx=allSegs,
-        )
+
+outputPath = os.path.join(
+    scratchFolder,
+    ns5FileName + '_epochs'
+    )
+if not os.path.exists(outputPath + '.nix'):
+    writer = ns5.NixIO(filename=outputPath + '.nix')
+    writer.write_block(masterBlock, use_obj_names=True)
+    writer.close()
 else:
-    preproc.addBlockToNIX(
-        masterBlock, neoSegIdx=allSegs,
-        writeAsigs=False, writeSpikes=False, writeEvents=True,
-        fileName=ns5FileName + '_analyze',
-        folderPath=analysisSubFolder,
-        purgeNixNames=False,
-        nixBlockIdx=0, nixSegIdx=allSegs,
-        )
+    preReader, preBlock = ns5.blockFromPath(
+        outputPath + '.nix', lazy=arguments['lazy'])
+    eventExists = alignEvents.name in [ev.name for ev in preBlock.filter(objects=[EventProxy, Event])]
+    preReader.file.close()
+    # if events already exist...
+    if eventExists:
+        print('motion times already calculated! Deleting block and starting over')
+        os.remove(outputPath + '.nix')
+        writer = ns5.NixIO(filename=outputPath + '.nix')
+        writer.write_block(masterBlock, use_obj_names=True)
+        writer.close()
+    else:
+        ns5.addBlockToNIX(
+            masterBlock, neoSegIdx=allSegs,
+            writeAsigs=False, writeSpikes=False, writeEvents=True,
+            fileName=ns5FileName + '_epochs',
+            folderPath=scratchFolder,
+            purgeNixNames=False,
+            nixBlockIdx=0, nixSegIdx=allSegs,
+            )

@@ -13,8 +13,8 @@
 #SBATCH -J simi_synch
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-simi_synch.stdout
-#SBATCH -e ../../batch_logs/%j-%a-simi_synch.errout
+#SBATCH -o ../../batch_logs/%j-%a-simi_synch.out
+#SBATCH -e ../../batch_logs/%j-%a-simi_synch.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo

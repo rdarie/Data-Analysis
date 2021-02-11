@@ -1,5 +1,5 @@
 import os
-
+import numpy as np
 
 def getExpOpts():
     #
@@ -33,6 +33,7 @@ def getExpOpts():
     
     experimentName = '201901261000-Proprio'
     deviceName = 'DeviceNPC700373H'
+    subjectName = 'Murdoc'
     
     jsonSessionNames = {
         #  per trial
@@ -42,7 +43,7 @@ def getExpOpts():
             'Session1548518982240'],
         2: ['Session1548520562275'],
         3: ['Session1548521956580'],
-        4: ['Session1548524126669'],
+        4: ['Session1548524126669', ],
         }
 
     synchInfo = {'ins': {}, 'nsp': {}}
@@ -89,7 +90,8 @@ def getExpOpts():
     synchInfo['ins'][4] = {
         #  per trialSegment
         0: {
-            'timeRanges': [(15.5, 17.5)],
+            # 'timeRanges': [(15.5, 17.5)],
+            'timeRanges': None,
             'chan': ['ins_td2', 'ins_td3'],
             'thres': 5,
             'iti': 0.2,
@@ -113,7 +115,8 @@ def getExpOpts():
             0: {'timeRanges': [105, 107], 'keepIndex': slice(None)}
             },
         4: {
-            0: {'timeRanges': [939, 941], 'keepIndex': slice(None)}
+            # 0: {'timeRanges': [939, 941], 'keepIndex': slice(None)}
+            0: {'timeRanges': None, 'keepIndex': slice(None)}
             },
         }
     #  if not possible to use taps, override with good taps from another segment
@@ -127,7 +130,7 @@ def getExpOpts():
         }
     # options for stim artifact detection
     detectStim = True
-    stimDetectThresDefault = 500
+    stimDetectThresDefault = 1000
     stimDetectChansDefault = ['ins_td2', 'ins_td3']
     stimDetectOverrideStartTimes = {
         1: None,
@@ -143,58 +146,35 @@ def getExpOpts():
         # group
         0: {
             # program
-            0: {'detectChannels': ['ins_td2'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True},
-            1: {'detectChannels': ['ins_td3'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True},
-            2: {'detectChannels': ['ins_td2', 'ins_td3'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True},
-            3: {'detectChannels': stimDetectChansDefault, 'thres': stimDetectThresDefault, 'useForSlotDetection': True}
+            0: {'detectChannels': ['ins_td2'], 'thres': 1000, 'useForSlotDetection': True},
+            1: {'detectChannels': ['ins_td3'], 'thres': 1000, 'useForSlotDetection': True},
+            2: {'detectChannels': ['ins_td2', 'ins_td3'], 'thres': 2000, 'useForSlotDetection': True},
+            3: {'detectChannels': stimDetectChansDefault, 'thres': 1000, 'useForSlotDetection': True}
         },
         1: {
             # program
             0: {'detectChannels': stimDetectChansDefault, 'thres': stimDetectThresDefault, 'useForSlotDetection': True},
-            1: {'detectChannels': ['ins_td2'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True},
+            1: {'detectChannels': ['ins_td2', 'ins_td3'], 'thres': 500, 'useForSlotDetection': True},
             2: {'detectChannels': stimDetectChansDefault, 'thres': stimDetectThresDefault, 'useForSlotDetection': True},
-            3: {'detectChannels': ['ins_td2', 'ins_td3'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True}
+            3: {'detectChannels': ['ins_td3'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True}
         }}
-    triFolderSourceBase = os.path.join(
-        '201901271000-Proprio', 'tdc_Block001')
-    triDestinations = [
-        'Block00{}'.format(blockIdx)
-        for blockIdx in [4]]
-    
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        # '201901261000-Proprio': [4],
-        '201901271000-Proprio': [1, 2, 3, 4],
+        '201901261000-Proprio': [4],
         }
 
     movementSizeBins = [0, 0.25, 0.5, 1, 1.25, 1.5]
+    movementSizeBinLabels = ['XS', 'S', 'M', 'L', 'XL']
     alignTimeBoundsLookup = {
-        #  TODO
-        1: [
-            [257, 552],
-            [670, 1343],
-            ],
-        #  per trial
-        #  TODO
-        2: [
-            #  per trialSegment
-            [238, 1198],
-            ],
-        #  TODO
-        3: [
-            [171, 1050]
-            ],
-        4: [
-            [939, 2252],
-            ]
         }
     outlierDetectOptions = dict(
-        targetEpochSize=5e-3,
-        windowSize=(-1, 1),
+        targetEpochSize=100e-3,
+        windowSize=(-.2, .4),
+        # conditionNames=[
+        #     'electrode', 'amplitude', 'RateInHz',
+        #     'pedalMovementCat', 'pedalSizeCat', 'pedalDirection'],
         conditionNames=[
-            'electrode', 'amplitude', 'RateInHz',
-            # 'pedalMovementCat', 'pedalSizeCat', 'pedalDirection'
-            ],
+            'electrode', 'amplitude', 'RateInHz'],
         twoTailed=True,
         )
     #
@@ -202,4 +182,36 @@ def getExpOpts():
         'n': 3,
         'categories': ['amplitude', 'electrode', 'RateInHz']
         }
+    #
+    spikeSortingOpts = {
+        'utah': {
+            'asigNameList': [
+                [
+                    'utah{:d}'.format(i)
+                    for i in range(1, 97)]
+                ],
+            'ainpNameList': [
+                'ainp{:d}'.format(i)
+                for i in range(1, 17)
+            ],
+            'electrodeMapPath': './Utah_Murdoc.cmp',
+            'rawBlockName': 'Block',
+            'excludeChans': [],
+            'prbOpts': dict(
+                contactSpacing=400,
+                groupIn={
+                    'xcoords': np.arange(-.1, 10.1, 1),
+                    'ycoords': np.arange(-.1, 10.1, 1)}),
+            'triFolderSource': {
+                'exp': experimentName, 'block': 4,
+                'nameSuffix': 'spike_preview'},
+            'triFolderDest': [
+                {
+                    'exp': experimentName, 'block': i,
+                    'nameSuffix': 'mean_subtracted'}
+                for i in [4]
+                ]
+        }
+    }
+    
     return locals()

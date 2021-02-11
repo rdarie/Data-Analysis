@@ -4,28 +4,31 @@ Usage:
     generateSpikeReport [options]
 
 Options:
-    --blockIdx=blockIdx                    which trial to analyze [default: 1]
-    --exp=exp                              which experimental day to analyze
-    --processAll                           process entire experimental day? [default: False]
-    --nameSuffix=nameSuffix                add anything to the output name?
-    --lazy                                 load from raw, or regular? [default: False]
-    --window=window                        process with short window? [default: short]
-    --alignFolderName=alignFolderName      append a name to the resulting blocks? [default: motion]
-    --analysisName=analysisName            append a name to the resulting blocks? [default: default]
-    --inputBlockName=inputBlockName        which trig_ block to pull
-    --unitQuery=unitQuery                  how to restrict channels if not supplying a list? [default: isispinaloremg]
-    --maskOutlierBlocks                    delete outlier trials? [default: False]
-    --invertOutlierBlocks                  delete outlier trials? [default: False]
-    --individualTraces                     mean+sem or individual traces? [default: False]
-    --alignQuery=alignQuery                what will the plot be aligned to? [default: all]
-    --hueName=hueName                      break down by hue  [default: nominalCurrent]
-    --hueControl=hueControl                hues to exclude from stats test
-    --sizeName=sizeName                    break down by size
-    --sizeControl=sizeControl              sizes to exclude from stats test
-    --styleName=styleName                  break down by style
-    --styleControl=styleControl            styles to exclude from stats test
-    --groupPagesBy=groupPagesBy            break down each page
+    --blockIdx=blockIdx                                  which trial to analyze [default: 1]
+    --exp=exp                                            which experimental day to analyze
+    --processAll                                         process entire experimental day? [default: False]
+    --nameSuffix=nameSuffix                              add anything to the output name?
+    --lazy                                               load from raw, or regular? [default: False]
+    --window=window                                      process with short window? [default: short]
+    --alignFolderName=alignFolderName                    append a name to the resulting blocks? [default: motion]
+    --analysisName=analysisName                          append a name to the resulting blocks? [default: default]
+    --inputBlockSuffix=inputBlockSuffix                  which trig_ block to pull
+    --inputBlockPrefix=inputBlockPrefix                  which trig_ block to pull
+    --unitQuery=unitQuery                                how to restrict channels if not supplying a list? [default: isispinaloremg]
+    --maskOutlierBlocks                                  delete outlier trials? [default: False]
+    --invertOutlierBlocks                                delete outlier trials? [default: False]
+    --individualTraces                                   mean+sem or individual traces? [default: False]
+    --alignQuery=alignQuery                              what will the plot be aligned to? [default: all]
+    --hueName=hueName                                    break down by hue  [default: nominalCurrent]
+    --hueControl=hueControl                              hues to exclude from stats test
+    --sizeName=sizeName                                  break down by size
+    --sizeControl=sizeControl                            sizes to exclude from stats test
+    --styleName=styleName                                break down by style
+    --styleControl=styleControl                          styles to exclude from stats test
+    --groupPagesBy=groupPagesBy                          break down each page
+    --amplitudeFieldName=amplitudeFieldName              what is the amplitude named? [default: nominalCurrent]
 """
+
 import matplotlib
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
@@ -49,9 +52,11 @@ from neo.io.proxyobjects import (
 import dataAnalysis.preproc.ns5 as preproc
 import pandas as pd
 import numpy as np
+import json
 from importlib import reload
 import os, pdb
 from tqdm import tqdm
+import dill as pickle
 #
 from currentExperiment import parseAnalysisOptions
 from docopt import docopt
@@ -75,13 +80,12 @@ analysisSubFolder = os.path.join(
     )
 if not os.path.exists(analysisSubFolder):
     os.makedirs(analysisSubFolder, exist_ok=True)
-
-
+#
 if arguments['groupPagesBy'] is not None:
     groupPagesBy = arguments['groupPagesBy'].split(', ')
 else:
     groupPagesBy = None
-if arguments['inputBlockName'] is not None:
+if arguments['inputBlockSuffix'] is not None:
     # plotting aligned features
     alignSubFolder = os.path.join(analysisSubFolder, arguments['alignFolderName'])
     if not os.path.exists(alignSubFolder):
@@ -96,13 +100,13 @@ if arguments['inputBlockName'] is not None:
     dataPath = os.path.join(
         alignSubFolder,
         prefix + '_{}_{}.nix'.format(
-            arguments['inputBlockName'], arguments['window']))
+            arguments['inputBlockSuffix'], arguments['window']))
     cachedH5Path = os.path.join(
         calcSubFolder,
         prefix + '_{}_{}.h5'.format(
-            arguments['inputBlockName'], arguments['window']))
+            arguments['inputBlockSuffix'], arguments['window']))
     reportName = prefix + '_{}_{}_{}_topo'.format(
-            arguments['inputBlockName'], arguments['window'],
+            arguments['inputBlockSuffix'], arguments['window'],
             arguments['alignQuery']) + nameSuffix
     figureOutputFolder = os.path.join(
         figureFolder, arguments['analysisName'], 'alignedFeatures')
@@ -127,16 +131,18 @@ alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(
 alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = (
     ash.processUnitQueryArgs(
         namedQueries, analysisSubFolder, **arguments))
+#
 alignedAsigsKWargs.update(dict(
     duplicateControlsByProgram=False,
     makeControlProgram=False,
     metaDataToCategories=False,
     removeFuzzyName=False,
     getMetaData=[
-        'RateInHz', 'feature', 'electrode', 'nominalCurrent',
+        'RateInHz', 'feature', 'electrode',
+        arguments['amplitudeFieldName'],
         'stimCat', 'originalIndex', 'segment', 't'],
     transposeToColumns='bin', concatOn='index'))
-
+#
 #############################
 # for stim spike report
 # alignedAsigsKWargs.update(dict(
@@ -146,26 +152,34 @@ alignedAsigsKWargs.update(dict(
     windowSize=(-100e-3, 400e-3)))
 # alignedAsigsKWargs.update(dict(
 #     windowSize=(-25e-3, 125e-3)))
-alignedAsigsKWargs.update({'amplitudeColumn': arguments['hueName']})
-
-rippleMapDF = prb_meta.mapToDF(rippleMapFile[int(arguments['blockIdx'])])
-rippleMapDF.loc[
-    rippleMapDF['label'].str.contains('caudal'),
-    'ycoords'] += 800
-
-if 'delsysMapDict' in locals():
-    delsysMapDF = pd.DataFrame(delsysMapDict)
-    mapsDict = {
-        'ripple': rippleMapDF,
-        'delsys': delsysMapDF}
+alignedAsigsKWargs.update({'amplitudeColumn': arguments['amplitudeFieldName']})
+#
+if 'proprio' in blockExperimentType:
+    electrodeMapPath = spikeSortingOpts[arguments['arrayName']]['electrodeMapPath']
+    mapExt = electrodeMapPath.split('.')[-1]
+    if mapExt == 'cmp':
+        mapDF = prb_meta.cmpToDF(electrodeMapPath)
+    elif mapExt == 'map':
+        mapDF = prb_meta.mapToDF(electrodeMapPath)
 else:
-    mapsDict = {
-        'ripple': rippleMapDF}
-
-flipInfo = {
-    'ripple': {'lr': True, 'ud': False},
-    'delsys': {'lr': False, 'ud': False}
-    }
+    rippleMapDF = prb_meta.mapToDF(rippleMapFile[int(arguments['blockIdx'])])
+    rippleMapDF.loc[
+        rippleMapDF['label'].str.contains('caudal'),
+        'ycoords'] += 800
+    #
+    if 'delsysMapDict' in locals():
+        delsysMapDF = pd.DataFrame(delsysMapDict)
+        mapsDict = {
+            'ripple': rippleMapDF,
+            'delsys': delsysMapDF}
+    else:
+        mapsDict = {
+            'ripple': rippleMapDF}
+    
+    flipInfo = {
+        'ripple': {'lr': True, 'ud': False},
+        'delsys': {'lr': False, 'ud': False}
+        }
 mapSpecificRelplotKWArgs = {
     'ripple': {
         'facet_kws': {
@@ -263,6 +277,22 @@ if arguments['individualTraces']:
     pdfName = pdfName.replace('.pdf', '_traces.pdf')
 if arguments['invertOutlierBlocks']:
     pdfName = pdfName.replace('.pdf', '_outliers.pdf')
+#
+saveFigMetaToPath = pdfName.replace('.pdf', '_metadata.pickle')
+####################
+optsSourceFolder = os.path.join(
+    figureFolder, 'default', 'alignedFeatures')
+loadFigMetaPath = os.path.join(
+    optsSourceFolder,
+    '_emg_XS_stimOn_topo_metadata.pickle'
+    )
+with open(loadFigMetaPath, 'rb') as _f:
+    loadedFigMeta = pickle.load(_f)
+# plotProcFuns.append(
+
+#     asp.genAxLimSaver(
+#         filePath=saveAxLimsToPath, keyColName='feature')
+#     )
 ################
 # from here on we can start defining a function
 # TODO delete this and rework, right now it is very hacky
@@ -356,6 +386,8 @@ else:
     pageGrouper = asigWide.groupby(groupPagesBy)
 #
 pageCount = 0
+if saveFigMetaToPath is not None:
+    figMetaData = []
 with PdfPages(pdfName) as pdf:
     for pageIdx, (pageName, pageGroup) in enumerate(tqdm(pageGrouper)):
         #
@@ -403,6 +435,9 @@ with PdfPages(pdfName) as pdf:
                 size=arguments['sizeName'], style=arguments['styleName'],
                 row='xcoords', col='ycoords', **relplotKWArgs)
             for (ro, co, hu), dataSubset in g.facet_data():
+                emptySubset = (
+                    (dataSubset.empty) or
+                    (dataSubset['segment'].isna().all()))
                 # if sigTestResults is not None:
                 #     addSignificanceStars(
                 #         g, sigTestResults.query(
@@ -412,6 +447,28 @@ with PdfPages(pdfName) as pdf:
                 if len(allProbePlotFuns):
                     for procFun in allProbePlotFuns:
                         procFun(g, ro, co, hu, dataSubset)
+                if saveFigMetaToPath is not None:
+                    if 'facetMetaList' not in locals():
+                        facetMetaList = []
+                    if not emptySubset:
+                        facetMeta = {}
+                        for gVarName in [g._row_var, g._col_var, g._hue_var]:
+                            if gVarName is not None:
+                                gVarValue = dataSubset[gVarName].dropna().unique()
+                                assert isinstance(gVarValue, np.ndarray)
+                                assert gVarValue.shape == (1,)
+                                facetMeta.update({gVarName: gVarValue[0]})
+                        gFeatName = dataSubset['feature'].dropna().unique()
+                        if isinstance(gFeatName, np.ndarray):
+                            if gFeatName.shape == (1,):
+                                facetMeta.update({'feature': gFeatName[0]})
+                        facetMeta.update({
+                            'xlim_left': g.axes[ro, co].get_xlim()[0],
+                            'xlim_right': g.axes[ro, co].get_xlim()[1],
+                            'ylim_bottom': g.axes[ro, co].get_ylim()[0],
+                            'ylim_top': g.axes[ro, co].get_ylim()[1]
+                            })
+                        facetMetaList.append(pd.Series(facetMeta))
             g.set_titles("")
             g.set_axis_labels("", "")
             if 'facet_kws' in relplotKWArgs:
@@ -432,9 +489,21 @@ with PdfPages(pdfName) as pdf:
                 saveLegendOpts.update({
                     'bbox_extra_artists': [pageTitle] + allLegends})
             # if not plt.rcParams['figure.constrained_layout.use']:
+            if saveFigMetaToPath is not None:
+                pageFullIdx = {
+                    key: value
+                    for key, value in zip(
+                        groupPagesBy + ['probe'], list(pageName) + [probeName])
+                    }
+                facetMetaDF = pd.concat(facetMetaList, axis='columns')
+                facetMetaDF.pageFullIdx = pageFullIdx
+                figMetaData.append(facetMetaDF.T)
+                del facetMetaList
             #     g.fig.tight_layout(pad=0)
             pdf.savefig(bbox_inches='tight', pad_inches=0, **saveLegendOpts)
             # plt.show()
             plt.close()
             pageCount += 1
-#
+    if saveFigMetaToPath is not None:
+        with open(saveFigMetaToPath, 'wb') as _f:
+            pickle.dump(figMetaData, _f)

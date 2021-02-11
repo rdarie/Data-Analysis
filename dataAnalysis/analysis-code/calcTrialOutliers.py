@@ -8,6 +8,7 @@ Options:
     --processAll                                 process entire experimental day? [default: False]
     --lazy                                       load from raw, or regular? [default: False]
     --saveResults                                load from raw, or regular? [default: False]
+    --useCachedMahalanobis                       load previous covariance matrix? [default: False]
     --inputBlockName=inputBlockName              which trig_ block to pull [default: pca]
     --verbose                                    print diagnostics? [default: False]
     --plotting                                   plot results?
@@ -48,6 +49,7 @@ from currentExperiment import parseAnalysisOptions
 from namedQueries import namedQueries
 from sklearn.covariance import EmpiricalCovariance, MinCovDet, EllipticEnvelope
 from sklearn.utils.random import sample_without_replacement as swr
+
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']), arguments['exp'])
 globals().update(expOpts)
@@ -101,28 +103,42 @@ alignedAsigsKWargs.update(dict(
     getMetaData=[
         'RateInHz', 'feature', 'electrode',
         arguments['amplitudeFieldName'], 'stimPeriod',
-        'pedalMovementCat', 'pedalSizeCat', 'pedalDirection',
+        'pedalSizeCat', 'pedalDirection', 'pedalMovementCat',
         'stimCat', 'originalIndex', 'segment', 't'],
     transposeToColumns='feature', concatOn='columns',
     verbose=False, procFun=None))
 #
+print(
+    "'outlierDetectOptions' in locals(): {}"
+    .format('outlierDetectOptions' in locals()))
+#
+stimConditionNames = [
+    'electrode', arguments['amplitudeFieldName'], 'RateInHz']
+motionConditionNames = [
+    'pedalMovementCat', 'pedalSizeCat', 'pedalDirection']
+if (blockExperimentType == 'proprio-miniRC') or (blockExperimentType == 'proprio-RC'):
+    # has stim but no motion
+    stimulusConditionNames = stimConditionNames
+elif blockExperimentType == 'proprio-motionOnly':
+    # has motion but no stim
+    stimulusConditionNames = motionConditionNames
+else:
+    stimulusConditionNames = stimConditionNames + motionConditionNames
+print('Block type {}; using the following stimulus condition breakdown:'.format(blockExperimentType))
+print('\n'.join(['    {}'.format(scn) for scn in stimulusConditionNames]))
 if 'outlierDetectOptions' in locals():
     targetEpochSize = outlierDetectOptions['targetEpochSize']
-    stimulusConditionNames = outlierDetectOptions['conditionNames']
     twoTailed = outlierDetectOptions['twoTailed']
     alignedAsigsKWargs['windowSize'] = outlierDetectOptions['windowSize']
+    alignedAsigsKWargs['procFun'] = ash.genDetrender(
+        timeWindow=(
+            alignedAsigsKWargs['windowSize'][0],
+            alignedAsigsKWargs['windowSize'][1] + 100e-3))
 else:
     targetEpochSize = 1e-3
-    stimulusConditionNames = [
-        'electrode', arguments['amplitudeFieldName'], 'RateInHz']
     twoTailed = False
     alignedAsigsKWargs['windowSize'] = (-100e-3, 400e-3)
 
-def takeSqrt(waveDF, spkTrain):
-    return np.sqrt(waveDF)
-
-if arguments['sqrtTransform']:
-    alignedAsigsKWargs['procFun'] = takeSqrt
 
 alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **arguments)
 alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
@@ -140,40 +156,38 @@ def findOutliers(
         chi2Bounds = chi2.interval(qThresh, nDim)
         sdThresh = multiplier * chi2Bounds[1]
     #
-    chiProba = pd.Series(
-        -np.log(np.squeeze(chi2.pdf(mahalDistDF, nDim))),
-        index=mahalDistDF.index)
-    chiProbaLim = -np.log(chi2.pdf(sdThresh, nDim))
-    if devQuantile is not None:
-        deviation = chiProba.groupby(groupBy).quantile(q=devQuantile)
-        # maxMhDist = mahalDistDF.groupby(groupBy).quantile(q=devQuantile).iloc[:, -1] - sdThresh
-        # minMhDist = sdThreshInner - mahalDistDF.groupby(groupBy).quantile(q=1-devQuantile).iloc[:, -1]
+    if twoTailed:
+        chiProba = pd.Series(
+            -np.log(np.squeeze(chi2.pdf(mahalDistDF, nDim))),
+            index=mahalDistDF.index)
+        chiProbaLim = -np.log(chi2.pdf(sdThresh, nDim))
+        if devQuantile is not None:
+            deviation = chiProba.groupby(groupBy).quantile(q=devQuantile)
+        else:
+            deviation = chiProba.groupby(groupBy).max()
     else:
-        deviation = chiProba.groupby(groupBy).max()
-        # maxMhDist = mahalDistDF.groupby(groupBy).max().iloc[:, -1] - sdThresh
-        # minMhDist = sdThreshInner - mahalDistDF.groupby(groupBy).min().iloc[:, -1]
+        if devQuantile is not None:
+            deviation = mahalDistDF['mahalDist'].groupby(groupBy).quantile(q=devQuantile)
+        else:
+            deviation = mahalDistDF['mahalDist'].groupby(groupBy).max()
+    deviationDF = deviation.to_frame(name='deviation')
     #
-    # if twoTailed:
-    #     deviation = pd.concat([maxMhDist, minMhDist], axis='columns').max(axis='columns')
-    #     pdb.set_trace()
-    # else:
-    #     deviation = maxMhDist
-    if isinstance(deviation, pd.Series):
-        deviationDF = deviation.to_frame(name='deviation')
+    if twoTailed:
+        deviationDF['rejectBlock'] = (deviationDF['deviation'] > chiProbaLim)
     else:
-        deviationDF = deviation
-    deviationDF['rejectBlock'] = (deviationDF['deviation'] > chiProbaLim)
+        deviationDF['rejectBlock'] = (deviationDF['deviation'] > sdThresh)
+    #
     return deviationDF
 
 @profile
 def calcCovMat(
         partition, dataColNames=None,
-        useEmpiricalCovariance=True,
+        useMinCovDet=True,
         supportFraction=None, verbose=False):
     dataColMask = partition.columns.isin(dataColNames)
     partitionData = partition.loc[:, dataColMask]
     # print('partition shape = {}'.format(partitionData.shape))
-    if not useEmpiricalCovariance:
+    if useMinCovDet:
         try:
             est = MinCovDet(support_fraction=supportFraction)
             est.fit(partitionData.values)
@@ -189,9 +203,11 @@ def calcCovMat(
         est.mahalanobis(partitionData.values),
         index=partition.index, columns=['mahalDist'])
     # print('result shape is {}'.format(result.shape))
-    result = pd.concat([result, partition.loc[:, ~dataColMask]], axis=1)
+    result = pd.concat(
+        [result, partition.loc[:, ~dataColMask]],
+        axis=1)
     result.name = 'mahalanobisDistance'
-    # pdb.set_trace()
+    #
     # if result['electrode'].iloc[0] == 'foo':
     #     pdb.set_trace()
     # print('result type is {}'.format(type(result)))
@@ -206,7 +222,7 @@ if __name__ == "__main__":
         triggeredPath, lazy=arguments['lazy'])
     dataDF = ns5.alignedAsigsToDF(
         dataBlock, **alignedAsigsKWargs)
-
+    #
     if 'outlierDetectColumns' in locals():
         dataDF.drop(
             columns=[
@@ -219,7 +235,6 @@ if __name__ == "__main__":
     if ordMag < 0:
         dataDF = dataDF * 10 ** (-ordMag)
     # dataDF = dataDF.apply(lambda x: x - x.mean())
-
     trialInfo = dataDF.index.to_frame().reset_index(drop=True)
     trialInfo['epoch'] = np.nan
     firstBinMask = trialInfo['bin'] == trialInfo['bin'].unique()[0]
@@ -227,36 +242,43 @@ if __name__ == "__main__":
     #  delay to account for transmission between event
     #  at t=0 and the signal being recorded
     transmissionDelay = 0
-    if 'stimPeriod' not in trialInfo.columns:
-        trialInfo['stimPeriod'] = trialInfo['RateInHz'] ** (-1)
-        trialInfo.loc[np.isinf(trialInfo['stimPeriod']), 'stimPeriod'] = 10
-    #
-    for stimPeriod, group in trialInfo.groupby('stimPeriod'):
-        # adjust epoch size down from nominal, to capture
-        # integer number of stim periods
-        if stimPeriod > targetEpochSize:
-            epochSize = stimPeriod / np.floor(stimPeriod / targetEpochSize)
-        else:
-            epochSize = stimPeriod * np.ceil(targetEpochSize / stimPeriod)
-        print('stimPeriod = {}, epochSize = {}'.format(stimPeriod, epochSize))
-        theseTBins = group['bin'].to_numpy()
-        epochBins = np.arange(
-            theseTBins.min(), theseTBins.max(), epochSize)
-        # align epoch bins to window
-        epochOffset = np.max(epochBins[epochBins <= 0])
-        epochBins = epochBins - epochOffset + transmissionDelay
-        validBins = (epochBins > theseTBins.min()) & (epochBins < theseTBins.max())
-        epochBins = epochBins[validBins]
-        # stretch first and last epoch bin to cover entire window
-        epochBins[0] = theseTBins.min() - 1
-        epochBins[-1] = theseTBins.max() + 1
-        theseEpochs = pd.cut(theseTBins, bins=epochBins, labels=False)
-        trialInfo.loc[group.index, 'epoch'] = theseEpochs
+    if 'RateInHz' in trialInfo.columns:
+        trialInfo.loc[trialInfo['RateInHz'] <= 0, 'RateInHz'] = 1e-1
+        if 'stimPeriod' not in trialInfo.columns:
+            trialInfo['stimPeriod'] = trialInfo['RateInHz'] ** (-1)
+            trialInfo.loc[np.isinf(trialInfo['stimPeriod']), 'stimPeriod'] = 10
+        #
+        for stimPeriod, group in trialInfo.groupby('stimPeriod'):
+            # adjust epoch size down from nominal, to capture
+            # integer number of stim periods
+            if stimPeriod > targetEpochSize:
+                epochSize = stimPeriod / np.floor(stimPeriod / targetEpochSize)
+            else:
+                epochSize = stimPeriod * np.ceil(targetEpochSize / stimPeriod)
+            print('stimPeriod = {}, epochSize = {}'.format(stimPeriod, epochSize))
+            theseTBins = group['bin'].to_numpy()
+            epochBins = np.arange(
+                theseTBins.min(), theseTBins.max(), epochSize)
+            # align epoch bins to window
+            epochOffset = np.max(epochBins[epochBins <= 0])
+            epochBins = epochBins - epochOffset + transmissionDelay
+            validBins = (epochBins > theseTBins.min()) & (epochBins < theseTBins.max())
+            epochBins = epochBins[validBins]
+            # stretch first and last epoch bin to cover entire window
+            epochBins[0] = theseTBins.min() - 1
+            epochBins[-1] = theseTBins.max() + 1
+            theseEpochs = pd.cut(theseTBins, bins=epochBins, labels=False)
+            trialInfo.loc[group.index, 'epoch'] = theseEpochs
+    else:
+        trialInfo.loc[:, 'epoch'] = 0
     #
     dataDF.set_index(
         pd.Index(trialInfo['epoch'], name='epoch'),
         append=True, inplace=True)
-
+    #  ########################### Debugging
+    # if True:
+    #     dataDF = dataDF.drop(columns=[('utah25#0', 0)])
+    #  ###########################
     testVar = None
     groupBy = ['segment', 't']
     resultNames = [
@@ -265,8 +287,7 @@ if __name__ == "__main__":
     print('working with {} samples'.format(dataDF.shape[0]))
     randSample = slice(None, None, None)
 
-    useCachedMahalDist = False
-    if useCachedMahalDist and os.path.exists(resultPath):
+    if arguments['useCachedMahalanobis'] and os.path.exists(resultPath):
         with pd.HDFStore(resultPath,  mode='r') as store:
             mahalDist = pd.read_hdf(
                 store, 'mahalDist')
@@ -275,11 +296,11 @@ if __name__ == "__main__":
         mahalDistLoaded = False
 
     covOpts = dict(
-        useEmpiricalCovariance=True,
+        useMinCovDet=False,
         supportFraction=None)
     daskComputeOpts = dict(
-        scheduler='processes'
-        # scheduler='single-threaded'
+        # scheduler='processes'
+        scheduler='single-threaded'
         )
     if not mahalDistLoaded:
         if arguments['verbose']:
@@ -308,7 +329,7 @@ if __name__ == "__main__":
 
     outlierTrials = findOutliers(
         mahalDist, groupBy=groupBy, multiplier=1, qThresh=1-1e-6,
-        nDim=len(dataDF.columns), devQuantile=0.95, twoTailed=twoTailed)
+        nDim=len(dataDF.columns), devQuantile=0.99, twoTailed=twoTailed)
     # outlierTrials = ash.applyFunGrouped(
     #     mahalDist,
     #     groupBy, testVar,
@@ -375,7 +396,7 @@ if __name__ == "__main__":
     theseOutliers = (
         outlierTrials
         .loc[outlierTrials['rejectBlock'].astype(np.bool), 'deviation'].sort_values()
-        )
+        ).iloc[-100:]
     # maxDroppedTrials = pd.Series(
     #     index=np.concatenate(
     #         [
@@ -405,7 +426,8 @@ if __name__ == "__main__":
     # print(maxDroppedTrials)
     # print(saveNOutliers.sort_values())
     if arguments['plotting'] and outlierTrials['rejectBlock'].astype(np.bool).any():
-        nRowCol = int(np.ceil(np.sqrt(theseOutliers.size)))
+        # nRowCol = int(np.ceil(np.sqrt(theseOutliers.size)))
+        nRowCol = max(int(np.ceil(np.sqrt(theseOutliers.size))), 2)
         emgFig, emgAx = plt.subplots(
             nRowCol, nRowCol, sharex=True)
         emgFig.set_size_inches(5 * nRowCol, 3 * nRowCol)
@@ -480,12 +502,12 @@ if __name__ == "__main__":
     minNObservations = 5
     firstBinTrialInfo = trialInfo.loc[firstBinMask, :]
     goodTrialInfo = firstBinTrialInfo.loc[~outlierTrials['rejectBlock'].to_numpy().flatten().astype(np.bool), :]
-    goodTrialCount = goodTrialInfo.groupby(['electrode', arguments['amplitudeFieldName']])['RateInHz'].value_counts().to_frame(name='count').reset_index()
+    goodTrialCount = goodTrialInfo.groupby([stimulusConditionNames[0], stimulusConditionNames[1]])['RateInHz'].value_counts().to_frame(name='count').reset_index()
     goodTrialCount = goodTrialCount.loc[goodTrialCount['count'] > minNObservations, :]
     goodTrialCount.to_csv(os.path.join(figureOutputFolder, prefix + '_good_trial_breakdown.csv'))
-    goodTrialCount.groupby(['electrode', 'RateInHz', arguments['amplitudeFieldName']]).ngroups
+    goodTrialCount.groupby([stimulusConditionNames[0], 'RateInHz', stimulusConditionNames[1]]).ngroups
     badTrialInfo = firstBinTrialInfo.loc[outlierTrials['rejectBlock'].to_numpy().flatten().astype(np.bool), :]
-    badTrialCount = badTrialInfo.groupby(['electrode', arguments['amplitudeFieldName']])['RateInHz'].value_counts().sort_values().to_frame(name='count').reset_index()
+    badTrialCount = badTrialInfo.groupby([stimulusConditionNames[0], stimulusConditionNames[1]])['RateInHz'].value_counts().sort_values().to_frame(name='count').reset_index()
     outlierTrials['deviation'].reset_index().sort_values(['segment', 'deviation']).to_csv(os.path.join(figureOutputFolder, prefix + '_trial_deviation_breakdown.csv'))
     print('Bad trial count:\n{}'.format(badTrialCount))
 

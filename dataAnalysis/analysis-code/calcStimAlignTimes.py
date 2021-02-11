@@ -11,7 +11,7 @@ Options:
     --makeControl                        make control align times? [default: False]
     --lazy                               load from raw, or regular? [default: False]
 """
-import os, pdb, traceback
+import os, pdb, traceback, sys
 from importlib import reload
 import neo
 from neo import (
@@ -40,6 +40,12 @@ expOpts, allOpts = parseAnalysisOptions(
     arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
+
+print('\n' + '#' * 50 + '\n{}\n'.format(__file__) + '#' * 50 + '\n')
+# trick to allow joint processing of minirc and regular trials
+if blockExperimentType == 'proprio-motionOnly':
+    print('skipping blocks without stim')
+    sys.exit()
 analysisSubFolder = os.path.join(
     scratchFolder, arguments['analysisName']
     )
@@ -58,9 +64,7 @@ insBlock = insReader.read_block(0)
 #          filename=experimentDataPath)
 #  else:
 #      # alignTimeBounds = alignTimeBoundsLookup[experimentName][int(arguments['blockIdx'])]
-alignTimeBounds = [
-    alignTimeBoundsLookup[int(arguments['blockIdx'])]
-    ]
+
 dataReader = neo.io.nixio_fr.NixIO(
     filename=analysisDataPath)
 
@@ -69,7 +73,17 @@ dataBlock = dataReader.read_block(
     signal_group_mode='split-all')
 for ev in dataBlock.filter(objects=EventProxy):
     ev.name = '_'.join(ev.name.split('_')[1:])
-
+try:
+    alignTimeBounds = [
+    alignTimeBoundsLookup[int(arguments['blockIdx'])]
+    ]
+except Exception:
+    alignTimeBounds = [[
+        [
+            float(dataBlock.segments[0].filter(objects=AnalogSignalProxy)[0].t_start),
+            float(dataBlock.segments[-1].filter(objects=AnalogSignalProxy)[0].t_stop)
+        ]
+    ]]
 availableCateg = [
     'amplitude', 'program', 'activeGroup', 'RateInHz']
 progAmpNames = rcsa_helpers.progAmpNames
@@ -85,10 +99,8 @@ masterBlock.name = dataBlock.annotations['neo_name']
 masterBlock.annotate(
     nix_name=dataBlock.annotations['neo_name'])
 
-blockIdx = 0
 checkReferences = False
 for segIdx, dataSeg in enumerate(dataBlock.segments):
-    print('Calculating stim align times for trial {}'.format(segIdx + 1))
     eventProxysList = dataSeg.events
     if checkReferences:
         for evP in eventProxysList:
@@ -97,13 +109,12 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
             print('evP._event_channel_index = {}'.format(
                  evP._event_channel_index))
             evP_ch = evP._event_channel_index
-            mts = evP._rawio.file.blocks[blockIdx].groups[segIdx].multi_tags
+            mts = evP._rawio.file.blocks[0].groups[segIdx].multi_tags
             try:
                 assert evP.name in mts[evP_ch].name
             except Exception:
                 traceback.print_exc()
     dataSegEvents = [evP.load() for evP in eventProxysList]
-    # pdb.set_trace()
     eventDF = ns5.eventsToDataFrame(
         dataSegEvents, idxT='t',
         names=['property', 'value']
@@ -119,19 +130,20 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         )
     stimStatus = stimStatus.loc[tMask, :].reset_index(drop=True)
     #
-    ampMask = stimStatus['amplitude'] > 0
-    categories = stimStatus.loc[
-        ampMask,
-        availableCateg + ['t']]
-    categories['stimCat'] = 'stimOn'
+    ampUpdateMask = (
+        (eventDF['property'] == 'amplitude') &
+        (eventDF['value'] > 0)
+        )
+    ampUpdateMask = (eventDF['property'] == 'amplitude')
+    ampMask = stimStatus['t'].isin(eventDF.loc[ampUpdateMask, 't'])
     #
+    categories = stimStatus.loc[ampMask, availableCateg + ['t']]
+    categories.loc[categories['amplitude'] > 0, 'stimCat'] = 'stimOn'
+    categories.loc[categories['amplitude'] == 0, 'stimCat'] = 'stimOff'
+    # pdb.set_trace()
     if arguments['makeControl']:
-        offIdx = []
         midTimes = []
         for name, group in stimStatus.groupby('amplitudeRound'):
-            ampOff = group.query('amplitude==0')
-            if len(ampOff):
-                offIdx.append(ampOff.index[0])
             if name > 0:
                 ampOn = group.query('amplitude>0')
                 if len(ampOn):
@@ -139,10 +151,6 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
                     prevIdx = max(ampOn.index[0] - 1, stimStatus.index[0])
                     tPrev = stimStatus.loc[prevIdx, 't']
                     midTimes.append((tStart + tPrev) / 2)
-        offCategories = stimStatus.loc[
-            offIdx,
-            availableCateg + ['t']]
-        offCategories['stimCat'] = 'stimOff'
         #
         midCategories = pd.DataFrame(midTimes, columns=['t'])
         midCategories['stimCat'] = 'control'
@@ -151,7 +159,7 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         midCategories['RateInHz'] = 0
         #
         alignEventsDF = pd.concat((
-            categories, offCategories, midCategories),
+            categories, midCategories),
             axis=0, ignore_index=True, sort=True)
     else:
         alignEventsDF = categories
@@ -166,22 +174,27 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         if pName == 999:
             alignEventsDF.loc[group.index, 'electrode'] = 'control'
         else:
-            unitName = 'g{}p{}'.format(gName, pName)
-            thisUnit = insBlock.filter(objects=Unit, name=unitName)[0]
-            cathodes = thisUnit.annotations['cathodes']
-            anodes = thisUnit.annotations['anodes']
-            elecName = ''
-            if isinstance(anodes, Iterable):
-                elecName += '+ ' + ', '.join(['E{}'.format(i) for i in anodes])
-            else:
-                elecName += '+ E{}'.format(anodes)
-            elecName += ' '
-            if isinstance(cathodes, Iterable):
-                elecName += '- ' + ', '.join(['E{}'.format(i) for i in cathodes])
-            else:
-                elecName += '- E{}'.format(cathodes)
-            alignEventsDF.loc[group.index, 'electrode'] = elecName
+            unitName = 'g{}p{}#0'.format(gName, pName)
+            unitCandidates = insBlock.filter(objects=Unit, name=unitName)
+            #
+            if len(unitCandidates) == 1:
+                thisUnit = unitCandidates[0]
+                cathodes = thisUnit.annotations['cathodes']
+                anodes = thisUnit.annotations['anodes']
+                elecName = ''
+                if isinstance(anodes, Iterable):
+                    elecName += '+ ' + ', '.join(['E{}'.format(i) for i in anodes])
+                else:
+                    elecName += '+ E{}'.format(anodes)
+                elecName += ' '
+                if isinstance(cathodes, Iterable):
+                    elecName += '- ' + ', '.join(['E{}'.format(i) for i in cathodes])
+                else:
+                    elecName += '- E{}'.format(cathodes)
+                alignEventsDF.loc[group.index, 'electrode'] = elecName
     #
+    # TODO: fix synch code so that all units are present, to avoid this hack:
+    alignEventsDF.loc[:, 'electrode'] = alignEventsDF['electrode'].fillna('NA')
     alignEvents = ns5.eventDataFrameToEvents(
         alignEventsDF, idxT='t',
         annCol=None,
@@ -211,21 +224,21 @@ dataReader.file.close()
 
 masterBlock.create_relationship()
 allSegs = list(range(len(masterBlock.segments)))
-if arguments['processAll']:
-    ns5.addBlockToNIX(
-        masterBlock, neoSegIdx=allSegs,
-        writeAsigs=False, writeSpikes=False, writeEvents=True,
-        fileName=experimentName + '_analyze',
-        folderPath=analysisSubFolder,
-        purgeNixNames=False,
-        nixBlockIdx=0, nixSegIdx=allSegs,
-        )
+
+outputPath = os.path.join(
+    scratchFolder,
+    ns5FileName + '_epochs'
+    )
+if not os.path.exists(outputPath + '.nix'):
+    writer = ns5.NixIO(filename=outputPath + '.nix')
+    writer.write_block(masterBlock, use_obj_names=True)
+    writer.close()
 else:
     ns5.addBlockToNIX(
         masterBlock, neoSegIdx=allSegs,
         writeAsigs=False, writeSpikes=False, writeEvents=True,
-        fileName=ns5FileName + '_analyze',
-        folderPath=analysisSubFolder,
+        fileName=ns5FileName + '_epochs',
+        folderPath=scratchFolder,
         purgeNixNames=False,
         nixBlockIdx=0, nixSegIdx=allSegs,
         )

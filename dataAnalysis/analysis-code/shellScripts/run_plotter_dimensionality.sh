@@ -13,8 +13,8 @@
 #SBATCH -J extract_pca
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-extract_pca.stdout
-#SBATCH -e ../../batch_logs/%j-extract_pca.errout
+#SBATCH -o ../../batch_logs/%j-extract_pca.out
+#SBATCH -e ../../batch_logs/%j-extract_pca.out
 
 # Specify account details
 #SBATCH --account=bibs-dborton-condo
