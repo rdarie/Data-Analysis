@@ -381,21 +381,21 @@ def calcBlockAnalysisWrapper():
     tdDF = ns5.analogSignalsToDataFrame(asigList)
     del asigList
     tdDF.loc[:, 't'] += asigBlock.annotations['chunkTStart']
-    origTimeStep = tdDF['t'].iloc[1] - tdDF['t'].iloc[0]
+    # origTimeStep = tdDF['t'].iloc[1] - tdDF['t'].iloc[0]
     tdDF.set_index('t', inplace=True)
     # interpolate rig analog signals
+    lowPassOpts = {
+        'low': {
+            'Wn': float(samplingRate) / 2,
+            'N': 4,
+            'btype': 'low',
+            'ftype': 'bessel'
+        }
+    }
     if samplingRate != dummyRigAsig.sampling_rate:
         if samplingRate < dummyRigAsig.sampling_rate:
-            lowPassOpts = {
-                'low': {
-                    'Wn': float(samplingRate),
-                    'N': 2,
-                    'btype': 'low',
-                    'ftype': 'bessel'
-                }
-            }
             filterCoeffs = hf.makeFilterCoeffsSOS(
-                lowPassOpts, float(dummyRigAsig.sampling_rate))
+                lowPassOpts.copy(), float(dummyRigAsig.sampling_rate))
             if trackMemory:
                 print('Filtering analog data before downsampling. memory usage: {:.1f} MB'.format(
                     prf.memory_usage_psutil()))
@@ -431,21 +431,13 @@ def calcBlockAnalysisWrapper():
                 dummyInsAsig = asig
                 break
         insDF = ns5.analogSignalsToDataFrame(insAsigList)
-        origInsTimeStep = insDF['t'].iloc[1] - insDF['t'].iloc[0]
+        # origInsTimeStep = insDF['t'].iloc[1] - insDF['t'].iloc[0]
         insDF.set_index('t', inplace=True)
         # interpolate rig analog signals
         if samplingRate != dummyInsAsig.sampling_rate:
             if samplingRate < dummyInsAsig.sampling_rate:
-                lowPassOpts = {
-                    'low': {
-                        'Wn': float(samplingRate),
-                        'N': 2,
-                        'btype': 'low',
-                        'ftype': 'bessel'
-                    }
-                }
                 filterCoeffs = hf.makeFilterCoeffsSOS(
-                    lowPassOpts, float(dummyInsAsig.sampling_rate))
+                    lowPassOpts.copy(), float(dummyInsAsig.sampling_rate))
                 if trackMemory:
                     print('Filtering analog data before downsampling. memory usage: {:.1f} MB'.format(
                         prf.memory_usage_psutil()))
@@ -517,7 +509,7 @@ def calcBlockAnalysisWrapper():
         emgDF.set_index('t', inplace=True)
         # interpolate emg analog signals
         emgCols = [cn for cn in emgDF.columns if 'Emg' in cn]
-        accCols = [cn for cn in emgDF.columns if 'Acc' in cn]
+        # accCols = [cn for cn in emgDF.columns if 'Acc' in cn]
         highPassOpts = {
             'high': {
                 'Wn': 10,
@@ -550,20 +542,11 @@ def calcBlockAnalysisWrapper():
         #
         if samplingRate != dummyEmgAsig.sampling_rate:
             if samplingRate < dummyEmgAsig.sampling_rate:
-                lowPassOpts = {
-                    'low': {
-                        'Wn': float(samplingRate),
-                        'N': 2,
-                        'btype': 'low',
-                        'ftype': 'bessel'
-                    }
-                }
                 filterCoeffs = hf.makeFilterCoeffsSOS(
-                    lowPassOpts, float(dummyInsAsig.sampling_rate))
+                    lowPassOpts.copy(), float(dummyEmgAsig.sampling_rate))
                 if trackMemory:
                     print('Filtering analog data before downsampling. memory usage: {:.1f} MB'.format(
                         prf.memory_usage_psutil()))
-                # insDF.loc[:, tdChanNames] = signal.sosfiltfilt(
                 filteredAsigs = signal.sosfiltfilt(
                     filterCoeffs, emgDF.to_numpy(),
                     axis=0)

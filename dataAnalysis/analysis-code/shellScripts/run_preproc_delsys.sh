@@ -44,9 +44,9 @@
 # EXP="exp202007021300"
 # EXP="exp202008180700"
 # EXP="exp202009031500"
-# EXP="exp202102041100"
+EXP="exp202102041100"
 # EXP="exp202102081100"
-EXP="exp202102101100"
+# EXP="exp202102101100"
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
@@ -55,4 +55,4 @@ source activate nda2
 python --version
 
 SLURM_ARRAY_TASK_ID=1
-python3 ./preprocDelsysCSV.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID
+python3 ./preprocDelsysCSV.py --notchAccChans --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID

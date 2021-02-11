@@ -46,4 +46,4 @@ source activate nda2
 python --version
 
 SLURM_ARRAY_TASK_ID=1
-python3 -u './synchronizeDelsysToNSP.py' --nspBlockPrefix='utah' --nspBlockSuffix='analog_inputs' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --trigRate=2 --plotting
+python3 -u './synchronizeDelsysToNSP.py' --nspBlockPrefix='utah' --nspBlockSuffix='analog_inputs' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --trigRate=2

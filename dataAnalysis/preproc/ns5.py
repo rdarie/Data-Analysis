@@ -463,26 +463,32 @@ def concatenateBlocks(
         tdDF.loc[:, 't'] += asigBlock.annotations['chunkTStart']
         tdDF.set_index('t', inplace=True)
         if samplingRate != dummyAsig.sampling_rate:
+            lowPassOpts = {
+                'low': {
+                    'Wn': float(samplingRate / 2),
+                    'N': 4,
+                    'btype': 'low',
+                    'ftype': 'bessel'
+                }
+            }
             newT = pd.Series(
                 np.arange(
                     dummyAsig.t_start + asigBlock.annotations['chunkTStart'] * pq.s,
                     dummyAsig.t_stop + asigBlock.annotations['chunkTStart'] * pq.s,
                     1/samplingRate))
             if samplingRate < dummyAsig.sampling_rate:
-                lowPassOpts = {
-                    'low': {
-                        'Wn': float(samplingRate),
-                        'N': 2,
-                        'btype': 'low',
-                        'ftype': 'bessel'
-                    }
-                }
                 filterCoeffs = hf.makeFilterCoeffsSOS(
                     lowPassOpts, float(dummyAsig.sampling_rate))
                 if trackMemory:
                     print('Filtering analog data before downsampling. memory usage: {:.1f} MB'.format(
                         prf.memory_usage_psutil()))
-                # tdDF.loc[:, tdChanNames] = signal.sosfiltfilt(
+                '''
+                ### check that axis=0 is the correct option
+                dummyDF = tdDF.iloc[:, :4].copy()
+                filteredAsigs0 = signal.sosfiltfilt( filterCoeffs, dummyDF.to_numpy(), axis=0)
+                filteredAsigs1 = signal.sosfiltfilt( filterCoeffs, dummyDF.to_numpy(), axis=1)
+                ###
+                '''
                 filteredAsigs = signal.sosfiltfilt(
                     filterCoeffs, tdDF.to_numpy(),
                     axis=0)
@@ -815,8 +821,6 @@ def unitSpikeTrainWaveformsToDF(
                 else:
                     v = np.asarray(values)
                 annDict.update({k: v})
-            pdb.set_trace()
-            #
             skipAnnNames = (
                 st.annotations['arrayAnnNames'] +
                 [
@@ -834,9 +838,20 @@ def unitSpikeTrainWaveformsToDF(
                 if k not in skipAnnNames:
                     annDF.loc[:, k] = value
             #
+            if isinstance(getMetaData, Iterable):
+                doNotFillList = idxLabels + ['feature', 'bin']
+                fieldsNeedFiller = [
+                    mdn
+                    for mdn in getMetaData
+                    if (mdn not in doNotFillList) and (mdn not in annDF.columns)]
+                for mdName in fieldsNeedFiller:
+                    annDF.loc[:, mdName] = 'NA'
             annColumns = annDF.columns.to_list()
             if getMetaData:
-                idxLabels += annColumns
+                for annNm in annColumns:
+                    if annNm not in idxLabels:
+                        idxLabels.append(annNm)
+                # idxLabels += annColumns
             spikeDF = annDF.join(wfDF)
         else:
             spikeDF = wfDF
