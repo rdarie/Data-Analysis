@@ -746,7 +746,6 @@ def unitSpikeTrainWaveformsToDF(
         lags=None, decimate=1, rollingWindow=None,
         getMetaData=True, verbose=False,
         whichSegments=None, windowSize=None, procFun=None):
-    #pdb.set_trace()
     #  list contains different segments from *one* unit
     if isinstance(spikeTrainContainer, ChannelIndex):
         assert len(spikeTrainContainer.units) == 0
@@ -866,15 +865,12 @@ def unitSpikeTrainWaveformsToDF(
             if not getMetaData:
                 spikeDF.drop(columns=annColumns, inplace=True)
         waveformsList.append(spikeDF)
-        #pdb.set_trace()
     #
-    #pdb.set_trace()
     zeroLagWaveformsDF = pd.concat(waveformsList, axis='index')
     if verbose:
         prf.print_memory_usage('before transposing waveforms')
     # TODO implement lags and rolling window addition here
     metaDF = zeroLagWaveformsDF.loc[:, idxLabels].copy()
-    #pdb.set_trace()
     zeroLagWaveformsDF.drop(columns=idxLabels, inplace=True)
     if lags is None:
         lags = [0]
@@ -928,12 +924,12 @@ def unitSpikeTrainWaveformsToDF(
             laggedWaveformsDict[
                 (spikeTrainContainer.name, lag)] = (
                     shiftedWaveform.iloc[:, seekIdx].copy())
+    #
     if transposeToColumns == 'feature':
         # stack the bin, name the feature column
         # 
         for idx, (key, value) in enumerate(laggedWaveformsDict.items()):
             if idx == 0:
-                #pdb.set_trace()
                 stackedIndexDF = pd.concat(
                     [metaDF, value], axis='columns')
                 stackedIndexDF.set_index(idxLabels, inplace=True)
@@ -3725,105 +3721,7 @@ def preprocBlockToNix(
         if i.name not in chanIdxDiscardNames
         ]
     writer._create_source_links(block, nixblock)
-    return idx
-
-
-def preproc(
-        fileName='Trial001',
-        rawFolderPath='./',
-        outputFolderPath='./', mapDF=None,
-        # swapMaps=None,
-        electrodeArrayName='utah',
-        fillOverflow=True, removeJumps=True,
-        motorEncoderMask=None,
-        calcAverageLFP=False,
-        eventInfo=None,
-        spikeSourceType='', spikePath=None,
-        chunkSize=1800, equalChunks=True,
-        chunkList=None,
-        writeMode='rw',
-        signal_group_mode='split-all', trialInfo=None,
-        asigNameList=None, ainpNameList=None, nameSuffix='',
-        calcRigEvents=True, normalizeByImpedance=False,
-        removeMeanAcross=False,
-        LFPFilterOpts=None, encoderCountPerDegree=180e2
-        ):
-    #  base file name
-    rawBasePath = os.path.join(rawFolderPath, fileName)
-    outputFilePath = os.path.join(
-        outputFolderPath,
-        fileName + nameSuffix + '.nix')
-    if os.path.exists(outputFilePath):
-        os.remove(outputFilePath)
-    #  instantiate reader, get metadata
-    print('Loading\n{}\n'.format(rawBasePath))
-    reader = BlackrockIO(
-        filename=rawBasePath, nsx_to_load=5)
-    reader.parse_header()
-    metadata = reader.header
-    #  instantiate spike reader if requested
-    if spikeSourceType == 'tdc':
-        if spikePath is None:
-            spikePath = os.path.join(
-                outputFolderPath, 'tdc_' + fileName,
-                'tdc_' + fileName + '.nix')
-        print('loading {}'.format(spikePath))
-        spikeReader = nixio_fr.NixIO(filename=spikePath)
-    else:
-        spikeReader = None
-    #  instantiate writer
-    writer = NixIO(
-        filename=outputFilePath, mode=writeMode)
-    #  absolute section index
-    idx = 0
-    for blkIdx in range(metadata['nb_block']):
-        #  blkIdx = 0
-        block = readBlockFixNames(
-            reader,
-            block_index=blkIdx, lazy=True,
-            signal_group_mode=signal_group_mode,
-            mapDF=mapDF,
-            # swapMaps=swapMaps
-            )
-        #pdb.set_trace()
-        # ripple debugging
-        # allSptProx = block.filter(objects=SpikeTrainProxy)
-        # allSpt = [i.load() for i in allSptProx]
-        # print([i.annotations['unit_id'] for i in allSpt])
-        if spikeReader is not None:
-            spikeBlock = readBlockFixNames(
-                spikeReader, block_index=blkIdx, lazy=True,
-                signal_group_mode=signal_group_mode,
-                mapDF=mapDF,
-                # swapMaps=swapMaps
-                )
-            spikeBlock = purgeNixAnn(spikeBlock)
-        else:
-            spikeBlock = None
-        #
-        idx = preprocBlockToNix(
-            block, writer, chunkSize,
-            segInitIdx=idx,
-            equalChunks=equalChunks,
-            chunkList=chunkList,
-            fillOverflow=fillOverflow,
-            removeJumps=removeJumps,
-            motorEncoderMask=motorEncoderMask,
-            electrodeArrayName=electrodeArrayName,
-            calcAverageLFP=calcAverageLFP,
-            eventInfo=eventInfo,
-            asigNameList=asigNameList, ainpNameList=ainpNameList,
-            spikeSourceType=spikeSourceType,
-            spikeBlock=spikeBlock,
-            calcRigEvents=calcRigEvents,
-            normalizeByImpedance=normalizeByImpedance,
-            removeMeanAcross=removeMeanAcross,
-            LFPFilterOpts=LFPFilterOpts,
-            encoderCountPerDegree=encoderCountPerDegree
-            )
-    writer.close()
-    #
-    return nixio_fr.NixIO(filename=outputFilePath)
+    return
 
 
 def purgeNixAnn(
