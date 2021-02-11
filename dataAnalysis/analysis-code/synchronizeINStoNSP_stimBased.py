@@ -363,7 +363,7 @@ else:
             nspPeakIdx = thisNspDF.index[peakIdx]
         nspPeakIdx = nspPeakIdx[sessTapOptsNSP['keepIndex']]
         nspTapTimes = thisNspDF.loc[nspPeakIdx, 't'].to_numpy()
-        print('nspTapTimes: {}'.format(nspTapTimes))
+        print('nspTapTimes from {} to {}'.format(nspTapTimes.min(), nspTapTimes.max()))
         theseChanNamesINS = [
             'seg0_' + scn
             for scn in sessTapOptsINS['synchChanName']
@@ -454,7 +454,7 @@ else:
                         thisSpikeMat = thisSpikeMat.astype(np.float)
                         thisSpikeMat[idxOfSpikes] = ampNormalizers
                         coarseSpikeMats.append(thisSpikeMat[:, np.newaxis])
-                        print('{}: coarseSt.times = {}'.format(coarseSt.name, coarseSt.times))
+                        # print('{}: coarseSt.times = {}'.format(coarseSt.name, coarseSt.times))
                         # print('st.times = {}'.format(st.times))
                 if not len(coarseSpikeMats) > 0:
                     print('\n\n INS {} has no stim spikes!'.format(jsonSessionNames[insSessIdx]))
@@ -463,11 +463,6 @@ else:
                     sessTapOptsNSP['synchByXCorrTapDetectSignal'] = True
                 else:
                     trigRaster.loc[:, 'insDiracDelta'] = np.concatenate(coarseSpikeMats, axis=1).sum(axis=1)
-                    # pdb.set_trace()
-                    debugDelta = trigRaster.loc[:, 'insDiracDelta'].unique()
-                    print("trigRaster.loc[:, 'insDiracDelta'].unique() = {}".format(debugDelta))
-                    #  if debugDelta.size > 2:
-                    #      pdb.set_trace()
                     trigRaster.loc[:, 'insTrigs'] = hf.gaussianSupport(
                         support=trigRaster.set_index('t')['insDiracDelta'],
                         gaussWid=gaussWid, fs=trigRasterSamplingRate).to_numpy()
@@ -512,7 +507,7 @@ else:
                     trigRaster.loc[:, 'nspDiracDelta'] = nspDiracRaster.astype(np.float)
                 trigRaster.loc[:, 'nspTrigs'] = hf.gaussianSupport(
                     support=trigRaster.set_index('t')['nspDiracDelta'],
-                    gaussWid=gaussWid,
+                    gaussWid=gaussWid, normalize=False,
                     fs=trigRasterSamplingRate).to_numpy()
             #
             def corrAtLag(targetLag, xSrs=None, ySrs=None):

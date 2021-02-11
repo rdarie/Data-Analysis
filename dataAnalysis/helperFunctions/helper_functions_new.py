@@ -682,7 +682,9 @@ def extractSignalsFromBlock(
 
 def gaussianSupport(
         tdSeg=None, peakIdx=None,
-        gaussWid=None, fs=None, support=None, returnCopy=False):
+        gaussWid=None, fs=None,
+        normalize=True,
+        support=None, returnCopy=False):
 
     if tdSeg is not None:
         kernNSamp = min(int(gaussWid * fs), len(tdSeg.index) - 1)
@@ -701,22 +703,26 @@ def gaussianSupport(
             support.values,
             gaussKern, mode='same'
             )
-        support = pd.Series(
-            MinMaxScaler(feature_range=(1e-2, 1))
-            .fit_transform(support.values.reshape(-1, 1))
-            .squeeze(),
-            index=support.index)
-        return support
+        if normalize:
+            support = pd.Series(
+                MinMaxScaler(feature_range=(1e-2, 1))
+                .fit_transform(support.values.reshape(-1, 1))
+                .squeeze(),
+                index=support.index)
+            return support
+        else:
+            return support
     else:
         retSupport = pd.Series(np.convolve(
             support.to_numpy(),
             gaussKern, mode='same'
             ), index=support.index)
-        retSupport = pd.Series(
-            MinMaxScaler(feature_range=(1e-2, 1))
-            .fit_transform(retSupport.to_numpy().reshape(-1, 1))
-            .squeeze(),
-            index=support.index)
+        if normalize:
+            retSupport = pd.Series(
+                MinMaxScaler(feature_range=(1e-2, 1))
+                .fit_transform(retSupport.to_numpy().reshape(-1, 1))
+                .squeeze(),
+                index=support.index)
         return retSupport
 
     
@@ -3796,7 +3802,10 @@ def plotCorrSynchReport(
     prodAx = ax[2].twinx()
     prodAx.plot(_trigRaster['t'], lowPassShiftedProduct, c='tab:olive', label='elementwise product of trigs (1 hz low pass)')
     prodAx.set_yticks([])
-    ax[2].set_ylim([-0.1, 1.2])
+    ax[2].set_ylim(
+        [
+            ax[2].get_ylim()[0],
+            ax[2].get_ylim()[1] * 1.1])
     listOfLegends.append(prodAx.legend(loc='lower right'))
     figSaveOpts = dict(
         bbox_extra_artists=listOfLegends,
