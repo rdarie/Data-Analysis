@@ -68,17 +68,24 @@ def getExpOpts():
         7: [],
         8: [],
         }
-    synchInfo = {'delsys': {}, 'nsp': {}, 'ins': {}}
+    synchInfo = {'delsysToNsp': {}, 'nspForDelsys': {}, 'ins': {}}
+    for blockIdx in blockExperimentTypeLookup.keys():
+        synchInfo['nspForDelsys'][blockIdx] = {
+            'synchChanName': 'analog 1'
+            }
+        synchInfo['delsysToNsp'][blockIdx] = {
+            'synchChanName': 'AnalogInputAdapterAnalog'
+        }
     # For emg analysis - emg missing for some time ranges
-    synchInfo['delsys'][3] = {'timeRanges': [10, 3127], 'chooseCrossings': slice(None)}
-    synchInfo['delsys'][6] = {'timeRanges': [90, 2080], 'chooseCrossings': slice(None, 1000)}
-    synchInfo['delsys'][7] = {'timeRanges': [12, 1203], 'chooseCrossings': slice(None, 1200)}
-    synchInfo['delsys'][7] = {'timeRanges': [19, 674], 'chooseCrossings': slice(None, 1200)}
+    synchInfo['delsysToNsp'][3].update({'timeRanges': [10, 3127], 'chooseCrossings': slice(None)})
+    synchInfo['delsysToNsp'][6].update({'timeRanges': [90, 2080], 'chooseCrossings': slice(None, 1000)})
+    synchInfo['delsysToNsp'][7].update({'timeRanges': [12, 1203], 'chooseCrossings': slice(None, 1200)})
+    synchInfo['delsysToNsp'][7].update({'timeRanges': [19, 674], 'chooseCrossings': slice(None, 1200)})
     #
-    synchInfo['nsp'][3] = {'timeRanges': [10, 3127], 'chooseCrossings': slice(None)}
-    synchInfo['nsp'][6] = {'timeRanges': [50, 2040], 'chooseCrossings': slice(None, 1000)}
-    synchInfo['nsp'][7] = {'timeRanges': [6, 1244], 'chooseCrossings': slice(None, 1200)}
-    synchInfo['nsp'][7] = {'timeRanges': [3, 659], 'chooseCrossings': slice(None, 1200)}
+    synchInfo['nspForDelsys'][3].update({'timeRanges': [10, 3127], 'chooseCrossings': slice(None)})
+    synchInfo['nspForDelsys'][6].update({'timeRanges': [50, 2040], 'chooseCrossings': slice(None, 1000)})
+    synchInfo['nspForDelsys'][7].update({'timeRanges': [6, 1244], 'chooseCrossings': slice(None, 1200)})
+    synchInfo['nspForDelsys'][7].update({'timeRanges': [3, 659], 'chooseCrossings': slice(None, 1200)})
     alignTimeBoundsLookup = {
         # 1: [
         #     [3, 2290.5]
