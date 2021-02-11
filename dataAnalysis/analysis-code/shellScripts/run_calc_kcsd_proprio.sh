@@ -21,7 +21,7 @@
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=1,3
+#SBATCH --array=1,2,3
 
 # EXP="exp202101141100"
 # EXP="exp202101191100"
@@ -43,6 +43,6 @@ conda activate
 source activate nda2
 python --version
 
-SLURM_ARRAY_TASK_ID=2
+# SLURM_ARRAY_TASK_ID=2
 #
 python -u ./calcLaplacian.py --useKCSD --inputBlockSuffix='analyze' --chanQuery="lfp" --outputBlockSuffix=kcsd --eventBlockSuffix='epochs' --verbose --plotting --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER $LAZINESS
