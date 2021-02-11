@@ -31,6 +31,7 @@
 # EXP="exp202101251100"
 # EXP="exp202101271100"
 EXP="exp202101281100"
+EXP="exp202102041100"
 
 LAZINESS="--lazy"
 #
@@ -54,10 +55,10 @@ conda activate
 source activate nda2
 python --version
 
-# SLURM_ARRAY_TASK_ID=1
+SLURM_ARRAY_TASK_ID=1
 #
 # python -u ./synchronizeSIMItoNSP.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP
-python -u ./calcProprioAnalysisNix.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER $SPIKESOURCE $SPIKEBLOCKSUFFIX $BLOCKPREFIX $RIGSUFFIX --chanQuery="all" --verbose --lazy
+python -u ./calcProprioAnalysisNix.py --hasEMG --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER $SPIKESOURCE $SPIKEBLOCKSUFFIX $BLOCKPREFIX $RIGSUFFIX --chanQuery="all" --verbose --lazy
 ##
 # python -u ./calcMotionAlignTimes.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID  $ANALYSISFOLDER --plotParamHistograms $LAZINESS
 #        # python -u ./calcStimAlignTimes.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER --plotParamHistograms $LAZINESS

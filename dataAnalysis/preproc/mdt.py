@@ -2033,9 +2033,9 @@ def preprocINS(
         ['RateInHz', 'therapyStatus', 'trialSegment'] +
         progAmpNames)
     deriveCols = ['amplitudeRound']
-    HUTChunkSize = 100
+    HUTChunkSize = 25
     interpFunHUTtoINS = getHUTtoINSSyncFun(
-        timeSync, degree=1,
+        timeSync, degree=0,
         syncTo='PacketGenTime',
         chunkSize=HUTChunkSize)
     # # # #
@@ -2112,7 +2112,7 @@ def preprocINS(
         stimSpikesDF = ns5.unitSpikeTrainArrayAnnToDF(stimSpikes)
         if stimSpikesDF.size > 0:
             if trialFilesStim['eventsFromFirstInTrain']:
-                firstOfTrainMask = stimSpikesDF['firstOfTrain'].astype(np.bool).to_numpy()
+                firstOfTrainMask = (stimSpikesDF['rankInTrain'] == 1).to_numpy()
                 stimSpikesDF = stimSpikesDF.loc[firstOfTrainMask, :].reset_index()
             stimSpikesDF['ratePeriod'] = stimSpikesDF['RateInHz'] ** (-1)
             stimSpikesDF.sort_values('t', kind='mergesort', inplace=True)
@@ -2461,7 +2461,7 @@ def getINSStimOnset(
         'trialSegment', 'offsetFromExpected',
         'offsetFromLogged','usedExpectedT',
         'usedSlotToDetect',
-        'firstOfTrain', 'trialSegment']
+        'rankInTrain', 'trainNPulses', 'trialSegment']
     # warnings.filterwarnings("error")
     for name, group in tdDF.groupby('amplitudeRound'):
         anomalyOccured = False
@@ -2909,11 +2909,13 @@ def getINSStimOnset(
                 )[0]
             thisElecConfig = elecConfiguration[activeGroup][activeProgram]
             #
-            firstOfTrain = (theseOnsetTimestamps ** 0).magnitude * pq.dimensionless
+            rankInTrain = (theseOnsetTimestamps ** 0).magnitude * pq.dimensionless
+            trainNPulses = (theseOnsetTimestamps ** 0).magnitude * pq.dimensionless
             theseTrialSegments = (theseOnsetTimestamps ** 0).magnitude * thisTrialSegment * pq.dimensionless
             ##############################################################################
             repeatCycles = False
             #############################
+            '''
             if repeatCycles:
                 if thisElecConfig['cyclingEnabled']:
                     thisCycleOnTime = (
@@ -2956,10 +2958,12 @@ def getINSStimOnset(
                     theseOffsetTimestamps = np.concatenate(tempOffTimes) * offTime.units
                     onsetDifferenceFromExpected = np.concatenate(tempOnDiffsE) * onTime.units
                     onsetDifferenceFromLogged = np.concatenate(tempOnDiffsL) * offTime.units
+            '''
             ##############################################################################
             if treatAsSinglePulses:
                 tempOnTimes = []
-                tempFirstOfTrain = []
+                tempRankInTrain = []
+                tempTrainNPulses = []
                 tempTrialSegs = []
                 tempOffTimes = []
                 tempOnDiffsE = []
@@ -2971,9 +2975,8 @@ def getINSStimOnset(
                         onTime, offTime,
                         interPulseInterval) * onTime.units
                     #
-                    pulseFoT = pulseOnTimes ** 0 - 1
-                    pulseFoT[0] = 1.
-                    tempFirstOfTrain.append(pulseFoT)
+                    tempRankInTrain.append(np.cumsum(pulseOnTimes ** 0))
+                    tempTrainNPulses.append(pulseOnTimes ** 0 * pulseOnTimes.size)
                     tempTrialSegs.append(
                         pulseOnTimes ** 0 * theseTrialSegments[idx])
                     #
@@ -2989,7 +2992,8 @@ def getINSStimOnset(
                 theseOffsetTimestamps = np.concatenate(tempOffTimes) * offTime.units
                 onsetDifferenceFromExpected = np.concatenate(tempOnDiffsE) * onTime.units
                 onsetDifferenceFromLogged = np.concatenate(tempOnDiffsL) * offTime.units
-                firstOfTrain = np.concatenate(tempFirstOfTrain) * pq.dimensionless
+                rankInTrain = np.concatenate(tempRankInTrain) * pq.dimensionless
+                trainNPulses = np.concatenate(tempTrainNPulses) * pq.dimensionless
                 theseTrialSegments = np.concatenate(tempTrialSegs) * pq.dimensionless
             #
             ampList = theseOnsetTimestamps ** 0 * 100 * thisAmplitude * pq.uA
@@ -3011,7 +3015,8 @@ def getINSStimOnset(
                 'group': groupList,
                 'offsetFromExpected': onsetDifferenceFromExpected,
                 'offsetFromLogged': onsetDifferenceFromLogged,
-                'firstOfTrain': firstOfTrain,
+                'rankInTrain': rankInTrain,
+                'trainNPulses': trainNPulses,
                 'trialSegment': theseTrialSegments,
                 'usedExpectedT': usedExpTList,
                 'usedSlotToDetect': usedSlotList}

@@ -271,6 +271,8 @@ else:
         print('aligning session nb {}'.format(insSessIdx))
         sessTapOptsNSP = tapDetectOptsNSP[insSessIdx]
         sessTapOptsINS = tapDetectOptsINS[insSessIdx]
+        stimTrainEdgeProportion = sessTapOptsINS.pop('stimTrainEdgeProportion', None)
+        minStimAmp = sessTapOptsINS.pop('minStimAmp', None)
         theseChanNamesNSP = [
             'seg0_' + scn
             for scn in sessTapOptsNSP['synchChanName']
@@ -363,7 +365,9 @@ else:
             nspPeakIdx = thisNspDF.index[peakIdx]
         nspPeakIdx = nspPeakIdx[sessTapOptsNSP['keepIndex']]
         nspTapTimes = thisNspDF.loc[nspPeakIdx, 't'].to_numpy()
-        print('nspTapTimes from {} to {}'.format(nspTapTimes.min(), nspTapTimes.max()))
+        print(
+            'nspTapTimes from {:.3f} to {:.3f}'.format(
+                nspTapTimes.min(), nspTapTimes.max()))
         theseChanNamesINS = [
             'seg0_' + scn
             for scn in sessTapOptsINS['synchChanName']
@@ -437,14 +441,23 @@ else:
                         coarseSt.t_stop = coarseSt.t_stop + unixDeltaT * coarseSt.t_stop.units
                         newStT = coarseSt.times.magnitude + unixDeltaT
                         coarseSt.magnitude[:] = newStT
+                        selectionMask = (coarseSt.magnitude ** 0).astype(np.bool)
                         if 'amplitude' in coarseSt.array_annotations:
                             theseAmps = coarseSt.array_annotations['amplitude']
-                            ampMask = theseAmps > sessTapOptsINS['minStimAmp']
-                            spikesToBinarize = coarseSt.times[theseAmps > sessTapOptsINS['minStimAmp']]
-                            ampNormalizers = theseAmps[theseAmps > sessTapOptsINS['minStimAmp']]
-                        else:
-                            spikesToBinarize = coarseSt.times
-                            ampNormalizers = theseAmps
+                            if minStimAmp is not None:
+                                ampMask = theseAmps > minStimAmp
+                                selectionMask = selectionMask & ampMask
+                                # spikesToBinarize = coarseSt.times[ampMask]
+                                # theseAmps = theseAmps[ampMask]
+                        if 'rankInTrain' in coarseSt.array_annotations:
+                            if stimTrainEdgeProportion is not None:
+                                rankInTrain = coarseSt.array_annotations['rankInTrain']
+                                assert 'trainNPulses' in coarseSt.array_annotations
+                                trainNPulses = coarseSt.array_annotations['trainNPulses']
+                                rankAsProportion = rankInTrain / trainNPulses
+                                rankMask = (rankAsProportion < stimTrainEdgeProportion) | (rankAsProportion > (1 - stimTrainEdgeProportion))
+                                selectionMask = selectionMask & rankMask
+                        spikesToBinarize = coarseSt.times[selectionMask]
                         thisSpikeMat = binarize(
                             spikesToBinarize,
                             sampling_rate=trigRasterSamplingRate * pq.Hz,
@@ -452,9 +465,12 @@ else:
                             t_stop=trigRaster['t'].max() * pq.s)
                         idxOfSpikes = np.flatnonzero(thisSpikeMat)
                         thisSpikeMat = thisSpikeMat.astype(np.float)
-                        thisSpikeMat[idxOfSpikes] = ampNormalizers
+                        if 'amplitude' in coarseSt.array_annotations:
+                            thisSpikeMat[idxOfSpikes] = theseAmps[selectionMask] 
                         coarseSpikeMats.append(thisSpikeMat[:, np.newaxis])
-                        # print('{}: coarseSt.times = {}'.format(coarseSt.name, coarseSt.times))
+                        print(
+                            '{}: coarseSt.times from {:.3f} to {:.3f}'.format(
+                                coarseSt.name, min(coarseSt.times), max(coarseSt.times)))
                         # print('st.times = {}'.format(st.times))
                 if not len(coarseSpikeMats) > 0:
                     print('\n\n INS {} has no stim spikes!'.format(jsonSessionNames[insSessIdx]))
@@ -462,7 +478,8 @@ else:
                     sessTapOptsINS['synchByXCorrTapDetectSignal'] = True
                     sessTapOptsNSP['synchByXCorrTapDetectSignal'] = True
                 else:
-                    trigRaster.loc[:, 'insDiracDelta'] = np.concatenate(coarseSpikeMats, axis=1).sum(axis=1)
+                    trigRaster.loc[:, 'insDiracDelta'] = np.concatenate(
+                        coarseSpikeMats, axis=1).sum(axis=1)
                     trigRaster.loc[:, 'insTrigs'] = hf.gaussianSupport(
                         support=trigRaster.set_index('t')['insDiracDelta'],
                         gaussWid=gaussWid, fs=trigRasterSamplingRate).to_numpy()
@@ -507,7 +524,7 @@ else:
                     trigRaster.loc[:, 'nspDiracDelta'] = nspDiracRaster.astype(np.float)
                 trigRaster.loc[:, 'nspTrigs'] = hf.gaussianSupport(
                     support=trigRaster.set_index('t')['nspDiracDelta'],
-                    gaussWid=gaussWid, normalize=False,
+                    gaussWid=gaussWid,
                     fs=trigRasterSamplingRate).to_numpy()
             #
             def corrAtLag(targetLag, xSrs=None, ySrs=None):

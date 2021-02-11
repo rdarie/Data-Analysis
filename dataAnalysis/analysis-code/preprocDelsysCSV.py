@@ -133,6 +133,7 @@ def preprocDelsysWrapper():
             inplace=True)
     print('Concatenating...')
     collatedData = pd.concat(collatedDataList, axis=1)
+    # TODO: fill zeros with linear interp
     collatedData.columns = [
         re.sub('[\s+]', '', re.sub(r'[^a-zA-Z]', ' ', colName).title())
         for colName in collatedData.columns

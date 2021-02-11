@@ -46,7 +46,7 @@ globals().update(allOpts)
 
 def synchronizeDelsysToNSP():
     if arguments['nspBlockPrefix'] is not None:
-        nspBlockBasename = '{}{:03d}'.format(arguments['nspBlockPrefix'], arguments['blockIdx'])
+        nspBlockBasename = '{}{:03d}'.format(arguments['nspBlockPrefix'], int(arguments['blockIdx']))
     else:
         nspBlockBasename = ns5FileName
     if arguments['nspBlockSuffix'] is not None:
@@ -57,12 +57,14 @@ def synchronizeDelsysToNSP():
         scratchFolder,
         nspBlockBasename + nspBlockSuffix + '.nix')
     # 
+    print('Loading {}...'.format(nspPath))
     nspReader, nspBlock = ns5.blockFromPath(
         nspPath, lazy=arguments['lazy'])
     #
     oePath = os.path.join(
         scratchFolder,
         ns5FileName + '_delsys.nix')
+    print('Loading {}...'.format(oePath))
     oeReader, oeBlock = ns5.blockFromPath(
         oePath, lazy=arguments['lazy'])
 
@@ -71,7 +73,8 @@ def synchronizeDelsysToNSP():
     nspSeg = nspBlock.segments[segIdx]
     oeSeg = oeBlock.segments[segIdx]
     #
-    oeSyncAsig = oeSeg.filter(name='seg0_{}'.format(synchInfo['delsysToNsp']['synchChanName']))[0]
+    delsysSynchChanName = synchInfo['delsysToNsp'][blockIdx]['synchChanName']
+    oeSyncAsig = oeSeg.filter(name='seg0_{}'.format(delsysSynchChanName))[0]
     try:
         tStart, tStop = synchInfo['delsysToNsp'][blockIdx]['timeRanges']
     except Exception:
@@ -93,7 +96,7 @@ def synchronizeDelsysToNSP():
     oeDiffUncertainty = oeSrs.diff().abs().quantile(1-1e-6) / 4
     oeThresh = (oeLims[-1] - oeLims[0]) / 2
 
-    nspSynchChanName = synchInfo['delsysToNsp'][blockIdx]['synchChanName']
+    nspSynchChanName = synchInfo['nspForDelsys'][blockIdx]['synchChanName']
     nspSyncAsig = nspSeg.filter(name='seg0_{}'.format(nspSynchChanName))[0]
     try:
         tStart, tStop = synchInfo['nspForDelsys'][blockIdx]['timeRanges']

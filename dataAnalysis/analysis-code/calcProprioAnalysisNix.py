@@ -9,12 +9,15 @@ Options:
     --lazy                                 load as neo proxy objects or no? [default: False]
     --analysisName=analysisName            append a name to the resulting blocks? [default: default]
     --sourceFilePrefix=sourceFilePrefix    Does the block have an unusual prefix
-    --insFilePrefix=insFilePrefix          Does the INS block have an unusual prefix
     --sourceFileSuffix=sourceFileSuffix    append a name to the resulting blocks?
     --rigFileSuffix=rigFileSuffix          append a name to the resulting blocks?
     --spikeFileSuffix=spikeFileSuffix      append a name to the resulting blocks?
-    --insFileSuffix=insFileSuffix          append a name to the resulting blocks? [default: ins]
     --spikeSource=spikeSource              append a name to the resulting blocks?
+    --insFilePrefix=insFilePrefix          Does the INS block have an unusual prefix
+    --insFileSuffix=insFileSuffix          append a name to the resulting blocks? [default: ins]
+    --emgFilePrefix=emgFilePrefix          Does the EMG block have an unusual prefix
+    --emgFileSuffix=emgFileSuffix          append a name to the resulting blocks? [default: delsys]
+    --hasEMG                               is there EMG data? [default: False]
     --chanQuery=chanQuery                  how to restrict channels if not providing a list? [default: fr]
     --samplingRate=samplingRate            resample the result??
     --rigOnly                              is there no INS block? [default: False]
@@ -89,6 +92,16 @@ def calcBlockAnalysisWrapper():
         insFileSuffix = '_' + arguments['insFileSuffix']
     else:
         insFileSuffix = ''
+    if arguments['hasEMG']:
+        if arguments['emgFileSuffix'] is not None:
+            emgFileSuffix = '_' + arguments['emgFileSuffix']
+        else:
+            emgFileSuffix = ''
+        if arguments['emgFilePrefix'] is not None:
+            emgBlockBaseName = ns5FileName.replace(
+                'Block', arguments['emgFilePrefix'])
+        else:
+            emgBlockBaseName = copy(ns5FileName)
     #  electrode array name (changes the prefix of the file)
     arrayName = arguments['sourceFilePrefix']
     if arguments['sourceFilePrefix'] is not None:
@@ -483,6 +496,94 @@ def calcBlockAnalysisWrapper():
     #         'seg0_position_x', 'seg0_position_y',
     #         'seg0_velocity_x', 'seg0_velocity_y']
     #
+    if arguments['hasEMG']:
+        emgPath = os.path.join(
+            scratchFolder,
+            emgBlockBaseName + emgFileSuffix + '.nix')
+        emgReader, emgBlock = ns5.blockFromPath(
+            emgPath, lazy=False,
+            reduceChannelIndexes=True)
+        emgSeg = emgBlock.segments[0]
+        emgAsigList = [
+            asig
+            for asig in emgSeg.analogsignals
+            if ('Acc' in asig.name) or ('Emg' in asig.name)
+            ]
+        for asig in emgAsigList:
+            if asig.size > 0:
+                dummyEmgAsig = asig
+                break
+        emgDF = ns5.analogSignalsToDataFrame(emgAsigList)
+        emgDF.set_index('t', inplace=True)
+        # interpolate emg analog signals
+        emgCols = [cn for cn in emgDF.columns if 'Emg' in cn]
+        accCols = [cn for cn in emgDF.columns if 'Acc' in cn]
+        highPassOpts = {
+            'high': {
+                'Wn': 10,
+                'N': 2,
+                'btype': 'high',
+                'ftype': 'bessel'
+            }
+        }
+        lowPassOptsEMG = {
+            'low': {
+                'Wn': 40,
+                'N': 2,
+                'btype': 'low',
+                'ftype': 'bessel'
+            }
+        }
+        filterCoeffsHP = hf.makeFilterCoeffsSOS(
+            highPassOpts, float(dummyEmgAsig.sampling_rate))
+        filterCoeffsLPEMG = hf.makeFilterCoeffsSOS(
+            lowPassOptsEMG, float(dummyEmgAsig.sampling_rate))
+        filteredEMG = signal.sosfiltfilt(
+            filterCoeffsHP, emgDF.loc[:, emgCols].to_numpy(),
+            axis=0)
+        filteredEMG = np.abs(filteredEMG)
+        filteredEMG = signal.sosfiltfilt(
+            filterCoeffsLPEMG, filteredEMG,
+            axis=0)
+        emgEnvColumns = [eN.replace('Emg', 'EmgEnv') for eN in emgCols]
+        emgDF.loc[:, emgEnvColumns] = filteredEMG
+        #
+        if samplingRate != dummyEmgAsig.sampling_rate:
+            if samplingRate < dummyEmgAsig.sampling_rate:
+                lowPassOpts = {
+                    'low': {
+                        'Wn': float(samplingRate),
+                        'N': 2,
+                        'btype': 'low',
+                        'ftype': 'bessel'
+                    }
+                }
+                filterCoeffs = hf.makeFilterCoeffsSOS(
+                    lowPassOpts, float(dummyInsAsig.sampling_rate))
+                if trackMemory:
+                    print('Filtering analog data before downsampling. memory usage: {:.1f} MB'.format(
+                        prf.memory_usage_psutil()))
+                # insDF.loc[:, tdChanNames] = signal.sosfiltfilt(
+                filteredAsigs = signal.sosfiltfilt(
+                    filterCoeffs, emgDF.to_numpy(),
+                    axis=0)
+                emgDF = pd.DataFrame(
+                    filteredAsigs,
+                    index=emgDF.index,
+                    columns=emgDF.columns)
+                if trackMemory:
+                    print('Just finished analog data filtering before downsampling. memory usage: {:.1f} MB'.format(
+                        prf.memory_usage_psutil()))
+            emgInterp = hf.interpolateDF(
+                emgDF, outputBlockT,
+                kind='linear', fill_value=(0, 0),
+                verbose=arguments['verbose'])
+            # free up memory used by full resolution asigs
+            del emgDF
+        else:
+            emgInterp = emgDF
+        concatList.append(emgInterp)
+
     if len(concatList) > 1:
         tdInterp = pd.concat(
             concatList,

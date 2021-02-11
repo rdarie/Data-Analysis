@@ -79,32 +79,15 @@ nspBlock = ns5.readBlockFixNames(
     signal_group_mode='split-all',
     reduceChannelIndexes=True,
     )
-print('Detecting NSP Timestamps...')
-nspChannelName = eventInfo['inputIDs']['tapSync']
 
 segIdx = 0
 nspSeg = nspBlock.segments[segIdx]
-nspSyncAsig = nspSeg.filter(name='seg0_{}'.format(nspChannelName))[0].load()
-# try:
-#     tStart, tStop = synchInfo['nsp'][blockIdx]['timeRanges']
-# except Exception:
-#     traceback.print_exc()
-#     tStart = float(nspSyncAsig.times[0] + 2 * pq.s)
-#     tStop = float(nspSyncAsig.times[-1] - 2 * pq.s)
-# nspTimeMask = hf.getTimeMaskFromRanges(
-#     nspSyncAsig.times, [(tStart, tStop)])
-nspSrs = pd.Series(nspSyncAsig.magnitude.flatten())
-nspDF = nspSrs.to_frame(name=nspChannelName)
-nspDF['t'] = nspSyncAsig.times.magnitude
-channelData = {
-    'data': nspDF,
-    't': nspDF['t']
-    }
+dummyAsig = nspSeg.filter(objects=AnalogSignalProxy)[0]
 recDateTime = pd.Timestamp(nspBlock.rec_datetime, tz='utc')
 summaryText = '<h2>{}</h2>\n'.format(nspPath)
 summaryText += '<h3>Block started {}</h3>\n'.format(
     recDateTime.tz_convert("America/New_York").strftime('%Y-%m-%d %H:%M:%S'))
-recEndTime = recDateTime + pd.Timedelta(nspDF['t'].max(), unit='s')
+recEndTime = recDateTime + pd.Timedelta(float(dummyAsig.t_stop), unit='s')
 summaryText += '<h3>Block ended {}</h3>\n<br>\n'.format(
     recEndTime.tz_convert("America/New_York").strftime('%Y-%m-%d %H:%M:%S'))
 #
@@ -152,91 +135,114 @@ if os.path.exists(listOfSummarizedPath):
             ]
         )
     )
-# nspLims = nspSrs.quantile([1e-6, 1-1e-6]).to_list()
-if arguments['usedTENSPulses']:
-    interTriggerInterval = 39.7e-3  # 20 Hz
-    minAnalogValue = 200  # mV (determined empirically)
-    nspSrs.loc[nspSrs <= minAnalogValue] = 0
-    nspPeakIdx = hf.getTriggers(
-        nspSrs, iti=interTriggerInterval, itiWiggle=.5,
-        fs=float(nspSyncAsig.sampling_rate), plotting=arguments['plotting'],
-        thres=2.58, edgeType='rising')
-else:
-    interTriggerInterval = .2
-    nspLims = [min(nspSrs), max(nspSrs)]
-    nspThresh = nspLims[0] + (nspLims[-1] - nspLims[0]) / 2
-    nspPeakIdx, nspCrossMask = hf.getThresholdCrossings(
-        nspSrs, thresh=nspThresh,
-        iti=interTriggerInterval, fs=float(nspSyncAsig.sampling_rate),
-        edgeType='both', itiWiggle=.2,
-        absVal=False, plotting=arguments['plotting'], keep_max=False)
-
-allNSPTapTimes = nspDF.loc[nspPeakIdx, 't'].to_numpy()
-
-approxTapTimes = pd.DataFrame([allNSPTapTimes]).T
-approxTapTimes.columns = ['NSP']
-tapIntervals = approxTapTimes['NSP'].diff()
-approxTapTimes['tapGroup'] = (tapIntervals > 60).cumsum()
-autoTimeRanges = {
-    'NSP': [],
-    }
-for trialSegment, group in approxTapTimes.groupby('tapGroup'):
-    firstNSPTap = (
-        recDateTime +
-        pd.Timedelta(int(group['NSP'].min() * 1e3), unit='milli'))
-    summaryText += (
-        '<h3>Segment {} started: '.format(trialSegment) +
-        firstNSPTap.strftime('%Y-%m-%d %H:%M:%S') +
-        ' (t = {:.3f} sec)</h3>\n'.format(group['NSP'].min()))
-    if trialSegment == approxTapTimes['tapGroup'].max():
-        lastNSPTime = (
-            recDateTime +
-            pd.Timedelta(int(nspDF['t'].max() * 1e3), unit='milli'))
+if 'tapSync' in eventInfo['inputIDs']:
+    print('Detecting NSP Tap Timestamps...')
+    nspChannelName = eventInfo['inputIDs']['tapSync']
+    nspSyncAsig = nspSeg.filter(name='seg0_{}'.format(nspChannelName))[0].load()
+    # try:
+    #     tStart, tStop = synchInfo['nsp'][blockIdx]['timeRanges']
+    # except Exception:
+    #     traceback.print_exc()
+    #     tStart = float(nspSyncAsig.times[0] + 2 * pq.s)
+    #     tStop = float(nspSyncAsig.times[-1] - 2 * pq.s)
+    # nspTimeMask = hf.getTimeMaskFromRanges(
+    #     nspSyncAsig.times, [(tStart, tStop)])
+    nspSrs = pd.Series(nspSyncAsig.magnitude.flatten())
+    nspDF = nspSrs.to_frame(name=nspChannelName)
+    nspDF['t'] = nspSyncAsig.times.magnitude
+    channelData = {
+        'data': nspDF,
+        't': nspDF['t']
+        }
+    # nspLims = nspSrs.quantile([1e-6, 1-1e-6]).to_list()
+    if arguments['usedTENSPulses']:
+        interTriggerInterval = 39.7e-3  # 20 Hz
+        minAnalogValue = 200  # mV (determined empirically)
+        nspSrs.loc[nspSrs <= minAnalogValue] = 0
+        nspPeakIdx = hf.getTriggers(
+            nspSrs, iti=interTriggerInterval, itiWiggle=.5,
+            fs=float(nspSyncAsig.sampling_rate), plotting=arguments['plotting'],
+            thres=2.58, edgeType='rising')
     else:
-        nextGroup = approxTapTimes.loc[(approxTapTimes['tapGroup'] == trialSegment + 1), :]
-        lastNSPTime = recDateTime + pd.Timedelta(int(nextGroup['NSP'].min() * 1e3), unit='milli')
-    segDur = lastNSPTime - firstNSPTap
-    summaryText += (
-        '<h3>             ended: '.format(trialSegment) +
-        lastNSPTime.strftime('%Y-%m-%d %H:%M:%S') +
-        ' (lasted up to {} sec)</h3>\n'.format(segDur.total_seconds()))
+        interTriggerInterval = .2
+        nspLims = [min(nspSrs), max(nspSrs)]
+        nspThresh = nspLims[0] + (nspLims[-1] - nspLims[0]) / 2
+        nspPeakIdx, nspCrossMask = hf.getThresholdCrossings(
+            nspSrs, thresh=nspThresh,
+            iti=interTriggerInterval, fs=float(nspSyncAsig.sampling_rate),
+            edgeType='both', itiWiggle=.2,
+            absVal=False, plotting=arguments['plotting'], keep_max=False)
+
+    allNSPTapTimes = nspDF.loc[nspPeakIdx, 't'].to_numpy()
+
+    approxTapTimes = pd.DataFrame([allNSPTapTimes]).T
+    approxTapTimes.columns = ['NSP']
+    tapIntervals = approxTapTimes['NSP'].diff()
+    approxTapTimes['tapGroup'] = (tapIntervals > 60).cumsum()
+    autoTimeRanges = {
+        'NSP': [],
+        }
+    for trialSegment, group in approxTapTimes.groupby('tapGroup'):
+        firstNSPTap = (
+            recDateTime +
+            pd.Timedelta(int(group['NSP'].min() * 1e3), unit='milli'))
+        summaryText += (
+            '<h3>Segment {} started: '.format(trialSegment) +
+            firstNSPTap.strftime('%Y-%m-%d %H:%M:%S') +
+            ' (t = {:.3f} sec)</h3>\n'.format(group['NSP'].min()))
+        if trialSegment == approxTapTimes['tapGroup'].max():
+            lastNSPTime = (
+                recDateTime +
+                pd.Timedelta(int(nspDF['t'].max() * 1e3), unit='milli'))
+        else:
+            nextGroup = approxTapTimes.loc[(approxTapTimes['tapGroup'] == trialSegment + 1), :]
+            lastNSPTime = recDateTime + pd.Timedelta(int(nextGroup['NSP'].min() * 1e3), unit='milli')
+        segDur = lastNSPTime - firstNSPTap
+        summaryText += (
+            '<h3>             ended: '.format(trialSegment) +
+            lastNSPTime.strftime('%Y-%m-%d %H:%M:%S') +
+            ' (lasted up to {} sec)</h3>\n'.format(segDur.total_seconds()))
 #### impedances
 impedanceFilePath = os.path.join(
     remoteBasePath,
     '{}_blackrock_impedances.h5'.format(subjectName))
-impedances = prb_meta.getLatestImpedance(
-    block=nspBlock, impedanceFilePath=impedanceFilePath)
-impedances.sort_values('impedance')
-summaryText += impedances.to_html()
+if os.path.exists(impedanceFilePath):
+    impedances = prb_meta.getLatestImpedance(
+        block=nspBlock, impedanceFilePath=impedanceFilePath)
+    impedances.sort_values('impedance')
+    summaryText += impedances.to_html()
 #### problem channel id
-segIdx = 0
-problemChannelsList = []
-problemThreshold = 4e3
-targetQuantile = 0.99
-summaryText += (
-    '<h3>.95 voltage intervals:</h3>\n<p>\n'
-    .format(2 * problemThreshold))
-for asigP in nspBlock.segments[segIdx].analogsignals:
-    chName = asigP.channel_index.name
-    if 'ainp' not in chName:
-        print('    Loading {}'.format(chName))
-        lastT = min((spikeSortingOpts['utah']['previewOffset'] + spikeSortingOpts['utah']['previewDuration']) * pq.s,  asigP.t_stop)
-        firstT = max(spikeSortingOpts['utah']['previewOffset'] * pq.s,  asigP.t_start)
-        tempAsig = asigP.load(time_slice=[firstT, lastT])
-        sigLims = np.quantile(
-            tempAsig, [
-                (1 - targetQuantile) / 2,
-                (1 + targetQuantile) / 2
-                ])
-        thisTextRow = (
-            '{}: {:.1f} uV to {:.1f} uV <br>\n'
-            .format(chName, sigLims[0], sigLims[1]))
-        if (sigLims[0] < -1 * problemThreshold) and (sigLims[1] > problemThreshold):
-            problemChannelsList.append(chName)
-            thisTextRow = '<b>' + thisTextRow.replace('<br>', '</b><br>')
-        summaryText += thisTextRow
-summaryText += ('</p>\n<h3>List view: </h3>\n')
-summaryText += '{}\n'.format(problemChannelsList)
+try:
+    segIdx = 0
+    problemChannelsList = []
+    problemThreshold = 4e3
+    targetQuantile = 0.99
+    summaryText += (
+        '<h3>.95 voltage intervals:</h3>\n<p>\n'
+        .format(2 * problemThreshold))
+    for asigP in nspBlock.segments[segIdx].analogsignals:
+        chName = asigP.channel_index.name
+        if 'ainp' not in chName:
+            print('    Loading {}'.format(chName))
+            lastT = min((spikeSortingOpts['utah']['previewOffset'] + spikeSortingOpts['utah']['previewDuration']) * pq.s,  asigP.t_stop)
+            firstT = max(spikeSortingOpts['utah']['previewOffset'] * pq.s,  asigP.t_start)
+            tempAsig = asigP.load(time_slice=[firstT, lastT])
+            sigLims = np.quantile(
+                tempAsig, [
+                    (1 - targetQuantile) / 2,
+                    (1 + targetQuantile) / 2
+                    ])
+            thisTextRow = (
+                '{}: {:.1f} uV to {:.1f} uV <br>\n'
+                .format(chName, sigLims[0], sigLims[1]))
+            if (sigLims[0] < -1 * problemThreshold) and (sigLims[1] > problemThreshold):
+                problemChannelsList.append(chName)
+                thisTextRow = '<b>' + thisTextRow.replace('<br>', '</b><br>')
+            summaryText += thisTextRow
+    summaryText += ('</p>\n<h3>List view: </h3>\n')
+    summaryText += '{}\n'.format(problemChannelsList)
+except Exception:
+    traceback.print_exc()
 approxTimesPath = os.path.join(
     scratchFolder,
     '{}_{}_NS5_Preview.html'.format(

@@ -21,18 +21,21 @@ def getExpOpts():
         'forceX': 'ainp14',
         'forceY': 'ainp15',
         'tapSync': 'ainp1',
+        'delsysSynch': 'ainp2',
         }
     miniRCRigInputs = {
         'tapSync': 'ainp1',
         'simiTrigs': 'ainp16',
         'forceX': 'ainp14',
         'forceY': 'ainp15',
+        'delsysSynch': 'ainp2',
         }
     RCRigInputs = {
         'tapSync': 'ainp1',
         'kinectSync': 'ainp16',
         'forceX': 'ainp14',
         'forceY': 'ainp15',
+        'delsysSynch': 'ainp2',
         }
     experimentName = '202102081100-Rupert'
     deviceName = 'DeviceNPC700246H'

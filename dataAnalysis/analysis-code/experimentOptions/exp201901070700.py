@@ -1,21 +1,19 @@
+import numpy as np
+
 def getExpOpts():
     #
-    miniRCBlockLookup = {
-        1: False,
-        2: False,
-        3: False,
-        4: False
+    blockExperimentTypeLookup = {
+        1: 'proprio-RC',
+        2: 'proprio-RC',
+        3: 'proprio-RC',
+        4: 'proprio-RC',
         }
-    RCBlockLookup = {
-        1: True,
-        2: True,
-        3: True,
-        4: True
+    RCRigInputs = {
+        'kinectSync': 'ainp16',
         }
-         
-
     experimentName = '201901070700-Proprio'
     deviceName = 'DeviceNPC700373H'
+    subjectName = 'Murdoc'
     
     jsonSessionNames = {
         #  per trial
@@ -52,12 +50,12 @@ def getExpOpts():
         4: [1],
     }
     #
-    openEphysBaseNames = {i: 'Block{:0>3}_EMG'.format(i) for i in RCBlockLookup.keys()}
+    openEphysBaseNames = {i: 'Block{:0>3}_EMG'.format(i) for i in blockExperimentTypeLookup.keys()}
     RCBlockInfo = {'oe': {}, 'ins': {}, 'nsp': {}}
     #  discard first n seconds
     RCBlockInfo['oe']['discardTime'] = {
         i: None
-        for i in RCBlockLookup.keys()}
+        for i in blockExperimentTypeLookup.keys()}
 
     synchInfo = {'oe': {}, 'ins': {}, 'nsp': {}}
     #  options for automatic tap detection on ins data
@@ -241,4 +239,46 @@ def getExpOpts():
         [188, 1060],
         [0, 890]
         ]
+    spikeSortingOpts = {
+        'utah': {
+            'asigNameList': [
+                [
+                    'elec{:d}'.format(i)
+                    for i in range(1, 97)]
+                ],
+            'ainpNameList': [
+                'ainp{:d}'.format(i)
+                for i in range(1, 17)
+            ],
+            'electrodeMapPath': './Utah_SN6251_002374_Rupert.cmp',
+            'rawBlockName': 'Block',
+            ############################################################
+            'excludeChans': [],  # CHECK
+            'prbOpts': dict(
+                contactSpacing=400,
+                groupIn={
+                    'xcoords': np.arange(-.1, 10.1, 1),
+                    'ycoords': np.arange(-.1, 10.1, 1)}),
+            'previewDuration': 300,
+            'previewOffset': 0,
+            'interpolateOutliers': True,
+            'outlierThreshold': 1 - 1e-6,
+            'shape_distance_threshold': None,
+            'shape_boundary_threshold': None,
+            'energy_reduction_threshold': 0.25,
+            'make_classifier': True,
+            'refit_projector': True,
+            'n_max_peeler_passes': 2,
+            'confidence_threshold': .5,
+            'refractory_period': 2e-3,
+            'triFolderSource': {
+                'exp': experimentName, 'block': 3,
+                'nameSuffix': 'spike_preview'},
+            'triFolderDest': [
+                {
+                    'exp': experimentName, 'block': i,
+                    'nameSuffix': 'mean_subtracted'}
+                for i in [1, 2, 3]]
+        }
+    }
     return locals()

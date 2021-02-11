@@ -20,18 +20,21 @@ def getExpOpts():
         'forceX': 'ainp14',
         'forceY': 'ainp15',
         'tapSync': 'ainp1',
+        'delsysSynch': 'ainp2',
         }
     miniRCRigInputs = {
         'tapSync': 'ainp1',
         'simiTrigs': 'ainp16',
         'forceX': 'ainp14',
         'forceY': 'ainp15',
+        'delsysSynch': 'ainp2',
         }
     RCRigInputs = {
         'tapSync': 'ainp1',
         'kinectSync': 'ainp16',
         'forceX': 'ainp14',
         'forceY': 'ainp15',
+        'delsysSynch': 'ainp2',
         }
     experimentName = '202102101100-Rupert'
     deviceName = 'DeviceNPC700246H'
@@ -61,10 +64,11 @@ def getExpOpts():
                 'timeRanges': None,
                 'synchChanName': ['ins_td0', 'ins_td2'],
                 'synchStimUnitName': ['g0p0#0'],
+                'stimTrainEdgeProportion': .2,
+                'minStimAmp': 0,
                 'synchByXCorrTapDetectSignal': False,
                 'xCorrSamplingRate': None,
-                'xCorrGaussWid': 10e-3,
-                'minStimAmp': 0,
+                'xCorrGaussWid': 20e-3,
                 'unixTimeAdjust': None,
                 'thres': 5,
                 'iti': 10e-3,
@@ -88,7 +92,7 @@ def getExpOpts():
                 'synchChanName': ['utah_artifact_0'], 'iti': 10e-3,
                 'synchByXCorrTapDetectSignal': False,
                 'unixTimeAdjust': None,
-                'minAnalogValue': None, 'thres': 7}
+                'minAnalogValue': None, 'thres': 4}
             for j, sessionName in enumerate(jsonSessionNames[i])
             }
         for i in jsonSessionNames.keys()

@@ -10,11 +10,11 @@
 #SBATCH --mem=127G
 
 # Specify a job name:
-#SBATCH -J ins_preproc_2021_01_28
+#SBATCH -J ins_preproc_2021_02_04
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-ins_preproc_2021_01_28.out
-#SBATCH -e ../../batch_logs/%j-%a-ins_preproc_2021_01_28.out
+#SBATCH -o ../../batch_logs/%j-%a-ins_preproc_2021_02_04.out
+#SBATCH -e ../../batch_logs/%j-%a-ins_preproc_2021_02_04.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -37,7 +37,7 @@ python --version
 # EXP="exp202101221100"
 # EXP="exp202101251100"
 # EXP="exp202101271100"
-EXP="exp202101281100"
+# EXP="exp202101281100"
 EXP="exp202102041100"
 # EXP="exp202102081100"
 # EXP="exp202102101100"

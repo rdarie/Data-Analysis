@@ -43,7 +43,8 @@ def getExpOpts():
     jsonSessionNames = {
         #  per block
         1: [
-            'Session1612457685082', 'Session1612457976582', 'Session1612458137820',
+            'Session1612457685082', 'Session1612457976582',
+            'Session1612458137820',
             'Session1612458942642', 'Session1612459720423',
             'Session1612459939584'],
         }
@@ -63,9 +64,10 @@ def getExpOpts():
                 'timeRanges': None,
                 'synchChanName': ['ins_td0', 'ins_td2'],
                 'synchStimUnitName': ['g0p0#0'],
+                'stimTrainEdgeProportion': .2,
                 'synchByXCorrTapDetectSignal': False,
                 'xCorrSamplingRate': None,
-                'xCorrGaussWid': 15e-3,
+                'xCorrGaussWid': 20e-3,
                 'minStimAmp': 0,
                 'unixTimeAdjust': None,
                 'thres': 5,
@@ -98,7 +100,7 @@ def getExpOpts():
     ############################################################
     ############################################################
     # manually add special instructions, e.g
-    # synchInfo['nsp'][1][0].update({'thres': 6, 'timeRanges': [(110, 130)]})
+    synchInfo['nsp'][1][0].update({'thres': 3})
     #
     #
     ############################################################
