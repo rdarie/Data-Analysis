@@ -29,19 +29,22 @@ conda activate
 source activate nda2
 python --version
 
-EXP="exp202101141100"
+# EXP="exp202101141100"
 # EXP="exp202101191100"
 # EXP="exp202101201100"
 # EXP="exp202101211100"
 # EXP="exp202101221100"
 # EXP="exp202101251100"
 # EXP="exp202101271100"
-# EXP="exp202101281100"
+EXP="exp202101281100"
+EXP="exp202102041100"
+EXP="exp202102081100"
+EXP="exp202102101100"
 
 # python -u ./previewINSSessionSummary.py --exp=$EXP
-python -u ./saveImpedances.py --exp=$EXP --processAll --reprocess
+# python -u ./saveImpedances.py --exp=$EXP --processAll --reprocess
 
-# for BLOCKIDX in 1 2 3
-# do
-#     python -u './previewNSPTapTimes.py' --blockIdx=$BLOCKIDX --exp=$EXP --usedTENSPulses
-# done
+for BLOCKIDX in 1
+do
+    python -u './previewNSPTapTimes.py' --blockIdx=$BLOCKIDX --exp=$EXP --usedTENSPulses
+done

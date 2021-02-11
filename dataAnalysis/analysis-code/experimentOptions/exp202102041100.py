@@ -4,8 +4,6 @@ import numpy as np
 def getExpOpts():
     blockExperimentTypeLookup = {
         1: 'proprio-miniRC',
-        2: 'proprio',
-        3: 'proprio-motionOnly',
         }
     fullRigInputs = {
         'A+': 'ainp12',
@@ -22,38 +20,41 @@ def getExpOpts():
         'forceX': 'ainp14',
         'forceY': 'ainp15',
         'tapSync': 'ainp1',
+        'delsysSynch': 'ainp2',
         }
     miniRCRigInputs = {
         'tapSync': 'ainp1',
+        'delsysSynch': 'ainp2',
         'simiTrigs': 'ainp16',
         'forceX': 'ainp14',
         'forceY': 'ainp15',
         }
     RCRigInputs = {
         'tapSync': 'ainp1',
+        'delsysSynch': 'ainp2',
         'kinectSync': 'ainp16',
         'forceX': 'ainp14',
         'forceY': 'ainp15',
         }
-    experimentName = '202101281100-Rupert'
+    experimentName = '202102041100-Rupert'
     deviceName = 'DeviceNPC700246H'
     subjectName = 'Rupert'
     #
     jsonSessionNames = {
         #  per block
         1: [
-            'Session1611851045712', 'Session1611851119278',
-            'Session1611851334376'
-            ],
-        2: [
-            'Session1611851887132', 'Session1611852925167',
-            'Session1611853488545'
-            ],
-        3: [
-            'Session1611854079418', 'Session1611854145204'
-            ]
+            'Session1612457685082', 'Session1612457976582', 'Session1612458137820',
+            'Session1612458942642', 'Session1612459720423',
+            'Session1612459939584'],
         }
-    synchInfo = {'nform': {}, 'nsp': {}, 'ins': {}}
+    synchInfo = {'nform': {}, 'nsp': {}, 'ins': {}, 'nspForDelsys': {}, 'delsysToNsp': {}}
+    for blockIdx in jsonSessionNames.keys():
+        synchInfo['nspForDelsys'][blockIdx] = {
+            'synchChanName': 'ainp2'
+            }
+        synchInfo['delsysToNsp'][blockIdx] = {
+            'synchChanName': 'AnalogInputAdapterAnalog'
+        }
     # populate with defaults
     for blockIdx in jsonSessionNames.keys():
         synchInfo['ins'][blockIdx] = {}
@@ -64,7 +65,7 @@ def getExpOpts():
                 'synchStimUnitName': ['g0p0#0'],
                 'synchByXCorrTapDetectSignal': False,
                 'xCorrSamplingRate': None,
-                'xCorrGaussWid': 10e-3,
+                'xCorrGaussWid': 15e-3,
                 'minStimAmp': 0,
                 'unixTimeAdjust': None,
                 'thres': 5,
@@ -89,7 +90,7 @@ def getExpOpts():
                 'synchChanName': ['utah_artifact_0'], 'iti': 10e-3,
                 'synchByXCorrTapDetectSignal': False,
                 'unixTimeAdjust': None,
-                'minAnalogValue': None, 'thres': 7}
+                'minAnalogValue': None, 'thres': 4}
             for j, sessionName in enumerate(jsonSessionNames[i])
             }
         for i in jsonSessionNames.keys()
@@ -97,7 +98,7 @@ def getExpOpts():
     ############################################################
     ############################################################
     # manually add special instructions, e.g
-    # synchInfo['nsp'][2][0].update({'timeRanges': [(40, 9999)]})
+    synchInfo['nsp'][1][0].update({'thres': 6, 'timeRanges': [(110, 130)]})
     #
     #
     ############################################################
@@ -131,7 +132,7 @@ def getExpOpts():
         }}
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        '202101281100-Rupert': [2],
+        '202102041100-Rupert': [2],
         }
     # Options relevant to the classifcation of proprio trials
     movementSizeBins = [0, 0.6, 1]

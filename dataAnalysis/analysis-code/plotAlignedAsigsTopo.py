@@ -28,6 +28,7 @@ Options:
     --styleControl=styleControl                          styles to exclude from stats test
     --groupPagesBy=groupPagesBy                          break down each page
     --amplitudeFieldName=amplitudeFieldName              what is the amplitude named? [default: nominalCurrent]
+    --noStim                                             process entire experimental day? [default: False]
 """
 
 import matplotlib
@@ -134,13 +135,20 @@ alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = (
     ash.processUnitQueryArgs(
         namedQueries, analysisSubFolder, **arguments))
 #
+if arguments['noStim']:
+    alignedAsigsKWargs.update(dict(
+        duplicateControlsByProgram=False,
+        makeControlProgram=False,
+        metaDataToCategories=False))
+else:
+    alignedAsigsKWargs.update(dict(
+        duplicateControlsByProgram=True,
+        makeControlProgram=True,
+        metaDataToCategories=False))
+#
 alignedAsigsKWargs.update(dict(
-    duplicateControlsByProgram=False,
-    makeControlProgram=False,
-    metaDataToCategories=False,
-    removeFuzzyName=False,
     getMetaData=[
-        'RateInHz', 'feature', 'electrode',
+        'RateInHz', 'feature', 'electrode', 'program',
         arguments['amplitudeFieldName'],
         'stimCat', 'originalIndex', 'segment', 't'],
     transposeToColumns='bin', concatOn='index'))
@@ -222,8 +230,8 @@ mapSpecificPlotProcFuns = {
         asp.genTicksToScale(
             lineOpts={'lw': 1}, shared=sharedYAxes,
             xUnitFactor=1e3, xUnits='msec',
-            # yUnitFactor=1e3, yUnits='uA/mm^3',
-            yUnitFactor=1, yUnits='uV',
+            yUnitFactor=1e3, yUnits='uA/mm^3',
+            # yUnitFactor=1, yUnits='uV',
             )
         ]}
 addSpacesFromMap = True

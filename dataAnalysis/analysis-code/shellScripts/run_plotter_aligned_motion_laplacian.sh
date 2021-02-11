@@ -22,7 +22,8 @@
 # Request custom resources
 #SBATCH --array=1,2,3
 
-SLURM_ARRAY_TASK_ID=2
+SLURM_ARRAY_TASK_ID=3
 source ./shellScripts/run_plotter_aligned_motion_preamble.sh
 
-python3 -u './plotAlignedAsigsV1.py' --inputBlockSuffix="laplacian" --unitQuery="lfp" --enableOverrides --exp=$EXP $BLOCKSELECTOR $ANALYSISFOLDER $WINDOW $ALIGNQUERY $ALIGNFOLDER $TIMEWINDOWOPTS $STATSOVERLAY $OUTLIERMASK $HUEOPTS $ROWOPTS $COLOPTS $STYLEOPTS $SIZEOPTS $PAGELIMITS $OTHERASIGOPTS
+python -u './plotAlignedAsigsTopo.py' --inputBlockSuffix="kcsd" --unitQuery="lfp" --amplitudeFieldName=amplitude --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --groupPagesBy="electrode, RateInHz" $HUEOPTS $OUTLIERMASK
+# python -u './plotAlignedAsigsV1.py' --inputBlockSuffix="kcsd" --unitQuery="lfp" --enableOverrides --exp=$EXP $BLOCKSELECTOR $ANALYSISFOLDER $WINDOW $ALIGNQUERY $ALIGNFOLDER $TIMEWINDOWOPTS $STATSOVERLAY $OUTLIERMASK $HUEOPTS $ROWOPTS $COLOPTS $STYLEOPTS $SIZEOPTS $PAGELIMITS $OTHERASIGOPTS

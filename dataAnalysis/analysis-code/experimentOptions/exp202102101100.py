@@ -4,8 +4,6 @@ import numpy as np
 def getExpOpts():
     blockExperimentTypeLookup = {
         1: 'proprio-miniRC',
-        2: 'proprio',
-        3: 'proprio-motionOnly',
         }
     fullRigInputs = {
         'A+': 'ainp12',
@@ -35,27 +33,28 @@ def getExpOpts():
         'forceX': 'ainp14',
         'forceY': 'ainp15',
         }
-    experimentName = '202101281100-Rupert'
+    experimentName = '202102101100-Rupert'
     deviceName = 'DeviceNPC700246H'
     subjectName = 'Rupert'
     #
     jsonSessionNames = {
         #  per block
         1: [
-            'Session1611851045712', 'Session1611851119278',
-            'Session1611851334376'
-            ],
-        2: [
-            'Session1611851887132', 'Session1611852925167',
-            'Session1611853488545'
-            ],
-        3: [
-            'Session1611854079418', 'Session1611854145204'
-            ]
+            'Session1612976543082', 'Session1612976697929',
+            'Session1612976871046', 'Session1612977048329',
+            'Session1612977255857', 'Session1612977491225'],
         }
-    synchInfo = {'nform': {}, 'nsp': {}, 'ins': {}}
+    synchInfo = {
+        'nform': {}, 'nsp': {}, 'ins': {}, 'nspForDelsys': {}, 'delsysToNsp': {}}
+    for blockIdx in blockExperimentTypeLookup.keys():
+        synchInfo['nspForDelsys'][blockIdx] = {
+            'synchChanName': 'ainp2'
+            }
+        synchInfo['delsysToNsp'][blockIdx] = {
+            'synchChanName': 'AnalogInputAdapterAnalog'
+        }
     # populate with defaults
-    for blockIdx in jsonSessionNames.keys():
+    for blockIdx in blockExperimentTypeLookup.keys():
         synchInfo['ins'][blockIdx] = {}
         for idx, sessionName in enumerate(jsonSessionNames[blockIdx]):
             synchInfo['ins'][blockIdx][idx] = {
@@ -131,7 +130,7 @@ def getExpOpts():
         }}
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        '202101281100-Rupert': [2],
+        '202102101100-Rupert': [1],
         }
     # Options relevant to the classifcation of proprio trials
     movementSizeBins = [0, 0.6, 1]

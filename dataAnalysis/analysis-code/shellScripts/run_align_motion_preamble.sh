@@ -22,6 +22,11 @@ WINDOW="--window=M"
 ANALYSISFOLDER="--analysisName=default"
 # ANALYSISFOLDER="--analysisName=fullRes"
 
+SIGNALFOLDER="--signalSubfolder=default"
+# SIGNALFOLDER="--signalSubfolder=normalizedByImpedance"
+
+EVENTFOLDER="--eventSubfolder=None"
+
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
 # BLOCKSELECTOR="--processAll"
 

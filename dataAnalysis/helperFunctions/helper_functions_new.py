@@ -3772,15 +3772,15 @@ def plotCorrSynchReport(
         lPFForSP, shiftedProduct.to_numpy())
     ax[2].plot(
         _trigRaster['t'],
-        _trigRaster['nspTrigs'], c='tab:blue')
+        _trigRaster['nspTrigs'], c='b')
     nspTargetMask = _trigRaster['nspDiracDelta'] > 0
     if nspTargetMask.any():
         ax[2].plot(
             _trigRaster.loc[nspTargetMask, 't'],
-            _trigRaster.loc[nspTargetMask, 'nspTrigs'], 'o', c='tab:purple', label='NSP impulses')
+            _trigRaster.loc[nspTargetMask, 'nspTrigs'], 'o', c='tab:blue', label='NSP impulses')
     ax[2].plot(
         _trigRaster['t'],
-        shiftedInsTrig, c='tab:orange')
+        shiftedInsTrig, ls='--', c='r')
     insTargetMask = shiftedInsImpulse > 0
     if insTargetMask.any():
         defaultMarkerSize = matplotlib.rcParams['lines.markersize']
@@ -3788,13 +3788,15 @@ def plotCorrSynchReport(
             _trigRaster.loc[insTargetMask, 't'],
             shiftedInsTrig.loc[insTargetMask], 'd', c='tab:red', label='INS impulses (shifted)',
             markersize=defaultMarkerSize / 2)
-    ax[2].plot(_trigRaster['t'], shiftedProduct, c='tab:green', label='elementwise product of trigs')
+    ax[2].plot(
+        _trigRaster['t'], shiftedProduct, c='tab:green', label='elementwise product of trigs')
     ax[2].set_xlabel('NSP time (sec)')
     ax[2].set_ylabel('A.U.')
     listOfLegends.append(ax[2].legend(loc='upper right'))
     prodAx = ax[2].twinx()
     prodAx.plot(_trigRaster['t'], lowPassShiftedProduct, c='tab:olive', label='elementwise product of trigs (1 hz low pass)')
     prodAx.set_yticks([])
+    ax[2].set_ylim([-0.1, 1.2])
     listOfLegends.append(prodAx.legend(loc='lower right'))
     figSaveOpts = dict(
         bbox_extra_artists=listOfLegends,

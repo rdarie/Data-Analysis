@@ -45,15 +45,19 @@ expOpts, allOpts = parseAnalysisOptions(
     arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
-
+import glob
 import line_profiler
 import atexit
 
-#  profile = line_profiler.LineProfiler()
-#  atexit.register(profile.print_stats)
 
 delsysPath = os.path.join(
     nspFolder, ns5FileName + '.csv')
+if not os.path.exists(delsysPath):
+    searchStr = os.path.join(nspFolder, '*' + ns5FileName + '*.csv')
+    altSearchStr = os.path.join(nspFolder, '*' + 'Block{:0>4}'.format(blockIdx) + '*.csv')
+    delsysPathCandidates = glob.glob(searchStr) + glob.glob(altSearchStr)
+    assert len(delsysPathCandidates) == 1
+    delsysPath = delsysPathCandidates[0]
 
 
 def preprocDelsysWrapper():

@@ -1111,6 +1111,7 @@ def alignedAsigsToDF(
                 )
             uniqProgs = stimWaveforms[programColumn].unique()
             progElecLookup = {}
+            # pdb.set_trace()
             for progIdx in uniqProgs:
                 theseStimDF = stimWaveforms.loc[
                     stimWaveforms[programColumn] == progIdx,
@@ -1417,6 +1418,8 @@ def getAsigsAlignedToEvents(
             purgeNixNames=False,
             nixBlockIdx=0, nixSegIdx=allSegs)
     else:
+        if os.path.exists(triggeredPath):
+            os.remove(triggeredPath)
         masterBlock = purgeNixAnn(masterBlock)
         writer = NixIO(filename=triggeredPath)
         writer.write_block(masterBlock, use_obj_names=True)
@@ -2279,7 +2282,7 @@ def readBlockFixNames(
 def loadSpikeTrainList(
         dataBlock, listOfSpikeTrainNames=None,
         replaceInParents=True):
-    listOfSpikeTrains = None
+    listOfSpikeTrains = []
     if listOfSpikeTrainNames is None:
         listOfSpikeTrainNames = [
             stp.name
@@ -2835,10 +2838,13 @@ def preprocBlockToNix(
     block.segments = [newSeg]
     block, nixblock = writer.write_block_meta(block)
     # descend into Segments
-    if normalizeByImpedance:
-        impedances = prb_meta.getLatestImpedance(
-            block=block, impedanceFilePath=impedanceFilePath)
-        averageImpedance = impedances['impedance'].median()
+    if impedanceFilePath is not None:
+        try:
+            impedances = prb_meta.getLatestImpedance(
+                block=block, impedanceFilePath=impedanceFilePath)
+            averageImpedance = impedances['impedance'].median()
+        except Exception:
+            traceback.print_exc()
     # for segIdx, seg in enumerate(oldSegList):
     if spikeBlock is not None:
         spikeSeg = spikeBlock.segments[0]
@@ -3372,21 +3378,26 @@ def preprocBlockToNix(
             #  link AnalogSignal and ID providing channel_index
             asig.channel_index = chanIdx
             #  perform requested preproc operations
-            if normalizeByImpedance and (aSigProxy not in ainpList):
+            if 'impedances' in locals():
                 elNmMatchMsk = impedances['elec'] == chanIdx.name
-                '''
-                asig.magnitude[:] = (
-                    (asig.magnitude - np.median(asig.magnitude)) /
-                    np.min(
+                if elNmMatchMsk.any():
+                    originalImpedance = np.min(
                         impedances.loc[elNmMatchMsk, 'impedance']
                         )
-                    )
-                '''
-                asig.magnitude[:] = (
-                    (asig.magnitude) * averageImpedance /
-                    np.min(
-                        impedances.loc[elNmMatchMsk, 'impedance']
-                        ))
+                    asig.annotations['originalImpedance'] = originalImpedance
+                    if normalizeByImpedance and (aSigProxy not in ainpList):
+                        '''
+                        asig.magnitude[:] = (
+                            (asig.magnitude - np.median(asig.magnitude)) /
+                            np.min(
+                                impedances.loc[elNmMatchMsk, 'impedance']
+                                )
+                            )
+                        '''
+                        print('Normalizing {} by {} kOhms'.format(asig.name, originalImpedance))
+                        asig.magnitude[:] = (
+                            (asig.magnitude * averageImpedance) / originalImpedance
+                            )
             if fillOverflow:
                 # fill in overflow:
                 asig.magnitude[:], _ = hf.fillInOverflow2(
@@ -3404,7 +3415,7 @@ def preprocBlockToNix(
                 badData.update(newBadData)
                 '''
                 pass
-            if removeMeanAcross and (aSigProxy not in ainpList):
+            if calcAverageLFP and (aSigProxy not in ainpList):
                 for k, cols in meanGroups.items():
                     if asig.name in cols:
                         whichColumnToSubtract = k
@@ -3431,10 +3442,11 @@ def preprocBlockToNix(
                     ax.legend()
                     plt.show()
                 ###
-                asig.magnitude[:] = np.atleast_2d(
-                    asig.magnitude.flatten() - noiseTerm).transpose()
-                asig.magnitude[:] = (
-                    asig.magnitude - np.median(asig.magnitude))
+                if removeMeanAcross:
+                    asig.magnitude[:] = np.atleast_2d(
+                        asig.magnitude.flatten() - noiseTerm).transpose()
+                    # asig.magnitude[:] = (
+                    #     asig.magnitude - np.median(asig.magnitude))
             if (LFPFilterOpts is not None) and (aSigProxy not in ainpList):
                 asig.magnitude[:] = filterFun(asig, filterCoeffs=filterCoeffs)
             if (interpolateOutliers) and (aSigProxy not in ainpList) and (not outlierRemovalDebugFlag):

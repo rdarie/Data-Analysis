@@ -10,11 +10,11 @@
 #SBATCH --mem=32G
 
 # Specify a job name:
-#SBATCH -J ins_synch_2021_01_19
+#SBATCH -J ins_synch_2021_02_04
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-ins_synch_2021_01_19.out
-#SBATCH -e ../../batch_logs/%j-%a-ins_synch_2021_01_19.out
+#SBATCH -o ../../batch_logs/%j-%a-ins_synch_2021_02_04.out
+#SBATCH -e ../../batch_logs/%j-%a-ins_synch_2021_02_04.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -34,11 +34,15 @@ python --version
 # EXP="exp202101221100"
 # EXP="exp202101251100"
 # EXP="exp202101271100"
-EXP="exp202101281100"
+# EXP="exp202101281100"
+EXP="exp202102041100"
+# EXP="exp202102081100"
+# EXP="exp202102101100"
 
 BLOCKSELECTOR=""
 # BLOCKSELECTOR="--inputINSBlockSuffix="
-# SLURM_ARRAY_TASK_ID=2
+
+SLURM_ARRAY_TASK_ID=1
 
 ## --showFigures --forceRecalc
-python -u './synchronizeINStoNSP_stimBased.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP $BLOCKSELECTOR --inputNSPBlockSuffix=analog_inputs --addToNIX --lazy --usedTENSPulses --forceRecalc
+python -u './synchronizeINStoNSP_stimBased.py' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP $BLOCKSELECTOR --inputNSPBlockSuffix=analog_inputs --addToNIX --lazy --usedTENSPulses --forceRecalc --showFigures

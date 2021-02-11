@@ -4,8 +4,7 @@ import numpy as np
 def getExpOpts():
     blockExperimentTypeLookup = {
         1: 'proprio-miniRC',
-        2: 'proprio',
-        3: 'proprio-motionOnly',
+        2: 'proprio-motionOnly',
         }
     fullRigInputs = {
         'A+': 'ainp12',
@@ -35,25 +34,26 @@ def getExpOpts():
         'forceX': 'ainp14',
         'forceY': 'ainp15',
         }
-    experimentName = '202101281100-Rupert'
+    experimentName = '202102081100-Rupert'
     deviceName = 'DeviceNPC700246H'
     subjectName = 'Rupert'
     #
     jsonSessionNames = {
         #  per block
         1: [
-            'Session1611851045712', 'Session1611851119278',
-            'Session1611851334376'
-            ],
-        2: [
-            'Session1611851887132', 'Session1611852925167',
-            'Session1611853488545'
-            ],
-        3: [
-            'Session1611854079418', 'Session1611854145204'
-            ]
+            'Session1612802745771', 'Session1612803011423',
+            'Session1612804010695', 'Session1612804498009',
+            'Session1612804615607'],
+        2: [],
         }
-    synchInfo = {'nform': {}, 'nsp': {}, 'ins': {}}
+    synchInfo = {'nform': {}, 'nsp': {}, 'ins': {}, 'nspForDelsys': {}, 'delsysToNsp': {}}
+    for blockIdx in jsonSessionNames.keys():
+        synchInfo['nspForDelsys'][blockIdx] = {
+            'synchChanName': 'ainp2'
+            }
+        synchInfo['delsysToNsp'][blockIdx] = {
+            'synchChanName': 'AnalogInputAdapterAnalog'
+        }
     # populate with defaults
     for blockIdx in jsonSessionNames.keys():
         synchInfo['ins'][blockIdx] = {}
@@ -131,7 +131,7 @@ def getExpOpts():
         }}
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        '202101281100-Rupert': [2],
+        '202102081100-Rupert': [1],
         }
     # Options relevant to the classifcation of proprio trials
     movementSizeBins = [0, 0.6, 1]

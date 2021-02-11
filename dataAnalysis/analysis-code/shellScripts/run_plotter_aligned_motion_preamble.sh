@@ -29,5 +29,6 @@ SIZEOPTS="--sizeName= --sizeControl="
 # PAGELIMITS="--limitPages=5"
 PAGELIMITS=""
 
-OTHERASIGOPTS="--noStim"
+# OTHERASIGOPTS="--noStim"
+OTHERASIGOPTS="--noStim --recalcStats"
 OTHERNEURONOPTS="--noStim"

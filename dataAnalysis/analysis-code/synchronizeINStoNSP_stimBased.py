@@ -343,7 +343,7 @@ else:
             thisNspDF.loc[:, 'tapDetectSignal'] = empCov.mahalanobis(nspVals)
         else:
             thisNspDF.loc[:, 'tapDetectSignal'] = np.mean(nspVals, axis=1)
-        nspTrigFinder = 'getThresholdCrossings'
+        nspTrigFinder = 'peaks'
         if nspTrigFinder == 'getTriggers':
             nspPeakIdx = hf.getTriggers(
                 thisNspDF['tapDetectSignal'], iti=sessTapOptsNSP['iti'], itiWiggle=.2,
@@ -355,6 +355,12 @@ else:
                 iti=sessTapOptsNSP['iti'], fs=nspSamplingRate,
                 edgeType='rising', itiWiggle=.2,
                 absVal=False, plotting=arguments['plotting'])
+        elif nspTrigFinder == 'peaks':
+            width = int(nspSamplingRate * sessTapOptsNSP['iti'] * 0.8)
+            peakIdx = peakutils.indexes(
+                thisNspDF['tapDetectSignal'].to_numpy(), thres=sessTapOptsNSP['thres'],
+                min_dist=width, thres_abs=True, keep_what='max')
+            nspPeakIdx = thisNspDF.index[peakIdx]
         nspPeakIdx = nspPeakIdx[sessTapOptsNSP['keepIndex']]
         nspTapTimes = thisNspDF.loc[nspPeakIdx, 't'].to_numpy()
         print('nspTapTimes: {}'.format(nspTapTimes))
@@ -435,13 +441,18 @@ else:
                             theseAmps = coarseSt.array_annotations['amplitude']
                             ampMask = theseAmps > sessTapOptsINS['minStimAmp']
                             spikesToBinarize = coarseSt.times[theseAmps > sessTapOptsINS['minStimAmp']]
+                            ampNormalizers = theseAmps[theseAmps > sessTapOptsINS['minStimAmp']]
                         else:
                             spikesToBinarize = coarseSt.times
+                            ampNormalizers = theseAmps
                         thisSpikeMat = binarize(
                             spikesToBinarize,
                             sampling_rate=trigRasterSamplingRate * pq.Hz,
                             t_start=trigRaster['t'].min() * pq.s,
                             t_stop=trigRaster['t'].max() * pq.s)
+                        idxOfSpikes = np.flatnonzero(thisSpikeMat)
+                        thisSpikeMat = thisSpikeMat.astype(np.float)
+                        thisSpikeMat[idxOfSpikes] = ampNormalizers
                         coarseSpikeMats.append(thisSpikeMat[:, np.newaxis])
                         print('{}: coarseSt.times = {}'.format(coarseSt.name, coarseSt.times))
                         # print('st.times = {}'.format(st.times))
@@ -451,8 +462,8 @@ else:
                     sessTapOptsINS['synchByXCorrTapDetectSignal'] = True
                     sessTapOptsNSP['synchByXCorrTapDetectSignal'] = True
                 else:
-                    trigRaster.loc[:, 'insDiracDelta'] = np.concatenate(
-                        coarseSpikeMats, axis=1).any(axis=1)
+                    trigRaster.loc[:, 'insDiracDelta'] = np.concatenate(coarseSpikeMats, axis=1).sum(axis=1)
+                    # pdb.set_trace()
                     debugDelta = trigRaster.loc[:, 'insDiracDelta'].unique()
                     print("trigRaster.loc[:, 'insDiracDelta'].unique() = {}".format(debugDelta))
                     #  if debugDelta.size > 2:
@@ -487,10 +498,18 @@ else:
                     times=nspTapTimes, units='s',
                     t_start=trigRaster['t'].min() * pq.s,
                     t_stop=trigRaster['t'].max() * pq.s)
-                trigRaster.loc[:, 'nspDiracDelta'] = binarize(
+                nspDiracRaster = binarize(
                     nspDiracSt, sampling_rate=trigRasterSamplingRate * pq.Hz,
                     t_start=trigRaster['t'].min() * pq.s, t_stop=trigRaster['t'].max() * pq.s
                     )
+                useValsAtTrigs = True
+                if useValsAtTrigs:
+                    indicesToUse = np.flatnonzero(nspDiracRaster)
+                    nspDiracRaster = nspDiracRaster.astype(np.float)
+                    nspDiracRaster[indicesToUse] = thisNspDF.loc[nspPeakIdx, 'tapDetectSignal'].to_numpy()
+                    trigRaster.loc[:, 'nspDiracDelta'] = nspDiracRaster
+                else:
+                    trigRaster.loc[:, 'nspDiracDelta'] = nspDiracRaster.astype(np.float)
                 trigRaster.loc[:, 'nspTrigs'] = hf.gaussianSupport(
                     support=trigRaster.set_index('t')['nspDiracDelta'],
                     gaussWid=gaussWid,

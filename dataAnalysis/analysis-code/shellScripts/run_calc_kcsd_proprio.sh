@@ -11,17 +11,17 @@
 #SBATCH --mem=250G
 
 # Specify a job name:
-#SBATCH -J laplacian_calc_2021_01_28_lapl
+#SBATCH -J laplacian_calc_2021_01_28_kcsd
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-laplacian_calc_2021_01_28_lapl.out
-#SBATCH -e ../../batch_logs/%j-%a-laplacian_calc_2021_01_28_lapl.out
+#SBATCH -o ../../batch_logs/%j-%a-laplacian_calc_2021_01_28_kcsd.out
+#SBATCH -e ../../batch_logs/%j-%a-laplacian_calc_2021_01_28_kcsd.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=1,2,3
+#SBATCH --array=1,3
 
 # EXP="exp202101141100"
 # EXP="exp202101191100"
@@ -43,6 +43,6 @@ conda activate
 source activate nda2
 python --version
 
-SLURM_ARRAY_TASK_ID=1
+SLURM_ARRAY_TASK_ID=2
 #
-python -u ./calcLaplacian.py --outputBlockSuffix=laplacian --chanQuery="lfp" --inputBlockSuffix='analyze' --eventBlockSuffix='epochs' --verbose --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER $LAZINESS --plotting
+python -u ./calcLaplacian.py --useKCSD --inputBlockSuffix='analyze' --chanQuery="lfp" --outputBlockSuffix=kcsd --eventBlockSuffix='epochs' --verbose --plotting --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER $LAZINESS

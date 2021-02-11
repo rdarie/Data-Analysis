@@ -367,6 +367,11 @@ def parseAnalysisOptions(
                 'binInterval': 1e-3,
                 'binWidth': 10e-3,
                 'smoothKernelWidth': 10e-3},  # default
+            'normalizedByImpedance': {
+                'subfolder': 'default',
+                'binInterval': 1e-3,
+                'binWidth': 10e-3,
+                'smoothKernelWidth': 10e-3},  # default
             'parameter_recovery': {
                 'binInterval': 1e-3,
                 'binWidth': 10e-3,

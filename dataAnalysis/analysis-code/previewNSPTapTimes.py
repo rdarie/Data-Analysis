@@ -48,6 +48,7 @@ from neo import (
     Event, AnalogSignal, SpikeTrain, Unit)
 import neo
 import elephant.pandas_bridge as elphpdb
+import dataAnalysis.helperFunctions.probe_metadata as prb_meta
 
 #  load options
 from currentExperiment import parseAnalysisOptions
@@ -199,7 +200,14 @@ for trialSegment, group in approxTapTimes.groupby('tapGroup'):
         '<h3>             ended: '.format(trialSegment) +
         lastNSPTime.strftime('%Y-%m-%d %H:%M:%S') +
         ' (lasted up to {} sec)</h3>\n'.format(segDur.total_seconds()))
-
+#### impedances
+impedanceFilePath = os.path.join(
+    remoteBasePath,
+    '{}_blackrock_impedances.h5'.format(subjectName))
+impedances = prb_meta.getLatestImpedance(
+    block=nspBlock, impedanceFilePath=impedanceFilePath)
+impedances.sort_values('impedance')
+summaryText += impedances.to_html()
 #### problem channel id
 segIdx = 0
 problemChannelsList = []

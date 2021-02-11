@@ -130,18 +130,15 @@ if 'outlierDetectOptions' in locals():
     targetEpochSize = outlierDetectOptions['targetEpochSize']
     twoTailed = outlierDetectOptions['twoTailed']
     alignedAsigsKWargs['windowSize'] = outlierDetectOptions['windowSize']
+    alignedAsigsKWargs['procFun'] = ash.genDetrender(
+        timeWindow=(
+            alignedAsigsKWargs['windowSize'][0],
+            alignedAsigsKWargs['windowSize'][1] + 100e-3))
 else:
     targetEpochSize = 1e-3
     twoTailed = False
     alignedAsigsKWargs['windowSize'] = (-100e-3, 400e-3)
 
-
-def takeSqrt(waveDF, spkTrain):
-    return np.sqrt(waveDF)
-
-
-if arguments['sqrtTransform']:
-    alignedAsigsKWargs['procFun'] = takeSqrt
 
 alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **arguments)
 alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
@@ -225,7 +222,7 @@ if __name__ == "__main__":
         triggeredPath, lazy=arguments['lazy'])
     dataDF = ns5.alignedAsigsToDF(
         dataBlock, **alignedAsigsKWargs)
-
+    #
     if 'outlierDetectColumns' in locals():
         dataDF.drop(
             columns=[
@@ -238,7 +235,6 @@ if __name__ == "__main__":
     if ordMag < 0:
         dataDF = dataDF * 10 ** (-ordMag)
     # dataDF = dataDF.apply(lambda x: x - x.mean())
-
     trialInfo = dataDF.index.to_frame().reset_index(drop=True)
     trialInfo['epoch'] = np.nan
     firstBinMask = trialInfo['bin'] == trialInfo['bin'].unique()[0]

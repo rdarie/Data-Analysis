@@ -3,12 +3,14 @@ Usage:
     calcBlockAnalysisNix.py [options]
 
 Options:
-    --blockIdx=blockIdx             which trial to analyze
-    --exp=exp                       which experimental day to analyze
-    --lazy                          load from raw, or regular? [default: False]
-    --trigRate=trigRate             inter trigger interval [default: 60]
-    --plotting                      whether to show diagnostic plots (must have display) [default: False]
-    --chanQuery=chanQuery           how to restrict channels if not providing a list?
+    --blockIdx=blockIdx                          which trial to analyze
+    --exp=exp                                    which experimental day to analyze
+    --lazy                                       load from raw, or regular? [default: False]
+    --trigRate=trigRate                          inter trigger interval [default: 60]
+    --plotting                                   whether to show diagnostic plots (must have display) [default: False]
+    --chanQuery=chanQuery                        how to restrict channels if not providing a list?
+    --nspBlockSuffix=nspBlockSuffix              which block to pull
+    --nspBlockPrefix=nspBlockPrefix              which block to pull
 """
 
 from neo.io.proxyobjects import (
@@ -41,10 +43,19 @@ expOpts, allOpts = parseAnalysisOptions(
 globals().update(expOpts)
 globals().update(allOpts)
 
+
 def synchronizeDelsysToNSP():
+    if arguments['nspBlockPrefix'] is not None:
+        nspBlockBasename = '{}{:03d}'.format(arguments['nspBlockPrefix'], arguments['blockIdx'])
+    else:
+        nspBlockBasename = ns5FileName
+    if arguments['nspBlockSuffix'] is not None:
+        nspBlockSuffix = '_{}'.format(arguments['nspBlockSuffix'])
+    else:
+        nspBlockSuffix = ''
     nspPath = os.path.join(
         scratchFolder,
-        ns5FileName + '.nix')
+        nspBlockBasename + nspBlockSuffix + '.nix')
     # 
     nspReader, nspBlock = ns5.blockFromPath(
         nspPath, lazy=arguments['lazy'])
@@ -60,9 +71,9 @@ def synchronizeDelsysToNSP():
     nspSeg = nspBlock.segments[segIdx]
     oeSeg = oeBlock.segments[segIdx]
     #
-    oeSyncAsig = oeSeg.filter(name='seg0_AnalogInputAdapterAnalog')[0]
+    oeSyncAsig = oeSeg.filter(name='seg0_{}'.format(synchInfo['delsysToNsp']['synchChanName']))[0]
     try:
-        tStart, tStop = synchInfo['delsys'][blockIdx]['timeRanges']
+        tStart, tStop = synchInfo['delsysToNsp'][blockIdx]['timeRanges']
     except Exception:
         traceback.print_exc()
         tStart = float(oeSyncAsig.times[0] + 2 * pq.s)
@@ -82,9 +93,10 @@ def synchronizeDelsysToNSP():
     oeDiffUncertainty = oeSrs.diff().abs().quantile(1-1e-6) / 4
     oeThresh = (oeLims[-1] - oeLims[0]) / 2
 
-    nspSyncAsig = nspSeg.filter(name='seg0_analog 1')[0]
+    nspSynchChanName = synchInfo['delsysToNsp'][blockIdx]['synchChanName']
+    nspSyncAsig = nspSeg.filter(name='seg0_{}'.format(nspSynchChanName))[0]
     try:
-        tStart, tStop = synchInfo['nsp'][blockIdx]['timeRanges']
+        tStart, tStop = synchInfo['nspForDelsys'][blockIdx]['timeRanges']
     except Exception:
         traceback.print_exc()
         tStart = float(nspSyncAsig.times[0] + 2 * pq.s)
@@ -124,7 +136,7 @@ def synchronizeDelsysToNSP():
     # nspCrossMask = nspSrs.index.isin(nspPeakIdx)
     print('Found {} triggers'.format(nspPeakIdx.size))
     try:
-        chooseCrossings = synchInfo['delsys'][blockIdx]['chooseCrossings']
+        chooseCrossings = synchInfo['delsysToNsp'][blockIdx]['chooseCrossings']
         oeTimes = (
             oeSyncAsig.times[oeTimeMask][oeCrossMask][chooseCrossings])
     except Exception:
@@ -132,7 +144,7 @@ def synchronizeDelsysToNSP():
         oeTimes = (
             oeSyncAsig.times[oeTimeMask][oeCrossMask])
     try:
-        chooseCrossings = synchInfo['nsp'][blockIdx]['chooseCrossings']
+        chooseCrossings = synchInfo['nspForDelsys'][blockIdx]['chooseCrossings']
         nspTimes = (
             nspSyncAsig.times[nspTimeMask][nspCrossMask][chooseCrossings])
     except Exception:

@@ -86,18 +86,24 @@ def preprocNS5():
     equalChunks = False
     ###############################################################
     groupAsigsByBank = True
-    if groupAsigsByBank and ('spikeSortingOpts' in locals()):
-        print('Rewriting list of asigs that will be processed')
-        spikeSortingOpts[arrayName]['asigNameList'] = []
-        for name, group in mapDF.groupby('bank'):
-            allAsigsInBank = sorted(group['label'].to_list())
-            theseAsigNames = [
-                aName
-                for aName in allAsigsInBank
-                if aName not in spikeSortingOpts[arrayName]['excludeChans']
-                ]
-            spikeSortingOpts[arrayName]['asigNameList'].append(theseAsigNames)
-            print(theseAsigNames)
+    # pdb.set_trace()
+    if groupAsigsByBank:
+        try:
+            print('Rewriting list of asigs that will be processed')
+            asigNameListByBank = []
+            # spikeSortingOpts[arrayName]['asigNameList'] = []
+            for name, group in mapDF.groupby('bank'):
+                allAsigsInBank = sorted(group['label'].to_list())
+                theseAsigNames = [
+                    aName
+                    for aName in allAsigsInBank
+                    if aName not in spikeSortingOpts[arrayName]['excludeChans']
+                    ]
+                asigNameListByBank.append(theseAsigNames)
+                # spikeSortingOpts[arrayName]['asigNameList'].append(theseAsigNames)
+                print(theseAsigNames)
+        except Exception:
+            asigNameListByBank = None
     ###############################################################
     if arguments['maskMotorEncoder']:
         try:
@@ -133,6 +139,10 @@ def preprocNS5():
     #
     if arguments['forSpikeSorting']:
         print('\n\nPreprocNs5, generating spike preview...\n\n')
+        if asigNameListByBank is not None:
+            theseAsigNames = asigNameListByBank
+        else:
+            theseAsigNames = spikeSortingOpts[arrayName]['asigNameList']
         ns5.preproc(
             fileName=ns5FileName,
             rawFolderPath=nspFolder,
@@ -145,7 +155,7 @@ def preprocNS5():
             motorEncoderMask=motorEncoderMask,
             calcAverageLFP=True,
             eventInfo=trialFilesFrom['utah']['eventInfo'],
-            asigNameList=spikeSortingOpts[arrayName]['asigNameList'],
+            asigNameList=theseAsigNames,
             ainpNameList=[],
             spikeSourceType='',
             removeMeanAcross=True,
@@ -158,8 +168,13 @@ def preprocNS5():
             chunkOffset=spikeSortingOpts[arrayName]['previewOffset'],
             equalChunks=False, chunkList=[0],
             calcRigEvents=False, outlierRemovalDebugFlag=False)
+    #
     if arguments['fullSubtractMean']:
         print('\n\nPreprocNs5, generating spike extraction data...\n\n')
+        if asigNameListByBank is not None:
+            theseAsigNames = asigNameListByBank
+        else:
+            theseAsigNames = spikeSortingOpts[arrayName]['asigNameList']
         ns5.preproc(
             fileName=ns5FileName,
             rawFolderPath=nspFolder,
@@ -174,7 +189,7 @@ def preprocNS5():
             removeMeanAcross=True,
             linearDetrend=True,
             eventInfo=trialFilesFrom['utah']['eventInfo'],
-            asigNameList=spikeSortingOpts[arrayName]['asigNameList'],
+            asigNameList=theseAsigNames,
             ainpNameList=[],
             spikeSourceType='',
             nameSuffix='_mean_subtracted',
@@ -183,8 +198,10 @@ def preprocNS5():
             writeMode='ow',
             chunkSize=chunkSize, equalChunks=equalChunks, chunkList=chunkList,
             calcRigEvents=False)
+    #
     if arguments['fullSubtractMeanUnfiltered']:
         print('\n\nPreprocNs5, generating lfp data...\n\n')
+        theseAsigNames = [mapDF['label'].iloc[::10].to_list()]
         ns5.preproc(
             fileName=ns5FileName,
             rawFolderPath=nspFolder,
@@ -206,6 +223,7 @@ def preprocNS5():
             writeMode='ow',
             chunkSize=chunkSize, equalChunks=equalChunks, chunkList=chunkList,
             calcRigEvents=False)
+    #
     if arguments['fullUnfiltered']:
         print('\n\nPreprocNs5, generating lfp data...\n\n')
         ns5.preproc(
@@ -216,11 +234,11 @@ def preprocNS5():
             outlierThreshold=spikeSortingOpts[arrayName]['outlierThreshold'],
             outlierMaskFilterOpts=outlierMaskFilterOpts,
             motorEncoderMask=motorEncoderMask,
-            calcAverageLFP=True,
+            calcAverageLFP=False,
             removeMeanAcross=False,
             linearDetrend=False,
             interpolateOutliers=False, calcOutliers=False,
-            normalizeByImpedance=True,
+            normalizeByImpedance=False,
             impedanceFilePath=os.path.join(
                 remoteBasePath,
                 '{}_blackrock_impedances.h5'.format(subjectName)),
@@ -237,6 +255,7 @@ def preprocNS5():
     if arguments['analogOnly']:
         analogInputNames = sorted(
             trialFilesFrom['utah']['eventInfo']['inputIDs'].values())
+        theseAsigNames = [mapDF['label'].iloc[::2].to_list()]
         print('\n\nPreprocNs5, generating rig inputs and other analog data...\n\n')
         ns5.preproc(
             fileName=ns5FileName,
@@ -249,7 +268,7 @@ def preprocNS5():
             # outlierMaskFilterOpts=outlierMaskFilterOpts,
             motorEncoderMask=motorEncoderMask,
             eventInfo=trialFilesFrom['utah']['eventInfo'],
-            asigNameList=[spikeSortingOpts[arrayName]['asigNameList'][0]],
+            asigNameList=theseAsigNames,
             saveFromAsigNameList=False,
             calcAverageLFP=True,
             LFPFilterOpts=stimArtifactFilterOpts,

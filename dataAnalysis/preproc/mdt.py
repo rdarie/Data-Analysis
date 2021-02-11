@@ -2651,8 +2651,8 @@ def getINSStimOnset(
             if expectRateProportionalStimOnDelay:
                 expectedOnsetIdx = (
                     nominalStimOnIdx +
-                    int(slotSize)
-                    # int(slotSize / 2) + activeProgram * int(slotSize / 4)
+                    # int(slotSize)
+                    int(slotSize / 2) + activeProgram * int(slotSize / 4)
                     )
             else:
                 expectedOnsetIdx = nominalStimOnIdx
@@ -2887,8 +2887,8 @@ def getINSStimOnset(
                 group.index[-1],
                 (
                     group.index[groupAmpMask][-1] +
-                    int(slotSize)
-                    # int(slotSize/2) + activeProgram * int(slotSize/4)
+                    # int(slotSize)
+                    int(slotSize/2) + activeProgram * int(slotSize/4)
                 ))
         else:
             stimOffIdx = min(
