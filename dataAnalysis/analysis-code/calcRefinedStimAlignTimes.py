@@ -234,6 +234,7 @@ for segIdx, nspSeg in enumerate(nspBlock.segments):
     try:
         assert simultOn.max() == 1
     except Exception:
+        traceback.print_exc()
         pdb.set_trace()
     #
     globalStart = stimStatus['t'].min()

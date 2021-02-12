@@ -395,21 +395,21 @@ def compareMeansGrouped(
     testBins = np.arange(
         tStart + testWidth / 2, tStop - testWidth / 2, testStride)
     if isinstance(groupBy, str):
-        if groupBy not in asigWide.index.names:
+        if (groupBy not in asigWide.index.names) and (asigWide.size > 0):
             asigWide.loc[:, groupBy] = 'NA'
             asigWide.set_index(groupBy, append=True, inplace=True)
     elif isinstance(groupBy, list):
         for gb in groupBy:
-            if gb not in asigWide.index.names:
+            if (gb not in asigWide.index.names) and (asigWide.size > 0):
                 asigWide.loc[:, gb] = 'NA'
                 asigWide.set_index(gb, append=True, inplace=True)
     if isinstance(testVar, str):
-        if testVar not in asigWide.index.names:
+        if (testVar not in asigWide.index.names) and (asigWide.size > 0):
             asigWide.loc[:, testVar] = 'NA'
             asigWide.set_index(testVar, append=True, inplace=True)
     elif isinstance(testVar, list):
         for gb in testVar:
-            if gb not in asigWide.index.names:
+            if (gb not in asigWide.index.names) and (asigWide.size > 0):
                 asigWide.loc[:, gb] = 'NA'
                 asigWide.set_index(gb, append=True, inplace=True)
     if (isinstance(groupBy, list)) and (len(groupBy) == 1):

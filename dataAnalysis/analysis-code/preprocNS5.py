@@ -255,7 +255,7 @@ def preprocNS5():
     if arguments['analogOnly']:
         analogInputNames = sorted(
             trialFilesFrom['utah']['eventInfo']['inputIDs'].values())
-        theseAsigNames = [mapDF['label'].iloc[::2].to_list()]
+        theseAsigNames = [mapDF['label'].iloc[::5].to_list()]
         print('\n\nPreprocNs5, generating rig inputs and other analog data...\n\n')
         ns5.preproc(
             fileName=ns5FileName,

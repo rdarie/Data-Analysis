@@ -11,17 +11,17 @@
 #SBATCH --mem=200G
 
 # Specify a job name:
-#SBATCH -J delsys_preproc_20200903_raw
+#SBATCH -J delsys_preproc_2021_02_10_delsys
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-delsys_preproc_20200903_raw.out
-#SBATCH -e ../../batch_logs/%j-%a-delsys_preproc_20200903_raw.out
+#SBATCH -o ../../batch_logs/%j-%a-delsys_preproc_2021_02_10_delsys.out
+#SBATCH -e ../../batch_logs/%j-%a-delsys_preproc_2021_02_10_delsys.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=1,2
+#SBATCH --array=1
 
 # EXP="exp201901070700"
 # EXP="exp201901201200"
@@ -44,9 +44,9 @@
 # EXP="exp202007021300"
 # EXP="exp202008180700"
 # EXP="exp202009031500"
-EXP="exp202102041100"
+# EXP="exp202102041100"
 # EXP="exp202102081100"
-# EXP="exp202102101100"
+EXP="exp202102101100"
 
 module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
@@ -54,5 +54,5 @@ conda activate
 source activate nda2
 python --version
 
-SLURM_ARRAY_TASK_ID=1
+# SLURM_ARRAY_TASK_ID=1
 python3 ./preprocDelsysCSV.py --notchAccChans --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID

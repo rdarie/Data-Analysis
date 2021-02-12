@@ -21,7 +21,7 @@
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=2,3
+#SBATCH --array=1
 
 # EXP="exp202101141100"
 # EXP="exp202101191100"
@@ -32,6 +32,8 @@
 # EXP="exp202101271100"
 EXP="exp202101281100"
 EXP="exp202102041100"
+EXP="exp202102081100"
+# EXP="exp202102101100"
 
 LAZINESS="--lazy"
 #
@@ -58,7 +60,7 @@ python --version
 SLURM_ARRAY_TASK_ID=1
 #
 # python -u ./synchronizeSIMItoNSP.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP
-python -u ./calcProprioAnalysisNix.py --hasEMG --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER $SPIKESOURCE $SPIKEBLOCKSUFFIX $BLOCKPREFIX $RIGSUFFIX --chanQuery="all" --verbose --lazy
+# python -u ./calcProprioAnalysisNix.py --hasEMG --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER $SPIKESOURCE $SPIKEBLOCKSUFFIX $BLOCKPREFIX $RIGSUFFIX --chanQuery="all" --verbose --lazy
 ##
 python -u ./calcMotionAlignTimes.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID  $ANALYSISFOLDER --plotParamHistograms $LAZINESS
 #        # python -u ./calcStimAlignTimes.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER --plotParamHistograms $LAZINESS

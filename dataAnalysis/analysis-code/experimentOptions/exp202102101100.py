@@ -56,6 +56,7 @@ def getExpOpts():
         synchInfo['delsysToNsp'][blockIdx] = {
             'synchChanName': 'AnalogInputAdapterAnalog'
         }
+    synchInfo['nspForDelsys'][1].update({'timeRanges': [20, 2440]})
     # populate with defaults
     for blockIdx in blockExperimentTypeLookup.keys():
         synchInfo['ins'][blockIdx] = {}
