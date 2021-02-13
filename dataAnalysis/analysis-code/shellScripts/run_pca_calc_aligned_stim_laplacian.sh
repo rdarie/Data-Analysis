@@ -7,23 +7,25 @@
 
 # Request memory:
 #SBATCH --nodes=1
-#SBATCH --mem=24G
+#SBATCH --mem=127G
 
 # Specify a job name:
-#SBATCH -J plots_stim_lapl
+#SBATCH -J pca_calc_stim_lapl
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-plots_stim_lapl.out
-#SBATCH -e ../../batch_logs/%j-%a-plots_stim_lapl.out
+#SBATCH -o ../../batch_logs/%j-%a-pca_calc_stim_lapl.out
+#SBATCH -e ../../batch_logs/%j-%a-pca_calc_stim_lapl.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=1,2
+#SBATCH --array=2
 
 SLURM_ARRAY_TASK_ID=2
 source ./shellScripts/run_pca_calc_aligned_stim_preamble.sh
 
 # python -u './calcPCAinChunks.py' --inputBlockSuffix="kcsd" --unitQuery="lfp" --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $OUTLIERMASK
-python -u './applyEstimatorToTriggered.py' --inputBlockSuffix="kcsd" --estimatorName="pca" --unitQuery="lfp" --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR
+# python -u './calcSparsePCA.py' --inputBlockSuffix="kcsd" --unitQuery="lfp" --estimatorName="sparse_pca_lapl" --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $OUTLIERMASK
+# python -u './applyEstimatorToTriggered.py' --inputBlockSuffix="kcsd" --estimatorName="sparse_pca_lapl" --unitQuery="lfp" --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR
+python -u './calcSpectralFeatures.py' --inputBlockSuffix="kcsd_pca" --unitQuery="pca" --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR

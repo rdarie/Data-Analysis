@@ -22,7 +22,7 @@
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 
-SLURM_ARRAY_TASK_ID=1
+# SLURM_ARRAY_TASK_ID=1
 source shellScripts/run_align_stim_preamble.sh
 
 python -u ./calcAlignedAsigs.py --eventBlockSuffix='epochs' --signalBlockSuffix='kcsd' --chanQuery="lfp" --outputBlockSuffix="kcsd" --verbose --exp=$EXP $BLOCKSELECTOR $WINDOW $LAZINESS $EVENTSELECTOR $ALIGNFOLDER $AMPFIELDNAME $ANALYSISFOLDER $SIGNALFOLDER $EVENTFOLDER

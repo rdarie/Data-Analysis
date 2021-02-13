@@ -2619,7 +2619,10 @@ def assignLabels(timeVector, lbl, fnc, CameraFs = 100, oversizeWindow = None):
             #
     return labels
 
-def getSpectrogram(channelData, elec_ids, samp_per_s, start_time_s, dataT, winLen_s, stepLen_s = 0.02, R = 20, fr_start = None, fr_stop = None, whichChan = 1, plotting = False):
+def getSpectrogram(
+        channelData, elec_ids, samp_per_s, start_time_s,
+        dataT, winLen_s, stepLen_s = 0.02, R = 20,
+        fr_start = None, fr_stop = None, whichChan = 1, plotting = False):
 
     Fs = samp_per_s
     nChan = channelData.shape[1]

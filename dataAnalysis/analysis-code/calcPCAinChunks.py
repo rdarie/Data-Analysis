@@ -103,8 +103,8 @@ for segIdx in range(nSeg):
     # trialInfo = dataDF.index.to_frame().reset_index(drop=True)
     prf.print_memory_usage('just loaded data, fitting')
     if 'estimator' not in locals():
-        # nComp = len(alignedAsigsKWargs['unitNames'])
-        nComp = dataDF.columns.shape[0]
+        # nComp = dataDF.columns.shape[0]
+        nComp = 5
         estimator = IncrementalPCA(
             n_components=nComp,
             batch_size=int(5 * nComp))
