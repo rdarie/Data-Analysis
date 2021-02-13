@@ -168,26 +168,40 @@ if arguments['fromScratchToData']:
                     shutil.copytree(originPath, destinPath)
                 print('Copying from\n{}\ninto\n{}'.format(originPath, destinPath))
     if arguments['searchTerm'] is not None:
+        itemsToMoveFullPath = glob.glob(os.path.join(processedFolder, '**{}'.format(arguments['searchTerm'])), recursive=True)
         itemsToMove = [
-            itemName
-            for itemName in os.listdir(scratchFolder)
-            if arguments['searchTerm'] in os.path.join(scratchFolder, itemName)
+            itemName.replace(scratchFolder + '/', '')
+            for itemName in itemsToMoveFullPath
             ]
+        # pdb.set_trace()
         print('\nAbout to move:\n')
         print('\n'.join(itemsToMove))
         x = input('\n********\nPress any key to continue.')
-        for itemName in os.listdir(scratchFolder):
+        for itemName in itemsToMove:
+            destinPath = os.path.join(processedFolder, itemName)
+            originPath = os.path.join(scratchFolder, itemName)
+            if os.path.isdir(originPath):
+                shutil.copytree(originPath, destinPath)
+                print('Copying from\n{}\ninto\n{}'.format(originPath, destinPath))
+    if arguments['fileSearchTerm'] is not None:
+        itemsToMoveFullPath = glob.glob(os.path.join(scratchFolder, '**', arguments['fileSearchTerm']), recursive=True)
+        itemsToMove = [
+            itemName.replace(scratchFolder + '/', '')
+            for itemName in itemsToMoveFullPath
+            ]
+        # pdb.set_trace()
+        print('\nAbout to move:\n')
+        print('\n'.join(itemsToMove))
+        x = input('\n********\nPress any key to continue.')
+        for itemName in itemsToMove:
             originPath = os.path.join(scratchFolder, itemName)
             destinPath = os.path.join(processedFolder, itemName)
-            if os.path.isdir(originPath) and arguments['searchTerm'] in originPath:
-                if os.path.exists(destinPath):
-                    shutil.rmtree(destinPath)
-                if arguments['moveItems']:
-                    shutil.move(originPath, destinPath)
-                else:
-                    shutil.copytree(originPath, destinPath)
-                print('Copying from\n{}\ninto\n{}'.format(originPath, destinPath))
-            if os.path.isfile(originPath) and arguments['searchTerm'] in originPath:
+            # if os.path.isdir(originPath) and arguments['searchTerm'] in originPath:
+            #     if os.path.exists(destinPath):
+            #         shutil.rmtree(destinPath)
+            #     shutil.copytree(originPath, destinPath)
+            #     print('Copying from\n{}\ninto\n{}'.format(originPath, destinPath))
+            if os.path.isfile(originPath):
                 shutil.copyfile(originPath, destinPath)
                 print('Copying from\n{}\ninto\n{}'.format(originPath, destinPath))
 
@@ -228,24 +242,25 @@ if arguments['fromDataToScratch']:
                     shutil.copytree(originPath, destinPath)
                 print('Copying from\n{}\ninto\n{}'.format(originPath, destinPath))
     if arguments['searchTerm'] is not None:
+        itemsToMoveFullPath = glob.glob(os.path.join(processedFolder, '**{}'.format(arguments['searchTerm'])), recursive=True)
         itemsToMove = [
-            itemName
-            for itemName in os.listdir(processedFolder)
-            if arguments['searchTerm'] in os.path.join(processedFolder, itemName)
+            itemName.replace(processedFolder + '/', '')
+            for itemName in itemsToMoveFullPath
             ]
+        # pdb.set_trace()
         print('\nAbout to move:\n')
         print('\n'.join(itemsToMove))
         x = input('\n********\nPress any key to continue.')
-        for itemName in os.listdir(processedFolder):
+        for itemName in itemsToMove:
             originPath = os.path.join(processedFolder, itemName)
             destinPath = os.path.join(scratchFolder, itemName)
-            if os.path.isdir(originPath) and arguments['searchTerm'] in originPath:
-                if os.path.exists(destinPath):
-                    shutil.rmtree(destinPath)
+            # if os.path.isdir(originPath) and arguments['searchTerm'] in originPath:
+            #     if os.path.exists(destinPath):
+            #         shutil.rmtree(destinPath)
+            #     shutil.copytree(originPath, destinPath)
+            #     print('Copying from\n{}\ninto\n{}'.format(originPath, destinPath))
+            if os.path.isdir(originPath):
                 shutil.copytree(originPath, destinPath)
-                print('Copying from\n{}\ninto\n{}'.format(originPath, destinPath))
-            if os.path.isfile(originPath) and arguments['searchTerm'] in originPath:
-                shutil.copyfile(originPath, destinPath)
                 print('Copying from\n{}\ninto\n{}'.format(originPath, destinPath))
     if arguments['fileSearchTerm'] is not None:
         itemsToMoveFullPath = glob.glob(os.path.join(processedFolder, '**', arguments['fileSearchTerm']), recursive=True)

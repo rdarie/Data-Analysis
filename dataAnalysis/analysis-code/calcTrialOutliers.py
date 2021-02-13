@@ -251,24 +251,27 @@ if __name__ == "__main__":
         for stimPeriod, group in trialInfo.groupby('stimPeriod'):
             # adjust epoch size down from nominal, to capture
             # integer number of stim periods
-            if stimPeriod > targetEpochSize:
-                epochSize = stimPeriod / np.floor(stimPeriod / targetEpochSize)
+            if isinstance(stimPeriod, str):
+                trialInfo.loc[group.index, 'epoch'] = 0
             else:
-                epochSize = stimPeriod * np.ceil(targetEpochSize / stimPeriod)
-            print('stimPeriod = {}, epochSize = {}'.format(stimPeriod, epochSize))
-            theseTBins = group['bin'].to_numpy()
-            epochBins = np.arange(
-                theseTBins.min(), theseTBins.max(), epochSize)
-            # align epoch bins to window
-            epochOffset = np.max(epochBins[epochBins <= 0])
-            epochBins = epochBins - epochOffset + transmissionDelay
-            validBins = (epochBins > theseTBins.min()) & (epochBins < theseTBins.max())
-            epochBins = epochBins[validBins]
-            # stretch first and last epoch bin to cover entire window
-            epochBins[0] = theseTBins.min() - 1
-            epochBins[-1] = theseTBins.max() + 1
-            theseEpochs = pd.cut(theseTBins, bins=epochBins, labels=False)
-            trialInfo.loc[group.index, 'epoch'] = theseEpochs
+                if stimPeriod > targetEpochSize:
+                    epochSize = stimPeriod / np.floor(stimPeriod / targetEpochSize)
+                else:
+                    epochSize = stimPeriod * np.ceil(targetEpochSize / stimPeriod)
+                print('stimPeriod = {}, epochSize = {}'.format(stimPeriod, epochSize))
+                theseTBins = group['bin'].to_numpy()
+                epochBins = np.arange(
+                    theseTBins.min(), theseTBins.max(), epochSize)
+                # align epoch bins to window
+                epochOffset = np.max(epochBins[epochBins <= 0])
+                epochBins = epochBins - epochOffset + transmissionDelay
+                validBins = (epochBins > theseTBins.min()) & (epochBins < theseTBins.max())
+                epochBins = epochBins[validBins]
+                # stretch first and last epoch bin to cover entire window
+                epochBins[0] = theseTBins.min() - 1
+                epochBins[-1] = theseTBins.max() + 1
+                theseEpochs = pd.cut(theseTBins, bins=epochBins, labels=False)
+                trialInfo.loc[group.index, 'epoch'] = theseEpochs
     else:
         trialInfo.loc[:, 'epoch'] = 0
     #

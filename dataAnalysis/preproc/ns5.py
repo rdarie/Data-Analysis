@@ -338,7 +338,7 @@ def transposeSpikeDF(
 
 def concatenateBlocks(
         asigBlocks, spikeBlocks, eventBlocks, chunkingMetadata,
-        samplingRate, chanQuery, lazy, trackMemory, verbose
+        samplingRate, chanQuery, lazy, trackMemory, verbose, clipSignals=True
         ):
     # Scan ahead through all files and ensure that
     # spikeTrains and units are present across all assembled files
@@ -469,6 +469,12 @@ def concatenateBlocks(
                     'N': 4,
                     'btype': 'low',
                     'ftype': 'bessel'
+                },
+                'high': {
+                    'Wn': 1.,
+                    'N': 4,
+                    'btype': 'high',
+                    'ftype': 'bessel'
                 }
             }
             newT = pd.Series(
@@ -512,6 +518,12 @@ def concatenateBlocks(
         #
         print('Finished chunk {}'.format(chunkIdxStr))
     allTdDF = pd.concat(asigCache)
+    #
+    if clipSignals:
+        tdMedians = allTdDF.median()
+        tdIQR = (allTdDF.astype(float).quantile(0.75) - allTdDF.astype(float).quantile(0.25))
+        allTdDF.clip(
+            lower=tdMedians - 3 * tdIQR, upper=tdMedians + 3 * tdIQR, axis=1, inplace=True)
     # TODO: check for nans, if, for example a signal is partially missing
     allTdDF.fillna(method='bfill', inplace=True)
     allTdDF.fillna(method='ffill', inplace=True)
@@ -1466,11 +1478,17 @@ def alignedAsigDFtoSpikeTrain(
         newSeg.annotate(nix_name=dataSeg.annotations['neo_name'])
         masterBlock.segments.append(newSeg)
         #
-        if group.columns.name == 'bin':
-            grouper = group.groupby('feature')
-            colsAre = 'bin'
-        elif group.columns.name == 'feature':
-            grouper = group.iteritems()
+        # pdb.set_trace()
+        if isinstance(group.columns, pd.MultiIndex):
+            if 'feature' in group.columns.names:
+                grouper = group.groupby(['feature', 'lag'])
+        elif isinstance(group.columns, pd.Index):
+            if group.columns.name == 'bin':
+                grouper = group.groupby('feature')
+                colsAre = 'bin'
+            elif group.columns.name == 'feature':
+                grouper = group.iteritems()
+                colsAre = 'feature'
             colsAre = 'feature'
         for featName, featGroup in grouper:
             print('Saving {}...'.format(featName))
@@ -1510,7 +1528,11 @@ def alignedAsigDFtoSpikeTrain(
             spikeTimes = arrAnnDF['t']
             arrAnnDF.drop(columns='t', inplace=True)
             arrAnn = {}
-            colsToKeep = arrAnnDF.columns.drop(['originalIndex', 'feature', 'segment', 'lag'])
+            # colsToKeep = arrAnnDF.columns.drop(['originalIndex', 'feature', 'segment', 'lag'])
+            colsToKeep = [
+                cN
+                for cN in arrAnnDF.columns
+                if cN not in ['originalIndex', 'feature', 'segment', 'lag']]
             for cName in colsToKeep:
                 values = arrAnnDF[cName].to_numpy()
                 if isinstance(values[0], str):

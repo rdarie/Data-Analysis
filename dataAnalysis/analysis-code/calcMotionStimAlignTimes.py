@@ -299,7 +299,8 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
                 for annName in motionAnnNamesForStim:
                     stimEvDF.loc[closestIdx, annName] = theseMotAnn[annName]
             else:
-                raise(Exception('No off time corresponding to stim on for this move round (t = {:.3f})!'.format(reachPeakT)))
+                stimOffTs = reachPeakT + searchRadius
+                raise(Exception('No off time corresponding to stim on for this move round (t = {:.3f})!'.format(float(reachPeakT))))
         if roundHasRetStim:
             stimInSearchRadius = (
                 (stimEvDF['t'] > retStimOn) &
@@ -324,7 +325,9 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
                 for annName in motionAnnNamesForStim:
                     stimEvDF.loc[closestIdx, annName] = theseMotAnn[annName]
             else:
-                raise(Exception('No off time corresponding to stim on for this move round (t = {:.3f})!'.format(reachBaseT)))
+                stimOffTs = reachBaseT + searchRadius
+                print('No off time corresponding to stim on for this move round (t = {:.3f})!'.format(float(reachBaseT)))
+                # raise(Exception())
     '''
     motionEvDF.loc[:, stimAnnNames] = (
         motionEvDF

@@ -11,14 +11,19 @@ Options:
     --lazy                                 load from raw, or regular? [default: False]
     --alignQuery=alignQuery                choose a subset of the data?
     --analysisName=analysisName            append a name to the resulting blocks? [default: default]
+    --alignFolderName=alignFolderName      append a name to the resulting blocks? [default: motion]
     --window=window                        process with short window? [default: short]
-    --estimator=estimator                  estimator filename
+    --winStart=winStart                    start of window [default: 200]
+    --winStop=winStop                      end of window [default: 400]
+    --estimatorName=estimatorName          estimator filename
     --unitQuery=unitQuery                  how to restrict channels?
-    --inputBlockName=inputBlockName        filename for resulting estimator [default: fr_sqrt]
+    --inputBlockSuffix=inputBlockSuffix    which trig_ block to pull [default: pca]
+    --inputBlockPrefix=inputBlockPrefix    which trig_ block to pull [default: Block]
 """
 #
 import dataAnalysis.helperFunctions.profiling as prf
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
+import dataAnalysis.helperFunctions.helper_functions_new as hf
 from namedQueries import namedQueries
 import os
 import pandas as pd
@@ -35,63 +40,47 @@ expOpts, allOpts = parseAnalysisOptions(
 globals().update(expOpts)
 globals().update(allOpts)
 #
-analysisSubFolder = os.path.join(
-    scratchFolder, arguments['analysisName']
-    )
-if not os.path.exists(analysisSubFolder):
-    os.makedirs(analysisSubFolder, exist_ok=True)
-#
-estimatorPath = os.path.join(
-    analysisSubFolder,
-    arguments['estimator'] + '.joblib')
-with open(
-    os.path.join(
-        analysisSubFolder,
-        arguments['estimator'] + '_meta.pickle'),
-        'rb') as f:
-    estimatorMetadata = pickle.load(f)
-estimator = jb.load(
-    os.path.join(analysisSubFolder, estimatorMetadata['path']))
-# estimator.regressorNames = estimator.regressorNames.unique(level='taskVariable')
-# estimatorMetadata['outputFeatures'] = estimatorMetadata['outputFeatures'].unique(level='taskVariable')
-alignedAsigsKWargs.update(estimatorMetadata['alignedAsigsKWargs'])
-alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(
-    namedQueries, **arguments)
-# !!
-# Reduce time sample even further
-alignedAsigsKWargs.update(dict(getMetaData=True, decimate=20))
-alignedAsigsKWargs['verbose'] = arguments['verbose']
-#
-if arguments['processAll']:
-    prefix = assembledName
-else:
-    prefix = ns5FileName
+blockBaseName, inputBlockSuffix = hf.processBasicPaths(arguments)
+analysisSubFolder, alignSubFolder = hf.processSubfolderPaths(
+    arguments, scratchFolder)
+
 triggeredPath = os.path.join(
     alignSubFolder,
-    prefix + '_{}_{}.nix'.format(
-        arguments['inputBlockName'], arguments['window']))
+    blockBaseName + '{}_{}.nix'.format(
+        inputBlockSuffix, arguments['window']))
+
+# alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
+#     namedQueries, scratchFolder, **arguments)
+#
+estimatorSubFolder = os.path.join(
+    analysisSubFolder, 'estimators')
+estimatorPath = os.path.join(
+    estimatorSubFolder,
+    arguments['estimatorName'] + '.joblib')
+with open(
+    os.path.join(
+        estimatorSubFolder,
+        arguments['estimatorName'] + '_meta.pickle'),
+        'rb') as f:
+    estimatorMetadata = pickle.load(f)
+estimator = jb.load(estimatorPath)
+alignedAsigsKWargs.update(estimatorMetadata['alignedAsigsKWargs'])
+alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **arguments)
+# !!
+# Reduce time sample even further
+# alignedAsigsKWargs.update(dict(getMetaData=True, decimate=20))
+alignedAsigsKWargs['verbose'] = arguments['verbose']
+#
 outputPath = os.path.join(
-    analysisSubFolder,
-    prefix + '_{}_{}'.format(
+    alignSubFolder,
+    blockBaseName + inputBlockSuffix + '_{}_{}'.format(
         estimatorMetadata['name'], arguments['window']))
 #
-if arguments['profile']:
-    prf.print_memory_usage('before load dataBlock')
-    prf.start_timing('')
 dataReader, dataBlock = ns5.blockFromPath(
     triggeredPath, lazy=arguments['lazy'])
-if arguments['profile']:
-    prf.stop_timing('after load dataBlock')
-    prf.print_memory_usage('after load dataBlock')
 #
-if arguments['profile']:
-    prf.print_memory_usage('before load firing rates')
-    prf.start_timing('')
 alignedAsigsDF = ns5.alignedAsigsToDF(
     dataBlock, **alignedAsigsKWargs)
-if arguments['profile']:
-    prf.stop_timing('after load firing rates')
-    prf.print_memory_usage('after load firing rates')
 #
 features = estimator.transform(alignedAsigsDF.to_numpy())
 if arguments['profile']:
@@ -104,6 +93,10 @@ else:
         estimatorMetadata['name'] + '{:0>3}'.format(i)
         for i in range(features.shape[1])]
 #
+# pdb.set_trace()
+# colNames = pd.MultiIndex.from_arrays(
+#     [featureNames, [0 for fN in featureNames]],
+#     names=['feature', 'lag'])
 alignedFeaturesDF = pd.DataFrame(
     features, index=alignedAsigsDF.index, columns=featureNames)
 alignedFeaturesDF.columns.name = 'feature'
@@ -113,6 +106,7 @@ masterBlock = ns5.alignedAsigDFtoSpikeTrain(alignedFeaturesDF, dataBlock)
 if arguments['lazy']:
     dataReader.file.close()
 masterBlock = ns5.purgeNixAnn(masterBlock)
+print('Writing {}.nix...'.format(outputPath))
 writer = ns5.NixIO(filename=outputPath + '.nix')
 writer.write_block(masterBlock, use_obj_names=True)
 writer.close()

@@ -27,8 +27,9 @@ import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
 import dataAnalysis.helperFunctions.helper_functions_new as hf
 from namedQueries import namedQueries
 import pdb
+import pandas as pd
 import dataAnalysis.preproc.ns5 as ns5
-from sklearn.decomposition import PCA, IncrementalPCA
+from sklearn.decomposition import SparsePCA
 from sklearn.pipeline import make_pipeline, Pipeline
 import joblib as jb
 import dill as pickle
@@ -91,7 +92,7 @@ dataReader, dataBlock = ns5.blockFromPath(
     triggeredPath, lazy=arguments['lazy'])
 
 nSeg = len(dataBlock.segments)
-
+dataList = []
 for segIdx in range(nSeg):
     if arguments['verbose']:
         prf.print_memory_usage('fitting on segment {}'.format(segIdx))
@@ -99,19 +100,19 @@ for segIdx in range(nSeg):
         dataBlock,
         whichSegments=[segIdx],
         **alignedAsigsKWargs)
-    # TODO: use trial metadata to ensure balanced dataset?
-    # trialInfo = dataDF.index.to_frame().reset_index(drop=True)
-    prf.print_memory_usage('just loaded data, fitting')
-    if 'estimator' not in locals():
-        # nComp = len(alignedAsigsKWargs['unitNames'])
-        nComp = dataDF.columns.shape[0]
-        estimator = IncrementalPCA(
-            n_components=nComp,
-            batch_size=int(5 * nComp))
-    estimator.partial_fit(dataDF.to_numpy())
-    saveUnitNames = [cN[0] for cN in dataDF.columns]
-    del dataDF
-    gc.collect()
+    dataList.append(dataDF)
+allDataDF = pd.concat(dataList)
+# TODO: use trial metadata to ensure balanced dataset?
+# trialInfo = dataDF.index.to_frame().reset_index(drop=True)
+prf.print_memory_usage('just loaded data, fitting')
+# nComp = len(alignedAsigsKWargs['unitNames'])
+nComp = dataDF.columns.shape[0]
+estimator = SparsePCA(
+    n_components=None)
+estimator.fit(dataDF.to_numpy())
+saveUnitNames = [cN[0] for cN in dataDF.columns]
+del dataDF
+gc.collect()
 #
 prf.print_memory_usage('Done fitting')
 
