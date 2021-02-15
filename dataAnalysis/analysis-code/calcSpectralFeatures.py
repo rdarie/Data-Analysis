@@ -70,12 +70,12 @@ alignedAsigsKWargs.update(dict(
 
 if HASLIBTFR:
     def pSpec(
-            data, stepLen, stepLen_samp, fr_start_idx, fr_stop_idx, NFFT,
+            data, tStart, stepLen, stepLen_samp, fr_start_idx, fr_stop_idx, NFFT,
             fs, fr, fr_samp, nw, nTapers, indexTName, annCols=None,
             annValues=None):
         nSamples = data.shape[0]
         nWindows = m.floor((nSamples - NFFT + 1) / stepLen_samp)
-        t = np.arange(nWindows + 1) * stepLen + NFFT / fs * 0.5
+        t = tStart + np.arange(nWindows + 1) * stepLen + NFFT / fs * 0.5
         spectrum = np.zeros((nWindows + 1, fr_samp))
         # generate a transform object with size equal to signal length and ntapers tapers
         D = libtfr.mfft_dpss(NFFT, nw, nTapers, NFFT)
@@ -83,13 +83,21 @@ if HASLIBTFR:
         P_libtfr = P_libtfr[:, fr_start_idx:fr_stop_idx]
         #
         # TODO: specIndex = pd.Multiindex, 'bin' ,etc.
-        spectrum = pd.DataFrame(P_libtfr, index=t, columns=fr)
+        if annCols is not None:
+            indexFrame = pd.DataFrame(np.nan, index=range(t.size), columns=[indexTName] + annCols)
+            for annIdx, annNm in enumerate(annCols):
+                indexFrame.loc[:, annNm] = annValues[annIdx]
+            indexFrame.loc[:, indexTName] = t
+            thisIndex = pd.MultiIndex.from_frame(indexFrame)
+        else:
+            thisIndex = pd.Index(t, name=indexTName)
+        spectrum = pd.DataFrame(P_libtfr, index=thisIndex, columns=fr)
         spectrum.columns.name = 'feature'
         spectrum.origin = 'libtfr'
         return spectrum
 else:
     def pSpec(
-            data, stepLen, stepLen_samp, fr_start_idx, fr_stop_idx, NFFT,
+            data, tStart, stepLen, stepLen_samp, fr_start_idx, fr_stop_idx, NFFT,
             fs, fr, fr_samp, nw, nTapers, indexTName, annCols=None,
             annValues=None):
         nSamples = data.shape[0]
@@ -100,7 +108,15 @@ else:
             data, mode='magnitude',
             window='boxcar', nperseg=NFFT, noverlap=overlap_samp, fs=fs)
         P_scipy = P_scipy.transpose()[np.newaxis, :, fr_start_idx:fr_stop_idx]
-        spectrum = pd.DataFrame(P_scipy, index=t, columns=fr)
+        if annCols is not None:
+            indexFrame = pd.DataFrame(np.nan, index=range(t.size), columns=[indexTName] + annCols)
+            for annIdx, annNm in enumerate(annCols):
+                indexFrame.loc[:, annNm] = annValues[annIdx]
+            indexFrame.loc[:, indexTName] = t
+            thisIndex = pd.MultiIndex.from_frame(indexFrame)
+        else:
+            thisIndex = pd.Index(t, name=indexTName)
+        spectrum = pd.DataFrame(P_scipy, index=thisIndex, columns=fr)
         spectrum.columns.name = 'feature'
         spectrum.origin = 'scipy'
         return spectrum
@@ -136,8 +152,9 @@ def getSpectrogram(
     trialGroupByNames = ['segment', 'originalIndex', 't']
     indexTName = 'bin'
     for name, group in dataSrs.groupby(trialGroupByNames):
+        tStart = group.index.get_level_values(indexTName)[0]
         spectra.append(pSpec(
-            group.to_numpy(), stepLen, stepLen_samp, fr_start_idx, fr_stop_idx,
+            group.to_numpy(), tStart, stepLen, stepLen_samp, fr_start_idx, fr_stop_idx,
             NFFT, fs, fr, fr_samp, nw, nTapers,
             indexTName, annCols=trialGroupByNames, annValues=name))
     return pd.concat(spectra)
