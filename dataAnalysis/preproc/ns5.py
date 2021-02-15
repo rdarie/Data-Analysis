@@ -1456,29 +1456,47 @@ def getAsigsAlignedToEvents(
 
 
 def alignedAsigDFtoSpikeTrain(
-        allWaveforms, dataBlock=None, matchSamplingRate=True):
+        allWaveforms, spikeTrainMeta=None,
+        dataBlock=None, matchSamplingRate=True):
     masterBlock = Block()
-    masterBlock.name = dataBlock.annotations['neo_name']
-    masterBlock.annotate(nix_name=dataBlock.annotations['neo_name'])
+    if dataBlock is not None:
+        masterBlock.name = dataBlock.annotations['neo_name']
+        masterBlock.annotate(nix_name=dataBlock.annotations['neo_name'])
+    else:
+        masterBlock.name = 'block'
     for segIdx, group in allWaveforms.groupby('segment'):
-        print('Saving trajectoriess for segment {}'.format(segIdx))
-        dataSeg = dataBlock.segments[segIdx]
-        exSt = dataSeg.spiketrains[0]
-        if isinstance(exSt, SpikeTrainProxy):
-            print(
-                'alignedAsigDFtoSpikeTrain basing seg {} on {}'
-                .format(segIdx, exSt.name))
-            stProxy = exSt
-            exSt = loadStProxy(stProxy)
-            exSt = loadObjArrayAnn(exSt)
-        print('exSt.left_sweep is {}'.format(exSt.left_sweep))
-        wfBins = ((np.arange(exSt.waveforms.shape[2]) / (exSt.sampling_rate)) - exSt.left_sweep).magnitude
+        print('Saving spiketrains for segment {}'.format(segIdx))
         # seg to contain triggered time series
-        newSeg = Segment(name=dataSeg.annotations['neo_name'])
-        newSeg.annotate(nix_name=dataSeg.annotations['neo_name'])
+        newSeg = Segment(name='seg{}_'.format(segIdx))
+        # newSeg.annotate(nix_name=dataSeg.annotations['neo_name'])
         masterBlock.segments.append(newSeg)
-        #
-        # pdb.set_trace()
+        if dataBlock is not None:
+            dataSeg = dataBlock.segments[segIdx]
+            exSt = dataSeg.spiketrains[0]
+            if isinstance(exSt, SpikeTrainProxy):
+                print(
+                    'alignedAsigDFtoSpikeTrain basing seg {} on {}'
+                    .format(segIdx, exSt.name))
+                stProxy = exSt
+                exSt = loadStProxy(stProxy)
+                exSt = loadObjArrayAnn(exSt)
+            print('exSt.left_sweep is {}'.format(exSt.left_sweep))
+            wfBins = ((np.arange(exSt.waveforms.shape[2]) / (exSt.sampling_rate)) - exSt.left_sweep).magnitude
+            #
+            tUnits = exSt.units
+            wvfUnits = exSt.waveforms.units
+            t_start = exSt.t_start
+            t_stop = exSt.t_stop
+            left_sweep = exSt.left_sweep
+            sampling_rate = exSt.sampling_rate
+        else:
+            assert spikeTrainMeta is not None
+            tUnits = spikeTrainMeta['units']
+            wvfUnits = spikeTrainMeta['wvfUnits']
+            t_start = spikeTrainMeta['t_start']
+            t_stop = spikeTrainMeta['t_stop']
+            left_sweep = spikeTrainMeta['left_sweep']
+            sampling_rate = spikeTrainMeta['sampling_rate']
         if isinstance(group.columns, pd.MultiIndex):
             if 'feature' in group.columns.names:
                 grouper = group.groupby(['feature', 'lag'])
@@ -1489,7 +1507,6 @@ def alignedAsigDFtoSpikeTrain(
             elif group.columns.name == 'feature':
                 grouper = group.iteritems()
                 colsAre = 'feature'
-            colsAre = 'feature'
         for featName, featGroup in grouper:
             print('Saving {}...'.format(featName))
             if featName[-2:] == '#0':
@@ -1536,17 +1553,21 @@ def alignedAsigDFtoSpikeTrain(
             for cName in colsToKeep:
                 values = arrAnnDF[cName].to_numpy()
                 if isinstance(values[0], str):
+                    print('Converting {} to unicode'.format(cName))
                     values = values.astype('U')
                 arrAnn.update({str(cName): values.flatten()})
             arrayAnnNames = {
-                'arrayAnnNames': list(arrAnn.keys())}
+                'arrayAnnNames': np.asarray([
+                    k
+                    for k, v in arrAnn.items()],
+                    dtype='U')}
             st = SpikeTrain(
                 name='seg{}_{}'.format(int(segIdx), thisUnit.name),
-                times=spikeTimes.to_numpy() * exSt.units,
-                waveforms=spikeWaveforms * pq.dimensionless,
-                t_start=exSt.t_start, t_stop=exSt.t_stop,
-                left_sweep=exSt.left_sweep,
-                sampling_rate=exSt.sampling_rate,
+                times=spikeTimes.to_numpy() * tUnits,
+                waveforms=spikeWaveforms * wvfUnits,
+                t_start=t_start, t_stop=t_stop,
+                left_sweep=left_sweep,
+                sampling_rate=sampling_rate,
                 **arrAnn, **arrayAnnNames
                 )
             st.annotate(nix_name=st.name)

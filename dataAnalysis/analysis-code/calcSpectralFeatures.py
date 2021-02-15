@@ -32,6 +32,7 @@ import dataAnalysis.preproc.ns5 as ns5
 import joblib as jb
 import pickle
 import math as m
+import quantities as pq
 
 try:
     import libtfr
@@ -66,19 +67,26 @@ alignedAsigsKWargs.update(dict(
     duplicateControlsByProgram=False,
     makeControlProgram=False,
     transposeToColumns='feature', concatOn='columns',
-    getMetaData=True, decimate=1))
+    getMetaData=[
+        'segment', 'originalIndex', 't', 'amplitude', 'program',
+        'activeGroup', 'RateInHz', 'stimCat', 'electrode',
+        'pedalDirection', 'pedalSize', 'pedalSizeCat', 'pedalMovementCat',
+        'pedalMetaCat', 'bin'
+    ],
+    decimate=1))
 
 if HASLIBTFR:
     def pSpec(
-            data, tStart, stepLen, stepLen_samp, fr_start_idx, fr_stop_idx, NFFT,
-            fs, fr, fr_samp, nw, nTapers, indexTName, annCols=None,
+            data, tStart, winLen, winLen_samp,
+            stepLen, stepLen_samp,
+            fs, fr, fr_samp, fr_start_idx, fr_stop_idx, NFFT,
+            nw, nTapers, indexTName, annCols=None,
             annValues=None):
         nSamples = data.shape[0]
-        nWindows = m.floor((nSamples - NFFT + 1) / stepLen_samp)
-        t = tStart + np.arange(nWindows + 1) * stepLen + NFFT / fs * 0.5
-        spectrum = np.zeros((nWindows + 1, fr_samp))
+        nWindows = m.floor((nSamples - winLen_samp + 1) / stepLen_samp)
+        t = tStart + winLen + np.arange(nWindows) * stepLen
         # generate a transform object with size equal to signal length and ntapers tapers
-        D = libtfr.mfft_dpss(NFFT, nw, nTapers, NFFT)
+        D = libtfr.mfft_dpss(NFFT, nw, nTapers, winLen_samp)
         P_libtfr = D.mtspec(data, stepLen_samp).transpose()
         P_libtfr = P_libtfr[:, fr_start_idx:fr_stop_idx]
         #
@@ -97,16 +105,19 @@ if HASLIBTFR:
         return spectrum
 else:
     def pSpec(
-            data, tStart, stepLen, stepLen_samp, fr_start_idx, fr_stop_idx, NFFT,
-            fs, fr, fr_samp, nw, nTapers, indexTName, annCols=None,
+            data, tStart, winLen, winLen_samp,
+            stepLen, stepLen_samp,
+            fs, fr, fr_samp, fr_start_idx, fr_stop_idx, NFFT,
+            nw, nTapers, indexTName, annCols=None,
             annValues=None):
-        nSamples = data.shape[0]
-        nWindows = m.floor((nSamples - NFFT + 1) / stepLen_samp)
-        spectrum = np.zeros((nWindows, fr_samp))
+        # nSamples = data.shape[0]
+        # nWindows = m.floor((nSamples - NFFT + 1) / stepLen_samp)
+        # spectrum = np.zeros((nWindows, fr_samp))
         overlap_samp = NFFT - stepLen_samp
         _, t, P_scipy = scipy.signal.spectrogram(
             data, mode='magnitude',
             window='boxcar', nperseg=NFFT, noverlap=overlap_samp, fs=fs)
+        t += (tStart + winLen)
         P_scipy = P_scipy.transpose()[np.newaxis, :, fr_start_idx:fr_stop_idx]
         if annCols is not None:
             indexFrame = pd.DataFrame(np.nan, index=range(t.size), columns=[indexTName] + annCols)
@@ -124,6 +135,7 @@ else:
 
 def getSpectrogram(
         dataSrs,
+        trialGroupByNames=None,
         winLen=None, stepLen=0.02, R=20,
         fs=None, fStart=None, fStop=None):
     # t = np.asarray(dataSrs.index)
@@ -134,7 +146,7 @@ def getSpectrogram(
     nw = winLen * R  # time bandwidth product based on 0.1 sec windows and 200 Hz bandwidth
     nTapers = m.ceil(nw / 2)  # L < nw - 1
     fr_samp = int(NFFT / 2) + 1
-    fr = np.arange(fr_samp) * fs / (2 * fr_samp)
+    fr = (1 + np.arange(fr_samp)) * fs / (2 * fr_samp)
     #
     if fStart is not None:
         fr_start_idx = np.where(fr > fStart)[0][0]
@@ -149,13 +161,14 @@ def getSpectrogram(
     fr = fr[fr_start_idx: fr_stop_idx]
     fr_samp = len(fr)
     spectra = []
-    trialGroupByNames = ['segment', 'originalIndex', 't']
     indexTName = 'bin'
     for name, group in dataSrs.groupby(trialGroupByNames):
         tStart = group.index.get_level_values(indexTName)[0]
         spectra.append(pSpec(
-            group.to_numpy(), tStart, stepLen, stepLen_samp, fr_start_idx, fr_stop_idx,
-            NFFT, fs, fr, fr_samp, nw, nTapers,
+            group.to_numpy(), tStart, winLen, winLen_samp,
+            stepLen, stepLen_samp,
+            fs, fr, fr_samp, fr_start_idx, fr_stop_idx,
+            NFFT, nw, nTapers,
             indexTName, annCols=trialGroupByNames, annValues=name))
     return pd.concat(spectra)
 
@@ -166,16 +179,50 @@ outputPath = os.path.join(
 dataReader, dataBlock = ns5.blockFromPath(
     triggeredPath, lazy=arguments['lazy'])
 #
+freqBands = pd.DataFrame({
+    'name': ['low', 'beta', 'hi', 'spb'],
+    'lBound': [1.5, 10, 80, 250],
+    'hBound': [4.5, 40, 250, 1000]
+    })
 alignedAsigsDF = ns5.alignedAsigsToDF(
     dataBlock, **alignedAsigsKWargs)
+
+alignedAsigsDF.columns = alignedAsigsDF.columns.droplevel('lag')
+trialGroupByNames = alignedAsigsDF.index.droplevel('bin').names
 dummySt = dataBlock.filter(
     objects=[ns5.SpikeTrain, ns5.SpikeTrainProxy])[0]
 fs = float(dummySt.sampling_rate)
-bla = getSpectrogram(
-    alignedAsigsDF.iloc[:, 1],
-    winLen=.1, stepLen=0.02, R=20,
-    fs=fs, fStart=None, fStop=None)
-masterBlock = ns5.alignedAsigDFtoSpikeTrain(spectralDF, dataBlock)
+theseSpectralFeatList = []
+for featName in alignedAsigsDF.columns:
+    thisSpectrogram = getSpectrogram(
+        alignedAsigsDF.loc[:, featName],
+        trialGroupByNames=trialGroupByNames,
+        winLen=200e-3, stepLen=20e-3, R=20,
+        fs=fs, fStart=None, fStop=None)
+    fBands = thisSpectrogram.columns
+    for rIdx, row in freqBands.iterrows():
+        thisMask = (fBands >= row['lBound']) & (fBands < row['hBound'])
+        if thisMask.any():
+            thisFeat = thisSpectrogram.loc[:, thisMask].mean(axis='columns')
+            thisFeat.name = '{}_{}'.format(featName[:-2], row['name'])
+            theseSpectralFeatList.append(thisFeat)
+
+spectralDF = pd.concat(theseSpectralFeatList, axis='columns')
+spectralDF.columns.name = 'feature'
+
+tBins = np.unique(spectralDF.index.get_level_values('bin'))
+trialTimes = np.unique(spectralDF.index.get_level_values('t'))
+spikeTrainMeta = {
+    'units': pq.s,
+    'wvfUnits': pq.dimensionless,
+    'left_sweep': (-1) * tBins[0] * pq.s,
+    't_start': min(0, trialTimes[0]) * pq.s,
+    't_stop': trialTimes[-1] * pq.s,
+    'sampling_rate': (tBins[1] - tBins[0]) ** (-1) * pq.Hz
+}
+masterBlock = ns5.alignedAsigDFtoSpikeTrain(
+    spectralDF, spikeTrainMeta=spikeTrainMeta, matchSamplingRate=False)
+
 if arguments['lazy']:
     dataReader.file.close()
 masterBlock = ns5.purgeNixAnn(masterBlock)
