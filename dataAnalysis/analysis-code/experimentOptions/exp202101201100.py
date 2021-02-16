@@ -161,6 +161,7 @@ def getExpOpts():
         'n': 1,
         'categories': ['amplitude', 'electrode', 'RateInHz']
         }
+    #
     spikeSortingOpts = {
         'utah': {
             'asigNameList': [
@@ -201,6 +202,18 @@ def getExpOpts():
                     'exp': experimentName, 'block': i,
                     'nameSuffix': 'mean_subtracted'}
                 for i in [1, 2, 3]]
+        }
+    }
+    #
+    csdOpts = {
+        'skipChannels': ['utah25', 'utah39'],
+        'filterOpts': {
+            'low': {
+                'Wn': 300,
+                'N': 4,
+                'btype': 'low',
+                'ftype': 'bessel'
+            }
         }
     }
     return locals()

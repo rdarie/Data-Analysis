@@ -2348,7 +2348,7 @@ def loadSpikeTrainList(
             for stp in dataBlock.filter(objects=SpikeTrainProxy)]
     for stP in dataBlock.filter(objects=SpikeTrainProxy):
         if stP.name in listOfSpikeTrainNames:
-            st = loadObjArrayAnn(stP.load())
+            st = loadObjArrayAnn(loadStProxy(stP))
             listOfSpikeTrains.append(st)
             if replaceInParents:
                 seg = stP.segment

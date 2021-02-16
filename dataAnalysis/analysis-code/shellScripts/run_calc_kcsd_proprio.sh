@@ -21,7 +21,7 @@
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=1,2,3
+#SBATCH --array=2
 
 # EXP="exp202101141100"
 # EXP="exp202101191100"
@@ -34,8 +34,8 @@ EXP="exp202101201100"
 
 LAZINESS="--lazy"
 #
-ANALYSISFOLDER="--analysisName=loRes"
-# ANALYSISFOLDER="--analysisName=default"
+# ANALYSISFOLDER="--analysisName=loRes"
+ANALYSISFOLDER="--analysisName=default"
 #
 module load anaconda/2020.02
 . /gpfs/runtime/opt/anaconda/2020.02/etc/profile.d/conda.sh
@@ -45,4 +45,4 @@ python --version
 
 # SLURM_ARRAY_TASK_ID=2
 #
-python -u ./calcLaplacian.py --useKCSD --inputBlockSuffix='analyze' --chanQuery="lfp" --outputBlockSuffix=kcsd --eventBlockSuffix='epochs' --verbose --plotting --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER $LAZINESS
+python -u ./calcLaplacianFromAsig.py --useKCSD --inputBlockSuffix='analyze' --chanQuery="lfp" --outputBlockSuffix="kcsd" --eventBlockSuffix='epochs' --verbose --plotting --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER $LAZINESS

@@ -1,3 +1,3 @@
 ccvUsername = 'jcarberr'
-scratchPath = '/gpfs/scratch/jcarberr/jcarberr/Neural Recordings'
-remoteBasePath = '/gpfs/data/dborton/jcarberr/Neural Recordings'
+scratchPath = '/gpfs/scratch/{}/{}/Neural Recordings'.format(ccvUsername, ccvUsername)
+remoteBasePath = '/gpfs/data/dborton/{}/Neural Recordings'.format(ccvUsername)
