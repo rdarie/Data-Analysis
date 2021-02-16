@@ -114,7 +114,7 @@ def preprocDelsysWrapper():
         if featName in featureRenameLookup:
             featName = featureRenameLookup[featName]
         chanName = pd.Series(featName)
-        pdb.set_trace()
+        #pdb.set_trace()
         if not eval(chanQuery)[0]:
             print('Not loading {} bc. of query'.format(thisLabel))
             continue

@@ -204,7 +204,7 @@ def synchronizeDelsysToNSP():
                     y=nspTimes[nspDiscRound == roundIdx], deg=1)
             except Exception:
                 traceback.print_exc()
-                pdb.set_trace()
+                #pdb.set_trace()
             thisInterpFun = np.poly1d(thesePolyCoeffs)
             if roundIdx == 0:
                 pwSyncDict[roundIdx] = {

@@ -30,7 +30,7 @@ import quantities as pq
 # import seaborn as sns
 
 #  load options
-#@profile
+@profile
 def assembleExperimentDataWrapper():
     from currentExperiment import parseAnalysisOptions
     from docopt import docopt
@@ -75,7 +75,7 @@ def assembleExperimentDataWrapper():
                 trialDataPath, fromRaw=False,
                 reduceChannelIndexes=True)
             # [cI.name for cI in dataBlock.channel_indexes]
-            pdb.set_trace()
+            #pdb.set_trace()
             #
             blocksCache[trialDataPath] = dataBlock
             if idx == 0:
