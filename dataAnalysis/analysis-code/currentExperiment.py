@@ -359,9 +359,9 @@ def parseAnalysisOptions(
     rasterOpts = {
         'binOpts': {
             'loRes': {
-                'binInterval': 2e-4,
+                'binInterval': 5e-4,
                 'binWidth': 5e-3,
-                'smoothKernelWidth': 5e-3},  # 5 kHz,
+                'smoothKernelWidth': 5e-3},  # 2 kHz,
             'default': {
                 'subfolder': 'default',
                 'binInterval': 1e-3,
