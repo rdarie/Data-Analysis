@@ -218,7 +218,7 @@ spikeTrainMeta = {
     'left_sweep': (-1) * tBins[0] * pq.s,
     't_start': min(0, trialTimes[0]) * pq.s,
     't_stop': trialTimes[-1] * pq.s,
-    'sampling_rate': (tBins[1] - tBins[0]) ** (-1) * pq.Hz
+    'sampling_rate': ((tBins[1] - tBins[0]) ** (-1)) * pq.Hz
 }
 masterBlock = ns5.alignedAsigDFtoSpikeTrain(
     spectralDF, spikeTrainMeta=spikeTrainMeta, matchSamplingRate=False)
@@ -226,6 +226,8 @@ masterBlock = ns5.alignedAsigDFtoSpikeTrain(
 if arguments['lazy']:
     dataReader.file.close()
 masterBlock = ns5.purgeNixAnn(masterBlock)
+if os.path.exists(outputPath + '.nix'):
+    os.remove(outputPath + '.nix')
 print('Writing {}.nix...'.format(outputPath))
 writer = ns5.NixIO(filename=outputPath + '.nix')
 writer.write_block(masterBlock, use_obj_names=True)

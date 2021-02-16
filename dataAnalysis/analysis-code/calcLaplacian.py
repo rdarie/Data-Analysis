@@ -434,7 +434,7 @@ if __name__ == "__main__":
             kcsdKWArgs = {
                 'cv_iterator': True,
                 'verbose': True,
-                'Rs': np.asarray([0.2, 0.3, 0.4]),
+                'Rs': np.asarray([0.2, 0.25, 0.3]),
                 # 'lambdas': np.logspace(-2, -10, 10, base=10.),
                 'n_lambda_suggestions': 10,
                 'gdx': 0.4, 'ext_x': 0.2, 'gdy': 0.4, 'ext_y': 0.2,

@@ -37,9 +37,9 @@ EXP="exp202101201100"
 
 LAZINESS="--lazy"
 #
-# ANALYSISFOLDER="--analysisName=loRes"
+ANALYSISFOLDER="--analysisName=loRes"
 # ANALYSISFOLDER="--analysisName=normalizedByImpedance"
-ANALYSISFOLDER="--analysisName=default"
+# ANALYSISFOLDER="--analysisName=default"
 #
 SPIKEBLOCKSUFFIX="--spikeFileSuffix=mean_subtracted"
 #
@@ -57,7 +57,7 @@ conda activate
 source activate nda2
 python --version
 
-# SLURM_ARRAY_TASK_ID=1
+# SLURM_ARRAY_TASK_ID=2
 #
 # python -u ./synchronizeSIMItoNSP.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP
 python -u ./calcProprioAnalysisNix.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER $SPIKESOURCE $SPIKEBLOCKSUFFIX $BLOCKPREFIX $RIGSUFFIX --chanQuery="all" --verbose --lazy

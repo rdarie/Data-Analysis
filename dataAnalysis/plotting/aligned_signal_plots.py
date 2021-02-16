@@ -334,11 +334,12 @@ def plotNeuronsAligned(
                             dropLabels = pd.Series(
                                 False,
                                 index=asigWide.index)
-                            for rIdx, row in underMinLabels.iterrows():
-                                theseBad = pd.Series(True, index=asigWide.index)
-                                for cName in row.index:
-                                    theseBad = theseBad & (indexInfo[cName] == row[cName])
-                                dropLabels = dropLabels | (theseBad)
+                            if not underMinLabels.empty:
+                                for rIdx, row in underMinLabels.iterrows():
+                                    theseBad = pd.Series(True, index=asigWide.index)
+                                    for cName in row.index:
+                                        theseBad = theseBad & (indexInfo[cName] == row[cName])
+                                    dropLabels = dropLabels | (theseBad)
                             minObsKeepMask = ~dropLabels.to_numpy()
                     if minNObservations > 0:
                         asigWide = asigWide.loc[minObsKeepMask, :]
@@ -451,6 +452,7 @@ def plotAsigsAligned(
             dataBlock, loadArgs['unitQuery'], objType=Unit)
     unitNames = loadArgs.pop('unitNames')
     loadArgs.pop('unitQuery')
+    # pdb.set_trace()
     with PdfPages(os.path.join(figureFolder, pdfName + '.pdf')) as pdf:
         for idx, unitName in enumerate(tqdm(unitNames)):
             asigWide = ns5.alignedAsigsToDF(
@@ -485,11 +487,12 @@ def plotAsigsAligned(
                         dropLabels = pd.Series(
                             False,
                             index=asigWide.index)
-                        for rIdx, row in underMinLabels.iterrows():
-                            theseBad = pd.Series(True, index=asigWide.index)
-                            for cName in row.index:
-                                theseBad = theseBad & (indexInfo[cName] == row[cName])
-                            dropLabels = dropLabels | (theseBad)
+                        if not underMinLabels.empty:
+                            for rIdx, row in underMinLabels.iterrows():
+                                theseBad = pd.Series(True, index=asigWide.index)
+                                for cName in row.index:
+                                    theseBad = theseBad & (indexInfo[cName] == row[cName])
+                                dropLabels = dropLabels | (theseBad)
                         minObsKeepMask = ~dropLabels.to_numpy()
                 if minNObservations > 0:
                     #
@@ -529,7 +532,6 @@ def plotAsigsAligned(
                         for hn in hueOrder
                         if hn in sorted(np.unique(indexInfo[hueName]))]
                 asig = asigWide.stack().reset_index(name='signal')
-                # 
                 g = sns.relplot(
                     x='bin', y='signal',
                     col=colName, row=rowName, hue=hueName,

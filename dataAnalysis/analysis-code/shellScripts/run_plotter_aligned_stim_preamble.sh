@@ -2,8 +2,8 @@
 
 source ./shellScripts/run_align_stim_preamble.sh
 
-OUTLIERMASK="--maskOutlierBlocks"
-# OUTLIERMASK=""
+#OUTLIERMASK="--maskOutlierBlocks"
+OUTLIERMASK=""
 
 STATSOVERLAY="--overlayStats"
 # STATSOVERLAY=""
@@ -22,7 +22,7 @@ ALIGNQUERY="--alignQuery=stimOnHighRate"
 
 HUEOPTS="--hueName=amplitude --hueControl="
 ROWOPTS="--rowName=RateInHz --rowControl="
-COLOPTS="--colName=pedalMovementCat --colControl="
+COLOPTS="--colName=electrode --colControl="
 STYLEOPTS="--styleName= --styleControl="
 SIZEOPTS="--sizeName= --sizeControl="
 

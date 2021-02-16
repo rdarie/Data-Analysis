@@ -34,8 +34,8 @@ EXP="exp202101201100"
 
 LAZINESS="--lazy"
 #
-# ANALYSISFOLDER="--analysisName=loRes"
-ANALYSISFOLDER="--analysisName=default"
+ANALYSISFOLDER="--analysisName=loRes"
+# ANALYSISFOLDER="--analysisName=default"
 #
 module load anaconda/2020.02
 . /gpfs/runtime/opt/anaconda/2020.02/etc/profile.d/conda.sh

@@ -104,8 +104,7 @@ statsTestOpts = dict(
     pThresh=5e-2,
     correctMultiple=False
     )
-alignedAsigsKWargs['procFun'] = ash.genDetrender(timeWindow=(-200e-3, -100e-3))
-#
+# alignedAsigsKWargs['procFun'] = ash.genDetrender(timeWindow=(-200e-3, -100e-3))
 #
 #############################################
 
@@ -154,7 +153,7 @@ relplotUpdates = {
             'hspace': 0.01
         }}
     }
-if arguments['inputBlockSuffix'] == 'kcsd':
+if 'kcsd' in arguments['inputBlockSuffix']:
     relplotUpdates.update({
         'palette': "ch:0.6,.3,dark=.1,light=0.7,reverse=1"
         })
