@@ -1221,10 +1221,10 @@ def getAsigsAlignedToEvents(
         masterBlock.annotate(nix_name=signalBlock.name)
     #  make channels and units for triggered time series
     for chanName in chansToTrigger:
-        chanIdx = ChannelIndex(name=chanName + '#0', index=[0])
+        chanIdx = ChannelIndex(name=chanName, index=[0])
         chanIdx.annotate(nix_name=chanIdx.name)
-        thisUnit = Unit(name=chanIdx.name)
-        thisUnit.annotate(nix_name=chanIdx.name)
+        thisUnit = Unit(name=chanName + '#0')
+        thisUnit.annotate(nix_name=chanName + '#0')
         chanIdx.units.append(thisUnit)
         thisUnit.channel_index = chanIdx
         masterBlock.channel_indexes.append(chanIdx)

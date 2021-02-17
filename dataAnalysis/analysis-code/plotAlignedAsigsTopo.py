@@ -199,7 +199,7 @@ relplotKWArgs.update({
             'wspace': 0.01,
             'hspace': 0.01
         }}})
-if arguments['inputBlockSuffix'] == 'kcsd':
+if 'kcsd' in arguments['inputBlockSuffix']:
     relplotKWArgs.update({
         'palette': "ch:0.6,.3,dark=.1,light=0.7,reverse=1"
         })
@@ -293,14 +293,7 @@ else:
         dataBlock, **alignedAsigsKWargs)
 #
 prf.print_memory_usage('loaded asig wide')
-# TODO check that these actually should be here
-# if 'nominalCurrentCat' in asigWide.index.names:
-#     asigWide.index = asigWide.index.droplevel('nominalCurrentCat')
-# asigStack = (
-#     asigWide
-#     .stack(level=['feature', 'lag'])
-#     .reset_index(name='signal')
-#     .dropna())
+
 trialInfo = asigWide.index.to_frame().reset_index(drop=True)
 #
 if minNObservations is not None:
@@ -333,13 +326,14 @@ for cidx, chanIdx in enumerate(dataBlock.channel_indexes):
     if len(listOfSpikeTrains):
         dummySt = listOfSpikeTrains[0]
         if 'xCoords' in dummySt.annotations:
+            nameMatches = (trialInfo['parentChanName'] == chanIdx.name) | (trialInfo['feature'] == chanIdx.name)
             try:
-                trialInfo.loc[trialInfo['feature'] == chanIdx.name, 'xcoords'] = dummySt.annotations['xCoords']
-                trialInfo.loc[trialInfo['feature'] == chanIdx.name, 'ycoords'] = dummySt.annotations['yCoords']
-                trialInfo.loc[trialInfo['feature'] == chanIdx.name, 'mapGroup'] = 'utah'
+                trialInfo.loc[nameMatches, 'xcoords'] = dummySt.annotations['xCoords']
+                trialInfo.loc[nameMatches, 'ycoords'] = dummySt.annotations['yCoords']
+                trialInfo.loc[nameMatches, 'mapGroup'] = 'utah'
             except Exception:
                 traceback.print_exc()
-
+# pdb.set_trace()
 if trialInfo['xcoords'].isna().any():
     if 'mapDF' not in locals():
         electrodeMapPath = spikeSortingOpts[arguments['arrayName']]['electrodeMapPath']
@@ -357,7 +351,7 @@ if trialInfo['xcoords'].isna().any():
             .loc[:, 'parentChanName']
             .map(mapSer))
     trialInfo.loc[:, 'mapGroup'] = 'utah'
-# pdb.set_trace()
+
 dummyDict = {}
 for probeName, tInfoGrp in trialInfo.groupby('mapGroup'):
     dummyList = []
@@ -444,7 +438,6 @@ with PdfPages(pdfName) as pdf:
                             relplotKWArgs['height'] * 0.1 / np.mean(absHeights))
                     else:
                         updateFigSize = None
-            # pdb.set_trace()
             g = sns.relplot(
                 data=thisAsigStack,
                 x='bin', y='signal', hue=arguments['hueName'],

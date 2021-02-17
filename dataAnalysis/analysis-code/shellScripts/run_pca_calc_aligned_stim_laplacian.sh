@@ -20,7 +20,7 @@
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=1,2,3
+#SBATCH --array=2
 
 # SLURM_ARRAY_TASK_ID=2
 source ./shellScripts/run_pca_calc_aligned_stim_preamble.sh

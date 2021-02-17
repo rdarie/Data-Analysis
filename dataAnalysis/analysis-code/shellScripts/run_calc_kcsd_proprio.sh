@@ -11,11 +11,11 @@
 #SBATCH --mem=250G
 
 # Specify a job name:
-#SBATCH -J laplacian_calc_2021_01_28_kcsd
+#SBATCH -J laplacian_calc_2021_01_20_kcsd
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-laplacian_calc_2021_01_28_kcsd.out
-#SBATCH -e ../../batch_logs/%j-%a-laplacian_calc_2021_01_28_kcsd.out
+#SBATCH -o ../../batch_logs/%j-%a-laplacian_calc_2021_01_20_kcsd.out
+#SBATCH -e ../../batch_logs/%j-%a-laplacian_calc_2021_01_20_kcsd.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo

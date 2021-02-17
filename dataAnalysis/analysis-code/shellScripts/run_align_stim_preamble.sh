@@ -26,12 +26,12 @@ LAZINESS="--lazy"
 WINDOW="--window=M"
 AMPFIELDNAME="--amplitudeFieldName=amplitude"
 
-ANALYSISFOLDER="--analysisName=loRes"
-# ANALYSISFOLDER="--analysisName=default"
+# ANALYSISFOLDER="--analysisName=loRes"
+ANALYSISFOLDER="--analysisName=default"
 # ANALYSISFOLDER="--analysisName=normalizedByImpedance"
 
-SIGNALFOLDER="--signalSubfolder=loRes"
-# SIGNALFOLDER="--signalSubfolder=default"
+# SIGNALFOLDER="--signalSubfolder=loRes"
+SIGNALFOLDER="--signalSubfolder=default"
 # SIGNALFOLDER="--signalSubfolder=normalizedByImpedance"
 
 EVENTFOLDER="--eventSubfolder=None"

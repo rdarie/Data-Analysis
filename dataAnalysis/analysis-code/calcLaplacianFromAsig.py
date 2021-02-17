@@ -19,6 +19,7 @@ Options:
     --plotting                                   plot results?
     --eventSubfolder=eventSubfolder              name of folder where the event block is
     --eventBlockSuffix=eventBlockSuffix          name of events object to align to
+    --recalcKCSDCV                               recalculate optimal kCSD hyperparameters [default: False]
 """
 
 import matplotlib
@@ -98,6 +99,8 @@ dataPath = os.path.join(
 outputPath = os.path.join(
     analysisSubFolder,
     blockBaseName + '{}.nix'.format(outputBlockSuffix))
+annotationsPath = os.path.join(
+    analysisSubFolder, '{}_kcsd_meta.h5'.format(blockBaseName))
 
 arguments['chanNames'], arguments['chanQuery'] = ash.processChannelQueryArgs(
     namedQueries, scratchFolder, **arguments)
@@ -130,6 +133,9 @@ if __name__ == "__main__":
         csdOpts = {}
     skipChannels = csdOpts.pop('skipChannels', None)
     csdTimeFilterOpts = csdOpts.pop('filterOpts', None)
+    csdOptimalHyperparameters = csdOpts.pop('optimalHyperparameters', None)
+    NSamplesForCV = csdOpts.pop('NSamplesForCV', 1000)
+    chunkSize = csdOpts.pop('chunkSize', 20000)
     if skipChannels is not None:
         reqChanNames = [cn for cn in reqChanNames if cn not in skipChannels]
     #
@@ -220,8 +226,6 @@ if __name__ == "__main__":
         sigma = 1
         #
         # TODO: bring in events block, use perievent times to do cross validation
-        NSamplesForCV = 1000
-        chunkSize = 10000
         estimateAsigs = asigs
         # estimateAsigs = asigs[:100, :]
         # NSamplesForCV = 10
@@ -264,64 +268,106 @@ if __name__ == "__main__":
                 'n_src_init': (3 * 10 ** ordMagX) * (3 * 10 ** ordMagY)
                 }
             print('calcKCSD using {} sources'.format(kcsdKWArgs['n_src_init']))
-            # testParams = pd.MultiIndex.from_product(
-            #     [[0.2, 0.5, 1], ], names=['h']
-            #     ).to_frame()
-            testParams = pd.DataFrame([0.2, 0.5, 1], columns=['h'])
-            allErrsList = []
-            # pdb.set_trace()
-            if eventBlock is not None:
-                ev = ns5.loadEventList(
-                    eventBlock.segments[segIdx],
-                    listOfEventNames=['seg{}_{}'.format(segIdx, eventName)])
-                sampleIndices = np.arange(estimateAsigs.shape[0])
-                sampleMask = np.zeros(sampleIndices.shape, dtype=np.bool)
-                for t in ev[0].times:
-                    sampleMask = sampleMask | ((estimateAsigs.times > t) & (estimateAsigs.times <= t + 1 * pq.s))
-                sampleIdx = sample(
-                    list(sampleIndices[sampleMask]),
-                    min(sampleIndices[sampleMask].shape[0], NSamplesForCV))
-            else:
+            needKCSDCV = (not os.path.exists(annotationsPath)) and (csdOptimalHyperparameters is None)
+            if arguments['recalcKCSDCV'] or needKCSDCV:
+                # testParams = pd.MultiIndex.from_product(
+                #     [[0.2, 0.5, 1], ], names=['h']
+                #     ).to_frame()
+                # testParams = pd.DataFrame([0.2, 0.5, 1], columns=['h'])
+                testParams = pd.DataFrame([0.2, 1], columns=['h'])
+                allErrsList = []
                 sampleIdx = sample(
                     list(range(estimateAsigs.shape[0])),
                     min(estimateAsigs.shape[0], NSamplesForCV))
-            for tpIdx, tp in testParams.iterrows():
-                # run cross validator on a subset of the data
-                sampleLFP = estimateAsigs.magnitude[sampleIdx, :] * estimateAsigs.units
-                theseArgs = kcsdKWArgs.copy()
-                theseArgs.update(tp.to_dict())
-                kcsd, csdAsigs, cv_R, cv_lambda = csd.runKcsd(
-                    sampleLFP,
-                    chanIndex.coordinates[:, :2],
-                    kwargs=theseArgs.copy(),
-                    process_estimate=True)
-                if 'lambdas' not in theseArgs:
-                    lambdas = np.concatenate([kcsd.suggest_lambda(), [0]])
-                else:
-                    lambdas = theseArgs['lambdas']
-                if 'Rs' not in theseArgs:
-                    Rs = [kcsd.R_init]
-                else:
-                    Rs = theseArgs['Rs']
-                theseErrs = {}
-                for ridx, R in enumerate(Rs):
-                    theseErrs[R] = pd.DataFrame(
-                        kcsd.errs_per_ele[ridx],
-                        index=lambdas, columns=chanNames)
-                errThisTP = pd.concat(theseErrs, names=['R_init', 'lambd'])
-                errThisTP.columns.name = 'electrode'
-                errThisTP = errThisTP.stack().reset_index()
-                errThisTP.rename(columns={0: 'error'}, inplace=True)
-                for prmNm in tp.index:
-                    errThisTP.loc[:, prmNm] = tp[prmNm]
-                allErrsList.append(errThisTP)
-            kcsdErrsDF = pd.concat(allErrsList)
-            paramNames = testParams.columns.to_list() + ['R_init', 'lambd']
-            meanErrs = kcsdErrsDF.groupby(paramNames).mean()['error']
-            #
-            optiParams = {
-                paramNames[pidx]: p
-                for pidx, p in enumerate(meanErrs.idxmin())}
+                for tpIdx, tp in testParams.iterrows():
+                    # run cross validator on a subset of the data
+                    sampleLFP = estimateAsigs.magnitude[sampleIdx, :] * estimateAsigs.units
+                    theseArgs = kcsdKWArgs.copy()
+                    theseArgs.update(tp.to_dict())
+                    kcsd, csdAsigs, cv_R, cv_lambda = csd.runKcsd(
+                        sampleLFP,
+                        chanIndex.coordinates[:, :2],
+                        kwargs=theseArgs.copy(),
+                        process_estimate=True)
+                    if 'lambdas' not in theseArgs:
+                        lambdas = np.concatenate([kcsd.suggest_lambda(), [0]])
+                    else:
+                        lambdas = theseArgs['lambdas']
+                    if 'Rs' not in theseArgs:
+                        Rs = [kcsd.R_init]
+                    else:
+                        Rs = theseArgs['Rs']
+                    theseErrs = {}
+                    for ridx, R in enumerate(Rs):
+                        theseErrs[R] = pd.DataFrame(
+                            kcsd.errs_per_ele[ridx],
+                            index=lambdas, columns=chanNames)
+                    errThisTP = pd.concat(theseErrs, names=['R_init', 'lambd'])
+                    errThisTP.columns.name = 'electrode'
+                    errThisTP = errThisTP.stack().reset_index()
+                    errThisTP.rename(columns={0: 'error'}, inplace=True)
+                    for prmNm in tp.index:
+                        errThisTP.loc[:, prmNm] = tp[prmNm]
+                    allErrsList.append(errThisTP)
+                kcsdErrsDF = pd.concat(allErrsList)
+                #
+                kcsdErrsDF.to_hdf(annotationsPath, 'kcsd_error')
+                testParams.to_hdf(annotationsPath, 'testParams')
+                paramNames = testParams.columns.to_list() + ['R_init', 'lambd']
+                meanErrs = kcsdErrsDF.groupby(paramNames).mean()['error']
+                #
+                optiParams = {
+                    paramNames[pidx]: p
+                    for pidx, p in enumerate(meanErrs.idxmin())}
+                if arguments['plotting']:
+                    #
+                    plotGroups = ['R_init', 'h']
+                    # meanGroups = ['lambd']
+                    nPlotHeadings = kcsdErrsDF.groupby(plotGroups).ngroups
+                    nRows = int(np.ceil(np.sqrt(nPlotHeadings)))
+                    nCols = int(np.ceil(nPlotHeadings / nRows))
+                    fig2, ax2 = plt.subplots(nRows, nCols)
+                    fig2.set_size_inches(8 * nRows, 8 * nCols)
+                    flatAxes = ax2.flatten()
+                    globalMeanErr = kcsdErrsDF.groupby('electrode').mean()['error']
+                    for axIdx, (params, errGroup) in enumerate(kcsdErrsDF.groupby(plotGroups)):
+                        thisMeanErr = errGroup.groupby('electrode').mean()['error']
+                        errAx = flatAxes[axIdx]
+                        csdErrPerElec = AnalogSignal(
+                            thisMeanErr.to_numpy()[np.newaxis, :],
+                            units=pq.uV, t_start=0 * pq.s,
+                            sampling_rate=dummyAsig.sampling_rate
+                            )
+                        _, _, errDF = csd.plotLfp2D(
+                            asig=csdErrPerElec[0, :], chanIndex=chanIndex,
+                            fig=fig2, ax=errAx,
+                            heatmapKWs={
+                                'cmap': 'viridis',
+                                'annot': annotations2D['chanName'],
+                                'vmin': globalMeanErr.min(),
+                                'vmax': globalMeanErr.max(),
+                                'fmt': '^5'})
+                        errAx.set_title('mean err = {:3f}; {} = {}'.format(
+                            thisMeanErr.mean(), plotGroups, params))
+                    fig2.suptitle('kCSD CV Error (optimal params = {})'.format(optiParams))
+                    fig2.savefig(
+                        os.path.join(
+                            figureOutputFolder,
+                            '{}_{}_error_by_electrode.pdf'.format(
+                                blockBaseName, methodName)),
+                        bbox_inches='tight', pad_inches=0
+                        )
+            elif csdOptimalHyperparameters is not None:
+                optiParams = csdOptimalHyperparameters
+            else:
+                kcsdErrsDF = pd.read_hdf(annotationsPath, 'kcsd_error')
+                testParams = pd.read_hdf(annotationsPath, 'testParams')
+                paramNames = testParams.columns.to_list() + ['R_init', 'lambd']
+                meanErrs = kcsdErrsDF.groupby(paramNames).mean()['error']
+                #
+                optiParams = {
+                    paramNames[pidx]: p
+                    for pidx, p in enumerate(meanErrs.idxmin())}
             print('After CV, updating params to: {}'.format(optiParams))
             kcsdKWArgs.update(optiParams)
             #
@@ -465,26 +511,6 @@ if __name__ == "__main__":
             axis=0)
         csdAsigsLong.magnitude[:] = filteredAsigs
     if arguments['plotting']:
-        '''
-        sns.set(font_scale=.8)
-        if arguments['useKCSD']:
-            fig, ax = plt.subplots(1, 2)
-            origAx = ax[0]
-            csdAx = ax[1]
-            methodName = 'kcsd'
-        else:
-            fig, ax = plt.subplots(1, 3)
-            origAx = ax[0]
-            smoothedAx = ax[1]
-            csdAx = ax[2]
-            methodName = 'laplacian'
-        #
-        fig.set_size_inches(5 * len(ax), 5)
-        _, _, lfpDF = csd.plotLfp2D(
-            asig=estimateAsigs[0, :], chanIndex=chanIndex,
-            fillerFun=csd.interpLfp, fig=fig, ax=origAx)
-        origAx.set_title('Original')
-        '''
         _, _, csdDF = csd.plotLfp2D(
             asig=csdAsigsLong[0, :], chanIndex=csdChanIndex,
             fillerFun=csd.interpLfp, fig=fig, ax=csdAx,
@@ -504,47 +530,6 @@ if __name__ == "__main__":
                 '{}_{}_example.pdf'.format(blockBaseName, methodName)),
             bbox_inches='tight', pad_inches=0
         )
-        if arguments['useKCSD']:
-            #
-            plotGroups = ['R_init', 'h']
-            # meanGroups = ['lambd']
-            nPlotHeadings = kcsdErrsDF.groupby(plotGroups).ngroups
-            nRows = int(np.ceil(np.sqrt(nPlotHeadings)))
-            nCols = int(np.ceil(nPlotHeadings / nRows))
-            fig2, ax2 = plt.subplots(nRows, nCols)
-            fig2.set_size_inches(8 * nRows, 8 * nCols)
-            flatAxes = ax2.flatten()
-            globalMeanErr = kcsdErrsDF.groupby('electrode').mean()['error']
-            for axIdx, (params, errGroup) in enumerate(kcsdErrsDF.groupby(plotGroups)):
-                thisMeanErr = errGroup.groupby('electrode').mean()['error']
-                errAx = flatAxes[axIdx]
-                csdErrPerElec = AnalogSignal(
-                    thisMeanErr.to_numpy()[np.newaxis, :],
-                    units=pq.uV, t_start=0 * pq.s,
-                    sampling_rate=dummyAsig.sampling_rate
-                    )
-                _, _, errDF = csd.plotLfp2D(
-                    asig=csdErrPerElec[0, :], chanIndex=chanIndex,
-                    fig=fig2, ax=errAx,
-                    heatmapKWs={
-                        'cmap': 'viridis',
-                        'annot': annotations2D['chanName'],
-                        'vmin': globalMeanErr.min(),
-                        'vmax': globalMeanErr.max(),
-                        'fmt': '^5'})
-                errAx.set_title('mean err = {:3f}; {} = {}'.format(
-                    thisMeanErr.mean(), plotGroups, params))
-            fig2.suptitle('kCSD CV Error (optimal params = {})'.format(optiParams))
-            fig2.savefig(
-                os.path.join(
-                    figureOutputFolder,
-                    '{}_{}_error_by_electrode.pdf'.format(
-                        blockBaseName, methodName)),
-                bbox_inches='tight', pad_inches=0
-                )
-            annotationsPath = os.path.join(
-                analysisSubFolder, '{}_kcsd_meta.h5'.format(blockBaseName))
-            kcsdErrsDF.to_hdf(annotationsPath, 'kcsd_error')
         # plt.show()
         plt.close()
     outputBlock = Block(name='csd')

@@ -128,6 +128,9 @@ if __name__ == "__main__":
         csdOpts = {}
     skipChannels = csdOpts.pop('skipChannels', None)
     csdTimeFilterOpts = csdOpts.pop('filterOpts', None)
+    csdOptimalHyperparameters = csdOpts.pop('optimalHyperparameters', None)
+    NSamplesForCV = csdOpts.pop('NSamplesForCV', 1000)
+    chunkSize = csdOpts.pop('chunkSize', 20000)
     if skipChannels is not None:
         reqUnitNames = [
             cn
@@ -223,16 +226,15 @@ if __name__ == "__main__":
         decimateFactor = None
         sigma = 1
         #
-        NSamplesForCV = 1000
-        chunkSize = 10000
         estimateAsigs = asigs
         ###########################################
         # for debugging, reduce nTrials
-        # nTrials = 2
-        # dummySt = dummySt[:nTrials]
-        # estimateAsigs = asigs[:nBins*nTrials, :]
-        # NSamplesForCV = 10
-        # chunkSize = 10
+        '''
+        nTrials = 3
+        dummySt = dummySt[:nTrials]
+        estimateAsigs = asigs[:nBins*nTrials, :]
+        NSamplesForCV = 10
+        '''
         #
         if arguments['plotting'] and (segIdx == 0):
             sns.set(font_scale=.8)
@@ -263,20 +265,21 @@ if __name__ == "__main__":
             kcsdKWArgs = {
                 'cv_iterator': True,
                 'verbose': True,
-                'Rs': np.asarray([0.2, 0.25, 0.3]),
+                # 'Rs': np.asarray([0.2, 0.25, 0.3]),
+                'Rs': np.asarray([0.2, 0.3]),
                 # 'lambdas': np.logspace(-2, -10, 10, base=10.),
-                'n_lambda_suggestions': 10,
+                'n_lambda_suggestions': 3,
                 'gdx': 0.4, 'ext_x': 0.2, 'gdy': 0.4, 'ext_y': 0.2,
                 'n_src_init': (3 * 10 ** ordMagX) * (3 * 10 ** ordMagY)
                 }
-            print('calcKCSD using {} sources'.format(kcsdKWArgs['n_src_init']))
-            kCSDCVDone = os.path.exists(annotationsPath)
-            optiParamsExist = 'csdOptimalHyperparams' in locals()
-            if arguments['recalcKCSDCV']:
+            print('calcKCSD using {} sources'.format(kcsdKWArgs['n_src_init'])) 
+            needKCSDCV = (not os.path.exists(annotationsPath)) and (csdOptimalHyperparameters is None)
+            if arguments['recalcKCSDCV'] or needKCSDCV:
                 # testParams = pd.MultiIndex.from_product(
                 #     [[0.2, 0.5, 1], ], names=['h']
                 #     ).to_frame()
-                testParams = pd.DataFrame([0.2, 0.5, 1], columns=['h'])
+                # testParams = pd.DataFrame([0.2, 0.5, 1], columns=['h'])
+                testParams = pd.DataFrame([0.2, 1], columns=['h'])
                 allErrsList = []
                 sampleIdx = sample(
                     list(range(estimateAsigs.shape[0])),
@@ -315,6 +318,12 @@ if __name__ == "__main__":
                 #
                 kcsdErrsDF.to_hdf(annotationsPath, 'kcsd_error')
                 testParams.to_hdf(annotationsPath, 'testParams')
+                paramNames = testParams.columns.to_list() + ['R_init', 'lambd']
+                meanErrs = kcsdErrsDF.groupby(paramNames).mean()['error']
+                #
+                optiParams = {
+                    paramNames[pidx]: p
+                    for pidx, p in enumerate(meanErrs.idxmin())}
                 if arguments['plotting']:
                     #
                     plotGroups = ['R_init', 'h']
@@ -353,16 +362,17 @@ if __name__ == "__main__":
                                 blockBaseName, methodName)),
                         bbox_inches='tight', pad_inches=0
                         )
+            elif csdOptimalHyperparameters is not None:
+                optiParams = csdOptimalHyperparameters
             else:
                 kcsdErrsDF = pd.read_hdf(annotationsPath, 'kcsd_error')
                 testParams = pd.read_hdf(annotationsPath, 'testParams')
-
-            paramNames = testParams.columns.to_list() + ['R_init', 'lambd']
-            meanErrs = kcsdErrsDF.groupby(paramNames).mean()['error']
-            #
-            optiParams = {
-                paramNames[pidx]: p
-                for pidx, p in enumerate(meanErrs.idxmin())}
+                paramNames = testParams.columns.to_list() + ['R_init', 'lambd']
+                meanErrs = kcsdErrsDF.groupby(paramNames).mean()['error']
+                #
+                optiParams = {
+                    paramNames[pidx]: p
+                    for pidx, p in enumerate(meanErrs.idxmin())}
             print('After CV, updating params to: {}'.format(optiParams))
             kcsdKWArgs.update(optiParams)
             #
@@ -502,32 +512,11 @@ if __name__ == "__main__":
         print('time domain filtering csd estimate...')
         for trialIdx in range(nTrials):
             locator = slice(trialIdx * nBins, (trialIdx + 1) * nBins)
-            # pdb.set_trace()
             filteredAsigs = signal.sosfiltfilt(
                 filterCoeffs, csdAsigsLong.magnitude[locator, :],
                 axis=0)
             csdAsigsLong.magnitude[locator, :] = filteredAsigs
     if arguments['plotting']:
-        '''
-        sns.set(font_scale=.8)
-        if arguments['useKCSD']:
-            fig, ax = plt.subplots(1, 2)
-            origAx = ax[0]
-            csdAx = ax[1]
-            methodName = 'kcsd'
-        else:
-            fig, ax = plt.subplots(1, 3)
-            origAx = ax[0]
-            smoothedAx = ax[1]
-            csdAx = ax[2]
-            methodName = 'laplacian'
-        #
-        fig.set_size_inches(5 * len(ax), 5)
-        _, _, lfpDF = csd.plotLfp2D(
-            asig=estimateAsigs[0, :], chanIndex=chanIndex,
-            fillerFun=csd.interpLfp, fig=fig, ax=origAx)
-        origAx.set_title('Original')
-        '''
         _, _, csdDF = csd.plotLfp2D(
             asig=csdAsigsLong[0, :], chanIndex=csdChanIndex,
             fillerFun=csd.interpLfp, fig=fig, ax=csdAx,
@@ -580,7 +569,7 @@ if __name__ == "__main__":
                 waveforms=csdAsigsLong[:, cidx].reshape(nTrials, 1, nBins),
                 sampling_rate=dummySt.sampling_rate, t_start=dummySt.t_start,
                 t_stop=dummySt.t_stop, left_sweep=dummySt.left_sweep,
-                annotations=dummySt.annotations
+                **dummySt.annotations
                 )
             thisSt.annotations['xCoords'] = float(newChIdx.coordinates[:, 0])
             thisSt.annotations['yCoords'] = float(newChIdx.coordinates[:, 1])

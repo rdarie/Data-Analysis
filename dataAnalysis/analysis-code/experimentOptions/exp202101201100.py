@@ -206,7 +206,10 @@ def getExpOpts():
     }
     #
     csdOpts = {
+        'NSamplesForCV': 1000,
+        'chunkSize': 20000,
         'skipChannels': ['utah25', 'utah39'],
+        'optimalHyperparameters': {'h': 1.0, 'R_init': 0.2, 'lambd': 0.00166},
         'filterOpts': {
             'low': {
                 'Wn': 300,
