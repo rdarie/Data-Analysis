@@ -24,6 +24,7 @@ from datetime import timezone
 import os, gc
 import traceback
 import json
+import line_profiler
 from functools import reduce
 from sklearn.covariance import EmpiricalCovariance
 from sklearn.decomposition import PCA
@@ -39,7 +40,7 @@ except ImportError:
     from collections import Iterable
 from elephant.conversion import binarize
 
-
+@profile
 def analogSignalsToDataFrame(
         analogsignals, idxT='t', useChanNames=False):
     asigList = []
@@ -65,7 +66,7 @@ def analogSignalsToDataFrame(
             index=range(asig.shape[0])))
     return pd.concat(asigList, axis=1)
 
-
+@profile
 def listChanNames(
         dataBlock, chanQuery,
         objType=AnalogSignalProxy, condition=None):
@@ -88,7 +89,7 @@ def listChanNames(
         chansToTrigger = chansToTrigger['chanName'].to_list()
     return chansToTrigger
 
-
+@profile
 def spikeDictToSpikeTrains(
         spikes, block=None, seg=None,
         probeName='insTD', t_stop=None,
@@ -147,7 +148,7 @@ def spikeDictToSpikeTrains(
     block.create_relationship()
     return block
 
-
+@profile
 def spikeTrainsToSpikeDict(
         spiketrains):
     nCh = len(spiketrains)
@@ -191,7 +192,7 @@ def spikeTrainsToSpikeDict(
             spikes['Classification'][idx] = classVals
     return spikes
 
-
+@profile
 def channelIndexesToSpikeDict(
         channel_indexes):
     nCh = len(channel_indexes)
@@ -274,7 +275,7 @@ def channelIndexesToSpikeDict(
                 maxUnitIdx += 1
     return spikes
 
-
+@profile
 def unitSpikeTrainArrayAnnToDF(
         spikeTrainContainer):
     #  list contains different segments
@@ -294,7 +295,7 @@ def unitSpikeTrainArrayAnnToDF(
         fullAnnotationsDict, names=['segment', 'index'], sort=True)
     return annotationsDF
 
-
+@profile
 def getSpikeDFMetadata(spikeDF, metaDataCols):
     spikeDF.reset_index(inplace=True)
     metaDataCols = np.atleast_1d(metaDataCols)
@@ -303,7 +304,7 @@ def getSpikeDFMetadata(spikeDF, metaDataCols):
     newSpikeDF = spikeDF.drop(columns=metaDataCols).reset_index()
     return newSpikeDF, metaDataDF
 
-
+@profile
 def transposeSpikeDF(
         spikeDF, transposeToColumns,
         fastTranspose=False):
@@ -335,7 +336,7 @@ def transposeSpikeDF(
             .set_index(newIdxLabels))
         return newSpikeDF
 
-
+@profile
 def concatenateBlocks(
         asigBlocks, spikeBlocks, eventBlocks, chunkingMetadata,
         samplingRate, chanQuery, lazy, trackMemory, verbose
@@ -656,7 +657,7 @@ def concatenateEventsContainerV2(eventContainer, newSegIdx=0):
     return masterEvent
 '''
 
-
+@profile
 def concatenateEventsContainer(eventContainer, linkParents=True):
     if isinstance(eventContainer, dict):
         listOfEvents = list(eventContainer.values())
@@ -739,6 +740,7 @@ def concatenateEventsContainer(eventContainer, newSegIdx=0):
 '''
 
 #  renamed spikeTrainWaveformsToDF to unitSpikeTrainWaveformsToDF
+@profile
 def unitSpikeTrainWaveformsToDF(
         spikeTrainContainer,
         dataQuery=None,
@@ -964,7 +966,7 @@ def unitSpikeTrainWaveformsToDF(
             fastTranspose=fastTranspose)
     return waveformsDF
 
-
+@profile
 def concatenateUnitSpikeTrainWaveformsDF(
         units, dataQuery=None,
         transposeToColumns='bin', concatOn='index',
@@ -1046,7 +1048,7 @@ def concatenateUnitSpikeTrainWaveformsDF(
         pdb.set_trace()
     return allWaveforms
 
-
+@profile
 def alignedAsigsToDF(
         dataBlock, unitNames=None,
         unitQuery=None, dataQuery=None,
@@ -1181,7 +1183,7 @@ def alignedAsigsToDF(
         axis='columns', inplace=True, kind='mergesort')
     return allWaveforms
 
-
+@profile
 def getAsigsAlignedToEvents(
         eventBlock=None, signalBlock=None,
         chansToTrigger=None, chanQuery=None,
@@ -1442,7 +1444,7 @@ def getAsigsAlignedToEvents(
         writer.close()
     return masterBlock
 
-
+@profile
 def alignedAsigDFtoSpikeTrain(
         allWaveforms, dataBlock=None, matchSamplingRate=True):
     masterBlock = Block()
@@ -1533,7 +1535,7 @@ def alignedAsigDFtoSpikeTrain(
             st.unit = thisUnit
     return masterBlock
 
-
+@profile
 def dataFrameToAnalogSignals(
         df,
         block=None, seg=None,
@@ -1588,7 +1590,7 @@ def dataFrameToAnalogSignals(
     seg.create_relationship()
     return block
 
-
+@profile
 def eventDataFrameToEvents(
         eventDF, idxT=None,
         annCol=None,
@@ -1631,7 +1633,7 @@ def eventDataFrameToEvents(
                 {colName: arrayAnn})
         return event
 
-
+@profile
 def eventsToDataFrame(
         events, idxT='t', names=None
         ):
@@ -1665,7 +1667,7 @@ def eventsToDataFrame(
     eventDict.update({idxT: t})
     return pd.concat(eventDict, axis=1)
 
-
+@profile
 def loadSpikeMats(
         dataPath, rasterOpts,
         alignTimes=None, chans=None, loadAll=False,
@@ -1808,7 +1810,7 @@ def loadSpikeMats(
             #  plt.imshow(rawSpikeMat.to_numpy(), aspect='equal'); plt.show()
     return spikeMats, validTrials
 
-
+@profile
 def synchronizeINStoNSP(
         tapTimestampsNSP=None, tapTimestampsINS=None,
         precalculatedFun=None,
@@ -1917,7 +1919,7 @@ def synchronizeINStoNSP(
         #         concatEvents[trialSegment].times[:].magnitude)
     return td, accel, insBlock, timeInterpFunINStoNSP
 
-
+@profile
 def findSegsIncluding(
         block, timeSlice=None):
     segBoundsList = []
@@ -1937,7 +1939,7 @@ def findSegsIncluding(
         requestedSegs = segBounds
     return segBounds, requestedSegs
 
-
+@profile
 def findSegsIncluded(
         block, timeSlice=None):
     segBoundsList = []
@@ -1957,7 +1959,7 @@ def findSegsIncluded(
         requestedSegs = segBounds
     return segBounds, requestedSegs
 
-
+@profile
 def getElecLookupTable(
         block, elecIds=None):
     lookupTableList = []
@@ -1981,7 +1983,7 @@ def getElecLookupTable(
             requestedIndices = lookupTable.loc[idxMask, :]
     return lookupTable, requestedIndices
 
-
+@profile
 def getNIXData(
         fileName=None,
         folderPath=None,
@@ -2062,7 +2064,7 @@ def getNIXData(
         # closing the reader breaks its connection to the block
     return channelData, block
 
-
+@profile
 def childBaseName(
         childName, searchTerm):
     if searchTerm in childName:
@@ -2071,7 +2073,7 @@ def childBaseName(
         baseName = childName
     return baseName
 
-
+@profile
 def readBlockFixNames(
         rawioReader,
         block_index=0, signal_group_mode='split-all',
@@ -2294,7 +2296,7 @@ def readBlockFixNames(
         dataBlock = purgeNixAnn(dataBlock)
     return dataBlock
 
-
+@profile
 def loadSpikeTrainList(
         dataBlock, listOfSpikeTrainNames=None,
         replaceInParents=True):
@@ -2320,7 +2322,7 @@ def loadSpikeTrainList(
                 unit.spiketrains[idxInUnit] = st
     return listOfSpikeTrains
 
-
+@profile
 def loadEventList(
         dataBlock,
         listOfEventNames=None, replaceInParents=True):
@@ -2340,7 +2342,7 @@ def loadEventList(
                 seg.events[idxInSeg] = ev
     return listOfEvents
 
-
+@profile
 def loadAsigList(
         dataBlock, listOfAsigProxyNames=None, replaceInParents=True):
     listOfAsigs = []
@@ -2368,7 +2370,7 @@ def loadAsigList(
                 chIdx.analogsignals[idxInChIdx] = asig
     return listOfAsigs
 
-
+@profile
 def addBlockToNIX(
         newBlock, neoSegIdx=[0],
         writeAsigs=True, writeSpikes=True, writeEvents=True,
@@ -2464,7 +2466,7 @@ def addBlockToNIX(
     print('Done adding block to Nix.')
     return newBlock
 
-
+@profile
 def loadStProxy(stProxy):
     try:
         st = stProxy.load(
@@ -2477,7 +2479,7 @@ def loadStProxy(stProxy):
         st.waveforms = np.asarray([]).reshape((0, 0, 0))*pq.mV
     return st
 
-
+@profile
 def preproc(
         fileName='Trial001',
         rawFolderPath='./',
@@ -2691,7 +2693,7 @@ def preproc(
         json.dump(chunkingMetadata, f)
     return
 
-
+@profile
 def preprocBlockToNix(
         block, writer,
         chunkTStart=None,
@@ -3723,7 +3725,7 @@ def preprocBlockToNix(
     writer._create_source_links(block, nixblock)
     return
 
-
+@profile
 def purgeNixAnn(
         block, annNames=['nix_name', 'neo_name']):
     for annName in annNames:
@@ -3742,7 +3744,7 @@ def purgeNixAnn(
                 if k not in annNames}
     return block
 
-
+@profile
 def loadContainerArrayAnn(
         container=None, trainList=None
         ):
@@ -3772,7 +3774,7 @@ def loadContainerArrayAnn(
         st = loadObjArrayAnn(st)
     return returnObj
 
-
+@profile
 def loadObjArrayAnn(st):
     if 'arrayAnnNames' in st.annotations.keys():
         if isinstance(st.annotations['arrayAnnNames'], str):
@@ -3799,7 +3801,7 @@ def loadObjArrayAnn(st):
             st.waveforms = np.asarray([]).reshape((0, 0, 0)) * pq.mV
     return st
 
-
+@profile
 def loadWithArrayAnn(
         dataPath, fromRaw=False,
         mapDF=None, reduceChannelIndexes=False):
@@ -3823,7 +3825,7 @@ def loadWithArrayAnn(
         reader.close()
     return block
 
-
+@profile
 def blockFromPath(
         dataPath, lazy=False, mapDF=None,
         reduceChannelIndexes=False, loadList=None,
@@ -3889,7 +3891,7 @@ def blockFromPath(
             dataBlock.merge(dataBlock2)
     return dataReader, dataBlock
 
-
+@profile
 def calcBinarizedArray(
         dataBlock, samplingRate,
         binnedSpikePath=None,
@@ -3988,7 +3990,7 @@ def calcBinarizedArray(
         writer.close()
     return spikeMatBlock
 
-
+@profile
 def calcFR(
         binnedPath, dataPath,
         suffix='fr', aggregateFun=None,

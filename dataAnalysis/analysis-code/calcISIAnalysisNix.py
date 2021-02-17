@@ -510,7 +510,7 @@ def calcISIBlockAnalysisNix():
                 # annotate ripple stim spikes with info from json log
                 chanName = st.unit.channel_index.name
                 # matchingChIdx = nspBlock.filter(objects=ChannelIndex, name=chanName)
-                # pdb.set_trace()
+                #pdb.set_trace()
                 rippleChanNum = int(mapDF.loc[mapDF['label'] == chanName, 'nevID'])
                 if stimEvents is not None:
                     # find which events in the stim log reference this spiketrain
@@ -538,7 +538,7 @@ def calcISIBlockAnalysisNix():
                         stAnnotations = allUpdates.loc[
                             allUpdates.index.isin(st.times.magnitude), :]
                     except Exception:
-                        #pdb.set_trace()
+                        pdb.set_trace()
                         traceback.print_exc()
                 #
                 wvf = pd.DataFrame(np.atleast_2d(np.squeeze(st.waveforms)))
@@ -697,7 +697,7 @@ def calcISIBlockAnalysisNix():
                                 )
                             theseTimes = st.times[theseTimesMask]
                             if not theseTimesMask.sum():
-                                #pdb.set_trace()
+                                pdb.set_trace()
                             stimRasterAmplitude[activeChan] = np.mean(
                                 st.annotations['amplitude'][theseTimesMask])
                             stimRasterCurrent[activeChan] = np.mean(
@@ -733,7 +733,7 @@ def calcISIBlockAnalysisNix():
                                     try:
                                         rateMismatch = np.abs(nominalRate - observedRate)
                                     except:
-                                        #pdb.set_trace()
+                                        pdb.set_trace()
                                     if not rateMismatch < 1e-6:
                                         print(
                                             'Rate mismatch warning on {} at time {}: off by {} Hz'
