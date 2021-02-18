@@ -9,7 +9,6 @@ Options:
     --plotting                       show plots? [default: False]
     --verbose                        show plots? [default: False]
     --chanQuery=chanQuery            how to restrict channels if not providing a list?
-    --notchAccChans                  apply notch filter to accel channels? [default: False]
 """
 
 from docopt import docopt
@@ -36,6 +35,7 @@ import numpy as np
 from scipy import signal
 import quantities as pq
 import dataAnalysis.preproc.ns5 as ns5
+import pandas as pd
 import os
 import pdb, traceback
 import re
@@ -89,6 +89,11 @@ def preprocDelsysWrapper():
     # for idx, cName in enumerate(rawData.columns): print('{}: {}'.format(idx, cName))
     domainCols = [cName for cName in rawData.columns if 'X[' in cName]
     featureCols = [cName for cName in rawData.columns if 'X[' not in cName]
+    try:
+        # defined in expXXXXXX.py
+        customRenamer = delsysCustomRenamer
+    except Exception:
+        customRenamer = None
     collatedDataList = []
     print('Assembling list of vectors...')
     for idx, (dom, feat) in enumerate(tqdm(iter(zip(domainCols, featureCols)))):
@@ -96,6 +101,10 @@ def preprocDelsysWrapper():
         keepDataMask = rawData[feat].notna()
         newIndex = rawData[dom].interpolate(method='linear')[keepDataMask]
         duplIndex = newIndex.duplicated()
+        if customRenamer is not None:
+            feat = customRenamer(feat)
+            if feat is None:
+                continue
         thisFeat = pd.DataFrame(
             newFeat[keepDataMask][~duplIndex],
             index=newIndex[~duplIndex],
@@ -117,16 +126,19 @@ def preprocDelsysWrapper():
         else:
             chanQuery = arguments['chanQuery']
         chanQuery = chanQuery.replace('chanName', 'featureNames').replace('Emg', 'EMG')
-        # pdb.set_trace()
         featureNames = featureNames[eval(chanQuery)]
         collatedDataList = [
             df
             for df in collatedDataList
             if featureNames.str.contains(df.columns[0]).any()]
     print('interpolating...')
+    try:
+        filterOptsDict = delsysFilterOpts
+        filterCoeffsDict = {}
+    except Exception:
+        filterOptsDict = None
     for idx, thisFeat in enumerate(tqdm(collatedDataList)):
         # tempT = np.unique(np.concatenate([resampledT, thisFeat.index.to_numpy()]))
-        # pdb.set_trace()
         thisColName = thisFeat.columns[0]
         print('    {}'.format(thisColName))
         # Delsys pads zeros where the signal dropped, interpolate those here
@@ -138,54 +150,25 @@ def preprocDelsysWrapper():
             (thisFeat[thisColName].diff(periods=-1) == 0))
         badMask = zeroAndStaysZero | zeroAndWasZero
         thisFeat.loc[badMask, thisColName] = np.nan
-        # pdb.set_trace()
         thisFeat = thisFeat.interpolate(method='linear', axis=0)
         thisFeat = thisFeat.fillna(method='bfill').fillna(method='ffill')
         outputFeat = hf.interpolateDF(
             thisFeat, resampledT,
             kind='linear', fill_value=(0, 0),
             x=None, columns=None, verbose=arguments['verbose'])
-        if ('Acc' in thisColName) and arguments['notchAccChans']:
-            # acc channels present an unusual 75 Hz oscillation
-            # that is removed here
-            if 'filterCoeffs' not in locals():
-                filterOpts = {
-                    'bandstop': {
-                        'Wn': 75,
-                        'Q': 5,
-                        'nHarmonics': 1,
-                        'N': 4,
-                        'btype': 'bandstop',
-                        'ftype': 'bessel'
-                    }
-                }
-                filterCoeffs = hf.makeFilterCoeffsSOS(
-                    filterOpts.copy(), samplingRate)
-            print('        notch filtering at {} Hz (Q = {})'.format(
-                filterOpts['bandstop']['Wn'], filterOpts['bandstop']['Q']))
-            filteredFeat = signal.sosfiltfilt(
-                filterCoeffs, outputFeat[thisColName].to_numpy())
-            '''
-            # debug filtering
-            if arguments['plotting']:
-                fig, ax = plt.subplots()
-                ax.plot(resampledT, filteredFeat, label='filtered')
-                ax.plot(resampledT, outputFeat, label='original')
-                ax.legend()
-                plt.show()
-            '''
-            outputFeat.loc[:, thisColName] = filteredFeat
+        if filterOptsDict is not None:
+            for fName, fOpts in filterOptsDict.items():
+                if (fName in thisColName):
+                    if (fName not in filterCoeffsDict):
+                        filterCoeffsDict[fName] = hf.makeFilterCoeffsSOS(
+                            fOpts.copy(), samplingRate)
+                    if 'bandstop' in fOpts:
+                        print('        notch filtering at {} Hz (Q = {})'.format(
+                            fOpts['bandstop']['Wn'], fOpts['bandstop']['Q']))
+                    filteredFeat = signal.sosfiltfilt(
+                        filterCoeffsDict[fName], outputFeat[thisColName].to_numpy())
+                    outputFeat.loc[:, thisColName] = filteredFeat
         collatedDataList[idx] = outputFeat
-        '''
-        collatedDataList[idx] = (
-            thisFeat.reindex(tempT)
-            .interpolate(method='linear')
-            .fillna(method='ffill').fillna(method='bfill'))
-        absentInNew = ~collatedDataList[idx].index.isin(resampledT)
-        collatedDataList[idx].drop(
-            index=collatedDataList[idx].index[absentInNew],
-            inplace=True)
-        '''
     print('Concatenating...')
     collatedData = pd.concat(collatedDataList, axis=1)
     collatedData.columns = [
@@ -206,20 +189,6 @@ def preprocDelsysWrapper():
     collatedData.fillna(method='bfill', inplace=True)
     collatedData.index.name = 't'
     collatedData.reset_index(inplace=True)
-    '''
-    if arguments['plotting']:
-        fig, ax = plt.subplots()
-        pNames = [
-            'AnalogInputAdapterAnalog',
-            'RVastusLateralisEmg',
-            'RSemitendinosusEmg', 'RPeroneusLongusEmg']
-        for cName in pNames:
-            plt.plot(
-                collatedData['t'],
-                collatedData[cName] / collatedData[cName].abs().max(),
-                '.-')
-        plt.show()
-    '''
     dataBlock = ns5.dataFrameToAnalogSignals(
         collatedData,
         idxT='t', useColNames=True, probeName='',

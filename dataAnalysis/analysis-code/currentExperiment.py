@@ -205,17 +205,13 @@ def parseAnalysisOptions(
         } for grpIdx in range(4)}
     stimDetectOptsByChannel = stimDetectOptsByChannelDefault
     stimDetectOptsByChannel.update(expOpts['stimDetectOptsByChannelSpecific'])
-    try:
-        overrideStartTimes = expOpts['stimDetectOverrideStartTimes'][blockIdx]
-    except Exception:
-        overrideStartTimes = None
     commonStimDetectionOpts = {
         'stimDetectOptsByChannel': stimDetectOptsByChannelDefault,
         'spikeWindow': spikeWindow,
         'cyclePeriodCorrection': 20e-3,
         'plotAnomalies': False,
-        'overrideStartTimes': overrideStartTimes,
         'plotting':  range(0, 1000),  # [] range(1000)
+        'overrideStartTimes': None
         }
     miniRCStimDetectionOpts = {
         'minDist': 1.2,
@@ -235,7 +231,7 @@ def parseAnalysisOptions(
         'artifactKeepWhat': 'max',
         'expectRateProportionalStimOnDelay': True,
         'expectRateProportionalStimOffDelay': True,
-        'predictSlots': False, 'snapToGrid': False,
+        'predictSlots': True, 'snapToGrid': True,
         'treatAsSinglePulses': True
         }
     fullStimDetectionOpts = {
@@ -257,6 +253,7 @@ def parseAnalysisOptions(
         eventInfo = {'inputIDs': expOpts['miniRCRigInputs']}
     elif blockExperimentType == 'proprio-RC':
         trialFilesStim['ins']['getINSkwargs'].update(RCStimDetectionOpts)
+        trialFilesStim['ins']['eventsFromFirstInTrain'] = False
         #  should rename eventInfo to something more intuitive
         eventInfo = {'inputIDs': expOpts['RCRigInputs']}
     elif blockExperimentType == 'isi':
@@ -381,18 +378,18 @@ def parseAnalysisOptions(
                 'binWidth': 5e-3,
                 'smoothKernelWidth': 5e-3},  # 30 kHz
             'hiRes': {
-                'binInterval': 1e-4,
+                'binInterval': 2e-4,
                 'binWidth': 5e-3,
-                'smoothKernelWidth': 5e-3},  # 10 kHz
+                'smoothKernelWidth': 5e-3},  # 5 kHz
             },
         'windowSizes': {
             'XS': (-0.2, 0.4),
             'XSPre': (-0.65, -0.05),
-            'XXS': (-0.2, 0.05),
+            'XXS': (-0.1, 0.1),
             'XXXS': (-0.005, 0.025),
             'M': (-0.2, 0.8),
             'short': (-0.5, 0.5),
-            'long': (-2.25, 2.25),
+            'L': (-0.4, 1.2),
             'RC': (-0.33, 0.33),
             'miniRC': (-1, 1)},
         'discardEmpty': None, 'maxSpikesTo': None, 'timeRange': None,

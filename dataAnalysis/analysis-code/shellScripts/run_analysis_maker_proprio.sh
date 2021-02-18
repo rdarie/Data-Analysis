@@ -8,7 +8,7 @@
 
 # Use more memory (32GB):
 #SBATCH --nodes=1
-#SBATCH --mem=96G
+#SBATCH --mem=250G
 
 # Specify a job name:
 #SBATCH -J analysis_calc_2021_01_20
@@ -21,11 +21,11 @@
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=1,2,3
+#SBATCH --array=1,2
 
 # EXP="exp202101141100"
 # EXP="exp202101191100"
-EXP="exp202101201100"
+# EXP="exp202101201100"
 # EXP="exp202101211100"
 # EXP="exp202101221100"
 # EXP="exp202101251100"
@@ -34,12 +34,14 @@ EXP="exp202101201100"
 # EXP="exp202102041100"
 # EXP="exp202102081100"
 # EXP="exp202102101100"
+EXP="exp202102151100"
 
 LAZINESS="--lazy"
 #
-ANALYSISFOLDER="--analysisName=loRes"
+# ANALYSISFOLDER="--analysisName=loRes"
+# ANALYSISFOLDER="--analysisName=hiRes"
 # ANALYSISFOLDER="--analysisName=normalizedByImpedance"
-# ANALYSISFOLDER="--analysisName=default"
+ANALYSISFOLDER="--analysisName=default"
 #
 SPIKEBLOCKSUFFIX="--spikeFileSuffix=mean_subtracted"
 #
@@ -63,9 +65,13 @@ python --version
 python -u ./calcProprioAnalysisNix.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER $SPIKESOURCE $SPIKEBLOCKSUFFIX $BLOCKPREFIX $RIGSUFFIX --chanQuery="all" --verbose --lazy
 ##
 # python -u ./calcMotionAlignTimes.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID  $ANALYSISFOLDER --plotParamHistograms $LAZINESS
-#        # python -u ./calcStimAlignTimes.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER --plotParamHistograms $LAZINESS
-# python -u ./calcRefinedStimAlignTimes.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER --inputNSPBlockSuffix=analog_inputs --plotParamHistograms $LAZINESS
+# python -u ./calcRefinedStimAlignTimes.py --removeLabels='stimOff' --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER --inputNSPBlockSuffix=analog_inputs --plotParamHistograms $LAZINESS
 # python -u ./calcMotionStimAlignTimes.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER $LAZINESS --plotParamHistograms
 #
 # python -u ./calcFR.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER
 # python -u ./calcFRsqrt.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID
+
+# RC
+python -u ./calcProprioAnalysisNix.py --hasEMG --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER $SPIKESOURCE $SPIKEBLOCKSUFFIX $BLOCKPREFIX $RIGSUFFIX --chanQuery="all" --verbose --lazy
+##
+# python -u ./calcRefinedStimAlignTimes.py --disableRefinement --removeLabels='stimOff' --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER --inputNSPBlockSuffix=analog_inputs --plotParamHistograms $LAZINESS

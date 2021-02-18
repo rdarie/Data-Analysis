@@ -322,7 +322,6 @@ def preprocNS5():
             fileName=ns5FileName,
             rawFolderPath=nspFolder,
             outputFolderPath=scratchFolder, mapDF=mapDF,
-            # swapMaps=swapMaps,
             fillOverflow=False, removeJumps=False,
             motorEncoderMask=motorEncoderMask,
             eventInfo=trialFilesFrom['utah']['eventInfo'],
@@ -380,9 +379,13 @@ def preprocNS5():
             chunkSize=chunkSize, equalChunks=equalChunks,
             chunkList=chunkList,
             calcRigEvents=trialFilesFrom['utah']['calcRigEvents'],
-            normalizeByImpedance=False, removeMeanAcross=False,
-            asigNameList=None, ainpNameList=None, nameSuffix='_raw',
-            LFPFilterOpts=LFPFilterOpts, calcAverageLFP=True)
+            calcAverageLFP=True,
+            removeMeanAcross=False,
+            linearDetrend=False,
+            interpolateOutliers=False, calcOutliers=False,
+            normalizeByImpedance=False,
+            asigNameList=None, ainpNameList=ainpNameList, nameSuffix='',
+            LFPFilterOpts=None)
     return
 
 

@@ -8,7 +8,7 @@ python --version
 
 # EXP="exp202101141100"
 # EXP="exp202101191100"
-EXP="exp202101201100"
+# EXP="exp202101201100"
 # EXP="exp202101211100"
 # EXP="exp202101221100"
 # EXP="exp202101251100"
@@ -18,18 +18,21 @@ EXP="exp202101201100"
 # EXP="exp202102041100"
 # EXP="exp202102081100"
 # EXP="exp202102101100"
+EXP="exp202102151100"
 
 LAZINESS="--lazy"
 # LAZINESS=""
 
-# WINDOW="--window=long"
+# WINDOW="--window=L"
 WINDOW="--window=M"
 AMPFIELDNAME="--amplitudeFieldName=amplitude"
 
+# ANALYSISFOLDER="--analysisName=hiRes"
 # ANALYSISFOLDER="--analysisName=loRes"
 ANALYSISFOLDER="--analysisName=default"
 # ANALYSISFOLDER="--analysisName=normalizedByImpedance"
 
+# SIGNALFOLDER="--signalSubfolder=hiRes"
 # SIGNALFOLDER="--signalSubfolder=loRes"
 SIGNALFOLDER="--signalSubfolder=default"
 # SIGNALFOLDER="--signalSubfolder=normalizedByImpedance"

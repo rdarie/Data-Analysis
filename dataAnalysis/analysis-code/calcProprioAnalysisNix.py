@@ -183,10 +183,16 @@ def calcBlockAnalysisWrapper():
                 idx, prf.memory_usage_psutil()))
     chanQuery = arguments['chanQuery']
     ##############################################################################
+    try:
+        clippingOpts = analysisClippingOpts
+    except Exception:
+        print('Using default clipping opts')
+        clippingOpts = {}
     outputBlock = ns5.concatenateBlocks(
         asigBlocks, spikeBlocks, eventBlocks,
         chunkingMetadata, samplingRate, chanQuery,
-        arguments['lazy'], trackMemory, arguments['verbose'])
+        arguments['lazy'], trackMemory, arguments['verbose'],
+        clipSignals=True, clippingOpts=clippingOpts)
     ##############################################################################
     # close open readers, etc
     for idx, (chunkIdxStr, chunkMeta) in enumerate(chunkingMetadata.items()):

@@ -92,7 +92,7 @@ else:
     outputINSBlockSuffix = "_{}".format(arguments['outputINSBlockSuffix'])
 
 # searchRadius = [-1.5, 1.5]
-searchRadius = [-.25, .25]
+searchRadius = [-.5, .5]
 searchRadiusUnix = [
     pd.Timedelta(searchRadius[0], unit='s'),
     pd.Timedelta(searchRadius[1], unit='s')]

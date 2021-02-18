@@ -19,7 +19,7 @@
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 # Request custom resources
-#SBATCH --array=1
+#SBATCH --array=1,2
 
 # EXP="exp202003201200"
 # EXP="exp202003191400"
@@ -36,14 +36,15 @@
 # EXP="exp202102041100"
 # EXP="exp202102081100"
 EXP="exp202102101100"
+EXP="exp202102151100"
 
 LAZINESS="--lazy"
 
-module load anaconda/3-5.2.0
-. /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
+module load anaconda/2020.02
+. /gpfs/runtime/opt/anaconda/2020.02/etc/profile.d/conda.sh
 conda activate
 source activate nda2
 python --version
 
-SLURM_ARRAY_TASK_ID=1
+# SLURM_ARRAY_TASK_ID=1
 python3 -u './synchronizeDelsysToNSP.py' --nspBlockPrefix='utah' --nspBlockSuffix='analog_inputs' --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --trigRate=2

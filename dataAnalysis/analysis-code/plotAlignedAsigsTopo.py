@@ -27,6 +27,8 @@ Options:
     --styleName=styleName                                break down by style
     --styleControl=styleControl                          styles to exclude from stats test
     --groupPagesBy=groupPagesBy                          break down each page
+    --winStart=winStart                                  start of window [default: 200]
+    --winStop=winStop                                    end of window [default: 400]
     --amplitudeFieldName=amplitudeFieldName              what is the amplitude named? [default: nominalCurrent]
     --noStim                                             process entire experimental day? [default: False]
 """
@@ -164,8 +166,12 @@ alignedAsigsKWargs['procFun'] = ash.genDetrender(timeWindow=(-200e-3, -100e-3))
 # alignedAsigsKWargs.update(dict(
 #     windowSize=(6e-5, 1.2e-3)))
 # for evoked lfp report
-alignedAsigsKWargs.update(dict(
-    windowSize=(-200e-3, 800e-3)))
+if 'windowSize' not in alignedAsigsKWargs:
+    alignedAsigsKWargs['windowSize'] = list(rasterOpts['windowSizes'][arguments['window']])
+if 'winStart' in arguments:
+    alignedAsigsKWargs['windowSize'][0] = float(arguments['winStart']) * (-1e-3)
+if 'winStop' in arguments:
+    alignedAsigsKWargs['windowSize'][1] = float(arguments['winStop']) * (1e-3)
 # alignedAsigsKWargs.update(dict(
 #     windowSize=(-25e-3, 125e-3)))
 alignedAsigsKWargs.update({'amplitudeColumn': arguments['amplitudeFieldName']})
@@ -205,7 +211,7 @@ if 'kcsd' in arguments['inputBlockSuffix']:
         })
 sharedYAxes = relplotKWArgs['facet_kws']['sharey']
 plotProcFuns = [
-    asp.genYLimSetter(quantileLims=0.95, forceLims=True),
+    asp.genYLimSetter(quantileLims=0.9, forceLims=True),
     # asp.genYLabelChanger(
     #     lookupDict={}, removeMatch='#0'),
     # asp.genYLimSetter(newLims=[-75, 100], forceLims=True),
@@ -276,6 +282,9 @@ with open(loadFigMetaPath, 'rb') as _f:
 #     asp.genAxLimSaver(
 #         filePath=saveAxLimsToPath, keyColName='feature')
 #     )
+
+if arguments['analysisName'] == 'hiRes':
+    alignedAsigsKWargs['decimate'] = 5
 ################
 # from here on, we can start defining a function
 # TODO delete this and rework, right now it is very hacky
@@ -283,7 +292,9 @@ useCached = False
 if useCached:
     print('loading {}'.format(cachedH5Path))
     asigWide = pd.read_hdf(cachedH5Path, 'clean')
-    tMask = (asigWide.columns > alignedAsigsKWargs['windowSize'][0]) & (asigWide.columns < alignedAsigsKWargs['windowSize'][-1])
+    tMask = (
+        (asigWide.columns > alignedAsigsKWargs['windowSize'][0]) &
+        (asigWide.columns < alignedAsigsKWargs['windowSize'][-1]))
     asigWide = asigWide.loc[:, tMask]
 else:
     print('loading {}'.format(dataPath))
@@ -291,7 +302,7 @@ else:
         dataPath, lazy=arguments['lazy'])
     asigWide = preproc.alignedAsigsToDF(
         dataBlock, **alignedAsigsKWargs)
-#
+# pdb.set_trace()
 prf.print_memory_usage('loaded asig wide')
 
 trialInfo = asigWide.index.to_frame().reset_index(drop=True)

@@ -68,17 +68,24 @@ def getExpOpts():
         7: [],
         8: [],
         }
-    synchInfo = {'delsys': {}, 'nsp': {}, 'ins': {}}
+    synchInfo = {'delsysToNSP': {}, 'nspForDelsys': {}, 'ins': {}}
+    for blockIdx in blockExperimentTypeLookup.keys():
+        synchInfo['nspForDelsys'][blockIdx] = {
+            'synchChanName': 'ainp2'
+            }
+        synchInfo['delsysToNsp'][blockIdx] = {
+            'synchChanName': 'AnalogInputAdapterAnalog'
+        }
     # For emg analysis - emg missing for some time ranges
-    synchInfo['delsys'][3] = {'timeRanges': [10, 3127], 'chooseCrossings': slice(None)}
-    synchInfo['delsys'][6] = {'timeRanges': [90, 2080], 'chooseCrossings': slice(None, 1000)}
-    synchInfo['delsys'][7] = {'timeRanges': [12, 1203], 'chooseCrossings': slice(None, 1200)}
-    synchInfo['delsys'][7] = {'timeRanges': [19, 674], 'chooseCrossings': slice(None, 1200)}
+    synchInfo['delsysToNSP'][3] = {'timeRanges': [10, 3127], 'chooseCrossings': slice(None)}
+    synchInfo['delsysToNSP'][6] = {'timeRanges': [90, 2080], 'chooseCrossings': slice(None, 1000)}
+    synchInfo['delsysToNSP'][7] = {'timeRanges': [12, 1203], 'chooseCrossings': slice(None, 1200)}
+    synchInfo['delsysToNSP'][7] = {'timeRanges': [19, 674], 'chooseCrossings': slice(None, 1200)}
     #
-    synchInfo['nsp'][3] = {'timeRanges': [10, 3127], 'chooseCrossings': slice(None)}
-    synchInfo['nsp'][6] = {'timeRanges': [50, 2040], 'chooseCrossings': slice(None, 1000)}
-    synchInfo['nsp'][7] = {'timeRanges': [6, 1244], 'chooseCrossings': slice(None, 1200)}
-    synchInfo['nsp'][7] = {'timeRanges': [3, 659], 'chooseCrossings': slice(None, 1200)}
+    synchInfo['nspForDelsys'][3] = {'timeRanges': [10, 3127], 'chooseCrossings': slice(None)}
+    synchInfo['nspForDelsys'][6] = {'timeRanges': [50, 2040], 'chooseCrossings': slice(None, 1000)}
+    synchInfo['nspForDelsys'][7] = {'timeRanges': [6, 1244], 'chooseCrossings': slice(None, 1200)}
+    synchInfo['nspForDelsys'][7] = {'timeRanges': [3, 659], 'chooseCrossings': slice(None, 1200)}
     alignTimeBoundsLookup = {
         # 1: [
         #     [3, 2290.5]
@@ -122,10 +129,10 @@ def getExpOpts():
     triDestinations = []
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        '202012171300-Goat': [3],
+        '202012171300-Goat': [3, 5, 6],
         }
     assembledSegmentToBlockLookup = {
-        i - 1: i for i in [3]
+        i - 1: i for i in [3, 5, 6]
         }
     movementSizeBins = [0, 0.25, 0.5, 1, 1.25, 1.5]
     rowColOverrides = {

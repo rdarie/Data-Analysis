@@ -338,7 +338,8 @@ def transposeSpikeDF(
 
 def concatenateBlocks(
         asigBlocks, spikeBlocks, eventBlocks, chunkingMetadata,
-        samplingRate, chanQuery, lazy, trackMemory, verbose, clipSignals=True
+        samplingRate, chanQuery, lazy, trackMemory, verbose, clipSignals=False,
+        clippingOpts={}
         ):
     # Scan ahead through all files and ensure that
     # spikeTrains and units are present across all assembled files
@@ -520,10 +521,26 @@ def concatenateBlocks(
     allTdDF = pd.concat(asigCache)
     #
     if clipSignals:
-        tdMedians = allTdDF.median()
-        tdIQR = (allTdDF.astype(float).quantile(0.75) - allTdDF.astype(float).quantile(0.25))
-        allTdDF.clip(
-            lower=tdMedians - 3 * tdIQR, upper=tdMedians + 3 * tdIQR, axis=1, inplace=True)
+        # pdb.set_trace()
+        for clpN, clpOpt in clippingOpts.items():
+            colMask = allTdDF.columns.str.contains(clpN)
+            useIQR = clpOpt.pop('IQR', False)
+            if useIQR:
+                tdMedian = np.median(allTdDF.loc[:, colMask])
+                qVal = clpOpt.pop('quantileVal')
+                multi = clpOpt.pop('quantileMultiple')
+                tdIQR = (
+                    np.percentile(allTdDF.loc[:, colMask], 100 * (1 - qVal)) -
+                    np.percentile(allTdDF.loc[:, colMask], 100 * qVal))
+                allTdDF.loc[:, colMask] = allTdDF.loc[:, colMask].clip(
+                    lower=tdMedian - multi * tdIQR,
+                    upper=tdMedian + multi * tdIQR)
+            absoluteLimit = clpOpt.pop('absoluteLimit', False)
+            if absoluteLimit:
+                allTdDF.loc[:, colMask] = allTdDF.loc[:, colMask].clip(
+                    lower=absoluteLimit * (-1),
+                    upper=absoluteLimit)
+
     # TODO: check for nans, if, for example a signal is partially missing
     allTdDF.fillna(method='bfill', inplace=True)
     allTdDF.fillna(method='ffill', inplace=True)
@@ -674,15 +691,32 @@ def concatenateEventsContainer(eventContainer, linkParents=True):
         listOfEvents = list(eventContainer.values())
     else:
         listOfEvents = eventContainer
-    nonEmptyEvents = [ev for ev in listOfEvents if len(ev.times)]
+    nonEmptyEvents = []
+    masterEvent = None
+    for evIdx, ev in enumerate(listOfEvents):
+        if len(ev.times):
+            nonEmptyEvents.append(ev)
+            if masterEvent is None:
+                masterEvent = ev
+                startIdx = evIdx + 1
     if not len(nonEmptyEvents) > 0:
         return listOfEvents[0]
-    masterEvent = listOfEvents[0]
-    for evIdx, ev in enumerate(listOfEvents[1:]):
+    for evIdx, ev in enumerate(listOfEvents[startIdx:]):
         try:
+            if hasattr(masterEvent, 't_stop'):
+                if masterEvent.t_stop < ev.t_stop:
+                    masterEvent.t_stop = ev.t_stop
+                elif masterEvent.t_stop > ev.t_stop:
+                    ev.t_stop = masterEvent.t_stop
+            if hasattr(masterEvent, 't_start'):
+                if masterEvent.t_start > ev.t_start:
+                    masterEvent.t_start = ev.t_start
+                elif masterEvent.t_start < ev.t_start:
+                    ev.t_start = masterEvent.t_start
             masterEvent = masterEvent.merge(ev)
         except Exception:
             traceback.print_exc()
+            # [arr.shape for key, arr in masterEvent.array_annotations.items()]
             pdb.set_trace()
     if masterEvent.array_annotations is not None:
         arrayAnnNames = list(masterEvent.array_annotations.keys())
@@ -2193,7 +2227,7 @@ def readBlockFixNames(
     nExtraChans = 0
     for stp in spikeTrainLikeList:
         stpBaseName = childBaseName(stp.name, 'seg')
-        nameParser = re.search(r'ch(\d*)#(\d*)', stpBaseName)
+        nameParser = re.search(r'ch(\d+)#(\d+)', stpBaseName)
         if nameParser is not None:
             # first time at this unit, rename it
             chanId = int(nameParser.group(1))

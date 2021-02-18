@@ -44,7 +44,7 @@
 # EXP="exp202003181300"
 # EXP="exp202006171300"
 
-EXP="exp202007011300"
+# EXP="exp202007011300"
 # has blocks 1,2,3,4
 
 # EXP="exp202007021300"
@@ -58,7 +58,7 @@ EXP="exp202007011300"
 # EXP="exp202010081400"
 # EXP="exp202010151400"
 # EXP="exp202010191100"
-# EXP="exp202012171300"
+EXP="exp202012171300"
 
 # 
 module load anaconda/3-5.2.0
@@ -71,13 +71,13 @@ python --version
 LAZINESS="--lazy"
 # LAZINESS=""
 
-# WINDOW="--window=XXS"
-WINDOW="--window=XS"
+WINDOW="--window=XXS"
+# WINDOW="--window=XS"
 
 # ANALYSISFOLDER="--analysisName=fullRes"
-# ANALYSISFOLDER="--analysisName=hiRes"
+ANALYSISFOLDER="--analysisName=hiRes"
 # ANALYSISFOLDER="--analysisName=loRes"
-ANALYSISFOLDER="--analysisName=default"
+# ANALYSISFOLDER="--analysisName=default"
 # ANALYSISFOLDER="--analysisName=parameter_recovery"
 
 CHANSELECTOR="--chanQuery=all"
@@ -95,11 +95,11 @@ UNITSELECTOR="--unitQuery=isiemgenv"
 # UNITSELECTOR="--unitQuery=isiacc"
 # UNITSELECTOR="--unitQuery=isispinaloremg"
 
-SLURM_ARRAY_TASK_ID=1
+SLURM_ARRAY_TASK_ID=3
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
 
 #  #  preprocess
-# python -u ./preprocNS5.py --exp=$EXP $BLOCKSELECTOR --ISIMinimal --transferISIStimLog
+python -u ./preprocNS5.py --exp=$EXP $BLOCKSELECTOR --ISIMinimal --transferISIStimLog
 # python -u ./preprocDelsysHPF.py --exp=$EXP $BLOCKSELECTOR $CHANSELECTOR --verbose
 # python -u ./preprocDelsysCSV.py --exp=$EXP $BLOCKSELECTOR $CHANSELECTOR --verbose
 
@@ -107,7 +107,7 @@ BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
 # python -u ./synchronizeDelsysToNSP.py $BLOCKSELECTOR --exp=$EXP $CHANSELECTOR --trigRate=2
  
 #  #  downsample
-python -u ./calcISIAnalysisNix.py --exp=$EXP $BLOCKSELECTOR $CHANSELECTOR $ANALYSISFOLDER --verbose
+# python -u ./calcISIAnalysisNix.py --exp=$EXP $BLOCKSELECTOR $CHANSELECTOR $ANALYSISFOLDER --verbose
 
 ################################################################################################################
 ALIGNQUERY="--alignQuery=stimOn"

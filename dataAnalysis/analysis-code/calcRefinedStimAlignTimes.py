@@ -13,6 +13,8 @@ Options:
     --inputNSPBlockSuffix=inputNSPBlockSuffix             append a name to the input block?
     --inputINSBlockSuffix=inputINSBlockSuffix             append a name to the input block?
     --plotting                                            display diagnostic plots? [default: False]
+    --removeLabels=removeLabels                           remove certain labels, e.g. stimOff (comma separated)
+    --disableRefinement                                   by default, use xcorr to refine stim times [default: False]
 """
 import matplotlib, pdb, traceback
 matplotlib.use('Qt5Agg')   # generate interactive output by default
@@ -29,15 +31,14 @@ from neo import (
 from neo.io.proxyobjects import (
     AnalogSignalProxy, SpikeTrainProxy, EventProxy)
 import quantities as pq
-#  import dataAnalysis.helperFunctions.kilosort_analysis_new as ksa
 import dataAnalysis.helperFunctions.helper_functions_new as hf
 import rcsanalysis.packet_func as rcsa_helpers
 import dataAnalysis.preproc.ns5 as ns5
 import dataAnalysis.preproc.mdt as mdt
-#  import dataAnalysis.preproc.mdt as preprocINS
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from tqdm import tqdm
 import matplotlib.pyplot as plt
 from collections import Iterable
 from elephant.conversion import binarize
@@ -231,104 +232,108 @@ for segIdx, nspSeg in enumerate(nspBlock.segments):
     onOffCheck.loc[categories['stimCat'] == 'stimOn'] = 1
     onOffCheck.loc[categories['stimCat'] == 'stimOff'] = -1
     simultOn = onOffCheck.cumsum()
+    '''
     try:
         assert simultOn.max() == 1
     except Exception:
         traceback.print_exc()
         pdb.set_trace()
+    '''
     #
     globalStart = stimStatus['t'].min()
     globalStop = stimStatus['t'].max()
     #
     categories.loc[:, 'detectionDelay'] = 999
-    for name, group in categories.groupby(['amplitudeRound']):
-        prgIdx = int(group['program'].iloc[0])
-        grpIdx = int(group['activeGroup'].iloc[0])
-        stimRate = group['RateInHz'].iloc[0]
-        searchRadius = [-2 * stimRate ** (-1), 2 * stimRate ** (-1)]
-        # searchRadius = [-25e-3, 25e-3]
-        targetLags = np.arange(
-            searchRadius[0] * trigRasterSamplingRate,
-            searchRadius[1] * trigRasterSamplingRate + 1,
-            # -0.8 * trigRasterSamplingRate,
-            # 0.1 * trigRasterSamplingRate + 1,
-            dtype=np.int)
-        targetLagsSrs = pd.Series(
-            targetLags, index=targetLags * trigSampleInterval)
-        pulsesSt = insSeg.filter(objects=SpikeTrain, name='seg0_g{}p{}#0'.format(grpIdx, prgIdx))
-        assert len(pulsesSt) == 1
-        #
-        groupStart = group['t'].min()
-        groupStop = group['t'].max()
-        # expand window to make sure we don't clip edges
-        windowStart = max(
-            groupStart + 5 * searchRadius[0],
-            globalStart
+    print('getting stimulation times')
+    if not arguments['disableRefinement']:
+        for name, group in tqdm(categories.groupby(['amplitudeRound'])):
+            prgIdx = int(group['program'].iloc[0])
+            grpIdx = int(group['activeGroup'].iloc[0])
+            stimRate = group['RateInHz'].iloc[0]
+            searchRadius = [-2 * stimRate ** (-1), 2 * stimRate ** (-1)]
+            # searchRadius = [-25e-3, 25e-3]
+            targetLags = np.arange(
+                searchRadius[0] * trigRasterSamplingRate,
+                searchRadius[1] * trigRasterSamplingRate + 1,
+                # -0.8 * trigRasterSamplingRate,
+                # 0.1 * trigRasterSamplingRate + 1,
+                dtype=np.int)
+            targetLagsSrs = pd.Series(
+                targetLags, index=targetLags * trigSampleInterval)
+            pulsesSt = insSeg.filter(objects=SpikeTrain, name='seg0_g{}p{}#0'.format(grpIdx, prgIdx))
+            assert len(pulsesSt) == 1
+            #
+            groupStart = group['t'].min()
+            groupStop = group['t'].max()
+            # expand window to make sure we don't clip edges
+            windowStart = max(
+                groupStart + 5 * searchRadius[0],
+                globalStart
+                )
+            windowStop = min(
+                groupStop + 5 * searchRadius[1],
+                globalStop
             )
-        windowStop = min(
-            groupStop + 5 * searchRadius[1],
-            globalStop
-        )
-        pulseMask = (pulsesSt[0] >= windowStart * pq.s) & (pulsesSt[0] <= windowStop * pq.s)
-        theseInsPulses = pulsesSt[0][np.where(pulseMask)].copy()
-        # pulsesSt[0].magnitude[]
-        theseInsRaster = binarize(
-            theseInsPulses,
-            sampling_rate=trigRasterSamplingRate * pq.Hz,
-            t_start=windowStart * pq.s,
-            t_stop=windowStop * pq.s)
-        rasterT = windowStart + np.arange(theseInsRaster.shape[0]) * trigSampleInterval
-        theseInsRasterSrs = pd.Series(
-            theseInsRaster, index=rasterT
-            )
-        theseInsTrigs = hf.gaussianSupport(
-            support=theseInsRasterSrs,
-            gaussWid=gaussWid, fs=trigRasterSamplingRate, returnCopy=True)
-        #
-        nspPulseMask = (nspDiracSt >= windowStart * pq.s) & (nspDiracSt <= windowStop * pq.s)
-        if nspPulseMask.any():
-            theseNspPulses = nspDiracSt[np.where(nspPulseMask)].copy()
-            theseNspRaster = binarize(
-                theseNspPulses,
+            pulseMask = (pulsesSt[0] >= windowStart * pq.s) & (pulsesSt[0] <= windowStop * pq.s)
+            theseInsPulses = pulsesSt[0][np.where(pulseMask)].copy()
+            # pulsesSt[0].magnitude[]
+            theseInsRaster = binarize(
+                theseInsPulses,
                 sampling_rate=trigRasterSamplingRate * pq.Hz,
                 t_start=windowStart * pq.s,
                 t_stop=windowStop * pq.s)
-            theseNspRasterSrs = pd.Series(
-                theseNspRaster, index=rasterT
+            rasterT = windowStart + np.arange(theseInsRaster.shape[0]) * trigSampleInterval
+            theseInsRasterSrs = pd.Series(
+                theseInsRaster, index=rasterT
                 )
-            theseNspTrigs = hf.gaussianSupport(
-                support=theseNspRasterSrs,
+            theseInsTrigs = hf.gaussianSupport(
+                support=theseInsRasterSrs,
                 gaussWid=gaussWid, fs=trigRasterSamplingRate, returnCopy=True)
-            trigRaster = pd.DataFrame({
-                't': rasterT,
-                'nspDiracDelta': theseNspRasterSrs.to_numpy(),
-                'nspTrigs': theseNspTrigs.to_numpy(),
-                'insDiracDelta': theseInsRasterSrs.to_numpy(),
-                'insTrigs': theseInsTrigs.to_numpy(),
-            })
-            zeroMask = pd.Series(False, index=trigRaster.index)
-            if (targetLags > 0).any():
-                zeroMask = zeroMask | (trigRaster.index < targetLags.max())
-            if (targetLags < 0).any():
-                maxTRI = trigRaster.index.max()
-                zeroMask = zeroMask | (trigRaster.index > maxTRI + targetLags.min())
-            # trigRaster.loc[zeroMask, 'insTrigs'] = 0
-            # print('Calculating cross corr')
-            xCorrSrs = targetLagsSrs.apply(
-                corrAtLag, xSrs=trigRaster['nspTrigs'],
-                ySrs=trigRaster['insTrigs'])
-            maxLag = xCorrSrs.idxmax()
-            # print('maxLag = {:.1f} millisec'.format(1000 * maxLag))
-            if True:
-                fig, ax, figSaveOpts = hf.plotCorrSynchReport(
-                    _trigRaster=trigRaster, _searchRadius=searchRadius,
-                    _targetLagsSrs=targetLagsSrs, _maxLag=maxLag, _xCorrSrs=xCorrSrs,
+            #
+            nspPulseMask = (nspDiracSt >= windowStart * pq.s) & (nspDiracSt <= windowStop * pq.s)
+            if nspPulseMask.any():
+                theseNspPulses = nspDiracSt[np.where(nspPulseMask)].copy()
+                theseNspRaster = binarize(
+                    theseNspPulses,
+                    sampling_rate=trigRasterSamplingRate * pq.Hz,
+                    t_start=windowStart * pq.s,
+                    t_stop=windowStop * pq.s)
+                theseNspRasterSrs = pd.Series(
+                    theseNspRaster, index=rasterT
                     )
-                synchReportPDF.savefig(**figSaveOpts)
-                # plt.show()
-                plt.close()
-            categories.loc[group.loc[group['stimCat'] == 'stimOn', :].index, 'detectionDelay'] = maxLag
-            categories.loc[group.loc[group['stimCat'] == 'stimOn', :].index, 't'] += maxLag
+                theseNspTrigs = hf.gaussianSupport(
+                    support=theseNspRasterSrs,
+                    gaussWid=gaussWid, fs=trigRasterSamplingRate, returnCopy=True)
+                trigRaster = pd.DataFrame({
+                    't': rasterT,
+                    'nspDiracDelta': theseNspRasterSrs.to_numpy(),
+                    'nspTrigs': theseNspTrigs.to_numpy(),
+                    'insDiracDelta': theseInsRasterSrs.to_numpy(),
+                    'insTrigs': theseInsTrigs.to_numpy(),
+                })
+                zeroMask = pd.Series(False, index=trigRaster.index)
+                if (targetLags > 0).any():
+                    zeroMask = zeroMask | (trigRaster.index < targetLags.max())
+                if (targetLags < 0).any():
+                    maxTRI = trigRaster.index.max()
+                    zeroMask = zeroMask | (trigRaster.index > maxTRI + targetLags.min())
+                # trigRaster.loc[zeroMask, 'insTrigs'] = 0
+                # print('Calculating cross corr')
+                xCorrSrs = targetLagsSrs.apply(
+                    corrAtLag, xSrs=trigRaster['nspTrigs'],
+                    ySrs=trigRaster['insTrigs'])
+                maxLag = xCorrSrs.idxmax()
+                # print('maxLag = {:.1f} millisec'.format(1000 * maxLag))
+                if arguments['plotting']:
+                    fig, ax, figSaveOpts = hf.plotCorrSynchReport(
+                        _trigRaster=trigRaster, _searchRadius=searchRadius,
+                        _targetLagsSrs=targetLagsSrs, _maxLag=maxLag, _xCorrSrs=xCorrSrs,
+                        )
+                    synchReportPDF.savefig(**figSaveOpts)
+                    # plt.show()
+                    plt.close()
+                categories.loc[group.loc[group['stimCat'] == 'stimOn', :].index, 'detectionDelay'] = maxLag
+                categories.loc[group.loc[group['stimCat'] == 'stimOn', :].index, 't'] += maxLag
             # pdb.set_trace()
     if (segIdx == 0) and arguments['plotParamHistograms']:
         fig, ax = plt.subplots()
@@ -420,6 +425,11 @@ for segIdx, nspSeg in enumerate(nspBlock.segments):
     #
     # TODO: fix synch code so that all units are present, to avoid this hack:
     alignEventsDF.loc[:, 'electrode'] = alignEventsDF['electrode'].fillna('NA')
+    if arguments['removeLabels'] is not None:
+        labelsToRemove = arguments['removeLabels'].split(', ')
+        idxToRemove = categories.index[categories['stimCat'].isin(labelsToRemove)]
+        categories.drop(index=idxToRemove, inplace=True)
+        categories.reset_index(drop=True)
     alignEvents = ns5.eventDataFrameToEvents(
         alignEventsDF, idxT='t',
         annCol=None,

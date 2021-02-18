@@ -1,11 +1,11 @@
 import numpy as np
-
+import pandas as pd
 
 def getExpOpts():
     blockExperimentTypeLookup = {
-        1: 'proprio-miniRC',
-        2: 'proprio',
-        3: 'proprio-motionOnly',
+        1: 'proprio-RC',
+        2: 'proprio-RC',
+        3: 'proprio-RC',
         }
     fullRigInputs = {
         'A+': 'ainp12',
@@ -22,36 +22,40 @@ def getExpOpts():
         'forceX': 'ainp14',
         'forceY': 'ainp15',
         'tapSync': 'ainp1',
+        'delsysSynch': 'ainp2',
         }
     miniRCRigInputs = {
         'tapSync': 'ainp1',
         'simiTrigs': 'ainp16',
         'forceX': 'ainp14',
         'forceY': 'ainp15',
+        'delsysSynch': 'ainp2',
         }
     RCRigInputs = {
         'tapSync': 'ainp1',
         'kinectSync': 'ainp16',
         'forceX': 'ainp14',
         'forceY': 'ainp15',
+        'delsysSynch': 'ainp2',
         }
-    experimentName = '202101201100-Rupert'
+    experimentName = '202102151100-Rupert'
     deviceName = 'DeviceNPC700246H'
     subjectName = 'Rupert'
     #
     jsonSessionNames = {
         #  per blo
-        1: [
-            'Session1611161648041'
-            ],
-        2: [
-            'Session1611162632629',
-            'Session1611163616272'
-            ],
-        3: [
-            'Session1611164507435'],
+        1: ['Session1613402898768', 'Session1613403672383'], # ~148.6
+        2: ['Session1613406217371'],
+        3: [],
         }
-    synchInfo = {'nform': {}, 'nsp': {}, 'ins': {}}
+    synchInfo = {'nform': {}, 'nsp': {}, 'ins': {}, 'nspForDelsys': {}, 'delsysToNsp': {}}
+    for blockIdx in blockExperimentTypeLookup.keys():
+        synchInfo['nspForDelsys'][blockIdx] = {
+            'synchChanName': 'ainp2'
+            }
+        synchInfo['delsysToNsp'][blockIdx] = {
+            'synchChanName': 'AnalogInputAdapterAnalog'
+        }
     # populate with defaults
     for blockIdx in jsonSessionNames.keys():
         synchInfo['ins'][blockIdx] = {}
@@ -62,11 +66,11 @@ def getExpOpts():
                 'synchStimUnitName': ['g0p0#0'],
                 'synchByXCorrTapDetectSignal': False,
                 'xCorrSamplingRate': None,
-                'xCorrGaussWid': 10e-3,
+                'xCorrGaussWid': 50e-3,
                 'minStimAmp': 0,
                 'unixTimeAdjust': None,
                 'thres': 5,
-                'iti': 10e-3,
+                'iti': 50e-3,
                 'minAnalogValue': None,
                 'keepIndex': slice(None)
                 }
@@ -84,10 +88,10 @@ def getExpOpts():
             #  per trialSegment
             j: {
                 'timeRanges': None, 'keepIndex': slice(None),
-                'synchChanName': ['utah_artifact_0'], 'iti': 10e-3,
+                'synchChanName': ['utah_artifact_0'], 'iti': 50e-3,
                 'synchByXCorrTapDetectSignal': False,
                 'unixTimeAdjust': None,
-                'minAnalogValue': None, 'thres': 7}
+                'minAnalogValue': None, 'thres': 4}
             for j, sessionName in enumerate(jsonSessionNames[i])
             }
         for i in jsonSessionNames.keys()
@@ -112,24 +116,33 @@ def getExpOpts():
     # options for stim artifact detection
     stimDetectOverrideStartTimes = {
         #  each key is a Block
-        1: None,
+        1: {
+            #  each key is an ins session
+            0: [130.996, 370.780, 469.282, 546.28, 618.28, 713.06]
+        },
+        2: {
+            #  each key is an ins session
+            0: [
+                132.681, 180.683, 220.183, 260.187, 300.182, 444.183, 487.686,
+                ]
+        },
         # 2: [96.43, 191.689],
     }
     detectStim = True
-    stimDetectThresDefault = 1e6
+    stimDetectThresDefault = 250
     stimDetectChansDefault = ['ins_td0', 'ins_td2']
     stimDetectOptsByChannelSpecific = {
         # group
         0: {
             # program
-            0: {'detectChannels': stimDetectChansDefault, 'thres': stimDetectThresDefault, 'useForSlotDetection': True},
-            1: {'detectChannels': stimDetectChansDefault, 'thres': stimDetectThresDefault, 'useForSlotDetection': True},
-            2: {'detectChannels': stimDetectChansDefault, 'thres': stimDetectThresDefault, 'useForSlotDetection': True},
+            0: {'detectChannels': ['ins_td0'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True},
+            1: {'detectChannels': ['ins_td0'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True},
+            2: {'detectChannels': ['ins_td2'], 'thres': stimDetectThresDefault, 'useForSlotDetection': True},
             3: {'detectChannels': stimDetectChansDefault, 'thres': stimDetectThresDefault, 'useForSlotDetection': True}
         }}
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        '202101201100-Rupert': [1],
+        '202102151100-Rupert': [1],
         }
     # Options relevant to the classifcation of proprio trials
     movementSizeBins = [0, 0.6, 1]
@@ -137,18 +150,23 @@ def getExpOpts():
 
     ############################################################
     ############################################################
-    # alignTimeBoundsLookup = None
+    alignTimeBoundsLookup = None
+    '''
     alignTimeBoundsLookup = {
         3: [
             [108, 99999]
             ],
         }
+    '''
     #
+    motorEncoderBoundsLookup = None
+    '''
     motorEncoderBoundsLookup = {
         2: [
             [100, 772], [1173, 1896]
         ]
     }
+    '''
     ############################################################
     ############################################################
     outlierDetectOptions = dict(
@@ -221,11 +239,65 @@ def getExpOpts():
         'optimalHyperparameters': {'h': 1.0, 'R_init': 0.2, 'lambd': 0.0016},
         'filterOpts': {
             'low': {
-                'Wn': 1000,
+                # 'Wn': 1000,
                 'N': 4,
                 'btype': 'low',
                 'ftype': 'bessel'
             }
         }
     }
+
+    delsysFilterOpts = {
+        'ACC': {
+            'bandstop': {
+                'Wn': 75,
+                'Q': 5,
+                'nHarmonics': 1,
+                'N': 4,
+                'btype': 'bandstop',
+                'ftype': 'bessel'
+            }
+        },
+        'EMG': {
+            'bandstop': {
+                'Wn': 60,
+                'Q': 5,
+                'nHarmonics': 1,
+                'N': 4,
+                'btype': 'bandstop',
+                'ftype': 'bessel'
+            }
+        }
+    }
+
+    def delsysCustomRenamer(featName):
+        lookupSrs = pd.Series({
+            'Avanti sensor 1: ': 'RightInnerThigh',
+            'Avanti sensor 2: ': 'LeftInnerThigh',
+            'Avanti sensor 3: ': 'RightGluteus',
+            'Avanti sensor 4: ': 'LeftGluteus',
+            'Avanti sensor 5: ': 'LeftQuad',
+            'Avanti sensor 6: ': 'LeftHamstring',
+            'Avanti sensor 7: ': 'RightQuad',
+            'Avanti sensor 8: ': 'RightHamstring',
+            'Avanti sensor 10: ': 'LeftShin',
+            'Avanti sensor 11: ': 'LeftCalf',
+            'Avanti sensor 12: ': 'RightShin',
+            'Avanti sensor 13: ': 'RightCalf',
+            'Analog Input adapter 16: ': 'Analog Input adapter'
+            })
+        featPrefix = featName.split(':')[0]
+        chanNumStr = featPrefix.split(' ')[-1]
+        nameMatchesMask = lookupSrs.index.str.contains(featPrefix + ': ')
+        if nameMatchesMask.any():
+            assert nameMatchesMask.sum() == 1
+            inpStr = lookupSrs.index[nameMatchesMask][0]
+            outStr = (
+                lookupSrs[nameMatchesMask].iloc[0] +
+                ' {}: '.format(chanNumStr))
+            updatedFeat = featName.replace(inpStr, outStr)
+            return updatedFeat
+        else:
+            return None
+    
     return locals()

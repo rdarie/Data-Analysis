@@ -7,7 +7,7 @@
 
 # Request memory:
 #SBATCH --nodes=1
-#SBATCH --mem=24G
+#SBATCH --mem=96G
 
 # Specify a job name:
 #SBATCH -J plots_stim_rig
@@ -20,9 +20,9 @@
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=1
+#SBATCH --array=1,2
 
-SLURM_ARRAY_TASK_ID=1
+# SLURM_ARRAY_TASK_ID=1
 source ./shellScripts/run_plotter_aligned_stim_preamble.sh
 
 # OTHERASIGOPTS="--individualTraces --invertOutlierBlocks"

@@ -15,7 +15,7 @@ Options:
     --useKCSD                                    which algorithm to use [default: False]
     --lazy                                       load from raw, or regular? [default: False]
     --unitQuery=unitQuery                        how to restrict channels?
-    --alignQuery=alignQuery                      choose a subset of the data?
+    --alignQuery=alignQuery                      choose a subset of the data? [default: all]
     --verbose                                    print diagnostics? [default: False]
     --plotting                                   plot results?
 """
@@ -138,7 +138,9 @@ if __name__ == "__main__":
             dummySt = stLikeList[0]
         dummyStList.append(dummySt)
         originalDummyUnitAnns = dummySt.annotations.pop('unitAnnotations', None)
+        
         if 'chanIndex' not in locals():
+            '''
             xcoords, ycoords = [], []
             for stIdx, st in enumerate(stLikeList):
                 xcoords.append(st.annotations['xCoords'] * 400)
@@ -153,14 +155,16 @@ if __name__ == "__main__":
             coordinateIndices = np.concatenate(
                 [xIdx[:, np.newaxis], yIdx[:, np.newaxis]],
                 axis=1)
+            '''
             chanIndex = ChannelIndex(
                 name=arguments['arrayName'],
                 index=np.arange(len(unitNames)),
                 channel_ids=np.arange(len(unitNames)),
                 channel_names=unitNames,
-                coordinates=coordinates,
-                coordinateIndices=coordinateIndices
+                # coordinates=coordinates,
+                # coordinateIndices=coordinateIndices
                 )
+            '''
             annotationsLong = pd.DataFrame(
                 chanIndex.coordinates, columns=['x', 'y'])
             annotationsLong.loc[:, ['xIdx', 'yIdx']] = coordinateIndices
@@ -168,7 +172,9 @@ if __name__ == "__main__":
             annotations2D = {
                 key: annotationsLong.pivot(index='y', columns='x', values=key)
                 for key in ['chanName']}
+            '''
         #
+        
         nTrials = dummySt.waveforms.shape[0]
         nBins = dummySt.waveforms.shape[2]
         allWaveforms = np.zeros((nTrials * nBins, len(unitNames)))
@@ -209,8 +215,8 @@ if __name__ == "__main__":
                     index=np.asarray([0]).flatten(),
                     channel_ids=np.asarray([cidx]).flatten(),
                     channel_names=np.asarray([cName]).flatten(),
-                    coordinates=coordinates[cidx, :][np.newaxis, :],  # coordinates must be 2d
-                    coordinateIndices=coordinateIndices[cidx, :],  # any other annotation *cannot* be 2d...
+                    # coordinates=coordinates[cidx, :][np.newaxis, :],  # coordinates must be 2d
+                    # coordinateIndices=coordinateIndices[cidx, :],  # any other annotation *cannot* be 2d...
                     )
                 newChIdx.block = outputBlock
                 outputBlock.channel_indexes.append(newChIdx)
@@ -222,10 +228,12 @@ if __name__ == "__main__":
                 units=dummySt.waveforms.units, sampling_rate=dummySt.sampling_rate,
                 t_start=dummySt.t_start,
                 )
+            '''
             thisAsig.annotations['xCoords'] = float(newChIdx.coordinates[:, 0])
             thisAsig.annotations['yCoords'] = float(newChIdx.coordinates[:, 1])
             thisAsig.annotations['coordUnits'] = '{}'.format(
                 newChIdx.coordinates[:, 0].units)
+            '''
             #
             newChIdx.analogsignals.append(thisAsig)
             newSeg.analogsignals.append(thisAsig)

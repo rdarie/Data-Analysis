@@ -10,6 +10,7 @@ Options:
     --analysisName=analysisName          append a name to the resulting blocks? [default: default]
     --makeControl                        make control align times? [default: False]
     --lazy                               load from raw, or regular? [default: False]
+    --removeLabels=removeLabels          remove certain labels, e.g. stimOff (comma separated)
 """
 import os, pdb, traceback, sys
 from importlib import reload
@@ -31,6 +32,7 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 from collections import Iterable
+from tqdm import tqdm
 #  load options
 from currentExperiment import parseAnalysisOptions
 from docopt import docopt
@@ -195,6 +197,9 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
     #
     # TODO: fix synch code so that all units are present, to avoid this hack:
     alignEventsDF.loc[:, 'electrode'] = alignEventsDF['electrode'].fillna('NA')
+    if arguments['removeLabels'] is not None:
+        pdb.set_trace()
+        labelsToRemove = ', '.split(arguments['removeLabels'])
     alignEvents = ns5.eventDataFrameToEvents(
         alignEventsDF, idxT='t',
         annCol=None,

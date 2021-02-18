@@ -2534,7 +2534,7 @@ def getINSStimOnset(
         #     group.loc[groupAmpMask, 't'].iloc[-1] + 0.25 * paddingDuration)
         # plotMaskTD = (tdDF['t'] > tStartPadded) & (tdDF['t'] < tStopPadded)
         paddingDuration = max(
-            np.around(2.5 * stimPeriod, decimals=4),
+            np.around(3.5 * stimPeriod, decimals=4),
             6 * gaussWid)
         plotMaskTD = hf.getTimeMaskFromRanges(
             tdDF['t'],
@@ -2585,7 +2585,8 @@ def getINSStimOnset(
                 (tdSeg.index >= earliestStimOnIdx) &
                 (tdSeg.index <= latestStimOnIdx + int(slotSize))
                 )
-            possibleSlotStartIdx = tdSeg.index[slotStartMask]
+            # possibleSlotStartIdx = tdSeg.index[slotStartMask]
+            possibleSlotStartIdx = tdSeg.index[slotStartMask] + activeProgram * int(slotSize / 4)
             print('possibleSlotStartIdx is {}\n'.format(possibleSlotStartIdx))
             if len(possibleSlotStartIdx) > 1:
                 stimOnUncertainty = pd.Series(
@@ -2602,10 +2603,13 @@ def getINSStimOnset(
                 uncertaintyVals = uncertaintyVals[keepMask]
             else:
                 uncertaintyVals = np.array([1])
+            '''
             possibleOnsetIdx = (
                 possibleSlotStartIdx +
                 activeProgram * int(slotSize / 4)
                 )
+            '''
+            possibleOnsetIdx = possibleSlotStartIdx
             allPossibleTimestamps = tdSeg.loc[possibleOnsetIdx, 't']
             print('allPossibleTimestamps\n{}\n'.format(allPossibleTimestamps))
             try:
@@ -2627,12 +2631,12 @@ def getINSStimOnset(
                 allPossibleTimestamps.iloc[-1] + max(3 * stimPeriod / 16, ROIWid / 2))
             if overrideStartTimes is not None:
                 ovrTimes = pd.Series(overrideStartTimes)
-                ovrMask = (ovrTimes > tdSeg['t'].iloc[0]) & (ovrTimes < tdSeg['t'].iloc[-1])
+                ovrMask = (ovrTimes >= tdSeg['t'].iloc[0]) & (ovrTimes < tdSeg['t'].iloc[-1])
                 ovrTimes = ovrTimes[ovrMask]
                 if ovrTimes.any():
                     ROIWid = 3 * stimPeriod / 8
+                    print('Using override time; replacing {}'.format(expectedTimestamp))
                     expectedTimestamp = ovrTimes.iloc[0]
-                    print('Using override time {}'.format(expectedTimestamp))
                     tStartOnset = expectedTimestamp - ROIWid / 2
                     tStopOnset = expectedTimestamp + ROIWid / 2
             print("Expected timestamp is {}".format(expectedTimestamp))
@@ -2660,12 +2664,15 @@ def getINSStimOnset(
                 expectedOnsetIdx = nominalStimOnIdx
             expectedTimestamp = tdSeg.loc[expectedOnsetIdx, 't']
             if overrideStartTimes is not None:
+                print('Checking for overrides between {} and {}'.format(
+                    tdSeg['t'].iloc[0], tdSeg['t'].iloc[-1]
+                ))
                 ovrTimes = pd.Series(overrideStartTimes)
-                ovrMask = (ovrTimes > tdSeg['t'].iloc[0]) & (ovrTimes < tdSeg['t'].iloc[-1])
+                ovrMask = (ovrTimes >= tdSeg['t'].iloc[0]) & (ovrTimes < tdSeg['t'].iloc[-1])
                 ovrTimes = ovrTimes[ovrMask]
                 if ovrTimes.any():
                     ROIWid = 3 * stimPeriod / 8
-                    print('Using override time {}'.format(expectedTimestamp))
+                    print('Using override time: replacing {}'.format(expectedTimestamp))
                     expectedTimestamp = ovrTimes.iloc[0]
             print('Expected timestamp is {}'.format(expectedTimestamp))
             ROIBasis = pd.Series(0, index=tdSeg['t'])

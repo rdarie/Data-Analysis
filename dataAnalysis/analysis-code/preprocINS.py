@@ -24,7 +24,7 @@ sns.set(
     palette='dark', font='sans-serif',
     font_scale=0.75, color_codes=True)
 import dataAnalysis.preproc.mdt as mdt
-import os, pdb
+import os, pdb, traceback
 from importlib import reload
 import warnings
 #  load options
@@ -59,18 +59,23 @@ if arguments['outputSuffix'] is not None:
 else:
     outputSuffix = ''
 
+
 def preprocINSWrapper(
         trialFilesStim=None,
         insDataPath=None,
         figureOutputFolder=None,
         arguments=None
         ):
-    # pdb.set_trace()
     jsonSessionNames = trialFilesStim['ins'].pop('jsonSessionNames')
     trialFilesStim = trialFilesStim['ins']
     if arguments['disableStimDetection']:
         trialFilesStim['detectStim'] = False
-    for jsn in jsonSessionNames:
+    for jsnIdx, jsn in enumerate(jsonSessionNames):
+        try:
+            overrideStartTimes = stimDetectOverrideStartTimes[blockIdx][jsnIdx]
+            trialFilesStim['getINSkwargs']['overrideStartTimes'] = overrideStartTimes
+        except Exception:
+            traceback.print_exc()
         trialFilesStim['jsonSessionNames'] = [jsn]
         insDataPath = os.path.join(
             scratchFolder, '{}{}.nix'.format(jsn, outputSuffix))

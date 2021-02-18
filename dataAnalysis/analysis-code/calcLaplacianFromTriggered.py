@@ -265,10 +265,8 @@ if __name__ == "__main__":
             kcsdKWArgs = {
                 'cv_iterator': True,
                 'verbose': True,
-                # 'Rs': np.asarray([0.2, 0.25, 0.3]),
-                'Rs': np.asarray([0.2, 0.3]),
-                # 'lambdas': np.logspace(-2, -10, 10, base=10.),
-                'n_lambda_suggestions': 3,
+                'Rs': np.asarray([0.2, 0.25, 0.3]),
+                'n_lambda_suggestions': 10,
                 'gdx': 0.4, 'ext_x': 0.2, 'gdy': 0.4, 'ext_y': 0.2,
                 'n_src_init': (3 * 10 ** ordMagX) * (3 * 10 ** ordMagY)
                 }
@@ -506,7 +504,7 @@ if __name__ == "__main__":
     if csdTimeFilterOpts is not None:
         if 'low' in csdTimeFilterOpts:
             if 'Wn' not in csdTimeFilterOpts['low']:
-                csdTimeFilterOpts['low']['Wn'] = float(dummySt.sampling_rate) / 2 - 1
+                csdTimeFilterOpts['low']['Wn'] = float(dummySt.sampling_rate) / 3
         filterCoeffs = hf.makeFilterCoeffsSOS(
             csdTimeFilterOpts.copy(), float(dummySt.sampling_rate))
         print('time domain filtering csd estimate...')
