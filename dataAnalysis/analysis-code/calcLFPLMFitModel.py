@@ -91,18 +91,18 @@ alignedAsigsKWargs.update(dict(
     duplicateControlsByProgram=False,
     makeControlProgram=False,
     removeFuzzyName=False,
-    decimate=1, windowSize=(0, 10e-3),
+    decimate=1, windowSize=(0, 9e-3),
     metaDataToCategories=False,
-    getMetaData=[
-        'RateInHz', 'feature', 'electrode',
-        arguments['amplitudeFieldName'], 'stimPeriod',
-        'pedalMovementCat', 'pedalSizeCat', 'pedalDirection',
-        'stimCat', 'originalIndex', 'segment', 't'],
+    # getMetaData=[
+    #     'RateInHz', 'feature', 'electrode',
+    #     arguments['amplitudeFieldName'], 'stimPeriod',
+    #     'pedalMovementCat', 'pedalSizeCat', 'pedalDirection',
+    #     'stimCat', 'originalIndex', 'segment', 't'],
     transposeToColumns='bin', concatOn='index',
     verbose=False, procFun=None))
 #
 alignedAsigsKWargs['procFun'] = ash.genDetrender(
-    timeWindow=(alignedAsigsKWargs['windowSize'][-1] - 2e-3, alignedAsigsKWargs['windowSize'][-1]))
+    timeWindow=(alignedAsigsKWargs['windowSize'][-1] - 1e-3, alignedAsigsKWargs['windowSize'][-1]))
 alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **arguments)
 alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
     namedQueries, scratchFolder, **arguments)
@@ -110,58 +110,68 @@ alignedAsigsKWargs['outlierTrials'] = ash.processOutlierTrials(
     calcSubFolder, prefix, **arguments)
 
 from lmfit.models import ExponentialModel, GaussianModel, ConstantModel
+
+np.random.seed(0)
 exp_mod = ExponentialModel(prefix='exp_')
 c_mod = ConstantModel(prefix='const_')
 gauss1 = GaussianModel(prefix='g1_')
 gauss2 = GaussianModel(prefix='g2_')
 gauss3 = GaussianModel(prefix='g3_')
-mod = gauss1 + gauss2 + gauss3 + exp_mod + c_mod
+gauss4 = GaussianModel(prefix='g4_')
+mod = gauss1 + gauss2 + gauss3 + gauss4 + exp_mod + c_mod
 
 pars = exp_mod.make_params()
 pars.update(gauss1.make_params())
 pars.update(gauss2.make_params())
 pars.update(gauss3.make_params())
+pars.update(gauss4.make_params())
 pars.update(c_mod.make_params())
 #
-pars['g1_center'].set(value=2, min=.5, max=10)
+pars['exp_decay'].set(min=.1, max=5)
+pars['g1_center'].set(min=.5, max=10)
 pars['g2_center'].set(expr='g1_center + 2 * g1_sigma + 2 * g2_sigma')
 pars['g3_center'].set(expr='g1_center + 2 * g1_sigma + 4 * g2_sigma + 2 * g3_sigma')
-for idx in range(3):
-    pars['g{}_sigma'.format(idx+1)].set(value=.2, min=.1, max=1)
+pars['g4_center'].set(expr='g1_center + 2 * g1_sigma + 4 * g2_sigma + 4 * g3_sigma + 2 * g4_sigma')
+for idx in range(4):
+    pars['g{}_sigma'.format(idx+1)].set(value=.3, min=.2, max=.5)
 
 
 def applyModel(dataSrs):
-    if not (dataSrs == 1).all():
-        x = dataSrs.index.to_numpy(dtype=np.float) * 1e3
-        y = dataSrs.to_numpy(dtype=np.float)
-        # terminalValue = np.percentile(y[x >= 9], 95)
-        # pars['const_c'].set(value=terminalValue, vary=False)
-        thesePars = pars.copy()
-        prelim_stats = np.percentile(y, q=[25, 75])
-        spread = prelim_stats[1] - prelim_stats[0]
-        exp_guess = exp_mod.guess(y, x=x)
-        thesePars.update(exp_guess)
-        thesePars['exp_amplitude'].set(min=-5*spread, max=5*spread)
-        thesePars['exp_decay'].set(min=0, max=2)
-        init_exp = exp_mod.eval(exp_guess, x=x)
-        #
-        init_resid = y - init_exp
-        resid_stats = np.percentile(init_resid, q=[25, 75])
-        spread = resid_stats[1] - resid_stats[0]
-        thesePars['g1_amplitude'].set(value=spread, min=0, max=5 * spread)
-        thesePars['g2_amplitude'].set(value=(-1) * spread, min=-5 * spread, max=0)
-        thesePars['g3_amplitude'].set(value=spread, min=0, max=5 * spread)
-        #
-        init = mod.eval(thesePars, x=x)
-        out = mod.fit(y, thesePars, x=x)
-        #
-        fig, ax = plotLmFit(x, y, init, out)
-        plt.show()
-        # pdb.set_trace()
-    return dataSrs
+    x = dataSrs.index.to_numpy(dtype=np.float) * 1e3
+    y = dataSrs.to_numpy(dtype=np.float)
+    thesePars = pars.copy()
+    #
+    prelim_stats = np.percentile(y, q=[25, 75])
+    iqr = prelim_stats[1] - prelim_stats[0]
+    if iqr == 0:
+        return pd.Series(0, index=dataSrs.index)
+    thesePars['const_c'].set(value=0, min=-3*iqr, max=3*iqr)
+    thesePars['exp_amplitude'].set(
+        value=np.median(y[x <= 1.4]),
+        min=-3*iqr, max=3*iqr)
+    exp_guess = exp_mod.guess(y, x=x)
+    thesePars.update(exp_guess)
+    #
+    init_exp = exp_mod.eval(exp_guess, x=x)
+    init_resid = y - init_exp
+    resid_stats = np.percentile(init_resid, q=[25, 75])
+    iqr = resid_stats[1] - resid_stats[0]
+    thesePars['g1_center'].set(value=np.random.uniform(0, 2))
+    #
+    thesePars['g1_amplitude'].set(value=iqr, min=0, max=3 * iqr)
+    thesePars['g2_amplitude'].set(value=(-1) * iqr, min=-3 * iqr, max=0)
+    thesePars['g3_amplitude'].set(value=iqr, min=0, max=3 * iqr)
+    thesePars['g4_amplitude'].set(value=(-1) * iqr, min=-3 * iqr, max=0)
+    #
+    init = mod.eval(thesePars, x=x)
+    out = mod.fit(y, thesePars, x=x)
+    #
+    fig, ax = plotLmFit(x, y, init, out)
+    return pd.Series(out.best_fit, index=dataSrs.index)
 
 
 def plotLmFit(x, y, init, out):
+    print(out.fit_report())
     fig, axes = plt.subplots(1, 2, figsize=(12.8, 4.8))
     axes[0].plot(x, y, 'b')
     axes[0].plot(x, init, 'k--', label='initial fit')
@@ -172,7 +182,8 @@ def plotLmFit(x, y, init, out):
     axes[1].plot(x, comps['g1_'], 'c--', lw=2, label='Gaussian component 1')
     axes[1].plot(x, comps['g2_'], 'm--', lw=2, label='Gaussian component 2')
     axes[1].plot(x, comps['g3_'], 'y--', lw=2, label='Gaussian component 3')
-    axes[1].plot(x, comps['exp_'], 'k--', lw=2, label='Exponential component')
+    axes[1].plot(x, comps['g4_'], 'g--', lw=2, label='Gaussian component 4')
+    axes[1].plot(x, comps['exp_'] + comps['const_'], 'k--', lw=2, label='Offset exponential component')
     # axes[1].axhline(comps['const_'], c='r', lw=2, label='Constant component')
     axes[1].legend(loc='best')
     return fig, axes
@@ -182,7 +193,7 @@ def shapeFit(
         group, dataColNames=None,
         tBounds=None,
         plotting=False, iterMethod='loo',
-        modelFun=None,
+        modelFun=None, corrMethod='pearson',
         maxIter=1e6):
     # print('os.getpid() = {}'.format(os.getpid()))
     # print('Group shape is {}'.format(group.shape))
@@ -198,22 +209,28 @@ def shapeFit(
         maskX = np.ones_like(groupData.columns).astype(np.bool)
     #
     nSamp = groupData.shape[0]
+    fig, ax = plt.subplots()
+    ax.plot(groupData.T)
+    ax.text(
+        0.95, 0.95,
+        '{}'.format(group.iloc[0, :].loc[keepIndexCols]),
+        horizontalalignment='right', verticalalignment='top',
+        transform=ax.transAxes)
+    plt.show()
     if iterMethod == 'loo':
         loo = LeaveOneOut()
         allCorr = pd.Series(index=groupData.index)
         iterator = loo.split(groupData)
         for idx, (train_index, test_index) in enumerate(iterator):
             refX = groupData.iloc[train_index, maskX].mean()
-            bla = modelFun(refX)
-            return bla
+            testX = modelFun(refX)
             '''
             testX = pd.Series(
                 groupData.iloc[test_index, maskX].to_numpy().squeeze(),
                 index=refX.index)
-            
+            '''
             allCorr.iloc[test_index] = refX.corr(
                 testX, method=corrMethod)
-            '''
             if idx > maxIter:
                 break
         allCorr.dropna(inplace=True)
@@ -239,18 +256,32 @@ def shapeFit(
                 ((refXBar - testXBar) ** 2)
                 .mean())
             '''
+    elif iterMethod == 'chooseN':
+        nChoose = max(groupData.shape[0] - 2, int(groupData.shape[0] / 2), 2)
+        if maxIter is None:
+            maxIter = int(factorial(nSamp) / (factorial(nChoose) ** 2))
+        else:
+            maxIter = int(maxIter)
+        allCorr = pd.Series(index=range(maxIter))
+        for idx in range(maxIter):
+            testX = shuffle(groupData, n_samples=nChoose)
+            testXBar = testX.iloc[:, maskX].mean()
+            testX = modelFun(testXBar)
     # if allCorr.mean() < 0:
     #     pdb.set_trace()
     #     plt.plot(testXBar); plt.plot(refXBar); plt.show()
     #     plt.plot(testX.transpose(), 'b'); plt.plot(refX.transpose(), 'r'); plt.show()
+    plt.show()
     resultDF = pd.DataFrame(
         {
             'noiseCeil': allCorr.mean(),
             'noiseCeilStd': allCorr.std(),
-            'covariance': allCov.mean(),
-            'covarianceStd': allCov.std(),
-            'mse': allMSE.mean(),
-            'mseStd': allMSE.std()}, index=[group.index[0]])
+            # 'covariance': allCov.mean(),
+            # 'covarianceStd': allCov.std(),
+            # 'mse': allMSE.mean(),
+            # 'mseStd': allMSE.std()
+            },
+        index=[group.index[0]])
     for cN in keepIndexCols:
         resultDF.loc[group.index[0], cN] = group.loc[group.index[0], cN]
     # print(os.getpid())
@@ -261,7 +292,7 @@ if __name__ == "__main__":
     testVar = None
     conditionNames = [
         'electrode',
-        'RateInHz',
+        # 'RateInHz',
         'nominalCurrent']
     groupBy = ['feature'] + conditionNames
     # resultMeta = {
@@ -272,6 +303,10 @@ if __name__ == "__main__":
     #     'mse': np.float,
     #     'mseStd': np.float
     #     }
+    alignedAsigsKWargs['getMetaData'] = conditionNames
+    for nM in ['RateInHz', 'stimCat', 'originalIndex', 'segment', 't']:
+        if nM not in alignedAsigsKWargs['getMetaData']:
+            alignedAsigsKWargs['getMetaData'].append(nM)
     useCachedResult = True
     if not (useCachedResult and os.path.exists(resultPath)):
         print('loading {}'.format(triggeredPath))
@@ -284,10 +319,10 @@ if __name__ == "__main__":
             dataDF.xs(egFeatName, level='feature', drop_level=False),
             'RateInHz', 'electrode', 'nominalCurrent')
         funKWArgs = dict(
-                tBounds=[2e-3, 10e-3],
+                tBounds=[1.3e-3, 8e-3],
                 modelFun=applyModel,
-                plotting=False, iterMethod='loo',
-                maxIter=100)
+                plotting=False, iterMethod='chooseN',
+                maxIter=3)
         # daskComputeOpts = {}
         daskComputeOpts = dict(
             # scheduler='threads'
