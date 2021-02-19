@@ -23,22 +23,22 @@ Options:
 """
 from docopt import docopt
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
-if arguments['plotting']:
-    import matplotlib
-    matplotlib.rcParams['pdf.fonttype'] = 42
-    matplotlib.rcParams['ps.fonttype'] = 42
-    matplotlib.use('QT5Agg')   # generate postscript output
-    # matplotlib.use('Agg')   # generate postscript output
-    import matplotlib.pyplot as plt
-    from matplotlib.backends.backend_pdf import PdfPages
-    import seaborn as sns
-    sns.set()
-    sns.set_color_codes("dark")
-    sns.set_context("notebook")
-    sns.set_style("dark")
+
+import matplotlib
+matplotlib.rcParams['pdf.fonttype'] = 42
+matplotlib.rcParams['ps.fonttype'] = 42
+matplotlib.use('QT5Agg')   # generate postscript output
+# matplotlib.use('Agg')   # generate postscript output
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
+import seaborn as sns
+sns.set(
+    context='talk', style='dark',
+    palette='dark', font='sans-serif',
+    font_scale=1, color_codes=True)
 # from tqdm import tqdm
 import pdb
-import os
+import os, random
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
 import dataAnalysis.plotting.aligned_signal_plots as asp
 import dataAnalysis.preproc.ns5 as preproc
@@ -91,7 +91,7 @@ alignedAsigsKWargs.update(dict(
     duplicateControlsByProgram=False,
     makeControlProgram=False,
     removeFuzzyName=False,
-    decimate=1, windowSize=(0, 300e-3),
+    decimate=1, windowSize=(0, 10e-3),
     metaDataToCategories=False,
     getMetaData=[
         'RateInHz', 'feature', 'electrode',
@@ -101,18 +101,89 @@ alignedAsigsKWargs.update(dict(
     transposeToColumns='bin', concatOn='index',
     verbose=False, procFun=None))
 #
+alignedAsigsKWargs['procFun'] = ash.genDetrender(
+    timeWindow=(alignedAsigsKWargs['windowSize'][-1] - 2e-3, alignedAsigsKWargs['windowSize'][-1]))
 alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **arguments)
 alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
     namedQueries, scratchFolder, **arguments)
 alignedAsigsKWargs['outlierTrials'] = ash.processOutlierTrials(
     calcSubFolder, prefix, **arguments)
 
+from lmfit.models import ExponentialModel, GaussianModel, ConstantModel
+exp_mod = ExponentialModel(prefix='exp_')
+c_mod = ConstantModel(prefix='const_')
+gauss1 = GaussianModel(prefix='g1_')
+gauss2 = GaussianModel(prefix='g2_')
+gauss3 = GaussianModel(prefix='g3_')
+mod = gauss1 + gauss2 + gauss3 + exp_mod + c_mod
 
-def noiseCeil(
+pars = exp_mod.make_params()
+pars.update(gauss1.make_params())
+pars.update(gauss2.make_params())
+pars.update(gauss3.make_params())
+pars.update(c_mod.make_params())
+#
+pars['g1_center'].set(value=2, min=.5, max=10)
+pars['g2_center'].set(expr='g1_center + 2 * g1_sigma + 2 * g2_sigma')
+pars['g3_center'].set(expr='g1_center + 2 * g1_sigma + 4 * g2_sigma + 2 * g3_sigma')
+for idx in range(3):
+    pars['g{}_sigma'.format(idx+1)].set(value=.2, min=.1, max=1)
+
+
+def applyModel(dataSrs):
+    if not (dataSrs == 1).all():
+        x = dataSrs.index.to_numpy(dtype=np.float) * 1e3
+        y = dataSrs.to_numpy(dtype=np.float)
+        # terminalValue = np.percentile(y[x >= 9], 95)
+        # pars['const_c'].set(value=terminalValue, vary=False)
+        thesePars = pars.copy()
+        prelim_stats = np.percentile(y, q=[25, 75])
+        spread = prelim_stats[1] - prelim_stats[0]
+        exp_guess = exp_mod.guess(y, x=x)
+        thesePars.update(exp_guess)
+        thesePars['exp_amplitude'].set(min=-5*spread, max=5*spread)
+        thesePars['exp_decay'].set(min=0, max=2)
+        init_exp = exp_mod.eval(exp_guess, x=x)
+        #
+        init_resid = y - init_exp
+        resid_stats = np.percentile(init_resid, q=[25, 75])
+        spread = resid_stats[1] - resid_stats[0]
+        thesePars['g1_amplitude'].set(value=spread, min=0, max=5 * spread)
+        thesePars['g2_amplitude'].set(value=(-1) * spread, min=-5 * spread, max=0)
+        thesePars['g3_amplitude'].set(value=spread, min=0, max=5 * spread)
+        #
+        init = mod.eval(thesePars, x=x)
+        out = mod.fit(y, thesePars, x=x)
+        #
+        fig, ax = plotLmFit(x, y, init, out)
+        plt.show()
+        # pdb.set_trace()
+    return dataSrs
+
+
+def plotLmFit(x, y, init, out):
+    fig, axes = plt.subplots(1, 2, figsize=(12.8, 4.8))
+    axes[0].plot(x, y, 'b')
+    axes[0].plot(x, init, 'k--', label='initial fit')
+    axes[0].plot(x, out.best_fit, 'r-', label='best fit')
+    axes[0].legend(loc='best')
+    comps = out.eval_components(x=x)
+    axes[1].plot(x, y, 'b')
+    axes[1].plot(x, comps['g1_'], 'c--', lw=2, label='Gaussian component 1')
+    axes[1].plot(x, comps['g2_'], 'm--', lw=2, label='Gaussian component 2')
+    axes[1].plot(x, comps['g3_'], 'y--', lw=2, label='Gaussian component 3')
+    axes[1].plot(x, comps['exp_'], 'k--', lw=2, label='Exponential component')
+    # axes[1].axhline(comps['const_'], c='r', lw=2, label='Constant component')
+    axes[1].legend(loc='best')
+    return fig, axes
+
+
+def shapeFit(
         group, dataColNames=None,
         tBounds=None,
         plotting=False, iterMethod='loo',
-        corrMethod='pearson', maxIter=1e6):
+        modelFun=None,
+        maxIter=1e6):
     # print('os.getpid() = {}'.format(os.getpid()))
     # print('Group shape is {}'.format(group.shape))
     dataColMask = group.columns.isin(dataColNames)
@@ -133,11 +204,16 @@ def noiseCeil(
         iterator = loo.split(groupData)
         for idx, (train_index, test_index) in enumerate(iterator):
             refX = groupData.iloc[train_index, maskX].mean()
+            bla = modelFun(refX)
+            return bla
+            '''
             testX = pd.Series(
                 groupData.iloc[test_index, maskX].to_numpy().squeeze(),
                 index=refX.index)
+            
             allCorr.iloc[test_index] = refX.corr(
                 testX, method=corrMethod)
+            '''
             if idx > maxIter:
                 break
         allCorr.dropna(inplace=True)
@@ -152,15 +228,17 @@ def noiseCeil(
         allMSE = pd.Series(index=range(maxIter))
         for idx in range(maxIter):
             testX = shuffle(groupData, n_samples=nChoose)
-            testXBar = testX.mean()
+            testXBar = testX.iloc[:, maskX].mean()
             refX = groupData.loc[~groupData.index.isin(testX.index), :]
-            refXBar = refX.mean()
+            refXBar = refX.iloc[:, maskX].mean()
+            '''
             allCorr.iloc[idx] = refX.mean().corr(
                 testXBar, method=corrMethod)
             allCov.iloc[idx] = refXBar.cov(testXBar)
             allMSE.iloc[idx] = (
                 ((refXBar - testXBar) ** 2)
                 .mean())
+            '''
     # if allCorr.mean() < 0:
     #     pdb.set_trace()
     #     plt.plot(testXBar); plt.plot(refXBar); plt.show()
@@ -183,7 +261,8 @@ if __name__ == "__main__":
     testVar = None
     conditionNames = [
         'electrode',
-        'RateInHz', 'nominalCurrent']
+        'RateInHz',
+        'nominalCurrent']
     groupBy = ['feature'] + conditionNames
     # resultMeta = {
     #     'noiseCeil': np.float,
@@ -205,14 +284,15 @@ if __name__ == "__main__":
             dataDF.xs(egFeatName, level='feature', drop_level=False),
             'RateInHz', 'electrode', 'nominalCurrent')
         funKWArgs = dict(
-                tBounds=None,
-                plotting=False, iterMethod='half',
-                corrMethod='pearson', maxIter=100)
+                tBounds=[2e-3, 10e-3],
+                modelFun=applyModel,
+                plotting=False, iterMethod='loo',
+                maxIter=100)
         # daskComputeOpts = {}
         daskComputeOpts = dict(
             # scheduler='threads'
-            scheduler='processes'
-            # scheduler='single-threaded'
+            # scheduler='processes'
+            scheduler='single-threaded'
             )
         exampleOutput = pd.DataFrame(
         {
@@ -224,10 +304,12 @@ if __name__ == "__main__":
             'mseStd': float(1)}, index=[0])
         daskClient = Client()
         resDF = ash.splitApplyCombine(
-            dataDF, fun=noiseCeil, resultPath=resultPath,
+            dataDF, fun=shapeFit, resultPath=resultPath,
             funArgs=[], funKWArgs=funKWArgs,
             rowKeys=groupBy, colKeys=testVar, useDask=True,
-            daskPersist=True, daskProgBar=True, daskResultMeta=None,
+            daskPersist=True, 
+            daskProgBar=False,
+            daskResultMeta=None,
             daskComputeOpts=daskComputeOpts, nPartitionMultiplier=2,
             reindexFromInput=False)
         #

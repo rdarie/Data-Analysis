@@ -2998,6 +2998,7 @@ def preprocBlockToNix(
             plt.show()
     # first pass through asigs, if removing mean across channels
     if (removeMeanAcross or calcAverageLFP):
+        # [asigP.name for asigP in seg.analogsignals]
         for aSigIdx, aSigProxy in enumerate(seg.analogsignals):
             if aSigIdx == 0:
                 # check bounds
@@ -3014,6 +3015,7 @@ def preprocBlockToNix(
                     time_slice=(tStart, tStop),
                     magnitude_mode='rescaled')
                 if 'tempLFPStore' not in locals():
+                    # pdb.set_trace()
                     tempLFPStore = pd.DataFrame(
                         np.zeros(
                             (asig.shape[0], nAsigs),
@@ -3918,7 +3920,8 @@ def blockFromPath(
                 'chunkTStart': 0,
                 'chunkTStop': 'NaN'
             }}
-    for idx, (chunkIdxStr, chunkMeta) in enumerate(chunkingMetadata.items()):   
+    for idx, (chunkIdxStr, chunkMeta) in enumerate(chunkingMetadata.items()):
+        print('blockFromPath: chunkIdx = {}'.format(chunkIdxStr))
         thisDataPath = chunkMeta['filename']
         assert os.path.exists(thisDataPath)
         if idx == 0:

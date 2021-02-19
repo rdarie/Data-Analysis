@@ -2586,7 +2586,10 @@ def getINSStimOnset(
                 (tdSeg.index <= latestStimOnIdx + int(slotSize))
                 )
             # possibleSlotStartIdx = tdSeg.index[slotStartMask]
-            possibleSlotStartIdx = tdSeg.index[slotStartMask] + activeProgram * int(slotSize / 4)
+            possibleSlotStartIdx = (
+                tdSeg.index[slotStartMask] +
+                activeProgram * int(slotSize / 4))
+            possibleSlotStartIdx = possibleSlotStartIdx[possibleSlotStartIdx.isin(tdSeg.index)]
             print('possibleSlotStartIdx is {}\n'.format(possibleSlotStartIdx))
             if len(possibleSlotStartIdx) > 1:
                 stimOnUncertainty = pd.Series(
@@ -2599,7 +2602,10 @@ def getINSStimOnset(
                 # keepMask = uncertaintyVals > .1
                 keepMask = uncertaintyVals > uncertaintyValsDF.quantile(0.9)
                 keepMask[np.argmax(uncertaintyVals)] = True
-                possibleSlotStartIdx = possibleSlotStartIdx[keepMask]
+                try:
+                    possibleSlotStartIdx = possibleSlotStartIdx[keepMask]
+                except:
+                    pdb.set_trace()
                 uncertaintyVals = uncertaintyVals[keepMask]
             else:
                 uncertaintyVals = np.array([1])

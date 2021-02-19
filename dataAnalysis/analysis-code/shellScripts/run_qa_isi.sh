@@ -56,9 +56,9 @@ UNITSELECTOR="--unitQuery=isiemgoracc"
 # UNITSELECTOR="--unitQuery=isispinaloremg"
 
 OUTPUTBLOCKNAME="--outputBlockName=emg_clean"
-INPUTBLOCKNAME="--inputBlockName=emg"
+INPUTBLOCKNAME="--inputBlockSuffix=emg"
 # OUTPUTBLOCKNAME="--outputBlockName=lfp_clean"
-# INPUTBLOCKNAME="--inputBlockName=lfp"
+# INPUTBLOCKNAME="--inputBlockSuffix=lfp"
 
 ALIGNQUERY="--alignQuery=stimOn"
 # ALIGNQUERY="--alignQuery=all"
@@ -73,13 +73,13 @@ conda activate
 source activate nda2
 python --version
 
-INPUTBLOCKNAME="--inputBlockName=emg"
+INPUTBLOCKNAME="--inputBlockSuffix=emg"
 OUTPUTBLOCKNAME="--outputBlockName=emg_clean"
 python3 -u ./cleanISIData.py --exp=$EXP --alignFolderName=stim $OUTPUTBLOCKNAME $INPUTBLOCKNAME $BLOCKSELECTOR $ANALYSISSELECTOR $UNITSELECTOR $WINDOW $ALIGNQUERY --saveResults --verbose --plotting
 
-# INPUTBLOCKNAME="--inputBlockName=emg_clean"
+# INPUTBLOCKNAME="--inputBlockSuffix=emg_clean"
 # python3 -u ./calcTrialOutliers.py --exp=$EXP --alignFolderName=stim $INPUTBLOCKNAME $BLOCKSELECTOR $ANALYSISSELECTOR $UNITSELECTOR $WINDOW $ALIGNQUERY --verbose --plotting --saveResults
 # 
-# INPUTBLOCKNAME="--inputBlockName=emg_clean"
+# INPUTBLOCKNAME="--inputBlockSuffix=emg_clean"
 # UNITSELECTOR="--unitQuery=isiemgenv"
 # python -u ./calcTargetNoiseCeiling.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISSELECTOR --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --maskOutlierBlocks $ALIGNQUERY --plotting

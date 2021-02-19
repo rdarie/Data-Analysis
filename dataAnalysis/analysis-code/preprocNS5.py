@@ -371,7 +371,7 @@ def preprocNS5():
         ns5.preproc(
             fileName=ns5FileName,
             rawFolderPath=nspFolder,
-            outputFolderPath=scratchFolder, mapDF=None,
+            outputFolderPath=scratchFolder, mapDF=mapDF,
             fillOverflow=False, removeJumps=False,
             motorEncoderMask=motorEncoderMask,
             eventInfo=trialFilesFrom['utah']['eventInfo'],
@@ -384,7 +384,8 @@ def preprocNS5():
             linearDetrend=False,
             interpolateOutliers=False, calcOutliers=False,
             normalizeByImpedance=False,
-            asigNameList=None, ainpNameList=ainpNameList, nameSuffix='',
+            asigNameList=asigNameList, ainpNameList=ainpNameList,
+            nameSuffix='',
             LFPFilterOpts=None)
     return
 

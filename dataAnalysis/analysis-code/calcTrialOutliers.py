@@ -9,7 +9,7 @@ Options:
     --lazy                                       load from raw, or regular? [default: False]
     --saveResults                                load from raw, or regular? [default: False]
     --useCachedMahalanobis                       load previous covariance matrix? [default: False]
-    --inputBlockName=inputBlockName              which trig_ block to pull [default: pca]
+    --inputBlockSuffix=inputBlockSuffix          which trig_ block to pull [default: pca]
     --verbose                                    print diagnostics? [default: False]
     --plotting                                   plot results?
     --window=window                              process with short window? [default: long]
@@ -82,7 +82,7 @@ else:
 triggeredPath = os.path.join(
     alignSubFolder,
     prefix + '_{}_{}.nix'.format(
-        arguments['inputBlockName'], arguments['window']))
+        arguments['inputBlockSuffix'], arguments['window']))
 
 resultPath = os.path.join(
     calcSubFolder,
@@ -116,7 +116,7 @@ stimConditionNames = [
     'electrode', arguments['amplitudeFieldName'], 'RateInHz']
 motionConditionNames = [
     'pedalMovementCat', 'pedalSizeCat', 'pedalDirection']
-if (blockExperimentType == 'proprio-miniRC') or (blockExperimentType == 'proprio-RC'):
+if (blockExperimentType == 'proprio-miniRC') or (blockExperimentType == 'proprio-RC') or (blockExperimentType == 'isi'):
     # has stim but no motion
     stimulusConditionNames = stimConditionNames
 elif blockExperimentType == 'proprio-motionOnly':
@@ -130,14 +130,20 @@ if 'outlierDetectOptions' in locals():
     targetEpochSize = outlierDetectOptions['targetEpochSize']
     twoTailed = outlierDetectOptions['twoTailed']
     alignedAsigsKWargs['windowSize'] = outlierDetectOptions['windowSize']
+    devQuantile = outlierDetectOptions.pop('devQuantile', 0.95)
+    qThresh = outlierDetectOptions.pop('qThresh', 1-1e-6)
+    '''
     alignedAsigsKWargs['procFun'] = ash.genDetrender(
         timeWindow=(
             alignedAsigsKWargs['windowSize'][0],
             alignedAsigsKWargs['windowSize'][1] + 100e-3))
+    '''
 else:
     targetEpochSize = 1e-3
     twoTailed = False
     alignedAsigsKWargs['windowSize'] = (-100e-3, 400e-3)
+    devQuantile = 0.95
+    qThresh = 1-1e-6
 
 
 alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **arguments)
@@ -220,9 +226,10 @@ if __name__ == "__main__":
     print('loading {}'.format(triggeredPath))
     dataReader, dataBlock = ns5.blockFromPath(
         triggeredPath, lazy=arguments['lazy'])
+    # pdb.set_trace()
     dataDF = ns5.alignedAsigsToDF(
         dataBlock, **alignedAsigsKWargs)
-    #
+    # pdb.set_trace()
     if 'outlierDetectColumns' in locals():
         dataDF.drop(
             columns=[
@@ -331,8 +338,8 @@ if __name__ == "__main__":
     print('#######################################################')
 
     outlierTrials = findOutliers(
-        mahalDist, groupBy=groupBy, multiplier=1, qThresh=1-1e-6,
-        nDim=len(dataDF.columns), devQuantile=0.99, twoTailed=twoTailed)
+        mahalDist, groupBy=groupBy, multiplier=1, qThresh=qThresh,
+        nDim=len(dataDF.columns), devQuantile=devQuantile, twoTailed=twoTailed)
     # outlierTrials = ash.applyFunGrouped(
     #     mahalDist,
     #     groupBy, testVar,

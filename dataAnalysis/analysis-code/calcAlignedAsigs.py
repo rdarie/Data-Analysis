@@ -139,6 +139,10 @@ elif blockExperimentType == 'proprio':
     elif arguments['eventName'] == 'motion':
         eventName = 'motionStimAlignTimes'
     minNConditionRepetitions['categories'] = motionConditionNames + stimConditionNames
+elif blockExperimentType == 'isi':
+    if arguments['eventName'] == 'stim':
+        eventName = 'stimAlignTimes'
+    minNConditionRepetitions['categories'] = stimConditionNames
 
 print('Loading events from {}'.format(eventPath))
 print('Loading signal from {}'.format(signalPath))

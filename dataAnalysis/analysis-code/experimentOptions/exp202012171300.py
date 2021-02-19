@@ -51,7 +51,7 @@ def getExpOpts():
     asigNameList = [
         ['caudalX_e{:02d}_a'.format(i) for i in range(1, 8)] +
         ['caudalY_e{:02d}_a'.format(i) for i in range(9, 16)] +
-        ['caudalZ_e{:02d}_a'.format(i) for i in range(17, 25)] +
+        ['caudalZ_e{:02d}_a'.format(i) for i in range(17, 25)],
         ['rostralX_e{:02d}_a'.format(i) for i in range(1, 8)] +
         ['rostralY_e{:02d}_a'.format(i) for i in range(9, 16)] +
         ['rostralZ_e{:02d}_a'.format(i) for i in range(17, 25)]
@@ -68,24 +68,24 @@ def getExpOpts():
         7: [],
         8: [],
         }
-    synchInfo = {'delsysToNSP': {}, 'nspForDelsys': {}, 'ins': {}}
+    synchInfo = {'delsysToNsp': {}, 'nspForDelsys': {}, 'ins': {}}
     for blockIdx in blockExperimentTypeLookup.keys():
         synchInfo['nspForDelsys'][blockIdx] = {
-            'synchChanName': 'ainp2'
+            'synchChanName': 'analog 1'
             }
         synchInfo['delsysToNsp'][blockIdx] = {
             'synchChanName': 'AnalogInputAdapterAnalog'
         }
     # For emg analysis - emg missing for some time ranges
-    synchInfo['delsysToNSP'][3] = {'timeRanges': [10, 3127], 'chooseCrossings': slice(None)}
-    synchInfo['delsysToNSP'][6] = {'timeRanges': [90, 2080], 'chooseCrossings': slice(None, 1000)}
-    synchInfo['delsysToNSP'][7] = {'timeRanges': [12, 1203], 'chooseCrossings': slice(None, 1200)}
-    synchInfo['delsysToNSP'][7] = {'timeRanges': [19, 674], 'chooseCrossings': slice(None, 1200)}
+    synchInfo['delsysToNsp'][3].update({'timeRanges': [10, 3127], 'chooseCrossings': slice(None)})
+    synchInfo['delsysToNsp'][6].update({'timeRanges': [90, 2080], 'chooseCrossings': slice(None, 1000)})
+    synchInfo['delsysToNsp'][7].update({'timeRanges': [12, 1203], 'chooseCrossings': slice(None, 1200)})
+    synchInfo['delsysToNsp'][7].update({'timeRanges': [19, 674], 'chooseCrossings': slice(None, 1200)})
     #
-    synchInfo['nspForDelsys'][3] = {'timeRanges': [10, 3127], 'chooseCrossings': slice(None)}
-    synchInfo['nspForDelsys'][6] = {'timeRanges': [50, 2040], 'chooseCrossings': slice(None, 1000)}
-    synchInfo['nspForDelsys'][7] = {'timeRanges': [6, 1244], 'chooseCrossings': slice(None, 1200)}
-    synchInfo['nspForDelsys'][7] = {'timeRanges': [3, 659], 'chooseCrossings': slice(None, 1200)}
+    synchInfo['nspForDelsys'][3].update({'timeRanges': [10, 3127], 'chooseCrossings': slice(None)})
+    synchInfo['nspForDelsys'][6].update({'timeRanges': [50, 2040], 'chooseCrossings': slice(None, 1000)})
+    synchInfo['nspForDelsys'][7].update({'timeRanges': [6, 1244], 'chooseCrossings': slice(None, 1200)})
+    synchInfo['nspForDelsys'][7].update({'timeRanges': [3, 659], 'chooseCrossings': slice(None, 1200)})
     alignTimeBoundsLookup = {
         # 1: [
         #     [3, 2290.5]
@@ -160,14 +160,15 @@ def getExpOpts():
     }
     outlierDetectOptions = dict(
         targetEpochSize=10e-3,
-        windowSize=(0, 300e-3),
+        windowSize=(0, 100e-3),
         # conditionNames=[
         #     'electrode', 'amplitude', 'RateInHz',
         #     'pedalMovementCat', 'pedalSizeCat', 'pedalDirection'],
         conditionNames=[
             'electrode', 'nominalCurrent', 'RateInHz'],
-        twoTailed=True,
+        twoTailed=False,
         )
+    '''
     outlierDetectColumns = [
             # 'LThoracolumbarFasciaEmg#0',
             # 'LGracilisEmg#0',
@@ -194,6 +195,7 @@ def getExpOpts():
             'RBicepsFemorisEmgEnv#0',
             'RGastrocnemiusEmgEnv#0'
         ]
+    '''
     RCPlotOpts = {
         'keepFeatures': [
             'LBicepsFemoris', 'LGastrocnemius', 'LGracilis',
@@ -253,4 +255,26 @@ def getExpOpts():
         'n': 5,
         'categories': ['nominalCurrent', 'electrode', 'RateInHz']
         }
+    delsysFilterOpts = {
+        'ACC': {
+            'bandstop': {
+                'Wn': 75,
+                'Q': 5,
+                'nHarmonics': 1,
+                'N': 4,
+                'btype': 'bandstop',
+                'ftype': 'bessel'
+            }
+        },
+        'EMG': {
+            'bandstop': {
+                'Wn': 60,
+                'Q': 5,
+                'nHarmonics': 1,
+                'N': 4,
+                'btype': 'bandstop',
+                'ftype': 'bessel'
+            }
+        }
+    }
     return locals()

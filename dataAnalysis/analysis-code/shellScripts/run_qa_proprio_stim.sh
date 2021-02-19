@@ -27,7 +27,7 @@ source shellScripts/run_align_stim_preamble.sh
 ALIGNQUERY="--alignQuery=stimOn"
 
 UNITQUERY="--unitQuery=lfp"
-INPUTBLOCKNAME="--inputBlockName=lfp"
+INPUTBLOCKNAME="--inputBlockSuffix=lfp"
 
 python -u ./calcTrialOutliers.py --exp=$EXP $BLOCKSELECTOR $UNITSELECTOR $WINDOW $ALIGNFOLDER $ANALYSISFOLDER $ALIGNQUERY $LAZINESS $UNITQUERY $INPUTBLOCKNAME --plotting --verbose --amplitudeFieldName="amplitude" --saveResults
 # python -u ./calcTrialOutliersPCA.py --exp=$EXP $BLOCKSELECTOR $UNITSELECTOR $WINDOW $ALIGNFOLDER $ANALYSISFOLDER $ALIGNQUERY $LAZINESS $UNITQUERY $INPUTBLOCKNAME --plotting --verbose --amplitudeFieldName="amplitude" --saveResults

@@ -20,7 +20,7 @@
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=1,2
+#SBATCH --array=2
 
 
 module load anaconda/2020.02
@@ -43,7 +43,7 @@ python --version
 # EXP="exp202102101100"
 EXP="exp202102151100"
 
-SLURM_ARRAY_TASK_ID=1
+# SLURM_ARRAY_TASK_ID=2
 
 # --makePlots to make quality check plots
 # --showPlots to interactively display quality check plots
