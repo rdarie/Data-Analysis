@@ -74,8 +74,8 @@ LAZINESS="--lazy"
 WINDOW="--window=XXS"
 # WINDOW="--window=XS"
 
-# ANALYSISFOLDER="--analysisName=fullRes"
-ANALYSISFOLDER="--analysisName=hiRes"
+ANALYSISFOLDER="--analysisName=fullRes"
+# ANALYSISFOLDER="--analysisName=hiRes"
 # ANALYSISFOLDER="--analysisName=loRes"
 # ANALYSISFOLDER="--analysisName=default"
 # ANALYSISFOLDER="--analysisName=parameter_recovery"
@@ -99,7 +99,7 @@ SLURM_ARRAY_TASK_ID=3
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
 
 #  #  preprocess
-python -u ./preprocNS5.py --exp=$EXP $BLOCKSELECTOR --ISIRaw --transferISIStimLog
+# python -u ./preprocNS5.py --exp=$EXP $BLOCKSELECTOR --ISIRaw --transferISIStimLog
 # python -u ./preprocDelsysHPF.py --exp=$EXP $BLOCKSELECTOR $CHANSELECTOR --verbose
 # python -u ./preprocDelsysCSV.py --exp=$EXP $BLOCKSELECTOR $CHANSELECTOR --verbose
 
@@ -122,13 +122,14 @@ CHANSELECTOR="--chanQuery=isispinal"
 EVENTFOLDER="--eventSubfolder=hiRes"
 SIGNALFOLDER="--signalSubfolder=hiRes"
 # python -u ./calcAlignedAsigs.py --signalBlockSuffix="analyze" --eventBlockSuffix="analyze" --exp=$EXP $BLOCKSELECTOR $WINDOW $LAZINESS $ANALYSISFOLDER --eventName=stim $CHANSELECTOR $OUTPUTBLOCKNAME --verbose --alignFolderName=stim --amplitudeFieldName=nominalCurrent $EVENTFOLDER $SIGNALFOLDER
-python -u ./calcAlignedAsigs.py $CHANSELECTOR --outputBlockSuffix="lfp_raw" --eventBlockSuffix='analyze' $EVENTFOLDER --signalBlockPrefix='Block' --verbose --exp=$EXP --amplitudeFieldName=nominalCurrent $BLOCKSELECTOR $WINDOW $LAZINESS --eventName=stim $ALIGNFOLDER --analysisName=fullRes --signalSubfolder=None
+# python -u ./calcAlignedAsigs.py $CHANSELECTOR --outputBlockSuffix="lfp_raw" --eventBlockSuffix='analyze' $EVENTFOLDER --signalBlockPrefix='Block' --verbose --exp=$EXP --amplitudeFieldName=nominalCurrent $BLOCKSELECTOR $WINDOW $LAZINESS --eventName=stim --alignFolderName=stim --analysisName=fullRes --signalSubfolder=None
 
-INPUTBLOCKNAME="--inputBlockSuffix=lfp"
+INPUTBLOCKNAME="--inputBlockSuffix=lfp_raw"
+# python -u ./makeViewableBlockFromTriggered.py --plotting $INPUTBLOCKNAME $UNITSELECTOR --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS --alignFolderName=stim
 
 # python -u ./calcTrialOutliers.py --exp=$EXP --alignFolderName=stim $INPUTBLOCKNAME $BLOCKSELECTOR $ANALYSISFOLDER $UNITSELECTOR $WINDOW $ALIGNQUERY --verbose --plotting --saveResults
-# python -u ./exportForDeepSpine.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $UNITSELECTOR --alignQuery="stimOn" $INPUTBLOCKNAME --maskOutlierBlocks
-# python -u ./calcLFPLMFitModel.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --maskOutlierBlocks $ALIGNQUERY --plotting
+# python -u ./exportForDeepSpine.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $UNITSELECTOR $INPUTBLOCKNAME --maskOutlierBlocks
+python -u ./calcLFPLMFitModel.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --maskOutlierBlocks $ALIGNQUERY --plotting
 # python -u ./calcTargetNoiseCeiling.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --maskOutlierBlocks $ALIGNQUERY --plotting
 
 # python -u ./loadSheepDeepSpine.py

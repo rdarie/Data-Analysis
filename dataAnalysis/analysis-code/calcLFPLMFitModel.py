@@ -91,7 +91,7 @@ alignedAsigsKWargs.update(dict(
     duplicateControlsByProgram=False,
     makeControlProgram=False,
     removeFuzzyName=False,
-    decimate=1, windowSize=(0, 9e-3),
+    decimate=1, windowSize=(-10e3, 10e-3),
     metaDataToCategories=False,
     # getMetaData=[
     #     'RateInHz', 'feature', 'electrode',
@@ -101,8 +101,13 @@ alignedAsigsKWargs.update(dict(
     transposeToColumns='bin', concatOn='index',
     verbose=False, procFun=None))
 #
+'''
 alignedAsigsKWargs['procFun'] = ash.genDetrender(
     timeWindow=(alignedAsigsKWargs['windowSize'][-1] - 1e-3, alignedAsigsKWargs['windowSize'][-1]))
+'''
+alignedAsigsKWargs['procFun'] = ash.genDetrender(
+    timeWindow=(alignedAsigsKWargs['windowSize'][0], -1e-3))
+
 alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **arguments)
 alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
     namedQueries, scratchFolder, **arguments)
@@ -112,23 +117,28 @@ alignedAsigsKWargs['outlierTrials'] = ash.processOutlierTrials(
 from lmfit.models import ExponentialModel, GaussianModel, ConstantModel
 
 np.random.seed(0)
-exp_mod = ExponentialModel(prefix='exp_')
-c_mod = ConstantModel(prefix='const_')
+exp1 = ExponentialModel(prefix='exp1_')
+exp2 = ExponentialModel(prefix='exp2_')
+const = ConstantModel(prefix='const_')
 gauss1 = GaussianModel(prefix='g1_')
 gauss2 = GaussianModel(prefix='g2_')
 gauss3 = GaussianModel(prefix='g3_')
 gauss4 = GaussianModel(prefix='g4_')
-mod = gauss1 + gauss2 + gauss3 + gauss4 + exp_mod + c_mod
+mod = gauss1 + gauss2 + gauss3 + gauss4 + exp1 + exp2 + const
 
-pars = exp_mod.make_params()
+pars = exp1.make_params()
+pars.update(exp2.make_params())
 pars.update(gauss1.make_params())
 pars.update(gauss2.make_params())
 pars.update(gauss3.make_params())
 pars.update(gauss4.make_params())
-pars.update(c_mod.make_params())
+pars.update(const.make_params())
 #
-pars['exp_decay'].set(min=.1, max=5)
-pars['g1_center'].set(min=.5, max=10)
+pars['exp1_decay'].set(value=.5, min=.25, max=.75)
+pars['exp2_decay'].set(value=100, min=10, max=5000)
+pars.add(name='exp2_ratio', value=-1, min=-1.1, max=-0.9)
+pars['exp2_amplitude'].set(expr='exp2_ratio * exp1_amplitude')
+pars['g1_center'].set(min=.5, max=8)
 pars['g2_center'].set(expr='g1_center + 2 * g1_sigma + 2 * g2_sigma')
 pars['g3_center'].set(expr='g1_center + 2 * g1_sigma + 4 * g2_sigma + 2 * g3_sigma')
 pars['g4_center'].set(expr='g1_center + 2 * g1_sigma + 4 * g2_sigma + 4 * g3_sigma + 2 * g4_sigma')
@@ -136,45 +146,57 @@ for idx in range(4):
     pars['g{}_sigma'.format(idx+1)].set(value=.3, min=.2, max=.5)
 
 
-def applyModel(dataSrs):
-    x = dataSrs.index.to_numpy(dtype=np.float) * 1e3
-    y = dataSrs.to_numpy(dtype=np.float)
+def applyModel(x, y):
     thesePars = pars.copy()
     #
-    prelim_stats = np.percentile(y, q=[25, 75])
+    initVal = np.mean(y[x <= (x[0] + .5)])
+    lastVal = np.mean(y[x >= (x[-1] - .5)])
+    meanVal = np.mean(y[(x >= 5) & (x <= 6)])
+    prelim_stats = np.percentile(y, q=[1, 99])
     iqr = prelim_stats[1] - prelim_stats[0]
     if iqr == 0:
-        return pd.Series(0, index=dataSrs.index)
-    thesePars['const_c'].set(value=0, min=-3*iqr, max=3*iqr)
-    thesePars['exp_amplitude'].set(
-        value=np.median(y[x <= 1.4]),
-        min=-3*iqr, max=3*iqr)
-    exp_guess = exp_mod.guess(y, x=x)
-    thesePars.update(exp_guess)
+        return pd.Series(0, index=x)
+    thesePars['const_c'].set(value=0, min=-iqr, max=iqr, vary=False)
     #
-    init_exp = exp_mod.eval(exp_guess, x=x)
-    init_resid = y - init_exp
-    resid_stats = np.percentile(init_resid, q=[25, 75])
-    iqr = resid_stats[1] - resid_stats[0]
-    thesePars['g1_center'].set(value=np.random.uniform(0, 2))
+    thesePars['exp1_amplitude'].set(
+        value=-10*meanVal,
+        # min=-20*iqr, max=20*iqr
+        )
+    if lastVal > 0:
+        thesePars['exp1_amplitude'].set(min=-20*iqr, max=0)
+    else:
+        thesePars['exp1_amplitude'].set(max=20*iqr, min=0)
+    # exp_guess = exp1.guess(y - lastVal, x=x)
+    # thesePars.update(exp_guess)
+    # init_exp = exp1.eval(exp_guess, x=x) + lastVal
+    # init_resid = y - init_exp
+    # resid_stats = np.percentile(init_resid, q=[25, 75])
+    # iqr = resid_stats[1] - resid_stats[0]
+    thesePars['g1_center'].set(value=np.random.uniform(.5, 1.5))
     #
     thesePars['g1_amplitude'].set(value=iqr, min=0, max=3 * iqr)
     thesePars['g2_amplitude'].set(value=(-1) * iqr, min=-3 * iqr, max=0)
     thesePars['g3_amplitude'].set(value=iqr, min=0, max=3 * iqr)
     thesePars['g4_amplitude'].set(value=(-1) * iqr, min=-3 * iqr, max=0)
     #
+    freezeGaussians = True
+    if freezeGaussians:
+        for idx in range(4):
+            thesePars['g{}_amplitude'.format(idx+1)].set(value=0, vary=False)
+            thesePars['g{}_sigma'.format(idx+1)].set(value=.2, vary=False)
+    #
     init = mod.eval(thesePars, x=x)
     out = mod.fit(y, thesePars, x=x)
     #
     fig, ax = plotLmFit(x, y, init, out)
-    return pd.Series(out.best_fit, index=dataSrs.index)
+    return pd.Series(out.best_fit, index=x)
 
 
 def plotLmFit(x, y, init, out):
     print(out.fit_report())
     fig, axes = plt.subplots(1, 2, figsize=(12.8, 4.8))
     axes[0].plot(x, y, 'b')
-    axes[0].plot(x, init, 'k--', label='initial fit')
+    # axes[0].plot(x, init, 'k--', label='initial fit')
     axes[0].plot(x, out.best_fit, 'r-', label='best fit')
     axes[0].legend(loc='best')
     comps = out.eval_components(x=x)
@@ -183,8 +205,9 @@ def plotLmFit(x, y, init, out):
     axes[1].plot(x, comps['g2_'], 'm--', lw=2, label='Gaussian component 2')
     axes[1].plot(x, comps['g3_'], 'y--', lw=2, label='Gaussian component 3')
     axes[1].plot(x, comps['g4_'], 'g--', lw=2, label='Gaussian component 4')
-    axes[1].plot(x, comps['exp_'] + comps['const_'], 'k--', lw=2, label='Offset exponential component')
-    # axes[1].axhline(comps['const_'], c='r', lw=2, label='Constant component')
+    axes[1].plot(
+        x, comps['exp1_'] + comps['exp2_'] + comps['const_'],
+        'k--', lw=2, label='Offset exponential component')
     axes[1].legend(loc='best')
     return fig, axes
 
@@ -217,13 +240,15 @@ def shapeFit(
         horizontalalignment='right', verticalalignment='top',
         transform=ax.transAxes)
     plt.show()
+    groupT = 1e3 * groupData.columns[maskX].to_numpy(dtype=np.float)
+    # groupT = groupT - groupT[0]
     if iterMethod == 'loo':
         loo = LeaveOneOut()
         allCorr = pd.Series(index=groupData.index)
         iterator = loo.split(groupData)
         for idx, (train_index, test_index) in enumerate(iterator):
             refX = groupData.iloc[train_index, maskX].mean()
-            testX = modelFun(refX)
+            testX = modelFun(groupT, refX.to_numpy())
             '''
             testX = pd.Series(
                 groupData.iloc[test_index, maskX].to_numpy().squeeze(),
@@ -241,8 +266,6 @@ def shapeFit(
         else:
             maxIter = int(maxIter)
         allCorr = pd.Series(index=range(maxIter))
-        allCov = pd.Series(index=range(maxIter))
-        allMSE = pd.Series(index=range(maxIter))
         for idx in range(maxIter):
             testX = shuffle(groupData, n_samples=nChoose)
             testXBar = testX.iloc[:, maskX].mean()
@@ -266,7 +289,7 @@ def shapeFit(
         for idx in range(maxIter):
             testX = shuffle(groupData, n_samples=nChoose)
             testXBar = testX.iloc[:, maskX].mean()
-            testX = modelFun(testXBar)
+            testX = modelFun(groupT, testXBar.to_numpy())
     # if allCorr.mean() < 0:
     #     pdb.set_trace()
     #     plt.plot(testXBar); plt.plot(refXBar); plt.show()
@@ -293,7 +316,7 @@ if __name__ == "__main__":
     conditionNames = [
         'electrode',
         # 'RateInHz',
-        'nominalCurrent']
+        arguments['amplitudeFieldName']]
     groupBy = ['feature'] + conditionNames
     # resultMeta = {
     #     'noiseCeil': np.float,
@@ -314,15 +337,16 @@ if __name__ == "__main__":
             triggeredPath, lazy=arguments['lazy'])
         dataDF = preproc.alignedAsigsToDF(
             dataBlock, **alignedAsigsKWargs)
-        egFeatName = dataDF.index.get_level_values('feature').unique()[0]
+        featNames = dataDF.index.get_level_values('feature')
+        egFeatName = featNames.unique()[0]
         breakDownData, breakDownText, fig, ax = asp.printBreakdown(
             dataDF.xs(egFeatName, level='feature', drop_level=False),
-            'RateInHz', 'electrode', 'nominalCurrent')
+            'RateInHz', 'electrode', arguments['amplitudeFieldName'])
         funKWArgs = dict(
-                tBounds=[1.3e-3, 8e-3],
+                tBounds=[1.3e-3, 9.9e-3],
                 modelFun=applyModel,
                 plotting=False, iterMethod='chooseN',
-                maxIter=3)
+                maxIter=1)
         # daskComputeOpts = {}
         daskComputeOpts = dict(
             # scheduler='threads'
@@ -337,12 +361,25 @@ if __name__ == "__main__":
             'covarianceStd': float(1),
             'mse': float(1),
             'mseStd': float(1)}, index=[0])
+        #############################
+        #############################
+        featNames = dataDF.index.get_level_values('feature')
+        elecNames = dataDF.index.get_level_values('electrode')
+        amps = dataDF.index.get_level_values(arguments['amplitudeFieldName'])
+        dbMask = (
+            featNames.str.contains('rostralY_e12') &
+            elecNames.str.contains('caudalY_e11') &
+            (amps < -500)
+            )
+        #############################
+        #############################
         daskClient = Client()
         resDF = ash.splitApplyCombine(
-            dataDF, fun=shapeFit, resultPath=resultPath,
+            dataDF.loc[dbMask, :],
+            fun=shapeFit, resultPath=resultPath,
             funArgs=[], funKWArgs=funKWArgs,
             rowKeys=groupBy, colKeys=testVar, useDask=True,
-            daskPersist=True, 
+            daskPersist=True,
             daskProgBar=False,
             daskResultMeta=None,
             daskComputeOpts=daskComputeOpts, nPartitionMultiplier=2,
