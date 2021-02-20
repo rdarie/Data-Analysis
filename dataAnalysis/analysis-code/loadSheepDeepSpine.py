@@ -145,12 +145,12 @@ if checkPlots:
     try:
         ax[2].plot(accNP[0, :, 0], label='acc')
         ax[2].legend()
-    except:
+    except Exception:
         pass
     try:
         ax[3].plot(lfpNP[0, :, 0], label='lfp')
         ax[3].legend()
-    except:
+    except Exception:
         pass
     plt.show()
     print('Number of trials per ees condition: ')
