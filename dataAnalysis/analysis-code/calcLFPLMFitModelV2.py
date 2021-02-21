@@ -172,7 +172,7 @@ modelColumnNames = [
 
 def applyModel(
         x, y,
-        method='nelder',
+        method='nelder', scoreBounds=None,
         verbose=True, plotting=False):
     ##############################################
     prelim_stats = np.percentile(y, q=[1, 99])
@@ -243,13 +243,21 @@ def applyModel(
     out = full_mod.fit(y, fullPars, x=x, method=method)
     outSrs = pd.Series(out.best_fit, index=x)
     outParams = pd.Series(out.best_values)
+    if scoreBounds is not None:
+        maskX = (x >= scoreBounds[0]) & (x < scoreBounds[1])
+    else:
+        maskX = np.ones_like(x).astype(np.bool)
+    # pdb.set_trace()
+    chisqr = ((y[maskX] - out.best_fit[maskX]) ** 2).sum()
+    r2 = 1 - (chisqr / (y[maskX] ** 2).sum())
     outStats = pd.Series(
         {
-            'chisqr': out.chisqr,
-            'r2': 1 - (out.chisqr / (y ** 2).sum())})
+            'chisqr': chisqr,
+            'r2': r2})
     # pdb.set_trace()
     if plotting:
         fig, ax = plotLmFit(x, y, init, out, verbose=verbose)
+        ax[1].set_title('R^2 = {}'.format(r2))
     return pd.concat([outSrs, outParams, outStats])
 
 
@@ -271,13 +279,13 @@ def plotLmFit(x, y, init, out, verbose=False):
         x, comps['exp1_'] + comps['exp2_'],  # + comps['const_'],
         'k--', lw=2, label='Offset exponential component')
     axes[1].legend(loc='best')
-    axes[1].set_title('R^2 = {}'.format(1 - (out.chisqr / (y ** 2).sum())))
     return fig, axes
 
 
 def shapeFit(
         group, dataColNames=None,
         tBounds=None, verbose=False,
+        scoreBounds=None,
         plotting=False, iterMethod='loo',
         modelFun=None, corrMethod='pearson',
         maxIter=1e6):
@@ -290,7 +298,7 @@ def shapeFit(
     keepIndexCols = indexCols[~indexCols.isin(['segment', 'originalIndex', 't'])]
     #
     if tBounds is not None:
-        maskX = (groupData.columns > tBounds[0]) & (groupData.columns < tBounds[1])
+        maskX = (groupData.columns >= tBounds[0]) & (groupData.columns < tBounds[1])
     else:
         maskX = np.ones_like(groupData.columns).astype(np.bool)
     #
@@ -304,7 +312,10 @@ def shapeFit(
             horizontalalignment='right', verticalalignment='top',
             transform=ax.transAxes)
         # plt.show()
-    groupT = 1e3 * groupData.columns[maskX].to_numpy(dtype=np.float)
+    groupT = groupData.columns[maskX].to_numpy(dtype=np.float)
+    if scoreBounds is not None:
+        scBnds = [1e3 * (sb - groupT[0]) for sb in scoreBounds]
+    groupT = 1e3 * (groupT - groupT[0])
     groupT = groupT - groupT[0]
     # groupT = groupT - .666
     outList = []
@@ -336,7 +347,10 @@ def shapeFit(
         for idx in range(maxIter):
             testX = shuffle(groupData, n_samples=nChoose)
             testXBar = testX.iloc[:, maskX].mean()
-            resultsSrs = modelFun(groupT, testXBar.to_numpy(), verbose=verbose, plotting=plotting)
+            resultsSrs = modelFun(
+                groupT, testXBar.to_numpy(),
+                scoreBounds=scBnds,
+                verbose=verbose, plotting=plotting)
             # TODO: return best model too
             outList.append(resultsSrs)
     # if allCorr.mean() < 0:
@@ -408,27 +422,29 @@ if __name__ == "__main__":
         rates = dataDF.index.get_level_values('RateInHz')
         amps = dataDF.index.get_level_values(arguments['amplitudeFieldName'])
         print('Available rates are {}'.format(np.unique(rates)))
-        
+        '''
         dbMask = (
             featNames.str.contains('rostralY_e12') &
             elecNames.str.contains('caudalY_e11') &
             (rates < 60) &
             (amps < -500)
             )
-        
+        '''
+        dbMask = (rates < 60)
+        dataDF = dataDF.loc[dbMask, :]
         #############################
         #############################
         daskClient = Client()
         funKWArgs = dict(
                 # tBounds=[1.3e-3, 9.9e-3],
                 tBounds=[1.2e-3, 19.7e-3],
+                scoreBounds=[1.2e-3, 9.7e-3],
                 modelFun=applyModel,
                 iterMethod='chooseN',
                 plotting=False, verbose=False,
                 maxIter=100)
         resDF = ash.splitApplyCombine(
             dataDF,
-            # dataDF.loc[dbMask, :],
             fun=shapeFit, resultPath=resultPath,
             funArgs=[], funKWArgs=funKWArgs,
             rowKeys=groupBy, colKeys=testVar, useDask=True,
@@ -448,8 +464,40 @@ if __name__ == "__main__":
         #     resultNames=resultNames, plotting=False)
         resDF.set_index(modelColumnNames, inplace=True, append=True)
         resDF.to_hdf(resultPath, 'lmfit_lfp')
+        # pdb.set_trace()
+        presentNames = [cn for cn in resDF.index.names if cn in dataDF.index.names]
+        meansDF = dataDF.groupby(presentNames).mean()
+        meansDF.to_hdf(resultPath, 'flp')
     else:
         resDF = pd.read_hdf(resultPath, 'lmfit_lfp')
+        meansDF = pd.read_hdf(resultPath, 'flp')
+    try:
+        meansDF = dataDF.groupby(groupBy).mean()
+    except Exception:
+        print('loading {}'.format(triggeredPath))
+        dataReader, dataBlock = preproc.blockFromPath(
+            triggeredPath, lazy=arguments['lazy'])
+        dataDF = preproc.alignedAsigsToDF(
+            dataBlock, **alignedAsigsKWargs)
+    allIdxNames = resDF.index.names
+    resDF = resDF.droplevel([cn for cn in allIdxNames if cn not in groupBy])
+    pdb.set_trace()
+    resDF.columns = (resDF.columns + 1.2) / 1e3
+    allIdxNames = meansDF.index.names
+    meansDF = meansDF.droplevel([cn for cn in allIdxNames if cn not in groupBy])
+    #
+    plotDF = pd.concat(
+        {'fit': resDF, 'target': meansDF},
+        names=['regrID'] + list(resDF.index.names))
+    plotDF.dropna(axis='columns', inplace=True)
+    plotDF.columns.name = 'bin'
+    plotDF = plotDF.stack().to_frame(name='signal')
+    sns.relplot(
+        data=plotDF.reset_index(),
+        x='bin', y='signal', style='regrID', kind='line', row='feature', col='nominalCurrent')
+    plt.show()
+    pdb.set_trace()
+
     '''
     if arguments['exportToDeepSpine']:
         deepSpineExportPath = os.path.join(
