@@ -86,6 +86,11 @@ resultPath = os.path.join(
     calcSubFolder,
     prefix + '_{}_{}_calc.h5'.format(
         arguments['inputBlockSuffix'], arguments['window']))
+
+useCachedResult = False
+if not (useCachedResult and os.path.exists(resultPath)):
+    if os.path.exists(resultPath):
+        os.remove(resultPath)
 # e.g. resultPath = '/gpfs/scratch/rdarie/rdarie/Neural Recordings/202006171300-Peep/emgLoRes/stim/_emg_XS.nix'
 alignedAsigsKWargs.update(dict(
     duplicateControlsByProgram=False,
@@ -132,7 +137,7 @@ expPars = exp1.make_params()
 expPars.update(exp2.make_params())
 # expPars.update(const.make_params())
 expPars['exp1_decay'].set(value=100, min=10, max=1000)
-expPars['exp2_decay'].set(value=.5, min=.25, max=.75)
+expPars['exp2_decay'].set(value=.4, min=.2, max=.6)
 expPars.add(name='exp2_ratio', value=-1, min=-1.1, max=-0.9, vary=False)
 expPars['exp2_amplitude'].set(expr='exp2_ratio * exp1_amplitude')
 #
@@ -141,34 +146,41 @@ gaussPars.update(gauss2.make_params())
 gaussPars.update(gauss3.make_params())
 gaussPars.update(gauss4.make_params())
 #
-gaussPars['g1_center'].set(min=1, max=3)
-gaussPars['g2_center'].set(expr='g1_center + 2 * g1_sigma + 2 * g2_sigma')
-gaussPars['g3_center'].set(expr='g1_center + 2 * g1_sigma + 4 * g2_sigma + 2 * g3_sigma')
-gaussPars['g4_center'].set(expr='g1_center + 2 * g1_sigma + 4 * g2_sigma + 4 * g3_sigma + 2 * g4_sigma')
-gaussPars.add(name='g3_ratio', value=.1, min=0, max=2)
+gaussPars.add(name='g1_offset', min=0.1, max=3)
+gaussPars.add(name='g2_offset', value=2, min=0, max=10)
+gaussPars['g1_center'].set(expr='2 * g1_sigma + g1_offset')
+gaussPars['g2_center'].set(expr='g1_center + 2 * g1_sigma + 2 * g2_sigma + g2_offset')
+gaussPars['g3_center'].set(expr='g2_center + 2 * g2_sigma + 2 * g3_sigma')
+gaussPars['g4_center'].set(expr='g3_center + 2 * g3_sigma + 2 * g4_sigma')
 gaussPars.add(name='g4_ratio', value=.1, min=0, max=2)
-gaussPars['g3_amplitude'].set(expr='g3_ratio * g1_amplitude')
 gaussPars['g4_amplitude'].set(expr='g4_ratio * g2_amplitude')
 
 dependentParamNames = [
-    'g2_center', 'g3_center', 'g4_center',
-    'g3_amplitude', 'g4_amplitude',
+    'g1_center', 'g2_center',
+    'g3_center', 'g4_center',
+    'g4_amplitude',
     'exp2_amplitude']
 fullPars = expPars.copy()
 fullPars.update(gaussPars)
 
+modelColumnNames = [
+    'g4_amplitude', 'g4_center', 'g4_sigma', 'g3_amplitude', 'g3_center',
+    'g3_sigma', 'g2_amplitude', 'g2_center', 'g2_sigma', 'g1_amplitude',
+    'g1_center', 'g1_sigma', 'exp2_amplitude', 'exp2_decay',
+    'exp1_amplitude', 'exp1_decay', 'chisqr', 'r2']
+
 
 def applyModel(
         x, y,
-        method='least_squares',
-        verbose=False):
+        method='nelder',
+        verbose=True, plotting=False):
     ##############################################
     prelim_stats = np.percentile(y, q=[1, 99])
     iqr = prelim_stats[1] - prelim_stats[0]
     if iqr == 0:
         dummy = pd.Series(0, index=x)
-        dummyR = pd.Series({'r2': 0})
-        return pd.concat([dummy, dummyR])
+        dummyAnns = pd.Series({key: 0 for key in modelColumnNames})
+        return pd.concat([dummy, dummyAnns])
     #
     guessTauFast = 0.5  # msec
     guessTauSlow = 200  # msec
@@ -192,21 +204,27 @@ def applyModel(
     if verbose:
         print(exp_out.fit_report())
     #
-    gaussPars['g1_center'].set(value=np.random.uniform(1, 1.25))
     for idx in range(4):
         gaussPars['g{}_sigma'.format(idx+1)].set(
-            value=np.random.uniform(.2, .3),
+            value=np.random.uniform(.1, .3),
             min=.1, max=.75)
+    gaussPars['g1_offset'].set(value=np.random.uniform(.5, 1.))
+    # positives
     gaussPars['g1_amplitude'].set(
         value=0,  # vary=False,
         min=0, max=2 * intermed_iqr)
+    # negatives
     gaussPars['g2_amplitude'].set(
-        value=0, # vary=False,
-        min=-2 * intermed_iqr, max=0)
+        value=0,  # vary=False,
+        min=0, max=2 * intermed_iqr)
+    gaussPars['g3_amplitude'].set(
+        value=0,  # vary=False,
+        max=0, min=-2 * intermed_iqr)
     freezeGaussians = False
     if freezeGaussians:
-        gaussPars['g1_amplitude'.format(idx+1)].set(value=0, vary=False)
-        gaussPars['g2_amplitude'.format(idx+1)].set(value=0, vary=False)
+        gaussPars['g1_amplitude'].set(value=0, vary=False)
+        gaussPars['g2_amplitude'].set(value=0, vary=False)
+        gaussPars['g4_amplitude'].set(value=0, vary=False)
         for idx in range(4):
             gaussPars['g{}_sigma'.format(idx+1)].set(value=.2, vary=False)
     #
@@ -230,7 +248,8 @@ def applyModel(
             'chisqr': out.chisqr,
             'r2': 1 - (out.chisqr / (y ** 2).sum())})
     # pdb.set_trace()
-    fig, ax = plotLmFit(x, y, init, out, verbose=verbose)
+    if plotting:
+        fig, ax = plotLmFit(x, y, init, out, verbose=verbose)
     return pd.concat([outSrs, outParams, outStats])
 
 
@@ -258,7 +277,7 @@ def plotLmFit(x, y, init, out, verbose=False):
 
 def shapeFit(
         group, dataColNames=None,
-        tBounds=None,
+        tBounds=None, verbose=False,
         plotting=False, iterMethod='loo',
         modelFun=None, corrMethod='pearson',
         maxIter=1e6):
@@ -276,8 +295,7 @@ def shapeFit(
         maskX = np.ones_like(groupData.columns).astype(np.bool)
     #
     nSamp = groupData.shape[0]
-    # pdb.set_trace()
-    if not (groupData == 1).all(axis=None):
+    if (not (groupData == 1).all(axis=None)) and plotting:
         fig, ax = plt.subplots()
         ax.plot(groupData.T)
         ax.text(
@@ -287,8 +305,8 @@ def shapeFit(
             transform=ax.transAxes)
         # plt.show()
     groupT = 1e3 * groupData.columns[maskX].to_numpy(dtype=np.float)
-    # groupT = groupT - groupT[0]
-    groupT = groupT - .666
+    groupT = groupT - groupT[0]
+    # groupT = groupT - .666
     outList = []
     if iterMethod == 'loo':
         loo = LeaveOneOut()
@@ -318,7 +336,8 @@ def shapeFit(
         for idx in range(maxIter):
             testX = shuffle(groupData, n_samples=nChoose)
             testXBar = testX.iloc[:, maskX].mean()
-            resultsSrs = modelFun(groupT, testXBar.to_numpy())
+            resultsSrs = modelFun(groupT, testXBar.to_numpy(), verbose=verbose, plotting=plotting)
+            # TODO: return best model too
             outList.append(resultsSrs)
     # if allCorr.mean() < 0:
     #     pdb.set_trace()
@@ -327,7 +346,8 @@ def shapeFit(
     prelimDF = pd.DataFrame(outList)
     resultDF = prelimDF.loc[prelimDF['r2'].argmax(), :].to_frame().T
     resultDF.index = [group.index[0]]
-    plt.show()
+    if (not (groupData == 1).all(axis=None)) and plotting:
+        plt.show()
     for cN in keepIndexCols:
         resultDF.loc[group.index[0], cN] = group.loc[group.index[0], cN]
     # print(os.getpid())
@@ -353,7 +373,6 @@ if __name__ == "__main__":
     for nM in ['RateInHz', 'stimCat', 'originalIndex', 'segment', 't']:
         if nM not in alignedAsigsKWargs['getMetaData']:
             alignedAsigsKWargs['getMetaData'].append(nM)
-    useCachedResult = True
     if not (useCachedResult and os.path.exists(resultPath)):
         print('loading {}'.format(triggeredPath))
         dataReader, dataBlock = preproc.blockFromPath(
@@ -365,18 +384,13 @@ if __name__ == "__main__":
         # breakDownData, breakDownText, fig, ax = asp.printBreakdown(
         #     dataDF.xs(egFeatName, level='feature', drop_level=False),
         #     'RateInHz', 'electrode', arguments['amplitudeFieldName'])
-        funKWArgs = dict(
-                # tBounds=[1.3e-3, 9.9e-3],
-                tBounds=[1.3e-3, 19.9e-3],
-                modelFun=applyModel,
-                plotting=False, iterMethod='chooseN',
-                maxIter=3)
         # daskComputeOpts = {}
         daskComputeOpts = dict(
             # scheduler='threads'
-            # scheduler='processes'
-            scheduler='single-threaded'
+            scheduler='processes'
+            # scheduler='single-threaded'
             )
+        '''
         exampleOutput = pd.DataFrame(
             {
                 'noiseCeil': float(1),
@@ -386,29 +400,42 @@ if __name__ == "__main__":
                 'mse': float(1),
                 'mseStd': float(1)},
             index=[0])
+        '''
         #############################
         #############################
         featNames = dataDF.index.get_level_values('feature')
         elecNames = dataDF.index.get_level_values('electrode')
+        rates = dataDF.index.get_level_values('RateInHz')
         amps = dataDF.index.get_level_values(arguments['amplitudeFieldName'])
+        print('Available rates are {}'.format(np.unique(rates)))
+        
         dbMask = (
-            # featNames.str.contains('rostralY_e12') &
-            # elecNames.str.contains('caudalY_e11') &
-            (dataDF.index.get_level_values('RateInHz') < 50) &
+            featNames.str.contains('rostralY_e12') &
+            elecNames.str.contains('caudalY_e11') &
+            (rates < 60) &
             (amps < -500)
             )
+        
         #############################
         #############################
         daskClient = Client()
+        funKWArgs = dict(
+                # tBounds=[1.3e-3, 9.9e-3],
+                tBounds=[1.2e-3, 19.7e-3],
+                modelFun=applyModel,
+                iterMethod='chooseN',
+                plotting=False, verbose=False,
+                maxIter=100)
         resDF = ash.splitApplyCombine(
-            dataDF.loc[dbMask, :],
+            dataDF,
+            # dataDF.loc[dbMask, :],
             fun=shapeFit, resultPath=resultPath,
             funArgs=[], funKWArgs=funKWArgs,
             rowKeys=groupBy, colKeys=testVar, useDask=True,
             daskPersist=True,
-            daskProgBar=False,
+            daskProgBar=True,
             daskResultMeta=None,
-            daskComputeOpts=daskComputeOpts, nPartitionMultiplier=2,
+            daskComputeOpts=daskComputeOpts,
             reindexFromInput=False)
         #
         # resDF = ash.applyFunGrouped(
@@ -419,46 +446,19 @@ if __name__ == "__main__":
         #         plotting=arguments['plotting'],
         #         iterMethod='half', maxIter=1e2),
         #     resultNames=resultNames, plotting=False)
-        for rN in resDF.columns:
-            resDF[rN].to_hdf(resultPath, rN, format='fixed')
-        noiseCeil = resDF['noiseCeil']
-        covar = resDF['covariance']
-        mse = resDF['mse']
+        resDF.set_index(modelColumnNames, inplace=True, append=True)
+        resDF.to_hdf(resultPath, 'lmfit_lfp')
     else:
-        noiseCeil = pd.read_hdf(resultPath, 'noiseCeil')
-        covar = pd.read_hdf(resultPath, 'covariance')
-        mse = pd.read_hdf(resultPath, 'mse')
-        resDF = pd.concat({
-            'noiseCeil': noiseCeil,
-            'covariance': covar,
-            'mse': mse,
-            }, axis='columns')
-    for cN in ['covariance', 'mse']:
-        robScaler = RobustScaler(quantile_range=(5, 95))
-        # inputDF = resDF[cN].unstack(level='feature')
-        #
-        robScaler.fit(resDF.loc[resDF[cN].notna(), cN].to_numpy().reshape(-1, 1))
-        preScaled = (robScaler.transform(resDF[cN].to_numpy().reshape(-1, 1)))
-        resDF[cN + '_q_scale'] = pd.Series(
-            preScaled.squeeze(),
-            index=resDF[cN].index)
-        scaledMask = np.abs(preScaled.squeeze()) < 2
-        # scaledMask = pd.Series(
-        #     np.abs(preScaled.squeeze()) < 2,
-        #     index=resDF[cN].index)
-        mmScaler = MinMaxScaler()
-        mmScaler.fit(resDF.loc[scaledMask, cN].to_numpy().reshape(-1, 1))
-        resDF[cN + '_scaled'] = mmScaler.transform(resDF[cN].to_numpy().reshape(-1, 1))
+        resDF = pd.read_hdf(resultPath, 'lmfit_lfp')
+    '''
     if arguments['exportToDeepSpine']:
         deepSpineExportPath = os.path.join(
             alignSubFolder,
             prefix + '_{}_{}_export.h5'.format(
                 arguments['inputBlockSuffix'], arguments['window']))
-        for cN in ['noiseCeil', 'covariance', 'covariance_q_scale']:
-            resDF[cN].to_hdf(deepSpineExportPath, cN)
     #
     # pdb.set_trace()
-    trialInfo = resDF['noiseCeil'].index.to_frame().reset_index(drop=True)
+    trialInfo = resDF.index.to_frame().reset_index(drop=True)
     dropColumns = []
     dropElectrodes = []
     
@@ -566,3 +566,4 @@ if __name__ == "__main__":
             plt.show()
         else:
             plt.close()
+    '''
