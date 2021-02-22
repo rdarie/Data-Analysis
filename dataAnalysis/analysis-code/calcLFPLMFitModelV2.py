@@ -177,16 +177,18 @@ def applyModel(
     ##############################################
     prelim_stats = np.percentile(y, q=[1, 99])
     iqr = prelim_stats[1] - prelim_stats[0]
+    dummy = pd.Series(0, index=x)
+    dummyAnns = pd.Series({key: 0 for key in modelColumnNames})
     if iqr == 0:
-        dummy = pd.Series(0, index=x)
-        dummyAnns = pd.Series({key: 0 for key in modelColumnNames})
         return pd.concat([dummy, dummyAnns])
     #
     guessTauFast = 0.5  # msec
     guessTauSlow = 200  # msec
-    ampGuess = np.median(
+    ampGuess = np.mean(
         y / (np.exp(-x/guessTauSlow) - np.exp(-x/guessTauFast)),
         axis=None)
+    if ampGuess == 0:
+        return pd.concat([dummy, dummyAnns])
     # expPars['const_c'].set(value=0, min=-iqr, max=iqr, vary=False)
     #
     expPars['exp1_amplitude'].set(
