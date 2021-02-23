@@ -41,6 +41,7 @@ from tqdm import tqdm
 import pdb, traceback
 import random
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
+import dataAnalysis.helperFunctions.helper_functions_new as hf
 import dataAnalysis.plotting.aligned_signal_plots as asp
 import dataAnalysis.preproc.ns5 as preproc
 import numpy as np
@@ -53,6 +54,7 @@ from namedQueries import namedQueries
 from math import factorial
 from sklearn.preprocessing import scale, robust_scale
 from dask.distributed import Client
+from scipy import signal
 #
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']), arguments['exp'])
@@ -95,7 +97,7 @@ alignedAsigsKWargs.update(dict(
     duplicateControlsByProgram=False,
     makeControlProgram=False,
     removeFuzzyName=False,
-    decimate=1, windowSize=(-100e3, 40e-3),
+    decimate=1, windowSize=(-100e3, 20e-3),
     metaDataToCategories=False,
     # getMetaData=[
     #     'RateInHz', 'feature', 'electrode',
@@ -108,9 +110,9 @@ alignedAsigsKWargs.update(dict(
 '''
 alignedAsigsKWargs['procFun'] = ash.genDetrender(
     timeWindow=(alignedAsigsKWargs['windowSize'][-1] - 1e-3, alignedAsigsKWargs['windowSize'][-1]))
-'''
 alignedAsigsKWargs['procFun'] = ash.genDetrender(
     timeWindow=(alignedAsigsKWargs['windowSize'][0], -1e-3))
+'''
 
 alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **arguments)
 alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
@@ -118,27 +120,57 @@ alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUn
 alignedAsigsKWargs['outlierTrials'] = ash.processOutlierTrials(
     calcSubFolder, prefix, **arguments)
 
-from lmfit.models import ExponentialModel, GaussianModel, ConstantModel
+from lmfit.models import ExponentialModel, GaussianModel, ConstantModel, SkewedGaussianModel, StepModel
+from lmfit import Model, CompositeModel
 
-# np.random.seed(0)
+np.random.seed(0)
+
+
+def convolve(dat, kernel):
+    """simple convolution of two arrays"""
+    npts = dat.shape[0]
+    out = np.convolve(dat, kernel, mode='full')
+    return out[:npts]
+
 exp1 = ExponentialModel(prefix='exp1_')
-exp2 = ExponentialModel(prefix='exp2_')
-# const = ConstantModel(prefix='const_')
+expGauss = SkewedGaussianModel(prefix='expGauss_')
+expS = StepModel(prefix='expS_', form='linear')
+truncated_exp = exp1 * expS
+exp_mod = CompositeModel(truncated_exp, expGauss, convolve, prefix='expFull_')
+#
+expPars = exp1.make_params()
+expPars.update(expS.make_params())
+expPars.update(expGauss.make_params())
+#
+expPars['exp1_decay'].set(value=200, min=10, max=1000)
+expPars['exp1_amplitude'].set(value=1)
+#
+expPars['expS_amplitude'].set(value=1, vary=False)
+expPars['expS_center'].set(value=1.2, vary=False)
+expPars['expS_sigma'].set(value=.1, vary=False)
+#
+expPars['expGauss_amplitude'].set(value=1, vary=False)
+expPars['expGauss_center'].set(expr='expGauss_sigma')
+expPars['expGauss_sigma'].set(value=.5)
+expPars['expGauss_gamma'].set(value=4, vary=False)
+#
+test_x = np.linspace(-1, 1, 100)
+test_g = expGauss.eval(expPars, x=test_x)
+expPars['expGauss_amplitude'].set(value=test_g.sum() ** (-1), vary=False)
+'''
+plt.plot(x, exp1.eval(expPars, x=x))
+plt.plot(x, truncated_exp.eval(expPars, x=x))
+plt.plot(x, exp_mod.eval(expPars, x=x)); plt.show()
+plt.plot(test_x, expGauss.eval(expPars, x=test_x)); plt.show()
+'''
 gauss1 = GaussianModel(prefix='g1_')
 gauss2 = GaussianModel(prefix='g2_')
 gauss3 = GaussianModel(prefix='g3_')
 gauss4 = GaussianModel(prefix='g4_')
-exp_mod = exp1 + exp2  # + const
 gauss_mod = gauss1 + gauss2 + gauss3 + gauss4
 full_mod = exp_mod + gauss_mod
 #
-expPars = exp1.make_params()
-expPars.update(exp2.make_params())
-# expPars.update(const.make_params())
-expPars['exp1_decay'].set(value=100, min=10, max=1000)
-expPars['exp2_decay'].set(value=.4, min=.2, max=.6)
-expPars.add(name='exp2_ratio', value=-1, min=-1.1, max=-0.9)
-expPars['exp2_amplitude'].set(expr='exp2_ratio * exp1_amplitude')
+
 #
 gaussPars = gauss1.make_params()
 gaussPars.update(gauss2.make_params())
@@ -155,10 +187,9 @@ gaussPars.add(name='g4_ratio', value=.1, min=0, max=2)
 gaussPars['g4_amplitude'].set(expr='g4_ratio * g2_amplitude')
 
 dependentParamNames = [
-    'g1_center', 'g2_center',
-    'g3_center', 'g4_center',
-    'g4_amplitude',
-    'exp2_amplitude']
+    'g1_center', 'g2_center', 'g3_center',
+    'g4_center', 'g4_amplitude',
+    'expS_form']
 fullPars = expPars.copy()
 fullPars.update(gaussPars)
 
@@ -182,11 +213,9 @@ def applyModel(
     if iqr == 0:
         return pd.concat([dummy, dummyAnns])
     #
-    guessTauFast = 0.5  # msec
-    guessTauSlow = 200  # msec
-    ampGuess = np.nanmedian(
-        y / (np.exp(-x/guessTauSlow) - np.exp(-x/guessTauFast)),
-        axis=None)
+    signalGuess = exp_mod.eval(expPars, x=x)
+    # plt.plot(x, exp_mod.eval(expPars, x=x)); plt.show()
+    ampGuess = np.nanmedian(y / signalGuess, axis=None)
     if ampGuess == 0:
         return pd.concat([dummy, dummyAnns])
     try:
@@ -223,7 +252,7 @@ def applyModel(
         gaussPars['g3_amplitude'].set(
             value=0,  # vary=False,
             max=0, min=-2 * intermed_iqr)
-        freezeGaussians = False
+        freezeGaussians = True
         if freezeGaussians:
             gaussPars['g1_amplitude'].set(value=0, vary=False)
             gaussPars['g2_amplitude'].set(value=0, vary=False)
@@ -281,9 +310,8 @@ def plotLmFit(x, y, init, out, verbose=False):
     axes[1].plot(x, comps['g2_'], 'm--', lw=2, label='Gaussian component 2')
     axes[1].plot(x, comps['g3_'], 'y--', lw=2, label='Gaussian component 3')
     axes[1].plot(x, comps['g4_'], 'g--', lw=2, label='Gaussian component 4')
-    axes[1].plot(
-        x, comps['exp1_'] + comps['exp2_'],  # + comps['const_'],
-        'k--', lw=2, label='Offset exponential component')
+    expComp = convolve(comps['exp1_'] * comps['expS_'], comps['expGauss_'])
+    axes[1].plot(x, expComp, 'k--', lw=2, label='Exponential component')
     axes[1].legend(loc='best')
     return fig, axes
 
@@ -291,7 +319,7 @@ def plotLmFit(x, y, init, out, verbose=False):
 def shapeFit(
         group, dataColNames=None,
         tBounds=None, verbose=False,
-        scoreBounds=None, tOffset=0,
+        scoreBounds=None,
         plotting=False, iterMethod='loo',
         modelFun=None, corrMethod='pearson',
         maxIter=1e6):
@@ -319,10 +347,10 @@ def shapeFit(
             transform=ax.transAxes)
         # plt.show()
     groupT = groupData.columns[maskX].to_numpy(dtype=np.float)
-    # convert to msec
     if scoreBounds is not None:
-        scBnds = [1e3 * (sb - tOffset) for sb in scoreBounds]
-    groupT = 1e3 * (groupT - tOffset)
+        scBnds = [1e3 * (sb - groupT[0]) for sb in scoreBounds]
+    groupT = 1e3 * (groupT - groupT[0])
+    groupT = groupT - groupT[0]
     # groupT = groupT - .666
     outList = []
     if iterMethod == 'loo':
@@ -368,7 +396,7 @@ def shapeFit(
     resultDF.index = [group.index[0]]
     if (not (groupData == 1).all(axis=None)) and plotting:
         plt.show()
-    print('shapeFit (proc {}) finished: '.format(os.getpid()))
+    print('shapeFit() finished: ')
     for cN in keepIndexCols:
         print('        {} = {}'.format(cN, group.loc[group.index[0], cN]))
         resultDF.loc[group.index[0], cN] = group.loc[group.index[0], cN]
@@ -430,30 +458,28 @@ if __name__ == "__main__":
         rates = dataDF.index.get_level_values('RateInHz')
         amps = dataDF.index.get_level_values(arguments['amplitudeFieldName'])
         print('Available rates are {}'.format(np.unique(rates)))
-        
         dbMask = (
             # featNames.str.contains('rostralX_e01') &
             # elecNames.str.contains('caudalZ_e23') &
             featNames.str.contains('rostralY_e12') &
             elecNames.str.contains('caudalY_e11') &
-            (rates < 50) &
+            (rates < 60) &
             (amps < -500)
             )
         # dbMask = (rates < 60)
-        #
         dataDF = dataDF.loc[dbMask, :]
         #############################
         #############################
         daskClient = Client()
         funKWArgs = dict(
-                tBounds=[1.2e-3, 39.6e-3],
-                # tOffset=4 * 166e-6,
-                tOffset=1.2e-3,
-                scoreBounds=[1.2e-3, 10e-3],
+                # tBounds=[1.3e-3, 9.9e-3],
+                # tBounds=[1.2e-3, 19.7e-3],
+                tBounds=[0, 19.7e-3],
+                scoreBounds=[1.2e-3, 9.7e-3],
                 modelFun=applyModel,
                 iterMethod='chooseN',
-                plotting=True, verbose=False,
-                maxIter=2)
+                plotting=True, verbose=True,
+                maxIter=3)
         resDF = ash.splitApplyCombine(
             dataDF,
             fun=shapeFit, resultPath=resultPath,
@@ -473,10 +499,18 @@ if __name__ == "__main__":
     else:
         resDF = pd.read_hdf(resultPath, 'lmfit_lfp')
         meansDF = pd.read_hdf(resultPath, 'lfp')
+    try:
+        meansDF = dataDF.groupby(groupBy).mean()
+    except Exception:
+        print('loading {}'.format(triggeredPath))
+        dataReader, dataBlock = preproc.blockFromPath(
+            triggeredPath, lazy=arguments['lazy'])
+        dataDF = preproc.alignedAsigsToDF(
+            dataBlock, **alignedAsigsKWargs)
     allIdxNames = resDF.index.names
     resDF = resDF.droplevel([cn for cn in allIdxNames if cn not in groupBy])
     # pdb.set_trace()
-    resDF.columns = resDF.columns / 1e3 + funKWArgs['tOffset']
+    resDF.columns = (resDF.columns + 1.2) / 1e3
     allIdxNames = meansDF.index.names
     meansDF = meansDF.droplevel([cn for cn in allIdxNames if cn not in groupBy])
     #
@@ -500,16 +534,14 @@ if __name__ == "__main__":
             # pdb.set_trace()
             g = sns.relplot(
                 data=group,
-                x='bin', y='signal',
-                hue='regrID', style='regrID',
+                x='bin', y='signal', style='regrID',
                 row='nominalCurrent', col='electrode',
                 facet_kws=dict(sharey=False),
                 **relplotKWArgs)
             g.fig.suptitle(name)
             pdf.savefig()
-            # plt.close()
-            plt.show()
-            pdb.set_trace()
+            plt.close()
+            # plt.show()
 
 
     '''

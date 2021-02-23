@@ -30,15 +30,17 @@ from sklearn.decomposition import PCA
 from matplotlib import pyplot as plt
 import seaborn as sns
 #  import h5py
-import re
+import re, sys
 #  from scipy import signal
 #  import rcsanalysis.packet_func as rcsa_helpers
 try:
     from collections.abc import Iterable
 except ImportError:
     from collections import Iterable
-from elephant.conversion import binarize
 
+sys.stderr = open(os.devnull, "w")  # silence stderr
+from elephant.conversion import binarize
+sys.stderr = sys.__stderr__  # unsilence stderr
 
 def analogSignalsToDataFrame(
         analogsignals, idxT='t', useChanNames=False):

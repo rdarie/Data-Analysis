@@ -119,10 +119,25 @@ alignedAsigsKWargs['outlierTrials'] = ash.processOutlierTrials(
     calcSubFolder, prefix, **arguments)
 
 from lmfit.models import ExponentialModel, GaussianModel, ConstantModel
+from lmfit import Model, CompositeModel
 
 # np.random.seed(0)
-exp1 = ExponentialModel(prefix='exp1_')
-exp2 = ExponentialModel(prefix='exp2_')
+
+
+def offsetExponential(x, amplitude=1, decay=1, offset=0):
+    res = amplitude * np.exp(-(x - offset)/decay)
+    if isinstance(x, np.ndarray):
+        res[x < offset] = 0
+        return res
+    else:
+        if x >= offset:
+            return res
+        else:
+            return 0
+
+
+exp1 = Model(offsetExponential, prefix='exp1_')
+exp2 = Model(offsetExponential, prefix='exp2_')
 # const = ConstantModel(prefix='const_')
 gauss1 = GaussianModel(prefix='g1_')
 gauss2 = GaussianModel(prefix='g2_')
@@ -135,17 +150,20 @@ full_mod = exp_mod + gauss_mod
 expPars = exp1.make_params()
 expPars.update(exp2.make_params())
 # expPars.update(const.make_params())
-expPars['exp1_decay'].set(value=100, min=10, max=1000)
+expPars['exp1_amplitude'].set(value=1)
+expPars['exp1_decay'].set(value=200, min=10, max=500)
 expPars['exp2_decay'].set(value=.4, min=.2, max=.6)
-expPars.add(name='exp2_ratio', value=-1, min=-1.1, max=-0.9)
+expPars.add(name='exp2_ratio', min=-1.1, max=-0.9)
 expPars['exp2_amplitude'].set(expr='exp2_ratio * exp1_amplitude')
+expPars['exp1_offset'].set(value=0.7, vary=False)
+expPars['exp2_offset'].set(value=1.2, vary=False)
 #
 gaussPars = gauss1.make_params()
 gaussPars.update(gauss2.make_params())
 gaussPars.update(gauss3.make_params())
 gaussPars.update(gauss4.make_params())
 #
-gaussPars.add(name='g1_offset', min=0.1, max=3)
+gaussPars.add(name='g1_offset', min=1.2, max=3)
 gaussPars.add(name='g2_offset', value=2, min=0, max=10)
 gaussPars['g1_center'].set(expr='2 * g1_sigma + g1_offset')
 gaussPars['g2_center'].set(expr='g1_center + 2 * g1_sigma + 2 * g2_sigma + g2_offset')
@@ -159,20 +177,21 @@ dependentParamNames = [
     'g3_center', 'g4_center',
     'g4_amplitude',
     'exp2_amplitude']
-fullPars = expPars.copy()
-fullPars.update(gaussPars)
 
 modelColumnNames = [
     'g4_amplitude', 'g4_center', 'g4_sigma', 'g3_amplitude', 'g3_center',
     'g3_sigma', 'g2_amplitude', 'g2_center', 'g2_sigma', 'g1_amplitude',
-    'g1_center', 'g1_sigma', 'exp2_amplitude', 'exp2_decay',
-    'exp1_amplitude', 'exp1_decay', 'chisqr', 'r2']
+    'g1_center', 'g1_sigma', 'exp2_amplitude', 'exp2_decay', 'exp2_offset',
+    'exp1_amplitude', 'exp1_decay', 'exp1_offset', 'chisqr', 'r2']
 
 
 def applyModel(
         x, y,
         method='nelder', scoreBounds=None,
         verbose=True, plotting=False):
+
+    fullPars = expPars.copy()
+    fullPars.update(gaussPars)
     ##############################################
     dummy = pd.Series(0, index=x)
     dummyAnns = pd.Series({key: 0 for key in modelColumnNames})
@@ -181,26 +200,24 @@ def applyModel(
     iqr = prelim_stats[1] - prelim_stats[0]
     if iqr == 0:
         return pd.concat([dummy, dummyAnns])
+    # reset expPars for guess
     #
-    guessTauFast = 0.5  # msec
-    guessTauSlow = 200  # msec
-    ampGuess = np.nanmedian(
-        y / (np.exp(-x/guessTauSlow) - np.exp(-x/guessTauFast)),
-        axis=None)
+    signalGuess = exp_mod.eval(fullPars, x=x)
+    ampGuess = np.nanmedian(y / signalGuess, axis=None)
     if ampGuess == 0:
         return pd.concat([dummy, dummyAnns])
     try:
-        # expPars['const_c'].set(value=0, min=-iqr, max=iqr, vary=False)
+        # fullPars['const_c'].set(value=0, min=-iqr, max=iqr, vary=False)
         #
-        expPars['exp1_amplitude'].set(
+        fullPars['exp1_amplitude'].set(
             value=ampGuess,
             )
         if ampGuess > 0:
-            expPars['exp1_amplitude'].set(max=2*ampGuess, min=0)
+            fullPars['exp1_amplitude'].set(max=2*ampGuess, min=1e-3 * ampGuess)
         else:
-            expPars['exp1_amplitude'].set(max=0, min=2*ampGuess)
+            fullPars['exp1_amplitude'].set(max=1e-3 * ampGuess, min=2*ampGuess)
         #
-        exp_out = exp_mod.fit(y, expPars, x=x, method=method)
+        exp_out = exp_mod.fit(y, fullPars, x=x, method=method)
         intermed_y = y - exp_out.best_fit
         intermed_stats = np.percentile(intermed_y, q=[1, 99])
         intermed_iqr = intermed_stats[1] - intermed_stats[0]
@@ -208,30 +225,30 @@ def applyModel(
             print(exp_out.fit_report())
         #
         for idx in range(4):
-            gaussPars['g{}_sigma'.format(idx+1)].set(
+            fullPars['g{}_sigma'.format(idx+1)].set(
                 value=np.random.uniform(.1, .3),
-                min=.1, max=.75)
-        gaussPars['g1_offset'].set(value=np.random.uniform(.5, 1.))
+                min=.1, max=2.)
+        fullPars['g1_offset'].set(value=np.random.uniform(.5, 1.))
         # positives
-        gaussPars['g1_amplitude'].set(
-            value=0,  # vary=False,
-            min=0, max=2 * intermed_iqr)
+        fullPars['g1_amplitude'].set(
+            value=1e-3 * intermed_iqr,  # vary=False,
+            min=1e-3 * intermed_iqr, max=2 * intermed_iqr)
         # negatives
-        gaussPars['g2_amplitude'].set(
-            value=0,  # vary=False,
-            min=0, max=2 * intermed_iqr)
-        gaussPars['g3_amplitude'].set(
-            value=0,  # vary=False,
-            max=0, min=-2 * intermed_iqr)
+        fullPars['g2_amplitude'].set(
+            value=1e-3 * intermed_iqr,  # vary=False,
+            min=1e-3 * intermed_iqr, max=2 * intermed_iqr)
+        fullPars['g3_amplitude'].set(
+            value=1e-3 * intermed_iqr,  # vary=False,
+            max=1e-3 * intermed_iqr, min=-2 * intermed_iqr)
         freezeGaussians = False
         if freezeGaussians:
-            gaussPars['g1_amplitude'].set(value=0, vary=False)
-            gaussPars['g2_amplitude'].set(value=0, vary=False)
-            gaussPars['g4_amplitude'].set(value=0, vary=False)
+            fullPars['g1_amplitude'].set(value=0, vary=False)
+            fullPars['g2_amplitude'].set(value=0, vary=False)
+            fullPars['g4_amplitude'].set(value=0, vary=False)
             for idx in range(4):
-                gaussPars['g{}_sigma'.format(idx+1)].set(value=.2, vary=False)
+                fullPars['g{}_sigma'.format(idx+1)].set(value=.2, vary=False)
         #
-        gauss_out = gauss_mod.fit(intermed_y, gaussPars, x=x, method=method)
+        gauss_out = gauss_mod.fit(intermed_y, fullPars, x=x, method=method)
         if verbose:
             print(gauss_out.fit_report())
         #
@@ -272,7 +289,7 @@ def plotLmFit(x, y, init, out, verbose=False):
         print(out.fit_report())
     fig, axes = plt.subplots(1, 2, figsize=(12.8, 4.8))
     axes[0].plot(x, y, 'b')
-    axes[0].plot(x, init, 'k--', label='initial fit')
+    axes[0].plot(x, init, 'c--', label='initial fit')
     axes[0].plot(x, out.best_fit, 'r-', label='best fit')
     axes[0].legend(loc='best')
     comps = out.eval_components(x=x)
@@ -409,8 +426,8 @@ if __name__ == "__main__":
         # daskComputeOpts = {}
         daskComputeOpts = dict(
             # scheduler='threads'
-            # scheduler='processes'
-            scheduler='single-threaded'
+            scheduler='processes'
+            # scheduler='single-threaded'
             )
         '''
         exampleOutput = pd.DataFrame(
@@ -430,16 +447,17 @@ if __name__ == "__main__":
         rates = dataDF.index.get_level_values('RateInHz')
         amps = dataDF.index.get_level_values(arguments['amplitudeFieldName'])
         print('Available rates are {}'.format(np.unique(rates)))
-        
+        '''
         dbMask = (
-            # featNames.str.contains('rostralX_e01') &
+            # featNames.str.contains('rostralY_e12') &
             # elecNames.str.contains('caudalZ_e23') &
-            featNames.str.contains('rostralY_e12') &
+            (featNames.str.contains('rostralY_e12') | featNames.str.contains('caudalX_e01')) &
             elecNames.str.contains('caudalY_e11') &
             (rates < 50) &
-            (amps < -500)
+            (amps < -1000)
             )
-        # dbMask = (rates < 60)
+        '''
+        dbMask = (rates < 50)
         #
         dataDF = dataDF.loc[dbMask, :]
         #############################
@@ -447,20 +465,20 @@ if __name__ == "__main__":
         daskClient = Client()
         funKWArgs = dict(
                 tBounds=[1.2e-3, 39.6e-3],
-                # tOffset=4 * 166e-6,
-                tOffset=1.2e-3,
+                # tOffset=.7e-3,
+                # tOffset=1.2e-3,
                 scoreBounds=[1.2e-3, 10e-3],
                 modelFun=applyModel,
                 iterMethod='chooseN',
-                plotting=True, verbose=False,
-                maxIter=2)
+                plotting=False, verbose=False,
+                maxIter=10)
         resDF = ash.splitApplyCombine(
             dataDF,
             fun=shapeFit, resultPath=resultPath,
             funArgs=[], funKWArgs=funKWArgs,
             rowKeys=groupBy, colKeys=testVar, useDask=True,
             daskPersist=True,
-            daskProgBar=False,
+            daskProgBar=True,
             daskResultMeta=None,
             daskComputeOpts=daskComputeOpts,
             reindexFromInput=False)
@@ -476,7 +494,7 @@ if __name__ == "__main__":
     allIdxNames = resDF.index.names
     resDF = resDF.droplevel([cn for cn in allIdxNames if cn not in groupBy])
     # pdb.set_trace()
-    resDF.columns = resDF.columns / 1e3 + funKWArgs['tOffset']
+    resDF.columns = resDF.columns.astype(np.float) / 1e3 + funKWArgs.pop('tOffset', 0)
     allIdxNames = meansDF.index.names
     meansDF = meansDF.droplevel([cn for cn in allIdxNames if cn not in groupBy])
     #
@@ -507,10 +525,8 @@ if __name__ == "__main__":
                 **relplotKWArgs)
             g.fig.suptitle(name)
             pdf.savefig()
-            # plt.close()
-            plt.show()
-            pdb.set_trace()
-
+            plt.close()
+            # plt.show()
 
     '''
     if arguments['exportToDeepSpine']:

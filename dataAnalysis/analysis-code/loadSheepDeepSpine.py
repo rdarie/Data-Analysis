@@ -9,11 +9,8 @@ cropEdgesTimes = [-100e-3, 400e-3]
 # cropEdgesTimes = [-600e-3, -100e-3]
 # inputPath = 'G:\\Delsys\\scratch\\202009231400-Peep\\default\\stim\\_emg_XS_export.h5'
 
-inputFolder = 'E:\\Neural Recordings\\scratch\\202012171300-Goat\\parameter_recovery\\stim'
-inputPath = 'G:\\Delsys\\scratch\\202010191100-Peep\\default\\stim\\_emg_XS_export.h5'
-inputPath = 'G:\\Delsys\\scratch\\202007011300-Peep\\_emg_XS_export_0701.h5'
-inputPath = 'E:\\Neural Recordings\\scratch\\202012171300-Goat\\parameter_recovery\\stim\\_emg_XS_export.h5'
-# inputPath = '/gpfs/scratch/rdarie/rdarie/Neural Recordings/202009231400-Peep/default/stim/_emg_XS_export.h5'
+inputFolder = '/gpfs/data/dborton/rdarie/Neural Recordings/raw/202012091400-Goat'
+inputPath = os.path.join(inputFolder, '_emg_XS_export.h5')
 
 with pd.HDFStore(inputPath, 'r') as store:
     # each trial has its own eesKey, get list of all
@@ -83,6 +80,8 @@ metadataNP = metaDataDF.to_numpy()
 # globalIdx is the index of the trial
 # combinationIdx is the index of the particular combination
 # of rate, active electrodes and amplitude
+pdb.set_trace()
+stimData.columns.to_frame().reset_index(drop=True).to_csv(os.path.join(inputFolder, 'h5_columns.csv'))
 
 with pd.HDFStore(inputPath, 'r') as store:
     if 'noiseCeil' in store:

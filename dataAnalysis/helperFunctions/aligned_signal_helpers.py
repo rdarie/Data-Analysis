@@ -1,5 +1,11 @@
+
+import os, sys, warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+sys.stderr = open(os.devnull, "w")  # silence stderr
+import pingouin as pg
 import dill as pickle
-import os
+sys.stderr = sys.__stderr__  # unsilence stderr
+
 import dataAnalysis.preproc.ns5 as ns5
 import dataAnalysis.helperFunctions.profiling as prf
 import dataAnalysis.helperFunctions.helper_functions_new as hf
@@ -13,11 +19,7 @@ from scipy import stats
 from statsmodels.stats.multitest import multipletests as mt
 from copy import copy
 import pdb, traceback
-try:
-    import pingouin as pg
-except:
-    traceback.print_exc()
-    pass
+
 
 
 def processAlignQueryArgs(

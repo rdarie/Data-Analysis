@@ -22,7 +22,7 @@
 # Request custom resources
 #SBATCH --array=2
 
-# SLURM_ARRAY_TASK_ID=2
+SLURM_ARRAY_TASK_ID=2
 source ./shellScripts/run_pca_calc_aligned_stim_preamble.sh
 
 # python -u './calcLaplacianFromTriggered.py' --plotting --recalcKCSDCV --useKCSD --inputBlockSuffix="lfp" --unitQuery="lfp" --outputBlockSuffix="kcsd_triggered" --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $OUTLIERMASK $LAZINESS

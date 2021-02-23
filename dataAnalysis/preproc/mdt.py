@@ -4,7 +4,6 @@ from neo import (
     AnalogSignal, Event, Block,
     Segment, ChannelIndex, SpikeTrain, Unit)
 import neo
-import elephant as elph
 from collections.abc import Iterable
 import dataAnalysis.helperFunctions.helper_functions_new as hf
 import dataAnalysis.helperFunctions.kilosort_analysis_new as ksa
@@ -32,6 +31,9 @@ import datetime
 from datetime import datetime as dt
 import json
 from copy import copy
+sys.stderr = open(os.devnull, "w")  # silence stderr
+import elephant as elph
+sys.stderr = sys.__stderr__  # unsilence stderr
 
 # INSReferenceTime = pd.Timestamp('2018-03-01')
 INSReferenceTime = pd.Timestamp('2019-01-01')

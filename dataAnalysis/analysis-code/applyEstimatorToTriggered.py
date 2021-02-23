@@ -30,7 +30,7 @@ import pandas as pd
 import pdb
 import dataAnalysis.preproc.ns5 as ns5
 import joblib as jb
-import pickle
+import dill as pickle
 #
 from currentExperiment import parseAnalysisOptions
 from docopt import docopt
@@ -48,7 +48,7 @@ triggeredPath = os.path.join(
     alignSubFolder,
     blockBaseName + '{}_{}.nix'.format(
         inputBlockSuffix, arguments['window']))
-
+# pdb.set_trace()
 # alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
 #     namedQueries, scratchFolder, **arguments)
 #

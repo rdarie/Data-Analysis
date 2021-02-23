@@ -2,13 +2,13 @@
 
 # 06a: Preprocess the NS5 File
 # Request 24 hours of runtime:
-#SBATCH --time=1:00:00
+#SBATCH --time=23:00:00
 
 # Default resources are 1 core with 2.8GB of memory.
 
 # Use more memory (32GB):
-#SBATCH --nodes=1
-#SBATCH --mem=127G
+#SBATCH --nodes=24
+#SBATCH --mem=96G
 
 # Specify a job name:
 #SBATCH -J isi_preproc_one_shot
@@ -21,7 +21,7 @@
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=6-9
+######SBATCH --array=6-9
 
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=radu_darie@brown.edu
@@ -61,13 +61,14 @@
 EXP="exp202012171300"
 
 # 
-module load anaconda/3-5.2.0
-. /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
+module load anaconda/2020.02
+. /gpfs/runtime/opt/anaconda/2020.02/etc/profile.d/conda.sh
 conda activate
 source activate nda2
 python --version
 #
 
+OUTDATED_IGNORE=1
 LAZINESS="--lazy"
 # LAZINESS=""
 
@@ -130,7 +131,7 @@ INPUTBLOCKNAME="--inputBlockSuffix=lfp_raw"
 # python -u ./calcTrialOutliers.py --exp=$EXP --alignFolderName=stim $INPUTBLOCKNAME $BLOCKSELECTOR $ANALYSISFOLDER $UNITSELECTOR $WINDOW $ALIGNQUERY --verbose --plotting --saveResults
 # python -u ./exportForDeepSpine.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $UNITSELECTOR $INPUTBLOCKNAME --maskOutlierBlocks
 # python -u ./calcLFPLMFitModel.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --maskOutlierBlocks $ALIGNQUERY --plotting
-python -u ./calcLFPLMFitModelV2.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --maskOutlierBlocks $ALIGNQUERY --plotting
+python -u ./calcLFPLMFitModelV4.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --maskOutlierBlocks $ALIGNQUERY --plotting
 # python -u ./calcTargetNoiseCeiling.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --maskOutlierBlocks $ALIGNQUERY --plotting
 
 # python -u ./loadSheepDeepSpine.py
