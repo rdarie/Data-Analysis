@@ -2669,6 +2669,7 @@ def preproc(
             'chunkTStop': chunkTStop}
         block.annotate(chunkTStart=chunkTStart)
         block.annotate(chunkTStop=chunkTStop)
+        # pdb.set_trace()
         block.annotate(
             recDatetimeStr=(
                 block

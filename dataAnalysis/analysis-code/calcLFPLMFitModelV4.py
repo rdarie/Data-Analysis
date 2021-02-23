@@ -471,7 +471,7 @@ if __name__ == "__main__":
                 modelFun=applyModel,
                 iterMethod='chooseN',
                 plotting=False, verbose=False,
-                maxIter=10)
+                maxIter=100)
         resDF = ash.splitApplyCombine(
             dataDF,
             fun=shapeFit, resultPath=resultPath,

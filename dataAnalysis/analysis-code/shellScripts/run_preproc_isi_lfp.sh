@@ -96,11 +96,11 @@ UNITSELECTOR="--unitQuery=isispinal"
 # UNITSELECTOR="--unitQuery=isiacc"
 # UNITSELECTOR="--unitQuery=isispinaloremg"
 
-SLURM_ARRAY_TASK_ID=3
+SLURM_ARRAY_TASK_ID=5
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
 
 #  #  preprocess
-# python -u ./preprocNS5.py --exp=$EXP $BLOCKSELECTOR --ISIRaw --transferISIStimLog
+python -u ./preprocNS5.py --exp=$EXP $BLOCKSELECTOR --ISIRaw --transferISIStimLog
 # python -u ./preprocDelsysHPF.py --exp=$EXP $BLOCKSELECTOR $CHANSELECTOR --verbose
 # python -u ./preprocDelsysCSV.py --exp=$EXP $BLOCKSELECTOR $CHANSELECTOR --verbose
 
