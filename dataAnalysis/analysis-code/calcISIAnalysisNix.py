@@ -536,8 +536,8 @@ def calcISIBlockAnalysisNix():
                         stAnnotations = allUpdates.loc[
                             allUpdates.index.isin(st.times.magnitude), :]
                     except Exception:
-                        pdb.set_trace()
                         traceback.print_exc()
+                        pdb.set_trace()
                 #
                 wvf = pd.DataFrame(np.atleast_2d(np.squeeze(st.waveforms)))
                 wvfDiff = wvf.diff(-1, axis=1).fillna(0)
@@ -694,7 +694,7 @@ def calcISIBlockAnalysisNix():
                                     1.1 * samplingRate ** (-1) / 2))
                                 )
                             theseTimes = st.times[theseTimesMask]
-                            if not theseTimesMask.sum():
+                            if not theseTimesMask.sum() or ('nominalCurrent' not in st.annotations):
                                 pdb.set_trace()
                             stimRasterAmplitude[activeChan] = np.mean(
                                 st.annotations['amplitude'][theseTimesMask])
