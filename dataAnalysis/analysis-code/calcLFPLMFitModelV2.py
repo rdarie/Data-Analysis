@@ -95,7 +95,7 @@ alignedAsigsKWargs.update(dict(
     duplicateControlsByProgram=False,
     makeControlProgram=False,
     removeFuzzyName=False,
-    decimate=1, windowSize=(-100e3, 40e-3),
+    decimate=1, windowSize=(-100e3, 100e-3),
     metaDataToCategories=False,
     # getMetaData=[
     #     'RateInHz', 'feature', 'electrode',
@@ -142,8 +142,10 @@ p1 = GaussianModel(prefix='p1_')
 n1 = GaussianModel(prefix='n1_')
 p2 = GaussianModel(prefix='p2_')
 p3 = GaussianModel(prefix='p3_')
+n2 = GaussianModel(prefix='n2_')
+p4 = GaussianModel(prefix='p4_')
 exp_mod = exp1 + exp2  # + const
-gauss_mod = p1 + n1 + p2 + p3
+gauss_mod = p1 + n1 + p2 + p3 + n2 + p4
 full_mod = exp_mod + gauss_mod
 #
 expPars = exp1.make_params()
@@ -168,19 +170,25 @@ gaussPars = p1.make_params()
 gaussPars.update(n1.make_params())
 gaussPars.update(p2.make_params())
 gaussPars.update(p3.make_params())
+gaussPars.update(n2.make_params())
+gaussPars.update(p4.make_params())
 #
-gaussPars.add(name='n1_offset', min=1., max=1.3)
-gaussPars.add(name='p3_offset', value=0, min=0, max=.5)
+gaussPars.add(name='n1_offset', min=1.1, max=1.3)
+gaussPars.add(name='p3_offset', value=0, min=0, max=.25)
 gaussPars['n1_center'].set(expr='n1_offset + 2 * n1_sigma')
 gaussPars['p1_center'].set(expr='n1_offset - 2 * p1_sigma')
 gaussPars['p2_center'].set(expr='n1_center + 2 * n1_sigma + 2 * p2_sigma')
 gaussPars['p3_center'].set(expr='p2_center + 2 * p2_sigma + p3_offset + 2 * p3_sigma')
-gaussPars.add(name='p3_ratio', value=1e-3, min=0, max=2)
-gaussPars['p3_amplitude'].set(expr='p3_ratio * p2_amplitude')
+gaussPars['n2_center'].set(expr='p3_center + 2 * p3_sigma + 2 * n2_sigma')
+gaussPars['p4_center'].set(expr='n2_center + 2 * n2_sigma + 2 * p4_sigma')
+# gaussPars.add(name='p3_ratio', value=1e-3, min=0, max=2)
+# gaussPars['p3_amplitude'].set(expr='p3_ratio * p2_amplitude')
 gaussPars['n1_sigma'].set(value=100e-3, min=75e-3, max=150e-3)
 gaussPars['p1_sigma'].set(value=100e-3, min=75e-3, max=150e-3)
 gaussPars['p2_sigma'].set(value=200e-3, min=150e-3, max=300e-3)
 gaussPars['p3_sigma'].set(value=200e-3, min=150e-3, max=300e-3)
+gaussPars['n2_sigma'].set(value=400e-3, min=300e-3, max=600e-3)
+gaussPars['p4_sigma'].set(value=400e-3, min=300e-3, max=1200e-3)
 
 pars = expPars.copy()
 pars.update(gaussPars)
@@ -188,13 +196,15 @@ pars.update(gaussPars)
 dependentParamNames = [
     'n1_center', 'p1_center',
     'p2_center', 'p3_center',
-    'p3_amplitude', 'exp2_amplitude']
+    'n2_center', 'p4_center'
+    'exp2_amplitude']
 
 modelColumnNames = [
-    'p3_amplitude', 'p3_center', 'p3_sigma', 'p2_amplitude', 'p2_center',
-    'p2_sigma', 'n1_amplitude', 'n1_center', 'n1_sigma', 'p1_amplitude',
-    'p1_center', 'p1_sigma', 'exp2_amplitude', 'exp2_decay', 'exp2_offset',
-    'exp1_amplitude', 'exp1_decay', 'exp1_offset', 'chisqr', 'r2']
+    'p4_amplitude', 'p4_center', 'p4_sigma', 'n2_amplitude', 'n2_center',
+    'n2_sigma', 'p3_amplitude', 'p3_center', 'p3_sigma', 'p2_amplitude',
+    'p2_center', 'p2_sigma', 'n1_amplitude', 'n1_center', 'n1_sigma',
+    'p1_amplitude', 'p1_center', 'p1_sigma', 'exp2_amplitude', 'exp2_decay',
+    'exp2_offset', 'exp1_amplitude', 'exp1_decay', 'exp1_offset', 'chisqr', 'r2']
 
 
 def applyModel(
@@ -232,7 +242,7 @@ def applyModel(
         if verbose:
             print(exp_out.fit_report())
         #
-        for pref in ['n1', 'p1', 'p2', 'p3']:
+        for pref in ['n1', 'p1', 'p2', 'p3', 'n2', 'p4']:
             pName = '{}_sigma'.format(pref)
             fullPars[pName].set(
                 value=np.random.uniform(
@@ -245,15 +255,15 @@ def applyModel(
         fullPars['p3_sigma'].set(value=np.random.uniform(150e-3, 300e-3))
         '''
         #
-        fullPars['n1_offset'].set(value=np.random.uniform(1., 1.3))
+        fullPars['n1_offset'].set(value=np.random.uniform(1.1, 1.3))
         # positives
-        for pref in ['p1', 'p2']:
+        for pref in ['p1', 'p2', 'p3', 'p4']:
             pName = '{}_amplitude'.format(pref)
             fullPars[pName].set(
                 value=1e-3 * intermed_iqr,  # vary=False,
                 min=1e-3 * intermed_iqr, max=2 * intermed_iqr)
         # negatives
-        for pref in ['n1']:
+        for pref in ['n1', 'n2']:
             pName = '{}_amplitude'.format(pref)
             fullPars[pName].set(
                 value=-1e-3 * intermed_iqr,  # vary=False,
@@ -301,6 +311,7 @@ def applyModel(
         if plotting:
             fig, ax = plotLmFit(x, y, init, out, comps, verbose=verbose)
             ax[1].set_title('R^2 = {}'.format(r2))
+        # pdb.set_trace()
         return outSrs, pd.concat([outParams, outStats])
     except Exception:
         traceback.print_exc()
@@ -317,14 +328,16 @@ def plotLmFit(x, y, init, out, comps, verbose=False):
     axes[0].legend(loc='best')
     axes[1].plot(x, y, 'b')
     expComp = comps['exp1_'] + comps['exp2_']
-    axes[1].plot(x, y - expComp, 'c', label='Residual after exponent.')
+    axes[1].plot(x, y - expComp, 'b--', label='Residual after exponent.')
     axes[1].plot(
         x, expComp,  # + comps['const_'],
         'k--', lw=2, label='Offset exponential component')
     axes[1].plot(x, comps['p1_'], 'm--', lw=2, label='P1')
     axes[1].plot(x, comps['n1_'], 'c--', lw=2, label='N1')
     axes[1].plot(x, comps['p2_'], 'y--', lw=2, label='P2')
-    axes[1].plot(x, comps['p3_'], 'g--', lw=2, label='P3')
+    axes[1].plot(x, comps['p3_'], 'r--', lw=2, label='P3')
+    axes[1].plot(x, comps['n2_'], 'b--', lw=2, label='N2')
+    axes[1].plot(x, comps['p4_'], 'g--', lw=2, label='P4')
     axes[1].legend(loc='best')
     return fig, axes
 
@@ -396,6 +409,18 @@ def shapeFit(
     # print(os.getpid())
     return resultDF
 
+funKWArgs = dict(
+    tBounds=[1.2e-3, 99e-3],
+    # tBounds=[3e-3, 39.6e-3],
+    # tOffset=.7e-3,
+    # tOffset=1.2e-3,
+    scoreBounds=[1.2e-3, 8e-3],
+    modelFun=applyModel,
+    iterMethod='chooseN',
+    plotting=False, verbose=False,
+    # plotting=True, verbose=True,
+    maxIter=10
+    )
 
 if __name__ == "__main__":
     testVar = None
@@ -431,8 +456,8 @@ if __name__ == "__main__":
         # daskComputeOpts = {}
         daskComputeOpts = dict(
             # scheduler='threads'
-            # scheduler='processes'
-            scheduler='single-threaded'
+            scheduler='processes'
+            # scheduler='single-threaded'
             )
         '''
         exampleOutput = pd.DataFrame(
@@ -452,38 +477,28 @@ if __name__ == "__main__":
         rates = dataDF.index.get_level_values('RateInHz')
         amps = dataDF.index.get_level_values(arguments['amplitudeFieldName'])
         print('Available rates are {}'.format(np.unique(rates)))
+        '''
         dbMask = (
             # featNames.str.contains('rostralY_e12') &
             # elecNames.str.contains('caudalZ_e23') &
-            (featNames.str.contains('rostralY_e15') | featNames.str.contains('caudalY_e11')) &
+            # (featNames.str.contains('rostralY_e15') | featNames.str.contains('caudalY_e11')) &
             elecNames.str.contains('rostralY_e11') &
             (rates < 50) &
             (amps < -1000)
             )
-        # dbMask = (rates < 50)
+        '''
+        dbMask = (rates < 20)
         #
         dataDF = dataDF.loc[dbMask, :]
         #############################
         #############################
         daskClient = Client()
-        funKWArgs = dict(
-                tBounds=[1.2e-3, 39.6e-3],
-                # tBounds=[3e-3, 39.6e-3],
-                # tOffset=.7e-3,
-                # tOffset=1.2e-3,
-                scoreBounds=[1.2e-3, 10e-3],
-                modelFun=applyModel,
-                iterMethod='chooseN',
-                # plotting=False, verbose=False,
-                plotting=True, verbose=True,
-                maxIter=1
-                )
         resDF = ash.splitApplyCombine(
             dataDF,
             fun=shapeFit, resultPath=resultPath,
             funArgs=[], funKWArgs=funKWArgs,
             rowKeys=groupBy, colKeys=testVar, useDask=True,
-            daskPersist=True, daskProgBar=False,
+            daskPersist=True, daskProgBar=True,
             daskResultMeta=None, daskComputeOpts=daskComputeOpts,
             reindexFromInput=False)
         resDF.set_index(modelColumnNames, inplace=True, append=True)
@@ -521,7 +536,7 @@ if __name__ == "__main__":
         for name, group in tqdm(plotDF.groupby('feature')):
             # pdb.set_trace()
             g = sns.relplot(
-                data=group,
+                data=group.query('bin < 10e-3'),
                 x='bin', y='signal',
                 hue='regrID', style='regrID',
                 row='nominalCurrent', col='electrode',
