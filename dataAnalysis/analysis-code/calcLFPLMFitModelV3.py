@@ -30,13 +30,6 @@ matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
 matplotlib.use('QT5Agg')   # generate postscript output
 # matplotlib.use('Agg')   # generate postscript output
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_pdf import PdfPages
-import seaborn as sns
-sns.set(
-    context='talk', style='dark',
-    palette='dark', font='sans-serif',
-    font_scale=1, color_codes=True)
 from tqdm import tqdm
 import pdb, traceback
 import random
@@ -53,6 +46,13 @@ from namedQueries import namedQueries
 from math import factorial
 from sklearn.preprocessing import scale, robust_scale
 from dask.distributed import Client
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
+import seaborn as sns
+sns.set(
+    context='talk', style='darkgrid',
+    palette='pastel', font='sans-serif',
+    font_scale=.75, color_codes=True)
 #
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']), arguments['exp'])
@@ -86,16 +86,12 @@ resultPath = os.path.join(
     prefix + '_{}_{}_calc.h5'.format(
         arguments['inputBlockSuffix'], arguments['window']))
 
-useCachedResult = False
-if not (useCachedResult and os.path.exists(resultPath)):
-    if os.path.exists(resultPath):
-        os.remove(resultPath)
 # e.g. resultPath = '/gpfs/scratch/rdarie/rdarie/Neural Recordings/202006171300-Peep/emgLoRes/stim/_emg_XS.nix'
 alignedAsigsKWargs.update(dict(
     duplicateControlsByProgram=False,
     makeControlProgram=False,
     removeFuzzyName=False,
-    decimate=1, windowSize=(-100e3, 40e-3),
+    decimate=1, windowSize=(-10e3, 100e-3),
     metaDataToCategories=False,
     # getMetaData=[
     #     'RateInHz', 'feature', 'electrode',
@@ -107,10 +103,10 @@ alignedAsigsKWargs.update(dict(
 #
 '''
 alignedAsigsKWargs['procFun'] = ash.genDetrender(
-    timeWindow=(alignedAsigsKWargs['windowSize'][-1] - 1e-3, alignedAsigsKWargs['windowSize'][-1]))
-'''
-alignedAsigsKWargs['procFun'] = ash.genDetrender(
     timeWindow=(alignedAsigsKWargs['windowSize'][0], -1e-3))
+alignedAsigsKWargs['procFun'] = ash.genDetrender(
+    timeWindow=(alignedAsigsKWargs['windowSize'][-1] - 10e-3, alignedAsigsKWargs['windowSize'][-1]))
+'''
 
 alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **arguments)
 alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
@@ -119,9 +115,42 @@ alignedAsigsKWargs['outlierTrials'] = ash.processOutlierTrials(
     calcSubFolder, prefix, **arguments)
 
 from lmfit.models import ExponentialModel, GaussianModel, ConstantModel
-from lmfit import Model, CompositeModel
+from lmfit import Model, CompositeModel, Parameters
 
 # np.random.seed(0)
+
+funKWArgs = dict(
+    tBounds=[1.3e-3, 95e-3],
+    # tBounds=[0.85e-3, 39.5e-3],
+    # tOffset=.7e-3,
+    # tOffset=1.2e-3,
+    scoreBounds=[1.3e-3, 8e-3],
+    # scoreBounds=[.85e-3, 8e-3],
+    iterMethod='chooseN',
+    plotting=False, verbose=False,
+    maxIter=20
+    )
+daskComputeOpts = dict(
+    # scheduler='threads'
+    scheduler='processes'
+    # scheduler='single-threaded'
+    )
+daskOpts = dict(
+    useDask=True,
+    daskPersist=True, daskProgBar=True,
+    daskResultMeta=None, daskComputeOpts=daskComputeOpts,
+    reindexFromInput=False)
+
+useCachedResult = False
+
+DEBUGGING = False
+if DEBUGGING:
+    daskOpts['daskProgBar'] = False
+    daskOpts['daskProgBar']['scheduler'] = 'single-threaded'
+    funKWArgs.update({
+        'maxIter': 1,
+        'plotting': True,
+        'verbose': True})
 
 
 def offsetExponential(x, amplitude=1, decay=1, offset=0):
@@ -148,19 +177,23 @@ exp_mod = exp1 + exp2  # + const
 gauss_mod = p1 + n1 + p2 + p3 + n2 + p4
 full_mod = exp_mod + gauss_mod
 #
-expPars = exp1.make_params()
+# pdb.set_trace()
+expPars = Parameters(usersyms={'exp': np.exp})
+expPars.update(exp1.make_params())
 expPars.update(exp2.make_params())
 # expPars.update(const.make_params())
 expPars['exp1_amplitude'].set(value=1)
-expPars['exp1_decay'].set(value=200, min=10, max=500)
-expPars['exp2_decay'].set(value=2., min=.1, max=2.)
+expPars['exp1_decay'].set(value=100, min=5, max=500)
+expPars['exp2_decay'].set(value=.1, min=.1, max=5.)
 '''
 expPars.add(name='exp2_ratio', value=-1, vary=False)
 expPars['exp1_offset'].set(value=0.7, vary=False)
 expPars['exp2_offset'].set(value=1.2, vary=False)
 '''
 #
-expPars.add(name='exp2_ratio', value=-1., min=-2., max=-0.5)
+# expPars.add(name='exp2_ratio', value=-1., min=-2., max=-0.5)
+expPars.add(name='exp2_delay', value=.5, min=0., max=1.)
+expPars.add(name='exp2_ratio', expr='-1 * exp(-1 * exp2_delay / exp1_decay)')
 expPars['exp1_offset'].set(value=0, vary=False)
 expPars['exp2_offset'].set(value=0, vary=False)
 #
@@ -173,9 +206,12 @@ gaussPars.update(p3.make_params())
 gaussPars.update(n2.make_params())
 gaussPars.update(p4.make_params())
 #
-gaussPars.add(name='n1_offset', min=1.1, max=1.3)
+gaussPars.add(
+    name='n1_offset',
+    min=max(0.5, funKWArgs['tBounds'][0] * 1e3),
+    max=1.5)
 gaussPars.add(name='p3_offset', value=0, min=0, max=.25)
-gaussPars['n1_center'].set(expr='n1_offset + 2 * n1_sigma')
+gaussPars['n1_center'].set(expr='n1_offset + n1_sigma')
 gaussPars['p1_center'].set(expr='n1_offset - 2 * p1_sigma')
 gaussPars['p2_center'].set(expr='n1_center + 2 * n1_sigma + 2 * p2_sigma')
 gaussPars['p3_center'].set(expr='p2_center + 2 * p2_sigma + p3_offset + 2 * p3_sigma')
@@ -197,7 +233,7 @@ dependentParamNames = [
     'n1_center', 'p1_center',
     'p2_center', 'p3_center',
     'n2_center', 'p4_center'
-    'exp2_amplitude']
+    'exp2_delay', 'exp2_amplitude']
 
 modelColumnNames = [
     'p4_amplitude', 'p4_center', 'p4_sigma', 'n2_amplitude', 'n2_center',
@@ -255,7 +291,10 @@ def applyModel(
         fullPars['p3_sigma'].set(value=np.random.uniform(150e-3, 300e-3))
         '''
         #
-        fullPars['n1_offset'].set(value=np.random.uniform(1.1, 1.3))
+        fullPars['n1_offset'].set(
+            value=np.random.uniform(
+                fullPars['n1_offset'].min, fullPars['n1_offset'].max
+                ))
         # positives
         for pref in ['p1', 'p2', 'p3', 'p4']:
             pName = '{}_amplitude'.format(pref)
@@ -281,8 +320,8 @@ def applyModel(
                     vary=False)
         #
         gauss_out = gauss_mod.fit(intermed_y, fullPars, x=x, method=method)
-        if verbose:
-            print(gauss_out.fit_report())
+        # if verbose:
+        #     print(gauss_out.fit_report())
         #
         for nM, value in exp_out.best_values.items():
             if nM not in dependentParamNames:
@@ -322,21 +361,21 @@ def plotLmFit(x, y, init, out, comps, verbose=False):
     if verbose:
         print(out.fit_report())
     fig, axes = plt.subplots(1, 2, figsize=(12.8, 4.8))
-    axes[0].plot(x, y, 'b')
-    axes[0].plot(x, init, 'c--', label='initial fit')
-    axes[0].plot(x, out.best_fit, 'r-', label='best fit')
+    axes[0].plot(x, y, c='k', label='data')
+    axes[0].plot(x, init, '--', c='dimgray', label='initial fit')
+    axes[0].plot(x, out.best_fit, '-', c='silver', label='best fit')
     axes[0].legend(loc='best')
-    axes[1].plot(x, y, 'b')
+    axes[1].plot(x, y, c='k', label='data')
     expComp = comps['exp1_'] + comps['exp2_']
-    axes[1].plot(x, y - expComp, 'b--', label='Residual after exponent.')
+    axes[1].plot(x, y - expComp, '--', c='dimgray', label='Residual after exponent.')
     axes[1].plot(
         x, expComp,  # + comps['const_'],
-        'k--', lw=2, label='Offset exponential component')
-    axes[1].plot(x, comps['p1_'], 'm--', lw=2, label='P1')
-    axes[1].plot(x, comps['n1_'], 'c--', lw=2, label='N1')
+        '--', c='silver', lw=2, label='Offset exponential component')
+    axes[1].plot(x, comps['p1_'], 'c--', lw=2, label='P1')
+    axes[1].plot(x, comps['n1_'], 'm--', lw=2, label='N1')
     axes[1].plot(x, comps['p2_'], 'y--', lw=2, label='P2')
-    axes[1].plot(x, comps['p3_'], 'r--', lw=2, label='P3')
-    axes[1].plot(x, comps['n2_'], 'b--', lw=2, label='N2')
+    axes[1].plot(x, comps['p3_'], 'b--', lw=2, label='P3')
+    axes[1].plot(x, comps['n2_'], 'r--', lw=2, label='N2')
     axes[1].plot(x, comps['p4_'], 'g--', lw=2, label='P4')
     axes[1].legend(loc='best')
     return fig, axes
@@ -365,7 +404,7 @@ def shapeFit(
     nSamp = groupData.shape[0]
     if (not (groupData == 1).all(axis=None)) and plotting:
         fig, ax = plt.subplots()
-        ax.plot(groupData.T)
+        ax.plot(groupData.T, '.-')
         ax.text(
             0.95, 0.95,
             '{}'.format(group.iloc[0, :].loc[keepIndexCols]),
@@ -381,6 +420,7 @@ def shapeFit(
     outList = {'model': [], 'params': []}
     if iterMethod == 'chooseN':
         nChoose = max(groupData.shape[0] - 2, int(groupData.shape[0] / 2), 2)
+        # nChoose = 1
         if maxIter is None:
             maxIter = int(factorial(nSamp) / (factorial(nChoose) ** 2))
         else:
@@ -402,6 +442,7 @@ def shapeFit(
     resultDF.index = [group.index[0]]
     if (not (groupData == 1).all(axis=None)) and plotting:
         plt.show()
+    print('\n\n#######################')
     print('shapeFit (proc {}) finished: '.format(os.getpid()))
     for cN in keepIndexCols:
         print('        {} = {}'.format(cN, group.loc[group.index[0], cN]))
@@ -409,18 +450,11 @@ def shapeFit(
     # print(os.getpid())
     return resultDF
 
-funKWArgs = dict(
-    # tBounds=[1.2e-3, 99e-3],
-    tBounds=[1.2e-3, 39.6e-3],
-    # tOffset=.7e-3,
-    # tOffset=1.2e-3,
-    scoreBounds=[1.2e-3, 8e-3],
-    modelFun=applyModel,
-    iterMethod='chooseN',
-    plotting=False, verbose=False,
-    # plotting=True, verbose=True,
-    maxIter=20
-    )
+
+funKWArgs.update({'modelFun': applyModel})
+if not (useCachedResult and os.path.exists(resultPath)):
+    if os.path.exists(resultPath):
+        os.remove(resultPath)
 
 if __name__ == "__main__":
     testVar = None
@@ -450,15 +484,6 @@ if __name__ == "__main__":
             dataBlock, **alignedAsigsKWargs)
         featNames = dataDF.index.get_level_values('feature')
         egFeatName = featNames.unique()[0]
-        # breakDownData, breakDownText, fig, ax = asp.printBreakdown(
-        #     dataDF.xs(egFeatName, level='feature', drop_level=False),
-        #     'RateInHz', 'electrode', arguments['amplitudeFieldName'])
-        # daskComputeOpts = {}
-        daskComputeOpts = dict(
-            # scheduler='threads'
-            scheduler='processes'
-            # scheduler='single-threaded'
-            )
         '''
         exampleOutput = pd.DataFrame(
             {
@@ -477,18 +502,20 @@ if __name__ == "__main__":
         rates = dataDF.index.get_level_values('RateInHz')
         amps = dataDF.index.get_level_values(arguments['amplitudeFieldName'])
         print('Available rates are {}'.format(np.unique(rates)))
-        '''
-        dbMask = (
-            # featNames.str.contains('rostralY_e12') &
-            # elecNames.str.contains('caudalZ_e23') &
-            # (featNames.str.contains('rostralY_e15') | featNames.str.contains('caudalY_e11')) &
-            elecNames.str.contains('rostralY_e11') &
-            (rates < 50) &
-            (amps < -1000)
-            )
-        '''
-        dbMask = (rates < 50)
+        # pdb.set_trace()
+        if DEBUGGING:
+            dbMask = (
+                # featNames.str.contains('rostralY_e12') &
+                # elecNames.str.contains('caudalZ_e23') &
+                (featNames.str.contains('rostralY_e11') | featNames.str.contains('caudalY_e12')) &
+                elecNames.str.contains('caudalY_e11') &
+                (rates < funKWArgs['tBounds'][-1] ** (-1)) &
+                (amps < -480)
+                )
+        else:
+            dbMask = (rates < funKWArgs['tBounds'][-1] ** (-1))
         #
+        # pdb.set_trace()
         dataDF = dataDF.loc[dbMask, :]
         #############################
         #############################
@@ -497,10 +524,7 @@ if __name__ == "__main__":
             dataDF,
             fun=shapeFit, resultPath=resultPath,
             funArgs=[], funKWArgs=funKWArgs,
-            rowKeys=groupBy, colKeys=testVar, useDask=True,
-            daskPersist=True, daskProgBar=True,
-            daskResultMeta=None, daskComputeOpts=daskComputeOpts,
-            reindexFromInput=False)
+            rowKeys=groupBy, colKeys=testVar, **daskOpts)
         resDF.set_index(modelColumnNames, inplace=True, append=True)
         resDF.to_hdf(resultPath, 'lmfit_lfp')
         # pdb.set_trace()

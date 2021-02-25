@@ -375,9 +375,7 @@ def preprocNS5():
             fillOverflow=False, removeJumps=False,
             motorEncoderMask=motorEncoderMask,
             eventInfo=trialFilesFrom['utah']['eventInfo'],
-            spikeSourceType='nev', writeMode='ow',
-            chunkSize=chunkSize, equalChunks=equalChunks,
-            chunkList=chunkList,
+            spikeSourceType='nev',
             calcRigEvents=trialFilesFrom['utah']['calcRigEvents'],
             calcAverageLFP=True,
             removeMeanAcross=False,
@@ -386,7 +384,17 @@ def preprocNS5():
             normalizeByImpedance=False,
             asigNameList=asigNameList, ainpNameList=ainpNameList,
             nameSuffix='',
-            LFPFilterOpts=None)
+            writeMode='ow',
+            chunkSize=chunkSize, equalChunks=equalChunks, chunkList=chunkList,
+            LFPFilterOpts=rippleFilterOpts)
+    ##
+    if arguments['transferISIStimLog']:
+        try:
+            jsonSrcPath = os.path.join(nspFolder, ns5FileName + '_autoStimLog.json')
+            jsonDestPath = trialBasePath.replace('.nix', '_autoStimLog.json')
+            shutil.copyfile(jsonSrcPath, jsonDestPath)
+        except Exception:
+            traceback.print_exc()
     return
 
 

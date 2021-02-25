@@ -7,10 +7,8 @@ def getExpOpts():
         4: 'isi',
         5: 'isi',
         6: 'isi',
-        7: 'isi',
-        8: 'isi',
         }
-    experimentName = '202012171300-Goat'
+    experimentName = '202012221300-Goat'
     deviceName = None
     subjectName = 'Rupert'
     rippleMapFile = {
@@ -20,8 +18,6 @@ def getExpOpts():
         4: 'isi_port1nano1caudal_xAyBzC_ortho_port2nano1rostral_xAyBzC_ortho.map',
         5: 'isi_port1nano1caudal_xAyBzC_ortho_port2nano1rostral_xAyBzC_ortho.map',
         6: 'isi_port1nano1caudal_xAyBzC_ortho_port2nano1rostral_xAyBzC_ortho.map',
-        7: 'isi_port1nano1caudal_xAyBzC_ortho_port2nano1rostral_xAyBzC_ortho.map',
-        8: 'isi_port1nano1caudal_xAyBzC_ortho_port2nano1rostral_xAyBzC_ortho.map',
         }
     delsysExampleHeaderPath = './delsys_example_header_20200922.csv'
     # use "original" file in edge cases where the ns5 file was saved incorrectly
@@ -33,8 +29,6 @@ def getExpOpts():
         4: None,
         5: None,
         6: None,
-        7: None,
-        8: None,
         }
     #
     rippleFastSettleTriggers = {
@@ -44,8 +38,6 @@ def getExpOpts():
         4: {'stim': 'none'},
         5: {'stim': 'none'},
         6: {'stim': 'none'},
-        7: {'stim': 'none'},
-        8: {'stim': 'none'},
     }
     # exclude dummy electrodes 8 and 16
     asigNameList = [
@@ -65,8 +57,6 @@ def getExpOpts():
         4: [],
         5: [],
         6: [],
-        7: [],
-        8: [],
         }
     synchInfo = {'delsysToNsp': {}, 'nspForDelsys': {}, 'ins': {}}
     for blockIdx in blockExperimentTypeLookup.keys():
@@ -77,6 +67,7 @@ def getExpOpts():
             'synchChanName': 'AnalogInputAdapterAnalog'
         }
     # For emg analysis - emg missing for some time ranges
+    '''
     synchInfo['delsysToNsp'][3].update({'timeRanges': [10, 3127], 'chooseCrossings': slice(None)})
     synchInfo['delsysToNsp'][6].update({'timeRanges': [90, 2080], 'chooseCrossings': slice(None, 1000)})
     synchInfo['delsysToNsp'][7].update({'timeRanges': [12, 1203], 'chooseCrossings': slice(None, 1200)})
@@ -86,6 +77,7 @@ def getExpOpts():
     synchInfo['nspForDelsys'][6].update({'timeRanges': [50, 2040], 'chooseCrossings': slice(None, 1000)})
     synchInfo['nspForDelsys'][7].update({'timeRanges': [6, 1244], 'chooseCrossings': slice(None, 1200)})
     synchInfo['nspForDelsys'][7].update({'timeRanges': [3, 659], 'chooseCrossings': slice(None, 1200)})
+    '''
     alignTimeBoundsLookup = {
         # 1: [
         #     [3, 2290.5]
@@ -96,8 +88,6 @@ def getExpOpts():
         4: None,
         5: None,
         6: None,
-        7: None,
-        8: None,
         }
     #  if not possible to use taps, override with good taps from another segment
     #  not ideal, because segments are only synchronized to the nearest **second**
@@ -109,8 +99,6 @@ def getExpOpts():
         4: {},
         5: {},
         6: {},
-        7: {},
-        8: {},
         }
     # options for stim artifact detection
     detectStim = False
@@ -257,7 +245,7 @@ def getExpOpts():
         }
     rippleFilterOpts = {
         'high': {
-            'Wn': 2,
+            'Wn': 1,
             'N': 4,
             'btype': 'high',
             'ftype': 'bessel'
@@ -285,4 +273,14 @@ def getExpOpts():
             }
         }
     }
+    # 'R THORACOLUMBAR FASCIA' and 'L GRACILIS' were swapped
+
+    def delsysCustomRenamer(featName):
+        if 'R THORACOLUMBAR FASCIA: ' in featName:
+            return featName.replace('R THORACOLUMBAR FASCIA: ', 'L GRACILIS: ')
+        elif 'L GRACILIS: ' in featName:
+            return featName.replace('L GRACILIS: ', 'R THORACOLUMBAR FASCIA: ')
+        else:
+            return featName
+    
     return locals()

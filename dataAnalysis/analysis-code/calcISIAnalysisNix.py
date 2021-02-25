@@ -491,14 +491,26 @@ def calcISIBlockAnalysisNix():
                 #     keepStimRasterList.append(chanName)
                 keepStimRasterList.append(chanName)
             stimActive = stimRastersDF[keepStimRasterList].sum(axis=1) > 0
-            activeTimes = stimRastersDF.loc[stimActive, 't']
+            rasterActiveTimes = stimRastersDF.loc[stimActive, 't']
+            spikeActiveTimes = pd.Series(np.unique(np.concatenate([st.times for st in spikeList])))
+            activeTimes, _  = hf.closestSeries(
+                takeFrom=rasterActiveTimes,
+                compareTo=spikeActiveTimes)
             #
             if stimEvents is not None:
-                stimEvents[:] = (
+                coarselyAlignedEvTimes = pd.Series(
                     stimEvents.times -
-                    stimEvents.times[0] -
-                    20e-3 * pq.s +  # Fudge factor to account for delay between execution and matlab save
+                    stimEvents.times[0] +
+                    # 20e-3 * pq.s +  # Fudge factor to account for delay between execution and matlab save
                     activeTimes.min() * pq.s)
+                closestTimes, _  = hf.closestSeries(
+                    takeFrom=coarselyAlignedEvTimes,
+                    compareTo=activeTimes)
+                # pdb.set_trace()
+                mismatch = (closestTimes - coarselyAlignedEvTimes)
+                assert mismatch.median() < 20e-3
+                stimEvents[:] = (closestTimes.to_numpy() - 20e-3) * pq.s
+                # Fudge factor to account for delay between execution and matlab save
                 stimEventsDF = pd.DataFrame(stimEvents.array_annotations)
                 stimEventsDF['t'] = stimEvents.times
                 stimEventsDF.to_csv(os.path.join(
@@ -876,13 +888,35 @@ def calcISIBlockAnalysisNix():
     aSigList = tdBlock.filter(objects=AnalogSignal)
     tdDF = ns5.analogSignalsToDataFrame(aSigList)
     currentSamplingRate = aSigList[0].sampling_rate
-    #
+    
+    filterOpts = {}
+    # pdb.set_trace()
+    if samplingRate < currentSamplingRate:
+        filterOpts.update({
+            'low': {
+                'Wn': float(samplingRate) / 2,
+                'N': 4,
+                'btype': 'high',
+                'ftype': 'bessel'
+            }
+            })
+    if filterOpts:
+        filterCoeffs = hf.makeFilterCoeffsSOS(
+            filterOpts.copy(), float(currentSamplingRate))
+        for cName in tdDF.columns:
+            if ('caudal' in cName) or ('rostral' in cName):
+                print('Filtering {}'.format(cName))
+                filteredFeat = signal.sosfiltfilt(
+                    filterCoeffs, tdDF[cName].to_numpy())
+                tdDF.loc[:, cName] = filteredFeat
+    
     if samplingRate != currentSamplingRate:
         print("Reinterpolating...")
         tdInterp = hf.interpolateDF(
             tdDF, newT,
             kind='linear', fill_value=(0, 0),
-            x='t', columns=tdChanNames, verbose=arguments['verbose'])
+            x='t', columns=tdChanNames,
+            verbose=arguments['verbose'])
     else:
         tdInterp = tdDF
     delsysASigList = delsysLoadedBlock.filter(objects=AnalogSignal)

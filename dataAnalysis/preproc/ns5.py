@@ -1360,14 +1360,16 @@ def getAsigsAlignedToEvents(
                 asig = signalSeg.filter(name=asigName)[0]
                 nominalWinLen = int(
                     (windowSize[1] - windowSize[0]) *
-                    asig.sampling_rate - 1)
+                    asig.sampling_rate)
                 validMask = (
                     ((
                         alignEvents + windowSize[1] +
-                        asig.sampling_rate ** (-1)) < asig.t_stop) &
+                        # asig.sampling_rate ** (-1)) < asig.t_stop) &
+                        asig.sampling_period) < asig.t_stop) &
                     ((
                         alignEvents + windowSize[0] -
-                        asig.sampling_rate ** (-1)) > asig.t_start)
+                        # asig.sampling_rate ** (-1)) >= asig.t_start)
+                        asig.sampling_period) >= asig.t_start)
                     )
                 thisKeepMask = alignEvents.array_annotations['keepMask']
                 fullMask = (validMask & thisKeepMask)
@@ -1396,17 +1398,24 @@ def getAsigsAlignedToEvents(
                             traceback.print_exc()
                     rawWaveforms = [
                         asig.load(
-                            time_slice=(t + windowSize[0], t + windowSize[1]))
+                            time_slice=(
+                                t + windowSize[0] - asig.sampling_period,
+                                t + windowSize[1]))
                         for t in alignEvents]
                     if any([rW.shape[0] < nominalWinLen for rW in rawWaveforms]):
                         rawWaveforms = [
                             asig.load(
-                                time_slice=(t + windowSize[0], t + windowSize[1] + asig.sampling_period))
+                                time_slice=(
+                                    t + windowSize[0] - asig.sampling_period,
+                                    t + windowSize[1] + asig.sampling_period))
                             for t in alignEvents]
                 elif isinstance(asig, AnalogSignal):
                     rawWaveforms = []
                     for t in alignEvents:
-                        asigMask = (asig.times > t + windowSize[0]) & (asig.times < t + windowSize[1])
+                        asigMask = (
+                            (asig.times >= t + windowSize[0]) &
+                            (asig.times < t + windowSize[1])
+                            )
                         rawWaveforms.append(asig[asigMask[:, np.newaxis]])
                 else:
                     raise(Exception('{} must be an AnalogSignal or AnalogSignalProxy!'.format(asigName)))
