@@ -283,4 +283,12 @@ def getExpOpts():
         else:
             return featName
     
+    lmfitFunKWArgs = dict(
+        tBounds=[0.85e-3, 95e-3],
+        scoreBounds=[.85e-3, 8e-3],
+        slowExpTBounds=[9e-3, 95e-3],
+        iterMethod='sampleOneManyTimes',
+        plotting=False, verbose=False,
+        maxIter=2
+        )
     return locals()

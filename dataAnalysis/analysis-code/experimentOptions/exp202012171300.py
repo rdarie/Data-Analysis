@@ -285,4 +285,11 @@ def getExpOpts():
             }
         }
     }
+    lmfitFunKWArgs = dict(
+        tBounds=[1.2e-3, 39.5e-3],
+        scoreBounds=[1.2e-3, 6e-3],
+        iterMethod='chooseN',
+        plotting=False, verbose=False,
+        maxIter=2
+        )
     return locals()
