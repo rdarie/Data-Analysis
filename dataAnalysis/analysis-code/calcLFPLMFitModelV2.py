@@ -141,7 +141,7 @@ daskOpts = dict(
 
 useCachedResult = False
 
-DEBUGGING = False
+DEBUGGING = True
 if DEBUGGING:
     daskOpts['daskProgBar'] = False
     daskOpts['daskComputeOpts']['scheduler'] = 'single-threaded'
@@ -178,24 +178,18 @@ p2 = Model(gaussian, prefix='p2_')
 p3 = Model(gaussian, prefix='p3_')
 n2 = Model(gaussian, prefix='n2_')
 p4 = Model(gaussian, prefix='p4_')
-exp_mod = exp1 + exp2  # + const
+exp_mod = exp1 + exp2
 gauss_mod = p1 + n1 + p2 + p3 + n2 + p4
 full_mod = exp_mod + gauss_mod
 #
-# pdb.set_trace()
 expPars = exp1.make_params()
 expPars.update(exp2.make_params())
-# expPars.update(const.make_params())
+#
 expPars['exp1_amplitude'].set(value=1)
 expPars['exp1_decay'].set(value=250, min=5, max=500)
-# expPars['exp1_offset'].set(value=0, vary=False)
 #
-# expPars['exp2_offset'].set(value=0, vary=False)
+expPars['exp2_amplitude'].set(value=1)
 expPars['exp2_decay'].set(value=.1, min=.01, max=2.)
-expPars.add(name='exp2_delay', value=0., min=0., max=.5)
-expPars.add(name='exp2_ratio', expr='-1 * exp(-1 * exp2_delay / exp1_decay)')
-#
-expPars['exp2_amplitude'].set(expr='exp2_ratio * exp1_amplitude')
 #
 gaussPars = p1.make_params()
 gaussPars.update(n1.make_params())
@@ -215,14 +209,14 @@ gaussPars['p2_center'].set(expr='n1_center + 2 * n1_sigma + 2 * p2_sigma')
 gaussPars['p3_center'].set(expr='p2_center + 2 * p2_sigma + p3_offset + 2 * p3_sigma')
 gaussPars['n2_center'].set(expr='p3_center + 2 * p3_sigma + 2 * n2_sigma')
 gaussPars['p4_center'].set(expr='n2_center + 2 * n2_sigma + 2 * p4_sigma')
-# gaussPars.add(name='p3_ratio', value=1e-3, min=0, max=2)
-# gaussPars['p3_amplitude'].set(expr='p3_ratio * p2_amplitude')
+#
 gaussPars['n1_sigma'].set(value=100e-3, min=50e-3, max=150e-3)
 gaussPars['p1_sigma'].set(value=100e-3, min=50e-3, max=150e-3)
 gaussPars['p2_sigma'].set(value=200e-3, min=100e-3, max=300e-3)
 gaussPars['p3_sigma'].set(value=200e-3, min=100e-3, max=300e-3)
 gaussPars['n2_sigma'].set(value=400e-3, min=200e-3, max=600e-3)
 gaussPars['p4_sigma'].set(value=400e-3, min=200e-3, max=1200e-3)
+#
 absMaxPotential = 1e3 # uV
 pars = expPars.copy()
 pars.update(gaussPars)
@@ -231,7 +225,7 @@ dependentParamNames = [
     'n1_center', 'p1_center',
     'p2_center', 'p3_center',
     'n2_center', 'p4_center'
-    'exp2_delay', 'exp2_amplitude']
+    ]
 
 modelColumnNames = [
     'p4_amplitude', 'p4_center', 'p4_sigma', 'n2_amplitude', 'n2_center',
@@ -244,7 +238,7 @@ modelColumnNames = [
 def applyModel(
         x, y,
         method='nelder', scoreBounds=None,
-        slowExpTBounds=None,
+        slowExpTBounds=None, fastExpTBounds=None,
         verbose=True, plotting=False):
     #
     fullPars = pars.copy()
@@ -261,23 +255,16 @@ def applyModel(
     if slowExpTBounds is not None:
         exp_tStart = slowExpTBounds[0] if slowExpTBounds[0] is not None else x[0]
         exp_tStop = slowExpTBounds[1] if slowExpTBounds[1] is not None else x[-1] + 1
-        # pdb.set_trace()
         exp_xMask = (x >= (1e3 * exp_tStart)) & (x < (1e3 * exp_tStop))
         exp_x = x[exp_xMask]
         exp_y = y[exp_xMask]
     else:
         exp_x = x
         exp_y = y
-    # pdb.set_trace()
-    '''
-    signalGuess = exp1.eval(fullPars, x=exp_x)
-    ampGuess = np.nanmean(exp_y / signalGuess, axis=None)
-    print('amp guess = {}'.format(ampGuess))
-    '''
     expGuess = exp1.guess(exp_y, x=exp_x)
     signGuess = np.sign(np.nanmean(exp_y, axis=None))
     ampGuess = signGuess * expGuess['exp1_amplitude'].value
-    # pdb.set_trace()
+    #
     if ampGuess == 0:
         return dummy, dummyAnns, None
     #
@@ -301,11 +288,57 @@ def applyModel(
             print(fullPars['exp1_decay'])
         print('####')
         #
-        intermed_y = exp_y - exp_out.best_fit
+        intermed_y = y - exp_out.eval(fullPars, x=x)
         if verbose:
             print(exp_out.fit_report())
         intermed_stats = np.percentile(intermed_y, q=[1, 99])
         intermed_iqr = intermed_stats[1] - intermed_stats[0]
+    except Exception:
+        traceback.print_exc()
+        return dummy, dummyAnns, None
+    #
+    if fastExpTBounds is not None:
+        exp2_tStart = fastExpTBounds[0] if fastExpTBounds[0] is not None else x[0]
+        exp2_tStop = fastExpTBounds[1] if fastExpTBounds[1] is not None else x[-1] + 1
+        exp2_xMask = (x >= (1e3 * exp2_tStart)) & (x < (1e3 * exp2_tStop))
+        #
+        exp2_x = x[exp2_xMask]
+        exp2_y = intermed_y[exp2_xMask]
+    else:
+        exp2_x = x
+        exp2_y = intermed_y
+    expGuess = exp2.guess(exp2_y, x=exp2_x)
+    signGuess = np.sign(np.nanmean(exp2_y, axis=None))
+    ampGuess = signGuess * expGuess['exp2_amplitude'].value
+    try:
+        tempPars = exp2.make_params()
+        if ampGuess > 0:
+            tempPars['exp2_amplitude'].set(value=ampGuess, max=3 * ampGuess, min=1e-3 * ampGuess)
+        else:
+            tempPars['exp2_amplitude'].set(value=ampGuess, max=1e-3 * ampGuess, min=3 * ampGuess)
+        #
+        tempPars['exp2_decay'].set(value=expGuess['exp2_decay'].value)
+        ###
+        exp_out = exp2.fit(exp2_y, tempPars, x=exp2_x, method=method)
+        #
+        fullPars['exp2_amplitude'].set(value=exp_out.best_values['exp2_amplitude'], vary=False)
+        fullPars['exp2_decay'].set(value=exp_out.best_values['exp2_decay'], vary=False)
+        #
+        print('####')
+        if verbose:
+            print(fullPars['exp2_amplitude'])
+            print(fullPars['exp2_decay'])
+        print('####')
+        #
+        intermed_y = y - exp_out.eval(fullPars, x=x)
+        if verbose:
+            print(exp_out.fit_report())
+        intermed_stats = np.percentile(intermed_y, q=[1, 99])
+        intermed_iqr = intermed_stats[1] - intermed_stats[0]
+    except Exception:
+        traceback.print_exc()
+        return dummy, dummyAnns, None
+    try:
         #
         for pref in ['n1', 'p1', 'p2', 'p3', 'n2', 'p4']:
             pName = '{}_sigma'.format(pref)
@@ -402,6 +435,7 @@ def plotLmFit(x, y, init, out, comps, verbose=False):
 def shapeFit(
         group, dataColNames=None,
         tBounds=None, verbose=False, slowExpTBounds=None,
+        fastExpTBounds=None,
         scoreBounds=None, tOffset=0,
         plotting=False, iterMethod='loo',
         modelFun=None, corrMethod='pearson',
@@ -464,6 +498,7 @@ def shapeFit(
             resultsSrs, resultsParams, mod = modelFun(
                 groupT, testX.iloc[:, maskX].to_numpy().flatten(),
                 scoreBounds=scBnds, slowExpTBounds=slowExpTBounds,
+                fastExpTBounds=fastExpTBounds,
                 verbose=verbose, plotting=plotting)
             # TODO: return best model too
             outList['best_fit'].append(resultsSrs)
