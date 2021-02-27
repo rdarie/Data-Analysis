@@ -181,6 +181,36 @@ def cmpDFToPrb(
             f.write('channel_groups = ' + str(prbDict))
     return prbDict
 
+
+def parseElecComboName(elecNames):
+    elecRegex = r'((?:\-|\+)(?:(?:rostral|caudal)\S_\S\S\S)*)'
+    chanRegex = r'((?:rostral|caudal)\S_\S\S\S)'
+    elecChanNames = []
+    stimConfigLookup = {}
+    for comboName in elecNames:
+        matches = re.findall(elecRegex, comboName)
+        if matches:
+            print(comboName)
+            thisLookup = {'cathodes': [], 'anodes': []}
+            for matchGroup in matches:
+                print('\t' + matchGroup)
+                if len(matchGroup):
+                    theseChanNames = re.findall(chanRegex, matchGroup)
+                    if theseChanNames:
+                        for chanName in theseChanNames:
+                            if chanName not in elecChanNames:
+                                elecChanNames.append(chanName)
+                        if '-' in matchGroup:
+                            for chanName in theseChanNames:
+                                if chanName not in thisLookup['cathodes']:
+                                    thisLookup['cathodes'].append(chanName)
+                        if '+' in matchGroup:
+                            for chanName in theseChanNames:
+                                if chanName not in thisLookup['anodes']:
+                                    thisLookup['anodes'].append(chanName)
+            stimConfigLookup[comboName] = thisLookup
+    return stimConfigLookup, elecChanNames
+
 '''
 def cmpDFToPrbAddDummies(
         cmpDF, filePath=None,

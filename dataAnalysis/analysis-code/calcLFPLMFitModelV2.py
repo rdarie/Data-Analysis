@@ -21,7 +21,7 @@ Options:
     --selector=selector                         filename if using a unit selector
     --amplitudeFieldName=amplitudeFieldName     what is the amplitude named? [default: nominalCurrent]
 """
-import os, sys
+import os, sys, re
 from docopt import docopt
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 
@@ -31,10 +31,11 @@ matplotlib.rcParams['ps.fonttype'] = 42
 matplotlib.use('QT5Agg')   # generate postscript output
 # matplotlib.use('Agg')   # generate postscript output
 from tqdm import tqdm
-import pdb, traceback
+import pdb, traceback, shutil
 import random
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
 import dataAnalysis.plotting.aligned_signal_plots as asp
+import dataAnalysis.helperFunctions.probe_metadata as prb_meta
 import dataAnalysis.preproc.ns5 as preproc
 import numpy as np
 import pandas as pd
@@ -49,13 +50,14 @@ from dask.distributed import Client
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import seaborn as sns
+import dataAnalysis.plotting.spike_sorting_plots as ssplt
 #
 sns.set(
     context='poster',
     # context='notebook',
     style='darkgrid',
-    palette='pastel', font='sans-serif',
-    font_scale=.5,
+    palette='muted', font='sans-serif',
+    font_scale=1,
     color_codes=True)
 #
 expOpts, allOpts = parseAnalysisOptions(
@@ -139,9 +141,9 @@ daskOpts = dict(
     daskResultMeta=None, daskComputeOpts=daskComputeOpts,
     reindexFromInput=False)
 
-useCachedResult = False
+useCachedResult = True
 
-DEBUGGING = True
+DEBUGGING = False
 if DEBUGGING:
     daskOpts['daskProgBar'] = False
     daskOpts['daskComputeOpts']['scheduler'] = 'single-threaded'
@@ -152,18 +154,6 @@ if DEBUGGING:
         })
 
 
-def offsetExponential(x, amplitude=1, decay=1, offset=0):
-    res = amplitude * np.exp(-(x - offset) / decay)
-    if isinstance(x, np.ndarray):
-        res[x < offset] = 0
-        return res
-    else:
-        if x >= offset:
-            return res
-        else:
-            return 0
-
-
 def gaussian(x, amplitude, center, sigma):
     return amplitude * np.exp(-(x-center)**2 / (2 * sigma ** 2))
 
@@ -172,24 +162,30 @@ def gaussian(x, amplitude, center, sigma):
 # exp2 = Model(offsetExponential, prefix='exp2_')
 exp1 = ExponentialModel(prefix='exp1_')
 exp2 = ExponentialModel(prefix='exp2_')
+exp3 = ExponentialModel(prefix='exp3_')
+#
 p1 = Model(gaussian, prefix='p1_')
 n1 = Model(gaussian, prefix='n1_')
 p2 = Model(gaussian, prefix='p2_')
 p3 = Model(gaussian, prefix='p3_')
 n2 = Model(gaussian, prefix='n2_')
 p4 = Model(gaussian, prefix='p4_')
-exp_mod = exp1 + exp2
+exp_mod = exp1 + exp2 + exp3
 gauss_mod = p1 + n1 + p2 + p3 + n2 + p4
 full_mod = exp_mod + gauss_mod
 #
 expPars = exp1.make_params()
 expPars.update(exp2.make_params())
+expPars.update(exp3.make_params())
 #
 expPars['exp1_amplitude'].set(value=1)
-expPars['exp1_decay'].set(value=250, min=5, max=500)
+expPars['exp1_decay'].set(value=250., min=10., max=500.)
 #
 expPars['exp2_amplitude'].set(value=1)
-expPars['exp2_decay'].set(value=.1, min=.01, max=2.)
+expPars['exp2_decay'].set(value=10., min=.1, max=20.)
+#
+expPars['exp3_amplitude'].set(value=1)
+expPars['exp3_decay'].set(value=.1, min=.05, max=.5)
 #
 gaussPars = p1.make_params()
 gaussPars.update(n1.make_params())
@@ -203,7 +199,7 @@ gaussPars.add(
     min=max(0.5, funKWArgs['tBounds'][0] * 1e3),
     max=1.5)
 gaussPars.add(name='p3_offset', value=0, min=0, max=.25)
-gaussPars['n1_center'].set(expr='n1_offset + 2 * n1_sigma')
+gaussPars['n1_center'].set(expr='n1_offset + n1_sigma')
 gaussPars['p1_center'].set(expr='n1_offset - 2 * p1_sigma')
 gaussPars['p2_center'].set(expr='n1_center + 2 * n1_sigma + 2 * p2_sigma')
 gaussPars['p3_center'].set(expr='p2_center + 2 * p2_sigma + p3_offset + 2 * p3_sigma')
@@ -227,18 +223,17 @@ dependentParamNames = [
     'n2_center', 'p4_center'
     ]
 
-modelColumnNames = [
-    'p4_amplitude', 'p4_center', 'p4_sigma', 'n2_amplitude', 'n2_center',
-    'n2_sigma', 'p3_amplitude', 'p3_center', 'p3_sigma', 'p2_amplitude',
-    'p2_center', 'p2_sigma', 'n1_amplitude', 'n1_center', 'n1_sigma',
-    'p1_amplitude', 'p1_center', 'p1_sigma', 'exp2_amplitude', 'exp2_decay',
-    'exp1_amplitude', 'exp1_decay', 'chisqr', 'r2', 'model']
-
+modelColumnNames = ['p4_amplitude', 'p4_center', 'p4_sigma', 'n2_amplitude', 'n2_center',
+       'n2_sigma', 'p3_amplitude', 'p3_center', 'p3_sigma', 'p2_amplitude',
+       'p2_center', 'p2_sigma', 'n1_amplitude', 'n1_center', 'n1_sigma',
+       'p1_amplitude', 'p1_center', 'p1_sigma', 'exp3_amplitude', 'exp3_decay',
+       'exp2_amplitude', 'exp2_decay', 'exp1_amplitude', 'exp1_decay',
+       'chisqr', 'r2', 'model']
 
 def applyModel(
         x, y,
         method='nelder', scoreBounds=None,
-        slowExpTBounds=None, fastExpTBounds=None,
+        slowExpTBounds=None, medExpTBounds=None, fastExpTBounds=None,
         verbose=True, plotting=False):
     #
     fullPars = pars.copy()
@@ -264,6 +259,7 @@ def applyModel(
     expGuess = exp1.guess(exp_y, x=exp_x)
     signGuess = np.sign(np.nanmean(exp_y, axis=None))
     ampGuess = signGuess * expGuess['exp1_amplitude'].value
+    decayGuess = np.clip(expGuess['exp1_decay'].value, fullPars['exp1_decay'].min, fullPars['exp1_decay'].max)
     #
     if ampGuess == 0:
         return dummy, dummyAnns, None
@@ -275,7 +271,11 @@ def applyModel(
         else:
             tempPars['exp1_amplitude'].set(value=ampGuess, max=1e-3 * ampGuess, min=3 * ampGuess)
         #
-        tempPars['exp1_decay'].set(value=expGuess['exp1_decay'].value)
+        tempPars['exp1_decay'].set(
+            value=decayGuess,
+            min=fullPars['exp1_decay'].min,
+            max=fullPars['exp1_decay'].max
+            )
         ###
         exp_out = exp1.fit(exp_y, tempPars, x=exp_x, method=method)
         #
@@ -297,9 +297,11 @@ def applyModel(
         traceback.print_exc()
         return dummy, dummyAnns, None
     #
-    if fastExpTBounds is not None:
-        exp2_tStart = fastExpTBounds[0] if fastExpTBounds[0] is not None else x[0]
-        exp2_tStop = fastExpTBounds[1] if fastExpTBounds[1] is not None else x[-1] + 1
+    # medium scale exp fitting
+    #
+    if medExpTBounds is not None:
+        exp2_tStart = medExpTBounds[0] if medExpTBounds[0] is not None else x[0]
+        exp2_tStop = medExpTBounds[1] if medExpTBounds[1] is not None else x[-1] + 1
         exp2_xMask = (x >= (1e3 * exp2_tStart)) & (x < (1e3 * exp2_tStop))
         #
         exp2_x = x[exp2_xMask]
@@ -310,6 +312,7 @@ def applyModel(
     expGuess = exp2.guess(exp2_y, x=exp2_x)
     signGuess = np.sign(np.nanmean(exp2_y, axis=None))
     ampGuess = signGuess * expGuess['exp2_amplitude'].value
+    decayGuess = np.clip(expGuess['exp2_decay'].value, fullPars['exp2_decay'].min, fullPars['exp2_decay'].max)
     try:
         tempPars = exp2.make_params()
         if ampGuess > 0:
@@ -317,7 +320,10 @@ def applyModel(
         else:
             tempPars['exp2_amplitude'].set(value=ampGuess, max=1e-3 * ampGuess, min=3 * ampGuess)
         #
-        tempPars['exp2_decay'].set(value=expGuess['exp2_decay'].value)
+        tempPars['exp2_decay'].set(
+            value=decayGuess,
+            min=fullPars['exp2_decay'].min,
+            max=fullPars['exp2_decay'].max)
         ###
         exp_out = exp2.fit(exp2_y, tempPars, x=exp2_x, method=method)
         #
@@ -330,7 +336,53 @@ def applyModel(
             print(fullPars['exp2_decay'])
         print('####')
         #
-        intermed_y = y - exp_out.eval(fullPars, x=x)
+        intermed_y = intermed_y - exp_out.eval(fullPars, x=x)
+        if verbose:
+            print(exp_out.fit_report())
+        intermed_stats = np.percentile(intermed_y, q=[1, 99])
+        intermed_iqr = intermed_stats[1] - intermed_stats[0]
+    except Exception:
+        traceback.print_exc()
+        return dummy, dummyAnns, None
+    # super fast exp fitting
+    if fastExpTBounds is not None:
+        exp3_tStart = fastExpTBounds[0] if fastExpTBounds[0] is not None else x[0]
+        exp3_tStop = fastExpTBounds[1] if fastExpTBounds[1] is not None else x[-1] + 1
+        exp3_xMask = (x >= (1e3 * exp3_tStart)) & (x < (1e3 * exp3_tStop))
+        #
+        exp3_x = x[exp3_xMask]
+        exp3_y = intermed_y[exp3_xMask]
+    else:
+        exp3_x = x
+        exp3_y = intermed_y
+    expGuess = exp3.guess(exp3_y, x=exp3_x)
+    signGuess = np.sign(np.nanmean(exp3_y, axis=None))
+    ampGuess = signGuess * expGuess['exp3_amplitude'].value
+    decayGuess = np.clip(expGuess['exp3_decay'].value, fullPars['exp3_decay'].min, fullPars['exp3_decay'].max)
+    try:
+        tempPars = exp3.make_params()
+        if ampGuess > 0:
+            tempPars['exp3_amplitude'].set(value=ampGuess, max=3 * ampGuess, min=1e-3 * ampGuess)
+        else:
+            tempPars['exp3_amplitude'].set(value=ampGuess, max=1e-3 * ampGuess, min=3 * ampGuess)
+        #
+        tempPars['exp3_decay'].set(
+            value=decayGuess,
+            min=fullPars['exp3_decay'].min,
+            max=fullPars['exp3_decay'].max)
+        ###
+        exp_out = exp3.fit(exp3_y, tempPars, x=exp3_x, method=method)
+        #
+        fullPars['exp3_amplitude'].set(value=exp_out.best_values['exp3_amplitude'], vary=False)
+        fullPars['exp3_decay'].set(value=exp_out.best_values['exp3_decay'], vary=False)
+        #
+        print('####')
+        if verbose:
+            print(fullPars['exp3_amplitude'])
+            print(fullPars['exp3_decay'])
+        print('####')
+        #
+        intermed_y = intermed_y - exp_out.eval(fullPars, x=x)
         if verbose:
             print(exp_out.fit_report())
         intermed_stats = np.percentile(intermed_y, q=[1, 99])
@@ -339,21 +391,17 @@ def applyModel(
         traceback.print_exc()
         return dummy, dummyAnns, None
     try:
-        #
+        # Randomize std dev
         for pref in ['n1', 'p1', 'p2', 'p3', 'n2', 'p4']:
             pName = '{}_sigma'.format(pref)
             fullPars[pName].set(
                 value=np.random.uniform(
                     fullPars[pName].min,
                     fullPars[pName].max))
-        #
+        # Randomize n1_offset
         fullPars['n1_offset'].set(
             value=np.random.uniform(
                 fullPars['n1_offset'].min, fullPars['n1_offset'].max
-                ))
-        fullPars['exp2_decay'].set(
-            value=np.random.uniform(
-                fullPars['exp2_decay'].min, fullPars['exp2_decay'].max
                 ))
         # positives
         for pref in ['p1', 'p2', 'p3', 'p4']:
@@ -373,8 +421,8 @@ def applyModel(
                 min=-maxAmp
                 )
         # freeze any?
-        # freezeGaussians = ['p1']
-        freezeGaussians = []
+        freezeGaussians = ['p1']
+        # freezeGaussians = []
         # freezeGaussians = ['p1', 'n1', 'p2', 'p3']
         if len(freezeGaussians):
             for pref in freezeGaussians:
@@ -382,7 +430,7 @@ def applyModel(
                 fullPars[pName].set(value=0, vary=False)
                 pName = '{}_sigma'.format(pref)
                 fullPars[pName].set(
-                    value=(fullPars[pName].max - fullPars[pName].min) / 2,
+                    value=fullPars[pName].min,
                     vary=False)
         init = full_mod.eval(fullPars, x=x)
         out = full_mod.fit(y, fullPars, x=x, method=method)
@@ -417,7 +465,7 @@ def plotLmFit(x, y, init, out, comps, verbose=False):
     axes[0].plot(x, out.best_fit, '-', c='silver', label='best fit')
     axes[0].legend(loc='best')
     axes[1].plot(x, y, c='k', label='data')
-    expComp = comps['exp1_'] + comps['exp2_']
+    expComp = comps['exp1_'] + comps['exp2_'] + comps['exp3_']
     axes[1].plot(x, y - expComp, '--', c='dimgray', label='Residual after exponent.')
     axes[1].plot(
         x, expComp,  # + comps['const_'],
@@ -435,7 +483,7 @@ def plotLmFit(x, y, init, out, comps, verbose=False):
 def shapeFit(
         group, dataColNames=None,
         tBounds=None, verbose=False, slowExpTBounds=None,
-        fastExpTBounds=None,
+        fastExpTBounds=None, medExpTBounds=None,
         scoreBounds=None, tOffset=0,
         plotting=False, iterMethod='loo',
         modelFun=None, corrMethod='pearson',
@@ -497,10 +545,12 @@ def shapeFit(
             testX = shuffle(groupData, n_samples=1)
             resultsSrs, resultsParams, mod = modelFun(
                 groupT, testX.iloc[:, maskX].to_numpy().flatten(),
-                scoreBounds=scBnds, slowExpTBounds=slowExpTBounds,
+                scoreBounds=scBnds,
+                slowExpTBounds=slowExpTBounds,
                 fastExpTBounds=fastExpTBounds,
+                medExpTBounds=medExpTBounds,
                 verbose=verbose, plotting=plotting)
-            # TODO: return best model too
+            #
             outList['best_fit'].append(resultsSrs)
             outList['params'].append(resultsParams)
             outList['model'].append(mod)
@@ -577,7 +627,7 @@ if __name__ == "__main__":
             dbMask = (
                 # featNames.str.contains('rostralY_e12') &
                 # elecNames.str.contains('caudalZ_e23') &
-                (featNames.str.contains('caudalY_e11') | featNames.str.contains('caudalY_e09')) &
+                (featNames.str.contains('caudalY_e11') | featNames.str.contains('rostralY_e11')) &
                 elecNames.str.contains('caudalY_e11') &
                 (rates < funKWArgs['tBounds'][-1] ** (-1)) &
                 (amps < -480)
@@ -598,7 +648,8 @@ if __name__ == "__main__":
         # pdb.set_trace()
         if not (useCachedResult and os.path.exists(resultPath)):
             if os.path.exists(resultPath):
-                os.remove(resultPath)
+                shutil.rmtree(resultFolder)
+                os.makedirs(resultFolder)
         resDF.index = dataDF.index
         modelsSrs = resDF['model'].copy()
         resDF.drop(columns='model', inplace=True)
@@ -622,6 +673,7 @@ if __name__ == "__main__":
     else:
         resDF = pd.read_hdf(resultPath, 'lmfit_lfp')
         meansDF = pd.read_hdf(resultPath, 'lfp')
+    modelParams = resDF.index.to_frame().reset_index(drop=True)
     allIdxNames = resDF.index.names
     modelIndex = pd.Series(
         resDF.index.get_level_values('model_index'),
@@ -651,7 +703,7 @@ if __name__ == "__main__":
         concatComps[key] = pd.DataFrame(
             np.concatenate([v[:, np.newaxis] for v in value], axis=1).T,
             index=resDF.index, columns=resDF.columns)
-    concatComps['exp_'] = concatComps['exp1_'] + concatComps['exp2_']
+    concatComps['exp_'] = concatComps['exp1_'] + concatComps['exp2_'] + concatComps['exp3_']
     concatComps.update({'model': resDF, 'target': meansDF.groupby(meansDF.index.names).mean()})
     concatComps['exp_resid'] = concatComps['target'] - concatComps['exp_']
     plotDF = pd.concat(
@@ -674,18 +726,115 @@ if __name__ == "__main__":
         'alignedFeatures')
     if not os.path.exists(alignedFeaturesFolder):
         os.makedirs(alignedFeaturesFolder, exist_ok=True)
+    relplotKWArgs.pop('palette', None)
+    # pdb.set_trace()
+    plotDF.drop(index=plotDF.index[plotDF['columnLabel'] == 'NA'], inplace=True)
+    ##########
+    
+    meanParams = modelParams.groupby(['electrode', arguments['amplitudeFieldName'], 'feature']).mean().reset_index()
+    stimConfigLookup, elecChanNames = prb_meta.parseElecComboName(meanParams['electrode'].unique())
+    rippleMapDF = prb_meta.mapToDF(rippleMapFile[int(arguments['blockIdx'])])
+    rippleMapDF.loc[
+        rippleMapDF['label'].str.contains('caudal'),
+        'ycoords'] += 500
+    #
+    meanParams.loc[:, 'xCoords'] = meanParams['feature'].str.replace('#0', '').map(pd.Series(rippleMapDF['xcoords'].to_numpy(), index=rippleMapDF['label']))
+    meanParams.loc[:, 'yCoords'] = meanParams['feature'].str.replace('#0', '').map(pd.Series(rippleMapDF['ycoords'].to_numpy(), index=rippleMapDF['label']))
+    #
+    coordLookup = pd.DataFrame(rippleMapDF.loc[:, ['xcoords', 'ycoords', 'label']])
+    coordLookup.loc[:, 'label'] = coordLookup.loc[:, 'label'].str.replace('_a', '').str.replace('_b', '')
+    coordLookup.drop_duplicates(inplace=True)
+    coordLookup.set_index('label', inplace=True, drop=True)
+    xIdx, yIdx = ssplt.coordsToIndices(
+        rippleMapDF['xcoords'], rippleMapDF['ycoords'])
+    #
+    meanParams.loc[:, 'N1P2'] = meanParams['p2_amplitude'] - meanParams['n1_amplitude']
+    paramMetaData = {
+        'N1P2': {
+            'units': 'uV',
+            'label': 'N1-P2 Amplitude'
+        },
+        'n1_center': {
+            'units': 'msec',
+            'label': 'N1 Latency'
+        },
+        'n1_sigma': {
+            'units': 'msec',
+            'label': 'N1 Sigma',
+        },
+        'n2_center': {
+            'units': 'msec',
+            'label': 'N2 Latency'
+        },
+        'n2_sigma': {
+            'units': 'msec',
+            'label': 'N2 Sigma'
+        }}
+    whichParamsToPlot = list(paramMetaData.keys())
+    for pName in whichParamsToPlot:
+        vLims = 2 * meanParams.loc[:, pName].quantile([.25, .75]) - meanParams.loc[:, pName].median()
+        paramMetaData[pName].update({
+            'vmin': vLims.iloc[0], 'vmax': vLims.iloc[-1]})
+    pdfPath = os.path.join(
+        alignedFeaturesFolder,
+        prefix + '_{}_{}_lmfit_heatmaps.pdf'.format(
+            arguments['inputBlockSuffix'], arguments['window']))
+    xSize = meanParams['xCoords'].unique().size
+    minX = meanParams['xCoords'].min()
+    maxX = meanParams['xCoords'].max()
+    ySize = meanParams['yCoords'].unique().size
+    minY = meanParams['yCoords'].min()
+    maxY = meanParams['yCoords'].max()
+    def cTransform(absV, minV, maxV, vSize):
+        return (absV - minV) / (maxV - minV) * vSize
+    #
+    with PdfPages(pdfPath) as pdf:
+        for name, group in tqdm(meanParams.groupby(['electrode', arguments['amplitudeFieldName']])):
+            for pName, plotMeta in paramMetaData.items():
+                fig, ax = plt.subplots()
+                fig.set_size_inches(8, 24)
+                data = group.loc[:, ['xCoords', 'yCoords', pName]]
+                data.loc[group['r2'] < 0.9, pName] = np.nan
+                dataSquare = data.pivot('yCoords', 'xCoords', pName)
+                anns = group.loc[:, ['xCoords', 'yCoords', 'feature']]
+                annsSquare = anns.pivot('yCoords', 'xCoords', 'feature')
+                ax = sns.heatmap(
+                    dataSquare, annot=annsSquare, fmt='s',
+                    annot_kws={'fontsize': 'x-small'},
+                    vmin=plotMeta['vmin'], vmax=plotMeta['vmax'],
+                    ax=ax)
+                # overAx = ax.twinx()
+                elecConfig = stimConfigLookup[name[0]]
+                for eName in elecConfig['cathodes']:
+                    x = coordLookup.loc[eName, 'xcoords']
+                    tX = cTransform(x, minX, maxX, xSize)
+                    y = coordLookup.loc[eName, 'ycoords']
+                    tY = cTransform(y, minY, maxY, ySize)
+                    ax.plot(tX, tY, marker='*', c='b', ms=10, ls=None)
+                for eName in elecConfig['anodes']:
+                    x = coordLookup.loc[eName, 'xcoords']
+                    tX = cTransform(x, minX, maxX, xSize)
+                    y = coordLookup.loc[eName, 'ycoords']
+                    tY = cTransform(y, minY, maxY, ySize)
+                    ax.plot(tX, tY, marker='*', c='r', ms=10, ls=None)
+                titleText = '{} ({})'.format(plotMeta['label'], plotMeta['units'])
+                titleText += '\n stim on {} ({} uA)'.format(name[0], name[1])
+                fig.suptitle(titleText)
+                pdf.savefig()
+                plt.close()
+                # plt.show()
+    # pdb.set_trace()
+    ###########################
+    
     pdfPath = os.path.join(
         alignedFeaturesFolder,
         prefix + '_{}_{}_lmfit.pdf'.format(
             arguments['inputBlockSuffix'], arguments['window']))
-    relplotKWArgs.pop('palette', None)
-    # pdb.set_trace()
-    plotDF.drop(index=plotDF.index[plotDF['columnLabel'] == 'NA'], inplace=True)
     with PdfPages(pdfPath) as pdf:
         for name, group in tqdm(plotDF.groupby('feature')):
             g = sns.relplot(
                 data=group,
-                # data=group.query('bin < 10e-3'),
+                # data=group.query('bin < 3e-3'),
                 x='bin', y='signal',
                 hue='regrID',
                 row='rowLabel', col='columnLabel',
@@ -695,3 +844,4 @@ if __name__ == "__main__":
             pdf.savefig()
             plt.close()
             # plt.show()
+    

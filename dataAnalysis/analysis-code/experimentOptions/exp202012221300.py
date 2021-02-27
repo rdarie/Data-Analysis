@@ -284,12 +284,14 @@ def getExpOpts():
             return featName
     
     lmfitFunKWArgs = dict(
-        tBounds=[0.85e-3, 95e-3],
-        scoreBounds=[.85e-3, 8e-3],
+        tBounds=[.9e-3, 95e-3],
+        scoreBounds=[.9e-3, 8e-3],
+        #
         slowExpTBounds=[9e-3, 95e-3],
-        fastExpTBounds=[.85e-3, 9e-3],
+        medExpTBounds=[.9e-3, 19e-3],
+        fastExpTBounds=[.9e-3, 2e-3],
         iterMethod='sampleOneManyTimes',
         plotting=False, verbose=False,
-        maxIter=2
+        maxIter=20
         )
     return locals()
