@@ -142,8 +142,9 @@ daskOpts = dict(
     reindexFromInput=False)
 
 useCachedResult = False
-
 DEBUGGING = True
+SMALLDATASET = True
+
 if DEBUGGING:
     daskOpts['daskProgBar'] = False
     daskOpts['daskComputeOpts']['scheduler'] = 'single-threaded'
@@ -223,13 +224,13 @@ dependentParamNames = [
     'n2_center', 'p4_center'
     ]
 
-modelColumnNames = [
+modelParamNames = [
     'p4_amplitude', 'p4_center', 'p4_sigma', 'n2_amplitude', 'n2_center',
     'n2_sigma', 'p3_amplitude', 'p3_center', 'p3_sigma', 'p2_amplitude',
     'p2_center', 'p2_sigma', 'n1_amplitude', 'n1_center', 'n1_sigma',
     'p1_amplitude', 'p1_center', 'p1_sigma', 'exp3_amplitude', 'exp3_decay',
-    'exp2_amplitude', 'exp2_decay', 'exp1_amplitude', 'exp1_decay',
-    'chisqr', 'r2', 'model']
+    'exp2_amplitude', 'exp2_decay', 'exp1_amplitude', 'exp1_decay']
+modelStatsNames = ['chisqr', 'r2', 'model']
 
 def applyModel(
         x, y,
@@ -239,15 +240,17 @@ def applyModel(
     #
     fullPars = pars.copy()
     dummy = pd.Series(0, index=x)
-    dummyAnns = pd.Series({key: 0 for key in modelColumnNames})
+    dummyAnns = pd.Series({key: 0 for key in modelParamNames + modelStatsNames})
     #
     prelim_stats = np.percentile(y, q=[1, 99])
     iqr = prelim_stats[1] - prelim_stats[0]
     if iqr == 0:
         return dummy, dummyAnns, None
+    ################################################
     #
     #  Slow exp fitting
     #
+    ################################################
     if slowExpTBounds is not None:
         exp_tStart = slowExpTBounds[0] if slowExpTBounds[0] is not None else x[0]
         exp_tStop = slowExpTBounds[1] if slowExpTBounds[1] is not None else x[-1] + 1
@@ -279,9 +282,27 @@ def applyModel(
             )
         ###
         exp_out = exp1.fit(exp_y, tempPars, x=exp_x, method=method)
+        try:
+            exp_out.conf_interval()
+            ciDF = pd.DataFrame(exp_out.ci_out)
+            paramsCI = {}
+            modelFitsWellEnough = True
+            for pName in ciDF.columns:
+                paramsCI[pName] = (ciDF.loc[5, pName][1] - ciDF.loc[1, pName][1]) / exp_out.best_values[pName]
+                if paramsCI[pName] > 1:
+                    # print('exponential param {} has relative CI {}! discarding...'.format(pName, paramsCI[pName]))
+                    modelFitsWellEnough = False
+        except Exception:
+            traceback.print_exc()
+            modelFitsWellEnough = False
         #
-        fullPars['exp1_amplitude'].set(value=exp_out.best_values['exp1_amplitude'], vary=False)
-        fullPars['exp1_decay'].set(value=exp_out.best_values['exp1_decay'], vary=False)
+        if modelFitsWellEnough:
+            fullPars['exp1_amplitude'].set(value=exp_out.best_values['exp1_amplitude'], vary=False)
+            fullPars['exp1_decay'].set(value=exp_out.best_values['exp1_decay'], vary=False)
+        else:
+            print(exp_out.ci_report())
+            fullPars['exp1_amplitude'].set(value=0, vary=False)
+            fullPars['exp1_decay'].set(value=fullPars['exp1_decay'].max, vary=False)
         #
         print('####')
         if verbose:
@@ -297,9 +318,11 @@ def applyModel(
     except Exception:
         traceback.print_exc()
         return dummy, dummyAnns, None
+    ################################################
     #
     # medium scale exp fitting
     #
+    ################################################
     if medExpTBounds is not None:
         exp2_tStart = medExpTBounds[0] if medExpTBounds[0] is not None else x[0]
         exp2_tStop = medExpTBounds[1] if medExpTBounds[1] is not None else x[-1] + 1
@@ -327,9 +350,27 @@ def applyModel(
             max=fullPars['exp2_decay'].max)
         ###
         exp_out = exp2.fit(exp2_y, tempPars, x=exp2_x, method=method)
+        try:
+            exp_out.conf_interval()
+            ciDF = pd.DataFrame(exp_out.ci_out)
+            paramsCI = {}
+            modelFitsWellEnough = True
+            for pName in ciDF.columns:
+                paramsCI[pName] = (ciDF.loc[5, pName][1] - ciDF.loc[1, pName][1]) / exp_out.best_values[pName]
+                if paramsCI[pName] > 1:
+                    # print('exponential param {} has relative CI {}! discarding...'.format(pName, paramsCI[pName]))
+                    modelFitsWellEnough = False
+        except Exception:
+            traceback.print_exc()
+            modelFitsWellEnough = False
         #
-        fullPars['exp2_amplitude'].set(value=exp_out.best_values['exp2_amplitude'], vary=False)
-        fullPars['exp2_decay'].set(value=exp_out.best_values['exp2_decay'], vary=False)
+        if modelFitsWellEnough:
+            fullPars['exp2_amplitude'].set(value=exp_out.best_values['exp2_amplitude'], vary=False)
+            fullPars['exp2_decay'].set(value=exp_out.best_values['exp2_decay'], vary=False)
+        else:
+            print(exp_out.ci_report())
+            fullPars['exp2_amplitude'].set(value=0, vary=False)
+            fullPars['exp2_decay'].set(value=fullPars['exp2_decay'].max, vary=False)
         #
         print('####')
         if verbose:
@@ -345,7 +386,11 @@ def applyModel(
     except Exception:
         traceback.print_exc()
         return dummy, dummyAnns, None
+    ################################################
+    #
     # super fast exp fitting
+    #
+    ################################################
     if fastExpTBounds is not None:
         exp3_tStart = fastExpTBounds[0] if fastExpTBounds[0] is not None else x[0]
         exp3_tStop = fastExpTBounds[1] if fastExpTBounds[1] is not None else x[-1] + 1
@@ -373,9 +418,27 @@ def applyModel(
             max=fullPars['exp3_decay'].max)
         ###
         exp_out = exp3.fit(exp3_y, tempPars, x=exp3_x, method=method)
+        try:
+            exp_out.conf_interval()
+            ciDF = pd.DataFrame(exp_out.ci_out)
+            paramsCI = {}
+            modelFitsWellEnough = True
+            for pName in ciDF.columns:
+                paramsCI[pName] = (ciDF.loc[5, pName][1] - ciDF.loc[1, pName][1]) / exp_out.best_values[pName]
+                if paramsCI[pName] > 1:
+                    # print('exponential param {} has relative CI {}! discarding...'.format(pName, paramsCI[pName]))
+                    modelFitsWellEnough = False
+        except Exception:
+            traceback.print_exc()
+            modelFitsWellEnough = False
         #
-        fullPars['exp3_amplitude'].set(value=exp_out.best_values['exp3_amplitude'], vary=False)
-        fullPars['exp3_decay'].set(value=exp_out.best_values['exp3_decay'], vary=False)
+        if modelFitsWellEnough:
+            fullPars['exp3_amplitude'].set(value=exp_out.best_values['exp3_amplitude'], vary=False)
+            fullPars['exp3_decay'].set(value=exp_out.best_values['exp3_decay'], vary=False)
+        else:
+            print(exp_out.ci_report())
+            fullPars['exp3_amplitude'].set(value=0, vary=False)
+            fullPars['exp3_decay'].set(value=fullPars['exp3_decay'].max, vary=False)
         #
         print('####')
         if verbose:
@@ -391,6 +454,11 @@ def applyModel(
     except Exception:
         traceback.print_exc()
         return dummy, dummyAnns, None
+    ################################################
+    #
+    # gaussian fitting
+    #
+    ################################################
     try:
         # Randomize std dev
         for pref in ['n1', 'p1', 'p2', 'p3', 'n2', 'p4']:
@@ -559,7 +627,6 @@ def shapeFit(
             outList['model'].append(mod)
     prelimParams = pd.DataFrame(outList['params'])
     prelimDF = pd.DataFrame(outList['best_fit'])
-    # pdb.set_trace()
     bestIdx = prelimParams['r2'].argmax()
     resultDF = pd.concat([prelimDF, prelimParams], axis='columns').loc[bestIdx, :].to_frame().T
     resultDF.index = [group.index[0]]
@@ -579,7 +646,6 @@ def shapeFit(
 
 
 funKWArgs.update({'modelFun': applyModel})
-# pdb.set_trace()
 
 if __name__ == "__main__":
     testVar = None
@@ -621,15 +687,12 @@ if __name__ == "__main__":
                 'mseStd': float(1)},
             index=[0])
         '''
-        #############################
-        #############################
         featNames = dataDF.index.get_level_values('feature')
         elecNames = dataDF.index.get_level_values('electrode')
         rates = dataDF.index.get_level_values('RateInHz')
         amps = dataDF.index.get_level_values(arguments['amplitudeFieldName'])
         print('Available rates are {}'.format(np.unique(rates)))
-        # pdb.set_trace()
-        if DEBUGGING:
+        if SMALLDATASET:
             dbMask = (
                 # featNames.str.contains('rostralY_e12') &
                 # elecNames.str.contains('caudalZ_e23') &
@@ -641,17 +704,13 @@ if __name__ == "__main__":
         else:
             dbMask = (rates < funKWArgs['tBounds'][-1] ** (-1))
         #
-        # pdb.set_trace()
         dataDF = dataDF.loc[dbMask, :]
-        #############################
-        #############################
         daskClient = Client()
         resDF = ash.splitApplyCombine(
             dataDF,
             fun=shapeFit, resultPath=resultPath,
             funArgs=[], funKWArgs=funKWArgs,
             rowKeys=groupBy, colKeys=testVar, **daskOpts)
-        pdb.set_trace()
         if not (useCachedResult and os.path.exists(resultPath)):
             if os.path.exists(resultPath):
                 shutil.rmtree(resultFolder)
@@ -659,10 +718,9 @@ if __name__ == "__main__":
         resDF.index = dataDF.index
         modelsSrs = resDF['model'].copy()
         resDF.drop(columns='model', inplace=True)
-        modelColumnNames.remove('model')
-        modelColumnNames.append('model_index')
+        modelStatsNames.remove('model')
+        modelStatsNames.append('model_index')
         resDF.loc[:, 'model_index'] = range(resDF.shape[0])
-        # pdb.set_trace()
         for idx, metaIdx in enumerate(modelsSrs.index):
             modelResult = modelsSrs[metaIdx]
             thisPath = os.path.join(
@@ -670,27 +728,30 @@ if __name__ == "__main__":
                 prefix + '_{}_{}_lmfit_{}.sav'.format(
                     arguments['inputBlockSuffix'], arguments['window'], idx))
             save_modelresult(modelResult, thisPath)
-        resDF.set_index(modelColumnNames, inplace=True, append=True)
+        resDF.set_index(modelParamNames + modelStatsNames, inplace=True, append=True)
         resDF.to_hdf(resultPath, 'lmfit_lfp')
-        # pdb.set_trace()
         presentNames = [cn for cn in resDF.index.names if cn in dataDF.index.names]
         meansDF = dataDF.groupby(presentNames).mean()
         meansDF.to_hdf(resultPath, 'lfp')
     else:
+        modelStatsNames.remove('model')
+        modelStatsNames.append('model_index')
         resDF = pd.read_hdf(resultPath, 'lmfit_lfp')
         meansDF = pd.read_hdf(resultPath, 'lfp')
-    modelParams = resDF.index.to_frame().reset_index(drop=True)
+    #########################################################################
+    modelParams = resDF.index.to_frame()  #.reset_index(drop=True)
     allIdxNames = resDF.index.names
     modelIndex = pd.Series(
         resDF.index.get_level_values('model_index'),
         index=resDF.index)
     resDF = resDF.droplevel([cn for cn in allIdxNames if cn not in groupBy])
+    modelParams = modelParams.droplevel([cn for cn in allIdxNames if cn not in groupBy])
     modelIndex = modelIndex.droplevel([cn for cn in allIdxNames if cn not in groupBy])
-    resDF.columns = resDF.columns.astype(np.float) / 1e3 + funKWArgs.pop('tOffset', 0)
     allIdxNames = meansDF.index.names
     meansDF = meansDF.droplevel([cn for cn in allIdxNames if cn not in groupBy])
-    # pdb.set_trace()
+    resDF.columns = resDF.columns.astype(np.float) / 1e3 + funKWArgs.pop('tOffset', 0)
     compsDict = {}
+    paramsCI = pd.DataFrame(np.nan, index=modelParams.index, columns=modelParamNames)
     for rowIdx, row in resDF.iterrows():
         thisMIdx = modelIndex.loc[rowIdx]
         modelPath = thisPath = os.path.join(
@@ -698,12 +759,33 @@ if __name__ == "__main__":
             prefix + '_{}_{}_lmfit_{}.sav'.format(
                 arguments['inputBlockSuffix'], arguments['window'], thisMIdx))
         model = load_modelresult(modelPath)
+        if hasattr(model, 'ci_out'):
+            ciDF = pd.DataFrame(model.ci_out)
+            for pName in ciDF.columns:
+                paramsCI.loc[rowIdx, pName] = ciDF.loc[5, pName][1] - ciDF.loc[1, pName][1]
         comps = model.eval_components(x=(resDF.columns * 1e3).to_numpy(dtype=np.float))
         for key, value in comps.items():
             if key not in compsDict:
                 compsDict[key] = [value]
             else:
                 compsDict[key].append(value)
+    relativeCI = (paramsCI / modelParams).loc[:, modelParamNames]
+    modelParams = modelParams.loc[:, modelParamNames]
+    meanParams = modelParams.groupby(['electrode', arguments['amplitudeFieldName'], 'feature']).mean() * np.nan
+    for name, group in modelParams.groupby(['electrode', arguments['amplitudeFieldName'], 'feature']):
+        for pref in ['n1_', 'n2_', 'p1_', 'p2_', 'p3_', 'p4_']:
+            prefMask = group.columns.str.startswith(pref)
+            subGroup = group.loc[:, prefMask].reset_index(drop=True)
+            subGroupCI = relativeCI.loc[group.index, prefMask].reset_index(drop=True)
+            goodFitMask = (subGroupCI[pref + 'amplitude'].abs() < 1).to_numpy()
+            subGroupMean = subGroup.loc[goodFitMask, :].mean()
+            if np.isnan(subGroupMean[pref + 'amplitude']):
+                subGroupMean.loc[pref + 'amplitude'] = 0
+            meanParams.loc[name, subGroupMean.index] = subGroupMean
+    meanParams.loc[:, 'N1P2'] = meanParams['p2_amplitude'] - meanParams['n1_amplitude']
+    meanParams.loc[meanParams['N1P2'] == 0, 'N1P2'] = np.nan
+    meanParams = meanParams.reset_index()
+    # resDF = resDF.reset_index(drop=True)
     concatComps = {}
     for key, value in compsDict.items():
         concatComps[key] = pd.DataFrame(
@@ -733,11 +815,8 @@ if __name__ == "__main__":
     if not os.path.exists(alignedFeaturesFolder):
         os.makedirs(alignedFeaturesFolder, exist_ok=True)
     relplotKWArgs.pop('palette', None)
-    # pdb.set_trace()
     plotDF.drop(index=plotDF.index[plotDF['columnLabel'] == 'NA'], inplace=True)
-    ##########
-    
-    meanParams = modelParams.groupby(['electrode', arguments['amplitudeFieldName'], 'feature']).mean().reset_index()
+    #
     stimConfigLookup, elecChanNames = prb_meta.parseElecComboName(meanParams['electrode'].unique())
     rippleMapDF = prb_meta.mapToDF(rippleMapFile[int(arguments['blockIdx'])])
     rippleMapDF.loc[
@@ -754,7 +833,6 @@ if __name__ == "__main__":
     xIdx, yIdx = ssplt.coordsToIndices(
         rippleMapDF['xcoords'], rippleMapDF['ycoords'])
     #
-    meanParams.loc[:, 'N1P2'] = meanParams['p2_amplitude'] - meanParams['n1_amplitude']
     paramMetaData = {
         'N1P2': {
             'units': 'uV',
@@ -793,14 +871,14 @@ if __name__ == "__main__":
     maxY = meanParams['yCoords'].max()
     def cTransform(absV, minV, maxV, vSize):
         return (absV - minV) / (maxV - minV) * vSize
-    #
+    # plot heatmaps
     with PdfPages(pdfPath) as pdf:
         for name, group in tqdm(meanParams.groupby(['electrode', arguments['amplitudeFieldName']])):
             for pName, plotMeta in paramMetaData.items():
                 fig, ax = plt.subplots()
                 fig.set_size_inches(8, 24)
                 data = group.loc[:, ['xCoords', 'yCoords', pName]]
-                data.loc[group['r2'] < 0.9, pName] = np.nan
+                # data.loc[group['r2'] < 0.9, pName] = np.nan
                 dataSquare = data.pivot('yCoords', 'xCoords', pName)
                 anns = group.loc[:, ['xCoords', 'yCoords', 'feature']]
                 annsSquare = anns.pivot('yCoords', 'xCoords', 'feature')
@@ -829,9 +907,7 @@ if __name__ == "__main__":
                 pdf.savefig()
                 plt.close()
                 # plt.show()
-    # pdb.set_trace()
     ###########################
-    
     pdfPath = os.path.join(
         alignedFeaturesFolder,
         prefix + '_{}_{}_lmfit_15_msec.pdf'.format(
