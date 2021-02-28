@@ -288,10 +288,10 @@ def getExpOpts():
         scoreBounds=[.9e-3, 8e-3],
         #
         slowExpTBounds=[9e-3, 95e-3],
-        medExpTBounds=[.9e-3, 19e-3],
+        medExpTBounds=[2e-3, 19e-3],
         fastExpTBounds=[.9e-3, 2e-3],
         iterMethod='sampleOneManyTimes',
         plotting=False, verbose=False,
-        maxIter=20
+        maxIter=2
         )
     return locals()

@@ -141,9 +141,9 @@ daskOpts = dict(
     daskResultMeta=None, daskComputeOpts=daskComputeOpts,
     reindexFromInput=False)
 
-useCachedResult = True
+useCachedResult = False
 
-DEBUGGING = False
+DEBUGGING = True
 if DEBUGGING:
     daskOpts['daskProgBar'] = False
     daskOpts['daskComputeOpts']['scheduler'] = 'single-threaded'
@@ -179,13 +179,13 @@ expPars.update(exp2.make_params())
 expPars.update(exp3.make_params())
 #
 expPars['exp1_amplitude'].set(value=1)
-expPars['exp1_decay'].set(value=250., min=10., max=500.)
+expPars['exp1_decay'].set(min=30., value=250., max=500.)
 #
 expPars['exp2_amplitude'].set(value=1)
-expPars['exp2_decay'].set(value=10., min=.1, max=20.)
+expPars['exp2_decay'].set(min=2., value=10., max=20.)
 #
 expPars['exp3_amplitude'].set(value=1)
-expPars['exp3_decay'].set(value=.1, min=.05, max=.5)
+expPars['exp3_decay'].set(min=.05, value=.1, max=.5)
 #
 gaussPars = p1.make_params()
 gaussPars.update(n1.make_params())
@@ -223,16 +223,17 @@ dependentParamNames = [
     'n2_center', 'p4_center'
     ]
 
-modelColumnNames = ['p4_amplitude', 'p4_center', 'p4_sigma', 'n2_amplitude', 'n2_center',
-       'n2_sigma', 'p3_amplitude', 'p3_center', 'p3_sigma', 'p2_amplitude',
-       'p2_center', 'p2_sigma', 'n1_amplitude', 'n1_center', 'n1_sigma',
-       'p1_amplitude', 'p1_center', 'p1_sigma', 'exp3_amplitude', 'exp3_decay',
-       'exp2_amplitude', 'exp2_decay', 'exp1_amplitude', 'exp1_decay',
-       'chisqr', 'r2', 'model']
+modelColumnNames = [
+    'p4_amplitude', 'p4_center', 'p4_sigma', 'n2_amplitude', 'n2_center',
+    'n2_sigma', 'p3_amplitude', 'p3_center', 'p3_sigma', 'p2_amplitude',
+    'p2_center', 'p2_sigma', 'n1_amplitude', 'n1_center', 'n1_sigma',
+    'p1_amplitude', 'p1_center', 'p1_sigma', 'exp3_amplitude', 'exp3_decay',
+    'exp2_amplitude', 'exp2_decay', 'exp1_amplitude', 'exp1_decay',
+    'chisqr', 'r2', 'model']
 
 def applyModel(
         x, y,
-        method='nelder', scoreBounds=None,
+        method='least_squares', scoreBounds=None,
         slowExpTBounds=None, medExpTBounds=None, fastExpTBounds=None,
         verbose=True, plotting=False):
     #
@@ -408,7 +409,8 @@ def applyModel(
             pName = '{}_amplitude'.format(pref)
             maxAmp = min(intermed_iqr, absMaxPotential)
             fullPars[pName].set(
-                value=.1 * maxAmp,  # vary=False,
+                # value=.1 * maxAmp,  # vary=False,
+                value=0,
                 min=1e-3 * maxAmp, max=maxAmp
                 )
         # negatives
@@ -416,7 +418,8 @@ def applyModel(
             pName = '{}_amplitude'.format(pref)
             maxAmp = min(intermed_iqr, absMaxPotential)
             fullPars[pName].set(
-                value=-.1 * maxAmp,
+                value=0,
+                # value=-.1 * maxAmp,
                 max=-1e-3 * maxAmp,
                 min=-maxAmp
                 )
@@ -560,7 +563,10 @@ def shapeFit(
     bestIdx = prelimParams['r2'].argmax()
     resultDF = pd.concat([prelimDF, prelimParams], axis='columns').loc[bestIdx, :].to_frame().T
     resultDF.index = [group.index[0]]
-    resultDF.loc[group.index[0], 'model'] = outList['model'][bestIdx]
+    bestModel = outList['model'][bestIdx]
+    if bestModel is not None:
+        bestModel.conf_interval()
+    resultDF.loc[group.index[0], 'model'] = bestModel
     if (not (groupData == 1).all(axis=None)) and plotting:
         plt.show()
     print('\n\n#######################')
@@ -645,7 +651,7 @@ if __name__ == "__main__":
             fun=shapeFit, resultPath=resultPath,
             funArgs=[], funKWArgs=funKWArgs,
             rowKeys=groupBy, colKeys=testVar, **daskOpts)
-        # pdb.set_trace()
+        pdb.set_trace()
         if not (useCachedResult and os.path.exists(resultPath)):
             if os.path.exists(resultPath):
                 shutil.rmtree(resultFolder)
@@ -828,13 +834,13 @@ if __name__ == "__main__":
     
     pdfPath = os.path.join(
         alignedFeaturesFolder,
-        prefix + '_{}_{}_lmfit.pdf'.format(
+        prefix + '_{}_{}_lmfit_15_msec.pdf'.format(
             arguments['inputBlockSuffix'], arguments['window']))
     with PdfPages(pdfPath) as pdf:
         for name, group in tqdm(plotDF.groupby('feature')):
             g = sns.relplot(
-                data=group,
-                # data=group.query('bin < 3e-3'),
+                # data=group,
+                data=group.query('bin < 15e-3'),
                 x='bin', y='signal',
                 hue='regrID',
                 row='rowLabel', col='columnLabel',
@@ -844,4 +850,5 @@ if __name__ == "__main__":
             pdf.savefig()
             plt.close()
             # plt.show()
+    pdb.set_trace()
     
