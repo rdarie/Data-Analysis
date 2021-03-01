@@ -287,11 +287,22 @@ def getExpOpts():
         tBounds=[.9e-3, 95e-3],
         scoreBounds=[.9e-3, 8e-3],
         #
-        slowExpTBounds=[9e-3, 95e-3],
-        medExpTBounds=[2e-3, 19e-3],
-        fastExpTBounds=[.9e-3, 2e-3],
+        expOpts=dict(
+            exp1_=dict(
+                tBounds=[9e-3, 95e-3],
+                assessModel=False
+            ),
+            exp2_=dict(
+                tBounds=[2e-3, 19e-3],
+                assessModel=False
+            ),
+            exp3_=dict(
+                tBounds=[.9e-3, 1.6e-3],
+                assessModel=False
+            )
+        ),
         iterMethod='sampleOneManyTimes',
         plotting=False, verbose=False,
-        maxIter=2
+        maxIter=1
         )
     return locals()

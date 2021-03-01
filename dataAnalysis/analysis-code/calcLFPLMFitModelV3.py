@@ -129,7 +129,7 @@ alignedAsigsKWargs['outlierTrials'] = ash.processOutlierTrials(
 
 from lmfit.models import ExponentialModel, GaussianModel, ConstantModel
 from lmfit import Model, CompositeModel, Parameters
-from lmfit.model import save_modelresult, load_modelresult
+from lmfit.model import save_modelresult, load_modelresult, ModelResult
 # np.random.seed(0)
 
 funKWArgs = lmfitFunKWArgs
@@ -159,42 +159,39 @@ if DEBUGGING:
 def gaussian(x, amplitude, center, sigma):
     return amplitude * np.exp(-(x-center)**2 / (2 * sigma ** 2))
 
-
-# exp1 = Model(offsetExponential, prefix='exp1_')
-# exp2 = Model(offsetExponential, prefix='exp2_')
-exp1 = ExponentialModel(prefix='exp1_')
-exp2 = ExponentialModel(prefix='exp2_')
-exp3 = ExponentialModel(prefix='exp3_')
+expPrefixes = ['exp1_', 'exp2_', 'exp3_']
+gaussPrefixes = ['p1_', 'n1_', 'p2_', 'p3_', 'n2_', 'p4_']
+modelPrefixes = expPrefixes + gaussPrefixes
 #
-p1 = Model(gaussian, prefix='p1_')
-n1 = Model(gaussian, prefix='n1_')
-p2 = Model(gaussian, prefix='p2_')
-p3 = Model(gaussian, prefix='p3_')
-n2 = Model(gaussian, prefix='n2_')
-p4 = Model(gaussian, prefix='p4_')
-exp_mod = exp1 + exp2 + exp3
-gauss_mod = p1 + n1 + p2 + p3 + n2 + p4
+modelParamNames = [
+    'p4_amplitude', 'p4_center', 'p4_sigma', 'n2_amplitude', 'n2_center',
+    'n2_sigma', 'p3_amplitude', 'p3_center', 'p3_sigma', 'p2_amplitude',
+    'p2_center', 'p2_sigma', 'n1_amplitude', 'n1_center', 'n1_sigma',
+    'p1_amplitude', 'p1_center', 'p1_sigma', 'exp3_amplitude', 'exp3_decay',
+    'exp2_amplitude', 'exp2_decay', 'exp1_amplitude', 'exp1_decay']
+modelStatsNames = ['chisqr', 'r2', 'model']
+
+expMs = {pref: ExponentialModel(prefix=pref) for pref in expPrefixes}
+gaussMs = {pref: Model(gaussian, prefix=pref) for pref in gaussPrefixes}
+exp_mod = expMs['exp1_'] + expMs['exp2_'] + expMs['exp3_']
+gauss_mod = gaussMs['p1_'] + gaussMs['n1_'] + gaussMs['p2_'] + gaussMs['p3_'] + gaussMs['n2_'] + gaussMs['p4_']
 full_mod = exp_mod + gauss_mod
 #
-expPars = exp1.make_params()
-expPars.update(exp2.make_params())
-expPars.update(exp3.make_params())
+expPars = Parameters()
+for pref, mod in expMs.items():
+    expPars.update(mod.make_params())
+gaussPars = Parameters()
+for pref, mod in gaussMs.items():
+    gaussPars.update(mod.make_params())
 #
-expPars['exp1_amplitude'].set(value=1)
+expPars['exp1_amplitude'].set(value=0)
 expPars['exp1_decay'].set(min=30., value=250., max=500.)
 #
-expPars['exp2_amplitude'].set(value=1)
+expPars['exp2_amplitude'].set(value=0)
 expPars['exp2_decay'].set(min=2., value=10., max=20.)
 #
-expPars['exp3_amplitude'].set(value=1)
-expPars['exp3_decay'].set(min=.05, value=.1, max=.5)
-#
-gaussPars = p1.make_params()
-gaussPars.update(n1.make_params())
-gaussPars.update(p2.make_params())
-gaussPars.update(p3.make_params())
-gaussPars.update(n2.make_params())
-gaussPars.update(p4.make_params())
+expPars['exp3_amplitude'].set(value=0)
+expPars['exp3_decay'].set(min=.05, value=.1, max=.4)
 #
 gaussPars.add(
     name='n1_offset',
@@ -219,27 +216,11 @@ absMaxPotential = 1e3 # uV
 pars = expPars.copy()
 pars.update(gaussPars)
 
-dependentParamNames = [
-    'n1_center', 'p1_center',
-    'p2_center', 'p3_center',
-    'n2_center', 'p4_center'
-    ]
-
-modelPrefixes = ['exp1_', 'exp2_', 'exp3_', 'p1_', 'n1_', 'p2_', 'p3_', 'n2_', 'p4_']
-modelParamNames = [
-    'p4_amplitude', 'p4_center', 'p4_sigma', 'n2_amplitude', 'n2_center',
-    'n2_sigma', 'p3_amplitude', 'p3_center', 'p3_sigma', 'p2_amplitude',
-    'p2_center', 'p2_sigma', 'n1_amplitude', 'n1_center', 'n1_sigma',
-    'p1_amplitude', 'p1_center', 'p1_sigma', 'exp3_amplitude', 'exp3_decay',
-    'exp2_amplitude', 'exp2_decay', 'exp1_amplitude', 'exp1_decay']
-modelStatsNames = ['chisqr', 'r2', 'model']
-
 
 def applyModel(
         x, y,
         method='least_squares', scoreBounds=None,
-        slowExpTBounds=None, medExpTBounds=None, fastExpTBounds=None,
-        assessSlow=False, assessMed=False, assessFast=False,
+        expOpts=None,
         verbose=True, plotting=False):
     #
     fullPars = pars.copy()
@@ -255,218 +236,91 @@ def applyModel(
     #  Slow exp fitting
     #
     ################################################
-    if slowExpTBounds is not None:
-        exp_tStart = slowExpTBounds[0] if slowExpTBounds[0] is not None else x[0]
-        exp_tStop = slowExpTBounds[1] if slowExpTBounds[1] is not None else x[-1] + 1
-        exp_xMask = (x >= (1e3 * exp_tStart)) & (x < (1e3 * exp_tStop))
-        exp_x = x[exp_xMask]
-        exp_y = y[exp_xMask]
-    else:
-        exp_x = x
-        exp_y = y
-    expGuess = exp1.guess(exp_y, x=exp_x)
-    signGuess = np.sign(np.nanmean(exp_y, axis=None))
-    ampGuess = signGuess * expGuess['exp1_amplitude'].value
-    decayGuess = np.clip(expGuess['exp1_decay'].value, fullPars['exp1_decay'].min, fullPars['exp1_decay'].max)
-    #
-    if ampGuess == 0:
-        return dummy, dummyAnns, None
-    #
-    try:
-        tempPars = exp1.make_params()
-        if ampGuess > 0:
-            tempPars['exp1_amplitude'].set(value=ampGuess, max=3 * ampGuess, min=1e-3 * ampGuess)
+    y_resid = y
+    for pref, thisExpMod in expMs.items():
+        theseExpOpts = expOpts.copy().pop(pref, dict())
+        expTBounds = theseExpOpts.pop('tBounds', None)
+        if expTBounds is not None:
+            exp_tStart = expTBounds[0] if expTBounds[0] is not None else x[0]
+            exp_tStop = expTBounds[1] if expTBounds[1] is not None else x[-1] + 1
+            exp_xMask = (x >= (1e3 * exp_tStart)) & (x < (1e3 * exp_tStop))
+            exp_x = x[exp_xMask]
+            exp_y = y_resid[exp_xMask]
         else:
-            tempPars['exp1_amplitude'].set(value=ampGuess, max=1e-3 * ampGuess, min=3 * ampGuess)
+            exp_x = x
+            exp_y = y_resid
+        expGuess = thisExpMod.guess(exp_y, x=exp_x)
+        signGuess = np.sign(np.nanmean(exp_y, axis=None))
+        ampGuess = signGuess * expGuess['{}amplitude'.format(pref)].value
+        decayGuess = np.clip(
+            expGuess['{}decay'.format(pref)].value,
+            fullPars['{}decay'.format(pref)].min,
+            fullPars['{}decay'.format(pref)].max)
         #
-        tempPars['exp1_decay'].set(
-            value=decayGuess,
-            min=fullPars['exp1_decay'].min,
-            max=fullPars['exp1_decay'].max
-            )
-        ###
-        exp_out = exp1.fit(exp_y, tempPars, x=exp_x, method=method)
-        if assessSlow:
-            try:
-                exp_out.conf_interval()
-                ciDF = pd.DataFrame(exp_out.ci_out)
-                paramsCI = {}
+        if ampGuess == 0:
+            return dummy, dummyAnns, None
+        #
+        try:
+            tempPars = thisExpMod.make_params()
+            if ampGuess > 0:
+                tempPars['{}amplitude'.format(pref)].set(
+                    value=ampGuess, max=3 * ampGuess, min=1e-3 * ampGuess)
+            else:
+                tempPars['{}amplitude'.format(pref)].set(
+                    value=ampGuess, max=1e-3 * ampGuess, min=3 * ampGuess)
+            #
+            tempPars['{}decay'.format(pref)].set(
+                value=decayGuess,
+                min=fullPars['{}decay'.format(pref)].min,
+                max=fullPars['{}decay'.format(pref)].max
+                )
+            ###
+            exp_out = thisExpMod.fit(exp_y, tempPars, x=exp_x, method=method)
+            assessThisModel = theseExpOpts.pop('assessModel', False)
+            if assessThisModel:
+                try:
+                    exp_out.conf_interval()
+                    ciDF = pd.DataFrame(exp_out.ci_out)
+                    paramsCI = {}
+                    modelFitsWellEnough = True
+                    for pName in ciDF.columns:
+                        paramsCI[pName] = (
+                            ciDF.loc[5, pName][1] - ciDF.loc[1, pName][1]) / exp_out.best_values[pName]
+                        if paramsCI[pName] > 1:
+                            modelFitsWellEnough = False
+                except Exception:
+                    traceback.print_exc()
+                    modelFitsWellEnough = False
+            else:
                 modelFitsWellEnough = True
-                for pName in ciDF.columns:
-                    paramsCI[pName] = (ciDF.loc[5, pName][1] - ciDF.loc[1, pName][1]) / exp_out.best_values[pName]
-                    if paramsCI[pName] > 1:
-                        # print('exponential param {} has relative CI {}! discarding...'.format(pName, paramsCI[pName]))
-                        modelFitsWellEnough = False
-            except Exception:
-                traceback.print_exc()
-                modelFitsWellEnough = False
-        else:
-            modelFitsWellEnough = True
-        #
-        if modelFitsWellEnough:
-            fullPars['exp1_amplitude'].set(value=exp_out.best_values['exp1_amplitude'], vary=False)
-            fullPars['exp1_decay'].set(value=exp_out.best_values['exp1_decay'], vary=False)
-        else:
-            print(exp_out.ci_report())
-            fullPars['exp1_amplitude'].set(value=0, vary=False)
-            fullPars['exp1_decay'].set(value=fullPars['exp1_decay'].max, vary=False)
-        #
-        print('####')
-        if verbose:
-            print(fullPars['exp1_amplitude'])
-            print(fullPars['exp1_decay'])
-        print('####')
-        #
-        intermed_y = y - exp_out.eval(fullPars, x=x)
-        if verbose:
-            print(exp_out.fit_report())
-        intermed_stats = np.percentile(intermed_y, q=[1, 99])
-        intermed_iqr = intermed_stats[1] - intermed_stats[0]
-    except Exception:
-        traceback.print_exc()
-        return dummy, dummyAnns, None
-    ################################################
-    #
-    # medium scale exp fitting
-    #
-    ################################################
-    if medExpTBounds is not None:
-        exp2_tStart = medExpTBounds[0] if medExpTBounds[0] is not None else x[0]
-        exp2_tStop = medExpTBounds[1] if medExpTBounds[1] is not None else x[-1] + 1
-        exp2_xMask = (x >= (1e3 * exp2_tStart)) & (x < (1e3 * exp2_tStop))
-        #
-        exp2_x = x[exp2_xMask]
-        exp2_y = intermed_y[exp2_xMask]
-    else:
-        exp2_x = x
-        exp2_y = intermed_y
-    expGuess = exp2.guess(exp2_y, x=exp2_x)
-    signGuess = np.sign(np.nanmean(exp2_y, axis=None))
-    ampGuess = signGuess * expGuess['exp2_amplitude'].value
-    decayGuess = np.clip(expGuess['exp2_decay'].value, fullPars['exp2_decay'].min, fullPars['exp2_decay'].max)
-    try:
-        tempPars = exp2.make_params()
-        if ampGuess > 0:
-            tempPars['exp2_amplitude'].set(value=ampGuess, max=3 * ampGuess, min=1e-3 * ampGuess)
-        else:
-            tempPars['exp2_amplitude'].set(value=ampGuess, max=1e-3 * ampGuess, min=3 * ampGuess)
-        #
-        tempPars['exp2_decay'].set(
-            value=decayGuess,
-            min=fullPars['exp2_decay'].min,
-            max=fullPars['exp2_decay'].max)
-        ###
-        exp_out = exp2.fit(exp2_y, tempPars, x=exp2_x, method=method)
-        if assessMed:
-            try:
-                exp_out.conf_interval()
-                ciDF = pd.DataFrame(exp_out.ci_out)
-                paramsCI = {}
-                modelFitsWellEnough = True
-                for pName in ciDF.columns:
-                    paramsCI[pName] = (ciDF.loc[5, pName][1] - ciDF.loc[1, pName][1]) / exp_out.best_values[pName]
-                    if paramsCI[pName] > 1:
-                        # print('exponential param {} has relative CI {}! discarding...'.format(pName, paramsCI[pName]))
-                        modelFitsWellEnough = False
-            except Exception:
-                traceback.print_exc()
-                modelFitsWellEnough = False
-        else:
-            modelFitsWellEnough = True
-        #
-        if modelFitsWellEnough:
-            fullPars['exp2_amplitude'].set(value=exp_out.best_values['exp2_amplitude'], vary=False)
-            fullPars['exp2_decay'].set(value=exp_out.best_values['exp2_decay'], vary=False)
-        else:
-            print(exp_out.ci_report())
-            fullPars['exp2_amplitude'].set(value=0, vary=False)
-            fullPars['exp2_decay'].set(value=fullPars['exp2_decay'].max, vary=False)
-        #
-        print('####')
-        if verbose:
-            print(fullPars['exp2_amplitude'])
-            print(fullPars['exp2_decay'])
-        print('####')
-        #
-        intermed_y = intermed_y - exp_out.eval(fullPars, x=x)
-        if verbose:
-            print(exp_out.fit_report())
-        intermed_stats = np.percentile(intermed_y, q=[1, 99])
-        intermed_iqr = intermed_stats[1] - intermed_stats[0]
-    except Exception:
-        traceback.print_exc()
-        return dummy, dummyAnns, None
-    ################################################
-    #
-    # super fast exp fitting
-    #
-    ################################################
-    if fastExpTBounds is not None:
-        exp3_tStart = fastExpTBounds[0] if fastExpTBounds[0] is not None else x[0]
-        exp3_tStop = fastExpTBounds[1] if fastExpTBounds[1] is not None else x[-1] + 1
-        exp3_xMask = (x >= (1e3 * exp3_tStart)) & (x < (1e3 * exp3_tStop))
-        #
-        exp3_x = x[exp3_xMask]
-        exp3_y = intermed_y[exp3_xMask]
-    else:
-        exp3_x = x
-        exp3_y = intermed_y
-    expGuess = exp3.guess(exp3_y, x=exp3_x)
-    signGuess = np.sign(np.nanmean(exp3_y, axis=None))
-    ampGuess = signGuess * expGuess['exp3_amplitude'].value
-    decayGuess = np.clip(expGuess['exp3_decay'].value, fullPars['exp3_decay'].min, fullPars['exp3_decay'].max)
-    try:
-        tempPars = exp3.make_params()
-        if ampGuess > 0:
-            tempPars['exp3_amplitude'].set(value=ampGuess, max=3 * ampGuess, min=1e-3 * ampGuess)
-        else:
-            tempPars['exp3_amplitude'].set(value=ampGuess, max=1e-3 * ampGuess, min=3 * ampGuess)
-        #
-        tempPars['exp3_decay'].set(
-            value=decayGuess,
-            min=fullPars['exp3_decay'].min,
-            max=fullPars['exp3_decay'].max)
-        ###
-        exp_out = exp3.fit(exp3_y, tempPars, x=exp3_x, method=method)
-        if assessFast:
-            try:
-                exp_out.conf_interval()
-                ciDF = pd.DataFrame(exp_out.ci_out)
-                paramsCI = {}
-                modelFitsWellEnough = True
-                for pName in ciDF.columns:
-                    paramsCI[pName] = (ciDF.loc[5, pName][1] - ciDF.loc[1, pName][1]) / exp_out.best_values[pName]
-                    if paramsCI[pName] > 1:
-                        # print('exponential param {} has relative CI {}! discarding...'.format(pName, paramsCI[pName]))
-                        modelFitsWellEnough = False
-            except Exception:
-                traceback.print_exc()
-                modelFitsWellEnough = False
-        else:
-            modelFitsWellEnough = True
-        #
-        if modelFitsWellEnough:
-            fullPars['exp3_amplitude'].set(value=exp_out.best_values['exp3_amplitude'], vary=False)
-            fullPars['exp3_decay'].set(value=exp_out.best_values['exp3_decay'], vary=False)
-        else:
-            print(exp_out.ci_report())
-            fullPars['exp3_amplitude'].set(value=0, vary=False)
-            fullPars['exp3_decay'].set(value=fullPars['exp3_decay'].max, vary=False)
-        #
-        print('####')
-        if verbose:
-            print(fullPars['exp3_amplitude'])
-            print(fullPars['exp3_decay'])
-        print('####')
-        #
-        intermed_y = intermed_y - exp_out.eval(fullPars, x=x)
-        if verbose:
-            print(exp_out.fit_report())
-        intermed_stats = np.percentile(intermed_y, q=[1, 99])
-        intermed_iqr = intermed_stats[1] - intermed_stats[0]
-    except Exception:
-        traceback.print_exc()
-        return dummy, dummyAnns, None
+            #
+            if modelFitsWellEnough:
+                fullPars['{}amplitude'.format(pref)].set(
+                    value=exp_out.best_values['{}amplitude'.format(pref)],
+                    vary=False)
+                fullPars['{}decay'.format(pref)].set(
+                    value=exp_out.best_values['{}decay'.format(pref)],
+                    vary=False)
+            else:
+                print(exp_out.ci_report())
+                fullPars['{}amplitude'.format(pref)].set(value=0, vary=False)
+                fullPars['{}decay'.format(pref)].set(
+                    value=fullPars['{}decay'.format(pref)].max, vary=False)
+            #
+            print('####')
+            if verbose:
+                print(fullPars['{}amplitude'.format(pref)])
+                print(fullPars['{}decay'.format(pref)])
+            print('####')
+            #
+            y_resid = y_resid - exp_out.eval(fullPars, x=x)
+            if verbose:
+                print(exp_out.fit_report())
+            intermed_stats = np.percentile(y_resid, q=[1, 99])
+            intermed_iqr = intermed_stats[1] - intermed_stats[0]
+        except Exception:
+            traceback.print_exc()
+            return dummy, dummyAnns, None
     ################################################
     #
     # gaussian fitting
@@ -474,8 +328,8 @@ def applyModel(
     ################################################
     try:
         # Randomize std dev
-        for pref in ['n1', 'p1', 'p2', 'p3', 'n2', 'p4']:
-            pName = '{}_sigma'.format(pref)
+        for pref in ['n1_', 'p1_', 'p2_', 'p3_', 'n2_', 'p4_']:
+            pName = '{}sigma'.format(pref)
             fullPars[pName].set(
                 value=np.random.uniform(
                     fullPars[pName].min,
@@ -486,8 +340,8 @@ def applyModel(
                 fullPars['n1_offset'].min, fullPars['n1_offset'].max
                 ))
         # positives
-        for pref in ['p1', 'p2', 'p3', 'p4']:
-            pName = '{}_amplitude'.format(pref)
+        for pref in ['p1_', 'p2_', 'p3_', 'p4_']:
+            pName = '{}amplitude'.format(pref)
             maxAmp = min(intermed_iqr, absMaxPotential)
             fullPars[pName].set(
                 # value=.1 * maxAmp,  # vary=False,
@@ -495,8 +349,8 @@ def applyModel(
                 min=1e-3 * maxAmp, max=maxAmp
                 )
         # negatives
-        for pref in ['n1', 'n2']:
-            pName = '{}_amplitude'.format(pref)
+        for pref in ['n1_', 'n2_']:
+            pName = '{}amplitude'.format(pref)
             maxAmp = min(intermed_iqr, absMaxPotential)
             fullPars[pName].set(
                 value=0,
@@ -505,14 +359,12 @@ def applyModel(
                 min=-maxAmp
                 )
         # freeze any?
-        freezeGaussians = ['p1']
-        # freezeGaussians = []
-        # freezeGaussians = ['p1', 'n1', 'p2', 'p3']
+        freezeGaussians = ['p1_']
         if len(freezeGaussians):
             for pref in freezeGaussians:
-                pName = '{}_amplitude'.format(pref)
+                pName = '{}amplitude'.format(pref)
                 fullPars[pName].set(value=0, vary=False)
-                pName = '{}_sigma'.format(pref)
+                pName = '{}sigma'.format(pref)
                 fullPars[pName].set(
                     value=fullPars[pName].min,
                     vary=False)
@@ -566,9 +418,7 @@ def plotLmFit(x, y, init, out, comps, verbose=False):
 
 def shapeFit(
         group, dataColNames=None,
-        tBounds=None, verbose=False, slowExpTBounds=None,
-        fastExpTBounds=None, medExpTBounds=None,
-        assessSlow=False, assessMed=False, assessFast=False,
+        tBounds=None, verbose=False, expOpts=None,
         scoreBounds=None, tOffset=0,
         plotting=False, iterMethod='loo',
         modelFun=None, corrMethod='pearson',
@@ -631,11 +481,7 @@ def shapeFit(
             resultsSrs, resultsParams, mod = modelFun(
                 groupT, testX.iloc[:, maskX].to_numpy().flatten(),
                 scoreBounds=scBnds,
-                slowExpTBounds=slowExpTBounds,
-                fastExpTBounds=fastExpTBounds,
-                medExpTBounds=medExpTBounds,
-                assessSlow=assessSlow, assessMed=assessMed,
-                assessFast=assessFast,
+                expOpts=expOpts,
                 verbose=verbose, plotting=plotting)
             #
             outList['best_fit'].append(resultsSrs)
@@ -647,9 +493,11 @@ def shapeFit(
     resultDF = pd.concat([prelimDF, prelimParams], axis='columns').loc[bestIdx, :].to_frame().T
     resultDF.index = [group.index[0]]
     bestModel = outList['model'][bestIdx]
-    if bestModel is not None:
+    if isinstance(bestModel, ModelResult):
         bestModel.conf_interval()
-    resultDF.loc[group.index[0], 'model'] = bestModel
+        resultDF.loc[group.index[0], 'model'] = bestModel
+    else:
+        resultDF.loc[group.index[0], 'model'] = np.nan
     if (not (groupData == 1).all(axis=None)) and plotting:
         plt.show()
     print('\n\n#######################')
@@ -743,14 +591,14 @@ if __name__ == "__main__":
         meansDF = dataDF.groupby(presentNames).mean()
         meansDF.to_hdf(resultPath, 'lfp')
         for idx, metaIdx in enumerate(modelsSrs.index):
-            modelResult = modelsSrs[metaIdx]
-            if not np.isnan(modelResult):
+            modRes = modelsSrs[metaIdx]
+            if not isinstance(modRes, ModelResult):
                 thisPath = os.path.join(
                     resultFolder,
                     prefix + '_{}_{}_lmfit_{}.sav'.format(
                         arguments['inputBlockSuffix'], arguments['window'], idx))
                 try:
-                    save_modelresult(modelResult, thisPath)
+                    save_modelresult(modRes, thisPath)
                 except Exception:
                     traceback.print_exc()
     else:
@@ -939,28 +787,27 @@ if __name__ == "__main__":
                 plt.close()
                 # plt.show()
     ###########################
-    '''
-    pdfPath = os.path.join(
-        alignedFeaturesFolder,
-        prefix + '_{}_{}_lmfit_3_msec.pdf'.format(
-            arguments['inputBlockSuffix'], arguments['window']))
-    with PdfPages(pdfPath) as pdf:
-        for name, group in tqdm(plotDF.groupby('feature')):
-            g = sns.relplot(
-                # data=group,
-                data=group.query('bin < 3e-3'),
-                x='bin', y='signal',
-                hue='regrID',
-                row='rowLabel', col='columnLabel',
-                facet_kws=dict(sharey=False),
-                **relplotKWArgs)
-            g.fig.suptitle(name)
-            pdf.savefig()
-            plt.close()
-            # plt.show()
-    '''
+    timeScales = ['3', '15', '100']
+    for timeScale in timeScales:
+        pdfPath = os.path.join(
+            alignedFeaturesFolder,
+            prefix + '_{}_{}_lmfit_{}_msec.pdf'.format(
+                arguments['inputBlockSuffix'], arguments['window'], timeScale))
+        with PdfPages(pdfPath) as pdf:
+            for name, group in tqdm(plotDF.groupby('feature')):
+                g = sns.relplot(
+                    # data=group,
+                    data=group.query('bin < {}e-3'.format(timeScale)),
+                    x='bin', y='signal',
+                    hue='regrID',
+                    row='rowLabel', col='columnLabel',
+                    facet_kws=dict(sharey=False),
+                    **relplotKWArgs)
+                g.fig.suptitle(name)
+                pdf.savefig()
+                plt.close()
+                # plt.show()
     # # export model params and confidence intervals
-    # pdb.set_trace()
     outputParams = modelParams.reset_index()
     outputParams.columns = outputParams.columns.astype(np.str)
     resultPath = os.path.join(

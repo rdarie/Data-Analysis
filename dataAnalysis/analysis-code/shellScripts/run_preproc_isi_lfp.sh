@@ -135,7 +135,7 @@ INPUTBLOCKNAME="--inputBlockSuffix=lfp_raw"
 
 # python -u ./makeViewableBlockFromTriggered.py --plotting $INPUTBLOCKNAME $UNITSELECTOR --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS --alignFolderName=stim $OUTLIERMASK
 # python -u ./exportForDeepSpine.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $UNITSELECTOR $INPUTBLOCKNAME 
-python -u ./calcLFPLMFitModelV2.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR $ALIGNQUERY --plotting $OUTLIERMASK
+python -u ./calcLFPLMFitModelV3.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR $ALIGNQUERY --plotting $OUTLIERMASK
 # python -u ./calcTargetNoiseCeiling.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --maskOutlierBlocks $ALIGNQUERY --plotting
 
 # python -u ./loadSheepDeepSpine.py
