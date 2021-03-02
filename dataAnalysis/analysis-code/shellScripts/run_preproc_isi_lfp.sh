@@ -2,12 +2,10 @@
 
 # 06a: Preprocess the NS5 File
 # Request 24 hours of runtime:
-#SBATCH --time=23:00:00
+#SBATCH --time=12:00:00
 
-# Default resources are 1 core with 2.8GB of memory.
-
-# Use more memory (32GB):
-#SBATCH --nodes=32
+#SBATCH --nodes=1
+#SBATCH --ntasks=32
 #SBATCH --mem=64G
 
 # Specify a job name:
@@ -25,6 +23,7 @@
 
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=radu_darie@brown.edu
+#SBATCH --export=OUTDATED_IGNORE=1
 
 # EXP="exp201901070700"
 # EXP="exp201901201200"

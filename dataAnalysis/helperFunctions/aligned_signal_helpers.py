@@ -258,27 +258,6 @@ def splitApplyCombine(
     dataColNames = asigStack.columns.to_list()
     funKWArgs['dataColNames'] = dataColNames
     if useDask:
-        '''
-            tempDF = pd.DataFrame(
-                asigStack.to_numpy(), columns=asigStack.columns)
-            tempDF['groupLabels'] = (
-                asigStack.groupby(rowKeys).ngroup().to_numpy())
-            tempSavePath = os.path.join(
-                os.path.dirname(resultPath), 'temp.parquet')
-            if os.path.exists(tempSavePath):
-                os.remove(tempSavePath)
-            # trick to stash data in parquet compatible form (string columns)
-            tempDF = asigStack.reset_index()
-            stashColDtypes = [type(i) for i in tempDF.columns]
-            tempDF.columns = [str(i) for i in tempDF.columns]
-            tempDF.to_parquet(tempSavePath)
-            del tempDF
-            tempDaskDF = dd.read_parquet(tempSavePath)
-            newColumns = []
-            for oldType, value in zip(stashColDtypes, tempDaskDF.columns):
-                newColumns.append(np.array(value).astype(oldType).item())
-            tempDaskDF.columns = newColumns
-            '''
         tempDaskDF = dd.from_pandas(
             asigStack.reset_index(),
             npartitions=nPartitionMultiplier*multiprocessing.cpu_count())
@@ -293,7 +272,7 @@ def splitApplyCombine(
         if daskPersist:
             resultCollection.persist()
         if daskProgBar:
-            with ProgressBar():
+            with ProgressBar(minimum=10, dt=5):
                 result = resultCollection.compute(**daskComputeOpts)
         else:
             result = resultCollection.compute(**daskComputeOpts)

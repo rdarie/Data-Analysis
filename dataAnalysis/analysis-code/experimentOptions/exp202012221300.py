@@ -284,8 +284,8 @@ def getExpOpts():
             return featName
     
     lmfitFunKWArgs = dict(
-        tBounds=[.9e-3, 95e-3],
-        scoreBounds=[.9e-3, 8e-3],
+        tBounds=[.7e-3, 95e-3],
+        scoreBounds=[1e-3, 6e-3],
         #
         expOpts=dict(
             exp1_=dict(
@@ -297,12 +297,14 @@ def getExpOpts():
                 assessModel=False
             ),
             exp3_=dict(
-                tBounds=[.9e-3, 1.6e-3],
+                tBounds=[.7e-3, 1.5e-3],
                 assessModel=False
             )
         ),
+        # fit_kws=dict(loss='soft_l1'),
+        method='nelder',
         iterMethod='sampleOneManyTimes',
         plotting=False, verbose=False,
-        maxIter=1
+        maxIter=3
         )
     return locals()

@@ -24,7 +24,7 @@ Options:
 ##########################################################
 ##########################################################
 useCachedResult = False
-DEBUGGING = False
+DEBUGGING = True
 SMALLDATASET = True
 ##########################################################
 ##########################################################
@@ -58,7 +58,8 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import seaborn as sns
 import dataAnalysis.plotting.spike_sorting_plots as ssplt
-#
+from copy import copy
+
 sns.set(
     context='poster',
     # context='notebook',
@@ -147,6 +148,7 @@ daskOpts = dict(
 
 
 if DEBUGGING:
+    sns.set(font_scale=.5)
     daskOpts['daskProgBar'] = False
     daskOpts['daskComputeOpts']['scheduler'] = 'single-threaded'
     funKWArgs.update({
@@ -205,12 +207,12 @@ gaussPars['p3_center'].set(expr='p2_center + 2 * p2_sigma + p3_offset + 2 * p3_s
 gaussPars['n2_center'].set(expr='p3_center + 2 * p3_sigma + 2 * n2_sigma')
 gaussPars['p4_center'].set(expr='n2_center + 2 * n2_sigma + 2 * p4_sigma')
 #
-gaussPars['n1_sigma'].set(value=100e-3, min=50e-3, max=150e-3)
-gaussPars['p1_sigma'].set(value=100e-3, min=50e-3, max=150e-3)
-gaussPars['p2_sigma'].set(value=200e-3, min=100e-3, max=300e-3)
-gaussPars['p3_sigma'].set(value=200e-3, min=100e-3, max=300e-3)
-gaussPars['n2_sigma'].set(value=400e-3, min=200e-3, max=600e-3)
-gaussPars['p4_sigma'].set(value=400e-3, min=200e-3, max=1200e-3)
+gaussPars['n1_sigma'].set(min=50e-3, max=500e-3)
+gaussPars['p1_sigma'].set(min=50e-3, max=500e-3)
+gaussPars['p2_sigma'].set(min=50e-3, max=500e-3)
+gaussPars['p3_sigma'].set(min=100e-3, max=1500e-3)
+gaussPars['n2_sigma'].set(min=100e-3, max=1500e-3)
+gaussPars['p4_sigma'].set(min=100e-3, max=1500e-3)
 #
 absMaxPotential = 1e3 # uV
 pars = expPars.copy()
@@ -219,15 +221,29 @@ pars.update(gaussPars)
 
 def applyModel(
         x, y,
-        method='least_squares', scoreBounds=None,
-        expOpts=None,
+        method='nelder', fit_kws={},
+        max_nfev=None, tBounds=None,
+        scoreBounds=None, expOpts=None,
         verbose=True, plotting=False):
     #
+    if tBounds is not None:
+        tStart = tBounds[0] if tBounds[0] is not None else x[0]
+        tStop = tBounds[1] if tBounds[1] is not None else x[-1] + 1
+        xMask = (x >= (1e3 * tStart)) & (x < (1e3 * tStop))
+        fit_x = x[xMask]
+        fit_y = y[xMask]
+    else:
+        fit_x = x
+        fit_y = y
+    if scoreBounds is not None:
+        scoreMaskX = (fit_x >= scoreBounds[0]) & (fit_x < scoreBounds[1])
+    else:
+        scoreMaskX = np.ones_like(fit_x).astype(np.bool)
     fullPars = pars.copy()
     dummy = pd.Series(0, index=x)
     dummyAnns = pd.Series({key: 0 for key in modelParamNames + modelStatsNames})
     #
-    prelim_stats = np.percentile(y, q=[1, 99])
+    prelim_stats = np.percentile(fit_y, q=[1, 99])
     iqr = prelim_stats[1] - prelim_stats[0]
     if iqr == 0:
         return dummy, dummyAnns, None
@@ -236,19 +252,20 @@ def applyModel(
     #  Slow exp fitting
     #
     ################################################
-    y_resid = y
+    y_resid = fit_y
     for pref, thisExpMod in expMs.items():
         theseExpOpts = expOpts.copy().pop(pref, dict())
         expTBounds = theseExpOpts.pop('tBounds', None)
         if expTBounds is not None:
             exp_tStart = expTBounds[0] if expTBounds[0] is not None else x[0]
             exp_tStop = expTBounds[1] if expTBounds[1] is not None else x[-1] + 1
-            exp_xMask = (x >= (1e3 * exp_tStart)) & (x < (1e3 * exp_tStop))
-            exp_x = x[exp_xMask]
+            exp_xMask = (fit_x >= (1e3 * exp_tStart)) & (fit_x < (1e3 * exp_tStop))
+            exp_x = fit_x[exp_xMask]
             exp_y = y_resid[exp_xMask]
         else:
-            exp_x = x
+            exp_x = fit_x
             exp_y = y_resid
+        #
         expGuess = thisExpMod.guess(exp_y, x=exp_x)
         signGuess = np.sign(np.nanmean(exp_y, axis=None))
         ampGuess = signGuess * expGuess['{}amplitude'.format(pref)].value
@@ -275,11 +292,14 @@ def applyModel(
                 max=fullPars['{}decay'.format(pref)].max
                 )
             ###
-            exp_out = thisExpMod.fit(exp_y, tempPars, x=exp_x, method=method)
+            exp_out = thisExpMod.fit(
+                exp_y, tempPars, x=exp_x,
+                method=method,
+                max_nfev=max_nfev, fit_kws=fit_kws)
             assessThisModel = theseExpOpts.pop('assessModel', False)
             if assessThisModel:
                 try:
-                    exp_out.conf_interval()
+                    exp_out.conf_interval() # conf_interval uses leastsq minimizer, need to remove inappropriate keywords
                     ciDF = pd.DataFrame(exp_out.ci_out)
                     paramsCI = {}
                     modelFitsWellEnough = True
@@ -302,18 +322,19 @@ def applyModel(
                     value=exp_out.best_values['{}decay'.format(pref)],
                     vary=False)
             else:
-                print(exp_out.ci_report())
+                if verbose:
+                    print(exp_out.ci_report())
                 fullPars['{}amplitude'.format(pref)].set(value=0, vary=False)
                 fullPars['{}decay'.format(pref)].set(
                     value=fullPars['{}decay'.format(pref)].max, vary=False)
             #
-            print('####')
             if verbose:
+                print('####')
                 print(fullPars['{}amplitude'.format(pref)])
                 print(fullPars['{}decay'.format(pref)])
-            print('####')
+                print('####')
             #
-            y_resid = y_resid - exp_out.eval(fullPars, x=x)
+            y_resid = y_resid - exp_out.eval(fullPars, x=fit_x)
             if verbose:
                 print(exp_out.fit_report())
             intermed_stats = np.percentile(y_resid, q=[1, 99])
@@ -333,7 +354,7 @@ def applyModel(
             fullPars[pName].set(
                 value=np.random.uniform(
                     fullPars[pName].min,
-                    fullPars[pName].max))
+                    4 * fullPars[pName].min))
         # Randomize n1_offset
         fullPars['n1_offset'].set(
             value=np.random.uniform(
@@ -344,48 +365,45 @@ def applyModel(
             pName = '{}amplitude'.format(pref)
             maxAmp = min(intermed_iqr, absMaxPotential)
             fullPars[pName].set(
-                # value=.1 * maxAmp,  # vary=False,
-                value=0,
-                min=1e-3 * maxAmp, max=maxAmp
-                )
+                value=0, min=1e-6 * maxAmp, max=maxAmp)
         # negatives
         for pref in ['n1_', 'n2_']:
             pName = '{}amplitude'.format(pref)
             maxAmp = min(intermed_iqr, absMaxPotential)
             fullPars[pName].set(
-                value=0,
-                # value=-.1 * maxAmp,
-                max=-1e-3 * maxAmp,
-                min=-maxAmp
-                )
+                value=0, max=-1e-6 * maxAmp, min=-maxAmp)
         # freeze any?
-        freezeGaussians = ['p1_']
+        freezeGaussians = ['p1_', 'n1_']
         if len(freezeGaussians):
             for pref in freezeGaussians:
                 pName = '{}amplitude'.format(pref)
                 fullPars[pName].set(value=0, vary=False)
                 pName = '{}sigma'.format(pref)
                 fullPars[pName].set(
-                    value=fullPars[pName].min,
-                    vary=False)
-        init = full_mod.eval(fullPars, x=x)
-        out = full_mod.fit(y, fullPars, x=x, method=method)
-        outSrs = pd.Series(out.best_fit, index=x)
+                    value=fullPars[pName].min, vary=False)
+        out = full_mod.fit(
+            fit_y, fullPars, x=fit_x, method=method,
+            max_nfev=max_nfev, fit_kws=fit_kws)
+        outSrs = pd.Series(full_mod.eval(out.params, x=x), index=x)
         outParams = pd.Series(out.best_values)
-        if scoreBounds is not None:
-            maskX = (x >= scoreBounds[0]) & (x < scoreBounds[1])
-        else:
-            maskX = np.ones_like(x).astype(np.bool)
-        chisqr = ((y[maskX] - out.best_fit[maskX]) ** 2).sum()
-        r2 = 1 - (chisqr / (y[maskX] ** 2).sum())
+        #
+        scoreComps = out.eval_components(x=fit_x[scoreMaskX])
+        bestFit = y_resid[scoreMaskX] ** 0 - 1
+        for cName in gaussPrefixes:
+            bestFit += scoreComps[cName]
+        residuals = (y_resid[scoreMaskX] - bestFit)
+        chisqr = (residuals ** 2).sum()
+        r2 = 1 - (chisqr / (y_resid[scoreMaskX] ** 2).sum())
         outStats = pd.Series(
             {
                 'chisqr': chisqr,
                 'r2': r2})
         if plotting:
-            comps = out.eval_components(x=x)
-            fig, ax = plotLmFit(x, y, init, out, comps, verbose=verbose)
-            ax[1].set_title('R^2 = {}'.format(r2))
+            comps = out.eval_components(x=fit_x)
+            init = full_mod.eval(fullPars, x=fit_x)
+            fig, ax = plotLmFit(fit_x, fit_y, init, out, comps, verbose=verbose)
+            ax[0].set_title('t_0 = {:.3f} msec'.format(1e3 * tBounds[0]))
+            ax[1].set_title('R^2 = {:.3f}'.format(r2))
         return outSrs, pd.concat([outParams, outStats]), out
     except Exception:
         traceback.print_exc()
@@ -417,9 +435,10 @@ def plotLmFit(x, y, init, out, comps, verbose=False):
 
 
 def shapeFit(
-        group, dataColNames=None,
+        group, dataColNames=None, fit_kws={},
+        method='nelder', max_nfev=None,
         tBounds=None, verbose=False, expOpts=None,
-        scoreBounds=None, tOffset=0,
+        scoreBounds=None, tOffset=0, startJitter=.2e-3,
         plotting=False, iterMethod='loo',
         modelFun=None, corrMethod='pearson',
         maxIter=1e6):
@@ -430,12 +449,9 @@ def shapeFit(
     indexColMask = ~group.columns.isin(dataColNames)
     indexCols = group.columns[indexColMask]
     keepIndexCols = indexCols[~indexCols.isin(['segment', 'originalIndex', 't'])]
-    #
-    if tBounds is not None:
-        maskX = (groupData.columns >= tBounds[0]) & (groupData.columns < tBounds[1])
-    else:
-        maskX = np.ones_like(groupData.columns).astype(np.bool)
-    #
+    groupT = groupData.columns.to_numpy(dtype=np.float)
+    if tBounds is None:
+        tBounds = [groupT[0], groupT[-1] + 1]
     nSamp = groupData.shape[0]
     if (not (groupData == 1).all(axis=None)) and plotting:
         fig, ax = plt.subplots()
@@ -446,7 +462,6 @@ def shapeFit(
             horizontalalignment='right', verticalalignment='top',
             transform=ax.transAxes)
         # plt.show()
-    groupT = groupData.columns[maskX].to_numpy(dtype=np.float)
     # convert to msec
     if scoreBounds is not None:
         scBnds = [1e3 * (sb - tOffset) for sb in scoreBounds]
@@ -461,16 +476,7 @@ def shapeFit(
         else:
             maxIter = int(maxIter)
         for idx in range(maxIter):
-            testX = shuffle(groupData, n_samples=nChoose)
-            testXBar = testX.iloc[:, maskX].mean()
-            resultsSrs, resultsParams, mod = modelFun(
-                groupT, testXBar.to_numpy(),
-                scoreBounds=scBnds, slowExpTBounds=slowExpTBounds,
-                verbose=verbose, plotting=plotting)
-            # TODO: return best model too
-            outList['best_fit'].append(resultsSrs)
-            outList['params'].append(resultsParams)
-            outList['model'].append(mod)
+            pass
     elif iterMethod == 'sampleOneManyTimes':
         if maxIter is None:
             maxIter = 5
@@ -478,10 +484,14 @@ def shapeFit(
             maxIter = int(maxIter)
         for idx in range(maxIter):
             testX = shuffle(groupData, n_samples=1)
+            theseTBounds = copy(tBounds)
+            theseTBounds[0] += np.random.uniform(0, startJitter)
             resultsSrs, resultsParams, mod = modelFun(
-                groupT, testX.iloc[:, maskX].to_numpy().flatten(),
-                scoreBounds=scBnds,
-                expOpts=expOpts,
+                groupT, testX.to_numpy().flatten(),
+                tBounds=theseTBounds,
+                scoreBounds=scBnds, fit_kws=fit_kws,
+                expOpts=expOpts, method=method,
+                max_nfev=max_nfev,
                 verbose=verbose, plotting=plotting)
             #
             outList['best_fit'].append(resultsSrs)
@@ -494,7 +504,17 @@ def shapeFit(
     resultDF.index = [group.index[0]]
     bestModel = outList['model'][bestIdx]
     if isinstance(bestModel, ModelResult):
-        bestModel.conf_interval()
+        # try:
+        #     pdb.set_trace()
+        #     kwsStash = bestModel.kws.copy()
+        #     for kw in ['loss']:
+        #         bestModel.kws.pop(kw)
+        #     bestModel.conf_interval()  # conf_interval uses leastsq minimizer, need to remove inappropriate keywords
+        #     bestModel.kws = kwsStash
+        # except Exception:
+        #     traceback.print_exc()
+        #     pdb.set_trace()
+        # pdb.set_trace()
         resultDF.loc[group.index[0], 'model'] = bestModel
     else:
         resultDF.loc[group.index[0], 'model'] = np.nan
@@ -557,18 +577,18 @@ if __name__ == "__main__":
         amps = dataDF.index.get_level_values(arguments['amplitudeFieldName'])
         print('Available rates are {}'.format(np.unique(rates)))
         if SMALLDATASET:
-            dbMask = (
-                # featNames.str.contains('rostralY_e12') &
+            dbIndexMask = (
                 # elecNames.str.contains('caudalZ_e23') &
                 # (featNames.str.contains('caudalY_e11') | featNames.str.contains('rostralY_e11')) &
+                featNames.str.contains('lY_e') &
                 elecNames.str.contains('caudalY_e11') &
                 (rates < funKWArgs['tBounds'][-1] ** (-1)) &
-                (amps < -720)
+                (amps < -600)
                 )
         else:
-            dbMask = (rates < funKWArgs['tBounds'][-1] ** (-1))
-        #
-        dataDF = dataDF.loc[dbMask, :]
+            dbIndexMask = (rates < funKWArgs['tBounds'][-1] ** (-1))
+        dbColMask = (dataDF.columns.astype(np.float) >= funKWArgs['tBounds'][0]) & (dataDF.columns.astype(np.float) < funKWArgs['tBounds'][-1])
+        dataDF = dataDF.loc[dbIndexMask, dbColMask]
         daskClient = Client()
         resDF = ash.splitApplyCombine(
             dataDF,
@@ -592,7 +612,7 @@ if __name__ == "__main__":
         meansDF.to_hdf(resultPath, 'lfp')
         for idx, metaIdx in enumerate(modelsSrs.index):
             modRes = modelsSrs[metaIdx]
-            if not isinstance(modRes, ModelResult):
+            if isinstance(modRes, ModelResult):
                 thisPath = os.path.join(
                     resultFolder,
                     prefix + '_{}_{}_lmfit_{}.sav'.format(
@@ -643,9 +663,9 @@ if __name__ == "__main__":
             filler = resDF.columns.to_numpy() * 0
             for key in modelPrefixes:
                 if key not in compsDict:
-                    compsDict[key] = [value]
+                    compsDict[key] = [filler]
                 else:
-                    compsDict[key].append(value)
+                    compsDict[key].append(filler)
     relativeCI = (paramsCI / modelParams).loc[:, modelParamNames]
     modelParams = modelParams.loc[:, modelParamNames]
     meanParams = modelParams.groupby(['electrode', arguments['amplitudeFieldName'], 'feature']).mean() * np.nan
@@ -660,6 +680,10 @@ if __name__ == "__main__":
                 subGroupMean.loc[pref + 'amplitude'] = 0
             meanParams.loc[name, subGroupMean.index] = subGroupMean
     meanParams.loc[:, 'N1P2'] = meanParams['p2_amplitude'] - meanParams['n1_amplitude']
+    for pref in ['n1_', 'p2_', 'n2_']:
+        meanParams.loc[:, '{}latency'.format(pref)] = (
+            meanParams['{}center'.format(pref)] +
+            3 * meanParams['{}sigma'.format(pref)])
     meanParams.loc[meanParams['N1P2'] == 0, 'N1P2'] = np.nan
     meanParams = meanParams.reset_index()
     # resDF = resDF.reset_index(drop=True)
@@ -717,21 +741,17 @@ if __name__ == "__main__":
             'units': 'uV',
             'label': 'N1-P2 Amplitude'
         },
-        'n1_center': {
+        'n1_latency': {
             'units': 'msec',
             'label': 'N1 Latency'
         },
-        'n1_sigma': {
+        'p2_latency': {
             'units': 'msec',
-            'label': 'N1 Sigma',
+            'label': 'P2 Latency'
         },
-        'n2_center': {
+        'n2_latency': {
             'units': 'msec',
             'label': 'N2 Latency'
-        },
-        'n2_sigma': {
-            'units': 'msec',
-            'label': 'N2 Sigma'
         }}
     whichParamsToPlot = list(paramMetaData.keys())
     for pName in whichParamsToPlot:
@@ -760,10 +780,14 @@ if __name__ == "__main__":
                 # data.loc[group['r2'] < 0.9, pName] = np.nan
                 dataSquare = data.pivot('yCoords', 'xCoords', pName)
                 anns = group.loc[:, ['xCoords', 'yCoords', 'feature']]
+                anns.loc[:, 'feature'] = anns['feature'].str.replace('a#0', '')
+                anns.loc[:, 'feature'] = anns['feature'].str.replace('b#0', '')
+                anns.loc[:, 'feature'] = anns['feature'].str.replace('_', '\n')
+                # pdb.set_trace()
                 annsSquare = anns.pivot('yCoords', 'xCoords', 'feature')
                 ax = sns.heatmap(
                     dataSquare, annot=annsSquare, fmt='s',
-                    annot_kws={'fontsize': 'xx-small'},
+                    annot_kws={'fontsize': 'xx-small'}, cmap='Blues_r',
                     vmin=plotMeta['vmin'], vmax=plotMeta['vmax'],
                     ax=ax)
                 # overAx = ax.twinx()
@@ -788,6 +812,7 @@ if __name__ == "__main__":
                 # plt.show()
     ###########################
     timeScales = ['3', '15', '100']
+    # timeScales = []
     for timeScale in timeScales:
         pdfPath = os.path.join(
             alignedFeaturesFolder,
