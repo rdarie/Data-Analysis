@@ -190,7 +190,7 @@ expPars['exp1_amplitude'].set(value=0)
 expPars['exp1_decay'].set(min=30., value=250., max=500.)
 #
 expPars['exp2_amplitude'].set(value=0)
-expPars['exp2_decay'].set(min=2., value=10., max=20.)
+expPars['exp2_decay'].set(min=2., value=5., max=20.)
 #
 expPars['exp3_amplitude'].set(value=0)
 expPars['exp3_decay'].set(min=.05, value=.1, max=.4)
@@ -198,7 +198,7 @@ expPars['exp3_decay'].set(min=.05, value=.1, max=.4)
 gaussPars.add(
     name='n1_offset',
     min=max(0.5, funKWArgs['tBounds'][0] * 1e3),
-    max=1.5)
+    max=1.7)
 gaussPars.add(name='p3_offset', value=0, min=0, max=.25)
 gaussPars['n1_center'].set(expr='n1_offset + n1_sigma')
 gaussPars['p1_center'].set(expr='n1_offset - 2 * p1_sigma')
@@ -299,14 +299,9 @@ def applyModel(
             assessThisModel = theseExpOpts.pop('assessModel', False)
             if assessThisModel:
                 try:
-                    exp_out.conf_interval() # conf_interval uses leastsq minimizer, need to remove inappropriate keywords
-                    ciDF = pd.DataFrame(exp_out.ci_out)
-                    paramsCI = {}
-                    modelFitsWellEnough = True
-                    for pName in ciDF.columns:
-                        paramsCI[pName] = (
-                            ciDF.loc[5, pName][1] - ciDF.loc[1, pName][1]) / exp_out.best_values[pName]
-                        if paramsCI[pName] > 1:
+                    for pName, thisP in exp_out.params.items():
+                        relativeError = 4 * thisP.stderr / thisP.value
+                        if np.abs(relativeError) > 1:
                             modelFitsWellEnough = False
                 except Exception:
                     traceback.print_exc()
@@ -323,7 +318,8 @@ def applyModel(
                     vary=False)
             else:
                 if verbose:
-                    print(exp_out.ci_report())
+                    for pName, thisP in exp_out.params.items():
+                        print(thisP)
                 fullPars['{}amplitude'.format(pref)].set(value=0, vary=False)
                 fullPars['{}decay'.format(pref)].set(
                     value=fullPars['{}decay'.format(pref)].max, vary=False)
@@ -438,7 +434,7 @@ def shapeFit(
         group, dataColNames=None, fit_kws={},
         method='nelder', max_nfev=None,
         tBounds=None, verbose=False, expOpts=None,
-        scoreBounds=None, tOffset=0, startJitter=.2e-3,
+        scoreBounds=None, tOffset=0, startJitter=.3e-3,
         plotting=False, iterMethod='loo',
         modelFun=None, corrMethod='pearson',
         maxIter=1e6):
@@ -504,17 +500,6 @@ def shapeFit(
     resultDF.index = [group.index[0]]
     bestModel = outList['model'][bestIdx]
     if isinstance(bestModel, ModelResult):
-        # try:
-        #     pdb.set_trace()
-        #     kwsStash = bestModel.kws.copy()
-        #     for kw in ['loss']:
-        #         bestModel.kws.pop(kw)
-        #     bestModel.conf_interval()  # conf_interval uses leastsq minimizer, need to remove inappropriate keywords
-        #     bestModel.kws = kwsStash
-        # except Exception:
-        #     traceback.print_exc()
-        #     pdb.set_trace()
-        # pdb.set_trace()
         resultDF.loc[group.index[0], 'model'] = bestModel
     else:
         resultDF.loc[group.index[0], 'model'] = np.nan
@@ -648,10 +633,8 @@ if __name__ == "__main__":
                 arguments['inputBlockSuffix'], arguments['window'], thisMIdx))
         try:
             model = load_modelresult(modelPath)
-            if hasattr(model, 'ci_out'):
-                ciDF = pd.DataFrame(model.ci_out)
-                for pName in ciDF.columns:
-                    paramsCI.loc[rowIdx, pName] = ciDF.loc[5, pName][1] - ciDF.loc[1, pName][1]
+            for pName in modelParamNames:
+                paramsCI.loc[rowIdx, pName] = model.params[pName].stderr
             comps = model.eval_components(x=(resDF.columns * 1e3).to_numpy(dtype=np.float))
             for key, value in comps.items():
                 if key not in compsDict:
@@ -666,7 +649,7 @@ if __name__ == "__main__":
                     compsDict[key] = [filler]
                 else:
                     compsDict[key].append(filler)
-    relativeCI = (paramsCI / modelParams).loc[:, modelParamNames]
+    relativeCI = (4 * paramsCI / modelParams).loc[:, modelParamNames]
     modelParams = modelParams.loc[:, modelParamNames]
     meanParams = modelParams.groupby(['electrode', arguments['amplitudeFieldName'], 'feature']).mean() * np.nan
     for name, group in modelParams.groupby(['electrode', arguments['amplitudeFieldName'], 'feature']):
@@ -675,7 +658,7 @@ if __name__ == "__main__":
             subGroup = group.loc[:, prefMask].reset_index(drop=True)
             subGroupCI = relativeCI.loc[group.index, prefMask].reset_index(drop=True)
             goodFitMask = (subGroupCI[pref + 'amplitude'].abs() < 1).to_numpy()
-            subGroupMean = subGroup.loc[goodFitMask, :].mean()
+            subGroupMean = subGroup.loc[goodFitMask, :].median()
             if np.isnan(subGroupMean[pref + 'amplitude']):
                 subGroupMean.loc[pref + 'amplitude'] = 0
             meanParams.loc[name, subGroupMean.index] = subGroupMean
@@ -822,7 +805,7 @@ if __name__ == "__main__":
             for name, group in tqdm(plotDF.groupby('feature')):
                 g = sns.relplot(
                     # data=group,
-                    data=group.query('bin < {}e-3'.format(timeScale)),
+                    data=group.query('(bin < {}e-3) & (bin >= 0.9e-3)'.format(timeScale)),
                     x='bin', y='signal',
                     hue='regrID',
                     row='rowLabel', col='columnLabel',
@@ -853,6 +836,6 @@ if __name__ == "__main__":
     outputCI.columns = outputCI.columns.astype(np.str)
     resultPath = os.path.join(
         resultFolder,
-        prefix + '_{}_{}_lmfit_confidence_intervals.parquet'.format(
+        prefix + '_{}_{}_lmfit_std_errs.parquet'.format(
             arguments['inputBlockSuffix'], arguments['window']))
     outputCI.to_parquet(resultPath, engine="fastparquet")
