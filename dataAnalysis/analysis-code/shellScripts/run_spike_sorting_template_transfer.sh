@@ -12,7 +12,7 @@
 
 # Specify a job name:
 #SBATCH -J spike_sort_peeler
-#SBATCH --array=2
+#SBATCH --array=1,2,3
 
 # Specify an output file
 #SBATCH -o ../../batch_logs/%j-%a-spike_sort_peeler.out

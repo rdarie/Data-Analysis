@@ -289,7 +289,7 @@ def getExpOpts():
         #
         expOpts=dict(
             exp1_=dict(
-                tBounds=[9e-3, 95e-3],
+                tBounds=[19e-3, 95e-3],
                 assessModel=True
             ),
             exp2_=dict(
@@ -301,9 +301,9 @@ def getExpOpts():
                 assessModel=True
             )
         ),
-        fit_kws=dict(loss='soft_l1'),
-        method='least_squares',
-        # method='nelder',
+        # fit_kws=dict(loss='soft_l1'),
+        # method='least_squares',
+        method='nelder',
         iterMethod='sampleOneManyTimes',
         plotting=False, verbose=False,
         maxIter=20

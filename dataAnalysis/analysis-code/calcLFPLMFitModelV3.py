@@ -24,8 +24,8 @@ Options:
 ##########################################################
 ##########################################################
 useCachedResult = False
-DEBUGGING = True
-SMALLDATASET = True
+DEBUGGING = False
+SMALLDATASET = False
 ##########################################################
 ##########################################################
 import os, sys, re
@@ -198,8 +198,8 @@ expPars['exp3_decay'].set(min=.05, value=.1, max=.4)
 gaussPars.add(
     name='n1_offset',
     min=max(0.5, funKWArgs['tBounds'][0] * 1e3),
-    max=1.7)
-gaussPars.add(name='p3_offset', value=0, min=0, max=.25)
+    max=1.5)
+gaussPars.add(name='p3_offset', value=0, min=0, max=1.)
 gaussPars['n1_center'].set(expr='n1_offset + n1_sigma')
 gaussPars['p1_center'].set(expr='n1_offset - 2 * p1_sigma')
 gaussPars['p2_center'].set(expr='n1_center + 2 * n1_sigma + 2 * p2_sigma')
@@ -207,12 +207,12 @@ gaussPars['p3_center'].set(expr='p2_center + 2 * p2_sigma + p3_offset + 2 * p3_s
 gaussPars['n2_center'].set(expr='p3_center + 2 * p3_sigma + 2 * n2_sigma')
 gaussPars['p4_center'].set(expr='n2_center + 2 * n2_sigma + 2 * p4_sigma')
 #
-gaussPars['n1_sigma'].set(min=50e-3, max=500e-3)
-gaussPars['p1_sigma'].set(min=50e-3, max=500e-3)
-gaussPars['p2_sigma'].set(min=50e-3, max=500e-3)
-gaussPars['p3_sigma'].set(min=100e-3, max=1500e-3)
-gaussPars['n2_sigma'].set(min=100e-3, max=1500e-3)
-gaussPars['p4_sigma'].set(min=100e-3, max=1500e-3)
+gaussPars['n1_sigma'].set(min=75e-3, max=500e-3)
+gaussPars['p1_sigma'].set(min=75e-3, max=500e-3)
+gaussPars['p2_sigma'].set(min=75e-3, max=500e-3)
+gaussPars['p3_sigma'].set(min=150e-3, max=1000e-3)
+gaussPars['n2_sigma'].set(min=150e-3, max=1000e-3)
+gaussPars['p4_sigma'].set(min=150e-3, max=1000e-3)
 #
 absMaxPotential = 1e3 # uV
 pars = expPars.copy()
@@ -298,9 +298,10 @@ def applyModel(
                 max_nfev=max_nfev, fit_kws=fit_kws)
             assessThisModel = theseExpOpts.pop('assessModel', False)
             if assessThisModel:
+                modelFitsWellEnough = True
                 try:
                     for pName, thisP in exp_out.params.items():
-                        relativeError = 4 * thisP.stderr / thisP.value
+                        relativeError = 2 * thisP.stderr / thisP.value
                         if np.abs(relativeError) > 1:
                             modelFitsWellEnough = False
                 except Exception:
@@ -350,7 +351,7 @@ def applyModel(
             fullPars[pName].set(
                 value=np.random.uniform(
                     fullPars[pName].min,
-                    4 * fullPars[pName].min))
+                    2 * fullPars[pName].min))
         # Randomize n1_offset
         fullPars['n1_offset'].set(
             value=np.random.uniform(
@@ -369,7 +370,7 @@ def applyModel(
             fullPars[pName].set(
                 value=0, max=-1e-6 * maxAmp, min=-maxAmp)
         # freeze any?
-        freezeGaussians = ['p1_', 'n1_']
+        freezeGaussians = []
         if len(freezeGaussians):
             for pref in freezeGaussians:
                 pName = '{}amplitude'.format(pref)
@@ -397,7 +398,9 @@ def applyModel(
         if plotting:
             comps = out.eval_components(x=fit_x)
             init = full_mod.eval(fullPars, x=fit_x)
-            fig, ax = plotLmFit(fit_x, fit_y, init, out, comps, verbose=verbose)
+            fig, ax = plotLmFit(
+                fit_x, fit_y, init, out, comps,
+                verbose=verbose)
             ax[0].set_title('t_0 = {:.3f} msec'.format(1e3 * tBounds[0]))
             ax[1].set_title('R^2 = {:.3f}'.format(r2))
         return outSrs, pd.concat([outParams, outStats]), out
@@ -565,7 +568,7 @@ if __name__ == "__main__":
             dbIndexMask = (
                 # elecNames.str.contains('caudalZ_e23') &
                 # (featNames.str.contains('caudalY_e11') | featNames.str.contains('rostralY_e11')) &
-                featNames.str.contains('lY_e') &
+                # featNames.str.contains('lY_e') &
                 elecNames.str.contains('caudalY_e11') &
                 (rates < funKWArgs['tBounds'][-1] ** (-1)) &
                 (amps < -600)
@@ -724,17 +727,17 @@ if __name__ == "__main__":
             'units': 'uV',
             'label': 'N1-P2 Amplitude'
         },
-        'n1_latency': {
+        'n1_center': {
             'units': 'msec',
-            'label': 'N1 Latency'
+            'label': 'N1 Peak'
         },
-        'p2_latency': {
+        'p2_center': {
             'units': 'msec',
-            'label': 'P2 Latency'
+            'label': 'P2 Peak'
         },
-        'n2_latency': {
+        'n2_center': {
             'units': 'msec',
-            'label': 'N2 Latency'
+            'label': 'N2 Peak'
         }}
     whichParamsToPlot = list(paramMetaData.keys())
     for pName in whichParamsToPlot:
@@ -794,8 +797,8 @@ if __name__ == "__main__":
                 plt.close()
                 # plt.show()
     ###########################
-    timeScales = ['3', '15', '100']
-    # timeScales = []
+    timeScales = ['3', '8', '100']
+    # timeScales = ['8']
     for timeScale in timeScales:
         pdfPath = os.path.join(
             alignedFeaturesFolder,
