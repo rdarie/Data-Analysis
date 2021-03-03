@@ -301,6 +301,8 @@ def applyModel(
                 modelFitsWellEnough = True
                 try:
                     for pName, thisP in exp_out.params.items():
+                        assert thisP.stderr is not None
+                        assert thisP.value is not None
                         relativeError = 2 * thisP.stderr / thisP.value
                         if np.abs(relativeError) > 1:
                             modelFitsWellEnough = False

@@ -202,6 +202,8 @@ if arguments['fromScratchToData']:
             #     shutil.copytree(originPath, destinPath)
             #     print('Copying from\n{}\ninto\n{}'.format(originPath, destinPath))
             if os.path.isfile(originPath):
+                if not os.path.exists(os.path.dirname(destinPath)):
+                    os.makedirs(os.path.dirname(destinPath))
                 shutil.copyfile(originPath, destinPath)
                 print('Copying from\n{}\ninto\n{}'.format(originPath, destinPath))
 
@@ -281,6 +283,8 @@ if arguments['fromDataToScratch']:
             #     shutil.copytree(originPath, destinPath)
             #     print('Copying from\n{}\ninto\n{}'.format(originPath, destinPath))
             if os.path.isfile(originPath):
+                if not os.path.exists(os.path.dirname(destinPath)):
+                    os.makedirs(os.path.dirname(destinPath))
                 shutil.copyfile(originPath, destinPath)
                 print('Copying from\n{}\ninto\n{}'.format(originPath, destinPath))
 

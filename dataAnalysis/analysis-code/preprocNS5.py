@@ -148,6 +148,7 @@ def preprocNS5():
             rawFolderPath=nspFolder,
             outputFolderPath=scratchFolder, mapDF=mapDF,
             fillOverflow=False, removeJumps=False,
+            calcArtifactTrace=spikeSortingOpts[arrayName]['interpolateOutliers'],
             calcOutliers=spikeSortingOpts[arrayName]['interpolateOutliers'],
             interpolateOutliers=spikeSortingOpts[arrayName]['interpolateOutliers'],
             outlierThreshold=spikeSortingOpts[arrayName]['outlierThreshold'],

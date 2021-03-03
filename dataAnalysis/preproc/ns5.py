@@ -3228,7 +3228,8 @@ def preprocBlockToNix(
                                 )
                     ##################################
                     print('Whitening cached traces before outlier detection')
-                    whitenByPCA = True
+                    whitenByPCA = False
+                    whitenByMahalanobisDist = False
                     if whitenByPCA:
                         projector = PCA(
                             n_components=None, whiten=True)
@@ -3240,12 +3241,16 @@ def preprocBlockToNix(
                         pcs = pcs[:, explVarMask]
                         nDim = pcs.shape[1]
                         lfpDeviation[:, subListIdx] = (pcs ** 2).sum(axis=1)
-                    else:  # whiten by mahalanobis distance
+                    elif whitenByMahalanobisDist:  # whiten by mahalanobis distance
                         est = EmpiricalCovariance()
                         est.fit(tempLFPStore.loc[:, columnsForThisGroup].to_numpy())
                         lfpDeviation[:, subListIdx] = est.mahalanobis(
                             tempLFPStore.loc[:, columnsForThisGroup].to_numpy())
                         nDim = tempLFPStore.loc[:, columnsForThisGroup].shape[1]
+                    else: # use sum of artifact signal
+                        lfpDeviation[:, subListIdx] = artifactSignal[:, subListIdx]
+                        # nDim = tempLFPStore.loc[:, columnsForThisGroup].shape[1]
+                        nDim = 1
                     #
                     transformedDeviation = stats.norm.isf(stats.chi2.sf(lfpDeviation[:, subListIdx], nDim))
                     infMask = np.isinf(transformedDeviation)
@@ -3935,7 +3940,7 @@ def blockFromPath(
     for idx, (chunkIdxStr, chunkMeta) in enumerate(chunkingMetadata.items()):
         print('blockFromPath: chunkIdx = {}'.format(chunkIdxStr))
         thisDataPath = chunkMeta['filename']
-        assert os.path.exists(thisDataPath)
+        assert os.path.exists(thisDataPath), '{}\nDoes not exist!'.format(thisDataPath)
         if idx == 0:
             if lazy:
                 dataReader = nixio_fr.NixIO(

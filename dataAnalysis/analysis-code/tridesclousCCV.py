@@ -264,6 +264,7 @@ def tdcCCVWrapper():
     # ########## decomposition options
     #
     #  ### parametric umap (with tensorflow) projection options
+    '''
     callbacks = [
         tf.keras.callbacks.EarlyStopping(
             # Stop training when `loss` is no longer improving
@@ -290,15 +291,15 @@ def tdcCCVWrapper():
         'n_training_epochs': 15,
         'keras_fit_kwargs': {'verbose': 2, 'callbacks': callbacks}
         }
-    #  ### PCA opts
     '''
+    #  ### PCA opts
     theseFeatureOpts = {
         'method': 'global_pca',
         'n_components': 5
         }
-    '''
     #  ########## clustering options
     #
+    '''
     theseClusterOpts = {
         'method': 'agglomerative',
         'n_clusters': 2
@@ -307,7 +308,6 @@ def tdcCCVWrapper():
     theseClusterOpts = {
         'method': 'onecluster',
         }
-    '''
     thesePreprocOpts = dict(
         relative_threshold=4,
         fill_overflow=False,

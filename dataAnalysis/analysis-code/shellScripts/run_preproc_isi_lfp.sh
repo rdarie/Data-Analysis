@@ -57,8 +57,8 @@
 # EXP="exp202010081400"
 # EXP="exp202010151400"
 # EXP="exp202010191100"
-# EXP="exp202012171300"
-EXP="exp202012221300"
+EXP="exp202012171300"
+# EXP="exp202012221300"
 
 # 
 module load anaconda/2020.02
@@ -96,7 +96,7 @@ UNITSELECTOR="--unitQuery=isispinal"
 # UNITSELECTOR="--unitQuery=isiacc"
 # UNITSELECTOR="--unitQuery=isispinaloremg"
 
-SLURM_ARRAY_TASK_ID=6
+SLURM_ARRAY_TASK_ID=3
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
 
 #  #  preprocess

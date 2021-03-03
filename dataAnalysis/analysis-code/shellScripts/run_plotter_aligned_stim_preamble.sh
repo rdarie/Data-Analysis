@@ -11,8 +11,8 @@ STATSOVERLAY="--overlayStats"
 TIMEWINDOWOPTS="--winStart=200 --winStop=500"
 
 # ALIGNQUERY="--alignQuery=stimOn"
-ALIGNQUERY="--alignQuery=stimOnLowRate"
-# ALIGNQUERY="--alignQuery=stimOnHighRate"
+# ALIGNQUERY="--alignQuery=stimOnLowRate"
+ALIGNQUERY="--alignQuery=stimOnHighRate"
 # ALIGNQUERY="--alignQuery=outbound"
 
 # HUEOPTS="--hueName=amplitude --hueControl="
@@ -23,7 +23,7 @@ ALIGNQUERY="--alignQuery=stimOnLowRate"
 
 HUEOPTS="--hueName=amplitude --hueControl="
 ROWOPTS="--rowName=RateInHz --rowControl="
-COLOPTS="--colName=electrode --colControl="
+COLOPTS="--colName=pedalMovementCat --colControl="
 STYLEOPTS="--styleName= --styleControl="
 SIZEOPTS="--sizeName= --sizeControl="
 

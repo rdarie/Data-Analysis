@@ -559,26 +559,29 @@ def plotAsigsAligned(
 def addSignificanceStars(
         g, sigTestResults, ro, co, hu, dataSubset, sigStarOpts):
     pQueryList = []
+    # pdb.set_trace()
     if len(g.row_names):
         rowFacetName = g.row_names[ro]
         rowName = g._row_var
         if rowName is not None:
-            if isinstance(rowFacetName, str):
-                compareName = '\'' + rowFacetName + '\''
-            else:
-                compareName = rowFacetName
-            pQueryList.append(
-                '({} == {})'.format(rowName, compareName))
+            if rowName in sigTestResults.index.names:
+                if isinstance(rowFacetName, str):
+                    compareName = '\'' + rowFacetName + '\''
+                else:
+                    compareName = rowFacetName
+                pQueryList.append(
+                    '({} == {})'.format(rowName, compareName))
     if len(g.col_names):
         colFacetName = g.col_names[co]
         colName = g._col_var
         if colName is not None:
-            if isinstance(colFacetName, str):
-                compareName = '\'' + colFacetName + '\''
-            else:
-                compareName = colFacetName
-            pQueryList.append(
-                '({} == {})'.format(colName, compareName))
+            if colName in sigTestResults.index.names:
+                if isinstance(colFacetName, str):
+                    compareName = '\'' + colFacetName + '\''
+                else:
+                    compareName = colFacetName
+                pQueryList.append(
+                    '({} == {})'.format(colName, compareName))
     pQuery = '&'.join(pQueryList)
     if len(pQuery):
         significantBins = sigTestResults.query(pQuery)
@@ -1122,9 +1125,12 @@ def plotSignificance(
         return
     sigValsDF = sigValsDF.stack().reset_index(name='significant')
     with PdfPages(os.path.join(figureFolder, pdfName + '.pdf')) as pdf:
+        # pdb.set
+        rowName = kwargs['rowName'] if kwargs['rowName'] in sigValsDF.columns else None
+        colName = kwargs['colName'] if kwargs['colName'] in sigValsDF.columns else None
         gPH = sns.catplot(
             y='significant', x='bin',
-            row=kwargs['rowName'], col=kwargs['colName'],
+            row=rowName, col=colName,
             kind='bar', ci=None, data=sigValsDF,
             linewidth=0, color='m', dodge=False
             )

@@ -25,14 +25,14 @@
 # EXP="exp201901070700"
 # EXP="exp202101141100"
 # EXP="exp202101191100"
-# EXP="exp202101201100"
+EXP="exp202101201100"
 # EXP="exp202101211100"
 # EXP="exp202101221100"
 # EXP="exp202101251100"
 # EXP="exp202101281100"
 # EXP="exp202102041100"
 # EXP="exp202102081100"
-EXP="exp202102101100"
+# EXP="exp202102101100"
 # EXP="exp202102151100"
 
 # ANALYSISSELECTOR="--analysisName=emgHiRes"
@@ -48,7 +48,7 @@ python --version
 
 # global operations
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --preprocFolderFiles --fromScratchToData --moveItems
-python './shuttleFilesToFromScratch.py' --exp=$EXP --preprocFolderFiles --preprocFolderSubfolders --fromScratchToData --moveItems
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --preprocFolderFiles --preprocFolderSubfolders --fromScratchToData --moveItems
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --preprocFolderFiles --preprocFolderSubfolders --fromDataToScratch
-# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='default' --fromDataToScratch
+python './shuttleFilesToFromScratch.py' --exp=$EXP --fileSearchTerm='*_mean_subtracted*' --fromDataToScratch
 # 
