@@ -59,7 +59,7 @@
 # EXP="exp202010151400"
 # EXP="exp202010191100"
 EXP="exp202012171300"
-EXP="exp202012091400"
+# EXP="exp202012091400"
 
 # 
 module load anaconda/3-5.2.0
@@ -72,12 +72,12 @@ python --version
 LAZINESS="--lazy"
 # LAZINESS=""
 
-WINDOW="--window=XXS"
+WINDOW="--window=XS"
 # WINDOW="--window=XS"
 
 # ANALYSISFOLDER="--analysisName=fullRes"
-ANALYSISFOLDER="--analysisName=hiRes"
-# ANALYSISFOLDER="--analysisName=loRes"
+# ANALYSISFOLDER="--analysisName=hiRes"
+ANALYSISFOLDER="--analysisName=loRes"
 # ANALYSISFOLDER="--analysisName=default"
 # ANALYSISFOLDER="--analysisName=parameter_recovery"
 
@@ -96,7 +96,7 @@ UNITSELECTOR="--unitQuery=isiemgenv"
 # UNITSELECTOR="--unitQuery=isiacc"
 # UNITSELECTOR="--unitQuery=isispinaloremg"
 
-SLURM_ARRAY_TASK_ID=3
+SLURM_ARRAY_TASK_ID=5
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
 
 #  #  preprocess
@@ -113,7 +113,7 @@ BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
 ################################################################################################################
 ALIGNQUERY="--alignQuery=stimOn"
 
-# python -u ./assembleExperimentData.py --exp=$EXP --blockIdx=1 --processAsigs --processRasters $ANALYSISFOLDER
+python -u ./assembleExperimentData.py --exp=$EXP --blockIdx=1 --processAsigs --processRasters $ANALYSISFOLDER
 
 OUTPUTBLOCKNAME="--outputBlockName=emg"
 CHANSELECTOR="--chanQuery=isiemgenv"
