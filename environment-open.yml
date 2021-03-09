@@ -38,8 +38,5 @@ dependencies:
 - python-snappy
 - datashader
 - holoviews
-- tensorflow
+- tensorflow>2=mkl*
 - pynndescent
-- pip:
-  - pyqt5==5.10.1
-  - vg==1.6.1

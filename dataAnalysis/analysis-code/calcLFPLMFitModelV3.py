@@ -23,7 +23,7 @@ Options:
 """
 ##########################################################
 ##########################################################
-useCachedResult = False
+useCachedResult = True
 DEBUGGING = False
 SMALLDATASET = False
 ##########################################################
@@ -41,6 +41,7 @@ from tqdm import tqdm
 import pdb, traceback, shutil
 import random
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
+import dataAnalysis.helperFunctions.profiling as prf
 import dataAnalysis.plotting.aligned_signal_plots as asp
 import dataAnalysis.helperFunctions.probe_metadata as prb_meta
 import dataAnalysis.preproc.ns5 as preproc
@@ -631,6 +632,7 @@ if __name__ == "__main__":
     compsDict = {}
     paramsCI = pd.DataFrame(np.nan, index=modelParams.index, columns=modelParamNames)
     for rowIdx, row in resDF.iterrows():
+        prf.print_memory_usage(prefix='Loading result {}'.format(rowIdx))
         thisMIdx = modelIndex.loc[rowIdx]
         modelPath = thisPath = os.path.join(
             resultFolder,
@@ -690,7 +692,9 @@ if __name__ == "__main__":
     compsAndTargetDF.dropna(axis='columns', inplace=True)
     compsAndTargetDF.columns.name = 'bin'
     #
-    plotDF = compsAndTargetDF.stack().to_frame(name='signal').reset_index()
+    # pdb.set_trace()
+    # plotDF = compsAndTargetDF.stack().to_frame(name='signal').reset_index()
+    plotDF = compsAndTargetDF.reset_index()
     plotDF.loc[:, 'columnLabel'] = 'NA'
     plotDF.loc[plotDF['regrID'].isin(['model', 'target', 'exp_']), 'columnLabel'] = 'targets'
     plotDF.loc[plotDF['regrID'].isin(['p1_', 'n1_', 'p2_', 'p3_', 'n2_', 'p4_', 'exp_resid']), 'columnLabel'] = 'components'
@@ -800,7 +804,7 @@ if __name__ == "__main__":
                 # plt.show()
     ###########################
     timeScales = ['3', '8', '100']
-    # timeScales = ['8']
+    # timeScales = ['8']g
     for timeScale in timeScales:
         pdfPath = os.path.join(
             alignedFeaturesFolder,
@@ -808,9 +812,11 @@ if __name__ == "__main__":
                 arguments['inputBlockSuffix'], arguments['window'], timeScale))
         with PdfPages(pdfPath) as pdf:
             for name, group in tqdm(plotDF.groupby('feature')):
+                # pdb.set_trace()
+                plotGroup = group.stack().to_frame(name='signal').reset_index()
                 g = sns.relplot(
-                    # data=group,
-                    data=group.query('(bin < {}e-3) & (bin >= 0.9e-3)'.format(timeScale)),
+                    # data=plotGroup,
+                    data=plotGroup.query('(bin < {}e-3) & (bin >= 0.9e-3)'.format(timeScale)),
                     x='bin', y='signal',
                     hue='regrID',
                     row='rowLabel', col='columnLabel',

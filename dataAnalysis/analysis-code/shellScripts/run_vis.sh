@@ -20,6 +20,10 @@
 #SBATCH --account=bibs-dborton-condo
 
 
+module load opengl
+module load qt/5.10.1
+module load zlib/1.2.11
+
 module load anaconda/2020.02
 . /gpfs/runtime/opt/anaconda/2020.02/etc/profile.d/conda.sh
 conda activate
