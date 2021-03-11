@@ -15,6 +15,7 @@ dependencies:
 - numpy
 - imbalanced-learn
 - pandas
+- pandas-flavor
 - h5py
 - lmfit
 - matplotlib
@@ -40,3 +41,5 @@ dependencies:
 - holoviews
 - tensorflow>2=mkl*
 - pynndescent
+- outdated
+- tabulate

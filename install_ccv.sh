@@ -19,7 +19,7 @@ module load gcc/8.3
 module load leveldb lapack openblas llvm hdf5 protobuf ffmpeg
 module load anaconda/2020.02
 module load mpi
-module load opengl
+# module load opengl
 module load qt/5.10.1
 module load zlib/1.2.11
 
@@ -51,7 +51,7 @@ for i in ${RepoList[*]}; do
     echo $GitRepoRoot$i".git"
     git clone $GitRepoRoot$i".git"
     cd $i
-    git checkout tags/ndav0.3
+    # git checkout tags/ndav0.3
     python setup.py develop --install-dir="/users/rdarie/anaconda/nda2/lib/python3.7/site-packages" --no-deps
     cd ..
 done

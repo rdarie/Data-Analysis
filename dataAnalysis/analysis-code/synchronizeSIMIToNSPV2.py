@@ -12,7 +12,6 @@ Options:
     --nspBlockSuffix=nspBlockSuffix              which block to pull
     --nspBlockPrefix=nspBlockPrefix              which block to pull
 """
-
 from neo.io.proxyobjects import (
     AnalogSignalProxy, SpikeTrainProxy, EventProxy)
 from neo import (
@@ -21,6 +20,7 @@ from neo import (
 # import neo
 import dataAnalysis.helperFunctions.helper_functions_new as hf
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
+
 import dataAnalysis.preproc.ns5 as ns5
 # from namedQueries import namedQueries
 import numpy as np
@@ -66,10 +66,12 @@ def synchronizeSimiToNSP():
     nspSeg = nspBlock.segments[segIdx]
     #
     pdb.set_trace()
-    nspSynchChanName = synchInfo['nspForDelsys'][blockIdx]['synchChanName']
+    nspSynchChanName = eventInfo['inputIDs']['simiTrigs']
     nspSyncAsig = nspSeg.filter(name='seg0_{}'.format(nspSynchChanName))[0]
     try:
-        tStart, tStop = synchInfo['nspForDelsys'][blockIdx]['timeRanges']
+        alignTimeBounds = alignTimeBoundsLookup[int(arguments['blockIdx'])]
+        tStart = alignTimeBounds[0][0] * pq.s
+        tStop = alignTimeBounds[-1][-1] * pq.s
     except Exception:
         traceback.print_exc()
         tStart = float(nspSyncAsig.times[0] + 2 * pq.s)
@@ -80,23 +82,7 @@ def synchronizeSimiToNSP():
     nspSrs = pd.Series(nspSyncAsig.magnitude[nspTimeMask].flatten())
 
     nspLims = nspSrs.quantile([1e-3, 1-1e-3]).to_list()
-    nspDiffUncertainty = nspSrs.diff().abs().quantile(1-1e-3) / 4
     nspThresh = (nspLims[-1] - nspLims[0]) / 2
-    
-    oePeakIdx, oeCrossMask = hf.getThresholdCrossings(
-        oeSrs, thresh=oeThresh,
-        iti=interTriggerInterval, fs=float(oeSyncAsig.sampling_rate),
-        edgeType='both', itiWiggle=.2,
-        absVal=False, plotting=arguments['plotting'], keep_max=False)
-    # oePeakIdx = hf.getTriggers(
-    #     oeSrs, iti=interTriggerInterval, fs=float(oeSyncAsig.sampling_rate),
-    #     thres=1.5, edgeType='falling', plotting=arguments['plotting'])
-    # oeCrossMask = oeSrs.index.isin(oePeakIdx)
-    print('Found {} triggers'.format(oePeakIdx.size))
-    #
-    print(
-        'On trial {}, detecting NSP threshold crossings.'
-        .format(blockIdx))
     nspPeakIdx, nspCrossMask = hf.getThresholdCrossings(
         nspSrs, thresh=nspThresh,
         iti=interTriggerInterval, fs=float(nspSyncAsig.sampling_rate),
@@ -303,9 +289,9 @@ if __name__ == "__main__":
         import dataAnalysis.helperFunctions.profiling as prf
         nameSuffix = os.environ.get('SLURM_ARRAY_TASK_ID')
         prf.profileFunction(
-            topFun=synchronizeSIMIToNSP,
+            topFun=synchronizeSimiToNSP,
             modulesToProfile=[hf, ash, ns5],
             outputBaseFolder=os.path.join(remoteBasePath, 'batch_logs'),
             nameSuffix=nameSuffix)
     else:
-        synchronizeSIMIToNSP()
+        synchronizeSimiToNSP()

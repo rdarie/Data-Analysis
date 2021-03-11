@@ -30,4 +30,5 @@ conda activate
 source activate nda2
 python --version
 
+export QT_DEBUG_PLUGINS=1
 python ./launchVis.py --exp=exp202101111100 --blockIdx=1

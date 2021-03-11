@@ -68,9 +68,8 @@ conda activate
 source activate nda2
 python --version
 
-# SLURM_ARRAY_TASK_ID=2
-#
-python -u ./synchronizeSIMIToNSPV2.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP
+SLURM_ARRAY_TASK_ID=2
+python -u ./synchronizeSIMItoNSPV2.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP  --nspBlockSuffix=analog_inputs  --nspBlockPrefix=utah
 # python -u ./calcProprioAnalysisNix.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER $SPIKESOURCE $SPIKEBLOCKSUFFIX $BLOCKPREFIX $RIGSUFFIX --chanQuery="all" --verbose --lazy
 ##
 # python -u ./calcMotionAlignTimes.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID  $ANALYSISFOLDER --plotParamHistograms $LAZINESS

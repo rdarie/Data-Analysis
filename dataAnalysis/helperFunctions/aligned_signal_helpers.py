@@ -1,10 +1,10 @@
-
+print('Here!')
 import os, sys, warnings
-warnings.filterwarnings("ignore", category=DeprecationWarning)
-sys.stderr = open(os.devnull, "w")  # silence stderr
+# warnings.filterwarnings("ignore", category=DeprecationWarning)
+# sys.stderr = open(os.devnull, "w")  # silence stderr
 import pingouin as pg
 import dill as pickle
-sys.stderr = sys.__stderr__  # unsilence stderr
+# sys.stderr = sys.__stderr__  # unsilence stderr
 
 import dataAnalysis.preproc.ns5 as ns5
 import dataAnalysis.helperFunctions.profiling as prf
