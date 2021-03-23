@@ -299,7 +299,7 @@ else:
         if sessTapOptsNSP['timeRanges'] is not None:
             nspTimeRangesMask = hf.getTimeMaskFromRanges(
                 nspDF['t'], sessTapOptsNSP['timeRanges'])
-            maskedNspUnixTimes = insGroup.loc[nspTimeRangesMask, 'unixTime']
+            maskedNspUnixTimes = nspDF.loc[nspTimeRangesMask, 'unixTime']
             searchLimsUnixStartList.append(maskedNspUnixTimes.min())
             searchLimsUnixStopList.append(maskedNspUnixTimes.max())
         searchLimsUnix = {

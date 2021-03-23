@@ -222,7 +222,8 @@ try:
         .format(2 * problemThreshold))
     for asigP in nspBlock.segments[segIdx].analogsignals:
         chName = asigP.channel_index.name
-        if 'ainp' not in chName:
+        # if 'ainp' not in chName:
+        if True:
             print('    Loading {}'.format(chName))
             lastT = min((spikeSortingOpts['utah']['previewOffset'] + spikeSortingOpts['utah']['previewDuration']) * pq.s,  asigP.t_stop)
             firstT = max(spikeSortingOpts['utah']['previewOffset'] * pq.s,  asigP.t_start)

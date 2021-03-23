@@ -28,6 +28,8 @@ def getExpOpts():
         'simiTrigs': 'ainp16',
         'forceX': 'ainp14',
         'forceY': 'ainp15',
+        'rightLED': 'ainp7',
+        'leftLED': 'ainp8',
         }
     RCRigInputs = {
         'tapSync': 'ainp1',
@@ -51,7 +53,7 @@ def getExpOpts():
         3: [
             'Session1611164507435'],
         }
-    synchInfo = {'nform': {}, 'nsp': {}, 'ins': {}}
+    synchInfo = {'nform': {}, 'nsp': {}, 'ins': {}, 'nspForSimi':{}, 'simiToNsp':{}}
     # populate with defaults
     for blockIdx in jsonSessionNames.keys():
         synchInfo['ins'][blockIdx] = {}
@@ -108,7 +110,35 @@ def getExpOpts():
         #  2: {2: 1},  # e.g. for ins session 2, use the alignment of ins session 1
         #
         }
-    #
+    ############################################################
+    for blockIdx in jsonSessionNames.keys():
+        synchInfo['simiToNsp'][blockIdx] = {
+            'scorerName': 'DLC_resnet_50_Proprio_5CamMar15',
+            'shuffle': 2,
+            'snapshot': 30000,
+            'synchChanName': [('g', 1), ('b', 1)],  # coords, cameraIdx
+            'unixTimeAdjust': None,
+            'timeRanges': None,
+            'synchByXCorrTapDetectSignal': True,
+            'xCorrSamplingRate': 500,
+            'xCorrGaussWid': 200e-3,
+            'thres': 5,
+            'clipToThres': False,
+            'iti': .5,
+            'edgeType': 'rising',
+            'minAnalogValue': None,
+            'keepIndex': slice(None)
+            }
+        synchInfo['nspForSimi'][blockIdx] = {
+            'synchChanName': ['ainp7'],
+            'timeRanges': None, 'keepIndex': slice(None),
+            'iti': .5,
+            'clipToThres': False,
+            'synchByXCorrTapDetectSignal': True,
+            'unixTimeAdjust': None,
+            'edgeType': 'rising',
+            'minAnalogValue': None, 'thres': 5}
+
     # options for stim artifact detection
     stimDetectOverrideStartTimes = {
         #  each key is a Block

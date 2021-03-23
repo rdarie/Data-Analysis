@@ -31,7 +31,7 @@ python --version
 
 # EXP="exp201901070700"
 # EXP="exp202101141100"
-# EXP="exp202101191100"
+EXP="exp202101191100"
 # EXP="exp202101201100"
 # EXP="exp202101211100"
 # EXP="exp202101221100"
@@ -41,12 +41,12 @@ python --version
 # EXP="exp202102041100"
 # EXP="exp202102081100"
 # EXP="exp202102101100"
-EXP="exp202102151100"
+# EXP="exp202102151100"
 
 python -u ./previewINSSessionSummary.py --exp=$EXP
 # python -u ./saveImpedances.py --exp=$EXP --processAll --reprocess
 
-for BLOCKIDX in 1 2 3
+for BLOCKIDX in 1 2
 do
     python -u './previewNSPTapTimes.py' --blockIdx=$BLOCKIDX --exp=$EXP --usedTENSPulses
 done

@@ -18,6 +18,7 @@ import mpl_toolkits.mplot3d.axes3d as p3
 from matplotlib.lines import Line2D
 import matplotlib.animation as animation
 from matplotlib.animation import FFMpegWriter
+import matplotlib.dates as mdates
 #  import matplotlib.backends.backend_pdf
 import numpy as np
 import pandas as pd
@@ -1078,7 +1079,7 @@ def getThresholdCrossings(
             peaks = np.arange(y.size)[~rem]
             crossIdx = dsToSearch.index[peaks]
             crossMask = dsToSearch.index.isin(crossIdx)
-    if plotting:
+    if plotting and (crossIdx.size > 0):
         figData, axData, figDist, axDist = confirmTriggersPlot(crossIdx, dsToSearch, fs)
         plt.show(block=True)
     return crossIdx, crossMask
@@ -3713,6 +3714,8 @@ def plotCorrSynchReport(
     fig, ax = plt.subplots(3, 1)
     fig.set_size_inches(12, 8)
     _trigRasterSamplingRate = (_trigRaster['t'].iloc[1] - _trigRaster['t'].iloc[0]) ** (-1)
+    timeAsDate = pd.to_datetime(_trigRaster['t'].to_numpy(), unit='s')
+    mins_fmt = mdates.DateFormatter('%M:%S')
     listOfLegends = []
     plotT0 = _trigRaster.loc[
         (_trigRaster['insTrigs'] > 0.5) & (_trigRaster['nspTrigs'] > 0.5), 't']
@@ -3775,35 +3778,48 @@ def plotCorrSynchReport(
     lowPassShiftedProduct = signal.sosfiltfilt(
         lPFForSP, shiftedProduct.to_numpy())
     ax[2].plot(
-        _trigRaster['t'],
+        timeAsDate,
+        # _trigRaster['t'],
         _trigRaster['nspTrigs'], c='b')
     nspTargetMask = _trigRaster['nspDiracDelta'] > 0
     if nspTargetMask.any():
         ax[2].plot(
-            _trigRaster.loc[nspTargetMask, 't'],
+            timeAsDate[nspTargetMask],
+            # _trigRaster.loc[nspTargetMask, 't'],
             _trigRaster.loc[nspTargetMask, 'nspTrigs'], 'o', c='tab:blue', label='NSP impulses')
     ax[2].plot(
-        _trigRaster['t'],
+        timeAsDate,
+        # _trigRaster['t'],
         shiftedInsTrig, ls='--', c='r')
     insTargetMask = shiftedInsImpulse > 0
     if insTargetMask.any():
         defaultMarkerSize = matplotlib.rcParams['lines.markersize']
         ax[2].plot(
-            _trigRaster.loc[insTargetMask, 't'],
+            timeAsDate[insTargetMask],
+            # _trigRaster.loc[insTargetMask, 't'],
             shiftedInsTrig.loc[insTargetMask], 'd', c='tab:red', label='INS impulses (shifted)',
             markersize=defaultMarkerSize / 2)
     ax[2].plot(
-        _trigRaster['t'], shiftedProduct, c='tab:green', label='elementwise product of trigs')
+        timeAsDate,
+        # _trigRaster['t'],
+        shiftedProduct,
+        c='tab:green', label='elementwise product of trigs')
     ax[2].set_xlabel('NSP time (sec)')
     ax[2].set_ylabel('A.U.')
     listOfLegends.append(ax[2].legend(loc='upper right'))
     prodAx = ax[2].twinx()
-    prodAx.plot(_trigRaster['t'], lowPassShiftedProduct, c='tab:olive', label='elementwise product of trigs (1 hz low pass)')
+    prodAx.plot(
+        timeAsDate,
+        # _trigRaster['t'],
+        lowPassShiftedProduct, c='tab:olive',
+        label='elementwise product of trigs (1 hz low pass)')
     prodAx.set_yticks([])
     ax[2].set_ylim(
         [
             ax[2].get_ylim()[0],
             ax[2].get_ylim()[1] * 1.1])
+    ax[2].xaxis.set_major_formatter(mins_fmt)
+    prodAx.xaxis.set_major_formatter(mins_fmt)
     listOfLegends.append(prodAx.legend(loc='lower right'))
     figSaveOpts = dict(
         bbox_extra_artists=listOfLegends,

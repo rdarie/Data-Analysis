@@ -59,7 +59,7 @@ module load gcc/8.3
 module load leveldb lapack openblas llvm hdf5 protobuf ffmpeg
 module load anaconda/2020.02
 module load mpi
-module load opengl
+# module load opengl
 module load qt/5.10.1
 module load zlib/1.2.11
 
@@ -69,7 +69,7 @@ source activate nda2
 python --version
 
 SLURM_ARRAY_TASK_ID=2
-python -u ./synchronizeSIMItoNSPV2.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP  --nspBlockSuffix=analog_inputs  --nspBlockPrefix=utah
+python -u ./synchronizeSIMItoNSP_stimBased.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP  --inputBlockSuffix=analog_inputs  --inputBlockPrefix=utah --showFigures --plotting --forceRecalc
 # python -u ./calcProprioAnalysisNix.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER $SPIKESOURCE $SPIKEBLOCKSUFFIX $BLOCKPREFIX $RIGSUFFIX --chanQuery="all" --verbose --lazy
 ##
 # python -u ./calcMotionAlignTimes.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID  $ANALYSISFOLDER --plotParamHistograms $LAZINESS

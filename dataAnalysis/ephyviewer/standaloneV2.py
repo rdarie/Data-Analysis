@@ -6,7 +6,8 @@ from collections import OrderedDict
 from ephyviewer.myqt import QT, QT_MODE
 import pyqtgraph as pg
 
-
+import sys, os, json
+import numpy as np
 from dataAnalysis.ephyviewer.mainviewer import MainViewer, compose_mainviewer_from_sources
 #  ~ from .traceviewer import TraceViewer
 #  ~ from .epochviewer import EpochViewer
@@ -16,6 +17,7 @@ from ephyviewer.tools import get_dict_from_group_param
 
 
 from ephyviewer.datasource import get_sources_from_neo_rawio
+from ephyviewer.datasource.video import MultiVideoFileSource
 
 # browse neo.rawios and add some gui_params
 from neo.rawio import rawiolist
@@ -91,6 +93,32 @@ class StandAloneViewer(MainViewer):
                     allSources[key] = value
                 else:
                     allSources[key] += value
+            print('Loading {}'.format(thisPath))
+            companionVideoPath = thisPath.replace('.nix', '_videoMetadata.json')
+            print('Searching for {}'.format(companionVideoPath))
+            if os.path.exists(companionVideoPath):
+                print('Found it!')
+                with open(companionVideoPath, 'r') as _f:
+                    videoMetaData = json.load(_f)
+                    videoMetaData['video_times'] = [
+                        np.asarray(vls) for vls in videoMetaData['video_times']
+                        ]
+                oneGridView = False
+                if oneGridView:
+                    videoSourceList = [MultiVideoFileSource(**videoMetaData)]
+                else:
+                    videoSourceList = []
+                    for cameraIdx, videoPath in enumerate(videoMetaData['video_filenames']):
+                        videoTimes = videoMetaData['video_times'][cameraIdx]
+                        videoSourceList.append(
+                            MultiVideoFileSource(
+                                video_filenames=[videoPath],
+                                video_times=[videoTimes])
+                        )
+                if 'video' not in allSources:
+                    allSources['video'] = videoSourceList
+                else:
+                    allSources['video'] += videoSourceList
             # print(sources)
         print(allSources)
         compose_mainviewer_from_sources(allSources, mainviewer=self)

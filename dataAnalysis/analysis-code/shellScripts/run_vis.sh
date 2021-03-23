@@ -20,7 +20,7 @@
 #SBATCH --account=bibs-dborton-condo
 
 
-module load opengl
+# module load opengl
 module load qt/5.10.1
 module load zlib/1.2.11
 
@@ -30,5 +30,4 @@ conda activate
 source activate nda2
 python --version
 
-export QT_DEBUG_PLUGINS=1
 python ./launchVis.py --exp=exp202101111100 --blockIdx=1

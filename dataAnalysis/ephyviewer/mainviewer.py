@@ -13,9 +13,11 @@ from ephyviewer.navigation import NavigationToolBar
 
 from ephyviewer.traceviewer import TraceViewer
 from ephyviewer.epochviewer import EpochViewer
+from ephyviewer.epochviewer import EpochViewer
 from ephyviewer.eventlist import EventList
 from ephyviewer.spiketrainviewer import SpikeTrainViewer
 from ephyviewer.timefreqviewer import TimeFreqViewer
+from ephyviewer.videoviewer import VideoViewer
 
 location_to_qt={
     'left': QT.LeftDockWidgetArea,
@@ -241,12 +243,21 @@ def compose_mainviewer_from_sources(
             mainviewer.add_view(view)
         else:
             mainviewer.add_view(view, tabify_with='spectrogram {}'.format(i-1))
-
+    #
+    videoViewList = []
+    for i, sig_source in enumerate(sources['video']):
+        view = VideoViewer(source=sig_source, name='video {}'.format(i))
+        if len(videoViewList) == 0:
+            mainviewer.add_view(view)
+        else:
+            mainviewer.add_view(view, tabify_with=videoViewList[0].name)
+        videoViewList.append(view)
+    #
     epochViews = []
     for i, spike_source in enumerate(sources['spike']):
         view = SpikeTrainViewer(source=spike_source, name='spikes {}'.format(i))
         if len(epochViews) > 0:
-            mainviewer.add_view(view,  tabify_with=epochViews[0].name)
+            mainviewer.add_view(view, tabify_with=epochViews[0].name)
         else:
             mainviewer.add_view(view)
         epochViews.append(view)
