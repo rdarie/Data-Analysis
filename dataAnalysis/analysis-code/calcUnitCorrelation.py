@@ -74,7 +74,7 @@ alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **argu
 alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
     namedQueries, scratchFolder, **arguments)
 alignedAsigsKWargs['outlierTrials'] = ash.processOutlierTrials(
-    prefix, **arguments)
+    scratchPath, prefix, **arguments)
 
 correlationDF = ash.applyFun(
     triggeredPath=triggeredPath, resultPath=resultPath,

@@ -99,7 +99,7 @@ outputPath = os.path.join(
 reqUnitNames, unitQuery = ash.processUnitQueryArgs(
     namedQueries, scratchFolder, **arguments)
 outlierTrials = ash.processOutlierTrials(
-    blockBaseName, **arguments)
+    scratchPath, blockBaseName, **arguments)
 
 #####
 # DEBUG_ARRAY_RESHAPING = False

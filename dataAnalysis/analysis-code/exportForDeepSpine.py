@@ -69,7 +69,7 @@ alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = (
     ash.processUnitQueryArgs(
         namedQueries, analysisSubFolder, **arguments))
 outlierTrialNames = ash.processOutlierTrials(
-    prefix, **arguments)
+    scratchPath, prefix, **arguments)
 
 if arguments['window'] == 'XS':
     cropWindow = (-100e-3, 400e-3)

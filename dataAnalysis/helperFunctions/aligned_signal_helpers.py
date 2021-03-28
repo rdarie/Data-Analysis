@@ -57,10 +57,10 @@ def processChannelQueryArgs(
 
 
 def processOutlierTrials(
-        prefix,
+        scratchPath, prefix,
         maskOutlierBlocks=False,
         invertOutlierBlocks=False,
-        window=None, scratchPath=None, alignFolderName=None,
+        window=None, alignFolderName=None,
         **kwargs
         ):
     if maskOutlierBlocks:

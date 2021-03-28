@@ -134,7 +134,7 @@ def calcUnitRegressionToAsig():
     alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
         namedQueries, alignSubFolder, **arguments)
     alignedAsigsKWargs['outlierTrials'] = ash.processOutlierTrials(
-        prefix, **arguments)
+        scratchPath, prefix, **arguments)
     #
     featuresMetaDataPath = os.path.join(
         estimatorSubFolder, 'features_meta.pickle')
