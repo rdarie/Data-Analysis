@@ -129,6 +129,7 @@ if arguments['alignFolderFromScratchToData']:
 #  Global moves
 #######################
 if arguments['fromScratchToData']:
+    #
     if arguments['preprocFolderFiles']:
         itemsToMove = [
             itemName
@@ -147,6 +148,7 @@ if arguments['fromScratchToData']:
                 else:
                     shutil.copyfile(originPath, destinPath)
                 print('Copying from\n{}\ninto\n{}'.format(originPath, destinPath))
+    #
     if arguments['preprocFolderSubfolders']:
         itemsToMove = [
             itemName
@@ -167,8 +169,11 @@ if arguments['fromScratchToData']:
                 else:
                     shutil.copytree(originPath, destinPath)
                 print('Copying from\n{}\ninto\n{}'.format(originPath, destinPath))
+    #
     if arguments['searchTerm'] is not None:
-        itemsToMoveFullPath = glob.glob(os.path.join(processedFolder, '**{}'.format(arguments['searchTerm'])), recursive=True)
+        itemsToMoveFullPath = glob.glob(
+            os.path.join(
+                scratchFolder, '**{}'.format(arguments['searchTerm'])), recursive=True)
         itemsToMove = [
             itemName.replace(scratchFolder + '/', '')
             for itemName in itemsToMoveFullPath
@@ -183,8 +188,12 @@ if arguments['fromScratchToData']:
             if os.path.isdir(originPath):
                 shutil.copytree(originPath, destinPath)
                 print('Copying from\n{}\ninto\n{}'.format(originPath, destinPath))
+    #
     if arguments['fileSearchTerm'] is not None:
-        itemsToMoveFullPath = glob.glob(os.path.join(scratchFolder, '**', arguments['fileSearchTerm']), recursive=True)
+        itemsToMoveFullPath = glob.glob(
+            os.path.join(
+                scratchFolder, '**', arguments['fileSearchTerm']),
+            recursive=True)
         itemsToMove = [
             itemName.replace(scratchFolder + '/', '')
             for itemName in itemsToMoveFullPath
@@ -208,6 +217,7 @@ if arguments['fromScratchToData']:
                 print('Copying from\n{}\ninto\n{}'.format(originPath, destinPath))
 
 if arguments['fromDataToScratch']:
+    #
     if arguments['preprocFolderFiles']:
         itemsToMove = [
             itemName
@@ -223,6 +233,7 @@ if arguments['fromDataToScratch']:
             if os.path.isfile(originPath):
                 shutil.copyfile(originPath, destinPath)
                 print('Copying from\n{}\ninto\n{}'.format(originPath, destinPath))
+    #
     if arguments['preprocFolderSubfolders']:
         itemsToMove = [
             itemName
@@ -243,8 +254,12 @@ if arguments['fromDataToScratch']:
                 else:
                     shutil.copytree(originPath, destinPath)
                 print('Copying from\n{}\ninto\n{}'.format(originPath, destinPath))
+    #
     if arguments['searchTerm'] is not None:
-        itemsToMoveFullPath = glob.glob(os.path.join(processedFolder, '**{}'.format(arguments['searchTerm'])), recursive=True)
+        itemsToMoveFullPath = glob.glob(
+            os.path.join(
+                processedFolder, '**{}'.format(arguments['searchTerm'])),
+            recursive=True)
         itemsToMove = [
             itemName.replace(processedFolder + '/', '')
             for itemName in itemsToMoveFullPath
@@ -264,8 +279,12 @@ if arguments['fromDataToScratch']:
             if os.path.isdir(originPath):
                 shutil.copytree(originPath, destinPath)
                 print('Copying from\n{}\ninto\n{}'.format(originPath, destinPath))
+    #
     if arguments['fileSearchTerm'] is not None:
-        itemsToMoveFullPath = glob.glob(os.path.join(processedFolder, '**', arguments['fileSearchTerm']), recursive=True)
+        itemsToMoveFullPath = glob.glob(
+            os.path.join(
+                processedFolder, '**', arguments['fileSearchTerm']),
+            recursive=True)
         itemsToMove = [
             itemName.replace(processedFolder + '/', '')
             for itemName in itemsToMoveFullPath

@@ -41,6 +41,7 @@ import dataAnalysis.preproc.mdt_constants as mdt_constants
 import warnings
 import h5py
 import os
+import vg
 import math as m
 import seaborn as sns
 import scipy.interpolate as intrp
@@ -77,6 +78,9 @@ expOpts, allOpts = parseAnalysisOptions(
     arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
+
+idxSl = pd.IndexSlice
+
 #############################################################
 blockBaseName, inputBlockSuffix = hf.processBasicPaths(arguments)
 searchRadius = [-2., 2.]
@@ -184,7 +188,7 @@ else:
     alignByUnixTime = False
     getSimiTrigTimes = True
     plotSynchReport = True
-    plotTriggers = True
+    plotTriggers = False
     #
     if plotSynchReport and alignByXCorr:
         simiDiagnosticsFolder = os.path.join(figureFolder, 'simiDiagnostics')
@@ -564,20 +568,58 @@ outTStart = max(nspBoundaries[0], simiBoundaries[0])
 outTStop = min(nspBoundaries[1], simiBoundaries[1])
 outT = np.arange(outTStart, outTStop + simiSamplingRate ** -1, simiSamplingRate ** -1)
 
-pdb.set_trace()
+# pdb.set_trace()
 simiPoses = pd.read_hdf(simiPath, 'df_with_missing')
+simiPoses.columns = simiPoses.columns.droplevel('scorer')
+lOfAngles = {}
+anglesToCalc = {
+    'right_hip': ['right_crest', 'right_hip', 'right_knee'],
+    'right_knee': ['right_hip', 'right_knee', 'right_ankle'],
+    'right_ankle': ['right_knee', 'right_ankle', 'right_knuckle']
+    }
+for jointName, listOfParts in anglesToCalc.items():
+    p = [
+        simiPoses.loc[:, idxSl['individual1', partName, ['x', 'y', 'z']]].to_numpy()
+        for partName in listOfParts
+        ]
+    v = [
+        p[1] - p[0],
+        p[1] - p[2]
+        ]
+    simiPoses.loc[:, ('individual1', jointName, 'angle')] = vg.angle(v[0], v[1])
+
+p = [
+    simiPoses.loc[:, idxSl['single', partName, ['x', 'y', 'z']]].to_numpy()
+    for partName in ['pedal_center', 'pedal_end']
+    ]
+v = [
+    p[1] - p[0]
+    ]
+v.append(np.zeros_like(p[0]))
+v[1][:, 0] = 1
+simiPoses.loc[:, ('single', 'pedal', 'angle')] = vg.angle(v[0], v[1])
+simiAngles = simiPoses.loc[:, idxSl[:, :, 'angle']]
+angleColumnNames = simiAngles.columns.to_frame().apply(lambda x: '{}_{}'.format(x[1], x[2]), axis=1)
+simiAngles.columns = angleColumnNames.to_list()
+
 simiDFOutInterp = hf.interpolateDF(
-    simiDF, outT, x='nspT',
+    pd.concat([simiDF, simiAngles], axis='columns'),
+    outT, x='nspT',
     kind='linear', fill_value=(0, 0))
 #
 simiDFOutInterp.columns = [cN.replace('seg0_', '') for cN in simiDFOutInterp.columns]
-# pdb.set_trace()
+
 videoMetaData = {
     'video_filenames': [
         os.path.join(
             projVideoFolder,
-            '{}-{}-{}.avi'.format(
-                experimentName, ns5FileName, cameraIdx
+            '{}-{}-{}{}shuffle{}_{}_{}{}_bp_labeled.mp4'.format(
+                experimentName, ns5FileName, cameraIdx,
+                tapDetectOptsSimi['scorerName'],
+                tapDetectOptsSimi['shuffle'],
+                tapDetectOptsSimi['snapshot'],
+                tapDetectOptsSimi['tracker'],
+                tapDetectOptsSimi['filteredSuffix'],
             ))
         for cameraIdx in range(1, 6)],
     'video_times': [

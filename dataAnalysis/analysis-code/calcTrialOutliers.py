@@ -38,6 +38,7 @@ import dataAnalysis.helperFunctions.helper_functions_new as hf
 import dataAnalysis.preproc.ns5 as ns5
 from scipy.stats import zscore, chi2
 # import pingouin as pg
+import quantities as pq
 import pandas as pd
 import numpy as np
 from dask import dataframe as dd
@@ -70,7 +71,8 @@ alignSubFolder = os.path.join(analysisSubFolder, arguments['alignFolderName'])
 if not os.path.exists(alignSubFolder):
     os.makedirs(alignSubFolder, exist_ok=True)
 
-calcSubFolder = os.path.join(alignSubFolder, 'dataframes')
+calcSubFolder = os.path.join(
+    scratchFolder, 'outlierTrials', arguments['alignFolderName'])
 if not os.path.exists(calcSubFolder):
     os.makedirs(calcSubFolder, exist_ok=True)
 #
@@ -501,13 +503,37 @@ if __name__ == "__main__":
     #         bla.index.get_level_values('bin').to_numpy(),
     #         bla.to_numpy())
     #     plt.show()
-    # 
     if arguments['saveResults']:
         outlierTrials['deviation'].to_hdf(
             resultPath, 'deviation')
         outlierTrials['rejectBlock'].to_hdf(
             resultPath, 'rejectBlock')
-
+        exportDF = (
+            outlierTrials
+            .apply(
+                lambda x: 'deviation: {:.3f}, rejected: {}'.format(x['deviation'], x['rejectBlock']),
+                axis='columns')
+            .reset_index()
+            .drop(columns=['segment'])
+                )
+        event = ns5.Event(
+            name='seg0_outlierTrials',
+            times=exportDF['t'].to_numpy() * pq.sec,
+            labels=exportDF[0].to_numpy()
+            )
+        eventBlock = ns5.Block(name='outlierTrials')
+        seg = ns5.Segment(name='seg0_outlierTrials')
+        eventBlock.segments.append(seg)
+        seg.block = eventBlock
+        seg.events.append(event)
+        event.segment = seg
+        eventExportPath = os.path.join(
+            calcSubFolder,
+            prefix + '_{}_outliers.nix'.format(
+                arguments['window']))
+        writer = ns5.NixIO(filename=eventExportPath)
+        writer.write_block(eventBlock, use_obj_names=True)
+        writer.close()
     # 
     minNObservations = 5
     firstBinTrialInfo = trialInfo.loc[firstBinMask, :]

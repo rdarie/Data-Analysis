@@ -88,7 +88,7 @@ alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **argu
 alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
     namedQueries, scratchFolder, **arguments)
 alignedAsigsKWargs['outlierTrials'] = ash.processOutlierTrials(
-    alignSubFolder, prefix, **arguments)
+    prefix, **arguments)
 from sklearn.preprocessing import scale, robust_scale
 
 

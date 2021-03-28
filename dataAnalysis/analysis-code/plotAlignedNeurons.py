@@ -96,7 +96,7 @@ alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **argu
 alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
     namedQueries, alignSubFolder, **arguments)
 alignedAsigsKWargs['outlierTrials'] = ash.processOutlierTrials(
-    calcSubFolder, prefix, **arguments)
+    prefix, **arguments)
 #
 if arguments['noStim']:
     alignedAsigsKWargs.update(dict(

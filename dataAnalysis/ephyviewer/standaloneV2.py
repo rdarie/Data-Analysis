@@ -93,6 +93,8 @@ class StandAloneViewer(MainViewer):
                     allSources[key] = value
                 else:
                     allSources[key] += value
+            if 'video' not in allSources:
+                allSources['video'] = []
             print('Loading {}'.format(thisPath))
             companionVideoPath = thisPath.replace('.nix', '_videoMetadata.json')
             print('Searching for {}'.format(companionVideoPath))

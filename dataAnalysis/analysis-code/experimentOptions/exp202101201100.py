@@ -116,6 +116,9 @@ def getExpOpts():
             'scorerName': 'DLC_resnet_50_Proprio_5CamMar15',
             'shuffle': 2,
             'snapshot': 30000,
+            'track_method': 'skeleton',
+            'tracker': 'sk',
+            'filteredSuffix': '',
             'synchChanName': [('g', 1), ('b', 1)],  # coords, cameraIdx
             'unixTimeAdjust': None,
             'timeRanges': None,

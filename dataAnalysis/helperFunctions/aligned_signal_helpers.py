@@ -57,15 +57,15 @@ def processChannelQueryArgs(
 
 
 def processOutlierTrials(
-        alignSubFolder, prefix,
+        prefix,
         maskOutlierBlocks=False,
         invertOutlierBlocks=False,
-        window=None,
+        window=None, scratchPath=None, alignFolderName=None,
         **kwargs
         ):
     if maskOutlierBlocks:
         resultPath = os.path.join(
-            alignSubFolder,
+            scratchPath, 'outlierTrials', alignFolderName,
             prefix + '_{}_outliers.h5'.format(window))
         oBlocks = pd.read_hdf(resultPath, 'rejectBlock')
         if invertOutlierBlocks:

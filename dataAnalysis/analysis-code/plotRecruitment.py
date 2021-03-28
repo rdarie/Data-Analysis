@@ -70,7 +70,7 @@ resultPath = os.path.join(
         arguments['inputBlockName'], arguments['window']))
 print('loading {}'.format(resultPath))
 outlierTrials = ash.processOutlierTrials(
-    calcSubFolder, prefix, **arguments)
+    prefix, **arguments)
 #  Overrides
 limitPages = None
 amplitudeFieldName = 'nominalCurrent'

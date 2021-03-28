@@ -22,7 +22,7 @@
 # Request custom resources
 #SBATCH --array=1,2
 
-# SLURM_ARRAY_TASK_ID=1
+SLURM_ARRAY_TASK_ID=2
 source ./shellScripts/run_plotter_aligned_stim_preamble.sh
 
 # OTHERASIGOPTS="--individualTraces --invertOutlierBlocks"

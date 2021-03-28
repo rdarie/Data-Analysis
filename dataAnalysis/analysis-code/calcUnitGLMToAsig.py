@@ -158,7 +158,7 @@ def calcUnitRegressionToAsig():
     alignedAsigsKWargs['unitQuery'] = uQ
     #
     alignedAsigsKWargs['outlierTrials'] = ash.processOutlierTrials(
-        calcSubFolder, prefix, **arguments)
+        prefix, **arguments)
     #
     featuresMetaDataPath = os.path.join(
         estimatorSubFolder, 'features_meta.pickle')
@@ -423,11 +423,11 @@ def calcUnitRegressionToAsig():
             targetLoadArgs['dataQuery'] = ash.processAlignQueryArgs(
                 namedQueries, alignQuery=sourceOpt['alignQuery'])
             targetLoadArgs['outlierTrials'] = ash.processOutlierTrials(
-                sourceCalcSubFolder, sourceOpt['prefix'], **arguments)
+                sourceOpt['prefix'], **arguments)
             featureLoadArgs['dataQuery'] = ash.processAlignQueryArgs(
                 namedQueries, alignQuery=sourceOpt['alignQuery'])
             featureLoadArgs['outlierTrials'] = ash.processOutlierTrials(
-                sourceCalcSubFolder, sourceOpt['prefix'], **arguments)
+                sourceOpt['prefix'], **arguments)
             featureLoadArgs['windowSize'] = sourceOpt['windowSize']
             targetLoadArgs['windowSize'] = sourceOpt['windowSize']
             triggeredPath = os.path.join(

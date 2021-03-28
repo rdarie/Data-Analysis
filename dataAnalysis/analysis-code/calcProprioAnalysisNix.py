@@ -3,24 +3,27 @@ Usage:
     calcBlockAnalysisNix.py [options]
 
 Options:
-    --blockIdx=blockIdx                    which trial to analyze
-    --exp=exp                              which experimental day to analyze
-    --verbose                              print out messages? [default: False]
-    --lazy                                 load as neo proxy objects or no? [default: False]
-    --analysisName=analysisName            append a name to the resulting blocks? [default: default]
-    --sourceFilePrefix=sourceFilePrefix    Does the block have an unusual prefix
-    --sourceFileSuffix=sourceFileSuffix    append a name to the resulting blocks?
-    --rigFileSuffix=rigFileSuffix          append a name to the resulting blocks?
-    --spikeFileSuffix=spikeFileSuffix      append a name to the resulting blocks?
-    --spikeSource=spikeSource              append a name to the resulting blocks?
-    --insFilePrefix=insFilePrefix          Does the INS block have an unusual prefix
-    --insFileSuffix=insFileSuffix          append a name to the resulting blocks? [default: ins]
-    --emgFilePrefix=emgFilePrefix          Does the EMG block have an unusual prefix
-    --emgFileSuffix=emgFileSuffix          append a name to the resulting blocks? [default: delsys]
-    --hasEMG                               is there EMG data? [default: False]
-    --chanQuery=chanQuery                  how to restrict channels if not providing a list? [default: fr]
-    --samplingRate=samplingRate            resample the result??
-    --rigOnly                              is there no INS block? [default: False]
+    --blockIdx=blockIdx                        which trial to analyze
+    --exp=exp                                  which experimental day to analyze
+    --verbose                                  print out messages? [default: False]
+    --lazy                                     load as neo proxy objects or no? [default: False]
+    --analysisName=analysisName                append a name to the resulting blocks? [default: default]
+    --sourceFilePrefix=sourceFilePrefix        Does the block have an unusual prefix
+    --sourceFileSuffix=sourceFileSuffix        append a name to the resulting blocks?
+    --rigFileSuffix=rigFileSuffix              append a name to the resulting blocks?
+    --spikeFileSuffix=spikeFileSuffix          append a name to the resulting blocks?
+    --spikeSource=spikeSource                  append a name to the resulting blocks?
+    --insFilePrefix=insFilePrefix              Does the INS block have an unusual prefix
+    --insFileSuffix=insFileSuffix              append a name to the resulting blocks? [default: ins]
+    --emgFilePrefix=emgFilePrefix              Does the EMG block have an unusual prefix
+    --emgFileSuffix=emgFileSuffix              append a name to the resulting blocks? [default: delsys]
+    --hasEMG                                   is there EMG data? [default: False]
+    --kinemFilePrefix=kinemFilePrefix          Does the EMG block have an unusual prefix
+    --kinemFileSuffix=kinemFileSuffix          append a name to the resulting blocks? [default: simiTrigs]
+    --hasKinematics                            is there motion capture data? [default: False]
+    --chanQuery=chanQuery                      how to restrict channels if not providing a list? [default: fr]
+    --samplingRate=samplingRate                resample the result??
+    --rigOnly                                  is there no INS block? [default: False]
 """
 
 from neo.io import NixIO
@@ -102,6 +105,18 @@ def calcBlockAnalysisWrapper():
                 'Block', arguments['emgFilePrefix'])
         else:
             emgBlockBaseName = copy(ns5FileName)
+    #
+    if arguments['hasKinematics']:
+        if arguments['kinemFileSuffix'] is not None:
+            kinemFileSuffix = '_' + arguments['kinemFileSuffix']
+        else:
+            kinemFileSuffix = ''
+        if arguments['kinemFilePrefix'] is not None:
+            kinemBlockBaseName = ns5FileName.replace(
+                'Block', arguments['kinemFilePrefix'])
+        else:
+            kinemBlockBaseName = copy(ns5FileName)
+    #
     #  electrode array name (changes the prefix of the file)
     arrayName = arguments['sourceFilePrefix']
     if arguments['sourceFilePrefix'] is not None:
@@ -493,6 +508,69 @@ def calcBlockAnalysisWrapper():
     #     rigChanNames += [
     #         'seg0_position_x', 'seg0_position_y',
     #         'seg0_velocity_x', 'seg0_velocity_y']
+    #
+
+    if arguments['hasKinematics']:
+        kinemPath = os.path.join(
+            scratchFolder,
+            kinemBlockBaseName + kinemFileSuffix + '.nix')
+        kinemReader, kinemBlock = ns5.blockFromPath(
+            kinemPath, lazy=False,
+            reduceChannelIndexes=True)
+        kinemSeg = kinemBlock.segments[0]
+        kinemAsigList = [
+            asig
+            for asig in kinemSeg.analogsignals
+            if ('_angle' in asig.name)
+            ]
+        for asig in kinemAsigList:
+            if asig.size > 0:
+                dummyKinemAsig = asig
+                break
+        kinemDF = ns5.analogSignalsToDataFrame(kinemAsigList)
+        kinemDF.set_index('t', inplace=True)
+        # interpolate kinematic analog signals
+        kinemCols = [cn for cn in kinemDF.columns if '_angle' in cn]
+        filterOptsKinem = {
+            'low': {
+                'Wn': 40,
+                'N': 2,
+                'btype': 'low',
+                'ftype': 'bessel'
+            }
+        }
+        filterCoeffsKinem = hf.makeFilterCoeffsSOS(
+            filterOptsKinem, float(dummyKinemAsig.sampling_rate))
+        filteredKinem = signal.sosfiltfilt(
+            filterCoeffsKinem, kinemDF.loc[:, kinemCols].to_numpy(),
+            axis=0)
+        #
+        if samplingRate != dummyKinemAsig.sampling_rate:
+            if samplingRate < dummyKinemAsig.sampling_rate:
+                filterCoeffs = hf.makeFilterCoeffsSOS(
+                    lowPassOpts.copy(), float(dummyKinemAsig.sampling_rate))
+                if trackMemory:
+                    print('Filtering analog data before downsampling. memory usage: {:.1f} MB'.format(
+                        prf.memory_usage_psutil()))
+                filteredAsigs = signal.sosfiltfilt(
+                    filterCoeffs, kinemDF.to_numpy(),
+                    axis=0)
+                kinemDF = pd.DataFrame(
+                    filteredAsigs,
+                    index=kinemDF.index,
+                    columns=kinemDF.columns)
+                if trackMemory:
+                    print('Just finished analog data filtering before downsampling. memory usage: {:.1f} MB'.format(
+                        prf.memory_usage_psutil()))
+            kinemInterp = hf.interpolateDF(
+                kinemDF, outputBlockT,
+                kind='linear', fill_value=(0, 0),
+                verbose=arguments['verbose'])
+            # free up memory used by full resolution asigs
+            del kinemDF
+        else:
+            kinemInterp = kinemDF
+        concatList.append(kinemInterp)
     #
     if arguments['hasEMG']:
         emgPath = os.path.join(
