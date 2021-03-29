@@ -43,7 +43,7 @@ pickleshare==0.7.5        # via ipython
 prompt-toolkit==2.0.9     # via ipython
 psutil==5.6.3
 ptyprocess==0.6.0         # via pexpect
-pygments==2.4.2           # via ipython
+pygments==2.7.4           # via ipython
 pyparsing==2.4.2          # via matplotlib
 pyqtgraph==0.10.0
 python-dateutil==2.8.0    # via matplotlib, pandas
