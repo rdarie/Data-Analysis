@@ -3195,9 +3195,13 @@ def preprocBlockToNix(
                     if LFPFilterOpts is not None:
                         print('applying LFPFilterOpts to cached asigs for artifact ID')
                         # tempLFPStore.loc[:, columnsForThisGroup] = signal.sosfilt(
-                        tempLFPStore.loc[:, columnsForThisGroup] = signal.sosfiltfilt(
-                            filterCoeffs, tempLFPStore.loc[:, columnsForThisGroup],
-                            axis=0)
+                        try:
+                            tempLFPStore.loc[:, columnsForThisGroup] = signal.sosfiltfilt(
+                                filterCoeffs, tempLFPStore.loc[:, columnsForThisGroup].to_numpy(),
+                                axis=0)
+                        except:
+                            traceback.print_exc()
+                            pdb.set_trace()
                         if useMeanToCenter:
                             tempCenter = (
                                 tempLFPStore

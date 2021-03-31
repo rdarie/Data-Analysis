@@ -69,41 +69,62 @@ def getExpOpts():
         2: ['Session1609951940258', 'Session1609952078942', 'Session1609952463973'],
         3: ['Session1609952950984'],
         }
-    synchInfo = {'nform': {}, 'nsp': {}, 'ins': {}}
+    synchInfo = {'nform': {}, 'nsp': {}, 'ins': {}, 'nspForSimi':{}, 'simiToNsp':{}}
     # populate with defaults
     for blockIdx in jsonSessionNames.keys():
         synchInfo['ins'][blockIdx] = {}
         for idx, sessionName in enumerate(jsonSessionNames[blockIdx]):
             synchInfo['ins'][blockIdx][idx] = {
                 'timeRanges': None,
-                'chan': ['ins_td0'],
+                'synchChanName': ['ins_td0', 'ins_td2'],
+                'synchStimUnitName': ['g0p0#0'],
+                'synchByXCorrTapDetectSignal': False,
+                'xCorrSamplingRate': None,
+                'xCorrGaussWid': 10e-3,
+                'minStimAmp': 0,
+                'unixTimeAdjust': None,
                 'thres': 5,
-                'iti': 50e-3,
-                'keepIndex': slice(-5, None)
+                'iti': 10e-3,
+                'minAnalogValue': None,
+                'keepIndex': slice(None)
                 }
-    # manually add special instructions
-    # #synchInfo['ins'][1][1] = {
-    # #    'timeRanges': None,
-    # #    'chan': ['ins_td2'],
-    # #    'thres': 5,
-    # #    'iti': 50e-3,
-    # #    'keepIndex': slice(None)
-    # #    }
+    ############################################################
+    ############################################################
+    # manually add special instructions, e.g.
+    # synchInfo['ins'][3][0].update({'minStimAmp': 0})
+    #
+    #
+    ############################################################
+    ############################################################
     synchInfo['nsp'] = {
-        #  per trialSegment
+        # per block
         i: {
-            j: {'timeRanges': None, 'keepIndex': slice(-5, None)}
+            #  per trialSegment
+            j: {
+                'timeRanges': None, 'keepIndex': slice(None),
+                'synchChanName': ['utah_artifact_0'], 'iti': 10e-3,
+                'synchByXCorrTapDetectSignal': False,
+                'unixTimeAdjust': None,
+                'minAnalogValue': None, 'thres': 7}
             for j, sessionName in enumerate(jsonSessionNames[i])
             }
         for i in jsonSessionNames.keys()
         }
-    # manually add special instructions
-    # synchInfo['nsp'][1][1] = {'timeRanges': None, 'keepIndex': slice(3, None)}
+    ############################################################
+    ############################################################
+    # manually add special instructions, e.g
+    # synchInfo['nsp'][2][0].update({'timeRanges': [(40, 9999)]})
+    #
+    #
+    ############################################################
+    #  overrideSegmentsForTapSync
     #  if not possible to use taps, override with good taps from another segment
     #  not ideal, because segments are only synchronized to the nearest **second**
     overrideSegmentsForTapSync = {
         #  each key is a Block
-        2: {2: 1},
+        #  1: {0: 'coarse'},  # e.g. for ins session 0, use the coarse alignment based on system unix time
+        #  2: {2: 1},  # e.g. for ins session 2, use the alignment of ins session 1
+        #
         }
     # options for stim artifact detection
     stimDetectOverrideStartTimes = {

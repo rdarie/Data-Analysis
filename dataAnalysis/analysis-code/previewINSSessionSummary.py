@@ -50,7 +50,7 @@ def summarizeINSSession(
     summaryText = '<h1>Session{}</h1>\n'.format(sessionUnixTime)
     print(summaryText)
     #
-    sessionTime = pd.Timestamp(sessionUnixTime, unit='ms')
+    sessionTime = pd.Timestamp(sessionUnixTime, unit='ms', tz='EST')
     logEntry = {
         'unixStartTime': sessionUnixTime,
         'tStart': sessionTime.isoformat(),

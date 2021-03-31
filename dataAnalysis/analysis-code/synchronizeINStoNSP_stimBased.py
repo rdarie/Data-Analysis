@@ -218,6 +218,7 @@ else:
         for asig in nspBlock.filter(objects=AnalogSignal)
         if asig.name in nspChanNames
         ]
+
 nspDF = ns5.analogSignalsToDataFrame(asigList)
 nspSamplingRate = float(asigList[0].sampling_rate)
 

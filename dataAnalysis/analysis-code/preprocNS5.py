@@ -133,7 +133,7 @@ def preprocNS5():
             eventInfo=trialFilesFrom['utah']['eventInfo'],
             asigNameList=spikeSortingOpts[arrayName]['asigNameList'],
             ainpNameList=spikeSortingOpts[arrayName]['ainpNameList'],
-            spikeSourceType='tdc', writeMode='w',
+            spikeSourceType='tdc', writeMode='ow',
             chunkSize=chunkSize, equalChunks=equalChunks, chunkList=chunkList,
             calcRigEvents=False)
     #
@@ -164,7 +164,7 @@ def preprocNS5():
             nameSuffix='_spike_preview',
             LFPFilterOpts=spikeSortingFilterOpts,
             # LFPFilterOpts=None,
-            writeMode='w',
+            writeMode='ow',
             chunkSize=spikeSortingOpts[arrayName]['previewDuration'],
             chunkOffset=spikeSortingOpts[arrayName]['previewOffset'],
             equalChunks=False, chunkList=[0],
@@ -196,7 +196,7 @@ def preprocNS5():
             nameSuffix='_mean_subtracted',
             LFPFilterOpts=spikeSortingFilterOpts,
             #
-            writeMode='w',
+            writeMode='ow',
             chunkSize=chunkSize, equalChunks=equalChunks, chunkList=chunkList,
             calcRigEvents=False)
     #
@@ -221,7 +221,7 @@ def preprocNS5():
             spikeSourceType='',
             nameSuffix='',
             LFPFilterOpts=None,
-            writeMode='w',
+            writeMode='ow',
             chunkSize=chunkSize, equalChunks=equalChunks, chunkList=chunkList,
             calcRigEvents=False)
     #
@@ -249,7 +249,7 @@ def preprocNS5():
             spikeSourceType='',
             nameSuffix='',
             LFPFilterOpts=None,
-            writeMode='w',
+            writeMode='ow',
             chunkSize=chunkSize, equalChunks=equalChunks, chunkList=chunkList,
             calcRigEvents=False)
     #
@@ -275,7 +275,7 @@ def preprocNS5():
             LFPFilterOpts=stimArtifactFilterOpts,
             ainpNameList=analogInputNames,
             spikeSourceType='',
-            nameSuffix='_analog_inputs', writeMode='w',
+            nameSuffix='_analog_inputs', writeMode='ow',
             chunkSize=9999,
             calcRigEvents=trialFilesFrom['utah']['calcRigEvents'])
     #
@@ -301,7 +301,7 @@ def preprocNS5():
             nameSuffix='',
             spikeSourceType='tdc', spikePath=spikePath,
             #
-            writeMode='w',
+            writeMode='ow',
             chunkSize=chunkSize, equalChunks=equalChunks, chunkList=chunkList,
             calcRigEvents=trialFilesFrom['utah']['calcRigEvents'])
     ###############################################################################
@@ -326,7 +326,7 @@ def preprocNS5():
             fillOverflow=False, removeJumps=False,
             motorEncoderMask=motorEncoderMask,
             eventInfo=trialFilesFrom['utah']['eventInfo'],
-            spikeSourceType='nev', writeMode='w',
+            spikeSourceType='nev', writeMode='ow',
             chunkSize=chunkSize, equalChunks=equalChunks,
             chunkList=chunkList,
             calcRigEvents=trialFilesFrom['utah']['calcRigEvents'],
@@ -352,7 +352,7 @@ def preprocNS5():
             fillOverflow=False, removeJumps=False,
             motorEncoderMask=motorEncoderMask,
             eventInfo=trialFilesFrom['utah']['eventInfo'],
-            spikeSourceType='nev', writeMode='w',
+            spikeSourceType='nev', writeMode='ow',
             chunkSize=chunkSize, equalChunks=equalChunks,
             chunkList=chunkList,
             calcRigEvents=trialFilesFrom['utah']['calcRigEvents'],
@@ -385,7 +385,7 @@ def preprocNS5():
             normalizeByImpedance=False,
             asigNameList=asigNameList, ainpNameList=ainpNameList,
             nameSuffix='',
-            writeMode='w',
+            writeMode='ow',
             chunkSize=chunkSize, equalChunks=equalChunks, chunkList=chunkList,
             LFPFilterOpts=rippleFilterOpts)
     ##

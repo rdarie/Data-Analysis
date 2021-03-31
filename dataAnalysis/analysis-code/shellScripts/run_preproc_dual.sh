@@ -25,7 +25,8 @@
 
 # EXP="exp202101141100"
 # EXP="exp202101191100"
-EXP="exp202101201100"
+EXP="exp202101061100"
+# EXP="exp202101201100"
 # EXP="exp202101211100"
 # EXP="exp202101221100"
 # EXP="exp202101251100"
@@ -43,7 +44,7 @@ conda activate
 source activate nda2
 python --version
 
-SLURM_ARRAY_TASK_ID=1
+SLURM_ARRAY_TASK_ID=2
 
 ########### get analog inputs separately to run synchronization, etc
 # !! --maskMotorEncoder ignores all motor events outside alignTimeBounds
