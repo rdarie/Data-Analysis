@@ -254,7 +254,7 @@ def getExpOpts():
         'optimalHyperparameters': {'h': 1.0, 'R_init': 0.2, 'lambd': 0.0016},
         'filterOpts': {
             'low': {
-                'Wn': 1000,
+                'Wn': 400,
                 'N': 4,
                 'btype': 'low',
                 'ftype': 'bessel'

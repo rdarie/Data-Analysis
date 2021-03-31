@@ -16,7 +16,7 @@
 #SBATCH -o ../../batch_logs/%j-%a-plots_stim_rig.out
 #SBATCH -e ../../batch_logs/%j-%a-plots_stim_rig.out
 
-# Specify account details
+# Specify account detailsv
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources

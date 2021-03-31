@@ -51,4 +51,5 @@ python --version
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --preprocFolderFiles --preprocFolderSubfolders --fromScratchToData --moveItems
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --preprocFolderFiles --fromDataToScratch
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --fileSearchTerm='*_utah002_pt*' --fromDataToScratch
-python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='/default/*' --fromDataToScratch
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='/default/*' --fromDataToScratch
+python './shuttleFilesToFromScratch.py' --exp=$EXP --preprocFolderSubfolders --fromDataToScratch

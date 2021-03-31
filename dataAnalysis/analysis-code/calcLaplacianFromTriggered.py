@@ -379,7 +379,10 @@ if __name__ == "__main__":
             adjChunkSize = int(np.ceil(len(estimateAsigs) / nChunks))
             csdLongList = []
             for chunkIdx in range(nChunks):
-                seeker = slice(adjChunkSize * chunkIdx, adjChunkSize * (chunkIdx + 1))
+                if chunkIdx == nChunks - 1:
+                    seeker = slice(adjChunkSize * chunkIdx, None)
+                else:
+                    seeker = slice(adjChunkSize * chunkIdx, adjChunkSize * (chunkIdx + 1))
                 kcsd, csdAsigs = csd.runKcsd(
                     estimateAsigs[seeker],
                     chanIndex.coordinates[:, :2],
@@ -514,6 +517,7 @@ if __name__ == "__main__":
                 filterCoeffs, csdAsigsLong.magnitude[locator, :],
                 axis=0)
             csdAsigsLong.magnitude[locator, :] = filteredAsigs
+    pdb.set_trace()
     if arguments['plotting']:
         _, _, csdDF = csd.plotLfp2D(
             asig=csdAsigsLong[0, :], chanIndex=csdChanIndex,
@@ -560,7 +564,6 @@ if __name__ == "__main__":
             else:
                 newChIdx = outputBlock.channel_indexes[cidx]
                 newUnit = newChIdx.filter(objects=Unit, name=newChIdx.name + '#0')
-            # pdb.set_trace()
             thisSt = SpikeTrain(
                 dummySt.times,
                 name='seg{}_{}#0'.format(segIdx, csdName),
@@ -583,7 +586,7 @@ if __name__ == "__main__":
     outputBlock.create_relationship()
     outputBlock = ns5.purgeNixAnn(outputBlock)
     writer = NixIO(
-        filename=outputPath, mode='ow')
+        filename=outputPath, mode='w')
     writer.write_block(outputBlock, use_obj_names=True)
     writer.close()
     print('Done writing CSD matrix')

@@ -302,6 +302,45 @@ class trialAwareStratifiedKFold:
         return self.n_splits
 
 
+class trainTestValidationSplitter:
+    def __init__(
+            self, dataDF, splitterType,
+            n_splits, splitterKWArgs):
+        # evaluate a preliminary test-train split,
+        # to get a validation-working set split
+        prelimCV = splitterType(
+            n_splits=n_splits + 1,
+            **splitterKWArgs).split(dataDF)
+        # note that train and test are iloc indices into dataDF
+        (workIdx, validationIdx) = prelimCV[0]
+        self.validation = validationIdx
+        self.work = workIdx
+        # however, prelimCV[1:] contains workIdx indices that are part of the validation set
+        # here, we will re-split prelimCV's workIdx indices
+        # into a train-test split
+        tempCv = splitterType(
+            n_splits=n_splits, **splitterKWArgs)
+        folds_temp = tempCv.split(dataDF.iloc[workIdx, :])
+        # folds contains iloc indices into the submatrix dataDF.iloc[workIdx, :]
+        # here, we transform them to indices into the original dataDF
+        originalIndices = np.arange(dataDF.index.shape[0])
+        self.folds = []
+        for _train, _test in folds_temp:
+            train = originalIndices[_train]
+            test = originalIndices[_test]
+            self.folds.append((train.tolist(), test.tolist()))
+        #
+        self.n_splits = n_splits
+        self.splitterKWArgs = splitterKWArgs
+        return
+
+    def split(self, X, y=None, groups=None):
+        return self.folds
+
+    def get_n_splits(self, X=None, y=None, groups=None):
+        return self.n_splits
+
+
 class SMWrapper(BaseEstimator, RegressorMixin):
     """
         A universal sklearn-style wrapper for statsmodels regressors

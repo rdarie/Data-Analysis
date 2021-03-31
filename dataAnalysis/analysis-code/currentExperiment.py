@@ -246,6 +246,21 @@ def parseAnalysisOptions(
         }
     # pdb.set_trace()
     trialFilesStim['ins']['getINSkwargs'].update(commonStimDetectionOpts)
+    amplitudeFieldName = 'nominalCurrent' if blockExperimentType == 'isi' else 'amplitude'
+    stimConditionNames = [
+        'electrode', amplitudeFieldName, 'RateInHz']
+    motionConditionNames = [
+        'pedalMovementCat', 'pedalSizeCat', 'pedalDirection']
+    if (blockExperimentType == 'proprio-miniRC') or (blockExperimentType == 'proprio-RC') or (blockExperimentType == 'isi'):
+        # has stim but no motion
+        stimulusConditionNames = stimConditionNames
+    elif blockExperimentType == 'proprio-motionOnly':
+        # has motion but no stim
+        stimulusConditionNames = motionConditionNames
+    else:
+        stimulusConditionNames = stimConditionNames + motionConditionNames
+    print('Block type {}; using the following stimulus condition breakdown:'.format(blockExperimentType))
+    #
     if blockExperimentType == 'proprio-miniRC':
         #  override with settings for detecting cycling stim trains
         trialFilesStim['ins']['getINSkwargs'].update(miniRCStimDetectionOpts)

@@ -18,6 +18,7 @@ Options:
     --unitQuery=unitQuery                  how to restrict channels?
     --inputBlockSuffix=inputBlockSuffix    which trig_ block to pull [default: pca]
     --inputBlockPrefix=inputBlockPrefix    which trig_ block to pull [default: Block]
+    --substituteOneChannel                 correct for rank defficiency by using one unsubtracted chan [default: False]
 """
 #
 import dataAnalysis.helperFunctions.profiling as prf
@@ -84,8 +85,13 @@ dummySt = dataBlock.filter(
 fs = float(dummySt.sampling_rate)
 # pdb.set_trace()
 # rerefDF = alignedAsigsDF - alignedAsigsDF.mean(axis='columns')
-rerefDF = alignedAsigsDF.sub(alignedAsigsDF.mean(axis='columns'), axis=0)
-
+referenceSignal = alignedAsigsDF.mean(axis='columns')
+rerefDF = alignedAsigsDF.sub(referenceSignal, axis=0)
+if arguments['substituteOneChannel']:
+    # implemented based on Milekovic, ..., Brochier 2015
+    # check that it works!
+    rerefDF.iloc[:, 0] = alignedAsigsDF.iloc[:, 0]
+#
 masterBlock = ns5.alignedAsigDFtoSpikeTrain(
     rerefDF, dataBlock=dataBlock, matchSamplingRate=True)
 

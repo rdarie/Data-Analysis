@@ -371,6 +371,7 @@ for segIdx, nspSeg in enumerate(nspBlock.segments):
         fig.savefig(
             os.path.join(
                 figureFolder, 'stimDetectionDelayDistribution{}.pdf'.format(inputINSBlockSuffix)))
+    #
     if arguments['makeControl']:
         midTimes = []
         for name, group in stimStatus.groupby('amplitudeRound'):

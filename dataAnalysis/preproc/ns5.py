@@ -74,6 +74,7 @@ def listChanNames(
     allChanList = [
         i.name
         for i in dataBlock.filter(objects=objType)]
+    # pdb.set_trace()
     if condition == 'hasAsigs':
         allChanList = [
             i
@@ -855,6 +856,7 @@ def unitSpikeTrainWaveformsToDF(
             wfDF = procFun(wfDF, st)
         idxLabels = ['segment', 'originalIndex', 't']
         wfDF.loc[:, 't'] = np.asarray(st.times.magnitude)
+        # pdb.set_trace()
         if (getMetaData) or (dataQuery is not None):
             # if there's a query, get metadata temporarily to resolve it
             annDict = {}
@@ -1108,7 +1110,8 @@ def alignedAsigsToDF(
         whichSegments=None, windowSize=None,
         getMetaData=True, metaDataToCategories=True,
         outlierTrials=None, invertOutlierMask=False,
-        makeControlProgram=False, removeFuzzyName=False, procFun=None):
+        makeControlProgram=False, removeFuzzyName=False,
+        procFun=None, finalIndexMask=None):
     #  channels to trigger
     if unitNames is None:
         unitNames = listChanNames(dataBlock, unitQuery, objType=Unit)
@@ -1227,6 +1230,8 @@ def alignedAsigsToDF(
         allWaveforms.columns = allWaveforms.columns.remove_unused_levels()
     allWaveforms.sort_index(
         axis='columns', inplace=True, kind='mergesort')
+    if finalIndexMask is not None:
+        allWaveforms = allWaveforms.loc[finalIndexMask.to_numpy(), :]
     return allWaveforms
 
 

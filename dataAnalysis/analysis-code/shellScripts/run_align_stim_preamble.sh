@@ -25,6 +25,7 @@ LAZINESS="--lazy"
 
 # WINDOW="--window=L"
 WINDOW="--window=M"
+
 AMPFIELDNAME="--amplitudeFieldName=amplitude"
 
 # ANALYSISFOLDER="--analysisName=hiRes"

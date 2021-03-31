@@ -569,7 +569,7 @@ if __name__ == "__main__":
     #
     outputBlock.create_relationship()
     writer = NixIO(
-        filename=outputPath, mode='ow')
+        filename=outputPath, mode='w')
     writer.write_block(outputBlock, use_obj_names=True)
     writer.close()
     print('Done writing CSD matrix')

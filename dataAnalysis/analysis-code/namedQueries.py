@@ -41,7 +41,8 @@ namedQueries = {
         'oechorsense': "((chanName.str.contains('CH'))or(chanName.str.contains('Sense')))",
         'oechorins': "((chanName.str.contains('CH'))or(chanName.str.contains('ins')))",
         'neural': "((chanName.str.contains('elec'))or(chanName.str.contains('nform')))or(chanName.str.contains('utah'))",
-        'rig': "not((chanName.str.contains('elec'))or(chanName.str.contains('pca'))or(chanName.str.contains('nform'))or(chanName.str.contains('ainp')))"
+        'rig': "not((chanName.str.contains('elec'))or(chanName.str.contains('pca'))or(chanName.str.contains('nform'))or(chanName.str.contains('ainp')))",
+        'jointAngle': "chanName.isin(['right_hip_angle#0', 'right_knee_angle#0', 'right_ankle_angle#0'])"
     },
     'chan': {
         'all': "(chanName.notna())",
@@ -301,6 +302,12 @@ namedQueries['align'].update({
 namedQueries['align'].update({
     'stimOnHighRate': '&'.join([
         namedQueries['align']['stimOn'],
+        "(RateInHz > 20)"
+        ])
+    })
+namedQueries['align'].update({
+    'stimOffHighRate': '&'.join([
+        namedQueries['align']['stimOff'],
         "(RateInHz > 20)"
         ])
     })

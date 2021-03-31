@@ -598,12 +598,15 @@ v = [
 v.append(np.zeros_like(p[0]))
 v[1][:, 0] = 1
 simiPoses.loc[:, ('single', 'pedal', 'angle')] = vg.angle(v[0], v[1])
-simiAngles = simiPoses.loc[:, idxSl[:, :, 'angle']]
+simiAngles = simiPoses.loc[:, idxSl[:, :, 'angle']].copy()
 angleColumnNames = simiAngles.columns.to_frame().apply(lambda x: '{}_{}'.format(x[1], x[2]), axis=1)
 simiAngles.columns = angleColumnNames.to_list()
-
+simiAnglesInterp = (
+    simiAngles
+    .interpolate(method='linear')
+    .fillna(method='bfill').fillna(method='ffill'))
 simiDFOutInterp = hf.interpolateDF(
-    pd.concat([simiDF, simiAngles], axis='columns'),
+    pd.concat([simiDF, simiAnglesInterp], axis='columns'),
     outT, x='nspT',
     kind='linear', fill_value=(0, 0))
 #

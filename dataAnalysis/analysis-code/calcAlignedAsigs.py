@@ -10,12 +10,12 @@ Options:
     --lazy                                               load from raw, or regular? [default: False]
     --chanQuery=chanQuery                                how to restrict channels? [default: raster]
     --outputBlockSuffix=outputBlockSuffix                name for new block [default: raster]
-    --eventSubfolder=eventSubfolder                      name of folder where the event block is [default: None]
-    --eventBlockSuffix=eventBlockSuffix                  name of events object to align to [default: analyze]
     --signalSubfolder=signalSubfolder                    name of folder where the signal block is [default: default]
     --signalBlockSuffix=signalBlockSuffix                name of signal block
     --signalBlockPrefix=signalBlockPrefix                name of signal block
     --eventBlockPrefix=eventBlockPrefix                  name of event block
+    --eventBlockSuffix=eventBlockSuffix                  name of events object to align to [default: analyze]
+    --eventSubfolder=eventSubfolder                      name of folder where the event block is [default: None]
     --eventName=eventName                                name of events object to align to [default: motionStimAlignTimes]
     --analysisName=analysisName                          append a name to the resulting blocks? [default: default]
     --alignFolderName=alignFolderName                    append a name to the resulting blocks? [default: motion]
