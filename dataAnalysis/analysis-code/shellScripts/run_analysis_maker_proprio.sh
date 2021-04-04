@@ -25,7 +25,8 @@
 
 # EXP="exp202101141100"
 # EXP="exp202101191100"
-EXP="exp202101201100"
+EXP="exp202101061100"
+# EXP="exp202101201100"
 # EXP="exp202101211100"
 # EXP="exp202101221100"
 # EXP="exp202101251100"
@@ -45,8 +46,8 @@ ANALYSISFOLDER="--analysisName=default"
 #
 SPIKEBLOCKSUFFIX="--spikeFileSuffix=mean_subtracted"
 #
-SPIKESOURCE="--spikeSource=tdc"
-# SPIKESOURCE=""
+# SPIKESOURCE="--spikeSource=tdc"
+SPIKESOURCE=""
 #
 RIGSUFFIX="--rigFileSuffix=analog_inputs"
 # BLOCKSUFFIX=""

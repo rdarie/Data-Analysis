@@ -470,13 +470,13 @@ def concatenateBlocks(
             lowPassOpts = {
                 'low': {
                     'Wn': float(samplingRate / 2),
-                    'N': 4,
+                    'N': 2,
                     'btype': 'low',
                     'ftype': 'bessel'
                 },
                 'high': {
                     'Wn': 1.,
-                    'N': 4,
+                    'N': 2,
                     'btype': 'high',
                     'ftype': 'bessel'
                 }
