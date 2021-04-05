@@ -169,7 +169,10 @@ dataAnalysis/paths.py
 .gitBase.txt
 #local environment definitions
 
+batch_logs/*
+.idea/*
 dataAnalysis/\.ftpconfig
+dataAnalysis/analysis_code/.vscode/*
 .vscode/ftp-sync.json
 dataAnalysis/analysis_code/\.vscode/ftp-sync.json
 dataAnalysis/simulation/\.vscode/ftp-sync.json

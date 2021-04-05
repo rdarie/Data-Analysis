@@ -1,0 +1,10 @@
+addpath /gpfs_home/rdarie/Github/NeuralTraj
+addpath /gpfs_home/rdarie/Github/NeuralTraj/core_gpfa
+addpath /gpfs_home/rdarie/Github/NeuralTraj/core_tdgpfa
+addpath /gpfs_home/rdarie/Github/NeuralTraj/core_twostage
+addpath /gpfs_home/rdarie/Github/NeuralTraj/plotting
+addpath /gpfs_home/rdarie/Github/NeuralTraj/util
+addpath /gpfs_home/rdarie/Github/NeuralTraj/util/precomp
+addpath /gpfs_home/rdarie/Github/NeuralTraj/util/invToeplitz
+addpath /gpfs_home/rdarie/Github/NeuralTraj/util/invChol
+addpath /gpfs_home/rdarie/Github/analysis-tools
