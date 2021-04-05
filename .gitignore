@@ -171,9 +171,9 @@ dataAnalysis/paths.py
 
 dataAnalysis/\.ftpconfig
 .vscode/ftp-sync.json
-dataAnalysis/analysis-code/\.vscode/ftp-sync.json
+dataAnalysis/analysis_code/\.vscode/ftp-sync.json
 dataAnalysis/simulation/\.vscode/ftp-sync.json
 paths.py
-dataAnalysis\analysis-code\dask-worker-space
+dataAnalysis\analysis_code\dask-worker-space
 *.lock
 *.dirlock
