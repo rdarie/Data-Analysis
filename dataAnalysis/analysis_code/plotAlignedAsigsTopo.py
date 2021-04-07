@@ -118,7 +118,7 @@ if arguments['inputBlockSuffix'] is not None:
     if not os.path.exists(figureOutputFolder):
         os.makedirs(figureOutputFolder, exist_ok=True)
     alignedAsigsKWargs['outlierTrials'] = ash.processOutlierTrials(
-        scratchPath, prefix, **arguments)
+        scratchFolder, prefix, **arguments)
 else:
     # plotting aligned spike waveforms
     if arguments['processAll']:

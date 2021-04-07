@@ -4,6 +4,8 @@ namedQueries = {
         'midPeak': "(pedalMovementCat=='midPeak')",
         'outbound': "(pedalMovementCat=='outbound')",
         'return': "(pedalMovementCat=='return')",
+        'reachedPeak': "(pedalMovementCat=='reachedPeak')",
+        'reachedBase': "(pedalMovementCat=='reachedBase')",
         'stimOn': "(stimCat=='stimOn')",
         'stimOff': "(stimCat=='stimOff')",
         'outboundXS': "(pedalSizeCat=='XS')&(pedalMovementCat=='outbound')",
@@ -42,7 +44,8 @@ namedQueries = {
         'oechorins': "((chanName.str.contains('CH'))or(chanName.str.contains('ins')))",
         'neural': "((chanName.str.contains('elec'))or(chanName.str.contains('nform')))or(chanName.str.contains('utah'))",
         'rig': "not((chanName.str.contains('elec'))or(chanName.str.contains('pca'))or(chanName.str.contains('nform'))or(chanName.str.contains('ainp')))",
-        'jointAngle': "chanName.isin(['right_hip_angle#0', 'right_knee_angle#0', 'right_ankle_angle#0'])"
+        'jointAngle': "chanName.isin(['right_hip_angle#0', 'right_knee_angle#0', 'right_ankle_angle#0'])",
+        'pedalPosition': "chanName.isin(['position#0'])"
     },
     'chan': {
         'all': "(chanName.notna())",
@@ -92,6 +95,12 @@ namedQueries['align'].update({
     'starting': '|'.join([
         namedQueries['align']['outbound'],
         namedQueries['align']['return'],
+        ])
+    })
+namedQueries['align'].update({
+    'stopping': '|'.join([
+        namedQueries['align']['reachedPeak'],
+        namedQueries['align']['reachedBase'],
         ])
     })
 namedQueries['align'].update({

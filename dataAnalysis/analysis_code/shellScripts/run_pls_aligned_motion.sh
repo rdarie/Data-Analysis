@@ -23,7 +23,7 @@
 #SBATCH --array=2
 
 SLURM_ARRAY_TASK_ID=2
-source ./shellScripts/run_pca_calc_aligned_stim_preamble.sh
+source ./shellScripts/run_pca_calc_aligned_motion_preamble.sh
 
 # python -u './calcPartialLeastSquares.py' --lhsBlockSuffix="kcsd" --unitQueryLhs="lfp" --rhsBlockSuffix="rig" --unitQueryRhs="jointAngle" --estimatorName='pls' --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting
-python -u './calcPartialLeastSquares.py' --lhsBlockSuffix="lfp_CAR" --unitQueryLhs="lfp" --rhsBlockSuffix="rig" --unitQueryRhs="jointAngle" --estimatorName='pls' --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting
+python -u './calcPartialLeastSquares.py' --blockIdx=2 --processAll --loadFromFrames --iteratorSuffix='a' --lhsBlockSuffix="lfp" --unitQueryLhs="lfp" --rhsBlockSuffix="rig" --unitQueryRhs="pedalPosition" --estimatorName='pls' --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER --plotting

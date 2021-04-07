@@ -160,9 +160,6 @@ if 'kcsd' in arguments['inputBlockSuffix']:
 if arguments['analysisName'] == 'hiRes':
     alignedAsigsKWargs['decimate'] = 5
 relplotKWArgs.update(relplotUpdates)
-alignedAsigsKWargs['procFun'] = ash.genDetrender(timeWindow=(-200e-3, 1e-3))
-# alignedAsigsKWargs['decimate'] = 20
-# alignedAsigsKWargs['rollingWindow'] = 200
 #
 #
 #############################################

@@ -101,6 +101,10 @@ masterBlock = ns5.purgeNixAnn(masterBlock)
 if os.path.exists(outputPath + '.nix'):
     os.remove(outputPath + '.nix')
 print('Writing {}.nix...'.format(outputPath))
-writer = ns5.NixIO(filename=outputPath + '.nix')
+if os.path.exists(outputPath):
+    os.remove(outputPath)
+writer = ns5.NixIO(
+    filename=outputPath + '.nix',
+    mode='ow')
 writer.write_block(masterBlock, use_obj_names=True)
 writer.close()

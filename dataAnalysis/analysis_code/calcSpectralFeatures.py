@@ -33,7 +33,7 @@ import joblib as jb
 import pickle
 import math as m
 import quantities as pq
-
+from tqdm import tqdm
 try:
     import libtfr
     HASLIBTFR = True
@@ -67,12 +67,7 @@ alignedAsigsKWargs.update(dict(
     duplicateControlsByProgram=False,
     makeControlProgram=False,
     transposeToColumns='feature', concatOn='columns',
-    getMetaData=[
-        'segment', 'originalIndex', 't', 'amplitude', 'program',
-        'activeGroup', 'RateInHz', 'stimCat', 'electrode',
-        'pedalDirection', 'pedalSize', 'pedalSizeCat', 'pedalMovementCat',
-        'pedalMetaCat', 'bin'
-    ],
+    getMetaData=essentialMetadataFields,
     decimate=1))
 
 if HASLIBTFR:
@@ -88,7 +83,7 @@ if HASLIBTFR:
         # generate a transform object with size equal to signal length and ntapers tapers
         D = libtfr.mfft_dpss(NFFT, nw, nTapers, winLen_samp)
         P_libtfr = D.mtspec(data, stepLen_samp).transpose()
-        P_libtfr = P_libtfr[:, fr_start_idx:fr_stop_idx]
+        P_libtfr = P_libtfr[:nWindows, fr_start_idx:fr_stop_idx]
         #
         # TODO: specIndex = pd.Multiindex, 'bin' ,etc.
         if annCols is not None:
@@ -137,7 +132,7 @@ def getSpectrogram(
         dataSrs,
         trialGroupByNames=None,
         winLen=None, stepLen=0.02, R=20,
-        fs=None, fStart=None, fStop=None):
+        fs=None, fStart=None, fStop=None, progBar=True):
     # t = np.asarray(dataSrs.index)
     # delta = 1 / fs
     winLen_samp = int(winLen * fs)
@@ -162,6 +157,8 @@ def getSpectrogram(
     fr_samp = len(fr)
     spectra = []
     indexTName = 'bin'
+    if progBar:
+        pBar = tqdm(total=dataSrs.groupby(trialGroupByNames).ngroups)
     for name, group in dataSrs.groupby(trialGroupByNames):
         tStart = group.index.get_level_values(indexTName)[0]
         spectra.append(pSpec(
@@ -170,6 +167,8 @@ def getSpectrogram(
             fs, fr, fr_samp, fr_start_idx, fr_stop_idx,
             NFFT, nw, nTapers,
             indexTName, annCols=trialGroupByNames, annValues=name))
+        if progBar:
+            pBar.update(1)
     return pd.concat(spectra)
 
 outputPath = os.path.join(
@@ -182,7 +181,7 @@ dataReader, dataBlock = ns5.blockFromPath(
 freqBands = pd.DataFrame({
     'name': ['low', 'beta', 'hi', 'spb'],
     'lBound': [1.5, 10, 80, 250],
-    'hBound': [4.5, 40, 250, 1000]
+    'hBound': [4.5, 40, 250, 1000] # CHANGE BACK FOR HIGH FREQ
     })
 alignedAsigsDF = ns5.alignedAsigsToDF(
     dataBlock, **alignedAsigsKWargs)
@@ -194,6 +193,8 @@ dummySt = dataBlock.filter(
 fs = float(dummySt.sampling_rate)
 theseSpectralFeatList = []
 for featName in alignedAsigsDF.columns:
+    if arguments['verbose']:
+        print('on feature {}'.format(featName))
     thisSpectrogram = getSpectrogram(
         alignedAsigsDF.loc[:, featName],
         trialGroupByNames=trialGroupByNames,
@@ -211,6 +212,7 @@ spectralDF = pd.concat(theseSpectralFeatList, axis='columns')
 spectralDF.columns.name = 'feature'
 
 tBins = np.unique(spectralDF.index.get_level_values('bin'))
+# pdb.set_trace()
 trialTimes = np.unique(spectralDF.index.get_level_values('t'))
 spikeTrainMeta = {
     'units': pq.s,
@@ -229,6 +231,6 @@ masterBlock = ns5.purgeNixAnn(masterBlock)
 if os.path.exists(outputPath + '.nix'):
     os.remove(outputPath + '.nix')
 print('Writing {}.nix...'.format(outputPath))
-writer = ns5.NixIO(filename=outputPath + '.nix')
+writer = ns5.NixIO(filename=outputPath + '.nix', mode='ow')
 writer.write_block(masterBlock, use_obj_names=True)
 writer.close()

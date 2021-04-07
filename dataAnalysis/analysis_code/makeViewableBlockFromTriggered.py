@@ -243,8 +243,10 @@ if __name__ == "__main__":
         dataReader.file.close()
     outputBlock.create_relationship()
     outputBlock = ns5.purgeNixAnn(outputBlock)
+    if os.path.exists(outputPath):
+        os.remove(outputPath)
     writer = NixIO(
-        filename=outputPath, mode='w')
+        filename=outputPath, mode='ow')
     writer.write_block(outputBlock, use_obj_names=True)
     writer.close()
     print('Done writing viewable matrix')

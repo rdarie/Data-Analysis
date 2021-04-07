@@ -251,7 +251,9 @@ if __name__ == "__main__":
     #  delay to account for transmission between event
     #  at t=0 and the signal being recorded
     transmissionDelay = 0
+    # pdb.set_trace()
     if 'RateInHz' in trialInfo.columns:
+        trialInfo.loc[trialInfo['RateInHz'] == 'NA', 'RateInHz'] = 1e-1
         trialInfo.loc[trialInfo['RateInHz'] <= 0, 'RateInHz'] = 1e-1
         if 'stimPeriod' not in trialInfo.columns:
             trialInfo['stimPeriod'] = trialInfo['RateInHz'] ** (-1)

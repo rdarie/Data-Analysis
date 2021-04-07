@@ -17,7 +17,7 @@ RepoList=(\
 
 module load git/2.10.2
 module load gcc/8.3
-module load leveldb lapack openblas llvm hdf5 protobuf ffmpeg
+module load leveldb lapack openblas llvm hdf5 protobuf ffmpeg fftw scons
 module load anaconda/2020.02
 module load mpi
 # module load opengl
@@ -43,8 +43,8 @@ pip install vg==1.6.1 --target="/users/rdarie/anaconda/nda2/lib/python3.7/site-p
 pip install git+git://github.com/G-Node/nixpy@v1.5.0b3 --target="/users/rdarie/anaconda/nda2/lib/python3.7/site-packages" --no-deps
 pip install git+git://github.com/hector-sab/ttictoc@v0.4.1 --target="/users/rdarie/anaconda/nda2/lib/python3.7/site-packages" --no-deps
 pip install git+git://github.com/raphaelvallat/pingouin@v0.3.3 --target="/users/rdarie/anaconda/nda2/lib/python3.7/site-packages" --no-deps
+pip install git+git://github.com/melizalab/libtfr --target="/users/rdarie/anaconda/nda2/lib/python3.7/site-packages" --no-deps
 #
-
 for i in ${RepoList[*]}; do
     echo $GitRepoRoot$i".git"
     git clone $GitRepoRoot$i".git"

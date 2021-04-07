@@ -25,8 +25,8 @@
 
 # EXP="exp202101141100"
 # EXP="exp202101191100"
-EXP="exp202101061100"
-# EXP="exp202101201100"
+# EXP="exp202101061100"
+EXP="exp202101201100"
 # EXP="exp202101211100"
 # EXP="exp202101221100"
 # EXP="exp202101251100"
@@ -69,8 +69,8 @@ conda activate
 source activate nda2
 python --version
 
-SLURM_ARRAY_TASK_ID=2
-# python -u ./synchronizeSIMItoNSP_stimBased.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP  --inputBlockSuffix=analog_inputs  --inputBlockPrefix=utah --plotting --forceRecalc
+SLURM_ARRAY_TASK_ID=3
+# python -u ./synchronizeSIMItoNSP_stimBased.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --showFigures --inputBlockSuffix=analog_inputs  --inputBlockPrefix=utah --plotting --forceRecalc
 # python -u ./calcProprioAnalysisNix.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER $SPIKESOURCE $SPIKEBLOCKSUFFIX $BLOCKPREFIX $RIGSUFFIX --chanQuery="all" --verbose --lazy
 python -u ./calcProprioAnalysisNix.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER $SPIKESOURCE $SPIKEBLOCKSUFFIX $BLOCKPREFIX $RIGSUFFIX --chanQuery="all" --verbose --lazy --hasKinematics
 ##

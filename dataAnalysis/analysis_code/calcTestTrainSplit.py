@@ -4,13 +4,16 @@ Usage:
 
 Options:
     --exp=exp                                            which experimental day to analyze
+    --maskOutlierBlocks                                  delete outlier trials? [default: False]
     --blockIdx=blockIdx                                  which trial to analyze [default: 1]
     --processAll                                         process entire experimental day? [default: False]
     --analysisName=analysisName                          append a name to the resulting blocks? [default: default]
     --alignFolderName=alignFolderName                    append a name to the resulting blocks? [default: motion]
     --window=window                                      process with short window? [default: long]
-    --ROIWinStart=ROIWinStart                            start of window [default: 200]
-    --ROIWinStop=ROIWinStop                              end of window [default: 400]
+    --winStart=winStart                                  start of absolute window (when loading)
+    --winStop=winStop                                    end of absolute window (when loading)
+    --ROIWinStart=ROIWinStart                            start of relative window (masked per trial) [default: 200]
+    --ROIWinStop=ROIWinStop                              end of relative window (masked per trial) [default: 400]
     --lazy                                               load from raw, or regular? [default: False]
     --verbose                                            print diagnostics? [default: False]
     --unitQuery=unitQuery                                how to restrict channels? [default: fr_sqrt]
@@ -25,6 +28,9 @@ Options:
     --eventBlockSuffix=eventBlockSuffix                  name of events object to align to [default: analyze]
     --eventName=eventName                                name of events object to align to [default: motionStimAlignTimes]
     --eventSubfolder=eventSubfolder                      name of folder where the event block is [default: None]
+    --loadFromFrames                                     load data from pre-saved dataframes?
+    --saveDataFrame                                      save corresponding dataframe?
+    --selectionName=selectionName                        name in h5 for the saved data
 """
 
 import os, sys
@@ -32,20 +38,21 @@ import dataAnalysis.helperFunctions.profiling as prf
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
 import dataAnalysis.helperFunctions.helper_functions_new as hf
 import dataAnalysis.custom_transformers.tdr as tdr
-from namedQueries import namedQueries
+from dataAnalysis.analysis_code.namedQueries import namedQueries
+from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
 import pdb
-import numpy as np
+# import numpy as np
 import dataAnalysis.preproc.ns5 as ns5
-from sklearn.decomposition import PCA, IncrementalPCA
-from sklearn.pipeline import make_pipeline, Pipeline
-from sklearn.covariance import ShrunkCovariance, LedoitWolf, EmpiricalCovariance
-from sklearn.model_selection import cross_val_score, GridSearchCV
-import joblib as jb
+# from sklearn.decomposition import PCA, IncrementalPCA
+# from sklearn.pipeline import make_pipeline, Pipeline
+# from sklearn.covariance import ShrunkCovariance, LedoitWolf, EmpiricalCovariance
+# from sklearn.model_selection import cross_val_score, GridSearchCV
+# import joblib as jb
 import dill as pickle
-import gc
-from currentExperiment import parseAnalysisOptions
+# import gc
 from docopt import docopt
 import pandas as pd
+
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']), arguments['exp'])
@@ -59,24 +66,38 @@ calcSubFolder = os.path.join(
     scratchFolder, 'testTrainSplits', arguments['alignFolderName'])
 if not(os.path.exists(calcSubFolder)):
     os.makedirs(calcSubFolder)
-#
+dataFramesFolder = os.path.join(
+    alignSubFolder, 'dataframes'
+    )
+if not(os.path.exists(dataFramesFolder)):
+    os.makedirs(dataFramesFolder)
+
 alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **arguments)
 alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
     namedQueries, scratchFolder, **arguments)
 alignedAsigsKWargs['outlierTrials'] = ash.processOutlierTrials(
-    scratchPath, blockBaseName, **arguments)
+    scratchFolder, blockBaseName, **arguments)
 
 alignedAsigsKWargs.update(dict(
     duplicateControlsByProgram=False,
     makeControlProgram=False, metaDataToCategories=False,
     transposeToColumns='feature', concatOn='columns',
-    getMetaData=True, decimate=1))
+    getMetaData=essentialMetadataFields, decimate=1))
 alignedAsigsKWargs['verbose'] = arguments['verbose']
 
 triggeredPath = os.path.join(
     alignSubFolder,
     blockBaseName + '{}_{}.nix'.format(
         inputBlockSuffix, arguments['window']))
+
+if 'windowSize' not in alignedAsigsKWargs:
+    alignedAsigsKWargs['windowSize'] = [ws for ws in rasterOpts['windowSizes'][arguments['window']]]
+if 'winStart' in arguments:
+    if arguments['winStart'] is not None:
+        alignedAsigsKWargs['windowSize'][0] = float(arguments['winStart']) * (-1e-3)
+if 'winStop' in arguments:
+    if arguments['winStop'] is not None:
+        alignedAsigsKWargs['windowSize'][1] = float(arguments['winStop']) * (1e-3)
 
 if arguments['calcTimeROI']:
     if arguments['eventBlockSuffix'] is not None:
@@ -138,57 +159,113 @@ else:
     iteratorSuffix = ''
 iteratorPath = os.path.join(
     calcSubFolder,
-    '{}{}_{}_{}_cvIterators.pickle'.format(
+    '{}_{}_{}{}_cvIterators.pickle'.format(
         blockBaseName,
-        iteratorSuffix,
         arguments['window'],
-        arguments['alignQuery']))
+        arguments['alignQuery'],
+        iteratorSuffix))
 
 if arguments['verbose']:
     prf.print_memory_usage('before load data')
 
-print('loading {}'.format(triggeredPath))
-dataReader, dataBlock = ns5.blockFromPath(
-    triggeredPath, lazy=arguments['lazy'])
-
-nSeg = len(dataBlock.segments)
+nSplits = 7
+cv_kwargs = dict(
+    shuffle=True,
+    stratifyFactors=stimulusConditionNames,
+    continuousFactors=['segment', 'originalIndex'])
 listOfIterators = []
-for segIdx in range(nSeg):
-    if arguments['verbose']:
-        prf.print_memory_usage('fitting on segment {}'.format(segIdx))
-    dataDF = ns5.alignedAsigsToDF(
-        dataBlock,
-        whichSegments=[segIdx],
-        **alignedAsigsKWargs)
-    if arguments['calcTimeROI']:
-        endMaskQuery = ash.processAlignQueryArgs(namedQueries, alignQuery=arguments['timeROIAlignQuery'])
-        evList = eventBlock.filter(
-            objects=ns5.Event,
-            name='seg{}_{}'.format(segIdx, eventName))
-        assert len(evList) == 1
-        targetTrialAnnDF = ns5.unitSpikeTrainArrayAnnToDF(evList).query(endMaskQuery)
-        targetMask = pd.Series(True, index=dataDF.index)
-        for (_, _, t), group in dataDF.groupby(['segment', 'originalIndex', 't']):
-            timeDifference = (targetTrialAnnDF['t'] - t)
-            deltaT = timeDifference[timeDifference > 0].min()
-            groupBins = group.index.get_level_values('bin')
-            print('Looking for bins >= {} and < {}'.format(ROIWinStart, deltaT + ROIWinStop))
-            targetMask.loc[group.index] = (groupBins >= ROIWinStart) & (groupBins < deltaT + ROIWinStop)
-        listOfROIMasks.append(targetMask)
-        dataDF = dataDF.loc[targetMask, :]
-        exampleIndex = dataDF.index
-        listOfExampleIndexes.append(exampleIndex)
-    cv_kwargs = dict(
-        shuffle=True,
-        stratifyFactors=stimulusConditionNames,
-        continuousFactors=['segment', 'originalIndex'])
+listOfDataFrames = []
+if not arguments['loadFromFrames']:
+    print('loading {}'.format(triggeredPath))
+    dataReader, dataBlock = ns5.blockFromPath(
+        triggeredPath, lazy=arguments['lazy'])
+    nSeg = len(dataBlock.segments)
+    for segIdx in range(nSeg):
+        if arguments['verbose']:
+            prf.print_memory_usage(
+                'fitting on segment {}'.format(segIdx))
+        # pdb.set_trace()
+        aakwa = alignedAsigsKWargs.copy()
+        if 'spectral' not in inputBlockSuffix:
+            # needs downsampling
+            aakwa['decimate'] = 20
+            aakwa['rollingWindow'] = 200
+        dataDF = ns5.alignedAsigsToDF(
+            dataBlock,
+            whichSegments=[segIdx],
+            **aakwa)
+        if arguments['calcTimeROI']:
+            endMaskQuery = ash.processAlignQueryArgs(
+                namedQueries, alignQuery=arguments['timeROIAlignQuery'])
+            evList = eventBlock.filter(
+                objects=ns5.Event,
+                name='seg{}_{}'.format(segIdx, eventName))
+            assert len(evList) == 1
+            targetTrialAnnDF = ns5.unitSpikeTrainArrayAnnToDF(evList).query(endMaskQuery)
+            targetMask = pd.Series(True, index=dataDF.index)
+            for (_, _, t), group in dataDF.groupby(['segment', 'originalIndex', 't']):
+                timeDifference = (targetTrialAnnDF['t'] - t)
+                deltaT = timeDifference[timeDifference > 0].min()
+                groupBins = group.index.get_level_values('bin')
+                print('Looking for bins >= {} and < {}'.format(ROIWinStart, deltaT + ROIWinStop))
+                targetMask.loc[group.index] = (groupBins >= ROIWinStart) & (groupBins < deltaT + ROIWinStop)
+            listOfROIMasks.append(targetMask)
+            dataDF = dataDF.loc[targetMask, :]
+            exampleIndex = dataDF.index
+            listOfExampleIndexes.append(exampleIndex)
+        listOfDataFrames.append(dataDF)
+    if arguments['lazy']:
+        dataReader.file.close()
+else:    # loading frames
+    if not arguments['processAll']:
+        experimentsToAssemble = {
+            experimentName: [blockIdx]}
+    currBlockNum = 0
+    for expName, lOfBlocks in experimentsToAssemble.items():
+        thisScratchFolder = os.path.join(scratchPath, expName)
+        analysisSubFolder, alignSubFolder = hf.processSubfolderPaths(
+            arguments, thisScratchFolder)
+        thisDFFolder = os.path.join(alignSubFolder, 'dataframes')
+        for bIdx in lOfBlocks:
+            theseArgs = arguments.copy()
+            theseArgs['blockIdx'] = '{}'.format(bIdx)
+            theseArgs['processAll'] = False
+            thisBlockBaseName, _ = hf.processBasicPaths(theseArgs)
+            dFPath = os.path.join(
+                thisDFFolder,
+                '{}_{}_{}_df{}.h5'.format(
+                    thisBlockBaseName,
+                    arguments['window'],
+                    arguments['alignQuery'],
+                    iteratorSuffix))
+            thisDF = pd.read_hdf(dFPath, arguments['selectionName'])
+            # newSegLevel = [currBlockNum for i in range(thisDF.shape[0])]
+            thisDF.index = thisDF.index.set_levels([currBlockNum], level='segment')
+            listOfDataFrames.append(thisDF)
+            currBlockNum += 1
+
+'''
+trialInfo = dataDF.index.to_frame().reset_index(drop=True)
+for cN in trialInfo.columns:
+    print('{}'.format(cN))
+    print(trialInfo[cN].unique())
+    print('   ')
+    '''
+# pdb.set_trace()
+if not arguments['processAll']:
+    for dataDF in listOfDataFrames:
+        cvIterator = tdr.trainTestValidationSplitter(
+            dataDF, tdr.trialAwareStratifiedKFold,
+            n_splits=nSplits, splitterKWArgs=cv_kwargs
+            )
+        listOfIterators.append(cvIterator)
+else:
+    exportDF = pd.concat(listOfDataFrames)
     cvIterator = tdr.trainTestValidationSplitter(
-        dataDF, tdr.trialAwareStratifiedKFold, n_splits=7,
-        splitterKWArgs=cv_kwargs
+        exportDF, tdr.trialAwareStratifiedKFold,
+        n_splits=nSplits, splitterKWArgs=cv_kwargs
         )
     listOfIterators.append(cvIterator)
-if arguments['lazy']:
-    dataReader.file.close()
 
 exportAAKWA = alignedAsigsKWargs.copy()
 exportAAKWA.pop('unitNames', None)
@@ -196,7 +273,8 @@ exportAAKWA.pop('unitQuery', None)
 iteratorMetadata = {
     'alignedAsigsKWargs': exportAAKWA,
     'iteratorsBySegment': listOfIterators,
-    'cv_kwargs': cv_kwargs
+    'cv_kwargs': cv_kwargs,
+    'experimentsToAssemble': experimentsToAssemble
 }
 if arguments['calcTimeROI']:
     iteratorMetadata.update({
@@ -207,3 +285,12 @@ print('saving {}'.format(iteratorPath))
 with open(iteratorPath, 'wb') as f:
     pickle.dump(
         iteratorMetadata, f)
+if arguments['saveDataFrame']:
+    outputDFPath = os.path.join(
+        dataFramesFolder,
+        '{}_{}_{}_df{}.h5'.format(
+            blockBaseName,
+            arguments['window'],
+            arguments['alignQuery'],
+            iteratorSuffix))
+    exportDF.to_hdf(outputDFPath, arguments['selectionName'], mode='w')

@@ -30,7 +30,8 @@ import quantities as pq
 # import seaborn as sns
 
 #  load options
-from currentExperiment import parseAnalysisOptions
+from dataAnalysis.analysis_code.namedQueries import namedQueries
+from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
 from docopt import docopt
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(

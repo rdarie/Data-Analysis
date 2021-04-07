@@ -819,7 +819,7 @@ def genDetrender(
                 (waveDF.columns >= timeWindow[0]) &
                 (waveDF.columns < timeWindow[1]))
             if not trendMask.any():
-                print(Warning('detrender failed to find matching time range!'))
+                print(Warning('detrender failed to find matching time range! Returning data as is'))
                 return waveDF
         if useMean:
             trend = waveDF.loc[:, trendMask].mean(axis='columns')

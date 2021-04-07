@@ -10,18 +10,18 @@
 #SBATCH --mem=59G
 
 # Specify a job name:
-#SBATCH -J qa_motion_2021_01_25
+#SBATCH -J qa_motion_2021_01_20
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-qa_motion_2021_01_25.out
-#SBATCH -e ../../batch_logs/%j-%a-qa_motion_2021_01_25.out
+#SBATCH -o ../../batch_logs/%j-%a-qa_motion_2021_01_20.out
+#SBATCH -e ../../batch_logs/%j-%a-qa_motion_2021_01_20.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 # Request custom resources
 #SBATCH --array=1,2,3
 
-# SLURM_ARRAY_TASK_ID=2
+SLURM_ARRAY_TASK_ID=3
 source shellScripts/run_plotter_aligned_motion_preamble.sh
 
 UNITQUERY="--unitQuery=lfp"

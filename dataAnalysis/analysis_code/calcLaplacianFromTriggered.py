@@ -582,7 +582,6 @@ if __name__ == "__main__":
     #
     if arguments['lazy']:
         dataReader.file.close()
-    pdb.set_trace()
     outputBlock.create_relationship()
     outputBlock = ns5.purgeNixAnn(outputBlock)
     if os.path.exists(outputPath):

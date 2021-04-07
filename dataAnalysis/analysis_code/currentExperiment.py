@@ -17,7 +17,8 @@ def parseAnalysisOptions(
         remoteBasePath = d['remoteBasePath']
     #
     optsModule = importlib.import_module(
-        'dataAnalysis.analysis_code.experimentOptions.' + experimentShorthand, package=None)
+        'dataAnalysis.analysis_code.experimentOptions.' + experimentShorthand,
+        package=None)
     expOpts = optsModule.getExpOpts()
     #  globals().update(expOpts)
     #  remote paths
@@ -31,7 +32,8 @@ def parseAnalysisOptions(
 
     nspPrbPath = os.path.join('.', 'nsp_map.prb')
     try:
-        insFolder = os.path.join(remoteBasePath, 'ORCA Logs', expOpts['subjectName'])
+        insFolder = os.path.join(
+            remoteBasePath, 'ORCA Logs', expOpts['subjectName'])
     except Exception:
         insFolder = os.path.join(remoteBasePath, 'ORCA Logs')
     experimentName = expOpts['experimentName']
@@ -404,7 +406,7 @@ def parseAnalysisOptions(
             'XXXS': (-0.005, 0.025),
             'M': (-0.2, 0.8),
             'short': (-0.5, 0.5),
-            'L': (-0.4, 1.2),
+            'L': (-0.2, 1.2),
             'RC': (-0.33, 0.33),
             'miniRC': (-1, 1)},
         'discardEmpty': None, 'maxSpikesTo': None, 'timeRange': None,
@@ -519,4 +521,10 @@ def parseAnalysisOptions(
                 windowSize=(-1750e-3, 1750e-3)),
             covariateSpacing=10e-3),
     }
+    essentialMetadataFields = [
+        'segment', 'originalIndex', 't', 'amplitude', 'program',
+        'activeGroup', 'RateInHz', 'stimCat', 'electrode',
+        'pedalDirection', 'pedalSize', 'pedalSizeCat', 'pedalMovementCat',
+        'pedalMetaCat', 'bin'
+        ]
     return expOpts, locals()

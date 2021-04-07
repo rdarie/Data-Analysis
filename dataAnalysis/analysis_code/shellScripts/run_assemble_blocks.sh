@@ -19,6 +19,6 @@
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 
-source shellScripts/run_align_full_preamble.sh
+source shellScripts/run_align_stim_preamble.sh
 
 python -u ./assembleExperimentData.py --exp=$EXP $ANALYSISFOLDER --processAsigs --processRasters

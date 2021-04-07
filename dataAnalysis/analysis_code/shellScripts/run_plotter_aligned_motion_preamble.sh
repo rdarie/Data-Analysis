@@ -2,13 +2,13 @@
 
 source ./shellScripts/run_align_motion_preamble.sh
 
-# OUTLIERMASK="--maskOutlierBlocks"
-OUTLIERMASK=""
+OUTLIERMASK="--maskOutlierBlocks"
+# OUTLIERMASK=""
 
-# STATSOVERLAY="--overlayStats"
-STATSOVERLAY=""
+STATSOVERLAY="--overlayStats"
+# STATSOVERLAY=""
 
-TIMEWINDOWOPTS="--winStart=200 --winStop=800"
+TIMEWINDOWOPTS="--winStart=200 --winStop=1200"
 
 # ALIGNQUERY="--alignQuery=stimOn"
 # ALIGNQUERY="--alignQuery=outbound"
@@ -21,7 +21,7 @@ ALIGNQUERY="--alignQuery=starting"
 # SIZEOPTS="--sizeName= --sizeControl="
 
 HUEOPTS="--hueName=amplitude --hueControl="
-ROWOPTS="--rowName=RateInHz --rowControl="
+ROWOPTS="--rowName=pedalSizeCat --rowControl="
 COLOPTS="--colName=pedalMovementCat --colControl="
 STYLEOPTS="--styleName= --styleControl="
 SIZEOPTS="--sizeName= --sizeControl="

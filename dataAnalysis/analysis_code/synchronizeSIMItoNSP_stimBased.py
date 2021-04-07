@@ -83,7 +83,7 @@ idxSl = pd.IndexSlice
 
 #############################################################
 blockBaseName, inputBlockSuffix = hf.processBasicPaths(arguments)
-searchRadius = [-2., 2.]
+searchRadius = [-30., 30.]
 # searchRadius = [-.5, .5]
 searchRadiusUnix = [
     pd.Timedelta(searchRadius[0], unit='s'),
@@ -116,7 +116,7 @@ interpFunSimiToNSP = {}
 interpFunNSPtoSimi = {}
 #  load Simi Data
 ############################################################
-projVideoFolder = '/gpfs/data/dborton/rdarie/Video_Tracking/dummy_projects/proprioInference1-Radu-2021-03-22/videos'
+projVideoFolder = '/gpfs/data/dborton/rdarie/Video_Tracking/dummy_projects/proprioInference2-Radu-2021-04-07/videos'
 simiPath = os.path.join(
     projVideoFolder,
     '{}-{}-{}shuffle{}_{}_3D.h5'.format(

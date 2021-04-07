@@ -856,7 +856,6 @@ def unitSpikeTrainWaveformsToDF(
             wfDF = procFun(wfDF, st)
         idxLabels = ['segment', 'originalIndex', 't']
         wfDF.loc[:, 't'] = np.asarray(st.times.magnitude)
-        # pdb.set_trace()
         if (getMetaData) or (dataQuery is not None):
             # if there's a query, get metadata temporarily to resolve it
             annDict = {}
@@ -875,7 +874,7 @@ def unitSpikeTrainWaveformsToDF(
                 st.annotations['arrayAnnNames'] +
                 [
                     'arrayAnnNames', 'arrayAnnDTypes',
-                    'nix_name', 'neo_name', 'id',
+                    'nix_name', 'neo_name', 'id', 'templateDist',
                     'cell_label', 'cluster_label', 'max_on_channel', 'binWidth']
                 )
             annDF = pd.DataFrame(annDict)
@@ -888,6 +887,12 @@ def unitSpikeTrainWaveformsToDF(
                 if k not in skipAnnNames:
                     annDF.loc[:, k] = value
             #
+            metaFillerLookup = {
+                'program': 999.,
+                'amplitude': 0.,
+                'activeGroup': 0.,
+                'RateInHz': 0.
+            }
             if isinstance(getMetaData, Iterable):
                 doNotFillList = idxLabels + ['feature', 'bin']
                 fieldsNeedFiller = [
@@ -895,7 +900,7 @@ def unitSpikeTrainWaveformsToDF(
                     for mdn in getMetaData
                     if (mdn not in doNotFillList) and (mdn not in annDF.columns)]
                 for mdName in fieldsNeedFiller:
-                    annDF.loc[:, mdName] = 'NA'
+                    annDF.loc[:, mdName] = metaFillerLookup.setdefault(mdName, 'NA')
             annColumns = annDF.columns.to_list()
             if getMetaData:
                 for annNm in annColumns:
@@ -922,6 +927,7 @@ def unitSpikeTrainWaveformsToDF(
     # TODO implement lags and rolling window addition here
     metaDF = zeroLagWaveformsDF.loc[:, idxLabels].copy()
     zeroLagWaveformsDF.drop(columns=idxLabels, inplace=True)
+    zeroLagWaveformsDF.columns = zeroLagWaveformsDF.columns.astype(np.float)
     if lags is None:
         lags = [0]
     laggedWaveformsDict = {
@@ -932,22 +938,17 @@ def unitSpikeTrainWaveformsToDF(
                 lag, axis='columns')
             if rollingWindow is not None:
                 halfRollingWin = int(np.ceil(rollingWindow/2))
-                seekIdx = slice(
-                    halfRollingWin, -halfRollingWin+1, decimate)
-                # seekIdx = slice(None, None, decimate)
-                #shiftedWaveform = (
-                #    shiftedWaveform
-                #    .rolling(
-                #        window=rollingWindow, win_type='gaussian',
-                #        axis='columns', center=True)
-                #    .mean(std=halfRollingWin))
+                # seekIdx = slice(
+                #     halfRollingWin, -halfRollingWin+1, decimate)
+                seekIdx = slice(rollingWindow, None, decimate)
                 shiftedWaveform = (
                     shiftedWaveform
+                    .T
                     .rolling(
-                        window=rollingWindow, 
-                        axis='columns', center=True)
-                    .mean())
-            else:
+                        window=rollingWindow, win_type='gaussian',
+                        center=False)
+                    .mean(std=halfRollingWin).T)
+            else: # rollingWindow is None
                 halfRollingWin = 0
                 seekIdx = slice(None, None, decimate)
                 if False:
@@ -956,21 +957,22 @@ def unitSpikeTrainWaveformsToDF(
                     plt.plot(oldShiftedWaveform.iloc[0, :])
                     plt.plot(shiftedWaveform.iloc[0, :])
                     plt.show()
+            thisLaggedWvf = shiftedWaveform.iloc[:, seekIdx].copy()
             laggedWaveformsDict[
-                (spikeTrainContainer.name, lag)] = (
-                    shiftedWaveform.iloc[:, seekIdx].copy())
+                (spikeTrainContainer.name, lag)] = thisLaggedWvf
         if isinstance(lag, tuple):
             halfRollingWin = int(np.ceil(lag[1]/2))
-            seekIdx = slice(
-                halfRollingWin, -halfRollingWin+1, decimate)
-            # seekIdx = slice(None, None, decimate)
+            '''seekIdx = slice(
+                halfRollingWin, -halfRollingWin+1, decimate)'''
+            seekIdx = slice(lag[1], None, decimate)
             shiftedWaveform = (
                 zeroLagWaveformsDF
                 .shift(lag[0], axis='columns')
+                .T
                 .rolling(
                     window=lag[1], win_type='gaussian',
-                    axis='columns', center=True)
-                .mean(std=halfRollingWin))
+                    center=False)
+                .mean(std=halfRollingWin).T)
             laggedWaveformsDict[
                 (spikeTrainContainer.name, lag)] = (
                     shiftedWaveform.iloc[:, seekIdx].copy())
@@ -3885,7 +3887,12 @@ def loadObjArrayAnn(st):
         elif isinstance(st.annotations['arrayAnnNames'], tuple):
             st.annotations['arrayAnnNames'] = [i for i in st.annotations['arrayAnnNames']]
         #
-        for key in st.annotations['arrayAnnNames']:
+        arrayAnnNames = copy(st.annotations['arrayAnnNames'])
+        for key in arrayAnnNames:
+            if key not in st.annotations:
+                print('Warning! {} not found in st.annotations'.format(key))
+                st.annotations['arrayAnnNames'].remove(key)
+                continue
             #  fromRaw, the ann come back as tuple, need to recast
             try:
                 if len(st.times) == 1:
