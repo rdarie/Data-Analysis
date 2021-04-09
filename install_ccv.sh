@@ -12,7 +12,9 @@ RepoList=(\
 "rcsanalysis" \
 "peakutils" \
 "umap" \
-"kCSD-python"
+"kCSD-python" \
+"scaleogram" \
+"pywt"
 )
 
 module load git/2.10.2
@@ -23,6 +25,7 @@ module load mpi
 # module load opengl
 module load qt/5.10.1
 module load zlib/1.2.11
+module unload python
 
 . /gpfs/runtime/opt/anaconda/2020.02/etc/profile.d/conda.sh
 conda activate

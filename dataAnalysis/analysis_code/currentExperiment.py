@@ -380,7 +380,7 @@ def parseAnalysisOptions(
                 'subfolder': 'default',
                 'binInterval': 1e-3,
                 'binWidth': 10e-3,
-                'smoothKernelWidth': 10e-3},  # default
+                'smoothKernelWidth': 10e-3},  # default, 1kHz
             'normalizedByImpedance': {
                 'subfolder': 'default',
                 'binInterval': 1e-3,
@@ -527,4 +527,12 @@ def parseAnalysisOptions(
         'pedalDirection', 'pedalSize', 'pedalSizeCat', 'pedalMovementCat',
         'pedalMetaCat', 'bin'
         ]
+    spectralFeatureOpts = dict(
+        winLen=100e-3, stepLen=20e-3, R=20,
+        fStart=None, fStop=None)
+    freqBandsDict = ({
+        'name': ['low', 'beta', 'hi', 'spb'],
+        'lBound': [1.5, 10, 80, 250],
+        'hBound': [8.0, 40, 250, 1000]
+        })
     return expOpts, locals()

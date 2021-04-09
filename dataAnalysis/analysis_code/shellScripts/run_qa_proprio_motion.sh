@@ -21,9 +21,9 @@
 # Request custom resources
 #SBATCH --array=1,2,3
 
-SLURM_ARRAY_TASK_ID=3
+# SLURM_ARRAY_TASK_ID=3
 source shellScripts/run_plotter_aligned_motion_preamble.sh
-
+ANALYSISFOLDER="--analysisName=default"
 UNITQUERY="--unitQuery=lfp"
 INPUTBLOCKNAME="--inputBlockSuffix=lfp"
 

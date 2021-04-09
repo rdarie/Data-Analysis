@@ -52,7 +52,7 @@ import dataAnalysis.preproc.ns5 as ns5
 # from sklearn.decomposition import PCA, IncrementalPCA
 # from sklearn.pipeline import make_pipeline, Pipeline
 # from sklearn.covariance import ShrunkCovariance, LedoitWolf, EmpiricalCovariance
-from sklearn.cross_decomposition import PLSRegression, PLSSVD, PLSCanonical
+from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import cross_val_score, cross_validate, GridSearchCV
 import joblib as jb
 import dill as pickle
@@ -67,12 +67,14 @@ arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 consoleDebugging = True
 if consoleDebugging:
     arguments = {
-        'iteratorSuffix': 'a', 'alignFolderName': 'motion', 'unitQueryLhs': 'pedalPosition',
+        'iteratorSuffix': 'a', 'alignFolderName': 'motion',
         'processAll': True, 'exp': 'exp202101201100', 'analysisName': 'default',
-        'rhsBlockSuffix': 'rig', 'blockIdx': '2', 'rhsBlockPrefix': 'Block', 'verbose': False,
-        'lhsBlockSuffix': 'rig', 'loadFromFrames': True, 'estimatorName': 'pls_csd_spectral_ja',
+        'blockIdx': '2', 'rhsBlockPrefix': 'Block', 'verbose': False,
+        'lhsBlockSuffix': 'lfp_CAR_spectral', 'unitQueryLhs': 'lfp_CAR_spectral',
+        'rhsBlockSuffix': 'rig', 'unitQueryRhs': 'jointAngle',
+        'loadFromFrames': True, 'estimatorName': 'ols_lfp_CAR_ja',
         'alignQuery': 'starting', 'winStop': '400', 'window': 'L', 'selector': None, 'winStart': '200',
-        'unitQueryRhs': 'jointAngle', 'plotting': True, 'lazy': False, 'lhsBlockPrefix': 'Block',
+        'plotting': True, 'lazy': False, 'lhsBlockPrefix': 'Block',
         'showFigures': True}
     os.chdir('/gpfs/home/rdarie/nda2/Data-Analysis/dataAnalysis/analysis_code')
 '''
@@ -152,17 +154,11 @@ cv_kwargs = loadingMeta.pop('cv_kwargs')
 #
 def compute_scores(
         X, y, estimator,
-        nComponentsToTest,
         estimatorKWArgs={},
         crossvalKWArgs={},
         verbose=False):
-    scores = {}
-    for n in nComponentsToTest:
-        if verbose:
-            print('evaluating with {} components'.format(n))
-        instance = estimator(**estimatorKWArgs)
-        instance.n_components = n
-        scores[n] = cross_validate(instance, X, y, **crossvalKWArgs)
+    instance = estimator(**estimatorKWArgs)
+    scores = cross_validate(instance, X, y, **crossvalKWArgs)
     return scores
 
 lOfRhsDF = []
@@ -258,21 +254,22 @@ workingLhsDF = lhsDF.iloc[workIdx, :]
 workingRhsDF = rhsDF.iloc[workIdx, :]
 nFeatures = lhsDF.columns.shape[0]
 nTargets = rhsDF.columns.shape[0]
-nCompsToTest = range(1, min(nTargets, nFeatures) + 1)
-# PLSSVD, PLSRegression, PLSCanonical
-scores = compute_scores(
-    lhsDF, rhsDF, PLSCanonical,
-    nCompsToTest, verbose=True,
-    crossvalKWArgs=dict(
-        cv=cvIterator, scoring='r2',
-        return_estimator=True,
-        return_train_score=True),
-    # estimatorKWArgs=dict(svd_solver='full')
-    )
+
+scores = {}
+for cName, lag in rhsDF.columns:
+    scores[cName] = compute_scores(
+        lhsDF, rhsDF.loc[:, (cName, lag)], LinearRegression,
+        verbose=True,
+        crossvalKWArgs=dict(
+            cv=cvIterator, scoring='r2',
+            return_estimator=True,
+            return_train_score=True),
+        # estimatorKWArgs=dict(svd_solver='full')
+        )
 
 scoresDF = pd.concat(
     {nc: pd.DataFrame(scr) for nc, scr in scores.items()},
-    names=['nComponents', 'fold'])
+    names=['target', 'fold'])
 
 if arguments['plotting']:
     figureOutputPath = os.path.join(
@@ -288,10 +285,10 @@ if arguments['plotting']:
         fig.set_size_inches(12, 8)
         sns.violinplot(
             data=scoresForPlot, hue='evalType',
-            x='nComponents', y='score',
+            x='target', y='score',
             ci='sem', ax=ax)
-        ax.set_xlabel('number of components')
-        ax.set_ylabel('R2 of partial least squares fit')
+        ax.set_xlabel('regression target')
+        ax.set_ylabel('R2 of ordinary least squares fit')
         fig.tight_layout(pad=1)
         pdf.savefig(bbox_inches='tight', pad_inches=0)
         if arguments['showFigures']:

@@ -13,8 +13,8 @@ Options:
     --analysisName=analysisName            append a name to the resulting blocks? [default: default]
     --alignFolderName=alignFolderName      append a name to the resulting blocks? [default: motion]
     --window=window                        process with short window? [default: short]
-    --winStart=winStart                    start of window [default: 200]
-    --winStop=winStop                      end of window [default: 400]
+    --winStart=winStart                    start of window
+    --winStop=winStop                      end of window
     --unitQuery=unitQuery                  how to restrict channels?
     --inputBlockSuffix=inputBlockSuffix    which trig_ block to pull [default: pca]
     --inputBlockPrefix=inputBlockPrefix    which trig_ block to pull [default: Block]
@@ -23,7 +23,7 @@ Options:
 import dataAnalysis.helperFunctions.profiling as prf
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
 import dataAnalysis.helperFunctions.helper_functions_new as hf
-from namedQueries import namedQueries
+from dataAnalysis.analysis_code.namedQueries import namedQueries
 import os
 import pandas as pd
 import numpy as np
@@ -34,6 +34,7 @@ import pickle
 import math as m
 import quantities as pq
 from tqdm import tqdm
+import pywt
 try:
     import libtfr
     HASLIBTFR = True
@@ -41,9 +42,20 @@ except Exception:
     import scipy.signal
     HASLIBTFR = False
 
-from currentExperiment import parseAnalysisOptions
+from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
 from docopt import docopt
+
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
+'''
+consoleDebug = True
+if consoleDebug:
+    arguments = {
+        'window': 'L', 'analysisName': 'hiRes', 'lazy': True, 'inputBlockSuffix': 'lfp_CAR',
+        'blockIdx': '3', 'verbose': True, 'processAll': False, 'unitQuery': 'lfp',
+        'winStop': '1300', 'profile': False, 'alignQuery': 'starting', 'exp': 'exp202101201100',
+        'alignFolderName': 'motion', 'inputBlockPrefix': 'Block', 'winStart': '300'}
+    os.chdir('/gpfs/home/rdarie/nda2/Data-Analysis/dataAnalysis/analysis_code')
+'''
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']), arguments['exp'])
 globals().update(expOpts)
@@ -161,6 +173,13 @@ def getSpectrogram(
         pBar = tqdm(total=dataSrs.groupby(trialGroupByNames).ngroups)
     for name, group in dataSrs.groupby(trialGroupByNames):
         tStart = group.index.get_level_values(indexTName)[0]
+        # pdb.set_trace()
+        ###
+        # wav = pywt.ContinuousWavelet('cmor1.5-1.0')
+        # dt = fs ** (-1)
+        # scales = [1, 2, 3, 4, 10, 15]
+        # coef, freqs = pywt.cwt(group.to_numpy(), scales, wav, sampling_period=dt)
+        ###
         spectra.append(pSpec(
             group.to_numpy(), tStart, winLen, winLen_samp,
             stepLen, stepLen_samp,
@@ -178,14 +197,9 @@ outputPath = os.path.join(
 dataReader, dataBlock = ns5.blockFromPath(
     triggeredPath, lazy=arguments['lazy'])
 #
-freqBands = pd.DataFrame({
-    'name': ['low', 'beta', 'hi', 'spb'],
-    'lBound': [1.5, 10, 80, 250],
-    'hBound': [4.5, 40, 250, 1000] # CHANGE BACK FOR HIGH FREQ
-    })
 alignedAsigsDF = ns5.alignedAsigsToDF(
     dataBlock, **alignedAsigsKWargs)
-
+freqBands = pd.DataFrame(freqBandsDict)
 alignedAsigsDF.columns = alignedAsigsDF.columns.droplevel('lag')
 trialGroupByNames = alignedAsigsDF.index.droplevel('bin').names
 dummySt = dataBlock.filter(
@@ -193,13 +207,13 @@ dummySt = dataBlock.filter(
 fs = float(dummySt.sampling_rate)
 theseSpectralFeatList = []
 for featName in alignedAsigsDF.columns:
+    # dataSrs = alignedAsigsDF.loc[:, featName]
     if arguments['verbose']:
         print('on feature {}'.format(featName))
     thisSpectrogram = getSpectrogram(
         alignedAsigsDF.loc[:, featName],
         trialGroupByNames=trialGroupByNames,
-        winLen=200e-3, stepLen=20e-3, R=20,
-        fs=fs, fStart=None, fStop=None)
+        fs=fs, **spectralFeatureOpts)
     fBands = thisSpectrogram.columns
     for rIdx, row in freqBands.iterrows():
         thisMask = (fBands >= row['lBound']) & (fBands < row['hBound'])

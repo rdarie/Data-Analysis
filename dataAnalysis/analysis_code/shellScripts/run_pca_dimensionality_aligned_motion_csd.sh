@@ -21,8 +21,8 @@
 
 # Request custom resources
 #SBATCH --array=2
-
+SLURM_ARRAY_TASK_ID=2
 source ./shellScripts/run_pca_calc_aligned_motion_preamble.sh
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
-python -u './calcSignalDimensionality.py' --loadFromFrames --inputBlockSuffix="kcsd" --unitQuery="lfp" --estimatorName="pca_kcsd" --iteratorSuffix='a' --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting
-python -u './calcSignalDimensionality.py' --loadFromFrames --inputBlockSuffix="kcsd_spectral" --unitQuery="lfp" --estimatorName="pca_kcsd" --iteratorSuffix='a' --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting
+python -u './calcSignalDimensionality.py' --loadFromFrames --inputBlockSuffix="csd" --unitQuery="csd" --estimatorName="pca_csd" --iteratorSuffix='a' --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting
+python -u './calcSignalDimensionality.py' --loadFromFrames --inputBlockSuffix="csd_spectral" --unitQuery="csd_spectral" --estimatorName="pca_csd_spectral" --iteratorSuffix='a' --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting

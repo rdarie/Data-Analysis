@@ -24,5 +24,5 @@
 SLURM_ARRAY_TASK_ID=2
 source ./shellScripts/run_pca_calc_aligned_motion_preamble.sh
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
-python -u './calcSignalDimensionality.py' --loadFromFrames --inputBlockSuffix="lfp_CAR" --unitQuery="lfp" --estimatorName="pca_lfp" --iteratorSuffix='a' --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting
-# python -u './calcSignalDimensionality.py' --loadFromFrames --inputBlockSuffix="lfp_CAR_spectral" --unitQuery="lfp" --estimatorName="pca_lfp" --iteratorSuffix='a' --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting
+python -u './calcSignalDimensionality.py' --loadFromFrames --inputBlockSuffix="lfp_CAR" --unitQuery="lfp_CAR" --estimatorName="pca_lfp_CAR" --iteratorSuffix='a' --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting
+python -u './calcSignalDimensionality.py' --loadFromFrames --inputBlockSuffix="lfp_CAR_spectral" --unitQuery="lfp_CAR_spectral" --estimatorName="pca_lfp_CAR_spectral" --iteratorSuffix='a' --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting

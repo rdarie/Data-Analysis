@@ -18,6 +18,7 @@ Options:
     --inputBlockSuffix=inputBlockSuffix    which trig_ block to pull [default: pca]
     --inputBlockPrefix=inputBlockPrefix    which trig_ block to pull [default: Block]
     --iteratorSuffix=iteratorSuffix        filename for cross_val iterator
+    --needsRollingWindow                   need to decimate to align to spectrogram?
     --selector=selector                    filename if using a unit selector
 """
 import matplotlib
@@ -109,10 +110,14 @@ for segIdx in range(nSeg):
     if 'listOfROIMasks' in loadingMeta:
         alignedAsigsKWargs.update({'finalIndexMask': loadingMeta['listOfROIMasks'][segIdx]})
     aakwa = alignedAsigsKWargs.copy()
-    if 'spectral' not in inputBlockSuffix:
+    # pdb.set_trace()
+    if arguments['needsRollingWindow']:
         # needs downsampling
-        aakwa['decimate'] = 20
-        aakwa['rollingWindow'] = 200
+        binInterval = rasterOpts['binOpts'][arguments['analysisName']]['binInterval']
+        stepLen = spectralFeatureOpts['stepLen']
+        winLen = spectralFeatureOpts['winLen']
+        aakwa['decimate'] = int(stepLen / binInterval)
+        aakwa['rollingWindow'] = int(winLen / binInterval)
     dataDF = ns5.alignedAsigsToDF(
         dataBlock,
         whichSegments=[segIdx],
@@ -146,4 +151,4 @@ outputDFPath = os.path.join(
         iteratorSuffix))
 if arguments['verbose']:
     prf.print_memory_usage('Saving {}'.format(outputDFPath))
-exportDF.to_hdf(outputDFPath, arguments['selectionName'], mode='r+')
+exportDF.to_hdf(outputDFPath, arguments['selectionName'], mode='a')

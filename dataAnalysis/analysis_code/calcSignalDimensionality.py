@@ -202,7 +202,7 @@ else:    # loading frames
             listOfDataFrames.append(thisDF)
             currBlockNum += 1
 
-# pdb.set_trace()
+
 dataDF = pd.concat(listOfDataFrames)
 trialInfo = dataDF.index.to_frame().reset_index(drop=True)
 cvIterator = iteratorsBySegment[0]
@@ -281,9 +281,10 @@ jb.dump(pcaFull, estimatorPath)
 
 alignedAsigsKWargs['unitNames'] = saveUnitNames
 alignedAsigsKWargs['unitQuery'] = None
-alignedAsigsKWargs.pop('dataQuery')
+alignedAsigsKWargs.pop('dataQuery', None)
+# pdb.set_trace()
 estimatorMetadata = {
-    'trainingDataPath': os.path.basename(triggeredPath),
+    'trainingDataPath': os.path.basename(iteratorPath),
     'path': os.path.basename(estimatorPath),
     'name': arguments['estimatorName'],
     'inputBlockSuffix': inputBlockSuffix,

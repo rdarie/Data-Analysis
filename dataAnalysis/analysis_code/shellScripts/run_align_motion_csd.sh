@@ -25,5 +25,5 @@
 # SLURM_ARRAY_TASK_ID=2
 source ./shellScripts/run_align_motion_preamble.sh
 
-python -u ./calcLaplacianFromTriggered.py --plotting --useKCSD --inputBlockSuffix="lfp" --unitQuery="lfp" --outputBlockSuffix="kcsd" --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
-python -u ./makeViewableBlockFromTriggered.py --plotting --inputBlockSuffix="kcsd" --unitQuery="lfp" --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
+python -u ./calcLaplacianFromTriggered.py --plotting --useKCSD --inputBlockSuffix="lfp" --unitQuery="lfp" --outputBlockSuffix="csd" --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
+python -u ./makeViewableBlockFromTriggered.py --plotting --inputBlockSuffix="csd" --unitQuery="lfp" --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS

@@ -25,4 +25,4 @@
 ####  SLURM_ARRAY_TASK_ID=2
 source shellScripts/run_align_motion_preamble.sh
 #
-python -u ./calcAlignedAsigs.py --chanQuery="raster" --outputBlockSuffix="raster" --eventBlockSuffix='epochs' --signalBlockSuffix='binarized' --verbose --exp=$EXP $AMPFIELDNAME $BLOCKSELECTOR $WINDOW $LAZINESS $EVENTSELECTOR $ALIGNFOLDER $ANALYSISFOLDER
+python -u ./calcAlignedAsigs.py --chanQuery="raster" --outputBlockSuffix="raster" --eventBlockSuffix='epochs' --signalBlockSuffix='binarized' --verbose --exp=$EXP $AMPFIELDNAME $BLOCKSELECTOR $WINDOW $LAZINESS $EVENTSELECTOR $ALIGNFOLDER $ANALYSISFOLDER $SIGNALFOLDER $EVENTFOLDER

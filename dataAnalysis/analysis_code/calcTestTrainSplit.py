@@ -30,6 +30,7 @@ Options:
     --eventSubfolder=eventSubfolder                      name of folder where the event block is [default: None]
     --loadFromFrames                                     load data from pre-saved dataframes?
     --saveDataFrame                                      save corresponding dataframe?
+    --needsRollingWindow                                 need to decimate to align to spectrogram?
     --selectionName=selectionName                        name in h5 for the saved data
 """
 
@@ -184,16 +185,19 @@ if not arguments['loadFromFrames']:
         if arguments['verbose']:
             prf.print_memory_usage(
                 'fitting on segment {}'.format(segIdx))
-        # pdb.set_trace()
         aakwa = alignedAsigsKWargs.copy()
-        if 'spectral' not in inputBlockSuffix:
+        if arguments['needsRollingWindow']:
             # needs downsampling
-            aakwa['decimate'] = 20
-            aakwa['rollingWindow'] = 200
+            binInterval = rasterOpts['binOpts'][arguments['analysisName']]['binInterval']
+            stepLen = spectralFeatureOpts['stepLen']
+            winLen = spectralFeatureOpts['winLen']
+            aakwa['decimate'] = int(stepLen / binInterval)
+            aakwa['rollingWindow'] = int(winLen / binInterval)
         dataDF = ns5.alignedAsigsToDF(
             dataBlock,
             whichSegments=[segIdx],
             **aakwa)
+        # trialInfo = dataDF.index.to_frame().reset_index(drop=True)
         if arguments['calcTimeROI']:
             endMaskQuery = ash.processAlignQueryArgs(
                 namedQueries, alignQuery=arguments['timeROIAlignQuery'])
@@ -251,7 +255,6 @@ for cN in trialInfo.columns:
     print(trialInfo[cN].unique())
     print('   ')
     '''
-# pdb.set_trace()
 if not arguments['processAll']:
     for dataDF in listOfDataFrames:
         cvIterator = tdr.trainTestValidationSplitter(
