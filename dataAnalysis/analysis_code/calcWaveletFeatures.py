@@ -8,6 +8,8 @@ Options:
     --processAll                           process entire experimental day? [default: False]
     --verbose                              print diagnostics? [default: False]
     --profile                              print time and mem diagnostics? [default: False]
+    --plotting                             display plots [default: False]
+    --showNow                              show plots at runtime? [default: False]
     --lazy                                 load from raw, or regular? [default: False]
     --alignQuery=alignQuery                choose a subset of the data?
     --analysisName=analysisName            append a name to the resulting blocks? [default: default]
@@ -38,10 +40,12 @@ from dask.diagnostics import ProgressBar
 from dask.distributed import Client
 from tqdm import tqdm
 import pywt
+import dataAnalysis.helperFunctions.pywt_helpers as pywthf
 from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
 from docopt import docopt
-
+import matplotlib.pyplot as plt
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
+
 '''
 consoleDebug = True
 if consoleDebug:
@@ -81,29 +85,37 @@ alignedAsigsKWargs.update(dict(
 
 def calcCWT(
         partition, dataColNames=None,
-        fs=None, dt=None, freqBandsDict=None,
-        scale=20,
-        verbose=False):
-    if dt is None:
-        dt = fs ** (-1)
+        verbose=False, waveletList=None, pycwtKWs={}):
     dataColMask = partition.columns.isin(dataColNames)
     partitionData = partition.loc[:, dataColMask]
-    # frequencies = pywt.scale2frequency('cmor1.5-1.0', [1, 2, 3, 4]) / dt
-    pdb.set_trace()
-    for fBIdx, fBName in enumerate(freqBandsDict['name']):
-        bandwidth = (freqBandsDict['hBound'][fBIdx] - freqBandsDict['lBound'][fBIdx]) / 2  # Hz
-        center = (freqBandsDict['hBound'][fBIdx] + freqBandsDict['lBound'][fBIdx]) / 2 # Hz
-        B = (fs / (2 * np.pi * scale * bandwidth)) ** 2
-        C = (center * scale) / fs
-    pywt.cwt
-    result = None
-    '''result = pd.DataFrame(
-        xxx,
-        index=partition.index, columns=xxx)
+    outputList = []
+    for wvlDict in waveletList:
+        coefs, freq = pywt.cwt(
+            partitionData, wvlDict['scales'],
+            wvlDict['wavelet'], **pycwtKWs)
+        scalesIdx = np.asarray([
+            [wvlDict['scales'][j] for i in range(coefs.shape[1])]
+            for j in range(coefs.shape[0])])
+        coefDF = pd.DataFrame(
+            np.abs(coefs).reshape(-1, partitionData.shape[1]),
+            columns=partitionData.columns)
+        coefDF.insert(0, 'scale', scalesIdx.reshape(-1))
+        coefDF.insert(1, 'freqBandName', wvlDict['name'])
+        coefDF.insert(2, 'center', wvlDict['center'])  # TODO reconcile with freq
+        coefDF.insert(3, 'bandwidth', wvlDict['bandwidth'])
+        coefDF.insert(4, 'waveletName', wvlDict['wavelet'].name)
+        outputList.append(coefDF)
+    # pdb.set_trace()
+    allCoefDF = pd.concat(outputList).reset_index(drop=True)
+    nNewFeatures = int(allCoefDF.shape[0] / partition.shape[0])
+    newIndexEntries = pd.concat(
+        [partition.loc[:, ~dataColMask] for i in range(nNewFeatures)]).reset_index(drop=True)
     result = pd.concat(
-        [result, partition.loc[:, ~dataColMask]],
+        [
+            newIndexEntries,
+            allCoefDF],
         axis=1)
-    result.name = 'cwt' '''
+    result.name = 'cwt'
     return result
 
 outputPath = os.path.join(
@@ -116,70 +128,86 @@ if __name__ == "__main__":
     #
     dataDF = ns5.alignedAsigsToDF(
         dataBlock, **alignedAsigsKWargs)
-    freqBands = pd.DataFrame(freqBandsDict)
-    # dataDF.columns = dataDF.columns.droplevel('lag')
-    # trialGroupByNames = dataDF.index.droplevel('bin').names
     dummySt = dataBlock.filter(
         objects=[ns5.SpikeTrain, ns5.SpikeTrainProxy])[0]
     fs = float(dummySt.sampling_rate)
+    dt = fs ** -1
+    scale = 50
+    waveletList = []
+    for fBIdx, fBName in enumerate(freqBandsDict['name']):
+        bandwidth = (freqBandsDict['hBound'][fBIdx] - freqBandsDict['lBound'][fBIdx]) / 6  # Hz
+        center = (freqBandsDict['hBound'][fBIdx] + freqBandsDict['lBound'][fBIdx]) / 2 # Hz
+        B = pywthf.bandwidthToMorletB(bandwidth, fs=fs, scale=scale)
+        C = pywthf.centerToMorletC(center, fs=fs, scale=scale)
+        minWidth = np.ceil((12 * scale * np.sqrt(B / 2) - 1) / scale)
+        waveletName = 'cmor{:.3f}-{:.3f}'.format(B, C)
+        wavelet = pywt.ContinuousWavelet(waveletName)
+        frequencies = pywt.scale2frequency(wavelet, [scale]) / dt
+        if arguments['plotting']:
+            bws, fcs, bw_ratios, figsDict = pywthf.plotKernels(
+                pywt.ContinuousWavelet(waveletName),
+                np.asarray([scale / 2, scale]),
+                dt=dt, precision=16, verbose=True,
+                width=minWidth)
+        if arguments['showNow']:
+            plt.show()
+        else:
+            plt.close()
+        waveletList.append({
+            'name': fBName, 'center': center,
+            'bandwidth': bandwidth, 'wavelet': wavelet,
+            'scales': [scale]
+        })
+    # dataDF.columns = dataDF.columns.droplevel('lag')
+    # trialGroupByNames = dataDF.index.droplevel('bin').names
     daskComputeOpts = dict(
             # scheduler='processes'
             scheduler='single-threaded'
             )
     cwtOpts = dict(
-        freqBandsDict=freqBandsDict, fs=fs)
-    daskClient = Client()
+        waveletList=waveletList,
+        pycwtKWs=dict(sampling_period=dt, axis=-1))
+    # daskClient = Client()
     # print(daskClient.scheduler_info()['services'])
     spectralDF = ash.splitApplyCombine(
         dataDF, fun=calcCWT,
         funKWArgs=cwtOpts,
         rowKeys=['feature'], colKeys=None,
-        daskProgBar=False,
-        daskPersist=True, useDask=True, reindexFromInput=False,
+        daskProgBar=True,
+        daskPersist=True,
+        useDask=True, reindexFromInput=False,
         daskComputeOpts=daskComputeOpts
         )
-
-'''theseSpectralFeatList = []
-for featName in dataDF.columns:
-    # dataSrs = dataDF.loc[:, featName]
-    if arguments['verbose']:
-        print('on feature {}'.format(featName))
-    thisSpectrogram = getSpectrogram(
-        dataDF.loc[:, featName],
-        trialGroupByNames=trialGroupByNames,
-        fs=fs, **spectralFeatureOpts)
-    fBands = thisSpectrogram.columns
-    for rIdx, row in freqBands.iterrows():
-        thisMask = (fBands >= row['lBound']) & (fBands < row['hBound'])
-        if thisMask.any():
-            thisFeat = thisSpectrogram.loc[:, thisMask].mean(axis='columns')
-            thisFeat.name = '{}_{}'.format(featName[:-2], row['name'])
-            theseSpectralFeatList.append(thisFeat)
-
-spectralDF = pd.concat(theseSpectralFeatList, axis='columns')
-spectralDF.columns.name = 'feature'
-
-tBins = np.unique(spectralDF.index.get_level_values('bin'))
-# pdb.set_trace()
-trialTimes = np.unique(spectralDF.index.get_level_values('t'))
-spikeTrainMeta = {
-    'units': pq.s,
-    'wvfUnits': pq.dimensionless,
-    'left_sweep': (-1) * tBins[0] * pq.s,
-    't_start': min(0, trialTimes[0]) * pq.s,
-    't_stop': trialTimes[-1] * pq.s,
-    'sampling_rate': ((tBins[1] - tBins[0]) ** (-1)) * pq.Hz
-}
-masterBlock = ns5.alignedAsigDFtoSpikeTrain(
-    spectralDF, spikeTrainMeta=spikeTrainMeta, matchSamplingRate=False)
-
-if arguments['lazy']:
-    dataReader.file.close()
-masterBlock = ns5.purgeNixAnn(masterBlock)
-if os.path.exists(outputPath + '.nix'):
-    os.remove(outputPath + '.nix')
-print('Writing {}.nix...'.format(outputPath))
-writer = ns5.NixIO(filename=outputPath + '.nix', mode='ow')
-writer.write_block(masterBlock, use_obj_names=True)
-writer.close()
-'''
+    newIndexCols = ['scale', 'freqBandName', 'center', 'bandwidth', 'waveletName']
+    spectralDF.set_index(newIndexCols, append=True, inplace=True)
+    spectralDF.columns = spectralDF.columns.astype(np.float)
+    tBins = np.unique(spectralDF.columns.get_level_values('bin'))
+    featNames = spectralDF.index.get_level_values('feature')
+    featNamesClean = featNames.str.replace('#0', '')
+    fbNames = spectralDF.index.get_level_values('freqBandName')
+    newFeatNames = ['{}_{}'.format(featNamesClean[i], fbNames[i]) for i in range(featNames.shape[0])]
+    spectralDF.index = spectralDF.index.droplevel('feature')
+    # pdb.set_trace()
+    spectralDF.loc[:, 'parentFeature'] = featNames
+    spectralDF.loc[:, 'feature'] = newFeatNames
+    spectralDF.set_index(['parentFeature', 'feature'], inplace=True)
+    trialTimes = np.unique(spectralDF.index.get_level_values('t'))
+    spikeTrainMeta = {
+        'units': pq.s,
+        'wvfUnits': pq.dimensionless,
+        'left_sweep': (-1) * tBins[0] * pq.s,
+        't_start': min(0, trialTimes[0]) * pq.s,
+        't_stop': trialTimes[-1] * pq.s,
+        'sampling_rate': ((tBins[1] - tBins[0]) ** (-1)) * pq.Hz
+    }
+    masterBlock = ns5.alignedAsigDFtoSpikeTrain(
+        spectralDF, spikeTrainMeta=spikeTrainMeta, matchSamplingRate=False)
+    if arguments['lazy']:
+        dataReader.file.close()
+    masterBlock = ns5.purgeNixAnn(masterBlock)
+    if os.path.exists(outputPath + '.nix'):
+        os.remove(outputPath + '.nix')
+    print('Writing {}.nix...'.format(outputPath))
+    writer = ns5.NixIO(filename=outputPath + '.nix', mode='ow')
+    writer.write_block(masterBlock, use_obj_names=True)
+    writer.close()

@@ -40,8 +40,11 @@ conda activate nda2
 cd ..
 export PYTHONPATH="/users/rdarie/anaconda/nda2/lib/python3.7/site-packages"
 #
-pip install pyqt5==5.10.1 --target="/users/rdarie/anaconda/nda2/lib/python3.7/site-packages"
-pip install vg==1.6.1 --target="/users/rdarie/anaconda/nda2/lib/python3.7/site-packages"
+pip install pyqt5==5.10.1 --target="/users/rdarie/anaconda/nda2/lib/python3.7/site-packages" --upgrade
+# jupyter requires the qt console, installing after the fact to ensure the proper version
+conda install jupyter --freeze-installed
+conda install pyqtgraph=0.10.0 --freeze-installed
+pip install vg==1.6.1 --target="/users/rdarie/anaconda/nda2/lib/python3.7/site-packages" --no-deps
 #
 pip install git+git://github.com/G-Node/nixpy@v1.5.0b3 --target="/users/rdarie/anaconda/nda2/lib/python3.7/site-packages" --no-deps
 pip install git+git://github.com/hector-sab/ttictoc@v0.4.1 --target="/users/rdarie/anaconda/nda2/lib/python3.7/site-packages" --no-deps
