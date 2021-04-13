@@ -110,8 +110,7 @@ if arguments['plotting']:
         os.makedirs(figureOutputFolder)
 #
 cvIteratorSubfolder = os.path.join(
-    scratchFolder, 'testTrainSplits',
-    arguments['alignFolderName'])
+    alignSubFolder, 'testTrainSplits')
 if arguments['iteratorSuffix'] is not None:
     iteratorSuffix = '_{}'.format(arguments['iteratorSuffix'])
 else:
@@ -242,6 +241,11 @@ else:    # loading frames
                     arguments['window'],
                     arguments['alignQuery'],
                     iteratorSuffix))
+            pdb.set_trace()
+            '''
+                with pd.HDFStore(dFPath) as store:
+                    print(store.info())
+            '''
             thisRhsDF = pd.read_hdf(dFPath, arguments['unitQueryRhs'])
             thisRhsDF.index = thisRhsDF.index.set_levels([currBlockNum], level='segment')
             lOfRhsDF.append(thisRhsDF)
@@ -254,6 +258,7 @@ rhsDF = pd.concat(lOfRhsDF)
 #####
 cvIterator = iteratorsBySegment[0]
 workIdx = cvIterator.work
+# lhsDF.iloc[workIdx, :]
 workingLhsDF = lhsDF.iloc[workIdx, :]
 workingRhsDF = rhsDF.iloc[workIdx, :]
 nFeatures = lhsDF.columns.shape[0]

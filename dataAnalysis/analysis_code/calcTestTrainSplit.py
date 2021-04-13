@@ -64,7 +64,7 @@ blockBaseName, inputBlockSuffix = hf.processBasicPaths(arguments)
 analysisSubFolder, alignSubFolder = hf.processSubfolderPaths(
     arguments, scratchFolder)
 calcSubFolder = os.path.join(
-    scratchFolder, 'testTrainSplits', arguments['alignFolderName'])
+    alignSubFolder, 'testTrainSplits')
 if not(os.path.exists(calcSubFolder)):
     os.makedirs(calcSubFolder)
 dataFramesFolder = os.path.join(
@@ -269,7 +269,7 @@ else:
         n_splits=nSplits, splitterKWArgs=cv_kwargs
         )
     listOfIterators.append(cvIterator)
-
+# pdb.set_trace()
 exportAAKWA = alignedAsigsKWargs.copy()
 exportAAKWA.pop('unitNames', None)
 exportAAKWA.pop('unitQuery', None)
@@ -284,7 +284,9 @@ if arguments['calcTimeROI']:
         'listOfROIMasks': listOfROIMasks,
         'listOfExampleIndexes': listOfExampleIndexes
     })
-print('saving {}'.format(iteratorPath))
+print('saving\n{}\n'.format(iteratorPath))
+if os.path.exists(iteratorPath):
+    os.remove(iteratorPath)
 with open(iteratorPath, 'wb') as f:
     pickle.dump(
         iteratorMetadata, f)

@@ -97,8 +97,7 @@ if arguments['plotting']:
         os.makedirs(figureOutputFolder)
 #
 cvIteratorSubfolder = os.path.join(
-    scratchFolder, 'testTrainSplits',
-    arguments['alignFolderName'])
+    alignSubFolder, 'testTrainSplits')
 if arguments['iteratorSuffix'] is not None:
     iteratorSuffix = '_{}'.format(arguments['iteratorSuffix'])
 else:

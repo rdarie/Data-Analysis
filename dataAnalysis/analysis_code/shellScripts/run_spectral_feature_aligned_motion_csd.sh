@@ -24,4 +24,4 @@
 
 # SLURM_ARRAY_TASK_ID=2
 source ./shellScripts/run_pca_calc_aligned_motion_preamble.sh
-python -u './calcSpectralFeatures.py' --inputBlockSuffix="csd" --unitQuery="lfp" --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $TIMEWINDOWOPTS $LAZINESS --verbose
+python -u './calcWaveletFeatures.py' --inputBlockSuffix="csd" --unitQuery="lfp" --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $TIMEWINDOWOPTS $LAZINESS --verbose

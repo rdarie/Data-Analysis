@@ -20,6 +20,7 @@ Options:
     --iteratorSuffix=iteratorSuffix        filename for cross_val iterator
     --needsRollingWindow                   need to decimate to align to spectrogram?
     --selector=selector                    filename if using a unit selector
+    --resetHDF                             delete the h5 file if it exists?
 """
 import matplotlib
 matplotlib.rcParams['pdf.fonttype'] = 42
@@ -69,8 +70,7 @@ dataFramesFolder = os.path.join(
     ) # must exist from previous call to calcTestTrainSplit.py
 
 cvIteratorSubfolder = os.path.join(
-    scratchFolder, 'testTrainSplits',
-    arguments['alignFolderName'])
+    alignSubFolder, 'testTrainSplits')
 
 if arguments['iteratorSuffix'] is not None:
     iteratorSuffix = '_{}'.format(arguments['iteratorSuffix'])
@@ -84,6 +84,7 @@ iteratorPath = os.path.join(
         arguments['alignQuery'],
         iteratorSuffix))
 
+print('Loading cv iterator from\n{}\n'.format(iteratorPath))
 with open(iteratorPath, 'rb') as f:
     loadingMeta = pickle.load(f)
 iteratorsBySegment = loadingMeta.pop('iteratorsBySegment')
@@ -110,7 +111,6 @@ for segIdx in range(nSeg):
     if 'listOfROIMasks' in loadingMeta:
         alignedAsigsKWargs.update({'finalIndexMask': loadingMeta['listOfROIMasks'][segIdx]})
     aakwa = alignedAsigsKWargs.copy()
-    # pdb.set_trace()
     if arguments['needsRollingWindow']:
         # needs downsampling
         binInterval = rasterOpts['binOpts'][arguments['analysisName']]['binInterval']
@@ -131,6 +131,8 @@ for segIdx in range(nSeg):
             for ta in targetAnns
             if ta not in ['stimDelay', 'unitAnnotations', 'detectionDelay', 'originalIndex']]
         try:
+            # loadedTrialInfo.loc[:, 'bin']
+            # trialInfo.loc[:, 'bin']
             assert (trialInfo.loc[:, targetAnns] == loadedTrialInfo.loc[:, targetAnns]).all(axis=None)
         except Exception:
             traceback.print_exc()
@@ -151,4 +153,7 @@ outputDFPath = os.path.join(
         iteratorSuffix))
 if arguments['verbose']:
     prf.print_memory_usage('Saving {}'.format(outputDFPath))
+if arguments['resetHDF']:
+    if os.path.exists(outputDFPath):
+        os.remove(outputDFPath)
 exportDF.to_hdf(outputDFPath, arguments['selectionName'], mode='a')
