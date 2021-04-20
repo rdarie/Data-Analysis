@@ -138,7 +138,6 @@ if __name__ == "__main__":
             dummySt = stLikeList[0]
         dummyStList.append(dummySt)
         originalDummyUnitAnns = dummySt.annotations.pop('unitAnnotations', None)
-        
         if 'chanIndex' not in locals():
             '''
             xcoords, ycoords = [], []
@@ -174,7 +173,6 @@ if __name__ == "__main__":
                 for key in ['chanName']}
             '''
         #
-        
         nTrials = dummySt.waveforms.shape[0]
         nBins = dummySt.waveforms.shape[2]
         allWaveforms = np.zeros((nTrials * nBins, len(unitNames)))

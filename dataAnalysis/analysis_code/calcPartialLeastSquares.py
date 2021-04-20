@@ -241,7 +241,7 @@ else:    # loading frames
                     arguments['window'],
                     arguments['alignQuery'],
                     iteratorSuffix))
-            pdb.set_trace()
+            # pdb.set_trace()
             '''
                 with pd.HDFStore(dFPath) as store:
                     print(store.info())

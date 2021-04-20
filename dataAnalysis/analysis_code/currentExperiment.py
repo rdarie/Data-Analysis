@@ -525,7 +525,7 @@ def parseAnalysisOptions(
         'segment', 'originalIndex', 't', 'amplitude', 'program',
         'activeGroup', 'RateInHz', 'stimCat', 'electrode',
         'pedalDirection', 'pedalSize', 'pedalSizeCat', 'pedalMovementCat',
-        'pedalMetaCat', 'bin'
+        'pedalMetaCat',
         ]
     spectralFeatureOpts = dict(
         winLen=100e-3, stepLen=20e-3, R=20,

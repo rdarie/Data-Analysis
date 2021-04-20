@@ -112,7 +112,6 @@ def raisedCos(x, c, dc):
     return (np.cos(argCos) + 1) / 2
 
 
-#
 def raisedCosBoundary(
         b=None, DT=None, minX=None, nb=None, plotting=False):
     eps = 1e-20
@@ -157,6 +156,7 @@ def makeRaisedCosBasis(
         for colIdx in range(ihbasis.shape[1]):
             ihbasis[:, colIdx] = ihbasis[:, colIdx] / np.sum(ihbasis[:, colIdx])
     return pd.DataFrame(ihbasis, index=iht, columns=ctrs)
+
 
 def makeLogRaisedCosBasis(
         nb, dt, endpoints, b=0.01, zflag=False, normalize=False):

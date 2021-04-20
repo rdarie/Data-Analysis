@@ -843,9 +843,11 @@ def unitSpikeTrainWaveformsToDF(
                 wf = wf[:, 0, :]
         wfDF = pd.DataFrame(wf)
         samplingRate = st.sampling_rate
+        samplingPeriod = np.float64(st.sampling_period) * st.sampling_period.units
+        leftSweep = np.float64(st.left_sweep) * st.left_sweep.units
         bins = (
-            np.asarray(wfDF.columns) / samplingRate -
-            st.left_sweep)
+            np.arange(wfDF.shape[1], dtype=np.float64) * samplingPeriod -
+            leftSweep)
         wfDF.columns = np.around(bins.magnitude, decimals=6)
         if windowSize is not None:
             winMask = (
@@ -927,7 +929,7 @@ def unitSpikeTrainWaveformsToDF(
     # TODO implement lags and rolling window addition here
     metaDF = zeroLagWaveformsDF.loc[:, idxLabels].copy()
     zeroLagWaveformsDF.drop(columns=idxLabels, inplace=True)
-    zeroLagWaveformsDF.columns = zeroLagWaveformsDF.columns.astype(np.float)
+    zeroLagWaveformsDF.columns = zeroLagWaveformsDF.columns.astype(np.float64)
     if lags is None:
         lags = [0]
     laggedWaveformsDict = {

@@ -292,8 +292,10 @@ def splitApplyCombine(
     else:
         presentIndices = [
             idx
-            for idx in asigStack.index.names
-            if (idx in result.columns)]
+            for idx in result.columns
+            if (idx not in dataColNames)]
+            # for idx in asigStack.index.names
+            # if (idx in result.columns)]
         resultDF = result.sort_index().set_index(presentIndices)
         if colKeys is not None:
             presentColKeys = list(np.intersect1d(colKeys, presentIndices))

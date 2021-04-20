@@ -27,12 +27,12 @@ LAZINESS="--lazy"
 
 WINDOW="--window=L"
 # WINDOW="--window=XS"
-# ANALYSISFOLDER="--analysisName=default"
+ANALYSISFOLDER="--analysisName=default"
 # ANALYSISFOLDER="--analysisName=fullRes"
-ANALYSISFOLDER="--analysisName=hiRes"
+# ANALYSISFOLDER="--analysisName=hiRes"
 
-# SIGNALFOLDER="--signalSubfolder=default"
-SIGNALFOLDER="--signalSubfolder=hiRes"
+SIGNALFOLDER="--signalSubfolder=default"
+# SIGNALFOLDER="--signalSubfolder=hiRes"
 # SIGNALFOLDER="--signalSubfolder=normalizedByImpedance"
 
 EVENTFOLDER="--eventSubfolder=None"

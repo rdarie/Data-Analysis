@@ -25,5 +25,5 @@ SLURM_ARRAY_TASK_ID=2
 source ./shellScripts/run_pca_calc_aligned_motion_preamble.sh
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
 
-# python -u './calcPartialLeastSquares.py' --loadFromFrames --iteratorSuffix='a' --lhsBlockSuffix="lfp" --unitQueryLhs="lfp_CAR" --rhsBlockSuffix="rig" --unitQueryRhs="jointAngle" --estimatorName='pls_lfp_CAR_ja' --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting
+python -u './calcPartialLeastSquares.py' --loadFromFrames --iteratorSuffix='a' --lhsBlockSuffix="lfp" --unitQueryLhs="lfp_CAR" --rhsBlockSuffix="rig" --unitQueryRhs="jointAngle" --estimatorName='pls_lfp_CAR_ja' --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting
 python -u './calcPartialLeastSquares.py' --loadFromFrames --iteratorSuffix='a' --lhsBlockSuffix="lfp" --unitQueryLhs="lfp_CAR_spectral" --rhsBlockSuffix="rig" --unitQueryRhs="jointAngle" --estimatorName='pls_lfp_CAR_spectral_ja' --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting

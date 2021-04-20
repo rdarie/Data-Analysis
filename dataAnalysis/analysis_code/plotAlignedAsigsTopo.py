@@ -149,6 +149,7 @@ else:
         metaDataToCategories=False))
 #
 requiredAnns = [
+    'xCoords', 'yCoords',
     'RateInHz', 'feature', 'electrode', 'program',
     arguments['amplitudeFieldName'],
     'stimCat', 'originalIndex', 'segment', 't']
@@ -197,21 +198,21 @@ relplotKWArgs.update({
     'legend': 'brief',
     # 'legend': False,
     'height': 6,
-    'aspect': 1,
+    'aspect': 2,
     'facet_kws': {
-        'sharey': True,
+        'sharey': False,
         'legend_out': False,
         'gridspec_kws': {
             'wspace': 0.01,
             'hspace': 0.01
         }}})
-if 'kcsd' in arguments['inputBlockSuffix']:
+if 'csd' in arguments['inputBlockSuffix']:
     relplotKWArgs.update({
         'palette': "ch:0.6,.3,dark=.1,light=0.7,reverse=1"
         })
 sharedYAxes = relplotKWArgs['facet_kws']['sharey']
 plotProcFuns = [
-    asp.genYLimSetter(quantileLims=0.9, forceLims=True),
+    # asp.genYLimSetter(quantileLims=0.99, forceLims=True),
     # asp.genYLabelChanger(
     #     lookupDict={}, removeMatch='#0'),
     # asp.genYLimSetter(newLims=[-75, 100], forceLims=True),
@@ -255,7 +256,7 @@ extraSpaces = {
         (85, 1060)]}
 #
 limitPages = None
-minNObservations = 5
+minNObservations = None
 #
 if arguments['individualTraces']:
     relplotKWArgs['alpha'] = 0.3
@@ -302,9 +303,7 @@ else:
         dataPath, lazy=arguments['lazy'])
     asigWide = preproc.alignedAsigsToDF(
         dataBlock, **alignedAsigsKWargs)
-# pdb.set_trace()
 prf.print_memory_usage('loaded asig wide')
-
 trialInfo = asigWide.index.to_frame().reset_index(drop=True)
 #
 if minNObservations is not None:
@@ -318,34 +317,37 @@ if minNObservations is not None:
     #
     def lookupKeep(x):
         keepVal = nObs.loc[tuple(x.loc[nObsCountedFeatures]), 'keepMask']
-        # print(keepVal)
+        print(keepVal)
         return(keepVal)
     #
     keepMask = trialInfo.apply(lookupKeep, axis=1).to_numpy()
     asigWide = asigWide.loc[keepMask, :]
     trialInfo = asigWide.index.to_frame().reset_index(drop=True)
 
-trialInfo['parentChanName'] = (
+trialInfo.loc[:, 'parentChanName'] = (
     trialInfo['feature']
     .apply(lambda x: x.replace('_stim#0', '').replace('#0', '')))
-trialInfo.loc[:, 'xcoords'] = np.nan
-trialInfo.loc[:, 'ycoords'] = np.nan
-trialInfo.loc[:, 'mapGroup'] = np.nan
+#
+if np.all(trialInfo['xCoords'].unique() == ['NA']):
+    trialInfo.loc[:, 'xCoords'] = np.nan
+    trialInfo.loc[:, 'yCoords'] = np.nan
+    trialInfo.loc[:, 'mapGroup'] = np.nan
+    for cidx, chanIdx in enumerate(dataBlock.channel_indexes):
+        listOfSpikeTrains = chanIdx.filter(objects=[SpikeTrain, SpikeTrainProxy])
+        if len(listOfSpikeTrains):
+            dummySt = listOfSpikeTrains[0]
+            if 'xCoords' in dummySt.annotations:
+                nameMatches = (trialInfo['parentChanName'] == chanIdx.name) | (trialInfo['feature'] == chanIdx.name)
+                try:
+                    trialInfo.loc[nameMatches, 'xCoords'] = dummySt.annotations['xCoords']
+                    trialInfo.loc[nameMatches, 'yCoords'] = dummySt.annotations['yCoords']
+                    trialInfo.loc[nameMatches, 'mapGroup'] = 'utah'
+                except Exception:
+                    traceback.print_exc()
+else:
+    trialInfo.loc[:, 'mapGroup'] = 'utah'
 
-for cidx, chanIdx in enumerate(dataBlock.channel_indexes):
-    listOfSpikeTrains = chanIdx.filter(objects=[SpikeTrain, SpikeTrainProxy])
-    if len(listOfSpikeTrains):
-        dummySt = listOfSpikeTrains[0]
-        if 'xCoords' in dummySt.annotations:
-            nameMatches = (trialInfo['parentChanName'] == chanIdx.name) | (trialInfo['feature'] == chanIdx.name)
-            try:
-                trialInfo.loc[nameMatches, 'xcoords'] = dummySt.annotations['xCoords']
-                trialInfo.loc[nameMatches, 'ycoords'] = dummySt.annotations['yCoords']
-                trialInfo.loc[nameMatches, 'mapGroup'] = 'utah'
-            except Exception:
-                traceback.print_exc()
-# pdb.set_trace()
-if trialInfo['xcoords'].isna().any():
+if trialInfo['xCoords'].isna().any():
     if 'mapDF' not in locals():
         electrodeMapPath = spikeSortingOpts[arguments['arrayName']]['electrodeMapPath']
         mapExt = electrodeMapPath.split('.')[-1]
@@ -353,7 +355,7 @@ if trialInfo['xcoords'].isna().any():
             mapDF = prb_meta.cmpToDF(electrodeMapPath)
         elif mapExt == 'map':
             mapDF = prb_meta.mapToDF(electrodeMapPath)
-    for cName in ['xcoords', 'ycoords']:
+    for cName in ['xCoords', 'yCoords']:
         mapSer = pd.Series(
             mapDF[cName].to_numpy(),
             index=mapDF['label'])
@@ -367,18 +369,18 @@ dummyDict = {}
 for probeName, tInfoGrp in trialInfo.groupby('mapGroup'):
     dummyList = []
     if addSpacesFromMap:
-        for name, subGrp in tInfoGrp.groupby(['xcoords', 'ycoords']):
+        for name, subGrp in tInfoGrp.groupby(['xCoords', 'yCoords']):
             dummySer = pd.Series(np.nan, index=trialInfo.columns)
-            dummySer['xcoords'] = name[0]
-            dummySer['ycoords'] = name[1]
+            dummySer['xCoords'] = name[0]
+            dummySer['yCoords'] = name[1]
             dummySer['mapGroup'] = probeName
             dummyList.append(dummySer)
     xtrSpc = extraSpaces.pop(probeName, None)
     if xtrSpc is not None:
         for name in xtrSpc:
             dummySer = pd.Series(np.nan, index=trialInfo.columns)
-            dummySer['xcoords'] = name[0]
-            dummySer['ycoords'] = name[1]
+            dummySer['xCoords'] = name[0]
+            dummySer['yCoords'] = name[1]
             dummySer['mapGroup'] = probeName
             dummyList.append(dummySer)
     if len(dummyList):
@@ -396,6 +398,8 @@ if groupPagesBy is None:
 else:
     pageGrouper = asigWide.groupby(groupPagesBy)
 #
+# import warnings
+# warnings.filterwarnings("error")
 pageCount = 0
 if saveFigMetaToPath is not None:
     figMetaData = []
@@ -421,10 +425,10 @@ with PdfPages(pdfName) as pdf:
             if theseFlipInfo is not None:
                 ud = theseFlipInfo.pop('ud', False)
                 if ud:
-                    thisAsigStack['xcoords'] *= -1
+                    thisAsigStack['xCoords'] *= -1
                 lr = theseFlipInfo.pop('lr', False)
                 if lr:
-                    thisAsigStack['ycoords'] *= -1
+                    thisAsigStack['yCoords'] *= -1
             if 'facet_kws' in relplotKWArgs:
                 if 'gridspec_kws' in relplotKWArgs['facet_kws']:
                     msrpkwa = mapSpecificRelplotKWArgs.pop(probeName, None)
@@ -453,7 +457,7 @@ with PdfPages(pdfName) as pdf:
                 data=thisAsigStack,
                 x='bin', y='signal', hue=arguments['hueName'],
                 size=arguments['sizeName'], style=arguments['styleName'],
-                row='xcoords', col='ycoords', **relplotKWArgs)
+                row='xCoords', col='yCoords', **relplotKWArgs)
             for (ro, co, hu), dataSubset in g.facet_data():
                 emptySubset = (
                     (dataSubset.empty) or

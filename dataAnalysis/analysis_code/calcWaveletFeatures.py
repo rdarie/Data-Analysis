@@ -9,7 +9,7 @@ Options:
     --verbose                              print diagnostics? [default: False]
     --profile                              print time and mem diagnostics? [default: False]
     --plotting                             display plots [default: False]
-    --showNow                              show plots at runtime? [default: False]
+    --showFigures                          show plots at runtime? [default: False]
     --lazy                                 load from raw, or regular? [default: False]
     --alignQuery=alignQuery                choose a subset of the data?
     --analysisName=analysisName            append a name to the resulting blocks? [default: default]
@@ -43,7 +43,8 @@ import pywt
 import dataAnalysis.helperFunctions.pywt_helpers as pywthf
 from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
 from docopt import docopt
-
+from numpy.random import default_rng
+rng = default_rng()
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 
 import matplotlib.pyplot as plt
@@ -81,13 +82,14 @@ alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUn
 alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **arguments)
 alignedAsigsKWargs['verbose'] = arguments['verbose']
 #
+essentialMetadataFields.remove('freqBandName')
 alignedAsigsKWargs.update(dict(
     duplicateControlsByProgram=False,
     makeControlProgram=False,
     # transposeToColumns='feature', concatOn='columns',
     transposeToColumns='bin', concatOn='index',
     getMetaData=essentialMetadataFields + ['xCoords', 'yCoords'],
-    decimate=1))
+    decimate=1, metaDataToCategories=False))
 
 def calcCWT(
         partition, dataColNames=None, plotting=False,
@@ -98,11 +100,18 @@ def calcCWT(
     partitionData = partition.loc[:, dataColMask]
     '''DEBUGGING = True
     if DEBUGGING:
-        dbf = 20 # Hz
+        dbf = 25 # Hz
+        t = partitionData.columns.to_numpy(dtype=np.float)
+        refSignal = (
+                np.sin(2 * np.pi * dbf * t) *
+                (1 + t))
         for rIdx in range(partitionData.shape[0]):
-            t = partitionData.columns.to_numpy(dtype=np.float)
-            partitionData.iloc[rIdx, :] = np.sin(2 * np.pi * dbf * t)
+            partitionData.iloc[rIdx, :] = (
+                    refSignal +
+                    0.3 * rng.standard_normal(size=t.size))
             # fig, ax = plt.subplots(); ax.plot(t, np.sin(2 * np.pi * dbf * t)); plt.show()'''
+    '''if True:
+        pycwtKWs = {'sampling_period': 1e-3, 'axis': -1, 'precision': 14}'''
     outputList = []
     if plotting:
         fig, ax = plt.subplots()
@@ -133,7 +142,11 @@ def calcCWT(
             plotData.columns = ['type', 'level_1', 'rowIdx', 'bin', 'signal']
             sns.lineplot(
                 x='bin', y='signal', hue='type',
-                data=plotData, ax=ax, ci='sem')
+                data=plotData, ax=ax, ci='sem', palette={
+                    'original': 'b', 'low': 'r', 'beta': 'g', 'hi': 'c',
+                    'spb': 'm'
+                })
+            ax.set_title(('{}_f_c={} Hz'.format(wvlDict['name'], wvlDict['center'])))
     if plotting:
         plt.show()
     allCoefDF = pd.concat(outputList).reset_index(drop=True)
@@ -164,19 +177,22 @@ if __name__ == "__main__":
     dt = fs ** -1
     scale = 50
     waveletList = []
+    ###
     cwtOpts = dict(
         waveletList=waveletList,
+        plotting=False,
         pycwtKWs=dict(
-            sampling_period=dt, axis=0,
+            sampling_period=dt, axis=-1,
             # method='conv',
             precision=14
         ))
+    ###
     for fBIdx, fBName in enumerate(freqBandsDict['name']):
         bandwidth = (freqBandsDict['hBound'][fBIdx] - freqBandsDict['lBound'][fBIdx]) / 6  # Hz
         center = (freqBandsDict['hBound'][fBIdx] + freqBandsDict['lBound'][fBIdx]) / 2  # Hz
         B = pywthf.bandwidthToMorletB(bandwidth, fs=fs, scale=scale)
         C = pywthf.centerToMorletC(center, fs=fs, scale=scale)
-        minWidth = np.ceil((12 * scale * np.sqrt(B / 2) - 1) / scale)
+        minWidth = np.ceil((8 * scale * np.sqrt(B / 2) - 1) / scale)
         waveletName = 'cmor{:.3f}-{:.3f}'.format(B, C)
         wavelet = pywt.ContinuousWavelet(waveletName)
         # pdb.set_trace()
@@ -198,9 +214,9 @@ if __name__ == "__main__":
             'bandwidth': bandwidth, 'wavelet': wavelet,
             'scales': [scale]
         })
-    if arguments['plotting'] and arguments['showNow']:
+    if arguments['plotting'] and arguments['showFigures']:
         plt.show()
-    elif arguments['plotting'] and (not arguments['showNow']):
+    elif arguments['plotting'] and (not arguments['showFigures']):
         plt.close()
     # dataDF.columns = dataDF.columns.droplevel('lag')
     # trialGroupByNames = dataDF.index.droplevel('bin').names
@@ -219,10 +235,10 @@ if __name__ == "__main__":
         useDask=False, reindexFromInput=False,
         daskComputeOpts=daskComputeOpts
         )
-    newIndexCols = ['scale', 'freqBandName', 'center', 'bandwidth', 'waveletName']
-    spectralDF.set_index(newIndexCols, append=True, inplace=True)
-    spectralDF.columns = spectralDF.columns.astype(np.float)
-    pdb.set_trace()
+    # newIndexCols = ['scale', 'freqBandName', 'center', 'bandwidth', 'waveletName']
+    # spectralDF.set_index(newIndexCols, append=True, inplace=True)
+    spectralDF.columns = spectralDF.columns.astype(np.float64)
+    # pdb.set_trace()
     tBins = np.unique(spectralDF.columns.get_level_values('bin'))
     featNames = spectralDF.index.get_level_values('feature')
     featNamesClean = featNames.str.replace('#0', '')
@@ -231,16 +247,18 @@ if __name__ == "__main__":
     spectralDF.index = spectralDF.index.droplevel('feature')
     spectralDF.loc[:, 'parentFeature'] = featNames
     spectralDF.loc[:, 'feature'] = newFeatNames
-    spectralDF.set_index(['parentFeature', 'feature'], inplace=True, append=True)
     # pdb.set_trace()
+    spectralDF.set_index(['parentFeature', 'feature'], inplace=True, append=True)
     trialTimes = np.unique(spectralDF.index.get_level_values('t'))
     spikeTrainMeta = {
         'units': pq.s,
         'wvfUnits': pq.dimensionless,
-        'left_sweep': (-1) * tBins[0] * pq.s,
+        # 'left_sweep': (-1) * tBins[0] * pq.s,
+        'left_sweep': dummySt.left_sweep,
         't_start': min(0, trialTimes[0]) * pq.s,
         't_stop': trialTimes[-1] * pq.s,
-        'sampling_rate': ((tBins[1] - tBins[0]) ** (-1)) * pq.Hz
+        # 'sampling_rate': ((tBins[1] - tBins[0]) ** (-1)) * pq.Hz
+        'sampling_rate': dummySt.sampling_rate
     }
     masterBlock = ns5.alignedAsigDFtoSpikeTrain(
         spectralDF, spikeTrainMeta=spikeTrainMeta, matchSamplingRate=False)

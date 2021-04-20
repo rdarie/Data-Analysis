@@ -60,13 +60,9 @@ alignedAsigsKWargs['verbose'] = arguments['verbose']
 alignedAsigsKWargs.update(dict(
     duplicateControlsByProgram=False,
     makeControlProgram=False,
-    transposeToColumns='feature', concatOn='columns',
-    getMetaData=[
-        'segment', 'originalIndex', 't', 'amplitude', 'program',
-        'activeGroup', 'RateInHz', 'stimCat', 'electrode',
-        'pedalDirection', 'pedalSize', 'pedalSizeCat', 'pedalMovementCat',
-        'pedalMetaCat', 'bin'
-    ],
+    # transposeToColumns='feature', concatOn='columns',
+    transposeToColumns='bin', concatOn='index',
+    getMetaData=essentialMetadataFields + ['xCoords', 'yCoords'],
     decimate=1))
 
 outputPath = os.path.join(
@@ -75,25 +71,26 @@ outputPath = os.path.join(
 #
 dataReader, dataBlock = ns5.blockFromPath(
     triggeredPath, lazy=arguments['lazy'])
-#
-alignedAsigsDF = ns5.alignedAsigsToDF(
+dataDF = ns5.alignedAsigsToDF(
     dataBlock, **alignedAsigsKWargs)
-
-alignedAsigsDF.columns = alignedAsigsDF.columns.droplevel('lag')
+#
+# dataDF.columns = dataDF.columns.droplevel('lag')
 dummySt = dataBlock.filter(
     objects=[ns5.SpikeTrain, ns5.SpikeTrainProxy])[0]
 fs = float(dummySt.sampling_rate)
-# pdb.set_trace()
-# rerefDF = alignedAsigsDF - alignedAsigsDF.mean(axis='columns')
-referenceSignal = alignedAsigsDF.mean(axis='columns')
-rerefDF = alignedAsigsDF.sub(referenceSignal, axis=0)
-if arguments['substituteOneChannel']:
-    # implemented based on Milekovic, ..., Brochier 2015
-    # check that it works!
-    rerefDF.iloc[:, 0] = alignedAsigsDF.iloc[:, 0]
+
+for trialIdx, trialData in dataDF.groupby(['segment', 'originalIndex', 't']):
+    if arguments['substituteOneChannel']:
+        saveFirstSrs = trialData.iloc[0, :].copy()
+    referenceSignal = trialData.mean(axis='index')
+    dataDF.loc[trialData.index, :] = trialData.sub(referenceSignal, axis='columns')
+    if arguments['substituteOneChannel']:
+        # implemented based on Milekovic, ..., Brochier 2015
+        # check that it works!
+        dataDF.loc[trialData.index[0], :] = saveFirstSrs
 #
 masterBlock = ns5.alignedAsigDFtoSpikeTrain(
-    rerefDF, dataBlock=dataBlock, matchSamplingRate=True)
+    dataDF, dataBlock=dataBlock, matchSamplingRate=True)
 
 if arguments['lazy']:
     dataReader.file.close()

@@ -163,7 +163,6 @@ def compute_scores(
 
 lOfRhsDF = []
 lOfLhsDF = []
-lOfLhsMasks = []
 if not arguments['loadFromFrames']:
     alignedAsigsKWargs = loadingMeta['alignedAsigsKWargs'].copy()
     loadRhsKWArgs = alignedAsigsKWargs.copy()
@@ -245,8 +244,6 @@ else:    # loading frames
             thisLhsDF = pd.read_hdf(dFPath, arguments['unitQueryLhs'])
             thisLhsDF.index = thisLhsDF.index.set_levels([currBlockNum], level='segment')
             lOfLhsDF.append(thisLhsDF)
-            thisLhsMask = pd.read_hdf(dFPath, arguments['unitQueryLhs'] + '_featureMasks')
-            lOfLhsMasks.append(thisLhsMask)
             currBlockNum += 1
 lhsDF = pd.concat(lOfLhsDF)
 rhsDF = pd.concat(lOfRhsDF)
@@ -259,14 +256,12 @@ nFeatures = lhsDF.columns.shape[0]
 nTargets = rhsDF.columns.shape[0]
 
 allScores = []
-lhsMasks = lOfLhsMasks[0]
-lhGroupNames = lhsMasks.index.names
-for maskIdx, lhsMask in lhsMasks.iterrows():
+lhGroupNames = ['freqBandName']
+for groupName, lhGroup in lhsDF.groupby(lhGroupNames, axis='columns'):
     scores = {}
-    lhGroup = lhsDF.loc[:, lhsMask]
+    # pdb.set_trace()
     for columnTuple in rhsDF.columns:
         targetName = columnTuple[0]
-        print('Fitting {} to {}...'.format(lhsMask.name, targetName))
         scores[targetName] = compute_scores(
             lhGroup, rhsDF.loc[:, columnTuple], LinearRegression,
             verbose=True,
@@ -279,13 +274,12 @@ for maskIdx, lhsMask in lhsMasks.iterrows():
     scoresDF = pd.concat(
         {nc: pd.DataFrame(scr) for nc, scr in scores.items()},
         names=['target', 'fold'])
-    '''if not isinstance(groupName, list):
+    if not isinstance(groupName, list):
         attrNameList = [groupName]
     else:
-        attrNameList = groupName'''
-    for i, lhAttr in enumerate(maskIdx):
-        lhKey = lhGroupNames[i]
-        scoresDF.loc[:, lhKey] = lhAttr
+        attrNameList = groupName
+    for i, lhAttr in enumerate(lhGroupNames):
+        scoresDF.loc[:, lhAttr] = attrNameList[i]
     allScores.append(scoresDF)
 allScoresDF = pd.concat(allScores)
 allScoresDF.set_index(lhGroupNames, inplace=True, append=True)

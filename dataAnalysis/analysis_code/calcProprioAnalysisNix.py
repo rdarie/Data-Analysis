@@ -61,7 +61,6 @@ globals().update(expOpts)
 globals().update(allOpts)
 
 print('\n' + '#' * 50 + '\n{}\n'.format(__file__) + '#' * 50 + '\n')
-
 binOpts = rasterOpts['binOpts'][arguments['analysisName']]
 trackMemory = True
 
@@ -77,7 +76,7 @@ def calcBlockAnalysisWrapper():
     if arguments['samplingRate'] is not None:
         samplingRate = float(arguments['samplingRate']) * pq.Hz
     else:
-        samplingRate = float(1 / binOpts['binInterval']) * pq.Hz
+        samplingRate = float(binOpts['binInterval'] ** -1) * pq.Hz
     #
     if arguments['sourceFileSuffix'] is not None:
         sourceFileSuffix = '_' + arguments['sourceFileSuffix']
@@ -198,6 +197,8 @@ def calcBlockAnalysisWrapper():
                 idx, prf.memory_usage_psutil()))
     chanQuery = arguments['chanQuery']
     ##############################################################################
+    # clip magnitude of signal (y axis)?
+    ####
     try:
         clippingOpts = analysisClippingOpts
     except Exception:
@@ -407,7 +408,7 @@ def calcBlockAnalysisWrapper():
     # interpolate rig analog signals
     lowPassOpts = {
         'low': {
-            'Wn': float(samplingRate) / 2,
+            'Wn': float(samplingRate) / 3,
             'N': 4,
             'btype': 'low',
             'ftype': 'bessel'
@@ -454,7 +455,7 @@ def calcBlockAnalysisWrapper():
         insDF = ns5.analogSignalsToDataFrame(insAsigList)
         # origInsTimeStep = insDF['t'].iloc[1] - insDF['t'].iloc[0]
         insDF.set_index('t', inplace=True)
-        # interpolate rig analog signals
+        # interpolate INS analog signals
         if samplingRate != dummyInsAsig.sampling_rate:
             if samplingRate < dummyInsAsig.sampling_rate:
                 filterCoeffs = hf.makeFilterCoeffsSOS(
@@ -533,8 +534,8 @@ def calcBlockAnalysisWrapper():
         kinemCols = [cn for cn in kinemDF.columns if '_angle' in cn]
         filterOptsKinem = {
             'low': {
-                'Wn': 40,
-                'N': 2,
+                'Wn': 33,
+                'N': 4,
                 'btype': 'low',
                 'ftype': 'bessel'
             }
@@ -596,16 +597,16 @@ def calcBlockAnalysisWrapper():
         # accCols = [cn for cn in emgDF.columns if 'Acc' in cn]
         highPassOpts = {
             'high': {
-                'Wn': 10,
-                'N': 2,
+                'Wn': 1,
+                'N': 4,
                 'btype': 'high',
                 'ftype': 'bessel'
             }
         }
         lowPassOptsEMG = {
             'low': {
-                'Wn': 40,
-                'N': 2,
+                'Wn': 100,
+                'N': 4,
                 'btype': 'low',
                 'ftype': 'bessel'
             }

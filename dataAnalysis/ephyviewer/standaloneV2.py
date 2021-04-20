@@ -96,7 +96,10 @@ class StandAloneViewer(MainViewer):
             if 'video' not in allSources:
                 allSources['video'] = []
             print('Loading {}'.format(thisPath))
-            companionVideoPath = thisPath.replace('.nix', '_videoMetadata.json')
+            # import pdb; pdb.set_trace()
+            companionVideoPath = (
+                os.path.splitext(thisPath)[0] +
+                '_videoMetadata.json')
             print('Searching for {}'.format(companionVideoPath))
             if os.path.exists(companionVideoPath):
                 print('Found it!')

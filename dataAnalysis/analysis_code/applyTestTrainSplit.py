@@ -54,6 +54,7 @@ import dill as pickle
 import gc
 from docopt import docopt
 import traceback
+from copy import deepcopy
 
 idxSl = pd.IndexSlice
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
@@ -67,7 +68,7 @@ analysisSubFolder, alignSubFolder = hf.processSubfolderPaths(
     arguments, scratchFolder)
 dataFramesFolder = os.path.join(
     alignSubFolder, 'dataframes'
-    ) # must exist from previous call to calcTestTrainSplit.py
+    )  # must exist from previous call to calcTestTrainSplit.py
 
 cvIteratorSubfolder = os.path.join(
     alignSubFolder, 'testTrainSplits')
@@ -108,9 +109,20 @@ nSeg = len(dataBlock.segments)
 for segIdx in range(nSeg):
     if arguments['verbose']:
         prf.print_memory_usage('extracting data on segment {}'.format(segIdx))
+    aakwa = deepcopy(alignedAsigsKWargs)
+    featureAnnsToGrab = ['xCoords', 'yCoords', 'freqBandName']
+    aakwa.update(dict(transposeToColumns='bin', concatOn='index'))
+    aakwa['getMetaData'] += featureAnnsToGrab
+    tempDF = ns5.alignedAsigsToDF(
+        dataBlock, whichSegments=[segIdx], **aakwa)
+    _, firstTrial = next(iter(tempDF.groupby(['segment', 'originalIndex', 't'])))
+    featureInfo = firstTrial.index.to_frame().reset_index(drop=True).set_index(['feature', 'lag'])
+    del tempDF, firstTrial
+    aakwa = deepcopy(alignedAsigsKWargs)
+    dataDF = ns5.alignedAsigsToDF(
+        dataBlock, whichSegments=[segIdx], **aakwa)
     if 'listOfROIMasks' in loadingMeta:
-        alignedAsigsKWargs.update({'finalIndexMask': loadingMeta['listOfROIMasks'][segIdx]})
-    aakwa = alignedAsigsKWargs.copy()
+        aakwa['finalIndexMask'] = loadingMeta['listOfROIMasks'][segIdx]
     if arguments['needsRollingWindow']:
         # needs downsampling
         binInterval = rasterOpts['binOpts'][arguments['analysisName']]['binInterval']
@@ -119,9 +131,9 @@ for segIdx in range(nSeg):
         aakwa['decimate'] = int(stepLen / binInterval)
         aakwa['rollingWindow'] = int(winLen / binInterval)
     dataDF = ns5.alignedAsigsToDF(
-        dataBlock,
-        whichSegments=[segIdx],
-        **aakwa)
+        dataBlock, whichSegments=[segIdx], **aakwa)
+    columnsMeta = featureInfo.loc[dataDF.columns, featureAnnsToGrab].reset_index()
+    dataDF.columns = pd.MultiIndex.from_frame(columnsMeta)
     if 'listOfExampleIndexes' in loadingMeta:
         trialInfo = dataDF.index.to_frame().reset_index(drop=True)
         loadedTrialInfo = loadingMeta['listOfExampleIndexes'][segIdx].to_frame().reset_index(drop=True)
@@ -129,7 +141,10 @@ for segIdx in range(nSeg):
         targetAnns = [
             ta
             for ta in targetAnns
-            if ta not in ['stimDelay', 'unitAnnotations', 'detectionDelay', 'originalIndex']]
+            if ta not in [
+                'stimDelay', 'unitAnnotations',
+                'detectionDelay', 'originalIndex',
+                'freqBandName', 'xCoords', 'yCoords']]
         try:
             # loadedTrialInfo.loc[:, 'bin']
             # trialInfo.loc[:, 'bin']
@@ -156,4 +171,32 @@ if arguments['verbose']:
 if arguments['resetHDF']:
     if os.path.exists(outputDFPath):
         os.remove(outputDFPath)
+featureGroupNames = ['freqBandName']
+maskList = []
+haveAllGroup = False
+for name, group in exportDF.groupby(featureGroupNames, axis='columns'):
+    if not isinstance(name, tuple):
+        attrValues = (name, )
+    else:
+        attrValues = name
+    thisMask = pd.Series(exportDF.columns.isin(group.columns), index=exportDF.columns).to_frame()
+    if np.all(thisMask):
+        haveAllGroup = True
+        thisMask.columns = pd.MultiIndex.from_tuples(
+            [tuple('all' for fgn in featureGroupNames)],
+            names=featureGroupNames)
+    else:
+        thisMask.columns = pd.MultiIndex.from_tuples((attrValues, ), names=featureGroupNames)
+    maskList.append(thisMask.T)
+#
+if not haveAllGroup:
+    allMask = pd.Series(True, index=exportDF.columns).to_frame()
+    allMask.columns = pd.MultiIndex.from_tuples(
+        [tuple('all' for fgn in featureGroupNames)],
+        names=featureGroupNames)
+    maskList.append(allMask.T)
+#
+maskDF = pd.concat(maskList)
+#
 exportDF.to_hdf(outputDFPath, arguments['selectionName'], mode='a')
+maskDF.to_hdf(outputDFPath, arguments['selectionName'] + '_featureMasks', mode='a')
