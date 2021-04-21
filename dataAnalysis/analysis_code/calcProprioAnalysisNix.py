@@ -435,7 +435,9 @@ def calcBlockAnalysisWrapper():
     # interpolate rig analog signals
     filterOptsPerCategory = {
         'forceSensor': {
-            'names': ['seg0_forceX', 'seg0_forceY'],
+            'names': [
+                'seg0_forceX', 'seg0_forceY',
+                'seg0_forceX_prime', 'seg0_forceY_prime',],
             'filterOpts': {
                 'low': {
                     'Wn': float(samplingRate) / 3,
