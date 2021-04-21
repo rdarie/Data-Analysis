@@ -493,15 +493,17 @@ def calcBlockAnalysisWrapper():
         filteredAsigs = signal.sosfiltfilt(
             filterCoeffs, tdDF.loc[:, group.index].to_numpy(),
             axis=0)
+        pdb.set_trace()
+        if True:
+            cName = 'forceX_prime'
+            fig, ax = plt.subplots()
+            idx1, idx2 = int(6e4), int(9e4)
+            numericalDiff = tdDF[cName].diff() * float(dummyRigAsig.sampling_rate)
+            ax.plot(tdDF.index[idx1:idx2], numericalDiff.iloc[idx1:idx2], label='original')
+            ax.plot(tdDF.index[idx1:idx2], tdDF[cName + '_prime'].iloc[idx1:idx2], label='savgol')
+            ax.legend()
+            plt.show()
         tdDF.loc[:, group.index] = filteredAsigs
-        '''fig, ax = plt.subplots()
-        idx1, idx2 = int(6e4), int(9e4)
-        numericalDiff = tdDF[cName].diff() * float(dummyRigAsig.sampling_rate)
-        ax.plot(tdDF.index[idx1:idx2], numericalDiff.iloc[idx1:idx2], label='original')
-        ax.plot(tdDF.index[idx1:idx2], tdDF[cName + '_prime'].iloc[idx1:idx2], label='savgol')
-        ax.legend()
-        plt.show()'''
-        
         if trackMemory:
             print('Just finished analog data filtering before downsampling. memory usage: {:.1f} MB'.format(
                 prf.memory_usage_psutil()))
