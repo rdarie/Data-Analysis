@@ -25,9 +25,8 @@ SLURM_ARRAY_TASK_ID=2
 source ./shellScripts/run_pca_calc_aligned_motion_preamble.sh
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
 
-# python -u './calcOrdinaryLeastSquares.py' --loadFromFrames --iteratorSuffix='a' --lhsBlockSuffix="lfp" --unitQueryLhs="lfp_CAR" --rhsBlockSuffix="rig" --unitQueryRhs="jointAngle" --estimatorName='ols' --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting
-# python -u './calcOrdinaryLeastSquares.py' --loadFromFrames --iteratorSuffix='a' --lhsBlockSuffix="lfp" --unitQueryLhs="lfp_CAR_spectral" --rhsBlockSuffix="rig" --unitQueryRhs="jointAngle" --estimatorName='ols' --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting
+# python -u './calcOrdinaryLeastSquares.py' --loadFromFrames --iteratorSuffix='a' --lhsBlockSuffix="lfp" --unitQueryLhs="lfp_CAR_spectral" --rhsBlockSuffix="rig" --unitQueryRhs="jointAngle" --estimatorName='ols' --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --showFigures
+python -u './calcGridSearchSingleTarget.py' --loadFromFrames --iteratorSuffix='a' --lhsBlockSuffix="lfp" --unitQueryLhs="lfp_CAR_spectral" --rhsBlockSuffix="rig" --unitQueryRhs="jointAngle" --estimatorName='enr' --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --showFigures --verbose=2
+python -u './calcGridSearchSingleTarget.py' --loadFromFrames --iteratorSuffix='a' --lhsBlockSuffix="lfp" --unitQueryLhs="lfp_CAR_spectral" --rhsBlockSuffix="rig" --unitQueryRhs="jointAngularVelocity" --estimatorName='enr' --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --showFigures --verbose=2
 # python -u './processOrdinaryLeastSquares.py' --fullEstimatorName='ols_lfp_CAR_spectral_to_jointAngle_a_L_starting' --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting
-python -u './plotOrdinaryLeastSquares.py' --fullEstimatorName='ols_lfp_CAR_spectral_to_jointAngle_a_L_starting' --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting
-# python -u './processOrdinaryLeastSquares.py' --fullEstimatorName='ols_lfp_CAR_to_jointAngle_a_L_starting' --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting
-python -u './plotOrdinaryLeastSquares.py' --fullEstimatorName='ols_lfp_CAR_to_jointAngle_a_L_starting' --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting
+# python -u './plotOrdinaryLeastSquares.py' --fullEstimatorName='ols_lfp_CAR_spectral_to_jointAngle_a_L_starting' --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting

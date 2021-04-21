@@ -469,14 +469,14 @@ def concatenateBlocks(
         if samplingRate != dummyAsig.sampling_rate:
             lowPassOpts = {
                 'low': {
-                    'Wn': float(samplingRate / 2),
-                    'N': 2,
+                    'Wn': float(samplingRate / 3),
+                    'N': 4,
                     'btype': 'low',
                     'ftype': 'bessel'
                 },
                 'high': {
                     'Wn': 1.,
-                    'N': 2,
+                    'N': 4,
                     'btype': 'high',
                     'ftype': 'bessel'
                 }

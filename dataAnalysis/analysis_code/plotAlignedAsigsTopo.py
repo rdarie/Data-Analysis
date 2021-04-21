@@ -113,10 +113,6 @@ if arguments['inputBlockSuffix'] is not None:
     reportName = prefix + '_{}_{}_{}_topo'.format(
             arguments['inputBlockSuffix'], arguments['window'],
             arguments['alignQuery']) + nameSuffix
-    figureOutputFolder = os.path.join(
-        figureFolder, arguments['analysisName'], 'alignedFeatures')
-    if not os.path.exists(figureOutputFolder):
-        os.makedirs(figureOutputFolder, exist_ok=True)
     alignedAsigsKWargs['outlierTrials'] = ash.processOutlierTrials(
         scratchFolder, prefix, **arguments)
 else:
@@ -127,8 +123,12 @@ else:
     else:
         dataPath = analysisDataPath
         reportName = ns5FileName + '_isi_spike_report' + nameSuffix
-    figureOutputFolder = figureFolder
 dataPath = dataPath.format(arguments['analysisName'])
+figureOutputFolder = os.path.join(
+    figureFolder, arguments['analysisName'],
+    arguments['alignFolderName'], 'alignedFeatures')
+if not os.path.exists(figureOutputFolder):
+    os.makedirs(figureOutputFolder, exist_ok=True)
 pdfName = os.path.join(figureOutputFolder, reportName + '.pdf')
 #
 alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(

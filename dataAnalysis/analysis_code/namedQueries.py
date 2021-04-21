@@ -45,6 +45,7 @@ namedQueries = {
         'neural': "((chanName.str.contains('elec'))or(chanName.str.contains('nform')))or(chanName.str.contains('utah'))",
         'rig': "not((chanName.str.contains('elec'))or(chanName.str.contains('pca'))or(chanName.str.contains('nform'))or(chanName.str.contains('ainp')))",
         'jointAngle': "chanName.isin(['right_hip_angle#0', 'right_knee_angle#0', 'right_ankle_angle#0'])",
+        'jointAngularVelocity': "chanName.isin(['right_hip_omega#0', 'right_knee_omega#0', 'right_ankle_omega#0'])",
         'pedalPosition': "chanName.isin(['position#0'])"
     },
     'chan': {

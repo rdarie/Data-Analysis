@@ -392,41 +392,68 @@ def filterDF(
     return filteredDF
 
 
+def applySavGol(
+        df, window_length_sec=None,
+        polyorder=None, fs=None,
+        deriv=0, pos=None, columns=None):
+    if fs is None:
+        fs = 1.
+    delta = float(fs) ** (-1)
+    window_length = int(2 * np.ceil(fs * window_length_sec / 2) + 1)
+    polyorder = min(polyorder, window_length - 1)
+    passedSeries = False
+    if isinstance(df, pd.Series):
+        passedSeries = True
+        data = df.to_frame(name='temp')
+        columns = ['temp']
+    else:
+        data = df.copy()
+    if columns is None:
+        columns = df.columns
+    savGolCoeffs = signal.savgol_coeffs(
+        window_length, polyorder, deriv=deriv,
+        delta=delta, pos=pos)
+    for cName in columns:
+        data.loc[:, cName] = np.convolve(data[cName], savGolCoeffs, mode='same')
+    if passedSeries:
+        data = data['temp']
+    return data
+
 def makeFilterCoeffsSOS(
         filterOpts, samplingRate, plotting=False):
     fOpts = deepcopy(filterOpts)
     filterCoeffsSOS = np.ndarray(shape=(0, 6))
     #
-    if 'bandstop' in fOpts:
-        nNotchHarmonics = fOpts['bandstop'].pop('nHarmonics')
-        notchFreq = fOpts['bandstop'].pop('Wn')
-        notchQ = fOpts['bandstop'].pop('Q')
-        fOpts['bandstop']['fs'] = samplingRate
-        for harmonicOrder in range(1, nNotchHarmonics + 1):
-            w0 = harmonicOrder * notchFreq
-            bw = w0/notchQ
-            fOpts['bandstop']['Wn'] = [w0 - bw/2, w0 + bw/2]
+    for fName, theseOpts in fOpts.items():
+        if theseOpts['btype'] == 'bandstop':
+            nNotchHarmonics = theseOpts.pop('nHarmonics')
+            notchFreq = theseOpts.pop('Wn')
+            notchQ = theseOpts.pop('Q')
+            theseOpts['fs'] = samplingRate
+            for harmonicOrder in range(1, nNotchHarmonics + 1):
+                w0 = harmonicOrder * notchFreq
+                bw = w0/notchQ
+                theseOpts['Wn'] = [w0 - bw/2, w0 + bw/2]
+                sos = signal.iirfilter(
+                        **theseOpts, output='sos')
+                filterCoeffsSOS = np.concatenate([filterCoeffsSOS, sos])
+                if plotting:
+                    plotFilterOptsResponse(theseOpts)
+        if theseOpts['btype'] == 'high':
+            theseOpts['fs'] = samplingRate
             sos = signal.iirfilter(
-                    **fOpts['bandstop'], output='sos')
+                    **theseOpts, output='sos')
             filterCoeffsSOS = np.concatenate([filterCoeffsSOS, sos])
             if plotting:
-                plotFilterOptsResponse(fOpts['bandstop'])
-    #
-    if 'high' in fOpts:
-        fOpts['high']['fs'] = samplingRate
-        sos = signal.iirfilter(
-                **fOpts['high'], output='sos')
-        filterCoeffsSOS = np.concatenate([filterCoeffsSOS, sos])
-        if plotting:
-            plotFilterOptsResponse(fOpts['high'])
-    #
-    if 'low' in fOpts:
-        fOpts['low']['fs'] = samplingRate
-        sos = signal.iirfilter(
-            **fOpts['low'], output='sos')
-        filterCoeffsSOS = np.concatenate([filterCoeffsSOS, sos])
-        if plotting:
-            plotFilterOptsResponse(fOpts['low'])
+                plotFilterOptsResponse(theseOpts)
+        #
+        if theseOpts['btype'] == 'low':
+            theseOpts['fs'] = samplingRate
+            sos = signal.iirfilter(
+                **theseOpts, output='sos')
+            filterCoeffsSOS = np.concatenate([filterCoeffsSOS, sos])
+            if plotting:
+                plotFilterOptsResponse(theseOpts)
     return filterCoeffsSOS
 
 

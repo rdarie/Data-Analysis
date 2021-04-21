@@ -25,7 +25,12 @@ Options:
     --samplingRate=samplingRate                resample the result??
     --rigOnly                                  is there no INS block? [default: False]
 """
-
+import matplotlib
+matplotlib.rcParams['pdf.fonttype'] = 42
+matplotlib.rcParams['ps.fonttype'] = 42
+matplotlib.use('QT5Agg')   # generate postscript output
+# matplotlib.use('Agg')   # generate postscript output
+import matplotlib.pyplot as plt
 from neo.io import NixIO
 from neo.io.proxyobjects import (
     AnalogSignalProxy, SpikeTrainProxy, EventProxy)
@@ -53,6 +58,14 @@ import json
 #  load options
 from currentExperiment import parseAnalysisOptions
 from docopt import docopt
+import seaborn as sns
+#
+sns.set(
+    context='talk', style='dark',
+    palette='dark', font='sans-serif',
+    font_scale=1.5, color_codes=True)
+
+
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']),
@@ -405,33 +418,94 @@ def calcBlockAnalysisWrapper():
     tdDF.loc[:, 't'] += asigBlock.annotations['chunkTStart']
     # origTimeStep = tdDF['t'].iloc[1] - tdDF['t'].iloc[0]
     tdDF.set_index('t', inplace=True)
+    descriptiveNames = pd.Series(eventInfo['inputIDs']).reset_index()
+    descriptiveNames.columns = ['newName', 'ainpName']
+    renamingDict = {
+        'seg0_' + row['ainpName']: 'seg0_' + row['newName']
+        for rowIdx, row in descriptiveNames.iterrows()}
+    tdDF.rename(columns=renamingDict, inplace=True)
+    signalsForDerivative = ['seg0_forceX', 'seg0_forceY']
+    for cName in signalsForDerivative:
+        if cName in tdDF.columns:
+            tdDF.loc[:, cName + '_prime'] = hf.applySavGol(
+                tdDF[cName],
+                window_length_sec=10e-3,
+                fs=int(dummyRigAsig.sampling_rate),
+                polyorder=3, deriv=1)
     # interpolate rig analog signals
-    lowPassOpts = {
-        'low': {
-            'Wn': float(samplingRate) / 3,
-            'N': 4,
-            'btype': 'low',
-            'ftype': 'bessel'
+    filterOptsPerCategory = {
+        'forceSensor': {
+            'names': ['seg0_forceX', 'seg0_forceY'],
+            'filterOpts': {
+                'low': {
+                    'Wn': float(samplingRate) / 3,
+                    'N': 4,
+                    'btype': 'low',
+                    'ftype': 'bessel'
+                },
+                'bandstop60Hz': {
+                    'Wn': 60,
+                    'nHarmonics': 1,
+                    'Q': 20,
+                    'N': 4,
+                    'rp': 1,
+                    'btype': 'bandstop',
+                    'ftype': 'cheby1'
+                },
+                'bandstop85Hz': {
+                    'Wn': 85,
+                    'nHarmonics': 2,
+                    'Q': 20,
+                    'N': 4,
+                    'rp': 1,
+                    'btype': 'bandstop',
+                    'ftype': 'cheby1'
+                }
+            }
+        },
+        'other': {
+            'names': [],
+            'filterOpts': {
+                'low': {
+                    'Wn': float(samplingRate) / 3,
+                    'N': 4,
+                    'btype': 'low',
+                    'ftype': 'bessel'
+                }
+            }
         }
     }
+    lowPassOpts = filterOptsPerCategory['other']['filterOpts']
+    columnInfo = tdDF.columns.to_frame(name='feature')
+    columnInfo.loc[:, 'featureGroup'] = np.nan
+    for featureName, _ in columnInfo.iterrows():
+        for categName, filterData in filterOptsPerCategory.items():
+            if featureName in filterData['names']:
+                columnInfo.loc[featureName, 'featureGroup'] = categName
+    columnInfo.loc[:, 'featureGroup'] = columnInfo['featureGroup'].fillna('other')
+    for groupName, group in columnInfo.groupby('featureGroup'):
+        fOpts = filterOptsPerCategory[groupName]['filterOpts'].copy()
+        filterCoeffs = hf.makeFilterCoeffsSOS(
+            fOpts, float(dummyRigAsig.sampling_rate))
+        if trackMemory:
+            print('Filtering analog data before downsampling. memory usage: {:.1f} MB'.format(
+                prf.memory_usage_psutil()))
+        filteredAsigs = signal.sosfiltfilt(
+            filterCoeffs, tdDF.loc[:, group.index].to_numpy(),
+            axis=0)
+        tdDF.loc[:, group.index] = filteredAsigs
+        '''fig, ax = plt.subplots()
+        idx1, idx2 = int(6e4), int(9e4)
+        numericalDiff = tdDF[cName].diff() * float(dummyRigAsig.sampling_rate)
+        ax.plot(tdDF.index[idx1:idx2], numericalDiff.iloc[idx1:idx2], label='original')
+        ax.plot(tdDF.index[idx1:idx2], tdDF[cName + '_prime'].iloc[idx1:idx2], label='savgol')
+        ax.legend()
+        plt.show()'''
+        
+        if trackMemory:
+            print('Just finished analog data filtering before downsampling. memory usage: {:.1f} MB'.format(
+                prf.memory_usage_psutil()))
     if samplingRate != dummyRigAsig.sampling_rate:
-        if samplingRate < dummyRigAsig.sampling_rate:
-            filterCoeffs = hf.makeFilterCoeffsSOS(
-                lowPassOpts.copy(), float(dummyRigAsig.sampling_rate))
-            if trackMemory:
-                print('Filtering analog data before downsampling. memory usage: {:.1f} MB'.format(
-                    prf.memory_usage_psutil()))
-            # tdDF.loc[:, tdChanNames] = signal.sosfiltfilt(
-            filteredAsigs = signal.sosfiltfilt(
-                filterCoeffs, tdDF.to_numpy(),
-                axis=0)
-            tdDF = pd.DataFrame(
-                filteredAsigs,
-                index=tdDF.index,
-                columns=tdDF.columns)
-            if trackMemory:
-                print('Just finished analog data filtering before downsampling. memory usage: {:.1f} MB'.format(
-                    prf.memory_usage_psutil()))
         tdInterp = hf.interpolateDF(
             tdDF, outputBlockT,
             kind='linear', fill_value=(0, 0),
@@ -440,6 +514,17 @@ def calcBlockAnalysisWrapper():
         del tdDF
     else:
         tdInterp = tdDF
+    # add analog traces derived from position
+    if 'seg0_position' in tdInterp.columns:
+        tdInterp.loc[:, 'seg0_position_x'] = (
+            np.cos(np.radians(tdInterp['seg0_position'].astype(float) * 100)))
+        tdInterp.loc[:, 'seg0_position_y'] = (
+            np.sin(np.radians(tdInterp['seg0_position'].astype(float) * 100)))
+        tdInterp.sort_index(axis='columns', inplace=True)
+        tdInterp.loc[:, 'seg0_velocity_x'] = (
+            tdInterp[ 'seg0_position_y'] * (-1) * (tdInterp['seg0_velocity'].astype(float) * 3e2))
+        tdInterp.loc[:, 'seg0_velocity_y'] = (
+            tdInterp[ 'seg0_position_x'] * (tdInterp['seg0_velocity'].astype(float) * 3e2))
     concatList = [tdInterp]
     #
     if not arguments['rigOnly']:
@@ -463,7 +548,6 @@ def calcBlockAnalysisWrapper():
                 if trackMemory:
                     print('Filtering analog data before downsampling. memory usage: {:.1f} MB'.format(
                         prf.memory_usage_psutil()))
-                # insDF.loc[:, tdChanNames] = signal.sosfiltfilt(
                 filteredAsigs = signal.sosfiltfilt(
                     filterCoeffs, insDF.to_numpy(),
                     axis=0)
@@ -484,33 +568,8 @@ def calcBlockAnalysisWrapper():
             insInterp = insDF
         concatList.append(insInterp)
         concatList.append(infoFromStimStatus)
-    # add analog traces derived from position
-    # if 'seg0_position' in tdInterp.columns:
-    #     tdInterp.loc[:, 'seg0_position_x'] = ((
-    #         np.cos(
-    #             tdInterp.loc[:, 'seg0_position'] *
-    #             100 * 2 * np.pi / 360))
-    #         .to_numpy())
-    #     tdInterp.sort_index(axis='columns', inplace=True)
-    #     tdInterp.loc[:, 'seg0_position_y'] = ((
-    #         np.sin(
-    #             tdInterp.loc[:, 'seg0_position'] *
-    #             100 * 2 * np.pi / 360))
-    #         .to_numpy())
-    #     tdInterp.loc[:, 'seg0_velocity_x'] = ((
-    #         tdInterp.loc[:, 'seg0_position_y'] *
-    #         (-1) *
-    #         (tdInterp.loc[:, 'seg0_velocity'] * 3e2))
-    #         .to_numpy())
-    #     tdInterp.loc[:, 'seg0_velocity_y'] = ((
-    #         tdInterp.loc[:, 'seg0_position_x'] *
-    #         (tdInterp.loc[:, 'seg0_velocity'] * 3e2))
-    #         .to_numpy())
-    #     rigChanNames += [
-    #         'seg0_position_x', 'seg0_position_y',
-    #         'seg0_velocity_x', 'seg0_velocity_y']
     #
-
+    #
     if arguments['hasKinematics']:
         kinemPath = os.path.join(
             scratchFolder,
@@ -532,6 +591,12 @@ def calcBlockAnalysisWrapper():
         kinemDF.set_index('t', inplace=True)
         # interpolate kinematic analog signals
         kinemCols = [cn for cn in kinemDF.columns if '_angle' in cn]
+        for cName in kinemCols:
+            kinemDF.loc[:, cName.replace('_angle', '_omega')] = hf.applySavGol(
+                kinemDF[cName],
+                window_length_sec=30e-3,
+                fs=int(dummyKinemAsig.sampling_rate),
+                polyorder=3, deriv=1)
         filterOptsKinem = {
             'low': {
                 'Wn': 33,
@@ -651,32 +716,14 @@ def calcBlockAnalysisWrapper():
         else:
             emgInterp = emgDF
         concatList.append(emgInterp)
-
     if len(concatList) > 1:
         tdInterp = pd.concat(
-            concatList,
-            axis=1)
-    # smooth by simi fps
-    # simiFps = 100
-    # smoothWindowStd = int(1 / (origTimeStep * simiFps * 2))
-    # if not arguments['rigOnly']:
-    #     tdInterp.loc[:, 'RateInHz'] = (
-    #         tdInterp.loc[:, 'RateInHz'] *
-    #         (tdInterp.loc[:, 'amplitude'].abs() > 0))
-    #     for pName in progAmpNames:
-    #         if pName in tdInterp.columns:
-    #             tdInterp.loc[:, pName.replace('amplitude', 'ACR')] = (
-    #                 tdInterp.loc[:, pName] *
-    #                 tdInterp.loc[:, 'RateInHz'])
-    #             tdInterp.loc[:, pName.replace('amplitude', 'dAmpDt')] = (
-    #                 tdInterp.loc[:, pName].diff()
-    #                 .rolling(6 * smoothWindowStd, center=True, win_type='gaussian')
-    #                 .mean(std=smoothWindowStd).fillna(0) / origTimeStep)
+            concatList, axis=1)
+    signalsForAbsoluteValue = ['seg0_velocity'] + [cN for cN in tdInterp.columns if '_omega' in cN]
+    for cName in signalsForAbsoluteValue:
+        if cName in tdInterp.columns:
+            tdInterp.loc[:, cName + '_abs'] = tdInterp[cName].abs()
     tdInterp.columns = [cN.replace('seg0_', '') for cN in tdInterp.columns]
-    descriptiveNames = pd.Series(eventInfo['inputIDs']).reset_index()
-    descriptiveNames.columns = ['newName', 'ainpName']
-    renamingDict = {row['ainpName']: row['newName'] for rowIdx, row in descriptiveNames.iterrows()}
-    tdInterp.rename(columns=renamingDict, inplace=True)
     tdInterp.sort_index(axis='columns', inplace=True)
     tdBlockInterp = ns5.dataFrameToAnalogSignals(
         tdInterp,

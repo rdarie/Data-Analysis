@@ -5,6 +5,8 @@ from sklearn.model_selection import (
     GridSearchCV, StratifiedKFold)
 from sklearn.model_selection._split import _BaseKFold
 from sklearn.metrics import make_scorer
+from sklearn.linear_model import ElasticNet, ElasticNetCV
+from sklearn.svm import LinearSVR
 import pandas as pd
 import numpy as np
 import statsmodels.api as sm
@@ -26,6 +28,73 @@ sns.set()
 sns.set_color_codes("dark")
 sns.set_context("talk")
 sns.set_style("whitegrid")
+
+
+def crossValidationScores(
+        X, y, estimator,
+        estimatorKWArgs={},
+        crossvalKWArgs={},
+        joblibBackendArgs={},
+        verbose=0):
+    with jb.parallel_backend(**joblibBackendArgs):
+        instance = estimator(**estimatorKWArgs)
+        scores = cross_validate(instance, X, y, verbose=verbose, **crossvalKWArgs)
+    # train on all of the "working" samples, eval on the "validation"
+    if hasattr(crossvalKWArgs['cv'], 'work'):
+        workingIdx = crossvalKWArgs['cv'].work
+        workEstim = estimator(**estimatorKWArgs)
+        workX = X.iloc[workingIdx, :]
+        workY = y.iloc[workingIdx]
+        validIdx = crossvalKWArgs['cv'].validation
+        valX = X.iloc[validIdx, :]
+        valY = y.iloc[validIdx]
+        #
+        workEstim.fit(workX, workY)
+        #
+        scores['fit_time'] = np.append(scores['fit_time'], np.nan)
+        scores['score_time'] = np.append(scores['score_time'], np.nan)
+        scores['estimator'] = np.append(scores['estimator'], workEstim)
+        scores['train_score'] = np.append(scores['train_score'], workEstim.score(workX, workY))
+        scores['test_score'] = np.append(scores['test_score'], workEstim.score(valX, valY))
+    return scores
+
+
+def gridSearchHyperparameters(
+        X, y, estimator,
+        estimatorKWArgs={},
+        gridSearchKWArgs={},
+        crossvalKWArgs={},
+        joblibBackendArgs={},
+        verbose=0):
+    with jb.parallel_backend(**joblibBackendArgs):
+        estimatorProto = estimator(**estimatorKWArgs)
+        if isinstance(estimatorProto, ElasticNet):
+            gridSearcher = ElasticNetCV(verbose=verbose, **gridSearchKWArgs)
+        else:
+            gridSearcher = GridSearchCV(
+                estimatorProto, verbose=verbose, **gridSearchKWArgs)
+        if verbose > 0:
+            print('Fitting gridSearchCV...')
+        gridSearcher.fit(X, y)
+        if verbose:
+            print('    Done fitting gridSearchCV!')
+        if isinstance(estimatorProto, ElasticNet):
+            optParams = {'alpha': gridSearcher.alpha_, 'l1_ratio': gridSearcher.l1_ratio_}
+        else:
+            optParams = gridSearcher.best_params_
+        scoringEstimatorParams = estimatorKWArgs.copy()
+        scoringEstimatorParams.update(optParams)
+        if verbose:
+            print('cross val scoring')
+        scores = crossValidationScores(
+            X, y, estimator,
+            estimatorKWArgs=scoringEstimatorParams,
+            crossvalKWArgs=crossvalKWArgs,
+            joblibBackendArgs=joblibBackendArgs,
+            verbose=verbose)
+        if verbose:
+            print('    Done cross val scoring!')
+    return scores, gridSearcher
 
 
 def timeShift(x, lag):
@@ -189,7 +258,6 @@ def makeLogRaisedCosBasis(
     yrnge = nlin(endpoints + b)
     db = np.diff(yrnge)/(nb-1)  # spacing between raised cosine peaks
     ctrs = np.arange(yrnge[0], yrnge[1] + db, db)  # centers for basis vectors
-    # pdb.set_trace()
     if ctrs.size > nb:
         ctrs = ctrs[:-1]
     mxt = invnl(yrnge[1]+2*db) - b  # maximum time bin

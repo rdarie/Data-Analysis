@@ -14,7 +14,7 @@ Options:
     --lazy                                 load from raw, or regular? [default: False]
     --plotting                             make plots? [default: False]
     --showFigures                          show plots? [default: False]
-    --verbose                              print diagnostics? [default: False]
+    --verbose=verbose                      print diagnostics? [default: 0]
     --alignQuery=alignQuery                what will the plot be aligned to? [default: midPeak]
     --rhsBlockSuffix=rhsBlockSuffix        which trig_ block to pull [default: pca]
     --rhsBlockPrefix=rhsBlockPrefix        which trig_ block to pull [default: Block]
@@ -53,7 +53,8 @@ import dataAnalysis.preproc.ns5 as ns5
 # from sklearn.decomposition import PCA, IncrementalPCA
 # from sklearn.pipeline import make_pipeline, Pipeline
 # from sklearn.covariance import ShrunkCovariance, LedoitWolf, EmpiricalCovariance
-from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import ElasticNet, ElasticNetCV
+from sklearn.svm import LinearSVR
 from sklearn.model_selection import cross_val_score, cross_validate, GridSearchCV
 import joblib as jb
 import dill as pickle
@@ -124,7 +125,7 @@ if __name__ == '__main__':
             iteratorSuffix))
     with open(iteratorPath, 'rb') as f:
         loadingMeta = pickle.load(f)
-
+    #
     fullEstimatorName = '{}_{}_to_{}{}_{}_{}'.format(
         arguments['estimatorName'],
         arguments['unitQueryLhs'], arguments['unitQueryRhs'],
@@ -140,21 +141,43 @@ if __name__ == '__main__':
         alignSubFolder,
         rhsBlockBaseName + '{}_{}.nix'.format(
             rhsBlockSuffix, arguments['window']))
-
+    #
     if arguments['lhsBlockSuffix'] is not None:
         lhsBlockSuffix = '_{}'.format(arguments['lhsBlockSuffix'])
     else:
         lhsBlockSuffix = ''
-
+    #
     triggeredLhsPath = os.path.join(
         alignSubFolder,
         lhsBlockBaseName + '{}_{}.nix'.format(
             lhsBlockSuffix, arguments['window']))
     #
-    #
     iteratorsBySegment = loadingMeta['iteratorsBySegment'].copy()
     cv_kwargs = loadingMeta['cv_kwargs'].copy()
-
+    cvIterator = iteratorsBySegment[0]
+    workIdx = cvIterator.work
+    estimatorClass = ElasticNet
+    '''gridSearchKWArgs = dict(
+        l1_ratio=[.1, .5, .7, .9, .95, .99, 1.],
+        cv=cvIterator)'''
+    estimatorClass = LinearSVR
+    estimatorKWArgs = dict(
+        max_iter=2000
+        )
+    gridSearchKWArgs = dict(
+        param_grid=dict(
+            C=np.logspace(-2, 2, 5)
+            ),
+        cv=cvIterator,
+        scoring='r2'
+        )
+    crossvalKWArgs = dict(
+        cv=cvIterator, scoring='r2',
+        return_estimator=True,
+        return_train_score=True)
+    joblibBackendArgs = dict(
+        backend='dask'
+        )
     ######### data loading stuff
     lOfRhsDF = []
     lOfLhsDF = []
@@ -247,8 +270,6 @@ if __name__ == '__main__':
     rhsDF = pd.concat(lOfRhsDF)
     ##### end of data loading stuff
     #
-    cvIterator = iteratorsBySegment[0]
-    workIdx = cvIterator.work
     workingLhsDF = lhsDF.iloc[workIdx, :]
     workingRhsDF = rhsDF.iloc[workIdx, :]
     nFeatures = lhsDF.columns.shape[0]
@@ -257,32 +278,29 @@ if __name__ == '__main__':
     allScores = []
     lhsMasks = lOfLhsMasks[0]
     lhGroupNames = lhsMasks.index.names
-    crossvalKWArgs=dict(
-        cv=cvIterator, scoring='r2',
-        return_estimator=True,
-        return_train_score=True)
-    joblibBackendArgs = dict(
-        backend='dask'
-        )
-    estimatorKWArgs = dict()
     if 'backend' in joblibBackendArgs:
         if joblibBackendArgs['backend'] == 'dask':
             daskClient = Client()
+    allGridSearchDict = {}
     for maskIdx, lhsMask in lhsMasks.iterrows():
         scores = {}
+        gridSearcherDict = {}
         lhGroup = lhsDF.loc[:, lhsMask]
         for columnTuple in rhsDF.columns:
             targetName = columnTuple[0]
             print('Fitting {} to {}...'.format(lhsMask.name, targetName))
-            scores[targetName] = tdr.crossValidationScores(
-                lhGroup, rhsDF.loc[:, columnTuple], LinearRegression,
-                verbose=True, crossvalKWArgs=crossvalKWArgs,
-                joblibBackendArgs=joblibBackendArgs,
-                estimatorKWArgs=estimatorKWArgs
+            scores[targetName], gridSearcherDict[targetName] = tdr.gridSearchHyperparameters(
+                lhGroup, rhsDF.loc[:, columnTuple], estimatorClass,
+                verbose=int(arguments['verbose']),
+                gridSearchKWArgs=gridSearchKWArgs,
+                crossvalKWArgs=crossvalKWArgs,
+                estimatorKWArgs=estimatorKWArgs,
+                joblibBackendArgs=joblibBackendArgs
                 )
         scoresDF = pd.concat(
             {nc: pd.DataFrame(scr) for nc, scr in scores.items()},
             names=['target', 'fold'])
+        allGridSearchDict[lhsMask.name] = gridSearcherDict
         '''if not isinstance(groupName, list):
             attrNameList = [groupName]
         else:
@@ -293,7 +311,6 @@ if __name__ == '__main__':
         allScores.append(scoresDF)
     allScoresDF = pd.concat(allScores)
     allScoresDF.set_index(lhGroupNames, inplace=True, append=True)
-
     if arguments['plotting']:
         figureOutputPath = os.path.join(
                 figureOutputFolder,
@@ -312,7 +329,6 @@ if __name__ == '__main__':
             (scoresForPlot['fold'] == lastFoldIdx) &
             (scoresForPlot['evalType'] == 'train'))
         scoresForPlot.loc[workingMask, 'evalType'] = 'work'
-    if True:
         with PdfPages(figureOutputPath) as pdf:
             # fig, ax = plt.subplots()
             # fig.set_size_inches(12, 8)
@@ -331,6 +347,7 @@ if __name__ == '__main__':
             else:
                 plt.close()
     del lhsDF, rhsDF
+    # gc.collect()
     prf.print_memory_usage('Done fitting')
     estimatorsSubFolder = os.path.join(
         alignSubFolder, 'estimators')

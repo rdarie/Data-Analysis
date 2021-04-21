@@ -126,7 +126,7 @@ def processFigureFolderTree(
         os.makedirs(figureStatsFolder, exist_ok=True)
     alignedFeaturesFolder = os.path.join(
         _figureFolder, _arguments['analysisName'],
-        'alignedFeatures')
+        _arguments['alignFolderName'], 'alignedFeatures')
     if not os.path.exists(alignedFeaturesFolder):
         os.makedirs(alignedFeaturesFolder, exist_ok=True)
     #
