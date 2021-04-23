@@ -6,7 +6,7 @@
 # Default resources are 1 core with 2.8GB of memory.
 
 # Request memory:
-#SBATCH --nodes=1
+#SBATCH --nodes=8
 #SBATCH --mem=127G
 
 # Specify a job name:
@@ -21,12 +21,15 @@
 
 # Request custom resources
 #SBATCH --array=2
-SLURM_ARRAY_TASK_ID=2
+#  SLURM_ARRAY_TASK_ID=2
 source ./shellScripts/run_pca_calc_aligned_motion_preamble.sh
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
 
-# python -u './calcOrdinaryLeastSquares.py' --loadFromFrames --iteratorSuffix='a' --lhsBlockSuffix="lfp" --unitQueryLhs="lfp_CAR_spectral" --rhsBlockSuffix="rig" --unitQueryRhs="jointAngle" --estimatorName='ols' --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --showFigures
-python -u './calcGridSearchSingleTarget.py' --loadFromFrames --iteratorSuffix='a' --lhsBlockSuffix="lfp" --unitQueryLhs="lfp_CAR_spectral" --rhsBlockSuffix="rig" --unitQueryRhs="jointAngle" --estimatorName='enr' --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --showFigures --verbose=2
-python -u './calcGridSearchSingleTarget.py' --loadFromFrames --iteratorSuffix='a' --lhsBlockSuffix="lfp" --unitQueryLhs="lfp_CAR_spectral" --rhsBlockSuffix="rig" --unitQueryRhs="jointAngularVelocity" --estimatorName='enr' --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --showFigures --verbose=2
-# python -u './processOrdinaryLeastSquares.py' --fullEstimatorName='ols_lfp_CAR_spectral_to_jointAngle_a_L_starting' --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting
-# python -u './plotOrdinaryLeastSquares.py' --fullEstimatorName='ols_lfp_CAR_spectral_to_jointAngle_a_L_starting' --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting
+python -u './calcOrdinaryLeastSquares.py' --loadFromFrames --iteratorSuffix='a' --lhsBlockSuffix="lfp" --unitQueryLhs="lfp_CAR_spectral" --rhsBlockSuffix="rig" --unitQueryRhs="limbState" --estimatorName='ols' --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting
+python -u './processOrdinaryLeastSquares.py' --fullEstimatorName='ols_lfp_CAR_spectral_to_limbState_a_L_starting' --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting
+python -u './plotOrdinaryLeastSquares.py' --fullEstimatorName='ols_lfp_CAR_spectral_to_limbState_a_L_starting' --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting
+
+python -u './calcGridSearchSingleTarget.py' --loadFromFrames --iteratorSuffix='a' --lhsBlockSuffix="lfp" --unitQueryLhs="lfp_CAR_spectral" --rhsBlockSuffix="rig" --unitQueryRhs="limbState" --estimatorName='enr' --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
+# python -u './calcGridSearchSingleTarget.py' --loadFromFrames --iteratorSuffix='a' --lhsBlockSuffix="lfp" --unitQueryLhs="lfp_CAR_spectral" --rhsBlockSuffix="rig" --unitQueryRhs="jointAngularVelocity" --estimatorName='enr' --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
+python -u './processOrdinaryLeastSquares.py' --fullEstimatorName='enr_lfp_CAR_spectral_to_limbState_a_L_starting' --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting
+python -u './plotOrdinaryLeastSquares.py' --fullEstimatorName='enr_lfp_CAR_spectral_to_limbState_a_L_starting' --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting

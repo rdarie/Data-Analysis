@@ -799,7 +799,7 @@ def calcISIBlockAnalysisNix():
                 #
                 currCats = pd.cut(
                     startCategories['nominalCurrent'],
-                    np.arange(-2, 2, 0.2))
+                    np.arange(-2e3, 2e3, 200))
                 startCategories['nominalCurrentCat'] = currCats.astype('str')
                 startCategories['RateInHz'] = np.round(startCategories['RateInHz'], decimals=1)
                 stopCategories = startCategories.copy()
@@ -825,9 +825,9 @@ def calcISIBlockAnalysisNix():
                 # stopCategories['amplitudeCat'] = ampCats.astype(np.str)
                 startCategories['stimCat'] = 'stimOn'
                 stopCategories['stimCat'] = 'stimOff'
+                # pdb.set_trace()
                 startCategories.dropna(inplace=True)
                 stopCategories.dropna(inplace=True)
-        #
         with open(etpJsonPath, 'w') as f:
             json.dump(electrodeToProgramLookup, f)
         alignEventsDF = pd.concat((
@@ -894,7 +894,7 @@ def calcISIBlockAnalysisNix():
     if samplingRate < currentSamplingRate:
         filterOpts.update({
             'low': {
-                'Wn': float(samplingRate) / 2,
+                'Wn': float(samplingRate) / 3,
                 'N': 4,
                 'btype': 'high',
                 'ftype': 'bessel'
@@ -1134,7 +1134,7 @@ def calcISIBlockAnalysisNix():
 
 
 if __name__ == "__main__":
-    runProfiler = True
+    runProfiler = False
     if runProfiler:
         import dataAnalysis.helperFunctions.profiling as prf
         nameSuffix = os.environ.get('SLURM_ARRAY_TASK_ID')

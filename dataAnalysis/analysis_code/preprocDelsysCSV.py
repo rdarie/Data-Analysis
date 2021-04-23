@@ -59,6 +59,7 @@ if not os.path.exists(delsysPath):
     searchStr = os.path.join(nspFolder, '*' + ns5FileName + '*.csv')
     altSearchStr = os.path.join(nspFolder, '*' + 'Block{:0>4}'.format(blockIdx) + '*.csv')
     delsysPathCandidates = glob.glob(searchStr) + glob.glob(altSearchStr)
+    print('Loading from {}'.format(delsysPathCandidates))
     assert len(delsysPathCandidates) == 1
     delsysPath = delsysPathCandidates[0]
 

@@ -198,15 +198,15 @@ def calcCovMat(
     if useMinCovDet:
         try:
             est = MinCovDet(support_fraction=supportFraction)
-            est.fit(partitionData.values)
+            est.fit(partitionData)
         except Exception:
             traceback.print_exc()
             print('\npartition shape = {}\n'.format(partitionData.shape))
             est = EmpiricalCovariance()
-            est.fit(partitionData.values)
+            est.fit(partitionData)
     else:
         est = EmpiricalCovariance()
-        est.fit(partitionData.values)
+        est.fit(partitionData)
     result = pd.DataFrame(
         est.mahalanobis(partitionData.values),
         index=partition.index, columns=['mahalDist'])
@@ -231,7 +231,6 @@ if __name__ == "__main__":
     # pdb.set_trace()
     dataDF = ns5.alignedAsigsToDF(
         dataBlock, **alignedAsigsKWargs)
-    # pdb.set_trace()
     if 'outlierDetectColumns' in locals():
         dataDF.drop(
             columns=[
@@ -240,6 +239,7 @@ if __name__ == "__main__":
                 if cn[0] not in outlierDetectColumns],
             level='feature', inplace=True)
     # fix order of magnitude
+    dataDF = dataDF.astype(float)
     ordMag = np.floor(np.log10(dataDF.abs().mean().mean()))
     if ordMag < 0:
         dataDF = dataDF * 10 ** (-ordMag)
@@ -325,9 +325,8 @@ if __name__ == "__main__":
             dataDF, fun=calcCovMat, resultPath=resultPath,
             funKWArgs=covOpts,
             rowKeys=groupNames, colKeys=['lag'],
-            daskPersist=True, useDask=True, reindexFromInput=False,
-            daskComputeOpts=daskComputeOpts
-            )
+            daskPersist=True, useDask=True, retainInputIndex=True,
+            daskComputeOpts=daskComputeOpts)
         mahalDist.columns = ['mahalDist']
         if arguments['saveResults']:
             if os.path.exists(resultPath):

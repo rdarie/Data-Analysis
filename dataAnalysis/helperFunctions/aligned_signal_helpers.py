@@ -242,7 +242,7 @@ def splitApplyCombine(
         funArgs=[], funKWArgs={},
         rowKeys=None, colKeys=None, useDask=False, nPartitionMultiplier=2,
         daskPersist=True, daskProgBar=True, daskResultMeta=None,
-        daskComputeOpts={}, reindexFromInput=False):
+        daskComputeOpts={}, reindexFromInput=False, retainInputIndex=False):
     if isinstance(rowKeys, str):
         rowKeys = [rowKeys, ]
     if isinstance(colKeys, str):
@@ -287,20 +287,22 @@ def splitApplyCombine(
         resultDF = pd.DataFrame(
             result.sort_index().loc[:, dataColNames].to_numpy(),
             index=asigStack.index, columns=asigStack.columns)
-        if colKeys is not None:
-            resultDF = resultDF.unstack(level=colKeys)
+    elif retainInputIndex:
+        presentIndices = [
+            idx
+            for idx in result.columns
+            if (idx in asigStack.index.names)]
+        resultDF = result.sort_index().set_index(presentIndices)
     else:
         presentIndices = [
             idx
             for idx in result.columns
             if (idx not in dataColNames)]
-            # for idx in asigStack.index.names
-            # if (idx in result.columns)]
         resultDF = result.sort_index().set_index(presentIndices)
-        if colKeys is not None:
-            presentColKeys = list(np.intersect1d(colKeys, presentIndices))
-            if len(presentColKeys):
-                resultDF = resultDF.unstack(level=presentColKeys)
+    if colKeys is not None:
+        presentColKeys = list(np.intersect1d(colKeys, resultDF.index.names))
+        if len(presentColKeys):
+            resultDF = resultDF.unstack(level=presentColKeys)
     return resultDF
 
 

@@ -11,7 +11,7 @@ Options:
     --verbose                              print diagnostics? [default: True]
     --lazy                                 load from raw, or regular? [default: False]
     --window=window                        process with short window? [default: short]
-    --inputBlockName=inputBlockName        which trig_ block to pull [default: pca]
+    --inputBlockSuffix=inputBlockSuffix    which trig_ block to pull [default: pca]
     --unitQuery=unitQuery                  how to restrict channels if not supplying a list? [default: pca]
     --alignQuery=alignQuery                what will the plot be aligned to? [default: outboundWithStim]
     --selector=selector                    filename if using a unit selector
@@ -38,6 +38,7 @@ import dill as pickle
 import pandas as pd
 import numpy as np
 from scipy import stats
+from sklearn.preprocessing import RobustScaler, MinMaxScaler
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']), arguments['exp'])
@@ -74,11 +75,11 @@ else:
 triggeredPath = os.path.join(
     alignSubFolder,
     prefix + '_{}_{}.nix'.format(
-        arguments['inputBlockName'], arguments['window']))
+        arguments['inputBlockSuffix'], arguments['window']))
 resultPath = os.path.join(
     calcSubFolder,
     prefix + '_{}_{}_rauc.h5'.format(
-        arguments['inputBlockName'], arguments['window']))
+        arguments['inputBlockSuffix'], arguments['window']))
 print('loading {}'.format(triggeredPath))
 dataReader, dataBlock = ns5.blockFromPath(
     triggeredPath, lazy=arguments['lazy'])
@@ -106,7 +107,68 @@ for name, group in rAUCDF.groupby(['electrode', 'feature']):
         rAUCDF.loc[group.index, 'kruskalStat'] = 0
         rAUCDF.loc[group.index, 'kruskalP'] = 1
 
-rAUCDF.to_hdf(resultPath, resultName, format='table')
+derivedAnnot = [
+    'normalizedRAUC', 'standardizedRAUC',
+    'featureName', 'EMGSide', 'EMGSite']
+saveIndexNames = (rAUCDF.index.names).copy()
+rAUCDF.reset_index(inplace=True)
+for annName in derivedAnnot:
+    rAUCDF.loc[:, annName] = np.nan
+
+rAUCDF.loc[:, amplitudeFieldName] = rAUCDF[amplitudeFieldName].abs()
+sideLookup = {'R': 'Right', 'L': 'Left'}
+'''nSig = {}'''
+
+qLims = (0.05, 0.95)
+# for name, group in rAUCDF.groupby(['feature', 'electrode']):
+for name, group in rAUCDF.groupby(['feature']):
+    rAUCDF.loc[group.index, 'standardizedRAUC'] = (
+        RobustScaler(quantile_range=[i * 100 for i in qLims])
+        .fit_transform(
+            group['rauc'].to_numpy().reshape(-1, 1)))
+    groupQuantiles = group['rauc'].quantile(qLims)
+    rauc = group['rauc'].copy()
+    rauc[rauc > groupQuantiles[qLims[-1]]] = groupQuantiles[qLims[-1]]
+    rauc[rauc < groupQuantiles[qLims[0]]] = groupQuantiles[qLims[0]]
+    # outlierMask = rAUCDF.loc[group.index, 'standardizedRAUC'].abs() > 6
+    thisScaler = MinMaxScaler()
+    thisScaler.fit(
+        rauc.to_numpy().reshape(-1, 1))
+    rAUCDF.loc[group.index, 'normalizedRAUC'] = (
+        thisScaler.transform(rauc.to_numpy().reshape(-1, 1)))
+    featName = name
+    rAUCDF.loc[group.index, 'featureName'] = featName[:-8]
+    rAUCDF.loc[group.index, 'EMGSite'] = featName[1:-8]
+    rAUCDF.loc[group.index, 'EMGSide'] = sideLookup[featName[0]]
+    '''if os.path.exists(statsTestPath):
+        theseSig = sigValsWide.xs(featName, level='unit')
+        nSig.update({featName[:-8]: theseSig.sum().sum()})'''
+
+rAUCDF.loc[:, 'EMG Location'] = (
+    rAUCDF['EMGSide'] + ' ' + rAUCDF['EMGSite'])
+for name, group in rAUCDF.groupby('electrode'):
+    rAUCDF.loc[group.index, 'normalizedAmplitude'] = pd.cut(
+        group[amplitudeFieldName], bins=10, labels=False)
+featurePlotOptsColumns = ['featureName', 'EMGSide', 'EMGSite', 'EMG Location']
+featurePlotOptsDF = rAUCDF.drop_duplicates(subset=['feature']).loc[:, featurePlotOptsColumns]
+plotOptNames = ['color', 'style']
+# pdb.set_trace()
+for pon in plotOptNames:
+    featurePlotOptsDF.loc[:, pon] = np.nan
+uniqueSiteNames = sorted(featurePlotOptsDF['EMGSite'].unique())
+nColors = len(uniqueSiteNames)
+paletteNames = ['deep', 'pastel']
+styleNames = ['-', '--']
+for gIdx, (name, group) in enumerate(featurePlotOptsDF.groupby('EMGSide')):
+    thisPalette = pd.Series(
+        sns.color_palette(paletteNames[gIdx], nColors),
+        index=uniqueSiteNames)
+    featurePlotOptsDF.loc[group.index, 'color'] = group['EMGSite'].map(thisPalette)
+    featurePlotOptsDF.loc[group.index, 'style'] = styleNames[gIdx]
+
+rAUCDF.set_index(saveIndexNames, inplace=True)
+rAUCDF.to_hdf(resultPath, resultName)
+featurePlotOptsDF.to_hdf(resultPath, resultName + '_plotOpts')
 
 """
 RecCurve = ash.facetGridApplyFunGrouped(

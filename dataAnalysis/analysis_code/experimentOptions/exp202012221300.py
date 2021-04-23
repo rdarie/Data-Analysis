@@ -10,7 +10,7 @@ def getExpOpts():
         }
     experimentName = '202012221300-Goat'
     deviceName = None
-    subjectName = 'Rupert'
+    subjectName = 'Goat'
     rippleMapFile = {
         1: 'isi_port1nano1caudal_xAyBzC_ortho_port2nano1rostral_xAyBzC_ortho.map',
         2: 'isi_port1nano1caudal_xAyBzC_ortho_port2nano1rostral_xAyBzC_ortho.map',
@@ -156,7 +156,6 @@ def getExpOpts():
             'electrode', 'nominalCurrent', 'RateInHz'],
         twoTailed=False,
         )
-    '''
     outlierDetectColumns = [
             # 'LThoracolumbarFasciaEmg#0',
             # 'LGracilisEmg#0',
@@ -170,6 +169,7 @@ def getExpOpts():
             # 'RPeroneusLongusEmg#0',
             # 'RBicepsFemorisEmg#0',
             # 'RGastrocnemiusEmg#0',
+            #
             # 'LThoracolumbarFasciaEmgEnv#0',
             'LGracilisEmgEnv#0',
             'LTensorFasciaeLataeEmgEnv#0',
@@ -183,7 +183,6 @@ def getExpOpts():
             'RBicepsFemorisEmgEnv#0',
             'RGastrocnemiusEmgEnv#0'
         ]
-    '''
     RCPlotOpts = {
         'keepFeatures': [
             'LBicepsFemoris', 'LGastrocnemius', 'LGracilis',
@@ -192,11 +191,11 @@ def getExpOpts():
             'RGastrocnemius', 'RGracilis', 'RPeroneusLongus',
             'RTensorFasciaeLatae',
             # 'LThoracolumbarFascia', 'RThoracolumbarFascia',
-            'RExtensorDigitorum',
+            # 'RExtensorDigitorum',
             'LSemitendinosus', 'RSemitendinosus',
             ],
         'keepElectrodes': None,
-        'significantOnly': False,
+        'significantOnly': True,
         }
     EMGStyleMarkers = {
         'LThoracolumbarFasciaEmgEnv#0': 'o',
@@ -284,12 +283,12 @@ def getExpOpts():
             return featName
     
     lmfitFunKWArgs = dict(
-        tBounds=[.7e-3, 95e-3],
+        tBounds=[.9e-3, 39e-3],
         scoreBounds=[1e-3, 6e-3],
         #
         expOpts=dict(
             exp1_=dict(
-                tBounds=[19e-3, 95e-3],
+                tBounds=[19e-3, 39e-3],
                 assessModel=True
             ),
             exp2_=dict(
@@ -297,7 +296,7 @@ def getExpOpts():
                 assessModel=True
             ),
             exp3_=dict(
-                tBounds=[.7e-3, 1.4e-3],
+                tBounds=[.9e-3, 1.9e-3],
                 assessModel=True
             )
         ),

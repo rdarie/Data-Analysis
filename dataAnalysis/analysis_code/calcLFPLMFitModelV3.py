@@ -10,7 +10,7 @@ Options:
     --verbose                                   print diagnostics? [default: False]
     --exportToDeepSpine                         look for a deepspine exported h5 and save these there [default: False]
     --plotting                                  plot out the correlation matrix? [default: True]
-    --showPlots                                 show the plots? [default: False]
+    --showFigures                               show the plots? [default: False]
     --analysisName=analysisName                 append a name to the resulting blocks? [default: default]
     --inputBlockSuffix=inputBlockSuffix         filename for inputs [default: fr]
     --maskOutlierBlocks                         delete outlier trials? [default: False]
@@ -23,9 +23,9 @@ Options:
 """
 ##########################################################
 ##########################################################
-useCachedResult = True
-DEBUGGING = False
-SMALLDATASET = False
+useCachedResult = False
+DEBUGGING = True
+SMALLDATASET = True
 ##########################################################
 ##########################################################
 import os, sys, re
@@ -110,7 +110,7 @@ alignedAsigsKWargs.update(dict(
     duplicateControlsByProgram=False,
     makeControlProgram=False,
     removeFuzzyName=False,
-    decimate=1, windowSize=(-10e3, 100e-3),
+    decimate=1, windowSize=(-20e3, 100e-3),
     metaDataToCategories=False,
     # getMetaData=[
     #     'RateInHz', 'feature', 'electrode',
@@ -127,7 +127,7 @@ alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **argu
 alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
     namedQueries, scratchFolder, **arguments)
 alignedAsigsKWargs['outlierTrials'] = ash.processOutlierTrials(
-    scratchPath, prefix, **arguments)
+    scratchFolder, prefix, **arguments)
 
 from lmfit.models import ExponentialModel, GaussianModel, ConstantModel
 from lmfit import Model, CompositeModel, Parameters
@@ -186,15 +186,15 @@ for pref, mod in expMs.items():
 gaussPars = Parameters()
 for pref, mod in gaussMs.items():
     gaussPars.update(mod.make_params())
-#
+# Decays in **milliseconds**
 expPars['exp1_amplitude'].set(value=0)
-expPars['exp1_decay'].set(min=30., value=250., max=500.)
+expPars['exp1_decay'].set(min=.1, value=1000., max=1000.)
 #
 expPars['exp2_amplitude'].set(value=0)
-expPars['exp2_decay'].set(min=2., value=5., max=20.)
+expPars['exp2_decay'].set(min=.05, value=20., max=20.)
 #
 expPars['exp3_amplitude'].set(value=0)
-expPars['exp3_decay'].set(min=.05, value=.1, max=.4)
+expPars['exp3_decay'].set(min=.01, value=.5, max=2.)
 #
 gaussPars.add(
     name='n1_offset',
@@ -250,13 +250,14 @@ def applyModel(
         return dummy, dummyAnns, None
     ################################################
     #
-    #  Slow exp fitting
+    #  Exp fitting
     #
     ################################################
     y_resid = fit_y
+    maxDecay = None
     for pref, thisExpMod in expMs.items():
         theseExpOpts = expOpts.copy().pop(pref, dict())
-        expTBounds = theseExpOpts.pop('tBounds', None)
+        expTBounds = theseExpOpts.copy().pop('tBounds', None)
         if expTBounds is not None:
             exp_tStart = expTBounds[0] if expTBounds[0] is not None else x[0]
             exp_tStop = expTBounds[1] if expTBounds[1] is not None else x[-1] + 1
@@ -267,13 +268,22 @@ def applyModel(
             exp_x = fit_x
             exp_y = y_resid
         #
+        if maxDecay is None:
+            maxDecay = fullPars['{}decay'.format(pref)].max
         expGuess = thisExpMod.guess(exp_y, x=exp_x)
-        signGuess = np.sign(np.nanmean(exp_y, axis=None))
+        signGuessOldWay = np.sign(np.nanmean(exp_y, axis=None))
+        positivePred = thisExpMod.eval(expGuess, x=exp_x)
+        positiveResid = np.sum((exp_y - positivePred) ** 2)
+        negativeResid = np.sum((exp_y + positivePred) ** 2)
+        if positiveResid < negativeResid:
+            signGuess = 1.
+        else:
+            signGuess = -1.
         ampGuess = signGuess * expGuess['{}amplitude'.format(pref)].value
         decayGuess = np.clip(
             expGuess['{}decay'.format(pref)].value,
             fullPars['{}decay'.format(pref)].min,
-            fullPars['{}decay'.format(pref)].max)
+            maxDecay)
         #
         if ampGuess == 0:
             return dummy, dummyAnns, None
@@ -286,18 +296,21 @@ def applyModel(
             else:
                 tempPars['{}amplitude'.format(pref)].set(
                     value=ampGuess, max=1e-3 * ampGuess, min=3 * ampGuess)
-            #
+            if verbose:
+                print('{} ampGuess is {}'.format(pref, ampGuess))
+            thisMaxDecay = max(
+                min(maxDecay, fullPars['{}decay'.format(pref)].max),
+                decayGuess)
             tempPars['{}decay'.format(pref)].set(
                 value=decayGuess,
                 min=fullPars['{}decay'.format(pref)].min,
-                max=fullPars['{}decay'.format(pref)].max
+                max=thisMaxDecay
                 )
             ###
             exp_out = thisExpMod.fit(
-                exp_y, tempPars, x=exp_x,
-                method=method,
+                exp_y, tempPars, x=exp_x, method=method,
                 max_nfev=max_nfev, fit_kws=fit_kws)
-            assessThisModel = theseExpOpts.pop('assessModel', False)
+            assessThisModel = theseExpOpts.copy().pop('assessModel', False)
             if assessThisModel:
                 modelFitsWellEnough = True
                 try:
@@ -306,20 +319,34 @@ def applyModel(
                         assert thisP.value is not None
                         relativeError = 2 * thisP.stderr / thisP.value
                         if np.abs(relativeError) > 1:
+                            print('Removing component {} (fit not adequate)'.format(pref))
                             modelFitsWellEnough = False
                 except Exception:
+                    print('WARNING!')
                     traceback.print_exc()
-                    modelFitsWellEnough = False
+                    origEnergy = np.sum(exp_y ** 2)
+                    residEnergy = np.sum(exp_out.residual ** 2)
+                    print('best_values = {}'.format(exp_out.best_values))
+                    if origEnergy > residEnergy:
+                        print('Keeping component {} (error assesing fit, but fit ok)'.format(pref))
+                        modelFitsWellEnough = True
+                    else:
+                        print('Removing component {} (error assesing fit)'.format(pref))
+                        modelFitsWellEnough = False
+                    print('origEnergy / residEnergy = {}'.format(origEnergy / residEnergy))
             else:
+                print('using component {} without assesing'.format(pref))
                 modelFitsWellEnough = True
             #
             if modelFitsWellEnough:
+                print('using component {}'.format(pref))
                 fullPars['{}amplitude'.format(pref)].set(
                     value=exp_out.best_values['{}amplitude'.format(pref)],
                     vary=False)
+                foundDecay = exp_out.best_values['{}decay'.format(pref)]
                 fullPars['{}decay'.format(pref)].set(
-                    value=exp_out.best_values['{}decay'.format(pref)],
-                    vary=False)
+                    value=foundDecay, vary=False)
+                maxDecay = min(foundDecay, maxDecay)
             else:
                 if verbose:
                     for pName, thisP in exp_out.params.items():
@@ -327,16 +354,14 @@ def applyModel(
                 fullPars['{}amplitude'.format(pref)].set(value=0, vary=False)
                 fullPars['{}decay'.format(pref)].set(
                     value=fullPars['{}decay'.format(pref)].max, vary=False)
-            #
             if verbose:
                 print('####')
                 print(fullPars['{}amplitude'.format(pref)])
                 print(fullPars['{}decay'.format(pref)])
                 print('####')
-            #
             y_resid = y_resid - exp_out.eval(fullPars, x=fit_x)
-            if verbose:
-                print(exp_out.fit_report())
+            '''if verbose:
+                print(exp_out.fit_report())'''
             intermed_stats = np.percentile(y_resid, q=[1, 99])
             intermed_iqr = intermed_stats[1] - intermed_stats[0]
         except Exception:
@@ -394,6 +419,11 @@ def applyModel(
         residuals = (y_resid[scoreMaskX] - bestFit)
         chisqr = (residuals ** 2).sum()
         r2 = 1 - (chisqr / (y_resid[scoreMaskX] ** 2).sum())
+        '''if r2 < 0.82:
+            plt.show()
+            plt.plot(exp_x, exp_y)
+            plt.show()
+            pdb.set_trace()'''
         outStats = pd.Series(
             {
                 'chisqr': chisqr,
@@ -403,7 +433,7 @@ def applyModel(
             init = full_mod.eval(fullPars, x=fit_x)
             fig, ax = plotLmFit(
                 fit_x, fit_y, init, out, comps,
-                verbose=verbose)
+                verbose=False)
             ax[0].set_title('t_0 = {:.3f} msec'.format(1e3 * tBounds[0]))
             ax[1].set_title('R^2 = {:.3f}'.format(r2))
         return outSrs, pd.concat([outParams, outStats]), out
@@ -574,7 +604,7 @@ if __name__ == "__main__":
                 # featNames.str.contains('lY_e') &
                 elecNames.str.contains('caudalY_e11') &
                 (rates < funKWArgs['tBounds'][-1] ** (-1)) &
-                (amps < -600)
+                (amps == -900)
                 )
         else:
             dbIndexMask = (rates < funKWArgs['tBounds'][-1] ** (-1))
@@ -692,7 +722,6 @@ if __name__ == "__main__":
     compsAndTargetDF.dropna(axis='columns', inplace=True)
     compsAndTargetDF.columns.name = 'bin'
     #
-    # pdb.set_trace()
     # plotDF = compsAndTargetDF.stack().to_frame(name='signal').reset_index()
     plotDF = compsAndTargetDF.reset_index()
     plotDF.loc[:, 'columnLabel'] = 'NA'
@@ -775,7 +804,6 @@ if __name__ == "__main__":
                 anns.loc[:, 'feature'] = anns['feature'].str.replace('a#0', '')
                 anns.loc[:, 'feature'] = anns['feature'].str.replace('b#0', '')
                 anns.loc[:, 'feature'] = anns['feature'].str.replace('_', '\n')
-                # pdb.set_trace()
                 annsSquare = anns.pivot('yCoords', 'xCoords', 'feature')
                 ax = sns.heatmap(
                     dataSquare, annot=annsSquare, fmt='s',
@@ -800,11 +828,13 @@ if __name__ == "__main__":
                 titleText += '\n stim on {} ({} uA)'.format(name[0], name[1])
                 fig.suptitle(titleText)
                 pdf.savefig()
-                plt.close()
-                # plt.show()
+                if arguments['showFigures']:
+                    plt.show()
+                else:
+                    plt.close()
     ###########################
     timeScales = ['3', '8', '100']
-    # timeScales = ['8']g
+    # timeScales = ['8']
     for timeScale in timeScales:
         pdfPath = os.path.join(
             alignedFeaturesFolder,
@@ -812,7 +842,6 @@ if __name__ == "__main__":
                 arguments['inputBlockSuffix'], arguments['window'], timeScale))
         with PdfPages(pdfPath) as pdf:
             for name, group in tqdm(plotDF.groupby('feature')):
-                # pdb.set_trace()
                 plotGroup = group.stack().to_frame(name='signal').reset_index()
                 g = sns.relplot(
                     # data=plotGroup,
@@ -824,9 +853,12 @@ if __name__ == "__main__":
                     **relplotKWArgs)
                 g.fig.suptitle(name)
                 pdf.savefig()
-                plt.close()
-                # plt.show()
+                if arguments['showFigures']:
+                    plt.show()
+                else:
+                    plt.close()
     # # export model params and confidence intervals
+    pdb.set_trace()
     outputParams = modelParams.reset_index()
     outputParams.columns = outputParams.columns.astype(np.str)
     resultPath = os.path.join(

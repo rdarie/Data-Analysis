@@ -46,7 +46,15 @@ namedQueries = {
         'rig': "not((chanName.str.contains('elec'))or(chanName.str.contains('pca'))or(chanName.str.contains('nform'))or(chanName.str.contains('ainp')))",
         'jointAngle': "chanName.isin(['right_hip_angle#0', 'right_knee_angle#0', 'right_ankle_angle#0'])",
         'jointAngularVelocity': "chanName.isin(['right_hip_omega#0', 'right_knee_omega#0', 'right_ankle_omega#0'])",
-        'pedalPosition': "chanName.isin(['position#0'])"
+        'jointAngularVelocityMagnitude': "chanName.isin(['right_hip_omega_abs#0', 'right_knee_omega_abs#0', 'right_ankle_omega_abs#0'])",
+        'endpointForce': "chanName.isin(['forceX#0', 'forceY#0'])",
+        'endpointForceMagnitude': "chanName.isin(['forceMagnitude#0'])",
+        'endpointYank': "chanName.isin(['forceX_prime#0', 'forceY_prime#0', 'forceMagnitude_prime#0'])",
+        'endpointYankMagnitude': "chanName.isin(['forceX_prime_abs#0', 'forceY_prime_abs#0'])",
+        'pedalPosition': "chanName.isin(['position#0'])",
+        'pedalPositionXY': "chanName.isin(['position_x#0', 'position_y#0'])",
+        'pedalVelocity': "chanName.isin(['velocity#0'])",
+        'pedalVelocityXY': "chanName.isin(['velocity_x#0', 'velocity_y#0'])",
     },
     'chan': {
         'all': "(chanName.notna())",
@@ -72,6 +80,17 @@ namedQueries = {
         'isiemgraw': "((chanName.str.contains('Emg')) and not (chanName.str.contains('EmgEnv')))",
     }
 }
+namedQueries['unit'].update({
+    'limbState': '(' + '|'.join([
+            namedQueries['unit'][key]
+            for key in [
+                'jointAngle', 'jointAngularVelocity',
+                'jointAngularVelocityMagnitude',
+                'endpointForce', 'endpointYank',
+                'endpointYankMagnitude', 'endpointForceMagnitude'
+            ]
+        ]) + ')'
+    })
 namedQueries['align'].update({
     'pedalSizeCat>S': '(' + '|'.join([
         '(pedalSizeCat == \'{}\')'.format(i)

@@ -125,7 +125,7 @@ alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **argu
 alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
     namedQueries, scratchFolder, **arguments)
 alignedAsigsKWargs['outlierTrials'] = ash.processOutlierTrials(
-    scratchPath, prefix, **arguments)
+    scratchFolder, prefix, **arguments)
 
 from lmfit.models import ExponentialModel, GaussianModel, ConstantModel
 from lmfit import Model, CompositeModel, Parameters

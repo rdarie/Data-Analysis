@@ -437,6 +437,7 @@ def makeFilterCoeffsSOS(
                 sos = signal.iirfilter(
                         **theseOpts, output='sos')
                 filterCoeffsSOS = np.concatenate([filterCoeffsSOS, sos])
+                print('Adding {} coefficients for filter portion {}'.format(sos.shape[0], fName))
                 if plotting:
                     plotFilterOptsResponse(theseOpts)
         if theseOpts['btype'] == 'high':
@@ -444,6 +445,7 @@ def makeFilterCoeffsSOS(
             sos = signal.iirfilter(
                     **theseOpts, output='sos')
             filterCoeffsSOS = np.concatenate([filterCoeffsSOS, sos])
+            print('Adding {} coefficients for filter portion {}'.format(sos.shape[0], fName))
             if plotting:
                 plotFilterOptsResponse(theseOpts)
         #
@@ -452,6 +454,7 @@ def makeFilterCoeffsSOS(
             sos = signal.iirfilter(
                 **theseOpts, output='sos')
             filterCoeffsSOS = np.concatenate([filterCoeffsSOS, sos])
+            print('Adding {} coefficients for filter portion {}'.format(sos.shape[0], fName))
             if plotting:
                 plotFilterOptsResponse(theseOpts)
     return filterCoeffsSOS

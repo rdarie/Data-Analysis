@@ -129,27 +129,28 @@ OUTPUTBLOCKNAME="--outputBlockSuffix=lfp"
 CHANSELECTOR="--chanQuery=isispinal"
 # python -u ./calcAlignedAsigs.py --signalBlockSuffix="analyze" --eventBlockSuffix="analyze" --exp=$EXP $BLOCKSELECTOR $WINDOW $LAZINESS $ANALYSISFOLDER --eventName=stim $CHANSELECTOR $OUTPUTBLOCKNAME --verbose --alignFolderName=stim --amplitudeFieldName=nominalCurrent $EVENTFOLDER $SIGNALFOLDER
 
-CHANSELECTOR="--chanQuery=isispinal"
 # python -u ./calcAlignedAsigs.py $CHANSELECTOR --outputBlockSuffix="lfp_raw" --eventBlockSuffix='analyze' $EVENTFOLDER --signalBlockPrefix='Block' --verbose --exp=$EXP --amplitudeFieldName=nominalCurrent $BLOCKSELECTOR $WINDOW $LAZINESS --eventName=stim --alignFolderName=stim --analysisName=fullRes --signalSubfolder=None
 
 INPUTBLOCKNAME="--inputBlockSuffix=emg"
 # python -u ./calcTrialOutliers.py --exp=$EXP --alignFolderName=stim $INPUTBLOCKNAME $BLOCKSELECTOR $ANALYSISFOLDER $UNITSELECTOR $WINDOW $ALIGNQUERY --verbose --plotting --saveResults
 
-ANALYSISFOLDER="--analysisName=fullRes"
-INPUTBLOCKNAME="--inputBlockSuffix=lfp_raw"
+ANALYSISFOLDER="--analysisName=loRes"
+INPUTBLOCKNAME="--inputBlockSuffix=lfp"
 # OUTLIERMASK=""
 OUTLIERMASK="--maskOutlierBlocks"
 
 # python -u ./makeViewableBlockFromTriggered.py --plotting $INPUTBLOCKNAME $UNITSELECTOR --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS --alignFolderName=stim $OUTLIERMASK
 # python -u ./exportForDeepSpine.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $UNITSELECTOR $INPUTBLOCKNAME
-UNITSELECTOR="--unitQuery=isispinal"
-python -u ./calcLFPLMFitModelV3.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR $ALIGNQUERY --plotting $OUTLIERMASK
+# python -u ./calcLFPLMFitModelV3.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR $ALIGNQUERY --plotting $OUTLIERMASK
 # python -u ./calcTargetNoiseCeiling.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --maskOutlierBlocks $ALIGNQUERY --plotting
 
 # python -u ./loadSheepDeepSpine.py
 INPUTBLOCKNAME="--inputBlockSuffix=emg"
-# python -u ./calcRecruitment.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --alignQuery="stimOn"
+python -u ./calcRecruitment.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --alignQuery="stimOn"
 # python -u ./plotEcapEMGCorrelation.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --alignQuery="stimOn"
+INPUTBLOCKNAME="--emgBlockSuffix=emg --lfpBlockSuffix=lfp_raw"
+ANALYSISFOLDER="--analysisNameLFP=fullRes --analysisNameEMG=loRes"
+# python -u ./plotEcapEMGCorrelationFromAuto.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --alignQuery="stimOn"
 # python -u ./plotRecruitment.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --alignQuery="stimOn"
 
 INPUTBLOCKNAME="--inputBlockSuffix=lfp"

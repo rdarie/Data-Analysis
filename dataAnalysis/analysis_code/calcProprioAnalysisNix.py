@@ -424,20 +424,25 @@ def calcBlockAnalysisWrapper():
         'seg0_' + row['ainpName']: 'seg0_' + row['newName']
         for rowIdx, row in descriptiveNames.iterrows()}
     tdDF.rename(columns=renamingDict, inplace=True)
-    signalsForDerivative = ['seg0_forceX', 'seg0_forceY']
+    if 'seg0_forceX' in tdDF.columns:
+        tdDF.loc[:, 'seg0_forceMagnitude'] = np.sqrt(
+            tdDF['seg0_forceX'].astype(float) ** 2 +
+            tdDF['seg0_forceY'].astype(float) ** 2)
+    signalsForDerivative = [
+        'seg0_forceX', 'seg0_forceY', 'seg0_forceMagnitude']
     for cName in signalsForDerivative:
         if cName in tdDF.columns:
             tdDF.loc[:, cName + '_prime'] = hf.applySavGol(
                 tdDF[cName],
-                window_length_sec=10e-3,
+                window_length_sec=20e-3,
                 fs=int(dummyRigAsig.sampling_rate),
                 polyorder=3, deriv=1)
     # interpolate rig analog signals
     filterOptsPerCategory = {
         'forceSensor': {
             'names': [
-                'seg0_forceX', 'seg0_forceY',
-                'seg0_forceX_prime', 'seg0_forceY_prime',],
+                'seg0_forceX', 'seg0_forceY', 'seg0_forceMagnitude',
+                'seg0_forceX_prime', 'seg0_forceY_prime', 'seg0_forceMagnitude_prime'],
             'filterOpts': {
                 'low': {
                     'Wn': float(samplingRate) / 3,
@@ -447,7 +452,7 @@ def calcBlockAnalysisWrapper():
                 },
                 'bandstop60Hz': {
                     'Wn': 60,
-                    'nHarmonics': 1,
+                    'nHarmonics': 2,
                     'Q': 20,
                     'N': 4,
                     'rp': 1,
@@ -495,16 +500,17 @@ def calcBlockAnalysisWrapper():
         filteredAsigs = signal.sosfiltfilt(
             filterCoeffs, tdDF.loc[:, group.index].to_numpy(),
             axis=0)
-        pdb.set_trace()
+        '''pdb.set_trace()
         if True:
-            cName = 'forceX_prime'
+            cName = 'seg0_forceY'
+            cNameIdx = group.index.get_loc(cName)
             fig, ax = plt.subplots()
             idx1, idx2 = int(6e4), int(9e4)
-            numericalDiff = tdDF[cName].diff() * float(dummyRigAsig.sampling_rate)
-            ax.plot(tdDF.index[idx1:idx2], numericalDiff.iloc[idx1:idx2], label='original')
-            ax.plot(tdDF.index[idx1:idx2], tdDF[cName + '_prime'].iloc[idx1:idx2], label='savgol')
+            # numericalDiff = tdDF[cName].diff() * float(dummyRigAsig.sampling_rate)
+            ax.plot(tdDF.index[idx1:idx2], filteredAsigs[idx1:idx2, cNameIdx], label='filtered')
+            ax.plot(tdDF.index[idx1:idx2], tdDF[cName].iloc[idx1:idx2], label='original')
             ax.legend()
-            plt.show()
+            plt.show()'''
         tdDF.loc[:, group.index] = filteredAsigs
         if trackMemory:
             print('Just finished analog data filtering before downsampling. memory usage: {:.1f} MB'.format(

@@ -109,11 +109,12 @@ if arguments['inputBlockSuffix'] is not None:
             arguments['inputBlockSuffix'], arguments['window'],
             arguments['alignQuery']) + nameSuffix
     figureOutputFolder = os.path.join(
-        figureFolder, arguments['analysisName'], 'alignedFeatures')
+        figureFolder, arguments['analysisName'],
+        arguments['alignFolderName'], 'alignedFeatures')
     if not os.path.exists(figureOutputFolder):
         os.makedirs(figureOutputFolder, exist_ok=True)
     alignedAsigsKWargs['outlierTrials'] = ash.processOutlierTrials(
-        scratchPath, prefix, **arguments)
+        scratchFolder, prefix, **arguments)
 else:
     # plotting aligned spike waveforms
     if arguments['processAll']:
@@ -148,8 +149,11 @@ alignedAsigsKWargs.update(dict(
 # alignedAsigsKWargs.update(dict(
 #     windowSize=(6e-5, 1.2e-3)))
 # for evoked lfp report
+# alignedAsigsKWargs.update(dict(
+#     windowSize=(-2e-3, 10e-3)))
+# for evoked emg report
 alignedAsigsKWargs.update(dict(
-    windowSize=(-100e-3, 400e-3)))
+    windowSize=(-20e-3, 100e-3)))
 # alignedAsigsKWargs.update(dict(
 #     windowSize=(-25e-3, 125e-3)))
 alignedAsigsKWargs.update({'amplitudeColumn': arguments['amplitudeFieldName']})
@@ -280,14 +284,14 @@ if arguments['invertOutlierBlocks']:
 #
 saveFigMetaToPath = pdfName.replace('.pdf', '_metadata.pickle')
 ####################
-optsSourceFolder = os.path.join(
+'''optsSourceFolder = os.path.join(
     figureFolder, 'default', 'alignedFeatures')
 loadFigMetaPath = os.path.join(
     optsSourceFolder,
     '_emg_XS_stimOn_topo_metadata.pickle'
     )
 with open(loadFigMetaPath, 'rb') as _f:
-    loadedFigMeta = pickle.load(_f)
+    loadedFigMeta = pickle.load(_f)'''
 # plotProcFuns.append(
 
 #     asp.genAxLimSaver(

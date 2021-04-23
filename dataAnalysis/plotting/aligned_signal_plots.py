@@ -741,6 +741,36 @@ def genGridAnnotator(
         return
     return gridAnnotator
 
+def genTitleAnnotator(
+        template='', colNames=[],
+        textOpts={}, shared=True,
+        dropna=True, dropNaNCol='segment'):
+
+    def titleAnnotator(g, ro, co, hu, dataSubset):
+        topLeftCol = ((ro == 0) and (co == 0))
+        emptySubset = (
+            (dataSubset.empty) or
+            (dataSubset[dropNaNCol].isna().all()))
+        if ((topLeftCol) or (not shared)) and not emptySubset:
+            dataEntries = []
+            for cn in colNames:
+                if dropna:
+                    dataEntries.append(' '.join([
+                        '{}'.format(entry)
+                        for entry in dataSubset[cn].unique()
+                        if not pd.isnull(entry)
+                        ]))
+                else:
+                    dataEntries.append(' '.join([
+                        '{}'.format(entry)
+                        for entry in dataSubset[cn].unique()
+                        ]))
+            xText = template.format(*dataEntries)
+            g.axes[ro, co].set_title(
+                xText, **textOpts)
+        return
+    return titleAnnotator
+
 
 def genTicksToScale(
         lineOpts={}, textOpts={}, shared=True,

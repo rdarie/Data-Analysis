@@ -11,7 +11,7 @@ Options:
     --verbose                              print diagnostics? [default: True]
     --lazy                                 load from raw, or regular? [default: False]
     --window=window                        process with short window? [default: short]
-    --inputBlockName=inputBlockName        which trig_ block to pull [default: pca]
+    --inputBlockSuffix=inputBlockSuffix    which trig_ block to pull [default: pca]
     --unitQuery=unitQuery                  how to restrict channels if not supplying a list? [default: pca]
     --alignQuery=alignQuery                what will the plot be aligned to? [default: outboundWithStim]
     --maskOutlierBlocks                    delete outlier trials? [default: False]
@@ -67,7 +67,7 @@ else:
 resultPath = os.path.join(
     calcSubFolder,
     prefix + '_{}_{}_rauc.h5'.format(
-        arguments['inputBlockName'], arguments['window']))
+        arguments['inputBlockSuffix'], arguments['window']))
 print('loading {}'.format(resultPath))
 outlierTrials = ash.processOutlierTrials(
     scratchPath, prefix, **arguments)
@@ -114,201 +114,18 @@ if minNObservations is not None:
 
 plotRC = recCurve.reset_index()
 
-figureStatsFolder = os.path.join(
+'''figureStatsFolder = os.path.join(
     alignSubFolder, 'figureStats'
     )
 alignedPdfName = '{}_{}_{}_{}'.format(
-    prefix, arguments['inputBlockName'],
+    prefix, arguments['inputBlockSuffix'],
     arguments['window'],
     arguments['alignQuery'])
 statsTestPath = os.path.join(figureStatsFolder, alignedPdfName + '_stats.h5')
 if os.path.exists(statsTestPath):
     sigValsWide = pd.read_hdf(statsTestPath, 'sig')
-    sigValsWide.columns.name = 'bin'
+    sigValsWide.columns.name = 'bin''''
 
-'''
-def masterPlot(
-        emgRC, targetFeature, plotElectrode,
-        plotFeature, keepElectrodeList):
-    meanSelectivity = pd.DataFrame(
-        np.nan,
-        index=emgRC['electrode'].unique(),
-        columns=emgRC[targetFeature].unique())
-    onTargetList = []
-    offTargetList = []
-    selectivityIdxMax = pd.DataFrame(
-        np.nan,
-        index=emgRC['electrode'].unique(),
-        columns=emgRC[targetFeature].unique())
-    #
-    for elecName, elecGroup in emgRC.groupby(['electrode']):
-        for featName, featGroup in elecGroup.groupby([targetFeature]):
-            thisSelectivity = pd.DataFrame(
-                np.nan, index=elecGroup[amplitudeFieldName].unique(),
-                columns=['onTarget', 'offTarget'])
-            for ampName, ampGroup in elecGroup.groupby(amplitudeFieldName):
-                onTarget = ampGroup.loc[
-                    ampGroup[targetFeature] == featName, 'normalizedRAUC'].to_frame(name='ratio')
-                offTarget = ampGroup.loc[
-                    ampGroup[targetFeature] != featName, 'normalizedRAUC'].to_frame(name='ratio')
-                onTarget[amplitudeFieldName] = ampName
-                offTarget[amplitudeFieldName] = ampName
-                onTarget['electrode'] = elecName
-                offTarget['electrode'] = elecName
-                onTarget['targetFeature'] = featName
-                offTarget['targetFeature'] = featName
-                thisSelectivity.loc[ampName, "onTargetMean"] = onTarget['ratio'].mean()
-                thisSelectivity.loc[ampName, "offTargetMean"] = offTarget['ratio'].mean()
-                onTargetList.append(onTarget.reset_index(drop=True))
-                offTargetList.append(offTarget.reset_index(drop=True))
-            maxDiff = thisSelectivity['onTargetMean'] - thisSelectivity['offTargetMean']
-            meanSelectivity.loc[elecName, featName] = maxDiff.max()
-            selectivityIdxMax.loc[elecName, featName] = maxDiff.idxmax()
-    onTargetAll = pd.concat(onTargetList, ignore_index=True)
-    onTargetAll['type'] = 'on'
-    offTargetAll = pd.concat(offTargetList, ignore_index=True)
-    offTargetAll['type'] = 'off'
-    ratiosAll = pd.concat([onTargetAll, offTargetAll], ignore_index=True)
-    keepDataIdx = [cn for cn in meanSelectivity.index if cn in keepElectrodeList]
-    pdfPath = os.path.join(
-        figureFolder,
-        prefix + '_{}_{}_{}_{}.pdf'.format(
-            arguments['inputBlockName'], arguments['window'],
-            targetFeature,
-            'selectivity_heatmap'))
-    fig = plt.figure(figsize=(10, 5), constrained_layout=True)
-    spec = gridspec.GridSpec(ncols=2, nrows=1, figure=fig, width_ratios=[10, 1])
-    ax = fig.add_subplot(spec[0, 0])
-    cb_ax = fig.add_subplot(spec[0, 1])
-    sns.heatmap(data=meanSelectivity.loc[keepDataIdx, :], annot=True, fmt=".2f", ax=ax, cbar_ax=cb_ax)
-    plt.setp(ax.xaxis.get_majorticklabels(), rotation=45)
-    plt.setp(ax.yaxis.get_majorticklabels(), rotation=45)
-    plt.savefig(pdfPath)
-    plt.show()
-    pdfPath = os.path.join(
-        figureFolder,
-        prefix + '_{}_{}_{}_selectivity_{}_{}.pdf'.format(
-            arguments['inputBlockName'], arguments['window'],
-            targetFeature, plotElectrode, plotFeature))
-    fig = plt.figure(figsize=(5, 5), constrained_layout=True)
-    spec = gridspec.GridSpec(ncols=1, nrows=1, figure=fig)
-    ax = fig.add_subplot(spec[0, 0])
-    keepDataMask = (ratiosAll['electrode'] == plotElectrode) & (ratiosAll['targetFeature'] == plotFeature)
-    ax = sns.boxplot(
-        x=amplitudeFieldName, y='ratio', hue='type',
-        data=ratiosAll.loc[keepDataMask, :])
-    ax.set_ylim([
-        ratiosAll.loc[keepDataMask, 'ratio'].min(),
-        ratiosAll.loc[keepDataMask, 'ratio'].quantile(0.999),
-        ])
-    ax.set_title('{} selectivity for {}'.format(plotElectrode, plotFeature))
-    plt.savefig(pdfPath)
-    plt.show()
-
-rippleMapDF = prb_meta.mapToDF(expOpts['rippleMapFile'][int(arguments['blockIdx'])])
-rippleMapDF.loc[
-    rippleMapDF['label'].str.contains('caudal'),
-    'ycoords'] += 800
-#
-if 'delsysMapDict' in locals():
-    delsysMapDF = pd.DataFrame(delsysMapDict)
-    mapsDict = {
-        'ripple': rippleMapDF,
-        'delsys': delsysMapDF}
-else:
-    mapsDict = {
-        'ripple': rippleMapDF}
-
-lfpRC = (
-    plotRC.loc[plotRC['feature'].str.contains('caudal') |
-    plotRC['feature'].str.contains('rostral'), :].copy())
-lfpRC['normalizedRAUC'] = np.nan
-lfpRC['standardizedRAUC'] = np.nan
-lfpRC['xcoords'] = np.nan
-lfpRC['ycoords'] = np.nan
-lfpRC['featureName'] = np.nan
-nSig = {}
-for name, group in lfpRC.groupby('feature'):
-    print(name)
-    lfpRC.loc[group.index, 'standardizedRAUC'] = (
-        RobustScaler(quantile_range=(5., 95.))
-        .fit_transform(
-            group['rauc'].to_numpy().reshape(-1, 1)))
-    outlierMask = lfpRC.loc[group.index, 'standardizedRAUC'].abs() > 6
-    thisScaler = MinMaxScaler()
-    thisScaler.fit(
-        group.loc[~outlierMask, 'rauc'].to_numpy().reshape(-1, 1))
-    lfpRC.loc[group.index, 'normalizedRAUC'] = (
-        thisScaler.transform(group['rauc'].to_numpy().reshape(-1, 1)))
-    lfpRC.loc[group.index, 'featureName'] = name[:-2]
-    lfpRC.loc[group.index, 'xcoords'] = rippleMapDF.loc[rippleMapDF['label'] == name[:-2], 'xcoords'].iloc[0]
-    lfpRC.loc[group.index, 'ycoords'] = rippleMapDF.loc[rippleMapDF['label'] == name[:-2], 'ycoords'].iloc[0]
-
-uniqueX = np.unique(rippleMapDF['xcoords'].to_list() + [3400, 8500])
-# xIdx = [3, 4, 6, 7]
-uniqueY = np.unique(rippleMapDF['ycoords'].to_list() + [6200, 31000, 40000, 50000, 66200, 91000])
-# yIdx = [0, 2, 3, 4, 6, 8, 10, 11, 12, 14, 16]
-# xLookup = {k: v for k, v in zip(uniqueX, xIdx)}
-# yLookup = {k: v for k, v in zip(uniqueY, yIdx)}
-
-lfpRAUCDistr = {}
-for elecName, elecGroup in lfpRC.groupby('electrode'):
-    lfpRAUCDistr.update({
-        elecName: pd.DataFrame(
-            np.nan,
-            index=uniqueY,
-            columns=uniqueX)})
-    for posName, posGroup in elecGroup.groupby(['xcoords', 'ycoords']):
-        lfpRAUCDistr[elecName].loc[posName[1], posName[0]] = posGroup['normalizedRAUC'].mean()
-
-for elecName in lfpRAUCDistr.keys():
-    for xPos in rippleMapDF['xcoords'].unique():
-        for yPos in rippleMapDF['ycoords'].unique():
-            if np.isnan(lfpRAUCDistr[elecName].loc[yPos, xPos]):
-                lfpRAUCDistr[elecName].loc[yPos, xPos] = 0
-
-keepElectrodeList = ['-rostralY_e10']
-targetFeature = 'featureName'
-plotElectrode = '-rostralY_e10'
-plotFeature = 'caudalZ_e18_a'
-sns.set(rc={'axes.facecolor':'grey'})
-fig = plt.figure(figsize=(5, 30), constrained_layout=True)
-spec = gridspec.GridSpec(ncols=1, nrows=2, figure=fig, height_ratios=[20, 1])
-ax = fig.add_subplot(spec[0, 0])
-cb_ax = fig.add_subplot(spec[1, 0])
-pdfPath = os.path.join(
-    figureFolder,
-    prefix + '_{}_{}_{}.pdf'.format(
-        arguments['inputBlockName'], arguments['window'],
-        'meanRAUC_lfp_heatmap'))
-sns.heatmap(
-    lfpRAUCDistr[plotElectrode].iloc[slice(-1, None, -1), :], linewidths=.5,
-    mask=lfpRAUCDistr[plotElectrode].iloc[slice(-1, None, -1), :].isna(),
-    ax=ax, cbar_ax=cb_ax, cbar_kws={"orientation": "horizontal"})
-plt.savefig(pdfPath)
-plt.show()
-
-masterPlot(lfpRC, targetFeature, plotElectrode, plotFeature, keepElectrodeList)
-lfpPalette = sns.color_palette('Set2', lfpRC[targetFeature].unique().size)
-pdfPath = os.path.join(
-    figureFolder,
-    prefix + '_{}_{}_{}.pdf'.format(
-        arguments['inputBlockName'], arguments['window'],
-        'meanRAUC_lfp'))
-keepDataMask = lfpRC['electrode'].isin(keepElectrodeList)
-plotLfpRC = lfpRC.loc[keepDataMask, :]
-g = sns.relplot(
-    col='electrode', col_wrap=5, col_order=np.unique(plotLfpRC['electrode']),
-    x=amplitudeFieldName, y='normalizedRAUC',
-    hue=targetFeature, hue_order=np.unique(plotLfpRC[targetFeature]),
-    kind='line', data=plotLfpRC,
-    palette=lfpPalette,
-    height=5, aspect=1.5, ci='sem', estimator='mean',
-    )
-# for (ro, co, hu), dataSubset in g.facet_data():
-#     break
-plt.savefig(pdfPath)
-'''
 emgRC = plotRC.loc[plotRC['feature'].str.contains('EmgEnv'), :].copy()
 emgRC['normalizedRAUC'] = np.nan
 emgRC['standardizedRAUC'] = np.nan
@@ -318,7 +135,7 @@ emgRC['EMGSite'] = np.nan
 # emgRC[amplitudeFieldName] *= (-1)
 emgRC[amplitudeFieldName] = emgRC[amplitudeFieldName].abs()
 sideLookup = {'R': 'Right', 'L': 'Left'}
-nSig = {}
+'''nSig = {}'''
 
 qLims = (0.05, 0.95)
 # for name, group in emgRC.groupby(['feature', 'electrode']):
@@ -341,9 +158,9 @@ for name, group in emgRC.groupby(['feature']):
     emgRC.loc[group.index, 'featureName'] = featName[:-8]
     emgRC.loc[group.index, 'EMGSite'] = featName[1:-8]
     emgRC.loc[group.index, 'EMGSide'] = sideLookup[featName[0]]
-    if os.path.exists(statsTestPath):
+    '''if os.path.exists(statsTestPath):
         theseSig = sigValsWide.xs(featName, level='unit')
-        nSig.update({featName[:-8]: theseSig.sum().sum()})
+        nSig.update({featName[:-8]: theseSig.sum().sum()})'''
 
 emgRC.loc[:, 'EMG Location'] = (
     emgRC['EMGSide'] + ' ' + emgRC['EMGSite'])
@@ -354,7 +171,7 @@ for name, group in emgRC.groupby('electrode'):
 pdfPath = os.path.join(
     figureOutputFolder,
     prefix + '_{}_{}_{}.pdf'.format(
-        arguments['inputBlockName'], arguments['window'],
+        arguments['inputBlockSuffix'], arguments['window'],
         'meanRAUC'))
 
 plotEmgRC = emgRC
@@ -387,4 +204,4 @@ g = sns.relplot(
     )
 #
 plt.savefig(pdfPath)
-plt.close()
+plt.show()
