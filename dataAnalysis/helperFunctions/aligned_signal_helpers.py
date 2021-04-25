@@ -283,6 +283,7 @@ def splitApplyCombine(
             .groupby(by=rowKeys, group_keys=False)
             .apply(fun, *funArgs, **funKWArgs))
     # TODO, below is a transformation, handle other index types
+    # pdb.set_trace()
     if reindexFromInput:
         resultDF = pd.DataFrame(
             result.sort_index().loc[:, dataColNames].to_numpy(),

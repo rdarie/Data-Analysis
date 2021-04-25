@@ -133,17 +133,17 @@ def getRAUC(x, timeWindow):
     tMask = (x.index >= tWinStart) & (x.index < tWinStop)
     return x.loc[tMask].abs().mean()
 
-ecapTWinStart, ecapTWinStop = 0.2e-3, 4e-3
+ecapTWinStart, ecapTWinStop = 1e-3, 4e-3
 ecapRauc = ecapDF.apply(getRAUC, axis='columns', args=[(ecapTWinStart, ecapTWinStop)])
 ecapRaucWideDF = ecapRauc.unstack(level='feature')
 recCurve = pd.read_hdf(resultPathEMG, 'meanRAUC')
 plotOpts = pd.read_hdf(resultPathEMG, 'meanRAUC_plotOpts')
 emgPalette = plotOpts.loc[:, ['featureName', 'color']].set_index('featureName')['color']
 rates = recCurve.index.get_level_values('RateInHz')
-dbIndexMask = (rates < 12)
+dbIndexMask = (rates < 30)
 recCurveWideDF = recCurve.loc[dbIndexMask, :].groupby(ecapDF.index.names).mean()['rauc']
 recCurveWideDF = recCurveWideDF.unstack(level='feature')
-
+pdb.set_trace()
 assert np.all(recCurveWideDF.index == ecapRaucWideDF.index)
 if outlierTrials is not None:
     def rejectionLookup(entry):

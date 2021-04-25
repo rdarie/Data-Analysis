@@ -305,6 +305,6 @@ def getExpOpts():
         method='nelder',
         iterMethod='sampleOneManyTimes',
         plotting=False, verbose=False,
-        maxIter=20
+        maxIter=1
         )
     return locals()

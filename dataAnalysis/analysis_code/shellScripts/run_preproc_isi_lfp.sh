@@ -2,11 +2,11 @@
 
 # 06a: Preprocess the NS5 File
 # Request 24 hours of runtime:
-#SBATCH --time=12:00:00
+#SBATCH --time=24:00:00
 
-#SBATCH --nodes=1
-#SBATCH --ntasks=32
-#SBATCH --mem=64G
+#SBATCH --nodes=16
+#SBATCH --ntasks=16
+#SBATCH --mem=96G
 
 # Specify a job name:
 #SBATCH -J isi_preproc_one_shot
@@ -143,7 +143,8 @@ OUTLIERMASK="--maskOutlierBlocks"
 # python -u ./makeViewableBlockFromTriggered.py --plotting $INPUTBLOCKNAME $UNITSELECTOR --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS --alignFolderName=stim $OUTLIERMASK
 # python -u ./exportForDeepSpine.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $UNITSELECTOR $INPUTBLOCKNAME
 UNITSELECTOR="--unitQuery=isispinal"
-python -u ./calcLFPLMFitModelV3.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR $ALIGNQUERY --plotting $OUTLIERMASK
+
+python -u ./calcLFPLMFitModelV3.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR $ALIGNQUERY --plotting
 # python -u ./calcTargetNoiseCeiling.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --maskOutlierBlocks $ALIGNQUERY --plotting
 
 # python -u ./loadSheepDeepSpine.py
