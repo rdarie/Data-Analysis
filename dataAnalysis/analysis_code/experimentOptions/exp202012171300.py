@@ -204,7 +204,7 @@ def getExpOpts():
             'RGastrocnemius', 'RGracilis', 'RPeroneusLongus',
             'RTensorFasciaeLatae',
             # 'LThoracolumbarFascia', 'RThoracolumbarFascia',
-            'RExtensorDigitorum',
+            # 'RExtensorDigitorum',
             'LSemitendinosus', 'RSemitendinosus',
             ],
         'keepElectrodes': None,

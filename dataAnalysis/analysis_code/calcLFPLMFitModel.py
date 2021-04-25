@@ -338,13 +338,13 @@ def applyModel(
                     print('using component {} without assesing'.format(pref))
                 modelFitsWellEnough = True
             #
-            if True:
+            '''if True:
                 plt.show()
                 fig, ax = plt.subplots()
                 ax.plot(exp_x, exp_y, label='{} original'.format(pref))
                 ax.plot(exp_x, exp_out.best_fit, label='{} fit'.format(pref))
                 ax.legend()
-                plt.show()
+                plt.show()'''
             if modelFitsWellEnough:
                 if verbose:
                     print('using component {}'.format(pref))
@@ -549,6 +549,7 @@ def shapeFit(
 funKWArgs.update({'modelFun': applyModel})
 
 if __name__ == "__main__":
+    daskClient = Client()
     testVar = None
     conditionNames = [
         'electrode',
@@ -607,7 +608,6 @@ if __name__ == "__main__":
             dbIndexMask = (rates < funKWArgs['tBounds'][-1] ** (-1))
         dbColMask = (dataDF.columns.astype(np.float) >= funKWArgs['tBounds'][0]) & (dataDF.columns.astype(np.float) < funKWArgs['tBounds'][-1])
         dataDF = dataDF.loc[dbIndexMask, dbColMask]
-        daskClient = Client()
         resDF = ash.splitApplyCombine(
             dataDF,
             fun=shapeFit, resultPath=resultPath,
@@ -692,10 +692,7 @@ if __name__ == "__main__":
             subGroup = group.loc[:, prefMask].reset_index(drop=True)
             subGroupCI = relativeCI.loc[group.index, prefMask].reset_index(drop=True)
             goodFitMask = (subGroupCI[pref + 'amplitude'].abs() < 1).to_numpy()
-            try:
-                subGroupMean = subGroup.loc[goodFitMask, :].median()
-            except Exception:
-                pdb.set_trace()
+            subGroupMean = subGroup.loc[goodFitMask, :].median()
             if np.isnan(subGroupMean[pref + 'amplitude']):
                 subGroupMean.loc[pref + 'amplitude'] = 0
             meanParams.loc[name, subGroupMean.index] = subGroupMean

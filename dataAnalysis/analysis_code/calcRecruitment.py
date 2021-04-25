@@ -15,6 +15,7 @@ Options:
     --unitQuery=unitQuery                  how to restrict channels if not supplying a list? [default: pca]
     --alignQuery=alignQuery                what will the plot be aligned to? [default: outboundWithStim]
     --selector=selector                    filename if using a unit selector
+    --maskOutlierBlocks                    delete outlier trials? [default: False]
 """
 import matplotlib
 matplotlib.rcParams['pdf.fonttype'] = 42
@@ -80,6 +81,8 @@ resultPath = os.path.join(
     calcSubFolder,
     prefix + '_{}_{}_rauc.h5'.format(
         arguments['inputBlockSuffix'], arguments['window']))
+outlierTrials = ash.processOutlierTrials(
+    scratchFolder, prefix, **arguments)
 print('loading {}'.format(triggeredPath))
 dataReader, dataBlock = ns5.blockFromPath(
     triggeredPath, lazy=arguments['lazy'])
@@ -92,6 +95,14 @@ funKWargs = dict(
 #  End Overrides
 asigWide = ns5.alignedAsigsToDF(
     dataBlock, **alignedAsigsKWargs)
+if outlierTrials is not None:
+    trialInfo = asigWide.index.copy()
+    for idxName in trialInfo.names:
+        if idxName not in outlierTrials.index.names:
+            trialInfo = trialInfo.droplevel(idxName)
+    outlierMask = pd.Series(trialInfo.to_numpy()).map(outlierTrials)
+    asigWide = asigWide.loc[~outlierMask.to_numpy(), :]
+pdb.set_trace()
 
 rAUCDF = ash.rAUC(
     asigWide, **funKWargs).to_frame(name='rauc')

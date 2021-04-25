@@ -16,8 +16,6 @@ Options:
     --emgBlockSuffix=emgBlockSuffix        which trig_ block to pull [default: pca]
     --unitQuery=unitQuery                  how to restrict channels if not supplying a list? [default: pca]
     --alignQuery=alignQuery                what will the plot be aligned to? [default: outboundWithStim]
-    --maskOutlierBlocks                    delete outlier trials? [default: False]
-    --invertOutlierMask                    delete outlier trials? [default: False]
 """
 import matplotlib
 matplotlib.rcParams['pdf.fonttype'] = 42
@@ -43,7 +41,7 @@ import dataAnalysis.plotting.spike_sorting_plots as ssplt
 from sklearn.preprocessing import RobustScaler, MinMaxScaler
 #
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
-consoleDebug = True
+'''consoleDebug = True
 if consoleDebug:
     arguments = {
         'lfpBlockSuffix': 'lfp_raw', 'emgBlockSuffix': 'emg',
@@ -56,7 +54,7 @@ if consoleDebug:
     scratchFolder = '/gpfs/scratch/rdarie/rdarie/Neural Recordings/202012221300-Goat'
     figureFolder = '/gpfs/data/dborton/rdarie/Neural Recordings/processed/202012221300-Goat/figures'
     ns5FileName = 'Block006'
-    scratchPath = '/gpfs/scratch/rdarie/rdarie/Neural Recordings'
+    scratchPath = '/gpfs/scratch/rdarie/rdarie/Neural Recordings''''
 #
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']), arguments['exp'])
@@ -92,8 +90,6 @@ resultPathEMG = os.path.join(
     prefix + '_{}_{}_rauc.h5'.format(
         arguments['emgBlockSuffix'], arguments['window']))
 print('loading {}'.format(resultPathEMG))
-outlierTrials = ash.processOutlierTrials(
-    scratchPath, prefix, **arguments)
 #  Overrides
 limitPages = None
 amplitudeFieldName = 'nominalCurrent'
@@ -136,6 +132,7 @@ def getRAUC(x, timeWindow):
 ecapTWinStart, ecapTWinStop = 1e-3, 4e-3
 ecapRauc = ecapDF.apply(getRAUC, axis='columns', args=[(ecapTWinStart, ecapTWinStop)])
 ecapRaucWideDF = ecapRauc.unstack(level='feature')
+#
 recCurve = pd.read_hdf(resultPathEMG, 'meanRAUC')
 plotOpts = pd.read_hdf(resultPathEMG, 'meanRAUC_plotOpts')
 emgPalette = plotOpts.loc[:, ['featureName', 'color']].set_index('featureName')['color']
@@ -143,24 +140,8 @@ rates = recCurve.index.get_level_values('RateInHz')
 dbIndexMask = (rates < 30)
 recCurveWideDF = recCurve.loc[dbIndexMask, :].groupby(ecapDF.index.names).mean()['rauc']
 recCurveWideDF = recCurveWideDF.unstack(level='feature')
-pdb.set_trace()
+# pdb.set_trace()
 assert np.all(recCurveWideDF.index == ecapRaucWideDF.index)
-if outlierTrials is not None:
-    def rejectionLookup(entry):
-        key = []
-        for subKey in outlierTrials.index.names:
-            keyIdx = recCurve.index.names.index(subKey)
-            key.append(entry[keyIdx])
-        # print(key)
-        return outlierTrials[tuple(key)]
-    #
-    outlierMask = np.asarray(
-        recCurveWideDF.index.map(rejectionLookup),
-        dtype=np.bool)
-    if arguments['invertOutlierMask']:
-        outlierMask = ~outlierMask
-    recCurveWideDF = recCurveWideDF.loc[~outlierMask, :]
-    ecapRaucWideDF = ecapRaucWideDF.loc[~outlierMask, :]
 #
 fixedElectrodeNames = pd.Series(ecapDF.index.get_level_values('electrode')).apply(lambda x: x[1:])
 fixedFeatureNames = pd.Series(ecapDF.index.get_level_values('feature')).apply(lambda x: x[:-4])

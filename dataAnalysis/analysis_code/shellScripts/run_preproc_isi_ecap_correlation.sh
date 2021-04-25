@@ -57,8 +57,8 @@
 # EXP="exp202010081400"
 # EXP="exp202010151400"
 # EXP="exp202010191100"
-# EXP="exp202012171300"
-EXP="exp202012221300"
+EXP="exp202012171300"
+#  EXP="exp202012221300"
 
 # 
 module load anaconda/2020.02
@@ -97,7 +97,7 @@ UNITSELECTOR="--unitQuery=isiemgenv"
 # UNITSELECTOR="--unitQuery=isiacc"
 # UNITSELECTOR="--unitQuery=isispinaloremg"
 
-SLURM_ARRAY_TASK_ID=6
+SLURM_ARRAY_TASK_ID=3
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
 
 #  #  preprocess
@@ -141,17 +141,17 @@ OUTLIERMASK="--maskOutlierBlocks"
 
 # python -u ./makeViewableBlockFromTriggered.py --plotting $INPUTBLOCKNAME $UNITSELECTOR --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS --alignFolderName=stim $OUTLIERMASK
 # python -u ./exportForDeepSpine.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $UNITSELECTOR $INPUTBLOCKNAME
-# python -u ./calcLFPLMFitModelV3.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR $ALIGNQUERY --plotting $OUTLIERMASK
+# python -u ./calcLFPLMFitModel.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR $ALIGNQUERY --plotting $OUTLIERMASK
 # python -u ./calcTargetNoiseCeiling.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --maskOutlierBlocks $ALIGNQUERY --plotting
 
 # python -u ./loadSheepDeepSpine.py
 INPUTBLOCKNAME="--inputBlockSuffix=emg"
-# python -u ./calcRecruitment.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --alignQuery="stimOn"
-# python -u ./plotEcapEMGCorrelation.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --alignQuery="stimOn"
-INPUTBLOCKNAME="--emgBlockSuffix=emg --lfpBlockSuffix=lfp_raw"
-ANALYSISFOLDER="--analysisNameLFP=fullRes --analysisNameEMG=loRes"
-python -u ./plotEcapEMGCorrelationFromAuto.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --alignQuery="stimOn"
+# python -u ./calcRecruitment.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --alignQuery="stimOn" $OUTLIERMASK
 # python -u ./plotRecruitment.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --alignQuery="stimOn"
+INPUTBLOCKNAME="--emgBlockSuffix=emg"
+python -u ./plotEcapEMGCorrelation.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --alignQuery="stimOn"
+ANALYSISFOLDER="--analysisNameLFP=fullRes --analysisNameEMG=loRes"
+# python -u ./plotEcapEMGCorrelationFromAuto.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --alignQuery="stimOn"
 
 INPUTBLOCKNAME="--inputBlockSuffix=lfp"
 UNITSELECTOR="--unitQuery=isispinal"

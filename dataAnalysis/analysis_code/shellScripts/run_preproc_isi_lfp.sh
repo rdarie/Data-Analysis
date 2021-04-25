@@ -2,18 +2,18 @@
 
 # 06a: Preprocess the NS5 File
 # Request 24 hours of runtime:
-#SBATCH --time=24:00:00
+#SBATCH --time=48:00:00
 
-#SBATCH --nodes=16
-#SBATCH --ntasks=16
-#SBATCH --mem=96G
+#SBATCH --nodes=24
+#SBATCH --ntasks=24
+#SBATCH --mem=72G
 
 # Specify a job name:
-#SBATCH -J isi_preproc_one_shot
+#SBATCH -J isi_preproc_lfp
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-isi_preproc_one_shot.out
-#SBATCH -e ../../batch_logs/%j-%a-isi_preproc_one_shot.out
+#SBATCH -o ../../batch_logs/%j-%a-isi_preproc_lfp.out
+#SBATCH -e ../../batch_logs/%j-%a-isi_preproc_lfp.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -144,7 +144,7 @@ OUTLIERMASK="--maskOutlierBlocks"
 # python -u ./exportForDeepSpine.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $UNITSELECTOR $INPUTBLOCKNAME
 UNITSELECTOR="--unitQuery=isispinal"
 
-python -u ./calcLFPLMFitModelV3.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR $ALIGNQUERY --plotting
+python -u ./calcLFPLMFitModel.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR $ALIGNQUERY --plotting
 # python -u ./calcTargetNoiseCeiling.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --maskOutlierBlocks $ALIGNQUERY --plotting
 
 # python -u ./loadSheepDeepSpine.py
