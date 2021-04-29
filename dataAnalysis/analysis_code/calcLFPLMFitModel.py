@@ -10,6 +10,9 @@ Options:
     --verbose                                   print diagnostics? [default: False]
     --exportToDeepSpine                         look for a deepspine exported h5 and save these there [default: False]
     --plotting                                  plot out the correlation matrix? [default: True]
+    --debugging                                 plot out the correlation matrix? [default: True]
+    --smallDataset                              plot out the correlation matrix? [default: True]
+    --interactive                               plot out the correlation matrix? [default: True]
     --showFigures                               show the plots? [default: False]
     --analysisName=analysisName                 append a name to the resulting blocks? [default: default]
     --inputBlockSuffix=inputBlockSuffix         filename for inputs [default: fr]
@@ -23,9 +26,7 @@ Options:
 """
 ##########################################################
 ##########################################################
-useCachedResult = False
-DEBUGGING = False
-SMALLDATASET = False
+useCachedResult = True
 ##########################################################
 ##########################################################
 import os, sys, re
@@ -35,8 +36,10 @@ arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 import matplotlib
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
-# matplotlib.use('QT5Agg')   # generate postscript output
-matplotlib.use('PS')   # generate postscript output
+if arguments['interactive'] or arguments['debugging']:
+    matplotlib.use('QT5Agg')   # generate interactive output
+else:
+    matplotlib.use('PS')   # generate postscript output
 from tqdm import tqdm
 import pdb, traceback, shutil
 import random
@@ -89,7 +92,7 @@ if not os.path.exists(calcSubFolder):
     os.makedirs(calcSubFolder, exist_ok=True)
 
 if arguments['processAll']:
-    prefix = assembledName
+    prefix = 'Block'
 else:
     prefix = ns5FileName
 triggeredPath = os.path.join(
@@ -110,7 +113,7 @@ alignedAsigsKWargs.update(dict(
     duplicateControlsByProgram=False,
     makeControlProgram=False,
     removeFuzzyName=False,
-    decimate=1, windowSize=(-20e3, 100e-3),
+    decimate=1, windowSize=(-10e3, 100e-3),
     metaDataToCategories=False,
     # getMetaData=[
     #     'RateInHz', 'feature', 'electrode',
@@ -121,7 +124,7 @@ alignedAsigsKWargs.update(dict(
     verbose=False, procFun=None))
 #
 alignedAsigsKWargs['procFun'] = ash.genDetrender(
-    timeWindow=(alignedAsigsKWargs['windowSize'][0], -1e-3))
+    timeWindow=(alignedAsigsKWargs['windowSize'][0], -2e-3))
 
 alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **arguments)
 alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
@@ -148,7 +151,7 @@ daskOpts = dict(
     reindexFromInput=False)
 
 
-if DEBUGGING:
+if arguments['debugging']:
     sns.set(font_scale=.5)
     daskOpts['daskProgBar'] = False
     daskOpts['daskComputeOpts']['scheduler'] = 'single-threaded'
@@ -161,6 +164,7 @@ if DEBUGGING:
 
 def gaussian(x, amplitude, center, sigma):
     return amplitude * np.exp(-(x-center)**2 / (2 * sigma ** 2))
+
 
 expPrefixes = ['exp1_', 'exp2_', 'exp3_']
 gaussPrefixes = ['p1_', 'n1_', 'p2_', 'p3_', 'n2_', 'p4_']
@@ -194,7 +198,7 @@ expPars['exp2_amplitude'].set(value=0)
 expPars['exp2_decay'].set(min=.1, value=20., max=20.)
 #
 expPars['exp3_amplitude'].set(value=0)
-expPars['exp3_decay'].set(min=.025, value=.5, max=2.)
+expPars['exp3_decay'].set(min=.05, value=.5, max=2.)
 #
 gaussPars.add(
     name='n1_offset',
@@ -270,7 +274,7 @@ def applyModel(
         if maxDecay is None:
             maxDecay = fullPars['{}decay'.format(pref)].max
         expGuess = thisExpMod.guess(exp_y, x=exp_x)
-        signGuessOldWay = np.sign(np.nanmean(exp_y, axis=None))
+        # signGuess = np.sign(np.nanmean(exp_y, axis=None))
         positivePred = thisExpMod.eval(expGuess, x=exp_x)
         positiveResid = np.sum((exp_y - positivePred) ** 2)
         negativeResid = np.sum((exp_y + positivePred) ** 2)
@@ -290,9 +294,11 @@ def applyModel(
         try:
             tempPars = thisExpMod.make_params()
             if ampGuess > 0:
+                ampGuess = max(ampGuess, 1e-6)
                 tempPars['{}amplitude'.format(pref)].set(
                     value=ampGuess, max=3 * ampGuess, min=1e-3 * ampGuess)
             else:
+                ampGuess = min(ampGuess, -1e-6)
                 tempPars['{}amplitude'.format(pref)].set(
                     value=ampGuess, max=1e-3 * ampGuess, min=3 * ampGuess)
             if verbose:
@@ -553,7 +559,7 @@ if __name__ == "__main__":
     testVar = None
     conditionNames = [
         'electrode',
-        # 'RateInHz',
+        'RateInHz',
         arguments['amplitudeFieldName'],
         'originalIndex', 'segment', 't'
         ]
@@ -593,20 +599,27 @@ if __name__ == "__main__":
         featNames = dataDF.index.get_level_values('feature')
         elecNames = dataDF.index.get_level_values('electrode')
         rates = dataDF.index.get_level_values('RateInHz')
-        amps = dataDF.index.get_level_values(arguments['amplitudeFieldName'])
         print('Available rates are {}'.format(np.unique(rates)))
-        if SMALLDATASET:
+        amps = dataDF.index.get_level_values(arguments['amplitudeFieldName'])
+        print('Available amps are {}'.format(np.unique(amps)))
+        if arguments['smallDataset']:
             dbIndexMask = (
                 # elecNames.str.contains('caudalZ_e23') &
                 # (featNames.str.contains('caudalY_e11') | featNames.str.contains('rostralY_e11')) &
-                featNames.str.contains('rostralY_e13') &
-                elecNames.str.contains('caudalY_e11') &
-                (rates < funKWArgs['tBounds'][-1] ** (-1)) &
-                (amps == -900)
+                featNames.str.contains('rostralY') &
+                elecNames.str.contains('caudalY') &
+                (rates < funKWArgs['tBounds'][-1] ** (-1))
+                # (amps == -900)
                 )
         else:
-            dbIndexMask = (rates < funKWArgs['tBounds'][-1] ** (-1))
-        dbColMask = (dataDF.columns.astype(np.float) >= funKWArgs['tBounds'][0]) & (dataDF.columns.astype(np.float) < funKWArgs['tBounds'][-1])
+            dbIndexMask = (
+                    (featNames.str.contains('rostral')) &
+                    (rates < funKWArgs['tBounds'][-1] ** (-1)) &
+                    (elecNames.str.contains('caudal'))
+                )
+        dbColMask = (
+            (dataDF.columns.astype(float) >= funKWArgs['tBounds'][0]) &
+            (dataDF.columns.astype(float) < funKWArgs['tBounds'][-1]))
         dataDF = dataDF.loc[dbIndexMask, dbColMask]
         resDF = ash.splitApplyCombine(
             dataDF,
@@ -790,6 +803,32 @@ if __name__ == "__main__":
     def cTransform(absV, minV, maxV, vSize):
         return (absV - minV) / (maxV - minV) * vSize
     # plot heatmaps
+
+    # # export model params and confidence intervals
+    outputParams = modelParams.reset_index()
+    outputParams.columns = outputParams.columns.astype(str)
+    resultPath = os.path.join(
+        resultFolder,
+        prefix + '_{}_{}_lmfit_model_parameters.parquet'.format(
+            arguments['inputBlockSuffix'], arguments['window']))
+    outputParams.to_parquet(resultPath, engine="fastparquet")
+    #
+    outputComps = compsAndTargetDF.reset_index()
+    outputComps.columns = outputComps.columns.astype(str)
+    resultPath = os.path.join(
+        resultFolder,
+        prefix + '_{}_{}_lmfit_signals.parquet'.format(
+            arguments['inputBlockSuffix'], arguments['window']))
+    outputComps.to_parquet(resultPath, engine="fastparquet")
+    #
+    outputCI = paramsCI.reset_index()
+    outputCI.columns = outputCI.columns.astype(str)
+    resultPath = os.path.join(
+        resultFolder,
+        prefix + '_{}_{}_lmfit_std_errs.parquet'.format(
+            arguments['inputBlockSuffix'], arguments['window']))
+    outputCI.to_parquet(resultPath, engine="fastparquet")
+    #
     with PdfPages(pdfPath) as pdf:
         for name, group in tqdm(meanParams.groupby(['electrode', arguments['amplitudeFieldName']])):
             for pName, plotMeta in paramMetaData.items():
@@ -856,27 +895,3 @@ if __name__ == "__main__":
                     plt.show()
                 else:
                     plt.close()
-    # # export model params and confidence intervals
-    outputParams = modelParams.reset_index()
-    outputParams.columns = outputParams.columns.astype(str)
-    resultPath = os.path.join(
-        resultFolder,
-        prefix + '_{}_{}_lmfit_model_parameters.parquet'.format(
-            arguments['inputBlockSuffix'], arguments['window']))
-    outputParams.to_parquet(resultPath, engine="fastparquet")
-    #
-    outputComps = compsAndTargetDF.reset_index()
-    outputComps.columns = outputComps.columns.astype(str)
-    resultPath = os.path.join(
-        resultFolder,
-        prefix + '_{}_{}_lmfit_signals.parquet'.format(
-            arguments['inputBlockSuffix'], arguments['window']))
-    outputComps.to_parquet(resultPath, engine="fastparquet")
-    # 
-    outputCI = paramsCI.reset_index()
-    outputCI.columns = outputCI.columns.astype(str)
-    resultPath = os.path.join(
-        resultFolder,
-        prefix + '_{}_{}_lmfit_std_errs.parquet'.format(
-            arguments['inputBlockSuffix'], arguments['window']))
-    outputCI.to_parquet(resultPath, engine="fastparquet")

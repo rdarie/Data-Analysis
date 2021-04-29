@@ -740,7 +740,7 @@ def calcISIBlockAnalysisNix():
                                         observedRate = 3 / pq.s
                                     try:
                                         rateMismatch = np.abs(nominalRate - observedRate)
-                                    except:
+                                    except Exception:
                                         pdb.set_trace()
                                     if not rateMismatch < 1e-6:
                                         print(

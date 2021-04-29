@@ -8,6 +8,7 @@ import pandas as pd
 import numpy as np
 import pdb
 import math
+from copy import copy, deepcopy
 import seaborn as sns
 import dataAnalysis.helperFunctions.kilosort_analysis_new as ksa
 import dataAnalysis.helperFunctions.helper_functions_new as hf
@@ -453,7 +454,6 @@ def plotAsigsAligned(
             dataBlock, loadArgs['unitQuery'], objType=Unit)
     unitNames = loadArgs.pop('unitNames')
     loadArgs.pop('unitQuery')
-    # pdb.set_trace()
     with PdfPages(os.path.join(figureFolder, pdfName + '.pdf')) as pdf:
         for idx, unitName in enumerate(tqdm(unitNames)):
             asigWide = ns5.alignedAsigsToDF(
@@ -774,9 +774,10 @@ def genTitleAnnotator(
 
 def genTicksToScale(
         lineOpts={}, textOpts={}, shared=True,
-        xUnitFactor=1, yUnitFactor=1,
+        xUnitFactor=1, yUnitFactor=1, limFracX=0.2, limFracY=0.2,
+        scaleBarPosition=None, dX=None, dY=None,
+        xTicks=[], yTicks=[],
         xUnits='', yUnits='', dropNaNCol='segment'):
-    limFrac = 0.2
 
     def ticksToScale(g, ro, co, hu, dataSubset):
         # topLeftCol = ((ro == 0) and (co == 0))
@@ -789,28 +790,42 @@ def genTicksToScale(
             g.ticksToScaleDone = True
             xLim = g.axes[ro, co].get_xlim()
             yLim = g.axes[ro, co].get_ylim()
-            odX = limFrac * (xLim[1] - xLim[0])
-            odY = limFrac * (yLim[1] - yLim[0])
+            odX = limFracX * (xLim[1] - xLim[0])
+            odY = limFracY * (yLim[1] - yLim[0])
             # round to nearest order of magnitude
             if odX > 1:
-                xOrdMag = -np.floor(np.log10(odX)) + 3
+                xOrdMag = -np.floor(np.log10(odX + 1e-6)) + 3
             else:
-                xOrdMag = -np.floor(np.log10(odX)) + 2
-            dX = np.round(odX, decimals=int(xOrdMag))
+                xOrdMag = -np.floor(np.log10(odX + 1e-6)) + 2
+            if dX is None:
+                scaleDX = np.round(odX, decimals=int(xOrdMag))
+            else:
+                scaleDX = dX
             if odY > 1:
-                yOrdMag = -np.floor(np.log10(odY)) + 3
+                yOrdMag = -np.floor(np.log10(odY + 1e-6)) + 3
             else:
-                yOrdMag = -np.floor(np.log10(odY)) + 2
-            dY = np.round(odY, decimals=int(yOrdMag))
-            if odX > 0 and odY > 0:
+                yOrdMag = -np.floor(np.log10(odY + 1e-6)) + 2
+            if dY is None:
+                scaleDY = np.round(odY, decimals=int(yOrdMag))
+            else:
+                scaleDY = dY
+            # print(odX)
+            if odX >= 0 and odY >= 0:
                 # positions of scale-bar
-                scaleX = xLim[0] + np.asarray([odX,    odX, dX+odX])
-                scaleY = yLim[0] + np.asarray([dY+odY, odY, odY])
+                if scaleBarPosition is None:
+                    scaleX = xLim[0] + np.asarray([odX,    odX, scaleDX+odX])
+                    scaleY = yLim[0] + np.asarray([scaleDY+odY, odY, odY])
+                else:
+                    scaleX = scaleBarPosition[0] + np.asarray([0.,    0., scaleDX])
+                    scaleY = scaleBarPosition[1] + np.asarray([scaleDY, 0., 0.])
                 #
                 # g.axes[ro, co].autoscale(enable=False)
                 g.axes[ro, co].plot(scaleX, scaleY, 'k-', **lineOpts)
                 #
-                xText = '{:.1f}'.format(dX * xUnitFactor)
+                if abs(xUnitFactor) > 0:
+                    xText = '{:.1f}'.format(scaleDX * xUnitFactor)
+                else:
+                    xText = ''
                 if xUnits:
                     xText += ' {}'.format(xUnits)
                 g.axes[ro, co].text(
@@ -818,7 +833,10 @@ def genTicksToScale(
                     horizontalalignment='left',
                     verticalalignment='top', **textOpts)
                 #
-                yText = '{:.1f}'.format(dY * yUnitFactor)
+                if abs(yUnitFactor) > 0:
+                    yText = '{:.1f}'.format(scaleDY * yUnitFactor)
+                else:
+                    yText = ''
                 if yUnits:
                     yText += ' {}'.format(yUnits)
                 g.axes[ro, co].text(
@@ -826,8 +844,8 @@ def genTicksToScale(
                     horizontalalignment='right',
                     verticalalignment='bottom',
                     rotation='vertical', **textOpts)
-        g.axes[ro, co].set_yticks([])
-        g.axes[ro, co].set_xticks([])
+        g.axes[ro, co].set_yticks(yTicks)
+        g.axes[ro, co].set_xticks(xTicks)
         return
     return ticksToScale
 
@@ -928,6 +946,15 @@ def genTicksToScaleTwin(
             return
     return ticksToScaleTwin
 
+def genXTicksChanger(xTicksProcFun):
+    def xTicksChanger(g, ro, co, hu, dataSubset):
+        if not hasattr(g.axes[ro, co], 'xTicksChanged'):
+            g.axes[ro, co].xTicksChanged = True
+            currXTicks = g.axes[ro, co].get_xticks()
+            print(currXTicks)
+            g.axes[ro, co].set_xticks(xTicksProcFun(currXTicks))
+        return
+    return xTicksChanger
 
 def genDespiner(
         top=True, right=True,

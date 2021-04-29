@@ -186,16 +186,30 @@ def getExpOpts():
     RCPlotOpts = {
         'keepFeatures': [
             'LBicepsFemoris', 'LGastrocnemius', 'LGracilis',
-            'LPeroneusLongus', 'LTensorFasciaeLatae',
+            'LPeroneusLongus',
             'RBicepsFemoris',
             'RGastrocnemius', 'RGracilis', 'RPeroneusLongus',
-            'RTensorFasciaeLatae',
+            # 'RTensorFasciaeLatae', 'LTensorFasciaeLatae',
+            # 'LThoracolumbarFascia', 'RThoracolumbarFascia',
+            # 'RExtensorDigitorum',
+            'LSemitendinosus', 'RSemitendinosus',
+        ],
+        'keepElectrodes': None,
+        'significantOnly': False,
+    }
+    RCCalcOpts = {
+        'keepFeatures': [
+            'LBicepsFemoris', 'LGastrocnemius', 'LGracilis',
+            'LPeroneusLongus',
+            'RBicepsFemoris',
+            'RGastrocnemius', 'RGracilis', 'RPeroneusLongus',
+            # 'RTensorFasciaeLatae', 'LTensorFasciaeLatae',
             # 'LThoracolumbarFascia', 'RThoracolumbarFascia',
             # 'RExtensorDigitorum',
             'LSemitendinosus', 'RSemitendinosus',
             ],
         'keepElectrodes': None,
-        'significantOnly': True,
+        'significantOnly': False,
         }
     EMGStyleMarkers = {
         'LThoracolumbarFasciaEmgEnv#0': 'o',

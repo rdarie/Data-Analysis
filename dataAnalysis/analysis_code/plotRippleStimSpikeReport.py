@@ -10,6 +10,8 @@ Options:
     --nameSuffix=nameSuffix                              add anything to the output name?
     --lazy                                               load from raw, or regular? [default: False]
     --window=window                                      process with short window? [default: short]
+    --winStart=winStart                                  start of window [default: None]
+    --winStop=winStop                                    end of window [default: None]
     --alignFolderName=alignFolderName                    append a name to the resulting blocks? [default: motion]
     --analysisName=analysisName                          append a name to the resulting blocks? [default: default]
     --inputBlockSuffix=inputBlockSuffix                  which trig_ block to pull
@@ -94,7 +96,7 @@ if arguments['inputBlockSuffix'] is not None:
     if not os.path.exists(calcSubFolder):
         os.makedirs(calcSubFolder, exist_ok=True)
     if arguments['processAll']:
-        prefix = assembledName
+        prefix = 'Block'
     else:
         prefix = ns5FileName
     dataPath = os.path.join(
@@ -156,6 +158,13 @@ alignedAsigsKWargs.update(dict(
     windowSize=(-20e-3, 100e-3)))
 # alignedAsigsKWargs.update(dict(
 #     windowSize=(-25e-3, 125e-3)))
+if 'windowSize' not in alignedAsigsKWargs:
+    alignedAsigsKWargs['windowSize'] = list(rasterOpts['windowSizes'][arguments['window']])
+if arguments['winStart'] == 'None':
+    alignedAsigsKWargs['windowSize'][0] = float(arguments['winStart']) * (-1e-3)
+if arguments['winStop'] == 'None':
+    alignedAsigsKWargs['windowSize'][1] = float(arguments['winStop']) * (1e-3)
+
 alignedAsigsKWargs.update({'amplitudeColumn': arguments['amplitudeFieldName']})
 #
 if 'proprio' in blockExperimentType:

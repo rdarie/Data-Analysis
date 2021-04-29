@@ -16,6 +16,7 @@ Options:
     --alignQuery=alignQuery                what will the plot be aligned to? [default: outboundWithStim]
     --maskOutlierBlocks                    delete outlier trials? [default: False]
     --invertOutlierMask                    delete outlier trials? [default: False]
+    --showFigures                          show plots interactively? [default: False]
 """
 import matplotlib
 matplotlib.rcParams['pdf.fonttype'] = 42
@@ -60,7 +61,7 @@ figureOutputFolder = os.path.join(
 if not os.path.exists(figureOutputFolder):
     os.makedirs(figureOutputFolder, exist_ok=True)
 if arguments['processAll']:
-    prefix = assembledName
+    prefix = 'Block'
 else:
     prefix = ns5FileName
 #
@@ -76,60 +77,87 @@ limitPages = None
 amplitudeFieldName = 'nominalCurrent'
 # amplitudeFieldName = 'amplitudeCat'
 #  End Overrides
-recCurve = pd.read_hdf(resultPath, 'meanRAUC')
-plotOpts = pd.read_hdf(resultPath, 'meanRAUC_plotOpts')
+recCurve = pd.read_hdf(resultPath, 'emgRAUC')
+plotOpts = pd.read_hdf(resultPath, 'emgRAUC_plotOpts')
 pdfPath = os.path.join(
     figureOutputFolder,
     prefix + '_{}_{}_{}.pdf'.format(
         arguments['inputBlockSuffix'], arguments['window'],
-        'meanRAUC'))
+        'emgRAUC'))
 
-plotEmgRC = recCurve.copy().reset_index()
+plotEmgRC = recCurve.reset_index()
 keepCols = [
     'segment', 'originalIndex', 't', 'RateInHz',
     'electrode', 'nominalCurrent', 'feature', 'lag']
 dropCols = [
     idxName
     for idxName in recCurve.index.names
-    if idxName not in []]
-if RCPlotOpts['significantOnly']:
-    plotEmgRC = plotEmgRC.query("(kruskalP < 1e-3)")
-#
-if RCPlotOpts['keepElectrodes'] is not None:
-    keepDataMask = emgRC['electrode'].isin(RCPlotOpts['keepElectrodes'])
-    plotEmgRC = plotEmgRC.loc[keepDataMask, :]
-#
-if RCPlotOpts['keepFeatures'] is not None:
-    keepDataMask = plotEmgRC['featureName'].isin(RCPlotOpts['keepFeatures'])
-    plotEmgRC = plotEmgRC.loc[keepDataMask, :]
+    if idxName not in keepCols]
+plotEmgRC.drop(columns=dropCols, inplace=True)
+
 #
 emgPalette = (
     plotOpts
         .loc[:, ['featureName', 'color']]
         .set_index('featureName')['color']
         .to_dict())
+mapDF = prb_meta.mapToDF(rippleMapFile[int(arguments['blockIdx'])])
+mapDF.loc[:, 'whichArray'] = mapDF['elecName'].apply(lambda x: x[:-1])
+mapDF.loc[mapDF['whichArray'] == 'rostral', 'xcoords'] += mapDF['xcoords'].max() * 2
+mapDF.loc[:, 'channelRepetition'] = mapDF['label'].apply(lambda x: x.split('_')[-1])
+mapDF.loc[:, 'topoName'] = mapDF['label'].apply(lambda x: x[:-2])
+mapAMask = (mapDF['channelRepetition'] == 'a').to_numpy()
+#
+plotEmgRC.loc[:, 'electrode'] = plotEmgRC['electrode'].apply(lambda x: x[1:])
+plotEmgRC.loc[:, 'feature'] = plotEmgRC['feature'].apply(lambda x: x[:-4])
+#
 
-colOrder = sorted(np.unique(plotEmgRC['electrode']))
+if RCPlotOpts['significantOnly']:
+    plotEmgRC = plotEmgRC.query("(kruskalP < 1e-3)")
+#
+if RCPlotOpts['keepElectrodes'] is not None:
+    keepDataMask = plotEmgRC['electrode'].isin(RCPlotOpts['keepElectrodes'])
+    plotEmgRC = plotEmgRC.loc[keepDataMask, :]
+#
+if RCPlotOpts['keepFeatures'] is not None:
+    keepDataMask = plotEmgRC['featureName'].isin(RCPlotOpts['keepFeatures'])
+    plotEmgRC = plotEmgRC.loc[keepDataMask, :]
+
+annotNames = ['xcoords', 'ycoords', 'whichArray']
+for annotName in annotNames:
+    lookupSource = mapDF.loc[mapAMask, [annotName, 'topoName']].set_index('topoName')[annotName]
+    plotEmgRC.loc[:, 'electrode_' + annotName] = plotEmgRC['electrode'].map(lookupSource)
+
+# colName = 'electrode_xcoords'
+colName = 'electrode'
+colOrder = sorted(np.unique(plotEmgRC[colName]))
 hueName = 'featureName'
 featToSite = plotOpts.loc[:, ['featureName', 'EMGSite']].set_index('EMGSite')['featureName']
 hueOrder = (
     featToSite.loc[featToSite.isin(plotEmgRC['featureName'])]
     .sort_index().to_numpy())
+colWrap = min(3, len(colOrder))
+height, aspect = 5, 1.5
+# pdb.set_trace()
 g = sns.relplot(
-    col='electrode',
+    col=colName,
     col_order=colOrder,
-    col_wrap=min(3, len(colOrder)),
+    col_wrap=colWrap,
     # row='EMGSide',
     # x='normalizedAmplitude',
     x=amplitudeFieldName,
     y='normalizedRAUC',
     style='EMGSide', style_order=['Right', 'Left'],
     hue=hueName, hue_order=hueOrder,
-    kind='line', data=plotEmgRC.query('RateInHz > 50'),
+    kind='line', data=plotEmgRC,
     palette=emgPalette,
-    height=5, aspect=1.5, ci='sem', estimator='mean',
-    facet_kws=dict(sharey=True, sharex=False), lw=2,
+    height=height, aspect=aspect, ci='sem', estimator='mean',
+    facet_kws=dict(sharey=True, sharex=False, legend_out=True), lw=2,
     )
-#
+g.fig.set_size_inches(colWrap * height * aspect + 10, height + 2)
+plt.tight_layout(pad=.1)
 plt.savefig(pdfPath)
-plt.show()
+if arguments['showFigures']:
+    plt.show()
+else:
+    plt.close()

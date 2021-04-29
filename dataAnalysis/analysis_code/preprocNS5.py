@@ -387,7 +387,7 @@ def preprocNS5():
             nameSuffix='',
             writeMode='ow',
             chunkSize=chunkSize, equalChunks=equalChunks, chunkList=chunkList,
-            LFPFilterOpts=rippleFilterOpts)
+            LFPFilterOpts=None)
     ##
     if arguments['transferISIStimLog']:
         try:

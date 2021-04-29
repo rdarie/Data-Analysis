@@ -1071,7 +1071,7 @@ def genLegendRounder(decimals=2):
             for t in leg.texts:
                 # check if numeric
                 if t.get_text().replace('.', '', 1).isdigit():
-                    # truncate label text to 4 characters
+                    # truncate label text to "decimals" characters
                     textNumeric = np.round(
                         float(t.get_text()),
                         decimals=decimals)

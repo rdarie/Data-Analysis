@@ -475,8 +475,8 @@ def parseAnalysisOptions(
             for tIdx in val:
                 trialsToAssemble.append(
                     os.path.join(
-                        scratchPath, key, '{}',
-                        'Block00{}.nix'.format(tIdx)
+                        scratchPath, key, '{}', '{}',
+                        '{{}}{:0>3}{{}}.nix'.format(int(tIdx))
                     )
                 )
     except Exception:

@@ -129,13 +129,13 @@ def getExpOpts():
     triDestinations = []
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        '202012171300-Goat': [3, 5],
+        '202012171300-Goat': [3, 5, 6, 7, 8],
         }
     assembledSegmentToBlockLookup = {
-        i - 1: i for i in [3, 5]
+        i - 1: i for i in [3, 5, 6, 7, 8]
         }
     movementSizeBins = [0, 0.25, 0.5, 1, 1.25, 1.5]
-    rowColOverrides = {
+    '''rowColOverrides = {
         'electrode': [
             # Block001
             '-rostralZ_e20',
@@ -157,7 +157,7 @@ def getExpOpts():
             '-caudalZ_e21+caudalZ_e17',
             '-rostralZ_e24+rostralZ_e19',
             ]
-    }
+    }'''
     outlierDetectOptions = dict(
         targetEpochSize=10e-3,
         windowSize=(0, 100e-3),
@@ -198,15 +198,23 @@ def getExpOpts():
     '''
     RCPlotOpts = {
         'keepFeatures': [
-            'LBicepsFemoris', 'LGastrocnemius', 'LGracilis',
-            'LPeroneusLongus', 'LTensorFasciaeLatae',
-            'RBicepsFemoris',
-            'RGastrocnemius', 'RGracilis', 'RPeroneusLongus',
-            'RTensorFasciaeLatae',
+            'LBicepsFemoris', 'LGastrocnemius', 'LGracilis', 'LPeroneusLongus',
+            'RBicepsFemoris', 'RGastrocnemius', 'RGracilis', 'RPeroneusLongus',
+            # 'RTensorFasciaeLatae', 'LTensorFasciaeLatae',
             # 'LThoracolumbarFascia', 'RThoracolumbarFascia',
-            # 'RExtensorDigitorum',
-            'LSemitendinosus', 'RSemitendinosus',
+            # 'RExtensorDigitorum', 'LSemitendinosus', 'RSemitendinosus',
             ],
+        'keepElectrodes': ['caudalY_e11', 'caudalZ_e18', 'caudalZ_e23'],
+        'significantOnly': False,
+        }
+    RCCalcOpts = {
+        'keepFeatures': [
+            'LBicepsFemoris', 'LGastrocnemius', 'LGracilis', 'LPeroneusLongus',
+            'RBicepsFemoris', 'RGastrocnemius', 'RGracilis', 'RPeroneusLongus',
+            # 'RTensorFasciaeLatae', 'LTensorFasciaeLatae',
+            # 'LThoracolumbarFascia', 'RThoracolumbarFascia',
+            # 'RExtensorDigitorum', 'LSemitendinosus', 'RSemitendinosus',
+        ],
         'keepElectrodes': None,
         'significantOnly': False,
         }
@@ -255,14 +263,14 @@ def getExpOpts():
         'n': 5,
         'categories': ['nominalCurrent', 'electrode', 'RateInHz']
         }
-    rippleFilterOpts = {
+    '''rippleFilterOpts = {
         'high': {
-            'Wn': 2,
+            'Wn': .1,
             'N': 4,
             'btype': 'high',
             'ftype': 'bessel'
         }
-    }
+    }'''
     delsysFilterOpts = {
         'ACC': {
             'bandstop': {
@@ -286,12 +294,12 @@ def getExpOpts():
         }
     }
     lmfitFunKWArgs = dict(
-        tBounds=[1.1e-3, 95e-3],
-        scoreBounds=[1e-3, 6e-3],
+        tBounds=[1.3e-3, 39e-3],
+        scoreBounds=[1.3e-3, 6e-3],
         #
         expOpts=dict(
             exp1_=dict(
-                tBounds=[19e-3, 95e-3],
+                tBounds=[19e-3, 39e-3],
                 assessModel=True
             ),
             exp2_=dict(
@@ -299,7 +307,7 @@ def getExpOpts():
                 assessModel=True
             ),
             exp3_=dict(
-                tBounds=[1.1e-3, 1.4e-3],
+                tBounds=[1.3e-3, 1.9e-3],
                 assessModel=True
             )
         ),
@@ -308,6 +316,6 @@ def getExpOpts():
         method='nelder',
         iterMethod='sampleOneManyTimes',
         plotting=False, verbose=False,
-        maxIter=20
+        maxIter=1
         )
     return locals()

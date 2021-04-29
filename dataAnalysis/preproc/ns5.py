@@ -689,7 +689,8 @@ def concatenateEventsContainerV2(eventContainer, newSegIdx=0):
 '''
 
 
-def concatenateEventsContainer(eventContainer, linkParents=True):
+def concatenateEventsContainer(
+        eventContainer, linkParents=True):
     if isinstance(eventContainer, dict):
         listOfEvents = list(eventContainer.values())
     else:
@@ -3009,14 +3010,14 @@ def preprocBlockToNix(
             return sig
         filterCoeffs = hf.makeFilterCoeffsSOS(
             LFPFilterOpts, float(seg.analogsignals[0].sampling_rate))
-        if False:
+        '''if False:
             fig, ax1, ax2 = hf.plotFilterResponse(
                 filterCoeffs,
                 float(seg.analogsignals[0].sampling_rate))
             fig2, ax3, ax4 = hf.plotFilterImpulseResponse(
                 LFPFilterOpts,
                 float(seg.analogsignals[0].sampling_rate))
-            plt.show()
+            plt.show()'''
     # first pass through asigs, if removing mean across channels
     if (removeMeanAcross or calcAverageLFP):
         # [asigP.name for asigP in seg.analogsignals]

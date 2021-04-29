@@ -329,6 +329,18 @@ namedQueries['align'].update({
         ])
     })
 namedQueries['align'].update({
+    'stimOnLessThan11Hz': '&'.join([
+        namedQueries['align']['stimOn'],
+        "(RateInHz < 11) & (RateInHz > 5)"
+        ])
+    })
+namedQueries['align'].update({
+    'stimOnLessThan30Hz': '&'.join([
+        namedQueries['align']['stimOn'],
+        "(RateInHz < 30) & (RateInHz > 5)"
+        ])
+    })
+namedQueries['align'].update({
     'stimOnHighRate': '&'.join([
         namedQueries['align']['stimOn'],
         "(RateInHz > 20)"

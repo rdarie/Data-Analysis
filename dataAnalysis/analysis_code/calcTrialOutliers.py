@@ -77,7 +77,7 @@ if not os.path.exists(calcSubFolder):
     os.makedirs(calcSubFolder, exist_ok=True)
 #
 if arguments['processAll']:
-    prefix = assembledName
+    prefix = 'Block'
 else:
     prefix = ns5FileName
 

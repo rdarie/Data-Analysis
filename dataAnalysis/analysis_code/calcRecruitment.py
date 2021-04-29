@@ -39,7 +39,7 @@ import dill as pickle
 import pandas as pd
 import numpy as np
 from scipy import stats
-from sklearn.preprocessing import RobustScaler, MinMaxScaler
+from sklearn.preprocessing import RobustScaler, MinMaxScaler, StandardScaler
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']), arguments['exp'])
@@ -66,10 +66,12 @@ alignedAsigsKWargs.update(dict(
     makeControlProgram=False,
     metaDataToCategories=False,
     removeFuzzyName=False,
-    decimate=1, windowSize=(0, 300e-3),
-    transposeToColumns='bin', concatOn='index',))
+    decimate=1, windowSize=(-100e-3, 100e-3),
+    transposeToColumns='bin', concatOn='index'))
+alignedAsigsKWargs['procFun'] = ash.genDetrender(
+    timeWindow=(-90e-3, -50e-3))
 if arguments['processAll']:
-    prefix = assembledName
+    prefix = 'Block'
 else:
     prefix = ns5FileName
 #
@@ -88,10 +90,9 @@ dataReader, dataBlock = ns5.blockFromPath(
     triggeredPath, lazy=arguments['lazy'])
 #  Overrides
 limitPages = None
-resultName = 'meanRAUC'
 funKWargs = dict(
-    baseline='mean',
-    tStart=None, tStop=None)
+    # baseline='mean',
+    tStart=-40e-3, tStop=40e-3)
 #  End Overrides
 asigWide = ns5.alignedAsigsToDF(
     dataBlock, **alignedAsigsKWargs)
@@ -102,10 +103,10 @@ if outlierTrials is not None:
             trialInfo = trialInfo.droplevel(idxName)
     outlierMask = pd.Series(trialInfo.to_numpy()).map(outlierTrials)
     asigWide = asigWide.loc[~outlierMask.to_numpy(), :]
-pdb.set_trace()
 
 rAUCDF = ash.rAUC(
     asigWide, **funKWargs).to_frame(name='rauc')
+
 rAUCDF['kruskalStat'] = np.nan
 rAUCDF['kruskalP'] = np.nan
 for name, group in rAUCDF.groupby(['electrode', 'feature']):
@@ -130,12 +131,16 @@ rAUCDF.loc[:, amplitudeFieldName] = rAUCDF[amplitudeFieldName].abs()
 sideLookup = {'R': 'Right', 'L': 'Left'}
 '''nSig = {}'''
 
-qLims = (0.05, 0.95)
+qLims = (5e-3, 1-5e-3)
 # for name, group in rAUCDF.groupby(['feature', 'electrode']):
 for name, group in rAUCDF.groupby(['feature']):
-    rAUCDF.loc[group.index, 'standardizedRAUC'] = (
+    '''rAUCDF.loc[group.index, 'standardizedRAUC'] = (
         RobustScaler(quantile_range=[i * 100 for i in qLims])
         .fit_transform(
+            group['rauc'].to_numpy().reshape(-1, 1)))'''
+    rAUCDF.loc[group.index, 'standardizedRAUC'] = (
+        StandardScaler()
+            .fit_transform(
             group['rauc'].to_numpy().reshape(-1, 1)))
     groupQuantiles = group['rauc'].quantile(qLims)
     rauc = group['rauc'].copy()
@@ -148,8 +153,10 @@ for name, group in rAUCDF.groupby(['feature']):
     rAUCDF.loc[group.index, 'normalizedRAUC'] = (
         thisScaler.transform(rauc.to_numpy().reshape(-1, 1)))
     featName = name
-    rAUCDF.loc[group.index, 'featureName'] = featName[:-8]
-    rAUCDF.loc[group.index, 'EMGSite'] = featName[1:-8]
+    featNameShort = featName.replace('EmgEnv#0', '').replace('Emg#0', '')
+    # pdb.set_trace()
+    rAUCDF.loc[group.index, 'featureName'] = featNameShort
+    rAUCDF.loc[group.index, 'EMGSite'] = featNameShort[1:]
     rAUCDF.loc[group.index, 'EMGSide'] = sideLookup[featName[0]]
     '''if os.path.exists(statsTestPath):
         theseSig = sigValsWide.xs(featName, level='unit')
@@ -178,25 +185,10 @@ for gIdx, (name, group) in enumerate(featurePlotOptsDF.groupby('EMGSide')):
     featurePlotOptsDF.loc[group.index, 'style'] = styleNames[gIdx]
 
 rAUCDF.set_index(saveIndexNames, inplace=True)
-rAUCDF.to_hdf(resultPath, resultName)
-featurePlotOptsDF.to_hdf(resultPath, resultName + '_plotOpts')
-
-"""
-RecCurve = ash.facetGridApplyFunGrouped(
-    dataBlock, resultPath,
-    fun=ash.rAUC, funArgs=[], funKWargs=funKWargs,
-    resultNames=resultNames,
-    limitPages=limitPages,
-    loadArgs=alignedAsigsKWargs,
-    rowColOpts=rowColOpts, verbose=arguments['verbose'])
+rAUCDF.to_hdf(resultPath, 'emgRAUC')
+featurePlotOptsDF.to_hdf(resultPath, 'emgRAUC_plotOpts')
+asigWide.index = rAUCDF.index
+asigWide.to_hdf(resultPath, 'emgRAUC_raw')
 #
-for rName in resultNames:
-    tempResDict = {}
-    for uName, uResults in RecCurve.items():
-        tempResDict.update({uName: uResults[rName]})
-    tempResDF = pd.concat(tempResDict)
-    tempResDF.index.names = ['unit'] + uResults[rName].index.names
-    tempResDF.to_hdf(resultPath, rName, format='table')
-"""
 if arguments['lazy']:
     dataReader.file.close()

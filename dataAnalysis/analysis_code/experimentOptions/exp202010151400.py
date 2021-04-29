@@ -72,11 +72,18 @@ def getExpOpts():
         8: [],
         9: [],
         }
-    synchInfo = {'delsys': {}, 'nsp': {}, 'ins': {}}
+    synchInfo = {'delsysToNsp': {}, 'nspForDelsys': {}}
+    for blockIdx in blockExperimentTypeLookup.keys():
+        synchInfo['nspForDelsys'][blockIdx] = {
+            'synchChanName': 'analog 1'
+            }
+        synchInfo['delsysToNsp'][blockIdx] = {
+            'synchChanName': 'AnalogInputAdapterAnalog'
+        }
     # For emg analysis - emg missing for some time ranges
-    synchInfo['delsys'][3] = {'timeRanges': [8, 1313], 'chooseCrossings': slice(None)}
+    synchInfo['delsysToNsp'][3].update({'timeRanges': [8, 1313], 'chooseCrossings': slice(None)})
     #
-    synchInfo['nsp'][3] = {'timeRanges': [4, 1313], 'chooseCrossings': slice(None)}
+    synchInfo['nspForDelsys'][3].update({'timeRanges': [4, 1313], 'chooseCrossings': slice(None)})
     alignTimeBoundsLookup = {
         # 1: [
         #     [3, 2290.5]
@@ -122,13 +129,15 @@ def getExpOpts():
     triDestinations = []
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        '202010151400-Peep': [6, 7, 8, 9],
+        # '202010151400-Peep': [6, 7, 8, 9],
+        '202010151400-Peep': [1, 2, 3, 4],
         }
     assembledSegmentToBlockLookup = {
-        i - 1: i for i in [6, 7, 8, 9]
+        # i - 1: i for i in [6, 7, 8, 9]
+        i - 1: i for i in [1, 2, 3, 4]
         }
     movementSizeBins = [0, 0.25, 0.5, 1, 1.25, 1.5]
-    rowColOverrides = {
+    '''rowColOverrides = {
         'electrode': [
             # Block001
             '-rostralZ_e20',
@@ -150,7 +159,7 @@ def getExpOpts():
             '-caudalZ_e21+caudalZ_e17',
             '-rostralZ_e24+rostralZ_e19',
             ]
-    }
+    }'''
     outlierDetectOptions = dict(
         targetEpochSize=10e-3,
         windowSize=(0, 300e-3),
@@ -189,18 +198,23 @@ def getExpOpts():
         ]
     RCPlotOpts = {
         'keepFeatures': [
-            'LBicepsFemoris', 'LGastrocnemius', 'LGracilis',
-            'LPeroneusLongus',
-            # 'LTensorFasciaeLatae',
-            # 'RBicepsFemoris',
-            'RGastrocnemius',
-            # 'RGracilis',
-            'RPeroneusLongus',
-            'RTensorFasciaeLatae',
+            'LBicepsFemoris', 'LGastrocnemius', 'LGracilis', 'LPeroneusLongus',
+            'RBicepsFemoris', 'RGastrocnemius', 'RGracilis', 'RPeroneusLongus',
+            # 'RTensorFasciaeLatae', 'LTensorFasciaeLatae',
             # 'LThoracolumbarFascia', 'RThoracolumbarFascia',
-            # 'RExtensorDigitorum',
-            # 'LSemitendinosus', 'RSemitendinosus',
-            ],
+            # 'RExtensorDigitorum', 'LSemitendinosus', 'RSemitendinosus',
+        ],
+        'keepElectrodes': ['caudalY_e10', 'caudalZ_e21'],
+        'significantOnly': False,
+        }
+    RCCalcOpts = {
+        'keepFeatures': [
+            'LBicepsFemoris', 'LGastrocnemius', 'LGracilis', 'LPeroneusLongus',
+            'RBicepsFemoris', 'RGastrocnemius', 'RGracilis', 'RPeroneusLongus',
+            # 'RTensorFasciaeLatae', 'LTensorFasciaeLatae',
+            # 'LThoracolumbarFascia', 'RThoracolumbarFascia',
+            # 'RExtensorDigitorum', 'LSemitendinosus', 'RSemitendinosus',
+        ],
         'keepElectrodes': None,
         'significantOnly': False,
         }
@@ -249,4 +263,65 @@ def getExpOpts():
         'n': 5,
         'categories': ['nominalCurrent', 'electrode', 'RateInHz']
         }
+    '''rippleFilterOpts = {
+        'high': {
+            'Wn': .1,
+            'N': 4,
+            'btype': 'high',
+            'ftype': 'bessel'
+        }
+    }'''
+    delsysFilterOpts = {
+        'ACC': {
+            'bandstop': {
+                'Wn': 75,
+                'Q': 5,
+                'nHarmonics': 1,
+                'N': 4,
+                'btype': 'bandstop',
+                'ftype': 'bessel'
+            }
+        },
+        'EMG': {
+            'bandstop': {
+                'Wn': 60,
+                'Q': 5,
+                'nHarmonics': 1,
+                'N': 4,
+                'btype': 'bandstop',
+                'ftype': 'bessel'
+            },
+            'high': {
+                'Wn': .2,
+                'N': 4,
+                'btype': 'high',
+                'ftype': 'bessel'
+            }
+        }
+    }
+    lmfitFunKWArgs = dict(
+        tBounds=[1.3e-3, 39e-3],
+        scoreBounds=[1.3e-3, 6e-3],
+        #
+        expOpts=dict(
+            exp1_=dict(
+                tBounds=[19e-3, 39e-3],
+                assessModel=True
+            ),
+            exp2_=dict(
+                tBounds=[2e-3, 19e-3],
+                assessModel=True
+            ),
+            exp3_=dict(
+                tBounds=[1.3e-3, 1.9e-3],
+                assessModel=True
+            )
+        ),
+        # fit_kws=dict(loss='soft_l1'),
+        # method='least_squares',
+        method='nelder',
+        iterMethod='sampleOneManyTimes',
+        plotting=False, verbose=False,
+        maxIter=1
+        )
     return locals()

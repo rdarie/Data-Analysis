@@ -112,6 +112,7 @@ else:
         scratchFolder,
         signalPrefix + signalBlockSuffix + '_chunkingInfo.json'
         )
+#
 stimConditionNames = [
     'electrode', arguments['amplitudeFieldName'], 'RateInHz']
 motionConditionNames = [

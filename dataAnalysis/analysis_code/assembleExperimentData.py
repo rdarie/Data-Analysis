@@ -8,6 +8,7 @@ Options:
     --analysisName=analysisName      append a name to the resulting blocks? [default: default]
     --processAsigs                   whether to process the analog signals [default: False]
     --processRasters                 whether to process the rasters [default: False]
+    --processFiringRates             whether to process the rasters [default: False]
     --commitResults                  whether to additionally save to the processed data folder [default: False]
 """
 # import dataAnalysis.ephyviewer.scripts as vis_scripts
@@ -46,7 +47,8 @@ if arguments['processAsigs']:
     suffixList.append('_analyze')
 if arguments['processRasters']:
     suffixList.append('_binarized')
-suffixList.append('_fr')
+if arguments['processFiringRates']:
+    suffixList.append('_fr')
 
 for suffix in suffixList:
     print('assembling {}'.format(suffix))
@@ -100,6 +102,7 @@ for suffix in suffixList:
                 for annName,  annVal in chIdx.annotations.items():
                     masterChanDF.loc[chIdx.name, annName] = annVal
             else:
+                # update asigs / unit existence info
                 if len(chIdx.units) > 0:
                     masterChanDF.loc[chAlreadyThere, 'hasUnits'] = True
                 if len(chIdx.analogsignals):
