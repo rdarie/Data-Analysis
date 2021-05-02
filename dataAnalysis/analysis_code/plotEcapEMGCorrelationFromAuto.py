@@ -331,7 +331,10 @@ plt.savefig(
     bbox_inches='tight', pad_inches=0.2,
     # bbox_extra_artists=[leg, figYLabel, figXLabel]
     )
-plt.show()
+if arguments['showFigures']:
+    plt.show()
+else:
+    plt.close()
 #########
 sns.set(
     context='notebook', style='dark',
@@ -400,7 +403,10 @@ plt.savefig(
     bbox_inches='tight', pad_inches=0.2,
     # bbox_extra_artists=[leg, figYLabel, figXLabel]
     )
-plt.show()
+if arguments['showFigures']:
+    plt.show()
+else:
+    plt.close()
 '''
 exEMGName, exLFPName = plotDF.loc[plotDF['R2'].idxmin(), ['emg', 'lfp']]
 binMask = (plotEcap['bin'] > ecapTWinStart) & (plotEcap['bin'] < ecapTWinStop)
@@ -504,7 +510,10 @@ plt.savefig(
     pdfPath,
     bbox_inches='tight', pad_inches=0.2,
     bbox_extra_artists=[leg, figYLabel])
-plt.show()
+if arguments['showFigures']:
+    plt.show()
+else:
+    plt.close()
 
 ########################################################################
 ## plot lfp rc
@@ -615,7 +624,10 @@ plt.savefig(
     bbox_inches='tight', pad_inches=0.2,
     bbox_extra_artists=[leg, figYLabel, figXLabel]
     ) #
-plt.show()
+if arguments['showFigures']:
+    plt.show()
+else:
+    plt.close()
 ########################################################################
 ## plot emg rc
 ########################################################################
@@ -721,4 +733,7 @@ plt.savefig(
     bbox_inches='tight', pad_inches=0.2,
     bbox_extra_artists=[leg, figYLabel, figXLabel]
     )
-plt.show()
+if arguments['showFigures']:
+    plt.show()
+else:
+    plt.close()
