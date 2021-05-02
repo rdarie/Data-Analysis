@@ -129,10 +129,10 @@ def getExpOpts():
     triDestinations = []
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        '202012171300-Goat': [3, 5, 6, 7, 8],
+        '202012171300-Goat': [3, 5, 6],
         }
     assembledSegmentToBlockLookup = {
-        i - 1: i for i in [3, 5, 6, 7, 8]
+        i - 1: i for i in [3, 5, 6]
         }
     movementSizeBins = [0, 0.25, 0.5, 1, 1.25, 1.5]
     '''rowColOverrides = {
@@ -205,6 +205,7 @@ def getExpOpts():
             # 'RExtensorDigitorum', 'LSemitendinosus', 'RSemitendinosus',
             ],
         'keepElectrodes': ['caudalY_e11', 'caudalZ_e18', 'caudalZ_e23'],
+        # 'keepElectrodes': ['caudalZ_e23', 'caudalZ_e18', 'caudalZ_e22', 'caudalZ_e24'],
         'significantOnly': False,
         }
     RCCalcOpts = {

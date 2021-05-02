@@ -126,29 +126,14 @@ ecapDF.set_index(
         if idxName in ecapDF.columns],
     inplace=True)
 ecapDF.columns = ecapDF.columns.astype(float)
+ecapDetrender = ash.genDetrender(
+    timeWindow=[35e-3, 39e-3], useMean=False)
+ecapDF = ecapDetrender(ecapDF, None)
 #
-'''
-rawEcapDF.set_index([
-        'segment', 'originalIndex', 't',
-        'electrode', 'nominalCurrent', 'feature', 'regrID'],
-    inplace=True)
-rawEcapDF.columns = rawEcapDF.columns.astype(float)
-#
-plotEcap = rawEcapDF.stack().reset_index()
-plotEcap.rename(columns={0: 'signal'}, inplace=True)
-plotEcap.loc[:, 'feature'] = plotEcap['feature'].apply(lambda x: x.replace('#0', ''))
-'''
-#
-'''
-def getRAUC(x, timeWindow):
-    tWinStart, tWinStop = timeWindow
-    tMask = (x.index >= tWinStart) & (x.index < tWinStop)
-    return x.loc[tMask].abs().mean()
-'''
-ecapTWinStart, ecapTWinStop = 1.3e-3, 10e-3
+ecapTWinStart, ecapTWinStop = 1.3e-3, 4e-3
 qLimsEcap = (2.5e-3, 1-2.5e-3)
 emgTWinStart, emgTWinStop = 0, 39e-3
-# ecapRauc = ecapDF.apply(getRAUC, axis='columns', args=[(ecapTWinStart, ecapTWinStop)])
+#
 ecapRauc = ash.rAUC(ecapDF, tStart=ecapTWinStart, tStop=ecapTWinStop).to_frame(name='rauc')
 ecapRauc['kruskalStat'] = np.nan
 ecapRauc['kruskalP'] = np.nan
@@ -166,21 +151,24 @@ ecapRauc.reset_index(inplace=True)
 for annName in derivedAnnot:
     ecapRauc.loc[:, annName] = np.nan
 #
-# normalizationGrouper = ecapRauc.groupby(['feature'])
+normalizationGrouper = ecapRauc.groupby(['feature'])
 # normalizationGrouper = [('all', ecapRauc), ]
-for name, group in ecapRauc.groupby(['feature']):
-    ecapRauc.loc[group.index, 'standardizedRAUC'] = (
-        StandardScaler()
-        .fit_transform(
-            group['rauc'].to_numpy().reshape(-1, 1)))
-    '''(
-        RobustScaler(quantile_range=[i * 100 for i in qLimsEcap])
-        .fit_transform(
-            group['rauc'].to_numpy().reshape(-1, 1)))'''
+for name, group in normalizationGrouper:
     groupQuantiles = group['rauc'].quantile(qLimsEcap)
     rauc = group['rauc'].copy()
     rauc[rauc > groupQuantiles[qLimsEcap[-1]]] = groupQuantiles[qLimsEcap[-1]]
     rauc[rauc < groupQuantiles[qLimsEcap[0]]] = groupQuantiles[qLimsEcap[0]]
+    standardizedRAUC = pd.Series(
+        (
+            StandardScaler().fit_transform(
+                group['rauc'].to_numpy().reshape(-1, 1))).flatten(),
+        index=group.index
+    )
+    ecapRauc.loc[group.index, 'standardizedRAUC'] = standardizedRAUC
+    '''(
+        RobustScaler(quantile_range=[i * 100 for i in qLimsEcap])
+        .fit_transform(
+            group['rauc'].to_numpy().reshape(-1, 1)))'''
     thisScaler = MinMaxScaler()
     thisScaler.fit(
         rauc.to_numpy().reshape(-1, 1))
@@ -264,6 +252,11 @@ uniqueX = np.unique(mapDF['xcoords'])
 xUnshiftedPalette = pd.Series(
     sns.color_palette('rocket', n_colors=uniqueX.size),
     index=uniqueX
+    )
+uniqueY = np.unique(mapDF['ycoords'])
+yUnshiftedPalette = pd.Series(
+    sns.color_palette('mako', n_colors=uniqueY.size),
+    index=uniqueY
     )
 xPalette = (
     mapDF
@@ -357,12 +350,6 @@ exLfp = (
     .xs(exLFPName, level='feature')
     .xs(exAmplitude, level='nominalCurrent')
     .iloc[0, :])
-lfpAx.plot(
-    exLfp.index[lfpMaskAx] * 1e3, exLfp[lfpMaskAx],
-    color=stimAmpPalette[exAmplitude], lw=2)
-lfpMask = (
-        (ecapDF.columns >= ecapTWinStart) &
-        (ecapDF.columns < ecapTWinStop))
 lfpMask = (
         (ecapDF.columns >= ecapTWinStart) &
         (ecapDF.columns < ecapTWinStop))
@@ -370,7 +357,10 @@ lfpAx.fill_between(
     exLfp.index[lfpMask] * 1e3, exLfp[lfpMask], 0,
     edgecolor=stimAmpPalette[exAmplitude],
     facecolor=stimAmpPaletteDesat[exAmplitude],
-    linewidth=2)
+    linewidth=0)
+lfpAx.plot(
+    exLfp.index[lfpMaskAx] * 1e3, exLfp[lfpMaskAx],
+    color=stimAmpPalette[exAmplitude], lw=2)
 lfpAx.set_xlabel('Time (msec)')
 lfpAx.set_ylabel('{} LFP (uV)'.format(exLFPName))
 lfpAx.set_xlim([lfpAxTStart, lfpAxTStop])
@@ -384,9 +374,6 @@ emgAxTStart, emgAxTStop = 0, 80
 emgMaskAx = (
         (emgDF.columns >= emgAxTStart * 1e-3) &
         (emgDF.columns < emgAxTStop * 1e-3))
-emgAx.plot(
-    exEmg.index[emgMaskAx] * 1e3, exEmg[emgMaskAx],
-    color=emgPalette[exEMGName], lw=2)
 emgMask = (
         (emgDF.columns >= emgTWinStart) &
         (emgDF.columns < emgTWinStop))
@@ -394,7 +381,10 @@ emgAx.fill_between(
     exEmg.index[emgMask] * 1e3, exEmg[emgMask], 0,
     edgecolor=emgPalette[exEMGName],
     facecolor=emgPaletteDesat[exEMGName],
-    linewidth=2)
+    linewidth=0)
+emgAx.plot(
+    exEmg.index[emgMaskAx] * 1e3, exEmg[emgMaskAx],
+    color=emgPalette[exEMGName], lw=2)
 emgAx.set_title('EMG RAUC ({} to {} msec)'.format(int(emgTWinStart * 1e3), int(emgTWinStop * 1e3)))
 emgAx.set_xlim([emgAxTStart, emgAxTStop])
 emgAx.set_xlabel('Time (msec)')
@@ -574,6 +564,7 @@ g = sns.relplot(
     x=amplitudeFieldName,
     y=plotY,
     hue='electrode_xcoords', palette=xPalette.to_dict(),
+    # hue='electrode_ycoords', palette=yUnshiftedPalette.to_dict(),
     kind='line', data=plotEcapRC,
     height=5, aspect=.7, ci='sem', estimator='mean',
     facet_kws=dict(sharey=True, sharex=True), lw=2,

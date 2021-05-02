@@ -102,20 +102,20 @@ SLURM_ARRAY_TASK_ID=3
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
 
 #  #  preprocess
-# python -u ./preprocNS5.py --exp=$EXP $BLOCKSELECTOR --ISIRaw --transferISIStimLog
+python -u ./preprocNS5.py --exp=$EXP $BLOCKSELECTOR --ISIRaw --transferISIStimLog
 CHANSELECTOR="--chanQuery=isiemgoranalog"
-# python -u ./preprocDelsysCSV.py --exp=$EXP $BLOCKSELECTOR $CHANSELECTOR --verbose
+python -u ./preprocDelsysCSV.py --exp=$EXP $BLOCKSELECTOR $CHANSELECTOR --verbose
 #  #  synchronize
 CHANSELECTOR="--chanQuery=all"
 python -u ./synchronizeDelsysToNSP.py $BLOCKSELECTOR --exp=$EXP $CHANSELECTOR --trigRate=2
 #  #  downsample
-# python -u ./calcISIAnalysisNix.py --exp=$EXP $BLOCKSELECTOR $CHANSELECTOR $ANALYSISFOLDER --verbose
+python -u ./calcISIAnalysisNix.py --exp=$EXP $BLOCKSELECTOR $CHANSELECTOR $ANALYSISFOLDER --verbose
 
 EVENTFOLDER="--eventSubfolder=loRes"
 SIGNALFOLDER="--signalSubfolder=loRes"
 OUTPUTBLOCKNAME="--outputBlockSuffix=emg"
 CHANSELECTOR="--chanQuery=isiemg"
-# python -u ./calcAlignedAsigs.py --signalBlockSuffix="analyze" --eventBlockSuffix="analyze" --exp=$EXP $BLOCKSELECTOR $WINDOW $LAZINESS $ANALYSISFOLDER --eventName=stim $CHANSELECTOR $OUTPUTBLOCKNAME --verbose --alignFolderName=stim --amplitudeFieldName=nominalCurrent $EVENTFOLDER $SIGNALFOLDER
+python -u ./calcAlignedAsigs.py --signalBlockSuffix="analyze" --eventBlockSuffix="analyze" --exp=$EXP $BLOCKSELECTOR $WINDOW $LAZINESS $ANALYSISFOLDER --eventName=stim $CHANSELECTOR $OUTPUTBLOCKNAME --verbose --alignFolderName=stim --amplitudeFieldName=nominalCurrent $EVENTFOLDER $SIGNALFOLDER
 #
 ANALYSISFOLDER="--analysisName=fullRes"
 CHANSELECTOR="--chanQuery=isispinal"
