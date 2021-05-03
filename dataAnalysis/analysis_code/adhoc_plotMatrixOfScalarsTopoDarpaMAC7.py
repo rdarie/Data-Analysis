@@ -151,10 +151,3 @@ with PdfPages(pdfPath) as pdf:
     plt.title('p = {:.4}'.format(pv))
     pdf.savefig()
     plt.show()
-
-# ax.set_xticklabels(
-#     [i.get_text().split('#')[0] for i in ax.get_xticklabels()],
-#     fontdict={'fontsize': ax.get_xticklabels()[0].get_size()})
-# ax.set_yticklabels(
-#     [i.get_text().split('_')[0] for i in ax.get_yticklabels()],
-#     fontdict={'fontsize': ax.get_xticklabels()[0].get_size()})

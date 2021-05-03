@@ -233,7 +233,7 @@ with PdfPages(pdfPath) as pdf:
         figTitle = g.fig.suptitle('{}'.format(name))
         pdf.savefig(
             bbox_inches='tight', pad_inches=0.2,
-            bbox_extra_artists=[leg]
+            bbox_extra_artists=[leg, figTitle]
             )
         if arguments['showFigures']:
             plt.show()
