@@ -70,6 +70,7 @@ source activate nda2
 python --version
 
 SLURM_ARRAY_TASK_ID=3
+echo --blockIdx=$SLURM_ARRAY_TASK_ID
 # python -u ./synchronizeSIMItoNSP_stimBased.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --showFigures --inputBlockSuffix=analog_inputs  --inputBlockPrefix=utah --plotting --forceRecalc
 # python -u ./calcProprioAnalysisNix.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER $SPIKESOURCE $SPIKEBLOCKSUFFIX $BLOCKPREFIX $RIGSUFFIX --chanQuery="all" --verbose --lazy
 python -u ./calcProprioAnalysisNix.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER $SPIKESOURCE $SPIKEBLOCKSUFFIX $BLOCKPREFIX $RIGSUFFIX --chanQuery="all" --verbose --lazy --hasKinematics

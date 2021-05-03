@@ -466,7 +466,7 @@ def calcBlockAnalysisWrapper():
                 },
                 'bandstop85Hz': {
                     'Wn': 85,
-                    'nHarmonics': 3,
+                    'nHarmonics': 2,
                     'Q': 10,
                     'N': 4,
                     'rp': 1,
@@ -506,16 +506,16 @@ def calcBlockAnalysisWrapper():
             filterCoeffs, tdDF.loc[:, group.index].to_numpy(),
             axis=0)
         if True:
-            cName = 'seg0_forceY'
-            cNameIdx = group.index.get_loc(cName)
+            plotCName = 'seg0_forceY'
+            plotCNameIdx = group.index.get_loc(plotCName)
             fig, ax = plt.subplots()
             idx1, idx2 = int(6e4), int(9e4)
-            # numericalDiff = tdDF[cName].diff() * float(dummyRigAsig.sampling_rate)
-            ax.plot(tdDF.index[idx1:idx2], filteredAsigs[idx1:idx2, cNameIdx], label='filtered')
-            ax.plot(tdDF.index[idx1:idx2], tdDF[cName].iloc[idx1:idx2], label='original')
+            ax.plot(tdDF.index[idx1:idx2], filteredAsigs[idx1:idx2, plotCNameIdx], label='filtered')
+            ax.plot(tdDF.index[idx1:idx2], tdDF[plotCName].iloc[idx1:idx2], label='original')
+            ax.set_title(plotCName)
             ax.legend()
             plt.show()
-        pdb.set_trace()
+        # pdb.set_trace()
         tdDF.loc[:, group.index] = filteredAsigs
         if trackMemory:
             print('Just finished analog data filtering before downsampling. memory usage: {:.1f} MB'.format(
