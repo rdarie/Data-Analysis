@@ -9,7 +9,6 @@ Options:
     --verbose                              print diagnostics? [default: False]
     --profile                              print time and mem diagnostics? [default: False]
     --plotting                             display plots [default: False]
-    --verbose                              display plots [default: False]
     --showFigures                          show plots at runtime? [default: False]
     --lazy                                 load from raw, or regular? [default: False]
     --alignQuery=alignQuery                choose a subset of the data?

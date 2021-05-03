@@ -143,9 +143,8 @@ if arguments['calcTimeROI']:
         eventPath, lazy=arguments['lazy'],
         loadList={'events': ['seg0_{}'.format(eventName)]},
         purgeNixNames=True)
-    pdb.set_trace()
     if 'ROIWinStart' in arguments:
-        ROIWinStart = float(arguments['ROIWinStart']) * (-1e-3)
+        ROIWinStart = float(arguments['ROIWinStart']) * (1e-3)
     else:
         ROIWinStart = 0
     if 'ROIWinStop' in arguments:
@@ -210,7 +209,7 @@ if not arguments['loadFromFrames']:
             targetMask = pd.Series(True, index=dataDF.index)
             for (_, _, t), group in dataDF.groupby(['segment', 'originalIndex', 't']):
                 timeDifference = (targetTrialAnnDF['t'] - t)
-                deltaT = timeDifference[timeDifference > 0].min()
+                deltaT = timeDifference[timeDifference >= 0].min()
                 groupBins = group.index.get_level_values('bin')
                 print('Looking for bins >= {} and < {}'.format(ROIWinStart, deltaT + ROIWinStop))
                 targetMask.loc[group.index] = (groupBins >= ROIWinStart) & (groupBins < deltaT + ROIWinStop)

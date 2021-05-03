@@ -26,7 +26,7 @@ EXP="exp202101201100"
 # EXP="exp202101281100"
 
 LAZINESS="--lazy"
-
+VERBOSITY="--verbose"
 WINDOW="--window=L"
 # WINDOW="--window=XS"
 ANALYSISFOLDER="--analysisName=default"

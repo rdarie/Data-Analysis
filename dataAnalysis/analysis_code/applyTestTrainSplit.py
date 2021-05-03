@@ -85,7 +85,8 @@ iteratorPath = os.path.join(
         arguments['alignQuery'],
         iteratorSuffix))
 
-print('Loading cv iterator from\n{}\n'.format(iteratorPath))
+if arguments['verbose']:
+    print('Loading cv iterator from\n{}\n'.format(iteratorPath))
 with open(iteratorPath, 'rb') as f:
     loadingMeta = pickle.load(f)
 iteratorsBySegment = loadingMeta.pop('iteratorsBySegment')

@@ -30,7 +30,7 @@ EXP="exp202101201100"
 
 LAZINESS="--lazy"
 # LAZINESS=""
-
+VERBOSITY="--verbose"
 # WINDOW="--window=L"
 WINDOW="--window=M"
 
