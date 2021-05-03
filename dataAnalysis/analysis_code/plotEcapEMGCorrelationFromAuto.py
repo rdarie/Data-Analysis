@@ -153,7 +153,7 @@ for annName in derivedAnnot:
 #
 normalizationGrouper = ecapRauc.groupby(['feature'])
 # normalizationGrouper = [('all', ecapRauc), ]
-for name, group in normalizationGrouper:
+for name, group in ecapRauc.groupby(['feature']):
     groupQuantiles = group['rauc'].quantile(qLimsEcap)
     rauc = group['rauc'].copy()
     rauc[rauc > groupQuantiles[qLimsEcap[-1]]] = groupQuantiles[qLimsEcap[-1]]
@@ -283,9 +283,9 @@ for annotName in annotNames:
     lookupSource = mapDF.loc[mapAMask, [annotName, 'topoName']].set_index('topoName')[annotName]
     corrDF.loc[:, annotName] = corrDF.index.get_level_values('lfp').map(lookupSource)
 
-corrDF.loc[:, 'xIdx'], corrDF.loc[:, 'yIdx'] = ssplt.coordsToIndices(
+'''corrDF.loc[:, 'xIdx'], corrDF.loc[:, 'yIdx'] = ssplt.coordsToIndices(
     corrDF['xcoords'], corrDF['ycoords'],
-    swapXY=True)
+    swapXY=True)'''
 corrDF.loc[:, 'R2'] = corrDF['R'] ** 2
 corrDF.loc[:, 'xDummy'] = 1
 
@@ -473,7 +473,7 @@ plotProcFuns = [
     axModFun
     ]
 g = sns.catplot(
-    row='xIdx', col='yIdx', y=barVarName, x='xDummy',
+    row='xcoords', col='ycoords', y=barVarName, x='xDummy',
     data=plotDF, height=5, aspect=.7,
     kind='bar', hue='emg', palette=emgPalette.to_dict(),
     hue_order=sorted(plotDF['emg'].unique()),
@@ -527,12 +527,12 @@ for annotName in annotNames:
     lookupSource = mapDF.loc[mapAMask, [annotName, 'topoName']].set_index('topoName')[annotName]
     plotEcapRC.loc[:, 'feature_' + annotName] = plotEcapRC['feature'].map(lookupSource)
     plotEcapRC.loc[:, 'electrode_' + annotName] = plotEcapRC['electrode'].map(lookupSource)
-plotEcapRC.loc[:, 'feature_xIdx'], plotEcapRC.loc[:, 'feature_yIdx'] = ssplt.coordsToIndices(
+'''plotEcapRC.loc[:, 'feature_xIdx'], plotEcapRC.loc[:, 'feature_yIdx'] = ssplt.coordsToIndices(
     plotEcapRC['feature_xcoords'], plotEcapRC['feature_ycoords'],
     swapXY=True)
 plotEcapRC.loc[:, 'electrode_xIdx'], plotEcapRC.loc[:, 'electrode_yIdx'] = ssplt.coordsToIndices(
     plotEcapRC['electrode_xcoords'], plotEcapRC['electrode_ycoords'],
-    swapXY=True)
+    swapXY=True)'''
 plotEcapRC = plotEcapRC.query('feature_whichArray == "rostral"')
 if RCPlotOpts['keepElectrodes'] is not None:
     keepDataMask = plotEcapRC['electrode'].isin(RCPlotOpts['keepElectrodes'])

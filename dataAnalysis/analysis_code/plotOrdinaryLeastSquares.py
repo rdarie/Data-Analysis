@@ -55,12 +55,9 @@ consoleDebugging = True
 if consoleDebugging:
     arguments = {
     'analysisName': 'default', 'showFigures': True, 'exp': 'exp202101201100', 'processAll': True,
-    'verbose': False, 'plotting': True, 'fullEstimatorName': 'ols_lfp_CAR_spectral_to_jointAngle_a_L_starting',
-    'alignFolderName': 'motion', 'blockIdx': '2', 'correctFreqBandName': True}
+    'verbose': False, 'plotting': True, 'fullEstimatorName': 'enr_lfp_CAR_spectral_to_limbState_a_L_starting',
+    'alignFolderName': 'motion', 'blockIdx': '2'}
     os.chdir('/gpfs/home/rdarie/nda2/Data-Analysis/dataAnalysis/analysis_code')
-    scratchPath = '/gpfs/scratch/rdarie/rdarie/Neural Recordings'
-    scratchFolder = '/gpfs/scratch/rdarie/rdarie/Neural Recordings/202101201100-Rupert'
-    figureFolder = '/gpfs/data/dborton/rdarie/Neural Recordings/processed/202101201100-Rupert/figures'
 '''
 
 expOpts, allOpts = parseAnalysisOptions(
@@ -189,10 +186,56 @@ figureOutputFolder = os.path.join(
     arguments['analysisName'], arguments['alignFolderName'])
 if not os.path.exists(figureOutputFolder):
     os.makedirs(figureOutputFolder)
-#
-g = sns.relplot(
-    col='feature', row='pedalMovementCat', hue='freqBandName', style='data_origin',
-    x='bin', y='signal', data=predStack, kind='line', ci='sem')
-g.fig.set_size_inches((12, 8))
-g.fig.savefig(os.path.join(figureOutputFolder, '{}_fitted_signals.pdf'.format(fullEstimatorName)))
-plt.close()
+
+pdfPath = os.path.join(figureOutputFolder, '{}_fitted_signals.pdf'.format(fullEstimatorName))
+plotProcFuns = []
+with PdfPages(pdfPath) as pdf:
+    for name, group in predStack.groupby('feature'):
+        print('making {}'.format(plot))
+        g = sns.relplot(
+            row='pedalMovementCat', hue='freqBandName', style='data_origin',
+            x='bin', y='signal', data=group, kind='line', ci='sem')
+        g.fig.set_size_inches((12, 8))
+        for (ro, co, hu), dataSubset in g.facet_data():
+            emptySubset = (
+                    (dataSubset.empty) or
+                    (dataSubset['signal'].isna().all()))
+            if len(plotProcFuns):
+                for procFun in plotProcFuns:
+                    procFun(g, ro, co, hu, dataSubset)
+        leg = g._legend
+        titleOverrides = {}
+        entryOverrides = {}
+        if leg is not None:
+            for t in leg.texts:
+                tContent = t.get_text()
+                if tContent in titleOverrides:
+                    t.set_text(titleOverrides[tContent])
+                # elif tContent.replace('.', '', 1).isdigit():
+                # e.g. is numeric
+                else:
+                    try:
+                        tNumeric = float(tContent)
+                        t.set_text('{:.2f}'.format(tNumeric))
+                        '''if tNumeric in entryOverrides.index:
+                            t.set_text('{} {}'.format(
+                                entryOverrides.loc[float(tContent), 'whichArray'],
+                                entryOverrides.loc[float(tContent), 'electrodeSide']))'''
+                    except Exception:
+                        pass
+        g.set_titles('{row_name}')
+        '''g.set_xlabels('')
+        g.set_ylabels('')
+        g.set_yticklabels('')'''
+        g.fig.subplots_adjust(wspace=0.05, hspace=0.05)
+        # figYLabel = g.fig.supylabel('LFP RAUC (a.u.)', x=0.1)
+        # figXLabel = g.fig.supxlabel('Stimulation Amplitude (uA)', y=0.1)
+        figTitle = g.fig.suptitle('{}'.format(name))
+        pdf.savefig(
+            bbox_inches='tight', pad_inches=0.2,
+            bbox_extra_artists=[leg]
+            )
+        if arguments['showFigures']:
+            plt.show()
+        else:
+            plt.close()
