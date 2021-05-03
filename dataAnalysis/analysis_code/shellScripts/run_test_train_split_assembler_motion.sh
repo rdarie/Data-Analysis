@@ -20,8 +20,9 @@
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=2,3
+#               SBATCH --array=2,3
 
 # SLURM_ARRAY_TASK_ID=3
 source ./shellScripts/run_pca_calc_aligned_motion_preamble.sh
-python -u './calcTestTrainSplit.py' --blockIdx=2 --processAll --loadFromFrames --inputBlockSuffix="rig" --unitQuery="jointAngle" --selectionName='jointAngle' --verbose --iteratorSuffix='a' --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $LAZINESS
+python -u './calcTestTrainSplit.py' --blockIdx=2 --processAll --iteratorSuffix='b' --loadFromFrames --inputBlockSuffix="rig" --unitQuery="limbState" --selectionName='limbState' --verbose --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $LAZINESS
+python -u './calcTestTrainSplit.py' --blockIdx=2 --processAll --iteratorSuffix='c' --loadFromFrames --inputBlockSuffix="rig" --unitQuery="limbState" --selectionName='limbState' --verbose --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $LAZINESS
