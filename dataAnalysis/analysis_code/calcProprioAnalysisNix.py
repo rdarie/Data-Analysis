@@ -242,6 +242,8 @@ def calcBlockAnalysisWrapper():
         analysisSubFolder,
         ns5FileName + '_analyze.nix'
         )
+    if os.path.exists(outputFilePath):
+        os.remove(outputFilePath)
     writer = NixIO(
         filename=outputFilePath, mode='ow')
     writer.write_block(outputBlock, use_obj_names=True)
@@ -424,19 +426,22 @@ def calcBlockAnalysisWrapper():
         'seg0_' + row['ainpName']: 'seg0_' + row['newName']
         for rowIdx, row in descriptiveNames.iterrows()}
     tdDF.rename(columns=renamingDict, inplace=True)
+    signalsForAbsoluteValue = []
     if 'seg0_forceX' in tdDF.columns:
+        signalsForAbsoluteValue.append('seg0_forceX')
+        signalsForAbsoluteValue.append('seg0_forceY')
         tdDF.loc[:, 'seg0_forceMagnitude'] = np.sqrt(
             tdDF['seg0_forceX'].astype(float) ** 2 +
             tdDF['seg0_forceY'].astype(float) ** 2)
-    signalsForDerivative = [
-        'seg0_forceX', 'seg0_forceY', 'seg0_forceMagnitude']
-    for cName in signalsForDerivative:
-        if cName in tdDF.columns:
-            tdDF.loc[:, cName + '_prime'] = hf.applySavGol(
-                tdDF[cName],
-                window_length_sec=20e-3,
-                fs=int(dummyRigAsig.sampling_rate),
-                polyorder=3, deriv=1)
+        signalsForDerivative = [
+            'seg0_forceX', 'seg0_forceY', 'seg0_forceMagnitude']
+        for cName in signalsForDerivative:
+            if cName in tdDF.columns:
+                tdDF.loc[:, cName + '_prime'] = hf.applySavGol(
+                    tdDF[cName],
+                    window_length_sec=30e-3,
+                    fs=int(dummyRigAsig.sampling_rate),
+                    polyorder=3, deriv=1)
     # interpolate rig analog signals
     filterOptsPerCategory = {
         'forceSensor': {
@@ -453,7 +458,7 @@ def calcBlockAnalysisWrapper():
                 'bandstop60Hz': {
                     'Wn': 60,
                     'nHarmonics': 2,
-                    'Q': 20,
+                    'Q': 10,
                     'N': 4,
                     'rp': 1,
                     'btype': 'bandstop',
@@ -461,8 +466,8 @@ def calcBlockAnalysisWrapper():
                 },
                 'bandstop85Hz': {
                     'Wn': 85,
-                    'nHarmonics': 2,
-                    'Q': 20,
+                    'nHarmonics': 3,
+                    'Q': 10,
                     'N': 4,
                     'rp': 1,
                     'btype': 'bandstop',
@@ -500,7 +505,6 @@ def calcBlockAnalysisWrapper():
         filteredAsigs = signal.sosfiltfilt(
             filterCoeffs, tdDF.loc[:, group.index].to_numpy(),
             axis=0)
-        '''pdb.set_trace()
         if True:
             cName = 'seg0_forceY'
             cNameIdx = group.index.get_loc(cName)
@@ -510,7 +514,8 @@ def calcBlockAnalysisWrapper():
             ax.plot(tdDF.index[idx1:idx2], filteredAsigs[idx1:idx2, cNameIdx], label='filtered')
             ax.plot(tdDF.index[idx1:idx2], tdDF[cName].iloc[idx1:idx2], label='original')
             ax.legend()
-            plt.show()'''
+            plt.show()
+        pdb.set_trace()
         tdDF.loc[:, group.index] = filteredAsigs
         if trackMemory:
             print('Just finished analog data filtering before downsampling. memory usage: {:.1f} MB'.format(
@@ -526,6 +531,7 @@ def calcBlockAnalysisWrapper():
         tdInterp = tdDF
     # add analog traces derived from position
     if 'seg0_position' in tdInterp.columns:
+        signalsForAbsoluteValue.append('seg0_velocity')
         tdInterp.loc[:, 'seg0_position_x'] = (
             np.cos(np.radians(tdInterp['seg0_position'].astype(float) * 100)))
         tdInterp.loc[:, 'seg0_position_y'] = (
@@ -602,6 +608,7 @@ def calcBlockAnalysisWrapper():
         # interpolate kinematic analog signals
         kinemCols = [cn for cn in kinemDF.columns if '_angle' in cn]
         for cName in kinemCols:
+            signalsForAbsoluteValue.append(cName.replace('_angle', '_omega'))
             kinemDF.loc[:, cName.replace('_angle', '_omega')] = hf.applySavGol(
                 kinemDF[cName],
                 window_length_sec=30e-3,
@@ -729,7 +736,6 @@ def calcBlockAnalysisWrapper():
     if len(concatList) > 1:
         tdInterp = pd.concat(
             concatList, axis=1)
-    signalsForAbsoluteValue = ['seg0_velocity'] + [cN for cN in tdInterp.columns if '_omega' in cN]
     for cName in signalsForAbsoluteValue:
         if cName in tdInterp.columns:
             tdInterp.loc[:, cName + '_abs'] = tdInterp[cName].abs()
