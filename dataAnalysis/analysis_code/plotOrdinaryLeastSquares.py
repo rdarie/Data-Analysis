@@ -191,7 +191,7 @@ pdfPath = os.path.join(figureOutputFolder, '{}_fitted_signals.pdf'.format(fullEs
 plotProcFuns = []
 with PdfPages(pdfPath) as pdf:
     for name, group in predStack.groupby('feature'):
-        print('making {}'.format(plot))
+        print('making {}'.format(name))
         g = sns.relplot(
             row='pedalMovementCat', hue='freqBandName', style='data_origin',
             x='bin', y='signal', data=group, kind='line', ci='sem')
