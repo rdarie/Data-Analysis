@@ -8,7 +8,7 @@ OUTLIERMASK=""
 STATSOVERLAY="--overlayStats"
 # STATSOVERLAY=""
 
-TIMEWINDOWOPTS="--winStart=100 --winStop=800"
+TIMEWINDOWOPTS="--winStart=200 --winStop=1000"
 
 # ALIGNQUERY="--alignQuery=stimOn"
 # ALIGNQUERY="--alignQuery=outbound"

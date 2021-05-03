@@ -48,7 +48,6 @@ sns.set(
 idxSl = pd.IndexSlice
 
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
-# pdb.set_trace()
 # if debugging in a console:
 '''
 consoleDebugging = True
@@ -94,6 +93,8 @@ scoresDF = pd.read_hdf(estimatorPath, 'cv')
 predDF = pd.read_hdf(estimatorPath, 'predictions')
 with open(estimatorPath.replace('.h5', '_meta.pickle'), 'rb') as _f:
     loadingMeta = pickle.load(_f)
+    for discardEntry in ['plotting', 'showFigures']:
+        _ = loadingMeta['arguments'].pop(discardEntry)
 arguments.update(loadingMeta['arguments'])
 #
 cvIteratorSubfolder = os.path.join(
@@ -191,7 +192,7 @@ pdfPath = os.path.join(figureOutputFolder, '{}_fitted_signals.pdf'.format(fullEs
 plotProcFuns = []
 with PdfPages(pdfPath) as pdf:
     for name, group in predStack.groupby('feature'):
-        print('making {}'.format(name))
+        print('making plot of {}'.format(name))
         g = sns.relplot(
             row='pedalMovementCat', hue='freqBandName', style='data_origin',
             x='bin', y='signal', data=group, kind='line', ci='sem')

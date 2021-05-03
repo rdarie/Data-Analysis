@@ -82,7 +82,7 @@ alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUn
 alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **arguments)
 alignedAsigsKWargs['verbose'] = arguments['verbose']
 #
-essentialMetadataFields.remove('freqBandName')
+# essentialMetadataFields.remove('freqBandName')
 alignedAsigsKWargs.update(dict(
     duplicateControlsByProgram=False,
     makeControlProgram=False,
@@ -98,10 +98,10 @@ def calcCWT(
         plotting = True'''
     dataColMask = partition.columns.isin(dataColNames)
     partitionData = partition.loc[:, dataColMask]
-    '''DEBUGGING = True
+    DEBUGGING = True
     if DEBUGGING:
-        dbf = 25 # Hz
-        t = partitionData.columns.to_numpy(dtype=np.float)
+        dbf = 30  # Hz
+        t = partitionData.columns.to_numpy(dtype=float)
         refSignal = (
                 np.sin(2 * np.pi * dbf * t) *
                 (1 + t))
@@ -127,7 +127,7 @@ def calcCWT(
             columns=partitionData.columns)
         coefDF.insert(0, 'scale', scalesIdx.reshape(-1))
         coefDF.insert(1, 'freqBandName', wvlDict['name'])
-        coefDF.insert(2, 'center', wvlDict['center'])  # TODO reconcile with freq
+        coefDF.insert(2, 'center', wvlDict['center'])   # TODO reconcile with freq
         coefDF.insert(3, 'bandwidth', wvlDict['bandwidth'])
         coefDF.insert(4, 'waveletName', wvlDict['wavelet'].name)
         outputList.append(coefDF)

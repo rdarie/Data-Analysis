@@ -23,6 +23,6 @@
 #SBATCH --array=2,3
 
 #   SLURM_ARRAY_TASK_ID=2
-source ./shellScripts/run_plotter_aligned_motion_preamble.sh
 
+source ./shellScripts/run_plotter_aligned_motion_preamble.sh
 python3 -u './plotAlignedAsigsV2.py' --inputBlockSuffix="rig" --unitQuery="limbState" --enableOverrides --exp=$EXP $BLOCKSELECTOR $ANALYSISFOLDER $WINDOW $ALIGNQUERY $ALIGNFOLDER $TIMEWINDOWOPTS $STATSOVERLAY $OUTLIERMASK $HUEOPTS $ROWOPTS $COLOPTS $STYLEOPTS $SIZEOPTS $PAGELIMITS $OTHERASIGOPTS
