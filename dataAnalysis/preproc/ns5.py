@@ -1512,7 +1512,7 @@ def getAsigsAlignedToEvents(
 
 def alignedAsigDFtoSpikeTrain(
         allWaveforms, spikeTrainMeta=None,
-        dataBlock=None, matchSamplingRate=True):
+        dataBlock=None, matchSamplingRate=True, verbose=False):
     masterBlock = Block()
     if dataBlock is not None:
         masterBlock.name = dataBlock.annotations['neo_name']
@@ -1535,7 +1535,8 @@ def alignedAsigDFtoSpikeTrain(
                 stProxy = exSt
                 exSt = loadStProxy(stProxy)
                 exSt = loadObjArrayAnn(exSt)
-            print('exSt.left_sweep is {}'.format(exSt.left_sweep))
+            if verbose:
+                print('exSt.left_sweep is {}'.format(exSt.left_sweep))
             wfBins = ((np.arange(exSt.waveforms.shape[2]) / (exSt.sampling_rate)) - exSt.left_sweep).magnitude
             #
             tUnits = exSt.units
@@ -1563,7 +1564,8 @@ def alignedAsigDFtoSpikeTrain(
                 grouper = group.iteritems()
                 colsAre = 'feature'
         for featName, featGroup in grouper:
-            print('Saving {}...'.format(featName))
+            if verbose:
+                print('Saving {}...'.format(featName))
             if featName[-2:] == '#0':
                 cleanFeatName = featName
             else:
@@ -1625,6 +1627,8 @@ def alignedAsigDFtoSpikeTrain(
                 sampling_rate=sampling_rate,
                 **arrAnn, **arrayAnnNames
                 )
+            if verbose:
+                print('st.left_sweep is {}'.format(st.left_sweep))
             st.annotate(nix_name=st.name)
             thisUnit.spiketrains.append(st)
             newSeg.spiketrains.append(st)

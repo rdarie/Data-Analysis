@@ -9,6 +9,7 @@ Options:
     --verbose                              print diagnostics? [default: False]
     --profile                              print time and mem diagnostics? [default: False]
     --plotting                             display plots [default: False]
+    --verbose                              display plots [default: False]
     --showFigures                          show plots at runtime? [default: False]
     --lazy                                 load from raw, or regular? [default: False]
     --alignQuery=alignQuery                choose a subset of the data?
@@ -91,25 +92,33 @@ alignedAsigsKWargs.update(dict(
     getMetaData=essentialMetadataFields + ['xCoords', 'yCoords'],
     decimate=1, metaDataToCategories=False))
 
+DEBUGGING = False
+
 def calcCWT(
         partition, dataColNames=None, plotting=False,
         verbose=False, waveletList=None, pycwtKWs={}):
-    '''if True:
-        plotting = True'''
     dataColMask = partition.columns.isin(dataColNames)
     partitionData = partition.loc[:, dataColMask]
-    DEBUGGING = True
+    #
     if DEBUGGING:
+        plotting = True
+        #  Replace actual data with reference signal (noisy sine waves),
+        #  to check that the bandpassing effect of the wavelets is
+        #  correct
         dbf = 30  # Hz
+        dbp = dbf ** -1  # sec
         t = partitionData.columns.to_numpy(dtype=float)
         refSignal = (
                 np.sin(2 * np.pi * dbf * t) *
                 (1 + t))
+        refMask = (t < 0) | (t > 3 * dbp)
+        refSignal[refMask] = 0
         for rIdx in range(partitionData.shape[0]):
             partitionData.iloc[rIdx, :] = (
                     refSignal +
                     0.3 * rng.standard_normal(size=t.size))
-            # fig, ax = plt.subplots(); ax.plot(t, np.sin(2 * np.pi * dbf * t)); plt.show()'''
+            # fig, ax = plt.subplots(); ax.plot(t, np.sin(2 * np.pi * dbf * t)); plt.show()
+    #
     '''if True:
         pycwtKWs = {'sampling_period': 1e-3, 'axis': -1, 'precision': 14}'''
     outputList = []
@@ -261,7 +270,8 @@ if __name__ == "__main__":
         'sampling_rate': dummySt.sampling_rate
     }
     masterBlock = ns5.alignedAsigDFtoSpikeTrain(
-        spectralDF, spikeTrainMeta=spikeTrainMeta, matchSamplingRate=False)
+        spectralDF, spikeTrainMeta=spikeTrainMeta,
+        matchSamplingRate=False, verbose=arguments['verbose'])
     if arguments['lazy']:
         dataReader.file.close()
     masterBlock = ns5.purgeNixAnn(masterBlock)

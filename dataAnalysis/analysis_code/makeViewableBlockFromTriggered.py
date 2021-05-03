@@ -207,6 +207,7 @@ if __name__ == "__main__":
         concatEvents.segment = newSeg
         newSeg.events.append(concatEvents)
         for cidx, cName in enumerate(chanIndex.channel_names):
+            print('Saving channel {}'.format(cName))
             if segIdx == 0:
                 newChIdx = ChannelIndex(
                     name='{}'.format(cName),

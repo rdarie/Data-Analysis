@@ -143,6 +143,7 @@ if arguments['calcTimeROI']:
         eventPath, lazy=arguments['lazy'],
         loadList={'events': ['seg0_{}'.format(eventName)]},
         purgeNixNames=True)
+    pdb.set_trace()
     if 'ROIWinStart' in arguments:
         ROIWinStart = float(arguments['ROIWinStart']) * (-1e-3)
     else:
