@@ -426,6 +426,7 @@ for segIdx, nspSeg in enumerate(nspBlock.segments):
     #
     # TODO: fix synch code so that all units are present, to avoid this hack:
     alignEventsDF.loc[:, 'electrode'] = alignEventsDF['electrode'].fillna('NA')
+    #
     if arguments['removeLabels'] is not None:
         labelsToRemove = arguments['removeLabels'].split(', ')
         idxToRemove = categories.index[categories['stimCat'].isin(labelsToRemove)]

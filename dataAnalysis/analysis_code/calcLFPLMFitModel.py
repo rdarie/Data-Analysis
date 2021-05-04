@@ -55,7 +55,7 @@ from currentExperiment import parseAnalysisOptions
 from namedQueries import namedQueries
 from math import factorial
 from sklearn.preprocessing import scale, robust_scale
-from dask.distributed import Client
+from dask.distributed import Client, LocalCluster
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import seaborn as sns
@@ -151,6 +151,7 @@ daskOpts = dict(
 
 
 if arguments['debugging']:
+    print('\n\nApplying debugging settings...\n\n')
     sns.set(font_scale=.5)
     daskOpts['daskProgBar'] = False
     daskOpts['daskComputeOpts']['scheduler'] = 'single-threaded'
@@ -554,7 +555,15 @@ def shapeFit(
 funKWArgs.update({'modelFun': applyModel})
 
 if __name__ == "__main__":
-    daskClient = Client()
+    if daskOpts['daskComputeOpts']['scheduler'] == 'single-threaded':
+        daskClient = LocalCluster(n_workers=1)
+    elif daskOpts['daskComputeOpts']['scheduler'] == 'processes':
+        daskClient = LocalCluster(processes=True)
+    elif daskOpts['daskComputeOpts']['scheduler'] == 'threads':
+        daskClient = LocalCluster(processes=False)
+
+    else:
+        print('Scheduler name is not correct!')
     testVar = None
     conditionNames = [
         'electrode',
@@ -602,11 +611,12 @@ if __name__ == "__main__":
         amps = dataDF.index.get_level_values(arguments['amplitudeFieldName'])
         print('Available amps are {}'.format(np.unique(amps)))
         if arguments['smallDataset']:
+            print('\n\nApplying small dataset mask...\n\n')
             dbIndexMask = (
                 # elecNames.str.contains('caudalZ_e23') &
                 # (featNames.str.contains('caudalY_e11') | featNames.str.contains('rostralY_e11')) &
                 featNames.str.contains('rostralY') &
-                elecNames.str.contains('caudalY') &
+                elecNames.str.contains('caudalZ') &
                 (rates < funKWArgs['tBounds'][-1] ** (-1))
                 # (amps == -900)
                 )

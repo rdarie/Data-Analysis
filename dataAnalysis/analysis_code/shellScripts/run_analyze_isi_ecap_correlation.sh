@@ -110,8 +110,8 @@ UNITSELECTOR="--unitQuery=isiemgraw"
 
 UNITSELECTOR="--unitQuery=isiemgraw"
 ALIGNQUERY="--alignQuery=stimOn"
-python -u ./calcRecruitment.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR $ALIGNQUERY $OUTLIERMASK
-python -u ./plotRecruitment.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR $ALIGNQUERY --showFigures
+# python -u ./calcRecruitment.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR $ALIGNQUERY $OUTLIERMASK
+# python -u ./plotRecruitment.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR $ALIGNQUERY --showFigures
 
 ANALYSISFOLDER="--analysisName=fullRes"
 INPUTBLOCKNAME="--inputBlockSuffix=lfp_raw"
