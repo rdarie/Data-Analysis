@@ -48,7 +48,7 @@ namedQueries = {
         'jointAngularVelocity': "chanName.isin(['right_hip_omega#0', 'right_knee_omega#0', 'right_ankle_omega#0'])",
         'jointAngularVelocityMagnitude': "chanName.isin(['right_hip_omega_abs#0', 'right_knee_omega_abs#0', 'right_ankle_omega_abs#0'])",
         'endpointForce': "chanName.isin(['forceX#0', 'forceY#0'])",
-        'endpointForceMagnitude': "chanName.isin(['forceMagnitude#0'])",
+        'endpointForceMagnitude': "chanName.isin(['forceMagnitude#0', 'forceX_abs#0', 'forceY_abs#0'])",
         'endpointYank': "chanName.isin(['forceX_prime#0', 'forceY_prime#0', 'forceMagnitude_prime#0'])",
         'endpointYankMagnitude': "chanName.isin(['forceX_prime_abs#0', 'forceY_prime_abs#0'])",
         'pedalPosition': "chanName.isin(['position#0'])",
@@ -86,6 +86,17 @@ namedQueries['unit'].update({
             for key in [
                 'jointAngle', 'jointAngularVelocity',
                 'jointAngularVelocityMagnitude',
+                'endpointForce', 'endpointYank',
+                'endpointYankMagnitude', 'endpointForceMagnitude'
+            ]
+        ]) + ')'
+    })
+namedQueries['unit'].update({
+    'pedalState': '(' + '|'.join([
+            namedQueries['unit'][key]
+            for key in [
+                'pedalPosition', 'pedalVelocity',
+                'pedalPositionXY', 'pedalVelocityXY',
                 'endpointForce', 'endpointYank',
                 'endpointYankMagnitude', 'endpointForceMagnitude'
             ]

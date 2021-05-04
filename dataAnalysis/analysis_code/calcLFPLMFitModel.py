@@ -556,13 +556,13 @@ funKWArgs.update({'modelFun': applyModel})
 
 if __name__ == "__main__":
     if daskOpts['daskComputeOpts']['scheduler'] == 'single-threaded':
-        daskClient = LocalCluster(n_workers=1)
+        daskClient = Client(LocalCluster(n_workers=1))
     elif daskOpts['daskComputeOpts']['scheduler'] == 'processes':
-        daskClient = LocalCluster(processes=True)
+        daskClient = Client(LocalCluster(processes=True))
     elif daskOpts['daskComputeOpts']['scheduler'] == 'threads':
-        daskClient = LocalCluster(processes=False)
-
+        daskClient = Client(LocalCluster(processes=False))
     else:
+        daskClient = None
         print('Scheduler name is not correct!')
     testVar = None
     conditionNames = [
@@ -616,7 +616,7 @@ if __name__ == "__main__":
                 # elecNames.str.contains('caudalZ_e23') &
                 # (featNames.str.contains('caudalY_e11') | featNames.str.contains('rostralY_e11')) &
                 featNames.str.contains('rostralY') &
-                elecNames.str.contains('caudalZ') &
+                elecNames.str.contains('caudalZ_e23') &
                 (rates < funKWArgs['tBounds'][-1] ** (-1))
                 # (amps == -900)
                 )
