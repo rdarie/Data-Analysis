@@ -242,7 +242,7 @@ def getExpOpts():
                 # 'Wn': 1000,
                 'N': 4,
                 'btype': 'low',
-                'ftype': 'bessel'
+                'ftype': 'butter'
             }
         }
     }
@@ -255,7 +255,7 @@ def getExpOpts():
                 'nHarmonics': 1,
                 'N': 4,
                 'btype': 'bandstop',
-                'ftype': 'bessel'
+                'ftype': 'butter'
             }
         },
         'EMG': {
@@ -265,7 +265,7 @@ def getExpOpts():
                 'nHarmonics': 1,
                 'N': 4,
                 'btype': 'bandstop',
-                'ftype': 'bessel'
+                'ftype': 'butter'
             }
         }
     }

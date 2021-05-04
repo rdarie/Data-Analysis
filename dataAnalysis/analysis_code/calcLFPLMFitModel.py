@@ -614,8 +614,8 @@ if __name__ == "__main__":
         else:
             dbIndexMask = (
                     (featNames.str.contains('rostral')) &
-                    (rates < funKWArgs['tBounds'][-1] ** (-1)) &
-                    (elecNames.str.contains('caudal'))
+                    (rates < funKWArgs['tBounds'][-1] ** (-1))
+                    # (elecNames.str.contains('caudal'))
                 )
         dbColMask = (
             (dataDF.columns.astype(float) >= funKWArgs['tBounds'][0]) &

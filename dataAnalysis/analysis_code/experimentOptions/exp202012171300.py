@@ -204,7 +204,7 @@ def getExpOpts():
             # 'LThoracolumbarFascia', 'RThoracolumbarFascia',
             # 'RExtensorDigitorum', 'LSemitendinosus', 'RSemitendinosus',
             ],
-        'keepElectrodes': ['caudalY_e11', 'caudalZ_e18', 'caudalZ_e23'],
+        # 'keepElectrodes': ['caudalY_e11', 'caudalZ_e18', 'caudalZ_e23'],
         # 'keepElectrodes': ['caudalZ_e23', 'caudalZ_e18', 'caudalZ_e22', 'caudalZ_e24'],
         'significantOnly': False,
         }
@@ -216,7 +216,8 @@ def getExpOpts():
             # 'LThoracolumbarFascia', 'RThoracolumbarFascia',
             # 'RExtensorDigitorum', 'LSemitendinosus', 'RSemitendinosus',
         ],
-        'keepElectrodes': ['-caudalY_e11', '-caudalZ_e18', '-caudalZ_e23'],
+        'keepElectrodes': None,
+        # 'keepElectrodes': ['-caudalY_e11', '-caudalZ_e18', '-caudalZ_e23'],
         'significantOnly': False,
         }
     EMGStyleMarkers = {
@@ -269,7 +270,7 @@ def getExpOpts():
             'Wn': .1,
             'N': 4,
             'btype': 'high',
-            'ftype': 'bessel'
+            'ftype': 'butter'
         }
     }'''
     delsysFilterOpts = {
@@ -280,7 +281,7 @@ def getExpOpts():
                 'nHarmonics': 1,
                 'N': 4,
                 'btype': 'bandstop',
-                'ftype': 'bessel'
+                'ftype': 'butter'
             }
         },
         'EMG': {
@@ -290,7 +291,7 @@ def getExpOpts():
                 'nHarmonics': 1,
                 'N': 4,
                 'btype': 'bandstop',
-                'ftype': 'bessel'
+                'ftype': 'butter'
             }
         }
     }

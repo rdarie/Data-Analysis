@@ -268,7 +268,7 @@ def getExpOpts():
             'Wn': .1,
             'N': 4,
             'btype': 'high',
-            'ftype': 'bessel'
+            'ftype': 'butter'
         }
     }'''
     delsysFilterOpts = {
@@ -279,7 +279,7 @@ def getExpOpts():
                 'nHarmonics': 1,
                 'N': 4,
                 'btype': 'bandstop',
-                'ftype': 'bessel'
+                'ftype': 'butter'
             }
         },
         'EMG': {
@@ -289,13 +289,13 @@ def getExpOpts():
                 'nHarmonics': 1,
                 'N': 4,
                 'btype': 'bandstop',
-                'ftype': 'bessel'
+                'ftype': 'butter'
             },
             'high': {
                 'Wn': .2,
                 'N': 4,
                 'btype': 'high',
-                'ftype': 'bessel'
+                'ftype': 'butter'
             }
         }
     }

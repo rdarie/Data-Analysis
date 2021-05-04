@@ -897,7 +897,7 @@ def calcISIBlockAnalysisNix():
                 'Wn': float(samplingRate) / 3,
                 'N': 4,
                 'btype': 'high',
-                'ftype': 'bessel'
+                'ftype': 'butter'
             }
             })
     if filterOpts:

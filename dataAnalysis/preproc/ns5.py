@@ -472,13 +472,13 @@ def concatenateBlocks(
                     'Wn': float(samplingRate / 3),
                     'N': 4,
                     'btype': 'low',
-                    'ftype': 'bessel'
+                    'ftype': 'butter'
                 },
                 'high': {
                     'Wn': .1,
                     'N': 4,
                     'btype': 'high',
-                    'ftype': 'bessel'
+                    'ftype': 'butter'
                 }
             }
             newT = pd.Series(

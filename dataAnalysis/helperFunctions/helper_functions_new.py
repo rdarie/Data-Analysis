@@ -3802,7 +3802,7 @@ def plotCorrSynchReport(
                 'Wn': 1,
                 'N': 4,
                 'btype': 'low',
-                'ftype': 'bessel'
+                'ftype': 'butter'
                 }},
         _trigRasterSamplingRate)
     lowPassShiftedProduct = signal.sosfiltfilt(

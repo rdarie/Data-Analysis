@@ -25,12 +25,12 @@
 
 # EXP="exp202101141100"
 # EXP="exp202101191100"
-EXP="exp202101061100"
+# EXP="exp202101061100"
 # EXP="exp202101201100"
 # EXP="exp202101211100"
 # EXP="exp202101221100"
 # EXP="exp202101251100"
-# EXP="exp202101271100"
+EXP="exp202101271100"
 # EXP="exp202101281100"
 # EXP="exp202102041100"
 # EXP="exp202102081100"
@@ -44,11 +44,11 @@ conda activate
 source activate nda2
 python --version
 
-SLURM_ARRAY_TASK_ID=2
+#  SLURM_ARRAY_TASK_ID=2
 
 ########### get analog inputs separately to run synchronization, etc
 # !! --maskMotorEncoder ignores all motor events outside alignTimeBounds
-# python -u ./preprocNS5.py --arrayName=utah --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --analogOnly --maskMotorEncoder
+python -u ./preprocNS5.py --arrayName=utah --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --analogOnly --maskMotorEncoder
 
 ######### finalize dataset
 python -u ./preprocNS5.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID --arrayName=utah --fullUnfiltered --chunkSize=700

@@ -257,7 +257,7 @@ def getExpOpts():
                 'Wn': 400,
                 'N': 4,
                 'btype': 'low',
-                'ftype': 'bessel'
+                'ftype': 'butter'
             }
         }
     }

@@ -242,8 +242,6 @@ def calcBlockAnalysisWrapper():
         analysisSubFolder,
         ns5FileName + '_analyze.nix'
         )
-    if os.path.exists(outputFilePath):
-        os.remove(outputFilePath)
     writer = NixIO(
         filename=outputFilePath, mode='ow')
     writer.write_block(outputBlock, use_obj_names=True)
@@ -453,25 +451,23 @@ def calcBlockAnalysisWrapper():
                     'Wn': float(samplingRate) / 3,
                     'N': 4,
                     'btype': 'low',
-                    'ftype': 'bessel'
+                    'ftype': 'butter'
                 },
                 'bandstop60Hz': {
                     'Wn': 60,
                     'nHarmonics': 2,
                     'Q': 10,
                     'N': 4,
-                    'rp': 1,
                     'btype': 'bandstop',
-                    'ftype': 'cheby1'
+                    'ftype': 'butter'
                 },
                 'bandstop85Hz': {
                     'Wn': 85,
                     'nHarmonics': 2,
                     'Q': 10,
                     'N': 4,
-                    'rp': 1,
                     'btype': 'bandstop',
-                    'ftype': 'cheby1'
+                    'ftype': 'butter'
                 }
             }
         },
@@ -482,7 +478,7 @@ def calcBlockAnalysisWrapper():
                     'Wn': float(samplingRate) / 3,
                     'N': 4,
                     'btype': 'low',
-                    'ftype': 'bessel'
+                    'ftype': 'butter'
                 }
             }
         }
@@ -505,21 +501,20 @@ def calcBlockAnalysisWrapper():
         filteredAsigs = signal.sosfiltfilt(
             filterCoeffs, tdDF.loc[:, group.index].to_numpy(),
             axis=0)
-        pdb.set_trace()
-        if True:
+        '''if True:
             plotCName = 'seg0_forceY'
             plotCNameIdx = group.index.get_loc(plotCName)
             fig, ax = plt.subplots()
-            idx1, idx2 = int(6e4), int(9e4)
-            ax.plot(
-                tdDF.index[idx1:idx2], filteredAsigs[idx1:idx2, plotCNameIdx],
-                label='filtered')
+            idx1, idx2 = int(2 * float(dummyRigAsig.sampling_rate)), int(6 * float(dummyRigAsig.sampling_rate))
             ax.plot(
                 tdDF.index[idx1:idx2], tdDF[plotCName].iloc[idx1:idx2],
                 label='original')
+            ax.plot(
+                tdDF.index[idx1:idx2], filteredAsigs[idx1:idx2, plotCNameIdx],
+                label='filtered')
             ax.set_title(plotCName)
             ax.legend()
-            plt.show()
+            plt.show()'''
         tdDF.loc[:, group.index] = filteredAsigs
         if trackMemory:
             print('Just finished analog data filtering before downsampling. memory usage: {:.1f} MB'.format(
@@ -623,7 +618,7 @@ def calcBlockAnalysisWrapper():
                 'Wn': 33,
                 'N': 4,
                 'btype': 'low',
-                'ftype': 'bessel'
+                'ftype': 'butter'
             }
         }
         filterCoeffsKinem = hf.makeFilterCoeffsSOS(
@@ -686,7 +681,7 @@ def calcBlockAnalysisWrapper():
                 'Wn': .1,
                 'N': 4,
                 'btype': 'high',
-                'ftype': 'bessel'
+                'ftype': 'butter'
             }
         }
         lowPassOptsEMG = {
@@ -694,7 +689,7 @@ def calcBlockAnalysisWrapper():
                 'Wn': 100,
                 'N': 4,
                 'btype': 'low',
-                'ftype': 'bessel'
+                'ftype': 'butter'
             }
         }
         filterCoeffsHP = hf.makeFilterCoeffsSOS(

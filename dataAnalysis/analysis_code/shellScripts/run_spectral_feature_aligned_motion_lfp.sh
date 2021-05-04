@@ -20,7 +20,7 @@
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=3
+#SBATCH --array=2,3
 
 # SLURM_ARRAY_TASK_ID=3
 source ./shellScripts/run_pca_calc_aligned_motion_preamble.sh

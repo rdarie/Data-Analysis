@@ -72,13 +72,13 @@ def parseAnalysisOptions(
             'Wn': 1000,
             'N': 8,
             'btype': 'low',
-            'ftype': 'bessel'
+            'ftype': 'butter'
         },
         'high': {
             'Wn': 15,
             'N': 10,
             'btype': 'high',
-            'ftype': 'bessel'
+            'ftype': 'butter'
         }
     }
     #
@@ -90,19 +90,19 @@ def parseAnalysisOptions(
             'N': 1,
             'rp': 1,
             'btype': 'bandstop',
-            'ftype': 'bessel'
+            'ftype': 'butter'
         },
         'low': {
             'Wn': 1000,
             'N': 2,
             'btype': 'low',
-            'ftype': 'bessel'
+            'ftype': 'butter'
         },
         'high': {
             'Wn': 5,
             'N': 2,
             'btype': 'high',
-            'ftype': 'bessel'
+            'ftype': 'butter'
         }
     }
     if 'spikeSortingFilterOpts' not in expOpts:
@@ -111,13 +111,13 @@ def parseAnalysisOptions(
                 'Wn': 5000,
                 'N': 8,
                 'btype': 'low',
-                'ftype': 'bessel'
+                'ftype': 'butter'
             },
             'high': {
                 'Wn': 100,
                 'N': 2,
                 'btype': 'high',
-                'ftype': 'bessel'
+                'ftype': 'butter'
             }
         }
     else:
@@ -128,7 +128,7 @@ def parseAnalysisOptions(
                 'Wn': 200,
                 'N': 4,
                 'btype': 'high',
-                'ftype': 'bessel'
+                'ftype': 'butter'
             }
         }
     else:
@@ -138,7 +138,7 @@ def parseAnalysisOptions(
             'Wn': 20,
             'N': 2,
             'btype': 'high',
-            'ftype': 'bessel'
+            'ftype': 'butter'
         }
     }
     if 'outlierMaskFilterOpts' not in expOpts:
@@ -147,7 +147,7 @@ def parseAnalysisOptions(
                 'Wn': 1000,
                 'N': 4,
                 'btype': 'low',
-                'ftype': 'bessel'
+                'ftype': 'butter'
             }}
     else:
         outlierMaskFilterOpts = expOpts['outlierMaskFilterOpts']
