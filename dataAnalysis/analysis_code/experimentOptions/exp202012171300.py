@@ -206,6 +206,7 @@ def getExpOpts():
             ],
         # 'keepElectrodes': ['caudalY_e11', 'caudalZ_e18', 'caudalZ_e23'],
         # 'keepElectrodes': ['caudalZ_e23', 'caudalZ_e18', 'caudalZ_e22', 'caudalZ_e24'],
+        'keepElectrodes': None,
         'significantOnly': False,
         }
     RCCalcOpts = {

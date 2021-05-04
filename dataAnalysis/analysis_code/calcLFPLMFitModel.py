@@ -9,11 +9,14 @@ Options:
     --lazy                                      load from raw, or regular? [default: False]
     --verbose                                   print diagnostics? [default: False]
     --exportToDeepSpine                         look for a deepspine exported h5 and save these there [default: False]
-    --plotting                                  plot out the correlation matrix? [default: True]
-    --debugging                                 plot out the correlation matrix? [default: True]
-    --smallDataset                              plot out the correlation matrix? [default: True]
-    --interactive                               plot out the correlation matrix? [default: True]
+    --plotting                                  plot out the correlation matrix? [default: False]
+    --debugging                                 plot out the correlation matrix? [default: False]
+    --smallDataset                              plot out the correlation matrix? [default: False]
+    --interactive                               plot out the correlation matrix? [default: False]
     --showFigures                               show the plots? [default: False]
+    --useCachedResult                           show the plots? [default: False]
+    --showFigures                               show the plots? [default: False]
+    --detrendInputs                             Remove baseline when loading? [default: False]
     --analysisName=analysisName                 append a name to the resulting blocks? [default: default]
     --inputBlockSuffix=inputBlockSuffix         filename for inputs [default: fr]
     --maskOutlierBlocks                         delete outlier trials? [default: False]
@@ -24,11 +27,6 @@ Options:
     --selector=selector                         filename if using a unit selector
     --amplitudeFieldName=amplitudeFieldName     what is the amplitude named? [default: nominalCurrent]
 """
-##########################################################
-##########################################################
-useCachedResult = True
-##########################################################
-##########################################################
 import os, sys, re
 from docopt import docopt
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
@@ -123,8 +121,9 @@ alignedAsigsKWargs.update(dict(
     transposeToColumns='bin', concatOn='index',
     verbose=False, procFun=None))
 #
-alignedAsigsKWargs['procFun'] = ash.genDetrender(
-    timeWindow=(alignedAsigsKWargs['windowSize'][0], -2e-3))
+if arguments['detrendInputs']:
+    alignedAsigsKWargs['procFun'] = ash.genDetrender(
+        timeWindow=(alignedAsigsKWargs['windowSize'][0], -2e-3))
 
 alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **arguments)
 alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
@@ -576,7 +575,7 @@ if __name__ == "__main__":
     for nM in ['RateInHz', arguments['amplitudeFieldName'], 'stimCat', 'originalIndex', 'segment', 't']:
         if nM not in alignedAsigsKWargs['getMetaData']:
             alignedAsigsKWargs['getMetaData'].append(nM)
-    if not (useCachedResult and os.path.exists(resultPath)):
+    if not (arguments['useCachedResult'] and os.path.exists(resultPath)):
         print('loading {}'.format(triggeredPath))
         dataReader, dataBlock = preproc.blockFromPath(
             triggeredPath, lazy=arguments['lazy'])
@@ -626,7 +625,7 @@ if __name__ == "__main__":
             fun=shapeFit, resultPath=resultPath,
             funArgs=[], funKWArgs=funKWArgs,
             rowKeys=groupBy, colKeys=testVar, **daskOpts)
-        if not (useCachedResult and os.path.exists(resultPath)):
+        if not (arguments['useCachedResult'] and os.path.exists(resultPath)):
             if os.path.exists(resultPath):
                 shutil.rmtree(resultFolder)
                 os.makedirs(resultFolder)
