@@ -475,7 +475,7 @@ def concatenateBlocks(
                     'ftype': 'bessel'
                 },
                 'high': {
-                    'Wn': 1.,
+                    'Wn': .1,
                     'N': 4,
                     'btype': 'high',
                     'ftype': 'bessel'

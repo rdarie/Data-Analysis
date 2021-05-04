@@ -505,17 +505,21 @@ def calcBlockAnalysisWrapper():
         filteredAsigs = signal.sosfiltfilt(
             filterCoeffs, tdDF.loc[:, group.index].to_numpy(),
             axis=0)
+        pdb.set_trace()
         if True:
             plotCName = 'seg0_forceY'
             plotCNameIdx = group.index.get_loc(plotCName)
             fig, ax = plt.subplots()
             idx1, idx2 = int(6e4), int(9e4)
-            ax.plot(tdDF.index[idx1:idx2], filteredAsigs[idx1:idx2, plotCNameIdx], label='filtered')
-            ax.plot(tdDF.index[idx1:idx2], tdDF[plotCName].iloc[idx1:idx2], label='original')
+            ax.plot(
+                tdDF.index[idx1:idx2], filteredAsigs[idx1:idx2, plotCNameIdx],
+                label='filtered')
+            ax.plot(
+                tdDF.index[idx1:idx2], tdDF[plotCName].iloc[idx1:idx2],
+                label='original')
             ax.set_title(plotCName)
             ax.legend()
             plt.show()
-        # pdb.set_trace()
         tdDF.loc[:, group.index] = filteredAsigs
         if trackMemory:
             print('Just finished analog data filtering before downsampling. memory usage: {:.1f} MB'.format(
@@ -679,7 +683,7 @@ def calcBlockAnalysisWrapper():
         # accCols = [cn for cn in emgDF.columns if 'Acc' in cn]
         highPassOpts = {
             'high': {
-                'Wn': 1,
+                'Wn': .1,
                 'N': 4,
                 'btype': 'high',
                 'ftype': 'bessel'
