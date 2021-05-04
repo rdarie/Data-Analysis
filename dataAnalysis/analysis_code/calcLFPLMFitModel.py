@@ -192,7 +192,7 @@ for pref, mod in gaussMs.items():
     gaussPars.update(mod.make_params())
 # Decays in **milliseconds**
 expPars['exp1_amplitude'].set(value=0)
-expPars['exp1_decay'].set(min=.2, value=1000., max=1000.)
+expPars['exp1_decay'].set(min=.2, value=1e6, max=1e6)
 #
 expPars['exp2_amplitude'].set(value=0)
 expPars['exp2_decay'].set(min=.1, value=20., max=20.)
@@ -616,7 +616,7 @@ if __name__ == "__main__":
                 # elecNames.str.contains('caudalZ_e23') &
                 # (featNames.str.contains('caudalY_e11') | featNames.str.contains('rostralY_e11')) &
                 featNames.str.contains('rostralY') &
-                elecNames.str.contains('caudalZ_e23') &
+                elecNames.str.contains('caudal') &
                 (rates < funKWArgs['tBounds'][-1] ** (-1))
                 # (amps == -900)
                 )
