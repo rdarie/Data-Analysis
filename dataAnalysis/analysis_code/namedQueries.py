@@ -129,6 +129,12 @@ namedQueries['align'].update({
         ])
     })
 namedQueries['align'].update({
+    'startingNoStim': '&'.join([
+        namedQueries['align']['starting'],
+        namedQueries['align']['noStim'],
+        ])
+    })
+namedQueries['align'].update({
     'stopping': '|'.join([
         namedQueries['align']['reachedPeak'],
         namedQueries['align']['reachedBase'],

@@ -7,4 +7,4 @@ OUTLIERMASK="--maskOutlierBlocks"
 
 TIMEWINDOWOPTS="--winStart=300 --winStop=1300"
 
-ALIGNQUERY="--alignQuery=starting"
+ALIGNQUERY="--alignQuery=startingNoStim"

@@ -317,8 +317,7 @@ if __name__ == '__main__':
     if arguments['plotting']:
         figureOutputPath = os.path.join(
                 figureOutputFolder,
-                '{}_{}_r2.pdf'.format(
-                    fullEstimatorName, arguments['window']))
+                '{}_r2.pdf'.format(fullEstimatorName))
         scoresForPlot = pd.concat(
             {'test': allScoresDF['test_score'], 'train': allScoresDF['train_score']},
             names=['evalType']).to_frame(name='score').reset_index()

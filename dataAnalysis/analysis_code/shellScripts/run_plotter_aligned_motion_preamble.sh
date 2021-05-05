@@ -2,8 +2,8 @@
 
 source ./shellScripts/run_align_motion_preamble.sh
 
-# OUTLIERMASK="--maskOutlierBlocks"
-OUTLIERMASK=""
+OUTLIERMASK="--maskOutlierBlocks"
+# OUTLIERMASK=""
 
 STATSOVERLAY="--overlayStats"
 # STATSOVERLAY=""
@@ -12,8 +12,9 @@ TIMEWINDOWOPTS="--winStart=200 --winStop=800"
 
 # ALIGNQUERY="--alignQuery=stimOn"
 # ALIGNQUERY="--alignQuery=outbound"
-ALIGNQUERY="--alignQuery=starting"
+# ALIGNQUERY="--alignQuery=starting"
 # ALIGNQUERY="--alignQuery=stopping"
+ALIGNQUERY="--alignQuery=startingNoStim"
 
 # HUEOPTS="--hueName= --hueControl="
 # ROWOPTS="--rowName=pedalDirection --rowControl="
