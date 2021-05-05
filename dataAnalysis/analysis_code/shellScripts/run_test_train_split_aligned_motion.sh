@@ -22,8 +22,8 @@
 # Request custom resources
 #SBATCH --array=2,3
 
-SLURM_ARRAY_TASK_ID=2
-source ./shellScripts/run_pca_calc_aligned_motion_preamble.sh
+#  SLURM_ARRAY_TASK_ID=2
+source shellScripts/run_plotter_aligned_motion_preamble.sh
 
 # ITERATOR="--iteratorSuffix=a"
 # ROIOPTS="--calcTimeROI --ROIWinStart=0 --ROIWinStop=0 --timeROIAlignQuery=stopping"
@@ -38,5 +38,5 @@ python -u './applyTestTrainSplit.py' --inputBlockSuffix="lfp_CAR_spectral" --uni
 # python -u './applyTestTrainSplit.py' --inputBlockSuffix="csd_spectral" --unitQuery="lfp" --selectionName='csd_spectral' --verbose $ITERATOR --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
 python -u './applyTestTrainSplit.py' --inputBlockSuffix="rig" --unitQuery="limbState" --selectionName='limbState' --verbose $ITERATOR --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
 python -u './applyTestTrainSplit.py' --inputBlockSuffix="rig" --unitQuery="pedalState" --selectionName='pedalState' $ITERATOR --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS $VERBOSITY
-
+#
 # next, go to run_test_train_split_assembler_xxx.sh

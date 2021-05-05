@@ -2,7 +2,7 @@
 
 source ./shellScripts/run_align_motion_preamble.sh
 
-BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
+# BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
 
 OUTLIERMASK="--maskOutlierBlocks"
 # OUTLIERMASK=""

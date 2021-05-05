@@ -123,16 +123,16 @@ namedQueries['align'].update({
         ])
     })
 namedQueries['align'].update({
-    'starting': '|'.join([
+    'starting': '(' + '|'.join([
         namedQueries['align']['outbound'],
         namedQueries['align']['return'],
-        ])
+        ]) + ')'
     })
 namedQueries['align'].update({
-    'startingNoStim': '&'.join([
+    'startingNoStim': '(' + '&'.join([
         namedQueries['align']['starting'],
         namedQueries['align']['noStim'],
-        ])
+        ]) + ')'
     })
 namedQueries['align'].update({
     'stopping': '|'.join([

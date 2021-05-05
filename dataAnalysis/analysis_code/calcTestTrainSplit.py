@@ -197,6 +197,7 @@ if not arguments['loadFromFrames']:
             dataBlock,
             whichSegments=[segIdx],
             **aakwa)
+        # pdb.set_trace()
         # trialInfo = dataDF.index.to_frame().reset_index(drop=True)
         if arguments['calcTimeROI']:
             endMaskQuery = ash.processAlignQueryArgs(

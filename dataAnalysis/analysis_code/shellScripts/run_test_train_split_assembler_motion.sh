@@ -25,10 +25,10 @@
 # SLURM_ARRAY_TASK_ID=3
 source ./shellScripts/run_pca_calc_aligned_motion_preamble.sh
 ITERATOR="--iteratorSuffix=b"
-# python -u './calcTestTrainSplit.py' --blockIdx=2 --processAll $ITERATOR --loadFromFrames --inputBlockSuffix="rig" --unitQuery="limbState" --selectionName='limbState' --verbose --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $LAZINESS
+python -u './calcTestTrainSplit.py' --blockIdx=2 --processAll $ITERATOR --loadFromFrames --inputBlockSuffix="rig" --unitQuery="limbState" --selectionName='limbState' --verbose --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $LAZINESS
 
-# blocks=(lfp_CAR lfp_CAR_spectral rig)
-blocks=(lfp_CAR_spectral)
+blocks=(lfp_CAR lfp_CAR_spectral rig)
+# blocks=(lfp_CAR_spectral)
 for B in "${blocks[@]}"
 do
     echo "concatenating $B blocks"
