@@ -19,7 +19,7 @@
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 # Request custom resources
-#SBATCH --array=1,2,3
+#SBATCH --array=2,3
 
 # SLURM_ARRAY_TASK_ID=3
 source shellScripts/run_plotter_aligned_motion_preamble.sh

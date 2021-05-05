@@ -8,12 +8,12 @@ OUTLIERMASK=""
 STATSOVERLAY="--overlayStats"
 # STATSOVERLAY=""
 
-TIMEWINDOWOPTS="--winStart=200 --winStop=1000"
+TIMEWINDOWOPTS="--winStart=200 --winStop=800"
 
 # ALIGNQUERY="--alignQuery=stimOn"
 # ALIGNQUERY="--alignQuery=outbound"
-# ALIGNQUERY="--alignQuery=starting"
-ALIGNQUERY="--alignQuery=stopping"
+ALIGNQUERY="--alignQuery=starting"
+# ALIGNQUERY="--alignQuery=stopping"
 
 # HUEOPTS="--hueName= --hueControl="
 # ROWOPTS="--rowName=pedalDirection --rowControl="

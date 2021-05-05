@@ -181,8 +181,10 @@ def findOutliers(
     deviationDF = deviation.to_frame(name='deviation')
     #
     if twoTailed:
+        deviationDF.loc[np.isinf(deviationDF['deviation']), 'deviation'] = 100 * chiProbaLim
         deviationDF['rejectBlock'] = (deviationDF['deviation'] > chiProbaLim)
     else:
+        deviationDF.loc[np.isinf(deviationDF['deviation']), 'deviation'] = 100 * sdThresh
         deviationDF['rejectBlock'] = (deviationDF['deviation'] > sdThresh)
     #
     return deviationDF
