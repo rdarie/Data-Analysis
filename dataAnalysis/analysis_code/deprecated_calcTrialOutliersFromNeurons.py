@@ -315,8 +315,8 @@ outlierTrials['averageDeviation'] = (
     outlierTrialsRig['averageDeviation'] +
     outlierTrialsFr['averageDeviation'])
 outlierTrials['rejectBlock'] = (
-    (outlierTrialsRig['rejectBlock']).astype(np.bool) |
-    (outlierTrialsFr['rejectBlock']).astype(np.bool))
+    (outlierTrialsRig['rejectBlock']).astype(bool) |
+    (outlierTrialsFr['rejectBlock']).astype(bool))
 if arguments['saveResults']:
     outlierTrials['averageDeviation'].to_hdf(
         resultPath, 'averageDeviation', format='fixed')

@@ -115,7 +115,7 @@ def loadKSDir(filePath, excludeNoise=True, loadPCs=False):
             #
             noiseClusters = clusterInfo[clusterInfo.loc[:,'group'] == 'noise'].loc[:, 'cluster_id'].values
             # identify which spikes are in noise clusters
-            spikeMask = np.array([not x in noiseClusters for x in spikeCluster], dtype = np.bool)
+            spikeMask = np.array([not x in noiseClusters for x in spikeCluster], dtype = bool)
 
             # discard these spike
 
@@ -329,7 +329,7 @@ def getNevMatSpikes(filePath, nevIDs = None, plotting = False, excludeClus = [0]
                 if excludeClus:
                     notMUAMask = np.logical_not(np.isin(f['NEV']['Data']['Spikes']['Unit'][chanMask], excludeClus))
                 else:
-                    notMUAMask = np.full(len(f['NEV']['Data']['Spikes']['Unit'][chanMask]), True, dtype = np.bool)
+                    notMUAMask = np.full(len(f['NEV']['Data']['Spikes']['Unit'][chanMask]), True, dtype = bool)
                 #
                 spikes['Classification'][idx] = f['NEV']['Data']['Spikes']['Unit'][chanMask] + 1 + lastMaxUnitID
                 spikes['Classification'][idx] = spikes['Classification'][idx][notMUAMask]
@@ -394,7 +394,7 @@ def getWaveClusSpikes(filePath, nevIDs = None, plotting = False, excludeClus = [
         if excludeClus:
             notMUAMask = np.logical_not(np.isin(waveClusData['cluster_class'][:,0], excludeClus))
         else:
-            notMUAMask = np.full(len(waveClusData['cluster_class'][:,0]), True, dtype = np.bool)
+            notMUAMask = np.full(len(waveClusData['cluster_class'][:,0]), True, dtype = bool)
         #
         spikes['Classification'][idx] = waveClusData['cluster_class'][notMUAMask,0] + 1 + lastMaxUnitID
         spikes['TimeStamps'][idx] = waveClusData['cluster_class'][notMUAMask,1] / 1e3

@@ -21,11 +21,11 @@
 # Request custom resources
 #SBATCH --array=2,3
 
-# SLURM_ARRAY_TASK_ID=3
+SLURM_ARRAY_TASK_ID=2
 source shellScripts/run_plotter_aligned_motion_preamble.sh
 ANALYSISFOLDER="--analysisName=default"
 UNITQUERY="--unitQuery=lfp"
-INPUTBLOCKNAME="--inputBlockSuffix=lfp"
+INPUTBLOCKNAME="--inputBlockSuffix=lfp_CAR"
 
 python -u ./calcTrialOutliers.py --exp=$EXP $BLOCKSELECTOR $UNITSELECTOR $WINDOW $ALIGNFOLDER $ANALYSISFOLDER $ALIGNQUERY $LAZINESS $UNITQUERY $INPUTBLOCKNAME --plotting --verbose --amplitudeFieldName="amplitude" --saveResults
 # python -u ./calcTrialOutliersPCA.py --exp=$EXP $BLOCKSELECTOR $UNITSELECTOR $WINDOW $ALIGNFOLDER $ANALYSISFOLDER $ALIGNQUERY $LAZINESS $UNITQUERY $INPUTBLOCKNAME --plotting --verbose --amplitudeFieldName="amplitude" --saveResults

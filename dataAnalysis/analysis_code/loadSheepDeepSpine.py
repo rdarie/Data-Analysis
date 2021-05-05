@@ -124,7 +124,7 @@ if noiseCeilDF is not None:
 trialCountGood = (
     metaDataDF
     .loc[~metaDataDF['outlierTrial']
-    .astype(np.bool), :]
+    .astype(bool), :]
     .groupby(['electrode', 'amplitude'])['RateInHz']
     .value_counts())
 trialCount = metaDataDF.groupby(['electrode', 'amplitude'])['RateInHz'].value_counts()

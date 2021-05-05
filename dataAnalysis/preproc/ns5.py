@@ -1150,7 +1150,7 @@ def alignedAsigsToDF(
         #
         outlierMask = np.asarray(
             allWaveforms.index.map(rejectionLookup),
-            dtype=np.bool)
+            dtype=bool)
         if invertOutlierMask:
             outlierMask = ~outlierMask
         allWaveforms = allWaveforms.loc[~outlierMask, :]
@@ -1284,7 +1284,6 @@ def getAsigsAlignedToEvents(
                 thisUnit.annotations['parentChanXCoords'] = float(chanIdx.coordinates[:, 0].magnitude)
                 thisUnit.annotations['parentChanYCoords'] = float(chanIdx.coordinates[:, 1].magnitude)
                 thisUnit.annotations['parentChanCoordinateUnits'] = '{}'.format(coordUnits)
-    #
     totalNSegs = 0
     #  print([evSeg.events[3].name for evSeg in eventBlock.segments])
     allAlignEventsList = []
@@ -3108,7 +3107,7 @@ def preprocBlockToNix(
                     dtype=np.float32)
                 outlierMask = np.zeros(
                     (tempLFPStore.shape[0], len(asigNameList)),
-                    dtype=np.bool)
+                    dtype=bool)
                 outlierMetadata = {}
             # if calcArtifactTrace:
             if True:
@@ -3639,7 +3638,7 @@ def preprocBlockToNix(
             #  (we're getting them as plain annotations)
             timeMask = np.asarray(
                 (st.times >= tStart) & (st.times < tStop),
-                dtype=np.bool)
+                dtype=bool)
             try:
                 if 'arrayAnnNames' in st.annotations:
                     for key in st.annotations['arrayAnnNames']:
@@ -3719,7 +3718,7 @@ def preprocBlockToNix(
                 time_slice=(tStart, tStop),
                 magnitude_mode='rescaled')
             ainpTime = ainpData.times.magnitude
-            meTimeMask = np.zeros_like(ainpTime, dtype=np.bool)
+            meTimeMask = np.zeros_like(ainpTime, dtype=bool)
             for meTimeBounds in motorEncoderMask:
                 meTimeMask = (
                     meTimeMask |

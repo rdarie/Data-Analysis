@@ -243,7 +243,7 @@ def applyModel(
     if scoreBounds is not None:
         scoreMaskX = (fit_x >= scoreBounds[0]) & (fit_x < scoreBounds[1])
     else:
-        scoreMaskX = np.ones_like(fit_x).astype(np.bool)
+        scoreMaskX = np.ones_like(fit_x).astype(bool)
     fullPars = pars.copy()
     dummy = pd.Series(0, index=x)
     dummyAnns = pd.Series({key: 0 for key in modelParamNames + modelStatsNames})

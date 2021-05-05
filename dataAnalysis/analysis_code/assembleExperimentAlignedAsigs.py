@@ -158,7 +158,13 @@ for idx, trialBasePath in enumerate(trialsToAssemble):
             unitCache[unit.name] = newUnit
             spiketrainCache[unit.name] = {}
         if len(unit.spiketrains) > 0:
-            assert len(unit.spiketrains) == 1
+            try:
+                assert len(unit.spiketrains) == 1
+            except Exception:
+                print('\n\n')
+                print('        Error while processing unit {}'.format(unit.name))
+                traceback.print_exc()
+                print('\n\n')
             st = unit.spiketrains[0]
             if len(st.times):
                 wvfUnits = st.waveforms.units

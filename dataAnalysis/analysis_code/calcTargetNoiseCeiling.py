@@ -124,7 +124,7 @@ def noiseCeil(
     if tBounds is not None:
         maskX = (groupData.columns > tBounds[0]) & (groupData.columns < tBounds[1])
     else:
-        maskX = np.ones_like(groupData.columns).astype(np.bool)
+        maskX = np.ones_like(groupData.columns).astype(bool)
     #
     nSamp = groupData.shape[0]
     if iterMethod == 'loo':

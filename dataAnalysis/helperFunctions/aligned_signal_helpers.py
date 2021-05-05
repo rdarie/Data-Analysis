@@ -69,7 +69,7 @@ def processOutlierTrials(
             prefix + '_{}_outliers.h5'.format(window))
         oBlocks = pd.read_hdf(resultPath, 'rejectBlock')
         if invertOutlierBlocks:
-            oBlocks = ~oBlocks.astype(np.bool)
+            oBlocks = ~oBlocks.astype(bool)
         return oBlocks
     else:
         return None

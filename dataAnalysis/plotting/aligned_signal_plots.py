@@ -1145,7 +1145,7 @@ def plotCorrelationMatrix(
         xticklabels_kws={}, yticklabels_kws={},
         maskType='upper'):
     #  based on https://seaborn.pydata.org/examples/many_pairwise_correlations.html
-    mask = np.zeros_like(correlationDF.to_numpy(), dtype=np.bool)
+    mask = np.zeros_like(correlationDF.to_numpy(), dtype=bool)
     if maskType == 'upper':
         mask[np.triu_indices_from(mask, k=0)] = True
     elif maskType == 'lower':
@@ -1460,7 +1460,7 @@ class FacetGridShadow(Grid):
 
         # Make a boolean mask that is True anywhere there is an NA
         # value in one of the faceting variables, but only if dropna is True
-        none_na = np.zeros(len(data), np.bool)
+        none_na = np.zeros(len(data), bool)
         if dropna:
             row_na = none_na if row is None else data[row].isnull()
             col_na = none_na if col is None else data[col].isnull()

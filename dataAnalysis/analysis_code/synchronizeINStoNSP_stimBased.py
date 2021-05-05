@@ -442,7 +442,7 @@ else:
                         coarseSt.t_stop = coarseSt.t_stop + unixDeltaT * coarseSt.t_stop.units
                         newStT = coarseSt.times.magnitude + unixDeltaT
                         coarseSt.magnitude[:] = newStT
-                        selectionMask = (coarseSt.magnitude ** 0).astype(np.bool)
+                        selectionMask = (coarseSt.magnitude ** 0).astype(bool)
                         if 'amplitude' in coarseSt.array_annotations:
                             theseAmps = coarseSt.array_annotations['amplitude']
                             if minStimAmp is not None:

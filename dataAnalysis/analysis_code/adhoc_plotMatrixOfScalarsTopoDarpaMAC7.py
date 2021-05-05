@@ -68,7 +68,7 @@ def getPairResult(resultPath, rippleMapDF, resultName):
     dataDF.index = dataDF.index.droplevel(level='lag')
     dataDF.index.name = 'to'
     #
-    duplicatesMask = np.zeros_like(dataDF,  dtype=np.bool)
+    duplicatesMask = np.zeros_like(dataDF,  dtype=bool)
     duplicatesMask[np.triu_indices_from(duplicatesMask)] = True
     #
     dataStack = (

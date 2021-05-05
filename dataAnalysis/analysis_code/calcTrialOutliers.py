@@ -360,7 +360,7 @@ if __name__ == "__main__":
     print('\nOutlier proportion was:')
     print(outlierTrials['rejectBlock'].sum() / outlierTrials['rejectBlock'].size)
 
-    if arguments['plotting'] and outlierTrials['rejectBlock'].astype(np.bool).any():
+    if arguments['plotting'] and outlierTrials['rejectBlock'].astype(bool).any():
         binSize = 1
         hist, binEdges = np.histogram(
             outlierTrials['deviation'],
@@ -410,7 +410,7 @@ if __name__ == "__main__":
     # #
     theseOutliers = (
         outlierTrials
-        .loc[outlierTrials['rejectBlock'].astype(np.bool), 'deviation'].sort_values()
+        .loc[outlierTrials['rejectBlock'].astype(bool), 'deviation'].sort_values()
         ).iloc[-100:]
     # maxDroppedTrials = pd.Series(
     #     index=np.concatenate(
@@ -440,7 +440,7 @@ if __name__ == "__main__":
     # print('\nMaximum number of dropped trials, as a function of deviation threshold:')
     # print(maxDroppedTrials)
     # print(saveNOutliers.sort_values())
-    if arguments['plotting'] and outlierTrials['rejectBlock'].astype(np.bool).any():
+    if arguments['plotting'] and outlierTrials['rejectBlock'].astype(bool).any():
         # nRowCol = int(np.ceil(np.sqrt(theseOutliers.size)))
         nRowCol = max(int(np.ceil(np.sqrt(theseOutliers.size))), 2)
         emgFig, emgAx = plt.subplots(
@@ -540,12 +540,12 @@ if __name__ == "__main__":
     # 
     minNObservations = 5
     firstBinTrialInfo = trialInfo.loc[firstBinMask, :]
-    goodTrialInfo = firstBinTrialInfo.loc[~outlierTrials['rejectBlock'].to_numpy().flatten().astype(np.bool), :]
+    goodTrialInfo = firstBinTrialInfo.loc[~outlierTrials['rejectBlock'].to_numpy().flatten().astype(bool), :]
     goodTrialCount = goodTrialInfo.groupby([stimulusConditionNames[0], stimulusConditionNames[1]])['RateInHz'].value_counts().to_frame(name='count').reset_index()
     goodTrialCount = goodTrialCount.loc[goodTrialCount['count'] > minNObservations, :]
     goodTrialCount.to_csv(os.path.join(figureOutputFolder, prefix + '_good_trial_breakdown.csv'))
     goodTrialCount.groupby([stimulusConditionNames[0], 'RateInHz', stimulusConditionNames[1]]).ngroups
-    badTrialInfo = firstBinTrialInfo.loc[outlierTrials['rejectBlock'].to_numpy().flatten().astype(np.bool), :]
+    badTrialInfo = firstBinTrialInfo.loc[outlierTrials['rejectBlock'].to_numpy().flatten().astype(bool), :]
     badTrialCount = badTrialInfo.groupby([stimulusConditionNames[0], stimulusConditionNames[1]])['RateInHz'].value_counts().sort_values().to_frame(name='count').reset_index()
     outlierTrials['deviation'].reset_index().sort_values(['segment', 'deviation']).to_csv(os.path.join(figureOutputFolder, prefix + '_trial_deviation_breakdown.csv'))
     print('Bad trial count:\n{}'.format(badTrialCount))

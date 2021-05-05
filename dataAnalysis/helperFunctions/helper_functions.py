@@ -1778,7 +1778,7 @@ def fillInOverflow(channelData, plotting = False, fillMethod = 'constant'):
     # TODO merge this into getBadContinuousMask
     overflowMask = pd.DataFrame(False, index = channelData.index,
         columns = channelData.columns,
-        dtype = np.bool).to_sparse(fill_value=False)
+        dtype = bool).to_sparse(fill_value=False)
     #
     columnList = list(channelData.columns)
     nChan = len(columnList)
@@ -1817,7 +1817,7 @@ def fillInOverflow(channelData, plotting = False, fillMethod = 'constant'):
         if dipStarts.any():
             nDips = len(dipStarts)
             fixedRow = row.copy()
-            maskRow = np.full(len(overflowMask.index), False, dtype = np.bool)
+            maskRow = np.full(len(overflowMask.index), False, dtype = bool)
             for dipIdx, dipStartIdx in enumerate(dipStarts):
                 try:
                     assert row.iloc[dipStartIdx - 1] > 8e3 # 8191 mV is equivalent to 32768
@@ -1870,8 +1870,8 @@ def fillInJumps(channelData, samp_per_s, smoothing_ms = 1, badThresh = 1e-3,
     consecLen = 30, nStdDiff = 20, nStdAmp = 20):
     #Allocate bad data mask as dict
     badMask = {'general':None,
-        'perChannelAmp' : pd.DataFrame(False, index = channelData.index, columns = channelData.columns, dtype = np.bool).to_sparse(fill_value=False),
-        'perChannelDer' : pd.DataFrame(False, index = channelData.index, columns = channelData.columns, dtype = np.bool).to_sparse(fill_value=False)
+        'perChannelAmp' : pd.DataFrame(False, index = channelData.index, columns = channelData.columns, dtype = bool).to_sparse(fill_value=False),
+        'perChannelDer' : pd.DataFrame(False, index = channelData.index, columns = channelData.columns, dtype = bool).to_sparse(fill_value=False)
         }
 
     #per channel, only smooth a couple of samples
@@ -1953,7 +1953,7 @@ def fillInJumps(channelData, samp_per_s, smoothing_ms = 1, badThresh = 1e-3,
         channelData.loc[:,idx] = replaceBad(row, mask, typeOpt = 'interp')
 
     badMask['general'] = pd.Series(np.array(badFlat, dtype = bool),
-        index = channelData.index, dtype = np.bool).to_sparse(fill_value=False)
+        index = channelData.index, dtype = bool).to_sparse(fill_value=False)
     print('\nFinished processing abnormal signal jumps')
 
     return channelData, badMask

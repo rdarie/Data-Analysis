@@ -103,9 +103,9 @@ def processMetaMatrixV2(
     originalMetaDFColumns = rcsa_helpers.metaMatrixColumns
     metaDF = pd.DataFrame(
         metaMatrix, columns=originalMetaDFColumns)
-    metaDF['microloss'] = metaDF['microloss'].astype(np.bool)
-    metaDF['macroloss'] = metaDF['macroloss'].astype(np.bool)
-    metaDF['bothloss'] = metaDF['bothloss'].astype(np.bool)
+    metaDF['microloss'] = metaDF['microloss'].astype(bool)
+    metaDF['macroloss'] = metaDF['macroloss'].astype(bool)
+    metaDF['bothloss'] = metaDF['bothloss'].astype(bool)
     # assume n channels is constant for all assembled sessions
     mostCommonSampleRateCode = metaDF['SampleRate'].value_counts().idxmax()
     fs = float(sampleRateLookupDict[mostCommonSampleRateCode])
@@ -161,9 +161,9 @@ def processMetaMatrixV2(
                 plotting=makePlots)
         metaDF = pd.DataFrame(
             metaMatrix, columns=originalMetaDFColumns)
-        metaDF['microloss'] = metaDF['microloss'].astype(np.bool)
-        metaDF['macroloss'] = metaDF['macroloss'].astype(np.bool)
-        metaDF['bothloss'] = metaDF['bothloss'].astype(np.bool)
+        metaDF['microloss'] = metaDF['microloss'].astype(bool)
+        metaDF['macroloss'] = metaDF['macroloss'].astype(bool)
+        metaDF['bothloss'] = metaDF['bothloss'].astype(bool)
         metaDF['dataPayloadDurSysTick'] = metaDF['lastSampleTick'].diff() * 1e-4
     else:
         print('Using sampling freq of {}'.format(fs))
@@ -177,9 +177,9 @@ def processMetaMatrixV2(
         metaMatrix = rcsa_helpers.code_micro_and_macro_packet_loss(
             metaMatrix)
         metaDF.loc[:, originalMetaDFColumns] = metaMatrix
-        metaDF['microloss'] = metaDF['microloss'].astype(np.bool)
-        metaDF['macroloss'] = metaDF['macroloss'].astype(np.bool)
-        metaDF['bothloss'] = metaDF['bothloss'].astype(np.bool)
+        metaDF['microloss'] = metaDF['microloss'].astype(bool)
+        metaDF['macroloss'] = metaDF['macroloss'].astype(bool)
+        metaDF['bothloss'] = metaDF['bothloss'].astype(bool)
         packetsNeededFixing = metaDF.loc[metaDF['packetNeedsFixing'], :].index
     else:
         packetsNeededFixing = pd.Index([])
@@ -258,7 +258,7 @@ def processMetaMatrixV2(
                 ).to_numpy()
             # ax[0].set_xlim([newXMin, newXMax])
         else:
-            plotMask = np.ones(metaDF.index.shape).astype(np.bool)
+            plotMask = np.ones(metaDF.index.shape).astype(bool)
         ax[0].plot(
             metaDF.loc[plotMask, xAxisVariable],
             1e3 * metaDF.loc[plotMask, 'dataPayloadDurPGT'],
@@ -367,7 +367,7 @@ def processMetaMatrixV2(
         ax[2].set_xlabel(xAxisLabel)
         ax[2].legend(loc='upper right')
     if tossPackets:
-        tossMask = np.zeros((metaMatrix.shape[0])).astype(np.bool)
+        tossMask = np.zeros((metaMatrix.shape[0])).astype(bool)
         dataTypeSeqIndex = np.flatnonzero(
             np.diff(metaMatrix[:, 1]) == 0)
         tossMask[dataTypeSeqIndex] = True

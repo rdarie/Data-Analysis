@@ -827,10 +827,10 @@ def enhanceNoisyTriggers(
 
 def getTimeMaskFromRanges(times, timeRanges):
     if not isinstance(times, pq.Quantity):
-        timeMask = np.zeros_like(times, dtype=np.bool)
+        timeMask = np.zeros_like(times, dtype=bool)
         tUnits = 1
     else:
-        timeMask = np.zeros_like(times.magnitude, dtype=np.bool)
+        timeMask = np.zeros_like(times.magnitude, dtype=bool)
         tUnits = times.units
     for tStart, tEnd in timeRanges:
         thisMask = (
@@ -888,8 +888,8 @@ def fillInJumps(
     ):
     #  Allocate bad data mask as dict
     badMask = {'general':None,
-        'perChannelAmp': pd.DataFrame(False, index = channelData.index, columns = channelData.columns, dtype = np.bool).to_sparse(fill_value=False),
-        'perChannelDer': pd.DataFrame(False, index = channelData.index, columns = channelData.columns, dtype = np.bool).to_sparse(fill_value=False)
+        'perChannelAmp': pd.DataFrame(False, index = channelData.index, columns = channelData.columns, dtype = bool).to_sparse(fill_value=False),
+        'perChannelDer': pd.DataFrame(False, index = channelData.index, columns = channelData.columns, dtype = bool).to_sparse(fill_value=False)
         }
 
     #per channel, only smooth a couple of samples
@@ -971,7 +971,7 @@ def fillInJumps(
         channelData.loc[:,idx] = replaceBad(row, mask, typeOpt = 'interp')
 
     badMask['general'] = pd.Series(np.array(badFlat, dtype = bool),
-        index = channelData.index, dtype = np.bool).to_sparse(fill_value=False)
+        index = channelData.index, dtype = bool).to_sparse(fill_value=False)
     print('\nFinished processing abnormal signal jumps')
 
     return channelData, badMask

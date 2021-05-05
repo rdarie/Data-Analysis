@@ -385,7 +385,7 @@ else:
                     coarseSt.t_stop = coarseSt.t_stop + unixDeltaT * coarseSt.t_stop.units
                     newStT = coarseSt.times.magnitude + unixDeltaT
                     coarseSt.magnitude[:] = newStT
-                    selectionMask = (coarseSt.magnitude ** 0).astype(np.bool)
+                    selectionMask = (coarseSt.magnitude ** 0).astype(bool)
                     spikesToBinarize = coarseSt.times[selectionMask]
                     thisSpikeMat = binarize(
                         spikesToBinarize,
