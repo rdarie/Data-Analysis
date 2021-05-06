@@ -90,7 +90,7 @@ asp.genTicksToScale(
     asp.genYLabelChanger(
         lookupDict={}, removeMatch='#0'),
     # asp.genYLimSetter(newLims=[-75, 100], forceLims=True),
-    asp.genYLimSetter(quantileLims=0.99, forceLims=True),
+    asp.genYLimSetter(quantileLims=0.9, forceLims=True),
     asp.xLabelsTime,
     # asp.genStimVLineAdder(
     #     'RateInHz', vLineOpts, tOnset=0, tOffset=.3, includeRight=False),
@@ -160,7 +160,6 @@ if 'kcsd' in arguments['inputBlockSuffix']:
 if arguments['analysisName'] == 'hiRes':
     alignedAsigsKWargs['decimate'] = 5
 relplotKWArgs.update(relplotUpdates)
-#
 #
 #############################################
 asp.plotAsigsAlignedWrapper(

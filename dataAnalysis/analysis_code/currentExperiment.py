@@ -357,11 +357,18 @@ def parseAnalysisOptions(
     # if not os.path.exists(GLMFiguresFolder):
     #     os.makedirs(GLMFiguresFolder, exist_ok=True)
     #
+    essentialMetadataFields = [
+        'segment', 'originalIndex', 't', 'amplitude', 'program',
+        'activeGroup', 'RateInHz', 'stimCat', 'electrode',
+        'pedalDirection', 'pedalSize', 'pedalSizeCat', 'pedalMovementCat',
+        'pedalMetaCat',
+        ]
     alignedAsigsKWargs = dict(
         amplitudeColumn='amplitude',
         programColumn='program',
         electrodeColumn='electrode',
         removeFuzzyName=False,
+        getMetaData=essentialMetadataFields,
         decimate=1)
     overrideChanNames = None
     # overrideChanNames = [
@@ -521,12 +528,6 @@ def parseAnalysisOptions(
                 windowSize=(-1750e-3, 1750e-3)),
             covariateSpacing=10e-3),
     }
-    essentialMetadataFields = [
-        'segment', 'originalIndex', 't', 'amplitude', 'program',
-        'activeGroup', 'RateInHz', 'stimCat', 'electrode',
-        'pedalDirection', 'pedalSize', 'pedalSizeCat', 'pedalMovementCat',
-        'pedalMetaCat',
-        ]
     spectralFeatureOpts = dict(
         winLen=100e-3, stepLen=20e-3, R=20,
         fStart=None, fStop=None)

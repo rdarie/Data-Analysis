@@ -20,13 +20,14 @@ TIMEWINDOWOPTS="--winStart=200 --winStop=500"
 ALIGNQUERY="--alignQuery=startingNoStim"
 
 # HUEOPTS="--hueName= --hueControl="
-# ROWOPTS="--rowName=pedalDirection --rowControl="
+# ROWOPTS="--rowName=pedalSizeCat --rowControl="
 # COLOPTS="--colName= --colControl="
 # STYLEOPTS="--styleName= --styleControl="
 # SIZEOPTS="--sizeName= --sizeControl="
 
+
 HUEOPTS="--hueName=amplitude --hueControl="
-ROWOPTS="--rowName=pedalSizeCat --rowControl="
+ROWOPTS="--rowName=pedalDirection --rowControl="
 COLOPTS="--colName=pedalMovementCat --colControl="
 STYLEOPTS="--styleName= --styleControl="
 SIZEOPTS="--sizeName= --sizeControl="
