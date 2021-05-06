@@ -98,12 +98,13 @@ asp.genTicksToScale(
     asp.genLegendRounder(decimals=2),
     ]
 statsTestOpts = dict(
-    testStride=25e-3,
-    testWidth=25e-3,
+    referenceTimeWindow=[-200e-3, -150e-3],
+    testStride=50e-3,
+    testWidth=50e-3,
     tStart=-100e-3,
     tStop=None,
     pThresh=5e-2,
-    correctMultiple=False
+    correctMultiple=True,
     )
 #
 #############################################
@@ -116,11 +117,10 @@ dataReader, dataBlock = ns5.blockFromPath(
 rowColOpts, alignedAsigsKWargs, statsTestOpts = asp.processFigureLoadArgs(
     arguments, namedQueries, analysisSubFolder, calcSubFolder, blockBaseName,
     rasterOpts, alignedAsigsKWargs, statsTestOpts)
-
+#
 #############################################
 #  room for custom code
 #############################################
-#
 #
 plotProcFuns.append(asp.genXLimSetter(alignedAsigsKWargs['windowSize']))
 plotProcFuns.append(
@@ -135,11 +135,10 @@ plotProcFuns.append(
 relplotKWArgs, minNObservations, limitPages = asp.processRelplotKWArgs(
     relplotKWArgs, minNObservations, arguments, alignedAsigsKWargs,
     _rasterOpts=rasterOpts, changeRelPlotAspectRatio=False)
-
+#
 #############################################
 #  room for custom code
 #############################################
-#
 #
 relplotUpdates = {
     'legend': 'brief',

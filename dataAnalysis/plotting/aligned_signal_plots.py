@@ -314,7 +314,6 @@ def plotNeuronsAligned(
                         np.diff(rasterWide.columns)[0] ** (-1)))
                 if enablePlots:
                     indexInfo = asigWide.index.to_frame()
-                    ####pdb.set_trace()
                     if idx == 0:
                         breakDownData, breakDownText, breakDownHtml = hf.calcBreakDown(
                             asigWide, rowName, colName, hueName)
@@ -560,7 +559,6 @@ def plotAsigsAligned(
 def addSignificanceStars(
         g, sigTestResults, ro, co, hu, dataSubset, sigStarOpts):
     pQueryList = []
-    # pdb.set_trace()
     if len(g.row_names):
         rowFacetName = g.row_names[ro]
         rowName = g._row_var
@@ -1183,7 +1181,6 @@ def plotSignificance(
         return
     sigValsDF = sigValsDF.stack().reset_index(name='significant')
     with PdfPages(os.path.join(figureFolder, pdfName + '.pdf')) as pdf:
-        # pdb.set
         rowName = kwargs['rowName'] if kwargs['rowName'] in sigValsDF.columns else None
         colName = kwargs['colName'] if kwargs['colName'] in sigValsDF.columns else None
         gPH = sns.catplot(

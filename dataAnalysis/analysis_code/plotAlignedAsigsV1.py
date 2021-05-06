@@ -98,16 +98,16 @@ asp.genTicksToScale(
     asp.genLegendRounder(decimals=2),
     ]
 statsTestOpts = dict(
-    testStride=25e-3,
-    testWidth=25e-3,
+    referenceTimeWindow=[-200e-3, -150e-3],
+    testStride=50e-3,
+    testWidth=50e-3,
     tStart=-100e-3,
     tStop=None,
     pThresh=5e-2,
-    correctMultiple=False
+    correctMultiple=True,
     )
 #
 #############################################
-
 blockBaseName, analysisSubFolder, alignSubFolder, figureStatsFolder, alignedFeaturesFolder, calcSubFolder, triggeredPath, pdfName, statsTestPath = asp.processFigureFolderTree(
     arguments, scratchFolder, figureFolder)
 print('loading {}'.format(triggeredPath))

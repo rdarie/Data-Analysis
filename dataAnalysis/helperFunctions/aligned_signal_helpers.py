@@ -283,7 +283,6 @@ def splitApplyCombine(
             .groupby(by=rowKeys, group_keys=False)
             .apply(fun, *funArgs, **funKWArgs))
     # TODO, below is a transformation, handle other index types
-    # pdb.set_trace()
     if reindexFromInput:
         resultDF = pd.DataFrame(
             result.sort_index().loc[:, dataColNames].to_numpy(),
@@ -367,13 +366,10 @@ def applyFunGrouped(
 
 
 def compareMeansGrouped(
-        asigWide, groupBy, testVar,
+        asigWide, groupBy, testVar, referenceTimeWindow=None,
         tStart=None, tStop=None,
-        testWidth=100e-3, testStride=20e-3,
-        pThresh=1e-3,
-        correctMultiple=True,
-        plotting=False):
-
+        testWidth=100e-3, testStride=20e-3, pThresh=1e-3,
+        correctMultiple=True, plotting=False):
     if tStart is None:
         tStart = asigWide.columns[0]
     if tStop is None:
@@ -425,14 +421,21 @@ def compareMeansGrouped(
         index=testIndex,
         columns=testBins)
     statVals.columns.name = 'bin'
+    if referenceTimeWindow is not None:
+        refTMask = (
+            (asigWide.columns >= referenceTimeWindow[0]) &
+            (asigWide.columns < referenceTimeWindow[1])
+            )
+        refAsig = asigWide.loc[:, refTMask]
+        refGroups = [
+            # np.ravel(i)
+            i.mean(axis=1).to_numpy()
+            for nm, i in refAsig.groupby(testVar)]
     for testBin in testBins:
-        #  try:
         tMask = (
-            (asigWide.columns > testBin - testWidth / 2) &
+            (asigWide.columns >= testBin - testWidth / 2) &
             (asigWide.columns < testBin + testWidth / 2)
             )
-        #  except Exception:
-        #      
         testAsig = asigWide.loc[:, tMask]
         if groupBy is not None:
             groupIter = testAsig.groupby(groupBy)
@@ -440,14 +443,14 @@ def compareMeansGrouped(
             groupIter = {'all': testAsig}.items()
         for name, group in groupIter:
             testGroups = [
-                # np.ravel(i)
                 i.mean(axis=1).to_numpy()
                 for nm, i in group.groupby(testVar)]
+            if referenceTimeWindow is not None:
+                testGroups = [testGroups[0], refGroups[0]]
             # groupSizes = [i.shape[0] for i in testGroups]
             # maxSize = int(np.mean(groupSizes))
             # testGroups = [t[:maxSize] for t in testGroups]
             if len(testGroups) > 1:
-                # pdb.set_trace()
                 try:
                     isNormal = [pg.normality(tg)['normal'].iloc[0] for tg in testGroups]
                     equalVariance = pg.homoscedasticity(testGroups)
@@ -474,7 +477,7 @@ def compareMeansGrouped(
                     pVals.loc[name, testBin] = p
                     statVals.loc[name, testBin] = stat
                 except Exception:
-                    #  traceback.print_exc()
+                    traceback.print_exc()
                     pVals.loc[name, testBin] = 1
                     statVals.loc[name, testBin] = np.nan
     if correctMultiple:
@@ -489,25 +492,21 @@ def compareMeansGrouped(
 
 def compareISIsGrouped(
         asigWide, groupBy, testVar,
-        tStart=None, tStop=None,
+        tStart=None, tStop=None, referenceTimeWindow=None,
         testWidth=100e-3, testStride=20e-3,
-        pThresh=1e-3,
-        correctMultiple=True,
-        plotting=False):
-
+        pThresh=1e-3, correctMultiple=True, plotting=False):
     if tStart is None:
         tStart = asigWide.columns[0]
     if tStop is None:
         tStop = asigWide.columns[-1]
     testBins = np.arange(
         tStart + testWidth / 2, tStop - testWidth / 2, testStride)
-
+    #
     if (isinstance(groupBy, list)) and (len(groupBy) == 1):
         groupBy = groupBy[0]
-
     if (isinstance(testVar, list)) and (len(testVar) == 1):
         testVar = testVar[0]
-    # 
+    #
     if isinstance(groupBy, str):
         testIndex = pd.Index(
             asigWide.groupby(by=groupBy).groups.keys())
@@ -543,7 +542,6 @@ def compareISIsGrouped(
         else:
             groupIter = {'all': testAsig}.items()
         for name, group in groupIter:
-            # pdb.set_trace()
             def getSC(rasterDF):
                 # listISI = []
                 listSpikeCount = []
@@ -560,7 +558,6 @@ def compareISIsGrouped(
             # maxSize = int(np.mean(groupSizes))
             # testGroups = [t[:maxSize] for t in testGroups]
             if len(testGroups) > 1:
-                # pdb.set_trace()
                 try:
                     isNormal = [pg.normality(tg)['normal'].iloc[0] for tg in testGroups]
                     equalVariance = pg.homoscedasticity(testGroups)
@@ -675,11 +672,8 @@ def facetGridApplyFunGrouped(
 
 def facetGridCompareMeans(
         dataBlock, statsTestPath,
-        limitPages=None, verbose=False,
-        compareISIs=False,
-        loadArgs={},
-        rowColOpts={},
-        statsTestOpts={}):
+        limitPages=None, verbose=False, compareISIs=False,
+        loadArgs={}, rowColOpts={}, statsTestOpts={}):
     #  get list of units
     if loadArgs['unitNames'] is None:
         loadArgs['unitNames'] = ns5.listChanNames(
@@ -722,7 +716,9 @@ def facetGridCompareMeans(
         for i in [rowColOpts['hueName'], rowColOpts['styleName']]
         if i is not None
         ]
-    assert sigTestVar is not None
+    if statsTestOpts['referenceTimeWindow'] is None:
+        # if comparing across a level, must have something there
+        assert len(sigTestVar) > 0
     #
     correctMultiple = statsTestOpts.pop('correctMultiple')
     #
@@ -739,6 +735,9 @@ def facetGridCompareMeans(
             sigTestAsig = asigWide.query(sigTestQuery)
         else:
             sigTestAsig = asigWide
+        # cannot have multiple traces per facet (one p-value per time bin)
+        if len(sigTestVar) > 0:
+            assert sigTestAsig.groupby(sigTestVar).ngroups == 1
         #  get significance test results (correct for multiple comparionsons at the end, not here)
         if not compareISIs:
             pVals, statVals, sigVals = compareMeansGrouped(
