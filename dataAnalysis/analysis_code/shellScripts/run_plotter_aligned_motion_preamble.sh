@@ -2,6 +2,8 @@
 
 source ./shellScripts/run_align_motion_preamble.sh
 
+BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
+
 
 OUTLIERMASK="--maskOutlierBlocks"
 # OUTLIERMASK=""
@@ -9,7 +11,7 @@ OUTLIERMASK="--maskOutlierBlocks"
 STATSOVERLAY="--overlayStats"
 # STATSOVERLAY=""
 
-TIMEWINDOWOPTS="--winStart=200 --winStop=800"
+TIMEWINDOWOPTS="--winStart=200 --winStop=500"
 
 # ALIGNQUERY="--alignQuery=stimOn"
 # ALIGNQUERY="--alignQuery=outbound"

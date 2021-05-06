@@ -7,7 +7,7 @@
 
 # Request memory:
 #SBATCH --nodes=1
-#SBATCH --mem=127G
+#SBATCH --mem=200G
 
 # Specify a job name:
 #SBATCH -J test_train_split
@@ -20,7 +20,7 @@
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=2,3
+#SBATCH --array=2
 
 #  SLURM_ARRAY_TASK_ID=2
 source shellScripts/run_plotter_aligned_motion_preamble.sh
@@ -28,7 +28,7 @@ source shellScripts/run_plotter_aligned_motion_preamble.sh
 # ITERATOR="--iteratorSuffix=a"
 # ROIOPTS="--calcTimeROI --ROIWinStart=0 --ROIWinStop=0 --timeROIAlignQuery=stopping"
 ITERATOR="--iteratorSuffix=b"
-ROIOPTS="--calcTimeROI --ROIWinStart=-50 --ROIWinStop=250 --timeROIAlignQuery=starting"
+ROIOPTS="--calcTimeROI --ROIWinStart=-50 --ROIWinStop=250 --timeROIAlignQuery=startingNoStim"
 
 python -u './calcTestTrainSplit.py' --inputBlockSuffix="rig" --unitQuery="rig" --selectionName='rig' $ROIOPTS $ITERATOR --eventName='motion' --eventBlockSuffix='epochs' --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $OUTLIERMASK $LAZINESS $TIMEWINDOWOPTS
 #
