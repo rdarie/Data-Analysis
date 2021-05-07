@@ -171,7 +171,7 @@ alignedAsigsKWargs['procFun'] = ash.genDetrender(timeWindow=(-200e-3, -100e-3))
 if 'windowSize' not in alignedAsigsKWargs:
     alignedAsigsKWargs['windowSize'] = list(rasterOpts['windowSizes'][arguments['window']])
 if 'winStart' in arguments:
-    alignedAsigsKWargs['windowSize'][0] = float(arguments['winStart']) * (-1e-3)
+    alignedAsigsKWargs['windowSize'][0] = float(arguments['winStart']) * (1e-3)
 if 'winStop' in arguments:
     alignedAsigsKWargs['windowSize'][1] = float(arguments['winStop']) * (1e-3)
 # alignedAsigsKWargs.update(dict(

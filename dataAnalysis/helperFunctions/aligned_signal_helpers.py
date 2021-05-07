@@ -284,6 +284,7 @@ def splitApplyCombine(
             .apply(fun, *funArgs, **funKWArgs))
     # TODO, below is a transformation, handle other index types
     if reindexFromInput:
+        # pdb.set_trace()
         resultDF = pd.DataFrame(
             result.sort_index().loc[:, dataColNames].to_numpy(),
             index=asigStack.index, columns=asigStack.columns)

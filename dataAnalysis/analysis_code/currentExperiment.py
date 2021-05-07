@@ -532,8 +532,8 @@ def parseAnalysisOptions(
         winLen=100e-3, stepLen=20e-3, R=20,
         fStart=None, fStop=None)
     freqBandsDict = ({
-        'name': ['low', 'beta', 'hi', 'spb'],
-        'lBound': [1.5, 10, 80, 250],
-        'hBound': [8.0, 40, 250, 1000]
+        'name':   ['low', 'alpha', 'beta', 'gamma', 'higamma', 'spb'],
+        'lBound': [1.5,   7,       15,     30,      60,        250],
+        'hBound': [7,     14,      29,     55,      120,       1000]
         })
     return expOpts, locals()

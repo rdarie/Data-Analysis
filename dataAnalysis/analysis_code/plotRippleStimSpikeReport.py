@@ -161,7 +161,7 @@ alignedAsigsKWargs.update(dict(
 if 'windowSize' not in alignedAsigsKWargs:
     alignedAsigsKWargs['windowSize'] = list(rasterOpts['windowSizes'][arguments['window']])
 if arguments['winStart'] == 'None':
-    alignedAsigsKWargs['windowSize'][0] = float(arguments['winStart']) * (-1e-3)
+    alignedAsigsKWargs['windowSize'][0] = float(arguments['winStart']) * (1e-3)
 if arguments['winStop'] == 'None':
     alignedAsigsKWargs['windowSize'][1] = float(arguments['winStop']) * (1e-3)
 

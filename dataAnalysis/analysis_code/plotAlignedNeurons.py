@@ -162,7 +162,7 @@ if arguments['enableOverrides']:
     ##########################################################################
     alignedAsigsKWargs.update({
         'windowSize': (
-            float(arguments['winStart']) * (-1e-3),
+            float(arguments['winStart']) * (1e-3),
             float(arguments['winStop']) * 1e-3
             )})
     ##########################################################################

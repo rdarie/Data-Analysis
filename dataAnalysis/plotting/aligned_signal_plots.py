@@ -174,7 +174,7 @@ def processFigureLoadArgs(
     if 'windowSize' not in alignedAsigsKWargs:
         alignedAsigsKWargs['windowSize'] = list(_rasterOpts['windowSizes'][_arguments['window']])
     if 'winStart' in _arguments:
-        alignedAsigsKWargs['windowSize'][0] = float(_arguments['winStart']) * (-1e-3)
+        alignedAsigsKWargs['windowSize'][0] = float(_arguments['winStart']) * (1e-3)
     if 'winStop' in _arguments:
         alignedAsigsKWargs['windowSize'][1] = float(_arguments['winStop']) * (1e-3)
     #

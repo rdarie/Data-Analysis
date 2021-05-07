@@ -1458,8 +1458,11 @@ def getAsigsAlignedToEvents(
                     for k, v in asig.annotations.items()
                     if k not in skipAsigAnnNames
                 })
+                thisStName = 'seg{}_{}'.format(int(totalNSegs), thisUnit.name)
+                if verbose:
+                    print('    making spiketrain {}'.format(thisStName))
                 st = SpikeTrain(
-                    name='seg{}_{}'.format(int(totalNSegs), thisUnit.name),
+                    name=thisStName,
                     times=alignEvents.times,
                     waveforms=spikeWaveforms,
                     t_start=asig.t_start, t_stop=asig.t_stop,
@@ -1473,6 +1476,7 @@ def getAsigsAlignedToEvents(
                 thisUnit.spiketrains.append(st)
                 newSeg.spiketrains.append(st)
                 st.unit = thisUnit
+                pdb.set_trace()
             totalNSegs += 1
     try:
         eventBlock.filter(
