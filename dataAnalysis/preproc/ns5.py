@@ -1274,6 +1274,7 @@ def getAsigsAlignedToEvents(
         chanIdx.units.append(thisUnit)
         thisUnit.channel_index = chanIdx
         masterBlock.channel_indexes.append(chanIdx)
+        chanIdx.block = masterBlock
         sigChanIdxList = signalBlock.filter(
             objects=ChannelIndex, name=chanName)
         if len(sigChanIdxList):
@@ -1476,7 +1477,6 @@ def getAsigsAlignedToEvents(
                 thisUnit.spiketrains.append(st)
                 newSeg.spiketrains.append(st)
                 st.unit = thisUnit
-                pdb.set_trace()
             totalNSegs += 1
     try:
         eventBlock.filter(
@@ -1493,7 +1493,7 @@ def getAsigsAlignedToEvents(
         folderPath, fileName + '.nix')
     if not os.path.exists(triggeredPath):
         appendToExisting = False
-
+    # pdb.set_trace()
     if appendToExisting:
         allSegs = list(range(len(masterBlock.segments)))
         addBlockToNIX(
@@ -3937,9 +3937,9 @@ def loadWithArrayAnn(
         block = reader.read_block()
         # [un.name for un in block.filter(objects=Unit)]
         # [len(un.spiketrains) for un in block.filter(objects=Unit)]
-    
+    #
     block = loadContainerArrayAnn(container=block)
-    
+    #
     if fromRaw:
         reader.file.close()
     else:

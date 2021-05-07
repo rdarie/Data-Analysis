@@ -24,12 +24,12 @@
 
 SLURM_ARRAY_TASK_ID=2
 source ./shellScripts/calc_aligned_motion_preamble.sh
-ITERATOR="--iteratorSuffix=b"
+# ITERATOR="--iteratorSuffix=b"
 # python -u './calcTestTrainSplit.py' --blockIdx=2 --processAll $ITERATOR --loadFromFrames --inputBlockSuffix="rig" --unitQuery="limbState" --selectionName='limbState' --verbose --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $LAZINESS
 
 blocks=(lfp_CAR lfp_CAR_spectral rig)
 for B in "${blocks[@]}"
 do
     echo "concatenating $B blocks"
-    python -u ./assembleExperimentAlignedAsigs.py --exp=$EXP --blockIdx=2 --processAll --inputBlockSuffix=$B $WINDOW $ANALYSISFOLDER $ALIGNFOLDER
+    python -u ./assembleExperimentAlignedAsigs.py --exp=$EXP --blockIdx=2 --processAll --inputBlockSuffix=$B $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $LAZINESS
 done

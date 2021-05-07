@@ -95,6 +95,7 @@ for idx, trialBasePath in enumerate(trialsToAssemble):
             ns5.loadAsigList(dataBlock, replaceInParents=True)
     else:
         raise (Exception('\n{}\nDoes not exist!\n'.format(trialDataPath)))
+    # pdb.set_trace()
     dataSeg = dataBlock.segments[0]
     if idx == 0:
         outputBlock = Block(
