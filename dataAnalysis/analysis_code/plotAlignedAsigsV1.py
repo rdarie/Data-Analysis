@@ -103,12 +103,12 @@ plotProcFuns = [
     asp.genLegendRounder(decimals=2),
     ]
 statsTestOpts = dict(
-    referenceTimeWindow=[-450e-3, -400e-3],
+    referenceTimeWindow=[-400e-3, -350e-3],
     testStride=50e-3,
     testWidth=50e-3,
     tStart=-100e-3,
     tStop=None,
-    pThresh=1e-3,
+    pThresh=5e-2,
     correctMultiple=True,
     )
 #
@@ -165,7 +165,7 @@ if 'kcsd' in arguments['inputBlockSuffix']:
 if arguments['analysisName'] == 'hiRes':
     alignedAsigsKWargs['decimate'] = 5
 relplotKWArgs.update(relplotUpdates)
-# alignedAsigsKWargs['procFun'] = ash.genDetrender(timeWindow=(-200e-3, -100e-3))
+alignedAsigsKWargs['procFun'] = ash.genDetrender(timeWindow=(-400e-3, -300e-3))
 # alignedAsigsKWargs['decimate'] = 20
 # alignedAsigsKWargs['rollingWindow'] = 200
 #
