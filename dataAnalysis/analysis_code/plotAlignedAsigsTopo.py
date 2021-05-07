@@ -148,11 +148,12 @@ else:
         makeControlProgram=True,
         metaDataToCategories=False))
 #
-requiredAnns = [
+'''requiredAnns = [
     'xCoords', 'yCoords',
     'RateInHz', 'feature', 'electrode', 'program',
     arguments['amplitudeFieldName'],
-    'stimCat', 'originalIndex', 'segment', 't']
+    'stimCat', 'originalIndex', 'segment', 't']'''
+requiredAnns = essentialMetadataFields + ['xCoords', 'yCoords']  
 if groupPagesBy is not None:
     for annNm in groupPagesBy:
         if annNm not in requiredAnns:

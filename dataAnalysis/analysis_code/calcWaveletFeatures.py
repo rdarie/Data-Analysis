@@ -82,11 +82,9 @@ alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUn
 alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **arguments)
 alignedAsigsKWargs['verbose'] = arguments['verbose']
 #
-# essentialMetadataFields.remove('freqBandName')
 alignedAsigsKWargs.update(dict(
     duplicateControlsByProgram=False,
     makeControlProgram=False,
-    # transposeToColumns='feature', concatOn='columns',
     transposeToColumns='bin', concatOn='index',
     getMetaData=essentialMetadataFields + ['xCoords', 'yCoords'],
     decimate=1, metaDataToCategories=False))

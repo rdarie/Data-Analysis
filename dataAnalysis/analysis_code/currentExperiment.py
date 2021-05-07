@@ -413,7 +413,7 @@ def parseAnalysisOptions(
             'XXXS': (-0.005, 0.025),
             'M': (-0.2, 0.8),
             'short': (-0.5, 0.5),
-            'L': (-0.2, 1.2),
+            'L': (-0.5, 1.5),
             'RC': (-0.33, 0.33),
             'miniRC': (-1, 1)},
         'discardEmpty': None, 'maxSpikesTo': None, 'timeRange': None,

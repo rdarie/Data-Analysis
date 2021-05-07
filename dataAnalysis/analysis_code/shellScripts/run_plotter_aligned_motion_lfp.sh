@@ -22,9 +22,11 @@
 # Request custom resources
 #SBATCH --array=2
 
-#  SLURM_ARRAY_TASK_ID=2
+SLURM_ARRAY_TASK_ID=2
 source ./shellScripts/run_plotter_aligned_motion_preamble.sh
-python3 -u './plotAlignedAsigsV1.py' --inputBlockSuffix="lfp_CAR" --unitQuery="lfp" --enableOverrides --exp=$EXP $BLOCKSELECTOR $ANALYSISFOLDER $WINDOW $ALIGNQUERY $ALIGNFOLDER $TIMEWINDOWOPTS $STATSOVERLAY $OUTLIERMASK $HUEOPTS $ROWOPTS $COLOPTS $STYLEOPTS $SIZEOPTS $PAGELIMITS $OTHERASIGOPTS
-python3 -u './plotAlignedAsigsTopo.py' --inputBlockSuffix="lfp_CAR" --unitQuery="lfp" --amplitudeFieldName=amplitude --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $TIMEWINDOWOPTS $BLOCKSELECTOR --groupPagesBy="electrode, RateInHz, pedalMovementCat, pedalDirection, pedalSizeCat" $HUEOPTS $OUTLIERMASK
-# python3 -u './plotAlignedAsigsV1.py' --inputBlockSuffix="lfp_CAR_spectral" --unitQuery="lfp" --enableOverrides --exp=$EXP $BLOCKSELECTOR $ANALYSISFOLDER $WINDOW $ALIGNQUERY $ALIGNFOLDER $TIMEWINDOWOPTS $STATSOVERLAY $OUTLIERMASK $HUEOPTS $ROWOPTS $COLOPTS $STYLEOPTS $SIZEOPTS $PAGELIMITS $OTHERASIGOPTS
+# python3 -u './plotAlignedAsigsV1.py' --inputBlockSuffix="lfp_CAR" --unitQuery="lfp" --enableOverrides --exp=$EXP $BLOCKSELECTOR $ANALYSISFOLDER $WINDOW $ALIGNQUERY $ALIGNFOLDER $TIMEWINDOWOPTS $STATSOVERLAY $OUTLIERMASK $HUEOPTS $ROWOPTS $COLOPTS $STYLEOPTS $SIZEOPTS $PAGELIMITS $OTHERASIGOPTS
+# python3 -u './plotAlignedAsigsTopo.py' --inputBlockSuffix="lfp_CAR" --unitQuery="lfp" --amplitudeFieldName=amplitude --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $TIMEWINDOWOPTS $BLOCKSELECTOR --groupPagesBy="electrode, RateInHz, pedalMovementCat, pedalDirection, pedalSizeCat" $HUEOPTS $OUTLIERMASK
 #
+PAGELIMITS="--limitPages=8"
+python3 -u './plotAlignedAsigsV1.py' --inputBlockSuffix="lfp_CAR_spectral" --unitQuery="lfp" --enableOverrides --exp=$EXP $BLOCKSELECTOR $ANALYSISFOLDER $WINDOW $ALIGNQUERY $ALIGNFOLDER $TIMEWINDOWOPTS $STATSOVERLAY $OUTLIERMASK $HUEOPTS $ROWOPTS $COLOPTS $STYLEOPTS $SIZEOPTS $PAGELIMITS $OTHERASIGOPTS
+# python3 -u './plotAlignedAsigsTopo.py' --inputBlockSuffix="lfp_CAR_spectral" --unitQuery="lfp" --amplitudeFieldName=amplitude --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $TIMEWINDOWOPTS $BLOCKSELECTOR --groupPagesBy="electrode, RateInHz, pedalMovementCat, pedalDirection, pedalSizeCat, freqBandName" $HUEOPTS $OUTLIERMASK

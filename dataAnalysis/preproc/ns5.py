@@ -3210,18 +3210,18 @@ def preprocBlockToNix(
                         except:
                             traceback.print_exc()
                             pdb.set_trace()
-                        if useMeanToCenter:
-                            tempCenter = (
-                                tempLFPStore
-                                .loc[:, columnsForThisGroup]
-                                .mean(axis=1).diff().fillna(0)
-                                )
-                        else:
-                            tempCenter = (
-                                tempLFPStore
-                                .loc[:, columnsForThisGroup]
-                                .median(axis=1).diff().fillna(0)
-                                )
+                    if useMeanToCenter:
+                        tempCenter = (
+                            tempLFPStore
+                            .loc[:, columnsForThisGroup]
+                            .mean(axis=1).diff().fillna(0)
+                            )
+                    else:
+                        tempCenter = (
+                            tempLFPStore
+                            .loc[:, columnsForThisGroup]
+                            .median(axis=1).diff().fillna(0)
+                            )
                     artifactSignal[:, subListIdx] = np.abs(stats.zscore(tempCenter.to_numpy()))
                 if calcOutliers:
                     if plotDevFilterDebug:
@@ -3271,6 +3271,7 @@ def preprocBlockToNix(
                     #
                     transformedDeviation = stats.norm.isf(stats.chi2.sf(lfpDeviation[:, subListIdx], nDim))
                     infMask = np.isinf(transformedDeviation)
+                    # pdb.set_trace()
                     if infMask.any():
                         transformedDeviation[infMask] = transformedDeviation[~infMask].max()
                     debugProbaTrans = False

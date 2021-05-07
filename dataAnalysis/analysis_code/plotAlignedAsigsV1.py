@@ -91,7 +91,7 @@ else:
         )
 ''''''
 plotProcFuns = [
-    scaleBarGenerator,
+    # scaleBarGenerator,
     asp.genYLabelChanger(
         lookupDict={}, removeMatch='#0'),
     # asp.genYLimSetter(newLims=[-75, 100], forceLims=True),
@@ -103,7 +103,7 @@ plotProcFuns = [
     asp.genLegendRounder(decimals=2),
     ]
 statsTestOpts = dict(
-    referenceTimeWindow=[-200e-3, -100e-3],
+    referenceTimeWindow=[-250e-3, -200e-3],
     testStride=50e-3,
     testWidth=50e-3,
     tStart=-100e-3,
@@ -165,7 +165,7 @@ if 'kcsd' in arguments['inputBlockSuffix']:
 if arguments['analysisName'] == 'hiRes':
     alignedAsigsKWargs['decimate'] = 5
 relplotKWArgs.update(relplotUpdates)
-alignedAsigsKWargs['procFun'] = ash.genDetrender(timeWindow=(-200e-3, -100e-3))
+# alignedAsigsKWargs['procFun'] = ash.genDetrender(timeWindow=(-200e-3, -100e-3))
 # alignedAsigsKWargs['decimate'] = 20
 # alignedAsigsKWargs['rollingWindow'] = 200
 #

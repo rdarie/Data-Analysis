@@ -79,6 +79,7 @@ dummySt = dataBlock.filter(
     objects=[ns5.SpikeTrain, ns5.SpikeTrainProxy])[0]
 fs = float(dummySt.sampling_rate)
 
+pdb.set_trace()
 for trialIdx, trialData in dataDF.groupby(['segment', 'originalIndex', 't']):
     if arguments['substituteOneChannel']:
         saveFirstSrs = trialData.iloc[0, :].copy()
