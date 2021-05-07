@@ -75,22 +75,27 @@ if 'rowColOverrides' in locals():
 #
 #
 minNObservations = 3
-''''''
-plotProcFuns = [
-asp.genTicksToScale(
+if 'kcsd' in arguments['inputBlockSuffix']:
+    scaleBarGenerator = asp.genTicksToScale(
+        lineOpts={'lw': 2}, shared=True,
+        # for evoked csd report
+        xUnitFactor=1e3, xUnits='msec',
+        yUnitFactor=1e3, yUnits='uA/mm^3',
+        )
+else:
+    scaleBarGenerator = asp.genTicksToScale(
         lineOpts={'lw': 2}, shared=True,
         # for evoked lfp report
-        # xUnitFactor=1e3, yUnitFactor=1,
-        # xUnits='msec', yUnits='uV',
-        # for evoked emg report
-        xUnitFactor=1e3, xUnits='msec',
-        # yUnitFactor=1, yUnits='uV',
-        yUnitFactor=1e3, yUnits='uA/mm^3',
-        ),
+        xUnitFactor=1e3, yUnitFactor=1,
+        xUnits='msec', yUnits='uV',
+        )
+''''''
+plotProcFuns = [
+    scaleBarGenerator,
     asp.genYLabelChanger(
         lookupDict={}, removeMatch='#0'),
     # asp.genYLimSetter(newLims=[-75, 100], forceLims=True),
-    asp.genYLimSetter(quantileLims=0.9, forceLims=True),
+    # asp.genYLimSetter(quantileLims=0.9, forceLims=True),
     asp.xLabelsTime,
     # asp.genStimVLineAdder(
     #     'RateInHz', vLineOpts, tOnset=0, tOffset=.3, includeRight=False),
@@ -98,12 +103,12 @@ asp.genTicksToScale(
     asp.genLegendRounder(decimals=2),
     ]
 statsTestOpts = dict(
-    referenceTimeWindow=[-200e-3, -150e-3],
+    referenceTimeWindow=[-200e-3, -100e-3],
     testStride=50e-3,
     testWidth=50e-3,
     tStart=-100e-3,
     tStop=None,
-    pThresh=5e-2,
+    pThresh=1e-3,
     correctMultiple=True,
     )
 #

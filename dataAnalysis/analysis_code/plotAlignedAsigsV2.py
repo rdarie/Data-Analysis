@@ -75,8 +75,7 @@ if 'rowColOverrides' in locals():
 #
 #
 minNObservations = 3
-''''''
-plotProcFuns = [
+'''
 asp.genTicksToScale(
         lineOpts={'lw': 2}, shared=True,
         # for evoked lfp report
@@ -84,13 +83,15 @@ asp.genTicksToScale(
         # xUnits='msec', yUnits='uV',
         # for evoked emg report
         xUnitFactor=1e3, xUnits='msec',
-        # yUnitFactor=1, yUnits='uV',
-        yUnitFactor=1e3, yUnits='uA/mm^3',
+        yUnitFactor=1, yUnits='uV',
+        # yUnitFactor=1e3, yUnits='uA/mm^3',
         ),
+        '''
+plotProcFuns = [
     asp.genYLabelChanger(
         lookupDict={}, removeMatch='#0'),
     # asp.genYLimSetter(newLims=[-75, 100], forceLims=True),
-    asp.genYLimSetter(quantileLims=0.9, forceLims=True),
+    asp.genYLimSetter(quantileLims=0.95, forceLims=True),
     asp.xLabelsTime,
     # asp.genStimVLineAdder(
     #     'RateInHz', vLineOpts, tOnset=0, tOffset=.3, includeRight=False),
@@ -152,7 +153,7 @@ relplotUpdates = {
             'hspace': 0.01
         }}
     }
-if 'kcsd' in arguments['inputBlockSuffix']:
+if 'csd' in arguments['inputBlockSuffix']:
     relplotUpdates.update({
         'palette': "ch:0.6,.3,dark=.1,light=0.7,reverse=1"
         })

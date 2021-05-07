@@ -11,7 +11,7 @@ OUTLIERMASK="--maskOutlierBlocks"
 STATSOVERLAY="--overlayStats"
 # STATSOVERLAY=""
 
-TIMEWINDOWOPTS="--winStart=200 --winStop=500"
+TIMEWINDOWOPTS="--winStart=200 --winStop=800"
 
 # ALIGNQUERY="--alignQuery=stimOn"
 # ALIGNQUERY="--alignQuery=outbound"
@@ -27,7 +27,7 @@ ALIGNQUERY="--alignQuery=startingNoStim"
 
 
 HUEOPTS="--hueName=amplitude --hueControl="
-ROWOPTS="--rowName=pedalDirection --rowControl="
+ROWOPTS="--rowName=pedalSizeCat --rowControl="
 COLOPTS="--colName=pedalMovementCat --colControl="
 STYLEOPTS="--styleName= --styleControl="
 SIZEOPTS="--sizeName= --sizeControl="

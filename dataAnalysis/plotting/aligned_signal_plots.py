@@ -540,14 +540,15 @@ def plotAsigsAligned(
                 #  iterate through plot and add significance stars
                 for (ro, co, hu), dataSubset in g.facet_data():
                     #  print('(ro, co, hu) = {}'.format((ro, co, hu)))
+                    if len(plotProcFuns):
+                        for procFun in plotProcFuns:
+                            procFun(g, ro, co, hu, dataSubset)
+                    #
                     if sigTestResults is not None:
                         addSignificanceStars(
                             g, sigTestResults.query(
                                 "unit == '{}'".format(unitName)),
                             ro, co, hu, dataSubset, sigStarOpts=sigStarOpts)
-                    if len(plotProcFuns):
-                        for procFun in plotProcFuns:
-                            procFun(g, ro, co, hu, dataSubset)
                 pdf.savefig()
                 plt.close()
             if limitPages is not None:
@@ -557,7 +558,10 @@ def plotAsigsAligned(
 
 
 def addSignificanceStars(
-        g, sigTestResults, ro, co, hu, dataSubset, sigStarOpts):
+        g, sigTestResults, ro, co, hu,
+        dataSubset, sigStarOpts):
+    if not hasattr(g.axes[ro, co], 'sigStarsPlotted'):
+        g.axes[ro, co].sigStarsPlotted = False
     pQueryList = []
     if len(g.row_names):
         rowFacetName = g.row_names[ro]
@@ -589,19 +593,18 @@ def addSignificanceStars(
     #  plot stars
     if not significantBins.empty:
         assert significantBins.shape[0] == 1
-        significantTimes = significantBins.columns[significantBins.to_numpy().flatten()].to_numpy()
-        if len(significantTimes):
+        significantTimes = (
+            significantBins
+            .columns[significantBins.to_numpy().flatten()]
+            .to_numpy())
+        if len(significantTimes) and (not g.axes[ro, co].sigStarsPlotted):
             ymin, ymax = g.axes[ro, co].get_ylim()
-            # g.axes[ro, co].autoscale(False)
-            # g.axes[ro, co].plot(
-            #     significantTimes,
-            #     significantTimes ** 0 * ymax * 0.95,
-            #     **sigStarOpts)
             g.axes[ro, co].scatter(
                 significantTimes,
                 significantTimes ** 0 * ymax * 0.95,
                 **sigStarOpts)
-            # g.axes[ro, co].autoscale(True)
+            if not hasattr(g.axes[ro, co], 'sigStarsPlotted'):
+                g.axes[ro, co].sigStarsPlotted = True
 
 
 def printBreakdown(asigWide, rowName, colName, hueName):
@@ -648,7 +651,7 @@ def plotAsigsAlignedWrapper(
                 loadArgs=_alignedAsigsKWargs,
                 rowColOpts=_rowColOpts,
                 limitPages=_limitPages,
-                statsTestOpts=_statsTestOpts)
+                statsTestOpts=_statsTestOpts, verbose=_arguments['verbose'])
     else:
         sigValsWide = None
     #
@@ -1125,12 +1128,14 @@ def genLegendRounder(decimals=2):
         if leg is not None:
             for t in leg.texts:
                 # check if numeric
-                if t.get_text().replace('.', '', 1).isdigit():
+                try:
+                    tNumeric = float(t.get_text())
                     # truncate label text to 4 characters
                     textNumeric = np.round(
-                        float(t.get_text()),
-                        decimals=decimals)
+                        tNumeric, decimals=decimals)
                     t.set_text('{}'.format(textNumeric))
+                except Exception:
+                    pass
         return
     return formatLegend
 
@@ -1175,7 +1180,7 @@ def plotCorrelationMatrix(
 def plotSignificance(
         sigValsDF,
         pdfName='pCount',
-        figureFolder=None,
+        figureFolder=None, decimals=3,
         **kwargs):
     if sigValsDF is None:
         return
@@ -1195,7 +1200,16 @@ def plotSignificance(
             ax.set_ylim((0, 1))
             skipEvery = len(labels) // targetNLabels + 1
             for i, l in enumerate(labels):
-                if (i % skipEvery != 0): labels[i] = ''  # skip every nth labe
+                if (i % skipEvery != 0): labels[i] = ''  # skip every nth label
+            for lb in labels:
+                try:
+                    tNumeric = float(lb.get_text())
+                    # truncate label text to 3 characters
+                    textNumeric = np.round(
+                        tNumeric, decimals=decimals)
+                    lb.set_text('{}'.format(textNumeric))
+                except Exception:
+                    pass
             ax.set_xticklabels(labels, rotation=30)
             try:
                 newwidth = (ax.get_xticks()[1] - ax.get_xticks()[0])
@@ -1207,7 +1221,7 @@ def plotSignificance(
                 centre = x + width/2.
                 bar.set_x(centre - newwidth/2.)
                 bar.set_width(newwidth)
-        pdf.savefig()
+        pdf.savefig(bbox_inches='tight', pad_inches=0.1)
         plt.close()
     return
 

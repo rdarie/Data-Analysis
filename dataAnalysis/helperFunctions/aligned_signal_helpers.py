@@ -426,26 +426,27 @@ def compareMeansGrouped(
             (asigWide.columns >= referenceTimeWindow[0]) &
             (asigWide.columns < referenceTimeWindow[1])
             )
-        refAsig = asigWide.loc[:, refTMask]
-        refGroups = [
-            # np.ravel(i)
-            i.mean(axis=1).to_numpy()
-            for nm, i in refAsig.groupby(testVar)]
     for testBin in testBins:
         tMask = (
             (asigWide.columns >= testBin - testWidth / 2) &
             (asigWide.columns < testBin + testWidth / 2)
             )
-        testAsig = asigWide.loc[:, tMask]
         if groupBy is not None:
-            groupIter = testAsig.groupby(groupBy)
+            groupIter = asigWide.groupby(groupBy)
         else:
-            groupIter = {'all': testAsig}.items()
+            groupIter = {'all': asigWide}.items()
         for name, group in groupIter:
+            testAsig = group.loc[:, tMask]
             testGroups = [
                 i.mean(axis=1).to_numpy()
-                for nm, i in group.groupby(testVar)]
+                for nm, i in testAsig.groupby(testVar)]
+            #
             if referenceTimeWindow is not None:
+                refAsig = group.loc[:, refTMask]
+                refGroups = [
+                    # np.ravel(i)
+                    i.mean(axis=1).to_numpy()
+                    for nm, i in refAsig.groupby(testVar)]
                 testGroups = [testGroups[0], refGroups[0]]
             # groupSizes = [i.shape[0] for i in testGroups]
             # maxSize = int(np.mean(groupSizes))
@@ -460,7 +461,7 @@ def compareMeansGrouped(
                         import matplotlib.pyplot as plt
                         import seaborn as sns
                         distBins = np.linspace(
-                            group.min().min(), group.max().max(), 250)
+                            group.min().min(), group.max().max(), 100)
                         fig, ax = plt.subplots(len(testGroups), 1, sharex=True)
                         for tIdx, tGrp in enumerate(testGroups):
                             sns.distplot(
@@ -468,10 +469,13 @@ def compareMeansGrouped(
                         featName = pd.unique(
                             asigWide.index.get_level_values('feature'))
                         if len(featName):
-                            ax[tIdx].set_xlabel('{}'.format(featName[0]))
+                            ax[tIdx].set_xlabel('{}, {}'.format(featName[0], name))
+                        if referenceTimeWindow is not None:
+                            ax[0].set_title('test group')
+                            ax[1].set_title('reference group')
                         plt.suptitle(
-                            't = {:.3f}; p = {:.6f}'
-                            .format(stat, p))
+                            'epoch {:.3f}: t_stat={:.3f}; p_val={:.6f}'
+                            .format(testBin, stat, p))
                         # plt.suptitle('sample size {}'.format(tMask.sum()))
                         plt.show()
                     pVals.loc[name, testBin] = p
@@ -727,7 +731,11 @@ def facetGridCompareMeans(
     allSigVals = {}
     for idx, unitName in enumerate(unitNames):
         if verbose:
-            print('on unit {}'.format(unitName))
+            print('    facetGridCompareMeans on unit {}'.format(unitName))
+        ##
+        # debugging
+        # statsTestOpts['plotting'] = (unitName == 'position#0')
+        ##
         asigWide = ns5.alignedAsigsToDF(
             dataBlock, [unitName],
             **loadArgs)
