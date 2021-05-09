@@ -149,9 +149,6 @@ if __name__ == "__main__":
         rowKeys=groupBy, colKeys=None, **daskOpts)
     #
     del dataDF
-    if arguments['lazy']:
-        dataReader.file.close()
-    #
     masterBlock = ns5.alignedAsigDFtoSpikeTrain(
         rerefDF, dataBlock=dataBlock, matchSamplingRate=True)
     masterBlock = ns5.purgeNixAnn(masterBlock)
@@ -163,3 +160,5 @@ if __name__ == "__main__":
         mode='ow')
     writer.write_block(masterBlock, use_obj_names=True)
     writer.close()
+    if arguments['lazy']:
+        dataReader.file.close()
