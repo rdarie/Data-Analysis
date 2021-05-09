@@ -234,6 +234,8 @@ if __name__ == '__main__':
                         arguments['window'],
                         arguments['alignQuery'],
                         iteratorSuffix))
+                if arguments['verbose']:
+                    print('Loading variables from {}'.format(dFPath))
                 thisRhsDF = pd.read_hdf(dFPath, arguments['unitQueryRhs'])
                 thisRhsDF.index = thisRhsDF.index.set_levels([currBlockNum], level='segment')
                 lOfRhsDF.append(thisRhsDF)
@@ -293,7 +295,7 @@ if __name__ == '__main__':
         allScores.append(scoresDF)
     allScoresDF = pd.concat(allScores)
     allScoresDF.set_index(lhGroupNames, inplace=True, append=True)
-
+    pdb.set_trace()
     if arguments['plotting']:
         figureOutputPath = os.path.join(
                 figureOutputFolder,

@@ -22,18 +22,19 @@
 
 # Request custom resources
 #SBATCH --array=2
-#   SLURM_ARRAY_TASK_ID=2
-source shellScripts/run_plotter_aligned_motion_preamble.sh
+
+SLURM_ARRAY_TASK_ID=2
+source shellScripts/calc_aligned_motion_preamble.sh
+ALIGNQUERY="--alignQuery=startingNoStim"
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
 TARGET="pedalState"
-
 ITERATOR="b"
 
 # iterator "b", -50 to 250 msec after start
 
-python -u './calcOrdinaryLeastSquares.py' --iteratorSuffix=$ITERATOR --lhsBlockSuffix="lfp" --unitQueryLhs="lfp_CAR_spectral" --rhsBlockSuffix="rig" --unitQueryRhs=$TARGET --estimatorName='ols' --loadFromFrames --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting
-python -u './processOrdinaryLeastSquares.py' --fullEstimatorName="ols_lfp_CAR_spectral_to_${TARGET}_${ITERATOR}_L_starting" --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting
-python -u './plotOrdinaryLeastSquares.py' --fullEstimatorName="ols_lfp_CAR_spectral_to_${TARGET}_${ITERATOR}_L_starting" --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting
+python -u './calcOrdinaryLeastSquares.py' --iteratorSuffix=$ITERATOR --lhsBlockSuffix="lfp" --unitQueryLhs="lfp_CAR_spectral" --rhsBlockSuffix="rig" --unitQueryRhs=$TARGET --estimatorName='ols' --loadFromFrames --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $VERBOSITY --plotting
+# python -u './processOrdinaryLeastSquares.py' --fullEstimatorName="ols_lfp_CAR_spectral_to_${TARGET}_${ITERATOR}_L_starting" --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting
+# python -u './plotOrdinaryLeastSquares.py' --fullEstimatorName="ols_lfp_CAR_spectral_to_${TARGET}_${ITERATOR}_L_starting" --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting
 
 # python -u './calcGridSearchSingleTarget.py' --iteratorSuffix=$ITERATOR --lhsBlockSuffix="lfp" --unitQueryLhs="lfp_CAR_spectral" --rhsBlockSuffix="rig" --unitQueryRhs="jointAngularVelocity" --estimatorName='enr' --loadFromFrames --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
 # python -u './processOrdinaryLeastSquares.py' --fullEstimatorName="enr_lfp_CAR_spectral_to_${TARGET}_${ITERATOR}_L_starting" --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting

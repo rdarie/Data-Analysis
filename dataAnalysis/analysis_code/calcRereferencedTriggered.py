@@ -130,6 +130,8 @@ if __name__ == "__main__":
         daskClient = None
         print('Scheduler name is not correct!')
     #
+    if arguments['verbose']:
+        print('calcRereferencedTriggered() loading {}'.format(triggeredPath))
     dataReader, dataBlock = ns5.blockFromPath(
         triggeredPath, lazy=arguments['lazy'])
     dataDF = ns5.alignedAsigsToDF(
@@ -156,8 +158,6 @@ if __name__ == "__main__":
     if os.path.exists(outputPath + '.nix'):
         os.remove(outputPath + '.nix')
     print('Writing {}.nix...'.format(outputPath))
-    if os.path.exists(outputPath):
-        os.remove(outputPath)
     writer = ns5.NixIO(
         filename=outputPath + '.nix',
         mode='ow')

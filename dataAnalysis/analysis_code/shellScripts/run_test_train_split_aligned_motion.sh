@@ -36,7 +36,7 @@ python -u './applyTestTrainSplit.py' --resetHDF --inputBlockSuffix="lfp_CAR" --u
 python -u './applyTestTrainSplit.py' --inputBlockSuffix="lfp_CAR_spectral" --unitQuery="lfp" --selectionName='lfp_CAR_spectral' --verbose $ITERATOR --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
 # python -u './applyTestTrainSplit.py' --inputBlockSuffix="csd" --unitQuery="lfp" --selectionName='csd' --verbose $ITERATOR --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
 # python -u './applyTestTrainSplit.py' --inputBlockSuffix="csd_spectral" --unitQuery="lfp" --selectionName='csd_spectral' --verbose $ITERATOR --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
-python -u './applyTestTrainSplit.py' --inputBlockSuffix="rig" --unitQuery="limbState" --selectionName='limbState' --verbose $ITERATOR --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
+# python -u './applyTestTrainSplit.py' --inputBlockSuffix="rig" --unitQuery="limbState" --selectionName='limbState' --verbose $ITERATOR --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
 python -u './applyTestTrainSplit.py' --inputBlockSuffix="rig" --unitQuery="pedalState" --selectionName='pedalState' $ITERATOR --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS $VERBOSITY
 #
 # next, go to run_test_train_split_assembler_xxx.sh
