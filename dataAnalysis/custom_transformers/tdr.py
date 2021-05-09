@@ -339,7 +339,6 @@ class trialAwareStratifiedKFold:
             .index.to_frame()
             .reset_index(drop=True)
             .loc[:, self.stratifyFactors + self.continuousFactors])
-        # 
         if (self.stratifyFactors is not None):
             for idx, (name, group) in enumerate(trialInfo.groupby(self.stratifyFactors)):
                 trialInfo.loc[group.index, 'stratifyGroup'] = idx

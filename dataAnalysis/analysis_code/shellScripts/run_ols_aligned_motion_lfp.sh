@@ -35,6 +35,6 @@ python -u './calcOrdinaryLeastSquares.py' --iteratorSuffix=$ITERATOR --lhsBlockS
 python -u './processOrdinaryLeastSquares.py' --fullEstimatorName="ols_lfp_CAR_spectral_to_${TARGET}_${ITERATOR}_L_starting" --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting
 python -u './plotOrdinaryLeastSquares.py' --fullEstimatorName="ols_lfp_CAR_spectral_to_${TARGET}_${ITERATOR}_L_starting" --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting
 
-python -u './calcGridSearchSingleTarget.py' --iteratorSuffix=$ITERATOR --lhsBlockSuffix="lfp" --unitQueryLhs="lfp_CAR_spectral" --rhsBlockSuffix="rig" --unitQueryRhs="jointAngularVelocity" --estimatorName='enr' --loadFromFrames --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
-python -u './processOrdinaryLeastSquares.py' --fullEstimatorName="enr_lfp_CAR_spectral_to_${TARGET}_${ITERATOR}_L_starting" --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting
-python -u './plotOrdinaryLeastSquares.py' --fullEstimatorName="enr_lfp_CAR_spectral_to_${TARGET}_${ITERATOR}_L_starting" --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting
+# python -u './calcGridSearchSingleTarget.py' --iteratorSuffix=$ITERATOR --lhsBlockSuffix="lfp" --unitQueryLhs="lfp_CAR_spectral" --rhsBlockSuffix="rig" --unitQueryRhs="jointAngularVelocity" --estimatorName='enr' --loadFromFrames --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
+# python -u './processOrdinaryLeastSquares.py' --fullEstimatorName="enr_lfp_CAR_spectral_to_${TARGET}_${ITERATOR}_L_starting" --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting
+# python -u './plotOrdinaryLeastSquares.py' --fullEstimatorName="enr_lfp_CAR_spectral_to_${TARGET}_${ITERATOR}_L_starting" --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting

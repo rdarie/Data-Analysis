@@ -95,7 +95,7 @@ if 'windowSize' not in alignedAsigsKWargs:
     alignedAsigsKWargs['windowSize'] = [ws for ws in rasterOpts['windowSizes'][arguments['window']]]
 if 'winStart' in arguments:
     if arguments['winStart'] is not None:
-        alignedAsigsKWargs['windowSize'][0] = float(arguments['winStart']) * (-1e-3)
+        alignedAsigsKWargs['windowSize'][0] = float(arguments['winStart']) * (1e-3)
 if 'winStop' in arguments:
     if arguments['winStop'] is not None:
         alignedAsigsKWargs['windowSize'][1] = float(arguments['winStop']) * (1e-3)
@@ -197,7 +197,6 @@ if not arguments['loadFromFrames']:
             dataBlock,
             whichSegments=[segIdx],
             **aakwa)
-        # pdb.set_trace()
         # trialInfo = dataDF.index.to_frame().reset_index(drop=True)
         if arguments['calcTimeROI']:
             endMaskQuery = ash.processAlignQueryArgs(

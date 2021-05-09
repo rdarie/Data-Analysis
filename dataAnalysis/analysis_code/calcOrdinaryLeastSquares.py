@@ -315,7 +315,8 @@ if __name__ == '__main__':
             # fig, ax = plt.subplots()
             # fig.set_size_inches(12, 8)
             g = sns.catplot(
-                data=scoresForPlot, hue='evalType', col='target',
+                data=scoresForPlot, hue='evalType',
+                col='target',
                 x='freqBandName', y='score',
                 kind='box')
             g.fig.suptitle('R^2')

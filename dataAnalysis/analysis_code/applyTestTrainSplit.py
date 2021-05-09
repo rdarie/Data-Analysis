@@ -172,7 +172,8 @@ if arguments['verbose']:
 if arguments['resetHDF']:
     if os.path.exists(outputDFPath):
         os.remove(outputDFPath)
-featureGroupNames = ['freqBandName']
+# pdb.set_trace()
+featureGroupNames = ['feature']
 maskList = []
 haveAllGroup = False
 for name, group in exportDF.groupby(featureGroupNames, axis='columns'):
