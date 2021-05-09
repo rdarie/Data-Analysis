@@ -22,7 +22,7 @@
 # Request custom resources
 #SBATCH --array=2
 SLURM_ARRAY_TASK_ID=2
-source ./shellScripts/run_pca_calc_aligned_motion_preamble.sh
+source ./shellScripts/calc_aligned_motion_preamble.sh
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
 python -u './calcPartialLeastSquares.py' --loadFromFrames --iteratorSuffix='a' --lhsBlockSuffix="csd" --unitQueryLhs="csd" --rhsBlockSuffix="rig" --unitQueryRhs="jointAngle" --estimatorName='pls_csd_ja' --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting
 python -u './calcPartialLeastSquares.py' --loadFromFrames --iteratorSuffix='a' --lhsBlockSuffix="csd_spectral" --unitQueryLhs="csd_spectral" --rhsBlockSuffix="rig" --unitQueryRhs="jointAngle" --estimatorName='pls_csd_spectral_ja' --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting

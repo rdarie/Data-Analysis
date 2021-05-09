@@ -23,6 +23,6 @@
 #SBATCH --array=2
 
 SLURM_ARRAY_TASK_ID=2
-source ./shellScripts/run_pca_calc_aligned_motion_preamble.sh
+source ./shellScripts/calc_aligned_motion_preamble.sh
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
 python -u './calcSignalDimensionality.py' --loadFromFrames --inputBlockSuffix="rig" --unitQuery="jointAngle" --estimatorName="pca_ja" --iteratorSuffix='a' --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting

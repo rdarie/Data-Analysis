@@ -23,7 +23,7 @@
 #SBATCH --array=2,3
 
 #    SLURM_ARRAY_TASK_ID=3
-source ./shellScripts/run_pca_calc_aligned_motion_preamble.sh
+source ./shellScripts/calc_aligned_motion_preamble.sh
 
 python -u './calcTestTrainSplit.py' --inputBlockSuffix="rig" --unitQuery="rig" --selectionName='rig' --calcTimeROI --ROIWinStart=-50 --ROIWinStop=300 --eventName='motion' --eventBlockSuffix='epochs' --timeROIAlignQuery='starting' --iteratorSuffix='b' --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $OUTLIERMASK $LAZINESS $TIMEWINDOWOPTS $VERBOSITY
 #
