@@ -159,6 +159,7 @@ if __name__ == '__main__':
     estimatorClass = ElasticNet
     estimatorKWArgs = dict()
     gridSearchKWArgs = dict(
+        max_iter=5000,
         l1_ratio=[.1, .5, .7, .9, .95, .99, 1.],
         cv=cvIterator)
     '''estimatorClass = SGDRegressor
@@ -266,11 +267,16 @@ if __name__ == '__main__':
                 thisRhsDF = pd.read_hdf(dFPath, arguments['unitQueryRhs'])
                 # only use zero lag targets    
                 thisRhsDF = thisRhsDF.xs(0, level='lag', axis='columns')
+                thisRhsDF.loc[:, 'expName'] = expName
+                thisRhsDF.set_index('expName', inplace=True, append=True)
                 #
                 thisRhsDF.index = thisRhsDF.index.set_levels([currBlockNum], level='segment')
                 lOfRhsDF.append(thisRhsDF)
+                # pdb.set_trace()
                 thisLhsDF = pd.read_hdf(dFPath, arguments['unitQueryLhs'])
                 thisLhsDF.index = thisLhsDF.index.set_levels([currBlockNum], level='segment')
+                thisLhsDF.loc[:, 'expName'] = expName
+                thisLhsDF.set_index('expName', inplace=True, append=True)
                 lOfLhsDF.append(thisLhsDF)
                 thisLhsMask = pd.read_hdf(dFPath, arguments['unitQueryLhs'] + '_featureMasks')
                 lOfLhsMasks.append(thisLhsMask)
@@ -278,6 +284,44 @@ if __name__ == '__main__':
     lhsDF = pd.concat(lOfLhsDF)
     rhsDF = pd.concat(lOfRhsDF)
     ##### end of data loading stuff
+    #
+    ## Normalize lhs
+    lhsNormalizationParams = [[], []]
+    if 'spectral' in arguments['unitQueryLhs']:
+        for expName, dataGroup in lhsDF.groupby('expName'):
+            for featName, subGroup in dataGroup.groupby('feature', axis='columns'):
+                print('Pre-normalizing {}, {}'.format(expName, featName))
+                meanLevel = np.mean(subGroup.xs(0, level='lag', axis='columns').to_numpy())
+                lhsDF.loc[subGroup.index, subGroup.columns] = np.sqrt(lhsDF.loc[subGroup.index, subGroup.columns] / meanLevel)
+                lhsNormalizationParams[0].append({
+                    'expName': expName,
+                    'feature': featName,
+                    'mu': meanLevel,
+                })
+        for featName, dataGroup in lhsDF.groupby('feature', axis='columns'):
+            print('Final normalizing {}'.format(featName))
+            refData = dataGroup.xs(0, level='lag', axis='columns').to_numpy()
+            mu = np.mean(refData)
+            sigma = np.std(refData)
+            lhsNormalizationParams[1].append({
+                'feature': featName,
+                'mu': mu,
+                'sigma': sigma
+            })
+            lhsDF.loc[:, dataGroup.columns] = (lhsDF[dataGroup.columns] - mu) / sigma
+    #
+    ## Normalize rhs
+    rhsNormalizationParams = [[]]
+    for featName, dataGroup in rhsDF.groupby('feature', axis='columns'):
+        print('Normalizing {}'.format(featName))
+        mu = np.mean(dataGroup)
+        sigma = np.std(dataGroup)
+        rhsNormalizationParams[0].append({
+            'feature': featName,
+            'mu': mu,
+            'sigma': sigma
+        })
+        rhsDF.loc[:, dataGroup.columns] = (rhsDF[dataGroup.columns] - mu) / sigma
     #
     workingLhsDF = lhsDF.iloc[workIdx, :]
     workingRhsDF = rhsDF.iloc[workIdx, :]
@@ -318,8 +362,8 @@ if __name__ == '__main__':
             lhKey = lhGroupNames[i]
             scoresDF.loc[:, lhKey] = lhAttr
         allScores.append(scoresDF)
-        if idx > 10:
-            break
+        '''if idx > 10:
+            break'''
     allScoresDF = pd.concat(allScores)
     allScoresDF.set_index(lhGroupNames, inplace=True, append=True)
     #

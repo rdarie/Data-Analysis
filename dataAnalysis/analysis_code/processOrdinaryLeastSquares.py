@@ -220,8 +220,8 @@ for idx, (attrNameList, lhsMask) in enumerate(lhsMasks.iterrows()):
         predListPerTarget.append(targetPredictions)
     groupPredictions = pd.concat(predListPerTarget, axis='columns')
     allPredictionsList.append(groupPredictions)
-    if idx > 10:
-        break
+    '''if idx > 10:
+        break'''
 #
 # target values do not have meaningful attributes from the predictor group
 predictedDF = pd.concat(allPredictionsList)
