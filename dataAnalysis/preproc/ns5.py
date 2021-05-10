@@ -74,7 +74,6 @@ def listChanNames(
     allChanList = [
         i.name
         for i in dataBlock.filter(objects=objType)]
-    # pdb.set_trace()
     if condition == 'hasAsigs':
         allChanList = [
             i
@@ -524,7 +523,6 @@ def concatenateBlocks(
     allTdDF = pd.concat(asigCache)
     #
     if clipSignals:
-        # pdb.set_trace()
         for clpN, clpOpt in clippingOpts.items():
             colMask = allTdDF.columns.str.contains(clpN)
             useIQR = clpOpt.pop('IQR', False)
@@ -951,7 +949,7 @@ def unitSpikeTrainWaveformsToDF(
                         window=rollingWindow, win_type='gaussian',
                         center=False)
                     .mean(std=halfRollingWin).T)
-            else: # rollingWindow is None
+            else:  # rollingWindow is None
                 halfRollingWin = 0
                 seekIdx = slice(None, None, decimate)
                 if False:
@@ -982,7 +980,6 @@ def unitSpikeTrainWaveformsToDF(
     #
     if transposeToColumns == 'feature':
         # stack the bin, name the feature column
-        # 
         for idx, (key, value) in enumerate(laggedWaveformsDict.items()):
             if idx == 0:
                 stackedIndexDF = pd.concat(
@@ -1004,9 +1001,13 @@ def unitSpikeTrainWaveformsToDF(
         waveformsDF = pd.concat(
             laggedWaveformsDict,
             names=['feature', 'lag', 'originalDummy']).reset_index()
+        metaLookup = pd.DataFrame(
+            np.nan, index=waveformsDF.index, columns=metaDF.columns)
+        for cN in metaLookup.columns:
+            metaLookup.loc[:, cN] = waveformsDF['originalDummy'].map(metaDF[cN])
         waveformsDF = pd.concat(
             [
-                metaDF.reset_index(drop=True),
+                metaLookup,
                 waveformsDF.drop(columns='originalDummy')],
             axis='columns')
         idxLabels += ['feature', 'lag']
@@ -1046,7 +1047,9 @@ def concatenateUnitSpikeTrainWaveformsDF(
             print('concatenating unitDF {}'.format(thisUnit.name))
         lags = None
         if addLags is not None:
-            if thisUnit.name in addLags:
+            if 'all' in addLags:
+                lags = addLags['all']
+            elif thisUnit.name in addLags:
                 lags = addLags[thisUnit.name]
         unitWaveforms = unitSpikeTrainWaveformsToDF(
             thisUnit, dataQuery=dataQuery,
@@ -1098,6 +1101,7 @@ def concatenateUnitSpikeTrainWaveformsDF(
         allWaveforms.sort_index(
             axis='columns', inplace=True, kind='mergesort')
     except Exception:
+        traceback.print_exc()
         pdb.set_trace()
     return allWaveforms
 
@@ -1116,7 +1120,7 @@ def alignedAsigsToDF(
         getMetaData=True, metaDataToCategories=True,
         outlierTrials=None, invertOutlierMask=False,
         makeControlProgram=False, removeFuzzyName=False,
-        procFun=None, finalIndexMask=None):
+        procFun=None, dropNaNs=True, finalIndexMask=None):
     #  channels to trigger
     if unitNames is None:
         unitNames = listChanNames(dataBlock, unitQuery, objType=Unit)
@@ -1183,7 +1187,6 @@ def alignedAsigsToDF(
                 )
             uniqProgs = stimWaveforms[programColumn].unique()
             progElecLookup = {}
-            # pdb.set_trace()
             for progIdx in uniqProgs:
                 theseStimDF = stimWaveforms.loc[
                     stimWaveforms[programColumn] == progIdx,
@@ -1235,6 +1238,11 @@ def alignedAsigsToDF(
         allWaveforms.columns = allWaveforms.columns.remove_unused_levels()
     allWaveforms.sort_index(
         axis='columns', inplace=True, kind='mergesort')
+    if dropNaNs:
+        if transposeToColumns == 'bin':
+            allWaveforms.dropna(inplace=True, axis='columns')
+        elif transposeToColumns == 'feature':
+            allWaveforms.dropna(inplace=True, axis='index')
     if finalIndexMask is not None:
         allWaveforms = allWaveforms.loc[finalIndexMask.to_numpy(), :]
     return allWaveforms
@@ -1493,7 +1501,6 @@ def getAsigsAlignedToEvents(
         folderPath, fileName + '.nix')
     if not os.path.exists(triggeredPath):
         appendToExisting = False
-    # pdb.set_trace()
     if appendToExisting:
         allSegs = list(range(len(masterBlock.segments)))
         addBlockToNIX(
@@ -2695,7 +2702,6 @@ def preproc(
             'chunkTStop': chunkTStop}
         block.annotate(chunkTStart=chunkTStart)
         block.annotate(chunkTStop=chunkTStop)
-        # pdb.set_trace()
         block.annotate(
             recDatetimeStr=(
                 block
@@ -3044,7 +3050,6 @@ def preprocBlockToNix(
                     time_slice=(tStart, tStop),
                     magnitude_mode='rescaled')
                 if 'tempLFPStore' not in locals():
-                    # pdb.set_trace()
                     tempLFPStore = pd.DataFrame(
                         np.zeros(
                             (asig.shape[0], nAsigs),
@@ -3126,6 +3131,7 @@ def preprocBlockToNix(
                 try:
                     devFiltDebugMask = (dummyAsig.times > 90 * pq.s) & (dummyAsig.times < 92 * pq.s)
                 except Exception:
+                    traceback.print_exc()
                     pdb.set_trace()
                 plotColIdx = 1
                 ddfFig, ddfAx = plt.subplots(len(asigNameList), 1)
@@ -3275,7 +3281,6 @@ def preprocBlockToNix(
                     #
                     transformedDeviation = stats.norm.isf(stats.chi2.sf(lfpDeviation[:, subListIdx], nDim))
                     infMask = np.isinf(transformedDeviation)
-                    # pdb.set_trace()
                     if infMask.any():
                         transformedDeviation[infMask] = transformedDeviation[~infMask].max()
                     debugProbaTrans = False
@@ -3596,7 +3601,6 @@ def preprocBlockToNix(
                     .fillna(method='bfill')
                     )
                 asig.magnitude[:, 0] = tempSer.to_numpy()
-            # pdb.set_trace()
             if (aSigProxy in aSigList) or (aSigProxy in ainpList):
                 # assign ownership to containers
                 chanIdx.analogsignals.append(asig)
@@ -3951,6 +3955,7 @@ def blockFromPath(
         dataPath, lazy=False, mapDF=None,
         reduceChannelIndexes=False, loadList=None,
         purgeNixNames=False, chunkingInfoPath=None):
+    print('blockFromPath() loading {}'.format(dataPath))
     chunkingMetadata = None
     if chunkingInfoPath is not None:
         if os.path.exists(chunkingInfoPath):

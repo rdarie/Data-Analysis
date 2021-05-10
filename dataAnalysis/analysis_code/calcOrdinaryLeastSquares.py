@@ -32,7 +32,7 @@ matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
 matplotlib.use('QT5Agg')   # generate postscript output
 # matplotlib.use('Agg')   # generate postscript output
-from dask.distributed import Client
+from dask.distributed import Client, LocalCluster
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import seaborn as sns
@@ -92,7 +92,7 @@ if __name__ == '__main__':
     if not os.path.exists(calcSubFolder):
         os.makedirs(calcSubFolder)
     dataFramesFolder = os.path.join(alignSubFolder, 'dataframes')
-
+    #
     if arguments['processAll']:
         rhsBlockBaseName = arguments['rhsBlockPrefix']
         lhsBlockBaseName = arguments['lhsBlockPrefix']
@@ -101,7 +101,7 @@ if __name__ == '__main__':
             arguments['rhsBlockPrefix'], arguments['blockIdx'])
         lhsBlockBaseName = '{}{:0>3}'.format(
             arguments['lhsBlockPrefix'], arguments['blockIdx'])
-
+    #
     if arguments['plotting']:
         figureOutputFolder = os.path.join(
             figureFolder,
@@ -124,7 +124,7 @@ if __name__ == '__main__':
             iteratorSuffix))
     with open(iteratorPath, 'rb') as f:
         loadingMeta = pickle.load(f)
-
+    #
     fullEstimatorName = '{}_{}_to_{}{}_{}_{}'.format(
         arguments['estimatorName'],
         arguments['unitQueryLhs'], arguments['unitQueryRhs'],
@@ -140,21 +140,19 @@ if __name__ == '__main__':
         alignSubFolder,
         rhsBlockBaseName + '{}_{}.nix'.format(
             rhsBlockSuffix, arguments['window']))
-
+    #
     if arguments['lhsBlockSuffix'] is not None:
         lhsBlockSuffix = '_{}'.format(arguments['lhsBlockSuffix'])
     else:
         lhsBlockSuffix = ''
-
+    #
     triggeredLhsPath = os.path.join(
         alignSubFolder,
         lhsBlockBaseName + '{}_{}.nix'.format(
             lhsBlockSuffix, arguments['window']))
     #
-    #
     iteratorsBySegment = loadingMeta['iteratorsBySegment'].copy()
     cv_kwargs = loadingMeta['cv_kwargs'].copy()
-
     ######### data loading stuff
     lOfRhsDF = []
     lOfLhsDF = []
@@ -213,6 +211,7 @@ if __name__ == '__main__':
             if not (triggeredLhsPath == triggeredRhsPath):
                 dataLhsReader.file.close()
     else:    # loading frames
+        lOfDFPaths = []
         experimentsToAssemble = loadingMeta['experimentsToAssemble'].copy()
         currBlockNum = 0
         for expName, lOfBlocks in experimentsToAssemble.items():
@@ -234,6 +233,7 @@ if __name__ == '__main__':
                         arguments['window'],
                         arguments['alignQuery'],
                         iteratorSuffix))
+                lOfDFPaths.append(dFPath)
                 if arguments['verbose']:
                     print('Loading variables from {}'.format(dFPath))
                 thisRhsDF = pd.read_hdf(dFPath, arguments['unitQueryRhs'])
@@ -247,8 +247,7 @@ if __name__ == '__main__':
                 currBlockNum += 1
     lhsDF = pd.concat(lOfLhsDF)
     rhsDF = pd.concat(lOfRhsDF)
-    ##### end of data loading stuff
-    #
+    #  #### end of data loading stuff
     cvIterator = iteratorsBySegment[0]
     workIdx = cvIterator.work
     workingLhsDF = lhsDF.iloc[workIdx, :]
@@ -259,7 +258,7 @@ if __name__ == '__main__':
     allScores = []
     lhsMasks = lOfLhsMasks[0]
     lhGroupNames = lhsMasks.index.names
-    crossvalKWArgs=dict(
+    crossvalKWArgs = dict(
         cv=cvIterator, scoring='r2',
         return_estimator=True,
         return_train_score=True)
@@ -269,8 +268,8 @@ if __name__ == '__main__':
     estimatorKWArgs = dict()
     if 'backend' in joblibBackendArgs:
         if joblibBackendArgs['backend'] == 'dask':
-            daskClient = Client()
-    for maskIdx, lhsMask in lhsMasks.iterrows():
+            daskClient = Client(LocalCluster())
+    for idx, (maskIdx, lhsMask) in enumerate(lhsMasks.iterrows()):
         scores = {}
         lhGroup = lhsDF.loc[:, lhsMask]
         for columnTuple in rhsDF.columns:
@@ -293,15 +292,19 @@ if __name__ == '__main__':
             lhKey = lhGroupNames[i]
             scoresDF.loc[:, lhKey] = lhAttr
         allScores.append(scoresDF)
+        '''if idx > 20:
+            break'''
     allScoresDF = pd.concat(allScores)
     allScoresDF.set_index(lhGroupNames, inplace=True, append=True)
-    pdb.set_trace()
+    # pdb.set_trace()
     if arguments['plotting']:
         figureOutputPath = os.path.join(
-                figureOutputFolder,
-                '{}_r2.pdf'.format(fullEstimatorName))
+            figureOutputFolder,
+            '{}_r2.pdf'.format(fullEstimatorName))
         scoresForPlot = pd.concat(
-            {'test': allScoresDF['test_score'], 'train': allScoresDF['train_score']},
+            {
+                'test': allScoresDF['test_score'],
+                'train': allScoresDF['train_score']},
             names=['evalType']).to_frame(name='score').reset_index()
         lastFoldIdx = scoresForPlot['fold'].max()
         validationMask = (
@@ -318,13 +321,15 @@ if __name__ == '__main__':
             # fig.set_size_inches(12, 8)
             g = sns.catplot(
                 data=scoresForPlot, hue='evalType',
-                col='target',
-                x='freqBandName', y='score',
+                col='feature', col_wrap=5,
+                x='target', y='score',
                 kind='box')
             g.fig.suptitle('R^2')
+            newYLims = scoresForPlot['score'].quantile([0.25, 1 - 1e-3]).to_list()
             for ax in g.axes.flat:
                 ax.set_xlabel('regression target')
                 ax.set_ylabel('R2 of ordinary least squares fit')
+                ax.set_ylim(newYLims)
             g.fig.tight_layout(pad=1)
             pdf.savefig(bbox_inches='tight', pad_inches=0)
             if arguments['showFigures']:

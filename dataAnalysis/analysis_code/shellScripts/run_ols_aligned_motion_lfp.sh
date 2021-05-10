@@ -32,7 +32,7 @@ ITERATOR="b"
 
 # iterator "b", -50 to 250 msec after start
 
-python -u './calcOrdinaryLeastSquares.py' --iteratorSuffix=$ITERATOR --lhsBlockSuffix="lfp" --unitQueryLhs="lfp_CAR_spectral" --rhsBlockSuffix="rig" --unitQueryRhs=$TARGET --estimatorName='ols' --loadFromFrames --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $VERBOSITY --plotting
+python -u './calcOrdinaryLeastSquares.py' --iteratorSuffix=$ITERATOR --lhsBlockSuffix="lfp" --unitQueryLhs="lfp_CAR_spectral" --rhsBlockSuffix="rig" --unitQueryRhs=$TARGET --estimatorName='ols' --loadFromFrames --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $VERBOSITY --plotting --showFigures
 # python -u './processOrdinaryLeastSquares.py' --fullEstimatorName="ols_lfp_CAR_spectral_to_${TARGET}_${ITERATOR}_L_starting" --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting
 # python -u './plotOrdinaryLeastSquares.py' --fullEstimatorName="ols_lfp_CAR_spectral_to_${TARGET}_${ITERATOR}_L_starting" --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting
 

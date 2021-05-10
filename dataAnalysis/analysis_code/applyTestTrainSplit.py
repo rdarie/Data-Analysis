@@ -111,6 +111,7 @@ for segIdx in range(nSeg):
     if arguments['verbose']:
         prf.print_memory_usage('extracting data on segment {}'.format(segIdx))
     aakwa = deepcopy(alignedAsigsKWargs)
+    ##
     featureAnnsToGrab = ['xCoords', 'yCoords', 'freqBandName']
     aakwa.update(dict(transposeToColumns='bin', concatOn='index'))
     aakwa['getMetaData'] += featureAnnsToGrab
@@ -122,6 +123,7 @@ for segIdx in range(nSeg):
     aakwa = deepcopy(alignedAsigsKWargs)
     dataDF = ns5.alignedAsigsToDF(
         dataBlock, whichSegments=[segIdx], **aakwa)
+    pdb.set_trace()
     if 'listOfROIMasks' in loadingMeta:
         aakwa['finalIndexMask'] = loadingMeta['listOfROIMasks'][segIdx]
     if arguments['needsRollingWindow']:
@@ -172,33 +174,35 @@ if arguments['verbose']:
 if arguments['resetHDF']:
     if os.path.exists(outputDFPath):
         os.remove(outputDFPath)
-# pdb.set_trace()
-featureGroupNames = ['feature']
-maskList = []
-haveAllGroup = False
-for name, group in exportDF.groupby(featureGroupNames, axis='columns'):
-    if not isinstance(name, tuple):
-        attrValues = (name, )
-    else:
-        attrValues = name
-    thisMask = pd.Series(exportDF.columns.isin(group.columns), index=exportDF.columns).to_frame()
-    if np.all(thisMask):
-        haveAllGroup = True
-        thisMask.columns = pd.MultiIndex.from_tuples(
-            [tuple('all' for fgn in featureGroupNames)],
-            names=featureGroupNames)
-    else:
-        thisMask.columns = pd.MultiIndex.from_tuples((attrValues, ), names=featureGroupNames)
-    maskList.append(thisMask.T)
-#
-if not haveAllGroup:
-    allMask = pd.Series(True, index=exportDF.columns).to_frame()
-    allMask.columns = pd.MultiIndex.from_tuples(
-        [tuple('all' for fgn in featureGroupNames)],
-        names=featureGroupNames)
-    maskList.append(allMask.T)
-#
-maskDF = pd.concat(maskList)
 #
 exportDF.to_hdf(outputDFPath, arguments['selectionName'], mode='a')
-maskDF.to_hdf(outputDFPath, arguments['selectionName'] + '_featureMasks', mode='a')
+#
+pdb.set_trace()
+if arguments['selectionName'] == 'lfp_CAR_spectral':
+    featureGroupNames = ['feature']
+    maskList = []
+    haveAllGroup = False
+    for name, group in exportDF.groupby(featureGroupNames, axis='columns'):
+        if not isinstance(name, tuple):
+            attrValues = (name, )
+        else:
+            attrValues = name
+        thisMask = pd.Series(exportDF.columns.isin(group.columns), index=exportDF.columns).to_frame()
+        if np.all(thisMask):
+            haveAllGroup = True
+            thisMask.columns = pd.MultiIndex.from_tuples(
+                [tuple('all' for fgn in featureGroupNames)],
+                names=featureGroupNames)
+        else:
+            thisMask.columns = pd.MultiIndex.from_tuples((attrValues, ), names=featureGroupNames)
+        maskList.append(thisMask.T)
+    #
+    if not haveAllGroup:
+        allMask = pd.Series(True, index=exportDF.columns).to_frame()
+        allMask.columns = pd.MultiIndex.from_tuples(
+            [tuple('all' for fgn in featureGroupNames)],
+            names=featureGroupNames)
+        maskList.append(allMask.T)
+    #
+    maskDF = pd.concat(maskList)
+    maskDF.to_hdf(outputDFPath, arguments['selectionName'] + '_featureMasks', mode='a')

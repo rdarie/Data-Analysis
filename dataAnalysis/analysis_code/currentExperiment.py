@@ -488,10 +488,13 @@ def parseAnalysisOptions(
                 )
     except Exception:
         pass
+    #
     glmOptsLookup = {
         'ensembleHistoryLen': .30,
-        'covariateHistoryLen': .30,
+        'covariateHistoryLen': .50,
         'nHistoryBasisTerms': 5,
+        'nCovariateBasisTerms': 5,
+        'regressionBinInterval': 10e-3,
         'glm_50msec': dict(
             subsampleOpts=dict(
                 rollingWindow=50, decimate=50,

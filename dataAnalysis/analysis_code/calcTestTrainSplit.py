@@ -30,7 +30,6 @@ Options:
     --eventSubfolder=eventSubfolder                      name of folder where the event block is [default: None]
     --loadFromFrames                                     load data from pre-saved dataframes?
     --saveDataFrame                                      save corresponding dataframe?
-    --needsRollingWindow                                 need to decimate to align to spectrogram?
     --selectionName=selectionName                        name in h5 for the saved data
 """
 
@@ -42,7 +41,7 @@ import dataAnalysis.custom_transformers.tdr as tdr
 from dataAnalysis.analysis_code.namedQueries import namedQueries
 from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
 import pdb
-# import numpy as np
+import numpy as np
 import dataAnalysis.preproc.ns5 as ns5
 # from sklearn.decomposition import PCA, IncrementalPCA
 # from sklearn.pipeline import make_pipeline, Pipeline
@@ -169,11 +168,18 @@ iteratorPath = os.path.join(
 if arguments['verbose']:
     prf.print_memory_usage('before load data')
 
+binOpts = rasterOpts['binOpts'][arguments['analysisName']]
+lags = np.linspace(
+    -1 * glmOptsLookup['covariateHistoryLen'],
+    glmOptsLookup['covariateHistoryLen'],
+    glmOptsLookup['nCovariateBasisTerms']) / binOpts['binInterval']
+alignedAsigsKWargs['addLags'] = {'all': lags.astype(int).tolist()}
+alignedAsigsKWargs['decimate'] = int(glmOptsLookup['regressionBinInterval'] / binOpts['binInterval'])
 nSplits = 7
 cv_kwargs = dict(
     shuffle=True,
     stratifyFactors=stimulusConditionNames,
-    continuousFactors=['segment', 'originalIndex'])
+    continuousFactors=['segment', 'originalIndex', 't'])
 listOfIterators = []
 listOfDataFrames = []
 if not arguments['loadFromFrames']:
@@ -186,13 +192,6 @@ if not arguments['loadFromFrames']:
             prf.print_memory_usage(
                 'fitting on segment {}'.format(segIdx))
         aakwa = alignedAsigsKWargs.copy()
-        if arguments['needsRollingWindow']:
-            # needs downsampling
-            binInterval = rasterOpts['binOpts'][arguments['analysisName']]['binInterval']
-            stepLen = spectralFeatureOpts['stepLen']
-            winLen = spectralFeatureOpts['winLen']
-            aakwa['decimate'] = int(stepLen / binInterval)
-            aakwa['rollingWindow'] = int(winLen / binInterval)
         dataDF = ns5.alignedAsigsToDF(
             dataBlock,
             whichSegments=[segIdx],
