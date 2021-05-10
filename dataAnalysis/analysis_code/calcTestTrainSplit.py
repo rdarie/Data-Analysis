@@ -213,6 +213,7 @@ if not arguments['loadFromFrames']:
                 print('Looking for bins >= {} and < {}'.format(ROIWinStart, deltaT + ROIWinStop))
                 targetMask.loc[group.index] = (groupBins >= ROIWinStart) & (groupBins < deltaT + ROIWinStop)
             listOfROIMasks.append(targetMask)
+            pdb.set_trace()
             dataDF = dataDF.loc[targetMask, :]
             exampleIndex = dataDF.index
             listOfExampleIndexes.append(exampleIndex)
@@ -270,6 +271,7 @@ else:
     listOfIterators.append(cvIterator)
 
 pdb.set_trace()
+###
 exportAAKWA = alignedAsigsKWargs.copy()
 exportAAKWA.pop('unitNames', None)
 exportAAKWA.pop('unitQuery', None)

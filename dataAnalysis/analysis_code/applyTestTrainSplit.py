@@ -177,6 +177,7 @@ if arguments['resetHDF']:
 #
 exportDF.to_hdf(outputDFPath, arguments['selectionName'], mode='a')
 #
+pdb.set_trace()
 if arguments['selectionName'] == 'lfp_CAR_spectral':
     featureGroupNames = ['feature']
     maskList = []

@@ -151,6 +151,9 @@ for expName, lOfBlocks in experimentsToAssemble.items():
                 iteratorSuffix))
         thisRhsDF = pd.read_hdf(dFPath, arguments['unitQueryRhs'])
         thisRhsDF.index = thisRhsDF.index.set_levels([currBlockNum], level='segment')
+        # only use zero lag targets    
+        thisRhsDF = thisRhsDF.xs(0, level='lag', axis='columns')
+        #
         lOfRhsDF.append(thisRhsDF)
         thisLhsDF = pd.read_hdf(dFPath, arguments['unitQueryLhs'])
         thisLhsDF.index = thisLhsDF.index.set_levels([currBlockNum], level='segment')
@@ -175,11 +178,14 @@ for attrIdx, attrName in enumerate(attrNameList):
 rhsDF.index = pd.MultiIndex.from_frame(trialInfo)
 workingLhsDF = lhsDF.iloc[workIdx, :]
 workingRhsDF = rhsDF.iloc[workIdx, :]
-# pdb.set_trace()
+pdb.set_trace()
 plotData = pd.concat({
     'ground_truth': workingRhsDF,
     'prediction': predDF}, names=['data_origin'])
+#    
 plotData.columns = plotData.columns.get_level_values('feature')
+plotData.columns.name = 'targetName'
+#
 predStack = plotData.stack(plotData.columns.names).to_frame(name='signal').reset_index()
 #
 figureOutputFolder = os.path.join(
@@ -191,10 +197,10 @@ if not os.path.exists(figureOutputFolder):
 pdfPath = os.path.join(figureOutputFolder, '{}_fitted_signals.pdf'.format(fullEstimatorName))
 plotProcFuns = []
 with PdfPages(pdfPath) as pdf:
-    for name, group in predStack.groupby('feature'):
+    for name, group in predStack.groupby('targetName'):
         print('making plot of {}'.format(name))
         g = sns.relplot(
-            row='pedalMovementCat', hue='freqBandName', style='data_origin',
+            row='pedalMovementCat', hue='feature', style='data_origin',
             x='bin', y='signal', data=group, kind='line', ci='sem')
         g.fig.set_size_inches((12, 8))
         for (ro, co, hu), dataSubset in g.facet_data():

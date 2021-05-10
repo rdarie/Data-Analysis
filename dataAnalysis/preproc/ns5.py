@@ -958,6 +958,7 @@ def unitSpikeTrainWaveformsToDF(
                     plt.plot(oldShiftedWaveform.iloc[0, :])
                     plt.plot(shiftedWaveform.iloc[0, :])
                     plt.show()
+            # pdb.set_trace()
             thisLaggedWvf = shiftedWaveform.iloc[:, seekIdx].copy()
             laggedWaveformsDict[
                 (spikeTrainContainer.name, lag)] = thisLaggedWvf

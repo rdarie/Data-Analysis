@@ -197,6 +197,9 @@ if __name__ == '__main__':
                 **loadLhsKWArgs)
             if arguments['verbose']:
                 prf.print_memory_usage('loaded LHS')
+            # only use zero lag targets    
+            loadRhsKWArgs['addLags'] = None
+            #
             rhsDF = ns5.alignedAsigsToDF(
                 dataRhsBlock,
                 whichSegments=[segIdx],
@@ -238,6 +241,9 @@ if __name__ == '__main__':
                     print('Loading variables from {}'.format(dFPath))
                 thisRhsDF = pd.read_hdf(dFPath, arguments['unitQueryRhs'])
                 thisRhsDF.index = thisRhsDF.index.set_levels([currBlockNum], level='segment')
+                # only use zero lag targets    
+                thisRhsDF = thisRhsDF.xs(0, level='lag', axis='columns')
+                #
                 lOfRhsDF.append(thisRhsDF)
                 thisLhsDF = pd.read_hdf(dFPath, arguments['unitQueryLhs'])
                 thisLhsDF.index = thisLhsDF.index.set_levels([currBlockNum], level='segment')

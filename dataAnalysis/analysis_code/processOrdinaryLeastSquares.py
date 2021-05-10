@@ -31,7 +31,7 @@ import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
 import dataAnalysis.helperFunctions.helper_functions_new as hf
 import dataAnalysis.custom_transformers.tdr as tdr
 from dataAnalysis.analysis_code.namedQueries import namedQueries
-import pdb
+import pdb, traceback
 import numpy as np
 import pandas as pd
 import dataAnalysis.preproc.ns5 as ns5
@@ -152,6 +152,9 @@ for expName, lOfBlocks in experimentsToAssemble.items():
                 iteratorSuffix))
         thisRhsDF = pd.read_hdf(dFPath, arguments['unitQueryRhs'])
         thisRhsDF.index = thisRhsDF.index.set_levels([currBlockNum], level='segment')
+        # only use zero lag targets    
+        thisRhsDF = thisRhsDF.xs(0, level='lag', axis='columns')
+        #
         lOfRhsDF.append(thisRhsDF)
         thisLhsDF = pd.read_hdf(dFPath, arguments['unitQueryLhs'])
         thisLhsDF.index = thisLhsDF.index.set_levels([currBlockNum], level='segment')
@@ -201,6 +204,8 @@ for idx, (attrNameList, lhsMask) in enumerate(lhsMasks.iterrows()):
                 (scoresGroup.index.get_level_values('target') == targetName))
             assert scoresGroup.loc[foldMaskScores, 'estimator'].size == 1'''
             theseIndices = (targetName, foldIdx) + attrNameList
+            if theseIndices not in scoresDF.index:
+                continue
             thisEstimator = scoresDF.loc[theseIndices, 'estimator']
             foldPrediction = pd.DataFrame(
                 thisEstimator.predict(foldLHS.to_numpy()), index=foldRHS.index,
@@ -215,7 +220,7 @@ for idx, (attrNameList, lhsMask) in enumerate(lhsMasks.iterrows()):
         predListPerTarget.append(targetPredictions)
     groupPredictions = pd.concat(predListPerTarget, axis='columns')
     allPredictionsList.append(groupPredictions)
-    if idx > 30:
+    if idx > 10:
         break
 #
 # target values do not have meaningful attributes from the predictor group

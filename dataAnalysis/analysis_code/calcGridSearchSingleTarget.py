@@ -225,6 +225,9 @@ if __name__ == '__main__':
                 **loadLhsKWArgs)
             if arguments['verbose']:
                 prf.print_memory_usage('loaded LHS')
+            # only use zero lag targets    
+            loadRhsKWArgs['addLags'] = None
+            #
             rhsDF = ns5.alignedAsigsToDF(
                 dataRhsBlock,
                 whichSegments=[segIdx],
@@ -261,6 +264,9 @@ if __name__ == '__main__':
                         arguments['alignQuery'],
                         iteratorSuffix))
                 thisRhsDF = pd.read_hdf(dFPath, arguments['unitQueryRhs'])
+                # only use zero lag targets    
+                thisRhsDF = thisRhsDF.xs(0, level='lag', axis='columns')
+                #
                 thisRhsDF.index = thisRhsDF.index.set_levels([currBlockNum], level='segment')
                 lOfRhsDF.append(thisRhsDF)
                 thisLhsDF = pd.read_hdf(dFPath, arguments['unitQueryLhs'])
@@ -289,7 +295,6 @@ if __name__ == '__main__':
         scores = {}
         gridSearcherDict = {}
         lhGroup = lhsDF.loc[:, lhsMask]
-        # pdb.set_trace()
         for columnTuple in rhsDF.columns:
             targetName = columnTuple[0]
             print('Fitting {} to {}...'.format(lhsMask.name, targetName))
@@ -301,8 +306,6 @@ if __name__ == '__main__':
                 estimatorKWArgs=estimatorKWArgs,
                 joblibBackendArgs=joblibBackendArgs
                 )
-        if idx > 30:
-            break
         scoresDF = pd.concat(
             {nc: pd.DataFrame(scr) for nc, scr in scores.items()},
             names=['target', 'fold'])
@@ -315,6 +318,8 @@ if __name__ == '__main__':
             lhKey = lhGroupNames[i]
             scoresDF.loc[:, lhKey] = lhAttr
         allScores.append(scoresDF)
+        if idx > 10:
+            break
     allScoresDF = pd.concat(allScores)
     allScoresDF.set_index(lhGroupNames, inplace=True, append=True)
     #
