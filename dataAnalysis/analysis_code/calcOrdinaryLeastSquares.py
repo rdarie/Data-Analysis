@@ -316,6 +316,7 @@ if __name__ == '__main__':
             (scoresForPlot['evalType'] == 'train'))
         scoresForPlot.loc[workingMask, 'evalType'] = 'work'
         #
+        # pdb.set_trace()
         with PdfPages(figureOutputPath) as pdf:
             # fig, ax = plt.subplots()
             # fig.set_size_inches(12, 8)

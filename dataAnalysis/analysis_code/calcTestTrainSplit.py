@@ -269,6 +269,7 @@ else:
         )
     listOfIterators.append(cvIterator)
 
+pdb.set_trace()
 exportAAKWA = alignedAsigsKWargs.copy()
 exportAAKWA.pop('unitNames', None)
 exportAAKWA.pop('unitQuery', None)

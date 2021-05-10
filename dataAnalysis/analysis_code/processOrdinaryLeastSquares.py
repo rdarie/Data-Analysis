@@ -175,8 +175,8 @@ workingTrialInfo = workingRhsDF.index.to_frame().reset_index(drop=True)
 allPredictionsList = []
 lhsMasks = lOfLhsMasks[0]
 lhGroupNames = lhsMasks.index.names
-for attrNameList, lhsMask in lhsMasks.iterrows():
-# for groupName, scoresGroup in scoresDF.groupby(lhGroupNames):
+for idx, (attrNameList, lhsMask) in enumerate(lhsMasks.iterrows()):
+    # for groupName, scoresGroup in scoresDF.groupby(lhGroupNames):
     '''if not isinstance(groupName, list):
         attrNameList = [groupName]
     else:
@@ -215,6 +215,8 @@ for attrNameList, lhsMask in lhsMasks.iterrows():
         predListPerTarget.append(targetPredictions)
     groupPredictions = pd.concat(predListPerTarget, axis='columns')
     allPredictionsList.append(groupPredictions)
+    if idx > 30:
+        break
 #
 # target values do not have meaningful attributes from the predictor group
 predictedDF = pd.concat(allPredictionsList)

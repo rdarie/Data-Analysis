@@ -285,21 +285,24 @@ if __name__ == '__main__':
         if joblibBackendArgs['backend'] == 'dask':
             daskClient = Client()
     allGridSearchDict = {}
-    for maskIdx, lhsMask in lhsMasks.iterrows():
+    for idx, (maskIdx, lhsMask) in enumerate(lhsMasks.iterrows()):
         scores = {}
         gridSearcherDict = {}
         lhGroup = lhsDF.loc[:, lhsMask]
+        # pdb.set_trace()
         for columnTuple in rhsDF.columns:
             targetName = columnTuple[0]
             print('Fitting {} to {}...'.format(lhsMask.name, targetName))
             scores[targetName], gridSearcherDict[targetName] = tdr.gridSearchHyperparameters(
                 lhGroup, rhsDF.loc[:, columnTuple], estimatorClass,
-                verbose=int(arguments['verbose']),
+                # verbose=int(arguments['verbose']),
                 gridSearchKWArgs=gridSearchKWArgs,
                 crossvalKWArgs=crossvalKWArgs,
                 estimatorKWArgs=estimatorKWArgs,
                 joblibBackendArgs=joblibBackendArgs
                 )
+        if idx > 30:
+            break
         scoresDF = pd.concat(
             {nc: pd.DataFrame(scr) for nc, scr in scores.items()},
             names=['target', 'fold'])
@@ -314,41 +317,7 @@ if __name__ == '__main__':
         allScores.append(scoresDF)
     allScoresDF = pd.concat(allScores)
     allScoresDF.set_index(lhGroupNames, inplace=True, append=True)
-    if arguments['plotting']:
-        figureOutputPath = os.path.join(
-                figureOutputFolder,
-                '{}_r2.pdf'.format(fullEstimatorName))
-        scoresForPlot = pd.concat(
-            {'test': allScoresDF['test_score'], 'train': allScoresDF['train_score']},
-            names=['evalType']).to_frame(name='score').reset_index()
-        lastFoldIdx = scoresForPlot['fold'].max()
-        validationMask = (
-            (scoresForPlot['fold'] == lastFoldIdx) &
-            (scoresForPlot['evalType'] == 'test'))
-        scoresForPlot.loc[validationMask, 'evalType'] = 'validation'
-        workingMask = (
-            (scoresForPlot['fold'] == lastFoldIdx) &
-            (scoresForPlot['evalType'] == 'train'))
-        scoresForPlot.loc[workingMask, 'evalType'] = 'work'
-        with PdfPages(figureOutputPath) as pdf:
-            # fig, ax = plt.subplots()
-            # fig.set_size_inches(12, 8)
-            g = sns.catplot(
-                data=scoresForPlot, hue='evalType', col='target',
-                x='freqBandName', y='score',
-                kind='box')
-            g.fig.suptitle('R^2')
-            for ax in g.axes.flat:
-                ax.set_xlabel('regression target')
-                ax.set_ylabel('R2 of ordinary least squares fit')
-            g.fig.tight_layout(pad=1)
-            pdf.savefig(bbox_inches='tight', pad_inches=0)
-            if arguments['showFigures']:
-                plt.show()
-            else:
-                plt.close()
-    del lhsDF, rhsDF
-    # gc.collect()
+    #
     prf.print_memory_usage('Done fitting')
     estimatorsSubFolder = os.path.join(
         alignSubFolder, 'estimators')
@@ -365,3 +334,44 @@ if __name__ == '__main__':
     loadingMeta['lhGroupNames'] = lhGroupNames
     with open(estimatorPath.replace('.h5', '_meta.pickle'), 'wb') as f:
         pickle.dump(loadingMeta, f)
+    #
+    if arguments['plotting']:
+        figureOutputPath = os.path.join(
+                figureOutputFolder,
+                '{}_r2.pdf'.format(fullEstimatorName))
+        scoresForPlot = pd.concat(
+            {'test': allScoresDF['test_score'], 'train': allScoresDF['train_score']},
+            names=['evalType']).to_frame(name='score').reset_index()
+        lastFoldIdx = scoresForPlot['fold'].max()
+        validationMask = (
+            (scoresForPlot['fold'] == lastFoldIdx) &
+            (scoresForPlot['evalType'] == 'test'))
+        scoresForPlot.loc[validationMask, 'evalType'] = 'validation'
+        workingMask = (
+            (scoresForPlot['fold'] == lastFoldIdx) &
+            (scoresForPlot['evalType'] == 'train'))
+        scoresForPlot.loc[workingMask, 'evalType'] = 'work'
+        # pdb.set_trace()
+        colWrap = np.ceil(np.sqrt(scoresForPlot['feature'].unique().size)).astype(int)
+        with PdfPages(figureOutputPath) as pdf:
+            # fig, ax = plt.subplots()
+            # fig.set_size_inches(12, 8)
+            g = sns.catplot(
+                data=scoresForPlot, hue='evalType',
+                col='feature', col_wrap=colWrap,
+                x='target', y='score',
+                kind='box')
+            g.fig.suptitle('R^2')
+            newYLims = scoresForPlot['score'].quantile([0.25, 1 - 1e-3]).to_list()
+            for ax in g.axes.flat:
+                ax.set_xlabel('regression target')
+                ax.set_ylabel('R2 of ordinary least squares fit')
+                ax.set_ylim(newYLims)
+            g.fig.tight_layout(pad=1)
+            pdf.savefig(bbox_inches='tight', pad_inches=0)
+            if arguments['showFigures']:
+                plt.show()
+            else:
+                plt.close()
+    del lhsDF, rhsDF
+    # gc.collect()

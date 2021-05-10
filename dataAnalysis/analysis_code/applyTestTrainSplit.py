@@ -112,8 +112,8 @@ for segIdx in range(nSeg):
         prf.print_memory_usage('extracting data on segment {}'.format(segIdx))
     aakwa = deepcopy(alignedAsigsKWargs)
     ##
-    featureAnnsToGrab = ['xCoords', 'yCoords', 'freqBandName']
-    aakwa.update(dict(transposeToColumns='bin', concatOn='index'))
+    featureAnnsToGrab = ['xCoords', 'yCoords', 'freqBandName', 'parentFeature']
+    aakwa.update(dict(transposeToColumns='bin', concatOn='index', rollingWindow=None))
     aakwa['getMetaData'] += featureAnnsToGrab
     tempDF = ns5.alignedAsigsToDF(
         dataBlock, whichSegments=[segIdx], **aakwa)
@@ -123,16 +123,16 @@ for segIdx in range(nSeg):
     aakwa = deepcopy(alignedAsigsKWargs)
     dataDF = ns5.alignedAsigsToDF(
         dataBlock, whichSegments=[segIdx], **aakwa)
-    pdb.set_trace()
+    # pdb.set_trace()
     if 'listOfROIMasks' in loadingMeta:
         aakwa['finalIndexMask'] = loadingMeta['listOfROIMasks'][segIdx]
-    if arguments['needsRollingWindow']:
+    '''if arguments['needsRollingWindow']:
         # needs downsampling
         binInterval = rasterOpts['binOpts'][arguments['analysisName']]['binInterval']
         stepLen = spectralFeatureOpts['stepLen']
         winLen = spectralFeatureOpts['winLen']
         aakwa['decimate'] = int(stepLen / binInterval)
-        aakwa['rollingWindow'] = int(winLen / binInterval)
+        aakwa['rollingWindow'] = int(winLen / binInterval)'''
     dataDF = ns5.alignedAsigsToDF(
         dataBlock, whichSegments=[segIdx], **aakwa)
     columnsMeta = featureInfo.loc[dataDF.columns, featureAnnsToGrab].reset_index()
@@ -177,31 +177,32 @@ if arguments['resetHDF']:
 #
 exportDF.to_hdf(outputDFPath, arguments['selectionName'], mode='a')
 #
-pdb.set_trace()
 if arguments['selectionName'] == 'lfp_CAR_spectral':
     featureGroupNames = ['feature']
     maskList = []
     haveAllGroup = False
+    allGroupIdx = pd.MultiIndex.from_tuples(
+        [tuple('all' for fgn in featureGroupNames)],
+        names=featureGroupNames)
     for name, group in exportDF.groupby(featureGroupNames, axis='columns'):
         if not isinstance(name, tuple):
             attrValues = (name, )
         else:
             attrValues = name
-        thisMask = pd.Series(exportDF.columns.isin(group.columns), index=exportDF.columns).to_frame()
+        thisMask = pd.Series(
+            exportDF.columns.isin(group.columns),
+            index=exportDF.columns).to_frame()
         if np.all(thisMask):
             haveAllGroup = True
-            thisMask.columns = pd.MultiIndex.from_tuples(
-                [tuple('all' for fgn in featureGroupNames)],
-                names=featureGroupNames)
+            thisMask.columns = allGroupIdx
         else:
-            thisMask.columns = pd.MultiIndex.from_tuples((attrValues, ), names=featureGroupNames)
+            thisMask.columns = pd.MultiIndex.from_tuples(
+                (attrValues, ), names=featureGroupNames)
         maskList.append(thisMask.T)
     #
     if not haveAllGroup:
         allMask = pd.Series(True, index=exportDF.columns).to_frame()
-        allMask.columns = pd.MultiIndex.from_tuples(
-            [tuple('all' for fgn in featureGroupNames)],
-            names=featureGroupNames)
+        allMask.columns = allGroupIdx
         maskList.append(allMask.T)
     #
     maskDF = pd.concat(maskList)
