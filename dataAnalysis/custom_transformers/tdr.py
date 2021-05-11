@@ -49,7 +49,7 @@ def crossValidationScores(
         valX = X.iloc[validIdx, :]
         valY = y.iloc[validIdx]
         #
-        workEstim.fit(workX, workY)
+        workEstim.fit(workX.to_numpy(), workY.to_numpy())
         #
         scores['fit_time'] = np.append(scores['fit_time'], np.nan)
         scores['score_time'] = np.append(scores['score_time'], np.nan)
@@ -75,7 +75,7 @@ def gridSearchHyperparameters(
                 estimatorProto, verbose=verbose, **gridSearchKWArgs)
         if verbose > 0:
             print('Fitting gridSearchCV...')
-        gridSearcher.fit(X, y)
+        gridSearcher.fit(X.to_numpy(), y.to_numpy())
         if verbose:
             print('    Done fitting gridSearchCV!')
         if isinstance(estimatorProto, ElasticNet):

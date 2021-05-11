@@ -228,4 +228,11 @@ if arguments['selectionName'] == 'lfp_CAR_spectral':
         maskList.append(thisMask.T)'''
     #
     maskDF = pd.concat(maskList)
+    maskParams = [
+        {k: v for k, v in zip(maskDF.index.names, idxItem)}
+        for idxItem in maskDF.index
+    ]
+    maskParamsStr = ['{}'.format(idxItem).replace("'", '') for idxItem in maskParams]
+    maskDF.loc[:, 'maskName'] = maskParamsStr
+    maskDF.set_index('maskName', append=True, inplace=True)
     maskDF.to_hdf(outputDFPath, arguments['selectionName'] + '_featureMasks', mode='a')

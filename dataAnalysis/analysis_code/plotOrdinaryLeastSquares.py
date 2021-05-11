@@ -9,7 +9,8 @@ Options:
     --plotting                               make plots? [default: False]
     --showFigures                            show plots? [default: False]
     --verbose                                print diagnostics? [default: False]
-    --fullEstimatorName=fullEstimatorName    filename for resulting estimator (cross-validated n_comps)
+    --estimatorName=estimatorName            filename for resulting estimator (cross-validated n_comps)
+    --datasetName=datasetName                filename for resulting estimator (cross-validated n_comps)
     --analysisName=analysisName              append a name to the resulting blocks? [default: default]
     --alignFolderName=alignFolderName        append a name to the resulting blocks? [default: motion]
 """
@@ -79,7 +80,10 @@ if arguments['plotting']:
     iteratorSuffix,
     arguments['window'],
     arguments['alignQuery'])'''
-fullEstimatorName = arguments['fullEstimatorName']
+# fullEstimatorName = arguments['fullEstimatorName']
+datasetName = arguments['datasetName']
+fullEstimatorName = '{}_{}'.format(
+    arguments['estimatorName'], arguments['datasetName'])
 #
 estimatorsSubFolder = os.path.join(
     alignSubFolder, 'estimators')
@@ -89,9 +93,13 @@ estimatorPath = os.path.join(
     estimatorsSubFolder,
     fullEstimatorName + '.h5'
     )
+datasetPath = os.path.join(
+    estimatorsSubFolder,
+    datasetName + '.h5'
+    )
 scoresDF = pd.read_hdf(estimatorPath, 'cv')
 predDF = pd.read_hdf(estimatorPath, 'predictions')
-with open(estimatorPath.replace('.h5', '_meta.pickle'), 'rb') as _f:
+with open(datasetPath.replace('.h5', '_meta.pickle'), 'rb') as _f:
     loadingMeta = pickle.load(_f)
     for discardEntry in ['plotting', 'showFigures']:
         _ = loadingMeta['arguments'].pop(discardEntry)
@@ -124,7 +132,7 @@ else:
 #
 iteratorsBySegment = loadingMeta['iteratorsBySegment'].copy()
 cv_kwargs = loadingMeta['cv_kwargs'].copy()
-# lhGroupNames = loadingMeta['lhGroupNames']
+'''lhGroupNames = loadingMeta['lhGroupNames']
 lOfRhsDF = []
 lOfLhsDF = []
 lOfLhsMasks = []
@@ -164,11 +172,15 @@ for expName, lOfBlocks in experimentsToAssemble.items():
 lhsDF = pd.concat(lOfLhsDF)
 rhsDF = pd.concat(lOfRhsDF)
 del lOfRhsDF, lOfLhsDF, thisRhsDF, thisLhsDF
+lhsMasks = lOfLhsMasks[0]'''
 
+lhsDF = pd.read_hdf(datasetPath, 'lhsDF')
+rhsDF = pd.read_hdf(datasetPath, 'rhsDF')
+lhsMasks = pd.read_hdf(datasetPath, 'lhsFeatureMasks')
+#
 cvIterator = iteratorsBySegment[0]
 workIdx = cvIterator.work
 
-lhsMasks = lOfLhsMasks[0]
 lhGroupNames = lhsMasks.index.names
 trialInfo = rhsDF.index.to_frame().reset_index(drop=True)
 attrNameList = lhsMasks.index.names
@@ -200,7 +212,7 @@ with PdfPages(pdfPath) as pdf:
     for name, group in predStack.groupby('targetName'):
         print('making plot of {}'.format(name))
         g = sns.relplot(
-            row='pedalMovementCat', hue='feature', style='data_origin',
+            row='pedalMovementCat', hue='maskName', style='data_origin',
             x='bin', y='signal', data=group, kind='line', ci='sem')
         g.fig.set_size_inches((12, 8))
         for (ro, co, hu), dataSubset in g.facet_data():

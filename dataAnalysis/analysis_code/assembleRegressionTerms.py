@@ -24,7 +24,6 @@ Options:
     --lhsBlockPrefix=lhsBlockPrefix        which trig_ block to pull [default: Block]
     --unitQueryLhs=unitQueryLhs            how to restrict channels? [default: fr_sqrt]
     --iteratorSuffix=iteratorSuffix        filename for cross_val iterator
-    --estimatorName=estimatorName          filename for resulting estimator (cross-validated n_comps)
     --selector=selector                    filename if using a unit selector
     --loadFromFrames                       load data from pre-saved dataframes?
 """
@@ -117,28 +116,6 @@ if __name__ == '__main__':
         iteratorSuffix = '_{}'.format(arguments['iteratorSuffix'])
     else:
         iteratorSuffix = ''
-    #
-    datasetName = '{}_to_{}{}_{}_{}'.format(
-        arguments['unitQueryLhs'], arguments['unitQueryRhs'],
-        iteratorSuffix,
-        arguments['window'],
-        arguments['alignQuery'])
-    fullEstimatorName = '{}_{}'.format(
-        arguments['estimatorName'], datasetName)
-    estimatorsSubFolder = os.path.join(
-        alignSubFolder, 'estimators')
-    if not os.path.exists(estimatorsSubFolder):
-        os.makedirs(estimatorsSubFolder)
-    estimatorPath = os.path.join(
-        estimatorsSubFolder,
-        fullEstimatorName + '.h5'
-        )
-    datasetPath = os.path.join(
-        estimatorsSubFolder,
-        datasetName + '.h5'
-        )
-    assert os.path.exists(datasetPath)
-    #
     iteratorPath = os.path.join(
         cvIteratorSubfolder,
         '{}_{}_{}{}_cvIterators.pickle'.format(
@@ -146,10 +123,14 @@ if __name__ == '__main__':
             arguments['window'],
             arguments['alignQuery'],
             iteratorSuffix))
-    iteratorPath = datasetPath.replace('.h5', '_meta.pickle')
-    #
     with open(iteratorPath, 'rb') as f:
         loadingMeta = pickle.load(f)
+    #
+    datasetName = '{}_to_{}{}_{}_{}'.format(
+        arguments['unitQueryLhs'], arguments['unitQueryRhs'],
+        iteratorSuffix,
+        arguments['window'],
+        arguments['alignQuery'])
     # rhs loading paths
     if arguments['rhsBlockSuffix'] is not None:
         rhsBlockSuffix = '_{}'.format(arguments['rhsBlockSuffix'])
@@ -174,7 +155,6 @@ if __name__ == '__main__':
     cv_kwargs = loadingMeta['cv_kwargs'].copy()
     cvIterator = iteratorsBySegment[0]
     workIdx = cvIterator.work
-    ###
     estimatorClass = ElasticNet
     estimatorKWArgs = dict()
     gridSearchKWArgs = dict(
@@ -205,10 +185,7 @@ if __name__ == '__main__':
     joblibBackendArgs = dict(
         backend='dask'
         )
-    lhsDF = pd.read_hdf(datasetPath, 'lhsDF')
-    rhsDF = pd.read_hdf(datasetPath, 'rhsDF')
-    lhsMasks = pd.read_hdf(datasetPath, 'lhsFeatureMasks')
-    '''######### data loading stuff
+    ######### data loading stuff
     lOfRhsDF = []
     lOfLhsDF = []
     lOfLhsMasks = []
@@ -347,111 +324,23 @@ if __name__ == '__main__':
             'sigma': sigma
         })
         rhsDF.loc[:, dataGroup.columns] = (rhsDF[dataGroup.columns] - mu) / sigma
-    lhsMasks = lOfLhsMasks[0]'''
     #
-    workingLhsDF = lhsDF.iloc[workIdx, :]
-    workingRhsDF = rhsDF.iloc[workIdx, :]
-    nFeatures = lhsDF.columns.shape[0]
-    nTargets = rhsDF.columns.shape[0]
-    #
-    allScores = []
-    lhGroupNames = lhsMasks.index.names
-    if 'backend' in joblibBackendArgs:
-        if joblibBackendArgs['backend'] == 'dask':
-            daskClient = Client()
-    allGridSearchDict = {}
-    for idx, (maskIdx, lhsMask) in enumerate(lhsMasks.iterrows()):
-        maskParams = {k: v for k, v in zip(lhsMask.index.names, maskIdx)}
-        ####
-        if arguments['debugging']:
-            if maskParams['freqBandName'] not in ['beta', 'gamma']:
-                continue
-        ###
-        scores = {}
-        gridSearcherDict = {}
-        lhGroup = lhsDF.loc[:, lhsMask]
-        for columnTuple in rhsDF.columns:
-            targetName = columnTuple[0]
-            ####
-            if arguments['debugging']:
-                if targetName not in ['position#0', 'forceMagnitude#0', 'velocity#0']:
-                    continue
-            ###
-            print('Fitting {} to {}...'.format(lhsMask.name[-1], targetName))
-            scores[targetName], gridSearcherDict[targetName] = tdr.gridSearchHyperparameters(
-                lhGroup, rhsDF.loc[:, columnTuple], estimatorClass,
-                # verbose=int(arguments['verbose']),
-                gridSearchKWArgs=gridSearchKWArgs,
-                crossvalKWArgs=crossvalKWArgs,
-                estimatorKWArgs=estimatorKWArgs,
-                joblibBackendArgs=joblibBackendArgs
-                )
-        scoresDF = pd.concat(
-            {nc: pd.DataFrame(scr) for nc, scr in scores.items()},
-            names=['target', 'fold'])
-        # pdb.set_trace()
-        allGridSearchDict[lhsMask.name] = gridSearcherDict
-        '''if not isinstance(groupName, list):
-            attrNameList = [groupName]
-        else:
-            attrNameList = groupName'''
-        for i, lhAttr in enumerate(maskIdx):
-            lhKey = lhGroupNames[i]
-            scoresDF.loc[:, lhKey] = lhAttr
-        # scoresDF.loc[:, 'lhsComponents'] = '{}'.format(maskParams)
-        allScores.append(scoresDF)
-    allScoresDF = pd.concat(allScores)
-    allScoresDF.set_index(
-        lhGroupNames,
-        inplace=True, append=True)
-    #
-    prf.print_memory_usage('Done fitting')
-    if os.path.exists(estimatorPath):
-        os.remove(estimatorPath)
-    allScoresDF.to_hdf(estimatorPath, 'cv')
-    '''loadingMeta['arguments'] = arguments.copy()
-    loadingMeta['lhGroupNames'] = lhGroupNames
+    estimatorsSubFolder = os.path.join(
+        alignSubFolder, 'estimators')
+    if not os.path.exists(estimatorsSubFolder):
+        os.makedirs(estimatorsSubFolder)
+    datasetPath = os.path.join(
+        estimatorsSubFolder,
+        datasetName + '.h5'
+        )
+    if os.path.exists(datasetPath):
+        os.remove(datasetPath)
+    lhsDF.to_hdf(datasetPath, 'lhsDF')
+    rhsDF.to_hdf(datasetPath, 'rhsDF')
+    thisLhsMask.to_hdf(datasetPath, 'lhsFeatureMasks')
+    loadingMeta['arguments'] = arguments.copy()
     loadingMeta['lhsNormalizationParams'] = lhsNormalizationParams
     loadingMeta['rhsNormalizationParams'] = rhsNormalizationParams
-    with open(estimatorPath.replace('.h5', '_meta.pickle'), 'wb') as f:
-        pickle.dump(loadingMeta, f)'''
-    #
-    if arguments['plotting']:
-        figureOutputPath = os.path.join(
-                figureOutputFolder,
-                '{}_r2.pdf'.format(fullEstimatorName))
-        scoresForPlot = pd.concat(
-            {'test': allScoresDF['test_score'], 'train': allScoresDF['train_score']},
-            names=['evalType']).to_frame(name='score').reset_index()
-        lastFoldIdx = scoresForPlot['fold'].max()
-        validationMask = (
-            (scoresForPlot['fold'] == lastFoldIdx) &
-            (scoresForPlot['evalType'] == 'test'))
-        scoresForPlot.loc[validationMask, 'evalType'] = 'validation'
-        workingMask = (
-            (scoresForPlot['fold'] == lastFoldIdx) &
-            (scoresForPlot['evalType'] == 'train'))
-        scoresForPlot.loc[workingMask, 'evalType'] = 'work'
-        colWrap = np.ceil(np.sqrt(scoresForPlot['maskName'].unique().size)).astype(int)
-        with PdfPages(figureOutputPath) as pdf:
-            # fig, ax = plt.subplots()
-            # fig.set_size_inches(12, 8)
-            g = sns.catplot(
-                data=scoresForPlot, hue='evalType',
-                col='maskName', col_wrap=colWrap,
-                x='target', y='score',
-                kind='box')
-            g.fig.suptitle('R^2')
-            newYLims = scoresForPlot['score'].quantile([0.25, 1 - 1e-3]).to_list()
-            for ax in g.axes.flat:
-                ax.set_xlabel('regression target')
-                ax.set_ylabel('R2 of ordinary least squares fit')
-                ax.set_ylim(newYLims)
-            g.fig.tight_layout(pad=1)
-            pdf.savefig(bbox_inches='tight', pad_inches=0)
-            if arguments['showFigures']:
-                plt.show()
-            else:
-                plt.close()
-    del lhsDF, rhsDF
-    # gc.collect()
+    with open(datasetPath.replace('.h5', '_meta.pickle'), 'wb') as f:
+        pickle.dump(loadingMeta, f)
+    pdb.set_trace()

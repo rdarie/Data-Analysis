@@ -9,7 +9,9 @@ Options:
     --plotting                               make plots? [default: False]
     --showFigures                            show plots? [default: False]
     --verbose                                print diagnostics? [default: False]
-    --fullEstimatorName=fullEstimatorName    filename for resulting estimator (cross-validated n_comps)
+    --debugging                              print diagnostics? [default: False]
+    --estimatorName=estimatorName            filename for resulting estimator (cross-validated n_comps)
+    --datasetName=datasetName                filename for resulting estimator (cross-validated n_comps)
     --analysisName=analysisName              append a name to the resulting blocks? [default: default]
     --alignFolderName=alignFolderName        append a name to the resulting blocks? [default: motion]
 """
@@ -83,18 +85,24 @@ if arguments['plotting']:
     iteratorSuffix,
     arguments['window'],
     arguments['alignQuery'])'''
-fullEstimatorName = arguments['fullEstimatorName']
+datasetName = arguments['datasetName']
+fullEstimatorName = '{}_{}'.format(
+    arguments['estimatorName'], arguments['datasetName'])
 #
 estimatorsSubFolder = os.path.join(
     alignSubFolder, 'estimators')
 if not os.path.exists(estimatorsSubFolder):
     os.makedirs(estimatorsSubFolder)
+datasetPath = os.path.join(
+    estimatorsSubFolder,
+    datasetName + '.h5'
+    )
 estimatorPath = os.path.join(
     estimatorsSubFolder,
     fullEstimatorName + '.h5'
     )
 scoresDF = pd.read_hdf(estimatorPath, 'cv')
-with open(estimatorPath.replace('.h5', '_meta.pickle'), 'rb') as _f:
+with open(datasetPath.replace('.h5', '_meta.pickle'), 'rb') as _f:
     loadingMeta = pickle.load(_f)
 arguments.update(loadingMeta['arguments'])
 #
@@ -125,7 +133,8 @@ else:
 #
 iteratorsBySegment = loadingMeta['iteratorsBySegment'].copy()
 cv_kwargs = loadingMeta['cv_kwargs'].copy()
-lhGroupNames = loadingMeta['lhGroupNames']
+
+'''lhGroupNames = loadingMeta['lhGroupNames']
 lOfRhsDF = []
 lOfLhsDF = []
 lOfLhsMasks = []
@@ -154,10 +163,14 @@ for expName, lOfBlocks in experimentsToAssemble.items():
         thisRhsDF.index = thisRhsDF.index.set_levels([currBlockNum], level='segment')
         # only use zero lag targets    
         thisRhsDF = thisRhsDF.xs(0, level='lag', axis='columns')
+        thisRhsDF.loc[:, 'expName'] = expName
+        thisRhsDF.set_index('expName', inplace=True, append=True)
         #
         lOfRhsDF.append(thisRhsDF)
         thisLhsDF = pd.read_hdf(dFPath, arguments['unitQueryLhs'])
         thisLhsDF.index = thisLhsDF.index.set_levels([currBlockNum], level='segment')
+        thisLhsDF.loc[:, 'expName'] = expName
+        thisLhsDF.set_index('expName', inplace=True, append=True)
         lOfLhsDF.append(thisLhsDF)
         thisLhsMask = pd.read_hdf(dFPath, arguments['unitQueryLhs'] + '_featureMasks')
         lOfLhsMasks.append(thisLhsMask)
@@ -166,6 +179,35 @@ lhsDF = pd.concat(lOfLhsDF)
 rhsDF = pd.concat(lOfRhsDF)
 del lOfRhsDF, lOfLhsDF, thisRhsDF, thisLhsDF
 
+## Normalize lhs
+lhsNormalizationParams = loadingMeta['lhsNormalizationParams']
+if 'spectral' in arguments['unitQueryLhs']:
+    for lhnDict in lhsNormalizationParams[0]:
+        featName = lhnDict['feature']
+        featMask = lhsDF.columns.get_level_values('feature') == featName
+        expName = lhnDict['expName']
+        expMask = lhsDF.index.get_level_values('expName') == expName
+        print('Pre-normalizing {}, {}'.format(expName, featName))
+        meanLevel = lhnDict['mu']
+        lhsDF.loc[expMask, featMask] = np.sqrt(lhsDF.loc[expMask, featMask] / meanLevel)
+    for lhnDict in lhsNormalizationParams[1]:
+        featName = lhnDict['feature']
+        featMask = lhsDF.columns.get_level_values('feature') == featName
+        print('Final normalizing {}'.format(featName))
+        lhsDF.loc[:, featMask] = (lhsDF.loc[:, featMask] - lhnDict['mu']) / lhnDict['sigma']
+#
+## Normalize rhs
+rhsNormalizationParams = loadingMeta['rhsNormalizationParams']
+for rhnDict in rhsNormalizationParams[0]:
+    featName = rhnDict['feature']
+    featMask = rhsDF.columns.get_level_values('feature') == featName
+    print('Final normalizing {}'.format(featName))
+    rhsDF.loc[:, featMask] = (rhsDF.loc[:, featMask] - rhnDict['mu']) / rhnDict['sigma']'''
+
+lhsDF = pd.read_hdf(datasetPath, 'lhsDF')
+rhsDF = pd.read_hdf(datasetPath, 'rhsDF')
+lhsMasks = pd.read_hdf(datasetPath, 'lhsFeatureMasks')
+#
 cvIterator = iteratorsBySegment[0]
 workIdx = cvIterator.work
 workingLhsDF = lhsDF.iloc[workIdx, :]
@@ -176,9 +218,10 @@ nTargets = rhsDF.columns.shape[0]
 lhsFeatureInfo = lhsDF.columns.to_frame().reset_index(drop=True)
 workingTrialInfo = workingRhsDF.index.to_frame().reset_index(drop=True)
 allPredictionsList = []
-lhsMasks = lOfLhsMasks[0]
+# lhsMasks = lOfLhsMasks[0]
 lhGroupNames = lhsMasks.index.names
 for idx, (attrNameList, lhsMask) in enumerate(lhsMasks.iterrows()):
+    maskParams = {k: v for k, v in zip(lhsMask.index.names, attrNameList)}
     # for groupName, scoresGroup in scoresDF.groupby(lhGroupNames):
     '''if not isinstance(groupName, list):
         attrNameList = [groupName]
@@ -203,10 +246,15 @@ for idx, (attrNameList, lhsMask) in enumerate(lhsMasks.iterrows()):
                 (scoresGroup.index.get_level_values('fold') == foldIdx) &
                 (scoresGroup.index.get_level_values('target') == targetName))
             assert scoresGroup.loc[foldMaskScores, 'estimator'].size == 1'''
+            #
             theseIndices = (targetName, foldIdx) + attrNameList
+            '''theseIndicesTemp = [ti for ti in ((targetName, foldIdx) + attrNameList)] + ['{}'.format(maskParams)]
+            theseIndices = tuple(ti for ti in theseIndicesTemp)'''
+            #
             if theseIndices not in scoresDF.index:
                 continue
             thisEstimator = scoresDF.loc[theseIndices, 'estimator']
+            # pdb.set_trace()
             foldPrediction = pd.DataFrame(
                 thisEstimator.predict(foldLHS.to_numpy()), index=foldRHS.index,
                 columns=foldRHS.columns)
@@ -216,12 +264,12 @@ for idx, (attrNameList, lhsMask) in enumerate(lhsMasks.iterrows()):
                 tempIndexFrame.loc[:, attrKey] = attrName
             foldPrediction.index = pd.MultiIndex.from_frame(tempIndexFrame)
             predListPerFold.append(foldPrediction)
-        targetPredictions = pd.concat(predListPerFold)
-        predListPerTarget.append(targetPredictions)
-    groupPredictions = pd.concat(predListPerTarget, axis='columns')
-    allPredictionsList.append(groupPredictions)
-    '''if idx > 10:
-        break'''
+        if len(predListPerFold):
+            targetPredictions = pd.concat(predListPerFold)
+            predListPerTarget.append(targetPredictions)
+    if len(predListPerTarget):
+        groupPredictions = pd.concat(predListPerTarget, axis='columns')
+        allPredictionsList.append(groupPredictions)
 #
 # target values do not have meaningful attributes from the predictor group
 predictedDF = pd.concat(allPredictionsList)

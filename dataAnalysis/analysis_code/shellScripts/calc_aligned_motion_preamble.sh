@@ -12,4 +12,4 @@ TIMEWINDOWOPTS="--winStart=-500 --winStop=1500"
 # ALIGNQUERY="--alignQuery=starting"
 ALIGNQUERY="--alignQuery=startingNoStim"
 
-LAZINESS=""
+LAZINESS="--lazy"
