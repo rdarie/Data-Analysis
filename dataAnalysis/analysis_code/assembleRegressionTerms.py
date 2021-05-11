@@ -287,9 +287,9 @@ if __name__ == '__main__':
     rhsDF = pd.concat(lOfRhsDF)
     ##### end of data loading stuff
     #
-    ## Normalize lhs
-    lhsNormalizationParams = [[], []]
     if 'spectral' in arguments['unitQueryLhs']:
+        ## Normalize lhs
+        lhsNormalizationParams = [[], []]
         for expName, dataGroup in lhsDF.groupby('expName'):
             for featName, subGroup in dataGroup.groupby('feature', axis='columns'):
                 print('Pre-normalizing {}, {}'.format(expName, featName))
@@ -306,6 +306,18 @@ if __name__ == '__main__':
             mu = np.mean(refData)
             sigma = np.std(refData)
             lhsNormalizationParams[1].append({
+                'feature': featName,
+                'mu': mu,
+                'sigma': sigma
+            })
+            lhsDF.loc[:, dataGroup.columns] = (lhsDF[dataGroup.columns] - mu) / sigma
+    else:
+        lhsNormalizationParams = [[]]
+        for featName, dataGroup in lhsDF.groupby('feature', axis='columns'):
+            print('Normalizing {}'.format(featName))
+            mu = np.mean(dataGroup)
+            sigma = np.std(dataGroup)
+            lhsNormalizationParams[0].append({
                 'feature': featName,
                 'mu': mu,
                 'sigma': sigma

@@ -210,10 +210,9 @@ if not arguments['loadFromFrames']:
                 timeDifference = (targetTrialAnnDF['t'] - t)
                 deltaT = timeDifference[timeDifference >= 0].min()
                 groupBins = group.index.get_level_values('bin')
-                print('Looking for bins >= {} and < {}'.format(ROIWinStart, deltaT + ROIWinStop))
+                print('Looking for bins >= {:.3f} and < {:.3f}'.format(ROIWinStart, deltaT + ROIWinStop))
                 targetMask.loc[group.index] = (groupBins >= ROIWinStart) & (groupBins < deltaT + ROIWinStop)
             listOfROIMasks.append(targetMask)
-            pdb.set_trace()
             dataDF = dataDF.loc[targetMask, :]
             exampleIndex = dataDF.index
             listOfExampleIndexes.append(exampleIndex)
@@ -269,8 +268,6 @@ else:
         n_splits=nSplits, splitterKWArgs=cv_kwargs
         )
     listOfIterators.append(cvIterator)
-
-pdb.set_trace()
 ###
 exportAAKWA = alignedAsigsKWargs.copy()
 exportAAKWA.pop('unitNames', None)
