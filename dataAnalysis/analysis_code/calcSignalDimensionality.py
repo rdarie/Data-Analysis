@@ -29,7 +29,7 @@ sns.set(
     context='talk', style='dark',
     palette='dark', font='sans-serif',
     font_scale=1.5, color_codes=True)
-import os
+import os, traceback
 import dataAnalysis.helperFunctions.profiling as prf
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
 import dataAnalysis.helperFunctions.helper_functions_new as hf
@@ -183,9 +183,13 @@ if arguments['plotting']:
             x='nComponents', y='test_score',
             hue='estimator', ci='sem', ax=ax)
         handles, labels = ax.get_legend_handles_labels()
-        meanScoreMLE = scoresDF.loc[idxSl[n_components_pca_mle, :], 'test_score'].mean()
-        line, = ax.plot(n_components_pca_mle, meanScoreMLE, 'g*', label='num. components from MLE')
-        handles.append(line)
+        try:
+            meanScoreMLE = scoresDF.loc[idxSl[n_components_pca_mle, :], 'test_score'].mean()
+            line, = ax.plot(n_components_pca_mle, meanScoreMLE, 'g*', label='num. components from MLE')
+            handles.append(line)
+        except Exception:
+            traceback.print_exc()
+            pass
         labels.append('num. components from MLE')
         ax.legend(handles, labels)
         ax.set_xlabel('number of components')
