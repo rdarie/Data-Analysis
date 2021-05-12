@@ -414,6 +414,7 @@ def parseAnalysisOptions(
             'M': (-0.2, 0.8),
             'short': (-0.5, 0.5),
             'L': (-0.5, 1.5),
+            'XL': (-1.5, 2.5),
             'RC': (-0.33, 0.33),
             'miniRC': (-1, 1)},
         'discardEmpty': None, 'maxSpikesTo': None, 'timeRange': None,
@@ -493,7 +494,7 @@ def parseAnalysisOptions(
         'ensembleHistoryLen': .30,
         'covariateHistoryLen': .50,
         'nHistoryBasisTerms': 5,
-        'nCovariateBasisTerms': 11,
+        'nCovariateBasisTerms': 1,
         'regressionBinInterval': 50e-3,
         'glm_50msec': dict(
             subsampleOpts=dict(

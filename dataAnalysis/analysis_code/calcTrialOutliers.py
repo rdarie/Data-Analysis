@@ -246,6 +246,7 @@ if __name__ == "__main__":
     if ordMag < 0:
         dataDF = dataDF * 10 ** (-ordMag)
     # dataDF = dataDF.apply(lambda x: x - x.mean())
+    # pdb.set_trace()
     trialInfo = dataDF.index.to_frame().reset_index(drop=True)
     trialInfo['epoch'] = np.nan
     firstBinMask = trialInfo['bin'] == trialInfo['bin'].unique()[0]

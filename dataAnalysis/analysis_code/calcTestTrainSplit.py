@@ -169,11 +169,12 @@ if arguments['verbose']:
     prf.print_memory_usage('before load data')
 
 binOpts = rasterOpts['binOpts'][arguments['analysisName']]
-lags = np.linspace(
-    -1 * glmOptsLookup['covariateHistoryLen'],
-    glmOptsLookup['covariateHistoryLen'],
-    glmOptsLookup['nCovariateBasisTerms']) / binOpts['binInterval']
-alignedAsigsKWargs['addLags'] = {'all': lags.astype(int).tolist()}
+if glmOptsLookup['nCovariateBasisTerms'] > 1:
+    lags = np.linspace(
+        -1 * glmOptsLookup['covariateHistoryLen'],
+        glmOptsLookup['covariateHistoryLen'],
+        glmOptsLookup['nCovariateBasisTerms']) / binOpts['binInterval']
+    alignedAsigsKWargs['addLags'] = {'all': lags.astype(int).tolist()}
 alignedAsigsKWargs['decimate'] = int(glmOptsLookup['regressionBinInterval'] / binOpts['binInterval'])
 nSplits = 7
 cv_kwargs = dict(

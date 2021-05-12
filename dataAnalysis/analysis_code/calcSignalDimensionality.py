@@ -94,6 +94,8 @@ with open(datasetPath.replace('.h5', '_meta.pickle'), 'rb') as _f:
     loadingMeta = pickle.load(_f)
     iteratorsBySegment = loadingMeta.pop('iteratorsBySegment')
     cv_kwargs = loadingMeta.pop('cv_kwargs')
+for argName in ['plotting', 'showFigures', 'debugging']:
+    loadingMeta['arguments'].pop(argName, None)
 arguments.update(loadingMeta['arguments'])
 
 
@@ -108,7 +110,7 @@ def compute_scores(
             print('compute_scores() evaluating with {} components'.format(n))
         instance = estimator(**estimatorKWArgs)
         instance.n_components = n
-        scores[n] = cross_validate(instance, X, cv=cv)
+        scores[n] = cross_validate(instance, X.to_numpy(), cv=cv)
     return scores
 
 
@@ -124,7 +126,7 @@ def shrunk_cov_score(
 
 
 def calc_lw_score(X, cv):
-    return cross_val_score(LedoitWolf(), X, cv=cv)
+    return cross_val_score(LedoitWolf(), X.to_numpy(), cv=cv)
 
 
 dataDF = pd.read_hdf(datasetPath, datasetName)
@@ -149,11 +151,12 @@ pcaFull.fit(workingDataDF)
 #
 nCompsToTest = range(1, nFeatures + 1)
 if arguments['debugging']:
-    nCompsToTest = range(1, 10)
+    nCompsToTest = range(1, 20)
+    n_components_pca_mle = min(n_components_pca_mle, 19)
 scores = compute_scores(
     dataDF, PCA,
     nCompsToTest, cv=cvIterator, verbose=True,
-    estimatorKWArgs=dict(svd_solver='full'))
+    estimatorKWArgs=dict(svd_solver='auto'))
 scoresDF = pd.concat(
     {nc: pd.DataFrame(scr) for nc, scr in scores.items()},
     names=['nComponents', 'fold'])
@@ -169,7 +172,6 @@ scoresForPlot = pd.concat(
         'PCA': scoresDF.loc[:, ['test_score']],
         'ledoitWolfMLE': lWForPlot},
     names=['estimator']).reset_index()
-#
 if arguments['plotting']:
     figureOutputPath = os.path.join(
             figureOutputFolder,
@@ -203,7 +205,7 @@ if arguments['plotting']:
         fig, ax = plt.subplots()
         fig.set_size_inches(12, 8)
         cumExplVariance = pd.Series(
-            np.cumsum(pcaFull.explained_variance_ratio_),
+            np.cumsum(pcaFull.explained_variance_ratio_[:len(nCompsToTest)]),
             index=nCompsToTest)
         ax.plot(cumExplVariance)
         ax.plot(n_components_pca_mle, cumExplVariance.loc[n_components_pca_mle], '*')

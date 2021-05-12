@@ -112,7 +112,7 @@ def rereference(
     if substituteOneChannel:
         # implemented based on Milekovic, ..., Brochier 2015
         # check that it works!
-        resData.loc[subChanLoc, :] = saveFirstSrs
+        resData.loc[subChanLoc, :] = referenceSignal
     resDF = pd.concat(
         [group.loc[:, indexCols], resData],
         axis='columns')
