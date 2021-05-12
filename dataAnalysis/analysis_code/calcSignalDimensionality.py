@@ -73,6 +73,11 @@ if not arguments['loadFromFrames']:
         blockBaseName + '{}_{}.nix'.format(
             inputBlockSuffix, arguments['window']))
 
+datasetName = '{}_to_{}{}_{}_{}'.format(
+        arguments['unitQueryLhs'], arguments['unitQueryRhs'],
+        iteratorSuffix,
+        arguments['window'],
+        arguments['alignQuery'])
 fullEstimatorName = '{}_{}_{}_{}'.format(
     blockBaseName,
     arguments['estimatorName'],
@@ -84,7 +89,6 @@ estimatorSubFolder = os.path.join(
     )
 if not os.path.exists(estimatorSubFolder):
     os.makedirs(estimatorSubFolder)
-
 estimatorPath = os.path.join(
     estimatorSubFolder,
     arguments['estimatorName'] + '.joblib')
@@ -156,7 +160,7 @@ def calc_lw_score(X, cv):
     return cross_val_score(LedoitWolf(), X, cv=cv)
 
 listOfDataFrames = []
-saveUnitNames = None
+'''saveUnitNames = None
 if not arguments['loadFromFrames']:
     for segIdx in range(nSeg):
         if arguments['verbose']:
@@ -201,8 +205,7 @@ else:    # loading frames
             listOfDataFrames.append(thisDF)
             currBlockNum += 1
 
-
-dataDF = pd.concat(listOfDataFrames)
+dataDF = pd.concat(listOfDataFrames)'''
 trialInfo = dataDF.index.to_frame().reset_index(drop=True)
 cvIterator = iteratorsBySegment[0]
 workIdx = cvIterator.work

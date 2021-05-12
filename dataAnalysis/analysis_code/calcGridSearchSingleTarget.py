@@ -178,12 +178,12 @@ if __name__ == '__main__':
     estimatorClass = ElasticNet
     estimatorKWArgs = dict()
     gridSearchKWArgs = dict(
-        max_iter=5000,
+        max_iter=10000,
         l1_ratio=[.1, .5, .7, .9, .95, .99, 1.],
         cv=cvIterator)
-    if arguments['debugging']:
+    '''if arguments['debugging']:
         gridSearchKWArgs['l1_ratio'] = [.1, .7, .99, 1.]
-        gridSearchKWArgs['n_alphas'] = 100
+        gridSearchKWArgs['n_alphas'] = 100'''
     #
     '''estimatorClass = SGDRegressor
     estimatorKWArgs = dict(
@@ -365,6 +365,7 @@ if __name__ == '__main__':
         ####
         if arguments['debugging']:
             if maskParams['freqBandName'] not in ['beta', 'gamma']:
+                # if maskParams['lag'] not in [0]:
                 continue
         ###
         scores = {}

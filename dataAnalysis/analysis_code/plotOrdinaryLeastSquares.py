@@ -190,7 +190,7 @@ for attrIdx, attrName in enumerate(attrNameList):
 rhsDF.index = pd.MultiIndex.from_frame(trialInfo)
 workingLhsDF = lhsDF.iloc[workIdx, :]
 workingRhsDF = rhsDF.iloc[workIdx, :]
-pdb.set_trace()
+# pdb.set_trace()
 plotData = pd.concat({
     'ground_truth': workingRhsDF,
     'prediction': predDF}, names=['data_origin'])

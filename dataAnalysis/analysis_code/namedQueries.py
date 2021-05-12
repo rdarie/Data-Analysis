@@ -53,7 +53,7 @@ namedQueries = {
         'endpointYankMagnitude': "chanName.isin(['forceX_prime_abs#0', 'forceY_prime_abs#0'])",
         'pedalPosition': "chanName.isin(['position#0'])",
         'pedalPositionXY': "chanName.isin(['position_x#0', 'position_y#0'])",
-        'pedalVelocity': "chanName.isin(['velocity#0'])",
+        'pedalVelocity': "chanName.isin(['velocity#0', 'velocity_abs#0'])",
         'pedalVelocityXY': "chanName.isin(['velocity_x#0', 'velocity_y#0'])",
     },
     'chan': {

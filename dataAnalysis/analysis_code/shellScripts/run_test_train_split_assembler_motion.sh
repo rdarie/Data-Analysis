@@ -24,7 +24,7 @@
 
 SLURM_ARRAY_TASK_ID=2
 source ./shellScripts/calc_aligned_motion_preamble.sh
-ITERATOR="--iteratorSuffix=b"
+ITERATOR="--iteratorSuffix=c"
 python -u './calcTestTrainSplit.py' --blockIdx=2 --processAll $ITERATOR --loadFromFrames --inputBlockSuffix="rig" --unitQuery="pedalState" --selectionName='pedalState' --verbose --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $LAZINESS
 
 #

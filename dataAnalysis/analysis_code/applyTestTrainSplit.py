@@ -22,18 +22,23 @@ Options:
     --selector=selector                    filename if using a unit selector
     --resetHDF                             delete the h5 file if it exists?
 """
-import matplotlib
-matplotlib.rcParams['pdf.fonttype'] = 42
-matplotlib.rcParams['ps.fonttype'] = 42
-matplotlib.use('QT5Agg')   # generate postscript output
-# matplotlib.use('Agg')   # generate postscript output
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_pdf import PdfPages
-import seaborn as sns
-sns.set(
-    context='talk', style='dark',
-    palette='dark', font='sans-serif',
-    font_scale=1.5, color_codes=True)
+
+from docopt import docopt
+arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
+
+if arguments['plotting']:
+    import matplotlib
+    matplotlib.rcParams['pdf.fonttype'] = 42
+    matplotlib.rcParams['ps.fonttype'] = 42
+    matplotlib.use('QT5Agg')   # generate postscript output
+    # matplotlib.use('Agg')   # generate postscript output
+    import matplotlib.pyplot as plt
+    from matplotlib.backends.backend_pdf import PdfPages
+    import seaborn as sns
+    sns.set(
+        context='talk', style='dark',
+        palette='dark', font='sans-serif',
+        font_scale=1.5, color_codes=True)
 
 import os
 import dataAnalysis.helperFunctions.profiling as prf
@@ -52,12 +57,10 @@ from sklearn.model_selection import cross_val_score, cross_validate, GridSearchC
 import joblib as jb
 import dill as pickle
 import gc
-from docopt import docopt
 import traceback
 from copy import deepcopy
 
 idxSl = pd.IndexSlice
-arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']), arguments['exp'])
 globals().update(expOpts)

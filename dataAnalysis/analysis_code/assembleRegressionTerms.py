@@ -355,4 +355,3 @@ if __name__ == '__main__':
     loadingMeta['rhsNormalizationParams'] = rhsNormalizationParams
     with open(datasetPath.replace('.h5', '_meta.pickle'), 'wb') as f:
         pickle.dump(loadingMeta, f)
-    pdb.set_trace()
