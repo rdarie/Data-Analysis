@@ -364,7 +364,7 @@ if __name__ == '__main__':
         maskParams = {k: v for k, v in zip(lhsMask.index.names, maskIdx)}
         ####
         if arguments['debugging']:
-            if maskParams['freqBandName'] not in ['beta', 'gamma']:
+            if maskParams['freqBandName'] not in ['beta', 'gamma', 'higamma']:
                 # if maskParams['lag'] not in [0]:
                 continue
         ###
@@ -375,7 +375,7 @@ if __name__ == '__main__':
             targetName = columnTuple[0]
             ####
             if arguments['debugging']:
-                if targetName not in ['position#0', 'forceMagnitude#0', 'velocity#0']:
+                if targetName not in ['position#0', 'forceMagnitude#0', 'velocity#0', 'velocity_abs#0']:
                     continue
             ###
             print('Fitting {} to {}...'.format(lhsMask.name[-1], targetName))

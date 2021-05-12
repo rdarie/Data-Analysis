@@ -101,10 +101,11 @@ estimatorPath = os.path.join(
     estimatorsSubFolder,
     fullEstimatorName + '.h5'
     )
-scoresDF = pd.read_hdf(estimatorPath, 'cv')
 with open(datasetPath.replace('.h5', '_meta.pickle'), 'rb') as _f:
     loadingMeta = pickle.load(_f)
 arguments.update(loadingMeta['arguments'])
+#
+scoresDF = pd.read_hdf(estimatorPath, 'cv')
 #
 cvIteratorSubfolder = os.path.join(
     alignSubFolder, 'testTrainSplits')

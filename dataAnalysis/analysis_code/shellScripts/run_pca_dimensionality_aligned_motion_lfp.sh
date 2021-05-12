@@ -21,8 +21,13 @@
 
 # Request custom resources
 #SBATCH --array=2
-# SLURM_ARRAY_TASK_ID=2
+SLURM_ARRAY_TASK_ID=2
 source ./shellScripts/calc_aligned_motion_preamble.sh
+
+ALIGNQUERYTERM="startingNoStim"
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
-python -u './calcSignalDimensionality.py' --loadFromFrames --inputBlockSuffix="lfp_CAR" --unitQuery="lfp_CAR" --estimatorName="pca_lfp_CAR" --iteratorSuffix='a' --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting
-python -u './calcSignalDimensionality.py' --loadFromFrames --inputBlockSuffix="lfp_CAR_spectral" --unitQuery="lfp_CAR_spectral" --estimatorName="pca_lfp_CAR_spectral" --iteratorSuffix='a' --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting
+TARGET="pedalState"
+ITERATOR="c"
+
+# python -u './assembleDataFrames.py' --debugging --iteratorSuffix=$ITERATOR --inputBlockSuffix="lfp" --unitQuery="lfp_CAR_spectral" --loadFromFrames --exp=$EXP $WINDOW --alignQuery=$ALIGNQUERYTERM $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
+python -u './calcSignalDimensionality.py' --estimatorName="pca" --datasetName="lfp_CAR_spectral_${ITERATOR}_L_${ALIGNQUERYTERM}" --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --showFigures --debugging

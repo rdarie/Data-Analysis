@@ -9,19 +9,13 @@ Options:
     --analysisName=analysisName            append a name to the resulting blocks? [default: default]
     --alignFolderName=alignFolderName      append a name to the resulting blocks? [default: motion]
     --window=window                        process with short window? [default: long]
-    --winStart=winStart                    start of window [default: 200]
-    --winStop=winStop                      end of window [default: 400]
     --lazy                                 load from raw, or regular? [default: False]
     --plotting                             load from raw, or regular? [default: False]
+    --showFigures                          load from raw, or regular? [default: False]
+    --debugging                            load from raw, or regular? [default: False]
     --verbose                              print diagnostics? [default: False]
-    --unitQuery=unitQuery                  how to restrict channels? [default: fr_sqrt]
-    --alignQuery=alignQuery                what will the plot be aligned to? [default: midPeak]
-    --inputBlockSuffix=inputBlockSuffix    which trig_ block to pull [default: pca]
-    --inputBlockPrefix=inputBlockPrefix    which trig_ block to pull [default: Block]
-    --iteratorSuffix=iteratorSuffix        filename for cross_val iterator
+    --datasetName=datasetName              filename for resulting estimator (cross-validated n_comps)
     --estimatorName=estimatorName          filename for resulting estimator (cross-validated n_comps)
-    --selector=selector                    filename if using a unit selector
-    --loadFromFrames                       load data from pre-saved dataframes?
 """
 import matplotlib
 matplotlib.rcParams['pdf.fonttype'] = 42
@@ -62,72 +56,45 @@ expOpts, allOpts = parseAnalysisOptions(
 globals().update(expOpts)
 globals().update(allOpts)
 
-blockBaseName, inputBlockSuffix = hf.processBasicPaths(arguments)
 analysisSubFolder, alignSubFolder = hf.processSubfolderPaths(
     arguments, scratchFolder)
-dataFramesFolder = os.path.join(alignSubFolder, 'dataframes')
-
-if not arguments['loadFromFrames']:
-    triggeredPath = os.path.join(
-        alignSubFolder,
-        blockBaseName + '{}_{}.nix'.format(
-            inputBlockSuffix, arguments['window']))
-
-datasetName = '{}_to_{}{}_{}_{}'.format(
-        arguments['unitQueryLhs'], arguments['unitQueryRhs'],
-        iteratorSuffix,
-        arguments['window'],
-        arguments['alignQuery'])
-fullEstimatorName = '{}_{}_{}_{}'.format(
-    blockBaseName,
-    arguments['estimatorName'],
-    arguments['window'],
-    arguments['alignQuery'])
-
-estimatorSubFolder = os.path.join(
-    analysisSubFolder, 'estimators'
-    )
-if not os.path.exists(estimatorSubFolder):
-    os.makedirs(estimatorSubFolder)
-estimatorPath = os.path.join(
-    estimatorSubFolder,
-    arguments['estimatorName'] + '.joblib')
-    # fullEstimatorName + '.joblib')
-
 if arguments['plotting']:
     figureOutputFolder = os.path.join(
-        figureFolder, arguments['analysisName'])
+        figureFolder,
+        arguments['analysisName'], arguments['alignFolderName'])
     if not os.path.exists(figureOutputFolder):
         os.makedirs(figureOutputFolder)
 #
-cvIteratorSubfolder = os.path.join(
-    alignSubFolder, 'testTrainSplits')
-if arguments['iteratorSuffix'] is not None:
-    iteratorSuffix = '_{}'.format(arguments['iteratorSuffix'])
-else:
-    iteratorSuffix = ''
-iteratorPath = os.path.join(
-    cvIteratorSubfolder,
-    '{}_{}_{}{}_cvIterators.pickle'.format(
-        blockBaseName,
-        arguments['window'],
-        arguments['alignQuery'],
-        iteratorSuffix))
-with open(iteratorPath, 'rb') as f:
-    loadingMeta = pickle.load(f)
+'''fullEstimatorName = '{}_{}_to_{}{}_{}_{}'.format(
+    arguments['estimatorName'],
+    arguments['unitQueryLhs'], arguments['unitQueryRhs'],
+    iteratorSuffix,
+    arguments['window'],
+    arguments['alignQuery'])'''
+datasetName = arguments['datasetName']
+# pdb.set_trace()
+fullEstimatorName = '{}_{}'.format(
+    arguments['estimatorName'], arguments['datasetName'])
+#
+estimatorsSubFolder = os.path.join(
+    alignSubFolder, 'estimators')
+if not os.path.exists(estimatorsSubFolder):
+    os.makedirs(estimatorsSubFolder)
+dataFramesFolder = os.path.join(alignSubFolder, 'dataframes')
+datasetPath = os.path.join(
+    dataFramesFolder,
+    datasetName + '.h5'
+    )
+estimatorPath = os.path.join(
+    estimatorsSubFolder,
+    fullEstimatorName + '.h5'
+    )
+#
+with open(datasetPath.replace('.h5', '_meta.pickle'), 'rb') as _f:
+    loadingMeta = pickle.load(_f)
     iteratorsBySegment = loadingMeta.pop('iteratorsBySegment')
     cv_kwargs = loadingMeta.pop('cv_kwargs')
-#
-if not arguments['loadFromFrames']:
-    alignedAsigsKWargs = loadingMeta.pop('alignedAsigsKWargs')
-    alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
-        namedQueries, scratchFolder, **arguments)
-    alignedAsigsKWargs['verbose'] = arguments['verbose']
-    if arguments['verbose']:
-        prf.print_memory_usage('loading {}'.format(triggeredPath))
-    dataReader, dataBlock = ns5.blockFromPath(
-        triggeredPath, lazy=arguments['lazy'])
-    nSeg = len(dataBlock.segments)
+arguments.update(loadingMeta['arguments'])
 
 
 def compute_scores(
@@ -138,7 +105,7 @@ def compute_scores(
     scores = {}
     for n in nComponentsToTest:
         if verbose:
-            print('evaluating with {} components'.format(n))
+            print('compute_scores() evaluating with {} components'.format(n))
         instance = estimator(**estimatorKWArgs)
         instance.n_components = n
         scores[n] = cross_validate(instance, X, cv=cv)
@@ -159,60 +126,30 @@ def shrunk_cov_score(
 def calc_lw_score(X, cv):
     return cross_val_score(LedoitWolf(), X, cv=cv)
 
-listOfDataFrames = []
-'''saveUnitNames = None
-if not arguments['loadFromFrames']:
-    for segIdx in range(nSeg):
-        if arguments['verbose']:
-            prf.print_memory_usage('fitting on segment {}'.format(segIdx))
-        # pdb.set_trace()
-        if 'listOfROIMasks' in loadingMeta:
-            alignedAsigsKWargs.update({'finalIndexMask': loadingMeta['listOfROIMasks'][segIdx]})
-        thisDF = ns5.alignedAsigsToDF(
-            dataBlock,
-            whichSegments=[segIdx],
-            **alignedAsigsKWargs)
-        # if 'listOfExampleIndexes' in loadingMeta:
-        #     assert np.all(dataDF.index == loadingMeta['listOfExampleIndexes'][segIdx])
-        if saveUnitNames is None:
-            saveUnitNames = [cN[0] for cN in thisDF.columns]
-        listOfDataFrames.append(thisDF)
-    if arguments['lazy']:
-        dataReader.file.close()
-else:    # loading frames
-    experimentsToAssemble = loadingMeta.pop('experimentsToAssemble')
-    currBlockNum = 0
-    for expName, lOfBlocks in experimentsToAssemble.items():
-        thisScratchFolder = os.path.join(scratchPath, expName)
-        analysisSubFolder, alignSubFolder = hf.processSubfolderPaths(
-            arguments, thisScratchFolder)
-        thisDFFolder = os.path.join(alignSubFolder, 'dataframes')
-        for bIdx in lOfBlocks:
-            theseArgs = arguments.copy()
-            theseArgs['blockIdx'] = '{}'.format(bIdx)
-            theseArgs['processAll'] = False
-            thisBlockBaseName, _ = hf.processBasicPaths(theseArgs)
-            dFPath = os.path.join(
-                thisDFFolder,
-                '{}_{}_{}_df{}.h5'.format(
-                    thisBlockBaseName,
-                    arguments['window'],
-                    arguments['alignQuery'],
-                    iteratorSuffix))
-            thisDF = pd.read_hdf(dFPath, arguments['unitQuery'])
-            # newSegLevel = [currBlockNum for i in range(thisDF.shape[0])]
-            thisDF.index = thisDF.index.set_levels([currBlockNum], level='segment')
-            listOfDataFrames.append(thisDF)
-            currBlockNum += 1
 
-dataDF = pd.concat(listOfDataFrames)'''
+dataDF = pd.read_hdf(datasetPath, datasetName)
+# only use zero lag targets    
+dataDF = dataDF.xs(0, level='lag', axis='columns')
 trialInfo = dataDF.index.to_frame().reset_index(drop=True)
 cvIterator = iteratorsBySegment[0]
 workIdx = cvIterator.work
 workingDataDF = dataDF.iloc[workIdx, :]
 prf.print_memory_usage('just loaded data, fitting')
 nFeatures = dataDF.columns.shape[0]
+#
+if arguments['verbose']:
+    print('Fitting mle estimator to working dataset...')
+pcaMle = PCA(svd_solver='full', n_components='mle')
+pcaMle.fit(workingDataDF)
+n_components_pca_mle = pcaMle.n_components_
+if arguments['verbose']:
+    print('Fitting all-dimensional estimator to working dataset...')
+pcaFull = PCA(svd_solver='full')
+pcaFull.fit(workingDataDF)
+#
 nCompsToTest = range(1, nFeatures + 1)
+if arguments['debugging']:
+    nCompsToTest = range(1, 10)
 scores = compute_scores(
     dataDF, PCA,
     nCompsToTest, cv=cvIterator, verbose=True,
@@ -221,12 +158,8 @@ scoresDF = pd.concat(
     {nc: pd.DataFrame(scr) for nc, scr in scores.items()},
     names=['nComponents', 'fold'])
 #
-pcaMle = PCA(svd_solver='full', n_components='mle')
-pcaMle.fit(workingDataDF)
-n_components_pca_mle = pcaMle.n_components_
-pcaFull = PCA(svd_solver='full')
-pcaFull.fit(workingDataDF)
-#
+if arguments['verbose']:
+    print('Calculating ledoit-wolf # of components...')
 lWScores = calc_lw_score(dataDF, cv=cvIterator)
 lWForPlot = pd.concat({
     nc: pd.DataFrame({'test_score': lWScores})
@@ -240,9 +173,8 @@ scoresForPlot = pd.concat(
 if arguments['plotting']:
     figureOutputPath = os.path.join(
             figureOutputFolder,
-            '{}_{}_{}_dimensionality.pdf'.format(
-                blockBaseName,
-                arguments['window'], arguments['estimatorName']))
+            '{}_{}_dimensionality.pdf'.format(
+                arguments['estimatorName'], datasetName))
     with PdfPages(figureOutputPath) as pdf:
         fig, ax = plt.subplots()
         fig.set_size_inches(12, 8)
@@ -260,7 +192,10 @@ if arguments['plotting']:
         ax.set_ylabel('average log-likelihood')
         fig.tight_layout(pad=1)
         pdf.savefig(bbox_inches='tight', pad_inches=0)
-        plt.close()
+        if arguments['showFigures']:
+            plt.show()
+        else:
+            plt.close()
         fig, ax = plt.subplots()
         fig.set_size_inches(12, 8)
         cumExplVariance = pd.Series(
@@ -273,7 +208,10 @@ if arguments['plotting']:
         ax.set_ylabel('explained variance')
         fig.tight_layout(pad=1)
         pdf.savefig(bbox_inches='tight', pad_inches=0)
-        plt.close()
+        if arguments['showFigures']:
+            plt.show()
+        else:
+            plt.close()
 del dataDF
 gc.collect()
 #
@@ -281,7 +219,7 @@ prf.print_memory_usage('Done fitting')
 
 jb.dump(pcaFull, estimatorPath)
 
-alignedAsigsKWargs['unitNames'] = saveUnitNames
+'''alignedAsigsKWargs['unitNames'] = saveUnitNames
 alignedAsigsKWargs['unitQuery'] = None
 alignedAsigsKWargs.pop('dataQuery', None)
 # pdb.set_trace()
@@ -296,4 +234,4 @@ estimatorMetadata = {
     }
 
 with open(estimatorPath.replace('.joblib', '_meta.pickle'), 'wb') as f:
-    pickle.dump(estimatorMetadata, f)
+    pickle.dump(estimatorMetadata, f)'''
