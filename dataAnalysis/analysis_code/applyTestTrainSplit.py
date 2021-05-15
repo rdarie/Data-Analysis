@@ -115,6 +115,7 @@ for segIdx in range(nSeg):
         prf.print_memory_usage('extracting data on segment {}'.format(segIdx))
     # prelim load to get feature annotations
     aakwa = deepcopy(alignedAsigsKWargs)
+    aakwa['verbose'] = False
     ##
     featureAnnsToGrab = ['xCoords', 'yCoords', 'freqBandName', 'parentFeature']
     aakwa.update(dict(transposeToColumns='bin', concatOn='index', rollingWindow=None))
@@ -125,17 +126,9 @@ for segIdx in range(nSeg):
     featureInfo = firstTrial.index.to_frame().reset_index(drop=True).set_index(['feature', 'lag'])
     del tempDF, firstTrial
     aakwa = deepcopy(alignedAsigsKWargs)
-    dataDF = ns5.alignedAsigsToDF(
-        dataBlock, whichSegments=[segIdx], **aakwa)
+    aakwa['verbose'] = False
     if 'listOfROIMasks' in loadingMeta:
         aakwa['finalIndexMask'] = loadingMeta['listOfROIMasks'][segIdx]
-    '''if arguments['needsRollingWindow']:
-        # needs downsampling
-        binInterval = rasterOpts['binOpts'][arguments['analysisName']]['binInterval']
-        stepLen = spectralFeatureOpts['stepLen']
-        winLen = spectralFeatureOpts['winLen']
-        aakwa['decimate'] = int(stepLen / binInterval)
-        aakwa['rollingWindow'] = int(winLen / binInterval)'''
     dataDF = ns5.alignedAsigsToDF(
         dataBlock, whichSegments=[segIdx], **aakwa)
     columnsMeta = featureInfo.loc[dataDF.columns, featureAnnsToGrab].reset_index()
