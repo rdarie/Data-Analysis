@@ -103,6 +103,7 @@ def compute_scores(
         X, estimator,
         nComponentsToTest,
         cv, estimatorKWArgs={},
+        return_train_score=True, return_estimator=True,
         verbose=False):
     scores = {}
     for n in nComponentsToTest:
@@ -110,7 +111,10 @@ def compute_scores(
             print('compute_scores() evaluating with {} components'.format(n))
         instance = estimator(**estimatorKWArgs)
         instance.n_components = n
-        scores[n] = cross_validate(instance, X.to_numpy(), cv=cv)
+        scores[n] = cross_validate(
+            instance, X.to_numpy(), cv=cv,
+            return_train_score=return_train_score,
+            return_estimator=return_estimator)
     return scores
 
 
@@ -125,8 +129,11 @@ def shrunk_cov_score(
     return cvResDF['mean_test_score'].max()
 
 
-def calc_lw_score(X, cv):
-    return cross_val_score(LedoitWolf(), X.to_numpy(), cv=cv)
+def calc_lw_score(
+        X, cv):
+    result = cross_val_score(
+        LedoitWolf(), X.to_numpy(), cv=cv)
+    return result
 
 
 dataDF = pd.read_hdf(datasetPath, datasetName)
@@ -151,8 +158,8 @@ pcaFull.fit(workingDataDF)
 #
 nCompsToTest = range(1, nFeatures + 1)
 if arguments['debugging']:
-    nCompsToTest = range(1, 20)
-    n_components_pca_mle = min(n_components_pca_mle, 19)
+    nCompsToTest = range(1, 200)
+    n_components_pca_mle = min(n_components_pca_mle, 199)
 scores = compute_scores(
     dataDF, PCA,
     nCompsToTest, cv=cvIterator, verbose=True,
@@ -160,6 +167,16 @@ scores = compute_scores(
 scoresDF = pd.concat(
     {nc: pd.DataFrame(scr) for nc, scr in scores.items()},
     names=['nComponents', 'fold'])
+#
+nCompsMaxMLE = scoresDF.groupby(['nComponents']).mean()['test_score'].idxmax()
+maxMLE = scoresDF.xs(nCompsMaxMLE, level='nComponents', axis='index').mean()['test_score']
+cumExplVariance = pd.Series(
+    np.cumsum(pcaFull.explained_variance_ratio_[:len(nCompsToTest)]),
+    index=nCompsToTest)
+######
+varCutoff = 0.95
+nCompsCutoff = cumExplVariance.index[cumExplVariance > varCutoff].min()
+######
 #
 if arguments['verbose']:
     print('Calculating ledoit-wolf # of components...')
@@ -169,9 +186,11 @@ lWForPlot = pd.concat({
     for nc in nCompsToTest}, names=['nComponents', 'fold'])
 scoresForPlot = pd.concat(
     {
-        'PCA': scoresDF.loc[:, ['test_score']],
+        'PCA_test': scoresDF.loc[:, ['test_score']],
+        'PCA_train': scoresDF.loc[:, ['train_score']],
         'ledoitWolfMLE': lWForPlot},
     names=['estimator']).reset_index()
+pdb.set_trace()
 if arguments['plotting']:
     figureOutputPath = os.path.join(
             figureOutputFolder,
@@ -187,12 +206,21 @@ if arguments['plotting']:
         handles, labels = ax.get_legend_handles_labels()
         try:
             meanScoreMLE = scoresDF.loc[idxSl[n_components_pca_mle, :], 'test_score'].mean()
-            line, = ax.plot(n_components_pca_mle, meanScoreMLE, 'g*', label='num. components from MLE')
-            handles.append(line)
+            textDescr = 'num. components from MLE'
+            lineMLE, = ax.plot(n_components_pca_mle, meanScoreMLE, 'g*', label=textDescr)
+            labels.append(textDescr)
+            handles.append(lineMLE)
         except Exception:
             traceback.print_exc()
             pass
-        labels.append('num. components from MLE')
+        try:
+            textDescr = 'num. components that maximize likelihood'
+            lineMax, = ax.plot(nCompsMaxMLE, maxMLE, 'r*', label=textDescr)
+            handles.append(lineMax)
+            labels.append(textDescr)
+        except Exception:
+            traceback.print_exc()
+            pass
         ax.legend(handles, labels)
         ax.set_xlabel('number of components')
         ax.set_ylabel('average log-likelihood')
@@ -204,11 +232,11 @@ if arguments['plotting']:
             plt.close()
         fig, ax = plt.subplots()
         fig.set_size_inches(12, 8)
-        cumExplVariance = pd.Series(
-            np.cumsum(pcaFull.explained_variance_ratio_[:len(nCompsToTest)]),
-            index=nCompsToTest)
         ax.plot(cumExplVariance)
-        ax.plot(n_components_pca_mle, cumExplVariance.loc[n_components_pca_mle], '*')
+        ax.plot(
+            n_components_pca_mle,
+            cumExplVariance.loc[n_components_pca_mle],
+            '*')
         ax.set_ylim((0, 1))
         ax.set_xlabel('number of components')
         ax.set_ylabel('explained variance')
@@ -225,7 +253,8 @@ prf.print_memory_usage('Done fitting')
 
 jb.dump(pcaFull, estimatorPath)
 
-'''alignedAsigsKWargs['unitNames'] = saveUnitNames
+'''
+alignedAsigsKWargs['unitNames'] = saveUnitNames
 alignedAsigsKWargs['unitQuery'] = None
 alignedAsigsKWargs.pop('dataQuery', None)
 # pdb.set_trace()
@@ -240,4 +269,5 @@ estimatorMetadata = {
     }
 
 with open(estimatorPath.replace('.joblib', '_meta.pickle'), 'wb') as f:
-    pickle.dump(estimatorMetadata, f)'''
+    pickle.dump(estimatorMetadata, f)
+    '''

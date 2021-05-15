@@ -29,6 +29,7 @@ LAZINESS="--lazy"
 # LAZINESS=""
 
 VERBOSITY="--verbose"
+# WINDOW="--window=L"
 WINDOW="--window=XL"
 # WINDOW="--window=XS"
 ANALYSISFOLDER="--analysisName=default"

@@ -68,8 +68,8 @@ alignedAsigsKWargs.update(dict(
 
 daskComputeOpts = dict(
     # scheduler='threads'
-    scheduler='processes'
-    # scheduler='single-threaded'
+    # scheduler='processes'
+    scheduler='single-threaded'
     )
 daskOpts = dict(
     useDask=True,
@@ -112,7 +112,7 @@ def rereference(
     if substituteOneChannel:
         # implemented based on Milekovic, ..., Brochier 2015
         # check that it works!
-        resData.loc[subChanLoc, :] = referenceSignal
+        resData.loc[subChanLoc, :] = referenceSignal.to_numpy()
     resDF = pd.concat(
         [group.loc[:, indexCols], resData],
         axis='columns')

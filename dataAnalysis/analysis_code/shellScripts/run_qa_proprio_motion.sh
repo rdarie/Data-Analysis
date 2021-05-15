@@ -21,7 +21,7 @@
 # Request custom resources
 #SBATCH --array=2,3
 
-#  SLURM_ARRAY_TASK_ID=2
+#  SLURM_ARRAY_TASK_ID=3
 source shellScripts/calc_aligned_motion_preamble.sh
 ANALYSISFOLDER="--analysisName=default"
 UNITQUERY="--unitQuery=lfp"

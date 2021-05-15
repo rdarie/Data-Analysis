@@ -23,11 +23,11 @@
 #SBATCH --array=2
 SLURM_ARRAY_TASK_ID=2
 source ./shellScripts/calc_aligned_motion_preamble.sh
-WINDOW="--window=L"
+
 ALIGNQUERYTERM="startingNoStim"
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
-TARGET="pedalState"
-ITERATOR="c"
+TARGET="lfp_CAR_spectral"
+ITERATOR="d"
+WINDOW="XL"
 
-python -u './calcSignalDimensionality.py' --estimatorName="pca" --datasetName="lfp_CAR_spectral_${ITERATOR}_L_${ALIGNQUERYTERM}" --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --showFigures
-python -u './calcSignalDimensionality.py' --estimatorName="pca" --datasetName="lfp_CAR_${ITERATOR}_L_${ALIGNQUERYTERM}" --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --showFigures
+python -u './calcSignalDimensionality.py' --estimatorName="pca_limited" --datasetName="${TARGET}_${ITERATOR}_${WINDOW}_${ALIGNQUERYTERM}" --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --debugging --showFigures

@@ -835,7 +835,7 @@ def unitSpikeTrainWaveformsToDF(
             print('extracting wf from {}'.format(stIn.segment))
         wf = np.asarray(
             np.squeeze(st.waveforms),
-            dtype='float32')
+            dtype=float)
         if wf.ndim == 3:
             print('Waveforms from more than one channel!')
             if wf.shape[1] > 0:
@@ -848,6 +848,7 @@ def unitSpikeTrainWaveformsToDF(
             np.arange(wfDF.shape[1], dtype=np.float64) * samplingPeriod -
             leftSweep)
         wfDF.columns = np.around(bins.magnitude, decimals=6)
+        # pdb.set_trace()
         if windowSize is not None:
             winMask = (
                 (wfDF.columns >= windowSize[0]) &
@@ -1239,10 +1240,13 @@ def alignedAsigsToDF(
         allWaveforms.columns = allWaveforms.columns.remove_unused_levels()
     allWaveforms.sort_index(
         axis='columns', inplace=True, kind='mergesort')
+    # pdb.set_trace()
     if dropNaNs:
         if transposeToColumns == 'bin':
+            # msk = allWaveforms.isna().any(axis='columns')
             allWaveforms.dropna(inplace=True, axis='columns')
         elif transposeToColumns == 'feature':
+            # mask = 
             allWaveforms.dropna(inplace=True, axis='index')
     if finalIndexMask is not None:
         allWaveforms = allWaveforms.loc[finalIndexMask.to_numpy(), :]
