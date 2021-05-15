@@ -214,6 +214,7 @@ if not arguments['loadFromFrames']:
                 print('Looking for bins >= {:.3f} and < {:.3f}'.format(ROIWinStart, deltaT + ROIWinStop))
                 targetMask.loc[group.index] = (groupBins >= ROIWinStart) & (groupBins < deltaT + ROIWinStop)
             listOfROIMasks.append(targetMask)
+            print('targetMask has dimension {}'.format(targetMask.shape))
             dataDF = dataDF.loc[targetMask, :]
             exampleIndex = dataDF.index
             listOfExampleIndexes.append(exampleIndex)

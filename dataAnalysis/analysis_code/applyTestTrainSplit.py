@@ -113,6 +113,7 @@ nSeg = len(dataBlock.segments)
 for segIdx in range(nSeg):
     if arguments['verbose']:
         prf.print_memory_usage('extracting data on segment {}'.format(segIdx))
+    # prelim load to get feature annotations
     aakwa = deepcopy(alignedAsigsKWargs)
     ##
     featureAnnsToGrab = ['xCoords', 'yCoords', 'freqBandName', 'parentFeature']
@@ -172,7 +173,9 @@ outputDFPath = os.path.join(
         arguments['alignQuery'],
         iteratorSuffix))
 if arguments['verbose']:
-    prf.print_memory_usage('Saving {}'.format(outputDFPath))
+    prf.print_memory_usage(
+        'Saving {} to {}'.format(
+            arguments['selectionName'], outputDFPath))
 if arguments['resetHDF']:
     if os.path.exists(outputDFPath):
         os.remove(outputDFPath)

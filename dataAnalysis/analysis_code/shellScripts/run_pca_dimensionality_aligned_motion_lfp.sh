@@ -30,4 +30,4 @@ TARGET="lfp_CAR_spectral"
 ITERATOR="d"
 WINDOW="XL"
 
-python -u './calcSignalDimensionality.py' --estimatorName="pca_limited" --datasetName="${TARGET}_${ITERATOR}_${WINDOW}_${ALIGNQUERYTERM}" --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --debugging --showFigures
+python -u './calcSignalDimensionality.py' --estimatorName="pca_limited" --datasetName="${TARGET}_${ITERATOR}_${WINDOW}_${ALIGNQUERYTERM}" --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=2 --plotting --debugging --showFigures

@@ -38,18 +38,30 @@ def crossValidationScores(
         verbose=0):
     with jb.parallel_backend(**joblibBackendArgs):
         instance = estimator(**estimatorKWArgs)
-        scores = cross_validate(instance, X, y, verbose=verbose, **crossvalKWArgs)
+        cvX = X.to_numpy()
+        if y is not None:
+            cvY = y.to_numpy()
+        else:
+            cvY = None
+        scores = cross_validate(
+            instance, cvX, cvY, verbose=verbose, **crossvalKWArgs)
     # train on all of the "working" samples, eval on the "validation"
     if hasattr(crossvalKWArgs['cv'], 'work'):
         workingIdx = crossvalKWArgs['cv'].work
-        workEstim = estimator(**estimatorKWArgs)
-        workX = X.iloc[workingIdx, :]
-        workY = y.iloc[workingIdx]
         validIdx = crossvalKWArgs['cv'].validation
-        valX = X.iloc[validIdx, :]
-        valY = y.iloc[validIdx]
         #
-        workEstim.fit(workX.to_numpy(), workY.to_numpy())
+        workEstim = estimator(**estimatorKWArgs)
+        #
+        workX = X.iloc[workingIdx, :].to_numpy()
+        valX = X.iloc[validIdx, :].to_numpy()
+        if y is not None:
+            workY = y.iloc[workingIdx].to_numpy()
+            valY = y.iloc[validIdx].to_numpy()
+        else:
+            workY = None
+            valY = None
+        #
+        workEstim.fit(workX, workY)
         #
         scores['fit_time'] = np.append(scores['fit_time'], np.nan)
         scores['score_time'] = np.append(scores['score_time'], np.nan)

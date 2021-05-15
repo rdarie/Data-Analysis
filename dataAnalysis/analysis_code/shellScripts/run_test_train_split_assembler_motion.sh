@@ -25,10 +25,10 @@
 SLURM_ARRAY_TASK_ID=2
 source ./shellScripts/calc_aligned_motion_preamble.sh
 
-ALIGNQUERYTERM="startingNoStim"
+ALIGNQUERYTERM="starting"
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
 TARGET="pedalState"
-ITERATOR="d"
+ITERATOR="e"
 
 python -u './calcTestTrainSplit.py' $BLOCKSELECTOR --iteratorSuffix=$ITERATOR --loadFromFrames --inputBlockSuffix="rig" --unitQuery="pedalState" --selectionName='pedalState' --verbose --exp=$EXP $WINDOW --alignQuery=$ALIGNQUERYTERM $ANALYSISFOLDER $ALIGNFOLDER $LAZINESS
 
