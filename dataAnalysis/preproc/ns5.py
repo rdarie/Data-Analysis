@@ -1005,8 +1005,13 @@ def unitSpikeTrainWaveformsToDF(
             names=['feature', 'lag', 'originalDummy']).reset_index()
         metaLookup = pd.DataFrame(
             np.nan, index=waveformsDF.index, columns=metaDF.columns)
-        for cN in metaLookup.columns:
-            metaLookup.loc[:, cN] = waveformsDF['originalDummy'].map(metaDF[cN])
+        try:
+            for cN in metaLookup.columns:
+                # metaLookup.loc[:, cN] = waveformsDF['originalDummy'].map(metaDF[cN])
+                metaLookup.loc[:, cN] = waveformsDF.index.map(metaDF.reset_index(drop=True)[cN])
+        except Exception:
+            traceback.print_exc()
+            pdb.set_trace()
         waveformsDF = pd.concat(
             [
                 metaLookup,

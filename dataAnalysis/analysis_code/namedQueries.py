@@ -34,6 +34,7 @@ namedQueries = {
         'all': "(chanName.str.endswith('#0'))",
         'pca': "(chanName.str.contains('pca'))",
         'factor': "(chanName.str.contains('factor'))",
+        'mahal': "(chanName.str.contains('mahal'))",
         'oech': "(chanName.str.contains('CH'))",
         'isispinaloremg': "((chanName.str.contains('caudal'))or(chanName.str.contains('rostral'))or(chanName.str.contains('Emg')))",
         'isispinal': "( (chanName.str.contains('caudal'))or(chanName.str.contains('rostral')) )",

@@ -92,9 +92,9 @@ else:
         loadingMeta = pickle.load(_f)
         for discardEntry in ['plotting', 'showFigures']:
             _ = loadingMeta['arguments'].pop(discardEntry)
-    for loadingEntry in ['unitQuery']:
+    '''for loadingEntry in ['unitQuery']:
         if loadingEntry in loadingMeta['arguments']:
-            arguments[loadingEntry] = loadingMeta['arguments'][loadingEntry]
+            arguments[loadingEntry] = loadingMeta['arguments'][loadingEntry]'''
     for aakwaEntry in ['getMetaData', 'concatOn', 'transposeToColumns']:
         if aakwaEntry in loadingMeta['alignedAsigsKWargs']:
             alignedAsigsKWargs[aakwaEntry] = loadingMeta['alignedAsigsKWargs'][aakwaEntry]
@@ -124,8 +124,11 @@ if arguments['verbose']:
 
 alignedAsigsDF = ns5.alignedAsigsToDF(
     dataBlock, **alignedAsigsKWargs)
-
-features = estimator.transform(alignedAsigsDF.to_numpy())
+# pdb.set_trace()
+if hasattr(estimator, 'transform'):
+    features = estimator.transform(alignedAsigsDF.to_numpy())
+elif hasattr(estimator, 'mahalanobis'):
+    features = estimator.mahalanobis(alignedAsigsDF.to_numpy())
 if arguments['profile']:
     prf.print_memory_usage('after estimator.transform')
 #
@@ -136,7 +139,6 @@ else:
         estimatorMetadata['name'] + '{:0>3}'.format(i)
         for i in range(features.shape[1])]
 #
-# pdb.set_trace()
 # colNames = pd.MultiIndex.from_arrays(
 #     [featureNames, [0 for fN in featureNames]],
 #     names=['feature', 'lag'])

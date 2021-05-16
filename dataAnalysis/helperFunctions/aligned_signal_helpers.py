@@ -746,7 +746,8 @@ def facetGridCompareMeans(
             sigTestAsig = asigWide
         # cannot have multiple traces per facet (one p-value per time bin)
         if len(sigTestVar) > 0:
-            assert sigTestAsig.groupby(sigTestVar).ngroups == 1
+            if statsTestOpts['referenceTimeWindow'] is not None:
+                assert sigTestAsig.groupby(sigTestVar).ngroups == 1
         #  get significance test results (correct for multiple comparionsons at the end, not here)
         if not compareISIs:
             pVals, statVals, sigVals = compareMeansGrouped(
