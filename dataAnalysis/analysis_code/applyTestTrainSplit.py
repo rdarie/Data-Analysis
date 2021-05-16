@@ -23,6 +23,9 @@ Options:
     --resetHDF                             delete the h5 file if it exists?
 """
 
+import sys
+for arg in sys.argv:
+    print(arg)
 from docopt import docopt
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 
@@ -59,7 +62,6 @@ import dill as pickle
 import gc
 import traceback
 from copy import deepcopy
-
 idxSl = pd.IndexSlice
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']), arguments['exp'])
@@ -120,7 +122,6 @@ for segIdx in range(nSeg):
     featureAnnsToGrab = ['xCoords', 'yCoords', 'freqBandName', 'parentFeature']
     aakwa.update(dict(transposeToColumns='bin', concatOn='index', rollingWindow=None))
     aakwa['getMetaData'] += featureAnnsToGrab
-    # pdb.set_trace()
     if arguments['verbose']:
         prf.print_memory_usage('Pre-loading feature info from  {}'.format(triggeredPath))
     tempDF = ns5.alignedAsigsToDF(

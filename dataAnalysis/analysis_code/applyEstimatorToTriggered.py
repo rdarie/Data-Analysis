@@ -32,15 +32,17 @@ import pdb
 import dataAnalysis.preproc.ns5 as ns5
 import joblib as jb
 import dill as pickle
-#
+import sys
 from currentExperiment import parseAnalysisOptions
 from docopt import docopt
+
+for arg in sys.argv:
+    print(arg)
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']), arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
-#
 blockBaseName, inputBlockSuffix = hf.processBasicPaths(arguments)
 analysisSubFolder, alignSubFolder = hf.processSubfolderPaths(
     arguments, scratchFolder)
@@ -55,23 +57,56 @@ if oldWay:
     # alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
     #     namedQueries, scratchFolder, **arguments)
     #
-    estimatorSubFolder = os.path.join(
+    estimatorsSubFolder = os.path.join(
         analysisSubFolder, 'estimators')
     estimatorPath = os.path.join(
-        estimatorSubFolder,
+        estimatorsSubFolder,
         arguments['estimatorName'] + '.joblib')
-    with open(
-        os.path.join(
-            estimatorSubFolder,
-            arguments['estimatorName'] + '_meta.pickle'),
-            'rb') as f:
-        estimatorMetadata = pickle.load(f)
     estimator = jb.load(estimatorPath)
     alignedAsigsKWargs.update(estimatorMetadata['alignedAsigsKWargs'])
     alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **arguments)
 else:
-    pdb.set_trace()
-# !!
+    datasetName = arguments['datasetName']
+    fullEstimatorName = '{}_{}'.format(
+        arguments['estimatorName'], arguments['datasetName'])
+    #
+    estimatorsSubFolder = os.path.join(
+        alignSubFolder, 'estimators')
+    if not os.path.exists(estimatorsSubFolder):
+        os.makedirs(estimatorsSubFolder)
+    dataFramesFolder = os.path.join(alignSubFolder, 'dataframes')
+    datasetPath = os.path.join(
+        dataFramesFolder,
+        datasetName + '.h5'
+        )
+    scoresPath = os.path.join(
+        estimatorsSubFolder,
+        fullEstimatorName + '.h5'
+        )
+    estimatorPath = os.path.join(
+        estimatorsSubFolder,
+        fullEstimatorName + '.joblib'
+        )
+    estimator = jb.load(estimatorPath)
+    with open(datasetPath.replace('.h5', '_meta.pickle'), 'rb') as _f:
+        loadingMeta = pickle.load(_f)
+        for discardEntry in ['plotting', 'showFigures']:
+            _ = loadingMeta['arguments'].pop(discardEntry)
+    for loadingEntry in ['unitQuery']:
+        if loadingEntry in loadingMeta['arguments']:
+            arguments[loadingEntry] = loadingMeta['arguments'][loadingEntry]
+    for aakwaEntry in ['getMetaData', 'concatOn', 'transposeToColumns']:
+        if aakwaEntry in loadingMeta['alignedAsigsKWargs']:
+            alignedAsigsKWargs[aakwaEntry] = loadingMeta['alignedAsigsKWargs'][aakwaEntry]
+    alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **arguments)
+    alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(namedQueries, scratchFolder, **arguments)
+#
+with open(
+    os.path.join(
+        estimatorPath.replace('.joblib', '_meta.pickle')),
+        'rb') as f:
+    estimatorMetadata = pickle.load(f)
+#
 # Reduce time sample even further
 # alignedAsigsKWargs.update(dict(getMetaData=True, decimate=20))
 alignedAsigsKWargs['verbose'] = arguments['verbose']
@@ -84,9 +119,12 @@ outputPath = os.path.join(
 dataReader, dataBlock = ns5.blockFromPath(
     triggeredPath, lazy=arguments['lazy'])
 #
+if arguments['verbose']:
+    prf.print_memory_usage('Loading {}'.format(triggeredPath))
+
 alignedAsigsDF = ns5.alignedAsigsToDF(
     dataBlock, **alignedAsigsKWargs)
-#
+
 features = estimator.transform(alignedAsigsDF.to_numpy())
 if arguments['profile']:
     prf.print_memory_usage('after estimator.transform')
@@ -107,7 +145,8 @@ alignedFeaturesDF = pd.DataFrame(
 alignedFeaturesDF.columns.name = 'feature'
 del alignedAsigsDF
 #
-masterBlock = ns5.alignedAsigDFtoSpikeTrain(alignedFeaturesDF, dataBlock)
+masterBlock = ns5.alignedAsigDFtoSpikeTrain(
+    alignedFeaturesDF, dataBlock=dataBlock)
 if arguments['lazy']:
     dataReader.file.close()
 masterBlock = ns5.purgeNixAnn(masterBlock)

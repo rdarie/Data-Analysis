@@ -32,5 +32,6 @@ WINDOW="XL"
 
 # python -u './calcSignalDimensionality.py' --estimatorName="fa_db" --debugging --datasetName="${TARGET}_${ITERATOR}_${WINDOW}_${ALIGNQUERYTERM}" --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=2 --plotting --showFigures
 
-BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
-python -u './applyEstimatorToTriggered.py' --inputBlockSuffix="${TARGET}" --estimatorName="fa_db" --datasetName="${TARGET}_${ITERATOR}_${WINDOW}_${ALIGNQUERYTERM}" --unitQuery="lfp" --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR
+#
+# python -u './assembleDataFrames.py' --debugging --iteratorSuffix=$ITERATOR --inputBlockSuffix="${TARGET}_fa_db" --unitQuery="${TARGET}_fa_db" --loadFromFrames --exp=$EXP --window=$WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
+python -u './assembleExperimentAlignedAsigs.py' --exp=$EXP $BLOCKSELECTOR --inputBlockSuffix="${TARGET}_fa_db" --window=$WINDOW $ANALYSISFOLDER $ALIGNFOLDER $LAZINESS

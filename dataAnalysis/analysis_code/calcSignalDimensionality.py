@@ -176,7 +176,7 @@ if __name__ == '__main__':
     #
     nCompsToTest = range(1, nFeatures + 1, 3)
     if arguments['debugging']:
-        nCompsToTest = range(1, 150, 5)
+        nCompsToTest = range(1, 100, 5)
     scores = {}
     for n in nCompsToTest:
         if arguments['verbose']:
@@ -200,11 +200,16 @@ if __name__ == '__main__':
     lastFoldIdx = scoresDF.index.get_level_values('fold').max()
     mostComps = scoresDF.index.get_level_values('nComponents').max()
     pcaFull = scoresDF.loc[(mostComps, lastFoldIdx), 'estimator']
+    chosenEstimator = scoresDF.loc[(nCompsMaxMLE, lastFoldIdx), 'estimator']
+    if 'pca' in arguments['estimatorName']:
+        outputFeatures = ['pca{:03d}'.format(nc) for nc in range(1, chosenEstimator.n_components + 1)]
+    elif 'fa' in arguments['estimatorName']:
+        outputFeatures = ['factor{:03d}'.format(nc) for nc in range(1, chosenEstimator.n_components + 1)]
     #
     prf.print_memory_usage('Done fitting')
     if os.path.exists(estimatorPath):
         os.remove(estimatorPath)
-    pdb.set_trace()
+    # 
     try:
         scoresDF.loc[idxSl[:, lastFoldIdx], :].to_hdf(estimatorPath, 'work')
         scoresDF.loc[:, ['test_score', 'train_score']].to_hdf(estimatorPath, 'cv')
@@ -215,6 +220,22 @@ if __name__ == '__main__':
     except Exception:
         traceback.print_exc()
     #
+    jb.dump(chosenEstimator, estimatorPath.replace('.h5', '.joblib'))
+    estimatorMetadata = {
+        'path': os.path.basename(estimatorPath),
+        'name': arguments['estimatorName'],
+        'datasetName': datasetName,
+        'outputFeatures': outputFeatures
+        }
+    with open(estimatorPath.replace('.h5', '_meta.pickle'), 'wb') as f:
+        pickle.dump(estimatorMetadata, f)
+    '''
+    alignedAsigsKWargs['unitNames'] = saveUnitNames
+    alignedAsigsKWargs['unitQuery'] = None
+    alignedAsigsKWargs.pop('dataQuery', None)
+    # pdb.set_trace()
+        '''
+
     if 'pca' in arguments['estimatorName']:
         cumExplVariance = pd.Series(
             np.cumsum(pcaFull.explained_variance_ratio_),
@@ -293,23 +314,3 @@ if __name__ == '__main__':
     gc.collect()
     #
     prf.print_memory_usage('Done fitting')
-
-    '''
-    jb.dump(pcaFull, estimatorPath)
-    alignedAsigsKWargs['unitNames'] = saveUnitNames
-    alignedAsigsKWargs['unitQuery'] = None
-    alignedAsigsKWargs.pop('dataQuery', None)
-    # pdb.set_trace()
-    estimatorMetadata = {
-        'trainingDataPath': os.path.basename(iteratorPath),
-        'path': os.path.basename(estimatorPath),
-        'name': arguments['estimatorName'],
-        'inputBlockSuffix': inputBlockSuffix,
-        'blockBaseName': blockBaseName,
-        'inputFeatures': saveUnitNames,
-        'alignedAsigsKWargs': alignedAsigsKWargs
-        }
-
-    with open(estimatorPath.replace('.joblib', '_meta.pickle'), 'wb') as f:
-        pickle.dump(estimatorMetadata, f)
-        '''
