@@ -24,19 +24,24 @@ Options:
     --selector=selector                    filename if using a unit selector
     --loadFromFrames                       load data from pre-saved dataframes?
 """
-import matplotlib
-matplotlib.rcParams['pdf.fonttype'] = 42
-matplotlib.rcParams['ps.fonttype'] = 42
-matplotlib.use('QT5Agg')   # generate postscript output
-# matplotlib.use('Agg')   # generate postscript output
+
+from docopt import docopt
+arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
+if arguments['plotting']:
+    import matplotlib
+    matplotlib.rcParams['pdf.fonttype'] = 42
+    matplotlib.rcParams['ps.fonttype'] = 42
+    # matplotlib.use('QT5Agg')   # generate interactive output
+    matplotlib.use('PS')   # generate postscript output
+    # matplotlib.use('Agg')   # generate postscript output
+    import matplotlib.pyplot as plt
+    from matplotlib.backends.backend_pdf import PdfPages
+    import seaborn as sns
+    sns.set(
+        context='talk', style='dark',
+        palette='dark', font='sans-serif',
+        font_scale=1.5, color_codes=True)
 from dask.distributed import Client
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_pdf import PdfPages
-import seaborn as sns
-sns.set(
-    context='talk', style='dark',
-    palette='dark', font='sans-serif',
-    font_scale=1.5, color_codes=True)
 import os
 import dataAnalysis.helperFunctions.profiling as prf
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
@@ -57,10 +62,8 @@ import joblib as jb
 import dill as pickle
 import gc
 from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
-from docopt import docopt
 idxSl = pd.IndexSlice
 
-arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 # if debugging in a console:
 '''
 consoleDebugging = True
@@ -196,7 +199,8 @@ if __name__ == '__main__':
             for featName, subGroup in dataGroup.groupby('feature', axis='columns'):
                 print('Pre-normalizing {}, {}'.format(expName, featName))
                 meanLevel = np.mean(subGroup.xs(0, level='lag', axis='columns').to_numpy())
-                finalDF.loc[subGroup.index, subGroup.columns] = np.sqrt(finalDF.loc[subGroup.index, subGroup.columns] / meanLevel)
+                # finalDF.loc[subGroup.index, subGroup.columns] = np.sqrt(finalDF.loc[subGroup.index, subGroup.columns] / meanLevel)
+                finalDF.loc[subGroup.index, subGroup.columns] = finalDF.loc[subGroup.index, subGroup.columns] - meanLevel
                 normalizationParams[0].append({
                     'expName': expName,
                     'feature': featName,

@@ -25,21 +25,20 @@
 SLURM_ARRAY_TASK_ID=2
 source ./shellScripts/calc_aligned_motion_preamble.sh
 
-ALIGNQUERYTERM="starting"
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
 TARGET="pedalState"
-ITERATOR="e"
+ITERATOR="a"
 
-python -u './calcTestTrainSplit.py' $BLOCKSELECTOR --iteratorSuffix=$ITERATOR --loadFromFrames --inputBlockSuffix="rig" --unitQuery="pedalState" --selectionName='pedalState' --verbose --exp=$EXP $WINDOW --alignQuery=$ALIGNQUERYTERM $ANALYSISFOLDER $ALIGNFOLDER $LAZINESS
+python -u './calcTestTrainSplit.py' $BLOCKSELECTOR --iteratorSuffix=$ITERATOR --loadFromFrames --inputBlockSuffix="rig" --unitQuery="pedalState" --selectionName='pedalState' --verbose --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $LAZINESS
 
-python -u './assembleDataFrames.py' --debugging --iteratorSuffix=$ITERATOR --inputBlockSuffix='lfp_CAR' --unitQuery='lfp_CAR' --loadFromFrames --exp=$EXP $WINDOW --alignQuery=$ALIGNQUERYTERM $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
-python -u './assembleDataFrames.py' --debugging --iteratorSuffix=$ITERATOR --inputBlockSuffix='lfp_CAR_spectral' --unitQuery='lfp_CAR_spectral' --loadFromFrames --exp=$EXP $WINDOW --alignQuery=$ALIGNQUERYTERM $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
-python -u './assembleDataFrames.py' --debugging --iteratorSuffix=$ITERATOR --inputBlockSuffix='rig' --unitQuery='pedalState' --loadFromFrames --exp=$EXP $WINDOW --alignQuery=$ALIGNQUERYTERM $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
+python -u './assembleDataFrames.py' --debugging --iteratorSuffix=$ITERATOR --inputBlockSuffix='lfp_CAR' --unitQuery='lfp_CAR' --loadFromFrames --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
+python -u './assembleDataFrames.py' --debugging --iteratorSuffix=$ITERATOR --inputBlockSuffix='lfp_CAR_spectral' --unitQuery='lfp_CAR_spectral' --loadFromFrames --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
+python -u './assembleDataFrames.py' --debugging --iteratorSuffix=$ITERATOR --inputBlockSuffix='rig' --unitQuery='pedalState' --loadFromFrames --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
 
 #
 # blocks=(lfp_CAR lfp_CAR_spectral rig)
 # for B in "${blocks[@]}"
 # do
 #     echo "concatenating $B blocks"
-#     python -u ./assembleExperimentAlignedAsigs.py --exp=$EXP $BLOCKSELECTOR --inputBlockSuffix=$B $WINDOW $ANALYSISFOLDER --alignQuery=$ALIGNQUERYTERM $LAZINESS
+#     python -u ./assembleExperimentAlignedAsigs.py --exp=$EXP $BLOCKSELECTOR --inputBlockSuffix=$B $WINDOW $ANALYSISFOLDER $ALIGNQUERY $LAZINESS
 # done

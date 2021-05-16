@@ -120,6 +120,9 @@ for segIdx in range(nSeg):
     featureAnnsToGrab = ['xCoords', 'yCoords', 'freqBandName', 'parentFeature']
     aakwa.update(dict(transposeToColumns='bin', concatOn='index', rollingWindow=None))
     aakwa['getMetaData'] += featureAnnsToGrab
+    # pdb.set_trace()
+    if arguments['verbose']:
+        prf.print_memory_usage('Pre-loading feature info from  {}'.format(triggeredPath))
     tempDF = ns5.alignedAsigsToDF(
         dataBlock, whichSegments=[segIdx], **aakwa)
     _, firstTrial = next(iter(tempDF.groupby(['segment', 'originalIndex', 't'])))
@@ -129,8 +132,12 @@ for segIdx in range(nSeg):
     aakwa['verbose'] = False
     if 'listOfROIMasks' in loadingMeta:
         aakwa['finalIndexMask'] = loadingMeta['listOfROIMasks'][segIdx]
+    if arguments['verbose']:
+        prf.print_memory_usage('Loading feature info from  {}'.format(triggeredPath))
     dataDF = ns5.alignedAsigsToDF(
         dataBlock, whichSegments=[segIdx], **aakwa)
+    # trialInfo = dataDF.index.to_frame().reset_index(drop=True)
+    # maskTrialInfo = loadingMeta['listOfROIMasks'][segIdx].index.to_frame().reset_index(drop=True)
     columnsMeta = featureInfo.loc[dataDF.columns, featureAnnsToGrab].reset_index()
     dataDF.columns = pd.MultiIndex.from_frame(columnsMeta)
     if 'listOfExampleIndexes' in loadingMeta:

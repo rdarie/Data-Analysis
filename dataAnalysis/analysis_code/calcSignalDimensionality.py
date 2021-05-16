@@ -42,7 +42,7 @@ import pdb
 import numpy as np
 import pandas as pd
 import dataAnalysis.preproc.ns5 as ns5
-from sklearn.decomposition import PCA, IncrementalPCA
+from sklearn.decomposition import PCA, FactorAnalysis
 from sklearn.pipeline import make_pipeline, Pipeline
 from sklearn.covariance import ShrunkCovariance, LedoitWolf, EmpiricalCovariance
 from sklearn.model_selection import cross_val_score, cross_validate, GridSearchCV
@@ -137,12 +137,17 @@ def calc_lw_score(
 
 if __name__ == '__main__':
     cvIterator = iteratorsBySegment[0]
-    estimatorKWArgs = dict(svd_solver='auto')
+    if 'pca' in arguments['estimatorName']:
+        estimatorClass = PCA
+        estimatorKWArgs = dict(svd_solver='auto')
+    elif 'fa' in arguments['estimatorName']:
+        estimatorClass = FactorAnalysis
+        estimatorKWArgs = dict()
     crossvalKWArgs = dict(
         cv=cvIterator,
         return_train_score=True, return_estimator=True)
     joblibBackendArgs = dict(
-        backend='loky'
+        backend='dask'
         )
     if joblibBackendArgs['backend'] == 'dask':
         daskComputeOpts = dict(
@@ -169,16 +174,18 @@ if __name__ == '__main__':
     prf.print_memory_usage('just loaded data, fitting')
     nFeatures = dataDF.columns.shape[0]
     #
-    nCompsToTest = range(1, nFeatures + 1)
+    nCompsToTest = range(1, nFeatures + 1, 3)
     if arguments['debugging']:
-        nCompsToTest = range(1, 500, 20)
+        nCompsToTest = range(1, 150, 5)
     scores = {}
     for n in nCompsToTest:
         if arguments['verbose']:
             print('tdr.crossValidationScores evaluating with {} components'.format(n))
+        ekwa = estimatorKWArgs.copy()
+        ekwa['n_components'] = n
         scores[n] = tdr.crossValidationScores(
-            dataDF, None, PCA,
-            estimatorKWArgs=estimatorKWArgs,
+            dataDF, None, estimatorClass,
+            estimatorKWArgs=ekwa,
             crossvalKWArgs=crossvalKWArgs,
             joblibBackendArgs=joblibBackendArgs,
             verbose=arguments['verbose']
@@ -186,26 +193,36 @@ if __name__ == '__main__':
     scoresDF = pd.concat(
         {nc: pd.DataFrame(scr) for nc, scr in scores.items()},
         names=['nComponents', 'fold'])
+    scoresDF.dropna(axis='columns', inplace=True)
     #
     nCompsMaxMLE = scoresDF.groupby(['nComponents']).mean()['test_score'].idxmax()
     maxMLE = scoresDF.xs(nCompsMaxMLE, level='nComponents', axis='index').mean()['test_score']
-    #
     lastFoldIdx = scoresDF.index.get_level_values('fold').max()
     mostComps = scoresDF.index.get_level_values('nComponents').max()
-    # pdb.set_trace()
     pcaFull = scoresDF.loc[(mostComps, lastFoldIdx), 'estimator']
-    cumExplVariance = pd.Series(
-        np.cumsum(pcaFull.explained_variance_ratio_[:len(nCompsToTest)]),
-        index=nCompsToTest)
-    ######
-    varCutoff = 0.95
-    nCompsCutoff = cumExplVariance.index[cumExplVariance > varCutoff].min()
-    ######
+    #
     prf.print_memory_usage('Done fitting')
     if os.path.exists(estimatorPath):
         os.remove(estimatorPath)
-    scoresDF.to_hdf(estimatorPath, 'cv')
-    #s
+    pdb.set_trace()
+    try:
+        scoresDF.loc[idxSl[:, lastFoldIdx], :].to_hdf(estimatorPath, 'work')
+        scoresDF.loc[:, ['test_score', 'train_score']].to_hdf(estimatorPath, 'cv')
+    except Exception:
+        traceback.print_exc()
+    try:
+        scoresDF['estimator'].to_hdf(estimatorPath, 'cv_estimators')
+    except Exception:
+        traceback.print_exc()
+    #
+    if 'pca' in arguments['estimatorName']:
+        cumExplVariance = pd.Series(
+            np.cumsum(pcaFull.explained_variance_ratio_),
+            index=[idx + 1 for idx in range(pcaFull.explained_variance_ratio_.shape[0])])
+        ######
+        varCutoff = 0.95
+        nCompsCutoff = cumExplVariance.index[cumExplVariance > varCutoff].min()
+    ######
     if arguments['verbose']:
         print('Calculating ledoit-wolf # of components...')
     lWScores = calc_lw_score(dataDF, cv=cvIterator)
@@ -255,22 +272,23 @@ if __name__ == '__main__':
                 plt.show()
             else:
                 plt.close()
-            fig, ax = plt.subplots()
-            fig.set_size_inches(12, 8)
-            ax.plot(cumExplVariance)
-            ax.plot(
-                nCompsMaxMLE,
-                cumExplVariance.loc[nCompsMaxMLE],
-                '*')
-            ax.set_ylim((0, 1))
-            ax.set_xlabel('number of components')
-            ax.set_ylabel('explained variance')
-            fig.tight_layout(pad=1)
-            pdf.savefig(bbox_inches='tight', pad_inches=0)
-            if arguments['showFigures']:
-                plt.show()
-            else:
-                plt.close()
+            if 'pca' in arguments['estimatorName']:
+                fig, ax = plt.subplots()
+                fig.set_size_inches(12, 8)
+                ax.plot(cumExplVariance)
+                ax.plot(
+                    nCompsMaxMLE,
+                    cumExplVariance.loc[nCompsMaxMLE],
+                    '*')
+                ax.set_ylim((0, 1))
+                ax.set_xlabel('number of components')
+                ax.set_ylabel('explained variance')
+                fig.tight_layout(pad=1)
+                pdf.savefig(bbox_inches='tight', pad_inches=0)
+                if arguments['showFigures']:
+                    plt.show()
+                else:
+                    plt.close()
     del dataDF
     gc.collect()
     #

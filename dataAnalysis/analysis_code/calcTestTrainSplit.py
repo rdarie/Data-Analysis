@@ -193,6 +193,7 @@ if not arguments['loadFromFrames']:
             prf.print_memory_usage(
                 'fitting on segment {}'.format(segIdx))
         aakwa = alignedAsigsKWargs.copy()
+        # pdb.set_trace()
         dataDF = ns5.alignedAsigsToDF(
             dataBlock,
             whichSegments=[segIdx],

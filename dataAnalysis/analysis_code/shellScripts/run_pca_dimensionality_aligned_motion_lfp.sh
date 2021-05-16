@@ -24,10 +24,13 @@
 SLURM_ARRAY_TASK_ID=2
 source ./shellScripts/calc_aligned_motion_preamble.sh
 
-ALIGNQUERYTERM="startingNoStim"
+
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
 TARGET="lfp_CAR_spectral"
-ITERATOR="d"
+ITERATOR="a"
 WINDOW="XL"
 
-python -u './calcSignalDimensionality.py' --estimatorName="pca_limited" --datasetName="${TARGET}_${ITERATOR}_${WINDOW}_${ALIGNQUERYTERM}" --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=2 --plotting --debugging --showFigures
+# python -u './calcSignalDimensionality.py' --estimatorName="fa_db" --debugging --datasetName="${TARGET}_${ITERATOR}_${WINDOW}_${ALIGNQUERYTERM}" --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=2 --plotting --showFigures
+
+BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
+python -u './applyEstimatorToTriggered.py' --inputBlockSuffix="${TARGET}" --estimatorName="fa_db" --datasetName="${TARGET}_${ITERATOR}_${WINDOW}_${ALIGNQUERYTERM}" --unitQuery="lfp" --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR

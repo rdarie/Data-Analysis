@@ -16,6 +16,7 @@ Options:
     --winStart=winStart                    start of window [default: 200]
     --winStop=winStop                      end of window [default: 400]
     --estimatorName=estimatorName          estimator filename
+    --datasetName=datasetName              filename for resulting estimator (cross-validated n_comps)
     --unitQuery=unitQuery                  how to restrict channels?
     --inputBlockSuffix=inputBlockSuffix    which trig_ block to pull [default: pca]
     --inputBlockPrefix=inputBlockPrefix    which trig_ block to pull [default: Block]
@@ -48,24 +49,28 @@ triggeredPath = os.path.join(
     alignSubFolder,
     blockBaseName + '{}_{}.nix'.format(
         inputBlockSuffix, arguments['window']))
-# pdb.set_trace()
-# alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
-#     namedQueries, scratchFolder, **arguments)
-#
-estimatorSubFolder = os.path.join(
-    analysisSubFolder, 'estimators')
-estimatorPath = os.path.join(
-    estimatorSubFolder,
-    arguments['estimatorName'] + '.joblib')
-with open(
-    os.path.join(
+###
+oldWay = False
+if oldWay:
+    # alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
+    #     namedQueries, scratchFolder, **arguments)
+    #
+    estimatorSubFolder = os.path.join(
+        analysisSubFolder, 'estimators')
+    estimatorPath = os.path.join(
         estimatorSubFolder,
-        arguments['estimatorName'] + '_meta.pickle'),
-        'rb') as f:
-    estimatorMetadata = pickle.load(f)
-estimator = jb.load(estimatorPath)
-alignedAsigsKWargs.update(estimatorMetadata['alignedAsigsKWargs'])
-alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **arguments)
+        arguments['estimatorName'] + '.joblib')
+    with open(
+        os.path.join(
+            estimatorSubFolder,
+            arguments['estimatorName'] + '_meta.pickle'),
+            'rb') as f:
+        estimatorMetadata = pickle.load(f)
+    estimator = jb.load(estimatorPath)
+    alignedAsigsKWargs.update(estimatorMetadata['alignedAsigsKWargs'])
+    alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **arguments)
+else:
+    pdb.set_trace()
 # !!
 # Reduce time sample even further
 # alignedAsigsKWargs.update(dict(getMetaData=True, decimate=20))
