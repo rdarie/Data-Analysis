@@ -175,7 +175,7 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         tdDF.loc[:, 'positionEpoch'] = 0
     #
     for name, group in tdDF.groupby('positionEpoch'):
-        pedalRestingMask = group['pedalVelocityAbs'] == 0
+        pedalRestingMask = group['pedalVelocityAbs'] < 1e-12
         thisTaskMask = group['isInTask']
         thisNeutralPoint = float(group.loc[thisTaskMask & pedalRestingMask, 'pedalPosition'].mode())
         assert np.abs(thisNeutralPoint) < 0.1 # if the neutral point > 10 deg, there might be a problem

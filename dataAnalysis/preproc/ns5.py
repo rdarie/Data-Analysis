@@ -1471,7 +1471,6 @@ def getAsigsAlignedToEvents(
                     for k, v in asig.annotations.items()
                     if k not in skipAsigAnnNames
                 })
-                pdb.set_trace()
                 thisStName = 'seg{}_{}'.format(int(totalNSegs), thisUnit.name)
                 if verbose:
                     print('    making spiketrain {}'.format(thisStName))

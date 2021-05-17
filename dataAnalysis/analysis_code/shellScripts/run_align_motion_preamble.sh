@@ -25,8 +25,8 @@ export OUTDATED_IGNORE=1
 EXP="exp202101271100"
 # EXP="exp202101281100"
 
-# LAZINESS="--lazy"
-LAZINESS=""
+LAZINESS="--lazy"
+# LAZINESS=""
 
 VERBOSITY="--verbose"
 # WINDOW="--window=L"

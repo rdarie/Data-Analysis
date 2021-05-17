@@ -366,6 +366,7 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         # plt.show()
         plt.close()
     ###
+    # pdb.set_trace()
     alignEventsMotion = preproc.eventDataFrameToEvents(
         motionEvDF, idxT='t',
         annCol=None,
