@@ -39,6 +39,7 @@ import dataAnalysis.custom_transformers.tdr as tdr
 from dataAnalysis.analysis_code.namedQueries import namedQueries
 from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
 import pdb
+from copy import deepcopy
 import numpy as np
 import pandas as pd
 import dataAnalysis.preproc.ns5 as ns5
@@ -50,7 +51,7 @@ import joblib as jb
 import dill as pickle
 import gc
 from docopt import docopt
-from copy import deepcopy
+
 idxSl = pd.IndexSlice
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
@@ -76,6 +77,7 @@ if arguments['plotting']:
     arguments['window'],
     arguments['alignQuery'])'''
 datasetName = arguments['datasetName']
+# pdb.set_trace()
 fullEstimatorName = '{}_{}'.format(
     arguments['estimatorName'], arguments['datasetName'])
 #
@@ -102,45 +104,10 @@ for argName in ['plotting', 'showFigures', 'debugging', 'verbose']:
 arguments.update(loadingMeta['arguments'])
 
 
-'''def compute_scores(
-        X, estimator,
-        nComponentsToTest,
-        cv, estimatorKWArgs={},
-        ,
-        verbose=False):
-    
-        scores[n] = cross_validate(
-            instance, X.to_numpy(), cv=cv,
-            return_train_score=return_train_score,
-            return_estimator=return_estimator)
-    return scores'''
-
-
-def shrunk_cov_score(
-        X, cvIterator):
-    shrinkages = np.logspace(-2, 0, 30)
-    cv = GridSearchCV(
-        ShrunkCovariance(),
-        {'shrinkage': shrinkages}, cv=cvIterator)
-    cv.fit(X)
-    cvResDF = pd.DataFrame(cv.cv_results_)
-    return cvResDF['mean_test_score'].max()
-
-
-def calc_lw_score(
-        X, cv):
-    result = cross_val_score(
-        LedoitWolf(), X.to_numpy(), cv=cv)
-    return result
-
-
 if __name__ == '__main__':
     cvIterator = iteratorsBySegment[0]
-    if 'pca' in arguments['estimatorName']:
-        estimatorClass = PCA
-        estimatorKWArgs = dict(svd_solver='auto')
-    elif 'fa' in arguments['estimatorName']:
-        estimatorClass = FactorAnalysis
+    if 'mahal' in arguments['estimatorName']:
+        estimatorClass = EmpiricalCovariance
         estimatorKWArgs = dict()
     crossvalKWArgs = dict(
         cv=cvIterator,
@@ -165,7 +132,7 @@ if __name__ == '__main__':
                 print('Scheduler name is not correct!')
                 daskClient = Client()
     dataDF = pd.read_hdf(datasetPath, datasetName)
-    # only use zero lag targets
+    # only use zero lag targets    
     lagMask = dataDF.columns.get_level_values('lag') == 0
     dataDF = dataDF.loc[:, lagMask]
     trialInfo = dataDF.index.to_frame().reset_index(drop=True)
@@ -174,51 +141,35 @@ if __name__ == '__main__':
     prf.print_memory_usage('just loaded data, fitting')
     nFeatures = dataDF.columns.shape[0]
     #
-    nCompsToTest = range(1, nFeatures + 1, 3)
-    if arguments['debugging']:
-        nCompsToTest = range(60, 110, 5)
-    #
-    scores = {}
-    for n in nCompsToTest:
-        if arguments['verbose']:
-            print('tdr.crossValidationScores evaluating with {} components'.format(n))
-        ekwa = estimatorKWArgs.copy()
-        ekwa['n_components'] = n
-        scores[n] = tdr.crossValidationScores(
-            dataDF, None, estimatorClass,
-            estimatorKWArgs=ekwa,
-            crossvalKWArgs=crossvalKWArgs,
-            joblibBackendArgs=joblibBackendArgs,
-            verbose=arguments['verbose']
-            )
-    scoresDF = pd.concat(
-        {nc: pd.DataFrame(scr) for nc, scr in scores.items()},
-        names=['nComponents', 'fold'])
+    '''if arguments['plotting']:
+        fig, ax = plt.subplots()
+        for name, group in dataDF.iloc[:, :10].groupby('feature', axis='columns'):
+            sns.distplot(group.to_numpy(), label=name, ax=ax)
+        ax.legend()
+        plt.show()'''
+    scores = tdr.crossValidationScores(
+        dataDF, None, estimatorClass,
+        estimatorKWArgs=estimatorKWArgs,
+        crossvalKWArgs=crossvalKWArgs,
+        joblibBackendArgs=joblibBackendArgs,
+        verbose=arguments['verbose']
+        )
+    scoresDF = pd.DataFrame(scores)
+    scoresDF.index.name = 'fold'
     scoresDF.dropna(axis='columns', inplace=True)
-    #
-    nCompsMaxMLE = scoresDF.groupby(['nComponents']).mean()['test_score'].idxmax()
-    maxMLE = scoresDF.xs(nCompsMaxMLE, level='nComponents', axis='index').mean()['test_score']
     lastFoldIdx = scoresDF.index.get_level_values('fold').max()
-    mostComps = scoresDF.index.get_level_values('nComponents').max()
-    pcaFull = scoresDF.loc[(mostComps, lastFoldIdx), 'estimator']
-    chosenEstimator = scoresDF.loc[(nCompsMaxMLE, lastFoldIdx), 'estimator']
-    pdb.set_trace()
-    # make transformed dataset
-    if 'pca' in arguments['estimatorName']:
-        outputFeatures = ['pca{:0>3d}'.format(nc) for nc in range(1, chosenEstimator.n_components + 1)]
-    elif 'fa' in arguments['estimatorName']:
-        outputFeatures = ['factor{:0>3d}'.format(nc) for nc in range(1, chosenEstimator.n_components + 1)]
+    chosenEstimator = scoresDF.loc[lastFoldIdx, 'estimator']
+    # pdb.set_trace()
     #
     prf.print_memory_usage('Done fitting')
     if os.path.exists(estimatorPath):
         os.remove(estimatorPath)
     # 
     try:
-        scoresDF.loc[idxSl[:, lastFoldIdx], :].to_hdf(estimatorPath, 'work')
+        scoresDF.loc[lastFoldIdx, :].to_hdf(estimatorPath, 'work')
         scoresDF.loc[:, ['test_score', 'train_score']].to_hdf(estimatorPath, 'cv')
     except Exception:
         traceback.print_exc()
-    #
     try:
         scoresDF['estimator'].to_hdf(estimatorPath, 'cv_estimators')
     except Exception:
@@ -226,6 +177,7 @@ if __name__ == '__main__':
     #
     jb.dump(chosenEstimator, estimatorPath.replace('.h5', '.joblib'))
     #
+    outputFeatures = ['mahalanobis_distance']
     estimatorMetadata = {
         'path': os.path.basename(estimatorPath),
         'name': arguments['estimatorName'],
@@ -234,10 +186,12 @@ if __name__ == '__main__':
         }
     with open(estimatorPath.replace('.h5', '_meta.pickle'), 'wb') as f:
         pickle.dump(estimatorMetadata, f)
-
+    #
     features = chosenEstimator.transform(dataDF)
     featureColumnFields = dataDF.columns.names
-    featureColumns = pd.DataFrame(np.nan, index=range(features.shape[1]), columns=featureColumnFields)
+    featureColumns = pd.DataFrame(
+        np.nan, index=range(features.shape[1]),
+        columns=featureColumnFields)
     for fcn in featureColumnFields:
         if fcn == 'feature':
             featureColumns.loc[:, fcn] = outputFeatures
@@ -246,7 +200,9 @@ if __name__ == '__main__':
         else:
             featureColumns.loc[:, fcn] = 'NA'
     #
-    featuresDF = pd.DataFrame(features, index=dataDF.index, columns=pd.MultiIndex.from_frame(featureColumns))
+    featuresDF = pd.DataFrame(
+        features, index=dataDF.index,
+        columns=pd.MultiIndex.from_frame(featureColumns))
     outputDatasetName = '{}_{}_{}_{}_{}'.format(
         arguments['unitQuery'], arguments['estimatorName'],
         arguments['iteratorSuffix'], arguments['window'], arguments['alignQuery'])
@@ -270,81 +226,5 @@ if __name__ == '__main__':
     alignedAsigsKWargs['unitNames'] = saveUnitNames
     alignedAsigsKWargs['unitQuery'] = None
     alignedAsigsKWargs.pop('dataQuery', None)
-        '''
-    if 'pca' in arguments['estimatorName']:
-        cumExplVariance = pd.Series(
-            np.cumsum(pcaFull.explained_variance_ratio_),
-            index=[idx + 1 for idx in range(pcaFull.explained_variance_ratio_.shape[0])])
-        ######
-        varCutoff = 0.95
-        nCompsCutoff = cumExplVariance.index[cumExplVariance > varCutoff].min()
-    ######
-    if arguments['verbose']:
-        print('Calculating ledoit-wolf # of components...')
-    lWScores = calc_lw_score(dataDF, cv=cvIterator)
-    lWForPlot = pd.concat({
-        nc: pd.DataFrame({'test_score': lWScores})
-        for nc in nCompsToTest}, names=['nComponents', 'fold'])
-    scoresForPlot = pd.concat(
-        {
-            'PCA_test': scoresDF['test_score'],
-            'PCA_train': scoresDF['train_score'],
-            'ledoitWolfMLE': lWForPlot['test_score']},
-        names=['evalType']).to_frame(name='score').reset_index()
-    validationMask = (
-        (scoresForPlot['fold'] == lastFoldIdx) &
-        (scoresForPlot['evalType'] == 'PCA_test'))
-    scoresForPlot.loc[validationMask, 'evalType'] = 'PCA_validation'
-    workingMask = (
-        (scoresForPlot['fold'] == lastFoldIdx) &
-        (scoresForPlot['evalType'] == 'PCA_train'))
-    scoresForPlot.loc[workingMask, 'evalType'] = 'PCA_work'
-    if arguments['plotting']:
-        figureOutputPath = os.path.join(
-                figureOutputFolder,
-                '{}_{}_dimensionality.pdf'.format(
-                    arguments['estimatorName'], datasetName))
-        with PdfPages(figureOutputPath) as pdf:
-            fig, ax = plt.subplots()
-            fig.set_size_inches(12, 8)
-            sns.lineplot(
-                data=scoresForPlot,
-                x='nComponents', y='score',
-                hue='evalType', ci='sem', ax=ax)
-            handles, labels = ax.get_legend_handles_labels()
-            textDescr = 'num. components that maximize likelihood'
-            lineMax, = ax.plot(
-                nCompsMaxMLE, maxMLE,
-                'r*', label=textDescr)
-            handles.append(lineMax)
-            labels.append(textDescr)
-            ax.legend(handles, labels)
-            ax.set_xlabel('number of components')
-            ax.set_ylabel('average log-likelihood')
-            fig.tight_layout(pad=1)
-            pdf.savefig(bbox_inches='tight', pad_inches=0)
-            if arguments['showFigures']:
-                plt.show()
-            else:
-                plt.close()
-            if 'pca' in arguments['estimatorName']:
-                fig, ax = plt.subplots()
-                fig.set_size_inches(12, 8)
-                ax.plot(cumExplVariance)
-                ax.plot(
-                    nCompsMaxMLE,
-                    cumExplVariance.loc[nCompsMaxMLE],
-                    '*')
-                ax.set_ylim((0, 1))
-                ax.set_xlabel('number of components')
-                ax.set_ylabel('explained variance')
-                fig.tight_layout(pad=1)
-                pdf.savefig(bbox_inches='tight', pad_inches=0)
-                if arguments['showFigures']:
-                    plt.show()
-                else:
-                    plt.close()
-    del dataDF
-    gc.collect()
-    #
-    prf.print_memory_usage('Done fitting')
+    # pdb.set_trace()
+    '''

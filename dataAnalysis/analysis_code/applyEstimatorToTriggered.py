@@ -17,7 +17,7 @@ Options:
     --winStart=winStart                    start of window [default: 200]
     --winStop=winStop                      end of window [default: 400]
     --estimatorName=estimatorName          estimator filename
-    --datasetName=datasetName              filename for resulting estimator (cross-validated n_comps)
+    --datasetName=datasetName              dataset used to train estimator (use to get loading arguments)
     --unitQuery=unitQuery                  how to restrict channels?
     --inputBlockSuffix=inputBlockSuffix    which trig_ block to pull [default: pca]
     --inputBlockPrefix=inputBlockPrefix    which trig_ block to pull [default: Block]
@@ -68,6 +68,7 @@ if oldWay:
     estimator = jb.load(estimatorPath)
     alignedAsigsKWargs.update(estimatorMetadata['alignedAsigsKWargs'])
     alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **arguments)
+    normalizeDataset = None
 else:
     datasetName = arguments['datasetName']
     fullEstimatorName = '{}_{}'.format(
@@ -95,10 +96,15 @@ else:
         loadingMeta = pickle.load(_f)
         for discardEntry in ['plotting', 'showFigures']:
             _ = loadingMeta['arguments'].pop(discardEntry)
+    if 'normalizeDataset' in loadingMeta:
+        normalizeDataset = loadingMeta['normalizeDataset']
+        normalizationParams = loadingMeta['normalizationParams']
+    else:
+        normalizeDataset = None
     '''for loadingEntry in ['unitQuery']:
         if loadingEntry in loadingMeta['arguments']:
             arguments[loadingEntry] = loadingMeta['arguments'][loadingEntry]'''
-    for aakwaEntry in ['getMetaData', 'concatOn', 'transposeToColumns']:
+    for aakwaEntry in ['getMetaData', 'concatOn', 'transposeToColumns', 'addLags', 'procFun']:
         if aakwaEntry in loadingMeta['alignedAsigsKWargs']:
             alignedAsigsKWargs[aakwaEntry] = loadingMeta['alignedAsigsKWargs'][aakwaEntry]
     if arguments['matchDownsampling']:
@@ -131,6 +137,8 @@ if arguments['verbose']:
 alignedAsigsDF = ns5.alignedAsigsToDF(
     dataBlock, **alignedAsigsKWargs)
 # pdb.set_trace()
+if normalizeDataset is not None:
+    alignedAsigsDF = normalizeDataset(alignedAsigsDF, normalizationParams)
 if hasattr(estimator, 'transform'):
     features = estimator.transform(alignedAsigsDF.to_numpy())
 elif hasattr(estimator, 'mahalanobis'):
@@ -154,7 +162,7 @@ alignedFeaturesDF = pd.DataFrame(
     features, index=alignedAsigsDF.index, columns=featureNames)
 alignedFeaturesDF.columns.name = 'feature'
 del alignedAsigsDF
-
+#
 spikeTrainMeta = {
     'units': pq.s,
     'wvfUnits': pq.dimensionless,
