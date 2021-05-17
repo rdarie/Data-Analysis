@@ -390,7 +390,6 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
     alignEventsMotion.segment = newSeg
     concatEvents.segment = newSeg
     ####
-    pdb.set_trace()
     stimEvDF.dropna(inplace=True)
     alignEventsStim = preproc.eventDataFrameToEvents(
         stimEvDF, idxT='t',

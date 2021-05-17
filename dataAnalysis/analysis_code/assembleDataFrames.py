@@ -181,8 +181,8 @@ if __name__ == '__main__':
                         arguments['alignQuery'],
                         iteratorSuffix))
                 thisDF = pd.read_hdf(dFPath, arguments['unitQuery'])
-                thisDF.loc[:, 'expName'] = expName
-                thisDF.set_index('expName', inplace=True, append=True)
+                '''thisDF.loc[:, 'expName'] = expName
+                thisDF.set_index('expName', inplace=True, append=True)'''
                 #
                 thisDF.index = thisDF.index.set_levels([currBlockNum], level='segment')
                 lOfDF.append(thisDF)
