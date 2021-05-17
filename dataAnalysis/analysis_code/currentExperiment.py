@@ -495,7 +495,7 @@ def parseAnalysisOptions(
         'covariateHistoryLen': .50,
         'nHistoryBasisTerms': 5,
         'nCovariateBasisTerms': 1,
-        'regressionBinInterval': 50e-3,
+        'regressionBinInterval': 20e-3,
         'glm_50msec': dict(
             subsampleOpts=dict(
                 rollingWindow=50, decimate=50,

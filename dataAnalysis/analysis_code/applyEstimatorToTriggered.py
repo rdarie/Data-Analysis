@@ -10,6 +10,7 @@ Options:
     --profile                              print time and mem diagnostics? [default: False]
     --lazy                                 load from raw, or regular? [default: False]
     --alignQuery=alignQuery                choose a subset of the data?
+    --matchDownsampling                    match downsampling? [default: False]
     --analysisName=analysisName            append a name to the resulting blocks? [default: default]
     --alignFolderName=alignFolderName      append a name to the resulting blocks? [default: motion]
     --window=window                        process with short window? [default: short]
@@ -27,7 +28,9 @@ import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
 import dataAnalysis.helperFunctions.helper_functions_new as hf
 from namedQueries import namedQueries
 import os
+import quantities as pq
 import pandas as pd
+import numpy as np
 import pdb
 import dataAnalysis.preproc.ns5 as ns5
 import joblib as jb
@@ -98,6 +101,9 @@ else:
     for aakwaEntry in ['getMetaData', 'concatOn', 'transposeToColumns']:
         if aakwaEntry in loadingMeta['alignedAsigsKWargs']:
             alignedAsigsKWargs[aakwaEntry] = loadingMeta['alignedAsigsKWargs'][aakwaEntry]
+    if arguments['matchDownsampling']:
+        if 'decimate' in loadingMeta['alignedAsigsKWargs']:
+            alignedAsigsKWargs['decimate'] = loadingMeta['alignedAsigsKWargs']['decimate']
     alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **arguments)
     alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(namedQueries, scratchFolder, **arguments)
 #
@@ -142,13 +148,23 @@ else:
 # colNames = pd.MultiIndex.from_arrays(
 #     [featureNames, [0 for fN in featureNames]],
 #     names=['feature', 'lag'])
+trialTimes = np.unique(alignedAsigsDF.index.get_level_values('t'))
+tBins = np.unique(alignedAsigsDF.index.get_level_values('bin'))
 alignedFeaturesDF = pd.DataFrame(
     features, index=alignedAsigsDF.index, columns=featureNames)
 alignedFeaturesDF.columns.name = 'feature'
 del alignedAsigsDF
-#
+
+spikeTrainMeta = {
+    'units': pq.s,
+    'wvfUnits': pq.dimensionless,
+    'left_sweep': (-1) * tBins[0] * pq.s,
+    't_start': min(0, trialTimes[0]) * pq.s,
+    't_stop': trialTimes[-1] * pq.s,
+    'sampling_rate': ((tBins[1] - tBins[0]) ** (-1)) * pq.Hz
+}
 masterBlock = ns5.alignedAsigDFtoSpikeTrain(
-    alignedFeaturesDF, dataBlock=dataBlock)
+    alignedFeaturesDF, spikeTrainMeta=spikeTrainMeta, matchSamplingRate=False)
 if arguments['lazy']:
     dataReader.file.close()
 masterBlock = ns5.purgeNixAnn(masterBlock)

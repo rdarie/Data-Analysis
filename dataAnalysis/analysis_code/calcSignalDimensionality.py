@@ -50,7 +50,7 @@ import joblib as jb
 import dill as pickle
 import gc
 from docopt import docopt
-
+from copy import deepcopy
 idxSl = pd.IndexSlice
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
@@ -176,7 +176,8 @@ if __name__ == '__main__':
     #
     nCompsToTest = range(1, nFeatures + 1, 3)
     if arguments['debugging']:
-        nCompsToTest = range(1, 100, 5)
+        nCompsToTest = range(50, 100, 5)
+    #
     scores = {}
     for n in nCompsToTest:
         if arguments['verbose']:
@@ -201,11 +202,42 @@ if __name__ == '__main__':
     mostComps = scoresDF.index.get_level_values('nComponents').max()
     pcaFull = scoresDF.loc[(mostComps, lastFoldIdx), 'estimator']
     chosenEstimator = scoresDF.loc[(nCompsMaxMLE, lastFoldIdx), 'estimator']
+    pdb.set_trace()
+    # make transformed dataset
     if 'pca' in arguments['estimatorName']:
         outputFeatures = ['pca{:03d}'.format(nc) for nc in range(1, chosenEstimator.n_components + 1)]
     elif 'fa' in arguments['estimatorName']:
         outputFeatures = ['factor{:03d}'.format(nc) for nc in range(1, chosenEstimator.n_components + 1)]
     #
+    features = chosenEstimator.transform(dataDF)
+    featureColumnFields = dataDF.columns.names
+    featureColumns = pd.DataFrame(np.nan, index=range(features.shape[1]), columns=featureColumnFields)
+    for fcn in featureColumnFields:
+        if fcn == 'feature':
+            featureColumns.loc[:, fcn] = outputFeatures
+        else:
+            featureColumns.loc[:, fcn] = 'NA'
+    #
+    featuresDF = pd.DataFrame(features, index=dataDF.index, columns=pd.MultiIndex.from_frame(featureColumns))
+    outputDatasetName = '{}_{}_{}_{}_{}'.format(
+        arguments['unitQuery'], arguments['estimatorName'],
+        arguments['iteratorSuffix'], arguments['window'], arguments['alignQuery'])
+    outputDFPath = os.path.join(
+        dataFramesFolder, outputDatasetName + '.h5'
+    )
+    outputLoadingMeta = deepcopy(loadingMeta)
+    # these were already applied, no need to apply them again
+    for k in ['decimate', 'procFun', 'addLags']:
+        outputLoadingMeta['alignedAsigsKWargs'].pop(k, None)
+    for k in ['normalizeDataset', 'unNormalizeDataset']:
+        outputLoadingMeta.pop(k, None)
+        outputLoadingMeta[k] = lambda x: x
+    featuresDF.to_hdf(
+        outputDFPath,
+        '{}_{}'.format(arguments['unitQuery'], arguments['estimatorName']),
+        mode='a')
+    with open(outputDFPath.replace('.h5', '_meta.pickle'), 'wb') as f:
+        pickle.dump(outputLoadingMeta, f)
     prf.print_memory_usage('Done fitting')
     if os.path.exists(estimatorPath):
         os.remove(estimatorPath)
@@ -215,12 +247,14 @@ if __name__ == '__main__':
         scoresDF.loc[:, ['test_score', 'train_score']].to_hdf(estimatorPath, 'cv')
     except Exception:
         traceback.print_exc()
+    #
     try:
         scoresDF['estimator'].to_hdf(estimatorPath, 'cv_estimators')
     except Exception:
         traceback.print_exc()
     #
     jb.dump(chosenEstimator, estimatorPath.replace('.h5', '.joblib'))
+    #
     estimatorMetadata = {
         'path': os.path.basename(estimatorPath),
         'name': arguments['estimatorName'],
@@ -235,7 +269,6 @@ if __name__ == '__main__':
     alignedAsigsKWargs.pop('dataQuery', None)
     # pdb.set_trace()
         '''
-
     if 'pca' in arguments['estimatorName']:
         cumExplVariance = pd.Series(
             np.cumsum(pcaFull.explained_variance_ratio_),

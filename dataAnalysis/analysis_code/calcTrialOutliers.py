@@ -43,7 +43,7 @@ import pandas as pd
 import numpy as np
 from dask import dataframe as dd
 from dask.diagnostics import ProgressBar
-from dask.distributed import Client
+from dask.distributed import Client, LocalCluster
 from copy import deepcopy
 from tqdm import tqdm
 from currentExperiment import parseAnalysisOptions
@@ -233,6 +233,7 @@ if __name__ == "__main__":
     # pdb.set_trace()
     dataDF = ns5.alignedAsigsToDF(
         dataBlock, **alignedAsigsKWargs)
+    # pdb.set_trace()
     if 'outlierDetectColumns' in locals():
         dataDF.drop(
             columns=[
@@ -314,15 +315,15 @@ if __name__ == "__main__":
 
     covOpts = dict(
         useMinCovDet=False,
-        supportFraction=None)
+        supportFraction=0.95)
     daskComputeOpts = dict(
-        # scheduler='processes'
-        scheduler='single-threaded'
+        scheduler='processes'
+        # scheduler='single-threaded'
         )
     if not mahalDistLoaded:
         if arguments['verbose']:
             print('Calculating covariance matrix...')
-        daskClient = Client()
+        daskClient = daskClient = Client(LocalCluster(processes=True))
         # print(daskClient.scheduler_info()['services'])
         mahalDist = ash.splitApplyCombine(
             dataDF, fun=calcCovMat, resultPath=resultPath,
@@ -542,12 +543,12 @@ if __name__ == "__main__":
     minNObservations = 5
     firstBinTrialInfo = trialInfo.loc[firstBinMask, :]
     goodTrialInfo = firstBinTrialInfo.loc[~outlierTrials['rejectBlock'].to_numpy().flatten().astype(bool), :]
-    goodTrialCount = goodTrialInfo.groupby([stimulusConditionNames[0], stimulusConditionNames[1]])['RateInHz'].value_counts().to_frame(name='count').reset_index()
+    goodTrialCount = goodTrialInfo.groupby(stimulusConditionNames).value_counts().to_frame(name='count').reset_index()
     goodTrialCount = goodTrialCount.loc[goodTrialCount['count'] > minNObservations, :]
     goodTrialCount.to_csv(os.path.join(figureOutputFolder, prefix + '_good_trial_breakdown.csv'))
-    goodTrialCount.groupby([stimulusConditionNames[0], 'RateInHz', stimulusConditionNames[1]]).ngroups
+    # goodTrialCount.groupby(stimulusConditionNames).ngroups
     badTrialInfo = firstBinTrialInfo.loc[outlierTrials['rejectBlock'].to_numpy().flatten().astype(bool), :]
-    badTrialCount = badTrialInfo.groupby([stimulusConditionNames[0], stimulusConditionNames[1]])['RateInHz'].value_counts().sort_values().to_frame(name='count').reset_index()
+    badTrialCount = badTrialInfo.groupby(stimulusConditionNames).value_counts().sort_values().to_frame(name='count').reset_index()
     outlierTrials['deviation'].reset_index().sort_values(['segment', 'deviation']).to_csv(os.path.join(figureOutputFolder, prefix + '_trial_deviation_breakdown.csv'))
     print('Bad trial count:\n{}'.format(badTrialCount))
 

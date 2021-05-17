@@ -157,9 +157,11 @@ def getExpOpts():
     ############################################################
     ############################################################
     outlierDetectOptions = dict(
-        targetEpochSize=100e-3,
+        targetEpochSize=500e-3,
         windowSize=(-.5, 1.5),
         twoTailed=True,
+        devQuantile=0.99,
+        qThresh=1-1e-6
         )
     #
     minNConditionRepetitions = {
