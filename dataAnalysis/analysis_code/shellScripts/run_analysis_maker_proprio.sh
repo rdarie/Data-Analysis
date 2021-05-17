@@ -11,11 +11,11 @@
 #SBATCH --mem=250G
 
 # Specify a job name:
-#SBATCH -J analysis_calc_2021_01_20
+#SBATCH -J analysis_calc_2021_01_28
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-analysis_calc_2021_01_20.out
-#SBATCH -e ../../batch_logs/%j-%a-analysis_calc_2021_01_20.out
+#SBATCH -o ../../batch_logs/%j-%a-analysis_calc_2021_01_28.out
+#SBATCH -e ../../batch_logs/%j-%a-analysis_calc_2021_01_28.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -30,8 +30,8 @@
 # EXP="exp202101211100"
 # EXP="exp202101221100"
 # EXP="exp202101251100"
-EXP="exp202101271100"
-# EXP="exp202101281100"
+# EXP="exp202101271100"
+EXP="exp202101281100"
 # EXP="exp202102041100"
 # EXP="exp202102081100"
 # EXP="exp202102101100"
@@ -71,8 +71,10 @@ python --version
 
 #  SLURM_ARRAY_TASK_ID=2
 echo --blockIdx=$SLURM_ARRAY_TASK_ID
+#
+python -u ./calcProprioAnalysisNix.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER $SPIKESOURCE $SPIKEBLOCKSUFFIX $BLOCKPREFIX $RIGSUFFIX --chanQuery="all" --verbose --lazy
+#
 # python -u ./synchronizeSIMItoNSP_stimBased.py --blockIdx=$SLURM_ARRAY_TASK_ID --exp=$EXP --showFigures --inputBlockSuffix=analog_inputs  --inputBlockPrefix=utah --plotting --forceRecalc
-# python -u ./calcProprioAnalysisNix.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER $SPIKESOURCE $SPIKEBLOCKSUFFIX $BLOCKPREFIX $RIGSUFFIX --chanQuery="all" --verbose --lazy
 # python -u ./calcProprioAnalysisNix.py --hasKinematics --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID $ANALYSISFOLDER $SPIKESOURCE $SPIKEBLOCKSUFFIX $BLOCKPREFIX $RIGSUFFIX --chanQuery="all" --verbose --lazy
 #
 python -u ./calcMotionAlignTimes.py --exp=$EXP --blockIdx=$SLURM_ARRAY_TASK_ID  $ANALYSISFOLDER --plotParamHistograms $LAZINESS
