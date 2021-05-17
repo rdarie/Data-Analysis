@@ -197,7 +197,7 @@ if __name__ == '__main__':
         normalizationParams = [[], []]
         for expName, dataGroup in finalDF.groupby('expName'):
             for featName, subGroup in dataGroup.groupby('feature', axis='columns'):
-                print('Pre-normalizing {}, {}'.format(expName, featName))
+                print('calculating pre-normalization, exp: {}, feature: {}'.format(expName, featName))
                 meanLevel = np.mean(subGroup.xs(0, level='lag', axis='columns').to_numpy())
                 # finalDF.loc[subGroup.index, subGroup.columns] = np.sqrt(finalDF.loc[subGroup.index, subGroup.columns] / meanLevel)
                 # finalDF.loc[subGroup.index, subGroup.columns] = finalDF.loc[subGroup.index, subGroup.columns] - meanLevel
@@ -207,7 +207,7 @@ if __name__ == '__main__':
                     'mu': meanLevel,
                 })
         for featName, dataGroup in finalDF.groupby('feature', axis='columns'):
-            print('Final normalizing {}'.format(featName))
+            print('calculating final normalization, feature: {}'.format(featName))
             refData = dataGroup.xs(0, level='lag', axis='columns').to_numpy()
             mu = np.mean(refData)
             sigma = np.std(refData)
@@ -220,23 +220,23 @@ if __name__ == '__main__':
         #
         def normalizeDataset(dataDF, params):
             for preParams in params[0]:
-                print('normalizing {}: {}'.format(preParams['expName'], preParams['feature']))
+                print('normalizing exp {}: feature {}'.format(preParams['expName'], preParams['feature']))
                 expMask = dataDF.index.get_level_values('expName') == preParams['expName']
                 featMask = dataDF.columns.get_level_values('feature') == preParams['feature']
                 dataDF.loc[expMask, featMask] = dataDF.loc[expMask, featMask] - preParams['mu']
             for postParams in params[1]:
-                print('normalizing {}'.format(preParams['feature']))
+                print('normalizing feature {}'.format(postParams['feature']))
                 featMask = dataDF.columns.get_level_values('feature') == postParams['feature']
                 dataDF.loc[:, featMask] = (dataDF.loc[:, featMask] - postParams['mu']) / postParams['sigma']
             return dataDF
         #
         def unNormalizeDataset(dataDF, params):
             for postParams in params[1]:
-                print('un-normalizing {}'.format(postParams['feature']))
+                print('un-normalizing feature {}'.format(postParams['feature']))
                 featMask = dataDF.columns.get_level_values('feature') == postParams['feature']
                 dataDF.loc[:, featMask] = (dataDF.loc[:, featMask] * postParams['sigma']) + postParams['mu']
             for preParams in params[0]:
-                print('un-normalizing {}: {}'.format(preParams['expName'], preParams['feature']))
+                print('un-normalizing exp {}: feature {}'.format(preParams['expName'], preParams['feature']))
                 expMask = dataDF.index.get_level_values('expName') == preParams['expName']
                 featMask = dataDF.columns.get_level_values('feature') == preParams['feature']
                 dataDF.loc[expMask, featMask] = dataDF.loc[expMask, featMask] + preParams['mu']
@@ -246,7 +246,7 @@ if __name__ == '__main__':
     else:
         normalizationParams = [[]]
         for featName, dataGroup in finalDF.groupby('feature', axis='columns'):
-            print('Normalizing {}'.format(featName))
+            print('calculating normalization {}'.format(featName))
             mu = np.mean(dataGroup)
             sigma = np.std(dataGroup)
             normalizationParams[0].append({
@@ -258,14 +258,14 @@ if __name__ == '__main__':
         #
         def normalizeDataset(dataDF, params):
             for postParams in params[0]:
-                print('normalizing {}'.format(postParams['feature']))
+                print('normalizing feature {}'.format(postParams['feature']))
                 featMask = dataDF.columns.get_level_values('feature') == postParams['feature']
                 dataDF.loc[:, featMask] = (dataDF.loc[:, featMask] - postParams['mu']) / postParams['sigma']
             return dataDF
         #
         def unNormalizeDataset(dataDF, params):
             for postParams in params[0]:
-                print('un-normalizing {}'.format(postParams['feature']))
+                print('un-normalizing feature {}'.format(postParams['feature']))
                 featMask = dataDF.columns.get_level_values('feature') == postParams['feature']
                 dataDF.loc[:, featMask] = (dataDF.loc[:, featMask] * postParams['sigma']) + postParams['mu']
             return dataDF

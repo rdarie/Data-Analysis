@@ -20,7 +20,7 @@
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=2
+#SBATCH --array=1,2,3
 
 
 module load anaconda/2020.02

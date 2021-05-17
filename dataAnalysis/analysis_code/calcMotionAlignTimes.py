@@ -373,7 +373,7 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
     concatLabelColumns = [
         'pedalMovementCat',
         'pedalSizeCat', 'pedalDirection',
-        'movementRound',
+        'movementRound', 'expName',
         'pedalMovementDuration']
     concatLabelsDF = alignEventsDF[concatLabelColumns]
     concatLabels = np.array([

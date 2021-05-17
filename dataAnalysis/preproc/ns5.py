@@ -848,7 +848,6 @@ def unitSpikeTrainWaveformsToDF(
             np.arange(wfDF.shape[1], dtype=float) * samplingPeriod -
             leftSweep)
         wfDF.columns = np.around(bins.magnitude, decimals=6)
-        # pdb.set_trace()
         if windowSize is not None:
             winMask = (
                 (wfDF.columns >= windowSize[0]) &
@@ -959,7 +958,6 @@ def unitSpikeTrainWaveformsToDF(
                     plt.plot(oldShiftedWaveform.iloc[0, :])
                     plt.plot(shiftedWaveform.iloc[0, :])
                     plt.show()
-            # pdb.set_trace()
             thisLaggedWvf = shiftedWaveform.iloc[:, seekIdx].copy()
             laggedWaveformsDict[
                 (spikeTrainContainer.name, lag)] = thisLaggedWvf
@@ -1473,6 +1471,7 @@ def getAsigsAlignedToEvents(
                     for k, v in asig.annotations.items()
                     if k not in skipAsigAnnNames
                 })
+                pdb.set_trace()
                 thisStName = 'seg{}_{}'.format(int(totalNSegs), thisUnit.name)
                 if verbose:
                     print('    making spiketrain {}'.format(thisStName))

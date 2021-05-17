@@ -272,6 +272,7 @@ else:
         )
     listOfIterators.append(cvIterator)
 ###
+# cvIterator.plot_schema()
 exportAAKWA = alignedAsigsKWargs.copy()
 exportAAKWA.pop('unitNames', None)
 exportAAKWA.pop('unitQuery', None)

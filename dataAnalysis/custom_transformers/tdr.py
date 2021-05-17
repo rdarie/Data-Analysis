@@ -402,7 +402,7 @@ class trainTestValidationSplitter:
         folds_temp = tempCv.split(dataDF.iloc[workIdx, :])
         # folds contains iloc indices into the submatrix dataDF.iloc[workIdx, :]
         # here, we transform them to indices into the original dataDF
-        originalIndices = np.arange(dataDF.index.shape[0])
+        originalIndices = np.arange(dataDF.index.shape[0])[workIdx]
         self.folds = []
         for _train, _test in folds_temp:
             train = originalIndices[_train]
@@ -419,8 +419,16 @@ class trainTestValidationSplitter:
     def get_n_splits(self, X=None, y=None, groups=None):
         return self.n_splits
 
-    def plot_schema(self)
-        pdb.set_trace()
+    def plot_schema(self):
+        if True:
+            fig, ax = plt.subplots()
+            for foldIdx, (tr, te) in enumerate(self.folds):
+                lhtr, = ax.plot(tr, [foldIdx for j in tr], 'bo', label='train')
+                lhte, = ax.plot(te, [foldIdx for j in te], 'ro', label='test')
+            lhw, = ax.plot(self.work, [foldIdx + 1 for j in self.work], 'co', label='work')
+            lhv, = ax.plot(self.validation, [foldIdx + 1 for j in self.validation], 'mo', label='validation')
+            ax.legend(handles=[lhtr, lhte, lhw, lhv])
+            plt.show()
         return
 
 
