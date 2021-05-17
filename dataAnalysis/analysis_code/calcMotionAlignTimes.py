@@ -362,6 +362,7 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         # falling thresholds probably resolve later
         alignEventsDF.loc[alignEventsDF['pedalMetaCat'] == 'stopping', 't'] += applyDelay
     # pdb.set_trace()
+    alignEventsDF.loc[:, 'expName'] = arguments['exp']
     alignEvents = ns5.eventDataFrameToEvents(
         alignEventsDF, idxT='t',
         annCol=None,

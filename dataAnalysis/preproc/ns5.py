@@ -139,7 +139,7 @@ def spikeDictToSpikeTrains(
                 times=theseTimes, t_stop=t_stop, units='sec',
                 name=unitName, sampling_rate=sampling_rate,
                 waveforms=theseWaveforms*waveformUnits,
-                left_sweep=0, dtype=np.float32)
+                left_sweep=0, dtype=float)
             unit.spiketrains.append(train)
             seg.spiketrains.append(train)
 
@@ -550,7 +550,7 @@ def concatenateBlocks(
             allTdDF[asigName].to_numpy() * asigUnits,
             name=asigName,
             sampling_rate=samplingRate,
-            dtype=np.float32,
+            dtype=float,
             **asigAnnCache[asigName])
         chIdxName = asigAnnCache[asigName]['parentChanName']
         chIdx = channelIndexCache[chIdxName]
@@ -842,10 +842,10 @@ def unitSpikeTrainWaveformsToDF(
                 wf = wf[:, 0, :]
         wfDF = pd.DataFrame(wf)
         samplingRate = st.sampling_rate
-        samplingPeriod = np.float64(st.sampling_period) * st.sampling_period.units
-        leftSweep = np.float64(st.left_sweep) * st.left_sweep.units
+        samplingPeriod = float(st.sampling_period) * st.sampling_period.units
+        leftSweep = float(st.left_sweep) * st.left_sweep.units
         bins = (
-            np.arange(wfDF.shape[1], dtype=np.float64) * samplingPeriod -
+            np.arange(wfDF.shape[1], dtype=float) * samplingPeriod -
             leftSweep)
         wfDF.columns = np.around(bins.magnitude, decimals=6)
         # pdb.set_trace()
@@ -929,7 +929,7 @@ def unitSpikeTrainWaveformsToDF(
     # TODO implement lags and rolling window addition here
     metaDF = zeroLagWaveformsDF.loc[:, idxLabels].copy()
     zeroLagWaveformsDF.drop(columns=idxLabels, inplace=True)
-    zeroLagWaveformsDF.columns = zeroLagWaveformsDF.columns.astype(np.float64)
+    zeroLagWaveformsDF.columns = zeroLagWaveformsDF.columns.astype(float)
     if lags is None:
         lags = [0]
     laggedWaveformsDict = {
@@ -1118,9 +1118,7 @@ def alignedAsigsToDF(
         unitQuery=None, dataQuery=None,
         collapseSizes=False, verbose=False,
         duplicateControlsByProgram=False,
-        amplitudeColumn='amplitude',
-        programColumn='program',
-        electrodeColumn='electrode',
+        amplitudeColumn='amplitude', programColumn='program', electrodeColumn='electrode',
         transposeToColumns='bin', concatOn='index', fastTranspose=True,
         addLags=None, decimate=1, rollingWindow=None,
         whichSegments=None, windowSize=None,
@@ -1248,10 +1246,8 @@ def alignedAsigsToDF(
     # pdb.set_trace()
     if dropNaNs:
         if transposeToColumns == 'bin':
-            # msk = allWaveforms.isna().any(axis='columns')
             allWaveforms.dropna(inplace=True, axis='columns')
         elif transposeToColumns == 'feature':
-            # mask = 
             allWaveforms.dropna(inplace=True, axis='index')
     if finalIndexMask is not None:
         allWaveforms = allWaveforms.loc[finalIndexMask.to_numpy(), :]
@@ -1487,8 +1483,7 @@ def getAsigsAlignedToEvents(
                     t_start=asig.t_start, t_stop=asig.t_stop,
                     left_sweep=windowSize[0] * (-1),
                     sampling_rate=samplingRate,
-                    **stAnn
-                    )
+                    **stAnn)
                 st.annotate(nix_name=st.name)
                 st.annotations['unitAnnotations'] = json.dumps(
                     thisUnit.annotations.copy())
@@ -1693,7 +1688,7 @@ def dataFrameToAnalogSignals(
             df[colName].to_numpy() * measureUnits,
             name='seg0_' + chanName,
             sampling_rate=samplingRate,
-            dtype=np.float32,
+            dtype=float,
             # **ann
             )
         if idxT is not None:
@@ -3063,7 +3058,7 @@ def preprocBlockToNix(
                     tempLFPStore = pd.DataFrame(
                         np.zeros(
                             (asig.shape[0], nAsigs),
-                            dtype=np.float32),
+                            dtype=float),
                         columns=asigNameListSeg)
                 if 'dummyAsig' not in locals():
                     dummyAsig = asig.copy()
@@ -3109,10 +3104,10 @@ def preprocBlockToNix(
         if (removeMeanAcross or calcAverageLFP):
             centerLFP = np.zeros(
                 (tempLFPStore.shape[0], len(asigNameList)),
-                dtype=np.float32)
+                dtype=float)
             spreadLFP = np.zeros(
                 (tempLFPStore.shape[0], len(asigNameList)),
-                dtype=np.float32)
+                dtype=float)
             # if calcOutliers:
             if True:
                 if outlierMaskFilterOpts is not None:
@@ -3120,10 +3115,10 @@ def preprocBlockToNix(
                         outlierMaskFilterOpts, float(dummyAsig.sampling_rate))
                 lfpDeviation = np.zeros(
                     (tempLFPStore.shape[0], len(asigNameList)),
-                    dtype=np.float32)
+                    dtype=float)
                 smoothedDeviation = np.zeros(
                     (tempLFPStore.shape[0], len(asigNameList)),
-                    dtype=np.float32)
+                    dtype=float)
                 outlierMask = np.zeros(
                     (tempLFPStore.shape[0], len(asigNameList)),
                     dtype=bool)
@@ -3132,7 +3127,7 @@ def preprocBlockToNix(
             if True:
                 artifactSignal = np.zeros(
                     (tempLFPStore.shape[0], len(asigNameList)),
-                    dtype=np.float32)
+                    dtype=float)
             ###############
             # tempLFPStore.iloc[:, 0] = np.nan  # for debugging axes
             #############
@@ -3441,7 +3436,7 @@ def preprocBlockToNix(
                     sampling_rate=dummyAsig.sampling_rate,
                     # name='seg{}_{}'.format(idx, outMaskChIdx.name)
                     name='seg{}_{}'.format(0, outMaskChIdx.name),
-                    t_start=tStart, dtype=np.float32
+                    t_start=tStart, dtype=float
                     )
                 outMaskAsig.annotations['outlierProportion'] = np.mean(outlierMask[:, mIdx])
                 if calcOutliers:
@@ -3772,7 +3767,7 @@ def preprocBlockToNix(
                 motorData[colName].to_numpy() * pq.mV,
                 name=colName,
                 sampling_rate=ainpAsig.sampling_rate,
-                dtype=np.float32)
+                dtype=float)
             motorAsig.t_start = ainpAsig.t_start
             motorAsig.channel_index = chanIdx
             # assign ownership to containers

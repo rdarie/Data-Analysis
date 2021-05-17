@@ -83,7 +83,7 @@ def corFun(
     scaledY.iloc[:] = robust_scale(scaledY.to_numpy())
     scaledY = scaledY.unstack(level='bin')
     dt = x.columns[1] - x.columns[0]
-    allMaxCorr = np.zeros(x.index.shape[0], dtype=np.float)
+    allMaxCorr = np.zeros(x.index.shape[0], dtype=float)
     allMaxLag = np.zeros(x.index.shape[0], dtype=np.int)
     for idx in range(scaledX.index.shape[0]):
         cor = np.correlate(

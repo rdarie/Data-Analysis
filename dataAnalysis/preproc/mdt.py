@@ -1632,7 +1632,7 @@ def stimStatusSerialtoLong(
             (stimStLong['RateInHz'].diff().fillna(0) != 0) |
             (stimStLong['trialSegment'].diff().fillna(0) != 0)
             )
-        stimStLong.loc[:, 'rateRound'] = rateChange.astype(np.float).cumsum()
+        stimStLong.loc[:, 'rateRound'] = rateChange.astype(float).cumsum()
         groupComponents = [group.copy() for name, group in stimStLong.groupby('rateRound')]
         for idx, (name, group) in enumerate(stimStLong.groupby('rateRound')):
             if idx < len(groupComponents) - 1:
@@ -1655,7 +1655,7 @@ def stimStatusSerialtoLong(
     ampChange = ampChange | (stimStLong['trialSegment'].diff().fillna(0) != 0)
     ####
     stimStLong.loc[:, 'amplitudeRound'] = (
-        ampIncrease.astype(np.float).cumsum())
+        ampIncrease.astype(float).cumsum())
     stimStLong.loc[:, 'amplitude'] = (
         stimStLong[progAmpNames].sum(axis=1))
     ################
@@ -1735,7 +1735,7 @@ def stimStatusSerialtoLong(
         plt.show()
     #
     stimStLong.loc[:, 'amplitudeRound'] = (
-        ampIncrease.astype(np.float).cumsum())
+        ampIncrease.astype(float).cumsum())
     stimStLong.loc[:, 'amplitude'] = (
         stimStLong[progAmpNames].sum(axis=1))
     ###############
@@ -2751,7 +2751,7 @@ def getINSStimOnset(
                 groupRate = therSegDF.loc[foundIdx, 'RateInHz'].iloc[0]
             except:
                 traceback.print_exc()
-            groupPeriod = np.float64(groupRate ** (-1))
+            groupPeriod = float(groupRate ** (-1))
             rateChangePeriods = (
                 therSegDF
                 .loc[rateDiff != 0, 'RateInHz']) ** (-1)
@@ -2789,7 +2789,7 @@ def getINSStimOnset(
                     therSegDF.index[-1])
                 groupRate = therSegDF.loc[timeSeekIdx, 'RateInHz']
                 # oldGroupPeriod = groupPeriod
-                groupPeriod = np.float64(groupRate ** (-1))
+                groupPeriod = float(groupRate ** (-1))
                 startTime = therSegDF.loc[timeSeekIdx, 't']
                 # startTime = (
                 #     therSegDF.loc[timeSeekIdx, 't'] +
@@ -3104,7 +3104,7 @@ def getINSStimOnset(
                 (
                     timesIndex.shape[0], len(unitDetectedOn),
                     left_sweep_samples + right_sweep_samples + 1),
-                dtype=np.float)
+                dtype=float)
             for idx, tIdx in enumerate(timesIndex):
                 thisWaveform = (
                     tdDF.loc[
@@ -3519,7 +3519,7 @@ def insDataToBlock(
             tdInterp[colName].to_numpy()*pq.mV,
             name='seg0_' + sigName,
             sampling_rate=sampleRate,
-            dtype=np.float32,
+            dtype=float,
             **senseInfo.loc[idx, :].to_dict())
         #
         asig.annotate(td=True, accel=False)
@@ -3543,7 +3543,7 @@ def insDataToBlock(
             tdInterp[colName].to_numpy()*pq.mV,
             name='seg0_' + colName,
             sampling_rate=sampleRate,
-            dtype=np.float32)
+            dtype=float)
         asig.t_start = tStart*pq.s
         seg.analogsignals.append(asig)
         chanIdx = ChannelIndex(
@@ -3566,7 +3566,7 @@ def insDataToBlock(
                 accelInterp[colName].values*accUnits,
                 name='seg0_' + sigName,
                 sampling_rate=sampleRate,
-                dtype=np.float32)
+                dtype=float)
             asig.annotate(td=False, accel=True)
             asig.t_start = tStart*pq.s
             seg.analogsignals.append(asig)

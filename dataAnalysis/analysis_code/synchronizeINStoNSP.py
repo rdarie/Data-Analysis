@@ -210,8 +210,8 @@ for insSession, group in approxTapTimes.groupby('tapGroup'):
     approxTapTimes.loc[group.index, 'tStop_INS'] = firstINSTap + tapTrainDur + lookAroundFwd
     autoTimeRanges['NSP'].append((firstNSPTap - lookAroundBack, firstNSPTap + tapTrainDur + lookAroundFwd))
     autoTimeRanges['INS'].append((firstINSTap - lookAroundBack, firstINSTap + tapTrainDur + lookAroundFwd))
-    tapTimestampsNSP = group['NSP'].astype(np.float)
-    tapTimestampsINS_coarse = group['INS'].astype(np.float)
+    tapTimestampsNSP = group['NSP'].astype(float)
+    tapTimestampsINS_coarse = group['INS'].astype(float)
     allTapTimestampsNSP.append(tapTimestampsNSP)
     allTapTimestampsINS_coarse.append(tapTimestampsINS_coarse)
     print('tSeg {}: NSP Taps:\n{}'.format(

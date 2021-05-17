@@ -358,7 +358,7 @@ def parseAnalysisOptions(
     #     os.makedirs(GLMFiguresFolder, exist_ok=True)
     #
     essentialMetadataFields = [
-        'segment', 'originalIndex', 't', 'amplitude', 'program',
+        'segment', 'originalIndex', 't', 'expName', 'amplitude', 'program',
         'activeGroup', 'RateInHz', 'stimCat', 'electrode',
         'pedalDirection', 'pedalSize', 'pedalSizeCat', 'pedalMovementCat',
         'pedalMetaCat',

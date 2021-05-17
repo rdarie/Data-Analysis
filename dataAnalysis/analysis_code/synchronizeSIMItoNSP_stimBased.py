@@ -393,7 +393,7 @@ else:
                         t_start=trigRaster['t'].min() * pq.s,
                         t_stop=trigRaster['t'].max() * pq.s)
                     idxOfSpikes = np.flatnonzero(thisSpikeMat)
-                    thisSpikeMat = thisSpikeMat.astype(np.float)
+                    thisSpikeMat = thisSpikeMat.astype(float)
                     coarseSpikeMats.append(thisSpikeMat[:, np.newaxis])
                     # print('st.times = {}'.format(st.times))
             if not len(coarseSpikeMats) > 0:
@@ -433,11 +433,11 @@ else:
             useValsAtTrigs = False
             if useValsAtTrigs:
                 indicesToUse = np.flatnonzero(nspDiracRaster)
-                nspDiracRaster = nspDiracRaster.astype(np.float)
+                nspDiracRaster = nspDiracRaster.astype(float)
                 nspDiracRaster[indicesToUse] = thisNspDF.loc[nspPeakIdx, 'tapDetectSignal'].to_numpy()
                 trigRaster.loc[:, 'nspDiracDelta'] = nspDiracRaster
             else:
-                trigRaster.loc[:, 'nspDiracDelta'] = nspDiracRaster.astype(np.float)
+                trigRaster.loc[:, 'nspDiracDelta'] = nspDiracRaster.astype(float)
             trigRaster.loc[:, 'nspTrigs'] = hf.gaussianSupport(
                 support=trigRaster.set_index('t')['nspDiracDelta'],
                 gaussWid=gaussWid,

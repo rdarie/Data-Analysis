@@ -1537,7 +1537,7 @@ def getINSStimLogFromJson(
         allStimStatusDF['amplitudeIncrease'] = (
             allStimStatusDF['amplitudeChange'] & ampPositive)
         allStimStatusDF['amplitudeRound'] = allStimStatusDF[
-            'amplitudeIncrease'].astype(np.float).cumsum()
+            'amplitudeIncrease'].astype(float).cumsum()
     return allStimStatusDF
 
 
@@ -1605,7 +1605,7 @@ def stimStatusSerialtoLong(
 
     if 'amplitudeRound' in deriveCols:
         stimStLong['amplitudeRound'] = (
-            ampIncrease.astype(np.float).cumsum())
+            ampIncrease.astype(float).cumsum())
     if 'movementRound' in deriveCols:
         stimStLong['movementRound'] = (
             stimStLong['movement'].abs().cumsum())
@@ -2936,7 +2936,7 @@ def catSpikesGenerator(nBins = None, type = 'RMS', timePoint = None, subSet = sl
     calcBounds = bounds is None
     if type == 'RMS':
         def catSpikes(spikes, chanIdx):
-            rms = np.sqrt(np.mean(np.array(spikes['Waveforms'][chanIdx][:,subSet], dtype = np.float32) ** 2, axis = 1))
+            rms = np.sqrt(np.mean(np.array(spikes['Waveforms'][chanIdx][:,subSet], dtype = float) ** 2, axis = 1))
             if calcBounds:
                 bounds = np.linspace(rms.min() * 0.99, rms.max() * 1.01, nBins + 1)
             return np.digitize(rms, bounds)

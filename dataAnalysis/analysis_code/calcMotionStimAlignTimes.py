@@ -140,7 +140,8 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         'activeGroup': 0,
         'electrode': 'NA',
         'detectionDelay': np.nan,
-        'stimDelay': np.nan
+        'stimDelay': np.nan,
+        'expName': arguments['exp']
     })
     for annName in stimAnnNames + extraAnnNames:
         motionEvDF.loc[:, annName] = np.nan
@@ -389,6 +390,7 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
     alignEventsMotion.segment = newSeg
     concatEvents.segment = newSeg
     ####
+    pdb.set_trace()
     stimEvDF.dropna(inplace=True)
     alignEventsStim = preproc.eventDataFrameToEvents(
         stimEvDF, idxT='t',

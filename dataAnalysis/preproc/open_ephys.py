@@ -56,7 +56,7 @@ def openEphysMatToNixBlock(
                 if headK in oneIntHeader:
                     headerDict[headK] = np.int(headerDict[headK][0])
                 if headK in oneFloatHeader:
-                    headerDict[headK] = np.float32(headerDict[headK][0])
+                    headerDict[headK] = float(headerDict[headK][0])
                 if headK in stringsHeader:
                     headerDict[headK] = ''.join(
                         [chr(l) for l in headerDict[headK]])
@@ -118,10 +118,10 @@ def openEphysMatToNixBlock(
                 # 
                 asig = AnalogSignal(
                     dataArray[segMask] * headerDict['bitVolts'] * pq.V,
-                    t_start=np.float32(t[segMask][0]) * pq.s,
+                    t_start=float(t[segMask][0]) * pq.s,
                     name='seg{}_{}'.format(segIdx, chanIdx.name),
                     sampling_rate=sampleRate * pq.Hz,
-                    dtype=np.float32,
+                    dtype=float,
                     **headerDict
                     )
                 asig.annotate(label=thisLabel)

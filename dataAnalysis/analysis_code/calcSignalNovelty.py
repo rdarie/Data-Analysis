@@ -97,8 +97,9 @@ estimatorPath = os.path.join(
 #
 with open(datasetPath.replace('.h5', '_meta.pickle'), 'rb') as _f:
     loadingMeta = pickle.load(_f)
-    iteratorsBySegment = loadingMeta.pop('iteratorsBySegment')
-    cv_kwargs = loadingMeta.pop('cv_kwargs')
+    # iteratorsBySegment = loadingMeta.pop('iteratorsBySegment')
+    iteratorsBySegment = loadingMeta['iteratorsBySegment']
+    cv_kwargs = loadingMeta['cv_kwargs']
 for argName in ['plotting', 'showFigures', 'debugging', 'verbose']:
     loadingMeta['arguments'].pop(argName, None)
 arguments.update(loadingMeta['arguments'])
@@ -132,7 +133,7 @@ if __name__ == '__main__':
                 print('Scheduler name is not correct!')
                 daskClient = Client()
     dataDF = pd.read_hdf(datasetPath, datasetName)
-    # only use zero lag targets    
+    # only use zero lag targets
     lagMask = dataDF.columns.get_level_values('lag') == 0
     dataDF = dataDF.loc[:, lagMask]
     trialInfo = dataDF.index.to_frame().reset_index(drop=True)
@@ -159,7 +160,7 @@ if __name__ == '__main__':
     scoresDF.dropna(axis='columns', inplace=True)
     lastFoldIdx = scoresDF.index.get_level_values('fold').max()
     chosenEstimator = scoresDF.loc[lastFoldIdx, 'estimator']
-    # pdb.set_trace()
+    pdb.set_trace()
     #
     prf.print_memory_usage('Done fitting')
     if os.path.exists(estimatorPath):
@@ -187,11 +188,10 @@ if __name__ == '__main__':
     with open(estimatorPath.replace('.h5', '_meta.pickle'), 'wb') as f:
         pickle.dump(estimatorMetadata, f)
     #
-    features = chosenEstimator.transform(dataDF)
+    features = chosenEstimator.mahalanobis(dataDF)
     featureColumnFields = dataDF.columns.names
     featureColumns = pd.DataFrame(
-        np.nan, index=range(features.shape[1]),
-        columns=featureColumnFields)
+        np.nan, index=[0], columns=featureColumnFields)
     for fcn in featureColumnFields:
         if fcn == 'feature':
             featureColumns.loc[:, fcn] = outputFeatures
@@ -208,23 +208,21 @@ if __name__ == '__main__':
         arguments['iteratorSuffix'], arguments['window'], arguments['alignQuery'])
     outputDFPath = os.path.join(
         dataFramesFolder, outputDatasetName + '.h5'
-    )
+        )
     outputLoadingMeta = deepcopy(loadingMeta)
+    outputLoadingMeta['arguments']['unitQuery'] = 'mahal'
     # these were already applied, no need to apply them again
     for k in ['decimate', 'procFun', 'addLags']:
         outputLoadingMeta['alignedAsigsKWargs'].pop(k, None)
     for k in ['normalizeDataset', 'unNormalizeDataset']:
         outputLoadingMeta.pop(k, None)
-        outputLoadingMeta[k] = lambda x: x
+        #
+        def passthr(df, params):
+            return df
+        #
+        outputLoadingMeta[k] = passthr
     featuresDF.to_hdf(
-        outputDFPath,
-        '{}_{}'.format(arguments['unitQuery'], arguments['estimatorName']),
+        outputDFPath, outputDatasetName,
         mode='a')
     with open(outputDFPath.replace('.h5', '_meta.pickle'), 'wb') as f:
         pickle.dump(outputLoadingMeta, f)
-    '''
-    alignedAsigsKWargs['unitNames'] = saveUnitNames
-    alignedAsigsKWargs['unitQuery'] = None
-    alignedAsigsKWargs.pop('dataQuery', None)
-    # pdb.set_trace()
-    '''

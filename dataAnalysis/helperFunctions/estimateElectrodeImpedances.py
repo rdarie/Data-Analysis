@@ -199,7 +199,7 @@ def fitETIPulseResponseNonLinear(
         k_1 = params['k_1'].value # uF / cm^2
         k_2 = params['k_2'].value # uF / cm^2
 
-        allModelV = np.zeros(voltages.shape, dtype = np.float32)
+        allModelV = np.zeros(voltages.shape, dtype = float)
 
         for current in IAmp:
             I, modelV, R_f, C_dl = ETIPulseResponse(S, current, PW = PW, pulseShape = pulseShape,

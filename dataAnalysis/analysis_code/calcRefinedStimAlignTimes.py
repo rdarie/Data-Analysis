@@ -257,7 +257,7 @@ for segIdx, nspSeg in enumerate(nspBlock.segments):
                 searchRadius[1] * trigRasterSamplingRate + 1,
                 # -0.8 * trigRasterSamplingRate,
                 # 0.1 * trigRasterSamplingRate + 1,
-                dtype=np.int)
+                dtype=int)
             targetLagsSrs = pd.Series(
                 targetLags, index=targetLags * trigSampleInterval)
             pulsesSt = insSeg.filter(objects=SpikeTrain, name='seg0_g{}p{}#0'.format(grpIdx, prgIdx))
@@ -432,6 +432,7 @@ for segIdx, nspSeg in enumerate(nspBlock.segments):
         idxToRemove = categories.index[categories['stimCat'].isin(labelsToRemove)]
         categories.drop(index=idxToRemove, inplace=True)
         categories.reset_index(drop=True)
+    alignEventsDF.loc[:, 'expName'] = arguments['exp']
     alignEvents = ns5.eventDataFrameToEvents(
         alignEventsDF, idxT='t',
         annCol=None,

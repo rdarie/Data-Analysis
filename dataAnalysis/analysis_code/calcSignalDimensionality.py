@@ -95,8 +95,9 @@ estimatorPath = os.path.join(
 #
 with open(datasetPath.replace('.h5', '_meta.pickle'), 'rb') as _f:
     loadingMeta = pickle.load(_f)
-    iteratorsBySegment = loadingMeta.pop('iteratorsBySegment')
-    cv_kwargs = loadingMeta.pop('cv_kwargs')
+    # iteratorsBySegment = loadingMeta.pop('iteratorsBySegment')
+    iteratorsBySegment = loadingMeta['iteratorsBySegment']
+    cv_kwargs = loadingMeta['cv_kwargs']
 for argName in ['plotting', 'showFigures', 'debugging', 'verbose']:
     loadingMeta['arguments'].pop(argName, None)
 arguments.update(loadingMeta['arguments'])
@@ -146,7 +147,8 @@ if __name__ == '__main__':
         cv=cvIterator,
         return_train_score=True, return_estimator=True)
     joblibBackendArgs = dict(
-        backend='dask'
+        # backend='dask'
+        backend='loky'
         )
     if joblibBackendArgs['backend'] == 'dask':
         daskComputeOpts = dict(
@@ -202,7 +204,6 @@ if __name__ == '__main__':
     mostComps = scoresDF.index.get_level_values('nComponents').max()
     pcaFull = scoresDF.loc[(mostComps, lastFoldIdx), 'estimator']
     chosenEstimator = scoresDF.loc[(nCompsMaxMLE, lastFoldIdx), 'estimator']
-    pdb.set_trace()
     # make transformed dataset
     if 'pca' in arguments['estimatorName']:
         outputFeatures = ['pca{:0>3d}'.format(nc) for nc in range(1, chosenEstimator.n_components + 1)]
@@ -237,40 +238,50 @@ if __name__ == '__main__':
 
     features = chosenEstimator.transform(dataDF)
     featureColumnFields = dataDF.columns.names
-    featureColumns = pd.DataFrame(np.nan, index=range(features.shape[1]), columns=featureColumnFields)
+    featureColumns = pd.DataFrame(
+        np.nan,
+        index=range(features.shape[1]),
+        columns=featureColumnFields)
     for fcn in featureColumnFields:
         if fcn == 'feature':
             featureColumns.loc[:, fcn] = outputFeatures
-        if fcn == 'lag':
+        elif fcn == 'lag':
             featureColumns.loc[:, fcn] = 0
         else:
             featureColumns.loc[:, fcn] = 'NA'
     #
-    featuresDF = pd.DataFrame(features, index=dataDF.index, columns=pd.MultiIndex.from_frame(featureColumns))
+    featuresDF = pd.DataFrame(
+        features, index=dataDF.index,
+        columns=pd.MultiIndex.from_frame(featureColumns))
     outputDatasetName = '{}_{}_{}_{}_{}'.format(
         arguments['unitQuery'], arguments['estimatorName'],
         arguments['iteratorSuffix'], arguments['window'], arguments['alignQuery'])
     outputDFPath = os.path.join(
         dataFramesFolder, outputDatasetName + '.h5'
-    )
+        )
     outputLoadingMeta = deepcopy(loadingMeta)
-    # these were already applied, no need to apply them again
+    if 'pca' in arguments['estimatorName']:
+        outputLoadingMeta['arguments']['unitQuery'] = 'pca'
+    elif 'fa' in arguments['estimatorName']:
+        outputLoadingMeta['arguments']['unitQuery'] = 'factor'
+    #
+    # 'decimate', 'procFun', 'addLags' were already applied, no need to apply them again
     for k in ['decimate', 'procFun', 'addLags']:
         outputLoadingMeta['alignedAsigsKWargs'].pop(k, None)
+    # 'normalizeDataset', 'unNormalizeDataset' were already applied, no need to apply them again
     for k in ['normalizeDataset', 'unNormalizeDataset']:
         outputLoadingMeta.pop(k, None)
-        outputLoadingMeta[k] = lambda x: x
+        #
+        def passthr(df, params):
+            return df
+        #
+        outputLoadingMeta[k] = passthr
+    # pdb.set_trace()
     featuresDF.to_hdf(
-        outputDFPath,
-        '{}_{}'.format(arguments['unitQuery'], arguments['estimatorName']),
+        outputDFPath, outputDatasetName,
         mode='a')
     with open(outputDFPath.replace('.h5', '_meta.pickle'), 'wb') as f:
         pickle.dump(outputLoadingMeta, f)
-    '''
-    alignedAsigsKWargs['unitNames'] = saveUnitNames
-    alignedAsigsKWargs['unitQuery'] = None
-    alignedAsigsKWargs.pop('dataQuery', None)
-        '''
     if 'pca' in arguments['estimatorName']:
         cumExplVariance = pd.Series(
             np.cumsum(pcaFull.explained_variance_ratio_),

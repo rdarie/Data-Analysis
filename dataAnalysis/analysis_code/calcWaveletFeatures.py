@@ -243,7 +243,7 @@ if __name__ == "__main__":
         )
     # newIndexCols = ['scale', 'freqBandName', 'center', 'bandwidth', 'waveletName']
     # spectralDF.set_index(newIndexCols, append=True, inplace=True)
-    spectralDF.columns = spectralDF.columns.astype(np.float64)
+    spectralDF.columns = spectralDF.columns.astype(float)
     # pdb.set_trace()
     tBins = np.unique(spectralDF.columns.get_level_values('bin'))
     featNames = spectralDF.index.get_level_values('feature')

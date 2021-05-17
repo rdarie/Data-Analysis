@@ -122,7 +122,7 @@ def cleanISIData(
         procDF = group.copy()
         dataColMask = procDF.columns.isin(dataColNames)
         groupData = procDF.loc[:, dataColMask]
-        t = np.asarray(groupData.columns).astype(np.float)
+        t = np.asarray(groupData.columns).astype(float)
         nDataCols = groupData.shape[1]
         #
         featureName = procDF['feature'].unique()[0]
@@ -353,7 +353,7 @@ if __name__ == "__main__":
         print('loading {}'.format(triggeredPath))
         dataDF = ns5.alignedAsigsToDF(
             dataBlock, **alignedAsigsKWargs)
-        dataDF.columns = dataDF.columns.astype(np.float)
+        dataDF.columns = dataDF.columns.astype(float)
         dataDF.to_hdf(triggeredH5Path, arguments['inputBlockName'])
         samplingRate = float(
             dataBlock

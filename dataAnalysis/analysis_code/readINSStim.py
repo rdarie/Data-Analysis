@@ -264,12 +264,12 @@ ax[1].set_ylabel('Frequency (Hz)')
 plotStimStatusAll.plot(
     x='t', y='therapyStatus',
     ax=ax[0], label='therapyStatus')
-plotStimStatusAll['amplitudeChange'] = plotStimStatusAll['amplitudeChange'].astype(np.float)
+plotStimStatusAll['amplitudeChange'] = plotStimStatusAll['amplitudeChange'].astype(float)
 plotStimStatusAll.plot(
     x='t', y='amplitudeChange',
     ax=ax[0], label='amplitudeChange')
 
-plotErrorStatusAll['OOR'] = plotErrorStatusAll['OOR'].astype(np.float)
+plotErrorStatusAll['OOR'] = plotErrorStatusAll['OOR'].astype(float)
 plotErrorStatusAll.plot(
     x='t', y='OOR',
     ax=ax[0], label='OOR', style = ['o'])

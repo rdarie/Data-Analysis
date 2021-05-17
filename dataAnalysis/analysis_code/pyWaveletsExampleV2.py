@@ -229,7 +229,7 @@ for thisB in np.arange(2, 10):
     bwDict[thisB] = pd.concat(temp, names='C')
 plt.close('all')
 bwDF = pd.concat(bwDict, names='B').reset_index()
-bwDF.loc[:, 'B'] = bwDF['B'].astype(np.float64) # units of samples ** 2?
+bwDF.loc[:, 'B'] = bwDF['B'].astype(float) # units of samples ** 2?
 bwDF.loc[:, 'sigma'] = (bwDF['B'] / 2).apply(np.sqrt) # units of samples
 bwDF.loc[:, 'sigma_adj'] = bwDF['sigma'] * dt
 #

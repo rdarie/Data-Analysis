@@ -186,12 +186,12 @@ if __name__ == "__main__":
         'RateInHz', 'nominalCurrent']
     groupBy = ['feature'] + conditionNames
     # resultMeta = {
-    #     'noiseCeil': np.float,
-    #     'noiseCeilStd': np.float,
-    #     'covariance': np.float,
-    #     'covarianceStd': np.float,
-    #     'mse': np.float,
-    #     'mseStd': np.float
+    #     'noiseCeil': float,
+    #     'noiseCeilStd': float,
+    #     'covariance': float,
+    #     'covarianceStd': float,
+    #     'mse': float,
+    #     'mseStd': float
     #     }
     useCachedResult = True
     if not (useCachedResult and os.path.exists(resultPath)):

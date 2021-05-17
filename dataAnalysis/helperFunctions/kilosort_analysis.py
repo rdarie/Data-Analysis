@@ -88,7 +88,7 @@ def loadKSDir(filePath, excludeNoise=True, loadPCs=False):
     params = loadParamsPy(filePath)
 
     spikeTimesSamples = np.load(filePath + '/spike_times.npy', mmap_mode = mMapMode).squeeze()
-    spikeTimes = spikeTimesSamples.astype(np.float)/params['sample_rate']
+    spikeTimes = spikeTimesSamples.astype(float)/params['sample_rate']
 
     spikeTemplates = np.load(filePath + '/spike_templates.npy', mmap_mode = mMapMode).squeeze()
     try:
@@ -2350,7 +2350,7 @@ def generateStimTriggeredAverageReport(folderPath, trialFileFrom, trialFileStim,
         if unitsOnThisChan.any():
             spikesStimList.append({'chan':channel})
         spikesStim['Waveforms'][idx] = (np.array(spikesStim['Waveforms'][idx],
-            dtype = np.float32) * 8.5 * 1e3) / (2**15 * impedances.loc[channel, 'Mag(kOhms)'])
+            dtype = float) * 8.5 * 1e3) / (2**15 * impedances.loc[channel, 'Mag(kOhms)'])
 
         spikesStim['Classification'][idx] = catSpikeFun(spikesStim, idx)
     #

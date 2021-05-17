@@ -173,7 +173,7 @@ if reloadFeatures:
     windowSize = [rasterDF.columns.min() * pq.s, rasterDF.columns.max() * pq.s]
     #
     def recoverSpikeTrain(Ser):
-        times = Ser.index[Ser > 0].to_numpy(dtype=np.float) * pq.s
+        times = Ser.index[Ser > 0].to_numpy(dtype=float) * pq.s
         anns = {idxNames[i]: ann for i, ann in enumerate(Ser.name)}
         t_start, t_stop = windowSize
         return SpikeTrain(times, t_stop=t_stop, t_start=t_start, **anns)

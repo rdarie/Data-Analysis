@@ -681,11 +681,11 @@ def calcUnitRegressionToAsig():
                 featuresDF,
                 return_type='dataframe')
             kinLags = [
-                np.float(i)
+                float(i)
                 for i in cBasis.columns
                 if (
-                    (np.float(i) >= modelOpts['minKinLag']) and
-                    (np.float(i) <= modelOpts['maxKinLag']))]
+                    (float(i) >= modelOpts['minKinLag']) and
+                    (float(i) <= modelOpts['maxKinLag']))]
             kinDescListFinal = [
                 Term([EvalFactor('applyCBasis(Q("{}"), {:.3f})'.format(k.name(), l))])
                 for k, l in product(kinDescList, kinLags)
@@ -731,11 +731,11 @@ def calcUnitRegressionToAsig():
                 [stimXTrain.design_info], featuresDF.iloc[test, :],
                 return_type='dataframe')[0]
             stimLags = [
-                np.float(i)
+                float(i)
                 for i in cBasis.columns
                 if (
-                    (np.float(i) >= modelOpts['minStimLag']) and
-                    (np.float(i) <= modelOpts['maxStimLag']))]
+                    (float(i) >= modelOpts['minStimLag']) and
+                    (float(i) <= modelOpts['maxStimLag']))]
             #
             stimDescListFinal = []
             if modelOpts['stimAmplitude']:

@@ -573,12 +573,12 @@ if __name__ == "__main__":
         ]
     groupBy = conditionNames + ['feature']
     # resultMeta = {
-    #     'noiseCeil': np.float,
-    #     'noiseCeilStd': np.float,
-    #     'covariance': np.float,
-    #     'covarianceStd': np.float,
-    #     'mse': np.float,
-    #     'mseStd': np.float
+    #     'noiseCeil': float,
+    #     'noiseCeilStd': float,
+    #     'covariance': float,
+    #     'covarianceStd': float,
+    #     'mse': float,
+    #     'mseStd': float
     #     }
     alignedAsigsKWargs['getMetaData'] = conditionNames
     for nM in ['RateInHz', arguments['amplitudeFieldName'], 'stimCat', 'originalIndex', 'segment', 't']:
@@ -677,7 +677,7 @@ if __name__ == "__main__":
     modelIndex = modelIndex.droplevel([cn for cn in allIdxNames if cn not in groupBy])
     allIdxNames = meansDF.index.names
     meansDF = meansDF.droplevel([cn for cn in allIdxNames if cn not in groupBy])
-    # resDF.columns = resDF.columns.astype(np.float) / 1e3 + funKWArgs.pop('tOffset', 0)
+    # resDF.columns = resDF.columns.astype(float) / 1e3 + funKWArgs.pop('tOffset', 0)
     compsDict = {}
     paramsCI = pd.DataFrame(np.nan, index=modelParams.index, columns=modelParamNames)
     for rowIdx, row in resDF.iterrows():
@@ -691,7 +691,7 @@ if __name__ == "__main__":
             model = load_modelresult(modelPath)
             for pName in modelParamNames:
                 paramsCI.loc[rowIdx, pName] = model.params[pName].stderr
-            comps = model.eval_components(x=(resDF.columns * 1e3).to_numpy(dtype=np.float))
+            comps = model.eval_components(x=(resDF.columns * 1e3).to_numpy(dtype=float))
             for key, value in comps.items():
                 if key not in compsDict:
                     compsDict[key] = [value]

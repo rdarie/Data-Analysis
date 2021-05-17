@@ -170,7 +170,7 @@ spikeTrainMeta = {
     't_start': min(0, trialTimes[0]) * pq.s,
     't_stop': trialTimes[-1] * pq.s,
     'sampling_rate': ((tBins[1] - tBins[0]) ** (-1)) * pq.Hz
-}
+    }
 masterBlock = ns5.alignedAsigDFtoSpikeTrain(
     alignedFeaturesDF, spikeTrainMeta=spikeTrainMeta, matchSamplingRate=False)
 if arguments['lazy']:
