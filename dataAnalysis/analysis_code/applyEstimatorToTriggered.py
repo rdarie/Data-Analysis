@@ -95,7 +95,7 @@ else:
     with open(datasetPath.replace('.h5', '_meta.pickle'), 'rb') as _f:
         loadingMeta = pickle.load(_f)
         for discardEntry in ['plotting', 'showFigures']:
-            _ = loadingMeta['arguments'].pop(discardEntry)
+            _ = loadingMeta['arguments'].pop(discardEntry, None)
     if 'normalizeDataset' in loadingMeta:
         normalizeDataset = loadingMeta['normalizeDataset']
         normalizationParams = loadingMeta['normalizationParams']
@@ -111,6 +111,7 @@ else:
         if 'decimate' in loadingMeta['alignedAsigsKWargs']:
             alignedAsigsKWargs['decimate'] = loadingMeta['alignedAsigsKWargs']['decimate']
     alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **arguments)
+    print('alignedAsigsKWargs[dataQuery] = {}'.format(alignedAsigsKWargs['dataQuery']))
     alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(namedQueries, scratchFolder, **arguments)
 #
 with open(

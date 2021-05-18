@@ -715,7 +715,8 @@ def concatenateEventsContainer(
                     masterEvent.t_start = ev.t_start
                 elif masterEvent.t_start < ev.t_start:
                     ev.t_start = masterEvent.t_start
-            masterEvent = masterEvent.merge(ev)
+            if ev.size:
+                masterEvent = masterEvent.merge(ev)
         except Exception:
             traceback.print_exc()
             # [arr.shape for key, arr in masterEvent.array_annotations.items()]

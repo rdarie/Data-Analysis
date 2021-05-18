@@ -403,7 +403,7 @@ else:
             insTapTimesStList = SpikeTrain(
                 insTapTimes, t_start=thisInsDF['t'].min() * pq.s,
                 t_stop=(thisInsDF['t'].max()) * pq.s,
-                units=pq.s, name='tap times')
+                units=pq.s, name='tap times', dtype=np.float64)
         #
         if sessTapOptsINS['synchStimUnitName'] is not None:
             insTapTimes = None
@@ -458,7 +458,7 @@ else:
                                 rankAsProportion = rankInTrain / trainNPulses
                                 rankMask = (rankAsProportion < stimTrainEdgeProportion) | (rankAsProportion > (1 - stimTrainEdgeProportion))
                                 selectionMask = selectionMask & rankMask
-                        spikesToBinarize = coarseSt.times[selectionMask]
+                        spikesToBinarize = coarseSt.times[selectionMask].astype(np.float64)
                         thisSpikeMat = binarize(
                             spikesToBinarize,
                             sampling_rate=trigRasterSamplingRate * pq.Hz,
@@ -507,19 +507,19 @@ else:
                     columns=['tapDetectSignal'],
                     kind='linear', fill_value=(0, 0))
             else:
-                # pdb.set_trace()
                 nspDiracSt = SpikeTrain(
                     times=nspTapTimes, units='s',
                     t_start=trigRaster['t'].min() * pq.s,
                     t_stop=(trigRaster['t'].max() + 1e-3) * pq.s, dtype=np.float64)
                 nspDiracRaster = binarize(
                     nspDiracSt, sampling_rate=trigRasterSamplingRate * pq.Hz,
-                    t_start=trigRaster['t'].min() * pq.s, t_stop=(trigRaster['t'].max()) * pq.s, dtype=np.float64
+                    t_start=trigRaster['t'].min() * pq.s, t_stop=(trigRaster['t'].max()) * pq.s
                     )
-                useValsAtTrigs = True
+                useValsAtTrigs = False
                 if useValsAtTrigs:
                     indicesToUse = np.flatnonzero(nspDiracRaster)
-                    nspDiracRaster = nspDiracRaster.astype(float)
+                    nspDiracRaster = nspDiracRaster.astype(np.float64)
+                    # pdb.set_trace()
                     nspDiracRaster[indicesToUse] = thisNspDF.loc[nspPeakIdx, 'tapDetectSignal'].to_numpy()
                     trigRaster.loc[:, 'nspDiracDelta'] = nspDiracRaster
                 else:

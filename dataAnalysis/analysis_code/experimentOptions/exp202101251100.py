@@ -66,7 +66,7 @@ def getExpOpts():
                 'synchChanName': ['ins_td0', 'ins_td2'],
                 'synchStimUnitName': ['g0p0#0'],
                 'synchByXCorrTapDetectSignal': False,
-                'xCorrSamplingRate': None,
+                'xCorrSamplingRate': 1000,
                 'xCorrGaussWid': 10e-3,
                 'minStimAmp': 0,
                 'unixTimeAdjust': None,
@@ -156,13 +156,15 @@ def getExpOpts():
     #     ]
     # }
     pedalPositionZeroEpochs = None
-    dropMotionRounds = None
+    dropMotionRounds = {
+        2: [106, 107, 108]
+    }
 
     ############################################################
     ############################################################
     outlierDetectOptions = dict(
         targetEpochSize=100e-3,
-        windowSize=(-.2, .8),
+        windowSize=(-.2, 1.2),
         twoTailed=True,
         )
     #
