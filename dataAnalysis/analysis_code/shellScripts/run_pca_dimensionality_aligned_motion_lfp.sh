@@ -30,12 +30,12 @@ TARGET="lfp_CAR_spectral"
 ITERATOR="a"
 WINDOW="XL"
 
-# python -u './calcSignalDimensionality.py' --estimatorName="fa_db" --debugging --datasetName="${TARGET}_${ITERATOR}_${WINDOW}_${ALIGNQUERYTERM}" --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=2 --plotting --showFigures
+python -u './calcSignalDimensionality.py' --estimatorName="fa" --datasetName="${TARGET}_${ITERATOR}_${WINDOW}_${ALIGNQUERYTERM}" --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=2 --plotting --showFigures
 #
-TARGET="lfp_CAR_spectral_fa_db"
-python -u './calcSignalNovelty.py' --estimatorName="mahal" --debugging --datasetName="${TARGET}_${ITERATOR}_${WINDOW}_${ALIGNQUERYTERM}" --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=2 --plotting --showFigures
+TARGET="lfp_CAR_spectral_fa"
+python -u './calcSignalNovelty.py' --estimatorName="mahal" --datasetName="${TARGET}_${ITERATOR}_${WINDOW}_${ALIGNQUERYTERM}" --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=2 --plotting --showFigures
 
 
-TARGET="lfp_CAR_spectral_fa_db_mahal"
+TARGET="lfp_CAR_spectral_fa_mahal"
 # python -u './assembleDataFrames.py' --debugging --iteratorSuffix=$ITERATOR --inputBlockSuffix="${TARGET}" --unitQuery="${TARGET}" --loadFromFrames --exp=$EXP --window=$WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
 # python -u './assembleExperimentAlignedAsigs.py' --exp=$EXP $BLOCKSELECTOR --inputBlockSuffix="${TARGET}" --window=$WINDOW $ANALYSISFOLDER $ALIGNFOLDER $LAZINESS

@@ -402,7 +402,7 @@ else:
                     traceback.print_exc()
             insTapTimesStList = SpikeTrain(
                 insTapTimes, t_start=thisInsDF['t'].min() * pq.s,
-                t_stop=(thisInsDF['t'].max() + 1e-5) * pq.s,
+                t_stop=(thisInsDF['t'].max()) * pq.s,
                 units=pq.s, name='tap times')
         #
         if sessTapOptsINS['synchStimUnitName'] is not None:
@@ -463,7 +463,7 @@ else:
                             spikesToBinarize,
                             sampling_rate=trigRasterSamplingRate * pq.Hz,
                             t_start=trigRaster['t'].min() * pq.s,
-                            t_stop=(trigRaster['t'].max() + 1e-5) * pq.s)
+                            t_stop=(trigRaster['t'].max()) * pq.s)
                         idxOfSpikes = np.flatnonzero(thisSpikeMat)
                         thisSpikeMat = thisSpikeMat.astype(float)
                         if 'amplitude' in coarseSt.array_annotations:
@@ -507,13 +507,14 @@ else:
                     columns=['tapDetectSignal'],
                     kind='linear', fill_value=(0, 0))
             else:
+                # pdb.set_trace()
                 nspDiracSt = SpikeTrain(
                     times=nspTapTimes, units='s',
                     t_start=trigRaster['t'].min() * pq.s,
-                    t_stop=(trigRaster['t'].max() + 1e-5) * pq.s)
+                    t_stop=(trigRaster['t'].max() + 1e-3) * pq.s, dtype=np.float64)
                 nspDiracRaster = binarize(
                     nspDiracSt, sampling_rate=trigRasterSamplingRate * pq.Hz,
-                    t_start=trigRaster['t'].min() * pq.s, t_stop=(trigRaster['t'].max()) * pq.s
+                    t_start=trigRaster['t'].min() * pq.s, t_stop=(trigRaster['t'].max()) * pq.s, dtype=np.float64
                     )
                 useValsAtTrigs = True
                 if useValsAtTrigs:
