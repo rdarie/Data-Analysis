@@ -26,7 +26,7 @@ ALIGNQUERY="--alignQuery=startingNoStim"
 # SIZEOPTS="--sizeName= --sizeControl="
 
 
-HUEOPTS="--hueName=amplitude --hueControl="
+HUEOPTS="--hueName=expName --hueControl="
 ROWOPTS="--rowName=pedalSizeCat --rowControl="
 COLOPTS="--colName=pedalMovementCat --colControl="
 STYLEOPTS="--styleName= --styleControl="

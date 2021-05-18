@@ -10,11 +10,11 @@
 #SBATCH --mem=59G
 
 # Specify a job name:
-#SBATCH -J qa_motion_2021_01_20
+#SBATCH -J qa_motion_2021_01_25
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-qa_motion_2021_01_20.out
-#SBATCH -e ../../batch_logs/%j-%a-qa_motion_2021_01_20.out
+#SBATCH -o ../../batch_logs/%j-%a-qa_motion_2021_01_25.out
+#SBATCH -e ../../batch_logs/%j-%a-qa_motion_2021_01_25.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -37,6 +37,6 @@ INPUTBLOCKNAME="--inputBlockSuffix=lfp_CAR"
 
 # for concatenated files
 BLOCKSELECTOR="--blockIdx=2 --processAll"
-INPUTBLOCKNAME="--inputBlockSuffix=lfp_CAR_spectral_fa"
-UNITQUERY="--unitQuery=factor"
+INPUTBLOCKNAME="--inputBlockSuffix=lfp_CAR"
+UNITQUERY="--unitQuery=lfp"
 python -u ./calcTrialOutliers.py --exp=$EXP $BLOCKSELECTOR $UNITSELECTOR $WINDOW $ALIGNFOLDER $ANALYSISFOLDER $ALIGNQUERY $LAZINESS $UNITQUERY $INPUTBLOCKNAME --plotting --verbose --amplitudeFieldName="amplitude" --saveResults

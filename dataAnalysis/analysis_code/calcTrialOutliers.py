@@ -192,7 +192,7 @@ def findOutliers(
 
 def calcCovMat(
         partition, dataColNames=None,
-        useMinCovDet=True,
+        useMinCovDet=False,
         supportFraction=None, verbose=False):
     dataColMask = partition.columns.isin(dataColNames)
     partitionData = partition.loc[:, dataColMask]
