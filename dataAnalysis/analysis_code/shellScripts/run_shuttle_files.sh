@@ -51,10 +51,10 @@ source activate nda2
 python --version
 
 # global operations
-python './shuttleFilesToFromScratch.py' --exp=$EXP --preprocFolderFiles --fromScratchToData --moveItems
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --preprocFolderFiles --fromScratchToData --moveItems
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --preprocFolderFiles --preprocFolderSubfolders --fromScratchToData --moveItems
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --preprocFolderFiles --fromDataToScratch
-# python './shuttleFilesToFromScratch.py' --exp=$EXP --fileSearchTerm='*utah*' --fromDataToScratch
+python './shuttleFilesToFromScratch.py' --exp=$EXP --fileSearchTerm='*epochs*' --fromDataToScratch
 
 # everything to data
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --preprocFolderSubfolders --fromScratchToData

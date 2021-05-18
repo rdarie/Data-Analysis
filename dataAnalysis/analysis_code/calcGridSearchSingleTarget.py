@@ -111,15 +111,25 @@ if __name__ == '__main__':
         if not os.path.exists(figureOutputFolder):
             os.makedirs(figureOutputFolder)
     #
-    cvIteratorSubfolder = os.path.join(
-        alignSubFolder, 'testTrainSplits')
+    '''cvIteratorSubfolder = os.path.join(
+        alignSubFolder, 'testTrainSplits')'''
     if arguments['iteratorSuffix'] is not None:
         iteratorSuffix = '_{}'.format(arguments['iteratorSuffix'])
     else:
         iteratorSuffix = ''
     #
     datasetName = '{}_to_{}{}_{}_{}'.format(
-        arguments['unitQueryLhs'], arguments['unitQueryRhs'],
+        arguments['unitQueryRhs'], arguments['unitQueryLhs'],
+        iteratorSuffix,
+        arguments['window'],
+        arguments['alignQuery'])
+    rhsDatasetName = '{}{}_{}_{}'.format(
+        arguments['unitQueryRhs'],
+        iteratorSuffix,
+        arguments['window'],
+        arguments['alignQuery'])
+    lhsDatasetName = '{}{}_{}_{}'.format(
+        arguments['unitQueryLhs'],
         iteratorSuffix,
         arguments['window'],
         arguments['alignQuery'])
@@ -133,20 +143,25 @@ if __name__ == '__main__':
         estimatorsSubFolder,
         fullEstimatorName + '.h5'
         )
-    datasetPath = os.path.join(
-        estimatorsSubFolder,
-        datasetName + '.h5'
+    rhsDatasetPath = os.path.join(
+        dataFramesFolder,
+        rhsDatasetName + '.h5'
         )
-    assert os.path.exists(datasetPath)
+    assert os.path.exists(rhsDatasetPath)
+    lhsDatasetPath = os.path.join(
+        dataFramesFolder,
+        lhsDatasetName + '.h5'
+        )
+    assert os.path.exists(lhsDatasetPath)
     #
-    iteratorPath = os.path.join(
+    '''iteratorPath = os.path.join(
         cvIteratorSubfolder,
         '{}_{}_{}{}_cvIterators.pickle'.format(
             rhsBlockBaseName,
             arguments['window'],
             arguments['alignQuery'],
-            iteratorSuffix))
-    iteratorPath = datasetPath.replace('.h5', '_meta.pickle')
+            iteratorSuffix))'''
+    iteratorPath = rhsDatasetPath.replace('.h5', '_meta.pickle')
     #
     with open(iteratorPath, 'rb') as f:
         loadingMeta = pickle.load(f)
@@ -205,9 +220,9 @@ if __name__ == '__main__':
     joblibBackendArgs = dict(
         backend='dask'
         )
-    lhsDF = pd.read_hdf(datasetPath, 'lhsDF')
-    rhsDF = pd.read_hdf(datasetPath, 'rhsDF')
-    lhsMasks = pd.read_hdf(datasetPath, 'lhsFeatureMasks')
+    lhsDF = pd.read_hdf(lhsDatasetPath, arguments['unitQueryLhs'])
+    rhsDF = pd.read_hdf(rhsDatasetPath, arguments['unitQueryRhs'])
+    lhsMasks = pd.read_hdf(lhsDatasetPath, arguments['unitQueryLhs'] + '_featureMasks')
     '''######### data loading stuff
     lOfRhsDF = []
     lOfLhsDF = []

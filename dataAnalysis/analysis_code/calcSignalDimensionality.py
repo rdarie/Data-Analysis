@@ -178,7 +178,7 @@ if __name__ == '__main__':
     #
     nCompsToTest = range(1, nFeatures + 1, 3)
     if arguments['debugging']:
-        nCompsToTest = range(60, 200, 3)
+        nCompsToTest = range(60, max(200, nFeatures + 1), 3)
     #
     scores = {}
     for n in nCompsToTest:
