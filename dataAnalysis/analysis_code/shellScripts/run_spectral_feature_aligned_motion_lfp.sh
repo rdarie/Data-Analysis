@@ -10,11 +10,11 @@
 #SBATCH --mem=127G
 
 # Specify a job name:
-#SBATCH -J spectral_calc_motion_lfp_25
+#SBATCH -J spectral_calc_motion_lfp_28
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-spectral_calc_motion_lfp_25.out
-#SBATCH -e ../../batch_logs/%j-%a-spectral_calc_motion_lfp_25.out
+#SBATCH -o ../../batch_logs/%j-%a-spectral_calc_motion_lfp_28.out
+#SBATCH -e ../../batch_logs/%j-%a-spectral_calc_motion_lfp_28.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
