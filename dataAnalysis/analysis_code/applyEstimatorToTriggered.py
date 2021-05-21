@@ -18,6 +18,7 @@ Options:
     --winStop=winStop                      end of window [default: 400]
     --estimatorName=estimatorName          estimator filename
     --datasetName=datasetName              dataset used to train estimator (use to get loading arguments)
+    --datasetExp=datasetExp                dataset used to train estimator (use to get loading arguments)
     --unitQuery=unitQuery                  how to restrict channels?
     --inputBlockSuffix=inputBlockSuffix    which trig_ block to pull [default: pca]
     --inputBlockPrefix=inputBlockPrefix    which trig_ block to pull [default: Block]
@@ -76,9 +77,14 @@ else:
     #
     estimatorsSubFolder = os.path.join(
         alignSubFolder, 'estimators')
+    if arguments['datasetExp'] is not None:
+        estimatorsSubFolder = estimatorsSubFolder.replace(experimentName, arguments['datasetExp'])
     if not os.path.exists(estimatorsSubFolder):
         os.makedirs(estimatorsSubFolder)
     dataFramesFolder = os.path.join(alignSubFolder, 'dataframes')
+    if arguments['datasetExp'] is not None:
+        dataFramesFolder = dataFramesFolder.replace(experimentName, arguments['datasetExp'])
+    # pdb.set_trace()
     datasetPath = os.path.join(
         dataFramesFolder,
         datasetName + '.h5'

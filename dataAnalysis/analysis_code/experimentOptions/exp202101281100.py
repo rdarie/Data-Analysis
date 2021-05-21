@@ -131,8 +131,8 @@ def getExpOpts():
         }}
     #  Options relevant to the assembled trial files
     experimentsToAssemble = {
-        # '202101251100-Rupert': [2, 3],
-        # '202101271100-Rupert': [2, 3],
+        '202101251100-Rupert': [2, 3],
+        '202101271100-Rupert': [2, 3],
         '202101281100-Rupert': [2, 3],
         }
     # Options relevant to the classifcation of proprio trials
@@ -165,9 +165,11 @@ def getExpOpts():
     ############################################################
     ############################################################
     outlierDetectOptions = dict(
-        targetEpochSize=100e-3,
-        windowSize=(-.2, .8),
+        targetEpochSize=500e-3,
+        windowSize=(-.5, 1.5),
         twoTailed=True,
+        devQuantile=0.99,
+        qThresh=1-1e-6
         )
     #
     minNConditionRepetitions = {

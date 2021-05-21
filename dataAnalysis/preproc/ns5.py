@@ -1090,6 +1090,7 @@ def concatenateUnitSpikeTrainWaveformsDF(
             .format(prf.memory_usage_psutil()))
     #  if concatenating indexes, reset the index of the result
     #  ignoreIndex = (concatOn == 'index')
+    assert len(waveformsList) > 0, 'Error: dataquery ({}) yields empty list!'.format(dataQuery)
     allWaveforms = pd.concat(
         waveformsList, axis=concatOn,
         # ignore_index=ignoreIndex

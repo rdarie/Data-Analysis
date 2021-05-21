@@ -22,7 +22,7 @@
 # Request custom resources
 #SBATCH --array=2,3
 
-#  SLURM_ARRAY_TASK_ID=3
+# SLURM_ARRAY_TASK_ID=3
 source ./shellScripts/calc_aligned_motion_preamble.sh
 
 
@@ -32,10 +32,10 @@ ESTIMATOR="fa"
 ITERATOR="a"
 WINDOW="XL"
 
-python -u './applyEstimatorToTriggered.py' --matchDownsampling --inputBlockSuffix="${TARGET}" --estimatorName="${ESTIMATOR}" --datasetName="${TARGET}_a_XL_outbound" --unitQuery="${TARGET}" --exp=$EXP --window=$WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR
+# python -u './applyEstimatorToTriggered.py' --matchDownsampling --inputBlockSuffix="${TARGET}" --estimatorName="${ESTIMATOR}" --datasetName="${TARGET}_a_XL_outbound" --datasetExp='202101281100-Rupert' --unitQuery="${TARGET}" --exp=$EXP --window=$WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR
 python -u './makeViewableBlockFromTriggered.py' --plotting --inputBlockSuffix="${TARGET}_${ESTIMATOR}" --unitQuery="factor" $VERBOSITY --exp=$EXP --window=$WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
 
 TARGET="lfp_CAR_spectral_fa"
 ESTIMATOR="mahal"
-python -u './applyEstimatorToTriggered.py' --inputBlockSuffix="${TARGET}" --estimatorName="${ESTIMATOR}" --datasetName="${TARGET}_a_XL_outbound" --exp=$EXP --window=$WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR
+python -u './applyEstimatorToTriggered.py' --inputBlockSuffix="${TARGET}" --estimatorName="${ESTIMATOR}" --datasetName="${TARGET}_a_XL_outbound" --datasetExp='202101281100-Rupert' --exp=$EXP --window=$WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR
 python -u './makeViewableBlockFromTriggered.py' --plotting --inputBlockSuffix="${TARGET}_${ESTIMATOR}" --unitQuery="mahal" $VERBOSITY --exp=$EXP --window=$WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
