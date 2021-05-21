@@ -43,6 +43,7 @@ from copy import deepcopy
 import numpy as np
 import pandas as pd
 import dataAnalysis.preproc.ns5 as ns5
+from sklearn.compose import ColumnTransformer
 from sklearn.decomposition import PCA, FactorAnalysis
 from sklearn.pipeline import make_pipeline, Pipeline
 from sklearn.covariance import ShrunkCovariance, LedoitWolf, EmpiricalCovariance
@@ -133,34 +134,73 @@ if __name__ == '__main__':
                 print('Scheduler name is not correct!')
                 daskClient = Client()
     dataDF = pd.read_hdf(datasetPath, datasetName)
+    featureMasks = pd.read_hdf(datasetPath, datasetName + '_featureMasks')
     # only use zero lag targets
     lagMask = dataDF.columns.get_level_values('lag') == 0
     dataDF = dataDF.loc[:, lagMask]
+    featureMasks = featureMasks.loc[:, lagMask]
+    #
     trialInfo = dataDF.index.to_frame().reset_index(drop=True)
     workIdx = cvIterator.work
     workingDataDF = dataDF.iloc[workIdx, :]
     prf.print_memory_usage('just loaded data, fitting')
-    nFeatures = dataDF.columns.shape[0]
+    # remove the 'all' column
+    featureMasks = featureMasks.loc[~ featureMasks.all(axis='columns'), :]
     #
-    '''if arguments['plotting']:
-        fig, ax = plt.subplots()
-        for name, group in dataDF.iloc[:, :10].groupby('feature', axis='columns'):
-            sns.distplot(group.to_numpy(), label=name, ax=ax)
-        ax.legend()
-        plt.show()'''
-    scores = tdr.crossValidationScores(
-        dataDF, None, estimatorClass,
-        estimatorKWArgs=estimatorKWArgs,
-        crossvalKWArgs=crossvalKWArgs,
-        joblibBackendArgs=joblibBackendArgs,
-        verbose=arguments['verbose']
-        )
-    scoresDF = pd.DataFrame(scores)
-    scoresDF.index.name = 'fold'
-    scoresDF.dropna(axis='columns', inplace=True)
-    lastFoldIdx = scoresDF.index.get_level_values('fold').max()
-    chosenEstimator = scoresDF.loc[lastFoldIdx, 'estimator']
+    outputFeatureList = []
+    featureColumnFields = dataDF.columns.names
+    cvScoresDict = {}
+    lOfColumnTransformers = []
     pdb.set_trace()
+    for idx, (maskIdx, featureMask) in enumerate(featureMasks.iterrows()):
+        maskParams = {k: v for k, v in zip(featureMask.index.names, maskIdx)}
+        dataGroup = dataDF.loc[:, featureMask]
+        trfName = '{}_{}'.format(arguments['estimatorName'], maskParams['freqBandName'])
+        if arguments['verbose']:
+            print('Fitting {} ...'.format(trfName))
+        nFeatures = dataGroup.columns.shape[0]
+        cvScores = tdr.crossValidationScores(
+            dataGroup, None, estimatorClass,
+            estimatorKWArgs=estimatorKWArgs,
+            crossvalKWArgs=crossvalKWArgs,
+            joblibBackendArgs=joblibBackendArgs,
+            verbose=arguments['verbose']
+            )
+        cvScoresDF = pd.DataFrame(cvScores)
+        cvScoresDF.index.name = 'fold'
+        cvScoresDF.dropna(axis='columns', inplace=True)
+        cvScoresDict[maskParams['freqBandName']] = cvScoresDF
+        #
+        lastFoldIdx = cvScoresDF.index.get_level_values('fold').max()
+        bestEstimator = cvScoresDF.loc[lastFoldIdx, 'estimator']
+        lOfColumnTransformers.append((
+            # transformer name
+            trfName,
+            # estimator
+            bestEstimator,
+            # columns
+            dataGroup.columns.copy()
+            ))
+        featureColumns = pd.DataFrame(
+            np.nan,
+            index=[idx],
+            columns=featureColumnFields)
+        for fcn in featureColumnFields:
+            if fcn == 'feature':
+                featureColumns.loc[idx, fcn] = trfName
+            elif fcn == 'lag':
+                featureColumns.loc[idx, fcn] = 0
+            else:
+                featureColumns.loc[idx, fcn] = maskParams[fcn]
+        outputFeatureList.append(featureColumns)
+    # pdb.set_trace()
+    chosenEstimator = ColumnTransformer(lOfColumnTransformers)
+    chosenEstimator.fit(workingDataDF)
+    outputFeaturesIndex = pd.MultiIndex.from_frame(
+        pd.concat(outputFeatureList).reset_index(drop=True))
+    #
+    scoresDF = pd.concat(cvScoresDict, names=['freqBandName'])
+    scoresDF.dropna(axis='columns', inplace=True)
     #
     prf.print_memory_usage('Done fitting')
     if os.path.exists(estimatorPath):

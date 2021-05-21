@@ -16,6 +16,7 @@ import os
 import scipy.optimize
 from itertools import product
 import joblib as jb
+from copy import copy
 import statsmodels
 from patsy import (
     ModelDesc, EvalEnvironment, Term, Sum, Treatment, INTERCEPT,
@@ -31,7 +32,7 @@ sns.set_style("whitegrid")
 
 
 def crossValidationScores(
-        X, y,
+        X, y=None,
         estimatorClass=None, estimatorInstance=None,
         estimatorKWArgs={},
         crossvalKWArgs={},
@@ -52,10 +53,7 @@ def crossValidationScores(
         workingIdx = crossvalKWArgs['cv'].work
         validIdx = crossvalKWArgs['cv'].validation
         #
-        if estimatorInstance is None:
-            workEstim = estimatorClass(**estimatorKWArgs)
-        else:
-            workEstim = estimatorInstance.copy()
+        workEstim = copy(estimatorInstance)
         #
         workX = X.iloc[workingIdx, :].to_numpy()
         valX = X.iloc[validIdx, :].to_numpy()
@@ -77,7 +75,7 @@ def crossValidationScores(
 
 
 def gridSearchHyperparameters(
-        X, y,
+        X, y=None,
         estimatorClass=None, estimatorInstance=None,
         estimatorKWArgs={},
         gridSearchKWArgs={},
@@ -94,7 +92,7 @@ def gridSearchHyperparameters(
                 estimatorInstance, verbose=verbose, **gridSearchKWArgs)
         if verbose > 0:
             print('Fitting gridSearchCV...')
-        gridSearcher.fit(X.to_numpy(), y.to_numpy())
+        gridSearcher.fit(X, y)
         if verbose:
             print('    Done fitting gridSearchCV!')
         if isinstance(estimatorInstance, ElasticNet):
@@ -103,19 +101,57 @@ def gridSearchHyperparameters(
                 'l1_ratio': gridSearcher.l1_ratio_}
         else:
             optParams = gridSearcher.best_params_
-        scoringEstimatorParams = estimatorKWArgs.copy()
+        gsScoresDF = pd.DataFrame(gridSearcher.cv_results_)
+        paramColNames = []
+        paramColNamesShort = []
+        colRenamer = {}
+        for cN in gsScoresDF.columns:
+            if cN.startswith('param_'):
+                paramColNames.append(cN)
+                paramColNamesShort.append(cN[6:])
+                colRenamer[cN] = cN[6:]
+        scoresDict = {}
+        for foldIdx in range(gridSearcher.n_splits_):
+            splitName = 'split{}_'.format(foldIdx)
+            theseColNames = paramColNames + ['{}test_score'.format(splitName)]
+            colRenamer['{}test_score'.format(splitName)] = 'test_score'
+            trainField = '{}train_score'.format(splitName)
+            if trainField in gsScoresDF.copy():
+                theseColNames += [trainField]
+                colRenamer[trainField] = 'train_score'
+            theseScores = gsScoresDF.loc[:, theseColNames]
+            theseScores.rename(columns=colRenamer, inplace=True)
+            theseScores.set_index(paramColNamesShort, inplace=True)
+            scoresDict[foldIdx] = theseScores
+        gsCVResultsDF = pd.concat(scoresDict, names=['fold'])
+        #
+        scoringEstimatorParams = copy(estimatorKWArgs)
         scoringEstimatorParams.update(optParams)
         if verbose:
             print('cross val scoring')
+        if estimatorClass is None:
+            estimatorInstanceForCrossVal = copy(estimatorInstance)
+            estimatorInstanceForCrossVal.set_params(scoringEstimatorParams)
+        else:
+            estimatorInstanceForCrossVal = None
         scores = crossValidationScores(
-            X, y, estimatorInstance=estimatorInstance,
+            X, y=y, estimatorInstance=estimatorInstanceForCrossVal,
+            estimatorClass=estimatorClass,
             estimatorKWArgs=scoringEstimatorParams,
             crossvalKWArgs=crossvalKWArgs,
             joblibBackendArgs=joblibBackendArgs,
             verbose=verbose)
         if verbose:
             print('    Done cross val scoring!')
-    return scores, gridSearcher
+    return scores, gridSearcher, gsCVResultsDF
+
+
+def scoreColumnTransformer(estimator, X, y=None):
+    componentScores = []
+    for trfTuple in estimator.transformers_:
+        trfName, trf, trfCols = trfTuple
+        componentScores.append(trf.score(X, y))
+    return np.mean(componentScores)
 
 
 def timeShift(x, lag):

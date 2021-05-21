@@ -70,6 +70,7 @@ if oldWay:
     alignedAsigsKWargs.update(estimatorMetadata['alignedAsigsKWargs'])
     alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **arguments)
     normalizeDataset = None
+    extendedFeatureMeta = None
 else:
     datasetName = arguments['datasetName']
     fullEstimatorName = '{}_{}'.format(
@@ -84,7 +85,6 @@ else:
     dataFramesFolder = os.path.join(alignSubFolder, 'dataframes')
     if arguments['datasetExp'] is not None:
         dataFramesFolder = dataFramesFolder.replace(experimentName, arguments['datasetExp'])
-    # pdb.set_trace()
     datasetPath = os.path.join(
         dataFramesFolder,
         datasetName + '.h5'
@@ -107,9 +107,8 @@ else:
         normalizationParams = loadingMeta['normalizationParams']
     else:
         normalizeDataset = None
-    '''for loadingEntry in ['unitQuery']:
-        if loadingEntry in loadingMeta['arguments']:
-            arguments[loadingEntry] = loadingMeta['arguments'][loadingEntry]'''
+    featureMasks = pd.read_hdf(datasetPath, datasetName + '_featureMasks')
+    extendedFeatureMeta = featureMasks.columns.to_frame().reset_index(drop=True)
     for aakwaEntry in ['getMetaData', 'concatOn', 'transposeToColumns', 'addLags', 'procFun']:
         if aakwaEntry in loadingMeta['alignedAsigsKWargs']:
             alignedAsigsKWargs[aakwaEntry] = loadingMeta['alignedAsigsKWargs'][aakwaEntry]
@@ -126,8 +125,6 @@ with open(
         'rb') as f:
     estimatorMetadata = pickle.load(f)
 #
-# Reduce time sample even further
-# alignedAsigsKWargs.update(dict(getMetaData=True, decimate=20))
 alignedAsigsKWargs['verbose'] = arguments['verbose']
 #
 outputPath = os.path.join(
@@ -143,13 +140,16 @@ if arguments['verbose']:
 
 alignedAsigsDF = ns5.alignedAsigsToDF(
     dataBlock, **alignedAsigsKWargs)
-# pdb.set_trace()
+if extendedFeatureMeta is not None:
+    featureMeta = alignedAsigsDF.columns.to_frame().reset_index(drop=True)
+    assert (featureMeta.loc[:, ['feature', 'lag']] == extendedFeatureMeta.loc[:, ['feature', 'lag']]).all(axis=None)
+    alignedAsigsDF.columns = pd.MultiIndex.from_frame(extendedFeatureMeta)
 if normalizeDataset is not None:
     alignedAsigsDF = normalizeDataset(alignedAsigsDF, normalizationParams)
 if hasattr(estimator, 'transform'):
-    features = estimator.transform(alignedAsigsDF.to_numpy())
+    features = estimator.transform(alignedAsigsDF)
 elif hasattr(estimator, 'mahalanobis'):
-    features = estimator.mahalanobis(alignedAsigsDF.to_numpy())
+    features = estimator.mahalanobis(alignedAsigsDF)
 if arguments['profile']:
     prf.print_memory_usage('after estimator.transform')
 #
@@ -159,14 +159,12 @@ else:
     featureNames = [
         estimatorMetadata['name'] + '{:0>3}'.format(i)
         for i in range(features.shape[1])]
-#
-# colNames = pd.MultiIndex.from_arrays(
-#     [featureNames, [0 for fN in featureNames]],
-#     names=['feature', 'lag'])
 trialTimes = np.unique(alignedAsigsDF.index.get_level_values('t'))
 tBins = np.unique(alignedAsigsDF.index.get_level_values('bin'))
 alignedFeaturesDF = pd.DataFrame(
     features, index=alignedAsigsDF.index, columns=featureNames)
+if isinstance(alignedFeaturesDF.columns, pd.MultiIndex):
+    alignedFeaturesDF.columns = alignedFeaturesDF.columns.get_level_values('feature')
 alignedFeaturesDF.columns.name = 'feature'
 del alignedAsigsDF
 #

@@ -28,14 +28,19 @@ source ./shellScripts/calc_aligned_motion_preamble.sh
 
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
 TARGET="lfp_CAR_spectral"
-ESTIMATOR="fa"
+ESTIMATOR="pca"
 ITERATOR="a"
 WINDOW="XL"
+
+ALIGNQUERYTERM="starting"
+# ALIGNQUERYTERM="outbound"
+#
+ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
 
 # python -u './applyEstimatorToTriggered.py' --matchDownsampling --inputBlockSuffix="${TARGET}" --estimatorName="${ESTIMATOR}" --datasetName="${TARGET}_a_XL_outbound" --datasetExp='202101281100-Rupert' --unitQuery="${TARGET}" --exp=$EXP --window=$WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR
 python -u './makeViewableBlockFromTriggered.py' --plotting --inputBlockSuffix="${TARGET}_${ESTIMATOR}" --unitQuery="factor" $VERBOSITY --exp=$EXP --window=$WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
 
-TARGET="lfp_CAR_spectral_fa"
+TARGET="lfp_CAR_spectral_pca"
 ESTIMATOR="mahal"
-python -u './applyEstimatorToTriggered.py' --inputBlockSuffix="${TARGET}" --estimatorName="${ESTIMATOR}" --datasetName="${TARGET}_a_XL_outbound" --datasetExp='202101281100-Rupert' --exp=$EXP --window=$WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR
-python -u './makeViewableBlockFromTriggered.py' --plotting --inputBlockSuffix="${TARGET}_${ESTIMATOR}" --unitQuery="mahal" $VERBOSITY --exp=$EXP --window=$WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
+# python -u './applyEstimatorToTriggered.py' --inputBlockSuffix="${TARGET}" --estimatorName="${ESTIMATOR}" --datasetName="${TARGET}_a_XL_outbound" --datasetExp='202101281100-Rupert' --exp=$EXP --window=$WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR
+# python -u './makeViewableBlockFromTriggered.py' --plotting --inputBlockSuffix="${TARGET}_${ESTIMATOR}" --unitQuery="mahal" $VERBOSITY --exp=$EXP --window=$WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
