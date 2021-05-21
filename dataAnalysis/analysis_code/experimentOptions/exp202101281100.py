@@ -166,9 +166,9 @@ def getExpOpts():
     ############################################################
     outlierDetectOptions = dict(
         targetEpochSize=500e-3,
-        windowSize=(-.5, 1.5),
+        windowSize=(-.4, 1.),
         twoTailed=True,
-        devQuantile=0.99,
+        devQuantile=0.95,
         qThresh=1-1e-6
         )
     #

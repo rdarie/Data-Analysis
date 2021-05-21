@@ -37,7 +37,7 @@ INPUTBLOCKNAME="--inputBlockSuffix=lfp_CAR"
 
 # for concatenated files
 BLOCKSELECTOR="--blockIdx=2 --processAll"
-INPUTBLOCKNAME="--inputBlockSuffix=lfp_CAR_spectral_fa"
-UNITQUERY="--unitQuery=factor"
+INPUTBLOCKNAME="--inputBlockSuffix=lfp_CAR"
+UNITQUERY="--unitQuery=lfp"
 #
 python -u ./calcTrialOutliers.py --exp=$EXP $BLOCKSELECTOR $UNITSELECTOR $WINDOW $ALIGNFOLDER $ANALYSISFOLDER $ALIGNQUERY $LAZINESS $UNITQUERY $INPUTBLOCKNAME --plotting --verbose --amplitudeFieldName="amplitude" --saveResults

@@ -31,26 +31,31 @@ sns.set_style("whitegrid")
 
 
 def crossValidationScores(
-        X, y, estimator,
+        X, y,
+        estimatorClass=None, estimatorInstance=None,
         estimatorKWArgs={},
         crossvalKWArgs={},
         joblibBackendArgs={},
         verbose=0):
     with jb.parallel_backend(**joblibBackendArgs):
-        instance = estimator(**estimatorKWArgs)
+        if estimatorInstance is None:
+            estimatorInstance = estimatorClass(**estimatorKWArgs)
         cvX = X.to_numpy()
         if y is not None:
             cvY = y.to_numpy()
         else:
             cvY = None
         scores = cross_validate(
-            instance, cvX, cvY, verbose=verbose, **crossvalKWArgs)
+            estimatorInstance, cvX, cvY, verbose=verbose, **crossvalKWArgs)
     # train on all of the "working" samples, eval on the "validation"
     if hasattr(crossvalKWArgs['cv'], 'work'):
         workingIdx = crossvalKWArgs['cv'].work
         validIdx = crossvalKWArgs['cv'].validation
         #
-        workEstim = estimator(**estimatorKWArgs)
+        if estimatorInstance is None:
+            workEstim = estimatorClass(**estimatorKWArgs)
+        else:
+            workEstim = estimatorInstance.copy()
         #
         workX = X.iloc[workingIdx, :].to_numpy()
         valX = X.iloc[validIdx, :].to_numpy()
@@ -72,26 +77,30 @@ def crossValidationScores(
 
 
 def gridSearchHyperparameters(
-        X, y, estimator,
+        X, y,
+        estimatorClass=None, estimatorInstance=None,
         estimatorKWArgs={},
         gridSearchKWArgs={},
         crossvalKWArgs={},
         joblibBackendArgs={},
         verbose=0):
     with jb.parallel_backend(**joblibBackendArgs):
-        estimatorProto = estimator(**estimatorKWArgs)
-        if isinstance(estimatorProto, ElasticNet):
+        if estimatorInstance is None:
+            estimatorInstance = estimatorClass(**estimatorKWArgs)
+        if isinstance(estimatorInstance, ElasticNet):
             gridSearcher = ElasticNetCV(verbose=verbose, **gridSearchKWArgs)
         else:
             gridSearcher = GridSearchCV(
-                estimatorProto, verbose=verbose, **gridSearchKWArgs)
+                estimatorInstance, verbose=verbose, **gridSearchKWArgs)
         if verbose > 0:
             print('Fitting gridSearchCV...')
         gridSearcher.fit(X.to_numpy(), y.to_numpy())
         if verbose:
             print('    Done fitting gridSearchCV!')
-        if isinstance(estimatorProto, ElasticNet):
-            optParams = {'alpha': gridSearcher.alpha_, 'l1_ratio': gridSearcher.l1_ratio_}
+        if isinstance(estimatorInstance, ElasticNet):
+            optParams = {
+                'alpha': gridSearcher.alpha_,
+                'l1_ratio': gridSearcher.l1_ratio_}
         else:
             optParams = gridSearcher.best_params_
         scoringEstimatorParams = estimatorKWArgs.copy()
@@ -99,7 +108,7 @@ def gridSearchHyperparameters(
         if verbose:
             print('cross val scoring')
         scores = crossValidationScores(
-            X, y, estimator,
+            X, y, estimatorInstance=estimatorInstance,
             estimatorKWArgs=scoringEstimatorParams,
             crossvalKWArgs=crossvalKWArgs,
             joblibBackendArgs=joblibBackendArgs,

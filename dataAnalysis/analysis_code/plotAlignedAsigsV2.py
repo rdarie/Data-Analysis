@@ -91,7 +91,7 @@ plotProcFuns = [
     asp.genYLabelChanger(
         lookupDict={}, removeMatch='#0'),
     # asp.genYLimSetter(newLims=[-75, 100], forceLims=True),
-    # asp.genYLimSetter(quantileLims=0.95, forceLims=True),
+    # asp.genYLimSetter(quantileLims=0.99, forceLims=True),
     asp.xLabelsTime,
     # asp.genStimVLineAdder(
     #     'RateInHz', vLineOpts, tOnset=0, tOffset=.3, includeRight=False),

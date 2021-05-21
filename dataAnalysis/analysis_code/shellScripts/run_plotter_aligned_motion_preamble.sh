@@ -15,9 +15,9 @@ TIMEWINDOWOPTS="--winStart=-400 --winStop=1000"
 
 # ALIGNQUERY="--alignQuery=stimOn"
 # ALIGNQUERY="--alignQuery=outbound"
-# ALIGNQUERY="--alignQuery=starting"
+ALIGNQUERY="--alignQuery=starting"
 # ALIGNQUERY="--alignQuery=stopping"
-ALIGNQUERY="--alignQuery=startingNoStim"
+# ALIGNQUERY="--alignQuery=startingNoStim"
 
 # HUEOPTS="--hueName= --hueControl="
 # ROWOPTS="--rowName=pedalSizeCat --rowControl="
@@ -26,7 +26,7 @@ ALIGNQUERY="--alignQuery=startingNoStim"
 # SIZEOPTS="--sizeName= --sizeControl="
 
 
-HUEOPTS="--hueName=expName --hueControl="
+HUEOPTS="--hueName=amplitude --hueControl="
 ROWOPTS="--rowName=pedalSizeCat --rowControl="
 COLOPTS="--colName=pedalMovementCat --colControl="
 STYLEOPTS="--styleName= --styleControl="
