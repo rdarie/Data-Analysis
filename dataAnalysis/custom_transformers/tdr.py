@@ -35,10 +35,9 @@ sns.set_style("whitegrid")
 def crossValidationScores(
         X, y=None,
         estimatorClass=None, estimatorInstance=None,
-        estimatorKWArgs={},
-        crossvalKWArgs={},
-        joblibBackendArgs={},
-        verbose=0):
+        estimatorKWArgs={}, crossvalKWArgs={},
+        joblibBackendArgs={}, verbose=0):
+    #
     with jb.parallel_backend(**joblibBackendArgs):
         if estimatorInstance is None:
             estimatorInstance = estimatorClass(**estimatorKWArgs)
@@ -78,11 +77,10 @@ def crossValidationScores(
 def gridSearchHyperparameters(
         X, y=None,
         estimatorClass=None, estimatorInstance=None,
-        estimatorKWArgs={},
-        gridSearchKWArgs={},
-        crossvalKWArgs={},
-        joblibBackendArgs={},
-        verbose=0):
+        estimatorKWArgs={}, gridSearchKWArgs={},
+        crossvalKWArgs={}, joblibBackendArgs={},
+        verbose=0, recalculateBestEstimator=False):
+    #
     with jb.parallel_backend(**joblibBackendArgs):
         if estimatorInstance is None:
             estimatorInstance = estimatorClass(**estimatorKWArgs)
@@ -96,12 +94,6 @@ def gridSearchHyperparameters(
         gridSearcher.fit(X, y)
         if verbose:
             print('    Done fitting gridSearchCV!')
-        if isinstance(estimatorInstance, ElasticNet):
-            optParams = {
-                'alpha': gridSearcher.alpha_,
-                'l1_ratio': gridSearcher.l1_ratio_}
-        else:
-            optParams = gridSearcher.best_params_
         gsScoresDF = pd.DataFrame(gridSearcher.cv_results_)
         paramColNames = []
         paramColNamesShort = []
@@ -125,6 +117,29 @@ def gridSearchHyperparameters(
             theseScores.set_index(paramColNamesShort, inplace=True)
             scoresDict[foldIdx] = theseScores
         gsCVResultsDF = pd.concat(scoresDict, names=['fold'])
+        optParams = None
+        if recalculateBestEstimator:
+            # the estimator that maximizes the score
+            # might yield similar results to other estimators
+            # that are much less complicated
+            #
+            # Here, we find a confidence interval around the score
+            # and choose a model that is "close enough" to the max
+            scoreMean = gsCVResultsDF.groupby(paramColNamesShort).mean()['test_score']
+            maxScore, minScore = scoreMean.max(), scoreMean.min()
+            scoreSem = gsCVResultsDF.groupby(paramColNamesShort).sem()['test_score']
+            threshold = minScore + (maxScore - minScore) * 0.95 - scoreSem.loc[scoreMean.idxmax()]
+            if scoreMean.index.names == ['n_components']:
+                optParams = {'n_components': scoreMean.loc[scoreMean > threshold].idxmin()}
+                print('Resetting optimal params to:\n{}\n'.format(optParams))
+            # else.. depends on whether we want the params to be maximized or minimized
+        if optParams is None:
+            if isinstance(estimatorInstance, ElasticNet):
+                optParams = {
+                    'alpha': gridSearcher.alpha_,
+                    'l1_ratio': gridSearcher.l1_ratio_}
+            else:
+                optParams = gridSearcher.best_params_
         #
         scoringEstimatorParams = copy(estimatorKWArgs)
         scoringEstimatorParams.update(optParams)

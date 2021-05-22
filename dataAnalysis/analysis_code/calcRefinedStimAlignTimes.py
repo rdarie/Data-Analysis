@@ -469,7 +469,7 @@ outputPath = os.path.join(
     ns5FileName + '_epochs'
     )
 if not os.path.exists(outputPath + '.nix'):
-    writer = ns5.NixIO(filename=outputPath + '.nix')
+    writer = ns5.NixIO(filename=outputPath + '.nix', mode='ow')
     writer.write_block(masterBlock, use_obj_names=True)
     writer.close()
 else:
@@ -481,7 +481,7 @@ else:
     if eventExists:
         print('motion times already calculated! Deleting block and starting over')
         os.remove(outputPath + '.nix')
-        writer = ns5.NixIO(filename=outputPath + '.nix')
+        writer = ns5.NixIO(filename=outputPath + '.nix', mode='ow')
         writer.write_block(masterBlock, use_obj_names=True)
         writer.close()
     else:

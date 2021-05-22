@@ -156,8 +156,7 @@ if __name__ == "__main__":
         os.remove(outputPath + '.nix')
     print('Writing {}.nix...'.format(outputPath))
     writer = ns5.NixIO(
-        filename=outputPath + '.nix',
-        mode='ow')
+        filename=outputPath + '.nix', mode='ow')
     writer.write_block(masterBlock, use_obj_names=True)
     writer.close()
     if arguments['lazy']:

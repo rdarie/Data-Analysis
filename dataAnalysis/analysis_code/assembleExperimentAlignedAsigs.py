@@ -244,7 +244,7 @@ if createRelationship:
     outputBlock.create_relationship()
 if os.path.exists(outputPath):
     os.remove(outputPath)
-writer = neo.io.NixIO(filename=outputPath)
+writer = neo.io.NixIO(filename=outputPath, mode='ow')
 print('writing {} ...'.format(outputPath))
 writer.write_block(outputBlock, use_obj_names=True)
 writer.close()

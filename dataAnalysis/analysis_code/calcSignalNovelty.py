@@ -145,8 +145,10 @@ if __name__ == '__main__':
     workIdx = cvIterator.work
     workingDataDF = dataDF.iloc[workIdx, :]
     prf.print_memory_usage('just loaded data, fitting')
-    # remove the 'all' column
-    featureMasks = featureMasks.loc[~ featureMasks.all(axis='columns'), :]
+    # remove the 'all' column?
+    removeAllColumn = False
+    if removeAllColumn:
+        featureMasks = featureMasks.loc[~ featureMasks.all(axis='columns'), :]
     #
     outputFeatureList = []
     featureColumnFields = dataDF.columns.names
@@ -188,7 +190,7 @@ if __name__ == '__main__':
             columns=featureColumnFields)
         for fcn in featureColumnFields:
             if fcn == 'feature':
-                featureColumns.loc[idx, fcn] = trfName
+                featureColumns.loc[idx, fcn] = trfName + '#0'
             elif fcn == 'lag':
                 featureColumns.loc[idx, fcn] = 0
             else:
@@ -208,7 +210,7 @@ if __name__ == '__main__':
         os.remove(estimatorPath)
     # 
     try:
-        scoresDF.loc[lastFoldIdx, :].to_hdf(estimatorPath, 'work')
+        scoresDF.loc[idxSl[:, lastFoldIdx], :].to_hdf(estimatorPath, 'work')
         scoresDF.loc[:, ['test_score', 'train_score']].to_hdf(estimatorPath, 'cv')
     except Exception:
         traceback.print_exc()
@@ -230,9 +232,10 @@ if __name__ == '__main__':
     #
     features = chosenEstimator.transform(dataDF)
     #
+    # pdb.set_trace()
     featuresDF = pd.DataFrame(
-        features, index=dataDF.index,
-        columns=pd.MultiIndex.from_frame(featureColumns))
+        features,
+        index=dataDF.index, columns=outputFeaturesIndex)
     outputDatasetName = '{}_{}_{}_{}_{}'.format(
         arguments['unitQuery'], arguments['estimatorName'],
         arguments['iteratorSuffix'], arguments['window'], arguments['alignQuery'])

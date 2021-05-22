@@ -142,7 +142,9 @@ alignedAsigsDF = ns5.alignedAsigsToDF(
     dataBlock, **alignedAsigsKWargs)
 if extendedFeatureMeta is not None:
     featureMeta = alignedAsigsDF.columns.to_frame().reset_index(drop=True)
-    assert (featureMeta.loc[:, ['feature', 'lag']] == extendedFeatureMeta.loc[:, ['feature', 'lag']]).all(axis=None)
+    # pdb.set_trace()
+    comparisonErrorMsg = "Error: loaded data columns\n\n{}\n\ndoes not equal dataset columns\n\n{}\n\n".format(featureMeta.loc[:, ['feature', 'lag']], extendedFeatureMeta.loc[:, ['feature', 'lag']])
+    assert (featureMeta.loc[:, ['feature', 'lag']] == extendedFeatureMeta.loc[:, ['feature', 'lag']]).all(axis=None), comparisonErrorMsg
     alignedAsigsDF.columns = pd.MultiIndex.from_frame(extendedFeatureMeta)
 if normalizeDataset is not None:
     alignedAsigsDF = normalizeDataset(alignedAsigsDF, normalizationParams)
@@ -154,17 +156,21 @@ if arguments['profile']:
     prf.print_memory_usage('after estimator.transform')
 #
 if 'outputFeatures' in estimatorMetadata:
-    featureNames = estimatorMetadata['outputFeatures']
+    if isinstance(estimatorMetadata['outputFeatures'], pd.Index):
+        featureNames = estimatorMetadata['outputFeatures']
+    elif isinstance(estimatorMetadata['outputFeatures'], pd.MultiIndex):
+        featureNames = pd.Index(estimatorMetadata['outputFeatures'].get_level_values('feature'))
+    else:
+        featureNames = pd.Index(estimatorMetadata['outputFeatures'])
+        featureNames.name = 'feature'
 else:
-    featureNames = [
-        estimatorMetadata['name'] + '{:0>3}'.format(i)
-        for i in range(features.shape[1])]
+    featureNames = pd.Index([
+        estimatorMetadata['name'] + '{:0>3}#0'.format(i)
+        for i in range(features.shape[1])])
 trialTimes = np.unique(alignedAsigsDF.index.get_level_values('t'))
 tBins = np.unique(alignedAsigsDF.index.get_level_values('bin'))
 alignedFeaturesDF = pd.DataFrame(
     features, index=alignedAsigsDF.index, columns=featureNames)
-if isinstance(alignedFeaturesDF.columns, pd.MultiIndex):
-    alignedFeaturesDF.columns = alignedFeaturesDF.columns.get_level_values('feature')
 alignedFeaturesDF.columns.name = 'feature'
 del alignedAsigsDF
 #
@@ -182,6 +188,6 @@ if arguments['lazy']:
     dataReader.file.close()
 masterBlock = ns5.purgeNixAnn(masterBlock)
 print('Writing {}.nix...'.format(outputPath))
-writer = ns5.NixIO(filename=outputPath + '.nix')
+writer = ns5.NixIO(filename=outputPath + '.nix', mode='ow')
 writer.write_block(masterBlock, use_obj_names=True)
 writer.close()

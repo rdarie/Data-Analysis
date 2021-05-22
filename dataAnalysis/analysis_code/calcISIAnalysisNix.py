@@ -1106,7 +1106,7 @@ def calcISIBlockAnalysisNix():
     outPathName = analysisDataPath.format(arguments['analysisName'])
     if os.path.exists(outPathName):
         os.remove(outPathName)
-    writer = neo.io.NixIO(filename=outPathName)
+    writer = neo.io.NixIO(filename=outPathName, mode='ow')
     writer.write_block(spikesBlock, use_obj_names=True)
     writer.close()
     if arguments['commitResults']:
