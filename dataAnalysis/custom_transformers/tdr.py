@@ -5,6 +5,7 @@ from sklearn.model_selection import (
     GridSearchCV, StratifiedKFold)
 from sklearn.model_selection._split import _BaseKFold
 from sklearn.metrics import make_scorer
+from sklearn.covariance import ShrunkCovariance, LedoitWolf, EmpiricalCovariance
 from sklearn.linear_model import ElasticNet, ElasticNetCV
 from sklearn.svm import LinearSVR
 import pandas as pd
@@ -476,6 +477,10 @@ class trainTestValidationSplitter:
             plt.show()
         return
 
+
+class EmpiricalCovarianceTransformer(EmpiricalCovariance, TransformerMixin):
+    def transform(self, X):
+        return np.reshape(self.mahalanobis(X), (-1, 1))
 
 class SMWrapper(BaseEstimator, RegressorMixin):
     """

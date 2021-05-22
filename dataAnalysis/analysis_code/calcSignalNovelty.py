@@ -109,7 +109,8 @@ arguments.update(loadingMeta['arguments'])
 if __name__ == '__main__':
     cvIterator = iteratorsBySegment[0]
     if 'mahal' in arguments['estimatorName']:
-        estimatorClass = EmpiricalCovariance
+        # estimatorClass = EmpiricalCovariance
+        estimatorClass = tdr.EmpiricalCovarianceTransformer
         estimatorKWArgs = dict()
     crossvalKWArgs = dict(
         cv=cvIterator,
@@ -151,7 +152,7 @@ if __name__ == '__main__':
     featureColumnFields = dataDF.columns.names
     cvScoresDict = {}
     lOfColumnTransformers = []
-    pdb.set_trace()
+    # pdb.set_trace()
     for idx, (maskIdx, featureMask) in enumerate(featureMasks.iterrows()):
         maskParams = {k: v for k, v in zip(featureMask.index.names, maskIdx)}
         dataGroup = dataDF.loc[:, featureMask]
@@ -193,7 +194,7 @@ if __name__ == '__main__':
             else:
                 featureColumns.loc[idx, fcn] = maskParams[fcn]
         outputFeatureList.append(featureColumns)
-    # pdb.set_trace()
+    #
     chosenEstimator = ColumnTransformer(lOfColumnTransformers)
     chosenEstimator.fit(workingDataDF)
     outputFeaturesIndex = pd.MultiIndex.from_frame(
@@ -218,27 +219,16 @@ if __name__ == '__main__':
     #
     jb.dump(chosenEstimator, estimatorPath.replace('.h5', '.joblib'))
     #
-    outputFeatures = ['mahalanobis_distance']
     estimatorMetadata = {
         'path': os.path.basename(estimatorPath),
         'name': arguments['estimatorName'],
         'datasetName': datasetName,
-        'outputFeatures': outputFeatures
+        'outputFeatures': outputFeaturesIndex
         }
     with open(estimatorPath.replace('.h5', '_meta.pickle'), 'wb') as f:
         pickle.dump(estimatorMetadata, f)
     #
-    features = chosenEstimator.mahalanobis(dataDF)
-    featureColumnFields = dataDF.columns.names
-    featureColumns = pd.DataFrame(
-        np.nan, index=[0], columns=featureColumnFields)
-    for fcn in featureColumnFields:
-        if fcn == 'feature':
-            featureColumns.loc[:, fcn] = outputFeatures
-        if fcn == 'lag':
-            featureColumns.loc[:, fcn] = 0
-        else:
-            featureColumns.loc[:, fcn] = 'NA'
+    features = chosenEstimator.transform(dataDF)
     #
     featuresDF = pd.DataFrame(
         features, index=dataDF.index,
@@ -249,6 +239,70 @@ if __name__ == '__main__':
     outputDFPath = os.path.join(
         dataFramesFolder, outputDatasetName + '.h5'
         )
+    #
+    maskList = []
+    haveAllGroup = False
+    allGroupIdx = pd.MultiIndex.from_tuples(
+        [tuple('all' for fgn in featureColumnFields)],
+        names=featureColumnFields)
+    allMask = pd.Series(True, index=featuresDF.columns).to_frame()
+    allMask.columns = allGroupIdx
+    maskList.append(allMask.T)
+    if arguments['unitQuery'] == 'lfp_CAR_spectral':
+        # each freq band
+        for name, group in featuresDF.groupby('freqBandName', axis='columns'):
+            attrValues = ['all' for fgn in featureColumnFields]
+            attrValues[featureColumnFields.index('freqBandName')] = name
+            thisMask = pd.Series(
+                featuresDF.columns.isin(group.columns),
+                index=featuresDF.columns).to_frame()
+            if np.all(thisMask):
+                haveAllGroup = True
+                thisMask.columns = allGroupIdx
+            else:
+                thisMask.columns = pd.MultiIndex.from_tuples(
+                    (attrValues, ), names=featureColumnFields)
+            maskList.append(thisMask.T)
+    # each lag    
+    for name, group in featuresDF.groupby('lag', axis='columns'):
+        attrValues = ['all' for fgn in featureColumnFields]
+        attrValues[featureColumnFields.index('lag')] = name
+        thisMask = pd.Series(
+            featuresDF.columns.isin(group.columns),
+            index=featuresDF.columns).to_frame()
+        if not np.all(thisMask):
+            # all group already covered
+            thisMask.columns = pd.MultiIndex.from_tuples(
+                (attrValues, ), names=featureColumnFields)
+            maskList.append(thisMask.T)
+    '''
+    # each parent feature
+    for name, group in featuresDF.groupby('parentFeature', axis='columns'):
+        attrValues = ['all' for fgn in featureColumnFields]
+        attrValues[featureColumnFields.index('parentFeature')] = name
+        thisMask = pd.Series(
+            featuresDF.columns.isin(group.columns),
+            index=featuresDF.columns).to_frame()
+        if np.all(thisMask):
+            haveAllGroup = True
+            thisMask.columns = allGroupIdx
+        else:
+            thisMask.columns = pd.MultiIndex.from_tuples(
+                (attrValues, ), names=featureColumnFields)
+        maskList.append(thisMask.T)'''
+    #
+    maskDF = pd.concat(maskList)
+    maskParams = [
+        {k: v for k, v in zip(maskDF.index.names, idxItem)}
+        for idxItem in maskDF.index
+        ]
+    maskParamsStr = [
+        '{}'.format(idxItem).replace("'", '')
+        for idxItem in maskParams]
+    maskDF.loc[:, 'maskName'] = maskParamsStr
+    maskDF.set_index('maskName', append=True, inplace=True)
+    maskDF.to_hdf(outputDFPath, outputDatasetName + '_featureMasks', mode='a')
+    #
     outputLoadingMeta = deepcopy(loadingMeta)
     outputLoadingMeta['arguments']['unitQuery'] = 'mahal'
     # these were already applied, no need to apply them again

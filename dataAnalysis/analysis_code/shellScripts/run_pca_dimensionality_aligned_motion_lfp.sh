@@ -36,9 +36,9 @@ ITERATOR="a"
 WINDOW="XL"
 #
 # python -u './calcSignalDimensionality.py' --debugging --estimatorName="${ESTIMATOR}" --datasetName="${TARGET}_${ITERATOR}_${WINDOW}_${ALIGNQUERYTERM}" --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=2 --plotting --showFigures
-python -u './calcGridSearchSignalDimensionality.py' --debugging --estimatorName="${ESTIMATOR}" --datasetName="${TARGET}_${ITERATOR}_${WINDOW}_${ALIGNQUERYTERM}" --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=2 --plotting --showFigures
+# python -u './calcGridSearchSignalDimensionality.py' --debugging --estimatorName="${ESTIMATOR}" --datasetName="${TARGET}_${ITERATOR}_${WINDOW}_${ALIGNQUERYTERM}" --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=2 --plotting --showFigures
 
-TARGET="lfp_CAR_spectral_fa"
+# TARGET="lfp_CAR_spectral_fa"
 # TARGET="lfp_CAR_fa"
 TARGET="lfp_CAR_spectral_pca"
 # TARGET="lfp_CAR_pca"
