@@ -27,7 +27,11 @@ source ./shellScripts/calc_aligned_motion_preamble.sh
 
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
 TARGET="pedalState"
-ITERATOR="a"
+# ITERATOR="a"
+#
+ITERATOR="b"
+ALIGNQUERYTERM="startingNoStim"
+ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
 
 python -u './calcTestTrainSplit.py' $BLOCKSELECTOR --iteratorSuffix=$ITERATOR --loadFromFrames --inputBlockSuffix="rig" --unitQuery="pedalState" --selectionName='pedalState' --verbose --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $LAZINESS
 

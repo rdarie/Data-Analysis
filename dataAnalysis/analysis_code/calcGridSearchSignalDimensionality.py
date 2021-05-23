@@ -53,57 +53,6 @@ import dill as pickle
 import gc
 from docopt import docopt
 from copy import deepcopy
-idxSl = pd.IndexSlice
-arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
-expOpts, allOpts = parseAnalysisOptions(
-    int(arguments['blockIdx']), arguments['exp'])
-globals().update(expOpts)
-globals().update(allOpts)
-#
-arguments['verbose'] = int(arguments['verbose'])
-#
-analysisSubFolder, alignSubFolder = hf.processSubfolderPaths(
-    arguments, scratchFolder)
-if arguments['plotting']:
-    figureOutputFolder = os.path.join(
-        figureFolder,
-        arguments['analysisName'], arguments['alignFolderName'])
-    if not os.path.exists(figureOutputFolder):
-        os.makedirs(figureOutputFolder)
-#
-'''fullEstimatorName = '{}_{}_to_{}{}_{}_{}'.format(
-    arguments['estimatorName'],
-    arguments['unitQueryLhs'], arguments['unitQueryRhs'],
-    iteratorSuffix,
-    arguments['window'],
-    arguments['alignQuery'])'''
-datasetName = arguments['datasetName']
-fullEstimatorName = '{}_{}'.format(
-    arguments['estimatorName'], arguments['datasetName'])
-#
-estimatorsSubFolder = os.path.join(
-    alignSubFolder, 'estimators')
-if not os.path.exists(estimatorsSubFolder):
-    os.makedirs(estimatorsSubFolder)
-dataFramesFolder = os.path.join(alignSubFolder, 'dataframes')
-datasetPath = os.path.join(
-    dataFramesFolder,
-    datasetName + '.h5'
-    )
-estimatorPath = os.path.join(
-    estimatorsSubFolder,
-    fullEstimatorName + '.h5'
-    )
-#
-with open(datasetPath.replace('.h5', '_meta.pickle'), 'rb') as _f:
-    loadingMeta = pickle.load(_f)
-    # iteratorsBySegment = loadingMeta.pop('iteratorsBySegment')
-    iteratorsBySegment = loadingMeta['iteratorsBySegment']
-    cv_kwargs = loadingMeta['cv_kwargs']
-for argName in ['plotting', 'showFigures', 'debugging', 'verbose']:
-    loadingMeta['arguments'].pop(argName, None)
-arguments.update(loadingMeta['arguments'])
-
 
 '''def compute_scores(
         X, estimator,
@@ -138,13 +87,67 @@ def calc_lw_score(
 
 
 if __name__ == '__main__':
+    idxSl = pd.IndexSlice
+    arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
+    expOpts, allOpts = parseAnalysisOptions(
+        int(arguments['blockIdx']), arguments['exp'])
+    globals().update(expOpts)
+    globals().update(allOpts)
+    #
+    arguments['verbose'] = int(arguments['verbose'])
+    #
+    analysisSubFolder, alignSubFolder = hf.processSubfolderPaths(
+        arguments, scratchFolder)
+    if arguments['plotting']:
+        figureOutputFolder = os.path.join(
+            figureFolder,
+            arguments['analysisName'], arguments['alignFolderName'])
+        if not os.path.exists(figureOutputFolder):
+            os.makedirs(figureOutputFolder)
+    #
+    '''fullEstimatorName = '{}_{}_to_{}{}_{}_{}'.format(
+        arguments['estimatorName'],
+        arguments['unitQueryLhs'], arguments['unitQueryRhs'],
+        iteratorSuffix,
+        arguments['window'],
+        arguments['alignQuery'])'''
+    datasetName = arguments['datasetName']
+    fullEstimatorName = '{}_{}'.format(
+        arguments['estimatorName'], arguments['datasetName'])
+    #
+    estimatorsSubFolder = os.path.join(
+        alignSubFolder, 'estimators')
+    if not os.path.exists(estimatorsSubFolder):
+        os.makedirs(estimatorsSubFolder)
+    dataFramesFolder = os.path.join(alignSubFolder, 'dataframes')
+    datasetPath = os.path.join(
+        dataFramesFolder,
+        datasetName + '.h5'
+        )
+    estimatorPath = os.path.join(
+        estimatorsSubFolder,
+        fullEstimatorName + '.h5'
+        )
+    #
+    with open(datasetPath.replace('.h5', '_meta.pickle'), 'rb') as _f:
+        loadingMeta = pickle.load(_f)
+        # iteratorsBySegment = loadingMeta.pop('iteratorsBySegment')
+        iteratorsBySegment = loadingMeta['iteratorsBySegment']
+        cv_kwargs = loadingMeta['cv_kwargs']
+    for argName in ['plotting', 'showFigures', 'debugging', 'verbose']:
+        loadingMeta['arguments'].pop(argName, None)
+    arguments.update(loadingMeta['arguments'])
     cvIterator = iteratorsBySegment[0]
     if 'pca' in arguments['estimatorName']:
         estimatorClass = PCA
         estimatorKWArgs = dict(svd_solver='auto')
     elif 'fa' in arguments['estimatorName']:
         estimatorClass = FactorAnalysis
-        estimatorKWArgs = dict()
+        estimatorKWArgs = dict(
+            max_iter=5000,
+            iterated_power=4,
+            tol=5e-3
+        )
     gridSearchKWArgs = dict(
         return_train_score=True,
         cv=cvIterator,
@@ -153,8 +156,8 @@ if __name__ == '__main__':
         cv=cvIterator,
         return_train_score=True, return_estimator=True)
     joblibBackendArgs = dict(
-        # backend='dask'
-        backend='loky'
+        backend='dask'
+        # backend='loky'
         )
     if joblibBackendArgs['backend'] == 'dask':
         daskComputeOpts = dict(
@@ -190,7 +193,7 @@ if __name__ == '__main__':
     lOfColumnTransformers = []
     ###
     # remove the 'all' column?
-    removeAllColumn = False
+    removeAllColumn = True
     if removeAllColumn:
         featureMasks = featureMasks.loc[~ featureMasks.all(axis='columns'), :]
     ###

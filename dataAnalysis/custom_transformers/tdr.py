@@ -17,7 +17,7 @@ import os
 import scipy.optimize
 from itertools import product
 import joblib as jb
-from copy import copy
+from copy import copy, deepcopy
 import statsmodels
 from patsy import (
     ModelDesc, EvalEnvironment, Term, Sum, Treatment, INTERCEPT,
@@ -81,84 +81,99 @@ def gridSearchHyperparameters(
         crossvalKWArgs={}, joblibBackendArgs={},
         verbose=0, recalculateBestEstimator=False):
     #
+    print(joblibBackendArgs)
+    workGridSearchKWArgs = deepcopy(gridSearchKWArgs)
+    workGridSearchKWArgs['cv'] = [(workGridSearchKWArgs['cv'].work, workGridSearchKWArgs['cv'].validation)]
     with jb.parallel_backend(**joblibBackendArgs):
         if estimatorInstance is None:
             estimatorInstance = estimatorClass(**estimatorKWArgs)
         if isinstance(estimatorInstance, ElasticNet):
             gridSearcher = ElasticNetCV(verbose=verbose, **gridSearchKWArgs)
+            workGridSearcher = ElasticNetCV(verbose=verbose, **workGridSearchKWArgs)
         else:
             gridSearcher = GridSearchCV(
                 estimatorInstance, verbose=verbose, **gridSearchKWArgs)
+            workGridSearcher = GridSearchCV(
+                estimatorInstance, verbose=verbose, **workGridSearchKWArgs)
         if verbose > 0:
             print('Fitting gridSearchCV...')
-        gridSearcher.fit(X, y)
-        if verbose:
-            print('    Done fitting gridSearchCV!')
-        gsScoresDF = pd.DataFrame(gridSearcher.cv_results_)
-        paramColNames = []
-        paramColNamesShort = []
-        colRenamer = {}
-        for cN in gsScoresDF.columns:
-            if cN.startswith('param_'):
-                paramColNames.append(cN)
-                paramColNamesShort.append(cN[6:])
-                colRenamer[cN] = cN[6:]
-        scoresDict = {}
-        for foldIdx in range(gridSearcher.n_splits_):
-            splitName = 'split{}_'.format(foldIdx)
-            theseColNames = paramColNames + ['{}test_score'.format(splitName)]
-            colRenamer['{}test_score'.format(splitName)] = 'test_score'
-            trainField = '{}train_score'.format(splitName)
-            if trainField in gsScoresDF.copy():
-                theseColNames += [trainField]
-                colRenamer[trainField] = 'train_score'
-            theseScores = gsScoresDF.loc[:, theseColNames]
-            theseScores.rename(columns=colRenamer, inplace=True)
-            theseScores.set_index(paramColNamesShort, inplace=True)
-            scoresDict[foldIdx] = theseScores
-        gsCVResultsDF = pd.concat(scoresDict, names=['fold'])
-        optParams = None
-        if recalculateBestEstimator:
-            # the estimator that maximizes the score
-            # might yield similar results to other estimators
-            # that are much less complicated
-            #
-            # Here, we find a confidence interval around the score
-            # and choose a model that is "close enough" to the max
-            scoreMean = gsCVResultsDF.groupby(paramColNamesShort).mean()['test_score']
-            maxScore, minScore = scoreMean.max(), scoreMean.min()
-            scoreSem = gsCVResultsDF.groupby(paramColNamesShort).sem()['test_score']
-            threshold = minScore + (maxScore - minScore) * 0.95 - scoreSem.loc[scoreMean.idxmax()]
-            if scoreMean.index.names == ['n_components']:
-                optParams = {'n_components': scoreMean.loc[scoreMean > threshold].idxmin()}
-                print('Resetting optimal params to:\n{}\n'.format(optParams))
-            # else.. depends on whether we want the params to be maximized or minimized
-        if optParams is None:
-            if isinstance(estimatorInstance, ElasticNet):
-                optParams = {
-                    'alpha': gridSearcher.alpha_,
-                    'l1_ratio': gridSearcher.l1_ratio_}
-            else:
-                optParams = gridSearcher.best_params_
-        #
-        scoringEstimatorParams = copy(estimatorKWArgs)
-        scoringEstimatorParams.update(optParams)
-        if verbose:
-            print('cross val scoring')
-        if estimatorClass is None:
-            estimatorInstanceForCrossVal = copy(estimatorInstance)
-            estimatorInstanceForCrossVal.set_params(scoringEstimatorParams)
+        if y is not None:
+            gridSearcher.fit(X.to_numpy(), y.to_numpy())
+            workGridSearcher.fit(X.to_numpy(), y.to_numpy())
         else:
-            estimatorInstanceForCrossVal = None
-        scores = crossValidationScores(
-            X, y=y, estimatorInstance=estimatorInstanceForCrossVal,
-            estimatorClass=estimatorClass,
-            estimatorKWArgs=scoringEstimatorParams,
-            crossvalKWArgs=crossvalKWArgs,
-            joblibBackendArgs=joblibBackendArgs,
-            verbose=verbose)
-        if verbose:
-            print('    Done cross val scoring!')
+            gridSearcher.fit(X.to_numpy())
+            workGridSearcher.fit(X.to_numpy())
+    if verbose:
+        print('    Done fitting gridSearchCV!')
+    gsScoresDF = pd.DataFrame(gridSearcher.cv_results_)
+    paramColNames = []
+    paramColNamesShort = []
+    colRenamer = {}
+    for cN in gsScoresDF.columns:
+        if cN.startswith('param_'):
+            paramColNames.append(cN)
+            paramColNamesShort.append(cN[6:])
+            colRenamer[cN] = cN[6:]
+    scoresDict = {}
+    for foldIdx in range(gridSearcher.n_splits_):
+        splitName = 'split{}_'.format(foldIdx)
+        theseColNames = paramColNames + ['{}test_score'.format(splitName)]
+        colRenamer['{}test_score'.format(splitName)] = 'test_score'
+        trainField = '{}train_score'.format(splitName)
+        if trainField in gsScoresDF.copy():
+            theseColNames += [trainField]
+            colRenamer[trainField] = 'train_score'
+        theseScores = gsScoresDF.loc[:, theseColNames]
+        theseScores.rename(columns=colRenamer, inplace=True)
+        theseScores.set_index(paramColNamesShort, inplace=True)
+        scoresDict[foldIdx] = theseScores
+    workGsScoresDF = pd.DataFrame(workGridSearcher.cv_results_).rename(columns=colRenamer)
+    workGsScoresDF = workGsScoresDF.loc[:, paramColNamesShort + ['test_score', 'train_score']]
+    workGsScoresDF.set_index(paramColNamesShort, inplace=True)
+    scoresDict[gridSearcher.n_splits_] = workGsScoresDF
+    gsCVResultsDF = pd.concat(scoresDict, names=['fold'])
+    optParams = None
+    if recalculateBestEstimator:
+        # the estimator that maximizes the score
+        # might yield similar results to other estimators
+        # that are much less complicated
+        #
+        # Here, we find a confidence interval around the score
+        # and choose a model that is "close enough" to the max
+        scoreMean = gsCVResultsDF.groupby(paramColNamesShort).mean()['test_score']
+        maxScore, minScore = scoreMean.max(), scoreMean.min()
+        scoreSem = gsCVResultsDF.groupby(paramColNamesShort).sem()['test_score']
+        threshold = minScore + (maxScore - minScore) * 0.95 - scoreSem.loc[scoreMean.idxmax()]
+        if scoreMean.index.names == ['n_components']:
+            optParams = {'n_components': scoreMean.loc[scoreMean > threshold].idxmin()}
+            print('Resetting optimal params to:\n{}\n'.format(optParams))
+        # else.. depends on whether we want the params to be maximized or minimized TODO
+    if optParams is None:
+        if isinstance(estimatorInstance, ElasticNet):
+            optParams = {
+                'alpha': gridSearcher.alpha_,
+                'l1_ratio': gridSearcher.l1_ratio_}
+        else:
+            optParams = gridSearcher.best_params_
+    #
+    scoringEstimatorParams = copy(estimatorKWArgs)
+    scoringEstimatorParams.update(optParams)
+    if verbose:
+        print('cross val scoring')
+    if estimatorClass is None:
+        estimatorInstanceForCrossVal = copy(estimatorInstance)
+        estimatorInstanceForCrossVal.set_params(scoringEstimatorParams)
+    else:
+        estimatorInstanceForCrossVal = None
+    scores = crossValidationScores(
+        X, y=y, estimatorInstance=estimatorInstanceForCrossVal,
+        estimatorClass=estimatorClass,
+        estimatorKWArgs=scoringEstimatorParams,
+        crossvalKWArgs=crossvalKWArgs,
+        joblibBackendArgs=joblibBackendArgs,
+        verbose=verbose)
+    if verbose:
+        print('    Done cross val scoring!')
     return scores, gridSearcher, gsCVResultsDF
 
 
