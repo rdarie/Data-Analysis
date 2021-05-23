@@ -142,9 +142,10 @@ alignedAsigsDF = ns5.alignedAsigsToDF(
     dataBlock, **alignedAsigsKWargs)
 if extendedFeatureMeta is not None:
     featureMeta = alignedAsigsDF.columns.to_frame().reset_index(drop=True)
-    # pdb.set_trace()
+    loadedMeta = featureMeta.loc[:, ['feature', 'lag']]
+    comparisonMeta = extendedFeatureMeta.loc[:, ['feature', 'lag']]
     comparisonErrorMsg = "Error: loaded data columns\n\n{}\n\ndoes not equal dataset columns\n\n{}\n\n".format(featureMeta.loc[:, ['feature', 'lag']], extendedFeatureMeta.loc[:, ['feature', 'lag']])
-    assert (featureMeta.loc[:, ['feature', 'lag']] == extendedFeatureMeta.loc[:, ['feature', 'lag']]).all(axis=None), comparisonErrorMsg
+    assert (loadedMeta == comparisonMeta).all(axis=None), comparisonErrorMsg
     alignedAsigsDF.columns = pd.MultiIndex.from_frame(extendedFeatureMeta)
 if normalizeDataset is not None:
     alignedAsigsDF = normalizeDataset(alignedAsigsDF, normalizationParams)
@@ -155,11 +156,12 @@ elif hasattr(estimator, 'mahalanobis'):
 if arguments['profile']:
     prf.print_memory_usage('after estimator.transform')
 #
+# pdb.set_trace()
 if 'outputFeatures' in estimatorMetadata:
-    if isinstance(estimatorMetadata['outputFeatures'], pd.Index):
+    if isinstance(estimatorMetadata['outputFeatures'], pd.MultiIndex):
+        featureNames = pd.Index(estimatorMetadata['outputFeatures'].get_level_values('feature'), dtype=str)
+    elif isinstance(estimatorMetadata['outputFeatures'], pd.Index):
         featureNames = estimatorMetadata['outputFeatures']
-    elif isinstance(estimatorMetadata['outputFeatures'], pd.MultiIndex):
-        featureNames = pd.Index(estimatorMetadata['outputFeatures'].get_level_values('feature'))
     else:
         featureNames = pd.Index(estimatorMetadata['outputFeatures'])
         featureNames.name = 'feature'
@@ -186,6 +188,8 @@ masterBlock = ns5.alignedAsigDFtoSpikeTrain(
     alignedFeaturesDF, spikeTrainMeta=spikeTrainMeta, matchSamplingRate=False)
 if arguments['lazy']:
     dataReader.file.close()
+if os.path.exists(outputPath + '.nix'):
+    os.remove(outputPath + '.nix')
 masterBlock = ns5.purgeNixAnn(masterBlock)
 print('Writing {}.nix...'.format(outputPath))
 writer = ns5.NixIO(filename=outputPath + '.nix', mode='ow')

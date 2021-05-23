@@ -12,8 +12,8 @@ OUTLIERMASK="--maskOutlierBlocks"
 
 TIMEWINDOWOPTS="--winStart=-500 --winStop=1500"
 #
-# ALIGNQUERYTERM="startingNoStim"
+ALIGNQUERYTERM="startingNoStim"
 # ALIGNQUERYTERM="starting"
-ALIGNQUERYTERM="outbound"
+# ALIGNQUERYTERM="outbound"
 #
 ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"

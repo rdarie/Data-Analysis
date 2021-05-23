@@ -27,8 +27,8 @@ ALIGNQUERY="--alignQuery=starting"
 
 
 HUEOPTS="--hueName=amplitude --hueControl="
-ROWOPTS="--rowName=pedalSizeCat --rowControl="
-COLOPTS="--colName=pedalMovementCat --colControl="
+ROWOPTS="--rowName=pedalMovementCat --rowControl="
+COLOPTS="--colName=electrode --colControl="
 STYLEOPTS="--styleName= --styleControl="
 SIZEOPTS="--sizeName= --sizeControl="
 
