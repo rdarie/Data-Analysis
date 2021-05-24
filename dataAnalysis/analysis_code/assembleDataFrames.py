@@ -199,8 +199,7 @@ if __name__ == '__main__':
             for featName, subGroup in dataGroup.groupby('feature', axis='columns'):
                 print('calculating pre-normalization, exp: {}, feature: {}'.format(expName, featName))
                 meanLevel = np.mean(subGroup.xs(0, level='lag', axis='columns').to_numpy())
-                # finalDF.loc[subGroup.index, subGroup.columns] = np.sqrt(finalDF.loc[subGroup.index, subGroup.columns] / meanLevel)
-                # finalDF.loc[subGroup.index, subGroup.columns] = finalDF.loc[subGroup.index, subGroup.columns] - meanLevel
+                finalDF.loc[subGroup.index, subGroup.columns] = finalDF.loc[subGroup.index, subGroup.columns] - meanLevel
                 normalizationParams[0].append({
                     'expName': expName,
                     'feature': featName,
@@ -216,7 +215,7 @@ if __name__ == '__main__':
                 'mu': mu,
                 'sigma': sigma
             })
-            # finalDF.loc[:, dataGroup.columns] = (finalDF[dataGroup.columns] - mu) / sigma
+            finalDF.loc[:, dataGroup.columns] = (finalDF[dataGroup.columns] - mu) / sigma
         #
         def normalizeDataset(dataDF, params):
             for preParams in params[0]:
@@ -234,15 +233,17 @@ if __name__ == '__main__':
             for postParams in params[1]:
                 print('un-normalizing feature {}'.format(postParams['feature']))
                 featMask = dataDF.columns.get_level_values('feature') == postParams['feature']
+                # if featMask.any():
                 dataDF.loc[:, featMask] = (dataDF.loc[:, featMask] * postParams['sigma']) + postParams['mu']
             for preParams in params[0]:
                 print('un-normalizing exp {}: feature {}'.format(preParams['expName'], preParams['feature']))
                 expMask = dataDF.index.get_level_values('expName') == preParams['expName']
                 featMask = dataDF.columns.get_level_values('feature') == preParams['feature']
+                # if featMask.any():
                 dataDF.loc[expMask, featMask] = dataDF.loc[expMask, featMask] + preParams['mu']
             return dataDF
         #
-        finalDF = normalizeDataset(finalDF, normalizationParams)
+        # finalDF = normalizeDataset(finalDF, normalizationParams)
     else:
         normalizationParams = [[]]
         for featName, dataGroup in finalDF.groupby('feature', axis='columns'):
@@ -258,18 +259,21 @@ if __name__ == '__main__':
         #
         def normalizeDataset(dataDF, params):
             for postParams in params[0]:
-                print('normalizing feature {}'.format(postParams['feature']))
                 featMask = dataDF.columns.get_level_values('feature') == postParams['feature']
-                dataDF.loc[:, featMask] = (dataDF.loc[:, featMask] - postParams['mu']) / postParams['sigma']
+                if featMask.any():
+                    print('normalizing feature {}'.format(postParams['feature']))
+                    dataDF.loc[:, featMask] = (dataDF.loc[:, featMask] - postParams['mu']) / postParams['sigma']
             return dataDF
         #
         def unNormalizeDataset(dataDF, params):
             for postParams in params[0]:
-                print('un-normalizing feature {}'.format(postParams['feature']))
                 featMask = dataDF.columns.get_level_values('feature') == postParams['feature']
-                dataDF.loc[:, featMask] = (dataDF.loc[:, featMask] * postParams['sigma']) + postParams['mu']
+                if featMask.any():
+                    print('un-normalizing feature {}'.format(postParams['feature']))
+                    dataDF.loc[:, featMask] = (dataDF.loc[:, featMask] * postParams['sigma']) + postParams['mu']
             return dataDF
-        finalDF = normalizeDataset(finalDF, normalizationParams)
+        #
+        # finalDF = normalizeDataset(finalDF, normalizationParams)
     #
     datasetPath = os.path.join(
         dataFramesFolder,
@@ -279,9 +283,13 @@ if __name__ == '__main__':
         os.remove(datasetPath)
     finalDF.to_hdf(datasetPath, datasetName)
     thisMask.to_hdf(datasetPath, datasetName + '_featureMasks')
+    #
+    loadingMetaPath = datasetPath.replace('.h5', '_meta.pickle')
+    if os.path.exists(loadingMetaPath):
+        os.remove(loadingMetaPath)
     loadingMeta['arguments'] = arguments.copy()
     loadingMeta['normalizationParams'] = normalizationParams
     loadingMeta['normalizeDataset'] = normalizeDataset
     loadingMeta['unNormalizeDataset'] = unNormalizeDataset
-    with open(datasetPath.replace('.h5', '_meta.pickle'), 'wb') as f:
+    with open(loadingMetaPath, 'wb') as f:
         pickle.dump(loadingMeta, f)

@@ -26,6 +26,9 @@ import pyglmnet
 import matplotlib.pyplot as plt
 import seaborn as sns
 import scipy.linalg
+from dask.distributed import Client, LocalCluster
+from sklearn.utils import _joblib, parallel_backend
+from ttictoc import tic, toc
 sns.set()
 sns.set_color_codes("dark")
 sns.set_context("talk")
@@ -38,7 +41,8 @@ def crossValidationScores(
         estimatorKWArgs={}, crossvalKWArgs={},
         joblibBackendArgs={}, verbose=0):
     #
-    with jb.parallel_backend(**joblibBackendArgs):
+    print('joblibBackendArgs = {}'.format(joblibBackendArgs))
+    with parallel_backend(**joblibBackendArgs):
         if estimatorInstance is None:
             estimatorInstance = estimatorClass(**estimatorKWArgs)
         cvX = X.to_numpy()
@@ -79,12 +83,14 @@ def gridSearchHyperparameters(
         estimatorClass=None, estimatorInstance=None,
         estimatorKWArgs={}, gridSearchKWArgs={},
         crossvalKWArgs={}, joblibBackendArgs={},
-        verbose=0, recalculateBestEstimator=False):
+        verbose=0, recalculateBestEstimator=False, timeThis=False):
     #
-    print(joblibBackendArgs)
     workGridSearchKWArgs = deepcopy(gridSearchKWArgs)
     workGridSearchKWArgs['cv'] = [(workGridSearchKWArgs['cv'].work, workGridSearchKWArgs['cv'].validation)]
-    with jb.parallel_backend(**joblibBackendArgs):
+    print('joblibBackendArgs = {}'.format(joblibBackendArgs))
+    if timeThis:
+        tic()
+    with parallel_backend(**joblibBackendArgs):
         if estimatorInstance is None:
             estimatorInstance = estimatorClass(**estimatorKWArgs)
         if isinstance(estimatorInstance, ElasticNet):
@@ -98,11 +104,15 @@ def gridSearchHyperparameters(
         if verbose > 0:
             print('Fitting gridSearchCV...')
         if y is not None:
-            gridSearcher.fit(X.to_numpy(), y.to_numpy())
-            workGridSearcher.fit(X.to_numpy(), y.to_numpy())
+            cvX, cvY = X.to_numpy(), y.to_numpy()
+            gridSearcher.fit(cvX, cvY)
+            workGridSearcher.fit(cvX, cvY)
         else:
-            gridSearcher.fit(X.to_numpy())
-            workGridSearcher.fit(X.to_numpy())
+            cvX = X.to_numpy()
+            gridSearcher.fit(cvX)
+            workGridSearcher.fit(cvX)
+    if timeThis:
+        print('Elapsed time: {}'.format(toc()))
     if verbose:
         print('    Done fitting gridSearchCV!')
     gsScoresDF = pd.DataFrame(gridSearcher.cv_results_)
@@ -127,11 +137,7 @@ def gridSearchHyperparameters(
         theseScores.rename(columns=colRenamer, inplace=True)
         theseScores.set_index(paramColNamesShort, inplace=True)
         scoresDict[foldIdx] = theseScores
-    workGsScoresDF = pd.DataFrame(workGridSearcher.cv_results_).rename(columns=colRenamer)
-    workGsScoresDF = workGsScoresDF.loc[:, paramColNamesShort + ['test_score', 'train_score']]
-    workGsScoresDF.set_index(paramColNamesShort, inplace=True)
-    scoresDict[gridSearcher.n_splits_] = workGsScoresDF
-    gsCVResultsDF = pd.concat(scoresDict, names=['fold'])
+    prelimGsCVResultsDF = pd.concat(scoresDict, names=['fold'])
     optParams = None
     if recalculateBestEstimator:
         # the estimator that maximizes the score
@@ -140,14 +146,19 @@ def gridSearchHyperparameters(
         #
         # Here, we find a confidence interval around the score
         # and choose a model that is "close enough" to the max
-        scoreMean = gsCVResultsDF.groupby(paramColNamesShort).mean()['test_score']
+        scoreMean = prelimGsCVResultsDF.groupby(paramColNamesShort).mean()['test_score']
         maxScore, minScore = scoreMean.max(), scoreMean.min()
-        scoreSem = gsCVResultsDF.groupby(paramColNamesShort).sem()['test_score']
+        scoreSem = prelimGsCVResultsDF.groupby(paramColNamesShort).sem()['test_score']
         threshold = minScore + (maxScore - minScore) * 0.95 - scoreSem.loc[scoreMean.idxmax()]
         if scoreMean.index.names == ['n_components']:
             optParams = {'n_components': scoreMean.loc[scoreMean > threshold].idxmin()}
             print('Resetting optimal params to:\n{}\n'.format(optParams))
         # else.. depends on whether we want the params to be maximized or minimized TODO
+    workGsScoresDF = pd.DataFrame(workGridSearcher.cv_results_).rename(columns=colRenamer)
+    workGsScoresDF = workGsScoresDF.loc[:, paramColNamesShort + ['test_score', 'train_score']]
+    workGsScoresDF.set_index(paramColNamesShort, inplace=True)
+    scoresDict[gridSearcher.n_splits_] = workGsScoresDF
+    gsCVResultsDF = pd.concat(scoresDict, names=['fold'])
     if optParams is None:
         if isinstance(estimatorInstance, ElasticNet):
             optParams = {
@@ -155,7 +166,13 @@ def gridSearchHyperparameters(
                 'l1_ratio': gridSearcher.l1_ratio_}
         else:
             optParams = gridSearcher.best_params_
-    #
+    # pdb.set_trace()
+    '''optKeys = []
+    optVals = []
+    for k, v in optParams.items():
+        optKeys.append(k)
+        optVals.append(v)
+    scores = gsCVResultsDF.xs(optVals, level=optKeys)'''
     scoringEstimatorParams = copy(estimatorKWArgs)
     scoringEstimatorParams.update(optParams)
     if verbose:
@@ -165,6 +182,7 @@ def gridSearchHyperparameters(
         estimatorInstanceForCrossVal.set_params(scoringEstimatorParams)
     else:
         estimatorInstanceForCrossVal = None
+    # pdb.set_trace()
     scores = crossValidationScores(
         X, y=y, estimatorInstance=estimatorInstanceForCrossVal,
         estimatorClass=estimatorClass,
@@ -447,6 +465,7 @@ class trialAwareStratifiedKFold:
             trainCG = continuousDF['continuousGroup'].iloc[tr]
             trainMask = trialInfo['continuousGroup'].isin(trainCG)
             trainIdx = trialInfo.loc[trainMask, :].index.to_list()
+            #
             testCG = continuousDF['continuousGroup'].iloc[te]
             testMask = trialInfo['continuousGroup'].isin(testCG)
             testIdx = trialInfo.loc[testMask, :].index.to_list()

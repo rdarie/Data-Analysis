@@ -150,14 +150,14 @@ if __name__ == '__main__':
         )
     gridSearchKWArgs = dict(
         return_train_score=True,
-        cv=cvIterator,
+        cv=cvIterator, refit=False,
         param_grid=dict())
     crossvalKWArgs = dict(
         cv=cvIterator,
         return_train_score=True, return_estimator=True)
     joblibBackendArgs = dict(
-        backend='dask'
-        # backend='loky'
+        # backend='dask'
+        backend='loky'
         )
     if joblibBackendArgs['backend'] == 'dask':
         daskComputeOpts = dict(
@@ -165,16 +165,16 @@ if __name__ == '__main__':
             scheduler='processes'
             # scheduler='single-threaded'
             )
-        if joblibBackendArgs['backend'] == 'dask':
-            if daskComputeOpts['scheduler'] == 'single-threaded':
-                daskClient = Client(LocalCluster(n_workers=1))
-            elif daskComputeOpts['scheduler'] == 'processes':
-                daskClient = Client(LocalCluster(processes=True))
-            elif daskComputeOpts['scheduler'] == 'threads':
-                daskClient = Client(LocalCluster(processes=False))
-            else:
-                print('Scheduler name is not correct!')
-                daskClient = Client()
+        if daskComputeOpts['scheduler'] == 'single-threaded':
+            daskClient = Client(LocalCluster(n_workers=1))
+        elif daskComputeOpts['scheduler'] == 'processes':
+            # daskClient = Client(LocalCluster(processes=True))
+            daskClient = Client(LocalCluster())
+        elif daskComputeOpts['scheduler'] == 'threads':
+            daskClient = Client(LocalCluster(processes=False))
+        else:
+            print('Scheduler name is not correct!')
+            daskClient = Client()
     dataDF = pd.read_hdf(datasetPath, datasetName)
     featureMasks = pd.read_hdf(datasetPath, datasetName + '_featureMasks')
     # only use zero lag targets
@@ -193,23 +193,25 @@ if __name__ == '__main__':
     lOfColumnTransformers = []
     ###
     # remove the 'all' column?
-    removeAllColumn = True
+    removeAllColumn = False
     if removeAllColumn:
         featureMasks = featureMasks.loc[~ featureMasks.all(axis='columns'), :]
     ###
     outputFeatureList = []
     featureColumnFields = dataDF.columns.names
     ###
+    minNCompsToTest = 100
+    # pdb.set_trace()
     for idx, (maskIdx, featureMask) in enumerate(featureMasks.iterrows()):
         maskParams = {k: v for k, v in zip(featureMask.index.names, maskIdx)}
         dataGroup = dataDF.loc[:, featureMask]
         nFeatures = dataGroup.columns.shape[0]
-        nCompsToTest = range(1, min(120, nFeatures + 1), 3)
+        nCompsToTest = range(1, min(minNCompsToTest, nFeatures + 1), 2)
         trfName = '{}_{}'.format(arguments['estimatorName'], maskParams['freqBandName'])
         if arguments['verbose']:
             print('Fitting {} ...'.format(trfName))
         if arguments['debugging']:
-            nCompsToTest = range(1, min(80, nFeatures + 1), 3)
+            nCompsToTest = range(1, min(minNCompsToTest, nFeatures + 1), 5)
         gridSearchKWArgs['param_grid']['n_components'] = [nc for nc in nCompsToTest]
         cvScores, gridSearcherDict[maskParams['freqBandName']], gsScoresDict[maskParams['freqBandName']] = tdr.gridSearchHyperparameters(
             dataGroup, estimatorClass=estimatorClass,
@@ -260,13 +262,6 @@ if __name__ == '__main__':
     #
     gsScoresDF = pd.concat(gsScoresDict, names=['freqBandName'])
     #
-    '''nCompsMaxMLE = scoresDF.groupby(['nComponents']).mean()['test_score'].idxmax()
-    maxMLE = scoresDF.xs(nCompsMaxMLE, level='nComponents', axis='index').mean()['test_score']
-    mostComps = scoresDF.index.get_level_values('nComponents').max()
-    pcaFull = scoresDF.loc[(mostComps, lastFoldIdx), 'estimator']
-    chosenEstimator = scoresDF.loc[(nCompsMaxMLE, lastFoldIdx), 'estimator']
-    #
-    '''
     prf.print_memory_usage('Done fitting')
     if os.path.exists(estimatorPath):
         os.remove(estimatorPath)
@@ -330,17 +325,18 @@ if __name__ == '__main__':
     allGroupIdx = pd.MultiIndex.from_tuples(
         [tuple('all' for fgn in featureColumnFields)],
         names=featureColumnFields)
-    if arguments['unitQuery'] == 'lfp_CAR_spectral':
-        # each freq band
-        for name, group in featuresDF.groupby('freqBandName', axis='columns'):
-            attrValues = ['all' for fgn in featureColumnFields]
-            attrValues[featureColumnFields.index('freqBandName')] = name
-            thisMask = pd.Series(
-                featuresDF.columns.isin(group.columns),
-                index=featuresDF.columns).to_frame()
-            thisMask.columns = pd.MultiIndex.from_tuples(
-                (attrValues, ), names=featureColumnFields)
-            maskList.append(thisMask.T)
+    # pdb.set_trace()
+    # if arguments['unitQuery'] == 'lfp_CAR_spectral':
+    # each freq band
+    for name, group in featuresDF.groupby('freqBandName', axis='columns'):
+        attrValues = ['all' for fgn in featureColumnFields]
+        attrValues[featureColumnFields.index('freqBandName')] = name
+        thisMask = pd.Series(
+            featuresDF.columns.isin(group.columns),
+            index=featuresDF.columns).to_frame()
+        thisMask.columns = pd.MultiIndex.from_tuples(
+            (attrValues, ), names=featureColumnFields)
+        maskList.append(thisMask.T)
     #
     maskDF = pd.concat(maskList)
     maskParams = [
@@ -366,7 +362,7 @@ if __name__ == '__main__':
                 maskParams = {k: v for k, v in zip(featureMask.index.names, maskIdx)}
                 dataGroup = dataDF.loc[:, featureMask]
                 nFeatures = dataGroup.columns.shape[0]
-                nCompsToTest = range(1, min(120, nFeatures + 1), 3)
+                nCompsToTest = range(1, min(minNCompsToTest, nFeatures + 1), 3)
                 if arguments['verbose']:
                     print('Calculating ledoit-wolf # of components...')
                 lWScores = calc_lw_score(dataGroup, cv=cvIterator)
@@ -396,8 +392,7 @@ if __name__ == '__main__':
                     hue='evalType', ci='sem', ax=ax)
                 handles, labels = ax.get_legend_handles_labels()
                 textDescr = 'Chosen parameters and corresponding score'
-                # pdb.set_trace()
-                bestScore = cvScoresDict[maskParams['freqBandName']].loc[lastFoldIdx, ['test_score']].iloc[0]
+                bestScore = cvScoresDict[maskParams['freqBandName']].mean()['test_score']
                 bestEstimator = cvScoresDict[maskParams['freqBandName']].loc[lastFoldIdx, ['estimator']].iloc[0]
                 lineMax, = ax.plot(
                     bestEstimator.n_components, bestScore,
@@ -408,7 +403,7 @@ if __name__ == '__main__':
                 ax.set_xlabel('number of components')
                 ax.set_ylabel('average log-likelihood')
                 fig.tight_layout(pad=1)
-                titleText = fig.suptitle('{}'.format(maskIdx))
+                titleText = fig.suptitle('{}'.format(maskParams['freqBandName']))
                 pdf.savefig(bbox_inches='tight', pad_inches=0)
                 if arguments['showFigures']:
                     plt.show()

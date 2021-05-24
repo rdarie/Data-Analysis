@@ -10,11 +10,11 @@
 #SBATCH --mem=200G
 
 # Specify a job name:
-#SBATCH -J test_train_split_28
+#SBATCH -J test_train_split_25
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-test_train_split_28.out
-#SBATCH -e ../../batch_logs/%j-%a-test_train_split_28.out
+#SBATCH -o ../../batch_logs/%j-%a-test_train_split_25.out
+#SBATCH -e ../../batch_logs/%j-%a-test_train_split_25.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -31,7 +31,7 @@ source shellScripts/calc_aligned_motion_preamble.sh
 # ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
 
 ITERATOR="--iteratorSuffix=b"
-ROIOPTS="--calcTimeROI --ROIWinStart=-100 --ROIWinStop=0 --timeROIAlignQuery=stopping"
+ROIOPTS="--calcTimeROI --ROIWinStart=-100 --ROIWinStop=-100 --timeROIAlignQuery=stoppingNoStim"
 ALIGNQUERYTERM="startingNoStim"
 ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
 

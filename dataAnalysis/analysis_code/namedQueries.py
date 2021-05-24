@@ -145,6 +145,12 @@ namedQueries['align'].update({
         ])
     })
 namedQueries['align'].update({
+    'stoppingNoStim': '(' + '&'.join([
+        namedQueries['align']['stopping'],
+        namedQueries['align']['noStim'],
+        ]) + ')'
+    })
+namedQueries['align'].update({
     'midPeakWithStim100HzCCW': '&'.join([
         namedQueries['align']['RateInHz==100or0'],
         namedQueries['align']['midPeak'],
