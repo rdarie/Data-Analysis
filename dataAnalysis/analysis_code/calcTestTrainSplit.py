@@ -40,7 +40,7 @@ import dataAnalysis.helperFunctions.helper_functions_new as hf
 import dataAnalysis.custom_transformers.tdr as tdr
 from dataAnalysis.analysis_code.namedQueries import namedQueries
 from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
-import pdb
+import pdb, traceback
 import numpy as np
 import dataAnalysis.preproc.ns5 as ns5
 # from sklearn.decomposition import PCA, IncrementalPCA
@@ -193,11 +193,15 @@ if not arguments['loadFromFrames']:
             prf.print_memory_usage(
                 'fitting on segment {}'.format(segIdx))
         aakwa = alignedAsigsKWargs.copy()
-        # pdb.set_trace()
-        dataDF = ns5.alignedAsigsToDF(
-            dataBlock,
-            whichSegments=[segIdx],
-            **aakwa)
+        # pdb.set_trace()  #
+        try:
+            dataDF = ns5.alignedAsigsToDF(
+                dataBlock,
+                whichSegments=[segIdx],
+                **aakwa)
+        except Exception:
+            traceback.print_exc()
+            continue
         # trialInfo = dataDF.index.to_frame().reset_index(drop=True)
         if arguments['calcTimeROI']:
             endMaskQuery = ash.processAlignQueryArgs(
@@ -244,7 +248,13 @@ else:    # loading frames
                     arguments['window'],
                     arguments['alignQuery'],
                     iteratorSuffix))
-            thisDF = pd.read_hdf(dFPath, arguments['selectionName'])
+            try:
+                thisDF = pd.read_hdf(dFPath, arguments['selectionName'])
+            except Exception:
+                traceback.print_exc()
+                print('Skipping...')
+                continue
+            print('Loaded {} from {}'.format(arguments['selectionName'], dFPath))
             # newSegLevel = [currBlockNum for i in range(thisDF.shape[0])]
             thisDF.index = thisDF.index.set_levels([currBlockNum], level='segment')
             listOfDataFrames.append(thisDF)

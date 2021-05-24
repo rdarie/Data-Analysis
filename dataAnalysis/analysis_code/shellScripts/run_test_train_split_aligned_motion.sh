@@ -10,11 +10,11 @@
 #SBATCH --mem=200G
 
 # Specify a job name:
-#SBATCH -J test_train_split_25
+#SBATCH -J test_train_split_27
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-test_train_split_25.out
-#SBATCH -e ../../batch_logs/%j-%a-test_train_split_25.out
+#SBATCH -o ../../batch_logs/%j-%a-test_train_split_27.out
+#SBATCH -e ../../batch_logs/%j-%a-test_train_split_27.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -22,7 +22,7 @@
 # Request custom resources
 #SBATCH --array=2,3
 
-# SLURM_ARRAY_TASK_ID=3
+SLURM_ARRAY_TASK_ID=2
 source shellScripts/calc_aligned_motion_preamble.sh
 
 # ITERATOR="--iteratorSuffix=a"
@@ -33,6 +33,11 @@ source shellScripts/calc_aligned_motion_preamble.sh
 ITERATOR="--iteratorSuffix=b"
 ROIOPTS="--calcTimeROI --ROIWinStart=-100 --ROIWinStop=-100 --timeROIAlignQuery=stoppingNoStim"
 ALIGNQUERYTERM="startingNoStim"
+ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
+
+ITERATOR="--iteratorSuffix=c"
+ROIOPTS="--calcTimeROI --ROIWinStart=-100 --ROIWinStop=-100 --timeROIAlignQuery=stopping"
+ALIGNQUERYTERM="startingE5"
 ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
 
 python -u './calcTestTrainSplit.py' --inputBlockSuffix="rig" --unitQuery="rig" --selectionName='rig' $ALIGNQUERY $ROIOPTS $ITERATOR --eventName='motion' --eventBlockSuffix='epochs' --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $OUTLIERMASK $LAZINESS

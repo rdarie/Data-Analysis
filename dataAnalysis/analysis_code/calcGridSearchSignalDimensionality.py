@@ -200,18 +200,18 @@ if __name__ == '__main__':
     outputFeatureList = []
     featureColumnFields = dataDF.columns.names
     ###
-    minNCompsToTest = 100
+    maxNCompsToTest = 90
     # pdb.set_trace()
     for idx, (maskIdx, featureMask) in enumerate(featureMasks.iterrows()):
         maskParams = {k: v for k, v in zip(featureMask.index.names, maskIdx)}
         dataGroup = dataDF.loc[:, featureMask]
         nFeatures = dataGroup.columns.shape[0]
-        nCompsToTest = range(1, min(minNCompsToTest, nFeatures + 1), 2)
+        nCompsToTest = range(1, min(maxNCompsToTest, nFeatures + 1), 2)
         trfName = '{}_{}'.format(arguments['estimatorName'], maskParams['freqBandName'])
         if arguments['verbose']:
             print('Fitting {} ...'.format(trfName))
         if arguments['debugging']:
-            nCompsToTest = range(1, min(minNCompsToTest, nFeatures + 1), 5)
+            nCompsToTest = range(1, min(maxNCompsToTest, nFeatures + 1), 5)
         gridSearchKWArgs['param_grid']['n_components'] = [nc for nc in nCompsToTest]
         cvScores, gridSearcherDict[maskParams['freqBandName']], gsScoresDict[maskParams['freqBandName']] = tdr.gridSearchHyperparameters(
             dataGroup, estimatorClass=estimatorClass,
@@ -357,12 +357,13 @@ if __name__ == '__main__':
                 figureOutputFolder,
                 '{}_{}_dimensionality.pdf'.format(
                     arguments['estimatorName'], datasetName))
+        print('Saving plots to {}'.format(figureOutputPath))
         with PdfPages(figureOutputPath) as pdf:
             for idx, (maskIdx, featureMask) in enumerate(featureMasks.iterrows()):
                 maskParams = {k: v for k, v in zip(featureMask.index.names, maskIdx)}
                 dataGroup = dataDF.loc[:, featureMask]
                 nFeatures = dataGroup.columns.shape[0]
-                nCompsToTest = range(1, min(minNCompsToTest, nFeatures + 1), 3)
+                nCompsToTest = range(1, min(maxNCompsToTest, nFeatures + 1), 3)
                 if arguments['verbose']:
                     print('Calculating ledoit-wolf # of components...')
                 lWScores = calc_lw_score(dataGroup, cv=cvIterator)

@@ -153,8 +153,6 @@ for segIdx in range(nSeg):
                 'detectionDelay', 'originalIndex',
                 'freqBandName', 'xCoords', 'yCoords']]
         try:
-            # loadedTrialInfo.loc[:, 'bin']
-            # trialInfo.loc[:, 'bin']
             assert (trialInfo.loc[:, targetAnns] == loadedTrialInfo.loc[:, targetAnns]).all(axis=None)
         except Exception:
             traceback.print_exc()

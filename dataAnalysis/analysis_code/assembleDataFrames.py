@@ -42,7 +42,7 @@ if arguments['plotting']:
         palette='dark', font='sans-serif',
         font_scale=1.5, color_codes=True)
 from dask.distributed import Client
-import os
+import os, traceback
 import dataAnalysis.helperFunctions.profiling as prf
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
 import dataAnalysis.helperFunctions.helper_functions_new as hf
@@ -151,10 +151,14 @@ if __name__ == '__main__':
             if 'listOfROIMasks' in loadingMeta:
                 alignedAsigsKWargs.update({'finalIndexMask': loadingMeta['listOfROIMasks'][segIdx]})
                 alignedAsigsKWargs.update({'finalIndexMask': loadingMeta['listOfROIMasks'][segIdx]})
-            dataDF = ns5.alignedAsigsToDF(
-                dataBlock,
-                whichSegments=[segIdx],
-                **alignedAsigsKWargs)
+            try:
+                dataDF = ns5.alignedAsigsToDF(
+                    dataBlock,
+                    whichSegments=[segIdx],
+                    **alignedAsigsKWargs)
+            except Exception:
+                traceback.print_exc()
+                continue
             if arguments['verbose']:
                 prf.print_memory_usage('loaded LHS')
             lOfDF.append(dataDF)
@@ -180,7 +184,11 @@ if __name__ == '__main__':
                         arguments['window'],
                         arguments['alignQuery'],
                         iteratorSuffix))
-                thisDF = pd.read_hdf(dFPath, arguments['unitQuery'])
+                try:
+                    thisDF = pd.read_hdf(dFPath, arguments['unitQuery'])
+                except Exception:
+                    traceback.print_exc()
+                    continue
                 '''thisDF.loc[:, 'expName'] = expName
                 thisDF.set_index('expName', inplace=True, append=True)'''
                 #

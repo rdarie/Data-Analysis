@@ -21,6 +21,7 @@ namedQueries = {
         'RateInHz==50or0': '((RateInHz==50)|(RateInHz==0))',
         'RateInHz==100or0': '((RateInHz==100)|(RateInHz==0))',
         'RateInHz>20or0': '((RateInHz>20)|(RateInHz==0))',
+        'E5': "(electrode=='+ E16 - E5')",
     },
     'unit': {
         'fr': "(chanName.str.endswith('fr#0'))",
@@ -136,6 +137,12 @@ namedQueries['align'].update({
     'startingNoStim': '(' + '&'.join([
         namedQueries['align']['starting'],
         namedQueries['align']['noStim'],
+        ]) + ')'
+    })
+namedQueries['align'].update({
+    'startingE5': '(' + '&'.join([
+        namedQueries['align']['starting'],
+        namedQueries['align']['E5'],
         ]) + ')'
     })
 namedQueries['align'].update({
