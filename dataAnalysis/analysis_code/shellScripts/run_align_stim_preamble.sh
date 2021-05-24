@@ -14,6 +14,7 @@ conda activate
 source activate nda2
 python --version
 
+# # # # # # #
 # EXP="exp202101141100"
 # EXP="exp202101191100"
 # EXP="exp202101201100"
@@ -32,7 +33,7 @@ LAZINESS="--lazy"
 # LAZINESS=""
 VERBOSITY="--verbose"
 # WINDOW="--window=L"
-WINDOW="--window=M"
+WINDOW="--window=XL"
 
 AMPFIELDNAME="--amplitudeFieldName=amplitude"
 
