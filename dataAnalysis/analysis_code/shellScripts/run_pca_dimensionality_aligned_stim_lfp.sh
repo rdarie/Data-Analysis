@@ -10,26 +10,47 @@
 #SBATCH --mem=127G
 
 # Specify a job name:
-#SBATCH -J pca_calc_stim_lfp
+#SBATCH -J pca_dimen_stim_lfp
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-pca_calc_stim_lfp.out
-#SBATCH -e ../../batch_logs/%j-%a-pca_calc_stim_lfp.out
+#SBATCH -o ../../batch_logs/%j-%a-pca_dimen_stim_lfp.out
+#SBATCH -e ../../batch_logs/%j-%a-pca_dimen_stim_lfp.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
 #SBATCH --array=2
+SLURM_ARRAY_TASK_ID=1
+source ./shellScripts/calc_aligned_stim_preamble.sh
 
-SLURM_ARRAY_TASK_ID=2
-source ./shellScripts/run_pca_calc_aligned_stim_preamble.sh
+BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
+#
+TARGET="lfp_CAR_spectral"
+# TARGET="lfp_CAR"
+#
+ESTIMATOR="fa"
+# ESTIMATOR="pca"
+#
+#
+ITERATOR="d"
+ALIGNQUERYTERM="stimOnE5"
+#
+ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
+#
+WINDOW="XL"
+#
+python -u './calcGridSearchSignalDimensionality.py' --estimatorName="${ESTIMATOR}" --datasetName="${TARGET}_${ITERATOR}_${WINDOW}_${ALIGNQUERYTERM}" --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=2 --plotting
+python -u './processSignalDimensionality.py' --estimatorName="${ESTIMATOR}" --datasetName="${TARGET}_${ITERATOR}_${WINDOW}_${ALIGNQUERYTERM}" --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=2 --plotting
+# python -u './assembleExperimentAlignedAsigs.py' --exp=$EXP $BLOCKSELECTOR --inputBlockSuffix="${TARGET}" --window=$WINDOW $ANALYSISFOLDER $ALIGNFOLDER $LAZINESS
 
-# python -u './calcLaplacianFromTriggered.py' --plotting --recalcKCSDCV --useKCSD --inputBlockSuffix="lfp" --unitQuery="lfp" --outputBlockSuffix="kcsd_triggered" --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $OUTLIERMASK $LAZINESS
+TARGET="lfp_CAR_spectral_fa"
+# TARGET="lfp_CAR_fa"
+# TARGET="lfp_CAR_spectral_pca"
+# TARGET="lfp_CAR_pca"
+# python -u './calcSignalNovelty.py' --estimatorName="mahal" --datasetName="${TARGET}_${ITERATOR}_${WINDOW}_${ALIGNQUERYTERM}" --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=2 --plotting --showFigures
+# python -u './assembleExperimentAlignedAsigs.py' --exp=$EXP $BLOCKSELECTOR --inputBlockSuffix="${TARGET}" --window=$WINDOW $ANALYSISFOLDER $ALIGNFOLDER $LAZINESS
 
-# python -u './calcPCAinChunks.py' --inputBlockSuffix="kcsd" --unitQuery="lfp" --estimatorName="pca_lapl" --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $OUTLIERMASK
-python -u './calcSignalDimensionality.py' --inputBlockSuffix="lfp" --unitQuery="lfp" --estimatorName="pca_lfp" --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting
-python -u './calcSignalDimensionality.py' --inputBlockSuffix="lfp_CAR" --unitQuery="lfp" --estimatorName="pca_car" --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting
-# python -u './calcSparsePCA.py' --inputBlockSuffix="kcsd" --unitQuery="lfp" --estimatorName="sparse_pca_lapl" --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $OUTLIERMASK
-# python -u './applyEstimatorToTriggered.py' --inputBlockSuffix="kcsd" --estimatorName="pca_lapl" --unitQuery="lfp" --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR
-# python -u './calcSpectralFeatures.py' --inputBlockSuffix="kcsd_pca" --unitQuery="pca" --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR
+TARGET="lfp_CAR_spectral_fa_mahal"
+# python -u './assembleDataFrames.py' --debugging --iteratorSuffix=$ITERATOR --inputBlockSuffix="${TARGET}" --unitQuery="${TARGET}" --loadFromFrames --exp=$EXP --window=$WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
+# python -u './assembleExperimentAlignedAsigs.py' --exp=$EXP $BLOCKSELECTOR --inputBlockSuffix="${TARGET}" --window=$WINDOW $ANALYSISFOLDER $ALIGNFOLDER $LAZINESS

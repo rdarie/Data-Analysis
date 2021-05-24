@@ -153,6 +153,7 @@ def gridSearchHyperparameters(
         if scoreMean.index.names == ['n_components']:
             optParams = {'n_components': scoreMean.loc[scoreMean > threshold].idxmin()}
             print('Resetting optimal params to:\n{}\n'.format(optParams))
+        pdb.set_trace()
         # else.. depends on whether we want the params to be maximized or minimized TODO
     workGsScoresDF = pd.DataFrame(workGridSearcher.cv_results_).rename(columns=colRenamer)
     workGsScoresDF = workGsScoresDF.loc[:, paramColNamesShort + ['test_score', 'train_score']]

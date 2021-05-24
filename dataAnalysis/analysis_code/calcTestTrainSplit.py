@@ -212,6 +212,7 @@ if not arguments['loadFromFrames']:
             assert len(evList) == 1
             targetTrialAnnDF = ns5.unitSpikeTrainArrayAnnToDF(evList).query(endMaskQuery)
             targetMask = pd.Series(True, index=dataDF.index)
+            pdb.set_trace()
             for (_, _, t), group in dataDF.groupby(['segment', 'originalIndex', 't']):
                 timeDifference = (targetTrialAnnDF['t'] - t)
                 deltaT = timeDifference[timeDifference >= 0].min()
