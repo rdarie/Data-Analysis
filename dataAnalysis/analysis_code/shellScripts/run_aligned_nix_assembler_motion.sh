@@ -20,7 +20,7 @@
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#               SBATCH --array=2,3
+# E              SBATCH --array=2,3
 
 SLURM_ARRAY_TASK_ID=2
 source ./shellScripts/calc_aligned_motion_preamble.sh
@@ -28,8 +28,8 @@ source ./shellScripts/calc_aligned_motion_preamble.sh
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
 TARGET="pedalState"
 
-blocks=(lfp_CAR rig)
-# blocks=(lfp_CAR lfp_CAR_spectral rig)
+blocks=(lfp_CAR lfp_CAR_spectral rig)
+# blocks=(lfp_CAR_spectral_fa lfp_CAR_spectral_fa_mahal)
 for B in "${blocks[@]}"
 do
     echo "concatenating $B blocks"

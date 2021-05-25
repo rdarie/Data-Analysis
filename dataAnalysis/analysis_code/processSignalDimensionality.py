@@ -130,7 +130,6 @@ if removeAllColumn:
 workIdx = cvIterator.work
 workingDataDF = dataDF.iloc[workIdx, :]
 #
-# pdb.set_trace()
 lastFoldIdx = cvIterator.get_n_splits()
 lOfFeatures = []
 lOfRec = []

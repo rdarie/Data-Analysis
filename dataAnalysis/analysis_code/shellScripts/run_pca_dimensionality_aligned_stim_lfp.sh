@@ -10,18 +10,19 @@
 #SBATCH --mem=127G
 
 # Specify a job name:
-#SBATCH -J pca_dimen_stim_lfp
+#SBATCH -J pca_dimen_stim_lfp_d
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-pca_dimen_stim_lfp.out
-#SBATCH -e ../../batch_logs/%j-%a-pca_dimen_stim_lfp.out
+#SBATCH -o ../../batch_logs/%j-%a-pca_dimen_stim_lfp_d.out
+#SBATCH -e ../../batch_logs/%j-%a-pca_dimen_stim_lfp_d.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=2
-SLURM_ARRAY_TASK_ID=1
+#SBATCH --array=1
+
+#   SLURM_ARRAY_TASK_ID=1
 source ./shellScripts/calc_aligned_stim_preamble.sh
 
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
@@ -40,8 +41,8 @@ ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
 #
 WINDOW="XL"
 #
-python -u './calcGridSearchSignalDimensionality.py' --estimatorName="${ESTIMATOR}" --datasetName="${TARGET}_${ITERATOR}_${WINDOW}_${ALIGNQUERYTERM}" --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=2 --plotting
-python -u './processSignalDimensionality.py' --estimatorName="${ESTIMATOR}" --datasetName="${TARGET}_${ITERATOR}_${WINDOW}_${ALIGNQUERYTERM}" --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=2 --plotting
+python -u './calcGridSearchSignalDimensionality.py' --estimatorName="${ESTIMATOR}" --datasetName="${TARGET}_${ITERATOR}_${WINDOW}_${ALIGNQUERYTERM}" --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
+python -u './processSignalDimensionality.py' --estimatorName="${ESTIMATOR}" --datasetName="${TARGET}_${ITERATOR}_${WINDOW}_${ALIGNQUERYTERM}" --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
 # python -u './assembleExperimentAlignedAsigs.py' --exp=$EXP $BLOCKSELECTOR --inputBlockSuffix="${TARGET}" --window=$WINDOW $ANALYSISFOLDER $ALIGNFOLDER $LAZINESS
 
 TARGET="lfp_CAR_spectral_fa"
