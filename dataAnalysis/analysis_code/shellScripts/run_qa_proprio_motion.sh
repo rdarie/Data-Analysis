@@ -35,9 +35,9 @@ INPUTBLOCKNAME="--inputBlockSuffix=lfp_CAR"
 # python -u ./calcUnitCorrelation.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ALIGNFOLDER $ANALYSISFOLDER $ALIGNQUERY --inputBlockName="fr" --unitQuery="fr" --verbose --plotting --maskOutlierBlocks
 # python -u ./selectUnitsByMeanFRandCorrelation.py --exp=$EXP $BLOCKSELECTOR $ALIGNFOLDER $ANALYSISFOLDER $WINDOW $LAZINESS --verbose
 
-# for concatenated files
+# for concatenated files#
 BLOCKSELECTOR="--blockIdx=2 --processAll"
-INPUTBLOCKNAME="--inputBlockSuffix=lfp_CAR_spectral"
+INPUTBLOCKNAME="--inputBlockSuffix=lfp_CAR"
 UNITQUERY="--unitQuery=lfp"
 #
 python -u ./calcTrialOutliers.py --exp=$EXP $BLOCKSELECTOR $UNITSELECTOR $WINDOW $ALIGNFOLDER $ANALYSISFOLDER $ALIGNQUERY $LAZINESS $UNITQUERY $INPUTBLOCKNAME --plotting --verbose --amplitudeFieldName="amplitude" --saveResults
