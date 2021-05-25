@@ -12,6 +12,7 @@ Options:
     --lazy                                 load from raw, or regular? [default: False]
     --window=window                        process with short window? [default: short]
     --inputBlockSuffix=inputBlockSuffix    which trig_ block to pull [default: pca]
+    --inputBlockPrefix=inputBlockPrefix    which trig_ block to pull [default: Block]
     --unitQuery=unitQuery                  how to restrict channels if not supplying a list? [default: pca]
     --alignQuery=alignQuery                what will the plot be aligned to? [default: outboundWithStim]
     --selector=selector                    filename if using a unit selector
@@ -33,6 +34,7 @@ from namedQueries import namedQueries
 import pdb
 import dataAnalysis.plotting.aligned_signal_plots as asp
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
+import dataAnalysis.helperFunctions.helper_functions_new as hf
 import dataAnalysis.preproc.ns5 as ns5
 import os
 from currentExperiment import parseAnalysisOptions
@@ -48,6 +50,8 @@ expOpts, allOpts = parseAnalysisOptions(
 globals().update(expOpts)
 globals().update(allOpts)
 #
+blockBaseName, inputBlockSuffix = hf.processBasicPaths(arguments)
+
 analysisSubFolder = os.path.join(
     scratchFolder, arguments['analysisName']
     )
@@ -73,12 +77,7 @@ alignedAsigsKWargs.update(dict(
     transposeToColumns='bin', concatOn='index'))
 #
 alignedAsigsKWargs['procFun'] = ash.genDetrender(
-    timeWindow=(-90e-3, -50e-3))
-
-if arguments['processAll']:
-    prefix = 'Block'
-else:
-    prefix = ns5FileName
+    timeWindow=(-200e-3, -100e-3))
 
 if 'windowSize' not in alignedAsigsKWargs:
     alignedAsigsKWargs['windowSize'] = [ws for ws in rasterOpts['windowSizes'][arguments['window']]]
@@ -91,12 +90,12 @@ if 'winStop' in arguments:
 
 triggeredPath = os.path.join(
     alignSubFolder,
-    prefix + '_{}_{}.nix'.format(
-        arguments['inputBlockSuffix'], arguments['window']))
+    blockBaseName + '{}_{}.nix'.format(
+        inputBlockSuffix, arguments['window']))
 resultPath = os.path.join(
     calcSubFolder,
-    prefix + '_{}_{}_rauc.h5'.format(
-        arguments['inputBlockSuffix'], arguments['window']))
+    blockBaseName + '{}_{}_rauc.h5'.format(
+        inputBlockSuffix, arguments['window']))
 
 print('loading {}'.format(triggeredPath))
 dataReader, dataBlock = ns5.blockFromPath(
@@ -105,18 +104,17 @@ dataReader, dataBlock = ns5.blockFromPath(
 limitPages = None
 funKWargs = dict(
     # baseline='mean',
-    tStart=-40e-3, tStop=40e-3)
+    tStart=-50e-3, tStop=400e-3)
 #  End Overrides
 asigWide = ns5.alignedAsigsToDF(
     dataBlock, **alignedAsigsKWargs)
 
-pdb.set_trace()
 rAUCDF = ash.rAUC(
     asigWide, **funKWargs).to_frame(name='rauc')
 rAUCDF['kruskalStat'] = np.nan
 rAUCDF['kruskalP'] = np.nan
 for name, group in rAUCDF.groupby(['electrode', 'feature']):
-    subGroups = [i['rauc'].to_numpy() for n, i in group.groupby('nominalCurrent')]
+    subGroups = [i['rauc'].to_numpy() for n, i in group.groupby(amplitudeFieldName)]
     try:
         stat, pval = stats.kruskal(*subGroups, nan_policy='omit')
         rAUCDF.loc[group.index, 'kruskalStat'] = stat
@@ -126,16 +124,13 @@ for name, group in rAUCDF.groupby(['electrode', 'feature']):
         rAUCDF.loc[group.index, 'kruskalP'] = 1
 
 derivedAnnot = [
-    'normalizedRAUC', 'standardizedRAUC',
-    'featureName', 'EMGSide', 'EMGSite']
+    'normalizedRAUC', 'standardizedRAUC']
 saveIndexNames = (rAUCDF.index.names).copy()
 rAUCDF.reset_index(inplace=True)
 for annName in derivedAnnot:
     rAUCDF.loc[:, annName] = np.nan
 
 rAUCDF.loc[:, amplitudeFieldName] = rAUCDF[amplitudeFieldName].abs()
-sideLookup = {'R': 'Right', 'L': 'Left'}
-'''nSig = {}'''
 
 qLims = (5e-3, 1-5e-3)
 # for name, group in rAUCDF.groupby(['feature', 'electrode']):
@@ -158,22 +153,12 @@ for name, group in rAUCDF.groupby(['feature']):
         rauc.to_numpy().reshape(-1, 1))
     rAUCDF.loc[group.index, 'normalizedRAUC'] = (
         thisScaler.transform(rauc.to_numpy().reshape(-1, 1)))
-    featName = name
-    featNameShort = featName.replace('EmgEnv#0', '').replace('Emg#0', '')
-    # pdb.set_trace()
-    rAUCDF.loc[group.index, 'featureName'] = featNameShort
-    rAUCDF.loc[group.index, 'EMGSite'] = featNameShort[1:]
-    rAUCDF.loc[group.index, 'EMGSide'] = sideLookup[featName[0]]
-    '''if os.path.exists(statsTestPath):
-        theseSig = sigValsWide.xs(featName, level='unit')
-        nSig.update({featName[:-8]: theseSig.sum().sum()})'''
-
-rAUCDF.loc[:, 'EMG Location'] = (
-    rAUCDF['EMGSide'] + ' ' + rAUCDF['EMGSite'])
+    
 for name, group in rAUCDF.groupby('electrode'):
     rAUCDF.loc[group.index, 'normalizedAmplitude'] = pd.cut(
         group[amplitudeFieldName], bins=10, labels=False)
-featurePlotOptsColumns = ['featureName', 'EMGSide', 'EMGSite', 'EMG Location']
+
+'''featurePlotOptsColumns = ['featureName', 'EMGSide', 'EMGSite', 'EMG Location']
 featurePlotOptsDF = rAUCDF.drop_duplicates(subset=['feature']).loc[:, featurePlotOptsColumns]
 plotOptNames = ['color', 'style']
 # pdb.set_trace()
@@ -189,12 +174,12 @@ for gIdx, (name, group) in enumerate(featurePlotOptsDF.groupby('EMGSide')):
         index=uniqueSiteNames)
     featurePlotOptsDF.loc[group.index, 'color'] = group['EMGSite'].map(thisPalette)
     featurePlotOptsDF.loc[group.index, 'style'] = styleNames[gIdx]
+featurePlotOptsDF.to_hdf(resultPath, 'RAUC_plotOpts')'''
 
 rAUCDF.set_index(saveIndexNames, inplace=True)
-rAUCDF.to_hdf(resultPath, 'emgRAUC')
-featurePlotOptsDF.to_hdf(resultPath, 'emgRAUC_plotOpts')
+rAUCDF.to_hdf(resultPath, 'RAUC')
 asigWide.index = rAUCDF.index
-asigWide.to_hdf(resultPath, 'emgRAUC_raw')
+asigWide.to_hdf(resultPath, 'RAUC_raw')
 #
 if arguments['lazy']:
     dataReader.file.close()

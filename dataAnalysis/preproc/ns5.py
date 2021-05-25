@@ -793,7 +793,7 @@ def unitSpikeTrainWaveformsToDF(
         dataQuery=None,
         transposeToColumns='bin', fastTranspose=True,
         lags=None, decimate=1, rollingWindow=None,
-        getMetaData=True, verbose=False,
+        getMetaData=True, verbose=False, getFeatureMetaData=None,
         whichSegments=None, windowSize=None, procFun=None):
     #  list contains different segments from *one* unit
     if isinstance(spikeTrainContainer, ChannelIndex):
@@ -842,7 +842,7 @@ def unitSpikeTrainWaveformsToDF(
             if wf.shape[1] > 0:
                 wf = wf[:, 0, :]
         wfDF = pd.DataFrame(wf)
-        samplingRate = st.sampling_rate
+        # samplingRate = st.sampling_rate
         samplingPeriod = float(st.sampling_period) * st.sampling_period.units
         leftSweep = float(st.left_sweep) * st.left_sweep.units
         bins = (
@@ -926,13 +926,14 @@ def unitSpikeTrainWaveformsToDF(
     zeroLagWaveformsDF = pd.concat(waveformsList, axis='index')
     if verbose:
         prf.print_memory_usage('before transposing waveforms')
-    # TODO implement lags and rolling window addition here
     metaDF = zeroLagWaveformsDF.loc[:, idxLabels].copy()
     zeroLagWaveformsDF.drop(columns=idxLabels, inplace=True)
     zeroLagWaveformsDF.columns = zeroLagWaveformsDF.columns.astype(float)
     if lags is None:
         lags = [0]
     laggedWaveformsDict = {
+        (spikeTrainContainer.name, k): None for k in lags}
+    laggedMetaDict = {
         (spikeTrainContainer.name, k): None for k in lags}
     for lag in lags:
         if isinstance(lag, int):
@@ -978,7 +979,11 @@ def unitSpikeTrainWaveformsToDF(
             laggedWaveformsDict[
                 (spikeTrainContainer.name, lag)] = (
                     shiftedWaveform.iloc[:, seekIdx].copy())
+        laggedMetaDict[
+            (spikeTrainContainer.name, lag)] = metaDF.copy()
     #
+    pdb.set_trace()
+    stackedMetaDF = pd.concat([metaDF.copy() for k, v in laggedWaveformsDict.items()]).reset_index(drop=True)
     if transposeToColumns == 'feature':
         # stack the bin, name the feature column
         for idx, (key, value) in enumerate(laggedWaveformsDict.items()):
@@ -1002,18 +1007,18 @@ def unitSpikeTrainWaveformsToDF(
         waveformsDF = pd.concat(
             laggedWaveformsDict,
             names=['feature', 'lag', 'originalDummy']).reset_index()
-        metaLookup = pd.DataFrame(
+        '''metaLookup = pd.DataFrame(
             np.nan, index=waveformsDF.index, columns=metaDF.columns)
         try:
-            for cN in metaLookup.columns:
-                # metaLookup.loc[:, cN] = waveformsDF['originalDummy'].map(metaDF[cN])
-                metaLookup.loc[:, cN] = waveformsDF.index.map(metaDF.reset_index(drop=True)[cN])
+            for cN in metaLookup.drop(columns='originalDummy').columns:
+                metaLookup.loc[:, cN] = waveformsDF['originalDummy'].map(metaDF[cN])
+                # metaLookup.loc[:, cN] = waveformsDF.index.map(metaDF.reset_index(drop=True)[cN])
         except Exception:
             traceback.print_exc()
-            pdb.set_trace()
+            pdb.set_trace()'''
         waveformsDF = pd.concat(
             [
-                metaLookup,
+                stackedMetaDF,
                 waveformsDF.drop(columns='originalDummy')],
             axis='columns')
         idxLabels += ['feature', 'lag']

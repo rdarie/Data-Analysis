@@ -198,7 +198,18 @@ figureOutputFolder = os.path.join(
     arguments['analysisName'], arguments['alignFolderName'])
 if not os.path.exists(figureOutputFolder):
     os.makedirs(figureOutputFolder)
+# pdb.set_trace()
+pdfPath = os.path.join(figureOutputFolder, '{}_covariance_matrix_heatmap.pdf'.format(fullEstimatorName))
+with PdfPages(pdfPath) as pdf:
+    fig, ax = plt.subplots()
+    ax = sns.heatmap(thisEstimator.get_covariance())
+    pdf.savefig(bbox_inches='tight', pad_inches=0)
+    if arguments['showFigures']:
+        plt.show()
+    else:
+        plt.close()
 pdfPath = os.path.join(figureOutputFolder, '{}_reconstructed_signals.pdf'.format(fullEstimatorName))
+pdb.set_trace()
 with PdfPages(pdfPath) as pdf:
     for name, group in recDF.groupby('feature', axis='columns'):
         print('making plot of {}'.format(name))
