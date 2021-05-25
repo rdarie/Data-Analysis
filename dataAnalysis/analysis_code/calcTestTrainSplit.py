@@ -84,7 +84,9 @@ alignedAsigsKWargs.update(dict(
     transposeToColumns='feature', concatOn='columns',
     getMetaData=essentialMetadataFields, decimate=1))
 alignedAsigsKWargs['verbose'] = arguments['verbose']
+alignedAsigsKWargs['getFeatureMetaData'] = ['xCoords', 'yCoords', 'freqBandName', 'parentFeature']
 
+'[[[[[[.l;;;;;;'
 triggeredPath = os.path.join(
     alignSubFolder,
     blockBaseName + '{}_{}.nix'.format(
@@ -259,7 +261,6 @@ else:    # loading frames
             thisDF.index = thisDF.index.set_levels([currBlockNum], level='segment')
             listOfDataFrames.append(thisDF)
             currBlockNum += 1
-
 '''
 trialInfo = dataDF.index.to_frame().reset_index(drop=True)
 for cN in trialInfo.columns:

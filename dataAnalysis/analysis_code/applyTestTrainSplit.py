@@ -116,10 +116,10 @@ for segIdx in range(nSeg):
     if arguments['verbose']:
         prf.print_memory_usage('extracting data on segment {}'.format(segIdx))
     # prelim load to get feature annotations
+    '''
     aakwa = deepcopy(alignedAsigsKWargs)
     aakwa['verbose'] = False
-    ##
-    featureAnnsToGrab = ['xCoords', 'yCoords', 'freqBandName', 'parentFeature']
+    ##featureAnnsToGrab = ['xCoords', 'yCoords', 'freqBandName', 'parentFeature']
     aakwa.update(dict(transposeToColumns='bin', concatOn='index', rollingWindow=None))
     aakwa['getMetaData'] += featureAnnsToGrab
     if arguments['verbose']:
@@ -128,7 +128,7 @@ for segIdx in range(nSeg):
         dataBlock, whichSegments=[segIdx], **aakwa)
     _, firstTrial = next(iter(tempDF.groupby(['segment', 'originalIndex', 't'])))
     featureInfo = firstTrial.index.to_frame().reset_index(drop=True).set_index(['feature', 'lag'])
-    del tempDF, firstTrial
+    del tempDF, firstTrial'''
     aakwa = deepcopy(alignedAsigsKWargs)
     aakwa['verbose'] = False
     if 'listOfROIMasks' in loadingMeta:
@@ -139,8 +139,8 @@ for segIdx in range(nSeg):
         dataBlock, whichSegments=[segIdx], **aakwa)
     # trialInfo = dataDF.index.to_frame().reset_index(drop=True)
     # maskTrialInfo = loadingMeta['listOfROIMasks'][segIdx].index.to_frame().reset_index(drop=True)
-    columnsMeta = featureInfo.loc[dataDF.columns, featureAnnsToGrab].reset_index()
-    dataDF.columns = pd.MultiIndex.from_frame(columnsMeta)
+    '''columnsMeta = featureInfo.loc[dataDF.columns, featureAnnsToGrab].reset_index()
+    dataDF.columns = pd.MultiIndex.from_frame(columnsMeta)'''
     if 'listOfExampleIndexes' in loadingMeta:
         trialInfo = dataDF.index.to_frame().reset_index(drop=True)
         loadedTrialInfo = loadingMeta['listOfExampleIndexes'][segIdx].to_frame().reset_index(drop=True)

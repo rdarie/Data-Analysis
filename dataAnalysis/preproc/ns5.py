@@ -818,6 +818,13 @@ def unitSpikeTrainWaveformsToDF(
     #
     waveformsList = []
     #
+    if getFeatureMetaData is not None:
+        if isinstance(getMetaData, Iterable):
+            for annName in getFeatureMetaData:
+                if annName not in getMetaData:
+                    getMetaData.append(annName)
+        elif not(getMetaData):
+            getMetaData = getFeatureMetaData
     for segIdx, stIn in enumerate(uniqueSpiketrains):
         if verbose:
             print('extracting spiketrain from {}'.format(stIn.segment))
@@ -982,8 +989,12 @@ def unitSpikeTrainWaveformsToDF(
         laggedMetaDict[
             (spikeTrainContainer.name, lag)] = metaDF.copy()
     #
-    pdb.set_trace()
-    stackedMetaDF = pd.concat([metaDF.copy() for k, v in laggedWaveformsDict.items()]).reset_index(drop=True)
+    stackedMetaDF = pd.concat(laggedMetaDict, names=['feature', 'lag', 'originalDummy']).reset_index().drop(columns=['originalDummy'])
+    # e.g. getFeatureMetaData = ['freqBandName', 'parentFeature']
+    if getFeatureMetaData is not None:
+        featureMetaDF = stackedMetaDF.loc[:, ['feature', 'lag'] + getFeatureMetaData].drop_duplicates().reset_index(drop=True)
+    else:
+        featureMetaDF = None
     if transposeToColumns == 'feature':
         # stack the bin, name the feature column
         for idx, (key, value) in enumerate(laggedWaveformsDict.items()):
@@ -1018,7 +1029,7 @@ def unitSpikeTrainWaveformsToDF(
             pdb.set_trace()'''
         waveformsDF = pd.concat(
             [
-                stackedMetaDF,
+                stackedMetaDF.drop(columns=['feature', 'lag']),
                 waveformsDF.drop(columns='originalDummy')],
             axis='columns')
         idxLabels += ['feature', 'lag']
@@ -1029,13 +1040,15 @@ def unitSpikeTrainWaveformsToDF(
         waveformsDF = transposeSpikeDF(
             waveformsDF, transposeToColumns,
             fastTranspose=fastTranspose)
-    return waveformsDF
+    return waveformsDF, featureMetaDF
 
 
 def concatenateUnitSpikeTrainWaveformsDF(
         units, dataQuery=None,
         transposeToColumns='bin', concatOn='index',
-        fastTranspose=True, getMetaData=True, verbose=False,
+        fastTranspose=True, getMetaData=True,
+        getFeatureMetaData=None,
+        verbose=False,
         addLags=None, decimate=1, rollingWindow=None,
         metaDataToCategories=False, windowSize=None,
         whichSegments=None, procFun=None):
@@ -1053,6 +1066,7 @@ def concatenateUnitSpikeTrainWaveformsDF(
         if np.any(hasAnySpikes):
             allUnits.append(thisUnit)
     waveformsList = []
+    featureMetaList = []
     for idx, thisUnit in enumerate(allUnits):
         if verbose:
             print('concatenating unitDF {}'.format(thisUnit.name))
@@ -1062,17 +1076,19 @@ def concatenateUnitSpikeTrainWaveformsDF(
                 lags = addLags['all']
             elif thisUnit.name in addLags:
                 lags = addLags[thisUnit.name]
-        unitWaveforms = unitSpikeTrainWaveformsToDF(
+        unitWaveforms, featureMetaDF = unitSpikeTrainWaveformsToDF(
             thisUnit, dataQuery=dataQuery,
             transposeToColumns=transposeToColumns,
             fastTranspose=fastTranspose, getMetaData=getMetaData,
+            getFeatureMetaData=getFeatureMetaData,
             lags=lags, decimate=decimate, rollingWindow=rollingWindow,
             verbose=verbose, windowSize=windowSize,
             whichSegments=whichSegments, procFun=procFun)
         if idx == 0:
             idxLabels = unitWaveforms.index.names
         if (concatOn == 'columns') and (idx > 0):
-            # other than first time, we already have the metadata
+            # i.e. if the columns represent features,
+            # other than first time, we already have the trial metadata
             unitWaveforms.reset_index(drop=True, inplace=True)
         else:
             # first time, or if concatenating indices,
@@ -1086,6 +1102,8 @@ def concatenateUnitSpikeTrainWaveformsDF(
                     .astype('category')
                     )
         waveformsList.append(unitWaveforms)
+        if getFeatureMetaData is not None:
+            featureMetaList.append(featureMetaDF)
         del unitWaveforms
         if verbose:
             print('memory usage: {:.1f} MB'.format(prf.memory_usage_psutil()))
@@ -1097,9 +1115,11 @@ def concatenateUnitSpikeTrainWaveformsDF(
     #  ignoreIndex = (concatOn == 'index')
     assert len(waveformsList) > 0, 'Error: dataquery ({}) yields empty list!'.format(dataQuery)
     allWaveforms = pd.concat(
-        waveformsList, axis=concatOn,
-        # ignore_index=ignoreIndex
-        )
+        waveformsList, axis=concatOn)
+    if getFeatureMetaData is not None:
+        allFeatureMetaDF = pd.concat(featureMetaList).drop_duplicates().set_index(['feature', 'lag'])
+    else:
+        allFeatureMetaDF = None
     del waveformsList
     if verbose:
         print(
@@ -1115,7 +1135,7 @@ def concatenateUnitSpikeTrainWaveformsDF(
     except Exception:
         traceback.print_exc()
         pdb.set_trace()
-    return allWaveforms
+    return allWaveforms, allFeatureMetaDF
 
 
 def alignedAsigsToDF(
@@ -1127,7 +1147,8 @@ def alignedAsigsToDF(
         transposeToColumns='bin', concatOn='index', fastTranspose=True,
         addLags=None, decimate=1, rollingWindow=None,
         whichSegments=None, windowSize=None,
-        getMetaData=True, metaDataToCategories=True,
+        getMetaData=True, getFeatureMetaData=None,
+        metaDataToCategories=True,
         outlierTrials=None, invertOutlierMask=False,
         makeControlProgram=False, removeFuzzyName=False,
         procFun=None, dropNaNs=True, finalIndexMask=None):
@@ -1137,14 +1158,15 @@ def alignedAsigsToDF(
     allUnits = []
     for uName in unitNames:
         allUnits += dataBlock.filter(objects=Unit, name=uName)
-    allWaveforms = concatenateUnitSpikeTrainWaveformsDF(
+    allWaveforms, columnsMeta = concatenateUnitSpikeTrainWaveformsDF(
         allUnits, dataQuery=dataQuery,
         transposeToColumns=transposeToColumns, concatOn=concatOn,
         fastTranspose=fastTranspose,
         addLags=addLags, decimate=decimate, rollingWindow=rollingWindow,
         verbose=verbose, whichSegments=whichSegments,
         windowSize=windowSize, procFun=procFun,
-        getMetaData=getMetaData, metaDataToCategories=metaDataToCategories)
+        getMetaData=getMetaData, getFeatureMetaData=getFeatureMetaData,
+        metaDataToCategories=metaDataToCategories)
     #
     manipulateIndex = np.any(
         [
@@ -1244,11 +1266,12 @@ def alignedAsigsToDF(
         except Exception:
             traceback.print_exc()
             allWaveforms.reindex(columns=unitNames)
+        assert np.all(allWaveforms.columns == columnsMeta.index)
+        allWaveforms.columns = pd.MultiIndex.from_frame(columnsMeta.reset_index())
     if isinstance(allWaveforms.columns, pd.MultiIndex):
         allWaveforms.columns = allWaveforms.columns.remove_unused_levels()
     allWaveforms.sort_index(
         axis='columns', inplace=True, kind='mergesort')
-    # pdb.set_trace()
     if dropNaNs:
         if transposeToColumns == 'bin':
             allWaveforms.dropna(inplace=True, axis='columns')
