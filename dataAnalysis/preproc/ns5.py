@@ -1266,8 +1266,10 @@ def alignedAsigsToDF(
         except Exception:
             traceback.print_exc()
             allWaveforms.reindex(columns=unitNames)
-        assert np.all(allWaveforms.columns == columnsMeta.index)
-        allWaveforms.columns = pd.MultiIndex.from_frame(columnsMeta.reset_index())
+        if getFeatureMetaData is not None:
+            assert np.all(allWaveforms.columns == columnsMeta.index)
+            allWaveforms.columns = pd.MultiIndex.from_frame(columnsMeta.reset_index())
+            allWaveforms = allWaveforms.droplevel(getFeatureMetaData, axis='index')
     if isinstance(allWaveforms.columns, pd.MultiIndex):
         allWaveforms.columns = allWaveforms.columns.remove_unused_levels()
     allWaveforms.sort_index(

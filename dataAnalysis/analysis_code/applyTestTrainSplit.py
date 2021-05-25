@@ -151,7 +151,7 @@ for segIdx in range(nSeg):
             if ta not in [
                 'stimDelay', 'unitAnnotations',
                 'detectionDelay', 'originalIndex',
-                'freqBandName', 'xCoords', 'yCoords']]
+                'freqBandName', 'xCoords', 'yCoords', 'parentFeature']]
         try:
             assert (trialInfo.loc[:, targetAnns] == loadedTrialInfo.loc[:, targetAnns]).all(axis=None)
         except Exception:
