@@ -741,6 +741,7 @@ if __name__ == "__main__":
     compsAndTargetDF.dropna(axis='columns', inplace=True)
     compsAndTargetDF.columns = compsAndTargetDF.columns.astype(float)
     compsAndTargetDF.columns.name = 'bin'
+    ##########################################
     # plotDF = compsAndTargetDF.stack().to_frame(name='signal').reset_index()
     plotDF = compsAndTargetDF.reset_index()
     # plotDF = compsAndTargetDF.copy()

@@ -27,17 +27,18 @@ source ./shellScripts/calc_aligned_motion_preamble.sh
 
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
 TARGET="pedalState"
-# ITERATOR="a"
-# ALIGNQUERYTERM="outbound"
+
+ITERATOR="a"
+ALIGNQUERYTERM="outbound"
 #
 # ITERATOR="b"
 # ALIGNQUERYTERM="startingNoStim"
 #
-ITERATOR="c"
-ALIGNQUERYTERM="startingE5"
+# ITERATOR="c"
+# ALIGNQUERYTERM="startingE5"
 #
-ITERATOR="e"
-ALIGNQUERYTERM="startingNoStim"
+# ITERATOR="e"
+# ALIGNQUERYTERM="startingNoStim"
 #
 ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
 

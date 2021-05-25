@@ -55,9 +55,9 @@
 # EXP="exp202009231400"
 # EXP="exp202010071400"
 # EXP="exp202010081400"
-EXP="exp202010151400"
+# EXP="exp202010151400"
 # EXP="exp202010191100"
-# EXP="exp202012171300"
+EXP="exp202012171300"
 # EXP="exp202012221300"
 
 # 
@@ -83,6 +83,10 @@ ALIGNQUERY="--alignQuery=stimOnLessThan30Hz"
 INPUTBLOCKNAME="--emgBlockSuffix=emg"
 # python -u ./plotEcapEMGCorrelation.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --alignQuery="stimOn"
 
+ANALYSISFOLDER="--analysisName=fullRes"
+INPUTBLOCKNAME="--inputBlockSuffix=lfp_raw"
+python -u ./plotLmFitPerformance.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --alignQuery="stimOn" --showFigures
+
 ANALYSISFOLDER="--analysisNameLFP=fullRes --analysisNameEMG=loRes"
 INPUTBLOCKNAME="--emgBlockSuffix=emg --lfpBlockSuffix=lfp_raw"
-python -u ./plotEcapEMGCorrelationFromAuto.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --alignQuery="stimOn" --showFigures
+# python -u ./plotEcapEMGCorrelationFromAuto.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --alignQuery="stimOn" --showFigures
