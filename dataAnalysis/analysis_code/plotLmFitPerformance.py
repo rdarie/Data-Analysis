@@ -61,8 +61,8 @@ globals().update(expOpts)
 globals().update(allOpts)
 #
 sns.set(
-    context='notebook', style='dark',
-    palette='dark', font='sans-serif',
+    context='notebook', style='darkgrid',
+    palette='pastel', font='sans-serif',
     font_scale=1.5, color_codes=True)
 #
 analysisSubFolder = os.path.join(
@@ -86,11 +86,24 @@ amplitudeFieldName = 'nominalCurrent'
 #  End Overrides
 ecapPath = os.path.join(
     calcSubFolder, 'lmfit',
-    prefix + '_{}_{}_lmfit_signals.parquet'.format(
+    prefix + '_{}_{}_lmfit_signals_CAR.parquet'.format(
         arguments['inputBlockSuffix'], arguments['window']))
 rawEcapDF = pd.read_parquet(ecapPath, engine='fastparquet')
 rawEcapDF.loc[:, 'nominalCurrent'] = rawEcapDF['nominalCurrent'] * (-1)
+# simplify electrode names
+pdb.set_trace()
+rawEcapDF.loc[:, 'electrode'] = rawEcapDF['electrode'].apply(lambda x: x[1:])
+
+if RCPlotOpts['rejectFeatures'] is not None:
+    rejectDataMask = rawEcapDF['featureName'].isin(RCPlotOpts['rejectFeatures'])
+    rawEcapDF = rawEcapDF.loc[~rejectDataMask, :]
+
+removeStimOnRec = True
+if removeStimOnRec:
+    ecapRmMask = (rawEcapDF['electrode'] == rawEcapDF['feature'])
+    rawEcapDF.drop(index=rawEcapDF.index[ecapRmMask], inplace=True)
 #
+###############################################################################
 mapDF = prb_meta.mapToDF(rippleMapFile[int(arguments['blockIdx'])])
 mapDF.loc[:, 'whichArray'] = mapDF['elecName'].apply(lambda x: x[:-1])
 mapDF.loc[:, 'shifted_xcoords'] = mapDF['xcoords']
@@ -108,98 +121,156 @@ elecSideLookup = {
 }
 mapDF.loc[:, 'electrodeSide'] = mapDF['elecName'].map(elecSideLookup)
 mapAMask = (mapDF['channelRepetition'] == 'a').to_numpy()
+# name lookup
 lfpNL = mapDF.loc[mapAMask, :].set_index('topoName')
-pdb.set_trace()
-# simplify electrode names
-rawEcapDF.loc[:, 'electrode'] = rawEcapDF['electrode'].apply(lambda x: x[1:])
-rawEcapDF.loc[:, 'feature'] = rawEcapDF['feature'].apply(lambda x: x[:-4])
-removeStimOnRec = True
-if removeStimOnRec:
-    ecapRmMask = (rawEcapDF['electrode'] == rawEcapDF['feature'])
-    rawEcapDF.drop(index=rawEcapDF.index[ecapRmMask], inplace=True)
+uniqueX = np.unique(mapDF['xcoords'])
+xUnshiftedPalette = pd.Series(
+    sns.color_palette('rocket', n_colors=uniqueX.size),
+    index=uniqueX
+    )
+uniqueY = np.unique(mapDF['ycoords'])
+yUnshiftedPalette = pd.Series(
+    sns.color_palette('mako', n_colors=uniqueY.size),
+    index=uniqueY
+    )
+xPalette = (
+    mapDF
+        .loc[:, ['xcoords', 'shifted_xcoords']]
+        .set_index('shifted_xcoords')['xcoords']
+        .map(xUnshiftedPalette)
+        .drop_duplicates())
+mapDF.loc[:, 'xcoords'] = mapDF['shifted_xcoords'].copy()
+###############################################################################
 #
 trialMetaNames = [
     'segment', 'originalIndex', 't',
     'RateInHz',
     'electrode', amplitudeFieldName]
+annotNames = ['xcoords', 'ycoords', 'whichArray']
+featureMetaNames = annotNames + ['regrID', 'feature']
 keepCols = trialMetaNames + ['feature']
-timeBinMask = ~rawEcapDF.columns.isin(['regrID', 'feature'] + trialMetaNames)
-newComponents = []
-print('Getting CAR')
-for name, group in tqdm(rawEcapDF.groupby(['segment', 'originalIndex', 't'])):
-    meanExpResid = group.loc[group['regrID'] == 'exp_resid', timeBinMask].mean()
-    #
-    expResidCAR = group.loc[group['regrID'] == 'exp_resid', :].copy()
-    expResidCAR.loc[:, 'regrID'] = 'exp_resid_CAR'
-    expResidCAR.loc[:, timeBinMask] = expResidCAR.loc[:, timeBinMask] - meanExpResid
-    newComponents.append(expResidCAR)
-    #
-    expResidMean = group.loc[group['regrID'] == 'exp_resid', :].copy()
-    expResidMean.loc[:, 'regrID'] = 'exp_resid_mean'
-    expResidMean.loc[:, timeBinMask] = np.tile(meanExpResid, (expResidMean.shape[0], 1))
-    newComponents.append(expResidMean)
-#
-plotDF = pd.concat([rawEcapDF] + newComponents)
+for colName in keepCols:
+    if colName not in rawEcapDF.columns:
+        rawEcapDF.loc[:, colName] = 0.
+plotDF = rawEcapDF.copy()
 plotDF.loc[:, 'columnLabel'] = 'NA'
-plotDF.loc[plotDF['regrID'].isin(['model', 'target', 'exp_']), 'columnLabel'] = 'targets'
+plotDF.loc[plotDF['regrID'].isin(['target', 'exp_']), 'columnLabel'] = 'targets'
 plotDF.loc[plotDF['regrID'].isin(['exp_resid_CAR', 'exp_resid_mean']), 'columnLabel'] = 'CAR'
-plotDF.loc[plotDF['regrID'].isin(['p1_', 'n1_', 'p2_', 'p3_', 'n2_', 'p4_', 'exp_resid']), 'columnLabel'] = 'components'
+plotDF.loc[plotDF['regrID'].isin(['exp_resid']), 'columnLabel'] = 'components'
+plotDF.drop(index=plotDF.index[plotDF['columnLabel'] == 'NA'], inplace=True)
 #
 plotDF.loc[:, 'rowLabel'] = (
     plotDF['electrode'].astype(np.str) +
     ': ' +
     plotDF[amplitudeFieldName].astype(np.str))
 relplotKWArgs.pop('palette', None)
-plotDF.drop(index=plotDF.index[plotDF['columnLabel'] == 'NA'], inplace=True)
 ###########################
-timeScales = ['3', '8', '40']
-# timeScales = ['8']
-plotDF.set_index(['regrID', 'feature', 'columnLabel', 'rowLabel'] + trialMetaNames, inplace=True)
+timeScales = ['10', '4']
+plotDF.set_index(['regrID', 'feature', 'columnLabel', 'rowLabel'] + annotNames + trialMetaNames, inplace=True)
 plotDF.columns = plotDF.columns.astype(float)
 relplotKWArgs['height'] = 4
 relplotKWArgs['aspect'] = 1.5
 colOrder = ['targets', 'components', 'CAR']
-for timeScale in timeScales:
-    pdfPath = os.path.join(
-        figureOutputFolder,
-        prefix + '_{}_{}_lmfit_{}_msec.pdf'.format(
-            arguments['inputBlockSuffix'], arguments['window'], timeScale))
-    pageCount = 0
-    with PdfPages(pdfPath) as pdf:
-        for pageName, group in tqdm(plotDF.groupby('feature')):
-            plotGroup = group.stack().to_frame(name='signal').reset_index()
-            g = sns.relplot(
-                # data=plotGroup,
-                data=plotGroup.query('(bin < {}e-3) & (bin >= 0.9e-3)'.format(timeScale)),
-                x='bin', y='signal',
-                hue='regrID',
-                row='rowLabel', col='columnLabel',
-                facet_kws=dict(sharey=False), palette='Set1',
-                lw=2, col_order=colOrder,
-                **relplotKWArgs)
-            pageTitle = g.fig.suptitle(pageName)
-            saveLegendOpts = {
-                    'bbox_extra_artists': [pageTitle]}
-            # contrived way of pushing legend outside without
-            # resizing the figure
-            allLegends = [
-                a.get_legend()
-                for a in g.axes.flat
-                if a.get_legend() is not None] + [g._legend]
-            if len(allLegends):
-                # bb = matplotlib.transforms.Bbox([[-1.01, 0.01], [-0.01, 1.01]])
-                # allLegends[0].set_bbox_to_anchor(bb)
-                saveLegendOpts.update({
-                    'bbox_extra_artists': [pageTitle] + allLegends})
-            g.fig.set_size_inches(
-                g._ncol * relplotKWArgs['height'] * relplotKWArgs['aspect'] + 10,
-                g._nrow * relplotKWArgs['height'] + 2)
-            pdf.savefig(bbox_inches='tight', pad_inches=0, **saveLegendOpts)
-            if arguments['showFigures']:
-                plt.show()
-            else:
-                plt.close()
-            pageCount += 1
-            if limitPages is not None:
-                if pageCount > limitPages:
-                    break
+if False:
+    for timeScale in timeScales:
+        pdfPath = os.path.join(
+            figureOutputFolder,
+            prefix + '_{}_{}_lmfit_{}_msec.pdf'.format(
+                arguments['inputBlockSuffix'], arguments['window'], timeScale))
+        pageCount = 0
+        with PdfPages(pdfPath) as pdf:
+            # for pageName, group in tqdm(plotDF.groupby('feature')):
+            for pageName, group in tqdm(plotDF.groupby(['rowLabel', 'columnLabel'])):
+                print('Plotting {}'.format(pageName))
+                plotGroup = group.stack().to_frame(name='signal').reset_index()
+                if True:
+                    # group by rowLabel, columnLabel
+                    g = sns.relplot(
+                        # data=plotGroup,
+                        data=plotGroup.query('(bin < {}e-3) & (bin >= 1.3e-3)'.format(timeScale)),
+                        x='bin', y='signal',
+                        hue='regrID',
+                        row='xcoords', col='ycoords',
+                        palette='Set1', lw=2,
+                        **relplotKWArgs)
+                else:
+                    g = sns.relplot(
+                        # data=plotGroup,
+                        data=plotGroup.query('(bin < {}e-3) & (bin >= 1.3e-3)'.format(timeScale)),
+                        x='bin', y='signal',
+                        hue='regrID',
+                        row='rowLabel', col='columnLabel',
+                        facet_kws=dict(sharey=False), palette='Set1',
+                        lw=2, col_order=colOrder,
+                        **relplotKWArgs)
+                pageTitle = g.fig.suptitle(pageName)
+                saveLegendOpts = {
+                        'bbox_extra_artists': [pageTitle]}
+                # contrived way of pushing legend outside without
+                # resizing the figure
+                allLegends = [
+                    a.get_legend()
+                    for a in g.axes.flat
+                    if a.get_legend() is not None] + [g._legend]
+                if len(allLegends):
+                    # bb = matplotlib.transforms.Bbox([[-1.01, 0.01], [-0.01, 1.01]])
+                    # allLegends[0].set_bbox_to_anchor(bb)
+                    saveLegendOpts.update({
+                        'bbox_extra_artists': [pageTitle] + allLegends})
+                g.fig.set_size_inches(
+                    g._ncol * relplotKWArgs['height'] * relplotKWArgs['aspect'] + 10,
+                    g._nrow * relplotKWArgs['height'] + 2)
+                pdf.savefig(bbox_inches='tight', pad_inches=0, **saveLegendOpts)
+                if arguments['showFigures']:
+                    plt.show()
+                else:
+                    plt.close()
+                pageCount += 1
+                if limitPages is not None:
+                    if pageCount > limitPages:
+                        break
+if True:
+    for timeScale in timeScales:
+        pdfPath = os.path.join(
+            figureOutputFolder,
+            prefix + '_{}_{}_lmfit_by_amplitude_{}_msec.pdf'.format(
+                arguments['inputBlockSuffix'], arguments['window'], timeScale))
+        pageCount = 0
+        maskForThisPlot = plotDF.index.get_level_values('regrID').isin(['exp_resid', 'exp_resid_CAR', 'target'])
+        with PdfPages(pdfPath) as pdf:
+            for pageName, group in tqdm(plotDF.loc[maskForThisPlot, :].groupby(['electrode', 'regrID'])):
+                print('Plotting {}'.format(pageName))
+                plotGroup = group.stack().to_frame(name='signal').reset_index()
+                g = sns.relplot(
+                    # data=plotGroup,
+                    data=plotGroup.query('(bin < {}e-3) & (bin >= 1.3e-3)'.format(timeScale)),
+                    x='bin', y='signal',
+                    hue=amplitudeFieldName,
+                    row='ycoords', col='xcoords', lw=2,
+                    **relplotKWArgs)
+                pageTitle = g.fig.suptitle(pageName)
+                saveLegendOpts = {
+                        'bbox_extra_artists': [pageTitle]}
+                # contrived way of pushing legend outside without
+                # resizing the figure
+                allLegends = [
+                    a.get_legend()
+                    for a in g.axes.flat
+                    if a.get_legend() is not None] + [g._legend]
+                if len(allLegends):
+                    # bb = matplotlib.transforms.Bbox([[-1.01, 0.01], [-0.01, 1.01]])
+                    # allLegends[0].set_bbox_to_anchor(bb)
+                    saveLegendOpts.update({
+                        'bbox_extra_artists': [pageTitle] + allLegends})
+                g.fig.set_size_inches(
+                    g._ncol * relplotKWArgs['height'] * relplotKWArgs['aspect'] + 10,
+                    g._nrow * relplotKWArgs['height'] + 2)
+                pdf.savefig(bbox_inches='tight', pad_inches=0, **saveLegendOpts)
+                if arguments['showFigures']:
+                    plt.show()
+                else:
+                    plt.close()
+                pageCount += 1
+                if limitPages is not None:
+                    if pageCount > limitPages:
+                        break

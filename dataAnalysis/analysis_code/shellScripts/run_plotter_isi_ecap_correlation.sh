@@ -9,11 +9,11 @@
 #SBATCH --mem=64G
 
 # Specify a job name:
-#SBATCH -J isi_preproc_15
+#SBATCH -J isi_preproc_17
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-isi_preproc_15.out
-#SBATCH -e ../../batch_logs/%j-%a-isi_preproc_15.out
+#SBATCH -o ../../batch_logs/%j-%a-isi_preproc_17.out
+#SBATCH -e ../../batch_logs/%j-%a-isi_preproc_17.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -55,9 +55,9 @@
 # EXP="exp202009231400"
 # EXP="exp202010071400"
 # EXP="exp202010081400"
-EXP="exp202010151400"
+# EXP="exp202010151400"
 # EXP="exp202010191100"
-# EXP="exp202012171300"
+EXP="exp202012171300"
 # EXP="exp202012221300"
 
 # 
@@ -66,7 +66,7 @@ module load anaconda/2020.02
 conda activate
 source activate nda2
 python --version
-#
+####
 
 export OUTDATED_IGNORE=1
 LAZINESS="--lazy"
@@ -76,6 +76,7 @@ WINDOW="--window=XXS"
 # WINDOW="--window=XS"
 
 SLURM_ARRAY_TASK_ID=1
+# BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
 
 INPUTBLOCKNAME="--inputBlockSuffix=emg"
@@ -85,8 +86,9 @@ INPUTBLOCKNAME="--emgBlockSuffix=emg"
 
 ANALYSISFOLDER="--analysisName=fullRes"
 INPUTBLOCKNAME="--inputBlockSuffix=lfp_raw"
+# python -u ./applyCARToLmFitResults.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --alignQuery="stimOn"
 python -u ./plotLmFitPerformance.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --alignQuery="stimOn"
 
 ANALYSISFOLDER="--analysisNameLFP=fullRes --analysisNameEMG=loRes"
 INPUTBLOCKNAME="--emgBlockSuffix=emg --lfpBlockSuffix=lfp_raw"
-python -u ./plotEcapEMGCorrelationFromAuto.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --alignQuery="stimOn"
+# python -u ./plotEcapEMGCorrelationFromAuto.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --alignQuery="stimOn"

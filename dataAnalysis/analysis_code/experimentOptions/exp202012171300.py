@@ -12,7 +12,7 @@ def getExpOpts():
         }
     experimentName = '202012171300-Goat'
     deviceName = None
-    subjectName = 'Rupert'
+    subjectName = 'Goat'
     rippleMapFile = {
         1: 'isi_port1nano1caudal_xAyBzC_ortho_port2nano1rostral_xAyBzC_ortho.map',
         2: 'isi_port1nano1caudal_xAyBzC_ortho_port2nano1rostral_xAyBzC_ortho.map',
@@ -197,6 +197,7 @@ def getExpOpts():
         ]
     '''
     RCPlotOpts = {
+        'rejectFeatures': ['rostralY_e12'],
         'keepFeatures': [
             'LBicepsFemoris', 'LGastrocnemius', 'LGracilis', 'LPeroneusLongus',
             'RBicepsFemoris', 'RGastrocnemius', 'RGracilis', 'RPeroneusLongus',
@@ -206,7 +207,7 @@ def getExpOpts():
             ],
         # 'keepElectrodes': ['caudalY_e11', 'caudalZ_e18', 'caudalZ_e23'],
         # 'keepElectrodes': ['caudalZ_e23', 'caudalZ_e18', 'caudalZ_e22', 'caudalZ_e24'],
-        'keepElectrodes': None,
+        'keepElectrodes': ['caudalY_e11', 'caudalZ_e18', 'caudalZ_e23'],
         'significantOnly': False,
         }
     RCCalcOpts = {
@@ -217,6 +218,7 @@ def getExpOpts():
             # 'LThoracolumbarFascia', 'RThoracolumbarFascia',
             # 'RExtensorDigitorum', 'LSemitendinosus', 'RSemitendinosus',
         ],
+        'rejectFeatures': ['rostralY_e12'],
         'keepElectrodes': None,
         # 'keepElectrodes': ['-caudalY_e11', '-caudalZ_e18', '-caudalZ_e23'],
         'significantOnly': False,
