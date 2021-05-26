@@ -39,6 +39,7 @@ import dill as pickle
 import pandas as pd
 idsl = pd.IndexSlice
 import numpy as np
+from tqdm import tqdm
 import dataAnalysis.plotting.spike_sorting_plots as ssplt
 from scipy import stats
 from sklearn.preprocessing import RobustScaler, MinMaxScaler, StandardScaler
@@ -76,7 +77,7 @@ alignSubFolderEMG = os.path.join(
 calcSubFolderLFP = os.path.join(alignSubFolderLFP, 'dataframes')
 calcSubFolderEMG = os.path.join(alignSubFolderEMG, 'dataframes')
 figureOutputFolder = os.path.join(
-    figureFolder, arguments['analysisNameLFP'])
+    figureFolder, arguments['analysisNameLFP'], arguments['alignFolderName'])
 if not os.path.exists(figureOutputFolder):
     os.makedirs(figureOutputFolder, exist_ok=True)
 if arguments['processAll']:
@@ -94,6 +95,11 @@ limitPages = None
 amplitudeFieldName = 'nominalCurrent'
 # amplitudeFieldName = 'amplitudeCat'
 #  End Overrides
+trialMetaNames = [
+    'segment', 'originalIndex', 't',
+    'RateInHz',
+    'electrode', 'nominalCurrent']
+keepCols = trialMetaNames + ['feature']
 ecapPath = os.path.join(
     calcSubFolderLFP, 'lmfit',
     prefix + '_{}_{}_lmfit_signals.parquet'.format(
@@ -105,20 +111,26 @@ rawEcapDF.drop(index=dropIndices, inplace=True)
 # simplify electrode names
 rawEcapDF.loc[:, 'electrode'] = rawEcapDF['electrode'].apply(lambda x: x[1:])
 rawEcapDF.loc[:, 'feature'] = rawEcapDF['feature'].apply(lambda x: x[:-4])
-# rawEcapDF.shape
-ecapDF = rawEcapDF.loc[rawEcapDF['regrID'] == 'exp_resid', :].copy()
-ecapDF.drop(columns=['regrID'], inplace=True)
-# pdb.set_trace()
-trialMetaNames = [
-    'segment', 'originalIndex', 't',
-    'RateInHz',
-    'electrode', 'nominalCurrent']
-keepCols = trialMetaNames + ['feature']
-
 removeStimOnRec = True
 if removeStimOnRec:
-    ecapRmMask = (ecapDF['electrode'] == ecapDF['feature'])
-    ecapDF.drop(index=ecapDF.index[ecapRmMask], inplace=True)
+    ecapRmMask = (rawEcapDF['electrode'] == rawEcapDF['feature'])
+    rawEcapDF.drop(index=rawEcapDF.index[ecapRmMask], inplace=True)
+timeBinMask = ~rawEcapDF.columns.isin(['regrID', 'feature'] + trialMetaNames)
+newComponents = []
+print('Getting CAR')
+for name, group in tqdm(rawEcapDF.groupby(['segment', 'originalIndex', 't'])):
+    meanExpResid = group.loc[group['regrID'] == 'exp_resid', timeBinMask].mean()
+    #
+    expResidCAR = group.loc[group['regrID'] == 'exp_resid', :].copy()
+    expResidCAR.loc[:, 'regrID'] = 'exp_resid_CAR'
+    expResidCAR.loc[:, timeBinMask] = expResidCAR.loc[:, timeBinMask] - meanExpResid
+    newComponents.append(expResidCAR)
+#
+rawEcapDF = pd.concat([rawEcapDF] + newComponents)
+# rawEcapDF.shape
+ecapDF = rawEcapDF.loc[rawEcapDF['regrID'] == 'exp_resid_CAR', :].copy()
+ecapDF.drop(columns=['regrID'], inplace=True)
+# pdb.set_trace()
 ecapDF.set_index(
     [
         idxName
@@ -126,11 +138,11 @@ ecapDF.set_index(
         if idxName in ecapDF.columns],
     inplace=True)
 ecapDF.columns = ecapDF.columns.astype(float)
-ecapDetrender = ash.genDetrender(
+'''ecapDetrender = ash.genDetrender(
     timeWindow=[35e-3, 39e-3], useMean=False)
-ecapDF = ecapDetrender(ecapDF, None)
+ecapDF = ecapDetrender(ecapDF, None)'''
 #
-ecapTWinStart, ecapTWinStop = 1.3e-3, 4e-3
+ecapTWinStart, ecapTWinStop = 1.5e-3, 4.5e-3
 qLimsEcap = (2.5e-3, 1-2.5e-3)
 emgTWinStart, emgTWinStop = 0, 39e-3
 #

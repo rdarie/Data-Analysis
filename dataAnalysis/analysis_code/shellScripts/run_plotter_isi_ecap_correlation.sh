@@ -5,15 +5,15 @@
 #SBATCH --time=12:00:00
 
 #SBATCH --nodes=1
-#SBATCH --ntasks=32
+#SBATCH --ntasks=1
 #SBATCH --mem=64G
 
 # Specify a job name:
-#SBATCH -J isi_preproc_one_shot
+#SBATCH -J isi_preproc_15
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-isi_preproc_one_shot.out
-#SBATCH -e ../../batch_logs/%j-%a-isi_preproc_one_shot.out
+#SBATCH -o ../../batch_logs/%j-%a-isi_preproc_15.out
+#SBATCH -e ../../batch_logs/%j-%a-isi_preproc_15.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -55,9 +55,9 @@
 # EXP="exp202009231400"
 # EXP="exp202010071400"
 # EXP="exp202010081400"
-# EXP="exp202010151400"
+EXP="exp202010151400"
 # EXP="exp202010191100"
-EXP="exp202012171300"
+# EXP="exp202012171300"
 # EXP="exp202012221300"
 
 # 
@@ -85,8 +85,8 @@ INPUTBLOCKNAME="--emgBlockSuffix=emg"
 
 ANALYSISFOLDER="--analysisName=fullRes"
 INPUTBLOCKNAME="--inputBlockSuffix=lfp_raw"
-python -u ./plotLmFitPerformance.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --alignQuery="stimOn" --showFigures
+python -u ./plotLmFitPerformance.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --alignQuery="stimOn"
 
 ANALYSISFOLDER="--analysisNameLFP=fullRes --analysisNameEMG=loRes"
 INPUTBLOCKNAME="--emgBlockSuffix=emg --lfpBlockSuffix=lfp_raw"
-# python -u ./plotEcapEMGCorrelationFromAuto.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --alignQuery="stimOn" --showFigures
+python -u ./plotEcapEMGCorrelationFromAuto.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --alignQuery="stimOn"

@@ -40,7 +40,7 @@ ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
 # ALIGNQUERYTERM="startingE5"
 # ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
 
-# used d in the aligned to stim category#####
+# used d in the aligned to stim category######
 
 # ITERATOR="--iteratorSuffix=e"
 # ROIOPTS="--calcTimeROI --ROIWinStart=-100 --ROIWinStop=100 --timeROIAlignQuery=stopping"

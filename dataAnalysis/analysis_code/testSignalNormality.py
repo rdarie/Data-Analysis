@@ -127,76 +127,122 @@ if __name__ == '__main__':
             maskParams = {k: v for k, v in zip(featureMask.index.names, maskIdx)}
             dataGroup = dataDF.loc[:, featureMask]
             originalDataGroup = originalDataDF.loc[:, featureMask]
-            hzResDict1 = {'normalized': {}, 'original': {}}
             ntResDict1 = {'normalized': {}, 'original': {}}
-            hsResDict1 = {'normalized': {}, 'original': {}}
+            if dataGroup.shape[1] > 1:
+                hsResDict1 = {'normalized': {}, 'original': {}}
+                hzResDict1 = {'normalized': {}, 'original': {}}
             for foldIdx, (tr, te) in enumerate(cvIterator.split(dataGroup)):
                 print('On fold {}'.format(foldIdx))
-                # Test equality of variance
-                hsResDict1['normalized'][foldIdx] = pg.homoscedasticity(
-                    dataGroup.iloc[tr, :]).reset_index().rename(columns={'index': 'method'})
-                hsResDict1['original'][foldIdx] = pg.homoscedasticity(
-                    originalDataGroup.iloc[tr, :]).reset_index().rename(columns={'index': 'method'})
-                #
-                # Henze-Zirkler multivariate normality test.
-                hzr = pg.multivariate_normality(
-                    dataGroup.iloc[tr, :].to_numpy(), alpha=0.05)
-                hzResDict1['normalized'][foldIdx] = pd.Series(hzr, index=['hz', 'pval', 'normal']).to_frame(name=foldIdx)
-                hzrO = pg.multivariate_normality(
-                    originalDataGroup.iloc[tr, :].to_numpy(), alpha=0.05)
-                hzResDict1['original'][foldIdx] = pd.Series(hzrO, index=['hz', 'pval', 'normal']).to_frame(name=foldIdx)
+                if dataGroup.shape[1] > 1:
+                    # Test equality of variance
+                    hsResDict1['normalized'][foldIdx] = pg.homoscedasticity(
+                        dataGroup.iloc[tr, :]).reset_index().rename(columns={'index': 'method'})
+                    hsResDict1['original'][foldIdx] = pg.homoscedasticity(
+                        originalDataGroup.iloc[tr, :]).reset_index().rename(columns={'index': 'method'})
+                    #
+                    # Henze-Zirkler multivariate normality test.
+                    hzr = pg.multivariate_normality(
+                        dataGroup.iloc[tr, :].to_numpy(), alpha=0.05)
+                    hzResDict1['normalized'][foldIdx] = pd.Series(hzr, index=['hz', 'pval', 'normal']).to_frame(name=foldIdx)
+                    hzrO = pg.multivariate_normality(
+                        originalDataGroup.iloc[tr, :].to_numpy(), alpha=0.05)
+                    hzResDict1['original'][foldIdx] = pd.Series(hzrO, index=['hz', 'pval', 'normal']).to_frame(name=foldIdx)
                 # Univariate normality test.
                 ntResDict1['normalized'][foldIdx] = pg.normality(
                     dataGroup.iloc[tr, :], method='normaltest')
                 ntResDict1['original'][foldIdx] = pg.normality(
                     originalDataGroup.iloc[tr, :], method='normaltest')
-            hzTemp = {
-                k: pd.concat(hzResDict1[k], axis='columns', names=['fold']).T
-                for k in ['original', 'normalized']
-                }
-            hzResDict0[maskParams['freqBandName']] = pd.concat(hzTemp, names=['dataType'])
             ntTemp = {
                 k: pd.concat(ntResDict1[k], names=['fold'])
                 for k in ['original', 'normalized']
                 }
             ntResDict0[maskParams['freqBandName']] = pd.concat(ntTemp, names=['dataType'])
-            hsTemp = {
-                k: pd.concat(hsResDict1[k], names=['fold'])
-                for k in ['original', 'normalized']
-                }
-            hsResDict0[maskParams['freqBandName']] = pd.concat(hsTemp, names=['dataType'])
+            if dataGroup.shape[1] > 1:
+                hzTemp = {
+                    k: pd.concat(hzResDict1[k], axis='columns', names=['fold']).T
+                    for k in ['original', 'normalized']
+                    }
+                hzResDict0[maskParams['freqBandName']] = pd.concat(hzTemp, names=['dataType'])
+                hsTemp = {
+                    k: pd.concat(hsResDict1[k], names=['fold'])
+                    for k in ['original', 'normalized']
+                    }
+                hsResDict0[maskParams['freqBandName']] = pd.concat(hsTemp, names=['dataType'])
         hzResDF = pd.concat(hzResDict0, names=['freqBandName'])
         hzResDF.to_hdf(outputPath, 'henzeZirkler')
+        hzResDF.loc[:, 'hz'] = hzResDF['hz'].astype(float)
         hsResDF = pd.concat(hsResDict0, names=['freqBandName'])
         hsResDF.to_hdf(outputPath, 'homoscedasticity')
         ntResDF = pd.concat(ntResDict0, names=['freqBandName'])
+        ntResDF.index = ntResDF.index.droplevel(0)
         ntResDF.to_hdf(outputPath, 'univariateNormality')
         #
         pdfPath = os.path.join(figureOutputFolder, '{}_normality_tests.pdf'.format(datasetName))
         pdb.set_trace()
         with PdfPages(pdfPath) as pdf:
             plotGroup = hzResDF.reset_index()
-
+            plotGroup.loc[:, 'xDummy'] = 0
+            g = sns.catplot(
+                y='hz', x='freqBandName',
+                kind='box', hue='dataType', sharey=False,
+                data=plotGroup)
+            g.fig.set_size_inches((12, 8))
+            g.fig.suptitle('{}'.format('henzeZirkler'))
+            g.fig.tight_layout(pad=1)
+            pdf.savefig(bbox_inches='tight', pad_inches=.2)
+            if arguments['showFigures']:
+                plt.show()
+            else:
+                plt.close()
+            ##
+            plotGroup = hsResDF.reset_index()
+            plotGroup.loc[:, 'xDummy'] = 0
+            g = sns.catplot(
+                y='W', x='freqBandName',
+                kind='box', hue='dataType', sharey=False,
+                data=plotGroup)
+            g.fig.set_size_inches((12, 8))
+            g.fig.suptitle('{}'.format('homoscedasticity W'))
+            g.fig.tight_layout(pad=1)
+            pdf.savefig(bbox_inches='tight', pad_inches=.2)
+            if arguments['showFigures']:
+                plt.show()
+            else:
+                plt.close()
+            ##
+            plotGroup = ntResDF.reset_index()
+            plotGroup.loc[:, 'xDummy'] = 0
+            g = sns.catplot(
+                y='W', x='freqBandName',
+                kind='box', hue='dataType', sharey=False,
+                data=plotGroup)
+            g.fig.set_size_inches((12, 8))
+            g.fig.suptitle('{}'.format('normality W'))
+            g.fig.tight_layout(pad=1)
+            pdf.savefig(bbox_inches='tight', pad_inches=.2)
+            if arguments['showFigures']:
+                plt.show()
+            else:
+                plt.close()
     pdfPath = os.path.join(figureOutputFolder, '{}_signal_distributions.pdf'.format(datasetName))
-    if True:
-        with PdfPages(pdfPath) as pdf:
-            for name, group in dataDF.groupby('feature', axis='columns'):
-                plotTemp = {
-                    'normalized': group.copy(),
-                    'original': originalDataDF.loc[:, group.columns].copy()}
-                plotGroup = pd.concat(plotTemp, names=['dataType'])
-                plotGroup.columns = plotGroup.columns.get_level_values('feature')
-                plotGroup.reset_index(inplace=True)
-                plotGroup.loc[:, 'xDummy'] = 0
-                g = sns.catplot(
-                    x='xDummy', y=name, hue='expName',
-                    kind='violin', col='dataType', sharey=False,
-                    data=plotGroup)
-                g.fig.set_size_inches((12, 8))
-                g.fig.suptitle('{}'.format(name))
-                g.fig.tight_layout(pad=1)
-                pdf.savefig(bbox_inches='tight', pad_inches=0)
-                if arguments['showFigures']:
-                    plt.show()
-                else:
-                    plt.close()
+    with PdfPages(pdfPath) as pdf:
+        for name, group in dataDF.groupby('feature', axis='columns'):
+            plotTemp = {
+                'normalized': group.copy(),
+                'original': originalDataDF.loc[:, group.columns].copy()}
+            plotGroup = pd.concat(plotTemp, names=['dataType'])
+            plotGroup.columns = plotGroup.columns.get_level_values('feature')
+            plotGroup.reset_index(inplace=True)
+            plotGroup.loc[:, 'xDummy'] = 0
+            g = sns.catplot(
+                x='xDummy', y=name, hue='expName',
+                kind='violin', col='dataType', sharey=False,
+                data=plotGroup)
+            g.fig.set_size_inches((12, 8))
+            g.fig.suptitle('{}'.format(name))
+            g.fig.tight_layout(pad=1)
+            pdf.savefig(bbox_inches='tight', pad_inches=0.2)
+            if arguments['showFigures']:
+                plt.show()
+            else:
+                plt.close()

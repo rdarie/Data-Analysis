@@ -24,12 +24,12 @@
 
 #
 # EXP="exp202010151400"
-EXP="exp202012171300"
+# EXP="exp202012171300"
 # EXP="exp202012221300"
 # EXP="exp201901070700"
 # EXP="exp202101141100"
 # EXP="exp202101191100"
-# EXP="exp202101201100"
+EXP="exp202101201100"
 # EXP="exp202101211100"
 # EXP="exp202101221100"
 # EXP="exp202101251100"
@@ -53,11 +53,12 @@ python --version
 
 # global operations
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --preprocFolderFiles --fromScratchToData --moveItems
-# python './shuttleFilesToFromScratch.py' --exp=$EXP --preprocFolderFiles --preprocFolderSubfolders --fromScratchToData --moveItems
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --preprocFolderFiles --preprocFolderSubfolders --fromScratchToData
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --preprocFolderFiles --fromDataToScratch
-python './shuttleFilesToFromScratch.py' --exp=$EXP --preprocFolderSubfolders --fromDataToScratch
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --fileSearchTerm='*.parquet' --fromDataToScratch
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --fileSearchTerm='*_emg_XXS*' --fromDataToScratch
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --fileSearchTerm='*epochs*' --fromDataToScratch
 
 # everything to data
-# python './shuttleFilesToFromScratch.py' --exp=$EXP --preprocFolderSubfolders --fromScratchToData
-# python './shuttleFilesToFromScratch.py' --exp=$EXP --preprocFolderFiles --fromScratchToData
+python './shuttleFilesToFromScratch.py' --exp=$EXP --preprocFolderSubfolders --fromScratchToData --moveItems
+python './shuttleFilesToFromScratch.py' --exp=$EXP --preprocFolderFiles --fromScratchToData --moveItems

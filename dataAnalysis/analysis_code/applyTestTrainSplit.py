@@ -205,7 +205,7 @@ if arguments['selectionName'] == 'lfp_CAR_spectral':
             thisMask.columns = pd.MultiIndex.from_tuples(
                 (attrValues, ), names=featureGroupNames)
         maskList.append(thisMask.T)
-# each lag    
+# each lag
 for name, group in exportDF.groupby('lag', axis='columns'):
     attrValues = ['all' for fgn in featureGroupNames]
     attrValues[featureGroupNames.index('lag')] = name
