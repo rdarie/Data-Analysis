@@ -184,6 +184,7 @@ def getExpOpts():
             'RGastrocnemiusEmgEnv#0'
         ]
     RCPlotOpts = {
+        'rejectFeatures': None,
         'keepFeatures': [
             'LBicepsFemoris', 'LGastrocnemius', 'LGracilis',
             'LPeroneusLongus',
@@ -198,6 +199,7 @@ def getExpOpts():
         'significantOnly': False,
     }
     RCCalcOpts = {
+        'rejectFeatures': None,
         'keepFeatures': [
             'LBicepsFemoris', 'LGastrocnemius', 'LGracilis',
             'LPeroneusLongus',

@@ -1275,6 +1275,9 @@ def alignedAsigsToDF(
     allWaveforms.sort_index(
         axis='columns', inplace=True, kind='mergesort')
     if dropNaNs:
+        allNaNIndex = allWaveforms.index[allWaveforms.isna().all(axis='columns')]
+        # allNaNIndex.to_frame().reset_index(drop=True)
+        allWaveforms.drop(index=allNaNIndex, inplace=True)
         if transposeToColumns == 'bin':
             allWaveforms.dropna(inplace=True, axis='columns')
         elif transposeToColumns == 'feature':

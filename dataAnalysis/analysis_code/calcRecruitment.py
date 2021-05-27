@@ -108,7 +108,8 @@ if outlierTrials is not None:
     asigWide = asigWide.loc[~outlierMask.to_numpy(), :]
 
 # pre-standardize
-preStandardizeBounds = [-100e-3, -40e-3]
+preStandardizeBounds = [-90e-3, -50e-3]
+# pdb.set_trace()
 preStMask = (asigWide.columns >= preStandardizeBounds[0]) & (asigWide.columns < preStandardizeBounds[1])
 
 for name, group in asigWide.groupby(['feature']):

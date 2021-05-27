@@ -118,7 +118,15 @@ for colName in keepCols:
     if colName not in rawEcapDF.columns:
         rawEcapDF.loc[:, colName] = 0.
 # rawEcapDF.shape
-ecapDF = rawEcapDF.loc[rawEcapDF['regrID'] == 'target_CAR', :].copy()
+ecapTWinStart, ecapTWinStop = 1e-3, 3e-3
+qLimsEcap = (2.5e-3, 1-2.5e-3)
+emgTWinStart, emgTWinStop = 0, 39e-3
+#
+barVarName = 'R2'
+whichRaucLFP = 'standardizedRAUC'
+whichRaucEMG = 'rauc'
+whichEcap = 'exp_resid_CAR'
+ecapDF = rawEcapDF.loc[rawEcapDF['regrID'] == whichEcap, :].copy()
 ecapDF.drop(columns=['regrID'] + mapAnnotNames, inplace=True)
 del rawEcapDF
 '''targetOrExpResidMask = rawEcapDF['regrID'].isin(['target', 'exp_resid_CAR'])
@@ -136,9 +144,6 @@ ecapDF.columns = ecapDF.columns.astype(float)
     timeWindow=[35e-3, 39e-3], useMean=False)
 ecapDF = ecapDetrender(ecapDF, None)'''
 #
-ecapTWinStart, ecapTWinStop = 1.5e-3, 4.5e-3
-qLimsEcap = (2.5e-3, 1-2.5e-3)
-emgTWinStart, emgTWinStop = 0, 39e-3
 #
 ecapRauc = ash.rAUC(
     ecapDF, baseline='median',
@@ -190,10 +195,6 @@ for name, group in ecapRauc.groupby(['feature']):
     ecapRauc.loc[group.index, 'normalizedRAUC'] = (
         thisScaler.transform(rauc.to_numpy().reshape(-1, 1)))
 #
-barVarName = 'R2'
-whichRaucLFP = 'standardizedRAUC'
-whichRaucEMG = 'standardizedRAUC'
-#
 ecapRaucWideDF = ecapRauc.set_index(keepCols)[whichRaucLFP].unstack(level='feature')
 #
 recCurve = pd.read_hdf(resultPathEMG, 'emgRAUC')
@@ -242,8 +243,8 @@ commonIdx = np.intersect1d(emgRCIndex, ecapRCIndex)
 # commonIdx = np.intersect1d(recCurveWideDF.index.to_numpy(), ecapRaucWideDF.index.to_numpy())
 recCurveWideDF = recCurveWideDF.loc[emgRCIndex.isin(commonIdx), :]
 ecapRaucWideDF = ecapRaucWideDF.loc[ecapRCIndex.isin(commonIdx), :]
-recCurveMaskDF = recCurveWideDF > 1
-ecapRaucMaskDF = ecapRaucWideDF > 1
+recCurveMaskDF = recCurveWideDF.notna()
+ecapRaucMaskDF = ecapRaucWideDF.notna()
 
 presentAmplitudes = sorted(ecapRaucWideDF.index.get_level_values('nominalCurrent').unique())
 if 0 not in presentAmplitudes:
