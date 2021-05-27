@@ -91,13 +91,12 @@ ecapPath = os.path.join(
 rawEcapDF = pd.read_parquet(ecapPath, engine='fastparquet')
 rawEcapDF.loc[:, 'nominalCurrent'] = rawEcapDF['nominalCurrent'] * (-1)
 # simplify electrode names
-pdb.set_trace()
 rawEcapDF.loc[:, 'electrode'] = rawEcapDF['electrode'].apply(lambda x: x[1:])
-
+#
 if RCPlotOpts['rejectFeatures'] is not None:
-    rejectDataMask = rawEcapDF['featureName'].isin(RCPlotOpts['rejectFeatures'])
+    rejectDataMask = rawEcapDF['feature'].isin(RCPlotOpts['rejectFeatures'])
     rawEcapDF = rawEcapDF.loc[~rejectDataMask, :]
-
+#
 removeStimOnRec = True
 if removeStimOnRec:
     ecapRmMask = (rawEcapDF['electrode'] == rawEcapDF['feature'])
@@ -160,18 +159,18 @@ plotDF.loc[plotDF['regrID'].isin(['exp_resid']), 'columnLabel'] = 'components'
 plotDF.drop(index=plotDF.index[plotDF['columnLabel'] == 'NA'], inplace=True)
 #
 plotDF.loc[:, 'rowLabel'] = (
-    plotDF['electrode'].astype(np.str) +
+    plotDF['electrode'].astype(str) +
     ': ' +
-    plotDF[amplitudeFieldName].astype(np.str))
+    plotDF[amplitudeFieldName].astype(str))
 relplotKWArgs.pop('palette', None)
 ###########################
-timeScales = ['10', '4']
+timeScales = ['5']
 plotDF.set_index(['regrID', 'feature', 'columnLabel', 'rowLabel'] + annotNames + trialMetaNames, inplace=True)
 plotDF.columns = plotDF.columns.astype(float)
 relplotKWArgs['height'] = 4
 relplotKWArgs['aspect'] = 1.5
 colOrder = ['targets', 'components', 'CAR']
-if False:
+if True:
     for timeScale in timeScales:
         pdfPath = os.path.join(
             figureOutputFolder,
@@ -190,7 +189,7 @@ if False:
                         data=plotGroup.query('(bin < {}e-3) & (bin >= 1.3e-3)'.format(timeScale)),
                         x='bin', y='signal',
                         hue='regrID',
-                        row='xcoords', col='ycoords',
+                        row='ycoords', col='xcoords',
                         palette='Set1', lw=2,
                         **relplotKWArgs)
                 else:
