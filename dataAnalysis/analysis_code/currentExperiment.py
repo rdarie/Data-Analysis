@@ -357,12 +357,18 @@ def parseAnalysisOptions(
     # if not os.path.exists(GLMFiguresFolder):
     #     os.makedirs(GLMFiguresFolder, exist_ok=True)
     #
-    essentialMetadataFields = [
-        'segment', 'originalIndex', 't', 'expName', 'amplitude', 'program',
-        'activeGroup', 'RateInHz', 'stimCat', 'electrode',
-        'pedalDirection', 'pedalSize', 'pedalSizeCat', 'pedalMovementCat',
-        'pedalMetaCat',
-        ]
+    if blockExperimentType in ['proprio-miniRC', 'proprio', 'proprio-RC']:
+        essentialMetadataFields = [
+            'segment', 'originalIndex', 't', 'expName', 'amplitude', 'program',
+            'activeGroup', 'RateInHz', 'stimCat', 'electrode',
+            'pedalDirection', 'pedalSize', 'pedalSizeCat', 'pedalMovementCat',
+            'pedalMetaCat',
+            ]
+    else:
+        essentialMetadataFields = [
+            'segment', 'originalIndex', 't', 'expName', 'nominalCurrent', 'program',
+            'activeGroup', 'RateInHz', 'stimCat', 'electrode',
+            ]
     alignedAsigsKWargs = dict(
         amplitudeColumn='amplitude',
         programColumn='program',

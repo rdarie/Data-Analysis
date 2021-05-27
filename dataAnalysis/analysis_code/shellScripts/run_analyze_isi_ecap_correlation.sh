@@ -61,7 +61,7 @@
 # EXP="exp202010191100"
 #
 # EXP="exp202012171300"
-#
+##
 EXP="exp202012221300"
 
 # 
@@ -116,7 +116,7 @@ UNITSELECTOR="--unitQuery=isiemgraw"
 
 UNITSELECTOR="--unitQuery=isiemgraw"
 ALIGNQUERY="--alignQuery=stimOn"
-# python -u ./calcRecruitment.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR $ALIGNQUERY $OUTLIERMASK
+python -u ./calcRecruitment.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR $ALIGNQUERY $OUTLIERMASK
 # python -u ./plotRecruitment.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR $ALIGNQUERY --showFigures
 
 ANALYSISFOLDER="--analysisName=fullRes"
@@ -128,4 +128,4 @@ UNITSELECTOR="--unitQuery=isispinal"
 # python -u ./plotAlignedAsigs.py --winStart=1 --winStop=4 --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER $INPUTBLOCKNAME $UNITSELECTOR $ALIGNQUERY --rowName="electrode" --rowControl= --colName="RateInHz" --colControl= --hueName="nominalCurrent" --alignFolderName=stim --enableOverrides $OUTLIERMASK
 # python -u ./plotRippleStimSpikeReport.py --winStart=1 --winStop=4 --exp=$EXP $BLOCKSELECTOR $WINDOW $UNITSELECTOR $ANALYSISFOLDER $ALIGNQUERY --alignFolderName=stim $INPUTBLOCKNAME --groupPagesBy="electrode, RateInHz" $OUTLIERMASK
 #
-python -u ./calcLFPLMFitModel.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR $ALIGNQUERY
+# python -u ./calcLFPLMFitModel.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR $ALIGNQUERY

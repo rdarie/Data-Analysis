@@ -156,6 +156,7 @@ plotDF = rawEcapDF.copy()
 plotDF.loc[:, 'columnLabel'] = 'NA'
 plotDF.loc[plotDF['regrID'].isin(['target', 'exp_']), 'columnLabel'] = 'targets'
 plotDF.loc[plotDF['regrID'].isin(['exp_resid_CAR', 'exp_resid_mean']), 'columnLabel'] = 'CAR'
+plotDF.loc[plotDF['regrID'].isin(['target_CAR', 'target_mean']), 'columnLabel'] = 'target_CAR'
 plotDF.loc[plotDF['regrID'].isin(['exp_resid']), 'columnLabel'] = 'components'
 plotDF.drop(index=plotDF.index[plotDF['columnLabel'] == 'NA'], inplace=True)
 #
@@ -172,12 +173,6 @@ relplotKWArgs['height'] = 4
 relplotKWArgs['aspect'] = 1.5
 colOrder = ['targets', 'components', 'CAR']
 plotProcFuns = [asp.genYLimSetter(quantileLims=0.99, forceLims=True)]
-paletteLookup = {
-    'target': 'Greys',
-    'exp_resid': 'Greens',
-    'exp_resid_CAR': 'Reds',
-    'exp_resid_mean': 'Blues'
-    }
 if True:
     for timeScale in timeScales:
         pdfPath = os.path.join(
@@ -243,6 +238,15 @@ if True:
                 if limitPages is not None:
                     if pageCount > limitPages:
                         break
+paletteLookup = {
+    'exp_resid': 'Purples',
+    'exp_resid_CAR': 'Reds',
+    'exp_resid_mean': 'Blues',
+    #
+    'target': 'Greens',
+    'target_CAR': 'Yellows',
+    'target_mean': 'Blues',
+    }
 if False:
     for timeScale in timeScales:
         pdfPath = os.path.join(
@@ -250,7 +254,7 @@ if False:
             prefix + '_{}_{}_lmfit_by_amplitude_{}_msec.pdf'.format(
                 arguments['inputBlockSuffix'], arguments['window'], timeScale))
         pageCount = 0
-        maskForThisPlot = plotDF.index.get_level_values('regrID').isin(['exp_resid', 'exp_resid_CAR', 'exp_resid_mean', 'target'])
+        maskForThisPlot = plotDF.index.get_level_values('regrID').isin(paletteLookup.keys())
         with PdfPages(pdfPath) as pdf:
             for pageName, group in tqdm(plotDF.loc[maskForThisPlot, :].groupby(['electrode', 'regrID'])):
                 regrName = pageName[1]

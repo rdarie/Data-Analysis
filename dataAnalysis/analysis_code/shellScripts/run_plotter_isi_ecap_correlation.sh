@@ -88,7 +88,7 @@ ANALYSISFOLDER="--analysisName=fullRes"
 INPUTBLOCKNAME="--inputBlockSuffix=lfp_raw"
 # python -u ./applyCARToLmFitResults.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --alignQuery="stimOn"
 # python -u ./plotLmFitPerformance.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --alignQuery="stimOn"
-#
+##
 ANALYSISFOLDER="--analysisNameLFP=fullRes --analysisNameEMG=loRes"
 INPUTBLOCKNAME="--emgBlockSuffix=emg --lfpBlockSuffix=lfp_raw"
 python -u ./plotEcapEMGCorrelationFromAuto.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --alignQuery="stimOn" --showFigures

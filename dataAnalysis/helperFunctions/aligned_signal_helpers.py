@@ -815,9 +815,10 @@ def rAUC(
     else:
         bLine = 0
     dt = asigWide.columns[1] - asigWide.columns[0]
-    rAUCDF = (
+    '''rAUCDF = (
         asigWide.loc[:, tMask].subtract(bLine, axis='index')
-        .abs().sum(axis='columns') * dt)
+        .abs().sum(axis='columns') * dt)'''
+    rAUCDF = asigWide.loc[:, tMask].abs().mean(axis='columns')
     # rAUCDF = (asigWide.loc[:, tMask] - bLine).std(axis='columns')
     return rAUCDF
 

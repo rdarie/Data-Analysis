@@ -108,10 +108,6 @@ ecapPath = os.path.join(
 rawEcapDF = pd.read_parquet(ecapPath, engine='fastparquet')
 
 rawEcapDF.loc[:, 'nominalCurrent'] = rawEcapDF['nominalCurrent'] * (-1)
-targetOrExpResidMask = rawEcapDF['regrID'].isin(['target', 'exp_resid_CAR'])
-rawEcapDF.loc[targetOrExpResidMask, :]
-dropIndices = rawEcapDF.loc[~targetOrExpResidMask].index
-rawEcapDF.drop(index=dropIndices, inplace=True)
 # simplify electrode names
 rawEcapDF.loc[:, 'electrode'] = rawEcapDF['electrode'].apply(lambda x: x[1:])
 removeStimOnRec = True
@@ -122,8 +118,12 @@ for colName in keepCols:
     if colName not in rawEcapDF.columns:
         rawEcapDF.loc[:, colName] = 0.
 # rawEcapDF.shape
-ecapDF = rawEcapDF.loc[rawEcapDF['regrID'] == 'exp_resid_CAR', :].copy()
+ecapDF = rawEcapDF.loc[rawEcapDF['regrID'] == 'target_CAR', :].copy()
 ecapDF.drop(columns=['regrID'] + mapAnnotNames, inplace=True)
+del rawEcapDF
+'''targetOrExpResidMask = rawEcapDF['regrID'].isin(['target', 'exp_resid_CAR'])
+dropIndices = rawEcapDF.loc[~targetOrExpResidMask].index
+rawEcapDF.drop(index=dropIndices, inplace=True)'''
 # 
 ecapDF.set_index(
     [
@@ -132,16 +132,17 @@ ecapDF.set_index(
         if idxName in ecapDF.columns],
     inplace=True)
 ecapDF.columns = ecapDF.columns.astype(float)
-ecapDetrender = ash.genDetrender(
+'''ecapDetrender = ash.genDetrender(
     timeWindow=[35e-3, 39e-3], useMean=False)
-ecapDF = ecapDetrender(ecapDF, None)
+ecapDF = ecapDetrender(ecapDF, None)'''
 #
 ecapTWinStart, ecapTWinStop = 1.5e-3, 4.5e-3
 qLimsEcap = (2.5e-3, 1-2.5e-3)
 emgTWinStart, emgTWinStop = 0, 39e-3
 #
 ecapRauc = ash.rAUC(
-    ecapDF, tStart=ecapTWinStart, tStop=ecapTWinStop).to_frame(name='rauc')
+    ecapDF, baseline='median',
+    tStart=ecapTWinStart, tStop=ecapTWinStop).to_frame(name='rauc')
 ecapRauc['kruskalStat'] = np.nan
 ecapRauc['kruskalP'] = np.nan
 for name, group in ecapRauc.groupby(['electrode', 'feature']):
@@ -162,17 +163,22 @@ for annName in derivedAnnot:
 # normalizationGrouper = ecapRauc.groupby(['feature'])
 # or
 # normalizationGrouper = [('all', ecapRauc), ]
-for name, group in [('all', ecapRauc), ]:
+for name, group in ecapRauc.groupby(['feature']):
     groupQuantiles = group['rauc'].quantile(qLimsEcap)
     rauc = group['rauc'].copy()
     rauc[rauc > groupQuantiles[qLimsEcap[-1]]] = groupQuantiles[qLimsEcap[-1]]
     rauc[rauc < groupQuantiles[qLimsEcap[0]]] = groupQuantiles[qLimsEcap[0]]
-    standardizedRAUC = pd.Series(
+    '''standardizedRAUC = pd.Series(
         (
             StandardScaler().fit_transform(
                 group['rauc'].to_numpy().reshape(-1, 1))).flatten(),
         index=group.index
-    )
+    )'''
+    scaler = StandardScaler()
+    minParams = group.groupby([amplitudeFieldName, 'electrode']).mean()['rauc'].idxmin()
+    minMask = (group[amplitudeFieldName] == minParams[0]) & (group['electrode'] == minParams[1])
+    scaler.fit(group.loc[minMask, 'rauc'].to_numpy().reshape(-1, 1))
+    standardizedRAUC = scaler.transform(group['rauc'].to_numpy().reshape(-1, 1))
     ecapRauc.loc[group.index, 'standardizedRAUC'] = standardizedRAUC
     '''(
         RobustScaler(quantile_range=[i * 100 for i in qLimsEcap])
@@ -185,8 +191,8 @@ for name, group in [('all', ecapRauc), ]:
         thisScaler.transform(rauc.to_numpy().reshape(-1, 1)))
 #
 barVarName = 'R2'
-whichRaucLFP = 'normalizedRAUC'
-whichRaucEMG = 'normalizedRAUC'
+whichRaucLFP = 'standardizedRAUC'
+whichRaucEMG = 'standardizedRAUC'
 #
 ecapRaucWideDF = ecapRauc.set_index(keepCols)[whichRaucLFP].unstack(level='feature')
 #
@@ -236,6 +242,8 @@ commonIdx = np.intersect1d(emgRCIndex, ecapRCIndex)
 # commonIdx = np.intersect1d(recCurveWideDF.index.to_numpy(), ecapRaucWideDF.index.to_numpy())
 recCurveWideDF = recCurveWideDF.loc[emgRCIndex.isin(commonIdx), :]
 ecapRaucWideDF = ecapRaucWideDF.loc[ecapRCIndex.isin(commonIdx), :]
+recCurveMaskDF = recCurveWideDF > 1
+ecapRaucMaskDF = ecapRaucWideDF > 1
 
 presentAmplitudes = sorted(ecapRaucWideDF.index.get_level_values('nominalCurrent').unique())
 if 0 not in presentAmplitudes:
@@ -291,9 +299,10 @@ corrDF = pd.DataFrame(np.nan, index=corrDFIndex, columns=['R'] + mapAnnotNames)
 for emgName, lfpName in corrDF.index:
     rowIdx = (emgName, lfpName)
     finiteMask = (recCurveWideDF[emgName].notna().to_numpy() & ecapRaucWideDF[lfpName].notna().to_numpy())
+    sizeMask = (recCurveMaskDF[emgName].to_numpy() & ecapRaucMaskDF[lfpName].to_numpy())
     corrDF.loc[rowIdx, 'R'] = np.corrcoef(
-        recCurveWideDF.loc[finiteMask, emgName],
-        ecapRaucWideDF.loc[finiteMask, lfpName])[0, 1]
+        recCurveWideDF.loc[finiteMask & sizeMask, emgName],
+        ecapRaucWideDF.loc[finiteMask & sizeMask, lfpName])[0, 1]
 for annotName in mapAnnotNames:
     lookupSource = mapDF.loc[mapAMask, [annotName, 'topoName']].set_index('topoName')[annotName]
     corrDF.loc[:, annotName] = corrDF.index.get_level_values('lfp').map(lookupSource)
@@ -310,9 +319,10 @@ plotDF = corrDF.reset_index().query('whichArray == "rostral"')
 ## plot illustrations of RAUC and R
 ########################################################################
 zoomLevel = 2e-2
-fig, ax = plt.subplots(1, 2, sharey=True, sharex=True)
 
 exEMGName, exLFPName = plotDF.loc[plotDF[barVarName].idxmin(), ['emg', 'lfp']]
+# plot maximally correlated pair
+'''fig, ax = plt.subplots(1, 2, sharey=True, sharex=True)
 ax[0] = sns.regplot(
     x=ecapRaucWideDF[exLFPName],
     y=recCurveWideDF[exEMGName], ax=ax[0],
@@ -323,9 +333,35 @@ ax[0].set_xlim([-1 * zoomLevel, 1 + zoomLevel])
 ax[0].set_ylabel('{} RAUC (a.u.)'.format(emgNL[exEMGName]))
 ax[0].set_ylim([-1 * zoomLevel, 1 + zoomLevel])
 ax[0].set_yticks([])
-ax[1].set_xticks([0, 0.5, 1])
+ax[1].set_xticks([0, 0.5, 1])'''
+finiteMask = (recCurveWideDF[exEMGName].notna().to_numpy() & ecapRaucWideDF[exLFPName].notna().to_numpy())
+sizeMask = (recCurveMaskDF[exEMGName].to_numpy() & ecapRaucMaskDF[exLFPName].to_numpy())
+g = sns.jointplot(
+    x=ecapRaucWideDF.loc[finiteMask & sizeMask, exLFPName],
+    y=recCurveWideDF.loc[finiteMask & sizeMask, exEMGName], kind='reg',
+    color=emgPalette[exEMGName])
+g.set_axis_labels(
+    '{} electrode {} RAUC (a.u.)'.format(
+        lfpNL.loc[exLFPName, 'whichArray'], int(lfpNL.loc[exLFPName, 'elecID'])),
+    '{} RAUC (a.u.)'.format(emgNL[exEMGName])
+    )
+pdfPath = os.path.join(
+    figureOutputFolder,
+    prefix + '_{}_{}_{}.pdf'.format(
+        arguments['emgBlockSuffix'], arguments['lfpBlockSuffix'],
+        'emgToLfpCorrelationMinExample'))
+g.fig.set_size_inches((10, 5))
+g.fig.savefig(
+    pdfPath,
+    bbox_inches='tight', pad_inches=0.2,
+    # bbox_extra_artists=[leg, figYLabel, figXLabel]
+    )
+if arguments['showFigures']:
+    plt.show()
+else:
+    plt.close()
 exEMGName, exLFPName = plotDF.loc[plotDF[barVarName].idxmax(), ['emg', 'lfp']]
-ax[1] = sns.regplot(
+'''ax[1] = sns.regplot(
     x=ecapRaucWideDF[exLFPName],
     y=recCurveWideDF[exEMGName], ax=ax[1],
     color=emgPalette[exEMGName])
@@ -336,13 +372,23 @@ ax[1].set_ylabel('{} RAUC (a.u.)'.format(emgNL[exEMGName]))
 ax[1].set_ylim([-1 * zoomLevel, 1 + zoomLevel])
 ax[1].set_yticks([0, 0.5, 1])
 ax[1].set_yticks([0, 0.5, 1])
+fig.set_size_inches((10, 5))'''
+g = sns.jointplot(
+    x=ecapRaucWideDF.loc[finiteMask & sizeMask, exLFPName],
+    y=recCurveWideDF.loc[finiteMask & sizeMask, exEMGName], kind='reg',
+    color=emgPalette[exEMGName])
+g.set_axis_labels(
+    '{} electrode {} RAUC (a.u.)'.format(
+        lfpNL.loc[exLFPName, 'whichArray'], int(lfpNL.loc[exLFPName, 'elecID'])),
+    '{} RAUC (a.u.)'.format(emgNL[exEMGName])
+    )
 pdfPath = os.path.join(
     figureOutputFolder,
     prefix + '_{}_{}_{}.pdf'.format(
         arguments['emgBlockSuffix'], arguments['lfpBlockSuffix'],
-        'emgToLfpCorrelationExample'))
-fig.set_size_inches((10, 5))
-plt.savefig(
+        'emgToLfpCorrelationMaxExample'))
+g.fig.set_size_inches((10, 5))
+g.fig.savefig(
     pdfPath,
     bbox_inches='tight', pad_inches=0.2,
     # bbox_extra_artists=[leg, figYLabel, figXLabel]
@@ -561,8 +607,7 @@ if RCPlotOpts['keepElectrodes'] is not None:
             'horizontalalignment': 'right'
         }, shared=False),
 '''
-pdb.set_trace()
-plotY = whichRaucLFP
+whichRaucLFP = 'normalizedRAUC'
 def axModFun(g, ro, co, hu, dataSubset):
     emptySubset = (
         (dataSubset.empty) or
@@ -647,6 +692,7 @@ else:
 ## plot emg rc
 ########################################################################
 #
+whichRaucEMG = 'normalizedRAUC'
 plotEmgRC = recCurve.reset_index()
 for annotName in mapAnnotNames:
     lookupSource = mapDF.loc[mapAMask, [annotName, 'topoName']].set_index('topoName')[annotName]

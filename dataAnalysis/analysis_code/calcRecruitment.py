@@ -20,13 +20,11 @@ Options:
 import matplotlib
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
-matplotlib.use('PS')   # generate postscript output by default
+matplotlib.use('Qt5Agg')   # generate interactive output
+# matplotlib.use('PS')   # generate postscript output by default
+import matplotlib.pyplot as plt
 import seaborn as sns
-sns.set()
-sns.set_color_codes("dark")
-sns.set_context("talk")
-sns.set_style("whitegrid")
-
+#
 from namedQueries import namedQueries
 import pdb
 import dataAnalysis.plotting.aligned_signal_plots as asp
@@ -45,6 +43,11 @@ expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']), arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
+#
+sns.set(
+    context='notebook', style='dark',
+    palette='dark', font='sans-serif',
+    font_scale=1.5, color_codes=True)
 #
 analysisSubFolder = os.path.join(
     scratchFolder, arguments['analysisName']
@@ -104,6 +107,16 @@ if outlierTrials is not None:
     outlierMask = pd.Series(trialInfo.to_numpy()).map(outlierTrials)
     asigWide = asigWide.loc[~outlierMask.to_numpy(), :]
 
+# pre-standardize
+preStandardizeBounds = [-100e-3, -40e-3]
+preStMask = (asigWide.columns >= preStandardizeBounds[0]) & (asigWide.columns < preStandardizeBounds[1])
+
+for name, group in asigWide.groupby(['feature']):
+    scaler = StandardScaler()
+    scaler.fit(group.loc[:, preStMask].to_numpy().reshape(-1, 1))
+    origShape = asigWide.loc[group.index, :].shape
+    asigWide.loc[group.index, :] = scaler.transform(asigWide.loc[group.index, :].to_numpy().reshape(-1, 1)).reshape(origShape)
+
 rAUCDF = ash.rAUC(
     asigWide, **funKWargs).to_frame(name='rauc')
 
@@ -124,10 +137,11 @@ derivedAnnot = [
     'featureName', 'EMGSide', 'EMGSite']
 saveIndexNames = (rAUCDF.index.names).copy()
 rAUCDF.reset_index(inplace=True)
+rAUCDF.loc[:, amplitudeFieldName] = rAUCDF[amplitudeFieldName].abs()
+
 for annName in derivedAnnot:
     rAUCDF.loc[:, annName] = np.nan
 
-rAUCDF.loc[:, amplitudeFieldName] = rAUCDF[amplitudeFieldName].abs()
 sideLookup = {'R': 'Right', 'L': 'Left'}
 '''nSig = {}'''
 
@@ -138,10 +152,15 @@ for name, group in rAUCDF.groupby(['feature']):
         RobustScaler(quantile_range=[i * 100 for i in qLims])
         .fit_transform(
             group['rauc'].to_numpy().reshape(-1, 1)))'''
-    rAUCDF.loc[group.index, 'standardizedRAUC'] = (
+    scaler = StandardScaler()
+    minParams = group.groupby([amplitudeFieldName, 'electrode']).mean()['rauc'].idxmin()
+    minMask = (group[amplitudeFieldName] == minParams[0]) & (group['electrode'] == minParams[1])
+    scaler.fit(group.loc[minMask, 'rauc'].to_numpy().reshape(-1, 1))
+    rAUCDF.loc[group.index, 'standardizedRAUC'] = scaler.transform(group['rauc'].to_numpy().reshape(-1, 1))
+    '''rAUCDF.loc[group.index, 'standardizedRAUC'] = (
         StandardScaler()
             .fit_transform(
-            group['rauc'].to_numpy().reshape(-1, 1)))
+            group['rauc'].to_numpy().reshape(-1, 1)))'''
     groupQuantiles = group['rauc'].quantile(qLims)
     rauc = group['rauc'].copy()
     rauc[rauc > groupQuantiles[qLims[-1]]] = groupQuantiles[qLims[-1]]
@@ -154,7 +173,6 @@ for name, group in rAUCDF.groupby(['feature']):
         thisScaler.transform(rauc.to_numpy().reshape(-1, 1)))
     featName = name
     featNameShort = featName.replace('EmgEnv#0', '').replace('Emg#0', '')
-    # pdb.set_trace()
     rAUCDF.loc[group.index, 'featureName'] = featNameShort
     rAUCDF.loc[group.index, 'EMGSite'] = featNameShort[1:]
     rAUCDF.loc[group.index, 'EMGSide'] = sideLookup[featName[0]]
@@ -170,7 +188,7 @@ for name, group in rAUCDF.groupby('electrode'):
 featurePlotOptsColumns = ['featureName', 'EMGSide', 'EMGSite', 'EMG Location']
 featurePlotOptsDF = rAUCDF.drop_duplicates(subset=['feature']).loc[:, featurePlotOptsColumns]
 plotOptNames = ['color', 'style']
-# pdb.set_trace()
+
 for pon in plotOptNames:
     featurePlotOptsDF.loc[:, pon] = np.nan
 uniqueSiteNames = sorted(featurePlotOptsDF['EMGSite'].unique())
@@ -184,6 +202,16 @@ for gIdx, (name, group) in enumerate(featurePlotOptsDF.groupby('EMGSide')):
     featurePlotOptsDF.loc[group.index, 'color'] = group['EMGSite'].map(thisPalette)
     featurePlotOptsDF.loc[group.index, 'style'] = styleNames[gIdx]
 
+if True:
+    fig, ax = plt.subplots()
+    for name, group in rAUCDF.groupby('featureName'):
+        useColor = featurePlotOptsDF.loc[featurePlotOptsDF['featureName'] == name, 'color'].iloc[0]
+        sns.distplot(group['rauc'], kde=False, hist_kws={"histtype": "step", "linewidth": 3, 'color': useColor}, ax=ax, label=name)
+    ax.legend()
+    plt.show()
+#
+if os.path.exists(resultPath):
+    os.remove(resultPath)
 rAUCDF.set_index(saveIndexNames, inplace=True)
 rAUCDF.to_hdf(resultPath, 'emgRAUC')
 featurePlotOptsDF.to_hdf(resultPath, 'emgRAUC_plotOpts')
