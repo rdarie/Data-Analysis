@@ -9,11 +9,11 @@
 #SBATCH --mem-per-cpu=16G
 
 # Specify a job name:
-#SBATCH -J isi_preproc_lfp_17
+#SBATCH -J isi_preproc_lfp_17b
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-isi_preproc_lfp_17.out
-#SBATCH -e ../../batch_logs/%j-%a-isi_preproc_lfp_17.out
+#SBATCH -o ../../batch_logs/%j-%a-isi_preproc_lfp_17b.out
+#SBATCH -e ../../batch_logs/%j-%a-isi_preproc_lfp_17b.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -55,10 +55,14 @@
 # EXP="exp202009231400"
 # EXP="exp202010071400"
 # EXP="exp202010081400"
-EXP="exp202010151400"
+#
+# EXP="exp202010151400"
+#
 # EXP="exp202010191100"
+#
 # EXP="exp202012171300"
-# EXP="exp202012221300"
+#
+EXP="exp202012221300"
 
 # 
 module load anaconda/2020.02
@@ -89,8 +93,10 @@ ANALYSISFOLDER="--analysisName=loRes"
 # CHANSELECTOR="--chanQuery=isispinaloremg"
 
 
-SLURM_ARRAY_TASK_ID=3
-BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
+SLURM_ARRAY_TASK_ID=6
+BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
+# BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
+
 INPUTBLOCKNAME="--inputBlockSuffix=emg"
 ANALYSISFOLDER="--analysisName=loRes"
 # python -u ./assembleExperimentAlignedAsigs.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER $INPUTBLOCKNAME --alignFolderName=stim
@@ -122,4 +128,4 @@ UNITSELECTOR="--unitQuery=isispinal"
 # python -u ./plotAlignedAsigs.py --winStart=1 --winStop=4 --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER $INPUTBLOCKNAME $UNITSELECTOR $ALIGNQUERY --rowName="electrode" --rowControl= --colName="RateInHz" --colControl= --hueName="nominalCurrent" --alignFolderName=stim --enableOverrides $OUTLIERMASK
 # python -u ./plotRippleStimSpikeReport.py --winStart=1 --winStop=4 --exp=$EXP $BLOCKSELECTOR $WINDOW $UNITSELECTOR $ANALYSISFOLDER $ALIGNQUERY --alignFolderName=stim $INPUTBLOCKNAME --groupPagesBy="electrode, RateInHz" $OUTLIERMASK
 #
-python -u ./calcLFPLMFitModel.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR $ALIGNQUERY --plotting --debugging --smallDataset --interactive
+python -u ./calcLFPLMFitModel.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR $ALIGNQUERY

@@ -88,6 +88,7 @@ ecapPath = os.path.join(
     calcSubFolder, 'lmfit',
     prefix + '_{}_{}_lmfit_signals_CAR.parquet'.format(
         arguments['inputBlockSuffix'], arguments['window']))
+print('plotLmFitPerformance loading {}...'.format(ecapPath))
 rawEcapDF = pd.read_parquet(ecapPath, engine='fastparquet')
 rawEcapDF.loc[:, 'nominalCurrent'] = rawEcapDF['nominalCurrent'] * (-1)
 # simplify electrode names
@@ -164,12 +165,19 @@ plotDF.loc[:, 'rowLabel'] = (
     plotDF[amplitudeFieldName].astype(str))
 relplotKWArgs.pop('palette', None)
 ###########################
-timeScales = ['5']
+timeScales = ['10', '40']
 plotDF.set_index(['regrID', 'feature', 'columnLabel', 'rowLabel'] + annotNames + trialMetaNames, inplace=True)
 plotDF.columns = plotDF.columns.astype(float)
 relplotKWArgs['height'] = 4
 relplotKWArgs['aspect'] = 1.5
 colOrder = ['targets', 'components', 'CAR']
+plotProcFuns = [asp.genYLimSetter(quantileLims=0.99, forceLims=True)]
+paletteLookup = {
+    'target': 'Greys',
+    'exp_resid': 'Greens',
+    'exp_resid_CAR': 'Reds',
+    'exp_resid_mean': 'Blues'
+    }
 if True:
     for timeScale in timeScales:
         pdfPath = os.path.join(
@@ -180,7 +188,7 @@ if True:
         with PdfPages(pdfPath) as pdf:
             # for pageName, group in tqdm(plotDF.groupby('feature')):
             for pageName, group in tqdm(plotDF.groupby(['rowLabel', 'columnLabel'])):
-                print('Plotting {}'.format(pageName))
+                print('Plotting {} at time scale {}'.format(pageName, timeScale))
                 plotGroup = group.stack().to_frame(name='signal').reset_index()
                 if True:
                     # group by rowLabel, columnLabel
@@ -202,6 +210,13 @@ if True:
                         facet_kws=dict(sharey=False), palette='Set1',
                         lw=2, col_order=colOrder,
                         **relplotKWArgs)
+                for (ro, co, hu), dataSubset in g.facet_data():
+                    emptySubset = (
+                            (dataSubset.empty) or
+                            (dataSubset['signal'].isna().all()))
+                    if len(plotProcFuns):
+                        for procFun in plotProcFuns:
+                            procFun(g, ro, co, hu, dataSubset)
                 pageTitle = g.fig.suptitle(pageName)
                 saveLegendOpts = {
                         'bbox_extra_artists': [pageTitle]}
@@ -228,23 +243,24 @@ if True:
                 if limitPages is not None:
                     if pageCount > limitPages:
                         break
-if True:
+if False:
     for timeScale in timeScales:
         pdfPath = os.path.join(
             figureOutputFolder,
             prefix + '_{}_{}_lmfit_by_amplitude_{}_msec.pdf'.format(
                 arguments['inputBlockSuffix'], arguments['window'], timeScale))
         pageCount = 0
-        maskForThisPlot = plotDF.index.get_level_values('regrID').isin(['exp_resid', 'exp_resid_CAR', 'target'])
+        maskForThisPlot = plotDF.index.get_level_values('regrID').isin(['exp_resid', 'exp_resid_CAR', 'exp_resid_mean', 'target'])
         with PdfPages(pdfPath) as pdf:
             for pageName, group in tqdm(plotDF.loc[maskForThisPlot, :].groupby(['electrode', 'regrID'])):
-                print('Plotting {}'.format(pageName))
+                regrName = pageName[1]
+                print('Plotting {} at time scale {}'.format(pageName, timeScale))
                 plotGroup = group.stack().to_frame(name='signal').reset_index()
                 g = sns.relplot(
                     # data=plotGroup,
-                    data=plotGroup.query('(bin < {}e-3) & (bin >= 1.3e-3)'.format(timeScale)),
+                    data=plotGroup.query('(bin < {}e-3) & (bin >= 1e-3)'.format(timeScale)),
                     x='bin', y='signal',
-                    hue=amplitudeFieldName,
+                    hue=amplitudeFieldName, palette=paletteLookup[regrName],
                     row='ycoords', col='xcoords', lw=2,
                     **relplotKWArgs)
                 pageTitle = g.fig.suptitle(pageName)
@@ -264,6 +280,13 @@ if True:
                 g.fig.set_size_inches(
                     g._ncol * relplotKWArgs['height'] * relplotKWArgs['aspect'] + 10,
                     g._nrow * relplotKWArgs['height'] + 2)
+                for (ro, co, hu), dataSubset in g.facet_data():
+                    emptySubset = (
+                            (dataSubset.empty) or
+                            (dataSubset['signal'].isna().all()))
+                    if len(plotProcFuns):
+                        for procFun in plotProcFuns:
+                            procFun(g, ro, co, hu, dataSubset)
                 pdf.savefig(bbox_inches='tight', pad_inches=0, **saveLegendOpts)
                 if arguments['showFigures']:
                     plt.show()

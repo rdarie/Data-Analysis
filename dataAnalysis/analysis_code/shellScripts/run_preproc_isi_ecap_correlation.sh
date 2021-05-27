@@ -57,9 +57,9 @@
 # EXP="exp202010081400"
 # EXP="exp202010151400"
 # EXP="exp202010191100"
-EXP="exp202012171300"
+# EXP="exp202012171300"
 # has blocks 3,5,6,7,8
-# EXP="exp202012221300"
+EXP="exp202012221300"
 # has blocks 1,3,4,5,6
 # 
 module load anaconda/2020.02
@@ -98,7 +98,7 @@ UNITSELECTOR="--unitQuery=isiemgenv"
 # UNITSELECTOR="--unitQuery=isiacc"
 # UNITSELECTOR="--unitQuery=isispinaloremg"
 
-SLURM_ARRAY_TASK_ID=3
+SLURM_ARRAY_TASK_ID=6
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
 
 #  #  preprocess
@@ -120,7 +120,7 @@ python -u ./calcAlignedAsigs.py --signalBlockSuffix="analyze" --eventBlockSuffix
 ANALYSISFOLDER="--analysisName=fullRes"
 CHANSELECTOR="--chanQuery=isispinal"
 OUTPUTBLOCKNAME="--outputBlockSuffix=lfp_raw"
-# python -u ./calcAlignedAsigs.py $CHANSELECTOR $OUTPUTBLOCKNAME --eventBlockSuffix='analyze' $EVENTFOLDER --signalBlockPrefix='Block' --verbose --exp=$EXP --amplitudeFieldName=nominalCurrent $BLOCKSELECTOR $WINDOW $LAZINESS --eventName=stim --alignFolderName=stim $ANALYSISFOLDER --signalSubfolder=None
+python -u ./calcAlignedAsigs.py $CHANSELECTOR $OUTPUTBLOCKNAME --eventBlockSuffix='analyze' $EVENTFOLDER --signalBlockPrefix='Block' --verbose --exp=$EXP --amplitudeFieldName=nominalCurrent $BLOCKSELECTOR $WINDOW $LAZINESS --eventName=stim --alignFolderName=stim $ANALYSISFOLDER --signalSubfolder=None
 UNITSELECTOR="--unitQuery=isispinal"
 INPUTBLOCKNAME="--inputBlockSuffix=lfp_raw"
-# python -u ./makeViewableBlockFromTriggered.py --plotting $INPUTBLOCKNAME $UNITSELECTOR --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS --alignFolderName=stim $OUTLIERMASK
+python -u ./makeViewableBlockFromTriggered.py --plotting $INPUTBLOCKNAME $UNITSELECTOR --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS --alignFolderName=stim $OUTLIERMASK

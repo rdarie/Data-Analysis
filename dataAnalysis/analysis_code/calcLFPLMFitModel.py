@@ -192,13 +192,13 @@ for pref, mod in gaussMs.items():
     gaussPars.update(mod.make_params())
 # Decays in **milliseconds**
 expPars['exp1_amplitude'].set(value=0)
-expPars['exp1_decay'].set(min=.2, value=1e6, max=1e6)
+expPars['exp1_decay'].set(min=5., value=1e6, max=1e6)
 #
 expPars['exp2_amplitude'].set(value=0)
-expPars['exp2_decay'].set(min=.1, value=20., max=20.)
+expPars['exp2_decay'].set(min=2., value=20., max=20.)
 #
 expPars['exp3_amplitude'].set(value=0)
-expPars['exp3_decay'].set(min=.05, value=.5, max=2.)
+expPars['exp3_decay'].set(min=1., value=1.5, max=2.)
 #
 gaussPars.add(
     name='n1_offset',
@@ -296,11 +296,11 @@ def applyModel(
             if ampGuess > 0:
                 ampGuess = max(ampGuess, 1e-6)
                 tempPars['{}amplitude'.format(pref)].set(
-                    value=ampGuess, max=3 * ampGuess, min=1e-3 * ampGuess)
+                    value=ampGuess, max=2 * ampGuess, min=1e-3 * ampGuess)
             else:
                 ampGuess = min(ampGuess, -1e-6)
                 tempPars['{}amplitude'.format(pref)].set(
-                    value=ampGuess, max=1e-3 * ampGuess, min=3 * ampGuess)
+                    value=ampGuess, max=1e-3 * ampGuess, min=2 * ampGuess)
             if verbose:
                 print('{} ampGuess is {}'.format(pref, ampGuess))
             thisMaxDecay = max(
@@ -821,6 +821,7 @@ if __name__ == "__main__":
         resultFolder,
         prefix + '_{}_{}_lmfit_model_parameters.parquet'.format(
             arguments['inputBlockSuffix'], arguments['window']))
+    print('Saving {}...'.format(resultPath))
     outputParams.to_parquet(resultPath, engine="fastparquet")
     #
     outputComps = compsAndTargetDF.reset_index()
@@ -829,6 +830,7 @@ if __name__ == "__main__":
         resultFolder,
         prefix + '_{}_{}_lmfit_signals.parquet'.format(
             arguments['inputBlockSuffix'], arguments['window']))
+    print('Saving {}...'.format(resultPath))
     outputComps.to_parquet(resultPath, engine="fastparquet")
     #
     outputCI = paramsCI.reset_index()
@@ -837,6 +839,7 @@ if __name__ == "__main__":
         resultFolder,
         prefix + '_{}_{}_lmfit_std_errs.parquet'.format(
             arguments['inputBlockSuffix'], arguments['window']))
+    print('Saving {}...'.format(resultPath))
     outputCI.to_parquet(resultPath, engine="fastparquet")
     #
     with PdfPages(pdfPath) as pdf:

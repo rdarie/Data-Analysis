@@ -60,13 +60,13 @@ EXP="exp202010151400"
 # EXP="exp202012171300"
 # EXP="exp202012221300"
 
-# 
+# #
 module load anaconda/2020.02
 . /gpfs/runtime/opt/anaconda/2020.02/etc/profile.d/conda.sh
 conda activate
 source activate nda2
 python --version
-####
+#######
 
 export OUTDATED_IGNORE=1
 LAZINESS="--lazy"
@@ -86,9 +86,9 @@ INPUTBLOCKNAME="--emgBlockSuffix=emg"
 
 ANALYSISFOLDER="--analysisName=fullRes"
 INPUTBLOCKNAME="--inputBlockSuffix=lfp_raw"
-python -u ./applyCARToLmFitResults.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --alignQuery="stimOn"
-python -u ./plotLmFitPerformance.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --alignQuery="stimOn"
+# python -u ./applyCARToLmFitResults.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --alignQuery="stimOn"
+# python -u ./plotLmFitPerformance.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --alignQuery="stimOn"
 #
 ANALYSISFOLDER="--analysisNameLFP=fullRes --analysisNameEMG=loRes"
 INPUTBLOCKNAME="--emgBlockSuffix=emg --lfpBlockSuffix=lfp_raw"
-# python -u ./plotEcapEMGCorrelationFromAuto.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --alignQuery="stimOn"
+python -u ./plotEcapEMGCorrelationFromAuto.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --alignQuery="stimOn" --showFigures

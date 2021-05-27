@@ -132,9 +132,9 @@ ecapDF.set_index(
         if idxName in ecapDF.columns],
     inplace=True)
 ecapDF.columns = ecapDF.columns.astype(float)
-'''ecapDetrender = ash.genDetrender(
+ecapDetrender = ash.genDetrender(
     timeWindow=[35e-3, 39e-3], useMean=False)
-ecapDF = ecapDetrender(ecapDF, None)'''
+ecapDF = ecapDetrender(ecapDF, None)
 #
 ecapTWinStart, ecapTWinStop = 1.5e-3, 4.5e-3
 qLimsEcap = (2.5e-3, 1-2.5e-3)
@@ -662,7 +662,6 @@ if RCPlotOpts['keepFeatures'] is not None:
     plotEmgRC = plotEmgRC.loc[keepDataMask, :]
 #####
 colName = 'electrode_xcoords'
-
 
 def axModFun(g, ro, co, hu, dataSubset):
     emptySubset = (
