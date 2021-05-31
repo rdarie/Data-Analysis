@@ -458,6 +458,7 @@ exLfp = (
     .xs(exLFPName, level='feature')
     .xs(exAmplitude, level='nominalCurrent')
     .iloc[0, :])
+pdb.set_trace()
 lfpMask = (
         (ecapDF.columns >= ecapTWinStart) &
         (ecapDF.columns < ecapTWinStop))
