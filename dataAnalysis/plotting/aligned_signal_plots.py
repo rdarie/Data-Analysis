@@ -19,7 +19,7 @@ from neo import (
     Event, AnalogSignal, SpikeTrain, Unit)
 from seaborn.relational import *
 from seaborn.axisgrid import (
-    Grid, dedent, _facet_docs, LooseVersion, mpl,
+    Grid, dedent, _facet_docs, mpl,
     utils, product, FacetGrid)
 from seaborn.relational import _ScatterPlotter, _LinePlotter
 import os
@@ -1436,8 +1436,7 @@ class FacetGridShadow(Grid):
             margin_titles=False, xlim=None, ylim=None, subplot_kws=None,
             gridspec_kws=None, size=None):
 
-        MPL_GRIDSPEC_VERSION = LooseVersion('1.4')
-        OLD_MPL = LooseVersion(mpl.__version__) < MPL_GRIDSPEC_VERSION
+        OLD_MPL = False
 
         # Handle deprecations
         if size is not None:

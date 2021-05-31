@@ -64,9 +64,10 @@ globals().update(expOpts)
 globals().update(allOpts)
 #
 sns.set(
-    context='notebook', style='dark',
+    context='paper', style='dark',
     palette='dark', font='sans-serif',
-    font_scale=1.5, color_codes=True)
+    font_scale=1., color_codes=True, rc={
+        'figure.dpi': 200, 'figure.constrained_layout.use': False})
 #
 analysisSubFolderLFP = os.path.join(
     scratchFolder, arguments['analysisNameLFP'])
@@ -310,6 +311,7 @@ stimAmpPaletteDesat = stimAmpPalette.apply(sns.desaturate, args=(0.3, ))
 mapDF = prb_meta.mapToDF(rippleMapFile[int(arguments['blockIdx'])])
 mapDF.loc[:, 'whichArray'] = mapDF['elecName'].apply(lambda x: x[:-1])
 mapDF.loc[:, 'shifted_xcoords'] = mapDF['xcoords']
+electrodeMaxXDistance = mapDF['xcoords'].max() - mapDF['xcoords'].min()
 mapDF.loc[mapDF['whichArray'] == 'rostral', 'shifted_xcoords'] -= mapDF['xcoords'].max() * 2
 # mapDF.loc[:, 'shifted_xcoords'] = mapDF['shifted_xcoords'] - mapDF['xcoords'].max() / 2
 mapDF.loc[:, 'channelRepetition'] = mapDF['label'].apply(lambda x: x.split('_')[-1])
@@ -391,7 +393,7 @@ plotDF = corrDF.reset_index().query('whichArray == "rostral"')
 ########################################################################
 ## plot illustrations of RAUC and R
 ########################################################################
-zoomLevel = 1e-3
+zoomLevel = 1e-2
 #
 pdfPath = os.path.join(
     figureOutputFolder,
@@ -400,7 +402,7 @@ pdfPath = os.path.join(
         'emgToLfpCorrelationExamples'))
 maxEMGName, maxLFPName = plotDF.loc[plotDF[barVarName].idxmax(), ['emg', 'lfp']]
 minEMGName, minLFPName = plotDF.loc[plotDF[barVarName].idxmin(), ['emg', 'lfp']]
-exAmplitude = max(presentAmplitudes)
+exAmplitude = presentAmplitudes[-2]
 
 exLfpSingleTrial = (
     ecapDF
@@ -418,24 +420,26 @@ if True:
             for exLFPName in ecapRaucWideDF.columns:
                 if not ((exEMGName, exLFPName) == (maxEMGName, maxLFPName) or (exEMGName, exLFPName) == (minEMGName, minLFPName)):
                     continue
-                # pdb.set_trace()
                 print('Plotting joint distributions of {} and {}'.format(exEMGName, exLFPName))
                 finiteMask = (recCurveWideDF[exEMGName].notna().to_numpy() & ecapRaucWideDF[exLFPName].notna().to_numpy())
                 sizeMask = (recCurveMaskDF[exEMGName].to_numpy() & ecapRaucMaskDF[exLFPName].to_numpy())
                 thisMask = finiteMask & sizeMask
                 if thisMask.sum() > 10:
-                    g = sns.jointplot(
+                    g = sns.JointGrid(
                         x=ecapRaucWideDF.loc[thisMask, exLFPName],
-                        y=recCurveWideDF.loc[thisMask, exEMGName], kind='reg',
-                        color=emgPalette[exEMGName],
+                        y=recCurveWideDF.loc[thisMask, exEMGName],
                         xlim=ecapRaucWideDF.loc[thisMask, exLFPName].quantile([zoomLevel, 1-zoomLevel]).to_list(),
-                        ylim=recCurveWideDF.loc[thisMask, exEMGName].quantile([zoomLevel, 1-zoomLevel]).to_list(),)
+                        ylim=recCurveWideDF.loc[thisMask, exEMGName].quantile([zoomLevel, 1-zoomLevel]).to_list(),
+                        ratio=100
+                        )
+                    g.plot_joint(sns.regplot, color=emgPalette[exEMGName])
+                    g.ax_marg_x.set_axis_off()
+                    g.ax_marg_y.set_axis_off()
                     if (exEMGName, exLFPName) == (maxEMGName, maxLFPName):
-                        # pdb.set_trace()
                         g.ax_joint.text(
                             ecapRaucWideDF.loc[exEmgSingleTrial.name, exLFPName],
                             recCurveWideDF.loc[exEmgSingleTrial.name, exEMGName],
-                            '*', ha='center', va='center'
+                            '$\Delta$', ha='center', va='center'
                         )
                     g.set_axis_labels(
                         '{} electrode {} RAUC (a.u.)'.format(
@@ -443,14 +447,19 @@ if True:
                         '{} RAUC (a.u.)'.format(emgNL[exEMGName])
                         )
                     scoreMask = (plotDF['emg'] == exEMGName) & (plotDF['lfp'] == exLFPName)
-                    thisScore = plotDF.loc[scoreMask, barVarName]
-                    thisPVal = plotDF.loc[scoreMask, 'pval']
-                    figTitle = g.fig.suptitle('{} = {:.3f}, p={:.3f}'.format(
-                        barVarName, float(thisScore), float(thisPVal)))
-                    g.fig.set_size_inches((10, 5))
+                    thisScore = float(plotDF.loc[scoreMask, barVarName])
+                    thisPVal = float(plotDF.loc[scoreMask, 'pval'])
+                    '''figTitle = g.fig.suptitle('{} = {:.3f}, p={:.3f}'.format(
+                        barVarName, float(thisScore), float(thisPVal)))'''
+                    g.fig.set_size_inches((3.5, 2))
+                    g.ax_joint.set_xticks([])
+                    g.ax_joint.set_yticks([])
+                    g.ax_joint.text(
+                        1, 1, "R: {:.2g}; p = {:.2g}".format(thisScore, thisPVal),
+                        ha='right', va='top')
                     pdf.savefig(
                         bbox_inches='tight', pad_inches=0.2,
-                        bbox_extra_artists=[figTitle]
+                        # bbox_extra_artists=[figTitle]
                         )
                     if (exEMGName, exLFPName) == (maxEMGName, maxLFPName) or (exEMGName, exLFPName) == (minEMGName, minLFPName):
                         if arguments['showFigures']:
@@ -460,10 +469,7 @@ if True:
                     else:
                         plt.close()
 #########
-sns.set(
-    context='notebook', style='white',
-    palette='dark', font='sans-serif',
-    font_scale=1.5, color_codes=True)
+sns.set_style(style='white')
 fig, ax = plt.subplots(1, 2)
 lfpAx, emgAx = ax
 lfpAxTStart, lfpAxTStop = 1, 8
@@ -523,10 +529,7 @@ else:
 ########################################################################
 ## plot response magnitude correlation
 ########################################################################
-sns.set(
-    context='notebook', style='dark',
-    palette='dark', font='sans-serif',
-    font_scale=1.5, color_codes=True)
+sns.set_style(style='dark')
 '''
     asp.genTitleAnnotator(
         template='{}', colNames=['lfp'],
@@ -575,25 +578,36 @@ def changePatchAlpha(g, ro, co, hu, dataSubset):
         (dataSubset[barVarName].isna().all()))
     if not emptySubset:
         # hu seems broken in this version of catplot, override it
+        resetXLims = [
+            g.axes[ro, co].patches[0].get_x(),
+            g.axes[ro, co].patches[-1].get_x() + g.axes[ro, co].patches[-1].get_width(),
+        ]
         for hu, thisPatch in enumerate(g.axes[ro, co].patches):
-            # pdb.set_trace() ##
             thisSubset = dataSubset.iloc[hu, :]
             thisPatch = g.axes[ro, co].patches[hu]
             thisPatch.set_edgecolor((0., 0., 0., 0.))
             if thisSubset['rejectH0']:
                 xPos = thisPatch.get_x() + thisPatch.get_width() / 2
                 yPos = thisPatch.get_y() + thisPatch.get_height()
-                g.axes[ro, co].text(xPos, yPos, '*', ha='center', va='center')
+                sigStar = g.axes[ro, co].text(
+                    xPos, yPos, '*',
+                    ha='center', va='bottom',
+                    fontsize='large')
+                # pdb.set_trace()
             if (thisSubset['emg'] == maxEMGName) and (thisSubset['lfp'] == maxLFPName):
                 thisPatch.set_edgecolor((0., 0., 0., 1.))
+                g.axes[ro, co].text(xPos, 0, '$\Delta$', ha='center', va='bottom')
+        g.axes[ro, co].set_xlim(resetXLims)
     return
 #
 plotProcFuns = [
     axModFun, changePatchAlpha
     ]
+catPlotHeight, catPlotAspect = 1., 1.5
+catPlotWidth = catPlotHeight * catPlotAspect
 g = sns.catplot(
     row='ycoords', col='xcoords', y=barVarName, x='xDummy',
-    data=plotDF, height=5, aspect=.7,
+    data=plotDF, height=catPlotHeight, aspect=catPlotAspect,
     kind='bar', hue='emg', palette=emgPalette.to_dict(),
     hue_order=sorted(plotDF['emg'].unique()),
     )
@@ -607,7 +621,12 @@ for (ro, co, hu), dataSubset in g.facet_data():
             procFun(g, ro, co, hu, dataSubset)
 leg = g._legend
 titleOverrides = {'emg': 'Muscle Name'}
+
 if leg is not None:
+    t = leg.get_title()
+    tContent = t.get_text()
+    if tContent in titleOverrides:
+        t.set_text(titleOverrides[tContent])
     for t in leg.texts:
         tContent = t.get_text()
         print(tContent)
@@ -619,7 +638,8 @@ g.set_titles('')
 g.set_xlabels('')
 g.set_ylabels('')
 g.set_xticklabels('')
-g.fig.subplots_adjust(wspace=0.05, hspace=0.05)
+# g.fig.set_size_inches(g._ncol * catPlotWidth + 20, g._nrow * catPlotHeight + 2)
+# g.fig.subplots_adjust(wspace=0.05, hspace=0.05)
 figYLabel = g.fig.supylabel('Spearman\'s R', x=0.1)
 pdfPath = os.path.join(
     figureOutputFolder,
@@ -638,10 +658,7 @@ else:
 ########################################################################
 ## plot lfp rc
 ########################################################################
-sns.set(
-    context='notebook', style='darkgrid',
-    palette='dark', font='sans-serif',
-    font_scale=1.5, color_codes=True)
+sns.set_style(style='darkgrid')
 plotEcapRC = ecapRauc.copy()
 for annotName in mapAnnotNames:
     lookupSource = mapDF.loc[mapAMask, [annotName, 'topoName']].set_index('topoName')[annotName]
@@ -672,6 +689,21 @@ def axModFun(g, ro, co, hu, dataSubset):
     emptySubset = (
         (dataSubset.empty) or
         (dataSubset[whichRaucLFP].isna().all()))
+    # pdb.set_trace()
+    maskFromExample = (
+        (dataSubset['feature'] == maxLFPName) &
+        (dataSubset[amplitudeFieldName] == exLfpSingleTrial.name[4]) &
+        (dataSubset['electrode'] == exLfpSingleTrial.name[3])
+    )
+    dataFromExample = dataSubset.loc[maskFromExample, :]
+    if not dataFromExample.empty:
+        xPalette[float(dataFromExample['electrode_xcoords'].unique())]
+        g.axes[ro, co].text(
+            exLfpSingleTrial.name[4],
+            dataFromExample[g._y_var].mean(),
+            '$\Delta$', ha='center', va='center',
+            # color=xPalette[float(dataFromExample['electrode_xcoords'].unique())]
+        )
     if not hasattr(g.axes[ro, co], 'axWasChanged'):
         g.axes[ro, co].axWasChanged = True
         if emptySubset:
@@ -683,10 +715,17 @@ plotProcFuns = [
         lineOpts={'lw': 2}, shared=True,
         xUnitFactor=1, xUnits='uA',
         yUnitFactor=1, yUnits='', limFracX=0.2, limFracY=.2,
-        dropNaNCol=whichRaucLFP, scaleBarPosition=[600., 0.2],
+        dropNaNCol=whichRaucLFP, scaleBarPosition=[presentAmplitudes[2], 0.2],
         # dX=0., yTicks=[0]
     ),
     axModFun]
+########
+# array is 5 rows by 6 columns
+# for a square figure, make width = l/6, height = l/5
+targetTotalWidth = 6 # inches
+width = targetTotalWidth / plotEcapRC['feature_xcoords'].unique().size
+height = targetTotalWidth / plotEcapRC['feature_ycoords'].unique().size
+aspect = width / height
 g = sns.relplot(
     col='feature_xcoords',
     row='feature_ycoords',
@@ -695,7 +734,7 @@ g = sns.relplot(
     hue='electrode_xcoords', palette=xPalette.to_dict(),
     # hue='electrode_ycoords', palette=yUnshiftedPalette.to_dict(),
     kind='line', data=plotEcapRC,
-    height=5, aspect=.7, ci='sem', estimator='mean',
+    height=height, aspect=aspect, errorbar='se', estimator='mean',
     facet_kws=dict(sharey=True, sharex=True), lw=2,
     )
 for (ro, co, hu), dataSubset in g.facet_data():
@@ -710,6 +749,7 @@ titleOverrides = {
     'electrode_xcoords': 'Stimulation location\nw.r.t. midline\n(mm)'
     }
 entryOverrides = mapDF.loc[:, ['xcoords', 'electrodeSide', 'whichArray']].drop_duplicates().set_index('xcoords')
+pdb.set_trace()
 if leg is not None:
     for t in leg.texts:
         tContent = t.get_text()
@@ -719,7 +759,7 @@ if leg is not None:
         # e.g. is numeric
         else:
             try:
-                tNumeric = float(tContent)
+                tNumeric = float(tContent) - electrodeMaxXDistance / 2
                 t.set_text('{:.2f}'.format(tNumeric / 10))
                 '''if tNumeric in entryOverrides.index:
                     t.set_text('{} {}'.format(
@@ -731,9 +771,11 @@ g.set_titles('')
 g.set_xlabels('')
 g.set_ylabels('')
 g.set_yticklabels('')
-g.fig.subplots_adjust(wspace=0.05, hspace=0.05)
+# g.fig.set_size_inches(g._ncol * width + 10, g._nrow * height)
+# g.fig.subplots_adjust(wspace=0.05, hspace=0.05)
 figYLabel = g.fig.supylabel('LFP RAUC (a.u.)', x=0.1)
 figXLabel = g.fig.supxlabel('Stimulation Amplitude (uA)', y=0.1)
+g.tight_layout(pad=0.1)
 pdfPath = os.path.join(
     figureOutputFolder,
     prefix + '_{}_{}_{}.pdf'.format(
@@ -773,13 +815,27 @@ def axModFun(g, ro, co, hu, dataSubset):
     emptySubset = (
         (dataSubset.empty) or
         (dataSubset[whichRaucEMG].isna().all()))
+    maskFromExample = (
+        (dataSubset['feature'] == maxEMGName) &
+        (dataSubset[amplitudeFieldName] == exEmgSingleTrial.name[4]) &
+        (dataSubset['electrode'] == exEmgSingleTrial.name[3])
+    )
+    dataFromExample = dataSubset.loc[maskFromExample, :]
+    if not dataFromExample.empty:
+        g.axes[ro, co].text(
+            exEmgSingleTrial.name[4],
+            dataFromExample[g._y_var].mean(),
+            '$\Delta$', ha='center', va='center',
+            # color=emgPalette[maxEMGName],
+        )
     if not hasattr(g.axes[ro, co], 'axWasChanged'):
         g.axes[ro, co].axWasChanged = True
         if emptySubset:
             g.axes[ro, co].set_xticks([])
             g.axes[ro, co].set_facecolor('w')
         else:
-            titleText = '{:0.2f} mm'.format(dataSubset[colName].iloc[0] / 10)
+            elecPos = dataSubset[colName].iloc[0] - electrodeMaxXDistance / 2
+            titleText = '{:0.2f} mm'.format(elecPos / 10)
             g.axes[ro, co].set_title(titleText)
     return
 
@@ -789,7 +845,7 @@ plotProcFuns = [
         lineOpts={'lw': 2}, shared=True,
         xUnitFactor=1, xUnits='uA',
         yUnitFactor=1, yUnits='', limFracX=0.2, limFracY=.2,
-        dropNaNCol=whichRaucEMG, scaleBarPosition=[500., 0.6],
+        dropNaNCol=whichRaucEMG, scaleBarPosition=[presentAmplitudes[2], 0.6],
         # dX=0., yTicks=[0]
     ),
     axModFun]
@@ -797,7 +853,7 @@ colOrder = sorted(np.unique(plotEmgRC[colName]))
 hueName = 'featureName'
 colWrap = min(3, len(colOrder))
 height, aspect = 5, 1.5
-
+width = height * aspect
 g = sns.relplot(
     data=plotEmgRC,
     col=colName,
@@ -810,11 +866,9 @@ g = sns.relplot(
     style='EMGSide', style_order=['Right', 'Left'],
     hue=hueName, hue_order=hueOrderEMG, palette=emgPalette.to_dict(),
     kind='line',
-    height=height, aspect=aspect, ci='sem', estimator='mean',
+    height=height, aspect=aspect, errorbar='se', estimator='mean',
     facet_kws=dict(sharey=True, sharex=False, legend_out=True), lw=2,
     )
-# g.fig.set_size_inches(colWrap * height * aspect + 10, height + 2)
-# plt.tight_layout(pad=.1)
 for (ro, co, hu), dataSubset in g.facet_data():
     emptySubset = (
             (dataSubset.empty) or
@@ -830,7 +884,8 @@ titleOverrides = {
 g.set_xlabels('')
 g.set_ylabels('')
 g.set_yticklabels('')
-g.fig.subplots_adjust(wspace=0.05, hspace=0.05)
+# g.fig.set_size_inches(g._ncol * width + 10, g._nrow * height + 2)
+# g.fig.subplots_adjust(wspace=0.05, hspace=0.05)
 figYLabel = g.fig.supylabel('EMG RAUC (a.u.)', x=0.1)
 figXLabel = g.fig.supxlabel('Stimulation Amplitude (uA)', y=0.1)
 figTitle = g.fig.suptitle('Stimulation location (mediolateral, w.r.t. midline')
