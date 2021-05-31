@@ -286,7 +286,6 @@ recCurveWideDF = recCurveWideDF.loc[emgRCIndex.isin(commonIdx), :]
 ecapRaucWideDF = ecapRaucWideDF.loc[ecapRCIndex.isin(commonIdx), :]
 recCurveMaskDF = recCurveMaskDF.loc[emgRCIndex.isin(commonIdx), :]
 ecapRaucMaskDF = ecapRaucWideDF.notna()
-pdb.set_trace()
 
 presentAmplitudes = sorted(ecapRaucWideDF.index.get_level_values('nominalCurrent').unique())
 if 0 not in presentAmplitudes:
