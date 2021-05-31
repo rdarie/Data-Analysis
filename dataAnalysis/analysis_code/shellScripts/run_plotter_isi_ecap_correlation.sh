@@ -55,12 +55,12 @@
 # EXP="exp202009231400"
 # EXP="exp202010071400"
 # EXP="exp202010081400"
-# EXP="exp202010151400"
+EXP="exp202010151400"
 # EXP="exp202010191100"
 # EXP="exp202012171300"
-EXP="exp202012221300"
+# EXP="exp202012221300"
 
-# #
+# # #
 module load anaconda/2020.02
 . /gpfs/runtime/opt/anaconda/2020.02/etc/profile.d/conda.sh
 conda activate
@@ -75,11 +75,11 @@ LAZINESS="--lazy"
 WINDOW="--window=XXS"
 # WINDOW="--window=XS"
 
-# SLURM_ARRAY_TASK_ID=3
-# BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
+SLURM_ARRAY_TASK_ID=3
+BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
 
-SLURM_ARRAY_TASK_ID=6
-BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
+# SLURM_ARRAY_TASK_ID=6
+# BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
 
 INPUTBLOCKNAME="--inputBlockSuffix=emg"
 ALIGNQUERY="--alignQuery=stimOnLessThan30Hz"
@@ -93,4 +93,4 @@ INPUTBLOCKNAME="--inputBlockSuffix=lfp_raw"
 ##
 ANALYSISFOLDER="--analysisNameLFP=fullRes --analysisNameEMG=loRes"
 INPUTBLOCKNAME="--emgBlockSuffix=emg --lfpBlockSuffix=lfp_raw"
-python -u ./plotEcapEMGCorrelationFromAuto.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --alignQuery="stimOn" --showFigures
+python -u ./plotEcapEMGCorrelationFromAuto.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --alignQuery="stimOn"

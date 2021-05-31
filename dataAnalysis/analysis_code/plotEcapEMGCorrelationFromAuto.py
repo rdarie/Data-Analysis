@@ -37,6 +37,7 @@ from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
 from docopt import docopt
 import dill as pickle
 import pandas as pd
+import pingouin as pg
 idsl = pd.IndexSlice
 import numpy as np
 from tqdm import tqdm
@@ -95,7 +96,6 @@ resultPathEMG = os.path.join(
     prefix + '_{}_{}_rauc.h5'.format(
         arguments['emgBlockSuffix'], arguments['window']))
 print('loading {}'.format(resultPathEMG))
-emgCorrDF = pd.read_hdf(corrPathEMG, 'noiseCeil').to_frame(name='noiseCeil').reset_index()
 #  Overrides
 limitPages = None
 amplitudeFieldName = 'nominalCurrent'
@@ -116,10 +116,6 @@ rawEcapDF.loc[:, 'nominalCurrent'] = rawEcapDF['nominalCurrent'] * (-1)
 # simplify electrode names
 rawEcapDF.loc[:, 'electrode'] = rawEcapDF['electrode'].apply(lambda x: x[1:])
 #
-emgCorrDF.loc[:, 'electrode'] = emgCorrDF['electrode'].apply(lambda x: x[1:])
-emgCorrDF.loc[:, 'feature'] = emgCorrDF['feature'].apply(lambda x: x.replace('EmgEnv#0', ''))
-emgCorrDF.loc[:, 'nominalCurrent'] = emgCorrDF['nominalCurrent'] * (-1)
-#
 removeStimOnRec = True
 if removeStimOnRec:
     ecapRmMask = (rawEcapDF['electrode'] == rawEcapDF['feature'])
@@ -128,13 +124,15 @@ for colName in keepCols:
     if colName not in rawEcapDF.columns:
         rawEcapDF.loc[:, colName] = 0.
 # rawEcapDF.shape
-ecapTWinStart, ecapTWinStop = 1.3e-3, 3e-3
+ecapTWinStart = lmfitFunKWArgs['tBounds'][0]
+ecapTWinStop = 3e-3
 qLimsEcap = (5e-3, 1-5e-3)
 emgTWinStart, emgTWinStop = 0, 39e-3
+emgCorrThreshold = 0.75
 #
 barVarName = 'absR'
 whichRaucLFP = 'rauc'
-whichRaucEMG = 'normalizedRAUC'
+whichRaucEMG = 'rauc'
 whichEcap = 'exp_resid_CAR'
 
 if RCCalcOpts['keepElectrodes'] is not None:
@@ -155,8 +153,11 @@ ecapDF.set_index(
         if idxName in ecapDF.columns],
     inplace=True)
 ecapDF.columns = ecapDF.columns.astype(float)
+# ecap detrending
+'''ecapDetrender = ash.genDetrender(
+    timeWindow=[35e-3, 39e-3], useMean=False)'''
 ecapDetrender = ash.genDetrender(
-    timeWindow=[35e-3, 39e-3], useMean=False)
+    timeWindow=[ecapTWinStart, ecapTWinStop], useMean=True)
 ecapDF = ecapDetrender(ecapDF, None)
 #
 #
@@ -197,32 +198,16 @@ for name, group in ecapRauc.groupby(['feature']):
             .reshape(-1, 1)
         )
     )
-    '''groupQuantiles = group['rauc'].quantile(qLimsEcap)
-    ecapRauc.loc[group.index, 'rauc'] = ecapRauc.loc[group.index, 'rauc'].clip(
-        upper=groupQuantiles.iloc[1],
-        lower=groupQuantiles.iloc[0],
-        )'''
 for name, group in ecapRauc.groupby(['feature']):
     rauc = group['rauc'].copy()
-    '''groupQuantiles = group['rauc'].quantile(qLimsEcap)
-    rauc[rauc > groupQuantiles[qLimsEcap[-1]]] = groupQuantiles[qLimsEcap[-1]]
-    rauc[rauc < groupQuantiles[qLimsEcap[0]]] = groupQuantiles[qLimsEcap[0]]'''
-    '''standardizedRAUC = pd.Series(
-        (
-            StandardScaler().fit_transform(
-                group['rauc'].to_numpy().reshape(-1, 1))).flatten(),
-        index=group.index
-    )'''
-    scaler = StandardScaler()
     minParams = group.groupby([amplitudeFieldName, 'electrode']).mean()['rauc'].idxmin()
     minMask = (group[amplitudeFieldName] == minParams[0]) & (group['electrode'] == minParams[1])
+    #
+    scaler = StandardScaler()
     scaler.fit(group.loc[minMask, 'rauc'].to_numpy().reshape(-1, 1))
     standardizedRAUC = scaler.transform(group['rauc'].to_numpy().reshape(-1, 1))
     ecapRauc.loc[group.index, 'standardizedRAUC'] = standardizedRAUC
-    '''(
-        RobustScaler(quantile_range=[i * 100 for i in qLimsEcap])
-        .fit_transform(
-            group['rauc'].to_numpy().reshape(-1, 1)))'''
+    #
     thisScaler = MinMaxScaler()
     thisScaler.fit(
         rauc.to_numpy().reshape(-1, 1))
@@ -244,6 +229,15 @@ for idxName in recCurve.index.names:
     if idxName not in keepCols:
         recCurve.index = recCurve.index.droplevel(idxName)
         emgDF.index = emgDF.index.droplevel(idxName)
+#
+#
+emgCorrDF = pd.read_hdf(corrPathEMG, 'noiseCeil').to_frame(name='noiseCeil').reset_index()
+#
+emgCorrDF.loc[:, 'electrode'] = emgCorrDF['electrode'].apply(lambda x: x[1:])
+emgCorrDF.loc[:, 'feature'] = emgCorrDF['feature'].apply(lambda x: x.replace('EmgEnv#0', ''))
+emgCorrDF.loc[:, 'nominalCurrent'] = emgCorrDF['nominalCurrent'] * (-1)
+emgCorrMaskLookup = emgCorrDF.set_index(stimulusConditionNames + ['feature'])['noiseCeil'] > emgCorrThreshold
+
 #
 recCurve.reset_index(inplace=True)
 emgDF.reset_index(inplace=True)
@@ -267,11 +261,28 @@ emgDF = emgDF.loc[emgDF.index.isin(recCurve.index), :]
 hueOrderEMG = (
     featToSiteEMG.loc[featToSiteEMG.isin(recCurve['featureName'])]
         .sort_index().to_numpy())
-#
-#
-emgCorrMaskLookup = emgCorrDF.set_index(stimulusConditionNames + ['feature'])['noiseCeil'] > 0.5
+
 recCurveCorrIdx = pd.MultiIndex.from_frame(recCurve.loc[:, stimulusConditionNames + ['feature']])
 recCurve.loc[:, 'passesCorrMask'] = recCurveCorrIdx.map(emgCorrMaskLookup).to_numpy()
+passingIndices = recCurve.loc[recCurve['passesCorrMask'], :].index
+
+for name, group in recCurve.groupby(['feature']):
+    qScaler = QuantileTransformer(output_distribution='normal')
+    trainIndices = np.intersect1d(group.index, passingIndices)
+    if trainIndices.size > 0:
+        qScaler.fit(
+            recCurve.loc[trainIndices, 'rauc']
+            .to_numpy()
+            .reshape(-1, 1))
+        recCurve.loc[group.index, 'rauc'] = (
+            qScaler.transform(
+                recCurve.loc[group.index, 'rauc']
+                .to_numpy()
+                .reshape(-1, 1)
+            )
+        )
+    else:
+        recCurve.loc[group.index, 'rauc'] = 0.
 #
 recCurve.set_index(keepCols, inplace=True)
 emgDF.set_index(keepCols, inplace=True)
@@ -336,7 +347,7 @@ mapDF.loc[:, 'xcoords'] = mapDF['shifted_xcoords'].copy()
 corrDFIndex = pd.MultiIndex.from_product(
     [recCurveWideDF.columns, ecapRaucWideDF.columns],
     names=['emg', 'lfp'])
-corrDF = pd.DataFrame(np.nan, index=corrDFIndex, columns=['R', 'pval'] + mapAnnotNames)
+corrDF = pd.DataFrame(np.nan, index=corrDFIndex, columns=['R', 'pval', 'valid'] + mapAnnotNames)
 #
 for emgName, lfpName in corrDF.index:
     rowIdx = (emgName, lfpName)
@@ -354,9 +365,16 @@ for emgName, lfpName in corrDF.index:
             )
         corrDF.loc[rowIdx, 'R'] = spr
         corrDF.loc[rowIdx, 'pval'] = pvalue
+        corrDF.loc[rowIdx, 'valid'] = True
     else:
         corrDF.loc[rowIdx, 'R'] = 0.
         corrDF.loc[rowIdx, 'pval'] = 1.
+        corrDF.loc[rowIdx, 'valid'] = False
+
+reject, pValsCorrected = pg.multicomp(corrDF.loc[corrDF['valid'].to_numpy(), 'pval'].to_list())
+corrDF.loc[:, 'correctedPVal'] = 1.
+corrDF.loc[corrDF['valid'].to_numpy(), 'correctedPVal'] = pValsCorrected
+corrDF.loc[:, 'rejectH0'] = corrDF['correctedPVal'] < 1e-2
 for annotName in mapAnnotNames:
     lookupSource = mapDF.loc[mapAMask, [annotName, 'topoName']].set_index('topoName')[annotName]
     corrDF.loc[:, annotName] = corrDF.index.get_level_values('lfp').map(lookupSource)
@@ -373,112 +391,101 @@ plotDF = corrDF.reset_index().query('whichArray == "rostral"')
 ########################################################################
 ## plot illustrations of RAUC and R
 ########################################################################
-zoomLevel = 2e-2
-
-# plot maximally correlated pair
-'''fig, ax = plt.subplots(1, 2, sharey=True, sharex=True)
-ax[0] = sns.regplot(
-    x=ecapRaucWideDF[exLFPName],
-    y=recCurveWideDF[exEMGName], ax=ax[0],
-    color=emgPalette[exEMGName])
-ax[0].set_xlabel('{} electrode {} RAUC (a.u.)'.format(
-    lfpNL.loc[exLFPName, 'whichArray'], int(lfpNL.loc[exLFPName, 'elecID'])))
-ax[0].set_xlim([-1 * zoomLevel, 1 + zoomLevel])
-ax[0].set_ylabel('{} RAUC (a.u.)'.format(emgNL[exEMGName]))
-ax[0].set_ylim([-1 * zoomLevel, 1 + zoomLevel])
-ax[0].set_yticks([])
-ax[1].set_xticks([0, 0.5, 1])'''
+zoomLevel = 1e-3
+#
 pdfPath = os.path.join(
     figureOutputFolder,
     prefix + '_{}_{}_{}.pdf'.format(
         arguments['emgBlockSuffix'], arguments['lfpBlockSuffix'],
         'emgToLfpCorrelationExamples'))
-# pdb.set_trace()
 maxEMGName, maxLFPName = plotDF.loc[plotDF[barVarName].idxmax(), ['emg', 'lfp']]
 minEMGName, minLFPName = plotDF.loc[plotDF[barVarName].idxmin(), ['emg', 'lfp']]
-with PdfPages(pdfPath) as pdf:
-    for exEMGName in recCurveWideDF.columns:
-        for exLFPName in ecapRaucWideDF.columns:
-            print('Plotting joint distributions of {} and {}'.format(exEMGName, exLFPName))
-            finiteMask = (recCurveWideDF[exEMGName].notna().to_numpy() & ecapRaucWideDF[exLFPName].notna().to_numpy())
-            sizeMask = (recCurveMaskDF[exEMGName].to_numpy() & ecapRaucMaskDF[exLFPName].to_numpy())
-            thisMask = finiteMask & sizeMask
-            if thisMask.sum() > 10:
-                g = sns.jointplot(
-                    x=ecapRaucWideDF.loc[thisMask, exLFPName],
-                    y=recCurveWideDF.loc[thisMask, exEMGName], kind='reg',
-                    color=emgPalette[exEMGName])
-                g.set_axis_labels(
-                    '{} electrode {} RAUC (a.u.)'.format(
-                        lfpNL.loc[exLFPName, 'whichArray'], int(lfpNL.loc[exLFPName, 'elecID'])),
-                    '{} RAUC (a.u.)'.format(emgNL[exEMGName])
-                    )
-                scoreMask = (plotDF['emg'] == exEMGName) & (plotDF['lfp'] == exLFPName)
-                thisScore = plotDF.loc[scoreMask, barVarName]
-                figTitle = g.fig.suptitle('{} = {:.3f}'.format(barVarName, float(thisScore)))
-                g.fig.set_size_inches((10, 5))
-                pdf.savefig(
-                    bbox_inches='tight', pad_inches=0.2,
-                    bbox_extra_artists=[figTitle]
-                    )
-                if (exEMGName, exLFPName) == (maxEMGName, maxLFPName) or (exEMGName, exLFPName) == (minEMGName, minLFPName):
-                    if arguments['showFigures']:
-                        plt.show()
+exAmplitude = max(presentAmplitudes)
+
+exLfpSingleTrial = (
+    ecapDF
+    .xs(maxLFPName, level='feature')
+    .xs(exAmplitude, level=amplitudeFieldName, drop_level=False)
+    .iloc[0, :])
+exEmgSingleTrial = (
+    emgDF
+    .xs(maxEMGName, level='feature')
+    .xs(exAmplitude, level=amplitudeFieldName, drop_level=False)
+    .iloc[0, :])
+if True:
+    with PdfPages(pdfPath) as pdf:
+        for exEMGName in recCurveWideDF.columns:
+            for exLFPName in ecapRaucWideDF.columns:
+                if not ((exEMGName, exLFPName) == (maxEMGName, maxLFPName) or (exEMGName, exLFPName) == (minEMGName, minLFPName)):
+                    continue
+                # pdb.set_trace()
+                print('Plotting joint distributions of {} and {}'.format(exEMGName, exLFPName))
+                finiteMask = (recCurveWideDF[exEMGName].notna().to_numpy() & ecapRaucWideDF[exLFPName].notna().to_numpy())
+                sizeMask = (recCurveMaskDF[exEMGName].to_numpy() & ecapRaucMaskDF[exLFPName].to_numpy())
+                thisMask = finiteMask & sizeMask
+                if thisMask.sum() > 10:
+                    g = sns.jointplot(
+                        x=ecapRaucWideDF.loc[thisMask, exLFPName],
+                        y=recCurveWideDF.loc[thisMask, exEMGName], kind='reg',
+                        color=emgPalette[exEMGName],
+                        xlim=ecapRaucWideDF.loc[thisMask, exLFPName].quantile([zoomLevel, 1-zoomLevel]).to_list(),
+                        ylim=recCurveWideDF.loc[thisMask, exEMGName].quantile([zoomLevel, 1-zoomLevel]).to_list(),)
+                    if (exEMGName, exLFPName) == (maxEMGName, maxLFPName):
+                        # pdb.set_trace()
+                        g.ax_joint.text(
+                            ecapRaucWideDF.loc[exEmgSingleTrial.name, exLFPName],
+                            recCurveWideDF.loc[exEmgSingleTrial.name, exEMGName],
+                            '*', ha='center', va='center'
+                        )
+                    g.set_axis_labels(
+                        '{} electrode {} RAUC (a.u.)'.format(
+                            lfpNL.loc[exLFPName, 'whichArray'], int(lfpNL.loc[exLFPName, 'elecID'])),
+                        '{} RAUC (a.u.)'.format(emgNL[exEMGName])
+                        )
+                    scoreMask = (plotDF['emg'] == exEMGName) & (plotDF['lfp'] == exLFPName)
+                    thisScore = plotDF.loc[scoreMask, barVarName]
+                    thisPVal = plotDF.loc[scoreMask, 'pval']
+                    figTitle = g.fig.suptitle('{} = {:.3f}, p={:.3f}'.format(
+                        barVarName, float(thisScore), float(thisPVal)))
+                    g.fig.set_size_inches((10, 5))
+                    pdf.savefig(
+                        bbox_inches='tight', pad_inches=0.2,
+                        bbox_extra_artists=[figTitle]
+                        )
+                    if (exEMGName, exLFPName) == (maxEMGName, maxLFPName) or (exEMGName, exLFPName) == (minEMGName, minLFPName):
+                        if arguments['showFigures']:
+                            plt.show()
+                        else:
+                            plt.close()
                     else:
                         plt.close()
-                else:
-                    plt.close()
-'''ax[1] = sns.regplot(
-    x=ecapRaucWideDF[exLFPName],
-    y=recCurveWideDF[exEMGName], ax=ax[1],
-    color=emgPalette[exEMGName])
-ax[1].set_xlabel('{} electrode {} RAUC (a.u.)'.format(
-    lfpNL.loc[exLFPName, 'whichArray'], int(lfpNL.loc[exLFPName, 'elecID'])))
-ax[1].set_xlim([-1 * zoomLevel, 1 + zoomLevel])
-ax[1].set_ylabel('{} RAUC (a.u.)'.format(emgNL[exEMGName]))
-ax[1].set_ylim([-1 * zoomLevel, 1 + zoomLevel])
-ax[1].set_yticks([0, 0.5, 1])
-ax[1].set_yticks([0, 0.5, 1])
-fig.set_size_inches((10, 5))'''
 #########
 sns.set(
-    context='notebook', style='dark',
+    context='notebook', style='white',
     palette='dark', font='sans-serif',
     font_scale=1.5, color_codes=True)
 fig, ax = plt.subplots(1, 2)
-exEMGName, exLFPName = plotDF.loc[plotDF[barVarName].idxmax(), ['emg', 'lfp']]
-exAmplitude = presentAmplitudes[4]
 lfpAx, emgAx = ax
 lfpAxTStart, lfpAxTStop = 1, 8
 lfpMaskAx = (
         (ecapDF.columns >= lfpAxTStart * 1e-3) &
         (ecapDF.columns < lfpAxTStop * 1e-3))
-exLfp = (
-    ecapDF
-    .xs(exLFPName, level='feature')
-    .xs(exAmplitude, level='nominalCurrent')
-    .iloc[0, :])
-pdb.set_trace()
 lfpMask = (
         (ecapDF.columns >= ecapTWinStart) &
         (ecapDF.columns < ecapTWinStop))
 lfpAx.fill_between(
-    exLfp.index[lfpMask] * 1e3, exLfp[lfpMask], 0,
+    exLfpSingleTrial.index[lfpMask] * 1e3, exLfpSingleTrial[lfpMask], 0,
     edgecolor=stimAmpPalette[exAmplitude],
     facecolor=stimAmpPaletteDesat[exAmplitude],
-    linewidth=0)
+    linewidth=0, alpha=0.5)
 lfpAx.plot(
-    exLfp.index[lfpMaskAx] * 1e3, exLfp[lfpMaskAx],
+    exLfpSingleTrial.index[lfpMaskAx] * 1e3, exLfpSingleTrial[lfpMaskAx],
     color=stimAmpPalette[exAmplitude], lw=2)
 lfpAx.set_xlabel('Time (msec)')
-lfpAx.set_ylabel('{} LFP (uV)'.format(exLFPName))
+lfpAx.set_ylabel('{} LFP (uV)'.format(maxLFPName))
 lfpAx.set_xlim([lfpAxTStart, lfpAxTStop])
 lfpAx.set_title('LFP RAUC ({} to {} msec)'.format(int(ecapTWinStart * 1e3), int(ecapTWinStop * 1e3)))
-exEmg = (
-    emgDF
-    .xs(exEMGName, level='feature')
-    .xs(exAmplitude, level='nominalCurrent')
-    .iloc[0, :])
+
 emgAxTStart, emgAxTStop = 0, 80
 emgMaskAx = (
         (emgDF.columns >= emgAxTStart * 1e-3) &
@@ -487,17 +494,17 @@ emgMask = (
         (emgDF.columns >= emgTWinStart) &
         (emgDF.columns < emgTWinStop))
 emgAx.fill_between(
-    exEmg.index[emgMask] * 1e3, exEmg[emgMask], 0,
-    edgecolor=emgPalette[exEMGName],
-    facecolor=emgPaletteDesat[exEMGName],
-    linewidth=0)
+    exEmgSingleTrial.index[emgMask] * 1e3, exEmgSingleTrial[emgMask], 0,
+    edgecolor=emgPalette[maxEMGName],
+    facecolor=emgPaletteDesat[maxEMGName],
+    linewidth=0, alpha=0.5)
 emgAx.plot(
-    exEmg.index[emgMaskAx] * 1e3, exEmg[emgMaskAx],
-    color=emgPalette[exEMGName], lw=2)
+    exEmgSingleTrial.index[emgMaskAx] * 1e3, exEmgSingleTrial[emgMaskAx],
+    color=emgPalette[maxEMGName], lw=2)
 emgAx.set_title('EMG RAUC ({} to {} msec)'.format(int(emgTWinStart * 1e3), int(emgTWinStop * 1e3)))
 emgAx.set_xlim([emgAxTStart, emgAxTStop])
 emgAx.set_xlabel('Time (msec)')
-emgAx.set_ylabel('{} EMG (uV)'.format(emgNL[exEMGName]))
+emgAx.set_ylabel('{} EMG (uV)'.format(emgNL[maxEMGName]))
 pdfPath = os.path.join(
     figureOutputFolder,
     prefix + '_{}_{}_{}.pdf'.format(
@@ -513,23 +520,11 @@ if arguments['showFigures']:
     plt.show()
 else:
     plt.close()
-'''
-exEMGName, exLFPName = plotDF.loc[plotDF['R2'].idxmin(), ['emg', 'lfp']]
-binMask = (plotEcap['bin'] > ecapTWinStart) & (plotEcap['bin'] < ecapTWinStop)
-featureMask = plotEcap['feature'] == exLFPName
-g = sns.relplot(
-    x='bin', y='signal', hue='nominalCurrent', row='electrode', style='regrID',
-    data=plotEcap.loc[binMask & featureMask, :], kind='line', ci='sem')
-for axIdx, ax in enumerate(g.axes.flat):
-    ax.set_ylabel(exLFPName)
-g.axes.flat[0].set_xlabel('Time (sec)')
-plt.show()
-'''
 ########################################################################
 ## plot response magnitude correlation
 ########################################################################
 sns.set(
-    context='notebook', style='darkgrid',
+    context='notebook', style='dark',
     palette='dark', font='sans-serif',
     font_scale=1.5, color_codes=True)
 '''
@@ -573,8 +568,28 @@ def axModFun(g, ro, co, hu, dataSubset):
             g.axes[ro, co].set_xticks([])
             g.axes[ro, co].set_facecolor('w')
     return
+#
+def changePatchAlpha(g, ro, co, hu, dataSubset):
+    emptySubset = (
+        (dataSubset.empty) or
+        (dataSubset[barVarName].isna().all()))
+    if not emptySubset:
+        # hu seems broken in this version of catplot, override it
+        for hu, thisPatch in enumerate(g.axes[ro, co].patches):
+            # pdb.set_trace() ##
+            thisSubset = dataSubset.iloc[hu, :]
+            thisPatch = g.axes[ro, co].patches[hu]
+            thisPatch.set_edgecolor((0., 0., 0., 0.))
+            if thisSubset['rejectH0']:
+                xPos = thisPatch.get_x() + thisPatch.get_width() / 2
+                yPos = thisPatch.get_y() + thisPatch.get_height()
+                g.axes[ro, co].text(xPos, yPos, '*', ha='center', va='center')
+            if (thisSubset['emg'] == maxEMGName) and (thisSubset['lfp'] == maxLFPName):
+                thisPatch.set_edgecolor((0., 0., 0., 1.))
+    return
+#
 plotProcFuns = [
-    axModFun
+    axModFun, changePatchAlpha
     ]
 g = sns.catplot(
     row='ycoords', col='xcoords', y=barVarName, x='xDummy',
@@ -583,6 +598,7 @@ g = sns.catplot(
     hue_order=sorted(plotDF['emg'].unique()),
     )
 for (ro, co, hu), dataSubset in g.facet_data():
+    print('ro = {}, co = {}, hu={}'.format(ro, co, hu))
     emptySubset = (
             (dataSubset.empty) or
             (dataSubset[barVarName].isna().all()))
@@ -604,7 +620,7 @@ g.set_xlabels('')
 g.set_ylabels('')
 g.set_xticklabels('')
 g.fig.subplots_adjust(wspace=0.05, hspace=0.05)
-figYLabel = g.fig.supylabel('Pearson\'s R', x=0.1)
+figYLabel = g.fig.supylabel('Spearman\'s R', x=0.1)
 pdfPath = os.path.join(
     figureOutputFolder,
     prefix + '_{}_{}_{}.pdf'.format(
