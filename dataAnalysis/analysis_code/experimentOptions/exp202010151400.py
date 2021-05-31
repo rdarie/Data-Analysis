@@ -217,7 +217,7 @@ def getExpOpts():
             # 'LThoracolumbarFascia', 'RThoracolumbarFascia',
             # 'RExtensorDigitorum', 'LSemitendinosus', 'RSemitendinosus',
         ],
-        'keepElectrodes': None,
+        'keepElectrodes': ['caudalY_e10', 'caudalZ_e21'],
         'significantOnly': False,
         }
     EMGStyleMarkers = {

@@ -60,9 +60,9 @@
 #
 # EXP="exp202010191100"
 #
-# EXP="exp202012171300"
+EXP="exp202012171300"
 ##
-EXP="exp202012221300"
+# EXP="exp202012221300"
 
 # 
 module load anaconda/2020.02
@@ -94,8 +94,8 @@ ANALYSISFOLDER="--analysisName=loRes"
 
 
 SLURM_ARRAY_TASK_ID=6
-BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
-# BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
+# BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
+BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
 
 INPUTBLOCKNAME="--inputBlockSuffix=emg"
 ANALYSISFOLDER="--analysisName=loRes"
@@ -105,6 +105,7 @@ INPUTBLOCKNAME="--inputBlockSuffix=emg"
 UNITSELECTOR="--unitQuery=isiemgenv"
 ALIGNQUERY="--alignQuery=stimOn"
 # python -u ./calcTrialOutliers.py --exp=$EXP --alignFolderName=stim $INPUTBLOCKNAME $BLOCKSELECTOR $ANALYSISFOLDER $UNITSELECTOR $WINDOW $ALIGNQUERY --verbose --plotting --saveResults
+python -u ./calcTargetNoiseCeiling.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --maskOutlierBlocks $ALIGNQUERY --plotting
 
 # OUTLIERMASK=""
 OUTLIERMASK="--maskOutlierBlocks"
@@ -116,7 +117,7 @@ UNITSELECTOR="--unitQuery=isiemgraw"
 
 UNITSELECTOR="--unitQuery=isiemgraw"
 ALIGNQUERY="--alignQuery=stimOn"
-python -u ./calcRecruitment.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR $ALIGNQUERY $OUTLIERMASK
+# python -u ./calcRecruitment.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR $ALIGNQUERY $OUTLIERMASK
 # python -u ./plotRecruitment.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR $ALIGNQUERY --showFigures
 
 ANALYSISFOLDER="--analysisName=fullRes"

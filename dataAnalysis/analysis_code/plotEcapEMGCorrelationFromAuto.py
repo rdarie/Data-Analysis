@@ -40,9 +40,10 @@ import pandas as pd
 idsl = pd.IndexSlice
 import numpy as np
 from tqdm import tqdm
+from matplotlib.backends.backend_pdf import PdfPages
 import dataAnalysis.plotting.spike_sorting_plots as ssplt
 from scipy import stats
-from sklearn.preprocessing import RobustScaler, MinMaxScaler, StandardScaler
+from sklearn.preprocessing import RobustScaler, MinMaxScaler, StandardScaler, QuantileTransformer
 #
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 '''
@@ -85,11 +86,16 @@ if arguments['processAll']:
 else:
     prefix = ns5FileName
 #
+corrPathEMG = os.path.join(
+    calcSubFolderEMG,
+    prefix + '_{}_{}_calc.h5'.format(
+        arguments['emgBlockSuffix'], arguments['window']))
 resultPathEMG = os.path.join(
     calcSubFolderEMG,
     prefix + '_{}_{}_rauc.h5'.format(
         arguments['emgBlockSuffix'], arguments['window']))
 print('loading {}'.format(resultPathEMG))
+emgCorrDF = pd.read_hdf(corrPathEMG, 'noiseCeil').to_frame(name='noiseCeil').reset_index()
 #  Overrides
 limitPages = None
 amplitudeFieldName = 'nominalCurrent'
@@ -97,8 +103,7 @@ amplitudeFieldName = 'nominalCurrent'
 #  End Overrides
 trialMetaNames = [
     'segment', 'originalIndex', 't',
-    'RateInHz',
-    'electrode', 'nominalCurrent']
+    ] + stimulusConditionNames
 keepCols = trialMetaNames + ['feature']
 mapAnnotNames = ['xcoords', 'ycoords', 'whichArray']
 ecapPath = os.path.join(
@@ -110,6 +115,11 @@ rawEcapDF = pd.read_parquet(ecapPath, engine='fastparquet')
 rawEcapDF.loc[:, 'nominalCurrent'] = rawEcapDF['nominalCurrent'] * (-1)
 # simplify electrode names
 rawEcapDF.loc[:, 'electrode'] = rawEcapDF['electrode'].apply(lambda x: x[1:])
+#
+emgCorrDF.loc[:, 'electrode'] = emgCorrDF['electrode'].apply(lambda x: x[1:])
+emgCorrDF.loc[:, 'feature'] = emgCorrDF['feature'].apply(lambda x: x.replace('EmgEnv#0', ''))
+emgCorrDF.loc[:, 'nominalCurrent'] = emgCorrDF['nominalCurrent'] * (-1)
+#
 removeStimOnRec = True
 if removeStimOnRec:
     ecapRmMask = (rawEcapDF['electrode'] == rawEcapDF['feature'])
@@ -118,14 +128,19 @@ for colName in keepCols:
     if colName not in rawEcapDF.columns:
         rawEcapDF.loc[:, colName] = 0.
 # rawEcapDF.shape
-ecapTWinStart, ecapTWinStop = 1e-3, 3e-3
-qLimsEcap = (2.5e-3, 1-2.5e-3)
+ecapTWinStart, ecapTWinStop = 1.3e-3, 3e-3
+qLimsEcap = (5e-3, 1-5e-3)
 emgTWinStart, emgTWinStop = 0, 39e-3
 #
-barVarName = 'R2'
-whichRaucLFP = 'standardizedRAUC'
-whichRaucEMG = 'rauc'
+barVarName = 'absR'
+whichRaucLFP = 'rauc'
+whichRaucEMG = 'normalizedRAUC'
 whichEcap = 'exp_resid_CAR'
+
+if RCCalcOpts['keepElectrodes'] is not None:
+    keepDataMask = rawEcapDF['electrode'].isin(RCCalcOpts['keepElectrodes'])
+    rawEcapDF = rawEcapDF.loc[keepDataMask, :]
+
 ecapDF = rawEcapDF.loc[rawEcapDF['regrID'] == whichEcap, :].copy()
 ecapDF.drop(columns=['regrID'] + mapAnnotNames, inplace=True)
 del rawEcapDF
@@ -140,13 +155,13 @@ ecapDF.set_index(
         if idxName in ecapDF.columns],
     inplace=True)
 ecapDF.columns = ecapDF.columns.astype(float)
-'''ecapDetrender = ash.genDetrender(
+ecapDetrender = ash.genDetrender(
     timeWindow=[35e-3, 39e-3], useMean=False)
-ecapDF = ecapDetrender(ecapDF, None)'''
+ecapDF = ecapDetrender(ecapDF, None)
 #
 #
 ecapRauc = ash.rAUC(
-    ecapDF, baseline='median',
+    ecapDF,
     tStart=ecapTWinStart, tStop=ecapTWinStop).to_frame(name='rauc')
 ecapRauc['kruskalStat'] = np.nan
 ecapRauc['kruskalP'] = np.nan
@@ -168,11 +183,30 @@ for annName in derivedAnnot:
 # normalizationGrouper = ecapRauc.groupby(['feature'])
 # or
 # normalizationGrouper = [('all', ecapRauc), ]
+
 for name, group in ecapRauc.groupby(['feature']):
-    groupQuantiles = group['rauc'].quantile(qLimsEcap)
+    qScaler = QuantileTransformer(output_distribution='normal')
+    qScaler.fit(
+        ecapRauc.loc[group.index, 'rauc']
+        .to_numpy()
+        .reshape(-1, 1))
+    ecapRauc.loc[group.index, 'rauc'] = (
+        qScaler.transform(
+            ecapRauc.loc[group.index, 'rauc']
+            .to_numpy()
+            .reshape(-1, 1)
+        )
+    )
+    '''groupQuantiles = group['rauc'].quantile(qLimsEcap)
+    ecapRauc.loc[group.index, 'rauc'] = ecapRauc.loc[group.index, 'rauc'].clip(
+        upper=groupQuantiles.iloc[1],
+        lower=groupQuantiles.iloc[0],
+        )'''
+for name, group in ecapRauc.groupby(['feature']):
     rauc = group['rauc'].copy()
+    '''groupQuantiles = group['rauc'].quantile(qLimsEcap)
     rauc[rauc > groupQuantiles[qLimsEcap[-1]]] = groupQuantiles[qLimsEcap[-1]]
-    rauc[rauc < groupQuantiles[qLimsEcap[0]]] = groupQuantiles[qLimsEcap[0]]
+    rauc[rauc < groupQuantiles[qLimsEcap[0]]] = groupQuantiles[qLimsEcap[0]]'''
     '''standardizedRAUC = pd.Series(
         (
             StandardScaler().fit_transform(
@@ -213,6 +247,13 @@ for idxName in recCurve.index.names:
 #
 recCurve.reset_index(inplace=True)
 emgDF.reset_index(inplace=True)
+# simplify electrode names
+recCurve.loc[:, 'electrode'] = recCurve['electrode'].apply(lambda x: x[1:])
+emgDF.loc[:, 'electrode'] = emgDF['electrode'].apply(lambda x: x[1:])
+#
+recCurve.loc[:, 'feature'] = recCurve['featureName'].to_numpy()
+emgDF.loc[:, 'feature'] = recCurve['featureName'].to_numpy()
+#
 #
 if RCCalcOpts['significantOnly']:
     recCurve = recCurve.query("(kruskalP < 1e-3)")
@@ -226,25 +267,26 @@ emgDF = emgDF.loc[emgDF.index.isin(recCurve.index), :]
 hueOrderEMG = (
     featToSiteEMG.loc[featToSiteEMG.isin(recCurve['featureName'])]
         .sort_index().to_numpy())
-# simplify electrode names
-recCurve.loc[:, 'electrode'] = recCurve['electrode'].apply(lambda x: x[1:])
-emgDF.loc[:, 'electrode'] = emgDF['electrode'].apply(lambda x: x[1:])
-recCurve.loc[:, 'feature'] = recCurve['featureName'].to_numpy()
-emgDF.loc[:, 'feature'] = recCurve['featureName'].to_numpy()
+#
+#
+emgCorrMaskLookup = emgCorrDF.set_index(stimulusConditionNames + ['feature'])['noiseCeil'] > 0.5
+recCurveCorrIdx = pd.MultiIndex.from_frame(recCurve.loc[:, stimulusConditionNames + ['feature']])
+recCurve.loc[:, 'passesCorrMask'] = recCurveCorrIdx.map(emgCorrMaskLookup).to_numpy()
 #
 recCurve.set_index(keepCols, inplace=True)
 emgDF.set_index(keepCols, inplace=True)
 emgDF.columns = emgDF.columns.astype(float)
 recCurveWideDF = recCurve[whichRaucEMG].unstack(level='feature')
-#
+recCurveMaskDF = recCurve['passesCorrMask'].unstack(level='feature')
 emgRCIndex = pd.MultiIndex.from_frame(recCurveWideDF.index.to_frame().reset_index(drop=True).loc[:, ['segment', 'originalIndex', 't']])
 ecapRCIndex = pd.MultiIndex.from_frame(ecapRaucWideDF.index.to_frame().reset_index(drop=True).loc[:, ['segment', 'originalIndex', 't']])
 commonIdx = np.intersect1d(emgRCIndex, ecapRCIndex)
 # commonIdx = np.intersect1d(recCurveWideDF.index.to_numpy(), ecapRaucWideDF.index.to_numpy())
 recCurveWideDF = recCurveWideDF.loc[emgRCIndex.isin(commonIdx), :]
 ecapRaucWideDF = ecapRaucWideDF.loc[ecapRCIndex.isin(commonIdx), :]
-recCurveMaskDF = recCurveWideDF.notna()
+recCurveMaskDF = recCurveMaskDF.loc[emgRCIndex.isin(commonIdx), :]
 ecapRaucMaskDF = ecapRaucWideDF.notna()
+pdb.set_trace()
 
 presentAmplitudes = sorted(ecapRaucWideDF.index.get_level_values('nominalCurrent').unique())
 if 0 not in presentAmplitudes:
@@ -295,15 +337,27 @@ mapDF.loc[:, 'xcoords'] = mapDF['shifted_xcoords'].copy()
 corrDFIndex = pd.MultiIndex.from_product(
     [recCurveWideDF.columns, ecapRaucWideDF.columns],
     names=['emg', 'lfp'])
-corrDF = pd.DataFrame(np.nan, index=corrDFIndex, columns=['R'] + mapAnnotNames)
+corrDF = pd.DataFrame(np.nan, index=corrDFIndex, columns=['R', 'pval'] + mapAnnotNames)
 #
 for emgName, lfpName in corrDF.index:
     rowIdx = (emgName, lfpName)
     finiteMask = (recCurveWideDF[emgName].notna().to_numpy() & ecapRaucWideDF[lfpName].notna().to_numpy())
     sizeMask = (recCurveMaskDF[emgName].to_numpy() & ecapRaucMaskDF[lfpName].to_numpy())
-    corrDF.loc[rowIdx, 'R'] = np.corrcoef(
-        recCurveWideDF.loc[finiteMask & sizeMask, emgName],
-        ecapRaucWideDF.loc[finiteMask & sizeMask, lfpName])[0, 1]
+    thisMask = finiteMask & sizeMask
+    if thisMask.sum() > 10:
+        # more than 10 pairs of #s to calculate on
+        '''corrDF.loc[rowIdx, 'R'] = np.corrcoef(
+            recCurveWideDF.loc[thisMask, emgName],
+            ecapRaucWideDF.loc[thisMask, lfpName])[0, 1]'''
+        spr, pvalue = stats.spearmanr(
+            recCurveWideDF.loc[thisMask, emgName],
+            ecapRaucWideDF.loc[thisMask, lfpName]
+            )
+        corrDF.loc[rowIdx, 'R'] = spr
+        corrDF.loc[rowIdx, 'pval'] = pvalue
+    else:
+        corrDF.loc[rowIdx, 'R'] = 0.
+        corrDF.loc[rowIdx, 'pval'] = 1.
 for annotName in mapAnnotNames:
     lookupSource = mapDF.loc[mapAMask, [annotName, 'topoName']].set_index('topoName')[annotName]
     corrDF.loc[:, annotName] = corrDF.index.get_level_values('lfp').map(lookupSource)
@@ -312,6 +366,7 @@ for annotName in mapAnnotNames:
     corrDF['xcoords'], corrDF['ycoords'],
     swapXY=True)'''
 corrDF.loc[:, 'R2'] = corrDF['R'] ** 2
+corrDF.loc[:, 'absR'] = corrDF['R'].abs()
 corrDF.loc[:, 'xDummy'] = 1
 
 plotDF = corrDF.reset_index().query('whichArray == "rostral"')
@@ -321,7 +376,6 @@ plotDF = corrDF.reset_index().query('whichArray == "rostral"')
 ########################################################################
 zoomLevel = 2e-2
 
-exEMGName, exLFPName = plotDF.loc[plotDF[barVarName].idxmin(), ['emg', 'lfp']]
 # plot maximally correlated pair
 '''fig, ax = plt.subplots(1, 2, sharey=True, sharex=True)
 ax[0] = sns.regplot(
@@ -335,33 +389,46 @@ ax[0].set_ylabel('{} RAUC (a.u.)'.format(emgNL[exEMGName]))
 ax[0].set_ylim([-1 * zoomLevel, 1 + zoomLevel])
 ax[0].set_yticks([])
 ax[1].set_xticks([0, 0.5, 1])'''
-finiteMask = (recCurveWideDF[exEMGName].notna().to_numpy() & ecapRaucWideDF[exLFPName].notna().to_numpy())
-sizeMask = (recCurveMaskDF[exEMGName].to_numpy() & ecapRaucMaskDF[exLFPName].to_numpy())
-g = sns.jointplot(
-    x=ecapRaucWideDF.loc[finiteMask & sizeMask, exLFPName],
-    y=recCurveWideDF.loc[finiteMask & sizeMask, exEMGName], kind='reg',
-    color=emgPalette[exEMGName])
-g.set_axis_labels(
-    '{} electrode {} RAUC (a.u.)'.format(
-        lfpNL.loc[exLFPName, 'whichArray'], int(lfpNL.loc[exLFPName, 'elecID'])),
-    '{} RAUC (a.u.)'.format(emgNL[exEMGName])
-    )
 pdfPath = os.path.join(
     figureOutputFolder,
     prefix + '_{}_{}_{}.pdf'.format(
         arguments['emgBlockSuffix'], arguments['lfpBlockSuffix'],
-        'emgToLfpCorrelationMinExample'))
-g.fig.set_size_inches((10, 5))
-g.fig.savefig(
-    pdfPath,
-    bbox_inches='tight', pad_inches=0.2,
-    # bbox_extra_artists=[leg, figYLabel, figXLabel]
-    )
-if arguments['showFigures']:
-    plt.show()
-else:
-    plt.close()
-exEMGName, exLFPName = plotDF.loc[plotDF[barVarName].idxmax(), ['emg', 'lfp']]
+        'emgToLfpCorrelationExamples'))
+# pdb.set_trace()
+maxEMGName, maxLFPName = plotDF.loc[plotDF[barVarName].idxmax(), ['emg', 'lfp']]
+minEMGName, minLFPName = plotDF.loc[plotDF[barVarName].idxmin(), ['emg', 'lfp']]
+with PdfPages(pdfPath) as pdf:
+    for exEMGName in recCurveWideDF.columns:
+        for exLFPName in ecapRaucWideDF.columns:
+            print('Plotting joint distributions of {} and {}'.format(exEMGName, exLFPName))
+            finiteMask = (recCurveWideDF[exEMGName].notna().to_numpy() & ecapRaucWideDF[exLFPName].notna().to_numpy())
+            sizeMask = (recCurveMaskDF[exEMGName].to_numpy() & ecapRaucMaskDF[exLFPName].to_numpy())
+            thisMask = finiteMask & sizeMask
+            if thisMask.sum() > 10:
+                g = sns.jointplot(
+                    x=ecapRaucWideDF.loc[thisMask, exLFPName],
+                    y=recCurveWideDF.loc[thisMask, exEMGName], kind='reg',
+                    color=emgPalette[exEMGName])
+                g.set_axis_labels(
+                    '{} electrode {} RAUC (a.u.)'.format(
+                        lfpNL.loc[exLFPName, 'whichArray'], int(lfpNL.loc[exLFPName, 'elecID'])),
+                    '{} RAUC (a.u.)'.format(emgNL[exEMGName])
+                    )
+                scoreMask = (plotDF['emg'] == exEMGName) & (plotDF['lfp'] == exLFPName)
+                thisScore = plotDF.loc[scoreMask, barVarName]
+                figTitle = g.fig.suptitle('{} = {:.3f}'.format(barVarName, float(thisScore)))
+                g.fig.set_size_inches((10, 5))
+                pdf.savefig(
+                    bbox_inches='tight', pad_inches=0.2,
+                    bbox_extra_artists=[figTitle]
+                    )
+                if (exEMGName, exLFPName) == (maxEMGName, maxLFPName) or (exEMGName, exLFPName) == (minEMGName, minLFPName):
+                    if arguments['showFigures']:
+                        plt.show()
+                    else:
+                        plt.close()
+                else:
+                    plt.close()
 '''ax[1] = sns.regplot(
     x=ecapRaucWideDF[exLFPName],
     y=recCurveWideDF[exEMGName], ax=ax[1],
@@ -374,30 +441,6 @@ ax[1].set_ylim([-1 * zoomLevel, 1 + zoomLevel])
 ax[1].set_yticks([0, 0.5, 1])
 ax[1].set_yticks([0, 0.5, 1])
 fig.set_size_inches((10, 5))'''
-g = sns.jointplot(
-    x=ecapRaucWideDF.loc[finiteMask & sizeMask, exLFPName],
-    y=recCurveWideDF.loc[finiteMask & sizeMask, exEMGName], kind='reg',
-    color=emgPalette[exEMGName])
-g.set_axis_labels(
-    '{} electrode {} RAUC (a.u.)'.format(
-        lfpNL.loc[exLFPName, 'whichArray'], int(lfpNL.loc[exLFPName, 'elecID'])),
-    '{} RAUC (a.u.)'.format(emgNL[exEMGName])
-    )
-pdfPath = os.path.join(
-    figureOutputFolder,
-    prefix + '_{}_{}_{}.pdf'.format(
-        arguments['emgBlockSuffix'], arguments['lfpBlockSuffix'],
-        'emgToLfpCorrelationMaxExample'))
-g.fig.set_size_inches((10, 5))
-g.fig.savefig(
-    pdfPath,
-    bbox_inches='tight', pad_inches=0.2,
-    # bbox_extra_artists=[leg, figYLabel, figXLabel]
-    )
-if arguments['showFigures']:
-    plt.show()
-else:
-    plt.close()
 #########
 sns.set(
     context='notebook', style='dark',

@@ -37,7 +37,7 @@ def parseAnalysisOptions(
     except Exception:
         insFolder = os.path.join(remoteBasePath, 'ORCA Logs')
     experimentName = expOpts['experimentName']
-    assembledName = ''
+    assembledName = 'Block'
     nspFolder = os.path.join(remoteBasePath, 'raw', experimentName)
     simiFolder = os.path.join(remoteBasePath, 'processed', experimentName, 'simi')
     oeFolder = os.path.join(remoteBasePath, 'raw', experimentName, 'open_ephys')

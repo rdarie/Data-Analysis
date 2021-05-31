@@ -52,7 +52,7 @@ from currentExperiment import parseAnalysisOptions
 from namedQueries import namedQueries
 from math import factorial
 from sklearn.preprocessing import scale, robust_scale
-from dask.distributed import Client
+from dask.distributed import Client, LocalCluster
 
 #
 expOpts, allOpts = parseAnalysisOptions(
@@ -105,7 +105,7 @@ alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **argu
 alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
     namedQueries, scratchFolder, **arguments)
 alignedAsigsKWargs['outlierTrials'] = ash.processOutlierTrials(
-    scratchPath, prefix, **arguments)
+    scratchFolder, prefix, **arguments)
 
 
 def noiseCeil(
@@ -185,6 +185,21 @@ if __name__ == "__main__":
         'electrode',
         'RateInHz', 'nominalCurrent']
     groupBy = ['feature'] + conditionNames
+    # daskComputeOpts = {}
+    daskComputeOpts = dict(
+        # scheduler='threads'
+        scheduler='processes'
+        # scheduler='single-threaded'
+        )
+    if daskComputeOpts['scheduler'] == 'single-threaded':
+        daskClient = Client(LocalCluster(n_workers=1))
+    elif daskComputeOpts['scheduler'] == 'processes':
+        daskClient = Client(LocalCluster(processes=True))
+    elif daskComputeOpts['scheduler'] == 'threads':
+        daskClient = Client(LocalCluster(processes=False))
+    else:
+        daskClient = None
+        print('Scheduler name is not correct!')
     # resultMeta = {
     #     'noiseCeil': float,
     #     'noiseCeilStd': float,
@@ -193,7 +208,7 @@ if __name__ == "__main__":
     #     'mse': float,
     #     'mseStd': float
     #     }
-    useCachedResult = True
+    useCachedResult = False
     if not (useCachedResult and os.path.exists(resultPath)):
         print('loading {}'.format(triggeredPath))
         dataReader, dataBlock = preproc.blockFromPath(
@@ -208,29 +223,21 @@ if __name__ == "__main__":
                 tBounds=None,
                 plotting=False, iterMethod='half',
                 corrMethod='pearson', maxIter=100)
-        # daskComputeOpts = {}
-        daskComputeOpts = dict(
-            # scheduler='threads'
-            scheduler='processes'
-            # scheduler='single-threaded'
-            )
         exampleOutput = pd.DataFrame(
-        {
-            'noiseCeil': float(1),
-            'noiseCeilStd': float(1),
-            'covariance': float(1),
-            'covarianceStd': float(1),
-            'mse': float(1),
-            'mseStd': float(1)}, index=[0])
-        daskClient = Client()
+            {
+                'noiseCeil': float(1),
+                'noiseCeilStd': float(1),
+                'covariance': float(1),
+                'covarianceStd': float(1),
+                'mse': float(1),
+                'mseStd': float(1)}, index=[0])
         resDF = ash.splitApplyCombine(
             dataDF, fun=noiseCeil, resultPath=resultPath,
             funArgs=[], funKWArgs=funKWArgs,
             rowKeys=groupBy, colKeys=testVar, useDask=True,
             daskPersist=True, daskProgBar=True, daskResultMeta=None,
             daskComputeOpts=daskComputeOpts, nPartitionMultiplier=2,
-            reindexFromInput=False)
-        #
+            retainInputIndex=True)
         # resDF = ash.applyFunGrouped(
         #     dataDF,
         #     groupBy, testVar,
@@ -277,7 +284,6 @@ if __name__ == "__main__":
         for cN in ['noiseCeil', 'covariance', 'covariance_q_scale']:
             resDF[cN].to_hdf(deepSpineExportPath, cN)
     #
-    # pdb.set_trace()
     trialInfo = resDF['noiseCeil'].index.to_frame().reset_index(drop=True)
     dropColumns = []
     dropElectrodes = []

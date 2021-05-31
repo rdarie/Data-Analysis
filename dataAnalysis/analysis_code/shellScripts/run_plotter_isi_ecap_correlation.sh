@@ -57,8 +57,8 @@
 # EXP="exp202010081400"
 # EXP="exp202010151400"
 # EXP="exp202010191100"
-# EXP="exp202012171300"
-EXP="exp202012221300"
+EXP="exp202012171300"
+# EXP="exp202012221300"
 
 # #
 module load anaconda/2020.02
@@ -66,7 +66,7 @@ module load anaconda/2020.02
 conda activate
 source activate nda2
 python --version
-#######
+########
 
 export OUTDATED_IGNORE=1
 LAZINESS="--lazy"
@@ -75,9 +75,11 @@ LAZINESS="--lazy"
 WINDOW="--window=XXS"
 # WINDOW="--window=XS"
 
-SLURM_ARRAY_TASK_ID=6
-BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
-# BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
+SLURM_ARRAY_TASK_ID=3
+BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
+
+# SLURM_ARRAY_TASK_ID=6
+# BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
 
 INPUTBLOCKNAME="--inputBlockSuffix=emg"
 ALIGNQUERY="--alignQuery=stimOnLessThan30Hz"

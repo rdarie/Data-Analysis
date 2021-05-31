@@ -283,6 +283,7 @@ def splitApplyCombine(
             .groupby(by=rowKeys, group_keys=False)
             .apply(fun, *funArgs, **funKWArgs))
     # TODO, below is a transformation, handle other index types
+    # pdb.set_trace()
     if reindexFromInput:
         # pdb.set_trace()
         resultDF = pd.DataFrame(
@@ -818,8 +819,8 @@ def rAUC(
     '''rAUCDF = (
         asigWide.loc[:, tMask].subtract(bLine, axis='index')
         .abs().sum(axis='columns') * dt)'''
-    rAUCDF = asigWide.loc[:, tMask].abs().mean(axis='columns')
-    # rAUCDF = (asigWide.loc[:, tMask] - bLine).std(axis='columns')
+    # rAUCDF = asigWide.loc[:, tMask].abs().mean(axis='columns')
+    rAUCDF = (asigWide.loc[:, tMask] - bLine).std(axis='columns')
     return rAUCDF
 
 
