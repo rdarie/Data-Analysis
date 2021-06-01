@@ -156,10 +156,7 @@ outputDFPath = os.path.join(
         blockBaseName,
         arguments['window'],
         iteratorSuffix))
-if arguments['verbose']:
-    prf.print_memory_usage(
-        'Saving {} to {}'.format(
-            arguments['selectionName'], outputDFPath))
+#
 if arguments['resetHDF']:
     if os.path.exists(outputDFPath):
         os.remove(outputDFPath)
@@ -170,52 +167,27 @@ if arguments['controlSet']:
         trialInfo.loc[:, sCN] = ns5.metaFillerLookup[sCN]
     trialInfo.loc[:, 'originalIndex'] = trialInfo['originalIndex'] + int(1e6)
     exportDF.index = pd.MultiIndex.from_frame(trialInfo)
-    exportDF.to_hdf(outputDFPath, '/{}/control'.format(arguments['selectionName']), mode='a')
+    exportKey = '/{}/control'.format(arguments['selectionName'])
 else:
-    exportDF.to_hdf(outputDFPath, '/{}/data'.format(arguments['selectionName']), mode='a')
-#
-if not arguments['controlSet']:
-    featureGroupNames = [cN for cN in exportDF.columns.names]
-    maskList = []
-    haveAllGroup = False
-    allGroupIdx = pd.MultiIndex.from_tuples(
-        [tuple('all' for fgn in featureGroupNames)],
-        names=featureGroupNames)
-    allMask = pd.Series(True, index=exportDF.columns).to_frame()
-    allMask.columns = allGroupIdx
-    maskList.append(allMask.T)
-    if arguments['selectionName'] == 'lfp_CAR_spectral':
-        # each freq band
-        for name, group in exportDF.groupby('freqBandName', axis='columns'):
-            attrValues = ['all' for fgn in featureGroupNames]
-            attrValues[featureGroupNames.index('freqBandName')] = name
-            thisMask = pd.Series(
-                exportDF.columns.isin(group.columns),
-                index=exportDF.columns).to_frame()
-            if np.all(thisMask):
-                haveAllGroup = True
-                thisMask.columns = allGroupIdx
-            else:
-                thisMask.columns = pd.MultiIndex.from_tuples(
-                    (attrValues, ), names=featureGroupNames)
-            maskList.append(thisMask.T)
-    # each lag
-    for name, group in exportDF.groupby('lag', axis='columns'):
+    exportKey = '/{}/data'.format(arguments['selectionName'])
+if arguments['verbose']:
+    prf.print_memory_usage(
+        'Saving {} to {}'.format(exportKey, outputDFPath))
+exportDF.to_hdf(outputDFPath, exportKey, mode='a')
+featureGroupNames = [cN for cN in exportDF.columns.names]
+maskList = []
+haveAllGroup = False
+allGroupIdx = pd.MultiIndex.from_tuples(
+    [tuple('all' for fgn in featureGroupNames)],
+    names=featureGroupNames)
+allMask = pd.Series(True, index=exportDF.columns).to_frame()
+allMask.columns = allGroupIdx
+maskList.append(allMask.T)
+if arguments['selectionName'] == 'lfp_CAR_spectral':
+    # each freq band
+    for name, group in exportDF.groupby('freqBandName', axis='columns'):
         attrValues = ['all' for fgn in featureGroupNames]
-        attrValues[featureGroupNames.index('lag')] = name
-        thisMask = pd.Series(
-            exportDF.columns.isin(group.columns),
-            index=exportDF.columns).to_frame()
-        if not np.all(thisMask):
-            # all group already covered
-            thisMask.columns = pd.MultiIndex.from_tuples(
-                (attrValues, ), names=featureGroupNames)
-            maskList.append(thisMask.T)
-    '''
-    # each parent feature
-    for name, group in exportDF.groupby('parentFeature', axis='columns'):
-        attrValues = ['all' for fgn in featureGroupNames]
-        attrValues[featureGroupNames.index('parentFeature')] = name
+        attrValues[featureGroupNames.index('freqBandName')] = name
         thisMask = pd.Series(
             exportDF.columns.isin(group.columns),
             index=exportDF.columns).to_frame()
@@ -225,16 +197,47 @@ if not arguments['controlSet']:
         else:
             thisMask.columns = pd.MultiIndex.from_tuples(
                 (attrValues, ), names=featureGroupNames)
-        maskList.append(thisMask.T)'''
-    #
-    maskDF = pd.concat(maskList)
-    maskParams = [
-        {k: v for k, v in zip(maskDF.index.names, idxItem)}
-        for idxItem in maskDF.index
-        ]
-    maskParamsStr = [
-        '{}'.format(idxItem).replace("'", '')
-        for idxItem in maskParams]
-    maskDF.loc[:, 'maskName'] = maskParamsStr
-    maskDF.set_index('maskName', append=True, inplace=True)
-    maskDF.to_hdf(outputDFPath, '/{}/featureMasks'.format(arguments['selectionName']), mode='a')
+        maskList.append(thisMask.T)
+# each lag
+for name, group in exportDF.groupby('lag', axis='columns'):
+    attrValues = ['all' for fgn in featureGroupNames]
+    attrValues[featureGroupNames.index('lag')] = name
+    thisMask = pd.Series(
+        exportDF.columns.isin(group.columns),
+        index=exportDF.columns).to_frame()
+    if not np.all(thisMask):
+        # all group already covered
+        thisMask.columns = pd.MultiIndex.from_tuples(
+            (attrValues, ), names=featureGroupNames)
+        maskList.append(thisMask.T)
+'''
+# each parent feature
+for name, group in exportDF.groupby('parentFeature', axis='columns'):
+    attrValues = ['all' for fgn in featureGroupNames]
+    attrValues[featureGroupNames.index('parentFeature')] = name
+    thisMask = pd.Series(
+        exportDF.columns.isin(group.columns),
+        index=exportDF.columns).to_frame()
+    if np.all(thisMask):
+        haveAllGroup = True
+        thisMask.columns = allGroupIdx
+    else:
+        thisMask.columns = pd.MultiIndex.from_tuples(
+            (attrValues, ), names=featureGroupNames)
+    maskList.append(thisMask.T)'''
+#
+maskDF = pd.concat(maskList)
+maskParams = [
+    {k: v for k, v in zip(maskDF.index.names, idxItem)}
+    for idxItem in maskDF.index
+    ]
+maskParamsStr = [
+    '{}'.format(idxItem).replace("'", '')
+    for idxItem in maskParams]
+maskDF.loc[:, 'maskName'] = maskParamsStr
+maskDF.set_index('maskName', append=True, inplace=True)
+masksKey = '/{}/featureMasks'.format(arguments['selectionName'])
+if arguments['verbose']:
+    prf.print_memory_usage(
+        'Saving {} to {}'.format(masksKey, outputDFPath))
+maskDF.to_hdf(outputDFPath, masksKey, mode='a')

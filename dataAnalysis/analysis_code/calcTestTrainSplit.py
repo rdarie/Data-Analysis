@@ -261,14 +261,17 @@ else:    # loading frames
                     iteratorSuffix))
             try:
                 with pd.HDFStore(dFPath,  mode='r') as store:
-                    thisDF = pd.read_hdf(store, '/{}/data'.format(arguments['selectionName']))
+                    theseDF = []
+                    dataKey = '/{}/data'.format(arguments['selectionName'])
+                    if dataKey in store:
+                        theseDF.append(pd.read_hdf(store, dataKey))
+                        print('Loaded {} from {}'.format(dataKey, dFPath))
                     controlKey = '/{}/control'.format(arguments['selectionName'])
                     if controlKey in store:
-                        ctrlDF = pd.read_hdf(store, controlKey)
-                        thisDF = pd.concat([thisDF, ctrlDF])
-                        # trialInfo = ctrlDF.index.to_frame().reset_index(drop=True)
-                    else:
-                        ctrlDF = None
+                        theseDF.append(pd.read_hdf(store, controlKey))
+                        print('Loaded {} from {}'.format(controlKey, dFPath))
+                    assert len(theseDF) > 0
+                    thisDF = pd.concat(theseDF)
             except Exception:
                 traceback.print_exc()
                 print('Skipping...')

@@ -90,7 +90,7 @@ globals().update(allOpts)
 if __name__ == '__main__':
     analysisSubFolder, alignSubFolder = hf.processSubfolderPaths(
         arguments, scratchFolder)
-    dataFramesFolder = os.path.join(alignSubFolder, 'dataframes')
+    dataFramesFolder = os.path.join(analysisSubFolder, 'dataframes')
     if not os.path.exists(dataFramesFolder):
         os.makedirs(dataFramesFolder)
     blockBaseName, inputBlockSuffix = hf.processBasicPaths(arguments)
@@ -118,11 +118,10 @@ if __name__ == '__main__':
     with open(iteratorPath, 'rb') as f:
         loadingMeta = pickle.load(f)
     #
-    datasetName = '{}{}_{}_{}'.format(
-        arguments['unitQuery'],
-        iteratorSuffix,
+    datasetName = '{}_{}_df{}'.format(
+        blockBaseName,
         arguments['window'],
-        arguments['alignQuery'])
+        iteratorSuffix)
     # loading paths
     triggeredPath = os.path.join(
         alignSubFolder,
@@ -185,16 +184,18 @@ if __name__ == '__main__':
                         arguments['window'],
                         iteratorSuffix))
                 try:
-                    print('Loading {} from {}'.format(arguments['selectionName'], dFPath))
                     with pd.HDFStore(dFPath,  mode='r') as store:
-                        thisDF = pd.read_hdf(store, '/{}/data'.format(arguments['selectionName']))
+                        theseDF = []
+                        dataKey = '/{}/data'.format(arguments['selectionName'])
+                        if dataKey in store:
+                            theseDF.append(pd.read_hdf(store, dataKey))
+                            print('Loaded {} from {}'.format(dataKey, dFPath))
                         controlKey = '/{}/control'.format(arguments['selectionName'])
                         if controlKey in store:
-                            ctrlDF = pd.read_hdf(store, controlKey)
-                            thisDF = pd.concat([thisDF, ctrlDF])
-                            # trialInfo = ctrlDF.index.to_frame().reset_index(drop=True)
-                        else:
-                            ctrlDF = None
+                            theseDF.append(pd.read_hdf(store, controlKey))
+                            print('Loaded {} from {}'.format(controlKey, dFPath))
+                        assert len(theseDF) > 0
+                        thisDF = pd.concat(theseDF)
                 except Exception:
                     traceback.print_exc()
                     print('Skipping...')
@@ -210,7 +211,7 @@ if __name__ == '__main__':
     dataDF = pd.concat(lOfDF)
     finalDF = dataDF.copy()
     #  #### end of data loading stuff
-    if 'spectral' in arguments['unitQuery']:
+    if 'spectral' in arguments['selectionName']:
         normalizationParams = [[], []]
         for expName, dataGroup in dataDF.groupby('expName'):
             for featName, subGroup in dataGroup.groupby('feature', axis='columns'):
@@ -309,7 +310,7 @@ if __name__ == '__main__':
             return outputDF
         #
         # finalDF = normalizeDataset(finalDF, normalizationParams)
-    sanityCheck = True
+    sanityCheck = False
     if sanityCheck:
         # sanity check that the normalizations are invertible
         originalDF = pd.concat(lOfDF)
@@ -350,8 +351,8 @@ if __name__ == '__main__':
         )
     if os.path.exists(datasetPath):
         os.remove(datasetPath)
-    finalDF.to_hdf(datasetPath, datasetName)
-    thisMask.to_hdf(datasetPath, datasetName + '_featureMasks')
+    finalDF.to_hdf(datasetPath, '{}/data'.format(arguments['selectionName']))
+    thisMask.to_hdf(datasetPath, '{}/featureMasks'.format(arguments['selectionName']))
     #
     loadingMetaPath = datasetPath.replace('.h5', '_meta.pickle')
     if os.path.exists(loadingMetaPath):

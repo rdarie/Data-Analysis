@@ -31,8 +31,8 @@ BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
 TARGET="lfp_CAR_spectral"
 # TARGET="lfp_CAR"
 #
-ESTIMATOR="fa2"
-# ESTIMATOR="pca"
+# ESTIMATOR="fa2"
+ESTIMATOR="pca"
 #
 ITERATOR="a"
 ALIGNQUERYTERM="outbound"
