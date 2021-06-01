@@ -20,6 +20,7 @@ Options:
     --inputBlockSuffix=inputBlockSuffix    which trig_ block to pull [default: pca]
     --inputBlockPrefix=inputBlockPrefix    which trig_ block to pull [default: Block]
     --unitQuery=unitQuery                  how to restrict channels? [default: fr_sqrt]
+    --selectionName=selectionName          how to restrict channels? [default: fr_sqrt]
     --iteratorSuffix=iteratorSuffix        filename for cross_val iterator
     --selector=selector                    filename if using a unit selector
     --loadFromFrames                       load data from pre-saved dataframes?
@@ -171,7 +172,7 @@ if __name__ == '__main__':
             thisScratchFolder = os.path.join(scratchPath, expName)
             analysisSubFolder, alignSubFolder = hf.processSubfolderPaths(
                 arguments, thisScratchFolder)
-            thisDFFolder = os.path.join(alignSubFolder, 'dataframes')
+            thisDFFolder = os.path.join(analysisSubFolder, 'dataframes')
             for bIdx in lOfBlocks:
                 theseArgs = arguments.copy()
                 theseArgs['blockIdx'] = '{}'.format(bIdx)
@@ -179,28 +180,36 @@ if __name__ == '__main__':
                 thisBlockBaseName, _ = hf.processBasicPaths(theseArgs)
                 dFPath = os.path.join(
                     thisDFFolder,
-                    '{}_{}_{}_df{}.h5'.format(
+                    '{}_{}_df{}.h5'.format(
                         thisBlockBaseName,
                         arguments['window'],
-                        arguments['alignQuery'],
                         iteratorSuffix))
                 try:
-                    thisDF = pd.read_hdf(dFPath, arguments['unitQuery'])
+                    print('Loading {} from {}'.format(arguments['selectionName'], dFPath))
+                    with pd.HDFStore(dFPath,  mode='r') as store:
+                        thisDF = pd.read_hdf(store, '/{}/data'.format(arguments['selectionName']))
+                        controlKey = '/{}/control'.format(arguments['selectionName'])
+                        if controlKey in store:
+                            ctrlDF = pd.read_hdf(store, controlKey)
+                            thisDF = pd.concat([thisDF, ctrlDF])
+                            # trialInfo = ctrlDF.index.to_frame().reset_index(drop=True)
+                        else:
+                            ctrlDF = None
                 except Exception:
                     traceback.print_exc()
+                    print('Skipping...')
                     continue
                 '''thisDF.loc[:, 'expName'] = expName
                 thisDF.set_index('expName', inplace=True, append=True)'''
                 #
                 thisDF.index = thisDF.index.set_levels([currBlockNum], level='segment')
                 lOfDF.append(thisDF)
-                thisMask = pd.read_hdf(dFPath, arguments['unitQuery'] + '_featureMasks')
+                thisMask = pd.read_hdf(dFPath, '/{}/featureMasks'.format(arguments['selectionName']))
                 lOfFeatureMasks.append(thisMask)
                 currBlockNum += 1
     dataDF = pd.concat(lOfDF)
     finalDF = dataDF.copy()
     #  #### end of data loading stuff
-    #
     if 'spectral' in arguments['unitQuery']:
         normalizationParams = [[], []]
         for expName, dataGroup in dataDF.groupby('expName'):
@@ -212,7 +221,6 @@ if __name__ == '__main__':
                     'feature': featName,
                     'mu': meanLevel,
                 })
-                # pdb.set_trace()
                 # finalDF.loc[subGroup.index, subGroup.columns] = dataDF.loc[subGroup.index, subGroup.columns] - meanLevel
                 finalDF.loc[subGroup.index, subGroup.columns] = np.sqrt(dataDF.loc[subGroup.index, subGroup.columns] / meanLevel)
         intermediateDF = finalDF.copy()

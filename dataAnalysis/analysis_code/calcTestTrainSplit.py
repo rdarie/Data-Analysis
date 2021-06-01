@@ -12,8 +12,6 @@ Options:
     --window=window                                      process with short window? [default: long]
     --winStart=winStart                                  start of absolute window (when loading)
     --winStop=winStop                                    end of absolute window (when loading)
-    --ROIWinStart=ROIWinStart                            start of relative window (masked per trial) [default: 200]
-    --ROIWinStop=ROIWinStop                              end of relative window (masked per trial) [default: 400]
     --lazy                                               load from raw, or regular? [default: False]
     --verbose                                            print diagnostics? [default: False]
     --unitQuery=unitQuery                                how to restrict channels? [default: fr_sqrt]
@@ -22,8 +20,6 @@ Options:
     --alignQuery=alignQuery                              what will the plot be aligned to? [default: midPeak]
     --iteratorSuffix=iteratorSuffix                      filename for resulting iterator
     --selector=selector                                  filename if using a unit selector
-    --calcTimeROI                                        if trial length isn't constant, use this to remove extraneous data [default: False]
-    --timeROIAlignQuery=timeROIAlignQuery                what will the plot be aligned to? [default: stimOff]
     --eventBlockPrefix=eventBlockPrefix                  name of event block
     --eventBlockSuffix=eventBlockSuffix                  name of events object to align to [default: analyze]
     --eventName=eventName                                name of events object to align to [default: motionStimAlignTimes]
@@ -31,6 +27,7 @@ Options:
     --loadFromFrames                                     load data from pre-saved dataframes?
     --saveDataFrame                                      save corresponding dataframe?
     --selectionName=selectionName                        name in h5 for the saved data
+    --controlSet                                         regular data, or control?
 """
 
 import os, sys
@@ -58,16 +55,16 @@ expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']), arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
-
+#
 blockBaseName, inputBlockSuffix = hf.processBasicPaths(arguments)
 analysisSubFolder, alignSubFolder = hf.processSubfolderPaths(
     arguments, scratchFolder)
-calcSubFolder = os.path.join(
+cvIteratorSubfolder = os.path.join(
     alignSubFolder, 'testTrainSplits')
-if not(os.path.exists(calcSubFolder)):
-    os.makedirs(calcSubFolder)
+if not(os.path.exists(cvIteratorSubfolder)):
+    os.makedirs(cvIteratorSubfolder)
 dataFramesFolder = os.path.join(
-    alignSubFolder, 'dataframes'
+    analysisSubFolder, 'dataframes'
     )
 if not(os.path.exists(dataFramesFolder)):
     os.makedirs(dataFramesFolder)
@@ -100,7 +97,10 @@ if 'winStop' in arguments:
     if arguments['winStop'] is not None:
         alignedAsigsKWargs['windowSize'][1] = float(arguments['winStop']) * (1e-3)
 
-if arguments['calcTimeROI']:
+binOpts = rasterOpts['binOpts'][arguments['analysisName']]
+theseIteratorOpts = iteratorOpts[arguments['iteratorSuffix']]
+
+if theseIteratorOpts['calcTimeROI'] and not arguments['loadFromFrames']:
     if arguments['eventBlockSuffix'] is not None:
         eventBlockSuffix = '_{}'.format(arguments['eventBlockSuffix'])
     else:
@@ -143,14 +143,6 @@ if arguments['calcTimeROI']:
         eventPath, lazy=arguments['lazy'],
         loadList={'events': ['seg0_{}'.format(eventName)]},
         purgeNixNames=True)
-    if 'ROIWinStart' in arguments:
-        ROIWinStart = float(arguments['ROIWinStart']) * (1e-3)
-    else:
-        ROIWinStart = 0
-    if 'ROIWinStop' in arguments:
-        ROIWinStop = float(arguments['ROIWinStop']) * (1e-3)
-    else:
-        ROIWinStop = 0
     listOfROIMasks = []
     listOfExampleIndexes = []
 #
@@ -158,33 +150,38 @@ if arguments['iteratorSuffix'] is not None:
     iteratorSuffix = '_{}'.format(arguments['iteratorSuffix'])
 else:
     iteratorSuffix = ''
+if arguments['controlSet']:
+    controlSuffix = '_ctrl'
+else:
+    controlSuffix = ''
 iteratorPath = os.path.join(
-    calcSubFolder,
-    '{}_{}_{}{}_cvIterators.pickle'.format(
+    cvIteratorSubfolder,
+    '{}_{}_{}{}{}_cvIterators.pickle'.format(
         blockBaseName,
         arguments['window'],
         arguments['alignQuery'],
-        iteratorSuffix))
+        iteratorSuffix, controlSuffix))
 
 if arguments['verbose']:
     prf.print_memory_usage('before load data')
 
-binOpts = rasterOpts['binOpts'][arguments['analysisName']]
-if glmOptsLookup['nCovariateBasisTerms'] > 1:
+if theseIteratorOpts['nCovariateBasisTerms'] > 1:
     lags = np.linspace(
-        -1 * glmOptsLookup['covariateHistoryLen'],
-        glmOptsLookup['covariateHistoryLen'],
-        glmOptsLookup['nCovariateBasisTerms']) / binOpts['binInterval']
+        -1 * theseIteratorOpts['covariateHistoryLen'],
+        theseIteratorOpts['covariateHistoryLen'],
+        theseIteratorOpts['nCovariateBasisTerms']) / binOpts['binInterval']
     alignedAsigsKWargs['addLags'] = {'all': lags.astype(int).tolist()}
-alignedAsigsKWargs['decimate'] = int(glmOptsLookup['regressionBinInterval'] / binOpts['binInterval'])
-nSplits = 7
+if theseIteratorOpts['forceBinInterval'] is not None:
+    alignedAsigsKWargs['decimate'] = int(theseIteratorOpts['forceBinInterval'] / binOpts['binInterval'])
+#
+nSplits = theseIteratorOpts['nSplits']
 cv_kwargs = dict(
     shuffle=True,
     stratifyFactors=stimulusConditionNames,
     continuousFactors=['segment', 'originalIndex', 't'])
 listOfIterators = []
 listOfDataFrames = []
-if not arguments['loadFromFrames']:
+if (not arguments['loadFromFrames']):
     print('loading {}'.format(triggeredPath))
     dataReader, dataBlock = ns5.blockFromPath(
         triggeredPath, lazy=arguments['lazy'])
@@ -204,9 +201,23 @@ if not arguments['loadFromFrames']:
             traceback.print_exc()
             continue
         # trialInfo = dataDF.index.to_frame().reset_index(drop=True)
-        if arguments['calcTimeROI']:
-            endMaskQuery = ash.processAlignQueryArgs(
-                namedQueries, alignQuery=arguments['timeROIAlignQuery'])
+        if theseIteratorOpts['calcTimeROI']:
+            if arguments['controlSet']:
+                aQ = theseIteratorOpts['timeROIOpts_control']['alignQuery']
+                if aQ is None:
+                    aQ = arguments['alignQuery']
+                endMaskQuery = ash.processAlignQueryArgs(
+                    namedQueries, alignQuery=aQ)
+                ROIWinStart = theseIteratorOpts['timeROIOpts_control']['winStart']
+                ROIWinStop = theseIteratorOpts['timeROIOpts_control']['winStop']
+            else:
+                aQ = theseIteratorOpts['timeROIOpts']['alignQuery']
+                if aQ is None:
+                    aQ = arguments['alignQuery']
+                endMaskQuery = ash.processAlignQueryArgs(
+                    namedQueries, alignQuery=aQ)
+                ROIWinStart = theseIteratorOpts['timeROIOpts']['winStart']
+                ROIWinStop = theseIteratorOpts['timeROIOpts']['winStop']
             evList = eventBlock.filter(
                 objects=ns5.Event,
                 name='seg{}_{}'.format(segIdx, eventName))
@@ -236,7 +247,7 @@ else:    # loading frames
         thisScratchFolder = os.path.join(scratchPath, expName)
         analysisSubFolder, alignSubFolder = hf.processSubfolderPaths(
             arguments, thisScratchFolder)
-        thisDFFolder = os.path.join(alignSubFolder, 'dataframes')
+        thisDFFolder = os.path.join(analysisSubFolder, 'dataframes')
         for bIdx in lOfBlocks:
             theseArgs = arguments.copy()
             theseArgs['blockIdx'] = '{}'.format(bIdx)
@@ -244,13 +255,20 @@ else:    # loading frames
             thisBlockBaseName, _ = hf.processBasicPaths(theseArgs)
             dFPath = os.path.join(
                 thisDFFolder,
-                '{}_{}_{}_df{}.h5'.format(
+                '{}_{}_df{}.h5'.format(
                     thisBlockBaseName,
                     arguments['window'],
-                    arguments['alignQuery'],
                     iteratorSuffix))
             try:
-                thisDF = pd.read_hdf(dFPath, arguments['selectionName'])
+                with pd.HDFStore(dFPath,  mode='r') as store:
+                    thisDF = pd.read_hdf(store, '/{}/data'.format(arguments['selectionName']))
+                    controlKey = '/{}/control'.format(arguments['selectionName'])
+                    if controlKey in store:
+                        ctrlDF = pd.read_hdf(store, controlKey)
+                        thisDF = pd.concat([thisDF, ctrlDF])
+                        # trialInfo = ctrlDF.index.to_frame().reset_index(drop=True)
+                    else:
+                        ctrlDF = None
             except Exception:
                 traceback.print_exc()
                 print('Skipping...')
@@ -292,7 +310,7 @@ iteratorMetadata = {
     'cv_kwargs': cv_kwargs,
     'experimentsToAssemble': experimentsToAssemble
 }
-if arguments['calcTimeROI']:
+if theseIteratorOpts['calcTimeROI'] and (not arguments['loadFromFrames']):
     iteratorMetadata.update({
         'listOfROIMasks': listOfROIMasks,
         'listOfExampleIndexes': listOfExampleIndexes
@@ -303,7 +321,8 @@ if os.path.exists(iteratorPath):
 with open(iteratorPath, 'wb') as f:
     pickle.dump(
         iteratorMetadata, f)
-if arguments['saveDataFrame']:
+
+'''if arguments['saveDataFrame']:
     outputDFPath = os.path.join(
         dataFramesFolder,
         '{}_{}_{}_df{}.h5'.format(
@@ -311,4 +330,4 @@ if arguments['saveDataFrame']:
             arguments['window'],
             arguments['alignQuery'],
             iteratorSuffix))
-    exportDF.to_hdf(outputDFPath, arguments['selectionName'], mode='w')
+    exportDF.to_hdf(outputDFPath, arguments['selectionName'], mode='w')'''

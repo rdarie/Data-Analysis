@@ -253,7 +253,8 @@ def parseAnalysisOptions(
         'electrode', amplitudeFieldName, 'RateInHz']
     motionConditionNames = [
         'pedalMovementCat', 'pedalSizeCat', 'pedalDirection']
-    if (blockExperimentType == 'proprio-miniRC') or (blockExperimentType == 'proprio-RC') or (blockExperimentType == 'isi'):
+    if blockExperimentType in ['proprio-miniRC', 'proprio-RC', 'isi']:
+        #if (blockExperimentType == 'proprio-miniRC') or (blockExperimentType == 'proprio-RC') or (blockExperimentType == 'isi'):
         # has stim but no motion
         stimulusConditionNames = stimConditionNames
     elif blockExperimentType == 'proprio-motionOnly':
@@ -357,7 +358,7 @@ def parseAnalysisOptions(
     # if not os.path.exists(GLMFiguresFolder):
     #     os.makedirs(GLMFiguresFolder, exist_ok=True)
     #
-    if blockExperimentType in ['proprio-miniRC', 'proprio', 'proprio-RC']:
+    if blockExperimentType in ['proprio-miniRC', 'proprio', 'proprio-RC', 'proprio-motionOnly']:
         essentialMetadataFields = [
             'segment', 'originalIndex', 't', 'expName', 'amplitude', 'program',
             'activeGroup', 'RateInHz', 'stimCat', 'electrode',
@@ -496,6 +497,47 @@ def parseAnalysisOptions(
     except Exception:
         pass
     #
+    iteratorOpts = {
+        # rest period from before movement onset
+        'a': {
+            'nSplits': 7,
+            'ensembleHistoryLen': .30,
+            'covariateHistoryLen': .50,
+            'nHistoryBasisTerms': 1,
+            'nCovariateBasisTerms': 1,
+            'forceBinInterval': 10e-3,
+            'calcTimeROI': True,
+            'timeROIOpts': {
+                'alignQuery': None,
+                'winStart': -900e-3,
+                'winStop': -100e-3
+            },
+            'timeROIOpts_control': {
+                'alignQuery': None,
+                'winStart': -900e-3,
+                'winStop': -100e-3
+            }
+        },
+        'f': {
+            'nSplits': 7,
+            'ensembleHistoryLen': .30,
+            'covariateHistoryLen': .50,
+            'nHistoryBasisTerms': 1,
+            'nCovariateBasisTerms': 1,
+            'forceBinInterval': None,
+            'calcTimeROI': True,
+            'timeROIOpts': {
+                'alignQuery': None,
+                'winStart': -100e-3,
+                'winStop': 100e-3
+            },
+            'timeROIOpts_control': {
+                'alignQuery': None,
+                'winStart': -400e-3,
+                'winStop': -300e-3
+            }
+        }
+    }
     glmOptsLookup = {
         'ensembleHistoryLen': .30,
         'covariateHistoryLen': .50,

@@ -440,6 +440,7 @@ class trialAwareStratifiedKFold:
         self.continuousFactors = continuousFactors
 
     def split(self, X, y=None, groups=None):
+        #
         trialInfo = (
             X
             .index.to_frame()

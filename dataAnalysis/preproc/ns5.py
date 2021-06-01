@@ -37,10 +37,18 @@ try:
     from collections.abc import Iterable
 except ImportError:
     from collections import Iterable
-
+from collections import defaultdict
 sys.stderr = open(os.devnull, "w")  # silence stderr
 from elephant.conversion import binarize
 sys.stderr = sys.__stderr__  # unsilence stderr
+
+
+metaFillerLookup = defaultdict(lambda: 'NA')
+metaFillerLookup['program'] = 999.
+metaFillerLookup['amplitude'] = 0.
+metaFillerLookup['activeGroup'] = 0.
+metaFillerLookup['RateInHz'] = 0.
+
 
 def analogSignalsToDataFrame(
         analogsignals, idxT='t', useChanNames=False):
@@ -896,12 +904,6 @@ def unitSpikeTrainWaveformsToDF(
                 if k not in skipAnnNames:
                     annDF.loc[:, k] = value
             #
-            metaFillerLookup = {
-                'program': 999.,
-                'amplitude': 0.,
-                'activeGroup': 0.,
-                'RateInHz': 0.
-            }
             if isinstance(getMetaData, Iterable):
                 doNotFillList = idxLabels + ['feature', 'bin']
                 fieldsNeedFiller = [
@@ -909,7 +911,7 @@ def unitSpikeTrainWaveformsToDF(
                     for mdn in getMetaData
                     if (mdn not in doNotFillList) and (mdn not in annDF.columns)]
                 for mdName in fieldsNeedFiller:
-                    annDF.loc[:, mdName] = metaFillerLookup.setdefault(mdName, 'NA')
+                    annDF.loc[:, mdName] = metaFillerLookup[mdName]
             annColumns = annDF.columns.to_list()
             if getMetaData:
                 for annNm in annColumns:
@@ -923,7 +925,7 @@ def unitSpikeTrainWaveformsToDF(
         spikeDF.loc[:, 'segment'] = segIdx
         spikeDF.loc[:, 'originalIndex'] = spikeDF.index
         spikeDF.columns.name = 'bin'
-        #
+        # pdb.set_trace()
         if dataQuery is not None:
             spikeDF.query(dataQuery, inplace=True)
             if not getMetaData:
