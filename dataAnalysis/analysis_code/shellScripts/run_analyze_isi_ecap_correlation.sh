@@ -56,13 +56,13 @@
 # EXP="exp202010071400"
 # EXP="exp202010081400"
 #
-# EXP="exp202010151400"
+EXP="exp202010151400"
 #
 # EXP="exp202010191100"
 #
 # EXP="exp202012171300"
 ###
-EXP="exp202012221300"
+# EXP="exp202012221300"
 
 # 
 module load anaconda/2020.02
@@ -92,22 +92,24 @@ ANALYSISFOLDER="--analysisName=loRes"
 # CHANSELECTOR="--chanQuery=isispinal"
 # CHANSELECTOR="--chanQuery=isispinaloremg"
 
-
-SLURM_ARRAY_TASK_ID=6
-BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
-# BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
+#
+# SLURM_ARRAY_TASK_ID=6
+# BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
+SLURM_ARRAY_TASK_ID=3
+BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
 
 INPUTBLOCKNAME="--inputBlockSuffix=emg"
 ANALYSISFOLDER="--analysisName=loRes"
 # python -u ./assembleExperimentAlignedAsigs.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER $INPUTBLOCKNAME --alignFolderName=stim
 
 INPUTBLOCKNAME="--inputBlockSuffix=emg"
-UNITSELECTOR="--unitQuery=isiemgenv"
+# UNITSELECTOR="--unitQuery=isiemgenv"
+UNITSELECTOR="--unitQuery=isiemgraw"
 ALIGNQUERY="--alignQuery=stimOn"
 python -u ./calcTrialOutliers.py --exp=$EXP --alignFolderName=stim $INPUTBLOCKNAME $BLOCKSELECTOR $ANALYSISFOLDER $UNITSELECTOR $WINDOW $ALIGNQUERY --verbose --plotting --saveResults
 python -u ./calcTargetNoiseCeiling.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR --maskOutlierBlocks $ALIGNQUERY --plotting
 
-# OUTLIERMASK=""
+## OUTLIERMASK=""
 OUTLIERMASK="--maskOutlierBlocks"
 
 ALIGNQUERY="--alignQuery=stimOnLessThan30Hz"
@@ -117,7 +119,7 @@ UNITSELECTOR="--unitQuery=isiemgraw"
 
 UNITSELECTOR="--unitQuery=isiemgraw"
 ALIGNQUERY="--alignQuery=stimOn"
-# python -u ./calcRecruitment.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR $ALIGNQUERY $OUTLIERMASK
+python -u ./calcRecruitment.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR $ALIGNQUERY $OUTLIERMASK
 # python -u ./plotRecruitment.py --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --alignFolderName=stim $INPUTBLOCKNAME $UNITSELECTOR $ALIGNQUERY --showFigures
 
 ANALYSISFOLDER="--analysisName=fullRes"

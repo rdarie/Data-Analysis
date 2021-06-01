@@ -104,7 +104,7 @@ dataReader, dataBlock = ns5.blockFromPath(
 limitPages = None
 funKWargs = dict(
     # baseline='mean',
-    tStart=-50e-3, tStop=400e-3)
+    tStart=-200e-3, tStop=200e-3)
 #  End Overrides
 asigWide = ns5.alignedAsigsToDF(
     dataBlock, **alignedAsigsKWargs)

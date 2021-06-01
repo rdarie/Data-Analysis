@@ -799,7 +799,7 @@ def genTicksToScale(
             else:
                 xOrdMag = -np.floor(np.log10(odX + 1e-6)) + 2
             if dX is None:
-                scaleDX = np.round(odX, decimals=int(xOrdMag))
+                scaleDX = np.round(odX, decimals=int(xOrdMag) - 1)
             else:
                 scaleDX = dX
             if odY > 1:
@@ -807,7 +807,7 @@ def genTicksToScale(
             else:
                 yOrdMag = -np.floor(np.log10(odY + 1e-6)) + 2
             if dY is None:
-                scaleDY = np.round(odY, decimals=int(yOrdMag))
+                scaleDY = np.round(odY, decimals=int(yOrdMag) - 1)
             else:
                 scaleDY = dY
             # print(odX)

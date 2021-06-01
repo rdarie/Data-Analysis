@@ -203,7 +203,7 @@ for gIdx, (name, group) in enumerate(featurePlotOptsDF.groupby('EMGSide')):
     featurePlotOptsDF.loc[group.index, 'color'] = group['EMGSite'].map(thisPalette)
     featurePlotOptsDF.loc[group.index, 'style'] = styleNames[gIdx]
 
-if True:
+if False:
     fig, ax = plt.subplots()
     for name, group in rAUCDF.groupby('featureName'):
         useColor = featurePlotOptsDF.loc[featurePlotOptsDF['featureName'] == name, 'color'].iloc[0]

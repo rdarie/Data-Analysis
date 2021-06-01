@@ -124,7 +124,6 @@ for annotName in annotNames:
     lookupSource = mapDF.loc[mapAMask, [annotName, 'topoName']].set_index('topoName')[annotName]
     plotRC.loc[:, 'electrode_' + annotName] = plotRC['electrode'].map(lookupSource)
 '''
-pdb.set_trace()
 # colName = 'electrode_xcoords'
 colName = 'electrode'
 colOrder = sorted(np.unique(plotRC[colName]))
@@ -134,20 +133,20 @@ rowName = 'pedalMovementCat'
 rowOrder = sorted(np.unique(plotRC[rowName]))
 colWrap = min(3, len(colOrder))
 height, aspect = 5, 3
-# pdb.set_trace()
 g = sns.relplot(
     col=colName,
     col_order=colOrder,
     row=rowName,
     # x='normalizedAmplitude',
     x=amplitudeFieldName,
-    y='normalizedRAUC',
+    y='rauc',
     hue=hueName, hue_order=hueOrder,
     kind='line', data=plotRC,
     # palette=emgPalette,
-    height=height, aspect=aspect, ci='sem', estimator='mean',
+    height=height, aspect=aspect, errorbar='se', estimator='mean',
     facet_kws=dict(sharey=True, sharex=False, legend_out=True), lw=3,
     )
+pdb.set_trace()
 '''g = sns.catplot(
     col=colName,
     col_order=colOrder,

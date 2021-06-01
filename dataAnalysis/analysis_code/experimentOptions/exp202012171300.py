@@ -168,34 +168,33 @@ def getExpOpts():
             'electrode', 'nominalCurrent', 'RateInHz'],
         twoTailed=False,
         )
-    '''
     outlierDetectColumns = [
             # 'LThoracolumbarFasciaEmg#0',
-            # 'LGracilisEmg#0',
+            'LGracilisEmg#0',
             # 'LTensorFasciaeLataeEmg#0',
-            # 'LPeroneusLongusEmg#0',
-            # 'LBicepsFemorisEmg#0',
-            # 'LGastrocnemiusEmg#0',
+            'LPeroneusLongusEmg#0',
+            'LBicepsFemorisEmg#0',
+            'LGastrocnemiusEmg#0',
             # 'RThoracolumbarFasciaEmg#0',
-            # 'RGracilisEmg#0',
+            'RGracilisEmg#0',
             # 'RTensorFasciaeLataeEmg#0',
-            # 'RPeroneusLongusEmg#0',
-            # 'RBicepsFemorisEmg#0',
-            # 'RGastrocnemiusEmg#0',
+            'RPeroneusLongusEmg#0',
+            'RBicepsFemorisEmg#0',
+            'RGastrocnemiusEmg#0',
             # 'LThoracolumbarFasciaEmgEnv#0',
-            'LGracilisEmgEnv#0',
-            'LTensorFasciaeLataeEmgEnv#0',
-            'LPeroneusLongusEmgEnv#0',
-            'LBicepsFemorisEmgEnv#0',
-            'LGastrocnemiusEmgEnv#0',
+            #
+            # 'LGracilisEmgEnv#0',
+            # 'LTensorFasciaeLataeEmgEnv#0',
+            # 'LPeroneusLongusEmgEnv#0',
+            # 'LBicepsFemorisEmgEnv#0',
+            # 'LGastrocnemiusEmgEnv#0',
             # 'RThoracolumbarFasciaEmgEnv#0',
-            'RGracilisEmgEnv#0',
-            'RTensorFasciaeLataeEmgEnv#0',
-            'RPeroneusLongusEmgEnv#0',
-            'RBicepsFemorisEmgEnv#0',
-            'RGastrocnemiusEmgEnv#0'
+            # 'RGracilisEmgEnv#0',
+            # 'RTensorFasciaeLataeEmgEnv#0',
+            # 'RPeroneusLongusEmgEnv#0',
+            # 'RBicepsFemorisEmgEnv#0',
+            # 'RGastrocnemiusEmgEnv#0'
         ]
-    '''
     RCPlotOpts = {
         'rejectFeatures': ['rostralY_e12'],
         'keepFeatures': [
