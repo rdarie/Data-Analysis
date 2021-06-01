@@ -86,7 +86,6 @@ alignedAsigsKWargs.update(dict(
 alignedAsigsKWargs['verbose'] = arguments['verbose']
 alignedAsigsKWargs['getFeatureMetaData'] = ['xCoords', 'yCoords', 'freqBandName', 'parentFeature']
 
-'[[[[[[.l;;;;;;'
 triggeredPath = os.path.join(
     alignSubFolder,
     blockBaseName + '{}_{}.nix'.format(

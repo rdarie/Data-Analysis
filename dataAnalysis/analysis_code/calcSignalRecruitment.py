@@ -43,7 +43,7 @@ import dill as pickle
 import pandas as pd
 import numpy as np
 from scipy import stats
-from sklearn.preprocessing import RobustScaler, MinMaxScaler, StandardScaler
+from sklearn.preprocessing import RobustScaler, MinMaxScaler, StandardScaler, QuantileTransformer, PowerTransformer
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']), arguments['exp'])
@@ -76,8 +76,8 @@ alignedAsigsKWargs.update(dict(
     decimate=1,
     transposeToColumns='bin', concatOn='index'))
 #
-alignedAsigsKWargs['procFun'] = ash.genDetrender(
-    timeWindow=(-200e-3, -100e-3))
+'''alignedAsigsKWargs['procFun'] = ash.genDetrender(
+    timeWindow=(-200e-3, -100e-3))'''
 
 if 'windowSize' not in alignedAsigsKWargs:
     alignedAsigsKWargs['windowSize'] = [ws for ws in rasterOpts['windowSizes'][arguments['window']]]
@@ -104,13 +104,28 @@ dataReader, dataBlock = ns5.blockFromPath(
 limitPages = None
 funKWargs = dict(
     # baseline='mean',
-    tStart=-200e-3, tStop=200e-3)
+    tStart=-100e-3, tStop=100e-3)
 #  End Overrides
 asigWide = ns5.alignedAsigsToDF(
     dataBlock, **alignedAsigsKWargs)
 
 rAUCDF = ash.rAUC(
-    asigWide, **funKWargs).to_frame(name='rauc')
+    asigWide, **funKWargs).to_frame(name='rawRAUC')
+rAUCDF.loc[:, 'rauc'] = np.nan
+for name, group in rAUCDF.groupby(['feature']):
+    qScaler = PowerTransformer()
+    qScaler.fit(
+        rAUCDF.loc[group.index, 'rawRAUC']
+        .to_numpy()
+        .reshape(-1, 1))
+    rAUCDF.loc[group.index, 'rauc'] = (
+        qScaler.transform(
+            rAUCDF.loc[group.index, 'rawRAUC']
+            .to_numpy()
+            .reshape(-1, 1)
+        )
+    )
+#
 rAUCDF['kruskalStat'] = np.nan
 rAUCDF['kruskalP'] = np.nan
 for name, group in rAUCDF.groupby(['electrode', 'feature']):
@@ -122,7 +137,7 @@ for name, group in rAUCDF.groupby(['electrode', 'feature']):
     except Exception:
         rAUCDF.loc[group.index, 'kruskalStat'] = 0
         rAUCDF.loc[group.index, 'kruskalP'] = 1
-
+#
 derivedAnnot = [
     'normalizedRAUC', 'standardizedRAUC']
 saveIndexNames = (rAUCDF.index.names).copy()
@@ -132,28 +147,18 @@ for annName in derivedAnnot:
 
 rAUCDF.loc[:, amplitudeFieldName] = rAUCDF[amplitudeFieldName].abs()
 
-qLims = (5e-3, 1-5e-3)
-# for name, group in rAUCDF.groupby(['feature', 'electrode']):
 for name, group in rAUCDF.groupby(['feature']):
-    '''rAUCDF.loc[group.index, 'standardizedRAUC'] = (
-        RobustScaler(quantile_range=[i * 100 for i in qLims])
-        .fit_transform(
-            group['rauc'].to_numpy().reshape(-1, 1)))'''
     rAUCDF.loc[group.index, 'standardizedRAUC'] = (
         StandardScaler()
             .fit_transform(
-            group['rauc'].to_numpy().reshape(-1, 1)))
-    groupQuantiles = group['rauc'].quantile(qLims)
-    rauc = group['rauc'].copy()
-    rauc[rauc > groupQuantiles[qLims[-1]]] = groupQuantiles[qLims[-1]]
-    rauc[rauc < groupQuantiles[qLims[0]]] = groupQuantiles[qLims[0]]
-    # outlierMask = rAUCDF.loc[group.index, 'standardizedRAUC'].abs() > 6
+            group['rawRAUC'].to_numpy().reshape(-1, 1)))
+    #
     thisScaler = MinMaxScaler()
     thisScaler.fit(
-        rauc.to_numpy().reshape(-1, 1))
+        group['rauc'].to_numpy().reshape(-1, 1))
     rAUCDF.loc[group.index, 'normalizedRAUC'] = (
-        thisScaler.transform(rauc.to_numpy().reshape(-1, 1)))
-    
+        thisScaler.transform(group['rauc'].to_numpy().reshape(-1, 1)))
+
 for name, group in rAUCDF.groupby('electrode'):
     rAUCDF.loc[group.index, 'normalizedAmplitude'] = pd.cut(
         group[amplitudeFieldName], bins=10, labels=False)
@@ -177,9 +182,9 @@ for gIdx, (name, group) in enumerate(featurePlotOptsDF.groupby('EMGSide')):
 featurePlotOptsDF.to_hdf(resultPath, 'RAUC_plotOpts')'''
 
 rAUCDF.set_index(saveIndexNames, inplace=True)
-rAUCDF.to_hdf(resultPath, 'RAUC')
+rAUCDF.to_hdf(resultPath, 'RAUC', mode='w')
 asigWide.index = rAUCDF.index
-asigWide.to_hdf(resultPath, 'RAUC_raw')
+asigWide.to_hdf(resultPath, 'RAUC_raw', mode='a')
 #
 if arguments['lazy']:
     dataReader.file.close()

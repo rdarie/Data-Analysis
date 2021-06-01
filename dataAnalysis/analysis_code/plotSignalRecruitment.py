@@ -27,6 +27,7 @@ matplotlib.use('Qt5Agg')   # generate interactive output
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import dataAnalysis.helperFunctions.probe_metadata as prb_meta
+from matplotlib.backends.backend_pdf import PdfPages
 import seaborn as sns
 from namedQueries import namedQueries
 import pdb
@@ -47,9 +48,10 @@ expOpts, allOpts = parseAnalysisOptions(
 globals().update(expOpts)
 globals().update(allOpts)
 sns.set(
-    context='notebook', style='whitegrid',
+    context='paper', style='whitegrid',
     palette='dark', font='sans-serif',
-    font_scale=1.5, color_codes=True)
+    font_scale=1., color_codes=True, rc={
+        'figure.dpi': 200, 'savefig.dpi': 200})
 #
 analysisSubFolder = os.path.join(
     scratchFolder, arguments['analysisName']
@@ -79,9 +81,9 @@ recCurve = pd.read_hdf(resultPath, 'RAUC')
 # plotOpts = pd.read_hdf(resultPath, 'RAUC_plotOpts')
 pdfPath = os.path.join(
     figureOutputFolder,
-    blockBaseName + '_{}_{}_{}.pdf'.format(
+    blockBaseName + '{}_{}_{}.pdf'.format(
         inputBlockSuffix, arguments['window'],
-        '_RAUC'))
+        'RAUC'))
 plotRC = recCurve.reset_index()
 keepCols = [
     'segment', 'originalIndex', 'feature', 'lag'] + stimulusConditionNames
@@ -132,39 +134,86 @@ hueOrder = sorted(np.unique(plotRC[hueName]))
 rowName = 'pedalMovementCat'
 rowOrder = sorted(np.unique(plotRC[rowName]))
 colWrap = min(3, len(colOrder))
-height, aspect = 5, 3
-g = sns.relplot(
-    col=colName,
-    col_order=colOrder,
-    row=rowName,
-    # x='normalizedAmplitude',
-    x=amplitudeFieldName,
-    y='rauc',
-    hue=hueName, hue_order=hueOrder,
-    kind='line', data=plotRC,
-    # palette=emgPalette,
-    height=height, aspect=aspect, errorbar='se', estimator='mean',
-    facet_kws=dict(sharey=True, sharex=False, legend_out=True), lw=3,
-    )
-pdb.set_trace()
-'''g = sns.catplot(
-    col=colName,
-    col_order=colOrder,
-    col_wrap=colWrap,
-    # row='EMGSide',
-    # x='normalizedAmplitude',
-    x=amplitudeFieldName,
-    y='normalizedRAUC',
-    hue=hueName, hue_order=hueOrder,
-    kind='box', data=plotRC,
-    # palette=emgPalette,
-    height=height, aspect=aspect,
-    facet_kws=dict(sharey=True, sharex=False, legend_out=True),
-    )'''
-g.fig.set_size_inches(len(rowOrder) * height * aspect + 10, height + 2)
-plt.tight_layout(pad=.1)
-plt.savefig(pdfPath)
-if arguments['showFigures']:
-    plt.show()
-else:
-    plt.close()
+whichRAUC = 'normalizedRAUC'
+height, width = 3, 3
+aspect = width / height
+with PdfPages(pdfPath) as pdf:
+    plotLims = plotRC[whichRAUC].quantile([1e-2, 1-1e-2])
+    for name, group in plotRC.groupby('RateInHz'):
+        nAmps = group[amplitudeFieldName].unique().size
+        if nAmps > 1:
+            g = sns.relplot(
+                col=colName,
+                col_order=colOrder,
+                row=rowName,
+                # x='normalizedAmplitude',
+                x=amplitudeFieldName,
+                y=whichRAUC,
+                hue=hueName, hue_order=hueOrder,
+                kind='line', data=group,
+                # palette=emgPalette,
+                height=height, aspect=aspect, errorbar='se', estimator='mean',
+                facet_kws=dict(sharey=True, sharex=False, margin_titles=True), lw=1,
+                )
+        else:
+            g = sns.catplot(
+                col=colName,
+                col_order=colOrder,
+                row=rowName,
+                # row='EMGSide',
+                # x='normalizedAmplitude',
+                x=amplitudeFieldName,
+                y=whichRAUC,
+                hue=hueName, hue_order=hueOrder,
+                kind='box', data=group,
+                # palette=emgPalette,
+                height=height, aspect=aspect,
+                facet_kws=dict(sharey=True, sharex=False, margin_titles=True),
+                )
+        g.axes[0, 0].set_ylim(plotLims)
+        g.set_titles(col_template="{col_name}", row_template="{row_name}")
+        g.tight_layout(pad=0.)
+        figTitle = g.fig.suptitle('rate = {}'.format(name))
+        leg = g._legend
+        pdf.savefig(
+            bbox_inches='tight',
+            bbox_extra_artists=[leg, figTitle]
+            )
+        if arguments['showFigures']:
+            plt.show()
+        else:
+            plt.close()
+#
+pdfPath = os.path.join(
+    figureOutputFolder,
+    blockBaseName + '{}_{}_{}.pdf'.format(
+        inputBlockSuffix, arguments['window'],
+        'distributions'))
+with PdfPages(pdfPath) as pdf:
+    g = sns.displot(
+        data=plotRC,
+        x='rawRAUC', hue='feature', kind='hist', element='step'
+        )
+    figTitle = g.fig.suptitle('raw')
+    g.axes[0, 0].set_xlim(plotRC['rawRAUC'].quantile([1e-6, 1-1e-2]))
+    pdf.savefig(
+        bbox_inches='tight',
+        bbox_extra_artists=[figTitle]
+        )
+    if arguments['showFigures']:
+        plt.show()
+    else:
+        plt.close()
+    g = sns.displot(
+        data=plotRC,
+        x='rauc', hue='feature', kind='hist', element='step'
+        )
+    figTitle = g.fig.suptitle('after power transformation')
+    pdf.savefig(
+        bbox_inches='tight',
+        bbox_extra_artists=[figTitle]
+        )
+    if arguments['showFigures']:
+        plt.show()
+    else:
+        plt.close()

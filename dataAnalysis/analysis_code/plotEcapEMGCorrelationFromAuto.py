@@ -44,7 +44,7 @@ from tqdm import tqdm
 from matplotlib.backends.backend_pdf import PdfPages
 import dataAnalysis.plotting.spike_sorting_plots as ssplt
 from scipy import stats
-from sklearn.preprocessing import RobustScaler, MinMaxScaler, StandardScaler, QuantileTransformer
+from sklearn.preprocessing import RobustScaler, MinMaxScaler, StandardScaler, QuantileTransformer, PowerTransformer
 #
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 '''
@@ -187,7 +187,7 @@ for annName in derivedAnnot:
 # normalizationGrouper = [('all', ecapRauc), ]
 
 for name, group in ecapRauc.groupby(['feature']):
-    qScaler = QuantileTransformer(output_distribution='normal')
+    qScaler = PowerTransformer()
     qScaler.fit(
         ecapRauc.loc[group.index, 'rauc']
         .to_numpy()

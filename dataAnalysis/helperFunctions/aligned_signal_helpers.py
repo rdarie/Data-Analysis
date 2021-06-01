@@ -815,8 +815,8 @@ def rAUC(
             bLine = baseline
     else:
         bLine = 0
-    dt = asigWide.columns[1] - asigWide.columns[0]
-    '''rAUCDF = (
+    '''dt = asigWide.columns[1] - asigWide.columns[0]
+    rAUCDF = (
         asigWide.loc[:, tMask].subtract(bLine, axis='index')
         .abs().sum(axis='columns') * dt)'''
     rAUCDF = (asigWide.loc[:, tMask] - bLine).abs().mean(axis='columns')
