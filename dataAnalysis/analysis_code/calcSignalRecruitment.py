@@ -19,6 +19,9 @@ Options:
     --maskOutlierBlocks                    delete outlier trials? [default: False]
     --winStart=winStart                    start of absolute window (when loading)
     --winStop=winStop                      end of absolute window (when loading)
+    --loadFromFrames                       delete outlier trials? [default: False]
+    --datasetName=datasetName              filename for resulting estimator (cross-validated n_comps)
+    --selectionName=selectionName          filename for resulting estimator (cross-validated n_comps)
 """
 import matplotlib
 matplotlib.rcParams['pdf.fonttype'] = 42
@@ -44,6 +47,10 @@ import pandas as pd
 import numpy as np
 from scipy import stats
 from sklearn.preprocessing import RobustScaler, MinMaxScaler, StandardScaler, QuantileTransformer, PowerTransformer
+import sys
+
+for arg in sys.argv:
+    print(arg)
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']), arguments['exp'])
@@ -62,53 +69,78 @@ calcSubFolder = os.path.join(alignSubFolder, 'dataframes')
 if not os.path.exists(calcSubFolder):
     os.makedirs(calcSubFolder, exist_ok=True)
 #
-alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **arguments)
-alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
-    namedQueries, scratchFolder, **arguments)
-alignedAsigsKWargs['outlierTrials'] = ash.processOutlierTrials(
-    scratchFolder, blockBaseName, **arguments)
-#
-alignedAsigsKWargs.update(dict(
-    duplicateControlsByProgram=False,
-    makeControlProgram=False,
-    metaDataToCategories=False,
-    removeFuzzyName=False,
-    decimate=1,
-    transposeToColumns='bin', concatOn='index'))
-#
-'''alignedAsigsKWargs['procFun'] = ash.genDetrender(
-    timeWindow=(-200e-3, -100e-3))'''
-
-if 'windowSize' not in alignedAsigsKWargs:
-    alignedAsigsKWargs['windowSize'] = [ws for ws in rasterOpts['windowSizes'][arguments['window']]]
-if 'winStart' in arguments:
-    if arguments['winStart'] is not None:
-        alignedAsigsKWargs['windowSize'][0] = float(arguments['winStart']) * (1e-3)
-if 'winStop' in arguments:
-    if arguments['winStop'] is not None:
-        alignedAsigsKWargs['windowSize'][1] = float(arguments['winStop']) * (1e-3)
-
-triggeredPath = os.path.join(
-    alignSubFolder,
-    blockBaseName + '{}_{}.nix'.format(
-        inputBlockSuffix, arguments['window']))
 resultPath = os.path.join(
     calcSubFolder,
     blockBaseName + '{}_{}_rauc.h5'.format(
         inputBlockSuffix, arguments['window']))
-
-print('loading {}'.format(triggeredPath))
-dataReader, dataBlock = ns5.blockFromPath(
-    triggeredPath, lazy=arguments['lazy'])
+#
 #  Overrides
 limitPages = None
 funKWargs = dict(
     # baseline='mean',
     tStart=-100e-3, tStop=100e-3)
 #  End Overrides
-asigWide = ns5.alignedAsigsToDF(
-    dataBlock, **alignedAsigsKWargs)
+if not arguments['loadFromFrames']:
+    alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **arguments)
+    alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
+        namedQueries, scratchFolder, **arguments)
+    alignedAsigsKWargs['outlierTrials'] = ash.processOutlierTrials(
+        scratchFolder, blockBaseName, **arguments)
+    #
+    alignedAsigsKWargs.update(dict(
+        duplicateControlsByProgram=False,
+        makeControlProgram=False,
+        metaDataToCategories=False,
+        removeFuzzyName=False,
+        decimate=1,
+        transposeToColumns='bin', concatOn='index'))
+    #
+    '''alignedAsigsKWargs['procFun'] = ash.genDetrender(
+        timeWindow=(-200e-3, -100e-3))'''
 
+    if 'windowSize' not in alignedAsigsKWargs:
+        alignedAsigsKWargs['windowSize'] = [ws for ws in rasterOpts['windowSizes'][arguments['window']]]
+    if 'winStart' in arguments:
+        if arguments['winStart'] is not None:
+            alignedAsigsKWargs['windowSize'][0] = float(arguments['winStart']) * (1e-3)
+    if 'winStop' in arguments:
+        if arguments['winStop'] is not None:
+            alignedAsigsKWargs['windowSize'][1] = float(arguments['winStop']) * (1e-3)
+
+    triggeredPath = os.path.join(
+        alignSubFolder,
+        blockBaseName + '{}_{}.nix'.format(
+            inputBlockSuffix, arguments['window']))
+
+    print('loading {}'.format(triggeredPath))
+    dataReader, dataBlock = ns5.blockFromPath(
+        triggeredPath, lazy=arguments['lazy'])
+    asigWide = ns5.alignedAsigsToDF(
+        dataBlock, **alignedAsigsKWargs)
+else:
+    datasetName = arguments['datasetName']
+    selectionName = arguments['selectionName']
+    dataFramesFolder = os.path.join(analysisSubFolder, 'dataframes')
+    datasetPath = os.path.join(
+        dataFramesFolder,
+        datasetName + '.h5'
+        )
+    loadingMetaPath = os.path.join(
+        dataFramesFolder,
+        datasetName + '_{}'.format(selectionName) + '_meta.pickle'
+        )
+    with open(loadingMetaPath, 'rb') as _f:
+        loadingMeta = pickle.load(_f)
+        # iteratorsBySegment = loadingMeta.pop('iteratorsBySegment')
+        iteratorsBySegment = loadingMeta['iteratorsBySegment']
+        cv_kwargs = loadingMeta['cv_kwargs']
+    for argName in ['plotting', 'showFigures', 'debugging', 'verbose']:
+        loadingMeta['arguments'].pop(argName, None)
+    arguments.update(loadingMeta['arguments'])
+    cvIterator = iteratorsBySegment[0]
+    dataDF = pd.read_hdf(datasetPath, '/{}/data'.format(selectionName))
+    featureMasks = pd.read_hdf(datasetPath, '/{}/featureMasks'.format(selectionName))
+    pdb.set_trace()
 rAUCDF = ash.rAUC(
     asigWide, **funKWargs).to_frame(name='rawRAUC')
 rAUCDF.loc[:, 'rauc'] = np.nan

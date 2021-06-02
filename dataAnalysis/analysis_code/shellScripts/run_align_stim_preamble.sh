@@ -19,11 +19,11 @@ python --version
 # EXP="exp202101201100"
 # EXP="exp202101211100"
 # EXP="exp202101221100"
-#
+##############
 # EXP="exp202101251100"
 # EXP="exp202101271100"
 EXP="exp202101281100"
-#
+
 # EXP="exp202102041100"
 # EXP="exp202102041100"
 # EXP="exp202102081100"
@@ -34,8 +34,9 @@ LAZINESS="--lazy"
 # LAZINESS=""
 VERBOSITY="--verbose"
 
+WINDOWTERM="XL"
 # WINDOW="--window=L"
-WINDOW="--window=XL"
+WINDOW="--window=${WINDOWTERM}"
 
 AMPFIELDNAME="--amplitudeFieldName=amplitude"
 

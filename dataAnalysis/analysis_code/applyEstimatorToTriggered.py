@@ -10,7 +10,6 @@ Options:
     --profile                              print time and mem diagnostics? [default: False]
     --lazy                                 load from raw, or regular? [default: False]
     --alignQuery=alignQuery                choose a subset of the data?
-    --matchDownsampling                    match downsampling? [default: False]
     --analysisName=analysisName            append a name to the resulting blocks? [default: default]
     --alignFolderName=alignFolderName      append a name to the resulting blocks? [default: motion]
     --window=window                        process with short window? [default: short]
@@ -18,6 +17,7 @@ Options:
     --winStop=winStop                      end of window [default: 400]
     --estimatorName=estimatorName          estimator filename
     --datasetName=datasetName              dataset used to train estimator (use to get loading arguments)
+    --selectionName=selectionName          dataset used to train estimator (use to get loading arguments)
     --datasetExp=datasetExp                dataset used to train estimator (use to get loading arguments)
     --unitQuery=unitQuery                  how to restrict channels?
     --inputBlockSuffix=inputBlockSuffix    which trig_ block to pull [default: pca]
@@ -73,22 +73,25 @@ if oldWay:
     extendedFeatureMeta = None
 else:
     datasetName = arguments['datasetName']
+    selectionName = arguments['selectionName']
+    estimatorName = arguments['estimatorName']
     fullEstimatorName = '{}_{}'.format(
-        arguments['estimatorName'], arguments['datasetName'])
+        estimatorName, selectionName)
     #
     estimatorsSubFolder = os.path.join(
-        alignSubFolder, 'estimators')
+        analysisSubFolder, 'estimators')
     if arguments['datasetExp'] is not None:
-        estimatorsSubFolder = estimatorsSubFolder.replace(experimentName, arguments['datasetExp'])
+        estimatorsSubFolder = estimatorsSubFolder.replace(
+            experimentName, arguments['datasetExp'])
     if not os.path.exists(estimatorsSubFolder):
         os.makedirs(estimatorsSubFolder)
-    dataFramesFolder = os.path.join(alignSubFolder, 'dataframes')
+    dataFramesFolder = os.path.join(analysisSubFolder, 'dataframes')
     if arguments['datasetExp'] is not None:
         dataFramesFolder = dataFramesFolder.replace(experimentName, arguments['datasetExp'])
-    datasetPath = os.path.join(
+    '''datasetPath = os.path.join(
         dataFramesFolder,
         datasetName + '.h5'
-        )
+        )'''
     scoresPath = os.path.join(
         estimatorsSubFolder,
         fullEstimatorName + '.h5'
@@ -98,7 +101,12 @@ else:
         fullEstimatorName + '.joblib'
         )
     estimator = jb.load(estimatorPath)
-    with open(datasetPath.replace('.h5', '_meta.pickle'), 'rb') as _f:
+    #
+    loadingMetaPath = os.path.join(
+        dataFramesFolder,
+        datasetName + '_{}'.format(selectionName) + '_meta.pickle'
+        )
+    with open(loadingMetaPath, 'rb') as _f:
         loadingMeta = pickle.load(_f)
         for discardEntry in ['plotting', 'showFigures']:
             _ = loadingMeta['arguments'].pop(discardEntry, None)
@@ -107,14 +115,16 @@ else:
         normalizationParams = loadingMeta['normalizationParams']
     else:
         normalizeDataset = None
-    featureMasks = pd.read_hdf(datasetPath, datasetName + '_featureMasks')
-    extendedFeatureMeta = featureMasks.columns.to_frame().reset_index(drop=True)
-    for aakwaEntry in ['getMetaData', 'concatOn', 'transposeToColumns', 'addLags', 'procFun']:
+    #
+    # featureMasks = pd.read_hdf(datasetPath, '/{}/featureMasks'.format(selectionName))
+    #
+    # extendedFeatureMeta = featureMasks.columns.to_frame().reset_index(drop=True)
+    for aakwaEntry in ['getMetaData', 'concatOn', 'transposeToColumns', 'addLags', 'procFun', 'getFeatureMetaData']:
         if aakwaEntry in loadingMeta['alignedAsigsKWargs']:
             alignedAsigsKWargs[aakwaEntry] = loadingMeta['alignedAsigsKWargs'][aakwaEntry]
-    if arguments['matchDownsampling']:
-        if 'decimate' in loadingMeta['alignedAsigsKWargs']:
-            alignedAsigsKWargs['decimate'] = loadingMeta['alignedAsigsKWargs']['decimate']
+    if 'decimate' in loadingMeta['alignedAsigsKWargs']:
+        alignedAsigsKWargs['decimate'] = loadingMeta['alignedAsigsKWargs']['decimate']
+    #
     alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **arguments)
     print('alignedAsigsKWargs[dataQuery] = {}'.format(alignedAsigsKWargs['dataQuery']))
     alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(namedQueries, scratchFolder, **arguments)
@@ -140,13 +150,14 @@ if arguments['verbose']:
 
 alignedAsigsDF = ns5.alignedAsigsToDF(
     dataBlock, **alignedAsigsKWargs)
-if extendedFeatureMeta is not None:
+# print(alignedAsigsDF.columns)
+'''if extendedFeatureMeta is not None:
     featureMeta = alignedAsigsDF.columns.to_frame().reset_index(drop=True)
     loadedMeta = featureMeta.loc[:, ['feature', 'lag']]
     comparisonMeta = extendedFeatureMeta.loc[:, ['feature', 'lag']]
     comparisonErrorMsg = "Error: loaded data columns\n\n{}\n\ndoes not equal dataset columns\n\n{}\n\n".format(featureMeta.loc[:, ['feature', 'lag']], extendedFeatureMeta.loc[:, ['feature', 'lag']])
     assert (loadedMeta == comparisonMeta).all(axis=None), comparisonErrorMsg
-    alignedAsigsDF.columns = pd.MultiIndex.from_frame(extendedFeatureMeta)
+    alignedAsigsDF.columns = pd.MultiIndex.from_frame(extendedFeatureMeta)'''
 if normalizeDataset is not None:
     alignedAsigsDF = normalizeDataset(alignedAsigsDF, normalizationParams)
 if hasattr(estimator, 'transform'):
@@ -156,7 +167,6 @@ elif hasattr(estimator, 'mahalanobis'):
 if arguments['profile']:
     prf.print_memory_usage('after estimator.transform')
 #
-# pdb.set_trace()
 if 'outputFeatures' in estimatorMetadata:
     if isinstance(estimatorMetadata['outputFeatures'], pd.MultiIndex):
         featureNames = pd.Index(estimatorMetadata['outputFeatures'].get_level_values('feature'), dtype=str)
@@ -172,7 +182,10 @@ else:
 trialTimes = np.unique(alignedAsigsDF.index.get_level_values('t'))
 tBins = np.unique(alignedAsigsDF.index.get_level_values('bin'))
 alignedFeaturesDF = pd.DataFrame(
-    features, index=alignedAsigsDF.index, columns=featureNames)
+    features, index=alignedAsigsDF.index,
+    # columns=featureNames
+    columns=estimatorMetadata['outputFeatures']
+    )
 alignedFeaturesDF.columns.name = 'feature'
 del alignedAsigsDF
 #

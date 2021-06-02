@@ -31,8 +31,8 @@ BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
 TARGET="lfp_CAR_spectral"
 # TARGET="lfp_CAR"
 #
-# ESTIMATOR="fa2"
-ESTIMATOR="pca"
+ESTIMATOR="fa"
+# ESTIMATOR="pca"
 #
 ITERATOR="a"
 ALIGNQUERYTERM="outbound"
@@ -48,15 +48,19 @@ ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
 WINDOW="XL"
 #####
 # python -u './testSignalNormality.py' --datasetName="Block_${WINDOW}_df_${ITERATOR}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
-python -u './calcGridSearchSignalDimensionality.py' --estimatorName="${ESTIMATOR}" --datasetName="Block_${WINDOW}_df_${ITERATOR}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
+# python -u './calcGridSearchSignalDimensionality.py' --estimatorName="${ESTIMATOR}" --datasetName="Block_${WINDOW}_df_${ITERATOR}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
+
+#
 # python -u './processSignalDimensionality.py' --estimatorName="${ESTIMATOR}" --datasetName="Block_${WINDOW}_df_${ITERATOR}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
+
+#
 # python -u './assembleExperimentAlignedAsigs.py' --exp=$EXP $BLOCKSELECTOR --inputBlockSuffix="${TARGET}" --window=$WINDOW $ANALYSISFOLDER $ALIGNFOLDER $LAZINESS
 
-TARGET="lfp_CAR_spectral_fa2"
+TARGET="lfp_CAR_spectral_fa"
 # TARGET="lfp_CAR_fa"
 # TARGET="lfp_CAR_spectral_pca"
 # TARGET="lfp_CAR_pca"
-# python -u './calcSignalNovelty.py' --estimatorName="mahal" --datasetName="Block_${WINDOW}_df_${ITERATOR}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=2 --plotting --showFigures
+python -u './calcSignalNovelty.py' --estimatorName="mahal" --datasetName="Block_${WINDOW}_df_${ITERATOR}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=2 --plotting --showFigures
 # python -u './assembleExperimentAlignedAsigs.py' --exp=$EXP $BLOCKSELECTOR --inputBlockSuffix="${TARGET}" --window=$WINDOW $ANALYSISFOLDER $ALIGNFOLDER $LAZINESS
 
 TARGET="lfp_CAR_spectral_fa2_mahal"

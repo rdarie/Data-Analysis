@@ -12,6 +12,7 @@ Options:
     --debugging                              print diagnostics? [default: False]
     --estimatorName=estimatorName            filename for resulting estimator (cross-validated n_comps)
     --datasetName=datasetName                filename for resulting estimator (cross-validated n_comps)
+    --selectionName=selectionName            filename for resulting estimator (cross-validated n_comps)
     --analysisName=analysisName              append a name to the resulting blocks? [default: default]
     --alignFolderName=alignFolderName        append a name to the resulting blocks? [default: motion]
 """
@@ -88,8 +89,10 @@ if arguments['plotting']:
     arguments['window'],
     arguments['alignQuery'])'''
 datasetName = arguments['datasetName']
+selectionName = arguments['selectionName']
+estimatorName = arguments['estimatorName']
 fullEstimatorName = '{}_{}'.format(
-    arguments['estimatorName'], arguments['datasetName'])
+    estimatorName, arguments['datasetName'])
 #
 estimatorsSubFolder = os.path.join(
     alignSubFolder, 'estimators')
@@ -99,11 +102,15 @@ datasetPath = os.path.join(
     dataFramesFolder,
     datasetName + '.h5'
     )
+loadingMetaPath = os.path.join(
+    dataFramesFolder,
+    datasetName + '_{}'.format(selectionName) + '_meta.pickle'
+    )
 estimatorPath = os.path.join(
     estimatorsSubFolder,
     fullEstimatorName + '.h5'
     )
-with open(datasetPath.replace('.h5', '_meta.pickle'), 'rb') as _f:
+with open(loadingMetaPath, 'rb') as _f:
     loadingMeta = pickle.load(_f)
     iteratorsBySegment = loadingMeta['iteratorsBySegment']
     cv_kwargs = loadingMeta['cv_kwargs']
@@ -111,19 +118,16 @@ with open(datasetPath.replace('.h5', '_meta.pickle'), 'rb') as _f:
         loadingMeta['arguments'].pop(argName, None)
 arguments.update(loadingMeta['arguments'])
 cvIterator = iteratorsBySegment[0]
-outputDatasetName = '{}_{}_{}_{}_{}'.format(
-    arguments['unitQuery'], arguments['estimatorName'],
-    arguments['iteratorSuffix'], arguments['window'], arguments['alignQuery'])
-outputDFPath = os.path.join(
-    dataFramesFolder, outputDatasetName + '.h5'
-    )
-validationFeaturesDF = pd.read_hdf(outputDFPath, outputDatasetName)
+outputSelectionName = '{}_{}'.format(
+    selectionName, estimatorName)
+# 
+validationFeaturesDF = pd.read_hdf(datasetPath, outputSelectionName)
 featureInfo = validationFeaturesDF.columns.to_frame().reset_index(drop=True)
 #
 scoresDF = pd.read_hdf(estimatorPath, 'cv')
 estimators = pd.read_hdf(estimatorPath, 'cv_estimators')
-dataDF = pd.read_hdf(datasetPath, datasetName)
-featureMasks = pd.read_hdf(datasetPath, datasetName + '_featureMasks')
+dataDF = pd.read_hdf(datasetPath, '/{}/data'.format(selectionName))
+featureMasks = pd.read_hdf(datasetPath, '/{}/featureMasks'.format(selectionName))
 removeAllColumn = True
 if removeAllColumn:
     featureMasks = featureMasks.loc[~ featureMasks.all(axis='columns'), :]
@@ -139,7 +143,7 @@ for idx, (maskIdx, featureMask) in enumerate(featureMasks.iterrows()):
     nFeatures = dataGroup.columns.shape[0]
     theseFeatureColumns = featureInfo.loc[featureInfo['freqBandName'] == maskParams['freqBandName'], :]
     lOfFeaturesPerFold = []
-    lOfRecPerFold = []
+    lOfRecPerFold = [] #reconstructions
     for foldIdx, estimatorsGroup in estimators.groupby('fold'):
         if foldIdx < lastFoldIdx:
             trainIdx, testIdx = cvIterator.folds[foldIdx]
@@ -194,12 +198,13 @@ recDF = pd.concat([
 recDF.columns = recDF.columns.get_level_values('feature')
 #
 figureOutputFolder = os.path.join(
-    figureFolder,
-    arguments['analysisName'], arguments['alignFolderName'])
+    figureFolder, arguments['analysisName'])
 if not os.path.exists(figureOutputFolder):
     os.makedirs(figureOutputFolder)
 # pdb.set_trace()
-pdfPath = os.path.join(figureOutputFolder, '{}_covariance_matrix_heatmap.pdf'.format(fullEstimatorName))
+pdfPath = os.path.join(
+    figureOutputFolder, '{}_{}_covariance_matrix_heatmap.pdf'.format(
+        datasetName, fullEstimatorName))
 with PdfPages(pdfPath) as pdf:
     fig, ax = plt.subplots()
     ax = sns.heatmap(thisEstimator.get_covariance())
@@ -208,8 +213,10 @@ with PdfPages(pdfPath) as pdf:
         plt.show()
     else:
         plt.close()
-pdfPath = os.path.join(figureOutputFolder, '{}_reconstructed_signals.pdf'.format(fullEstimatorName))
-pdb.set_trace()
+pdfPath = os.path.join(
+    figureOutputFolder, '{}_{}_reconstructed_signals.pdf'.format(
+        datasetName, fullEstimatorName))
+#
 with PdfPages(pdfPath) as pdf:
     for name, group in recDF.groupby('feature', axis='columns'):
         print('making plot of {}'.format(name))

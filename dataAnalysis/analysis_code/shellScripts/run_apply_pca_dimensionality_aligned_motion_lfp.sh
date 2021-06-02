@@ -10,22 +10,22 @@
 #SBATCH --mem=127G
 
 # Specify a job name:
-#SBATCH -J apply_pca_dimen_motion_lfp_25
+#SBATCH -J apply_pca_dimen_motion_lfp_28
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-apply_pca_dimen_motion_lfp_25.out
-#SBATCH -e ../../batch_logs/%j-%a-apply_pca_dimen_motion_lfp_25.out
+#SBATCH -o ../../batch_logs/%j-%a-apply_pca_dimen_motion_lfp_28.out
+#SBATCH -e ../../batch_logs/%j-%a-apply_pca_dimen_motion_lfp_28.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
-#SBATCH --array=1
+#SBATCH --array=2,3
 
-# SLURM_ARRAY_TASK_ID=3
+#  SLURM_ARRAY_TASK_ID=3
 source ./shellScripts/calc_aligned_motion_preamble.sh
 
-#####
+###########
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
 TARGET="lfp_CAR_spectral"
 ESTIMATOR="fa"
@@ -34,13 +34,14 @@ WINDOW="XL"
 
 ALIGNQUERYTERM="starting"
 # ALIGNQUERYTERM="outbound"
+
 ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
 
 #
-python -u './applyEstimatorToTriggered.py' --matchDownsampling --inputBlockSuffix="${TARGET}" --estimatorName="${ESTIMATOR}" --datasetName="${TARGET}_a_XL_outbound" --datasetExp='202101281100-Rupert' --unitQuery="${TARGET}" --exp=$EXP --window=$WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR
-python -u './makeViewableBlockFromTriggered.py' --plotting --inputBlockSuffix="${TARGET}_${ESTIMATOR}" --unitQuery="factor" $VERBOSITY --exp=$EXP --window=$WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
+python -u './applyEstimatorToTriggered.py' --inputBlockSuffix="${TARGET}" --estimatorName="${ESTIMATOR}" --datasetName="Block_${WINDOW}_df_${ITERATOR}" --selectionName=$TARGET --datasetExp='202101281100-Rupert' --unitQuery="${TARGET}" --exp=$EXP --window=$WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR
+# python -u './makeViewableBlockFromTriggered.py' --plotting --inputBlockSuffix="${TARGET}_${ESTIMATOR}" --unitQuery="factor" $VERBOSITY --exp=$EXP --window=$WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
 
 TARGET="lfp_CAR_spectral_fa"
 ESTIMATOR="mahal"
-python -u './applyEstimatorToTriggered.py' --inputBlockSuffix="${TARGET}" --estimatorName="${ESTIMATOR}" --datasetName="${TARGET}_a_XL_outbound" --datasetExp='202101281100-Rupert' --exp=$EXP --window=$WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR
-python -u './makeViewableBlockFromTriggered.py' --plotting --inputBlockSuffix="${TARGET}_${ESTIMATOR}" --unitQuery="mahal" $VERBOSITY --exp=$EXP --window=$WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
+python -u './applyEstimatorToTriggered.py' --inputBlockSuffix="${TARGET}" --estimatorName="${ESTIMATOR}" --datasetName="Block_${WINDOW}_df_${ITERATOR}" --selectionName=$TARGET --datasetExp='202101281100-Rupert' --exp=$EXP --window=$WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR
+# python -u './makeViewableBlockFromTriggered.py' --plotting --inputBlockSuffix="${TARGET}_${ESTIMATOR}" --unitQuery="mahal" $VERBOSITY --exp=$EXP --window=$WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS

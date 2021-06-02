@@ -106,12 +106,6 @@ if __name__ == '__main__':
         if not os.path.exists(figureOutputFolder):
             os.makedirs(figureOutputFolder)
     #
-    '''fullEstimatorName = '{}_{}_to_{}{}_{}_{}'.format(
-        arguments['estimatorName'],
-        arguments['unitQueryLhs'], arguments['unitQueryRhs'],
-        iteratorSuffix,
-        arguments['window'],
-        arguments['alignQuery'])'''
     datasetName = arguments['datasetName']
     selectionName = arguments['selectionName']
     estimatorName = arguments['estimatorName']
@@ -135,7 +129,6 @@ if __name__ == '__main__':
         estimatorsSubFolder,
         fullEstimatorName + '.h5'
         )
-    #
     with open(loadingMetaPath, 'rb') as _f:
         loadingMeta = pickle.load(_f)
         # iteratorsBySegment = loadingMeta.pop('iteratorsBySegment')
@@ -365,12 +358,12 @@ if __name__ == '__main__':
     with open(outputLoadingMetaPath, 'wb') as f:
         pickle.dump(outputLoadingMeta, f)
     if arguments['plotting']:
-        figureOutputPath = os.path.join(
+        pdfPath = os.path.join(
                 figureOutputFolder,
                 '{}_{}_dimensionality.pdf'.format(
                     datasetName, fullEstimatorName))
-        print('Saving plots to {}'.format(figureOutputPath))
-        with PdfPages(figureOutputPath) as pdf:
+        print('Saving plots to {}'.format(pdfPath))
+        with PdfPages(pdfPath) as pdf:
             for idx, (maskIdx, featureMask) in enumerate(featureMasks.iterrows()):
                 maskParams = {k: v for k, v in zip(featureMask.index.names, maskIdx)}
                 dataGroup = dataDF.loc[:, featureMask]

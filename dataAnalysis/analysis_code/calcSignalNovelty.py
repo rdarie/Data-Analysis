@@ -15,6 +15,7 @@ Options:
     --debugging                            load from raw, or regular? [default: False]
     --verbose=verbose                      print diagnostics? [default: 0]
     --datasetName=datasetName              filename for resulting estimator (cross-validated n_comps)
+    --selectionName=selectionName          filename for resulting estimator (cross-validated n_comps)
     --estimatorName=estimatorName          filename for resulting estimator (cross-validated n_comps)
 """
 
@@ -66,37 +67,35 @@ analysisSubFolder, alignSubFolder = hf.processSubfolderPaths(
     arguments, scratchFolder)
 if arguments['plotting']:
     figureOutputFolder = os.path.join(
-        figureFolder,
-        arguments['analysisName'], arguments['alignFolderName'])
+        figureFolder, arguments['analysisName'])
     if not os.path.exists(figureOutputFolder):
         os.makedirs(figureOutputFolder)
 #
-'''fullEstimatorName = '{}_{}_to_{}{}_{}_{}'.format(
-    arguments['estimatorName'],
-    arguments['unitQueryLhs'], arguments['unitQueryRhs'],
-    iteratorSuffix,
-    arguments['window'],
-    arguments['alignQuery'])'''
 datasetName = arguments['datasetName']
-# pdb.set_trace()
+selectionName = arguments['selectionName']
+estimatorName = arguments['estimatorName']
 fullEstimatorName = '{}_{}'.format(
-    arguments['estimatorName'], arguments['datasetName'])
+    estimatorName, selectionName)
 #
 estimatorsSubFolder = os.path.join(
-    alignSubFolder, 'estimators')
+    analysisSubFolder, 'estimators')
 if not os.path.exists(estimatorsSubFolder):
     os.makedirs(estimatorsSubFolder)
-dataFramesFolder = os.path.join(alignSubFolder, 'dataframes')
+dataFramesFolder = os.path.join(analysisSubFolder, 'dataframes')
 datasetPath = os.path.join(
     dataFramesFolder,
     datasetName + '.h5'
+    )
+loadingMetaPath = os.path.join(
+    dataFramesFolder,
+    datasetName + '_{}'.format(selectionName) + '_meta.pickle'
     )
 estimatorPath = os.path.join(
     estimatorsSubFolder,
     fullEstimatorName + '.h5'
     )
 #
-with open(datasetPath.replace('.h5', '_meta.pickle'), 'rb') as _f:
+with open(loadingMetaPath, 'rb') as _f:
     loadingMeta = pickle.load(_f)
     # iteratorsBySegment = loadingMeta.pop('iteratorsBySegment')
     iteratorsBySegment = loadingMeta['iteratorsBySegment']
@@ -108,7 +107,7 @@ arguments.update(loadingMeta['arguments'])
 
 if __name__ == '__main__':
     cvIterator = iteratorsBySegment[0]
-    if 'mahal' in arguments['estimatorName']:
+    if 'mahal' in estimatorName:
         # estimatorClass = EmpiricalCovariance
         estimatorClass = tdr.EmpiricalCovarianceTransformer
         estimatorKWArgs = dict()
@@ -134,8 +133,8 @@ if __name__ == '__main__':
             else:
                 print('Scheduler name is not correct!')
                 daskClient = Client()
-    dataDF = pd.read_hdf(datasetPath, datasetName)
-    featureMasks = pd.read_hdf(datasetPath, datasetName + '_featureMasks')
+    dataDF = pd.read_hdf(datasetPath, '/{}/data'.format(selectionName))
+    featureMasks = pd.read_hdf(datasetPath, '/{}/featureMasks'.format(selectionName))
     # only use zero lag targets
     lagMask = dataDF.columns.get_level_values('lag') == 0
     dataDF = dataDF.loc[:, lagMask]
@@ -158,7 +157,7 @@ if __name__ == '__main__':
     for idx, (maskIdx, featureMask) in enumerate(featureMasks.iterrows()):
         maskParams = {k: v for k, v in zip(featureMask.index.names, maskIdx)}
         dataGroup = dataDF.loc[:, featureMask]
-        trfName = '{}_{}'.format(arguments['estimatorName'], maskParams['freqBandName'])
+        trfName = '{}_{}'.format(estimatorName, maskParams['freqBandName'])
         if arguments['verbose']:
             print('Fitting {} ...'.format(trfName))
         nFeatures = dataGroup.columns.shape[0]
@@ -223,8 +222,9 @@ if __name__ == '__main__':
     #
     estimatorMetadata = {
         'path': os.path.basename(estimatorPath),
-        'name': arguments['estimatorName'],
+        'name': estimatorName,
         'datasetName': datasetName,
+        'selectionName': selectionName,
         'outputFeatures': outputFeaturesIndex
         }
     with open(estimatorPath.replace('.h5', '_meta.pickle'), 'wb') as f:
@@ -236,12 +236,8 @@ if __name__ == '__main__':
     featuresDF = pd.DataFrame(
         features,
         index=dataDF.index, columns=outputFeaturesIndex)
-    outputDatasetName = '{}_{}_{}_{}_{}'.format(
-        arguments['unitQuery'], arguments['estimatorName'],
-        arguments['iteratorSuffix'], arguments['window'], arguments['alignQuery'])
-    outputDFPath = os.path.join(
-        dataFramesFolder, outputDatasetName + '.h5'
-        )
+    outputSelectionName = '{}_{}'.format(
+        selectionName, estimatorName)
     #
     maskList = []
     haveAllGroup = False
@@ -304,7 +300,10 @@ if __name__ == '__main__':
         for idxItem in maskParams]
     maskDF.loc[:, 'maskName'] = maskParamsStr
     maskDF.set_index('maskName', append=True, inplace=True)
-    maskDF.to_hdf(outputDFPath, outputDatasetName + '_featureMasks', mode='a')
+    maskDF.to_hdf(
+        datasetPath,
+        '/{}/featureMasks'.format(outputSelectionName),
+        mode='a')
     #
     outputLoadingMeta = deepcopy(loadingMeta)
     outputLoadingMeta['arguments']['unitQuery'] = 'mahal'
@@ -319,7 +318,12 @@ if __name__ == '__main__':
         #
         outputLoadingMeta[k] = passthr
     featuresDF.to_hdf(
-        outputDFPath, outputDatasetName,
+        datasetPath,
+        '/{}/data'.format(outputSelectionName),
         mode='a')
-    with open(outputDFPath.replace('.h5', '_meta.pickle'), 'wb') as f:
+    outputLoadingMetaPath = os.path.join(
+        dataFramesFolder,
+        datasetName + '_{}'.format(outputSelectionName) + '_meta.pickle'
+        )
+    with open(outputLoadingMetaPath, 'wb') as f:
         pickle.dump(outputLoadingMeta, f)

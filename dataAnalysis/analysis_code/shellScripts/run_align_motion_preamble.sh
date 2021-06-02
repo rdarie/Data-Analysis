@@ -26,13 +26,15 @@ export OUTDATED_IGNORE=1
 # EXP="exp202101271100"
 EXP="exp202101281100"
 #
-#######
+####################
 LAZINESS="--lazy"
 # LAZINESS=""
 
 VERBOSITY="--verbose"
+
+WINDOWTERM="XL"
 # WINDOW="--window=L"
-WINDOW="--window=XL"
+WINDOW="--window=${WINDOWTERM}"
 # WINDOW="--window=XS"
 ANALYSISFOLDER="--analysisName=default"
 # ANALYSISFOLDER="--analysisName=fullRes"

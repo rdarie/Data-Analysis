@@ -1575,6 +1575,19 @@ def alignedAsigDFtoSpikeTrain(
         masterBlock.annotate(nix_name=dataBlock.annotations['neo_name'])
     else:
         masterBlock.name = 'block'
+    if isinstance(allWaveforms.columns, pd.MultiIndex):
+        extraSpikeTrainAnnotations = allWaveforms.columns.to_frame().reset_index(drop=True)
+        if 'bin' in extraSpikeTrainAnnotations:
+            extraSpikeTrainAnnotations = None
+        else:
+            assert 'feature' in extraSpikeTrainAnnotations
+            featureNames = pd.Index(allWaveforms.columns.get_level_values('feature'), dtype=str)
+            allWaveforms.columns = featureNames
+            allWaveforms.columns.name = 'feature'
+            extraSpikeTrainAnnotations.set_index('feature', inplace=True)
+            if 'lag' in extraSpikeTrainAnnotations:
+                extraSpikeTrainAnnotations.drop(columns=['lag'], inplace=True)
+    # pdb.set_trace()
     for segIdx, group in allWaveforms.groupby('segment'):
         print('Saving spiketrains for segment {}'.format(segIdx))
         # seg to contain triggered time series
@@ -1633,6 +1646,9 @@ def alignedAsigDFtoSpikeTrain(
                 chanIdx.annotate(nix_name=chanIdx.name)
                 thisUnit = Unit(name=chanIdx.name)
                 thisUnit.annotate(nix_name=chanIdx.name)
+                if extraSpikeTrainAnnotations is not None:
+                    theseExtraAnn = extraSpikeTrainAnnotations.loc[thisUnit.name, :].to_dict()
+                    thisUnit.annotations.update(theseExtraAnn)
                 chanIdx.units.append(thisUnit)
                 thisUnit.channel_index = chanIdx
                 masterBlock.channel_indexes.append(chanIdx)
@@ -1674,6 +1690,10 @@ def alignedAsigDFtoSpikeTrain(
                     k
                     for k, v in arrAnn.items()],
                     dtype='U')}
+            # pdb.set_trace()
+            if extraSpikeTrainAnnotations is not None:
+                theseExtraAnn = extraSpikeTrainAnnotations.loc[thisUnit.name, :].to_dict()
+                arrAnn.update(theseExtraAnn)
             st = SpikeTrain(
                 name='seg{}_{}'.format(int(segIdx), thisUnit.name),
                 times=spikeTimes.to_numpy() * tUnits,
