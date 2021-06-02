@@ -15,6 +15,7 @@ Options:
     --debugging                            load from raw, or regular? [default: False]
     --verbose=verbose                      print diagnostics? [default: 0]
     --datasetName=datasetName              filename for resulting estimator (cross-validated n_comps)
+    --selectionName=selectionName          filename for resulting estimator (cross-validated n_comps)
 """
 
 import matplotlib
@@ -77,7 +78,7 @@ if __name__ == '__main__':
         if not os.path.exists(figureOutputFolder):
             os.makedirs(figureOutputFolder)
     datasetName = arguments['datasetName']
-    dataFramesFolder = os.path.join(alignSubFolder, 'dataframes')
+    dataFramesFolder = os.path.join(analysisSubFolder, 'dataframes')
     datasetPath = os.path.join(
         dataFramesFolder,
         datasetName + '.h5'

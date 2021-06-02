@@ -728,7 +728,6 @@ def concatenateEventsContainer(
         except Exception:
             traceback.print_exc()
             # [arr.shape for key, arr in masterEvent.array_annotations.items()]
-            pdb.set_trace()
     if masterEvent.array_annotations is not None:
         arrayAnnNames = list(masterEvent.array_annotations.keys())
         masterEvent.annotations.update(masterEvent.array_annotations)
@@ -925,7 +924,6 @@ def unitSpikeTrainWaveformsToDF(
         spikeDF.loc[:, 'segment'] = segIdx
         spikeDF.loc[:, 'originalIndex'] = spikeDF.index
         spikeDF.columns.name = 'bin'
-        # pdb.set_trace()
         if dataQuery is not None:
             spikeDF.query(dataQuery, inplace=True)
             if not getMetaData:
@@ -1204,8 +1202,8 @@ def alignedAsigsToDF(
                 traceback.print_exc()
         if makeControlProgram:
             try:
-                allWaveforms.loc[allWaveforms[amplitudeColumn] == 0, programColumn] = 999
-                allWaveforms.loc[allWaveforms[amplitudeColumn] == 0, electrodeColumn] = 'control'
+                allWaveforms.loc[allWaveforms[amplitudeColumn] == 0, programColumn] = metaFillerLookup[programColumn]
+                allWaveforms.loc[allWaveforms[amplitudeColumn] == 0, electrodeColumn] = metaFillerLookup[electrodeColumn]
             except Exception:
                 traceback.print_exc()
         if duplicateControlsByProgram:
@@ -1229,8 +1227,8 @@ def alignedAsigsToDF(
                 progElecLookup.update({progIdx: elecIdx})
             #
             if makeControlProgram:
-                uniqProgs = np.append(uniqProgs, 999)
-                progElecLookup.update({999: 'control'})
+                uniqProgs = np.append(uniqProgs, metaFillerLookup[programColumn])
+                progElecLookup.update({metaFillerLookup[programColumn]: metaFillerLookup[electrodeColumn]})
             #
             for progIdx in uniqProgs:
                 dummyWaveforms = noStimWaveforms.copy()
@@ -1279,12 +1277,19 @@ def alignedAsigsToDF(
     if dropNaNs:
         allNaNIndex = allWaveforms.index[allWaveforms.isna().all(axis='columns')]
         # allNaNIndex.to_frame().reset_index(drop=True)
-        allWaveforms.drop(index=allNaNIndex, inplace=True)
+        if allNaNIndex.size > 0:
+            allWaveforms.drop(index=allNaNIndex, inplace=True)
         if transposeToColumns == 'bin':
             allWaveforms.dropna(inplace=True, axis='columns')
         elif transposeToColumns == 'feature':
             allWaveforms.dropna(inplace=True, axis='index')
     if finalIndexMask is not None:
+        if False:
+            tInfo1 = allWaveforms.index.to_frame().reset_index(drop=True).set_index(['segment', 't'])
+            tInfo1 = tInfo1.loc[~tInfo1.index.duplicated(keep='first'), :]
+            tInfo2 = finalIndexMask.index.to_frame().reset_index(drop=True).set_index(['segment', 't'])
+            tInfo2 = tInfo2.loc[~tInfo2.index.duplicated(keep='first'), :]
+            tInfo1.index[~tInfo1.index.duplicated(keep='first')]
         allWaveforms = allWaveforms.loc[finalIndexMask.to_numpy(), :]
     return allWaveforms
 

@@ -12,7 +12,7 @@ OUTLIERMASK="--maskOutlierBlocks"
 
 TIMEWINDOWOPTS="--winStart=-500 --winStop=1500"
 #
-# ALIGNQUERYTERM="stimOn"
-ALIGNQUERYTERM="stimOnHighRate"
-#
+ALIGNQUERYTERM="stimOn"
+# ALIGNQUERYTERM="stimOnHighRate"
+##
 ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"

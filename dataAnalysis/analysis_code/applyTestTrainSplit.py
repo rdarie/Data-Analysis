@@ -124,9 +124,10 @@ for segIdx in range(nSeg):
     if 'listOfROIMasks' in loadingMeta:
         aakwa['finalIndexMask'] = loadingMeta['listOfROIMasks'][segIdx]
     if arguments['verbose']:
-        prf.print_memory_usage('Loading feature info from  {}'.format(triggeredPath))
+        prf.print_memory_usage('Loading {}'.format(triggeredPath))
     dataDF = ns5.alignedAsigsToDF(
         dataBlock, whichSegments=[segIdx], **aakwa)
+    print(dataDF.index.names)
     if 'listOfExampleIndexes' in loadingMeta:
         trialInfo = dataDF.index.to_frame().reset_index(drop=True)
         loadedTrialInfo = loadingMeta['listOfExampleIndexes'][segIdx].to_frame().reset_index(drop=True)

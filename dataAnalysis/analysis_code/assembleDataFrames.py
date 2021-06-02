@@ -195,6 +195,8 @@ if __name__ == '__main__':
                             theseDF.append(pd.read_hdf(store, controlKey))
                             print('Loaded {} from {}'.format(controlKey, dFPath))
                         assert len(theseDF) > 0
+                        pdb.set_trace()
+                        db = [print(df.index.names) for df in theseDF]
                         thisDF = pd.concat(theseDF)
                 except Exception:
                     traceback.print_exc()
@@ -354,7 +356,10 @@ if __name__ == '__main__':
     finalDF.to_hdf(datasetPath, '{}/data'.format(arguments['selectionName']))
     thisMask.to_hdf(datasetPath, '{}/featureMasks'.format(arguments['selectionName']))
     #
-    loadingMetaPath = datasetPath.replace('.h5', '_meta.pickle')
+    loadingMetaPath = os.path.join(
+        dataFramesFolder,
+        datasetName + '_' + arguments['selectionName'] + '_meta.pickle'
+        )
     if os.path.exists(loadingMetaPath):
         os.remove(loadingMetaPath)
     loadingMeta['arguments'] = arguments.copy()

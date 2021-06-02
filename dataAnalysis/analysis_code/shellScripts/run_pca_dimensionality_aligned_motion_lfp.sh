@@ -47,9 +47,9 @@ ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
 #
 WINDOW="XL"
 ##
-# python -u './testSignalNormality.py' --datasetName="${TARGET}_${ITERATOR}_${WINDOW}_${ALIGNQUERYTERM}" --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
+python -u './testSignalNormality.py' --datasetName="Block_${WINDOW}_df_${ITERATOR}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
 # python -u './calcGridSearchSignalDimensionality.py' --estimatorName="${ESTIMATOR}" --datasetName="${TARGET}_${ITERATOR}_${WINDOW}_${ALIGNQUERYTERM}" --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
-python -u './processSignalDimensionality.py' --estimatorName="${ESTIMATOR}" --datasetName="${TARGET}_${ITERATOR}_${WINDOW}_${ALIGNQUERYTERM}" --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
+# python -u './processSignalDimensionality.py' --estimatorName="${ESTIMATOR}" --datasetName="${TARGET}_${ITERATOR}_${WINDOW}_${ALIGNQUERYTERM}" --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
 # python -u './assembleExperimentAlignedAsigs.py' --exp=$EXP $BLOCKSELECTOR --inputBlockSuffix="${TARGET}" --window=$WINDOW $ANALYSISFOLDER $ALIGNFOLDER $LAZINESS
 
 TARGET="lfp_CAR_spectral_fa2"
