@@ -10,11 +10,11 @@
 #SBATCH --mem=200G
 
 # Specify a job name:
-#SBATCH -J test_train_split_25
+#SBATCH -J test_train_split_28
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-test_train_split_25.out
-#SBATCH -e ../../batch_logs/%j-%a-test_train_split_25.out
+#SBATCH -o ../../batch_logs/%j-%a-test_train_split_28.out
+#SBATCH -e ../../batch_logs/%j-%a-test_train_split_28.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -38,7 +38,7 @@ CONTROLSTATUS="--controlSet"
 # ALIGNQUERYTERM="startingE5"
 # ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
 
-# used d in the aligned to stim category########
+# used d in the aligned to stim category############
 
 # ITERATOR="--iteratorSuffix=e"
 # ROIOPTS="--calcTimeROI --ROIWinStart=-100 --ROIWinStop=100 --timeROIAlignQuery=stopping"

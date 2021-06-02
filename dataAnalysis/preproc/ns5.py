@@ -1126,6 +1126,7 @@ def concatenateUnitSpikeTrainWaveformsDF(
             'finished concatenating, memory usage: {:.1f} MB'
             .format(prf.memory_usage_psutil()))
     try:
+        idxLabels = sorted(idxLabels)
         allWaveforms.set_index(idxLabels, inplace=True)
         allWaveforms.sort_index(
             level=['segment', 'originalIndex', 't'],
