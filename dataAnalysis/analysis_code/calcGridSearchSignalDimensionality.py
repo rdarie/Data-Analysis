@@ -15,6 +15,7 @@ Options:
     --debugging                            load from raw, or regular? [default: False]
     --verbose=verbose                      print diagnostics? [default: 0]
     --datasetName=datasetName              filename for resulting estimator (cross-validated n_comps)
+    --selectionName=selectionName          filename for resulting estimator (cross-validated n_comps)
     --estimatorName=estimatorName          filename for resulting estimator (cross-validated n_comps)
 """
 
@@ -101,7 +102,7 @@ if __name__ == '__main__':
     if arguments['plotting']:
         figureOutputFolder = os.path.join(
             figureFolder,
-            arguments['analysisName'], arguments['alignFolderName'])
+            arguments['analysisName'])
         if not os.path.exists(figureOutputFolder):
             os.makedirs(figureOutputFolder)
     #
@@ -112,24 +113,30 @@ if __name__ == '__main__':
         arguments['window'],
         arguments['alignQuery'])'''
     datasetName = arguments['datasetName']
+    selectionName = arguments['selectionName']
+    estimatorName = arguments['estimatorName']
     fullEstimatorName = '{}_{}'.format(
-        arguments['estimatorName'], arguments['datasetName'])
+        estimatorName, selectionName)
     #
     estimatorsSubFolder = os.path.join(
-        alignSubFolder, 'estimators')
+        analysisSubFolder, 'estimators')
     if not os.path.exists(estimatorsSubFolder):
         os.makedirs(estimatorsSubFolder)
-    dataFramesFolder = os.path.join(alignSubFolder, 'dataframes')
+    dataFramesFolder = os.path.join(analysisSubFolder, 'dataframes')
     datasetPath = os.path.join(
         dataFramesFolder,
         datasetName + '.h5'
+        )
+    loadingMetaPath = os.path.join(
+        dataFramesFolder,
+        datasetName + '_{}'.format(selectionName) + '_meta.pickle'
         )
     estimatorPath = os.path.join(
         estimatorsSubFolder,
         fullEstimatorName + '.h5'
         )
     #
-    with open(datasetPath.replace('.h5', '_meta.pickle'), 'rb') as _f:
+    with open(loadingMetaPath, 'rb') as _f:
         loadingMeta = pickle.load(_f)
         # iteratorsBySegment = loadingMeta.pop('iteratorsBySegment')
         iteratorsBySegment = loadingMeta['iteratorsBySegment']
@@ -138,10 +145,10 @@ if __name__ == '__main__':
         loadingMeta['arguments'].pop(argName, None)
     arguments.update(loadingMeta['arguments'])
     cvIterator = iteratorsBySegment[0]
-    if 'pca' in arguments['estimatorName']:
+    if 'pca' in estimatorName:
         estimatorClass = PCA
         estimatorKWArgs = dict(svd_solver='auto')
-    elif 'fa' in arguments['estimatorName']:
+    elif 'fa' in estimatorName:
         estimatorClass = FactorAnalysis
         estimatorKWArgs = dict(
             max_iter=5000,
@@ -207,7 +214,7 @@ if __name__ == '__main__':
         dataGroup = dataDF.loc[:, featureMask]
         nFeatures = dataGroup.columns.shape[0]
         nCompsToTest = range(1, min(maxNCompsToTest, nFeatures + 1), 2)
-        trfName = '{}_{}'.format(arguments['estimatorName'], maskParams['freqBandName'])
+        trfName = '{}_{}'.format(estimatorName, maskParams['freqBandName'])
         if arguments['verbose']:
             print('Fitting {} ...'.format(trfName))
         if arguments['debugging']:
@@ -281,8 +288,9 @@ if __name__ == '__main__':
     #
     estimatorMetadata = {
         'path': os.path.basename(estimatorPath),
-        'name': arguments['estimatorName'],
+        'name': estimatorName,
         'datasetName': datasetName,
+        'selectionName': selectionName,
         'outputFeatures': outputFeaturesIndex
         }
     with open(estimatorPath.replace('.h5', '_meta.pickle'), 'wb') as f:
@@ -293,16 +301,12 @@ if __name__ == '__main__':
     featuresDF = pd.DataFrame(
         features, index=dataDF.index,
         columns=outputFeaturesIndex)
-    outputDatasetName = '{}_{}_{}_{}_{}'.format(
-        arguments['unitQuery'], arguments['estimatorName'],
-        arguments['iteratorSuffix'], arguments['window'], arguments['alignQuery'])
-    outputDFPath = os.path.join(
-        dataFramesFolder, outputDatasetName + '.h5'
-        )
+    outputSelectionName = '{}_{}'.format(
+        selectionName, estimatorName)
     outputLoadingMeta = deepcopy(loadingMeta)
-    if 'pca' in arguments['estimatorName']:
+    if 'pca' in estimatorName:
         outputLoadingMeta['arguments']['unitQuery'] = 'pca'
-    elif 'fa' in arguments['estimatorName']:
+    elif 'fa' in estimatorName:
         outputLoadingMeta['arguments']['unitQuery'] = 'factor'
     #
     # 'decimate', 'procFun', 'addLags' were already applied, no need to apply them again
@@ -318,7 +322,8 @@ if __name__ == '__main__':
         outputLoadingMeta[k] = passthr
     # 
     featuresDF.to_hdf(
-        outputDFPath, outputDatasetName,
+        datasetPath,
+        '/{}/data'.format(outputSelectionName),
         mode='a')
     #
     maskList = []
@@ -348,15 +353,22 @@ if __name__ == '__main__':
         for idxItem in maskParams]
     maskDF.loc[:, 'maskName'] = maskParamsStr
     maskDF.set_index('maskName', append=True, inplace=True)
-    maskDF.to_hdf(outputDFPath, outputDatasetName + '_featureMasks', mode='a')
+    maskDF.to_hdf(
+        datasetPath,
+        '/{}/featureMasks'.format(outputSelectionName),
+        mode='a')
     ###
-    with open(outputDFPath.replace('.h5', '_meta.pickle'), 'wb') as f:
+    outputLoadingMetaPath = os.path.join(
+        dataFramesFolder,
+        datasetName + '_{}'.format(outputSelectionName) + '_meta.pickle'
+        )
+    with open(outputLoadingMetaPath, 'wb') as f:
         pickle.dump(outputLoadingMeta, f)
     if arguments['plotting']:
         figureOutputPath = os.path.join(
                 figureOutputFolder,
                 '{}_{}_dimensionality.pdf'.format(
-                    arguments['estimatorName'], datasetName))
+                    datasetName, fullEstimatorName))
         print('Saving plots to {}'.format(figureOutputPath))
         with PdfPages(figureOutputPath) as pdf:
             for idx, (maskIdx, featureMask) in enumerate(featureMasks.iterrows()):

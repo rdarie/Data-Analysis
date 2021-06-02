@@ -509,13 +509,13 @@ def parseAnalysisOptions(
             'calcTimeROI': True,
             'timeROIOpts': {
                 'alignQuery': None,
-                'winStart': -900e-3,
-                'winStop': -100e-3
+                'winStart': -700e-3,
+                'winStop': -400e-3
             },
             'timeROIOpts_control': {
                 'alignQuery': None,
-                'winStart': -900e-3,
-                'winStop': -100e-3
+                'winStart': -700e-3,
+                'winStop': -400e-3
             }
         },
         'f': {

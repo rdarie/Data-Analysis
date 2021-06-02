@@ -108,7 +108,7 @@ if __name__ == '__main__':
     print('loading {} from {}'.format(selectionName, datasetPath))
     dataDF = pd.read_hdf(datasetPath, '/{}/data'.format(selectionName))
     featureMasks = pd.read_hdf(datasetPath, '/{}/featureMasks'.format(selectionName))
-    # remove the 'all' column?
+    # remove the 'all' column?#
     removeAllColumn = ('spectral' in arguments['unitQuery'])
     if removeAllColumn:
         featureMasks = featureMasks.loc[~ featureMasks.all(axis='columns'), :]
@@ -122,8 +122,7 @@ if __name__ == '__main__':
     prf.print_memory_usage('just loaded data, fitting')
     originalDataDF = unNormalizeDataset(dataDF, normalizationParams)
     figureOutputFolder = os.path.join(
-        figureFolder,
-        arguments['analysisName'], arguments['alignFolderName'])
+        figureFolder, arguments['analysisName'])
     if not os.path.exists(figureOutputFolder):
         os.makedirs(figureOutputFolder)
     if True:
@@ -140,6 +139,7 @@ if __name__ == '__main__':
                 hzResDict1 = {'normalized': {}, 'original': {}}
             for foldIdx, (tr, te) in enumerate(cvIterator.split(dataGroup)):
                 print('On fold {}'.format(foldIdx))
+                pdb.set_trace()
                 if dataGroup.shape[1] > 1:
                     # Test equality of variance
                     hsResDict1['normalized'][foldIdx] = pg.homoscedasticity(
@@ -184,7 +184,7 @@ if __name__ == '__main__':
         ntResDF.index = ntResDF.index.droplevel(0)
         ntResDF.to_hdf(outputPath, 'univariateNormality')
         #
-        pdfPath = os.path.join(figureOutputFolder, '{}_normality_tests.pdf'.format(datasetName))
+        pdfPath = os.path.join(figureOutputFolder, '{}_normality_tests.pdf'.format(selectionName))
         # pdb.set_trace()
         with PdfPages(pdfPath) as pdf:
             plotGroup = hzResDF.reset_index()
@@ -231,7 +231,10 @@ if __name__ == '__main__':
                 plt.show()
             else:
                 plt.close()
-    pdfPath = os.path.join(figureOutputFolder, '{}_signal_distributions.pdf'.format(datasetName))
+    pdfPath = os.path.join(
+        figureOutputFolder,
+        '{}_{}_signal_distributions.pdf'.format(
+            datasetName, selectionName))
     with PdfPages(pdfPath) as pdf:
         for name, group in dataDF.groupby('feature', axis='columns'):
             plotTemp = {

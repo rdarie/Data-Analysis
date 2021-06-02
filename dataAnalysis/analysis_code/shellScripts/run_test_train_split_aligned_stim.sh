@@ -10,11 +10,11 @@
 #SBATCH --mem=200G
 
 # Specify a job name:
-#SBATCH -J test_train_split_25
+#SBATCH -J test_train_split_28
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-test_train_split_25.out
-#SBATCH -e ../../batch_logs/%j-%a-test_train_split_25.out
+#SBATCH -o ../../batch_logs/%j-%a-test_train_split_28.out
+#SBATCH -e ../../batch_logs/%j-%a-test_train_split_28.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -24,10 +24,10 @@
 
 #   SLURM_ARRAY_TASK_ID=1
 source shellScripts/calc_aligned_stim_preamble.sh
-###########################
+###
 
 ITERATOR="--iteratorSuffix=a"
-ALIGNQUERYTERM="stimOn"
+ALIGNQUERYTERM="stimOnHighRate"
 CONTROLSTATUS="--controlSet"
 
 # ITERATOR="--iteratorSuffix=d"

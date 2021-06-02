@@ -217,7 +217,7 @@ if __name__ == '__main__':
         for expName, dataGroup in dataDF.groupby('expName'):
             for featName, subGroup in dataGroup.groupby('feature', axis='columns'):
                 print('calculating pre-normalization params, exp: {}, feature: {}'.format(expName, featName))
-                meanLevel = np.mean(subGroup.xs(0, level='lag', axis='columns').to_numpy())
+                meanLevel = np.nanmean(subGroup.xs(0, level='lag', axis='columns').to_numpy())
                 normalizationParams[0].append({
                     'expName': expName,
                     'feature': featName,
@@ -229,8 +229,8 @@ if __name__ == '__main__':
         for featName, dataGroup in intermediateDF.groupby('feature', axis='columns'):
             print('calculating final normalization params, feature: {}'.format(featName))
             refData = dataGroup.xs(0, level='lag', axis='columns').to_numpy()
-            mu = np.mean(refData)
-            sigma = np.std(refData)
+            mu = np.nanmean(refData)
+            sigma = np.nanstd(refData)
             normalizationParams[1].append({
                 'feature': featName,
                 'mu': mu,
@@ -280,8 +280,8 @@ if __name__ == '__main__':
         for featName, dataGroup in dataDF.groupby('feature', axis='columns'):
             refData = dataGroup.xs(0, level='lag', axis='columns').to_numpy()
             print('calculating normalization params for {}'.format(featName))
-            mu = np.mean(refData)
-            sigma = np.std(refData)
+            mu = np.nanmean(refData)
+            sigma = np.nanstd(refData)
             print('mu = {} sigma = {}'.format(mu, sigma))
             normalizationParams[0].append({
                 'feature': featName,
@@ -350,10 +350,9 @@ if __name__ == '__main__':
         dataFramesFolder,
         datasetName + '.h5'
         )
-    if os.path.exists(datasetPath):
-        os.remove(datasetPath)
-    finalDF.to_hdf(datasetPath, '{}/data'.format(arguments['selectionName']))
-    thisMask.to_hdf(datasetPath, '{}/featureMasks'.format(arguments['selectionName']))
+    print('saving {} to {}'.format(arguments['selectionName'], datasetPath))
+    finalDF.to_hdf(datasetPath, '/{}/data'.format(arguments['selectionName']), mode='a')
+    thisMask.to_hdf(datasetPath, '/{}/featureMasks'.format(arguments['selectionName']), mode='a')
     #
     loadingMetaPath = os.path.join(
         dataFramesFolder,
