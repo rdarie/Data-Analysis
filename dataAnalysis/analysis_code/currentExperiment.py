@@ -438,7 +438,7 @@ def parseAnalysisOptions(
         correctMultiple=False
         )
     relplotKWArgs = dict(
-        # ci='sem',
+        # errorbar='se',
         # ci=95, n_boot=1000,
         estimator='mean',
         # estimator=None, units='t',

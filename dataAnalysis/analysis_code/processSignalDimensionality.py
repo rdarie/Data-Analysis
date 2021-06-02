@@ -224,7 +224,7 @@ with PdfPages(pdfPath) as pdf:
         g = sns.relplot(
             col='trialNum', col_wrap=5,
             hue='evalType', style='expName',
-            x='bin', y='signal', data=plotPredStack, kind='line', ci='sem')
+            x='bin', y='signal', data=plotPredStack, kind='line', errorbar='se')
         g.fig.set_size_inches((12, 8))
         g.fig.suptitle('{}'.format(name))
         g.fig.tight_layout(pad=1)

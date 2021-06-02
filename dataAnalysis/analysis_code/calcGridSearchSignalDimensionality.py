@@ -182,8 +182,8 @@ if __name__ == '__main__':
         else:
             print('Scheduler name is not correct!')
             daskClient = Client()
-    dataDF = pd.read_hdf(datasetPath, datasetName)
-    featureMasks = pd.read_hdf(datasetPath, datasetName + '_featureMasks')
+    dataDF = pd.read_hdf(datasetPath, '/{}/data'.format(selectionName))
+    featureMasks = pd.read_hdf(datasetPath, '/{}/featureMasks'.format(selectionName))
     # only use zero lag targets
     lagMask = dataDF.columns.get_level_values('lag') == 0
     dataDF = dataDF.loc[:, lagMask]
@@ -402,7 +402,7 @@ if __name__ == '__main__':
                 sns.lineplot(
                     data=scoresForPlot,
                     x='n_components', y='score',
-                    hue='evalType', ci='sem', ax=ax)
+                    hue='evalType', errorbar='se', ax=ax)
                 handles, labels = ax.get_legend_handles_labels()
                 textDescr = 'Chosen parameters and corresponding score'
                 bestScore = cvScoresDict[maskParams['freqBandName']].mean()['test_score']

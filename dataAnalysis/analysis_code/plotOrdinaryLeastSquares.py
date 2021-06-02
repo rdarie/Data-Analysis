@@ -213,7 +213,7 @@ with PdfPages(pdfPath) as pdf:
         print('making plot of {}'.format(name))
         g = sns.relplot(
             row='pedalMovementCat', hue='maskName', style='data_origin',
-            x='bin', y='signal', data=group, kind='line', ci='sem')
+            x='bin', y='signal', data=group, kind='line', errorbar='se')
         g.fig.set_size_inches((12, 8))
         for (ro, co, hu), dataSubset in g.facet_data():
             emptySubset = (

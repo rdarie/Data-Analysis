@@ -238,7 +238,7 @@ for trialName, trialGroup in tqdm(rawEcapDF.groupby(['segment', 'originalIndex',
                 data=originalDataForPlot)
             ax[0].set_title('Original')
             sns.lineplot(
-                x='bin', y='signal', ci='sem',
+                x='bin', y='signal', errorbar='se',
                 # units='level_0', estimator=None,
                 estimator='mean', ax=ax[1],
                 data=originalDataForPlot)

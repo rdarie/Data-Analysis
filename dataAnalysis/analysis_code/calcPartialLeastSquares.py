@@ -294,7 +294,7 @@ if arguments['plotting']:
         sns.violinplot(
             data=scoresForPlot, hue='evalType',
             x='nComponents', y='score',
-            ci='sem', ax=ax)
+            errorbar='se', ax=ax)
         ax.set_xlabel('number of components')
         ax.set_ylabel('R2 of partial least squares fit')
         fig.tight_layout(pad=1)

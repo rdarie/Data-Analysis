@@ -148,7 +148,7 @@ def calcCWT(
             plotData.columns = ['type', 'level_1', 'rowIdx', 'bin', 'signal']
             sns.lineplot(
                 x='bin', y='signal', hue='type',
-                data=plotData, ax=ax, ci='sem', palette={
+                data=plotData, ax=ax, errorbar='se', palette={
                     'original': 'b', 'low': 'r', 'beta': 'g', 'hi': 'c',
                     'spb': 'm'
                 })

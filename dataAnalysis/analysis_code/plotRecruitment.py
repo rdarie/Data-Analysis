@@ -151,7 +151,7 @@ g = sns.relplot(
     hue=hueName, hue_order=hueOrder,
     kind='line', data=plotEmgRC,
     palette=emgPalette,
-    height=height, aspect=aspect, ci='sem', estimator='mean',
+    height=height, aspect=aspect, errorbar='se', estimator='mean',
     facet_kws=dict(sharey=True, sharex=False, legend_out=True), lw=2,
     )
 g.fig.set_size_inches(colWrap * height * aspect + 10, height + 2)
