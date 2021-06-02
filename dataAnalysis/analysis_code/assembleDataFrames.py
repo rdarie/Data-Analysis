@@ -195,8 +195,7 @@ if __name__ == '__main__':
                             theseDF.append(pd.read_hdf(store, controlKey))
                             print('Loaded {} from {}'.format(controlKey, dFPath))
                         assert len(theseDF) > 0
-                        pdb.set_trace()
-                        db = [print(df.index.names) for df in theseDF]
+                        # db = [print(df.index.names) for df in theseDF]
                         thisDF = pd.concat(theseDF)
                 except Exception:
                     traceback.print_exc()

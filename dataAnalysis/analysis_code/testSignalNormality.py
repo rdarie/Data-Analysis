@@ -78,6 +78,7 @@ if __name__ == '__main__':
         if not os.path.exists(figureOutputFolder):
             os.makedirs(figureOutputFolder)
     datasetName = arguments['datasetName']
+    selectionName = arguments['selectionName']
     dataFramesFolder = os.path.join(analysisSubFolder, 'dataframes')
     datasetPath = os.path.join(
         dataFramesFolder,
@@ -85,10 +86,14 @@ if __name__ == '__main__':
         )
     outputPath = os.path.join(
         dataFramesFolder,
-        datasetName + '_normality_tests.h5'
+        datasetName + '_{}'.format(selectionName) + '_normality_tests.h5'
+        )
+    loadingMetaPath = os.path.join(
+        dataFramesFolder,
+        datasetName + '_{}'.format(selectionName) + '_meta.pickle'
         )
     #
-    with open(datasetPath.replace('.h5', '_meta.pickle'), 'rb') as _f:
+    with open(loadingMetaPath, 'rb') as _f:
         loadingMeta = pickle.load(_f)
         # iteratorsBySegment = loadingMeta.pop('iteratorsBySegment')
         iteratorsBySegment = loadingMeta['iteratorsBySegment']
@@ -100,8 +105,9 @@ if __name__ == '__main__':
     unNormalizeDataset = loadingMeta['unNormalizeDataset']
     normalizationParams = loadingMeta['normalizationParams']
     cvIterator = iteratorsBySegment[0]
-    dataDF = pd.read_hdf(datasetPath, datasetName)
-    featureMasks = pd.read_hdf(datasetPath, datasetName + '_featureMasks')
+    print('loading {} from {}'.format(selectionName, datasetPath))
+    dataDF = pd.read_hdf(datasetPath, '/{}/data'.format(selectionName))
+    featureMasks = pd.read_hdf(datasetPath, '/{}/featureMasks'.format(selectionName))
     # remove the 'all' column?
     removeAllColumn = ('spectral' in arguments['unitQuery'])
     if removeAllColumn:
@@ -179,7 +185,7 @@ if __name__ == '__main__':
         ntResDF.to_hdf(outputPath, 'univariateNormality')
         #
         pdfPath = os.path.join(figureOutputFolder, '{}_normality_tests.pdf'.format(datasetName))
-        pdb.set_trace()
+        # pdb.set_trace()
         with PdfPages(pdfPath) as pdf:
             plotGroup = hzResDF.reset_index()
             plotGroup.loc[:, 'xDummy'] = 0
