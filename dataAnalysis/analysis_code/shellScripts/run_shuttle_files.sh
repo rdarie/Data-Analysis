@@ -22,10 +22,10 @@
 # Request custom resources
 #SBATCH --array=1,2,3
 
-#
+####
 # EXP="exp202010151400"
-EXP="exp202012171300"
-# EXP="exp202012221300"
+# EXP="exp202012171300"
+EXP="exp202012221300"
 # EXP="exp201901070700"
 # EXP="exp202101141100"
 # EXP="exp202101191100"

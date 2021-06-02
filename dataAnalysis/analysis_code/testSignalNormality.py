@@ -138,8 +138,7 @@ if __name__ == '__main__':
                 hsResDict1 = {'normalized': {}, 'original': {}}
                 hzResDict1 = {'normalized': {}, 'original': {}}
             for foldIdx, (tr, te) in enumerate(cvIterator.split(dataGroup)):
-                print('On fold {}'.format(foldIdx))
-                pdb.set_trace()
+                prf.print_memory_usage('On fold {}'.format(foldIdx))
                 if dataGroup.shape[1] > 1:
                     # Test equality of variance
                     hsResDict1['normalized'][foldIdx] = pg.homoscedasticity(
