@@ -33,6 +33,14 @@ ALIGNQUERYTERM="starting"
 #
 ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
 
-python -u './calcTestTrainSplit.py' $BLOCKSELECTOR --iteratorSuffix=$ITERATOR --loadFromFrames --inputBlockSuffix=$TARGET --unitQuery="mahal" --selectionName=$TARGET --verbose --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $LAZINESS
+# python -u './calcTestTrainSplit.py' $BLOCKSELECTOR --iteratorSuffix=$ITERATOR --loadFromFrames --inputBlockSuffix=$TARGET --unitQuery="mahal" --selectionName=$TARGET --verbose --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $LAZINESS
 #
-python -u './assembleDataFrames.py' --iteratorSuffix=$ITERATOR --inputBlockSuffix='lfp_CAR_spectral_mahal' --selectionName=$TARGET --loadFromFrames --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
+# python -u './assembleDataFrames.py' --iteratorSuffix=$ITERATOR --inputBlockSuffix='lfp_CAR_spectral_mahal' --selectionName=$TARGET --loadFromFrames --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
+#
+TARGET="lfp_CAR_spectral_fa"
+# python -u './assembleExperimentAlignedAsigs.py' --exp=$EXP $BLOCKSELECTOR --inputBlockSuffix="${TARGET}" $WINDOW $ANALYSISFOLDER --alignFolderName=motion $LAZINESS
+python -u './assembleExperimentAlignedAsigs.py' --exp=$EXP $BLOCKSELECTOR --inputBlockSuffix="${TARGET}" $WINDOW $ANALYSISFOLDER --alignFolderName=stim $LAZINESS
+#
+TARGET="lfp_CAR_spectral_fa_mahal"
+# python -u './assembleExperimentAlignedAsigs.py' --exp=$EXP $BLOCKSELECTOR --inputBlockSuffix="${TARGET}" $WINDOW $ANALYSISFOLDER --alignFolderName=motion $LAZINESS
+python -u './assembleExperimentAlignedAsigs.py' --exp=$EXP $BLOCKSELECTOR --inputBlockSuffix="${TARGET}" $WINDOW $ANALYSISFOLDER --alignFolderName=stim $LAZINESS

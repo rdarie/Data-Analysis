@@ -22,8 +22,13 @@
 # Request custom resources
 #SBATCH --array=1
 
-SLURM_ARRAY_TASK_ID=2
+# SLURM_ARRAY_TASK_ID=2
 source ./shellScripts/run_plotter_aligned_stim_preamble.sh
+OPTS="--enableOverrides --exp=${EXP} ${BLOCKSELECTOR} ${ANALYSISFOLDER} ${WINDOW} ${ALIGNQUERY} ${ALIGNFOLDER} ${TIMEWINDOWOPTS} ${STATSOVERLAY} ${OUTLIERMASK} ${HUEOPTS} ${ROWOPTS} ${COLOPTS} ${STYLEOPTS} ${SIZEOPTS} ${PAGELIMITS} ${OTHERASIGOPTS}"
 
 # python -u './plotAlignedAsigsTopo.py' --inputBlockSuffix="lfp" --unitQuery="lfp" --amplitudeFieldName=amplitude --exp=$EXP $WINDOW $TIMEWINDOWOPTS $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --groupPagesBy="electrode, RateInHz, pedalMovementCat" $HUEOPTS $OUTLIERMASK
-python -u './plotAlignedAsigsV1.py' --inputBlockSuffix="lfp" --unitQuery="lfp" --enableOverrides --exp=$EXP $BLOCKSELECTOR $ANALYSISFOLDER $WINDOW $ALIGNQUERY $ALIGNFOLDER $TIMEWINDOWOPTS $STATSOVERLAY $OUTLIERMASK $HUEOPTS $ROWOPTS $COLOPTS $STYLEOPTS $SIZEOPTS $PAGELIMITS $OTHERASIGOPTS
+#
+python -u './plotAlignedAsigsV1.py' --inputBlockSuffix="lfp_CAR_spectral_fa_mahal" --unitQuery="mahal" $OPTS
+# python -u './plotAlignedAsigsV1.py' --inputBlockSuffix="lfp_CAR_spectral_fa" --unitQuery="factor" $OPTS
+python -u './plotAlignedAsigsV1.py' --inputBlockSuffix="lfp_CAR" --unitQuery="lfp" $OPTS
+python -u './plotAlignedAsigsV1.py' --inputBlockSuffix="lfp_CAR_spectral" --unitQuery="lfp" $OPTS

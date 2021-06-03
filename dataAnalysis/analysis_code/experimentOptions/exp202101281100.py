@@ -221,4 +221,13 @@ def getExpOpts():
     csdOpts = {
         'skipChannels': ['utah25', 'utah39']
         }
+    expIteratorOpts = {
+        'f': {
+            'experimentsToAssemble' : {
+                '202101251100-Rupert': [1, 2, 3],
+                '202101271100-Rupert': [1, 2, 3],
+                '202101281100-Rupert': [1, 2, 3],
+                }
+        }
+    }
     return locals()

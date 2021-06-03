@@ -29,7 +29,7 @@ source shellScripts/calc_aligned_stim_preamble.sh
 # suffix f, for RAUC calculations
 ITERATOR="--iteratorSuffix=f"
 #
-ALIGNQUERYTERM="stimOn"
+ALIGNQUERYTERM="stimOnHighRate"
 ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
 
 python -u './calcTestTrainSplit.py' --inputBlockSuffix="lfp_CAR_spectral_fa_mahal" --unitQuery="mahal" --selectionName='lfp_CAR_spectral_fa_mahal' $ALIGNQUERY $ITERATOR --eventName='stim' --eventBlockSuffix='epochs' --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $OUTLIERMASK $LAZINESS

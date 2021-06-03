@@ -59,7 +59,7 @@ analysisSubFolder = os.path.join(
 alignSubFolder = os.path.join(
     analysisSubFolder, arguments['alignFolderName']
     )
-calcSubFolder = os.path.join(alignSubFolder, 'dataframes')
+calcSubFolder = os.path.join(analysisSubFolder, 'dataframes')
 figureOutputFolder = os.path.join(
     figureFolder, arguments['analysisName'])
 if not os.path.exists(figureOutputFolder):
@@ -171,7 +171,7 @@ with PdfPages(pdfPath) as pdf:
                 facet_kws=dict(sharey=True, sharex=False, margin_titles=True),
                 )
         g.axes[0, 0].set_ylim(plotLims)
-        g.set_titles(col_template="{col_name}", row_template="{row_name}")
+        g.set_titles(template="{col_var}\n{col_name}\n{row_var}\n{row_name}")
         g.tight_layout(pad=0.)
         figTitle = g.fig.suptitle('rate = {}'.format(name))
         leg = g._legend

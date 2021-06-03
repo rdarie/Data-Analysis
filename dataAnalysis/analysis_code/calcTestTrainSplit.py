@@ -242,6 +242,8 @@ else:    # loading frames
     if not arguments['processAll']:
         experimentsToAssemble = {
             experimentName: [blockIdx]}
+    else:
+        experimentsToAssemble = theseIteratorOpts['experimentsToAssemble']
     currBlockNum = 0
     for expName, lOfBlocks in experimentsToAssemble.items():
         thisScratchFolder = os.path.join(scratchPath, expName)

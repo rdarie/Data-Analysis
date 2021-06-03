@@ -438,7 +438,7 @@ def parseAnalysisOptions(
         correctMultiple=False
         )
     relplotKWArgs = dict(
-        # errorbar='se',
+        errorbar='se',
         # ci=95, n_boot=1000,
         estimator='mean',
         # estimator=None, units='t',
@@ -538,6 +538,10 @@ def parseAnalysisOptions(
             }
         }
     }
+    if 'expIteratorOpts' in expOpts:
+        for key in iteratorOpts.keys():
+            if key in expOpts['expIteratorOpts']:
+                iteratorOpts[key].update(expOpts['expIteratorOpts'][key])
     glmOptsLookup = {
         'ensembleHistoryLen': .30,
         'covariateHistoryLen': .50,
