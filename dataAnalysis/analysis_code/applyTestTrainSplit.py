@@ -128,6 +128,7 @@ for segIdx in range(nSeg):
     dataDF = ns5.alignedAsigsToDF(
         dataBlock, whichSegments=[segIdx], **aakwa)
     print(dataDF.index.names)
+    print(dataDF.columns)
     if 'listOfExampleIndexes' in loadingMeta:
         trialInfo = dataDF.index.to_frame().reset_index(drop=True)
         loadedTrialInfo = loadingMeta['listOfExampleIndexes'][segIdx].to_frame().reset_index(drop=True)
@@ -166,6 +167,7 @@ if arguments['controlSet']:
     trialInfo = exportDF.index.to_frame().reset_index(drop=True)
     for sCN in stimulusConditionNames:
         trialInfo.loc[:, sCN] = ns5.metaFillerLookup[sCN]
+    pdb.set_trace()
     trialInfo.loc[:, 'originalIndex'] = trialInfo['originalIndex'] + int(1e6)
     exportDF.index = pd.MultiIndex.from_frame(trialInfo)
     exportKey = '/{}/control'.format(arguments['selectionName'])

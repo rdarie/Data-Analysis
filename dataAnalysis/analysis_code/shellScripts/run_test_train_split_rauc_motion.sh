@@ -22,9 +22,9 @@
 # Request custom resources
 #SBATCH --array=2,3
 
-#  SLURM_ARRAY_TASK_ID=2
+#    #SLURM_ARRAY_TASK_ID=2
 source shellScripts/calc_aligned_motion_preamble.sh
-
+#
 # suffixes a through e used for the dimensionality calculation#
 # suffix f, for RAUC calculations
 ITERATOR="--iteratorSuffix=f"
@@ -40,3 +40,6 @@ ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
 
 python -u './calcTestTrainSplit.py' --controlSet --inputBlockSuffix="lfp_CAR_spectral_fa_mahal" --unitQuery="mahal" --selectionName='lfp_CAR_spectral_fa_mahal' $ALIGNQUERY $ITERATOR --eventName='motion' --eventBlockSuffix='epochs' --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $OUTLIERMASK $LAZINESS
 python -u './applyTestTrainSplit.py' --controlSet --inputBlockSuffix="lfp_CAR_spectral_fa_mahal" --unitQuery="mahal" --selectionName='lfp_CAR_spectral_fa_mahal' --verbose $ALIGNQUERY $ITERATOR --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
+
+#
+# python -u './applyTestTrainSplit.py' --controlSet --inputBlockSuffix="lfp_CAR_spectral_fa" --unitQuery="factor" --selectionName='lfp_CAR_spectral_fa' --verbose $ALIGNQUERY $ITERATOR --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS

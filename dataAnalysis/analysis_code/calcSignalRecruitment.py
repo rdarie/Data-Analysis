@@ -65,14 +65,10 @@ analysisSubFolder = os.path.join(
 alignSubFolder = os.path.join(
     analysisSubFolder, arguments['alignFolderName']
     )
-calcSubFolder = os.path.join(alignSubFolder, 'dataframes')
+calcSubFolder = os.path.join(analysisSubFolder, 'dataframes')
 if not os.path.exists(calcSubFolder):
     os.makedirs(calcSubFolder, exist_ok=True)
 #
-resultPath = os.path.join(
-    calcSubFolder,
-    blockBaseName + '{}_{}_rauc.h5'.format(
-        inputBlockSuffix, arguments['window']))
 #
 #  Overrides
 limitPages = None
@@ -81,6 +77,10 @@ funKWargs = dict(
     tStart=-100e-3, tStop=100e-3)
 #  End Overrides
 if not arguments['loadFromFrames']:
+    resultPath = os.path.join(
+        calcSubFolder,
+        blockBaseName + '{}_{}_rauc.h5'.format(
+            inputBlockSuffix, arguments['window']))
     alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **arguments)
     alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
         namedQueries, scratchFolder, **arguments)
@@ -118,8 +118,13 @@ if not arguments['loadFromFrames']:
     asigWide = ns5.alignedAsigsToDF(
         dataBlock, **alignedAsigsKWargs)
 else:
+    # loading from dataframe
     datasetName = arguments['datasetName']
     selectionName = arguments['selectionName']
+    resultPath = os.path.join(
+        calcSubFolder,
+        blockBaseName + '{}_{}_rauc.h5'.format(
+            selectionName, arguments['window']))
     dataFramesFolder = os.path.join(analysisSubFolder, 'dataframes')
     datasetPath = os.path.join(
         dataFramesFolder,
@@ -138,9 +143,11 @@ else:
         loadingMeta['arguments'].pop(argName, None)
     arguments.update(loadingMeta['arguments'])
     cvIterator = iteratorsBySegment[0]
-    dataDF = pd.read_hdf(datasetPath, '/{}/data'.format(selectionName))
-    featureMasks = pd.read_hdf(datasetPath, '/{}/featureMasks'.format(selectionName))
-    pdb.set_trace()
+    asigWide = pd.read_hdf(datasetPath, '/{}/data'.format(selectionName))
+    asigWide.columns = asigWide.columns.get_level_values('feature')
+    asigWide.columns.name = 'feature'
+    asigWide = asigWide.stack().unstack('bin')
+    # featureMasks = pd.read_hdf(datasetPath, '/{}/featureMasks'.format(selectionName))
 rAUCDF = ash.rAUC(
     asigWide, **funKWargs).to_frame(name='rawRAUC')
 rAUCDF.loc[:, 'rauc'] = np.nan

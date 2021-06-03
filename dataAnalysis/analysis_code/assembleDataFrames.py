@@ -196,6 +196,7 @@ if __name__ == '__main__':
                             print('Loaded {} from {}'.format(controlKey, dFPath))
                         assert len(theseDF) > 0
                         # db = [print(df.index.names) for df in theseDF]
+                        # pdb.set_trace()
                         thisDF = pd.concat(theseDF)
                 except Exception:
                     traceback.print_exc()
