@@ -167,7 +167,6 @@ if arguments['controlSet']:
     trialInfo = exportDF.index.to_frame().reset_index(drop=True)
     for sCN in stimulusConditionNames:
         trialInfo.loc[:, sCN] = ns5.metaFillerLookup[sCN]
-    # pdb.set_trace()
     trialInfo.loc[:, 'originalIndex'] = trialInfo['originalIndex'] + int(1e6)
     exportDF.index = pd.MultiIndex.from_frame(trialInfo)
     exportKey = '/{}/control'.format(arguments['selectionName'])

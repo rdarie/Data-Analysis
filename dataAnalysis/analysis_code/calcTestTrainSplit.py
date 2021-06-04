@@ -263,17 +263,17 @@ else:    # loading frames
                     iteratorSuffix))
             try:
                 with pd.HDFStore(dFPath,  mode='r') as store:
-                    theseDF = []
+                    theseDF = {}
                     dataKey = '/{}/data'.format(arguments['selectionName'])
                     if dataKey in store:
-                        theseDF.append(pd.read_hdf(store, dataKey))
+                        theseDF['main'] = pd.read_hdf(store, dataKey)
                         print('Loaded {} from {}'.format(dataKey, dFPath))
                     controlKey = '/{}/control'.format(arguments['selectionName'])
                     if controlKey in store:
-                        theseDF.append(pd.read_hdf(store, controlKey))
+                        theseDF['control'] = pd.read_hdf(store, controlKey)
                         print('Loaded {} from {}'.format(controlKey, dFPath))
-                    assert len(theseDF) > 0
-                    thisDF = pd.concat(theseDF)
+                    assert len(theseDF.keys()) > 0
+                    thisDF = pd.concat(theseDF, names=['controlFlag'])
             except Exception:
                 traceback.print_exc()
                 print('Skipping...')
@@ -299,6 +299,12 @@ if not arguments['processAll']:
         listOfIterators.append(cvIterator)
 else:
     exportDF = pd.concat(listOfDataFrames)
+    controlProportion = 0.2
+    pdb.set_trace()
+    if controlProportion is not None:
+        trialInfo = exportDF.index.to_frame().reset_index(drop=True).drop_duplicates(subset=['controlFlag', 'segment', 'originalIndex', 't'])
+        valueCounts = trialInfo.groupby('controlFlag').count().iloc[:, 0]
+        targetNControls = int(controlProportion * valueCounts['main'])
     cvIterator = tdr.trainTestValidationSplitter(
         exportDF, tdr.trialAwareStratifiedKFold,
         n_splits=nSplits, splitterKWArgs=cv_kwargs

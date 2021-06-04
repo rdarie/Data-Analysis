@@ -14,7 +14,8 @@ RepoList=(\
 "umap" \
 "kCSD-python" \
 "scaleogram" \
-"pywt"
+"pywt" \
+"scikit-lego"
 )
 
 module load git/2.10.2

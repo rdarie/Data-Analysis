@@ -42,3 +42,4 @@ dependencies:
 - outdated
 - tabulate
 - numdifftools
+- sklearn-pandas

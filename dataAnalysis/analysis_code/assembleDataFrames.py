@@ -185,19 +185,19 @@ if __name__ == '__main__':
                         iteratorSuffix))
                 try:
                     with pd.HDFStore(dFPath,  mode='r') as store:
-                        theseDF = []
+                        theseDF = {}
                         dataKey = '/{}/data'.format(arguments['selectionName'])
                         if dataKey in store:
-                            theseDF.append(pd.read_hdf(store, dataKey))
+                            theseDF['main'] = pd.read_hdf(store, dataKey)
                             print('Loaded {} from {}'.format(dataKey, dFPath))
                         controlKey = '/{}/control'.format(arguments['selectionName'])
                         if controlKey in store:
-                            theseDF.append(pd.read_hdf(store, controlKey))
+                            theseDF['control'] = pd.read_hdf(store, controlKey)
                             print('Loaded {} from {}'.format(controlKey, dFPath))
                         assert len(theseDF) > 0
                         # db = [print(df.index.names) for df in theseDF]
                         # pdb.set_trace()
-                        thisDF = pd.concat(theseDF)
+                        thisDF = pd.concat(theseDF, names=['controlFlag'])
                 except Exception:
                     traceback.print_exc()
                     print('Skipping...')
@@ -211,6 +211,7 @@ if __name__ == '__main__':
                 lOfFeatureMasks.append(thisMask)
                 currBlockNum += 1
     dataDF = pd.concat(lOfDF)
+    # pdb.set_trace()
     finalDF = dataDF.copy()
     #  #### end of data loading stuff
     if 'spectral' in arguments['selectionName']:

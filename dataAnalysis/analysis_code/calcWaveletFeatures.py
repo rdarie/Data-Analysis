@@ -26,6 +26,8 @@ import dataAnalysis.helperFunctions.profiling as prf
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
 import dataAnalysis.helperFunctions.helper_functions_new as hf
 from dataAnalysis.analysis_code.namedQueries import namedQueries
+from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
+import dataAnalysis.helperFunctions.pywt_helpers as pywthf
 import os
 import pandas as pd
 import numpy as np
@@ -40,8 +42,6 @@ from dask.diagnostics import ProgressBar
 from dask.distributed import Client
 from tqdm import tqdm
 import pywt
-import dataAnalysis.helperFunctions.pywt_helpers as pywthf
-from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
 from docopt import docopt
 from numpy.random import default_rng
 rng = default_rng()

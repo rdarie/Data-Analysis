@@ -42,6 +42,7 @@ import dill as pickle
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import RobustScaler, MinMaxScaler
+
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']), arguments['exp'])
@@ -77,7 +78,19 @@ outlierTrials = ash.processOutlierTrials(
 #  Overrides
 limitPages = None
 #  End Overrides
-recCurve = pd.read_hdf(resultPath, 'RAUC')
+if False:
+    recCurve = pd.read_hdf(resultPath, 'RAUC')
+else:
+    rawRecCurve = pd.read_hdf(resultPath, 'raw')
+    rawRecCurve.columns = rawRecCurve.columns.get_level_values('feature')
+    recCurve = rawRecCurve.stack().to_frame(name='rawRAUC')
+    rauc = pd.read_hdf(resultPath, 'scaled')
+    rauc.columns = rauc.columns.get_level_values('feature')
+    recCurve.loc[:, 'rauc'] = rauc.stack().to_numpy()
+    normalizedRAUC = pd.read_hdf(resultPath, 'normalized')
+    normalizedRAUC.columns = normalizedRAUC.columns.get_level_values('feature')
+    recCurve.loc[:, 'normalizedRAUC'] = normalizedRAUC.stack().to_numpy()
+
 # plotOpts = pd.read_hdf(resultPath, 'RAUC_plotOpts')
 pdfPath = os.path.join(
     figureOutputFolder,

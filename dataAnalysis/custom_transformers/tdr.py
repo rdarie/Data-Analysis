@@ -40,30 +40,26 @@ def crossValidationScores(
         estimatorClass=None, estimatorInstance=None,
         estimatorKWArgs={}, crossvalKWArgs={},
         joblibBackendArgs={}, verbose=0):
-    #
-    print('joblibBackendArgs = {}'.format(joblibBackendArgs))
+    if verbose > 0:
+        print('joblibBackendArgs = {}'.format(joblibBackendArgs))
     with parallel_backend(**joblibBackendArgs):
         if estimatorInstance is None:
             estimatorInstance = estimatorClass(**estimatorKWArgs)
-        cvX = X.to_numpy()
-        if y is not None:
-            cvY = y.to_numpy()
-        else:
-            cvY = None
         scores = cross_validate(
-            estimatorInstance, cvX, cvY, verbose=verbose, **crossvalKWArgs)
+            estimatorInstance, X, y, verbose=verbose, **crossvalKWArgs)
     # train on all of the "working" samples, eval on the "validation"
+    # pdb.set_trace()
     if hasattr(crossvalKWArgs['cv'], 'work'):
         workingIdx = crossvalKWArgs['cv'].work
         validIdx = crossvalKWArgs['cv'].validation
         #
         workEstim = copy(estimatorInstance)
         #
-        workX = X.iloc[workingIdx, :].to_numpy()
-        valX = X.iloc[validIdx, :].to_numpy()
+        workX = X.iloc[workingIdx, :]
+        valX = X.iloc[validIdx, :]
         if y is not None:
-            workY = y.iloc[workingIdx].to_numpy()
-            valY = y.iloc[validIdx].to_numpy()
+            workY = y.iloc[workingIdx]
+            valY = y.iloc[validIdx]
         else:
             workY = None
             valY = None
@@ -72,7 +68,8 @@ def crossValidationScores(
         #
         scores['fit_time'] = np.append(scores['fit_time'], np.nan)
         scores['score_time'] = np.append(scores['score_time'], np.nan)
-        scores['estimator'] = np.append(scores['estimator'], workEstim)
+        if 'estimator' in scores:
+            scores['estimator'].append(workEstim)
         scores['train_score'] = np.append(scores['train_score'], workEstim.score(workX, workY))
         scores['test_score'] = np.append(scores['test_score'], workEstim.score(valX, valY))
     return scores
@@ -83,6 +80,7 @@ def gridSearchHyperparameters(
         estimatorClass=None, estimatorInstance=None,
         estimatorKWArgs={}, gridSearchKWArgs={},
         crossvalKWArgs={}, joblibBackendArgs={},
+        useElasticNetCV=False,
         verbose=0, recalculateBestEstimator=False, timeThis=False):
     #
     workGridSearchKWArgs = deepcopy(gridSearchKWArgs)
@@ -93,9 +91,11 @@ def gridSearchHyperparameters(
     with parallel_backend(**joblibBackendArgs):
         if estimatorInstance is None:
             estimatorInstance = estimatorClass(**estimatorKWArgs)
-        if isinstance(estimatorInstance, ElasticNet):
-            gridSearcher = ElasticNetCV(verbose=verbose, **gridSearchKWArgs)
-            workGridSearcher = ElasticNetCV(verbose=verbose, **workGridSearchKWArgs)
+        if isinstance(estimatorInstance, ElasticNet) and useElasticNetCV:
+            gridSearcher = ElasticNetCV(
+                verbose=verbose, **gridSearchKWArgs)
+            workGridSearcher = ElasticNetCV(
+                verbose=verbose, **workGridSearchKWArgs)
         else:
             gridSearcher = GridSearchCV(
                 estimatorInstance, verbose=verbose, **gridSearchKWArgs)
@@ -103,14 +103,8 @@ def gridSearchHyperparameters(
                 estimatorInstance, verbose=verbose, **workGridSearchKWArgs)
         if verbose > 0:
             print('Fitting gridSearchCV...')
-        if y is not None:
-            cvX, cvY = X.to_numpy(), y.to_numpy()
-            gridSearcher.fit(cvX, cvY)
-            workGridSearcher.fit(cvX, cvY)
-        else:
-            cvX = X.to_numpy()
-            gridSearcher.fit(cvX)
-            workGridSearcher.fit(cvX)
+        gridSearcher.fit(X, y)
+        workGridSearcher.fit(X, y)
     if timeThis:
         print('Elapsed time: {}'.format(toc()))
     if verbose:
@@ -160,7 +154,7 @@ def gridSearchHyperparameters(
     scoresDict[gridSearcher.n_splits_] = workGsScoresDF
     gsCVResultsDF = pd.concat(scoresDict, names=['fold'])
     if optParams is None:
-        if isinstance(estimatorInstance, ElasticNet):
+        if isinstance(estimatorInstance, ElasticNet) and useElasticNetCV:
             optParams = {
                 'alpha': gridSearcher.alpha_,
                 'l1_ratio': gridSearcher.l1_ratio_}
@@ -179,10 +173,9 @@ def gridSearchHyperparameters(
         print('cross val scoring')
     if estimatorClass is None:
         estimatorInstanceForCrossVal = copy(estimatorInstance)
-        estimatorInstanceForCrossVal.set_params(scoringEstimatorParams)
+        estimatorInstanceForCrossVal.set_params(**scoringEstimatorParams)
     else:
         estimatorInstanceForCrossVal = None
-    # pdb.set_trace()
     scores = crossValidationScores(
         X, y=y, estimatorInstance=estimatorInstanceForCrossVal,
         estimatorClass=estimatorClass,
