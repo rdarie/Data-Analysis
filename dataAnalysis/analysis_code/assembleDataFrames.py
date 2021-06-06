@@ -211,7 +211,9 @@ if __name__ == '__main__':
                 lOfFeatureMasks.append(thisMask)
                 currBlockNum += 1
     dataDF = pd.concat(lOfDF)
-    # pdb.set_trace()
+    if 'controlProportionMask' in loadingMeta:
+        if loadingMeta['controlProportionMask'] is not None:
+            dataDF = dataDF.loc[loadingMeta['controlProportionMask'], :]
     finalDF = dataDF.copy()
     #  #### end of data loading stuff
     if 'spectral' in arguments['selectionName']:

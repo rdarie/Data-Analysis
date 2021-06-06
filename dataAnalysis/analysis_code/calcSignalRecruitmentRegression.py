@@ -52,6 +52,8 @@ from sklego.preprocessing import PatsyTransformer
 from sklearn.compose import ColumnTransformer
 from sklearn_pandas import DataFrameMapper
 from sklearn.linear_model._coordinate_descent import _alpha_grid
+from imblearn.over_sampling import RandomOverSampler
+from imblearn.under_sampling import RandomUnderSampler
 sns.set(
     context='paper', style='whitegrid',
     palette='dark', font='sans-serif',
@@ -64,7 +66,7 @@ if consoleDebug:
         'alignFolderName': 'motion', 'showFigures': False, 'unitQuery': 'mahal', 'alignQuery': 'starting',
         'inputBlockPrefix': 'Block', 'invertOutlierMask': False, 'lazy': False, 'exp': 'exp202101281100',
         'analysisName': 'default', 'processAll': True, 'inputBlockSuffix': 'lfp_CAR_spectral_fa_mahal', 'verbose': False,
-        'blockIdx': '2', 'maskOutlierBlocks': False, 'window': 'XL', 'verbose':2}
+        'blockIdx': '2', 'maskOutlierBlocks': False, 'window': 'XL', 'verbose':0}
         os.chdir('/gpfs/home/rdarie/nda2/Data-Analysis/dataAnalysis/analysis_code')
 '''
 if __name__ == "__main__":
@@ -154,17 +156,21 @@ if __name__ == "__main__":
             l1_ratio=[.1, .5, .95, 1]
             )
         )
-    nAlphas = 50
+    nAlphas = 100
     lOfDesignFormulas = [
-        "pedalMovementCat/((electrode:amplitude)/RateInHz) - 1"
+        "pedalMovementCat/(electrode:(amplitude/RateInHz)) - 1",
+        "pedalMovementCat/(electrode:(amplitude:RateInHz)) - 1",
+        "pedalMovementCat/(electrode:(amplitude)) - 1",
     ]
-    recCurve = pd.read_hdf(resultPath, 'scaled')
-    #
+    recCurve = pd.read_hdf(resultPath, 'raw')
     cvIterator = tdr.trainTestValidationSplitter(
-        recCurve, tdr.trialAwareStratifiedKFold,
-        n_splits=nSplits, splitterKWArgs=splitterKWArgs
-        )
-
+        dataDF=recCurve, n_splits=nSplits,
+        resampler=RandomOverSampler, resamplerKWArgs={},
+        splitterType=tdr.trialAwareStratifiedKFold, splitterKWArgs=splitterKWArgs,
+        prelimSplitterType=tdr.trialAwareStratifiedKFold, prelimSplitterKWArgs=splitterKWArgs)
+    if arguments['showFigures']:
+        fig, ax = cvIterator.plot_schema()
+        plt.show()
     crossvalKWArgs['cv'] = cvIterator
     gridSearchKWArgs['cv'] = cvIterator
     groupsBreakdown = (
@@ -268,56 +274,75 @@ if __name__ == "__main__":
         gridSearcherDict0[designFormula] = gridSearcherDict1[targetName]
         gsScoresDict0[designFormula] = pd.concat(gsScoresDict1, names=['target'])
     scoresDF = pd.concat(cvScoresDict0, names=['design'])
-    lastFoldIdx = scoresDF.index.get_level_values('fold').max()
-    bestEstimators = scoresDF.xs(lastFoldIdx, level='fold')
     #
-    coefList = {}
-    predList = {}
+    coefDict0 = {}
+    predDict0 = {}
     for designFormula in lOfDesignFormulas:
         designMatrixTransformer = Pipeline([('scale', lhsScaler), ('design', patsyTransfDict[designFormula])])
         designMatrix = designMatrixTransformer.transform(lhsDF)
         designInfo = designMatrix.design_info
         designDF = (pd.DataFrame(designMatrix, index=lhsDF.index, columns=designInfo.column_names))
-        for estName, estSrs in bestEstimators.iterrows():
-            _, targetName = estName
-            regressionEstimator = bestEstimators.loc[(designFormula, targetName), 'estimator']
-            coefs = pd.Series(regressionEstimator.coef_, index=designInfo.column_names)
-            coefList[targetName] = coefs
-            ####
-            if True:
-                for eN in ['+ E16 - E5', '+ E16 - E2']:
-                    ampTermStr = 'pedalMovementCat[NA]:electrode[{}]:amplitude'.format(eN)
-                    print(ampTermStr)
-                    print('Coefficient:\n{}'.format(coefs[ampTermStr]))
-                    print('unique terms:\n{}'.format(designDF.loc[:, ampTermStr].unique()))
-                    ampRateTermStr = 'pedalMovementCat[NA]:electrode[{}]:amplitude:RateInHz'.format(eN)
-                    print(ampRateTermStr)
-                    print('Coefficient:\n{}'.format(coefs[ampRateTermStr]))
-                    print('unique terms:\n{}\n\n'.format(designDF.loc[:, ampRateTermStr].unique()))
-            predictionPerComponent = designDF * coefs
-            predictionSrs = predictionPerComponent.sum(axis='columns')
-            # sanity
-            mismatch = predictionSrs - regressionEstimator.predict(designDF)
-            print('max mismatch is {}'.format(mismatch.abs().max()))
-            assert (mismatch.abs().max() < 1e-3)
-            predictionPerSource = pd.DataFrame(np.nan, index=designDF.index, columns=designInfo.term_names)
-            for termName, termSlice in designInfo.term_name_slices.items():
-                predictionPerSource.loc[:, termName] = predictionPerComponent.iloc[:, termSlice].sum(axis='columns')
-            predictionPerSource.loc[:, 'prediction'] = predictionSrs
-            predictionPerSource.loc[:, 'ground_truth'] = rhsDF[targetName].to_numpy()
-            predList[targetName] = predictionPerSource
-
-        coefDF = pd.concat(coefList, names=['target'])
-        predDF = pd.concat(predList, axis='columns', names=['target', 'component'])
-        #
-        predDF.index = pd.MultiIndex.from_frame(trialInfo.loc[:, stimulusConditionNames + ['foldType', 'segment', 'originalIndex', 't']])
+        theseScores = scoresDF.xs(designFormula, level='design')
+        coefDict1 = {}
+        predDict1 = {}
+        for targetName, targetScores in theseScores.groupby('target'):
+            targetDF = rhsDF.xs(targetName, level='feature', axis='columns', drop_level=False)
+            coefDict2 = {}
+            predDict2 = {}
+            for foldIdx, estSrs in targetScores.groupby('fold'):
+                regressionEstimator = estSrs['estimator'].iloc[0]
+                coefs = pd.Series(regressionEstimator.coef_, index=designInfo.column_names)
+                coefDict2[foldIdx] = coefs
+                ####
+                if True:
+                    for eN in ['+ E16 - E5', '+ E16 - E2']:
+                        ampTermStr = 'pedalMovementCat[NA]:electrode[{}]:amplitude'.format(eN)
+                        if ampTermStr in coefs:
+                            print(ampTermStr)
+                            print('Coefficient:\n{}'.format(coefs[ampTermStr]))
+                            print('unique terms:\n{}'.format(designDF.loc[:, ampTermStr].unique()))
+                        ampRateTermStr = 'pedalMovementCat[NA]:electrode[{}]:amplitude:RateInHz'.format(eN)
+                        if ampRateTermStr in coefs:
+                            print(ampRateTermStr)
+                            print('Coefficient:\n{}'.format(coefs[ampRateTermStr]))
+                            print('unique terms:\n{}\n\n'.format(designDF.loc[:, ampRateTermStr].unique()))
+                predictionPerComponent = designDF * coefs
+                predictionSrs = predictionPerComponent.sum(axis='columns')
+                # sanity
+                mismatch = predictionSrs - regressionEstimator.predict(designDF)
+                print('max mismatch is {}'.format(mismatch.abs().max()))
+                assert (mismatch.abs().max() < 1e-3)
+                predictionPerSource = pd.DataFrame(np.nan, index=designDF.index, columns=designInfo.term_names)
+                for termName, termSlice in designInfo.term_name_slices.items():
+                    predictionPerSource.loc[:, termName] = predictionPerComponent.iloc[:, termSlice].sum(axis='columns')
+                predictionPerSource.loc[:, 'prediction'] = predictionSrs
+                predictionPerSource.loc[:, 'ground_truth'] = targetDF.to_numpy()
+                predDict2[foldIdx] = predictionPerSource
+            coefDict1[targetName] = pd.concat(coefDict2, names=['fold', 'component'])
+            predDict1[targetName] = pd.concat(predDict2, names=['fold', 'trial'])
+        coefDict0[designFormula] = pd.concat(coefDict1, names=['target', 'fold', 'component'])
+        predDict0[designFormula] = pd.concat(predDict1, names=['target', 'fold', 'trial'])
+    coefDF = pd.concat(coefDict0, names=['design', 'target', 'fold', 'component'])
+    predDF = pd.concat(predDict0, names=['design', 'target', 'fold', 'trial'])
+    predDF.columns.name = 'term'
+    extendedTrialInfo = (
+        trialInfo.loc[
+            predDF.index.get_level_values('trial'),
+            stimulusConditionNames + ['foldType', 'segment', 'originalIndex', 't']]
+        .reset_index(drop=True))
+    extendedTrialInfo = pd.concat([extendedTrialInfo, predDF.index.to_frame().reset_index(drop=True)], axis='columns')
+    predDF.index = pd.MultiIndex.from_frame(extendedTrialInfo)
     #
+    nTerms = predDF.columns.size
+    termPalette = pd.Series(
+        sns.color_palette('Set2', nTerms),
+        index=predDF.columns)
     height, width = 3, 3
     aspect = width / height
     commonOpts = dict(
-        row='RateInHz', col='pedalMovementCat',
-        x='amplitude', hue='component',
-        height=height, aspect=aspect
+        col='RateInHz', row='pedalMovementCat',
+        x='amplitude', y='rauc', hue='term',
+        height=height, aspect=aspect, palette=termPalette.to_dict()
     )
     pdfPath = os.path.join(
         figureOutputFolder,
@@ -325,17 +350,19 @@ if __name__ == "__main__":
             inputBlockSuffix, arguments['window'],
             'RAUC_regression'))
     with PdfPages(pdfPath) as pdf:
-        for targetName, predGroup in predDF.groupby('target', axis='columns'):
+        for targetName, predGroup in predDF.groupby('target'):
             for foldTypeName, predSubGroup0 in predGroup.groupby('foldType'):
-                for elecName, predSubGroup in predGroup.groupby('electrode'):
-                    plotData = predSubGroup.stack().reset_index()
+                for name, predSubGroup in predGroup.groupby(['design', 'electrode']):
+                    designName, elecName = name
+                    plotData = predSubGroup.stack().to_frame(name='rauc')
+                    plotData.reset_index(inplace=True)
                     plotData.loc[:, 'predType'] = 'component'
-                    plotData.loc[plotData['component'] == 'ground_truth', 'predType'] = 'ground_truth'
-                    plotData.loc[plotData['component'] == 'prediction', 'predType'] = 'prediction'
+                    plotData.loc[plotData['term'] == 'ground_truth', 'predType'] = 'ground_truth'
+                    plotData.loc[plotData['term'] == 'prediction', 'predType'] = 'prediction'
                     nAmps = plotData['amplitude'].unique()
                     if nAmps.size == 1:
                         g = sns.catplot(
-                            data=plotData, y=targetName,
+                            data=plotData,
                             kind='box',
                             facet_kws=dict(
                                 margin_titles=True),
@@ -343,8 +370,8 @@ if __name__ == "__main__":
                             )
                     else:
                         g = sns.relplot(
-                            data=plotData, y=targetName,
-                            kind='line', errorbar='se',
+                            data=plotData,
+                            kind='line', errorbar='sd',
                             style='predType', dashes={
                                 'ground_truth': (10, 0),
                                 'prediction': (2, 1),
@@ -355,7 +382,7 @@ if __name__ == "__main__":
                             **commonOpts,
                         )
                     g.set_titles(template="{col_var}\n{col_name}\n{row_var}\n{row_name}")
-                    titleText = '{}, electrode {} ({})'.format(targetName, elecName, foldTypeName)
+                    titleText = 'model {}\n{}, electrode {} ({})'.format(designName, targetName, elecName, foldTypeName)
                     print('Saving plot of {}...'.format(titleText))
                     figTitle = g.fig.suptitle(titleText)
                     g._tight_layout_rect[-1] -= 0.25 / g.fig.get_size_inches()[1]
@@ -369,4 +396,72 @@ if __name__ == "__main__":
                     else:
                         plt.close()
 
+    pdfPath = os.path.join(
+        figureOutputFolder,
+        blockBaseName + '{}_{}_{}.pdf'.format(
+            inputBlockSuffix, arguments['window'],
+            'RAUC_regression_coefficients'))
+    with PdfPages(pdfPath) as pdf:
+        allCoeffNames = coefDF.index.get_level_values('component').unique()
+        for designFormula, theseCoefs in coefDF.groupby('design'):
+            plotCoefs = theseCoefs.unstack('component').reindex(columns=allCoeffNames)
+            # indexing allCoeffNames adds nans for missing values, so that all the designs have identical rows and cols
+            plotCoefs.index = plotCoefs.index.droplevel('design')
+            grid_kws = {"width_ratios": (30, 1), 'wspace': 0.01}
+            aspect = plotCoefs.shape[1] / plotCoefs.shape[0]
+            h = 12
+            w = h * aspect
+            fig, (ax, cbar_ax) = plt.subplots(
+                1, 2,
+                gridspec_kw=grid_kws,
+                figsize=(w, h))
+            ax = sns.heatmap(
+                plotCoefs, ax=ax,
+                cbar_ax=cbar_ax)
+            titleText = 'Coefficients for model\n{}'.format(designFormula)
+            figTitle = fig.suptitle(titleText)
+            pdf.savefig(
+                bbox_inches='tight',
+                bbox_extra_artists=[figTitle]
+                )
+            if arguments['showFigures']:
+                plt.show()
+            else:
+                plt.close()
+    pdfPath = os.path.join(
+        figureOutputFolder,
+        blockBaseName + '{}_{}_{}.pdf'.format(
+            inputBlockSuffix, arguments['window'],
+            'RAUC_regression_scores'))
+    with PdfPages(pdfPath) as pdf:
+        height, width = 3, 3
+        aspect = width / height
+        trainScores = scoresDF.loc[:, 'train_score'].to_frame(name='score')
+        testScores = scoresDF.loc[:, 'test_score'].to_frame(name='score')
+        folds = trainScores.index.get_level_values('fold')
+        lastFoldIdx = folds.max()
+        lookup = {
+            k: 'train' if k < lastFoldIdx else 'work' for k in folds.unique()
+            }
+        trainScores.loc[:, 'scoreType'] = folds.map(lookup)
+        #
+        lookup2 = {
+            k: 'test' if k < lastFoldIdx else 'validation' for k in folds.unique()
+            }
+        testScores.loc[:, 'scoreType'] = folds.map(lookup2)
+        plotScores = pd.concat([testScores, trainScores]).reset_index()
+        plotScores.loc[:, 'xDummy'] = 0
+        g = sns.catplot(
+            data=plotScores, kind='box',
+            y='score', x='target',
+            col='design', hue='scoreType',
+            height=height, aspect=aspect
+            )
+        g.set_xticklabels(rotation=30, ha='right')
+        g.tight_layout(pad=0.1)
+        pdf.savefig(bbox_inches='tight')
+        if arguments['showFigures']:
+            plt.show()
+        else:
+            plt.close()
     print(designInfo.term_names); print(coefs)

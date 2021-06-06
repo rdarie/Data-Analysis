@@ -20,6 +20,7 @@ Options:
     --winStart=winStart                    start of absolute window (when loading)
     --winStop=winStop                      end of absolute window (when loading)
     --loadFromFrames                       delete outlier trials? [default: False]
+    --plotting                             delete outlier trials? [default: False]
     --datasetName=datasetName              filename for resulting estimator (cross-validated n_comps)
     --selectionName=selectionName          filename for resulting estimator (cross-validated n_comps)
 """
@@ -29,11 +30,6 @@ matplotlib.rcParams['ps.fonttype'] = 42
 # matplotlib.use('PS')   # generate postscript output by default
 matplotlib.use('QT5Agg')   # generate interactive output
 import seaborn as sns
-sns.set()
-sns.set_color_codes("dark")
-sns.set_context("talk")
-sns.set_style("whitegrid")
-
 import pdb
 import dataAnalysis.plotting.aligned_signal_plots as asp
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
@@ -50,6 +46,11 @@ import numpy as np
 from scipy import stats
 from sklearn.preprocessing import RobustScaler, MinMaxScaler, StandardScaler, QuantileTransformer, PowerTransformer
 import sys
+sns.set(
+    context='paper', style='whitegrid',
+    palette='dark', font='sans-serif',
+    font_scale=1., color_codes=True, rc={
+        'figure.dpi': 200, 'savefig.dpi': 200})
 '''
 consoleDebug = True
 if consoleDebug:
@@ -58,7 +59,7 @@ if consoleDebug:
     'lazy': False, 'verbose': False, 'window': 'XL', 'alignQuery': 'starting', 'datasetName': 'Block_XL_df_f',
     'analysisName': 'default', 'exp': 'exp202101281100', 'selector': None, 'winStart': '200', 'alignFolderName': 'motion',
     'winStop': '400', 'loadFromFrames': True, 'maskOutlierBlocks': False, 'unitQuery': 'fr_sqrt', 'inputBlockPrefix': 'Block',
-    'inputBlockSuffix': 'lfp_CAR_spectral_mahal', 'iteratorSuffix': 'f'}
+    'inputBlockSuffix': 'lfp_CAR_spectral_mahal', 'iteratorSuffix': 'f', 'plotting': True}
     os.chdir('/gpfs/home/rdarie/nda2/Data-Analysis/dataAnalysis/analysis_code')
     '''
 for arg in sys.argv:
@@ -189,22 +190,57 @@ if __name__ == "__main__":
         daskPersist=True, useDask=True, retainInputIndex=True,
         daskComputeOpts=daskComputeOpts, columnFeatureInfoHack=True)
     rawRaucDF.index = rawRaucDF.index.droplevel('bin')
-    rawRaucDF.to_hdf(resultPath, 'raw')
+    #
     qScaler = PowerTransformer()
     qScaler.fit(rawRaucDF)
     scaledRaucDF = pd.DataFrame(
         qScaler.transform(rawRaucDF),
         index=rawRaucDF.index,
         columns=rawRaucDF.columns)
-    scaledRaucDF.to_hdf(resultPath, 'scaled')
-    mmScaler = MinMaxScaler()
-    mmScaler.fit(scaledRaucDF)
-    normalizedRaucDF = pd.DataFrame(
-        mmScaler.transform(scaledRaucDF),
+    ##
+    sdThresh = 2.5
+    clippedScaledRaucDF = scaledRaucDF.clip(upper=sdThresh, lower=-sdThresh)
+    clippedRaucDF = pd.DataFrame(
+        qScaler.inverse_transform(clippedScaledRaucDF),
         index=rawRaucDF.index,
         columns=rawRaucDF.columns)
+    #
+    mmScaler = MinMaxScaler()
+    mmScaler.fit(clippedRaucDF)
+    normalizedRaucDF = pd.DataFrame(
+        mmScaler.transform(clippedRaucDF),
+        index=rawRaucDF.index,
+        columns=rawRaucDF.columns)
+    #
+    mmScaler2 = MinMaxScaler()
+    mmScaler2.fit(clippedScaledRaucDF)
+    scaledNormalizedRaucDF = pd.DataFrame(
+        mmScaler.transform(clippedScaledRaucDF),
+        index=rawRaucDF.index,
+        columns=rawRaucDF.columns)
+    scalers = pd.Series({'scale': qScaler, 'normalize': mmScaler, 'scale_normalize': mmScaler2})
+
+    clippedRaucDF.to_hdf(resultPath, 'raw')
+    clippedScaledRaucDF.to_hdf(resultPath, 'scaled')
     normalizedRaucDF.to_hdf(resultPath, 'normalized')
-    scalers = pd.Series({'scale': qScaler, 'normalize': mmScaler})
+    scaledNormalizedRaucDF.to_hdf(resultPath, 'scaled_normalized')
     scalers.to_hdf(resultPath, 'scalers')
+    #
+    if arguments['plotting']:
+        plotDFsDict = {
+            'raw': rawRaucDF.reset_index(drop=True),
+            'scaled': scaledRaucDF.reset_index(drop=True),
+            'clippedScaled': clippedScaledRaucDF.reset_index(drop=True),
+            'clipped': clippedRaucDF.reset_index(drop=True)
+            }
+        plotDF = pd.concat(plotDFsDict, names=['dataType'])
+        plotDF.columns = plotDF.columns.get_level_values('feature')
+        plotDF = plotDF.stack().reset_index()
+        plotDF.columns = ['dataType', 'trial', 'feature', 'rauc']
+        g = sns.displot(
+            data=plotDF, col='dataType',
+            x='rauc', hue='feature', kind='hist', element='step'
+            )
+
     if arguments['lazy']:
         dataReader.file.close()

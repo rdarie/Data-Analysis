@@ -106,39 +106,6 @@ dropCols = [
     if idxName not in keepCols]
 plotRC.drop(columns=dropCols, inplace=True)
 
-#
-'''emgPalette = (
-    plotOpts
-        .loc[:, ['featureName', 'color']]
-        .set_index('featureName')['color']
-        .to_dict())
-mapDF = prb_meta.mapToDF(rippleMapFile[int(arguments['blockIdx'])])
-mapDF.loc[:, 'whichArray'] = mapDF['elecName'].apply(lambda x: x[:-1])
-mapDF.loc[mapDF['whichArray'] == 'rostral', 'xcoords'] += mapDF['xcoords'].max() * 2
-mapDF.loc[:, 'channelRepetition'] = mapDF['label'].apply(lambda x: x.split('_')[-1])
-mapDF.loc[:, 'topoName'] = mapDF['label'].apply(lambda x: x[:-2])
-mapAMask = (mapDF['channelRepetition'] == 'a').to_numpy()'''
-#
-# plotRC.loc[:, 'electrode'] = plotRC['electrode'].apply(lambda x: x[1:])
-# plotRC.loc[:, 'feature'] = plotRC['feature'].apply(lambda x: x[:-4])
-#
-
-'''if RCPlotOpts['significantOnly']:
-    plotRC = plotRC.query("(kruskalP < 1e-3)")
-#
-if RCPlotOpts['keepElectrodes'] is not None:
-    keepDataMask = plotRC['electrode'].isin(RCPlotOpts['keepElectrodes'])
-    plotRC = plotRC.loc[keepDataMask, :]
-#
-if RCPlotOpts['keepFeatures'] is not None:
-    keepDataMask = plotRC['featureName'].isin(RCPlotOpts['keepFeatures'])
-    plotRC = plotRC.loc[keepDataMask, :]'''
-
-'''annotNames = ['xcoords', 'ycoords', 'whichArray']
-for annotName in annotNames:
-    lookupSource = mapDF.loc[mapAMask, [annotName, 'topoName']].set_index('topoName')[annotName]
-    plotRC.loc[:, 'electrode_' + annotName] = plotRC['electrode'].map(lookupSource)
-'''
 # colName = 'electrode_xcoords'
 colName = 'electrode'
 colOrder = sorted(np.unique(plotRC[colName]))
@@ -208,7 +175,7 @@ with PdfPages(pdfPath) as pdf:
         x='rawRAUC', hue='feature', kind='hist', element='step'
         )
     figTitle = g.fig.suptitle('raw')
-    g.axes[0, 0].set_xlim(plotRC['rawRAUC'].quantile([1e-6, 1-1e-2]))
+    # g.axes[0, 0].set_xlim(plotRC['rawRAUC'].quantile([1e-6, 1-1e-2]))
     pdf.savefig(
         bbox_inches='tight',
         bbox_extra_artists=[figTitle]

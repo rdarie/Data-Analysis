@@ -7,7 +7,7 @@
 
 # Request memory:
 #SBATCH --nodes=1
-#SBATCH --mem=200G
+#SBATCH --mem=48G
 
 # Specify a job name:
 #SBATCH -J test_train_split_28

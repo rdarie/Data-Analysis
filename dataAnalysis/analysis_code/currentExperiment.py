@@ -507,6 +507,7 @@ def parseAnalysisOptions(
             'nCovariateBasisTerms': 1,
             'forceBinInterval': 10e-3,
             'calcTimeROI': True,
+            'controlProportion': None,
             'timeROIOpts': {
                 'alignQuery': None,
                 'winStart': -700e-3,
@@ -526,6 +527,7 @@ def parseAnalysisOptions(
             'nCovariateBasisTerms': 1,
             'forceBinInterval': None,
             'calcTimeROI': True,
+            'controlProportion': 0.1,
             'timeROIOpts': {
                 'alignQuery': None,
                 'winStart': -100e-3,

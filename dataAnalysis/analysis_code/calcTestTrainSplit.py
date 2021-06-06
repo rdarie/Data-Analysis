@@ -39,17 +39,20 @@ from dataAnalysis.analysis_code.namedQueries import namedQueries
 from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
 import pdb, traceback
 import numpy as np
+from numpy.random import default_rng
 import dataAnalysis.preproc.ns5 as ns5
 # from sklearn.decomposition import PCA, IncrementalPCA
 # from sklearn.pipeline import make_pipeline, Pipeline
 # from sklearn.covariance import ShrunkCovariance, LedoitWolf, EmpiricalCovariance
-# from sklearn.model_selection import cross_val_score, GridSearchCV
+# from sklearn.model_selection import cross_val_score, GridSearchCVc
 # import joblib as jb
 import dill as pickle
+from imblearn.over_sampling import RandomOverSampler
+from imblearn.under_sampling import RandomUnderSampler
 # import gc
 from docopt import docopt
 import pandas as pd
-
+from copy import copy, deepcopy
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']), arguments['exp'])
@@ -179,6 +182,11 @@ cv_kwargs = dict(
     shuffle=True,
     stratifyFactors=stimulusConditionNames,
     continuousFactors=['segment', 'originalIndex', 't'])
+cv_kwargs_updated = deepcopy(cv_kwargs)
+cv_kwargs_updated.update({
+    'resampler': RandomOverSampler,
+    'resamplerKWArgs': {}
+})
 listOfIterators = []
 listOfDataFrames = []
 if (not arguments['loadFromFrames']):
@@ -299,16 +307,26 @@ if not arguments['processAll']:
         listOfIterators.append(cvIterator)
 else:
     exportDF = pd.concat(listOfDataFrames)
-    controlProportion = 0.2
-    pdb.set_trace()
-    if controlProportion is not None:
-        trialInfo = exportDF.index.to_frame().reset_index(drop=True).drop_duplicates(subset=['controlFlag', 'segment', 'originalIndex', 't'])
-        valueCounts = trialInfo.groupby('controlFlag').count().iloc[:, 0]
-        targetNControls = int(controlProportion * valueCounts['main'])
+    if theseIteratorOpts['controlProportion'] is not None:
+        trialInfo = exportDF.index.to_frame().reset_index(drop=True)
+        infoPerTrial = trialInfo.drop_duplicates(subset=['controlFlag', 'segment', 'originalIndex', 't'])
+        valueCounts = infoPerTrial.groupby('controlFlag').count().iloc[:, 0]
+        targetNControls = int(theseIteratorOpts['controlProportion'] * valueCounts['main'])
+        #
+        controlIndices = infoPerTrial.index[infoPerTrial['controlFlag'] == 'control']
+        dropIndices = default_rng().choice(controlIndices, size=(controlIndices.size - targetNControls), replace=False)
+        keepMI = infoPerTrial.drop(index=dropIndices).set_index(['controlFlag', 'segment', 'originalIndex', 't']).index
+        controlProportionMask = trialInfo.set_index(['controlFlag', 'segment', 'originalIndex', 't']).index.isin(keepMI)
+        exportDF = exportDF.loc[controlProportionMask, :]
+    else:
+        controlProportionMask = None
     cvIterator = tdr.trainTestValidationSplitter(
-        exportDF, tdr.trialAwareStratifiedKFold,
-        n_splits=nSplits, splitterKWArgs=cv_kwargs
-        )
+        dataDF=exportDF, n_splits=nSplits,
+        splitterType=tdr.trialAwareStratifiedKFold, splitterKWArgs=cv_kwargs_updated,
+        prelimSplitterType=None, prelimSplitterKWArgs=cv_kwargs)
+    if True:
+        fig, ax = cvIterator.plot_schema()
+        import matplotlib.pyplot as plt; plt.show()
     listOfIterators.append(cvIterator)
 ###
 # cvIterator.plot_schema()
@@ -326,6 +344,11 @@ if theseIteratorOpts['calcTimeROI'] and (not arguments['loadFromFrames']):
         'listOfROIMasks': listOfROIMasks,
         'listOfExampleIndexes': listOfExampleIndexes
     })
+if arguments['processAll']:
+    if controlProportionMask is not None:
+        iteratorMetadata.update({
+            'controlProportionMask': controlProportionMask
+        })
 print('saving\n{}\n'.format(iteratorPath))
 if os.path.exists(iteratorPath):
     os.remove(iteratorPath)
