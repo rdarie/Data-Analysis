@@ -438,7 +438,7 @@ def parseAnalysisOptions(
         correctMultiple=False
         )
     relplotKWArgs = dict(
-        # errorbar='se',
+        errorbar='se',
         # ci=95, n_boot=1000,
         estimator='mean',
         # estimator=None, units='t',
@@ -507,6 +507,7 @@ def parseAnalysisOptions(
             'nCovariateBasisTerms': 1,
             'forceBinInterval': 10e-3,
             'calcTimeROI': True,
+            'controlProportion': None,
             'timeROIOpts': {
                 'alignQuery': None,
                 'winStart': -700e-3,
@@ -526,6 +527,7 @@ def parseAnalysisOptions(
             'nCovariateBasisTerms': 1,
             'forceBinInterval': None,
             'calcTimeROI': True,
+            'controlProportion': 'majority',
             'timeROIOpts': {
                 'alignQuery': None,
                 'winStart': -100e-3,
@@ -538,6 +540,10 @@ def parseAnalysisOptions(
             }
         }
     }
+    if 'expIteratorOpts' in expOpts:
+        for key in iteratorOpts.keys():
+            if key in expOpts['expIteratorOpts']:
+                iteratorOpts[key].update(expOpts['expIteratorOpts'][key])
     glmOptsLookup = {
         'ensembleHistoryLen': .30,
         'covariateHistoryLen': .50,

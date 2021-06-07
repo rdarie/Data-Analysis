@@ -242,7 +242,8 @@ def splitApplyCombine(
         funArgs=[], funKWArgs={},
         rowKeys=None, colKeys=None, useDask=False, nPartitionMultiplier=2,
         daskPersist=True, daskProgBar=True, daskResultMeta=None,
-        daskComputeOpts={}, reindexFromInput=False, retainInputIndex=False):
+        daskComputeOpts={}, reindexFromInput=False, retainInputIndex=False,
+        columnFeatureInfoHack=False):
     if isinstance(rowKeys, str):
         rowKeys = [rowKeys, ]
     if isinstance(colKeys, str):
@@ -250,10 +251,15 @@ def splitApplyCombine(
     # TODO: test column iteration
     # TODO: handle transformation / aggregation / filtration
     # look to https://pandas.pydata.org/pandas-docs/stable/user_guide/groupby.html
-    if colKeys is not None:
-        asigStack = asigWide.stack(level=colKeys)
+    if columnFeatureInfoHack:
+        saveColumns = asigWide.columns.copy()
+        asigStack = asigWide.copy()
+        asigStack.columns = asigWide.columns.get_level_values('feature')
     else:
-        asigStack = asigWide
+        if colKeys is not None:
+            asigStack = asigWide.stack(level=colKeys)
+        else:
+            asigStack = asigWide
     # TODO: edge case for series?
     dataColNames = asigStack.columns.to_list()
     funKWArgs['dataColNames'] = dataColNames
@@ -283,7 +289,6 @@ def splitApplyCombine(
             .groupby(by=rowKeys, group_keys=False)
             .apply(fun, *funArgs, **funKWArgs))
     # TODO, below is a transformation, handle other index types
-    # pdb.set_trace()
     if reindexFromInput:
         # pdb.set_trace()
         resultDF = pd.DataFrame(
@@ -301,10 +306,13 @@ def splitApplyCombine(
             for idx in result.columns
             if (idx not in dataColNames)]
         resultDF = result.sort_index().set_index(presentIndices)
-    if colKeys is not None:
-        presentColKeys = list(np.intersect1d(colKeys, resultDF.index.names))
-        if len(presentColKeys):
-            resultDF = resultDF.unstack(level=presentColKeys)
+    if columnFeatureInfoHack:
+        resultDF.columns = saveColumns
+    else:
+        if colKeys is not None:
+            presentColKeys = list(np.intersect1d(colKeys, resultDF.index.names))
+            if len(presentColKeys):
+                resultDF = resultDF.unstack(level=presentColKeys)
     return resultDF
 
 

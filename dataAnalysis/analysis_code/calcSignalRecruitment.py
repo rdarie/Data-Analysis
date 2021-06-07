@@ -123,7 +123,7 @@ else:
     selectionName = arguments['selectionName']
     resultPath = os.path.join(
         calcSubFolder,
-        blockBaseName + '{}_{}_rauc.h5'.format(
+        blockBaseName + '_{}_{}_rauc.h5'.format(
             selectionName, arguments['window']))
     dataFramesFolder = os.path.join(analysisSubFolder, 'dataframes')
     datasetPath = os.path.join(
@@ -146,6 +146,13 @@ else:
     asigWide = pd.read_hdf(datasetPath, '/{}/data'.format(selectionName))
     asigWide.columns = asigWide.columns.get_level_values('feature')
     asigWide.columns.name = 'feature'
+    originalIndex = asigWide.index.to_frame().reset_index(drop=True)
+    originalIndex.loc[:, 'binOffset'] = np.nan
+    for name, group in originalIndex.groupby(['originalIndex', 'segment', 't']):
+        binOffset = group['bin'].min()
+        originalIndex.loc[group.index, 'binOffset'] = binOffset
+        originalIndex.loc[group.index, 'bin'] -= binOffset
+    asigWide.index = pd.MultiIndex.from_frame(originalIndex)
     asigWide = asigWide.stack().unstack('bin')
     # featureMasks = pd.read_hdf(datasetPath, '/{}/featureMasks'.format(selectionName))
 rAUCDF = ash.rAUC(

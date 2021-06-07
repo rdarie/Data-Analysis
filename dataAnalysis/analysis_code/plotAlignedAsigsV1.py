@@ -56,10 +56,14 @@ import dill as pickle
 import pandas as pd
 import numpy as np
 import seaborn as sns
+import sys
 sns.set(
     context='talk', style='dark',
     palette='dark', font='sans-serif',
     font_scale=1, color_codes=True)
+
+for arg in sys.argv:
+    print(arg)
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']), arguments['exp'])
@@ -166,7 +170,8 @@ if 'kcsd' in arguments['inputBlockSuffix']:
 if arguments['analysisName'] == 'hiRes':
     alignedAsigsKWargs['decimate'] = 5
 relplotKWArgs.update(relplotUpdates)
-alignedAsigsKWargs['procFun'] = ash.genDetrender(timeWindow=(-400e-3, -300e-3))
+#
+# alignedAsigsKWargs['procFun'] = ash.genDetrender(timeWindow=(-400e-3, -300e-3))
 # alignedAsigsKWargs['decimate'] = 20
 # alignedAsigsKWargs['rollingWindow'] = 200
 #

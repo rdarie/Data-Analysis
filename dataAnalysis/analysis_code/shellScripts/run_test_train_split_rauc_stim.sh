@@ -7,14 +7,14 @@
 
 # Request memory:
 #SBATCH --nodes=1
-#SBATCH --mem=200G
+#SBATCH --mem=48G
 
 # Specify a job name:
-#SBATCH -J test_train_split_25
+#SBATCH -J test_train_split_28
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j-%a-test_train_split_25.out
-#SBATCH -e ../../batch_logs/%j-%a-test_train_split_25.out
+#SBATCH -o ../../batch_logs/%j-%a-test_train_split_28.out
+#SBATCH -e ../../batch_logs/%j-%a-test_train_split_28.out
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -29,7 +29,7 @@ source shellScripts/calc_aligned_stim_preamble.sh
 # suffix f, for RAUC calculations
 ITERATOR="--iteratorSuffix=f"
 #
-ALIGNQUERYTERM="stimOn"
+ALIGNQUERYTERM="stimOnHighRate"
 ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
 
 python -u './calcTestTrainSplit.py' --inputBlockSuffix="lfp_CAR_spectral_fa_mahal" --unitQuery="mahal" --selectionName='lfp_CAR_spectral_fa_mahal' $ALIGNQUERY $ITERATOR --eventName='stim' --eventBlockSuffix='epochs' --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $OUTLIERMASK $LAZINESS

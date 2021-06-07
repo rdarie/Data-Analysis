@@ -2,7 +2,8 @@ from sklearn.base import TransformerMixin, BaseEstimator, RegressorMixin
 from sklearn.decomposition import PCA
 from sklearn.model_selection import (
     cross_val_score, cross_validate,
-    GridSearchCV, StratifiedKFold)
+    GridSearchCV, StratifiedKFold, StratifiedShuffleSplit)
+from imblearn.over_sampling import RandomOverSampler
 from sklearn.model_selection._split import _BaseKFold
 from sklearn.metrics import make_scorer
 from sklearn.covariance import ShrunkCovariance, LedoitWolf, EmpiricalCovariance
@@ -40,30 +41,26 @@ def crossValidationScores(
         estimatorClass=None, estimatorInstance=None,
         estimatorKWArgs={}, crossvalKWArgs={},
         joblibBackendArgs={}, verbose=0):
-    #
-    print('joblibBackendArgs = {}'.format(joblibBackendArgs))
+    if verbose > 0:
+        print('joblibBackendArgs = {}'.format(joblibBackendArgs))
     with parallel_backend(**joblibBackendArgs):
         if estimatorInstance is None:
             estimatorInstance = estimatorClass(**estimatorKWArgs)
-        cvX = X.to_numpy()
-        if y is not None:
-            cvY = y.to_numpy()
-        else:
-            cvY = None
         scores = cross_validate(
-            estimatorInstance, cvX, cvY, verbose=verbose, **crossvalKWArgs)
+            estimatorInstance, X, y, verbose=verbose, **crossvalKWArgs)
     # train on all of the "working" samples, eval on the "validation"
+    # pdb.set_trace()
     if hasattr(crossvalKWArgs['cv'], 'work'):
         workingIdx = crossvalKWArgs['cv'].work
         validIdx = crossvalKWArgs['cv'].validation
         #
         workEstim = copy(estimatorInstance)
         #
-        workX = X.iloc[workingIdx, :].to_numpy()
-        valX = X.iloc[validIdx, :].to_numpy()
+        workX = X.iloc[workingIdx, :]
+        valX = X.iloc[validIdx, :]
         if y is not None:
-            workY = y.iloc[workingIdx].to_numpy()
-            valY = y.iloc[validIdx].to_numpy()
+            workY = y.iloc[workingIdx]
+            valY = y.iloc[validIdx]
         else:
             workY = None
             valY = None
@@ -72,7 +69,8 @@ def crossValidationScores(
         #
         scores['fit_time'] = np.append(scores['fit_time'], np.nan)
         scores['score_time'] = np.append(scores['score_time'], np.nan)
-        scores['estimator'] = np.append(scores['estimator'], workEstim)
+        if 'estimator' in scores:
+            scores['estimator'].append(workEstim)
         scores['train_score'] = np.append(scores['train_score'], workEstim.score(workX, workY))
         scores['test_score'] = np.append(scores['test_score'], workEstim.score(valX, valY))
     return scores
@@ -83,6 +81,7 @@ def gridSearchHyperparameters(
         estimatorClass=None, estimatorInstance=None,
         estimatorKWArgs={}, gridSearchKWArgs={},
         crossvalKWArgs={}, joblibBackendArgs={},
+        useElasticNetCV=False,
         verbose=0, recalculateBestEstimator=False, timeThis=False):
     #
     workGridSearchKWArgs = deepcopy(gridSearchKWArgs)
@@ -93,9 +92,11 @@ def gridSearchHyperparameters(
     with parallel_backend(**joblibBackendArgs):
         if estimatorInstance is None:
             estimatorInstance = estimatorClass(**estimatorKWArgs)
-        if isinstance(estimatorInstance, ElasticNet):
-            gridSearcher = ElasticNetCV(verbose=verbose, **gridSearchKWArgs)
-            workGridSearcher = ElasticNetCV(verbose=verbose, **workGridSearchKWArgs)
+        if isinstance(estimatorInstance, ElasticNet) and useElasticNetCV:
+            gridSearcher = ElasticNetCV(
+                verbose=verbose, **gridSearchKWArgs)
+            workGridSearcher = ElasticNetCV(
+                verbose=verbose, **workGridSearchKWArgs)
         else:
             gridSearcher = GridSearchCV(
                 estimatorInstance, verbose=verbose, **gridSearchKWArgs)
@@ -103,14 +104,8 @@ def gridSearchHyperparameters(
                 estimatorInstance, verbose=verbose, **workGridSearchKWArgs)
         if verbose > 0:
             print('Fitting gridSearchCV...')
-        if y is not None:
-            cvX, cvY = X.to_numpy(), y.to_numpy()
-            gridSearcher.fit(cvX, cvY)
-            workGridSearcher.fit(cvX, cvY)
-        else:
-            cvX = X.to_numpy()
-            gridSearcher.fit(cvX)
-            workGridSearcher.fit(cvX)
+        gridSearcher.fit(X, y)
+        workGridSearcher.fit(X, y)
     if timeThis:
         print('Elapsed time: {}'.format(toc()))
     if verbose:
@@ -160,7 +155,7 @@ def gridSearchHyperparameters(
     scoresDict[gridSearcher.n_splits_] = workGsScoresDF
     gsCVResultsDF = pd.concat(scoresDict, names=['fold'])
     if optParams is None:
-        if isinstance(estimatorInstance, ElasticNet):
+        if isinstance(estimatorInstance, ElasticNet) and useElasticNetCV:
             optParams = {
                 'alpha': gridSearcher.alpha_,
                 'l1_ratio': gridSearcher.l1_ratio_}
@@ -179,10 +174,9 @@ def gridSearchHyperparameters(
         print('cross val scoring')
     if estimatorClass is None:
         estimatorInstanceForCrossVal = copy(estimatorInstance)
-        estimatorInstanceForCrossVal.set_params(scoringEstimatorParams)
+        estimatorInstanceForCrossVal.set_params(**scoringEstimatorParams)
     else:
         estimatorInstanceForCrossVal = None
-    # pdb.set_trace()
     scores = crossValidationScores(
         X, y=y, estimatorInstance=estimatorInstanceForCrossVal,
         estimatorClass=estimatorClass,
@@ -427,9 +421,91 @@ def FUDE(estimator1, estimator2, X, y, distr='softplus'):
     yhat1 = estimator1.predict(X)
     yhat2 = estimator2.predict(X)
     return _FUDE(y, yhat1, yhat2, distr)
-     
-     
+
+class dummyFold:
+    def __init__(self, folds):
+        self.folds = folds
+        self.n_splits = len(folds)
+
+    def split(self, X, y=None, groups=None):
+        return self.folds
+
+    def get_n_splits(self, X=None, y=None, groups=None):
+        return self.n_splits
+
 class trialAwareStratifiedKFold:
+    def __init__(
+            self, n_splits=5, random_state=None,
+            shuffle=None, test_size=None,
+            resampler=None, resamplerKWArgs={},
+            stratifyFactors=None, continuousFactors=None):
+        self.n_splits = n_splits
+        self.shuffle = shuffle
+        self.random_state = random_state
+        self.stratifyFactors = stratifyFactors
+        self.continuousFactors = continuousFactors
+        if resampler is not None:
+            self.resampler = resampler(**resamplerKWArgs)
+        else:
+            self.resampler = None
+        if test_size is None:
+            self.test_size = n_splits ** (-1)
+        else:
+            self.test_size = test_size
+
+    def split(self, X, y=None, groups=None):
+        #
+        trialMetadata = (
+            X
+            .index.to_frame()
+            .reset_index(drop=True)
+            .loc[:, self.stratifyFactors + self.continuousFactors])
+        if (self.continuousFactors is not None):
+            infoPerTrial = trialMetadata.drop_duplicates(subset=self.continuousFactors).copy()
+        else:
+            infoPerTrial = trialMetadata.copy()
+        infoPerTrial.loc[:, 'continuousGroup'] = np.arange(infoPerTrial.shape[0])
+        if (self.continuousFactors is not None):
+            mappingInfo = infoPerTrial.set_index(self.continuousFactors)['continuousGroup']
+            trialMetadata.loc[:, 'continuousGroup'] = trialMetadata.set_index(self.continuousFactors).index.map(mappingInfo)
+        else:
+            trialMetadata.loc[:, 'continuousGroup'] = np.arange(trialMetadata.shape[0])
+        #
+        if (self.stratifyFactors is not None):
+            labelsPerTrial = infoPerTrial.loc[:, self.stratifyFactors]
+        else:
+            labelsPerTrial = pd.DataFrame(np.ones((infoPerTrial.shape[0], 1)), index=infoPerTrial.index, columns=['stratifyGroup'])
+        skf = StratifiedShuffleSplit(
+            n_splits=self.n_splits, test_size=self.test_size,
+            random_state=self.random_state)
+        folds = []
+
+        def cgLookup(x):
+            return trialMetadata.index[trialMetadata['continuousGroup'] == x]
+
+        stratifyGroup = pd.DataFrame(np.nan, index=infoPerTrial.index, columns=['stratifyGroup'])
+        for idx, (name, group) in enumerate(labelsPerTrial.groupby(self.stratifyFactors)):
+            stratifyGroup.loc[group.index, :] = idx
+        for tr, te in skf.split(infoPerTrial, stratifyGroup):
+            trainCG = infoPerTrial['continuousGroup'].iloc[tr].reset_index(drop=True)
+            if self.resampler is not None:
+                X_res, _ = self.resampler.fit_resample(trainCG.to_numpy().reshape(-1, 1), stratifyGroup.iloc[tr])
+                trainCG = pd.Series(X_res.flatten())
+            trainIdx = np.concatenate(trainCG.apply(cgLookup).to_list())
+            #
+            testCG = infoPerTrial['continuousGroup'].iloc[te].reset_index(drop=True)
+            if self.resampler is not None:
+                X_res2, _ = self.resampler.fit_resample(testCG.to_numpy().reshape(-1, 1), stratifyGroup.iloc[te])
+                testCG = pd.Series(X_res2.flatten())
+            testIdx = np.concatenate(testCG.apply(cgLookup).to_list())
+            folds.append((trainIdx, testIdx))
+        return folds
+
+    def get_n_splits(self, X=None, y=None, groups=None):
+        return self.n_splits
+
+
+class trialAwareStratifiedKFoldBackup:
     def __init__(
             self, n_splits=5, shuffle=False, random_state=None,
             stratifyFactors=None, continuousFactors=None):
@@ -446,6 +522,7 @@ class trialAwareStratifiedKFold:
             .index.to_frame()
             .reset_index(drop=True)
             .loc[:, self.stratifyFactors + self.continuousFactors])
+        pdb.set_trace()
         if (self.stratifyFactors is not None):
             for idx, (name, group) in enumerate(trialInfo.groupby(self.stratifyFactors)):
                 trialInfo.loc[group.index, 'stratifyGroup'] = idx
@@ -478,6 +555,73 @@ class trialAwareStratifiedKFold:
 
 
 class trainTestValidationSplitter:
+    def __init__(
+            self, dataDF=None, n_splits=5,
+            resampler=None, resamplerKWArgs={},
+            prelimSplitterType=None, prelimSplitterKWArgs={},
+            splitterType=None, splitterKWArgs={}):
+        if prelimSplitterType is None:
+            prelimSplitterType = splitterType
+        if len(prelimSplitterKWArgs.keys()) == 0:
+            prelimSplitterKWArgs = splitterKWArgs
+        if resampler is not None:
+            prelimSplitterKWArgs.update(
+                {'resampler': resampler,
+                 'resamplerKWArgs': resamplerKWArgs}
+            )
+            splitterKWArgs.update(
+                {'resampler': resampler,
+                 'resamplerKWArgs': resamplerKWArgs}
+            )
+        # evaluate a preliminary test-train split,
+        # to get a validation-working set split
+        prelimCV = prelimSplitterType(
+            n_splits=n_splits + 1,
+            **prelimSplitterKWArgs).split(dataDF)
+        # note that train and test are iloc indices into dataDF
+        pdb.set_trace()
+        (workIdx, validationIdx) = prelimCV[0]
+        # NB! workIdx, validationIdx might have repeats or missing values if we are resampling
+        self.validation = np.unique(validationIdx)
+        self.work = np.unique(workIdx)
+        assert (np.union1d(self.work, self.validation) == np.arange(dataDF.shape[0])).all()
+        self.workIterator = dummyFold(folds=[(workIdx, validationIdx,)])
+        # however, prelimCV[1:] contains workIdx indices that are part of the validation set
+        # here, we will re-split prelimCV's workIdx indices
+        # into a train-test split
+        tempCv = splitterType(
+            n_splits=n_splits, **splitterKWArgs)
+        folds_temp = tempCv.split(dataDF.iloc[self.work, :])
+        # folds contains iloc indices into the submatrix dataDF.iloc[self.work, :]
+        # here, we transform them to indices into the original dataDF
+        originalIndices = np.arange(dataDF.shape[0])[self.work]
+        self.folds = []
+        for _train, _test in folds_temp:
+            train = originalIndices[_train]
+            test = originalIndices[_test]
+            self.folds.append((train.tolist(), test.tolist()))
+        #
+        self.n_splits = n_splits
+        self.splitterKWArgs = splitterKWArgs
+        return
+
+    def split(self, X, y=None, groups=None):
+        return self.folds
+
+    def get_n_splits(self, X=None, y=None, groups=None):
+        return self.n_splits
+
+    def plot_schema(self):
+        fig, ax = plt.subplots()
+        for foldIdx, (tr, te) in enumerate(self.folds):
+            lhtr, = ax.plot(tr, [foldIdx for j in tr], 'bo', alpha=0.3, label='train')
+            lhte, = ax.plot(te, [foldIdx for j in te], 'ro', alpha=0.3, label='test')
+        lhw, = ax.plot(self.work, [foldIdx + 1 for j in self.work], 'co', alpha=0.3, label='work')
+        lhv, = ax.plot(self.validation, [foldIdx + 1 for j in self.validation], 'mo', alpha=0.3, label='validation')
+        ax.legend(handles=[lhtr, lhte, lhw, lhv])
+        return fig, ax
+
+class trainTestValidationSplitterBackup:
     def __init__(
             self, dataDF, splitterType,
             n_splits, splitterKWArgs):
@@ -516,16 +660,14 @@ class trainTestValidationSplitter:
         return self.n_splits
 
     def plot_schema(self):
-        if True:
-            fig, ax = plt.subplots()
-            for foldIdx, (tr, te) in enumerate(self.folds):
-                lhtr, = ax.plot(tr, [foldIdx for j in tr], 'bo', label='train')
-                lhte, = ax.plot(te, [foldIdx for j in te], 'ro', label='test')
-            lhw, = ax.plot(self.work, [foldIdx + 1 for j in self.work], 'co', label='work')
-            lhv, = ax.plot(self.validation, [foldIdx + 1 for j in self.validation], 'mo', label='validation')
-            ax.legend(handles=[lhtr, lhte, lhw, lhv])
-            plt.show()
-        return
+        fig, ax = plt.subplots()
+        for foldIdx, (tr, te) in enumerate(self.folds):
+            lhtr, = ax.plot(tr, [foldIdx for j in tr], 'bo', alpha=0.3, label='train')
+            lhte, = ax.plot(te, [foldIdx for j in te], 'ro', alpha=0.3, label='test')
+        lhw, = ax.plot(self.work, [foldIdx + 1 for j in self.work], 'co', alpha=0.3, label='work')
+        lhv, = ax.plot(self.validation, [foldIdx + 1 for j in self.validation], 'mo', alpha=0.3, label='validation')
+        ax.legend(handles=[lhtr, lhte, lhw, lhv])
+        return fig, ax
 
 
 class EmpiricalCovarianceTransformer(EmpiricalCovariance, TransformerMixin):

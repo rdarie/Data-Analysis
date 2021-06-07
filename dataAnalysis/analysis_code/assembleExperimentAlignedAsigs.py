@@ -78,9 +78,10 @@ segIdx = 0
 
 stTimeUnits = pq.s
 wvfUnits = pq.uV
-for idx, trialBasePath in enumerate(trialsToAssemble):
+outputBlock = None
+idx = 0
+for trialBasePath in trialsToAssemble:
     gc.collect()
-    segIdx = idx
     trialDataPath = (
         trialBasePath
         .format(
@@ -97,10 +98,13 @@ for idx, trialBasePath in enumerate(trialsToAssemble):
             ns5.loadEventList(dataBlock, replaceInParents=True)
             ns5.loadAsigList(dataBlock, replaceInParents=True)
     else:
-        raise (Exception('\n{}\nDoes not exist!\n'.format(trialDataPath)))
+        # raise (Exception('\n{}\nDoes not exist!\n'.format(trialDataPath)))
+        print('\n{}\nDoes not exist!\n'.format(trialDataPath))
+        continue
     # pdb.set_trace()
+    segIdx = idx
     dataSeg = dataBlock.segments[0]
-    if idx == 0:
+    if outputBlock is None:
         outputBlock = Block(
             name=dataBlock.name,
             file_origin=dataBlock.file_origin,
@@ -191,6 +195,7 @@ for idx, trialBasePath in enumerate(trialsToAssemble):
             print('Assigning Event {}'.format(ev.name))
             newSeg.events.append(ev)
             ev.segment = dataSeg
+    idx += 1
 #
 for segIdx, outputSeg in enumerate(outputBlock.segments):
     for chIdx in outputBlock.filter(objects=ChannelIndex):

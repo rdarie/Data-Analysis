@@ -42,6 +42,7 @@ import dill as pickle
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import RobustScaler, MinMaxScaler
+
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']), arguments['exp'])
@@ -59,7 +60,7 @@ analysisSubFolder = os.path.join(
 alignSubFolder = os.path.join(
     analysisSubFolder, arguments['alignFolderName']
     )
-calcSubFolder = os.path.join(alignSubFolder, 'dataframes')
+calcSubFolder = os.path.join(analysisSubFolder, 'dataframes')
 figureOutputFolder = os.path.join(
     figureFolder, arguments['analysisName'])
 if not os.path.exists(figureOutputFolder):
@@ -77,7 +78,19 @@ outlierTrials = ash.processOutlierTrials(
 #  Overrides
 limitPages = None
 #  End Overrides
-recCurve = pd.read_hdf(resultPath, 'RAUC')
+if False:
+    recCurve = pd.read_hdf(resultPath, 'RAUC')
+else:
+    rawRecCurve = pd.read_hdf(resultPath, 'raw')
+    rawRecCurve.columns = rawRecCurve.columns.get_level_values('feature')
+    recCurve = rawRecCurve.stack().to_frame(name='rawRAUC')
+    rauc = pd.read_hdf(resultPath, 'scaled')
+    rauc.columns = rauc.columns.get_level_values('feature')
+    recCurve.loc[:, 'rauc'] = rauc.stack().to_numpy()
+    normalizedRAUC = pd.read_hdf(resultPath, 'normalized')
+    normalizedRAUC.columns = normalizedRAUC.columns.get_level_values('feature')
+    recCurve.loc[:, 'normalizedRAUC'] = normalizedRAUC.stack().to_numpy()
+
 # plotOpts = pd.read_hdf(resultPath, 'RAUC_plotOpts')
 pdfPath = os.path.join(
     figureOutputFolder,
@@ -93,39 +106,6 @@ dropCols = [
     if idxName not in keepCols]
 plotRC.drop(columns=dropCols, inplace=True)
 
-#
-'''emgPalette = (
-    plotOpts
-        .loc[:, ['featureName', 'color']]
-        .set_index('featureName')['color']
-        .to_dict())
-mapDF = prb_meta.mapToDF(rippleMapFile[int(arguments['blockIdx'])])
-mapDF.loc[:, 'whichArray'] = mapDF['elecName'].apply(lambda x: x[:-1])
-mapDF.loc[mapDF['whichArray'] == 'rostral', 'xcoords'] += mapDF['xcoords'].max() * 2
-mapDF.loc[:, 'channelRepetition'] = mapDF['label'].apply(lambda x: x.split('_')[-1])
-mapDF.loc[:, 'topoName'] = mapDF['label'].apply(lambda x: x[:-2])
-mapAMask = (mapDF['channelRepetition'] == 'a').to_numpy()'''
-#
-# plotRC.loc[:, 'electrode'] = plotRC['electrode'].apply(lambda x: x[1:])
-# plotRC.loc[:, 'feature'] = plotRC['feature'].apply(lambda x: x[:-4])
-#
-
-'''if RCPlotOpts['significantOnly']:
-    plotRC = plotRC.query("(kruskalP < 1e-3)")
-#
-if RCPlotOpts['keepElectrodes'] is not None:
-    keepDataMask = plotRC['electrode'].isin(RCPlotOpts['keepElectrodes'])
-    plotRC = plotRC.loc[keepDataMask, :]
-#
-if RCPlotOpts['keepFeatures'] is not None:
-    keepDataMask = plotRC['featureName'].isin(RCPlotOpts['keepFeatures'])
-    plotRC = plotRC.loc[keepDataMask, :]'''
-
-'''annotNames = ['xcoords', 'ycoords', 'whichArray']
-for annotName in annotNames:
-    lookupSource = mapDF.loc[mapAMask, [annotName, 'topoName']].set_index('topoName')[annotName]
-    plotRC.loc[:, 'electrode_' + annotName] = plotRC['electrode'].map(lookupSource)
-'''
 # colName = 'electrode_xcoords'
 colName = 'electrode'
 colOrder = sorted(np.unique(plotRC[colName]))
@@ -171,7 +151,7 @@ with PdfPages(pdfPath) as pdf:
                 facet_kws=dict(sharey=True, sharex=False, margin_titles=True),
                 )
         g.axes[0, 0].set_ylim(plotLims)
-        g.set_titles(col_template="{col_name}", row_template="{row_name}")
+        g.set_titles(template="{col_var}\n{col_name}\n{row_var}\n{row_name}")
         g.tight_layout(pad=0.)
         figTitle = g.fig.suptitle('rate = {}'.format(name))
         leg = g._legend
@@ -195,7 +175,7 @@ with PdfPages(pdfPath) as pdf:
         x='rawRAUC', hue='feature', kind='hist', element='step'
         )
     figTitle = g.fig.suptitle('raw')
-    g.axes[0, 0].set_xlim(plotRC['rawRAUC'].quantile([1e-6, 1-1e-2]))
+    # g.axes[0, 0].set_xlim(plotRC['rawRAUC'].quantile([1e-6, 1-1e-2]))
     pdf.savefig(
         bbox_inches='tight',
         bbox_extra_artists=[figTitle]

@@ -150,7 +150,8 @@ if __name__ == '__main__':
         )
     gridSearchKWArgs = dict(
         return_train_score=True,
-        cv=cvIterator, refit=False,
+        cv=cvIterator,
+        refit=False,
         param_grid=dict())
     crossvalKWArgs = dict(
         cv=cvIterator,
