@@ -421,8 +421,18 @@ def FUDE(estimator1, estimator2, X, y, distr='softplus'):
     yhat1 = estimator1.predict(X)
     yhat2 = estimator2.predict(X)
     return _FUDE(y, yhat1, yhat2, distr)
-     
-     
+
+class dummyFold:
+    def __init__(self, folds):
+        self.folds = folds
+        self.n_splits = len(folds)
+
+    def split(self, X, y=None, groups=None):
+        return self.folds
+
+    def get_n_splits(self, X=None, y=None, groups=None):
+        return self.n_splits
+
 class trialAwareStratifiedKFold:
     def __init__(
             self, n_splits=5, random_state=None,
@@ -469,19 +479,21 @@ class trialAwareStratifiedKFold:
             n_splits=self.n_splits, test_size=self.test_size,
             random_state=self.random_state)
         folds = []
+
         def cgLookup(x):
             return trialMetadata.index[trialMetadata['continuousGroup'] == x]
+
         stratifyGroup = pd.DataFrame(np.nan, index=infoPerTrial.index, columns=['stratifyGroup'])
         for idx, (name, group) in enumerate(labelsPerTrial.groupby(self.stratifyFactors)):
             stratifyGroup.loc[group.index, :] = idx
         for tr, te in skf.split(infoPerTrial, stratifyGroup):
-            trainCG = infoPerTrial['continuousGroup'].iloc[tr]
+            trainCG = infoPerTrial['continuousGroup'].iloc[tr].reset_index(drop=True)
             if self.resampler is not None:
                 X_res, _ = self.resampler.fit_resample(trainCG.to_numpy().reshape(-1, 1), stratifyGroup.iloc[tr])
                 trainCG = pd.Series(X_res.flatten())
             trainIdx = np.concatenate(trainCG.apply(cgLookup).to_list())
             #
-            testCG = infoPerTrial['continuousGroup'].iloc[te]
+            testCG = infoPerTrial['continuousGroup'].iloc[te].reset_index(drop=True)
             if self.resampler is not None:
                 X_res2, _ = self.resampler.fit_resample(testCG.to_numpy().reshape(-1, 1), stratifyGroup.iloc[te])
                 testCG = pd.Series(X_res2.flatten())
@@ -552,29 +564,37 @@ class trainTestValidationSplitter:
             prelimSplitterType = splitterType
         if len(prelimSplitterKWArgs.keys()) == 0:
             prelimSplitterKWArgs = splitterKWArgs
+        if resampler is not None:
+            prelimSplitterKWArgs.update(
+                {'resampler': resampler,
+                 'resamplerKWArgs': resamplerKWArgs}
+            )
+            splitterKWArgs.update(
+                {'resampler': resampler,
+                 'resamplerKWArgs': resamplerKWArgs}
+            )
         # evaluate a preliminary test-train split,
         # to get a validation-working set split
         prelimCV = prelimSplitterType(
             n_splits=n_splits + 1,
             **prelimSplitterKWArgs).split(dataDF)
         # note that train and test are iloc indices into dataDF
+        pdb.set_trace()
         (workIdx, validationIdx) = prelimCV[0]
-        self.validation = validationIdx
-        self.work = workIdx
+        # NB! workIdx, validationIdx might have repeats or missing values if we are resampling
+        self.validation = np.unique(validationIdx)
+        self.work = np.unique(workIdx)
+        assert (np.union1d(self.work, self.validation) == np.arange(dataDF.shape[0])).all()
+        self.workIterator = dummyFold(folds=[(workIdx, validationIdx,)])
         # however, prelimCV[1:] contains workIdx indices that are part of the validation set
         # here, we will re-split prelimCV's workIdx indices
         # into a train-test split
-        if resampler is not None:
-            splitterKWArgs.update(
-                {'resampler': resampler,
-                 'resamplerKWArgs': resamplerKWArgs}
-            )
         tempCv = splitterType(
             n_splits=n_splits, **splitterKWArgs)
-        folds_temp = tempCv.split(dataDF.iloc[workIdx, :])
-        # folds contains iloc indices into the submatrix dataDF.iloc[workIdx, :]
+        folds_temp = tempCv.split(dataDF.iloc[self.work, :])
+        # folds contains iloc indices into the submatrix dataDF.iloc[self.work, :]
         # here, we transform them to indices into the original dataDF
-        originalIndices = np.arange(dataDF.index.shape[0])[workIdx]
+        originalIndices = np.arange(dataDF.shape[0])[self.work]
         self.folds = []
         for _train, _test in folds_temp:
             train = originalIndices[_train]

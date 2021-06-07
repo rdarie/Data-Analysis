@@ -311,7 +311,14 @@ else:
         trialInfo = exportDF.index.to_frame().reset_index(drop=True)
         infoPerTrial = trialInfo.drop_duplicates(subset=['controlFlag', 'segment', 'originalIndex', 't'])
         valueCounts = infoPerTrial.groupby('controlFlag').count().iloc[:, 0]
-        targetNControls = int(theseIteratorOpts['controlProportion'] * valueCounts['main'])
+        if theseIteratorOpts['controlProportion'] == 'majority':
+            targetNControls = (
+                infoPerTrial
+                    .loc[infoPerTrial['controlFlag'] == 'main', :]
+                    .groupby(stimulusConditionNames)
+                    .count().iloc[:, 0].max())
+        else:
+            targetNControls = int(theseIteratorOpts['controlProportion'] * valueCounts['main'])
         #
         controlIndices = infoPerTrial.index[infoPerTrial['controlFlag'] == 'control']
         dropIndices = default_rng().choice(controlIndices, size=(controlIndices.size - targetNControls), replace=False)
@@ -324,7 +331,7 @@ else:
         dataDF=exportDF, n_splits=nSplits,
         splitterType=tdr.trialAwareStratifiedKFold, splitterKWArgs=cv_kwargs_updated,
         prelimSplitterType=None, prelimSplitterKWArgs=cv_kwargs)
-    if True:
+    if False:
         fig, ax = cvIterator.plot_schema()
         import matplotlib.pyplot as plt; plt.show()
     listOfIterators.append(cvIterator)
