@@ -60,6 +60,8 @@ class trialAwareStratifiedKFold:
         self.stratifyFactors = stratifyFactors
         self.continuousFactors = continuousFactors
         if resampler is not None:
+            if random_state is not None:
+                resamplerKWArgs['random_state'].update(random_state)
             self.resampler = resampler(**resamplerKWArgs)
         else:
             self.resampler = None
@@ -76,31 +78,38 @@ class trialAwareStratifiedKFold:
             .reset_index(drop=True)
             .loc[:, self.stratifyFactors + self.continuousFactors])
         if (self.continuousFactors is not None):
-            infoPerTrial = trialMetadata.drop_duplicates(subset=self.continuousFactors).copy()
+            infoPerTrial = (
+                trialMetadata
+                .drop_duplicates(subset=self.continuousFactors)
+                .copy())
         else:
             infoPerTrial = trialMetadata.copy()
         infoPerTrial.loc[:, 'continuousGroup'] = np.arange(infoPerTrial.shape[0])
         if (self.continuousFactors is not None):
             mappingInfo = infoPerTrial.set_index(self.continuousFactors)['continuousGroup']
-            trialMetadata.loc[:, 'continuousGroup'] = trialMetadata.set_index(self.continuousFactors).index.map(mappingInfo)
+            trialMetadata.loc[:, 'continuousGroup'] = (
+                trialMetadata.set_index(self.continuousFactors).index.map(mappingInfo))
         else:
             trialMetadata.loc[:, 'continuousGroup'] = np.arange(trialMetadata.shape[0])
         #
+        def cgLookup(x):
+            return trialMetadata.index[trialMetadata['continuousGroup'] == x]
+
         if (self.stratifyFactors is not None):
             labelsPerTrial = infoPerTrial.loc[:, self.stratifyFactors]
+            stratifyGroup = pd.DataFrame(np.nan, index=infoPerTrial.index, columns=['stratifyGroup'])
+            for idx, (name, group) in enumerate(labelsPerTrial.groupby(self.stratifyFactors)):
+                stratifyGroup.loc[group.index, :] = idx
         else:
-            labelsPerTrial = pd.DataFrame(np.ones((infoPerTrial.shape[0], 1)), index=infoPerTrial.index, columns=['stratifyGroup'])
+            labelsPerTrial = pd.DataFrame(
+                np.ones((infoPerTrial.shape[0], 1)),
+                index=infoPerTrial.index, columns=['stratifyGroup'])
+            stratifyGroup = labelsPerTrial.copy()
+        #
         skf = StratifiedShuffleSplit(
             n_splits=self.n_splits, test_size=self.test_size,
             random_state=self.random_state)
         folds = []
-
-        def cgLookup(x):
-            return trialMetadata.index[trialMetadata['continuousGroup'] == x]
-
-        stratifyGroup = pd.DataFrame(np.nan, index=infoPerTrial.index, columns=['stratifyGroup'])
-        for idx, (name, group) in enumerate(labelsPerTrial.groupby(self.stratifyFactors)):
-            stratifyGroup.loc[group.index, :] = idx
         for tr, te in skf.split(infoPerTrial, stratifyGroup):
             trainCG = infoPerTrial['continuousGroup'].iloc[tr].reset_index(drop=True)
             if self.resampler is not None:
