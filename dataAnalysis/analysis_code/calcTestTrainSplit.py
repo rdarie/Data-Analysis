@@ -85,12 +85,12 @@ alignedAsigsKWargs.update(dict(
     getMetaData=essentialMetadataFields, decimate=1))
 alignedAsigsKWargs['verbose'] = arguments['verbose']
 alignedAsigsKWargs['getFeatureMetaData'] = ['xCoords', 'yCoords', 'freqBandName', 'parentFeature']
-
+#
 triggeredPath = os.path.join(
     alignSubFolder,
     blockBaseName + '{}_{}.nix'.format(
         inputBlockSuffix, arguments['window']))
-
+#
 if 'windowSize' not in alignedAsigsKWargs:
     alignedAsigsKWargs['windowSize'] = [ws for ws in rasterOpts['windowSizes'][arguments['window']]]
 if 'winStart' in arguments:
@@ -178,15 +178,6 @@ if theseIteratorOpts['forceBinInterval'] is not None:
     alignedAsigsKWargs['decimate'] = int(theseIteratorOpts['forceBinInterval'] / binOpts['binInterval'])
 #
 nSplits = theseIteratorOpts['nSplits']
-cv_kwargs = dict(
-    shuffle=True,
-    stratifyFactors=stimulusConditionNames,
-    continuousFactors=['segment', 'originalIndex', 't'])
-cv_kwargs_updated = deepcopy(cv_kwargs)
-cv_kwargs_updated.update({
-    'resampler': RandomOverSampler,
-    'resamplerKWArgs': {}
-})
 listOfIterators = []
 listOfDataFrames = []
 if (not arguments['loadFromFrames']):
@@ -301,9 +292,7 @@ for cN in trialInfo.columns:
 if not arguments['processAll']:
     for dataDF in listOfDataFrames:
         cvIterator = tdr.trainTestValidationSplitter(
-            dataDF, tdr.trialAwareStratifiedKFold,
-            n_splits=nSplits, splitterKWArgs=cv_kwargs
-            )
+            dataDF=dataDF, **theseIteratorOpts['cvKWArgs'])
         listOfIterators.append(cvIterator)
 else:
     exportDF = pd.concat(listOfDataFrames)
@@ -317,6 +306,12 @@ else:
                     .loc[infoPerTrial['controlFlag'] == 'main', :]
                     .groupby(stimulusConditionNames)
                     .count().iloc[:, 0].max())
+        elif theseIteratorOpts['controlProportion'] == 'minority':
+            targetNControls = (
+                infoPerTrial
+                    .loc[infoPerTrial['controlFlag'] == 'main', :]
+                    .groupby(stimulusConditionNames)
+                    .count().iloc[:, 0].min())
         else:
             targetNControls = int(theseIteratorOpts['controlProportion'] * valueCounts['main'])
         #
@@ -328,12 +323,7 @@ else:
     else:
         controlProportionMask = None
     cvIterator = tdr.trainTestValidationSplitter(
-        dataDF=exportDF, n_splits=nSplits,
-        splitterType=tdr.trialAwareStratifiedKFold, splitterKWArgs=cv_kwargs_updated,
-        prelimSplitterType=None, prelimSplitterKWArgs=cv_kwargs)
-    if False:
-        fig, ax = cvIterator.plot_schema()
-        import matplotlib.pyplot as plt; plt.show()
+        dataDF=exportDF, **theseIteratorOpts['cvKWArgs'])
     listOfIterators.append(cvIterator)
 ###
 # cvIterator.plot_schema()

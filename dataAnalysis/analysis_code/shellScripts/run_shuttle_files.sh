@@ -52,13 +52,16 @@ source activate nda2
 python --version
 
 # global operations
-# python './shuttleFilesToFromScratch.py' --exp=$EXP --preprocFolderFiles --fromScratchToData --moveItems
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --preprocFolderFiles --preprocFolderSubfolders --fromScratchToData
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --preprocFolderFiles --fromDataToScratch
-# python './shuttleFilesToFromScratch.py' --exp=$EXP --fileSearchTerm='*.parquet' --fromDataToScratch
-# python './shuttleFilesToFromScratch.py' --exp=$EXP --fileSearchTerm='*Block003*' --fromDataToScratch
-# python './shuttleFilesToFromScratch.py' --exp=$EXP --fileSearchTerm='*epochs*' --fromDataToScratch
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*.parquet' --fromDataToScratch
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*Block003*' --fromDataToScratch
+#
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*fullRes*' --fromDataToScratch --foldersIncluded
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*fullRes*' --fromDataToScratch --foldersIncluded
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*loRes*' --fromDataToScratch --foldersIncluded
+python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*outlierTrials*' --fromDataToScratch --foldersIncluded
 
 # everything to data
-python './shuttleFilesToFromScratch.py' --exp=$EXP --preprocFolderSubfolders --fromScratchToData --moveItems
-python './shuttleFilesToFromScratch.py' --exp=$EXP --preprocFolderFiles --fromScratchToData --moveItems
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --preprocFolderSubfolders --fromScratchToData --moveItems
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --preprocFolderFiles --fromScratchToData --moveItems

@@ -29,6 +29,7 @@ import seaborn as sns
 import scipy.linalg
 from dask.distributed import Client, LocalCluster
 from sklearn.utils import _joblib, parallel_backend
+from sklearn.metrics import r2_score
 from ttictoc import tic, toc
 sns.set()
 sns.set_color_codes("dark")
@@ -50,27 +51,28 @@ class dummyFold:
 
 class trialAwareStratifiedKFold:
     def __init__(
-            self, n_splits=5, random_state=None,
-            shuffle=None, test_size=None,
-            resampler=None, resamplerKWArgs={},
+            self, samplerClass=None, samplerKWArgs=None,
+            resamplerClass=None, resamplerKWArgs={},
             stratifyFactors=None, continuousFactors=None):
-        self.n_splits = n_splits
-        self.shuffle = shuffle
-        self.random_state = random_state
+        if samplerClass is None:
+            samplerClass = StratifiedShuffleSplit
+        if len(samplerKWArgs.keys()) == 0:
+            samplerKWArgs = dict(
+                n_splits=5, random_state=None,
+                test_size=None,)
+        self.sampler = samplerClass(**samplerKWArgs)
         self.stratifyFactors = stratifyFactors
         self.continuousFactors = continuousFactors
-        if resampler is not None:
-            if random_state is not None:
-                resamplerKWArgs['random_state'].update(random_state)
-            self.resampler = resampler(**resamplerKWArgs)
+        if resamplerClass is not None:
+            self.resampler = resamplerClass(**resamplerKWArgs)
         else:
             self.resampler = None
-        if test_size is None:
-            self.test_size = n_splits ** (-1)
-        else:
-            self.test_size = test_size
+        self.folds = []
+        self.raw_folds = []
+        self.folds_per_trial = []
+        self.raw_folds_per_trial = []
 
-    def split(self, X, y=None, groups=None):
+    def fit(self, X, y=None, groups=None):
         #
         trialMetadata = (
             X
@@ -84,7 +86,10 @@ class trialAwareStratifiedKFold:
                 .copy())
         else:
             infoPerTrial = trialMetadata.copy()
+        #
+        infoPerTrial.reset_index(drop=True)
         infoPerTrial.loc[:, 'continuousGroup'] = np.arange(infoPerTrial.shape[0])
+        #
         if (self.continuousFactors is not None):
             mappingInfo = infoPerTrial.set_index(self.continuousFactors)['continuousGroup']
             trialMetadata.loc[:, 'continuousGroup'] = (
@@ -94,7 +99,7 @@ class trialAwareStratifiedKFold:
         #
         def cgLookup(x):
             return trialMetadata.index[trialMetadata['continuousGroup'] == x]
-
+        #
         if (self.stratifyFactors is not None):
             labelsPerTrial = infoPerTrial.loc[:, self.stratifyFactors]
             stratifyGroup = pd.DataFrame(np.nan, index=infoPerTrial.index, columns=['stratifyGroup'])
@@ -106,74 +111,92 @@ class trialAwareStratifiedKFold:
                 index=infoPerTrial.index, columns=['stratifyGroup'])
             stratifyGroup = labelsPerTrial.copy()
         #
-        skf = StratifiedShuffleSplit(
-            n_splits=self.n_splits, test_size=self.test_size,
-            random_state=self.random_state)
-        folds = []
-        for tr, te in skf.split(infoPerTrial, stratifyGroup):
+        self.folds = []
+        self.raw_folds = []
+        self.folds_per_trial = []
+        self.raw_folds_per_trial = []
+        for tr, te in self.sampler.split(infoPerTrial, stratifyGroup):
             trainCG = infoPerTrial['continuousGroup'].iloc[tr].reset_index(drop=True)
+            rawTrainCG = trainCG.to_list()
+            rawTrainIdx = np.concatenate(trainCG.apply(cgLookup).to_list())
             if self.resampler is not None:
                 X_res, _ = self.resampler.fit_resample(trainCG.to_numpy().reshape(-1, 1), stratifyGroup.iloc[tr])
                 trainCG = pd.Series(X_res.flatten())
             trainIdx = np.concatenate(trainCG.apply(cgLookup).to_list())
             #
             testCG = infoPerTrial['continuousGroup'].iloc[te].reset_index(drop=True)
+            rawTestCG = testCG.to_list()
+            rawTestIdx = np.concatenate(testCG.apply(cgLookup).to_list())
             if self.resampler is not None:
                 X_res2, _ = self.resampler.fit_resample(testCG.to_numpy().reshape(-1, 1), stratifyGroup.iloc[te])
                 testCG = pd.Series(X_res2.flatten())
             testIdx = np.concatenate(testCG.apply(cgLookup).to_list())
-            folds.append((trainIdx, testIdx))
-        return folds
+            self.folds.append((trainIdx, testIdx))
+            self.raw_folds.append((rawTrainIdx, rawTestIdx))
+            self.folds_per_trial.append((trainCG.to_list(), testCG.to_list()))
+            self.raw_folds_per_trial.append((rawTrainCG, rawTestCG))
+
+    def split(self, X, y=None, groups=None):
+        return self.folds
 
     def get_n_splits(self, X=None, y=None, groups=None):
-        return self.n_splits
+        return len(self.folds)
 
 
 class trainTestValidationSplitter:
     def __init__(
             self, dataDF=None, n_splits=5,
-            resampler=None, resamplerKWArgs={},
-            prelimSplitterType=None, prelimSplitterKWArgs={},
-            splitterType=None, splitterKWArgs={}):
-        if prelimSplitterType is None:
-            prelimSplitterType = splitterType
+            samplerClass=None, samplerKWArgs=None,
+            resamplerClass=None, resamplerKWArgs={},
+            prelimSplitterClass=None, prelimSplitterKWArgs={},
+            splitterClass=None, splitterKWArgs={}):
+        if splitterClass is None:
+            splitterClass = trialAwareStratifiedKFold
+        if prelimSplitterClass is None:
+            prelimSplitterClass = splitterClass
         if len(prelimSplitterKWArgs.keys()) == 0:
             prelimSplitterKWArgs = splitterKWArgs
-        if resampler is not None:
+        if resamplerClass is not None:
             prelimSplitterKWArgs.update(
-                {'resampler': resampler,
+                {'resamplerClass': resamplerClass,
                  'resamplerKWArgs': resamplerKWArgs}
             )
             splitterKWArgs.update(
-                {'resampler': resampler,
+                {'resamplerClass': resamplerClass,
                  'resamplerKWArgs': resamplerKWArgs}
             )
+        prelimSplitterKWArgs.update(dict(samplerClass=samplerClass, samplerKWArgs=samplerKWArgs,))
+        prelimSplitterKWArgs['samplerKWArgs']['n_splits'] = n_splits + 1
         # evaluate a preliminary test-train split,
         # to get a validation-working set split
-        prelimCV = prelimSplitterType(
-            n_splits=n_splits + 1,
-            **prelimSplitterKWArgs).split(dataDF)
+        self.prelimSplitter = prelimSplitterClass(**prelimSplitterKWArgs)
+        self.prelimSplitter.fit(dataDF)
         # note that train and test are iloc indices into dataDF
-        (workIdx, validationIdx) = prelimCV[0]
+        (workIdx, validationIdx) = self.prelimSplitter.folds[0]
         # NB! workIdx, validationIdx might have repeats or missing values if we are resampling
-        self.validation = np.unique(validationIdx)
-        self.work = np.unique(workIdx)
+        self.work, self.validation = self.prelimSplitter.raw_folds[0]
         assert (np.union1d(self.work, self.validation) == np.arange(dataDF.shape[0])).all()
         self.workIterator = dummyFold(folds=[(workIdx, validationIdx,)])
         # however, prelimCV[1:] contains workIdx indices that are part of the validation set
         # here, we will re-split prelimCV's workIdx indices
         # into a train-test split
-        tempCv = splitterType(
-            n_splits=n_splits, **splitterKWArgs)
-        folds_temp = tempCv.split(dataDF.iloc[self.work, :])
+        splitterKWArgs.update(dict(samplerClass=samplerClass, samplerKWArgs=samplerKWArgs,))
+        splitterKWArgs['samplerKWArgs']['n_splits'] = n_splits
+        self.splitter = splitterClass(**splitterKWArgs)
+        self.splitter.fit(dataDF.iloc[self.work, :])
         # folds contains iloc indices into the submatrix dataDF.iloc[self.work, :]
         # here, we transform them to indices into the original dataDF
         originalIndices = np.arange(dataDF.shape[0])[self.work]
         self.folds = []
-        for _train, _test in folds_temp:
-            train = originalIndices[_train]
-            test = originalIndices[_test]
+        self.raw_folds = []
+        for foldIdx, (_train, _test) in enumerate(self.splitter.folds):
+            train = originalIndices[self.splitter.folds[foldIdx][0]]
+            test = originalIndices[self.splitter.folds[foldIdx][1]]
             self.folds.append((train.tolist(), test.tolist()))
+            #
+            raw_train = originalIndices[self.splitter.raw_folds[foldIdx][0]]
+            raw_test = originalIndices[self.splitter.raw_folds[foldIdx][1]]
+            self.raw_folds.append((raw_train.tolist(), raw_test.tolist()))
         #
         self.n_splits = n_splits
         self.splitterKWArgs = splitterKWArgs
@@ -190,8 +213,10 @@ class trainTestValidationSplitter:
         for foldIdx, (tr, te) in enumerate(self.folds):
             lhtr, = ax.plot(tr, [foldIdx for j in tr], 'bo', alpha=0.3, label='train')
             lhte, = ax.plot(te, [foldIdx for j in te], 'ro', alpha=0.3, label='test')
-        lhw, = ax.plot(self.work, [foldIdx + 1 for j in self.work], 'co', alpha=0.3, label='work')
-        lhv, = ax.plot(self.validation, [foldIdx + 1 for j in self.validation], 'mo', alpha=0.3, label='validation')
+        maxFoldIdx = foldIdx + 1
+        for foldIdx, (tr, te) in enumerate(self.workIterator.folds):
+            lhw, = ax.plot(tr, [(foldIdx + maxFoldIdx) for j in tr], 'co', alpha=0.3, label='work')
+            lhv, = ax.plot(te, [(foldIdx + maxFoldIdx) for j in te], 'mo', alpha=0.3, label='validation')
         ax.legend(handles=[lhtr, lhte, lhw, lhv])
         return fig, ax
 
@@ -692,10 +717,11 @@ class SMWrapper(BaseEstimator, RegressorMixin):
     def __init__(
             self, sm_class, family=None,
             alpha=None, L1_wt=None, refit=None,
-            maxiter=100, tol=1e-8, disp=False
+            maxiter=100, tol=1e-6, disp=False, fit_intercept=False,
             ):
         self.sm_class = sm_class
         self.family = family
+        self.fit_intercept = fit_intercept
         self.alpha = alpha
         self.L1_wt = L1_wt
         self.refit = refit
@@ -709,9 +735,13 @@ class SMWrapper(BaseEstimator, RegressorMixin):
         for key in dir(self):
             if key in ['family']:
                 model_opts.update({key: getattr(self, key)})
+        if self.fit_intercept:
+            XX = sm.add_constant(X)
+        else:
+            XX = X
         try:
             self.model_ = self.sm_class(
-                y, X, **model_opts)
+                y, XX, **model_opts)
         except Exception:
             traceback.print_exc()
         #
@@ -735,14 +765,21 @@ class SMWrapper(BaseEstimator, RegressorMixin):
                 fit_opts.pop('disp')
             self.results_ = self.model_.fit_regularized(
                 **regular_opts, **fit_opts)
+        self.coef_ = self.results_.params
     #
     def predict(self, X):
-        return self.results_.predict(X)
+        if self.fit_intercept:
+            XX = sm.add_constant(X)
+        else:
+            XX = X
+        return self.results_.predict(XX)
     #
     def score(self, X, y=None):
         if 'family' in dir(self):
             if 'Poisson' in str(self.family):
                 return poisson_pseudoR2(self, X, y)
+            if 'Gaussian' in str(self.family):
+                return r2_score(y, self.predict(X))
 
 
 class pyglmnetWrapper(pyglmnet.GLM):

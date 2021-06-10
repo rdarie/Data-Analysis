@@ -40,17 +40,15 @@ if arguments['plotting']:
 import pdb
 import os
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
+import dataAnalysis.helperFunctions.helper_functions_new as hf
 import dataAnalysis.plotting.aligned_signal_plots as asp
 import dataAnalysis.preproc.ns5 as preproc
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import LeaveOneOut, PredefinedSplit
-from sklearn.utils import shuffle
 from sklearn.preprocessing import QuantileTransformer, RobustScaler, MinMaxScaler, StandardScaler
 
-from currentExperiment import parseAnalysisOptions
-from namedQueries import namedQueries
-from math import factorial
+from dataAnalysis.analysis_code.namedQueries import namedQueries
+from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
 from sklearn.preprocessing import scale, robust_scale
 from dask.distributed import Client, LocalCluster
 
@@ -107,78 +105,6 @@ alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUn
 alignedAsigsKWargs['outlierTrials'] = ash.processOutlierTrials(
     scratchFolder, prefix, **arguments)
 
-
-def noiseCeil(
-        group, dataColNames=None,
-        tBounds=None,
-        plotting=False, iterMethod='loo',
-        corrMethod='pearson', maxIter=1e6):
-    # print('os.getpid() = {}'.format(os.getpid()))
-    # print('Group shape is {}'.format(group.shape))
-    dataColMask = group.columns.isin(dataColNames)
-    groupData = group.loc[:, dataColMask]
-    indexColMask = ~group.columns.isin(dataColNames)
-    indexCols = group.columns[indexColMask]
-    keepIndexCols = indexCols[~indexCols.isin(['segment', 'originalIndex', 't'])]
-    #
-    if tBounds is not None:
-        maskX = (groupData.columns > tBounds[0]) & (groupData.columns < tBounds[1])
-    else:
-        maskX = np.ones_like(groupData.columns).astype(bool)
-    #
-    nSamp = groupData.shape[0]
-    if iterMethod == 'loo':
-        loo = LeaveOneOut()
-        allCorr = pd.Series(index=groupData.index)
-        iterator = loo.split(groupData)
-        for idx, (train_index, test_index) in enumerate(iterator):
-            refX = groupData.iloc[train_index, maskX].mean()
-            testX = pd.Series(
-                groupData.iloc[test_index, maskX].to_numpy().squeeze(),
-                index=refX.index)
-            allCorr.iloc[test_index] = refX.corr(
-                testX, method=corrMethod)
-            if idx > maxIter:
-                break
-        allCorr.dropna(inplace=True)
-    elif iterMethod == 'half':
-        nChoose = int(groupData.shape[0] / 2)
-        if maxIter is None:
-            maxIter = int(factorial(nSamp) / (factorial(nChoose) ** 2))
-        else:
-            maxIter = int(maxIter)
-        allCorr = pd.Series(index=range(maxIter))
-        allCov = pd.Series(index=range(maxIter))
-        allMSE = pd.Series(index=range(maxIter))
-        for idx in range(maxIter):
-            testX = shuffle(groupData, n_samples=nChoose)
-            testXBar = testX.mean()
-            refX = groupData.loc[~groupData.index.isin(testX.index), :]
-            refXBar = refX.mean()
-            allCorr.iloc[idx] = refX.mean().corr(
-                testXBar, method=corrMethod)
-            allCov.iloc[idx] = refXBar.cov(testXBar)
-            allMSE.iloc[idx] = (
-                ((refXBar - testXBar) ** 2)
-                .mean())
-    # if allCorr.mean() < 0:
-    #     pdb.set_trace()
-    #     plt.plot(testXBar); plt.plot(refXBar); plt.show()
-    #     plt.plot(testX.transpose(), 'b'); plt.plot(refX.transpose(), 'r'); plt.show()
-    resultDF = pd.DataFrame(
-        {
-            'noiseCeil': allCorr.mean(),
-            'noiseCeilStd': allCorr.std(),
-            'covariance': allCov.mean(),
-            'covarianceStd': allCov.std(),
-            'mse': allMSE.mean(),
-            'mseStd': allMSE.std()}, index=[group.index[0]])
-    for cN in keepIndexCols:
-        resultDF.loc[group.index[0], cN] = group.loc[group.index[0], cN]
-    # print(os.getpid())
-    return resultDF
-
-
 if __name__ == "__main__":
     testVar = None
     conditionNames = [
@@ -232,7 +158,7 @@ if __name__ == "__main__":
                 'mse': float(1),
                 'mseStd': float(1)}, index=[0])
         resDF = ash.splitApplyCombine(
-            dataDF, fun=noiseCeil, resultPath=resultPath,
+            dataDF, fun=hf.noiseCeil, resultPath=resultPath,
             funArgs=[], funKWArgs=funKWArgs,
             rowKeys=groupBy, colKeys=testVar, useDask=True,
             daskPersist=True, daskProgBar=True, daskResultMeta=None,

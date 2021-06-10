@@ -266,7 +266,7 @@ if __name__ == '__main__':
     prf.print_memory_usage('Done fitting')
     if os.path.exists(estimatorPath):
         os.remove(estimatorPath)
-    # 
+    #
     try:
         scoresDF.loc[idxSl[:, lastFoldIdx], :].to_hdf(estimatorPath, 'work')
         scoresDF.loc[:, ['test_score', 'train_score']].to_hdf(estimatorPath, 'cv')

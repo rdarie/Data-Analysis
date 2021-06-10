@@ -23,7 +23,6 @@ SLURM_ARRAY_TASK_ID=2
 source ./shellScripts/calc_aligned_motion_preamble.sh
 
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
-TIMEWINDOWOPTS="--winStart=-200 --winStop=500"
 INPUTBLOCKNAME="--inputBlockSuffix=lfp_CAR_spectral_fa_mahal"
 UNITSELECTOR="--unitQuery=mahal"
 
@@ -35,9 +34,14 @@ ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
 
 TARGET="lfp_CAR_spectral_fa_mahal"
 ITERATOR="f"
-
-
-# python -u "./calcSignalRecruitmentV2.py" --plotting --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --loadFromFrames --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET
+#
+python -u "./calcSignalRecruitmentV2.py" --iteratorSuffix=ros --plotting --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --loadFromFrames --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET
+python -u "./transformIterator.py" --iteratorSuffix=ros --iteratorOutputName=noRos --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $INPUTBLOCKNAME $UNITSELECTOR $ALIGNQUERY --verbose=1
+#
+# python -u "./calcSignalNoiseCeiling.py" --plotting --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --loadFromFrames --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET
 # python -u "./plotSignalRecruitment.py" --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $INPUTBLOCKNAME $UNITSELECTOR $ALIGNQUERY
-python -u "./calcSignalRecruitmentRegression.py" --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $INPUTBLOCKNAME $UNITSELECTOR $ALIGNQUERY --verbose=1
+#
+python -u "./calcSignalRecruitmentRegression.py" --estimatorName=enr_refit --iteratorSuffix=noRos --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $INPUTBLOCKNAME $UNITSELECTOR $ALIGNQUERY --verbose=1
+python -u "./calcSignalRecruitmentRegression.py" --estimatorName=enr_refit --iteratorSuffix=ros --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $INPUTBLOCKNAME $UNITSELECTOR $ALIGNQUERY --verbose=1
+# python -u "./processSignalRecruitmentRegression.py" --estimatorName=enr_refit --iteratorSuffix=noRos --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $INPUTBLOCKNAME $UNITSELECTOR $ALIGNQUERY --verbose=1
 #

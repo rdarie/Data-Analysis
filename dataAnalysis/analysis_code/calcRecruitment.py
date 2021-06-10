@@ -194,15 +194,22 @@ for pon in plotOptNames:
     featurePlotOptsDF.loc[:, pon] = np.nan
 uniqueSiteNames = sorted(featurePlotOptsDF['EMGSite'].unique())
 nColors = len(uniqueSiteNames)
-paletteNames = ['deep', 'pastel']
-styleNames = ['-', '--']
+# paletteNames = ['deep', 'pastel']
+hues = [0., 0.]
+lightnesses = [.6, .75]
+saturations = [.65, .75]
+styleNames = ['--', '-']
 for gIdx, (name, group) in enumerate(featurePlotOptsDF.groupby('EMGSide')):
-    thisPalette = pd.Series(
-        sns.color_palette(paletteNames[gIdx], nColors),
+    thisPalette = sns.hls_palette(
+        n_colors=int(nColors*2.5),
+        h=hues[gIdx], l=lightnesses[gIdx], s=saturations[gIdx])
+    thisPaletteSrs = pd.Series(
+        # sns.color_palette(paletteNames[gIdx], nColors),
+        thisPalette[:nColors],
         index=uniqueSiteNames)
-    featurePlotOptsDF.loc[group.index, 'color'] = group['EMGSite'].map(thisPalette)
+    featurePlotOptsDF.loc[group.index, 'color'] = group['EMGSite'].map(thisPaletteSrs)
     featurePlotOptsDF.loc[group.index, 'style'] = styleNames[gIdx]
-
+# sns.palplot(featurePlotOptsDF['color']); plt.show()
 if False:
     fig, ax = plt.subplots()
     for name, group in rAUCDF.groupby('featureName'):

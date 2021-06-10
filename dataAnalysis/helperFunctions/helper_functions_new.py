@@ -4,6 +4,7 @@ import sys, os, itertools
 #  import itertools, pickle, gc, string, random
 #  import subprocess, collections, math, argparse
 import peakutils
+from math import factorial
 import random
 import vg
 from tabulate import tabulate
@@ -34,6 +35,8 @@ from neo.io.proxyobjects import (
     AnalogSignalProxy, SpikeTrainProxy, EventProxy)
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.covariance import EmpiricalCovariance
+from sklearn.model_selection import LeaveOneOut, PredefinedSplit
+from sklearn.utils import shuffle
 import datetime
 from datetime import datetime as dt
 import json
@@ -3735,6 +3738,69 @@ def calcBreakDown(asigWide, rowName, colName, hueName):
     breakDownHtml = dfStyler.render()
     return breakDownData, breakDownText, breakDownHtml
 
+
+def noiseCeil(
+        group, dataColNames=None,
+        tBounds=None,
+        plotting=False, iterMethod='loo',
+        corrMethod='pearson', maxIter=1e6):
+    dataColMask = group.columns.isin(dataColNames)
+    groupData = group.loc[:, dataColMask]
+    indexColMask = ~group.columns.isin(dataColNames)
+    indexCols = group.columns[indexColMask]
+    keepIndexCols = indexCols[~indexCols.isin(['segment', 'originalIndex', 't'])]
+    #
+    if tBounds is not None:
+        maskX = (groupData.columns > tBounds[0]) & (groupData.columns < tBounds[1])
+    else:
+        maskX = np.ones_like(groupData.columns).astype(bool)
+    #
+    nSamp = groupData.shape[0]
+    if iterMethod == 'loo':
+        loo = LeaveOneOut()
+        allCorr = pd.Series(index=groupData.index)
+        iterator = loo.split(groupData)
+        for idx, (train_index, test_index) in enumerate(iterator):
+            refX = groupData.iloc[train_index, maskX].mean()
+            testX = pd.Series(
+                groupData.iloc[test_index, maskX].to_numpy().squeeze(),
+                index=refX.index)
+            allCorr.iloc[test_index] = refX.corr(
+                testX, method=corrMethod)
+            if idx > maxIter:
+                break
+        allCorr.dropna(inplace=True)
+    elif iterMethod == 'half':
+        nChoose = int(groupData.shape[0] / 2)
+        if maxIter is None:
+            maxIter = int(factorial(nSamp) / (factorial(nChoose) ** 2))
+        else:
+            maxIter = int(maxIter)
+        allCorr = pd.Series(index=range(maxIter))
+        allCov = pd.Series(index=range(maxIter))
+        allMSE = pd.Series(index=range(maxIter))
+        for idx in range(maxIter):
+            testX = shuffle(groupData, n_samples=nChoose)
+            testXBar = testX.mean()
+            refX = groupData.loc[~groupData.index.isin(testX.index), :]
+            refXBar = refX.mean()
+            allCorr.iloc[idx] = refX.mean().corr(
+                testXBar, method=corrMethod)
+            allCov.iloc[idx] = refXBar.cov(testXBar)
+            allMSE.iloc[idx] = (
+                ((refXBar - testXBar) ** 2)
+                .mean())
+    resultDF = pd.DataFrame(
+        {
+            'noiseCeil': allCorr.mean(),
+            'noiseCeilStd': allCorr.std(),
+            'covariance': allCov.mean(),
+            'covarianceStd': allCov.std(),
+            'mse': allMSE.mean(),
+            'mseStd': allMSE.std()}, index=[group.index[0]])
+    for cN in keepIndexCols:
+        resultDF.loc[group.index[0], cN] = group.loc[group.index[0], cN]
+    return resultDF
 
 def plotCorrSynchReport(
         _trigRaster=None, _searchRadius=None,

@@ -1,6 +1,8 @@
 import os, pdb, re, platform, traceback
 #  import dataAnalysis.helperFunctions.kilosort_analysis as ksa
 import dataAnalysis.helperFunctions.probe_metadata as prb_meta
+from imblearn.over_sampling import RandomOverSampler
+from imblearn.under_sampling import RandomUnderSampler
 import importlib
 
 
@@ -252,7 +254,9 @@ def parseAnalysisOptions(
     stimConditionNames = [
         'electrode', amplitudeFieldName, 'RateInHz']
     motionConditionNames = [
-        'pedalMovementCat', 'pedalSizeCat', 'pedalDirection']
+        'pedalMovementCat', 'pedalDirection',
+        # 'pedalSizeCat',
+        ]
     if blockExperimentType in ['proprio-miniRC', 'proprio-RC', 'isi']:
         #if (blockExperimentType == 'proprio-miniRC') or (blockExperimentType == 'proprio-RC') or (blockExperimentType == 'isi'):
         # has stim but no motion
@@ -500,7 +504,6 @@ def parseAnalysisOptions(
     iteratorOpts = {
         # rest period from before movement onset
         'a': {
-            'nSplits': 7,
             'ensembleHistoryLen': .30,
             'covariateHistoryLen': .50,
             'nHistoryBasisTerms': 1,
@@ -508,6 +511,12 @@ def parseAnalysisOptions(
             'forceBinInterval': 10e-3,
             'calcTimeROI': True,
             'controlProportion': None,
+            'cvKWArgs': dict(
+                n_splits=7,
+                splitterClass=None, splitterKWArgs=dict(random_state=None, test_size=None,),
+                samplerKWArgs=dict(random_state=None, test_size=None,),
+                resamplerClass=RandomOverSampler, resamplerKWArgs={},
+                ),
             'timeROIOpts': {
                 'alignQuery': None,
                 'winStart': -700e-3,
@@ -520,7 +529,6 @@ def parseAnalysisOptions(
             }
         },
         'f': {
-            'nSplits': 7,
             'ensembleHistoryLen': .30,
             'covariateHistoryLen': .50,
             'nHistoryBasisTerms': 1,
@@ -528,6 +536,12 @@ def parseAnalysisOptions(
             'forceBinInterval': None,
             'calcTimeROI': True,
             'controlProportion': 'majority',
+            'cvKWArgs': dict(
+                n_splits=7,
+                splitterClass=None, splitterKWArgs=dict(random_state=None, test_size=None,),
+                samplerKWArgs=dict(random_state=None, test_size=None,),
+                resamplerClass=RandomOverSampler, resamplerKWArgs={},
+                ),
             'timeROIOpts': {
                 'alignQuery': None,
                 'winStart': -100e-3,
