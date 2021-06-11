@@ -20,6 +20,7 @@ Options:
     --maskOutlierBlocks                        delete outlier trials? [default: False]
     --invertOutlierMask                        delete outlier trials? [default: False]
     --showFigures                              show plots interactively? [default: False]
+    --debugging                                show plots interactively? [default: False]
     --iteratorSuffix=iteratorSuffix            filename for resulting estimator (cross-validated n_comps)
     --refIteratorSuffix=refIteratorSuffix      filename for resulting estimator (cross-validated n_comps)
 """
@@ -48,6 +49,9 @@ import dill as pickle
 import pandas as pd
 import numpy as np
 from copy import deepcopy
+from pyglmnet.pyglmnet import _logL as pyglmnet_logL
+from pyglmnet.metrics import pseudo_R2 as pyglmnet_pseudo_R2
+import pyglmnet
 from dask.distributed import Client, LocalCluster
 from sklearn.preprocessing import RobustScaler, MinMaxScaler
 from sklearn.pipeline import FeatureUnion, Pipeline
@@ -73,9 +77,31 @@ if consoleDebug:
         'analysisName': 'default', 'processAll': True,
         'inputBlockSuffix': 'lfp_CAR_spectral_fa_mahal', 'verbose': False,
         'blockIdx': '2', 'maskOutlierBlocks': False, 'window': 'XL', 'verbose':0,
-        'estimatorName': 'enr_rsos_refit', 'refEstimatorName': 'enr_noRos_refit', 'debugging': True}
+        'refIteratorSuffix': 'ros', 'iteratorSuffix': 'noRos',
+        'refEstimatorName': 'enr_refit', 'estimatorName': 'enr_refit', 'debugging': True}
     os.chdir('/gpfs/home/rdarie/nda2/Data-Analysis/dataAnalysis/analysis_code')
 '''
+
+def getR2(srs):
+    lls = float(srs.xs('llSat', level='llType'))
+    lln = float(srs.xs('llNull', level='llType'))
+    llf = float(srs.xs('llFull', level='llType'))
+    return 1 - (lls - llf) / (lls - lln)
+
+
+def partialR2(srs, testDesign=None, refDesign=None):
+    llSat = llSrs.xs(testDesign, level='design').xs('llSat', level='llType')
+    assert testDesign is not None
+    # llSat2 = llSrs.xs(refDesign, level='design').xs('llSat', level='llType')
+    # sanity check: should be same
+    # assert (llSat - llSat2).abs().max() == 0
+    if refDesign is not None:
+        llRef = llSrs.xs(refDesign, level='design').xs('llFull', level='llType')
+    else:
+        llRef = llSrs.xs(testDesign, level='design').xs('llNull', level='llType')
+    llTest = llSrs.xs(testDesign, level='design').xs('llFull', level='llType')
+    return 1 - (llSat - llTest) / (llSat - llRef)
+
 if __name__ == "__main__":
     arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
     #
@@ -95,6 +121,7 @@ if __name__ == "__main__":
         iteratorSuffix = '_{}'.format(arguments['iteratorSuffix'])
     else:
         iteratorSuffix = ''
+    fullEstimatorName = '{}{}'.format(estimatorName, iteratorSuffix)
     if arguments['refIteratorSuffix'] is not None:
         refIteratorSuffix = '_{}'.format(arguments['refIteratorSuffix'])
     else:
@@ -146,14 +173,15 @@ if __name__ == "__main__":
             estimatorName, iteratorSuffix, blockBaseName, inputBlockSuffix, arguments['window']))
     if arguments['refEstimatorName'] is not None:
         refEstimatorName = arguments['refEstimatorName']
+        fullRefEstimatorName = '{}{}'.format(refEstimatorName, refIteratorSuffix)
         resultPathRef = os.path.join(
             calcSubFolder,
             '{}_{}{}_{}_rauc_regression.h5'.format(
-                refEstimatorName, refIteratorSuffix, blockBaseName, inputBlockSuffix, arguments['window']))
+                fullRefEstimatorName, blockBaseName, inputBlockSuffix, arguments['window']))
         resultPicklePathRef = os.path.join(
             calcSubFolder,
-            '{}{}_{}{}_{}_rauc_regression.pickle'.format(
-                refEstimatorName, refIteratorSuffix, blockBaseName, inputBlockSuffix, arguments['window']))
+            '{}_{}{}_{}_rauc_regression.pickle'.format(
+                fullRefEstimatorName, blockBaseName, inputBlockSuffix, arguments['window']))
 
     recCurve = pd.read_hdf(raucPath, 'raw')
 
@@ -163,16 +191,20 @@ if __name__ == "__main__":
     lhsScaler = estimatorMetadata['lhsScaler']
     with pd.HDFStore(resultPath) as store:
         scoresDF = pd.read_hdf(store, 'cv')
+        _estimatorsDF = pd.read_hdf(store, 'cv_estimators')
+        scoresDF.loc[:, 'estimator'] = _estimatorsDF
         workEstimatorsDF = pd.read_hdf(store, 'work')
         predDF = pd.read_hdf(store, 'predictions')
         termPalette = pd.read_hdf(store, 'plotOpts')
         coefDF = pd.read_hdf(store, 'coefficients')
+        allScoresForQuantile = np.concatenate([scoresDF['train_score'], scoresDF['test_score']])
 
     if arguments['refEstimatorName'] is not None:
         with open(resultPicklePathRef, 'rb') as _f:
             refEstimatorMetadata = pickle.load(_f)
         with pd.HDFStore(resultPathRef) as store:
             refScoresDF = pd.read_hdf(store, 'cv')
+            allScoresForQuantile = np.concatenate([allScoresForQuantile, refScoresDF['train_score'], refScoresDF['test_score']])
             refWorkEstimatorsDF = pd.read_hdf(store, 'work')
             refPredDF = pd.read_hdf(store, 'predictions')
             refCoefDF = pd.read_hdf(store, 'coefficients')
@@ -180,6 +212,8 @@ if __name__ == "__main__":
     else:
         refEstExists = False
 
+    #
+    allScoreQuantiles = np.quantile(allScoresForQuantile, [1e-2, 1-1e-2])
     trialInfo = recCurve.index.to_frame().reset_index(drop=True)
     trialInfo.index.name = 'trial'
     #
@@ -194,18 +228,27 @@ if __name__ == "__main__":
     if arguments['debugging']:
         rhsDF = rhsDF.loc[:, idxSl[['mahal_all#0', 'mahal_gamma#0'], :, :, :, :, :]]
     #
-    electrodeNames = [eN for eN in lhsDF['electrode'].unique() if eN != 'NA']
-    electrodeMasks = {}
-    for eN in electrodeNames:
-        eMask = lhsDF['electrode'] == eN
-        vMask = lhsDF.index.isin(cvIterator.validation)
-        electrodeMasks[eN] = eMask & vMask
-    #
+
+
+    pdb.set_trace()
+if True:
+    for name, estimatorDF in workEstimatorsDF.groupby(['design', 'target']):
+        designFormula, targetName = name
+        estimator = estimatorDF['estimator'].iloc[0]
+        factorNames = estimator.model_.exog_names
+        nRows = int(np.ceil(np.sqrt(len(factorNames))))
+        nCols = int(np.ceil(len(factorNames) / nRows))
+        fig, thisAx = plt.subplots(nRows, nCols)
+        for fIdx, fN in enumerate(factorNames):
+            fig = estimator.results_.plot_added_variable(focus_exog=fN, ax=thisAx.flat[fIdx])
+            break
+        break
+
     if refEstExists:
         pdfPath = os.path.join(
             figureOutputFolder,
             blockBaseName + '{}_{}_{}_vs_{}_{}.pdf'.format(
-                inputBlockSuffix, arguments['window'], estimatorName, refEstimatorName,
+                inputBlockSuffix, arguments['window'], fullEstimatorName, fullRefEstimatorName,
                 'RAUC_coefficients'))
         with PdfPages(pdfPath) as pdf:
             allCoeffNames = coefDF.index.get_level_values('component').unique()
@@ -231,7 +274,7 @@ if __name__ == "__main__":
                 ax = sns.heatmap(
                     plotCoefs, ax=ax,
                     cbar_ax=cbar_ax, vmin=vMin, vmax=vMax, cmap='vlag')
-                titleText = '{} coefficients for model\n{}'.format(estimatorName, designFormula)
+                titleText = '{} coefficients for model\n{}'.format(fullEstimatorName, designFormula)
                 figTitle = fig.suptitle(titleText)
                 pdf.savefig(
                     bbox_inches='tight',
@@ -253,7 +296,7 @@ if __name__ == "__main__":
                 ax = sns.heatmap(
                     plotRefCoefs, ax=ax,
                     cbar_ax=cbar_ax, vmin=vMin, vmax=vMax, cmap='vlag')
-                titleText = '{} coefficients for model\n{}'.format(refEstimatorName, designFormula)
+                titleText = '{} coefficients for model\n{}'.format(fullRefEstimatorName, designFormula)
                 figTitle = fig.suptitle(titleText)
                 pdf.savefig(
                     bbox_inches='tight',
@@ -263,7 +306,7 @@ if __name__ == "__main__":
                     plt.show()
                 else:
                     plt.close()
-
+                #
                 theseDiffCoefs = coefDiff.xs(designFormula, level='design', drop_level=False)
                 plotDiffCoefs = (
                     theseDiffCoefs.groupby(['target', 'component']).mean()
@@ -291,7 +334,7 @@ if __name__ == "__main__":
         pdfPath = os.path.join(
             figureOutputFolder,
             blockBaseName + '{}_{}_{}_vs_{}_{}.pdf'.format(
-                inputBlockSuffix, arguments['window'], estimatorName, refEstimatorName,
+                inputBlockSuffix, arguments['window'], fullEstimatorName, fullRefEstimatorName,
                 'RAUC_regression_scores'))
         with PdfPages(pdfPath) as pdf:
             height, width = 3, 3
@@ -340,8 +383,10 @@ if __name__ == "__main__":
             )
             g.set_xticklabels(rotation=30, ha='right')
             g.set_titles(template="{col_name}")
-            g.tight_layout(pad=0.1)
-            titleText = '{} scores'.format(estimatorName)
+
+            g.axes.flat[0].set_ylim(allScoreQuantiles)
+            g.tight_layout(pad=0.3)
+            titleText = '{} scores'.format(fullEstimatorName)
             figTitle = g.fig.suptitle(titleText)
             pdf.savefig(
                 bbox_inches='tight',
@@ -359,8 +404,9 @@ if __name__ == "__main__":
             )
             g.set_xticklabels(rotation=30, ha='right')
             g.set_titles(template="{col_name}")
-            g.tight_layout(pad=0.1)
-            titleText = '{} scores'.format(refEstimatorName)
+            g.axes.flat[0].set_ylim(allScoreQuantiles)
+            g.tight_layout(pad=0.3)
+            titleText = '{} scores'.format(fullRefEstimatorName)
             figTitle = g.fig.suptitle(titleText)
             pdf.savefig(
                 bbox_inches='tight',
@@ -378,8 +424,8 @@ if __name__ == "__main__":
             )
             g.set_xticklabels(rotation=30, ha='right')
             g.set_titles(template="{col_name}")
-            g.tight_layout(pad=0.1)
-            titleText = 'difference in scores ({} - {})'.format(refEstimatorName, estimatorName)
+            g.tight_layout(pad=0.3)
+            titleText = 'difference in scores ({} - {})'.format(fullRefEstimatorName, estimatorName)
             figTitle = g.fig.suptitle(titleText)
             pdf.savefig(
                 bbox_inches='tight',
@@ -389,20 +435,128 @@ if __name__ == "__main__":
                 plt.show()
             else:
                 plt.close()
-
+    #
+    llDict0 = {}
     for designFormula, designScores in scoresDF.groupby('design'):
         pT = PatsyTransformer(designFormula, return_type="matrix")
         designMatrix = pT.fit_transform(scaledLhsDF)
         designInfo = designMatrix.design_info
         designDF = (pd.DataFrame(designMatrix, index=lhsDF.index, columns=designInfo.column_names))
-        theseScores = scoresDF.xs(designFormula, level='design')
-        for targetName, targetScores in theseScores.groupby('target'):
+        llDict1 = {}
+        for scoreName, targetScores in designScores.groupby(['target', 'fold']):
+            targetName, fold = scoreName
             estimator = targetScores.iloc[0].loc['estimator']
-            thesePred = predDF.xs(targetName, level='target').xs(designFormula, level='design')
-            thesePred.index = thesePred.index.get_level_values('trial')
-            for elecName, elecMask in electrodeMasks.items():
-                trialIndices = lhsDF.loc[elecMask, :].index
-                thesePred.loc[trialIndices, 'ground_truth']
-                break
-            break
-        break
+            # estimator.model_.exog_names
+            # fig = estimator.results_.plot_added_variable('pedalMovementCat[outbound]')
+            thesePred = predDF.xs(targetName, level='target').xs(designFormula, level='design').xs(fold, level='fold')
+            '''
+            #### sanity checks
+            np.abs(thesePred.xs('work', level='trialType')['prediction'].to_numpy() - estimator.results_.fittedvalues).max()
+            #
+            1 - (estimator.results_.llf / estimator.results_.llnull)
+            residuals = (thesePred['ground_truth'] - thesePred['prediction'])
+            SSR = (residuals ** 2).sum()
+            SST = ((thesePred['ground_truth'] - thesePred['ground_truth'].mean()) ** 2).sum()
+            R2 = 1 - (SSR / SST)
+            #
+            llf = estimator.results_.family.loglike(thesePred['prediction'].to_numpy(), thesePred['ground_truth'].to_numpy())
+            llsat = estimator.results_.family.loglike(thesePred['ground_truth'].to_numpy(), thesePred['ground_truth'].to_numpy())
+            nullModel = ((thesePred['ground_truth'] ** 0) * thesePred['ground_truth'].mean()).to_numpy()
+            llnull = estimator.results_.family.loglike_obs(nullModel, thesePred['ground_truth'].to_numpy()).sum()
+            llR2 = 1 - ((llsat - llf) / (llsat - llnull))
+            #
+            L0 = pyglmnet_logL('gaussian', thesePred['ground_truth'].to_numpy(), nullModel)
+            L1 = pyglmnet_logL('gaussian', thesePred['ground_truth'].to_numpy(), thesePred['prediction'].to_numpy())
+            1 - (L1 / L0)
+            '''
+            ###
+            llDict2 = {}
+            for name, predGroup in thesePred.groupby(['electrode', 'trialType']):
+                llDict3 = {}
+                llDict3['llSat'] = estimator.results_.family.loglike(predGroup['ground_truth'].to_numpy(), predGroup['ground_truth'].to_numpy())
+                nullModel = ((predGroup['ground_truth'] ** 0) * predGroup['ground_truth'].mean()).to_numpy()
+                llDict3['llNull'] = estimator.results_.family.loglike(nullModel, predGroup['ground_truth'].to_numpy())
+                llDict3['llFull'] = estimator.results_.family.loglike(predGroup['prediction'].to_numpy(), predGroup['ground_truth'].to_numpy())
+                llDict2[name] = pd.Series(llDict3)
+            for trialType, predGroup in thesePred.groupby('trialType'):
+                llDict3 = {}
+                llDict3['llSat'] = estimator.results_.family.loglike(predGroup['ground_truth'].to_numpy(), predGroup['ground_truth'].to_numpy())
+                nullModel = ((predGroup['ground_truth'] ** 0) * predGroup['ground_truth'].mean()).to_numpy()
+                llDict3['llNull'] = estimator.results_.family.loglike(nullModel, predGroup['ground_truth'].to_numpy())
+                llDict3['llFull'] = estimator.results_.family.loglike(predGroup['prediction'].to_numpy(), predGroup['ground_truth'].to_numpy())
+                llDict2[('all', trialType)] = pd.Series(llDict3)
+            llDict1[scoreName] = pd.concat(llDict2, names=['electrode', 'trialType', 'llType'])
+        llDict0[designFormula] = pd.concat(llDict1, names=['target', 'fold', 'electrode', 'trialType', 'llType'])
+    llSrs = pd.concat(llDict0, names=['design', 'target', 'fold', 'electrode', 'trialType', 'llType'])
+
+    R2Per = llSrs.groupby(['design', 'target', 'electrode', 'fold', 'trialType']).apply(getR2)
+
+    # scoresDF.index.get_level_values('design').unique()
+    # print('all models: {}'.format(scoresDF.index.get_level_values('design').unique()))
+    modelsToTest = [
+        {
+            'testDesign': 'pedalMovementCat/(electrode:(amplitude/RateInHz)) - 1',
+            'refDesign': 'pedalMovementCat + (electrode:(amplitude/RateInHz)) - 1',
+            'captionStr': 'partial R2 of allowing pedalMovementCat to modulate electrode coefficients, vs assuming their independence'
+        },
+        {
+            'testDesign': 'pedalMovementCat/(electrode:(amplitude/RateInHz)) - 1',
+            'refDesign': 'pedalMovementCat - 1',
+            'captionStr': 'partial R2 of including any electrode coefficients'
+        },
+        {
+            'testDesign': 'pedalMovementCat/(electrode:(amplitude/RateInHz)) - 1',
+            'refDesign': 'pedalMovementCat/(electrode:amplitude) - 1',
+            'captionStr': 'partial R2 of including a term for modulation of electrode coefficients by RateInHz'
+        },
+        {
+            'testDesign': 'pedalMovementCat/(electrode:(amplitude/RateInHz)) - 1',
+            'refDesign': 'electrode:(amplitude/RateInHz) + 1',
+            'captionStr': 'partial R2 of including a term for pedalMovementCat, as opposed to an intercept'
+        },
+        {
+            'testDesign': 'pedalMovementCat/(electrode:(amplitude/RateInHz)) - 1',
+            'refDesign': None,
+            'captionStr': 'R2 of design (pedalMovementCat/(electrode:(amplitude/RateInHz)) - 1)'
+        },
+    ]
+    pdfPath = os.path.join(
+        figureOutputFolder,
+        blockBaseName + '{}_{}_{}_{}.pdf'.format(
+            inputBlockSuffix, arguments['window'], fullEstimatorName,
+            'RAUC_partial_scores'))
+    with PdfPages(pdfPath) as pdf:
+        height, width = 3, 3
+        aspect = width / height
+        for modelToTest in modelsToTest:
+            testDesign = modelToTest['testDesign']
+            refDesign = modelToTest['refDesign']
+            if 'captionStr' in modelToTest:
+                titleText = modelToTest['captionStr']
+            else:
+                titleText = 'partial R2 scores for {} compared {}'.format(testDesign, refDesign)
+            pR2 = partialR2(llSrs, refDesign=refDesign, testDesign=testDesign)
+            #
+            plotScores = pR2.to_frame(name='score').reset_index()
+            #
+            plotScores.loc[:, 'xDummy'] = 0
+            #
+            g = sns.catplot(
+                data=plotScores, kind='box',
+                y='score', x='target',
+                col='electrode', hue='trialType',
+                height=height, aspect=aspect
+            )
+            g.set_xticklabels(rotation=30, ha='right')
+            g.set_titles(template="{col_name}")
+            g.axes.flat[0].set_ylim(allScoreQuantiles)
+            g.tight_layout(pad=0.3)
+            figTitle = g.fig.suptitle(titleText)
+            pdf.savefig(
+                bbox_inches='tight',
+                bbox_extra_artists=[figTitle]
+            )
+            if arguments['showFigures']:
+                plt.show()
+            else:
+                plt.close()

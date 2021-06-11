@@ -56,13 +56,13 @@
 # EXP="exp202010071400"
 # EXP="exp202010081400"
 #
-# EXP="exp202010151400"
+EXP="exp202010151400"
 #
 # EXP="exp202010191100"
 #
 # EXP="exp202012171300"
 ###
-EXP="exp202012221300"
+# EXP="exp202012221300"
 
 # 
 module load anaconda/2020.02
@@ -93,10 +93,10 @@ ANALYSISFOLDER="--analysisName=loRes"
 # CHANSELECTOR="--chanQuery=isispinaloremg"
 
 #
-SLURM_ARRAY_TASK_ID=6
-BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
-# SLURM_ARRAY_TASK_ID=3
-# BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
+# SLURM_ARRAY_TASK_ID=6
+# BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
+SLURM_ARRAY_TASK_ID=3
+BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
 
 INPUTBLOCKNAME="--inputBlockSuffix=emg"
 ANALYSISFOLDER="--analysisName=loRes"

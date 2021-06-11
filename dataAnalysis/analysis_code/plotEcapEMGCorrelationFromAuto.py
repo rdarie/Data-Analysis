@@ -73,7 +73,7 @@ snsRCParams = {
         "axes.spines.bottom": True,
         "axes.spines.right": True,
         "axes.spines.top": True,
-        "axes.linewidth": .4,
+        "axes.linewidth": .125,
         "grid.linewidth": .2,
         "font.size": 5,
         "axes.labelsize": 7,
@@ -82,14 +82,29 @@ snsRCParams = {
         "ytick.labelsize": 5,
         "legend.fontsize": 5,
         "legend.title_fontsize": 7,
+        "xtick.bottom": True,
+        "xtick.top": True,
+        "ytick.left": True,
+        "ytick.right": True,
+        "xtick.major.width": .125,
+        "ytick.major.width": .125,
+        "xtick.minor.width": .125,
+        "ytick.minor.width": .125,
+        "xtick.major.size": 2,
+        "ytick.major.size": 2,
+        "xtick.minor.size": 1,
+        "ytick.minor.size": 1,
+        "xtick.direction": 'in',
+        "ytick.direction": 'in',
     }
 mplRCParams = {
     'figure.titlesize': 7
     }
 styleOpts = {
     'legend.lw': 2,
-    'tight_layout.pad': 1e-2
-}
+    'tight_layout.pad': 3e-1, # units of font size
+    'panel_heading.pad': 0.
+    }
 
 sns.set(
     context='paper', style='white',
@@ -252,6 +267,7 @@ emgNL = plotOptsEMG.loc[:, ['featureName', 'EMG Location']].set_index('featureNa
 emgNL = emgNL.apply(lambda x: ' '.join(re.findall('[A-Z][^A-Z]*', x.replace(' ', ''))))
 emgPalette = plotOptsEMG.loc[:, ['featureName', 'color']].set_index('featureName')['color']
 emgPaletteDesat = emgPalette.apply(sns.desaturate, args=(0.3, ))
+emgPaletteDarker = emgPalette.apply(sns.set_hls_values, args=(None, .4, None))
 #
 featToSiteEMG = plotOptsEMG.loc[:, ['featureName', 'EMGSite']].set_index('EMGSite')['featureName']
 for idxName in recCurve.index.names:
@@ -382,7 +398,6 @@ lfpXPalette = (
 lfpXPalette = lfpXPalette.loc[~lfpXPalette.index.duplicated()]
 lfpXPaletteDesat = lfpXPalette.apply(sns.desaturate, args=(0.3, ))
 #
-emgPaletteDarker = emgPalette.apply(sns.set_hls_values, args=(None, .4, None))
 mapDF.loc[:, 'xcoords'] = mapDF['shifted_xcoords'].copy()
 #
 corrDFIndex = pd.MultiIndex.from_product(
@@ -417,6 +432,7 @@ reject, pValsCorrected = pg.multicomp(corrDF.loc[corrDF['valid'].to_numpy(), 'pv
 corrDF.loc[:, 'correctedPVal'] = 1.
 corrDF.loc[corrDF['valid'].to_numpy(), 'correctedPVal'] = pValsCorrected
 corrDF.loc[:, 'rejectH0'] = corrDF['correctedPVal'] < 5e-3
+print('{} conditions reject H0 out of {}'.format(corrDF['rejectH0'].sum(), corrDF['rejectH0'].size))
 for annotName in mapAnnotNames:
     lookupSource = mapDF.loc[mapAMask, [annotName, 'topoName']].set_index('topoName')[annotName]
     corrDF.loc[:, annotName] = corrDF.index.get_level_values('lfp').map(lookupSource)
@@ -433,7 +449,7 @@ plotDF = corrDF.reset_index().query('whichArray == "rostral"')
 ## plot illustrations of RAUC and R
 ########################################################################
 if True:
-    zoomLevel = 1e-2
+    quantileZoomLevel = 1e-3
     #
     pdfPath = os.path.join(
         figureOutputFolder,
@@ -469,40 +485,48 @@ if True:
                 sizeMask = (recCurveMaskDF[exEMGName].to_numpy() & ecapRaucMaskDF[exLFPName].to_numpy())
                 thisMask = finiteMask & sizeMask
                 if thisMask.sum() > 10:
-                    g = sns.JointGrid(
+                    fig, ax = plt.subplots(1, 1, figsize=(2.7, 1.5))
+                    ax = sns.regplot(
                         x=ecapRaucWideDF.loc[thisMask, exLFPName],
                         y=recCurveWideDF.loc[thisMask, exEMGName],
-                        xlim=ecapRaucWideDF.loc[thisMask, exLFPName].quantile([zoomLevel, 1-zoomLevel]).to_list(),
-                        ylim=recCurveWideDF.loc[thisMask, exEMGName].quantile([zoomLevel, 1-zoomLevel]).to_list(),
+                        color=emgPalette[exEMGName]
+                        )
+                    xLim = ecapRaucWideDF.loc[thisMask, exLFPName].quantile(
+                        [quantileZoomLevel, 1 - quantileZoomLevel]).to_list()
+                    ax.set_xlim(xLim)
+                    yLim = recCurveWideDF.loc[thisMask, exEMGName].quantile(
+                        [quantileZoomLevel, 1 - quantileZoomLevel]).to_list()
+                    ax.set_ylim(yLim)
+                    '''g = sns.JointGrid(
+                        x=ecapRaucWideDF.loc[thisMask, exLFPName],
+                        y=recCurveWideDF.loc[thisMask, exEMGName],
+                        xlim=ecapRaucWideDF.loc[thisMask, exLFPName].quantile([quantileZoomLevel, 1-quantileZoomLevel]).to_list(),
+                        ylim=recCurveWideDF.loc[thisMask, exEMGName].quantile([quantileZoomLevel, 1-quantileZoomLevel]).to_list(),
                         ratio=100, height=3.5, marginal_ticks=False
                         )
-                    g.plot_joint(sns.regplot, color=emgPalette[exEMGName])
-                    axLW = snsRCParams['axes.linewidth']
-                    g.ax_joint.tick_params(length=axLW * 4, width=axLW, which='major', direction='in', reset=True)
-                    g.ax_joint.tick_params(length=axLW * 2, width=axLW / 2, which='minor', direction='in', reset=True)
-                    g.ax_marg_x.tick_params(length=0, colors=(1., 0., 0.), labelbottom=False, labelleft=False, reset=True)
-                    g.ax_marg_y.tick_params(length=0, colors=(1., 1., 0.), labelbottom=False, labelleft=False, reset=True)
-                    g.ax_joint.xaxis.set_major_locator(mpltk.MaxNLocator(prune='both', nbins=3))
-                    g.ax_joint.xaxis.set_minor_locator(mpltk.AutoMinorLocator())
-                    g.ax_joint.yaxis.set_major_locator(mpltk.MaxNLocator(prune='both', nbins=3))
-                    g.ax_joint.yaxis.set_minor_locator(mpltk.AutoMinorLocator(n=5))
-                    for side in g.ax_joint.spines.keys():  # 'top', 'bottom', 'left', 'right'
-                        g.ax_marg_y.spines[side].set_visible(False)
-                        g.ax_marg_x.spines[side].set_visible(False)
-                        g.ax_joint.spines[side].set_visible(True)
-                        g.ax_joint.spines[side].set_color(emgPalette[exEMGName])
-                        g.ax_joint.spines[side].set_linewidth(axLW)
-
-                    #
+                    g.plot_joint(sns.regplot, color=emgPalette[exEMGName])'''
+                    #######
+                    '''axLW = snsRCParams['axes.linewidth']
+                    ax.tick_params(length=axLW * 10, width=axLW, which='major', direction='in', reset=True)
+                    ax.tick_params(length=axLW * 5, width=axLW, which='minor', direction='in', reset=True)'''
+                    ax.xaxis.set_major_locator(mpltk.MaxNLocator(prune='both', nbins=3))
+                    ax.xaxis.set_minor_locator(mpltk.AutoMinorLocator())
+                    ax.yaxis.set_major_locator(mpltk.MaxNLocator(prune='both', nbins=3))
+                    ax.yaxis.set_minor_locator(mpltk.AutoMinorLocator(n=5))
+                    for side in ax.spines.keys():  # 'top', 'bottom', 'left', 'right'
+                        ax.spines[side].set_visible(True)
+                        ax.spines[side].set_color(emgPalette[exEMGName])
+                        # ax.spines[side].set_linewidth(axLW)
                     if (exEMGName, exLFPName) == (maxEMGName, maxLFPName):
-                        g.ax_joint.text(
+                        ax.text(
                             ecapRaucWideDF.loc[exEmgSingleTrial.name, exLFPName],
                             recCurveWideDF.loc[exEmgSingleTrial.name, exEMGName],
                             '$\Delta$', ha='center', va='baseline'
                         )
-                    g.set_axis_labels(
+                    ax.set_xlabel(
                         '{} electrode {}\nrAUC (a.u.)'.format(
-                            lfpNL.loc[exLFPName, 'whichArray'], int(lfpNL.loc[exLFPName, 'elecID'])),
+                            lfpNL.loc[exLFPName, 'whichArray'], int(lfpNL.loc[exLFPName, 'elecID'])))
+                    ax.set_ylabel(
                         '{}\nrAUC (a.u.)'.format(emgNL[exEMGName])
                         )
                     scoreMask = (plotDF['emg'] == exEMGName) & (plotDF['lfp'] == exLFPName)
@@ -514,21 +538,26 @@ if True:
                         thisPText = 'p < 1e-6'
                     else:
                         thisPText = 'p = {:.2g}'.format(thisPVal)
-                    g.ax_joint.text(
+                    ax.text(
                         .95, .95, "Spearman's R: {:.2g}; {}".format(thisScore, thisPText),
-                        ha='right', va='top', transform=g.ax_joint.transAxes)
+                        ha='right', va='top', transform=ax.transAxes)
                     if (exEMGName, exLFPName) == (maxEMGName, maxLFPName):
-                        g.ax_joint.text(
-                            .025, .95, u'\u2b24', ha='left', va='top', transform=g.ax_joint.transAxes,
+                        ax.text(
+                            .025, .95, u'\u2b24', ha='left', va='top', transform=ax.transAxes,
                             color=emgPaletteDarker[exEMGName]
                         )
                     if (exEMGName, exLFPName) == (minEMGName, minLFPName):
-                        g.ax_joint.text(
-                            .025, .95, r'$\blacksquare$', ha='left', va='top', transform=g.ax_joint.transAxes,
+                        ax.text(
+                            .025, .95, r'$\blacksquare$', ha='left', va='top', transform=ax.transAxes,
                             color=emgPaletteDarker[exEMGName]
                         )
                     print('Applying tight layout on distributions {} and {}'.format(exEMGName, exLFPName))
-                    g.fig.tight_layout(pad=styleOpts['tight_layout.pad'])
+                    fig_width, fig_height = fig.get_size_inches()
+                    ax.text(
+                        styleOpts['panel_heading.pad'], fig_height - styleOpts['panel_heading.pad'], 'A.', fontweight='bold',
+                        ha='left', va='top',
+                        fontsize=8, transform=fig.dpi_scale_trans)
+                    fig.tight_layout(pad=styleOpts['tight_layout.pad'])
                     pdf.savefig(bbox_inches='tight')
                     if (exEMGName, exLFPName) == (maxEMGName, maxLFPName) or (exEMGName, exLFPName) == (minEMGName, minLFPName):
                         if arguments['showFigures']:
@@ -542,7 +571,7 @@ if True:
 #########
 if True:
     exPlotKWArgs = {'lw': 0.25}
-    fig, ax = plt.subplots(2, 1, figsize=(3, 1.5))
+    fig, ax = plt.subplots(2, 1, figsize=(2.5, 1.5))
     lfpAx, emgAx = ax
     lfpAxTStart, lfpAxTStop = 0, 8
     lfpMaskAx = (
@@ -566,8 +595,8 @@ if True:
     lfpLims = lfpAx.get_ylim()
     lfpAx.set_xlim([lfpAxTStart, lfpAxTStop])
     axLW = snsRCParams['axes.linewidth']
-    lfpAx.tick_params(length=axLW * 4, width=axLW, which='major', direction='in', reset=True)
-    lfpAx.tick_params(length=axLW * 2, width=axLW / 2, which='minor', direction='in', reset=True)
+    lfpAx.tick_params(length=axLW * 10, width=axLW, which='major', direction='in', reset=True)
+    lfpAx.tick_params(length=axLW * 5, width=axLW, which='minor', direction='in', reset=True)
     # axTickIncr = lambda x: 10 ** np.round(np.log10((x[1] - x[0]) / 5))
     #
     # lfpAx.yaxis.set_major_locator(mpltk.MultipleLocator(axTickIncr(lfpLims)))
@@ -577,17 +606,19 @@ if True:
     lfpAx.yaxis.set_major_locator(mpltk.MaxNLocator(3))
     lfpAx.xaxis.set_minor_locator(mpltk.AutoMinorLocator(2))
     #
-    for side in lfpAx.spines.keys():  # 'top', 'bottom', 'left', 'right'
-        lfpAx.spines[side].set_color(lfpXPalette[maxLFPName])
+    '''for side in lfpAx.spines.keys():  # 'top', 'bottom', 'left', 'right'
+        lfpAx.spines[side].set_color(lfpXPalette[maxLFPName])'''
     lfpAx.text(
         .025, .95, "$\searrow$", color=lfpXPalette[exElectrode],
         ha='left', va='top', transform=lfpAx.transAxes)
     leg = lfpAx.legend(handles=[lfpLines], loc='lower right')
     for l in leg.get_lines():
         l.set_lw(styleOpts['legend.lw'])
+    fig_width, fig_height = fig.get_size_inches()
     lfpAx.text(
-        0.02, 0.95, 'A.', fontweight='bold',
-        fontsize=8, transform=fig.transFigure)
+        styleOpts['panel_heading.pad'], fig_height - styleOpts['panel_heading.pad'], 'A.', fontweight='bold',
+        ha='left', va='top',
+        fontsize=8, transform=fig.dpi_scale_trans)
     emgAxTStart, emgAxTStop = 0, 80
     emgMaskAx = (
             (emgDF.columns >= emgAxTStart * 1e-3) &
@@ -612,8 +643,8 @@ if True:
         l.set_lw(styleOpts['legend.lw'])
     emgLims = emgAx.get_ylim()
     #
-    emgAx.tick_params(length=axLW * 4, width=axLW, which='major', direction='in', reset=True)
-    emgAx.tick_params(length=axLW * 2, width=axLW / 2, which='minor', direction='in', reset=True)
+    emgAx.tick_params(length=axLW * 10, width=axLW, which='major', direction='in', reset=True)
+    emgAx.tick_params(length=axLW * 5, width=axLW, which='minor', direction='in', reset=True)
     #
     # emgAx.yaxis.set_major_locator(mpltk.MultipleLocator(axTickIncr(emgLims)))
     emgAx.yaxis.set_major_locator(mpltk.MaxNLocator(3))
@@ -622,12 +653,11 @@ if True:
     emgAx.xaxis.set_major_locator(mpltk.MaxNLocator(5))
     emgAx.xaxis.set_minor_locator(mpltk.AutoMinorLocator(2))
     #
-    for side in emgAx.spines.keys():  # 'top', 'bottom', 'left', 'right'
-        emgAx.spines[side].set_color(emgPalette[exEMGName])
+    '''for side in emgAx.spines.keys():  # 'top', 'bottom', 'left', 'right'
+        emgAx.spines[side].set_color(emgPalette[exEMGName])'''
     emgAx.text(
-        .025, .95, "$\searrow$", color=emgPalette[exEMGName],
+        .025, .95, "$\searrow$", color=emgPaletteDarker[exEMGName],
         ha='left', va='top', transform=emgAx.transAxes)
-    # sns.despine(fig=fig, trim=True)
     pdfPath = os.path.join(
         figureOutputFolder,
         prefix + '_{}_{}_{}.pdf'.format(
@@ -684,17 +714,34 @@ if True:
                 g.axes[ro, co].set_ylim(currYLim)
         if not hasattr(g.axes[ro, co], 'axWasChanged'):
             g.axes[ro, co].axWasChanged = True
+            if g.axes[ro, co].get_subplotspec().is_first_row() and g.axes[ro, co].get_subplotspec().is_first_col():
+                fig_width, fig_height = g.fig.get_size_inches()
+                g.axes[ro, co].text(
+                    styleOpts['panel_heading.pad'], fig_height - styleOpts['panel_heading.pad'], 'B.', fontweight='bold',
+                    ha='left', va='top',
+                    fontsize=8, transform=g.fig.dpi_scale_trans, zorder=100)
             if not emptySubset:
-                    currYTicks = g.axes[ro, co].get_yticks()
-                    currYLim = [yl for yl in g.axes[ro, co].get_ylim()]
-                    if len(currYTicks):
-                        g.axes[ro, co].set_yticks([
-                            np.round(currYLim[0] * limFrac, decimals=1),
-                            0,
-                            np.round(currYLim[-1] * limFrac, decimals=1)])
+                if g.axes[ro, co].get_subplotspec().is_first_col():
+                    g.axes[ro, co].spines['left'].set_visible(True)
+                    # g.axes[ro, co].yaxis.set_major_locator(mpltk.MaxNLocator(5))
+                    # g.axes[ro, co].yaxis.set_minor_locator(mpltk.AutoMinorLocator(2))
+                    for side in ['top', 'right']:  # 'top', 'bottom', 'left', 'right'
+                        g.axes[ro, co].spines[side].set_visible(False)
+                else:
+                    for side in ['top', 'left', 'right']:  # 'top', 'bottom', 'left', 'right'
+                        g.axes[ro, co].spines[side].set_visible(False)
+                '''currYTicks = g.axes[ro, co].get_yticks()
+                currYLim = [yl for yl in g.axes[ro, co].get_ylim()]
+                if len(currYTicks):
+                    g.axes[ro, co].set_yticks([
+                        np.round(currYLim[0] * limFrac, decimals=1),
+                        0,
+                        np.round(currYLim[-1] * limFrac, decimals=1)])'''
             else:
                 g.axes[ro, co].set_xticks([])
                 g.axes[ro, co].set_facecolor('w')
+                for side in ['top', 'bottom', 'left', 'right']:  # 'top', 'bottom', 'left', 'right'
+                    g.axes[ro, co].spines[side].set_visible(False)
         return
     #
     def changePatchAlpha(g, ro, co, hu, dataSubset):
@@ -733,21 +780,21 @@ if True:
     plotProcFuns = [
         axModFun, changePatchAlpha
         ]
+
+    targetTotalWidth = 5.9 # inches
+    targetTotalHeight = 3.6 # inches
+    width = targetTotalWidth / plotDF['xcoords'].unique().size
+    height = targetTotalHeight / plotDF['ycoords'].unique().size
+    aspect = width / height
+
     catPlotHeight, catPlotAspect = 1., 1.5
     catPlotWidth = catPlotHeight * catPlotAspect
     g = sns.catplot(
         row='ycoords', col='xcoords', y=barVarName, x='xDummy',
-        data=plotDF, height=catPlotHeight, aspect=catPlotAspect,
+        data=plotDF, height=height, aspect=aspect,
         kind='bar', hue='emg', palette=emgPalette.to_dict(),
         hue_order=sorted(plotDF['emg'].unique()),
         )
-    for (ro, co, hu), dataSubset in g.facet_data():
-        emptySubset = (
-                (dataSubset.empty) or
-                (dataSubset[barVarName].isna().all()))
-        if len(plotProcFuns):
-            for procFun in plotProcFuns:
-                procFun(g, ro, co, hu, dataSubset)
     leg = g._legend
     titleOverrides = {'emg': 'EMG Recording\nSite'}
 
@@ -768,12 +815,23 @@ if True:
     g.set_xlabels('')
     g.set_ylabels('')
     g.set_xticklabels('')
-    # g.fig.set_size_inches(g._ncol * catPlotWidth + 20, g._nrow * catPlotHeight + 2)
-    # g.fig.subplots_adjust(wspace=0.05, hspace=0.05)
-    figYLabel = g.fig.supylabel('Spearman\'s R', x=0.01, ha='left', va='center')
+    x0, y0, x1, y1 = g._tight_layout_rect
+    figYLabel = g.fig.supylabel(
+        'Spearman\'s R',
+        x=x0, y=(y1 - y0)/2,
+        ha='left', va='center')
     g.resize_legend(adjust_subtitles=True)
-    g._tight_layout_rect[0] += 1e-2 # add room for figXLabel
-    g.fig.subplots_adjust(left=g._tight_layout_rect[0])
+    for (ro, co, hu), dataSubset in g.facet_data():
+        emptySubset = (
+                (dataSubset.empty) or
+                (dataSubset[barVarName].isna().all()))
+        if len(plotProcFuns):
+            for procFun in plotProcFuns:
+                procFun(g, ro, co, hu, dataSubset)
+    yLabelH = (figYLabel.get_fontsize() / g.fig.dpi) / g.fig.get_size_inches()[0]
+    g._tight_layout_rect[0] += yLabelH  # add room for figYLabel
+    g.fig.subplots_adjust(
+        left=g._tight_layout_rect[0])
     g.tight_layout(pad=styleOpts['tight_layout.pad'])
     pdfPath = os.path.join(
         figureOutputFolder,
@@ -846,20 +904,25 @@ if True:
                 g.axes[ro, co].set_facecolor('w')
             else:
                 g.axes[ro, co].set_xlim([dataSubset[g._x_var].min(), dataSubset[g._x_var].max()])
+        if g.axes[ro, co].get_subplotspec().is_first_row() and g.axes[ro, co].get_subplotspec().is_first_col():
+            fig_width, fig_height = g.fig.get_size_inches()
+            g.axes[ro, co].text(
+                styleOpts['panel_heading.pad'], fig_height - styleOpts['panel_heading.pad'], 'B.', fontweight='bold',
+                ha='left', va='top',
+                fontsize=8, transform=g.fig.dpi_scale_trans, zorder=10)
         return
-    plotProcFuns = [
-        asp.genTicksToScale(
-            lineOpts={'lw': 1}, shared=True,
-            xUnitFactor=1, xUnits='uA',
-            yUnitFactor=1, yUnits='', limFracX=0.2, limFracY=.2,
-            dropNaNCol=whichRaucLFP, scaleBarPosition=[presentAmplitudes[2], 0.3],
-            # dX=0., yTicks=[0]
-        ),
-        axModFun]
+    plotProcFuns = [axModFun]
+    '''plotProcFuns.append(asp.genTicksToScale(
+        lineOpts={'lw': 1}, shared=True,
+        xUnitFactor=1, xUnits='uA',
+        yUnitFactor=1, yUnits='', limFracX=0.2, limFracY=.2,
+        dropNaNCol=whichRaucLFP, scaleBarPosition=[presentAmplitudes[2], 0.3],
+        # dX=0., yTicks=[0]
+    ))'''
     ########
     # array is 5 rows by 6 columns
     # for a square figure, make width = l/6, height = l/5
-    targetTotalWidth = 4 # inches
+    targetTotalWidth = 4.2 # inches
     targetTotalHeight = 3 # inches
     width = targetTotalWidth / plotEcapRC['feature_xcoords'].unique().size
     height = targetTotalHeight / plotEcapRC['feature_ycoords'].unique().size
@@ -876,19 +939,11 @@ if True:
         facet_kws=dict(sharey=True, sharex=True),
         lw=.25,
         )
-    for (ro, co, hu), dataSubset in g.facet_data():
-        emptySubset = (
-                (dataSubset.empty) or
-                (dataSubset[whichRaucLFP].isna().all()))
-        if len(plotProcFuns):
-            for procFun in plotProcFuns:
-                procFun(g, ro, co, hu, dataSubset)
     leg = g._legend
     titleOverrides = {
         'electrode_xcoords': 'Stimulation location\nw.r.t. midline\n(mm)'
         }
     entryOverrides = mapDF.loc[:, ['xcoords', 'electrodeSide', 'whichArray']].drop_duplicates().set_index('xcoords')
-
     if leg is not None:
         t = leg.get_title()
         tContent = t.get_text()
@@ -916,19 +971,39 @@ if True:
     g.set_titles('')
     g.set_xlabels('')
     g.set_ylabels('')
+    g.set_xticklabels('')
     g.set_yticklabels('')
-    figYLabel = g.fig.supylabel(
+    #
+    '''figYLabel = g.fig.supylabel(
         'ECAP rAUC (a.u.)', x=0.01, y=0.5,
         ha='left', va='center'
         )
     figXLabel = g.fig.supxlabel(
-        'Stimulation Amplitude (uA)', x=0.5, y=0.01,
+        'Stimulation amplitude (uA)', x=0.5, y=0.01,
         ha='center', va='bottom'
         )
-    g.resize_legend(adjust_subtitles=True)
     g._tight_layout_rect[0] += 1e-2 # add room for figXLabel
     g.fig.subplots_adjust(left=g._tight_layout_rect[0])
+    '''
+    #
+    g.resize_legend(adjust_subtitles=True)
+    for (ro, co, hu), dataSubset in g.facet_data():
+        emptySubset = (
+                (dataSubset.empty) or
+                (dataSubset[whichRaucLFP].isna().all()))
+        if len(plotProcFuns):
+            for procFun in plotProcFuns:
+                procFun(g, ro, co, hu, dataSubset)
     print('Applying tight layout on lfp rc')
+    textSizeX = (snsRCParams['font.size'] / g.fig.dpi) / g.fig.get_size_inches()[0]
+    g._tight_layout_rect[0] += textSizeX
+    textSizeY = (snsRCParams['font.size'] / g.fig.dpi) / g.fig.get_size_inches()[1]
+    g._tight_layout_rect[3] -= textSizeY
+    g.fig.subplots_adjust(
+        left=g._tight_layout_rect[0],
+        bottom=g._tight_layout_rect[1],
+        right=g._tight_layout_rect[2],
+        top=g._tight_layout_rect[3])
     g.tight_layout(pad=styleOpts['tight_layout.pad'])
     pdfPath = os.path.join(
         figureOutputFolder,
@@ -938,8 +1013,11 @@ if True:
     plt.savefig(
         pdfPath,
         bbox_inches='tight',
-        bbox_extra_artists=[leg, figYLabel, figXLabel]
-        ) #
+        bbox_extra_artists=[
+            leg,
+            # figYLabel, figXLabel
+            ]
+        )
     if arguments['showFigures']:
         plt.show()
     else:
@@ -969,12 +1047,19 @@ if True:
                 # '$\Delta$', ha='center', va='center',
                 color=thisColor
             )
+            if g.axes[ro, co].get_subplotspec().is_first_row() and g.axes[ro, co].get_subplotspec().is_first_col():
+                fig_width, fig_height = g.fig.get_size_inches()
+                g.axes[ro, co].text(
+                    styleOpts['panel_heading.pad'], fig_height - styleOpts['panel_heading.pad'], 'C.', fontweight='bold',
+                    ha='left', va='top',
+                    fontsize=8, transform=g.fig.dpi_scale_trans, zorder=10)
             g.axes[ro, co].set_xlim([dataSubset[g._x_var].min(), dataSubset[g._x_var].max()])
             for side in g.axes[ro, co].spines.keys():  # 'top', 'bottom', 'left', 'right'
+                g.axes[ro, co].spines[side].set_lw(axLW * 2)
                 g.axes[ro, co].spines[side].set_visible(True)
-                g.axes[ro, co].spines[side].set_color(thisColor)
-            g.axes[ro, co].tick_params(length=axLW * 4, width=axLW, which='major', direction='in', reset=True)
-            g.axes[ro, co].tick_params(length=axLW * 2, width=axLW / 2, which='minor', direction='in', reset=True)
+                g.axes[ro, co].spines[side].set_color(lfpXPalette[exElectrode])
+            g.axes[ro, co].tick_params(length=axLW * 10, width=axLW, which='major', direction='in', reset=True)
+            g.axes[ro, co].tick_params(length=axLW * 5, width=axLW, which='minor', direction='in', reset=True)
             g.axes[ro, co].xaxis.set_major_locator(mpltk.MaxNLocator(prune='both', nbins=4))
             g.axes[ro, co].xaxis.set_minor_locator(mpltk.AutoMinorLocator())
             g.axes[ro, co].yaxis.set_major_locator(mpltk.MaxNLocator(prune='both', nbins=4))
@@ -992,8 +1077,8 @@ if True:
         return
     plotProcFuns = [axModFun]
     ########
-    height = 1.7
-    width = 2.3
+    height = 1.5
+    width = 1.5
     aspect = width / height
     g = sns.relplot(
         col='feature_xcoords',
@@ -1007,13 +1092,6 @@ if True:
         facet_kws=dict(sharey=True, sharex=True),
         lw=.5,
         )
-    for (ro, co, hu), dataSubset in g.facet_data():
-        emptySubset = (
-                (dataSubset.empty) or
-                (dataSubset[whichRaucLFP].isna().all()))
-        if len(plotProcFuns):
-            for procFun in plotProcFuns:
-                procFun(g, ro, co, hu, dataSubset)
     leg = g._legend
     titleOverrides = {
         'electrode_xcoords': 'Stimulation location\nw.r.t. midline\n(mm)'
@@ -1045,19 +1123,42 @@ if True:
                 except Exception:
                     pass
     g.set_titles('')
-    g.set_xlabels('')
-    g.set_ylabels('')
+    g.set_xlabels('Stimulation amplitude (uA)')
+    g.set_ylabels('ECAP rAUC (a.u.)')
+    '''
+    x0, y0, x1, y1 = g._tight_layout_rect
     figYLabel = g.fig.supylabel(
-        'ECAP rAUC (a.u.)', x=0.01, y=0.5,
+        'ECAP rAUC (a.u.)', x=x0, y=(y1 - y0) / 2,
         ha='left', va='center'
         )
     figXLabel = g.fig.supxlabel(
-        'Stimulation Amplitude (uA)', x=0.5, y=0.01,
+        'Stimulation amplitude (uA)', x=(x1 - x0) / 2, y=y0,
         ha='center', va='bottom'
-        )
+        )'''
     g.resize_legend(adjust_subtitles=True)
-    g._tight_layout_rect[0] += 1e-2 # add room for figXLabel
-    g.fig.subplots_adjust(left=g._tight_layout_rect[0])
+    for (ro, co, hu), dataSubset in g.facet_data():
+        emptySubset = (
+                (dataSubset.empty) or
+                (dataSubset[whichRaucLFP].isna().all()))
+        if len(plotProcFuns):
+            for procFun in plotProcFuns:
+                procFun(g, ro, co, hu, dataSubset)
+    '''xLabelH = (figXLabel.get_fontsize() / g.fig.dpi) / g.fig.get_size_inches()[1]
+    g._tight_layout_rect[1] += xLabelH # add room for figYLabel
+    yLabelH = (figYLabel.get_fontsize() / g.fig.dpi) / g.fig.get_size_inches()[0]
+    g._tight_layout_rect[0] += yLabelH # add room for figYLabel
+    g.fig.subplots_adjust(
+        left=g._tight_layout_rect[0],
+        bottom=g._tight_layout_rect[1])'''
+    textSizeX = (snsRCParams['font.size'] / g.fig.dpi) / g.fig.get_size_inches()[0]
+    g._tight_layout_rect[0] += textSizeX
+    textSizeY = (snsRCParams['font.size'] / g.fig.dpi) / g.fig.get_size_inches()[1]
+    g._tight_layout_rect[3] -= textSizeY
+    g.fig.subplots_adjust(
+        left=g._tight_layout_rect[0],
+        bottom=g._tight_layout_rect[1],
+        right=g._tight_layout_rect[2],
+        top=g._tight_layout_rect[3])
     print('Applying tight layout on lfp rc closeup')
     g.tight_layout(pad=styleOpts['tight_layout.pad'])
     pdfPath = os.path.join(
@@ -1068,7 +1169,10 @@ if True:
     plt.savefig(
         pdfPath,
         bbox_inches='tight',
-        bbox_extra_artists=[leg, figYLabel, figXLabel]
+        bbox_extra_artists=[
+            leg,
+            # figYLabel, figXLabel
+        ]
         ) #
     if arguments['showFigures']:
         plt.show()
@@ -1104,13 +1208,19 @@ if True:
             (dataSubset[amplitudeFieldName] == exEmgSingleTrial.name[4]) &
             (dataSubset['electrode'] == exEmgSingleTrial.name[3])
         )
+        if g.axes[ro, co].get_subplotspec().is_first_row() and g.axes[ro, co].get_subplotspec().is_first_col():
+            fig_width, fig_height = g.fig.get_size_inches()
+            g.axes[ro, co].text(
+                styleOpts['panel_heading.pad'], fig_height - styleOpts['panel_heading.pad'], 'E.', fontweight='bold',
+                ha='left', va='top',
+                fontsize=8, transform=g.fig.dpi_scale_trans, zorder=10)
         dataFromExample = dataSubset.loc[maskFromExample, :]
         if not dataFromExample.empty:
             g.axes[ro, co].text(
                 exEmgSingleTrial.name[4],
                 dataFromExample[g._y_var].mean(),
                 '$\searrow$', ha='right', va='baseline',
-                color=emgPalette[maxEMGName],
+                color=emgPaletteDarker[maxEMGName],
             )
         if not hasattr(g.axes[ro, co], 'axWasChanged'):
             g.axes[ro, co].axWasChanged = True
@@ -1119,20 +1229,22 @@ if True:
                 g.axes[ro, co].set_facecolor('w')
             else:
                 elecPos = dataSubset[colName].iloc[0] - electrodeMaxXDistance / 2
+                thisElecName = dataSubset['electrode'].unique()[0]
                 titleText = '{:0.2f} mm'.format(elecPos / 10)
                 g.axes[ro, co].set_title(titleText)
                 axLW = snsRCParams['axes.linewidth']
                 g.axes[ro, co].set_xlim([dataSubset[g._x_var].min(), dataSubset[g._x_var].max()])
-                g.axes[ro, co].tick_params(length=axLW * 4, width=axLW, which='major', direction='in', reset=True)
-                g.axes[ro, co].tick_params(length=axLW * 2, width=axLW / 2, which='minor', direction='in', reset=True)
+                g.axes[ro, co].tick_params(length=axLW * 10, width=axLW, which='major', direction='in', reset=True)
+                g.axes[ro, co].tick_params(length=axLW * 5, width=axLW, which='minor', direction='in', reset=True)
                 g.axes[ro, co].xaxis.set_major_locator(mpltk.MaxNLocator(prune='both', nbins=3))
                 g.axes[ro, co].xaxis.set_minor_locator(mpltk.AutoMinorLocator())
                 g.axes[ro, co].yaxis.set_major_locator(mpltk.MaxNLocator(prune='both', nbins=3))
                 g.axes[ro, co].yaxis.set_minor_locator(mpltk.AutoMinorLocator())
                 for side in g.axes[ro, co].spines.keys():  # 'top', 'bottom', 'left', 'right'
                     g.axes[ro, co].spines[side].set_visible(True)
+                    g.axes[ro, co].spines[side].set_lw(axLW * 4)
+                    g.axes[ro, co].spines[side].set_color(lfpXPalette[thisElecName])
         return
-
 
     plotProcFuns = []
     plotProcFuns.append(axModFun)
@@ -1149,7 +1261,7 @@ if True:
     hueName = 'featureName'
     colWrap = min(3, len(colOrder))
 
-    width = 2.4
+    width = 2.2
     height = 1.8
     aspect = width / height
     width = height * aspect
@@ -1166,13 +1278,6 @@ if True:
         facet_kws=dict(sharey=True, sharex=False, legend_out=True),
         lw=.5,
         )
-    for (ro, co, hu), dataSubset in g.facet_data():
-        emptySubset = (
-                (dataSubset.empty) or
-                (dataSubset[whichRaucEMG].isna().all()))
-        if len(plotProcFuns):
-            for procFun in plotProcFuns:
-                procFun(g, ro, co, hu, dataSubset)
     leg = g._legend
     titleOverrides = {
         'featureName': 'EMG Recording\nSite',
@@ -1180,21 +1285,7 @@ if True:
         }
     g.set_xlabels('')
     g.set_ylabels('')
-    g.set_yticklabels('')
-    figYLabel = g.fig.supylabel(
-        'EMG RAUC (a.u.)', x=0.01, y=0.5,
-        ha='left', va='center'
-        )
-    figXLabel = g.fig.supxlabel(
-        'Stimulation Amplitude (uA)', x=0.5, y=0.01,
-        ha='center', va='bottom'
-        )
-    g._tight_layout_rect[0] += 1e-2 # add room for figXLabel
-    figTitle = g.fig.suptitle(
-        'Stimulation location (mediolateral, w.r.t. midline)',
-        x=0.5, y=.99,
-        ha='center', va='top'
-        )
+    # g.set_yticklabels('')
     if leg is not None:
         t = leg.get_title()
         tContent = t.get_text()
@@ -1210,6 +1301,38 @@ if True:
             # l.set_lw(2 * l.get_lw())
             l.set_lw(styleOpts['legend.lw'])
     g.resize_legend(adjust_subtitles=True)
+    for (ro, co, hu), dataSubset in g.facet_data():
+        emptySubset = (
+                (dataSubset.empty) or
+                (dataSubset[whichRaucEMG].isna().all()))
+        if len(plotProcFuns):
+            for procFun in plotProcFuns:
+                procFun(g, ro, co, hu, dataSubset)
+    x0, y0, x1, y1 = g._tight_layout_rect
+    figYLabel = g.fig.supylabel(
+        'EMG rAUC (a.u.)', x=x0, y=(y1 - y0) / 2,
+        ha='left', va='center'
+        )
+    figXLabel = g.fig.supxlabel(
+        'Stimulation amplitude (uA)', x=(x1 - x0) / 2, y=y0,
+        ha='center', va='bottom'
+        )
+    figTitle = g.fig.suptitle(
+        'Stimulation location (mediolateral, w.r.t. midline)',
+        x=(x1 - x0) / 2, y=y1,
+        ha='center', va='top'
+        )
+    xLabelH = (figXLabel.get_fontsize() / g.fig.dpi) / g.fig.get_size_inches()[1]
+    g._tight_layout_rect[1] += xLabelH # add room for figYLabel
+    yLabelH = (figYLabel.get_fontsize() / g.fig.dpi) / g.fig.get_size_inches()[0]
+    g._tight_layout_rect[0] += yLabelH # add room for figYLabel
+    supTitleH = (figTitle.get_fontsize() / g.fig.dpi) / g.fig.get_size_inches()[1]
+    g._tight_layout_rect[3] -= supTitleH # add room for figTitle
+    g.fig.subplots_adjust(
+        left=g._tight_layout_rect[0],
+        bottom=g._tight_layout_rect[1],
+        right=g._tight_layout_rect[2],
+        top=g._tight_layout_rect[3])
     print('Applying tight layout on emg rc')
     g.tight_layout(pad=styleOpts['tight_layout.pad'])
     pdfPath = os.path.join(

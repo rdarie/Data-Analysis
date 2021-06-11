@@ -23,9 +23,9 @@
 #SBATCH --array=1,2,3
 
 ####
-# EXP="exp202010151400"
+EXP="exp202010151400"
 # EXP="exp202012171300"
-EXP="exp202012221300"
+# EXP="exp202012221300"
 # EXP="exp201901070700"
 # EXP="exp202101141100"
 # EXP="exp202101191100"
@@ -57,11 +57,10 @@ python --version
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*.parquet' --fromDataToScratch
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*Block003*' --fromDataToScratch
 #
-# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*fullRes*' --fromDataToScratch --foldersIncluded
-# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*fullRes*' --fromDataToScratch --foldersIncluded
-# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*loRes*' --fromDataToScratch --foldersIncluded
+python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*.parquet' --fromDataToScratch --foldersIncluded --filesIncluded
+python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*loRes*' --fromDataToScratch --foldersIncluded
 python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*outlierTrials*' --fromDataToScratch --foldersIncluded
 
 # everything to data
-# python './shuttleFilesToFromScratch.py' --exp=$EXP --preprocFolderSubfolders --fromScratchToData --moveItems
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --fromScratchToData --searchTerm='*' --moveItems --foldersIncluded --filesIncluded
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --preprocFolderFiles --fromScratchToData --moveItems

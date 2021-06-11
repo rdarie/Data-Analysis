@@ -329,8 +329,10 @@ if __name__ == "__main__":
             print('Fitting {}'.format(targetName))
             if gsParamsPerTarget is not None:
                 gsKWA['param_grid'] = gsParamsPerTarget[targetName]
+            thisTargetSrs = rhsDF.loc[:, columnTuple]
+            thisTargetSrs.name = targetName
             cvScores, gridSearcherDict1[targetName], gsScoresDict1[targetName] = tdr.gridSearchHyperparameters(
-                designDF, rhsDF.loc[:, columnTuple],
+                designDF, thisTargetSrs,
                 estimatorInstance=estimatorInstance,
                 verbose=int(arguments['verbose']),
                 gridSearchKWArgs=gsKWA,
