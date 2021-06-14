@@ -195,7 +195,7 @@ if __name__ == "__main__":
         'family': sm.families.Gaussian(),
         'alpha': None, 'L1_wt': None,
         'refit': True, 'tol': 1e-3,
-        'maxiter': 1000, 'disp': False
+        'maxiter': 5000, 'disp': False
         }
     estimatorInstance = tdr.SMWrapper(**modelKWArgs)
     ## names of things in statsmodels
@@ -227,8 +227,8 @@ if __name__ == "__main__":
         "electrode:(amplitude/RateInHz) + 1",
         "pedalMovementCat - 1"
     ]
-    recCurve = pd.read_hdf(raucPath, 'raw')
-    ########
+    recCurve = pd.read_hdf(raucPath, 'scaled')
+    ########i
     with open(iteratorPath, 'rb') as _f:
         iteratorMeta = pickle.load(_f)
         iteratorKWArgs = iteratorMeta['iteratorKWArgs']

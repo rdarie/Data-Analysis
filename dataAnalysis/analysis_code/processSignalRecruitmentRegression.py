@@ -230,8 +230,7 @@ if __name__ == "__main__":
     #
 
 
-    pdb.set_trace()
-if True:
+    '''pdb.set_trace()
     for name, estimatorDF in workEstimatorsDF.groupby(['design', 'target']):
         designFormula, targetName = name
         estimator = estimatorDF['estimator'].iloc[0]
@@ -241,8 +240,8 @@ if True:
         fig, thisAx = plt.subplots(nRows, nCols)
         for fIdx, fN in enumerate(factorNames):
             fig = estimator.results_.plot_added_variable(focus_exog=fN, ax=thisAx.flat[fIdx])
-            break
-        break
+        plt.show()
+        break'''
 
     if refEstExists:
         pdfPath = os.path.join(

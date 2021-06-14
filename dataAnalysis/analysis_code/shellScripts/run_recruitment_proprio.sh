@@ -41,6 +41,6 @@ ITERATOR="f"
 # python -u "./calcSignalNoiseCeiling.py" --plotting --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER --loadFromFrames --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET
 # python -u "./plotSignalRecruitment.py" --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $INPUTBLOCKNAME $UNITSELECTOR $ALIGNQUERY
 #
-python -u "./calcSignalRecruitmentRegression.py" --estimatorName=enr_refit --iteratorSuffix=noRos --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $INPUTBLOCKNAME $UNITSELECTOR $ALIGNQUERY --verbose=1
+# python -u "./calcSignalRecruitmentRegression.py" --estimatorName=enr_refit --iteratorSuffix=noRos --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $INPUTBLOCKNAME $UNITSELECTOR $ALIGNQUERY --verbose=1
 python -u "./processSignalRecruitmentRegression.py" --estimatorName=enr_refit --iteratorSuffix=noRos --refEstimatorName=enr_refit --refIteratorSuffix=ros --exp=$EXP $BLOCKSELECTOR $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $INPUTBLOCKNAME $UNITSELECTOR $ALIGNQUERY --verbose=1
 #
