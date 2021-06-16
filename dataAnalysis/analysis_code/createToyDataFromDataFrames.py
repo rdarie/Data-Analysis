@@ -24,6 +24,7 @@ Options:
     --estimatorName=estimatorName          filename for resulting estimator (cross-validated n_comps)
     --selector=selector                    filename if using a unit selector
 """
+
 import matplotlib
 matplotlib.use('QT5Agg')   # generate postscript output
 # matplotlib.use('Agg')   # generate postscript output
@@ -301,11 +302,11 @@ if __name__ == '__main__':
     nDimLatent = 2
     #####
     kinDirection = vg.rotate(
-        vg.basis.x, vg.basis.z, 10)
+        vg.basis.x, vg.basis.z, 5)
     stimDirection = vg.rotate(
         kinDirection, vg.basis.z, 90)
     #####
-    mu = np.asarray([1., 2., 3.])
+    mu = np.asarray([0., 0., 0.])
     phi, theta, tau = 30, 70, 20
     Wrot = np.concatenate(
         [
@@ -313,16 +314,16 @@ if __name__ == '__main__':
             vg.rotate(vg.rotate(vg.rotate(vg.basis.y, vg.basis.x, phi), vg.basis.y, theta), vg.basis.z, tau).reshape(-1, 1)],
         axis=1
         )
-    var = np.asarray([2, 5])
+    var = np.asarray([2, 7])
     W = Wrot * var
-    S = np.eye(nDim)
+    S = np.eye(nDim) * .5
     #
     gtCoeffs = pd.Series({
         'Intercept': 0.,
-        'velocity': 1.,
-        'electrode[+ E16 - E9]:amplitude': 1.,
+        'velocity': 3.,
+        'electrode[+ E16 - E9]:amplitude': 2.,
         'electrode[NA]:amplitude': 0.,
-        'electrode[+ E16 - E9]:amplitude:RateInHz': 0.,
+        'electrode[+ E16 - E9]:amplitude:RateInHz': 1.,
         'electrode[NA]:amplitude:RateInHz': 0.
         })
 
@@ -352,5 +353,22 @@ if __name__ == '__main__':
         index=latentRhsDF.index,
         columns=['{}'.format(cN) for cN in range(nDim)])
     rhsPlotDF = pd.concat([rhsDF, toyLhsDF], axis='columns')
+    totalBoundsLatent = (
+        latentPlotDF.loc[:, latentRhsDF.columns].quantile(1e-2).min(),
+        latentPlotDF.loc[:, latentRhsDF.columns].quantile(1 - 1e-2).max(),)
     pdb.set_trace()
-    mlab.points3d(rhsPlotDF['0'], rhsPlotDF['1'], rhsPlotDF['2'])
+    fig, ax = plt.subplots()
+    ax.scatter(
+        latentPlotDF['0'], latentPlotDF['1'],
+        c=latentPlotDF['amplitude'], cmap='viridis', alpha=0.1, linewidths=0)
+    plt.show()
+    totalBounds = (
+        rhsPlotDF.loc[:, rhsDF.columns].quantile(1e-2).min(),
+        rhsPlotDF.loc[:, rhsDF.columns].quantile(1 - 1e-2).max(),)
+    fig = plt.figure()
+    fig.set_size_inches((12, 12))
+    ax = fig.add_subplot(projection='3d')
+    ax.scatter(
+        rhsPlotDF['0'], rhsPlotDF['1'], rhsPlotDF['2'],
+        c=rhsPlotDF['amplitude'], cmap='viridis', alpha=.1, linewidths=0)
+    plt.show()
