@@ -23,7 +23,7 @@ Options:
     --plotting                             delete outlier trials? [default: False]
     --datasetName=datasetName              filename for resulting estimator (cross-validated n_comps)
     --selectionName=selectionName          filename for resulting estimator (cross-validated n_comps)
-    --iteratorSuffix=iteratorSuffix            filename for resulting estimator (cross-validated n_comps)
+    --iteratorSuffix=iteratorSuffix        filename for resulting estimator (cross-validated n_comps)
 """
 import matplotlib
 matplotlib.rcParams['pdf.fonttype'] = 42

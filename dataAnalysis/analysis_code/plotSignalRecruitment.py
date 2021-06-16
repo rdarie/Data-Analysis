@@ -62,7 +62,7 @@ alignSubFolder = os.path.join(
     )
 calcSubFolder = os.path.join(analysisSubFolder, 'dataframes')
 figureOutputFolder = os.path.join(
-    figureFolder, arguments['analysisName'])
+    figureFolder, arguments['analysisName'], 'lfp_recruitment')
 if not os.path.exists(figureOutputFolder):
     os.makedirs(figureOutputFolder, exist_ok=True)
 
@@ -168,7 +168,7 @@ pdfPath = os.path.join(
     figureOutputFolder,
     blockBaseName + '{}_{}_{}.pdf'.format(
         inputBlockSuffix, arguments['window'],
-        'distributions'))
+        'RAUC_distributions'))
 with PdfPages(pdfPath) as pdf:
     g = sns.displot(
         data=plotRC,

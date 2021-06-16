@@ -122,7 +122,7 @@ if __name__ == '__main__':
     prf.print_memory_usage('just loaded data, fitting')
     originalDataDF = unNormalizeDataset(dataDF, normalizationParams)
     figureOutputFolder = os.path.join(
-        figureFolder, arguments['analysisName'])
+        figureFolder, arguments['analysisName'], 'dimensionality')
     if not os.path.exists(figureOutputFolder):
         os.makedirs(figureOutputFolder)
     if True:
@@ -131,6 +131,7 @@ if __name__ == '__main__':
         hsResDict0 = {}
         for idx, (maskIdx, featureMask) in enumerate(featureMasks.iterrows()):
             maskParams = {k: v for k, v in zip(featureMask.index.names, maskIdx)}
+            prf.print_memory_usage('On featureMask {}'.format(maskIdx))
             dataGroup = dataDF.loc[:, featureMask]
             originalDataGroup = originalDataDF.loc[:, featureMask]
             ntResDict1 = {'normalized': {}, 'original': {}}
@@ -183,7 +184,8 @@ if __name__ == '__main__':
         ntResDF.index = ntResDF.index.droplevel(0)
         ntResDF.to_hdf(outputPath, 'univariateNormality')
         #
-        pdfPath = os.path.join(figureOutputFolder, '{}_normality_tests.pdf'.format(selectionName))
+        pdfPath = os.path.join(
+            figureOutputFolder, '{}_normality_tests.pdf'.format(selectionName))
         # pdb.set_trace()
         with PdfPages(pdfPath) as pdf:
             plotGroup = hzResDF.reset_index()

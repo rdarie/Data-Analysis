@@ -31,14 +31,14 @@ BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
 TARGET="lfp_CAR_spectral"
 # TARGET="lfp_CAR"
 #
-ESTIMATOR="fa"
-# ESTIMATOR="pca"
+# ESTIMATOR="fa"
+ESTIMATOR="pca"
 #
-ITERATOR="a"
-ALIGNQUERYTERM="outbound"
+# ITERATOR="a"
+# ALIGNQUERYTERM="outbound"
 ##
-# ITERATOR="b"
-# ALIGNQUERYTERM="startingNoStim"
+ITERATOR="b"
+ALIGNQUERYTERM="startingNoStim"
 ##
 # ITERATOR="c"
 # ALIGNQUERYTERM="startingE5"
@@ -47,15 +47,15 @@ ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
 
 #####
 # python -u './testSignalNormality.py' --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
+# ITERATOR="a"
 # python -u './calcGridSearchSignalDimensionality.py' --estimatorName="${ESTIMATOR}" --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
-
-#
+# python -u './processSignalDimensionality.py' --estimatorName="${ESTIMATOR}" --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
+# ITERATOR="b"
+# python -u './calcGridSearchSignalDimensionality.py' --estimatorName="${ESTIMATOR}" --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
 # python -u './processSignalDimensionality.py' --estimatorName="${ESTIMATOR}" --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
 #
-# python -u './assembleExperimentAlignedAsigs.py' --exp=$EXP $BLOCKSELECTOR --inputBlockSuffix="${TARGET}" $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $LAZINESS
-
-TARGET="lfp_CAR_spectral_fa"
-# TARGET="lfp_CAR_fa"
-# TARGET="lfp_CAR_spectral_pca"
-# TARGET="lfp_CAR_pca"
-# python -u './calcSignalNovelty.py' --estimatorName="mahal" --datasetName="Block_${WINDOW}_df_${ITERATOR}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=2 --plotting --showFigures
+python -u './compareSignalCovarianceMatrices.py' --estimatorName="${ESTIMATOR}" --iteratorSuffixList="a, b" --datasetPrefix="Block_${WINDOWTERM}_df" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
+#
+# TARGET="lfp_CAR_spectral_fa"
+TARGET="lfp_CAR_spectral"
+# python -u './calcSignalNovelty.py' --estimatorName="mahal" --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=2 --plotting --showFigures

@@ -24,10 +24,6 @@ matplotlib.use('QT5Agg')   # generate postscript output
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import seaborn as sns
-sns.set(
-    context='talk', style='dark',
-    palette='dark', font='sans-serif',
-    font_scale=0.5, color_codes=True)
 import os, sys
 import dataAnalysis.helperFunctions.profiling as prf
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
@@ -41,6 +37,7 @@ import dataAnalysis.preproc.ns5 as ns5
 # from sklearn.decomposition import PCA, IncrementalPCA
 # from sklearn.pipeline import make_pipeline, Pipeline
 # from sklearn.covariance import ShrunkCovariance, LedoitWolf, EmpiricalCovariance
+from sklearn.metrics import explained_variance_score
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import cross_val_score, cross_validate, GridSearchCV
 import joblib as jb
@@ -48,8 +45,13 @@ import dill as pickle
 import gc
 from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
 from docopt import docopt
+from numpy.random import default_rng
+rng = default_rng()
 idxSl = pd.IndexSlice
-
+sns.set(
+    context='talk', style='dark',
+    palette='dark', font='sans-serif',
+    font_scale=0.5, color_codes=True)
 for arg in sys.argv:
     print(arg)
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
@@ -59,13 +61,10 @@ arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 consoleDebugging = True
 if consoleDebugging:
     arguments = {
-    'analysisName': 'default', 'showFigures': True, 'exp': 'exp202101201100', 'processAll': True,
-    'verbose': False, 'plotting': True, 'fullEstimatorName': 'ols_lfp_CAR_spectral_to_jointAngle_a_L_starting',
-    'alignFolderName': 'motion', 'blockIdx': '2', 'correctFreqBandName': True}
+        'processAll': True, 'debugging': False, 'blockIdx': '2', 'estimatorName': 'pca', 'analysisName': 'default',
+        'showFigures': False, 'selectionName': 'lfp_CAR_spectral', 'alignFolderName': 'motion', 'plotting': True,
+        'verbose': '1', 'datasetName': 'Block_XL_df_a', 'exp': 'exp202101281100'}
     os.chdir('/gpfs/home/rdarie/nda2/Data-Analysis/dataAnalysis/analysis_code')
-    scratchPath = '/gpfs/scratch/rdarie/rdarie/Neural Recordings'
-    scratchFolder = '/gpfs/scratch/rdarie/rdarie/Neural Recordings/202101201100-Rupert'
-    figureFolder = '/gpfs/data/dborton/rdarie/Neural Recordings/processed/202101201100-Rupert/figures'
 '''
 
 expOpts, allOpts = parseAnalysisOptions(
@@ -78,26 +77,20 @@ analysisSubFolder, alignSubFolder = hf.processSubfolderPaths(
 if arguments['plotting']:
     figureOutputFolder = os.path.join(
         figureFolder,
-        arguments['analysisName'], arguments['alignFolderName'])
+        arguments['analysisName'], 'dimensionality')
     if not os.path.exists(figureOutputFolder):
         os.makedirs(figureOutputFolder)
 #
-'''fullEstimatorName = '{}_{}_to_{}{}_{}_{}'.format(
-    arguments['estimatorName'],
-    arguments['unitQueryLhs'], arguments['unitQueryRhs'],
-    iteratorSuffix,
-    arguments['window'],
-    arguments['alignQuery'])'''
 datasetName = arguments['datasetName']
 selectionName = arguments['selectionName']
 estimatorName = arguments['estimatorName']
-fullEstimatorName = '{}_{}'.format(
-    estimatorName, arguments['datasetName'])
+fullEstimatorName = '{}_{}_{}'.format(
+    estimatorName, datasetName, selectionName)
 #
 estimatorsSubFolder = os.path.join(
-    alignSubFolder, 'estimators')
+    analysisSubFolder, 'estimators')
 dataFramesFolder = os.path.join(
-    alignSubFolder, 'dataframes')
+    analysisSubFolder, 'dataframes')
 datasetPath = os.path.join(
     dataFramesFolder,
     datasetName + '.h5'
@@ -110,6 +103,15 @@ estimatorPath = os.path.join(
     estimatorsSubFolder,
     fullEstimatorName + '.h5'
     )
+estimatorMetaDataPath = os.path.join(
+    estimatorsSubFolder,
+    fullEstimatorName + '_meta.pickle'
+    )
+#
+figureOutputFolder = os.path.join(
+    figureFolder, arguments['analysisName'], 'dimensionality')
+if not os.path.exists(figureOutputFolder):
+    os.makedirs(figureOutputFolder)
 with open(loadingMetaPath, 'rb') as _f:
     loadingMeta = pickle.load(_f)
     iteratorsBySegment = loadingMeta['iteratorsBySegment']
@@ -121,14 +123,17 @@ cvIterator = iteratorsBySegment[0]
 outputSelectionName = '{}_{}'.format(
     selectionName, estimatorName)
 # 
-validationFeaturesDF = pd.read_hdf(datasetPath, outputSelectionName)
+validationFeaturesDF = pd.read_hdf(datasetPath, '/{}/data'.format(outputSelectionName))
 featureInfo = validationFeaturesDF.columns.to_frame().reset_index(drop=True)
 #
-scoresDF = pd.read_hdf(estimatorPath, 'cv')
-estimators = pd.read_hdf(estimatorPath, 'cv_estimators')
+scoresDF = pd.read_hdf(estimatorPath, 'full_scores')
+estimators = pd.read_hdf(estimatorPath, 'full_estimators')
+scoresDF.loc[:, 'estimator'] = estimators
+bestEstimators = pd.read_hdf(estimatorPath, 'cv_estimators')
 dataDF = pd.read_hdf(datasetPath, '/{}/data'.format(selectionName))
+featureColumnFields = dataDF.columns.names
 featureMasks = pd.read_hdf(datasetPath, '/{}/featureMasks'.format(selectionName))
-removeAllColumn = True
+removeAllColumn = False
 if removeAllColumn:
     featureMasks = featureMasks.loc[~ featureMasks.all(axis='columns'), :]
 workIdx = cvIterator.work
@@ -136,75 +141,119 @@ workingDataDF = dataDF.iloc[workIdx, :]
 #
 lastFoldIdx = cvIterator.get_n_splits()
 lOfFeatures = []
-lOfRec = []
+dictOfRec = {}
+dictOfEVS0 = {}
+dictOfCovMats0 = {}
 for idx, (maskIdx, featureMask) in enumerate(featureMasks.iterrows()):
     maskParams = {k: v for k, v in zip(featureMask.index.names, maskIdx)}
+    trfName = '{}_{}'.format(estimatorName, maskParams['freqBandName'])
     dataGroup = dataDF.loc[:, featureMask]
     nFeatures = dataGroup.columns.shape[0]
-    theseFeatureColumns = featureInfo.loc[featureInfo['freqBandName'] == maskParams['freqBandName'], :]
+    # theseFeatureColumns = featureInfo.loc[featureInfo['freqBandName'] == maskParams['freqBandName'], :]
     lOfFeaturesPerFold = []
-    lOfRecPerFold = [] #reconstructions
+    lOfRecPerFold = []  # reconstructions
+    dictOfEVS1 = {}
+    dictOfCovMats1 = {}
     for foldIdx, estimatorsGroup in estimators.groupby('fold'):
         if foldIdx < lastFoldIdx:
             trainIdx, testIdx = cvIterator.folds[foldIdx]
-            evalTypes = ['train', 'test']
+            trialTypes = ['train', 'test']
         else:
             trainIdx, testIdx = cvIterator.work, cvIterator.validation
-            evalTypes = ['work', 'validation']
+            trialTypes = ['work', 'validation']
         foldTestDF = dataGroup.iloc[testIdx, :]
         foldTrainDF = dataGroup.iloc[trainIdx, :]
         thisEstimator = estimators.loc[idxSl[maskParams['freqBandName'], foldIdx]]
-        #
+        bestEst = bestEstimators.loc[idxSl[maskParams['freqBandName'], foldIdx]]
+        dictOfCovMats1[foldIdx] = pd.DataFrame(
+            thisEstimator.get_covariance(), index=dataGroup.columns.get_level_values('feature'),
+            columns=dataGroup.columns.get_level_values('feature'),
+            )
+        featureColumns = pd.DataFrame(
+            np.nan,
+            index=range(thisEstimator.n_components),
+            columns=featureColumnFields)
+        for fcn in featureColumnFields:
+            if fcn == 'feature':
+                featureColumns.loc[:, fcn] = [
+                    '{}{:0>3d}#0'.format(trfName, nc)
+                    for nc in range(1, thisEstimator.n_components + 1)]
+            elif fcn == 'lag':
+                featureColumns.loc[:, fcn] = 0
+            else:
+                featureColumns.loc[:, fcn] = maskParams[fcn]
         featTestDF = pd.DataFrame(
             thisEstimator.transform(foldTestDF), index=foldTestDF.index,
-            columns=pd.MultiIndex.from_frame(theseFeatureColumns))
+            columns=pd.MultiIndex.from_frame(featureColumns))
         featTestDF.loc[:, 'fold'] = foldIdx
-        featTestDF.loc[:, 'evalType'] = evalTypes[1]
-        featTestDF.set_index(['fold', 'evalType'], append=True, inplace=True)
+        featTestDF.loc[:, 'trialType'] = trialTypes[1]
+        featTestDF.set_index(['fold', 'trialType'], append=True, inplace=True)
         lOfFeaturesPerFold.append(featTestDF)
-        # pdb.set_trace()
         recTestDF = pd.DataFrame(
-            np.dot(featTestDF.to_numpy(), thisEstimator.components_) * np.sqrt(thisEstimator.noise_variance_) + thisEstimator.mean_,
+            np.tile(thisEstimator.mean_, (featTestDF.shape[0], 1)),
             index=foldTestDF.index, columns=foldTestDF.columns)
+        lOfEVS2 = []
+        for compIdx in range(thisEstimator.components_.shape[0]):
+            eVS = (explained_variance_score(foldTestDF, recTestDF))
+            recTestDF += (
+                    thisEstimator.components_[compIdx, :].reshape((-1, 1)) *
+                    featTestDF.iloc[:, compIdx].to_numpy()).T
+            eVSSrs = pd.Series([eVS])
+            eVSSrs.index = pd.MultiIndex.from_tuples([(compIdx, trialTypes[1],)], names=['component', 'trialType'])
+            lOfEVS2.append(eVSSrs)
+        '''recTestDF = pd.DataFrame(
+            np.dot(featTestDF.to_numpy(), thisEstimator.components_) + thisEstimator.mean_,
+            index=foldTestDF.index, columns=foldTestDF.columns)'''
         recTestDF.loc[:, 'fold'] = foldIdx
-        recTestDF.loc[:, 'evalType'] = evalTypes[1]
-        recTestDF.set_index(['fold', 'evalType'], append=True, inplace=True)
+        recTestDF.loc[:, 'trialType'] = trialTypes[1]
+        recTestDF.set_index(['fold', 'trialType'], append=True, inplace=True)
         lOfRecPerFold.append(recTestDF)
         featTrainDF = pd.DataFrame(
             thisEstimator.transform(foldTrainDF), index=foldTrainDF.index,
-            columns=pd.MultiIndex.from_frame(theseFeatureColumns))
+            columns=pd.MultiIndex.from_frame(featureColumns))
         featTrainDF.loc[:, 'fold'] = foldIdx
-        featTrainDF.loc[:, 'evalType'] = evalTypes[0]
-        featTrainDF.set_index(['fold', 'evalType'], append=True, inplace=True)
+        featTrainDF.loc[:, 'trialType'] = trialTypes[0]
+        featTrainDF.set_index(['fold', 'trialType'], append=True, inplace=True)
         lOfFeaturesPerFold.append(featTrainDF)
         recTrainDF = pd.DataFrame(
-            np.dot(featTrainDF.to_numpy(), thisEstimator.components_) + thisEstimator.mean_,
+            np.tile(thisEstimator.mean_, (featTrainDF.shape[0], 1)),
             index=foldTrainDF.index, columns=foldTrainDF.columns)
+        for compIdx in range(thisEstimator.components_.shape[0]):
+            eVS = (explained_variance_score(foldTrainDF, recTrainDF))
+            recTrainDF += (thisEstimator.components_[compIdx, :].reshape((-1, 1)) * featTrainDF.iloc[:, compIdx].to_numpy()).T
+            eVSSrs = pd.Series([eVS])
+            eVSSrs.index = pd.MultiIndex.from_tuples(
+                [(compIdx, trialTypes[0],)], names=['component', 'trialType'])
+            lOfEVS2.append(eVSSrs)
+        '''# equivalent to:
+        recTrainDF = pd.DataFrame(
+            np.dot(featTrainDF.to_numpy(), thisEstimator.components_) + thisEstimator.mean_,
+            index=foldTrainDF.index, columns=foldTrainDF.columns)'''
         recTrainDF.loc[:, 'fold'] = foldIdx
-        recTrainDF.loc[:, 'evalType'] = evalTypes[0]
-        recTrainDF.set_index(['fold', 'evalType'], append=True, inplace=True)
+        recTrainDF.loc[:, 'trialType'] = trialTypes[0]
+        recTrainDF.set_index(['fold', 'trialType'], append=True, inplace=True)
         lOfRecPerFold.append(recTrainDF)
+        dictOfEVS1[foldIdx] = pd.concat(lOfEVS2)
+    dictOfCovMats0[maskParams['freqBandName']] = pd.concat(dictOfCovMats1, names=['fold'])
+    dictOfEVS0[maskParams['freqBandName']] = pd.concat(dictOfEVS1, names=['fold', 'component', 'trialType'])
     lOfFeatures.append(pd.concat(lOfFeaturesPerFold))
-    lOfRec.append(pd.concat(lOfRecPerFold))
+    dictOfRec[maskParams['freqBandName']] = pd.concat(lOfRecPerFold)
 featuresDF = pd.concat(lOfFeatures, axis='columns')
+featuresDF.to_hdf(estimatorPath, 'full_features')
+del lOfFeatures
+eVSDF = pd.concat(dictOfEVS0, names=['freqBandName', 'fold', 'component', 'trialType'])
+eVSDF.to_hdf(estimatorPath, 'full_explained_variance')
+del dictOfEVS0, dictOfEVS1
+covMatDF = pd.concat(dictOfCovMats0, names=['freqBandName', 'fold', 'feature'])
+covMatDF.to_hdf(estimatorPath, 'cv_covariance_matrices')
+del dictOfCovMats0, dictOfCovMats1
+recsNoGT = pd.concat(dictOfRec, names=['freqBandName'])
+recsNoGT.to_hdf(estimatorPath, 'reconstructed')
+del dictOfRec
 #
-dataDF.loc[:, 'fold'] = 0
-dataDF.loc[:, 'evalType'] = 'ground_truth'
-dataDF.set_index(['fold', 'evalType'], append=True, inplace=True)
-#
-recDF = pd.concat([
-    pd.concat(lOfRec, axis='columns'),
-    dataDF])
-recDF.columns = recDF.columns.get_level_values('feature')
-#
-figureOutputFolder = os.path.join(
-    figureFolder, arguments['analysisName'])
-if not os.path.exists(figureOutputFolder):
-    os.makedirs(figureOutputFolder)
-# pdb.set_trace()
 pdfPath = os.path.join(
-    figureOutputFolder, '{}_{}_covariance_matrix_heatmap.pdf'.format(
-        datasetName, fullEstimatorName))
+    figureOutputFolder, '{}_covariance_matrix_heatmap.pdf'.format(
+        fullEstimatorName))
 with PdfPages(pdfPath) as pdf:
     fig, ax = plt.subplots()
     ax = sns.heatmap(thisEstimator.get_covariance())
@@ -213,29 +262,70 @@ with PdfPages(pdfPath) as pdf:
         plt.show()
     else:
         plt.close()
-pdfPath = os.path.join(
-    figureOutputFolder, '{}_{}_reconstructed_signals.pdf'.format(
-        datasetName, fullEstimatorName))
+# subselect features
+plotFeatIdxes = rng.choice(recsNoGT.groupby('feature', axis='columns').ngroups, size=10, replace=False)
+plotFeatNames = recsNoGT.columns.get_level_values('feature')[plotFeatIdxes]
 #
+dataDF.loc[:, 'fold'] = 0
+dataDF.loc[:, 'trialType'] = 'ground_truth'
+dataDF.set_index(['fold', 'trialType'], append=True, inplace=True)
+#
+pdfPath = os.path.join(
+    figureOutputFolder, '{}_reconstructed_signals.pdf'.format(
+        fullEstimatorName))
 with PdfPages(pdfPath) as pdf:
-    for name, group in recDF.groupby('feature', axis='columns'):
-        print('making plot of {}'.format(name))
-        # pdb.set_trace()
-        predStack = group.stack(group.columns.names).to_frame(name='signal').reset_index()
-        predStack.loc[:, 'trialNum'] = np.nan
-        for tIdx, (trialIdx, trialGroup) in enumerate(predStack.groupby(['segment', 'originalIndex', 't'])):
-            predStack.loc[trialGroup.index, 'trialNum'] = tIdx
-        chooseIndices = np.random.choice(predStack['trialNum'].unique(), 25)
-        plotPredStack = predStack.loc[predStack['trialNum'].isin(chooseIndices), :]
-        # pdb.set_trace()
+    for idx, (maskIdx, featureMask) in enumerate(featureMasks.iterrows()):
+        if maskParams['freqBandName'] == 'all':
+            continue
+        maskParams = {k: v for k, v in zip(featureMask.index.names, maskIdx)}
+        dataGroup = dataDF.loc[:, featureMask]
+        for featName, group in dataGroup.groupby('feature', axis='columns'):
+            if featName not in plotFeatNames:
+                continue
+            idxMask = recsNoGT.index.get_level_values('freqBandName') == maskParams['freqBandName']
+            colMask = recsNoGT.columns.isin(group.columns)
+            recDF = recsNoGT.loc[idxMask, colMask].copy()
+            recDF.columns = recDF.columns.get_level_values('feature')
+            predStack = recDF.stack(recDF.columns.names).to_frame(name='signal').reset_index()
+            GT = group.copy()
+            GT.columns = GT.columns.get_level_values('feature')
+            GTStack = GT.stack(GT.columns.names).to_frame(name='signal').reset_index()
+            print('making plot of {}'.format(featName))
+            predStack = pd.concat([predStack.loc[:, GTStack.columns], GTStack]).reset_index(drop=True)
+            predStack.loc[:, 'trialNum'] = np.nan
+            for tIdx, (trialIdx, trialGroup) in enumerate(predStack.groupby(['segment', 'originalIndex', 't'])):
+                predStack.loc[trialGroup.index, 'trialNum'] = tIdx
+            chooseIndices = rng.choice(predStack['trialNum'].unique(), 25)
+            plotPredStack = predStack.loc[predStack['trialNum'].isin(chooseIndices), :]
+            # pdb.set_trace()
+            g = sns.relplot(
+                col='trialNum', col_wrap=5,
+                hue='trialType', style='expName',
+                x='bin', y='signal', data=plotPredStack,
+                kind='line', alpha=0.5, lw=0.5, errorbar='se')
+            g.fig.set_size_inches((12, 8))
+            g.fig.suptitle('{}'.format(featName))
+            g.tight_layout(pad=.3)
+            pdf.savefig(bbox_inches='tight')
+            if arguments['showFigures']:
+                plt.show()
+            else:
+                plt.close()
+
+pdfPath = os.path.join(
+    figureOutputFolder, '{}_explained_variance.pdf'.format(
+        fullEstimatorName))
+with PdfPages(pdfPath) as pdf:
+    for name, group in eVSDF.groupby('freqBandName'):
+        plotDF = group.to_frame(name='signal').reset_index()
         g = sns.relplot(
-            col='trialNum', col_wrap=5,
-            hue='evalType', style='expName',
-            x='bin', y='signal', data=plotPredStack, kind='line', errorbar='se')
+            data=plotDF, x='component', hue='trialType',
+            y='signal', kind='line', alpha=0.5, lw=0.5, errorbar='se')
         g.fig.set_size_inches((12, 8))
         g.fig.suptitle('{}'.format(name))
-        g.fig.tight_layout(pad=1)
-        pdf.savefig(bbox_inches='tight', pad_inches=0)
+        g.resize_legend(adjust_subtitles=True)
+        g.tight_layout(pad=.3)
+        pdf.savefig(bbox_inches='tight')
         if arguments['showFigures']:
             plt.show()
         else:

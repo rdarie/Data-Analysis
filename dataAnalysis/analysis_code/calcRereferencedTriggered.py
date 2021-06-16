@@ -86,7 +86,7 @@ funKWArgs = {
     'substituteOneChannel': arguments['substituteOneChannel'],
     'substituteChannelLabel': 'utah8#0', 'subtractWhat': 'median'}
 #
-def rereference(
+def reReference(
         group, dataColNames=None, subtractWhat='mean',
         substituteOneChannel=False, substituteChannelLabel=None,
         verbose=False):
@@ -144,7 +144,7 @@ if __name__ == "__main__":
     #
     rerefDF = ash.splitApplyCombine(
         dataDF,
-        fun=rereference, resultPath=outputPath,
+        fun=reReference, resultPath=outputPath,
         funArgs=[], funKWArgs=funKWArgs,
         rowKeys=groupBy, colKeys=None, **daskOpts)
     #

@@ -6,6 +6,7 @@ module load anaconda/2020.02
 module load mpi
 # module load opengl
 module load qt/5.10.1
+module load vtk/8.1.0
 module load zlib/1.2.11
 module unload python
 

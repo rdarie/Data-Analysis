@@ -286,7 +286,7 @@ def channelIndexesToSpikeDict(
 
 
 def unitSpikeTrainArrayAnnToDF(
-        spikeTrainContainer):
+        spikeTrainContainer, columnNames=None):
     #  list contains different segments
     if isinstance(spikeTrainContainer, ChannelIndex):
         assert len(spikeTrainContainer.units) == 0
@@ -302,6 +302,14 @@ def unitSpikeTrainArrayAnnToDF(
         fullAnnotationsDict.update({segIdx: theseAnnDF})
     annotationsDF = pd.concat(
         fullAnnotationsDict, names=['segment', 'index'], sort=True)
+    if columnNames is not None:
+        doNotFillList = ['segment', 'originalIndex', 't', 'feature', 'bin']
+        fieldsNeedFiller = [
+            mdn
+            for mdn in columnNames
+            if (mdn not in doNotFillList) and (mdn not in annotationsDF.columns)]
+        for mdName in fieldsNeedFiller:
+            annotationsDF.loc[:, mdName] = metaFillerLookup[mdName]
     return annotationsDF
 
 

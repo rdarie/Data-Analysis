@@ -28,23 +28,12 @@ source shellScripts/calc_aligned_motion_preamble.sh
 
 ALIGNQUERYTERM="startingNoStim"
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
-TARGET="pedalState"
 ITERATOR="c"
+WINDOWTERM="XL"
+RHSOPTS="--datasetNameRhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameRhs=pedalState"
+LHSOPTS="--datasetNameLhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameLhs=lfp_CAR"
 
-# iterator "b", -50 to 250 msec after start
-
-# python -u './calcOrdinaryLeastSquares.py' --iteratorSuffix=$ITERATOR --lhsBlockSuffix="lfp" --unitQueryLhs="lfp_CAR_spectral" --rhsBlockSuffix="rig" --unitQueryRhs=$TARGET --estimatorName='ols' --loadFromFrames --exp=$EXP $WINDOW --alignQuery=$ALIGNQUERYTERM $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $VERBOSITY --plotting --showFigures
-# python -u './processOrdinaryLeastSquares.py' --fullEstimatorName="ols_lfp_CAR_spectral_to_${TARGET}_${ITERATOR}_L_${ALIGNQUERYTERM}" --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting
-# python -u './plotOrdinaryLeastSquares.py' --fullEstimatorName="ols_lfp_CAR_spectral_to_${TARGET}_${ITERATOR}_L_${ALIGNQUERYTERM}" --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting
-
-python -u './assembleRegressionTerms.py' --debugging --iteratorSuffix=$ITERATOR --lhsBlockSuffix="lfp" --unitQueryLhs="lfp_CAR_spectral" --rhsBlockSuffix="rig" --unitQueryRhs=$TARGET --loadFromFrames --exp=$EXP $WINDOW --alignQuery=$ALIGNQUERYTERM $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
-#
-python -u './calcGridSearchSingleTarget.py' --debugging --iteratorSuffix=$ITERATOR --lhsBlockSuffix="lfp" --unitQueryLhs="lfp_CAR_spectral" --rhsBlockSuffix="rig" --unitQueryRhs=$TARGET --estimatorName='enr' --loadFromFrames --exp=$EXP $WINDOW --alignQuery=$ALIGNQUERYTERM $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
-python -u './processOrdinaryLeastSquares.py' --debugging --estimatorName="enr" --datasetName="lfp_CAR_spectral_to_${TARGET}_${ITERATOR}_L_${ALIGNQUERYTERM}" --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting
-python -u './plotOrdinaryLeastSquares.py' --estimatorName="enr" --datasetName="lfp_CAR_spectral_to_${TARGET}_${ITERATOR}_L_${ALIGNQUERYTERM}" --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting
-
-# python -u './assembleRegressionTerms.py' --debugging --iteratorSuffix=$ITERATOR --lhsBlockSuffix="lfp" --unitQueryLhs=$TARGET --rhsBlockSuffix="rig" --unitQueryRhs=$TARGET --loadFromFrames --exp=$EXP $WINDOW --alignQuery=$ALIGNQUERYTERM $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
-# #
-# python -u './calcGridSearchSingleTarget.py' --debugging --iteratorSuffix=$ITERATOR --lhsBlockSuffix="lfp" --unitQueryLhs=$TARGET --rhsBlockSuffix="rig" --unitQueryRhs=$TARGET --estimatorName='enr' --loadFromFrames --exp=$EXP $WINDOW --alignQuery=$ALIGNQUERYTERM $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
-# python -u './processOrdinaryLeastSquares.py' --debugging --estimatorName="enr" --datasetName="${TARGET}_to_${TARGET}_${ITERATOR}_L_${ALIGNQUERYTERM}" --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting
-# python -u './plotOrdinaryLeastSquares.py' --estimatorName="enr" --datasetName="${TARGET}_to_${TARGET}_${ITERATOR}_L_${ALIGNQUERYTERM}" --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting
+# python -u './calcGridSearchSingleTarget.py' --estimatorName='enr' --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
+python -u './createToyDataFromDataFrames.py' --estimatorName='enr' --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
+# python -u './processOrdinaryLeastSquares.py' --debugging --estimatorName="enr" --datasetName="lfp_CAR_spectral_to_${TARGET}_${ITERATOR}_L_${ALIGNQUERYTERM}" --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting
+# python -u './plotOrdinaryLeastSquares.py' --estimatorName="enr" --datasetName="lfp_CAR_spectral_to_${TARGET}_${ITERATOR}_L_${ALIGNQUERYTERM}" --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting

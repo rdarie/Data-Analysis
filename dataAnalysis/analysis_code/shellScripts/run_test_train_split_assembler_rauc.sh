@@ -26,7 +26,8 @@ SLURM_ARRAY_TASK_ID=2
 source ./shellScripts/calc_aligned_motion_preamble.sh
 
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
-TARGET="lfp_CAR_spectral_fa_mahal"
+# TARGET="lfp_CAR_spectral_fa_mahal"
+TARGET="lfp_CAR_spectral_mahal"
 
 ITERATOR="f"
 ALIGNQUERYTERM="starting"
@@ -35,5 +36,5 @@ ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
 
 python -u './calcTestTrainSplit.py' $BLOCKSELECTOR --iteratorSuffix=$ITERATOR --loadFromFrames --inputBlockSuffix=$TARGET --unitQuery="mahal" --selectionName=$TARGET --verbose --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $LAZINESS
 #
-python -u './assembleDataFrames.py' --iteratorSuffix=$ITERATOR --inputBlockSuffix='lfp_CAR_spectral_mahal' --selectionName=$TARGET --loadFromFrames --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
+python -u './assembleDataFrames.py' --iteratorSuffix=$ITERATOR --inputBlockSuffix="${TARGET}" --selectionName=$TARGET --loadFromFrames --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
 #

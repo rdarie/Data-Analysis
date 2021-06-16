@@ -31,6 +31,9 @@ ITERATOR="--iteratorSuffix=f"
 #
 ALIGNQUERYTERM="stimOnHighRate"
 ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
+#
+TARGET="lfp_CAR_spectral_mahal"
+# TARGET="lfp_CAR_spectral_fa_mahal"
 
-python -u './calcTestTrainSplit.py' --inputBlockSuffix="lfp_CAR_spectral_fa_mahal" --unitQuery="mahal" --selectionName='lfp_CAR_spectral_fa_mahal' $ALIGNQUERY $ITERATOR --eventName='stim' --eventBlockSuffix='epochs' --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $OUTLIERMASK $LAZINESS
-python -u './applyTestTrainSplit.py' --resetHDF --inputBlockSuffix="lfp_CAR_spectral_fa_mahal" --unitQuery="mahal" --selectionName='lfp_CAR_spectral_fa_mahal' --verbose $ALIGNQUERY $ITERATOR --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
+python -u './calcTestTrainSplit.py' --inputBlockSuffix="${TARGET}" --unitQuery="mahal" --selectionName="${TARGET}" $ALIGNQUERY $ITERATOR --eventName='stim' --eventBlockSuffix='epochs' --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $OUTLIERMASK $LAZINESS
+python -u './applyTestTrainSplit.py' --resetHDF --inputBlockSuffix="${TARGET}" --unitQuery="mahal" --selectionName="${TARGET}" --verbose $ALIGNQUERY $ITERATOR --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS

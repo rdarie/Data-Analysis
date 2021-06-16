@@ -20,7 +20,7 @@ Options:
     --invertOutlierMask                    delete outlier trials? [default: False]
     --showFigures                          show plots interactively? [default: False]
     --debugging                            show plots interactively? [default: False]
-    --iteratorSuffix=iteratorSuffix            filename for resulting estimator (cross-validated n_comps)
+    --iteratorSuffix=iteratorSuffix        filename for resulting estimator (cross-validated n_comps)
 """
 import matplotlib
 matplotlib.rcParams['pdf.fonttype'] = 42
@@ -94,7 +94,7 @@ if __name__ == "__main__":
         )
     calcSubFolder = os.path.join(analysisSubFolder, 'dataframes')
     figureOutputFolder = os.path.join(
-        figureFolder, arguments['analysisName'])
+        figureFolder, arguments['analysisName'], 'lfp_recruitment')
     if not os.path.exists(figureOutputFolder):
         os.makedirs(figureOutputFolder, exist_ok=True)
     blockBaseName, inputBlockSuffix = hf.processBasicPaths(arguments)
@@ -194,8 +194,8 @@ if __name__ == "__main__":
         'sm_class': sm.GLM,
         'family': sm.families.Gaussian(),
         'alpha': None, 'L1_wt': None,
-        'refit': True, 'tol': 1e-3,
-        'maxiter': 5000, 'disp': False
+        'refit': True, 'tol': 1e-2,
+        'maxiter': 1000, 'disp': False
         }
     estimatorInstance = tdr.SMWrapper(**modelKWArgs)
     ## names of things in statsmodels
@@ -204,7 +204,7 @@ if __name__ == "__main__":
         return_train_score=True,
         refit=False,
         param_grid=dict(
-            L1_wt=[.1, .5, .95, 1]
+            L1_wt=[.1, .5, .95]
         ))
     '''
     estimatorInstance = GLM(fit_intercept=False, distr='gaussian', solver='L-BFGS-B', score_metric='pseudo_R2')
@@ -219,7 +219,7 @@ if __name__ == "__main__":
     )
     '''
     ####
-    nAlphas = 50
+    nAlphas = 20
     lOfDesignFormulas = [
         "pedalMovementCat/(electrode:(amplitude/RateInHz)) - 1",
         "pedalMovementCat + (electrode:(amplitude/RateInHz)) - 1",

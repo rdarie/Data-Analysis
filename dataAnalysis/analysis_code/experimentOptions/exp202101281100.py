@@ -222,8 +222,29 @@ def getExpOpts():
         'skipChannels': ['utah25', 'utah39']
         }
     expIteratorOpts = {
+        'a': {
+            'experimentsToAssemble': {
+                # '202101251100-Rupert': [1, 2, 3],
+                # '202101271100-Rupert': [1, 2, 3],
+                '202101281100-Rupert': [1, 2, 3],
+                }
+        },
+        'b': {
+            'experimentsToAssemble': {
+                # '202101251100-Rupert': [1, 2, 3],
+                # '202101271100-Rupert': [1, 2, 3],
+                '202101281100-Rupert': [1, 2, 3],
+                }
+        },
+        'c': {
+            'experimentsToAssemble': {
+                # '202101251100-Rupert': [1, 2, 3],
+                # '202101271100-Rupert': [1, 2, 3],
+                '202101281100-Rupert': [1, 2, 3],
+                }
+        },
         'f': {
-            'experimentsToAssemble' : {
+            'experimentsToAssemble': {
                 '202101251100-Rupert': [1, 2, 3],
                 '202101271100-Rupert': [1, 2, 3],
                 '202101281100-Rupert': [1, 2, 3],

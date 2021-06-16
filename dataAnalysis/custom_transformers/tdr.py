@@ -256,8 +256,13 @@ def crossValidationScores(
         scores['score_time'] = np.append(scores['score_time'], np.nan)
         if 'estimator' in scores:
             scores['estimator'].append(workEstim)
-        scores['train_score'] = np.append(scores['train_score'], workEstim.score(workX, workY))
-        scores['test_score'] = np.append(scores['test_score'], workEstim.score(valX, valY))
+        if 'scoring' in crossvalKWArgs:
+            scoreFun = crossvalKWArgs['scoring']
+            scores['train_score'] = np.append(scores['train_score'], scoreFun(workEstim, workX, workY))
+            scores['test_score'] = np.append(scores['test_score'], scoreFun(workEstim, valX, valY))
+        else:
+            scores['train_score'] = np.append(scores['train_score'], workEstim.score(workX, workY))
+            scores['test_score'] = np.append(scores['test_score'], workEstim.score(valX, valY))
     return scores
 
 
@@ -345,7 +350,6 @@ def gridSearchHyperparameters(
                 'l1_ratio': gridSearcher.l1_ratio_}
         else:
             optParams = gridSearcher.best_params_
-    # pdb.set_trace()
     '''optKeys = []
     optVals = []
     for k, v in optParams.items():
@@ -380,6 +384,17 @@ def scoreColumnTransformer(estimator, X, y=None):
         componentScores.append(trf.score(X, y))
     return np.mean(componentScores)
 
+def genReconstructionScorer(scoreFun):
+    def scorer(estimator, X, y=None):
+        feat = estimator.transform(X)
+        rec = np.dot(feat, estimator.components_) + estimator.mean_
+        return scoreFun(X, rec)
+    return scorer
+
+def reconstructionR2(estimator, X, y=None):
+    feat = estimator.transform(X)
+    rec = np.dot(feat, estimator.components_) + estimator.mean_
+    return r2_score(X, rec)
 
 def timeShift(x, lag):
     return (

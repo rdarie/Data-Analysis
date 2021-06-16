@@ -17,16 +17,12 @@ Options:
     --showFigures                          show plots? [default: False]
     --verbose=verbose                      print diagnostics? [default: 0]
     --alignQuery=alignQuery                what will the plot be aligned to? [default: midPeak]
-    --rhsBlockSuffix=rhsBlockSuffix        which trig_ block to pull [default: pca]
-    --rhsBlockPrefix=rhsBlockPrefix        which trig_ block to pull [default: Block]
-    --unitQueryRhs=unitQueryRhs            how to restrict channels? [default: fr_sqrt]
-    --lhsBlockSuffix=lhsBlockSuffix        which trig_ block to pull [default: pca]
-    --lhsBlockPrefix=lhsBlockPrefix        which trig_ block to pull [default: Block]
-    --unitQueryLhs=unitQueryLhs            how to restrict channels? [default: fr_sqrt]
-    --iteratorSuffix=iteratorSuffix        filename for cross_val iterator
+    --datasetNameRhs=datasetNameRhs        which trig_ block to pull [default: Block]
+    --selectionNameRhs=selectionNameRhs    how to restrict channels? [default: fr_sqrt]
+    --datasetNameLhs=datasetNameLhs        which trig_ block to pull [default: Block]
+    --selectionNameLhs=selectionNameLhs    how to restrict channels? [default: fr_sqrt]
     --estimatorName=estimatorName          filename for resulting estimator (cross-validated n_comps)
     --selector=selector                    filename if using a unit selector
-    --loadFromFrames                       load data from pre-saved dataframes?
 """
 import matplotlib
 matplotlib.rcParams['pdf.fonttype'] = 42
@@ -37,10 +33,6 @@ from dask.distributed import Client
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import seaborn as sns
-sns.set(
-    context='talk', style='dark',
-    palette='dark', font='sans-serif',
-    font_scale=1.5, color_codes=True)
 import os
 import dataAnalysis.helperFunctions.profiling as prf
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
@@ -59,10 +51,18 @@ from sklearn.svm import LinearSVR
 from sklearn.model_selection import cross_val_score, cross_validate, GridSearchCV
 import joblib as jb
 import dill as pickle
+import sys
 import gc
 from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
 from docopt import docopt
+for arg in sys.argv:
+    print(arg)
+
 idxSl = pd.IndexSlice
+sns.set(
+    context='talk', style='dark',
+    palette='dark', font='sans-serif',
+    font_scale=1.5, color_codes=True)
 
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 # if debugging in a console:
@@ -90,100 +90,41 @@ globals().update(allOpts)
 if __name__ == '__main__':
     analysisSubFolder, alignSubFolder = hf.processSubfolderPaths(
         arguments, scratchFolder)
-    calcSubFolder = os.path.join(alignSubFolder, 'pls')
-    if not os.path.exists(calcSubFolder):
-        os.makedirs(calcSubFolder)
-    dataFramesFolder = os.path.join(alignSubFolder, 'dataframes')
-
-    if arguments['processAll']:
-        rhsBlockBaseName = arguments['rhsBlockPrefix']
-        lhsBlockBaseName = arguments['lhsBlockPrefix']
-    else:
-        rhsBlockBaseName = '{}{:0>3}'.format(
-            arguments['rhsBlockPrefix'], arguments['blockIdx'])
-        lhsBlockBaseName = '{}{:0>3}'.format(
-            arguments['lhsBlockPrefix'], arguments['blockIdx'])
-
+    estimatorsSubFolder = os.path.join(
+        analysisSubFolder, 'estimators')
+    if not os.path.exists(estimatorsSubFolder):
+        os.makedirs(estimatorsSubFolder)
+    dataFramesFolder = os.path.join(analysisSubFolder, 'dataframes')
     if arguments['plotting']:
         figureOutputFolder = os.path.join(
             figureFolder,
-            arguments['analysisName'], arguments['alignFolderName'])
+            arguments['analysisName'], 'pls')
         if not os.path.exists(figureOutputFolder):
             os.makedirs(figureOutputFolder)
     #
-    '''cvIteratorSubfolder = os.path.join(
-        alignSubFolder, 'testTrainSplits')'''
-    if arguments['iteratorSuffix'] is not None:
-        iteratorSuffix = '_{}'.format(arguments['iteratorSuffix'])
-    else:
-        iteratorSuffix = ''
-    #
-    datasetName = '{}_to_{}{}_{}_{}'.format(
-        arguments['unitQueryRhs'], arguments['unitQueryLhs'],
-        iteratorSuffix,
-        arguments['window'],
-        arguments['alignQuery'])
-    rhsDatasetName = '{}{}_{}_{}'.format(
-        arguments['unitQueryRhs'],
-        iteratorSuffix,
-        arguments['window'],
-        arguments['alignQuery'])
-    lhsDatasetName = '{}{}_{}_{}'.format(
-        arguments['unitQueryLhs'],
-        iteratorSuffix,
-        arguments['window'],
-        arguments['alignQuery'])
-    fullEstimatorName = '{}_{}'.format(
-        arguments['estimatorName'], datasetName)
-    estimatorsSubFolder = os.path.join(
-        alignSubFolder, 'estimators')
-    if not os.path.exists(estimatorsSubFolder):
-        os.makedirs(estimatorsSubFolder)
-    estimatorPath = os.path.join(
-        estimatorsSubFolder,
-        fullEstimatorName + '.h5'
-        )
     rhsDatasetPath = os.path.join(
         dataFramesFolder,
-        rhsDatasetName + '.h5'
+        arguments['datasetNameRhs'] + '.h5'
         )
     assert os.path.exists(rhsDatasetPath)
     lhsDatasetPath = os.path.join(
         dataFramesFolder,
-        lhsDatasetName + '.h5'
+        arguments['datasetNameLhs'] + '.h5'
         )
     assert os.path.exists(lhsDatasetPath)
+    fullEstimatorName = '{}_{}_{}'.format(
+        arguments['estimatorName'], arguments['datasetNameLhs'], arguments['selectionNameLhs'])
+    estimatorPath = os.path.join(
+        estimatorsSubFolder,
+        fullEstimatorName + '.h5'
+        )
+    loadingMetaPathLhs = os.path.join(
+        dataFramesFolder,
+        arguments['datasetNameLhs'] + '_' + arguments['selectionNameLhs'] + '_meta.pickle'
+        )
     #
-    '''iteratorPath = os.path.join(
-        cvIteratorSubfolder,
-        '{}_{}_{}{}_cvIterators.pickle'.format(
-            rhsBlockBaseName,
-            arguments['window'],
-            arguments['alignQuery'],
-            iteratorSuffix))'''
-    iteratorPath = rhsDatasetPath.replace('.h5', '_meta.pickle')
-    #
-    with open(iteratorPath, 'rb') as f:
-        loadingMeta = pickle.load(f)
-    # rhs loading paths
-    if arguments['rhsBlockSuffix'] is not None:
-        rhsBlockSuffix = '_{}'.format(arguments['rhsBlockSuffix'])
-    else:
-        rhsBlockSuffix = ''
-    triggeredRhsPath = os.path.join(
-        alignSubFolder,
-        rhsBlockBaseName + '{}_{}.nix'.format(
-            rhsBlockSuffix, arguments['window']))
-    #
-    if arguments['lhsBlockSuffix'] is not None:
-        lhsBlockSuffix = '_{}'.format(arguments['lhsBlockSuffix'])
-    else:
-        lhsBlockSuffix = ''
-    #
-    triggeredLhsPath = os.path.join(
-        alignSubFolder,
-        lhsBlockBaseName + '{}_{}.nix'.format(
-            lhsBlockSuffix, arguments['window']))
+    with open(loadingMetaPathLhs, 'rb') as _f:
+        loadingMeta = pickle.load(_f)
     #
     iteratorsBySegment = loadingMeta['iteratorsBySegment'].copy()
     cv_kwargs = loadingMeta['cv_kwargs'].copy()
@@ -220,9 +161,9 @@ if __name__ == '__main__':
     joblibBackendArgs = dict(
         backend='dask'
         )
-    lhsDF = pd.read_hdf(lhsDatasetPath, arguments['unitQueryLhs'])
-    rhsDF = pd.read_hdf(rhsDatasetPath, arguments['unitQueryRhs'])
-    lhsMasks = pd.read_hdf(lhsDatasetPath, arguments['unitQueryLhs'] + '_featureMasks')
+    lhsDF = pd.read_hdf(lhsDatasetPath, '/{}/data'.format(arguments['selectionNameLhs']))
+    rhsDF = pd.read_hdf(rhsDatasetPath, '/{}/data'.format(arguments['selectionNameRhs']))
+    lhsMasks = pd.read_hdf(lhsDatasetPath, '/{}/featureMasks'.format(arguments['selectionNameLhs']))
     #
     workingLhsDF = lhsDF.iloc[workIdx, :]
     workingRhsDF = rhsDF.iloc[workIdx, :]
@@ -235,6 +176,7 @@ if __name__ == '__main__':
         if joblibBackendArgs['backend'] == 'dask':
             daskClient = Client()
     allGridSearchDict = {}
+    pdb.set_trace()
     for idx, (maskIdx, lhsMask) in enumerate(lhsMasks.iterrows()):
         maskParams = {k: v for k, v in zip(lhsMask.index.names, maskIdx)}
         ####

@@ -28,7 +28,8 @@ OPTS="--enableOverrides --exp=${EXP} ${BLOCKSELECTOR} ${ANALYSISFOLDER} ${WINDOW
 
 # python -u './plotAlignedAsigsTopo.py' --inputBlockSuffix="lfp" --unitQuery="lfp" --amplitudeFieldName=amplitude --exp=$EXP $WINDOW $TIMEWINDOWOPTS $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --groupPagesBy="electrode, RateInHz, pedalMovementCat" $HUEOPTS $OUTLIERMASK
 #
-python -u './plotAlignedAsigsV1.py' --inputBlockSuffix="lfp_CAR_spectral_fa_mahal" --unitQuery="mahal" $OPTS
+# python -u './plotAlignedAsigsV1.py' --inputBlockSuffix="lfp_CAR_spectral_fa_mahal" --unitQuery="mahal" $OPTS
+python -u './plotAlignedAsigsV1.py' --inputBlockSuffix="lfp_CAR_spectral_mahal" --unitQuery="mahal" $OPTS
 # python -u './plotAlignedAsigsV1.py' --inputBlockSuffix="lfp_CAR_spectral_fa" --unitQuery="factor" $OPTS
-python -u './plotAlignedAsigsV1.py' --inputBlockSuffix="lfp_CAR" --unitQuery="lfp" $OPTS
-python -u './plotAlignedAsigsV1.py' --inputBlockSuffix="lfp_CAR_spectral" --unitQuery="lfp" $OPTS
+# python -u './plotAlignedAsigsV1.py' --inputBlockSuffix="lfp_CAR" --unitQuery="lfp" $OPTS
+# python -u './plotAlignedAsigsV1.py' --inputBlockSuffix="lfp_CAR_spectral" --unitQuery="lfp" $OPTS

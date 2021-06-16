@@ -32,9 +32,11 @@ EXP="exp202010151400"
 # EXP="exp202101201100"
 # EXP="exp202101211100"
 # EXP="exp202101221100"
+#
 # EXP="exp202101251100"
 # EXP="exp202101271100"
-# EXP="exp202101281100"
+EXP="exp202101281100"
+#
 # EXP="exp202102041100"
 # EXP="exp202102081100"
 # EXP="exp202102101100"
@@ -52,14 +54,13 @@ source activate nda2
 python --version
 
 # global operations
-# python './shuttleFilesToFromScratch.py' --exp=$EXP --preprocFolderFiles --preprocFolderSubfolders --fromScratchToData
-# python './shuttleFilesToFromScratch.py' --exp=$EXP --preprocFolderFiles --fromDataToScratch
-# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*.parquet' --fromDataToScratch
-# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*Block003*' --fromDataToScratch
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_ins*' --fromDataToScratch --filesIncluded
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_epochs*' --fromDataToScratch --filesIncluded
+python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='utah*.nix' --fromDataToScratch --filesIncluded
 #
-python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*.parquet' --fromDataToScratch --foldersIncluded --filesIncluded
-python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*loRes*' --fromDataToScratch --foldersIncluded
-python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*outlierTrials*' --fromDataToScratch --foldersIncluded
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*.parquet' --fromDataToScratch --foldersIncluded --filesIncluded
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*loRes*' --fromDataToScratch --foldersIncluded
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*outlierTrials*' --fromDataToScratch --foldersIncluded
 
 # everything to data
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --fromScratchToData --searchTerm='*' --moveItems --foldersIncluded --filesIncluded

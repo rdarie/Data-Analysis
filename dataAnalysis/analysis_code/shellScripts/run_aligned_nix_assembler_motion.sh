@@ -27,9 +27,17 @@ source ./shellScripts/calc_aligned_motion_preamble.sh
 
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
 
-blocks=(lfp_CAR lfp_CAR_spectral rig)
+# primary data
+# blocks=(lfp_CAR lfp_CAR_spectral rig)
+#
+# derived after dimensionality reduction
 # blocks=(lfp_CAR_spectral_fa lfp_CAR_spectral_fa_mahal)
+#
+# derived without dim. reduction
+blocks=(lfp_CAR_spectral_mahal)
+#
 alignfolders=(stim motion)
+#
 for B in "${blocks[@]}"
 do
     echo "concatenating $B blocks"

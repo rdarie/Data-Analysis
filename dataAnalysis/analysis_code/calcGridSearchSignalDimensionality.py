@@ -27,16 +27,13 @@ matplotlib.use('QT5Agg')   # generate postscript output
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import seaborn as sns
-sns.set(
-    context='talk', style='dark',
-    palette='dark', font='sans-serif',
-    font_scale=1.5, color_codes=True)
 from dask.distributed import Client, LocalCluster
 import os, traceback
 import dataAnalysis.helperFunctions.profiling as prf
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
 import dataAnalysis.helperFunctions.helper_functions_new as hf
 import dataAnalysis.custom_transformers.tdr as tdr
+from dataAnalysis.custom_transformers.tdr import reconstructionR2
 from dataAnalysis.analysis_code.namedQueries import namedQueries
 from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
 import pdb
@@ -48,13 +45,19 @@ from sklearn.pipeline import make_pipeline, Pipeline
 from sklearn.compose import ColumnTransformer
 from sklearn.covariance import ShrunkCovariance, LedoitWolf, EmpiricalCovariance
 from sklearn.model_selection import cross_val_score, cross_validate, GridSearchCV
-from sklearn.metrics import make_scorer
+from sklearn.metrics import make_scorer, r2_score
 import joblib as jb
 import dill as pickle
-import gc
+import gc, sys
 from docopt import docopt
 from copy import deepcopy
-
+sns.set(
+    context='talk', style='dark',
+    palette='dark', font='sans-serif',
+    font_scale=1.5, color_codes=True)
+for arg in sys.argv:
+    print(arg)
+##
 '''def compute_scores(
         X, estimator,
         nComponentsToTest,
@@ -88,29 +91,41 @@ def calc_lw_score(
 
 
 if __name__ == '__main__':
-    idxSl = pd.IndexSlice
     arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
+    ##
+    '''
+    consoleDebugging = True
+    if consoleDebugging:
+        arguments = {
+            'alignFolderName': 'motion', 'lazy': False, 'debugging': False,
+            'datasetName': 'Block_XL_df_b', 'blockIdx': '2', 'window': 'long',
+            'processAll': True, 'plotting': True, 'verbose': '1', 'exp': 'exp202101281100',
+            'showFigures': False, 'selectionName': 'lfp_CAR', 'estimatorName': 'pca',
+            'analysisName': 'default'}
+        os.chdir('/gpfs/home/rdarie/nda2/Data-Analysis/dataAnalysis/analysis_code')
+    '''
+    ##
     expOpts, allOpts = parseAnalysisOptions(
         int(arguments['blockIdx']), arguments['exp'])
     globals().update(expOpts)
     globals().update(allOpts)
     #
+    idxSl = pd.IndexSlice
     arguments['verbose'] = int(arguments['verbose'])
     #
     analysisSubFolder, alignSubFolder = hf.processSubfolderPaths(
         arguments, scratchFolder)
     if arguments['plotting']:
         figureOutputFolder = os.path.join(
-            figureFolder,
-            arguments['analysisName'])
+            figureFolder, arguments['analysisName'], 'dimensionality')
         if not os.path.exists(figureOutputFolder):
             os.makedirs(figureOutputFolder)
     #
     datasetName = arguments['datasetName']
     selectionName = arguments['selectionName']
     estimatorName = arguments['estimatorName']
-    fullEstimatorName = '{}_{}'.format(
-        estimatorName, selectionName)
+    fullEstimatorName = '{}_{}_{}'.format(
+        estimatorName, datasetName, selectionName)
     #
     estimatorsSubFolder = os.path.join(
         analysisSubFolder, 'estimators')
@@ -129,6 +144,10 @@ if __name__ == '__main__':
         estimatorsSubFolder,
         fullEstimatorName + '.h5'
         )
+    estimatorMetaDataPath = os.path.join(
+        estimatorsSubFolder,
+        fullEstimatorName + '_meta.pickle'
+        )
     with open(loadingMetaPath, 'rb') as _f:
         loadingMeta = pickle.load(_f)
         # iteratorsBySegment = loadingMeta.pop('iteratorsBySegment')
@@ -144,18 +163,23 @@ if __name__ == '__main__':
     elif 'fa' in estimatorName:
         estimatorClass = FactorAnalysis
         estimatorKWArgs = dict(
-            max_iter=5000,
-            iterated_power=4,
-            tol=5e-3
+            max_iter=1000,
+            iterated_power=3,
+            tol=1e-2
         )
     gridSearchKWArgs = dict(
         return_train_score=True,
         cv=cvIterator,
-        refit=False,
+        refit=False, scoring=reconstructionR2,
         param_grid=dict())
     crossvalKWArgs = dict(
         cv=cvIterator,
-        return_train_score=True, return_estimator=True)
+        return_train_score=True, return_estimator=True,
+        scoring=reconstructionR2,
+    )
+    ###
+    scoreIsLikelihood = False
+    ###
     joblibBackendArgs = dict(
         # backend='dask'
         backend='loky'
@@ -188,7 +212,8 @@ if __name__ == '__main__':
     workingDataDF = dataDF.iloc[workIdx, :]
     prf.print_memory_usage('just loaded data, fitting')
     #
-    cvScoresDict = {}
+    cvScoresDict = {}  # cross validated best estimator
+    fmScoresDict = {}  # cross validated estimator with max n comps
     gsScoresDict = {}
     gridSearcherDict = {}
     lOfColumnTransformers = []
@@ -201,7 +226,7 @@ if __name__ == '__main__':
     outputFeatureList = []
     featureColumnFields = dataDF.columns.names
     ###
-    maxNCompsToTest = 90
+    maxNCompsToTest = 96
     # pdb.set_trace()
     for idx, (maskIdx, featureMask) in enumerate(featureMasks.iterrows()):
         maskParams = {k: v for k, v in zip(featureMask.index.names, maskIdx)}
@@ -227,6 +252,21 @@ if __name__ == '__main__':
         cvScoresDF.index.name = 'fold'
         cvScoresDF.dropna(axis='columns', inplace=True)
         cvScoresDict[maskParams['freqBandName']] = cvScoresDF
+        #
+        fullEstimatorParams = estimatorKWArgs.copy()
+        fullEstimatorParams['n_components'] = maxNCompsToTest
+        fullModelScores = tdr.crossValidationScores(
+            dataGroup,
+            estimatorClass=estimatorClass,
+            estimatorKWArgs=fullEstimatorParams,
+            crossvalKWArgs=crossvalKWArgs,
+            joblibBackendArgs=joblibBackendArgs,
+            verbose=int(arguments['verbose']),)
+        fmScoresDF = pd.DataFrame(fullModelScores)
+        fmScoresDF.index.name = 'fold'
+        fmScoresDF.dropna(axis='columns', inplace=True)
+        fmScoresDict[maskParams['freqBandName']] = fmScoresDF
+        #
         lastFoldIdx = cvScoresDF.index.get_level_values('fold').max()
         bestEstimator = cvScoresDF.loc[lastFoldIdx, 'estimator']
         # bestEstimator = gridSearcherDict[maskParams['freqBandName']].best_estimator_
@@ -259,6 +299,7 @@ if __name__ == '__main__':
         pd.concat(outputFeatureList).reset_index(drop=True))
     #
     scoresDF = pd.concat(cvScoresDict, names=['freqBandName'])
+    scoresFullModel = pd.concat(fmScoresDict, names=['freqBandName'])
     lastFoldIdx = scoresDF.index.get_level_values('fold').max()
     #
     gsScoresDF = pd.concat(gsScoresDict, names=['freqBandName'])
@@ -269,12 +310,14 @@ if __name__ == '__main__':
     #
     try:
         scoresDF.loc[idxSl[:, lastFoldIdx], :].to_hdf(estimatorPath, 'work')
+        scoresFullModel.loc[:, ['test_score', 'train_score']].to_hdf(estimatorPath, 'full_scores')
         scoresDF.loc[:, ['test_score', 'train_score']].to_hdf(estimatorPath, 'cv')
     except Exception:
         traceback.print_exc()
     #
     try:
         scoresDF['estimator'].to_hdf(estimatorPath, 'cv_estimators')
+        scoresFullModel['estimator'].to_hdf(estimatorPath, 'full_estimators')
     except Exception:
         traceback.print_exc()
     #
@@ -287,7 +330,7 @@ if __name__ == '__main__':
         'selectionName': selectionName,
         'outputFeatures': outputFeaturesIndex
         }
-    with open(estimatorPath.replace('.h5', '_meta.pickle'), 'wb') as f:
+    with open(estimatorMetaDataPath, 'wb') as f:
         pickle.dump(estimatorMetadata, f)
 
     features = chosenEstimator.transform(dataDF)
@@ -361,8 +404,8 @@ if __name__ == '__main__':
     if arguments['plotting']:
         pdfPath = os.path.join(
                 figureOutputFolder,
-                '{}_{}_dimensionality.pdf'.format(
-                    datasetName, fullEstimatorName))
+                '{}_dimensionality.pdf'.format(
+                    fullEstimatorName))
         print('Saving plots to {}'.format(pdfPath))
         with PdfPages(pdfPath) as pdf:
             for idx, (maskIdx, featureMask) in enumerate(featureMasks.iterrows()):
@@ -370,18 +413,18 @@ if __name__ == '__main__':
                 dataGroup = dataDF.loc[:, featureMask]
                 nFeatures = dataGroup.columns.shape[0]
                 nCompsToTest = range(1, min(maxNCompsToTest, nFeatures + 1), 3)
-                if arguments['verbose']:
-                    print('Calculating ledoit-wolf # of components...')
-                lWScores = calc_lw_score(dataGroup, cv=cvIterator)
-                lWForPlot = pd.concat({
-                    nc: pd.DataFrame({'test_score': lWScores})
-                    for nc in nCompsToTest}, names=['n_components', 'fold'])
-                scoresForPlot = pd.concat(
-                    {
-                        'PCA_test': gsScoresDF.xs(maskParams['freqBandName']).loc[:, 'test_score'],
-                        'PCA_train': gsScoresDF.xs(maskParams['freqBandName']).loc[:, 'train_score'],
-                        'ledoitWolfMLE': lWForPlot.swaplevel('n_components', 'fold')['test_score']},
-                    names=['evalType']).to_frame(name='score').reset_index()
+                scoresForPlotDict = {
+                    'PCA_test': gsScoresDF.xs(maskParams['freqBandName']).loc[:, 'test_score'],
+                    'PCA_train': gsScoresDF.xs(maskParams['freqBandName']).loc[:, 'train_score']}
+                if scoreIsLikelihood:
+                    if arguments['verbose']:
+                        print('Calculating ledoit-wolf # of components...')
+                    lWScores = calc_lw_score(dataGroup, cv=cvIterator)
+                    lWForPlot = pd.concat({
+                        nc: pd.DataFrame({'test_score': lWScores})
+                        for nc in nCompsToTest}, names=['n_components', 'fold'])
+                    scoresForPlotDict['ledoitWolfMLE'] = lWForPlot.swaplevel('n_components', 'fold')['test_score']
+                scoresForPlot = pd.concat(scoresForPlotDict, names=['evalType']).to_frame(name='score').reset_index()
                 validationMask = (
                     (scoresForPlot['fold'] == lastFoldIdx) &
                     (scoresForPlot['evalType'] == 'PCA_test'))
@@ -408,7 +451,10 @@ if __name__ == '__main__':
                 labels.append(textDescr)
                 ax.legend(handles, labels)
                 ax.set_xlabel('number of components')
-                ax.set_ylabel('average log-likelihood')
+                if scoreIsLikelihood:
+                    ax.set_ylabel('average log-likelihood')
+                elif 'scoring' in crossvalKWArgs:
+                    ax.set_ylabel('{}'.format(crossvalKWArgs['scoring']))
                 fig.tight_layout(pad=1)
                 titleText = fig.suptitle('{}'.format(maskParams['freqBandName']))
                 pdf.savefig(bbox_inches='tight', pad_inches=0)

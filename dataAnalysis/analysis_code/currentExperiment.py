@@ -501,6 +501,9 @@ def parseAnalysisOptions(
     except Exception:
         pass
     #
+    defaultSplitterKWArgs = dict(
+        stratifyFactors=stimulusConditionNames,
+        continuousFactors=['segment', 'originalIndex', 't'])
     iteratorOpts = {
         # rest period from before movement onset
         'a': {
@@ -513,9 +516,9 @@ def parseAnalysisOptions(
             'controlProportion': None,
             'cvKWArgs': dict(
                 n_splits=7,
-                splitterClass=None, splitterKWArgs=dict(random_state=None, test_size=None,),
+                splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
                 samplerKWArgs=dict(random_state=None, test_size=None,),
-                resamplerClass=RandomOverSampler, resamplerKWArgs={},
+                resamplerClass=None, resamplerKWArgs={},
                 ),
             'timeROIOpts': {
                 'alignQuery': None,
@@ -528,6 +531,59 @@ def parseAnalysisOptions(
                 'winStop': -400e-3
             }
         },
+        # perimovement, no stim
+        'b': {
+            'ensembleHistoryLen': .30,
+            'covariateHistoryLen': .50,
+            'nHistoryBasisTerms': 1,
+            'nCovariateBasisTerms': 1,
+            'forceBinInterval': 10e-3,
+            'calcTimeROI': True,
+            'controlProportion': None,
+            'cvKWArgs': dict(
+                n_splits=7,
+                splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
+                samplerKWArgs=dict(random_state=None, test_size=None,),
+                resamplerClass=None, resamplerKWArgs={},
+                ),
+            'timeROIOpts': {
+                'alignQuery': 'stoppingNoStim',
+                'winStart': -100e-3,
+                'winStop': 0.
+            },
+            'timeROIOpts_control': {
+                'alignQuery': None,
+                'winStart': -100e-3,
+                'winStop': 0.
+            }
+        },
+        # perimovement, any stim
+        'c': {
+            'ensembleHistoryLen': .30,
+            'covariateHistoryLen': .50,
+            'nHistoryBasisTerms': 1,
+            'nCovariateBasisTerms': 1,
+            'forceBinInterval': 10e-3,
+            'calcTimeROI': True,
+            'controlProportion': None,
+            'cvKWArgs': dict(
+                n_splits=7,
+                splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
+                samplerKWArgs=dict(random_state=None, test_size=None,),
+                resamplerClass=None, resamplerKWArgs={},
+                ),
+            'timeROIOpts': {
+                'alignQuery': 'stopping',
+                'winStart': -100e-3,
+                'winStop': 0.
+            },
+            'timeROIOpts_control': {
+                'alignQuery': None,
+                'winStart': -100e-3,
+                'winStop': 0.
+            }
+        },
+        # perimovement onset (or peristim onset if stim only) for RAUC
         'f': {
             'ensembleHistoryLen': .30,
             'covariateHistoryLen': .50,
@@ -538,9 +594,9 @@ def parseAnalysisOptions(
             'controlProportion': 'majority',
             'cvKWArgs': dict(
                 n_splits=7,
-                splitterClass=None, splitterKWArgs=dict(random_state=None, test_size=None,),
+                splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
                 samplerKWArgs=dict(random_state=None, test_size=None,),
-                resamplerClass=RandomOverSampler, resamplerKWArgs={},
+                resamplerClass=None, resamplerKWArgs={},
                 ),
             'timeROIOpts': {
                 'alignQuery': None,
@@ -558,7 +614,8 @@ def parseAnalysisOptions(
         for key in iteratorOpts.keys():
             if key in expOpts['expIteratorOpts']:
                 iteratorOpts[key].update(expOpts['expIteratorOpts'][key])
-    glmOptsLookup = {
+
+    '''glmOptsLookup = {
         'ensembleHistoryLen': .30,
         'covariateHistoryLen': .50,
         'nHistoryBasisTerms': 5,
@@ -599,7 +656,7 @@ def parseAnalysisOptions(
                 rollingWindow=None, decimate=1,
                 windowSize=(-1750e-3, 1750e-3)),
             covariateSpacing=10e-3),
-    }
+    }'''
     spectralFeatureOpts = dict(
         winLen=100e-3, stepLen=20e-3, R=20,
         fStart=None, fStop=None)

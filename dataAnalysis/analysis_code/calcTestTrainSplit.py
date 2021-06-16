@@ -177,7 +177,7 @@ if theseIteratorOpts['nCovariateBasisTerms'] > 1:
 if theseIteratorOpts['forceBinInterval'] is not None:
     alignedAsigsKWargs['decimate'] = int(theseIteratorOpts['forceBinInterval'] / binOpts['binInterval'])
 #
-nSplits = theseIteratorOpts['nSplits']
+# nSplits = theseIteratorOpts['nSplits']
 listOfIterators = []
 listOfDataFrames = []
 if (not arguments['loadFromFrames']):
@@ -190,7 +190,6 @@ if (not arguments['loadFromFrames']):
             prf.print_memory_usage(
                 'fitting on segment {}'.format(segIdx))
         aakwa = alignedAsigsKWargs.copy()
-        # pdb.set_trace()  #
         try:
             dataDF = ns5.alignedAsigsToDF(
                 dataBlock,
@@ -221,7 +220,12 @@ if (not arguments['loadFromFrames']):
                 objects=ns5.Event,
                 name='seg{}_{}'.format(segIdx, eventName))
             assert len(evList) == 1
-            targetTrialAnnDF = ns5.unitSpikeTrainArrayAnnToDF(evList).query(endMaskQuery)
+            targetTrialAnnDF = ns5.unitSpikeTrainArrayAnnToDF(evList, columnNames=aakwa['getMetaData'])
+            try:
+                targetTrialAnnDF = targetTrialAnnDF.query(endMaskQuery)
+            except Exception:
+                traceback.print_exc()
+                pass
             targetMask = pd.Series(True, index=dataDF.index)
             for (_, _, t), group in dataDF.groupby(['segment', 'originalIndex', 't']):
                 timeDifference = (targetTrialAnnDF['t'] - t)
@@ -333,7 +337,7 @@ exportAAKWA.pop('unitQuery', None)
 iteratorMetadata = {
     'alignedAsigsKWargs': exportAAKWA,
     'iteratorsBySegment': listOfIterators,
-    'cv_kwargs': cv_kwargs,
+    'cv_kwargs': theseIteratorOpts,
     'experimentsToAssemble': experimentsToAssemble
 }
 if theseIteratorOpts['calcTimeROI'] and (not arguments['loadFromFrames']):

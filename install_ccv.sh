@@ -26,6 +26,7 @@ module load mpi
 # module load opengl
 module load qt/5.10.1
 module load zlib/1.2.11
+module load vtk/8.1.0
 module unload python
 
 . /gpfs/runtime/opt/anaconda/2020.02/etc/profile.d/conda.sh
@@ -46,6 +47,8 @@ pip install pyqt5==5.10.1 --target="/users/rdarie/anaconda/nda2/lib/python3.7/si
 conda install jupyter --freeze-installed
 conda install pyqtgraph=0.10.0 --freeze-installed
 pip install vg==1.6.1 --target="/users/rdarie/anaconda/nda2/lib/python3.7/site-packages" --no-deps
+# conda install mayavi --freeze-installed
+# pip install importlib-resources --target="/users/rdarie/anaconda/nda2/lib/python3.7/site-packages" --no-deps
 
 pip install git+git://github.com/G-Node/nixpy@v1.5.0b3 --target="/users/rdarie/anaconda/nda2/lib/python3.7/site-packages" --no-deps
 pip install git+git://github.com/hector-sab/ttictoc@v0.4.1 --target="/users/rdarie/anaconda/nda2/lib/python3.7/site-packages" --no-deps

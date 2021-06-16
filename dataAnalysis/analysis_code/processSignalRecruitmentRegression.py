@@ -134,7 +134,7 @@ if __name__ == "__main__":
         )
     calcSubFolder = os.path.join(analysisSubFolder, 'dataframes')
     figureOutputFolder = os.path.join(
-        figureFolder, arguments['analysisName'])
+        figureFolder, arguments['analysisName'], 'lfp_recruitment')
     if not os.path.exists(figureOutputFolder):
         os.makedirs(figureOutputFolder, exist_ok=True)
     blockBaseName, inputBlockSuffix = hf.processBasicPaths(arguments)

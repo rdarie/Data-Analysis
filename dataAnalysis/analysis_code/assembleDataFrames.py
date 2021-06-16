@@ -138,7 +138,6 @@ if __name__ == '__main__':
         alignedAsigsKWargs = loadingMeta['alignedAsigsKWargs'].copy()
         alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
             namedQueries, scratchFolder, **rhsArgs)
-        #
         if arguments['verbose']:
             prf.print_memory_usage('before load data')
             print('loading {}'.format(triggeredPath))

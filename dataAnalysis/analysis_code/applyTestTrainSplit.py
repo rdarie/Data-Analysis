@@ -97,8 +97,8 @@ if arguments['verbose']:
     print('Loading cv iterator from\n{}\n'.format(iteratorPath))
 with open(iteratorPath, 'rb') as f:
     loadingMeta = pickle.load(f)
-iteratorsBySegment = loadingMeta.pop('iteratorsBySegment')
-cv_kwargs = loadingMeta.pop('cv_kwargs')
+iteratorsBySegment = loadingMeta['iteratorsBySegment']
+cv_kwargs = loadingMeta['cv_kwargs']
 
 listOfDataFrames = []
 
@@ -106,7 +106,7 @@ triggeredPath = os.path.join(
     alignSubFolder,
     blockBaseName + '{}_{}.nix'.format(
         inputBlockSuffix, arguments['window']))
-alignedAsigsKWargs = loadingMeta.pop('alignedAsigsKWargs')
+alignedAsigsKWargs = loadingMeta['alignedAsigsKWargs']
 alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
     namedQueries, scratchFolder, **arguments)
 alignedAsigsKWargs['verbose'] = arguments['verbose']
@@ -118,7 +118,6 @@ nSeg = len(dataBlock.segments)
 for segIdx in range(nSeg):
     if arguments['verbose']:
         prf.print_memory_usage('extracting data on segment {}'.format(segIdx))
-    # prelim load to get feature annotations
     aakwa = deepcopy(alignedAsigsKWargs)
     aakwa['verbose'] = False
     if 'listOfROIMasks' in loadingMeta:
@@ -158,10 +157,15 @@ outputDFPath = os.path.join(
         blockBaseName,
         arguments['window'],
         iteratorSuffix))
-#
 if arguments['resetHDF']:
     if os.path.exists(outputDFPath):
         os.remove(outputDFPath)
+outputLoadingMetaPath = os.path.join(
+    dataFramesFolder,
+    '{}_{}_df{}_{}_meta.pickle'.format(
+        blockBaseName,
+        arguments['window'],
+        iteratorSuffix, arguments['selectionName']))
 #
 if arguments['controlSet']:
     trialInfo = exportDF.index.to_frame().reset_index(drop=True)
@@ -243,3 +247,9 @@ if arguments['verbose']:
     prf.print_memory_usage(
         'Saving {} to {}'.format(masksKey, outputDFPath))
 maskDF.to_hdf(outputDFPath, masksKey, mode='a')
+#
+print('saving loading meta to \n{}\n'.format(outputLoadingMetaPath))
+if os.path.exists(outputLoadingMetaPath):
+    os.remove(outputLoadingMetaPath)
+with open(outputLoadingMetaPath, 'wb') as _f:
+    pickle.dump(loadingMeta, _f)

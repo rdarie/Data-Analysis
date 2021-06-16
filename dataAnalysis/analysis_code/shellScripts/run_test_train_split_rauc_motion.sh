@@ -29,17 +29,17 @@ source shellScripts/calc_aligned_motion_preamble.sh
 # suffix f, for RAUC calculations
 ITERATOR="--iteratorSuffix=f"
 #
+# TARGET="lfp_CAR_spectral_fa_mahal"
+TARGET="lfp_CAR_spectral_mahal"
+#
 ALIGNQUERYTERM="starting"
 ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
-
-python -u './calcTestTrainSplit.py' --inputBlockSuffix="lfp_CAR_spectral_fa_mahal" --unitQuery="mahal" --selectionName='lfp_CAR_spectral_fa_mahal' $ALIGNQUERY $ITERATOR --eventName='motion' --eventBlockSuffix='epochs' --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $OUTLIERMASK $LAZINESS
-python -u './applyTestTrainSplit.py' --resetHDF --inputBlockSuffix="lfp_CAR_spectral_fa_mahal" --unitQuery="mahal" --selectionName='lfp_CAR_spectral_fa_mahal' --verbose $ALIGNQUERY $ITERATOR --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
-##
+#
+python -u './calcTestTrainSplit.py' --inputBlockSuffix="${TARGET}" --unitQuery="mahal" --selectionName="${TARGET}" $ALIGNQUERY $ITERATOR --eventName='motion' --eventBlockSuffix='epochs' --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $OUTLIERMASK $LAZINESS
+python -u './applyTestTrainSplit.py' --resetHDF --inputBlockSuffix="${TARGET}" --unitQuery="mahal" --selectionName="${TARGET}" --verbose $ALIGNQUERY $ITERATOR --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
+# Control Sets
 ALIGNQUERYTERM="outbound"
 ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
-
-python -u './calcTestTrainSplit.py' --controlSet --inputBlockSuffix="lfp_CAR_spectral_fa_mahal" --unitQuery="mahal" --selectionName='lfp_CAR_spectral_fa_mahal' $ALIGNQUERY $ITERATOR --eventName='motion' --eventBlockSuffix='epochs' --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $OUTLIERMASK $LAZINESS
-python -u './applyTestTrainSplit.py' --controlSet --inputBlockSuffix="lfp_CAR_spectral_fa_mahal" --unitQuery="mahal" --selectionName='lfp_CAR_spectral_fa_mahal' --verbose $ALIGNQUERY $ITERATOR --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
-
 #
-# python -u './applyTestTrainSplit.py' --controlSet --inputBlockSuffix="lfp_CAR_spectral_fa" --unitQuery="factor" --selectionName='lfp_CAR_spectral_fa' --verbose $ALIGNQUERY $ITERATOR --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
+python -u './calcTestTrainSplit.py' --controlSet --inputBlockSuffix="${TARGET}" --unitQuery="mahal" --selectionName="${TARGET}" $ALIGNQUERY $ITERATOR --eventName='motion' --eventBlockSuffix='epochs' --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $OUTLIERMASK $LAZINESS
+python -u './applyTestTrainSplit.py' --controlSet --inputBlockSuffix="${TARGET}" --unitQuery="mahal" --selectionName="${TARGET}" --verbose $ALIGNQUERY $ITERATOR --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS

@@ -15,22 +15,21 @@ TIMEWINDOWOPTS="--winStart=-700 --winStop=700"
 
 # ALIGNQUERY="--alignQuery=stimOn"
 # ALIGNQUERY="--alignQuery=outbound"
-# ALIGNQUERY="--alignQuery=starting"
+ALIGNQUERY="--alignQuery=starting"
 # ALIGNQUERY="--alignQuery=stopping"
-ALIGNQUERY="--alignQuery=startingNoStim"
+# ALIGNQUERY="--alignQuery=startingNoStim"
 
-# HUEOPTS="--hueName= --hueControl="
-# ROWOPTS="--rowName=pedalSizeCat --rowControl="
-# COLOPTS="--colName= --colControl="
-# STYLEOPTS="--styleName= --styleControl="
-# SIZEOPTS="--sizeName= --sizeControl="
-
-
-HUEOPTS="--hueName=expName --hueControl="
+HUEOPTS="--hueName=amplitude --hueControl="
 ROWOPTS="--rowName=pedalMovementCat --rowControl="
-COLOPTS="--colName=pedalSizeCat --colControl="
+COLOPTS="--colName=electrode --colControl="
 STYLEOPTS="--styleName= --styleControl="
 SIZEOPTS="--sizeName= --sizeControl="
+
+# HUEOPTS="--hueName=expName --hueControl="
+# ROWOPTS="--rowName=pedalMovementCat --rowControl="
+# COLOPTS="--colName=pedalSizeCat --colControl="
+# STYLEOPTS="--styleName= --styleControl="
+# SIZEOPTS="--sizeName= --sizeControl="
 
 # PAGELIMITS="--limitPages=5"
 PAGELIMITS=""
