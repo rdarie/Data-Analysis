@@ -180,6 +180,7 @@ if arguments['verbose']:
     prf.print_memory_usage(
         'Saving {} to {}'.format(exportKey, outputDFPath))
 exportDF.to_hdf(outputDFPath, exportKey, mode='a')
+##
 featureGroupNames = [cN for cN in exportDF.columns.names]
 maskList = []
 haveAllGroup = False

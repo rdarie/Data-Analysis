@@ -4072,6 +4072,7 @@ def exportNormalizedDataFrame(
         dataFramesFolder,
         datasetName + '.h5'
         )
+    #  pdb.set_trace()
     print('saving {} to {}'.format(selectionName, datasetPath))
     finalDF.to_hdf(datasetPath, '/{}/data'.format(selectionName), mode='a')
     featureInfoMask.to_hdf(datasetPath, '/{}/featureMasks'.format(selectionName), mode='a')

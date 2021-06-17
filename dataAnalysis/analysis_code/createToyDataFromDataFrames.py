@@ -23,6 +23,7 @@ Options:
     --selectionNameLhs=selectionNameLhs    how to restrict channels? [default: fr_sqrt]
     --estimatorName=estimatorName          filename for resulting estimator (cross-validated n_comps)
     --selector=selector                    filename if using a unit selector
+    --iteratorSuffix=iteratorSuffix        filename if using a unit selector
 """
 
 import matplotlib
@@ -65,7 +66,6 @@ from scipy import stats
 from bokeh.models import ColorBar, ColumnDataSource
 from bokeh.palettes import Spectral6
 from bokeh.transform import linear_cmap
-from mayavi import mlab
 from scipy.spatial.transform import Rotation as Rot
 for arg in sys.argv:
     print(arg)
@@ -194,7 +194,6 @@ if __name__ == '__main__':
     lhGroupNames = lhsMasks.index.names
     trialInfo = lhsDF.index.to_frame().reset_index(drop=True)
     infoPerTrial = trialInfo.drop_duplicates(['segment', 'originalIndex', 't'])
-if True:
     ########################################################
     trialInfo.drop_duplicates(['segment', 'originalIndex', 't']).groupby(stimulusConditionNames).count().iloc[:, 0]
     trialInfo.drop_duplicates(['segment', 'originalIndex', 't']).groupby(['electrode', 'pedalMovementCat']).count().iloc[:, 0]
@@ -242,7 +241,6 @@ if True:
     shuffledIndices = np.arange(toyInfoPerTrial.shape[0])
     rng.shuffle(shuffledIndices)
     toyInfoPerTrial = toyInfoPerTrial.iloc[shuffledIndices, :]
-    toyInfoPerTrial.loc[:, 'bin'] = 0.
     toyInfoPerTrial.loc[:, 'segment'] = 0.
     toyInfoPerTrial.loc[:, 'originalIndex'] = np.arange(toyInfoPerTrial.shape[0])
     toyInfoPerTrial.loc[:, 't'] = toyInfoPerTrial['originalIndex'] * 10.
@@ -256,6 +254,7 @@ if True:
         ], names=lhsDF.columns.names)
     bins = np.unique(lhsDF.index.get_level_values('bin'))
     toyLhsList = []
+    toyInfoPerTrial.drop(columns=['bin'], inplace=True)
     for rowIdx, row in toyInfoPerTrial.iterrows():
         thisIdx = pd.MultiIndex.from_tuples([tuple(row)], names=row.index)
         vel = pd.DataFrame(0., index=thisIdx, columns=bins)
@@ -296,11 +295,8 @@ if True:
         'cvIterator': cvIterator
         }
     colsToScale = ['amplitude', 'RateInHz']
-    toyLhsDF.reset_index(level=['electrode', 'pedalMovementCat'], inplace=True)
+    saveIndex = toyLhsDF.index.copy()
     toyTrialInfo = toyLhsDF.index.to_frame().reset_index(drop=True)
-    toyTrialInfo.index.name = 'trial'
-    toyLhsDF.reset_index(inplace=True, drop=True)
-    toyLhsDF.index.name = 'trial'
     lOfTransformers = [
         (['amplitude'], MinMaxScaler(feature_range=(0., 1)),),
         (['RateInHz'], MinMaxScaler(feature_range=(0., .5)),)
@@ -312,54 +308,142 @@ if True:
         lOfTransformers, input_df=True, df_out=True
         )
     scaledLhsDF = lhsScaler.fit_transform(toyLhsDF)
+    #
+    scaledLhsDF.reset_index(level=['electrode', 'pedalMovementCat'], inplace=True)
+    scaledLhsDF.reset_index(inplace=True, drop=True)
+    scaledLhsDF.index.name = 'trial'
+    #
     designFormula = "velocity + electrode:(amplitude/RateInHz)"
     pt = PatsyTransformer(designFormula, return_type="matrix")
     designMatrix = pt.fit_transform(scaledLhsDF)
     designInfo = designMatrix.design_info
     designDF = (
-        pd.DataFrame(designMatrix,
-        index=toyLhsDF.index,
-        columns=designInfo.column_names))
+        pd.DataFrame(
+            designMatrix,
+            index=toyLhsDF.index,
+            columns=designInfo.column_names))
     ################################
-    nDim = 3
-    nDimLatent = 2
-    #####
-    kinDirection = vg.rotate(
-        vg.basis.x, vg.basis.z, 0)
-    stimDirection = vg.rotate(
-        kinDirection, vg.basis.z, 90)
-    #####
-    mu = np.asarray([2., 3., 1.])
-    phi, theta, psi = 30, 10, 20
-    r = Rot.from_euler('XYZ', [phi, theta, psi], degrees=True)
-    wRot = r.as_matrix()
-    var = np.diag([2, 7, 0])
-    # W = wRot @ var
-    S = np.eye(nDim) * .5e-2
-    #
-    gtCoeffs = pd.Series({
-        'Intercept': 0.,
-        'velocity': 1.,
+    iteratorSuffix = arguments['iteratorSuffix']
+    if iteratorSuffix == 'a':
+        nDim = 3
+        nDimLatent = 2
+        #####
+        kinDirection = vg.rotate(
+            vg.basis.x, vg.basis.z, 0)
+        stimDirection = vg.rotate(
+            kinDirection, vg.basis.z, 90)
+        #####
+        mu = np.asarray([2., 3., 1.])
+        phi, theta, psi = 30, 10, 20
+        r = Rot.from_euler('XYZ', [phi, theta, psi], degrees=True)
+        wRot = r.as_matrix()
+        var = np.diag([2, 7, 0])
+        # W = wRot @ var
+        S = np.eye(nDim) * .5e-2
         #
-        'electrode[+ E16 - E5]:amplitude': 2.,
-        'electrode[+ E16 - E9]:amplitude': 2.,
-        'electrode[NA]:amplitude': 0.,
+        gtCoeffs = pd.Series({
+            'Intercept': 0.,
+            'velocity': 3.,
+            #
+            'electrode[+ E16 - E5]:amplitude': 4.,
+            'electrode[+ E16 - E9]:amplitude': 4.,
+            'electrode[NA]:amplitude': 0.,
+            #
+            'electrode[+ E16 - E9]:amplitude:RateInHz': 1.,
+            'electrode[+ E16 - E5]:amplitude:RateInHz': 1.,
+            'electrode[NA]:amplitude:RateInHz': 0.
+            })
+        rotCoeffs = pd.Series({
+            'electrode[+ E16 - E9]:amplitude': [60., 5., 0.],
+            'electrode[+ E16 - E5]:amplitude': [0., 0., 0.],
+            'electrode[NA]:amplitude': [0., 0., 0.],
+            })
+        projectionLookup = {
+            'Intercept': kinDirection,
+            'velocity': kinDirection,
+            'electrode:amplitude': stimDirection,
+            'electrode:amplitude:RateInHz': stimDirection
+            }
+    elif iteratorSuffix == 'b':
+        nDim = 3
+        nDimLatent = 2
+        #####
+        kinDirection = vg.rotate(
+            vg.basis.x, vg.basis.z, 0)
+        stimDirection = vg.rotate(
+            kinDirection, vg.basis.z, 10)
+        #####
+        mu = np.asarray([2., 3., 1.])
+        phi, theta, psi = 30, 10, 20
+        r = Rot.from_euler('XYZ', [phi, theta, psi], degrees=True)
+        wRot = r.as_matrix()
+        var = np.diag([2, 7, 0])
+        # W = wRot @ var
+        S = np.eye(nDim) * .5e-2
         #
-        'electrode[+ E16 - E9]:amplitude:RateInHz': 1e-1,
-        'electrode[+ E16 - E5]:amplitude:RateInHz': 1e-1,
-        'electrode[NA]:amplitude:RateInHz': 0.
-        })
-    rotCoeffs = pd.Series({
-        'electrode[+ E16 - E9]:amplitude': [25., 5., 0.],
-        'electrode[+ E16 - E5]:amplitude': [0., 0., 0.],
-        'electrode[NA]:amplitude': [0., 0., 0.],
-        })
-    projectionLookup = {
-        'Intercept': kinDirection,
-        'velocity': kinDirection,
-        'electrode:amplitude': stimDirection,
-        'electrode:amplitude:RateInHz': stimDirection
-        }
+        gtCoeffs = pd.Series({
+            'Intercept': 0.,
+            'velocity': 3.,
+            #
+            'electrode[+ E16 - E5]:amplitude': 4.,
+            'electrode[+ E16 - E9]:amplitude': 4.,
+            'electrode[NA]:amplitude': 0.,
+            #
+            'electrode[+ E16 - E9]:amplitude:RateInHz': 1.,
+            'electrode[+ E16 - E5]:amplitude:RateInHz': 1.,
+            'electrode[NA]:amplitude:RateInHz': 0.
+            })
+        rotCoeffs = pd.Series({
+            'electrode[+ E16 - E9]:amplitude': [60., 5., 0.],
+            'electrode[+ E16 - E5]:amplitude': [0., 0., 0.],
+            'electrode[NA]:amplitude': [0., 0., 0.],
+            })
+        projectionLookup = {
+            'Intercept': kinDirection,
+            'velocity': kinDirection,
+            'electrode:amplitude': stimDirection,
+            'electrode:amplitude:RateInHz': stimDirection
+            }
+    elif iteratorSuffix == 'c':
+        nDim = 3
+        nDimLatent = 2
+        #####
+        kinDirection = vg.rotate(
+            vg.basis.x, vg.basis.z, 0)
+        stimDirection = vg.rotate(
+            kinDirection, vg.basis.z, 10)
+        #####
+        mu = np.asarray([2., 3., 1.])
+        phi, theta, psi = 30, 10, 20
+        r = Rot.from_euler('XYZ', [phi, theta, psi], degrees=True)
+        wRot = r.as_matrix()
+        var = np.diag([2, 7, 0])
+        # W = wRot @ var
+        S = np.eye(nDim) * .5e-2
+        #
+        gtCoeffs = pd.Series({
+            'Intercept': 0.,
+            'velocity': 3.,
+            #
+            'electrode[+ E16 - E5]:amplitude': 4.,
+            'electrode[+ E16 - E9]:amplitude': 4.,
+            'electrode[NA]:amplitude': 0.,
+            #
+            'electrode[+ E16 - E9]:amplitude:RateInHz': 1.,
+            'electrode[+ E16 - E5]:amplitude:RateInHz': 1.,
+            'electrode[NA]:amplitude:RateInHz': 0.
+            })
+        rotCoeffs = pd.Series({
+            'electrode[+ E16 - E9]:amplitude': [0., 0., 0.],
+            'electrode[+ E16 - E5]:amplitude': [0., 0., 0.],
+            'electrode[NA]:amplitude': [0., 0., 0.],
+            })
+        projectionLookup = {
+            'Intercept': kinDirection,
+            'velocity': kinDirection,
+            'electrode:amplitude': stimDirection,
+            'electrode:amplitude:RateInHz': stimDirection
+            }
     magnitudes = (designDF * gtCoeffs).loc[:, designDF.columns]
     # sanity check
     sanityCheckThis = False
@@ -369,10 +453,10 @@ if True:
             ax[0].plot(magnitudes[cN], label=cN)
         ax[0].legend()
     latentRhsDF = pd.DataFrame(
-        0, index=toyLhsDF.index,
+        0, index=scaledLhsDF.index,
         columns=['latent{}'.format(cN) for cN in range(nDimLatent)])
     termMagnitudes = pd.DataFrame(
-        0, index=toyLhsDF.index, columns=designInfo.term_names
+        0, index=scaledLhsDF.index, columns=designInfo.term_names
         )
     for termName, termSlice in designInfo.term_name_slices.items():
         termMagnitudes.loc[:, termName] = magnitudes.iloc[:, termSlice].sum(axis='columns').to_numpy()
@@ -385,15 +469,15 @@ if True:
     for termName, termSlice in designInfo.term_name_slices.items():
         termValues = termMagnitudes[termName].to_numpy().reshape(-1, 1) * projectionLookup[termName]
         latentRhsDF.loc[:, :] += termValues[:, :nDimLatent]
-    latentNoise = rng.normal(0, 1., size=(toyLhsDF.shape[0], nDimLatent))
+    latentNoise = rng.normal(0, 1., size=(scaledLhsDF.shape[0], nDimLatent))
     latentRhsDF += latentNoise
     latentRhsDF.loc[:, :] = StandardScaler().fit_transform(latentRhsDF)
     latentRhsDF.columns.name = 'feature'
     #
-    latentPlotDF = pd.concat([latentRhsDF, toyLhsDF], axis='columns')
+    latentPlotDF = pd.concat([latentRhsDF, scaledLhsDF], axis='columns')
     latentPlotDF.columns = latentPlotDF.columns.astype(str)
     #
-    rhsDF = pd.DataFrame(
+    toyRhsDF = pd.DataFrame(
         0.,
         index=latentRhsDF.index,
         columns=['data{}'.format(cN) for cN in range(nDim)])
@@ -404,51 +488,132 @@ if True:
         nPoints = group.index.shape[0]
         extraRotMat = Rot.from_euler('XYZ', [beta * amp for beta in rotCoeffs[factorName]], degrees=True).as_matrix()
         augL = np.concatenate([latentRhsDF.loc[group.index, :].to_numpy(), np.zeros([nPoints, 1])], axis=1).T
-        rhsDF.loc[group.index, :] += (wRot @ extraRotMat @ var @ augL).T
+        toyRhsDF.loc[group.index, :] += (wRot @ extraRotMat @ var @ augL).T
     noiseDistr = stats.multivariate_normal(mean=mu, cov=S)
     noiseTerm = noiseDistr.rvs(latentRhsDF.shape[0])
-    rhsDF += noiseTerm
-    rhsDF += mu
-    rhsPlotDF = pd.concat([rhsDF, toyLhsDF], axis='columns')
+    toyRhsDF += noiseTerm
+    toyRhsDF += mu
+    rhsPlotDF = pd.concat([toyRhsDF, scaledLhsDF], axis='columns')
     totalBoundsLatent = np.abs(
         (latentPlotDF.loc[:, latentRhsDF.columns].quantile(5e-3).min(),
         latentPlotDF.loc[:, latentRhsDF.columns].quantile(1 - 5e-3).max(),)).max() * np.asarray([-1, 1])
     fig, ax = plt.subplots(figsize=(12, 12))
     ax.scatter(
         latentPlotDF.iloc[:, 0], latentPlotDF.iloc[:, 1],
-        c=latentPlotDF['amplitude'], cmap='viridis', alpha=0.1, linewidths=0)
+        c=latentPlotDF['amplitude'], cmap='viridis', alpha=0.1, linewidths=0, rasterized=True)
     ax.set_xlim(totalBoundsLatent)
     ax.set_ylim(totalBoundsLatent)
     ax.axis('square')
     pdfPath = os.path.join(
-        figureOutputFolder, 'synthetic_dataset_latent.pdf'
+        figureOutputFolder, 'synthetic_dataset_latent_{}.pdf'.format(iteratorSuffix)
     )
     fig.tight_layout()
     plt.savefig(pdfPath)
-    plt.show()
+    if arguments['showFigures']:
+        plt.show()
+    else:
+        plt.close()
+    ####
     totalBounds = np.abs(
         (
-            rhsPlotDF.loc[:, rhsDF.columns].quantile(5e-3).min(),
-            rhsPlotDF.loc[:, rhsDF.columns].quantile(1 - 5e-3).max(),)).max() * np.asarray([-1, 1])
+            rhsPlotDF.loc[:, toyRhsDF.columns].quantile(5e-3).min(),
+            rhsPlotDF.loc[:, toyRhsDF.columns].quantile(1 - 5e-3).max(),)).max() * np.asarray([-1, 1])
     fig = plt.figure()
     fig.set_size_inches((12, 12))
     ax = fig.add_subplot(projection='3d')
     ax.scatter(
         rhsPlotDF.iloc[:, 0], rhsPlotDF.iloc[:, 1], rhsPlotDF.iloc[:, 2],
-        c=rhsPlotDF['amplitude'], cmap='viridis', alpha=.1, linewidths=0)
+        c=rhsPlotDF['amplitude'], cmap='viridis', alpha=.1, linewidths=0, rasterized=True)
     ax.set_xlim(totalBounds)
     ax.set_ylim(totalBounds)
     ax.set_zlim(totalBounds)
     pdfPath = os.path.join(
-        figureOutputFolder, 'synthetic_dataset.pdf'
+        figureOutputFolder, 'synthetic_dataset_{}.pdf'.format(iteratorSuffix)
     )
     fig.tight_layout()
     plt.savefig(pdfPath)
-    plt.show()
-    pdb.set_trace()
-    exportPacket = [
-        {}
-    ]
+    if arguments['showFigures']:
+        plt.show()
+    else:
+        plt.close()
+    ####
+    outputLoadingMeta = loadingMeta.copy()
+    outputLoadingMeta['iteratorsBySegment'] = [cvIterator]
+    outputLoadingMeta['cv_kwargs'] = iteratorKWArgs
+    outputLoadingMeta.pop('normalizationParams')
+    outputLoadingMeta.pop('normalizeDataset')
+    outputLoadingMeta.pop('unNormalizeDataset')
+    outputLoadingMeta.pop('arguments')
+    datasetName='Synthetic_{}_df_{}'.format(loadingMeta['arguments']['window'], iteratorSuffix)
+    #####
+    featureColumns = pd.DataFrame(
+        np.nan,
+        index=range(toyRhsDF.shape[1]),
+        columns=rhsDF.columns.names)
+    for fcn in rhsDF.columns.names:
+        if fcn == 'feature':
+            featureColumns.loc[:, fcn] = toyRhsDF.columns
+        elif fcn == 'lag':
+            featureColumns.loc[:, fcn] = 0
+        else:
+            featureColumns.loc[:, fcn] = ns5.metaFillerLookup[fcn]
+    toyRhsDF.columns = pd.MultiIndex.from_frame(featureColumns)
+    toyRhsDF.index = saveIndex
+    allGroupIdx = pd.MultiIndex.from_tuples(
+        [tuple('all' for fgn in rhsDF.columns.names)],
+        names=rhsDF.columns.names)
+    allMask = pd.Series(True, index=toyRhsDF.columns).to_frame()
+    allMask.columns = allGroupIdx
+    maskDF = allMask.T
+    maskParams = [
+        {k: v for k, v in zip(maskDF.index.names, idxItem)}
+        for idxItem in maskDF.index
+        ]
+    maskParamsStr = [
+        '{}'.format(idxItem).replace("'", '')
+        for idxItem in maskParams]
+    maskDF.loc[:, 'maskName'] = maskParamsStr
+    maskDF.set_index('maskName', append=True, inplace=True)
+    hf.exportNormalizedDataFrame(
+        dataDF=toyRhsDF, loadingMeta=outputLoadingMeta.copy(), featureInfoMask=maskDF,
+        arguments=arguments, selectionName=arguments['selectionNameRhs'],
+        dataFramesFolder=dataFramesFolder, datasetName=datasetName,
+        )
+    ###########
+    featureColumns = pd.DataFrame(
+        np.nan,
+        index=range(toyLhsDF.shape[1]),
+        columns=lhsDF.columns.names)
+    for fcn in lhsDF.columns.names:
+        if fcn == 'feature':
+            featureColumns.loc[:, fcn] = toyLhsDF.columns
+        elif fcn == 'lag':
+            featureColumns.loc[:, fcn] = 0
+        else:
+            featureColumns.loc[:, fcn] = ns5.metaFillerLookup[fcn]
+    toyLhsDF.columns = pd.MultiIndex.from_frame(featureColumns)
+    toyLhsDF.index = saveIndex
+    allGroupIdx = pd.MultiIndex.from_tuples(
+        [tuple('all' for fgn in lhsDF.columns.names)],
+        names=lhsDF.columns.names)
+    allMask = pd.Series(True, index=toyLhsDF.columns).to_frame()
+    allMask.columns = allGroupIdx
+    maskDF = allMask.T
+    maskParams = [
+        {k: v for k, v in zip(maskDF.index.names, idxItem)}
+        for idxItem in maskDF.index
+        ]
+    maskParamsStr = [
+        '{}'.format(idxItem).replace("'", '')
+        for idxItem in maskParams]
+    maskDF.loc[:, 'maskName'] = maskParamsStr
+    maskDF.set_index('maskName', append=True, inplace=True)
+    hf.exportNormalizedDataFrame(
+        dataDF=toyLhsDF, loadingMeta=outputLoadingMeta.copy(), featureInfoMask=maskDF,
+        arguments=arguments, selectionName=arguments['selectionNameLhs'],
+        dataFramesFolder=dataFramesFolder, datasetName=datasetName,
+        )
+    '''
     def exportNormalized(
         dataDF=None, selectionName=None,
         dataFramesFolder=None, datasetName=None,
@@ -574,4 +739,4 @@ if True:
         loadingMeta['normalizeDataset'] = normalizeDataset
         loadingMeta['unNormalizeDataset'] = unNormalizeDataset
         with open(loadingMetaPath, 'wb') as f:
-            pickle.dump(loadingMeta, f)
+            pickle.dump(loadingMeta, f)'''

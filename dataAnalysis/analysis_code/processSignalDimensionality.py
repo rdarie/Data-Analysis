@@ -263,7 +263,12 @@ with PdfPages(pdfPath) as pdf:
     else:
         plt.close()
 # subselect features
-plotFeatIdxes = rng.choice(recsNoGT.groupby('feature', axis='columns').ngroups, size=10, replace=False)
+nFeats = recsNoGT.groupby('feature', axis='columns').ngroups
+if nFeats > 10:
+    plotFeatIdxes = rng.choice(
+        nFeats, size=10, replace=False)
+else:
+    plotFeatIdxes = np.arange(nFeats)
 plotFeatNames = recsNoGT.columns.get_level_values('feature')[plotFeatIdxes]
 #
 dataDF.loc[:, 'fold'] = 0
@@ -275,8 +280,8 @@ pdfPath = os.path.join(
         fullEstimatorName))
 with PdfPages(pdfPath) as pdf:
     for idx, (maskIdx, featureMask) in enumerate(featureMasks.iterrows()):
-        if maskParams['freqBandName'] == 'all':
-            continue
+        # if maskParams['freqBandName'] == 'all':
+        #     continue
         maskParams = {k: v for k, v in zip(featureMask.index.names, maskIdx)}
         dataGroup = dataDF.loc[:, featureMask]
         for featName, group in dataGroup.groupby('feature', axis='columns'):
@@ -286,6 +291,7 @@ with PdfPages(pdfPath) as pdf:
             colMask = recsNoGT.columns.isin(group.columns)
             recDF = recsNoGT.loc[idxMask, colMask].copy()
             recDF.columns = recDF.columns.get_level_values('feature')
+            # pdb.set_trace()
             predStack = recDF.stack(recDF.columns.names).to_frame(name='signal').reset_index()
             GT = group.copy()
             GT.columns = GT.columns.get_level_values('feature')
@@ -300,7 +306,8 @@ with PdfPages(pdfPath) as pdf:
             # pdb.set_trace()
             g = sns.relplot(
                 col='trialNum', col_wrap=5,
-                hue='trialType', style='expName',
+                hue='trialType', style='trialType',
+                # style='expName',
                 x='bin', y='signal', data=plotPredStack,
                 kind='line', alpha=0.5, lw=0.5, errorbar='se')
             g.fig.set_size_inches((12, 8))
