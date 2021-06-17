@@ -43,6 +43,18 @@ do
     python -u './createToyDataFromDataFrames.py' --iteratorSuffix=$ITER --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
     python -u './calcGridSearchSignalDimensionality.py' --estimatorName=$ESTIMATOR --datasetName="Synthetic_${WINDOWTERM}_df_${ITER}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
     python -u './processSignalDimensionality.py' --estimatorName=$ESTIMATOR --datasetName="Synthetic_${WINDOWTERM}_df_${ITER}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
-    python -u './calcSignalNovelty.py' --estimatorName="mahal" --datasetName="Synthetic_${WINDOWTERM}_df_${ITER}" --selectionName=$TARGET --unitQuery=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=2 --plotting
 done
-python -u './compareSignalCovarianceMatrices.py' --estimatorName=$ESTIMATOR --iteratorSuffixList="a, b, c, d, e, f" --datasetPrefix="Synthetic_${WINDOWTERM}_df" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
+###
+#  python -u './calcSignalNovelty.py' --estimatorName="mahal" --datasetName="Synthetic_${WINDOWTERM}_df_f" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=2 --plotting
+###
+TARGET="lfp_CAR"
+ESTIMATOR="mahal"
+###
+#  iterators=(a b c d e)
+#  for ITER in "${iterators[@]}"
+#  do
+#      echo "On iterator $ITER"
+#      python -u './applyEstimatorToDataFrame.py' --inputBlockSuffix=$TARGET --estimatorName=$ESTIMATOR --originDatasetName="Synthetic_${WINDOWTERM}_df_f" --datasetName="Synthetic_${WINDOWTERM}_df_${ITER}" --selectionName=$TARGET --originDatasetExp='202101281100-Rupert' --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR
+#  done
+#  python -u './compareSignalCovarianceMatrices.py' --estimatorName=$ESTIMATOR --iteratorSuffixList="a, b, c, d, e, f" --datasetPrefix="Synthetic_${WINDOWTERM}_df" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
+#  

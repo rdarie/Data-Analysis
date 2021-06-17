@@ -47,7 +47,6 @@ import dataAnalysis.preproc.ns5 as ns5
 from sklearn.compose import ColumnTransformer
 from sklearn.decomposition import PCA, FactorAnalysis
 from sklearn.pipeline import make_pipeline, Pipeline
-from sklearn.covariance import ShrunkCovariance, LedoitWolf, EmpiricalCovariance
 from sklearn.model_selection import cross_val_score, cross_validate, GridSearchCV
 import joblib as jb
 import dill as pickle
@@ -74,8 +73,8 @@ if arguments['plotting']:
 datasetName = arguments['datasetName']
 selectionName = arguments['selectionName']
 estimatorName = arguments['estimatorName']
-fullEstimatorName = '{}_{}'.format(
-    estimatorName, selectionName)
+fullEstimatorName = '{}_{}_{}'.format(
+    estimatorName, datasetName, selectionName)
 #
 estimatorsSubFolder = os.path.join(
     analysisSubFolder, 'estimators')
@@ -109,7 +108,7 @@ if __name__ == '__main__':
     cvIterator = iteratorsBySegment[0]
     if 'mahal' in estimatorName:
         # estimatorClass = EmpiricalCovariance
-        estimatorClass = tdr.EmpiricalCovarianceTransformer
+        estimatorClass = tdr.LedoitWolfTransformer
         estimatorKWArgs = dict()
     crossvalKWArgs = dict(
         cv=cvIterator,
@@ -247,7 +246,7 @@ if __name__ == '__main__':
     allMask = pd.Series(True, index=featuresDF.columns).to_frame()
     allMask.columns = allGroupIdx
     maskList.append(allMask.T)
-    if arguments['unitQuery'] == 'lfp_CAR_spectral':
+    if selectionName == 'lfp_CAR_spectral':
         # each freq band
         for name, group in featuresDF.groupby('freqBandName', axis='columns'):
             attrValues = ['all' for fgn in featureColumnFields]
@@ -307,6 +306,7 @@ if __name__ == '__main__':
     #
     outputLoadingMeta = deepcopy(loadingMeta)
     outputLoadingMeta['arguments']['unitQuery'] = 'mahal'
+    outputLoadingMeta['arguments']['selectionName'] = outputSelectionName
     # these were already applied, no need to apply them again
     for k in ['decimate', 'procFun', 'addLags']:
         outputLoadingMeta['alignedAsigsKWargs'].pop(k, None)

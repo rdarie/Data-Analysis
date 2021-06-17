@@ -720,7 +720,11 @@ class trainTestValidationSplitterBackup:
 
 class EmpiricalCovarianceTransformer(EmpiricalCovariance, TransformerMixin):
     def transform(self, X):
-        return np.reshape(self.mahalanobis(X), (-1, 1))
+        return np.reshape(np.sqrt(self.mahalanobis(X)), (-1, 1))
+
+class LedoitWolfTransformer(LedoitWolf, TransformerMixin):
+    def transform(self, X):
+        return np.reshape(np.sqrt(self.mahalanobis(X)), (-1, 1))
 
 class SMWrapper(BaseEstimator, RegressorMixin):
     """

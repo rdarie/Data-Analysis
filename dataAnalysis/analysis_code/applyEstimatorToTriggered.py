@@ -75,8 +75,8 @@ else:
     datasetName = arguments['datasetName']
     selectionName = arguments['selectionName']
     estimatorName = arguments['estimatorName']
-    fullEstimatorName = '{}_{}'.format(
-        estimatorName, selectionName)
+    fullEstimatorName = '{}_{}_{}'.format(
+        estimatorName, datasetName, selectionName)
     #
     estimatorsSubFolder = os.path.join(
         analysisSubFolder, 'estimators')
@@ -162,8 +162,6 @@ if normalizeDataset is not None:
     alignedAsigsDF = normalizeDataset(alignedAsigsDF, normalizationParams)
 if hasattr(estimator, 'transform'):
     features = estimator.transform(alignedAsigsDF)
-elif hasattr(estimator, 'mahalanobis'):
-    features = estimator.mahalanobis(alignedAsigsDF)
 if arguments['profile']:
     prf.print_memory_usage('after estimator.transform')
 #
