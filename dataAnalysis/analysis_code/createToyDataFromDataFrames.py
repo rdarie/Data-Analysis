@@ -527,6 +527,7 @@ if __name__ == '__main__':
     ax.set_xlim(totalBounds)
     ax.set_ylim(totalBounds)
     ax.set_zlim(totalBounds)
+    ax.view_init(elev=7., azim=-5.)
     pdfPath = os.path.join(
         figureOutputFolder, 'synthetic_dataset_{}.pdf'.format(iteratorSuffix)
     )
