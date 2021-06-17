@@ -324,6 +324,7 @@ if __name__ == '__main__':
             columns=designInfo.column_names))
     iteratorSuffix = arguments['iteratorSuffix']
     if iteratorSuffix == 'a':
+        pdb.set_trace()
         ################################################################
         nDim = 3
         nDimLatent = 2

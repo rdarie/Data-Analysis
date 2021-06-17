@@ -47,6 +47,7 @@ pip install pyqt5==5.10.1 --target="/users/rdarie/anaconda/nda2/lib/python3.7/si
 conda install jupyter --freeze-installed
 conda install pyqtgraph=0.10.0 --freeze-installed
 pip install vg==1.6.1 --target="/users/rdarie/anaconda/nda2/lib/python3.7/site-packages" --no-deps
+# pip install vtk==8.1.0 --target="/users/rdarie/anaconda/nda2/lib/python3.7/site-packages" --no-deps --dry-run
 # conda install mayavi --freeze-installed
 # pip install importlib-resources --target="/users/rdarie/anaconda/nda2/lib/python3.7/site-packages" --no-deps
 
