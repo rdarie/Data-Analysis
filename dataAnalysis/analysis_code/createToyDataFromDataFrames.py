@@ -175,8 +175,8 @@ if __name__ == '__main__':
         'electrode': np.asarray(['+ E16 - E9', '+ E16 - E5'])
         }
     electrodeRatio = 3.
-    naRatio = .8
-    baseNTrials = 80
+    naRatio = 1.
+    baseNTrials = 100
     bins = np.arange(-100e-3, 510e-3, 10e-3)
     kinWindow = (0., 500e-3)
     kinWindowJitter = 50e-3
@@ -599,8 +599,8 @@ if __name__ == '__main__':
     markerStyles = ['o', 'd', 's']
     msDict = {key: markerStyles[idx] for idx, key in enumerate(latentPlotDF['velocity'].unique())}
     maskOpts = {
-        0: dict(alpha=0.1, linewidths=0),
-        1: dict(alpha=0.2, linewidths=1)
+        0: dict(alpha=0.2, linewidths=0),
+        1: dict(alpha=0.3, linewidths=1)
         }
     lOfMasksForBreakdown = [
         {
@@ -631,12 +631,11 @@ if __name__ == '__main__':
                 c=group['electrodeInfluence'],
                 # s=group['movementInfluence'],
                 marker=msDict[name], rasterized=True, **maskOpts[0])
+        ax.axis('square')
         xMid = (ax.get_xlim()[1] + ax.get_xlim()[0]) / 2
         ax.set_xlim([xMid - extentLatent/2, xMid + extentLatent/2])
-        #
         yMid = (ax.get_ylim()[1] + ax.get_ylim()[0]) / 2
         ax.set_ylim([yMid - extentLatent/2, yMid + extentLatent/2])
-        ax.axis('square')
         fig.tight_layout()
         pdf.savefig()
         if arguments['showFigures']:
@@ -650,6 +649,8 @@ if __name__ == '__main__':
             common_norm=False, alpha=.5,
             data=latentPlotDF, ax=ax)
         ax.axis('square')
+        ax.set_xlim([xMid - extentLatent/2, xMid + extentLatent/2])
+        ax.set_ylim([yMid - extentLatent/2, yMid + extentLatent/2])
         fig.tight_layout()
         pdf.savefig()
         if arguments['showFigures']:
@@ -667,9 +668,9 @@ if __name__ == '__main__':
                         # s=group['movementInfluence'],
                         marker=msDict[name], rasterized=True, **maskOpts[0])
                 #
+                ax.axis('square')
                 ax.set_xlim([xMid - extentLatent/2, xMid + extentLatent/2])
                 ax.set_ylim([yMid - extentLatent/2, yMid + extentLatent/2])
-                ax.axis('square')
                 fig.suptitle(maskDict['label'])
                 fig.tight_layout()
                 pdf.savefig()
