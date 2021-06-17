@@ -105,13 +105,13 @@ styleOpts = {
     'tight_layout.pad': 3e-1, # units of font size
     'panel_heading.pad': 0.
     }
-
 sns.set(
     context='paper', style='white',
     palette='dark', font='sans-serif',
     font_scale=.8, color_codes=True, rc=snsRCParams)
 for rcK, rcV in mplRCParams.items():
     matplotlib.rcParams[rcK] = rcV
+####
 analysisSubFolderLFP = os.path.join(
     scratchFolder, arguments['analysisNameLFP'])
 analysisSubFolderEMG = os.path.join(

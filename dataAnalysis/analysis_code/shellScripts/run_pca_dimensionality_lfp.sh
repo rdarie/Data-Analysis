@@ -55,7 +55,7 @@ ALIGNQUERY="--alignQuery=${ALIGNQUERYTERM}"
 # python -u './processSignalDimensionality.py' --estimatorName="${ESTIMATOR}" --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
 #
 python -u './compareSignalCovarianceMatrices.py' --estimatorName="${ESTIMATOR}" --iteratorSuffixList="a, b" --datasetPrefix="Block_${WINDOWTERM}_df" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
-#
+##
 # TARGET="lfp_CAR_spectral_fa"
 TARGET="lfp_CAR_spectral"
 # python -u './calcSignalNovelty.py' --estimatorName="mahal" --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=2 --plotting --showFigures

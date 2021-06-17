@@ -203,6 +203,7 @@ if __name__ == '__main__':
     dataDF = pd.read_hdf(datasetPath, '/{}/data'.format(selectionName))
     featureMasks = pd.read_hdf(datasetPath, '/{}/featureMasks'.format(selectionName))
     # only use zero lag targets
+    # pdb.set_trace()
     lagMask = dataDF.columns.get_level_values('lag') == 0
     dataDF = dataDF.loc[:, lagMask]
     featureMasks = featureMasks.loc[:, lagMask]
@@ -226,19 +227,20 @@ if __name__ == '__main__':
     outputFeatureList = []
     featureColumnFields = dataDF.columns.names
     ###
-    maxNCompsToTest = 96
+    maxNCompsToTest = min(96, dataDF.shape[1])
     # pdb.set_trace()
     for idx, (maskIdx, featureMask) in enumerate(featureMasks.iterrows()):
         maskParams = {k: v for k, v in zip(featureMask.index.names, maskIdx)}
         dataGroup = dataDF.loc[:, featureMask]
         nFeatures = dataGroup.columns.shape[0]
-        nCompsToTest = range(1, min(maxNCompsToTest, nFeatures + 1), 2)
+        nCompsToTest = range(1, min(maxNCompsToTest, nFeatures), 1)
         trfName = '{}_{}'.format(estimatorName, maskParams['freqBandName'])
         if arguments['verbose']:
             print('Fitting {} ...'.format(trfName))
         if arguments['debugging']:
-            nCompsToTest = range(1, min(maxNCompsToTest, nFeatures + 1), 5)
+            nCompsToTest = range(1, min(maxNCompsToTest, nFeatures), 5)
         gridSearchKWArgs['param_grid']['n_components'] = [nc for nc in nCompsToTest]
+        print('n_components = {}'.format(gridSearchKWArgs['param_grid']['n_components']))
         cvScores, gridSearcherDict[maskParams['freqBandName']], gsScoresDict[maskParams['freqBandName']] = tdr.gridSearchHyperparameters(
             dataGroup, estimatorClass=estimatorClass,
             verbose=int(arguments['verbose']),
@@ -462,7 +464,7 @@ if __name__ == '__main__':
                     plt.show()
                 else:
                     plt.close()
-                if 'pca' in arguments['estimatorName']:
+                if 'pca' in estimatorName:
                     cumExplVariance = pd.Series(
                         np.cumsum(bestEstimator.explained_variance_ratio_),
                         index=[idx + 1 for idx in range(bestEstimator.explained_variance_ratio_.shape[0])])
