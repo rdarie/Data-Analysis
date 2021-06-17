@@ -24,6 +24,8 @@ matplotlib.use('QT5Agg')   # generate postscript output
 # matplotlib.use('Agg')   # generate postscript output
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
+from matplotlib.colors import LogNorm, Normalize
+from matplotlib.ticker import MaxNLocator
 import seaborn as sns
 import os, sys
 import dataAnalysis.helperFunctions.profiling as prf
@@ -204,7 +206,7 @@ pdfPath = os.path.join(
 with PdfPages(pdfPath) as pdf:
     for freqBandName, klDF in klDict.items():
         fig, ax = plt.subplots(figsize=(12, 12))
-        ax = sns.heatmap(klDF)
+        ax = sns.heatmap(klDF, norm=LogNorm())
         pdf.savefig(bbox_inches='tight', pad_inches=0)
         if arguments['showFigures']:
             plt.show()

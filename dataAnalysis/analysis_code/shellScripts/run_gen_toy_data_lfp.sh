@@ -36,7 +36,7 @@ LHSOPTS="--datasetNameLhs=Block_${WINDOWTERM}_df_c --selectionNameLhs=pedalState
 TARGET="lfp_CAR"
 ESTIMATOR="pca"
 ###
-iterators=(a b c d)
+iterators=(a b c d e)
 for ITER in "${iterators[@]}"
 do
     echo "On iterator $ITER"
@@ -46,4 +46,4 @@ do
     python -u './calcSignalNovelty.py' --estimatorName="mahal" --datasetName="Synthetic_${WINDOWTERM}_df_${ITER}" --selectionName=$TARGET --unitQuery=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=2 --plotting
 done
 
-python -u './compareSignalCovarianceMatrices.py' --estimatorName=$ESTIMATOR --iteratorSuffixList="a, b, c" --datasetPrefix="Synthetic_${WINDOWTERM}_df" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
+python -u './compareSignalCovarianceMatrices.py' --estimatorName=$ESTIMATOR --iteratorSuffixList="a, b, c, d, e" --datasetPrefix="Synthetic_${WINDOWTERM}_df" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
