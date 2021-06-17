@@ -358,12 +358,6 @@ if __name__ == '__main__':
             'electrode[+ E16 - E5]:amplitude': [0., 0., 0.],
             'electrode[NA]:amplitude': [0., 0., 0.],
             })
-        projectionLookup = {
-            'Intercept': kinDirection,
-            'velocity': kinDirection,
-            'electrode:amplitude': stimDirection,
-            'electrode:amplitude:RateInHz': stimDirection
-            }
     elif iteratorSuffix == 'b':
         ################################################################
         nDim = 3
@@ -399,12 +393,6 @@ if __name__ == '__main__':
             'electrode[+ E16 - E5]:amplitude': [0., 0., 0.],
             'electrode[NA]:amplitude': [0., 0., 0.],
             })
-        projectionLookup = {
-            'Intercept': kinDirection,
-            'velocity': kinDirection,
-            'electrode:amplitude': stimDirection,
-            'electrode:amplitude:RateInHz': stimDirection
-            }
     elif iteratorSuffix == 'c':
         ################################################################
         nDim = 3
@@ -440,12 +428,6 @@ if __name__ == '__main__':
             'electrode[+ E16 - E5]:amplitude': [0., 0., 0.],
             'electrode[NA]:amplitude': [0., 0., 0.],
             })
-        projectionLookup = {
-            'Intercept': kinDirection,
-            'velocity': kinDirection,
-            'electrode:amplitude': stimDirection,
-            'electrode:amplitude:RateInHz': stimDirection
-            }
     elif iteratorSuffix == 'd':
         ################################################################
         nDim = 3
@@ -481,12 +463,47 @@ if __name__ == '__main__':
             'electrode[+ E16 - E5]:amplitude': [0., 0., 0.],
             'electrode[NA]:amplitude': [0., 0., 0.],
             })
-        projectionLookup = {
-            'Intercept': kinDirection,
-            'velocity': kinDirection,
-            'electrode:amplitude': stimDirection,
-            'electrode:amplitude:RateInHz': stimDirection
-            }
+    elif iteratorSuffix == 'e':
+        ################################################################
+        nDim = 3
+        nDimLatent = 2
+        #####
+        kinDirection = vg.rotate(
+            vg.basis.x, vg.basis.z, 0)
+        stimDirection = vg.rotate(
+            kinDirection, vg.basis.z, 0)
+        #####
+        mu = np.asarray([2., 3., 1.])
+        phi, theta, psi = 30, 10, 20
+        r = Rot.from_euler('XYZ', [phi, theta, psi], degrees=True)
+        wRot = r.as_matrix()
+        var = np.diag([2, 7, 0])
+        # W = wRot @ var
+        S = np.eye(nDim) * .5e-2
+        #
+        gtCoeffs = pd.Series({
+            'Intercept': 0.,
+            'velocity': 0.,
+            #
+            'electrode[+ E16 - E5]:amplitude': 0.,
+            'electrode[+ E16 - E9]:amplitude': 0.,
+            'electrode[NA]:amplitude': 0.,
+            #
+            'electrode[+ E16 - E9]:amplitude:RateInHz': 0.,
+            'electrode[+ E16 - E5]:amplitude:RateInHz': 0.,
+            'electrode[NA]:amplitude:RateInHz': 0.
+            })
+        rotCoeffs = pd.Series({
+            'electrode[+ E16 - E9]:amplitude': [0., 0., 0.],
+            'electrode[+ E16 - E5]:amplitude': [0., 0., 0.],
+            'electrode[NA]:amplitude': [0., 0., 0.],
+            })
+    projectionLookup = {
+        'Intercept': kinDirection,
+        'velocity': kinDirection,
+        'electrode:amplitude': stimDirection,
+        'electrode:amplitude:RateInHz': stimDirection
+        }
     magnitudes = (designDF * gtCoeffs).loc[:, designDF.columns]
     # sanity check
     sanityCheckThis = False
