@@ -394,7 +394,7 @@ if __name__ == '__main__':
             'electrode[NA]:amplitude:RateInHz': 0.
             })
         rotCoeffs = pd.Series({
-            'electrode[+ E16 - E9]:amplitude': [60., 5., 0.],
+            'electrode[+ E16 - E9]:amplitude': [80., 40., 0.],
             'electrode[+ E16 - E5]:amplitude': [0., 0., 0.],
             'electrode[NA]:amplitude': [0., 0., 0.],
             })
