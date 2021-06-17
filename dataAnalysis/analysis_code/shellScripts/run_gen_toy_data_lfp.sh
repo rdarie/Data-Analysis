@@ -36,7 +36,7 @@ LHSOPTS="--datasetNameLhs=Block_${WINDOWTERM}_df_c --selectionNameLhs=pedalState
 TARGET="lfp_CAR"
 ESTIMATOR="pca"
 ###
-iterators=(a b c)
+iterators=(a b c d)
 for ITER in "${iterators[@]}"
 do
     echo "On iterator $ITER"
