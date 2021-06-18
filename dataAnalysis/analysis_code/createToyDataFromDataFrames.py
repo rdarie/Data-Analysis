@@ -316,14 +316,14 @@ if __name__ == '__main__':
         #
         gtCoeffs = pd.Series({
             'Intercept': 0.,
-            'velocity': 4.,
+            'velocity': 2.,
             #
-            'electrode[+ E16 - E5]:amplitude': 10.,
-            'electrode[+ E16 - E9]:amplitude': 10.,
+            'electrode[+ E16 - E5]:amplitude': 5.,
+            'electrode[+ E16 - E9]:amplitude': 5.,
             'electrode[NA]:amplitude': 0.,
             #
-            'electrode[+ E16 - E9]:amplitude:RateInHz': 2.,
-            'electrode[+ E16 - E5]:amplitude:RateInHz': 2.,
+            'electrode[+ E16 - E9]:amplitude:RateInHz': 1.,
+            'electrode[+ E16 - E5]:amplitude:RateInHz': 1.,
             'electrode[NA]:amplitude:RateInHz': 0.
             })
     elif iteratorSuffix == 'b':
@@ -352,14 +352,14 @@ if __name__ == '__main__':
         #
         gtCoeffs = pd.Series({
             'Intercept': 0.,
-            'velocity': 4.,
+            'velocity': 2.,
             #
-            'electrode[+ E16 - E5]:amplitude': 10.,
-            'electrode[+ E16 - E9]:amplitude': 10.,
+            'electrode[+ E16 - E5]:amplitude': 5.,
+            'electrode[+ E16 - E9]:amplitude': 5.,
             'electrode[NA]:amplitude': 0.,
             #
-            'electrode[+ E16 - E9]:amplitude:RateInHz': 2.,
-            'electrode[+ E16 - E5]:amplitude:RateInHz': 2.,
+            'electrode[+ E16 - E9]:amplitude:RateInHz': 1.,
+            'electrode[+ E16 - E5]:amplitude:RateInHz': 1.,
             'electrode[NA]:amplitude:RateInHz': 0.
             })
     elif iteratorSuffix == 'c':
@@ -388,14 +388,14 @@ if __name__ == '__main__':
         #
         gtCoeffs = pd.Series({
             'Intercept': 0.,
-            'velocity': 4.,
+            'velocity': 2.,
             #
-            'electrode[+ E16 - E5]:amplitude': 10.,
-            'electrode[+ E16 - E9]:amplitude': 10.,
+            'electrode[+ E16 - E5]:amplitude': 5.,
+            'electrode[+ E16 - E9]:amplitude': 5.,
             'electrode[NA]:amplitude': 0.,
             #
-            'electrode[+ E16 - E9]:amplitude:RateInHz': 2.,
-            'electrode[+ E16 - E5]:amplitude:RateInHz': 2.,
+            'electrode[+ E16 - E9]:amplitude:RateInHz': 1.,
+            'electrode[+ E16 - E5]:amplitude:RateInHz': 1.,
             'electrode[NA]:amplitude:RateInHz': 0.
             })
     elif iteratorSuffix == 'd':
@@ -423,14 +423,14 @@ if __name__ == '__main__':
         #
         gtCoeffs = pd.Series({
             'Intercept': 0.,
-            'velocity': 4.,
+            'velocity': 2.,
             #
-            'electrode[+ E16 - E5]:amplitude': 10.,
-            'electrode[+ E16 - E9]:amplitude': 10.,
+            'electrode[+ E16 - E5]:amplitude': 5.,
+            'electrode[+ E16 - E9]:amplitude': 5.,
             'electrode[NA]:amplitude': 0.,
             #
-            'electrode[+ E16 - E9]:amplitude:RateInHz': 2.,
-            'electrode[+ E16 - E5]:amplitude:RateInHz': 2.,
+            'electrode[+ E16 - E9]:amplitude:RateInHz': 1.,
+            'electrode[+ E16 - E5]:amplitude:RateInHz': 1.,
             'electrode[NA]:amplitude:RateInHz': 0.
             })
     elif iteratorSuffix == 'e':
@@ -622,8 +622,8 @@ if __name__ == '__main__':
         
     with PdfPages(pdfPath) as pdf:
         extentLatent = (
-            latentPlotDF.loc[:, latentRhsDF.columns].quantile(1 - 5e-3) -
-            latentPlotDF.loc[:, latentRhsDF.columns].quantile(5e-3)).max()
+            latentPlotDF.loc[:, latentRhsDF.columns].quantile(1 - 1e-3) -
+            latentPlotDF.loc[:, latentRhsDF.columns].quantile(1e-3)).max()
         fig, ax = plt.subplots(figsize=(12, 12))
         for name, group in latentPlotDF.groupby('velocity'):
             ax.scatter(
@@ -631,7 +631,6 @@ if __name__ == '__main__':
                 c=group['electrodeInfluence'],
                 # s=group['movementInfluence'],
                 marker=msDict[name], rasterized=True, **maskOpts[0])
-        ax.axis('square')
         xMid = (ax.get_xlim()[1] + ax.get_xlim()[0]) / 2
         ax.set_xlim([xMid - extentLatent/2, xMid + extentLatent/2])
         yMid = (ax.get_ylim()[1] + ax.get_ylim()[0]) / 2
@@ -648,7 +647,6 @@ if __name__ == '__main__':
             levels=20, fill=True, thresh=.1, palette='Set1',
             common_norm=False, alpha=.5,
             data=latentPlotDF, ax=ax)
-        ax.axis('square')
         ax.set_xlim([xMid - extentLatent/2, xMid + extentLatent/2])
         ax.set_ylim([yMid - extentLatent/2, yMid + extentLatent/2])
         fig.tight_layout()
@@ -667,8 +665,6 @@ if __name__ == '__main__':
                         c=group['electrodeInfluence'],
                         # s=group['movementInfluence'],
                         marker=msDict[name], rasterized=True, **maskOpts[0])
-                #
-                ax.axis('square')
                 ax.set_xlim([xMid - extentLatent/2, xMid + extentLatent/2])
                 ax.set_ylim([yMid - extentLatent/2, yMid + extentLatent/2])
                 fig.suptitle(maskDict['label'])
@@ -684,8 +680,8 @@ if __name__ == '__main__':
         )
     with PdfPages(pdfPath) as pdf:
         extent = (
-            rhsPlotDF.loc[:, toyRhsDF.columns].quantile(1 - 5e-3) -
-            rhsPlotDF.loc[:, toyRhsDF.columns].quantile(5e-3)).max()
+            rhsPlotDF.loc[:, toyRhsDF.columns].quantile(1 - 1e-3) -
+            rhsPlotDF.loc[:, toyRhsDF.columns].quantile(1e-3)).max()
         fig = plt.figure()
         fig.set_size_inches((12, 12))
         ax = fig.add_subplot(projection='3d')
@@ -716,14 +712,48 @@ if __name__ == '__main__':
         #
         rhsPlotDF.loc[:, 'x2'], rhsPlotDF.loc[:, 'y2'], _ = proj3d.proj_transform(
             rhsPlotDF.iloc[:, 0], rhsPlotDF.iloc[:, 1], rhsPlotDF.iloc[:, 2], ax.get_proj())
-        #
+        #####
+        tempCols = [cN for cN in toyRhsDF.columns] + ['limbState x electrode']
+        rhsPlotDFStack = pd.DataFrame(
+            rhsPlotDF.loc[:, tempCols].to_numpy(),
+            columns=tempCols,
+            index=pd.MultiIndex.from_frame(toyTrialInfo.loc[:, ['electrode', 'bin', 'pedalMovementCat', 'amplitude']])
+            )
+        rhsPlotDFStack = rhsPlotDFStack.set_index('limbState x electrode', append=True)
+        rhsPlotDFStack.columns.name = 'feature'
+        rhsPlotDFStack = rhsPlotDFStack.stack().to_frame(name='signal').reset_index()
+        g = sns.relplot(
+            row='feature', col='limbState x electrode',
+            x='bin', y='signal', hue='amplitude',
+            data=rhsPlotDFStack, palette='plasma',
+            errorbar='se', kind='line'
+            )
+        g.tight_layout()
+        pdf.savefig()
+        if arguments['showFigures']:
+            plt.show()
+        else:
+            plt.close()
+        g = sns.displot(
+            row='feature', col='limbState x electrode',
+            y='signal', hue='amplitude',
+            data=rhsPlotDFStack, palette='plasma',
+            kind='kde', common_norm=False,
+            height=2, aspect=3
+            )
+        g.tight_layout()
+        pdf.savefig()
+        if arguments['showFigures']:
+            plt.show()
+        else:
+            plt.close()
+        ####
         fig, ax = plt.subplots(figsize=(12, 12))
         sns.kdeplot(
             x='x2', y='y2', hue='limbState x electrode',
             levels=20, fill=True, thresh=.1, palette='Set2',
             common_norm=False, linewidth=0., alpha=.5,
             data=rhsPlotDF, ax=ax)
-        ax.axis('square')
         fig.tight_layout()
         pdf.savefig()
         if arguments['showFigures']:
