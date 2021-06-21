@@ -3966,6 +3966,11 @@ def exportNormalizedDataFrame(
         arguments=None, selectionName=None,
         dataFramesFolder=None, datasetName=None,
         ):
+    #
+    if 'trialUID' not in dataDF.index.names:
+        trialInfo = dataDF.index.to_frame().reset_index(drop=True)
+        trialInfo.loc[:, 'trialUID'] = loadingMeta['iteratorsBySegment'][0].prelimSplitter.continuousGroup
+        dataDF.index = pd.MultiIndex.from_frame(trialInfo)
     # save, copied from assemble dataframes
     finalDF = dataDF.copy()
     #  #### end of data loading stuff

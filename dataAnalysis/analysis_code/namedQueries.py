@@ -158,6 +158,13 @@ namedQueries['align'].update({
         ])
     })
 namedQueries['align'].update({
+    'stoppingOrStimOff': '|'.join([
+        namedQueries['align']['reachedPeak'],
+        namedQueries['align']['reachedBase'],
+        namedQueries['align']['stimOff'],
+        ])
+    })
+namedQueries['align'].update({
     'stoppingNoStim': '(' + '&'.join([
         namedQueries['align']['stopping'],
         namedQueries['align']['noStim'],

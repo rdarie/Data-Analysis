@@ -30,10 +30,10 @@ ALIGNQUERYTERM="startingNoStim"
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
 ITERATOR="c"
 WINDOWTERM="XL"
-RHSOPTS="--datasetNameRhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameRhs=pedalState"
-LHSOPTS="--datasetNameLhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameLhs=lfp_CAR"
+RHSOPTS="--datasetNameRhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameRhs=lfp_CAR"
+LHSOPTS="--datasetNameLhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameLhs=pedalState"
 
-# python -u './calcGridSearchSingleTarget.py' --estimatorName='enr' --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
-python -u './createToyDataFromDataFrames.py' --estimatorName='enr' --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
+python -u './calcGridSearchSingleTarget.py' --estimatorName='enr' --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
+# python -u './createToyDataFromDataFrames.py' --estimatorName='enr' --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
 # python -u './processOrdinaryLeastSquares.py' --debugging --estimatorName="enr" --datasetName="lfp_CAR_spectral_to_${TARGET}_${ITERATOR}_L_${ALIGNQUERYTERM}" --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting
 # python -u './plotOrdinaryLeastSquares.py' --estimatorName="enr" --datasetName="lfp_CAR_spectral_to_${TARGET}_${ITERATOR}_L_${ALIGNQUERYTERM}" --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting

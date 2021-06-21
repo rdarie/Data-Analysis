@@ -42,12 +42,15 @@ import pandas as pd
 import dataAnalysis.preproc.ns5 as ns5
 from sklearn.decomposition import PCA, FactorAnalysis
 from sklearn.pipeline import make_pipeline, Pipeline
+from sklearn_pandas import gen_features, DataFrameMapper
 from sklearn.compose import ColumnTransformer
 from sklearn.covariance import ShrunkCovariance, LedoitWolf, EmpiricalCovariance
 from sklearn.model_selection import cross_val_score, cross_validate, GridSearchCV
+from sklearn.preprocessing import FunctionTransformer
 from sklearn.metrics import make_scorer, r2_score
 import joblib as jb
 import dill as pickle
+pickle.settings['recurse'] = True
 import gc, sys
 from docopt import docopt
 from copy import deepcopy
@@ -57,6 +60,8 @@ sns.set(
     font_scale=1.5, color_codes=True)
 for arg in sys.argv:
     print(arg)
+##
+averageByTrial = True
 ##
 '''def compute_scores(
         X, estimator,
@@ -70,7 +75,6 @@ for arg in sys.argv:
             return_train_score=return_train_score,
             return_estimator=return_estimator)
     return scores'''
-
 
 def shrunk_cov_score(
         X, cvIterator):
@@ -203,7 +207,6 @@ if __name__ == '__main__':
     dataDF = pd.read_hdf(datasetPath, '/{}/data'.format(selectionName))
     featureMasks = pd.read_hdf(datasetPath, '/{}/featureMasks'.format(selectionName))
     # only use zero lag targets
-    # pdb.set_trace()
     lagMask = dataDF.columns.get_level_values('lag') == 0
     dataDF = dataDF.loc[:, lagMask]
     featureMasks = featureMasks.loc[:, lagMask]
@@ -217,37 +220,53 @@ if __name__ == '__main__':
     fmScoresDict = {}  # cross validated estimator with max n comps
     gsScoresDict = {}
     gridSearcherDict = {}
-    lOfColumnTransformers = []
+    '''lOfColumnTransformers = []'''
     ###
     # remove the 'all' column?
     removeAllColumn = False
     if removeAllColumn:
         featureMasks = featureMasks.loc[~ featureMasks.all(axis='columns'), :]
     ###
-    outputFeatureList = []
+    '''outputFeatureNameList = []'''
+    featuresList = []
     featureColumnFields = dataDF.columns.names
     ###
+
     maxNCompsToTest = min(96, dataDF.shape[1])
-    # pdb.set_trace()
+    listOfNCompsToTest = []
     for idx, (maskIdx, featureMask) in enumerate(featureMasks.iterrows()):
         maskParams = {k: v for k, v in zip(featureMask.index.names, maskIdx)}
         dataGroup = dataDF.loc[:, featureMask]
         nFeatures = dataGroup.columns.shape[0]
-        nCompsToTest = range(1, min(maxNCompsToTest, nFeatures), 1)
-        trfName = '{}_{}'.format(estimatorName, maskParams['freqBandName'])
-        if arguments['verbose']:
-            print('Fitting {} ...'.format(trfName))
         if arguments['debugging']:
             nCompsToTest = range(1, min(maxNCompsToTest, nFeatures), 5)
-        gridSearchKWArgs['param_grid']['n_components'] = [nc for nc in nCompsToTest]
-        print('n_components = {}'.format(gridSearchKWArgs['param_grid']['n_components']))
+        else:
+            nCompsToTest = range(1, min(maxNCompsToTest, nFeatures), 1)
+        listOfNCompsToTest.append(nCompsToTest)
+        trfName = '{}_{}'.format(estimatorName, maskParams['freqBandName'])
+        ###
+        if averageByTrial:
+            estimatorInstance = Pipeline([
+                ('averager', tdr.DataFrameAverager(
+                    stimConditionNames=stimulusConditionNames + ['bin'], addIndexFor=stimulusConditionNames)),
+                ('dim_red', estimatorClass(**estimatorKWArgs))])
+        else:
+            estimatorInstance = Pipeline([('dim_red', estimatorClass(**estimatorKWArgs),), ])
+        ###
+        if arguments['verbose']:
+            print('Fitting {} ...'.format(trfName))
+        gridSearchKWArgs['param_grid']['dim_red__n_components'] = [nc for nc in nCompsToTest]
+        print('n_components = {}'.format(gridSearchKWArgs['param_grid']['dim_red__n_components']))
+        ###
+        estimatorInstance.fit_transform(dataGroup)
         cvScores, gridSearcherDict[maskParams['freqBandName']], gsScoresDict[maskParams['freqBandName']] = tdr.gridSearchHyperparameters(
-            dataGroup, estimatorClass=estimatorClass,
+            dataGroup,
+            # estimatorClass=estimatorClass, estimatorKWArgs=estimatorKWArgs,
+            estimatorInstance=estimatorInstance,
             verbose=int(arguments['verbose']),
             recalculateBestEstimator=True,
             gridSearchKWArgs=gridSearchKWArgs,
             crossvalKWArgs=crossvalKWArgs,
-            estimatorKWArgs=estimatorKWArgs,
             joblibBackendArgs=joblibBackendArgs
             )
         cvScoresDF = pd.DataFrame(cvScores)
@@ -255,12 +274,19 @@ if __name__ == '__main__':
         cvScoresDF.dropna(axis='columns', inplace=True)
         cvScoresDict[maskParams['freqBandName']] = cvScoresDF
         #
-        fullEstimatorParams = estimatorKWArgs.copy()
-        fullEstimatorParams['n_components'] = maxNCompsToTest
+        fullEstimatorKWArgs = estimatorKWArgs.copy()
+        fullEstimatorKWArgs['n_components'] = maxNCompsToTest
+        if averageByTrial:
+            fullEstimatorInstance = Pipeline([
+                ('averager', tdr.DataFrameAverager(
+                    stimConditionNames=stimulusConditionNames + ['bin'], addIndexFor=stimulusConditionNames)),
+                ('dim_red', estimatorClass(**fullEstimatorKWArgs))])
+        else:
+            fullEstimatorInstance=Pipeline([('dim_red', estimatorClass(**fullEstimatorKWArgs))])
         fullModelScores = tdr.crossValidationScores(
             dataGroup,
-            estimatorClass=estimatorClass,
-            estimatorKWArgs=fullEstimatorParams,
+            # estimatorClass=estimatorClass, estimatorKWArgs=fullEstimatorKWArgs,
+            estimatorInstance=fullEstimatorInstance,
             crossvalKWArgs=crossvalKWArgs,
             joblibBackendArgs=joblibBackendArgs,
             verbose=int(arguments['verbose']),)
@@ -272,33 +298,47 @@ if __name__ == '__main__':
         lastFoldIdx = cvScoresDF.index.get_level_values('fold').max()
         bestEstimator = cvScoresDF.loc[lastFoldIdx, 'estimator']
         # bestEstimator = gridSearcherDict[maskParams['freqBandName']].best_estimator_
-        lOfColumnTransformers.append((
+        '''lOfColumnTransformers.append((
             # transformer name
             trfName,
             # estimator
             bestEstimator,
             # columns
             dataGroup.columns.copy()
-            ))
+            ))'''
         featureColumns = pd.DataFrame(
             np.nan,
-            index=range(bestEstimator.n_components),
+            index=range(bestEstimator.get_params()['dim_red__n_components']),
             columns=featureColumnFields)
         for fcn in featureColumnFields:
             if fcn == 'feature':
                 featureColumns.loc[:, fcn] = [
                     '{}{:0>3d}#0'.format(trfName, nc)
-                    for nc in range(1, bestEstimator.n_components + 1)]
+                    for nc in range(1, bestEstimator.get_params()['dim_red__n_components'] + 1)]
             elif fcn == 'lag':
                 featureColumns.loc[:, fcn] = 0
             else:
                 featureColumns.loc[:, fcn] = maskParams[fcn]
-        outputFeatureList.append(featureColumns)
+        '''outputFeatureNameList.append(featureColumns)'''
+        if averageByTrial:
+            preEst = Pipeline(bestEstimator.steps[:-1])
+            xInterDF = preEst.fit_transform(dataGroup)
+            if isinstance(xInterDF, pd.DataFrame):
+                featuresIndex = xInterDF.index
+            else:
+                featuresIndex = pd.Index(range(xInterDF.shape[0]))
+        else:
+            featuresIndex = dataGroup.index
+        featuresList.append(pd.DataFrame(
+            bestEstimator.transform(dataGroup),
+            index=featuresIndex, columns=pd.MultiIndex.from_frame(featureColumns)))
     #
-    chosenEstimator = ColumnTransformer(lOfColumnTransformers)
-    chosenEstimator.fit(workingDataDF)
-    outputFeaturesIndex = pd.MultiIndex.from_frame(
-        pd.concat(outputFeatureList).reset_index(drop=True))
+    '''chosenEstimator = ColumnTransformer(lOfColumnTransformers)
+    chosenEstimator.fit(workingDataDF)'''
+    #
+    '''outputFeaturesIndex = pd.MultiIndex.from_frame(
+        pd.concat(outputFeatureNameList).reset_index(drop=True))'''
+    featuresDF = pd.concat(featuresList, axis='columns')
     #
     scoresDF = pd.concat(cvScoresDict, names=['freqBandName'])
     scoresFullModel = pd.concat(fmScoresDict, names=['freqBandName'])
@@ -308,38 +348,36 @@ if __name__ == '__main__':
     #
     prf.print_memory_usage('Done fitting')
     if os.path.exists(estimatorPath):
+        print('Deleting contents of {}'.format(estimatorPath))
         os.remove(estimatorPath)
     #
+    print('\n\nSaving {}\n\n'.format(estimatorPath))
     try:
         scoresDF.loc[idxSl[:, lastFoldIdx], :].to_hdf(estimatorPath, 'work')
         scoresFullModel.loc[:, ['test_score', 'train_score']].to_hdf(estimatorPath, 'full_scores')
-        scoresDF.loc[:, ['test_score', 'train_score']].to_hdf(estimatorPath, 'cv')
+        scoresDF.loc[:, ['test_score', 'train_score']].to_hdf(estimatorPath, 'cv_scores')
     except Exception:
         traceback.print_exc()
+        pdb.set_trace()
     #
     try:
         scoresDF['estimator'].to_hdf(estimatorPath, 'cv_estimators')
         scoresFullModel['estimator'].to_hdf(estimatorPath, 'full_estimators')
     except Exception:
         traceback.print_exc()
+        pdb.set_trace()
     #
-    jb.dump(chosenEstimator, estimatorPath.replace('.h5', '.joblib'))
+    '''jb.dump(chosenEstimator, estimatorPath.replace('.h5', '.joblib'))'''
     #
     estimatorMetadata = {
         'path': os.path.basename(estimatorPath),
         'name': estimatorName,
         'datasetName': datasetName,
         'selectionName': selectionName,
-        'outputFeatures': outputFeaturesIndex
+        'outputFeatures': featuresDF.columns
         }
     with open(estimatorMetaDataPath, 'wb') as f:
         pickle.dump(estimatorMetadata, f)
-
-    features = chosenEstimator.transform(dataDF)
-    #
-    featuresDF = pd.DataFrame(
-        features, index=dataDF.index,
-        columns=outputFeaturesIndex)
     outputSelectionName = '{}_{}'.format(
         selectionName, estimatorName)
     outputLoadingMeta = deepcopy(loadingMeta)
@@ -369,7 +407,6 @@ if __name__ == '__main__':
     allGroupIdx = pd.MultiIndex.from_tuples(
         [tuple('all' for fgn in featureColumnFields)],
         names=featureColumnFields)
-    # pdb.set_trace()
     # if arguments['unitQuery'] == 'lfp_CAR_spectral':
     # each freq band
     for name, group in featuresDF.groupby('freqBandName', axis='columns'):
@@ -414,7 +451,7 @@ if __name__ == '__main__':
                 maskParams = {k: v for k, v in zip(featureMask.index.names, maskIdx)}
                 dataGroup = dataDF.loc[:, featureMask]
                 nFeatures = dataGroup.columns.shape[0]
-                nCompsToTest = range(1, min(maxNCompsToTest, nFeatures + 1), 3)
+                nCompsToTest = listOfNCompsToTest[idx]
                 scoresForPlotDict = {
                     'PCA_test': gsScoresDF.xs(maskParams['freqBandName']).loc[:, 'test_score'],
                     'PCA_train': gsScoresDF.xs(maskParams['freqBandName']).loc[:, 'train_score']}
@@ -424,8 +461,8 @@ if __name__ == '__main__':
                     lWScores = calc_lw_score(dataGroup, cv=cvIterator)
                     lWForPlot = pd.concat({
                         nc: pd.DataFrame({'test_score': lWScores})
-                        for nc in nCompsToTest}, names=['n_components', 'fold'])
-                    scoresForPlotDict['ledoitWolfMLE'] = lWForPlot.swaplevel('n_components', 'fold')['test_score']
+                        for nc in nCompsToTest}, names=['dim_red__n_components', 'fold'])
+                    scoresForPlotDict['ledoitWolfMLE'] = lWForPlot.swaplevel('dim_red__n_components', 'fold')['test_score']
                 scoresForPlot = pd.concat(scoresForPlotDict, names=['evalType']).to_frame(name='score').reset_index()
                 validationMask = (
                     (scoresForPlot['fold'] == lastFoldIdx) &
@@ -440,14 +477,14 @@ if __name__ == '__main__':
                 fig.set_size_inches(12, 8)
                 sns.lineplot(
                     data=scoresForPlot,
-                    x='n_components', y='score',
+                    x='dim_red__n_components', y='score',
                     hue='evalType', errorbar='se', ax=ax)
                 handles, labels = ax.get_legend_handles_labels()
                 textDescr = 'Chosen parameters and corresponding score'
                 bestScore = cvScoresDict[maskParams['freqBandName']].mean()['test_score']
                 bestEstimator = cvScoresDict[maskParams['freqBandName']].loc[lastFoldIdx, ['estimator']].iloc[0]
                 lineMax, = ax.plot(
-                    bestEstimator.n_components, bestScore,
+                    bestEstimator.get_params()['dim_red__n_components'], bestScore,
                     'r*', label=textDescr)
                 handles.append(lineMax)
                 labels.append(textDescr)
@@ -466,8 +503,8 @@ if __name__ == '__main__':
                     plt.close()
                 if 'pca' in estimatorName:
                     cumExplVariance = pd.Series(
-                        np.cumsum(bestEstimator.explained_variance_ratio_),
-                        index=[idx + 1 for idx in range(bestEstimator.explained_variance_ratio_.shape[0])])
+                        np.cumsum(bestEstimator.steps[-1][1].explained_variance_ratio_),
+                        index=[idx + 1 for idx in range(bestEstimator.steps[-1][1].explained_variance_ratio_.shape[0])])
                 ######
                     fig, ax = plt.subplots()
                     fig.set_size_inches(12, 8)
@@ -475,8 +512,8 @@ if __name__ == '__main__':
                     handles, labels = ax.get_legend_handles_labels()
                     textDescr = 'Chosen parameters and corresponding num. components'
                     lineMax, = ax.plot(
-                        bestEstimator.n_components,
-                        cumExplVariance.loc[bestEstimator.n_components],
+                        bestEstimator.steps[-1][1].n_components,
+                        cumExplVariance.loc[bestEstimator.steps[-1][1].n_components],
                         'r*', label=textDescr)
                     handles.append(lineMax)
                     labels.append(textDescr)

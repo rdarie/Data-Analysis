@@ -33,11 +33,13 @@ Options:
     --noStim                                             process entire experimental day? [default: False]
 """
 
-import matplotlib
+import matplotlib, os
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
-matplotlib.use('QT5Agg')   # generate postscript output
-# matplotlib.use('Agg')   # generate postscript output
+if 'DISPLAY' in os.environ:
+    matplotlib.use('QT5Agg')   # generate postscript output
+else:
+    matplotlib.use('PS')   # generate postscript output
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 #
@@ -59,7 +61,7 @@ import pandas as pd
 import numpy as np
 import json
 from importlib import reload
-import os, pdb
+import pdb
 from tqdm import tqdm
 import dill as pickle
 #
@@ -328,8 +330,8 @@ if minNObservations is not None:
 trialInfo.loc[:, 'parentChanName'] = (
     trialInfo['feature']
     .apply(lambda x: x.replace('_stim#0', '').replace('#0', '')))
-#
-if np.all(trialInfo['xCoords'].unique() == ['NA']):
+
+if np.all(trialInfo['xCoords'].unique().tolist() == ['NA']):
     trialInfo.loc[:, 'xCoords'] = np.nan
     trialInfo.loc[:, 'yCoords'] = np.nan
     trialInfo.loc[:, 'mapGroup'] = np.nan

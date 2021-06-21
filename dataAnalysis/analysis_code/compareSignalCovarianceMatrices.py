@@ -177,6 +177,7 @@ for iteratorSuffix in listOfIteratorSuffixes:
     datasetName = arguments['datasetPrefix'] + '_{}'.format(iteratorSuffix)
     thisEstimatorName = '{}_{}_{}'.format(
         estimatorName, datasetName, selectionName)
+    # pdb.set_trace()
     estimatorPath = os.path.join(
         estimatorsSubFolder,
         thisEstimatorName + '.h5'
@@ -185,7 +186,7 @@ for iteratorSuffix in listOfIteratorSuffixes:
     with pd.HDFStore(estimatorPath, 'r') as store:
         covMatDict[iteratorSuffix] = pd.read_hdf(store, 'cv_covariance_matrices')
         eVSDict[iteratorSuffix] = pd.read_hdf(store, 'full_explained_variance')
-        estimatorsDict[iteratorSuffix] = pd.read_hdf(store, 'cv_estimators')
+        estimatorsDict[iteratorSuffix] = pd.read_hdf(store, 'full_estimators')
 covMatDF = pd.concat(covMatDict, names=['iterator'])
 eVSDF = pd.concat(eVSDict, names=['iterator'])
 estimatorsSrs = pd.concat(estimatorsDict, names=['iterator'])
@@ -206,7 +207,10 @@ pdfPath = os.path.join(
 with PdfPages(pdfPath) as pdf:
     for freqBandName, klDF in klDict.items():
         fig, ax = plt.subplots(figsize=(12, 12))
-        ax = sns.heatmap(klDF, norm=LogNorm())
+        ax = sns.heatmap(
+            klDF,
+            # norm=LogNorm()
+            )
         pdf.savefig(bbox_inches='tight', pad_inches=0)
         if arguments['showFigures']:
             plt.show()

@@ -338,9 +338,13 @@ if __name__ == '__main__':
                 lOfFeatureMasks.append(thisMask)
                 currBlockNum += 1
     dataDF = pd.concat(lOfDF)
+    ################################################################################################
     if 'controlProportionMask' in loadingMeta:
         if loadingMeta['controlProportionMask'] is not None:
             dataDF = dataDF.loc[loadingMeta['controlProportionMask'], :]
+    if 'minBinMask' in loadingMeta:
+        if loadingMeta['minBinMask'] is not None:
+            dataDF = dataDF.loc[loadingMeta['minBinMask'], :]
     #
     hf.exportNormalizedDataFrame(
         dataDF=dataDF, loadingMeta=loadingMeta, featureInfoMask=thisMask,

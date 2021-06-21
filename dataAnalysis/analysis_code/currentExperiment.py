@@ -255,7 +255,7 @@ def parseAnalysisOptions(
         'electrode', amplitudeFieldName, 'RateInHz']
     motionConditionNames = [
         'pedalMovementCat', 'pedalDirection',
-        # 'pedalSizeCat',
+        'pedalSizeCat',
         ]
     if blockExperimentType in ['proprio-miniRC', 'proprio-RC', 'isi']:
         #if (blockExperimentType == 'proprio-miniRC') or (blockExperimentType == 'proprio-RC') or (blockExperimentType == 'isi'):
@@ -504,6 +504,7 @@ def parseAnalysisOptions(
     defaultSplitterKWArgs = dict(
         stratifyFactors=stimulusConditionNames,
         continuousFactors=['segment', 'originalIndex', 't'])
+    defaultSamplerKWArgs = dict(random_state=42)
     iteratorOpts = {
         # rest period from before movement onset
         'a': {
@@ -512,12 +513,13 @@ def parseAnalysisOptions(
             'nHistoryBasisTerms': 1,
             'nCovariateBasisTerms': 1,
             'forceBinInterval': 10e-3,
+            'minBinCount': 5,
             'calcTimeROI': True,
             'controlProportion': None,
             'cvKWArgs': dict(
                 n_splits=7,
                 splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
-                samplerKWArgs=dict(random_state=None, test_size=None,),
+                samplerClass=None, samplerKWArgs=defaultSamplerKWArgs,
                 resamplerClass=None, resamplerKWArgs={},
                 ),
             'timeROIOpts': {
@@ -538,12 +540,13 @@ def parseAnalysisOptions(
             'nHistoryBasisTerms': 1,
             'nCovariateBasisTerms': 1,
             'forceBinInterval': 10e-3,
+            'minBinCount': 5,
             'calcTimeROI': True,
             'controlProportion': None,
             'cvKWArgs': dict(
                 n_splits=7,
                 splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
-                samplerKWArgs=dict(random_state=None, test_size=None,),
+                samplerClass=None, samplerKWArgs=defaultSamplerKWArgs,
                 resamplerClass=None, resamplerKWArgs={},
                 ),
             'timeROIOpts': {
@@ -564,16 +567,17 @@ def parseAnalysisOptions(
             'nHistoryBasisTerms': 1,
             'nCovariateBasisTerms': 1,
             'forceBinInterval': 10e-3,
+            'minBinCount': 5,
             'calcTimeROI': True,
             'controlProportion': None,
             'cvKWArgs': dict(
                 n_splits=7,
                 splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
-                samplerKWArgs=dict(random_state=None, test_size=None,),
+                samplerClass=None, samplerKWArgs=defaultSamplerKWArgs,
                 resamplerClass=None, resamplerKWArgs={},
                 ),
             'timeROIOpts': {
-                'alignQuery': 'stopping',
+                'alignQuery': 'stoppingOrStimOff',
                 'winStart': -100e-3,
                 'winStop': 0.
             },
@@ -590,12 +594,13 @@ def parseAnalysisOptions(
             'nHistoryBasisTerms': 1,
             'nCovariateBasisTerms': 1,
             'forceBinInterval': None,
+            'minBinCount': 5,
             'calcTimeROI': True,
             'controlProportion': 'majority',
             'cvKWArgs': dict(
                 n_splits=7,
                 splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
-                samplerKWArgs=dict(random_state=None, test_size=None,),
+                samplerClass=None, samplerKWArgs=defaultSamplerKWArgs,
                 resamplerClass=None, resamplerKWArgs={},
                 ),
             'timeROIOpts': {

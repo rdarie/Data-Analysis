@@ -8,6 +8,7 @@ from sklearn.model_selection._split import _BaseKFold
 from sklearn.metrics import make_scorer
 from sklearn.covariance import ShrunkCovariance, LedoitWolf, EmpiricalCovariance
 from sklearn.linear_model import ElasticNet, ElasticNetCV
+from sklearn.pipeline import make_pipeline, Pipeline
 from sklearn.svm import LinearSVR
 import pandas as pd
 import numpy as np
@@ -35,6 +36,28 @@ sns.set()
 sns.set_color_codes("dark")
 sns.set_context("talk")
 sns.set_style("whitegrid")
+
+
+class DataFrameAverager(TransformerMixin):
+    def __init__(
+            self, stimConditionNames=None,
+            addIndexFor=None):
+        self.stimConditionNames = stimConditionNames
+        self.addIndexFor = addIndexFor
+    #
+    def fit(self, X, y=None):
+        return self
+    #
+    def transform(self, X):
+        averagedX = X.groupby(self.stimConditionNames).mean()
+        if self.addIndexFor is not None:
+            trialInfo = averagedX.groupby(self.addIndexFor).mean().index
+            lookup = pd.Series(np.arange(trialInfo.size), index=trialInfo)
+            newIndexFrame = averagedX.index.to_frame()
+            newEntries = newIndexFrame.set_index(self.addIndexFor).index.map(lookup)
+            newIndexFrame.loc[:, 'trialUID'] = newEntries.to_numpy()
+            averagedX.index = pd.MultiIndex.from_frame(newIndexFrame.reset_index(drop=True))
+        return averagedX
 
 
 class dummyFold:
@@ -71,6 +94,7 @@ class trialAwareStratifiedKFold:
         self.raw_folds = []
         self.folds_per_trial = []
         self.raw_folds_per_trial = []
+        self.continuousGroup = None
 
     def fit(self, X, y=None, groups=None):
         #
@@ -96,6 +120,7 @@ class trialAwareStratifiedKFold:
                 trialMetadata.set_index(self.continuousFactors).index.map(mappingInfo))
         else:
             trialMetadata.loc[:, 'continuousGroup'] = np.arange(trialMetadata.shape[0])
+        self.continuousGroup = trialMetadata['continuousGroup'].to_numpy()
         #
         def cgLookup(x):
             return trialMetadata.index[trialMetadata['continuousGroup'] == x]
@@ -154,8 +179,10 @@ class trainTestValidationSplitter:
             splitterClass = trialAwareStratifiedKFold
         if prelimSplitterClass is None:
             prelimSplitterClass = splitterClass
+        #######
         if len(prelimSplitterKWArgs.keys()) == 0:
             prelimSplitterKWArgs = splitterKWArgs
+        ########
         if resamplerClass is not None:
             prelimSplitterKWArgs.update(
                 {'resamplerClass': resamplerClass,
@@ -165,8 +192,16 @@ class trainTestValidationSplitter:
                 {'resamplerClass': resamplerClass,
                  'resamplerKWArgs': resamplerKWArgs}
             )
+        #####
+        if samplerClass is None:
+            samplerClass = StratifiedShuffleSplit
+        if len(samplerKWArgs.keys()) == 0:
+            samplerKWArgs = dict(random_state=None)
+        ###
         prelimSplitterKWArgs.update(dict(samplerClass=samplerClass, samplerKWArgs=samplerKWArgs,))
         prelimSplitterKWArgs['samplerKWArgs']['n_splits'] = n_splits + 1
+        if samplerClass == StratifiedShuffleSplit:
+            prelimSplitterKWArgs['samplerKWArgs']['test_size'] = 1 / (n_splits + 1)
         # evaluate a preliminary test-train split,
         # to get a validation-working set split
         self.prelimSplitter = prelimSplitterClass(**prelimSplitterKWArgs)
@@ -182,6 +217,8 @@ class trainTestValidationSplitter:
         # into a train-test split
         splitterKWArgs.update(dict(samplerClass=samplerClass, samplerKWArgs=samplerKWArgs,))
         splitterKWArgs['samplerKWArgs']['n_splits'] = n_splits
+        if samplerClass == StratifiedShuffleSplit:
+            splitterKWArgs['samplerKWArgs']['test_size'] = 1 / n_splits
         self.splitter = splitterClass(**splitterKWArgs)
         self.splitter.fit(dataDF.iloc[self.work, :])
         # folds contains iloc indices into the submatrix dataDF.iloc[self.work, :]
@@ -334,8 +371,9 @@ def gridSearchHyperparameters(
         maxScore, minScore = scoreMean.max(), scoreMean.min()
         scoreSem = prelimGsCVResultsDF.groupby(paramColNamesShort).sem()['test_score']
         threshold = minScore + (maxScore - minScore) * 0.95 - scoreSem.loc[scoreMean.idxmax()]
-        if scoreMean.index.names == ['n_components']:
-            optParams = {'n_components': scoreMean.loc[scoreMean > threshold].index.min()}
+        # pdb.set_trace()
+        if scoreMean.index.names == ['dim_red__n_components']:
+            optParams = {'dim_red__n_components': scoreMean.loc[scoreMean > threshold].index.min()}
             print('Resetting optimal params to:\n{}\n'.format(optParams))
         # else.. depends on whether we want the params to be maximized or minimized TODO
     workGsScoresDF = pd.DataFrame(workGridSearcher.cv_results_).rename(columns=colRenamer)
@@ -392,9 +430,19 @@ def genReconstructionScorer(scoreFun):
     return scorer
 
 def reconstructionR2(estimator, X, y=None):
-    feat = estimator.transform(X)
-    rec = np.dot(feat, estimator.components_) + estimator.mean_
-    return r2_score(X, rec)
+    if isinstance(estimator, Pipeline):
+        if len(estimator.steps) > 1:
+            XInter = Pipeline(estimator.steps[:-1]).transform(X)
+        else:
+            XInter = X
+        finalStep = estimator.steps[-1][1]
+        feat = finalStep.transform(XInter)
+        rec = np.dot(feat, finalStep.components_) + finalStep.mean_
+        return r2_score(XInter, rec)
+    else:
+        feat = estimator.transform(X)
+        rec = np.dot(feat, estimator.components_) + estimator.mean_
+        return r2_score(X, rec)
 
 def timeShift(x, lag):
     return (

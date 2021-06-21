@@ -22,6 +22,7 @@
 # Request custom resources
 #SBATCH --array=2,3
 
+# SLURM_ARRAY_TASK_ID=2
 source shellScripts/calc_aligned_motion_preamble.sh
 
 #  ITERATOR="--iteratorSuffix=a"

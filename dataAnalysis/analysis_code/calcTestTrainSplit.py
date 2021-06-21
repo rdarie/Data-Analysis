@@ -72,6 +72,8 @@ dataFramesFolder = os.path.join(
 if not(os.path.exists(dataFramesFolder)):
     os.makedirs(dataFramesFolder)
 
+theseIteratorOpts = iteratorOpts[arguments['iteratorSuffix']]
+
 alignedAsigsKWargs['dataQuery'] = ash.processAlignQueryArgs(namedQueries, **arguments)
 alignedAsigsKWargs['unitNames'], alignedAsigsKWargs['unitQuery'] = ash.processUnitQueryArgs(
     namedQueries, scratchFolder, **arguments)
@@ -101,7 +103,6 @@ if 'winStop' in arguments:
         alignedAsigsKWargs['windowSize'][1] = float(arguments['winStop']) * (1e-3)
 
 binOpts = rasterOpts['binOpts'][arguments['analysisName']]
-theseIteratorOpts = iteratorOpts[arguments['iteratorSuffix']]
 
 if theseIteratorOpts['calcTimeROI'] and not arguments['loadFromFrames']:
     if arguments['eventBlockSuffix'] is not None:
@@ -227,6 +228,7 @@ if (not arguments['loadFromFrames']):
                 traceback.print_exc()
                 pass
             targetMask = pd.Series(True, index=dataDF.index)
+            # select custom time ranges 
             for (_, _, t), group in dataDF.groupby(['segment', 'originalIndex', 't']):
                 timeDifference = (targetTrialAnnDF['t'] - t)
                 deltaT = timeDifference[timeDifference >= 0].min()
@@ -300,6 +302,7 @@ if not arguments['processAll']:
         listOfIterators.append(cvIterator)
 else:
     exportDF = pd.concat(listOfDataFrames)
+    print('exportDF.shape[0] =  {}'.format(exportDF.shape[0]))
     if theseIteratorOpts['controlProportion'] is not None:
         trialInfo = exportDF.index.to_frame().reset_index(drop=True)
         infoPerTrial = trialInfo.drop_duplicates(subset=['controlFlag', 'segment', 'originalIndex', 't'])
@@ -324,8 +327,25 @@ else:
         keepMI = infoPerTrial.drop(index=dropIndices).set_index(['controlFlag', 'segment', 'originalIndex', 't']).index
         controlProportionMask = trialInfo.set_index(['controlFlag', 'segment', 'originalIndex', 't']).index.isin(keepMI)
         exportDF = exportDF.loc[controlProportionMask, :]
+        print('After controlProportion deleter exportDF.shape[0] =  {}'.format(exportDF.shape[0]))
     else:
         controlProportionMask = None
+    # reject bins where there aren't enough observations to average
+    minBinMask = pd.Series(True, index=exportDF.index)
+    if theseIteratorOpts['minBinCount']:
+        for stimCnd, stimGrp in exportDF.groupby(stimulusConditionNames):
+            binCount = stimGrp.groupby('bin').count().iloc[:, 0]
+            # which bins need to be rejected?
+            binsTooFew = binCount.index[binCount < theseIteratorOpts['minBinCount']]
+            binsTooFewMask = stimGrp.index.get_level_values('bin').isin(binsTooFew)
+            binsTooFewIndices = stimGrp.index[binsTooFewMask]
+            # which indices don't have enough bin observations?
+            minBinMask.loc[binsTooFewIndices] = False
+            print('minBinMask.sum() = {}'.format(minBinMask.sum()))
+        exportDF = exportDF.loc[minBinMask, :]
+        print('After minBinMask exportDF.shape[0] = {}'.format(exportDF.shape[0]))
+    else:
+        minBinMask = None
     cvIterator = tdr.trainTestValidationSplitter(
         dataDF=exportDF, **theseIteratorOpts['cvKWArgs'])
     listOfIterators.append(cvIterator)
@@ -349,6 +369,10 @@ if arguments['processAll']:
     if controlProportionMask is not None:
         iteratorMetadata.update({
             'controlProportionMask': controlProportionMask
+        })
+    if minBinMask is not None:
+        iteratorMetadata.update({
+            'minBinMask': minBinMask
         })
 print('saving\n{}\n'.format(iteratorPath))
 if os.path.exists(iteratorPath):

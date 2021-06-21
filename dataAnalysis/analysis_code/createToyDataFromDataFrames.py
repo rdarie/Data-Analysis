@@ -312,7 +312,7 @@ if __name__ == '__main__':
         wRot = r.as_matrix()
         explainedVar = np.diag([5, 3, 0])
         # W = wRot @ var
-        S = np.eye(nDim) * 5e-1
+        S = np.eye(nDim) * 2.
         #
         gtCoeffs = pd.Series({
             'Intercept': 0.,
@@ -348,7 +348,7 @@ if __name__ == '__main__':
         wRot = r.as_matrix()
         explainedVar = np.diag([5, 3, 0])
         # W = wRot @ var
-        S = np.eye(nDim) * 5e-1
+        S = np.eye(nDim) * 2.
         #
         gtCoeffs = pd.Series({
             'Intercept': 0.,
@@ -384,7 +384,7 @@ if __name__ == '__main__':
         wRot = r.as_matrix()
         explainedVar = np.diag([5, 3, 0])
         # W = wRot @ var
-        S = np.eye(nDim) * 5e-1
+        S = np.eye(nDim) * 2.
         #
         gtCoeffs = pd.Series({
             'Intercept': 0.,
@@ -419,7 +419,7 @@ if __name__ == '__main__':
         r = Rot.from_euler('XYZ', [phi, theta, psi], degrees=True)
         wRot = r.as_matrix()
         explainedVar = np.diag([5, 3, 0])
-        S = np.eye(nDim) * 5e-1
+        S = np.eye(nDim) * 2.
         #
         gtCoeffs = pd.Series({
             'Intercept': 0.,
@@ -455,7 +455,7 @@ if __name__ == '__main__':
         wRot = r.as_matrix()
         explainedVar = np.diag([5, 3, 0])
         # W = wRot @ var
-        S = np.eye(nDim) * 5e-1
+        S = np.eye(nDim) * 2.
         #
         gtCoeffs = pd.Series({
             'Intercept': 0.,
@@ -492,7 +492,7 @@ if __name__ == '__main__':
         r = Rot.from_euler('xyz', [phi, theta, psi], degrees=True)
         wRot = r.as_matrix()
         explainedVar = np.diag([5, 3, 0])
-        S = np.eye(nDim) * 5e-1
+        S = np.eye(nDim) * 2.
         #
         gtCoeffs = pd.Series({
             'Intercept': 0.,
@@ -565,7 +565,6 @@ if __name__ == '__main__':
     latentPlotDF.loc[:, 'electrodeInfluence'] = electrodeInfluence
     latentPlotDF.loc[:, 'movementInfluence'] = movementInfluence
     latentPlotDF.loc[:, 'limbState'] = toyLhsDF['velocity'].map({-1: 'flexion', 0:'rest', 1:'extension'}).to_numpy()
-    # pdb.set_trace()
     latentPlotDF.loc[:, 'limbState x electrode'] = ' '
     for name, group in latentPlotDF.groupby(['limbState', 'electrode']):
         latentPlotDF.loc[group.index, 'limbState x electrode'] = '{} {}'.format(*name)
@@ -713,40 +712,6 @@ if __name__ == '__main__':
         rhsPlotDF.loc[:, 'x2'], rhsPlotDF.loc[:, 'y2'], _ = proj3d.proj_transform(
             rhsPlotDF.iloc[:, 0], rhsPlotDF.iloc[:, 1], rhsPlotDF.iloc[:, 2], ax.get_proj())
         #####
-        tempCols = [cN for cN in toyRhsDF.columns] + ['limbState x electrode']
-        rhsPlotDFStack = pd.DataFrame(
-            rhsPlotDF.loc[:, tempCols].to_numpy(),
-            columns=tempCols,
-            index=pd.MultiIndex.from_frame(toyTrialInfo.loc[:, ['electrode', 'bin', 'pedalMovementCat', 'amplitude']])
-            )
-        rhsPlotDFStack = rhsPlotDFStack.set_index('limbState x electrode', append=True)
-        rhsPlotDFStack.columns.name = 'feature'
-        rhsPlotDFStack = rhsPlotDFStack.stack().to_frame(name='signal').reset_index()
-        g = sns.relplot(
-            row='feature', col='limbState x electrode',
-            x='bin', y='signal', hue='amplitude',
-            data=rhsPlotDFStack, palette='plasma',
-            errorbar='se', kind='line'
-            )
-        g.tight_layout()
-        pdf.savefig()
-        if arguments['showFigures']:
-            plt.show()
-        else:
-            plt.close()
-        g = sns.displot(
-            row='feature', col='limbState x electrode',
-            y='signal', hue='amplitude',
-            data=rhsPlotDFStack, palette='plasma',
-            kind='kde', common_norm=False,
-            height=2, aspect=3
-            )
-        g.tight_layout()
-        pdf.savefig()
-        if arguments['showFigures']:
-            plt.show()
-        else:
-            plt.close()
         ####
         fig, ax = plt.subplots(figsize=(12, 12))
         sns.kdeplot(
@@ -761,6 +726,41 @@ if __name__ == '__main__':
         else:
             plt.close()
         if iteratorSuffix in ['a', 'b']:
+            tempCols = [cN for cN in toyRhsDF.columns] + ['limbState x electrode']
+            rhsPlotDFStack = pd.DataFrame(
+                rhsPlotDF.loc[:, tempCols].to_numpy(),
+                columns=tempCols,
+                index=pd.MultiIndex.from_frame(toyTrialInfo.loc[:, ['electrode', 'bin', 'pedalMovementCat', 'amplitude']])
+                )
+            rhsPlotDFStack = rhsPlotDFStack.set_index('limbState x electrode', append=True)
+            rhsPlotDFStack.columns.name = 'feature'
+            rhsPlotDFStack = rhsPlotDFStack.stack().to_frame(name='signal').reset_index()
+            g = sns.relplot(
+                row='feature', col='limbState x electrode',
+                x='bin', y='signal', hue='amplitude',
+                data=rhsPlotDFStack, palette='plasma',
+                errorbar='se', kind='line',
+                height=2, aspect=3
+                )
+            g.tight_layout()
+            pdf.savefig()
+            if arguments['showFigures']:
+                plt.show()
+            else:
+                plt.close()
+            g = sns.displot(
+                row='feature', col='limbState x electrode',
+                y='signal', hue='amplitude',
+                data=rhsPlotDFStack, palette='plasma',
+                kind='kde', common_norm=False,
+                height=2, aspect=3
+                )
+            g.tight_layout()
+            pdf.savefig()
+            if arguments['showFigures']:
+                plt.show()
+            else:
+                plt.close()
             for maskDict in lOfMasksForBreakdown:
                 fig = plt.figure()
                 fig.set_size_inches((12, 12))
@@ -793,31 +793,18 @@ if __name__ == '__main__':
         dataFramesFolder,
         outputDatasetName + '_' + arguments['selectionNameRhs'] + '_meta.pickle'
         )
-    # make or load an iterator
-    if iteratorSuffix == 'a':
-        splitterKWArgs = dict(
-            stratifyFactors=stimulusConditionNames,
-            continuousFactors=['segment', 'originalIndex', 't'])
-        iteratorKWArgs = dict(
-            n_splits=7,
-            splitterClass=tdr.trialAwareStratifiedKFold, splitterKWArgs=splitterKWArgs,
-            samplerKWArgs=dict(random_state=None, test_size=None, ),
-            prelimSplitterClass=tdr.trialAwareStratifiedKFold, prelimSplitterKWArgs=splitterKWArgs,
-            resamplerClass=None, resamplerKWArgs={},
-            )
-        cvIterator = tdr.trainTestValidationSplitter(
-            dataDF=toyLhsDF.loc[restrictMask, :], **iteratorKWArgs)
-    else:
-        aLoadingMetaPath = os.path.join(
-            dataFramesFolder,
-            (
-                'Synthetic_{}_df_a'.format(loadingMeta['arguments']['window']) +
-                '_' + arguments['selectionNameRhs'] + '_meta.pickle')
-            )
-        with open(loadingMetaPathLhs, 'rb') as _f:
-            aLoadingMeta = pickle.load(_f)
-            iteratorKWArgs = aLoadingMeta['cv_kwargs']
-            cvIterator = aLoadingMeta['iteratorsBySegment'][0]
+    splitterKWArgs = dict(
+        stratifyFactors=stimulusConditionNames,
+        continuousFactors=['segment', 'originalIndex', 't'])
+    iteratorKWArgs = dict(
+        n_splits=7,
+        splitterClass=tdr.trialAwareStratifiedKFold, splitterKWArgs=splitterKWArgs,
+        samplerKWArgs=dict(random_state=None, test_size=None, ),
+        prelimSplitterClass=tdr.trialAwareStratifiedKFold, prelimSplitterKWArgs=splitterKWArgs,
+        resamplerClass=None, resamplerKWArgs={},
+        )
+    cvIterator = tdr.trainTestValidationSplitter(
+        dataDF=toyLhsDF.loc[restrictMask, :], **iteratorKWArgs)
     #
     outputLoadingMeta['iteratorsBySegment'] = [cvIterator]
     outputLoadingMeta['cv_kwargs'] = iteratorKWArgs

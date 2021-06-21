@@ -37,13 +37,14 @@ Options:
     --limitPages=limitPages                how many pages to print, max?
     --noStim                               disable references to "amplitude"
 """
-import matplotlib
+import matplotlib, os
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
-# matplotlib.use('Agg')   # generate postscript output
-matplotlib.use('QT5Agg')   # generate postscript output
-
-
+if 'DISPLAY' in os.environ:
+    matplotlib.use('QT5Agg')   # generate postscript output
+else:
+    matplotlib.use('PS')   # generate postscript output
+#
 from namedQueries import namedQueries
 import pdb
 import dataAnalysis.plotting.aligned_signal_plots as asp
