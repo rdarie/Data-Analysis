@@ -24,11 +24,13 @@ Options:
     --estimatorName=estimatorName          filename for resulting estimator (cross-validated n_comps)
     --selector=selector                    filename if using a unit selector
 """
-import matplotlib
+import matplotlib, os
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
-matplotlib.use('QT5Agg')   # generate postscript output
-# matplotlib.use('Agg')   # generate postscript output
+if 'DISPLAY' in os.environ:
+    matplotlib.use('QT5Agg')   # generate postscript output
+else:
+    matplotlib.use('PS')   # generate postscript output
 from dask.distributed import Client
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
@@ -55,30 +57,28 @@ import sys
 import gc
 from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
 from docopt import docopt
-for arg in sys.argv:
-    print(arg)
 
 idxSl = pd.IndexSlice
 sns.set(
     context='talk', style='dark',
     palette='dark', font='sans-serif',
-    font_scale=1.5, color_codes=True)
+    font_scale=.8, color_codes=True)
 
+for arg in sys.argv:
+    print(arg)
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
+pdb.set_trace()
 # if debugging in a console:
 '''
 consoleDebugging = True
 if consoleDebugging:
     arguments = {
-        'iteratorSuffix': 'a', 'alignFolderName': 'motion',
-        'processAll': True, 'exp': 'exp202101201100', 'analysisName': 'default',
-        'blockIdx': '2', 'rhsBlockPrefix': 'Block', 'verbose': False,
-        'lhsBlockSuffix': 'lfp_CAR_spectral', 'unitQueryLhs': 'lfp_CAR_spectral',
-        'rhsBlockSuffix': 'rig', 'unitQueryRhs': 'jointAngle',
-        'loadFromFrames': True, 'estimatorName': 'ols_lfp_CAR_ja',
-        'alignQuery': 'starting', 'winStop': '400', 'window': 'L', 'selector': None, 'winStart': '200',
-        'plotting': True, 'lazy': False, 'lhsBlockPrefix': 'Block',
-        'showFigures': True}
+        'exp': 'exp202101281100', 'datasetNameRhs': 'Block_XL_df_c', 'estimatorName': 'enr',
+        'winStop': '400', 'datasetNameLhs': 'Block_XL_df_c', 'analysisName': 'default',
+        'plotting': True, 'winStart': '200', 'verbose': '2', 'showFigures': False, 'blockIdx': '2',
+        'debugging': False, 'lazy': False, 'alignQuery': 'midPeak', 'processAll': True,
+        'selectionNameLhs': 'pedalState', 'window': 'long', 'selector': None,
+        'alignFolderName': 'motion', 'selectionNameRhs': 'lfp_CAR'}
     os.chdir('/gpfs/home/rdarie/nda2/Data-Analysis/dataAnalysis/analysis_code')
 '''
 expOpts, allOpts = parseAnalysisOptions(
@@ -165,6 +165,16 @@ if __name__ == '__main__':
     rhsDF = pd.read_hdf(rhsDatasetPath, '/{}/data'.format(arguments['selectionNameRhs']))
     lhsMasks = pd.read_hdf(lhsDatasetPath, '/{}/featureMasks'.format(arguments['selectionNameLhs']))
     #
+    pipelineNameRhs = '{}_{}_{}'.format(
+        'pca', arguments['datasetNameRhs'], arguments['selectionNameRhs'])
+    pipelinePathRhs = os.path.join(
+        estimatorsSubFolder,
+        pipelineNameRhs + '.h5'
+        )
+    pipelineMetaDataPathRhs = os.path.join(
+        estimatorsSubFolder,
+        pipelineNameRhs + '_meta.pickle'
+        )
     workingLhsDF = lhsDF.iloc[workIdx, :]
     workingRhsDF = rhsDF.iloc[workIdx, :]
     nFeatures = lhsDF.columns.shape[0]

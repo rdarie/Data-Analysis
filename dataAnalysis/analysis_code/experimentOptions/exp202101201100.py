@@ -240,7 +240,7 @@ def getExpOpts():
     #
     analysisClippingOpts = {
         'utah': {
-            'absoluteLimit': 250,
+            'absoluteLimit': 600,
             # 'IQR': True,
             # 'quantileVal': 0.25,
             # 'quantileMultiple': 5

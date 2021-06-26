@@ -241,11 +241,12 @@ if __name__ == "__main__":
     outputBlock.create_relationship()
     outputBlock = ns5.purgeNixAnn(outputBlock)
     if os.path.exists(outputPath):
+        print('Removing old version of {}'.format(outputPath))
         os.remove(outputPath)
+    if arguments['lazy']:
+        dataReader.file.close()
     writer = NixIO(
         filename=outputPath, mode='ow')
     writer.write_block(outputBlock, use_obj_names=True)
     writer.close()
     print('Done writing viewable matrix')
-    if arguments['lazy']:
-        dataReader.file.close()

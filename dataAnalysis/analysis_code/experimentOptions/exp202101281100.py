@@ -165,8 +165,8 @@ def getExpOpts():
     ############################################################
     ############################################################
     outlierDetectOptions = dict(
-        targetEpochSize=500e-3,
-        windowSize=(-.4, 1.),
+        targetEpochSize=600e-3,
+        windowSize=(-.2, .4),
         twoTailed=True,
         devQuantile=0.95,
         qThresh=1-1e-6
@@ -181,7 +181,7 @@ def getExpOpts():
             'asigNameList': [
                 [
                     'utah{:d}'.format(i)
-                    for i in range(1, 97)]
+                    for i in range(1, 97) if i not in [39]]
                 ],
             'ainpNameList': [
                 'ainp{:d}'.format(i)
@@ -218,9 +218,29 @@ def getExpOpts():
                 for i in [1, 2, 3]]
         }
     }
+    #
+    '''analysisClippingOpts = {
+        'utah': {
+            'absoluteLimit': 600,
+            # 'IQR': True,
+            # 'quantileVal': 0.25,
+            # 'quantileMultiple': 5
+        }}'''
+    #
     csdOpts = {
-        'skipChannels': ['utah25', 'utah39']
+        'NSamplesForCV': 1000,
+        'chunkSize': 20000,
+        'skipChannels': ['utah25', 'utah39'],
+        'optimalHyperparameters': {'h': 1.0, 'R_init': 0.2, 'lambd': 0.0016},
+        'filterOpts': {
+            'low': {
+                'Wn': 400,
+                'N': 4,
+                'btype': 'low',
+                'ftype': 'butter'
+            }
         }
+    }
     expIteratorOpts = {
         'a': {
             'experimentsToAssemble': {
@@ -237,6 +257,13 @@ def getExpOpts():
                 }
         },
         'c': {
+            'experimentsToAssemble': {
+                # '202101251100-Rupert': [1, 2, 3],
+                # '202101271100-Rupert': [1, 2, 3],
+                '202101281100-Rupert': [1, 2, 3],
+                }
+        },
+        'd': {
             'experimentsToAssemble': {
                 # '202101251100-Rupert': [1, 2, 3],
                 # '202101271100-Rupert': [1, 2, 3],

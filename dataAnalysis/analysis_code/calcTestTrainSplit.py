@@ -240,6 +240,9 @@ if (not arguments['loadFromFrames']):
             dataDF = dataDF.loc[targetMask, :]
             exampleIndex = dataDF.index
             listOfExampleIndexes.append(exampleIndex)
+            #
+            colRenamer = {fN: fN.replace('#0', '') for fN in dataDF.columns.get_level_values('feature')}
+            dataDF.rename(columns=colRenamer, level='feature', inplace=True)
         listOfDataFrames.append(dataDF)
     if arguments['lazy']:
         dataReader.file.close()
@@ -279,6 +282,8 @@ else:    # loading frames
                         print('Loaded {} from {}'.format(controlKey, dFPath))
                     assert len(theseDF.keys()) > 0
                     thisDF = pd.concat(theseDF, names=['controlFlag'])
+                    colRenamer = {fN: fN.replace('#0', '') for fN in thisDF.columns.get_level_values('feature')}
+                    thisDF.rename(columns=colRenamer, level='feature', inplace=True)
             except Exception:
                 traceback.print_exc()
                 print('Skipping...')

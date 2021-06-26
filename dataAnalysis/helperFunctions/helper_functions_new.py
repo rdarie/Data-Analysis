@@ -4036,6 +4036,14 @@ def exportNormalizedDataFrame(
             return outputDF
         #
         # finalDF = normalizeDataset(finalDF, normalizationParams)
+    elif selectionName == 'rig':
+        normalizationParams = [[]]
+
+        def normalizeDataset(inputDF, params):
+            return inputDF
+
+        def unNormalizeDataset(inputDF, params):
+            return inputDF
     else:
         # normal time domain data
         normalizationParams = [[]]

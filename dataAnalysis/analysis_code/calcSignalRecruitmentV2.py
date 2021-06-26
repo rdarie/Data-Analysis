@@ -184,10 +184,10 @@ if __name__ == "__main__":
         dataDF = pd.read_hdf(datasetPath, '/{}/data'.format(selectionName))
     groupNames = ['originalIndex', 'segment', 't']
     daskComputeOpts = dict(
-        # scheduler='processes'
-        scheduler='single-threaded'
+        scheduler='processes'
+        # scheduler='single-threaded'
         )
-    if daskComputeOpts['scheduler'] == 'single-threaded':
+    '''if daskComputeOpts['scheduler'] == 'single-threaded':
         daskClient = Client(LocalCluster(n_workers=1))
     elif daskComputeOpts['scheduler'] == 'processes':
         daskClient = Client(LocalCluster(processes=True))
@@ -196,14 +196,13 @@ if __name__ == "__main__":
         daskClient = Client(LocalCluster(processes=False))
     else:
         print('Scheduler name is not correct!')
-        daskClient = Client()
+        daskClient = Client()'''
     colFeatureInfo = [nm for nm in dataDF.columns.names if nm != 'feature']
     rawRaucDF = ash.splitApplyCombine(
         dataDF, fun=calcRauc, resultPath=resultPath,
         rowKeys=groupNames, colKeys=colFeatureInfo,
         daskProgBar=False,
-        daskPersist=True, useDask=True, retainInputIndex=True,
-        daskComputeOpts=daskComputeOpts, columnFeatureInfoHack=True)
+        daskPersist=True, useDask=True, daskComputeOpts=daskComputeOpts)
     rawRaucDF.index = rawRaucDF.index.droplevel('bin')
     #
     qScaler = PowerTransformer()

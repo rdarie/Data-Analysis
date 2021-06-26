@@ -16,12 +16,16 @@ Options:
     --removeLabels=removeLabels                           remove certain labels, e.g. stimOff (comma separated)
     --disableRefinement                                   by default, use xcorr to refine stim times [default: False]
 """
-import matplotlib, pdb, traceback
-matplotlib.use('Qt5Agg')   # generate interactive output by default
-#  matplotlib.rcParams['agg.path.chunksize'] = 10000
-#  matplotlib.use('PS')   # noninteract output
+
+import matplotlib, os
+matplotlib.rcParams['pdf.fonttype'] = 42
+matplotlib.rcParams['ps.fonttype'] = 42
+if 'DISPLAY' in os.environ:
+    matplotlib.use('QT5Agg')   # generate postscript output
+else:
+    matplotlib.use('PS')   # generate postscript output
 from matplotlib.backends.backend_pdf import PdfPages
-import os, pdb, traceback, sys
+import pdb, traceback, sys
 from importlib import reload
 from matplotlib.lines import Line2D
 import neo
@@ -45,6 +49,11 @@ from elephant.conversion import binarize
 #  load options
 from currentExperiment import parseAnalysisOptions
 from docopt import docopt
+sns.set(
+    context='talk', style='dark',
+    palette='dark', font='sans-serif',
+    font_scale=.8, color_codes=True)
+
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']),
@@ -384,10 +393,10 @@ for segIdx, nspSeg in enumerate(nspBlock.segments):
                     midTimes.append((tStart + tPrev) / 2)
         #
         midCategories = pd.DataFrame(midTimes, columns=['t'])
-        midCategories['stimCat'] = 'control'
-        midCategories['amplitude'] = 0
-        midCategories['program'] = 999
-        midCategories['RateInHz'] = 0
+        midCategories['stimCat'] = 'NA'
+        midCategories['amplitude'] = ns5.metaFillerLookup['amplitude']
+        midCategories['program'] = ns5.metaFillerLookup['program']
+        midCategories['RateInHz'] = ns5.metaFillerLookup['RateInHz']
         #
         alignEventsDF = pd.concat((
             categories, midCategories),
@@ -403,7 +412,7 @@ for segIdx, nspSeg in enumerate(nspBlock.segments):
         gName = int(name[0])
         pName = int(name[1])
         if pName == 999:
-            alignEventsDF.loc[group.index, 'electrode'] = 'control'
+            alignEventsDF.loc[group.index, 'electrode'] = 'NA'
         else:
             unitName = 'g{}p{}#0'.format(gName, pName)
             unitCandidates = insBlock.filter(objects=Unit, name=unitName)
@@ -433,6 +442,8 @@ for segIdx, nspSeg in enumerate(nspBlock.segments):
         categories.drop(index=idxToRemove, inplace=True)
         categories.reset_index(drop=True)
     alignEventsDF.loc[:, 'expName'] = arguments['exp']
+    htmlOutPath = os.path.join(insDiagnosticsFolder, '{}_motionAlignTimes.html'.format(ns5FileName))
+    alignEventsDF.to_html(htmlOutPath)
     alignEvents = ns5.eventDataFrameToEvents(
         alignEventsDF, idxT='t',
         annCol=None,

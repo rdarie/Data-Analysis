@@ -31,31 +31,31 @@ BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
 ITERATOR="a"
 WINDOWTERM="XL"
 RHSOPTS="--datasetNameRhs=Block_${WINDOWTERM}_df_c --selectionNameRhs=lfp_CAR"
-LHSOPTS="--datasetNameLhs=Block_${WINDOWTERM}_df_c --selectionNameLhs=pedalState"
+LHSOPTS="--datasetNameLhs=Block_${WINDOWTERM}_df_c --selectionNameLhs=rig"
 ###
 TARGET="lfp_CAR"
 ESTIMATOR="pca"
 ###
-iterators=(a b c d e f)
+# iterators=(a b c d e f)
+iterators=(g)
 for ITER in "${iterators[@]}"
 do
     echo "On iterator $ITER"
-    python -u './createToyDataFromDataFrames.py' --iteratorSuffix=$ITER --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
-    python -u './calcGridSearchSignalDimensionality.py' --estimatorName=$ESTIMATOR --datasetName="Synthetic_${WINDOWTERM}_df_${ITER}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
-    python -u './processSignalDimensionality.py' --estimatorName=$ESTIMATOR --datasetName="Synthetic_${WINDOWTERM}_df_${ITER}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
+    # python -u './createToyDataFromDataFrames.py' --iteratorSuffix=$ITER --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
+    # python -u './calcGridSearchSignalDimensionality.py' --estimatorName=$ESTIMATOR --datasetName="Synthetic_${WINDOWTERM}_df_${ITER}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
+    # python -u './processSignalDimensionality.py' --estimatorName=$ESTIMATOR --datasetName="Synthetic_${WINDOWTERM}_df_${ITER}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
+    #
+    # python -u './calcGridSearchSignalDimensionality.py' --averageByTrial --estimatorName="${ESTIMATOR}_ta" --datasetName="Synthetic_${WINDOWTERM}_df_${ITER}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
+    # python -u './processSignalDimensionality.py' --estimatorName="${ESTIMATOR}_ta" --datasetName="Synthetic_${WINDOWTERM}_df_${ITER}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
 done
 ###
-python -u './compareSignalCovarianceMatrices.py' --estimatorName=$ESTIMATOR --iteratorSuffixList="a, b, c, d, e, f" --datasetPrefix="Synthetic_${WINDOWTERM}_df" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
+# python -u './compareSignalCovarianceMatrices.py' --estimatorName=$ESTIMATOR --iteratorSuffixList="a, b, c, d, e, f" --datasetPrefix="Synthetic_${WINDOWTERM}_df" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
 
-# ###
-# TARGET="lfp_CAR"
-# ESTIMATOR="mahal"
-# python -u './calcSignalNovelty.py' --estimatorName="mahal" --datasetName="Synthetic_${WINDOWTERM}_df_f" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=2 --plotting
-###
-# iterators=(a b c d e)
-# for ITER in "${iterators[@]}"
-# do
-#     echo "On iterator $ITER"
-#     python -u './applyEstimatorToDataFrame.py' --inputBlockSuffix=$TARGET --estimatorName=$ESTIMATOR --originDatasetName="Synthetic_${WINDOWTERM}_df_f" --datasetName="Synthetic_${WINDOWTERM}_df_${ITER}" --selectionName=$TARGET --originDatasetExp='202101281100-Rupert' --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR
-# done
-#  
+
+ITERATOR="g"
+WINDOWTERM="XL"
+RHSOPTS="--datasetNameRhs=Synthetic_${WINDOWTERM}_df_${ITERATOR} --selectionNameRhs=lfp_CAR"
+LHSOPTS="--datasetNameLhs=Synthetic_${WINDOWTERM}_df_${ITERATOR} --selectionNameLhs=rig"
+
+python -u './calcGridSearchRegressionWithPipelines.py' --transformerNameRhs='pca' --debugging --estimatorName='enr' --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
+python -u './calcGridSearchRegressionWithPipelines.py' --transformerNameRhs='pca_ta' --debugging --estimatorName='enr' --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2

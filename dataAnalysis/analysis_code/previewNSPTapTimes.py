@@ -9,37 +9,20 @@ Options:
     --plotting                                      whether to display confirmation plots [default: False]
     --usedTENSPulses                                whether the sync was done using TENS pulses (as opposed to mechanical taps) [default: False]
 """
-import matplotlib, pdb, traceback
-# matplotlib.use('Qt5Agg')   # generate interactive output by default
-#  matplotlib.rcParams['agg.path.chunksize'] = 10000
-matplotlib.use('PS')   # noninteract output
+import matplotlib, os
+matplotlib.rcParams['pdf.fonttype'] = 42
+matplotlib.rcParams['ps.fonttype'] = 42
+if 'DISPLAY' in os.environ:
+    matplotlib.use('QT5Agg')   # generate postscript output
+else:
+    matplotlib.use('PS')   # generate postscript output
 from matplotlib import pyplot as plt
-import dill as pickle
-from scipy import stats
-from importlib import reload
-import datetime
-from datetime import datetime as dt
-from datetime import timezone
-import peakutils
 import numpy as np
 import pandas as pd
-import dataAnalysis.helperFunctions.kilosort_analysis_new as ksa
-import dataAnalysis.helperFunctions.motor_encoder_new as mea
-import dataAnalysis.helperFunctions.helper_functions_new as hf
-import dataAnalysis.helperFunctions.estimateElectrodeImpedances as eti
-import dataAnalysis.preproc.ns5 as ns5
-import dataAnalysis.preproc.mdt as mdt
-import dataAnalysis.preproc.mdt_constants as mdt_constants
-import warnings
-import h5py
+import pdb, traceback
 import os
-import math as m
 import seaborn as sns
-import scipy.interpolate as intrp
 import quantities as pq
-import json
-import rcsanalysis.packetizer as rcsa
-import rcsanalysis.packet_func as rcsa_helpers
 from neo.io import BlackrockIO
 from neo.io.proxyobjects import (
     AnalogSignalProxy, SpikeTrainProxy, EventProxy)
@@ -48,7 +31,37 @@ from neo import (
     Event, AnalogSignal, SpikeTrain, Unit)
 import neo
 import elephant.pandas_bridge as elphpdb
+import dataAnalysis.helperFunctions.helper_functions_new as hf
+import dataAnalysis.preproc.ns5 as ns5
 import dataAnalysis.helperFunctions.probe_metadata as prb_meta
+'''
+
+import dataAnalysis.helperFunctions.kilosort_analysis_new as ksa
+import dataAnalysis.helperFunctions.motor_encoder_new as mea
+import dataAnalysis.helperFunctions.estimateElectrodeImpedances as eti
+import dataAnalysis.preproc.mdt as mdt
+import dataAnalysis.preproc.mdt_constants as mdt_constants
+import rcsanalysis.packetizer as rcsa
+import rcsanalysis.packet_func as rcsa_helpers
+import warnings
+import h5py
+import math as m
+import json
+import dill as pickle
+from scipy import stats
+import scipy.interpolate as intrp
+from importlib import reload
+import datetime
+from datetime import datetime as dt
+from datetime import timezone
+import peakutils
+
+'''
+sns.set(
+    context='paper', style='darkgrid',
+    palette='dark', font='sans-serif',
+    font_scale=.8, color_codes=True, rc={
+        'figure.dpi': 200, 'savefig.dpi': 200})
 
 #  load options
 from currentExperiment import parseAnalysisOptions
@@ -220,13 +233,16 @@ try:
     summaryText += (
         '<h3>.95 voltage intervals:</h3>\n<p>\n'
         .format(2 * problemThreshold))
+    asigList = []
     for asigP in nspBlock.segments[segIdx].analogsignals:
         chName = asigP.channel_index.name
+        bankID = asigP.channel_index.annotations['connector_ID']
         # if 'ainp' not in chName:
         if True:
             print('    Loading {}'.format(chName))
-            lastT = min((spikeSortingOpts['utah']['previewOffset'] + spikeSortingOpts['utah']['previewDuration']) * pq.s,  asigP.t_stop)
             firstT = max(spikeSortingOpts['utah']['previewOffset'] * pq.s,  asigP.t_start)
+            lastT = min(firstT + spikeSortingOpts['utah']['previewDuration'] * pq.s,  asigP.t_stop)
+            # lastT = min(firstT + 30 * pq.s, asigP.t_stop)
             tempAsig = asigP.load(time_slice=[firstT, lastT])
             sigLims = np.quantile(
                 tempAsig, [
@@ -240,13 +256,48 @@ try:
                 problemChannelsList.append(chName)
                 thisTextRow = '<b>' + thisTextRow.replace('<br>', '</b><br>')
             summaryText += thisTextRow
+            ##
+            decimateFactor = 100
+            asigDFIndex = pd.MultiIndex.from_tuples([(chName, bankID),], names=['feature', 'bankID'])
+            asigDF = pd.DataFrame(
+                tempAsig.magnitude[::decimateFactor].reshape(1, -1),
+                index=asigDFIndex, columns=tempAsig.times.magnitude[::decimateFactor])
+            asigDF.columns.name = 'time'
+            asigList.append(asigDF)
+            ##
     summaryText += ('</p>\n<h3>List view: </h3>\n')
     summaryText += '{}\n'.format(problemChannelsList)
 except Exception:
     traceback.print_exc()
+preprocDiagnosticsFolder = os.path.join(
+    processedFolder, 'preprocDiagnostics'
+    )
+if not os.path.exists(preprocDiagnosticsFolder):
+    os.makedirs(preprocDiagnosticsFolder, exist_ok=True)
 approxTimesPath = os.path.join(
-    scratchFolder,
+    preprocDiagnosticsFolder,
     '{}_{}_NS5_Preview.html'.format(
         experimentName, ns5FileName))
 with open(approxTimesPath, 'w') as _file:
     _file.write(summaryText)
+allAsigDF = pd.concat(asigList).stack('time').to_frame(name='signal').reset_index()
+#
+signalRangesFigPath = os.path.join(
+    preprocDiagnosticsFolder,
+    '{}_{}_NS5_Preview_ranges.pdf'.format(
+        experimentName, ns5FileName))
+nGroups = allAsigDF.groupby('bankID').ngroups
+h = 18
+w = 3
+aspect = w / h
+g = sns.catplot(
+    col='bankID', x='signal', y='feature',
+    data=allAsigDF, orient='h', kind='violin', ci='sd',
+    linewidth=0.5, cut=0,
+    sharex=False, sharey=False, height=h, aspect=aspect
+    )
+g.tight_layout()
+g.fig.savefig(
+    signalRangesFigPath, bbox_inches='tight')
+plt.close()
+

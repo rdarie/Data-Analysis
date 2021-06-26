@@ -57,7 +57,6 @@ for arg in sys.argv:
     print(arg)
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 #
-averageByTrial = True
 #
 # if debugging in a console:
 '''
@@ -180,12 +179,8 @@ for idx, (maskIdx, featureMask) in enumerate(featureMasks.iterrows()):
         bestEst = bestEstimators.loc[idxSl[maskParams['freqBandName'], foldIdx]]
         bestDimRed = bestEst.steps[-1][1]
         #
-        if averageByTrial:
-            foldTestDF = preEst.transform(dataGroup.iloc[testIdx, :].copy())
-            foldTrainDF = preEst.transform(dataGroup.iloc[trainIdx, :].copy())
-        else:
-            foldTestDF = dataGroup.iloc[testIdx, :].copy()
-            foldTrainDF = dataGroup.iloc[trainIdx, :].copy()
+        foldTestDF = preEst.transform(dataGroup.iloc[testIdx, :].copy())
+        foldTrainDF = preEst.transform(dataGroup.iloc[trainIdx, :].copy())
         #
         dictOfCovMats1[foldIdx] = pd.DataFrame(
             thisDimRed.get_covariance(), index=dataGroup.columns.get_level_values('feature'),

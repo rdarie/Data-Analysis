@@ -56,7 +56,12 @@ python --version
 # global operations
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_ins*' --fromDataToScratch --filesIncluded
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='Block*_epochs*' --fromDataToScratch --filesIncluded
-python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='utah*.nix' --fromDataToScratch --filesIncluded
+python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='utah*.*' --fromDataToScratch --filesIncluded
+#
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='utah*.nix' --fromScratchToData --moveItems --filesIncluded
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='utah*.json' --fromScratchToData --moveItems --filesIncluded
+# python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='default' --fromScratchToData --moveItems --foldersIncluded
+
 #
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*.parquet' --fromDataToScratch --foldersIncluded --filesIncluded
 # python './shuttleFilesToFromScratch.py' --exp=$EXP --searchTerm='*loRes*' --fromDataToScratch --foldersIncluded

@@ -117,15 +117,6 @@ if __name__ == "__main__":
         scheduler='processes'
         # scheduler='single-threaded'
         )
-    if daskComputeOpts['scheduler'] == 'single-threaded':
-        daskClient = Client(LocalCluster(n_workers=1))
-    elif daskComputeOpts['scheduler'] == 'processes':
-        daskClient = Client(LocalCluster(processes=True))
-    elif daskComputeOpts['scheduler'] == 'threads':
-        daskClient = Client(LocalCluster(processes=False))
-    else:
-        daskClient = None
-        print('Scheduler name is not correct!')
     # resultMeta = {
     #     'noiseCeil': float,
     #     'noiseCeilStd': float,

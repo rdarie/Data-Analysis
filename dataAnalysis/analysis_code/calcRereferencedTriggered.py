@@ -61,21 +61,15 @@ alignedAsigsKWargs['verbose'] = arguments['verbose']
 alignedAsigsKWargs.update(dict(
     duplicateControlsByProgram=False,
     makeControlProgram=False,
-    # transposeToColumns='feature', concatOn='columns',
     transposeToColumns='bin', concatOn='index',
     getMetaData=essentialMetadataFields + ['xCoords', 'yCoords'],
     decimate=1))
 
 daskComputeOpts = dict(
     # scheduler='threads'
-    # scheduler='processes'
-    scheduler='single-threaded'
+    scheduler='processes'
+    # scheduler='single-threaded'
     )
-daskOpts = dict(
-    useDask=True,
-    daskPersist=True, daskProgBar=True,
-    daskResultMeta=None, daskComputeOpts=daskComputeOpts,
-    reindexFromInput=True)
 
 outputPath = os.path.join(
     alignSubFolder,
@@ -116,19 +110,20 @@ def reReference(
     resDF = pd.concat(
         [group.loc[:, indexCols], resData],
         axis='columns')
+    resDF.columns.name = group.columns.name
     return resDF
 
 
 if __name__ == "__main__":
-    if daskOpts['daskComputeOpts']['scheduler'] == 'single-threaded':
+    '''if daskOpts['daskComputeOpts']['scheduler'] == 'single-threaded':
         daskClient = Client(LocalCluster(n_workers=1))
     elif daskOpts['daskComputeOpts']['scheduler'] == 'processes':
         daskClient = Client(LocalCluster(processes=True))
     elif daskOpts['daskComputeOpts']['scheduler'] == 'threads':
         daskClient = Client(LocalCluster(processes=False))
     else:
-        daskClient = None
-        print('Scheduler name is not correct!')
+        daskClient = Client()
+        print('Scheduler name is not correct!')'''
     #
     if arguments['verbose']:
         print('calcRereferencedTriggered() loading {}'.format(triggeredPath))
@@ -142,12 +137,20 @@ if __name__ == "__main__":
         objects=[ns5.SpikeTrain, ns5.SpikeTrainProxy])[0]
     fs = float(dummySt.sampling_rate)
     #
+    daskOpts = dict(
+        useDask=True,
+        daskPersist=False, daskProgBar=True,
+        daskResultMeta=None,
+        daskComputeOpts=daskComputeOpts)
     rerefDF = ash.splitApplyCombine(
         dataDF,
         fun=reReference, resultPath=outputPath,
         funArgs=[], funKWArgs=funKWArgs,
         rowKeys=groupBy, colKeys=None, **daskOpts)
     #
+    pdb.set_trace()
+    assert (rerefDF.index == dataDF.index).all()
+    assert (rerefDF.columns == dataDF.columns).all()
     del dataDF
     masterBlock = ns5.alignedAsigDFtoSpikeTrain(
         rerefDF, dataBlock=dataBlock, matchSamplingRate=True)

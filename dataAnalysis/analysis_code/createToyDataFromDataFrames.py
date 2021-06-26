@@ -26,11 +26,13 @@ Options:
     --iteratorSuffix=iteratorSuffix        filename if using a unit selector
 """
 
-import matplotlib
-matplotlib.use('QT5Agg')   # generate postscript output
-# matplotlib.use('Agg')   # generate postscript output
+import matplotlib, os
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
+if 'DISPLAY' in os.environ:
+    matplotlib.use('QT5Agg')   # generate postscript output
+else:
+    matplotlib.use('PS')   # generate postscript output
 from mpl_toolkits.mplot3d import proj3d
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
@@ -212,13 +214,16 @@ if __name__ == '__main__':
     NAConfig = ('NA', 0., 0., 'NA', 'NA')
     protoIndex += [NAConfig] * int(np.ceil(baseNTrials * naRatio))
     ##
-    toyInfoPerTrial = pd.DataFrame(protoIndex, columns=['electrode', 'RateInHz', 'amplitude', 'pedalDirection', 'pedalMovementCat'])
+    toyInfoPerTrial = pd.DataFrame(
+        protoIndex,
+        columns=['electrode', 'RateInHz', 'amplitude', 'pedalDirection', 'pedalMovementCat'])
     rng = np.random.default_rng(seed=42)
     shuffledIndices = np.arange(toyInfoPerTrial.shape[0])
     rng.shuffle(shuffledIndices)
     toyInfoPerTrial = toyInfoPerTrial.iloc[shuffledIndices, :]
     toyInfoPerTrial.loc[:, 'segment'] = 0.
     toyInfoPerTrial.loc[:, 'originalIndex'] = np.arange(toyInfoPerTrial.shape[0])
+    toyInfoPerTrial.loc[:, 'trialUID'] = np.arange(toyInfoPerTrial.shape[0])
     toyInfoPerTrial.loc[:, 't'] = toyInfoPerTrial['originalIndex'] * 10.
     for cN in infoPerTrial.columns:
         if cN not in toyInfoPerTrial.columns:
@@ -263,6 +268,7 @@ if __name__ == '__main__':
     toyLhsDF = pd.concat(toyLhsList)
     colsToScale = ['amplitude', 'RateInHz']
     saveIndex = toyLhsDF.index.copy()
+    # pdb.set_trace()
     toyTrialInfo = toyLhsDF.index.to_frame().reset_index(drop=True)
     lOfTransformers = [
         (['amplitude'], MinMaxScaler(feature_range=(0., 1)),),
@@ -506,6 +512,42 @@ if __name__ == '__main__':
             'electrode[+ E16 - E5]:amplitude:RateInHz': 0.,
             'electrode[NA]:amplitude:RateInHz': 0.
             })
+    elif iteratorSuffix == 'g':
+        restrictMask = np.ones(scaledLhsDF['electrode'].shape, dtype=bool)
+        ################################################################
+        nDim = 3
+        nDimLatent = 2
+        #####
+        kinDirection = vg.rotate(
+            vg.basis.x, vg.basis.z, 0)
+        stimDirection = vg.rotate(
+            kinDirection, vg.basis.z, 90)  # perpendicular
+        rotCoeffs = pd.Series({
+            'electrode[+ E16 - E9]:amplitude': [40., 20., 0.],  # out of plane
+            'electrode[+ E16 - E5]:amplitude': [20., 0., 0.],
+            'electrode[NA]:amplitude': [0., 0., 0.],
+        })
+        #####
+        mu = np.asarray([2., 3., 1.])
+        phi, theta, psi = 30, 10, 20
+        r = Rot.from_euler('XYZ', [phi, theta, psi], degrees=True)
+        wRot = r.as_matrix()
+        explainedVar = np.diag([5, 3, 0])
+        # W = wRot @ var
+        S = np.eye(nDim) * 2.
+        #
+        gtCoeffs = pd.Series({
+            'Intercept': 0.,
+            'velocity': 2.,
+            #
+            'electrode[+ E16 - E5]:amplitude': 4.,
+            'electrode[+ E16 - E9]:amplitude': 4.,
+            'electrode[NA]:amplitude': 0.,
+            #
+            'electrode[+ E16 - E9]:amplitude:RateInHz': 1.,
+            'electrode[+ E16 - E5]:amplitude:RateInHz': 1.,
+            'electrode[NA]:amplitude:RateInHz': 0.
+        })
     #
     ################################################################
     ################################################################
@@ -787,7 +829,7 @@ if __name__ == '__main__':
                 else:
                     plt.close()
     ####
-    outputDatasetName='Synthetic_{}_df_{}'.format(loadingMeta['arguments']['window'], iteratorSuffix)
+    outputDatasetName = 'Synthetic_{}_df_{}'.format(loadingMeta['arguments']['window'], iteratorSuffix)
     outputLoadingMeta = loadingMeta.copy()
     outputLoadingMetaPath = os.path.join(
         dataFramesFolder,

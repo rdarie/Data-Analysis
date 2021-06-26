@@ -46,8 +46,11 @@ sys.stderr = sys.__stderr__  # unsilence stderr
 metaFillerLookup = defaultdict(lambda: 'NA')
 metaFillerLookup['program'] = 999.
 metaFillerLookup['amplitude'] = 0.
+metaFillerLookup['amplitudeRound'] = 999.
 metaFillerLookup['activeGroup'] = 0.
 metaFillerLookup['RateInHz'] = 0.
+metaFillerLookup['detectionDelay'] = np.nan
+metaFillerLookup['stimDelay'] = np.nan
 
 
 def analogSignalsToDataFrame(
@@ -1136,8 +1139,15 @@ def concatenateUnitSpikeTrainWaveformsDF(
     try:
         idxLabels = sorted(idxLabels)
         allWaveforms.set_index(idxLabels, inplace=True)
+        sortIndexBy = ['segment', 'originalIndex', 't']
+        for cN in ['bin']:
+            if cN in allWaveforms.index.names:
+                sortIndexBy = sortIndexBy + [cN]
+        for cN in ['lag', 'feature']:
+            if cN in allWaveforms.index.names:
+                sortIndexBy = [cN] + sortIndexBy
         allWaveforms.sort_index(
-            level=['segment', 'originalIndex', 't'],
+            level=sortIndexBy,
             axis='index', inplace=True, kind='mergesort')
         allWaveforms.sort_index(
             axis='columns', inplace=True, kind='mergesort')
@@ -1157,7 +1167,7 @@ def alignedAsigsToDF(
         addLags=None, decimate=1, rollingWindow=None,
         whichSegments=None, windowSize=None,
         getMetaData=True, getFeatureMetaData=None,
-        metaDataToCategories=True,
+        metaDataToCategories=False,
         outlierTrials=None, invertOutlierMask=False,
         makeControlProgram=False, removeFuzzyName=False,
         procFun=None, dropNaNs=True, finalIndexMask=None):
@@ -1275,14 +1285,11 @@ def alignedAsigsToDF(
         except Exception:
             traceback.print_exc()
             allWaveforms.reindex(columns=unitNames)
+        #
         if getFeatureMetaData is not None:
             assert np.all(allWaveforms.columns == columnsMeta.index)
             allWaveforms.columns = pd.MultiIndex.from_frame(columnsMeta.reset_index())
             allWaveforms = allWaveforms.droplevel(getFeatureMetaData, axis='index')
-    if isinstance(allWaveforms.columns, pd.MultiIndex):
-        allWaveforms.columns = allWaveforms.columns.remove_unused_levels()
-    allWaveforms.sort_index(
-        axis='columns', inplace=True, kind='mergesort')
     if dropNaNs:
         allNaNIndex = allWaveforms.index[allWaveforms.isna().all(axis='columns')]
         # allNaNIndex.to_frame().reset_index(drop=True)
@@ -1292,6 +1299,19 @@ def alignedAsigsToDF(
             allWaveforms.dropna(inplace=True, axis='columns')
         elif transposeToColumns == 'feature':
             allWaveforms.dropna(inplace=True, axis='index')
+    ##
+    if isinstance(allWaveforms.columns, pd.MultiIndex):
+        allWaveforms.columns = allWaveforms.columns.remove_unused_levels()
+    if 'bin' in allWaveforms.index.names:
+        sortIndexBy = ['segment', 'originalIndex', 't', 'bin']
+    else:
+        sortIndexBy = ['feature', 'lag', 'segment', 'originalIndex', 't']
+    allWaveforms.sort_index(
+        level=sortIndexBy,
+        axis='index', inplace=True, kind='mergesort')
+    allWaveforms.sort_index(
+        axis='columns', inplace=True, kind='mergesort')
+    ##
     if finalIndexMask is not None:
         if False:
             tInfo1 = allWaveforms.index.to_frame().reset_index(drop=True).set_index(['segment', 't'])
@@ -1595,7 +1615,8 @@ def alignedAsigDFtoSpikeTrain(
             extraSpikeTrainAnnotations.set_index('feature', inplace=True)
             if 'lag' in extraSpikeTrainAnnotations:
                 extraSpikeTrainAnnotations.drop(columns=['lag'], inplace=True)
-    # pdb.set_trace()
+    else:
+        extraSpikeTrainAnnotations = None
     for segIdx, group in allWaveforms.groupby('segment'):
         print('Saving spiketrains for segment {}'.format(segIdx))
         # seg to contain triggered time series
@@ -1670,8 +1691,7 @@ def alignedAsigDFtoSpikeTrain(
                     featGroup = featGroup.to_frame(name=featName)
                     featGroup.columns.name = 'feature'
                 spikeWaveformsDF = transposeSpikeDF(
-                    featGroup,
-                    'bin', fastTranspose=True)
+                    featGroup, 'bin', fastTranspose=True)
             if matchSamplingRate:
                 if len(spikeWaveformsDF.columns) != len(wfBins):
                     wfDF = spikeWaveformsDF.reset_index(drop=True).T
@@ -1698,7 +1718,6 @@ def alignedAsigDFtoSpikeTrain(
                     k
                     for k, v in arrAnn.items()],
                     dtype='U')}
-            # pdb.set_trace()
             if extraSpikeTrainAnnotations is not None:
                 theseExtraAnn = extraSpikeTrainAnnotations.loc[thisUnit.name, :].to_dict()
                 arrAnn.update(theseExtraAnn)
@@ -2819,7 +2838,7 @@ def preproc(
             # fileName + nameSuffix + partNameSuffix
             )
         if not os.path.exists(diagnosticFolder):
-            os.mkdir(diagnosticFolder)
+            os.makedirs(diagnosticFolder, exist_ok=True)
         asigDiagnostics = {}
         outlierDiagnostics = {}
         diagnosticText = ''

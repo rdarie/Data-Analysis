@@ -128,6 +128,10 @@ for segIdx in range(nSeg):
         dataBlock, whichSegments=[segIdx], **aakwa)
     print(dataDF.index.names)
     print(dataDF.columns)
+    #
+    colRenamer = {fN: fN.replace('#0', '') for fN in dataDF.columns.get_level_values('feature')}
+    dataDF.rename(columns=colRenamer, level='feature', inplace=True)
+    #
     if 'listOfExampleIndexes' in loadingMeta:
         trialInfo = dataDF.index.to_frame().reset_index(drop=True)
         loadedTrialInfo = loadingMeta['listOfExampleIndexes'][segIdx].to_frame().reset_index(drop=True)
@@ -141,6 +145,8 @@ for segIdx in range(nSeg):
                 'freqBandName', 'xCoords', 'yCoords', 'parentFeature']]
         try:
             assert (trialInfo.loc[:, targetAnns] == loadedTrialInfo.loc[:, targetAnns]).all(axis=None)
+            # (trialInfo['t'].unique() == np.unique(trialInfo['t'])).all()
+            # (loadedTrialInfo['t'].unique() == np.unique(loadedTrialInfo['t'])).all()
         except Exception:
             traceback.print_exc()
             pdb.set_trace()

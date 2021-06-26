@@ -11,7 +11,7 @@ import dataAnalysis.helperFunctions.profiling as prf
 import dataAnalysis.helperFunctions.helper_functions_new as hf
 import pandas as pd
 import numpy as np
-import dask
+from dask.distributed import Client, LocalCluster
 from dask import dataframe as dd
 from dask.diagnostics import ProgressBar
 import multiprocessing
@@ -240,10 +240,10 @@ def applyFun(
 def splitApplyCombine(
         asigWide, fun=None, resultPath=None,
         funArgs=[], funKWArgs={},
-        rowKeys=None, colKeys=None, useDask=False, nPartitionMultiplier=2,
-        daskPersist=True, daskProgBar=True, daskResultMeta=None,
-        daskComputeOpts={}, reindexFromInput=False, retainInputIndex=False,
-        columnFeatureInfoHack=False):
+        rowKeys=None, colKeys=None, useDask=False, nPartitionMultiplier=1,
+        daskPersist=True, daskProgBar=True, daskResultMeta=None, daskViaDisk=False,
+        daskComputeOpts={}, newMetadataNames=[], sortOutputIndex=True, sortIndexBy=None,
+        sortOutputColumns=True, sortColumnsBy=None, okToDeleteInput=False):
     if isinstance(rowKeys, str):
         rowKeys = [rowKeys, ]
     if isinstance(colKeys, str):
@@ -251,68 +251,116 @@ def splitApplyCombine(
     # TODO: test column iteration
     # TODO: handle transformation / aggregation / filtration
     # look to https://pandas.pydata.org/pandas-docs/stable/user_guide/groupby.html
-    if columnFeatureInfoHack:
-        saveColumns = asigWide.columns.copy()
-        asigStack = asigWide.copy()
-        asigStack.columns = asigWide.columns.get_level_values('feature')
+    wideColumns = asigWide.columns.copy()
+    wideIndex = asigWide.index.copy()
+    #
+    if colKeys is not None:
+        asigStack = asigWide.stack(level=colKeys)
+        stackedColNames = colKeys
     else:
-        if colKeys is not None:
-            asigStack = asigWide.stack(level=colKeys)
-        else:
-            asigStack = asigWide
+        stackedColNames = []
+        asigStack = asigWide.copy()
+    if okToDeleteInput:
+        del asigWide
     # TODO: edge case for series?
-    dataColNames = asigStack.columns.to_list()
-    funKWArgs['dataColNames'] = dataColNames
+    stackColumns = asigStack.columns.copy()
+    stackIndex = asigStack.index.copy()
+    #
+    dataColNames = stackColumns.to_list()
+    #
+    asigStack.reset_index(inplace=True)
     if useDask:
-        tempDaskDF = dd.from_pandas(
-            asigStack.reset_index(),
-            npartitions=nPartitionMultiplier*multiprocessing.cpu_count())
+        if daskViaDisk:
+            tempPath = '/users/rdarie/Desktop/Scratch Partition Neural Recordings/dask-temp.par'
+            asigToSave = asigStack
+            asigToSave.columns = ['{}'.format(cN) for cN in asigToSave.columns]
+            dataColNames = ['{}'.format(cN) for cN in dataColNames]
+            asigToSave.to_parquet(tempPath)  # checkDF = pd.read_parquet(tempPath)
+            del asigStack, asigToSave
+            tempDaskDF = dd.read_parquet(tempPath)
+        else:
+            tempDaskDF = dd.from_pandas(
+                asigStack,
+                npartitions=nPartitionMultiplier*multiprocessing.cpu_count())
+        funKWArgs['dataColNames'] = dataColNames
+        #
         if daskResultMeta is not None:
-            funKWArgs.update({'meta': daskResultMeta})
-        resultCollection = (
-            tempDaskDF
-            .groupby(by=rowKeys, group_keys=False)
-            .apply(
-                fun,
-                *funArgs, **funKWArgs))
+            daskResultMeta = pd.concat([stackIndex.to_frame().dtypes, daskResultMeta])
+            resultCollection = (
+                tempDaskDF
+                .groupby(by=rowKeys, group_keys=False)
+                .apply(fun, *funArgs, meta=daskResultMeta, **funKWArgs))
+        else:
+            resultCollection = (
+                tempDaskDF
+                .groupby(by=rowKeys, group_keys=False)
+                .apply(fun, *funArgs, **funKWArgs))
+        #
+        if 'scheduler' in daskComputeOpts:
+            schedulerType = daskComputeOpts.pop('scheduler')
+            if schedulerType == 'single-threaded':
+                # put it back, no client
+                daskComputeOpts['scheduler'] = 'single-threaded'
+                daskClient = None
+            elif schedulerType == 'processes':
+                daskClient = Client(LocalCluster(processes=True))
+            elif schedulerType == 'threads':
+                daskClient = Client(LocalCluster(processes=False))
+            else:
+                daskClient = Client()
+                print('Scheduler name is not correct!')
+        else:
+            daskClient = Client()
+        if daskClient is not None:
+            print(
+                '\n\nDiagnostics available at {}\n(from a browser on the same node as the computation)\n\n'.format(
+                    daskClient.dashboard_link))
+        #
         if daskPersist:
             resultCollection.persist()
         if daskProgBar:
             with ProgressBar(minimum=10, dt=5):
-                result = resultCollection.compute(**daskComputeOpts)
+                resultDF = resultCollection.compute(**daskComputeOpts)
         else:
-            result = resultCollection.compute(**daskComputeOpts)
+            resultDF = resultCollection.compute(**daskComputeOpts)
     else:
-        result = (
+        funKWArgs['dataColNames'] = dataColNames
+        resultDF = (
             asigStack
-            .reset_index()
             .groupby(by=rowKeys, group_keys=False)
             .apply(fun, *funArgs, **funKWArgs))
-    # TODO, below is a transformation, handle other index types
-    if reindexFromInput:
-        # pdb.set_trace()
-        resultDF = pd.DataFrame(
-            result.sort_index().loc[:, dataColNames].to_numpy(),
-            index=asigStack.index, columns=asigStack.columns)
-    elif retainInputIndex:
-        presentIndices = [
-            idx
-            for idx in result.columns
-            if (idx in asigStack.index.names)]
-        resultDF = result.sort_index().set_index(presentIndices)
+    # sort the index (comes back from dask out of order)
+    resultDF.sort_index(kind='mergesort', axis='index', inplace=True)
+    # find out which metadata fields are still present after the function
+    presentMetaNames = [cN for cN in stackIndex.names if cN in resultDF.columns]
+    # if I stacked a metadata level and it is still there, unstack it.
+    if len(stackedColNames):
+        stackedColNamesOut = [cN for cN in stackedColNames if cN in presentMetaNames]
     else:
-        presentIndices = [
-            idx
-            for idx in result.columns
-            if (idx not in dataColNames)]
-        resultDF = result.sort_index().set_index(presentIndices)
-    if columnFeatureInfoHack:
-        resultDF.columns = saveColumns
-    else:
-        if colKeys is not None:
-            presentColKeys = list(np.intersect1d(colKeys, resultDF.index.names))
-            if len(presentColKeys):
-                resultDF = resultDF.unstack(level=presentColKeys)
+        stackedColNamesOut = []
+    # if columns of the result are metadata, indicate in fuction call and add here
+    allMetaNames = presentMetaNames + newMetadataNames
+    resultDF.set_index(allMetaNames, inplace=True)
+    if len(stackedColNamesOut):
+        resultDF = resultDF.unstack(stackedColNamesOut)
+    if sortOutputIndex:
+        if sortIndexBy is None:
+            sortIndexBy = ['segment', 'originalIndex', 't']
+            for cN in ['bin']:
+                if cN in resultDF.index.names:
+                    sortIndexBy = sortIndexBy + [cN]
+            for cN in ['lag', 'feature']:
+                if cN in resultDF.index.names:
+                    sortIndexBy = [cN] + sortIndexBy
+        resultDF.sort_index(
+            level=sortIndexBy,
+            axis='index', inplace=True, kind='mergesort')
+    if sortOutputColumns:
+        resultDF.sort_index(
+            level=sortColumnsBy,
+            axis='columns', inplace=True, kind='mergesort')
+    # resultDF.index.get_level_values('t')
+    # asigStack.index.get_level_values('t')
     return resultDF
 
 

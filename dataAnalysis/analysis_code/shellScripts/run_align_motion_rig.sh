@@ -7,14 +7,14 @@
 
 # Request memory:
 #SBATCH --nodes=1
-#SBATCH --mem=32G
+#SBATCH --mem=200G
 
 # Specify a job name:
-#SBATCH -J align_motion_2021_01_25_rig
+#SBATCH -J align_motion_2021_01_28_rig
 
 # Specify an output file
-#SBATCH -o ../../batch_logs/%j_%a_align_motion_2021_01_25_rig.out
-#SBATCH -e ../../batch_logs/%j_%a_align_motion_2021_01_25_rig.out
+#SBATCH -o ../../batch_logs/%j_%a_align_motion_2021_01_28_rig.out
+#SBATCH -e ../../batch_logs/%j_%a_align_motion_2021_01_28_rig.out
 
 # Request custom resources
 #SBATCH --array=2,3
@@ -26,6 +26,4 @@
 source shellScripts/run_align_motion_preamble.sh
 #
 python -u ./calcAlignedAsigs.py --chanQuery="rig" --outputBlockSuffix="rig" --eventBlockSuffix='epochs' --signalBlockSuffix='analyze' --verbose --exp=$EXP $AMPFIELDNAME $BLOCKSELECTOR $WINDOW $LAZINESS $EVENTSELECTOR $ALIGNFOLDER $ANALYSISFOLDER $SIGNALFOLDER $EVENTFOLDER
-# get align bounds from calc query
-source ./shellScripts/calc_aligned_motion_preamble.sh
-python -u ./makeViewableBlockFromTriggered.py --plotting --inputBlockSuffix="rig" --unitQuery="rig" --exp=$EXP $WINDOW $ALIGNQUERY $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
+# python -u ./makeViewableBlockFromTriggered.py --plotting --inputBlockSuffix="rig" --unitQuery="rig" --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS

@@ -413,9 +413,9 @@ def parseAnalysisOptions(
                 'binWidth': 5e-3,
                 'smoothKernelWidth': 5e-3},  # 30 kHz
             'hiRes': {
-                'binInterval': 2e-4,
-                'binWidth': 5e-3,
-                'smoothKernelWidth': 5e-3},  # 5 kHz
+                'binInterval': (3e3) ** (-1),
+                'binWidth': 1e-3,
+                'smoothKernelWidth': 1e-3},  # 3 kHz
             },
         'windowSizes': {
             'XS': (-0.2, 0.4),
@@ -425,7 +425,7 @@ def parseAnalysisOptions(
             'M': (-0.2, 0.8),
             'short': (-0.5, 0.5),
             'L': (-0.5, 1.5),
-            'XL': (-1.5, 2.5),
+            'XL': (-1.5, 2.),
             'RC': (-0.33, 0.33),
             'miniRC': (-1, 1)},
         'discardEmpty': None, 'maxSpikesTo': None, 'timeRange': None,
@@ -448,7 +448,7 @@ def parseAnalysisOptions(
         # estimator=None, units='t',
         palette="ch:0.6,-.3,dark=.1,light=0.7,reverse=1",
         # facet_kws={'sharey': True},
-        height=6, aspect=2, kind='line')
+        height=6, aspect=2, kind='line', rasterized=True)
     vLineOpts = {'color': 'm', 'alpha': 0.5}
     asigPlotShadingOpts = {
         'facecolor': vLineOpts['color'],
@@ -587,6 +587,33 @@ def parseAnalysisOptions(
                 'winStop': 0.
             }
         },
+        # perimovement, any stim
+        'd': {
+            'ensembleHistoryLen': .30,
+            'covariateHistoryLen': .50,
+            'nHistoryBasisTerms': 1,
+            'nCovariateBasisTerms': 1,
+            'forceBinInterval': 5e-3,
+            'minBinCount': 5,
+            'calcTimeROI': True,
+            'controlProportion': None,
+            'cvKWArgs': dict(
+                n_splits=7,
+                splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
+                samplerClass=None, samplerKWArgs=defaultSamplerKWArgs,
+                resamplerClass=None, resamplerKWArgs={},
+                ),
+            'timeROIOpts': {
+                'alignQuery': 'startingOrStimOn',
+                'winStart': -100e-3,
+                'winStop': 300e-3
+            },
+            'timeROIOpts_control': {
+                'alignQuery': None,
+                'winStart': -100e-3,
+                'winStop': 0.
+            }
+        },
         # perimovement onset (or peristim onset if stim only) for RAUC
         'f': {
             'ensembleHistoryLen': .30,
@@ -666,8 +693,8 @@ def parseAnalysisOptions(
         winLen=100e-3, stepLen=20e-3, R=20,
         fStart=None, fStop=None)
     freqBandsDict = ({
-        'name':   ['low', 'alpha', 'beta', 'gamma', 'higamma', 'spb'],
-        'lBound': [1.5,   7,       15,     30,      60,        250],
-        'hBound': [7,     14,      29,     55,      120,       1000]
+        'name':   ['alpha', 'beta', 'gamma', 'higamma', 'spb'],
+        'lBound': [7,       15,     30,      60,        250],
+        'hBound': [14,      29,     55,      120,       1000]
         })
     return expOpts, locals()

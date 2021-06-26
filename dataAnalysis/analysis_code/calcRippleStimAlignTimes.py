@@ -123,7 +123,7 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         offCategories['stimCat'] = 'stimOff'
         #
         midCategories = pd.DataFrame(midTimes, columns=['t'])
-        midCategories['stimCat'] = 'control'
+        midCategories['stimCat'] = 'NA'
         midCategories['amplitude'] = 0
         midCategories['program'] = 999
         midCategories['RateInHz'] = 0
@@ -142,7 +142,7 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         gName = int(name[0])
         pName = int(name[1])
         if pName == 999:
-            alignEventsDF.loc[group.index, 'electrode'] = 'control'
+            alignEventsDF.loc[group.index, 'electrode'] = 'NA'
         else:
             unitName = 'g{}p{}'.format(gName, pName)
             thisUnit = insBlock.filter(objects=Unit, name=unitName)[0]

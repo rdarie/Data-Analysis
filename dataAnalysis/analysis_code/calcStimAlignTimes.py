@@ -174,7 +174,7 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         gName = int(name[0])
         pName = int(name[1])
         if pName == 999:
-            alignEventsDF.loc[group.index, 'electrode'] = 'control'
+            alignEventsDF.loc[group.index, 'electrode'] = 'NA'
         else:
             unitName = 'g{}p{}#0'.format(gName, pName)
             unitCandidates = insBlock.filter(objects=Unit, name=unitName)

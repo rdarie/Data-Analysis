@@ -36,20 +36,16 @@ LAZINESS="--lazy"
 VERBOSITY="--verbose"
 
 WINDOWTERM="XL"
-# WINDOW="--window=L"
+#
 WINDOW="--window=${WINDOWTERM}"
 
 AMPFIELDNAME="--amplitudeFieldName=amplitude"
 
-# ANALYSISFOLDER="--analysisName=hiRes"
-# ANALYSISFOLDER="--analysisName=loRes"
-ANALYSISFOLDER="--analysisName=default"
-# ANALYSISFOLDER="--analysisName=normalizedByImpedance"
+ANALYSISFOLDER="--analysisName=hiRes"
+# ANALYSISFOLDER="--analysisName=default"
 # 
-# SIGNALFOLDER="--signalSubfolder=hiRes"
-# SIGNALFOLDER="--signalSubfolder=loRes"
-SIGNALFOLDER="--signalSubfolder=default"
-# SIGNALFOLDER="--signalSubfolder=normalizedByImpedance"
+SIGNALFOLDER="--signalSubfolder=hiRes"
+# SIGNALFOLDER="--signalSubfolder=default"
 
 EVENTFOLDER="--eventSubfolder=None"
 
@@ -58,5 +54,4 @@ BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
 
 EVENTSELECTOR="--eventName=stim"
 #
-# ALIGNFOLDER="--alignFolderName=motion"
 ALIGNFOLDER="--alignFolderName=stim"

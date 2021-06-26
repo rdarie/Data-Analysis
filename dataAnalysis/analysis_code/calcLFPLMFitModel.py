@@ -555,7 +555,7 @@ def shapeFit(
 funKWArgs.update({'modelFun': applyModel})
 
 if __name__ == "__main__":
-    if daskOpts['daskComputeOpts']['scheduler'] == 'single-threaded':
+    '''if daskOpts['daskComputeOpts']['scheduler'] == 'single-threaded':
         daskClient = Client(LocalCluster(n_workers=1))
     elif daskOpts['daskComputeOpts']['scheduler'] == 'processes':
         daskClient = Client(LocalCluster(processes=True))
@@ -563,7 +563,7 @@ if __name__ == "__main__":
         daskClient = Client(LocalCluster(processes=False))
     else:
         daskClient = None
-        print('Scheduler name is not correct!')
+        print('Scheduler name is not correct!')'''
     testVar = None
     conditionNames = [
         'electrode',

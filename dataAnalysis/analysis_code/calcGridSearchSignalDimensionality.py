@@ -13,6 +13,7 @@ Options:
     --plotting                             load from raw, or regular? [default: False]
     --showFigures                          load from raw, or regular? [default: False]
     --debugging                            load from raw, or regular? [default: False]
+    --averageByTrial                       load from raw, or regular? [default: False]
     --verbose=verbose                      print diagnostics? [default: 0]
     --datasetName=datasetName              filename for resulting estimator (cross-validated n_comps)
     --selectionName=selectionName          filename for resulting estimator (cross-validated n_comps)
@@ -61,7 +62,6 @@ sns.set(
 for arg in sys.argv:
     print(arg)
 ##
-averageByTrial = True
 ##
 '''def compute_scores(
         X, estimator,
@@ -245,13 +245,15 @@ if __name__ == '__main__':
         listOfNCompsToTest.append(nCompsToTest)
         trfName = '{}_{}'.format(estimatorName, maskParams['freqBandName'])
         ###
-        if averageByTrial:
+        if arguments['averageByTrial']:
             estimatorInstance = Pipeline([
                 ('averager', tdr.DataFrameAverager(
                     stimConditionNames=stimulusConditionNames + ['bin'], addIndexFor=stimulusConditionNames)),
                 ('dim_red', estimatorClass(**estimatorKWArgs))])
         else:
-            estimatorInstance = Pipeline([('dim_red', estimatorClass(**estimatorKWArgs),), ])
+            estimatorInstance = Pipeline([
+                ('averager', tdr.DataFramePassThrough()),
+                ('dim_red', estimatorClass(**estimatorKWArgs))])
         ###
         if arguments['verbose']:
             print('Fitting {} ...'.format(trfName))
@@ -276,13 +278,15 @@ if __name__ == '__main__':
         #
         fullEstimatorKWArgs = estimatorKWArgs.copy()
         fullEstimatorKWArgs['n_components'] = maxNCompsToTest
-        if averageByTrial:
+        if arguments['averageByTrial']:
             fullEstimatorInstance = Pipeline([
                 ('averager', tdr.DataFrameAverager(
                     stimConditionNames=stimulusConditionNames + ['bin'], addIndexFor=stimulusConditionNames)),
                 ('dim_red', estimatorClass(**fullEstimatorKWArgs))])
         else:
-            fullEstimatorInstance=Pipeline([('dim_red', estimatorClass(**fullEstimatorKWArgs))])
+            fullEstimatorInstance = Pipeline([
+                ('averager', tdr.DataFramePassThrough()),
+                ('dim_red', estimatorClass(**fullEstimatorKWArgs))])
         fullModelScores = tdr.crossValidationScores(
             dataGroup,
             # estimatorClass=estimatorClass, estimatorKWArgs=fullEstimatorKWArgs,
@@ -313,22 +317,22 @@ if __name__ == '__main__':
         for fcn in featureColumnFields:
             if fcn == 'feature':
                 featureColumns.loc[:, fcn] = [
-                    '{}{:0>3d}#0'.format(trfName, nc)
+                    '{}{:0>3d}'.format(trfName, nc)
                     for nc in range(1, bestEstimator.get_params()['dim_red__n_components'] + 1)]
             elif fcn == 'lag':
                 featureColumns.loc[:, fcn] = 0
             else:
                 featureColumns.loc[:, fcn] = maskParams[fcn]
         '''outputFeatureNameList.append(featureColumns)'''
-        if averageByTrial:
-            preEst = Pipeline(bestEstimator.steps[:-1])
-            xInterDF = preEst.fit_transform(dataGroup)
-            if isinstance(xInterDF, pd.DataFrame):
-                featuresIndex = xInterDF.index
-            else:
-                featuresIndex = pd.Index(range(xInterDF.shape[0]))
+        # if arguments['averageByTrial']:
+        preEst = Pipeline(bestEstimator.steps[:-1])
+        xInterDF = preEst.fit_transform(dataGroup)
+        if isinstance(xInterDF, pd.DataFrame):
+            featuresIndex = xInterDF.index
         else:
-            featuresIndex = dataGroup.index
+            featuresIndex = pd.Index(range(xInterDF.shape[0]))
+        # else:
+        #     featuresIndex = dataGroup.index
         featuresList.append(pd.DataFrame(
             bestEstimator.transform(dataGroup),
             index=featuresIndex, columns=pd.MultiIndex.from_frame(featureColumns)))
@@ -407,8 +411,17 @@ if __name__ == '__main__':
     allGroupIdx = pd.MultiIndex.from_tuples(
         [tuple('all' for fgn in featureColumnFields)],
         names=featureColumnFields)
-    # if arguments['unitQuery'] == 'lfp_CAR_spectral':
-    # each freq band
+    # iterate principle components by feature
+    for name, group in featuresDF.groupby('feature', axis='columns'):
+        attrValues = ['all' for fgn in featureColumnFields]
+        attrValues[featureColumnFields.index('feature')] = name
+        thisMask = pd.Series(
+            featuresDF.columns.isin(group.columns),
+            index=featuresDF.columns).to_frame()
+        thisMask.columns = pd.MultiIndex.from_tuples(
+            (attrValues, ), names=featureColumnFields)
+        maskList.append(thisMask.T)
+    # iterate principle components by frequency band of input data
     for name, group in featuresDF.groupby('freqBandName', axis='columns'):
         attrValues = ['all' for fgn in featureColumnFields]
         attrValues[featureColumnFields.index('freqBandName')] = name

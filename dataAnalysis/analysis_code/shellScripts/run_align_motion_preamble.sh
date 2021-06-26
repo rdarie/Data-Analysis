@@ -35,16 +35,14 @@ LAZINESS="--lazy"
 VERBOSITY="--verbose"
 
 WINDOWTERM="XL"
-# WINDOW="--window=L"
+#
 WINDOW="--window=${WINDOWTERM}"
-# WINDOW="--window=XS"
-ANALYSISFOLDER="--analysisName=default"
-# ANALYSISFOLDER="--analysisName=fullRes"
-# ANALYSISFOLDER="--analysisName=hiRes"
 
-SIGNALFOLDER="--signalSubfolder=default"
-# SIGNALFOLDER="--signalSubfolder=hiRes"
-# SIGNALFOLDER="--signalSubfolder=normalizedByImpedance"
+# ANALYSISFOLDER="--analysisName=default"
+ANALYSISFOLDER="--analysisName=hiRes"
+
+# SIGNALFOLDER="--signalSubfolder=default"
+SIGNALFOLDER="--signalSubfolder=hiRes"
 
 EVENTFOLDER="--eventSubfolder=None"
 

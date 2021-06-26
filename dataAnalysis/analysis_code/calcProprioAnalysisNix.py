@@ -25,11 +25,13 @@ Options:
     --samplingRate=samplingRate                resample the result??
     --rigOnly                                  is there no INS block? [default: False]
 """
-import matplotlib
+import matplotlib, os
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
-matplotlib.use('QT5Agg')   # generate postscript output
-# matplotlib.use('Agg')   # generate postscript output
+if 'DISPLAY' in os.environ:
+    matplotlib.use('QT5Agg')   # generate postscript output
+else:
+    matplotlib.use('PS')   # generate postscript output
 import matplotlib.pyplot as plt
 from neo.io import NixIO
 from neo.io.proxyobjects import (
@@ -39,6 +41,7 @@ from neo import (
     Block, Segment, ChannelIndex, Unit,
     Event, Epoch, AnalogSignal, SpikeTrain)
 import neo
+from itertools import product
 import dataAnalysis.helperFunctions.helper_functions_new as hf
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
 import dataAnalysis.helperFunctions.profiling as prf
@@ -46,6 +49,7 @@ from namedQueries import namedQueries
 import numpy as np
 import pandas as pd
 import elephant.pandas_bridge as elphpdb
+from elephant.conversion import binarize
 import dataAnalysis.preproc.mdt as mdt
 import dataAnalysis.preproc.ns5 as ns5
 import quantities as pq
@@ -59,11 +63,10 @@ import json
 from currentExperiment import parseAnalysisOptions
 from docopt import docopt
 import seaborn as sns
-#
 sns.set(
     context='talk', style='dark',
     palette='dark', font='sans-serif',
-    font_scale=1.5, color_codes=True)
+    font_scale=.8, color_codes=True)
 
 
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
@@ -213,15 +216,15 @@ def calcBlockAnalysisWrapper():
     # clip magnitude of signal (y axis)?
     ####
     try:
-        clippingOpts = analysisClippingOpts
+        clippingKWArgs = dict(clipSignals=True, clippingOpts=analysisClippingOpts)
     except Exception:
         print('Using default clipping opts')
-        clippingOpts = {}
+        clippingKWArgs = dict(clipSignals=False, clippingOpts={})
     outputBlock = ns5.concatenateBlocks(
         asigBlocks, spikeBlocks, eventBlocks,
         chunkingMetadata, samplingRate, chanQuery,
         arguments['lazy'], trackMemory, arguments['verbose'],
-        clipSignals=True, clippingOpts=clippingOpts)
+        **clippingKWArgs)
     ##############################################################################
     # close open readers, etc
     for idx, (chunkIdxStr, chunkMeta) in enumerate(chunkingMetadata.items()):
@@ -287,11 +290,8 @@ def calcBlockAnalysisWrapper():
             'seg0_ins_acc{}'.format(accIdx)
             for accIdx in ['x', 'y', 'z', 'inertia']
             ])
-        insEventsToLoad = [
-            'seg0_ins_property',
-            'seg0_ins_value'
-            ]
-        insSpikesToLoad = ['seg0_g0p0#0']
+        insEventsToLoad = ['seg0_ins_property', 'seg0_ins_value']
+        insSpikesToLoad = ['seg0_g{}p{}#0'.format(gIdx, pIdx) for gIdx, pIdx in product(range(4), range(4))]
         insLoadList = {
             'asigs': insSignalsToLoad,
             'events': insEventsToLoad,
@@ -319,11 +319,27 @@ def calcBlockAnalysisWrapper():
                 stimStSer, idxT='t',  namePrefix='seg0_ins_',
                 expandCols=expandCols,
                 deriveCols=deriveCols, progAmpNames=progAmpNames)
-            columnsToBeAdded = ['amplitude', 'program', 'RateInHz'] + progAmpNames
+            columnsToBeAdded = ['amplitude', 'program', 'RateInHz', 'therapyStatus'] + progAmpNames
             infoFromStimStatus = hf.interpolateDF(
                 stimStatus, outputBlockT,
-                x='t', columns=columnsToBeAdded, kind='previous')
+                x='t', columns=columnsToBeAdded, kind='previous',
+                verbose=arguments['verbose'])
             infoFromStimStatus.set_index('t', inplace=True)
+            ##
+            for cN in ['amplitude'] + progAmpNames:
+                infoFromStimStatus.loc[:, cN] = infoFromStimStatus[cN] * infoFromStimStatus['therapyStatus'].to_numpy()
+            infoFromStimStatus.loc[:, 'RateInHz'] = infoFromStimStatus['RateInHz'] * (infoFromStimStatus['amplitude'].abs() > 0).to_numpy(dtype=float)
+            ##
+            insStimSpikes = [st for st in insBlock.filter(objects=SpikeTrain) if st.name in insSpikesToLoad]
+            stimRaster = np.zeros(outputBlockT.shape, dtype=float)
+            for insSt in insStimSpikes:
+                if len(insSt.times):
+                    thisSpikeMat = binarize(
+                        insSt, sampling_rate=samplingRate,
+                        t_start=outputBlockT.min(), t_stop=outputBlockT.max())
+                    stimRaster[:thisSpikeMat.size] = stimRaster[:thisSpikeMat.size] + thisSpikeMat.astype(float)
+            stimRaster *= infoFromStimStatus['amplitude'].to_numpy()
+            infoFromStimStatus.loc[:, 'amplitude_raster'] = stimRaster
         else:
             infoFromStimStatus = None
     else:

@@ -302,8 +302,8 @@ if __name__ == "__main__":
         designInfo = designMatrix.design_info
         designDF = (pd.DataFrame(designMatrix, index=lhsDF.index, columns=designInfo.column_names))
         gsParamsPerTarget = None
+        gsKWA = deepcopy(gridSearchKWArgs)
         if 'param_grid' in gridSearchKWArgs:
-            gsKWA = deepcopy(gridSearchKWArgs)
             if l1_ratio_name in gsKWA['param_grid']:
                 paramGrid = gsKWA.pop('param_grid')
                 lOfL1Ratios = paramGrid.pop(l1_ratio_name)

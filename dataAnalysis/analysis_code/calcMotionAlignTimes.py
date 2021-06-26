@@ -10,17 +10,15 @@ Options:
     --plotParamHistograms                plot pedal size, amplitude, duration distributions? [default: False]
     --lazy                               load from raw, or regular? [default: False]
 """
-import matplotlib
+import matplotlib, os
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
-# matplotlib.use('PS')   # generate postscript output by default
-matplotlib.use('Qt5Agg')   # generate postscript output by default
+if 'DISPLAY' in os.environ:
+    matplotlib.use('QT5Agg')   # generate postscript output
+else:
+    matplotlib.use('PS')   # generate postscript output
 import matplotlib.pyplot as plt
 import seaborn as sns
-sns.set()
-sns.set_color_codes("dark")
-sns.set_context("talk")
-sns.set_style("whitegrid")
 import os, pdb, traceback
 from importlib import reload
 import neo
@@ -42,6 +40,12 @@ import sys
 #  load options
 from currentExperiment import parseAnalysisOptions
 from docopt import docopt
+
+sns.set(
+    context='talk', style='dark',
+    palette='dark', font='sans-serif',
+    font_scale=.8, color_codes=True)
+
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']),
@@ -59,7 +63,12 @@ analysisSubFolder = os.path.join(
     )
 if not os.path.exists(analysisSubFolder):
     os.makedirs(analysisSubFolder, exist_ok=True)
-# 
+#
+figureOutputFolder = os.path.join(
+    scratchFolder, 'preprocDiagnostics'
+    )
+if not os.path.exists(figureOutputFolder):
+    os.makedirs(figureOutputFolder, exist_ok=True)
 if arguments['processAll']:
     prefix = assembledName
     alignTimeBounds = []  # not working as of 12/31/19
@@ -217,6 +226,7 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         trialsDict[mvCat].set_index('movementRound', inplace=True)
         for catName in availableCateg + ['tdIndex', 'markForDeletion']:
             trialsDict[mvCat].loc[:, catName] = np.nan
+    markForDeletionMaster = pd.Series(False, index=trialsDict['outbound'].index)
     for idx, (mvRound, group) in enumerate(tdDF.groupby('movementRound')):
         if mvRound >= 0:
             trialsDict['outbound'].loc[mvRound, 'tdIndex'] = group.index[0]
@@ -230,10 +240,12 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
                 assert crossIdxFall.size == 1
                 crossIdxFall = crossIdxFall[0]
             except Exception:
-                print('\n\n{}\n Error at t = {} sec\n\n'.format(
-                    dataBlockPath, group.loc[crossIdxFall, 't']))
+                print('\n\n{}\n Error finding edge between t = {} sec and {} sec\n\n'.format(
+                    dataBlockPath, group['t'].min(), group['t'].max()))
+                markForDeletionMaster.loc[mvRound] = True
                 traceback.print_exc()
-                pdb.set_trace()
+                continue
+                # pdb.set_trace()
             trialsDict['reachedBase'].loc[mvRound, 'tdIndex'] = crossIdxFall
             trialsDict['reachedBase'].loc[mvRound, 't'] = group.loc[crossIdxFall, 't']
             pedalSizeAbs = group['pedalPositionAbs'].quantile(1)
@@ -248,10 +260,12 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
                 assert crossIdxReachPeak.size == 1
                 crossIdxReachPeak = crossIdxReachPeak[0]
             except Exception:
-                print('\n\n{}\n Error at t = {} sec\n\n'.format(
-                    dataBlockPath, group.loc[crossIdxReachPeak, 't']))
+                print('\n\n{}\n Error finding reach peak between t = {} sec and {} sec\n\n'.format(
+                    dataBlockPath, group['t'].min(), group['t'].max()))
+                markForDeletionMaster.loc[mvRound] = True
                 traceback.print_exc()
-                pdb.set_trace()
+                continue
+                # pdb.set_trace()
             trialsDict['reachedPeak'].loc[mvRound, 'tdIndex'] = crossIdxReachPeak
             trialsDict['reachedPeak'].loc[mvRound, 't'] = group.loc[crossIdxReachPeak, 't']
             #  return
@@ -265,8 +279,12 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
                 assert crossIdxReturn.size == 1
                 crossIdxReturn = crossIdxReturn[0]
             except Exception:
+                print('\n\n{}\n Error finding return between t = {} sec and {} sec\n\n'.format(
+                    dataBlockPath, group['t'].min(), group['t'].max()))
+                markForDeletionMaster.loc[mvRound] = True
                 traceback.print_exc()
-                pdb.set_trace()
+                continue
+                # pdb.set_trace()
             trialsDict['return'].loc[mvRound, 'tdIndex'] = crossIdxReturn
             trialsDict['return'].loc[mvRound, 't'] = (
                 group.loc[crossIdxReturn, 't'])
@@ -289,32 +307,37 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
                     trialsDict[mvCat].loc[mvRound, 'pedalDirection'] = 'CCW'
                 trialsDict[mvCat].loc[mvRound, 'pedalMovementDuration'] = (
                     movementDuration)
-                trialsDict[mvCat].loc[mvRound, 'markForDeletion'] = (movementDuration > 10.)
+            markForDeletionMaster.loc[mvRound] = (movementDuration > 10.)
             #
-    #
-    if (segIdx == 0) and arguments['plotParamHistograms']:
-        ax = sns.distplot(
-            trialsDict['midPeak'].loc[:, 'pedalSize'].abs(),
-            bins=100, kde=False)
-        plt.savefig(
-            os.path.join(
-                figureFolder, 'pedalSizeDistribution.pdf'))
-        plt.close()
-        ax = sns.distplot(
-            trialsDict['midPeak'].loc[:, 'pedalMovementDuration'],
-            bins=100, kde=False)
-        plt.savefig(
-            os.path.join(
-                figureFolder, 'pedalMovementDurationDistribution.pdf'))
-        # plt.show()
-        plt.close()
     #  determine size category
+    observedPedalSizes = trialsDict['outbound'].loc[~markForDeletionMaster, 'pedalSize']
     pedalSizeCat = pd.cut(
-        trialsDict['outbound']['pedalSize'].abs(), movementSizeBins,
+        observedPedalSizes.abs(), movementSizeBins,
         labels=movementSizeBinLabels)
     assert not pedalSizeCat.isna().any()
     for mvCat in movementCatTypes:
-        trialsDict[mvCat].loc[:, 'pedalSizeCat'] = pedalSizeCat
+        trialsDict[mvCat].loc[markForDeletionMaster, 'pedalSize'] = 0.
+        trialsDict[mvCat].loc[markForDeletionMaster, 'pedalSizeCat'] = 'NA'
+        trialsDict[mvCat].loc[~markForDeletionMaster, 'pedalSizeCat'] = pedalSizeCat
+        trialsDict[mvCat].loc[:, 'markForDeletion'] = markForDeletionMaster
+    #
+    if (segIdx == 0) and arguments['plotParamHistograms']:
+        ax = sns.distplot(
+            trialsDict['midPeak'].loc[~markForDeletionMaster, 'pedalSize'].abs(),
+            bins=100, kde=False)
+        plt.savefig(
+            os.path.join(
+                figureOutputFolder, '{}_pedalSizeDistribution.pdf'.format(prefix)))
+        plt.close()
+        ax = sns.distplot(
+            trialsDict['midPeak'].loc[~markForDeletionMaster, 'pedalMovementDuration'],
+            bins=100, kde=False)
+        plt.savefig(
+            os.path.join(
+                figureOutputFolder, '{}_pedalMovementDurationDistribution.pdf'.format(prefix)))
+        # plt.show()
+        plt.close()
+    #
     alignEventsDF = (
         pd.concat(
             trialsDict, axis=0,
@@ -334,20 +357,20 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         traceback.print_exc()
     # print('Found events at {}'.format(alignEventsDF['t'].tolist()))
     if arguments['plotParamHistograms']:
-        # pdb.set_trace()
         fig, ax = plt.subplots()
-        fig.set_size_inches(4 * (tdDF['t'].max() // 500), 4)
+        # pdb.set_trace()
+        fig.set_size_inches(4 * np.ceil(tdDF['t'].max() / 500), 4)
         pPosDeg = 100 * tdDF['pedalPosition']
         ax.plot(tdDF['t'], pPosDeg, label='pedal position')
         ax.set_ylabel('deg.')
         ax.plot(
-            trialsDict['outbound']['t'],
-            pPosDeg.loc[trialsDict['outbound']['tdIndex']],
+            trialsDict['outbound'].loc[~markForDeletionMaster, 't'],
+            pPosDeg.loc[trialsDict['outbound'].loc[~markForDeletionMaster, 'tdIndex']],
             'ro', label='trial outbound movement')
         ax.legend()
         plt.savefig(
             os.path.join(
-                figureFolder, 'pedalMovementTrials.pdf'))
+                figureOutputFolder, '{}_pedalMovementTrials.pdf'.format(prefix)))
         # plt.show()
         plt.close()
     #  add metaCat
@@ -363,6 +386,8 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         alignEventsDF.loc[alignEventsDF['pedalMetaCat'] == 'stopping', 't'] += applyDelay
     # pdb.set_trace()
     alignEventsDF.loc[:, 'expName'] = arguments['exp']
+    htmlOutPath = os.path.join(figureOutputFolder, '{}_motionAlignTimes.html'.format(prefix))
+    alignEventsDF.to_html(htmlOutPath)
     alignEvents = ns5.eventDataFrameToEvents(
         alignEventsDF, idxT='t',
         annCol=None,

@@ -16,6 +16,54 @@ def gauss_fit(x, y):
     popt, pcov = curve_fit(gauss, x, y, p0=[min(y), max(y), mean, sigma])
     return popt
 
+def getKernel(
+        wav, scale, dt=1, precision=10, verbose=False, width=16):
+    # test params
+    '''
+        wav = pywt.ContinuousWavelet('cmor2.0-1.0')
+        scales = np.asarray([5, 10, 20, 30, 255])
+        dt = 1e-3
+        precision = 12
+        verbose=True
+        width = 8
+        '''
+    wav.lower_bound = (-1) * width / 2
+    wav.upper_bound = width / 2
+    # print the range over which the wavelet will be evaluated
+    print("Continuous wavelet will be evaluated over the range [{}, {}]".format(
+        wav.lower_bound, wav.upper_bound))
+    # by default upper_bound and lower_bound are plus minus 8
+    # these correspond to the min and max of x below
+    # The following code is adapted from the internals of cwt
+    # int_psi is scale invariant!
+    int_psi, x = pywt.integrate_wavelet(wav, precision=precision)
+    #
+    step = x[1] - x[0]
+    ntpsi = len(int_psi)
+    t_psi = np.linspace(-ntpsi // 2, ntpsi // 2, ntpsi) * dt
+    #
+    # the scale parameter corresponds to downsampling the "mother wavelet", int_psi
+    # the size of the convolution kernel is len(j) * dt = (scale * width + 1) * dt
+    j = np.floor(
+        np.arange(scale * width + 1) / (scale * step))
+    assert (scale * step) < 1  # otherwise we fail to downsample int_psi
+    if np.max(j) >= np.size(int_psi):
+        j = np.delete(j, np.where((j >= np.size(int_psi)))[0])
+    j = j.astype(np.int)
+    if verbose:
+        print('downsampling mother wavelet by:')
+        print('{} samples'.format(np.unique(np.diff(j))))
+    #
+    # discrete samples of the integrated wavelet
+    filt = int_psi[j]
+    # The CWT consists of convolution of filt with the signal at this scale
+    # Here we plot this discrete convolution kernel at each scale.
+    nt = len(filt)
+    t = np.linspace(-nt // 2, nt // 2, nt) * dt
+    t_extent = nt * dt
+    pdb.set_trace()
+    return t_extent
+
 def plotKernels(
         wav, scales, dt=1, precision=10, verbose=False,
         width=16):
@@ -145,13 +193,13 @@ def plotKernels(
         axes[n, 1].grid(True, axis='x')
         axes[n, 1].text(
             frequencies[n] + 2 * bws[n], 0.1,
-            'scale = {}\nf_center = {:.1f} Hz (empirical {:.1f} Hz)\nfwhm={:.1f} Hz\ndf={:.1f} Hz\ndeltaF={:.1f}'.format(
+            'scale = {}\nf_c = {:.1f} Hz\n  (empirical f_c {:.1f} Hz)\nfwhm={:.1f} Hz\ndf={:.1f} Hz\ndeltaF={:.1f}'.format(
                 scale, frequencies[n], x0, bws[n], df, deltaF))
     #
     axes[n, 0].set_xlabel('time (sec)')
     axes[n, 1].set_xlabel('frequency (Hz)')
     axes[0, 0].legend(['real', 'imaginary'], loc='upper left')
-    axes[0, 1].legend(['Power'], loc='upper left')
+    axes[0, 1].legend(['Normalized power'], loc='upper left')
     axes[0, 0].set_title('filter')
     axes[0, 1].set_title(r'|FFT(filter)|$^2$')
     fig.suptitle('wavelet {} sampling freq of {} Hz'.format(wav.name, fs))

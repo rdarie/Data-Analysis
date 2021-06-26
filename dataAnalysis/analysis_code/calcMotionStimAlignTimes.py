@@ -10,11 +10,13 @@ Options:
     --plotParamHistograms                plot pedal size, amplitude, duration distributions? [default: False]
     --lazy                               load from raw, or regular? [default: False]
 """
-import matplotlib
+import matplotlib, os
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
-# matplotlib.use('PS')   # generate postscript output by default
-matplotlib.use('Qt5Agg')   # generate postscript output by default
+if 'DISPLAY' in os.environ:
+    matplotlib.use('QT5Agg')   # generate postscript output
+else:
+    matplotlib.use('PS')   # generate postscript output
 import matplotlib.pyplot as plt
 import seaborn as sns
 sns.set()
@@ -42,6 +44,11 @@ import sys
 #  load options
 from currentExperiment import parseAnalysisOptions
 from docopt import docopt
+sns.set(
+    context='talk', style='dark',
+    palette='dark', font='sans-serif',
+    font_scale=.8, color_codes=True)
+
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']),
@@ -74,6 +81,12 @@ eventBlockPath = os.path.join(
     # analysisSubFolder,
     scratchFolder,
     prefix + '_epochs.nix')
+#
+figureOutputFolder = os.path.join(
+    scratchFolder, 'preprocDiagnostics'
+    )
+if not os.path.exists(figureOutputFolder):
+    os.makedirs(figureOutputFolder, exist_ok=True)
 print('loading {}'.format(dataBlockPath))
 dataReader, dataBlock = preproc.blockFromPath(
     dataBlockPath, lazy=arguments['lazy'])
@@ -132,7 +145,7 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
     stimAnnNames = [nm for nm in sorted(list(stimEvDict.keys())) if nm not in ['stimCat']]
     stimEvDict['t'] = stimEvent.times.magnitude
     stimEvDF = pd.DataFrame(stimEvDict)
-    noStimFiller = pd.Series({
+    '''noStimFiller = pd.Series({
         'amplitude': 0,
         'amplitudeRound': 999,
         'RateInHz': 0,
@@ -142,7 +155,10 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
         'detectionDelay': np.nan,
         'stimDelay': np.nan,
         'expName': arguments['exp']
-    })
+        })'''
+    noStimFiller = preproc.metaFillerLookup.copy()
+    noStimFiller['expName'] = arguments['exp']
+    # pdb.set_trace()
     for annName in stimAnnNames + extraAnnNames:
         motionEvDF.loc[:, annName] = np.nan
     for annName in motionAnnNamesForStim + extraAnnNames:
@@ -329,13 +345,14 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
                 stimOffTs = reachBaseT + searchRadius
                 print('No off time corresponding to stim on for this move round (t = {:.3f})!'.format(float(reachBaseT)))
                 # raise(Exception())
-    '''
-    motionEvDF.loc[:, stimAnnNames] = (
+    # pdb.set_trace()
+    for cN in stimAnnNames:
+        motionEvDF.loc[motionEvDF[cN].isna(), cN] = noStimFiller[cN]
+    '''motionEvDF.loc[motionEvDF[cN].isna(), stimAnnNames] = (
         motionEvDF
         .loc[:, stimAnnNames]
         .fillna(method='ffill')
-        .fillna(method='bfill'))
-    '''
+        .fillna(method='bfill'))'''
     if (segIdx == 0) and arguments['plotParamHistograms']:
         fig, ax = plt.subplots()
         for cN in movementCatTypes:
@@ -362,11 +379,13 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
                     )
         fig.savefig(
             os.path.join(
-                figureFolder, 'stimDelayDistribution.pdf'))
+                figureOutputFolder, '{}_stimDelayDistribution.pdf'.format(prefix)))
         # plt.show()
         plt.close()
     ###
     # pdb.set_trace()
+    htmlOutPath = os.path.join(figureOutputFolder, '{}_motionPeriStim.html'.format(prefix))
+    motionEvDF.to_html(htmlOutPath)
     alignEventsMotion = preproc.eventDataFrameToEvents(
         motionEvDF, idxT='t',
         annCol=None,
@@ -392,6 +411,8 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
     concatEvents.segment = newSeg
     ####
     stimEvDF.dropna(inplace=True)
+    htmlOutPath = os.path.join(figureOutputFolder, '{}_stimPeriMotion.html'.format(prefix))
+    stimEvDF.to_html(htmlOutPath)
     alignEventsStim = preproc.eventDataFrameToEvents(
         stimEvDF, idxT='t',
         annCol=None,

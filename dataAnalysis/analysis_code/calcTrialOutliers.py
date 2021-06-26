@@ -21,16 +21,18 @@ Options:
     --amplitudeFieldName=amplitudeFieldName      what is the amplitude named? [default: nominalCurrent]
     --sqrtTransform                              for firing rates, whether to take the sqrt to stabilize variance [default: False]
 """
-
+import matplotlib, os
+matplotlib.rcParams['pdf.fonttype'] = 42
+matplotlib.rcParams['ps.fonttype'] = 42
+if 'DISPLAY' in os.environ:
+    matplotlib.use('QT5Agg')   # generate postscript output
+else:
+    matplotlib.use('PS')   # generate postscript output
 from docopt import docopt
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
-if arguments['plotting']:
-    import matplotlib.pyplot as plt
-    import seaborn as sns
-    sns.set()
-    sns.set_color_codes("dark")
-    sns.set_context("notebook")
-    sns.set_style("darkgrid")
+
+import matplotlib.pyplot as plt
+import seaborn as sns
 import pdb, traceback
 import os
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
@@ -50,6 +52,11 @@ from currentExperiment import parseAnalysisOptions
 from namedQueries import namedQueries
 from sklearn.covariance import EmpiricalCovariance, MinCovDet, EllipticEnvelope
 from sklearn.utils.random import sample_without_replacement as swr
+
+sns.set(
+    context='talk', style='dark',
+    palette='dark', font='sans-serif',
+    font_scale=.8, color_codes=True)
 
 expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']), arguments['exp'])
@@ -217,6 +224,7 @@ def calcCovMat(
         [result, partition.loc[:, ~dataColMask]],
         axis=1)
     result.name = 'mahalanobisDistance'
+    result.columns.name = partition.columns.name
     #
     # if result['electrode'].iloc[0] == 'foo':
     #     pdb.set_trace()
@@ -323,27 +331,24 @@ if __name__ == "__main__":
     if not mahalDistLoaded:
         if arguments['verbose']:
             print('Calculating covariance matrix...')
-        daskClient = daskClient = Client(LocalCluster(processes=True))
-        # print(daskClient.scheduler_info()['services'])
         mahalDist = ash.splitApplyCombine(
             dataDF, fun=calcCovMat, resultPath=resultPath,
-            funKWArgs=covOpts,
+            funKWArgs=covOpts, daskResultMeta=pd.Series({'mahalDist': 'f8'}),
             rowKeys=groupNames, colKeys=['lag'],
-            daskPersist=True, useDask=True, retainInputIndex=True,
-            daskComputeOpts=daskComputeOpts)
+            daskPersist=True, useDask=True, daskComputeOpts=daskComputeOpts)
         mahalDist.columns = ['mahalDist']
         if arguments['saveResults']:
             if os.path.exists(resultPath):
                 os.remove(resultPath)
             mahalDist.to_hdf(
                 resultPath, 'mahalDist')
-
+    # pdb.set_trace()
     print('#######################################################')
     refInterval = chi2.interval(1 - 1e-6, len(dataDF.columns))
     print('Data is {} dimensional'.format(len(dataDF.columns)))
     print('The mahalanobis distance should lie within {}'.format(refInterval))
     print('#######################################################')
-
+    #
     outlierTrials = findOutliers(
         mahalDist, groupBy=groupBy, multiplier=1, qThresh=qThresh,
         nDim=len(dataDF.columns), devQuantile=devQuantile, twoTailed=twoTailed)
@@ -543,13 +548,11 @@ if __name__ == "__main__":
     minNObservations = 5
     firstBinTrialInfo = trialInfo.loc[firstBinMask, :]
     goodTrialInfo = firstBinTrialInfo.loc[~outlierTrials['rejectBlock'].to_numpy().flatten().astype(bool), :]
-    goodTrialCount = goodTrialInfo.groupby(stimulusConditionNames).value_counts().to_frame(name='count').reset_index()
+    goodTrialCount = goodTrialInfo.groupby(stimulusConditionNames).count().iloc[:, 0].to_frame(name='count').reset_index()
     goodTrialCount = goodTrialCount.loc[goodTrialCount['count'] > minNObservations, :]
     goodTrialCount.to_csv(os.path.join(figureOutputFolder, prefix + '_good_trial_breakdown.csv'))
     # goodTrialCount.groupby(stimulusConditionNames).ngroups
     badTrialInfo = firstBinTrialInfo.loc[outlierTrials['rejectBlock'].to_numpy().flatten().astype(bool), :]
-    badTrialCount = badTrialInfo.groupby(stimulusConditionNames).value_counts().sort_values().to_frame(name='count').reset_index()
-    outlierTrials['deviation'].reset_index().sort_values(['segment', 'deviation']).to_csv(os.path.join(figureOutputFolder, prefix + '_trial_deviation_breakdown.csv'))
+    badTrialCount = badTrialInfo.groupby(stimulusConditionNames).count().iloc[:, 0].sort_values().to_frame(name='count').reset_index()
+    outlierTrials['deviation'].reset_index().sort_values(['segment', 'deviation']).to_html(os.path.join(figureOutputFolder, prefix + '_trial_deviation_breakdown.html'))
     print('Bad trial count:\n{}'.format(badTrialCount))
-
-    # .to_csv(os.path.join(figureOutputFolder, 'bad_trial_breakdown.csv'))

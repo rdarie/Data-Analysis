@@ -7,7 +7,7 @@
 
 # Request memory:
 #SBATCH --nodes=1
-#SBATCH --mem=32G
+#SBATCH --mem=200G
 
 # Specify a job name:
 #SBATCH -J align_stim_2021_01_28_rig

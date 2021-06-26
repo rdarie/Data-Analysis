@@ -6,6 +6,7 @@ from sklearn.model_selection import (
 from imblearn.over_sampling import RandomOverSampler
 from sklearn.model_selection._split import _BaseKFold
 from sklearn.metrics import make_scorer
+from sklearn.base import clone
 from sklearn.covariance import ShrunkCovariance, LedoitWolf, EmpiricalCovariance
 from sklearn.linear_model import ElasticNet, ElasticNetCV
 from sklearn.pipeline import make_pipeline, Pipeline
@@ -38,7 +39,7 @@ sns.set_context("talk")
 sns.set_style("whitegrid")
 
 
-class DataFrameAverager(TransformerMixin):
+class DataFrameAverager(TransformerMixin, BaseEstimator):
     def __init__(
             self, stimConditionNames=None,
             addIndexFor=None):
@@ -58,6 +59,22 @@ class DataFrameAverager(TransformerMixin):
             newIndexFrame.loc[:, 'trialUID'] = newEntries.to_numpy()
             averagedX.index = pd.MultiIndex.from_frame(newIndexFrame.reset_index(drop=True))
         return averagedX
+
+    def inverse_transform(self, X):
+        return X
+
+class DataFramePassThrough(TransformerMixin, BaseEstimator):
+    def __init__(self):
+        return
+    #
+    def fit(self, X, y=None):
+        return self
+    #
+    def transform(self, X):
+        return X
+
+    def inverse_transform(self, X):
+        return X
 
 
 class dummyFold:
@@ -276,7 +293,7 @@ def crossValidationScores(
         validIdx = crossvalKWArgs['cv'].validation
         workingIdx, validIdx = crossvalKWArgs['cv'].workIterator.split(X)[0]
         #
-        workEstim = copy(estimatorInstance)
+        workEstim = clone(estimatorInstance)
         #
         workX = X.iloc[workingIdx, :]
         valX = X.iloc[validIdx, :]
@@ -399,7 +416,7 @@ def gridSearchHyperparameters(
     if verbose:
         print('cross val scoring')
     if estimatorClass is None:
-        estimatorInstanceForCrossVal = copy(estimatorInstance)
+        estimatorInstanceForCrossVal = clone(estimatorInstance)
         estimatorInstanceForCrossVal.set_params(**scoringEstimatorParams)
     else:
         estimatorInstanceForCrossVal = None

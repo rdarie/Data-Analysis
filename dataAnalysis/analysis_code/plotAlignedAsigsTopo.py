@@ -41,6 +41,10 @@ if 'DISPLAY' in os.environ:
 else:
     matplotlib.use('PS')   # generate postscript output
 import matplotlib.pyplot as plt
+if 'DISPLAY' in os.environ:
+    plt.switch_backend('QT5Agg')   # generate postscript output
+else:
+    plt.switch_backend('PS')   # generate postscript output
 from matplotlib.backends.backend_pdf import PdfPages
 #
 import dataAnalysis.plotting.aligned_signal_plots as asp
@@ -198,6 +202,7 @@ mapSpecificRelplotKWArgs = {
     }
 
 relplotKWArgs.update({
+    'rasterized': True,
     'legend': 'brief',
     # 'legend': False,
     'height': 6,
@@ -419,6 +424,7 @@ with PdfPages(pdfName) as pdf:
                 probeGroup.stack()
                 .reset_index(name='signal')
                 .dropna())
+            pdb.set_trace()
             if probeName in dummyDict:
                 thisAsigStack = pd.concat(
                     [thisAsigStack, dummyDict[probeName]],
