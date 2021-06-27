@@ -18,12 +18,14 @@ Options:
 """
 
 enableDiagnosticPlots = False
-if enableDiagnosticPlots:
-    import matplotlib
+if enableDiagnosticPlots:import matplotlib, os
     matplotlib.rcParams['pdf.fonttype'] = 42
     matplotlib.rcParams['ps.fonttype'] = 42
-    # matplotlib.use('PS')   # generate postscript output
-    matplotlib.use('Qt5Agg')   # generate interactive output
+    if 'CCV_HEADLESS' in os.environ:
+        matplotlib.use('PS')   # generate postscript output
+    else:
+        matplotlib.use('QT5Agg')   # generate interactive output
+    #
     import matplotlib.pyplot as plt
     import matplotlib.gridspec as gridspec
     from matplotlib.backends.backend_pdf import PdfPages

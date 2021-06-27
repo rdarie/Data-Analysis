@@ -16,11 +16,11 @@ namedQueries = {
         'CCW': "(pedalDirection=='CCW')",
         'CW': "(pedalDirection=='CW')",
         'noStim': "(amplitude==0)",
-        'RateInHz==50or0Fuzzy': '((RateInHzFuzzy==50)|(RateInHzFuzzy==0))',
-        'RateInHz==100or0Fuzzy': '((RateInHzFuzzy==100)|(RateInHzFuzzy==0))',
-        'RateInHz==50or0': '((RateInHz==50)|(RateInHz==0))',
-        'RateInHz==100or0': '((RateInHz==100)|(RateInHz==0))',
-        'RateInHz>20or0': '((RateInHz>20)|(RateInHz==0))',
+        'trialRateInHz==50or0Fuzzy': '((trialRateInHzFuzzy==50)|(trialRateInHzFuzzy==0))',
+        'trialRateInHz==100or0Fuzzy': '((trialRateInHzFuzzy==100)|(trialRateInHzFuzzy==0))',
+        'trialRateInHz==50or0': '((trialRateInHz==50)|(trialRateInHz==0))',
+        'trialRateInHz==100or0': '((trialRateInHz==100)|(trialRateInHz==0))',
+        'trialRateInHz>20or0': '((trialRateInHz>20)|(trialRateInHz==0))',
         'E5': "(electrode=='+ E16 - E5')",
     },
     'unit': {
@@ -122,7 +122,7 @@ namedQueries['align'].update({
 namedQueries['align'].update({
     'outboundWithStim100HzCCW': '&'.join([
         namedQueries['align']['pedalSizeCat>M'],
-        namedQueries['align']['RateInHz==100or0'],
+        namedQueries['align']['trialRateInHz==100or0'],
         namedQueries['align']['outbound'],
         namedQueries['align']['CCW']
         ])
@@ -179,7 +179,7 @@ namedQueries['align'].update({
     })
 namedQueries['align'].update({
     'midPeakWithStim100HzCCW': '&'.join([
-        namedQueries['align']['RateInHz==100or0'],
+        namedQueries['align']['trialRateInHz==100or0'],
         namedQueries['align']['midPeak'],
         namedQueries['align']['CCW']
         ])
@@ -187,7 +187,7 @@ namedQueries['align'].update({
 namedQueries['align'].update({
     'outboundWithStim50HzCCW': '&'.join([
         namedQueries['align']['pedalSizeCat>M'],
-        namedQueries['align']['RateInHz==50or0'],
+        namedQueries['align']['trialRateInHz==50or0'],
         namedQueries['align']['outbound'],
         namedQueries['align']['CCW']
         ])
@@ -326,14 +326,14 @@ namedQueries['align'].update({
 namedQueries['align'].update({
     'outboundWithStim100HzCW': '&'.join([
         namedQueries['align']['pedalSizeCat>M'],
-        namedQueries['align']['RateInHz==100or0'],
+        namedQueries['align']['trialRateInHz==100or0'],
         namedQueries['align']['outbound'],
         namedQueries['align']['CW']
         ])
     })
 namedQueries['align'].update({
     'midPeakWithStim100HzCW': '&'.join([
-        namedQueries['align']['RateInHz==100or0'],
+        namedQueries['align']['trialRateInHz==100or0'],
         namedQueries['align']['midPeak'],
         namedQueries['align']['CW']
         ])
@@ -341,20 +341,20 @@ namedQueries['align'].update({
 namedQueries['align'].update({
     'outboundWithStim50HzCW': '&'.join([
         namedQueries['align']['pedalSizeCat>M'],
-        namedQueries['align']['RateInHz==50or0'],
+        namedQueries['align']['trialRateInHz==50or0'],
         namedQueries['align']['outbound'],
         namedQueries['align']['CW']
         ])
     })
 namedQueries['align'].update({
     'midPeakWithStim50HzCW': '&'.join([
-        namedQueries['align']['RateInHz==50or0'],
+        namedQueries['align']['trialRateInHz==50or0'],
         namedQueries['align']['midPeak'],
         namedQueries['align']['CW']
         ])
     })
 listOfSubQ = [
-    namedQueries['align']['RateInHz>20or0'],
+    namedQueries['align']['trialRateInHz>20or0'],
     namedQueries['align']['outbound'],
     namedQueries['align']['CW']
     ]
@@ -362,7 +362,7 @@ namedQueries['align'].update({
     'outboundStim>20HzCW': '&'.join(['({})'.format(subQ) for subQ in listOfSubQ])
     })
 listOfSubQ = [
-    namedQueries['align']['RateInHz>20or0'],
+    namedQueries['align']['trialRateInHz>20or0'],
     namedQueries['align']['starting'],
     namedQueries['align']['CW']
     ]
@@ -379,30 +379,30 @@ namedQueries['align'].update({
 namedQueries['align'].update({
     'stimOnLowRate': '&'.join([
         namedQueries['align']['stimOn'],
-        "(RateInHz < 5)"
+        "(trialRateInHz < 5)"
         ])
     })
 namedQueries['align'].update({
     'stimOnLessThan11Hz': '&'.join([
         namedQueries['align']['stimOn'],
-        "(RateInHz < 11) & (RateInHz > 5)"
+        "(trialRateInHz < 11) & (trialRateInHz > 5)"
         ])
     })
 namedQueries['align'].update({
     'stimOnLessThan30Hz': '&'.join([
         namedQueries['align']['stimOn'],
-        "(RateInHz < 30) & (RateInHz > 5)"
+        "(trialRateInHz < 30) & (trialRateInHz > 5)"
         ])
     })
 namedQueries['align'].update({
     'stimOnHighRate': '&'.join([
         namedQueries['align']['stimOn'],
-        "(RateInHz > 20)"
+        "(trialRateInHz > 20)"
         ])
     })
 namedQueries['align'].update({
     'stimOffHighRate': '&'.join([
         namedQueries['align']['stimOff'],
-        "(RateInHz > 20)"
+        "(trialRateInHz > 20)"
         ])
     })

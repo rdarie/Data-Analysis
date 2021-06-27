@@ -213,7 +213,7 @@ def calcCovMat(
         index=partition.index, columns=['mahalDist'])
     # print('result shape is {}'.format(result.shape))
     result = pd.concat(
-        [result, partition.loc[:, ~dataColMask]],
+        [partition.loc[:, ~dataColMask], result],
         axis=1)
     result.name = 'mahalanobisDistance'
     result.columns.name = partition.columns.name
@@ -230,10 +230,8 @@ if __name__ == "__main__":
     print('loading {}'.format(triggeredPath))
     dataReader, dataBlock = ns5.blockFromPath(
         triggeredPath, lazy=arguments['lazy'])
-    # pdb.set_trace()
     dataDF = ns5.alignedAsigsToDF(
         dataBlock, **alignedAsigsKWargs)
-    # pdb.set_trace()
     if 'outlierDetectColumns' in locals():
         dataDF.drop(
             columns=[
@@ -247,7 +245,6 @@ if __name__ == "__main__":
     if ordMag < 0:
         dataDF = dataDF * 10 ** (-ordMag)
     # dataDF = dataDF.apply(lambda x: x - x.mean())
-    # pdb.set_trace()
     trialInfo = dataDF.index.to_frame().reset_index(drop=True)
     trialInfo['epoch'] = np.nan
     firstBinMask = trialInfo['bin'] == trialInfo['bin'].unique()[0]
@@ -255,7 +252,6 @@ if __name__ == "__main__":
     #  delay to account for transmission between event
     #  at t=0 and the signal being recorded
     transmissionDelay = 0
-    #   pdb.set_trace()
     if 'trialRateInHz' in trialInfo.columns:
         trialInfo.loc[trialInfo['trialRateInHz'] == 'NA', 'trialRateInHz'] = 1e-1
         trialInfo.loc[trialInfo['trialRateInHz'] <= 0, 'trialRateInHz'] = 1e-1
@@ -281,12 +277,16 @@ if __name__ == "__main__":
                 epochOffset = np.max(epochBins[epochBins <= 0])
                 epochBins = epochBins - epochOffset + transmissionDelay
                 validBins = (epochBins > theseTBins.min()) & (epochBins < theseTBins.max())
+                validBins[0] = True
+                validBins[-1] = True
                 epochBins = epochBins[validBins]
                 # stretch first and last epoch bin to cover entire window
                 epochBins[0] = theseTBins.min() - 1
                 epochBins[-1] = theseTBins.max() + 1
                 theseEpochs = pd.cut(theseTBins, bins=epochBins, labels=False)
                 trialInfo.loc[group.index, 'epoch'] = theseEpochs
+        trialInfo.fillna(method='ffill', inplace=True)
+        trialInfo.fillna(method='bfill', inplace=True)
     else:
         trialInfo.loc[:, 'epoch'] = 0
     #
@@ -317,8 +317,8 @@ if __name__ == "__main__":
         useMinCovDet=False,
         supportFraction=0.95)
     daskComputeOpts = dict(
-        scheduler='processes'
-        # scheduler='single-threaded'
+        # scheduler='processes'
+        scheduler='single-threaded'
         )
     if not mahalDistLoaded:
         if arguments['verbose']:
@@ -334,7 +334,6 @@ if __name__ == "__main__":
                 os.remove(resultPath)
             mahalDist.to_hdf(
                 resultPath, 'mahalDist')
-    # pdb.set_trace()
     print('#######################################################')
     refInterval = chi2.interval(1 - 1e-6, len(dataDF.columns))
     print('Data is {} dimensional'.format(len(dataDF.columns)))

@@ -4,7 +4,7 @@ module load gcc/8.3
 module load leveldb lapack openblas llvm hdf5 protobuf ffmpeg fftw scons
 module load anaconda/2020.02
 module load mpi
-module load opengl/mesa-12.0.6
+# module load opengl/mesa-12.0.6
 # module load opengl
 module load qt/5.10.1
 # module load vtk/8.1.0

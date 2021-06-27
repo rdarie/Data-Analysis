@@ -6,8 +6,8 @@
 # Default resources are 1 core with 2.8GB of memory.
 
 # Request memory:
-#SBATCH --nodes=8
-#SBATCH --mem=240G
+#SBATCH --nodes=4
+#SBATCH --mem=150G
 
 # Specify a job name:
 #SBATCH -J spectral_calc_motion_lfp_28
@@ -18,9 +18,10 @@
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
+#SBATCH --export=CCV_HEADLESS=1
 
 # Request custom resources
-#SBATCH --array=2,3
+#SBATCH --array=2
 
 # SLURM_ARRAY_TASK_ID=3
 source ./shellScripts/calc_aligned_motion_preamble.sh

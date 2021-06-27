@@ -30,10 +30,11 @@ Options:
 import matplotlib, os
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
-if 'DISPLAY' in os.environ:
-    matplotlib.use('QT5Agg')   # generate postscript output
-else:
+if 'CCV_HEADLESS' in os.environ:
     matplotlib.use('PS')   # generate postscript output
+else:
+    matplotlib.use('QT5Agg')   # generate interactive output
+#
 from dask.distributed import Client, LocalCluster
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
@@ -79,18 +80,19 @@ sns.set(
 for arg in sys.argv:
     print(arg)
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
-pdb.set_trace()
+
 # if debugging in a console:
 '''
 
 consoleDebugging = True
 if consoleDebugging:
     arguments = {
-    'analysisName': 'default', 'exp': 'exp202101281100', 'window': 'long', 'transformerNameRhs': 'pca_ta',
-    'estimatorName': 'enr', 'alignQuery': 'midPeak', 'winStop': '400', 'lazy': False, 'debugging': True,
-    'datasetNameRhs': 'Block_XL_df_d', 'selectionNameLhs': 'rig', 'winStart': '200', 'transformerNameLhs': None,
-    'blockIdx': '2', 'alignFolderName': 'motion', 'processAll': True, 'selector': None, 'selectionNameRhs': 'lfp_CAR',
-    'datasetNameLhs': 'Block_XL_df_d', 'plotting': True, 'verbose': '2', 'showFigures': False}
+        'verbose': '2', 'winStop': '400', 'selectionNameRhs': 'lfp_CAR', 'processAll': True,
+        'transformerNameLhs': None, 'analysisName': 'hiRes', 'alignFolderName': 'motion',
+        'estimatorName': 'enr', 'exp': 'exp202101281100', 'datasetNameRhs': 'Block_XL_df_d',
+        'lazy': False, 'winStart': '200', 'selector': None, 'blockIdx': '2', 'window': 'long',
+        'debugging': True, 'datasetNameLhs': 'Block_XL_df_d', 'transformerNameRhs': 'pca_ta',
+        'alignQuery': 'midPeak', 'selectionNameLhs': 'rig', 'showFigures': False, 'plotting': True}
     os.chdir('/gpfs/home/rdarie/nda2/Data-Analysis/dataAnalysis/analysis_code')
     
 '''
@@ -361,7 +363,7 @@ if __name__ == '__main__':
             for targetName in rhGroup.columns:
                 ####
                 if arguments['debugging']:
-                    if targetName not in ['pca_all001', 'pca_all002']:
+                    if targetName not in rhGroup.columns[:2]:
                         continue
                 ###
                 print('Fitting {} to {}...'.format(lhsMask.name[-1], targetName))

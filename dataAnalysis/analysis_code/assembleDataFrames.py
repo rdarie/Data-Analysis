@@ -29,12 +29,14 @@ Options:
 from docopt import docopt
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 if arguments['plotting']:
-    import matplotlib
+    import matplotlib, os
     matplotlib.rcParams['pdf.fonttype'] = 42
     matplotlib.rcParams['ps.fonttype'] = 42
-    matplotlib.use('QT5Agg')   # generate interactive output
-    # matplotlib.use('PS')   # generate postscript output
-    # matplotlib.use('Agg')   # generate postscript output
+    if 'CCV_HEADLESS' in os.environ:
+        matplotlib.use('PS')   # generate postscript output
+    else:
+        matplotlib.use('QT5Agg')   # generate interactive output
+#
     import matplotlib.pyplot as plt
     from matplotlib.backends.backend_pdf import PdfPages
     import seaborn as sns
@@ -339,12 +341,15 @@ if __name__ == '__main__':
                 currBlockNum += 1
     dataDF = pd.concat(lOfDF)
     ################################################################################################
+    # pdb.set_trace()
     if 'controlProportionMask' in loadingMeta:
         if loadingMeta['controlProportionMask'] is not None:
             dataDF = dataDF.loc[loadingMeta['controlProportionMask'], :]
     if 'minBinMask' in loadingMeta:
         if loadingMeta['minBinMask'] is not None:
-            dataDF = dataDF.loc[loadingMeta['minBinMask'], :]
+            # dataTrialInfo = dataDF.index.to_frame().reset_index(drop=True)
+            # maskTrialInfo = loadingMeta['minBinMask'].index.to_frame().reset_index(drop=True)
+            dataDF = dataDF.loc[loadingMeta['minBinMask'].to_numpy(), :]
     #
     hf.exportNormalizedDataFrame(
         dataDF=dataDF, loadingMeta=loadingMeta, featureInfoMask=thisMask,

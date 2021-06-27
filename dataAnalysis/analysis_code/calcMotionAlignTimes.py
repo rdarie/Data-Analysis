@@ -13,10 +13,11 @@ Options:
 import matplotlib, os
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
-if 'DISPLAY' in os.environ:
-    matplotlib.use('QT5Agg')   # generate postscript output
-else:
+if 'CCV_HEADLESS' in os.environ:
     matplotlib.use('PS')   # generate postscript output
+else:
+    matplotlib.use('QT5Agg')   # generate interactive output
+#
 import matplotlib.pyplot as plt
 import seaborn as sns
 import os, pdb, traceback

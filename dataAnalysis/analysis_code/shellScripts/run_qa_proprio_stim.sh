@@ -21,7 +21,7 @@
 # Request custom resources
 #SBATCH --array=1
 
-# SLURM_ARRAY_TASK_ID=2
+# SLURM_ARRAY_TASK_ID=1
 source shellScripts/run_align_stim_preamble.sh
 #
 ALIGNQUERY="--alignQuery=stimOn"

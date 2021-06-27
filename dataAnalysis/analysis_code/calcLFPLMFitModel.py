@@ -27,17 +27,18 @@ Options:
     --selector=selector                         filename if using a unit selector
     --amplitudeFieldName=amplitudeFieldName     what is the amplitude named? [default: nominalCurrent]
 """
-import os, sys, re
+import sys, re
 from docopt import docopt
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 
-import matplotlib
+import matplotlib, os
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
-if arguments['interactive'] or arguments['debugging']:
-    matplotlib.use('QT5Agg')   # generate interactive output
-else:
+if 'CCV_HEADLESS' in os.environ:
     matplotlib.use('PS')   # generate postscript output
+else:
+    matplotlib.use('QT5Agg')   # generate interactive output
+#
 from tqdm import tqdm
 import pdb, traceback, shutil
 import random

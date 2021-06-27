@@ -252,7 +252,7 @@ def parseAnalysisOptions(
     trialFilesStim['ins']['getINSkwargs'].update(commonStimDetectionOpts)
     amplitudeFieldName = 'nominalCurrent' if blockExperimentType == 'isi' else 'trialAmplitude'
     stimConditionNames = [
-        'electrode', amplitudeFieldName, 'RateInHz']
+        'electrode', amplitudeFieldName, 'trialRateInHz']
     motionConditionNames = [
         'pedalMovementCat', 'pedalDirection',
         'pedalSizeCat',
@@ -365,14 +365,14 @@ def parseAnalysisOptions(
     if blockExperimentType in ['proprio-miniRC', 'proprio', 'proprio-RC', 'proprio-motionOnly']:
         essentialMetadataFields = [
             'segment', 'originalIndex', 't', 'expName', amplitudeFieldName, 'program',
-            'activeGroup', 'RateInHz', 'stimCat', 'electrode',
+            'activeGroup', 'trialRateInHz', 'stimCat', 'electrode',
             'pedalDirection', 'pedalSize', 'pedalSizeCat', 'pedalMovementCat',
             'pedalMetaCat',
             ]
     else:
         essentialMetadataFields = [
             'segment', 'originalIndex', 't', 'expName', amplitudeFieldName, 'program',
-            'activeGroup', 'RateInHz', 'stimCat', 'electrode',
+            'activeGroup', 'trialRateInHz', 'stimCat', 'electrode',
             ]
     alignedAsigsKWargs = dict(
         amplitudeColumn=amplitudeFieldName,
