@@ -109,11 +109,7 @@ alignedAsigsKWargs.update(dict(
     makeControlProgram=False, removeFuzzyName=False,
     decimate=1,
     metaDataToCategories=False,
-    getMetaData=[
-        'RateInHz', 'feature', 'electrode',
-        arguments['amplitudeFieldName'], 'stimPeriod',
-        'pedalSizeCat', 'pedalDirection', 'pedalMovementCat',
-        'stimCat', 'originalIndex', 'segment', 't'],
+    getMetaData=essentialMetadataFields,
     transposeToColumns='feature', concatOn='columns',
     verbose=False, procFun=None))
 #
@@ -121,10 +117,6 @@ print(
     "'outlierDetectOptions' in locals(): {}"
     .format('outlierDetectOptions' in locals()))
 #
-stimConditionNames = [
-    'electrode', arguments['amplitudeFieldName'], 'RateInHz']
-motionConditionNames = [
-    'pedalMovementCat', 'pedalSizeCat', 'pedalDirection']
 if (blockExperimentType == 'proprio-miniRC') or (blockExperimentType == 'proprio-RC') or (blockExperimentType == 'isi'):
     # has stim but no motion
     stimulusConditionNames = stimConditionNames
@@ -264,11 +256,11 @@ if __name__ == "__main__":
     #  at t=0 and the signal being recorded
     transmissionDelay = 0
     #   pdb.set_trace()
-    if 'RateInHz' in trialInfo.columns:
-        trialInfo.loc[trialInfo['RateInHz'] == 'NA', 'RateInHz'] = 1e-1
-        trialInfo.loc[trialInfo['RateInHz'] <= 0, 'RateInHz'] = 1e-1
+    if 'trialRateInHz' in trialInfo.columns:
+        trialInfo.loc[trialInfo['trialRateInHz'] == 'NA', 'trialRateInHz'] = 1e-1
+        trialInfo.loc[trialInfo['trialRateInHz'] <= 0, 'trialRateInHz'] = 1e-1
         if 'stimPeriod' not in trialInfo.columns:
-            trialInfo['stimPeriod'] = trialInfo['RateInHz'] ** (-1)
+            trialInfo['stimPeriod'] = trialInfo['trialRateInHz'] ** (-1)
             trialInfo.loc[np.isinf(trialInfo['stimPeriod']), 'stimPeriod'] = 10
         #
         for stimPeriod, group in trialInfo.groupby('stimPeriod'):
@@ -333,7 +325,7 @@ if __name__ == "__main__":
             print('Calculating covariance matrix...')
         mahalDist = ash.splitApplyCombine(
             dataDF, fun=calcCovMat, resultPath=resultPath,
-            funKWArgs=covOpts, daskResultMeta=pd.Series({'mahalDist': 'f8'}),
+            funKWArgs=covOpts, daskResultMeta=None,
             rowKeys=groupNames, colKeys=['lag'],
             daskPersist=True, useDask=True, daskComputeOpts=daskComputeOpts)
         mahalDist.columns = ['mahalDist']
@@ -438,7 +430,7 @@ if __name__ == "__main__":
     #         nOutliersPerCondition = (
     #             trialInfo
     #             .loc[fullOutMask & firstBinMask, :]
-    #             .groupby(['electrode', arguments['amplitudeFieldName']])['RateInHz']
+    #             .groupby(['electrode', arguments['amplitudeFieldName']])['trialRateInHz']
     #             .value_counts())
     #         if ix == 0:
     #             saveNOutliers = nOutliersPerCondition

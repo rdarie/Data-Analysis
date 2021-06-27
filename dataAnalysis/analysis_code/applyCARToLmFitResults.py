@@ -97,7 +97,7 @@ rawEcapDF.loc[:, 'feature'] = rawEcapDF['feature'].apply(lambda x: x[:-4])
 annotNames = ['xcoords', 'ycoords', 'whichArray']
 trialMetaNames = [
     'segment', 'originalIndex', 't',
-    'RateInHz',
+    'trialRateInHz',
     'electrode', amplitudeFieldName]
 featureMetaNames = annotNames + ['regrID', 'feature']
 ################################################################################################

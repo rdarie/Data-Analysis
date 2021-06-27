@@ -238,7 +238,7 @@ if __name__ == '__main__':
     rhsDF.index = pd.MultiIndex.from_frame(trialInfo.loc[:, checkSameMeta])
     # fill zeros, e.g. if trials do not have measured position, positions will be NA
     lhsDF.fillna(0, inplace=True)
-    # plt.plot(lhsDF.loc[:, idxSl['RateInHz', :, :, :, :]].to_numpy()); plt.show()
+    # plt.plot(lhsDF.loc[:, idxSl['trialRateInHz', :, :, :, :]].to_numpy()); plt.show()
     if ('amplitude' in lhsDF.columns.get_level_values('feature')) and ('RateInHz' in lhsDF.columns.get_level_values('feature')):
         lhsDF.loc[:, idxSl['RateInHz', :, :, :, :]] = lhsDF.loc[:, idxSl['RateInHz', :, :, :, :]] * (lhsDF.loc[:, idxSl['amplitude', :, :, :, :]].abs() > 0).to_numpy(dtype=float)
     # plt.plot(lhsDF.loc[:, idxSl['RateInHz', :, :, :, :]].to_numpy()); plt.show()

@@ -140,12 +140,7 @@ def calcUnitRegressionToAsig():
         makeControlProgram=False,
         transposeToColumns='feature', concatOn='columns',
         removeFuzzyName=False,
-        getMetaData=[
-            'RateInHz', 'activeGroup', 'amplitude', 'amplitudeCat',
-            'bin', 'electrode', 'pedalDirection', 'pedalMetaCat',
-            'pedalMovementCat', 'stimCat', 'pedalMovementDuration',
-            'pedalSize', 'pedalSizeCat', 'pedalVelocityCat',
-            'program', 'segment', 't'],
+        getMetaData=essentialMetadataFields,
         **subsampleOpts,
         metaDataToCategories=False,
         verbose=False, procFun=None))

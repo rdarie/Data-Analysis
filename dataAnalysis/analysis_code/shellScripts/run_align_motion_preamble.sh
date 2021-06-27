@@ -53,5 +53,4 @@ BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
 EVENTSELECTOR="--eventName=motion"
 #
 ALIGNFOLDER="--alignFolderName=motion"
-AMPFIELDNAME="--amplitudeFieldName=amplitude"
 

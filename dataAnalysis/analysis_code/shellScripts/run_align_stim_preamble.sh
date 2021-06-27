@@ -39,7 +39,6 @@ WINDOWTERM="XL"
 #
 WINDOW="--window=${WINDOWTERM}"
 
-AMPFIELDNAME="--amplitudeFieldName=amplitude"
 
 ANALYSISFOLDER="--analysisName=hiRes"
 # ANALYSISFOLDER="--analysisName=default"

@@ -91,11 +91,7 @@ alignedAsigsKWargs.update(dict(
     removeFuzzyName=False,
     decimate=1, windowSize=(0, 300e-3),
     metaDataToCategories=False,
-    getMetaData=[
-        'RateInHz', 'feature', 'electrode',
-        arguments['amplitudeFieldName'], 'stimPeriod',
-        'pedalMovementCat', 'pedalSizeCat', 'pedalDirection',
-        'stimCat', 'originalIndex', 'segment', 't'],
+    getMetaData=essentialMetadataFields,
     transposeToColumns='bin', concatOn='index',
     verbose=False, procFun=None))
 #

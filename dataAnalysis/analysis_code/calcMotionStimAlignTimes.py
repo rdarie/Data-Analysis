@@ -145,17 +145,6 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
     stimAnnNames = [nm for nm in sorted(list(stimEvDict.keys())) if nm not in ['stimCat']]
     stimEvDict['t'] = stimEvent.times.magnitude
     stimEvDF = pd.DataFrame(stimEvDict)
-    '''noStimFiller = pd.Series({
-        'amplitude': 0,
-        'amplitudeRound': 999,
-        'RateInHz': 0,
-        'program': 999,
-        'activeGroup': 0,
-        'electrode': 'NA',
-        'detectionDelay': np.nan,
-        'stimDelay': np.nan,
-        'expName': arguments['exp']
-        })'''
     noStimFiller = preproc.metaFillerLookup.copy()
     noStimFiller['expName'] = arguments['exp']
     # pdb.set_trace()

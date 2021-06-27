@@ -442,7 +442,11 @@ for segIdx, nspSeg in enumerate(nspBlock.segments):
         categories.drop(index=idxToRemove, inplace=True)
         categories.reset_index(drop=True)
     alignEventsDF.loc[:, 'expName'] = arguments['exp']
-    htmlOutPath = os.path.join(insDiagnosticsFolder, '{}_motionAlignTimes.html'.format(ns5FileName))
+    # rename amplitude to avoid ambiguity with time domain amplitude signals
+    alignEventsDF.rename(columns={
+        'amplitude': 'trialAmplitude',
+        'RateInHz': 'trialRateInHz'}, inplace=True)
+    htmlOutPath = os.path.join(insDiagnosticsFolder, '{}_stimAlignTimes.html'.format(ns5FileName))
     alignEventsDF.to_html(htmlOutPath)
     alignEvents = ns5.eventDataFrameToEvents(
         alignEventsDF, idxT='t',

@@ -105,8 +105,8 @@ except Exception:
         .format(fallbackTStart, fallbackTStop))
 ###
 dummyCateg = [
-    'amplitude', 'amplitudeCat', 'program',
-    'RateInHz', 'electrode', 'activeGroup',
+    'trialAmplitude', 'amplitudeCat', 'program',
+    'trialRateInHz', 'electrode', 'activeGroup',
     'program']
 availableCateg = [
     'pedalDirection', 'pedalSizeCat',

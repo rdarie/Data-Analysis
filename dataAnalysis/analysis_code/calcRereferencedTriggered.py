@@ -66,8 +66,8 @@ alignedAsigsKWargs.update(dict(
     decimate=1))
 
 daskComputeOpts = dict(
-    # scheduler='threads'
-    scheduler='processes'
+    scheduler='threads'
+    # scheduler='processes'
     # scheduler='single-threaded'
     )
 
@@ -148,7 +148,6 @@ if __name__ == "__main__":
         funArgs=[], funKWArgs=funKWArgs,
         rowKeys=groupBy, colKeys=None, **daskOpts)
     #
-    pdb.set_trace()
     assert (rerefDF.index == dataDF.index).all()
     assert (rerefDF.columns == dataDF.columns).all()
     del dataDF

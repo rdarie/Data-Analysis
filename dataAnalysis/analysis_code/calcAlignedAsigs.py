@@ -19,7 +19,6 @@ Options:
     --eventName=eventName                                name of events object to align to [default: motionStimAlignTimes]
     --analysisName=analysisName                          append a name to the resulting blocks? [default: default]
     --alignFolderName=alignFolderName                    append a name to the resulting blocks? [default: motion]
-    --amplitudeFieldName=amplitudeFieldName              what is the amplitude named? [default: nominalCurrent]
     --verbose                                            print diagnostics? [default: False]
 """
 
@@ -113,10 +112,6 @@ else:
         signalPrefix + signalBlockSuffix + '_chunkingInfo.json'
         )
 #
-stimConditionNames = [
-    'electrode', arguments['amplitudeFieldName'], 'RateInHz']
-motionConditionNames = [
-    'pedalMovementCat', 'pedalSizeCat', 'pedalDirection']
 #
 if (blockExperimentType == 'proprio-miniRC') or (blockExperimentType == 'proprio-RC'):
     # has stim but no motion

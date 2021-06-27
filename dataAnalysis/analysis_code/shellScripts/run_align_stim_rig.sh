@@ -17,7 +17,7 @@
 #SBATCH -e ../../batch_logs/%j_%a_align_stim_2021_01_28_rig.out
 
 # Request custom resources
-#SBATCH --array=1,2,3
+#SBATCH --array=1
 
 # Specify account details
 #SBATCH --account=carney-dborton-condo
@@ -25,5 +25,5 @@
 # SLURM_ARRAY_TASK_ID=2
 source shellScripts/run_align_stim_preamble.sh
 
-python -u ./calcAlignedAsigs.py --chanQuery="rig" --outputBlockSuffix="rig" --eventBlockSuffix='epochs' --signalBlockSuffix='analyze' --verbose --exp=$EXP $BLOCKSELECTOR $WINDOW $LAZINESS $EVENTSELECTOR $ALIGNFOLDER $AMPFIELDNAME $ANALYSISFOLDER $SIGNALFOLDER $EVENTFOLDER
-python -u ./makeViewableBlockFromTriggered.py --plotting --inputBlockSuffix="rig" --unitQuery="rig" --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS
+python -u ./calcAlignedAsigs.py --chanQuery="rig" --outputBlockSuffix="rig" --eventBlockSuffix='epochs' --signalBlockSuffix='analyze' --verbose --exp=$EXP $BLOCKSELECTOR $WINDOW $LAZINESS $EVENTSELECTOR $ALIGNFOLDER $ANALYSISFOLDER $SIGNALFOLDER $EVENTFOLDER
+# python -u ./makeViewableBlockFromTriggered.py --plotting --inputBlockSuffix="rig" --unitQuery="rig" --exp=$EXP $WINDOW $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR $LAZINESS

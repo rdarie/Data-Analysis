@@ -250,7 +250,7 @@ def parseAnalysisOptions(
         }
     # pdb.set_trace()
     trialFilesStim['ins']['getINSkwargs'].update(commonStimDetectionOpts)
-    amplitudeFieldName = 'nominalCurrent' if blockExperimentType == 'isi' else 'amplitude'
+    amplitudeFieldName = 'nominalCurrent' if blockExperimentType == 'isi' else 'trialAmplitude'
     stimConditionNames = [
         'electrode', amplitudeFieldName, 'RateInHz']
     motionConditionNames = [
@@ -364,18 +364,18 @@ def parseAnalysisOptions(
     #
     if blockExperimentType in ['proprio-miniRC', 'proprio', 'proprio-RC', 'proprio-motionOnly']:
         essentialMetadataFields = [
-            'segment', 'originalIndex', 't', 'expName', 'amplitude', 'program',
+            'segment', 'originalIndex', 't', 'expName', amplitudeFieldName, 'program',
             'activeGroup', 'RateInHz', 'stimCat', 'electrode',
             'pedalDirection', 'pedalSize', 'pedalSizeCat', 'pedalMovementCat',
             'pedalMetaCat',
             ]
     else:
         essentialMetadataFields = [
-            'segment', 'originalIndex', 't', 'expName', 'nominalCurrent', 'program',
+            'segment', 'originalIndex', 't', 'expName', amplitudeFieldName, 'program',
             'activeGroup', 'RateInHz', 'stimCat', 'electrode',
             ]
     alignedAsigsKWargs = dict(
-        amplitudeColumn='amplitude',
+        amplitudeColumn=amplitudeFieldName,
         programColumn='program',
         electrodeColumn='electrode',
         removeFuzzyName=False,

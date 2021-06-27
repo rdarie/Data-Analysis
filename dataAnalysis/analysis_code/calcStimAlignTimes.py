@@ -200,6 +200,10 @@ for segIdx, dataSeg in enumerate(dataBlock.segments):
     if arguments['removeLabels'] is not None:
         pdb.set_trace()
         labelsToRemove = ', '.split(arguments['removeLabels'])
+    # rename amplitude to avoid ambiguity with time domain amplitude signals
+    alignEventsDF.rename(columns={
+        'amplitude': 'trialAmplitude',
+        'RateInHz': 'trialRateInHz'}, inplace=True)
     alignEvents = ns5.eventDataFrameToEvents(
         alignEventsDF, idxT='t',
         annCol=None,

@@ -174,7 +174,7 @@ def getExpOpts():
     #
     minNConditionRepetitions = {
         'n': 1,
-        'categories': ['amplitude', 'electrode', 'RateInHz']
+        'categories': ['trialAmplitude', 'electrode', 'trialRateInHz']
         }
     spikeSortingOpts = {
         'utah': {

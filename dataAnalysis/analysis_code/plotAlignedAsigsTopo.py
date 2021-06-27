@@ -424,7 +424,6 @@ with PdfPages(pdfName) as pdf:
                 probeGroup.stack()
                 .reset_index(name='signal')
                 .dropna())
-            pdb.set_trace()
             if probeName in dummyDict:
                 thisAsigStack = pd.concat(
                     [thisAsigStack, dummyDict[probeName]],

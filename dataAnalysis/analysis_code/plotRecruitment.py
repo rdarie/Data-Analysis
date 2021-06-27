@@ -87,8 +87,8 @@ pdfPath = os.path.join(
 
 plotEmgRC = recCurve.reset_index()
 keepCols = [
-    'segment', 'originalIndex', 't', 'RateInHz',
-    'electrode', 'nominalCurrent', 'feature', 'lag']
+    'segment', 'originalIndex', 't', 'trialRateInHz',
+    'electrode', amplitudeFieldName, 'feature', 'lag']
 dropCols = [
     idxName
     for idxName in recCurve.index.names

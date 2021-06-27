@@ -22,7 +22,7 @@
 # Request custom resources
 #SBATCH --array=1
 
-SLURM_ARRAY_TASK_ID=1
+# SLURM_ARRAY_TASK_ID=1
 source shellScripts/calc_aligned_stim_preamble.sh
 ###
 

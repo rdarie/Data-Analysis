@@ -45,10 +45,12 @@ sys.stderr = sys.__stderr__  # unsilence stderr
 
 metaFillerLookup = defaultdict(lambda: 'NA')
 metaFillerLookup['program'] = 999.
+metaFillerLookup['trialAmplitude'] = 0.
 metaFillerLookup['amplitude'] = 0.
 metaFillerLookup['amplitudeRound'] = 999.
 metaFillerLookup['activeGroup'] = 0.
 metaFillerLookup['RateInHz'] = 0.
+metaFillerLookup['trialRateInHz'] = 0.
 metaFillerLookup['detectionDelay'] = np.nan
 metaFillerLookup['stimDelay'] = np.nan
 

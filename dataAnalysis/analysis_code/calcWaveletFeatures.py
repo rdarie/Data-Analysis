@@ -309,7 +309,7 @@ if __name__ == "__main__":
         't_stop': trialTimes[-1] * pq.s,
         'sampling_rate': dummySt.sampling_rate
         }
-    pdb.set_trace()
+    # pdb.set_trace()
     masterBlock = ns5.alignedAsigDFtoSpikeTrain(
         spectralDF, spikeTrainMeta=spikeTrainMeta,
         matchSamplingRate=False, verbose=arguments['verbose'])
