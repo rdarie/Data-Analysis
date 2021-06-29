@@ -177,6 +177,7 @@ if theseIteratorOpts['nCovariateBasisTerms'] > 1:
     alignedAsigsKWargs['addLags'] = {'all': lags.astype(int).tolist()}
 if theseIteratorOpts['forceBinInterval'] is not None:
     alignedAsigsKWargs['decimate'] = int(theseIteratorOpts['forceBinInterval'] / binOpts['binInterval'])
+    alignedAsigsKWargs['rollingWindow'] = alignedAsigsKWargs['decimate']
 #
 # nSplits = theseIteratorOpts['nSplits']
 listOfIterators = []
@@ -362,7 +363,7 @@ exportAAKWA.pop('unitQuery', None)
 iteratorMetadata = {
     'alignedAsigsKWargs': exportAAKWA,
     'iteratorsBySegment': listOfIterators,
-    'cv_kwargs': theseIteratorOpts,
+    'iteratorOpts': theseIteratorOpts,
     'experimentsToAssemble': experimentsToAssemble
 }
 if theseIteratorOpts['calcTimeROI'] and (not arguments['loadFromFrames']):

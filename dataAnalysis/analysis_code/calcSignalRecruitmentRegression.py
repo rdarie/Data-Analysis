@@ -454,11 +454,11 @@ if __name__ == "__main__":
     height, width = 3, 3
     aspect = width / height
     commonOpts = dict(
-        col='RateInHz', row='pedalMovementCat',
+        col='trialRateInHz', row='pedalMovementCat',
         row_order=['NA', 'outbound', 'return'],
-        x='amplitude', y='rauc', hue='term',
+        x='trialAmplitude', y='rauc', hue='term',
         height=height, aspect=aspect, palette=termPalette.to_dict()
-    )
+        )
     pdfPath = os.path.join(
         figureOutputFolder,
         blockBaseName + '{}_{}_{}{}_{}.pdf'.format(

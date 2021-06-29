@@ -150,7 +150,7 @@ triggeredLhsPath = os.path.join(
 #
 #
 iteratorsBySegment = loadingMeta.pop('iteratorsBySegment')
-cv_kwargs = loadingMeta.pop('cv_kwargs')
+# cv_kwargs = loadingMeta.pop('cv_kwargs')
 #
 def compute_scores(
         X, y, estimator,

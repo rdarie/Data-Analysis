@@ -156,7 +156,7 @@ if __name__ == '__main__':
             lhsBlockSuffix, arguments['window']))
     #
     iteratorsBySegment = loadingMeta['iteratorsBySegment'].copy()
-    cv_kwargs = loadingMeta['cv_kwargs'].copy()
+    # cv_kwargs = loadingMeta['cv_kwargs'].copy()
     cvIterator = iteratorsBySegment[0]
     workIdx = cvIterator.work
     estimatorClass = ElasticNet

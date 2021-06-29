@@ -155,7 +155,7 @@ featureMasksDF.to_hdf(
     mode='a')
 ###
 loadingMeta = originFeatureLoadingMeta.copy()
-for key in ['iteratorsBySegment', 'cv_kwargs']:
+for key in ['iteratorsBySegment', 'iteratorOpts']:
     loadingMeta[key] = dataLoadingMeta[key]
 with open(outputLoadingMetaPath, 'wb') as f:
     pickle.dump(loadingMeta, f)

@@ -14,6 +14,7 @@ from sklearn.svm import LinearSVR
 import pandas as pd
 import numpy as np
 import statsmodels.api as sm
+from patsy.state import stateful_transform
 from statsmodels.stats.multitest import multipletests as mt
 import pdb, traceback
 import os
@@ -29,15 +30,158 @@ import pyglmnet
 import matplotlib.pyplot as plt
 import seaborn as sns
 import scipy.linalg
+from sklearn.utils.validation import check_is_fitted
 from dask.distributed import Client, LocalCluster
 from sklearn.utils import _joblib, parallel_backend
 from sklearn.metrics import r2_score
 from ttictoc import tic, toc
+import contextlib
 sns.set()
 sns.set_color_codes("dark")
 sns.set_context("talk")
 sns.set_style("whitegrid")
 
+
+class raisedCosTransformer(object):
+    def __init__(self, kWArgs=None):
+        if kWArgs is not None:
+            self.memorize_chunk(None, **kWArgs)
+        return
+
+    def memorize_chunk(
+            self, vecSrs, nb=1, dt=1.,
+            historyLen=None, b=1e-3,
+            normalize=False, useOrtho=True,
+            groupBy='trialUID', tLabel='bin',
+            zflag=False, logBasis=True):
+        self.nb = nb
+        self.dt = dt
+        self.historyLen = historyLen
+        self.b = b
+        self.zflag = zflag
+        self.logBasis = logBasis
+        self.normalize = normalize
+        self.useOrtho = useOrtho
+        self.groupBy = groupBy
+        self.tLabel = tLabel
+        ##
+        historyEdge = raisedCosBoundary(
+            b=b, DT=historyLen,
+            minX=max(dt / 2, 1e-3),
+            nb=nb)
+        endpoints = [
+            historyEdge[0], historyEdge[0] + historyLen]
+        self.endpoints = endpoints
+        self.ihbasisDF, self.orthobasisDF = makeLogRaisedCosBasis(
+            nb=nb, dt=dt, endpoints=endpoints, b=b,
+            zflag=zflag, normalize=normalize)
+        self.iht = np.array(self.ihbasisDF.index)
+        self.leftShiftBasis = int(((max(self.iht) - min(self.iht)) / 2 + min(self.iht)) / self.dt)
+        # self.leftShiftBasis = int(min(self.iht) / self.dt)
+        return
+
+    def memorize_finish(self):
+        return
+
+    def transform(
+            self, vecSrs, nb=1, dt=1.,
+            historyLen=None, b=1e-3,
+            normalize=False, useOrtho=True,
+            groupBy='trialUID', tLabel='bin',
+            zflag=False, logBasis=True):
+        columnNames = ['{}_{}'.format(vecSrs.name, basisCN) for basisCN in self.orthobasisDF.columns]
+        resDF = pd.DataFrame(np.nan, index=vecSrs.index, columns=columnNames)
+        if self.useOrtho:
+            basisDF = self.orthobasisDF
+        else:
+            basisDF = self.ihbasisDF
+        for name, group in vecSrs.groupby(self.groupBy):
+            for cNIdx, cN in enumerate(basisDF.columns):
+                resCN = resDF.columns[cNIdx]
+                convResult = np.convolve(
+                    group.to_numpy(),
+                    basisDF[cN].to_numpy(),
+                    mode='full')
+                seekIdx = slice(
+                    int(convResult.shape[0] / 2 - group.shape[0] / 2 - self.leftShiftBasis),
+                    int(convResult.shape[0] / 2 + group.shape[0] / 2 - self.leftShiftBasis)
+                    )
+                convResult = convResult[seekIdx]
+                '''if group.shape[0] <= basisDF.shape[0]:
+                    convResult = np.convolve(
+                        group.to_numpy(),
+                        basisDF[cN].to_numpy(),
+                        mode='full')
+                    #
+                    convResult = np.roll(convResult, shiftBy)
+                    if shiftBy > 0:
+                        convResult[:shiftBy] = 0
+                    else:
+                        convResult[shiftBy:] = 0
+                    #
+                    convLags = (np.arange(convResult.shape[0]) - np.round(convResult.shape[0] / 2)) * self.dt
+                    tBins = group.index.get_level_values(self.tLabel)
+                    convMask = (convLags >= tBins.min()) & (convLags <= tBins.max())
+                    convResult = convResult[convMask][:group.shape[0]]
+                else:
+                    convResult = np.convolve(
+                        group.to_numpy(),
+                        basisDF[cN].to_numpy(),
+                        mode='same')
+                    convResult = np.roll(convResult, shiftBy)
+                    if shiftBy > 0:
+                        convResult[:shiftBy] = 0
+                    else:
+                        convResult[shiftBy:] = 0'''
+                '''
+                shiftBy = -20
+                bla = np.arange(80)
+                plt.plot(bla, label='original')
+                bla1 = np.roll(bla, shiftBy)
+                plt.plot(bla1, label='shifted')
+                if shiftBy > 0:
+                    bla1[:shiftBy] = 0
+                else:
+                    bla1[shiftBy:] = 0
+                plt.plot(bla1, label='clipped')
+                plt.legend()
+                plt.show()
+                '''
+                #
+                # pdb.set_trace()
+                '''fig, ax = plt.subplots(4, 1)
+                M = group.shape[0]
+                N = basisDF.shape[0]
+                tPlotG = np.arange(M) - M / 2
+                tPlotB = np.arange(N) - N / 2
+                tPlotC = np.arange(M + N - 1) - (M + N - 1) / 2
+                ax[0].plot(tPlotG, group.to_numpy(), label='original')
+                ax[0].plot(tPlotB, basisDF[cN].to_numpy(), label='kernel')
+                ax[0].legend()
+                ax[1].plot(tBins / self.dt, group.to_numpy(), label='original')
+                ax[1].plot(self.iht / self.dt, basisDF[cN].to_numpy(), label='kernel')
+                ax[1].legend()
+                ax[2].plot(tPlotC, convResult, label='convolution result')
+                ax[2].legend()
+                ax[3].plot(tPlotG, group.to_numpy(), label='original')
+                ax[3].plot(tPlotG, convResultShifted, label='shifted')
+                ax[3].legend()
+                fig.suptitle('{}'.format(seekIdx))
+                plt.show()'''
+                #
+                resDF.loc[group.index, resCN] = convResult
+        return resDF
+
+    def plot_basis(self):
+        fig, ax = plt.subplots(2, 1, sharex=True)
+        ax[0].plot(self.ihbasisDF)
+        ax[0].set_title('raised log cos basis')
+        ax[1].plot(self.orthobasisDF)
+        ax[1].set_title('orthogonalized log cos basis')
+        ax[1].set_xlabel('Time (sec)')
+        return fig, ax
+
+patsyRaisedCosTransformer = stateful_transform(raisedCosTransformer)
 
 class DataFrameAverager(TransformerMixin, BaseEstimator):
     def __init__(
@@ -63,6 +207,7 @@ class DataFrameAverager(TransformerMixin, BaseEstimator):
     def inverse_transform(self, X):
         return X
 
+
 class DataFramePassThrough(TransformerMixin, BaseEstimator):
     def __init__(self):
         return
@@ -75,6 +220,29 @@ class DataFramePassThrough(TransformerMixin, BaseEstimator):
 
     def inverse_transform(self, X):
         return X
+
+
+class DataFrameMetaDataToColumns(TransformerMixin, BaseEstimator):
+    def __init__(self, addColumns=[]):
+        self.addColumns = addColumns
+        return
+    #
+    def fit(self, X, y=None):
+        return self
+    #
+    def transform(self, X):
+        trialInfo = X.index.to_frame().reset_index(drop=True)
+        Xout = X.copy()
+        for cN in self.addColumns:
+            cNKey = (cN, 0,) + ('NA',) * 4
+            Xout.loc[:, cNKey] = trialInfo.loc[:, cN].to_numpy()
+        return Xout
+
+    def inverse_transform(self, X):
+        maskColumns = X.columns.get_level_values('feature').isin(self.addColumns).to_numpy()
+        Xout = X.copy()
+        Xout = Xout.loc[:, ~maskColumns]
+        return Xout
 
 
 class dummyFold:
@@ -274,26 +442,31 @@ class trainTestValidationSplitter:
         ax.legend(handles=[lhtr, lhte, lhw, lhv])
         return fig, ax
 
+
 def crossValidationScores(
         X, y=None,
         estimatorClass=None, estimatorInstance=None,
         estimatorKWArgs={}, crossvalKWArgs={},
-        joblibBackendArgs={}, verbose=0):
+        joblibBackendArgs=None, verbose=0):
     if verbose > 0:
         print('joblibBackendArgs = {}'.format(joblibBackendArgs))
-    with parallel_backend(**joblibBackendArgs):
+    if hasattr(crossvalKWArgs['cv'], 'workIterator'):
+        workEstim = clone(estimatorInstance)
+    #
+    if joblibBackendArgs is None:
+        contextManager = contextlib.nullcontext()
+    else:
+        contextManager = parallel_backend(**joblibBackendArgs)
+    with contextManager:
         if estimatorInstance is None:
             estimatorInstance = estimatorClass(**estimatorKWArgs)
         scores = cross_validate(
             estimatorInstance, X, y, verbose=verbose, **crossvalKWArgs)
     # train on all of the "working" samples, eval on the "validation"
-    # pdb.set_trace()
     if hasattr(crossvalKWArgs['cv'], 'workIterator'):
         workingIdx = crossvalKWArgs['cv'].work
         validIdx = crossvalKWArgs['cv'].validation
         workingIdx, validIdx = crossvalKWArgs['cv'].workIterator.split(X)[0]
-        #
-        workEstim = clone(estimatorInstance)
         #
         workX = X.iloc[workingIdx, :]
         valX = X.iloc[validIdx, :]
@@ -332,7 +505,11 @@ def gridSearchHyperparameters(
     workGridSearchKWArgs['cv'] = gridSearchKWArgs['cv'].workIterator
     if timeThis:
         tic()
-    with parallel_backend(**joblibBackendArgs):
+    if joblibBackendArgs is None:
+        contextManager = contextlib.nullcontext()
+    else:
+        contextManager = parallel_backend(**joblibBackendArgs)
+    with contextManager:
         if estimatorInstance is None:
             estimatorInstance = estimatorClass(**estimatorKWArgs)
         if isinstance(estimatorInstance, ElasticNet) and useElasticNetCV:
@@ -439,12 +616,14 @@ def scoreColumnTransformer(estimator, X, y=None):
         componentScores.append(trf.score(X, y))
     return np.mean(componentScores)
 
+
 def genReconstructionScorer(scoreFun):
     def scorer(estimator, X, y=None):
         feat = estimator.transform(X)
         rec = np.dot(feat, estimator.components_) + estimator.mean_
         return scoreFun(X, rec)
     return scorer
+
 
 def reconstructionR2(estimator, X, y=None):
     if isinstance(estimator, Pipeline):
@@ -642,10 +821,11 @@ def makeLogRaisedCosBasis(
     ihbDF = pd.DataFrame(ihbasis, index=iht, columns=np.round(ctrs, decimals=3))
     orthobasDF = pd.DataFrame(orthobas, index=iht)
     #
-    negiht = np.sort(iht[iht > 0] * (-1))
-    negBDF = pd.DataFrame(0, index=negiht, columns=ihbDF.columns)
-    negOrthobasDF = pd.DataFrame(0, index=negiht, columns=orthobasDF.columns)
-    return pd.concat([negBDF, ihbDF]), pd.concat([negOrthobasDF, orthobasDF])
+    # negiht = np.sort(iht[iht > 0] * (-1))
+    # negBDF = pd.DataFrame(0, index=negiht, columns=ihbDF.columns)
+    # negOrthobasDF = pd.DataFrame(0, index=negiht, columns=orthobasDF.columns)
+    # return pd.concat([negBDF, ihbDF]), pd.concat([negOrthobasDF, orthobasDF])
+    return ihbDF, orthobasDF
 
 
 def _poisson_pseudoR2(y, yhat):
@@ -811,7 +991,6 @@ class SMWrapper(BaseEstimator, RegressorMixin):
         self.maxiter = maxiter
         self.tol = tol
         self.disp = disp
-        pass
     #
     def fit(self, X, y):
         model_opts = {}

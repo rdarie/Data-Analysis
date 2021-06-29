@@ -131,7 +131,7 @@ else:
     lhsBlockSuffix = ''
 #
 iteratorsBySegment = loadingMeta['iteratorsBySegment'].copy()
-cv_kwargs = loadingMeta['cv_kwargs'].copy()
+# cv_kwargs = loadingMeta['cv_kwargs'].copy()
 '''lhGroupNames = loadingMeta['lhGroupNames']
 lOfRhsDF = []
 lOfLhsDF = []

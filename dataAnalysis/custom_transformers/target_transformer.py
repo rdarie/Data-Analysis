@@ -236,7 +236,10 @@ class TransformedTargetRegressor(RegressorMixin, BaseEstimator):
         check_is_fitted(self)
         pred = self.regressor_.predict(X)
         if pred.ndim == 1:
-            pred = pred.reshape(-1, 1)
+            if isinstance(pred, pd.Series):
+                pred = pred.to_frame(name=pred.name)
+            else:
+                pred = pred.reshape(-1, 1)
         if (self._training_dim == 1 and
                 pred.ndim == 2 and pred.shape[1] == 1):
             pred = pred.squeeze(axis=1)

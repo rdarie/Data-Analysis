@@ -172,8 +172,8 @@ if __name__ == '__main__':
     conditions = {
         'pedalDirection': np.asarray(['CW']),
         'pedalMovementCat': np.asarray(['outbound', 'return']),
-        'RateInHz': np.asarray([50, 100]),
-        'amplitude': np.linspace(200, 800, 5),
+        'trialRateInHz': np.asarray([50, 100]),
+        'trialAmplitude': np.linspace(200, 800, 5),
         'electrode': np.asarray(['+ E16 - E9', '+ E16 - E5'])
         }
     electrodeRatio = 3.
@@ -192,12 +192,16 @@ if __name__ == '__main__':
         ('NA', 'NA'): 0
         }
     ########################
-    nAmpRate = conditions['RateInHz'].size * conditions['amplitude'].size
+    nAmpRate = conditions['trialRateInHz'].size * conditions['trialAmplitude'].size
     protoIndex = []
     stimConfigs = pd.MultiIndex.from_product(
-        [conditions['electrode'], conditions['RateInHz'], conditions['amplitude']], names=['electrode', 'RateInHz', 'amplitude'])
+        [
+            conditions['electrode'], conditions['trialRateInHz'], conditions['trialAmplitude']],
+        names=['electrode', 'trialRateInHz', 'trialAmplitude'])
     kinConfigs = pd.MultiIndex.from_product(
-        [conditions['pedalDirection'], conditions['pedalMovementCat']], names=['pedalDirection', 'pedalMovementCat'])
+        [
+            conditions['pedalDirection'], conditions['pedalMovementCat']],
+        names=['pedalDirection', 'pedalMovementCat'])
     # add stim movement
     for stimConfig in stimConfigs:
         for kinConfig in kinConfigs:
@@ -216,7 +220,7 @@ if __name__ == '__main__':
     ##
     toyInfoPerTrial = pd.DataFrame(
         protoIndex,
-        columns=['electrode', 'RateInHz', 'amplitude', 'pedalDirection', 'pedalMovementCat'])
+        columns=['electrode', 'trialRateInHz', 'trialAmplitude', 'pedalDirection', 'pedalMovementCat'])
     rng = np.random.default_rng(seed=42)
     shuffledIndices = np.arange(toyInfoPerTrial.shape[0])
     rng.shuffle(shuffledIndices)
@@ -257,8 +261,8 @@ if __name__ == '__main__':
         rate.columns.name = 'bin'
         if row['electrode'] != 'NA':
             stimMask = np.asarray((bins >= thisSW[0]) & (bins < thisSW[1]), dtype=float)
-            amp.loc[:, :] = stimMask * row['amplitude']
-            rate.loc[:, :] = stimMask * row['RateInHz']
+            amp.loc[:, :] = stimMask * row['trialAmplitude']
+            rate.loc[:, :] = stimMask * row['trialRateInHz']
         toyLhsList.append(
             pd.concat([
                 vel.stack('bin').to_frame(name='velocity'),
@@ -772,14 +776,14 @@ if __name__ == '__main__':
             rhsPlotDFStack = pd.DataFrame(
                 rhsPlotDF.loc[:, tempCols].to_numpy(),
                 columns=tempCols,
-                index=pd.MultiIndex.from_frame(toyTrialInfo.loc[:, ['electrode', 'bin', 'pedalMovementCat', 'amplitude']])
+                index=pd.MultiIndex.from_frame(toyTrialInfo.loc[:, ['electrode', 'bin', 'pedalMovementCat', 'trialAmplitude']])
                 )
             rhsPlotDFStack = rhsPlotDFStack.set_index('limbState x electrode', append=True)
             rhsPlotDFStack.columns.name = 'feature'
             rhsPlotDFStack = rhsPlotDFStack.stack().to_frame(name='signal').reset_index()
             g = sns.relplot(
                 row='feature', col='limbState x electrode',
-                x='bin', y='signal', hue='amplitude',
+                x='bin', y='signal', hue='trialAmplitude',
                 data=rhsPlotDFStack, palette='plasma',
                 errorbar='se', kind='line',
                 height=2, aspect=3
@@ -792,7 +796,7 @@ if __name__ == '__main__':
                 plt.close()
             g = sns.displot(
                 row='feature', col='limbState x electrode',
-                y='signal', hue='amplitude',
+                y='signal', hue='trialAmplitude',
                 data=rhsPlotDFStack, palette='plasma',
                 kind='kde', common_norm=False,
                 height=2, aspect=3
@@ -849,7 +853,7 @@ if __name__ == '__main__':
         dataDF=toyLhsDF.loc[restrictMask, :], **iteratorKWArgs)
     #
     outputLoadingMeta['iteratorsBySegment'] = [cvIterator]
-    outputLoadingMeta['cv_kwargs'] = iteratorKWArgs
+    outputLoadingMeta['iteratorOpts'] = iteratorKWArgs
     outputLoadingMeta.pop('normalizationParams')
     outputLoadingMeta.pop('normalizeDataset')
     outputLoadingMeta.pop('unNormalizeDataset')

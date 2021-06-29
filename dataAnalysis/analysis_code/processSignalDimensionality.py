@@ -118,7 +118,7 @@ if not os.path.exists(figureOutputFolder):
 with open(loadingMetaPath, 'rb') as _f:
     loadingMeta = pickle.load(_f)
     iteratorsBySegment = loadingMeta['iteratorsBySegment']
-    cv_kwargs = loadingMeta['cv_kwargs']
+    # cv_kwargs = loadingMeta['cv_kwargs']
     for argName in ['plotting', 'showFigures', 'debugging', 'verbose']:
         loadingMeta['arguments'].pop(argName, None)
 arguments.update(loadingMeta['arguments'])

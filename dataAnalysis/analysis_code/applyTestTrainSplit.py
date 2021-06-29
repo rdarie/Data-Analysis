@@ -101,7 +101,7 @@ if arguments['verbose']:
 with open(iteratorPath, 'rb') as f:
     loadingMeta = pickle.load(f)
 iteratorsBySegment = loadingMeta['iteratorsBySegment']
-cv_kwargs = loadingMeta['cv_kwargs']
+iteratorOpts = loadingMeta['iteratorOpts']
 
 listOfDataFrames = []
 

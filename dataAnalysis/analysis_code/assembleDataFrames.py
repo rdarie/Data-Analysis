@@ -258,7 +258,7 @@ if __name__ == '__main__':
         blockBaseName + '{}_{}.nix'.format(
             inputBlockSuffix, arguments['window']))
     iteratorsBySegment = loadingMeta['iteratorsBySegment'].copy()
-    cv_kwargs = loadingMeta['cv_kwargs'].copy()
+    # cv_kw##args = loadingMeta['cv_kw##args'].copy()
     cvIterator = iteratorsBySegment[0]
     workIdx = cvIterator.work
     ######### data loading stuff
@@ -340,6 +340,8 @@ if __name__ == '__main__':
                 lOfFeatureMasks.append(thisMask)
                 currBlockNum += 1
     dataDF = pd.concat(lOfDF)
+    # fill zeros, e.g. if some trials do not have measured position, positions will be NaN
+    dataDF.fillna(0, inplace=True)
     ################################################################################################
     # pdb.set_trace()
     if 'controlProportionMask' in loadingMeta:
@@ -356,159 +358,3 @@ if __name__ == '__main__':
         arguments=arguments, selectionName=arguments['selectionName'],
         dataFramesFolder=dataFramesFolder, datasetName=datasetName,
         )
-    '''finalDF = dataDF.copy()
-    #  #### end of data loading stuff
-    if 'spectral' in arguments['selectionName']:
-        normalizationParams = [[], []]
-        for expName, dataGroup in dataDF.groupby('expName'):
-            for featName, subGroup in dataGroup.groupby('feature', axis='columns'):
-                print('calculating pre-normalization params, exp: {}, feature: {}'.format(expName, featName))
-                meanLevel = np.nanmean(subGroup.xs(0, level='lag', axis='columns').to_numpy())
-                normalizationParams[0].append({
-                    'expName': expName,
-                    'feature': featName,
-                    'mu': meanLevel,
-                })
-                # finalDF.loc[subGroup.index, subGroup.columns] = dataDF.loc[subGroup.index, subGroup.columns] - meanLevel
-                finalDF.loc[subGroup.index, subGroup.columns] = np.sqrt(dataDF.loc[subGroup.index, subGroup.columns] / meanLevel)
-        intermediateDF = finalDF.copy()
-        for featName, dataGroup in intermediateDF.groupby('feature', axis='columns'):
-            print('calculating final normalization params, feature: {}'.format(featName))
-            refData = dataGroup.xs(0, level='lag', axis='columns').to_numpy()
-            mu = np.nanmean(refData)
-            sigma = np.nanstd(refData)
-            normalizationParams[1].append({
-                'feature': featName,
-                'mu': mu,
-                'sigma': sigma
-            })
-            #
-            finalDF.loc[:, dataGroup.columns] = (intermediateDF[dataGroup.columns] - mu) / sigma
-        #
-        def normalizeDataset(inputDF, params):
-            outputDF = inputDF.copy()
-            for preParams in params[0]:
-                expMask = inputDF.index.get_level_values('expName') == preParams['expName']
-                featMask = inputDF.columns.get_level_values('feature') == preParams['feature']
-                if expMask.any() and featMask.any():
-                    print('pre-normalizing exp {}: feature {}'.format(preParams['expName'], preParams['feature']))
-                    # outputDF.loc[expMask, featMask] = inputDF.loc[expMask, featMask] - preParams['mu']
-                    outputDF.loc[expMask, featMask] = np.sqrt(inputDF.loc[expMask, featMask] / preParams['mu'])
-            intermediateDF = outputDF.copy()
-            for postParams in params[1]:
-                featMask = inputDF.columns.get_level_values('feature') == postParams['feature']
-                if featMask.any():
-                    print('final normalizing feature {}'.format(postParams['feature']))
-                    outputDF.loc[:, featMask] = (intermediateDF.loc[:, featMask] - postParams['mu']) / postParams['sigma']
-            return outputDF
-        #
-        def unNormalizeDataset(inputDF, params):
-            outputDF = inputDF.copy()
-            for postParams in params[1]:
-                featMask = inputDF.columns.get_level_values('feature') == postParams['feature']
-                if featMask.any():
-                    print('pre un-normalizing feature {}'.format(postParams['feature']))
-                    outputDF.loc[:, featMask] = (inputDF.loc[:, featMask] * postParams['sigma']) + postParams['mu']
-            intermediateDF = outputDF.copy()
-            for preParams in params[0]:
-                expMask = inputDF.index.get_level_values('expName') == preParams['expName']
-                featMask = inputDF.columns.get_level_values('feature') == preParams['feature']
-                if expMask.any() and featMask.any():
-                    print('final un-normalizing exp {}: feature {}'.format(preParams['expName'], preParams['feature']))
-                    # outputDF.loc[expMask, featMask] = intermediateDF.loc[expMask, featMask] + preParams['mu']
-                    outputDF.loc[expMask, featMask] = intermediateDF.loc[expMask, featMask] ** 2 * preParams['mu']
-            return outputDF
-        #
-        # finalDF = normalizeDataset(finalDF, normalizationParams)
-    else:
-        # normal time domain data
-        normalizationParams = [[]]
-        for featName, dataGroup in dataDF.groupby('feature', axis='columns'):
-            refData = dataGroup.xs(0, level='lag', axis='columns').to_numpy()
-            print('calculating normalization params for {}'.format(featName))
-            mu = np.nanmean(refData)
-            sigma = np.nanstd(refData)
-            print('mu = {} sigma = {}'.format(mu, sigma))
-            normalizationParams[0].append({
-                'feature': featName,
-                'mu': mu,
-                'sigma': sigma
-            })
-            finalDF.loc[:, dataGroup.columns] = (dataDF[dataGroup.columns] - mu) / sigma
-        #
-        def normalizeDataset(inputDF, params):
-            outputDF = inputDF.copy()
-            for postParams in params[0]:
-                featMask = inputDF.columns.get_level_values('feature') == postParams['feature']
-                if featMask.any():
-                    print('normalizing feature {}'.format(postParams['feature']))
-                    print('mu = {} sigma = {}'.format(postParams['mu'], postParams['sigma']))
-                    outputDF.loc[:, featMask] = (inputDF.loc[:, featMask] - postParams['mu']) / postParams['sigma']
-            return outputDF
-        #
-        def unNormalizeDataset(inputDF, params):
-            outputDF = inputDF.copy()
-            for postParams in params[0]:
-                featMask = inputDF.columns.get_level_values('feature') == postParams['feature']
-                if featMask.any():
-                    print('un-normalizing feature {}'.format(postParams['feature']))
-                    print('mu = {} sigma = {}'.format(postParams['mu'], postParams['sigma']))
-                    outputDF.loc[:, featMask] = (inputDF.loc[:, featMask] * postParams['sigma']) + postParams['mu']
-            return outputDF
-        #
-        # finalDF = normalizeDataset(finalDF, normalizationParams)
-    sanityCheck = False
-    if sanityCheck:
-        # sanity check that the normalizations are invertible
-        originalDF = pd.concat(lOfDF)
-        rng = np.random.default_rng()
-        plotTIdx = rng.choice(range(originalDF.groupby(['segment', 'originalIndex', 't']).ngroups))
-        for tIdx, (name, origGroup) in enumerate(originalDF.groupby(['segment', 'originalIndex', 't'])):
-            if tIdx != plotTIdx:
-                continue
-            plotColumn = rng.choice(origGroup.columns)
-            #
-            orig = origGroup.loc[:, [plotColumn]]
-            normalized = normalizeDataset(orig, normalizationParams)
-            final = finalDF.loc[orig.index, [plotColumn]]
-            #
-            unNormalized = unNormalizeDataset(normalized, normalizationParams)
-            unNormalizedFinal = unNormalizeDataset(final, normalizationParams)
-            #
-            fig, ax = plt.subplots(1, 2)
-            tBins = orig.index.get_level_values('bin')
-            ax[0].plot(tBins, orig, 'b', lw=4, label='data')
-            ax[0].plot(tBins, unNormalized, 'c', ls='dashed', lw=3, label='un-normalize(normalize(data))')
-            ax[0].plot(tBins, unNormalizedFinal, 'g', ls='dashdot', lw=2, label='un-normalize(finalData)')
-            #
-            ax[1].plot(tBins, final, 'r', lw=3, label='finalData')
-            ax[1].plot(tBins, normalized, 'm', ls='dashed', lw=2, label='normalize(data)')
-            print('orig == unNormalized: {}'.format(float((orig - unNormalized).abs().mean()) < 1e-12))
-            print('orig == unNormalizedFinal: {}'.format(float((orig - unNormalizedFinal).abs().mean()) < 1e-12))
-            print('orig == normalized: {}'.format(float((orig - normalized).abs().mean()) < 1e-12))
-            print('final == normalized: {}'.format(float((final - normalized).abs().mean()) < 1e-12))
-            #
-            ax[0].legend()
-            ax[1].legend()
-            plt.show()
-            break
-    datasetPath = os.path.join(
-        dataFramesFolder,
-        datasetName + '.h5'
-        )
-    print('saving {} to {}'.format(arguments['selectionName'], datasetPath))
-    finalDF.to_hdf(datasetPath, '/{}/data'.format(arguments['selectionName']), mode='a')
-    thisMask.to_hdf(datasetPath, '/{}/featureMasks'.format(arguments['selectionName']), mode='a')
-    #
-    loadingMetaPath = os.path.join(
-        dataFramesFolder,
-        datasetName + '_' + arguments['selectionName'] + '_meta.pickle'
-        )
-    if os.path.exists(loadingMetaPath):
-        os.remove(loadingMetaPath)
-    loadingMeta['arguments'] = arguments.copy()
-    loadingMeta['normalizationParams'] = normalizationParams
-    loadingMeta['normalizeDataset'] = normalizeDataset
-    loadingMeta['unNormalizeDataset'] = unNormalizeDataset
-    with open(loadingMetaPath, 'wb') as f:
-        pickle.dump(loadingMeta, f)'''

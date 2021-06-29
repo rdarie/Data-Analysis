@@ -28,8 +28,8 @@ source ./shellScripts/calc_aligned_motion_preamble.sh
 
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
 #
-# TARGET="lfp_CAR_spectral"
-TARGET="lfp_CAR"
+TARGET="lfp_CAR_spectral"
+# TARGET="lfp_CAR"
 #
 # ESTIMATOR="fa"
 ESTIMATOR="pca"
@@ -59,10 +59,6 @@ python -u './processSignalDimensionality.py' --estimatorName="${ESTIMATOR}" --da
 ESTIMATOR="pca_ta"
 python -u './calcGridSearchSignalDimensionality.py' --averageByTrial --estimatorName="${ESTIMATOR}" --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=2 --plotting
 python -u './processSignalDimensionality.py' --estimatorName="${ESTIMATOR}" --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
-
-
-
-
 
 # python -u './compareSignalCovarianceMatrices.py' --estimatorName="${ESTIMATOR}" --iteratorSuffixList="a, b" --datasetPrefix="Block_${WINDOWTERM}_df" --selectionName=$TARGET --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
 ##

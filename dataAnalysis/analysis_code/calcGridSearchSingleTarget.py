@@ -127,7 +127,7 @@ if __name__ == '__main__':
         loadingMeta = pickle.load(_f)
     #
     iteratorsBySegment = loadingMeta['iteratorsBySegment'].copy()
-    cv_kwargs = loadingMeta['cv_kwargs'].copy()
+    # cv_kwargs = loadingMeta['cv_kwargs'].copy()
     cvIterator = iteratorsBySegment[0]
     workIdx = cvIterator.work
     ###
@@ -186,7 +186,7 @@ if __name__ == '__main__':
         if joblibBackendArgs['backend'] == 'dask':
             daskClient = Client()
     allGridSearchDict = {}
-    pdb.set_trace()
+    # pdb.set_trace()
     for idx, (maskIdx, lhsMask) in enumerate(lhsMasks.iterrows()):
         maskParams = {k: v for k, v in zip(lhsMask.index.names, maskIdx)}
         ####

@@ -158,7 +158,7 @@ if __name__ == '__main__':
         loadingMeta = pickle.load(_f)
         # iteratorsBySegment = loadingMeta.pop('iteratorsBySegment')
         iteratorsBySegment = loadingMeta['iteratorsBySegment']
-        cv_kwargs = loadingMeta['cv_kwargs']
+        # cv_kwargs = loadingMeta['cv_kwargs']
     for argName in ['plotting', 'showFigures', 'debugging', 'verbose']:
         loadingMeta['arguments'].pop(argName, None)
     arguments.update(loadingMeta['arguments'])
@@ -234,7 +234,8 @@ if __name__ == '__main__':
     featureColumnFields = dataDF.columns.names
     ###
 
-    maxNCompsToTest = min(96, dataDF.shape[1])
+    maxNCompsToTest = min(96, featureMasks.sum(axis='columns').min())
+    # pdb.set_trace()
     listOfNCompsToTest = []
     for idx, (maskIdx, featureMask) in enumerate(featureMasks.iterrows()):
         maskParams = {k: v for k, v in zip(featureMask.index.names, maskIdx)}

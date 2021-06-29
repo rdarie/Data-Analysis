@@ -8,13 +8,14 @@ Options:
     --processAll                             process entire experimental day? [default: False]
     --plotting                               make plots? [default: False]
     --showFigures                            show plots? [default: False]
-    --verbose                                print diagnostics? [default: False]
+    --verbose=verbose                        print diagnostics?
     --debugging                              print diagnostics? [default: False]
     --estimatorName=estimatorName            filename for resulting estimator (cross-validated n_comps)
     --datasetName=datasetName                filename for resulting estimator (cross-validated n_comps)
     --analysisName=analysisName              append a name to the resulting blocks? [default: default]
     --alignFolderName=alignFolderName        append a name to the resulting blocks? [default: motion]
 """
+
 import matplotlib
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
@@ -38,31 +39,40 @@ import numpy as np
 import pandas as pd
 import dataAnalysis.preproc.ns5 as ns5
 # from sklearn.decomposition import PCA, IncrementalPCA
-# from sklearn.pipeline import make_pipeline, Pipeline
+from sklearn.pipeline import make_pipeline, Pipeline
+from sklego.preprocessing import PatsyTransformer
 # from sklearn.covariance import ShrunkCovariance, LedoitWolf, EmpiricalCovariance
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import cross_val_score, cross_validate, GridSearchCV
 import joblib as jb
 import dill as pickle
 import gc
+from itertools import product
 from dataAnalysis.analysis_code.currentExperiment import parseAnalysisOptions
 from docopt import docopt
 idxSl = pd.IndexSlice
+sns.set(
+    context='paper', style='whitegrid',
+    palette='dark', font='sans-serif',
+    font_scale=.8, color_codes=True, rc={
+        'figure.dpi': 200, 'savefig.dpi': 200})
 
 arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
-# pdb.set_trace()
+
 # if debugging in a console:
 '''
+
 consoleDebugging = True
 if consoleDebugging:
     arguments = {
-    'analysisName': 'default', 'showFigures': True, 'exp': 'exp202101201100', 'processAll': True,
-    'verbose': False, 'plotting': True, 'fullEstimatorName': 'ols_lfp_CAR_spectral_to_jointAngle_a_L_starting',
-    'alignFolderName': 'motion', 'blockIdx': '2', 'correctFreqBandName': True}
+        'analysisName': 'hiRes', 'datasetName': 'Synthetic_XL_df_g', 'estimatorName': 'enr',
+        'processAll': True, 'verbose': '1', 'plotting': True, 'exp': 'exp202101281100',
+        'showFigures': True, 'alignFolderName': 'motion', 'blockIdx': '2', 'debugging': False}
     os.chdir('/gpfs/home/rdarie/nda2/Data-Analysis/dataAnalysis/analysis_code')
     scratchPath = '/gpfs/scratch/rdarie/rdarie/Neural Recordings'
     scratchFolder = '/gpfs/scratch/rdarie/rdarie/Neural Recordings/202101201100-Rupert'
     figureFolder = '/gpfs/data/dborton/rdarie/Neural Recordings/processed/202101201100-Rupert/figures'
+    
 '''
 
 expOpts, allOpts = parseAnalysisOptions(
@@ -74,10 +84,9 @@ analysisSubFolder, alignSubFolder = hf.processSubfolderPaths(
     arguments, scratchFolder)
 if arguments['plotting']:
     figureOutputFolder = os.path.join(
-        figureFolder,
-        arguments['analysisName'], arguments['alignFolderName'])
-    if not os.path.exists(figureOutputFolder):
-        os.makedirs(figureOutputFolder)
+        figureFolder, arguments['analysisName'], 'regression')
+if not os.path.exists(figureOutputFolder):
+    os.makedirs(figureOutputFolder)
 #
 '''fullEstimatorName = '{}_{}_to_{}{}_{}_{}'.format(
     arguments['estimatorName'],
@@ -90,188 +99,259 @@ fullEstimatorName = '{}_{}'.format(
     arguments['estimatorName'], arguments['datasetName'])
 #
 estimatorsSubFolder = os.path.join(
-    alignSubFolder, 'estimators')
-if not os.path.exists(estimatorsSubFolder):
-    os.makedirs(estimatorsSubFolder)
+    analysisSubFolder, 'estimators')
+dataFramesFolder = os.path.join(
+    analysisSubFolder, 'dataframes')
 datasetPath = os.path.join(
-    estimatorsSubFolder,
+    dataFramesFolder,
     datasetName + '.h5'
     )
 estimatorPath = os.path.join(
     estimatorsSubFolder,
     fullEstimatorName + '.h5'
     )
-with open(datasetPath.replace('.h5', '_meta.pickle'), 'rb') as _f:
+estimatorMetaDataPath = os.path.join(
+    estimatorsSubFolder,
+    fullEstimatorName + '_meta.pickle'
+    )
+with open(estimatorMetaDataPath, 'rb') as _f:
+    estimatorMeta = pickle.load(_f)
+#
+loadingMetaPath = estimatorMeta['loadingMetaPath']
+with open(loadingMetaPath, 'rb') as _f:
     loadingMeta = pickle.load(_f)
-arguments.update(loadingMeta['arguments'])
+    iteratorOpts = loadingMeta['iteratorOpts']
 #
-scoresDF = pd.read_hdf(estimatorPath, 'cv')
-#
-cvIteratorSubfolder = os.path.join(
-    alignSubFolder, 'testTrainSplits')
-if arguments['iteratorSuffix'] is not None:
-    iteratorSuffix = '_{}'.format(arguments['iteratorSuffix'])
-else:
-    iteratorSuffix = ''
-#
-if arguments['processAll']:
-    rhsBlockBaseName = arguments['rhsBlockPrefix']
-    lhsBlockBaseName = arguments['lhsBlockPrefix']
-else:
-    rhsBlockBaseName = '{}{:0>3}'.format(
-        arguments['rhsBlockPrefix'], arguments['blockIdx'])
-    lhsBlockBaseName = '{}{:0>3}'.format(
-        arguments['lhsBlockPrefix'], arguments['blockIdx'])
-# rhs loading paths
-if arguments['rhsBlockSuffix'] is not None:
-    rhsBlockSuffix = '_{}'.format(arguments['rhsBlockSuffix'])
-else:
-    rhsBlockSuffix = ''
-if arguments['lhsBlockSuffix'] is not None:
-    lhsBlockSuffix = '_{}'.format(arguments['lhsBlockSuffix'])
-else:
-    lhsBlockSuffix = ''
-#
+binInterval = iteratorOpts['forceBinInterval'] if iteratorOpts['forceBinInterval'] is not None else rasterOpts['binInterval']
+addHistoryTerms = {
+    'nb': 5,
+    'dt': binInterval,
+    # 'historyLen': iteratorOpts['covariateHistoryLen'],
+    'historyLen': 100e-3,
+    'b': 0.001, 'useOrtho': False,
+    'normalize': True, 'groupBy': 'trialUID',
+    'zflag': False}
+rcb = tdr.patsyRaisedCosTransformer
+thisEnv = patsy.EvalEnvironment.capture()
+
 iteratorsBySegment = loadingMeta['iteratorsBySegment'].copy()
-cv_kwargs = loadingMeta['cv_kwargs'].copy()
-
-'''lhGroupNames = loadingMeta['lhGroupNames']
-lOfRhsDF = []
-lOfLhsDF = []
-lOfLhsMasks = []
-experimentsToAssemble = loadingMeta['experimentsToAssemble'].copy()
-currBlockNum = 0
-for expName, lOfBlocks in experimentsToAssemble.items():
-    thisScratchFolder = os.path.join(scratchPath, expName)
-    analysisSubFolder, alignSubFolder = hf.processSubfolderPaths(
-        arguments, thisScratchFolder)
-    thisDFFolder = os.path.join(alignSubFolder, 'dataframes')
-    for bIdx in lOfBlocks:
-        theseArgs = arguments.copy()
-        theseArgs['blockIdx'] = '{}'.format(bIdx)
-        theseArgs['processAll'] = False
-        theseArgs['inputBlockSuffix'] = theseArgs['rhsBlockSuffix']
-        theseArgs['inputBlockPrefix'] = theseArgs['rhsBlockPrefix']
-        thisBlockBaseName, _ = hf.processBasicPaths(theseArgs)
-        dFPath = os.path.join(
-            thisDFFolder,
-            '{}_{}_{}_df{}.h5'.format(
-                thisBlockBaseName,
-                arguments['window'],
-                arguments['alignQuery'],
-                iteratorSuffix))
-        thisRhsDF = pd.read_hdf(dFPath, arguments['unitQueryRhs'])
-        thisRhsDF.index = thisRhsDF.index.set_levels([currBlockNum], level='segment')
-        # only use zero lag targets    
-        thisRhsDF = thisRhsDF.xs(0, level='lag', axis='columns')
-        thisRhsDF.loc[:, 'expName'] = expName
-        thisRhsDF.set_index('expName', inplace=True, append=True)
-        #
-        lOfRhsDF.append(thisRhsDF)
-        thisLhsDF = pd.read_hdf(dFPath, arguments['unitQueryLhs'])
-        thisLhsDF.index = thisLhsDF.index.set_levels([currBlockNum], level='segment')
-        thisLhsDF.loc[:, 'expName'] = expName
-        thisLhsDF.set_index('expName', inplace=True, append=True)
-        lOfLhsDF.append(thisLhsDF)
-        thisLhsMask = pd.read_hdf(dFPath, arguments['unitQueryLhs'] + '_featureMasks')
-        lOfLhsMasks.append(thisLhsMask)
-        currBlockNum += 1
-lhsDF = pd.concat(lOfLhsDF)
-rhsDF = pd.concat(lOfRhsDF)
-del lOfRhsDF, lOfLhsDF, thisRhsDF, thisLhsDF
-
-## Normalize lhs
-lhsNormalizationParams = loadingMeta['lhsNormalizationParams']
-if 'spectral' in arguments['unitQueryLhs']:
-    for lhnDict in lhsNormalizationParams[0]:
-        featName = lhnDict['feature']
-        featMask = lhsDF.columns.get_level_values('feature') == featName
-        expName = lhnDict['expName']
-        expMask = lhsDF.index.get_level_values('expName') == expName
-        print('Pre-normalizing {}, {}'.format(expName, featName))
-        meanLevel = lhnDict['mu']
-        lhsDF.loc[expMask, featMask] = np.sqrt(lhsDF.loc[expMask, featMask] / meanLevel)
-    for lhnDict in lhsNormalizationParams[1]:
-        featName = lhnDict['feature']
-        featMask = lhsDF.columns.get_level_values('feature') == featName
-        print('Final normalizing {}'.format(featName))
-        lhsDF.loc[:, featMask] = (lhsDF.loc[:, featMask] - lhnDict['mu']) / lhnDict['sigma']
-#
-## Normalize rhs
-rhsNormalizationParams = loadingMeta['rhsNormalizationParams']
-for rhnDict in rhsNormalizationParams[0]:
-    featName = rhnDict['feature']
-    featMask = rhsDF.columns.get_level_values('feature') == featName
-    print('Final normalizing {}'.format(featName))
-    rhsDF.loc[:, featMask] = (rhsDF.loc[:, featMask] - rhnDict['mu']) / rhnDict['sigma']'''
-
-lhsDF = pd.read_hdf(datasetPath, 'lhsDF')
-rhsDF = pd.read_hdf(datasetPath, 'rhsDF')
-lhsMasks = pd.read_hdf(datasetPath, 'lhsFeatureMasks')
-#
+# cv_kwargs = loadingMeta['cv_kwargs'].copy()
 cvIterator = iteratorsBySegment[0]
-workIdx = cvIterator.work
-workingLhsDF = lhsDF.iloc[workIdx, :]
-workingRhsDF = rhsDF.iloc[workIdx, :]
-nFeatures = lhsDF.columns.shape[0]
-nTargets = rhsDF.columns.shape[0]
 #
-lhsFeatureInfo = lhsDF.columns.to_frame().reset_index(drop=True)
-workingTrialInfo = workingRhsDF.index.to_frame().reset_index(drop=True)
-allPredictionsList = []
-# lhsMasks = lOfLhsMasks[0]
-lhGroupNames = lhsMasks.index.names
-for idx, (attrNameList, lhsMask) in enumerate(lhsMasks.iterrows()):
-    maskParams = {k: v for k, v in zip(lhsMask.index.names, attrNameList)}
-    # for groupName, scoresGroup in scoresDF.groupby(lhGroupNames):
-    '''if not isinstance(groupName, list):
-        attrNameList = [groupName]
+selectionNameLhs = estimatorMeta['arguments']['selectionNameLhs']
+selectionNameRhs = estimatorMeta['arguments']['selectionNameRhs']
+#
+
+#
+if estimatorMeta['pipelinePathRhs'] is not None:
+    transformedSelectionNameRhs = '{}_{}'.format(
+        selectionNameRhs, estimatorMeta['arguments']['transformerNameRhs'])
+    transformedRhsDF = pd.read_hdf(estimatorMeta['rhsDatasetPath'], '/{}/data'.format(transformedSelectionNameRhs))
+    pipelineScoresRhsDF = pd.read_hdf(estimatorMeta['pipelinePathRhs'], 'work')
+    workingPipelinesRhs = pipelineScoresRhsDF['estimator']
+else:
+    workingPipelinesRhs = None
+#
+if estimatorMeta['pipelinePathLhs'] is not None:
+    pipelineScoresLhsDF = pd.read_hdf(estimatorMeta['pipelinePathLhs'], 'work')
+    workingPipelinesLhs = pipelineScoresLhsDF['estimator']
+else:
+    workingPipelinesLhs = None
+#
+estimatorsDF = pd.read_hdf(estimatorPath, 'cv_estimators')
+scoresDF = pd.read_hdf(estimatorPath, 'cv_scores')
+lhsDF = pd.read_hdf(estimatorMeta['lhsDatasetPath'], '/{}/data'.format(selectionNameLhs))
+rhsDF = pd.read_hdf(estimatorMeta['rhsDatasetPath'], '/{}/data'.format(selectionNameRhs))
+lhsMasks = pd.read_hdf(estimatorMeta['lhsDatasetPath'], '/{}/featureMasks'.format(selectionNameLhs))
+rhsMasks = pd.read_hdf(estimatorMeta['rhsDatasetPath'], '/{}/featureMasks'.format(selectionNameRhs))
+#
+trialInfoLhs = lhsDF.index.to_frame().reset_index(drop=True)
+trialInfoRhs = rhsDF.index.to_frame().reset_index(drop=True)
+checkSameMeta = stimulusConditionNames + ['bin', 'trialUID']
+assert (trialInfoRhs.loc[:, checkSameMeta] == trialInfoLhs.loc[:, checkSameMeta]).all().all()
+trialInfo = trialInfoLhs
+#
+lhsDF.index = pd.MultiIndex.from_frame(trialInfo.loc[:, checkSameMeta])
+rhsDF.index = pd.MultiIndex.from_frame(trialInfo.loc[:, checkSameMeta])
+#
+coefDict0 = {}
+predDict0 = {}
+for lhsRowIdx, rhsRowIdx in product(list(range(lhsMasks.shape[0])), list(range(rhsMasks.shape[0]))):
+    lhsMask = lhsMasks.iloc[lhsRowIdx, :]
+    rhsMask = rhsMasks.iloc[rhsRowIdx, :]
+    lhsMaskParams = {k: v for k, v in zip(lhsMask.index.names, lhsMask.name)}
+    rhsMaskParams = {k: v for k, v in zip(rhsMask.index.names, rhsMask.name)}
+    lhGroup = lhsDF.loc[:, lhsMask]
+    #
+    lhGroup.columns = lhGroup.columns.get_level_values('feature')
+    designFormula = lhsMask.name[lhsMasks.index.names.index('designFormula')]
+    #
+    pt = PatsyTransformer(designFormula, return_type="matrix")
+    designMatrix = pt.fit_transform(lhGroup)
+    designInfo = designMatrix.design_info
+    designDF = (
+        pd.DataFrame(
+            designMatrix,
+            index=lhGroup.index,
+            columns=designInfo.column_names))
+    designDF.columns.name = 'feature'
+    rhGroup = rhsDF.loc[:, rhsMask].copy()
+    # transform to PCs
+    if workingPipelinesRhs is not None:
+        transformPipelineRhs = workingPipelinesRhs.xs(rhsMaskParams['freqBandName'], level='freqBandName').iloc[0]
+        rhsPipelineMinusAverager = Pipeline(transformPipelineRhs.steps[1:])
+        rhsPipelineAverager = transformPipelineRhs.named_steps['averager']
+        rhTransformedColumns = transformedRhsDF.columns[transformedRhsDF.columns.get_level_values('freqBandName') == rhsMaskParams['freqBandName']]
+        rhGroup = pd.DataFrame(
+            rhsPipelineMinusAverager.transform(rhGroup),
+            index=lhGroup.index, columns=rhTransformedColumns)
     else:
-        attrNameList = groupName'''
-    # lhsMask = np.ones(lhsDF.shape[1], dtype=bool)
-    '''scoresMask = np.ones(scoresDF.shape[1], dtype=bool)
-    pdb.set_trace()
-    for attrIdx, attrName in enumerate(attrNameList):
-        attrKey = lhGroupNames[attrIdx]
-        # lhsMask = lhsMask & (lhsFeatureInfo[attrKey] == attrName).to_numpy()
-        scoresMask = scoresMask & (lhsFeatureInfo[attrKey] == attrName).to_numpy()'''
-    lhsGroup = lhsDF.loc[:, lhsMask]
-    # scoresGroup = scoresDF.loc[:, scoresMask]
-    predListPerTarget = []
-    for targetName, rhsGroup in rhsDF.groupby('feature', axis='columns'):
-        predListPerFold = []
-        for foldIdx, (trainIdx, testIdx) in enumerate(cvIterator.folds):
-            foldLHS = lhsGroup.iloc[trainIdx, :]
-            foldRHS = rhsGroup.iloc[trainIdx, :]
-            '''foldMaskScores = (
-                (scoresGroup.index.get_level_values('fold') == foldIdx) &
-                (scoresGroup.index.get_level_values('target') == targetName))
-            assert scoresGroup.loc[foldMaskScores, 'estimator'].size == 1'''
-            #
-            theseIndices = (targetName, foldIdx) + attrNameList
-            '''theseIndicesTemp = [ti for ti in ((targetName, foldIdx) + attrNameList)] + ['{}'.format(maskParams)]
-            theseIndices = tuple(ti for ti in theseIndicesTemp)'''
-            #
-            if theseIndices not in scoresDF.index:
+        rhsPipelineAverager = Pipeline[('averager', tdr.DataFramePassThrough(), )]
+    rhGroup.columns = rhGroup.columns.get_level_values('feature')
+    for targetName in rhGroup.columns:
+        for foldIdx in range(cvIterator.n_splits + 1):
+            targetDF = rhGroup.loc[:, [targetName]]
+            estimatorIdx = (lhsRowIdx, rhsRowIdx, targetName, foldIdx)
+            print('estimator: {}'.format(estimatorIdx))
+            print('in dataframe: {}'.format(estimatorIdx in estimatorsDF.index))
+            if not estimatorIdx in estimatorsDF.index:
                 continue
-            thisEstimator = scoresDF.loc[theseIndices, 'estimator']
-            # pdb.set_trace()
-            foldPrediction = pd.DataFrame(
-                thisEstimator.predict(foldLHS.to_numpy()), index=foldRHS.index,
-                columns=foldRHS.columns)
-            tempIndexFrame = foldPrediction.index.to_frame().reset_index(drop=True)
-            for attrIdx, attrName in enumerate(attrNameList):
-                attrKey = lhGroupNames[attrIdx]
-                tempIndexFrame.loc[:, attrKey] = attrName
-            foldPrediction.index = pd.MultiIndex.from_frame(tempIndexFrame)
-            predListPerFold.append(foldPrediction)
-        if len(predListPerFold):
-            targetPredictions = pd.concat(predListPerFold)
-            predListPerTarget.append(targetPredictions)
-    if len(predListPerTarget):
-        groupPredictions = pd.concat(predListPerTarget, axis='columns')
-        allPredictionsList.append(groupPredictions)
+            if foldIdx == cvIterator.n_splits:
+                # work and validation folds
+                trainIdx, testIdx = cvIterator.workIterator.split(rhGroup)[0]
+                trainStr, testStr = 'work', 'validation'
+                foldType = 'validation'
+            else:
+                trainIdx, testIdx = cvIterator.raw_folds[foldIdx]
+                trainStr, testStr = 'train', 'test'
+                foldType = 'train'
+            estimator = estimatorsDF.loc[estimatorIdx]
+            coefs = pd.Series(
+                estimator.regressor_.named_steps['regressor'].coef_, index=designDF.columns)
+            coefDict0[estimatorIdx] = coefs
+            estPreprocessorLhs = Pipeline(estimator.regressor_.steps[:-1])
+            estPreprocessorRhs = estimator.transformer_
+            predictionPerComponent = pd.concat({
+                trainStr: estPreprocessorLhs.transform(designDF.iloc[trainIdx, :]) * coefs,
+                testStr: estPreprocessorLhs.transform(designDF.iloc[testIdx, :]) * coefs
+                }, names=['trialType'])
+            predictionSrs = predictionPerComponent.sum(axis='columns')
+            # sanity
+            indicesThisFold = np.concatenate([trainIdx, testIdx])
+            predictionsNormalWay = np.concatenate([
+                estimator.predict(designDF.iloc[trainIdx, :]),
+                estimator.predict(designDF.iloc[testIdx, :])
+                ])
+            mismatch = predictionSrs - predictionsNormalWay.reshape(-1)
+            print('max mismatch is {}'.format(mismatch.abs().max()))
+            assert (mismatch.abs().max() < 1e-3)
+            predictionPerSource = pd.DataFrame(
+                np.nan, index=predictionPerComponent.index,
+                columns=designInfo.term_names)
+            for termName, termSlice in designInfo.term_name_slices.items():
+                predictionPerSource.loc[:, termName] = predictionPerComponent.iloc[:, termSlice].sum(axis='columns')
+            predictionPerSource.loc[:, 'prediction'] = predictionSrs
+            predictionPerSource.loc[:, 'ground_truth'] = np.concatenate([
+                estPreprocessorRhs.transform(targetDF.iloc[trainIdx, :]),
+                estPreprocessorRhs.transform(targetDF.iloc[testIdx, :])
+                ])
+            predDict0[(lhsRowIdx, rhsRowIdx, targetName, foldIdx, foldType)] = predictionPerSource
+predDF = pd.concat(predDict0, names=['lhsMaskIdx', 'rhsMaskIdx', 'target', 'fold', 'foldType'])
+predDF.columns.name = 'term'
+coefDF = pd.concat(coefDict0, names=['lhsMaskIdx', 'rhsMaskIdx', 'target', 'fold', 'foldType'])
+
+nTerms = predDF.columns.size
+termPalette = pd.Series(
+    sns.color_palette('Set2', nTerms),
+    index=predDF.columns)
+
+coefDF.to_hdf(estimatorPath, 'coefficients')
+predDF.to_hdf(estimatorPath, 'predictions')
+termPalette.to_hdf(estimatorPath, 'plotOpts')
+
+groupPagesBy = ['rhsMaskIdx', 'lhsMaskIdx', 'target']
+groupSubPagesBy = ['trialType', 'foldType', 'electrode']
+scoresForPlot = pd.concat({
+        'test': scoresDF['test_score'],
+        'train': scoresDF['train_score']},
+    names=['trialType']
+    ).to_frame(name='score').reset_index()
 #
-# target values do not have meaningful attributes from the predictor group
-predictedDF = pd.concat(allPredictionsList)
-predictedDF.to_hdf(estimatorPath, 'predictions')
+lastFoldMask = (scoresForPlot['fold'] == cvIterator.n_splits)
+trainMask = (scoresForPlot['trialType'] == 'train')
+#
+scoresForPlot.loc[:, 'foldType'] = ''
+scoresForPlot.loc[(trainMask & lastFoldMask), 'foldType'] = 'work'
+scoresForPlot.loc[(trainMask & (~lastFoldMask)), 'foldType'] = 'train'
+scoresForPlot.loc[((~trainMask) & lastFoldMask), 'foldType'] = 'validation'
+scoresForPlot.loc[((~trainMask) & (~lastFoldMask)), 'foldType'] = 'test'
+scoresForPlot.loc[:, 'dummyX'] = 0
+#
+height, width = 3, 3
+aspect = width / height
+commonOpts = dict(
+    )
+pdfPath = os.path.join(
+    figureOutputFolder, '{}_{}.pdf'.format(fullEstimatorName, 'reconstructions'))
+
+with PdfPages(pdfPath) as pdf:
+    for name0, predGroup0 in predDF.groupby(groupPagesBy):
+        nmLk0 = {key: value for key, value in zip(groupPagesBy, name0)} # name lookup
+        #
+        scoreMasks = [
+            scoresForPlot[cN] == nmLk0[cN]
+            for cN in groupPagesBy]
+        theseScoresPlot = scoresForPlot.loc[np.logical_and.reduce(scoreMasks), :]
+        g = sns.catplot(
+            data=theseScoresPlot, hue='foldType',
+            x='dummyX', y='score',
+            kind='box')
+        g.fig.suptitle('R^2 for target {target}'.format(**nmLk0))
+        newYLims = theseScoresPlot['score'].quantile([0.25, 1 - 1e-3]).to_list()
+        for ax in g.axes.flat:
+            ax.set_xlabel('regression target')
+            ax.set_ylabel('R2 of ordinary least squares fit')
+            ax.set_ylim(newYLims)
+        g.fig.tight_layout(pad=1)
+        pdf.savefig(bbox_inches='tight', pad_inches=0)
+        if arguments['showFigures']:
+            plt.show()
+        else:
+            plt.close()
+        for name1, predGroup1 in predGroup0.groupby(groupSubPagesBy):
+            nmLk1 = {key: value for key, value in zip(groupSubPagesBy, name1)} # name lookup
+            nmLk0.update(nmLk1)
+            if nmLk0['trialType'] != 'train':
+                continue
+            plotData = predGroup1.stack().to_frame(name='signal').reset_index()
+            plotData.loc[:, 'predType'] = 'component'
+            plotData.loc[plotData['term'] == 'ground_truth', 'predType'] = 'ground_truth'
+            plotData.loc[plotData['term'] == 'prediction', 'predType'] = 'prediction'
+            g = sns.relplot(
+                data=plotData,
+                col='trialAmplitude', row='pedalMovementCat',
+                row_order=['NA', 'outbound', 'return'],
+                x='bin', y='signal', hue='term',
+                height=height, aspect=aspect, palette=termPalette.to_dict(),
+                kind='line', errorbar='sd',
+                style='predType', dashes={
+                    'ground_truth': (10, 0),
+                    'prediction': (2, 1),
+                    'component': (7, 3)
+                }, facet_kws=dict(margin_titles=True),
+                )
+            g.set_titles(template="{col_var}\n{col_name}\n{row_var}\n{row_name}")
+            titleText = 'model {lhsMaskIdx}\n{target}, electrode {electrode} ({foldType})'.format(
+                **nmLk0)
+            print('Saving plot of {}...'.format(titleText))
+            figTitle = g.fig.suptitle(titleText)
+            g._tight_layout_rect[-1] -= 0.25 / g.fig.get_size_inches()[1]
+            g.tight_layout(pad=0.1)
+            pdf.savefig(
+                bbox_inches='tight',
+                bbox_extra_artists=[figTitle, g.legend]
+                )
+            if arguments['showFigures']:
+                plt.show()
+            else:
+                plt.close()

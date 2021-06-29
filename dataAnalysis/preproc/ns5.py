@@ -1001,7 +1001,8 @@ def unitSpikeTrainWaveformsToDF(
                     shiftedWaveform.iloc[:, seekIdx].copy())
         laggedMetaDict[
             (spikeTrainContainer.name, lag)] = metaDF.copy()
-    #
+    # plt.plot(zeroLagWaveformsDF.columns, zeroLagWaveformsDF.mean())
+    # plt.plot(shiftedWaveform.columns, shiftedWaveform.mean()); plt.show()
     stackedMetaDF = pd.concat(laggedMetaDict, names=['feature', 'lag', 'originalDummy']).reset_index().drop(columns=['originalDummy'])
     # e.g. getFeatureMetaData = ['freqBandName', 'parentFeature']
     if getFeatureMetaData is not None:
