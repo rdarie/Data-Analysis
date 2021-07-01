@@ -3971,6 +3971,15 @@ def exportNormalizedDataFrame(
         trialInfo = dataDF.index.to_frame().reset_index(drop=True)
         trialInfo.loc[:, 'trialUID'] = loadingMeta['iteratorsBySegment'][0].prelimSplitter.continuousGroup
         dataDF.index = pd.MultiIndex.from_frame(trialInfo)
+    if 'conditionUID' not in dataDF.index.names:
+        trialInfo = dataDF.index.to_frame().reset_index(drop=True)
+        conditionUID = pd.Series(np.nan, index=trialInfo.index)
+        conditionNames = loadingMeta['iteratorsBySegment'][0].prelimSplitter.stratifyFactors
+        for name, group in trialInfo.groupby(conditionNames):
+            for uid, (_, subGroup) in enumerate(group.groupby('trialUID')):
+                conditionUID.loc[subGroup.index] = uid
+        trialInfo.loc[:, 'conditionUID'] = conditionUID
+        dataDF.index = pd.MultiIndex.from_frame(trialInfo)
     # save, copied from assemble dataframes
     finalDF = dataDF.copy()
     #  #### end of data loading stuff

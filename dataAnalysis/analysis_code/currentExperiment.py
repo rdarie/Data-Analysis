@@ -500,11 +500,21 @@ def parseAnalysisOptions(
                 )
     except Exception:
         pass
-    #
+    # args for the sklearn StratifiedShuffleSplit
+    defaultSamplerKWArgs = dict(random_state=42, test_size=0.5)
+    defaultPrelimSamplerKWArgs = dict(random_state=42, test_size=0.1)
+    # args for tdr.
     defaultSplitterKWArgs = dict(
         stratifyFactors=stimulusConditionNames,
-        continuousFactors=['segment', 'originalIndex', 't'])
-    defaultSamplerKWArgs = dict(random_state=42)
+        continuousFactors=['segment', 'originalIndex', 't'],
+        samplerClass=None,
+        samplerKWArgs=defaultSamplerKWArgs)
+    defaultPrelimSplitterKWArgs = dict(
+        stratifyFactors=stimulusConditionNames,
+        continuousFactors=['segment', 'originalIndex', 't'],
+        samplerClass=None,
+        samplerKWArgs=defaultPrelimSamplerKWArgs)
+    #
     iteratorOpts = {
         # rest period from before movement onset
         'a': {
@@ -519,7 +529,7 @@ def parseAnalysisOptions(
             'cvKWArgs': dict(
                 n_splits=7,
                 splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
-                samplerClass=None, samplerKWArgs=defaultSamplerKWArgs,
+                # samplerClass=None, samplerKWArgs=defaultSamplerKWArgs,
                 resamplerClass=None, resamplerKWArgs={},
                 ),
             'timeROIOpts': {
@@ -546,7 +556,7 @@ def parseAnalysisOptions(
             'cvKWArgs': dict(
                 n_splits=7,
                 splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
-                samplerClass=None, samplerKWArgs=defaultSamplerKWArgs,
+                # samplerClass=None, samplerKWArgs=defaultSamplerKWArgs,
                 resamplerClass=None, resamplerKWArgs={},
                 ),
             'timeROIOpts': {
@@ -573,7 +583,7 @@ def parseAnalysisOptions(
             'cvKWArgs': dict(
                 n_splits=7,
                 splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
-                samplerClass=None, samplerKWArgs=defaultSamplerKWArgs,
+                # samplerClass=None, samplerKWArgs=defaultSamplerKWArgs,
                 resamplerClass=None, resamplerKWArgs={},
                 ),
             'timeROIOpts': {
@@ -600,18 +610,19 @@ def parseAnalysisOptions(
             'cvKWArgs': dict(
                 n_splits=7,
                 splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
-                samplerClass=None, samplerKWArgs=defaultSamplerKWArgs,
+                prelimSplitterClass=None, prelimSplitterKWArgs=defaultPrelimSplitterKWArgs,
+                # samplerClass=None, samplerKWArgs=defaultSamplerKWArgs,
                 resamplerClass=None, resamplerKWArgs={},
                 ),
             'timeROIOpts': {
                 'alignQuery': 'startingOrStimOn',
-                'winStart': -100e-3,
-                'winStop': 300e-3
+                'winStart': -200e-3,
+                'winStop': 400e-3
             },
             'timeROIOpts_control': {
                 'alignQuery': None,
-                'winStart': -100e-3,
-                'winStop': 0.
+                'winStart': -800e-3,
+                'winStop': -200.
             }
         },
         # perimovement onset (or peristim onset if stim only) for RAUC
@@ -627,7 +638,7 @@ def parseAnalysisOptions(
             'cvKWArgs': dict(
                 n_splits=7,
                 splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
-                samplerClass=None, samplerKWArgs=defaultSamplerKWArgs,
+                # samplerClass=None, samplerKWArgs=defaultSamplerKWArgs,
                 resamplerClass=None, resamplerKWArgs={},
                 ),
             'timeROIOpts': {

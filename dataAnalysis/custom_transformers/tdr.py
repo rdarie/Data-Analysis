@@ -41,6 +41,29 @@ sns.set_color_codes("dark")
 sns.set_context("talk")
 sns.set_style("whitegrid")
 
+eps = np.spacing(1)
+
+
+def getR2(srs):
+    lls = float(srs.xs('llSat', level='llType'))
+    lln = float(srs.xs('llNull', level='llType'))
+    llf = float(srs.xs('llFull', level='llType'))
+    return 1 - (lls - llf) / (lls - lln)
+
+
+def partialR2(llSrs, testDesign=None, refDesign=None):
+    assert testDesign is not None
+    llSat = llSrs.xs(testDesign, level='design').xs('llSat', level='llType')
+    # llSat2 = llSrs.xs(refDesign, level='design').xs('llSat', level='llType')
+    # sanity check: should be same
+    # assert (llSat - llSat2).abs().max() == 0
+    if refDesign is not None:
+        llRef = llSrs.xs(refDesign, level='design').xs('llFull', level='llType')
+    else:
+        llRef = llSrs.xs(testDesign, level='design').xs('llNull', level='llType')
+    llTest = llSrs.xs(testDesign, level='design').xs('llFull', level='llType')
+    return 1 - (llSat.to_numpy() - llTest) / (llSat.to_numpy() - llRef.to_numpy())
+
 
 class raisedCosTransformer(object):
     def __init__(self, kWArgs=None):
@@ -53,7 +76,17 @@ class raisedCosTransformer(object):
             historyLen=None, b=1e-3,
             normalize=False, useOrtho=True,
             groupBy='trialUID', tLabel='bin',
-            zflag=False, logBasis=True):
+            zflag=False, logBasis=True,
+            addInputToOutput=False, causal=True,
+            selectColumns=None, preprocFun=None):
+        ##
+        if logBasis:
+            nlin = None
+            invnl = None
+        else:
+            nlin = lambda x: x
+            invnl = lambda x: x
+            b = 0
         self.nb = nb
         self.dt = dt
         self.historyLen = historyLen
@@ -64,17 +97,21 @@ class raisedCosTransformer(object):
         self.useOrtho = useOrtho
         self.groupBy = groupBy
         self.tLabel = tLabel
-        ##
-        historyEdge = raisedCosBoundary(
+        self.addInputToOutput = addInputToOutput
+        self.selectColumns = selectColumns
+        self.preprocFun = preprocFun
+        self.causal = causal
+        self.endpoints = raisedCosBoundary(
             b=b, DT=historyLen,
             minX=max(dt / 2, 1e-3),
-            nb=nb)
-        endpoints = [
-            historyEdge[0], historyEdge[0] + historyLen]
-        self.endpoints = endpoints
-        self.ihbasisDF, self.orthobasisDF = makeLogRaisedCosBasis(
-            nb=nb, dt=dt, endpoints=endpoints, b=b,
-            zflag=zflag, normalize=normalize)
+            nb=nb, nlin=nlin, invnl=invnl, causal=causal)
+        if logBasis:
+            self.ihbasisDF, self.orthobasisDF = makeLogRaisedCosBasis(
+                nb=nb, dt=dt, endpoints=self.endpoints, b=b,
+                zflag=zflag, normalize=normalize)
+        else:
+            self.ihbasisDF, self.orthobasisDF = makeRaisedCosBasis(
+                nb=nb, dt=dt, endpoints=self.endpoints, normalize=normalize)
         self.iht = np.array(self.ihbasisDF.index)
         self.leftShiftBasis = int(((max(self.iht) - min(self.iht)) / 2 + min(self.iht)) / self.dt)
         # self.leftShiftBasis = int(min(self.iht) / self.dt)
@@ -88,7 +125,11 @@ class raisedCosTransformer(object):
             historyLen=None, b=1e-3,
             normalize=False, useOrtho=True,
             groupBy='trialUID', tLabel='bin',
-            zflag=False, logBasis=True):
+            zflag=False, logBasis=True, causal=True, addInputToOutput=False,
+            selectColumns=None, preprocFun=None):
+        print('Starting to apply raised cos basis to {} (size={})'.format(vecSrs.name, vecSrs.size))
+        # for line in traceback.format_stack():
+        #     print(line.strip())
         columnNames = ['{}_{}'.format(vecSrs.name, basisCN) for basisCN in self.orthobasisDF.columns]
         resDF = pd.DataFrame(np.nan, index=vecSrs.index, columns=columnNames)
         if self.useOrtho:
@@ -98,15 +139,17 @@ class raisedCosTransformer(object):
         for name, group in vecSrs.groupby(self.groupBy):
             for cNIdx, cN in enumerate(basisDF.columns):
                 resCN = resDF.columns[cNIdx]
+                if self.preprocFun is not None:
+                    sig = self.preprocFun(group)
+                else:
+                    sig = group
                 convResult = np.convolve(
-                    group.to_numpy(),
+                    sig.to_numpy(),
                     basisDF[cN].to_numpy(),
                     mode='full')
-                seekIdx = slice(
-                    int(convResult.shape[0] / 2 - group.shape[0] / 2 - self.leftShiftBasis),
-                    int(convResult.shape[0] / 2 + group.shape[0] / 2 - self.leftShiftBasis)
-                    )
-                convResult = convResult[seekIdx]
+                leftSeek = int(convResult.shape[0] / 2 - group.shape[0] / 2 - self.leftShiftBasis)
+                rightSeek = leftSeek + group.shape[0]
+                convResult = convResult[leftSeek:rightSeek]
                 '''if group.shape[0] <= basisDF.shape[0]:
                     convResult = np.convolve(
                         group.to_numpy(),
@@ -170,12 +213,23 @@ class raisedCosTransformer(object):
                 plt.show()'''
                 #
                 resDF.loc[group.index, resCN] = convResult
+        #
+        if self.selectColumns is not None:
+            resDF = resDF.iloc[:, self.selectColumns]
+        #
+        if self.addInputToOutput:
+            if self.preprocFun is not None:
+                sig = self.preprocFun(vecSrs)
+            else:
+                sig = vecSrs
+            resDF.insert(0, 0., sig)
         return resDF
 
     def plot_basis(self):
         fig, ax = plt.subplots(2, 1, sharex=True)
         ax[0].plot(self.ihbasisDF)
-        ax[0].set_title('raised log cos basis')
+        titleStr = 'raised log cos basis' if self.logBasis else 'raised cos basis'
+        ax[0].set_title(titleStr)
         ax[1].plot(self.orthobasisDF)
         ax[1].set_title('orthogonalized log cos basis')
         ax[1].set_xlabel('Time (sec)')
@@ -266,7 +320,7 @@ class trialAwareStratifiedKFold:
             samplerClass = StratifiedShuffleSplit
         if len(samplerKWArgs.keys()) == 0:
             samplerKWArgs = dict(
-                n_splits=5, random_state=None,
+                n_splits=7, random_state=None,
                 test_size=None,)
         self.sampler = samplerClass(**samplerKWArgs)
         self.stratifyFactors = stratifyFactors
@@ -378,15 +432,15 @@ class trainTestValidationSplitter:
                  'resamplerKWArgs': resamplerKWArgs}
             )
         #####
-        if samplerClass is None:
-            samplerClass = StratifiedShuffleSplit
-        if len(samplerKWArgs.keys()) == 0:
-            samplerKWArgs = dict(random_state=None)
-        ###
-        prelimSplitterKWArgs.update(dict(samplerClass=samplerClass, samplerKWArgs=samplerKWArgs,))
+        # if samplerClass is None:
+        #     samplerClass = StratifiedShuffleSplit
+        # if len(samplerKWArgs.keys()) == 0:
+        #     samplerKWArgs = dict(random_state=None)
+        # ###
+        # prelimSplitterKWArgs.update(dict(samplerClass=samplerClass, samplerKWArgs=samplerKWArgs,))
         prelimSplitterKWArgs['samplerKWArgs']['n_splits'] = n_splits + 1
-        if samplerClass == StratifiedShuffleSplit:
-            prelimSplitterKWArgs['samplerKWArgs']['test_size'] = 1 / (n_splits + 1)
+        # if samplerClass == StratifiedShuffleSplit:
+        #     prelimSplitterKWArgs['samplerKWArgs']['test_size'] = 1 / (n_splits + 1)
         # evaluate a preliminary test-train split,
         # to get a validation-working set split
         self.prelimSplitter = prelimSplitterClass(**prelimSplitterKWArgs)
@@ -400,10 +454,10 @@ class trainTestValidationSplitter:
         # however, prelimCV[1:] contains workIdx indices that are part of the validation set
         # here, we will re-split prelimCV's workIdx indices
         # into a train-test split
-        splitterKWArgs.update(dict(samplerClass=samplerClass, samplerKWArgs=samplerKWArgs,))
+        # splitterKWArgs.update(dict(samplerClass=samplerClass, samplerKWArgs=samplerKWArgs,))
         splitterKWArgs['samplerKWArgs']['n_splits'] = n_splits
-        if samplerClass == StratifiedShuffleSplit:
-            splitterKWArgs['samplerKWArgs']['test_size'] = 1 / n_splits
+        # if samplerClass == StratifiedShuffleSplit:
+        #     splitterKWArgs['samplerKWArgs']['test_size'] = 1 / n_splits
         self.splitter = splitterClass(**splitterKWArgs)
         self.splitter.fit(dataDF.iloc[self.work, :])
         # folds contains iloc indices into the submatrix dataDF.iloc[self.work, :]
@@ -718,16 +772,20 @@ def applyScalersGroupedNoLag(DF, listOfScalers):
 
 
 def raisedCos(x, c, dc):
+    # x is time
+    # c is an offset
+    # dc is the spacing parameter
     argCos = (x - c) * np.pi / dc / 2
     argCos[argCos > np.pi] = np.pi
     argCos[argCos < - np.pi] = - np.pi
     return (np.cos(argCos) + 1) / 2
 
 
-def raisedCosBoundary(
-        b=None, DT=None, minX=None, nb=None, plotting=False):
-    eps = 1e-20
-    nlin = lambda x: np.log(x + eps)
+'''def raisedCosBoundary(
+        b=None, DT=None, minX=None,
+        nb=None, plotting=True, nlin=None):
+    if nlin is None:
+        nlin = lambda x: np.log(x + eps)
     # fun = lambda c0: (nb - 1) * nlin(c0 + b) + 2 * nlin(c0 + DT + b) - (nb - 1) * nlin(minX + b)
     def fun(c0):
         return raisedCos(
@@ -736,25 +794,44 @@ def raisedCosBoundary(
             np.asarray([nlin(c0 + DT + b) - nlin(c0 + b)]) / (nb - 1)
             )[0]
     if plotting:
-        plotC0 = np.linspace(-minX, minX * 20, 1000)
+        plotC0 = np.linspace(-minX * 5, minX * 20, 1000)
         plt.plot(plotC0, fun(plotC0))
         plt.title('solving for cos basis')
         plt.show()
-    return scipy.optimize.root(fun, minX * 2).x
+    result = scipy.optimize.root(fun, minX * 2).x
+    pdb.set_trace()
+    return result'''
 
+def raisedCosBoundary(
+        b=None, DT=None, minX=None, causal=True,
+        nb=None, plotting=True, nlin=None, invnl=None):
+    if nlin is None:
+        nlin = lambda x: np.log(x + eps)
+    if invnl is None:
+        invnl = lambda x: np.exp(x) - eps
+    boundsT = nlin(np.asarray([minX + b, minX + b + DT]))
+    if causal:
+        spacingT = (boundsT[1] - boundsT[0]) / (nb + 3)
+        endpoints = invnl(np.asarray([boundsT[0] + 2 * spacingT, boundsT[1] - 2 * spacingT]))
+    else:
+        endpoints = invnl(np.asarray([boundsT[0], boundsT[1]]))
+    return endpoints
 
 def makeRaisedCosBasis(
         nb=None, spacing=None, dt=None, endpoints=None, normalize=False):
     """
-        Make nonlinearly stretched basis consisting of raised cosines
+        Make linearly stretched basis consisting of raised cosines
     """
     if spacing is None:
         spacing = (endpoints[1] - endpoints[0]) / (nb - 1)
     else:
         assert (nb is None)
     # centers for basis vectors
-    ctrs = np.round(np.arange(
-        endpoints[0], endpoints[1] + spacing, spacing), decimals=3)
+    '''ctrs = np.round(np.arange(
+        endpoints[0], endpoints[1] + spacing, spacing), decimals=6)'''
+    ctrs = np.arange(endpoints[0], endpoints[1] + spacing, spacing)
+    if ctrs.size > nb:
+        ctrs = ctrs[:nb]
     if nb is None:
         nb = len(ctrs)
     iht = np.arange(
@@ -767,11 +844,16 @@ def makeRaisedCosBasis(
     if normalize:
         for colIdx in range(ihbasis.shape[1]):
             ihbasis[:, colIdx] = ihbasis[:, colIdx] / np.sum(ihbasis[:, colIdx])
-    return pd.DataFrame(ihbasis, index=iht, columns=ctrs)
+    orthobas = scipy.linalg.orth(ihbasis)
+    ihbDF = pd.DataFrame(ihbasis, index=iht, columns=np.round(ctrs, decimals=3))
+    orthobasDF = pd.DataFrame(orthobas, index=iht, columns=np.round(ctrs, decimals=3))
+    return ihbDF, orthobasDF
 
 
 def makeLogRaisedCosBasis(
-        nb, dt, endpoints, b=0.01, zflag=False, normalize=False):
+        nb, dt, endpoints, b=0.01,
+        zflag=False, normalize=False,
+        nlin=None, invnl=None):
     """
         Make nonlinearly stretched basis consisting of raised cosines
         Inputs:  nb = # of basis vectors
@@ -791,9 +873,10 @@ def makeLogRaisedCosBasis(
          iht, ihbas, ihbasis = makeRaisedCosBasis(10, .01, [0, 10], .1);
     """
     #
-    eps = 1e-20
-    nlin = lambda x: np.log(x + eps)
-    invnl = lambda x: np.exp(x) - eps
+    if nlin is None:
+        nlin = lambda x: np.log(x + eps)
+    if invnl is None:
+        invnl = lambda x: np.exp(x) - eps
     assert b > 0
     if isinstance(endpoints, list):
         endpoints = np.array(endpoints)
@@ -802,7 +885,7 @@ def makeLogRaisedCosBasis(
     db = np.diff(yrnge)/(nb-1)  # spacing between raised cosine peaks
     ctrs = np.arange(yrnge[0], yrnge[1] + db, db)  # centers for basis vectors
     if ctrs.size > nb:
-        ctrs = ctrs[:-1]
+        ctrs = ctrs[:nb]
     mxt = invnl(yrnge[1]+2*db) - b  # maximum time bin
     iht = np.arange(0, mxt, dt)
     nt = iht.size
@@ -813,13 +896,13 @@ def makeLogRaisedCosBasis(
     if zflag:
         tMask = iht < endpoints[0]
         ihbasis[tMask, 0] = 1
-    orthobas = scipy.linalg.orth(ihbasis)
     if normalize:
         for colIdx in range(ihbasis.shape[1]):
             ihbasis[:, colIdx] = ihbasis[:, colIdx] / np.sum(ihbasis[:, colIdx])
+    orthobas = scipy.linalg.orth(ihbasis)
     # orthobas, _ = scipy.linalg.qr(ihbasis)
     ihbDF = pd.DataFrame(ihbasis, index=iht, columns=np.round(ctrs, decimals=3))
-    orthobasDF = pd.DataFrame(orthobas, index=iht)
+    orthobasDF = pd.DataFrame(orthobas, index=iht, columns=np.round(ctrs, decimals=3))
     #
     # negiht = np.sort(iht[iht > 0] * (-1))
     # negBDF = pd.DataFrame(0, index=negiht, columns=ihbDF.columns)
@@ -831,7 +914,6 @@ def makeLogRaisedCosBasis(
 def _poisson_pseudoR2(y, yhat):
     ynull = np.mean(y)
     yhat = yhat.reshape(y.shape)
-    eps = np.spacing(1)
     L1 = np.sum((y)*np.log(eps+(yhat)) - (yhat))
     # L1_v = y*np.log(eps+yhat) - yhat
     L0 = np.sum((y)*np.log(eps+(ynull)) - (ynull))
@@ -1028,6 +1110,7 @@ class SMWrapper(BaseEstimator, RegressorMixin):
             self.results_ = self.model_.fit_regularized(
                 **regular_opts, **fit_opts)
         self.coef_ = self.results_.params
+        self.results_.remove_data()
     #
     def predict(self, X):
         if self.fit_intercept:

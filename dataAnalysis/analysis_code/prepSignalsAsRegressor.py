@@ -33,6 +33,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 import seaborn as sns
 from dask.distributed import Client, LocalCluster
 import os, traceback
+from dataAnalysis.analysis_code.regression_parameters import *
 import dataAnalysis.helperFunctions.profiling as prf
 import dataAnalysis.helperFunctions.aligned_signal_helpers as ash
 import dataAnalysis.helperFunctions.helper_functions_new as hf
@@ -54,6 +55,8 @@ from sklearn.model_selection import cross_val_score, cross_validate, GridSearchC
 from sklearn.preprocessing import FunctionTransformer
 from sklearn.metrics import make_scorer, r2_score
 import joblib as jb
+import patsy
+from sklego.preprocessing import PatsyTransformer
 import dill as pickle
 pickle.settings['recurse'] = True
 import gc, sys
@@ -190,16 +193,83 @@ if __name__ == '__main__':
             return df
         #
         outputLoadingMeta[k] = passthr
-    # 
+    #
+    keepMask = featuresDF.columns.get_level_values('feature').isin(regressionColumnsToUse)
+    featuresDF = featuresDF.loc[:, keepMask]
+    featuresDF.rename(columns=regressionColumnRenamer, level='feature', inplace=True)
+    #
     featuresDF.to_hdf(
         datasetPath,
         '/{}/data'.format(outputSelectionName),
         mode='a')
+    #####################################################################################################################
+    ###
+    '''from ttictoc import tic, toc
+    featuresDF.columns = featuresDF.columns.get_level_values('feature')
+    # get one of each condition, to fit the patsy transformer on
+    # (it needs to see all of the categoricals)
+    exampleFeaturesDF = featuresDF.loc[featuresDF.index.get_level_values('conditionUID') == 0, :]
+    # featuresDF = featuresDF.iloc[:800, :]
+    #
+    for hIdx, histOpts in enumerate(addHistoryTerms):
+        locals().update({'hto{}'.format(hIdx): getHistoryOpts(histOpts, iteratorOpts, rasterOpts)})
+    # hto1['logBasis'] = False
+    # hto1['addInputToOutput'] = True
+    # hto1['preprocFun'] = lambda x: x.diff().fillna(0)
+    # hto1['selectColumns'] = slice(2, 4)
+    # hto1['causal'] = False
+    raisedCosBaser = tdr.raisedCosTransformer(hto0)
+    #
+    if arguments['plotting']:
+        pdfPath = os.path.join(
+            figureOutputFolder, 'history_basis.pdf'
+            )
+        fig, ax = raisedCosBaser.plot_basis()
+        plt.savefig(pdfPath)
+        plt.savefig(pdfPath.replace('.pdf', '.png'))
+        if arguments['debugging']:
+            plt.show()
+        else:
+            plt.close()
+    #####
+    rcb = tdr.patsyRaisedCosTransformer
+    thisEnv = patsy.EvalEnvironment.capture()
+    timingInfo = {df: {} for df in lOfDesignFormulas}
+    for designFormula in lOfDesignFormulas:
+        print(designFormula)
+        tic()
+        pt = PatsyTransformer(designFormula, eval_env=thisEnv, return_type="matrix")
+        # train on example
+        pt.fit(exampleFeaturesDF)
+        # transform features
+        designMatrix = pt.transform(exampleFeaturesDF)
+        timingInfo[designFormula]['elapsed'] = toc()
+        timingInfo[designFormula]['designMatrix'] = designMatrix
+        print('Elapsed time: {}'.format(timingInfo[designFormula]['elapsed']))
+        ##
+    for designFormula in lOfDesignFormulas:
+        print('\n' * 5)
+        designMatrix = timingInfo[designFormula]['designMatrix']
+        designInfo = designMatrix.design_info
+        print(designInfo.describe())
+        print(designMatrix.shape)
+        print('\n'.join(designInfo.column_names))
+        designDF = (
+            pd.DataFrame(
+                designMatrix,
+                index=exampleFeaturesDF.index,
+                columns=designInfo.column_names))
+        fig, ax = plt.subplots(2, 1, sharex=True)
+        for cN in exampleFeaturesDF.columns:
+            ax[0].plot(exampleFeaturesDF[cN].to_numpy(), label='input {}'.format(cN))
+        ax[0].legend()
+        for cN in designDF.columns:
+            ax[1].plot(designDF[cN].to_numpy(), label=cN)
+        ax[1].legend()
+        plt.show()'''
+    #####################################################################################################################
     #
     maskList = []
-    lOfDesignFormulas = [
-        'velocity + electrode:(amplitude/RateInHz)',
-        'velocity + electrode:(rcb(amplitude, **addHistoryTerms)/RateInHz)']
     for designFormula in lOfDesignFormulas:
         attrNames = ['feature', 'lag', 'designFormula']
         attrValues = ['all', 0, designFormula]

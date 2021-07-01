@@ -19,7 +19,7 @@ ALIGNQUERY="--alignQuery=starting"
 # ALIGNQUERY="--alignQuery=stopping"
 # ALIGNQUERY="--alignQuery=startingNoStim"
 
-HUEOPTS="--hueName=amplitude --hueControl="
+HUEOPTS="--hueName=trialAmplitude --hueControl="
 ROWOPTS="--rowName=pedalMovementCat --rowControl="
 COLOPTS="--colName=electrode --colControl="
 STYLEOPTS="--styleName= --styleControl="

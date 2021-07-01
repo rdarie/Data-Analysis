@@ -57,6 +57,7 @@ from sklearn.preprocessing import RobustScaler, MinMaxScaler
 from sklearn.pipeline import FeatureUnion, Pipeline
 from sklearn.linear_model import LinearRegression, ElasticNet
 import dataAnalysis.custom_transformers.tdr as tdr
+from dataAnalysis.custom_transformers.tdr import getR2, partialR2
 from sklego.preprocessing import PatsyTransformer
 from sklearn.compose import ColumnTransformer
 from sklearn_pandas import DataFrameMapper
@@ -81,26 +82,6 @@ if consoleDebug:
         'refEstimatorName': 'enr_refit', 'estimatorName': 'enr_refit', 'debugging': True}
     os.chdir('/gpfs/home/rdarie/nda2/Data-Analysis/dataAnalysis/analysis_code')
 '''
-
-def getR2(srs):
-    lls = float(srs.xs('llSat', level='llType'))
-    lln = float(srs.xs('llNull', level='llType'))
-    llf = float(srs.xs('llFull', level='llType'))
-    return 1 - (lls - llf) / (lls - lln)
-
-
-def partialR2(srs, testDesign=None, refDesign=None):
-    llSat = llSrs.xs(testDesign, level='design').xs('llSat', level='llType')
-    assert testDesign is not None
-    # llSat2 = llSrs.xs(refDesign, level='design').xs('llSat', level='llType')
-    # sanity check: should be same
-    # assert (llSat - llSat2).abs().max() == 0
-    if refDesign is not None:
-        llRef = llSrs.xs(refDesign, level='design').xs('llFull', level='llType')
-    else:
-        llRef = llSrs.xs(testDesign, level='design').xs('llNull', level='llType')
-    llTest = llSrs.xs(testDesign, level='design').xs('llFull', level='llType')
-    return 1 - (llSat - llTest) / (llSat - llRef)
 
 if __name__ == "__main__":
     arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}

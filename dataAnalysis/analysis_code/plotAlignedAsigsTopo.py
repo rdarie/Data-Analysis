@@ -29,7 +29,6 @@ Options:
     --groupPagesBy=groupPagesBy                          break down each page
     --winStart=winStart                                  start of window [default: 200]
     --winStop=winStop                                    end of window [default: 400]
-    --amplitudeFieldName=amplitudeFieldName              what is the amplitude named? [default: nominalCurrent]
     --noStim                                             process entire experimental day? [default: False]
 """
 
@@ -154,11 +153,6 @@ else:
         makeControlProgram=True,
         metaDataToCategories=False))
 #
-'''requiredAnns = [
-    'xCoords', 'yCoords',
-    'RateInHz', 'feature', 'electrode', 'program',
-    arguments['amplitudeFieldName'],
-    'stimCat', 'originalIndex', 'segment', 't']'''
 requiredAnns = essentialMetadataFields + ['xCoords', 'yCoords']  
 if groupPagesBy is not None:
     for annNm in groupPagesBy:
@@ -182,7 +176,7 @@ if 'winStop' in arguments:
     alignedAsigsKWargs['windowSize'][1] = float(arguments['winStop']) * (1e-3)
 # alignedAsigsKWargs.update(dict(
 #     windowSize=(-25e-3, 125e-3)))
-alignedAsigsKWargs.update({'amplitudeColumn': arguments['amplitudeFieldName']})
+alignedAsigsKWargs.update({'amplitudeColumn': amplitudeFieldName})
 #
 flipInfo = {
     'delsys': {'lr': False, 'ud': False}

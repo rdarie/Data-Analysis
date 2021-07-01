@@ -356,7 +356,7 @@ else:
         dataDF=exportDF, **theseIteratorOpts['cvKWArgs'])
     listOfIterators.append(cvIterator)
 ###
-# cvIterator.plot_schema()
+# import matplotlib.pyplot as plt; cvIterator.plot_schema(); plt.show()
 exportAAKWA = alignedAsigsKWargs.copy()
 exportAAKWA.pop('unitNames', None)
 exportAAKWA.pop('unitQuery', None)

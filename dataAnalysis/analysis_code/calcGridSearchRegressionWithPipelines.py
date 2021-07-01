@@ -62,6 +62,7 @@ from sklearn.utils.validation import check_is_fitted
 from sklearn.base import clone
 from sklearn.model_selection import cross_val_score, cross_validate, GridSearchCV
 from dataAnalysis.custom_transformers.target_transformer import TransformedTargetRegressor
+from dataAnalysis.analysis_code.regression_parameters import *
 from sklego.preprocessing import PatsyTransformer
 from sklearn_pandas import gen_features, DataFrameMapper
 from sklearn.linear_model._coordinate_descent import _alpha_grid
@@ -136,6 +137,10 @@ if __name__ == '__main__':
     estimatorPath = os.path.join(
         estimatorsSubFolder,
         fullEstimatorName + '.h5'
+        )
+    cvEstimatorsPath = os.path.join(
+        estimatorsSubFolder,
+        fullEstimatorName + '_cv_estimators.pickle'
         )
     #
     estimatorMetaDataPath = os.path.join(
@@ -223,33 +228,8 @@ if __name__ == '__main__':
         return_train_score=True,
         refit=False
         )'''
-    #
-
-    ################################
-    binInterval = iteratorOpts['forceBinInterval'] if iteratorOpts['forceBinInterval'] is not None else rasterOpts['binInterval']
-    addHistoryTerms = {
-        'nb': 5,
-        'dt': binInterval,
-        # 'historyLen': iteratorOpts['covariateHistoryLen'],
-        'historyLen': 100e-3,
-        'b': 0.001, 'useOrtho': False,
-        'normalize': True, 'groupBy': 'trialUID',
-        'zflag': False}
-    ####
-    '''rcs = tdr.raisedCosTransformer(addHistoryTerms)
-    if arguments['plotting']:
-        pdfPath = os.path.join(
-            figureOutputFolder, 'history_basis.pdf'
-            )
-        fig, ax = rcs.plot_basis()
-        # plt.savefig(pdfPath)
-        # plt.savefig(pdfPath.replace('.pdf', '.png'))
-        if arguments['debugging']:
-            plt.show()
-        else:
-            plt.close()'''
-    #####
-    rcb = tdr.patsyRaisedCosTransformer
+    for hIdx, histOpts in enumerate(addHistoryTerms):
+        locals().update({'hto{}'.format(hIdx): getHistoryOpts(histOpts, iteratorOpts, rasterOpts)})
     thisEnv = patsy.EvalEnvironment.capture()
     #
     crossvalKWArgs['cv'] = cvIterator
@@ -309,7 +289,7 @@ if __name__ == '__main__':
     #
     trialInfoLhs = lhsDF.index.to_frame().reset_index(drop=True)
     trialInfoRhs = rhsDF.index.to_frame().reset_index(drop=True)
-    checkSameMeta = stimulusConditionNames + ['bin', 'trialUID']
+    checkSameMeta = stimulusConditionNames + ['bin', 'trialUID', 'conditionUID']
     assert (trialInfoRhs.loc[:, checkSameMeta] == trialInfoLhs.loc[:, checkSameMeta]).all().all()
     trialInfo = trialInfoLhs
     #
@@ -382,8 +362,11 @@ if __name__ == '__main__':
         lhGroup.columns = lhGroup.columns.get_level_values('feature')
         designFormula = lhsMask.name[lhsMasks.index.names.index('designFormula')]
         #
+        print(designFormula)
         pt = PatsyTransformer(designFormula, eval_env=thisEnv, return_type="matrix")
-        designMatrix = pt.fit_transform(lhGroup)
+        exampleLhGroup = lhGroup.loc[lhGroup.index.get_level_values('conditionUID') == 0, :]
+        pt.fit(exampleLhGroup)
+        designMatrix = pt.transform(lhGroup)
         designInfo = designMatrix.design_info
         designDF = (
             pd.DataFrame(
@@ -405,10 +388,10 @@ if __name__ == '__main__':
             rhsPipelineAverager = Pipeline[('averager', tdr.DataFramePassThrough(), )]
         rhGroup.columns = rhGroup.columns.get_level_values('feature')
         ####
-        if arguments['debugging']:
-            if rhsMaskParams['freqBandName'] not in ['beta', 'gamma', 'higamma', 'all']:
-                # if maskParams['lag'] not in [0]:
-                continue
+        # if arguments['debugging']:
+        #     if rhsMaskParams['freqBandName'] not in ['beta', 'gamma', 'higamma', 'all']:
+        #         # if maskParams['lag'] not in [0]:
+        #         continue
         pipelineRhs = Pipeline([('averager', rhsPipelineAverager, ), ])
         pipelineLhs = Pipeline([('averager', rhsPipelineAverager, ), ('regressor', regressorClass(**regressorKWArgs)), ])
         estimatorInstance = TransformedTargetRegressor(regressor=pipelineLhs, transformer=pipelineRhs, check_inverse=False)
@@ -440,11 +423,12 @@ if __name__ == '__main__':
         gridSearcherDict1 = {}
         gsScoresDict1 = {}
         for targetName in rhGroup.columns:
-            ####
-            if arguments['debugging']:
-                if targetName not in rhGroup.columns[:4]:
-                    continue
-            ###
+            ###########
+            ###########
+            if targetName not in rhGroup.columns[:2]:
+                continue
+            ###########
+            ###########
             print('Fitting {} to {}...'.format(lhsMask.name[-1], targetName))
             if gsParamsPerTarget is not None:
                 gsKWA['param_grid'] = gsParamsPerTarget[targetName]
@@ -480,8 +464,9 @@ if __name__ == '__main__':
     except Exception:
         traceback.print_exc()
         pdb.set_trace()
-    #
     try:
+        # with open(cvEstimatorsPath, 'wb') as _f:
+        #     pickle.dump(allCVScores['estimator'].to_dict(), _f)
         allCVScores['estimator'].to_hdf(estimatorPath, 'cv_estimators')
     except Exception:
         traceback.print_exc()

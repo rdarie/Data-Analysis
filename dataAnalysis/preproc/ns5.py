@@ -1165,7 +1165,7 @@ def alignedAsigsToDF(
         unitQuery=None, dataQuery=None,
         collapseSizes=False, verbose=False,
         duplicateControlsByProgram=False,
-        amplitudeColumn='amplitude', programColumn='program', electrodeColumn='electrode',
+        amplitudeColumn='trialAmplitude', programColumn='program', electrodeColumn='electrode',
         transposeToColumns='bin', concatOn='index', fastTranspose=True,
         addLags=None, decimate=1, rollingWindow=None,
         whichSegments=None, windowSize=None,
