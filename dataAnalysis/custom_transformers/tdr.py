@@ -62,6 +62,10 @@ def partialR2(llSrs, testDesign=None, refDesign=None):
     else:
         llRef = llSrs.xs(testDesign, level='design').xs('llNull', level='llType')
     llTest = llSrs.xs(testDesign, level='design').xs('llFull', level='llType')
+    # tInfoSat = llSat.index.to_frame().reset_index(drop=True)
+    # tInfoRef = llRef.index.to_frame().reset_index(drop=True)
+    # lhsMaskIdx refers to design, which is different between llRef and llTest
+    # so the indices don't line up between llRef and llTest
     return 1 - (llSat.to_numpy() - llTest) / (llSat.to_numpy() - llRef.to_numpy())
 
 
@@ -127,7 +131,7 @@ class raisedCosTransformer(object):
             groupBy='trialUID', tLabel='bin',
             zflag=False, logBasis=True, causal=True, addInputToOutput=False,
             selectColumns=None, preprocFun=None):
-        print('Starting to apply raised cos basis to {} (size={})'.format(vecSrs.name, vecSrs.size))
+        # print('Starting to apply raised cos basis to {} (size={})'.format(vecSrs.name, vecSrs.size))
         # for line in traceback.format_stack():
         #     print(line.strip())
         columnNames = ['{}_{}'.format(vecSrs.name, basisCN) for basisCN in self.orthobasisDF.columns]

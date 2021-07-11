@@ -166,14 +166,14 @@ def getExpOpts():
     #
     minNConditionRepetitions = {
         'n': 1,
-        'categories': ['amplitude', 'electrode', 'RateInHz']
+        'categories': ['trialAmplitude', 'electrode', 'trialRateInHz']
         }
     spikeSortingOpts = {
         'utah': {
             'asigNameList': [
                 [
                     'utah{:d}'.format(i)
-                    for i in range(1, 97)]
+                    for i in range(1, 97) if i not in [39]]
                 ],
             'ainpNameList': [
                 'ainp{:d}'.format(i)

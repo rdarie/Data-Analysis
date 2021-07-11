@@ -78,7 +78,7 @@ if __name__ == '__main__':
     consoleDebugging = True
     if consoleDebugging:
         arguments = {
-            'showFigures': False, 'estimatorName': 'regressor', 'datasetName': 'Block_XL_df_d',
+            'showFigures': False, 'estimatorName': 'regressor', 'datasetName': 'Synthetic_XL_df_g',
             'exp': 'exp202101281100', 'averageByTrial': False, 'verbose': '1', 'lazy': False,
             'analysisName': 'hiRes', 'blockIdx': '2', 'alignFolderName': 'motion', 'debugging': True,
             'plotting': True, 'window': 'long', 'selectionName': 'rig', 'processAll': True}
@@ -152,6 +152,7 @@ if __name__ == '__main__':
         'amplitude': MinMaxScaler(feature_range=(0., 1)),
         'RateInHz': MinMaxScaler(feature_range=(0., .5)),
         'velocity': MinMaxScaler(feature_range=(-1., 1.)),
+        'velocity_abs': MinMaxScaler(feature_range=(0., 1.)),
         }
     lOfTransformers = []
     for cN in dataDF.columns:
@@ -162,8 +163,9 @@ if __name__ == '__main__':
     lhsScaler = DataFrameMapper(lOfTransformers, input_df=True, )
     lhsScaler.fit(dataDF)
     featuresDF = pd.DataFrame(
-        lhsScaler.fit_transform(dataDF), index=dataDF.index, columns=dataDF.columns)
-    #
+        lhsScaler.transform(dataDF), index=dataDF.index, columns=dataDF.columns)
+    # pdb.set_trace()
+    # plt.plot(featuresDF.xs('velocity_abs', axis='columns', level='feature').to_numpy())
     regressorsFromMetadata = ['electrode']
     columnAdder = tdr.DataFrameMetaDataToColumns(addColumns=regressorsFromMetadata)
     featuresDF = columnAdder.fit_transform(featuresDF)
@@ -204,7 +206,8 @@ if __name__ == '__main__':
         mode='a')
     #####################################################################################################################
     ###
-    '''from ttictoc import tic, toc
+    '''
+    from ttictoc import tic, toc
     featuresDF.columns = featuresDF.columns.get_level_values('feature')
     # get one of each condition, to fit the patsy transformer on
     # (it needs to see all of the categoricals)
@@ -260,25 +263,28 @@ if __name__ == '__main__':
                 index=exampleFeaturesDF.index,
                 columns=designInfo.column_names))
         fig, ax = plt.subplots(2, 1, sharex=True)
-        for cN in exampleFeaturesDF.columns:
+        for cN in ['v', 'a', 'r']:
             ax[0].plot(exampleFeaturesDF[cN].to_numpy(), label='input {}'.format(cN))
         ax[0].legend()
         for cN in designDF.columns:
             ax[1].plot(designDF[cN].to_numpy(), label=cN)
         ax[1].legend()
-        plt.show()'''
+        plt.show()
+        '''
     #####################################################################################################################
     #
     maskList = []
+    attrNames = ['feature', 'lag', 'designFormula', 'ensembleTemplate', 'selfTemplate']
     for designFormula in lOfDesignFormulas:
-        attrNames = ['feature', 'lag', 'designFormula']
-        attrValues = ['all', 0, designFormula]
-        thisMask = pd.Series(
-            True,
-            index=featuresDF.columns).to_frame()
-        thisMask.columns = pd.MultiIndex.from_tuples(
-            (attrValues, ), names=attrNames)
-        maskList.append(thisMask.T)
+        for ensembleTemplate in lOfEnsembleTemplates:
+            for selfTemplate in lOfSelfTemplates:
+                attrValues = ['all', 0, designFormula, ensembleTemplate, selfTemplate]
+                thisMask = pd.Series(
+                    True,
+                    index=featuresDF.columns).to_frame()
+                thisMask.columns = pd.MultiIndex.from_tuples(
+                    (attrValues, ), names=attrNames)
+                maskList.append(thisMask.T)
     #
     maskDF = pd.concat(maskList)
     maskParams = [
@@ -290,6 +296,7 @@ if __name__ == '__main__':
         for idxItem in maskParams]
     maskDF.loc[:, 'maskName'] = maskParamsStr
     maskDF.set_index('maskName', append=True, inplace=True)
+    # pdb.set_trace()
     maskDF.to_hdf(
         datasetPath,
         '/{}/featureMasks'.format(outputSelectionName),

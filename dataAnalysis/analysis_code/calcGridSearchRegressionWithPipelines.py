@@ -91,11 +91,13 @@ consoleDebugging = True
 if consoleDebugging:
     arguments = {
         'selectionNameLhs': 'rig_regressor', 'selectionNameRhs': 'lfp_CAR', 'verbose': '2',
-        'datasetNameRhs': 'Synthetic_XL_df_g', 'transformerNameRhs': 'pca_ta', 'selector': None,
-        'debugging': True, 'processAll': True, 'winStop': '400', 'showFigures': True, 'window': 'long',
-        'lazy': False, 'datasetNameLhs': 'Synthetic_XL_df_g', 'alignFolderName': 'motion',
-        'plotting': True, 'estimatorName': 'enr', 'transformerNameLhs': None, 'blockIdx': '2',
-        'analysisName': 'hiRes', 'alignQuery': 'midPeak', 'winStart': '200', 'exp': 'exp202101281100'}
+        'selector': None, 'debugging': True, 'processAll': True, 'winStop': '400', 'showFigures': True, 'window': 'long',
+        'lazy': False, 'alignFolderName': 'motion', 'plotting': True,
+        'estimatorName': 'enr3_ta',
+        'datasetNameRhs': 'Synthetic_XL_df_g', 'transformerNameRhs': 'pca_ta',
+        'datasetNameLhs': 'Synthetic_XL_df_g', 'transformerNameLhs': None,
+        'blockIdx': '2', 'analysisName': 'hiRes', 'alignQuery': 'midPeak',
+        'winStart': '200', 'exp': 'exp202101281100'}
     os.chdir('/gpfs/home/rdarie/nda2/Data-Analysis/dataAnalysis/analysis_code')
     
 '''
@@ -201,7 +203,7 @@ if __name__ == '__main__':
         'refit': True, 'tol': 1e-2,
         'maxiter': 1000, 'disp': False
         }
-    regressorClass =  tdr.SMWrapper
+    regressorClass = tdr.SMWrapper
     regressorInstance = tdr.SMWrapper(**regressorKWArgs)
     ## names of things in statsmodels
     l1_ratio_name, alpha_name = 'regressor__regressor__L1_wt', 'regressor__regressor__alpha'
@@ -296,49 +298,6 @@ if __name__ == '__main__':
     lhsDF.index = pd.MultiIndex.from_frame(trialInfo.loc[:, checkSameMeta])
     rhsDF.index = pd.MultiIndex.from_frame(trialInfo.loc[:, checkSameMeta])
     #
-    '''# fill zeros, e.g. if trials do not have measured position, positions will be NaN
-    lhsDF.fillna(0, inplace=True)'''
-    # moved to assembleDataFrames
-    #
-    '''if ('amplitude' in lhsDF.columns.get_level_values('feature')) and ('RateInHz' in lhsDF.columns.get_level_values('feature')):
-        lhsDF.loc[:, idxSl['RateInHz', :, :, :, :]] = lhsDF.loc[:, idxSl['RateInHz', :, :, :, :]] * (lhsDF.loc[:, idxSl['amplitude', :, :, :, :]].abs() > 0).to_numpy(dtype=float)'''
-    # moved to analysis maker
-    #
-    '''lOfDesignFormulas = ["velocity + electrode:(amplitude/RateInHz)"]
-    estimatorMetadata['lOfDesignFormulas'] = lOfDesignFormulas
-    transformersLookup = {
-        # 'forceMagnitude': MinMaxScaler(feature_range=(0., 1)),
-        # 'forceMagnitude_prime': MinMaxScaler(feature_range=(-1., 1)),
-        'amplitude': MinMaxScaler(feature_range=(0., 1)),
-        'RateInHz': MinMaxScaler(feature_range=(0., .5)),
-        'velocity': MinMaxScaler(feature_range=(-1., 1.)),
-        }
-    lOfTransformers = []
-    for cN in lhsDF.columns:
-        if cN[0] not in transformersLookup:
-            lOfTransformers.append(([cN], None,))
-        else:
-            lOfTransformers.append(([cN], transformersLookup[cN[0]],))
-    lhsScaler = DataFrameMapper(lOfTransformers, input_df=True,)
-    lhsDF = pd.DataFrame(
-        lhsScaler.fit_transform(lhsDF), index=lhsDF.index, columns=lhsDF.columns)
-    #
-    estimatorMetadata['lhsScaler'] = lhsScaler
-    #
-    lhsMasks.iloc[0, :] = lhsMasks.columns.get_level_values('feature').isin(transformersLookup.keys())
-    regressorsFromMetadata = ['electrode']
-    #
-    estimatorMetadata['regressorsFromMetadata'] = regressorsFromMetadata'''
-    # moved to prep regressor
-    #
-    '''
-    workIdx = cvIterator.work
-    workingLhsDF = lhsDF.iloc[workIdx, :]
-    workingRhsDF = rhsDF.iloc[workIdx, :]
-    nFeatures = lhsDF.columns.shape[0]
-    nTargets = rhsDF.columns.shape[0]
-    '''
-    #
     allScores = []
     lhGroupNames = lhsMasks.index.names
     if 'backend' in joblibBackendArgs:
@@ -348,15 +307,92 @@ if __name__ == '__main__':
     cvScoresDict0 = {}
     gridSearcherDict0 = {}
     gsScoresDict0 = {}
+    designDict0 = {}
     #
     figureOutputPath = os.path.join(
         figureOutputFolder,
         '{}_signals.pdf'.format(fullEstimatorName))
-    for lhsRowIdx, rhsRowIdx in product(list(range(lhsMasks.shape[0])), list(range(rhsMasks.shape[0]))):
-        lhsMask = lhsMasks.iloc[lhsRowIdx, :]
-        rhsMask = rhsMasks.iloc[rhsRowIdx, :]
-        lhsMaskParams = {k: v for k, v in zip(lhsMask.index.names, lhsMask.name)}
-        rhsMaskParams = {k: v for k, v in zip(rhsMask.index.names, rhsMask.name)}
+
+    # prep rhs dataframes
+    rhsPipelineAveragerDict = {}
+    rhGroupDict = {}
+    #
+    ensDesignDict = {}
+    ensDesignInfoDict = {}
+    #
+    selfDesignDict = {}
+    selfDesignInfoDict = {}
+    for rhsMaskIdx in range(rhsMasks.shape[0]):
+        #
+        print('\n    On rhsRow {}\n'.format(rhsMaskIdx))
+        rhsMask = rhsMasks.iloc[rhsMaskIdx, :]
+        rhsMaskParams = {k: v for k, v in zip(rhsMasks.index.names, rhsMask.name)}
+        rhGroup = rhsDF.loc[:, rhsMask].copy()
+        # transform to PCs
+        if workingPipelinesRhs is not None:
+            transformPipelineRhs = workingPipelinesRhs.xs(rhsMaskParams['freqBandName'], level='freqBandName').iloc[0]
+            rhsPipelineMinusAverager = Pipeline(transformPipelineRhs.steps[1:])
+            rhsPipelineAveragerDict[rhsMaskIdx] = transformPipelineRhs.named_steps['averager']
+            rhTransformedColumns = transformedRhsDF.columns[
+                transformedRhsDF.columns.get_level_values('freqBandName') == rhsMaskParams['freqBandName']]
+            rhGroup = pd.DataFrame(
+                rhsPipelineMinusAverager.transform(rhGroup),
+                index=rhsDF.index, columns=rhTransformedColumns)
+        else:
+            rhsPipelineAveragerDict[rhsMaskIdx] = Pipeline[('averager', tdr.DataFramePassThrough(),)]
+        # pdb.set_trace()
+        rhGroup.columns = rhGroup.columns.get_level_values('feature')
+        #####################
+        rhGroup = rhGroup.iloc[:, :3]
+        ####################
+        rhGroupDict[rhsMaskIdx] = rhGroup
+        ####
+        # if arguments['debugging']:
+        #     if rhsMaskParams['freqBandName'] not in ['beta', 'gamma', 'higamma', 'all']:
+        #         # if maskParams['lag'] not in [0]:
+        #         continue
+        ####
+        for ensTemplate in lOfEnsembleTemplates:
+            if ensTemplate is None:
+                continue
+            ensFormula = ' + '.join([ensTemplate.format(cN) for cN in rhGroup.columns])
+            ensFormula += ' - 1'
+            print(ensFormula)
+            ensPt = PatsyTransformer(ensFormula, eval_env=thisEnv, return_type="matrix")
+            exampleRhGroup = rhGroup.loc[rhGroup.index.get_level_values('conditionUID') == 0, :]
+            ensPt.fit(exampleRhGroup)
+            ensDesignMatrix = ensPt.transform(rhGroup)
+            ensDesignInfo = ensDesignMatrix.design_info
+            ensDesignDict[(rhsMaskIdx, ensTemplate)] = (
+                pd.DataFrame(
+                    ensDesignMatrix,
+                    index=rhGroup.index,
+                    columns=ensDesignInfo.column_names))
+            ensDesignInfoDict[(rhsMaskIdx, ensTemplate)] = ensDesignInfo
+        for selfTemplate in lOfSelfTemplates:
+            if selfTemplate is None:
+                continue
+            selfFormula = ' + '.join([selfTemplate.format(cN) for cN in rhGroup.columns])
+            selfFormula += ' - 1'
+            print(selfFormula)
+            selfPt = PatsyTransformer(selfFormula, eval_env=thisEnv, return_type="matrix")
+            exampleRhGroup = rhGroup.loc[rhGroup.index.get_level_values('conditionUID') == 0, :]
+            selfPt.fit(exampleRhGroup)
+            selfDesignMatrix = selfPt.transform(rhGroup)
+            selfDesignInfo = selfDesignMatrix.design_info
+            selfDesignDict[(rhsMaskIdx, selfTemplate)] = (
+                pd.DataFrame(
+                    selfDesignMatrix,
+                    index=rhGroup.index,
+                    columns=selfDesignInfo.column_names))
+            selfDesignInfoDict[(rhsMaskIdx, selfTemplate)] = selfDesignInfo
+    #
+    ensDesignDF = pd.concat(ensDesignDict, names=['rhsMaskIdx', 'ensTemplate', 'factor'], axis='columns')
+    selfDesignDF = pd.concat(selfDesignDict, names=['rhsMaskIdx', 'selfTemplate', 'factor'], axis='columns')
+    #
+    for lhsMaskIdx in range(lhsMasks.shape[0]):
+        lhsMask = lhsMasks.iloc[lhsMaskIdx, :]
+        lhsMaskParams = {k: v for k, v in zip(lhsMasks.index.names, lhsMask.name)}
         lhGroup = lhsDF.loc[:, lhsMask]
         #
         lhGroup.columns = lhGroup.columns.get_level_values('feature')
@@ -374,90 +410,136 @@ if __name__ == '__main__':
                 index=lhGroup.index,
                 columns=designInfo.column_names))
         designDF.columns.name = 'feature'
-        rhGroup = rhsDF.loc[:, rhsMask].copy()
-        # transform to PCs
-        if workingPipelinesRhs is not None:
-            transformPipelineRhs = workingPipelinesRhs.xs(rhsMaskParams['freqBandName'], level='freqBandName').iloc[0]
-            rhsPipelineMinusAverager = Pipeline(transformPipelineRhs.steps[1:])
-            rhsPipelineAverager = transformPipelineRhs.named_steps['averager']
-            rhTransformedColumns = transformedRhsDF.columns[transformedRhsDF.columns.get_level_values('freqBandName') == rhsMaskParams['freqBandName']]
-            rhGroup = pd.DataFrame(
-                rhsPipelineMinusAverager.transform(rhGroup),
-                index=lhGroup.index, columns=rhTransformedColumns)
-        else:
-            rhsPipelineAverager = Pipeline[('averager', tdr.DataFramePassThrough(), )]
-        rhGroup.columns = rhGroup.columns.get_level_values('feature')
-        ####
-        # if arguments['debugging']:
-        #     if rhsMaskParams['freqBandName'] not in ['beta', 'gamma', 'higamma', 'all']:
-        #         # if maskParams['lag'] not in [0]:
-        #         continue
-        pipelineRhs = Pipeline([('averager', rhsPipelineAverager, ), ])
-        pipelineLhs = Pipeline([('averager', rhsPipelineAverager, ), ('regressor', regressorClass(**regressorKWArgs)), ])
-        estimatorInstance = TransformedTargetRegressor(regressor=pipelineLhs, transformer=pipelineRhs, check_inverse=False)
-        gsParamsPerTarget = None
-        if 'param_grid' in gridSearchKWArgs:
-            gsKWA = deepcopy(gridSearchKWArgs)
-            if l1_ratio_name in gsKWA['param_grid']:
-                dummyDesign = clone(pipelineLhs.named_steps['averager']).fit_transform(designDF)
-                dummyRhs = pd.DataFrame(
-                    clone(pipelineRhs.named_steps['averager']).fit_transform(rhGroup),
-                    columns=rhGroup.columns)
-                paramGrid = gsKWA.pop('param_grid')
-                lOfL1Ratios = paramGrid.pop(l1_ratio_name)
-                gsParamsPerTarget = {}
-                for targetName in rhGroup.columns:
-                    gsParamsPerTarget[targetName] = []
-                    for l1Ratio in lOfL1Ratios:
-                        alphas = _alpha_grid(
-                            dummyDesign, dummyRhs.loc[:, [targetName]],
-                            l1_ratio=l1Ratio, n_alphas=nAlphas)
-                        gsParamsPerTarget[targetName].append(
-                            {
-                                l1_ratio_name: [l1Ratio],
-                                # alpha_name: [1e-12]
-                                alpha_name: np.atleast_1d(alphas).tolist()
-                            }
+        designDict0[(lhsMaskIdx, designFormula)] = designDF
+        #
+        for rhsMaskIdx in range(rhsMasks.shape[0]):
+            print('\n    On rhsRow {}\n'.format(rhsMaskIdx))
+            '''rhsMask = rhsMasks.iloc[rhsMaskIdx, :]
+            rhsMaskParams = {k: v for k, v in zip(rhsMask.index.names, rhsMask.name)}
+            rhGroup = rhsDF.loc[:, rhsMask].copy()
+            # transform to PCs
+            if workingPipelinesRhs is not None:
+                transformPipelineRhs = workingPipelinesRhs.xs(rhsMaskParams['freqBandName'], level='freqBandName').iloc[0]
+                rhsPipelineMinusAverager = Pipeline(transformPipelineRhs.steps[1:])
+                rhsPipelineAverager = transformPipelineRhs.named_steps['averager']
+                rhTransformedColumns = transformedRhsDF.columns[transformedRhsDF.columns.get_level_values('freqBandName') == rhsMaskParams['freqBandName']]
+                rhGroup = pd.DataFrame(
+                    rhsPipelineMinusAverager.transform(rhGroup),
+                    index=lhGroup.index, columns=rhTransformedColumns)
+            else:
+                rhsPipelineAverager = Pipeline[('averager', tdr.DataFramePassThrough(), )]
+            rhGroup.columns = rhGroup.columns.get_level_values('feature')'''
+            ####
+            rhGroup = rhGroupDict[rhsMaskIdx]
+            rhsPipelineAverager = rhsPipelineAveragerDict[rhsMaskIdx]
+            ####
+            pipelineRhs = Pipeline([('averager', rhsPipelineAverager, ), ])
+            pipelineLhs = Pipeline([('averager', rhsPipelineAverager, ), ('regressor', regressorClass(**regressorKWArgs)), ])
+            estimatorInstance = TransformedTargetRegressor(regressor=pipelineLhs, transformer=pipelineRhs, check_inverse=False)
+            # add ensemble to designDF?
+            ensTemplate = lhsMaskParams['ensembleTemplate']
+            selfTemplate = lhsMaskParams['selfTemplate']
+            ###
+            if ensTemplate is not None:
+                ensDesignInfo = ensDesignInfoDict[(rhsMaskIdx, ensTemplate)]
+            if selfTemplate is not None:
+                selfDesignInfo = selfDesignInfoDict[(rhsMaskIdx, selfTemplate)]
+            # get selfDesignInfo
+            #
+            gsParamsPerTarget = None
+            if 'param_grid' in gridSearchKWArgs:
+                gsKWA = deepcopy(gridSearchKWArgs)
+                if l1_ratio_name in gsKWA['param_grid']:
+                    dummyDesign = clone(pipelineLhs.named_steps['averager']).fit_transform(designDF)
+                    dummyRhs = pd.DataFrame(
+                        clone(pipelineRhs.named_steps['averager']).fit_transform(rhGroup),
+                        columns=rhGroup.columns)
+                    paramGrid = gsKWA.pop('param_grid')
+                    lOfL1Ratios = paramGrid.pop(l1_ratio_name)
+                    gsParamsPerTarget = {}
+                    for targetName in rhGroup.columns:
+                        gsParamsPerTarget[targetName] = []
+                        for l1Ratio in lOfL1Ratios:
+                            alphas = _alpha_grid(
+                                dummyDesign, dummyRhs.loc[:, [targetName]],
+                                l1_ratio=l1Ratio, n_alphas=nAlphas)
+                            gsParamsPerTarget[targetName].append(
+                                {
+                                    l1_ratio_name: [l1Ratio],
+                                    # alpha_name: [1e-12]
+                                    alpha_name: np.atleast_1d(alphas).tolist()
+                                }
+                            )
+            cvScoresDict1 = {}
+            gridSearcherDict1 = {}
+            gsScoresDict1 = {}
+            #
+            for targetName in rhGroup.columns:
+                print('Fitting {} to {}...'.format(lhsMask.name[-1], targetName))
+                if gsParamsPerTarget is not None:
+                    gsKWA['param_grid'] = gsParamsPerTarget[targetName]
+                ##
+                targetDF = rhGroup.loc[:, [targetName]]
+                # add targetDF to designDF?
+                if ensTemplate is not None:
+                    thisEnsDesign = ensDesignDF.xs(rhsMaskIdx, level='rhsMaskIdx', axis='columns').xs(ensTemplate, level='ensTemplate', axis='columns')
+                    ensHistList = [
+                        thisEnsDesign.iloc[:, sl]
+                        for key, sl in ensDesignInfo.term_name_slices.items()
+                        if key != ensTemplate.format(targetName)]
+                else:
+                    ensHistList = []
+                #
+                if selfTemplate is not None:
+                    thisSelfDesign = selfDesignDF.xs(rhsMaskIdx, level='rhsMaskIdx', axis='columns').xs(selfTemplate, level='selfTemplate', axis='columns')
+                    selfHistList = [
+                        thisSelfDesign.iloc[:, sl]
+                        for key, sl in selfDesignInfo.term_name_slices.items()
+                        if key == selfTemplate.format(targetName)]
+                else:
+                    selfHistList = []
+                #
+                fullDesignList = [designDF] + ensHistList + selfHistList
+                fullDesignDF = pd.concat(fullDesignList, axis='columns')
+                if fullDesignDF.isna().any().any():
+                    pdb.set_trace()
+                try:
+                    cvScores, gridSearcherDict1[targetName], gsScoresDict1[targetName] = tdr.gridSearchHyperparameters(
+                        fullDesignDF, rhGroup.loc[:, [targetName]],
+                        estimatorInstance=estimatorInstance,
+                        verbose=int(arguments['verbose']),
+                        gridSearchKWArgs=gsKWA,
+                        crossvalKWArgs=crossvalKWArgs,
+                        joblibBackendArgs=joblibBackendArgs
                         )
-        cvScoresDict1 = {}
-        gridSearcherDict1 = {}
-        gsScoresDict1 = {}
-        for targetName in rhGroup.columns:
-            ###########
-            ###########
-            if targetName not in rhGroup.columns[:2]:
-                continue
-            ###########
-            ###########
-            print('Fitting {} to {}...'.format(lhsMask.name[-1], targetName))
-            if gsParamsPerTarget is not None:
-                gsKWA['param_grid'] = gsParamsPerTarget[targetName]
-            ##
-            targetDF = rhGroup.loc[:, [targetName]]
-            cvScores, gridSearcherDict1[targetName], gsScoresDict1[targetName] = tdr.gridSearchHyperparameters(
-                designDF, rhGroup.loc[:, [targetName]],
-                estimatorInstance=estimatorInstance,
-                verbose=int(arguments['verbose']),
-                gridSearchKWArgs=gsKWA,
-                crossvalKWArgs=crossvalKWArgs,
-                joblibBackendArgs=joblibBackendArgs
-                )
-            cvScoresDF = pd.DataFrame(cvScores)
-            cvScoresDF.index.name = 'fold'
-            cvScoresDF.dropna(axis='columns', inplace=True)
-            cvScoresDict1[targetName] = cvScoresDF
-            gridSearcherDict0[(lhsRowIdx, rhsRowIdx)] = gridSearcherDict1
+                except:
+                    traceback.print_exc()
+                    pdb.set_trace()
+                cvScoresDF = pd.DataFrame(cvScores)
+                cvScoresDF.index.name = 'fold'
+                cvScoresDF.dropna(axis='columns', inplace=True)
+                cvScoresDict1[targetName] = cvScoresDF
+                gridSearcherDict0[(lhsMaskIdx, rhsMaskIdx)] = gridSearcherDict1
             # pdb.set_trace()
-        cvScoresDict0[(lhsRowIdx, rhsRowIdx)] = pd.concat(cvScoresDict1, names=['target'])
-        gsScoresDict0[(lhsRowIdx, rhsRowIdx)] = pd.concat(gsScoresDict1, names=['target'])
+            cvScoresDict0[(lhsMaskIdx, rhsMaskIdx)] = pd.concat(cvScoresDict1, names=['target'])
+            gsScoresDict0[(lhsMaskIdx, rhsMaskIdx)] = pd.concat(gsScoresDict1, names=['target'])
     #
     allCVScores = pd.concat(cvScoresDict0, names=['lhsMaskIdx', 'rhsMaskIdx'])
     allGSScores = pd.concat(gsScoresDict0, names=['lhsMaskIdx', 'rhsMaskIdx'])
+    #
+    allDesignDF = pd.concat(designDict0, names=['lhsMaskIdx', 'design'])
+    allDesignDF.columns.name = 'factor'
+    #
     prf.print_memory_usage('Done fitting')
     if os.path.exists(estimatorPath):
         os.remove(estimatorPath)
     lastFoldIdx = cvIterator.n_splits
     print('\n\nSaving {}\n\n'.format(estimatorPath))
+    #
+    allDesignDF.to_hdf(estimatorPath, 'designMatrix')
+    selfDesignDF.to_hdf(estimatorPath, 'selfDesignMatrix')
+    ensDesignDF.to_hdf(estimatorPath, 'ensDesignMatrix')
+    #
     try:
         allCVScores.loc[idxSl[:, :, :, lastFoldIdx], :].to_hdf(estimatorPath, 'work_scores_estimators')
         allCVScores.loc[:, ['test_score', 'train_score']].to_hdf(estimatorPath, 'cv_scores')

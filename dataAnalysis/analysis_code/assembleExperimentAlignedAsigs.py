@@ -249,6 +249,10 @@ if createRelationship:
     outputBlock.create_relationship()
 if os.path.exists(outputPath):
     os.remove(outputPath)
+# pdb.set_trace()
+# stNames = pd.Series([st.name for st in outputBlock.filter(objects=SpikeTrain)])
+# stNames.value_counts()
+# uNames = pd.Series([un.name for un in outputBlock.filter(objects=Unit)])
 writer = neo.io.NixIO(filename=outputPath, mode='ow')
 print('writing {} ...'.format(outputPath))
 writer.write_block(outputBlock, use_obj_names=True)

@@ -15,7 +15,7 @@ namedQueries = {
         'outboundXL': "(pedalSizeCat=='XL')&(pedalMovementCat=='outbound')",
         'CCW': "(pedalDirection=='CCW')",
         'CW': "(pedalDirection=='CW')",
-        'noStim': "(amplitude==0)",
+        'noStim': "(trialAmplitude==0)",
         'trialRateInHz==50or0Fuzzy': '((trialRateInHzFuzzy==50)|(trialRateInHzFuzzy==0))',
         'trialRateInHz==100or0Fuzzy': '((trialRateInHzFuzzy==100)|(trialRateInHzFuzzy==0))',
         'trialRateInHz==50or0': '((trialRateInHz==50)|(trialRateInHz==0))',

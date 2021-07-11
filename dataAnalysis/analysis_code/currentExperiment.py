@@ -611,7 +611,6 @@ def parseAnalysisOptions(
                 n_splits=7,
                 splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
                 prelimSplitterClass=None, prelimSplitterKWArgs=defaultPrelimSplitterKWArgs,
-                # samplerClass=None, samplerKWArgs=defaultSamplerKWArgs,
                 resamplerClass=None, resamplerKWArgs={},
                 ),
             'timeROIOpts': {

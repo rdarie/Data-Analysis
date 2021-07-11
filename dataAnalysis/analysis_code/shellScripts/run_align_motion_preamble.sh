@@ -49,8 +49,7 @@ EVENTFOLDER="--eventSubfolder=None"
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID}"
 # BLOCKSELECTOR="--processAll"
 # BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
-
-EVENTSELECTOR="--eventName=motion"
 #
+EVENTSELECTOR="--eventName=motion"
 ALIGNFOLDER="--alignFolderName=motion"
 

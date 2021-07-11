@@ -23,6 +23,7 @@ dependencies:
 - hdbscan
 - scipy
 - patsy
+- nose
 - statsmodels
 - joblib
 - quantities

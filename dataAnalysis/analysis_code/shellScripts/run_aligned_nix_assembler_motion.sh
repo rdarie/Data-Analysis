@@ -29,7 +29,8 @@ BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
 
 # primary data
 # blocks=(lfp lfp_spectral rig)
-blocks=(lfp_CAR lfp_CAR_spectral rig)
+# blocks=(lfp_CAR lfp_CAR_spectral rig)
+blocks=(lfp_CAR)
 #
 # derived after dimensionality reduction
 # blocks=(lfp_CAR_spectral_fa lfp_CAR_spectral_fa_mahal)
@@ -37,7 +38,8 @@ blocks=(lfp_CAR lfp_CAR_spectral rig)
 # derived without dim. reduction
 # blocks=(lfp_CAR_spectral_mahal)
 #
-alignfolders=(stim motion)
+# alignfolders=(stim motion)
+alignfolders=(motion)
 #
 for B in "${blocks[@]}"
 do

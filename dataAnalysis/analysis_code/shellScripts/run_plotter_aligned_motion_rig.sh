@@ -7,7 +7,7 @@
 
 # Request memory:
 #SBATCH --nodes=1
-#SBATCH --mem=24G
+#SBATCH --mem=96G
 
 # Specify a job name:
 #SBATCH -J plots_motion_rig
@@ -17,6 +17,7 @@
 #SBATCH -e ../../batch_logs/%j-%a-plots_motion_rig.out
 
 # Specify account details
+#SBATCH --export=CCV_HEADLESS=1
 #SBATCH --account=carney-dborton-condo
 
 # Request custom resources
@@ -25,4 +26,4 @@
 #  SLURM_ARRAY_TASK_ID=2
 
 source ./shellScripts/run_plotter_aligned_motion_preamble.sh
-python3 -u './plotAlignedAsigsV2.py' --inputBlockSuffix="rig" --unitQuery="pedalState" --enableOverrides --exp=$EXP $BLOCKSELECTOR $ANALYSISFOLDER $WINDOW $ALIGNQUERY $ALIGNFOLDER $TIMEWINDOWOPTS $STATSOVERLAY $OUTLIERMASK $HUEOPTS $ROWOPTS $COLOPTS $STYLEOPTS $SIZEOPTS $PAGELIMITS $OTHERASIGOPTS $VERBOSITY
+python3 -u './plotAlignedAsigsV2.py' --inputBlockSuffix="rig" --unitQuery="rig" --enableOverrides --exp=$EXP $BLOCKSELECTOR $ANALYSISFOLDER $WINDOW $ALIGNQUERY $ALIGNFOLDER $TIMEWINDOWOPTS $STATSOVERLAY $OUTLIERMASK $HUEOPTS $ROWOPTS $COLOPTS $STYLEOPTS $SIZEOPTS $PAGELIMITS $OTHERASIGOPTS $VERBOSITY

@@ -35,15 +35,12 @@ Options:
 import matplotlib, os
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
-if 'DISPLAY' in os.environ:
-    matplotlib.use('QT5Agg')   # generate postscript output
+if 'CCV_HEADLESS' in os.environ:
+    matplotlib.use('Agg')   # generate postscript output
 else:
-    matplotlib.use('PS')   # generate postscript output
+    matplotlib.use('QT5Agg')   # generate interactive output
+
 import matplotlib.pyplot as plt
-if 'DISPLAY' in os.environ:
-    plt.switch_backend('QT5Agg')   # generate postscript output
-else:
-    plt.switch_backend('PS')   # generate postscript output
 from matplotlib.backends.backend_pdf import PdfPages
 #
 import dataAnalysis.plotting.aligned_signal_plots as asp

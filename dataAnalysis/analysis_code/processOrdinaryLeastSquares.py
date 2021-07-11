@@ -106,9 +106,10 @@ arguments = {arg.lstrip('-'): value for arg, value in docopt(__doc__).items()}
 consoleDebugging = True
 if consoleDebugging:
     arguments = {
-        'processAll': True, 'blockIdx': '2', 'analysisName': 'hiRes', 'datasetName': 'Block_XL_df_d', 'verbose': '1',
-        'debugging': False, 'plotting': True, 'showFigures': False, 'alignFolderName': 'motion',
-        'estimatorName': 'enr_ta_spectral', 'exp': 'exp202101281100'}
+        'analysisName': 'hiRes', 'datasetName': 'Block_XL_df_d', 'plotting': True,
+        'showFigures': False, 'alignFolderName': 'motion', 'processAll': True,
+        'verbose': '1', 'debugging': False, 'estimatorName': 'enr2_ta',
+        'blockIdx': '2', 'exp': 'exp202101281100'}
     os.chdir('/gpfs/home/rdarie/nda2/Data-Analysis/dataAnalysis/analysis_code')
     scratchPath = '/gpfs/scratch/rdarie/rdarie/Neural Recordings'
     scratchFolder = '/gpfs/scratch/rdarie/rdarie/Neural Recordings/202101201100-Rupert'
@@ -120,6 +121,43 @@ expOpts, allOpts = parseAnalysisOptions(
     int(arguments['blockIdx']), arguments['exp'])
 globals().update(expOpts)
 globals().update(allOpts)
+
+
+def makeImpulseLike(df, categoricalCols=[], categoricalIndex=[]):
+    for _, oneTrialDF in df.groupby('trialUID'):
+        break
+    impulseList = []
+    fillIndexCols = [cN for cN in oneTrialDF.index.names if cN not in ['bin', 'trialUID', 'conditionUID']]
+    fillCols = [cN for cN in oneTrialDF.columns if cN not in categoricalCols]
+    if not len(categoricalCols):
+        grouper = [('all', df),]
+    else:
+        grouper = df.groupby(categoricalCols)
+    uid = 0
+    for elecName, _ in grouper:
+        thisImpulse = oneTrialDF.copy()
+        thisTI = thisImpulse.index.to_frame().reset_index(drop=True)
+        thisTI.loc[:, fillIndexCols] = 'NA'
+        thisTI.loc[:, 'trialUID'] = uid
+        uid += 1
+        if len(categoricalCols):
+            if len(categoricalCols) == 1:
+                thisImpulse.loc[:, categoricalCols[0]] = elecName
+                thisTI.loc[:, categoricalIndex[0]] = elecName
+            else:
+                for idx, cN in enumerate(categoricalCols):
+                    thisImpulse.loc[:, cN] = elecName[idx]
+                    thisTI.loc[:, categoricalIndex[idx]] = elecName[idx]
+        #
+        tBins = thisImpulse.index.get_level_values('bin')
+        zeroBin = np.min(np.abs(tBins))
+        thisImpulse.loc[:, fillCols] = 0.
+        thisImpulse.loc[tBins == zeroBin, fillCols] = 1.
+        thisImpulse.index = pd.MultiIndex.from_frame(thisTI)
+        impulseList.append(thisImpulse)
+    impulseDF = pd.concat(impulseList)
+    return impulseDF
+
 
 analysisSubFolder, alignSubFolder = hf.processSubfolderPaths(
     arguments, scratchFolder)
@@ -171,6 +209,7 @@ thisEnv = patsy.EvalEnvironment.capture()
 iteratorsBySegment = loadingMeta['iteratorsBySegment'].copy()
 # cv_kwargs = loadingMeta['cv_kwargs'].copy()
 cvIterator = iteratorsBySegment[0]
+lastFoldIdx = cvIterator.n_splits
 #
 selectionNameLhs = estimatorMeta['arguments']['selectionNameLhs']
 selectionNameRhs = estimatorMeta['arguments']['selectionNameRhs']
@@ -213,117 +252,394 @@ with pd.HDFStore(estimatorPath) as store:
         coefDF = pd.read_hdf(store, 'coefficients')
         loadedCoefs = True
     else:
-        loadedPreds = False
+        loadedCoefs = False
     if 'predictions' in store:
         predDF = pd.read_hdf(store, 'predictions')
         loadedPreds = True
     else:
         loadedPreds = False
+    #
+    if 'designMatrix' in store:
+        allDesignDF = pd.read_hdf(store, 'designMatrix')
+        loadedDesigns = True
+    else:
+        loadedDesigns = False
+    if 'selfDesignMatrix' in store:
+        selfDesignDF = pd.read_hdf(store, 'selfDesignMatrix')
+        loadedSelfDesigns = True
+    else:
+        loadedSelfDesigns = False
+    if 'ensDesignMatrix' in store:
+        ensDesignDF = pd.read_hdf(store, 'ensDesignMatrix')
+        loadedEnsDesigns = True
+    else:
+        loadedEnsDesigns = False
+    #
     if 'plotOpts' in store:
         termPalette = pd.read_hdf(store, 'plotOpts')
         loadedPlotOpts = True
     else:
         loadedPlotOpts = False
+    iRsExist = (
+        ('impulseResponsePerTerm' in store) &
+        ('impulseResponsePerFactor' in store)
+        )
+    if iRsExist:
+        iRPerTerm = pd.read_hdf(store, 'impulseResponsePerTerm')
+        iRPerFactor = pd.read_hdf(store, 'impulseResponsePerFactor')
+        loadedIR = True
+    else:
+        loadedIR = False
 
-if not (loadedCoefs and loadedPreds):
+# prep rhs dataframes
+rhsPipelineAveragerDict = {}
+rhGroupDict = {}
+selfDesignInfoDict = {}
+selfImpulseDict = {}
+ensDesignInfoDict = {}
+ensImpulseDict = {}
+selfImpulseDict = {}
+for rhsMaskIdx in range(rhsMasks.shape[0]):
+    #
+    print('\n    On rhsRow {}\n'.format(rhsMaskIdx))
+    rhsMask = rhsMasks.iloc[rhsMaskIdx, :]
+    rhsMaskParams = {k: v for k, v in zip(rhsMasks.index.names, rhsMask.name)}
+    rhGroup = rhsDF.loc[:, rhsMask].copy()
+    # transform to PCs
+    if workingPipelinesRhs is not None:
+        transformPipelineRhs = workingPipelinesRhs.xs(rhsMaskParams['freqBandName'], level='freqBandName').iloc[0]
+        rhsPipelineMinusAverager = Pipeline(transformPipelineRhs.steps[1:])
+        rhsPipelineAveragerDict[rhsMaskIdx] = transformPipelineRhs.named_steps['averager']
+        rhTransformedColumns = transformedRhsDF.columns[
+            transformedRhsDF.columns.get_level_values('freqBandName') == rhsMaskParams['freqBandName']]
+        rhGroup = pd.DataFrame(
+            rhsPipelineMinusAverager.transform(rhGroup),
+            index=rhsDF.index, columns=rhTransformedColumns)
+    else:
+        rhsPipelineAveragerDict[rhsMaskIdx] = Pipeline[('averager', tdr.DataFramePassThrough(),)]
+    rhGroup.columns = rhGroup.columns.get_level_values('feature')
+    #####################
+    rhGroup = rhGroup.iloc[:, :3]
+    ####################
+    rhGroupDict[rhsMaskIdx] = rhGroup
+    ####
+    # if arguments['debugging']:
+    #     if rhsMaskParams['freqBandName'] not in ['beta', 'gamma', 'higamma', 'all']:
+    #         # if maskParams['lag'] not in [0]:
+    #         continue
+    ####
+    for ensTemplate in lOfEnsembleTemplates:
+        if ensTemplate is None:
+            continue
+        ensFormula = ' + '.join([ensTemplate.format(cN) for cN in rhGroup.columns])
+        ensFormula += ' - 1'
+        print('Evaluating ensemble history {}'.format(ensFormula))
+        ensPt = PatsyTransformer(ensFormula, eval_env=thisEnv, return_type="matrix")
+        exampleRhGroup = rhGroup.loc[rhGroup.index.get_level_values('conditionUID') == 0, :]
+        ensDesignMatrix = ensPt.fit_transform(exampleRhGroup)
+        ensDesignInfo = ensDesignMatrix.design_info
+        print(ensDesignInfo.term_names)
+        print('\n')
+        ensDesignInfoDict[(rhsMaskIdx, ensTemplate)] = ensDesignInfo
+        #
+        impulseDF = makeImpulseLike(exampleRhGroup)
+        impulseDM = ensPt.transform(impulseDF)
+        ensImpulseDesignDF = (
+            pd.DataFrame(
+                impulseDM,
+                index=impulseDF.index,
+                columns=ensDesignInfo.column_names))
+        ensImpulseDesignDF.columns.name = 'factor'
+        ensImpulseDict[(rhsMaskIdx, ensTemplate)] = ensImpulseDesignDF
+    for selfTemplate in lOfSelfTemplates:
+        if selfTemplate is None:
+            continue
+        selfFormula = ' + '.join([selfTemplate.format(cN) for cN in rhGroup.columns])
+        selfFormula += ' - 1'
+        print('Evaluating self history {}'.format(selfFormula))
+        selfPt = PatsyTransformer(selfFormula, eval_env=thisEnv, return_type="matrix")
+        exampleRhGroup = rhGroup.loc[rhGroup.index.get_level_values('conditionUID') == 0, :]
+        selfDesignMatrix = selfPt.fit_transform(exampleRhGroup)
+        selfDesignInfo = selfDesignMatrix.design_info
+        selfDesignInfoDict[(rhsMaskIdx, selfTemplate)] = selfDesignInfo
+        #
+        impulseDF = makeImpulseLike(exampleRhGroup)
+        impulseDM = selfPt.transform(impulseDF)
+        selfImpulseDesignDF = (
+            pd.DataFrame(
+                impulseDM,
+                index=impulseDF.index,
+                columns=selfDesignInfo.column_names))
+        selfImpulseDesignDF.columns.name = 'factor'
+        selfImpulseDict[(rhsMaskIdx, ensTemplate)] = selfImpulseDesignDF
+#
+designInfoDict0 = {}
+impulseDict = {}
+for lhsMaskIdx in range(lhsMasks.shape[0]):
+    lhsMask = lhsMasks.iloc[lhsMaskIdx, :]
+    lhsMaskParams = {k: v for k, v in zip(lhsMasks.index.names, lhsMask.name)}
+    lhGroup = lhsDF.loc[:, lhsMask]
+    #
+    lhGroup.columns = lhGroup.columns.get_level_values('feature')
+    designFormula = lhsMask.name[lhsMasks.index.names.index('designFormula')]
+    #
+    pt = PatsyTransformer(designFormula, eval_env=thisEnv, return_type="matrix")
+    exampleLhGroup = lhGroup.loc[lhGroup.index.get_level_values('conditionUID') == 0, :]
+    designMatrix = pt.fit_transform(exampleLhGroup)
+    designInfo = designMatrix.design_info
+    designInfoDict0[(lhsMaskIdx, designFormula)] = designInfo
+    #
+    impulseDF = makeImpulseLike(
+        exampleLhGroup, categoricalCols=['e'], categoricalIndex=['electrode'])
+    impulseDM = pt.transform(impulseDF)
+    impulseDesignDF = (
+        pd.DataFrame(
+            impulseDM,
+            index=impulseDF.index,
+            columns=designInfo.column_names))
+    impulseDesignDF.columns.name = 'factor'
+    impulseDict[(lhsMaskIdx, designFormula)] = impulseDesignDF
+
+designInfoDF = pd.DataFrame(
+    [value for key, value in designInfoDict0.items()],
+    columns=['designInfo'])
+designInfoDF.index = pd.MultiIndex.from_tuples([key for key, value in designInfoDict0.items()], names=['lhsMaskIdx', 'design'])
+
+reProcessPredsCoefs = not (loadedCoefs and loadedPreds and loadedDesigns)
+if reProcessPredsCoefs:
     coefDict0 = {}
     predDict0 = {}
-    for lhsRowIdx, rhsRowIdx in product(list(range(lhsMasks.shape[0])), list(range(rhsMasks.shape[0]))):
-        lhsMask = lhsMasks.iloc[lhsRowIdx, :]
-        rhsMask = rhsMasks.iloc[rhsRowIdx, :]
-        lhsMaskParams = {k: v for k, v in zip(lhsMask.index.names, lhsMask.name)}
-        rhsMaskParams = {k: v for k, v in zip(rhsMask.index.names, rhsMask.name)}
-        lhGroup = lhsDF.loc[:, lhsMask]
+    for lhsMaskIdx in range(lhsMasks.shape[0]):
+        lhsMask = lhsMasks.iloc[lhsMaskIdx, :]
+        lhsMaskParams = {k: v for k, v in zip(lhsMasks.index.names, lhsMask.name)}
+        # lhGroup = lhsDF.loc[:, lhsMask]
         #
-        lhGroup.columns = lhGroup.columns.get_level_values('feature')
+        # lhGroup.columns = lhGroup.columns.get_level_values('feature')
         designFormula = lhsMask.name[lhsMasks.index.names.index('designFormula')]
+        designInfo = designInfoDict0[(lhsMaskIdx, designFormula)]
+        designDF = allDesignDF.xs(lhsMaskIdx, level='lhsMaskIdx').xs(designFormula, level='design').loc[:, designInfo.column_names]
         #
-        pt = PatsyTransformer(designFormula, eval_env=thisEnv, return_type="matrix")
-        exampleLhGroup = lhGroup.loc[lhGroup.index.get_level_values('conditionUID') == 0, :]
-        pt.fit(exampleLhGroup)
-        designMatrix = pt.transform(lhGroup)
-        designInfo = designMatrix.design_info
-        designDF = (
-            pd.DataFrame(
-                designMatrix,
-                index=lhGroup.index,
-                columns=designInfo.column_names))
-        designDF.columns.name = 'feature'
-        rhGroup = rhsDF.loc[:, rhsMask].copy()
-        # transform to PCs
-        if workingPipelinesRhs is not None:
-            transformPipelineRhs = workingPipelinesRhs.xs(rhsMaskParams['freqBandName'], level='freqBandName').iloc[0]
-            rhsPipelineMinusAverager = Pipeline(transformPipelineRhs.steps[1:])
-            rhsPipelineAverager = transformPipelineRhs.named_steps['averager']
-            rhTransformedColumns = transformedRhsDF.columns[transformedRhsDF.columns.get_level_values('freqBandName') == rhsMaskParams['freqBandName']]
-            rhGroup = pd.DataFrame(
-                rhsPipelineMinusAverager.transform(rhGroup),
-                index=lhGroup.index, columns=rhTransformedColumns)
-        else:
-            rhsPipelineAverager = Pipeline[('averager', tdr.DataFramePassThrough(), )]
-        rhGroup.columns = rhGroup.columns.get_level_values('feature')
-        for targetName in rhGroup.columns:
-            for foldIdx in range(cvIterator.n_splits + 1):
-                targetDF = rhGroup.loc[:, [targetName]]
-                estimatorIdx = (lhsRowIdx, rhsRowIdx, targetName, foldIdx)
-                print('estimator: {}'.format(estimatorIdx))
-                print('in dataframe: {}'.format(estimatorIdx in estimatorsDF.index))
-                if not estimatorIdx in estimatorsDF.index:
-                    continue
-                if foldIdx == cvIterator.n_splits:
-                    # work and validation folds
-                    trainIdx, testIdx = cvIterator.workIterator.split(rhGroup)[0]
-                    trainStr, testStr = 'work', 'validation'
-                    foldType = 'validation'
+        # add ensemble to designDF?
+        ensTemplate = lhsMaskParams['ensembleTemplate']
+        selfTemplate = lhsMaskParams['selfTemplate']
+        for rhsMaskIdx in range(rhsMasks.shape[0]):
+            print('\n    On rhsRow {}\n'.format(rhsMaskIdx))
+            #  for lhsMaskIdx, rhsMaskIdx in product(list(range(lhsMasks.shape[0])), list(range(rhsMasks.shape[0]))):
+            #
+            rhsMask = rhsMasks.iloc[rhsMaskIdx, :]
+            rhsMaskParams = {k: v for k, v in zip(rhsMask.index.names, rhsMask.name)}
+            ####
+            rhGroup = rhGroupDict[rhsMaskIdx]
+            ####
+            if ensTemplate is not None:
+                ensDesignInfo = ensDesignInfoDict[(rhsMaskIdx, ensTemplate)]
+            if selfTemplate is not None:
+                selfDesignInfo = selfDesignInfoDict[(rhsMaskIdx, selfTemplate)]
+            ####
+            for targetName in rhGroup.columns:
+                # add targetDF to designDF?
+                if ensTemplate is not None:
+                    thisEnsDesign = (
+                        ensDesignDF
+                            .xs(rhsMaskIdx, level='rhsMaskIdx', axis='columns')
+                            .xs(ensTemplate, level='ensTemplate', axis='columns'))
+                    ensHistList = [
+                        thisEnsDesign.iloc[:, sl]
+                        for key, sl in ensDesignInfo.term_name_slices.items()
+                        if key != ensTemplate.format(targetName)]
+                    ensTermNames = [
+                        tN
+                        for tN in ensDesignInfo.term_names
+                        if tN != ensTemplate.format(targetName)]
                 else:
-                    trainIdx, testIdx = cvIterator.raw_folds[foldIdx]
-                    trainStr, testStr = 'train', 'test'
-                    foldType = 'train'
-                estimator = estimatorsDF.loc[estimatorIdx]
-                coefs = pd.Series(
-                    estimator.regressor_.named_steps['regressor'].coef_, index=designDF.columns)
-                coefDict0[estimatorIdx] = coefs
-                estPreprocessorLhs = Pipeline(estimator.regressor_.steps[:-1])
-                estPreprocessorRhs = estimator.transformer_
-                predictionPerComponent = pd.concat({
-                    trainStr: estPreprocessorLhs.transform(designDF.iloc[trainIdx, :]) * coefs,
-                    testStr: estPreprocessorLhs.transform(designDF.iloc[testIdx, :]) * coefs
-                    }, names=['trialType'])
-                predictionSrs = predictionPerComponent.sum(axis='columns')
-                # sanity
-                indicesThisFold = np.concatenate([trainIdx, testIdx])
-                predictionsNormalWay = np.concatenate([
-                    estimator.predict(designDF.iloc[trainIdx, :]),
-                    estimator.predict(designDF.iloc[testIdx, :])
-                    ])
-                mismatch = predictionSrs - predictionsNormalWay.reshape(-1)
-                print('max mismatch is {}'.format(mismatch.abs().max()))
-                assert (mismatch.abs().max() < 1e-3)
-                predictionPerSource = pd.DataFrame(
-                    np.nan, index=predictionPerComponent.index,
-                    columns=designInfo.term_names)
-                for termName, termSlice in designInfo.term_name_slices.items():
-                    predictionPerSource.loc[:, termName] = predictionPerComponent.iloc[:, termSlice].sum(axis='columns')
-                predictionPerSource.loc[:, 'prediction'] = predictionSrs
-                predictionPerSource.loc[:, 'ground_truth'] = np.concatenate([
-                    estPreprocessorRhs.transform(targetDF.iloc[trainIdx, :]),
-                    estPreprocessorRhs.transform(targetDF.iloc[testIdx, :])
-                    ])
-                predDict0[(lhsRowIdx, rhsRowIdx, targetName, foldIdx, foldType)] = predictionPerSource
-    predDF = pd.concat(predDict0, names=['lhsMaskIdx', 'rhsMaskIdx', 'target', 'fold', 'foldType'])
-    predDF.columns.name = 'term'
-    coefDF = pd.concat(coefDict0, names=['lhsMaskIdx', 'rhsMaskIdx', 'target', 'fold', 'foldType'])
+                    ensHistList = []
+                    ensTermNames = []
+                #
+                if selfTemplate is not None:
+                    thisSelfDesign = (
+                        selfDesignDF
+                            .xs(rhsMaskIdx, level='rhsMaskIdx', axis='columns')
+                            .xs(selfTemplate, level='selfTemplate', axis='columns'))
+                    selfHistList = [
+                        thisSelfDesign.iloc[:, sl]
+                        for key, sl in selfDesignInfo.term_name_slices.items()
+                        if key == selfTemplate.format(targetName)]
+                    selfTermNames = [
+                        tN
+                        for tN in selfDesignInfo.term_names
+                        if tN == selfTemplate.format(targetName)]
+                else:
+                    selfHistList = []
+                    selfTermNames = []
+                #
+                fullDesignList = [designDF] + ensHistList + selfHistList
+                fullDesignDF = pd.concat(fullDesignList, axis='columns')
+                for foldIdx in range(cvIterator.n_splits + 1):
+                    targetDF = rhGroup.loc[:, [targetName]]
+                    estimatorIdx = (lhsMaskIdx, rhsMaskIdx, targetName, foldIdx)
+                    print('estimator: {}'.format(estimatorIdx))
+                    print('in dataframe: {}'.format(estimatorIdx in estimatorsDF.index))
+                    if not estimatorIdx in estimatorsDF.index:
+                        continue
+                    if foldIdx == cvIterator.n_splits:
+                        # work and validation folds
+                        trainIdx, testIdx = cvIterator.workIterator.split(rhGroup)[0]
+                        trainStr, testStr = 'work', 'validation'
+                        foldType = 'validation'
+                    else:
+                        trainIdx, testIdx = cvIterator.raw_folds[foldIdx]
+                        trainStr, testStr = 'train', 'test'
+                        foldType = 'train'
+                    estimator = estimatorsDF.loc[estimatorIdx]
+                    coefs = pd.Series(
+                        estimator.regressor_.named_steps['regressor'].coef_, index=fullDesignDF.columns)
+                    coefDict0[(lhsMaskIdx, designFormula, rhsMaskIdx, targetName, foldIdx)] = coefs
+                    estPreprocessorLhs = Pipeline(estimator.regressor_.steps[:-1])
+                    estPreprocessorRhs = estimator.transformer_
+                    predictionPerComponent = pd.concat({
+                        trainStr: estPreprocessorLhs.transform(fullDesignDF.iloc[trainIdx, :]) * coefs,
+                        testStr: estPreprocessorLhs.transform(fullDesignDF.iloc[testIdx, :]) * coefs
+                        }, names=['trialType'])
+                    predictionSrs = predictionPerComponent.sum(axis='columns')
+                    # sanity check
+                    #############################
+                    indicesThisFold = np.concatenate([trainIdx, testIdx])
+                    predictionsNormalWay = np.concatenate([
+                        estimator.predict(fullDesignDF.iloc[trainIdx, :]),
+                        estimator.predict(fullDesignDF.iloc[testIdx, :])
+                        ])
+                    mismatch = predictionSrs - predictionsNormalWay.reshape(-1)
+                    print('max mismatch is {}'.format(mismatch.abs().max()))
+                    assert (mismatch.abs().max() < 1e-3)
+                    termNames = designInfo.term_names + ensTermNames + selfTermNames
+                    predictionPerSource = pd.DataFrame(
+                        np.nan, index=predictionPerComponent.index,
+                        columns=termNames)
+                    for termName, termSlice in designInfo.term_name_slices.items():
+                        factorNames = designInfo.column_names[termSlice]
+                        predictionPerSource.loc[:, termName] = predictionPerComponent.loc[:, factorNames].sum(axis='columns')
+                    if ensTemplate is not None:
+                        for termName in ensTermNames:
+                            factorNames = ensDesignInfo.column_names[ensDesignInfo.term_name_slices[termName]]
+                            predictionPerSource.loc[:, termName] = predictionPerComponent.loc[:, factorNames].sum(axis='columns')
+                    if selfTemplate is not None:
+                        for termName in selfTermNames:
+                            factorNames = selfDesignInfo.column_names[selfDesignInfo.term_name_slices[termName]]
+                            predictionPerSource.loc[:, termName] = predictionPerComponent.loc[:, factorNames].sum(axis='columns')
+                    #
+                    predictionPerSource.loc[:, 'prediction'] = predictionSrs
+                    predictionPerSource.loc[:, 'ground_truth'] = np.concatenate([
+                        estPreprocessorRhs.transform(targetDF.iloc[trainIdx, :]),
+                        estPreprocessorRhs.transform(targetDF.iloc[testIdx, :])
+                        ])
+                    predDict0[(lhsMaskIdx, designFormula, rhsMaskIdx, targetName, foldIdx, foldType)] = predictionPerSource
     #
+    predDF = pd.concat(predDict0, names=['lhsMaskIdx', 'design', 'rhsMaskIdx', 'target', 'fold', 'foldType'])
+    predDF.columns.name = 'term'
+    coefDF = pd.concat(coefDict0, names=['lhsMaskIdx', 'design', 'rhsMaskIdx', 'target', 'fold', 'factor'])
     coefDF.to_hdf(estimatorPath, 'coefficients')
     predDF.to_hdf(estimatorPath, 'predictions')
-    termPalette.to_hdf(estimatorPath, 'plotOpts')
 
+if not loadedIR:
+    iRPerFactorDict0 = {}
+    iRPerTermDict0 = {}
+    for lhsMaskIdx in range(lhsMasks.shape[0]):
+        lhsMask = lhsMasks.iloc[lhsMaskIdx, :]
+        lhsMaskParams = {k: v for k, v in zip(lhsMasks.index.names, lhsMask.name)}
+        designFormula = lhsMaskParams['designFormula']
+        designInfo = designInfoDict0[(lhsMaskIdx, designFormula)]
+        theseEstimators = estimatorsDF.xs(lhsMaskIdx, level='lhsMaskIdx')
+        designDF = impulseDict[(lhsMaskIdx, designFormula)]
+        termNames = designInfo.term_names
+        ensTemplate = lhsMaskParams['ensembleTemplate']
+        selfTemplate = lhsMaskParams['selfTemplate']
+        #
+        iRPerFactorDict1 = {}
+        iRPerTermDict1 = {}
+        for (rhsMaskIdx, targetName, fold), estimatorSrs in theseEstimators.groupby(['rhsMaskIdx', 'target', 'fold']):
+            estimator = estimatorSrs.iloc[0]
+            coefs = coefDF.loc[idxSl[lhsMaskIdx, designFormula, rhsMaskIdx, targetName, fold, :]]
+            coefs.index = coefs.index.get_level_values('factor')
+            columnsInDesign = [cN for cN in coefs.index if cN in designDF.columns]
+            columnsNotInDesign = [cN for cN in coefs.index if cN not in designDF.columns]
+            thisIR = designDF * coefs.loc[columnsInDesign]
+            outputIR = thisIR.copy()
+            #
+            if ensTemplate is not None:
+                ensDesignInfo = ensDesignInfoDict[(rhsMaskIdx, ensTemplate)]
+                ensTermNames = [
+                    key
+                    for key in ensDesignInfo.term_names
+                    if key != ensTemplate.format(targetName)]
+                ensFactorNames = np.concatenate([
+                    np.atleast_1d(ensDesignInfo.column_names[sl])
+                    for key, sl in ensDesignInfo.term_name_slices.items()
+                    if key != ensTemplate.format(targetName)])
+                thisEnsDesignDF = ensImpulseDict[(rhsMaskIdx, ensTemplate)].loc[:, ensFactorNames]
+                columnsInDesign = [cN for cN in coefs.index if cN in ensFactorNames]
+                ensIR = thisEnsDesignDF * coefs.loc[columnsInDesign]
+                for cN in ensFactorNames:
+                    outputIR.loc[:, cN] = np.nan
+            else:
+                ensTermNames = []
+            #
+            if selfTemplate is not None:
+                selfDesignInfo = selfDesignInfoDict[(rhsMaskIdx, selfTemplate)]
+                selfTermNames = [
+                    key
+                    for key in selfDesignInfo.term_names
+                    if key == selfTemplate.format(targetName)]
+                selfFactorNames = np.concatenate([
+                    np.atleast_1d(selfDesignInfo.column_names[sl])
+                    for key, sl in selfDesignInfo.term_name_slices.items()
+                    if key == selfTemplate.format(targetName)])
+                thisSelfDesignDF = selfImpulseDict[(rhsMaskIdx, selfTemplate)].loc[:, selfFactorNames]
+                columnsInDesign = [cN for cN in coefs.index if cN in selfFactorNames]
+                selfIR = thisSelfDesignDF * coefs.loc[columnsInDesign]
+                for cN in selfFactorNames:
+                    outputIR.loc[:, cN] = np.nan
+            else:
+                selfTermNames = []
+            ## !! reorder columns consistently
+            ipsList = []
+            for trialUID, group in thisIR.groupby('trialUID'):
+                iRPerSource = pd.DataFrame(
+                    np.nan, index=group.index,
+                    columns=termNames + ensTermNames + selfTermNames)
+                for termName, termSlice in designInfo.term_name_slices.items():
+                    factorNames = designInfo.column_names[termSlice]
+                    iRPerSource.loc[:, termName] = group.loc[:, factorNames].sum(axis='columns').to_numpy()
+                if ensTemplate is not None:
+                    outputIR.loc[group.index, ensFactorNames] = ensIR.to_numpy()
+                    for termName in ensTermNames:
+                        factorNames = ensFactorNames[ensDesignInfo.term_name_slices[termName]]
+                        iRPerSource.loc[:, termName] = ensIR.loc[:, factorNames].sum(axis='columns').to_numpy()
+                if selfTemplate is not None:
+                    outputIR.loc[group.index, selfFactorNames] = selfIR.to_numpy()
+                    for termName in selfTermNames:
+                        factorNames = selfDesignInfo.column_names[selfDesignInfo.term_name_slices[termName]]
+                        iRPerSource.loc[:, termName] = selfIR.loc[:, factorNames].sum(axis='columns').to_numpy()
+                ipsList.append(iRPerSource)
+            iRPerFactorDict1[(rhsMaskIdx, targetName, fold)] = outputIR
+            iRPerTermDict1[(rhsMaskIdx, targetName, fold)] = pd.concat(ipsList)
+        iRPerFactorDict0[(lhsMaskIdx, designFormula)] = pd.concat(iRPerFactorDict1, names=['rhsMaskIdx', 'target', 'fold'])
+        iRPerTermDict0[(lhsMaskIdx, designFormula)] = pd.concat(iRPerTermDict1, names=['rhsMaskIdx', 'target', 'fold'])
+    #
+    iRPerFactor = pd.concat(iRPerFactorDict0, names=['lhsMaskIdx', 'design'])
+    iRPerFactor.columns.name = 'factor'
+    iRPerFactor.to_hdf(estimatorPath, 'impulseResponsePerFactor')
+    iRPerTerm = pd.concat(iRPerTermDict0, names=['lhsMaskIdx', 'design'])
+    iRPerTerm.columns.name = 'term'
+    iRPerTerm.to_hdf(estimatorPath, 'impulseResponsePerTerm')
+#
 if not loadedPlotOpts:
     nTerms = predDF.columns.size
     termPalette = pd.Series(
         sns.color_palette('Set2', nTerms),
         index=predDF.columns)
+    termPalette.to_hdf(estimatorPath, 'plotOpts')
 
+trialTypeOrder = ['train', 'work', 'test', 'validation']
 groupPagesBy = ['rhsMaskIdx', 'lhsMaskIdx', 'target']
 groupSubPagesBy = ['trialType', 'foldType', 'electrode']
 scoresStack = pd.concat({
@@ -341,60 +657,203 @@ scoresStack.loc[(trainMask & (~lastFoldMask)), 'foldType'] = 'train'
 scoresStack.loc[((~trainMask) & lastFoldMask), 'foldType'] = 'validation'
 scoresStack.loc[((~trainMask) & (~lastFoldMask)), 'foldType'] = 'test'
 scoresStack.loc[:, 'dummyX'] = 0
+scoresStack.loc[:, 'design'] = scoresStack['lhsMaskIdx'].apply(lambda x: lOfDesignFormulas[x])
 #
 llDict1 = {}
 for scoreName, targetScores in scoresStack.groupby(['lhsMaskIdx', 'target', 'fold']):
     lhsMaskIdx, targetName, fold = scoreName
+    designFormula = lOfDesignFormulas[lhsMaskIdx]
     estimator = estimatorsDF.loc[idxSl[lhsMaskIdx, :, targetName, fold]].iloc[0]
     regressor = estimator.regressor_.steps[-1][1]
     thesePred = predDF.xs(targetName, level='target').xs(lhsMaskIdx, level='lhsMaskIdx').xs(fold, level='fold')
     llDict2 = {}
     for name, predGroup in thesePred.groupby(['electrode', 'trialType']):
-        llDict3 = {}
+        llDict3 = dict()
         llDict3['llSat'] = regressor.results_.family.loglike(predGroup['ground_truth'].to_numpy(), predGroup['ground_truth'].to_numpy())
         nullModel = ((predGroup['ground_truth'] ** 0) * predGroup['ground_truth'].mean()).to_numpy()
         llDict3['llNull'] = regressor.results_.family.loglike(nullModel, predGroup['ground_truth'].to_numpy())
         llDict3['llFull'] = regressor.results_.family.loglike(predGroup['prediction'].to_numpy(), predGroup['ground_truth'].to_numpy())
         llDict2[name] = pd.Series(llDict3)
     for trialType, predGroup in thesePred.groupby('trialType'):
-        llDict3 = {}
+        llDict3 = dict()
         llDict3['llSat'] = regressor.results_.family.loglike(predGroup['ground_truth'].to_numpy(), predGroup['ground_truth'].to_numpy())
         nullModel = ((predGroup['ground_truth'] ** 0) * predGroup['ground_truth'].mean()).to_numpy()
         llDict3['llNull'] = regressor.results_.family.loglike(nullModel, predGroup['ground_truth'].to_numpy())
         llDict3['llFull'] = regressor.results_.family.loglike(predGroup['prediction'].to_numpy(), predGroup['ground_truth'].to_numpy())
         llDict2[('all', trialType)] = pd.Series(llDict3)
-    llDict1[scoreName] = pd.concat(llDict2, names=['electrode', 'trialType', 'llType'])
-llDF = pd.concat(llDict1, names=['lhsMaskIdx', 'target', 'fold', 'electrode', 'trialType', 'llType']).to_frame(name='ll')
-R2Per = llDF['ll'].groupby(['lhsMaskIdx', 'target', 'electrode', 'fold', 'trialType']).apply(getR2).to_frame(name='score')
-#
-R2Per.loc[:, 'design'] = R2Per.reset_index()['lhsMaskIdx'].apply(lambda x: lOfDesignFormulas[x]).to_numpy()
-R2Per.set_index('design', append=True, inplace=True)
-#
-llDF.loc[:, 'design'] = llDF.reset_index()['lhsMaskIdx'].apply(lambda x: lOfDesignFormulas[x]).to_numpy()
-llDF.set_index('design', append=True, inplace=True)
+    llDict1[(lhsMaskIdx, designFormula, targetName, fold)] = pd.concat(llDict2, names=['electrode', 'trialType', 'llType'])
+llDF = pd.concat(llDict1, names=['lhsMaskIdx', 'design', 'target', 'fold', 'electrode', 'trialType', 'llType']).to_frame(name='ll')
+R2Per = llDF['ll'].groupby(['lhsMaskIdx', 'design', 'target', 'electrode', 'fold', 'trialType']).apply(getR2).to_frame(name='score')
 
-modelsToTest = [
-        {
-            'testDesign': 'rcb(v,**hto0) + e:(rcb(a,**hto0)+rcb(a*r,**hto0)) + e:(rcb(v*a,**hto0)+rcb(v*a*r,**hto0))',
-            'refDesign': 'rcb(v,**hto0) + e:(rcb(a,**hto0)+rcb(a*r,**hto0))',
-            'captionStr': 'partial R2 of allowing pedal velocity to modulate electrode coefficients, vs assuming their independence'
-        },
-        {
-            'testDesign': 'rcb(v,**hto0) + e:(rcb(a,**hto0)+rcb(a*r,**hto0)) + e:(rcb(v*a,**hto0)+rcb(v*a*r,**hto0))',
-            'refDesign': 'rcb(v,**hto0)',
-            'captionStr': 'partial R2 of including any electrode coefficients'
-        },
-        {
-            'testDesign': 'rcb(v,**hto0) + e:(rcb(a,**hto0)+rcb(a*r,**hto0)) + e:(rcb(v*a,**hto0)+rcb(v*a*r,**hto0))',
-            'refDesign': 'rcb(v,**hto0) + e:rcb(a,**hto0) + e:rcb(v*a,**hto0)',
-            'captionStr': 'partial R2 of including a term for modulation of electrode coefficients by RateInHz'
-        },
-        {
-            'refDesign': None,
-            'testDesign': 'rcb(v,**hto0) + e:(rcb(a,**hto0)+rcb(a*r,**hto0)) + e:(rcb(v*a,**hto0)+rcb(v*a*r,**hto0))',
-            'captionStr': 'R2 of design V + AR + VAR'
-        },
-    ]
+binInterval = iteratorOpts['forceBinInterval'] if iteratorOpts['forceBinInterval'] is not None else rasterOpts['binInterval']
+
+from scipy import signal
+import control as ctrl
+histOpts = hto0
+### sanity check impulse responses
+rawProbeTermName = 'pca_ta_all001'
+probeTermName = 'rcb({}, **hto0)'.format(rawProbeTermName)
+for (lhsMaskIdx, designFormula, rhsMaskIdx, targetName, fold), thisIRPerTerm in iRPerTerm.groupby(['lhsMaskIdx', 'design', 'rhsMaskIdx', 'target', 'fold']):
+    if fold == cvIterator.n_splits:
+        continue
+    lhsMask = lhsMasks.iloc[lhsMaskIdx, :]
+    lhsMaskParams = {k: v for k, v in zip(lhsMasks.index.names, lhsMask.name)}
+    lhGroup = lhsDF.loc[:, lhsMask]
+    #
+    lhGroup.columns = lhGroup.columns.get_level_values('feature')
+    #
+    designInfo = designInfoDict0[(lhsMaskIdx, designFormula)]
+    termNames = designInfo.term_names
+    ensTemplate = lhsMaskParams['ensembleTemplate']
+    selfTemplate = lhsMaskParams['selfTemplate']
+    if ensTemplate is not None:
+        ensDesignInfo = ensDesignInfoDict[(rhsMaskIdx, ensTemplate)]
+        ensDesignDF = ensImpulseDict[(rhsMaskIdx, ensTemplate)]
+        ensTermNames = [
+            key
+            for key, sl in ensDesignInfo.term_name_slices.items()
+            if key != ensTemplate.format(targetName)]
+    else:
+        ensTermNames = []
+    if selfTemplate is not None:
+        selfDesignInfo = selfDesignInfoDict[(rhsMaskIdx, selfTemplate)]
+        selfDesignDF = selfImpulseDict[(rhsMaskIdx, selfTemplate)]
+        selfTermNames = [
+            key
+            for key, sl in selfDesignInfo.term_name_slices.items()
+            if key == selfTemplate.format(targetName)]
+    else:
+        selfTermNames = []
+    estimatorIdx = (lhsMaskIdx, rhsMaskIdx, targetName, fold)
+    if not estimatorIdx in estimatorsDF.index:
+        continue
+    estimator = estimatorsDF.loc[estimatorIdx]
+    if rawProbeTermName in lhsDF.columns.get_level_values('feature'):
+        estPreprocessorLhs = Pipeline(estimator.regressor_.steps[:-1])
+        preprocdLhs = estPreprocessorLhs.transform(lhsDF.iloc[cvIterator.folds[fold][0], :])
+        preprocdLhs.columns = preprocdLhs.columns.get_level_values('feature')
+        dFToConvolve = preprocdLhs
+    else:
+        estPreprocessorRhs = estimator.transformer_
+        preprocdRhs = estPreprocessorRhs.transform(rhGroupDict[rhsMaskIdx].iloc[cvIterator.folds[fold][0], :])
+        preprocdRhs.columns = preprocdRhs.columns.get_level_values('feature')
+        dFToConvolve = preprocdRhs
+    #
+    thisIRPerTerm = thisIRPerTerm.dropna(axis='columns')
+    #
+    fig, ax = plt.subplots(2, 1)
+    for elecName, iRGroup in thisIRPerTerm.groupby('electrode'):
+        for moveCat, dataGroup0 in dFToConvolve.xs(elecName, level='electrode', drop_level=False).groupby('pedalMovementCat'):
+            for trialUID, dataGroup in dataGroup0.groupby('trialUID'):
+                break
+            try:
+                tBins = dataGroup.index.get_level_values('bin')
+                ax[0].plot(tBins, dataGroup[rawProbeTermName], label='input {}'.format(rawProbeTermName))
+                ax[0].plot(tBins, iRGroup[probeTermName], '*-', label='kernel corresponding to {}'.format(rawProbeTermName))
+                ax[0].legend()
+                ax[0].set_title('target {}, elec {}, {}'.format(targetName, elecName, moveCat))
+                predDFIdx = idxSl[lhsMaskIdx, designFormula, rhsMaskIdx, targetName, fold, 'train', 'train', elecName, :, :, :, :, :, :, trialUID]
+                ax[1].plot(tBins, predDF.loc[predDFIdx, probeTermName], 'c', label='predicted', lw=5)
+                #
+                kernelTMask = (tBins >= 0) & (tBins <= histOpts['historyLen'])
+                b = iRGroup.loc[kernelTMask, probeTermName].to_numpy()
+                a = np.zeros(b.shape)
+                a[0] = 1
+                #
+                filtered = signal.lfilter(b, a, dataGroup[rawProbeTermName])
+                ax[1].plot(tBins, filtered, 'b--', label='filtered', lw=2)
+                ax[1].legend()
+                plt.show()
+                # sys = signal.dlti(b, a, dt=binInterval)
+                # trFun = ctrl.tf(b, a, dt=binInterval)
+                # ctrl.tf2ss(trFun)
+            except:
+                traceback.print_exc()
+                continue
+            fig, ax = plt.subplots(2, 1)
+        break
+    break
+from sympy.matrices import Matrix, eye, zeros
+from sympy.interactive.printing import init_printing
+init_printing(use_unicode=False, wrap_line=False)
+from sympy.abc import z
+from sympy import simplify, cancel, ratsimp, degree
+iRGroupNames = ['lhsMaskIdx', 'design', 'rhsMaskIdx', 'fold', 'electrode']
+for name, iRGroup0 in iRPerTerm.groupby(iRGroupNames):
+    ##
+    iRGroup0.dropna(inplace=True, axis='columns')
+    ##
+    lhsMaskIdx, designFormula, rhsMaskIdx, fold, electrode = name
+    if lhsMaskIdx != 1:
+        continue
+    lhsMask = lhsMasks.iloc[lhsMaskIdx, :]
+    lhsMaskParams = {k: v for k, v in zip(lhsMasks.index.names, lhsMask.name)}
+    #
+    designInfo = designInfoDict0[(lhsMaskIdx, designFormula)]
+    termNames = designInfo.term_names
+    signalNames = iRGroup0.index.get_level_values('target').unique().to_list()
+    ensTemplate = lhsMaskParams['ensembleTemplate']
+    if ensTemplate is not None:
+        ensDesignInfo = ensDesignInfoDict[(rhsMaskIdx, ensTemplate)]
+    if selfTemplate is not None:
+        selfDesignInfo = selfDesignInfoDict[(rhsMaskIdx, selfTemplate)]
+    selfTemplate = lhsMaskParams['selfTemplate']
+    iRGroup0.rename(columns={ensTemplate.format(key): key for key in signalNames}, inplace=True)
+    #
+    #
+    Zs = pd.DataFrame(np.nan, index=signalNames, columns=signalNames + termNames)
+    MN = zeros(*Zs.shape)
+    for targetName, iRGroup in iRGroup0.groupby('target'):
+        '''if ensTemplate is not None:
+            ensTermNames = [
+                key
+                for key, sl in ensDesignInfo.term_name_slices.items()
+                if key != ensTemplate.format(targetName)]
+        else:
+            ensTermNames = []
+        if selfTemplate is not None:
+            selfTermNames = [
+                key
+                for key, sl in selfDesignInfo.term_name_slices.items()
+                if key == selfTemplate.format(targetName)]
+        else:
+            selfTermNames = []'''
+        tBins = iRGroup.index.get_level_values('bin')
+        kernelTMask = (tBins >= 0) & (tBins <= histOpts['historyLen'])
+        for termName in iRGroup.columns:
+            kernel = iRGroup.loc[kernelTMask, termName]
+            b = kernel.to_numpy()
+            a = np.zeros(b.shape)
+            a[0] = 1.
+            rowIdx = Zs.index.to_list().index(targetName)
+            colIdx = Zs.columns.to_list().index(termName)
+            for order, coefficient in enumerate(b):
+                MN[rowIdx, colIdx] += coefficient * z ** (-(order + 1))
+            # trFun = ctrl.tf(b, a, dt=binInterval)
+            # Zs.loc[targetName, termName] = trFun / ctrl.tf('z', dt=binInterval)
+            # sns.heatmap(sS.A, annot=True, annot_kws={'fontsize': 2})
+    M = MN[:, :len(signalNames)]
+    N = MN[:, len(signalNames):]
+    G = (z * eye(len(signalNames)) - M).inv() * N
+    tf_num = []
+    tf_den = []
+    for rowIdx, targetName in enumerate(Zs.index):
+        tf_num.append([])
+        tf_den.append([])
+        for colIdx, termName in enumerate(signalNames):
+            num, den = ratsimp(G[rowIdx, colIdx]).as_numer_denom()
+            print('{}, {}'.format(num, den))
+            if num == 0:
+                tf_num[rowIdx].append(np.asarray([0]))
+            else:
+                tf_num[rowIdx].append(np.asarray(num.as_poly().all_coeffs()))
+            if den == 1:
+                tf_den[rowIdx].append(np.asarray([1]))
+            else:
+                tf_den[rowIdx].append(np.asarray(den.as_poly().all_coeffs()))
+    trFun = ctrl.tf(tf_num, tf_den, dt=binInterval)
+    break
+####
 pdfPath = os.path.join(
     figureOutputFolder, '{}_{}.pdf'.format(fullEstimatorName, 'partial_scores'))
 with PdfPages(pdfPath) as pdf:
@@ -406,7 +865,7 @@ with PdfPages(pdfPath) as pdf:
         if 'captionStr' in modelToTest:
             titleText = modelToTest['captionStr']
         else:
-            titleText = 'partial R2 scores for {} compared {}'.format(testDesign, refDesign)
+            titleText = 'partial R2 scores for {} compared to {}'.format(testDesign, refDesign)
         pR2 = partialR2(llDF['ll'], refDesign=refDesign, testDesign=testDesign)
         #
         plotScores = pR2.reset_index().rename(columns={'ll': 'score'})
@@ -417,8 +876,10 @@ with PdfPages(pdfPath) as pdf:
             data=plotScores, kind='box',
             y='score', x='target',
             col='electrode', hue='trialType',
-            height=height, aspect=aspect
-        )
+            hue_order=trialTypeOrder,
+            height=height, aspect=aspect,
+            sharey=False
+            )
         g.set_xticklabels(rotation=30, ha='right')
         g.set_titles(template="{col_name}")
         # g.axes.flat[0].set_ylim(allScoreQuantiles)
@@ -434,15 +895,245 @@ with PdfPages(pdfPath) as pdf:
             plt.close()
 
 pdfPath = os.path.join(
+    figureOutputFolder, '{}_{}.pdf'.format(fullEstimatorName, 'impulse_responses'))
+with PdfPages(pdfPath) as pdf:
+    height, width = 3, 3
+    aspect = width / height
+    for (lhsMaskIdx, designFormula, targetName), thisIRPerTerm in iRPerTerm.groupby(['lhsMaskIdx', 'design', 'target']):
+        designInfo = designInfoDF.loc[(lhsMaskIdx, designFormula), 'designInfo']
+        '''
+        thisIRPerFactorMask = (
+            (iRPerFactor.index.get_level_values('lhsMaskIdx') == lhsMaskIdx) &
+            (iRPerFactor.index.get_level_values('design') == designFormula) &
+            (iRPerFactor.index.get_level_values('target') == targetName)
+        )thisIRPerFactor = iRPerFactor.loc[thisIRPerFactorMask, designInfo.column_names]
+        factorNames = thisIRPerFactor.columns.to_frame().reset_index(drop=True)
+        factorNames.loc[:, 'term'] = np.nan
+        for termName, termSlice in designInfo.term_name_slices.items():
+            factorNames.iloc[termSlice, 1] = termName
+        factorPalette = factorNames.set_index('factor')['term'].map(termPalette)'''
+        #
+        trialInfo = thisIRPerTerm.index.to_frame().reset_index(drop=True)
+        stimCondition = pd.Series(np.nan, index=trialInfo.index)
+        stimOrder = []
+        for name, group in trialInfo.groupby(['electrode', 'trialRateInHz']):
+            stimCondition.loc[group.index] = '{} {}'.format(*name)
+            stimOrder.append('{} {}'.format(*name))
+        trialInfo.loc[:, 'stimCondition'] = stimCondition
+        kinCondition = pd.Series(np.nan, index=trialInfo.index)
+        kinOrder = []
+        for name, group in trialInfo.groupby(['pedalMovementCat', 'pedalDirection']):
+            kinCondition.loc[group.index] = '{} {}'.format(*name)
+            kinOrder.append('{} {}'.format(*name))
+        trialInfo.loc[:, 'kinCondition'] = kinCondition
+        #
+        '''thisIRPerFactor.index = pd.MultiIndex.from_frame(trialInfo)
+        plotDF = thisIRPerFactor.stack().to_frame(name='signal').reset_index()
+        g = sns.relplot(
+            row='kinCondition', row_order=kinOrder,
+            col='stimCondition', col_order=stimOrder,
+            x='bin', y='signal', hue='factor',
+            kind='line', errorbar='se', data=plotDF,
+            palette=factorPalette.to_dict()
+            )
+        g.suptitle('Impulse responses (per factor) for model {}'.format(designFormula))
+        leg = g._legend
+        if leg is not None:
+            t = leg.get_title()
+            tContent = t.get_text()
+            # if tContent in titleOverrides:
+            #     t.set_text(titleOverrides[tContent])
+            # for t in leg.texts:
+            #     tContent = t.get_text()
+            #     if tContent in titleOverrides:
+            #         t.set_text(titleOverrides[tContent])
+            #     elif tContent in emgNL.index:
+            #         t.set_text('{}'.format(emgNL[tContent]))
+            for l in leg.get_lines():
+                # l.set_lw(2 * l.get_lw())
+                l.set_lw(styleOpts['legend.lw'])
+        g.tight_layout()
+        pdf.savefig(bbox_inches='tight', pad_inches=0)
+        if arguments['showFigures']:
+            plt.show()
+        else:
+            plt.close()'''
+        thisIRPerTerm.index = pd.MultiIndex.from_frame(trialInfo)
+        plotDF = thisIRPerTerm.stack().to_frame(name='signal').reset_index()
+        g = sns.relplot(
+            row='kinCondition', row_order=kinOrder,
+            col='stimCondition', col_order=stimOrder,
+            x='bin', y='signal', hue='term',
+            kind='line', errorbar='se', data=plotDF,
+            palette=termPalette.to_dict()
+            )
+        g.set_axis_labels("Time (msec)", "{}".format('contribution to {}'.format(targetName)))
+        g.suptitle('Impulse responses (per term) for model {}'.format(designFormula))
+        leg = g._legend
+        if leg is not None:
+            t = leg.get_title()
+            tContent = t.get_text()
+            # if tContent in titleOverrides:
+            #     t.set_text(titleOverrides[tContent])
+            # for t in leg.texts:
+            #     tContent = t.get_text()
+            #     if tContent in titleOverrides:
+            #         t.set_text(titleOverrides[tContent])
+            #     elif tContent in emgNL.index:
+            #         t.set_text('{}'.format(emgNL[tContent]))
+            for l in leg.get_lines():
+                # l.set_lw(2 * l.get_lw())
+                l.set_lw(styleOpts['legend.lw'])
+        g.tight_layout(pad=styleOpts['tight_layout.pad'])
+        pdf.savefig(bbox_inches='tight', pad_inches=0)
+        if arguments['showFigures']:
+            plt.show()
+        else:
+            plt.close()
+
+'''
+pdfPath = os.path.join(
+    figureOutputFolder, '{}_{}.pdf'.format(fullEstimatorName, 'regressors'))
+with PdfPages(pdfPath) as pdf:
+    for (lhsMaskIdx, designFormula), row in designInfoDF.iterrows():
+        #
+        designInfo = row['designInfo']
+        designDF = allDesignDF.xs(lhsMaskIdx, level='lhsMaskIdx').xs(designFormula, level='design').loc[:, designInfo.column_names]
+        factorNames = designDF.columns.to_frame().reset_index(drop=True)
+        factorNames.loc[:, 'term'] = np.nan
+        termDF = pd.DataFrame(
+            np.nan, index=designDF.index,
+            columns=designInfo.term_names)
+        termDF.columns.name = 'term'
+        for termName, termSlice in designInfo.term_name_slices.items():
+            termDF.loc[:, termName] = designDF.iloc[:, termSlice].sum(axis='columns')
+            factorNames.iloc[termSlice, 1] = termName
+        #
+        trialInfo = termDF.index.to_frame().reset_index(drop=True)
+        stimCondition = pd.Series(np.nan, index=trialInfo.index)
+        for name, group in trialInfo.groupby(['electrode', 'trialRateInHz']):
+            stimCondition.loc[group.index] = '{} {}'.format(*name)
+        trialInfo.loc[:, 'stimCondition'] = stimCondition
+        kinCondition = pd.Series(np.nan, index=trialInfo.index)
+        for name, group in trialInfo.groupby(['pedalMovementCat', 'pedalDirection']):
+            kinCondition.loc[group.index] = '{} {}'.format(*name)
+        trialInfo.loc[:, 'kinCondition'] = kinCondition
+        #
+        #
+        lhsMask = lhsMasks.iloc[lhsMaskIdx, :]
+        lhsMaskParams = {k: v for k, v in zip(lhsMask.index.names, lhsMask.name)}
+        plotDF = lhsDF.loc[:, lhsMask].copy()
+        plotDF.columns = plotDF.columns.get_level_values('feature')
+        plotDF.drop(columns=['e'], inplace=True)
+        plotDF.index = pd.MultiIndex.from_frame(trialInfo)
+        plotDF = plotDF.stack().to_frame(name='signal')
+        plotDF.reset_index(inplace=True)
+        g = sns.relplot(
+            row='kinCondition', col='stimCondition',
+            x='bin', y='signal', hue='feature',
+            kind='line', errorbar='se', data=plotDF
+            )
+        g.fig.suptitle('Features for model {}'.format(designFormula))
+        leg = g._legend
+        if leg is not None:
+            t = leg.get_title()
+            tContent = t.get_text()
+            # if tContent in titleOverrides:
+            #     t.set_text(titleOverrides[tContent])
+            # for t in leg.texts:
+            #     tContent = t.get_text()
+            #     if tContent in titleOverrides:
+            #         t.set_text(titleOverrides[tContent])
+            #     elif tContent in emgNL.index:
+            #         t.set_text('{}'.format(emgNL[tContent]))
+            for l in leg.get_lines():
+                # l.set_lw(2 * l.get_lw())
+                l.set_lw(styleOpts['legend.lw'])
+        g.tight_layout()
+        pdf.savefig(bbox_inches='tight', pad_inches=0)
+        if arguments['showFigures']:
+            plt.show()
+        else:
+            plt.close()
+        #
+        designDF.index = pd.MultiIndex.from_frame(trialInfo)
+        designDF = designDF.stack().to_frame(name='signal')
+        designDF.reset_index(inplace=True)
+        factorPalette = factorNames.set_index('factor')['term'].map(termPalette)
+        g = sns.relplot(
+            row='kinCondition', col='stimCondition',
+            x='bin', y='signal', hue='factor',
+            kind='line', errorbar='se', data=designDF,
+            palette=factorPalette.to_dict()
+            )
+        g.fig.suptitle('Terms for model {}'.format(designFormula))
+        leg = g._legend
+        if leg is not None:
+            t = leg.get_title()
+            tContent = t.get_text()
+            # if tContent in titleOverrides:
+            #     t.set_text(titleOverrides[tContent])
+            # for t in leg.texts:
+            #     tContent = t.get_text()
+            #     if tContent in titleOverrides:
+            #         t.set_text(titleOverrides[tContent])
+            #     elif tContent in emgNL.index:
+            #         t.set_text('{}'.format(emgNL[tContent]))
+            for l in leg.get_lines():
+                # l.set_lw(2 * l.get_lw())
+                l.set_lw(styleOpts['legend.lw'])
+        g.tight_layout()
+        pdf.savefig(bbox_inches='tight', pad_inches=0)
+        if arguments['showFigures']:
+            plt.show()
+        else:
+            plt.close()
+        #
+        termDF.index = pd.MultiIndex.from_frame(trialInfo)
+        termDF = termDF.stack().to_frame(name='signal')
+        termDF.reset_index(inplace=True)
+        g = sns.relplot(
+            row='kinCondition', col='stimCondition',
+            x='bin', y='signal', hue='term',
+            kind='line', errorbar='se', data=termDF,
+            palette=termPalette.to_dict()
+            )
+        g.fig.suptitle('Terms for model {}'.format(designFormula))
+        leg = g._legend
+        if leg is not None:
+            t = leg.get_title()
+            tContent = t.get_text()
+            # if tContent in titleOverrides:
+            #     t.set_text(titleOverrides[tContent])
+            # for t in leg.texts:
+            #     tContent = t.get_text()
+            #     if tContent in titleOverrides:
+            #         t.set_text(titleOverrides[tContent])
+            #     elif tContent in emgNL.index:
+            #         t.set_text('{}'.format(emgNL[tContent]))
+            for l in leg.get_lines():
+                # l.set_lw(2 * l.get_lw())
+                l.set_lw(styleOpts['legend.lw'])
+        g.tight_layout()
+        pdf.savefig(bbox_inches='tight', pad_inches=0)
+        if arguments['showFigures']:
+            plt.show()
+        else:
+            plt.close()
+'''
+
+pdfPath = os.path.join(
     figureOutputFolder, '{}_{}.pdf'.format(fullEstimatorName, 'r2'))
 with PdfPages(pdfPath) as pdf:
-    for name, theseScores in scoresStack.groupby('rhsMaskIdx'):
+    for rhsMaskIdx, theseScores in scoresStack.groupby(['rhsMaskIdx']):
+        rhsMask = rhsMasks.iloc[rhsMaskIdx, :]
         g = sns.catplot(
             data=theseScores, hue='foldType',
-            x='target', y='score',
+            x='design', y='score', col='target',
             kind='box')
-        g.fig.suptitle('Frequency band')
-        g.tight_layout()
+        g.suptitle('R2 (freqBand: {})'.format(rhsMask.name[4]))
+        g.set_xticklabels(rotation=-30, ha='left')
+        g.tight_layout(pad=styleOpts['tight_layout.pad'])
         pdf.savefig(bbox_inches='tight', pad_inches=0)
         if arguments['showFigures']:
             plt.show()
@@ -450,16 +1141,16 @@ with PdfPages(pdfPath) as pdf:
             plt.close()
 
 height, width = 2, 2
+trialTypeToPlot = 'test'
 aspect = width / height
 commonOpts = dict(
     )
 pdfPath = os.path.join(
     figureOutputFolder, '{}_{}.pdf'.format(fullEstimatorName, 'reconstructions'))
-
 with PdfPages(pdfPath) as pdf:
     for name0, predGroup0 in predDF.groupby(groupPagesBy):
         nmLk0 = {key: value for key, value in zip(groupPagesBy, name0)} # name lookup
-        #
+        nmLk0['design'] = lOfDesignFormulas[nmLk0['lhsMaskIdx']]
         scoreMasks = [
             scoresStack[cN] == nmLk0[cN]
             for cN in groupPagesBy]
@@ -468,13 +1159,14 @@ with PdfPages(pdfPath) as pdf:
             data=theseScoresPlot, hue='foldType',
             x='dummyX', y='score',
             kind='box')
-        g.fig.suptitle('R^2 for target {target}'.format(**nmLk0))
+        g.set_xticklabels(rotation=-30, ha='left')
+        g.suptitle('R^2 for target {target}'.format(**nmLk0))
         # newYLims = theseScoresPlot['score'].quantile([0.25, 1 - 1e-3]).to_list()
         # for ax in g.axes.flat:
         #     ax.set_xlabel('regression target')
         #     ax.set_ylabel('R2 of ordinary least squares fit')
         #     ax.set_ylim(newYLims)
-        g.fig.tight_layout(pad=1)
+        g.tight_layout(pad=styleOpts['tight_layout.pad'])
         pdf.savefig(bbox_inches='tight', pad_inches=0)
         if arguments['showFigures']:
             plt.show()
@@ -483,7 +1175,7 @@ with PdfPages(pdfPath) as pdf:
         for name1, predGroup1 in predGroup0.groupby(groupSubPagesBy):
             nmLk1 = {key: value for key, value in zip(groupSubPagesBy, name1)} # name lookup
             nmLk0.update(nmLk1)
-            if nmLk0['trialType'] != 'train':
+            if nmLk0['trialType'] != trialTypeToPlot:
                 continue
             plotData = predGroup1.stack().to_frame(name='signal').reset_index()
             plotData.loc[:, 'predType'] = 'component'
@@ -503,10 +1195,10 @@ with PdfPages(pdfPath) as pdf:
                 }, facet_kws=dict(margin_titles=True),
                 )
             g.set_titles(template="{col_var}\n{col_name}\n{row_var}\n{row_name}")
-            titleText = 'model {lhsMaskIdx}\n{target}, electrode {electrode} ({foldType})'.format(
+            titleText = 'model {design}\n{target}, electrode {electrode} ({trialType})'.format(
                 **nmLk0)
             print('Saving plot of {}...'.format(titleText))
-            figTitle = g.fig.suptitle(titleText)
+            g.suptitle(titleText)
             leg = g._legend
             if leg is not None:
                 t = leg.get_title()
@@ -522,11 +1214,11 @@ with PdfPages(pdfPath) as pdf:
                 for l in leg.get_lines():
                     # l.set_lw(2 * l.get_lw())
                     l.set_lw(styleOpts['legend.lw'])
-            g._tight_layout_rect[-1] -= 0.25 / g.fig.get_size_inches()[1]
-            g.tight_layout(pad=0.1)
+            g.resize_legend(adjust_subtitles=True)
+            g.tight_layout(pad=styleOpts['tight_layout.pad'])
             pdf.savefig(
                 bbox_inches='tight',
-                bbox_extra_artists=[figTitle, g.legend]
+                # bbox_extra_artists=[figTitle, g.legend]
                 )
             if arguments['showFigures']:
                 plt.show()

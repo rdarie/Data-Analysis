@@ -115,6 +115,49 @@ globals().update(allOpts)
 
 
 if __name__ == '__main__':
+    defaultSamplerKWArgs = dict(random_state=42, test_size=0.5)
+    defaultPrelimSamplerKWArgs = dict(random_state=42, test_size=0.1)
+    # args for tdr.
+    defaultSplitterKWArgs = dict(
+        stratifyFactors=stimulusConditionNames,
+        continuousFactors=['segment', 'originalIndex', 't'],
+        samplerClass=None,
+        samplerKWArgs=defaultSamplerKWArgs)
+    defaultPrelimSplitterKWArgs = dict(
+        stratifyFactors=stimulusConditionNames,
+        continuousFactors=['segment', 'originalIndex', 't'],
+        samplerClass=None,
+        samplerKWArgs=defaultPrelimSamplerKWArgs)
+    splitterKWArgs = dict(
+        stratifyFactors=stimulusConditionNames,
+        continuousFactors=['segment', 'originalIndex', 't'])
+    cvKWArgs = dict(
+        n_splits=3,
+        splitterClass=None, splitterKWArgs=defaultSplitterKWArgs,
+        prelimSplitterClass=None, prelimSplitterKWArgs=defaultPrelimSplitterKWArgs,
+        resamplerClass=None, resamplerKWArgs={},
+        )
+    iteratorOpts = {
+        'ensembleHistoryLen': .30,
+        'covariateHistoryLen': .50,
+        'nHistoryBasisTerms': 1,
+        'nCovariateBasisTerms': 1,
+        'forceBinInterval': 5e-3,
+        'minBinCount': 5,
+        'calcTimeROI': True,
+        'controlProportion': None,
+        'cvKWArgs': cvKWArgs,
+        'timeROIOpts': {
+            'alignQuery': 'startingOrStimOn',
+            'winStart': -200e-3,
+            'winStop': 400e-3
+        },
+        'timeROIOpts_control': {
+            'alignQuery': None,
+            'winStart': -800e-3,
+            'winStop': -200.
+        }
+    }
     analysisSubFolder, alignSubFolder = hf.processSubfolderPaths(
         arguments, scratchFolder)
     estimatorsSubFolder = os.path.join(
@@ -172,14 +215,15 @@ if __name__ == '__main__':
     conditions = {
         'pedalDirection': np.asarray(['CW']),
         'pedalMovementCat': np.asarray(['outbound', 'return']),
+        'pedalSizeCat': np.asarray(['L']),
         'trialRateInHz': np.asarray([50, 100]),
         'trialAmplitude': np.linspace(200, 800, 5),
         'electrode': np.asarray(['+ E16 - E9', '+ E16 - E5'])
         }
     electrodeRatio = 3.
     naRatio = 1.
-    baseNTrials = 100
-    bins = np.arange(-100e-3, 510e-3, 10e-3)
+    baseNTrials = 40
+    bins = np.arange(-100e-3, 510e-3, iteratorOpts['forceBinInterval'])
     kinWindow = (0., 500e-3)
     kinWindowJitter = 50e-3
     stimWindow = (0., 500e-3)
@@ -196,31 +240,30 @@ if __name__ == '__main__':
     protoIndex = []
     stimConfigs = pd.MultiIndex.from_product(
         [
-            conditions['electrode'], conditions['trialRateInHz'], conditions['trialAmplitude']],
-        names=['electrode', 'trialRateInHz', 'trialAmplitude'])
+            conditions['electrode'], conditions['trialAmplitude'], conditions['trialRateInHz'],],
+        names=['electrode', 'trialAmplitude', 'trialRateInHz',])
     kinConfigs = pd.MultiIndex.from_product(
         [
-            conditions['pedalDirection'], conditions['pedalMovementCat']],
-        names=['pedalDirection', 'pedalMovementCat'])
+            conditions['pedalMovementCat'], conditions['pedalDirection'], conditions['pedalSizeCat'],],
+        names=['pedalMovementCat', 'pedalDirection', 'pedalSizeCat'])
     # add stim movement
     for stimConfig in stimConfigs:
         for kinConfig in kinConfigs:
             protoIndex += [stimConfig + kinConfig] * int(np.ceil(baseNTrials * electrodeRatio / nAmpRate))
     # add stim no-movement
     for stimConfig in stimConfigs:
-        NAKinConfig = ('NA', 'NA')
+        NAKinConfig = ('NA', 'NA', 'NA')
         protoIndex += [stimConfig + NAKinConfig] * int(np.ceil(baseNTrials * electrodeRatio / nAmpRate))
     # add no-stim movement
     for kinConfig in kinConfigs:
         NAStimConfig = ('NA', 0., 0.)
         protoIndex += [NAStimConfig + kinConfig] * int(baseNTrials)
     # add no-stim no-movement
-    NAConfig = ('NA', 0., 0., 'NA', 'NA')
+    NAConfig = ('NA', 0., 0., 'NA', 'NA', 'NA')
     protoIndex += [NAConfig] * int(np.ceil(baseNTrials * naRatio))
     ##
     toyInfoPerTrial = pd.DataFrame(
-        protoIndex,
-        columns=['electrode', 'trialRateInHz', 'trialAmplitude', 'pedalDirection', 'pedalMovementCat'])
+        protoIndex, columns=stimulusConditionNames)
     rng = np.random.default_rng(seed=42)
     shuffledIndices = np.arange(toyInfoPerTrial.shape[0])
     rng.shuffle(shuffledIndices)
@@ -229,6 +272,13 @@ if __name__ == '__main__':
     toyInfoPerTrial.loc[:, 'originalIndex'] = np.arange(toyInfoPerTrial.shape[0])
     toyInfoPerTrial.loc[:, 'trialUID'] = np.arange(toyInfoPerTrial.shape[0])
     toyInfoPerTrial.loc[:, 't'] = toyInfoPerTrial['originalIndex'] * 10.
+    #
+    conditionUID = pd.Series(np.nan, index=toyInfoPerTrial.index)
+    for name, group in toyInfoPerTrial.groupby(stimulusConditionNames):
+        for uid, (_, subGroup) in enumerate(group.groupby('trialUID')):
+            conditionUID.loc[subGroup.index] = uid
+    toyInfoPerTrial.loc[:, 'conditionUID'] = conditionUID
+    #
     for cN in infoPerTrial.columns:
         if cN not in toyInfoPerTrial.columns:
             toyInfoPerTrial.loc[:, cN] = infoPerTrial[cN].iloc[0]
@@ -239,7 +289,7 @@ if __name__ == '__main__':
     print('Synthetic data trial counts, grouped by {}'.format(['electrode', 'pedalMovementCat']))
     print(toyInfoPerTrial.drop_duplicates(['segment', 'originalIndex', 't']).groupby(['electrode', 'pedalMovementCat']).count().iloc[:, 0])
     ##
-    '''toyLhsFeatures = ['velocity', 'amplitude', 'RateInHz']
+    '''toyLhsFeatures = ['velocity_abs', 'amplitude', 'RateInHz']
     toyLhsColumns = pd.MultiIndex.from_tuples([
         (col, 0,) + ('NA',) * 4
         for col in toyLhsFeatures
@@ -255,6 +305,7 @@ if __name__ == '__main__':
         thisSW = (stimWindow[0] + rng.random() * stimWindowJitter, stimWindow[1] + rng.random() * stimWindowJitter)
         kBinMask = (bins >= thisKW[0]) & (bins < thisKW[1])
         vel.loc[:, kBinMask] = velocityLookup[(row['pedalMovementCat'], row['pedalDirection'])]
+        vel = vel.abs() # velocity_abs
         amp = pd.DataFrame(0., index=thisIdx, columns=bins)
         amp.columns.name = 'bin'
         rate = pd.DataFrame(0., index=thisIdx, columns=bins)
@@ -265,7 +316,7 @@ if __name__ == '__main__':
             rate.loc[:, :] = stimMask * row['trialRateInHz']
         toyLhsList.append(
             pd.concat([
-                vel.stack('bin').to_frame(name='velocity'),
+                vel.stack('bin').to_frame(name='velocity_abs'),
                 amp.stack('bin').to_frame(name='amplitude'),
                 rate.stack('bin').to_frame(name='RateInHz'),
                 ], axis='columns'))
@@ -290,7 +341,7 @@ if __name__ == '__main__':
     scaledLhsDF.reset_index(inplace=True, drop=True)
     scaledLhsDF.index.name = 'trial'
     #
-    designFormula = "velocity + electrode:(amplitude/RateInHz)"
+    designFormula = "velocity_abs + electrode:(amplitude/RateInHz)"
     pt = PatsyTransformer(designFormula, return_type="matrix")
     designMatrix = pt.fit_transform(scaledLhsDF)
     designInfo = designMatrix.design_info
@@ -326,7 +377,7 @@ if __name__ == '__main__':
         #
         gtCoeffs = pd.Series({
             'Intercept': 0.,
-            'velocity': 2.,
+            'velocity_abs': 2.,
             #
             'electrode[+ E16 - E5]:amplitude': 5.,
             'electrode[+ E16 - E9]:amplitude': 5.,
@@ -362,7 +413,7 @@ if __name__ == '__main__':
         #
         gtCoeffs = pd.Series({
             'Intercept': 0.,
-            'velocity': 2.,
+            'velocity_abs': 2.,
             #
             'electrode[+ E16 - E5]:amplitude': 5.,
             'electrode[+ E16 - E9]:amplitude': 5.,
@@ -398,7 +449,7 @@ if __name__ == '__main__':
         #
         gtCoeffs = pd.Series({
             'Intercept': 0.,
-            'velocity': 2.,
+            'velocity_abs': 2.,
             #
             'electrode[+ E16 - E5]:amplitude': 5.,
             'electrode[+ E16 - E9]:amplitude': 5.,
@@ -433,7 +484,7 @@ if __name__ == '__main__':
         #
         gtCoeffs = pd.Series({
             'Intercept': 0.,
-            'velocity': 2.,
+            'velocity_abs': 2.,
             #
             'electrode[+ E16 - E5]:amplitude': 5.,
             'electrode[+ E16 - E9]:amplitude': 5.,
@@ -469,7 +520,7 @@ if __name__ == '__main__':
         #
         gtCoeffs = pd.Series({
             'Intercept': 0.,
-            'velocity': 4.,
+            'velocity_abs': 2.,
             #
             'electrode[+ E16 - E5]:amplitude': 0.,
             'electrode[+ E16 - E9]:amplitude': 0.,
@@ -506,7 +557,7 @@ if __name__ == '__main__':
         #
         gtCoeffs = pd.Series({
             'Intercept': 0.,
-            'velocity': 0.,
+            'velocity_abs': 0.,
             #
             'electrode[+ E16 - E5]:amplitude': 0.,
             'electrode[+ E16 - E9]:amplitude': 0.,
@@ -542,7 +593,7 @@ if __name__ == '__main__':
         #
         gtCoeffs = pd.Series({
             'Intercept': 0.,
-            'velocity': 2.,
+            'velocity_abs': 2.,
             #
             'electrode[+ E16 - E5]:amplitude': 4.,
             'electrode[+ E16 - E9]:amplitude': 4.,
@@ -557,7 +608,7 @@ if __name__ == '__main__':
     ################################################################
     projectionLookup = {
         'Intercept': kinDirection,
-        'velocity': kinDirection,
+        'velocity_abs': kinDirection,
         'electrode:amplitude': stimDirection,
         'electrode:amplitude:RateInHz': stimDirection
         }
@@ -601,7 +652,7 @@ if __name__ == '__main__':
     movementInfluence = pd.Series(
         MinMaxScaler(feature_range=(defaultMS, defaultMS * 2))
         .fit_transform(
-            termMagnitudes['velocity']
+            termMagnitudes['velocity_abs']
             .to_numpy().reshape(-1, 1))
         .flatten(), index=termMagnitudes.index)
     #
@@ -610,7 +661,7 @@ if __name__ == '__main__':
     latentPlotDF.loc[:, 'restrictMask'] = restrictMask
     latentPlotDF.loc[:, 'electrodeInfluence'] = electrodeInfluence
     latentPlotDF.loc[:, 'movementInfluence'] = movementInfluence
-    latentPlotDF.loc[:, 'limbState'] = toyLhsDF['velocity'].map({-1: 'flexion', 0:'rest', 1:'extension'}).to_numpy()
+    latentPlotDF.loc[:, 'limbState'] = toyLhsDF['velocity_abs'].map({-1: 'flexion', 0:'rest', 1:'extension'}).to_numpy()
     latentPlotDF.loc[:, 'limbState x electrode'] = ' '
     for name, group in latentPlotDF.groupby(['limbState', 'electrode']):
         latentPlotDF.loc[group.index, 'limbState x electrode'] = '{} {}'.format(*name)
@@ -642,7 +693,7 @@ if __name__ == '__main__':
     for name, group in rhsPlotDF.groupby(['limbState', 'electrode']):
         rhsPlotDF.loc[group.index, 'limbState x electrode'] = '{} {}'.format(*name)
     markerStyles = ['o', 'd', 's']
-    msDict = {key: markerStyles[idx] for idx, key in enumerate(latentPlotDF['velocity'].unique())}
+    msDict = {key: markerStyles[idx] for idx, key in enumerate(latentPlotDF['velocity_abs'].unique())}
     maskOpts = {
         0: dict(alpha=0.2, linewidths=0),
         1: dict(alpha=0.3, linewidths=1)
@@ -670,7 +721,7 @@ if __name__ == '__main__':
             latentPlotDF.loc[:, latentRhsDF.columns].quantile(1 - 1e-3) -
             latentPlotDF.loc[:, latentRhsDF.columns].quantile(1e-3)).max()
         fig, ax = plt.subplots(figsize=(12, 12))
-        for name, group in latentPlotDF.groupby('velocity'):
+        for name, group in latentPlotDF.groupby('velocity_abs'):
             ax.scatter(
                 group.iloc[:, 0], group.iloc[:, 1], cmap='viridis',
                 c=group['electrodeInfluence'],
@@ -700,11 +751,11 @@ if __name__ == '__main__':
             plt.show()
         else:
             plt.close()
-        if iteratorSuffix in ['a', 'b']:
+        if iteratorSuffix in ['a', 'b', 'g']:
             for maskDict in lOfMasksForBreakdown:
                 thisMask = maskDict['mask']
                 fig, ax = plt.subplots(figsize=(12, 12))
-                for name, group in latentPlotDF.loc[thisMask, :].groupby('velocity'):
+                for name, group in latentPlotDF.loc[thisMask, :].groupby('velocity_abs'):
                     ax.scatter(
                         group['latent0'], group['latent1'], cmap='viridis',
                         c=group['electrodeInfluence'],
@@ -731,7 +782,7 @@ if __name__ == '__main__':
         fig.set_size_inches((12, 12))
         ax = fig.add_subplot(projection='3d')
         ax.set_proj_type('ortho')
-        for name, group in rhsPlotDF.groupby('velocity'):
+        for name, group in rhsPlotDF.groupby('velocity_abs'):
             ax.scatter(
                 group.iloc[:, 0], group.iloc[:, 1], group.iloc[:, 2], cmap='plasma',
                 c=group['electrodeInfluence'],
@@ -771,7 +822,7 @@ if __name__ == '__main__':
             plt.show()
         else:
             plt.close()
-        if iteratorSuffix in ['a', 'b']:
+        if iteratorSuffix in ['a', 'b', 'g']:
             tempCols = [cN for cN in toyRhsDF.columns] + ['limbState x electrode']
             rhsPlotDFStack = pd.DataFrame(
                 rhsPlotDF.loc[:, tempCols].to_numpy(),
@@ -813,7 +864,7 @@ if __name__ == '__main__':
                 ax = fig.add_subplot(projection='3d')
                 ax.set_proj_type('ortho')
                 thisMask = maskDict['mask']
-                for name, group in rhsPlotDF.loc[thisMask, :].groupby('velocity'):
+                for name, group in rhsPlotDF.loc[thisMask, :].groupby('velocity_abs'):
                     ax.scatter(
                         group['data0'], group['data1'], group['data2'], cmap='plasma',
                         c=group['electrodeInfluence'],
@@ -839,21 +890,11 @@ if __name__ == '__main__':
         dataFramesFolder,
         outputDatasetName + '_' + arguments['selectionNameRhs'] + '_meta.pickle'
         )
-    splitterKWArgs = dict(
-        stratifyFactors=stimulusConditionNames,
-        continuousFactors=['segment', 'originalIndex', 't'])
-    iteratorKWArgs = dict(
-        n_splits=7,
-        splitterClass=tdr.trialAwareStratifiedKFold, splitterKWArgs=splitterKWArgs,
-        samplerKWArgs=dict(random_state=None, test_size=None, ),
-        prelimSplitterClass=tdr.trialAwareStratifiedKFold, prelimSplitterKWArgs=splitterKWArgs,
-        resamplerClass=None, resamplerKWArgs={},
-        )
     cvIterator = tdr.trainTestValidationSplitter(
-        dataDF=toyLhsDF.loc[restrictMask, :], **iteratorKWArgs)
+        dataDF=toyLhsDF.loc[restrictMask, :], **cvKWArgs)
     #
     outputLoadingMeta['iteratorsBySegment'] = [cvIterator]
-    outputLoadingMeta['iteratorOpts'] = iteratorKWArgs
+    outputLoadingMeta['iteratorOpts'] = iteratorOpts
     outputLoadingMeta.pop('normalizationParams')
     outputLoadingMeta.pop('normalizeDataset')
     outputLoadingMeta.pop('unNormalizeDataset')

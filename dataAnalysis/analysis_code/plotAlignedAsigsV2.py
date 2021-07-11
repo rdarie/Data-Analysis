@@ -40,10 +40,10 @@ Options:
 import matplotlib, os
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
-if 'DISPLAY' in os.environ:
-    matplotlib.use('QT5Agg')   # generate postscript output
+if 'CCV_HEADLESS' in os.environ:
+    matplotlib.use('Agg')   # generate postscript output
 else:
-    matplotlib.use('PS')   # generate postscript output
+    matplotlib.use('QT5Agg')   # generate interactive output
 
 
 from namedQueries import namedQueries
@@ -101,10 +101,11 @@ plotProcFuns = [
     asp.genLegendRounder(decimals=2),
     ]
 statsTestOpts = dict(
-    referenceTimeWindow=[-200e-3, -150e-3],
-    testStride=50e-3,
-    testWidth=50e-3,
-    tStart=-100e-3,
+    referenceTimeWindow=None,
+    # referenceTimeWindow=[-400e-3, -350e-3],
+    testStride=200e-3,
+    testWidth=200e-3,
+    tStart=-400e-3,
     tStop=None,
     pThresh=5e-2,
     correctMultiple=True,

@@ -30,18 +30,17 @@ ALIGNQUERYTERM="startingNoStim"
 BLOCKSELECTOR="--blockIdx=${SLURM_ARRAY_TASK_ID} --processAll"
 ITERATOR="d"
 WINDOWTERM="XL"
-SUFFIX="_spectral"
-# SUFFIX=""
+# SUFFIX="_spectral"
+SUFFIX=""
+#
 RHSOPTS="--datasetNameRhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameRhs=lfp_CAR${SUFFIX}"
 LHSOPTS="--datasetNameLhs=Block_${WINDOWTERM}_df_${ITERATOR} --selectionNameLhs=rig_regressor"
 
 #
-# python -u './calcGridSearchSingleTarget.py' --estimatorName='enr' --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
-#
 # python -u './prepSignalsAsRegressor.py' --estimatorName='regressor' --datasetName="Block_${WINDOWTERM}_df_${ITERATOR}" --selectionName='rig' --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting --debugging
 #
-# python -u './calcGridSearchRegressionWithPipelines.py' --transformerNameRhs='pca' --estimatorName="enr${SUFFIX}" --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
-# python -u './calcGridSearchRegressionWithPipelines.py' --transformerNameRhs='pca_ta' --debugging --estimatorName="enr_ta${SUFFIX}" --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
+# python -u './calcGridSearchRegressionWithPipelines.py' --transformerNameRhs='pca' --estimatorName="enr2${SUFFIX}" --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
+# python -u './calcGridSearchRegressionWithPipelines.py' --transformerNameRhs='pca_ta' --debugging --estimatorName="enr2_ta${SUFFIX}" --exp=$EXP $LHSOPTS $RHSOPTS $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --plotting --verbose=2
 #
-# python './processOrdinaryLeastSquares.py' --estimatorName="enr${SUFFIX}" --datasetName=Block_${WINDOWTERM}_df_${ITERATOR} --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
-python './processOrdinaryLeastSquares.py' --estimatorName="enr_ta${SUFFIX}" --datasetName=Block_${WINDOWTERM}_df_${ITERATOR} --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
+# python './processOrdinaryLeastSquares.py' --estimatorName="enr2_${SUFFIX}" --datasetName=Block_${WINDOWTERM}_df_${ITERATOR} --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
+python './processOrdinaryLeastSquares.py' --estimatorName="enr2_ta${SUFFIX}" --datasetName=Block_${WINDOWTERM}_df_${ITERATOR} --exp=$EXP $ANALYSISFOLDER $ALIGNFOLDER $BLOCKSELECTOR --verbose=1 --plotting
